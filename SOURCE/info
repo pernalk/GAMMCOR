@@ -1,0 +1,6 @@
+pgf90  -c test.f  -o test.o
+[pernal@energy SOURCE]$ pgf90 -o test.exe test.o xcfun.o xcfun_module.o xcfun_autogen.o -L/home/pernal/xcfun//lib -lxcfun
+
+to do:
+1.CMAT is the inverse of the D1MAT. romove calculation of D1MAT later on. 
+2. check if for om->0 there is a nonzero contribution from the occ's

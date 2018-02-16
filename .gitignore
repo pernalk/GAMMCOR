@@ -1,0 +1,10 @@
+gm
+OBJ/*
+EXAMPLES/*
+*.mod
+*.o
+*.f90#
+*.f90~
+*.exe
+
+

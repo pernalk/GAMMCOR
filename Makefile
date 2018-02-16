@@ -1,0 +1,81 @@
+S = SOURCE/
+O = OBJ/
+
+PROG = prdmft.exe
+
+OBJ = $(O)mainp.o $(O)initia.o $(O)dmscf.o $(O)misc.o $(O)optocc.o \
+      $(O)eigenno.o $(O)optnorb.o\
+      $(O)matvec.o $(O)hf.o $(O)matrix.o $(O)cpdmft.o \
+      $(O)nonadia.o $(O)dftgrid.o $(O)lsd_sr.o $(O)dftfun_exerfpbe.o \
+      $(O)dftfun_exerf.o $(O)dftfun_ecerfpbe.o $(O)dftfun_ecerf.o \
+      $(O)dftacg_pw92c.o $(O)projector.o $(O)ekt.o \
+      $(O)srlrdynamic.o $(O)erpa.o $(O)interpa.o  $(O)exact2el.o $(O)optapsg.o $(O)newton.o $(O)acfd.o
+
+FCC = gfortran
+FFLAGS = -O3 -fno-align-commons
+LIBS = -L/usr/lib -llapack -lblas
+#LIBS = /pbs_home/pkowalski/lapack-3.3.1/tmglib_LINUX.a /pbs_home/pkowalski/lapack-3.3.1/lapack_LINUX.a /pbs_home/pkowalski/lapack-3.3.1/blas_LINUX.a
+
+#FCC = ifort
+#FFLAGS = -mkl -heap-arrays  -O2
+#LIBS = -L/opt/intel/composer_xe_2013.2.146/mkl/lib/intel64 -lmkl_intel_ilp64 -lmkl_sequential -lmkl_core
+
+
+$(PROG) :  $(OBJ) 
+	$(FCC) $(FFLAGS) -o $(PROG) $(OBJ) $(LIBS)
+$(O)mainp.o : $(S)mainp.f $(S)commons.inc
+	$(FCC) $(FFLAGS)  -c $(S)mainp.f -o $(O)mainp.o
+$(O)initia.o : $(S)initia.f $(S)commons.inc
+	$(FCC) $(FFLAGS)  -c $(S)initia.f -o $(O)initia.o
+$(O)misc.o : $(S)misc.f $(S)commons.inc
+	$(FCC) $(FFLAGS)  -c $(S)misc.f -o $(O)misc.o
+$(O)dmscf.o : $(S)dmscf.f $(S)commons.inc
+	$(FCC) $(FFLAGS)  -c $(S)dmscf.f -o $(O)dmscf.o
+$(O)optocc.o : $(S)optocc.f $(S)commons.inc
+	$(FCC) $(FFLAGS)  -c $(S)optocc.f -o $(O)optocc.o
+$(O)eigenno.o : $(S)eigenno.f $(S)commons.inc
+	$(FCC) $(FFLAGS)  -c $(S)eigenno.f -o $(O)eigenno.o
+$(O)optnorb.o : $(S)optnorb.f $(S)commons.inc
+	$(FCC) $(FFLAGS)  -c $(S)optnorb.f -o $(O)optnorb.o
+$(O)matvec.o : $(S)matvec.f
+	$(FCC) $(FFLAGS)  -c $(S)matvec.f -o $(O)matvec.o
+$(O)hf.o : $(S)hf.f
+	$(FCC) $(FFLAGS)  -c $(S)hf.f -o $(O)hf.o
+$(O)matrix.o : $(S)matrix.f
+	$(FCC) $(FFLAGS)  -c $(S)matrix.f -o $(O)matrix.o
+$(O)cpdmft.o : $(S)cpdmft.f
+	$(FCC) $(FFLAGS)  -c $(S)cpdmft.f -o $(O)cpdmft.o
+$(O)nonadia.o : $(S)nonadia.f
+	$(FCC) $(FFLAGS)  -c $(S)nonadia.f -o $(O)nonadia.o
+$(O)dftgrid.o : $(S)dftgrid.f $(S)commons.inc
+	$(FCC) $(FFLAGS)  -c $(S)dftgrid.f -o $(O)dftgrid.o
+$(O)lsd_sr.o : $(S)lsd_sr.f
+	$(FCC) $(FFLAGS)  -c $(S)lsd_sr.f  -o $(O)lsd_sr.o
+$(O)dftfun_exerfpbe.o : $(S)dftfun_exerfpbe.f
+	$(FCC) $(FFLAGS)  -c $(S)dftfun_exerfpbe.f  -o $(O)dftfun_exerfpbe.o
+$(O)dftfun_exerf.o : $(S)dftfun_exerf.f
+	$(FCC) $(FFLAGS)  -c $(S)dftfun_exerf.f  -o $(O)dftfun_exerf.o
+$(O)dftfun_ecerfpbe.o : $(S)dftfun_ecerfpbe.f
+	$(FCC) $(FFLAGS)  -c $(S)dftfun_ecerfpbe.f  -o $(O)dftfun_ecerfpbe.o
+$(O)dftfun_ecerf.o : $(S)dftfun_ecerf.f
+	$(FCC) $(FFLAGS)  -c $(S)dftfun_ecerf.f  -o $(O)dftfun_ecerf.o
+$(O)dftacg_pw92c.o : $(S)dftacg_pw92c.f
+	$(FCC) $(FFLAGS)  -c $(S)dftacg_pw92c.f  -o $(O)dftacg_pw92c.o
+$(O)projector.o : $(S)projector.f
+	$(FCC) $(FFLAGS)  -c $(S)projector.f  -o $(O)projector.o
+$(O)ekt.o : $(S)ekt.f
+	$(FCC) $(FFLAGS)  -c $(S)ekt.f  -o $(O)ekt.o
+$(O)srlrdynamic.o : $(S)srlrdynamic.f
+	$(FCC) $(FFLAGS)  -c $(S)srlrdynamic.f -o $(O)srlrdynamic.o
+$(O)erpa.o : $(S)erpa.f
+	$(FCC) $(FFLAGS)  -c $(S)erpa.f -o $(O)erpa.o
+$(O)interpa.o : $(S)interpa.f
+	$(FCC) $(FFLAGS)  -c $(S)interpa.f -o $(O)interpa.o
+$(O)exact2el.o : $(S)exact2el.f
+	$(FCC) $(FFLAGS)  -c $(S)exact2el.f -o $(O)exact2el.o
+$(O)optapsg.o : $(S)optapsg.f
+	$(FCC) $(FFLAGS)  -c $(S)optapsg.f -o $(O)optapsg.o
+$(O)newton.o : $(S)newton.f
+	$(FCC) $(FFLAGS)  -c $(S)newton.f -o $(O)newton.o
+$(O)acfd.o : $(S)acfd.f
+	$(FCC) $(FFLAGS)  -c $(S)acfd.f -o $(O)acfd.o

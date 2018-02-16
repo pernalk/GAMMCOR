@@ -1,0 +1,44 @@
+*comdeck cdft $Revision: 2006.3 $
+c...  idft: 0=dft not active, 1=energy 2=functional derivative
+c...  dftfu: key names of functionals
+c...  idftd:  location of density matrix*10
+c...  idftdo:  location of spin density matrix*10
+c...  iprdft: print parameters
+c...  idftol: integral charge distrib cutoff 10**(-idftol)
+c...  dftval: functional values (total in dftval(0))
+c...  dftfac: scaling factor for functional components
+c...  exfac:  factor for scf exchange
+c...  exxfac: factor for exact local exchange
+c...  coulfac: factor for scf coulomb. Used in gradients. Zero for cfit case
+c...  idftgra: functional contains grad rho terms (1) , del.2 rho (2)
+c.... iexchg: calculate exchange terms in fock kernels
+c.... ilexchg: calculate local exchange
+c...  icoulrec,icoulfil: record to store the coulomb matrix in dfexch.
+      parameter (mxdftfu=15,ndftprc=5)
+      common /cdft  / idft,
+     >                idftd,idftdo,idftol,
+     >                idftgra,ndftfu,iexchg,ilexchg,
+     >                iprdft(ndftprc),idftest,
+     >                nfunc_inp,nfunc_inp_g,
+     >                icoulrec,icoulfil
+      common /cdftr / dftval(0:mxdftfu),dftfac(mxdftfu),
+     >                exfac,exxfac,coulfac,dftfac_g(mxdftfu),
+     >                coarseness,edft
+      character(8) :: dftfu,dftfu_inp,dftfu_inp_g
+      common /cdftc / dftfu(mxdftfu),dftfu_inp(mxdftfu),
+     >                dftfu_inp_g(mxdftfu)
+c==  thresholds
+c...  dft_thresh_total:   overall target accuracy of functional
+c...  dft_thresh_orbital:   orbital value cutoff
+c...  dft_thresh_density:      density value cutoff
+      parameter (n_dft_thresh=5)
+      common /cdftt / dft_thresh(n_dft_thresh)
+      equivalence (dft_thresh_total,   dft_thresh(1))
+      equivalence (dft_thresh_orbital, dft_thresh(2))
+      equivalence (dft_thresh_density, dft_thresh(3))
+      equivalence (dft_thresh_fock,    dft_thresh(4))
+      equivalence (dft_thresh_max ,    dft_thresh(5))
+      character(8) :: dft_thresh_code(n_dft_thresh)
+      data dft_thresh_code /'TOTAL','ORBITAL','DENSITY','FOCK','MAX'/
+c=== space to store poissongrid coulomb energy
+       common /cdftp / coulen(0:mxdftfu)

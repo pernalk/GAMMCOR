@@ -1,0 +1,5 @@
+*comdeck debug $Revision: 2002.9 $
+      character(72) :: here          ! FCC 27 June 2002
+      character(255) :: debuglist    ! FCC 27 June 2002
+      common/cdebug/debuglist        ! FCC 27 June 2002
+      logical ldebug                 ! FCC 27 June 2002
