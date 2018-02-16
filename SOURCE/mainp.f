@@ -10,6 +10,9 @@ C     K.PERNAL JAN/2010
 C
       Program PRDMFT
 C
+      use types
+      use inputfill
+      use systemdef 
       Implicit Real*8 (A-H,O-Z)
 C
       Character*60 Title,FMultTab
@@ -32,6 +35,9 @@ C
       Real*8, Dimension(:), Allocatable :: UMOAO
       Integer, Dimension(:), Allocatable :: NSymMO
 C
+      type(InputData) :: Input
+      type(FlagsData) :: Flags
+C    
       Include 'commons.inc'
 C     
 C     COMMON BLOCK USED IN OPTCPMFT
@@ -172,6 +178,11 @@ C
 C     READ THE INPUT AND PRINT THE INPUT DATA 
 C
       Call RWInput(Title,ZNucl,Charge,NBasis)
+C
+      Call read_Input(Input)
+      Call check_Calc(Input%CalcParams)
+      Call fill_Flags(Input,Flags)
+      Call free_Input(Input)
 C
 C     *************************************************************************
 C

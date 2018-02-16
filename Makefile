@@ -9,24 +9,26 @@ OBJ = $(O)mainp.o $(O)initia.o $(O)dmscf.o $(O)misc.o $(O)optocc.o \
       $(O)nonadia.o $(O)dftgrid.o $(O)lsd_sr.o $(O)dftfun_exerfpbe.o \
       $(O)dftfun_exerf.o $(O)dftfun_ecerfpbe.o $(O)dftfun_ecerf.o \
       $(O)dftacg_pw92c.o $(O)projector.o $(O)ekt.o \
+      $(O)sorter.o $(O)tran.o $(O)systemdef.o \
+      $(O)types.o $(O)inputfill.o \
       $(O)srlrdynamic.o $(O)erpa.o $(O)interpa.o  $(O)exact2el.o $(O)optapsg.o $(O)newton.o $(O)acfd.o
 
 FCC = gfortran
-FFLAGS = -O3 -fno-align-commons
+FFLAGS = -O3 -fno-align-commons 
+#-fcheck=all -Wall -Wextra -Warray-temporaries -Wrealloc-lhs-all -pedantic
 LIBS = -L/usr/lib -llapack -lblas
-#LIBS = /pbs_home/pkowalski/lapack-3.3.1/tmglib_LINUX.a /pbs_home/pkowalski/lapack-3.3.1/lapack_LINUX.a /pbs_home/pkowalski/lapack-3.3.1/blas_LINUX.a
 
 #FCC = ifort
 #FFLAGS = -mkl -heap-arrays  -O2
-#LIBS = -L/opt/intel/composer_xe_2013.2.146/mkl/lib/intel64 -lmkl_intel_ilp64 -lmkl_sequential -lmkl_core
+#LIBS = -L/opt/intel/composer_xe_2015.2.164/mkl/lib/intel64/ -lmkl_intel_ilp64 -lmkl_sequential -lmkl_core
 
 
 $(PROG) :  $(OBJ) 
 	$(FCC) $(FFLAGS) -o $(PROG) $(OBJ) $(LIBS)
-$(O)mainp.o : $(S)mainp.f $(S)commons.inc
+$(O)mainp.o : $(S)mainp.f $(S)commons.inc $(O)types.o $(O)inputfill.o $(O)systemdef.o
 	$(FCC) $(FFLAGS)  -c $(S)mainp.f -o $(O)mainp.o
-$(O)initia.o : $(S)initia.f $(S)commons.inc
-	$(FCC) $(FFLAGS)  -c $(S)initia.f -o $(O)initia.o
+$(O)initia.o : $(S)initia.f $(S)commons.inc $(O)sorter.o $(O)tran.o 
+	$(FCC) $(FFLAGS)  -c $(S)initia.f -o $(O)initia.o 
 $(O)misc.o : $(S)misc.f $(S)commons.inc
 	$(FCC) $(FFLAGS)  -c $(S)misc.f -o $(O)misc.o
 $(O)dmscf.o : $(S)dmscf.f $(S)commons.inc
@@ -79,8 +81,18 @@ $(O)newton.o : $(S)newton.f
 	$(FCC) $(FFLAGS)  -c $(S)newton.f -o $(O)newton.o
 $(O)acfd.o : $(S)acfd.f
 	$(FCC) $(FFLAGS)  -c $(S)acfd.f -o $(O)acfd.o
+$(O)types.o : $(S)types.f90
+	$(FCC) $(FFLAGS)  -c $(S)types.f90 -o $(O)types.o
+$(O)inputfill.o : $(S)inputfill.f90 $(O)types.o  
+	$(FCC) $(FFLAGS)  -c $(S)inputfill.f90 -o $(O)inputfill.o
+$(O)systemdef.o : $(S)systemdef.f90 $(O)types.o
+	$(FCC) $(FFLAGS)  -c $(S)systemdef.f90 -o $(O)systemdef.o
+$(O)sorter.o : $(S)sorter.f90
+	$(FCC) $(FFLAGS)  -c $(S)sorter.f90 -o $(O)sorter.o
+$(O)tran.o : $(S)tran.f90
+	$(FCC) $(FFLAGS)  -c $(S)tran.f90 -o $(O)tran.o
 
 .PHONY : clean
 clean :
-	rm $(O)*.o $(PROG)
+	rm $(O)*.o *.mod $(PROG)
 

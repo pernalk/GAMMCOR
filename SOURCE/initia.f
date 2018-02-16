@@ -5,10 +5,14 @@ C
 C     READ HAO, 2-EL INTEGRALS IN NO, C_COEFFICIENTS, IGEM FROM A DALTON_GENERATED FILE
 C     READ UMOAO FROM DALTON.MOPUN
 C
+      use sorter
+      use tran
+
       Implicit Real*8 (A-H,O-Z)
 C
       Real*8 XKin(NInte1),XNuc(NInte1),Occ(NBasis),URe(NBasis,NBasis),
      $ TwoEl(NInte2),UMOAO(NBasis,NBasis)
+      double precision, allocatable :: TMPMO(:,:)
 C
       Character*60 Line
       Character*30 Line1
@@ -92,7 +96,88 @@ C
 C
       Else
 C
+      call test2el(NBasis)
       Call read2el(TwoEl,UMOAO,NBasis,NInte2)
+C     TEST tran4_unsym      
+      allocate(TMPMO(NBasis**2,NBasis**2))
+C      call tran4_unsym(NBasis,NBasis,transpose(UMOAO),
+C     & NBasis,transpose(UMOAO),
+C     $ NBasis,transpose(UMOAO),NBasis,transpose(UMOAO),TMPMO)
+
+      call tran4_unsym2(NBasis,NBasis,UMOAO,NBasis,UMOAO,
+     $     NBasis,UMOAO,NBasis,UMOAO,TMPMO)
+      
+C      call tran4_sym(NBasis,NBasis,transpose(UMOAO),
+C     $ NBasis,transpose(UMOAO),
+C     $ NBasis,transpose(UMOAO),NBasis,transpose(UMOAO))
+
+C     TEST TWO-EL MOs! 
+C       block
+C       integer :: ip,iq,ir,is,irs,ipq 
+C       irs=0
+C       do is=1,NBasis
+C       do ir=1,NBasis
+C       irs=irs+1
+C       ipq=0
+C       do iq=1,NBasis
+C       do ip=1,NBasis
+C       ipq=ipq+1
+C
+C       write(6,*) TwoEl(NAddr3(ip,iq,ir,is)),TMPMO(ipq,irs)
+CC       write(6,*) TMPMO(ipq,irs), TMPMO(irs,ipq)
+C       enddo
+C       enddo
+C       enddo
+C       enddo
+C       end block
+C
+C      block
+C      integer :: ip,iq,ir,is,irs,ipq
+C      integer :: iunit
+C      double precision :: work1(NBasis*NBasis)
+C      double precision :: work2(NBasis*NBasis)
+CC
+C      open(newunit=iunit,file='TWOMOAB',status='OLD',
+C     $ access='DIRECT',recl=8*NBasis*(NBasis+1)/2)
+C
+C
+C      CHECK-1
+C      irs=0
+C      do is=1,NBasis
+C      do ir=1,NBasis
+C      !irs=irs+1
+C      irs = min(ir,is) + max(ir,is)*(max(ir,is)-1)/2
+C      read(iunit,rec=irs) work1(1:NBasis*(NBasis+1)/2)
+C      call triang_to_sq(work1,work2,NBasis)
+C      ipq=0
+C      do iq=1,NBasis
+C      do ip=1,NBasis
+C      ipq=ipq+1
+C      write(6,*) TwoEl(NAddr3(ip,iq,ir,is)), work2(ipq)
+C      enddo
+C      enddo
+C      enddo
+C      enddo
+C     CHECK-2
+C      irs=0
+C      do is=1,NBasis
+C      do ir=1,is
+C      irs=irs+1
+C      read(iunit,rec=irs) work1(1:NBasis*(NBasis+1)/2)
+C      ipq=0
+C      do iq=1,NBasis
+C      do ip=1,iq
+C      ipq = ipq+1
+C      write(6,*) TwoEl(NAddr3(ip,iq,ir,is)), work1(ipq)   
+C      enddo
+C      enddo
+C      enddo
+C      enddo
+CC
+C      close(iunit)
+C      end block
+C
+      deallocate(TMPMO)
 C
       If(ICASSCF.Eq.0) Then
 C
@@ -145,9 +230,9 @@ C
       NAcCAS=NAc
       NInAcCAS=NInAc
 C
-      ! Write(6,'(2X,"No of CAS inactive and active orbitals: ",4X,4I)')
-      Write(6,*)
-     $ NInAcCAS,NAcCAS 
+C     Write(6,'(2X,"No of CAS inactive and active orbitals: ",4X,4I)')
+      Write(6,'(2x,a,4x,2i3)')
+     $ "No of CAS inactive and active orbitals",NInAcCAS,NAcCAS 
       Write(6,'(2X,"CASSCF",3X,"Occupancy",4X,"Gem")')
       Do I=1,NBasis
       Write(6,'(X,I3,E16.6,I6)') I,Occ(I),IGem(I)
@@ -166,8 +251,7 @@ c     If(IAO.Eq.0)
 C
       Open(10,File='enuc.dat',Form='Formatted',Status='Old')
       Read(10,'(A31,F20.12)')Line,ENuc
-      ! Write(6,'(\,"  Nuclear repulsion:",F20.12)')ENuc
-      Write(6,'(a,F20.12)') "  Nuclear repulsion: ", ENuc
+      Write(6,'(/,"  Nuclear repulsion:",F20.12)')ENuc
       Close(10)
 C
       Return
@@ -1316,6 +1400,35 @@ c     *          write(*,'(4I4,F12.8)') ip, iq, ir, is, dbuf(i)
       end do
       
       if (nxx .ge. 0) go to 10
+  
+C     TEST read2el vs. test2el
+C      block
+C
+C      integer :: iunit,ip,iq,ir,is
+C      double precision :: TMP1, TMP2
+C      double precision :: mat(NBasis*(NBasis+1)/2)
+C
+C      open(newunit=iunit,file='AOTWOSORT',access='DIRECT',
+C     $ recl=8*NBasis*(NBasis+1)/2)
+C
+C      do is=1,NBasis
+C      do ir=1,NBasis
+C      read(iunit,rec=min(ir,is)+max(ir,is)*(max(ir,is)-1)/2) mat
+C      do iq=1,NBasis
+C      do ip=1,NBasis
+C  
+C      TMP1 = TwoEl(NAddr3(ip,iq,ir,is)) 
+C      TMP2 = mat(min(ip,iq)+max(ip,iq)*(max(ip,iq)-1)/2)
+C      if(TMP1.ne.TMP2) write(6,*) TMP1,TMP2
+C
+C      enddo
+C      enddo
+C      enddo
+C      enddo
+C      close(iunit)
+C
+C      end block
+
 C
 C     TRANSFORM THE INTEGRALS
 C
