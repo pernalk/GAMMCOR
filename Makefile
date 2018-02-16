@@ -79,3 +79,8 @@ $(O)newton.o : $(S)newton.f
 	$(FCC) $(FFLAGS)  -c $(S)newton.f -o $(O)newton.o
 $(O)acfd.o : $(S)acfd.f
 	$(FCC) $(FFLAGS)  -c $(S)acfd.f -o $(O)acfd.o
+
+.PHONY : clean
+clean :
+	rm $(O)*.o $(PROG)
+
