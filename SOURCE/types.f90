@@ -34,19 +34,19 @@ integer, parameter :: RDM_TYPE_DMRG = 4
 integer, parameter :: MONOMER_A = 1
 integer, parameter :: MONOMER_B = 2
 
-character(*),parameter :: PossibleInterface(*) = &
+character(*),parameter :: PossibleInterface(3) = &
 [character(8) :: &
 'DALTON', 'MOLPRO', 'OWN']
 
-character(*),parameter :: PossibleJobType(*) = &
+character(*),parameter :: PossibleJobType(5) = &
 [character(8) :: &
 'AC', 'AC0', 'ERPA', 'AC1', 'SAPT']
 
-character(*),parameter :: PossibleRDMType(*) = &
+character(*),parameter :: PossibleRDMType(4) = &
 [character(8) :: &
 'GVB', 'APSG', 'CASSCF', 'DMRG']
 
-character(*),parameter :: PossibleMonomers(*) = &
+character(*),parameter :: PossibleMonomers(2) = &
 [character(8) :: 'A', 'B']
 
 character(:), allocatable :: InputPath
