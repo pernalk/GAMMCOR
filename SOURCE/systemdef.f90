@@ -199,8 +199,65 @@ else
 
 endif
 
-! HERE!! ADD : PRINT_ALL_FLAGS // IPrint
+! PRINT_ALL_FLAGS // IPrint
+if(Input%CalcParams%IPrint.gt.1) then
+   call print_Flags(Flags)
+endif
 
 end subroutine fill_Flags
+
+subroutine print_Flags(Flags)
+implicit none
+type(FlagsData) :: Flags
+
+write(LOUT, '()')
+write(LOUT, '(1x,a,6x,i3)') "IDALTON ", &
+             (Flags%IDALTON)
+write(LOUT, '(1x,a,6x,i3)') "IRes    ", &
+             (Flags%IRes)
+write(LOUT, '(1x,a,6x,i3)') "IAO     ", &
+             (Flags%IAO)
+write(LOUT, '(1x,a,6x,i3)') "INO     ", &
+             (Flags%INO)
+write(LOUT, '(1x,a,6x,i3)') "NoSym   ", &
+             (Flags%NoSym)
+write(LOUT, '(1x,a,6x,i3)') "IGVB    ", &
+             (Flags%IGVB)
+write(LOUT, '(1x,a,6x,i3)') "IFun    ", &
+             (Flags%IFun)
+write(LOUT, '(1x,a,6x,i3)') "IFunSR  ", &
+             (Flags%IFunSR)
+write(LOUT, '(1x,a,5x,i3)') "IFunSRKer", &
+             (Flags%IFunSRKer)
+write(LOUT, '(1x,a,6x,i3)') "IModG   ", &
+             (Flags%IModG)
+write(LOUT, '(1x,a,6x,i3)') "NGOcc   ", &
+             (Flags%NGOcc)
+write(LOUT, '(1x,a,6x,i3)') "ILoc    ", &
+             (Flags%ILoc)
+write(LOUT, '(1x,a,6x,i3)') "IFreeze ", &
+             (Flags%IFreeze)
+write(LOUT, '(1x,a,6x,i3)') "IAPSG   ", &
+             (Flags%IAPSG)
+write(LOUT, '(1x,a,6x,i3)') "ISERPA  ", &
+             (Flags%ISERPA)
+write(LOUT, '(1x,a,6x,i3)') "IA      ", &
+             (Flags%IA)
+write(LOUT, '(1x,a,6x,i3)') "ICASSCF ", &
+             (Flags%ICASSCF)
+write(LOUT, '(1x,a,6x,i3)') "IDMRG   ", &
+             (Flags%IDMRG)
+write(LOUT, '(1x,a,6x,i3)') "IFlAC   ", &
+             (Flags%IFlAC)
+write(LOUT, '(1x,a,6x,i3)') "IFLSnd  ", &
+             (Flags%IFlSnd)
+write(LOUT, '(1x,a,6x,i3)') "IFlCore ", &
+             (Flags%IFlCore)
+write(LOUT, '(1x,a,6x,i3)') "IFlFrag ", &
+             (Flags%IFlFrag)
+write(LOUT, '(1x,a,6x,i3)') "IFl12   ", &
+              (Flags%IFl12)
+
+end subroutine print_Flags
 
 end module systemdef

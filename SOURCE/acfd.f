@@ -46,15 +46,6 @@ C
       Write
      $ (6,'(/,X,''ECASSCF+ENuc, AC0-Corr, AC0-CASSCF '',4X,3F15.8)')
      $ ETot+ENuc,ECorr,ETot+ENuc+ECorr
-
-c brute force implementation for testing purpose only   
-c      Call AC0BRUTE(ECorr,ETot,TwoNO,Occ,URe,XOne,
-c     $ ABPLUS,ABMIN,EigVecR,Eig,
-c     $ IndN,IndX,NDimX,NBasis,NDim,NInte1,NInte2)
-c      Write
-c     $ (6,'(/,2X,''ECASSCF+ENuc, AC0-Corr, AC0-CASSCF '',4X,3F15.8)')
-c     $ ETot+ENuc,ECorr,ETot+ENuc+ECorr
-
 C
       EndIf
 C
@@ -102,7 +93,7 @@ C
      $ Title,NBasis,NInte1,NInte2,NDim,NGem,IndAux,ACAlpha,
      $ IndN,IndX,NDimX)
 C
-      Write(*,*)' ACAlpha ',ACAlpha,' W_ALPHA ',ECorrA
+      Write(*,*)'ACAlpha ',ACAlpha,' W_ALPHA ',ECorrA
 C
       ECorr=ECorr+WGrid(I)*ECorrA
 C
@@ -171,174 +162,6 @@ C
       Write(6,'(2X,''Alpha, W_ALPHA '',4X,2F15.8)')ACAlpha,ECorr
 C
       EndDo
-C
-      Return
-      End
-
-*Deck AC0BRUTE
-      Subroutine AC0BRUTE(ECorr,ECASSCF,TwoNO,Occ,URe,XOne,
-     $ ABPLUS1,ABMIN1,EigY,Eig,
-     $ IndN,IndX,NDimX,NBasis,NDim,NInte1,NInte2)
-C
-C     A ROUTINE FOR COMPUTING AC INTEGRAND
-C
-      Implicit Real*8 (A-H,O-Z)
-C
-      Include 'commons.inc'
-c
-      Parameter(Zero=0.D0,Half=0.5D0,One=1.D0,Two=2.D0,Three=3.D0,
-     $ Four=4.D0)
-C
-      Dimension
-     $ URe(NBasis,NBasis),XOne(NInte1),Occ(NBasis),TwoNO(NInte2),
-     $ IndAux(NBasis),
-     $ ABPLUS1(NDim*NDim),ABMIN1(NDim*NDim),
-     $ ABPLUS0(NDim*NDim),ABMIN0(NDim*NDim),
-     $ Eig(NDimX),EigY(NDimX*NDimX),IndX(NDim),IndN(2,NDim)
-C
-C     LOCAL ARRAYS
-C
-      Dimension C(NBasis),HNO(NInte1),
-     $ IGFact(NInte2),
-     $ Ind1(NBasis),Ind2(NBasis),WMAT(NBasis,NBasis),
-     $ AuxI(NInte1),AuxIO(NInte1),IPair(NBasis,NBasis),
-     $ EigX(NDimX*NDimX),
-     $ IEigAddY(2,NDimX),IEigAddInd(2,NDimX),IndBlock(2,NDimX),
-     $ XT(NDimX*NDimX),YT(NDimX*NDimX)
-C
-      IPair(1:NBasis,1:NBasis)=0
-      Do II=1,NDimX
-      I=IndN(1,II)
-      J=IndN(2,II)
-      IPair(I,J)=1
-      IPair(J,I)=1
-      EndDo
-C
-      Do I=1,NBasis
-      C(I)=SQRT(Occ(I))
-      If(Occ(I).Lt.Half) C(I)=-C(I)
-      CICoef(I)=C(I)
-      EndDo
-C
-      Call AB_CAS(ABPLUS0,ABMIN0,ECASSCF,URe,Occ,XOne,TwoNO,IPair,
-     $ IndN,IndX,NDimX,NBasis,NDim,NInte1,NInte2,Zero)
-      Call AB_CAS(ABPLUS1,ABMIN1,ECASSCF,URe,Occ,XOne,TwoNO,IPair,
-     $ IndN,IndX,NDimX,NBasis,NDim,NInte1,NInte2,One) 
-C
-C     REDUCE THE MATRICES
-C
-      Do J=1,NDimX
-      Do I=1,NDimX
-      IJ=(J-1)*NDimX+I
-      IJ1=(IndX(J)-1)*NDim+IndX(I)
-      ABPLUS1(IJ)=ABPLUS1(IJ1)
-      ABMIN1(IJ)=ABMIN1(IJ1)
-      ABPLUS0(IJ)=ABPLUS0(IJ1)
-      ABMIN0(IJ)=ABMIN0(IJ1)
-      EndDo
-      EndDo
-C
-      Do I=1,NDimX
-      Do J=1,NDimX
-      IJ=I+(J-1)*NDimX
-      ABPLUS1(IJ)=ABPLUS1(IJ)-ABPLUS0(IJ)
-      ABMIN1(IJ)=ABMIN1(IJ)-ABMIN0(IJ)
-      EndDo
-      EndDo
-C
-      Call ERPASYMM1(EigY,Eig,ABPLUS0,ABMIN0,NBasis,NDimX)
-C
-C     GET X0 = Om^-1 ABMIN.Y0
-C
-      Do NU=1,NDimX
-C
-      Do I=1,NDimX
-C
-      EigX((NU-1)*NDimX+I)=Zero
-C
-      If(Eig(NU).Gt.1.D-7) Then
-C
-      Do J=1,NDimX
-      EigX((NU-1)*NDimX+I)=EigX((NU-1)*NDimX+I)
-     $ +One/Eig(NU)*ABMIN0(I+(J-1)*NDimX)*EigY((NU-1)*NDimX+J)
-      EndDo
-C
-      EndIf
-C
-      EndDo
-      EndDo
-C
-C     TRANSPOSE Y AND X
-      Do I=1,NDimX
-      Do J=1,NDimX
-      XT(I+(J-1)*NdimX)=EigX(J+(I-1)*NDimX)
-      YT(I+(J-1)*NdimX)=EigY(J+(I-1)*NDimX)
-      EndDo
-      EndDo
-C
-      IJ=0
-      Do I=1,NDimX
-      Do J=1,I
-      IJ=IJ+1
-      ABPLUS0(IJ)=ABPLUS1(I+(J-1)*NdimX)
-      ABMIN0(IJ)=  ABMIN1(I+(J-1)*NdimX) 
-      EndDo
-      EndDo
-C
-      Call MatTr(ABMIN0,YT,NDimX)
-      Call MatTr(ABPLUS0,XT,NDimX) 
-C
-      IJ=0
-      Do I=1,NDimX
-      Do J=1,I
-      IJ=IJ+1
-      ABPLUS1(IJ)=Two*(ABPLUS0(IJ)-ABMIN0(IJ))
-     $ /(Eig(I)+Eig(J))
-      EndDo
-      EndDo
-C
-      Call MatTr(ABPLUS1,EigY,NDimX) 
-C
-      IJ=0
-      Do I=1,NDimX
-      Do J=1,I
-      IJ=IJ+1
-      ABMIN1(I+(J-1)*NDimX)=ABPLUS1(IJ)
-      ABMIN1(J+(I-1)*NDimX)=ABMIN1(I+(J-1)*NDimX)
-      EndDo
-      EndDo
-C
-      EAll=Zero
-      EIntra=Zero
-C
-      Do I=1,NDimX
-C
-      IP=IndN(1,I)
-      IR=IndN(2,I)
-C
-      Do J=1,NDimX
-C
-      IQ=IndN(1,J)
-      IS=IndN(2,J)
-C
-      If(IP.Gt.IR.And.IQ.Gt.IS) Then
-C
-      SumY=ABMIN1(I+(J-1)*NDimX)
-      Aux=(C(IS)+C(IQ))*(C(IP)+C(IR))*SumY
-C
-      EAll=EAll+Aux*TwoNO(NAddr3(IP,IR,IQ,IS))
-C
-      If(IGem(IP).Eq.IGem(IR).And.IGem(IQ).Eq.IGem(IS).
-     $ And.IGem(IP).Eq.IGem(IQ))
-     $ EIntra=EIntra+Aux*TwoNO(NAddr3(IP,IR,IQ,IS))
-C
-C     endinf of If(IP.Gt.IR.And.IQ.Gt.IS) 
-      EndIf
-C
-      EndDo
-      EndDo
-C
-      ECorr=EAll-EIntra
 C
       Return
       End
@@ -417,7 +240,8 @@ C
       Allocate (RDM2Act(NRDM2Act))
       RDM2Act(1:NRDM2Act)=Zero
 C
-      Open(10,File="rdm2.dat")
+      Open(10,File="rdm2.dat",Status='Old')
+      Write(6,'(/,1X,''Active block of 2-RDM read from rdm2.dat'')')
 C
    10 Read(10,'(4I4,F19.12)',End=40)I,J,K,L,X
 C
@@ -1117,11 +941,6 @@ C
       If( .NOT.(IGem(IR).Eq.IGem(IS).And.IGem(IR).Eq.IGem(IPP)
      $ .And.IGem(IR).Eq.IGem(IQQ)) ) Then
 C
-c herer!!!
-c      If( Occ(IR)*Occ(IS).Eq.Zero.And.Occ(IPP)*Occ(IQQ).Eq.Zero
-c     $ .And.Occ(IR)+Occ(IS).Eq.One.And.Occ(IPP)+Occ(IQQ).Eq.One
-c     $ .And.Abs(TwoNO(NAddr3(IR,IS,IPP,IQQ))).Lt.1.D-7) Then
-
       If( (Occ(IR)*Occ(IS).Eq.Zero.And.Occ(IPP)*Occ(IQQ).Eq.Zero
      $ .And.Abs(TwoNO(NAddr3(IR,IS,IPP,IQQ))).Lt.1.D-7)
      $.Or.
@@ -1863,10 +1682,6 @@ C
 C
       If(.NOT.(IGem(IP).Eq.IGem(IR).And.IGem(IQ).Eq.IGem(IS).
      $ And.IGem(IP).Eq.IGem(IQ)).And.IP.Gt.IR.And.IQ.Gt.IS) Then
-c herer!!! ???
-c this works fine for TME
-c      if(.not. ( (ip.eq.nele.and.ir.le.NInAcCAS).or.
-c     $ (iq.eq.nele.and.is.le.NInAcCAS)  ) ) then 
 C
       ISkippedEig=0
       SumY=Zero
@@ -1886,9 +1701,6 @@ C
      $ -Occ(IP)*(One-Occ(IS))-Occ(IS)*(One-Occ(IP))
       ECorr=ECorr+Aux*TwoNO(NAddr3(IP,IR,IQ,IS))
 C
-c herer!!! ???
-c      endif      
-
 C     endinf of If(IP.Gt.IR.And.IQ.Gt.IS) 
       EndIf
 C

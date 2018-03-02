@@ -31,20 +31,16 @@ C
 C
 C     IFlAC   = 1 - adiabatic connection formula calculation
 C               0 - AC not used
-      IFlAC=0
 C
-C     IFlSnd  = 1 - run AC0-GVB (linerized in alpha, MP2-like expression for AC is used)
-C             = 0 - do not run AC0-GVB
-      IFlSnd=0
+C     IFlSnd  = 1 - run AC0 (linerized in alpha, MP2-like expression for AC is used)
+C             = 0 - do not run AC0
 C
 C     IFlCore = 1 - core (inactive) orbitals included in ERPA correlation 
 C             = 0 - core (inactive) orbitals excluded from ERPA correlation
-      IFlCore=1
 C
 C     IFlFrag1 = 1 : run embedding: call FragEcorr
 C                0 : do not call FragEcorr
 C              USED IN EneERPA 
-      IFlFrag1=0
 C
 C     IFlag12 = 0  : A+,A- MATRICES NOT TRUNCATED
 C             = 1  : A+,A- MATRICES ARE TRUNCATED TO INCLUDE ONLY INDICES
@@ -52,7 +48,6 @@ C                          OF ORBITALS BELONGING TO GEMINALS NEEDED FOR
 C                          A GIVEN ONE- TWO- THREE- OR FOUR-BODY INTERACTION
 C             USED IN FragEcorr and OneTwoBody
 C             IFlag12 IS ONLY IN EFFECT WHEN IFlFrag1=1
-      IFl12=1
 C
 C     RPAX: IFlCore=1, IFlFrag1=0
 C     ERPA without core orbitals: IFlCore=0, IFlFrag1=0
@@ -92,9 +87,6 @@ c      IConnect(I,J)=1
       EndDo
       EndDo
 C
-c herer!!! general 
-      NInActOrb=0
-c XXX 
       NActOrb=1
 C
 C     CONSTRUCT A LOOK-UP TABLE
@@ -111,9 +103,10 @@ C
 C
       If(ICASSCF.Eq.0) Then
 C
+      ThrAct=0.992
+      Write(6,'(/,X," Threshold for Active Orbitals: ",E14.4)')ThrAct
       Do I=1,NELE
-      If(Occ(I).Lt.0.992) Then
-C
+      If(Occ(I).Lt.ThrAct) Then
       IndAux(I)=1
       Write(6,'(/,X," Active Orbital: ",I4,E14.4)')
      $ I, Occ(I)
@@ -121,7 +114,6 @@ C
       Write(6,'(X," Active Orbital: ",I4,E14.4)')
      $ IFindG(I), Occ(IFindG(I))
       ICount=ICount+2
-C
       EndIf
       EndDo
 C
@@ -162,7 +154,12 @@ C     do not correlate active degenerate orbitals if from different geminals
      $.Or.
      $ (ICASSCF.Eq.1.
      $ .And.(IndAux(I).Eq.1).And.(IndAux(J).Eq.1) 
+c herer!!!
      $ .And.(Abs(Occ(I)-Occ(J))/Occ(I).Lt.1.D-10)) ) Then
+c herer!!! ???
+c     $ .And.(Abs(Occ(I)-Occ(J))/Occ(I).Lt.1.D-2)) ) Then
+c     $ .And.( (Occ(I).Gt.0.5.And.Occ(J).Gt.0.5)
+c     $    .Or.(Occ(I).lt.0.5.And.Occ(J).lt.0.5) ) ) ) Then 
 C
       Write(6,'(2X,"Discarding nearly degenerate pair ",2I4)')I,J
 C
@@ -2889,7 +2886,8 @@ C
       Allocate (RDM2Act(NRDM2Act))
       RDM2Act(1:NRDM2Act)=Zero
 C
-      Open(10,File="rdm2.dat")
+      Open(10,File="rdm2.dat",Status='Old')
+      Write(6,'(/,1X,''Active block of 2-RDM read from rdm2.dat'')')
 C
    10 Read(10,'(4I4,F19.12)',End=40)I,J,K,L,X
 C
@@ -3053,9 +3051,6 @@ C
       Do IQ=IQQ,IPP,IPP-IQQ
       If(IP.Ne.IQ) Then
 C
-      If(IP.Gt.IQ) IPQ=(IP**2-3*IP+2)/2+IQ
-      If(IQ.Gt.IP) IQP=(IQ**2-3*IQ+2)/2+IP
-C
       IQS=(Max(IS,IQ)*(Max(IS,IQ)-1))/2+Min(IS,IQ)
       IPR=(Max(IR,IP)*(Max(IR,IP)-1))/2+Min(IR,IP)
 C
@@ -3203,14 +3198,16 @@ C
       If(IS.Eq.IQ) Arspq=Arspq-Half*WMAT(IP,IR)
       If(IP.Eq.IR) Arspq=Arspq-Half*WMAT(IQ,IS)
 C
+      IPQ=IndX(ICol)
+C
       If(IR.Gt.IS.And.IP.Gt.IQ) Then
       ABPLUS(IRS,IPQ)=ABPLUS(IRS,IPQ)+Arspq
       ABMIN(IRS,IPQ)=ABMIN(IRS,IPQ)+Arspq
       EndIf
 C    
       If(IR.Gt.IS.And.IQ.Gt.IP) Then
-      ABPLUS(IRS,IQP)=ABPLUS(IRS,IQP)+Arspq
-      ABMIN(IRS,IQP)=ABMIN(IRS,IQP)-Arspq
+      ABPLUS(IRS,IPQ)=ABPLUS(IRS,IPQ)+Arspq
+      ABMIN(IRS,IPQ)=ABMIN(IRS,IPQ)-Arspq
       EndIf
 C
 c     If(IP.Ne.IQ)
@@ -3219,31 +3216,27 @@ C     end of IP,IQ LOOPS
       EndDo
       EndDo
 C
-c      ABPLUS(IPQ,IRS)=ABPLUS(IRS,IPQ)
-c      ABMIN(IPQ,IRS)=ABMIN(IRS,IPQ)
-C
       EndDo
       EndDo
 C
       Write(*,*)'ABPLUS,ABMIN CONSTRUCTED'
 C
-      IPQ=0
-      Do IP=1,NBasis
-      Do IQ=1,IP-1
-      IPQ=IPQ+1
+      Do IRow=1,NDimX
 C
-      IRS=0
-      Do IR=1,NBasis
-      Do IS=1,IR-1
-      IRS=IRS+1
+      IR=IndN(1,IRow)
+      IS=IndN(2,IRow)
+      IRS=IndX(IRow)
+C
+      Do ICol=1,NDimX
+C
+      IP=IndN(1,ICol)
+      IQ=IndN(2,ICol)
+      IPQ=IndX(ICol)
 C
       If((C(IP)+C(IQ))*(C(IR)+C(IS)).Ne.Zero)
-     $ ABPLUS(IPQ,IRS)=ABPLUS(IPQ,IRS)/(C(IP)+C(IQ))/(C(IR)+C(IS))
+     $ ABPLUS(IRS,IPQ)=ABPLUS(IRS,IPQ)/(C(IP)+C(IQ))/(C(IR)+C(IS))
       If((C(IP)-C(IQ))*(C(IR)-C(IS)).Ne.Zero)
-     $ ABMIN(IPQ,IRS)=ABMIN(IPQ,IRS)/(C(IP)-C(IQ))/(C(IR)-C(IS))
-C
-      EndDo
-      EndDo
+     $ ABMIN(IRS,IPQ)=ABMIN(IRS,IPQ)/(C(IP)-C(IQ))/(C(IR)-C(IS))
 C
       EndDo
       EndDo
@@ -3326,7 +3319,8 @@ c      EndDo
       Ind1(I)=INActive+I 
       EndDo
 C
-      Open(10,File="rdm2.dat")
+      Open(10,File="rdm2.dat",Status='Old')
+      Write(6,'(/,1X,''Active block of 2-RDM read from rdm2.dat'')')
 C
    10 Read(10,'(4I4,F19.12)',End=40)I,J,K,L,X
       I=Ind1(I)

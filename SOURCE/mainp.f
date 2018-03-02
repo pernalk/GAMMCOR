@@ -6,13 +6,14 @@ C                 FROM ATMOL AND THEY ARE USED AS A GUESS WITH U=1
 C                 GAUSSIAN BASIS SET USED
 C
 C
-C     K.PERNAL JAN/2010
+C     K.PERNAL 2018 
 C
       Program PRDMFT
 C
       use types
       use inputfill
-      use systemdef 
+      use systemdef
+C
       Implicit Real*8 (A-H,O-Z)
 C
       Character*60 Title,FMultTab
@@ -37,7 +38,7 @@ C
 C
       type(InputData) :: Input
       type(FlagsData) :: Flags
-C    
+C
       Include 'commons.inc'
 C     
 C     COMMON BLOCK USED IN OPTCPMFT
@@ -141,7 +142,7 @@ C     IFun   = 13 - APSG
 C
 C     IGVB   = 1  - APSG WITH ONLY TWO ORBITALS PER GEMINAL
 c herer!!!
-      IGVB=1
+      IGVB=0
 C
       IFun=13
       Cmix=0.2D0 
@@ -183,6 +184,7 @@ C
       Call check_Calc(Input%CalcParams)
       Call fill_Flags(Input,Flags)
       Call free_Input(Input)
+C
 C
 C     *************************************************************************
 C
@@ -335,7 +337,11 @@ C
       Allocate  (XKin(NInte1))
       Allocate  (XNuc(NInte1))
       Allocate  (TwoEl(NInte2))
+      If(IFunSR.Eq.1) Then
       Allocate  (TwoElErf(NInte2))
+      Else
+      Allocate  (TwoElErf(1))
+      EndIf
       Allocate  (DipX(NInte1))
       Allocate  (DipY(NInte1))
       Allocate  (DipZ(NInte1))
@@ -353,7 +359,11 @@ C
       XKin(1:NInte1)=          0.D0
       XNuc(1:NInte1)=          0.D0
       TwoEl(1:NInte2)=         0.D0
+      If(IFunSR.Eq.1) Then
       TwoElErf(1:NInte2)=      0.D0
+      Else
+      TwoElErf(1)=      0.D0
+      EndIf
       DipX(1:NInte1)=          0.D0
       DipY(1:NInte1)=          0.D0
       DipZ(1:NInte1)=          0.D0 

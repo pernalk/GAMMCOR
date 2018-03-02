@@ -1,6 +1,7 @@
 gm
 OBJ/*
 EXAMPLES/*
+BACKUP/*
 *.mod
 *.o
 *.f90#

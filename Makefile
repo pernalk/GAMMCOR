@@ -11,7 +11,7 @@ OBJ = $(O)mainp.o $(O)initia.o $(O)dmscf.o $(O)misc.o $(O)optocc.o \
       $(O)dftacg_pw92c.o $(O)projector.o $(O)ekt.o \
       $(O)sorter.o $(O)tran.o $(O)systemdef.o \
       $(O)types.o $(O)inputfill.o \
-      $(O)srlrdynamic.o $(O)erpa.o $(O)interpa.o  $(O)exact2el.o $(O)optapsg.o $(O)newton.o $(O)acfd.o
+      $(O)srlrdynamic.o $(O)erpa.o $(O)interpa.o  $(O)exact2el.o $(O)optapsg.o $(O)newton.o $(O)acfd.o $(O)accas.o
 
 FCC = gfortran
 FFLAGS = -O3 -fno-align-commons 
@@ -81,6 +81,8 @@ $(O)newton.o : $(S)newton.f
 	$(FCC) $(FFLAGS)  -c $(S)newton.f -o $(O)newton.o
 $(O)acfd.o : $(S)acfd.f
 	$(FCC) $(FFLAGS)  -c $(S)acfd.f -o $(O)acfd.o
+$(O)accas.o : $(S)accas.f
+	$(FCC) $(FFLAGS)  -c $(S)accas.f -o $(O)accas.o
 $(O)types.o : $(S)types.f90
 	$(FCC) $(FFLAGS)  -c $(S)types.f90 -o $(O)types.o
 $(O)inputfill.o : $(S)inputfill.f90 $(O)types.o  

@@ -5,29 +5,18 @@ C
 C     READ HAO, 2-EL INTEGRALS IN NO, C_COEFFICIENTS, IGEM FROM A DALTON_GENERATED FILE
 C     READ UMOAO FROM DALTON.MOPUN
 C
-      use sorter
-      use tran
-
       Implicit Real*8 (A-H,O-Z)
 C
       Real*8 XKin(NInte1),XNuc(NInte1),Occ(NBasis),URe(NBasis,NBasis),
      $ TwoEl(NInte2),UMOAO(NBasis,NBasis)
-      double precision, allocatable :: TMPMO(:,:)
 C
       Character*60 Line
       Character*30 Line1
 C
       Include 'commons.inc'
 C
-C     LOCAL ARRAYS
-C
-c     remove H2AC when not needed
-      Dimension H2AC(NInte1*NInte1)
-C
-C     IA=1 - read integrals from AOTWOINT
-      IA=1
 C     ICASSCF=1 - read occ from occupations.dat
-      ICASSCF=0
+      ICASSCF=1
 C
 C     IDMRG - integrals and RDM's read from external dmrg files
       IDMRG=0
@@ -57,127 +46,13 @@ C
       EndDo
       EndDo
 C
-C     READ 1-EL AO HAMILTONIAN INTEGRALS AND TRANSFORM TO NO, KEEP IT IN XKin
+C     READ 1-EL NO HAMILTONIAN FROM AOONEINT
 C
-      Open(10,File='gvb_data.dat',Form='UNFORMATTED')
-      Read(10) (XKin(I),I=1,NInte1)
-      Call MatTr(XKin,UMOAO,NBasis)
+      Call read1el(XKin,UMOAO,NBasis,NInte1)
 C
 C     GET 2-EL NO INTEGRALS AND CICoef
 C 
-      If(IA.Eq.0) Then
-C
-      Read(10) (H2AC(I),I=1,NInte1*NInte1)
-C
-      ICount=0
-      Do IP=1,NBasis 
-      Do IQ=1,IP
-C
-      Do IR=1,NBasis
-      Do IS=1,IR
-      ICount=ICount+1
-C
-      TwoEl(NAddr3(IP,IQ,IR,IS))=H2AC(ICount)
-C
-      EndDo
-      EndDo
-      EndDo
-      EndDo
-C
-      Read(10) (CICoef(I),I=1,NBasis)
-      Read(10) (IGem(I),I=1,NBasis)
-      NGem=NELE+1
-      Do I=1,NBasis
-      If(CICoef(I).Eq.0.D0) IGem(I)=NGem
-      Occ(I)=CICoef(I)**2
-      EndDo
-C
-      Close(10)
-C
-      Else
-C
-      call test2el(NBasis)
       Call read2el(TwoEl,UMOAO,NBasis,NInte2)
-C     TEST tran4_unsym      
-      allocate(TMPMO(NBasis**2,NBasis**2))
-C      call tran4_unsym(NBasis,NBasis,transpose(UMOAO),
-C     & NBasis,transpose(UMOAO),
-C     $ NBasis,transpose(UMOAO),NBasis,transpose(UMOAO),TMPMO)
-
-      call tran4_unsym2(NBasis,NBasis,UMOAO,NBasis,UMOAO,
-     $     NBasis,UMOAO,NBasis,UMOAO,TMPMO)
-      
-C      call tran4_sym(NBasis,NBasis,transpose(UMOAO),
-C     $ NBasis,transpose(UMOAO),
-C     $ NBasis,transpose(UMOAO),NBasis,transpose(UMOAO))
-
-C     TEST TWO-EL MOs! 
-C       block
-C       integer :: ip,iq,ir,is,irs,ipq 
-C       irs=0
-C       do is=1,NBasis
-C       do ir=1,NBasis
-C       irs=irs+1
-C       ipq=0
-C       do iq=1,NBasis
-C       do ip=1,NBasis
-C       ipq=ipq+1
-C
-C       write(6,*) TwoEl(NAddr3(ip,iq,ir,is)),TMPMO(ipq,irs)
-CC       write(6,*) TMPMO(ipq,irs), TMPMO(irs,ipq)
-C       enddo
-C       enddo
-C       enddo
-C       enddo
-C       end block
-C
-C      block
-C      integer :: ip,iq,ir,is,irs,ipq
-C      integer :: iunit
-C      double precision :: work1(NBasis*NBasis)
-C      double precision :: work2(NBasis*NBasis)
-CC
-C      open(newunit=iunit,file='TWOMOAB',status='OLD',
-C     $ access='DIRECT',recl=8*NBasis*(NBasis+1)/2)
-C
-C
-C      CHECK-1
-C      irs=0
-C      do is=1,NBasis
-C      do ir=1,NBasis
-C      !irs=irs+1
-C      irs = min(ir,is) + max(ir,is)*(max(ir,is)-1)/2
-C      read(iunit,rec=irs) work1(1:NBasis*(NBasis+1)/2)
-C      call triang_to_sq(work1,work2,NBasis)
-C      ipq=0
-C      do iq=1,NBasis
-C      do ip=1,NBasis
-C      ipq=ipq+1
-C      write(6,*) TwoEl(NAddr3(ip,iq,ir,is)), work2(ipq)
-C      enddo
-C      enddo
-C      enddo
-C      enddo
-C     CHECK-2
-C      irs=0
-C      do is=1,NBasis
-C      do ir=1,is
-C      irs=irs+1
-C      read(iunit,rec=irs) work1(1:NBasis*(NBasis+1)/2)
-C      ipq=0
-C      do iq=1,NBasis
-C      do ip=1,iq
-C      ipq = ipq+1
-C      write(6,*) TwoEl(NAddr3(ip,iq,ir,is)), work1(ipq)   
-C      enddo
-C      enddo
-C      enddo
-C      enddo
-CC
-C      close(iunit)
-C      end block
-C
-      deallocate(TMPMO)
 C
       If(ICASSCF.Eq.0) Then
 C
@@ -230,9 +105,10 @@ C
       NAcCAS=NAc
       NInAcCAS=NInAc
 C
-C     Write(6,'(2X,"No of CAS inactive and active orbitals: ",4X,4I)')
+C      Write(6,'(2X,"No of CAS inactive and active orbitals: ",4X,4I)')
+C     $ NInAcCAS,NAcCAS 
       Write(6,'(2x,a,4x,2i3)')
-     $ "No of CAS inactive and active orbitals",NInAcCAS,NAcCAS 
+     $ "No of CAS inactive and active orbitals",NInAcCAS,NAcCAS
       Write(6,'(2X,"CASSCF",3X,"Occupancy",4X,"Gem")')
       Do I=1,NBasis
       Write(6,'(X,I3,E16.6,I6)') I,Occ(I),IGem(I)
@@ -244,9 +120,6 @@ C
       Close(10)
 C
 c     If(ICASSCF.Eq.0)
-      EndIf
-C
-c     If(IAO.Eq.0)
       EndIf
 C
       Open(10,File='enuc.dat',Form='Formatted',Status='Old')
@@ -369,21 +242,16 @@ C
       Call MatTr(XKin,URe,NBasis)
 C
 C     READ 2-EL INTEGRALS AND TRANSFORM TO NO's
-c      Allocate (TwoAux(NInte2))
-c      TwoAux(1:NInte2)=Zero
-c      Call Int2(TwoAux,FName,NInte2,NBasis)
       TwoEl(1:NInte2)=Zero
       Write(6,'(" Reading in two-ele integrals ...",/)')
       Call Int2(TwoEl,FName,NInte2,NBasis)
 C
       Write(6,'(" Transforming two-electron integrals ...",/)')
-c      Call TwoNO(TwoEl,URe,TwoAux,NBasis,NInte2)
-c      Deallocate (TwoAux)
       Call TwoNO1(TwoEl,URe,NBasis,NInte2)
 C herer!!! ???
-      Write(6,'(" Skipping reading 2-RDM from rdmdump.dat.",/)')
-      Write(6,'(" 2-RDM will be read from rdm2.dat file ...",/)')
-      GoTo 888
+c      Write(6,'(" Skipping reading 2-RDM from rdmdump.dat.",/)')
+c      Write(6,'(" 2-RDM will be read from rdm2.dat file ...",/)')
+c      GoTo 888
 C
 C     READ ACTIVE 2-RDM AND TRANSFORM TO NO'S  
 C
@@ -433,20 +301,8 @@ C
       RDM2(I)=RDM2(I)+RDMAB2(I)
       EndDo
 C 
-c herer uncomment
-c      Open(10,File='rdm2_no.dat')
-c      Read(10,*)(RDM2(I),I=1,NRDM2)
-c      Close(10)
       Call TrRDM2(RDM2,URe,NBasis,NRDM2)
-c      Open(10,File='rdm2_no.dat')
-c      Write(10,*)(RDM2(I),I=1,NRDM2)
-c      Close(10)
-c      stop
-c
-c      NAct=NAcCAS
-c      INActive=NInAcCAS
-c      NOccup=INActive+NAct
-
+C
       Do IP=1,NBasis
       Do IQ=1,NBasis
       Do IR=1,NBasis
@@ -501,7 +357,6 @@ C
 C
       EndDo
       Write(*,*)'Active One-Electron Energy',eact
-c      write(*,*)'einactive',2.*occ(1)*xkin(1)+twoel(1)+enuc
 C
       etot2=zero
       Do IP=1,NOccup
@@ -513,9 +368,6 @@ C
       if(occ(ip).ne.1.d0.and.occ(ir).ne.1.d0.and.occ(iq).ne.1.d0.and.
      $ occ(is).ne.1.d0) then
       etot2=etot2+RDM2(IAdd)*Twoel(NAddr3(IP,IR,IQ,IS))
-c      write(*,'(4I3,2F14.7)')ip,iq,ir,is,etot2,
-c      write(*,'(4I3,2F14.7)')ip+1,iq+1,ir+1,is+1,etot2, 
-c     $ Twoel(NAddr3(IP,IR,IQ,IS)) 
       endif
       EndDo
       EndDo
@@ -1352,6 +1204,93 @@ C
       Return
       End
 
+
+****** PIOTR KOWALSKI, 01/2018 ***********************
+      subroutine read1el(XKin,UMOAO,NBasis,NInte1)
+C
+C     Reads 1-el integrals in AO and ttransform to NO
+C     Returns XKin in NO
+C
+      Implicit Real*8 (A-H,O-Z)
+C
+      Dimension XKin(NInte1),UMOAO(NBasis,NBasis)
+C
+      parameter (mxbuf = 10000)  ! KP
+      double precision  dbuf(mxbuf)
+      integer ibuf(mxbuf*2)
+      integer iunit77,iunit88, iunit99, ndim, norb, nbas, nfone
+      logical iprtvc
+      integer  maxrep, naos, lbuf, nibuf, nbits
+      common /daltwoel/  maxrep, naos(8), lbuf, nibuf, nbits
+      integer nxx
+C
+      XKin(1:NInte1)=         0.D0
+C      
+      iunit77=77
+      iunit88=88
+      iunit99=99
+
+      OPEN(UNIT=iunit77,FILE='AOONEINT',STATUS='OLD',
+     &           ACCESS='SEQUENTIAL',FORM='UNFORMATTED')
+
+      call initoneel(iunit77)
+
+10    continue
+      call readoneel(iunit77, dbuf, ibuf, lbuf, nibuf, nxx)
+
+C       write(*,*) nxx
+C       write(*,*) "-----------"
+C       write(*,*) dbuf
+C       write(*,*) ibuf
+
+      do i=1,nxx
+        XKin(ibuf(i)) = dbuf(i)
+      end do
+
+      if (nxx .ge. 0) go to 10
+C
+C     TRANSFORM THE INTEGRALS
+C
+      Write(6,'(" Transforming One-electron integrals ...",/)')
+        write(55,*) XKin
+      Call MatTr(XKin,UMOAO,NBasis)
+        write(56,*) XKin
+
+      return
+      end
+
+      subroutine readoneel(iunit, dbuf, ibuf, lbuf, nibuf, nxx)
+      integer iunit, ibuf, lbuf, nibuf, nxx
+      double precision dbuf
+      dimension dbuf(lbuf), ibuf(lbuf, nibuf)
+
+      read (iunit) dbuf, ibuf, nxx
+
+      end
+
+      subroutine initoneel(iunit)
+      integer iunit
+      character*8 ONEHAMIL
+      data ONEHAMIL  /'ONEHAMIL'/
+
+      integer  maxrep, naos, lbuf, nibuf, nbits
+      common /daltwoel/  maxrep, naos(8), lbuf, nibuf, nbits
+      logical findlab
+
+      integer i
+
+      nibuf=1
+      lbuf=600
+
+      if (.not. findlab(ONEHAMIL ,iunit)) then
+        write(*,*) 'Error finding label ', ONEHAMIL
+        stop
+C      else
+C        write(*,*) 'label ', ONEHAMIL, " was founded" 
+C        stop
+      end if
+      end
+
 ****** SUBROUTINES FROM RAFAL PODESZWA, 03/2017 ******
 *
 *Deck read2el 
@@ -1400,35 +1339,6 @@ c     *          write(*,'(4I4,F12.8)') ip, iq, ir, is, dbuf(i)
       end do
       
       if (nxx .ge. 0) go to 10
-  
-C     TEST read2el vs. test2el
-C      block
-C
-C      integer :: iunit,ip,iq,ir,is
-C      double precision :: TMP1, TMP2
-C      double precision :: mat(NBasis*(NBasis+1)/2)
-C
-C      open(newunit=iunit,file='AOTWOSORT',access='DIRECT',
-C     $ recl=8*NBasis*(NBasis+1)/2)
-C
-C      do is=1,NBasis
-C      do ir=1,NBasis
-C      read(iunit,rec=min(ir,is)+max(ir,is)*(max(ir,is)-1)/2) mat
-C      do iq=1,NBasis
-C      do ip=1,NBasis
-C  
-C      TMP1 = TwoEl(NAddr3(ip,iq,ir,is)) 
-C      TMP2 = mat(min(ip,iq)+max(ip,iq)*(max(ip,iq)-1)/2)
-C      if(TMP1.ne.TMP2) write(6,*) TMP1,TMP2
-C
-C      enddo
-C      enddo
-C      enddo
-C      enddo
-C      close(iunit)
-C
-C      end block
-
 C
 C     TRANSFORM THE INTEGRALS
 C

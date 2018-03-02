@@ -470,38 +470,6 @@ C
       End
 
 *Deck NAddr3
-C      Integer Function NAddr3(IAddr1,IAddr2,IAddr3,IAddr4)
-CC
-CC     POINTER FOR TWO-ELECTRON INTEGRALS
-CC     NAddr3 WILL POINT TO THE INTEGRAL (IAddr1,IAddr2,IAddr3,IAddr4)
-CC
-C      Implicit Real*8 (A-H,O-Z)
-CC
-C      Parameter(Zero=0.0D0,One=1.0D0,Two=2.0D0)
-CC
-C      Addr1=IAddr1
-C      Addr2=IAddr2
-C      Addr3=IAddr3
-C      Addr4=IAddr4
-CC
-C      NAddr3=Zero
-CC
-CC     CHANGE THE ORDER IF NECESSARY
-CC
-C      Addr12=Max(Addr1,Addr2)*(Max(Addr1,Addr2)-1)/2+
-C     $       Min(Addr2,Addr1)
-C      Addr34=Max(Addr3,Addr4)*(Max(Addr3,Addr4)-1)/2+
-C     $       Min(Addr3,Addr4)
-CC
-CC     GET THE POSITION OF THE ELEMEMT (12|34)
-CC
-C      NAddr3=Max(Addr12,Addr34)*(Max(Addr12,Addr34)-1)/2+
-C     $       Min(Addr12,Addr34)
-CC
-C      Return
-C      End
-
-*Deck NAddr3
       Integer Function NAddr3(IAddr1,IAddr2,IAddr3,IAddr4)
 C
 C     POINTER FOR TWO-ELECTRON INTEGRALS
@@ -510,15 +478,13 @@ C
       Implicit Real*8 (A-H,O-Z)
 C
       Parameter(Zero=0.0D0,One=1.0D0,Two=2.0D0)
-      integer(8) :: Addr1, Addr2, Addr3, Addr4
-      integer(8) :: Addr12, Addr34
 C
       Addr1=IAddr1
       Addr2=IAddr2
       Addr3=IAddr3
       Addr4=IAddr4
 C
-      NAddr3=0
+      NAddr3=Zero
 C
 C     CHANGE THE ORDER IF NECESSARY
 C
@@ -534,7 +500,6 @@ C
 C
       Return
       End
-
 
 *Deck Diag8
       Subroutine Diag8(C,NDim,NVar,AII,AJJ)

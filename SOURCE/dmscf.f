@@ -30,9 +30,9 @@ C
 C
 C     LOCAL ARRAYS
 C
-      Dimension VSR(NInte1),Gamma(NInte1),CoulNO(NInte1),ExchNO(NInte1),
+      Dimension VSR(NInte1),Gamma(NInte1),
      $ XOne(NInte1),UNOAO(Nbasis,NBasis),GammaOld(NInte1),Work(NBasis),
-     $ HNO(NInte1),NSymNO(NBasis),OccSav(NBasis),UReSav(NBasis,NBasis),
+     $ NSymNO(NBasis),OccSav(NBasis),UReSav(NBasis,NBasis),
      $ IGemSav(NBasis),Work2(NBasis,NBasis)
 C
       Real*8, Allocatable :: TNO(:),TNOLR(:)
@@ -570,21 +570,10 @@ C
 C
       IFunSR=IFunSRKer
 C
-      If(IFunSR.Ne.0) Then
-C 
-      Call ERPA(TNO,TNOLR,URe,Occ,XOne,
+      If(IFunSR.Ne.0) 
+     $ Call ERPA(TNO,TNOLR,URe,Occ,XOne,
      $  OrbGrid,WGrid,NSymMO,NBasis,NInte1,NInte2,NGrid,NDim,NDimKer,
      $  NGem,IAPSG,ISERPA,QMAX,Small)
-C
-      Else
-C
-      ISERPA=0
-      Call INTERPA(ETot,ENuc,TNO,URe,UReSav,Occ,XOne,Title,
-     $  OrbGrid,WGrid,NSymMO,NBasis,NInte1,NInte2,NGrid,NDim,
-     $  NGem,IAPSG,ISERPA,QMAX,NGOcc,Small)
-C
-c     endif of If(IFunSR.Ne.0)    
-      EndIf
 C
       Deallocate (TNO)
       Deallocate (TNOLR)
@@ -593,6 +582,27 @@ c     If(IDALTON.Ne.1) Then
       EndIf
 C
       If(IDALTON.Eq.1) Then
+C
+C     IFlAC   = 1 - adiabatic connection formula calculation
+C               0 - AC not used
+      IFlAC=0
+C
+C     IFlSnd  = 1 - run AC0 (linerized in alpha, MP2-like expression for AC is used)
+C             = 0 - do not run AC0
+      IFlSnd=0
+C
+C     IFlCore = 1 - core (inactive) orbitals included in ERPA correlation 
+C             = 0 - core (inactive) orbitals excluded from ERPA correlation
+      IFlCore=1
+C
+      IFlFrag1=0
+      IFl12=1
+C
+      If(ICASSCF.Eq.1) Then
+      Call ACCAS(ETot,ENuc,TwoEl,URe,UReSav,Occ,XOne,
+     $  Title,NBasis,NInte1,NInte2,NGem)
+      Return
+      EndIf
 C
 C     TwoEl - two-electron integrals in NO 
       ISERPA=0

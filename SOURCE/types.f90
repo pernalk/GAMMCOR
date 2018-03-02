@@ -64,7 +64,7 @@ type CalculationBlock
       integer :: Inactive = FLAG_CORE 
       integer :: SymType = TYPE_NO_SYM
       logical :: Restart = FLAG_RESTART
-      integer :: IPrint  = FLAG_PRINT_LEVEL 
+      integer :: IPrint  = 100 !FLAG_PRINT_LEVEL 
       double precision :: RPAThresh = 1.0D-6
       integer :: imon = 1
       character(:), allocatable :: JobTitle
