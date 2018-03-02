@@ -16,6 +16,7 @@ integer, parameter :: TYPE_SYM = 0
 
 integer, parameter :: JOB_TYPE_AC    = 1
 integer, parameter :: JOB_TYPE_AC0   = 2
+integer, parameter :: JOB_TYPE_AC1   = 3
 integer, parameter :: JOB_TYPE_ERPA  = 3
 integer, parameter :: JOB_TYPE_EERPA = 4
 integer, parameter :: JOB_TYPE_SAPT  = 5
@@ -25,6 +26,7 @@ integer, parameter :: FLAG_CORE = 1
 integer, parameter :: FLAG_NOBASIS = 0
 logical, parameter :: FLAG_RESTART = .FALSE.
 integer, parameter :: FLAG_PRINT_LEVEL = 0
+integer, parameter :: FLAG_DEBUG_FL12 = 1
 
 integer, parameter :: RDM_TYPE_GVB  = 1
 integer, parameter :: RDM_TYPE_APSG = 2
@@ -55,7 +57,7 @@ character(:), allocatable :: InputPath
 type CalculationBlock
       integer :: InterfaceType = INTER_TYPE_DAL
       integer :: NBasis = FLAG_NOBASIS
-      integer :: JOBType = JOB_TYPE_AC
+      integer :: JobType = JOB_TYPE_AC
       integer :: Fragments = FLAG_FRAG
       integer :: RDMType = RDM_TYPE_GVB
       integer :: RDMSource = INTER_TYPE_DAL

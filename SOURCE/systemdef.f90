@@ -119,31 +119,87 @@ if(Input%iflag==1) then
 
 else
 
-  ! load mainp.f Flags
+  ! Interface 
   select case(Input%CalcParams%InterfaceType)
   case(INTER_TYPE_DAL)
      Flags%IDALTON = 1
      Flags%IAO     = 0
      Flags%INO     = 0
      Flags%NoSym   = 1
-
+     Flags%IA = 1 
+     
   case(INTER_TYPE_MOL)
      Flags%IDALTON = 0
-!     Flags%IAO     = 0
-!     Flags%INO     = 0
+!    Flags%IAO     = 0
+!    Flags%INO     = 0
      Flags%NoSym   = Input%CalcParams%SymType 
+     Flags%IA = 1 
 
   case(INTER_TYPE_OWN)
      Flags%IDALTON = 0
+     Flags%IA = 1 
   ! ????
   end select
 
-   if(Input%CalcParams%Restart) Flags%IRes = 1 
+  if(Input%CalcParams%Restart) Flags%IRes = 1 
   
-! CAREFUL
-! HERE !! RDMTypes-related flags 
+! RDMType  
+  select case(Input%CalcParams%RDMType)
+  case(RDM_TYPE_GVB)
+      Flags%IGVB = 1
+      Flags%ICASSCF = 0
+
+  case(RDM_TYPE_APSG)
+      FLags%IGVB = 0
+      Flags%ICASSCF = 0
+
+  case(RDM_TYPE_CAS)
+      FLags%IGVB = 0
+      Flags%ICASSCF = 1
+
+  case(RDM_TYPE_DMRG)
+      Flags%ICASSCF = 1
+      Flags%IDMRG   = 1
+  end select
+
+! excitations
+  Flags%ISERPA = 0
+  Flags%IAPSG  = 0
+
+! JobType
+  select case(Input%CalcParams%JobType)
+  case(JOB_TYPE_AC)
+     Flags%IFlAC  = 1
+     Flags%IFlSnd = 0   
+
+  case(JOB_TYPE_AC0)
+! HERE WILL BE CHANGED TO:
+    !Flags%IFlAC = 0
+     Flags%IFlAC  = 1
+     Flags%IFlSnd = 1
+
+! same as ERPA  
+  case(JOB_TYPE_AC1)
+     Flags%IFlAC  = 0
+     Flags%IFlSnd = 0
+ 
+  case(JOB_TYPE_SAPT)
+     Flags%IFlAC  = 0
+     Flags%IFlSnd = 0
+  
+  end select
+
+ ! Inactive
+  Flags%IFlCore = Input%CalcParams%Inactive
+ 
+ ! EERPA
+ if(Input%CalcParams%Fragments==1) Flags%IFlFrag = 1
+
+ Flags%IFl12 = FLAG_DEBUG_FL12
 
 endif
+
+! HERE!! ADD : PRINT_ALL_FLAGS // IPrint
 
 end subroutine fill_Flags
 
