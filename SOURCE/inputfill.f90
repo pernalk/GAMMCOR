@@ -270,6 +270,8 @@ subroutine read_block_calculation(CalcParams, line)
                CalcParams%JobType = JOB_TYPE_AC0
            elseif (uppercase(val) == "ERPA" ) then
                CalcParams%JobType = JOB_TYPE_ERPA
+           elseif (uppercase(val) == "AC1" ) then
+               CalcParams%JobType = JOB_TYPE_ERPA
            elseif (uppercase(val) == "EERPA" ) then
                CalcParams%JobType = JOB_TYPE_EERPA
            elseif (uppercase(val) == "SAPT" ) then
@@ -294,7 +296,8 @@ subroutine read_block_calculation(CalcParams, line)
               CalcParams%RDMType = RDM_TYPE_GVB
            elseif (uppercase(val) == "APSG" ) then
               CalcParams%RDMType = RDM_TYPE_APSG
-           elseif (uppercase(val) == "CASSCF" ) then
+           elseif (uppercase(val) == "CASSCF".or.&
+                 & uppercase(val) == "CAS" ) then
               CalcParams%RDMType = RDM_TYPE_CAS
            elseif (uppercase(val) == "DMRG" ) then
               CalcParams%RDMType = RDM_TYPE_DMRG

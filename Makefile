@@ -27,11 +27,11 @@ $(PROG) :  $(OBJ)
 	$(FCC) $(FFLAGS) -o $(PROG) $(OBJ) $(LIBS)
 $(O)mainp.o : $(S)mainp.f $(S)commons.inc $(O)types.o $(O)inputfill.o $(O)systemdef.o
 	$(FCC) $(FFLAGS)  -c $(S)mainp.f -o $(O)mainp.o
-$(O)initia.o : $(S)initia.f $(S)commons.inc $(O)sorter.o $(O)tran.o 
+$(O)initia.o : $(S)initia.f $(S)commons.inc $(O)types.o $(O)sorter.o $(O)tran.o 
 	$(FCC) $(FFLAGS)  -c $(S)initia.f -o $(O)initia.o 
 $(O)misc.o : $(S)misc.f $(S)commons.inc
 	$(FCC) $(FFLAGS)  -c $(S)misc.f -o $(O)misc.o
-$(O)dmscf.o : $(S)dmscf.f $(S)commons.inc
+$(O)dmscf.o : $(S)dmscf.f $(S)commons.inc $(O)types.o
 	$(FCC) $(FFLAGS)  -c $(S)dmscf.f -o $(O)dmscf.o
 $(O)optocc.o : $(S)optocc.f $(S)commons.inc
 	$(FCC) $(FFLAGS)  -c $(S)optocc.f -o $(O)optocc.o

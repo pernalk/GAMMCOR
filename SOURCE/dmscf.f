@@ -3,12 +3,15 @@
      $ (ETot,Title,URe,Occ,Eps,XKin,XNuc,ENuc,UMOAO,
      $ DipX,DipY,DipZ,TwoEl,TwoElErf,NBasis,NInte1,NInte2,
      $ OrbGrid,OrbXGrid,OrbYGrid,OrbZGrid,WGrid,NSymMO,NGrid,
-     $ IAPSG,ISERPA,QMAX,IModG,NGOcc,Small,NGem)
+     $ IAPSG,ISERPA,QMAX,IModG,NGOcc,Small,NGem,
+     $ Flags)
 C
 C     !!! XKin CONTAINS BOTH KINETIC AND EL-N CONTRIBUTIONS !!!
 C     !!! XNuc IS EMPTY 
 C
 C     CALLS AN OPTIMIZER FOR THE ORBITALS AND OCCUPANCIES
+C
+      use types 
 C
       Implicit Real*8 (A-H,O-Z)
 C
@@ -36,6 +39,8 @@ C
      $ IGemSav(NBasis),Work2(NBasis,NBasis)
 C
       Real*8, Allocatable :: TNO(:),TNOLR(:)
+      type(FlagsData) :: Flags
+
 C
 C     FLAGS:  IRes   = 0 ... run the program from the beginning
 C                      1 ... restart the program 
@@ -585,18 +590,18 @@ C
 C
 C     IFlAC   = 1 - adiabatic connection formula calculation
 C               0 - AC not used
-      IFlAC=0
+      IFlAC=Flags%IFlAC
 C
 C     IFlSnd  = 1 - run AC0 (linerized in alpha, MP2-like expression for AC is used)
 C             = 0 - do not run AC0
-      IFlSnd=0
+      IFlSnd=Flags%IFlSnd
 C
 C     IFlCore = 1 - core (inactive) orbitals included in ERPA correlation 
 C             = 0 - core (inactive) orbitals excluded from ERPA correlation
-      IFlCore=1
+      IFlCore=Flags%IFlCore
 C
-      IFlFrag1=0
-      IFl12=1
+      IFlFrag1=Flags%IFlFrag
+      IFl12=Flags%IFl12
 C
       If(ICASSCF.Eq.1) Then
       Call ACCAS(ETot,ENuc,TwoEl,URe,UReSav,Occ,XOne,

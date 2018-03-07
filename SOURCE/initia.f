@@ -1,9 +1,11 @@
 *Deck ReadDAL
       Subroutine ReadDAL(XKin,XNuc,ENuc,Occ,URe,
-     $ TwoEl,UMOAO,NInte1,NBasis,NInte2,NGem)
+     $ TwoEl,UMOAO,NInte1,NBasis,NInte2,NGem,Flags)
 C
 C     READ HAO, 2-EL INTEGRALS IN NO, C_COEFFICIENTS, IGEM FROM A DALTON_GENERATED FILE
 C     READ UMOAO FROM DALTON.MOPUN
+C
+      use types      
 C
       Implicit Real*8 (A-H,O-Z)
 C
@@ -13,13 +15,16 @@ C
       Character*60 Line
       Character*30 Line1
 C
+      type(FlagsData) :: Flags
+C
       Include 'commons.inc'
 C
 C     ICASSCF=1 - read occ from occupations.dat
-      ICASSCF=1
+      ICASSCF=Flags%ICASSCF
+C      write(*,*) 'Flags:',Flags%ICASSCF, ICASSCF
 C
 C     IDMRG - integrals and RDM's read from external dmrg files
-      IDMRG=0
+      IDMRG=Flags%IDMRG
       If(IDMRG.Eq.1.And.ICASSCF.Eq.0) Stop 'Set ICASSCF TO 1'
 C
       If(IDMRG.Eq.1) Then
