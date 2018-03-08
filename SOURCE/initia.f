@@ -758,6 +758,8 @@ C
 C
       XELE=Half*(ZNucl-Charge)
       NELE=Int(ZNucl-Charge+Half)/2
+      write(*,*) 'RW-vals:', XELE,NELE
+
 C
       Return
       End

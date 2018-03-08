@@ -332,6 +332,9 @@ subroutine read_block_calculation(CalcParams, line)
 
       case ("INTEGRALSFILEPATH")
             CalcParams%IntegralsFilePath = val
+     
+      case ("IPRINT")
+            read(val,*) CalcParams%IPrint 
 
       end select
 end subroutine read_block_calculation

@@ -64,7 +64,7 @@ type CalculationBlock
       integer :: Inactive = FLAG_CORE 
       integer :: SymType = TYPE_NO_SYM
       logical :: Restart = FLAG_RESTART
-      integer :: IPrint  = 100 !FLAG_PRINT_LEVEL 
+      integer :: IPrint  = 0 !FLAG_PRINT_LEVEL 
       double precision :: RPAThresh = 1.0D-6
       integer :: imon = 1
       character(:), allocatable :: JobTitle
@@ -76,7 +76,10 @@ type SystemBlock
       integer :: Charge = 0
       integer :: ZNucl   = 0
       integer :: NBasis = 0
-      integer :: Monomer = MONOMER_A 
+      integer :: Monomer = MONOMER_A
+      integer :: NELE
+      double precision :: XELE
+      integer :: IPrint = 0 
 end type SystemBlock
 
 type FlagsData
@@ -97,6 +100,7 @@ type FlagsData
      integer :: IFreeze = 0
      integer :: IAPSG   = 1
      integer :: ISERPA  = 0
+     integer :: ISAPT   = 0
      ! initia.f
      integer :: IA = 1
      integer :: ICASSCF = 0
@@ -118,6 +122,12 @@ type InputData
      type(FlagsData) :: Flags 
 
 end type InputData
+
+type SaptData
+
+     type(SystemBlock) :: monA, monB
+
+end type SaptData
 
 contains 
 

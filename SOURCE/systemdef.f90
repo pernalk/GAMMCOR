@@ -184,6 +184,7 @@ else
      Flags%IFlSnd = 0
  
   case(JOB_TYPE_SAPT)
+     Flags%ISAPT  = 1
      Flags%IFlAC  = 0
      Flags%IFlSnd = 0
   
@@ -199,12 +200,147 @@ else
 
 endif
 
-! PRINT_ALL_FLAGS // IPrint
-if(Input%CalcParams%IPrint.gt.1) then
+! PRINT_ALL_FLAGS / IPrint
+if(Input%CalcParams%IPrint.gt.0) then
    call print_Flags(Flags)
 endif
 
 end subroutine fill_Flags
+
+subroutine create_System(Input,Flags,System,SAPT)
+implicit none
+
+type(InputData) :: Input
+type(FlagsData) :: Flags
+type(SystemBlock) :: System
+type(SaptData) :: SAPT
+
+! fill System
+if(Flags%ISAPT.Eq.0) then
+
+   if(Input%CalcParams%imon/=1) then
+     write(LOUT,'(a)') 'ERROR! TOO MANY SYSTEM BLOCKS!'
+     stop
+   endif   
+  
+   System%ZNucl  = Input%SystemInput(1)%ZNucl
+   System%Charge = Input%SystemInput(1)%Charge
+   System%NBasis = Input%CalcParams%NBasis
+   System%Multiplicity = Input%SystemInput(1)%Multiplicity
+   System%IPrint = Input%CalcParams%IPrint  
+  
+   System%XELE = (System%ZNucl - System%Charge)/2.0d0 
+   System%NELE = (System%ZNucl - System%Charge)/2 
+   
+  ! write(*,*) "ZNucl:",Input%SystemInput(1)%ZNucl
+  ! write(*,*) "Sys-val:",System%XELE, System%NELE
+
+! fill SAPT
+elseif(Flags%ISAPT.Eq.1) then
+
+ associate( monA => SAPT%monA, &
+            monB => SAPT%monB ) 
+   select case(Input%SystemInput(1)%Monomer)
+   case(1)
+      monA%ZNucl  = Input%SystemInput(1)%ZNucl
+      monA%Charge = Input%SystemInput(1)%Charge
+      monA%NBasis = Input%CalcParams%NBasis
+      monA%Multiplicity = Input%SystemInput(1)%Multiplicity
+      monA%Monomer = Input%SystemInput(1)%Monomer
+      monA%IPrint = Input%CalcParams%IPrint  
+     
+      monA%XELE = (SAPT%monA%ZNucl - SAPT%monA%Charge)/2.0d0 
+      monA%NELE = (SAPT%monA%ZNucl - SAPT%monA%Charge)/2 
+    
+      monB%ZNucl  = Input%SystemInput(2)%ZNucl
+      monB%Charge = Input%SystemInput(2)%Charge
+      monB%NBasis = Input%CalcParams%NBasis
+      monB%Multiplicity = Input%SystemInput(2)%Multiplicity
+      monB%Monomer = Input%SystemInput(2)%Monomer
+      monB%IPrint = Input%CalcParams%IPrint  
+     
+      monB%XELE = (monB%ZNucl - monB%Charge)/2.0d0 
+      monB%NELE = (monB%ZNucl - monB%Charge)/2 
+    
+   ! write(LOUT,*) monA%ZNucl,'MONO(1)A,case1,dupaaa'
+   ! write(LOUT,*) monB%ZNucl,'MONO(1)B,case1'
+   
+   case(2)
+  
+      monA%ZNucl  = Input%SystemInput(2)%ZNucl
+      monA%Charge = Input%SystemInput(2)%Charge
+      monA%NBasis = Input%CalcParams%NBasis
+      monA%Multiplicity = Input%SystemInput(2)%Multiplicity
+      monA%Monomer = Input%SystemInput(2)%Monomer
+      monA%IPrint = Input%CalcParams%IPrint  
+     
+      monA%XELE = (monA%ZNucl - monA%Charge)/2.0d0 
+      monA%NELE = (monA%ZNucl - monA%Charge)/2 
+   
+      monB%ZNucl  = Input%SystemInput(1)%ZNucl
+      monB%Charge = Input%SystemInput(1)%Charge
+      monB%NBasis = Input%CalcParams%NBasis
+      monB%Multiplicity = Input%SystemInput(1)%Multiplicity
+      monB%Monomer = Input%SystemInput(1)%Monomer
+      monB%IPrint = Input%CalcParams%IPrint  
+     
+      monB%XELE = (monB%ZNucl - monB%Charge)/2.0d0 
+      monB%NELE = (monB%ZNucl - monB%Charge)/2 
+   
+  !  write(LOUT,*) monA%ZNucl,'MONO(1)A,case2'
+  !  write(LOUT,*) monB%ZNucl,'MONO(2)B,case2,dupaa'
+  
+   end select
+ end associate
+
+System = SAPT%monA
+
+endif
+
+call print_System(Flags,System,SAPT)
+
+end subroutine create_System
+
+subroutine print_System(Flags,System,SAPT)
+implicit none
+
+type(FlagsData) :: Flags
+type(SystemBlock) :: System
+type(SaptData) :: SAPT
+integer :: i
+
+write(LOUT,'()')
+write(LOUT,'(1x,a)') 'SYSTEM '
+write(LOUT,'(8a10)') ('**********',i=1,8)
+
+if(Flags%ISAPT.Eq.0) then
+   write(LOUT,'(1x,a,1x,i3)') 'NUCLEAR CHARGE: ', System%ZNucl
+   write(LOUT,'(1x,a,8x,i3)') 'CHARGE: ', System%Charge
+
+elseif(Flags%ISAPT.Eq.1) then
+    write(LOUT,'(1x,a)') 'MONOMER A'
+    write(LOUT,'(1x,a,1x,i3)') 'NUCLEAR CHARGE: ', SAPT%monA%ZNucl
+    write(LOUT,'(1x,a,8x,i3)') 'CHARGE: ', SAPT%monA%Charge
+    write(LOUT,'()')
+    write(LOUT,'(1x,a)') 'MONOMER B'
+    write(LOUT,'(1x,a,1x,i3)') 'NUCLEAR CHARGE: ', SAPT%monB%ZNucl
+    write(LOUT,'(1x,a,8x,i3)') 'CHARGE: ', SAPT%monB%Charge
+
+endif
+
+   write(LOUT,'()')
+   write(LOUT,'(1x,a,1x,i3)') 'NO. OF CONTRACTIONS: ', System%NBasis
+
+   if(Flags%IRes.Ne.1) then
+      write(LOUT,'()')
+      write(LOUT,'(1x,a)') 'DENSITY MATRIX FUNCTIONAL CALCULATION'
+      write(LOUT,'(1x,a,1x,i3)') 'FUNCTIONAL', Flags%IFun
+   elseif(Flags%IRes.Eq.1) then
+      write(LOUT,'(1x,a)') 'RESTART REQUESTED' 
+   endif   
+
+
+end subroutine print_System
 
 subroutine print_Flags(Flags)
 implicit none
