@@ -101,6 +101,7 @@ type FlagsData
      integer :: IAPSG   = 1
      integer :: ISERPA  = 0
      integer :: ISAPT   = 0
+     character(:), allocatable :: JobTitle
      ! initia.f
      integer :: IA = 1
      integer :: ICASSCF = 0
@@ -153,8 +154,13 @@ write(LOUT,'(8a10)') ('**********',i=1,8)
 
 associate( CalcParams => Input%CalcParams)
  ! CALCULATION BLOCK
- write(LOUT,' (1x,a,4x,a)') "JOB TITLE: ", &
-              CalcParams%JobTitle
+ if(allocated(CalcParams%JobTitle)) then
+    write(LOUT,' (1x,a,4x,a)') "JOB TITLE: ", &
+                 CalcParams%JobTitle
+ else
+    write(LOUT,'(1x,a,4x,a)') "JOB TITLE: ", & 
+                 "EMPTY"
+ endif
  write(LOUT,' (1x,a,4x,a)') "INTERFACE: ", &
               PossibleInterface(CalcParams%InterfaceType)
  write(LOUT,' (1x,a,5x,a)') "JOB TYPE: ",  &

@@ -200,6 +200,12 @@ else
 
 endif
 
+if(allocated(Input%CalcParams%JobTitle)) then
+  Flags%JobTitle = Input%CalcParams%JobTitle
+else
+  Flags%JobTitle = 'EMPTY'
+endif
+
 ! PRINT_ALL_FLAGS / IPrint
 if(Input%CalcParams%IPrint.gt.0) then
    call print_Flags(Flags)
@@ -332,13 +338,24 @@ endif
    write(LOUT,'(1x,a,1x,i3)') 'NO. OF CONTRACTIONS: ', System%NBasis
 
    if(Flags%IRes.Ne.1) then
-      write(LOUT,'()')
-      write(LOUT,'(1x,a)') 'DENSITY MATRIX FUNCTIONAL CALCULATION'
-      write(LOUT,'(1x,a,1x,i3)') 'FUNCTIONAL', Flags%IFun
+!      write(LOUT,'()')
+!      write(LOUT,'(1x,a)') 'DENSITY MATRIX FUNCTIONAL CALCULATION'
+!      write(LOUT,'(1x,a,1x,i3)') 'FUNCTIONAL', Flags%IFun
    elseif(Flags%IRes.Eq.1) then
       write(LOUT,'(1x,a)') 'RESTART REQUESTED' 
    endif   
 
+if(Flags%ISAPT.Eq.0) then
+!   write(LOUT,'()')
+   write(LOUT,'(1x,a,1x,i3)') 'PRINT LEVEL: ', System%IPrint
+
+elseif(Flags%ISAPT.Eq.1) then
+!   write(LOUT,'()')
+   write(LOUT,'(1x,a,1x,i3)') 'PRINT LEVEL: ', SAPT%monA%IPrint
+ 
+endif
+
+   write(LOUT,'()')
 
 end subroutine print_System
 
