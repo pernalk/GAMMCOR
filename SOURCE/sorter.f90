@@ -1,4 +1,5 @@
 module sorter
+use types
 
 implicit none
 
@@ -140,30 +141,30 @@ integer :: i
 
 end subroutine test2el
 
-subroutine readlabel(iunit,text)
-! sets file pointer 
-! to first data after text
-implicit none
-
-integer :: iunit
-integer :: ios
-character(8) :: text, label(4)
-
-rewind(iunit)
-do 
-
-  read(iunit,iostat=ios) label
-  if(ios<0) then
-     write(6,*) 'ERROR!!! Empty section in AOTWOINT!'
-     stop
-  endif
-  if(label(1)=='********') then
-     if(label(4)==text) exit
-  endif
-
-enddo
-
-end subroutine readlabel
+!subroutine readlabel(iunit,text)
+!! sets file pointer 
+!! to first data after text
+!implicit none
+!
+!integer :: iunit
+!integer :: ios
+!character(8) :: text, label(4)
+!
+!rewind(iunit)
+!do 
+!
+!  read(iunit,iostat=ios) label
+!  if(ios<0) then
+!     write(6,*) 'ERROR!!! Empty section in AOTWOINT!'
+!     stop
+!  endif
+!  if(label(1)=='********') then
+!     if(label(4)==text) exit
+!  endif
+!
+!enddo
+!
+!end subroutine readlabel
 
 subroutine open_Sorter(srt,name,nBatch,BatchSize)
 implicit none

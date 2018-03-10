@@ -490,9 +490,11 @@ integer :: imon
     stop
  endif
 
- if(Input%CalcParams%NBasis==0) then
-     write(LOUT,'(1x,a)') 'FATAL ERROR: NBasis ENTRY MISSING'
-     stop
+ if(Input%CalcParams%InterfaceType.ne.INTER_TYPE_DAL) then
+    if(Input%CalcParams%NBasis==0) then
+       write(LOUT,'(1x,a)') 'FATAL ERROR: NBasis ENTRY MISSING'
+       stop
+    endif
  elseif(Input%CalcParams%NBasis.lt.0) then
      write(LOUT,'(1x,a)') 'FATAL ERROR: INCORRECT ENTRY&
                  & NBasis IN THE INPUT FILE'

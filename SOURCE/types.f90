@@ -255,6 +255,60 @@ write(LOUT,'()')
 
 end subroutine print_Input
 
+subroutine readlabel(iunit,text)
+! sets file pointer 
+! to first data after text
+implicit none
+
+integer :: iunit
+integer :: ios
+character(8) :: text, label(4)
+
+rewind(iunit)
+do 
+
+  read(iunit,iostat=ios) label
+  if(ios<0) then
+     write(6,*) 'ERROR!!! Empty section in AOTWOINT!'
+     stop
+  endif
+  if(label(1)=='********') then
+     if(label(4)==text) exit
+  endif
+
+enddo
+
+end subroutine readlabel
+
+
+
+subroutine basinfo(nbas)
+implicit none
+
+integer :: iunit 
+integer :: nsym,nbas,norb,nrhf,ioprhf
+logical :: ex
+
+ inquire(file='SIRIUS.RST',EXIST=ex)
+
+ if(ex) then 
+    open(newunit=iunit,file='SIRIUS.RST',status='OLD', &
+         access='SEQUENTIAL',form='UNFORMATTED')
+   
+    ! read basis info
+    call readlabel(iunit,'BASINFO ')
+   
+    read (iunit) nsym,nbas,norb,nrhf,ioprhf
+!   write(LOUT,'(1x,a)')  nsym,nbas,norb,nrhf,ioprhf
+   
+    close(iunit)
+ else
+    write(LOUT,'(1x,a)') 'WARNING: SIRIUS.RST NOT FOUND!'
+    write(LOUT,'(1x,a)') 'TRYING TO READ NBasis FROM INPUT!'
+ endif
+
+end subroutine basinfo
+
 
 function uppercase(s)
       !

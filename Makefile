@@ -11,6 +11,7 @@ OBJ = $(O)mainp.o $(O)initia.o $(O)dmscf.o $(O)misc.o $(O)optocc.o \
       $(O)dftacg_pw92c.o $(O)projector.o $(O)ekt.o \
       $(O)sorter.o $(O)tran.o $(O)systemdef.o \
       $(O)types.o $(O)inputfill.o \
+      $(O)sapt_main.o \
       $(O)srlrdynamic.o $(O)erpa.o $(O)interpa.o  $(O)exact2el.o $(O)optapsg.o $(O)newton.o $(O)acfd.o $(O)accas.o
 
 FCC = gfortran
@@ -25,7 +26,7 @@ LIBS = -L/usr/lib -llapack -lblas
 
 $(PROG) :  $(OBJ) 
 	$(FCC) $(FFLAGS) -o $(PROG) $(OBJ) $(LIBS)
-$(O)mainp.o : $(S)mainp.f $(S)commons.inc $(O)types.o $(O)inputfill.o $(O)systemdef.o
+$(O)mainp.o : $(S)mainp.f $(S)commons.inc $(O)types.o $(O)inputfill.o $(O)systemdef.o $(O)sapt_main.o
 	$(FCC) $(FFLAGS)  -c $(S)mainp.f -o $(O)mainp.o
 $(O)initia.o : $(S)initia.f $(S)commons.inc $(O)types.o $(O)sorter.o $(O)tran.o 
 	$(FCC) $(FFLAGS)  -c $(S)initia.f -o $(O)initia.o 
@@ -89,10 +90,12 @@ $(O)inputfill.o : $(S)inputfill.f90 $(O)types.o
 	$(FCC) $(FFLAGS)  -c $(S)inputfill.f90 -o $(O)inputfill.o
 $(O)systemdef.o : $(S)systemdef.f90 $(O)types.o
 	$(FCC) $(FFLAGS)  -c $(S)systemdef.f90 -o $(O)systemdef.o
-$(O)sorter.o : $(S)sorter.f90
+$(O)sorter.o : $(S)sorter.f90 $(O)types.o
 	$(FCC) $(FFLAGS)  -c $(S)sorter.f90 -o $(O)sorter.o
 $(O)tran.o : $(S)tran.f90
 	$(FCC) $(FFLAGS)  -c $(S)tran.f90 -o $(O)tran.o
+$(O)sapt_main.o : $(S)sapt_main.f90 $(O)types.o $(O)systemdef.o $(O)sorter.o
+	$(FCC) $(FFLAGS)  -c $(S)sapt_main.f90 -o $(O)sapt_main.o
 
 .PHONY : clean
 clean :
