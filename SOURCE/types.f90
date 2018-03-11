@@ -280,7 +280,29 @@ enddo
 
 end subroutine readlabel
 
+subroutine readoneint(iunit,ints)
+implicit none
 
+integer :: iunit
+double precision :: ints(:)
+integer,parameter :: lbuf = 600
+double precision :: buf(lbuf)
+integer :: ibuf(lbuf)
+integer :: length,i
+
+ints=0
+! information are kept in one record in the 
+! order: buf, ibuf, length
+! buf: integrals, ibuf: int number
+do 
+   read(iunit) buf,ibuf,length
+   if(length.lt.0) exit
+   do i=1,length
+      ints(ibuf(i)) = buf(i)
+   enddo
+enddo
+
+end subroutine readoneint
 
 subroutine basinfo(nbas)
 implicit none
