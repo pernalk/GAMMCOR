@@ -326,7 +326,7 @@ C
 C     CHECK IF SAPT RUN      
       ISAPT=Flags%ISAPT
 C
-      If(ISAPT.Eq.1) Call sapt_driver
+      If(ISAPT.Eq.1) Call sapt_driver(Flags,Sapt)
 C
 C
 C     *************************************************************************
@@ -492,6 +492,6 @@ C
      $ IAPSG,ISERPA,QMAX,IModG,NGOcc,Small,NGem,
      $ Flags)
 C
-      Stop
+C      Stop
       End
 C

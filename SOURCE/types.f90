@@ -79,7 +79,11 @@ type SystemBlock
       integer :: Monomer = MONOMER_A
       integer :: NELE
       double precision :: XELE
-      integer :: IPrint = 0 
+      integer :: NOrb, NGem
+      integer :: NAct, INAct
+      integer :: IPrint = 0
+      integer,allocatable :: IGem(:)
+      double precision,allocatable :: Occ(:), CICoef(:)
 end type SystemBlock
 
 type FlagsData
@@ -127,6 +131,7 @@ end type InputData
 type SaptData
 
      type(SystemBlock) :: monA, monB
+     integer :: IPrint = 0
 
 end type SaptData
 
@@ -246,6 +251,8 @@ end associate
                  (Input%Flags%IFlFrag)
      write(LOUT, '(1x,a,6x,i3)') "IFl12   ", &
                  (Input%Flags%IFl12)
+     write(LOUT, '(1x,a,6x,i3)') "ISAPT   ", &
+                 (Input%Flags%ISAPT)
  endif
 
 !write(LOUT,'(8a10)') ('**********',i=1,8)
@@ -303,6 +310,21 @@ do
 enddo
 
 end subroutine readoneint
+
+!subroutine writeoneint(iunit,ndim,S,V,H)
+!implicit none 
+!
+!integer :: iunit, ndim
+!double precision, dimension(ndim,ndim) :: S, V, H
+!
+! write(*,*) 'iunit',iunit
+! write(iunit) S 
+! !write(iunit) 'POTENTAL', V
+! !write(iunit) 'ONEHAMIL', H
+!
+! write(LOUT,'(1x,i3)') 'One-electron matrices written to record:', iunit 
+!
+!end subroutine writeoneint
 
 subroutine basinfo(nbas)
 implicit none

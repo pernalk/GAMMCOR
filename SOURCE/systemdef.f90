@@ -244,6 +244,8 @@ if(Flags%ISAPT.Eq.0) then
 ! fill SAPT
 elseif(Flags%ISAPT.Eq.1) then
 
+ SAPT%IPrint = Input%CalcParams%IPrint
+
  associate( monA => SAPT%monA, &
             monB => SAPT%monB ) 
    select case(Input%SystemInput(1)%Monomer)
