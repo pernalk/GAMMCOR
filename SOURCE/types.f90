@@ -79,9 +79,11 @@ type SystemBlock
       integer :: Monomer = MONOMER_A
       integer :: NELE
       double precision :: XELE
+      double precision :: SumOcc = 0
       integer :: NOrb, NGem
       integer :: NAct, INAct
       integer :: IPrint = 0
+      integer :: IWarn = 0
       integer,allocatable :: IGem(:)
       double precision,allocatable :: Occ(:), CICoef(:)
 end type SystemBlock
@@ -262,6 +264,36 @@ write(LOUT,'()')
 
 end subroutine print_Input
 
+subroutine print_sqmat(mat,ndim)
+implicit none
+
+integer,intent(in) :: ndim
+double precision,intent(in) :: mat(ndim,ndim)
+integer :: i,j
+
+ do i=1,ndim
+    write(LOUT,'(10f11.6)') (mat(i,j),j=1,ndim)
+ enddo
+ write(LOUT,'()') 
+ 
+ return
+end subroutine print_sqmat
+
+subroutine print_diag(mat,ndim)
+implicit none
+
+integer,intent(in) :: ndim
+double precision,intent(in) :: mat(ndim,ndim)
+integer :: i
+
+ do i=1,ndim
+    write(LOUT,'(10f11.6)') mat(i,i)
+ enddo
+ write(LOUT,'()') 
+ 
+ return
+end subroutine print_diag 
+
 subroutine readlabel(iunit,text)
 ! sets file pointer 
 ! to first data after text
@@ -326,17 +358,18 @@ end subroutine readoneint
 !
 !end subroutine writeoneint
 
-subroutine basinfo(nbas)
+subroutine basinfo(nbas,basfile)
 implicit none
 
 integer :: iunit 
+character(*) :: basfile
 integer :: nsym,nbas,norb,nrhf,ioprhf
 logical :: ex
 
- inquire(file='SIRIUS.RST',EXIST=ex)
+ inquire(file=basfile,EXIST=ex)
 
  if(ex) then 
-    open(newunit=iunit,file='SIRIUS.RST',status='OLD', &
+    open(newunit=iunit,file=basfile,status='OLD', &
          access='SEQUENTIAL',form='UNFORMATTED')
    
     ! read basis info
@@ -347,7 +380,7 @@ logical :: ex
    
     close(iunit)
  else
-    write(LOUT,'(1x,a)') 'WARNING: SIRIUS.RST NOT FOUND!'
+    write(LOUT,'(1x,a)') 'WARNING: '// basfile //' NOT FOUND!'
     write(LOUT,'(1x,a)') 'TRYING TO READ NBasis FROM INPUT!'
  endif
 

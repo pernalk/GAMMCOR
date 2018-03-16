@@ -321,7 +321,7 @@ C
       MOcc=NELE-NFrac
 C
 C     NBasis READ FROM SIRIUS.RST
-      If(IDALTON.Eq.1) Call basinfo(NBasis)
+      If(IDALTON.Eq.1) Call basinfo(NBasis,'SIRIUS.RST')
 C
 C     CHECK IF SAPT RUN      
       ISAPT=Flags%ISAPT

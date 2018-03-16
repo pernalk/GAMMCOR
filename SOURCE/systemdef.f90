@@ -301,7 +301,7 @@ elseif(Flags%ISAPT.Eq.1) then
    end select
  end associate
 
-System = SAPT%monA
+System = SAPT%monB
 
 endif
 
