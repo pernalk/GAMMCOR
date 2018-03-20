@@ -28,13 +28,14 @@ end type SortData
 
 contains 
 
-subroutine test2el(NBas)
+subroutine test2el(NBas,intfile)
 ! sorts 2-el integrals
 ! according to rs index
 ! and dumps them to file
 implicit none
 
 integer :: NBas
+character(*) :: intfile
 integer :: iunit,iunit2
 integer iunit77,iunit88, iunit99
 integer :: maxrep, naos(8), lbuf, nibuf, nbits
@@ -51,13 +52,14 @@ integer :: i
  call open_Sorter(srt,'TMPSORT',NBas*(NBas+1)/2,NBas*(NBas+1)/2)
 
  ! newunit works with Fortran 2008
- open(newunit=iunit,file='AOTWOINT',status='OLD',&
+ open(newunit=iunit,file=intfile,status='OLD',&
       access='SEQUENTIAL',form='UNFORMATTED')
 
  ! read info
  call readlabel(iunit,'BASINFO ')
  read(iunit) maxrep, naos, lbuf, nibuf, nbits 
 
+ write(6,'()')
  write(6,'(1x, a)') 'Dalton two-el. file initialized'
  write(6,'(1x,a,i3,a,i3,a,i3)') 'Buffer size: ', lbuf, &
        & ', integers per index packet: ', nibuf,       &
@@ -300,7 +302,7 @@ integer :: i
  deallocate(srt%ival,srt%rval)
  deallocate(srt%Batch)
  ! close SORT 
- close(srt%iunit)
+ close(srt%iunit,status='DELETE')
 
 end subroutine free_Sorter
 

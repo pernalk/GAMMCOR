@@ -82,6 +82,8 @@ type SystemBlock
       double precision :: SumOcc = 0
       integer :: NOrb, NGem
       integer :: NAct, INAct
+      integer :: NCen = 0
+      integer :: NMonOrb = 0
       integer :: IPrint = 0
       integer :: IWarn = 0
       integer,allocatable :: IGem(:)
@@ -196,9 +198,12 @@ associate( CalcParams => Input%CalcParams)
       write(LOUT, '()')
       write(LOUT, '(1x,a,6x,a)') "MONOMER: ", &
                     PossibleMonomers(System%Monomer)
-      write(LOUT, '(1x,a,7x,i3)') "ZNUCL: ", System%ZNucl
+      write(LOUT, '(1x,a,6x,i3)') "ZNUCL: ", System%ZNucl
       write(LOUT, '(1x,a,5x,i3)') "CHARGE: ", System%Charge
       write(LOUT, '(1x,a,i2)') "MULTIPLICITY: ", System%Multiplicity
+      if(System%NCen.gt.0) then
+         write(LOUT, '(1x,a,i2)') "NO. OF ATOMS: ", System%NCen 
+      endif
     end associate
  enddo
 
@@ -272,6 +277,7 @@ double precision,intent(in) :: mat(ndim,ndim)
 integer :: i,j
 
  do i=1,ndim
+    write(LOUT,*) i
     write(LOUT,'(10f11.6)') (mat(i,j),j=1,ndim)
  enddo
  write(LOUT,'()') 
@@ -385,7 +391,6 @@ logical :: ex
  endif
 
 end subroutine basinfo
-
 
 function uppercase(s)
       !

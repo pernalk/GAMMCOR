@@ -344,6 +344,8 @@ implicit none
 type(SystemBlock), intent(inout) :: SystemParams
 character(*), intent(in) :: line
 character(:), allocatable :: key, val
+character(:), allocatable :: first, last
+integer :: test,test2
  
  call split(line, key, val)
  select case (uppercase(key))
@@ -355,6 +357,11 @@ character(:), allocatable :: key, val
 
  case ("ZNUCL")      
        read(val, *) SystemParams%ZNucl
+
+ case ("NATOMS")
+       read(val, *) SystemParams%NCen
+! maybe sth more fancy i.e. swapping monomers
+      ! call get_ncen(val,SystemParams)
        
  end select
 end subroutine read_block_system
@@ -479,6 +486,21 @@ character(:), allocatable :: key, val
 
 end subroutine read_sapt_mon
 
+!subroutine get_ncen(val,System)
+!
+!type(SystemBlock) :: System
+!character(*) :: val
+!character(:), allocatable :: first, last
+!integer :: ncen, AtBeg, AtEnd
+!
+!call split(val,first,last,":")
+!read(first,*) AtBeg
+!read(last,*) AtEnd
+!ncen = abs(AtEnd - AtBeg) + 1
+!System%NCen = ncen
+!
+!end subroutine get_ncen
+
 subroutine check_Input(Input)
 implicit none
 
@@ -513,8 +535,13 @@ integer :: imon
       elseif(System%ZNucl.lt.0) then
          write(LOUT,'(1x,a)') 'FATAL ERROR: INCORRECT ENTRY&
                      & ZNucl IN THE INPUT FILE'
-      write(LOUT, '(1x,a,3x,i3)') 'ZNucl', System%ZNucl
-         stop 
+         write(LOUT, '(1x,a,3x,i3)') 'ZNucl', System%ZNucl
+         stop
+      elseif(System%NCen==0.and.Input%CalcParams%imon.gt.1) then
+         write(LOUT,'(1x,a)') 'FATAL ERROR: NAtoms ENTRY MISSING!&
+                    & HAS TO BE GIVEN FOR SAPT!'
+         write(LOUT, '(1x,a,3x,i3)') 'NCen', System%NCen 
+         stop
       endif
 
       if(System%Multiplicity.lt.0) then

@@ -5,12 +5,14 @@ C
 C     READ HAO, 2-EL INTEGRALS IN NO, C_COEFFICIENTS, IGEM FROM A DALTON_GENERATED FILE
 C     READ UMOAO FROM DALTON.MOPUN
 C
-      use types      
+      use types   
+      use tran   
 C
       Implicit Real*8 (A-H,O-Z)
 C
       Real*8 XKin(NInte1),XNuc(NInte1),Occ(NBasis),URe(NBasis,NBasis),
      $ TwoEl(NInte2),UMOAO(NBasis,NBasis)
+      double precision, allocatable :: TMPMO(:,:)
 C
       Character*60 Line
       Character*30 Line1
@@ -58,6 +60,82 @@ C
 C     GET 2-EL NO INTEGRALS AND CICoef
 C 
       Call read2el(TwoEl,UMOAO,NBasis,NInte2)
+C
+C     TESTING TRAN4
+      allocate(TMPMO(NBasis**2,NBasis**2))
+C
+C      call tran4_unsym2(NBasis,NBasis,UMOAO,NBasis,UMOAO,
+C     $     NBasis,UMOAO,NBasis,UMOAO,TMPMO)
+C
+C       block
+C       integer :: ip,iq,ir,is,irs,ipq 
+C       irs=0
+C       do is=1,NBasis
+C       do ir=1,NBasis
+C       irs=irs+1
+C       ipq=0
+C       do iq=1,NBasis
+C       do ip=1,NBasis
+C       ipq=ipq+1
+C
+C       write(6,*) TwoEl(NAddr3(ip,iq,ir,is)),TMPMO(ipq,irs)
+CC       write(6,*) TMPMO(ipq,irs), TMPMO(irs,ipq)
+C       enddo
+C       enddo
+C       enddo
+C       enddo
+C       end block
+C      call tran4_sym(NBasis,NBasis,transpose(UMOAO),
+C     $ NBasis,transpose(UMOAO),
+C     $ NBasis,transpose(UMOAO),NBasis,transpose(UMOAO))
+CC
+C      block
+C      integer :: ip,iq,ir,is,irs,ipq
+C      integer :: iunit
+C      double precision :: work1(NBasis*NBasis)
+C      double precision :: work2(NBasis*NBasis)
+CC
+C      open(newunit=iunit,file='TWOMOAB',status='OLD',
+C     $ access='DIRECT',recl=8*NBasis*(NBasis+1)/2)
+CC
+CC      CHECK-1
+CC      irs=0
+CC      do is=1,NBasis
+CC      do ir=1,NBasis
+CC      !irs=irs+1
+CC      irs = min(ir,is) + max(ir,is)*(max(ir,is)-1)/2
+CC      read(iunit,rec=irs) work1(1:NBasis*(NBasis+1)/2)
+CC      call triang_to_sq(work1,work2,NBasis)
+CC      ipq=0
+CC      do iq=1,NBasis
+CC      do ip=1,NBasis
+CC      ipq=ipq+1
+CC      write(6,*) TwoEl(NAddr3(ip,iq,ir,is)), work2(ipq)
+CC      enddo
+CC      enddo
+CC      enddo
+CC      enddo
+CC     CHECK-2
+C      irs=0
+C      do is=1,NBasis
+C      do ir=1,is
+C      irs=irs+1
+C      read(iunit,rec=irs) work1(1:NBasis*(NBasis+1)/2)
+C      ipq=0
+C      do iq=1,NBasis
+C      do ip=1,iq
+C      ipq = ipq+1
+CC      write(6,*) TwoEl(NAddr3(ip,iq,ir,is)), work1(ipq)   
+CCC      write(6,*) ip,iq,ir,is,TwoEl(NAddr3(ip,iq,ir,is))
+C      enddo
+C      enddo
+C      enddo
+C      enddo
+CC
+C      close(iunit)
+C      end block
+C
+      deallocate(TMPMO)
 C
       If(ICASSCF.Eq.0) Then
 C
@@ -1346,6 +1424,34 @@ c     *          write(*,'(4I4,F12.8)') ip, iq, ir, is, dbuf(i)
       end do
       
       if (nxx .ge. 0) go to 10
+
+C     TEST read2el vs. test2el
+C      block
+C
+C      integer :: iunit,ip,iq,ir,is
+C      double precision :: TMP1, TMP2
+C      double precision :: mat(NBasis*(NBasis+1)/2)
+C
+C      open(newunit=iunit,file='AOTWOSORT',access='DIRECT',
+C     $ recl=8*NBasis*(NBasis+1)/2)
+C
+C      do is=1,NBasis
+C      do ir=1,NBasis
+C      read(iunit,rec=min(ir,is)+max(ir,is)*(max(ir,is)-1)/2) mat
+C      do iq=1,NBasis
+C      do ip=1,NBasis
+C  
+C      TMP1 = TwoEl(NAddr3(ip,iq,ir,is)) 
+C      TMP2 = mat(min(ip,iq)+max(ip,iq)*(max(ip,iq)-1)/2)
+C      if(TMP1.ne.TMP2) write(6,*) TMP1,TMP2
+C    
+C      enddo
+C      enddo
+C      enddo
+C      enddo
+C      close(iunit)
+C
+C      end block
 C
 C     TRANSFORM THE INTEGRALS
 C

@@ -254,6 +254,7 @@ elseif(Flags%ISAPT.Eq.1) then
       monA%Charge = Input%SystemInput(1)%Charge
       monA%NBasis = Input%CalcParams%NBasis
       monA%Multiplicity = Input%SystemInput(1)%Multiplicity
+      monA%NCen = Input%SystemInput(1)%NCen
       monA%Monomer = Input%SystemInput(1)%Monomer
       monA%IPrint = Input%CalcParams%IPrint  
      
@@ -264,6 +265,7 @@ elseif(Flags%ISAPT.Eq.1) then
       monB%Charge = Input%SystemInput(2)%Charge
       monB%NBasis = Input%CalcParams%NBasis
       monB%Multiplicity = Input%SystemInput(2)%Multiplicity
+      monB%NCen = Input%SystemInput(2)%NCen
       monB%Monomer = Input%SystemInput(2)%Monomer
       monB%IPrint = Input%CalcParams%IPrint  
      
@@ -279,6 +281,7 @@ elseif(Flags%ISAPT.Eq.1) then
       monA%Charge = Input%SystemInput(2)%Charge
       monA%NBasis = Input%CalcParams%NBasis
       monA%Multiplicity = Input%SystemInput(2)%Multiplicity
+      monA%NCen = Input%SystemInput(2)%NCen
       monA%Monomer = Input%SystemInput(2)%Monomer
       monA%IPrint = Input%CalcParams%IPrint  
      
@@ -289,6 +292,7 @@ elseif(Flags%ISAPT.Eq.1) then
       monB%Charge = Input%SystemInput(1)%Charge
       monB%NBasis = Input%CalcParams%NBasis
       monB%Multiplicity = Input%SystemInput(1)%Multiplicity
+      monB%NCen = Input%SystemInput(1)%NCen
       monB%Monomer = Input%SystemInput(1)%Monomer
       monB%IPrint = Input%CalcParams%IPrint  
      
@@ -329,10 +333,12 @@ elseif(Flags%ISAPT.Eq.1) then
     write(LOUT,'(1x,a)') 'MONOMER A'
     write(LOUT,'(1x,a,1x,i3)') 'NUCLEAR CHARGE: ', SAPT%monA%ZNucl
     write(LOUT,'(1x,a,8x,i3)') 'CHARGE: ', SAPT%monA%Charge
+    write(LOUT,'(1x,a,3x,i3)') 'NO.OF ATOMS: ', SAPT%monA%NCen
     write(LOUT,'()')
     write(LOUT,'(1x,a)') 'MONOMER B'
     write(LOUT,'(1x,a,1x,i3)') 'NUCLEAR CHARGE: ', SAPT%monB%ZNucl
     write(LOUT,'(1x,a,8x,i3)') 'CHARGE: ', SAPT%monB%Charge
+    write(LOUT,'(1x,a,3x,i3)') 'NO.OF ATOMS: ', SAPT%monB%NCen
 
 endif
 
@@ -412,6 +418,8 @@ write(LOUT, '(1x,a,6x,i3)') "IFlFrag ", &
              (Flags%IFlFrag)
 write(LOUT, '(1x,a,6x,i3)') "IFl12   ", &
               (Flags%IFl12)
+write(LOUT, '(1x,a,6x,i3)') "ISAPT   ", &
+              (Flags%ISAPT)
 
 end subroutine print_Flags
 

@@ -133,7 +133,7 @@ integer,parameter :: cbuf=512
 integer :: i,rs,ab
 
  write(6,'()') 
- write(6,'(1x,a)') 'TRAN4_SYM_OUT_OF_CORE'
+! write(6,'(1x,a)') 'TRAN4_SYM_OUT_OF_CORE'
  write(6,'(1x,a)') 'Transforming integrals for AB dimer'
 
  allocate(work1(NBas*NBas),work2(NBas*NBas))
@@ -199,7 +199,7 @@ integer :: i,rs,ab
 
  deallocate(work1,work2,work3)
  close(iunit3)
- close(iunit2)
+ close(iunit2,status='DELETE')
 
 end subroutine tran4_sym
 
