@@ -56,7 +56,7 @@ C
       GradNo=Sqrt(GradNo)
 C
       Write(6,'(/,X,''  DATA READ FROM DALTON OUTPUT. Electronic ETot = 
-     $ '',E16.6)')ETot
+     $ '',f16.8)')ETot
       Write(6,'(/,X,''  DATA READ FROM DALTON OUTPUT. GRAD NORM = 
      $ '',E16.6)')GradNo
 C
@@ -69,6 +69,8 @@ c     If(IDALTON.Eq.1)
 C
 C     CONSTRUCT LOOK-UP TABLES TO REDUCE DIMENSIONS OF GRADIENTS AND HESSIANS
 C
+
+      write(*,*) 'LOOK-UP TABLES?'
       Do I=1,NInActOrb
       IndAux(I)=0
       EndDo

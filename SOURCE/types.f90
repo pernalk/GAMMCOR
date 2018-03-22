@@ -82,11 +82,15 @@ type SystemBlock
       double precision :: SumOcc = 0
       integer :: NOrb, NGem
       integer :: NAct, INAct
+      integer :: NDim, NDimX
       integer :: NCen = 0
       integer :: NMonOrb = 0
       integer :: IPrint = 0
       integer :: IWarn = 0
-      integer,allocatable :: IGem(:)
+      integer :: icnt
+      double precision :: ThrAct = 0.992d0
+      integer,allocatable :: IGem(:), IndAux(:)
+      integer,allocatable :: IndX(:), IndN(:,:), IPair(:,:)
       double precision,allocatable :: Occ(:), CICoef(:)
 end type SystemBlock
 
@@ -135,7 +139,7 @@ end type InputData
 type SaptData
 
      type(SystemBlock) :: monA, monB
-     integer :: IPrint = 0
+     integer :: IPrint = 1000
 
 end type SaptData
 
@@ -268,6 +272,43 @@ write(LOUT,'()')
 !write(LOUT,'(8a10)') ('**********',i=1,8)
 
 end subroutine print_Input
+
+subroutine print_TwoInt(NBasis)
+! print trasformed integrals 
+implicit none
+
+integer :: NBasis
+integer :: ip,iq,ir,is,irs,ipq
+integer :: iunit,i
+double precision :: work1(NBasis*NBasis)
+double precision :: work2(NBasis*NBasis)
+
+
+ open(newunit=iunit,file='TWOMOAB',status='OLD', &
+      access='DIRECT',recl=8*NBasis*(NBasis+1)/2)
+
+ write(LOUT,'()')
+ write(LOUT,'(1x,a)') 'Two-electron integrals in the NO representation:' 
+ write(LOUT,'(4x,a,12x,a)') 'p   q   r   s', 'Val'
+ write(LOUT,'(1x,8a6)') ('------',i=1,8)
+ irs=0
+ do is=1,NBasis
+    do ir=1,is
+       irs=irs+1
+       read(iunit,rec=irs) work1(1:NBasis*(NBasis+1)/2)
+       ipq=0
+       do iq=1,NBasis
+          do ip=1,iq
+             ipq = ipq+1
+             write(LOUT,'(1x,4i4,3x,f20.16)') ip,iq,ir,is,work1(ipq)
+          enddo
+       enddo
+    enddo
+ enddo
+
+ close(iunit)
+
+end subroutine print_TwoInt
 
 subroutine print_sqmat(mat,ndim)
 implicit none

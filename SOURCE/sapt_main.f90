@@ -16,9 +16,9 @@ type(SaptData) :: SAPT
 integer :: i
 
 ! TEMPORARY - JOBTYPE_2
-! AC0
- Flags%IFlAC  = 1
- Flags%IFlSnd = 1
+! ERPA
+ Flags%IFlAC  = 0
+ Flags%IFlSnd = 0
 
  write(LOUT,'()')
  write(LOUT,'(1x,a)') 'STARTING SAPT CALCULATIONS'
@@ -37,7 +37,7 @@ implicit none
 type(FlagsData) :: Flags
 type(SaptData) :: SAPT
 
-integer :: NBasis,NDim,NInte1,NInte2
+integer :: NBasis,NSq,NInte1,NInte2
 integer :: NCMOt, NOrbt, NBasist 
 integer :: NSym, NOrb
 double precision,allocatable :: work1(:),work2(:)
@@ -64,8 +64,10 @@ double precision ::  potnuc,emy,eactiv,emcscf
    NBasis = SAPT%monA%NBasis
  endif
 ! set dimensions
-  NDim = NBasis**2
+  NSq = NBasis**2
   NInte1 = NBasis*(NBasis+1)/2
+  SAPT%monA%NDim = NBasis*(NBasis-1)/2
+  SAPT%monB%NDim = NBasis*(NBasis-1)/2
 
  allocate(work1(NInte1),work2(NBasis**2))
  allocate(Ha(NBasis**2),Hb(NBasis**2))
@@ -102,7 +104,7 @@ double precision ::  potnuc,emy,eactiv,emcscf
 
  close(ione)
  ! square form
- call writeoneint('ONEEL_A',NDim,S,Va,Ha)
+ call writeoneint('ONEEL_A',NSq,S,Va,Ha)
  
 !BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB
 
@@ -132,7 +134,7 @@ double precision ::  potnuc,emy,eactiv,emcscf
 
  close(ione)
  ! square form
- call writeoneint('ONEEL_B',NDim,S,Vb,Hb)
+ call writeoneint('ONEEL_B',NSq,S,Vb,Hb)
 
 ! AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
 ! read coefficient, occupancies
@@ -213,39 +215,20 @@ double precision ::  potnuc,emy,eactiv,emcscf
 
 ! ABABABABABABABABABABABABABABABABABABABABABABABABABABABABAB
 ! read and transform 2-el integrals
-  call test2el(NBasis,'AOTWOINT_A')
-  call tran4_sym(NBasis,NBasis,Ca,NBasis,Ca,&
+ call test2el(NBasis,'AOTWOINT_A')
+ call tran4_sym(NBasis,NBasis,Ca,NBasis,Ca,&
                         NBasis,Cb,NBasis,Cb)
-!  block
-!  print trasformed integrals 
-!  integer :: ip,iq,ir,is,irs,ipq
-!  integer :: iunit
-!  double precision :: work1(NBasis*NBasis)
-!  double precision :: work2(NBasis*NBasis)
-!
-!  open(newunit=iunit,file='TWOMOAB',status='OLD', &
-!       access='DIRECT',recl=8*NBasis*(NBasis+1)/2)
-!
-!!     CHECK
-! irs=0
-! do is=1,NBasis
-!    do ir=1,is
-!       irs=irs+1
-!       read(iunit,rec=irs) work1(1:NBasis*(NBasis+1)/2)
-!       ipq=0
-!       do iq=1,NBasis
-!          do ip=1,iq
-!             ipq = ipq+1
-!             write(6,*) ip,iq,ir,is,work1(ipq)
-!          enddo
-!       enddo
-!    enddo
-! enddo
-!
-! close(iunit)
-! end block
-! HERE ENDED!!!!!
 
+ if(SAPT%IPrint.gt.100) call print_TwoInt(NBasis)
+
+! look-up tables
+ call select_active(SAPT%monA,NBasis,Flags%ICASSCF,Flags%IFlCore)
+ call select_active(SAPT%monB,NBasis,Flags%ICASSCF,Flags%IFlCore)
+
+ call print_active(SAPT,NBasis)
+ ! if(SAPT%SaptLevel.gt.1) then
+ call calc_response(SAPT,Flags,NBasis)
+ ! endif
 
 ! allocate(work3(NBasis,NBasis))
 
@@ -284,6 +267,31 @@ double precision ::  potnuc,emy,eactiv,emcscf
  deallocate(Ca)
 
 end subroutine sapt_interface
+
+subroutine calc_response(SAPT,Flags,nbas)
+implicit none
+
+type(SaptData) :: SAPT
+type(FlagsData) :: Flags
+integer :: nbas
+
+! HERE !!!! WHAT COMMONS NEEDED FOR ACABMAT0?
+! ACAlpha=One
+! if(Flags%ICASSCF==0) then
+!
+!    call ACABMAT0(ABPLUS,ABMIN,URe,Occ,XOne,TwoNO, &
+!         NBasis,NDim,NInte1,NInte2,NGem,ACAlpha,1)
+! else
+!      Write(6,'(/,X," The number of CASSCF Active Orbitals = ",I4)')
+!     & NAcCAS
+!      Call AB_CAS(ABPLUS,ABMIN,ECASSCF,URe,Occ,XOne,TwoNO,IPair,
+!     & IndN,IndX,NDimX,NBasis,NDim,NInte1,NInte2,ACAlpha)
+!      ETot=ECASSCF
+!
+!
+! endif
+
+end subroutine 
 
 subroutine arrange_oneint(mat,nbas,SAPT)
 implicit none
@@ -685,6 +693,118 @@ integer :: nisht, nasht, nocct, norbt, nbast, nconf, nwopt, nwoph
 
 end subroutine readmulti
 
+subroutine select_active(mon,nbas,ICASSCF,IFlCore)
+implicit none
+
+type(SystemBlock) :: mon
+integer :: nbas, ICASSCF, IFlCore
+integer :: i, j, ij, icnt
+integer :: ind, ind_ij
+integer :: IAuxGem(nbas) 
+integer :: test
+
+ IAuxGem = mon%IGem
+ allocate(mon%IndAux(nbas))
+
+ do i=1,mon%NELE
+    mon%IndAux(i)=0
+ enddo
+ do i=1+mon%NELE,nbas
+    mon%IndAux(i)=2
+ enddo
+
+! active orbitals
+ mon%icnt = 0
+ if(ICASSCF==0) then
+   do i=1,mon%NELE
+      if(mon%Occ(i).lt.mon%ThrAct) then
+         mon%IndAux(i)=1
+         !write(6,'(/,X," Active Orbital: ",I4,E14.4)') &
+         !      i, mon%Occ(i)
+         mon%IndAux(FindGem(i,mon))=1
+         !write(6,'(X," Active Orbital: ",I4,E14.4)') &
+         !FindGem(i,mon), mon%Occ(FindGem(i,mon))
+         mon%icnt = mon%icnt + 2
+      endif
+   enddo
+ elseif(ICASSCF==1) then
+   do i=1,nbas
+      if(mon%Occ(i).lt.1d0.and.mon%Occ(i).ne.0d0) then
+         mon%IndAux(i) = 1
+         write(6,'(X," Active Orbital: ",I4,E14.4)') i, mon%Occ(i)
+         mon%icnt = mon%icnt + 1
+      endif
+   enddo
+
+ endif
+
+! active pairs
+ allocate(mon%IPair(nbas,nbas),mon%IndX(mon%NDim),mon%IndN(2,mon%NDim))
+
+ mon%IPair(1:nbas,1:nbas) = 0
+
+ ij=0
+ ind = 0
+ do i=1,nbas
+    do j=1,i-1
+
+       ij = ij + 1
+       ind_ij = mon%IndAux(i)+mon%IndAux(j)
+       if((ind_ij/=0).and.(ind_ij/=4)) then
+   !   do not correlate active degenerate orbitals from different geminals 
+          if(ICASSCF==0.and.(mon%IGem(i).ne.mon%IGem(j)).and.&
+             (mon%IndAux(i)==1).and.(mon%IndAux(j)==1).and.&
+             (Abs(mon%Occ(i)-mon%Occ(j))/mon%Occ(i).lt.1.d-2)&
+          .or.&
+             (ICASSCF==1).and.& 
+             (mon%IndAux(i)==1).and.(mon%IndAux(j)==1).and.&
+             (Abs(mon%Occ(i)-mon%Occ(j))/mon%Occ(i).lt.1.d-10) ) then
+   
+             write(LOUT,'(1x,a,2x,2i4)') 'Discarding nearly degenerate pair',i,j 
+           else
+              ! if IFlCore=0 exclude core (inactive) orbitals
+              if(IFlCore==1.or.&
+                (IFlCore==0.and.&
+                 mon%Occ(i)/=1d0.and.mon%Occ(j)/=1d0) ) then
+   
+                 ind = ind + 1
+                 mon%IndX(ind) = ij
+                 mon%IndN(1,ind) = i
+                 mon%IndN(2,ind) = j
+                 mon%IPair(i,j) = 1
+                 mon%IPair(j,i) = 1
+   
+              endif
+           endif
+   
+       endif
+
+    enddo
+ enddo
+
+ mon%NDimX = ind
+! Write(6,'(/,2X,"Total number of pairs:",I6)') mon%NDim !nbas*(nbas-1)/2 
+! Write(6,'(2X,"Reduced to:",I6)') mon%NDimX 
+
+contains 
+
+function FindGem(io,mon) result(IFindG)
+implicit none
+
+type(SystemBlock) :: mon
+integer :: IFindG,i,io
+
+ IFindG = 0
+ do i=1,2*mon%NELE
+    if((mon%IGem(io).eq.mon%IGem(i)).and.(io.ne.i))  IFindG=i 
+ enddo
+ 
+ if(IFindG==0) IFindG = io
+
+end function FindGem
+
+end subroutine select_active
+
 subroutine print_occ(nbas,SAPT,ICASSCF)
 implicit none
 !!! HERE : Change to A/B monomers!
@@ -716,6 +836,80 @@ integer :: i
 
 end subroutine print_occ
 
+subroutine print_active(SAPT, nbas)
+implicit none
+
+type(SaptData) :: SAPT
+integer :: nbas, i, ip 
+integer :: NDimX
+
+! print orbs  
+ write(LOUT,'()')
+ write(LOUT,'(27x,a,4x,a)') 'Monomer A', 'Monomer B' 
+ do i=1,nbas 
+   associate(IndA => SAPT%monA%IndAux(i), &
+             OccA => SAPT%monA%Occ(i), &
+             IndB => SAPT%monB%IndAux(i), & 
+             OccB => SAPT%monB%Occ(i) )
+     if(IndA==1.or.IndB==1) then
+        write(LOUT,'(1x,a,2x,i2)',advance='no') 'Active orbital: ', i
+        if(IndA==1) then
+           write(LOUT,'(e14.4)',advance='no') OccA
+        else
+           write(LOUT,'(14x)',advance='no')
+        endif 
+        if(IndB==1) then
+           write(LOUT,'(e14.4)') OccB
+        else
+           write(LOUT, '()') 
+        endif
+     endif
+   end associate
+ enddo
+ write(LOUT,'(1x,6a)') ('--------',i=1,6)
+ write(LOUT,'(1x,a,14x,i3,9x,i3)') 'Total Active: ', SAPT%monA%icnt, SAPT%monB%icnt
+
+! print pairs
+ if(SAPT%IPrint.gt.0) then
+    !NDim = nbas*(nbas-1)/2 
+    write(LOUT,'()')
+    write(LOUT,'(26x,a,5x,a)') 'Monomer A', 'Monomer B' 
+    write(LOUT,'(1x,a,2x,i6,8x,i6)') 'Total number of pairs: ', SAPT%monA%NDim,SAPT%monB%NDim
+    write(LOUT,'(1x,a,12x,i6,8x,i6)') 'Reduced to: ', SAPT%monA%NDimX, SAPT%monB%NDimX 
+   
+    NDimX = max(SAPT%monA%NDimX,SAPT%monB%NDimX) 
+    write(LOUT,'()')
+    write(LOUT,'(2x,"Accepted pairs:")')
+    write(LOUT,'(2x,a,11x,a,28x,a)') 'p  q', 'Monomer A', 'MonomerB'
+    write(LOUT,'(2x,8a)',advance='no') ('----',i=1,8)
+    write(LOUT,'(5x,8a)') ('----',i=1,8)
+    do ip=1,NDimX
+       if(ip.gt.SAPT%monA%NDimX) then
+          write(LOUT,'(34x)',advance='no')
+       else
+          associate( idx1 => SAPT%monA%IndN(1,ip), &
+                     idx2 => SAPT%monA%IndN(2,ip), &
+                     Occ => SAPT%monA%Occ )
+            write(LOUT,'(2i3,2e14.4)',advance='no') &
+                         idx1,idx2,Occ(idx1),Occ(idx2)
+          end associate
+       endif
+   
+       if(ip.gt.SAPT%monB%NDimX) then
+          write(LOUT,'(14x)')
+       else
+          associate( idx1 => SAPT%monB%IndN(1,ip), &
+                     idx2 => SAPT%monB%IndN(2,ip), &
+                     Occ => SAPT%monB%Occ )
+            write(LOUT,'(3x,2i3,2e14.4)') idx1,idx2,Occ(idx1),Occ(idx2)
+          end associate
+       endif
+      
+    enddo
+ endif
+
+end subroutine print_active
+
 subroutine print_warn(SAPT)
 implicit none
 
@@ -735,7 +929,12 @@ implicit none
 
 type(SaptData) :: SAPT
 
-deallocate(SAPT%monA%CICoef, SAPT%monA%IGem, SAPT%monA%Occ)
+deallocate(SAPT%monA%CICoef,SAPT%monA%IGem,SAPT%monA%Occ, &
+           SAPT%monA%IndAux,SAPT%monA%IndX,SAPT%monA%IndN,&
+           SAPT%monA%IPair)
+deallocate(SAPT%monB%CICoef,SAPT%monB%IGem,SAPT%monB%Occ, &
+           SAPT%monB%IndAux,SAPT%monB%IndX,SAPT%monB%IndN,&
+           SAPT%monB%IPair)
 
 end subroutine free_sapt
 

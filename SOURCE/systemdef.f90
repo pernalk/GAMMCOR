@@ -233,6 +233,7 @@ if(Flags%ISAPT.Eq.0) then
    System%Charge = Input%SystemInput(1)%Charge
    System%NBasis = Input%CalcParams%NBasis
    System%Multiplicity = Input%SystemInput(1)%Multiplicity
+   System%ThrAct = Input%SystemInput(1)%ThrAct
    System%IPrint = Input%CalcParams%IPrint  
   
    System%XELE = (System%ZNucl - System%Charge)/2.0d0 
@@ -254,6 +255,7 @@ elseif(Flags%ISAPT.Eq.1) then
       monA%Charge = Input%SystemInput(1)%Charge
       monA%NBasis = Input%CalcParams%NBasis
       monA%Multiplicity = Input%SystemInput(1)%Multiplicity
+      monA%ThrAct = Input%SystemInput(1)%ThrAct
       monA%NCen = Input%SystemInput(1)%NCen
       monA%Monomer = Input%SystemInput(1)%Monomer
       monA%IPrint = Input%CalcParams%IPrint  
@@ -265,6 +267,7 @@ elseif(Flags%ISAPT.Eq.1) then
       monB%Charge = Input%SystemInput(2)%Charge
       monB%NBasis = Input%CalcParams%NBasis
       monB%Multiplicity = Input%SystemInput(2)%Multiplicity
+      monB%ThrAct = Input%SystemInput(2)%ThrAct
       monB%NCen = Input%SystemInput(2)%NCen
       monB%Monomer = Input%SystemInput(2)%Monomer
       monB%IPrint = Input%CalcParams%IPrint  
@@ -281,6 +284,7 @@ elseif(Flags%ISAPT.Eq.1) then
       monA%Charge = Input%SystemInput(2)%Charge
       monA%NBasis = Input%CalcParams%NBasis
       monA%Multiplicity = Input%SystemInput(2)%Multiplicity
+      monA%ThrAct = Input%SystemInput(2)%ThrAct
       monA%NCen = Input%SystemInput(2)%NCen
       monA%Monomer = Input%SystemInput(2)%Monomer
       monA%IPrint = Input%CalcParams%IPrint  
@@ -292,6 +296,7 @@ elseif(Flags%ISAPT.Eq.1) then
       monB%Charge = Input%SystemInput(1)%Charge
       monB%NBasis = Input%CalcParams%NBasis
       monB%Multiplicity = Input%SystemInput(1)%Multiplicity
+      monB%ThrAct = Input%SystemInput(1)%ThrAct
       monB%NCen = Input%SystemInput(1)%NCen
       monB%Monomer = Input%SystemInput(1)%Monomer
       monB%IPrint = Input%CalcParams%IPrint  
@@ -326,19 +331,21 @@ write(LOUT,'(1x,a)') 'SYSTEM '
 write(LOUT,'(8a10)') ('**********',i=1,8)
 
 if(Flags%ISAPT.Eq.0) then
-   write(LOUT,'(1x,a,1x,i3)') 'NUCLEAR CHARGE: ', System%ZNucl
+   write(LOUT,'(1x,a,1x,i2)') 'NUCLEAR CHARGE: ', System%ZNucl
    write(LOUT,'(1x,a,8x,i3)') 'CHARGE: ', System%Charge
 
 elseif(Flags%ISAPT.Eq.1) then
     write(LOUT,'(1x,a)') 'MONOMER A'
-    write(LOUT,'(1x,a,1x,i3)') 'NUCLEAR CHARGE: ', SAPT%monA%ZNucl
+    write(LOUT,'(1x,a,1x,i2)') 'NUCLEAR CHARGE: ', SAPT%monA%ZNucl
     write(LOUT,'(1x,a,8x,i3)') 'CHARGE: ', SAPT%monA%Charge
     write(LOUT,'(1x,a,3x,i3)') 'NO.OF ATOMS: ', SAPT%monA%NCen
+    write(LOUT,'(1x,a,2x,f9.4)') 'THRESH ACTIVE: ', SAPT%monA%ThrAct
     write(LOUT,'()')
     write(LOUT,'(1x,a)') 'MONOMER B'
-    write(LOUT,'(1x,a,1x,i3)') 'NUCLEAR CHARGE: ', SAPT%monB%ZNucl
+    write(LOUT,'(1x,a,1x,i2)') 'NUCLEAR CHARGE: ', SAPT%monB%ZNucl
     write(LOUT,'(1x,a,8x,i3)') 'CHARGE: ', SAPT%monB%Charge
     write(LOUT,'(1x,a,3x,i3)') 'NO.OF ATOMS: ', SAPT%monB%NCen
+    write(LOUT,'(1x,a,2x,f9.4)') 'THRESH ACTIVE: ', SAPT%monB%ThrAct
 
 endif
 

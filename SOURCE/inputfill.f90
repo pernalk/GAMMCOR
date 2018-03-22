@@ -362,7 +362,9 @@ integer :: test,test2
        read(val, *) SystemParams%NCen
 ! maybe sth more fancy i.e. swapping monomers
       ! call get_ncen(val,SystemParams)
-       
+ case ("THRACT")
+       read(val,*) SystemParams%ThrAct
+             
  end select
 end subroutine read_block_system
 
