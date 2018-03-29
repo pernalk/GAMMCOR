@@ -80,6 +80,8 @@ type SystemBlock
       integer :: NELE
       double precision :: XELE
       double precision :: SumOcc = 0
+      integer :: NSym = 1
+      integer :: GFunc(8) = 0
       integer :: NOrb, NGem
       integer :: NAct, INAct
       integer :: NDim, NDimX

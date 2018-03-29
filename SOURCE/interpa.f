@@ -225,6 +225,11 @@ C
       Call ACABMAT0(ABPLUS,ABMIN,URe,Occ,XOne,TwoNO,
      $ NBasis,NDim,NInte1,NInte2,NGem,ACAlpha,1)
 C
+C     Test diagonal part:
+C      Do I=1,NDim
+C      Write(6,*) ABPLUS(NDim*(I-1)+I), ABMIN(NDim*(I-1)+I)
+C      EndDo
+C
       ElseIf(ICASSCF.Eq.1) Then
 C
 c       Call RDMFT_AB(ABPLUS,ABMIN,URe,Occ,XOne,TwoNO,
@@ -302,12 +307,30 @@ C
       EndDo
       EndDo
 C
+CC     Test diagonal part:
+C!      Do I=1,NDimX
+C!      Write(6,*) ABPLUS(NDimX*(I-1)+I), ABMIN(NDimX*(I-1)+I)
+C!      EndDo
+C      Do I=1,NDim**2
+C      TMP = TMP + ABMIN(I)**2
+C      EndDo
+C      Write(6,*) TMP
+
+C
 C     FIND EIGENVECTORS (EigVecR) AND COMPUTE THE ENERGY
 C
       If(ISERPA.Eq.0) Then
 C
       Call ERPASYMM(EigVecR,Eig,ABPLUS,ABMIN,NBasis,NDimX)
+      TMP = 0
+      Do I=1,NDimX**2
+      TMP = TMP + EigVecR(I)**2
+      EndDo
+      Write(6,*) TMP
 C
+      Do I=1,NDimX
+      Write(6,*) I, Eig(I), EigVecR(NDimX*(I-1)+I)
+      EndDo
       Write(6,'(/," *** Computing ERPA energy *** ",/)')
 C
       ECorr=EOneTot
@@ -1182,6 +1205,8 @@ C
       ABMIN(J,I)=ABMIN(I,J)
       EndDo
       EndDo
+C 
+      Work = 0
 C
 C     FIND A+^(1/2)
 C
@@ -1222,7 +1247,16 @@ C
       Call MultpM(HlpAB,ABMIN,APLSQRT,NDimX)
       Call MultpM(EigVecR,APLSQRT,HlpAB,NDimX)
 C
+C      TEST FOR SAPT
+C      Do I=1,NDimX
+C      write(6,*) I, Eig(I), EigVecR(NDimX*(I-1)+I)
+C      EndDo
+C 
       Call Diag8(EigVecR,NDimX,NDimX,Eig,Work)
+C
+C      Do I=1,NDimX
+C      write(6,*) I, Eig(I), EigVecR(NDimX*(I-1)+I)
+C      EndDo 
 C
 C     COMPUTE Y's
 C
@@ -1230,6 +1264,7 @@ C
       Do J=I,NDimX
       HlpAB(I,J)=EigVecR(NDimX*(I-1)+J) 
       HlpAB(J,I)=EigVecR(NDimX*(J-1)+I)
+C      Write(6,*) HlpAB(I,J), HlpAB(J,I)
       EndDo
       EndDo
       Call MultpM(EigVecR,APLSQRT,HlpAB,NDimX) 
@@ -1267,6 +1302,11 @@ C
 c     enddo NU
       EndDo
 C
+C     TEST FOR SAPT
+C      Do I=1,NDimX
+C      write(6,*) I, EigVecR(NDimX*(I-1)+I)
+C      EndDo 
+
       Return
       End
 

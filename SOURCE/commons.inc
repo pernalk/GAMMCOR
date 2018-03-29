@@ -1,6 +1,6 @@
 C
       Common/MISCFL/ XELE,IFun,IFunSR,IFunSRKer,NELE,IRes,INO,IPrint,
-     $ IInteg,IAO,IGVB,IDALTON,IFreeze,ILoc,NInActOrb,NActOrb,NVirtOrb
+     $ IInteg,IAO,IGVB,IDALTON,IFreeze,ILoc,NInActOrb,NActOrb,NVirtOrb,
      $ ISAPT
       Common/CAS/ ICASSCF,NAcCAS,NInAcCAS
       Common/BBC3/ IType(1000)

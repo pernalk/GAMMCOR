@@ -1718,6 +1718,20 @@ C
       Return
       End
 
+*Deck TEST_COMM_HAPKA
+      Subroutine COMMTST(NBasis)
+C     TESTS COMMONS PASSED BY SAPT
+      Implicit Real*8 (A-H,O-Z)
+C    
+      Parameter(Zero=0.D0, Half=0.5D0, One=1.D0, Two=2.D0, Four=4.D0)
+      Parameter(Delta=1.D-6)
+C     
+      Include 'commons.inc'
+C
+      write(*,*) CICoef(1:NBasis)
+      write(*,*) IGem(1:NBasis)
+      End
+
 *Deck ACABMAT0
       Subroutine ACABMAT0(AMAT,BMAT,URe,Occ,XOne,TwoMO,
      $ NBasis,NDim,NInte1,NInte2,NGem,ACAlpha,IFlag)
@@ -1749,8 +1763,23 @@ C
       Dimension HNO(NInte1),C(NBasis),
      $ AuxXC(NBasis,NInte1),AuxH(NBasis,NInte1),IGFact(NInte2)
 C
+      If(ISAPT.Eq.1) Then
+      Write(6,'(1x,a)') 'Computing response'
+      Else
       Write(6,'(/,X,"***** COMPUTING AMAT, BMAT IN ACABMAT0 *****",/)')
+      EndIf
 C
+C     TEST URe
+C      Do I=1,NBasis
+C      Do J=1,NBasis
+C      write(6,*) URe(I,I)
+C      EndDo
+C      EndDo
+C      write(*,*) XOne(1:NBasis)
+C      Do I=1,NBasis
+C      Write(6,*) XOne(I*(I-1)/2+I)
+C      EndDo
+
       Do I=1,NDim
       Do J=1,NDim
       AMAT(I,J)=Zero
@@ -1789,6 +1818,7 @@ C
 C
       If(IGem(I).Ne.IGem(J)) Then
 C
+
       HNO(IJ)=ACAlpha*HNO(IJ)
 C
       Else
@@ -1971,6 +2001,12 @@ C
       EndDo
       EndDo
       EndDo
+C
+C     TEST FOR SAPT
+C      Do I=1,NDim
+CC      Write(6,*) AMAT(1,I)
+C      Write(6,*) AMAT(1,I),BMAT(1,I)
+C      EndDo
 C
       Return
       End

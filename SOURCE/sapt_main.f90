@@ -40,6 +40,7 @@ type(SaptData) :: SAPT
 integer :: NBasis,NSq,NInte1,NInte2
 integer :: NCMOt, NOrbt, NBasist 
 integer :: NSym, NOrb
+integer :: NOcc(8),NOrbs(8)
 double precision,allocatable :: work1(:),work2(:)
 double precision,allocatable :: Ha(:),Hb(:)
 double precision,allocatable :: Va(:),Vb(:),S(:)
@@ -50,7 +51,8 @@ logical :: exsiri
 double precision :: tmp
 !integer :: K,LL,NN,NLine
 integer :: p,q
-double precision,allocatable :: work3(:,:)
+!double precision,allocatable :: work3(:,:)
+double precision,allocatable :: work3(:)
 character(8) :: dupa
 integer :: tmp1
 double precision ::  potnuc,emy,eactiv,emcscf
@@ -66,6 +68,7 @@ double precision ::  potnuc,emy,eactiv,emcscf
 ! set dimensions
   NSq = NBasis**2
   NInte1 = NBasis*(NBasis+1)/2
+  NInte2 = NInte1*(NInte1+1)/2
   SAPT%monA%NDim = NBasis*(NBasis-1)/2
   SAPT%monB%NDim = NBasis*(NBasis-1)/2
 
@@ -122,12 +125,10 @@ double precision ::  potnuc,emy,eactiv,emcscf
  call triang_to_sq(work1,work2,NBasis)
  Vb(:) = Hb - work2
 
-! call readlabel(ione,'OVERLAP ')
-! call readoneint(ione,work1)
-! call triang_to_sq(work1,S,NBasis)
-
 ! rearrange in V: (B,A) -> (A,B)
+ call arrange_oneint(S,NBasis,SAPT)
  call arrange_oneint(Vb,NBasis,SAPT)
+ call arrange_oneint(Hb,NBasis,SAPT)
 
 ! print*, 'VB:'
 ! call print_sqmat(Vb,NBasis)
@@ -144,12 +145,15 @@ double precision ::  potnuc,emy,eactiv,emcscf
     open(newunit=isiri,file='SIRIFC_A',status='OLD', &
          access='SEQUENTIAL',form='UNFORMATTED')
     call readlabel(isiri,'TRCCINT ')
-    read(isiri) NSym,NOrbt,NBasist,NCMOt
- !   write(*,*) NSym,NOrbt,NBasist,NCMOt
- !   write(*,*) NOrb, 'NOrb'
+    read(isiri) NSym,NOrbt,NBasist,NCMOt,NOcc(1:NSym),NOrbs(1:NSym)
+!    print*, 'NSym,NOrb,NOcc: '
+!    write(*,*) NSym,NOrbt,NBasist,NCMOt
+    SAPT%monA%NSym = NSym
     SAPT%monA%NOrb = NOrbt
+    SAPT%monA%GFunc(1:NSym) = NOrbs(1:NSym)
  else
     SAPT%monA%NOrb = NOrb
+    SAPT%monA%GFunc(1) = NOrb
     NBasist = NBasis
     NCMOt = NOrb*NBasis
  endif 
@@ -157,7 +161,6 @@ double precision ::  potnuc,emy,eactiv,emcscf
     rewind(isiri)
     read (isiri)
     read (isiri) potnuc,emy,eactiv,emcscf
-!   write(*,*)   potnuc,emy,eactiv,emcscf
 
  if(Flags%ICASSCF==1) then
     call readmulti(NBasis,SAPT%monA,exsiri,isiri,'occupations.dat','SIRIUS_A.RST')
@@ -173,12 +176,16 @@ double precision ::  potnuc,emy,eactiv,emcscf
     open(newunit=isiri,file='SIRIFC_B',status='OLD', &
          access='SEQUENTIAL',form='UNFORMATTED')
     call readlabel(isiri,'TRCCINT ')
-    read(isiri) NSym,NOrbt,NBasist,NCMOt
+    read(isiri) NSym,NOrbt,NBasist,NCMOt,NOcc(1:NSym),NOrbs(1:NSym)
  !   write(*,*) 'B: ',NSym,NOrbt,NBasist,NCMOt
  !   write(*,*) NOrb, 'NOrb'
+    SAPT%monB%NSym = NSym
     SAPT%monB%NOrb = NOrbt
+    SAPT%monB%GFunc(1:NSym) = NOrbs(1:NSym)
  else
     SAPT%monB%NOrb = NOrb
+    SAPT%monB%GFunc(1) = NOrb
+    
 !    NBasist = NBasis
 !    NCMOt = NOrb*NBasis
  endif 
@@ -203,7 +210,7 @@ double precision ::  potnuc,emy,eactiv,emcscf
 ! dependecies in large basis sets
 ! ncmot = norb*nbas
  allocate(Ca(NCMOt),Cb(NCMOt))
- allocate(work3(NBasis,NBasis))
+! allocate(work3(NBasis,NBasis))
 
  call read_mo(Ca,NOrbt,NBasist,'SIRIUS_A.RST','DALTON_A.MOPUN')
  call read_mo(Cb,NOrbt,NBasist,'SIRIUS_B.RST','DALTON_B.MOPUN')
@@ -217,7 +224,7 @@ double precision ::  potnuc,emy,eactiv,emcscf
 ! read and transform 2-el integrals
  call test2el(NBasis,'AOTWOINT_A')
  call tran4_sym(NBasis,NBasis,Ca,NBasis,Ca,&
-                        NBasis,Cb,NBasis,Cb)
+                NBasis,Cb,NBasis,Cb,'TWOMOAB')
 
  if(SAPT%IPrint.gt.100) call print_TwoInt(NBasis)
 
@@ -226,72 +233,166 @@ double precision ::  potnuc,emy,eactiv,emcscf
  call select_active(SAPT%monB,NBasis,Flags%ICASSCF,Flags%IFlCore)
 
  call print_active(SAPT,NBasis)
- ! if(SAPT%SaptLevel.gt.1) then
- call calc_response(SAPT,Flags,NBasis)
- ! endif
 
-! allocate(work3(NBasis,NBasis))
+! calculate response
+! if(SAPT%SaptLevel.gt.1) then
+    call SaptInter(NBasis,SAPT%monA,Flags%ISAPT)
+!   call COMMTST(NBasis) 
+    call calc_response(SAPT%monA,Ca,Flags,NBasis,'TWOMOAA')
+! mon B
+    call SaptInter(NBasis,SAPT%monB,Flags%ISAPT)
+!   call COMMTST(NBasis) 
+    call calc_response(SAPT%monB,Cb,Flags,NBasis,'TWOMOBB')
+! endif
 
-! k = 0
-! work3 = 0
-! do p=1,NBasis
-!    do q=1,NBasis
-!       k = k + 1
-!       work3(p,q) = Ca(k)
-!    enddo
-! enddo
- 
- 
  deallocate(work1,work2)
-
-!!!! check stuff!
-!  S = 0
-!  Va = 0
-!  Ha = 0
-!  open(newunit=ione,file='ONEEL_A',access='SEQUENTIAL', &
-!        form='UNFORMATTED',status='OLD')
-! 
-!  read(ione) dupa, S 
-!  read(ione) dupa, Va
-!  read(ione) dupa, Ha
-!
-!  write(*,*) 'Ha',Ha(1:NBasis) 
-!  write(*,*) 'S',S(1:NBasis) 
-!  print*, dupa
-! 
-!  close(ione) 
 
 ! don't forget to write Ca, Cb to file!!!
 
  deallocate(Ha,Hb,Va,Vb,S)
- deallocate(Ca)
+ deallocate(Ca,Cb)
 
 end subroutine sapt_interface
 
-subroutine calc_response(SAPT,Flags,nbas)
+subroutine calc_response(Mon,MO,Flags,NBas,fname)
 implicit none
 
-type(SaptData) :: SAPT
+!type(SaptData) :: SAPT
+type(SystemBlock) :: Mon
 type(FlagsData) :: Flags
-integer :: nbas
+double precision :: MO(:)        
+integer :: NBas
+character(*) :: fname
+integer :: NSq,NInte1,NInte2
+double precision, allocatable :: work1(:),work2(:),XOne(:),TwoMO(:) 
+double precision, allocatable :: ABPlus(:), ABMin(:), URe(:,:), &
+                                 EigVecR(:), Eig(:)
+double precision,parameter :: One = 1d0
+integer :: i,j,ij,ij1,ione,itwo 
+double precision :: ACAlpha
+character(8) :: label
+character(:),allocatable :: onefile,twofile,propfile
+double precision :: tmp
 
-! HERE !!!! WHAT COMMONS NEEDED FOR ACABMAT0?
-! ACAlpha=One
-! if(Flags%ICASSCF==0) then
-!
-!    call ACABMAT0(ABPLUS,ABMIN,URe,Occ,XOne,TwoNO, &
-!         NBasis,NDim,NInte1,NInte2,NGem,ACAlpha,1)
-! else
+! set filenames
+ if(Mon%Monomer==1) then
+    onefile = 'ONEEL_A'
+    twofile = 'TWOMOAA'
+    propfile = 'PROP_A'
+ elseif(Mon%Monomer==2) then
+    onefile = 'ONEEL_B'
+    twofile = 'TWOMOBB'
+    propfile = 'PROP_B'
+ endif
+
+! set dimensions
+ NSq = NBas**2
+ NInte1 = NBas*(NBas+1)/2
+ NInte2 = NInte1*(NInte1+1)/2
+
+ allocate(work1(NSq),work2(NSq),XOne(NInte1),URe(NBas,NBas),&
+          TwoMO(NInte2))
+ 
+ URe = 0d0
+ do i=1,NBas
+    URe(i,i) = 1d0
+ enddo
+
+! read 1-el
+ open(newunit=ione,file=onefile,access='sequential',&
+      form='unformatted',status='old')
+
+ read(ione) 
+ read(ione)
+ read(ione) label, work1
+ if(label=='ONEHAMIL') then
+    call tran_oneint(work1,MO,MO,Mon%NSym,Mon%GFunc,work2,NBas)
+    call sq_to_triang(work1,XOne,NBas) 
+ else
+    write(LOUT,'(a)') 'ERROR! ONEHAMIL NOT FOUND IN '//onefile
+    stop
+ endif
+
+! diag XOne
+! do i=1,NBas
+!    write(*,*) XOne(i*(i-1)/2+i)
+! enddo
+!  write(*,*) XOne(1:NBas)
+
+! read 2-el
+! HERE???: Dedicated procedures for sym TWOMOAA, TWOMOBB?
+! call print_mo(MO,Mon%NOrb,'MONOMER B')
+
+ call tran4_sym(NBas,NBas,MO,NBas,MO, &
+                     NBas,MO,NBas,MO,fname)
+ call LoadSaptTwoEl(Mon%Monomer,TwoMO,NBas,NInte2)
+
+ ACAlpha=One
+ if(Flags%ICASSCF==0) then
+
+   allocate(ABPlus(Mon%NDim**2),ABMin(Mon%NDim**2), &
+            EigVecR(Mon%NDimX**2),Eig(Mon%NDimX))
+
+   call ACABMAT0(ABPlus,ABMin,URe,Mon%Occ,XOne,TwoMO, &
+                 NBas,Mon%NDim,NInte1,NInte2,Mon%NGem,ACAlpha,1)
+!  
+!   do i=1,Mon%NDim
+!       write(LOUT,*) ABPlus(1,i),ABMin(1,i)
+!!      write(LOUT,*) ABPlus(i,i), ABMin(i,i)
+!   enddo
+
+ ! reduce dim
+ do j=1,Mon%NDimX
+    do i=1,Mon%NDimX
+        ij=(j-1)*Mon%NDimX+i
+        ij1=(Mon%IndX(j)-1)*Mon%NDim+Mon%IndX(i)
+        ABPlus(ij) = ABPlus(ij1)
+        ABMin(ij) = ABMin(ij1)
+    enddo
+ enddo
+
+! do i=1,Mon%NDim**2
+!     tmp = tmp + ABMin(i)**2
+!    write(*,*) ABPlus(Mon%NDimX*(i-1)+i), ABMin(Mon%NDimX*(i-1)+i)
+! enddo
+! write(*,*) tmp
+
+ EigVecR = 0
+ Eig = 0
+ call ERPASYMM(EigVecR,Eig,ABPlus,ABMin,NBas,Mon%NDimX)
+
+! weird stuff ?
+ do i=1,Mon%NDimX**2
+     !tmp = tmp + Eig(i)**2
+     tmp = tmp + EigVecR(i)**2
+ enddo
+ write(*,*) tmp
+! do i=1,Mon%NDimX
+!    write(LOUT,*) Eig(i),EigVecR(Mon%NDimX*(i-1)+i)
+! enddo
+
+
+ else
+
+   allocate(ABPlus(Mon%NDimX**2),ABMin(Mon%NDimX**2))
+   write(LOUT,'(a)') 'ERROR! NOT READY YET!'
+!!! HERE FINISHED!! 
 !      Write(6,'(/,X," The number of CASSCF Active Orbitals = ",I4)')
 !     & NAcCAS
 !      Call AB_CAS(ABPLUS,ABMIN,ECASSCF,URe,Occ,XOne,TwoNO,IPair,
 !     & IndN,IndX,NDimX,NBasis,NDim,NInte1,NInte2,ACAlpha)
 !      ETot=ECASSCF
 !
-!
-! endif
+ endif
 
-end subroutine 
+! dump response
+ call writeresp(EigVecR,Eig,propfile)
+
+ close(ione)
+ deallocate(work1,work2,XOne,TwoMO,URe)
+ deallocate(ABPlus,ABMin,EigVecR,Eig)
+
+end subroutine calc_response 
 
 subroutine arrange_oneint(mat,nbas,SAPT)
 implicit none
@@ -363,6 +464,8 @@ if(ex) then
       stop
    endif
    A%NMonOrb = tmp - B%NMonOrb
+
+   close(iunit)
 else
    write(LOUT,'(1x,a)') 'ERROR! MISSING SYMINFO_B FILE!'
    stop
@@ -498,6 +601,19 @@ double precision,dimension(ndim) :: S, V, H
 
 end subroutine writeoneint
 
+subroutine writeresp(EVec,EVal,mon)
+implicit none
+
+character(*) :: mon
+double precision :: EVec(:), EVal(:)
+integer :: iunit
+
+ open(newunit=iunit,file=mon,form='unformatted')
+ write(iunit) EVec
+ write(iunit) EVal
+ close(iunit)
+
+end subroutine writeresp
 
 subroutine readgvb(mon,n,cfile)
 implicit none

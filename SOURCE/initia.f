@@ -6,6 +6,7 @@ C     READ HAO, 2-EL INTEGRALS IN NO, C_COEFFICIENTS, IGEM FROM A DALTON_GENERAT
 C     READ UMOAO FROM DALTON.MOPUN
 C
       use types   
+      use sorter
       use tran   
 C
       Implicit Real*8 (A-H,O-Z)
@@ -60,9 +61,10 @@ C
 C     GET 2-EL NO INTEGRALS AND CICoef
 C 
       Call read2el(TwoEl,UMOAO,NBasis,NInte2)
+C      Call test2el(NBasis,'AOTWOINT_A')
 C
 C     TESTING TRAN4
-      allocate(TMPMO(NBasis**2,NBasis**2))
+C      allocate(TMPMO(NBasis**2,NBasis**2))
 C
 C      call tran4_unsym2(NBasis,NBasis,UMOAO,NBasis,UMOAO,
 C     $     NBasis,UMOAO,NBasis,UMOAO,TMPMO)
@@ -87,15 +89,16 @@ C       enddo
 C       end block
 C      call tran4_sym(NBasis,NBasis,transpose(UMOAO),
 C     $ NBasis,transpose(UMOAO),
-C     $ NBasis,transpose(UMOAO),NBasis,transpose(UMOAO))
+C     $ NBasis,transpose(UMOAO),NBasis,transpose(UMOAO),
+C     $ 'TWOMOAA')
 CC
-C      block
-C      integer :: ip,iq,ir,is,irs,ipq
-C      integer :: iunit
-C      double precision :: work1(NBasis*NBasis)
-C      double precision :: work2(NBasis*NBasis)
-CC
-C      open(newunit=iunit,file='TWOMOAB',status='OLD',
+      block
+      integer :: ip,iq,ir,is,irs,ipq
+      integer :: iunit
+      double precision :: work1(NBasis*NBasis)
+      double precision :: work2(NBasis*NBasis)
+C
+C      open(newunit=iunit,file='TWOMOAA',status='OLD',
 C     $ access='DIRECT',recl=8*NBasis*(NBasis+1)/2)
 CC
 CC      CHECK-1
@@ -116,26 +119,26 @@ CC      enddo
 CC      enddo
 CC      enddo
 CC     CHECK-2
-C      irs=0
-C      do is=1,NBasis
-C      do ir=1,is
-C      irs=irs+1
-C      read(iunit,rec=irs) work1(1:NBasis*(NBasis+1)/2)
-C      ipq=0
-C      do iq=1,NBasis
-C      do ip=1,iq
-C      ipq = ipq+1
-CC      write(6,*) TwoEl(NAddr3(ip,iq,ir,is)), work1(ipq)   
-CCC      write(6,*) ip,iq,ir,is,TwoEl(NAddr3(ip,iq,ir,is))
-C      enddo
-C      enddo
-C      enddo
-C      enddo
-CC
-C      close(iunit)
-C      end block
+      irs=0
+      do is=1,NBasis
+      do ir=1,is
+      irs=irs+1
+!      read(iunit,rec=irs) work1(1:NBasis*(NBasis+1)/2)
+      ipq=0
+      do iq=1,NBasis
+      do ip=1,iq
+      ipq = ipq+1
+C      write(6,*) TwoEl(NAddr3(ip,iq,ir,is)), work1(ipq)   
+C      write(6,*) ip,iq,ir,is,TwoEl(NAddr3(ip,iq,ir,is))
+      enddo
+      enddo
+      enddo
+      enddo
 C
-      deallocate(TMPMO)
+C      close(iunit)
+      end block
+C
+C      deallocate(TMPMO)
 C
       If(ICASSCF.Eq.0) Then
 C
@@ -1432,6 +1435,8 @@ C      integer :: iunit,ip,iq,ir,is
 C      double precision :: TMP1, TMP2
 C      double precision :: mat(NBasis*(NBasis+1)/2)
 C
+C      print*, 'IG TEST?'
+C
 C      open(newunit=iunit,file='AOTWOSORT',access='DIRECT',
 C     $ recl=8*NBasis*(NBasis+1)/2)
 C
@@ -1443,6 +1448,7 @@ C      do ip=1,NBasis
 C  
 C      TMP1 = TwoEl(NAddr3(ip,iq,ir,is)) 
 C      TMP2 = mat(min(ip,iq)+max(ip,iq)*(max(ip,iq)-1)/2)
+C
 C      if(TMP1.ne.TMP2) write(6,*) TMP1,TMP2
 C    
 C      enddo
@@ -1548,6 +1554,71 @@ c#endif
       return
       end
 
+*Deck SaptInter
+      Subroutine SaptInter(NBasis,Mon)
+C     
+C     FEEDS COMMONS.INC WITH SAPT VALUES
+      Use types
+C     
+      Implicit Real*8 (A-H,O-Z)
+C      
+      type(SystemBlock) :: Mon
+C
+      Include 'commons.inc'
+
+      Do I=1,NBasis
+      CICoef(I) = Mon%CICoef(I)
+      IGem(I) = Mon%IGem(I)
+      EndDo
+C      write(*,*) 'SINTER,NDimX', Mon%NDimX
+C      write(*,*) CICoef(1:NBasis)
+C      write(*,*) IGem(1:NBasis)
+      
+      End 
+
+*Deck LoadSaptTwoEl
+      Subroutine LoadSaptTwoEl(Mon,TwoNO,NBasis,NInte2)
+C
+      Implicit Real*8 (A-H,O-Z)
+C   
+      Integer :: Mon, NInte2, NBasis
+      Integer :: IRS, IS, IR, IPQ, IQ, IP
+      Integer :: iunit
+      Dimension :: TwoNO(NInte2), Work1(NBasis**2)    
+      Character*8 :: fname
+
+      If(Mon.Eq.1) Then
+      fname='TWOMOAA '
+      ElseIf(Mon.Eq.2) Then
+      fname='TWOMOBB '
+      EndIf
+ 
+      Work1 = 0d0
+      TwoNO = 0d0 
+C      write(*,*) trim(fname) 
+      open(newunit=iunit,file=trim(fname),status='OLD',
+     $ access='DIRECT',recl=8*NBasis*(NBasis+1)/2)
+
+      IRS=0
+      Do IS=1,NBasis
+      Do IR=1,IS
+      IRS=IRS+1
+      read(iunit,rec=IRS) Work1(1:NBasis*(NBasis+1)/2)
+      IPQ=0
+      Do IQ=1,NBasis
+      Do IP=1,IQ
+      IPQ = IPQ + 1
+      TwoNO(NAddr3(IP,IQ,IR,IS)) = Work1(IPQ)   
+C      Write(6,*) IP,IQ,IR,IS, Work1(IPQ)
+C      Write(6,*) IP,IQ,IR,IS, TwoNO(NAddr3(IP,IQ,IR,IS)) 
+      EndDo
+      EndDo
+      EndDo
+      EndDo
+
+      close(iunit)
+      End
+
 *Deck TrRDM2
       Subroutine TrRDM2(RDM2,URe,NBasis,NRDM2)
 C
@@ -1651,3 +1722,4 @@ C
 C
       Return
       End
+

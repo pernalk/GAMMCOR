@@ -112,7 +112,7 @@ integer :: r,s,rs
 
 end subroutine tran4_unsym2
 
-subroutine tran4_sym(NBas,nA,CA,nB,CB,nC,CC,nD,CD)
+subroutine tran4_sym(NBas,nA,CA,nB,CB,nC,CC,nD,CD,fname)
 ! 4-index transformation out of core
 ! dumps all integrals on disk in the (triang,triang) form
 ! CAREFUL: C have to be in AOMO form!
@@ -126,6 +126,7 @@ integer,intent(in) :: nB,nC,nD
 ! CA(NBas*nA)
 double precision,intent(in) :: CA(*)
 double precision,intent(in) :: CB(*), CC(*), CD(*)
+character(*) :: fname
 double precision, allocatable :: work1(:), work2(:), work3(:,:)
 integer :: iunit,iunit2,iunit3
 integer :: ntr,nloop
@@ -134,7 +135,8 @@ integer :: i,rs,ab
 
  write(6,'()') 
 ! write(6,'(1x,a)') 'TRAN4_SYM_OUT_OF_CORE'
- write(6,'(1x,a)') 'Transforming integrals for AB dimer'
+! write(6,'(1x,a)') 'Transforming integrals for AB dimer'
+ write(6,'(1x,a)') 'Transforming integrals for '//fname
 
  allocate(work1(NBas*NBas),work2(NBas*NBas))
  allocate(work3(cbuf,NBas*(NBas+1)/2))
@@ -177,7 +179,7 @@ integer :: i,rs,ab
  close(iunit)
 
 ! |cd)
- open(newunit=iunit3,file='TWOMOAB',status='REPLACE',&
+ open(newunit=iunit3,file=fname,status='REPLACE',&
      access='DIRECT',form='UNFORMATTED',recl=8*ntr)
 
  do ab=1,ntr
@@ -202,6 +204,33 @@ integer :: i,rs,ab
  close(iunit2,status='DELETE')
 
 end subroutine tran4_sym
+
+subroutine tran_oneint(ints,MO1,MO2,NSym,GFunc,work,n)
+implicit none
+
+double precision,intent(inout),contiguous :: ints(:)
+double precision,intent(in),contiguous :: MO1(:),MO2(:)
+integer :: NSym, GFunc(:)
+double precision,contiguous :: work(:)
+integer :: irep,n,n2
+integer :: offset
+
+offset = 0
+do irep=1,NSym
+   n = GFunc(irep)
+   n2 = n**2
+   if(n>0) then
+      call dgemm('T','N',n,n,n,&
+           1d0,MO1(offset+1:offset+n2),n,ints(offset+1:offset+n2),n,&
+           0d0,work,n)
+      call dgemm('N','N',n,n,n,&
+           1d0,work,n,MO2(offset+1:offset+n2),n,&
+           0d0,ints(offset+1:offset+n2),n)
+   endif
+   offset = offset + n2
+enddo
+
+end subroutine tran_oneint
 
 subroutine triang_to_sq(matTr,matSq,NBas)
 implicit none
