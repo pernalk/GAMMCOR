@@ -3,6 +3,7 @@ use types
 use systemdef
 use tran
 use sorter
+use sapt_ener
 
 implicit none
 
@@ -25,6 +26,7 @@ integer :: i
  write(LOUT,'(8a10)') ('**********',i=1,8)
 
  call sapt_interface(Flags,SAPT)
+ call e2disp(Flags,SAPT%monA,SAPT%monB,SAPT)
 
  call print_warn(SAPT)
  call free_sapt(SAPT)
@@ -163,7 +165,7 @@ double precision ::  potnuc,emy,eactiv,emcscf
     read (isiri) potnuc,emy,eactiv,emcscf
 
  if(Flags%ICASSCF==1) then
-    call readmulti(NBasis,SAPT%monA,exsiri,isiri,'occupations.dat','SIRIUS_A.RST')
+    call readmulti(NBasis,SAPT%monA,exsiri,isiri,'occupations_A.dat','SIRIUS_A.RST')
  elseif(Flags%IGVB==1) then 
     call readgvb(SAPT%monA,NBasis,'coeff_A.dat')
  endif
@@ -196,7 +198,7 @@ double precision ::  potnuc,emy,eactiv,emcscf
 !    write(*,*)   potnuc,emy,eactiv,emcscf
 
  if(Flags%ICASSCF==1) then
-    call readmulti(NBasis,SAPT%monB,exsiri,isiri,'occupations.dat','SIRIUS_B.RST')
+    call readmulti(NBasis,SAPT%monB,exsiri,isiri,'occupations_B.dat','SIRIUS_B.RST')
  elseif(Flags%IGVB==1) then 
     call readgvb(SAPT%monB,NBasis,'coeff_B.dat')
  endif
@@ -614,6 +616,24 @@ integer :: iunit
  close(iunit)
 
 end subroutine writeresp
+
+!subroutine readresp(EVec,EVal,NDim,fname)
+!implicit none
+!
+!integer :: NDim
+!double precision :: EVec(NDim,NDim), EVal(NDim)
+!character(*) :: fname
+!integer :: iunit
+!
+! open(newunit=iunit,file=fname,form='UNFORMATTED',&
+!    access='SEQUENTIAL',status='OLD')
+!
+! read(iunit) EVec
+! read(iunit) EVal
+!
+! close(iunit)
+!
+!end subroutine readresp
 
 subroutine readgvb(mon,n,cfile)
 implicit none

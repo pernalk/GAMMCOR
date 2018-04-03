@@ -1584,6 +1584,7 @@ C
       Integer :: Mon, NInte2, NBasis
       Integer :: IRS, IS, IR, IPQ, IQ, IP
       Integer :: iunit
+      Integer(8),external :: NAddr3
       Dimension :: TwoNO(NInte2), Work1(NBasis**2)    
       Character*8 :: fname
 
@@ -1591,6 +1592,8 @@ C
       fname='TWOMOAA '
       ElseIf(Mon.Eq.2) Then
       fname='TWOMOBB '
+      ElseIf(Mon.Eq.3) Then
+      fname='TWOMOAB '
       EndIf
  
       Work1 = 0d0
@@ -1615,6 +1618,21 @@ C      Write(6,*) IP,IQ,IR,IS, TwoNO(NAddr3(IP,IQ,IR,IS))
       EndDo
       EndDo
       EndDo
+
+C      If(Mon.Eq.3) Then
+C      Write(6,*) 'TEST!!'
+C      Do IS=1,NBasis
+C      Do IR=1,IS
+C      Do IQ=1,NBasis
+C      Do IP=1,IQ
+C
+C      Write(6,*) ip,iq,ir,is,TwoNO(NAddr3(IP,IQ,IR,IS))  
+C
+C      EndDo
+C      EndDo
+C      EndDo
+C      EndDo
+C      EndIf
 
       close(iunit)
       End

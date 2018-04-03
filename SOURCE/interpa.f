@@ -327,6 +327,9 @@ C
       TMP = TMP + EigVecR(I)**2
       EndDo
       Write(6,*) TMP
+C      Do I=1,NDimX
+C      Write(6,*) IndN(1,I),IndN(2,I)
+C      EndDo
 C
       Do I=1,NDimX
       Write(6,*) I, Eig(I), EigVecR(NDimX*(I-1)+I)

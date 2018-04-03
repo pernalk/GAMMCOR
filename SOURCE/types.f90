@@ -435,6 +435,28 @@ logical :: ex
 
 end subroutine basinfo
 
+function iaddr(IAddr1,IAddr2,IAddr3,IAddr4) result(NAddr3)
+! POINTER FOR TWO-ELECTRON INTEGRALS
+ implicit none
+! parameter(Zero=0.0D0,One=1.0D0,Two=2.0D0)
+ integer    :: IAddr1, IAddr2, IAddr3, IAddr4
+ integer(8) :: IAddr12, IAddr34
+ integer(8) :: NAddr3
+
+! CHANGE THE ORDER IF NECESSARY
+
+ IAddr12 = Max(IAddr1,IAddr2)*(Max(IAddr1,IAddr2)-1)/2 + &
+          Min(IAddr2,IAddr1)
+ IAddr34 = Max(IAddr3,IAddr4)*(Max(IAddr3,IAddr4)-1)/2 + &
+          Min(IAddr3,IAddr4)
+
+! GET THE POSITION OF THE ELEMEMT (12|34)
+
+ NAddr3 = Max(IAddr12,IAddr34)*(Max(IAddr12,IAddr34)-1)/2 + &
+          Min(IAddr12,IAddr34)
+
+end function iaddr
+
 function uppercase(s)
       !
       ! Convert characters to uppercase.

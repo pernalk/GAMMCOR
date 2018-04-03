@@ -11,7 +11,7 @@ OBJ = $(O)mainp.o $(O)initia.o $(O)dmscf.o $(O)misc.o $(O)optocc.o \
       $(O)dftacg_pw92c.o $(O)projector.o $(O)ekt.o \
       $(O)sorter.o $(O)tran.o $(O)systemdef.o \
       $(O)types.o $(O)inputfill.o \
-      $(O)sapt_main.o \
+      $(O)sapt_main.o $(O)sapt.o \
       $(O)srlrdynamic.o $(O)erpa.o $(O)interpa.o  $(O)exact2el.o $(O)optapsg.o $(O)newton.o $(O)acfd.o $(O)accas.o
 
 FCC = gfortran
@@ -95,8 +95,10 @@ $(O)sorter.o : $(S)sorter.f90 $(O)types.o
 	$(FCC) $(FFLAGS)  -c $(S)sorter.f90 -o $(O)sorter.o
 $(O)tran.o : $(S)tran.f90
 	$(FCC) $(FFLAGS)  -c $(S)tran.f90 -o $(O)tran.o
-$(O)sapt_main.o : $(S)sapt_main.f90 $(O)types.o $(O)systemdef.o $(O)tran.o $(O)sorter.o
+$(O)sapt_main.o : $(S)sapt_main.f90 $(O)types.o $(O)systemdef.o $(O)tran.o $(O)sorter.o $(O)sapt.o
 	$(FCC) $(FFLAGS)  -c $(S)sapt_main.f90 -o $(O)sapt_main.o
+$(O)sapt.o : $(S)sapt.f90 $(O)types.o 
+	$(FCC) $(FFLAGS)  -c $(S)sapt.f90 -o $(O)sapt.o
 
 .PHONY : clean
 clean :
