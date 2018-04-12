@@ -164,8 +164,20 @@ C
       ACAlpha=One
       Write(6,'(/,X," The number of CASSCF Active Orbitals = ",I4)')
      $ NAcCAS
+      Write(6,*) NBasis,NDimX,NInte1,NInte2
       Call AB_CAS(ABPLUS,ABMIN,ECASSCF,URe,Occ,XOne,TwoNO,IPair,
      $ IndN,IndX,NDimX,NBasis,NDimX,NInte1,NInte2,ACAlpha)
+
+      TMP=0d0
+C      Do I=1,NDimX**2
+C      TMP = TMP + ABPLUS(I)**2d0
+C      TMP = TMP + ABMIN(I)**2d0
+C      EndDo
+C      Write(*,*) TMP
+C       Do I=1,NDimX
+C       Write(*,*) ABPLUS(NDimX*(I-1)+I), ABMIN(NDimX*(I-1)+I)
+C       EndDo
+
 C
       Write(6,'(/,X,''****************************************'',
      $            ''***************************************'')')
@@ -176,6 +188,22 @@ C
 C     FIND EIGENVECTORS (EigVecR) AND COMPUTE THE ENERGY
 C
       Call ERPASYMM1(EigVecR,Eig,ABPLUS,ABMIN,NBasis,NDimX)
+
+!     CHECK FOR SAPT
+!      Do I=1,NBasis
+!       Write(*,*) CICoef(I)
+!      EndDo
+C      TMP = 0
+C      Do I=1,NDimX**2
+C      TMP = TMP + EigVecR(I)**2
+C      EndDo
+C      Write(6,*) TMP
+C
+C      Do i=1,NDimX
+C       write(*,*) IndN(1,i)
+C       write(*,*) IndN(2,i)
+C      EndDo
+C
 C
       Write(6,'(/," *** Computing ERPA energy *** ",/)')
       Call ACEneERPA(ECorr,EigVecR,Eig,TwoNO,URe,Occ,XOne,

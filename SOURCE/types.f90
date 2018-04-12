@@ -32,6 +32,7 @@ integer, parameter :: RDM_TYPE_GVB  = 1
 integer, parameter :: RDM_TYPE_APSG = 2
 integer, parameter :: RDM_TYPE_CAS  = 3
 integer, parameter :: RDM_TYPE_DMRG = 4
+integer, parameter :: RDM_TYPE_HF   = 5
 
 integer, parameter :: MONOMER_A = 1
 integer, parameter :: MONOMER_B = 2
@@ -44,9 +45,9 @@ character(*),parameter :: PossibleJobType(5) = &
 [character(8) :: &
 'AC', 'AC0', 'ERPA', 'AC1', 'SAPT']
 
-character(*),parameter :: PossibleRDMType(4) = &
+character(*),parameter :: PossibleRDMType(5) = &
 [character(8) :: &
-'GVB', 'APSG', 'CASSCF', 'DMRG']
+'GVB', 'APSG', 'CASSCF', 'DMRG', 'HF']
 
 character(*),parameter :: PossibleMonomers(2) = &
 [character(8) :: 'A', 'B']
@@ -79,6 +80,7 @@ type SystemBlock
       integer :: Monomer = MONOMER_A
       integer :: NELE
       double precision :: XELE
+      double precision :: PotNuc 
       double precision :: SumOcc = 0
       integer :: NSym = 1
       integer :: GFunc(8) = 0
@@ -94,6 +96,7 @@ type SystemBlock
       integer,allocatable :: IGem(:), IndAux(:)
       integer,allocatable :: IndX(:), IndN(:,:), IPair(:,:)
       double precision,allocatable :: Occ(:), CICoef(:)
+      double precision,allocatable :: OrbE(:)
 end type SystemBlock
 
 type FlagsData
@@ -115,6 +118,7 @@ type FlagsData
      integer :: IAPSG   = 1
      integer :: ISERPA  = 0
      integer :: ISAPT   = 0
+     integer :: ISHF    = 0
      character(:), allocatable :: JobTitle
      ! initia.f
      integer :: IA = 1

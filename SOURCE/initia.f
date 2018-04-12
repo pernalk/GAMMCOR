@@ -60,8 +60,9 @@ C
 C
 C     GET 2-EL NO INTEGRALS AND CICoef
 C 
+      Call test2el(NBasis,'AOTWOINT')
       Call read2el(TwoEl,UMOAO,NBasis,NInte2)
-C      Call test2el(NBasis,'AOTWOINT_A')
+!      Call altread2el(TwoEl,UMOAO,NBasis,NInte2)
 C
 C     TESTING TRAN4
 C      allocate(TMPMO(NBasis**2,NBasis**2))
@@ -92,12 +93,12 @@ C     $ NBasis,transpose(UMOAO),
 C     $ NBasis,transpose(UMOAO),NBasis,transpose(UMOAO),
 C     $ 'TWOMOAA')
 CC
-      block
-      integer :: ip,iq,ir,is,irs,ipq
-      integer :: iunit
-      double precision :: work1(NBasis*NBasis)
-      double precision :: work2(NBasis*NBasis)
-C
+C      block
+C      integer :: ip,iq,ir,is,irs,ipq
+C      integer :: iunit
+C      double precision :: work1(NBasis*NBasis)
+C      double precision :: work2(NBasis*NBasis)
+CC
 C      open(newunit=iunit,file='TWOMOAA',status='OLD',
 C     $ access='DIRECT',recl=8*NBasis*(NBasis+1)/2)
 CC
@@ -119,24 +120,24 @@ CC      enddo
 CC      enddo
 CC      enddo
 CC     CHECK-2
-      irs=0
-      do is=1,NBasis
-      do ir=1,is
-      irs=irs+1
-!      read(iunit,rec=irs) work1(1:NBasis*(NBasis+1)/2)
-      ipq=0
-      do iq=1,NBasis
-      do ip=1,iq
-      ipq = ipq+1
+C      irs=0
+C      do is=1,NBasis
+C      do ir=1,is
+C      irs=irs+1
+C      read(iunit,rec=irs) work1(1:NBasis*(NBasis+1)/2)
+C      ipq=0
+C      do iq=1,NBasis
+C      do ip=1,iq
+C      ipq = ipq+1
 C      write(6,*) TwoEl(NAddr3(ip,iq,ir,is)), work1(ipq)   
-C      write(6,*) ip,iq,ir,is,TwoEl(NAddr3(ip,iq,ir,is))
-      enddo
-      enddo
-      enddo
-      enddo
+C!      write(6,*) ip,iq,ir,is,TwoEl(NAddr3(ip,iq,ir,is))
+C      enddo
+C      enddo
+C      enddo
+C      enddo
 C
 C      close(iunit)
-      end block
+C      end block
 C
 C      deallocate(TMPMO)
 C
@@ -1379,6 +1380,102 @@ C        stop
       end if
       end
 
+****** ALTERNATIVE READ HERE
+      subroutine altread2el(TwoEl,UMOAO,NBasis,NInte2)
+C
+C     Reads 2-el integrals in AO and ttransform to NO
+C     Returns TwoEl in NO
+C
+      Implicit Real*8 (A-H,O-Z)
+C
+      Dimension TwoEl(NInte2),UMOAO(NBasis,NBasis)
+C
+      Integer(8),external :: NAddr3
+C
+      integer :: iunit,iunit2
+      integer iunit77,iunit88, iunit99
+      integer :: maxrep, naos(8), lbuf, nibuf, nbits
+      integer :: nints, INDX
+      integer,allocatable :: idx_buf(:)
+      double precision,allocatable :: val_buf(:), mat(:)
+      integer :: idx_p, idx_q, idx_r, idx_s, pq, rs
+      logical :: swap_pqrs
+      integer :: i
+
+      ! newunit works with Fortran 2008
+      open(newunit=iunit,file='AOTWOINT',status='OLD',
+     $     access='SEQUENTIAL',form='UNFORMATTED')
+    
+      ! read info
+      call readlabel2(iunit,'BASINFO ')
+      read(iunit) maxrep, naos, lbuf, nibuf, nbits 
+    
+      write(6,'()')
+      write(6,'(1x, a)') 'Dalton two-el. file initialized'
+      write(6,*) lbuf,nibuf,nbits
+C      write(6,'(1x,a,i3,a,i3,a,i3)') 'Buffer size: ', lbuf, &
+C           & ', integers per index packet: ', nibuf,       &
+C           & ', bits: ', nbits
+    
+      allocate(val_buf(lbuf))
+      allocate(idx_buf(lbuf*nibuf))
+    
+      call readlabel2(iunit,'BASTWOEL')
+    
+      select case(nibuf)
+      case(1)
+    
+        do
+           read(iunit) val_buf, idx_buf, nints
+           if(nints<0) exit
+           do i=1,nints
+              INDX = idx_buf(i)
+              idx_p = ibits(INDX,0,8)
+              idx_q = ibits(INDX,8,8)
+              idx_r = ibits(INDX,16,8)
+              idx_s = ibits(INDX,24,8)
+    
+              ! pq: position in Batch
+              ! rs: Batch number
+              pq = idx_p + idx_q*(idx_q-1)/2
+              rs = idx_r + idx_s*(idx_s-1)/2 
+              !write(*,*) idx_p,idx_q,idx_r,idx_s 
+              swap_pqrs = (pq<rs)
+           TwoEl(NAddr3(idx_p,idx_q,idx_r,idx_s))=val_buf(i)
+           enddo
+        enddo
+       
+      case(2)
+    
+        do
+           read(iunit) val_buf, idx_buf, nints
+           if(nints<0) exit
+           do i=1,nints
+              INDX = idx_buf(i)
+              idx_r = ibits(INDX,0,16)
+              idx_s = ibits(INDX,16,16)
+              INDX = idx_buf(i+lbuf)
+              idx_p = ibits(INDX,0,16)
+              idx_q = ibits(INDX,16,16)
+    
+              pq = idx_p + idx_q*(idx_q-1)/2
+              rs = idx_r + idx_s*(idx_s-1)/2 
+              swap_pqrs = (pq<rs)
+           TwoEl(NAddr3(idx_p,idx_q,idx_r,idx_s))=val_buf(i)
+           enddo
+        enddo
+    
+      end select
+    
+      deallocate(val_buf,idx_buf)
+      close(unit=iunit)
+
+      Write(6,'(" Transforming two-electron integrals ...",/)')
+      Call TwoNO1(TwoEl,UMOAO,NBasis,NInte2)
+C
+      end subroutine altread2el
+
+
 ****** SUBROUTINES FROM RAFAL PODESZWA, 03/2017 ******
 *
 *Deck read2el 
@@ -1399,6 +1496,7 @@ C
       integer  maxrep, naos, lbuf, nibuf, nbits
       common /daltwoel/  maxrep, naos(8), lbuf, nibuf, nbits
       integer nxx
+      Integer(8),external :: NAddr3
 C
       TwoEl(1:NInte2)=         0.D0
 C      
@@ -1420,7 +1518,10 @@ C
       
 c      write (*,*) nxx, ' two electron integrals read'
       do i=1,nxx
-        call unpckdlt(ibuf(i), ibuf(i+lbuf), nibuf, nbits,ip,iq,ir,is)
+       call unpckdlt(ibuf(i), ibuf(i+lbuf), nibuf, nbits,ip,iq,ir,is)
+c     NOWE? 
+C       call unpckdlt(ibuf((i-1)*nibuf + 1), ibuf(i*nibuf),
+C     $ nibuf, nbits,ip,iq,ir,is)
 c        if (dabs(dbuf(i)).gt.1e-8)
 c     *          write(*,'(4I4,F12.8)') ip, iq, ir, is, dbuf(i)
       TwoEl(NAddr3(ip,iq,ir,is))=dbuf(i)
@@ -1429,35 +1530,37 @@ c     *          write(*,'(4I4,F12.8)') ip, iq, ir, is, dbuf(i)
       if (nxx .ge. 0) go to 10
 
 C     TEST read2el vs. test2el
-C      block
+      block
+
+      integer :: iunit,ip,iq,ir,is
+      double precision :: TMP1, TMP2
+      double precision :: mat(NBasis*(NBasis+1)/2)
+      Integer(8),external :: NAddr3
 C
-C      integer :: iunit,ip,iq,ir,is
-C      double precision :: TMP1, TMP2
-C      double precision :: mat(NBasis*(NBasis+1)/2)
+      print*, '2EL-TEST / NAddr3'
 C
-C      print*, 'IG TEST?'
+      open(newunit=iunit,file='AOTWOSORT',access='DIRECT',
+     $ recl=8*NBasis*(NBasis+1)/2)
 C
-C      open(newunit=iunit,file='AOTWOSORT',access='DIRECT',
-C     $ recl=8*NBasis*(NBasis+1)/2)
-C
-C      do is=1,NBasis
-C      do ir=1,NBasis
-C      read(iunit,rec=min(ir,is)+max(ir,is)*(max(ir,is)-1)/2) mat
-C      do iq=1,NBasis
-C      do ip=1,NBasis
+      do is=1,NBasis
+      do ir=1,NBasis
+      read(iunit,rec=min(ir,is)+max(ir,is)*(max(ir,is)-1)/2) mat
+      do iq=1,NBasis
+      do ip=1,NBasis
 C  
-C      TMP1 = TwoEl(NAddr3(ip,iq,ir,is)) 
-C      TMP2 = mat(min(ip,iq)+max(ip,iq)*(max(ip,iq)-1)/2)
+      TMP1 = TwoEl(NAddr3(ip,iq,ir,is)) 
+      TMP2 = mat(min(ip,iq)+max(ip,iq)*(max(ip,iq)-1)/2)
 C
-C      if(TMP1.ne.TMP2) write(6,*) TMP1,TMP2
+      if(TMP1.ne.TMP2) write(6,*) TMP1,TMP2
 C    
-C      enddo
-C      enddo
-C      enddo
-C      enddo
-C      close(iunit)
+      enddo
+      enddo
+      enddo
+      enddo
+      close(iunit)
 C
-C      end block
+      print*, 'Ended 2-el comparison'
+      end block
 C
 C     TRANSFORM THE INTEGRALS
 C
@@ -1555,7 +1658,7 @@ c#endif
       end
 
 *Deck SaptInter
-      Subroutine SaptInter(NBasis,Mon)
+      Subroutine SaptInter(NBasis,Mon,ICAS)
 C     
 C     FEEDS COMMONS.INC WITH SAPT VALUES
       Use types
@@ -1570,6 +1673,13 @@ C
       CICoef(I) = Mon%CICoef(I)
       IGem(I) = Mon%IGem(I)
       EndDo
+     
+      If(ICAS.Eq.1) Then
+      ICASSCF = ICAS
+      NAcCAS  = Mon%NAct
+      NInAcCAS= Mon%INAct
+      EndIf
+
 C      write(*,*) 'SINTER,NDimX', Mon%NDimX
 C      write(*,*) CICoef(1:NBasis)
 C      write(*,*) IGem(1:NBasis)
@@ -1592,6 +1702,7 @@ C
       fname='TWOMOAA '
       ElseIf(Mon.Eq.2) Then
       fname='TWOMOBB '
+      write(*,*) fname
       ElseIf(Mon.Eq.3) Then
       fname='TWOMOAB '
       EndIf
@@ -1740,4 +1851,31 @@ C
 C
       Return
       End
+
+      subroutine readlabel2(iunit,text)
+      ! sets file pointer 
+      ! to first data after text
+      implicit none
+      
+      integer :: iunit
+      integer :: ios
+      character(8) :: text, label(4)
+      
+      rewind(iunit)
+      do 
+      
+        read(iunit,iostat=ios) label
+        if(ios<0) then
+           write(6,*) 'ERROR!!! Empty section in AOTWOINT!'
+           stop
+        endif
+        if(label(1)=='********') then
+           if(label(4)==text) exit
+        endif
+      
+      enddo
+      
+      end subroutine readlabel2
+
+
 

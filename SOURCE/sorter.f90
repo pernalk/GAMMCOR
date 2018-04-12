@@ -88,6 +88,7 @@ integer :: i
           ! rs: Batch number
           pq = idx_p + idx_q*(idx_q-1)/2
           rs = idx_r + idx_s*(idx_s-1)/2 
+          !write(*,*) idx_p,idx_q,idx_r,idx_s 
           swap_pqrs = (pq<rs)
           call add_to_Sorter(srt,rs,pq,val_buf(i))
           if(swap_pqrs) call add_to_Sorter(srt,pq,rs,val_buf(i))
@@ -107,8 +108,10 @@ integer :: i
           idx_p = ibits(INDX,0,16)
           idx_q = ibits(INDX,16,16)
 
-          pq = idx_p*(idx_p-1)/2+idx_q 
-          rs = idx_r*(idx_r-1)/2+idx_s 
+ !        pq = idx_p*(idx_p-1)/2+idx_q 
+ !        rs = idx_r*(idx_r-1)/2+idx_s 
+          pq = idx_p + idx_q*(idx_q-1)/2
+          rs = idx_r + idx_s*(idx_s-1)/2 
           swap_pqrs = (pq<rs)
           call add_to_Sorter(srt,rs,pq,val_buf(i))
           if(swap_pqrs) call add_to_Sorter(srt,pq,rs,val_buf(i))
@@ -302,7 +305,7 @@ integer :: i
  deallocate(srt%ival,srt%rval)
  deallocate(srt%Batch)
  ! close SORT 
- close(srt%iunit,status='DELETE')
+ close(srt%iunit,status='KEEP')
 
 end subroutine free_Sorter
 

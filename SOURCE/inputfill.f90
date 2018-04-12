@@ -297,8 +297,12 @@ subroutine read_block_calculation(CalcParams, line)
            elseif (uppercase(val) == "APSG" ) then
               CalcParams%RDMType = RDM_TYPE_APSG
            elseif (uppercase(val) == "CASSCF".or.&
-                 & uppercase(val) == "CAS" ) then
+                 & uppercase(val) == "CAS") then 
               CalcParams%RDMType = RDM_TYPE_CAS
+           elseif (uppercase(val) == "HF".or.    &
+                 & uppercase(val) == "HFOCK".or. & 
+                 & uppercase(val) == "HARTREE-FOCK") then
+              CalcParams%RDMType = RDM_TYPE_HF
            elseif (uppercase(val) == "DMRG" ) then
               CalcParams%RDMType = RDM_TYPE_DMRG
            endif

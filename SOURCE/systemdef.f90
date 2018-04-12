@@ -160,6 +160,11 @@ else
   case(RDM_TYPE_DMRG)
       Flags%ICASSCF = 1
       Flags%IDMRG   = 1
+
+  case(RDM_TYPE_HF)
+      FLags%IGVB = 0
+      Flags%ICASSCF = 1
+      Flags%ISHF = 1
   end select
 
 ! excitations

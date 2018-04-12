@@ -58,8 +58,7 @@ double precision,allocatable :: work3(:)
 character(8) :: dupa
 integer :: tmp1
 double precision ::  potnuc,emy,eactiv,emcscf
-
-
+integer :: noccA, nvirtA, noccB, nvirtB
 
 ! read basis info
 ! only dimer basis
@@ -82,7 +81,7 @@ double precision ::  potnuc,emy,eactiv,emcscf
  open(newunit=ione,file='AOONEINT_A',access='sequential',&
       form='unformatted',status='old')
  read(ione) 
- read(ione) NSym,NOrb,potnucA
+ read(ione) NSym,NOrb,SAPT%monA%PotNuc
  
  call readlabel(ione,'ONEHAMIL')
  call readoneint(ione,work1)
@@ -116,7 +115,7 @@ double precision ::  potnuc,emy,eactiv,emcscf
  open(newunit=ione,file='AOONEINT_B',access='sequential',&
       form='unformatted',status='old')
  read(ione) 
- read(ione) NSym,NOrb,potnucB
+ read(ione) NSym,NOrb,SAPT%monB%PotNuc
 
  call readlabel(ione,'ONEHAMIL')
  call readoneint(ione,work1)
@@ -164,9 +163,15 @@ double precision ::  potnuc,emy,eactiv,emcscf
     read (isiri)
     read (isiri) potnuc,emy,eactiv,emcscf
 
- if(Flags%ICASSCF==1) then
-    call readmulti(NBasis,SAPT%monA,exsiri,isiri,'occupations_A.dat','SIRIUS_A.RST')
+ if(Flags%ICASSCF==1.and.Flags%ISHF==0) then
+    ! CASSCF
+    call readmulti(NBasis,SAPT%monA,.false.,exsiri,isiri,'occupations_A.dat','SIRIUS_A.RST')
+ elseif(Flags%ICASSCF==1.and.Flags%ISHF==1) then
+    ! Hartree-Fock
+    call readmulti(NBasis,SAPT%monA,.true.,exsiri,isiri,'occupations_A.dat','SIRIUS_A.RST')
+    call readener(NBasis,SAPT%monA,isiri)
  elseif(Flags%IGVB==1) then 
+    ! GVB
     call readgvb(SAPT%monA,NBasis,'coeff_A.dat')
  endif
 
@@ -197,9 +202,15 @@ double precision ::  potnuc,emy,eactiv,emcscf
     read (isiri) potnuc,emy,eactiv,emcscf
 !    write(*,*)   potnuc,emy,eactiv,emcscf
 
- if(Flags%ICASSCF==1) then
-    call readmulti(NBasis,SAPT%monB,exsiri,isiri,'occupations_B.dat','SIRIUS_B.RST')
- elseif(Flags%IGVB==1) then 
+ if(Flags%ICASSCF==1.and.Flags%ISHF==0) then
+    ! CASSCF
+    call readmulti(NBasis,SAPT%monB,.false.,exsiri,isiri,'occupations_B.dat','SIRIUS_B.RST')
+ elseif(Flags%ICASSCF==1.and.Flags%ISHF==1) then
+    ! Hartree-Fock
+    call readmulti(NBasis,SAPT%monB,.true.,exsiri,isiri,'occupations_B.dat','SIRIUS_B.RST')
+    call readener(NBasis,SAPT%monB,isiri)
+ elseif(Flags%IGVB==1) then
+    ! GVB 
     call readgvb(SAPT%monB,NBasis,'coeff_B.dat')
  endif
 
@@ -219,14 +230,22 @@ double precision ::  potnuc,emy,eactiv,emcscf
 
  call arrange_mo(Cb,NBasist,SAPT%monA,SAPT%monB)
 
-! if(SAPT%IPrint.ne.0) call print_mo(Ca,NOrbt,'MONOMER A')
-! if(SAPT%IPrint.ne.0) call print_mo(Cb,NOrbt,'MONOMER B')
+ !if(SAPT%IPrint.ne.0) call print_mo(Ca,NOrbt,'MONOMER A')
+ !if(SAPT%IPrint.ne.0) call print_mo(Cb,NOrbt,'MONOMER B')
 
 ! ABABABABABABABABABABABABABABABABABABABABABABABABABABABABAB
 ! read and transform 2-el integrals
  call test2el(NBasis,'AOTWOINT_A')
+! HERE?
  call tran4_sym(NBasis,NBasis,Ca,NBasis,Ca,&
                 NBasis,Cb,NBasis,Cb,'TWOMOAB')
+! noccA = 1
+! nvirtA = NBasis - noccA
+! noccB = 2
+! nvirtB = NBasis - noccB
+! call tran4_sym(NBasis,noccA,Ca,nvirtA,Ca,&
+!                noccB,Cb,nvirtB,Cb,'TWOMOAB')
+
 
  if(SAPT%IPrint.gt.100) call print_TwoInt(NBasis)
 
@@ -238,11 +257,11 @@ double precision ::  potnuc,emy,eactiv,emcscf
 
 ! calculate response
 ! if(SAPT%SaptLevel.gt.1) then
-    call SaptInter(NBasis,SAPT%monA,Flags%ISAPT)
+    call SaptInter(NBasis,SAPT%monA,Flags%ICASSCF)
 !   call COMMTST(NBasis) 
     call calc_response(SAPT%monA,Ca,Flags,NBasis,'TWOMOAA')
 ! mon B
-    call SaptInter(NBasis,SAPT%monB,Flags%ISAPT)
+    call SaptInter(NBasis,SAPT%monB,Flags%ICASSCF)
 !   call COMMTST(NBasis) 
     call calc_response(SAPT%monB,Cb,Flags,NBasis,'TWOMOBB')
 ! endif
@@ -269,11 +288,12 @@ integer :: NSq,NInte1,NInte2
 double precision, allocatable :: work1(:),work2(:),XOne(:),TwoMO(:) 
 double precision, allocatable :: ABPlus(:), ABMin(:), URe(:,:), &
                                  EigVecR(:), Eig(:)
-double precision,parameter :: One = 1d0
+double precision,parameter :: One = 1d0, Half = 0.5d0
 integer :: i,j,ij,ij1,ione,itwo 
 double precision :: ACAlpha
+double precision :: ECASSCF,ECorr
 character(8) :: label
-character(:),allocatable :: onefile,twofile,propfile
+character(:),allocatable :: onefile,twofile,propfile,rdmfile
 double precision :: tmp
 
 ! set filenames
@@ -281,10 +301,12 @@ double precision :: tmp
     onefile = 'ONEEL_A'
     twofile = 'TWOMOAA'
     propfile = 'PROP_A'
+    rdmfile='rdm2_A.dat'
  elseif(Mon%Monomer==2) then
     onefile = 'ONEEL_B'
     twofile = 'TWOMOBB'
     propfile = 'PROP_B'
+    rdmfile='rdm2_B.dat'
  endif
 
 ! set dimensions
@@ -376,16 +398,57 @@ double precision :: tmp
 
  else
 
-   allocate(ABPlus(Mon%NDimX**2),ABMin(Mon%NDimX**2))
-   write(LOUT,'(a)') 'ERROR! NOT READY YET!'
-!!! HERE FINISHED!! 
-!      Write(6,'(/,X," The number of CASSCF Active Orbitals = ",I4)')
-!     & NAcCAS
-!      Call AB_CAS(ABPLUS,ABMIN,ECASSCF,URe,Occ,XOne,TwoNO,IPair,
-!     & IndN,IndX,NDimX,NBasis,NDim,NInte1,NInte2,ACAlpha)
-!      ETot=ECASSCF
-!
+   allocate(ABPlus(Mon%NDimX**2),ABMin(Mon%NDimX**2),&
+            EigVecR(Mon%NDimX**2),Eig(Mon%NDimX))
+
+   call execute_command_line('cp '//rdmfile// ' rdm2.dat')
+ 
+!   Gamma_2_AB CAN BE USED 
+!   WITH DIFFERENT select_active
+!   AND reducing dimensions!
+!   call Gamma2_AB(ABPlus,ABMin,ECASSCF,URe,Mon%Occ,XOne,TwoMO,Mon%IPair,&
+!                  NBas,Mon%NDim,NInte1,NInte2,ACAlpha)
+   ECASSCF = 0
+   call AB_CAS(ABPlus,ABMin,ECASSCF,URe,Mon%Occ,XOne,TwoMO,Mon%IPair,&
+               Mon%IndN,Mon%IndX,Mon%NDimX,NBas,Mon%NDimX,NInte1,NInte2,ACAlpha)
+
+ !  tmp=0d0
+ !  do i=1,Mon%NDimX**2
+ !      tmp = tmp + ABMin(i)**2
+ !     tmp = tmp + ABPlus(i)**2
+ !    write(*,*) ABPlus(Mon%NDimX*(i-1)+i), ABMin(Mon%NDimX*(i-1)+i)
+ !  enddo
+ !  write(*,*) tmp
+
+!  do i=1,Mon%NDimX
+!     write(*,*) ABPlus(Mon%NDimX*(i-1)+i), ABMin(Mon%NDimX*(i-1)+i)
+!  enddo
+
+   EigVecR = 0
+   Eig = 0
+ 
+   call ERPASYMM1(EigVecR,Eig,ABPlus,ABMin,NBas,Mon%NDimX)
+
+   tmp=0
+   do i=1,Mon%NDimX
+      !write(*,*) Eig(i)
+       tmp = tmp + Eig(i)**2
+   enddo
+   write(*,*) tmp
+   tmp=0
+   do i=1,Mon%NDimX**2
+       tmp = tmp + EigVecR(i)**2
+   enddo
+   write(*,*) tmp
+
  endif
+
+ call ACEneERPA(ECorr,EigVecR,Eig,TwoMO,URe,Mon%Occ,XOne,&
+                Mon%IndN,NBas,NInte1,NInte2,Mon%NDimX,Mon%NGem)
+      ECorr=Ecorr*0.5d0
+
+ write(LOUT,'(/,1x,''ECASSCF+ENuc, Corr, ERPA-CASSCF'',6x,3f15.8)') &
+       ECASSCF+Mon%PotNuc,ECorr,ECASSCF+Mon%PotNuc+ECorr
 
 ! dump response
  call writeresp(EigVecR,Eig,propfile)
@@ -418,6 +481,7 @@ type(SystemBlock) :: A,B
 integer :: nbas
 double precision :: mat(nbas,nbas)
 
+print*, A%NMonOrb, B%NMonOrb
 call swap_rows(A%NMonOrb,B%NMonOrb,mat)
 
 end subroutine arrange_mo
@@ -671,7 +735,7 @@ do i=mon%INAct+1,mon%NELE
 enddo
 mon%NGem = mon%NELE + 1
 
-do i=1,n
+do i=1,n   
    if(mon%CICoef(i).eq.0d0) mon%IGem(i) = mon%NGem
    mon%Occ(i) = mon%CICoef(i)**2
 enddo
@@ -680,13 +744,14 @@ close(iunit)
 
 end subroutine readgvb
 
-subroutine readmulti(nbas,mon,exsiri,isiri,occfile,occsir)
+subroutine readmulti(nbas,mon,ihf,exsiri,isiri,occfile,occsir)
 implicit none 
 
 type(SystemBlock) :: mon
 logical :: exsiri, ioccsir
 integer :: isiri, nbas
 character(*) :: occfile, occsir 
+logical :: ihf
 logical :: iocc
 integer :: iunit,i
 integer :: NAct, INAct
@@ -696,6 +761,7 @@ integer :: istate, ispin, nactel, lsym
 integer :: nisht, nasht, nocct, norbt, nbast, nconf, nwopt, nwoph
 
  allocate(mon%CICoef(nbas),mon%IGem(nbas),mon%Occ(nbas))
+! exsiri=.false.
  if(exsiri) then
 
     rewind(isiri) 
@@ -718,23 +784,32 @@ integer :: nisht, nasht, nocct, norbt, nbast, nconf, nwopt, nwoph
       mon%IWarn = mon%IWarn + 1 
     endif
 
-   inquire(file=occsir,EXIST=ioccsir)
-   if(ioccsir) then
+   if(.not.ihf) then
+      ! CASCF case
+      inquire(file=occsir,EXIST=ioccsir)
+      if(ioccsir) then
+         mon%Occ = 0d0
+         open(newunit=iunit,file=occsir,status='OLD', &
+              access='SEQUENTIAL',form='UNFORMATTED')
+   
+         call readlabel(iunit,'NATOCC  ')
+         read(iunit) mon%Occ(1:mon%NAct+mon%INAct) 
+   
+         close(iunit)
+      endif
+   elseif(ihf) then
+      ! Hartree-Fock case
       mon%Occ = 0d0
-      open(newunit=iunit,file=occsir,status='OLD', &
-           access='SEQUENTIAL',form='UNFORMATTED')
+      mon%Occ(1:mon%NAct+mon%INAct) = 2d0
 
-      call readlabel(iunit,'NATOCC  ')
-      read(iunit) mon%Occ(1:mon%NAct+mon%INAct) 
-
-      sum1 = 0d0
-      do i=1,mon%INAct+mon%NAct
-         mon%Occ(i) = mon%Occ(i)/2d0
-         sum1 = sum1 + mon%Occ(i)
-      enddo
-      mon%SumOcc = sum1
-      close(iunit)
    endif
+
+   sum1 = 0d0
+   do i=1,mon%INAct+mon%NAct
+       mon%Occ(i) = mon%Occ(i)/2d0
+       sum1 = sum1 + mon%Occ(i)
+   enddo
+   mon%SumOcc = sum1
 
  endif
 ! occupations.dat 
@@ -763,6 +838,7 @@ integer :: nisht, nasht, nocct, norbt, nbast, nconf, nwopt, nwoph
        mon%INAct = INAct
        mon%NAct  = NAct
        mon%Occ   = Occ
+       mon%SumOcc = sum2
        ! SIRIUS.RST not there  
        write(LOUT,'(1x,a,i2,a)') 'OCCUPANCIES FOR MONOMER',mon%Monomer,' READ FROM '// occfile 
        write(LOUT,'()')
@@ -827,6 +903,15 @@ integer :: nisht, nasht, nocct, norbt, nbast, nconf, nwopt, nwoph
     mon%IGem(mon%INAct+mon%NAct+1:nbas) = 3
  endif
 
+! construct CICoef
+ do i=1,nbas 
+    mon%CICoef(i)=sqrt(Occ(I))
+    if(mon%Occ(i).lt.0.5d0) mon%CICoef(i)=-mon%CICoef(i)
+ enddo
+
+! check
+!  write(LOUT,*) mon%Occ
+
 end subroutine readmulti
 
 subroutine select_active(mon,nbas,ICASSCF,IFlCore)
@@ -864,6 +949,9 @@ integer :: test
       endif
    enddo
  elseif(ICASSCF==1) then
+   write(LOUT,'()')
+   if(mon%Monomer==1) write(LOUT,'(1x,a)') 'Monomer A' 
+   if(mon%Monomer==2) write(LOUT,'(1x,a)') 'Monomer B' 
    do i=1,nbas
       if(mon%Occ(i).lt.1d0.and.mon%Occ(i).ne.0d0) then
          mon%IndAux(i) = 1
@@ -879,46 +967,124 @@ integer :: test
 
  mon%IPair(1:nbas,1:nbas) = 0
 
- ij=0
- ind = 0
- do i=1,nbas
-    do j=1,i-1
+ if(ICASSCF==0) then
 
-       ij = ij + 1
-       ind_ij = mon%IndAux(i)+mon%IndAux(j)
-       if((ind_ij/=0).and.(ind_ij/=4)) then
-   !   do not correlate active degenerate orbitals from different geminals 
-          if(ICASSCF==0.and.(mon%IGem(i).ne.mon%IGem(j)).and.&
-             (mon%IndAux(i)==1).and.(mon%IndAux(j)==1).and.&
-             (Abs(mon%Occ(i)-mon%Occ(j))/mon%Occ(i).lt.1.d-2)&
-          .or.&
-             (ICASSCF==1).and.& 
-             (mon%IndAux(i)==1).and.(mon%IndAux(j)==1).and.&
-             (Abs(mon%Occ(i)-mon%Occ(j))/mon%Occ(i).lt.1.d-10) ) then
+    ij=0
+    ind = 0
+    do i=1,nbas
+       do j=1,i-1
    
-             write(LOUT,'(1x,a,2x,2i4)') 'Discarding nearly degenerate pair',i,j 
-           else
-              ! if IFlCore=0 exclude core (inactive) orbitals
-              if(IFlCore==1.or.&
-                (IFlCore==0.and.&
-                 mon%Occ(i)/=1d0.and.mon%Occ(j)/=1d0) ) then
-   
-                 ind = ind + 1
-                 mon%IndX(ind) = ij
-                 mon%IndN(1,ind) = i
-                 mon%IndN(2,ind) = j
-                 mon%IPair(i,j) = 1
-                 mon%IPair(j,i) = 1
-   
+          ij = ij + 1
+          ind_ij = mon%IndAux(i)+mon%IndAux(j)
+          if((ind_ij/=0).and.(ind_ij/=4)) then
+      !   do not correlate active degenerate orbitals from different geminals 
+             if((mon%IGem(i).ne.mon%IGem(j)).and.&
+                (mon%IndAux(i)==1).and.(mon%IndAux(j)==1).and.&
+                (Abs(mon%Occ(i)-mon%Occ(j))/mon%Occ(i).lt.1.d-2)) then
+      
+                write(LOUT,'(1x,a,2x,2i4)') 'Discarding nearly degenerate pair',i,j 
+              else
+                 ! if IFlCore=0 exclude core (inactive) orbitals
+                 if(IFlCore==1.or.&
+                   (IFlCore==0.and.&
+                    mon%Occ(i)/=1d0.and.mon%Occ(j)/=1d0) ) then
+      
+                    ind = ind + 1
+                    mon%IndX(ind) = ij
+                    mon%IndN(1,ind) = i
+                    mon%IndN(2,ind) = j
+                    mon%IPair(i,j) = 1
+                    mon%IPair(j,i) = 1
+      
+                 endif
               endif
-           endif
+      
+          endif
    
-       endif
-
+       enddo
     enddo
- enddo
 
+ elseif(ICASSCF==1) then
+
+    ij=0
+    ind = 0
+    do i=1,nbas
+       do j=1,i-1
+   
+          ij = ij + 1
+          ind_ij = mon%IndAux(i)+mon%IndAux(j)
+          if((ind_ij/=0).and.(ind_ij/=4)) then
+      !   do not correlate active degenerate orbitals from different geminals 
+               if((mon%IndAux(i)==1).and.(mon%IndAux(j)==1).and.&
+                (Abs(mon%Occ(i)-mon%Occ(j))/mon%Occ(i).lt.1.d-10) ) then
+      
+                write(LOUT,'(1x,a,2x,2i4)') 'Discarding nearly degenerate pair',i,j 
+              else
+                 ! if IFlCore=0 exclude core (inactive) orbitals
+                 if(IFlCore==1.or.&
+                   (IFlCore==0.and.&
+                    mon%Occ(i)/=1d0.and.mon%Occ(j)/=1d0) ) then
+      
+                    ind = ind + 1
+                    mon%IndX(ind) = ind
+                    mon%IndN(1,ind) = i
+                    mon%IndN(2,ind) = j
+                    mon%IPair(i,j) = 1
+                    mon%IPair(j,i) = 1
+      
+                 endif
+              endif
+      
+          endif
+   
+       enddo
+    enddo
+ 
+ endif
  mon%NDimX = ind
+
+! old:
+! ij=0
+! ind = 0
+! do i=1,nbas
+!    do j=1,i-1
+!
+!       ij = ij + 1
+!       ind_ij = mon%IndAux(i)+mon%IndAux(j)
+!       if((ind_ij/=0).and.(ind_ij/=4)) then
+!   !   do not correlate active degenerate orbitals from different geminals 
+!          if(ICASSCF==0.and.(mon%IGem(i).ne.mon%IGem(j)).and.&
+!             (mon%IndAux(i)==1).and.(mon%IndAux(j)==1).and.&
+!             (Abs(mon%Occ(i)-mon%Occ(j))/mon%Occ(i).lt.1.d-2)&
+!          .or.&
+!             (ICASSCF==1).and.& 
+!             (mon%IndAux(i)==1).and.(mon%IndAux(j)==1).and.&
+!             (Abs(mon%Occ(i)-mon%Occ(j))/mon%Occ(i).lt.1.d-10) ) then
+!   
+!             write(LOUT,'(1x,a,2x,2i4)') 'Discarding nearly degenerate pair',i,j 
+!           else
+!              ! if IFlCore=0 exclude core (inactive) orbitals
+!              if(IFlCore==1.or.&
+!                (IFlCore==0.and.&
+!                 mon%Occ(i)/=1d0.and.mon%Occ(j)/=1d0) ) then
+!   
+!                 ind = ind + 1
+!                 mon%IndX(ind) = ind
+!                 !mon%IndX(ind) = ij
+!                 mon%IndN(1,ind) = i
+!                 mon%IndN(2,ind) = j
+!                 mon%IPair(i,j) = 1
+!                 mon%IPair(j,i) = 1
+!   
+!              endif
+!           endif
+!   
+!       endif
+!
+!    enddo
+! enddo
+!
+! mon%NDimX = ind
 ! Write(6,'(/,2X,"Total number of pairs:",I6)') mon%NDim !nbas*(nbas-1)/2 
 ! Write(6,'(2X,"Reduced to:",I6)') mon%NDimX 
 
@@ -941,6 +1107,44 @@ end function FindGem
 
 end subroutine select_active
 
+
+subroutine readener(nbas,mon,isiri)
+implicit none
+
+type(SystemBlock) :: mon
+integer :: nbas, isiri
+integer :: MMORBT
+integer :: NISHT,NASHT,NOCCT,NORBT,NBAST,NCONF,NWOPT,NWOPH,&
+           NCDETS, NCMOT,NNASHX,NNASHY,NNORBT 
+integer :: i
+double precision,allocatable :: fock(:)
+
+! set dimensions
+ rewind(isiri)
+
+ read (isiri)
+ read (isiri) 
+ read (isiri) NISHT,NASHT,NOCCT,NORBT,NBAST,NCONF,NWOPT,NWOPH,&
+              NCDETS, NCMOT,NNASHX,NNASHY,NNORBT 
+ read(isiri)
+ read(isiri)
+ read(isiri)
+ read(isiri)
+ read(isiri)
+
+ MMORBT = max(4,NNORBT)
+ allocate(fock(MMORBT),mon%OrbE(NORBT))
+
+ read(isiri) fock 
+ ! orb energies: diag of Fock
+ do i=1,NORBT
+    mon%OrbE(i) = fock(i+i*(i-1)/2)
+ enddo
+
+ deallocate(fock)
+
+end subroutine readener 
+
 subroutine print_occ(nbas,SAPT,ICASSCF)
 implicit none
 !!! HERE : Change to A/B monomers!
@@ -948,9 +1152,9 @@ type(SaptData) :: SAPT
 integer :: nbas, ICASSCF
 integer :: i
 
- write(LOUT,'(2x,a)') 'ORBITAL OCCUPANCIES'
  associate(A => SAPT%monA, B => SAPT%monB)
  if(ICASSCF==0) then
+   write(LOUT,'(1x,a)') 'ORBITAL OCCUPANCIES'
    write(LOUT,'(2x,"Orb",3x,"Occupancy-A",6x,"Gem-A",10x,"Occupancy-B",6x,"Gem-B")')
    do i=1,nbas
       !write(6,'(X,i3,2e16.6,i6)') i,A%Occ(i),A%CICoef(i),A%IGem(i)
@@ -961,12 +1165,21 @@ integer :: i
 
  else
 
-   write(LOUT,'(1x,a,1x,i3,i3)') 'NO OF CAS INACTIVE AND ACTIVE ORBITALS:',A%INAct, A%NAct
-   write(LOUT,'(1x,a,3x,a,4x,a)') 'CASSCF', 'Occupancy', 'Gem'
+!   write(LOUT,'(1x,a)') 'NO OF CAS INACTIVE AND ACTIVE ORBITALS'
+   write(LOUT, '()')
+   write(LOUT,'(1x,a,11x,a,5x,a)') 'CAS ORBITALS','Monomer A',  'Monomer B'
+   write(LOUT,'(1x,a,17x,i3,11x,i3)') 'INACTIVE', A%INAct, B%INAct
+   write(LOUT,'(1x,a,17x,i3,11x,i3)') 'ACTIVE  ', A%NAct, B%NAct
+   write(LOUT, '()')
+!   write(LOUT,'(1x,a,1x,i3,i3)') 'NO OF CAS INACTIVE AND ACTIVE ORBITALS:',A%INAct, A%NAct
+!   write(LOUT,'(1x,a,1x,i3,i3)') 'NO OF CAS INACTIVE AND ACTIVE ORBITALS:',B%INAct, B%NAct
+   write(LOUT,'(1x,a)') 'ORBITAL OCCUPANCIES'
+   write(LOUT,'(1x,a,3x,a,4x,a,10x,a,6x,a)') 'CASSCF', 'Occupancy-A', 'Gem-A', 'Occupancy-B','Gem-B'
    do i=1,nbas
-      write(LOUT,'(1x,i3,e16.6,i6)') i, A%Occ(i), A%IGem(i)
+      write(LOUT,'(1x,i3,1x,e16.6,1x,i6,7x,e16.6,3x,i6)') i, A%Occ(i),A%IGem(i),B%Occ(i),B%IGem(i) 
    enddo
-   write(LOUT,'(2x,a,e16.6)') 'SUM OF OCCUPANCIES: ', A%SumOcc
+   write(LOUT,'(2x,a,f8.4,18x,f6.4)') 'SUM OF OCCUPANCIES: ', A%SumOcc, B%SumOcc
+   write(LOUT, '()')
  endif
  end associate
 
@@ -1071,6 +1284,15 @@ deallocate(SAPT%monA%CICoef,SAPT%monA%IGem,SAPT%monA%Occ, &
 deallocate(SAPT%monB%CICoef,SAPT%monB%IGem,SAPT%monB%Occ, &
            SAPT%monB%IndAux,SAPT%monB%IndX,SAPT%monB%IndN,&
            SAPT%monB%IPair)
+
+if(allocated(SAPT%monA%OrbE)) then
+  deallocate(SAPT%monA%OrbE)
+endif
+if(allocated(SAPT%monB%OrbE)) then
+  deallocate(SAPT%monB%OrbE)
+endif
+
+
 
 end subroutine free_sapt
 
