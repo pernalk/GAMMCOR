@@ -60,7 +60,7 @@ C
 C
 C     GET 2-EL NO INTEGRALS AND CICoef
 C 
-      Call test2el(NBasis,'AOTWOINT')
+C      Call readtwoint(NBasis,'AOTWOINT')
       Call read2el(TwoEl,UMOAO,NBasis,NInte2)
 !      Call altread2el(TwoEl,UMOAO,NBasis,NInte2)
 C
@@ -1529,38 +1529,38 @@ c     *          write(*,'(4I4,F12.8)') ip, iq, ir, is, dbuf(i)
       
       if (nxx .ge. 0) go to 10
 
-C     TEST read2el vs. test2el
-      block
-
-      integer :: iunit,ip,iq,ir,is
-      double precision :: TMP1, TMP2
-      double precision :: mat(NBasis*(NBasis+1)/2)
-      Integer(8),external :: NAddr3
+C     TEST read2el vs. readtwoint
+C      block
 C
-      print*, '2EL-TEST / NAddr3'
-C
-      open(newunit=iunit,file='AOTWOSORT',access='DIRECT',
-     $ recl=8*NBasis*(NBasis+1)/2)
-C
-      do is=1,NBasis
-      do ir=1,NBasis
-      read(iunit,rec=min(ir,is)+max(ir,is)*(max(ir,is)-1)/2) mat
-      do iq=1,NBasis
-      do ip=1,NBasis
-C  
-      TMP1 = TwoEl(NAddr3(ip,iq,ir,is)) 
-      TMP2 = mat(min(ip,iq)+max(ip,iq)*(max(ip,iq)-1)/2)
-C
-      if(TMP1.ne.TMP2) write(6,*) TMP1,TMP2
-C    
-      enddo
-      enddo
-      enddo
-      enddo
-      close(iunit)
-C
-      print*, 'Ended 2-el comparison'
-      end block
+C      integer :: iunit,ip,iq,ir,is
+C      double precision :: TMP1, TMP2
+C      double precision :: mat(NBasis*(NBasis+1)/2)
+C      Integer(8),external :: NAddr3
+CC
+C      print*, '2EL-TEST / NAddr3'
+CC
+C      open(newunit=iunit,file='AOTWOSORT',access='DIRECT',
+C     $ recl=8*NBasis*(NBasis+1)/2)
+CC
+C      do is=1,NBasis
+C      do ir=1,NBasis
+C      read(iunit,rec=min(ir,is)+max(ir,is)*(max(ir,is)-1)/2) mat
+C      do iq=1,NBasis
+C      do ip=1,NBasis
+CC  
+C      TMP1 = TwoEl(NAddr3(ip,iq,ir,is)) 
+C      TMP2 = mat(min(ip,iq)+max(ip,iq)*(max(ip,iq)-1)/2)
+CC
+C      if(TMP1.ne.TMP2) write(6,*) TMP1,TMP2
+CC    
+C      enddo
+C      enddo
+C      enddo
+C      enddo
+C      close(iunit)
+CC
+C      print*, 'Ended 2-el comparison'
+C      end block
 C
 C     TRANSFORM THE INTEGRALS
 C
@@ -1703,8 +1703,6 @@ C
       ElseIf(Mon.Eq.2) Then
       fname='TWOMOBB '
       write(*,*) fname
-      ElseIf(Mon.Eq.3) Then
-      fname='TWOMOAB '
       EndIf
  
       Work1 = 0d0

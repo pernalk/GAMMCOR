@@ -112,7 +112,7 @@ integer :: r,s,rs
 
 end subroutine tran4_unsym2
 
-subroutine tran4_sym(NBas,nA,CA,nB,CB,nC,CC,nD,CD,fname)
+subroutine tran4_full(NBas,CA,CB,fname)
 ! 4-index transformation out of core
 ! dumps all integrals on disk in the (triang,triang) form
 ! CAREFUL: C have to be in AOMO form!
@@ -121,11 +121,9 @@ subroutine tran4_sym(NBas,nA,CA,nB,CB,nC,CC,nD,CD,fname)
 implicit none
 
 integer,intent(in) :: NBas
-integer,intent(in) :: nA
-integer,intent(in) :: nB,nC,nD
+!integer,intent(in) :: nA,nB,nC,nD
 ! CA(NBas*nA)
-double precision,intent(in) :: CA(*)
-double precision,intent(in) :: CB(*), CC(*), CD(*)
+double precision,intent(in) :: CA(*), CB(*)
 character(*) :: fname
 double precision, allocatable :: work1(:), work2(:), work3(:,:)
 integer :: iunit,iunit2,iunit3
@@ -138,16 +136,107 @@ integer :: i,rs,ab
 ! write(6,'(1x,a)') 'Transforming integrals for AB dimer'
  write(6,'(1x,a)') 'Transforming integrals for '//fname
 
+ ntr = NBas*(NBas+1)/2
+
+ ! set no. of triangles in buffer
+ nloop = (ntr-1)/cbuf+1
+
  allocate(work1(NBas*NBas),work2(NBas*NBas))
- allocate(work3(cbuf,NBas*(NBas+1)/2))
+ allocate(work3(cbuf,ntr))
 
  open(newunit=iunit,file='AOTWOSORT',status='OLD',&
       access='DIRECT',form='UNFORMATTED',recl=8*NBas*(NBas+1)/2)
+
+ ! half-transformed file
+ open(newunit=iunit2,file='TMPMO',status='REPLACE',&
+     access='DIRECT',form='UNFORMATTED',recl=8*cbuf)
+
+! (ab|
+ do i=1,nloop
+    ! loop over cbuf
+    do rs=(i-1)*cbuf+1,min(i*cbuf,ntr)
+
+       read(iunit,rec=rs) work1(1:ntr)
+       call triang_to_sq(work1,work2,NBas)
+       ! work1=CA^T.work2
+       ! work2=work1.CB
+       call dgemm('T','N',NBas,NBas,NBas,1d0,CA,NBas,work2,NBas,0d0,work1,NBas) 
+       call dgemm('N','N',NBas,NBas,NBas,1d0,work1,NBas,CA,NBas,0d0,work2,NBas)
+       call sq_to_triang(work2,work1,NBas)
+       ! transpose
+       work3(rs-(i-1)*cbuf,1:ntr) = work1(1:ntr)
+
+    enddo
+
+    do ab=1,ntr
+       write(iunit2,rec=(i-1)*ntr+ab) work3(1:cbuf,ab)
+    enddo
+
+ enddo
+
+ close(iunit)
+
+! |cd)
+ open(newunit=iunit3,file=fname,status='REPLACE',&
+     access='DIRECT',form='UNFORMATTED',recl=8*ntr)
+
+ do ab=1,ntr
+
+    do i=1,nloop
+       ! get all (ab| for given |rs)
+       read(iunit2,rec=(i-1)*ntr+ab) work1((i-1)*cbuf+1:min(i*cbuf,ntr))
+    enddo
+
+    call triang_to_sq(work1,work2,NBas)
+    ! work1=CC^T.work2
+    ! work2=work1.CD
+    call dgemm('T','N',NBas,NBas,NBas,1d0,CB,NBas,work2,NBas,0d0,work1,NBas)
+    call dgemm('N','N',NBas,NBas,NBas,1d0,work1,NBas,CB,NBas,0d0,work2,NBas)
+    call sq_to_triang(work2,work1,NBas)
+    write(iunit3,rec=ab) work1(1:ntr)
+
+ enddo
+
+ deallocate(work1,work2,work3)
+ close(iunit3)
+ close(iunit2,status='DELETE')
+
+end subroutine tran4_full
+
+subroutine tran4_sym(NBas,nA,CA,nB,CB,nC,CC,nD,CD,fname)
+! 4-index transformation out of core
+! dumps all integrals on disk in the (triang,triang) form
+! CAREFUL: C have to be in AOMO form!
+!!! CAREFUL: write to simpler form
+!!! ie. (NBas,n,C)
+implicit none
+
+integer,intent(in) :: NBas
+integer,intent(in) :: nA,nB,nC,nD
+! CA(NBas*nA)
+double precision,intent(in) :: CA(*), CB(*), CC(*), CD(*)
+character(*) :: fname
+double precision, allocatable :: work1(:), work2(:), work3(:,:)
+integer :: iunit,iunit2,iunit3
+integer :: ntr,nloop
+integer,parameter :: cbuf=512
+integer :: i,rs,ab
+
+ write(6,'()') 
+! write(6,'(1x,a)') 'TRAN4_SYM_OUT_OF_CORE'
+! write(6,'(1x,a)') 'Transforming integrals for AB dimer'
+ write(6,'(1x,a)') 'Transforming integrals for '//fname
 
  ntr = NBas*(NBas+1)/2
 
  ! set no. of triangles in buffer
  nloop = (ntr-1)/cbuf+1
+
+ allocate(work1(NBas*NBas),work2(NBas*NBas))
+ allocate(work3(cbuf,ntr))
+
+ open(newunit=iunit,file='AOTWOSORT',status='OLD',&
+      access='DIRECT',form='UNFORMATTED',recl=8*NBas*(NBas+1)/2)
 
  ! half-transformed file
  open(newunit=iunit2,file='TMPMO',status='REPLACE',&
@@ -165,11 +254,11 @@ integer :: i,rs,ab
        call dgemm('T','N',nA,NBas,NBas,1d0,CA,NBas,work2,NBas,0d0,work1,nA) 
        call dgemm('N','N',nA,nB,NBas,1d0,work1,nA,CB,NBas,0d0,work2,nA)
        call sq_to_triang(work2,work1,NBas)
-       work3(rs,:) = work1(1:ntr)
+       ! transpose
+       work3(rs-(i-1)*cbuf,1:ntr) = work1(1:ntr)
 
     enddo
 
-    ! transpose 
     do ab=1,ntr
        write(iunit2,rec=(i-1)*ntr+ab) work3(1:cbuf,ab)
     enddo

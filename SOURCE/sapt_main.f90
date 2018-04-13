@@ -62,10 +62,20 @@ integer :: noccA, nvirtA, noccB, nvirtB
 
 ! read basis info
 ! only dimer basis
+ NBasis = 0
  call basinfo(NBasis,'SIRIUS_A.RST')
- if(NBasis==0) then
-   NBasis = SAPT%monA%NBasis
+ if(NBasis==0.and.SAPT%monA%NBasis==0) then
+    write(LOUT,'(1x,a)') 'ERROR!!! NBasis NOWHERE TO BE FOUND!'
+    stop
+ elseif(NBasis==0.and.SAPT%monA%NBasis/=0) then
+    ! basis only in input
+    NBasis = SAPT%monA%NBasis
+ elseif(NBasis/=0.and.SAPT%monA%NBasis==0) then
+    ! basis only in SIRIFC
+    SAPT%monA%NBasis = NBasis
+    SAPT%monB%NBasis = NBasis
  endif
+
 ! set dimensions
   NSq = NBasis**2
   NInte1 = NBasis*(NBasis+1)/2
@@ -235,23 +245,16 @@ integer :: noccA, nvirtA, noccB, nvirtB
 
 ! ABABABABABABABABABABABABABABABABABABABABABABABABABABABABAB
 ! read and transform 2-el integrals
- call test2el(NBasis,'AOTWOINT_A')
-! HERE?
- call tran4_sym(NBasis,NBasis,Ca,NBasis,Ca,&
-                NBasis,Cb,NBasis,Cb,'TWOMOAB')
-! noccA = 1
-! nvirtA = NBasis - noccA
-! noccB = 2
-! nvirtB = NBasis - noccB
-! call tran4_sym(NBasis,noccA,Ca,nvirtA,Ca,&
-!                noccB,Cb,nvirtB,Cb,'TWOMOAB')
-
+ call readtwoint(NBasis,'AOTWOINT_A')
+ call tran4_full(NBasis,Ca,Cb,'TWOMOAB')
+! call tran4_sym(NBasis,NBasis,Ca,NBasis,Ca,&
+!                NBasis,Cb,NBasis,Cb,'TWOMOAB')
 
  if(SAPT%IPrint.gt.100) call print_TwoInt(NBasis)
 
 ! look-up tables
- call select_active(SAPT%monA,NBasis,Flags%ICASSCF,Flags%IFlCore)
- call select_active(SAPT%monB,NBasis,Flags%ICASSCF,Flags%IFlCore)
+ call select_active(SAPT%monA,NBasis,Flags%ICASSCF,Flags%ISHF,Flags%IFlCore)
+ call select_active(SAPT%monB,NBasis,Flags%ICASSCF,Flags%ISHF,Flags%IFlCore)
 
  call print_active(SAPT,NBasis)
 
@@ -337,18 +340,8 @@ double precision :: tmp
     stop
  endif
 
-! diag XOne
-! do i=1,NBas
-!    write(*,*) XOne(i*(i-1)/2+i)
-! enddo
-!  write(*,*) XOne(1:NBas)
-
 ! read 2-el
-! HERE???: Dedicated procedures for sym TWOMOAA, TWOMOBB?
-! call print_mo(MO,Mon%NOrb,'MONOMER B')
-
- call tran4_sym(NBas,NBas,MO,NBas,MO, &
-                     NBas,MO,NBas,MO,fname)
+ call tran4_full(NBas,MO,MO,fname)
  call LoadSaptTwoEl(Mon%Monomer,TwoMO,NBas,NInte2)
 
  ACAlpha=One
@@ -386,15 +379,14 @@ double precision :: tmp
  call ERPASYMM(EigVecR,Eig,ABPlus,ABMin,NBas,Mon%NDimX)
 
 ! weird stuff ?
- do i=1,Mon%NDimX**2
-     !tmp = tmp + Eig(i)**2
-     tmp = tmp + EigVecR(i)**2
- enddo
- write(*,*) tmp
+! do i=1,Mon%NDimX**2
+!     !tmp = tmp + Eig(i)**2
+!     tmp = tmp + EigVecR(i)**2
+! enddo
+! write(*,*) tmp
 ! do i=1,Mon%NDimX
 !    write(LOUT,*) Eig(i),EigVecR(Mon%NDimX*(i-1)+i)
 ! enddo
-
 
  else
 
@@ -429,17 +421,17 @@ double precision :: tmp
  
    call ERPASYMM1(EigVecR,Eig,ABPlus,ABMin,NBas,Mon%NDimX)
 
-   tmp=0
-   do i=1,Mon%NDimX
-      !write(*,*) Eig(i)
-       tmp = tmp + Eig(i)**2
-   enddo
-   write(*,*) tmp
-   tmp=0
-   do i=1,Mon%NDimX**2
-       tmp = tmp + EigVecR(i)**2
-   enddo
-   write(*,*) tmp
+!   tmp=0
+!   do i=1,Mon%NDimX
+!      !write(*,*) Eig(i)
+!       tmp = tmp + Eig(i)**2
+!   enddo
+!   write(*,*) tmp
+!   tmp=0
+!   do i=1,Mon%NDimX**2
+!       tmp = tmp + EigVecR(i)**2
+!   enddo
+!   write(*,*) tmp
 
  endif
 
@@ -467,7 +459,7 @@ integer :: nbas
 double precision :: mat(nbas,nbas)
 integer :: nA, nB
 
-call read_syminf(SAPT%monA,SAPT%monB)
+call read_syminf(SAPT%monA,SAPT%monB,nbas)
 
 call swap_rows(SAPT%monA%NMonOrb,SAPT%monB%NMonOrb,mat)
 call swap_cols(SAPT%monA%NMonOrb,SAPT%monB%NMonOrb,mat)
@@ -486,14 +478,15 @@ call swap_rows(A%NMonOrb,B%NMonOrb,mat)
 
 end subroutine arrange_mo
 
-subroutine read_syminf(A,B)
+subroutine read_syminf(A,B,nbas)
 ! reads number of basis functions on each monomer
 ! from SYMINFO file!
 implicit none
 
 type(SystemBlock) :: A, B
+integer :: nbas
 integer :: iunit,ios
-integer :: ibas,icen
+integer :: ibas,icen,last_ibas,last_icen
 logical :: ex,dump
 integer :: tmp
 integer :: ACenTst, ACenBeg, ACenEnd
@@ -510,14 +503,16 @@ if(ex) then
    dump = .TRUE.
    do
      read(iunit,'(i5,i6)',iostat=ios) ibas,icen
-   ! if(ios/=0) exit
      if((icen.gt.B%NCen).and.dump) then 
         B%NMonOrb = ibas-1
         ACenBeg = icen
         dump = .FALSE.
+     elseif(.not.dump.and.ios==0) then
+        last_icen = icen
+        last_ibas = ibas
      elseif(ios/=0) then
-        tmp = ibas
-        ACenEnd = icen
+        tmp = last_ibas
+        ACenEnd = last_icen
         exit
      endif
      !write(*,*) ibas,icen,dump
@@ -914,11 +909,11 @@ integer :: nisht, nasht, nocct, norbt, nbast, nconf, nwopt, nwoph
 
 end subroutine readmulti
 
-subroutine select_active(mon,nbas,ICASSCF,IFlCore)
+subroutine select_active(mon,nbas,ICASSCF,ISHF,IFlCore)
 implicit none
 
 type(SystemBlock) :: mon
-integer :: nbas, ICASSCF, IFlCore
+integer :: nbas, ICASSCF, ISHF, IFlCore
 integer :: i, j, ij, icnt
 integer :: ind, ind_ij
 integer :: IAuxGem(nbas) 
@@ -948,7 +943,7 @@ integer :: test
          mon%icnt = mon%icnt + 2
       endif
    enddo
- elseif(ICASSCF==1) then
+ elseif(ICASSCF==1.and.ISHF==0) then
    write(LOUT,'()')
    if(mon%Monomer==1) write(LOUT,'(1x,a)') 'Monomer A' 
    if(mon%Monomer==2) write(LOUT,'(1x,a)') 'Monomer B' 

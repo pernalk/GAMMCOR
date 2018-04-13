@@ -20,7 +20,7 @@ double precision,allocatable :: OmA(:),OmB(:)
 !double precision,allocatable :: EVecA(:,:),EVecB(:,:)
 double precision,allocatable :: EVecA(:),EVecB(:)
 double precision,allocatable :: tmp1(:,:),tmp2(:,:) 
-double precision,allocatable :: TwoMO(:)
+double precision,allocatable :: work(:)
 double precision :: e2d,tmp
 double precision :: e2du,dea,deb
 
@@ -35,17 +35,15 @@ double precision :: e2du,dea,deb
  NInte1 = NBas*(NBas+1)/2
  NInte2 = NInte1*(NInte1+1)/2
 
-! read EigValA_B
-! allocate(EVecA(A%NDimX,A%NDimX),OmA(A%NDimX),&
-!          EVecB(B%NDimX,B%NDimX),OmB(B%NDimX),&
-!          TwoMO(NInte2))
+ print*,NBas,NInte1,NInte2
 
+! read EigValA_B
  allocate(EVecA(A%NDimX*A%NDimX),OmA(A%NDimX),&
-          EVecB(B%NDimX*B%NDimX),OmB(B%NDimX),&
-          TwoMO(NInte2))
+          EVecB(B%NDimX*B%NDimX),OmB(B%NDimX))
 
  call readresp(EVecA,OmA,A%NDimX,'PROP_A')
  call readresp(EVecB,OmB,B%NDimX,'PROP_B')
+
 ! TEST RESPONSE
 ! tmp = 0
 !do j=1,A%NDimX
@@ -68,9 +66,6 @@ double precision :: e2du,dea,deb
 ! enddo
 ! print*, 'test-resp:',tmp
 
-! read 2-el integrals
-  call LoadSaptTwoEl(3,TwoMO,NBas,NInte2)
-
 ! print*, 'iaddr'
 ! do is=1,NBas
 !    do ir=1,is
@@ -82,119 +77,88 @@ double precision :: e2du,dea,deb
 !    enddo
 ! enddo
 
-! HERE!!!!
 ! uncoupled
+allocate(work(NInte1))
+open(newunit=iunit,file='TWOMOAB',status='OLD',&
+     access='DIRECT',form='UNFORMATTED',recl=8*NInte1)
+
 
 e2du=0d0
 do pq=1,A%NDimX
    ip = A%IndN(1,pq)
    iq = A%IndN(2,pq)
-   dea = A%OrbE(ip)-A%OrbE(iq) 
+   dea = A%OrbE(ip)-A%OrbE(iq)
+   !print*, iq,ip,iq+ip*(ip-1)/2,NInte1
+   read(iunit,rec=iq+ip*(ip-1)/2) work(1:NInte1)
    do rs=1,B%NDimX
       ir = B%IndN(1,rs)
       is = B%IndN(2,rs)
       deb = B%OrbE(ir)-B%OrbE(is) 
-      e2du = e2du + & 
-            TwoMO(iaddr(ip,iq,ir,is))**2d0/(dea+deb)
-       enddo
-       !write(*,*) 'tmp1',tmp1(i,pq)
-    enddo
- write(*,*)'e2du: ', -4d0*e2du 
-
-! 2-el 
-!tmp=0d0
-!do pq=1,A%NDimX
-!   ip = A%IndN(1,pq)
-!   iq = A%IndN(2,pq)
-!   do rs=1,B%NDimX
-!      ir = B%IndN(1,rs)
-!      is = B%IndN(2,rs)
-!      tmp = tmp + & 
-!            TwoMO(iaddr(ip,iq,ir,is))**2d0
-!       enddo
-!       !write(*,*) 'tmp1',tmp1(i,pq)
-!    enddo
-! write(*,*)'TwoEl:', tmp
-! tmp=0d0 
-
-! do i=1,A%NDimX
-!    write(*,*) A%IndN(1,i)
-!    write(*,*) A%IndN(2,i)
-! enddo
+      !print*, is,ir,is+ir*(ir-1)/2,NInte1
+      e2du = e2du + work(is+ir*(ir-1)/2)**2/(dea+deb)
+   enddo
+enddo
+ write(LOUT,'()') 
+ write(LOUT,'(1x,a,f16.8)')'E2disp(unc) = ', -4d0*e2du*1000d0 
 
 allocate(tmp1(A%NDimX,B%NDimX),tmp2(A%NDimX,B%NDimX))
 
-!do j=1,A%NDimX
-!   ir = A%IndN(1,j)
-!   is = A%IndN(2,j)
-!   write(*,*) is,ir, sqrt(A%Occ(ir)), A%CICoef(ir)
-!enddo
-
-!do i=1,A%NDimX
-!   ip = A%IndN(1,i)
-!   iq = A%IndN(2,i)
-!   write(*,*) A%Occ(iq),A%Occ(ip)
-!enddo
-
 ! coupled - 1
-! tmp1=0
-! do i=1,A%NDimX
-!    do pq=1,A%NDimX
-!       ip = A%IndN(1,pq)
-!       iq = A%IndN(2,pq)
-!       do rs=1,B%NDimX
-!          ir = B%IndN(1,rs)
-!          is = B%IndN(2,rs)
-!          tmp1(i,rs) = tmp1(i,rs) + & 
-!                       (A%CICoef(iq)+A%CICoef(ip)) * &
-!                       (B%CICoef(is)+B%CICoef(ir)) * &
-!                      ! EVecA(i,pq)*TwoMO(iaddr(ip,iq,ir,is))
-!                       EVecA(pq,i)*TwoMO(iaddr(ip,iq,ir,is))
-!       enddo
-!       !write(*,*) 'tmp1',tmp1(i,pq)
-!    enddo
-! enddo
-! tmp2=0
-! do j=1,B%NDimX
-!    do i=1,A%NDimX
-!       do rs=1,B%NDimX
-!       ir = B%IndN(1,rs)
-!       is = B%IndN(2,rs)
-!       tmp2(i,j) = tmp2(i,j) + &
-!                   EVecB(j,rs)*tmp1(i,rs)
-!       enddo
-!    enddo   
-! enddo
+ tmp1=0
+ do i=1,A%NDimX
+    do pq=1,A%NDimX
+       ip = A%IndN(1,pq)
+       iq = A%IndN(2,pq)
+       read(iunit,rec=iq+ip*(ip-1)/2) work(1:NInte1)
+       do rs=1,B%NDimX
+          ir = B%IndN(1,rs)
+          is = B%IndN(2,rs)
+          tmp1(i,rs) = tmp1(i,rs) + & 
+                       (A%CICoef(iq)+A%CICoef(ip)) * &
+                       (B%CICoef(is)+B%CICoef(ir)) * &
+                       EVecA((i-1)*A%NDimX+pq)*work(is+ir*(ir-1)/2)
+       enddo
+    enddo
+ enddo
+ tmp2=0
+ do j=1,B%NDimX
+    do i=1,A%NDimX
+       do rs=1,B%NDimX
+       ir = B%IndN(1,rs)
+       is = B%IndN(2,rs)
+       tmp2(i,j) = tmp2(i,j) + &
+                    EVecB((j-1)*B%NDimX+rs)*tmp1(i,rs)
+       enddo
+    enddo   
+ enddo
 
-! e2d = 0d0
-! do i=1,A%NDimX
-!    do j=1,B%NDimX
-!       e2d = e2d + tmp2(i,j)**2d0/(OmA(i)+OmB(j))
-!    enddo
-! enddo
-! e2d = -16d0*e2d
-!!
-! print*, 'e2disp: ',e2d
+ e2d = 0d0
+ do i=1,A%NDimX
+    do j=1,B%NDimX
+       e2d = e2d + tmp2(i,j)**2d0/(OmA(i)+OmB(j))
+    enddo
+ enddo
+ e2d = -16d0*e2d*1000d0
+ write(LOUT,'(1x,a,5x,f16.8)') 'E2disp = ',e2d
 
-! coupled -2 
+!! coupled -2
 ! e2d = 0d0
-! tmp=0d0
 ! do i=1,A%NDimX
 !    do j=1,B%NDimX
 !
-!       tmp = 0d0
+!       tmp=0d0
 !       do pq=1,A%NDimX
 !          ip = A%IndN(1,pq)
 !          iq = A%IndN(2,pq)
-! 
+!          read(iunit,rec=iq+ip*(ip-1)/2) work(1:NInte1)
 !          do rs=1,B%NDimX
 !             ir = B%IndN(1,rs)
 !             is = B%IndN(2,rs)
-!             tmp = tmp - &
+!             tmp = tmp + &
 !                   (A%CICoef(ip)+A%CICoef(iq)) * &
 !                   (B%CICoef(ir)+B%CICoef(is)) * &
-!                   EVecA(pq,i)*TwoMO(iaddr(ip,iq,ir,is))*&
-!                   EVecB(j,rs)
+!                   EVecA((i-1)*A%NDimX+pq)*work(is+ir*(ir-1)/2)*&
+!                   EVecB((j-1)*B%NDimX+rs)
 !          enddo
 !       enddo
 !
@@ -205,39 +169,11 @@ allocate(tmp1(A%NDimX,B%NDimX),tmp2(A%NDimX,B%NDimX))
 ! 
 ! print*, 'e2disp: ',e2d*1000
 
-! coupled-3
- e2d = 0d0
- tmp=0d0
- do i=1,A%NDimX
-    do j=1,B%NDimX
-!
-       do pq=1,A%NDimX
-          ip = A%IndN(1,pq)
-          iq = A%IndN(2,pq)
- 
-          do rs=1,B%NDimX
-             ir = B%IndN(1,rs)
-             is = B%IndN(2,rs)
-             tmp = tmp + &
-                   (A%CICoef(ip)+A%CICoef(iq)) * &
-                   (B%CICoef(ir)+B%CICoef(is)) * &
-                   EVecA((pq-1)*A%NDimX+i)*TwoMO(iaddr(ip,iq,ir,is))*&
-                   EVecB((j-1)*B%NDimX+rs)
-          enddo
-       enddo
+ close(iunit)
+ deallocate(work)
 
-       e2d = e2d  + tmp**2d0/(OmA(i)+OmB(j))
-       tmp=0
-    enddo
- enddo
- e2d = -16d0*e2d
-! 
- print*, 'e2disp: ',e2d*1000
-
-
-
+ deallocate(tmp1,tmp2)
  deallocate(EVecA,EVecB,OmA,OmB)
- deallocate(TwoMO,tmp1,tmp2)
 
 end subroutine e2disp
 

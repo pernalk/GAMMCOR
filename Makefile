@@ -14,15 +14,15 @@ OBJ = $(O)mainp.o $(O)initia.o $(O)dmscf.o $(O)misc.o $(O)optocc.o \
       $(O)sapt_main.o $(O)sapt.o \
       $(O)srlrdynamic.o $(O)erpa.o $(O)interpa.o  $(O)exact2el.o $(O)optapsg.o $(O)newton.o $(O)acfd.o $(O)accas.o
 
-FCC = gfortran
-FFLAGS = -O3 -fno-align-commons -fcheck=all 
-#-fdefault-real-8 
-#-Wall -Wextra -Warray-temporaries -Wrealloc-lhs-all -pedantic
-LIBS = -L/usr/lib -llapack -lblas
+#FCC = gfortran
+#FFLAGS = -O3 -fno-align-commons -fcheck=all 
+##-fdefault-real-8 
+##-Wall -Wextra -Warray-temporaries -Wrealloc-lhs-all -pedantic
+#LIBS = -L/usr/lib -llapack -lblas
 
-#FCC = ifort
-#FFLAGS = -mkl -heap-arrays  -O2
-#LIBS = -L/opt/intel/composer_xe_2015.2.164/mkl/lib/intel64/ -lmkl_intel_ilp64 -lmkl_sequential -lmkl_core
+FCC = ifort -assume byterecl
+FFLAGS = -mkl -heap-arrays  -O2
+LIBS = -L/opt/intel/composer_xe_2015.2.164/mkl/lib/intel64/ -lmkl_intel_ilp64 -lmkl_sequential -lmkl_core
 
 
 $(PROG) :  $(OBJ) 
