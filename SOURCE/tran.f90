@@ -203,7 +203,7 @@ integer :: i,rs,ab
 
 end subroutine tran4_full
 
-subroutine tran4_sym(NBas,nA,CA,nB,CB,nC,CC,nD,CD,fname)
+subroutine tran4_gen(NBas,nA,CA,nB,CB,nC,CC,nD,CD,fname)
 ! 4-index transformation out of core
 ! dumps all integrals on disk in the (triang,triang) form
 ! CAREFUL: C have to be in AOMO form!
@@ -218,7 +218,7 @@ double precision,intent(in) :: CA(*), CB(*), CC(*), CD(*)
 character(*) :: fname
 double precision, allocatable :: work1(:), work2(:), work3(:,:)
 integer :: iunit,iunit2,iunit3
-integer :: ntr,nloop
+integer :: ntr,nAB,nCD,nloop
 integer,parameter :: cbuf=512
 integer :: i,rs,ab
 
@@ -228,15 +228,17 @@ integer :: i,rs,ab
  write(6,'(1x,a)') 'Transforming integrals for '//fname
 
  ntr = NBas*(NBas+1)/2
+ nAB = nA*nB
+ nCD = nC*nD
 
  ! set no. of triangles in buffer
  nloop = (ntr-1)/cbuf+1
 
  allocate(work1(NBas*NBas),work2(NBas*NBas))
- allocate(work3(cbuf,ntr))
+ allocate(work3(cbuf,nAB))
 
  open(newunit=iunit,file='AOTWOSORT',status='OLD',&
-      access='DIRECT',form='UNFORMATTED',recl=8*NBas*(NBas+1)/2)
+      access='DIRECT',form='UNFORMATTED',recl=8*ntr)
 
  ! half-transformed file
  open(newunit=iunit2,file='TMPMO',status='REPLACE',&
@@ -253,14 +255,13 @@ integer :: i,rs,ab
        ! work2=work1.CB
        call dgemm('T','N',nA,NBas,NBas,1d0,CA,NBas,work2,NBas,0d0,work1,nA) 
        call dgemm('N','N',nA,nB,NBas,1d0,work1,nA,CB,NBas,0d0,work2,nA)
-       call sq_to_triang(work2,work1,NBas)
        ! transpose
-       work3(rs-(i-1)*cbuf,1:ntr) = work1(1:ntr)
+       work3(rs-(i-1)*cbuf,1:nAB) = work2(1:nAB)
 
     enddo
 
-    do ab=1,ntr
-       write(iunit2,rec=(i-1)*ntr+ab) work3(1:cbuf,ab)
+    do ab=1,nAB
+       write(iunit2,rec=(i-1)*nAB+ab) work3(1:cbuf,ab)
     enddo
 
  enddo
@@ -269,13 +270,13 @@ integer :: i,rs,ab
 
 ! |cd)
  open(newunit=iunit3,file=fname,status='REPLACE',&
-     access='DIRECT',form='UNFORMATTED',recl=8*ntr)
+     access='DIRECT',form='UNFORMATTED',recl=8*nCD)
 
- do ab=1,ntr
+ do ab=1,nAB
 
     do i=1,nloop
        ! get all (ab| for given |rs)
-       read(iunit2,rec=(i-1)*ntr+ab) work1((i-1)*cbuf+1:min(i*cbuf,ntr))
+       read(iunit2,rec=(i-1)*nAB+ab) work1((i-1)*cbuf+1:min(i*cbuf,ntr))
     enddo
 
     call triang_to_sq(work1,work2,NBas)
@@ -283,8 +284,7 @@ integer :: i,rs,ab
     ! work2=work1.CD
     call dgemm('T','N',nC,NBas,NBas,1d0,CC,NBas,work2,NBas,0d0,work1,nC)
     call dgemm('N','N',nC,nD,NBas,1d0,work1,nC,CD,NBas,0d0,work2,nC)
-    call sq_to_triang(work2,work1,NBas)
-    write(iunit3,rec=ab) work1(1:ntr)
+    write(iunit3,rec=ab) work2(1:nCD)
 
  enddo
 
@@ -292,7 +292,49 @@ integer :: i,rs,ab
  close(iunit3)
  close(iunit2,status='DELETE')
 
-end subroutine tran4_sym
+end subroutine tran4_gen
+
+subroutine make_J(NBas,XA,XB,JA,JB)
+implicit none
+integer :: NBas
+double precision :: XA(*), XB(*), JA(NBas,NBas), JB(NBas,NBas)
+integer :: iunit, ntr
+integer :: ir,is,irs
+double precision :: tmp
+double precision,allocatable :: work1(:),work2(:)
+double precision,external :: ddot
+! works in DCBS
+
+ ntr = NBas*(NBas+1)/2
+
+ allocate(work1(NBas*NBas),work2(NBas*NBas))
+
+ open(newunit=iunit,file='AOTWOSORT',status='OLD',&
+      access='DIRECT',form='UNFORMATTED',recl=8*ntr)
+
+ irs=0
+ do is=1,NBas
+    do ir=1,is
+    irs = irs + 1
+    read(iunit,rec=irs) work1(1:ntr)    
+    call triang_to_sq(work1,work2,NBas)
+
+    tmp = ddot(NBas**2,work2,1,XA,1)
+    JA(ir,is) = tmp
+    JA(is,ir) = tmp
+
+    tmp = ddot(NBas**2,work2,1,XB,1)
+    JB(ir,is) = tmp
+    JB(is,ir) = tmp
+
+    enddo
+ enddo
+
+
+ deallocate(work1,work2)
+ close(iunit)
+
+end subroutine make_J
 
 subroutine tran_oneint(ints,MO1,MO2,NSym,GFunc,work,n)
 implicit none

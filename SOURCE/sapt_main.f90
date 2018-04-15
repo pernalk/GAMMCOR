@@ -243,18 +243,27 @@ integer :: noccA, nvirtA, noccB, nvirtB
  !if(SAPT%IPrint.ne.0) call print_mo(Ca,NOrbt,'MONOMER A')
  !if(SAPT%IPrint.ne.0) call print_mo(Cb,NOrbt,'MONOMER B')
 
-! ABABABABABABABABABABABABABABABABABABABABABABABABABABABABAB
-! read and transform 2-el integrals
- call readtwoint(NBasis,'AOTWOINT_A')
- call tran4_full(NBasis,Ca,Cb,'TWOMOAB')
-! call tran4_sym(NBasis,NBasis,Ca,NBasis,Ca,&
-!                NBasis,Cb,NBasis,Cb,'TWOMOAB')
-
- if(SAPT%IPrint.gt.100) call print_TwoInt(NBasis)
-
 ! look-up tables
  call select_active(SAPT%monA,NBasis,Flags%ICASSCF,Flags%ISHF,Flags%IFlCore)
  call select_active(SAPT%monB,NBasis,Flags%ICASSCF,Flags%ISHF,Flags%IFlCore)
+
+! ABABABABABABABABABABABABABABABABABABABABABABABABABABABABAB
+! read and transform 2-el integrals
+ call readtwoint(NBasis,'AOTWOINT_A')
+! call tran4_full(NBasis,Ca,Cb,'TWOMOAB')
+ ! integrals stored as (ov|ov)
+ call tran4_gen(NBasis,&
+                SAPT%monA%num0+SAPT%monA%num1,Ca,&
+                SAPT%monA%num1+SAPT%monA%num2,Ca(NBasis*SAPT%monA%num0+1:NBasis**2),&
+                SAPT%monB%num0+SAPT%monB%num1,Cb,&
+                SAPT%monB%num1+SAPT%monB%num2,Cb(NBasis*SAPT%monB%num0+1:NBasis**2),&
+                'TWOMOAB')
+
+ if(SAPT%IPrint.gt.100) call print_TwoInt(NBasis)
+
+!! look-up tables
+! call select_active(SAPT%monA,NBasis,Flags%ICASSCF,Flags%ISHF,Flags%IFlCore)
+! call select_active(SAPT%monB,NBasis,Flags%ICASSCF,Flags%ISHF,Flags%IFlCore)
 
  call print_active(SAPT,NBasis)
 
@@ -956,6 +965,20 @@ integer :: test
    enddo
 
  endif
+
+! set generalized "occupied" = num0 + num1
+! and "virtual" = num1 + num2 indices
+ mon%num0 = 0 
+ do i=1,nbas
+    if(mon%IndAux(i)/=0) exit
+    mon%num0 = mon%num0 + 1
+ enddo
+ mon%num2 = 0
+ do i=nbas,1,-1
+    if(mon%IndAux(i)/=2) exit
+    mon%num2 = mon%num2 + 1
+ enddo
+ mon%num1 = nbas - mon%num0 - mon%num2
 
 ! active pairs
  allocate(mon%IPair(nbas,nbas),mon%IndX(mon%NDim),mon%IndN(2,mon%NDim))

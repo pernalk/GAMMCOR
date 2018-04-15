@@ -13,6 +13,7 @@ type(FlagsData) :: Flags
 type(SystemBlock) :: A, B
 type(SaptData) :: SAPT
 integer :: NBas, NInte1,NInte2
+integer :: dimOA,dimVA,dimOB,dimVB,nOVA,nOVB
 integer :: iunit
 integer :: i,j,pq,rs
 integer :: ip,iq,ir,is
@@ -34,8 +35,14 @@ double precision :: e2du,dea,deb
 ! set dimensions
  NInte1 = NBas*(NBas+1)/2
  NInte2 = NInte1*(NInte1+1)/2
+ dimOA = A%num0+A%num1
+ dimVA = A%num1+A%num2
+ dimOB = B%num0+B%num1
+ dimVB = B%num1+B%num2
+ nOVA = dimOA*dimVA
+ nOVB = dimOB*dimVB
 
- print*,NBas,NInte1,NInte2
+ print*,NBas,NInte1,NInte2,nOVA,nOVB
 
 ! read EigValA_B
  allocate(EVecA(A%NDimX*A%NDimX),OmA(A%NDimX),&
@@ -78,68 +85,94 @@ double precision :: e2du,dea,deb
 ! enddo
 
 ! uncoupled
-allocate(work(NInte1))
-open(newunit=iunit,file='TWOMOAB',status='OLD',&
-     access='DIRECT',form='UNFORMATTED',recl=8*NInte1)
+! works with tran4_full
+!allocate(work(NInte1))
+!open(newunit=iunit,file='TWOMOAB',status='OLD',&
+!     access='DIRECT',form='UNFORMATTED',recl=8*NInte1)
+!
+!
+!e2du=0d0
+!do pq=1,A%NDimX
+!   ip = A%IndN(1,pq)
+!   iq = A%IndN(2,pq)
+!   dea = A%OrbE(ip)-A%OrbE(iq)
+!   !print*, iq,ip,iq+ip*(ip-1)/2,NInte1
+!   read(iunit,rec=iq+ip*(ip-1)/2) work(1:NInte1)
+!   do rs=1,B%NDimX
+!      ir = B%IndN(1,rs)
+!      is = B%IndN(2,rs)
+!      deb = B%OrbE(ir)-B%OrbE(is) 
+!      !print*, is,ir,is+ir*(ir-1)/2,NInte1
+!      e2du = e2du + work(is+ir*(ir-1)/2)**2/(dea+deb)
+!   enddo
+!enddo
+! write(LOUT,'()') 
+! write(LOUT,'(1x,a,f16.8)')'E2disp(unc) = ', -4d0*e2du*1000d0 
 
+! uncoupled
+allocate(work(nOVB))
+open(newunit=iunit,file='TWOMOAB',status='OLD',&
+     access='DIRECT',form='UNFORMATTED',recl=8*nOVB)
 
 e2du=0d0
 do pq=1,A%NDimX
    ip = A%IndN(1,pq)
    iq = A%IndN(2,pq)
    dea = A%OrbE(ip)-A%OrbE(iq)
-   !print*, iq,ip,iq+ip*(ip-1)/2,NInte1
-   read(iunit,rec=iq+ip*(ip-1)/2) work(1:NInte1)
+!   print*, iq,ip,iq+(ip-A%num0-1)*dimOA,nOVA
+   read(iunit,rec=iq+(ip-A%num0-1)*dimOA) work(1:nOVB)
    do rs=1,B%NDimX
       ir = B%IndN(1,rs)
       is = B%IndN(2,rs)
       deb = B%OrbE(ir)-B%OrbE(is) 
-      !print*, is,ir,is+ir*(ir-1)/2,NInte1
-      e2du = e2du + work(is+ir*(ir-1)/2)**2/(dea+deb)
+!      print*, is,ir,is+(ir-B%num0-1)*dimOB,nOVB
+      e2du = e2du + work(is+(ir-B%num0-1)*dimOB)**2/(dea+deb)
    enddo
 enddo
  write(LOUT,'()') 
  write(LOUT,'(1x,a,f16.8)')'E2disp(unc) = ', -4d0*e2du*1000d0 
 
+
 allocate(tmp1(A%NDimX,B%NDimX),tmp2(A%NDimX,B%NDimX))
 
 ! coupled - 1
- tmp1=0
- do i=1,A%NDimX
-    do pq=1,A%NDimX
-       ip = A%IndN(1,pq)
-       iq = A%IndN(2,pq)
-       read(iunit,rec=iq+ip*(ip-1)/2) work(1:NInte1)
-       do rs=1,B%NDimX
-          ir = B%IndN(1,rs)
-          is = B%IndN(2,rs)
-          tmp1(i,rs) = tmp1(i,rs) + & 
-                       (A%CICoef(iq)+A%CICoef(ip)) * &
-                       (B%CICoef(is)+B%CICoef(ir)) * &
-                       EVecA((i-1)*A%NDimX+pq)*work(is+ir*(ir-1)/2)
-       enddo
-    enddo
- enddo
- tmp2=0
- do j=1,B%NDimX
-    do i=1,A%NDimX
-       do rs=1,B%NDimX
-       ir = B%IndN(1,rs)
-       is = B%IndN(2,rs)
-       tmp2(i,j) = tmp2(i,j) + &
-                    EVecB((j-1)*B%NDimX+rs)*tmp1(i,rs)
-       enddo
-    enddo   
- enddo
-
- e2d = 0d0
- do i=1,A%NDimX
-    do j=1,B%NDimX
-       e2d = e2d + tmp2(i,j)**2d0/(OmA(i)+OmB(j))
-    enddo
- enddo
- e2d = -16d0*e2d*1000d0
- write(LOUT,'(1x,a,5x,f16.8)') 'E2disp = ',e2d
+! works with tran4_full
+! tmp1=0
+! do i=1,A%NDimX
+!    do pq=1,A%NDimX
+!       ip = A%IndN(1,pq)
+!       iq = A%IndN(2,pq)
+!       read(iunit,rec=iq+ip*(ip-1)/2) work(1:NInte1)
+!       do rs=1,B%NDimX
+!          ir = B%IndN(1,rs)
+!          is = B%IndN(2,rs)
+!          tmp1(i,rs) = tmp1(i,rs) + & 
+!                       (A%CICoef(iq)+A%CICoef(ip)) * &
+!                       (B%CICoef(is)+B%CICoef(ir)) * &
+!                       EVecA((i-1)*A%NDimX+pq)*work(is+ir*(ir-1)/2)
+!       enddo
+!    enddo
+! enddo
+! tmp2=0
+! do j=1,B%NDimX
+!    do i=1,A%NDimX
+!       do rs=1,B%NDimX
+!       ir = B%IndN(1,rs)
+!       is = B%IndN(2,rs)
+!       tmp2(i,j) = tmp2(i,j) + &
+!                    EVecB((j-1)*B%NDimX+rs)*tmp1(i,rs)
+!       enddo
+!    enddo   
+! enddo
+!
+! e2d = 0d0
+! do i=1,A%NDimX
+!    do j=1,B%NDimX
+!       e2d = e2d + tmp2(i,j)**2d0/(OmA(i)+OmB(j))
+!    enddo
+! enddo
+! e2d = -16d0*e2d*1000d0
+! write(LOUT,'(1x,a,5x,f16.8)') 'E2disp = ',e2d
 
 !! coupled -2
 ! e2d = 0d0

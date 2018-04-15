@@ -37,7 +37,7 @@ implicit none
 integer :: NBas
 character(*) :: intfile
 integer :: iunit,iunit2
-integer :: maxrep, naos(8), lbuf, nibuf, nbits
+integer :: maxrep, naos(8), lbuf, nibuf, nbits, lenint4
 type(SortData) :: srt
 integer :: nints, INDX
 integer,allocatable :: idx_buf(:)
@@ -56,17 +56,17 @@ integer :: i
 
  ! read info
  call readlabel(iunit,'BASINFO ')
- read(iunit) maxrep, naos, lbuf, nibuf, nbits 
+ read(iunit) maxrep, naos, lbuf, nibuf, nbits, lenint4 
 
  write(6,'()')
  write(6,'(1x, a)') 'Dalton two-el. file initialized'
- write(6,'(1x,a,i3,a,i3,a,i3)') 'Buffer size: ', lbuf, &
+ write(6,'(1x,4(a,i5))') 'Buffer size: ', lbuf, &
        & ', integers per index packet: ', nibuf,       &
-       & ', bits: ', nbits
-
+       & ', bits: ', nbits, &
+       & ', record lenght in INT*4: ', lenint4
 
  allocate(val_buf(lbuf))
- allocate(idx_buf(lbuf*nibuf))
+ allocate(idx_buf(nibuf*lbuf))
 
  call readlabel(iunit,'BASTWOEL')
 
@@ -100,10 +100,10 @@ integer :: i
        read(iunit) val_buf, idx_buf, nints
        if(nints<0) exit
        do i=1,nints
-          INDX = idx_buf(i)
+          INDX = idx_buf(2*i-1)
           idx_r = ibits(INDX,0,16)
           idx_s = ibits(INDX,16,16)
-          INDX = idx_buf(i+lbuf)
+          INDX = idx_buf(2*i)
           idx_p = ibits(INDX,0,16)
           idx_q = ibits(INDX,16,16)
 

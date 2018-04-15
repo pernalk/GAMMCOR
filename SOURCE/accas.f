@@ -43,6 +43,13 @@ C
       EndDo
 C
       Write(6,'(/,X," In ACCAS: Active Orbitals ",I4,/)')ICount
+
+C     
+      Do i=1,NBasis
+      Write(LOUT,*) 'TTT', i, IndAux(i)
+      EndDo
+
+
 C
       IPair(1:NBasis,1:NBasis)=0
 C

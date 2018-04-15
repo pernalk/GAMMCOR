@@ -92,6 +92,7 @@ type SystemBlock
       integer :: IPrint = 0
       integer :: IWarn = 0
       integer :: icnt
+      integer :: num0,num1,num2
       double precision :: ThrAct = 0.992d0
       integer,allocatable :: IGem(:), IndAux(:)
       integer,allocatable :: IndX(:), IndN(:,:), IPair(:,:)
