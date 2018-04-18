@@ -198,4 +198,20 @@ C
 C
       Return
       End
+
+*Deck trace
+      Function trace(m,n) result(tr)
+      Implicit none
+
+      Integer,intent(in) :: n
+      Double precision,intent(in) :: m(n,n)
+      Integer :: i
+      Double precision :: tr
+!
+      tr = 0
+      Do i=1,n
+      tr = tr + m(i,i)
+      EndDo 
  
+      end function trace 
+

@@ -24,9 +24,10 @@ integer :: i
  write(LOUT,'()')
  write(LOUT,'(1x,a)') 'STARTING SAPT CALCULATIONS'
  write(LOUT,'(8a10)') ('**********',i=1,8)
-
+ 
  call sapt_interface(Flags,SAPT)
  call e2disp(Flags,SAPT%monA,SAPT%monB,SAPT)
+ call e1elst(SAPT%monA,SAPT%monB,SAPT)
 
  call print_warn(SAPT)
  call free_sapt(SAPT)
@@ -48,7 +49,7 @@ double precision,allocatable :: Ha(:),Hb(:)
 double precision,allocatable :: Va(:),Vb(:),S(:)
 double precision,allocatable :: Ca(:),Cb(:)
 double precision :: potnucA,potnucB
-integer :: ione,iorb,isiri,i,j
+integer :: ione,iorb,isiri,i,j,ij
 logical :: exsiri
 double precision :: tmp
 !integer :: K,LL,NN,NLine
@@ -59,9 +60,13 @@ character(8) :: dupa
 integer :: tmp1
 double precision ::  potnuc,emy,eactiv,emcscf
 integer :: noccA, nvirtA, noccB, nvirtB
+integer :: ncen
+!integer,parameter :: maxcen = 500
+!double precision :: charga(maxcen),xyza(maxcen,3)
+!double precision :: chargb(maxcen),xyzb(maxcen,3)
 
 ! read basis info
-! only dimer basis
+! only DCBS 
  NBasis = 0
  call basinfo(NBasis,'SIRIUS_A.RST')
  if(NBasis==0.and.SAPT%monA%NBasis==0) then
@@ -74,14 +79,18 @@ integer :: noccA, nvirtA, noccB, nvirtB
     ! basis only in SIRIFC
     SAPT%monA%NBasis = NBasis
     SAPT%monB%NBasis = NBasis
+ elseif(NBasis/=0.and.SAPT%monA%NBasis/=0) then
+    ! choose SIRIFC values
+    SAPT%monA%NBasis = NBasis
+    SAPT%monB%NBasis = NBasis
  endif
 
 ! set dimensions
-  NSq = NBasis**2
-  NInte1 = NBasis*(NBasis+1)/2
-  NInte2 = NInte1*(NInte1+1)/2
-  SAPT%monA%NDim = NBasis*(NBasis-1)/2
-  SAPT%monB%NDim = NBasis*(NBasis-1)/2
+ NSq = NBasis**2
+ NInte1 = NBasis*(NBasis+1)/2
+ NInte2 = NInte1*(NInte1+1)/2
+ SAPT%monA%NDim = NBasis*(NBasis-1)/2
+ SAPT%monB%NDim = NBasis*(NBasis-1)/2
 
  allocate(work1(NInte1),work2(NBasis**2))
  allocate(Ha(NBasis**2),Hb(NBasis**2))
@@ -105,6 +114,15 @@ integer :: noccA, nvirtA, noccB, nvirtB
  call readlabel(ione,'OVERLAP ')
  call readoneint(ione,work1)
  call triang_to_sq(work1,S,NBasis)
+
+ call readlabel(ione,'ISORDK  ')
+ read(ione) 
+ read(ione) SAPT%monA%charg,ncen,SAPT%monA%xyz 
+
+! print*, ncen
+! write(LOUT,*) SAPT%monA%charg(1:ncen)
+! write(LOUT,*) SAPT%monA%xyz(1,:)
+! write(LOUT,*) SAPT%monA%xyz(2,:)
 
 ! write(*,*) 'VA'
 ! call print_sqmat(Va,NBasis)
@@ -136,13 +154,22 @@ integer :: noccA, nvirtA, noccB, nvirtB
  call triang_to_sq(work1,work2,NBasis)
  Vb(:) = Hb - work2
 
+ call readlabel(ione,'ISORDK  ')
+ read(ione) 
+ read(ione) SAPT%monB%charg,ncen,SAPT%monB%xyz 
+
+! print*, ncen
+! write(LOUT,*) SAPT%monB%charg(1:ncen)
+! write(LOUT,*) SAPT%monB%xyz(1,:)
+! write(LOUT,*) SAPT%monB%xyz(2,:)
+
 ! rearrange in V: (B,A) -> (A,B)
  call arrange_oneint(S,NBasis,SAPT)
  call arrange_oneint(Vb,NBasis,SAPT)
  call arrange_oneint(Hb,NBasis,SAPT)
 
-! print*, 'VB:'
-! call print_sqmat(Vb,NBasis)
+ !print*, 'VB:'
+ !call print_sqmat(Vb,NBasis)
 
  close(ione)
  ! square form
@@ -172,7 +199,7 @@ integer :: noccA, nvirtA, noccB, nvirtB
     rewind(isiri)
     read (isiri)
     read (isiri) potnuc,emy,eactiv,emcscf
-
+ 
  if(Flags%ICASSCF==1.and.Flags%ISHF==0) then
     ! CASSCF
     call readmulti(NBasis,SAPT%monA,.false.,exsiri,isiri,'occupations_A.dat','SIRIUS_A.RST')
@@ -225,14 +252,14 @@ integer :: noccA, nvirtA, noccB, nvirtB
  endif
 
  if(exsiri) close(isiri) 
-
  call print_occ(NBasis,SAPT,Flags%ICASSCF)
 
 ! read orbitals 
 ! norb.leq.nbas, orbitals mays be deleted due to linear
 ! dependecies in large basis sets
 ! ncmot = norb*nbas
- allocate(Ca(NCMOt),Cb(NCMOt))
+ !allocate(Ca(NCMOt),Cb(NCMOt))
+ allocate(Ca(NBasis*NBasis),Cb(NBasis*NBasis))
 ! allocate(work3(NBasis,NBasis))
 
  call read_mo(Ca,NOrbt,NBasist,'SIRIUS_A.RST','DALTON_A.MOPUN')
@@ -240,8 +267,9 @@ integer :: noccA, nvirtA, noccB, nvirtB
 
  call arrange_mo(Cb,NBasist,SAPT%monA,SAPT%monB)
 
- !if(SAPT%IPrint.ne.0) call print_mo(Ca,NOrbt,'MONOMER A')
- !if(SAPT%IPrint.ne.0) call print_mo(Cb,NOrbt,'MONOMER B')
+! MAYBE: one should print with NOrbt?
+! if(SAPT%IPrint.ne.0) call print_mo(Ca,NBasis,'MONOMER A')
+! if(SAPT%IPrint.ne.0) call print_mo(Cb,NBasis,'MONOMER B')
 
 ! look-up tables
  call select_active(SAPT%monA,NBasis,Flags%ICASSCF,Flags%ISHF,Flags%IFlCore)
@@ -250,6 +278,7 @@ integer :: noccA, nvirtA, noccB, nvirtB
 ! ABABABABABABABABABABABABABABABABABABABABABABABABABABABABAB
 ! read and transform 2-el integrals
  call readtwoint(NBasis,'AOTWOINT_A')
+! full 4-idx tran
 ! call tran4_full(NBasis,Ca,Cb,'TWOMOAB')
  ! integrals stored as (ov|ov)
  call tran4_gen(NBasis,&
@@ -260,10 +289,6 @@ integer :: noccA, nvirtA, noccB, nvirtB
                 'TWOMOAB')
 
  if(SAPT%IPrint.gt.100) call print_TwoInt(NBasis)
-
-!! look-up tables
-! call select_active(SAPT%monA,NBasis,Flags%ICASSCF,Flags%ISHF,Flags%IFlCore)
-! call select_active(SAPT%monB,NBasis,Flags%ICASSCF,Flags%ISHF,Flags%IFlCore)
 
  call print_active(SAPT,NBasis)
 
@@ -280,7 +305,22 @@ integer :: noccA, nvirtA, noccB, nvirtB
 
  deallocate(work1,work2)
 
-! don't forget to write Ca, Cb to file!!!
+! maybe better: add writing Ca, Cb to file?!!
+ allocate(SAPT%monA%CMO(NBasis,NBasis),SAPT%monB%CMO(NBasis,NBasis)) 
+ ij=0
+ SAPT%monA%CMO = 0
+ SAPT%monB%CMO = 0
+ do i=1,NBasis
+    do j=1,NBasis
+       ij = ij + 1
+       SAPT%monA%CMO(j,i) = Ca(ij)
+       SAPT%monB%CMO(j,i) = Cb(ij)
+    enddo 
+ enddo 
+
+! calc intermolecular repulsion
+
+ SAPT%Vnn = calc_vnn(SAPT%monA,SAPT%monB)
 
  deallocate(Ha,Hb,Va,Vb,S)
  deallocate(Ca,Cb)
@@ -460,6 +500,27 @@ double precision :: tmp
 
 end subroutine calc_response 
 
+function calc_vnn(A,B) result(Vnn)
+implicit none
+
+type(SystemBlock) :: A,B
+integer :: ia, ib
+double precision :: dx,dy,dz,dist
+double precision :: Vnn
+
+ Vnn=0d0
+ do ia=1,A%NCen
+    do ib=1,B%NCen
+       dx = A%xyz(ia,1) - B%xyz(ib,1)
+       dy = A%xyz(ia,2) - B%xyz(ib,2)
+       dz = A%xyz(ia,3) - B%xyz(ib,3)
+       dist = sqrt(dx**2+dy**2+dz**2)
+       Vnn = Vnn + A%charg(ia)*B%charg(ib)/dist
+    enddo
+ enddo
+
+end function calc_vnn
+
 subroutine arrange_oneint(mat,nbas,SAPT)
 implicit none
 
@@ -482,7 +543,7 @@ type(SystemBlock) :: A,B
 integer :: nbas
 double precision :: mat(nbas,nbas)
 
-print*, A%NMonOrb, B%NMonOrb
+print*, A%NMonOrb,B%NMonOrb,size(mat)
 call swap_rows(A%NMonOrb,B%NMonOrb,mat)
 
 end subroutine arrange_mo
@@ -582,12 +643,14 @@ subroutine read_mo(cmo,norb,nbas,nsiri,nmopun)
 implicit none
 
 integer :: iunit,norb,nbas
-double precision :: cmo(norb,nbas)
+!double precision :: cmo(norb,nbas)
+double precision :: cmo(nbas,nbas)
 character(*) :: nsiri,nmopun
 logical :: isiri
 character(60) :: line
 integer :: i,j
 double precision :: natocc(10)
+double precision :: tmp(nbas*norb)
 
 inquire(file=nsiri,EXIST=isiri)
 
@@ -597,15 +660,25 @@ if(isiri) then
          access='SEQUENTIAL',form='UNFORMATTED')
 
    call readlabel(iunit,'NEWORB  ')
-   read(iunit) cmo
+   !read(iunit) cmo
+   read(iunit) tmp
+
+   cmo=0d0 
+   do i=1,norb
+      do j=1,nbas
+         cmo(j,i) = tmp((i-1)*nbas + j)
+      end do
+   end do
 
    write(LOUT,'(1x,a)') 'Orbitals read from '//nsiri 
-else
 
+else
+   print*, 'Achtung!!!',norb,nbas
    open(newunit=iunit,file=nmopun, &
         form='FORMATTED',status='OLD')
    read(iunit,'(a60)') line
-   do j=1,norb     
+   !do j=1,norb     
+   do j=1,nbas     
       read(iunit,'(4f18.14)') (cmo(i,j),i=1,nbas)
    enddo
 !   print*, line
@@ -616,42 +689,6 @@ endif
 close(iunit)
 
 end subroutine read_mo
-
-subroutine print_mo(cmo,n,mon)
-implicit none
-
-integer,intent(in) :: n
-double precision,intent(in) :: cmo(n,n) 
-character(*) :: mon
-integer :: i,j,ll,nn
-integer :: nline
-
- write(LOUT,'()')
- write(LOUT,'(1x,a)') 'NATURAL ORBITALS '//mon
- do i=1,n
-    write(LOUT,'(1x,i3)') i
-    write(LOUT,'(10f10.6)') cmo(:,i)
-    write(LOUT,'()')
- enddo
-
-! nLine=n/10
-! if(nLine*10-n.Ne.0)nLine=nLine+1
-! do i=1,n
-!    write(*,'(i3)') i
-!
-!    do ll=0,nLine-1
-!       nn=n-10*ll
-!       if(nn.le.10) then
-!          write(LOUT,'(10f10.6)') (cmo(i,j),j=10*ll+1,n)
-!       else
-!          write(LOUT,'(10f10.6)') (cmo(i,j),j=10*ll+1,10*(ll+1))
-!       endIf
-!    enddo
-!    write(LOUT,'()')
-! enddo
- 
-
-end subroutine print_mo
 
 subroutine writeoneint(mon,ndim,S,V,H)
 implicit none
@@ -961,9 +998,8 @@ integer :: test
          mon%IndAux(i) = 1
          write(6,'(X," Active Orbital: ",I4,E14.4)') i, mon%Occ(i)
          mon%icnt = mon%icnt + 1
-      endif
+     endif
    enddo
-
  endif
 
 ! set generalized "occupied" = num0 + num1
@@ -979,6 +1015,12 @@ integer :: test
     mon%num2 = mon%num2 + 1
  enddo
  mon%num1 = nbas - mon%num0 - mon%num2
+
+! print*, '***TESTY***'
+! print*, mon%num0,mon%num1,mon%num2
+! do i=1,nbas
+!    write(LOUT,*) i,mon%IndAux(i)
+! enddo
 
 ! active pairs
  allocate(mon%IPair(nbas,nbas),mon%IndX(mon%NDim),mon%IndN(2,mon%NDim))
@@ -1298,9 +1340,11 @@ type(SaptData) :: SAPT
 
 deallocate(SAPT%monA%CICoef,SAPT%monA%IGem,SAPT%monA%Occ, &
            SAPT%monA%IndAux,SAPT%monA%IndX,SAPT%monA%IndN,&
+           SAPT%monA%CMO,&
            SAPT%monA%IPair)
 deallocate(SAPT%monB%CICoef,SAPT%monB%IGem,SAPT%monB%Occ, &
            SAPT%monB%IndAux,SAPT%monB%IndX,SAPT%monB%IndN,&
+           SAPT%monB%CMO,&
            SAPT%monB%IPair)
 
 if(allocated(SAPT%monA%OrbE)) then
@@ -1310,9 +1354,26 @@ if(allocated(SAPT%monB%OrbE)) then
   deallocate(SAPT%monB%OrbE)
 endif
 
-
-
 end subroutine free_sapt
+
+subroutine tranMO(C,nbas)
+implicit none
+
+integer :: nbas
+double precision :: C(nbas,nbas)
+double precision :: tmp(nbas,nbas)
+integer :: i,j
+
+do i=1,nbas
+do j=1,nbas
+ tmp(j,i) = C(i,j)
+enddo
+enddo
+
+C = tmp
+
+end subroutine tranMO
+
 
 end module sapt_main
 

@@ -14,15 +14,16 @@ OBJ = $(O)mainp.o $(O)initia.o $(O)dmscf.o $(O)misc.o $(O)optocc.o \
       $(O)sapt_main.o $(O)sapt.o \
       $(O)srlrdynamic.o $(O)erpa.o $(O)interpa.o  $(O)exact2el.o $(O)optapsg.o $(O)newton.o $(O)acfd.o $(O)accas.o
 
-#FCC = gfortran
-#FFLAGS = -O3 -fno-align-commons -fcheck=all 
-##-fdefault-real-8 
-##-Wall -Wextra -Warray-temporaries -Wrealloc-lhs-all -pedantic
-#LIBS = -L/usr/lib -llapack -lblas
+FCC = gfortran
+FFLAGS = -O3 -fno-align-commons -fcheck=all 
+#-fdefault-real-8 
+#-Wall -Wextra -Warray-temporaries -Wrealloc-lhs-all -pedantic
+#LIBS = -L/usr/lib -lopenblas
+LIBS = -L/usr/lib -llapack -lblas
 
-FCC = ifort -assume byterecl
-FFLAGS = -mkl -heap-arrays  -O2
-LIBS = -L/opt/intel/composer_xe_2015.2.164/mkl/lib/intel64/ -lmkl_intel_ilp64 -lmkl_sequential -lmkl_core
+#FCC = ifort -assume byterecl
+#FFLAGS = -mkl -heap-arrays  -O2
+#LIBS = -L/opt/intel/composer_xe_2015.2.164/mkl/lib/intel64/ -lmkl_intel_ilp64 -lmkl_sequential -lmkl_core
 
 
 $(PROG) :  $(OBJ) 
@@ -97,7 +98,7 @@ $(O)tran.o : $(S)tran.f90
 	$(FCC) $(FFLAGS)  -c $(S)tran.f90 -o $(O)tran.o
 $(O)sapt_main.o : $(S)sapt_main.f90 $(O)types.o $(O)systemdef.o $(O)tran.o $(O)sorter.o $(O)sapt.o
 	$(FCC) $(FFLAGS)  -c $(S)sapt_main.f90 -o $(O)sapt_main.o
-$(O)sapt.o : $(S)sapt.f90 $(O)types.o 
+$(O)sapt.o : $(S)sapt.f90 $(O)types.o $(O)tran.o 
 	$(FCC) $(FFLAGS)  -c $(S)sapt.f90 -o $(O)sapt.o
 
 .PHONY : clean

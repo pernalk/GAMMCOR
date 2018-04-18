@@ -294,7 +294,44 @@ integer :: i,rs,ab
 
 end subroutine tran4_gen
 
-subroutine make_J(NBas,XA,XB,JA,JB)
+subroutine make_J1(NBas,X,J)
+implicit none
+integer :: NBas
+double precision :: X(*), J(NBas,NBas)
+integer :: iunit, ntr
+integer :: ir,is,irs
+double precision :: tmp
+double precision,allocatable :: work1(:),work2(:)
+double precision,external :: ddot
+! works in DCBS
+
+ ntr = NBas*(NBas+1)/2
+
+ allocate(work1(NBas*NBas),work2(NBas*NBas))
+
+ open(newunit=iunit,file='AOTWOSORT',status='OLD',&
+      access='DIRECT',form='UNFORMATTED',recl=8*ntr)
+
+ irs=0
+ do is=1,NBas
+    do ir=1,is
+    irs = irs + 1
+    read(iunit,rec=irs) work1(1:ntr)    
+    call triang_to_sq(work1,work2,NBas)
+
+    tmp = ddot(NBas**2,work2,1,X,1)
+    J(ir,is) = tmp
+    J(is,ir) = tmp
+
+    enddo
+ enddo
+
+ deallocate(work1,work2)
+ close(iunit)
+
+end subroutine make_J1
+
+subroutine make_J2(NBas,XA,XB,JA,JB)
 implicit none
 integer :: NBas
 double precision :: XA(*), XB(*), JA(NBas,NBas), JB(NBas,NBas)
@@ -334,21 +371,23 @@ double precision,external :: ddot
  deallocate(work1,work2)
  close(iunit)
 
-end subroutine make_J
+end subroutine make_J2
 
-subroutine tran_oneint(ints,MO1,MO2,NSym,GFunc,work,n)
+subroutine tran_oneint(ints,MO1,MO2,NSym,GFunc,work,nbas)
 implicit none
 
+integer,intent(in) :: nbas
 double precision,intent(inout),contiguous :: ints(:)
 double precision,intent(in),contiguous :: MO1(:),MO2(:)
 integer :: NSym, GFunc(:)
 double precision,contiguous :: work(:)
-integer :: irep,n,n2
+integer :: irep,n2,n
 integer :: offset
 
 offset = 0
 do irep=1,NSym
-   n = GFunc(irep)
+   n = nbas
+!   n = GFunc(irep)
    n2 = n**2
    if(n>0) then
       call dgemm('T','N',n,n,n,&

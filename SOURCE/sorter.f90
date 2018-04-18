@@ -304,8 +304,8 @@ integer :: i
 
  deallocate(srt%ival,srt%rval)
  deallocate(srt%Batch)
- ! close SORT 
- close(srt%iunit,status='KEEP')
+ ! close TMPSORT 
+ close(srt%iunit,status='DELETE')
 
 end subroutine free_Sorter
 

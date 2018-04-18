@@ -45,10 +45,6 @@ C
       Write(6,'(/,X," In ACCAS: Active Orbitals ",I4,/)')ICount
 
 C     
-      Do i=1,NBasis
-      Write(LOUT,*) 'TTT', i, IndAux(i)
-      EndDo
-
 
 C
       IPair(1:NBasis,1:NBasis)=0
@@ -171,7 +167,17 @@ C
       ACAlpha=One
       Write(6,'(/,X," The number of CASSCF Active Orbitals = ",I4)')
      $ NAcCAS
-      Write(6,*) NBasis,NDimX,NInte1,NInte2
+      
+C      Do I=1,NDimX 
+C      Write(6,*) I,IndN(1,I),IndN(2,I)
+C      EndDo
+
+      TMP=0
+      Do I=1,NInte1
+        TMP = TMP + XOne(I)**2 
+      EndDo
+      Write(6,*) 'XONE',TMP
+
       Call AB_CAS(ABPLUS,ABMIN,ECASSCF,URe,Occ,XOne,TwoNO,IPair,
      $ IndN,IndX,NDimX,NBasis,NDimX,NInte1,NInte2,ACAlpha)
 

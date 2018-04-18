@@ -37,6 +37,8 @@ integer, parameter :: RDM_TYPE_HF   = 5
 integer, parameter :: MONOMER_A = 1
 integer, parameter :: MONOMER_B = 2
 
+integer,parameter :: maxcen = 500
+
 character(*),parameter :: PossibleInterface(3) = &
 [character(8) :: &
 'DALTON', 'MOLPRO', 'OWN']
@@ -98,6 +100,9 @@ type SystemBlock
       integer,allocatable :: IndX(:), IndN(:,:), IPair(:,:)
       double precision,allocatable :: Occ(:), CICoef(:)
       double precision,allocatable :: OrbE(:)
+      double precision,allocatable :: CMO(:,:)
+      double precision  :: charg(maxcen),xyz(maxcen,3)
+
 end type SystemBlock
 
 type FlagsData
@@ -146,6 +151,7 @@ end type InputData
 type SaptData
 
      type(SystemBlock) :: monA, monB
+     double precision :: Vnn,elst,e2disp
      integer :: IPrint = 1000
 
 end type SaptData
@@ -348,6 +354,41 @@ integer :: i
  return
 end subroutine print_diag 
 
+subroutine print_mo(cmo,n,mon)
+implicit none
+
+integer,intent(in) :: n
+double precision,intent(in) :: cmo(n,n) 
+character(*) :: mon
+integer :: i,j,ll,nn
+integer :: nline
+
+ write(LOUT,'()')
+ write(LOUT,'(1x,a)') 'NATURAL ORBITALS '//mon
+ do i=1,n
+    write(LOUT,'(1x,i3)') i
+    write(LOUT,'(10f10.6)') cmo(:,i)
+    write(LOUT,'()')
+ enddo
+
+! nLine=n/10
+! if(nLine*10-n.Ne.0)nLine=nLine+1
+! do i=1,n
+!    write(*,'(i3)') i
+!
+!    do ll=0,nLine-1
+!       nn=n-10*ll
+!       if(nn.le.10) then
+!          write(LOUT,'(10f10.6)') (cmo(i,j),j=10*ll+1,n)
+!       else
+!          write(LOUT,'(10f10.6)') (cmo(i,j),j=10*ll+1,10*(ll+1))
+!       endIf
+!    enddo
+!    write(LOUT,'()')
+! enddo
+
+end subroutine print_mo
+
 subroutine readlabel(iunit,text)
 ! sets file pointer 
 ! to first data after text
@@ -412,6 +453,81 @@ end subroutine readoneint
 !
 !end subroutine writeoneint
 
+subroutine get_den(nbas,MO,Occ,Den)
+implicit none
+
+integer,intent(in) :: nbas
+double precision, intent(in) :: MO(nbas,nbas)
+double precision, intent(in) :: Occ(nbas)
+double precision, intent(out) :: Den(nbas,nbas)
+integer :: i
+
+Den = 0
+do i = 1,nbas
+    call dger(nbas, nbas, Occ(i), MO(:, i), 1, MO(:, i), 1, Den, nbas)
+enddo
+
+end subroutine get_den
+
+subroutine get_one_mat(var,mat,mono,nbas)
+implicit none
+
+character(1),intent(in) :: var
+integer,intent(in) :: nbas,mono
+double precision,intent(out) :: mat(nbas,nbas)
+integer :: ione
+logical :: valid
+character(8) :: label
+character(:),allocatable :: onefile
+
+ if(mono==1) then
+    onefile = 'ONEEL_A'
+ elseif(mono==2) then
+    onefile = 'ONEEL_B'
+ else
+    write(LOUT,'(1x,a)') 'ERROR!!! ONLY 2 MONOMERS ACCEPTED!'
+    stop
+ endif
+
+ open(newunit=ione,file=onefile,access='sequential',&
+      form='unformatted',status='old')
+
+ valid=.false.
+ mat=0
+ select case(var)
+ case('V','v')
+
+    read(ione)
+    read(ione) label,mat 
+    if(label=='POTENTAL') valid=.true. 
+ 
+ case('S','s')
+
+    read(ione) label,mat 
+    if(label=='OVERLAP ') valid=.true. 
+
+ case('H','h')
+
+    read(ione) 
+    read(ione)
+    read(ione) label,mat 
+    if(label=='ONEHAMIL') valid=.true. 
+
+ case default
+    write(LOUT,'()')
+    write(LOUT,'(1x,a)') 'ERROR IN get_one_max! TYPE '//var//' NOT AVAILABLE!'
+    stop
+ end select
+
+ if(.not.valid) then
+    write(LOUT,'(1x,a)') 'ERROR!!! LABEL MISMATCH IN get_one_mat!' 
+    stop
+ endif
+
+ close(ione)
+
+end subroutine get_one_mat
+
 subroutine basinfo(nbas,basfile)
 implicit none
 
@@ -439,6 +555,21 @@ logical :: ex
  endif
 
 end subroutine basinfo
+
+!function trace(m,n) result(tr)
+!implicit none
+!
+!integer,intent(in) :: n
+!double precision,intent(in) :: m(n,n)
+!integer :: i
+!double precision :: tr
+!
+! tr = 0
+! do i=1,n
+!    tr = tr + m(i,i)
+! enddo
+! 
+!end function trace 
 
 function iaddr(IAddr1,IAddr2,IAddr3,IAddr4) result(NAddr3)
 ! POINTER FOR TWO-ELECTRON INTEGRALS

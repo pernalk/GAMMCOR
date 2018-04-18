@@ -63,6 +63,7 @@ C
 C      Call readtwoint(NBasis,'AOTWOINT')
       Call read2el(TwoEl,UMOAO,NBasis,NInte2)
 !      Call altread2el(TwoEl,UMOAO,NBasis,NInte2)
+
 C
 C     TESTING TRAN4
 C      allocate(TMPMO(NBasis**2,NBasis**2))
@@ -80,9 +81,10 @@ C       ipq=0
 C       do iq=1,NBasis
 C       do ip=1,NBasis
 C       ipq=ipq+1
-C
-C       write(6,*) TwoEl(NAddr3(ip,iq,ir,is)),TMPMO(ipq,irs)
-CC       write(6,*) TMPMO(ipq,irs), TMPMO(irs,ipq)
+CC
+C       write(6,*) ip,iq,ir,is,TwoEl(NAddr3(ip,iq,ir,is))
+CC       write(6,*) TwoEl(NAddr3(ip,iq,ir,is)),TMPMO(ipq,irs)
+CCC       write(6,*) TMPMO(ipq,irs), TMPMO(irs,ipq)
 C       enddo
 C       enddo
 C       enddo
@@ -1518,11 +1520,10 @@ C
       
 c      write (*,*) nxx, ' two electron integrals read'
       do i=1,nxx
-       call unpckdlt(ibuf(i), ibuf(i+lbuf), nibuf, nbits,ip,iq,ir,is)
-c     NOWE? 
-C       call unpckdlt(ibuf((i-1)*nibuf + 1), ibuf(i*nibuf),
-C     $ nibuf, nbits,ip,iq,ir,is)
-c        if (dabs(dbuf(i)).gt.1e-8)
+C       call unpckdlt(ibuf(i), ibuf(i+lbuf), nibuf, nbits,ip,iq,ir,is)
+       call unpckdlt(ibuf((i-1)*nibuf + 1), ibuf(i*nibuf),
+     $ nibuf, nbits,ip,iq,ir,is)
+C        if (dabs(dbuf(i)).gt.1e-8)
 c     *          write(*,'(4I4,F12.8)') ip, iq, ir, is, dbuf(i)
       TwoEl(NAddr3(ip,iq,ir,is))=dbuf(i)
       end do
@@ -1548,6 +1549,7 @@ C      read(iunit,rec=min(ir,is)+max(ir,is)*(max(ir,is)-1)/2) mat
 C      do iq=1,NBasis
 C      do ip=1,NBasis
 CC  
+CC      write(*,*) ip,iq,ir,is,TwoEl(NAddr3(ip,iq,ir,is)) 
 C      TMP1 = TwoEl(NAddr3(ip,iq,ir,is)) 
 C      TMP2 = mat(min(ip,iq)+max(ip,iq)*(max(ip,iq)-1)/2)
 CC
@@ -1558,10 +1560,10 @@ C      enddo
 C      enddo
 C      enddo
 C      close(iunit)
-CC
-C      print*, 'Ended 2-el comparison'
+CCC
+CC      print*, 'Ended 2-el comparison'
 C      end block
-C
+CC
 C     TRANSFORM THE INTEGRALS
 C
       Write(6,'(" Transforming two-electron integrals ...",/)')
