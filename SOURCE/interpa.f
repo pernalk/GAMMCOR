@@ -322,18 +322,15 @@ C
       If(ISERPA.Eq.0) Then
 C
       Call ERPASYMM(EigVecR,Eig,ABPLUS,ABMIN,NBasis,NDimX)
-      TMP = 0
-      Do I=1,NDimX**2
-      TMP = TMP + EigVecR(I)**2
-      EndDo
-      Write(6,*) TMP
-C      Do I=1,NDimX
-C      Write(6,*) IndN(1,I),IndN(2,I)
+C      TMP = 0
+C      Do I=1,NDimX**2
+C      TMP = TMP + EigVecR(I)**2
 C      EndDo
+C      Write(6,*) TMP
 C
-      Do I=1,NDimX
-      Write(6,*) I, Eig(I), EigVecR(NDimX*(I-1)+I)
-      EndDo
+C      Do I=1,NDimX
+C      Write(6,*) I, Eig(I), EigVecR(NDimX*(I-1)+I)
+C      EndDo
       Write(6,'(/," *** Computing ERPA energy *** ",/)')
 C
       ECorr=EOneTot

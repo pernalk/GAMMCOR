@@ -146,44 +146,44 @@ else
 ! RDMType  
   select case(Input%CalcParams%RDMType)
   case(RDM_TYPE_GVB)
-      Flags%IGVB = 1
-      Flags%ICASSCF = 0
+     Flags%IGVB = 1
+     Flags%ICASSCF = 0
 
   case(RDM_TYPE_APSG)
-      FLags%IGVB = 0
-      Flags%ICASSCF = 0
+     FLags%IGVB = 0
+     Flags%ICASSCF = 0
 
   case(RDM_TYPE_CAS)
-      FLags%IGVB = 0
-      Flags%ICASSCF = 1
+     FLags%IGVB = 0
+     Flags%ICASSCF = 1
 
   case(RDM_TYPE_DMRG)
-      Flags%ICASSCF = 1
-      Flags%IDMRG   = 1
+     Flags%ICASSCF = 1
+     Flags%IDMRG   = 1
 
   case(RDM_TYPE_HF)
-      FLags%IGVB = 0
-      Flags%ICASSCF = 1
-      Flags%ISHF = 1
+     FLags%IGVB = 0
+     Flags%ICASSCF = 1
+     Flags%ISHF = 1
   end select
 
-! excitations
+  ! excitations
   Flags%ISERPA = 0
   Flags%IAPSG  = 0
 
-! JobType
+  ! JobType
   select case(Input%CalcParams%JobType)
   case(JOB_TYPE_AC)
      Flags%IFlAC  = 1
      Flags%IFlSnd = 0   
 
   case(JOB_TYPE_AC0)
-! HERE WILL BE CHANGED TO:
+    ! HERE WILL BE CHANGED TO:
     !Flags%IFlAC = 0
      Flags%IFlAC  = 1
      Flags%IFlSnd = 1
 
-! same as ERPA  
+  ! same as ERPA  
   case(JOB_TYPE_AC1)
      Flags%IFlAC  = 0
      Flags%IFlSnd = 0
@@ -192,7 +192,15 @@ else
      Flags%ISAPT  = 1
      Flags%IFlAC  = 0
      Flags%IFlSnd = 0
-  
+
+     ! Response for SAPT
+     select case(Input%CalcParams%Response)
+     case(RESP_ERPA)
+        Flags%ISERPA = 0 
+     case(RESP_APSG)
+        Flags%ISERPA = 2
+     end select
+ 
   end select
 
  ! Inactive

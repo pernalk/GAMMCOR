@@ -26,8 +26,14 @@ integer :: i
  write(LOUT,'(8a10)') ('**********',i=1,8)
  
  call sapt_interface(Flags,SAPT)
- call e2disp(Flags,SAPT%monA,SAPT%monB,SAPT)
+ write(LOUT,'()')
  call e1elst(SAPT%monA,SAPT%monB,SAPT)
+
+ if(Flags%ISERPA==0) then
+    call e2disp(Flags,SAPT%monA,SAPT%monB,SAPT)
+ elseif(Flags%ISERPA==2) then
+    call e2disp_apsg(Flags,SAPT%monA,SAPT%monB,SAPT)
+ endif
 
  call print_warn(SAPT)
  call free_sapt(SAPT)
@@ -52,11 +58,9 @@ double precision :: potnucA,potnucB
 integer :: ione,iorb,isiri,i,j,ij
 logical :: exsiri
 double precision :: tmp
-!integer :: K,LL,NN,NLine
 integer :: p,q
 !double precision,allocatable :: work3(:,:)
 double precision,allocatable :: work3(:)
-character(8) :: dupa
 integer :: tmp1
 double precision ::  potnuc,emy,eactiv,emcscf
 integer :: noccA, nvirtA, noccB, nvirtB
@@ -296,11 +300,11 @@ integer :: ncen
 ! if(SAPT%SaptLevel.gt.1) then
     call SaptInter(NBasis,SAPT%monA,Flags%ICASSCF)
 !   call COMMTST(NBasis) 
-    call calc_response(SAPT%monA,Ca,Flags,NBasis,'TWOMOAA')
+    call calc_response(SAPT%monA,Ca,Flags,NBasis,'TWOMOAA',SAPT%EnChck)
 ! mon B
     call SaptInter(NBasis,SAPT%monB,Flags%ICASSCF)
 !   call COMMTST(NBasis) 
-    call calc_response(SAPT%monB,Cb,Flags,NBasis,'TWOMOBB')
+    call calc_response(SAPT%monB,Cb,Flags,NBasis,'TWOMOBB',SAPT%EnChck)
 ! endif
 
  deallocate(work1,work2)
@@ -327,7 +331,7 @@ integer :: ncen
 
 end subroutine sapt_interface
 
-subroutine calc_response(Mon,MO,Flags,NBas,fname)
+subroutine calc_response(Mon,MO,Flags,NBas,fname,EChck)
 implicit none
 
 !type(SaptData) :: SAPT
@@ -336,18 +340,22 @@ type(FlagsData) :: Flags
 double precision :: MO(:)        
 integer :: NBas
 character(*) :: fname
+logical :: EChck
 integer :: NSq,NInte1,NInte2
 double precision, allocatable :: work1(:),work2(:),XOne(:),TwoMO(:) 
 double precision, allocatable :: ABPlus(:), ABMin(:), URe(:,:), &
+                                 CMAT(:),EMAT(:),EMATM(:),&
+                                 DMAT(:),DMATK(:),&
                                  EigVecR(:), Eig(:)
 double precision,parameter :: One = 1d0, Half = 0.5d0
 integer :: i,j,ij,ij1,ione,itwo 
 double precision :: ACAlpha
-double precision :: ECASSCF,ECorr
+double precision :: ECASSCF,ETot,ECorr
 character(8) :: label
 character(:),allocatable :: onefile,twofile,propfile,rdmfile
 double precision :: tmp
-
+double precision,parameter :: SmallE=0d0,BigE=1.D20
+     
 ! set filenames
  if(Mon%Monomer==1) then
     onefile = 'ONEEL_A'
@@ -394,50 +402,126 @@ double precision :: tmp
  call LoadSaptTwoEl(Mon%Monomer,TwoMO,NBas,NInte2)
 
  ACAlpha=One
- if(Flags%ICASSCF==0) then
+ if(Flags%ICASSCF==0.and.Flags%ISERPA==0) then
 
    allocate(ABPlus(Mon%NDim**2),ABMin(Mon%NDim**2), &
             EigVecR(Mon%NDimX**2),Eig(Mon%NDimX))
 
    call ACABMAT0(ABPlus,ABMin,URe,Mon%Occ,XOne,TwoMO, &
                  NBas,Mon%NDim,NInte1,NInte2,Mon%NGem,ACAlpha,1)
-!  
-!   do i=1,Mon%NDim
-!       write(LOUT,*) ABPlus(1,i),ABMin(1,i)
-!!      write(LOUT,*) ABPlus(i,i), ABMin(i,i)
-!   enddo
+  
+   !   do i=1,Mon%NDim
+   !       write(LOUT,*) ABPlus(1,i),ABMin(1,i)
+   !!      write(LOUT,*) ABPlus(i,i), ABMin(i,i)
+   !   enddo
 
- ! reduce dim
- do j=1,Mon%NDimX
-    do i=1,Mon%NDimX
-        ij=(j-1)*Mon%NDimX+i
-        ij1=(Mon%IndX(j)-1)*Mon%NDim+Mon%IndX(i)
-        ABPlus(ij) = ABPlus(ij1)
-        ABMin(ij) = ABMin(ij1)
+   ! reduce dim
+   call reduce_dim('AB',ABPlus,ABMin,Mon)
+
+    tmp=0
+    do i=1,Mon%NDimX**2
+        tmp = tmp + ABPlus(i)**2
+   !    write(*,*) ABPlus(Mon%NDimX*(i-1)+i), ABMin(Mon%NDimX*(i-1)+i)
     enddo
- enddo
+    write(*,*) 'AB+',tmp
 
-! do i=1,Mon%NDim**2
-!     tmp = tmp + ABMin(i)**2
-!    write(*,*) ABPlus(Mon%NDimX*(i-1)+i), ABMin(Mon%NDimX*(i-1)+i)
-! enddo
-! write(*,*) tmp
 
- EigVecR = 0
- Eig = 0
- call ERPASYMM(EigVecR,Eig,ABPlus,ABMin,NBas,Mon%NDimX)
+   EigVecR = 0
+   Eig = 0
+   call ERPASYMM(EigVecR,Eig,ABPlus,ABMin,NBas,Mon%NDimX)
 
-! weird stuff ?
-! do i=1,Mon%NDimX**2
-!     !tmp = tmp + Eig(i)**2
-!     tmp = tmp + EigVecR(i)**2
-! enddo
-! write(*,*) tmp
-! do i=1,Mon%NDimX
-!    write(LOUT,*) Eig(i),EigVecR(Mon%NDimX*(i-1)+i)
-! enddo
+   ! do i=1,Mon%NDimX**2
+   !     !tmp = tmp + Eig(i)**2
+   !     tmp = tmp + EigVecR(i)**2
+   ! enddo
+   ! write(*,*) tmp
+   ! do i=1,Mon%NDimX
+   !    write(LOUT,*) Eig(i),EigVecR(Mon%NDimX*(i-1)+i)
+   ! enddo
 
- else
+   if(EChck) then
+      write(LOUT,'(/,1x,a)') 'ERPA-GVB ENERGY CHECK REQUESTED:'
+      call EneERPA(ETot,ECorr,Mon%PotNuc,EigVecR,Eig,TwoMO,URe,&
+           Mon%Occ,XOne,Mon%IndN,NBas,NInte1,NInte2,Mon%NDimX,Mon%NGem)
+   endif
+
+ ! GVB with TD-APSG response
+ elseif(Flags%ICASSCF==0.and.Flags%ISERPA==2) then
+
+   Mon%NDimN=0
+   do i=1,NBas
+      if(Mon%Occ(i).gt.0d0) Mon%NDimN=Mon%NDimN+1
+   enddo
+
+   allocate(ABPlus(Mon%NDim**2),ABMin(Mon%NDim**2), &
+            CMAT(Mon%NDim**2),EMAT(NBas**2),EMATM(NBas**2),&
+            DMAT(Mon%NDim*NBas),DMATK(Mon%NDim*NBas),&
+            EigVecR(2*(Mon%NDimX+Mon%NDimN)*2*(Mon%NDimX+Mon%NDimN)),&
+            Eig(2*(Mon%NDimX+Mon%NDimN))) 
+
+   CMAT=0
+   call APSG_NEST(ABPlus,ABMin,CMAT,EMAT,EMATM,DMAT,DMATK,&
+                  URe,Mon%Occ,XOne,TwoMO,&
+                  NBas,Mon%NDim,NInte1,NInte2,Mon%NGem,Flags%ISERPA)
+
+   !reduce dimensions
+   call reduce_dim('AB',ABPlus,ABMin,Mon)
+   call reduce_dim('D',DMAT,DMATK,Mon)
+   call reduce_dim('E',EMAT,EMATM,Mon)
+
+  ! tmp=0
+  ! do i=1,Mon%NDimX**2
+  !     tmp = tmp + ABPlus(i)**2
+  ! enddo
+  ! write(*,*) 'AB-test:',tmp
+  ! tmp=0
+  ! do i=1,Mon%NDimN**2
+  !     tmp = tmp + EMAT(i)**2
+  ! enddo
+  ! write(*,*) 'E+',tmp
+  ! tmp=0
+  ! do i=1,Mon%NDimN**2
+  !     tmp = tmp + EMATM(i)**2
+  ! enddo
+  ! write(*,*) 'E-',tmp
+  ! tmp=0d0
+  ! do i=1,Mon%NDimN*Mon%NDimX
+  !     tmp = tmp + DMAT(i)**2
+  ! enddo
+  ! write(*,*) 'D+',tmp
+  ! tmp=0d0
+  ! do i=1,Mon%NDimN*Mon%NDimX
+  !     tmp = tmp + DMATK(i)**2
+  ! enddo
+  ! write(*,*) 'D-',tmp
+
+!    write(*,*) Mon%NGem,Mon%NDimN,Mon%NDimX
+!    write(*,*) Mon%Occ,NBas
+    EigVecR = 0
+    Eig = 0
+    call PINOVEC(EigVecR,Eig,ABPlus,ABMin,DMAT,DMATK,EMAT,EMATM, &
+                 Mon%Occ,NBas,Mon%NDimX,Mon%NDimN)
+
+    print*, 'TESTY:',Mon%NDimX,Mon%NDimN,Mon%NDimX+Mon%NDimN
+    do i=1,size(Eig)
+       write(LOUT,*) i,Eig(i)
+    enddo
+
+   ! j=0
+   ! do i=1,size(Eig)
+   !    if(Eig(i).Gt.SmallE.And.Eig(i).Lt.BigE) then
+   !    j = j + 1
+   !    write(LOUT,*) j,i,Eig(i)
+   !    endif
+   ! enddo
+
+!   call select_resp(EigVecR,Eig,Mon,NBas,&
+!                    Mon%NDimX+Mon%NDimN)
+
+   deallocate(CMAT,EMAT,EMATM,DMAT,DMATK)
+
+ ! CAS-SCF
+ elseif(Flags%ICASSCF==1.and.Flags%ISERPA==0) then
 
    allocate(ABPlus(Mon%NDimX**2),ABMin(Mon%NDimX**2),&
             EigVecR(Mon%NDimX**2),Eig(Mon%NDimX))
@@ -482,14 +566,89 @@ double precision :: tmp
 !   enddo
 !   write(*,*) tmp
 
- endif
-
- call ACEneERPA(ECorr,EigVecR,Eig,TwoMO,URe,Mon%Occ,XOne,&
-                Mon%IndN,NBas,NInte1,NInte2,Mon%NDimX,Mon%NGem)
+   if(EChck) then
+      call ACEneERPA(ECorr,EigVecR,Eig,TwoMO,URe,Mon%Occ,XOne,&
+                     Mon%IndN,NBas,NInte1,NInte2,Mon%NDimX,Mon%NGem)
       ECorr=Ecorr*0.5d0
+  
+      write(LOUT,'(/,1x,''ECASSCF+ENuc, Corr, ERPA-CASSCF'',6x,3f15.8)') &
+            ECASSCF+Mon%PotNuc,ECorr,ECASSCF+Mon%PotNuc+ECorr
+   endif
 
- write(LOUT,'(/,1x,''ECASSCF+ENuc, Corr, ERPA-CASSCF'',6x,3f15.8)') &
-       ECASSCF+Mon%PotNuc,ECorr,ECASSCF+Mon%PotNuc+ECorr
+ ! CAS-SCF Two-electron systems
+ elseif(Flags%ICASSCF==1.and.Flags%ISERPA==2.and.Mon%NELE==1) then
+ 
+   Mon%NDimN=0
+   do i=1,NBas
+      if(Mon%Occ(i).gt.0d0) Mon%NDimN=Mon%NDimN+1
+   enddo
+
+   allocate(ABPlus(Mon%NDim**2),ABMin(Mon%NDim**2), &
+            CMAT(Mon%NDim**2),EMAT(NBas**2),EMATM(NBas**2),&
+            DMAT(Mon%NDim*NBas),DMATK(Mon%NDim*NBas),&
+            EigVecR(2*(Mon%NDimX+Mon%NDimN)*2*(Mon%NDimX+Mon%NDimN)),&
+            Eig(2*(Mon%NDimX+Mon%NDimN))) 
+!            EigVecR(2*(Mon%NDim+NBas)*2*(Mon%NDim+NBas)),&
+!            Eig(2*(Mon%NDim+NBas))) 
+
+   CMAT=0
+   call APSG_NEST(ABPlus,ABMin,CMAT,EMAT,EMATM,DMAT,DMATK,&
+                  URe,Mon%Occ,XOne,TwoMO,&
+                  NBas,Mon%NDim,NInte1,NInte2,Mon%NGem,Flags%ISERPA)
+
+   !reduce dimensions
+   call reduce_dim('AB',ABPlus,ABMin,Mon)
+   call reduce_dim('D',DMAT,DMATK,Mon)
+   call reduce_dim('E',EMAT,EMATM,Mon)
+
+  ! tmp=0
+  ! do i=1,Mon%NDimX**2
+  !      tmp = tmp + ABPlus(i)**2
+  !  enddo
+  !  write(*,*) 'AB-test:',tmp
+  !  tmp=0
+  !  do i=1,Mon%NDimN**2
+  !      tmp = tmp + EMAT(i)**2
+  !  enddo
+  !  write(*,*) 'E+',tmp
+  !  tmp=0
+  !  do i=1,Mon%NDimN**2
+  !      tmp = tmp + EMATM(i)**2
+  !  enddo
+  !  write(*,*) 'E-',tmp
+  !  tmp=0d0
+  !  do i=1,Mon%NDimN*Mon%NDimX
+  !      tmp = tmp + DMAT(i)**2
+  !  enddo
+  !  write(*,*) 'D+',tmp
+  !  tmp=0d0
+  !  do i=1,Mon%NDimN*Mon%NDimX
+  !      tmp = tmp + DMATK(i)**2
+  !  enddo
+  !  write(*,*) 'D-',tmp
+  ! write(*,*) Mon%NGem,Mon%NDimN,Mon%NDimX
+  ! write(*,*) Mon%Occ,NBas
+
+   EigVecR = 0
+   Eig = 0
+   call PINOVEC(EigVecR,Eig,ABPlus,ABMin,DMAT,DMATK,EMAT,EMATM, &
+                Mon%Occ,NBas,Mon%NDimX,Mon%NDimN)
+
+   print*, 'TESTY:',Mon%NDimX,Mon%NDimN,Mon%NDimX+Mon%NDimN
+   do i=1,size(Eig)
+      write(LOUT,*) i,Eig(i)
+   enddo
+
+ !   j=0
+ !   do i=1,size(Eig)
+ !      if(Eig(i).Gt.SmallE.And.Eig(i).Lt.BigE) then
+ !      j = j + 1
+ !      write(LOUT,*) j,i,Eig(i)
+ !      endif
+ !   enddo
+
+
+ endif
 
 ! dump response
  call writeresp(EigVecR,Eig,propfile)
@@ -499,6 +658,134 @@ double precision :: tmp
  deallocate(ABPlus,ABMin,EigVecR,Eig)
 
 end subroutine calc_response 
+
+subroutine reduce_dim(var,matP,matM,Mon)
+implicit none
+
+character(*) :: var
+double precision :: matP(:),matM(:)
+type(SystemBlock) :: Mon
+integer :: i,j,ij,ij1
+
+select case(var) 
+case('AB','ab')
+   ! matP = ABPlus
+   ! matM = ABMin
+   ij=0
+   ij1=0
+   do j = 1,Mon%NDimX
+      do i = 1,Mon%NDimX
+          ij  = (j-1)*Mon%NDimX + i
+          ij1 = (Mon%IndX(j)-1)*Mon%NDim + Mon%IndX(i)
+          matP(ij) = matP(ij1)
+          matM(ij) = matM(ij1)
+      enddo
+   enddo
+
+case('D','d')
+   ! matP = DMAT
+   ! matM = DMATK
+   ij=0
+   ij1=0
+   do j = 1,Mon%NDimN
+      do i = 1,Mon%NDimX
+         ij  = (j-1)*Mon%NDimX + i
+         ij1 = (j-1)*Mon%NDim + Mon%IndX(i)
+         matP(ij) = matP(ij1)
+         matM(ij) = matM(ij1)
+      enddo
+   enddo
+
+case('E','e')
+   ! matP = EMAT
+   ! matM = EMATM
+   ij=0
+   ij1=0 
+   do j=1,Mon%NDimN
+      do i=1,Mon%NDimN
+         ij  = (j-1)*Mon%NDimN + i
+         ij1 = (j-1)*Mon%NBasis + i
+         matP(ij) = matP(ij1)
+         matM(ij) = matM(ij1)
+      enddo
+   enddo
+
+end select
+
+end subroutine reduce_dim
+
+subroutine select_resp(EigVec,Eig,Mon,NBas,NDimEx)
+implicit none
+! is this even ok?
+type(SystemBlock) :: Mon
+integer :: NBas,NDimEx
+double precision :: EigVec(2*NDimEx,2*NDimEx),Eig(2*NDimEx)
+double precision,allocatable :: TmpVec(:,:),TmpEig(:)
+integer :: i,j
+integer :: pq,ip,iq
+
+ !NDimEx = Mon%NDimX+Mon%NDimN
+ allocate(TmpEig(NDimEx),TmpVec(NDimEx,NDimEx))
+
+ TmpEig = 0
+ TmpVec = 0
+ j = 0
+ do i=1,2*NDimEx
+    if(Eig(i).gt.1d0.and.Eig(i).lt.1d20) then
+       j = j + 1
+       TmpEig(j) = Eig(i)
+       TmpVec(1:NDimEx,j) = EigVec(1:NDimEx,i)
+    endif
+ enddo  
+ 
+ print*, 'TmpEig'
+ do i=1,NDimEx
+    write(LOUT,*) i,TmpEig(i)
+ enddo
+
+! not too much... 
+! this is so complicated...
+! maybe a way to simplify it?
+  print*, '1st'
+  do i=1,NDimEx
+    do pq=1,2*NDimEx
+       if(pq.le.Mon%NDimX) then
+          ip=Mon%IndN(1,pq)
+          iq=Mon%IndN(2,pq)
+       else
+          ip=pq-Mon%NDimX
+          iq=ip
+       endif
+       if(ip.gt.iq) then
+          if(Eig(pq).gt.1d0.and.Eig(pq).lt.1d20) then
+            write(6,*) ip,iq,EigVec(i,pq)
+          endif
+       endif
+    enddo
+  enddo 
+ 
+  print*, '2nd'
+! map(pq) here?
+  do i=1,NDimEx
+    do pq=1,NDimEx
+       if(pq.le.Mon%NDimX) then
+          ip=Mon%IndN(1,pq)
+          iq=Mon%IndN(2,pq)
+       else
+          ip=pq-Mon%NDimX
+          iq=ip
+       endif
+       if(ip.gt.iq) then
+          write(6,*) ip,iq,TmpVec(i,pq)
+       endif
+    enddo
+  enddo 
+
+
+
+ deallocate(TmpEig,TmpVec)
+
+end subroutine select_resp
 
 function calc_vnn(A,B) result(Vnn)
 implicit none

@@ -172,12 +172,6 @@ C      Do I=1,NDimX
 C      Write(6,*) I,IndN(1,I),IndN(2,I)
 C      EndDo
 
-      TMP=0
-      Do I=1,NInte1
-        TMP = TMP + XOne(I)**2 
-      EndDo
-      Write(6,*) 'XONE',TMP
-
       Call AB_CAS(ABPLUS,ABMIN,ECASSCF,URe,Occ,XOne,TwoNO,IPair,
      $ IndN,IndX,NDimX,NBasis,NDimX,NInte1,NInte2,ACAlpha)
 

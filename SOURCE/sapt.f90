@@ -249,7 +249,7 @@ allocate(tmp1(A%NDimX,B%NDimX),tmp2(A%NDimX,B%NDimX))
  enddo
  SAPT%e2disp = -16d0*e2d
  e2d = -16d0*e2d*1000d0
- write(LOUT,'(1x,a,5x,f16.8)') 'E2disp = ',e2d
+ write(LOUT,'(1x,a,f16.8)') 'E2disp      = ',e2d
 
 !! coupled - TEST!
 ! e2d = 0d0
@@ -286,6 +286,233 @@ allocate(tmp1(A%NDimX,B%NDimX),tmp2(A%NDimX,B%NDimX))
  deallocate(EVecA,EVecB,OmA,OmB)
 
 end subroutine e2disp
+
+subroutine e2disp_apsg(Flags,A,B,SAPT)
+implicit none
+
+type(FlagsData) :: Flags
+type(SystemBlock) :: A, B
+type(SaptData) :: SAPT
+integer :: NBas, NInte1,NInte2
+integer :: dimOA,dimVA,dimOB,dimVB,nOVA,nOVB
+integer :: iunit
+integer :: i,j,pq,rs
+integer :: ip,iq,ir,is
+integer :: ii,jj
+integer :: ADimEx,BDimEx
+double precision,allocatable :: OmA(:),OmB(:)
+double precision,allocatable :: EVecA(:),EVecB(:)
+double precision,allocatable :: tmp1(:,:),tmp2(:,:) 
+double precision,allocatable :: work(:)
+double precision :: e2d,tmp
+double precision :: e2du,dea,deb
+double precision,parameter :: SmallE = 0d0!1.d-9
+
+ if(A%NBasis.ne.B%NBasis) then
+    write(LOUT,'(1x,a)') 'ERROR! MCBS not implemented in SAPT!'
+    stop
+ else
+    NBas = A%NBasis 
+ endif
+
+! set dimensions
+ ADimEx = A%NDimX + A%NDimN
+ BDimEx = B%NDimX + B%NDimN
+ NInte1 = NBas*(NBas+1)/2
+ NInte2 = NInte1*(NInte1+1)/2
+ dimOA = A%num0+A%num1
+ dimVA = A%num1+A%num2
+ dimOB = B%num0+B%num1
+ dimVB = B%num1+B%num2
+ nOVA = dimOA*dimVA
+ nOVB = dimOB*dimVB
+
+! read EigValA_B
+ allocate(EVecA(2*ADimEx*2*ADimEx),OmA(2*ADimEx),&
+          EVecB(2*BDimEx*2*BDimEx),OmB(2*BDimEx))
+
+ call readresp(EVecA,OmA,2*ADimEx,'PROP_A')
+ call readresp(EVecB,OmB,2*BDimEx,'PROP_B')
+
+ ! tran4_gen
+ allocate(work(nOVB))
+ open(newunit=iunit,file='TWOMOAB',status='OLD',&
+     access='DIRECT',form='UNFORMATTED',recl=8*nOVB)
+
+ allocate(tmp1(2*ADimEx,2*BDimEx),tmp2(2*ADimEx,2*BDimEx))
+
+ tmp1=0
+ do i=1,2*ADimEx
+    if(OmA(i).gt.SmallE.and.OmA(i).lt.1d20) then
+    do pq=1,A%NDimX+A%NDimN
+       if(pq.le.A%NDimX) then
+          ip = A%IndN(1,pq)
+          iq = A%IndN(2,pq)
+       else
+          ip = pq - A%NDimX
+          iq = ip
+       endif
+       if(ip.ge.iq) then
+         ! print*, iq,ip,iq+(ip-A%num0-1)*dimOA,nOVA
+          read(iunit,rec=iq+(ip-A%num0-1)*dimOA) work(1:nOVB)
+          do rs=1,B%NDimX+B%NDimN
+             if(rs.le.B%NDimX) then 
+                ir = B%IndN(1,rs)
+                is = B%IndN(2,rs)
+             else
+                ir = rs - B%NDimX
+                is = ir
+             endif
+             if(ir.gt.is.and.ip.gt.iq) then   
+                !print*, is,ir,is+(ir-B%num0-1)*dimOB,nOVB
+
+                   tmp1(i,rs) = tmp1(i,rs) + & 
+                              (A%CICoef(iq)+A%CICoef(ip)) * &
+                              (B%CICoef(is)+B%CICoef(ir)) * &
+                              EVecA((i-1)*2*ADimEx+pq)* &
+                              work(is+(ir-B%num0-1)*dimOB)
+            
+             elseif(ir.eq.is.and.ip.eq.iq) then
+                   
+                   tmp1(i,rs+B%NDimX) = tmp1(i,rs+B%NDimX) + &
+                          2d0*(A%CICoef(iq)) * &
+                              (B%CICoef(is)) * &
+                              EVecA((i-1)*2*ADimEx+A%NDimX+pq)* &
+                              work(is+(ir-B%num0-1)*dimOB)
+!
+!              elseif(ir.eq.is.and.ip.gt.iq) then
+!
+!                   tmp1(i,rs) = tmp1(i,rs) + & 
+!                              (A%CICoef(iq)+B%CICoef(ip)) * &
+!                              (B%CICoef(is)) * &
+!                              EVecA((i-1)*2*ADimEx+pq)* &
+!                              work(is+(ir-B%num0-1)*dimOB)
+!
+!              elseif(ir.gt.is.and.ip.eq.iq) then
+!
+!                   tmp1(i,rs) = tmp1(i,rs) + & 
+!                              (A%CICoef(iq)) * &
+!                              (B%CICoef(is)+B%CICoef(ir)) * &
+!                              EVecA((i-1)*2*ADimEx+A%NDimX+pq)* &
+!                              work(is+(ir-B%num0-1)*dimOB)
+
+             endif
+          enddo
+       endif
+    enddo
+    endif
+ enddo
+
+ tmp2=0
+ do j=1,2*BDimEx
+    if(OmB(j).gt.SmallE.and.OmB(j).lt.1d20) then
+       do i=1,2*ADimEx
+          if(OmA(i).gt.SmallE.and.OmA(i).lt.1d20) then
+             do rs=1,B%NDimX+B%NDimN
+                if(rs.le.B%NDimX) then 
+                   ir = B%IndN(1,rs)
+                   is = B%IndN(2,rs)
+                else
+                   ir = rs - B%NDimX
+                   is = ir
+                endif
+
+             if(ir.gt.is) then       
+                 tmp2(i,j) = tmp2(i,j) + &
+                             EVecB((j-1)*2*BDimEx+rs)*tmp1(i,rs)
+!            elseif(ir.eq.is) then
+!                  tmp2(i,j) = tmp2(i,j) + &
+!                            EVecB((j-1)*2*BDimEx+B%NDimX+rs)*tmp1(i,rs+B%NDimX)
+             endif
+
+             enddo
+          endif
+       enddo   
+    endif
+ enddo
+
+ e2d = 0d0
+ do i=1,2*ADimEx
+    if(OmA(i).gt.SmallE.and.OmA(i).lt.1d20) then
+       do j=1,2*BDimEx
+          if(OmB(j).gt.SmallE.and.OmB(j).lt.1d20) then
+             e2d = e2d + tmp2(i,j)**2d0/(OmA(i)+OmB(j))
+          endif
+       enddo
+    endif
+ enddo
+ !SAPT%e2disp = -16d0*e2d
+ e2d = -16d0*e2d*1000d0
+ write(LOUT,'(1x,a,f16.8)') 'E2disp      = ',e2d
+
+
+! full-check
+ e2d = 0d0
+ do i=1,2*ADimEx
+    if(OmA(i).gt.SmallE.and.OmA(i).lt.1d20) then
+    do j=1,2*BDimEx
+       if(OmB(j).gt.SmallE.and.OmB(j).lt.1d20) then
+
+       tmp=0d0
+       do pq=1,A%NDimX+A%NDimN
+          if(pq.le.A%NDimX) then
+             ip = A%IndN(1,pq)
+             iq = A%IndN(2,pq)
+          else
+             ip = pq - A%NDimX
+             iq = ip
+          endif
+          if(ip.ge.iq) then          
+
+             read(iunit,rec=iq+(ip-A%num0-1)*dimOA) work(1:nOVB)
+
+             do rs=1,B%NDimX+B%NDimN
+                if(rs.le.B%NDimX) then
+                   ir = B%IndN(1,rs)
+                   is = B%IndN(2,rs)
+                else
+                   ir = rs - B%NDimX
+                   is = ir
+                endif
+
+                if(ir.gt.is.and.ip.gt.iq) then
+                   tmp = tmp + &
+                      (A%CICoef(ip)+A%CICoef(iq)) * &
+                      (B%CICoef(ir)+B%CICoef(is)) * &
+                      EVecA((i-1)*2*ADimEx+pq) * &
+                      EVecB((j-1)*2*BDimEx+rs) * & 
+                      work(is+(ir-B%num0-1)*dimOB)
+
+                elseif(ir.eq.is.and.ip.eq.iq) then
+                       !print*, ir,is,rs,ip,iq,pq
+                  ! tmp = tmp + &
+                  !    2d0*(A%CICoef(ip)) * &
+                  !    (B%CICoef(ir)) * &
+                  !    EVecA((i-1)*2*ADimEx+pq) * &
+                  !    EVecB((j-1)*2*BDimEx+rs) * & 
+                  !    work(is+(ir-B%num0-1)*dimOB)
+
+                endif
+
+             enddo
+
+          endif
+       enddo
+
+       e2d = e2d  + tmp**2d0/(OmA(i)+OmB(j))
+       endif
+    enddo
+    endif
+ enddo
+ e2d = -16d0*e2d
+ print*, 'e2d:',e2d
+
+ close(iunit)
+ deallocate(work)
+ deallocate(tmp2,tmp1)
+ deallocate(OmB,EVecB,OmA,EVecA)
+
+end subroutine e2disp_apsg
 
 subroutine readresp(EVec,EVal,NDim,fname)
 implicit none

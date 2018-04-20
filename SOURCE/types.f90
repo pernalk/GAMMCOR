@@ -37,6 +37,9 @@ integer, parameter :: RDM_TYPE_HF   = 5
 integer, parameter :: MONOMER_A = 1
 integer, parameter :: MONOMER_B = 2
 
+integer, parameter :: RESP_ERPA = 1
+integer, parameter :: RESP_APSG = 2
+
 integer,parameter :: maxcen = 500
 
 character(*),parameter :: PossibleInterface(3) = &
@@ -64,6 +67,7 @@ type CalculationBlock
       integer :: Fragments = FLAG_FRAG
       integer :: RDMType = RDM_TYPE_GVB
       integer :: RDMSource = INTER_TYPE_DAL
+      integer :: Response = RESP_ERPA
       integer :: Inactive = FLAG_CORE 
       integer :: SymType = TYPE_NO_SYM
       logical :: Restart = FLAG_RESTART
@@ -89,6 +93,7 @@ type SystemBlock
       integer :: NOrb, NGem
       integer :: NAct, INAct
       integer :: NDim, NDimX
+      integer :: NDimN
       integer :: NCen = 0
       integer :: NMonOrb = 0
       integer :: IPrint = 0
@@ -153,6 +158,7 @@ type SaptData
      type(SystemBlock) :: monA, monB
      double precision :: Vnn,elst,e2disp
      integer :: IPrint = 1000
+     logical :: EnChck = .true.
 
 end type SaptData
 

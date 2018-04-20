@@ -306,6 +306,15 @@ subroutine read_block_calculation(CalcParams, line)
            elseif (uppercase(val) == "DMRG" ) then
               CalcParams%RDMType = RDM_TYPE_DMRG
            endif
+      ! here not sure
+      case ("RESPONSE")
+           if (uppercase(val) == "ERPA-APSG".or.&
+               uppercase(val) == "ERPA") then
+               CalcParams%Response = RESP_ERPA
+           elseif (uppercase(val) == "TD-APSG".or.&
+                   uppercase(val) == "FULL") then
+               CalcParams%Response = RESP_APSG
+           endif
 
       case ("RDMSOURCE")
            if (uppercase(val) == "DALTON") then

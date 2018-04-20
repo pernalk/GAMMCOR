@@ -1750,6 +1750,142 @@ C
       Return
       End
 
+*Deck PINOVEC
+      Subroutine PINOVEC(EigVecR,Eig,
+     $ APLUS,AMIN,DPLUS,DMIN,EPLUS,EMIN,
+     $ Occ,NBasis,NDimX,NDimN)
+C
+      Implicit Real*8 (A-H,O-Z)
+C
+      Parameter(Zero=0.D0,Half=0.5D0,One=1.D0,Two=2.D0,Three=3.D0,
+     $ Four=4.D0)
+C
+      Include 'commons.inc'
+C
+      Dimension
+     $ APLUS(NDimX,NDimX),AMIN(NDimX,NDimX),
+     $ DPLUS(NDimX,NDimN),EPLUS(NDimN,NDimN),
+     $ DMIN(NDimX,NDimN),EMIN(NDimN,NDimN),
+     $ Q1(2*(NDimX+NDimN),2*(NDimX+NDimN)),
+     $ Q2(2*(NDimX+NDimN)*2*(NDimX+NDimN)),
+     $ EigVecR(2*(NDimX+NDimN)*2*(NDimX+NDimN)),
+     $ EigVecL(2*(NDimX+NDimN)*2*(NDimX+NDimN)),
+     $ Occ(NBasis),
+     $ Eig(2*(NDimX+NDimN)),EigI(2*(NDimX+NDimN)),
+     $ Work(4*2*(NDimX+NDimN))
+
+C
+      Do I=1,2*(NDimX+NDimN)
+      Do J=1,2*(NDimX+NDimN)
+      Q1(I,J)=Zero
+C
+C     1ST SUPER ROW
+C
+      If(I.Le.NDimX) Then
+C
+      If(J.Gt.NDimX.And.J.Le.2*NDimX) Q1(I,J)=APLUS(I,J-NDimX)
+      If(J.Gt.2*NDimX+NDimN) Q1(I,J)=DPLUS(I,J-2*NDimX-NDimN)
+C
+      EndIf
+C
+C     2ND SUPER ROW
+C
+      If(I.Gt.NDimX.And.I.Le.2*NDimX) Then
+C
+      If(J.Le.NDimX) Q1(I,J)=AMIN(I-NDimX,J)
+      If(J.Gt.2*NDimX.And.J.Le.2*NDimX+NDimN)
+     $ Q1(I,J)=DMIN(I-NDimX,J-2*NDimX)
+C
+      EndIf
+C
+C     3RD SUPER ROW 
+C
+      If(I.Gt.2*NDimX.And.I.Le.2*NDimX+NDimN) Then
+C
+      If(J.Gt.NDimX.And.J.Le.2*NDimX)
+     $ Q1(I,J)=Two*DPLUS(J-NDimX,I-2*NDimX)
+      If(J.Gt.2*NDimX+NDimN)
+     $ Q1(I,J)=EPLUS(I-2*NDimX,J-2*NDimX-NDimN)
+C
+      EndIf
+C
+C     4TH SUPER ROW
+C
+      If(I.Gt.2*NDimX+NDimN) Then
+C
+      If(J.Le.NDimX) Q1(I,J)=Two*DMIN(J,I-2*NDimX-NDimN)
+      If(J.Gt.2*NDimX.And.J.Le.2*NDimX+NDimN)
+     $ Q1(I,J)=EMIN(I-2*NDimX-NDimN,J-2*NDimX)
+C
+      EndIf
+C
+      EndDo
+      EndDo
+C
+      NI=2*(NDimX+NDimN)
+      Index=0
+      Do J=1,NI
+      Do I=1,NI
+      Index=Index+1
+      Q2(Index)=Q1(I,J)
+      EndDo
+      EndDo
+C   
+      Call DGEEV('N','V',NI,Q2,NI,Eig,EigI,
+     $           EigVecL,NI,EigVecR,NI,Work,4*NI,INFO)
+
+C
+C    
+C     NORMALIZE [Y,X,W,V] SO THAT 2 Y*X + V*W = 1
+C     THE NORMALIZATION IS APPLIED TO EIGVECTORS CORRESPONDING TO POSITIVE OMEGA's
+C
+      Do NU=1,NI
+C
+      If(Abs(EigI(NU)).Gt.1.D-12) Then
+C
+      Write(6,'(X,"Complex PINO Eigenvalue",I4,2E12.4)')
+     $ NU,Eig(NU),EigI(NU)
+      Eig(NU)=Zero
+      Do I=1,NI
+      EigVecR((NU-1)*NI+I)=Zero
+      EndDo      
+C
+      EndIf
+      EndDo 
+C
+      Do NU=1,NI
+C
+      SumNU=Zero
+      Do I=1,NDimX+NDimN
+      If(I.Le.NDimX) Then
+      SumNU=SumNU+Two*
+     $ EigVecR((NU-1)*NI+I)*EigVecR((NU-1)*NI+NDimX+I)
+      Else
+      SumNU=SumNU+EigVecR((NU-1)*NI+NDimX+I)*
+     $ EigVecR((NU-1)*NI+NDimX+NDimN+I)
+      EndIf
+      EndDo
+C     
+      If(SumNU.Gt.Zero) Then      
+      SumNU=One/SQRT(SumNU)
+      If(Eig(NU).Lt.Zero) Write(6,'(X,"Negative Excit Norm",I4,2E12.4)')
+     $  NU,Eig(NU),SumNU
+      Eig(NU)=Abs(Eig(NU))
+      Else
+      SumNU=Zero
+      Eig(NU)=-Abs(Eig(NU))
+      EndIf
+C
+      Do I=1,NI
+      EigVecR((NU-1)*NI+I)=EigVecR((NU-1)*NI+I)*SumNU
+      EndDo
+C
+c     enddo NU
+      EndDo
+C
+      Return
+      End
+
 *Deck Get_APL
       Subroutine Get_APL(IR,IS,IP,IQ,APL,HNO,XMu,TwoMO,AuxH,
      $ NBasis,NInte1,NInte2)
@@ -1926,8 +2062,3 @@ C
 
 
 
-
-
-
- 
-      

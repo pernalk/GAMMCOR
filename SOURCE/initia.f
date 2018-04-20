@@ -1704,7 +1704,6 @@ C
       fname='TWOMOAA '
       ElseIf(Mon.Eq.2) Then
       fname='TWOMOBB '
-      write(*,*) fname
       EndIf
  
       Work1 = 0d0
