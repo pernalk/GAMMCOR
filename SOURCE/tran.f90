@@ -373,6 +373,51 @@ double precision,external :: ddot
 
 end subroutine make_J2
 
+subroutine make_K(NBas,X,K)
+implicit none
+integer,intent(in) :: NBas
+double precision,intent(in) :: X(NBas,NBas)
+double precision,intent(inout) :: K(NBas,NBas)
+integer :: iunit, ntr
+integer :: ir,is,irs
+double precision :: tmp
+double precision,allocatable :: work1(:),work2(:)
+! works in DCBS
+
+ K = 0
+ ntr = NBas*(NBas+1)/2
+
+ allocate(work1(NBas*NBas),work2(NBas*NBas))
+
+ open(newunit=iunit,file='AOTWOSORT',status='OLD',&
+      access='DIRECT',form='UNFORMATTED',recl=8*ntr)
+
+ irs = 0
+ do is=1,NBas
+    do ir=1,is
+    irs = irs + 1
+    read(iunit,rec=irs) work1(1:ntr)
+    call triang_to_sq(work1,work2,NBas)
+
+    if(ir==is) then
+
+       call dgemv('N',NBas,NBas,1.d0,work2,NBas,X(:,is),1,1.d0,K(:,ir),1)
+
+    else
+
+       call dgemv('N',NBas,NBas,1.d0,work2,NBas,X(:,is),1,1.d0,K(:,ir),1)
+       call dgemv('N',NBas,NBas,1.d0,work2,NBas,X(:,ir),1,1.d0,K(:,is),1)
+
+    endif
+
+    enddo
+ enddo
+
+ deallocate(work2,work1)
+ close(iunit)
+
+end subroutine make_K
+
 subroutine tran_oneint(ints,MO1,MO2,NSym,GFunc,work,nbas)
 implicit none
 

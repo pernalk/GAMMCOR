@@ -28,6 +28,7 @@ integer :: i
  call sapt_interface(Flags,SAPT)
  write(LOUT,'()')
  call e1elst(SAPT%monA,SAPT%monB,SAPT)
+ call e2ind(Flags,SAPT%monA,SAPT%monB,SAPT)
 
  if(Flags%ISERPA==0) then
     call e2disp(Flags,SAPT%monA,SAPT%monB,SAPT)
@@ -322,8 +323,10 @@ integer :: ncen
     enddo 
  enddo 
 
-! calc intermolecular repulsion
+ ! calculate electrostatic potential
+ call calc_elpot(SAPT%monA,SAPT%monB,NBasis)
 
+! calc intermolecular repulsion
  SAPT%Vnn = calc_vnn(SAPT%monA,SAPT%monB)
 
  deallocate(Ha,Hb,Va,Vb,S)
@@ -658,6 +661,34 @@ double precision,parameter :: SmallE=0d0,BigE=1.D20
  deallocate(ABPlus,ABMin,EigVecR,Eig)
 
 end subroutine calc_response 
+
+subroutine calc_elpot(A,B,NBas)
+implicit none
+
+integer :: NBas
+type(SystemBlock) :: A, B
+double precision,allocatable :: Pa(:,:),Pb(:,:) 
+double precision,allocatable :: Va(:,:),Vb(:,:) 
+double precision,allocatable :: Ja(:,:),Jb(:,:) 
+
+ allocate(Pa(NBas,NBas),Pb(NBas,NBas),&
+          Va(NBas,NBas),Vb(NBas,NBas),&
+          Ja(NBas,NBas),Jb(NBas,NBas))
+
+ call get_den(NBas,A%CMO,2d0*A%Occ,PA)
+ call get_den(NBas,B%CMO,2d0*B%Occ,PB)
+
+ call get_one_mat('V',Va,A%Monomer,NBas)
+ call get_one_mat('V',Vb,B%Monomer,NBas)
+
+ call make_J2(NBas,Pa,Pb,Ja,Jb)
+
+ A%W = Va + Ja
+ B%W = Vb + Jb
+ 
+ deallocate(Jb,Ja,Vb,Va,Pb,Pa)
+
+end subroutine calc_elpot 
 
 subroutine reduce_dim(var,matP,matM,Mon)
 implicit none
@@ -1633,6 +1664,14 @@ deallocate(SAPT%monB%CICoef,SAPT%monB%IGem,SAPT%monB%Occ, &
            SAPT%monB%IndAux,SAPT%monB%IndX,SAPT%monB%IndN,&
            SAPT%monB%CMO,&
            SAPT%monB%IPair)
+
+! HERE - change to SAPTLEVEL?
+if(allocated(SAPT%monA%W)) then
+  deallocate(SAPT%monA%W)
+endif
+if(allocated(SAPT%monB%W)) then
+  deallocate(SAPT%monB%W)
+endif
 
 if(allocated(SAPT%monA%OrbE)) then
   deallocate(SAPT%monA%OrbE)

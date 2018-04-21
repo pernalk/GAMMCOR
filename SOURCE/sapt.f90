@@ -56,6 +56,29 @@ double precision,external  :: trace
 
 end subroutine e1elst
 
+subroutine e2ind(Flags,A,B,SAPT)
+implicit none
+
+type(FlagsData) :: Flags
+type(SystemBlock) :: A, B
+type(SaptData) :: SAPT
+integer :: NBas, NInte1,NInte2
+double precision,allocatable :: OmA(:),OmB(:)
+double precision,allocatable :: EVecA(:,:),EVecB(:,:)
+
+! read EigValA_B
+ allocate(EVecA(A%NDimX,A%NDimX),OmA(A%NDimX),&
+          EVecB(B%NDimX,B%NDimX),OmB(B%NDimX))
+
+ call readresp(EVecA,OmA,A%NDimX,'PROP_A')
+ call readresp(EVecB,OmB,B%NDimX,'PROP_B')
+
+ print*, 'E2ind-TEST'
+
+ deallocate(OmB,EVecB,Oma,EVecA)
+
+end subroutine e2ind
+
 subroutine e2disp(Flags,A,B,SAPT)
 implicit none
 
