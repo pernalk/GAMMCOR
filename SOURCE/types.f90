@@ -106,7 +106,7 @@ type SystemBlock
       double precision,allocatable :: Occ(:), CICoef(:)
       double precision,allocatable :: OrbE(:)
       double precision,allocatable :: CMO(:,:)
-      double precision,allocatable :: W(:,:)
+      double precision,allocatable :: WPot(:,:)
       double precision  :: charg(maxcen),xyz(maxcen,3)
 
 end type SystemBlock

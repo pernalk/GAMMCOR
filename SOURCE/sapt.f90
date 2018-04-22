@@ -1,7 +1,6 @@
 module sapt_ener
 use types
 use tran
-!use sapt_main
 
 implicit none
 
@@ -65,16 +64,85 @@ type(SaptData) :: SAPT
 integer :: NBas, NInte1,NInte2
 double precision,allocatable :: OmA(:),OmB(:)
 double precision,allocatable :: EVecA(:,:),EVecB(:,:)
+double precision,allocatable :: WaBB(:,:),WbAA(:,:)
+double precision,allocatable :: AlphaA(:,:),AlphaB(:,:)
+integer :: i,j,pq,ip,iq,rs,ir,is
+double precision :: e2ba,e2ab,e2iu,e2ic 
+double precision :: tmp
+
+ if(A%NBasis.ne.B%NBasis) then
+    write(LOUT,'(1x,a)') 'ERROR! MCBS not implemented in SAPT!'
+    stop
+ else
+    NBas = A%NBasis 
+ endif
 
 ! read EigValA_B
- allocate(EVecA(A%NDimX,A%NDimX),OmA(A%NDimX),&
+ allocate(EVecA(A%NDimX,A%NDimX),OmA(A%NDimX), &
           EVecB(B%NDimX,B%NDimX),OmB(B%NDimX))
+ allocate(AlphaA(A%NDimX,A%NDimX),AlphaB(B%NDimX,B%NDimX), &
+          WaBB(NBas,NBas),WbAA(NBas,NBas))
 
  call readresp(EVecA,OmA,A%NDimX,'PROP_A')
  call readresp(EVecB,OmB,B%NDimX,'PROP_B')
+ 
+ call tran2MO(A%WPot,B%CMO,B%CMO,WaBB,NBas) 
+ call tran2MO(B%WPot,A%CMO,A%CMO,WbAA,NBas) 
 
- print*, 'E2ind-TEST'
+ call calc_resp(EVecA,OmA,AlphaA,0d0,A)
+ call calc_resp(EVecB,OmB,AlphaB,0d0,B)
 
+ !tmp=0
+ !do i=1,A%NDimX
+ !do j=1,A%NDimX
+ !   tmp = tmp + AlphaA(i,j)**2
+ !enddo
+ !enddo
+ !print*, 'RMA: ',tmp
+ !tmp=0
+ !do i=1,B%NDimX
+ !do j=1,B%NDimX
+ !   tmp = tmp + AlphaB(i,j)**2
+ !enddo
+ !enddo
+ !print*, 'RMB: ',tmp
+
+ e2ba=0
+ do pq=1,A%NDimX
+    ip = A%IndN(1,pq)
+    iq = A%IndN(2,pq)
+    do rs=1,A%NDimX
+       ir = A%IndN(1,rs)
+       is = A%IndN(2,rs)
+
+       e2ba = e2ba + & 
+            WbAA(ip,iq)*AlphaA(pq,rs)*WbAA(ir,is)
+
+    enddo
+ enddo
+ e2ba = -0.5d0*e2ba
+ write(LOUT,'(/,1x,a,f16.8)') 'Ind(B--A)   = ', e2ba*1000d0 
+
+ e2ab=0
+ do pq=1,B%NDimX
+    ip = B%IndN(1,pq)
+    iq = B%IndN(2,pq)
+    do rs=1,B%NDimX
+       ir = B%IndN(1,rs)
+       is = B%IndN(2,rs)
+
+       e2ab = e2ab + & 
+            WaBB(ip,iq)*AlphaB(pq,rs)*WaBB(ir,is)
+
+    enddo
+ enddo
+ e2ab = -0.5d0*e2ab
+ write(LOUT,'(1x,a,f16.8)') 'Ind(A--B)   = ', e2ab*1000d0 
+
+ e2ic = (e2ab + e2ba)
+ write(LOUT,'(1x,a,f16.8)') 'E2ind       = ', e2ic*1000d0 
+
+ deallocate(WaBB,WbAA,AlphaB,AlphaA)
  deallocate(OmB,EVecB,Oma,EVecA)
 
 end subroutine e2ind
@@ -216,7 +284,7 @@ allocate(tmp1(A%NDimX,B%NDimX),tmp2(A%NDimX,B%NDimX))
           tmp1(i,rs) = tmp1(i,rs) + & 
                        (A%CICoef(iq)+A%CICoef(ip)) * &
                        (B%CICoef(is)+B%CICoef(ir)) * &
-                        EVecA((i-1)*A%NDimX+pq)* &
+                        EVecA(pq+(i-1)*A%NDimX)* &
                         work(is+(ir-B%num0-1)*dimOB)
        enddo
     enddo
@@ -228,7 +296,7 @@ allocate(tmp1(A%NDimX,B%NDimX),tmp2(A%NDimX,B%NDimX))
        ir = B%IndN(1,rs)
        is = B%IndN(2,rs)
        tmp2(i,j) = tmp2(i,j) + &
-                    EVecB((j-1)*B%NDimX+rs)*tmp1(i,rs)
+                    EVecB(rs+(j-1)*B%NDimX)*tmp1(i,rs)
        enddo
     enddo   
  enddo
@@ -555,6 +623,46 @@ integer :: iunit
 
 end subroutine readresp
 
+subroutine calc_resp(EVec,EVal,Alpha,Freq,Mon)
+implicit none
 
+type(SystemBlock) :: Mon
+double precision,intent(in) :: EVec(Mon%NDimX,Mon%NDimX), &
+                               EVal(Mon%NDimX)
+double precision,intent(in) :: Freq
+double precision,intent(out) :: Alpha(Mon%NDimX,Mon%NDimX)
+double precision :: frac
+integer :: pq,rs,t,ip,iq,ir,is
+
+ Alpha = 0
+ do t=1,Mon%NDimX
+
+!   if(imag) then
+!      v=4d0*omega(p)/(freq**2+omega(p)**2)
+!   else
+!      v=4d0*omega(p)/(-freq**2+omega(p)**2)
+!   end if
+
+    frac = 8d0*EVal(t)/(EVal(t)**2d0+freq)
+
+    do pq=1,Mon%NDimX
+       ip = Mon%IndN(1,pq)
+       iq = Mon%IndN(2,pq)
+       do rs=1,pq
+          ir = Mon%IndN(1,rs)
+          is = Mon%IndN(2,rs)
+
+          Alpha(pq,rs) = Alpha(pq,rs) + &
+                       (Mon%CICoef(iq)+Mon%CICoef(ip)) * &
+                       (Mon%CICoef(is)+Mon%CICoef(ir)) * & 
+                       EVec(pq,t)*EVec(rs,t)*frac
+          Alpha(rs,pq) = Alpha(pq,rs)                
+
+       enddo
+    enddo
+
+ enddo
+
+end subroutine calc_resp
 
 end module sapt_ener

@@ -675,17 +675,19 @@ double precision,allocatable :: Ja(:,:),Jb(:,:)
           Va(NBas,NBas),Vb(NBas,NBas),&
           Ja(NBas,NBas),Jb(NBas,NBas))
 
- call get_den(NBas,A%CMO,2d0*A%Occ,PA)
- call get_den(NBas,B%CMO,2d0*B%Occ,PB)
+ call get_den(NBas,A%CMO,2d0*A%Occ,Pa)
+ call get_den(NBas,B%CMO,2d0*B%Occ,Pb)
 
  call get_one_mat('V',Va,A%Monomer,NBas)
  call get_one_mat('V',Vb,B%Monomer,NBas)
 
  call make_J2(NBas,Pa,Pb,Ja,Jb)
 
- A%W = Va + Ja
- B%W = Vb + Jb
- 
+ allocate(A%WPot(NBas,NBas),B%WPot(NBas,NBas))
+
+ A%WPot = Va + Ja
+ B%WPot = Vb + Jb
+
  deallocate(Jb,Ja,Vb,Va,Pb,Pa)
 
 end subroutine calc_elpot 
@@ -1666,11 +1668,11 @@ deallocate(SAPT%monB%CICoef,SAPT%monB%IGem,SAPT%monB%Occ, &
            SAPT%monB%IPair)
 
 ! HERE - change to SAPTLEVEL?
-if(allocated(SAPT%monA%W)) then
-  deallocate(SAPT%monA%W)
+if(allocated(SAPT%monA%WPot)) then
+  deallocate(SAPT%monA%WPot)
 endif
-if(allocated(SAPT%monB%W)) then
-  deallocate(SAPT%monB%W)
+if(allocated(SAPT%monB%WPot)) then
+  deallocate(SAPT%monB%WPot)
 endif
 
 if(allocated(SAPT%monA%OrbE)) then
@@ -1682,24 +1684,23 @@ endif
 
 end subroutine free_sapt
 
-subroutine tranMO(C,nbas)
-implicit none
-
-integer :: nbas
-double precision :: C(nbas,nbas)
-double precision :: tmp(nbas,nbas)
-integer :: i,j
-
-do i=1,nbas
-do j=1,nbas
- tmp(j,i) = C(i,j)
-enddo
-enddo
-
-C = tmp
-
-end subroutine tranMO
-
+!subroutine tranMO(C,nbas)
+!implicit none
+!
+!integer :: nbas
+!double precision :: C(nbas,nbas)
+!double precision :: tmp(nbas,nbas)
+!integer :: i,j
+!
+!do i=1,nbas
+!do j=1,nbas
+! tmp(j,i) = C(i,j)
+!enddo
+!enddo
+!
+!C = tmp
+!
+!end subroutine tranMO
 
 end module sapt_main
 

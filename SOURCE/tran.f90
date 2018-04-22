@@ -447,6 +447,26 @@ enddo
 
 end subroutine tran_oneint
 
+subroutine tran2MO(MatIn,Ca,Cb,MatOut,nbas)
+implicit none
+
+integer,intent(in) :: nbas
+double precision,intent(in) :: MatIn(nbas,nbas)
+double precision,intent(in) :: Ca(nbas,nbas),Cb(nbas,nbas)
+double precision,intent(out) :: MatOut(nbas,nbas)
+double precision,allocatable :: tmp(:,:)
+integer :: i,j
+
+ allocate(tmp(nbas,nbas))
+
+ tmp = 0
+ call dgemm('T','N',nbas,nbas,nbas,1d0,Ca,nbas,MatIn,nbas,0d0,tmp,nbas)
+ call dgemm('N','N',nbas,nbas,nbas,1d0,tmp,nbas,Cb,nbas,0d0,MatOut,nbas)
+
+ deallocate(tmp)
+
+end subroutine tran2MO
+
 subroutine triang_to_sq(matTr,matSq,NBas)
 implicit none
 
