@@ -272,21 +272,21 @@ allocate(tmp1(A%NDimX,B%NDimX),tmp2(A%NDimX,B%NDimX))
 
 ! coupled - 0
  tmp1=0
- do i=1,A%NDimX
-    do pq=1,A%NDimX
-       ip = A%IndN(1,pq)
-       iq = A%IndN(2,pq)
-      ! print*, iq,ip,iq+(ip-A%num0-1)*dimOA,nOVA
-       read(iunit,rec=iq+(ip-A%num0-1)*dimOA) work(1:nOVB)
-       do rs=1,B%NDimX
-          ir = B%IndN(1,rs)
-          is = B%IndN(2,rs)
+ do pq=1,A%NDimX
+    ip = A%IndN(1,pq)
+    iq = A%IndN(2,pq)
+    ! print*, iq,ip,iq+(ip-A%num0-1)*dimOA,nOVA
+    read(iunit,rec=iq+(ip-A%num0-1)*dimOA) work(1:nOVB)
+    do rs=1,B%NDimX
+       ir = B%IndN(1,rs)
+       is = B%IndN(2,rs)
+       do i=1,A%NDimX
           tmp1(i,rs) = tmp1(i,rs) + & 
-                       (A%CICoef(iq)+A%CICoef(ip)) * &
-                       (B%CICoef(is)+B%CICoef(ir)) * &
-                        EVecA(pq+(i-1)*A%NDimX)* &
-                        work(is+(ir-B%num0-1)*dimOB)
-       enddo
+                     (A%CICoef(iq)+A%CICoef(ip)) * &
+                     (B%CICoef(is)+B%CICoef(ir)) * &
+                     EVecA(pq+(i-1)*A%NDimX)* &
+                     work(is+(ir-B%num0-1)*dimOB)
+      enddo
     enddo
  enddo
  tmp2=0
@@ -385,7 +385,7 @@ type(FlagsData) :: Flags
 type(SystemBlock) :: A, B
 type(SaptData) :: SAPT
 integer :: NBas, NInte1,NInte2
-integer :: dimOA,dimVA,dimOB,dimVB,nOVA,nOVB
+integer :: dimOA,dimFA,dimOB,dimFB,nOFA,nOFB
 integer :: iunit
 integer :: i,j,pq,rs
 integer :: ip,iq,ir,is
@@ -395,9 +395,10 @@ double precision,allocatable :: OmA(:),OmB(:)
 double precision,allocatable :: EVecA(:),EVecB(:)
 double precision,allocatable :: tmp1(:,:),tmp2(:,:) 
 double precision,allocatable :: work(:)
-double precision :: e2d,tmp
+double precision :: fact
+double precision :: e2d1,e2d2,e2d3,e2d4,e2d,tmp
 double precision :: e2du,dea,deb
-double precision,parameter :: SmallE = 0d0!1.d-9
+double precision,parameter :: SmallE = 1.d-6 
 
  if(A%NBasis.ne.B%NBasis) then
     write(LOUT,'(1x,a)') 'ERROR! MCBS not implemented in SAPT!'
@@ -412,11 +413,11 @@ double precision,parameter :: SmallE = 0d0!1.d-9
  NInte1 = NBas*(NBas+1)/2
  NInte2 = NInte1*(NInte1+1)/2
  dimOA = A%num0+A%num1
- dimVA = A%num1+A%num2
+ dimFA = NBas
  dimOB = B%num0+B%num1
- dimVB = B%num1+B%num2
- nOVA = dimOA*dimVA
- nOVB = dimOB*dimVB
+ dimFB = NBas 
+ nOFA = dimOA*dimFA
+ nOFB = dimOB*dimFB
 
 ! read EigValA_B
  allocate(EVecA(2*ADimEx*2*ADimEx),OmA(2*ADimEx),&
@@ -426,72 +427,35 @@ double precision,parameter :: SmallE = 0d0!1.d-9
  call readresp(EVecB,OmB,2*BDimEx,'PROP_B')
 
  ! tran4_gen
- allocate(work(nOVB))
+ allocate(work(nOFB))
  open(newunit=iunit,file='TWOMOAB',status='OLD',&
-     access='DIRECT',form='UNFORMATTED',recl=8*nOVB)
+     access='DIRECT',form='UNFORMATTED',recl=8*nOFB)
 
  allocate(tmp1(2*ADimEx,2*BDimEx),tmp2(2*ADimEx,2*BDimEx))
 
+! PART 1: p>q,r>s
  tmp1=0
- do i=1,2*ADimEx
-    if(OmA(i).gt.SmallE.and.OmA(i).lt.1d20) then
-    do pq=1,A%NDimX+A%NDimN
-       if(pq.le.A%NDimX) then
-          ip = A%IndN(1,pq)
-          iq = A%IndN(2,pq)
-       else
-          ip = pq - A%NDimX
-          iq = ip
-       endif
-       if(ip.ge.iq) then
-         ! print*, iq,ip,iq+(ip-A%num0-1)*dimOA,nOVA
-          read(iunit,rec=iq+(ip-A%num0-1)*dimOA) work(1:nOVB)
-          do rs=1,B%NDimX+B%NDimN
-             if(rs.le.B%NDimX) then 
-                ir = B%IndN(1,rs)
-                is = B%IndN(2,rs)
-             else
-                ir = rs - B%NDimX
-                is = ir
-             endif
-             if(ir.gt.is.and.ip.gt.iq) then   
-                !print*, is,ir,is+(ir-B%num0-1)*dimOB,nOVB
+ do pq=1,A%NDimX
+    ip = A%IndN(1,pq)
+    iq = A%IndN(2,pq)
+!   ! print*, iq,ip,iq+(ip-A%num0-1)*dimOA,nOFA
+    read(iunit,rec=iq+(ip-1)*dimOA) work(1:nOFB)
+    do rs=1,B%NDimX
+       ir = B%IndN(1,rs)
+       is = B%IndN(2,rs)
+!      !print*, is,ir,is+(ir-B%num0-1)*dimOB,nOFB
+       do i=1,2*ADimEx
+          if(OmA(i).gt.SmallE.and.OmA(i).lt.1d20) then
 
-                   tmp1(i,rs) = tmp1(i,rs) + & 
-                              (A%CICoef(iq)+A%CICoef(ip)) * &
-                              (B%CICoef(is)+B%CICoef(ir)) * &
-                              EVecA((i-1)*2*ADimEx+pq)* &
-                              work(is+(ir-B%num0-1)*dimOB)
-            
-             elseif(ir.eq.is.and.ip.eq.iq) then
-                   
-                   tmp1(i,rs+B%NDimX) = tmp1(i,rs+B%NDimX) + &
-                          2d0*(A%CICoef(iq)) * &
-                              (B%CICoef(is)) * &
-                              EVecA((i-1)*2*ADimEx+A%NDimX+pq)* &
-                              work(is+(ir-B%num0-1)*dimOB)
-!
-!              elseif(ir.eq.is.and.ip.gt.iq) then
-!
-!                   tmp1(i,rs) = tmp1(i,rs) + & 
-!                              (A%CICoef(iq)+B%CICoef(ip)) * &
-!                              (B%CICoef(is)) * &
-!                              EVecA((i-1)*2*ADimEx+pq)* &
-!                              work(is+(ir-B%num0-1)*dimOB)
-!
-!              elseif(ir.gt.is.and.ip.eq.iq) then
-!
-!                   tmp1(i,rs) = tmp1(i,rs) + & 
-!                              (A%CICoef(iq)) * &
-!                              (B%CICoef(is)+B%CICoef(ir)) * &
-!                              EVecA((i-1)*2*ADimEx+A%NDimX+pq)* &
-!                              work(is+(ir-B%num0-1)*dimOB)
+             tmp1(i,rs) = tmp1(i,rs) + & 
+                        (A%CICoef(iq)+A%CICoef(ip)) * &
+                        (B%CICoef(is)+B%CICoef(ir)) * &
+                        EVecA((i-1)*2*ADimEx+pq)* &
+                        work(is+(ir-1)*dimOB)
 
-             endif
-          enddo
-       endif
+          endif
+       enddo
     enddo
-    endif
  enddo
 
  tmp2=0
@@ -499,22 +463,12 @@ double precision,parameter :: SmallE = 0d0!1.d-9
     if(OmB(j).gt.SmallE.and.OmB(j).lt.1d20) then
        do i=1,2*ADimEx
           if(OmA(i).gt.SmallE.and.OmA(i).lt.1d20) then
-             do rs=1,B%NDimX+B%NDimN
-                if(rs.le.B%NDimX) then 
-                   ir = B%IndN(1,rs)
-                   is = B%IndN(2,rs)
-                else
-                   ir = rs - B%NDimX
-                   is = ir
-                endif
+             do rs=1,B%NDimX
+                ir = B%IndN(1,rs)
+                is = B%IndN(2,rs)
 
-             if(ir.gt.is) then       
                  tmp2(i,j) = tmp2(i,j) + &
                              EVecB((j-1)*2*BDimEx+rs)*tmp1(i,rs)
-!            elseif(ir.eq.is) then
-!                  tmp2(i,j) = tmp2(i,j) + &
-!                            EVecB((j-1)*2*BDimEx+B%NDimX+rs)*tmp1(i,rs+B%NDimX)
-             endif
 
              enddo
           endif
@@ -522,81 +476,188 @@ double precision,parameter :: SmallE = 0d0!1.d-9
     endif
  enddo
 
- e2d = 0d0
+ e2d1 = 0d0
  do i=1,2*ADimEx
     if(OmA(i).gt.SmallE.and.OmA(i).lt.1d20) then
        do j=1,2*BDimEx
           if(OmB(j).gt.SmallE.and.OmB(j).lt.1d20) then
-             e2d = e2d + tmp2(i,j)**2d0/(OmA(i)+OmB(j))
+             e2d1 = e2d1 + tmp2(i,j)**2d0/(OmA(i)+OmB(j))
           endif
        enddo
     endif
  enddo
- !SAPT%e2disp = -16d0*e2d
- e2d = -16d0*e2d*1000d0
- write(LOUT,'(1x,a,f16.8)') 'E2disp      = ',e2d
+ print*, -16d0*e2d1*1000d0
 
+! PART 2: p>q,r=s
+ tmp1=0
+ do pq=1,A%NDimX
+    ip = A%IndN(1,pq)
+    iq = A%IndN(2,pq)
+!   ! print*, iq,ip,iq+(ip-A%num0-1)*dimOA,nOFA
+    read(iunit,rec=iq+(ip-1)*dimOA) work(1:nOFB)
+    do ir=1,B%NDimN
+!      !print*, is,ir,is+(ir-B%num0-1)*dimOB,nOFB
 
-! full-check
- e2d = 0d0
- do i=1,2*ADimEx
-    if(OmA(i).gt.SmallE.and.OmA(i).lt.1d20) then
-    do j=1,2*BDimEx
-       if(OmB(j).gt.SmallE.and.OmB(j).lt.1d20) then
+       fact = sqrt(2d0)*work(ir+(ir-1)*dimOB)
 
-       tmp=0d0
-       do pq=1,A%NDimX+A%NDimN
-          if(pq.le.A%NDimX) then
-             ip = A%IndN(1,pq)
-             iq = A%IndN(2,pq)
-          else
-             ip = pq - A%NDimX
-             iq = ip
+       do i=1,2*ADimEx
+          if(OmA(i).gt.SmallE.and.OmA(i).lt.1d20) then
+
+             tmp1(i,ir) = tmp1(i,ir) + &
+                        (A%CICoef(iq)+A%CICoef(ip)) * &
+                        fact*B%CICoef(ir) * &
+                        EVecA((i-1)*2*ADimEx+pq)
+
           endif
-          if(ip.ge.iq) then          
+       enddo
+    enddo
+ enddo
+!
+ tmp2=0
+ do j=1,2*BDimEx
+    if(OmB(j).gt.SmallE.and.OmB(j).lt.1d20) then
+       do i=1,2*ADimEx
+          if(OmA(i).gt.SmallE.and.OmA(i).lt.1d20) then
+             do ir=1,B%NDimN
 
-             read(iunit,rec=iq+(ip-A%num0-1)*dimOA) work(1:nOVB)
-
-             do rs=1,B%NDimX+B%NDimN
-                if(rs.le.B%NDimX) then
-                   ir = B%IndN(1,rs)
-                   is = B%IndN(2,rs)
-                else
-                   ir = rs - B%NDimX
-                   is = ir
-                endif
-
-                if(ir.gt.is.and.ip.gt.iq) then
-                   tmp = tmp + &
-                      (A%CICoef(ip)+A%CICoef(iq)) * &
-                      (B%CICoef(ir)+B%CICoef(is)) * &
-                      EVecA((i-1)*2*ADimEx+pq) * &
-                      EVecB((j-1)*2*BDimEx+rs) * & 
-                      work(is+(ir-B%num0-1)*dimOB)
-
-                elseif(ir.eq.is.and.ip.eq.iq) then
-                       !print*, ir,is,rs,ip,iq,pq
-                  ! tmp = tmp + &
-                  !    2d0*(A%CICoef(ip)) * &
-                  !    (B%CICoef(ir)) * &
-                  !    EVecA((i-1)*2*ADimEx+pq) * &
-                  !    EVecB((j-1)*2*BDimEx+rs) * & 
-                  !    work(is+(ir-B%num0-1)*dimOB)
-
-                endif
+                 tmp2(i,j) = tmp2(i,j) + &
+                             EVecB((j-1)*2*BDimEx+2*B%NDimX+ir) * &
+                             tmp1(i,ir)
 
              enddo
+          endif
+       enddo   
+    endif
+ enddo
+
+ e2d2 = 0d0
+ do i=1,2*ADimEx
+    if(OmA(i).gt.SmallE.and.OmA(i).lt.1d20) then
+       do j=1,2*BDimEx
+          if(OmB(j).gt.SmallE.and.OmB(j).lt.1d20) then
+             e2d2 = e2d2 + tmp2(i,j)**2d0/(OmA(i)+OmB(j))
+          endif
+       enddo
+    endif
+ enddo
+ print*, -16d0*e2d2*1000d0
+
+! PART 3: p=q,r>s
+ tmp1=0
+ do ip=1,A%NDimN
+!   ! print*, iq,ip,iq+(ip-A%num0-1)*dimOA,nOFA
+    read(iunit,rec=ip+(ip-1)*dimOA) work(1:nOFB)
+    do rs=1,B%NDimX
+       ir = B%IndN(1,rs)
+       is = B%IndN(2,rs)
+!      !print*, is,ir,is+(ir-B%num0-1)*dimOB,nOFB
+      ! fact = ... before the loop!!!
+       do i=1,2*ADimEx
+          if(OmA(i).gt.SmallE.and.OmA(i).lt.1d20) then
+
+             tmp1(i,rs) = tmp1(i,rs) + & 
+                        sqrt(2d0)*A%CICoef(ip) * &
+                        (B%CICoef(is)+B%CICoef(ir)) * &
+                        EVecA((i-1)*2*ADimEx+2*A%NDimX+ip)* &
+                        work(is+(ir-1)*dimOB)
 
           endif
        enddo
-
-       e2d = e2d  + tmp**2d0/(OmA(i)+OmB(j))
-       endif
     enddo
+ enddo
+!
+ tmp2=0
+ do j=1,2*BDimEx
+    if(OmB(j).gt.SmallE.and.OmB(j).lt.1d20) then
+       do i=1,2*ADimEx
+          if(OmA(i).gt.SmallE.and.OmA(i).lt.1d20) then
+             do rs=1,B%NDimX
+                ir = B%IndN(1,rs)
+                is = B%IndN(2,rs)
+
+                 tmp2(i,j) = tmp2(i,j) + &
+                             EVecB((j-1)*2*BDimEx+rs)*tmp1(i,rs)
+
+             enddo
+          endif
+       enddo   
     endif
  enddo
- e2d = -16d0*e2d
- print*, 'e2d:',e2d
+
+ e2d3 = 0d0
+ do i=1,2*ADimEx
+    if(OmA(i).gt.SmallE.and.OmA(i).lt.1d20) then
+       do j=1,2*BDimEx
+          if(OmB(j).gt.SmallE.and.OmB(j).lt.1d20) then
+             e2d3 = e2d3 + tmp2(i,j)**2d0/(OmA(i)+OmB(j))
+          endif
+       enddo
+    endif
+ enddo
+ print*, -16d0*e2d3*1000d0
+
+! PART 4: p=q,r=s
+ tmp1=0
+ do ip=1,A%NDimN
+    ! print*, iq,ip,iq+(ip-A%num0-1)*dimOA,nOFA
+    read(iunit,rec=ip+(ip-1)*dimOA) work(1:nOFB)
+    do ir=1,B%NDimN
+       !print*, is,ir,is+(ir-B%num0-1)*dimOB,nOFB
+       do i=1,2*ADimEx
+          if(OmA(i).gt.SmallE.and.OmA(i).lt.1d20) then
+
+             tmp1(i,ir) = tmp1(i,ir) + &
+                        2d0*A%CICoef(ip) * &
+                        B%CICoef(ir) * &
+                        EVecA((i-1)*2*ADimEx+2*A%NDimX+ip)* &
+                        work(ir+(ir-1)*dimOB)
+
+          endif
+       enddo
+    enddo
+ enddo
+ 
+ print*, 'tmp1', norm2(tmp1(1:2*ADimEx,1:B%NDimN))
+ 
+!
+ tmp2=0
+ do j=1,2*BDimEx
+    if(OmB(j).gt.SmallE.and.OmB(j).lt.1d20) then
+       do i=1,2*ADimEx
+          if(OmA(i).gt.SmallE.and.OmA(i).lt.1d20) then
+             do ir=1,B%NDimN
+
+                 tmp2(i,j) = tmp2(i,j) + &
+                             EVecB((j-1)*2*BDimEx+2*B%NDimX+ir) * &
+                             tmp1(i,ir)
+
+             enddo
+          endif
+       enddo   
+    endif
+ enddo
+
+ print*, 'tmp2: ',norm2(tmp2)
+
+ e2d4 = 0d0
+ do j=1,2*BDimEx
+    if(OmB(j).gt.SmallE.and.OmB(j).lt.1d20) then
+       do i=1,2*ADimEx
+       if(OmA(i).gt.SmallE.and.OmA(i).lt.1d20) then
+             e2d4 = e2d4 + tmp2(i,j)**2/(OmA(i)+OmB(j))
+             !print*, tmp2(i,j)**2,OmA(i),OmB(j)
+       endif
+       enddo
+    endif
+ enddo
+ print*, 'e2d4',-16*e2d4*1000
+
+
+
+! SAPT%e2disp = -16d0*e2d
+ print*, -16*(e2d2+e2d3+e2d4)*1000
+ write(LOUT,'(1x,a,f16.8)') 'E2disp      = ',-16*(e2d1+e2d2+e2d3+e2d4)*1000
+
 
  close(iunit)
  deallocate(work)

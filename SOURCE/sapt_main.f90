@@ -26,6 +26,7 @@ integer :: i
  write(LOUT,'(8a10)') ('**********',i=1,8)
  
  call sapt_interface(Flags,SAPT)
+ ! SAPT components
  write(LOUT,'()')
  call e1elst(SAPT%monA,SAPT%monB,SAPT)
  call e2ind(Flags,SAPT%monA,SAPT%monB,SAPT)
@@ -285,13 +286,27 @@ integer :: ncen
  call readtwoint(NBasis,'AOTWOINT_A')
 ! full 4-idx tran
 ! call tran4_full(NBasis,Ca,Cb,'TWOMOAB')
- ! integrals stored as (ov|ov)
- call tran4_gen(NBasis,&
-                SAPT%monA%num0+SAPT%monA%num1,Ca,&
-                SAPT%monA%num1+SAPT%monA%num2,Ca(NBasis*SAPT%monA%num0+1:NBasis**2),&
-                SAPT%monB%num0+SAPT%monB%num1,Cb,&
-                SAPT%monB%num1+SAPT%monB%num2,Cb(NBasis*SAPT%monB%num0+1:NBasis**2),&
-                'TWOMOAB')
+
+ if(Flags%ISERPA==0) then
+
+   ! integrals stored as (ov|ov)
+   call tran4_gen(NBasis,&
+                  SAPT%monA%num0+SAPT%monA%num1,Ca,&
+                  SAPT%monA%num1+SAPT%monA%num2,Ca(NBasis*SAPT%monA%num0+1:NBasis**2),&
+                  SAPT%monB%num0+SAPT%monB%num1,Cb,&
+                  SAPT%monB%num1+SAPT%monB%num2,Cb(NBasis*SAPT%monB%num0+1:NBasis**2),&
+                  'TWOMOAB')
+
+ elseif(Flags%ISERPA==2) then
+   ! integrals stored as (oFull,oFull)
+   call tran4_gen(NBasis,&
+                  SAPT%monA%num0+SAPT%monA%num1,Ca,&
+                  NBasis,Ca,&
+                  SAPT%monB%num0+SAPT%monB%num1,Cb,&
+                  NBasis,Cb,&
+                  'TWOMOAB')
+ 
+ endif
 
  if(SAPT%IPrint.gt.100) call print_TwoInt(NBasis)
 
