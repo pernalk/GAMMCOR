@@ -237,6 +237,7 @@ integer :: i,rs,ab
  allocate(work1(NBas*NBas),work2(NBas*NBas))
  allocate(work3(cbuf,nAB))
 
+
  open(newunit=iunit,file='AOTWOSORT',status='OLD',&
       access='DIRECT',form='UNFORMATTED',recl=8*ntr)
 

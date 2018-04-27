@@ -1698,12 +1698,14 @@ C
       Integer :: iunit
       Integer(8),external :: NAddr3
       Dimension :: TwoNO(NInte2), Work1(NBasis**2)    
-      Character*8 :: fname
+      Character*9 :: fname
 
       If(Mon.Eq.1) Then
       fname='TWOMOAA '
       ElseIf(Mon.Eq.2) Then
       fname='TWOMOBB '
+      ElseIf(Mon.Eq.3) Then
+      fname='AOTWOSORT'
       EndIf
  
       Work1 = 0d0

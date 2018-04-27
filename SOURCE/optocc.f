@@ -1110,6 +1110,8 @@ C
      $ PWorkA(NBasis*NBasis)
        Dimension AP(NInte1,NInte1),PP(NInte1),PWork(NInte1),
      $ indx(nbasis,nbasis),hno(ninte1),singl(nbasis*nbasis)
+
+C      goto 999
 C
 C     READ THE DIRECT MULTIPLICATION TABLE
 C
@@ -2018,4 +2020,598 @@ C
       brentocc=fx
       return
       END
+
+      Subroutine OptTwo1(ETot,ENuc,URe,Occ,XOne,TwoEl,NSymMO,
+     $ CISapt,NBasis,NInte1,NInte2,NoEig)
+C
+C     OPTIMIZATION ALGORITHM FOR TWO-ELECTRON SYSTEMS
+C     THE WHOLE DENISTY MATRIX IS FOUND IN ONE STEP
+C
+      Implicit Real*8 (A-H,O-Z)
+C
+      Parameter(Zero=0.0D0,Half=0.50D0,One=1.0D0,Two=2.0D0,Four=4.0D0)
+C
+      Character*60 FMultTab
+      Include 'commons.inc'
+C
+      Dimension URe(Nbasis,NBasis),Occ(NBasis),XOne(NInte1),
+     $ TwoEl(NInte2),NSymMO(NBasis),CISapt(NBasis),MultpC(15,15)
+C
+C     LOCAL ARRAYS
+C
+      Dimension APA(NBasis*NBasis,NBasis*NBasis),PPA(NBasis*NBasis),
+     $ PWorkA(NBasis*NBasis)
+       Dimension AP(NInte1,NInte1),PP(NInte1),PWork(NInte1),
+     $ indx(nbasis,nbasis),hno(ninte1),singl(nbasis*nbasis)
+c herer!!!
+
+      goto 999
+C
+C     READ THE DIRECT MULTIPLICATION TABLE
+C
+      Open(10,File=FMultTab)
+      Do I=1,MxSym
+      Read(10,*)(MultpC(I,J),J=1,I)
+      Do J=1,I
+      MultpC(J,I)=MultpC(I,J)
+      EndDo
+      EndDo
+      Close(10)
+C
+      IAB=0
+      Do IA=1,NBasis
+      Do IB=1,NBasis
+      IAB=IAB+1
+C
+      ICD=0
+      Do IC=1,NBasis
+      Do ID=1,NBasis
+      ICD=ICD+1
+C
+      APA(IAB,ICD)=TwoEl(NAddr3(IA,IC,ID,IB))
+      IAC=(Max(IA,IC)*(Max(IA,IC)-1))/2+Min(IA,IC)
+      IAD=(Max(IA,ID)*(Max(IA,ID)-1))/2+Min(IA,ID)
+      IBC=(Max(IC,IB)*(Max(IC,IB)-1))/2+Min(IC,IB)
+      IBD=(Max(ID,IB)*(Max(ID,IB)-1))/2+Min(ID,IB)
+C
+      If(IB.Eq.ID) APA(IAB,ICD)=APA(IAB,ICD)+XOne(IAC)
+      If(IA.Eq.IC) APA(IAB,ICD)=APA(IAB,ICD)+XOne(IBD)
+C
+      EndDo
+      EndDo
+      EndDo
+      EndDo
+C
+      Call Diag8(APA,NBasis**2,NBasis**2,PPA,PWorkA)
+
+c      write(*,*)PPa
+c      kl=0
+c      do k=1,nbasis
+c      do l=1,nbasis
+c      kl=kl+1 
+c      write(*,*)"excit",ppa(kl)-ppa(1)
+c      ij=0
+c      do i=1,nbasis
+c      do j=1,nbasis
+c      ij=ij+1
+c      write(*,*)i,j,apa(kl,ij)
+c
+c      enddo
+c      enddo
+c      enddo
+c      enddo
+c etot
+C
+      ETot=Zero
+      IJ=0
+      Do I=1,NBasis
+C
+      II=(I*(I+1))/2
+      ETot=ETot+Occ(I)*XOne(II)
+     $ -Half*Occ(I)*(One-Occ(I))*Twoel(NAddr3(I,I,I,I))
+C
+      Do J=1,I
+      IJ=IJ+1
+      FacIJ=Two
+      If(I.Eq.J) FacIJ=One
+      ETot=ETot+FacIJ*Occ(I)*Occ(J)*(Twoel(NAddr3(I,I,J,J))
+     $ -Half*Twoel(NAddr3(I,J,I,J)))
+      enddo
+      enddo  
+C
+      ETot=Two*ETot
+      write(*,*)'ETOT 1 ***',etot
+
+       ij=0
+       do i=1,nbasis
+       do j=1,nbasis
+       ij=ij+1
+       indx(i,j)=ij
+       enddo
+       enddo
+
+c select singlets
+       kl=0
+       do k=1,nbasis
+       do l=1,nbasis
+       kl=kl+1
+       singl(kl)=1
+       do ip=1,nbasis
+       do ir=1,ip-1
+       if(apa(kl,indx(ip,ir))*apa(kl,indx(ir,ip)).lt.-1.D-8) singl(kl)=0
+       enddo
+       enddo
+       enddo
+       enddo
+
+       ipr=0
+       do ip=1,nbasis
+       do ir=1,nbasis
+       ipr=ipr+1
+       iqs=0
+       do iq=1,nbasis
+       do is=1,nbasis
+       iqs=iqs+1
+c
+       cr=sqrt(occ(ir))
+       if(occ(ir).gt.0.5) cr=-cr
+       cq=sqrt(occ(iq))
+       if(occ(iq).gt.0.5) cq=-cq
+       cp=sqrt(occ(ip))
+       if(occ(ip).gt.0.5) cp=-cp
+       cs=sqrt(occ(is))
+       if(occ(is).gt.0.5) cs=-cs
+c
+      if(ip.gt.ir.and.iq.gt.is) then
+      if(ir.eq.is.and.ip.eq.iq)
+     $ etot=etot-(occ(ip)*(one-occ(is))+occ(is)*(one-occ(ip)))*
+     $ twoel(NAddr3(Ip,Ir,Iq,Is))
+      endif 
+c
+       if(ip.gt.ir.and.iq.gt.is) then
+c
+       sum=zero
+       kl=0
+       do k=1,nbasis
+       do l=1,nbasis
+       kl=kl+1 
+       if(singl(kl).eq.1.and.kl.ne.1) sum=sum+
+     $ apa(kl,indx(ip,ir))*apa(kl,indx(is,iq))
+
+       enddo  
+       enddo
+c
+       aux=two*(cr+cp)*(cq+cs)*sum
+
+       etot=etot+aux*TwoEl(NAddr3(Ip,Ir,Iq,Is))
+c
+       endif
+c
+       if(ip.gt.ir.and.iq.eq.is) then
+c
+       sum=zero
+       kl=0
+       do k=1,nbasis
+       do l=1,nbasis
+       kl=kl+1
+       if(singl(kl).eq.1.and.kl.ne.1) sum=sum+
+     $ apa(kl,indx(ip,ir))*apa(kl,indx(is,iq))
+       enddo
+       enddo
+c
+       aux=4.d0*(cr+cp)*cq*sum
+       etot=etot+aux*TwoEl(NAddr3(Ip,Ir,Iq,Is))
+c
+       endif
+c
+       if(ip.eq.ir.and.iq.eq.is) then
+c
+       sum=zero
+       kl=0
+       do k=1,nbasis
+       do l=1,nbasis
+       kl=kl+1
+       if(singl(kl).eq.1.and.kl.ne.1) sum=sum+
+     $ apa(kl,indx(ip,ir))*apa(kl,indx(is,iq))
+       enddo
+       enddo
+c
+       aux=2.d0*cp*cq*sum
+       etot=etot+aux*TwoEl(NAddr3(Ip,Ir,Iq,Is))
+c
+       endif
+
+c
+       enddo
+       enddo
+       enddo
+       enddo
+       write(*,*)'ETOT',etot
+c herer!!!
+       return
+c      stop
+
+  999 Continue
+C
+      IAB=0
+      Do IA=1,NBasis
+      Do IB=1,IA
+      IAB=IAB+1
+C
+      FAB=One
+      If(IA.Eq.IB) FAB=SQRT(Half)
+C
+      ICD=0
+      Do IC=1,NBasis
+      Do ID=1,IC
+      ICD=ICD+1
+      FCD=One
+      If(IC.Eq.ID) FCD=SQRT(Half)
+C
+      AP(IAB,ICD)=TwoEl(NAddr3(IA,IC,ID,IB))+TwoEl(NAddr3(IA,ID,IC,IB))
+      IAC=(Max(IA,IC)*(Max(IA,IC)-1))/2+Min(IA,IC)
+      IAD=(Max(IA,ID)*(Max(IA,ID)-1))/2+Min(IA,ID)
+      IBC=(Max(IC,IB)*(Max(IC,IB)-1))/2+Min(IC,IB)
+      IBD=(Max(ID,IB)*(Max(ID,IB)-1))/2+Min(ID,IB)
+C
+      If(IB.Eq.ID) AP(IAB,ICD)=AP(IAB,ICD)+XOne(IAC)
+      If(IA.Eq.ID) AP(IAB,ICD)=AP(IAB,ICD)+XOne(IBC)
+      If(IB.Eq.IC) AP(IAB,ICD)=AP(IAB,ICD)+XOne(IAD)
+      If(IA.Eq.IC) AP(IAB,ICD)=AP(IAB,ICD)+XOne(IBD)
+C
+      AP(IAB,ICD)=FAB*FCD*AP(IAB,ICD)
+C
+      EndDo
+      EndDo
+      EndDo
+      EndDo
+C
+      Write(6,'(/,X,
+     $''DIAGONALIZATION IN THE TWO-ELECTRON FUNCTIONAL OPTIMIZATION'')') 
+C
+      Call Diag8(AP,NInte1,NInte1,PP,PWork)
+      ETot=PP(NoEig)
+C
+      Write(6,'(/,X,
+     $ ''RESULTS FROM THE TWO-ELECTRON FUNCTIONAL OPTIMIZATION'')')
+C
+      Write(6,'(/,X,''State no'',I3,'' Total Energy'',F16.10,/)') NoEig,
+     $ ETot+ENuc
+C
+      IAB=0
+      Do IA=1,NBasis
+      Do IB=1,IA
+      IAB=IAB+1
+      PWork(IAB)=AP(NoEig,IAB)
+C
+      If(IA.Eq.IB) PWork(IAB)=SQRT(Two)*PWork(IAB)
+      EndDo
+      EndDo
+      Call CpySym(URe,PWork,NBasis)
+      Call Diag8(URe,NBasis,NBasis,Occ,PWork)
+C
+      Sum=Zero
+      Do I=1,NBasis
+      CICoef(I)=Occ(I)
+      Occ(I)=Occ(I)**2
+      Sum=Sum+Occ(I)
+      EndDo
+      Do I=1,NBasis
+      Occ(I)=Occ(I)/Sum
+      CICoef(I)=CICoef(I)/Sqrt(Sum)
+      EndDo
+C
+      Call SortOcc(Occ,URe,NBasis)
+C
+      Write(6,'('' COEFFICIENTS AND ORBITAL OCCUPANCIES'')')
+      Do 100 I=1,NBasis
+  100 Write(6,'(X,I3,2E16.6)') I,CICoef(I),Occ(I)
+C
+C     WRITE CICoef FOR SAPT
+      Do I=1,NBasis
+      CISapt(I) = CICoef(I)
+      Enddo
+
+      Return
+      End
+
+*Deck OptTwo
+      Subroutine OptTwo2(ETot,ENuc,URe,Occ,XOne,TwoEl,NSymMO,
+     $ CISapt,NBasis,NInte1,NInte2,NoEig)
+C
+C     OPTIMIZATION ALGORITHM FOR TWO-ELECTRON SYSTEMS
+C     THE WHOLE DENISTY MATRIX IS FOUND IN ONE STEP
+C
+      Implicit Real*8 (A-H,O-Z)
+C
+      Parameter(Zero=0.0D0,Half=0.50D0,One=1.0D0,Two=2.0D0,Four=4.0D0)
+C
+      Character*60 FMultTab
+      Include 'commons.inc'
+C
+      Dimension URe(Nbasis,NBasis),Occ(NBasis),XOne(NInte1),
+     $ CISapt(Nbasis),TwoEl(NInte2),NSymMO(NBasis),MultpC(15,15)
+C
+C     LOCAL ARRAYS
+C
+      Dimension APA(NBasis*NBasis,NBasis*NBasis),PPA(NBasis*NBasis),
+     $ PWorkA(NBasis*NBasis)
+       Dimension AP(NInte1,NInte1),PP(NInte1),PWork(NInte1),
+     $ indx(nbasis,nbasis),hno(ninte1),singl(nbasis*nbasis)
+c herer!!!
+
+      goto 999
+C
+C     READ THE DIRECT MULTIPLICATION TABLE
+C
+      Open(10,File=FMultTab)
+      Do I=1,MxSym
+      Read(10,*)(MultpC(I,J),J=1,I)
+      Do J=1,I
+      MultpC(J,I)=MultpC(I,J)
+      EndDo
+      EndDo
+      Close(10)
+C
+      IAB=0
+      Do IA=1,NBasis
+      Do IB=1,NBasis
+      IAB=IAB+1
+C
+      ICD=0
+      Do IC=1,NBasis
+      Do ID=1,NBasis
+      ICD=ICD+1
+C
+      APA(IAB,ICD)=TwoEl(NAddr3(IA,IC,ID,IB))
+      IAC=(Max(IA,IC)*(Max(IA,IC)-1))/2+Min(IA,IC)
+      IAD=(Max(IA,ID)*(Max(IA,ID)-1))/2+Min(IA,ID)
+      IBC=(Max(IC,IB)*(Max(IC,IB)-1))/2+Min(IC,IB)
+      IBD=(Max(ID,IB)*(Max(ID,IB)-1))/2+Min(ID,IB)
+C
+      If(IB.Eq.ID) APA(IAB,ICD)=APA(IAB,ICD)+XOne(IAC)
+      If(IA.Eq.IC) APA(IAB,ICD)=APA(IAB,ICD)+XOne(IBD)
+C
+      EndDo
+      EndDo
+      EndDo
+      EndDo
+C
+      Call Diag8(APA,NBasis**2,NBasis**2,PPA,PWorkA)
+
+c      write(*,*)PPa
+c      kl=0
+c      do k=1,nbasis
+c      do l=1,nbasis
+c      kl=kl+1 
+c      write(*,*)"excit",ppa(kl)-ppa(1)
+c      ij=0
+c      do i=1,nbasis
+c      do j=1,nbasis
+c      ij=ij+1
+c      write(*,*)i,j,apa(kl,ij)
+c
+c      enddo
+c      enddo
+c      enddo
+c      enddo
+c etot
+C
+      ETot=Zero
+      IJ=0
+      Do I=1,NBasis
+C
+      II=(I*(I+1))/2
+      ETot=ETot+Occ(I)*XOne(II)
+     $ -Half*Occ(I)*(One-Occ(I))*Twoel(NAddr3(I,I,I,I))
+C
+      Do J=1,I
+      IJ=IJ+1
+      FacIJ=Two
+      If(I.Eq.J) FacIJ=One
+      ETot=ETot+FacIJ*Occ(I)*Occ(J)*(Twoel(NAddr3(I,I,J,J))
+     $ -Half*Twoel(NAddr3(I,J,I,J)))
+      enddo
+      enddo  
+C
+      ETot=Two*ETot
+      write(*,*)'ETOT 1 ***',etot
+
+       ij=0
+       do i=1,nbasis
+       do j=1,nbasis
+       ij=ij+1
+       indx(i,j)=ij
+       enddo
+       enddo
+
+c select singlets
+       kl=0
+       do k=1,nbasis
+       do l=1,nbasis
+       kl=kl+1
+       singl(kl)=1
+       do ip=1,nbasis
+       do ir=1,ip-1
+       if(apa(kl,indx(ip,ir))*apa(kl,indx(ir,ip)).lt.-1.D-8) singl(kl)=0
+       enddo
+       enddo
+       enddo
+       enddo
+
+       ipr=0
+       do ip=1,nbasis
+       do ir=1,nbasis
+       ipr=ipr+1
+       iqs=0
+       do iq=1,nbasis
+       do is=1,nbasis
+       iqs=iqs+1
+c
+       cr=sqrt(occ(ir))
+       if(occ(ir).gt.0.5) cr=-cr
+       cq=sqrt(occ(iq))
+       if(occ(iq).gt.0.5) cq=-cq
+       cp=sqrt(occ(ip))
+       if(occ(ip).gt.0.5) cp=-cp
+       cs=sqrt(occ(is))
+       if(occ(is).gt.0.5) cs=-cs
+c
+      if(ip.gt.ir.and.iq.gt.is) then
+      if(ir.eq.is.and.ip.eq.iq)
+     $ etot=etot-(occ(ip)*(one-occ(is))+occ(is)*(one-occ(ip)))*
+     $ twoel(NAddr3(Ip,Ir,Iq,Is))
+      endif 
+c
+       if(ip.gt.ir.and.iq.gt.is) then
+c
+       sum=zero
+       kl=0
+       do k=1,nbasis
+       do l=1,nbasis
+       kl=kl+1 
+       if(singl(kl).eq.1.and.kl.ne.1) sum=sum+
+     $ apa(kl,indx(ip,ir))*apa(kl,indx(is,iq))
+
+       enddo  
+       enddo
+c
+       aux=two*(cr+cp)*(cq+cs)*sum
+
+       etot=etot+aux*TwoEl(NAddr3(Ip,Ir,Iq,Is))
+c
+       endif
+c
+       if(ip.gt.ir.and.iq.eq.is) then
+c
+       sum=zero
+       kl=0
+       do k=1,nbasis
+       do l=1,nbasis
+       kl=kl+1
+       if(singl(kl).eq.1.and.kl.ne.1) sum=sum+
+     $ apa(kl,indx(ip,ir))*apa(kl,indx(is,iq))
+       enddo
+       enddo
+c
+       aux=4.d0*(cr+cp)*cq*sum
+       etot=etot+aux*TwoEl(NAddr3(Ip,Ir,Iq,Is))
+c
+       endif
+c
+       if(ip.eq.ir.and.iq.eq.is) then
+c
+       sum=zero
+       kl=0
+       do k=1,nbasis
+       do l=1,nbasis
+       kl=kl+1
+       if(singl(kl).eq.1.and.kl.ne.1) sum=sum+
+     $ apa(kl,indx(ip,ir))*apa(kl,indx(is,iq))
+       enddo
+       enddo
+c
+       aux=2.d0*cp*cq*sum
+       etot=etot+aux*TwoEl(NAddr3(Ip,Ir,Iq,Is))
+c
+       endif
+
+c
+       enddo
+       enddo
+       enddo
+       enddo
+       write(*,*)'ETOT',etot
+c herer!!!
+       return
+c      stop
+
+  999 Continue
+C
+      IAB=0
+      Do IA=1,NBasis
+      Do IB=1,IA
+      IAB=IAB+1
+C
+      FAB=One
+      If(IA.Eq.IB) FAB=SQRT(Half)
+C
+      ICD=0
+      Do IC=1,NBasis
+      Do ID=1,IC
+      ICD=ICD+1
+      FCD=One
+      If(IC.Eq.ID) FCD=SQRT(Half)
+C
+      AP(IAB,ICD)=TwoEl(NAddr3(IA,IC,ID,IB))+TwoEl(NAddr3(IA,ID,IC,IB))
+      IAC=(Max(IA,IC)*(Max(IA,IC)-1))/2+Min(IA,IC)
+      IAD=(Max(IA,ID)*(Max(IA,ID)-1))/2+Min(IA,ID)
+      IBC=(Max(IC,IB)*(Max(IC,IB)-1))/2+Min(IC,IB)
+      IBD=(Max(ID,IB)*(Max(ID,IB)-1))/2+Min(ID,IB)
+C
+      If(IB.Eq.ID) AP(IAB,ICD)=AP(IAB,ICD)+XOne(IAC)
+      If(IA.Eq.ID) AP(IAB,ICD)=AP(IAB,ICD)+XOne(IBC)
+      If(IB.Eq.IC) AP(IAB,ICD)=AP(IAB,ICD)+XOne(IAD)
+      If(IA.Eq.IC) AP(IAB,ICD)=AP(IAB,ICD)+XOne(IBD)
+C
+      AP(IAB,ICD)=FAB*FCD*AP(IAB,ICD)
+C
+      EndDo
+      EndDo
+      EndDo
+      EndDo
+C
+      Write(6,'(/,X,
+     $''DIAGONALIZATION IN THE TWO-ELECTRON FUNCTIONAL OPTIMIZATION'')') 
+C
+      Call Diag8(AP,NInte1,NInte1,PP,PWork)
+      ETot=PP(NoEig)
+C
+      Write(6,'(/,X,
+     $ ''RESULTS FROM THE TWO-ELECTRON FUNCTIONAL OPTIMIZATION'')')
+C
+      Write(6,'(/,X,''State no'',I3,'' Total Energy'',F19.11,/)') NoEig,
+     $ ETot+ENuc
+C
+      IAB=0
+      Do IA=1,NBasis
+      Do IB=1,IA
+      IAB=IAB+1
+      PWork(IAB)=AP(NoEig,IAB)
+C
+      If(IA.Eq.IB) PWork(IAB)=SQRT(Two)*PWork(IAB)
+      EndDo
+      EndDo
+      Call CpySym(URe,PWork,NBasis)
+      Call Diag8(URe,NBasis,NBasis,Occ,PWork)
+C
+      Sum=Zero
+      Do I=1,NBasis
+      CICoef(I)=Occ(I)
+      Occ(I)=Occ(I)**2
+      Sum=Sum+Occ(I)
+      EndDo
+      Do I=1,NBasis
+      Occ(I)=Occ(I)/Sum
+      CICoef(I)=CICoef(I)/Sqrt(Sum)
+      EndDo
+C
+      Call SortOcc(Occ,URe,NBasis)
+C
+      Write(6,'('' COEFFICIENTS AND ORBITAL OCCUPANCIES'')')
+      Do 100 I=1,NBasis
+  100 Write(6,'(X,I3,2E16.6)') I,CICoef(I),Occ(I)
+C
+C
+C     WRITE CICoef FOR SAPT
+      Do I=1,NBasis
+      CISapt(I) = CICoef(I)
+      Enddo
+
+
+      Return
+      End
+
+
+
 

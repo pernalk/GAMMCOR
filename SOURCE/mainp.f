@@ -486,6 +486,8 @@ C
 C
 C     RUN DMFT CALCULATION
 C
+      ISERPA=0
+ 
       Call DMSCF(ETot,Title,URe,Occ,EpsHF,XKin,XNuc,ENuc,UMOAO,
      $ DipX,DipY,DipZ,TwoEl,TwoElErf,NBasis,NInte1,NInte2,
      $ OrbGrid,OrbXGrid,OrbYGrid,OrbZGrid,WGrid,NSymMO,NGrid,

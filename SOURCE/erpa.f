@@ -2055,10 +2055,225 @@ C
 C
       Return
       End
+C
+C
+*Deck EnePINO
+      Subroutine EnePINO(ETot,ENuc,EigVecR,Eig,TwoNO,URe,Occ,XOne,
+     $ IndN,NBasis,NInte1,NInte2,NDimX,NDimN)
+C
+      Implicit Real*8 (A-H,O-Z)
+C    
+      Parameter(Zero=0.D0, Half=0.5D0, One=1.D0, Two=2.D0, Four=4.D0)
+      Parameter(SmallE=1.D-2,BigE=1.D20)
+c      Parameter(SmallE=1.D-3,BigE=1.D2)
+C
+C     ONLY EXCITATIONS > SmallE AND < BigE ARE INCLUDED 
+C     
+      Include 'commons.inc'
+C     
+      Dimension EigVecR(2*(NDimX+NDimN)*2*(NDimX+NDimN)),
+     $ Eig(2*(NDimX+NDimN)),URe(NBasis,NBasis),
+     $ Occ(NBasis),XOne(NInte1),TwoNO(NInte2),IndN(2,NDimX)
+C
+C     LOCAL ARRAYS
+C
+      Dimension HNO(NInte1),C(NBasis)
+C
+      NI=2*(NDimX+NDimN)
+C
+      Do I=1,NBasis
+      C(I)=CICoef(I)
+      EndDo
+C
+C     ONE-ELECTRON MATRIX IN A NO REPRESENTATION
+C   
+      IJ=0
+      Do I=1,NBasis
+      Do J=1,I
+      IJ=IJ+1
+      HNO(IJ)=Zero
+C
+      Do IA=1,NBasis
+      Do IB=1,NBasis
+      IAB=(Max(IA,IB)*(Max(IA,IB)-1))/2+Min(IA,IB)
+      HNO(IJ)=HNO(IJ)+URe(I,IA)*URe(J,IB)*XOne(IAB)
+      EndDo
+      EndDo
+C
+      EndDo
+      EndDo
+C
+C     ONE_ELECTRON PART + HARTREE + EXCHANGE + np(1-np) <pp|pp>
+C     COMPUTE THE APSG ENERGY
+C
+      ETot=Zero
+      EAPSG=Zero
+C
+      IJ=0
+      Do I=1,NBasis
+C
+      II=(I*(I+1))/2
+      ETot=ETot+Occ(I)*HNO(II)
+     $ -Half*Occ(I)*(One-Occ(I))*TwoNO(NAddr3(I,I,I,I))
+C
+      EAPSG=EAPSG+Two*Occ(I)*HNO(II)
+C
+      Do J=1,I
+      IJ=IJ+1
+      FacIJ=Two
+      If(I.Eq.J) FacIJ=One
+      ETot=ETot+FacIJ*Occ(I)*Occ(J)*(TwoNO(NAddr3(I,I,J,J))
+     $ -Half*TwoNO(NAddr3(I,J,I,J)))
+C
+      If(IGem(I).Eq.IGem(J)) Then
+      EAPSG=EAPSG+FacIJ*C(I)*C(J)*TwoNO(NAddr3(I,J,I,J))
+      Else
+      EAPSG=EAPSG+FacIJ*Occ(I)*Occ(J)*(Two*TwoNO(NAddr3(I,I,J,J))
+     $ -TwoNO(NAddr3(I,J,I,J)))
+      EndIf
+C
+      EndDo
+      EndDo
+C
+      ETot=Two*ETot
+C
+C     ADD CONTRIBUTIONS FROM THE Y,W EIGENVECTORS
+C     COMPUTE INTERGEMINAL CORRELATION TERMS
+C
+      ECorr1=Zero
+      ECorr1CT=Zero
+      ECorr2CT=Zero 
+      ECorrDispX=Zero
+C
+C     EIntra - only contributions from terms with all indices belonging to the same geminal
+C     EAll   - contributions from all terms 
+C
+      EIntra=Zero
+      EAll=Zero
+C
+      Do I=1,NDimX+NDimN
+C
+      If(I.Le.NDimX) Then
+      IP=IndN(1,I)
+      IR=IndN(2,I)
+      Else
+      IP=I-NDimX
+      IR=IP
+      EndIf
+C
+      Do J=1,NDimX+NDimN
+C
+      If(J.Le.NDimX) Then
+      IQ=IndN(1,J)
+      IS=IndN(2,J)
+      Else
+      IQ=J-NDimX
+      IS=IQ
+      EndIf
+C
+      If(IP.Gt.IR.And.IQ.Gt.IS) Then
+C
+      SumY=Zero
+      Do K=1,NI
+      If(Eig(K).Gt.SmallE.And.Eig(K).Lt.BigE)
+     $ SumY=SumY+EigVecR((K-1)*NI+I)*EigVecR((K-1)*NI+J)
+      EndDo
+C
+      Aux=Two*(C(IS)+C(IQ))*(C(IP)+C(IR))*SumY
+C
+      AuxInterG=Zero
+      If(IGem(IP).Eq.IGem(IR).And.IGem(IQ).Eq.IGem(IS).And.
+     $ IGem(IP).Ne.IGem(IQ)) AuxInterG=Aux 
+C
+      Aux1CT=Zero
+      If(IGem(IP).Eq.IGem(IR).And.IGem(IQ).Ne.IGem(IS).And.
+     $ (IGem(IP).Eq.IGem(IQ).Or.IGem(IP).Eq.IGem(IS))) 
+     $ Aux1CT=Aux1CT+Aux
+      If(IGem(IP).Ne.IGem(IR).And.IGem(IQ).Eq.IGem(IS).And.
+     $ (IGem(IP).Eq.IGem(IQ).Or.IGem(IR).Eq.IGem(IQ))) 
+     $ Aux1CT=Aux1CT+Aux
+C
+      Aux2CT=Zero
+      If(IGem(IP).Ne.IGem(IR).And.IGem(IQ).Ne.IGem(IS).And.
+     $ IGem(IP).Eq.IGem(IQ).And.IGem(IR).Eq.IGem(IS)) Then
+      Aux2CT=Aux2CT+Aux
+      If(IR.Eq.IS.And.IP.Eq.IQ) Aux2CT=Aux2CT
+     $ -Occ(IP)*(One-Occ(IS))-Occ(IS)*(One-Occ(IP))
+      EndIf
+C
+      AuxDispX=Zero
+      If(IGem(IP).Ne.IGem(IR).And.IGem(IQ).Ne.IGem(IS).And.
+     $ IGem(IP).Eq.IGem(IS).And.IGem(IR).Eq.IGem(IQ))
+     $ AuxDispX=AuxDispX+Aux
+C
+      If(IR.Eq.IS.And.IP.Eq.IQ) Aux=Aux
+     $ -Occ(IP)*(One-Occ(IS))-Occ(IS)*(One-Occ(IP))
+C
+      EAll=EAll+Aux*TwoNO(NAddr3(IP,IR,IQ,IS))
+C
+      If(IGem(IP).Eq.IGem(IR).And.IGem(IQ).Eq.IGem(IS).
+     $ And.IGem(IP).Eq.IGem(IQ)) EIntra=EIntra
+     $ +Aux*TwoNO(NAddr3(IP,IR,IQ,IS))
+C
+      ETot=ETot+Aux*TwoNO(NAddr3(IP,IR,IQ,IS))
+      ECorr1=ECorr1+AuxInterG*TwoNO(NAddr3(IP,IR,IQ,IS))
+      ECorr1CT=ECorr1CT+Aux1CT*TwoNO(NAddr3(IP,IR,IQ,IS))
+      ECorr2CT=ECorr2CT+Aux2CT*TwoNO(NAddr3(IP,IR,IQ,IS))
+      ECorrDispX=ECorrDispX+AuxDispX*TwoNO(NAddr3(IP,IR,IQ,IS))
+C
+      EndIf
+C
+      If(IP.Gt.IR.And.IQ.Eq.IS) Then
+C
+      SumY=Zero
+      Do K=1,NI
+      If(Eig(K).Gt.SmallE.And.Eig(K).Lt.BigE)
+     $ SumY=SumY+EigVecR((K-1)*NI+I)*EigVecR((K-1)*NI+NDimX+J)
+      EndDo
+C
+      EAll=EAll+Four*C(IQ)*(C(IP)+C(IR))*SumY*TwoNO(NAddr3(IP,IR,IQ,IQ))
+C
+      If(IGem(IP).Eq.IGem(IR).And.IGem(IP).Eq.IGem(IQ)) EIntra=EIntra
+     $ +Four*C(IQ)*(C(IP)+C(IR))*SumY*TwoNO(NAddr3(IP,IR,IQ,IQ))
+C
+      ETot=ETot+Four*C(IQ)*(C(IP)+C(IR))*SumY*TwoNO(NAddr3(IP,IR,IQ,IQ))
+C
+      If(IGem(IP).Eq.IGem(IR).And.IGem(IP).Ne.IGem(IQ)) ECorr1=
+     $ ECorr1+Four*C(IQ)*(C(IP)+C(IR))*SumY*TwoNO(NAddr3(IP,IR,IQ,IQ))
+C
+      EndIf
+C
+      If(IP.Eq.IR.And.IQ.Eq.IS) Then
+C
+      SumY=Zero
+      Do K=1,NI
+      If(Eig(K).Gt.1.D-3.And.Eig(K).Lt.BigE)
+     $ SumY=SumY+EigVecR((K-1)*NI+NDimX+I)*EigVecR((K-1)*NI+NDimX+J)
+      EndDo
+C
+      EAll=EAll+Two*C(IQ)*C(IP)*SumY*TwoNO(NAddr3(IP,IP,IQ,IQ))
+C
+      If(IGem(IP).Eq.IGem(IQ)) EIntra=EIntra
+     $ +Two*C(IQ)*C(IP)*SumY*TwoNO(NAddr3(IP,IP,IQ,IQ))
 
-
-
-
-
+      ETot=ETot+Two*C(IQ)*C(IP)*SumY*TwoNO(NAddr3(IP,IP,IQ,IQ))
+C
+      If(IGem(IP).Ne.IGem(IQ)) ECorr1=
+     $ ECorr1+Two*C(IQ)*C(IP)*SumY*TwoNO(NAddr3(IP,IP,IQ,IQ))
+C
+      EndIf
+C
+      EndDo
+      EndDo
+C
+       Write
+     $(6,'(/,1X,''EPINO + ENuc     '', 45X,F15.8)')ETot+ENuc
+C
+       Write
+     $ (6,'(1X,''EAPSG+ENuc, Corr, PINO-APSG '',4X,3F15.8)')EAPSG+ENuc,
+     $ Half*(EAll-EIntra),EAPSG+ENuc+Half*(EAll-EIntra)
+C
+      Return
+      End
 
 

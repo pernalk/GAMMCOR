@@ -610,7 +610,7 @@ C
       EndIf
 C
 C     TwoEl - two-electron integrals in NO 
-      ISERPA=0
+
       Call INTERPA(ETot,ENuc,TwoEl,URe,UReSav,Occ,XOne,Title,
      $  OrbGrid,WGrid,NSymMO,NBasis,NInte1,NInte2,NGrid,NDim,
      $  NGem,IAPSG,ISERPA,QMAX,NGOcc,Small)
