@@ -171,7 +171,7 @@ C
 C      Do I=1,NDimX 
 C      Write(6,*) I,IndN(1,I),IndN(2,I)
 C      EndDo
-
+      
       Call AB_CAS(ABPLUS,ABMIN,ECASSCF,URe,Occ,XOne,TwoNO,IPair,
      $ IndN,IndX,NDimX,NBasis,NDimX,NInte1,NInte2,ACAlpha)
 

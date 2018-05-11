@@ -52,6 +52,18 @@ double precision,external  :: trace
  write(LOUT,'(1x,a,f16.8)') 'Eelst       = ', elst*1000d0 
  SAPT%elst = elst
 
+!! test wabb
+! work = 0
+! Ja = 0
+! call make_J1(NBas,PB,Ja)
+!
+! call dgemm('N','N',NBas,NBas,NBas,1d0,PA,NBas,Ja,NBas,0d0,work,NBas)
+! print*, 'Pa.Jb', trace(work,NBas)
+!
+! call dgemm('N','N',NBas,NBas,NBas,1d0,PA,NBas,B%WPot,NBas,0d0,work,NBas)
+! print*, 'Pa.Wb', trace(work,NBas)
+!
+
  deallocate(work)
  deallocate(Ja,Vb,Va,PB,PA) 
 
@@ -161,10 +173,10 @@ double precision,allocatable :: EVecA(:,:),EVecB(:,:)
 double precision,allocatable :: WaBB(:,:),WbAA(:,:)
 double precision,allocatable :: AlphaA(:,:),AlphaB(:,:)
 integer :: i,j,pq,ip,iq,rs,ir,is
-double precision :: e2ba1,e2ba2,e2ab,e2iu,e2ic 
-double precision :: tmp
-
-! not sure here... ?
+double precision :: termsBA(3), termsAB(3)
+double precision :: e2ba,e2ab
+double precision :: e2iu,e2ic 
+double precision :: e2tmp, tmp
 
  if(A%NBasis.ne.B%NBasis) then
     write(LOUT,'(1x,a)') 'ERROR! MCBS not implemented in SAPT!'
@@ -190,7 +202,7 @@ double precision :: tmp
  call calc_resp_apsg(EVecA,OmA,AlphaA,0d0,A)
  call calc_resp_apsg(EVecB,OmB,AlphaB,0d0,B)
 
- e2ba1=0
+ termsBA=0
  do pq=1,A%NDimX
     ip = A%IndN(1,pq)
     iq = A%IndN(2,pq)
@@ -198,43 +210,40 @@ double precision :: tmp
        ir = A%IndN(1,rs)
        is = A%IndN(2,rs)
 
-       e2ba1 = e2ba1 + & 
+       termsBA(1) = termsBA(1) + & 
             WbAA(ip,iq)*AlphaA(pq,rs)*WbAA(ir,is)
 
     enddo
  enddo
- e2ba1 = -0.5d0*e2ba1
- write(LOUT,'(/,1x,a,f16.8)') 'Ind(B--A)   = ', e2ba1*1000 
+ termsBA(1) = -0.5d0*termsBA(1)
+! write(LOUT,'(/,1x,a,f16.8)') 'Ind(B--A) p>q r>s   = ', termsBA(1)*1000 
 
-! e2ba2=0
-! do pq=1,A%NDimX
-!    ip = A%IndN(1,pq)
-!    iq = A%IndN(2,pq)
-!    do ir=1,A%NDimN
-!
-!       e2ba2 = e2ba2 + & 
-!            WbAA(ip,iq)*AlphaA(pq,ir)*WbAA(ir,ir)
-!
-!    enddo
-! enddo
-! e2ba2 = -1d0*e2ba2
-! write(*,*) e2ba2*1000d0 
-!
-! e2ba2=0
-! do ip=1,A%NDimN
-!    do ir=1,A%NDimN
-!
-!       print*, ip,WbAA(ip,ip),AlphaA(ip,ir)
-!!!
-!!!       e2ba2 = e2ba2 + & 
-!!!            WbAA(ip,ip)*AlphaA(ip,ir)*WbAA(ir,ir)
-!!!
-!    enddo
-! enddo
-! e2ba2 = -0.5d0*e2ba2
-! write(*,*) e2ba2*1000d0 
+ do pq=1,A%NDimX
+    ip = A%IndN(1,pq)
+    iq = A%IndN(2,pq)
+    do ir=1,A%NDimN
 
- e2ab=0
+      termsBA(2) = termsBA(2) + & 
+            WbAA(ip,iq)*AlphaA(pq,A%NDimX+ir)*WbAA(ir,ir)
+
+    enddo
+ enddo
+ termsBA(2) = -1d0*termsBA(2)
+
+ do ip=1,A%NDimN
+    do ir=1,A%NDimN
+
+       termsBA(3) = termsBA(3) + & 
+            WbAA(ip,ip)*AlphaA(A%NDimX+ip,A%NDimX+ir)*WbAA(ir,ir)
+
+    enddo
+ enddo
+ termsBA(3) = -0.5d0*termsBA(3)
+
+ e2ba = sum(termsBA)
+ write(LOUT,'(/,1x,a,f16.8)') 'Ind(B--A)   = ', e2ba*1000 
+
+ termsAB=0
  do pq=1,B%NDimX
     ip = B%IndN(1,pq)
     iq = B%IndN(2,pq)
@@ -242,18 +251,45 @@ double precision :: tmp
        ir = B%IndN(1,rs)
        is = B%IndN(2,rs)
 
-       e2ab = e2ab + & 
+       termsAB(1) = termsAB(1) + & 
             WaBB(ip,iq)*AlphaB(pq,rs)*WaBB(ir,is)
+
 
     enddo
  enddo
- e2ab = -0.5d0*e2ab
+ termsAB(1) = -0.5d0*termsAB(1)
+! write(LOUT,'(1x,a,f16.8)') 'Ind(A--B) p>q r>s  = ', termsAB(1)*1000d0 
+
+ do pq=1,B%NDimX
+    ip = B%IndN(1,pq)
+    iq = B%IndN(2,pq)
+    do ir=1,B%NDimN
+
+       termsAB(2) = termsAB(2) + & 
+            WaBB(ip,iq)*AlphaB(pq,B%NDimX+ir)*WaBB(ir,ir)
+
+    enddo
+ enddo
+ termsAB(2) = -1.0d0*termsAB(2)
+
+ do ip=1,B%NDimN
+    do ir=1,B%NDimN
+
+       termsAB(3) = termsAB(3) + & 
+            WaBB(ip,ip)*AlphaB(B%NDimX+ip,B%NDimX+ir)*WaBB(ir,ir)
+
+    enddo
+ enddo
+ termsAB(3) = -0.5d0*termsAB(3)
+
+ e2ab = sum(termsAB)
  write(LOUT,'(1x,a,f16.8)') 'Ind(A--B)   = ', e2ab*1000d0 
 
- e2ic = (e2ab + e2ba1)
+ e2tmp = (termsBA(1)+termsAB(1))
+ write(LOUT,'(1x,a,f16.8)') 'p>q r>s     = ', e2tmp*1000d0 
+
+ e2ic = (e2ab + e2ba)
  write(LOUT,'(1x,a,f16.8)') 'E2ind       = ', e2ic*1000d0 
-
-
 
 end subroutine e2ind_apsg
 
@@ -589,8 +625,8 @@ double precision,parameter :: SmallE = 1.d-6
     endif
  enddo
 
- print*, ''
- print*, 'PART1: ',-16d0*e2d1*1000d0
+! print*, ''
+! print*, 'PART1: ',-16d0*e2d1*1000d0
 
 ! PART 2: p>q,r=s
  tmp1=0
@@ -643,7 +679,7 @@ double precision,parameter :: SmallE = 1.d-6
        enddo
     endif
  enddo
- write(LOUT,*) 'PART2: ',-16d0*e2d2*1000d0
+! write(LOUT,*) 'PART2: ',-16d0*e2d2*1000d0
 
 ! PART 3: p=q,r>s
  tmp1=0
@@ -697,7 +733,7 @@ double precision,parameter :: SmallE = 1.d-6
        enddo
     endif
  enddo
- write(LOUT,*) 'PART3: ', -16d0*e2d3*1000d0
+! write(LOUT,*) 'PART3: ', -16d0*e2d3*1000d0
 
 ! PART 4: p=q,r=s
  tmp1=0
@@ -751,7 +787,7 @@ double precision,parameter :: SmallE = 1.d-6
        enddo
     endif
  enddo
- print*, 'PART4: ',-16*e2d4*1000
+! print*, 'PART4: ',-16*e2d4*1000
 
 ! SAPT%e2disp = -16d0*e2d
  write(LOUT,'(1x,a,f16.8)') 'E2disp      = ',-16*(e2d1+e2d2+e2d3+e2d4)*1000
@@ -850,7 +886,7 @@ double precision,parameter :: SmallE = 1.d-6
 !   end if
 
     if(EVal(t).gt.SmallE.and.EVal(t).lt.1d20) then
-       frac = 8d0*EVal(t)/(EVal(t)**2d0+freq)
+       frac = 8d0*EVal(t)/(EVal(t)**2+freq)
 
        do pq=1,Mon%NDimX
           ip = Mon%IndN(1,pq)
@@ -870,7 +906,7 @@ double precision,parameter :: SmallE = 1.d-6
     endif
  enddo
 
-! ! p>q,r=s
+! p>q,r=s
 ! 
   do t=1,NDimEx
  !   if(imag) then
@@ -880,25 +916,32 @@ double precision,parameter :: SmallE = 1.d-6
  !   end if
  
      if(EVal(t).gt.SmallE.and.EVal(t).lt.1d20) then
-        frac = 8d0*EVal(t)/(EVal(t)**2d0+freq)
+        frac = 8d0*EVal(t)/(EVal(t)**2+freq)
  
         do pq=1,Mon%NDimX
            ip = Mon%IndN(1,pq)
            iq = Mon%IndN(2,pq)
            do ir=1,Mon%NDimN
  
-              Alpha(pq,ir) = Alpha(pq,ir) + &
+!              Alpha(pq,ir) = Alpha(pq,ir) + &
+!                           (Mon%CICoef(iq)+Mon%CICoef(ip)) * &
+!                          Mon%CICoef(ir) * & 
+!                           EVec(pq,t)*EVec(2*Mon%NDimX+ir,t)*frac
+!              Alpha(ir,pq) = Alpha(pq,ir)                
+
+              Alpha(pq,Mon%NDimX+ir) = Alpha(pq,Mon%NDimX+ir) + &
                            (Mon%CICoef(iq)+Mon%CICoef(ip)) * &
                            Mon%CICoef(ir) * & 
                            EVec(pq,t)*EVec(2*Mon%NDimX+ir,t)*frac
-              Alpha(ir,pq) = Alpha(pq,ir)                
+              Alpha(Mon%NDimX+ir,pq) = Alpha(pq,Mon%NDimX+ir)                
  
            enddo
         enddo
  
      endif
   enddo
-! 
+ 
+
  ! p=q,r=s
   do t=1,NDimEx
  
@@ -909,16 +952,23 @@ double precision,parameter :: SmallE = 1.d-6
  !   end if
  
      if(EVal(t).gt.SmallE.and.EVal(t).lt.1d20) then
-        frac = 8d0*EVal(t)/(EVal(t)**2d0+freq)
+        frac = 8d0*EVal(t)/(EVal(t)**2+freq)
  
         do ip=1,Mon%NDimN
            do ir=1,ip !Mon%NDimN
  
-              Alpha(ip,ir) = Alpha(ip,ir) + &
+!              Alpha(ip,ir) = Alpha(ip,ir) + &
+!                           Mon%CICoef(ip) * &
+!                           Mon%CICoef(ir) * & 
+!                           EVec(2*Mon%NDimX+ip,t)*EVec(2*Mon%NDimX+ir,t)*frac
+!              Alpha(ir,ip) = Alpha(ip,ir)
+
+              Alpha(Mon%NDimX+ip,Mon%NDimX+ir) = Alpha(Mon%NDimX+ip,Mon%NDimX+ir) + &
                            Mon%CICoef(ip) * &
                            Mon%CICoef(ir) * & 
                            EVec(2*Mon%NDimX+ip,t)*EVec(2*Mon%NDimX+ir,t)*frac
-              Alpha(ir,ip) = Alpha(ip,ir)
+              Alpha(Mon%NDimX+ir,Mon%NDimX+ip) = Alpha(Mon%NDimX+ip,Mon%NDimX+ir)
+
  
            enddo
         enddo

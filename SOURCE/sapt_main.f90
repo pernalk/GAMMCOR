@@ -1,9 +1,11 @@
 module sapt_main
 use types
 use systemdef
+use timing
 use tran
 use sorter
 use sapt_ener
+
 
 implicit none
 
@@ -16,6 +18,7 @@ type(FlagsData) :: Flags
 type(SaptData) :: SAPT
 integer :: i
 integer :: NBasis
+double precision :: Tcpu,Twall
 
 ! TEMPORARY - JOBTYPE_2
 ! ERPA
@@ -25,7 +28,9 @@ integer :: NBasis
  write(LOUT,'()')
  write(LOUT,'(1x,a)') 'STARTING SAPT CALCULATIONS'
  write(LOUT,'(8a10)') ('**********',i=1,8)
- 
+
+
+ call clock('START',Tcpu,Twall) 
  call sapt_interface(Flags,SAPT)
 
  ! SAPT components
@@ -46,6 +51,8 @@ integer :: NBasis
 
  call print_warn(SAPT)
  call free_sapt(SAPT)
+
+ call clock('SAPT',Tcpu,Twall)
 
 ! call interface to PRDMFT
 
@@ -145,12 +152,6 @@ integer :: ncen
 ! call print_sqmat(Va,NBasis)
 ! call print_diag(Va,NBasis)
 
-! tmp = 0d0
-! do i=1,NDim
-!    tmp = tmp + S(i)**2
-! enddo
-! write(*,*) tmp
-
  close(ione)
  ! square form
  call writeoneint('ONEEL_A',NSq,S,Va,Ha)
@@ -174,11 +175,6 @@ integer :: ncen
  call readlabel(ione,'ISORDK  ')
  read(ione) 
  read(ione) SAPT%monB%charg,ncen,SAPT%monB%xyz 
-
-! print*, ncen
-! write(LOUT,*) SAPT%monB%charg(1:ncen)
-! write(LOUT,*) SAPT%monB%xyz(1,:)
-! write(LOUT,*) SAPT%monB%xyz(2,:)
 
 ! rearrange in V: (B,A) -> (A,B)
  call arrange_oneint(S,NBasis,SAPT)
@@ -217,16 +213,32 @@ integer :: ncen
     read (isiri)
     read (isiri) potnuc,emy,eactiv,emcscf
  
- if(Flags%ICASSCF==1.and.Flags%ISHF==0) then
+ if(Flags%ICASSCF==1.and.Flags%ISHF==0.and.SAPT%monA%NELE/=1) then
+
     ! CASSCF
     call readmulti(NBasis,SAPT%monA,.false.,exsiri,isiri,'occupations_A.dat','SIRIUS_A.RST')
+
+ elseif(Flags%ICASSCF==1.and.Flags%ISHF==0.and.SAPT%monA%NELE==1.and.Flags%ISERPA==0) then
+
+    ! CASSCF
+    ! for 2-el electron case: read from occupations.dat
+    call readmulti(NBasis,SAPT%monA,.false.,.false.,isiri,'occupations_A.dat','SIRIUS_A.RST')
+
+ elseif(Flags%ICASSCF==1.and.Flags%ISHF==0.and.SAPT%monA%NELE==1.and.Flags%ISERPA==2) then
+
+    call readmulti(NBasis,SAPT%monA,.false.,exsiri,isiri,'occupations_A.dat','SIRIUS_A.RST')
+
  elseif(Flags%ICASSCF==1.and.Flags%ISHF==1) then
+
     ! Hartree-Fock
     call readmulti(NBasis,SAPT%monA,.true.,exsiri,isiri,'occupations_A.dat','SIRIUS_A.RST')
     call readener(NBasis,SAPT%monA,isiri)
+
  elseif(Flags%IGVB==1) then 
+
     ! GVB
     call readgvb(SAPT%monA,NBasis,'coeff_A.dat')
+
  endif
 
  if(exsiri) close(isiri) 
@@ -256,14 +268,30 @@ integer :: ncen
     read (isiri) potnuc,emy,eactiv,emcscf
 !    write(*,*)   potnuc,emy,eactiv,emcscf
 
- if(Flags%ICASSCF==1.and.Flags%ISHF==0) then
+ if(Flags%ICASSCF==1.and.Flags%ISHF==0.and.SAPT%monB%NELE/=1) then
+
     ! CASSCF
     call readmulti(NBasis,SAPT%monB,.false.,exsiri,isiri,'occupations_B.dat','SIRIUS_B.RST')
+
+ elseif(Flags%ICASSCF==1.and.Flags%ISHF==0.and.SAPT%monB%NELE==1.and.Flags%ISERPA==0) then
+
+    ! CASSCF
+    ! for 2-el electron case: read from occupations.dat
+    call readmulti(NBasis,SAPT%monB,.false.,.false.,isiri,'occupations_B.dat','SIRIUS_B.RST')
+
+ elseif(Flags%ICASSCF==1.and.Flags%ISHF==0.and.SAPT%monB%NELE==1.and.Flags%ISERPA==2) then
+
+    ! CASSCF - TD-APSG
+    call readmulti(NBasis,SAPT%monB,.false.,exsiri,isiri,'occupations_B.dat','SIRIUS_B.RST')
+ 
  elseif(Flags%ICASSCF==1.and.Flags%ISHF==1) then
+
     ! Hartree-Fock
     call readmulti(NBasis,SAPT%monB,.true.,exsiri,isiri,'occupations_B.dat','SIRIUS_B.RST')
     call readener(NBasis,SAPT%monB,isiri)
+
  elseif(Flags%IGVB==1) then
+
     ! GVB 
     call readgvb(SAPT%monB,NBasis,'coeff_B.dat')
  endif
@@ -285,8 +313,8 @@ integer :: ncen
  call arrange_mo(Cb,NBasist,SAPT%monA%NMonOrb,SAPT%monB%NMonOrb)
 
 ! MAYBE: one should print with NOrbt?
- if(SAPT%IPrint.ne.0) call print_mo(Ca,NBasis,'MONOMER A')
- if(SAPT%IPrint.ne.0) call print_mo(Cb,NBasis,'MONOMER B')
+ !if(SAPT%IPrint.ne.0) call print_mo(Ca,NBasis,'MONOMER A')
+ !if(SAPT%IPrint.ne.0) call print_mo(Cb,NBasis,'MONOMER B')
 
 ! maybe better: add writing Ca, Cb to file?!!
  allocate(SAPT%monA%CMO(NBasis,NBasis),SAPT%monB%CMO(NBasis,NBasis)) 
@@ -384,13 +412,11 @@ integer :: NBas
 character(*) :: fname
 logical :: EChck
 integer :: NOrbA,NOrbB
-integer :: NSq,NInte1,NInte2,NDimEx
+integer :: NSq,NInte1,NInte2
 double precision, allocatable :: work1(:),work2(:),XOne(:),TwoMO(:) 
-double precision, allocatable :: NSymMO(:),TwoMO2(:) 
 double precision, allocatable :: ABPlus(:), ABMin(:), URe(:,:), &
                                  CMAT(:),EMAT(:),EMATM(:), &
                                  DMAT(:),DMATK(:), &
-                                 Ctmp(:,:),Dtmp(:,:), &
                                  EigVecR(:), Eig(:)
 double precision :: Dens(NBas,NBas)
 double precision,parameter :: One = 1d0, Half = 0.5d0
@@ -445,47 +471,19 @@ double precision,external  :: trace
     stop
  endif
 
+ ! transform and read 2-el integrals
+ call tran4_full(NBas,MO,MO,fname)
+ call LoadSaptTwoEl(Mon%Monomer,TwoMO,NBas,NInte2)
+
  if(Flags%ISHF==1.and.Flags%ISERPA==2.and.Mon%NELE==1) then
 
-    write(LOUT,'(/,1x,a)') 'ENTERING FCI FOR 2-EL SYSTEMS...'
-    ! for two-electron systems calculate FCI
-    ! load 2-el integrals 
-    call tran4_full(NBas,MO,MO,fname)
-    call LoadSaptTwoEl(Mon%Monomer,TwoMO,NBas,NInte2)
-   
-    allocate(NSymMO(NBas),Ctmp(NBas,NBas),Dtmp(NBas,NBas))
-
-    NSymMO = 1
-    ETot=0
-    
-    call OptTwo1(ETot,Mon%PotNuc,URe,Mon%Occ,XOne,TwoMO,NSymMO, &
-                 Mon%CICoef,NBas,NInte1,NInte2,1)
-        
-    ! Transform orbitals from MO to NO 
-    call dgemm('N','T',NBas,NBas,NBas,1d0,Mon%CMO,NBas,URe,NBas,0d0,Ctmp,NBas)
-    print*, 'New NOs'
-    Dtmp=0
-    call get_den(NBas,Ctmp,2d0*Mon%Occ,Dtmp)
-    print*, 'Trace test',trace(Dtmp,NBas)
-   ! call print_mo(Ctmp,NBas,'MONOMER X')
-    Mon%CMO = Ctmp
-
-    ! transform 2-el integrals
-    allocate(TwoMO2(NInte2))
-    TwoMO2(1:NInte2) = 0
-    call TwoNO(TwoMO2,URe,TwoMO,NBas,NInte2)
-
-   deallocate(NSymMO,Ctmp,Dtmp)
-
- else
-
-   ! transform and read 2-el integrals
-   call tran4_full(NBas,MO,MO,fname)
-   call LoadSaptTwoEl(Mon%Monomer,TwoMO,NBas,NInte2)
+    ! Calculate FCI for 2-el systems
+    call calc_fci(NBas,NInte1,NInte2,XOne,URe,TwoMO,Mon)
 
  endif
 
  ACAlpha=One
+ ! GVB
  if(Flags%ICASSCF==0.and.Flags%ISERPA==0) then
 
    allocate(ABPlus(Mon%NDim**2),ABMin(Mon%NDim**2), &
@@ -507,66 +505,16 @@ double precision,external  :: trace
            Mon%Occ,XOne,Mon%IndN,NBas,NInte1,NInte2,Mon%NDimX,Mon%NGem)
    endif
 
- ! GVB with TD-APSG response
- elseif(Flags%ICASSCF==0.and.Flags%ISERPA==2) then
-
-   Mon%NDimN=0
-   do i=1,NBas
-      if(Mon%Occ(i).gt.0d0) Mon%NDimN=Mon%NDimN+1
-   enddo
-
-   allocate(ABPlus(Mon%NDim**2),ABMin(Mon%NDim**2), &
-            CMAT(Mon%NDim**2),EMAT(NBas**2),EMATM(NBas**2),&
-            DMAT(Mon%NDim*NBas),DMATK(Mon%NDim*NBas),&
-            EigVecR(2*(Mon%NDimX+Mon%NDimN)*2*(Mon%NDimX+Mon%NDimN)),&
-            Eig(2*(Mon%NDimX+Mon%NDimN))) 
-
-   !Mon%NDimN = 0 
-   CMAT=0
-   call APSG_NEST(ABPlus,ABMin,CMAT,EMAT,EMATM,DMAT,DMATK,&
-                  URe,Mon%Occ,XOne,TwoMO,&
-                  NBas,Mon%NDim,NInte1,NInte2,Mon%NGem,Flags%ISERPA)
-
-    !reduce dimensions
-   call reduce_dim('AB',ABPlus,ABMin,Mon)
-   call reduce_dim('D',DMAT,DMATK,Mon)
-   call reduce_dim('E',EMAT,EMATM,Mon)
-
-!    write(*,*) Mon%NGem,Mon%NDimN,Mon%NDimX
-!    write(*,*) Mon%Occ,NBas
-    EigVecR = 0
-    Eig = 0
-    call PINOVEC(EigVecR,Eig,ABPlus,ABMin,DMAT,DMATK,EMAT,EMATM, &
-                 Mon%Occ,NBas,Mon%NDimX,Mon%NDimN)
-
-    print*, 'TESTY:',Mon%NDimX,Mon%NDimN,Mon%NDimX+Mon%NDimN
-    do i=1,size(Eig)
-       write(LOUT,*) i,Eig(i)
-    enddo
-
-   ETot = 0
-   call EnePINO(ETot,Mon%PotNuc,EigVecR,Eig,TwoMO,URe,Mon%Occ,XOne, &
-                Mon%IndN,NBas,NInte1,NInte2,Mon%NDimX,Mon%NDimN)
-
-   ! j=0
-   ! do i=1,size(Eig)
-   !    if(Eig(i).Gt.SmallE.And.Eig(i).Lt.BigE) then
-   !    j = j + 1
-   !    write(LOUT,*) j,i,Eig(i)
-   !    endif
-   ! enddo
-
-   deallocate(CMAT,EMAT,EMATM,DMAT,DMATK)
-
  ! CAS-SCF
  elseif(Flags%ICASSCF==1.and.Flags%ISERPA==0) then
-
 
    allocate(ABPlus(Mon%NDimX**2),ABMin(Mon%NDimX**2),&
             EigVecR(Mon%NDimX**2),Eig(Mon%NDimX))
 
-   call execute_command_line('cp '//rdmfile// ' rdm2.dat')
- 
+
+!  call execute_command_line('cp '//rdmfile// ' rdm2.dat')
+   call system('cp '//rdmfile// ' rdm2.dat')
+
 !   Gamma_2_AB CAN BE USED 
 !   WITH DIFFERENT select_active
 !   AND reducing dimensions!
@@ -576,12 +524,12 @@ double precision,external  :: trace
    ECASSCF = 0
    call AB_CAS(ABPlus,ABMin,ECASSCF,URe,Mon%Occ,XOne,TwoMO,Mon%IPair,&
                Mon%IndN,Mon%IndX,Mon%NDimX,NBas,Mon%NDimX,NInte1,NInte2,ACAlpha)
-
+ 
    EigVecR = 0
    Eig = 0
    call ERPASYMM1(EigVecR,Eig,ABPlus,ABMin,NBas,Mon%NDimX)
-
-   if(EChck) then
+ 
+  if(EChck) then
       call ACEneERPA(ECorr,EigVecR,Eig,TwoMO,URe,Mon%Occ,XOne,&
                      Mon%IndN,NBas,NInte1,NInte2,Mon%NDimX,Mon%NGem)
       ECorr=Ecorr*0.5d0
@@ -590,211 +538,56 @@ double precision,external  :: trace
             ECASSCF+Mon%PotNuc,ECorr,ECASSCF+Mon%PotNuc+ECorr
    endif
 
- ! CAS-SCF Two-electron systems
- elseif(Flags%ICASSCF==1.and.Flags%ISERPA==2.and.Flags%ISHF==0.and.Mon%NELE==1) then
+  elseif(Flags%ISERPA==2) then
+  ! TD-APSG response: GVB, CASSCF, FCI
+
+      if(Flags%ICASSCF==1.and.MON%NELE/=1) then
+         write(LOUT,'(1x,a)') 'ERROR!!! FCI POSSIBLE ONLY FOR 2-EL MONOMERS!'
+         stop 
+      endif
+
+      if(Flags%ICASSCF==1.and.Flags%ISHF==0) then
+         ! CAS-SCF
+         call execute_command_line('cp '//rdmfile// ' rdm2.dat')
+      elseif(Flags%ICASSCF==1.and.Flags%ISHF==1) then
+         ! PINO
+         call init_pino(NBas,Mon,Flags%ICASSCF) 
+      endif
+
+      Mon%NDimN=0
+      do i=1,NBas
+         if(Mon%Occ(i).gt.0d0) Mon%NDimN=Mon%NDimN+1
+      enddo
+   
+      allocate(ABPlus(Mon%NDim**2),ABMin(Mon%NDim**2), &
+               CMAT(Mon%NDim**2),EMAT(NBas**2),EMATM(NBas**2),&
+               DMAT(Mon%NDim*NBas),DMATK(Mon%NDim*NBas),&
+               EigVecR(2*(Mon%NDimX+Mon%NDimN)*2*(Mon%NDimX+Mon%NDimN)),&
+               Eig(2*(Mon%NDimX+Mon%NDimN))) 
  
-   call execute_command_line('cp '//rdmfile// ' rdm2.dat')
+      !Mon%NDimN = 0 
+      CMAT=0
+      call APSG_NEST(ABPlus,ABMin,CMAT,EMAT,EMATM,DMAT,DMATK,&
+                     URe,Mon%Occ,XOne,TwoMO,&
+                     NBas,Mon%NDim,NInte1,NInte2,Mon%NGem,Flags%ISERPA)
+   
+      !reduce dimensions
+      call reduce_dim('AB',ABPlus,ABMin,Mon)
+      call reduce_dim('D',DMAT,DMATK,Mon)
+      call reduce_dim('E',EMAT,EMATM,Mon)
+   
+      !    write(*,*) Mon%NGem,Mon%NDimN,Mon%NDimX
+      !    write(*,*) Mon%Occ,NBas
+      EigVecR = 0
+      Eig = 0
+      call PINOVEC(EigVecR,Eig,ABPlus,ABMin,DMAT,DMATK,EMAT,EMATM, &
+                   Mon%Occ,NBas,Mon%NDimX,Mon%NDimN)
+   
+      ETot = 0
+      call EnePINO(ETot,Mon%PotNuc,EigVecR,Eig,TwoMO,URe,Mon%Occ,XOne, &
+                   Mon%IndN,NBas,NInte1,NInte2,Mon%NDimX,Mon%NDimN)
 
-   Mon%NDimN=0
-   do i=1,NBas
-      if(Mon%Occ(i).gt.0d0) Mon%NDimN=Mon%NDimN+1
-   enddo
-   NDimEx = Mon%NDimX + Mon%NDimN
-
-  ! Mon%NDimN = 0
-   allocate(ABPlus(Mon%NDim**2),ABMin(Mon%NDim**2), &
-            CMAT(Mon%NDim**2),EMAT(NBas**2),EMATM(NBas**2),&
-            DMAT(Mon%NDim*NBas),DMATK(Mon%NDim*NBas),&
-            EigVecR(2*(Mon%NDim+NBas)*2*(Mon%NDim+NBas)),&
-            Eig(2*(Mon%NDim+NBas))) 
-
-  ! ECASSCF = 0
-  ! call AB_CAS(ABPlus,ABMin,ECASSCF,URe,Mon%Occ,XOne,TwoMO,Mon%IPair,&
-  !             Mon%IndN,Mon%IndX,Mon%NDimX,NBas,Mon%NDimX,NInte1,NInte2,ACAlpha)
-
-   CMAT=0
-   call APSG_NEST(ABPlus,ABMin,CMAT,EMAT,EMATM,DMAT,DMATK,&
-                  URe,Mon%Occ,XOne,TwoMO,&
-                  NBas,Mon%NDim,NInte1,NInte2,Mon%NGem,Flags%ISERPA)
-
-   !reduce dimensions
-   call reduce_dim('AB',ABPlus,ABMin,Mon)
-   call reduce_dim('D',DMAT,DMATK,Mon)
-   call reduce_dim('E',EMAT,EMATM,Mon)
-
-  ! write(6,*) 'AB+',norm2(ABPlus)
-  ! write(6,*) 'AB-',norm2(ABMin)
-  ! write(6,*) 'C  ',norm2(CMAT)
-  ! write(6,*) 'E  ',norm2(EMAT)
-  ! write(6,*) 'EM ',norm2(EMATM)
-  ! write(6,*) 'D  ',norm2(DMAT)
-  ! write(6,*) 'DK ',norm2(DMATK)
-
-   EigVecR = 0
-   Eig = 0
-
-   print*, 'nums',Mon%num0,Mon%num1,Mon%num2  
-   print*, 'ISERPA:',Flags%ISERPA
-   print*, 'TESTY:',Mon%NDimX,Mon%NDimN,Mon%NDimX+Mon%NDimN
-
-  !call ERPASYMM1(EigVecR,Eig,ABPlus,ABMin,NBas,Mon%NDimX)
-   call PINOVEC(EigVecR,Eig,ABPlus,ABMin,DMAT,DMATK,EMAT,EMATM, &
-                Mon%Occ,NBas,Mon%NDimX,Mon%NDimN)
-
-!   do i=1,size(Eig)
-!      if(Eig(i).gt.0d0) then
-!         write(LOUT,*) i,Eig(i)
-!      endif
-!   enddo
-   write(LOUT,*) 'Eig-Norm2 ',norm2(Eig)
-   write(LOUT,*) 'EigVecR-Norm2 ',norm2(EigVecR)
-
-   ETot = 0
-   call EnePINO(ETot,Mon%PotNuc,EigVecR,Eig,TwoMO,URe,Mon%Occ,XOne, &
-                Mon%IndN,NBas,NInte1,NInte2,Mon%NDimX,Mon%NDimN)
-
-  !   j=0
- !   do i=1,size(Eig)
- !      if(Eig(i).Gt.SmallE.And.Eig(i).Lt.BigE) then
- !      j = j + 1
- !      write(LOUT,*) j,i,Eig(i)
- !      endif
- !   enddo
-   deallocate(CMAT,EMAT,EMATM,DMAT,DMATK)
-
- elseif(Flags%ISHF==1.and.Flags%ISERPA==2.and.Mon%NELE==1) then
- 
-    ! set IGem
-    Mon%NGem=1
-    do j=1,NBas
-       Mon%IGem(j)=1
-       if(Mon%Occ(1)==0) Mon%IGem(j) = 2 
-       if(Mon%Occ(1)==0) Mon%NGem = 2
-    enddo
-
-    call SaptInter(NBas,Mon,Flags%ICASSCF)
- 
-   ! look-up table 
-    do i=1,Mon%NELE
-      Mon%IndAux(i)=0
-    enddo
-    do i=1+Mon%NELE,NBas
-      Mon%IndAux(i)=2
-    enddo
- 
-    Mon%NAct = 1
-    if(Mon%NAct.ne.0) then
-      Mon%icnt = 0
-      do i=1,NBas  
-         if(Mon%Occ(i).gt.0d0) then
-            Mon%IndAux(i) = 1
-            Mon%icnt = Mon%icnt + 1
-         endif
-      enddo      
-    endif
-
-    ! set generalized "occupied" = num0 + num1
-    ! and "virtual" = num1 + num2 indices
-    mon%num0 = 0 
-    do i=1,nbas
-       if(mon%IndAux(i)/=0) exit
-       mon%num0 = mon%num0 + 1
-    enddo
-    mon%num2 = 0
-    do i=nbas,1,-1
-       if(mon%IndAux(i)/=2) exit
-       mon%num2 = mon%num2 + 1
-    enddo
-    mon%num1 = nbas - mon%num0 - mon%num2
-
-    Mon%NDimN=0
-    do i=1,NBas
-       if(Mon%Occ(i).gt.0d0) Mon%NDimN=Mon%NDimN+1
-    enddo
-
-    allocate(ABPlus(Mon%NDim**2),ABMin(Mon%NDim**2), &
-             CMAT(Mon%NDim**2),EMAT(NBas**2),EMATM(NBas**2),&
-             DMAT(Mon%NDim*NBas),DMATK(Mon%NDim*NBas),&
-             EigVecR(2*(Mon%NDim+NBas)*2*(Mon%NDim+NBas)),&
-             Eig(2*(Mon%NDim+NBas))) 
-
-   write(6,*) 'Gem,Dim,In1,In2',Mon%NGem,Mon%NDim,NInte1,NInte2
-   !write(6,*) 'URe',norm2(URe)
-   !write(6,*) 'XOne',norm2(XOne)
-   !write(6,*) 'TwoNO',norm2(TwoMO2)
-
-   CMAT=0
-   call APSG_NEST(ABPlus,ABMin,CMAT,EMAT,EMATM,DMAT,DMATK,&
-                  URe,Mon%Occ,XOne,TwoMO2,&
-                  NBas,Mon%NDim,NInte1,NInte2,Mon%NGem,Flags%ISERPA)
-
-   !write(6,*) 'AB+',norm2(ABPlus)
-   !write(6,*) 'AB-',norm2(ABMin)
-   !write(6,*) 'C  ',norm2(CMAT)
-   !write(6,*) 'E  ',norm2(EMAT)
-   !write(6,*) 'EM ',norm2(EMATM)
-   !write(6,*) 'D  ',norm2(DMAT)
-   !write(6,*) 'DK ',norm2(DMATK)
-
-
-    ij=0
-    ind=0
-    do i=1,NBas
-       do j=1,i-1  
-
-       ij=ij+1
-
-       if(Mon%IndAux(i)+Mon%IndAux(j).Ne.0.and.Mon%IndAux(i)+Mon%IndAux(j).Ne.4) then 
-
-          if((Mon%IGem(i).ne.Mon%IGem(j)).And.(Mon%IndAux(i).Eq.1).And.(Mon%IndAux(j).Eq.1) &
-            .and.(Abs(Mon%Occ(i)-Mon%Occ(j))/Mon%Occ(i).Lt.1.D-2) ) Then
-
-             write(*,*)"Discarding nearly degenerate pair",i,j
-
-          else
-
-          ind=ind+1
-          Mon%IndX(ind)=ind!ij
-          Mon%IndN(1,ind)=i
-          Mon%IndN(2,ind)=j
-     
-          endif
-       endif
-
-       enddo
-    enddo
-
-    Mon%NDimX = ind
-    write(LOUT,*) Mon%NDim,Mon%NDimX,Mon%NDimN
-
-   !reduce dimensions
-   call reduce_dim('AB',ABPlus,ABMin,Mon)
-   call reduce_dim('D',DMAT,DMATK,Mon)
-   call reduce_dim('E',EMAT,EMATM,Mon)
-
-   EigVecR = 0
-   Eig = 0
-   !Mon%NDimN = 0
-   call PINOVEC(EigVecR,Eig,ABPlus,ABMin,DMAT,DMATK,EMAT,EMATM, &
-!                Mon%Occ,NBas,Mon%NDimX,0)
-                Mon%Occ,NBas,Mon%NDimX,Mon%NDimN)
-
-   !do i=1,size(Eig)
-   !   if(Eig(i).gt.0d0) then
-   !      write(*,*) i,Eig(i)
-   !   endif
-   !enddo
-
-   write(LOUT,*) 'Eig-Norm2 ',norm2(Eig)
-   write(LOUT,*) 'EigVecR-Norm2 ',norm2(EigVecR)
-
-   ETot = 0
-   call EnePINO(ETot,Mon%PotNuc,EigVecR,Eig,TwoMO2,URe,Mon%Occ,XOne, &
-                Mon%IndN,NBas,NInte1,NInte2,Mon%NDimX,Mon%NDimN)
-
-
-   deallocate(TwoMO2)
-   deallocate(CMAT,EMAT,EMATM,DMAT,DMATK)
+      deallocate(CMAT,EMAT,EMATM,DMAT,DMATK)
 
  endif
 
@@ -806,6 +599,136 @@ double precision,external  :: trace
  deallocate(ABPlus,ABMin,EigVecR,Eig)
 
 end subroutine calc_response 
+
+subroutine calc_fci(NBas,NInte1,NInte2,XOne,URe,TwoMO,Mon)
+implicit none
+
+integer,intent(in) :: NBas, NInte1, NInte2
+double precision   :: URe(NBas,NBas),XOne(NInte1),TwoMO(NInte2)
+type(SystemBlock)  :: Mon
+double precision   :: ETot
+double precision, allocatable :: Ctmp(:,:),Dtmp(:,:), &
+                                 NSymMO(:), TwoMOt(:)
+
+ write(LOUT,'(/,1x,a)') 'ENTERING FCI FOR 2-EL SYSTEMS...'
+   
+ allocate(Ctmp(NBas,NBas),Dtmp(NBas,NBas),NSymMO(NBas),TwoMOt(NInte2))
+
+ NSymMO = 1
+ ETot=0
+    
+ call OptTwo1(ETot,Mon%PotNuc,URe,Mon%Occ,XOne,TwoMO,NSymMO, &
+              Mon%CICoef,NBas,NInte1,NInte2,1)
+        
+ ! Transform orbitals from MO to NO 
+ call dgemm('N','T',NBas,NBas,NBas,1d0,Mon%CMO,NBas,URe,NBas,0d0,Ctmp,NBas)
+
+ Dtmp=0
+ ! call get_den(NBas,Ctmp,2d0*Mon%Occ,Dtmp)
+ ! print*, 'Trace test',trace(Dtmp,NBas)
+ ! call print_mo(Ctmp,NBas,'MONOMER X')
+
+ ! Save NO orbitals
+ Mon%CMO = Ctmp
+
+ ! MO->NO transform 2-el ints
+ TwoMOt(1:NInte2) = 0
+ call TwoNO(TwoMOt,URe,TwoMO,NBas,NInte2)
+
+ ! Save transformed ints
+ TwoMO = TwoMOt
+
+ deallocate(TwoMOt,NSymMO,Ctmp,Dtmp)
+
+end subroutine calc_fci
+
+subroutine init_pino(NBas,Mon,ICASSCF)
+implicit none
+
+integer,intent(in) :: NBas, ICASSCF
+type(SystemBlock) :: Mon
+integer :: i,j,ij,ind
+
+ ! set IGem
+ Mon%NGem=1
+ do j=1,NBas
+    Mon%IGem(j)=1
+    if(Mon%Occ(1)==0) Mon%IGem(j) = 2 
+    if(Mon%Occ(1)==0) Mon%NGem = 2
+ enddo
+
+ call SaptInter(NBas,Mon,ICASSCF)
+
+! look-up table 
+ do i=1,Mon%NELE
+   Mon%IndAux(i)=0
+ enddo
+ do i=1+Mon%NELE,NBas
+   Mon%IndAux(i)=2
+ enddo
+
+ Mon%NAct = 1
+ if(Mon%NAct.ne.0) then
+   Mon%icnt = 0
+   do i=1,NBas  
+      if(Mon%Occ(i).gt.0d0) then
+         Mon%IndAux(i) = 1
+         Mon%icnt = Mon%icnt + 1
+      endif
+   enddo      
+ endif
+
+ ! set generalized "occupied" = num0 + num1
+ ! and "virtual" = num1 + num2 indices
+ Mon%num0 = 0 
+ do i=1,nbas
+    if(Mon%IndAux(i)/=0) exit
+    Mon%num0 = Mon%num0 + 1
+ enddo
+ Mon%num2 = 0
+ do i=nbas,1,-1
+    if(Mon%IndAux(i)/=2) exit
+       Mon%num2 = Mon%num2 + 1
+ enddo
+ Mon%num1 = nbas - Mon%num0 - Mon%num2
+
+! do i=1,NBas
+!    if(Mon%Occ(i).gt.0d0) Mon%NDimN=Mon%NDimN+1
+! enddo
+
+ ij=0
+ ind=0
+ do i=1,NBas
+    do j=1,i-1  
+
+    ij=ij+1
+
+    if(Mon%IndAux(i)+Mon%IndAux(j).Ne.0.and.Mon%IndAux(i)+Mon%IndAux(j).Ne.4) then 
+
+       if((Mon%IGem(i).ne.Mon%IGem(j)).And.(Mon%IndAux(i).Eq.1).And.(Mon%IndAux(j).Eq.1) &
+         .and.(Abs(Mon%Occ(i)-Mon%Occ(j))/Mon%Occ(i).Lt.1.D-2) ) Then
+
+          write(*,*)"Discarding nearly degenerate pair",i,j
+
+       else
+
+       ind=ind+1
+       Mon%IndX(ind)=ind!ij
+       Mon%IndN(1,ind)=i
+       Mon%IndN(2,ind)=j
+  
+       endif
+    endif
+
+    enddo
+ enddo
+
+ Mon%NDimX = ind
+! write(LOUT,*) Mon%NDim,Mon%NDimX,Mon%NDimN
+ write(LOUT,*) 'init PINO!!!'
+
+
+end subroutine init_pino
 
 subroutine calc_elpot(A,B,NBas)
 implicit none
@@ -892,78 +815,78 @@ end select
 
 end subroutine reduce_dim
 
-subroutine select_resp(EigVec,Eig,Mon,NBas,NDimEx)
-implicit none
-! is this even ok?
-type(SystemBlock) :: Mon
-integer :: NBas,NDimEx
-double precision :: EigVec(2*NDimEx,2*NDimEx),Eig(2*NDimEx)
-double precision,allocatable :: TmpVec(:,:),TmpEig(:)
-integer :: i,j
-integer :: pq,ip,iq
-
- !NDimEx = Mon%NDimX+Mon%NDimN
- allocate(TmpEig(NDimEx),TmpVec(NDimEx,NDimEx))
-
- TmpEig = 0
- TmpVec = 0
- j = 0
- do i=1,2*NDimEx
-    if(Eig(i).gt.1d0.and.Eig(i).lt.1d20) then
-       j = j + 1
-       TmpEig(j) = Eig(i)
-       TmpVec(1:NDimEx,j) = EigVec(1:NDimEx,i)
-    endif
- enddo  
- 
- print*, 'TmpEig'
- do i=1,NDimEx
-    write(LOUT,*) i,TmpEig(i)
- enddo
-
-! not too much... 
-! this is so complicated...
-! maybe a way to simplify it?
-  print*, '1st'
-  do i=1,NDimEx
-    do pq=1,2*NDimEx
-       if(pq.le.Mon%NDimX) then
-          ip=Mon%IndN(1,pq)
-          iq=Mon%IndN(2,pq)
-       else
-          ip=pq-Mon%NDimX
-          iq=ip
-       endif
-       if(ip.gt.iq) then
-          if(Eig(pq).gt.1d0.and.Eig(pq).lt.1d20) then
-            write(6,*) ip,iq,EigVec(i,pq)
-          endif
-       endif
-    enddo
-  enddo 
- 
-  print*, '2nd'
-! map(pq) here?
-  do i=1,NDimEx
-    do pq=1,NDimEx
-       if(pq.le.Mon%NDimX) then
-          ip=Mon%IndN(1,pq)
-          iq=Mon%IndN(2,pq)
-       else
-          ip=pq-Mon%NDimX
-          iq=ip
-       endif
-       if(ip.gt.iq) then
-          write(6,*) ip,iq,TmpVec(i,pq)
-       endif
-    enddo
-  enddo 
-
-
-
- deallocate(TmpEig,TmpVec)
-
-end subroutine select_resp
+!subroutine select_resp(EigVec,Eig,Mon,NBas,NDimEx)
+!implicit none
+!! is this even ok?
+!type(SystemBlock) :: Mon
+!integer :: NBas,NDimEx
+!double precision :: EigVec(2*NDimEx,2*NDimEx),Eig(2*NDimEx)
+!double precision,allocatable :: TmpVec(:,:),TmpEig(:)
+!integer :: i,j
+!integer :: pq,ip,iq
+!
+! !NDimEx = Mon%NDimX+Mon%NDimN
+! allocate(TmpEig(NDimEx),TmpVec(NDimEx,NDimEx))
+!
+! TmpEig = 0
+! TmpVec = 0
+! j = 0
+! do i=1,2*NDimEx
+!    if(Eig(i).gt.1d0.and.Eig(i).lt.1d20) then
+!       j = j + 1
+!       TmpEig(j) = Eig(i)
+!       TmpVec(1:NDimEx,j) = EigVec(1:NDimEx,i)
+!    endif
+! enddo  
+! 
+! print*, 'TmpEig'
+! do i=1,NDimEx
+!    write(LOUT,*) i,TmpEig(i)
+! enddo
+!
+!! not too much... 
+!! this is so complicated...
+!! maybe a way to simplify it?
+!  print*, '1st'
+!  do i=1,NDimEx
+!    do pq=1,2*NDimEx
+!       if(pq.le.Mon%NDimX) then
+!          ip=Mon%IndN(1,pq)
+!          iq=Mon%IndN(2,pq)
+!       else
+!          ip=pq-Mon%NDimX
+!          iq=ip
+!       endif
+!       if(ip.gt.iq) then
+!          if(Eig(pq).gt.1d0.and.Eig(pq).lt.1d20) then
+!            write(6,*) ip,iq,EigVec(i,pq)
+!          endif
+!       endif
+!    enddo
+!  enddo 
+! 
+!  print*, '2nd'
+!! map(pq) here?
+!  do i=1,NDimEx
+!    do pq=1,NDimEx
+!       if(pq.le.Mon%NDimX) then
+!          ip=Mon%IndN(1,pq)
+!          iq=Mon%IndN(2,pq)
+!       else
+!          ip=pq-Mon%NDimX
+!          iq=ip
+!       endif
+!       if(ip.gt.iq) then
+!          write(6,*) ip,iq,TmpVec(i,pq)
+!       endif
+!    enddo
+!  enddo 
+!
+!
+!
+! deallocate(TmpEig,TmpVec)
+!
+!end subroutine select_resp
 
 function calc_vnn(A,B) result(Vnn)
 implicit none
@@ -1129,7 +1052,7 @@ if(isiri) then
    !read(iunit) cmo
    read(iunit) tmp
 
-   print*, norb,'NORB!!!!'
+!   print*, norb,'NORB!!!!'
    cmo=0d0 
    do i=1,norb
       do j=1,nbas
@@ -1269,7 +1192,8 @@ integer :: istate, ispin, nactel, lsym
 integer :: nisht, nasht, nocct, norbt, nbast, nconf, nwopt, nwoph
 
  allocate(mon%CICoef(nbas),mon%IGem(nbas),mon%Occ(nbas))
-! exsiri=.false.
+ ioccsir=.false.
+ !exsiri=.false.
  if(exsiri) then
 
     rewind(isiri) 
@@ -1528,6 +1452,7 @@ integer :: test
 
  elseif(Flags%ICASSCF==1.and.Flags%ISERPA==0) then
 
+
     ij=0
     ind = 0
     do i=1,nbas
@@ -1577,7 +1502,6 @@ integer :: test
                 !if((mon%IndAux(i)==1).and.(mon%IndAux(j)==1)  & 
                 ! .and.&
                 ! (Abs(mon%Occ(i)-mon%Occ(j))/mon%Occ(i).lt.1.d-10) ) then
-               
                 ! write(LOUT,'(1x,a,2x,2i4)') 'Discarding nearly degenerate pair',i,j 
                 !else
                  ! if IFlCore=0 exclude core (inactive) orbitals
@@ -1593,7 +1517,7 @@ integer :: test
                     mon%IPair(j,i) = 1
       
                  endif
-               !endif
+              ! endif
       
           endif
    

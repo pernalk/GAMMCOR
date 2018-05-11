@@ -2892,6 +2892,8 @@ C
       ABMIN(I,J)=Zero
       EndDo
       EndDo
+
+C
 C
 C     ONE-ELECTRON MATRIX IN A NO REPRESENTATION
 C   
