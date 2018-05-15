@@ -100,6 +100,7 @@ type SystemBlock
       integer :: IWarn = 0
       integer :: icnt
       integer :: num0,num1,num2
+      logical :: ISHF = .false. 
       double precision :: ThrAct = 0.992d0
       integer,allocatable :: IGem(:), IndAux(:)
       integer,allocatable :: IndX(:), IndN(:,:), IPair(:,:)
@@ -228,6 +229,10 @@ associate( CalcParams => Input%CalcParams)
       if(System%NCen.gt.0) then
          write(LOUT, '(1x,a,i2)') "NO. OF ATOMS: ", System%NCen 
       endif
+      if(System%ISHF) then
+         write(LOUT, '(1x,a,l2)') "HARTREE-FOCK: ", System%ISHF 
+      endif
+
     end associate
  enddo
 

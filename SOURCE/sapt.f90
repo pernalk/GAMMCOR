@@ -474,7 +474,7 @@ allocate(tmp1(A%NDimX,B%NDimX),tmp2(A%NDimX,B%NDimX))
  enddo
  SAPT%e2disp = -16d0*e2d
  e2d = -16d0*e2d*1000d0
- write(LOUT,'(1x,a,f16.8)') 'E2disp      = ',e2d
+ write(LOUT,'(/1x,a,f16.8)') 'E2disp      = ',e2d
 
 !! coupled - TEST!
 ! e2d = 0d0

@@ -19,8 +19,8 @@ FCC = gfortran
 FFLAGS = -O3 -fno-align-commons -fcheck=all 
 #-fdefault-real-8 
 #-Wall -Wextra -Warray-temporaries -Wrealloc-lhs-all -pedantic
-#LIBS = -L/usr/lib -lopenblas
-LIBS = -L/usr/lib -llapack -lblas
+LIBS = -L/usr/lib -lopenblas
+#LIBS = -L/usr/lib -llapack -lblas
 
 #FCC = ifort -assume byterecl
 #FFLAGS = -mkl -heap-arrays  -O2

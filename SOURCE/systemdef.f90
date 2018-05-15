@@ -269,6 +269,7 @@ elseif(Flags%ISAPT.Eq.1) then
       monA%NBasis = Input%CalcParams%NBasis
       monA%Multiplicity = Input%SystemInput(1)%Multiplicity
       monA%ThrAct = Input%SystemInput(1)%ThrAct
+      monA%ISHF = Input%SystemInput(1)%ISHF
       monA%NCen = Input%SystemInput(1)%NCen
       monA%Monomer = Input%SystemInput(1)%Monomer
       monA%IPrint = Input%CalcParams%IPrint  
@@ -281,6 +282,7 @@ elseif(Flags%ISAPT.Eq.1) then
       monB%NBasis = Input%CalcParams%NBasis
       monB%Multiplicity = Input%SystemInput(2)%Multiplicity
       monB%ThrAct = Input%SystemInput(2)%ThrAct
+      monB%ISHF = Input%SystemInput(2)%ISHF
       monB%NCen = Input%SystemInput(2)%NCen
       monB%Monomer = Input%SystemInput(2)%Monomer
       monB%IPrint = Input%CalcParams%IPrint  
@@ -298,6 +300,7 @@ elseif(Flags%ISAPT.Eq.1) then
       monA%NBasis = Input%CalcParams%NBasis
       monA%Multiplicity = Input%SystemInput(2)%Multiplicity
       monA%ThrAct = Input%SystemInput(2)%ThrAct
+      monA%ISHF = Input%SystemInput(2)%ISHF
       monA%NCen = Input%SystemInput(2)%NCen
       monA%Monomer = Input%SystemInput(2)%Monomer
       monA%IPrint = Input%CalcParams%IPrint  
@@ -310,6 +313,7 @@ elseif(Flags%ISAPT.Eq.1) then
       monB%NBasis = Input%CalcParams%NBasis
       monB%Multiplicity = Input%SystemInput(1)%Multiplicity
       monB%ThrAct = Input%SystemInput(1)%ThrAct
+      monB%ISHF = Input%SystemInput(1)%ISHF
       monB%NCen = Input%SystemInput(1)%NCen
       monB%Monomer = Input%SystemInput(1)%Monomer
       monB%IPrint = Input%CalcParams%IPrint  

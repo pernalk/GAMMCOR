@@ -213,8 +213,11 @@ integer :: ncen
     read (isiri)
     read (isiri) potnuc,emy,eactiv,emcscf
  
- if(Flags%ICASSCF==1.and.Flags%ISHF==0.and.SAPT%monA%NELE/=1) then
+ print*, Flags%ISHF, SAPT%monA%ISHF
+ if(Flags%ICASSCF==1.and.Flags%ISHF==0.and.SAPT%monA%NELE/=1.and.(.not.SAPT%monA%ISHF)) then
+ !if(Flags%ICASSCF==1.and.Flags%ISHF==0.and.SAPT%monA%NELE/=1) then
 
+    print*, 'CASSCF-MONA!!!!'
     ! CASSCF
     call readmulti(NBasis,SAPT%monA,.false.,exsiri,isiri,'occupations_A.dat','SIRIUS_A.RST')
 
@@ -228,8 +231,9 @@ integer :: ncen
 
     call readmulti(NBasis,SAPT%monA,.false.,exsiri,isiri,'occupations_A.dat','SIRIUS_A.RST')
 
- elseif(Flags%ICASSCF==1.and.Flags%ISHF==1) then
+ elseif(Flags%ICASSCF==1.and.(Flags%ISHF==1.or.SAPT%monA%ISHF)) then
 
+    print*, 'HFOCK-MONA!!!!'
     ! Hartree-Fock
     call readmulti(NBasis,SAPT%monA,.true.,exsiri,isiri,'occupations_A.dat','SIRIUS_A.RST')
     call readener(NBasis,SAPT%monA,isiri)

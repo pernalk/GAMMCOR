@@ -377,7 +377,10 @@ integer :: test,test2
       ! call get_ncen(val,SystemParams)
  case ("THRACT")
        read(val,*) SystemParams%ThrAct
-             
+
+ case ("ISHF")
+       read(val,*) SystemParams%ISHF
+
  end select
 end subroutine read_block_system
 
