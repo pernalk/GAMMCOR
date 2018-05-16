@@ -217,7 +217,6 @@ integer :: ncen
  if(Flags%ICASSCF==1.and.Flags%ISHF==0.and.SAPT%monA%NELE/=1.and.(.not.SAPT%monA%ISHF)) then
  !if(Flags%ICASSCF==1.and.Flags%ISHF==0.and.SAPT%monA%NELE/=1) then
 
-    print*, 'CASSCF-MONA!!!!'
     ! CASSCF
     call readmulti(NBasis,SAPT%monA,.false.,exsiri,isiri,'occupations_A.dat','SIRIUS_A.RST')
 
@@ -1208,7 +1207,8 @@ integer :: nisht, nasht, nocct, norbt, nbast, nconf, nwopt, nwoph
    
 !    print*,    potnuc,emy,eactiv,emcscf, &
 !               istate,ispin,nactel,lsym
-!    write (*,*) nisht,nasht,nocct,norbt,nbast !,nconf,nwopt,nwoph
+ !   print*, 'READM-TEST'
+ !   write (*,*) nisht,nasht,nocct,norbt,nbast !,nconf,nwopt,nwoph
    
     mon%NAct  = nasht
     mon%INAct = nisht

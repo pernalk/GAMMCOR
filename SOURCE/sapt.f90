@@ -328,6 +328,10 @@ double precision :: e2du,dea,deb
  nOVA = dimOA*dimVA
  nOVB = dimOB*dimVB
 
+ !print*, A%num0,A%num1,A%num2
+! print*, nOVA,dimOA,dimVA 
+ !print*, B%num0,B%num1,B%num2
+
 ! read EigValA_B
  allocate(EVecA(A%NDimX*A%NDimX),OmA(A%NDimX),&
           EVecB(B%NDimX*B%NDimX),OmB(B%NDimX))
@@ -335,9 +339,14 @@ double precision :: e2du,dea,deb
  call readresp(EVecA,OmA,A%NDimX,'PROP_A')
  call readresp(EVecB,OmB,B%NDimX,'PROP_B')
 
-! do i=1,size(OmA)
-!    if(OmA(i).le.0d0) write(*,*) OmA(i),i
-! enddo
+! print*, norm2(OmA)
+! print*, norm2(EVecA)
+! print*, norm2(OmB)
+! print*, norm2(EVecB)
+!
+ !do i=1,size(OmA)
+ !   if(OmA(i).le.0d0) write(*,*) OmA(i),i
+ !enddo
 
 ! uncoupled
 ! works with tran4_full
@@ -396,6 +405,8 @@ if(Flags%ISHF==1) then
 endif
 
 allocate(tmp1(A%NDimX,B%NDimX),tmp2(A%NDimX,B%NDimX))
+
+!print*, 'A-ndimX',A%NDimX
 
 ! coupled - 0
  tmp1=0
