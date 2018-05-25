@@ -40,6 +40,7 @@ C
 C
       If(ICASSCF.Eq.1) Then
 C 
+
       Call AC0CAS(ECorr,ETot,TwoNO,Occ,URe,XOne,
      $ ABPLUS,ABMIN,EigVecR,Eig,
      $ IndN,IndX,NDimX,NBasis,NDim,NInte1,NInte2)

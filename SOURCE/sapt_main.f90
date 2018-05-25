@@ -220,8 +220,8 @@ integer :: ncen
     ! CASSCF
     call readmulti(NBasis,SAPT%monA,.false.,exsiri,isiri,'occupations_A.dat','SIRIUS_A.RST')
 
- elseif(Flags%ICASSCF==1.and.Flags%ISHF==0.and.SAPT%monA%NELE==1.and.Flags%ISERPA==0) then
-
+ elseif(Flags%ICASSCF==1.and.Flags%ISHF==0.and.SAPT%monA%NELE==1.and.Flags%ISERPA==0.and.(.not.SAPT%monA%ISHF)) then
+    print*, 'here?'
     ! CASSCF
     ! for 2-el electron case: read from occupations.dat
     call readmulti(NBasis,SAPT%monA,.false.,.false.,isiri,'occupations_A.dat','SIRIUS_A.RST')
@@ -407,7 +407,6 @@ end subroutine sapt_interface
 subroutine calc_response(Mon,MO,Flags,NBas,fname,EChck,NOrbA,NOrbB)
 implicit none
 
-!type(SaptData) :: SAPT
 type(SystemBlock) :: Mon
 type(FlagsData) :: Flags
 double precision :: MO(:)        
@@ -1391,6 +1390,7 @@ integer :: test
    if(mon%Monomer==2) write(LOUT,'(1x,a)') 'Monomer B' 
    do i=1,nbas
       if(mon%Occ(i).lt.1d0.and.mon%Occ(i).ne.0d0) then
+         ! HERE!!! ACTIVE!!!! 
          mon%IndAux(i) = 1
          write(6,'(X," Active Orbital: ",I4,E14.4)') i, mon%Occ(i)
          mon%icnt = mon%icnt + 1
@@ -1411,6 +1411,7 @@ integer :: test
     mon%num2 = mon%num2 + 1
  enddo
  mon%num1 = nbas - mon%num0 - mon%num2
+ print*, 'TTESSSTT:', mon%num0,mon%num1,mon%num2, nbas
 
 ! active pairs
  allocate(mon%IPair(nbas,nbas),mon%IndX(mon%NDim),mon%IndN(2,mon%NDim))

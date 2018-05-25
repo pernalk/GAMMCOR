@@ -310,6 +310,10 @@ double precision,allocatable :: tmp1(:,:),tmp2(:,:)
 double precision,allocatable :: work(:)
 double precision :: e2d,fact,tmp
 double precision :: e2du,dea,deb
+double precision,parameter :: SmallE = 1.D-3
+double precision,parameter :: BigE = 1.D8 
+
+! Parameter(SmallE=1.D-3,BigE=1.D8)
 
  if(A%NBasis.ne.B%NBasis) then
     write(LOUT,'(1x,a)') 'ERROR! MCBS not implemented in SAPT!'
@@ -344,8 +348,9 @@ double precision :: e2du,dea,deb
 ! print*, norm2(OmB)
 ! print*, norm2(EVecB)
 !
- !do i=1,size(OmA)
- !   if(OmA(i).le.0d0) write(*,*) OmA(i),i
+ !print*, 'EXC ENERGIES'
+ !do i=1,100!size(OmB)
+ !   if(OmB(i).gt.0d0) write(*,*) OmB(i)
  !enddo
 
 ! uncoupled
@@ -408,6 +413,13 @@ allocate(tmp1(A%NDimX,B%NDimX),tmp2(A%NDimX,B%NDimX))
 
 !print*, 'A-ndimX',A%NDimX
 
+!print*, 'E2disp,CICoeff=1'
+!B%CICoef = 0d0
+!do i=1,B%NELE !size(B%CICoef)
+!   B%CICoef(i)=1d0
+!   write(*,*) B%CICoef(i),i  
+!enddo
+
 ! coupled - 0
  tmp1=0
  do pq=1,A%NDimX
@@ -419,20 +431,24 @@ allocate(tmp1(A%NDimX,B%NDimX),tmp2(A%NDimX,B%NDimX))
        ir = B%IndN(1,rs)
        is = B%IndN(2,rs)
 
+      ! HERE!!!!
        fact = (A%CICoef(iq)+A%CICoef(ip)) * &
               (B%CICoef(is)+B%CICoef(ir)) * &
-               work(is+(ir-B%num0-1)*dimOB)
+              work(is+(ir-B%num0-1)*dimOB)
   
+ !      if(OmA(i).gt.SmallE.and.OmA(i).lt.1d20) then
        do i=1,A%NDimX
           tmp1(i,rs) = tmp1(i,rs) + & 
                        fact * &
                        EVecA(pq+(i-1)*A%NDimX)
        enddo
+ !      endif
 
     enddo
  enddo
  tmp2=0
  do j=1,B%NDimX
+!    if(OmB(j).gt.SmallE.and.OmB(j).lt.1d20) then
     do i=1,A%NDimX
        do rs=1,B%NDimX
        ir = B%IndN(1,rs)
@@ -440,7 +456,8 @@ allocate(tmp1(A%NDimX,B%NDimX),tmp2(A%NDimX,B%NDimX))
        tmp2(i,j) = tmp2(i,j) + &
                     EVecB(rs+(j-1)*B%NDimX)*tmp1(i,rs)
        enddo
-    enddo   
+    enddo  
+!    endif 
  enddo
 
 
@@ -478,7 +495,8 @@ allocate(tmp1(A%NDimX,B%NDimX),tmp2(A%NDimX,B%NDimX))
  do i=1,A%NDimX
     do j=1,B%NDimX
        ! remove this if later!!!!
-       if(OmA(i).gt.0d0.and.OmB(i).gt.0d0) then
+       if(OmA(i).gt.SmallE.and.OmB(j).gt.SmallE&
+          .and.OmA(i).lt.BigE.and.OmB(j).lt.BigE) then
        e2d = e2d + tmp2(i,j)**2/(OmA(i)+OmB(j))
        endif
     enddo
@@ -572,6 +590,17 @@ double precision,parameter :: SmallE = 1.d-6
 
  call readresp(EVecA,OmA,2*ADimEx,'PROP_A')
  call readresp(EVecB,OmB,2*BDimEx,'PROP_B')
+
+! print*, 'OmA'
+! do i=1,size(OmA)
+!    if(OmA(i).gt.0d0)  write(*,*) i,OmA(i)
+! enddo
+!
+! print*, 'OmB'
+! do i=1,size(OmB)
+!    if(OmB(i).gt.0d0)  write(*,*) i,OmB(i)
+! enddo
+
  
  ! tran4_gen
  allocate(work(nOFB))
