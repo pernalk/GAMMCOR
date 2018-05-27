@@ -2954,6 +2954,7 @@ C
       ETot=ETot+Two*Occ(I)*HNO(II)      
       EndDo
 C
+C
       Do IP=1,NOccup
       Do IQ=1,NOccup
       Do IR=1,NOccup

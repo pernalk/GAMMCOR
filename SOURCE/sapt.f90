@@ -27,8 +27,8 @@ double precision,external  :: trace
           Va(NBas,NBas),Vb(NBas,NBas),Ja(NBas,NBas))
  allocate(work(NBas,NBas))
 
- call get_den(NBas,A%CMO,2d0*A%Occ,PA)
- call get_den(NBas,B%CMO,2d0*B%Occ,PB)
+ call get_den(NBas,A%CMO,A%Occ,2d0,PA)
+ call get_den(NBas,B%CMO,B%Occ,2d0,PB)
 
  call get_one_mat('V',Va,A%Monomer,NBas)
  call get_one_mat('V',Vb,B%Monomer,NBas)
@@ -68,6 +68,263 @@ double precision,external  :: trace
  deallocate(Ja,Vb,Va,PB,PA) 
 
 end subroutine e1elst
+
+subroutine e1exchs2(A,B,SAPT)
+implicit none
+
+type(SystemBlock) :: A, B
+type(SaptData) :: SAPT
+integer :: i, j, ia, jb
+integer :: ip, iq, ir, is
+integer :: iv, iz, iu, it
+integer :: iunit
+integer :: NBas
+double precision,allocatable :: S(:,:),Sab(:,:)
+double precision,allocatable :: USa(:,:),USb(:,:)
+double precision,allocatable :: PA(:,:),PB(:,:) 
+double precision,allocatable :: Kb(:,:)
+double precision,allocatable :: Qab(:,:),Qba(:,:) 
+double precision,allocatable :: Va(:,:),Vb(:,:)
+double precision,allocatable :: tmpA(:,:,:,:),tmpB(:,:,:,:), &
+                                tmpAB(:,:,:,:)
+double precision,allocatable :: work(:,:)
+double precision :: tmp,ea,eb,exchs2
+double precision :: t2a(4)
+double precision,parameter :: Half=0.5d0
+double precision,external  :: trace,FRDM2
+
+! set dimensions
+ NBas = A%NBasis 
+
+ allocate(S(NBas,NBas),Sab(NBas,NBas),&
+          PA(NBas,NBas),PB(NBas,NBas),&
+          Va(NBas,NBas),Vb(NBas,NBas))
+ allocate(USa(NBas,NBas),USb(NBas,NBas),&
+          Qab(NBas,NBas),Qba(NBas,NBas),&
+          Kb(NBas,NBas))
+ allocate(work(NBas,NBas))
+
+! poprawic
+ call get_den(NBas,A%CMO,A%Occ,2d0,PA)
+ call get_den(NBas,B%CMO,B%Occ,2d0,PB)
+
+ call get_one_mat('S',S,A%Monomer,NBas)
+
+ call get_one_mat('V',Va,A%Monomer,NBas)
+ call get_one_mat('V',Vb,B%Monomer,NBas)
+
+ call tran2MO(S,A%CMO,B%CMO,Sab,NBas) 
+
+! USa=0; USb=0
+ call dgemm('T','N',NBas,NBas,NBas,1d0,A%CMO,NBas,S,NBas,0d0,USa,NBas)
+ call dgemm('T','N',NBas,NBas,NBas,1d0,B%CMO,NBas,S,NBas,0d0,USb,NBas)
+! make it simpler
+
+! Qab=0; Qba=0
+ call dgemm('N','T',NBas,NBas,NBas,1d0,PA,NBas,USb,NBas,0d0,Qab,NBas)
+ call dgemm('N','T',NBas,NBas,NBas,1d0,PB,NBas,USa,NBas,0d0,Qba,NBas)
+
+ call tran3Q_full(NBas,A%CMO,Qba,'TWOA3B')
+ call tran3Q_full(NBas,B%CMO,Qab,'TWOB3A')
+
+ call make_K(NBas,PB,Kb)
+
+ !do i=1,NBas
+ !   write(*,*) i,A%Ind2(i),B%Ind2(i)
+ !enddo
+
+! block
+! integer :: ip,iq,ir,is
+! integer :: NInte1,NInte2,NOcc
+! double precision,allocatable :: TwoMO(:)
+! double precision :: ETot
+! integer,external :: NAddr3
+! double precision,external :: FRDM2
+!
+! !NOcc=A%NAct+A%INAct
+! NOcc=B%NAct+B%INAct
+! NInte1 = NBas*(NBas+1)/2
+! NInte2 = NInte1*(NInte1+1)/2
+!
+! allocate(TwoMO(NInte2))
+!
+! call LoadSaptTwoEl(B%Monomer,TwoMO,NBas,NInte2)
+! ETot=0
+! do ip=1,NOcc
+!    do iq=1,NOcc
+!      do ir=1,NOcc
+!         do is=1,NOcc
+!            ETot=ETot+FRDM2(ip,iq,ir,is,B%RDM2,B%Occ,B%Ind2,B%NAct,NBas)&
+!            *TwoMO(NAddr3(ip,ir,iq,is))
+!         enddo
+!      enddo
+!    enddo
+! enddo
+! print*, 'Check 2-el part of the energy: ',ETot
+!
+! deallocate(TwoMO)
+!
+! end block
+
+ t2a=0
+ open(newunit=iunit,file='TWOA3B',status='OLD',&
+     access='DIRECT',form='UNFORMATTED',recl=8*NBas**2)
+! Qba 
+ do ir=1,NBas
+    do ip=1,ir
+       read(iunit,rec=ip+ir*(ir-1)/2) work
+
+       if(ip==ir) then
+ 
+         do is=1,NBas
+             do iq=1,NBas
+                  t2a(2) = t2a(2) + work(iq,is)* &
+                           FRDM2(ip,iq,ir,is,A%RDM2,A%Occ,A%Ind2,A%NAct,NBas)
+             enddo
+          enddo
+
+       else
+         
+          do is=1,NBas
+             do iq=1,NBas
+                t2a(2) = t2a(2) + work(iq,is)* &
+                        (FRDM2(ip,iq,ir,is,A%RDM2,A%Occ,A%Ind2,A%NAct,NBas)+ &
+                         FRDM2(ir,iq,ip,is,A%RDM2,A%Occ,A%Ind2,A%NAct,NBas))
+             enddo
+          enddo
+  
+       endif
+
+    enddo
+ enddo
+ t2a(2) = -2*t2a(2)
+ print*, 'TEST...',t2a(2)
+ close(iunit)
+
+! Qab
+ open(newunit=iunit,file='TWOB3A',status='OLD',&
+     access='DIRECT',form='UNFORMATTED',recl=8*NBas**2)
+
+ do ir=1,NBas
+    do ip=1,ir
+       read(iunit,rec=ip+ir*(ir-1)/2) work
+
+       if(ip==ir) then
+ 
+         do is=1,NBas
+             do iq=1,NBas
+                  t2a(3) = t2a(3) + work(iq,is)* &
+                           FRDM2(ip,iq,ir,is,B%RDM2,B%Occ,B%Ind2,B%NAct,NBas)
+             enddo
+          enddo
+
+       else
+         
+          do is=1,NBas
+             do iq=1,NBas
+                t2a(3) = t2a(3) + work(iq,is)* &
+                        (FRDM2(ip,iq,ir,is,B%RDM2,B%Occ,B%Ind2,B%NAct,NBas)+ &
+                         FRDM2(ir,iq,ip,is,B%RDM2,B%Occ,B%Ind2,B%NAct,NBas))
+             enddo
+          enddo
+  
+       endif
+
+    enddo
+ enddo
+ t2a(3) = -2*t2a(3)
+ print*, 'TEST...',t2a(3)
+ close(iunit)
+
+ allocate(tmpA(NBas,NBas,NBas,NBas),tmpB(NBas,NBas,NBas,NBas),&
+          tmpAB(NBas,NBas,NBas,NBas))
+! N^5 
+ tmpA = 0
+ do iz=1,NBas
+    do ir=1,NBas
+       do iq=1,NBas
+          do ip=1,NBas
+             do is=1,NBas
+                 tmpA(ip,iq,ir,iz) = tmpA(ip,iq,ir,iz) + &
+                                  Sab(is,iz)* &
+                                  FRDM2(ip,iq,ir,is,A%RDM2,A%Occ,A%Ind2,A%NAct,NBas)
+             enddo
+          enddo
+       enddo
+    enddo
+ enddo
+! N^5
+tmpB = 0
+ do iq=1,NBas
+    do iu=1,NBas
+       do iz=1,NBas
+          do iv=1,NBas
+             do it=1,NBas
+                 tmpB(iv,iz,iu,iq) = tmpB(iv,iz,iu,iq) + &
+                                  Sab(iq,it)* &
+                                  FRDM2(iv,iz,iu,it,B%RDM2,B%Occ,B%Ind2,B%NAct,NBas)
+             enddo
+          enddo
+       enddo
+    enddo
+ enddo
+
+! N^6
+ tmpAB=0
+
+ do iu=1,NBas
+    do iv=1,NBas
+       do ir=1,NBas
+          do ip=1,NBas
+             do iz=1,NBas
+                do iq=1,NBas
+                   tmpAB(ip,ir,iv,iu) = tmpAB(ip,ir,iv,iu) + &
+                                        tmpA(ip,iq,ir,iz)*tmpB(iv,iz,iu,iq)
+                enddo
+             enddo
+          enddo
+       enddo
+    enddo
+ enddo
+
+ open(newunit=iunit,file='TMPMOAB',status='OLD',&
+     access='DIRECT',form='UNFORMATTED',recl=8*NBas**2)
+
+ do ir=1,NBas
+    do ip=1,NBas
+       read(iunit,rec=ip+(ir-1)*NBas) work
+      
+       do iv=1,NBas
+          do iu=1,NBas
+             t2a(4)=t2a(4)+work(iv,iu)* &
+                    tmpAB(ip,ir,iv,iu)
+          enddo
+       enddo
+
+     enddo
+ enddo
+ t2a(4) = -2*t2a(4)
+ print*, 't2a(4): ',t2a(4)
+
+ close(iunit)
+ deallocate(tmpAB,tmpB,tmpA)
+
+! 
+ do jb=1,NBas
+    do ia=1,NBas
+       t2a(1) = t2a(1) + PA(ia,jb)*Kb(jb,ia)
+    enddo
+ enddo
+ t2a(1) = -2*t2a(1)
+
+ 
+ print*, 'Kb',norm2(Kb),t2a(1)
+
+ deallocate(Vb,Va,PB,PA,Sab,S)
+ deallocate(Kb,Qba,Qab,USb,USa) 
+ deallocate(work)
+
+end subroutine e1exchs2
 
 subroutine e2ind(Flags,A,B,SAPT)
 implicit none

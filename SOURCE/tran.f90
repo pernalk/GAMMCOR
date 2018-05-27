@@ -112,6 +112,95 @@ integer :: r,s,rs
 
 end subroutine tran4_unsym2
 
+subroutine tran3Q_full(NBas,CX,Q,fname)
+! 3-index transformation out of core
+implicit none
+
+integer,intent(in) :: NBas
+!integer,intent(in) :: nA,nB,nC,nD
+! CA(NBas*nA)
+double precision,intent(in) :: CX(*),Q(*)
+character(*) :: fname
+double precision, allocatable :: work1(:), work2(:), work3(:,:)
+integer :: iunit,iunit2,iunit3
+integer :: ntr,nsq,nloop
+integer,parameter :: cbuf=512
+integer :: i,rs,ab
+
+ write(6,'()') 
+! write(6,'(1x,a)') 'TRAN3'
+! write(6,'(1x,a)') 'Transforming integrals for AB dimer'
+ write(6,'(1x,a)') 'Transforming 3-ints for '//fname
+
+ ntr = NBas*(NBas+1)/2
+ nsq = NBas**2
+
+ ! set no. of triangles in buffer
+ nloop = (ntr-1)/cbuf+1
+
+ allocate(work1(NBas*NBas),work2(NBas*NBas))
+ allocate(work3(cbuf,ntr))
+
+ open(newunit=iunit,file='AOTWOSORT',status='OLD',&
+      access='DIRECT',form='UNFORMATTED',recl=8*ntr)
+
+ ! half-transformed file
+ open(newunit=iunit2,file='TMPMO',status='REPLACE',&
+     access='DIRECT',form='UNFORMATTED',recl=8*cbuf)
+
+! (pr|
+ do i=1,nloop
+    ! loop over cbuf
+    do rs=(i-1)*cbuf+1,min(i*cbuf,ntr)
+
+       read(iunit,rec=rs) work1(1:ntr)
+       call triang_to_sq(work1,work2,NBas)
+       ! work1=CA^T.work2
+       ! work2=work1.CB
+       call dgemm('T','N',NBas,NBas,NBas,1d0,CX,NBas,work2,NBas,0d0,work1,NBas) 
+       call dgemm('N','N',NBas,NBas,NBas,1d0,work1,NBas,CX,NBas,0d0,work2,NBas)
+       call sq_to_triang(work2,work1,NBas)
+       ! transpose
+       work3(rs-(i-1)*cbuf,1:ntr) = work1(1:ntr)
+
+    enddo
+
+    do ab=1,ntr
+       write(iunit2,rec=(i-1)*ntr+ab) work3(1:cbuf,ab)
+    enddo
+
+ enddo
+
+ close(iunit)
+
+
+! |qa) pr-triang, qa-square
+ open(newunit=iunit3,file=fname,status='REPLACE',&
+     access='DIRECT',form='UNFORMATTED',recl=8*nsq)
+
+ do ab=1,ntr
+
+    do i=1,nloop
+       ! get all (ab| for given |rs)
+       read(iunit2,rec=(i-1)*ntr+ab) work1((i-1)*cbuf+1:min(i*cbuf,ntr))
+    enddo
+
+    call triang_to_sq(work1,work2,NBas)
+    ! work1=CX^T.work2
+    ! work2=work1.Q 
+    call dgemm('T','N',NBas,NBas,NBas,1d0,CX,NBas,work2,NBas,0d0,work1,NBas)
+    call dgemm('N','N',NBas,NBas,NBas,1d0,work1,NBas,Q,NBas,0d0,work2,NBas)
+
+    write(iunit3,rec=ab) work2(1:nsq)
+
+ enddo
+
+ deallocate(work1,work2,work3)
+ close(iunit3)
+ close(iunit2,status='DELETE')
+
+end subroutine tran3Q_full
+
 subroutine tran4_full(NBas,CA,CB,fname)
 ! 4-index transformation out of core
 ! dumps all integrals on disk in the (triang,triang) form

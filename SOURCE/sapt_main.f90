@@ -38,6 +38,7 @@ double precision :: Tcpu,Twall
  if(Flags%ISERPA==0) then
 
     call e1elst(SAPT%monA,SAPT%monB,SAPT)
+    call e1exchs2(SAPT%monA,SAPT%monB,SAPT)
     call e2ind(Flags,SAPT%monA,SAPT%monB,SAPT)
     call e2disp(Flags,SAPT%monA,SAPT%monB,SAPT)
 
@@ -352,6 +353,12 @@ integer :: ncen
                   SAPT%monB%num1+SAPT%monB%num2,Cb(NBasis*SAPT%monB%num0+1:NBasis**2),&
                   'TWOMOAB')
 
+   ! this is for testing E1exchS2...
+   call tran4_gen(NBasis,&
+                  NBasis,Ca,NBasis,Ca,&
+                  NBasis,Cb,NBasis,Cb,&
+                  'TMPMOAB')
+
  elseif(Flags%ISERPA==2.and.Flags%ISHF==0) then
    ! integrals stored as (oFull,oFull)
    call tran4_gen(NBasis,&
@@ -513,6 +520,8 @@ double precision,external  :: trace
    allocate(ABPlus(Mon%NDimX**2),ABMin(Mon%NDimX**2),&
             EigVecR(Mon%NDimX**2),Eig(Mon%NDimX))
 
+   ! read 2-RDMs
+   call read2rdm(Mon,NBas)
 
 !  call execute_command_line('cp '//rdmfile// ' rdm2.dat')
    call system('cp '//rdmfile// ' rdm2.dat')
@@ -745,8 +754,8 @@ double precision,allocatable :: Ja(:,:),Jb(:,:)
           Va(NBas,NBas),Vb(NBas,NBas),&
           Ja(NBas,NBas),Jb(NBas,NBas))
 
- call get_den(NBas,A%CMO,2d0*A%Occ,Pa)
- call get_den(NBas,B%CMO,2d0*B%Occ,Pb)
+ call get_den(NBas,A%CMO,A%Occ,2d0,Pa)
+ call get_den(NBas,B%CMO,B%Occ,2d0,Pb)
 
  call get_one_mat('V',Va,A%Monomer,NBas)
  call get_one_mat('V',Vb,B%Monomer,NBas)
@@ -1748,6 +1757,15 @@ if(allocated(SAPT%monA%OrbE)) then
 endif
 if(allocated(SAPT%monB%OrbE)) then
   deallocate(SAPT%monB%OrbE)
+endif
+
+if(allocated(SAPT%monA%RDM2)) then
+  deallocate(SAPT%monA%RDM2)
+  deallocate(SAPT%monA%Ind2)
+endif
+if(allocated(SAPT%monB%RDM2)) then
+  deallocate(SAPT%monB%RDM2)
+  deallocate(SAPT%monB%Ind2)
 endif
 
 end subroutine free_sapt

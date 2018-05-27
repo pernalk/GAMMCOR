@@ -104,10 +104,12 @@ type SystemBlock
       double precision :: ThrAct = 0.992d0
       integer,allocatable :: IGem(:), IndAux(:)
       integer,allocatable :: IndX(:), IndN(:,:), IPair(:,:)
+      integer,allocatable :: Ind2(:)
       double precision,allocatable :: Occ(:), CICoef(:)
       double precision,allocatable :: OrbE(:)
       double precision,allocatable :: CMO(:,:)
       double precision,allocatable :: WPot(:,:)
+      double precision,allocatable :: RDM2(:)
       double precision  :: charg(maxcen),xyz(maxcen,3)
 
 end type SystemBlock
@@ -465,18 +467,84 @@ end subroutine readoneint
 !
 !end subroutine writeoneint
 
-subroutine get_den(nbas,MO,Occ,Den)
+subroutine read2rdm(Mon,NBas)
+
+implicit none 
+
+type(SystemBlock) :: Mon
+integer, intent(in) :: NBas
+character(:),allocatable :: rdmfile
+integer :: iunit,ios
+integer :: NRDM2Act
+integer :: Ind1(NBas),Ind2(NBas)
+integer :: i,j,k,l
+double precision :: val
+double precision,parameter :: Half=0.5d0
+integer,external :: NAddrRDM
+
+ if(Mon%Monomer==1) then
+    rdmfile='rdm2_A.dat'
+ elseif(Mon%Monomer==2) then
+    rdmfile='rdm2_B.dat'
+ endif 
+
+ Ind1=0
+ Ind2=0
+ do i=1,Mon%NAct
+    Ind1(i) = Mon%INAct + i
+    Ind2(Mon%INAct+i) = i 
+ enddo
+
+  NRDM2Act = Mon%NAct**2*(Mon%NAct**2+1)/2
+  print*, Mon%NAct,NRDM2Act
+
+  allocate (Mon%RDM2(NRDM2Act))
+  Mon%RDM2(1:NRDM2Act)=0
+
+  open(newunit=iunit,file=rdmfile,status='OLD',&
+       form='FORMATTED')
+  do
+
+     read(iunit,'(4i4,f19.12)',iostat=ios) i,j,k,l,val
+
+!    val IS DEFINED AS: < E(IJ)E(KL) > - DELTA(J,K) < E(IL) > = 2 GAM2(JLIK)
+
+     if(ios==0) then
+        Mon%RDM2(NAddrRDM(j,l,i,k,Mon%NAct))=Half*val
+!       print*, Mon%RDM2(NAddrRDM(j,l,i,k,Mon%NAct))
+
+        i=Ind1(i)
+        j=Ind1(j)
+        k=Ind1(k)
+        l=Ind1(l)
+
+      elseif(ios/=0) then 
+        exit
+
+     endif
+
+  enddo
+  close(iunit)
+
+  allocate(Mon%Ind2(NBas))
+
+  Mon%Ind2 = Ind2
+
+end subroutine read2rdm
+
+subroutine get_den(nbas,MO,Occ,Fac,Den)
 implicit none
 
 integer,intent(in) :: nbas
 double precision, intent(in) :: MO(nbas,nbas)
 double precision, intent(in) :: Occ(nbas)
+double precision, intent(in) :: Fac
 double precision, intent(out) :: Den(nbas,nbas)
 integer :: i
 
 Den = 0
 do i = 1,nbas
-    call dger(nbas, nbas, Occ(i), MO(:, i), 1, MO(:, i), 1, Den, nbas)
+    call dger(nbas, nbas, Fac*Occ(i), MO(:, i), 1, MO(:, i), 1, Den, nbas)
 enddo
 
 end subroutine get_den
