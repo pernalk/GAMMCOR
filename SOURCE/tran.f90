@@ -548,7 +548,8 @@ double precision,allocatable :: tmp(:,:)
 integer :: i,j
 
  allocate(tmp(nbas,nbas))
-
+ ! tmp=Ca^T.MatIn
+ ! MatOut=tmp.Cb
  tmp = 0
  call dgemm('T','N',nbas,nbas,nbas,1d0,Ca,nbas,MatIn,nbas,0d0,tmp,nbas)
  call dgemm('N','N',nbas,nbas,nbas,1d0,tmp,nbas,Cb,nbas,0d0,MatOut,nbas)

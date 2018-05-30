@@ -160,7 +160,7 @@ end type InputData
 type SaptData
 
      type(SystemBlock) :: monA, monB
-     double precision :: Vnn,elst,e2disp
+     double precision :: Vnn,elst,e2ind,e2disp
      integer :: IPrint = 1000
      logical :: EnChck = .true.
 

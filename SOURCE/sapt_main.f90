@@ -45,6 +45,7 @@ double precision :: Tcpu,Twall
  elseif(Flags%ISERPA==2) then
 
     call e1elst(SAPT%monA,SAPT%monB,SAPT)
+    call e1exchs2(SAPT%monA,SAPT%monB,SAPT)
     call e2ind_apsg(Flags,SAPT%monA,SAPT%monB,SAPT)
     call e2disp_apsg(Flags,SAPT%monA,SAPT%monB,SAPT)
 
@@ -367,7 +368,13 @@ integer :: ncen
                   SAPT%monB%num0+SAPT%monB%num1,Cb,&
                   NBasis,Cb,&
                   'TWOMOAB')
- 
+   ! this is for testing E1exchS2...
+   call tran4_gen(NBasis,&
+                  NBasis,Ca,NBasis,Ca,&
+                  NBasis,Cb,NBasis,Cb,&
+                  'TMPMOAB')
+
+
  endif
 
  if(SAPT%IPrint.gt.100) call print_TwoInt(NBasis)
@@ -395,7 +402,13 @@ integer :: ncen
                       (SAPT%monB%num0+SAPT%monB%num1),SAPT%monB%CMO,&
                       NBasis,SAPT%monB%CMO,&
                       'TWOMOAB')
-  endif
+ 
+     !call tran4_gen(NBasis,&
+     !             NBasis,Ca,NBasis,Ca,&
+     !             NBasis,Cb,NBasis,Cb,&
+     !             'TMPMOAB')
+
+ endif
 
 
  deallocate(work1,work2)
@@ -558,10 +571,13 @@ double precision,external  :: trace
       endif
 
       if(Flags%ICASSCF==1.and.Flags%ISHF==0) then
-         ! CAS-SCF
+        ! read 2-RDMs
+         call read2rdm(Mon,NBas)
+        ! CAS-SCF
          call execute_command_line('cp '//rdmfile// ' rdm2.dat')
       elseif(Flags%ICASSCF==1.and.Flags%ISHF==1) then
          ! PINO
+         call read2rdm(Mon,NBas)
          call init_pino(NBas,Mon,Flags%ICASSCF) 
       endif
 

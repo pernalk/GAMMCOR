@@ -2954,7 +2954,6 @@ C
       ETot=ETot+Two*Occ(I)*HNO(II)      
       EndDo
 C
-C
       Do IP=1,NOccup
       Do IQ=1,NOccup
       Do IR=1,NOccup
@@ -3958,6 +3957,7 @@ C
      $  RDM2=RDM2+Two*Occ(IP)*Occ(IQ)
       If(IP.Eq.IS.And.IQ.Eq.IR.And. (Occ(IP).Eq.One.Or.Occ(IQ).Eq.One) )
      $ RDM2=RDM2-Occ(IP)*Occ(IQ)
+C     $ RDM2=RDM2+0
 C
 C     ACTIVE PART?
 C
