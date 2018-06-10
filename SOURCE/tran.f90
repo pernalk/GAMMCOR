@@ -508,32 +508,18 @@ double precision,allocatable :: work1(:),work2(:)
 
 end subroutine make_K
 
-subroutine tran_oneint(ints,MO1,MO2,NSym,GFunc,work,nbas)
+subroutine tran_oneint(ints,MO1,MO2,work,nbas)
 implicit none
 
 integer,intent(in) :: nbas
 double precision,intent(inout),contiguous :: ints(:)
 double precision,intent(in),contiguous :: MO1(:),MO2(:)
-integer :: NSym, GFunc(:)
 double precision,contiguous :: work(:)
-integer :: irep,n2,n
-integer :: offset
 
-offset = 0
-do irep=1,NSym
-   n = nbas
-!   n = GFunc(irep)
-   n2 = n**2
-   if(n>0) then
-      call dgemm('T','N',n,n,n,&
-           1d0,MO1(offset+1:offset+n2),n,ints(offset+1:offset+n2),n,&
-           0d0,work,n)
-      call dgemm('N','N',n,n,n,&
-           1d0,work,n,MO2(offset+1:offset+n2),n,&
-           0d0,ints(offset+1:offset+n2),n)
-   endif
-   offset = offset + n2
-enddo
+ if(nbas>0) then
+    call dgemm('T','N',nbas,nbas,nbas,1d0,MO1,nbas,ints,nbas,0d0,work,nbas)
+    call dgemm('N','N',nbas,nbas,nbas,1d0,work,nbas,MO2,nbas,0d0,ints,nbas)
+ endif
 
 end subroutine tran_oneint
 

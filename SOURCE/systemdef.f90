@@ -271,6 +271,7 @@ elseif(Flags%ISAPT.Eq.1) then
       monA%ThrAct = Input%SystemInput(1)%ThrAct
       monA%ISHF = Input%SystemInput(1)%ISHF
       monA%NCen = Input%SystemInput(1)%NCen
+      monA%UCen = Input%SystemInput(1)%UCen
       monA%Monomer = Input%SystemInput(1)%Monomer
       monA%IPrint = Input%CalcParams%IPrint  
      
@@ -284,6 +285,7 @@ elseif(Flags%ISAPT.Eq.1) then
       monB%ThrAct = Input%SystemInput(2)%ThrAct
       monB%ISHF = Input%SystemInput(2)%ISHF
       monB%NCen = Input%SystemInput(2)%NCen
+      monB%UCen = Input%SystemInput(2)%UCen
       monB%Monomer = Input%SystemInput(2)%Monomer
       monB%IPrint = Input%CalcParams%IPrint  
      
@@ -302,6 +304,7 @@ elseif(Flags%ISAPT.Eq.1) then
       monA%ThrAct = Input%SystemInput(2)%ThrAct
       monA%ISHF = Input%SystemInput(2)%ISHF
       monA%NCen = Input%SystemInput(2)%NCen
+      monA%UCen = Input%SystemInput(2)%UCen
       monA%Monomer = Input%SystemInput(2)%Monomer
       monA%IPrint = Input%CalcParams%IPrint  
      
@@ -315,6 +318,7 @@ elseif(Flags%ISAPT.Eq.1) then
       monB%ThrAct = Input%SystemInput(1)%ThrAct
       monB%ISHF = Input%SystemInput(1)%ISHF
       monB%NCen = Input%SystemInput(1)%NCen
+      monB%UCen = Input%SystemInput(1)%UCen
       monB%Monomer = Input%SystemInput(1)%Monomer
       monB%IPrint = Input%CalcParams%IPrint  
      

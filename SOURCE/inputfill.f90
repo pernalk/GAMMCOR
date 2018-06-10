@@ -359,7 +359,7 @@ character(*), intent(in) :: line
 character(:), allocatable :: key, val
 character(:), allocatable :: first, last
 integer :: test,test2
- 
+
  call split(line, key, val)
  select case (uppercase(key))
  case ("CHARGE")
@@ -373,6 +373,9 @@ integer :: test,test2
 
  case ("NATOMS")
        read(val, *) SystemParams%NCen
+
+ case ("UATOMS")
+       read(val, *) SystemParams%UCen
 ! maybe sth more fancy i.e. swapping monomers
       ! call get_ncen(val,SystemParams)
  case ("THRACT")
@@ -560,6 +563,13 @@ integer :: imon
                     & HAS TO BE GIVEN FOR SAPT!'
          write(LOUT, '(1x,a,3x,i3)') 'NCen', System%NCen 
          stop
+      endif
+    
+      if(System%UCen==0) then
+        System%UCen = System%NCen
+      elseif(System%UCen.lt.0) then
+         write(LOUT,'(1x,a)') 'FATAL ERROR: UAtoms .LT. 0!'
+         stop   
       endif
 
       if(System%Multiplicity.lt.0) then

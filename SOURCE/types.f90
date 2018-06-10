@@ -88,14 +88,15 @@ type SystemBlock
       double precision :: XELE
       double precision :: PotNuc 
       double precision :: SumOcc = 0
-      integer :: NSym = 1
-      integer :: GFunc(8) = 0
+      integer :: NSym 
+      integer :: NSymBas(8),NSymOrb(8)
       integer :: NOrb, NGem
       integer :: NAct, INAct
       integer :: NDim, NDimX
       integer :: NDimN
       integer :: NCen = 0
-      integer :: NMonOrb = 0
+      integer :: UCen = 0  
+      integer :: NMonBas(8) = 0
       integer :: IPrint = 0
       integer :: IWarn = 0
       integer :: icnt
@@ -109,7 +110,7 @@ type SystemBlock
       double precision,allocatable :: OrbE(:)
       double precision,allocatable :: CMO(:,:)
       double precision,allocatable :: WPot(:,:)
-      double precision,allocatable :: RDM2(:)
+      double precision,allocatable :: RDM2(:),RDM2Act(:,:,:,:)
       double precision  :: charg(maxcen),xyz(maxcen,3)
 
 end type SystemBlock
@@ -145,6 +146,8 @@ type FlagsData
      integer :: IFlCore = 1
      integer :: IFlFrag = 0
      integer :: IFl12 = 1
+     ! sapt_main.f90
+     integer :: IFlag0 = 0
 
 end type FlagsData
 
@@ -160,7 +163,7 @@ end type InputData
 type SaptData
 
      type(SystemBlock) :: monA, monB
-     double precision :: Vnn,elst,e2ind,e2disp
+     double precision :: Vnn,elst,e2ind,e2disp,e2disp_unc
      integer :: IPrint = 1000
      logical :: EnChck = .true.
 
@@ -230,6 +233,9 @@ associate( CalcParams => Input%CalcParams)
       write(LOUT, '(1x,a,i2)') "MULTIPLICITY: ", System%Multiplicity
       if(System%NCen.gt.0) then
          write(LOUT, '(1x,a,i2)') "NO. OF ATOMS: ", System%NCen 
+      endif
+      if(System%UCen.gt.0) then
+         write(LOUT, '(1x,a,i2)') "NO. OF SYM. EQUIV. ATOMS: ", System%UCen 
       endif
       if(System%ISHF) then
          write(LOUT, '(1x,a,l2)') "HARTREE-FOCK: ", System%ISHF 
@@ -498,8 +504,10 @@ integer,external :: NAddrRDM
   NRDM2Act = Mon%NAct**2*(Mon%NAct**2+1)/2
   print*, Mon%NAct,NRDM2Act
 
-  allocate (Mon%RDM2(NRDM2Act))
+  allocate(Mon%RDM2(NRDM2Act), &
+           Mon%RDM2Act(Mon%NAct,Mon%NAct,Mon%NAct,Mon%NAct))
   Mon%RDM2(1:NRDM2Act)=0
+  Mon%RDM2Act=0
 
   open(newunit=iunit,file=rdmfile,status='OLD',&
        form='FORMATTED')
@@ -511,7 +519,11 @@ integer,external :: NAddrRDM
 
      if(ios==0) then
         Mon%RDM2(NAddrRDM(j,l,i,k,Mon%NAct))=Half*val
-!       print*, Mon%RDM2(NAddrRDM(j,l,i,k,Mon%NAct))
+        !print*, 'old',Mon%RDM2(NAddrRDM(j,l,i,k,Mon%NAct))
+
+!       not all elements would be included ?
+!        Mon%RDM2Act(j,l,i,k) = Half*val        
+        !print*, 'new',Mon%RDM2Act(j,l,i,k)
 
         i=Ind1(i)
         j=Ind1(j)
@@ -526,11 +538,50 @@ integer,external :: NAddrRDM
   enddo
   close(iunit)
 
+ ! not elegant
+  do i=1,Mon%NAct
+     do j=1,Mon%NAct
+        do k=1,Mon%NAct
+           do l=1,Mon%NAct
+              Mon%RDM2Act(i,j,k,l) = Mon%RDM2(NAddrRDM(i,j,k,l,Mon%NAct))
+           enddo
+        enddo
+     enddo
+  enddo
+
   allocate(Mon%Ind2(NBas))
 
   Mon%Ind2 = Ind2
 
 end subroutine read2rdm
+
+subroutine  square_oneint(tr,sq,nbas,nsym,norb)
+
+implicit none
+integer,intent(in) :: nbas,nsym,norb(8)
+double precision,intent(in) :: tr(:)
+double precision,intent(out) :: sq(nbas,nbas)
+integer :: irep,i,j
+integer :: offset,idx 
+
+sq=0
+
+offset=0
+idx=0
+do irep=1,nsym
+   do j=offset+1,offset+norb(irep)
+      do i=offset+1,j
+
+         idx=idx+1
+         sq(i,j)=tr(idx)
+         sq(j,i)=tr(idx)
+
+      enddo
+   enddo
+   offset=offset+norb(irep)
+enddo
+
+end subroutine square_oneint
 
 subroutine get_den(nbas,MO,Occ,Fac,Den)
 implicit none
@@ -608,12 +659,13 @@ character(:),allocatable :: onefile
 
 end subroutine get_one_mat
 
-subroutine basinfo(nbas,basfile)
+subroutine basinfo(nbasis,basfile)
 implicit none
 
+character(*),intent(in) :: basfile
+integer,intent(out) :: nbasis
 integer :: iunit 
-character(*) :: basfile
-integer :: nsym,nbas,norb,nrhf,ioprhf
+integer :: nsym,nbas(8),norb(8),nrhf(8),ioprhf
 logical :: ex
 
  inquire(file=basfile,EXIST=ex)
@@ -626,13 +678,17 @@ logical :: ex
     call readlabel(iunit,'BASINFO ')
    
     read (iunit) nsym,nbas,norb,nrhf,ioprhf
-!   write(LOUT,'(1x,a)')  nsym,nbas,norb,nrhf,ioprhf
-   
+    !write(LOUT,*)  nsym,nbas,norb,nrhf,ioprhf
+
     close(iunit)
+
+    nbasis = sum(nbas(1:nsym))
+
  else
     write(LOUT,'(1x,a)') 'WARNING: '// basfile //' NOT FOUND!'
     write(LOUT,'(1x,a)') 'TRYING TO READ NBasis FROM INPUT!'
  endif
+
 
 end subroutine basinfo
 

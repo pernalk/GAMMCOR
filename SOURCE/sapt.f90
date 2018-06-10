@@ -91,7 +91,7 @@ double precision,allocatable :: Va(:,:),Vb(:,:), &
 double precision,allocatable :: tmp1(:,:),tmp2(:,:)
 double precision,allocatable :: tmpA(:,:,:,:),tmpB(:,:,:,:), &
                                 tmpAB(:,:,:,:)
-double precision,allocatable :: work(:,:)
+double precision,allocatable :: work(:,:),rdm2B(:,:,:,:)
 double precision :: tmp,ea,eb,exchs2
 double precision :: t1(2),t2a(4),t2b(2),t2c(2),t2d
 double precision :: t1f,t2f
@@ -240,7 +240,39 @@ double precision,external  :: trace,FRDM2
     enddo
  enddo
  t2c(2) = -2d0*t2c(2)
+ write(LOUT,*)
  write(LOUT,*) 'T2c(2) ',t2c(2)
+! TEST
+ print*, B%NAct,B%INAct
+ tmp=0
+ do ip=1,B%NAct
+    do iq=1,B%NAct
+       do ir=1,B%NAct
+          do is=1,B%NAct
+             tmp = tmp + B%RDM2Act(ip,iq,ir,is) * &
+                    Vabb(B%INAct+ip,B%INAct+ir)*PAbb(B%INAct+is,B%INAct+iq)
+          enddo
+       enddo    
+    enddo
+ enddo
+ write(LOUT,*) 'test(2) ',-2d0*tmp
+!
+ tmp=0
+ do ip=1,NBas
+    do iq=1,NBas
+       tmp = tmp + B%Occ(ip)*B%Occ(iq)*Vabb(ip,ip)*PAbb(iq,iq)
+    enddo
+ enddo
+ tmp = -4d0*tmp
+ print*, 'test(2-1)', tmp
+ tmp=0
+ do ip=1,NBas
+    do iq=1,NBas
+       tmp = tmp + B%Occ(ip)*B%Occ(iq)*Vabb(ip,iq)*PAbb(ip,iq)
+    enddo
+ enddo
+ tmp = 2d0*tmp
+ print*, 'test(2-2)',tmp
 !
 ! 
 ! T2b
@@ -714,12 +746,22 @@ integer :: dimOA,dimVA,dimOB,dimVB,nOVA,nOVB
 integer :: iunit
 integer :: i,j,pq,rs
 integer :: ip,iq,ir,is
-double precision,allocatable :: OmA(:),OmB(:)
-double precision,allocatable :: EVecA(:),EVecB(:)
-double precision,allocatable :: tmp1(:,:),tmp2(:,:) 
+integer :: kc, ik, ic
+double precision,allocatable :: OmA(:), OmB(:), &
+                                OmA0(:),OmB0(:),&
+                                OmA1(:),OmB1(:)
+double precision,allocatable :: EVecA(:), EVecB(:), &
+                                EVecA0(:),EVecB0(:),& 
+                                EVecA1(:),EVecB1(:)
+double precision,allocatable :: tmp1(:,:),tmp2(:,:),&
+                                tmp01(:,:),tmp02(:,:),&  
+                                sc10a(:,:),sc10b(:,:),&
+                                sc01b(:,:)
 double precision,allocatable :: work(:)
+double precision,allocatable :: tmp03(:,:) 
 double precision :: e2d,fact,tmp
 double precision :: e2du,dea,deb
+double precision :: e2ds,e2ds1,e2ds2
 double precision,parameter :: SmallE = 1.D-3
 double precision,parameter :: BigE = 1.D8 
 
@@ -748,13 +790,31 @@ double precision,parameter :: BigE = 1.D8
 
 ! read EigValA_B
  allocate(EVecA(A%NDimX*A%NDimX),OmA(A%NDimX),&
-          EVecB(B%NDimX*B%NDimX),OmB(B%NDimX))
+          EVecB(B%NDimX*B%NDimX),OmB(B%NDimX),&
+          EVecA0(A%NDimX*A%NDimX),OmA0(A%NDimX),&
+          EVecB0(B%NDimX*B%NDimX),OmB0(B%NDimX))  
+ if(Flags%IFlag0==0) then
+    allocate(EVecA1(A%NDimX*A%NDimX),OmA1(A%NDimX),&
+             EVecB1(B%NDimX*B%NDimX),OmB1(B%NDimX))  
+ endif           
 
  call readresp(EVecA,OmA,A%NDimX,'PROP_A')
  call readresp(EVecB,OmB,B%NDimX,'PROP_B')
 
-! print*, norm2(OmA)
-! print*, norm2(EVecA)
+ call readresp(EVecA0,OmA0,A%NDimX,'PROP_A0')
+ call readresp(EVecB0,OmB0,B%NDimX,'PROP_B0')
+
+ if(Flags%IFlag0==0) then
+    call readresp(EVecA1,OmA1,A%NDimX,'PROP_A1')
+    call readresp(EVecB1,OmB1,B%NDimX,'PROP_B1')
+ endif
+
+ !print*, 'Normy:'
+ !print*, norm2(OmB)
+ !print*, norm2(OmB0)
+ !print*, norm2(OmB1)
+! print*, norm2(EVecB)
+! print*, norm2(EVecB0)
 ! print*, norm2(OmB)
 ! print*, norm2(EVecB)
 !
@@ -800,7 +860,65 @@ open(newunit=iunit,file='TWOMOAB',status='OLD',&
      access='DIRECT',form='UNFORMATTED',recl=8*nOVB)
 
 if(Flags%ISHF==1) then
+
+allocate(tmp01(A%NDimX,B%NDimX),tmp02(A%NDimX,B%NDimX),&
+         tmp03(A%NDimX,B%NDimX))
+ tmp01=0
+ tmp03=0
+ do pq=1,A%NDimX
+    ip = A%IndN(1,pq)
+    iq = A%IndN(2,pq)
+    ! print*, iq,ip,iq+(ip-A%num0-1)*dimOA,nOVA
+    read(iunit,rec=iq+(ip-A%num0-1)*dimOA) work(1:nOVB)
+    do rs=1,B%NDimX
+       ir = B%IndN(1,rs)
+       is = B%IndN(2,rs)
+
+       fact = &
+              work(is+(ir-B%num0-1)*dimOB)
+
+       do i=1,A%NDimX
+
+          tmp01(i,rs) = tmp01(i,rs) + &
+                       fact * &
+                       EVecA1(pq+(i-1)*A%NDimX)
+
+          tmp03(i,rs) = tmp03(i,rs) + &
+                       fact * sqrt(2d0) * &
+                       EVecA0(pq+(i-1)*A%NDimX)
+
+       enddo
+
+    enddo
+ enddo
+
+ tmp02=0
+ do j=1,B%NDimX
+    do pq=1,A%NDimX
+    ip = A%IndN(1,pq)
+    iq = A%IndN(2,pq)
+    ! print*, iq,ip,iq+(ip-A%num0-1)*dimOA,nOVA
+    read(iunit,rec=iq+(ip-A%num0-1)*dimOA) work(1:nOVB)
+ 
+       do rs=1,B%NDimX
+       ir = B%IndN(1,rs)
+       is = B%IndN(2,rs)
+
+       tmp02(pq,j) = tmp02(pq,j) + &
+                    EVecB1(rs+(j-1)*B%NDimX)*&!tmp01(i,rs)
+                    !work(is+(ir-B%num0-1)*dimOB)
+                    tmp03(pq,rs)
+       enddo
+    enddo  
+ enddo
+
+
+
+
    e2du=0d0
+   e2ds2=0d0
+   e2ds1=0d0
+   tmp=0d0
    do pq=1,A%NDimX
       ip = A%IndN(1,pq)
       iq = A%IndN(2,pq)
@@ -812,14 +930,51 @@ if(Flags%ISHF==1) then
          is = B%IndN(2,rs)
          deb = B%OrbE(ir)-B%OrbE(is) 
    !      print*, is,ir,is+(ir-B%num0-1)*dimOB,nOVB
+
+         tmp=0
+         do kc=1,B%NDimX
+            ik = B%IndN(1,kc)
+            ic = B%IndN(2,kc)
+            tmp = tmp + work(ic+(ik-B%num0-1)*dimOB)*EVecB1(kc+(rs-1)*B%NDimX)
+         enddo
+
+       if(OmA0(pq).gt.SmallE.and.OmB0(rs).gt.SmallE&
+        .and.OmA0(pq).lt.BigE.and.OmB0(rs).lt.BigE) then
+
          e2du = e2du + work(is+(ir-B%num0-1)*dimOB)**2/(dea+deb)
+         !e2ds2 = e2ds2 + work(is+(ir-B%num0-1)*dimOB)**2*(OmA1(pq)+OmB1(rs))/(OmA0(pq)+OmB0(rs))**2
+         e2ds2 = e2ds2 + work(is+(ir-B%num0-1)*dimOB)**2*(OmA1(pq)+OmB1(rs))/(dea+deb)**2
+        ! e2ds1 = e2ds1 + (tmp02(pq,rs)+tmp01(pq,rs))*work(is+(ir-B%num0-1)*dimOB)/(OmA0(pq)+OmB0(rs))
+         e2ds1 = e2ds1 + (tmp+tmp01(pq,rs))*work(is+(ir-B%num0-1)*dimOB)/(OmA0(pq)+OmB0(rs))
+
+       endif
+ 
       enddo
    enddo
     write(LOUT,'()') 
-    write(LOUT,'(1x,a,f16.8)')'E2disp(unc) = ', -4d0*e2du*1000d0 
+    e2ds = (-4d0*e2du-16/sqrt(2d0)*e2ds1+4d0*e2ds2)*1000
+    print*, -16/sqrt(2d0)*e2ds1*1000
+    write(LOUT,'(1x,a,f16.8)')'SPOLE:      = ', -4d0*e2du*1000d0 + 4d0*e2ds2*1000d0
+    write(LOUT,'(1x,a,f16.8)')'E2disp(sc)  = ', e2ds
+    write(LOUT,'(1x,a,f16.8)')'E2disp(unc) = ', -4d0*e2du*1000d0
+    e2ds  = 0
+    e2ds1 = 0
+    e2ds2 = 0 
+
+deallocate(tmp01,tmp02,tmp03)
 endif
 
-allocate(tmp1(A%NDimX,B%NDimX),tmp2(A%NDimX,B%NDimX))
+allocate(tmp1(A%NDimX,B%NDimX),tmp2(A%NDimX,B%NDimX),&
+        tmp01(A%NDimX,B%NDimX),tmp02(A%NDimX,B%NDimX))
+
+if(Flags%IFlag0==0) then
+! print*, 'tttesst?'
+ allocate(sc10a(A%NDimX,B%NDimX),sc10b(A%NDimX,B%NDimX),&
+          sc01b(A%NDimX,B%NDimX))
+ sc10a = 0
+ sc10b = 0
+ sc01b = 0
+endif
 
 !print*, 'A-ndimX',A%NDimX
 
@@ -832,6 +987,7 @@ allocate(tmp1(A%NDimX,B%NDimX),tmp2(A%NDimX,B%NDimX))
 
 ! coupled - 0
  tmp1=0
+ tmp01=0
  do pq=1,A%NDimX
     ip = A%IndN(1,pq)
     iq = A%IndN(2,pq)
@@ -851,12 +1007,22 @@ allocate(tmp1(A%NDimX,B%NDimX),tmp2(A%NDimX,B%NDimX))
           tmp1(i,rs) = tmp1(i,rs) + & 
                        fact * &
                        EVecA(pq+(i-1)*A%NDimX)
+
+          tmp01(i,rs) = tmp01(i,rs) + & 
+                       fact * &
+                       EVecA0(pq+(i-1)*A%NDimX)
+
+          sc10a(i,rs) = sc10a(i,rs) + & 
+                       fact * &
+                       EVecA1(pq+(i-1)*A%NDimX)
+
        enddo
  !      endif
 
     enddo
  enddo
  tmp2=0
+ tmp02=0
  do j=1,B%NDimX
 !    if(OmB(j).gt.SmallE.and.OmB(j).lt.1d20) then
     do i=1,A%NDimX
@@ -865,6 +1031,17 @@ allocate(tmp1(A%NDimX,B%NDimX),tmp2(A%NDimX,B%NDimX))
        is = B%IndN(2,rs)
        tmp2(i,j) = tmp2(i,j) + &
                     EVecB(rs+(j-1)*B%NDimX)*tmp1(i,rs)
+
+       tmp02(i,j) = tmp02(i,j) + &
+                    EVecB0(rs+(j-1)*B%NDimX)*tmp01(i,rs)
+
+       sc10b(i,j) = sc10b(i,j) + &
+                    EVecB0(rs+(j-1)*B%NDimX)*sc10a(i,rs)
+
+       sc01b(i,j) = sc01b(i,j) + &
+                    EVecB1(rs+(j-1)*B%NDimX)*tmp01(i,rs)
+                    !work(is+(ir-B%num0-1)*dimOB)
+
        enddo
     enddo  
 !    endif 
@@ -901,19 +1078,49 @@ allocate(tmp1(A%NDimX,B%NDimX),tmp2(A%NDimX,B%NDimX))
 !    enddo   
 ! enddo
 
+ e2du=0d0
+ e2ds1=0d0
+ e2ds2=0d0
+ do i=1,A%NDimX
+    do j=1,B%NDimX
+       ! remove this if later!!!!
+       if(OmA0(i).gt.SmallE.and.OmB0(j).gt.SmallE&
+        .and.OmA0(i).lt.BigE.and.OmB0(j).lt.BigE) then
+
+       e2du = e2du + tmp02(i,j)**2/(OmA0(i)+OmB0(j))
+       e2ds2 = e2ds2 + (OmA1(i)+OmB1(j))*tmp02(i,j)**2/(OmA0(i)+OmB0(j))**2
+       e2ds1 = e2ds1 + tmp02(i,j)*(sc10b(i,j)+sc01b(i,j))/(OmA0(i)+OmB0(j))
+
+       endif
+    enddo
+ enddo
+ SAPT%e2disp_unc = -16d0*e2du
+ e2du = -16d0*e2du*1000d0
+ print*, 'SPOLE:   ',e2du+16*e2ds2*1000
+ print*, 'E2DS1:   ',-32*e2ds1*1000
+ e2ds= e2du+(16*e2ds2-32*e2ds1)*1000
+ write(LOUT,'(1x,a,f16.8)')'E2disp(sc) =  ', e2ds
+
  e2d = 0d0
  do i=1,A%NDimX
     do j=1,B%NDimX
        ! remove this if later!!!!
        if(OmA(i).gt.SmallE.and.OmB(j).gt.SmallE&
           .and.OmA(i).lt.BigE.and.OmB(j).lt.BigE) then
+
        e2d = e2d + tmp2(i,j)**2/(OmA(i)+OmB(j))
+!       e2du = e2du + tmp02(i,j)**2/(OmA0(i)+OmB0(j))
+
        endif
     enddo
  enddo
  SAPT%e2disp = -16d0*e2d
- e2d = -16d0*e2d*1000d0
- write(LOUT,'(/1x,a,f16.8)') 'E2disp      = ',e2d
+! SAPT%e2disp_unc = -16d0*e2du
+! e2du = -16d0*e2du*1000d0
+ e2d  = -16d0*e2d*1000d0
+ write(LOUT,'(/1x,a,f16.8)')'E2disp(unc) = ', e2du
+ write(LOUT,'(1x,a,f16.8)') 'E2disp      = ',e2d
+
 
 !! coupled - TEST!
 ! e2d = 0d0
@@ -946,8 +1153,12 @@ allocate(tmp1(A%NDimX,B%NDimX),tmp2(A%NDimX,B%NDimX))
  close(iunit)
  deallocate(work)
 
- deallocate(tmp1,tmp2)
- deallocate(EVecA,EVecB,OmA,OmB)
+ if(Flags%IFlag0==0) then
+    deallocate(OmB1,EVecB1,OmA1,EVecA1)
+ endif
+
+ deallocate(tmp02,tmp01,tmp2,tmp1)
+ deallocate(OmB0,EVecB0,OmA0,EVecA0,OmB,EVecB,OmA,EVecA)
 
 end subroutine e2disp
 

@@ -830,6 +830,64 @@ C
       Return
       End
 
+C*Deck ERPAVEC
+C      Subroutine ERPAVEC(EigVecR,Eig,ABPLUS,ABMIN,NBasis,NDimX)
+CC
+C      Implicit Real*8 (A-H,O-Z)
+CC
+C      Parameter(Zero=0.D0,Half=0.5D0,One=1.D0,Two=2.D0,Three=3.D0,
+Cc     set small being a square of small in Deck EneERPA
+C     $ Four=4.D0, Small=1.D-6)
+CC
+C      Include 'commons.inc'
+CC
+C      Dimension
+C     $ ABPLUS(NDimX,NDimX),ABMIN(NDimX,NDimX),
+C     $ HlpAB(NDimX,NDimX),
+C     $ EigVecR(NDimX*NDimX),EigVecL(NDimX*NDimX),
+C     $ Eig(NDimX),EigI(NDimX),Work(5*NDimX)
+CC
+C      Call MultpM(HlpAB,ABPLUS,ABMIN,NDimX)
+CC
+C      Call DGEEV('N','V',NDimX,HlpAB,NDimX,Eig,EigI,
+C     $           EigVecL,NDimX,EigVecR,NDimX,Work,5*NDimX,INFO)
+CC
+CC     IMPOSE THE NORMALIZATION 2 Y*X = 1 ON THE EIGENVECTORS CORRESPONDING TO POSITIVE
+CC     OMEGA'S 
+CC
+CC     SINCE X = Om^-1 ABMIN.Y THEN THE NORMALIZATION READS 2 Om^-1 Y^T AMIN Y = 1
+CC
+C      Do NU=1,NDimX
+C      SumNU=Zero
+CC
+C      If(Eig(NU).Gt.Small) Then
+CC    
+C      Eig(NU)=SQRT(Eig(NU))
+CC
+C      Do I=1,NDimX
+C      Do J=1,NDimX
+C      SumNU=SumNU+Two/Eig(NU)*ABMIN(I,J)*
+C     $ EigVecR((NU-1)*NDimX+I)*EigVecR((NU-1)*NDimX+J)
+C      EndDo
+C      EndDo
+CC
+C      If(SumNU.Gt.Zero) Then
+C      SumNU=One/Sqrt(SumNU)
+C      Else
+C      SumNU=Zero
+C      EndIf
+CC
+C      Do I=1,NDimX
+C      EigVecR((NU-1)*NDimX+I)=EigVecR((NU-1)*NDimX+I)*SumNU
+C      EndDo
+CC
+C      EndIf
+Cc     enddo NU
+C      EndDo
+CC
+C      Return
+C      End
+
 *Deck ERPAVEC
       Subroutine ERPAVEC(EigVecR,Eig,ABPLUS,ABMIN,NBasis,NDimX)
 C
@@ -847,6 +905,17 @@ C
      $ EigVecR(NDimX*NDimX),EigVecL(NDimX*NDimX),
      $ Eig(NDimX),EigI(NDimX),Work(5*NDimX)
 C
+C     SYMMETRIZE A+,A-
+C
+      Do I=1,NDimX
+      Do J=I+1,NDimX
+      ABPLUS(I,J)=Half*(ABPLUS(I,J)+ABPLUS(J,I))
+      ABPLUS(J,I)=ABPLUS(I,J)
+      ABMIN(I,J)=Half*(ABMIN(I,J)+ABMIN(J,I))
+      ABMIN(J,I)=ABMIN(I,J)
+      EndDo
+      EndDo
+C
       Call MultpM(HlpAB,ABPLUS,ABMIN,NDimX)
 C
       Call DGEEV('N','V',NDimX,HlpAB,NDimX,Eig,EigI,
@@ -858,10 +927,119 @@ C
 C     SINCE X = Om^-1 ABMIN.Y THEN THE NORMALIZATION READS 2 Om^-1 Y^T AMIN Y = 1
 C
       Do NU=1,NDimX
+C
+      If(Abs(EigI(NU)).Gt.1.D-12) Then
+C
+      Write(6,'(X,"Complex ERPA Eigenvalue",I4,2E12.4)')
+     $ NU,Eig(NU),EigI(NU)
+      Eig(NU)=Zero
+      Do I=1,NDimX
+      EigVecR((NU-1)*NDimX+I)=Zero
+      EndDo
+C
+      EndIf
+      EndDo
+C
+      Do NU=1,NDimX
       SumNU=Zero
 C
       If(Eig(NU).Gt.Small) Then
-C    
+C   
+      Eig(NU)=SQRT(Eig(NU))
+C
+      Do I=1,NDimX
+      Do J=1,NDimX
+      SumNU=SumNU+Two/Eig(NU)*ABMIN(I,J)*
+     $ EigVecR((NU-1)*NDimX+I)*EigVecR((NU-1)*NDimX+J)
+      EndDo
+      EndDo 
+      If(SumNu.Lt.Zero) Write(6,'(X,"Negative Excit Norm",I4,2E12.4)')
+     $  NU,Eig(NU),SumNU
+C
+C     If SumNU < 0 the eigenvector corresponds to deexcitation, normalize it to -1
+C
+c      If(SumNU.Gt.Zero) Then
+c      SumNU=One/Sqrt(SumNU)
+c      Else
+c      SumNU=Zero
+c      EndIf
+      SumNU=One/Sqrt(Abs(SumNU))
+C
+      ElseIf(Eig(NU).Ne.Zero) Then
+      Write(6,'(X,"Negative ERPA Eigenvalue",I4,2E12.4)')
+     $ NU,Eig(NU),EigI(NU)
+      Eig(NU)=Zero
+      SumNU=Zero
+C
+      EndIf
+C
+      Do I=1,NDimX
+      EigVecR((NU-1)*NDimX+I)=EigVecR((NU-1)*NDimX+I)*SumNU
+      EndDo
+C
+c     enddo NU
+      EndDo
+C
+      Return
+      End
+
+*Deck ERPAVECYX
+      Subroutine ERPAVECYX(EigVecR,EigVecL,Eig,ABPLUS,ABMIN,NDimX)
+C
+      Implicit Real*8 (A-H,O-Z)
+C
+      Parameter(Zero=0.D0,Half=0.5D0,One=1.D0,Two=2.D0,Three=3.D0,
+c     set small being a square of small in Deck EneERPA
+     $ Four=4.D0, Small=1.D-6)
+C
+      Include 'commons.inc'
+C
+      Dimension
+     $ ABPLUS(NDimX,NDimX),ABMIN(NDimX,NDimX),
+     $ HlpAB(NDimX,NDimX),
+     $ EigVecR(NDimX*NDimX),EigVecL(NDimX*NDimX),
+     $ Eig(NDimX),EigI(NDimX),Work(5*NDimX)
+C
+C     SYMMETRIZE A+,A-
+C
+      Do I=1,NDimX
+      Do J=I+1,NDimX
+      ABPLUS(I,J)=Half*(ABPLUS(I,J)+ABPLUS(J,I))
+      ABPLUS(J,I)=ABPLUS(I,J)
+      ABMIN(I,J)=Half*(ABMIN(I,J)+ABMIN(J,I))
+      ABMIN(J,I)=ABMIN(I,J)
+      EndDo
+      EndDo
+C
+      Call MultpM(HlpAB,ABPLUS,ABMIN,NDimX)
+C
+      Call DGEEV('N','V',NDimX,HlpAB,NDimX,Eig,EigI,
+     $           EigVecL,NDimX,EigVecR,NDimX,Work,5*NDimX,INFO)
+C
+C     IMPOSE THE NORMALIZATION 2 Y*X = 1 ON THE EIGENVECTORS CORRESPONDING TO POSITIVE
+C     OMEGA'S 
+C
+C     SINCE X = Om^-1 ABMIN.Y THEN THE NORMALIZATION READS 2 Om^-1 Y^T AMIN Y = 1
+C
+      Do NU=1,NDimX
+C
+      If(Abs(EigI(NU)).Gt.1.D-12) Then
+C
+      Write(6,'(X,"Complex ERPA Eigenvalue",I4,2E12.4)')
+     $ NU,Eig(NU),EigI(NU)
+      Eig(NU)=Zero
+      Do I=1,NDimX
+      EigVecR((NU-1)*NDimX+I)=Zero
+      EndDo
+C
+      EndIf
+      EndDo
+C
+      Do NU=1,NDimX
+      SumNU=Zero
+C
+      If(Eig(NU).Gt.Small) Then
+C   
       Eig(NU)=SQRT(Eig(NU))
 C
       Do I=1,NDimX
@@ -871,14 +1049,47 @@ C
       EndDo
       EndDo
 C
-      If(SumNU.Gt.Zero) Then
-      SumNU=One/Sqrt(SumNU)
-      Else
+      If(SumNu.Lt.Zero) Write(6,'(X,"Negative Excit Norm",I4,2E12.4)')
+     $  NU,Eig(NU),SumNU 
+C      
+      Work(NU)=One
+      If(SumNU.Lt.Zero) Work(NU)=-One
+      SumNU=One/Sqrt(Abs(SumNU))
+C
+      ElseIf(Eig(NU).Ne.Zero) Then
+      Write(6,'(X,"Negative ERPA Eigenvalue",I4,2E12.4)')
+     $ NU,Eig(NU),EigI(NU)
+      Eig(NU)=Zero
       SumNU=Zero
+C
       EndIf
 C
       Do I=1,NDimX
       EigVecR((NU-1)*NDimX+I)=EigVecR((NU-1)*NDimX+I)*SumNU
+      EndDo
+C
+c     enddo NU
+      EndDo
+C
+C     COMPUTE EigX
+C
+      Do NU=1,NDimX
+C
+      If(Eig(NU).Gt.Small) Then
+C    
+      Do I=1,NDimX
+      EigVecL((NU-1)*NDimX+I)=Zero
+      Do J=1,NDimX
+      EigVecL((NU-1)*NDimX+I)=EigVecL((NU-1)*NDimX+I)
+     $ +Work(NU)*One/Eig(NU)*ABMIN(I,J)*EigVecR((NU-1)*NDimX+J)
+      EndDo
+      EndDo
+C
+      Else
+C
+      Do I=1,NDimX
+      EigVecR((NU-1)*NDimX+I)=Zero
+      EigVecL((NU-1)*NDimX+I)=Zero
       EndDo
 C
       EndIf
@@ -887,6 +1098,7 @@ c     enddo NU
 C
       Return
       End
+
 
 *Deck ERPASYMM0
       Subroutine ERPASYMM0(EigY,EigX,Eig,APLSQRT,ABMIN,NDimX)
