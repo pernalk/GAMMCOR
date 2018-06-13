@@ -39,9 +39,9 @@ double precision :: Tcpu,Twall
 
     call e1elst(SAPT%monA,SAPT%monB,SAPT)
     ! temporary here!!!!
-!    if(Flags%ICASSCF==1) then
-!       call e1exchs2(SAPT%monA,SAPT%monB,SAPT)
-!    endif
+    if(Flags%ICASSCF==1) then
+       call e1exchs2(SAPT%monA,SAPT%monB,SAPT)
+    endif
     call e2ind(Flags,SAPT%monA,SAPT%monB,SAPT)
     call e2disp(Flags,SAPT%monA,SAPT%monB,SAPT)
 
@@ -250,7 +250,7 @@ integer :: ncen
     call readmulti(NBasis,SAPT%monA,.false.,exsiri,isiri,'occupations_A.dat','SIRIUS_A.RST')
 
  elseif(Flags%ICASSCF==1.and.Flags%ISHF==0.and.SAPT%monA%NELE==1.and.Flags%ISERPA==0.and.(.not.SAPT%monA%ISHF)) then
-    print*, 'here?'
+    print*, 'here?-why so?'
     ! CASSCF
     ! for 2-el electron case: read from occupations.dat
     call readmulti(NBasis,SAPT%monA,.false.,.false.,isiri,'occupations_A.dat','SIRIUS_A.RST')
@@ -307,7 +307,8 @@ integer :: ncen
 
     ! CASSCF
     ! for 2-el electron case: read from occupations.dat
-    call readmulti(NBasis,SAPT%monB,.false.,.false.,isiri,'occupations_B.dat','SIRIUS_B.RST')
+    ! info in SIRIFC seems wrong in this case?
+     call readmulti(NBasis,SAPT%monB,.false.,.false.,isiri,'occupations_B.dat','SIRIUS_B.RST')
 
  elseif(Flags%ICASSCF==1.and.Flags%ISHF==0.and.SAPT%monB%NELE==1.and.Flags%ISERPA==2) then
 
@@ -343,6 +344,14 @@ integer :: ncen
               'SIRIUS_B.RST','DALTON_B.MOPUN')
 
  call arrange_mo(Cb,NBasis,SAPT)
+
+! HERE NEW STUFF
+ if(SAPT%monA%NSym.gt.1) then
+    call sort_sym_mo(Ca,NBasis,SAPT%monA)
+ endif
+ if(SAPT%monB%NSym.gt.1) then
+    call sort_sym_mo(Cb,NBasis,SAPT%monB)
+ endif
 
 ! MAYBE: one should print with NOrbt?
  !if(SAPT%IPrint.ne.0) call print_mo(Ca,NBasis,'MONOMER A')
@@ -699,6 +708,9 @@ double precision,external  :: trace
    Eig = 0
    call ERPASYMM1(EigVecR,Eig,ABPlus,ABMin,NBas,Mon%NDimX)
  
+  !print*, 'Entering ERPAVEC...' 
+  ! call ERPAVEC(EigVecR,Eig,ABPlus,ABMin,NBas,Mon%NDimX)
+ 
   if(EChck) then
       call ACEneERPA(ECorr,EigVecR,Eig,TwoMO,URe,Mon%Occ,XOne,&
                      Mon%IndN,NBas,NInte1,NInte2,Mon%NDimX,Mon%NGem)
@@ -794,7 +806,7 @@ integer :: EigNum
  if(Mon%Monomer==1) then
     EigNum=1
  elseif(Mon%Monomer==2) then
-    EigNum=1
+    EigNum=2
  endif
 
  call OptTwo1(ETot,Mon%PotNuc,URe,Mon%Occ,XOne,TwoMO,NSymMO, &
@@ -1476,15 +1488,20 @@ integer :: isiri, nbas
 character(*) :: occfile, occsir 
 logical :: ihf
 logical :: iocc
-integer :: iunit,i
-integer :: NAct, INAct
+integer :: iunit,ios,i
+integer :: NAct, INAct, NActS(8), INActS(8)
+integer :: irep,TotEl,offset
 double precision :: Occ(nbas), sum1, sum2
 double precision :: potnuc, emy, eactiv, emcscf
 integer :: istate, ispin, nactel, lsym
-integer :: nisht, nasht, nocct, norbt, nbast, nconf, nwopt, nwoph
+!integer :: nisht, nasht, nocct, norbt, nbast, nconf, nwopt, nwoph
+integer :: NISHT,NASHT,NOCCT,NORBT,NBAST,NCONF,NWOPT,NWOPH,&
+           NCDETS, NCMOT,NNASHX,NNASHY,NNORBT,N2ORBT,&
+           NSYM,MULD2H(8,8),NRHF(8),NFRO(8),NISH(8),NASH(8),NORB(8),NBASM(8) 
 
  allocate(mon%CICoef(nbas),mon%IGem(nbas),mon%Occ(nbas))
  ioccsir=.false.
+ print*, 'SIRI?',exsiri
  !exsiri=.false.
  if(exsiri) then
 
@@ -1492,8 +1509,11 @@ integer :: nisht, nasht, nocct, norbt, nbast, nconf, nwopt, nwoph
     read (isiri) 
     read (isiri) potnuc,emy,eactiv,emcscf, &
                  istate,ispin,nactel,lsym
-    read (isiri) nisht,nasht,nocct,norbt,nbast !,nconf,nwopt,nwoph
-   
+!    read (isiri) nisht,nasht,nocct,norbt,nbast !,nconf,nwopt,nwoph
+    read (isiri) NISHT,NASHT,NOCCT,NORBT,NBAST,NCONF,NWOPT,NWOPH,&
+              NCDETS, NCMOT,NNASHX,NNASHY,NNORBT,N2ORBT,&
+              NSYM,MULD2H,NRHF,NFRO,NISH,NASH,NORB,NBASM 
+  
 !    print*,    potnuc,emy,eactiv,emcscf, &
 !               istate,ispin,nactel,lsym
  !   print*, 'READM-TEST'
@@ -1501,6 +1521,9 @@ integer :: nisht, nasht, nocct, norbt, nbast, nconf, nwopt, nwoph
    
     mon%NAct  = nasht
     mon%INAct = nisht
+!    print*, nasht, nisht, norbt, nactel 
+!    print*, 'nash',nash
+!    print*, 'wtf?',sum(nash), sum(nish)
 
     if(nbast.ne.nbas) then
       write(LOUT,'(1x,a)') 'WARNING! NBasis FROM SIRIFC DOES NOT MATCH!'
@@ -1521,6 +1544,7 @@ integer :: nisht, nasht, nocct, norbt, nbast, nconf, nwopt, nwoph
          read(iunit) mon%Occ(1:mon%NAct+mon%INAct) 
    
          close(iunit)
+  
       endif
    elseif(ihf) then
       ! Hartree-Fock case
@@ -1542,8 +1566,10 @@ integer :: nisht, nasht, nocct, norbt, nbast, nconf, nwopt, nwoph
  if(iocc) then
  
     Occ = 0d0
+    INActS = 0
+    NActS  = 0
     open(newunit=iunit,file=occfile,form='FORMATTED',status='OLD') 
- 
+
     read(iunit,*) INAct, NAct
     INAct = INAct/2
     read(iunit,*) (Occ(i),i=1,INAct+NAct)
@@ -1553,13 +1579,45 @@ integer :: nisht, nasht, nocct, norbt, nbast, nconf, nwopt, nwoph
        sum2 = sum2 + Occ(i)
     enddo
 
+    ! (in)active orbs in each symmetry
+    read(iunit,*,iostat=ios) (INActS(i),i=1,mon%NSym)
+    if(ios==0) then
+       read(iunit,*) (NActS(i),i=1,mon%NSym)
+       mon%INActS(1:mon%NSym) = INActS(1:mon%NSym)
+       mon%NActS(1:mon%NSym)  = NActS(1:mon%NSym)
+    endif
+
+    if(mon%NSym.gt.1) then
+      call sort_sym_occ(nbas,mon%NSym,INAct,NAct,INActS,NActS,Occ)
+    endif
+
+!    offset = 0
+!    sum2 = 0d0
+!    do irep=1,mon%NSym
+!       read(iunit,*,iostat=ios) INActS(irep), NActS(irep)
+!       INActS(irep) = INActS(irep)/2
+!       TotEl = INActS(irep) + NActS(irep)
+!       ! print*, 'TotEl',TotEl,offset
+!       if(TotEl.gt.0) read(iunit,*) (Occ(i),i=offset+1,offset+TotEl)
+!       do i=offset+1,offset+TotEl
+!          Occ(i) = Occ(i)/2d0
+!          sum2 = sum2 + Occ(i)
+!       enddo
+!       offset = offset + mon%NSymOrb(irep)
+!       ! print*, 'offs',offset
+!    enddo
+!    INAct = sum(INActS)
+!    NAct  = sum(NActS)
+!    mon%INActS(1:mon%NSym) = INActS(1:mon%NSym)
+!    mon%NActS(1:mon%NSym)  = NActS(1:mon%NSym)
+
     if(.not.ioccsir) then
-       if(Abs(sum2-mon%XELE).gt.1.0d-8) then
-          write(LOUT,'(1x,a)') 'ERROR! OCCUPANCIES DO NOT SUM TO NELE!'  
-          write(LOUT,'(1x,a,1x,f10.6,5x,a,i3)') 'SUM(OCC): ', sum2, 'MONOMER: ', mon%Monomer
-          write(LOUT,'(1x,a)') 'CHECK occupations.dat!'  
-          stop
-       endif
+    !   if(Abs(sum2-mon%XELE).gt.1.0d-8) then
+    !      write(LOUT,'(1x,a)') 'ERROR! OCCUPANCIES DO NOT SUM TO NELE!'  
+    !      write(LOUT,'(1x,a,1x,f10.6,5x,a,i3)') 'SUM(OCC): ', sum2, 'MONOMER: ', mon%Monomer
+    !      write(LOUT,'(1x,a)') 'CHECK occupations.dat!'  
+    !      stop
+    !   endif
        mon%INAct = INAct
        mon%NAct  = NAct
        mon%Occ   = Occ
@@ -1617,8 +1675,19 @@ integer :: nisht, nasht, nocct, norbt, nbast, nconf, nwopt, nwoph
      stop
  endif
 
+
  if(mon%INAct==0) then
     mon%NGem = 2
+
+   ! offset=0
+   ! do irep=1,mon%NSym
+   !    TotEl = mon%NActS(irep)+mon%INActS(irep)
+   !    mon%IGem(offset+1:offset+TotEl) = 1
+   !    mon%IGem(offset+TotEl+1:offset+mon%NSymOrb(irep)) = 2
+   !     
+   !    offset = offset + mon%NSymOrb(irep)
+   ! enddo  
+
     mon%IGem(1:mon%NAct+mon%INAct) = 1
     mon%IGem(mon%NAct+mon%INAct+1:nbas) = 2
  else
@@ -1845,6 +1914,150 @@ end function FindGem
 
 end subroutine select_active
 
+subroutine sort_sym_occ(nbas,nsym,INAct,NAct,INActS,NActS,Occ)
+implicit none
+
+integer,intent(in) :: nbas, nsym, INAct, NAct 
+integer,intent(in) :: INActS(8), NActS(8)
+double precision,intent(inout) :: Occ(nbas)
+integer :: TotEl
+integer :: i,ii
+integer,allocatable :: ICpy1(:),ICpy2(:)
+double precision :: OccOrd(nbas)
+
+ TotEl = INAct + NAct
+ OccOrd = 0
+
+ allocate(ICpy1(TotEl),ICpy2(TotEl))
+
+ ICpy1 = 0
+ ICpy2 = 0
+
+ do ii=1,TotEl 
+
+    ! inactive 
+    do i=1,TotEl
+       if(ICpy2(i).eq.0.and.ICpy1(ii).eq.0.and.Occ(i).eq.2.0D0) then
+          ICpy2(i)  = 1
+          ICpy1(ii) = 1
+          OccOrd(ii) = Occ(i)
+       endif
+    enddo
+
+    ! active
+    if(ICpy1(ii).eq.0) then
+       do i=1,TotEl
+          if(ICpy2(i).eq.0.and.ICpy1(ii).eq.0) then
+             ICpy2(i)  = 1
+             ICpy1(ii) = 1
+             OccOrd(ii) = Occ(i)
+          endif
+       enddo
+    endif
+
+ enddo
+
+! check
+! do i=1,nbas
+!    print*, i,Occ(i),OccOrd(i)
+! enddo
+
+ Occ = OccOrd
+   
+ deallocate(ICpy2,ICpy1)
+
+end subroutine sort_sym_occ
+
+subroutine sort_sym_mo(CMO,nbas,mon)
+implicit none
+
+type(SystemBlock) :: mon
+integer,intent(in) :: nbas
+double precision,intent(inout) :: CMO(nbas,nbas)
+integer,allocatable :: ICpy1(:),ICpy2(:)
+integer,allocatable :: LabelAct(:),LabelIAct(:)
+double precision,allocatable :: COrd(:,:)
+integer :: TotEl,TotElIrep,irep,idx
+integer :: i,j,ii
+
+ TotEl = mon%INAct + mon%NAct
+
+ allocate(ICpy1(nbas),ICpy2(nbas))
+ allocate(LabelAct(nbas),LabelIAct(nbas),COrd(nbas,nbas))
+
+ ICpy1 = 0
+ ICpy2 = 0
+
+ ! make labels
+ idx = 0
+ do irep=1,mon%NSym
+    do j=1,mon%NSymOrb(irep)
+
+       idx = idx + 1
+       LabelAct(idx) = 0
+       TotElIrep = mon%INActS(irep)+mon%NActS(irep)
+
+       if(j.gt.mon%INActS(irep).and.j.le.TotElIrep) then
+          LabelAct(idx) = 1
+       endif
+       LabelIAct(idx)=0
+
+       if(j.le.mon%INActS(irep)) LabelIAct(irep)=1
+
+    enddo
+ enddo
+
+ do ii=1,nbas 
+
+   ! inactive 
+   do i=1,nbas  
+      if(LabelIAct(i).eq.1.and.ICpy2(i).eq.0.and.ICpy1(ii).eq.0) then
+         ICpy2(i)  = 1
+         ICpy1(ii) = 1
+
+         do j=1,nbas  
+!            URe2(II+(J-1)*NBasis)=URe1(I+(J-1)*NBasis)
+             COrd(j,ii) = CMO(j,i)
+         enddo
+      endif
+   enddo
+
+   ! active
+   if(ICpy1(ii).eq.0) then
+      do i=1,nbas  
+         if(LabelAct(i).eq.1.and.ICpy2(i).eq.0.and.ICpy1(ii).eq.0) then
+            ICpy2(i)  = 1
+            ICpy1(ii) = 1
+            do j=1,nbas  
+               COrd(j,ii) = CMO(j,i)
+!               URe2(II+(J-1)*NBasis)=URe1(I+(J-1)*NBasis)
+            enddo
+         endif
+      enddo
+   endif
+
+   ! virtual
+   if(ICpy1(ii).Eq.0) then
+      do i=1,nbas  
+         if(ICpy2(i).eq.0.and.ICpy1(ii).eq.0) then
+            ICpy2(i)  = 1
+            ICpy1(ii) = 1
+            do j=1,nbas
+               COrd(j,ii) = CMO(j,i)
+               ! URe2(II+(J-1)*NBasis)=URe1(I+(J-1)*NBasis)
+            enddo
+         endif
+      enddo
+   endif
+
+ enddo
+
+ CMO = COrd
+
+ deallocate(COrd,LabelIAct,LabelAct)
+ deallocate(ICpy2,ICpy1)
+
+end subroutine sort_sym_mo
 
 subroutine readener(nbasis,mon,isiri)
 implicit none

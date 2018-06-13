@@ -501,7 +501,7 @@ tmpB = 0
  deallocate(tmpAB,tmpB,tmpA)
 
  exchs2=t1f+sum(t2a)+sum(t2b)+sum(t2c)+t2d
- write(LOUT,*) exchs2*1000
+ write(LOUT,*) 'ExchS2: ', exchs2*1000
 
  deallocate(Vbaa,Vabb,PBaa,PAbb,Vb,Va,PB,PA,Sab,S)
  deallocate(Kb,Qba,Qab,USb,USa) 
@@ -1489,6 +1489,8 @@ double precision,intent(in) :: Freq
 double precision,intent(out) :: Alpha(Mon%NDimX,Mon%NDimX)
 double precision :: frac
 integer :: pq,rs,t,ip,iq,ir,is
+double precision,parameter :: SmallE = 1.D-3
+double precision,parameter :: BigE = 1.D8 
 
  Alpha = 0
  do t=1,Mon%NDimX
@@ -1498,6 +1500,7 @@ integer :: pq,rs,t,ip,iq,ir,is
 !   else
 !      v=4d0*omega(p)/(-freq**2+omega(p)**2)
 !   end if
+    if(EVal(t).gt.SmallE.and.EVal(t).lt.BigE) then
 
     frac = 8d0*EVal(t)/(EVal(t)**2d0+freq)
 
@@ -1516,7 +1519,7 @@ integer :: pq,rs,t,ip,iq,ir,is
 
        enddo
     enddo
-
+    endif
  enddo
 
 end subroutine calc_resp

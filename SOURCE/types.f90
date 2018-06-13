@@ -92,6 +92,7 @@ type SystemBlock
       integer :: NSymBas(8),NSymOrb(8)
       integer :: NOrb, NGem
       integer :: NAct, INAct
+      integer :: NActS(8), INActS(8)
       integer :: NDim, NDimX
       integer :: NDimN
       integer :: NCen = 0
