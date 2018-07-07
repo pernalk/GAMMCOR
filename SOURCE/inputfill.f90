@@ -330,6 +330,17 @@ subroutine read_block_calculation(CalcParams, line)
               CalcParams%SymType = TYPE_SYM 
            endif
 
+      case ("SAPTLEVEL")
+           if (uppercase(val) == "0".or.&
+               uppercase(val) == "SAPT0") then
+              CalcParams%SaptLevel = SAPTLEVEL0
+           elseif (uppercase(val) == "1" ) then
+              CalcParams%SaptLevel = SAPTLEVEL1 
+           elseif (uppercase(val) == "2".or.&
+                   uppercase(val) == "SAPT2" ) then
+              CalcParams%SaptLevel = SAPTLEVEL2 
+           endif
+
       case("RESTART") 
            if (uppercase(val) == "TRUE".or.  &
                uppercase(val) == ".TRUE.".or.&

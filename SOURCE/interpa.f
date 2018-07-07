@@ -897,12 +897,15 @@ C
 c     set small being a square of small in Deck EneERPA
      $ Four=4.D0, Small=1.D-6)
 C
+      Integer :: DimV1,Max_NDEG
+      Integer :: Space1(3,NDimX)
+C
       Include 'commons.inc'
 C
       Dimension
      $ ABPLUS(NDimX,NDimX),ABMIN(NDimX,NDimX),
      $ HlpAB(NDimX,NDimX),
-     $ EigVecR(NDimX*NDimX),EigVecL(NDimX*NDimX),
+     $ EigVecR(NDimX*NDimX),EigVecL(1),
      $ Eig(NDimX),EigI(NDimX),Work(5*NDimX)
 C
 C     SYMMETRIZE A+,A-
@@ -919,7 +922,11 @@ C
       Call MultpM(HlpAB,ABPLUS,ABMIN,NDimX)
 C
       Call DGEEV('N','V',NDimX,HlpAB,NDimX,Eig,EigI,
-     $           EigVecL,NDimX,EigVecR,NDimX,Work,5*NDimX,INFO)
+     $           EigVecL,1,EigVecR,NDimX,Work,5*NDimX,INFO)
+C   
+C     ORTHOGONALISE DEGENERATE VECTORS
+      Call CREATE_SPACE(Eig,Space1,NDimX,DimV1,Max_NDEG)
+      Call ORTHO_DEGVEC(EigVecR,Space1,DimV1,NDimX,Max_NDEG)
 C
 C     IMPOSE THE NORMALIZATION 2 Y*X = 1 ON THE EIGENVECTORS CORRESPONDING TO POSITIVE
 C     OMEGA'S 
@@ -983,122 +990,92 @@ C
       Return
       End
 
-*Deck ERPAVECYX
-      Subroutine ERPAVECYX(EigVecR,EigVecL,Eig,ABPLUS,ABMIN,NDimX)
-C
-      Implicit Real*8 (A-H,O-Z)
-C
-      Parameter(Zero=0.D0,Half=0.5D0,One=1.D0,Two=2.D0,Three=3.D0,
-c     set small being a square of small in Deck EneERPA
-     $ Four=4.D0, Small=1.D-6)
-C
-      Include 'commons.inc'
-C
-      Dimension
-     $ ABPLUS(NDimX,NDimX),ABMIN(NDimX,NDimX),
-     $ HlpAB(NDimX,NDimX),
-     $ EigVecR(NDimX*NDimX),EigVecL(NDimX*NDimX),
-     $ Eig(NDimX),EigI(NDimX),Work(5*NDimX)
-C
-C     SYMMETRIZE A+,A-
-C
-      Do I=1,NDimX
-      Do J=I+1,NDimX
-      ABPLUS(I,J)=Half*(ABPLUS(I,J)+ABPLUS(J,I))
-      ABPLUS(J,I)=ABPLUS(I,J)
-      ABMIN(I,J)=Half*(ABMIN(I,J)+ABMIN(J,I))
-      ABMIN(J,I)=ABMIN(I,J)
-      EndDo
-      EndDo
-C
-      Call MultpM(HlpAB,ABPLUS,ABMIN,NDimX)
-C
-      Call DGEEV('N','V',NDimX,HlpAB,NDimX,Eig,EigI,
-     $           EigVecL,NDimX,EigVecR,NDimX,Work,5*NDimX,INFO)
-C
-C     IMPOSE THE NORMALIZATION 2 Y*X = 1 ON THE EIGENVECTORS CORRESPONDING TO POSITIVE
-C     OMEGA'S 
-C
-C     SINCE X = Om^-1 ABMIN.Y THEN THE NORMALIZATION READS 2 Om^-1 Y^T AMIN Y = 1
-C
-      Do NU=1,NDimX
-C
-      If(Abs(EigI(NU)).Gt.1.D-12) Then
-C
-      Write(6,'(X,"Complex ERPA Eigenvalue",I4,2E12.4)')
-     $ NU,Eig(NU),EigI(NU)
-      Eig(NU)=Zero
-      Do I=1,NDimX
-      EigVecR((NU-1)*NDimX+I)=Zero
-      EndDo
-C
-      EndIf
-      EndDo
-C
-      Do NU=1,NDimX
-      SumNU=Zero
-C
-      If(Eig(NU).Gt.Small) Then
-C   
-      Eig(NU)=SQRT(Eig(NU))
-C
-      Do I=1,NDimX
-      Do J=1,NDimX
-      SumNU=SumNU+Two/Eig(NU)*ABMIN(I,J)*
-     $ EigVecR((NU-1)*NDimX+I)*EigVecR((NU-1)*NDimX+J)
-      EndDo
-      EndDo
-C
-      If(SumNu.Lt.Zero) Write(6,'(X,"Negative Excit Norm",I4,2E12.4)')
-     $  NU,Eig(NU),SumNU 
-C      
-      Work(NU)=One
-      If(SumNU.Lt.Zero) Work(NU)=-One
-      SumNU=One/Sqrt(Abs(SumNU))
-C
-      ElseIf(Eig(NU).Ne.Zero) Then
-      Write(6,'(X,"Negative ERPA Eigenvalue",I4,2E12.4)')
-     $ NU,Eig(NU),EigI(NU)
-      Eig(NU)=Zero
-      SumNU=Zero
-C
-      EndIf
-C
-      Do I=1,NDimX
-      EigVecR((NU-1)*NDimX+I)=EigVecR((NU-1)*NDimX+I)*SumNU
-      EndDo
-C
-c     enddo NU
-      EndDo
-C
-C     COMPUTE EigX
-C
-      Do NU=1,NDimX
-C
-      If(Eig(NU).Gt.Small) Then
+*Deck CREATE_SPACE 
+      Subroutine CREATE_SPACE(Eig,Space1,NDimX,DimV1,Max_NDEG)
+      Implicit None
 C    
-      Do I=1,NDimX
-      EigVecL((NU-1)*NDimX+I)=Zero
-      Do J=1,NDimX
-      EigVecL((NU-1)*NDimX+I)=EigVecL((NU-1)*NDimX+I)
-     $ +Work(NU)*One/Eig(NU)*ABMIN(I,J)*EigVecR((NU-1)*NDimX+J)
-      EndDo
-      EndDo
+      Double Precision :: Eig(NDimX) 
+      Integer :: NDimX,DimV1,Max_NDEG
+      Integer :: Space1(3,NDimX)
+      Double Precision :: Tmp
+      Double Precision,Parameter :: Thresh=1.d-9
+      Integer :: I
 C
-      Else
-C
-      Do I=1,NDimX
-      EigVecR((NU-1)*NDimX+I)=Zero
-      EigVecL((NU-1)*NDimX+I)=Zero
-      EndDo
-C
+      I = 1
+      DimV1 = 1
+      Space1(1,DimV1) = I
+      Tmp = Eig(I)
+      Do while(I<NDimX)
+      I = I + 1
+      If(abs(Eig(I)-Tmp)>Thresh) Then
+         Space1(2,DimV1) = I-1
+         Space1(3,DimV1) = Space1(2,DimV1)-Space1(1,DimV1)+1
+         DimV1=DimV1+1
+         Space1(1,DimV1) = I
+         Tmp=Eig(I)
       EndIf
-c     enddo NU
+      EndDo
+      Space1(2,DimV1) = NDimX
+      Space1(3,DimV1) = Space1(2,DimV1)-Space1(1,DimV1)+1
+C  
+      Max_NDEG = maxval(Space1(3,:))
+C
+      End Subroutine CREATE_SPACE
+
+*Deck ORTHO_DEGVEC
+      Subroutine ORTHO_DEGVEC(EigVecR,Space1,DimV1,NDimX,Max_NDEG)
+      Implicit None
+C
+      Integer :: DimV1,NDimX,Max_NDEG
+      Integer :: Space1(3,DimV1)
+      Integer :: NDEG,IVEC,JVEC
+      Integer :: I,II,JJ,INFO 
+      Double Precision :: Tmp
+      Double Precision :: EigVecR(NDimX**2),Eig
+      Double Precision :: Smat(Max_NDEG**2),
+     $                    Shlp(max(Max_NDEG**2,3*Max_NDEG)),
+     $                    Smh(Max_NDEG**2),Sval(Max_NDEG),
+     $                    ModVec(NDimX*Max_NDEG)
+      Double Precision,external :: ddot
+C
+      Do I=1,DimV1
+C   
+         NDEG=Space1(3,I)
+         If(NDEG>1) Then
+C
+         ! LOOP OVER DEGENERATE VECS
+         Do JJ=1,NDEG
+         Do II=1,JJ
+         IVEC=Space1(1,I)+II-1 
+         JVEC=Space1(1,I)+JJ-1 
+         Smat(II+(JJ-1)*NDEG)=ddot(NDimX,EigVecR((IVEC-1)*NDimX+1),1,
+     $                                   EigVecR((JVEC-1)*NDimX+1),1) 
+         EndDo
+         EndDo
+C
+         Call DSYEV('V','U',NDEG,Smat,NDEG,Sval,Shlp,3*NDEG,INFO)
+C
+C        Shlp = (lambda^-1/2).V^T
+C        S^-1/2 = V.Shlp^T
+         Do II=1,NDEG
+         Shlp((II-1)*NDEG+1:II*NDEG)=Smat((II-1)*NDEG+1:II*NDEG)
+     $                               /sqrt(Sval(II))
+         EndDo
+         Call DGEMM('N','T',NDEG,NDEG,NDEG,1d0,Smat,NDEG,Shlp,NDEG,
+     $              0d0,Smh,NDEG)
+C    
+C        ORTHOGONAL VECTORS: V'=S^-1/2.V     
+         Call DGEMM('N','N',NDimX,NDEG,NDEG,1d0,
+     $             EigVecR((Space1(1,I)-1)*NDimX+1:),NDimX,Smh,NDEG,
+     $             0d0,ModVec,NDimX)
+C
+         EigVecR((Space1(1,I)-1)*NDimX+1:Space1(2,I)*NDimX)=
+     $                               ModVec(1:NDimX*NDEG)
+C   
+         EndIf
       EndDo
 C
-      Return
-      End
-
+      End Subroutine ORTHO_DEGVEC
 
 *Deck ERPASYMM0
       Subroutine ERPASYMM0(EigY,EigX,Eig,APLSQRT,ABMIN,NDimX)
@@ -3166,6 +3143,7 @@ C
       ETot=ETot+Two*Occ(I)*HNO(II)      
       EndDo
 C
+C
       Do IP=1,NOccup
       Do IQ=1,NOccup
       Do IR=1,NOccup
@@ -4169,7 +4147,6 @@ C
      $  RDM2=RDM2+Two*Occ(IP)*Occ(IQ)
       If(IP.Eq.IS.And.IQ.Eq.IR.And. (Occ(IP).Eq.One.Or.Occ(IQ).Eq.One) )
      $ RDM2=RDM2-Occ(IP)*Occ(IQ)
-C     $ RDM2=RDM2+0
 C
 C     ACTIVE PART?
 C

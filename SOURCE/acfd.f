@@ -814,6 +814,9 @@ c
       Parameter(Zero=0.D0,Half=0.5D0,One=1.D0,Two=2.D0,Three=3.D0,
      $ Four=4.D0)
 C
+C     HERE THERE OCCURS A PROBLEM...!!!
+      Parameter(SmallE=1.D-6)
+C
       Dimension
      $ URe(NBasis,NBasis),XOne(NInte1),Occ(NBasis),TwoNO(NInte2),
      $ ABPLUS(NDimX*NDimX),ABMIN(NDimX*NDimX),
@@ -1255,6 +1258,7 @@ C
 C
 C     DONE 0TH-ORDER CALCULATIONS  
 C
+
       Write(*,*)'NoEig, NDimX - they should be equal!',NoEig,NDimX
       NDimX=NoEig
       Do I=1,NDimX
@@ -1328,6 +1332,8 @@ C
       EndDo
 
 C
+C      print*, 'test-1,norm2(EigY1)
+C
       Do NU=1,NoEig
       Do MU=1,NoEig
 C
@@ -1399,7 +1405,9 @@ C     $  (ABPLUS(MU+(NU-1)*NoEig)+ABMIN(MU+(NU-1)*NoEig))/
 C     $ (Eig(MU)-Eig(NU))
 C
 C     ?? TEMP FIX
-      If(MU.Ne.NU.And.Eig(MU).Ne.Eig(NU)) Then 
+      DiffEig = Abs(Eig(MU)-Eig(NU))
+      If(MU.Ne.NU.And.DiffEig.Gt.SmallE) Then 
+C      If(MU.Ne.NU.And.Eig(MU).Ne.Eig(NU)) Then 
         Aux2=
      $  (ABPLUS(MU+(NU-1)*NoEig)+ABMIN(MU+(NU-1)*NoEig))/
      $ (Eig(MU)-Eig(NU))
@@ -1407,11 +1415,11 @@ C     ?? TEMP FIX
 C       print*, Eig(MU)-Eig(NU),Aux2
       EndIf
 C
-C
       EigY1(I+(MU-1)*NoEig)=EigY1(I+(MU-1)*NoEig)+
      $(Aux1+Aux2)*EigY(IStart+II)
 C
       II=II+1
+
       EndDo
 C
       EndIf
@@ -1453,8 +1461,11 @@ C
       EndDo
       EndDo
 C
+C
       Return
       End
+
+
 
 
 *Deck AB1_CAS

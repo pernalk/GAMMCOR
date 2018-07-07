@@ -21,6 +21,10 @@ integer, parameter :: JOB_TYPE_ERPA  = 3
 integer, parameter :: JOB_TYPE_EERPA = 4
 integer, parameter :: JOB_TYPE_SAPT  = 5
 
+integer, parameter :: SAPTLEVEL0 = 0
+integer, parameter :: SAPTLEVEL1 = 1
+integer, parameter :: SAPTLEVEL2 = 2
+
 integer, parameter :: FLAG_FRAG = 0
 integer, parameter :: FLAG_CORE = 1
 integer, parameter :: FLAG_NOBASIS = 0
@@ -70,6 +74,7 @@ type CalculationBlock
       integer :: Response = RESP_ERPA
       integer :: Inactive = FLAG_CORE 
       integer :: SymType = TYPE_NO_SYM
+      integer :: SaptLevel = SAPTLEVEL2 
       logical :: Restart = FLAG_RESTART
       integer :: IPrint  = 0 !FLAG_PRINT_LEVEL 
       double precision :: RPAThresh = 1.0D-6
@@ -109,6 +114,7 @@ type SystemBlock
       integer,allocatable :: Ind2(:)
       double precision,allocatable :: Occ(:), CICoef(:)
       double precision,allocatable :: OrbE(:)
+      double precision,allocatable :: TwoMO(:)
       double precision,allocatable :: CMO(:,:)
       double precision,allocatable :: WPot(:,:)
       double precision,allocatable :: RDM2(:),RDM2Act(:,:,:,:)
@@ -164,9 +170,11 @@ end type InputData
 type SaptData
 
      type(SystemBlock) :: monA, monB
-     double precision :: Vnn,elst,e2ind,e2disp,e2disp_unc
+     double precision :: Vnn,elst,e2ind,e2disp
+     double precision :: e2disp_sc,e2disp_sp,e2disp_unc
+     integer :: SaptLevel = SAPTLEVEL2
      integer :: IPrint = 1000
-     logical :: EnChck = .true.
+     logical :: EnChck = .true., HFCheck=.true.
 
 end type SaptData
 
@@ -553,6 +561,7 @@ integer,external :: NAddrRDM
   allocate(Mon%Ind2(NBas))
 
   Mon%Ind2 = Ind2
+  print*, 'check!?'
 
 end subroutine read2rdm
 

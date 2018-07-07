@@ -259,6 +259,7 @@ if(Flags%ISAPT.Eq.0) then
 elseif(Flags%ISAPT.Eq.1) then
 
  SAPT%IPrint = Input%CalcParams%IPrint
+ SAPT%SaptLevel = Input%CalcParams%SaptLevel
 
  associate( monA => SAPT%monA, &
             monB => SAPT%monB ) 
