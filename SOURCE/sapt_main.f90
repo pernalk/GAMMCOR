@@ -677,6 +677,7 @@ double precision, allocatable :: EigTmp(:), VecTmp(:)
  integer :: ii,jj,dimV1
  double precision,parameter :: thresh=1.d-10
  integer :: space1(2,Mon%NDimX)
+ integer :: IndN_tmp(2,Mon%NDim)
  double precision :: work(Mon%NDimX)
  double precision,external :: ddot
 
@@ -780,11 +781,11 @@ double precision, allocatable :: EigTmp(:), VecTmp(:)
    ECASSCF = 0
 !
 ! test semicoupled
-!  ACAlpha = 1
+!  ACAlpha = 0.000000001
 ! if(Mon%Monomer==1) then
 !   ACAlpha=0.010  
 ! else
-!   ACAlpha=0.00000001
+!   ACAlpha=0.0000001
 ! endif 
 
    call AB_CAS(ABPlus,ABMin,ECASSCF,URe,Mon%Occ,XOne,TwoMO,Mon%IPair,&
@@ -792,195 +793,25 @@ double precision, allocatable :: EigTmp(:), VecTmp(:)
  
    EigVecR = 0
    Eig = 0
-   !call ERPASYMM1(EigVecR,Eig,ABPlus,ABMin,NBas,Mon%NDimX)
+   call ERPASYMM1(EigVecR,Eig,ABPlus,ABMin,NBas,Mon%NDimX)
  
-   print*, 'Entering ERPAVEC...' 
-   call ERPAVEC(EigVecR,Eig,ABPlus,ABMin,NBas,Mon%NDimX)
-!
-   i = 1
-   dimV1 = 1
-   space1(1,dimV1) = i
-   tmp = Eig(i)
-   do while(i<Mon%NDimX)
-      i = i + 1
-      if(abs(Eig(i)-tmp)>thresh) then
-         space1(2,dimV1) = i-1
-         dimV1=dimV1+1
-         space1(1,dimV1) = i
-         tmp=Eig(i)
-      endif
-   enddo
-   space1(2,dimV1) = Mon%NDimX
-!
-!   do i=1,dimV1
-!
-!      if(space1(1,i)/=space1(2,i)) then
-!
-!          ii=space1(1,i)
-!          jj=space1(2,i)
-!          tmp = ddot(Mon%NDimX,EigVecR((ii-1)*Mon%NDimX+1),1,EigVecR((jj-1)*Mon%NDimX+1),1)!&
-!!                (dnrm2(Mon%NDimX,EVec1((ii-1)*Mon%NDimX+1),1)*dnrm2(Mon%NDimX,EVec1((jj-1)*Mon%NDimX+1),1))
-!          write(*,*) ii,jj,tmp
-!
-!
-!        ! remove degenerate vectors        
-!!        do ii=space1(1,i),space1(2,i)
-!!!              EigVecR((ii-1)*Mon%NDimX+1:ii*Mon%NDimX) = 0
-!!        enddo
-!
-!      endif
-!
-!   enddo
-
-   !work=0
-   !print*, 'TEST-UPA!'
-   !do ii=1,Mon%NDimX
-   !   do jj=1,Mon%NDimX
-
-   !       call dgemv('N',Mon%NDimX,Mon%NDimX,1d0,ABMin,Mon%NDimX,EigVecR((jj-1)*Mon%NDimX+1),1,0d0,work,1)
-   !       tmp = ddot(Mon%NDimX,EigVecR((ii-1)*Mon%NDimX+1),1,work,1)
-   !      write(*,*) ii,jj,tmp*2/Eig(ii)
-   !    enddo
-   !enddo
-!
-
-   !do i=1,dimV1
-   !   print*, space1(1,i),space1(2,i)
-
-   !enddo
-
-!   block
-!   integer :: i,j,ii,jj
-!   integer :: dimV1,dimV2
-!   double precision,parameter :: thresh=1.d-5
-!   double precision :: EVec1(Mon%NDimX**2),EVec2(Mon%NDimX**2)
-!   double precision :: EVal1(Mon%NDimX),EVal2(Mon%NDimX)
-!   double precision :: work(Mon%NDimX)
-!   integer :: space1(2,Mon%NDimX),space2(2,Mon%NDimX)
-!   double precision :: tmp 
-!   double precision,external :: ddot,dnrm2 
-!
-!   call AB_CAS(ABPlus,ABMin,ECASSCF,URe,Mon%Occ,XOne,TwoMO,Mon%IPair,&
-!               Mon%IndN,Mon%IndX,Mon%NDimX,NBas,Mon%NDimX,NInte1,NInte2,ACAlpha)
-!
-!   call ERPAVEC(EVec2,EVal2,ABPlus,ABMin,NBas,Mon%NDimX)
-!   call ERPASYMM1(EVec1,EVal1,ABPlus,ABMin,NBas,Mon%NDimX)
-!
-!   do i=1,Mon%NDimX
-!
-!      write(*,*) i,EVal1(i),EVal2(i)
-!
-!   enddo
+   !print*, 'Entering ERPAVEC...' 
+   !call ERPAVEC(EigVecR,Eig,ABPlus,ABMin,NBas,Mon%NDimX)
 !
 !   i = 1
 !   dimV1 = 1
 !   space1(1,dimV1) = i
-!   tmp = EVal1(i)
+!   tmp = Eig(i)
 !   do while(i<Mon%NDimX)
 !      i = i + 1
-!      if(abs(EVal1(i)-tmp)>thresh) then
+!      if(abs(Eig(i)-tmp)>thresh) then
 !         space1(2,dimV1) = i-1
 !         dimV1=dimV1+1
 !         space1(1,dimV1) = i
-!         tmp=Eval1(i)
+!         tmp=Eig(i)
 !      endif
 !   enddo
 !   space1(2,dimV1) = Mon%NDimX
-!
-!   do i=1,dimV1
-!      write(*,*) i,space1(:,i)
-!   enddo
-!
-!   i = 1
-!   dimV2 = 1
-!   space2(1,dimV2) = i
-!   tmp = EVal2(i)
-!   do while(i<Mon%NDimX)
-!      i = i + 1
-!      if(abs(EVal2(i)-tmp)>thresh) then
-!         space2(2,dimV2) = i-1
-!         dimV2=dimV2+1
-!         space2(1,dimV2) = i
-!         tmp=Eval2(i)
-!      endif
-!   enddo
-!   space2(2,dimV2) = Mon%NDimX
-!
-!   do i=1,dimV2
-!      write(*,*) i,space2(:,i)
-!   enddo
-!
-!   print*, 'TEST-Vec1/Vec2!'
-!   do i=1,dimV1
-!      do j=1,dimV2
-!         if(abs(EVal1(space1(1,i))-EVal2(space2(1,j)))<thresh) exit
-!      enddo
-!      
-!      !write(*,*) i,j
-!      do ii=space1(1,i),space1(2,i)
-!        do jj=space2(1,j),space2(2,j)
-!!           tmp = ddot(Mon%NDimX,EVec1((ii-1)*Mon%NDimX+1),1,EVec2((jj-1)*Mon%NDimX+1),1)/&
-!!                 (dnrm2(Mon%NDimX,EVec1((ii-1)*Mon%NDimX+1),1)*dnrm2(Mon%NDimX,EVec2((jj-1)*Mon%NDimX+1),1))
-!
-!          call dgemv('N',Mon%NDimX,Mon%NDimX,1d0,ABMin,Mon%NDimX,EVec2((jj-1)*Mon%NDimX+1),1,0d0,work,1)
-!          tmp = ddot(Mon%NDimX,EVec1((ii-1)*Mon%NDimX+1),1,work,1)
-!
-!           write(*,*) ii,jj,tmp*2/EVal1(space1(1,i))
-!         enddo
-!      enddo
-!
-!
-!
-!   enddo
-!
-!!   print*, 'TEST-dUPA!'
-!!   do ii=1,Mon%NDimX
-!!      do jj=1,Mon%NDimX
-!!
-!!!          call dgemv('N',Mon%NDimX,Mon%NDimX,1d0,ABMin,Mon%NDimX,EVec2((jj-1)*Mon%NDimX+1),1,0d0,work,1)
-!!!          tmp = ddot(Mon%NDimX,EVec2((ii-1)*Mon%NDimX+1),1,work,1)
-!!
-!!         call dgemv('N',Mon%NDimX,Mon%NDimX,1d0,ABMin,Mon%NDimX,EVec1((jj-1)*Mon%NDimX+1),1,0d0,work,1)
-!!          tmp = ddot(Mon%NDimX,EVec1((ii-1)*Mon%NDimX+1),1,work,1)
-!!
-!!
-!!!          tmp = ddot(Mon%NDimX,EVec1((ii-1)*Mon%NDimX+1),1,EVec1((jj-1)*Mon%NDimX+1),1)/&
-!!!                (dnrm2(Mon%NDimX,EVec1((ii-1)*Mon%NDimX+1),1)*dnrm2(Mon%NDimX,EVec1((jj-1)*Mon%NDimX+1),1))
-!!
-!!         write(*,*) ii,jj,tmp*2
-!!!         write(*,*) ii,jj,ddot(Mon%NDimX,EVec1((ii-1)*Mon%NDimX+1),1,EVec1((jj-1)*Mon%NDimX+1),1)
-!!       enddo
-!!   enddo
-!
-!! test energies!
-!      ECorr=0
-!      call ACEneERPA(ECorr,EVec1,EVal1,TwoMO,URe,Mon%Occ,XOne,&
-!                     Mon%IndN,NBas,NInte1,NInte2,Mon%NDimX,Mon%NGem)
-!      ECorr=Ecorr*0.5d0
-!      write(LOUT,'(/,1x,''ECASSCF+ENuc, Corr, ERPA-CASSCF'',6x,3f15.8)') &
-!            ECASSCF+Mon%PotNuc,ECorr,ECASSCF+Mon%PotNuc+ECorr
-!
-!      ECorr=0
-!      call ACEneERPA(ECorr,EVec2,EVal2,TwoMO,URe,Mon%Occ,XOne,&
-!                     Mon%IndN,NBas,NInte1,NInte2,Mon%NDimX,Mon%NGem)
-!      ECorr=Ecorr*0.5d0
-!      write(LOUT,'(/,1x,''ECASSCF+ENuc, Corr, ERPA-CASSCF'',6x,3f15.8)') &
-!            ECASSCF+Mon%PotNuc,ECorr,ECASSCF+Mon%PotNuc+ECorr
-! 
-!
-!   end block
-
-! switch-off EigVals
-!   offset=0
-!   do i=1,Mon%NDimX
-!      if(Eig(i).gt.0.95d0) then
-!         EigVecR(offset+1:offset+Mon%NDimX) = 0d0
-!    !     print*, 'DUPA=0!!!',Eig(i)
-!      endif
-!   offset = offset + Mon%NDimX 
-!   print*, i,Eig(i)
-!   enddo
-!   print*, norm2(EigVecR) 
 
   if(EChck) then
       ECorr=0
@@ -1004,11 +835,18 @@ double precision, allocatable :: EigTmp(:), VecTmp(:)
    EigY1 = 0
    Eig0 = 0
    Eig1 = 0
-  
- !  call Y01CAS(TwoMO,Mon%Occ,URe,XOne,ABPlus,ABMin, &
- !      EigY0,EigY1,Eig0,Eig1, &
- !      Mon%IndN,Mon%IndX,Mon%NDimX,NBas,Mon%NDim,NInte1,NInte2,Flags%IFlag0)
-!
+
+   allocate(Mon%IndNT(2,Mon%NDim)) 
+   Mon%IndNT=0 
+   do i=1,Mon%NDim
+      Mon%IndNT(1,i) = Mon%IndN(1,i)
+      Mon%IndNT(2,i) = Mon%IndN(2,i)
+   enddo
+   call Y01CAS(TwoMO,Mon%Occ,URe,XOne,ABPlus,ABMin, &
+       EigY0,EigY1,Eig0,Eig1, &
+       !Mon%IndNT,Mon%IndX,Mon%NDimX,NBas,Mon%NDim,NInte1,NInte2,Flags%IFlag0)
+       Mon%IndN,Mon%IndX,Mon%NDimX,NBas,Mon%NDim,NInte1,NInte2,Flags%IFlag0)
+
    ! dump uncoupled response
    call writeresp(EigY0,Eig0,propfile0)
    if(Flags%IFlag0==0) then

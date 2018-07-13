@@ -804,8 +804,8 @@ C
 C     A ROUTINE FOR COMPUTING Y VECTORS AND EIGENVALUES OF ERPA 
 C     IN THE 1ST-ORDER APPROXIMATION
 C
-C     Flag0 = 1 - compute only 0th-order Y [EigY] and 0th-order omega [Eig] 
-C             0 - compute both 0th-order and 1st-order Y [EigY1] and omega [Eig1]
+C     IFlag0 = 1 - compute only 0th-order Y [EigY] and 0th-order omega [Eig] 
+C              0 - compute both 0th-order and 1st-order Y [EigY1] and omega [Eig1]
 C
       Implicit Real*8 (A-H,O-Z)
 C
@@ -813,9 +813,6 @@ C
 c
       Parameter(Zero=0.D0,Half=0.5D0,One=1.D0,Two=2.D0,Three=3.D0,
      $ Four=4.D0)
-C
-C     HERE THERE OCCURS A PROBLEM...!!!
-      Parameter(SmallE=1.D-6)
 C
       Dimension
      $ URe(NBasis,NBasis),XOne(NInte1),Occ(NBasis),TwoNO(NInte2),
@@ -832,7 +829,9 @@ C
      $ Ind1(NBasis),Ind2(NBasis),WMAT(NBasis,NBasis),
      $ AuxI(NInte1),AuxIO(NInte1),IPair(NBasis,NBasis),
      $ EigX(NDimX*NDimX),
-     $ IEigAddY(2,NDimX),IEigAddInd(2,NDimX),IndBlock(2,NDimX)
+     $ IEigAddY(2,NDimX),IEigAddInd(2,NDimX),IndBlock(2,NDimX),
+c NEW 11/07/2018
+     $ IMatch(NDimX)
 C
       IPair(1:NBasis,1:NBasis)=0
       Do II=1,NDimX
@@ -1254,16 +1253,21 @@ C
       EndDo
       EndDo
 C
-      Write(6,'(/," *** DONE WITH 0TH-ORDER IN Y01CAS ***")')
+      Write(6,'(" *** DONE WITH 0TH-ORDER IN Y01CAS ***")')
 C
 C     DONE 0TH-ORDER CALCULATIONS  
 C
-
-      Write(*,*)'NoEig, NDimX - they should be equal!',NoEig,NDimX
-      NDimX=NoEig
+C NEW 11/07/2018
+C     Check if NoEig=NDimX - they should be equal!
+      If(NoEig.Ne.NDimX) Stop 'Fatal error in Y01CAS: NoEig.Ne.NDimX!'
+C
       Do I=1,NDimX
-      IndN(1,I)=IndBlock(1,I)
-      IndN(2,I)=IndBlock(2,I)
+      IP=IndN(1,I)
+      IQ=IndN(2,I)
+      Do J=1,NDimX
+      If(IP.Eq.IndBlock(1,J).And.IQ.Eq.IndBlock(2,J))
+     $ IMatch(I)=J
+      EndDo
       EndDo
 C
       If(IFlag0.Eq.1) Then
@@ -1294,24 +1298,33 @@ C
       EndDo
       EndDo
 C
-C     RETURN OF ONLY 0TH-ORDER Y REQUESTED
+C NEW 11/07/2017
+C
+C     RESORT Y0 ACCORDING TO IndN
+C
+      Call CpyM(ABPLUS,EigY,NDimX)
+C
+      Do MU=1,NDimX
+      Do I=1,NDimX
+      EigY((MU-1)*NoEig+I)=ABPLUS((MU-1)*NoEig+IMatch(I))
+      EndDo
+      EndDo
+C
+C     RETURN IF ONLY 0TH-ORDER Y REQUESTED
 C
       Return
       EndIf
 C
-      Write(6,'(/,
-     $" *** COMPUTING ABPLUS(1) AND ABMIN(1) MATRICES ***"
+      Write(6,'(" *** COMPUTING ABPLUS(1) AND ABMIN(1) MATRICES ***"
      $ )')
 C
-
       Call AB1_CAS(ABPLUS,ABMIN,URe,Occ,XOne,TwoNO,
      $ RDM2Act,NRDM2Act,IGFact,C,Ind1,Ind2,
      $ IndBlock,NoEig,NDimX,NBasis,NInte1,NInte2)
 C
       Deallocate(RDM2Act)
-
 C
-      Write(6,'(/," *** DONE WITH COMPUTING AB(1) MATRICES ***")')
+      Write(6,'(" *** DONE WITH COMPUTING AB(1) MATRICES ***")')
 C
 C     1ST-ORDER PART
 C
@@ -1330,9 +1343,6 @@ C
 C
       EndDo
       EndDo
-
-C
-C      print*, 'test-1,norm2(EigY1)
 C
       Do NU=1,NoEig
       Do MU=1,NoEig
@@ -1382,7 +1392,6 @@ C
       EndDo
       EndDo
 C
-C
       EigY1(1:NoEig*NoEig)=Zero
       Do MU=1,NoEig
 C
@@ -1399,27 +1408,16 @@ C
       Aux1=(ABPLUS(MU+(NU-1)*NoEig)-ABMIN(MU+(NU-1)*NoEig))/
      $ (Eig(MU)+Eig(NU))
       Aux2=Zero
-C
-C      If(MU.Ne.NU) Aux2=
-C     $  (ABPLUS(MU+(NU-1)*NoEig)+ABMIN(MU+(NU-1)*NoEig))/
-C     $ (Eig(MU)-Eig(NU))
-C
-C     ?? TEMP FIX
-      DiffEig = Abs(Eig(MU)-Eig(NU))
-      If(MU.Ne.NU.And.DiffEig.Gt.SmallE) Then 
-C      If(MU.Ne.NU.And.Eig(MU).Ne.Eig(NU)) Then 
-        Aux2=
+c herer!!!
+      If((MU.Ne.NU).And.(Abs(Eig(MU)-Eig(NU)).Gt.1.D-12)) Aux2=
+c      If(MU.Ne.NU) Aux2= 
      $  (ABPLUS(MU+(NU-1)*NoEig)+ABMIN(MU+(NU-1)*NoEig))/
      $ (Eig(MU)-Eig(NU))
-      Else
-C       print*, Eig(MU)-Eig(NU),Aux2
-      EndIf
 C
       EigY1(I+(MU-1)*NoEig)=EigY1(I+(MU-1)*NoEig)+
      $(Aux1+Aux2)*EigY(IStart+II)
 C
       II=II+1
-
       EndDo
 C
       EndIf
@@ -1460,11 +1458,24 @@ C     Y^(1) ALREADY IN EigY1
 C
       EndDo
       EndDo
+C NEW 11/07/2018
 C
+C     SORT Y0 AND Y1 ACCORDING TO IndN
+C
+      Call CpyM(ABPLUS,EigY,NDimX) 
+      Call CpyM(ABMIN,EigY1,NDimX)
+C
+      Do MU=1,NDimX
+C
+      Do I=1,NDimX
+      EigY((MU-1)*NoEig+I)=ABPLUS((MU-1)*NoEig+IMatch(I))
+      EigY1((MU-1)*NoEig+I)=ABMIN((MU-1)*NoEig+IMatch(I)) 
+      EndDo
+C
+      EndDo
 C
       Return
       End
-
 
 
 
