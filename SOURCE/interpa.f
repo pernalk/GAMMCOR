@@ -3101,6 +3101,7 @@ C
 C
       EndDo
       EndDo
+
 C
 C     READ 2RDM, COMPUTE THE ENERGY
 C
@@ -3135,6 +3136,7 @@ C
    40 Continue
       Close(10)
 C
+      Write(*,*) 'RDM2Act',norm2(RDM2Act)
 C     COMPUTE THE ENERGY FOR CHECKING
 C
       ETot=Zero 
@@ -3194,6 +3196,8 @@ C
       EndDo
       EndDo
 C
+      Write(*,*) 'DUPA00', norm2(HNO)
+
 C     CONSTRUCT TWO-ELECTRON PART OF THE AC ALPHA-HAMILTONIAN      
 C
       NAdd=Zero

@@ -1205,7 +1205,8 @@ double precision,allocatable :: work(:)
 double precision :: fact,dea,deb
 double precision :: e2du,e2d
 double precision :: e2ds,e2sp,e2ds1,e2ds2
-double precision :: inv_omega, tmp
+double precision :: e2dw12,e2dw12_sp,e2dsApp
+double precision :: inv_omega, inv_om12,tmp
 double precision,parameter :: SmallE = 1.D-3
 double precision,parameter :: BigE = 1.D8 
 double precision :: Alpha, Beta
@@ -1443,21 +1444,32 @@ endif
  e2sp=0d0
  e2ds1=0d0
  e2ds2=0d0
+ e2dw12=0d0
+ e2dw12_sp=0d0
+ e2dsApp=0
 
  if(Flags%IFlag0==0) then
     do j=1,B%NDimX
        do i=1,A%NDimX
           ! remove this if later!!!!
-    !      if(OmA0(i).gt.SmallE.and.OmB0(j).gt.SmallE&
-    !       .and.OmA0(i).lt.BigE.and.OmB0(j).lt.BigE) then
+          if(OmA0(i).gt.SmallE.and.OmB0(j).gt.SmallE&
+           .and.OmA0(i).lt.BigE.and.OmB0(j).lt.BigE) then
+        !  if((OmA0(i)+OmA1(i)).gt.SmallE.and.(OmB0(j)+OmB1(j)).gt.SmallE &
+        !   .and.(OmA1(i)+OmA0(i)).lt.BigE.and.(OmB1(j)+OmB0(j)).lt.BigE) then
+ 
           inv_omega = 1d0/(OmA0(i)+OmB0(j))
+          inv_om12 = 1d0/(OmA0(i)+OmA1(i)+OmB0(j)+OmB1(j))
    
           e2du = e2du + y0y0(i,j)**2*inv_omega
           e2ds2 = e2ds2 + (Alpha*OmA1(i)+Beta*OmB1(j))*(y0y0(i,j)*inv_omega)**2
           !e2ds1 = e2ds1 + tmp02(i,j)*(Alpha*sc10b(i,j)+Beta*sc01b(i,j))*inv_omega
           e2ds1 = e2ds1 + y0y0(i,j)*(y1y0(i,j)+y0y1(i,j))*inv_omega
-   
-     !     endif
+
+          e2dw12 = e2dw12 + y0y0(i,j)**2*inv_om12
+          e2dw12_sp = e2dw12_sp + y0y0(i,j)*(y1y0(i,j)+y0y1(i,j))*inv_om12
+  
+          !print*, i,j,inv_om12,OmA0(i),OmA1(i),OmB0(j),OmB1(j)
+          endif
        enddo
     enddo
 
@@ -1465,13 +1477,16 @@ endif
 
     do j=1,B%NDimX
        do i=1,A%NDimX
-    !      if(OmA0(i).gt.SmallE.and.OmB0(j).gt.SmallE&
-    !       .and.OmA0(i).lt.BigE.and.OmB0(j).lt.BigE) then
+          if(OmA0(i).gt.SmallE.and.OmB0(j).gt.SmallE&
+           .and.OmA0(i).lt.BigE.and.OmB0(j).lt.BigE) then
+
           inv_omega = 1d0/(OmA0(i)+OmB0(j))
+          inv_om12 = 1d0/(OmA0(i)+OmA1(i)+OmB0(j)+OmB1(j))
    
           e2du = e2du + y0y0(i,j)**2*inv_omega
+          e2dw12 = e2dw12 + y0y0(i,j)**2*inv_om12
    
-     !     endif
+          endif
        enddo
     enddo
 
@@ -1483,11 +1498,17 @@ endif
 
  e2du = -16d0*e2du*1000d0
  e2sp = e2du + 16*e2ds2*1000 
- e2ds= e2du+(16*e2ds2-32*e2ds1)*1000
+ e2ds = e2du + (16*e2ds2-32*e2ds1)*1000
+
+ e2dw12 = -16*e2dw12*1000
+ print*, -32*e2dw12_sp
+ e2dsApp = e2dw12 -32*e2dw12_sp*1000
 
  write(LOUT,'(/1x,a,f16.8)')'E2disp(unc) = ', e2du
  write(LOUT,'(1x,a,f16.8)')'E2disp(sp) =  ', e2sp
  write(LOUT,'(1x,a,f16.8)')'E2disp(sc) =  ', e2ds
+ write(LOUT,'(/1x,a,f16.8)')'E2disp(w12) = ', e2dw12
+ write(LOUT,'(1x,a,f16.8)')'E2disp(sc2) = ', e2dsApp
 
  close(iunit)
  deallocate(work)

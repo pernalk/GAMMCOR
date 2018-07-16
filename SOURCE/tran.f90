@@ -1,6 +1,8 @@
 module tran
 !!! CAREFUL :: unsym procedures yet to be tested!!!
+use types,only: LOUT
 implicit none
+
 
 contains
 
@@ -564,6 +566,24 @@ integer :: t,p,q,pq,qp
 
 end subroutine triang_to_sq
 
+subroutine triang_to_sq2(matTr,matSq,NBas)
+implicit none
+
+double precision :: matTr(:), matSq(:,:)
+integer :: NBas
+integer :: t,p,q
+
+ t = 0
+ do q=1,NBas
+    do p=1,q
+       t = t + 1
+       matSq(p,q) = matTr(t)
+       matSq(q,p) = matTr(t)
+    enddo
+ enddo
+
+end subroutine triang_to_sq2
+
 subroutine sq_to_triang(matSq,matTr,NBas)
 implicit none
 
@@ -581,6 +601,203 @@ integer :: t,p,q,pq
  enddo
 
 end subroutine sq_to_triang
+
+subroutine sq_to_triang2(matSq,matTr,NBas)
+implicit none
+
+double precision :: matSq(:,:), matTr(:)
+integer :: NBas
+integer :: t,p,q
+
+ t = 0
+ do q=1,NBas
+    do p=1,q
+       t = t + 1
+       matTr(t) = matSq(p,q)
+    enddo
+ enddo
+
+end subroutine sq_to_triang2
+
+
+subroutine sq_symmetrize(mat,NBas)
+implicit none
+
+double precision :: mat(NBas,NBas)
+integer :: NBas
+integer :: i,j
+double precision :: val
+
+do j=2,NBas
+   do i=1,j-1
+      val = (mat(i,j)+mat(j,i))*0.5d0
+      mat(i,j) = val
+      mat(j,i) = val
+   enddo
+enddo
+
+end subroutine sq_symmetrize
+
+subroutine AB_CAS_mithap(ABPLUS,ABMIN,ETot,URe,Occ,XOne,IPair, &
+                     IndN,IndX,IGem,NAct,INActive,NDimX,NBasis,NDim,NInte1,IntFileName,ACAlpha)
+!
+! COMPUTE THE A+B AND A-B MATRICES FOR 2-RDM READ FROM A rdm2.dat FILE
+! 
+! RDM2 IS IN NO REPRESENTATION. IT IS PARTIALLY SPIN-SUMMED
+! THE FOLLOWING SYMMETRY IS ASSUMED
+! RDM2(ij,kl) = RDM2(kl,ij)
+! ONLY ELEMENTS ij >= kl ARE STORED BUT ONLY FOR THE ACTIVE ELEMENTS
+! SIZE: NRDM2 = NBasis**2*(NBasis**2+1)/2
+implicit none
+
+integer,intent(in) :: NAct,INActive,NDimX,NBasis,NDim,NInte1
+character(*) :: IntFileName
+double precision,intent(out) :: ABPLUS(NDim,NDim),ABMIN(NDim,NDim)
+double precision,intent(out) :: ETot
+double precision,intent(in)  :: URe(NBasis,NBasis),Occ(NBasis),XOne(NInte1)
+integer,intent(in) :: IPair(NBasis,NBasis),IndN(2,NDim),IndX(NDim),IGem(NBasis)
+double precision,intent(in)  :: ACAlpha
+
+integer :: i,j,k,l,ij,kl,iunit,ios
+integer :: NOccup,NRDM2Act
+integer :: Ind1(NBasis),Ind2(NBasis)
+double precision :: HNO(NBasis,NBasis),val
+double precision,allocatable :: RDM2val(:,:,:,:),RDM2Act(:)
+double precision,allocatable :: work1(:),work2(:)
+double precision,allocatable :: ints(:,:)
+integer,external :: NAddrRDM
+double precision,external :: FRDM2
+
+ABPLUS = 0
+ABMIN  = 0
+ETot = 0
+
+! set dimensions
+NOccup = NAct + INActive
+Ind1 = 0
+Ind2 = 0 
+do i=1,NAct
+   Ind1(i) = INActive + i
+   Ind2(INActive+i) = i
+enddo
+
+allocate(work1(NBasis**2),work2(NBasis**2),ints(NBasis,NBasis))
+allocate(RDM2val(NOccup,NOccup,NOccup,NOccup))
+
+NRDM2Act = NAct**2*(NAct**2+1)/2
+allocate(RDM2Act(NRDM2Act))
+
+RDM2Act=0
+open(newunit=iunit,file='rdm2.dat',status='old')
+write(LOUT,'(/,1x,''Active block of 2-RDM read from rdm2.dat'')')
+do
+  read(iunit,*,iostat=ios) i,j,k,l,val  
+  if(ios/=0) exit 
+  RDM2Act(NAddrRDM(j,l,i,k,NAct))=0.5d0*val
+enddo
+close(iunit)
+
+do l=1,NOccup
+   do k=1,NOccup
+      do j=1,NOccup
+         do i=1,NOccup
+            RDM2val(i,j,k,l) = FRDM2(i,k,j,l,RDM2Act,Occ,Ind2,NAct,NBasis)
+         enddo
+      enddo
+   enddo
+enddo
+
+deallocate(RDM2Act)
+
+
+call triang_to_sq(XOne,work1,NBasis) 
+call dgemm('N','N',NBasis,NBasis,NBasis,1d0,URe,NBasis,work1,NBasis,0d0,work2,NBasis)
+call dgemm('N','T',NBasis,NBasis,NBasis,1d0,work2,NBasis,URe,NBasis,0d0,HNO,NBasis)
+call sq_symmetrize(HNO,NBasis) 
+
+
+do i=1,NOccup
+   ETot = ETot + Occ(i)*HNO(i,i)
+enddo
+ETot = 2*ETot
+
+open(newunit=iunit,file=trim(IntFileName),status='OLD', &
+     access='DIRECT',recl=8*NBasis*(NBasis+1)/2)
+
+kl = 0
+do l=1,NBasis
+   do k=1,l
+      kl = kl + 1
+      read(iunit,rec=kl) work1(1:NBasis*(NBasis+1)/2)
+      call triang_to_sq2(work1,ints,NBasis)
+
+      if(l<=NOccup) then
+         ETot = ETot + sum(RDM2val(:,:,k,l)*ints(1:NOccup,1:NOccup))
+         if(k/=l) ETot = ETot + sum(RDM2val(:,:,l,k)*ints(1:NOccup,1:NOccup))
+      endif
+
+     if(IGem(k)/=IGem(l)) then
+  
+        HNO(k,l) = ACAlpha*HNO(k,l)
+        if(k/=l) HNO(l,k) = ACAlpha*HNO(l,k)
+  
+     else
+  
+        val = 0
+        do i=1,NBasis
+           if(IGem(i)/=IGem(k)) val = val + Occ(i)*ints(i,i)
+        enddo  
+        val = 2*(1-ACAlpha)*val
+        HNO(k,l) = HNO(k,l)+val
+        if(k/=l) HNO(l,k) = HNO(l,k) + val
+
+       ! exchange !
+       ! do i=1,NBasis
+       !    if(IGem(i)/=IGem(k)) HNO(i,l) = HNO(i,l)-(1-ACAlpha)*Occ(k)*ints(i,k) 
+       ! enddo
+       ! if(k/=l) then 
+       !    do i=1,NBasis
+       !       if(IGem(i)/=IGem(l)) HNO(i,k) = HNO(i,k)-(1-ACAlpha)*Occ(l)*ints(i,l) 
+       !    enddo
+       ! endif
+
+     endif
+
+   enddo
+enddo
+
+close(iunit)
+
+
+call sq_to_triang2(HNO,work1,NBasis)
+write(LOUT,*) 'DUPAmy', norm2(work1(1:NBasis*(NBasis+1)/2))
+HNO=transpose(HNO)
+call sq_to_triang2(HNO,work1,NBasis)
+write(LOUT,*) 'DUPCmy', norm2(work1(1:NBasis*(NBasis+1)/2))
+
+write(LOUT,'(/,1X,''CASSCF Energy (w/o ENuc)'',5X,F15.8)') ETot
+
+
+
+
+
+
+
+
+
+
+
+
+deallocate(RDM2val)
+deallocate(ints,work2,work1)
+
+end subroutine AB_CAS_mithap
+
+
+
+
+
+
 
 end module
 

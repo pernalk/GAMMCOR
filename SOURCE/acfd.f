@@ -1409,6 +1409,7 @@ C
      $ (Eig(MU)+Eig(NU))
       Aux2=Zero
 c herer!!!
+C      If((MU.Ne.NU).And.(Abs(Eig(MU)-Eig(NU)).Gt.1.D-5)) Aux2=
       If((MU.Ne.NU).And.(Abs(Eig(MU)-Eig(NU)).Gt.1.D-12)) Aux2=
 c      If(MU.Ne.NU) Aux2= 
      $  (ABPLUS(MU+(NU-1)*NoEig)+ABMIN(MU+(NU-1)*NoEig))/
