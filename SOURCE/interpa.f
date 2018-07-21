@@ -3244,6 +3244,9 @@ C
       EndDo
       EndDo
 C
+      Print*, 'AuxI-Ka',norm2(AuxI)
+      Print*, 'AuxIO-Ka',norm2(AuxIO)
+C
 C     AUXILIARY MATRIX WMAT
 C
       Do I=1,NBasis
@@ -3271,6 +3274,8 @@ C
       EndDo
       EndDo
       EndDo
+C
+      Print*, 'WMAT-Ka',norm2(WMAT)
 C
       Do IRow=1,NDimX
 C

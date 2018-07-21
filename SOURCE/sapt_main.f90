@@ -789,10 +789,10 @@ double precision, allocatable :: EigTmp(:), VecTmp(:)
 ! endif 
 
   ! big testing AB-CAS 
-   !ACAlpha=sqrt(2d0)/2d0
-   !call AB_CAS_mithap(ABPlus,ABMin,ECASSCF,URe,Mon%Occ,XOne,Mon%IPair,&
-    !           Mon%IndN,Mon%IndX,Mon%IGem,Mon%NAct,Mon%INAct,Mon%NDimX,NBas,Mon%NDimX,&
-    !           NInte1,twofile,ACAlpha)
+   ACAlpha=sqrt(2d0)/2d0
+   call AB_CAS_mithap(ABPlus,ABMin,ECASSCF,URe,Mon%Occ,XOne,Mon%IPair,&
+               Mon%IndN,Mon%IndX,Mon%IGem,Mon%NAct,Mon%INAct,Mon%NDimX,NBas,Mon%NDimX,&
+               NInte1,twofile,ACAlpha)
 
    call AB_CAS(ABPlus,ABMin,ECASSCF,URe,Mon%Occ,XOne,TwoMO,Mon%IPair,&
                Mon%IndN,Mon%IndX,Mon%NDimX,NBas,Mon%NDimX,NInte1,NInte2,ACAlpha)
@@ -1890,6 +1890,8 @@ integer :: test
    if(mon%Monomer==2) write(LOUT,'(1x,a)') 'Monomer B' 
    do i=1,nbas
       if(mon%Occ(i).lt.1d0.and.mon%Occ(i).ne.0d0) then
+      ! here!!!
+      !if(mon%Occ(i).lt.1d0.and.mon%Occ(i).gt.1d-6) then
          ! HERE!!! ACTIVE!!!! 
          mon%IndAux(i) = 1
          write(6,'(X," Active Orbital: ",I4,E14.4)') i, mon%Occ(i)
@@ -1969,7 +1971,9 @@ integer :: test
                 ! do not correlate active degenerate orbitals from different geminals 
                 if((mon%IndAux(i)==1).and.(mon%IndAux(j)==1)  & 
                  .and.&
-                 (Abs(mon%Occ(i)-mon%Occ(j))/mon%Occ(i).lt.1.d-10) ) then
+                 (Abs(mon%Occ(i)-mon%Occ(j))/mon%Occ(i).lt.1.d-3) ) then
+                 ! here!!!
+                 !(Abs(mon%Occ(i)-mon%Occ(j))/mon%Occ(i).lt.0.5d-1) ) then
                
                    write(LOUT,'(1x,a,2x,2i4)') 'Discarding nearly degenerate pair',i,j 
                 else

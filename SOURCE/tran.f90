@@ -658,15 +658,18 @@ double precision,intent(in)  :: URe(NBasis,NBasis),Occ(NBasis),XOne(NInte1)
 integer,intent(in) :: IPair(NBasis,NBasis),IndN(2,NDim),IndX(NDim),IGem(NBasis)
 double precision,intent(in)  :: ACAlpha
 
-integer :: i,j,k,l,ij,kl,iunit,ios
+integer :: i,j,k,l,ij,kl,ir,it,iw
+integer :: iunit,ios
 integer :: NOccup,NRDM2Act
 integer :: Ind1(NBasis),Ind2(NBasis)
-double precision :: HNO(NBasis,NBasis),val
+double precision :: HNO(NBasis,NBasis),AuxI(NBasis,NBasis),AuxIO(NBasis,NBasis),WMAT(NBasis,NBasis)
+double precision :: AuxTen3(3,3,3),AuxTen4(3,3,3,3),AuxTwo,val
 double precision,allocatable :: RDM2val(:,:,:,:),RDM2Act(:)
 double precision,allocatable :: work1(:),work2(:)
 double precision,allocatable :: ints(:,:)
 integer,external :: NAddrRDM
 double precision,external :: FRDM2
+logical :: same_idx
 
 ABPLUS = 0
 ABMIN  = 0
@@ -715,15 +718,51 @@ call dgemm('N','N',NBasis,NBasis,NBasis,1d0,URe,NBasis,work1,NBasis,0d0,work2,NB
 call dgemm('N','T',NBasis,NBasis,NBasis,1d0,work2,NBasis,URe,NBasis,0d0,HNO,NBasis)
 call sq_symmetrize(HNO,NBasis) 
 
-
+val = 0
 do i=1,NOccup
-   ETot = ETot + Occ(i)*HNO(i,i)
+   val = val + Occ(i)*HNO(i,i)
 enddo
-ETot = 2*ETot
+ETot = ETot + 2*val
 
 open(newunit=iunit,file=trim(IntFileName),status='OLD', &
      access='DIRECT',recl=8*NBasis*(NBasis+1)/2)
 
+do j=1,NBasis
+   do i=1,NBasis
+     if(IGem(i)/=IGem(j)) HNO(i,j) = ACAlpha*HNO(i,j)
+   enddo
+enddo
+
+do l=1,3
+   do k=1,3
+      do i=1,3
+      if((i==k).and.(k==l)) then 
+         AuxTen3(i,k,l) = 1
+      else 
+         AuxTen3(i,k,l) = ACAlpha
+      endif
+      enddo
+   enddo
+enddo
+
+do l=1,3
+   do k=1,3
+      do j=1,3
+         do i=1,3
+            if((i==j).and.(j==k).and.(k==l)) then 
+               AuxTen4(i,j,k,l) = 1
+            else 
+               AuxTen4(i,j,k,l) = ACAlpha
+            endif
+         enddo
+      enddo
+   enddo
+enddo
+
+AuxI  = 0
+AuxIO = 0
+WMAT  = 0
+ 
 kl = 0
 do l=1,NBasis
    do k=1,l
@@ -731,36 +770,112 @@ do l=1,NBasis
       read(iunit,rec=kl) work1(1:NBasis*(NBasis+1)/2)
       call triang_to_sq2(work1,ints,NBasis)
 
+! COMPUTE THE ENERGY FOR CHECKING
       if(l<=NOccup) then
          ETot = ETot + sum(RDM2val(:,:,k,l)*ints(1:NOccup,1:NOccup))
          if(k/=l) ETot = ETot + sum(RDM2val(:,:,l,k)*ints(1:NOccup,1:NOccup))
       endif
 
-     if(IGem(k)/=IGem(l)) then
-  
-        HNO(k,l) = ACAlpha*HNO(k,l)
-        if(k/=l) HNO(l,k) = ACAlpha*HNO(l,k)
-  
-     else
+     same_idx = (IGem(k)==IGem(l))
+
+! CONSTRUCT ONE-ELECTRON PART OF THE AC ALPHA-HAMILTONIAN
+     ! Coulomb  
+     if(same_idx) then
   
         val = 0
         do i=1,NBasis
            if(IGem(i)/=IGem(k)) val = val + Occ(i)*ints(i,i)
         enddo  
         val = 2*(1-ACAlpha)*val
-        HNO(k,l) = HNO(k,l)+val
+        HNO(k,l) = HNO(k,l) + val
         if(k/=l) HNO(l,k) = HNO(l,k) + val
 
-       ! exchange !
-       ! do i=1,NBasis
-       !    if(IGem(i)/=IGem(k)) HNO(i,l) = HNO(i,l)-(1-ACAlpha)*Occ(k)*ints(i,k) 
-       ! enddo
-       ! if(k/=l) then 
-       !    do i=1,NBasis
-       !       if(IGem(i)/=IGem(l)) HNO(i,k) = HNO(i,k)-(1-ACAlpha)*Occ(l)*ints(i,l) 
-       !    enddo
-       ! endif
+     endif
+     ! exchange 
+     if(.not.same_idx) then  
 
+        val = (1-ACAlpha)*Occ(k)
+        do i=1,NBasis
+           if(IGem(i)==IGem(l)) HNO(i,l) = HNO(i,l) - val*ints(i,k) 
+        enddo
+        if(k/=l) then 
+           val = (1-ACAlpha)*Occ(l)
+           do i=1,NBasis
+              if(IGem(i)==IGem(k)) HNO(i,k) = HNO(i,k) - val*ints(i,l) 
+           enddo
+        endif
+
+     endif
+
+! AUXILIARY MATRIX AuxI  
+    
+     val = 0
+     do i=1,INActive 
+        val = val + AuxTen3(IGem(i),IGem(k),IGem(l))*Occ(i)*ints(i,i)
+     enddo 
+     AuxIO(k,l) = AuxIO(k,l) + 2*val
+     if(k/=l) AuxIO(l,k) = AuxIO(l,k) + 2*val
+     
+     do i=INActive+1,NOccup
+        val = val + AuxTen3(IGem(i),IGem(k),IGem(l))*Occ(i)*ints(i,i)
+     enddo 
+     AuxI(k,l) = AuxI(k,l) + 2*val
+     if(k/=l) AuxI(l,k) = AuxI(l,k) + 2*val
+
+     ! exchange
+     if(k<=INActive) then
+
+        do i=1,NBasis
+           AuxIO(i,l) = AuxIO(i,l) - AuxTen3(IGem(k),IGem(i),IGem(l))*Occ(k)*ints(i,k) 
+        enddo
+        if(k/=l.and.l<=INActive) then 
+           do i=1,NBasis
+              AuxIO(i,k) = AuxIO(i,k) - AuxTen3(IGem(l),IGem(i),IGem(k))*Occ(l)*ints(i,l) 
+           enddo
+        endif
+     endif
+
+     if(k<=NOccup) then
+
+        do i=1,NBasis
+           AuxI(i,l) = AuxI(i,l) - AuxTen3(IGem(k),IGem(i),IGem(l))*Occ(k)*ints(i,k) 
+        enddo
+        if(k/=l.and.l<=NOccup) then 
+           do i=1,NBasis
+              AuxI(i,k) = AuxI(i,k) - AuxTen3(IGem(l),IGem(i),IGem(k))*Occ(l)*ints(i,l) 
+           enddo
+        endif
+
+     endif
+ 
+! AUXILIARY MATRIX WMAT
+     if(l<=NOccup) then
+        do ir=1,NOccup
+           val = 0
+           do iw=1,NOccup
+              do it=1,NOccup
+
+                 val = val &
+                 + AuxTen4(IGem(it),IGem(iw),IGem(k),IGem(l))*ints(it,iw)*RDM2val(it,iw,ir,l)
+
+              enddo
+           enddo
+           WMAT(k,ir) = WMAT(k,ir) + 2*val
+        enddo
+     endif
+     if(k/=l.and.k<=NOccup) then
+        do ir=1,NOccup
+           val = 0
+           do iw=1,NOccup
+              do it=1,NOccup
+
+                 val = val &
+                 + AuxTen4(IGem(it),IGem(iw),IGem(l),IGem(k))*ints(it,iw)*RDM2val(it,iw,ir,k)
+
+              enddo
+           enddo
+           WMAT(l,ir) = WMAT(l,ir) + 2*val
+        enddo
      endif
 
    enddo
@@ -777,10 +892,19 @@ write(LOUT,*) 'DUPCmy', norm2(work1(1:NBasis*(NBasis+1)/2))
 
 write(LOUT,'(/,1X,''CASSCF Energy (w/o ENuc)'',5X,F15.8)') ETot
 
+call sq_to_triang2(AuxI,work1,NBasis)
+write(LOUT,*) 'AuxI-my', norm2(work1(1:NBasis*(NBasis+1)/2))
+AuxI=transpose(AuxI)
+call sq_to_triang2(AuxI,work1,NBasis)
+write(LOUT,*) 'AuxI-tr', norm2(work1(1:NBasis*(NBasis+1)/2))
 
+call sq_to_triang2(AuxIO,work1,NBasis)
+write(LOUT,*) 'AuxIO-my', norm2(work1(1:NBasis*(NBasis+1)/2))
+AuxIO=transpose(AuxIO)
+call sq_to_triang2(AuxIO,work1,NBasis)
+write(LOUT,*) 'AuxIO-tr', norm2(work1(1:NBasis*(NBasis+1)/2))
 
-
-
+write(LOUT,*) 'WMAT-my', norm2(WMAT)
 
 
 
