@@ -3311,67 +3311,67 @@ C
 C
       If(Occ(IP).Eq.One.Or.Occ(IR).Eq.One) Then
 C
-      Arspq=Arspq+Occ(IP)*Occ(IR)*AuxTwoPQRS*
-     $ (Two*TwoNO(NAddr3(IP,IQ,IR,IS))-TwoNO(NAddr3(IP,IR,IQ,IS)))
+Cmh      Arspq=Arspq+Occ(IP)*Occ(IR)*AuxTwoPQRS*
+Cmh     $ (Two*TwoNO(NAddr3(IP,IQ,IR,IS))-TwoNO(NAddr3(IP,IR,IQ,IS)))
       If(IP.Eq.IR) Arspq=Arspq+Occ(IP)*AuxI(IQS)
 C
       Else
-C
-      Do ITT=1,NAct
-      Do IUU=1,NAct
-      IT=Ind1(ITT)
-      IU=Ind1(IUU)
-C
-      AuxTwoSQTU=One
-      If(IGFact(NAddr3(IS,IQ,IT,IU)).Eq.0) AuxTwoSQTU=ACAlpha
-C
-      Arspq=Arspq
-     $ +TwoNO(NAddr3(IS,IQ,IT,IU))*
-     $  FRDM2(IP,IU,IR,IT,RDM2Act,Occ,Ind2,NAct,NBasis)
-     $  *AuxTwoSQTU
-     $ +TwoNO(NAddr3(IS,IU,IT,IQ))*
-     $ FRDM2(IP,IU,IT,IR,RDM2Act,Occ,Ind2,NAct,NBasis)
-     $  *AuxTwoSQTU
-C
-      EndDo
-      EndDo
-C
+CmhC
+Cmh      Do ITT=1,NAct
+Cmh      Do IUU=1,NAct
+Cmh      IT=Ind1(ITT)
+Cmh      IU=Ind1(IUU)
+CmhC
+Cmh      AuxTwoSQTU=One
+Cmh      If(IGFact(NAddr3(IS,IQ,IT,IU)).Eq.0) AuxTwoSQTU=ACAlpha
+CmhC
+Cmh      Arspq=Arspq
+Cmh     $ +TwoNO(NAddr3(IS,IQ,IT,IU))*
+Cmh     $  FRDM2(IP,IU,IR,IT,RDM2Act,Occ,Ind2,NAct,NBasis)
+Cmh     $  *AuxTwoSQTU
+Cmh     $ +TwoNO(NAddr3(IS,IU,IT,IQ))*
+Cmh     $ FRDM2(IP,IU,IT,IR,RDM2Act,Occ,Ind2,NAct,NBasis)
+Cmh     $  *AuxTwoSQTU
+CmhC
+Cmh      EndDo
+Cmh      EndDo
+CmhC
       If(IP.Eq.IR) Arspq=Arspq+Occ(IP)*AuxIO(IQS) 
-C
+CmhC
       EndIf
       EndIf
-C
-C     T3+T4 
-C
+CmhC
+CmhC     T3+T4 
+CmhC
       If(Occ(IQ)*Occ(IS).Ne.Zero) Then
 C
       If(Occ(IQ).Eq.One.Or.Occ(IS).Eq.One) Then
-C
-      Arspq=Arspq+Occ(IQ)*Occ(IS)*AuxTwoPQRS*
-     $ (Two*TwoNO(NAddr3(IP,IQ,IR,IS))-TwoNO(NAddr3(IP,IR,IQ,IS)))
+CmhC
+Cmh      Arspq=Arspq+Occ(IQ)*Occ(IS)*AuxTwoPQRS*
+Cmh     $ (Two*TwoNO(NAddr3(IP,IQ,IR,IS))-TwoNO(NAddr3(IP,IR,IQ,IS)))
       If(IQ.Eq.IS) Arspq=Arspq+Occ(IQ)*AuxI(IPR)
-C
+CmhC
       Else
-C
-      Do ITT=1,NAct
-      Do IUU=1,NAct
-      IT=Ind1(ITT)
-      IU=Ind1(IUU)
-C
-      AuxTwoUTPR=One
-      If(IGFact(NAddr3(IU,IT,IP,IR)).Eq.0) AuxTwoUTPR=ACAlpha
-C
-      Arspq=Arspq
-     $ +TwoNO(NAddr3(IU,IT,IP,IR))*
-     $ FRDM2(IS,IT,IQ,IU,RDM2Act,Occ,Ind2,NAct,NBasis)
-     $  *AuxTwoUTPR
-     $ +TwoNO(NAddr3(IU,IR,IP,IT))*
-     $ FRDM2(IS,IT,IU,IQ,RDM2Act,Occ,Ind2,NAct,NBasis)
-     $  *AuxTwoUTPR
-C
-      EndDo
-      EndDo
-C
+CmhC
+Cmh      Do ITT=1,NAct
+Cmh      Do IUU=1,NAct
+Cmh      IT=Ind1(ITT)
+Cmh      IU=Ind1(IUU)
+CmhC
+Cmh      AuxTwoUTPR=One
+Cmh      If(IGFact(NAddr3(IU,IT,IP,IR)).Eq.0) AuxTwoUTPR=ACAlpha
+CmhC
+Cmh      Arspq=Arspq
+Cmh     $ +TwoNO(NAddr3(IU,IT,IP,IR))*
+Cmh     $ FRDM2(IS,IT,IQ,IU,RDM2Act,Occ,Ind2,NAct,NBasis)
+Cmh     $  *AuxTwoUTPR
+Cmh     $ +TwoNO(NAddr3(IU,IR,IP,IT))*
+Cmh     $ FRDM2(IS,IT,IU,IQ,RDM2Act,Occ,Ind2,NAct,NBasis)
+Cmh     $  *AuxTwoUTPR
+CmhC
+Cmh      EndDo
+Cmh      EndDo
+CmhC
       If(IQ.Eq.IS) Arspq=Arspq+Occ(IQ)*AuxIO(IPR)
 C
       EndIf
@@ -3385,25 +3385,25 @@ C
       If(Occ(IQ).Eq.One.Or.Occ(IR).Eq.One) Then
 C
       Arspq=Arspq-Occ(IQ)*Occ(IR)*AuxPQRS
-C
-      Else
-C
-      Do ITT=1,NAct
-      Do IUU=1,NAct
-      IT=Ind1(ITT)
-      IU=Ind1(IUU)
-C
-      AuxTwoPTSU=One
-      If(IGFact(NAddr3(IP,IT,IS,IU)).Eq.0) AuxTwoPTSU=ACAlpha
-C
-      Arspq=Arspq
-     $ -TwoNO(NAddr3(IP,IT,IS,IU))*
-     $ FRDM2(IT,IU,IQ,IR,RDM2Act,Occ,Ind2,NAct,NBasis)
-     $  *AuxTwoPTSU
-C
-      EndDo
-      EndDo
-C
+CmhC
+Cmh      Else
+CmhC
+Cmh      Do ITT=1,NAct
+Cmh      Do IUU=1,NAct
+Cmh      IT=Ind1(ITT)
+Cmh      IU=Ind1(IUU)
+CmhC
+Cmh      AuxTwoPTSU=One
+Cmh      If(IGFact(NAddr3(IP,IT,IS,IU)).Eq.0) AuxTwoPTSU=ACAlpha
+CmhC
+Cmh      Arspq=Arspq
+Cmh     $ -TwoNO(NAddr3(IP,IT,IS,IU))*
+Cmh     $ FRDM2(IT,IU,IQ,IR,RDM2Act,Occ,Ind2,NAct,NBasis)
+Cmh     $  *AuxTwoPTSU
+CmhC
+Cmh      EndDo
+Cmh      EndDo
+CmhC
       EndIf
       EndIf
 C
@@ -3414,25 +3414,25 @@ C
       If(Occ(IP).Eq.One.Or.Occ(IS).Eq.One) Then
 C
       Arspq=Arspq-Occ(IP)*Occ(IS)*AuxPQRS
-C
-      Else
-C
-      Do ITT=1,NAct
-      Do IUU=1,NAct
-      IT=Ind1(ITT)
-      IU=Ind1(IUU)
-C
-      AuxTwoTQUR=One
-      If(IGFact(NAddr3(IT,IQ,IU,IR)).Eq.0) AuxTwoTQUR=ACAlpha
-C
-      Arspq=Arspq
-     $ -TwoNO(NAddr3(IT,IQ,IU,IR))*
-     $ FRDM2(IS,IP,IU,IT,RDM2Act,Occ,Ind2,NAct,NBasis)
-     $  *AuxTwoTQUR
-C
-      EndDo
-      EndDo
-C
+CmhC
+Cmh      Else
+CmhC
+Cmh      Do ITT=1,NAct
+Cmh      Do IUU=1,NAct
+Cmh      IT=Ind1(ITT)
+Cmh      IU=Ind1(IUU)
+CmhC
+Cmh      AuxTwoTQUR=One
+Cmh      If(IGFact(NAddr3(IT,IQ,IU,IR)).Eq.0) AuxTwoTQUR=ACAlpha
+CmhC
+Cmh      Arspq=Arspq
+Cmh     $ -TwoNO(NAddr3(IT,IQ,IU,IR))*
+Cmh     $ FRDM2(IS,IP,IU,IT,RDM2Act,Occ,Ind2,NAct,NBasis)
+Cmh     $  *AuxTwoTQUR
+CmhC
+Cmh      EndDo
+Cmh      EndDo
+CmhC
       EndIf
       EndIf
 C
@@ -3461,6 +3461,8 @@ C
       EndDo
 C
       Write(*,*)'ABPLUS,ABMIN CONSTRUCTED'
+C
+      Write(*,*) 'AB-Ka',norm2(ABPLUS),norm2(ABMIN)
 C
       Do IRow=1,NDimX
 C

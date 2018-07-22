@@ -1971,7 +1971,7 @@ integer :: test
                 ! do not correlate active degenerate orbitals from different geminals 
                 if((mon%IndAux(i)==1).and.(mon%IndAux(j)==1)  & 
                  .and.&
-                 (Abs(mon%Occ(i)-mon%Occ(j))/mon%Occ(i).lt.1.d-3) ) then
+                 (Abs(mon%Occ(i)-mon%Occ(j))/mon%Occ(i).lt.1.d-8) ) then
                  ! here!!!
                  !(Abs(mon%Occ(i)-mon%Occ(j))/mon%Occ(i).lt.0.5d-1) ) then
                
