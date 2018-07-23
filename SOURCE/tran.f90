@@ -658,20 +658,20 @@ double precision,intent(in)  :: URe(NBasis,NBasis),Occ(NBasis),XOne(NInte1)
 integer,intent(in) :: IPair(NBasis,NBasis),IndN(2,NDim),IndX(NDim),IGem(NBasis)
 double precision,intent(in)  :: ACAlpha
 
-integer :: i,j,k,l,ij,kl
-integer :: ip,iq,ir,is,it,iw,ipq,irs,ICol,IRow
+integer :: i,j,k,l,ij,kl,kk,ll,klround
+integer :: ip,iq,ir,is,it,iu,iw,ipq,irs,ICol,IRow
 integer :: iunit,ios
 integer :: NOccup,NRDM2Act
-integer :: Ind1(NBasis),Ind2(NBasis),AuxTen2(3,3)
+integer :: Ind1(NBasis),Ind2(NBasis),AuxInd(3,3)
 double precision :: HNO(NBasis,NBasis),AuxI(NBasis,NBasis),AuxIO(NBasis,NBasis),WMAT(NBasis,NBasis)
-double precision :: AuxTen4(3,3,3,3),AuxVal,val
+double precision :: AuxCoeff(3,3,3,3),AuxVal,val
 double precision,allocatable :: FullPLUS(:,:,:,:),FullMIN(:,:,:,:)
 double precision,allocatable :: RDM2val(:,:,:,:),RDM2Act(:)
 double precision,allocatable :: work1(:),work2(:)
 double precision,allocatable :: ints(:,:)
 integer,external :: NAddrRDM
 double precision,external :: FRDM2
-logical :: same_idx
+
 
 ABPLUS = 0
 ABMIN  = 0
@@ -680,7 +680,7 @@ ETot = 0
 ! set dimensions
 NOccup = NAct + INActive
 Ind1 = 0
-Ind2 = 0 
+Ind2 = 0
 do i=1,NAct
    Ind1(i) = INActive + i
    Ind2(INActive+i) = i
@@ -698,9 +698,9 @@ RDM2Act=0
 open(newunit=iunit,file='rdm2.dat',status='old')
 write(LOUT,'(/,1x,''Active block of 2-RDM read from rdm2.dat'')')
 do
-  read(iunit,*,iostat=ios) i,j,k,l,val  
-  if(ios/=0) exit 
-  RDM2Act(NAddrRDM(j,l,i,k,NAct))=0.5d0*val
+   read(iunit,*,iostat=ios) i,j,k,l,val
+   if(ios/=0) exit
+   RDM2Act(NAddrRDM(j,l,i,k,NAct))=0.5d0*val
 enddo
 close(iunit)
 
@@ -717,10 +717,10 @@ enddo
 deallocate(RDM2Act)
 
 
-call triang_to_sq(XOne,work1,NBasis) 
+call triang_to_sq(XOne,work1,NBasis)
 call dgemm('N','N',NBasis,NBasis,NBasis,1d0,URe,NBasis,work1,NBasis,0d0,work2,NBasis)
 call dgemm('N','T',NBasis,NBasis,NBasis,1d0,work2,NBasis,URe,NBasis,0d0,HNO,NBasis)
-call sq_symmetrize(HNO,NBasis) 
+call sq_symmetrize(HNO,NBasis)
 
 val = 0
 do i=1,NOccup
@@ -728,27 +728,24 @@ do i=1,NOccup
 enddo
 ETot = ETot + 2*val
 
-open(newunit=iunit,file=trim(IntFileName),status='OLD', &
-     access='DIRECT',recl=8*NBasis*(NBasis+1)/2)
-
 do j=1,NBasis
    do i=1,NBasis
-     if(IGem(i)/=IGem(j)) HNO(i,j) = ACAlpha*HNO(i,j)
+      if(IGem(i)/=IGem(j)) HNO(i,j) = ACAlpha*HNO(i,j)
    enddo
 enddo
 
-AuxTen2 = 0
-AuxTen2(1:2,1:2) = 1
-AuxTen2(2,2) = 2
+AuxInd = 0
+AuxInd(1:2,1:2) = 1
+AuxInd(2,2) = 2
 
 do l=1,3
    do k=1,3
       do j=1,3
          do i=1,3
-            if((i==j).and.(j==k).and.(k==l)) then 
-               AuxTen4(i,j,k,l) = 1
-            else 
-               AuxTen4(i,j,k,l) = ACAlpha
+            if((i==j).and.(j==k).and.(k==l)) then
+               AuxCoeff(i,j,k,l) = 1
+            else
+               AuxCoeff(i,j,k,l) = ACAlpha
             endif
          enddo
       enddo
@@ -760,241 +757,242 @@ AuxIO = 0
 WMAT  = 0
 FullPLUS = 0
 FullMIN  = 0
- 
+
+open(newunit=iunit,file=trim(IntFileName),status='OLD', &
+     access='DIRECT',recl=8*NBasis*(NBasis+1)/2)
+
+! old loop: 
+!kl = 0
+!do l=1,NBasis
+!   do k=1,l
+!      kl = kl + 1
+!      read(iunit,rec=kl) work1(1:NBasis*(NBasis+1)/2)
+!      call triang_to_sq2(work1,ints,NBasis)
+
 kl = 0
-do l=1,NBasis
-   do k=1,l
+do ll=1,NBasis
+   do kk=1,ll
       kl = kl + 1
       read(iunit,rec=kl) work1(1:NBasis*(NBasis+1)/2)
       call triang_to_sq2(work1,ints,NBasis)
+      do klround=1,merge(1,2,kk==ll)
+         select case(klround)
+         case(1)
+            k = kk
+            l = ll
+         case(2)
+            k = ll
+            l = kk
+         end select
 
 ! COMPUTE THE ENERGY FOR CHECKING
-      if(l<=NOccup) then
-         ETot = ETot + sum(RDM2val(:,:,k,l)*ints(1:NOccup,1:NOccup))
-         if(k/=l) ETot = ETot + sum(RDM2val(:,:,l,k)*ints(1:NOccup,1:NOccup))
-      endif
-
-     same_idx = (IGem(k)==IGem(l))
+         if((k<=NOccup).and.(l<=NOccup)) then
+            ETot = ETot + sum(RDM2val(:,:,k,l)*ints(1:NOccup,1:NOccup))
+         endif
 
 ! CONSTRUCT ONE-ELECTRON PART OF THE AC ALPHA-HAMILTONIAN
-     ! Coulomb  
-     if(same_idx) then
-  
-        val = 0
-        do i=1,NBasis
-           if(IGem(i)/=IGem(k)) val = val + Occ(i)*ints(i,i)
-        enddo  
-        val = 2*(1-ACAlpha)*val
-        HNO(k,l) = HNO(k,l) + val
-        if(k/=l) HNO(l,k) = HNO(l,k) + val
+         ! Coulomb
+         if(IGem(k)==IGem(l)) then
 
-     endif
-     ! exchange 
-     if(.not.same_idx) then  
+            val = 0
+            do i=1,NBasis
+               if(IGem(i)/=IGem(k)) val = val + Occ(i)*ints(i,i)
+            enddo
+            val = 2*(1-ACAlpha)*val
+            HNO(k,l) = HNO(k,l) + val
 
-        val = (1-ACAlpha)*Occ(k)
-        do i=1,NBasis
-           if(IGem(i)==IGem(l)) HNO(i,l) = HNO(i,l) - val*ints(i,k) 
-        enddo
-        if(k/=l) then 
-           val = (1-ACAlpha)*Occ(l)
-           do i=1,NBasis
-              if(IGem(i)==IGem(k)) HNO(i,k) = HNO(i,k) - val*ints(i,l) 
-           enddo
-        endif
+         ! exchange
+         else
 
-     endif
+            val = (1-ACAlpha)*Occ(k)
+            do i=1,NBasis
+               if(IGem(i)==IGem(l)) HNO(i,l) = HNO(i,l) - val*ints(i,k)
+            enddo
 
-! AUXILIARY MATRIX AuxI AND AuxIO 
-    
-     val = 0
-     do i=1,INActive 
-        val = val + AuxTen4(IGem(i),IGem(i),IGem(k),IGem(l))*Occ(i)*ints(i,i)
-     enddo 
-     AuxIO(k,l) = AuxIO(k,l) + 2*val
-     if(k/=l) AuxIO(l,k) = AuxIO(l,k) + 2*val
-     
-     do i=INActive+1,NOccup
-        val = val + AuxTen4(IGem(i),IGem(i),IGem(k),IGem(l))*Occ(i)*ints(i,i)
-     enddo 
-     AuxI(k,l) = AuxI(k,l) + 2*val
-     if(k/=l) AuxI(l,k) = AuxI(l,k) + 2*val
+         endif
 
-     ! exchange
-     if(k<=INActive) then
+! AUXILIARY MATRIX AuxI AND AuxIO
+         ! Coulomb
+         val = 0
+         do i=1,INActive
+            val = val + AuxCoeff(IGem(i),IGem(i),IGem(k),IGem(l))*Occ(i)*ints(i,i)
+         enddo
+         AuxIO(k,l) = AuxIO(k,l) + 2*val
+         do i=INActive+1,NOccup
+            val = val + AuxCoeff(IGem(i),IGem(i),IGem(k),IGem(l))*Occ(i)*ints(i,i)
+         enddo
+         AuxI(k,l) = AuxI(k,l) + 2*val
 
-        do i=1,NBasis
-           AuxIO(i,l) = AuxIO(i,l) - AuxTen4(IGem(i),IGem(k),IGem(i),IGem(l))*Occ(k)*ints(i,k) 
-        enddo
-        if(k/=l.and.l<=INActive) then 
-           do i=1,NBasis
-              AuxIO(i,k) = AuxIO(i,k) - AuxTen4(IGem(i),IGem(l),IGem(i),IGem(k))*Occ(l)*ints(i,l) 
-           enddo
-        endif
-     endif
+         ! exchange
+         if(k<=INActive) then
+            do i=1,NBasis
+               AuxIO(i,l) = AuxIO(i,l) - AuxCoeff(IGem(i),IGem(k),IGem(i),IGem(l))*Occ(k)*ints(i,k)
+            enddo
+         endif
+         if(k<=NOccup) then
+            do i=1,NBasis
+               AuxI(i,l) = AuxI(i,l) - AuxCoeff(IGem(i),IGem(k),IGem(i),IGem(l))*Occ(k)*ints(i,k)
+            enddo
+         endif
 
-     if(k<=NOccup) then
-
-        do i=1,NBasis
-           AuxI(i,l) = AuxI(i,l) - AuxTen4(IGem(i),IGem(k),IGem(i),IGem(l))*Occ(k)*ints(i,k) 
-        enddo
-        if(k/=l.and.l<=NOccup) then 
-           do i=1,NBasis
-              AuxI(i,k) = AuxI(i,k) - AuxTen4(IGem(i),IGem(l),IGem(i),IGem(k))*Occ(l)*ints(i,l) 
-           enddo
-        endif
-
-     endif
- 
 ! AUXILIARY MATRIX WMAT
-     if(l<=NOccup) then
-        do ir=1,NOccup
-           val = 0
-           do iw=1,NOccup
-              do it=1,NOccup
+         if(l<=NOccup) then
+            do ir=1,NOccup
+               val = 0
+               do iw=1,NOccup
+                  do it=1,NOccup
+                     val = val &
+                          + AuxCoeff(IGem(it),IGem(iw),IGem(k),IGem(l))*ints(it,iw)*RDM2val(it,iw,ir,l)
+                  enddo
+               enddo
+               WMAT(k,ir) = WMAT(k,ir) + val
+            enddo
+         endif
 
-                 val = val &
-                 + AuxTen4(IGem(it),IGem(iw),IGem(k),IGem(l))*ints(it,iw)*RDM2val(it,iw,ir,l)
+! CONSTRUCT TWO-ELECTRON PART OF THE AC ALPHA-HAMILTONIAN
+         ! T5+T6: AuxInd = 1
+         ! Coulomb
+         if(k>INActive.and.l<=NOccup) then
+            ir = k
+            is = l
 
-              enddo
-           enddo
-           WMAT(k,ir) = WMAT(k,ir) + val
-        enddo
-     endif
-     if(k/=l.and.k<=NOccup) then
-        do ir=1,NOccup
-           val = 0
-           do iw=1,NOccup
-              do it=1,NOccup
+            do iq=1,NOccup
+               do ip=INActive+1,NBasis
 
-                 val = val &
-                 + AuxTen4(IGem(it),IGem(iw),IGem(l),IGem(k))*ints(it,iw)*RDM2val(it,iw,ir,k)
+                  AuxVal = AuxCoeff(IGem(ip),IGem(iq),IGem(ir),IGem(is))
 
-              enddo
-           enddo
-           WMAT(l,ir) = WMAT(l,ir) + val
-        enddo
-     endif
+                  val = 0
+                  if(AuxInd(IGem(iq),IGem(ir))==1) val = val + Occ(iq)*Occ(ir)
+                  if(AuxInd(IGem(ip),IGem(is))==1) val = val + Occ(ip)*Occ(is)
+                  val = -2*AuxVal*val*ints(ip,iq)
 
-! CONSTRUCT TWO-ELECTRON PART OF THE AC ALPHA-HAMILTONIAN      
-     if(l>INActive.and.k<=NOccup) then
-       ir = l
-       is = k
+                  FullPLUS(ip,iq,ir,is) = FullPLUS(ip,iq,ir,is) + val
+                  FullMIN(ip,iq,ir,is)  = FullMIN(ip,iq,ir,is) + val
 
-       do iq=1,NOccup
-          do ip=INActive+1,NBasis
-             
-             AuxVal = AuxTen4(IGem(ip),IGem(iq),IGem(ir),IGem(is))
+                  val = 0
+                  if(AuxInd(IGem(ip),IGem(ir))==1) val = val + Occ(ip)*Occ(ir)
+                  if(AuxInd(IGem(iq),IGem(is))==1) val = val + Occ(iq)*Occ(is)
+                  val = -2*AuxVal*val*ints(iq,ip)
 
-             val = 0
-             if(AuxTen2(IGem(iq),IGem(ir))==1) val = val + Occ(iq)*Occ(ir)
-             if(AuxTen2(IGem(ip),IGem(is))==1) val = val + Occ(ip)*Occ(is)
-             val = -2*AuxVal*val*ints(ip,iq)
+                  FullPLUS(ip,iq,ir,is) = FullPLUS(ip,iq,ir,is) + val
+                  FullMIN(ip,iq,ir,is)  = FullMIN(ip,iq,ir,is) - val
 
-             FullPLUS(ip,iq,ir,is) = FullPLUS(ip,iq,ir,is) + val
-             FullMIN(ip,iq,ir,is)  = FullMIN(ip,iq,ir,is) + val
+               enddo
+            enddo
 
-             val = 0
-             if(AuxTen2(IGem(ip),IGem(ir))==1) val = val + Occ(ip)*Occ(ir)
-             if(AuxTen2(IGem(iq),IGem(is))==1) val = val + Occ(iq)*Occ(is)
-             val = -2*AuxVal*val*ints(iq,ip)
-  
-             FullPLUS(ip,iq,ir,is) = FullPLUS(ip,iq,ir,is) + val
-             FullMIN(ip,iq,ir,is)  = FullMIN(ip,iq,ir,is) - val
+         endif
 
-          enddo
-       enddo
+         ! exchange
+         if(l<=NOccup) then
+            if(k<=NOccup) then
+               iq = k
+               is = l
 
-     endif
+               do ir=INActive+1,NBasis
+                  do ip=INActive+1,NBasis
 
-     ! exchange
-     if(l<=NOccup) then
-       iq = k
-       is = l    
+                     AuxVal = AuxCoeff(IGem(ip),IGem(ir),IGem(iq),IGem(is))
 
-       do ir=INActive+1,NBasis
-          do ip=INActive+1,NBasis
-             
-             AuxVal = AuxTen4(IGem(ip),IGem(ir),IGem(iq),IGem(is))
+                     val = 0
+                     if(AuxInd(IGem(iq),IGem(ir))==1) val = val + Occ(iq)*Occ(ir)
+                     if(AuxInd(IGem(ip),IGem(is))==1) val = val + Occ(ip)*Occ(is)
+                     val = AuxVal*val*ints(ip,ir)
 
-             val = 0
-             if(AuxTen2(IGem(iq),IGem(ir))==1) val = val + Occ(iq)*Occ(ir)
-             if(AuxTen2(IGem(ip),IGem(is))==1) val = val + Occ(ip)*Occ(is)
-             val = AuxVal*val*ints(ip,ir)
+                     FullPLUS(ip,iq,ir,is) = FullPLUS(ip,iq,ir,is) + val
+                     FullMIN(ip,iq,ir,is)  = FullMIN(ip,iq,ir,is) + val
 
-             FullPLUS(ip,iq,ir,is) = FullPLUS(ip,iq,ir,is) + val
-             FullMIN(ip,iq,ir,is)  = FullMIN(ip,iq,ir,is) + val
+                  enddo
+               enddo
 
-          enddo
-       enddo
+            endif
+            if(k>INActive) then
+               ip = k
+               is = l
 
-       if(k/=l) then
-          iq = l
-          is = k
-     
-          do ir=INActive+1,NBasis
-             do ip=INActive+1,NBasis
-                
-                AuxVal = AuxTen4(IGem(ip),IGem(ir),IGem(iq),IGem(is))
-   
-                val = 0
-                if(AuxTen2(IGem(iq),IGem(ir))==1) val = val + Occ(iq)*Occ(ir)
-                if(AuxTen2(IGem(ip),IGem(is))==1) val = val + Occ(ip)*Occ(is)
-                val = AuxVal*val*ints(ip,ir)
-   
-                FullPLUS(ip,iq,ir,is) = FullPLUS(ip,iq,ir,is) + val
-                FullMIN(ip,iq,ir,is)  = FullMIN(ip,iq,ir,is) + val
-   
-             enddo
-          enddo
-       endif
+               do ir=INActive+1,NBasis
+                  do iq=1,NOccup
 
-     endif
+                     AuxVal = AuxCoeff(IGem(ip),IGem(ir),IGem(iq),IGem(is))
 
-     if(l>INActive.and.k<=NOccup) then
-       ip = l
-       is = k
+                     val = 0
+                     if(AuxInd(IGem(ip),IGem(ir))==1) val = val + Occ(ip)*Occ(ir)
+                     if(AuxInd(IGem(iq),IGem(is))==1) val = val + Occ(iq)*Occ(is)
+                     val = AuxVal*val*ints(iq,ir)
 
-       do ir=INActive+1,NBasis
-          do iq=1,NOccup
-             
-             AuxVal = AuxTen4(IGem(ip),IGem(ir),IGem(iq),IGem(is))
+                     FullPLUS(ip,iq,ir,is) = FullPLUS(ip,iq,ir,is) + val
+                     FullMIN(ip,iq,ir,is)  = FullMIN(ip,iq,ir,is) - val
 
-             val = 0
-             if(AuxTen2(IGem(ip),IGem(ir))==1) val = val + Occ(ip)*Occ(ir)
-             if(AuxTen2(IGem(iq),IGem(is))==1) val = val + Occ(iq)*Occ(is)
-             val = AuxVal*val*ints(iq,ir)
-  
-             FullPLUS(ip,iq,ir,is) = FullPLUS(ip,iq,ir,is) + val
-             FullMIN(ip,iq,ir,is)  = FullMIN(ip,iq,ir,is) - val
+                  enddo
+               enddo
+            endif
+         endif
 
-          enddo
-       enddo
-     endif
+         ! T5: AuxInd = 2
+         if((k<=NOccup).and.(l>INActive.and.l<=NOccup)) then
+            is = k
+            iu = l
+            
+            do ir=INActive+1,NOccup
+               do iq=INActive+1,NOccup
+                  do ip=INActive+1,NBasis
+                     val = 0
+                     do it=INActive+1,NOccup
+                        val = val - AuxCoeff(IGem(ip),IGem(it),IGem(is),IGem(iu))*RDM2val(it,iq,iu,ir)*ints(it,ip)
+                     enddo
+                     FullPLUS(ip,iq,ir,is) = FullPLUS(ip,iq,ir,is) + val
+                     FullMIN(ip,iq,ir,is) = FullMIN(ip,iq,ir,is) + val
+                  enddo
+               enddo
+            enddo
+            
+            do ir=INActive+1,NOccup
+               do iq=1,NOccup
+                  do ip=INActive+1,NOccup
+                     val = 0
+                     do it=INActive+1,NOccup
+                        val = val - AuxCoeff(IGem(iq),IGem(it),IGem(is),IGem(iu))*RDM2val(it,ip,iu,ir)*ints(it,iq)
+                     enddo
+                     FullPLUS(ip,iq,ir,is) = FullPLUS(ip,iq,ir,is) + val
+                     FullMIN(ip,iq,ir,is) = FullMIN(ip,iq,ir,is) - val
+                  enddo
+               enddo
+            enddo
+            
+         endif
 
-     if(k/=l) then
-        if(k>INActive.and.l<=NOccup) then
-          ip = k
-          is = l
+         if((k>INActive).and.(l>INActive.and.l<=NOccup)) then
+            ir = k
+            iu = l
 
-          do ir=INActive+1,NBasis
-             do iq=1,NOccup
-                
-                AuxVal = AuxTen4(IGem(ip),IGem(ir),IGem(iq),IGem(is))
-
-                val = 0
-                if(AuxTen2(IGem(ip),IGem(ir))==1) val = val + Occ(ip)*Occ(ir)
-                if(AuxTen2(IGem(iq),IGem(is))==1) val = val + Occ(iq)*Occ(is)
-                val = AuxVal*val*ints(iq,ir)
-  
-                FullPLUS(ip,iq,ir,is) = FullPLUS(ip,iq,ir,is) + val
-                FullMIN(ip,iq,ir,is)  = FullMIN(ip,iq,ir,is) - val
-
-             enddo
-          enddo
-        endif
-     endif
-
+            do is=INActive+1,NOccup
+               do iq=1,NOccup
+                  do ip=INActive+1,NOccup
+                     val = 0
+                     do it=INActive+1,NOccup
+                        val = val - AuxCoeff(IGem(it),IGem(iq),IGem(iu),IGem(ir))*RDM2val(it,ip,iu,is)*ints(it,iq)
+                     enddo
+                     FullPLUS(ip,iq,ir,is) = FullPLUS(ip,iq,ir,is) + val
+                     FullMIN(ip,iq,ir,is) = FullMIN(ip,iq,ir,is) + val
+                  enddo
+               enddo
+            enddo
+            
+            do is=INActive+1,NOccup
+               do iq=INActive+1,NOccup
+                  do ip=INActive+1,NBasis
+                     val = 0
+                     do it=INActive+1,NOccup
+                        val = val - AuxCoeff(IGem(it),IGem(ip),IGem(iu),IGem(ir))*RDM2val(it,iq,iu,is)*ints(it,ip)
+                     enddo
+                     FullPLUS(ip,iq,ir,is) = FullPLUS(ip,iq,ir,is) + val
+                     FullMIN(ip,iq,ir,is) = FullMIN(ip,iq,ir,is) - val
+                  enddo
+               enddo
+            enddo
+            
+         endif
+      
+      enddo
    enddo
 enddo
 
@@ -1016,48 +1014,48 @@ do ICol=1,NDimX
 
          val = 0
 
-         if(ip==ir) then 
+         if(ip==ir) then
             val = val + (Occ(ip)-Occ(is))*HNO(iq,is) - WMAT(iq,is)
-            select case(AuxTen2(IGem(ip),IGem(ir)))
+            select case(AuxInd(IGem(ip),IGem(ir)))
             case(1)
-               val = val + Occ(ip)*AuxI(iq,is) 
+               val = val + Occ(ip)*AuxI(iq,is)
             case(2)
                val = val + Occ(ip)*AuxIO(iq,is)
-            end select    
-         endif 
-   
+            end select
+         endif
+
          if(iq==is) then
             val = val + (Occ(iq)-Occ(ir))*HNO(ip,ir) - WMAT(ip,ir)
-            select case(AuxTen2(IGem(iq),IGem(is)))
+            select case(AuxInd(IGem(iq),IGem(is)))
             case(1)
-              val = val + Occ(iq)*AuxI(ip,ir)
+               val = val + Occ(iq)*AuxI(ip,ir)
             case(2)
-              val = val + Occ(iq)*AuxIO(ip,ir)
+               val = val + Occ(iq)*AuxIO(ip,ir)
             end select
-         endif 
+         endif
 
          ABPLUS(irs,ipq) = ABPLUS(irs,ipq) + val
          ABMIN(irs,ipq) = ABMIN(irs,ipq) + val
 
-         val = 0  
+         val = 0
 
-         if(iq==ir) then 
+         if(iq==ir) then
             val = val + (Occ(iq)-Occ(is))*HNO(ip,is) - WMAT(ip,is)
-            select case(AuxTen2(IGem(iq),IGem(ir)))
+            select case(AuxInd(IGem(iq),IGem(ir)))
             case(1)
-               val = val + Occ(iq)*AuxI(ip,is) 
+               val = val + Occ(iq)*AuxI(ip,is)
             case(2)
                val = val + Occ(iq)*AuxIO(ip,is)
-            end select    
+            end select
          endif
 
          if(ip==is) then
             val = val + (Occ(ip)-Occ(ir))*HNO(iq,ir) - WMAT(iq,ir)
-            select case(AuxTen2(IGem(ip),IGem(is)))
+            select case(AuxInd(IGem(ip),IGem(is)))
             case(1)
-              val = val + Occ(ip)*AuxI(iq,ir)
+               val = val + Occ(ip)*AuxI(iq,ir)
             case(2)
-              val = val + Occ(ip)*AuxIO(iq,ir)
+               val = val + Occ(ip)*AuxIO(iq,ir)
             end select
          endif
 
