@@ -662,46 +662,40 @@ integer :: i,j,k,l,ij,kl,kk,ll,klround
 integer :: ip,iq,ir,is,it,iu,iw,ipq,irs,ICol,IRow
 integer :: iunit,ios
 integer :: NOccup,NRDM2Act
-integer :: Ind1(NBasis),Ind2(NBasis),AuxInd(3,3)
+integer :: Ind(NBasis),AuxInd(3,3),pos(NBasis,NBasis)
 double precision :: C(NBasis)
 double precision :: HNO(NBasis,NBasis),AuxI(NBasis,NBasis),AuxIO(NBasis,NBasis),WMAT(NBasis,NBasis)
 double precision :: AuxCoeff(3,3,3,3),AuxVal,val
-double precision,allocatable :: FullPLUS(:,:,:,:),FullMIN(:,:,:,:)
 double precision,allocatable :: RDM2val(:,:,:,:),RDM2Act(:)
 double precision,allocatable :: work1(:),work2(:)
 double precision,allocatable :: ints(:,:)
 integer,external :: NAddrRDM
 double precision,external :: FRDM2
 
-
 ABPLUS = 0
 ABMIN  = 0
-ETot = 0
+ETot   = 0
 
 ! set dimensions
 NOccup = NAct + INActive
-Ind1 = 0
-Ind2 = 0
+Ind = 0
 do i=1,NAct
-   Ind1(i) = INActive + i
-   Ind2(INActive+i) = i
+   Ind(INActive+i) = i
 enddo
 
-allocate(FullPLUS(INActive+1:NBasis,1:NOccup,INActive+1:NBasis,1:NOccup),&
-          FullMIN(INActive+1:NBasis,1:NOccup,INActive+1:NBasis,1:NOccup))
 allocate(work1(NBasis**2),work2(NBasis**2),ints(NBasis,NBasis))
 allocate(RDM2val(NOccup,NOccup,NOccup,NOccup))
 
 NRDM2Act = NAct**2*(NAct**2+1)/2
 allocate(RDM2Act(NRDM2Act))
 
-RDM2Act=0
+RDM2Act = 0
 open(newunit=iunit,file='rdm2.dat',status='old')
 write(LOUT,'(/,1x,''Active block of 2-RDM read from rdm2.dat'')')
 do
    read(iunit,*,iostat=ios) i,j,k,l,val
    if(ios/=0) exit
-   RDM2Act(NAddrRDM(j,l,i,k,NAct))=0.5d0*val
+   RDM2Act(NAddrRDM(i,k,j,l,NAct)) = 0.5d0*val
 enddo
 close(iunit)
 
@@ -709,7 +703,7 @@ do l=1,NOccup
    do k=1,NOccup
       do j=1,NOccup
          do i=1,NOccup
-            RDM2val(i,j,k,l) = FRDM2(i,k,j,l,RDM2Act,Occ,Ind2,NAct,NBasis)
+            RDM2val(i,j,k,l) = FRDM2(i,k,j,l,RDM2Act,Occ,Ind,NAct,NBasis)
          enddo
       enddo
    enddo
@@ -753,11 +747,14 @@ do l=1,3
    enddo
 enddo
 
+pos = 0
+do i=1,NDimX
+   pos(IndN(1,i),IndN(2,i)) = IndX(i)
+enddo
+
 AuxI  = 0
 AuxIO = 0
 WMAT  = 0
-FullPLUS = 0
-FullMIN  = 0
 
 open(newunit=iunit,file=trim(IntFileName),status='OLD', &
      access='DIRECT',recl=8*NBasis*(NBasis+1)/2)
@@ -779,9 +776,7 @@ do ll=1,NBasis
          end select
 
 ! COMPUTE THE ENERGY FOR CHECKING
-         if((k<=NOccup).and.(l<=NOccup)) then
-            ETot = ETot + sum(RDM2val(:,:,k,l)*ints(1:NOccup,1:NOccup))
-         endif
+         if((k<=NOccup).and.(l<=NOccup)) ETot = ETot + sum(RDM2val(:,:,k,l)*ints(1:NOccup,1:NOccup))
 
 ! CONSTRUCT ONE-ELECTRON PART OF THE AC ALPHA-HAMILTONIAN
          ! Coulomb
@@ -823,12 +818,12 @@ do ll=1,NBasis
          ! exchange
          if(k<=INActive) then
             do i=1,NBasis
-               AuxIO(i,l) = AuxIO(i,l) - AuxCoeff(IGem(i),IGem(k),IGem(i),IGem(l))*Occ(k)*ints(i,k)
+               AuxIO(i,l) = AuxIO(i,l) - AuxCoeff(IGem(i),IGem(i),IGem(k),IGem(l))*Occ(k)*ints(i,k)
             enddo
          endif
          if(k<=NOccup) then
             do i=1,NBasis
-               AuxI(i,l) = AuxI(i,l) - AuxCoeff(IGem(i),IGem(k),IGem(i),IGem(l))*Occ(k)*ints(i,k)
+               AuxI(i,l) = AuxI(i,l) - AuxCoeff(IGem(i),IGem(i),IGem(k),IGem(l))*Occ(k)*ints(i,k)
             enddo
          endif
 
@@ -854,35 +849,41 @@ do ll=1,NBasis
          if(k>INActive.and.l<=NOccup) then
             ir = k
             is = l
+            irs = pos(ir,is)
+            if(irs>0) then
 
-            do iq=1,NOccup
-               do ip=INActive+1,NBasis
+               do iq=1,NOccup
+                  do ip=INActive+1,NBasis
+                     ipq = pos(ip,iq)
+                     if(ipq>0) then
 
-                  AuxVal = AuxCoeff(IGem(ip),IGem(iq),IGem(ir),IGem(is))
+                        AuxVal = AuxCoeff(IGem(ip),IGem(iq),IGem(ir),IGem(is))
 
-                  val = 0
-                  if(AuxInd(IGem(ip),IGem(ir))==1) val = val + Occ(ip)*Occ(ir)
-                  if(AuxInd(IGem(iq),IGem(is))==1) val = val + Occ(iq)*Occ(is)
-                  if(AuxInd(IGem(iq),IGem(ir))==1) val = val - Occ(iq)*Occ(ir)
-                  if(AuxInd(IGem(ip),IGem(is))==1) val = val - Occ(ip)*Occ(is)
-                  val = 2*AuxVal*val*ints(ip,iq)
+                        val = 0
+                        if(AuxInd(IGem(ip),IGem(ir))==1) val = val + Occ(ip)*Occ(ir)
+                        if(AuxInd(IGem(iq),IGem(is))==1) val = val + Occ(iq)*Occ(is)
+                        if(AuxInd(IGem(iq),IGem(ir))==1) val = val - Occ(iq)*Occ(ir)
+                        if(AuxInd(IGem(ip),IGem(is))==1) val = val - Occ(ip)*Occ(is)
+                        val = 2*AuxVal*val*ints(ip,iq)
                   
-                  FullPLUS(ip,iq,ir,is) = FullPLUS(ip,iq,ir,is) + val
-                  FullMIN(ip,iq,ir,is)  = FullMIN(ip,iq,ir,is) + val
+                        ABPLUS(ipq,irs) = ABPLUS(ipq,irs) + val
+                        ABMIN(ipq,irs) = ABMIN(ipq,irs) + val
 
-                  val = 0
-                  if(AuxInd(IGem(iq),IGem(ir))==1) val = val + Occ(iq)*Occ(ir)
-                  if(AuxInd(IGem(ip),IGem(is))==1) val = val + Occ(ip)*Occ(is)
-                  if(AuxInd(IGem(ip),IGem(ir))==1) val = val - Occ(ip)*Occ(ir)
-                  if(AuxInd(IGem(iq),IGem(is))==1) val = val - Occ(iq)*Occ(is)
-                  val = 2*AuxVal*val*ints(iq,ip)
+                        val = 0
+                        if(AuxInd(IGem(iq),IGem(ir))==1) val = val + Occ(iq)*Occ(ir)
+                        if(AuxInd(IGem(ip),IGem(is))==1) val = val + Occ(ip)*Occ(is)
+                        if(AuxInd(IGem(ip),IGem(ir))==1) val = val - Occ(ip)*Occ(ir)
+                        if(AuxInd(IGem(iq),IGem(is))==1) val = val - Occ(iq)*Occ(is)
+                        val = 2*AuxVal*val*ints(iq,ip)
 
-                  FullPLUS(ip,iq,ir,is) = FullPLUS(ip,iq,ir,is) + val
-                  FullMIN(ip,iq,ir,is)  = FullMIN(ip,iq,ir,is) - val
+                        ABPLUS(ipq,irs) = ABPLUS(ipq,irs) + val
+                        ABMIN(ipq,irs) = ABMIN(ipq,irs) - val
 
+                     endif
+                  enddo
                enddo
-            enddo
 
+            endif
          endif
 
          ! exchange
@@ -892,44 +893,56 @@ do ll=1,NBasis
                is = l
 
                do ir=INActive+1,NBasis
-                  do ip=INActive+1,NBasis
+                  irs = pos(ir,is)
+                  if(irs>0) then
+                     do ip=INActive+1,NBasis
+                        ipq = pos(ip,iq)
+                        if(ipq>0) then
 
-                     AuxVal = AuxCoeff(IGem(ip),IGem(iq),IGem(ir),IGem(is))
+                           AuxVal = AuxCoeff(IGem(ip),IGem(iq),IGem(ir),IGem(is))
 
-                     val = 0
-                     if(AuxInd(IGem(ip),IGem(ir))==1) val = val + Occ(ip)*Occ(ir)
-                     if(AuxInd(IGem(iq),IGem(is))==1) val = val + Occ(iq)*Occ(is)
-                     if(AuxInd(IGem(iq),IGem(ir))==1) val = val - Occ(iq)*Occ(ir)
-                     if(AuxInd(IGem(ip),IGem(is))==1) val = val - Occ(ip)*Occ(is)
-                     val = - AuxVal*val*ints(ip,ir)
+                           val = 0
+                           if(AuxInd(IGem(ip),IGem(ir))==1) val = val + Occ(ip)*Occ(ir)
+                           if(AuxInd(IGem(iq),IGem(is))==1) val = val + Occ(iq)*Occ(is)
+                           if(AuxInd(IGem(iq),IGem(ir))==1) val = val - Occ(iq)*Occ(ir)
+                           if(AuxInd(IGem(ip),IGem(is))==1) val = val - Occ(ip)*Occ(is)
+                           val = - AuxVal*val*ints(ip,ir)
 
-                     FullPLUS(ip,iq,ir,is) = FullPLUS(ip,iq,ir,is) + val
-                     FullMIN(ip,iq,ir,is)  = FullMIN(ip,iq,ir,is) + val
-
-                  enddo
+                           ABPLUS(ipq,irs) = ABPLUS(ipq,irs) + val
+                           ABMIN(ipq,irs) = ABMIN(ipq,irs) + val
+                           
+                        endif
+                     enddo
+                  endif
                enddo
-
+               
             endif
             if(k>INActive) then
                ip = k
                is = l
 
                do ir=INActive+1,NBasis
-                  do iq=1,NOccup
+                  irs = pos(ir,is)
+                  if(irs>0) then                  
+                     do iq=1,NOccup
+                        ipq = pos(ip,iq)
+                        if(ipq>0) then
 
-                     AuxVal = AuxCoeff(IGem(ip),IGem(iq),IGem(ir),IGem(is))
+                           AuxVal = AuxCoeff(IGem(ip),IGem(iq),IGem(ir),IGem(is))
 
-                     val = 0
-                     if(AuxInd(IGem(iq),IGem(ir))==1) val = val + Occ(iq)*Occ(ir)
-                     if(AuxInd(IGem(ip),IGem(is))==1) val = val + Occ(ip)*Occ(is)
-                     if(AuxInd(IGem(ip),IGem(ir))==1) val = val - Occ(ip)*Occ(ir)
-                     if(AuxInd(IGem(iq),IGem(is))==1) val = val - Occ(iq)*Occ(is)
-                     val = - AuxVal*val*ints(iq,ir)
+                           val = 0
+                           if(AuxInd(IGem(iq),IGem(ir))==1) val = val + Occ(iq)*Occ(ir)
+                           if(AuxInd(IGem(ip),IGem(is))==1) val = val + Occ(ip)*Occ(is)
+                           if(AuxInd(IGem(ip),IGem(ir))==1) val = val - Occ(ip)*Occ(ir)
+                           if(AuxInd(IGem(iq),IGem(is))==1) val = val - Occ(iq)*Occ(is)
+                           val = - AuxVal*val*ints(iq,ir)
 
-                     FullPLUS(ip,iq,ir,is) = FullPLUS(ip,iq,ir,is) + val
-                     FullMIN(ip,iq,ir,is)  = FullMIN(ip,iq,ir,is) - val
-
-                  enddo
+                           ABPLUS(ipq,irs) = ABPLUS(ipq,irs) + val
+                           ABMIN(ipq,irs) = ABMIN(ipq,irs) - val
+                           
+                        endif
+                     enddo
+                  endif
                enddo
             endif
          endif
@@ -938,14 +951,23 @@ do ll=1,NBasis
          if((k<=NOccup).and.(l<=NOccup)) then
             iq = k
             is = l
-         
+
             do ir=INActive+1,NOccup
-               do ip=INActive+1,NOccup
-                  val = AuxCoeff(IGem(iq),IGem(is),2,2)* &
-                       sum(RDM2val(INActive+1:NOccup,INActive+1:NOccup,ip,ir)*ints(INActive+1:NOccup,INActive+1:NOccup))
-                  FullPLUS(ip,iq,ir,is) = FullPLUS(ip,iq,ir,is) + val
-                  FullMIN(ip,iq,ir,is) = FullMIN(ip,iq,ir,is) + val
-               enddo
+               irs = pos(ir,is)
+               if(irs>0) then
+                  do ip=INActive+1,NOccup
+                     ipq = pos(ip,iq)
+                     if(ipq>0) then
+
+                        val = AuxCoeff(IGem(iq),IGem(is),2,2)* &
+                             sum(RDM2val(INActive+1:NOccup,INActive+1:NOccup,ip,ir)*ints(INActive+1:NOccup,INActive+1:NOccup))
+
+                        ABPLUS(ipq,irs) = ABPLUS(ipq,irs) + val
+                        ABMIN(ipq,irs) = ABMIN(ipq,irs) + val
+
+                     endif
+                  enddo
+               endif
             enddo
             
          endif
@@ -956,14 +978,23 @@ do ll=1,NBasis
             is = l
 
             do ir=INActive+1,NOccup
-               do iq=INActive+1,NOccup
-                  val = AuxCoeff(IGem(ip),IGem(is),2,2)* &
-                       sum(RDM2val(INActive+1:NOccup,INActive+1:NOccup,iq,ir)*ints(INActive+1:NOccup,INActive+1:NOccup))
-                  FullPLUS(ip,iq,ir,is) = FullPLUS(ip,iq,ir,is) + val
-                  FullMIN(ip,iq,ir,is) = FullMIN(ip,iq,ir,is) - val
-               enddo
-            enddo
+               irs = pos(ir,is)
+               if(irs>0) then
+                  do iq=INActive+1,NOccup
+                     ipq = pos(ip,iq)
+                     if(ipq>0) then
+                        
+                        val = AuxCoeff(IGem(ip),IGem(is),2,2)* &
+                             sum(RDM2val(INActive+1:NOccup,INActive+1:NOccup,iq,ir)*ints(INActive+1:NOccup,INActive+1:NOccup))
+                        
+                        ABPLUS(ipq,irs) = ABPLUS(ipq,irs) + val
+                        ABMIN(ipq,irs) = ABMIN(ipq,irs) - val
 
+                     endif
+                  enddo
+               endif
+            enddo
+             
          endif
 
          ! T3
@@ -972,12 +1003,20 @@ do ll=1,NBasis
             ir = l
 
             do is=INActive+1,NOccup
-               do iq=INActive+1,NOccup
-                  val = AuxCoeff(IGem(ip),IGem(ir),2,2)* &
-                       sum(RDM2val(INActive+1:NOccup,INActive+1:NOccup,iq,is)*ints(INActive+1:NOccup,INActive+1:NOccup))
-                  FullPLUS(ip,iq,ir,is) = FullPLUS(ip,iq,ir,is) + val
-                  FullMIN(ip,iq,ir,is) = FullMIN(ip,iq,ir,is) + val
-               enddo
+               irs = pos(ir,is)
+               if(irs>0) then
+                  do iq=INActive+1,NOccup
+                     ipq = pos(ip,iq)
+                     if(ipq>0) then
+                        val = AuxCoeff(IGem(ip),IGem(ir),2,2)* &
+                             sum(RDM2val(INActive+1:NOccup,INActive+1:NOccup,iq,is)*ints(INActive+1:NOccup,INActive+1:NOccup))
+
+                        ABPLUS(ipq,irs) = ABPLUS(ipq,irs) + val
+                        ABMIN(ipq,irs) = ABMIN(ipq,irs) + val
+                        
+                     endif
+                  enddo
+               endif
             enddo
             
          endif
@@ -987,12 +1026,20 @@ do ll=1,NBasis
             ir = l
 
             do is=INActive+1,NOccup
-               do ip=INActive+1,NOccup
-                  val = AuxCoeff(IGem(iq),IGem(ir),2,2)* &
-                       sum(RDM2val(INActive+1:NOccup,INActive+1:NOccup,ip,is)*ints(INActive+1:NOccup,INActive+1:NOccup))
-                  FullPLUS(ip,iq,ir,is) = FullPLUS(ip,iq,ir,is) + val
-                  FullMIN(ip,iq,ir,is) = FullMIN(ip,iq,ir,is) - val
-               enddo
+               irs = pos(ir,is)
+               if(irs>0) then
+                  do ip=INActive+1,NOccup
+                     ipq = pos(ip,iq)
+                     if(ipq>0) then
+                        val = AuxCoeff(IGem(iq),IGem(ir),2,2)* &
+                             sum(RDM2val(INActive+1:NOccup,INActive+1:NOccup,ip,is)*ints(INActive+1:NOccup,INActive+1:NOccup))
+
+                        ABPLUS(ipq,irs) = ABPLUS(ipq,irs) + val
+                        ABMIN(ipq,irs) = ABMIN(ipq,irs) - val
+                        
+                     endif
+                  enddo
+               endif
             enddo
             
          endif
@@ -1004,51 +1051,83 @@ do ll=1,NBasis
             
             ! T2
             do ir=INActive+1,NOccup
-               do iq=1,NOccup
-                  do ip=INActive+1,NOccup
-                     val = AuxCoeff(IGem(iq),IGem(is),IGem(iu),2)* &
-                          sum(RDM2val(INActive+1:NOccup,ip,ir,iu)*ints(INActive+1:NOccup,iq))
-                     FullPLUS(ip,iq,ir,is) = FullPLUS(ip,iq,ir,is) + val
-                     FullMIN(ip,iq,ir,is) = FullMIN(ip,iq,ir,is) + val
+               irs = pos(ir,is)
+               if(irs>0) then
+                  do iq=1,NOccup
+                     do ip=INActive+1,NOccup
+                        ipq = pos(ip,iq)
+                        if(ipq>0) then
+                           val = AuxCoeff(IGem(iq),IGem(is),IGem(iu),2)* &
+                                sum(RDM2val(INActive+1:NOccup,ip,ir,iu)*ints(INActive+1:NOccup,iq))
+
+                           ABPLUS(ipq,irs) = ABPLUS(ipq,irs) + val
+                           ABMIN(ipq,irs) = ABMIN(ipq,irs) + val
+
+                        endif
+                     enddo
                   enddo
-               enddo
+               endif
             enddo
             ! p->q
             do ir=INActive+1,NOccup
-               do iq=INActive+1,NOccup
-                  do ip=INActive+1,NBasis
-                     val = AuxCoeff(IGem(ip),IGem(is),IGem(iu),2)* &
-                          sum(RDM2val(INActive+1:NOccup,iq,ir,iu)*ints(INActive+1:NOccup,ip))
-                     FullPLUS(ip,iq,ir,is) = FullPLUS(ip,iq,ir,is) + val
-                     FullMIN(ip,iq,ir,is) = FullMIN(ip,iq,ir,is) - val
+               irs = pos(ir,is)
+               if(irs>0) then
+                  do iq=INActive+1,NOccup
+                     do ip=INActive+1,NBasis
+                        ipq = pos(ip,iq)
+                        if(ipq>0) then
+                           val = AuxCoeff(IGem(ip),IGem(is),IGem(iu),2)* &
+                                sum(RDM2val(INActive+1:NOccup,iq,ir,iu)*ints(INActive+1:NOccup,ip))
+                           
+                           ABPLUS(ipq,irs) = ABPLUS(ipq,irs) + val
+                           ABMIN(ipq,irs) = ABMIN(ipq,irs) - val
+                           
+                        endif
+                     enddo
                   enddo
-               enddo
+               endif
             enddo
 
             ! T5
             do ir=INActive+1,NOccup
-               do iq=INActive+1,NOccup
-                  do ip=INActive+1,NBasis
-                     val = - AuxCoeff(IGem(ip),IGem(is),IGem(iu),2)* &
-                          sum(RDM2val(INActive+1:NOccup,iq,iu,ir)*ints(INActive+1:NOccup,ip))
-                     FullPLUS(ip,iq,ir,is) = FullPLUS(ip,iq,ir,is) + val
-                     FullMIN(ip,iq,ir,is) = FullMIN(ip,iq,ir,is) + val
+               irs = pos(ir,is)
+               if(irs>0) then
+                  do iq=INActive+1,NOccup
+                     do ip=INActive+1,NBasis
+                        ipq = pos(ip,iq)
+                        if(ipq>0) then
+                           val = - AuxCoeff(IGem(ip),IGem(is),IGem(iu),2)* &
+                                sum(RDM2val(INActive+1:NOccup,iq,iu,ir)*ints(INActive+1:NOccup,ip))
+
+                           ABPLUS(ipq,irs) = ABPLUS(ipq,irs) + val
+                           ABMIN(ipq,irs) = ABMIN(ipq,irs) + val
+                           
+                        endif
+                     enddo
                   enddo
-               enddo
+               endif
             enddo
             ! p->q
             do ir=INActive+1,NOccup
-               do iq=1,NOccup
-                  do ip=INActive+1,NOccup
-                     val = - AuxCoeff(IGem(iq),IGem(is),IGem(iu),2)* &
-                          sum(RDM2val(INActive+1:NOccup,ip,iu,ir)*ints(INActive+1:NOccup,iq))
-                     FullPLUS(ip,iq,ir,is) = FullPLUS(ip,iq,ir,is) + val
-                     FullMIN(ip,iq,ir,is) = FullMIN(ip,iq,ir,is) - val
+               irs = pos(ir,is)
+               if(irs>0) then
+                  do iq=1,NOccup
+                     do ip=INActive+1,NOccup
+                        ipq = pos(ip,iq)
+                        if(ipq>0) then
+                           val = - AuxCoeff(IGem(iq),IGem(is),IGem(iu),2)* &
+                                sum(RDM2val(INActive+1:NOccup,ip,iu,ir)*ints(INActive+1:NOccup,iq))
+
+                           ABPLUS(ipq,irs) = ABPLUS(ipq,irs) + val
+                           ABMIN(ipq,irs) = ABMIN(ipq,irs) - val
+
+                        endif
+                     enddo
                   enddo
-               enddo
+               endif
             enddo
-            
-         endif
+         
+      endif
             
          ! T4+T6: AuxInd = 2
          if((k>INActive).and.(l>INActive.and.l<=NOccup)) then
@@ -1057,52 +1136,84 @@ do ll=1,NBasis
 
             ! T4
             do is=INActive+1,NOccup
-               do iq=INActive+1,NOccup
-                  do ip=INActive+1,NBasis
-                     val = AuxCoeff(IGem(ip),IGem(ir),IGem(iu),2)* &
-                          sum(RDM2val(INActive+1:NOccup,iq,is,iu)*ints(INActive+1:NOccup,ip))
-                     FullPLUS(ip,iq,ir,is) = FullPLUS(ip,iq,ir,is) + val
-                     FullMIN(ip,iq,ir,is) = FullMIN(ip,iq,ir,is) + val
+               irs = pos(ir,is)
+               if(irs>0) then
+                  do iq=INActive+1,NOccup
+                     do ip=INActive+1,NBasis
+                        ipq = pos(ip,iq)
+                        if(ipq>0) then
+                           val = AuxCoeff(IGem(ip),IGem(ir),IGem(iu),2)* &
+                                sum(RDM2val(INActive+1:NOccup,iq,is,iu)*ints(INActive+1:NOccup,ip))
+
+                           ABPLUS(ipq,irs) = ABPLUS(ipq,irs) + val
+                           ABMIN(ipq,irs) = ABMIN(ipq,irs) + val
+                           
+                        endif
+                     enddo
                   enddo
-               enddo
+               endif
             enddo
             ! p->q
             do is=INActive+1,NOccup
-               do iq=1,NOccup
-                  do ip=INActive+1,NOccup
-                     val = AuxCoeff(IGem(iq),IGem(ir),IGem(iu),2)* &
-                          sum(RDM2val(INActive+1:NOccup,ip,is,iu)*ints(INActive+1:NOccup,iq))
-                     FullPLUS(ip,iq,ir,is) = FullPLUS(ip,iq,ir,is) + val
-                     FullMIN(ip,iq,ir,is) = FullMIN(ip,iq,ir,is) - val
+               irs = pos(ir,is)
+               if(irs>0) then
+                  do iq=1,NOccup
+                     do ip=INActive+1,NOccup
+                        ipq = pos(ip,iq)
+                        if(ipq>0) then
+                           val = AuxCoeff(IGem(iq),IGem(ir),IGem(iu),2)* &
+                                sum(RDM2val(INActive+1:NOccup,ip,is,iu)*ints(INActive+1:NOccup,iq))
+                           
+                           ABPLUS(ipq,irs) = ABPLUS(ipq,irs) + val
+                           ABMIN(ipq,irs) = ABMIN(ipq,irs) - val
+                           
+                        endif
+                     enddo
                   enddo
-               enddo
+               endif
             enddo
             
             ! T6
             do is=INActive+1,NOccup
-               do iq=1,NOccup
-                  do ip=INActive+1,NOccup
-                     val = - AuxCoeff(IGem(iq),IGem(ir),IGem(iu),2)* &
-                          sum(RDM2val(INActive+1:NOccup,ip,iu,is)*ints(INActive+1:NOccup,iq))
-                     FullPLUS(ip,iq,ir,is) = FullPLUS(ip,iq,ir,is) + val
-                     FullMIN(ip,iq,ir,is) = FullMIN(ip,iq,ir,is) + val
+               irs = pos(ir,is)
+               if(irs>0) then
+                  do iq=1,NOccup
+                     do ip=INActive+1,NOccup
+                        ipq = pos(ip,iq)
+                        if(ipq>0) then                        
+                           val = - AuxCoeff(IGem(iq),IGem(ir),IGem(iu),2)* &
+                                sum(RDM2val(INActive+1:NOccup,ip,iu,is)*ints(INActive+1:NOccup,iq))
+                           
+                           ABPLUS(ipq,irs) = ABPLUS(ipq,irs) + val
+                           ABMIN(ipq,irs) = ABMIN(ipq,irs) + val
+                           
+                        endif
+                     enddo
                   enddo
-               enddo
+               endif
             enddo
             ! p->q
             do is=INActive+1,NOccup
-               do iq=INActive+1,NOccup
-                  do ip=INActive+1,NBasis
-                     val = - AuxCoeff(IGem(ip),IGem(ir),IGem(iu),2)* &
-                          sum(RDM2val(INActive+1:NOccup,iq,iu,is)*ints(INActive+1:NOccup,ip))
-                     FullPLUS(ip,iq,ir,is) = FullPLUS(ip,iq,ir,is) + val
-                     FullMIN(ip,iq,ir,is) = FullMIN(ip,iq,ir,is) - val
+               irs = pos(ir,is)
+               if(irs>0) then
+                  do iq=INActive+1,NOccup
+                     do ip=INActive+1,NBasis
+                        ipq = pos(ip,iq)
+                        if(ipq>0) then  
+                           val = - AuxCoeff(IGem(ip),IGem(ir),IGem(iu),2)* &
+                                sum(RDM2val(INActive+1:NOccup,iq,iu,is)*ints(INActive+1:NOccup,ip))
+
+                           ABPLUS(ipq,irs) = ABPLUS(ipq,irs) + val
+                           ABMIN(ipq,irs) = ABMIN(ipq,irs) - val
+                           
+                        endif
+                     enddo
                   enddo
-               enddo
+               endif
             enddo
 
          endif
-      
+         
       enddo
    enddo
 enddo
@@ -1123,9 +1234,6 @@ do ICol=1,NDimX
          ip = IndN(1,IRow)
          iq = IndN(2,IRow)
          ipq = IndX(IRow)
-
-         ABPLUS(ipq,irs) = FullPLUS(ip,iq,ir,is)
-         ABMIN(ipq,irs) = FullMIN(ip,iq,ir,is)
 
          val = 0
 
@@ -1187,80 +1295,6 @@ do ICol=1,NDimX
    endif
 enddo
 
-!!$do ICol=1,NDimX
-!!$   ip = IndN(1,ICol)
-!!$   iq = IndN(2,ICol)
-!!$   ipq = IndX(ICol)
-!!$   if(ip/=iq) then
-!!$
-!!$      do IRow=1,NDimX
-!!$         ir = IndN(1,IRow)
-!!$         is = IndN(2,IRow)
-!!$         irs = IndX(IRow)
-!!$
-!!$         ABPLUS(irs,ipq) = FullPLUS(ip,iq,ir,is)
-!!$         ABMIN(irs,ipq) = FullMIN(ip,iq,ir,is)
-!!$
-!!$         val = 0
-!!$
-!!$         if(ip==ir) then
-!!$            val = val + (Occ(ip)-Occ(is))*HNO(iq,is) - WMAT(iq,is)
-!!$            select case(AuxInd(IGem(ip),IGem(ir)))
-!!$            case(1)
-!!$               val = val + Occ(ip)*AuxI(iq,is)
-!!$            case(2)
-!!$               val = val + Occ(ip)*AuxIO(iq,is)
-!!$            end select
-!!$         endif
-!!$
-!!$         if(iq==is) then
-!!$            val = val + (Occ(iq)-Occ(ir))*HNO(ip,ir) - WMAT(ip,ir)
-!!$            select case(AuxInd(IGem(iq),IGem(is)))
-!!$            case(1)
-!!$               val = val + Occ(iq)*AuxI(ip,ir)
-!!$            case(2)
-!!$               val = val + Occ(iq)*AuxIO(ip,ir)
-!!$            end select
-!!$         endif
-!!$
-!!$         ABPLUS(irs,ipq) = ABPLUS(irs,ipq) + val
-!!$         ABMIN(irs,ipq) = ABMIN(irs,ipq) + val
-!!$
-!!$         val = 0
-!!$
-!!$         if(iq==ir) then
-!!$            val = val + (Occ(iq)-Occ(is))*HNO(ip,is) - WMAT(ip,is)
-!!$            select case(AuxInd(IGem(iq),IGem(ir)))
-!!$            case(1)
-!!$               val = val + Occ(iq)*AuxI(ip,is)
-!!$            case(2)
-!!$               val = val + Occ(iq)*AuxIO(ip,is)
-!!$            end select
-!!$         endif
-!!$
-!!$         if(ip==is) then
-!!$            val = val + (Occ(ip)-Occ(ir))*HNO(iq,ir) - WMAT(iq,ir)
-!!$            select case(AuxInd(IGem(ip),IGem(is)))
-!!$            case(1)
-!!$               val = val + Occ(ip)*AuxI(iq,ir)
-!!$            case(2)
-!!$               val = val + Occ(ip)*AuxIO(iq,ir)
-!!$            end select
-!!$         endif
-!!$
-!!$         ABPLUS(irs,ipq) = ABPLUS(irs,ipq) + val
-!!$         ABMIN(irs,ipq) = ABMIN(irs,ipq) - val
-!!$
-!!$         val = (C(ip) + C(iq))*(C(ir) + C(is))
-!!$         if(val/=0d0) ABPLUS(irs,ipq) = ABPLUS(irs,ipq)/val
-!!$         val = (C(ip) - C(iq))*(C(ir) - C(is))
-!!$         if(val/=0d0) ABMIN(irs,ipq) = ABMIN(irs,ipq)/val
-!!$         
-!!$      enddo
-!!$
-!!$   endif
-!!$enddo
-
 print*, "AB-my",norm2(ABPLUS),norm2(ABMIN)
 
 call sq_to_triang2(HNO,work1,NBasis)
@@ -1287,7 +1321,6 @@ write(LOUT,*) 'WMAT-my', 2d0*norm2(WMAT)
 
 deallocate(RDM2val)
 deallocate(ints,work2,work1)
-deallocate(FullMIN,FullPLUS)
 
 end subroutine AB_CAS_mithap
 
