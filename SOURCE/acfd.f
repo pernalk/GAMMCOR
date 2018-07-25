@@ -825,13 +825,16 @@ C     LOCAL ARRAYS
 C
       Real*8, Allocatable :: RDM2Act(:)
       Dimension C(NBasis),HNO(NInte1),
-     $ IGFact(NInte2),
+C     $ IGFact(NInte2),
      $ Ind1(NBasis),Ind2(NBasis),WMAT(NBasis,NBasis),
      $ AuxI(NInte1),AuxIO(NInte1),IPair(NBasis,NBasis),
      $ EigX(NDimX*NDimX),
      $ IEigAddY(2,NDimX),IEigAddInd(2,NDimX),IndBlock(2,NDimX),
 c NEW 11/07/2018
      $ IMatch(NDimX)
+c     NEW 25/07/2018
+      Real*8 AuxCoeff(3,3,3,3)
+      
 C
       IPair(1:NBasis,1:NBasis)=0
       Do II=1,NDimX
@@ -861,6 +864,22 @@ C
       EndDo
       EndDo
 C
+C     PREPARE AuxCoeff
+      Do L=1,3
+      Do K=1,3
+      Do J=1,3
+      Do i=1,3
+C            
+      If((I==J).And.(J==K).And.(K==L)) Then
+      AuxCoeff(I,J,K,L) = 1
+      Else
+      AuxCoeff(I,J,K,L) = 0
+      EndIf
+C      
+      EndDo
+      EndDo
+      EndDo
+      EndDo
 C     READ 2RDM
 C
       NAct=NAcCAS
@@ -941,11 +960,12 @@ C
 C
       If(IJ.Ge.KL) Then
       NAdd=NAdd+1
-C
-      IGFact(NAdd)=1
-      If(.Not.(
-     $IGem(I).Eq.IGem(J).And.IGem(J).Eq.IGem(K).And.IGem(K).Eq.IGem(L)))
-     $ IGFact(NAdd)=0
+C     DO NOT USE IGFact!!
+c$$$  C
+c$$$      IGFact(NAdd)=1
+c$$$      If(.Not.(
+c$$$     $IGem(I).Eq.IGem(J).And.IGem(J).Eq.IGem(K).And.IGem(K).Eq.IGem(L)))
+c$$$     $ IGFact(NAdd)=0
 C
       EndIf
 C
@@ -955,7 +975,7 @@ C
       EndDo
 C
 C     AUXILIARY MATRIX AuxI AND AuxIO  
-C   
+C     
       IPQ=0
       Do IP=1,NBasis
       Do IQ=1,IP
@@ -963,7 +983,8 @@ C
       AuxI(IPQ)=Zero
       AuxIO(IPQ)=Zero
       Do IT=1,NOccup
-      If(IGFact(NAddr3(IT,IT,IP,IQ)).Eq.1) Then
+      If(AuxCoeff(IGem(IT),IGem(IT),IGem(IP),IGem(IQ)).Eq.1) Then   
+C      If(IGFact(NAddr3(IT,IT,IP,IQ)).Eq.1) Then
        AuxI(IPQ)=AuxI(IPQ)+Occ(IT)*
      $ (Two*TwoNO(NAddr3(IP,IQ,IT,IT))-TwoNO(NAddr3(IP,IT,IQ,IT)))
       If(IT.Le.INActive) AuxIO(IPQ)=AuxIO(IPQ)+Occ(IT)*
@@ -986,7 +1007,8 @@ C
       Do IT=1,NOccup
       Do IW=1,NOccup
       Do IU=1,NOccup
-      If(IGFact(NAddr3(IT,IW,IP,IU)).Eq.1)
+      If(AuxCoeff(IGem(IT),IGem(IW),IGem(IP),IGem(IU)).Eq.1)
+C      If(IGFact(NAddr3(IT,IW,IP,IU)).Eq.1)
      $ WMAT(IP,IR)=WMAT(IP,IR)
      $ +TwoNO(NAddr3(IT,IW,IP,IU))
      $ *FRDM2(IW,IU,IT,IR,RDM2Act,Occ,Ind2,NAct,NBasis)
@@ -1047,7 +1069,7 @@ C
 C
       If(IRow.Ge.ICol) Then
 C
-      Call AB0ELEMENT(ABP,ABM,IP,IQ,IR,IS,Occ,HNO,IGFact,
+      Call AB0ELEMENT(ABP,ABM,IP,IQ,IR,IS,Occ,HNO,AuxCoeff,    
      $ TwoNO,AuxI,AuxIO,WMAT,RDM2Act,C,Ind1,Ind2,NAct,NRDM2Act,
      $ NInte1,NInte2,NBasis)
 C
@@ -1116,7 +1138,7 @@ C
 C
       If(IRow.Ge.ICol) Then
 C
-      Call AB0ELEMENT(ABP,ABM,IP,IQ,IR,IS,Occ,HNO,IGFact,
+      Call AB0ELEMENT(ABP,ABM,IP,IQ,IR,IS,Occ,HNO,AuxCoeff,
      $ TwoNO,AuxI,AuxIO,WMAT,RDM2Act,C,Ind1,Ind2,NAct,NRDM2Act,
      $ NInte1,NInte2,NBasis)
 C
@@ -1188,7 +1210,7 @@ C
 C
       If(IRow.Ge.ICol) Then
 C
-      Call AB0ELEMENT(ABP,ABM,IP,IQ,IR,IS,Occ,HNO,IGFact,
+      Call AB0ELEMENT(ABP,ABM,IP,IQ,IR,IS,Occ,HNO,AuxCoeff,         
      $ TwoNO,AuxI,AuxIO,WMAT,RDM2Act,C,Ind1,Ind2,NAct,NRDM2Act,
      $ NInte1,NInte2,NBasis)
 C
@@ -1236,7 +1258,7 @@ C
       IEigAddInd(1,NFree1)=NFree1
       IEigAddInd(2,NFree1)=NFree1
 C
-      Call AB0ELEMENT(ABP,ABM,IP,IQ,IP,IQ,Occ,HNO,IGFact,
+      Call AB0ELEMENT(ABP,ABM,IP,IQ,IP,IQ,Occ,HNO,AuxCoeff, 
      $ TwoNO,AuxI,AuxIO,WMAT,RDM2Act,C,Ind1,Ind2,NAct,NRDM2Act,
      $ NInte1,NInte2,NBasis)
 C
@@ -1319,8 +1341,10 @@ C
      $ )')
 C
       Call AB1_CAS(ABPLUS,ABMIN,URe,Occ,XOne,TwoNO,
-     $ RDM2Act,NRDM2Act,IGFact,C,Ind1,Ind2,
-     $ IndBlock,NoEig,NDimX,NBasis,NInte1,NInte2)
+     $     RDM2Act,NRDM2Act,
+     $     AuxCoeff, 
+     $     C,Ind1,Ind2,
+     $     IndBlock,NoEig,NDimX,NBasis,NInte1,NInte2)
 C
       Deallocate(RDM2Act)
 C
@@ -1482,8 +1506,10 @@ C
 
 *Deck AB1_CAS
       Subroutine AB1_CAS(ABPLUS,ABMIN,URe,Occ,XOne,TwoNO,
-     $ RDM2Act,NRDM2Act,IGFact,C,Ind1,Ind2,
-     $ IndBlock,NoEig,NDimX,NBasis,NInte1,NInte2)
+     $     RDM2Act,NRDM2Act,
+     $     AuxCoeff,
+     $     C,Ind1,Ind2,
+     $     IndBlock,NoEig,NDimX,NBasis,NInte1,NInte2)
 C
 C     COMPUTE THE ALPHA-DEPENDENT PARTS OF A+B AND A-B MATRICES
 C
@@ -1502,7 +1528,10 @@ C
       Dimension ABPLUS(NoEig*NoEig),ABMIN(NoEig*NoEig),
      $ URe(NBasis,NBasis),
      $ Occ(NBasis),XOne(NInte1),TwoNO(NInte2),
-     $ RDM2Act(NRDM2Act),IGFact(NInte2),C(NBasis),
+     $ RDM2Act(NRDM2Act),
+     $ AuxCoeff(3,3,3,3),
+C     $ IGFact(NInte2),
+     $ C(NBasis),
      $ Ind1(NBasis),Ind2(NBasis),
      $ IndBlock(2,NDimX)
 C
@@ -1561,7 +1590,7 @@ C
       NAct=NAcCAS
       INActive=NInAcCAS
       NOccup=INActive+NAct
-C
+C     
 C     AUXILIARY MATRIX AuxI  
 C   
       IPQ=0
@@ -1571,7 +1600,8 @@ C
       AuxI(IPQ)=Zero
       AuxIO(IPQ)=Zero
       Do IT=1,NOccup
-      If(IGFact(NAddr3(IT,IT,IP,IQ)).Eq.0) Then
+      If(AuxCoeff(IGem(IT),IGem(IT),IGem(IP),IGem(IQ)).Eq.0) Then
+C     If(IGFact(NAddr3(IT,IT,IP,IQ)).Eq.0) Then
       AuxI(IPQ)=AuxI(IPQ)+Occ(IT)*
      $ (Two*TwoNO(NAddr3(IP,IQ,IT,IT))-TwoNO(NAddr3(IP,IT,IQ,IT)))
       If(IT.Le.INActive) AuxIO(IPQ)=AuxIO(IPQ)+Occ(IT)*
@@ -1594,7 +1624,8 @@ C
       Do IW=1,NOccup
       Do IU=1,NOccup
 C
-      If(IGFact(NAddr3(IT,IW,IP,IU)).Eq.0) Then
+      If(AuxCoeff(IGem(IT),IGem(IW),IGem(IP),IGem(IU)).Eq.0) Then
+C     If(IGFact(NAddr3(IT,IW,IP,IU)).Eq.0) Then
 C
       Do IR=1,NOccup
       WMAT(IP,IR)=WMAT(IP,IR)
@@ -1650,8 +1681,11 @@ C
       If(IP.Eq.IR) Arspq=Arspq+(Occ(IP)-Occ(IS))*HNO(IQS)
       If(IS.Eq.IQ) Arspq=Arspq+(Occ(IQ)-Occ(IR))*HNO(IPR)
 C
+C     HERE!!!
       AuxTwoPQRS=Zero
-      If(IGFact(NAddr3(IP,IQ,IR,IS)).Eq.0) AuxTwoPQRS=One
+C     If(IGFact(NAddr3(IP,IQ,IR,IS)).Eq.0) AuxTwoPQRS=One
+      If(AuxCoeff(IGem(IP),IGem(IQ),IGem(IR),IGem(IS)).Eq.0)
+     $ AuxTwoPQRS=One
       AuxPQRS=AuxTwoPQRS*
      $ (Two*TwoNO(NAddr3(IP,IQ,IR,IS))-TwoNO(NAddr3(IP,IR,IQ,IS)))
 C
@@ -1673,7 +1707,8 @@ C
       IT=Ind1(ITT)
       IU=Ind1(IUU)
 C
-      If(IGFact(NAddr3(IS,IQ,IT,IU)).Eq.0)
+      If(AuxCoeff(IGem(IS),IGem(IQ),IGem(IT),IGem(IU)).Eq.0)
+C     If(IGFact(NAddr3(IS,IQ,IT,IU)).Eq.0)
      $ Arspq=Arspq
      $ +TwoNO(NAddr3(IS,IQ,IT,IU))*
      $  FRDM2(IP,IU,IR,IT,RDM2Act,Occ,Ind2,NAct,NBasis)
@@ -1706,7 +1741,8 @@ C
       IT=Ind1(ITT)
       IU=Ind1(IUU)
 C
-      If(IGFact(NAddr3(IU,IT,IP,IR)).Eq.0) 
+      If(AuxCoeff(IGem(IU),IGem(IT),IGem(IP),IGem(IR)).Eq.0)
+C      If(IGFact(NAddr3(IU,IT,IP,IR)).Eq.0) 
      $ Arspq=Arspq
      $ +TwoNO(NAddr3(IU,IT,IP,IR))*
      $ FRDM2(IS,IT,IQ,IU,RDM2Act,Occ,Ind2,NAct,NBasis)
@@ -1736,7 +1772,8 @@ C
       IT=Ind1(ITT)
       IU=Ind1(IUU)
 C
-      If(IGFact(NAddr3(IP,IT,IS,IU)).Eq.0)
+      If(AuxCoeff(IGem(IP),IGem(IT),IGem(IS),IGem(IU)).Eq.0)
+C      If(IGFact(NAddr3(IP,IT,IS,IU)).Eq.0)
      $ Arspq=Arspq
      $ -TwoNO(NAddr3(IP,IT,IS,IU))*
      $ FRDM2(IT,IU,IQ,IR,RDM2Act,Occ,Ind2,NAct,NBasis)
@@ -1761,7 +1798,8 @@ C
       IT=Ind1(ITT)
       IU=Ind1(IUU)
 C
-      If(IGFact(NAddr3(IT,IQ,IU,IR)).Eq.0)
+      If(AuxCoeff(IGem(IT),IGem(IQ),IGem(IU),IGem(IR)).Eq.0)
+C      If(IGFact(NAddr3(IT,IQ,IU,IR)).Eq.0)
      $ Arspq=Arspq
      $ -TwoNO(NAddr3(IT,IQ,IU,IR))*
      $ FRDM2(IS,IP,IU,IT,RDM2Act,Occ,Ind2,NAct,NBasis)
@@ -1831,7 +1869,7 @@ C
       End
 
 *Deck AB0ELEMENT
-      Subroutine AB0ELEMENT(ABPL,ABMIN,IR,IS,IPP,IQQ,Occ,HNO,IGFact,
+      Subroutine AB0ELEMENT(ABPL,ABMIN,IR,IS,IPP,IQQ,Occ,HNO,AuxCoeff, 
      $ TwoNO,AuxI,AuxIO,WMAT,RDM2Act,C,Ind1,Ind2,NAct,NRDM2Act,NInte1,
      $ NInte2,NBasis)
 C
@@ -1845,7 +1883,9 @@ C
       Include 'commons.inc'
 C
       Dimension
-     $ Occ(NBasis),HNO(NInte1),IGFact(NInte2),
+     $ Occ(NBasis),HNO(NInte1),
+C    $ IGFact(NInte2),
+     $ AuxCoeff(3,3,3,3), 
      $ TwoNO(NInte2),AuxI(NInte1),AuxIO(NInte1),
      $ WMAT(NBasis,NBasis),RDM2Act(NRDM2Act),
      $ C(NBasis),Ind1(NBasis),Ind2(NBasis)
@@ -1868,8 +1908,9 @@ C
       If(IP.Eq.IR) Arspq=Arspq+(Occ(IP)-Occ(IS))*HNO(IQS)
       If(IS.Eq.IQ) Arspq=Arspq+(Occ(IQ)-Occ(IR))*HNO(IPR)
 C
-      AuxTwoPQRS=One
-      If(IGFact(NAddr3(IP,IQ,IR,IS)).Eq.0) AuxTwoPQRS=Zero
+      AuxTwoPQRS=AuxCoeff(IGem(IP),IGem(IQ),IGem(IR),IGem(IS))
+c     AuxTwoPQRS=One
+c      If(IGFact(NAddr3(IP,IQ,IR,IS)).Eq.0) AuxTwoPQRS=Zero
 C
       AuxPQRS=Zero
       If(AuxTwoPQRS.Eq.One)
@@ -1893,7 +1934,8 @@ C
       IT=Ind1(ITT)
       IU=Ind1(IUU)
 C
-      If(IGFact(NAddr3(IS,IQ,IT,IU)).Eq.1) 
+      If(AuxCoeff(IGem(IS),IGem(IQ),IGem(IT),IGem(IU)).Eq.1)
+C     If(IGFact(NAddr3(IS,IQ,IT,IU)).Eq.1) 
      $ Arspq=Arspq
      $ +TwoNO(NAddr3(IS,IQ,IT,IU))*
      $  FRDM2(IP,IU,IR,IT,RDM2Act,Occ,Ind2,NAct,NBasis)
@@ -1927,7 +1969,8 @@ C
       IT=Ind1(ITT)
       IU=Ind1(IUU)
 C
-      If(IGFact(NAddr3(IU,IT,IP,IR)).Eq.1)
+      If(AuxCoeff(IGem(IU),IGem(IT),IGem(IP),IGem(IR)).Eq.1)     
+C      If(IGFact(NAddr3(IU,IT,IP,IR)).Eq.1)
      $ Arspq=Arspq
      $ +TwoNO(NAddr3(IU,IT,IP,IR))*
      $ FRDM2(IS,IT,IQ,IU,RDM2Act,Occ,Ind2,NAct,NBasis)
@@ -1960,7 +2003,8 @@ C
       IT=Ind1(ITT)
       IU=Ind1(IUU)
 C
-      If(IGFact(NAddr3(IP,IT,IS,IU)).Eq.1) 
+      If(AuxCoeff(IGem(IP),IGem(IT),IGem(IS),IGem(IU)).Eq.1)
+C     If(IGFact(NAddr3(IP,IT,IS,IU)).Eq.1) 
      $ Arspq=Arspq
      $ -TwoNO(NAddr3(IP,IT,IS,IU))*
      $ FRDM2(IT,IU,IQ,IR,RDM2Act,Occ,Ind2,NAct,NBasis)
@@ -1988,7 +2032,8 @@ C
       IT=Ind1(ITT)
       IU=Ind1(IUU)
 C
-      If(IGFact(NAddr3(IT,IQ,IU,IR)).Eq.1) 
+      If(AuxCoeff(IGem(IT),IGem(IQ),IGem(IU),IGem(IR)).Eq.1)
+C      If(IGFact(NAddr3(IT,IQ,IU,IR)).Eq.1) 
      $ Arspq=Arspq
      $ -TwoNO(NAddr3(IT,IQ,IU,IR))*
      $ FRDM2(IS,IP,IU,IT,RDM2Act,Occ,Ind2,NAct,NBasis)

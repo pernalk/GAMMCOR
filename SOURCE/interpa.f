@@ -3071,17 +3071,17 @@ C     LOCAL ARRAYS
 C
       Real*8, Allocatable :: RDM2Act(:)
       Dimension C(NBasis),HNO(NInte1),
-     $ IGFact(NInte2),
+C     $ IGFact(NInte2),
      $ Ind1(NBasis),Ind2(NBasis),WMAT(NBasis,NBasis),
-     $ AuxI(NInte1),AuxIO(NInte1)
-C
+     $ AuxI(NInte1),AuxIO(NInte1),
+     $ AuxCoeff(3,3,3,3)
+      
       Do I=1,NDim
       Do J=1,NDim
       ABPLUS(I,J)=Zero
       ABMIN(I,J)=Zero
       EndDo
       EndDo
-
 C
 C
 C     ONE-ELECTRON MATRIX IN A NO REPRESENTATION
@@ -3103,6 +3103,22 @@ C
       EndDo
 
 C
+C     PREPARE AuxCoeff
+      Do L=1,3
+      Do K=1,3
+      Do J=1,3
+      Do i=1,3
+C            
+      If((I==J).And.(J==K).And.(K==L)) Then
+      AuxCoeff(I,J,K,L) = 1
+      Else
+      AuxCoeff(I,J,K,L) = ACAlpha
+      EndIf
+C      
+      EndDo
+      EndDo
+      EndDo
+      EndDo     
 C     READ 2RDM, COMPUTE THE ENERGY
 C
       NAct=NAcCAS
@@ -3213,10 +3229,11 @@ C
       If(IJ.Ge.KL) Then
       NAdd=NAdd+1
 C
-      IGFact(NAdd)=1
-      If(.Not.(
-     $IGem(I).Eq.IGem(J).And.IGem(J).Eq.IGem(K).And.IGem(K).Eq.IGem(L)))
-     $ IGFact(NAdd)=0
+C      MH: IGFact IS NOW REMOVED!
+C      IGFact(NAdd)=1
+C      If(.Not.(
+C     $IGem(I).Eq.IGem(J).And.IGem(J).Eq.IGem(K).And.IGem(K).Eq.IGem(L)))
+C     $ IGFact(NAdd)=0
 C
       EndIf
 C
@@ -3224,7 +3241,7 @@ C
       EndDo
       EndDo
       EndDo
-C    
+
 C     AUXILIARY MATRIX AuxI  
 C   
       IPQ=0
@@ -3234,8 +3251,9 @@ C
       AuxI(IPQ)=Zero
       AuxIO(IPQ)=Zero
       Do IT=1,NOccup
-      AuxTwo=One
-      If(IGFact(NAddr3(IT,IT,IP,IQ)).Eq.0) AuxTwo=ACAlpha
+      AuxTwo=AuxCoeff(IGem(IT),IGem(IT),IGem(IP),IGem(IQ))   
+C      AuxTwo=One
+C      If(IGFact(NAddr3(IT,IT,IP,IQ)).Eq.0) AuxTwo=ACAlpha
       AuxI(IPQ)=AuxI(IPQ)+Occ(IT)*AuxTwo*
      $ (Two*TwoNO(NAddr3(IP,IQ,IT,IT))-TwoNO(NAddr3(IP,IT,IQ,IT)))
       If(IT.Le.INActive) AuxIO(IPQ)=AuxIO(IPQ)+Occ(IT)*AuxTwo*
@@ -3260,8 +3278,9 @@ C
       Do IT=1,NOccup
       Do IW=1,NOccup
       Do IU=1,NOccup
-      AuxTwo=One
-      If(IGFact(NAddr3(IT,IW,IP,IU)).Eq.0) AuxTwo=ACAlpha
+      AuxTwo=AuxCoeff(IGem(IT),IGem(IW),IGem(IP),IGem(IU))            
+C      AuxTwo=One
+C      If(IGFact(NAddr3(IT,IW,IP,IU)).Eq.0) AuxTwo=ACAlpha
 C
       WMAT(IP,IR)=WMAT(IP,IR)
      $ +TwoNO(NAddr3(IT,IW,IP,IU))
@@ -3300,8 +3319,9 @@ C
       If(IP.Eq.IR) Arspq=Arspq+(Occ(IP)-Occ(IS))*HNO(IQS)
       If(IS.Eq.IQ) Arspq=Arspq+(Occ(IQ)-Occ(IR))*HNO(IPR)
 C
-      AuxTwoPQRS=One
-      If(IGFact(NAddr3(IP,IQ,IR,IS)).Eq.0) AuxTwoPQRS=ACAlpha
+      AuxTwoPQRS=AuxCoeff(IGem(IP),IGem(IQ),IGem(IR),IGem(IS))
+C     AuxTwoPQRS=One
+C      If(IGFact(NAddr3(IP,IQ,IR,IS)).Eq.0) AuxTwoPQRS=ACAlpha
       AuxPQRS=AuxTwoPQRS*
      $ (Two*TwoNO(NAddr3(IP,IQ,IR,IS))-TwoNO(NAddr3(IP,IR,IQ,IS)))
 C
@@ -3322,8 +3342,9 @@ C
       IT=Ind1(ITT)
       IU=Ind1(IUU)
 C
-      AuxTwoSQTU=One
-      If(IGFact(NAddr3(IS,IQ,IT,IU)).Eq.0) AuxTwoSQTU=ACAlpha
+      AuxTwoSQTU=AuxCoeff(IGem(IS),IGem(IQ),IGem(IT),IGem(IU)) 
+C      AuxTwoSQTU=One
+C      If(IGFact(NAddr3(IS,IQ,IT,IU)).Eq.0) AuxTwoSQTU=ACAlpha
 C
       Arspq=Arspq
      $ +TwoNO(NAddr3(IS,IQ,IT,IU))*
@@ -3358,8 +3379,9 @@ C
       IT=Ind1(ITT)
       IU=Ind1(IUU)
 C
-      AuxTwoUTPR=One
-      If(IGFact(NAddr3(IU,IT,IP,IR)).Eq.0) AuxTwoUTPR=ACAlpha
+      AuxTwoUTPR=AuxCoeff(IGem(IU),IGem(IT),IGem(IP),IGem(IR))
+C     AuxTwoUTPR=One
+C      If(IGFact(NAddr3(IU,IT,IP,IR)).Eq.0) AuxTwoUTPR=ACAlpha
 C
       Arspq=Arspq
      $ +TwoNO(NAddr3(IU,IT,IP,IR))*
@@ -3393,8 +3415,9 @@ C
       IT=Ind1(ITT)
       IU=Ind1(IUU)
 C
-      AuxTwoPTSU=One
-      If(IGFact(NAddr3(IP,IT,IS,IU)).Eq.0) AuxTwoPTSU=ACAlpha
+      AuxTwoPTSU=AuxCoeff(IGem(IP),IGem(IT),IGem(IS),IGem(IU))
+C     AuxTwoPTSU=One
+C      If(IGFact(NAddr3(IP,IT,IS,IU)).Eq.0) AuxTwoPTSU=ACAlpha
 C
       Arspq=Arspq
      $ -TwoNO(NAddr3(IP,IT,IS,IU))*
@@ -3422,8 +3445,9 @@ C
       IT=Ind1(ITT)
       IU=Ind1(IUU)
 C
-      AuxTwoTQUR=One
-      If(IGFact(NAddr3(IT,IQ,IU,IR)).Eq.0) AuxTwoTQUR=ACAlpha
+      AuxTwoTQUR=AuxCoeff(IGem(IT),IGem(IQ),IGem(IU),IGem(IR))
+C      AuxTwoTQUR=One
+C      If(IGFact(NAddr3(IT,IQ,IU,IR)).Eq.0) AuxTwoTQUR=ACAlpha
 C
       Arspq=Arspq
      $ -TwoNO(NAddr3(IT,IQ,IU,IR))*
