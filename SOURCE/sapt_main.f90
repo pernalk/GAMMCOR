@@ -848,6 +848,12 @@ double precision, allocatable :: EigTmp(:), VecTmp(:)
       Mon%IndNT(1,i) = Mon%IndN(1,i)
       Mon%IndNT(2,i) = Mon%IndN(2,i)
    enddo
+!  HERE! - started work on Y01CAS
+!   call Y01CAS_mithap(Mon%Occ,URe,XOne,ABPlus,ABMin, &
+!       EigY0,EigY1,Eig0,Eig1, &
+!       Mon%IndN,Mon%IndX,Mon%IGem,Mon%NAct,Mon%INAct,Mon%NDimX, &
+!       NBas,Mon%NDim,NInte1,twofile,Flags%IFlag0)
+!
    call Y01CAS(TwoMO,Mon%Occ,URe,XOne,ABPlus,ABMin, &
        EigY0,EigY1,Eig0,Eig1, &
        !Mon%IndNT,Mon%IndX,Mon%NDimX,NBas,Mon%NDim,NInte1,NInte2,Flags%IFlag0)

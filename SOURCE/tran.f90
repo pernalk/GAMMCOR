@@ -1324,6 +1324,236 @@ deallocate(ints,work2,work1)
 
 end subroutine AB_CAS_mithap
 
+!!$ Y01CAS_mithap(Mon%Occ,URe,XOne,ABPlus,ABMin, &
+!!$       EigY0,EigY1,Eig0,Eig1, &
+!!$       Mon%IndN,Mon%IndX,Mon%NDimX,NBas,Mon%NDim,NInte1,NInte2,Flags%IFlag0)
+
+
+subroutine Y01CAS_mithap(Occ,URe,XOne,ABPLUS,ABMIN, &
+     EigY,EigY1,Eig,Eig1, &
+     IndN,IndX,IGem,NAct,INActive,NDimX,NBasis,NDim,NInte1,IntFileName,IFlag0)
+!
+!     A ROUTINE FOR COMPUTING Y VECTORS AND EIGENVALUES OF ERPA 
+!     IN THE 1ST-ORDER APPROXIMATION
+!
+!     IFlag0 = 1 - compute only 0th-order Y [EigY] and 0th-order omega [Eig] 
+!              0 - compute both 0th-order and 1st-order Y [EigY1] and omega [Eig1]
+implicit none
+
+integer,intent(in) :: NAct,INActive,NDimX,NBasis,NDim,NInte1
+character(*) :: IntFileName
+double precision,intent(out) :: ABPLUS(NDimX,NDimX),ABMIN(NDimX,NDimX)
+double precision,intent(out) :: EigY(NDimX,NDimX),EigY1(NDimX,NDimX)
+double precision,intent(out) :: Eig(NDimX),Eig1(NDimX)
+double precision,intent(in)  :: URe(NBasis,NBasis),Occ(NBasis),XOne(NInte1)
+integer,intent(in) :: IndN(2,NDim),IndX(NDim),IGem(NBasis),IFlag0
+
+integer :: i,j,k,l,ij,kl,kk,ll,klround
+integer :: ip,iq,ir,is,it,iu,iw,ipq,irs,ICol,IRow
+integer :: iunit,ios
+integer :: NOccup,NRDM2Act
+integer :: Ind(NBasis),AuxInd(3,3),pos(NBasis,NBasis)
+double precision :: C(NBasis)
+double precision :: HNO(NBasis,NBasis),AuxI(NBasis,NBasis),AuxIO(NBasis,NBasis),WMAT(NBasis,NBasis)
+double precision :: AuxCoeff(3,3,3,3),AuxVal,val
+double precision,allocatable :: RDM2val(:,:,:,:),RDM2Act(:)
+double precision,allocatable :: work1(:),work2(:)
+double precision,allocatable :: ints(:,:)
+integer,external :: NAddrRDM
+double precision,external :: FRDM2
+
+ABPLUS = 0
+ABMIN  = 0
+
+! set dimensions
+NOccup = NAct + INActive
+Ind = 0
+do i=1,NAct
+   Ind(INActive+i) = i
+enddo
+
+allocate(work1(NBasis**2),work2(NBasis**2),ints(NBasis,NBasis))
+allocate(RDM2val(NOccup,NOccup,NOccup,NOccup))
+
+NRDM2Act = NAct**2*(NAct**2+1)/2
+allocate(RDM2Act(NRDM2Act))
+
+RDM2Act = 0
+open(newunit=iunit,file='rdm2.dat',status='old')
+write(LOUT,'(/,1x,''Active block of 2-RDM read from rdm2.dat'')')
+do
+   read(iunit,*,iostat=ios) i,j,k,l,val
+   if(ios/=0) exit
+   RDM2Act(NAddrRDM(i,k,j,l,NAct)) = 0.5d0*val
+enddo
+close(iunit)
+
+do l=1,NOccup
+   do k=1,NOccup
+      do j=1,NOccup
+         do i=1,NOccup
+            RDM2val(i,j,k,l) = FRDM2(i,k,j,l,RDM2Act,Occ,Ind,NAct,NBasis)
+         enddo
+      enddo
+   enddo
+enddo
+
+deallocate(RDM2Act)
+
+
+call triang_to_sq(XOne,work1,NBasis)
+call dgemm('N','N',NBasis,NBasis,NBasis,1d0,URe,NBasis,work1,NBasis,0d0,work2,NBasis)
+call dgemm('N','T',NBasis,NBasis,NBasis,1d0,work2,NBasis,URe,NBasis,0d0,HNO,NBasis)
+call sq_symmetrize(HNO,NBasis)
+
+do j=1,NBasis
+   do i=1,NBasis
+      if(IGem(i)/=IGem(j)) HNO(i,j) = 0d0
+   enddo
+enddo
+
+AuxInd = 0
+AuxInd(1:2,1:2) = 1
+AuxInd(2,2) = 2
+
+do l=1,3
+   do k=1,3
+      do j=1,3
+         do i=1,3
+            if((i==j).and.(j==k).and.(k==l)) then
+               AuxCoeff(i,j,k,l) = 1
+            else
+               AuxCoeff(i,j,k,l) = 0
+            endif
+         enddo
+      enddo
+   enddo
+enddo
+
+pos = 0
+do i=1,NDimX
+   pos(IndN(1,i),IndN(2,i)) = IndX(i)
+enddo
+
+AuxI  = 0
+AuxIO = 0
+WMAT  = 0
+
+open(newunit=iunit,file=trim(IntFileName),status='OLD', &
+     access='DIRECT',recl=8*NBasis*(NBasis+1)/2)
+
+kl = 0
+do ll=1,NBasis
+   do kk=1,ll
+      kl = kl + 1
+      read(iunit,rec=kl) work1(1:NBasis*(NBasis+1)/2)
+      call triang_to_sq2(work1,ints,NBasis)
+      do klround=1,merge(1,2,kk==ll)
+         select case(klround)
+         case(1)
+            k = kk
+            l = ll
+         case(2)
+            k = ll
+            l = kk
+         end select
+
+! CONSTRUCT ONE-ELECTRON PART OF THE AC ALPHA-HAMILTONIAN
+         ! Coulomb
+         if(IGem(k)==IGem(l)) then
+
+            val = 0
+            do i=1,NBasis
+               if(IGem(i)/=IGem(k)) val = val + Occ(i)*ints(i,i)
+            enddo
+            ! val = 2*(1-ACAlpha)*val
+            HNO(k,l) = HNO(k,l) + 2*val
+
+         ! exchange
+         else
+
+            val = Occ(k)
+            do i=1,NBasis
+               if(IGem(i)==IGem(l)) HNO(i,l) = HNO(i,l) - val*ints(i,k)
+            enddo
+
+         endif
+
+! AUXILIARY MATRIX AuxI AND AuxIO
+         ! Coulomb
+         val = 0
+         
+         AuxVal = AuxCoeff(IGem(k),IGem(l),1,1)
+         do i=1,INActive
+            val = val + AuxVal*Occ(i)*ints(i,i)
+         enddo
+         AuxIO(k,l) = AuxIO(k,l) + 2*val
+         
+         AuxVal = AuxCoeff(IGem(k),IGem(l),2,2)
+         do i=INActive+1,NOccup
+            val = val + AuxVal*Occ(i)*ints(i,i)
+         enddo
+         AuxI(k,l) = AuxI(k,l) + 2*val
+
+         ! exchange
+         if(k<=INActive) then
+            do i=1,NBasis
+               AuxIO(i,l) = AuxIO(i,l) - AuxCoeff(IGem(i),IGem(i),IGem(k),IGem(l))*Occ(k)*ints(i,k)
+            enddo
+         endif
+         if(k<=NOccup) then
+            do i=1,NBasis
+               AuxI(i,l) = AuxI(i,l) - AuxCoeff(IGem(i),IGem(i),IGem(k),IGem(l))*Occ(k)*ints(i,k)
+            enddo
+         endif
+
+! AUXILIARY MATRIX WMAT
+         if(l<=NOccup) then
+            do ir=1,NOccup
+               val = 0
+               val = val + AuxCoeff(IGem(k),IGem(l),1,1)* &
+                    sum(ints(1:INActive,1:INActive)*RDM2val(1:INActive,1:INActive,ir,l))
+               val = val + AuxCoeff(IGem(k),IGem(l),2,1)* &
+                    sum(ints(INActive+1:NOccup,1:INActive)*RDM2val(INActive+1:NOccup,1:INActive,ir,l))
+               val = val + AuxCoeff(IGem(k),IGem(l),1,2)* &
+                    sum(ints(1:INActive,INActive+1:NOccup)*RDM2val(1:INActive,INActive+1:NOccup,ir,l))
+               val = val + AuxCoeff(IGem(k),IGem(l),2,2)* &
+                    sum(ints(INActive+1:NOccup,INActive+1:NOccup)*RDM2val(INActive+1:NOccup,INActive+1:NOccup,ir,l))
+               WMAT(k,ir) = WMAT(k,ir) + val
+            enddo
+         endif
+         
+      enddo
+   enddo
+enddo
+
+close(iunit)
+
+call sq_to_triang2(HNO,work1,NBasis)
+write(LOUT,*) 'HNO-m1', norm2(work1(1:NBasis*(NBasis+1)/2))
+HNO=transpose(HNO)
+call sq_to_triang2(HNO,work1,NBasis)
+write(LOUT,*) 'HNO-m2', norm2(work1(1:NBasis*(NBasis+1)/2))
+
+call sq_to_triang2(AuxI,work1,NBasis)
+write(LOUT,*) 'AuxI-my', norm2(work1(1:NBasis*(NBasis+1)/2))
+AuxI=transpose(AuxI)
+call sq_to_triang2(AuxI,work1,NBasis)
+write(LOUT,*) 'AuxI-tr', norm2(work1(1:NBasis*(NBasis+1)/2))
+
+call sq_to_triang2(AuxIO,work1,NBasis)
+write(LOUT,*) 'AuxIO-my', norm2(work1(1:NBasis*(NBasis+1)/2))
+AuxIO=transpose(AuxIO)
+call sq_to_triang2(AuxIO,work1,NBasis)
+write(LOUT,*) 'AuxIO-tr', norm2(work1(1:NBasis*(NBasis+1)/2))
+
+write(LOUT,*) 'WMAT-my', 2d0*norm2(WMAT)
+
+deallocate(RDM2val)
+deallocate(ints,work2,work1)
+
+end subroutine Y01CAS_mithap
+
 end module
 
 

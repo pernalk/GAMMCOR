@@ -3241,7 +3241,7 @@ C
       EndDo
       EndDo
       EndDo
-
+C    
 C     AUXILIARY MATRIX AuxI  
 C   
       IPQ=0

@@ -946,6 +946,9 @@ C
       EndDo
       EndDo
 C
+C
+       Write(*,*) 'HNO-Ka',norm2(HNO)
+C     
 C     CONSTRUCT TWO-ELECTRON PART OF THE AC ALPHA-HAMILTONIAN      
 C
       NAdd=Zero
@@ -994,6 +997,9 @@ C      If(IGFact(NAddr3(IT,IT,IP,IQ)).Eq.1) Then
       EndDo
       EndDo
 C
+      Write(*,*) 'AuxI-Ka',norm2(AuxI)
+      Write(*,*) 'AuxIO-Ka',norm2(AuxIO)
+C     
 C     AUXILIARY MATRIX WMAT
 C
       Do I=1,NBasis
@@ -1021,6 +1027,8 @@ C
       EndDo
       EndDo
 C
+      Write(*,*) 'WMAT-Ka',norm2(WMAT)
+C     
 C     FIND THE 0TH-ORDER SOLUTION FOR THE ACTIVE-ACTIVE BLOCK
 C
       Write(6,'(" *** ACTIVE-ACTIVE BLOCK ***")')
