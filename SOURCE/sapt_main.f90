@@ -703,7 +703,7 @@ double precision, allocatable :: EigTmp(:), VecTmp(:)
  NInte1 = NBas*(NBas+1)/2
  NInte2 = NInte1*(NInte1+1)/2
 
- allocate(work1(NSq),work2(NSq),XOne(NInte1),URe(NBas,NBas),&
+ allocate(work1(NSq),work2(NSq),XOne(NInte1),URe(NBas,NBas), &
           TwoMO(NInte2))
  
  URe = 0d0
@@ -789,13 +789,14 @@ double precision, allocatable :: EigTmp(:), VecTmp(:)
 ! endif 
 
   ! big testing AB-CAS 
-   ACAlpha=sqrt(2d0)/2d0
-!   call AB_CAS_mithap(ABPlus,ABMin,ECASSCF,URe,Mon%Occ,XOne,Mon%IPair,&
-!               Mon%IndN,Mon%IndX,Mon%IGem,Mon%NAct,Mon%INAct,Mon%NDimX,NBas,Mon%NDimX,&
-!               NInte1,twofile,ACAlpha)
+!   ACAlpha=sqrt(2d0)/2d0
+   write(*,*) 'AB_CAS_mithap! NO TwoMO!'
+   call AB_CAS_mithap(ABPlus,ABMin,ECASSCF,URe,Mon%Occ,XOne,Mon%IPair,&
+               Mon%IndN,Mon%IndX,Mon%IGem,Mon%NAct,Mon%INAct,Mon%NDimX,NBas,Mon%NDimX,&
+               NInte1,twofile,ACAlpha)
 
-   call AB_CAS(ABPlus,ABMin,ECASSCF,URe,Mon%Occ,XOne,TwoMO,Mon%IPair,&
-               Mon%IndN,Mon%IndX,Mon%NDimX,NBas,Mon%NDimX,NInte1,NInte2,ACAlpha)
+!   call AB_CAS(ABPlus,ABMin,ECASSCF,URe,Mon%Occ,XOne,TwoMO,Mon%IPair,&
+!               Mon%IndN,Mon%IndX,Mon%NDimX,NBas,Mon%NDimX,NInte1,NInte2,ACAlpha)
  
    EigVecR = 0
    Eig = 0
@@ -821,8 +822,8 @@ double precision, allocatable :: EigTmp(:), VecTmp(:)
 
   if(EChck) then
       ECorr=0
-      call ACEneERPA(ECorr,EigVecR,Eig,TwoMO,URe,Mon%Occ,XOne,&
-                     Mon%IndN,NBas,NInte1,NInte2,Mon%NDimX,Mon%NGem)
+!      call ACEneERPA(ECorr,EigVecR,Eig,TwoMO,URe,Mon%Occ,XOne,&
+!                     Mon%IndN,NBas,NInte1,NInte2,Mon%NDimX,Mon%NGem)
       ECorr=Ecorr*0.5d0
   
       write(LOUT,'(/,1x,''ECASSCF+ENuc, Corr, ERPA-CASSCF'',6x,3f15.8)') &
@@ -830,7 +831,6 @@ double precision, allocatable :: EigTmp(:), VecTmp(:)
    endif
 
    ! uncoupled
-   ! something deeply wrong with IndN here??????????????? !!!!!!
 
 !   call test_resp_unc(Mon,URe,XOne,TwoMO,NBas,NInte1,NInte2,Flags%IFlag0) 
 
@@ -849,15 +849,15 @@ double precision, allocatable :: EigTmp(:), VecTmp(:)
       Mon%IndNT(2,i) = Mon%IndN(2,i)
    enddo
 !  HERE! - started work on Y01CAS
-!   call Y01CAS_mithap(Mon%Occ,URe,XOne,ABPlus,ABMin, &
-!       EigY0,EigY1,Eig0,Eig1, &
-!       Mon%IndN,Mon%IndX,Mon%IGem,Mon%NAct,Mon%INAct,Mon%NDimX, &
-!       NBas,Mon%NDim,NInte1,twofile,Flags%IFlag0)
-!
+   call Y01CAS_mithap(Mon%Occ,URe,XOne,ABPlus,ABMin, &
+        EigY0,EigY1,Eig0,Eig1, &
+        Mon%IndN,Mon%IndX,Mon%IGem,Mon%NAct,Mon%INAct,Mon%NDimX, &
+        NBas,Mon%NDim,NInte1,twofile,Flags%IFlag0)
+   !
    call Y01CAS(TwoMO,Mon%Occ,URe,XOne,ABPlus,ABMin, &
-       EigY0,EigY1,Eig0,Eig1, &
-       !Mon%IndNT,Mon%IndX,Mon%NDimX,NBas,Mon%NDim,NInte1,NInte2,Flags%IFlag0)
-       Mon%IndN,Mon%IndX,Mon%NDimX,NBas,Mon%NDim,NInte1,NInte2,Flags%IFlag0)
+        EigY0,EigY1,Eig0,Eig1, &
+        !Mon%IndNT,Mon%IndX,Mon%NDimX,NBas,Mon%NDim,NInte1,NInte2,Flags%IFlag0)
+        Mon%IndN,Mon%IndX,Mon%NDimX,NBas,Mon%NDim,NInte1,NInte2,Flags%IFlag0)
 
    ! dump uncoupled response
    call writeresp(EigY0,Eig0,propfile0)
@@ -927,6 +927,7 @@ double precision, allocatable :: EigTmp(:), VecTmp(:)
  call writeresp(EigVecR,Eig,propfile)
 
  close(ione)
+! deallocate(work1,work2,XOne,URe)
  deallocate(work1,work2,XOne,TwoMO,URe)
  deallocate(ABPlus,ABMin,EigVecR,Eig)
 

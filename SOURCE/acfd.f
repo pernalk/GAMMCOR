@@ -947,8 +947,8 @@ C
       EndDo
 C
 C
-       Write(*,*) 'HNO-Ka',norm2(HNO)
-C     
+      Write(*,*) 'HNO-Ka',norm2(HNO)
+C
 C     CONSTRUCT TWO-ELECTRON PART OF THE AC ALPHA-HAMILTONIAN      
 C
       NAdd=Zero
@@ -1049,7 +1049,9 @@ C
       EndIf
       EndDo
       EndDo
-C 
+C
+C      Write(*,*) 'NDimB-Act',NDimB
+C     
       Do I=1,NDimB
       IEigAddY(1,NFree1-1+I)=NFree2+(I-1)*NDimB
       IEigAddY(2,NFree1-1+I)=IEigAddY(1,NFree1-1+I)+NDimB-1
@@ -1097,6 +1099,15 @@ C
       EndDo
 C
       If(NDimB.Ne.0)
+     $ Write(*,*) 'AB0-Ka',norm2(ABPLUS(1:NDimB**2)),
+     $     norm2(ABMIN(1:NDimB**2))
+C
+      write(*,*) 'AB+',
+     $     norm2(reshape(ABPLUS(1:NDimB**2),shape=[NDimB,NDimB])
+     $     -transpose(reshape(ABPLUS(1:NDimB**2),shape=[NDimB,NDimB])))
+C      write(*,*) 'AB-',norm2(ABMIN(1:nAA,1:nAA)-transpose(ABMIN(1:nAA,1:nAA)))
+C      
+      If(NDimB.Ne.0)
      $Call ERPASYMM0(EigY(NFree2),EigX(NFree2),Eig(NFree1),ABPLUS,ABMIN,
      $ NDimB)      
 C
@@ -1120,6 +1131,7 @@ C
       EndIf
       EndDo
 C
+C     
       Do I=1,NDimB
       IEigAddY(1,NFree1-1+I)=NFree2+(I-1)*NDimB
       IEigAddY(2,NFree1-1+I)=IEigAddY(1,NFree1-1+I)+NDimB-1
@@ -1166,6 +1178,15 @@ C
       EndDo
 C
       If(NDimB.Ne.0)
+     $     Write(*,*) 'ABia-Ka',IQ,norm2(ABPLUS(1:NDimB**2)),
+     $     norm2(ABMIN(1:NDimB**2))
+C     
+      write(*,*) 'AB+',
+     $     norm2(reshape(ABPLUS(1:NDimB**2),shape=[NDimB,NDimB])
+     $     -transpose(reshape(ABPLUS(1:NDimB**2),shape=[NDimB,NDimB])))
+      
+C
+      If(NDimB.Ne.0)
      $Call ERPASYMM0(EigY(NFree2),EigX(NFree2),Eig(NFree1),ABPLUS,ABMIN,
      $ NDimB)
 C
@@ -1173,7 +1194,7 @@ C
       NFree1=NoEig+1
       NFree2=NFree2+NDimB*NDimB
 C
-C     Do IP
+C     Do IQ
       EndDo
 C
 C     FIND THE 0TH-ORDER SOLUTION FOR THE VIRTUAL-ACTIVE BLOCKS
@@ -1192,6 +1213,7 @@ C
       EndIf
       EndDo
 C
+C     
       Do I=1,NDimB
       IEigAddY(1,NFree1-1+I)=NFree2+(I-1)*NDimB
       IEigAddY(2,NFree1-1+I)=IEigAddY(1,NFree1-1+I)+NDimB-1
@@ -1238,6 +1260,15 @@ C
       EndDo
 C
       If(NDimB.Ne.0)
+     $     Write(*,*) 'ABav-Ka',IP,norm2(ABPLUS(1:NDimB**2)),
+     $     norm2(ABMIN(1:NDimB**2))
+C     
+      write(*,*) 'AB+',
+     $     norm2(reshape(ABPLUS(1:NDimB**2),shape=[NDimB,NDimB])
+     $     -transpose(reshape(ABPLUS(1:NDimB**2),shape=[NDimB,NDimB])))
+C 
+C     
+      If(NDimB.Ne.0)
      $Call ERPASYMM0(EigY(NFree2),EigX(NFree2),Eig(NFree1),ABPLUS,ABMIN,
      $ NDimB)
 C
@@ -1258,6 +1289,7 @@ C
       If(IPair(IP,IQ).Eq.1) Then
 C
       NDimB=1
+         
       IndBlock(1,NFree1)=IP
       IndBlock(2,NFree1)=IQ
 C
@@ -1270,6 +1302,8 @@ C
      $ TwoNO,AuxI,AuxIO,WMAT,RDM2Act,C,Ind1,Ind2,NAct,NRDM2Act,
      $ NInte1,NInte2,NBasis)
 C
+      Write(*,*) 'ABiv-Ka',IP,IQ,ABP
+C      
       Eig(NFree1)=ABP
       EigY(NFree2)=One/Sqrt(Two)
       EigX(NFree2)=One/Sqrt(Two)
