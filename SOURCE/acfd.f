@@ -997,8 +997,8 @@ C      If(IGFact(NAddr3(IT,IT,IP,IQ)).Eq.1) Then
       EndDo
       EndDo
 C
-      Write(*,*) 'AuxI-Ka',norm2(AuxI)
-      Write(*,*) 'AuxIO-Ka',norm2(AuxIO)
+C      Write(*,*) 'AuxI-Ka',norm2(AuxI)
+C      Write(*,*) 'AuxIO-Ka',norm2(AuxIO)
 C     
 C     AUXILIARY MATRIX WMAT
 C
@@ -1027,7 +1027,7 @@ C
       EndDo
       EndDo
 C
-      Write(*,*) 'WMAT-Ka',norm2(WMAT)
+C      Write(*,*) 'WMAT-Ka',norm2(WMAT)
 C     
 C     FIND THE 0TH-ORDER SOLUTION FOR THE ACTIVE-ACTIVE BLOCK
 C
@@ -1098,9 +1098,9 @@ C
       EndDo
       EndDo
 C
-      If(NDimB.Ne.0)
-     $ Write(*,*) 'AB0-Ka',norm2(ABPLUS(1:NDimB**2)),
-     $     norm2(ABMIN(1:NDimB**2))
+C      If(NDimB.Ne.0)
+C     $ Write(*,*) 'AB0-Ka',norm2(ABPLUS(1:NDimB**2)),
+C     $     norm2(ABMIN(1:NDimB**2))
 C
       write(*,*) 'AB+',
      $     norm2(reshape(ABPLUS(1:NDimB**2),shape=[NDimB,NDimB])
@@ -1111,6 +1111,9 @@ C
      $Call ERPASYMM0(EigY(NFree2),EigX(NFree2),Eig(NFree1),ABPLUS,ABMIN,
      $ NDimB)      
 C
+      Write(*,*) 'EigY,X,val',norm2(EigY(NFree2:NDimB**2)),
+     $ norm2(EigX(NFree2:NDimB**2))
+C      
       NoEig=NoEig+NDimB
       NFree1=NoEig+1
       NFree2=NFree2+NDimB*NDimB
@@ -1177,19 +1180,23 @@ C
 C
       EndDo
 C
-      If(NDimB.Ne.0)
-     $     Write(*,*) 'ABia-Ka',IQ,norm2(ABPLUS(1:NDimB**2)),
-     $     norm2(ABMIN(1:NDimB**2))
+C      If(NDimB.Ne.0)
+C     $     Write(*,*) 'ABia-Ka',IQ,norm2(ABPLUS(1:NDimB**2)),
+C     $     norm2(ABMIN(1:NDimB**2))
 C     
-      write(*,*) 'AB+',
-     $     norm2(reshape(ABPLUS(1:NDimB**2),shape=[NDimB,NDimB])
-     $     -transpose(reshape(ABPLUS(1:NDimB**2),shape=[NDimB,NDimB])))
+C      write(*,*) 'AB+',
+C     $     norm2(reshape(ABPLUS(1:NDimB**2),shape=[NDimB,NDimB])
+C     $     -transpose(reshape(ABPLUS(1:NDimB**2),shape=[NDimB,NDimB])))
       
 C
       If(NDimB.Ne.0)
      $Call ERPASYMM0(EigY(NFree2),EigX(NFree2),Eig(NFree1),ABPLUS,ABMIN,
      $ NDimB)
 C
+C      Write(*,*) 'EigY,X,val',norm2(EigY(NFree2:NFree2+NDimB**2)),
+C     $ norm2(EigX(NFree2:NFree2+NDimB**2)),
+C     $ norm2(Eig(NFree1:NFree1+NDimB))
+C     
       NoEig=NoEig+NDimB
       NFree1=NoEig+1
       NFree2=NFree2+NDimB*NDimB
@@ -1259,18 +1266,23 @@ C
 C
       EndDo
 C
-      If(NDimB.Ne.0)
-     $     Write(*,*) 'ABav-Ka',IP,norm2(ABPLUS(1:NDimB**2)),
-     $     norm2(ABMIN(1:NDimB**2))
-C     
-      write(*,*) 'AB+',
-     $     norm2(reshape(ABPLUS(1:NDimB**2),shape=[NDimB,NDimB])
-     $     -transpose(reshape(ABPLUS(1:NDimB**2),shape=[NDimB,NDimB])))
+c      If(NDimB.Ne.0)
+C     $     Write(*,*) 'ABav-Ka',IP,norm2(ABPLUS(1:NDimB**2)),
+C     $     norm2(ABMIN(1:NDimB**2))
+CC     
+C      write(*,*) 'AB+',
+C     $     norm2(reshape(ABPLUS(1:NDimB**2),shape=[NDimB,NDimB])
+C     $     -transpose(reshape(ABPLUS(1:NDimB**2),shape=[NDimB,NDimB])))
 C 
 C     
       If(NDimB.Ne.0)
      $Call ERPASYMM0(EigY(NFree2),EigX(NFree2),Eig(NFree1),ABPLUS,ABMIN,
      $ NDimB)
+
+C      Write(*,*) 'EigY,X,val',norm2(EigY(NFree2:NFree2+NDimB**2)),
+C     $ norm2(EigX(NFree2:NFree2+NDimB**2)),
+C     $ norm2(Eig(NFree1:NFree1+NDimB))
+
 C
       NoEig=NoEig+NDimB
       NFree1=NoEig+1
@@ -1300,9 +1312,9 @@ C
 C
       Call AB0ELEMENT(ABP,ABM,IP,IQ,IP,IQ,Occ,HNO,AuxCoeff, 
      $ TwoNO,AuxI,AuxIO,WMAT,RDM2Act,C,Ind1,Ind2,NAct,NRDM2Act,
-     $ NInte1,NInte2,NBasis)
+     $     NInte1,NInte2,NBasis)
 C
-      Write(*,*) 'ABiv-Ka',IP,IQ,ABP
+C      Write(*,*) 'ABiv-Ka',IP,IQ,ABP
 C      
       Eig(NFree1)=ABP
       EigY(NFree2)=One/Sqrt(Two)
@@ -1375,7 +1387,9 @@ C
       EndDo
 C
 C     RETURN IF ONLY 0TH-ORDER Y REQUESTED
-C
+C       write(*,*) 'EigY(r)-Ka',norm2(EigY)     
+C       write(*,*) 'Eig(r)-Ka ',norm2(Eig)
+C           
       Return
       EndIf
 C

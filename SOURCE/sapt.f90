@@ -1330,6 +1330,7 @@ endif
 
 allocate(tmp01(A%NDimX,B%NDimX),y0y0(A%NDimX,B%NDimX))
 
+
 if(Flags%IFlag0==0) then
  allocate(y1y0h(A%NDimX,B%NDimX),y1y0(A%NDimX,B%NDimX),&
           y0y1(A%NDimX,B%NDimX))
@@ -1398,6 +1399,7 @@ else
    enddo
 
 endif
+
  
  y0y0=0
  if(Flags%IFlag0==1) then
@@ -1439,7 +1441,6 @@ endif
 
 endif
 
-
  e2du=0d0
  e2sp=0d0
  e2ds1=0d0
@@ -1447,7 +1448,8 @@ endif
  e2dw12=0d0
  e2dw12_sp=0d0
  e2dsApp=0
-
+ 
+ 
  if(Flags%IFlag0==0) then
     do j=1,B%NDimX
        do i=1,A%NDimX
@@ -1481,10 +1483,10 @@ endif
            .and.OmA0(i).lt.BigE.and.OmB0(j).lt.BigE) then
 
           inv_omega = 1d0/(OmA0(i)+OmB0(j))
-          inv_om12 = 1d0/(OmA0(i)+OmA1(i)+OmB0(j)+OmB1(j))
+        !  inv_om12 = 1d0/(OmA0(i)+OmA1(i)+OmB0(j)+OmB1(j))
    
           e2du = e2du + y0y0(i,j)**2*inv_omega
-          e2dw12 = e2dw12 + y0y0(i,j)**2*inv_om12
+        !  e2dw12 = e2dw12 + y0y0(i,j)**2*inv_om12
    
           endif
        enddo
@@ -1504,6 +1506,7 @@ endif
  print*, -32*e2dw12_sp
  e2dsApp = e2dw12 -32*e2dw12_sp*1000
 
+
  write(LOUT,'(/1x,a,f16.8)')'E2disp(unc) = ', e2du
  write(LOUT,'(1x,a,f16.8)')'E2disp(sp) =  ', e2sp
  write(LOUT,'(1x,a,f16.8)')'E2disp(sc) =  ', e2ds
@@ -1512,6 +1515,8 @@ endif
 
  close(iunit)
  deallocate(work)
+
+
 
  if(Flags%IFlag0==0) then
 
@@ -1593,12 +1598,14 @@ double precision :: Alpha, Beta
  call readresp(EVecA,OmA,A%NDimX,'PROP_A')
  call readresp(EVecB,OmB,B%NDimX,'PROP_B')
 
- call readresp(EVecA0,OmA0,A%NDimX,'PROP_A0')
- call readresp(EVecB0,OmB0,B%NDimX,'PROP_B0')
+ if(.not.(Flags%ICASSCF==0.and.Flags%ISERPA==0)) then
+    call readresp(EVecA0,OmA0,A%NDimX,'PROP_A0')
+    call readresp(EVecB0,OmB0,B%NDimX,'PROP_B0')
 
- if(Flags%IFlag0==0) then
-    call readresp(EVecA1,OmA1,A%NDimX,'PROP_A1')
-    call readresp(EVecB1,OmB1,B%NDimX,'PROP_B1')
+    if(Flags%IFlag0==0) then
+       call readresp(EVecA1,OmA1,A%NDimX,'PROP_A1')
+       call readresp(EVecB1,OmB1,B%NDimX,'PROP_B1')
+    endif
  endif
 
  !print*, 'Normy:'
@@ -1760,6 +1767,7 @@ allocate(tmp01(A%NDimX,B%NDimX),tmp02(A%NDimX,B%NDimX),&
     e2ds2 = 0 
 
 deallocate(tmp01,tmp02,tmp03)
+! end Hartree-Fock check
 endif
 
 allocate(tmp1(A%NDimX,B%NDimX),tmp2(A%NDimX,B%NDimX),&
@@ -1784,6 +1792,9 @@ endif
 
 
 ! coupled - 0
+
+if(.not.(Flags%ICASSCF==0.and.Flags%ISERPA==0)) then
+
  tmp1=0
  tmp01=0
  do pq=1,A%NDimX
@@ -1842,6 +1853,50 @@ endif
     enddo  
  enddo
 
+elseif(Flags%ICASSCF==0.and.Flags%ISERPA==0) then
+
+ tmp1=0
+ do pq=1,A%NDimX
+    ip = A%IndN(1,pq)
+    iq = A%IndN(2,pq)
+    ! print*, iq,ip,iq+(ip-A%num0-1)*dimOA,nOVA
+    read(iunit,rec=iq+(ip-A%num0-1)*dimOA) work(1:nOVB)
+    do rs=1,B%NDimX
+       ir = B%IndN(1,rs)
+       is = B%IndN(2,rs)
+
+       fact = (A%CICoef(iq)+A%CICoef(ip)) * &
+              (B%CICoef(is)+B%CICoef(ir)) * &
+               work(is+(ir-B%num0-1)*dimOB)
+  
+       do i=1,A%NDimX
+          tmp1(i,rs) = tmp1(i,rs) + & 
+                       fact * &
+                       EVecA(pq+(i-1)*A%NDimX)
+
+       enddo
+
+    enddo
+ enddo
+
+ tmp2=0
+ do j=1,B%NDimX
+    do i=1,A%NDimX
+       do rs=1,B%NDimX
+       ir = B%IndN(1,rs)
+       is = B%IndN(2,rs)
+       tmp2(i,j) = tmp2(i,j) + &
+                    EVecB(rs+(j-1)*B%NDimX)*tmp1(i,rs)
+
+       enddo
+    enddo  
+ enddo
+
+! end GVB select
+endif
+
+
+if(.not.(Flags%ICASSCF==0.and.Flags%ISERPA==0)) then
 ! uncoupled and semicoupled
  e2du=0d0
 ! e2ds1=0d0
@@ -1868,6 +1923,8 @@ endif
  e2du = -16d0*e2du*1000d0
  e2sp = e2du + 16*e2ds2*1000 
  e2ds= e2du+(16*e2ds2-32*e2ds1)*1000
+
+endif
 
  e2d = 0d0
  do j=1,B%NDimX
@@ -1955,6 +2012,7 @@ double precision :: fact
 double precision :: e2d1,e2d2,e2d3,e2d4,e2d,tmp
 double precision :: e2du,dea,deb
 double precision,parameter :: SmallE = 1.d-6
+
 
  if(A%NBasis.ne.B%NBasis) then
     write(LOUT,'(1x,a)') 'ERROR! MCBS not implemented in SAPT!'
@@ -2047,19 +2105,22 @@ double precision,parameter :: SmallE = 1.d-6
     endif
  enddo
 
+!write(*,*) 'tmp1,tmp2:',norm2(tmp1),norm2(tmp2)
+
  e2d1 = 0d0
  do i=1,2*ADimEx
     if(OmA(i).gt.SmallE.and.OmA(i).lt.1d20) then
        do j=1,2*BDimEx
           if(OmB(j).gt.SmallE.and.OmB(j).lt.1d20) then
              e2d1 = e2d1 + tmp2(i,j)**2/(OmA(i)+OmB(j))
+             ! print*, OmA(i),OmB(j)
           endif
        enddo
     endif
  enddo
 
-! print*, ''
-! print*, 'PART1: ',-16d0*e2d1*1000d0
+ print*, ''
+ print*, 'PART1: ',-16d0*e2d1*1000d0
 
 ! PART 2: p>q,r=s
  tmp1=0
@@ -2112,7 +2173,7 @@ double precision,parameter :: SmallE = 1.d-6
        enddo
     endif
  enddo
-! write(LOUT,*) 'PART2: ',-16d0*e2d2*1000d0
+ write(LOUT,*) 'PART2: ',-16d0*e2d2*1000d0
 
 ! PART 3: p=q,r>s
  tmp1=0
@@ -2166,7 +2227,7 @@ double precision,parameter :: SmallE = 1.d-6
        enddo
     endif
  enddo
-! write(LOUT,*) 'PART3: ', -16d0*e2d3*1000d0
+ write(LOUT,*) 'PART3: ', -16d0*e2d3*1000d0
 
 ! PART 4: p=q,r=s
  tmp1=0
@@ -2220,7 +2281,7 @@ double precision,parameter :: SmallE = 1.d-6
        enddo
     endif
  enddo
-! print*, 'PART4: ',-16*e2d4*1000
+ print*, 'PART4: ',-16*e2d4*1000
 
 ! SAPT%e2disp = -16d0*e2d
  write(LOUT,'(1x,a,f16.8)') 'E2disp      = ',-16*(e2d1+e2d2+e2d3+e2d4)*1000

@@ -3196,7 +3196,7 @@ C
       EndDo
       EndDo
 C
-      Write(*,*) 'DUPA00', norm2(HNO)
+      Write(*,*) 'HNO-Ka', norm2(HNO)
 
 C     CONSTRUCT TWO-ELECTRON PART OF THE AC ALPHA-HAMILTONIAN      
 C
@@ -3244,6 +3244,10 @@ C
       EndDo
       EndDo
 C
+C
+      Write(*,*) 'AuxI-Ka',norm2(AuxI)
+      Write(*,*) 'AuxIO-Ka',norm2(AuxIO)
+C
 C     AUXILIARY MATRIX WMAT
 C
       Do I=1,NBasis
@@ -3271,6 +3275,8 @@ C
       EndDo
       EndDo
       EndDo
+C
+      Write(*,*) 'WMAT-Ka',norm2(WMAT)
 C
       Do IRow=1,NDimX
 C
@@ -3476,6 +3482,8 @@ C
 C
       EndDo
       EndDo
+C
+      Print*, "AB-Ka",norm2(ABPLUS),norm2(ABMIN)
 C
       Deallocate(RDM2Act)
 C

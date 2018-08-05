@@ -53,7 +53,7 @@ double precision :: Tcpu,Twall
 
     call e1elst(SAPT%monA,SAPT%monB,SAPT)
     !call e1exchs2(SAPT%monA,SAPT%monB,SAPT)
-    call e2ind_apsg(Flags,SAPT%monA,SAPT%monB,SAPT)
+!    call e2ind_apsg(Flags,SAPT%monA,SAPT%monB,SAPT)
     call e2disp_apsg(Flags,SAPT%monA,SAPT%monB,SAPT)
 
  endif
@@ -505,12 +505,15 @@ character(*) :: fname
 integer :: NSq,NInte1,NInte2
 double precision, allocatable :: work1(:),work2(:),XOne(:),TwoMO(:) 
 double precision, allocatable :: ABPlus(:), ABMin(:), URe(:,:), &
-                                 EigY(:), EigY1(:), Eig(:), Eig1(:)
+     EigY(:), EigY1(:), Eig(:), Eig1(:), &
+     testY(:),testEig(:)
+
 integer :: i,ione
 double precision,parameter :: One = 1d0, Half = 0.5d0
 character(8) :: label
 character(:),allocatable :: onefile,twofile,propfile0,propfile1,rdmfile
 double precision :: tmp
+integer :: j
 
 ! perform check
  if(Flags%ICASSCF==0) then
@@ -578,13 +581,18 @@ double precision :: tmp
  Eig   = 0
  Eig1  = 0
 
- call Y01CAS(TwoMO,Mon%Occ,URe,XOne,ABPlus,ABMin, &
+ Flags%IFlag0 = 1
+ call Y01CAS_mithap(Mon%Occ,URe,XOne,ABPlus,ABMin, &
       EigY,EigY1,Eig,Eig1, &
-      Mon%IndN,Mon%IndX,Mon%NDimX,NBas,Mon%NDim,NInte1,NInte2,Flags%IFlag0)
+      Mon%IndN,Mon%IndX,Mon%IGem,Mon%NAct,Mon%INAct,Mon%NDimX, &
+      NBas,Mon%NDim,NInte1,twofile,Flags%IFlag0)
+
+! call Y01CAS(TwoMO,Mon%Occ,URe,XOne,ABPlus,ABMin, &
+!      EigY,EigY1,Eig,Eig1, &
+!      Mon%IndN,Mon%IndX,Mon%NDimX,NBas,Mon%NDim,NInte1,NInte2,Flags%IFlag0)
 
 ! dump response
 ! maybe construct smarter resp-files?
-
  call writeresp(EigY,Eig,propfile0)
  if(Flags%IFlag0==0) then
     call writeresp(EigY1,Eig1,propfile1)
@@ -626,7 +634,7 @@ double precision, allocatable :: EigY0(:),EigY1(:), &
  EigY1 = 0
  Eig0 = 0
  Eig1 = 0
-
+ 
  call Y01CAS(TwoMO,Mon%Occ,URe,XOne,ABPlus,ABMin, &
              EigY0,EigY1,Eig0,Eig1, &
              Mon%IndN,Mon%IndX,Mon%NDimX,NBas,Mon%NDim,NInte1,NInte2,IFlag0)
@@ -789,15 +797,14 @@ double precision, allocatable :: EigTmp(:), VecTmp(:)
 ! endif 
 
   ! big testing AB-CAS 
-!   ACAlpha=sqrt(2d0)/2d0
-   write(*,*) 'AB_CAS_mithap! NO TwoMO!'
-   call AB_CAS_mithap(ABPlus,ABMin,ECASSCF,URe,Mon%Occ,XOne,Mon%IPair,&
-               Mon%IndN,Mon%IndX,Mon%IGem,Mon%NAct,Mon%INAct,Mon%NDimX,NBas,Mon%NDimX,&
-               NInte1,twofile,ACAlpha)
+   ACAlpha=sqrt(2d0)/2d0
+ !  call AB_CAS_mithap(ABPlus,ABMin,ECASSCF,URe,Mon%Occ,XOne,Mon%IPair,&
+ !              Mon%IndN,Mon%IndX,Mon%IGem,Mon%NAct,Mon%INAct,Mon%NDimX,NBas,Mon%NDimX,&
+ !              NInte1,twofile,ACAlpha)
 
-!   call AB_CAS(ABPlus,ABMin,ECASSCF,URe,Mon%Occ,XOne,TwoMO,Mon%IPair,&
-!               Mon%IndN,Mon%IndX,Mon%NDimX,NBas,Mon%NDimX,NInte1,NInte2,ACAlpha)
- 
+   call AB_CAS(ABPlus,ABMin,ECASSCF,URe,Mon%Occ,XOne,TwoMO,Mon%IPair,&
+               Mon%IndN,Mon%IndX,Mon%NDimX,NBas,Mon%NDimX,NInte1,NInte2,ACAlpha)
+
    EigVecR = 0
    Eig = 0
    call ERPASYMM1(EigVecR,Eig,ABPlus,ABMin,NBas,Mon%NDimX)
@@ -822,8 +829,8 @@ double precision, allocatable :: EigTmp(:), VecTmp(:)
 
   if(EChck) then
       ECorr=0
-!      call ACEneERPA(ECorr,EigVecR,Eig,TwoMO,URe,Mon%Occ,XOne,&
-!                     Mon%IndN,NBas,NInte1,NInte2,Mon%NDimX,Mon%NGem)
+      call ACEneERPA(ECorr,EigVecR,Eig,TwoMO,URe,Mon%Occ,XOne,&
+                     Mon%IndN,NBas,NInte1,NInte2,Mon%NDimX,Mon%NGem)
       ECorr=Ecorr*0.5d0
   
       write(LOUT,'(/,1x,''ECASSCF+ENuc, Corr, ERPA-CASSCF'',6x,3f15.8)') &
@@ -849,15 +856,15 @@ double precision, allocatable :: EigTmp(:), VecTmp(:)
       Mon%IndNT(2,i) = Mon%IndN(2,i)
    enddo
 !  HERE! - started work on Y01CAS
-   call Y01CAS_mithap(Mon%Occ,URe,XOne,ABPlus,ABMin, &
-        EigY0,EigY1,Eig0,Eig1, &
-        Mon%IndN,Mon%IndX,Mon%IGem,Mon%NAct,Mon%INAct,Mon%NDimX, &
-        NBas,Mon%NDim,NInte1,twofile,Flags%IFlag0)
-   !
-   call Y01CAS(TwoMO,Mon%Occ,URe,XOne,ABPlus,ABMin, &
-        EigY0,EigY1,Eig0,Eig1, &
-        !Mon%IndNT,Mon%IndX,Mon%NDimX,NBas,Mon%NDim,NInte1,NInte2,Flags%IFlag0)
-        Mon%IndN,Mon%IndX,Mon%NDimX,NBas,Mon%NDim,NInte1,NInte2,Flags%IFlag0)
+!   call Y01CAS_mithap(Mon%Occ,URe,XOne,ABPlus,ABMin, &
+!        EigY0,EigY1,Eig0,Eig1, &
+!        Mon%IndN,Mon%IndX,Mon%IGem,Mon%NAct,Mon%INAct,Mon%NDimX, &
+!        NBas,Mon%NDim,NInte1,twofile,Flags%IFlag0)
+  !
+!   call Y01CAS(TwoMO,Mon%Occ,URe,XOne,ABPlus,ABMin, &
+!        EigY0,EigY1,Eig0,Eig1, &
+!        !Mon%IndNT,Mon%IndX,Mon%NDimX,NBas,Mon%NDim,NInte1,NInte2,Flags%IFlag0)
+!        Mon%IndN,Mon%IndX,Mon%NDimX,NBas,Mon%NDim,NInte1,NInte2,Flags%IFlag0)
 
    ! dump uncoupled response
    call writeresp(EigY0,Eig0,propfile0)
@@ -1877,34 +1884,38 @@ integer :: test
     mon%IndAux(i)=2
  enddo
 
-! active orbitals
- mon%icnt = 0
- if(Flags%ICASSCF==0) then
-   do i=1,mon%NELE
-      if(mon%Occ(i).lt.mon%ThrAct) then
-         mon%IndAux(i)=1
-         !write(6,'(/,X," Active Orbital: ",I4,E14.4)') &
-         !      i, mon%Occ(i)
-         mon%IndAux(FindGem(i,mon))=1
-         !write(6,'(X," Active Orbital: ",I4,E14.4)') &
-         !FindGem(i,mon), mon%Occ(FindGem(i,mon))
-         mon%icnt = mon%icnt + 2
-      endif
-   enddo
- elseif(Flags%ICASSCF==1.and.Flags%ISHF==0) then
-   write(LOUT,'()')
-   if(mon%Monomer==1) write(LOUT,'(1x,a)') 'Monomer A' 
-   if(mon%Monomer==2) write(LOUT,'(1x,a)') 'Monomer B' 
-   do i=1,nbas
-      if(mon%Occ(i).lt.1d0.and.mon%Occ(i).ne.0d0) then
-      ! here!!!
-      !if(mon%Occ(i).lt.1d0.and.mon%Occ(i).gt.1d-6) then
-         ! HERE!!! ACTIVE!!!! 
-         mon%IndAux(i) = 1
-         write(6,'(X," Active Orbital: ",I4,E14.4)') i, mon%Occ(i)
-         mon%icnt = mon%icnt + 1
-     endif
-   enddo
+ if(mon%NActOrb/=0) then
+
+    ! active orbitals
+    mon%icnt = 0
+    if(Flags%ICASSCF==0) then
+       do i=1,mon%NELE
+          if(mon%Occ(i).lt.mon%ThrAct) then
+             mon%IndAux(i)=1
+             !write(6,'(/,X," Active Orbital: ",I4,E14.4)') &
+             !      i, mon%Occ(i)
+             mon%IndAux(FindGem(i,mon))=1
+             !write(6,'(X," Active Orbital: ",I4,E14.4)') &
+             !FindGem(i,mon), mon%Occ(FindGem(i,mon))
+             mon%icnt = mon%icnt + 2
+          endif
+       enddo
+    elseif(Flags%ICASSCF==1.and.Flags%ISHF==0) then
+       write(LOUT,'()')
+       if(mon%Monomer==1) write(LOUT,'(1x,a)') 'Monomer A' 
+       if(mon%Monomer==2) write(LOUT,'(1x,a)') 'Monomer B' 
+       do i=1,nbas
+          if(mon%Occ(i).lt.1d0.and.mon%Occ(i).ne.0d0) then
+             ! here!!!
+             !if(mon%Occ(i).lt.1d0.and.mon%Occ(i).gt.1d-6) then
+             ! HERE!!! ACTIVE!!!! 
+             mon%IndAux(i) = 1
+             write(6,'(X," Active Orbital: ",I4,E14.4)') i, mon%Occ(i)
+             mon%icnt = mon%icnt + 1
+          endif
+       enddo
+    endif
+
  endif
 
 ! set generalized "occupied" = num0 + num1
@@ -1928,7 +1939,8 @@ integer :: test
  mon%IPair(1:nbas,1:nbas) = 0
 
  if(Flags%ICASSCF==0) then
-
+ print*, 'HERE???'
+ 
     ij=0
     ind = 0
     do i=1,nbas
@@ -1941,7 +1953,7 @@ integer :: test
              if((mon%IGem(i).ne.mon%IGem(j)).and.&
                 (mon%IndAux(i)==1).and.(mon%IndAux(j)==1).and.&
                 (Abs(mon%Occ(i)-mon%Occ(j))/mon%Occ(i).lt.1.d-2)) then
-      
+                  
                 write(LOUT,'(1x,a,2x,2i4)') 'Discarding nearly degenerate pair',i,j 
               else
                  ! if IFlCore=0 exclude core (inactive) orbitals
@@ -1966,7 +1978,6 @@ integer :: test
 
  elseif(Flags%ICASSCF==1.and.Flags%ISERPA==0) then
 
-
     ij=0
     ind = 0
     do i=1,nbas
@@ -1978,7 +1989,7 @@ integer :: test
                 ! do not correlate active degenerate orbitals from different geminals 
                 if((mon%IndAux(i)==1).and.(mon%IndAux(j)==1)  & 
                  .and.&
-                 (Abs(mon%Occ(i)-mon%Occ(j))/mon%Occ(i).lt.1.d-8) ) then
+                 (Abs(mon%Occ(i)-mon%Occ(j))/mon%Occ(i).lt.1.d-2) ) then
                  ! here!!!
                  !(Abs(mon%Occ(i)-mon%Occ(j))/mon%Occ(i).lt.0.5d-1) ) then
                

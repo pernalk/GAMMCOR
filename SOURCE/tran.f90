@@ -639,7 +639,7 @@ enddo
 end subroutine sq_symmetrize
 
 subroutine AB_CAS_mithap(ABPLUS,ABMIN,ETot,URe,Occ,XOne,IPair, &
-     IndN,IndX,IGem,NAct,INActive,NDimX,NBasis,NDim,NInte1,IntFileName,ACAlpha)
+     IndN,IndX,IGemIN,NAct,INActive,NDimX,NBasis,NDim,NInte1,IntFileName,ACAlpha)
 !
 ! COMPUTE THE A+B AND A-B MATRICES FOR 2-RDM READ FROM A rdm2.dat FILE
 ! 
@@ -655,14 +655,14 @@ character(*) :: IntFileName
 double precision,intent(out) :: ABPLUS(NDim,NDim),ABMIN(NDim,NDim)
 double precision,intent(out) :: ETot
 double precision,intent(in)  :: URe(NBasis,NBasis),Occ(NBasis),XOne(NInte1)
-integer,intent(in) :: IPair(NBasis,NBasis),IndN(2,NDim),IndX(NDim),IGem(NBasis)
+integer,intent(in) :: IPair(NBasis,NBasis),IndN(2,NDim),IndX(NDim),IGemIN(NBasis)
 double precision,intent(in)  :: ACAlpha
 
 integer :: i,j,k,l,ij,kl,kk,ll,klround
 integer :: ip,iq,ir,is,it,iu,iw,ipq,irs,ICol,IRow
 integer :: iunit,ios
 integer :: NOccup,NRDM2Act
-integer :: Ind(NBasis),AuxInd(3,3),pos(NBasis,NBasis)
+integer :: IGem(NBasis),Ind(NBasis),AuxInd(3,3),pos(NBasis,NBasis)
 double precision :: C(NBasis)
 double precision :: HNO(NBasis,NBasis),AuxI(NBasis,NBasis),AuxIO(NBasis,NBasis),WMAT(NBasis,NBasis)
 double precision :: AuxCoeff(3,3,3,3),AuxVal,val
@@ -681,6 +681,17 @@ NOccup = NAct + INActive
 Ind = 0
 do i=1,NAct
    Ind(INActive+i) = i
+enddo
+
+! fix IGem
+do i=1,INActive
+   IGem(i) = 1
+enddo
+do i=INActive+1,NOccup
+   IGem(i) = 2
+enddo
+do i=NOccup+1,NBasis
+   IGem(i) = 3
 enddo
 
 allocate(work1(NBasis**2),work2(NBasis**2),ints(NBasis,NBasis))
@@ -1298,10 +1309,10 @@ enddo
 print*, "AB-my",norm2(ABPLUS),norm2(ABMIN)
 
 call sq_to_triang2(HNO,work1,NBasis)
-write(LOUT,*) 'DUPAmy', norm2(work1(1:NBasis*(NBasis+1)/2))
+write(LOUT,*) 'HNO-my', norm2(work1(1:NBasis*(NBasis+1)/2))
 HNO=transpose(HNO)
 call sq_to_triang2(HNO,work1,NBasis)
-write(LOUT,*) 'DUPCmy', norm2(work1(1:NBasis*(NBasis+1)/2))
+write(LOUT,*) 'HNO-tr', norm2(work1(1:NBasis*(NBasis+1)/2))
 
 write(LOUT,'(/,1X,''CASSCF Energy (w/o ENuc)'',5X,F15.8)') ETot
 
@@ -1355,9 +1366,10 @@ double precision :: AuxCoeff(3,3,3,3),AuxVal,val
 double precision,allocatable :: RDM2val(:,:,:,:),RDM2Act(:)
 double precision,allocatable :: work1(:),work2(:)
 double precision,allocatable :: ints(:,:)
+double precision,allocatable :: EigYt(:,:),EigXt(:,:),Eigt(:)
 integer,external :: NAddrRDM
 double precision,external :: FRDM2
-integer :: ii,ipos
+integer :: ii,jj,ipos
 integer :: nAA,tmpAA(NAct*(NAct-1)/2),limAA(2)
 integer :: nAI(INActive),tmpAI(NAct,1:INActive),limAI(2,1:INActive)
 integer :: nAV(INActive+NAct+1:NBasis),tmpAV(NAct,INActive+NAct+1:NBasis),limAV(2,INActive+NAct+1:NBasis)
@@ -1468,7 +1480,7 @@ ipos = 0
 limAA(1) = ipos + 1
 do ii=1,nAA
    i = tmpAA(ii)
-!$   print*, ii,i
+   ! print*, ii,i
    ip = IndN(1,i)
    iq = IndN(2,i)
    ipos = ipos + 1
@@ -1479,7 +1491,7 @@ do is=1,INActive
    limAI(1,is) = ipos + 1
    do ii=1,nAI(is)
       i = tmpAI(ii,is)
-  !    print*, ii,is,i
+      ! print*, ii,is,i
       ip = IndN(1,i)
       iq = IndN(2,i)
       ipos = ipos + 1
@@ -1492,7 +1504,7 @@ do ir=NOccup+1,NBasis
    limAV(1,ir) = ipos + 1
    do ii=1,nAV(ir)
       i = tmpAV(ii,ir)
- !     print*, ii,ir,i
+      ! print*, ii,ir,i
       ip = IndN(1,i)
       iq = IndN(2,i)
       ipos = ipos + 1
@@ -1503,7 +1515,7 @@ enddo
 limIV(1) = ipos + 1
 do ii=1,nIV
    i = tmpIV(ii)
-!   print*, ii,i
+   ! print*, ii,i
    ip = IndN(1,i)
    iq = IndN(2,i)
    ipos = ipos + 1
@@ -2013,13 +2025,13 @@ do ICol=1,NDimX
             end select
          endif
 
-!         if(ipq>=irs) then
+        ! if(ipq>=irs) then
             ABPLUS(ipq,irs) = ABPLUS(ipq,irs) + val
             ABMIN(ipq,irs) = ABMIN(ipq,irs) + val
-!
-!            ABPLUS(irs,ipq) = ABPLUS(ipq,irs) 
-!            ABMIN(irs,ipq) = ABMIN(ipq,irs) 
-!         endif
+
+        !    ABPLUS(irs,ipq) = ABPLUS(ipq,irs) 
+        !    ABMIN(irs,ipq) = ABMIN(ipq,irs) 
+        ! endif
 
          val = 0
 
@@ -2043,83 +2055,128 @@ do ICol=1,NDimX
             end select
          endif
 
-!         if(ipq>=irs) then
+        ! if(ipq>=irs) then
             ABPLUS(ipq,irs) = ABPLUS(ipq,irs) + val
             ABMIN(ipq,irs) = ABMIN(ipq,irs) - val
 
-!            ABPLUS(irs,ipq) = ABPLUS(ipq,irs) 
-!            ABMIN(irs,ipq) = ABMIN(ipq,irs)
-!         endif
+        !    ABPLUS(irs,ipq) = ABPLUS(ipq,irs) 
+        !    ABMIN(irs,ipq) = ABMIN(ipq,irs)
+        ! endif
 
-!         if(ipq>=irs) then
+       !  if(ipq>=irs) then
             val = (C(ip) + C(iq))*(C(ir) + C(is))
             if(val/=0d0) ABPLUS(ipq,irs) = ABPLUS(ipq,irs)/val
             val = (C(ip) - C(iq))*(C(ir) - C(is))
             if(val/=0d0) ABMIN(ipq,irs)  = ABMIN(ipq,irs)/val
-!            
-!           ABPLUS(irs,ipq) = ABPLUS(ipq,irs) 
-!            ABMIN(irs,ipq) = ABMIN(ipq,irs)
-!         endif
+            
+        !   ABPLUS(irs,ipq) = ABPLUS(ipq,irs) 
+        !    ABMIN(irs,ipq) = ABMIN(ipq,irs)
+        ! endif
          
       enddo
 
 !   endif
 enddo
 
+EigY = 0
+!
 i = limAA(1)
 j = limAA(2)
-write(*,*) 'AB0-my',norm2(ABPLUS(i:j,i:j)),norm2(ABMIN(i:j,i:j))
-write(*,*) 'AB+',norm2(ABPLUS(i:j,i:j)-transpose(ABPLUS(i:j,i:j)))
-write(*,*) 'AB-',norm2(ABMIN(i:j,i:j)-transpose(ABMIN(i:j,i:j)))
+!!$ write(*,*) 'AB0-my',norm2(ABPLUS(i:j,i:j)),norm2(ABMIN(i:j,i:j))
+!!$write(*,*) 'AB+',norm2(ABPLUS(i:j,i:j)-transpose(ABPLUS(i:j,i:j)))
+!!$write(*,*) 'AB-',norm2(ABMIN(i:j,i:j)-transpose(ABMIN(i:j,i:j)))
+
+allocate(EigYt(nAA,nAA),EigXt(nAA,nAA),Eigt(nAA))
+call ERPASYMM0(EigYt,EigXt,Eigt,ABPLUS(i:j,i:j),ABMIN(i:j,i:j),nAA)
+!write(*,*) 'EigYaa',norm2(EigYt),norm2(EigXt),norm2(Eigt)
+
+do ii=1,nAA
+   ipos = tmpAA(ii)
+   EigY(ipos,i:j) = EigYt(ii,1:nAA)
+enddo
+Eig(i:j) = Eigt(1:nAA)
+
+deallocate(Eigt,EigXt,EigYt)
 
 do iq=1,INActive
    i = limAI(1,iq)
    j = limAI(2,iq)
-   write(*,*) 'ABai-my',iq,norm2(ABPLUS(i:j,i:j)),norm2(ABMIN(i:j,i:j))
-   write(*,*) 'AB+',iq,norm2(ABPLUS(i:j,i:j)-transpose(ABPLUS(i:j,i:j)))
-   write(*,*) 'AB-',iq,norm2(ABMIN(i:j,i:j)-transpose(ABMIN(i:j,i:j)))
+!!$   write(*,*) 'ABai-my',iq,norm2(ABPLUS(i:j,i:j)),norm2(ABMIN(i:j,i:j))
+!!$   write(*,*) 'AB+',iq,norm2(ABPLUS(i:j,i:j)-transpose(ABPLUS(i:j,i:j)))
+!!$   write(*,*) 'AB-',iq,norm2(ABMIN(i:j,i:j)-transpose(ABMIN(i:j,i:j)))
+
+   allocate(EigYt(nAI(iq),nAI(iq)),EigXt(nAI(iq),nAI(iq)),Eigt(nAI(iq)))
+   call ERPASYMM0(EigYt,EigXt,Eigt,ABPLUS(i:j,i:j),ABMIN(i:j,i:j),nAI(iq))
+   ! write(*,*) 'EigYai',norm2(EigYt),norm2(EigXt),norm2(Eigt)
+   do ii=1,nAI(iq)
+      ipos = tmpAI(ii,iq)
+      EigY(ipos,i:j) = EigYt(ii,1:nAI(iq))
+   enddo
+   Eig(i:j) = Eigt(1:nAI(iq))
+
+   deallocate(Eigt,EigXt,EigYt)
+
 enddo
 
 do ip=NOccup+1,NBasis
    i = limAV(1,ip)
    j = limAV(2,ip)
-   write(*,*) 'ABav-my',ip,norm2(ABPLUS(i:j,i:j)),norm2(ABMIN(i:j,i:j))
-   write(*,*) 'AB+',ip,norm2(ABPLUS(i:j,i:j)-transpose(ABPLUS(i:j,i:j)))
-!   write(*,*) 'AB-',ip,norm2(ABMIN(i:j,i:j)-transpose(ABMIN(i:j,i:j)))
+!!$   write(*,*) 'ABav-my',ip,norm2(ABPLUS(i:j,i:j)),norm2(ABMIN(i:j,i:j))
+!!$   write(*,*) 'AB+',ip,norm2(ABPLUS(i:j,i:j)-transpose(ABPLUS(i:j,i:j)))
+!!$   write(*,*) 'AB-',ip,norm2(ABMIN(i:j,i:j)-transpose(ABMIN(i:j,i:j)))
+
+   allocate(EigYt(nAV(ip),nAV(ip)),EigXt(nAV(ip),nAV(ip)),Eigt(nAV(ip)))
+   call ERPASYMM0(EigYt,EigXt,Eigt,ABPLUS(i:j,i:j),ABMIN(i:j,i:j),nAV(ip))
+   ! write(*,*) 'EigYav',norm2(EigYt),norm2(EigXt),norm2(Eigt)
+   do ii=1,nAV(ip)
+      ipos = tmpAV(ii,ip)
+      EigY(ipos,i:j) = EigYt(ii,1:nAV(ip))
+   enddo
+   Eig(i:j) = Eigt(1:nAV(ip))
+   
+   deallocate(Eigt,EigXt,EigYt)
 enddo
 
 do i=limIV(1),limIV(2)
    ii = tmpIV(i-limIV(1)+1)
    ip = IndN(1,ii)
    iq = IndN(2,ii)
-   write(*,*) 'ABiv-my',ip,iq,ABPLUS(i,i)
+   ! write(*,*) 'ABiv-my',ip,iq,ABPLUS(i,i)
+   Eig(i) = ABPLUS(i,i)
+enddo
+do ii=1,nIV
+   i = tmpiV(ii)
+   EigY(i,limIV(1)+ii-1) = 1d0/sqrt(2d0)
 enddo
 
+!!$write(*,*) 'EigY-my',norm2(EigY)
+!!$write(*,*) 'Eig-my ',norm2(Eig)
 
-call sq_to_triang2(HNO,work1,NBasis)
-write(LOUT,*) 'HNO-m1', norm2(work1(1:NBasis*(NBasis+1)/2))
-HNO=transpose(HNO)
-call sq_to_triang2(HNO,work1,NBasis)
-write(LOUT,*) 'HNO-m2', norm2(work1(1:NBasis*(NBasis+1)/2))
-
-!do i=1,NBasis*(NBasis+1)/2
-!   print*, i, work1(i)
-!enddo
-
-call sq_to_triang2(AuxI,work1,NBasis)
-write(LOUT,*) 'AuxI-my', norm2(work1(1:NBasis*(NBasis+1)/2))
-AuxI=transpose(AuxI)
-call sq_to_triang2(AuxI,work1,NBasis)
-write(LOUT,*) 'AuxI-tr', norm2(work1(1:NBasis*(NBasis+1)/2))
-
-call sq_to_triang2(AuxIO,work1,NBasis)
-write(LOUT,*) 'AuxIO-my', norm2(work1(1:NBasis*(NBasis+1)/2))
-AuxIO=transpose(AuxIO)
-call sq_to_triang2(AuxIO,work1,NBasis)
-write(LOUT,*) 'AuxIO-tr', norm2(work1(1:NBasis*(NBasis+1)/2))
-
-write(LOUT,*) 'WMAT-my', 2d0*norm2(WMAT)
-write(LOUT,*) 'WMAT-norm',norm2(WMAT(1:NOccup,1:NOccup)-transpose(WMAT(1:NOccup,1:NOccup)))
+! TESTS
+!!$call sq_to_triang2(HNO,work1,NBasis)
+!!$write(LOUT,*) 'HNO-m1', norm2(work1(1:NBasis*(NBasis+1)/2))
+!!$HNO=transpose(HNO)
+!!$call sq_to_triang2(HNO,work1,NBasis)
+!!$write(LOUT,*) 'HNO-m2', norm2(work1(1:NBasis*(NBasis+1)/2))
+!!$
+!!$!do i=1,NBasis*(NBasis+1)/2
+!!$!   print*, i, work1(i)
+!!$!enddo
+!!$
+!!$call sq_to_triang2(AuxI,work1,NBasis)
+!!$write(LOUT,*) 'AuxI-my', norm2(work1(1:NBasis*(NBasis+1)/2))
+!!$AuxI=transpose(AuxI)
+!!$call sq_to_triang2(AuxI,work1,NBasis)
+!!$write(LOUT,*) 'AuxI-tr', norm2(work1(1:NBasis*(NBasis+1)/2))
+!!$
+!!$call sq_to_triang2(AuxIO,work1,NBasis)
+!!$write(LOUT,*) 'AuxIO-my', norm2(work1(1:NBasis*(NBasis+1)/2))
+!!$AuxIO=transpose(AuxIO)
+!!$call sq_to_triang2(AuxIO,work1,NBasis)
+!!$write(LOUT,*) 'AuxIO-tr', norm2(work1(1:NBasis*(NBasis+1)/2))
+!!$
+!!$write(LOUT,*) 'WMAT-my', 2d0*norm2(WMAT)
+!!$write(LOUT,*) 'WMAT-norm',norm2(WMAT(1:NOccup,1:NOccup)-transpose(WMAT(1:NOccup,1:NOccup)))
 
 deallocate(RDM2val)
 deallocate(ints,work2,work1)
