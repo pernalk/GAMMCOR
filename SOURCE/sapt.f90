@@ -1558,7 +1558,9 @@ double precision :: e2d,fact,tmp
 double precision :: e2du,e2sp,dea,deb
 double precision :: e2ds,e2ds1,e2ds2
 double precision :: inv_omega
-double precision,parameter :: SmallE = 1.D-3
+! for Be ERPA:
+double precision,parameter :: SmallE = 1.D-1
+!double precision,parameter :: SmallE = 1.D-3
 double precision,parameter :: BigE = 1.D8 
 double precision :: Alpha, Beta
 
@@ -2011,7 +2013,8 @@ double precision,allocatable :: work(:)
 double precision :: fact
 double precision :: e2d1,e2d2,e2d3,e2d4,e2d,tmp
 double precision :: e2du,dea,deb
-double precision,parameter :: SmallE = 1.d-6
+!double precision,parameter :: SmallE = 1.d-6
+double precision,parameter :: SmallE = 1.d-1
 
 
  if(A%NBasis.ne.B%NBasis) then
@@ -2033,7 +2036,8 @@ double precision,parameter :: SmallE = 1.d-6
  nOFA = dimOA*dimFA
  nOFB = dimOB*dimFB
 
-! print*, A%num0,A%num1,A%num2
+ print*, A%num0,A%num1,A%num2
+ print*, B%num0,B%num1,B%num2
 
 ! read EigValA_B
  allocate(EVecA(2*ADimEx*2*ADimEx),OmA(2*ADimEx),&
@@ -2044,12 +2048,14 @@ double precision,parameter :: SmallE = 1.d-6
 
 ! print*, 'OmA'
 ! do i=1,size(OmA)
-!    if(OmA(i).gt.0d0)  write(*,*) i,OmA(i)
+!   ! if(OmA(i).gt.0d0)  write(*,*) i,OmA(i)
+!    write(*,*) i,",",OmA(i)
 ! enddo
 !
 ! print*, 'OmB'
 ! do i=1,size(OmB)
-!    if(OmB(i).gt.0d0)  write(*,*) i,OmB(i)
+!    !  if(OmB(i).gt.0d0)  write(*,*) i,OmB(i)
+!    write(*,*) i,",",OmB(i)
 ! enddo
 
  
@@ -2078,9 +2084,10 @@ double precision,parameter :: SmallE = 1.d-6
        !print*, fact
        do i=1,2*ADimEx
           if(OmA(i).gt.SmallE.and.OmA(i).lt.1d20) then
+          !if(abs(OmA(i)).gt.SmallE.and.abs(OmA(i)).lt.1d20) then
 
              tmp1(i,rs) = tmp1(i,rs) + & 
-                        fact*EVecA((i-1)*2*ADimEx+pq)
+                  fact*EVecA((i-1)*2*ADimEx+pq)
 
           endif
        enddo
@@ -2090,18 +2097,20 @@ double precision,parameter :: SmallE = 1.d-6
  tmp2=0
  do j=1,2*BDimEx
     if(OmB(j).gt.SmallE.and.OmB(j).lt.1d20) then
+    !if(abs(OmB(j)).gt.SmallE.and.abs(OmB(j)).lt.1d20) then
        do i=1,2*ADimEx
           if(OmA(i).gt.SmallE.and.OmA(i).lt.1d20) then
+          !if(abs(OmA(i)).gt.SmallE.and.abs(OmA(i)).lt.1d20) then
              do rs=1,B%NDimX
                 ir = B%IndN(1,rs)
                 is = B%IndN(2,rs)
-
-                 tmp2(i,j) = tmp2(i,j) + &
-                             EVecB((j-1)*2*BDimEx+rs)*tmp1(i,rs)
-
+                
+                tmp2(i,j) = tmp2(i,j) + &
+                     EVecB((j-1)*2*BDimEx+rs)*tmp1(i,rs)
+             
              enddo
           endif
-       enddo   
+       enddo
     endif
  enddo
 
@@ -2110,8 +2119,10 @@ double precision,parameter :: SmallE = 1.d-6
  e2d1 = 0d0
  do i=1,2*ADimEx
     if(OmA(i).gt.SmallE.and.OmA(i).lt.1d20) then
+    !if(abs(OmA(i)).gt.SmallE.and.abs(OmA(i)).lt.1d20) then
        do j=1,2*BDimEx
           if(OmB(j).gt.SmallE.and.OmB(j).lt.1d20) then
+          !if(abs(OmB(j)).gt.SmallE.and.abs(OmB(j)).lt.1d20) then
              e2d1 = e2d1 + tmp2(i,j)**2/(OmA(i)+OmB(j))
              ! print*, OmA(i),OmB(j)
           endif
@@ -2119,8 +2130,8 @@ double precision,parameter :: SmallE = 1.d-6
     endif
  enddo
 
- print*, ''
- print*, 'PART1: ',-16d0*e2d1*1000d0
+print*, ''
+print*, 'PART1: ',-16d0*e2d1*1000d0
 
 ! PART 2: p>q,r=s
  tmp1=0
@@ -2139,7 +2150,7 @@ double precision,parameter :: SmallE = 1.d-6
           if(OmA(i).gt.SmallE.and.OmA(i).lt.1d20) then
 
              tmp1(i,ir) = tmp1(i,ir) + &
-                          fact*EVecA((i-1)*2*ADimEx+pq)
+                  fact*EVecA((i-1)*2*ADimEx+pq)
 
           endif
        enddo
@@ -2152,14 +2163,14 @@ double precision,parameter :: SmallE = 1.d-6
        do i=1,2*ADimEx
           if(OmA(i).gt.SmallE.and.OmA(i).lt.1d20) then
              do ir=1,B%NDimN
-
-                 tmp2(i,j) = tmp2(i,j) + &
-                             EVecB((j-1)*2*BDimEx+2*B%NDimX+ir) * &
-                             tmp1(i,ir)
-
+          
+                tmp2(i,j) = tmp2(i,j) + &
+                     EVecB((j-1)*2*BDimEx+2*B%NDimX+ir) * &
+                     tmp1(i,ir)
+                
              enddo
           endif
-       enddo   
+       enddo
     endif
  enddo
 
@@ -2178,22 +2189,22 @@ double precision,parameter :: SmallE = 1.d-6
 ! PART 3: p=q,r>s
  tmp1=0
  do ip=1,A%NDimN
-!   ! print*, iq,ip,iq+(ip-1)*dimOA,nOFA
+    !   ! print*, iq,ip,iq+(ip-1)*dimOA,nOFA
     read(iunit,rec=ip+(ip-1)*dimOA) work(1:nOFB)
     do rs=1,B%NDimX
        ir = B%IndN(1,rs)
        is = B%IndN(2,rs)
-!      !print*, is,ir,is+(ir-1)*dimOB,nOFB
+       !      !print*, is,ir,is+(ir-1)*dimOB,nOFB
        fact = A%CICoef(ip) * &
-              (B%CICoef(is)+B%CICoef(ir)) * &
-              work(is+(ir-1)*dimOB)
- 
+            (B%CICoef(is)+B%CICoef(ir)) * &
+            work(is+(ir-1)*dimOB)
+       
        do i=1,2*ADimEx
           if(OmA(i).gt.SmallE.and.OmA(i).lt.1d20) then
-
+             
              tmp1(i,rs) = tmp1(i,rs) + & 
-                        fact*EVecA((i-1)*2*ADimEx+2*A%NDimX+ip)
-
+                  fact*EVecA((i-1)*2*ADimEx+2*A%NDimX+ip)
+             
           endif
        enddo
     enddo
@@ -2207,16 +2218,16 @@ double precision,parameter :: SmallE = 1.d-6
              do rs=1,B%NDimX
                 ir = B%IndN(1,rs)
                 is = B%IndN(2,rs)
-
-                 tmp2(i,j) = tmp2(i,j) + &
-                             EVecB((j-1)*2*BDimEx+rs)*tmp1(i,rs)
-
+                
+                tmp2(i,j) = tmp2(i,j) + &
+                     EVecB((j-1)*2*BDimEx+rs)*tmp1(i,rs)
+                
              enddo
           endif
-       enddo   
+       enddo
     endif
  enddo
-
+ 
  e2d3 = 0d0
  do i=1,2*ADimEx
     if(OmA(i).gt.SmallE.and.OmA(i).lt.1d20) then
@@ -2242,14 +2253,14 @@ double precision,parameter :: SmallE = 1.d-6
           if(OmA(i).gt.SmallE.and.OmA(i).lt.1d20) then
 
              tmp1(i,ir) = tmp1(i,ir) + &
-                        fact*EVecA((i-1)*2*ADimEx+2*A%NDimX+ip)
+                  fact*EVecA((i-1)*2*ADimEx+2*A%NDimX+ip)
 
           endif
        enddo
     enddo
  enddo
  
-! print*, 'tmp1', norm2(tmp1(1:2*ADimEx,1:B%NDimN))
+ print*, 'tmp1', norm2(tmp1(1:2*ADimEx,1:B%NDimN))
 !
  tmp2=0
  do j=1,2*BDimEx
@@ -2258,34 +2269,33 @@ double precision,parameter :: SmallE = 1.d-6
           if(OmA(i).gt.SmallE.and.OmA(i).lt.1d20) then
              do ir=1,B%NDimN
 
-                 tmp2(i,j) = tmp2(i,j) + &
-                             EVecB((j-1)*2*BDimEx+2*B%NDimX+ir) * &
-                             tmp1(i,ir)
-
+                tmp2(i,j) = tmp2(i,j) + &
+                     EVecB((j-1)*2*BDimEx+2*B%NDimX+ir) * &
+                     tmp1(i,ir)
+                
              enddo
           endif
-       enddo   
+       enddo
     endif
  enddo
 
-! print*, 'tmp2: ',norm2(tmp2)
+ print*, 'tmp2: ',norm2(tmp2)
 
  e2d4 = 0d0
  do j=1,2*BDimEx
     if(OmB(j).gt.SmallE.and.OmB(j).lt.1d20) then
        do i=1,2*ADimEx
-       if(OmA(i).gt.SmallE.and.OmA(i).lt.1d20) then
+          if(OmA(i).gt.SmallE.and.OmA(i).lt.1d20) then
              e2d4 = e2d4 + tmp2(i,j)**2/(OmA(i)+OmB(j))
-             !print*, tmp2(i,j)**2,OmA(i),OmB(j)
-       endif
+            ! print*, tmp2(i,j)**2,OmA(i),OmB(j)
+          endif
        enddo
     endif
  enddo
  print*, 'PART4: ',-16*e2d4*1000
 
-! SAPT%e2disp = -16d0*e2d
+ ! SAPT%e2disp = -16d0*e2d
  write(LOUT,'(1x,a,f16.8)') 'E2disp      = ',-16*(e2d1+e2d2+e2d3+e2d4)*1000
-
 
  close(iunit)
  deallocate(work)

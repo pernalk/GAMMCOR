@@ -1775,6 +1775,15 @@ C
      $ Work(4*2*(NDimX+NDimN))
 
 C
+      Do I=1,NDimX
+      Do J=I+1,NDimX
+      APLUS(I,J)=Half*(APLUS(I,J)+APLUS(J,I))
+      APLUS(J,I)=APLUS(I,J)
+      AMIN(I,J)=Half*(AMIN(I,J)+AMIN(J,I))
+      AMIN(J,I)=AMIN(I,J)
+      EndDo
+      EndDo
+C
       Do I=1,2*(NDimX+NDimN)
       Do J=1,2*(NDimX+NDimN)
       Q1(I,J)=Zero
@@ -1844,6 +1853,15 @@ C
       If(Abs(EigI(NU)).Gt.1.D-12) Then
 C
       Write(6,'(X,"Complex PINO Eigenvalue",I4,2E12.4)')
+     $ NU,Eig(NU),EigI(NU)
+      Eig(NU)=Zero
+      EigI(NU)=Zero
+      Do I=1,NI
+      EigVecR((NU-1)*NI+I)=Zero
+      EndDo      
+C
+      ElseIf(Abs(Eig(NU)).Lt.1.D-2) Then
+      Write(6,'(X,"Zero PINO Eigenvalue",I4,2E12.4)')
      $ NU,Eig(NU),EigI(NU)
       Eig(NU)=Zero
       Do I=1,NI

@@ -465,7 +465,6 @@ integer :: ncen
  endif
 
   if(Flags%ISERPA==2.and.Flags%ISHF==1) then
-
      call tran4_gen(NBasis,&
                       (SAPT%monA%num0+SAPT%monA%num1),SAPT%monA%CMO,&
                       NBasis,SAPT%monA%CMO,&
@@ -797,7 +796,7 @@ double precision, allocatable :: EigTmp(:), VecTmp(:)
 ! endif 
 
   ! big testing AB-CAS 
-   ACAlpha=sqrt(2d0)/2d0
+ !  ACAlpha=sqrt(2d0)/2d0
  !  call AB_CAS_mithap(ABPlus,ABMin,ECASSCF,URe,Mon%Occ,XOne,Mon%IPair,&
  !              Mon%IndN,Mon%IndX,Mon%IGem,Mon%NAct,Mon%INAct,Mon%NDimX,NBas,Mon%NDimX,&
  !              NInte1,twofile,ACAlpha)
@@ -897,6 +896,7 @@ double precision, allocatable :: EigTmp(:), VecTmp(:)
       do i=1,NBas
          if(Mon%Occ(i).gt.0d0) Mon%NDimN=Mon%NDimN+1
       enddo
+      ! print*, 'NDimN: ',Mon%NDimN
    
       allocate(ABPlus(Mon%NDim**2),ABMin(Mon%NDim**2), &
                CMAT(Mon%NDim**2),EMAT(NBas**2),EMATM(NBas**2),&
@@ -1933,6 +1933,18 @@ integer :: test
  mon%num1 = nbas - mon%num0 - mon%num2
  print*, 'TTESSSTT:', mon%num0,mon%num1,mon%num2, nbas
 
+!! test!
+! do i=1,mon%NELE
+!    mon%IndAux(i)=0
+! enddo
+! do i=1+mon%NELE,nbas
+!    mon%IndAux(i)=2
+! enddo
+!
+!mon%num0 = 2 
+!mon%num1 = 1
+!mon%num2 = nbas - mon%num0 - mon%num2
+
 ! active pairs
  allocate(mon%IPair(nbas,nbas),mon%IndX(mon%NDim),mon%IndN(2,mon%NDim))
 
@@ -1949,28 +1961,28 @@ integer :: test
           ij = ij + 1
           ind_ij = mon%IndAux(i)+mon%IndAux(j)
           if((ind_ij/=0).and.(ind_ij/=4)) then
-      !   do not correlate active degenerate orbitals from different geminals 
+             ! do not correlate active degenerate orbitals from different geminals 
              if((mon%IGem(i).ne.mon%IGem(j)).and.&
-                (mon%IndAux(i)==1).and.(mon%IndAux(j)==1).and.&
-                (Abs(mon%Occ(i)-mon%Occ(j))/mon%Occ(i).lt.1.d-2)) then
+                  (mon%IndAux(i)==1).and.(mon%IndAux(j)==1).and.&
+                  (Abs(mon%Occ(i)-mon%Occ(j))/mon%Occ(i).lt.1.d-2)) then
                   
                 write(LOUT,'(1x,a,2x,2i4)') 'Discarding nearly degenerate pair',i,j 
-              else
-                 ! if IFlCore=0 exclude core (inactive) orbitals
-                 if(Flags%IFlCore==1.or.&
-                   (Flags%IFlCore==0.and.&
-                    mon%Occ(i)/=1d0.and.mon%Occ(j)/=1d0) ) then
-      
-                    ind = ind + 1
-                    mon%IndX(ind) = ij
-                    mon%IndN(1,ind) = i
-                    mon%IndN(2,ind) = j
-                    mon%IPair(i,j) = 1
-                    mon%IPair(j,i) = 1
-      
-                 endif
-              endif
-      
+             else
+                ! if IFlCore=0 exclude core (inactive) orbitals
+                if(Flags%IFlCore==1.or.&
+                     (Flags%IFlCore==0.and.&
+                     mon%Occ(i)/=1d0.and.mon%Occ(j)/=1d0) ) then
+                   
+                   ind = ind + 1
+                   mon%IndX(ind) = ij
+                   mon%IndN(1,ind) = i
+                   mon%IndN(2,ind) = j
+                   mon%IPair(i,j) = 1
+                   mon%IPair(j,i) = 1
+                   
+                endif
+             endif
+             
           endif
    
        enddo
@@ -1986,35 +1998,35 @@ integer :: test
           ij = ij + 1
           ind_ij = mon%IndAux(i)+mon%IndAux(j)
           if((ind_ij/=0).and.(ind_ij/=4)) then
-                ! do not correlate active degenerate orbitals from different geminals 
-                if((mon%IndAux(i)==1).and.(mon%IndAux(j)==1)  & 
-                 .and.&
-                 (Abs(mon%Occ(i)-mon%Occ(j))/mon%Occ(i).lt.1.d-2) ) then
-                 ! here!!!
-                 !(Abs(mon%Occ(i)-mon%Occ(j))/mon%Occ(i).lt.0.5d-1) ) then
-               
-                   write(LOUT,'(1x,a,2x,2i4)') 'Discarding nearly degenerate pair',i,j 
-                else
-                  ! if IFlCore=0 exclude core (inactive) orbitals
-                  if(Flags%IFlCore==1.or.&
-                    (Flags%IFlCore==0.and.&
+             ! do not correlate active degenerate orbitals from different geminals 
+             if((mon%IndAux(i)==1).and.(mon%IndAux(j)==1)  & 
+                  .and.&
+                  (Abs(mon%Occ(i)-mon%Occ(j))/mon%Occ(i).lt.1.d-10) ) then
+                ! here!!!
+                !(Abs(mon%Occ(i)-mon%Occ(j))/mon%Occ(i).lt.0.5d-1) ) then
+                
+                write(LOUT,'(1x,a,2x,2i4)') 'Discarding nearly degenerate pair',i,j 
+             else
+                ! if IFlCore=0 exclude core (inactive) orbitals
+                if(Flags%IFlCore==1.or.&
+                     (Flags%IFlCore==0.and.&
                      mon%Occ(i)/=1d0.and.mon%Occ(j)/=1d0) ) then
-      
-                     ind = ind + 1
-                     mon%IndX(ind) = ind
-                     mon%IndN(1,ind) = i
-                     mon%IndN(2,ind) = j
-                     mon%IPair(i,j) = 1
-                     mon%IPair(j,i) = 1
-      
-                  endif
+                   
+                   ind = ind + 1
+                   mon%IndX(ind) = ind
+                   mon%IndN(1,ind) = i
+                   mon%IndN(2,ind) = j
+                   mon%IPair(i,j) = 1
+                   mon%IPair(j,i) = 1
+                   
                 endif
-      
+             endif
+             
           endif
-   
+          
        enddo
     enddo
-
+    
  elseif(Flags%ICASSCF==1.and.Flags%ISERPA==2) then
 
     ij=0
@@ -2025,32 +2037,31 @@ integer :: test
           ij = ij + 1
           ind_ij = mon%IndAux(i)+mon%IndAux(j)
           if((ind_ij/=0).and.(ind_ij/=4)) then
-                ! do not correlate active degenerate orbitals from different geminals 
-                !if((mon%IndAux(i)==1).and.(mon%IndAux(j)==1)  & 
-                ! .and.&
-                ! (Abs(mon%Occ(i)-mon%Occ(j))/mon%Occ(i).lt.1.d-10) ) then
-                ! write(LOUT,'(1x,a,2x,2i4)') 'Discarding nearly degenerate pair',i,j 
-                !else
-                 ! if IFlCore=0 exclude core (inactive) orbitals
-                 if(Flags%IFlCore==1.or.&
-                   (Flags%IFlCore==0.and.&
-                    mon%Occ(i)/=1d0.and.mon%Occ(j)/=1d0) ) then
-      
-                    ind = ind + 1
-                    mon%IndX(ind) = ind
-                    mon%IndN(1,ind) = i
-                    mon%IndN(2,ind) = j
-                    mon%IPair(i,j) = 1
-                    mon%IPair(j,i) = 1
-      
-                 endif
-              ! endif
-      
+             ! do not correlate active degenerate orbitals from different geminals 
+             !if((mon%IndAux(i)==1).and.(mon%IndAux(j)==1)  & 
+             ! .and.&
+             ! (Abs(mon%Occ(i)-mon%Occ(j))/mon%Occ(i).lt.1.d-10) ) then
+             ! write(LOUT,'(1x,a,2x,2i4)') 'Discarding nearly degenerate pair',i,j 
+             !else
+             ! if IFlCore=0 exclude core (inactive) orbitals
+             if(Flags%IFlCore==1.or.&
+                  (Flags%IFlCore==0.and.&
+                  mon%Occ(i)/=1d0.and.mon%Occ(j)/=1d0) ) then
+                
+                ind = ind + 1
+                mon%IndX(ind) = ind
+                mon%IndN(1,ind) = i
+                mon%IndN(2,ind) = j
+                mon%IPair(i,j) = 1
+                mon%IPair(j,i) = 1
+                
+             endif
+             ! endif
+             
           endif
-   
+          
        enddo
     enddo
- 
  
  endif
  mon%NDimX = ind
