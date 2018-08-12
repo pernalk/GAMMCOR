@@ -1784,6 +1784,30 @@ C
       EndDo
       EndDo
 C
+      Do I=1,NDimX
+      Do J=1,NDimN
+      If(Occ(J).Eq.One) Then
+      DPLUS(I,J) = Zero
+      DMIN(I,J) = Zero
+      EndIf
+      EndDo
+      EndDo
+C
+      Do I=1,NDimN
+      Do J=1,NDimN
+      If(Occ(J).Eq.One) Then
+      EPLUS(I,J) = Zero
+      EMIN(I,J) = Zero
+      EndIf
+      EndDo
+      EndDo
+C
+CC     ADDITIONAL TEST
+C      Write(*,*) 'D(E)MIN = D(E)PLUS'
+C      DMIN = DPLUS
+C      EMIN = EPLUS
+CC
+C
       Do I=1,2*(NDimX+NDimN)
       Do J=1,2*(NDimX+NDimN)
       Q1(I,J)=Zero

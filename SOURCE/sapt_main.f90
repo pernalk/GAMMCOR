@@ -580,15 +580,14 @@ integer :: j
  Eig   = 0
  Eig1  = 0
 
- Flags%IFlag0 = 1
- call Y01CAS_mithap(Mon%Occ,URe,XOne,ABPlus,ABMin, &
-      EigY,EigY1,Eig,Eig1, &
-      Mon%IndN,Mon%IndX,Mon%IGem,Mon%NAct,Mon%INAct,Mon%NDimX, &
-      NBas,Mon%NDim,NInte1,twofile,Flags%IFlag0)
+ !call Y01CAS_mithap(Mon%Occ,URe,XOne,ABPlus,ABMin, &
+ !     EigY,EigY1,Eig,Eig1, &
+ !     Mon%IndN,Mon%IndX,Mon%IGem,Mon%NAct,Mon%INAct,Mon%NDimX, &
+ !     NBas,Mon%NDim,NInte1,twofile,Flags%IFlag0)
 
-! call Y01CAS(TwoMO,Mon%Occ,URe,XOne,ABPlus,ABMin, &
-!      EigY,EigY1,Eig,Eig1, &
-!      Mon%IndN,Mon%IndX,Mon%NDimX,NBas,Mon%NDim,NInte1,NInte2,Flags%IFlag0)
+ call Y01CAS(TwoMO,Mon%Occ,URe,XOne,ABPlus,ABMin, &
+      EigY,EigY1,Eig,Eig1, &
+      Mon%IndN,Mon%IndX,Mon%NDimX,NBas,Mon%NDim,NInte1,NInte2,Flags%IFlag0)
 
 ! dump response
 ! maybe construct smarter resp-files?
@@ -795,11 +794,10 @@ double precision, allocatable :: EigTmp(:), VecTmp(:)
 !   ACAlpha=0.0000001
 ! endif 
 
-  ! big testing AB-CAS 
- !  ACAlpha=sqrt(2d0)/2d0
- !  call AB_CAS_mithap(ABPlus,ABMin,ECASSCF,URe,Mon%Occ,XOne,Mon%IPair,&
- !              Mon%IndN,Mon%IndX,Mon%IGem,Mon%NAct,Mon%INAct,Mon%NDimX,NBas,Mon%NDimX,&
- !              NInte1,twofile,ACAlpha)
+   !   ACAlpha=sqrt(2d0)/2d0
+   ! call AB_CAS_mithap(ABPlus,ABMin,ECASSCF,URe,Mon%Occ,XOne, &
+   !             Mon%IndN,Mon%IndX,Mon%IGem,Mon%NAct,Mon%INAct,Mon%NDimX,NBas,Mon%NDimX,&
+   !             NInte1,twofile,ACAlpha,.false.)
 
    call AB_CAS(ABPlus,ABMin,ECASSCF,URe,Mon%Occ,XOne,TwoMO,Mon%IPair,&
                Mon%IndN,Mon%IndX,Mon%NDimX,NBas,Mon%NDimX,NInte1,NInte2,ACAlpha)
@@ -810,38 +808,23 @@ double precision, allocatable :: EigTmp(:), VecTmp(:)
  
    !print*, 'Entering ERPAVEC...' 
    !call ERPAVEC(EigVecR,Eig,ABPlus,ABMin,NBas,Mon%NDimX)
-!
-!   i = 1
-!   dimV1 = 1
-!   space1(1,dimV1) = i
-!   tmp = Eig(i)
-!   do while(i<Mon%NDimX)
-!      i = i + 1
-!      if(abs(Eig(i)-tmp)>thresh) then
-!         space1(2,dimV1) = i-1
-!         dimV1=dimV1+1
-!         space1(1,dimV1) = i
-!         tmp=Eig(i)
-!      endif
-!   enddo
-!   space1(2,dimV1) = Mon%NDimX
+   !
 
-  if(EChck) then
+   if(EChck) then
       ECorr=0
       call ACEneERPA(ECorr,EigVecR,Eig,TwoMO,URe,Mon%Occ,XOne,&
-                     Mon%IndN,NBas,NInte1,NInte2,Mon%NDimX,Mon%NGem)
+           Mon%IndN,NBas,NInte1,NInte2,Mon%NDimX,Mon%NGem)
       ECorr=Ecorr*0.5d0
-  
+      
       write(LOUT,'(/,1x,''ECASSCF+ENuc, Corr, ERPA-CASSCF'',6x,3f15.8)') &
-            ECASSCF+Mon%PotNuc,ECorr,ECASSCF+Mon%PotNuc+ECorr
+           ECASSCF+Mon%PotNuc,ECorr,ECASSCF+Mon%PotNuc+ECorr
    endif
 
    ! uncoupled
-
-!   call test_resp_unc(Mon,URe,XOne,TwoMO,NBas,NInte1,NInte2,Flags%IFlag0) 
+   ! call test_resp_unc(Mon,URe,XOne,TwoMO,NBas,NInte1,NInte2,Flags%IFlag0) 
 
    allocate(EigY0(Mon%NDimX**2),EigY1(Mon%NDimX**2),&
-            Eig0(Mon%NDimX),Eig1(Mon%NDimX))
+        Eig0(Mon%NDimX),Eig1(Mon%NDimX))
  
    EigY0 = 0
    EigY1 = 0
@@ -854,16 +837,16 @@ double precision, allocatable :: EigTmp(:), VecTmp(:)
       Mon%IndNT(1,i) = Mon%IndN(1,i)
       Mon%IndNT(2,i) = Mon%IndN(2,i)
    enddo
-!  HERE! - started work on Y01CAS
-!   call Y01CAS_mithap(Mon%Occ,URe,XOne,ABPlus,ABMin, &
-!        EigY0,EigY1,Eig0,Eig1, &
-!        Mon%IndN,Mon%IndX,Mon%IGem,Mon%NAct,Mon%INAct,Mon%NDimX, &
-!        NBas,Mon%NDim,NInte1,twofile,Flags%IFlag0)
-  !
-!   call Y01CAS(TwoMO,Mon%Occ,URe,XOne,ABPlus,ABMin, &
-!        EigY0,EigY1,Eig0,Eig1, &
-!        !Mon%IndNT,Mon%IndX,Mon%NDimX,NBas,Mon%NDim,NInte1,NInte2,Flags%IFlag0)
-!        Mon%IndN,Mon%IndX,Mon%NDimX,NBas,Mon%NDim,NInte1,NInte2,Flags%IFlag0)
+
+   !call Y01CAS_mithap(Mon%Occ,URe,XOne,ABPlus,ABMin, &
+   !       EigY0,EigY1,Eig0,Eig1, &
+   !       Mon%IndN,Mon%IndX,Mon%IGem,Mon%NAct,Mon%INAct,Mon%NDimX, &
+   !       NBas,Mon%NDim,NInte1,twofile,Flags%IFlag0)
+   !
+   call Y01CAS(TwoMO,Mon%Occ,URe,XOne,ABPlus,ABMin, &
+        EigY0,EigY1,Eig0,Eig1, &
+        !Mon%IndNT,Mon%IndX,Mon%NDimX,NBas,Mon%NDim,NInte1,NInte2,Flags%IFlag0)
+        Mon%IndN,Mon%IndX,Mon%NDimX,NBas,Mon%NDim,NInte1,NInte2,Flags%IFlag0)
 
    ! dump uncoupled response
    call writeresp(EigY0,Eig0,propfile0)
@@ -873,13 +856,13 @@ double precision, allocatable :: EigTmp(:), VecTmp(:)
   
    deallocate(Eig1,Eig0,EigY1,EigY0)
 
-  elseif(Flags%ISERPA==2) then
-  ! TD-APSG response: GVB, CASSCF, FCI
+elseif(Flags%ISERPA==2) then
+   ! TD-APSG response: GVB, CASSCF, FCI
 
-      if(Flags%ICASSCF==1.and.MON%NELE/=1) then
-         write(LOUT,'(1x,a)') 'ERROR!!! FCI POSSIBLE ONLY FOR 2-EL MONOMERS!'
-         stop 
-      endif
+   if(Flags%ICASSCF==1.and.MON%NELE/=1) then
+      write(LOUT,'(1x,a)') 'ERROR!!! FCI POSSIBLE ONLY FOR 2-EL MONOMERS!'
+      stop 
+   endif
 
       if(Flags%ICASSCF==1.and.Flags%ISHF==0) then
         ! read 2-RDMs

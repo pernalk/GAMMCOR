@@ -1503,7 +1503,7 @@ endif
  e2ds = e2du + (16*e2ds2-32*e2ds1)*1000
 
  e2dw12 = -16*e2dw12*1000
- print*, -32*e2dw12_sp
+ ! print*, -32*e2dw12_sp
  e2dsApp = e2dw12 -32*e2dw12_sp*1000
 
 
@@ -2260,7 +2260,7 @@ print*, 'PART1: ',-16d0*e2d1*1000d0
     enddo
  enddo
  
- print*, 'tmp1', norm2(tmp1(1:2*ADimEx,1:B%NDimN))
+! print*, 'tmp1', norm2(tmp1(1:2*ADimEx,1:B%NDimN))
 !
  tmp2=0
  do j=1,2*BDimEx
@@ -2279,7 +2279,7 @@ print*, 'PART1: ',-16d0*e2d1*1000d0
     endif
  enddo
 
- print*, 'tmp2: ',norm2(tmp2)
+! print*, 'tmp2: ',norm2(tmp2)
 
  e2d4 = 0d0
  do j=1,2*BDimEx

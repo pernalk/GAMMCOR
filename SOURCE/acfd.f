@@ -947,7 +947,7 @@ C
       EndDo
 C
 C
-      Write(*,*) 'HNO-Ka',norm2(HNO)
+Cmh      Write(*,*) 'HNO-Ka',norm2(HNO)
 C
 C     CONSTRUCT TWO-ELECTRON PART OF THE AC ALPHA-HAMILTONIAN      
 C
@@ -1102,17 +1102,17 @@ C      If(NDimB.Ne.0)
 C     $ Write(*,*) 'AB0-Ka',norm2(ABPLUS(1:NDimB**2)),
 C     $     norm2(ABMIN(1:NDimB**2))
 C
-      write(*,*) 'AB+',
-     $     norm2(reshape(ABPLUS(1:NDimB**2),shape=[NDimB,NDimB])
-     $     -transpose(reshape(ABPLUS(1:NDimB**2),shape=[NDimB,NDimB])))
+C      write(*,*) 'AB+',
+C     $     norm2(reshape(ABPLUS(1:NDimB**2),shape=[NDimB,NDimB])
+C     $     -transpose(reshape(ABPLUS(1:NDimB**2),shape=[NDimB,NDimB])))
 C      write(*,*) 'AB-',norm2(ABMIN(1:nAA,1:nAA)-transpose(ABMIN(1:nAA,1:nAA)))
 C      
       If(NDimB.Ne.0)
      $Call ERPASYMM0(EigY(NFree2),EigX(NFree2),Eig(NFree1),ABPLUS,ABMIN,
      $ NDimB)      
 C
-      Write(*,*) 'EigY,X,val',norm2(EigY(NFree2:NDimB**2)),
-     $ norm2(EigX(NFree2:NDimB**2))
+Cmh      Write(*,*) 'EigY,X,val',norm2(EigY(NFree2:NDimB**2)),
+Cmh     $ norm2(EigX(NFree2:NDimB**2))
 C      
       NoEig=NoEig+NDimB
       NFree1=NoEig+1
@@ -1347,7 +1347,7 @@ C
       EndDo
 C
       If(IFlag0.Eq.1) Then
-C
+C     
       Do I=1,NFree2
       EigY1(I)=EigY(I)
       EndDo
@@ -1406,6 +1406,9 @@ C
 C
       Write(6,'(" *** DONE WITH COMPUTING AB(1) MATRICES ***")')
 C
+Cmh      Write(*,*) 'EigY-Ka1',norm2(EigY)
+Cmh      Write(*,*) 'EigX-Ka1',norm2(EigX)
+C
 C     1ST-ORDER PART
 C
       Do NU=1,NoEig
@@ -1439,6 +1442,9 @@ C
 C
       EndDo
       EndDo
+
+C
+Cmh       Write(*,*) 'YABpY-Ka1',norm2(ABPLUS)
 C
       Do NU=1,NoEig
       Do MU=1,NoEig
@@ -1471,7 +1477,8 @@ C
 C
       EndDo
       EndDo
-C
+Cmh       Write(*,*) 'YABmY-Ka1',norm2(ABMIN)
+C     
       EigY1(1:NoEig*NoEig)=Zero
       Do MU=1,NoEig
 C
@@ -1490,10 +1497,10 @@ C
       Aux2=Zero
 c herer!!!
 C      If((MU.Ne.NU).And.(Abs(Eig(MU)-Eig(NU)).Gt.1.D-5)) Aux2=
-      If((MU.Ne.NU).And.(Abs(Eig(MU)-Eig(NU)).Gt.1.D-12)) Aux2=
-c      If(MU.Ne.NU) Aux2= 
+      If(Abs(Eig(MU)-Eig(NU)).Gt.1.D-12) Aux2=
+Cmh      If((MU.Ne.NU).And.(Abs(Eig(MU)-Eig(NU)).Gt.1.D-12)) Aux2=
      $  (ABPLUS(MU+(NU-1)*NoEig)+ABMIN(MU+(NU-1)*NoEig))/
-     $ (Eig(MU)-Eig(NU))
+     $     (Eig(MU)-Eig(NU))
 C
       EigY1(I+(MU-1)*NoEig)=EigY1(I+(MU-1)*NoEig)+
      $(Aux1+Aux2)*EigY(IStart+II)
@@ -1540,7 +1547,7 @@ C
       EndDo
       EndDo
 C NEW 11/07/2018
-C
+C     
 C     SORT Y0 AND Y1 ACCORDING TO IndN
 C
       Call CpyM(ABPLUS,EigY,NDimX) 
@@ -1555,6 +1562,9 @@ C
 C
       EndDo
 C
+      Write(*,*) 'EigY1-Ka1',norm2(EigY1)     
+Cmh      Write(*,*) 'EigY-Ka ',norm2(EigY)
+C     
       Return
       End
 
@@ -1643,6 +1653,8 @@ C
       EndDo
       EndDo
 C
+C      Write(*,*) 'HNO-Ka1',norm2(HNO)
+C
       NAct=NAcCAS
       INActive=NInAcCAS
       NOccup=INActive+NAct
@@ -1666,6 +1678,9 @@ C     If(IGFact(NAddr3(IT,IT,IP,IQ)).Eq.0) Then
       EndDo
       EndDo
       EndDo
+C
+C      Write(*,*) 'AuxI-Ka1',norm2(AuxI)
+C      Write(*,*) 'AuxIO-Ka1',norm2(AuxIO)
 C
 C     AUXILIARY MATRIX WMAT
 C
@@ -1698,6 +1713,8 @@ C
       EndDo
       EndDo
 C
+C      Write(*,*) 'WMAT-Ka1',norm2(WMAT)
+C
       icount=0
       Call CPU_TIME(START_TIME)
       Do IRow=1,NoEig
@@ -1705,25 +1722,27 @@ C
       IR=IndBlock(1,IRow)
       IS=IndBlock(2,IRow)
 C
-      Do ICol=1,IRow
+C      TURN OFF SYMMETRIZE !
+Cmh      Do ICol=1,IRow
+      Do ICol=1,NoEig     
 C
       IPP=IndBlock(1,ICol)
       IQQ=IndBlock(2,ICol)
 C
-      If( .NOT.(IGem(IR).Eq.IGem(IS).And.IGem(IR).Eq.IGem(IPP)
-     $ .And.IGem(IR).Eq.IGem(IQQ)) ) Then
+Cmh      If( .NOT.(IGem(IR).Eq.IGem(IS).And.IGem(IR).Eq.IGem(IPP)
+Cmh     $ .And.IGem(IR).Eq.IGem(IQQ)) ) Then
+CmhC
+Cmh      If( (Occ(IR)*Occ(IS).Eq.Zero.And.Occ(IPP)*Occ(IQQ).Eq.Zero
+Cmh     $ .And.Abs(TwoNO(NAddr3(IR,IS,IPP,IQQ))).Lt.1.D-7)
+Cmh     $.Or.
+Cmh     $((Occ(IR).Eq.One.Or.Occ(IS).Eq.One)
+Cmh     $ .And.
+Cmh     $ (Occ(IPP).Eq.One.Or.Occ(IQQ).Eq.One)
+Cmh     $ .And.Abs(TwoNO(NAddr3(IR,IS,IPP,IQQ))).Lt.1.D-7)) Then
+CmhC
+Cmh      icount=icount+1
 C
-      If( (Occ(IR)*Occ(IS).Eq.Zero.And.Occ(IPP)*Occ(IQQ).Eq.Zero
-     $ .And.Abs(TwoNO(NAddr3(IR,IS,IPP,IQQ))).Lt.1.D-7)
-     $.Or.
-     $((Occ(IR).Eq.One.Or.Occ(IS).Eq.One)
-     $ .And.
-     $ (Occ(IPP).Eq.One.Or.Occ(IQQ).Eq.One)
-     $ .And.Abs(TwoNO(NAddr3(IR,IS,IPP,IQQ))).Lt.1.D-7)) Then
-C
-      icount=icount+1
-C
-      Else  
+Cmh      Else  
 C
       Do IP=IQQ,IPP,IPP-IQQ
       Do IQ=IQQ,IPP,IPP-IQQ
@@ -1737,7 +1756,6 @@ C
       If(IP.Eq.IR) Arspq=Arspq+(Occ(IP)-Occ(IS))*HNO(IQS)
       If(IS.Eq.IQ) Arspq=Arspq+(Occ(IQ)-Occ(IR))*HNO(IPR)
 C
-C     HERE!!!
       AuxTwoPQRS=Zero
 C     If(IGFact(NAddr3(IP,IQ,IR,IS)).Eq.0) AuxTwoPQRS=One
       If(AuxCoeff(IGem(IP),IGem(IQ),IGem(IR),IGem(IS)).Eq.0)
@@ -1887,9 +1905,9 @@ C     end of IP,IQ LOOPS
       EndDo
 C
  1000 Continue
-      EndIf
-c     If IGem ....
-      EndIf
+Cmh      EndIf
+Cmhc     If IGem ....
+Cmh      EndIf
 C
       EndDo
       EndDo
@@ -1903,8 +1921,9 @@ C
       Do I=1,NoEig
       IP=IndBlock(1,I)
       IQ=IndBlock(2,I)
-c      Do J=1,NoEig
-      Do J=1,I
+C     TURN OFF SYM! for testing
+      Do J=1,NoEig
+Cmh      Do J=1,I
       IR=IndBlock(1,J)
       IS=IndBlock(2,J)
 C
@@ -1915,11 +1934,14 @@ C
      $ ABMIN(I+(J-1)*NoEig)=ABMIN(I+(J-1)*NoEig)
      $/(C(IP)-C(IQ))/(C(IR)-C(IS))
 C
-      ABPLUS(J+(I-1)*NoEig)=ABPLUS(I+(J-1)*NoEig)
-      ABMIN(J+(I-1)*NoEig)=ABMIN(I+(J-1)*NoEig)
+C    TURN OFF SYM! for testing
+Cmh      ABPLUS(J+(I-1)*NoEig)=ABPLUS(I+(J-1)*NoEig)
+Cmh      ABMIN(J+(I-1)*NoEig)=ABMIN(I+(J-1)*NoEig)
 C
       EndDo
       EndDo
+C
+      Write(*,*) 'ABPlus-Ka1',norm2(ABPLUS),'ABMin-Ka1',norm2(ABMIN)
 C
       Return
       End
