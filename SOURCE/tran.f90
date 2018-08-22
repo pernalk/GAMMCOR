@@ -640,7 +640,7 @@ end subroutine sq_symmetrize
 
 subroutine AB_CAS_mithap(ABPLUS,ABMIN,ETot,URe,Occ,XOne, &
      IndN,IndX,IGemIN,NAct,INActive,NDimX,NBasis,NDim,NInte1,IntFileName,ACAlpha,&
-     Test)
+     AB1)
 !
 ! COMPUTE THE A+B AND A-B MATRICES FOR 2-RDM READ FROM A rdm2.dat FILE
 ! 
@@ -658,7 +658,7 @@ double precision,intent(out) :: ETot
 double precision,intent(in)  :: URe(NBasis,NBasis),Occ(NBasis),XOne(NInte1)
 integer,intent(in) :: IndN(2,NDim),IndX(NDim),IGemIN(NBasis)
 double precision,intent(in)  :: ACAlpha
-logical,intent(in) :: Test
+logical,intent(in) :: AB1
 
 integer :: i,j,k,l,ij,kl,kk,ll,klround
 integer :: ip,iq,ir,is,it,iu,iw,ipq,irs,ICol,IRow
@@ -736,13 +736,13 @@ do i=1,NOccup
 enddo
 ETot = ETot + 2*val
 
-if(Test) then
+if(AB1) then
    do j=1,NBasis
       do i=1,NBasis
          if(IGem(i)/=IGem(j)) HNO(i,j) = ACAlpha*HNO(i,j)
          if(IGem(i)==IGem(j)) HNO(i,j) = 0
       enddo
-enddo
+   enddo
 else
    do j=1,NBasis
       do i=1,NBasis
@@ -755,13 +755,12 @@ AuxInd = 0
 AuxInd(1:2,1:2) = 1
 AuxInd(2,2) = 2
 
-if(Test) then
+if(AB1) then
    do l=1,3
       do k=1,3
          do j=1,3
             do i=1,3
                if((i==j).and.(j==k).and.(k==l)) then
-                  !AuxCoeff(i,j,k,l) = 1
                   AuxCoeff(i,j,k,l) = 0
                else
                   AuxCoeff(i,j,k,l) = ACAlpha
@@ -795,7 +794,7 @@ AuxI  = 0
 AuxIO = 0
 WMAT  = 0
 
-if(Test) then
+if(AB1) then
    HNOCoef = -1
 else
    HNOCoef = 1 - ACAlpha
@@ -831,16 +830,12 @@ do ll=1,NBasis
             do i=1,NBasis
                if(IGem(i)/=IGem(k)) val = val + Occ(i)*ints(i,i)
             enddo
-            !val = 2*(1-ACAlpha)*val
-            !val = -2*val
             val = 2*HNOCoef*val
             HNO(k,l) = HNO(k,l) + val
             
          ! exchange
          else
 
-            !val = (1-ACAlpha)*Occ(k)
-            !val = -Occ(k)
             val = HNOCoef*Occ(k)
             do i=1,NBasis
                if(IGem(i)==IGem(l)) HNO(i,l) = HNO(i,l) - val*ints(i,k)
@@ -1320,7 +1315,7 @@ do ICol=1,NDimX
                val = val + Occ(iq)*AuxIO(ip,is)
             end select
          endif
-
+         
          if(ip==is) then
             val = val + (Occ(ip)-Occ(ir))*HNO(iq,ir) - WMAT(iq,ir)
             select case(AuxInd(IGem(ip),IGem(is)))
@@ -1464,7 +1459,6 @@ enddo
 
 deallocate(RDM2Act)
 
-
 call triang_to_sq(XOne,work1,NBasis)
 call dgemm('N','N',NBasis,NBasis,NBasis,1d0,URe,NBasis,work1,NBasis,0d0,work2,NBasis)
 call dgemm('N','T',NBasis,NBasis,NBasis,1d0,work2,NBasis,URe,NBasis,0d0,HNO,NBasis)
@@ -1523,7 +1517,6 @@ do i=1,NDimX
        nIV = nIV + 1
        tmpIV(nIV) = i
    endif
-!   pos(IndN(1,i),IndN(2,i)) = IndX(i)
 enddo
 
 pos = 0
@@ -1605,7 +1598,6 @@ do ll=1,NBasis
             do i=1,NBasis
                if(IGem(i)/=IGem(k)) val = val + Occ(i)*ints(i,i)
             enddo
-            ! val = 2*(1-ACAlpha)*val
             HNO(k,l) = HNO(k,l) + 2*val
 
          ! exchange
@@ -2047,7 +2039,6 @@ do ICol=1,NDimX
    ir = IndN(1,ICol)
    is = IndN(2,ICol)
    irs = pos(ir,is)
-!   if(ir/=is) then
       
       do IRow=1,NDimX
          ip = IndN(1,IRow)
@@ -2126,7 +2117,6 @@ do ICol=1,NDimX
          
       enddo
 
-!   endif
 enddo
 
 EigY1 = 0
@@ -2138,72 +2128,73 @@ j = limAA(2)
 !!$write(*,*) 'AB+',norm2(ABPLUS(i:j,i:j)-transpose(ABPLUS(i:j,i:j)))
 !!$write(*,*) 'AB-',norm2(ABMIN(i:j,i:j)-transpose(ABMIN(i:j,i:j)))
 
-allocate(ABP(nAA,nAA),ABM(nAA,nAA),EigYt(nAA,nAA),EigXt(nAA,nAA),Eigt(nAA))
-ABP = ABPLUS(i:j,i:j)
-ABM = ABMIN(i:j,i:j)
-!call ERPASYMM0(EigYt,EigXt,Eigt,ABPLUS(i:j,i:j),ABMIN(i:j,i:j),nAA)
-call ERPASYMM0(EigYt,EigXt,Eigt,ABP,ABM,nAA)
-!write(*,*) 'EigYaa',norm2(EigYt),norm2(EigXt),norm2(Eigt)
+if(nAA>0) then
+   allocate(ABP(nAA,nAA),ABM(nAA,nAA),EigYt(nAA,nAA),EigXt(nAA,nAA),Eigt(nAA))
 
-do ii=1,nAA
-   ipos = tmpAA(ii)
-   EigY(ipos,i:j) = EigYt(ii,1:nAA)
-   if(IFlag0==0) EigY1(ipos,i:j) = EigXt(ii,1:nAA)
-enddo
-Eig(i:j) = Eigt(1:nAA)
+   ABP = ABPLUS(i:j,i:j)
+   ABM = ABMIN(i:j,i:j)
+   call ERPASYMM0(EigYt,EigXt,Eigt,ABP,ABM,nAA)
+   
+   do ii=1,nAA
+      ipos = tmpAA(ii)
+      EigY(ipos,i:j) = EigYt(ii,1:nAA)
+      if(IFlag0==0) EigY1(ipos,i:j) = EigXt(ii,1:nAA)
+   enddo
+   Eig(i:j) = Eigt(1:nAA)
 
-deallocate(Eigt,EigXt,EigYt,ABM,ABP)
+   deallocate(Eigt,EigXt,EigYt,ABM,ABP)
 
-do iq=1,INActive
-   i = limAI(1,iq)
-   j = limAI(2,iq)
+   do iq=1,INActive
+      i = limAI(1,iq)
+      j = limAI(2,iq)
+
 !!$   write(*,*) 'ABai-my',iq,norm2(ABPLUS(i:j,i:j)),norm2(ABMIN(i:j,i:j))
 !!$   write(*,*) 'AB+',iq,norm2(ABPLUS(i:j,i:j)-transpose(ABPLUS(i:j,i:j)))
 !!$   write(*,*) 'AB-',iq,norm2(ABMIN(i:j,i:j)-transpose(ABMIN(i:j,i:j)))
 
-   allocate(ABP(nAI(iq),nAI(iq)),ABM(nAI(iq),nAI(iq)),&
-        EigYt(nAI(iq),nAI(iq)),EigXt(nAI(iq),nAI(iq)),Eigt(nAI(iq)))
-   ABP = ABPLUS(i:j,i:j)
-   ABM = ABMIN(i:j,i:j)
-   ! call ERPASYMM0(EigYt,EigXt,Eigt,ABPLUS(i:j,i:j),ABMIN(i:j,i:j),nAI(iq))
-   call ERPASYMM0(EigYt,EigXt,Eigt,ABP,ABM,nAI(iq))
-   ! write(*,*) 'EigYai',norm2(EigYt),norm2(EigXt),norm2(Eigt)
-   do ii=1,nAI(iq)
-      ipos = tmpAI(ii,iq)
-      EigY(ipos,i:j) = EigYt(ii,1:nAI(iq))
-      if(IFlag0==0) EigY1(ipos,i:j) = EigXt(ii,1:nAI(iq))
+      allocate(ABP(nAI(iq),nAI(iq)),ABM(nAI(iq),nAI(iq)),&
+           EigYt(nAI(iq),nAI(iq)),EigXt(nAI(iq),nAI(iq)),Eigt(nAI(iq)))
+
+      ABP = ABPLUS(i:j,i:j)
+      ABM = ABMIN(i:j,i:j)
+      call ERPASYMM0(EigYt,EigXt,Eigt,ABP,ABM,nAI(iq))
+   
+      do ii=1,nAI(iq)
+         ipos = tmpAI(ii,iq)
+         EigY(ipos,i:j) = EigYt(ii,1:nAI(iq))
+         if(IFlag0==0) EigY1(ipos,i:j) = EigXt(ii,1:nAI(iq))
+      enddo
+      Eig(i:j) = Eigt(1:nAI(iq))
+      
+      deallocate(Eigt,EigXt,EigYt,ABM,ABP)
+      
    enddo
-   Eig(i:j) = Eigt(1:nAI(iq))
 
-   deallocate(Eigt,EigXt,EigYt,ABM,ABP)
-
-enddo
-
-do ip=NOccup+1,NBasis
-   i = limAV(1,ip)
-   j = limAV(2,ip)
+   do ip=NOccup+1,NBasis
+      i = limAV(1,ip)
+      j = limAV(2,ip)
 !!$   write(*,*) 'ABav-my',ip,norm2(ABPLUS(i:j,i:j)),norm2(ABMIN(i:j,i:j))
 !!$   write(*,*) 'AB+',ip,norm2(ABPLUS(i:j,i:j)-transpose(ABPLUS(i:j,i:j)))
 !!$   write(*,*) 'AB-',ip,norm2(ABMIN(i:j,i:j)-transpose(ABMIN(i:j,i:j)))
 
-   allocate(ABP(nAV(ip),nAV(ip)),ABM(nAV(ip),nAV(ip)),&
-        EigYt(nAV(ip),nAV(ip)),EigXt(nAV(ip),nAV(ip)),Eigt(nAV(ip)))
-!!$   ABP(1:nAV(ip),1:nAV(ip)) = ABPLUS(i:j,i:j)
-!!$   ABM(1:nAV(ip),1:nAV(ip)) = ABMIN(i:j,i:j)
-   ABP = ABPLUS(i:j,i:j)
-   ABM = ABMIN(i:j,i:j)
-   !call ERPASYMM0(EigYt,EigXt,Eigt,ABPLUS(i:j,i:j),ABMIN(i:j,i:j),nAV(ip))
-   call ERPASYMM0(EigYt,EigXt,Eigt,ABP,ABM,nAV(ip))
-   ! write(*,*) 'EigYav',norm2(EigYt),norm2(EigXt),norm2(Eigt)
-   do ii=1,nAV(ip)
-      ipos = tmpAV(ii,ip)
-      EigY(ipos,i:j) = EigYt(ii,1:nAV(ip))
-      if(IFlag0==0) EigY1(ipos,i:j) = EigXt(ii,1:nAV(ip))
-   enddo
-   Eig(i:j) = Eigt(1:nAV(ip))
+      allocate(ABP(nAV(ip),nAV(ip)),ABM(nAV(ip),nAV(ip)),&
+           EigYt(nAV(ip),nAV(ip)),EigXt(nAV(ip),nAV(ip)),Eigt(nAV(ip)))
+
+      ABP = ABPLUS(i:j,i:j)
+      ABM = ABMIN(i:j,i:j)
+      call ERPASYMM0(EigYt,EigXt,Eigt,ABP,ABM,nAV(ip))
+
+      do ii=1,nAV(ip)
+         ipos = tmpAV(ii,ip)
+         EigY(ipos,i:j) = EigYt(ii,1:nAV(ip))
+         if(IFlag0==0) EigY1(ipos,i:j) = EigXt(ii,1:nAV(ip))
+      enddo
+      Eig(i:j) = Eigt(1:nAV(ip))
    
-   deallocate(Eigt,EigXt,EigYt,ABM,ABP)
-enddo
+      deallocate(Eigt,EigXt,EigYt,ABM,ABP)
+      
+   enddo
+endif
 
 do i=limIV(1),limIV(2)
    ii = tmpIV(i-limIV(1)+1)
@@ -2220,25 +2211,24 @@ enddo
 
 deallocate(work1)
 
+if(IFlag0==1) return
+
+
 ! AB(1) PART
 call AB_CAS_mithap(ABPLUS,ABMIN,EnDummy,URe,Occ,XOne,&
               IndN,IndX,IGem,NAct,INActive,NDimX,NBasis,NDimX,&
               NInte1,IntFileName,1d0,.true.)
 
-!write(*,*) 'AB1-my',norm2(ABPLUS),"AB1-my",norm2(ABMIN)
-
 allocate(work1(NDimX**2))
-! work1=ABMIN.EigX
+! work1=ABPLUS.EigX
 ! ABPLUS=work1.EigX
 call dgemm('N','N',NDimX,NDimX,NDimX,1d0,ABPLUS,NDimX,EigY1,NDimX,0d0,work1,NDimX) 
 call dgemm('T','N',NDimX,NDimX,NDimX,1d0,work1,NDimX,EigY1,NDimX,0d0,ABPLUS,NDimX)
-!print*, 'YABpY-my',norm2(ABPLUS)
 
 ! work1=ABMIN.EigY
 ! ABMIN=work1.EigY
 call dgemm('N','N',NDimX,NDimX,NDimX,1d0,ABMIN,NDimX,EigY,NDimX,0d0,work1,NDimX) 
 call dgemm('T','N',NDimX,NDimX,NDimX,1d0,work1,NDimX,EigY,NDimX,0d0,ABMIN,NDimX)
-!print*, 'YAmY-my',norm2(ABMIN)
 
 do i=1,NDimX
    Eig1(i)=ABPLUS(i,i)+ABMIN(i,i)
@@ -2291,6 +2281,165 @@ deallocate(RDM2val)
 deallocate(ints,work2,work1)
 
 end subroutine Y01CAS_mithap
+
+subroutine ACABMAT0_mithap(AMAT,BMAT,URe,Occ,XOne,IGem,C, &
+               NAct,INActive,NBasis,NDim,NInte1,NGem,IntFileName,ISAPT,ACAlpha,IFlag)
+!     IFlag = 1 - AMAT AND BMAT WILL CONTAIN (A+B)/C+/C+ AND (A-B)/C-/C-, RESPECTIVELY
+!             0 - AMAT AND BMAT WILL CONTAIN A ANB B MATRICES, RESPECTIVELY
+!
+!     ACAlpha - Alpha-connection parameter in AC
+!     HNO AND TwoMO are modified to correspond to an alpha-Hamiltonian
+!
+!     STRAIGHTFORWARD IMPLEMENTATION OF THE AMAT AND BMAT DEFINITIONS (NO SPECIAL CASES CONSIDERED) 
+!     
+!     COMPUTE THE A+B AND A-B MATRICES IN ERPA WITH APSG APPROXIMATION
+!
+!     NESTED COMMUTATOR 
+!
+implicit none
+
+integer,intent(in) :: NAct,INActive,NBasis,NDim,NInte1,ISAPT,NGem
+character(*) :: IntFileName
+double precision,intent(out) :: AMAT(NDim,NDim),BMAT(NDim,NDim)
+double precision,intent(in)  :: URe(NBasis,NBasis),Occ(NBasis),XOne(NInte1),C(NBasis)
+double precision,intent(in)  :: ACAlpha
+integer,intent(in) :: IGem(NBasis),IFlag
+
+integer :: i,j,k,l,ij,kl,kk,ll,klround
+integer :: ip,iq,ir,is,it,iu,iw,ipq,irs,ICol,IRow
+integer :: iunit,ios
+integer :: NOccup
+integer :: Ind(NBasis),AuxInd(3,3),pos(NBasis,NBasis)
+!double precision :: C(NBasis)
+double precision :: HNO(NBasis,NBasis),HNOCoef
+double precision :: AuxCoeff(NGem,NGem,NGem,NGem),AuxVal,val
+double precision,allocatable :: work1(:),work2(:)
+double precision,allocatable :: ints(:,:)
+
+print*, 'Wszystko od nowa!'
+if(ISAPT==1) then
+   write(6,'(1x,a)') 'Computing response-my'
+else
+   write(6,'(/,X,"***** COMPUTING AMAT, BMAT IN ACABMAT0 *****",/)')
+endif
+
+AMAT = 0
+BMAT = 0
+
+! set dimensions
+NOccup = NAct + INActive
+
+allocate(work1(NBasis**2),work2(NBasis**2),ints(NBasis,NBasis))
+
+call triang_to_sq(XOne,work1,NBasis)
+call dgemm('N','N',NBasis,NBasis,NBasis,1d0,URe,NBasis,work1,NBasis,0d0,work2,NBasis)
+call dgemm('N','T',NBasis,NBasis,NBasis,1d0,work2,NBasis,URe,NBasis,0d0,HNO,NBasis)
+call sq_symmetrize(HNO,NBasis)
+
+do j=1,NBasis
+   do i=1,NBasis
+      if(IGem(i)/=IGem(j)) HNO(i,j) = ACAlpha*HNO(i,j)
+   enddo
+enddo
+
+do l=1,NGem
+   do k=1,NGem
+      do j=1,NGem
+         do i=1,NGem
+            if((i==j).and.(j==k).and.(k==l)) then
+               AuxCoeff(i,j,k,l) = 1
+            else
+               AuxCoeff(i,j,k,l) = ACAlpha
+            endif
+         enddo
+      enddo
+   enddo
+enddo
+
+HNOCoef = 1 - ACAlpha
+
+open(newunit=iunit,file=trim(IntFileName),status='OLD', &
+     access='DIRECT',recl=8*NBasis*(NBasis+1)/2)
+
+kl = 0
+do ll=1,NBasis
+   do kk=1,ll
+      kl = kl + 1
+      read(iunit,rec=kl) work1(1:NBasis*(NBasis+1)/2)
+      call triang_to_sq2(work1,ints,NBasis)
+      do klround=1,merge(1,2,kk==ll)
+         select case(klround)
+         case(1)
+            k = kk
+            l = ll
+         case(2)
+            k = ll
+            l = kk
+         end select
+
+! CONSTRUCT ONE-ELECTRON PART OF THE AC ALPHA-HAMILTONIAN
+         ! Coulomb
+         if(IGem(k)==IGem(l)) then
+
+            val = 0
+            do i=1,NBasis
+               if(IGem(i)/=IGem(k)) val = val + Occ(i)*ints(i,i)
+            enddo
+            val = 2*HNOCoef*val
+            HNO(k,l) = HNO(k,l) + val
+            
+            ! exchange
+         else
+
+            val = HNOCoef*Occ(k)
+            do i=1,NBasis
+               if(IGem(i)==IGem(l)) HNO(i,l) = HNO(i,l) - val*ints(i,k)
+            enddo
+
+         endif
+         
+      enddo
+   enddo
+enddo
+
+close(iunit)
+
+ipq = 0
+do ip=2,NBasis
+   do iq=1,ip-1
+      ipq = ipq + 1
+
+      irs = 0
+      do ir=2,NBasis
+         do is=1,ir-1
+            irs = irs + 1
+            
+            val = 0
+            if(iq==ir) val = val + (Occ(ir)-Occ(is))*HNO(ip,is)
+            if(ip==is) val = val - (Occ(ir)-Occ(is))*HNO(iq,ir)
+            BMAT(irs,ipq) = BMAT(irs,ipq) + val
+
+            val = 0
+            if(ip==ir) val = val + (Occ(ir)-Occ(is))*HNO(iq,is)
+            if(iq==is) val = val - (Occ(ir)-Occ(is))*HNO(ip,ir)
+            AMAT(irs,ipq) = AMAT(irs,ipq) + val
+            
+         enddo
+      enddo
+   enddo
+enddo
+
+print*, "AB-my",norm2(AMAT),norm2(BMAT)
+
+call sq_to_triang2(HNO,work1,NBasis)
+write(LOUT,*) 'HNO-my', norm2(work1(1:NBasis*(NBasis+1)/2))
+HNO=transpose(HNO)
+call sq_to_triang2(HNO,work1,NBasis)
+write(LOUT,*) 'HNO-tr', norm2(work1(1:NBasis*(NBasis+1)/2))
+
+deallocate(ints,work2,work1)
+
+end subroutine ACABMAT0_mithap
 
 end module
 

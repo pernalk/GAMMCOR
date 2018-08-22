@@ -662,7 +662,8 @@ double precision, allocatable :: work1(:),work2(:),XOne(:),TwoMO(:)
 double precision, allocatable :: ABPlus(:), ABMin(:), URe(:,:), &
                                  CMAT(:),EMAT(:),EMATM(:), &
                                  DMAT(:),DMATK(:), &
-                                 EigVecR(:), Eig(:)
+                                 EigVecR(:), Eig(:), &
+                                 ABPlusT(:), ABMinT(:)
 double precision, allocatable :: Eig0(:), Eig1(:), EigY0(:), EigY1(:) 
 double precision :: Dens(NBas,NBas)
 double precision,parameter :: One = 1d0, Half = 0.5d0
@@ -750,9 +751,28 @@ double precision, allocatable :: EigTmp(:), VecTmp(:)
    allocate(ABPlus(Mon%NDim**2),ABMin(Mon%NDim**2), &
             EigVecR(Mon%NDimX**2),Eig(Mon%NDimX))
 
-   call ACABMAT0(ABPlus,ABMin,URe,Mon%Occ,XOne,TwoMO, &
-                 NBas,Mon%NDim,NInte1,NInte2,Mon%NGem,ACAlpha,1)
-  
+
+! HERE: STARTED WORK ON ACABMAT0_mithap!
+!   ACAlpha=sqrt(2d0)/2.d0
+   call ACABMAT0_mithap(ABPlus,ABMin,URe,Mon%Occ,XOne,Mon%IGem,Mon%CICoef, &
+                 Mon%NAct,Mon%INAct,NBas,Mon%NDim,NInte1,Mon%NGem,&
+                 twofile,Flags%ISAPT,ACAlpha,1)
+!   allocate(ABPlusT(Mon%NDim**2),ABMinT(Mon%NDim**2))
+!   call ACABMAT0(ABPlusT,ABMinT,URe,Mon%Occ,XOne,TwoMO, &
+!!   call ACABMAT0(ABPlus,ABMin,URe,Mon%Occ,XOne,TwoMO, &
+!                 NBas,Mon%NDim,NInte1,NInte2,Mon%NGem,ACAlpha,1)
+
+!   write(*,*) 'DUPA_PLUS',norm2(ABPlus),norm2(ABPlusT)
+!   write(*,*) 'DUPA_MIN',norm2(ABMin),norm2(ABMinT)
+!   write(*,*) 'ABPLUS: ',norm2(ABPlus-ABPlusT)
+!   write(*,*) 'ABMIN: ',norm2(ABMin-ABMinT)
+
+!   do j=1,Mon%NDim**2
+!      write(*,*) j,ABPlus(j),ABPlusT(j)
+!   enddo
+   
+!   deallocate(ABMinT,ABPlusT)
+   
    ! reduce dim
    call reduce_dim('AB',ABPlus,ABMin,Mon)
 
@@ -795,12 +815,12 @@ double precision, allocatable :: EigTmp(:), VecTmp(:)
 ! endif 
 
    !   ACAlpha=sqrt(2d0)/2d0
-   ! call AB_CAS_mithap(ABPlus,ABMin,ECASSCF,URe,Mon%Occ,XOne, &
-   !             Mon%IndN,Mon%IndX,Mon%IGem,Mon%NAct,Mon%INAct,Mon%NDimX,NBas,Mon%NDimX,&
-   !             NInte1,twofile,ACAlpha,.false.)
+    call AB_CAS_mithap(ABPlus,ABMin,ECASSCF,URe,Mon%Occ,XOne, &
+                Mon%IndN,Mon%IndX,Mon%IGem,Mon%NAct,Mon%INAct,Mon%NDimX,NBas,Mon%NDimX,&
+                NInte1,twofile,ACAlpha,.false.)
 
-   call AB_CAS(ABPlus,ABMin,ECASSCF,URe,Mon%Occ,XOne,TwoMO,Mon%IPair,&
-               Mon%IndN,Mon%IndX,Mon%NDimX,NBas,Mon%NDimX,NInte1,NInte2,ACAlpha)
+   !call AB_CAS(ABPlus,ABMin,ECASSCF,URe,Mon%Occ,XOne,TwoMO,Mon%IPair,&
+   !            Mon%IndN,Mon%IndX,Mon%NDimX,NBas,Mon%NDimX,NInte1,NInte2,ACAlpha)
 
    EigVecR = 0
    Eig = 0

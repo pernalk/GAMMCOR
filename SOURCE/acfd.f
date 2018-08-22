@@ -2587,7 +2587,9 @@ C      write(*,*) XOne(1:NBasis)
 C      Do I=1,NBasis
 C      Write(6,*) XOne(I*(I-1)/2+I)
 C      EndDo
-
+C
+      Write(*,*) 'NGem',NGem
+C
       Do I=1,NDim
       Do J=1,NDim
       AMAT(I,J)=Zero
@@ -2616,7 +2618,9 @@ C
 C
       EndDo
       EndDo
-C
+
+C      
+C      
 C     CONSTRUCT ONE-ELECTRON PART OF AC ALPHA-HAMILTONIAN
 C
       IJ=0
@@ -2647,6 +2651,9 @@ C
       EndDo
       EndDo
 C
+C     TESTUMY
+      Write(*,*) 'HNO-Ka',norm2(HNO)
+C      
 C     CONSTRUCT TWO-ELECTRON PART OF AC ALPHA-HAMILTONIAN      
 C
       NAdd=Zero
@@ -2744,14 +2751,14 @@ C
       IGemQR=1
       If(IGem(IQ).Eq.IGem(IR)) IGemQR=0
 C
-      XMAT=XMAT+ (-Occ(IR)*Occ(IP)*IGemPR
-     $            +Occ(IS)*Occ(IP)*IGemPS
-     $            +Occ(IR)*Occ(IQ)*IGemQR
-     $            -Occ(IS)*Occ(IQ)*IGemQS)*AuxTwo
-     $ *( Two*TwoMO(NAddr3(IQ,IP,IS,IR))-TwoMO(NAddr3(IQ,IR,IS,IP)) )
+Cmh      XMAT=XMAT+ (-Occ(IR)*Occ(IP)*IGemPR
+Cmh     $            +Occ(IS)*Occ(IP)*IGemPS
+Cmh     $            +Occ(IR)*Occ(IQ)*IGemQR
+Cmh     $            -Occ(IS)*Occ(IQ)*IGemQS)*AuxTwo
+Cmh     $ *( Two*TwoMO(NAddr3(IQ,IP,IS,IR))-TwoMO(NAddr3(IQ,IR,IS,IP)) )
 C
-      If(IQ.Eq.IR) XMAT=XMAT+Occ(IQ)*AuxH(IQ,IPS)-Occ(IS)*AuxH(IS,IPS)
-      If(IS.Eq.IP) XMAT=XMAT+Occ(IP)*AuxH(IP,IQR)-Occ(IR)*AuxH(IR,IQR)
+Cmh      If(IQ.Eq.IR) XMAT=XMAT+Occ(IQ)*AuxH(IQ,IPS)-Occ(IS)*AuxH(IS,IPS)
+Cmh      If(IS.Eq.IP) XMAT=XMAT+Occ(IP)*AuxH(IP,IQR)-Occ(IR)*AuxH(IR,IQR)
 C
 C     INTRAGEMINAL PART
 C
@@ -2759,13 +2766,13 @@ C
       If(IGem(IQ).Ne.IGem(IR)) IGemQR=0
       IGemPS=1
       If(IGem(IP).Ne.IGem(IS)) IGemPS=0
-      XMAT=XMAT+(C(IQ)*C(IR)*IGemQR+C(IP)*C(IS)*IGemPS)*AuxTwo
-     $ *( TwoMO(NAddr3(IP,IS,IQ,IR))+TwoMO(NAddr3(IP,IR,IQ,IS)) )
+Cmh      XMAT=XMAT+(C(IQ)*C(IR)*IGemQR+C(IP)*C(IS)*IGemPS)*AuxTwo
+Cmh     $ *( TwoMO(NAddr3(IP,IS,IQ,IR))+TwoMO(NAddr3(IP,IR,IQ,IS)) )
 C
-      If(IS.Eq.IP) XMAT=XMAT-C(IR)*AuxXC(IR,IQR)
-      If(IR.Eq.IQ) XMAT=XMAT-C(IS)*AuxXC(IS,IPS)
-      If(IR.Eq.IP) XMAT=XMAT-C(IP)*AuxXC(IP,IQS)
-      If(IS.Eq.IQ) XMAT=XMAT-C(IQ)*AuxXC(IQ,IPR)
+Cmh      If(IS.Eq.IP) XMAT=XMAT-C(IR)*AuxXC(IR,IQR)
+Cmh      If(IR.Eq.IQ) XMAT=XMAT-C(IS)*AuxXC(IS,IPS)
+Cmh      If(IR.Eq.IP) XMAT=XMAT-C(IP)*AuxXC(IP,IQS)
+Cmh      If(IS.Eq.IQ) XMAT=XMAT-C(IQ)*AuxXC(IQ,IPR)
 C
       If (IR.Gt.IS.And.IP.Gt.IQ) BMAT(IRS,IPQ)=XMAT
       If (IR.Gt.IS.And.IQ.Gt.IP) AMAT(IRS,IQP)=XMAT
@@ -2775,6 +2782,12 @@ C
       EndDo
       EndDo
 C
+C
+      Print*, "AB-Ka",norm2(AMAT),norm2(BMAT)      
+C
+Cmh         
+      Return
+C     
       If(IFlag.Eq.0) Return
 C
       IRS=0
