@@ -753,25 +753,25 @@ double precision, allocatable :: EigTmp(:), VecTmp(:)
 
 
 ! HERE: STARTED WORK ON ACABMAT0_mithap!
-!   ACAlpha=sqrt(2d0)/2.d0
+   ACAlpha=sqrt(2d0)/2.d0
    call ACABMAT0_mithap(ABPlus,ABMin,URe,Mon%Occ,XOne,Mon%IGem,Mon%CICoef, &
                  Mon%NAct,Mon%INAct,NBas,Mon%NDim,NInte1,Mon%NGem,&
                  twofile,Flags%ISAPT,ACAlpha,1)
-!   allocate(ABPlusT(Mon%NDim**2),ABMinT(Mon%NDim**2))
-!   call ACABMAT0(ABPlusT,ABMinT,URe,Mon%Occ,XOne,TwoMO, &
-!!   call ACABMAT0(ABPlus,ABMin,URe,Mon%Occ,XOne,TwoMO, &
-!                 NBas,Mon%NDim,NInte1,NInte2,Mon%NGem,ACAlpha,1)
+   allocate(ABPlusT(Mon%NDim**2),ABMinT(Mon%NDim**2))
+   call ACABMAT0(ABPlusT,ABMinT,URe,Mon%Occ,XOne,TwoMO, &
+!   call ACABMAT0(ABPlus,ABMin,URe,Mon%Occ,XOne,TwoMO, &
+                 NBas,Mon%NDim,NInte1,NInte2,Mon%NGem,ACAlpha,1)
 
-!   write(*,*) 'DUPA_PLUS',norm2(ABPlus),norm2(ABPlusT)
-!   write(*,*) 'DUPA_MIN',norm2(ABMin),norm2(ABMinT)
-!   write(*,*) 'ABPLUS: ',norm2(ABPlus-ABPlusT)
-!   write(*,*) 'ABMIN: ',norm2(ABMin-ABMinT)
+   write(*,*) 'DUPA_PLUS',norm2(ABPlus),norm2(ABPlusT)
+   write(*,*) 'DUPA_MIN',norm2(ABMin),norm2(ABMinT)
+   write(*,*) 'ABPLUS: ',norm2(ABPlus-ABPlusT)
+   write(*,*) 'ABMIN: ',norm2(ABMin-ABMinT)
 
 !   do j=1,Mon%NDim**2
 !      write(*,*) j,ABPlus(j),ABPlusT(j)
 !   enddo
    
-!   deallocate(ABMinT,ABPlusT)
+   deallocate(ABMinT,ABPlusT)
    
    ! reduce dim
    call reduce_dim('AB',ABPlus,ABMin,Mon)

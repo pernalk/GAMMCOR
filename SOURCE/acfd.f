@@ -2712,6 +2712,13 @@ C
 C
       EndDo
 C
+Cmh      Do I=1,NBasis
+Cmh         Write(*,*) 'AuxH-Ka',I,norm2(AuxH(I,:))
+Cmh      EndDo
+Cmh      Do I=1,NBasis
+Cmh         Write(*,*) 'AuxXC-Ka',I,norm2(AuxXC(I,:))
+Cmh      EndDo
+C      
 C     COMPUTE THE MATRICES A+B, A-B
 C
       IRS=0
@@ -2757,8 +2764,8 @@ Cmh     $            +Occ(IR)*Occ(IQ)*IGemQR
 Cmh     $            -Occ(IS)*Occ(IQ)*IGemQS)*AuxTwo
 Cmh     $ *( Two*TwoMO(NAddr3(IQ,IP,IS,IR))-TwoMO(NAddr3(IQ,IR,IS,IP)) )
 C
-Cmh      If(IQ.Eq.IR) XMAT=XMAT+Occ(IQ)*AuxH(IQ,IPS)-Occ(IS)*AuxH(IS,IPS)
-Cmh      If(IS.Eq.IP) XMAT=XMAT+Occ(IP)*AuxH(IP,IQR)-Occ(IR)*AuxH(IR,IQR)
+      If(IQ.Eq.IR) XMAT=XMAT+Occ(IQ)*AuxH(IQ,IPS)-Occ(IS)*AuxH(IS,IPS)
+      If(IS.Eq.IP) XMAT=XMAT+Occ(IP)*AuxH(IP,IQR)-Occ(IR)*AuxH(IR,IQR)
 C
 C     INTRAGEMINAL PART
 C
@@ -2769,10 +2776,10 @@ C
 Cmh      XMAT=XMAT+(C(IQ)*C(IR)*IGemQR+C(IP)*C(IS)*IGemPS)*AuxTwo
 Cmh     $ *( TwoMO(NAddr3(IP,IS,IQ,IR))+TwoMO(NAddr3(IP,IR,IQ,IS)) )
 C
-Cmh      If(IS.Eq.IP) XMAT=XMAT-C(IR)*AuxXC(IR,IQR)
-Cmh      If(IR.Eq.IQ) XMAT=XMAT-C(IS)*AuxXC(IS,IPS)
-Cmh      If(IR.Eq.IP) XMAT=XMAT-C(IP)*AuxXC(IP,IQS)
-Cmh      If(IS.Eq.IQ) XMAT=XMAT-C(IQ)*AuxXC(IQ,IPR)
+      If(IS.Eq.IP) XMAT=XMAT-C(IR)*AuxXC(IR,IQR)
+      If(IR.Eq.IQ) XMAT=XMAT-C(IS)*AuxXC(IS,IPS)
+      If(IR.Eq.IP) XMAT=XMAT-C(IP)*AuxXC(IP,IQS)
+      If(IS.Eq.IQ) XMAT=XMAT-C(IQ)*AuxXC(IQ,IPR)
 C
       If (IR.Gt.IS.And.IP.Gt.IQ) BMAT(IRS,IPQ)=XMAT
       If (IR.Gt.IS.And.IQ.Gt.IP) AMAT(IRS,IQP)=XMAT

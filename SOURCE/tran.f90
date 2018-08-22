@@ -2309,10 +2309,12 @@ integer :: i,j,k,l,ij,kl,kk,ll,klround
 integer :: ip,iq,ir,is,it,iu,iw,ipq,irs,ICol,IRow
 integer :: iunit,ios
 integer :: NOccup
+integer :: IGemType
 integer :: Ind(NBasis),AuxInd(3,3),pos(NBasis,NBasis)
 !double precision :: C(NBasis)
 double precision :: HNO(NBasis,NBasis),HNOCoef
 double precision :: AuxCoeff(NGem,NGem,NGem,NGem),AuxVal,val
+double precision :: AuxH(NBasis,NBasis,NGem),AuxXC(NBasis,NBasis,NGem)
 double precision,allocatable :: work1(:),work2(:)
 double precision,allocatable :: ints(:,:)
 
@@ -2356,6 +2358,9 @@ do l=1,NGem
    enddo
 enddo
 
+AuxH = 0
+AuxXC = 0
+
 HNOCoef = 1 - ACAlpha
 
 open(newunit=iunit,file=trim(IntFileName),status='OLD', &
@@ -2397,6 +2402,31 @@ do ll=1,NBasis
             enddo
 
          endif
+
+         do IGemType=1,NGem
+            
+            ! Coulomb
+            val = 0
+            do i=1,NBasis
+               if(IGem(i)/=IGemType) val = val + &
+                    AuxCoeff(IGem(k),IGem(l),IGem(i),IGem(i))*Occ(i)*ints(i,i)
+            enddo
+            AuxH(k,l,IGemType) = AuxH(k,l,IGemType) + 2*val
+
+            ! exchange
+            if(IGem(k)==IGemType) then
+               do i=1,NBasis
+                  AuxXC(i,l,IGemType) = AuxXC(i,l,IGemType) + AuxCoeff(IGem(i),IGem(k),IGem(k),IGem(l))*C(k)*ints(i,k)
+               enddo
+            else
+               do i=1,NBasis
+                  AuxH(i,l,IGemType) = AuxH(i,l,IGemType) - AuxCoeff(IGem(i),IGem(k),IGem(k),IGem(l))*Occ(k)*ints(i,k)
+               enddo
+            endif
+            
+         enddo
+
+         
          
       enddo
    enddo
@@ -2415,13 +2445,37 @@ do ip=2,NBasis
             irs = irs + 1
             
             val = 0
-            if(iq==ir) val = val + (Occ(ir)-Occ(is))*HNO(ip,is)
-            if(ip==is) val = val - (Occ(ir)-Occ(is))*HNO(iq,ir)
+            if(iq==ir) val = val &
+                 + (Occ(ir)-Occ(is))*HNO(ip,is) &
+                 + Occ(iq)*AuxH(ip,is,IGem(iq)) &
+                 - Occ(is)*AuxH(ip,is,IGem(is)) &
+                 - C(is)*AuxXC(ip,is,IGem(is))
+            if(ip==is) val = val &
+                 - (Occ(ir)-Occ(is))*HNO(iq,ir) &
+                 + Occ(ip)*AuxH(iq,ir,IGem(ip)) &
+                 - Occ(ir)*AuxH(iq,ir,IGem(ir)) &
+                 - C(ir)*AuxXC(iq,ir,IGem(ir))
+            if(ip==ir) val = val &
+                 - C(ip)*AuxXC(iq,is,IGem(ip))
+            if(iq==is) val = val &
+                 - C(iq)*AuxXC(ip,ir,IGem(iq))
             BMAT(irs,ipq) = BMAT(irs,ipq) + val
 
             val = 0
-            if(ip==ir) val = val + (Occ(ir)-Occ(is))*HNO(iq,is)
-            if(iq==is) val = val - (Occ(ir)-Occ(is))*HNO(ip,ir)
+            if(ip==ir) val = val &
+                 + (Occ(ir)-Occ(is))*HNO(iq,is) &
+                 + Occ(ip)*AuxH(iq,is,IGem(ip)) &
+                 - Occ(is)*AuxH(iq,is,IGem(is)) &
+                 - C(is)*AuxXC(iq,is,IGem(is))
+            if(iq==is) val = val &
+                 - (Occ(ir)-Occ(is))*HNO(ip,ir) &
+                 + Occ(iq)*AuxH(ip,ir,IGem(iq)) &
+                 - Occ(ir)*AuxH(ip,ir,IGem(ir)) & 
+                 - C(ir)*AuxXC(ip,ir,IGem(ir))
+            if(iq==ir) val = val &
+                 - C(iq)*AuxXC(ip,is,IGem(iq))
+            if(ip==is) val = val &
+                 - C(ip)*AuxXC(iq,ir,IGem(ip))
             AMAT(irs,ipq) = AMAT(irs,ipq) + val
             
          enddo
@@ -2436,6 +2490,23 @@ write(LOUT,*) 'HNO-my', norm2(work1(1:NBasis*(NBasis+1)/2))
 HNO=transpose(HNO)
 call sq_to_triang2(HNO,work1,NBasis)
 write(LOUT,*) 'HNO-tr', norm2(work1(1:NBasis*(NBasis+1)/2))
+
+!!$do IGemType=1,NGem
+!!$   call sq_to_triang2(AuxH(:,:,IGemType),work1,NBasis)
+!!$   write(LOUT,*) 'AuxH-my', IGemType,norm2(work1(1:NBasis*(NBasis+1)/2))
+!!$   AuxH(:,:,IGemType)=transpose(AuxH(:,:,IGemType))
+!!$   call sq_to_triang2(AuxH(:,:,IGemType),work1,NBasis)
+!!$   write(LOUT,*) 'AuxH-tr', IGemType,norm2(work1(1:NBasis*(NBasis+1)/2))
+!!$enddo
+!!$
+!!$print*, ''
+!!$do IGemType=1,NGem
+!!$   call sq_to_triang2(AuxXC(:,:,IGemType),work1,NBasis)
+!!$   write(LOUT,*) 'AuxXC-my', IGemType,norm2(work1(1:NBasis*(NBasis+1)/2))
+!!$   AuxXC(:,:,IGemType)=transpose(AuxXC(:,:,IGemType))
+!!$   call sq_to_triang2(AuxXC(:,:,IGemType),work1,NBasis)
+!!$   write(LOUT,*) 'AuxXC-tr', IGemType,norm2(work1(1:NBasis*(NBasis+1)/2))
+!!$enddo
 
 deallocate(ints,work2,work1)
 
