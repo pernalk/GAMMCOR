@@ -2282,8 +2282,9 @@ deallocate(ints,work2,work1)
 
 end subroutine Y01CAS_mithap
 
-subroutine ACABMAT0_mithap(AMAT,BMAT,URe,Occ,XOne,IGem,C, &
-               NAct,INActive,NBasis,NDim,NInte1,NGem,IntFileName,ISAPT,ACAlpha,IFlag)
+subroutine ACABMAT0_mithap(AMAT,BMAT,URe,Occ,XOne,&
+               IndN,IndX,IGem,C, &
+               NAct,INActive,NBasis,NDim,NDimX,NInte1,NGem,IntFileName,ISAPT,ACAlpha,IFlag)
 !     IFlag = 1 - AMAT AND BMAT WILL CONTAIN (A+B)/C+/C+ AND (A-B)/C-/C-, RESPECTIVELY
 !             0 - AMAT AND BMAT WILL CONTAIN A ANB B MATRICES, RESPECTIVELY
 !
@@ -2298,11 +2299,12 @@ subroutine ACABMAT0_mithap(AMAT,BMAT,URe,Occ,XOne,IGem,C, &
 !
 implicit none
 
-integer,intent(in) :: NAct,INActive,NBasis,NDim,NInte1,ISAPT,NGem
+integer,intent(in) :: NAct,INActive,NBasis,NDim,NDimX,NInte1,ISAPT,NGem
 character(*) :: IntFileName
-double precision,intent(out) :: AMAT(NDim,NDim),BMAT(NDim,NDim)
+double precision,intent(out) :: AMAT(NDimX,NDimX),BMAT(NDimX,NDimX)
 double precision,intent(in)  :: URe(NBasis,NBasis),Occ(NBasis),XOne(NInte1),C(NBasis)
 double precision,intent(in)  :: ACAlpha
+integer,intent(in) :: IndN(2,NDim),IndX(NDim)
 integer,intent(in) :: IGem(NBasis),IFlag
 
 integer :: i,j,k,l,ij,kl,kk,ll,klround
@@ -2311,12 +2313,14 @@ integer :: iunit,ios
 integer :: NOccup
 integer :: IGemType
 integer :: Ind(NBasis),AuxInd(3,3),pos(NBasis,NBasis)
-!double precision :: C(NBasis)
 double precision :: HNO(NBasis,NBasis),HNOCoef
 double precision :: AuxCoeff(NGem,NGem,NGem,NGem),AuxVal,val
+double precision :: OccProd(NBasis,NBasis),CProd(NBasis,NBasis)
 double precision :: AuxH(NBasis,NBasis,NGem),AuxXC(NBasis,NBasis,NGem)
+double precision :: SaveA,SaveB
 double precision,allocatable :: work1(:),work2(:)
 double precision,allocatable :: ints(:,:)
+double precision,parameter :: Delta = 1.d-6
 
 print*, 'Wszystko od nowa!'
 if(ISAPT==1) then
@@ -2355,6 +2359,23 @@ do l=1,NGem
             endif
          enddo
       enddo
+   enddo
+enddo
+
+pos = 0
+do i=1,NDimX
+   pos(IndN(1,i),IndN(2,i)) = i
+enddo
+
+CProd = 0
+OccProd = 0
+do j=1,NBasis
+   do i=1,NBasis
+      if(IGem(i)==IGem(j)) then
+         CProd(i,j) = C(i)*C(j)         
+      else
+         OccProd(i,j) = Occ(i)*Occ(j)
+      endif
    enddo
 enddo
 
@@ -2426,7 +2447,134 @@ do ll=1,NBasis
             
          enddo
 
+         ! INTERGEMINAL PART
+         ir = k
+         is = l
+         irs = pos(ir,is)
+         if(irs>0) then
+            do ipq=1,NDimX
+               ip = IndN(1,ipq)
+               iq = IndN(2,ipq)
+
+               val = 2*AuxCoeff(IGem(ip),IGem(iq),IGem(ir),IGem(is)) &
+                    *(-OccProd(ip,ir)+OccProd(ip,is)+OccProd(iq,ir)-OccProd(iq,is))*ints(ip,iq)   
+               BMAT(ipq,irs) = BMAT(ipq,irs) + val
+               AMAT(ipq,irs) = AMAT(ipq,irs) - val
+                   
+            enddo
+         endif
+
+         ip = k
+         is = l
+         do iq=1,ip-1
+            ipq = pos(ip,iq)
+            if(ipq>0) then
+               do ir=is+1,NBasis
+                  irs = pos(ir,is)
+                  if(irs>0) then
+                     
+                     val = -AuxCoeff(IGem(ip),IGem(iq),IGem(ir),IGem(is)) &
+                          *(-OccProd(ip,ir)+OccProd(ip,is)+OccProd(iq,ir)-OccProd(iq,is))*ints(ir,iq)
+                     BMAT(ipq,irs) = BMAT(ipq,irs) + val
+                          
+                  endif
+               enddo
+            endif
+         enddo
+
+         ! p->q
+         iq = k
+         is = l
+         do ip=iq+1,NBasis
+            ipq = pos(ip,iq)
+            if(ipq>0) then
+               do ir=is+1,NBasis
+                  irs = pos(ir,is)
+                  if(irs>0) then
+                     
+                     val = -AuxCoeff(IGem(ip),IGem(iq),IGem(ir),IGem(is)) &
+                          *(-OccProd(ip,ir)+OccProd(ip,is)+OccProd(iq,ir)-OccProd(iq,is))*ints(ir,ip)
+                     AMAT(ipq,irs) = AMAT(ipq,irs) - val
+                          
+                  endif
+               enddo
+            endif
+         enddo
+
+         ! INTRAGEMINAL PART
+         iq = k
+         ir = l
+         do ip=iq+1,NBasis
+            ipq = pos(ip,iq)
+            if(ipq>0) then
+               do is=1,ir-1 !NBasis
+                  irs = pos(ir,is)
+                  if(irs>0) then
+
+                     val = AuxCoeff(IGem(ip),IGem(iq),IGem(ir),IGem(is)) &
+                          *(CProd(iq,ir)+CProd(ip,is))*ints(ip,is)
+                     BMAT(ipq,irs) = BMAT(ipq,irs) + val
+                     
+                  endif
+               enddo
+            endif
+         enddo
          
+         ! p->q
+         ip = k
+         ir = l
+         do iq=1,ip-1
+            ipq = pos(ip,iq)
+            if(ipq>0) then
+               do is=1,ir-1
+                  irs = pos(ir,is)
+                  if(irs>0) then
+
+                     val = AuxCoeff(IGem(ip),IGem(iq),IGem(ir),IGem(is)) &
+                          *(CProd(ip,ir)+CProd(iq,is))*ints(iq,is)
+                     AMAT(ipq,irs) = AMAT(ipq,irs) + val
+                     
+                  endif
+               enddo
+            endif
+         enddo
+
+         iq = k
+         is = l
+         do ip=iq+1,NBasis
+            ipq = pos(ip,iq)
+            if(ipq>0) then
+               do ir=is+1,NBasis
+                  irs = pos(ir,is)
+                  if(irs>0) then
+
+                     val = AuxCoeff(IGem(ip),IGem(iq),IGem(ir),IGem(is)) &
+                          *(CProd(iq,ir)+CProd(ip,is))*ints(ip,ir)
+                     BMAT(ipq,irs) = BMAT(ipq,irs) + val
+                     
+                  endif
+               enddo
+            endif
+         enddo
+         
+         ! p->q       
+         ip = k
+         is = l
+         do iq=1,ip-1
+            ipq = pos(ip,iq)
+            if(ipq>0) then
+               do ir=is+1,NBasis
+                  irs = pos(ir,is)
+                  if(irs>0) then
+
+                     val = AuxCoeff(IGem(ip),IGem(iq),IGem(ir),IGem(is)) &
+                          *(CProd(ip,ir)+CProd(iq,is))*ints(iq,ir)
+                     AMAT(ipq,irs) = AMAT(ipq,irs) + val
+                     
+                  endif
+               enddo
+            endif
+         enddo
          
       enddo
    enddo
@@ -2434,16 +2582,17 @@ enddo
 
 close(iunit)
 
-ipq = 0
-do ip=2,NBasis
-   do iq=1,ip-1
-      ipq = ipq + 1
+do ICol=1,NDimX
+   ip = IndN(1,ICol)
+   iq = IndN(2,ICol)
+   ipq = ICol
+ 
+   if(ip/=iq) then
+      do IRow=1,NDimX
+         ir = IndN(1,IRow)
+         is = IndN(2,IRow)
+         irs = IRow
 
-      irs = 0
-      do ir=2,NBasis
-         do is=1,ir-1
-            irs = irs + 1
-            
             val = 0
             if(iq==ir) val = val &
                  + (Occ(ir)-Occ(is))*HNO(ip,is) &
@@ -2460,7 +2609,7 @@ do ip=2,NBasis
             if(iq==is) val = val &
                  - C(iq)*AuxXC(ip,ir,IGem(iq))
             BMAT(irs,ipq) = BMAT(irs,ipq) + val
-
+         
             val = 0
             if(ip==ir) val = val &
                  + (Occ(ir)-Occ(is))*HNO(iq,is) &
@@ -2477,11 +2626,36 @@ do ip=2,NBasis
             if(ip==is) val = val &
                  - C(ip)*AuxXC(iq,ir,IGem(ip))
             AMAT(irs,ipq) = AMAT(irs,ipq) + val
-            
+
+            if(IFlag/=0) then
+!!$               if(abs(abs(C(ip))-abs(C(iq)))<=Delta*abs(C(iq)).or.& 
+!!$                    abs(abs(C(ir))-abs(C(is)))<=Delta*abs(C(ir))) then
+!!$               
+!!$                  AMAT(irs,ipq) = 0
+!!$                  BMAT(irs,ipq) = 0
+!!$               else
+                  
+                  SaveA = AMAT(irs,ipq)
+                  SaveB = BMAT(irs,ipq)
+                  
+                  val = (C(ip) + C(iq))*(C(ir) + C(is))
+                  if(val==0) then
+                     AMAT(irs,ipq) = 0
+                  else
+                     AMAT(irs,ipq) = (SaveA+SaveB)/val
+                  endif
+                  val = (C(ip) - C(iq))*(C(ir) - C(is))
+                  if(val==0) then
+                     BMAT(irs,ipq) = 0
+                  else
+                     BMAT(irs,ipq) = (SaveA-SaveB)/val
+                  endif
+               endif
+!!$            endif
+                        
          enddo
-      enddo
+      endif
    enddo
-enddo
 
 print*, "AB-my",norm2(AMAT),norm2(BMAT)
 

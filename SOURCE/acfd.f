@@ -2758,11 +2758,11 @@ C
       IGemQR=1
       If(IGem(IQ).Eq.IGem(IR)) IGemQR=0
 C
-Cmh      XMAT=XMAT+ (-Occ(IR)*Occ(IP)*IGemPR
-Cmh     $            +Occ(IS)*Occ(IP)*IGemPS
-Cmh     $            +Occ(IR)*Occ(IQ)*IGemQR
-Cmh     $            -Occ(IS)*Occ(IQ)*IGemQS)*AuxTwo
-Cmh     $ *( Two*TwoMO(NAddr3(IQ,IP,IS,IR))-TwoMO(NAddr3(IQ,IR,IS,IP)) )
+      XMAT=XMAT+ (-Occ(IR)*Occ(IP)*IGemPR
+     $            +Occ(IS)*Occ(IP)*IGemPS
+     $            +Occ(IR)*Occ(IQ)*IGemQR
+     $            -Occ(IS)*Occ(IQ)*IGemQS)*AuxTwo
+     $ *( Two*TwoMO(NAddr3(IQ,IP,IS,IR))-TwoMO(NAddr3(IQ,IR,IS,IP)) )
 C
       If(IQ.Eq.IR) XMAT=XMAT+Occ(IQ)*AuxH(IQ,IPS)-Occ(IS)*AuxH(IS,IPS)
       If(IS.Eq.IP) XMAT=XMAT+Occ(IP)*AuxH(IP,IQR)-Occ(IR)*AuxH(IR,IQR)
@@ -2773,8 +2773,8 @@ C
       If(IGem(IQ).Ne.IGem(IR)) IGemQR=0
       IGemPS=1
       If(IGem(IP).Ne.IGem(IS)) IGemPS=0
-Cmh      XMAT=XMAT+(C(IQ)*C(IR)*IGemQR+C(IP)*C(IS)*IGemPS)*AuxTwo
-Cmh     $ *( TwoMO(NAddr3(IP,IS,IQ,IR))+TwoMO(NAddr3(IP,IR,IQ,IS)) )
+      XMAT=XMAT+(C(IQ)*C(IR)*IGemQR+C(IP)*C(IS)*IGemPS)*AuxTwo
+     $     *( TwoMO(NAddr3(IP,IS,IQ,IR))+TwoMO(NAddr3(IP,IR,IQ,IS)) )
 C
       If(IS.Eq.IP) XMAT=XMAT-C(IR)*AuxXC(IR,IQR)
       If(IR.Eq.IQ) XMAT=XMAT-C(IS)*AuxXC(IS,IPS)
@@ -2793,7 +2793,7 @@ C
       Print*, "AB-Ka",norm2(AMAT),norm2(BMAT)      
 C
 Cmh         
-      Return
+Cmh      Return
 C     
       If(IFlag.Eq.0) Return
 C

@@ -748,33 +748,37 @@ double precision, allocatable :: EigTmp(:), VecTmp(:)
  ! GVB
  if(Flags%ICASSCF==0.and.Flags%ISERPA==0) then
 
-   allocate(ABPlus(Mon%NDim**2),ABMin(Mon%NDim**2), &
+  ! allocate(ABPlus(Mon%NDim**2),ABMin(Mon%NDim**2), &
+   allocate(ABPlus(Mon%NDimX**2),ABMin(Mon%NDimX**2), &
             EigVecR(Mon%NDimX**2),Eig(Mon%NDimX))
 
 
 ! HERE: STARTED WORK ON ACABMAT0_mithap!
-   ACAlpha=sqrt(2d0)/2.d0
-   call ACABMAT0_mithap(ABPlus,ABMin,URe,Mon%Occ,XOne,Mon%IGem,Mon%CICoef, &
-                 Mon%NAct,Mon%INAct,NBas,Mon%NDim,NInte1,Mon%NGem,&
+  ! ACAlpha=sqrt(2d0)/2.d0
+   call ACABMAT0_mithap(ABPlus,ABMin,URe,Mon%Occ,XOne,&
+                 Mon%IndN,Mon%IndX,Mon%IGem,Mon%CICoef,&
+                 Mon%NAct,Mon%INAct,NBas,Mon%NDim,Mon%NDimX,NInte1,Mon%NGem,&
                  twofile,Flags%ISAPT,ACAlpha,1)
-   allocate(ABPlusT(Mon%NDim**2),ABMinT(Mon%NDim**2))
-   call ACABMAT0(ABPlusT,ABMinT,URe,Mon%Occ,XOne,TwoMO, &
+!   allocate(ABPlusT(Mon%NDim**2),ABMinT(Mon%NDim**2))
+!!   call ACABMAT0(ABPlusT,ABMinT,URe,Mon%Occ,XOne,TwoMO, &
 !   call ACABMAT0(ABPlus,ABMin,URe,Mon%Occ,XOne,TwoMO, &
-                 NBas,Mon%NDim,NInte1,NInte2,Mon%NGem,ACAlpha,1)
+!                 NBas,Mon%NDim,NInte1,NInte2,Mon%NGem,ACAlpha,1)
 
-   write(*,*) 'DUPA_PLUS',norm2(ABPlus),norm2(ABPlusT)
-   write(*,*) 'DUPA_MIN',norm2(ABMin),norm2(ABMinT)
-   write(*,*) 'ABPLUS: ',norm2(ABPlus-ABPlusT)
-   write(*,*) 'ABMIN: ',norm2(ABMin-ABMinT)
-
-!   do j=1,Mon%NDim**2
-!      write(*,*) j,ABPlus(j),ABPlusT(j)
-!   enddo
-   
-   deallocate(ABMinT,ABPlusT)
-   
    ! reduce dim
-   call reduce_dim('AB',ABPlus,ABMin,Mon)
+!   call reduce_dim('AB',ABPlus,ABMin,Mon)
+
+   ! TESTY
+   !call reduce_dim('AB',ABPlusT,ABMinT,Mon)
+   ! write(*,*) 'DUPA_PLUS',norm2(ABPlus),norm2(ABPlusT(1:Mon%NDimX**2))
+   ! write(*,*) 'DUPA_MIN',norm2(ABMin),norm2(ABMinT(1:Mon%NDimX**2))
+   ! write(*,*) 'ABPLUS: ',norm2(ABPlus(1:Mon%NDimX**2)-ABPlusT(1:Mon%NDimX**2))
+   ! write(*,*) 'ABMIN: ',norm2(ABMin(1:Mon%NDimX**2)-ABMinT(1:Mon%NDimX**2))
+
+   ! do j=1,Mon%NDimX**2
+   !   write(*,*) j,ABPlus(j),ABPlusT(j)
+   !enddo
+   
+   !deallocate(ABMinT,ABPlusT)
 
    EigVecR = 0
    Eig = 0
