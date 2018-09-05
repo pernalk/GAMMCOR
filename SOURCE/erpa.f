@@ -1760,6 +1760,9 @@ C
       Parameter(Zero=0.D0,Half=0.5D0,One=1.D0,Two=2.D0,Three=3.D0,
      $ Four=4.D0)
 C
+      Integer :: DimV1,Max_NDEG
+      Integer :: Space1(3,2*(NDimX+NDimN))
+C
       Include 'commons.inc'
 C
       Dimension
@@ -1803,10 +1806,14 @@ C
       EndDo
 C
 CC     ADDITIONAL TEST
-C      Write(*,*) 'D(E)MIN = D(E)PLUS'
+C      Write(6,*) 'D(E)MIN = D(E)PLUS'
 C      DMIN = DPLUS
 C      EMIN = EPLUS
 CC
+C    
+C      Print*, 'DEPLUS,DEMIN' 
+C      Print*, norm2(DPLUS),norm2(DMIN)
+C      Print*, norm2(EPLUS),norm2(EMIN)
 C
       Do I=1,2*(NDimX+NDimN)
       Do J=1,2*(NDimX+NDimN)
@@ -1866,9 +1873,23 @@ C
 C   
       Call DGEEV('N','V',NI,Q2,NI,Eig,EigI,
      $           EigVecL,NI,EigVecR,NI,Work,4*NI,INFO)
-
 C
+C     ORTHOGONALISE DEGENERATE VECTORS
+      Write(6,*) 'ORTHOGONALIZE DEGENERATE VECTORS IN PINOVEC'
+      Call SORT_PINOVECS(EigVecR,Eig,EigI,NI)
+      Call CREATE_SPACE(Eig,Space1,NI,DimV1,Max_NDEG)
+      Call ORTHO_DEGVEC(EigVecR,Space1,DimV1,NI,Max_NDEG)
+C      Call ZERO_DEGVEC(EigVecR,Eig,Space1,DimV1,NDimEx,Max_NDEG)
 C    
+      NDeg = 0
+      Do I=1,NDimEx
+      If(Space1(3,I).Gt.1) NDeg = NDeg + 1
+      EndDo
+      Write(6,*) 'NUMBER OF DEGENERATE VECS:', NDeg 
+C      Write(6,*) 'DimV1                    :', DimV1
+      Write(6,*) 'MAXIMUM DEGENERACY       :', Max_NDEG
+      Write(6,*) ' '
+C
 C     NORMALIZE [Y,X,W,V] SO THAT 2 Y*X + V*W = 1
 C     THE NORMALIZATION IS APPLIED TO EIGVECTORS CORRESPONDING TO POSITIVE OMEGA's
 C

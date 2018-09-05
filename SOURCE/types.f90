@@ -112,6 +112,7 @@ type SystemBlock
       double precision :: ThrAct = 0.992d0
       integer,allocatable :: IGem(:), IndAux(:)
       integer,allocatable :: IndX(:), IndN(:,:), IPair(:,:)
+      integer,allocatable :: IndXh(:)
       ! TEST ONLY
       integer,allocatable :: IndNT(:,:)
       integer,allocatable :: Ind2(:)

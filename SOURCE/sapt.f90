@@ -1559,8 +1559,8 @@ double precision :: e2du,e2sp,dea,deb
 double precision :: e2ds,e2ds1,e2ds2
 double precision :: inv_omega
 ! for Be ERPA:
-double precision,parameter :: SmallE = 1.D-1
-!double precision,parameter :: SmallE = 1.D-3
+!double precision,parameter :: SmallE = 1.D-1
+double precision,parameter :: SmallE = 1.D-3
 double precision,parameter :: BigE = 1.D8 
 double precision :: Alpha, Beta
 
@@ -1624,10 +1624,15 @@ double precision :: Alpha, Beta
 ! print*, norm2(EVecB),'B'
 ! print*, norm2(EVecA),'A'
 !
- !print*, 'EXC ENERGIES'
- !do i=1,100!size(OmB)
- !   if(OmB(i).gt.0d0) write(*,*) OmB(i)
- !enddo
+! print*, 'EXC ENERGIES-A'
+! do i=1,size(OmA)
+!    if(OmA(i).gt.0d0) write(*,*) OmA(i)
+! enddo
+!
+! print*, 'EXC ENERGIES-B'
+! do i=1,size(OmB)
+!    if(OmB(i).gt.0d0) write(*,*) OmB(i)
+! enddo
 
 ! uncoupled
 ! works with tran4_full
@@ -2046,6 +2051,7 @@ double precision,parameter :: SmallE = 1.d-1
  call readresp(EVecA,OmA,2*ADimEx,'PROP_A')
  call readresp(EVecB,OmB,2*BDimEx,'PROP_B')
 
+! print*, norm2(EVecA),norm2(EVecB)
 ! print*, 'OmA'
 ! do i=1,size(OmA)
 !   ! if(OmA(i).gt.0d0)  write(*,*) i,OmA(i)
@@ -2057,7 +2063,6 @@ double precision,parameter :: SmallE = 1.d-1
 !    !  if(OmB(i).gt.0d0)  write(*,*) i,OmB(i)
 !    write(*,*) i,",",OmB(i)
 ! enddo
-
  
  ! tran4_gen
  allocate(work(nOFB))

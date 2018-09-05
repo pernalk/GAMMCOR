@@ -927,6 +927,8 @@ C
 C     ORTHOGONALISE DEGENERATE VECTORS
       Call CREATE_SPACE(Eig,Space1,NDimX,DimV1,Max_NDEG)
       Call ORTHO_DEGVEC(EigVecR,Space1,DimV1,NDimX,Max_NDEG)
+C     CALL FOR TESTS ONLY:
+C      Call ZERO_DEGVEC(EigVecR,Eig,Space1,DimV1,NDimX,Max_NDEG)
 C
 C     IMPOSE THE NORMALIZATION 2 Y*X = 1 ON THE EIGENVECTORS CORRESPONDING TO POSITIVE
 C     OMEGA'S 
@@ -990,6 +992,52 @@ C
       Return
       End
 
+*Deck SORT_PINOVECS
+      Subroutine SORT_PINOVECS(EigVec,Eig,EigI,NDimX)
+      Implicit None
+C
+      Double Precision :: EigVec(NDimX**2)
+      Double Precision :: Eig(NDimX),EigI(NDimX) 
+      Integer :: NDimX
+      Double Precision :: TmpEig,TmpEigI,TmpVec(NDimX)
+      Double Precision,Parameter :: Thresh=1.d-9,EigThresh=1.d-15
+      Integer :: I,II,J,IndVI,IndVJ,NDeg,NDegSwp
+C
+      NDeg = 0
+      NDegSwp = 0
+      Do I=1,NDimX
+      Do J=I+1,NDimX
+C     CHECK IF EigThresh NECESSARY?
+         If(abs(Eig(I)-Eig(J)).Le.Thresh.and.
+     $      abs(Eig(I)).Gt.EigThresh) Then
+         II = I + 1
+         NDeg = NDeg + 1 
+         If(J/=II) Then
+           NDegSwp = NDegSwp + 1
+           IndVI = (II-1)*NDimX 
+           IndVJ = (J-1)*NDimX
+C          EIGENVECS
+           TmpVec = EigVec(IndVI+1:IndVI+NDimX)
+           EigVec(IndVI+1:IndVI+NDimX) = 
+     $     EigVec(IndVJ+1:IndVJ+NDimX)
+           EigVec(IndVJ+1:IndVJ+NDimX) = TmpVec(1:NDimX)
+C          EIGENVALS
+           TmpEig = Eig(II) 
+           Eig(II) = Eig(J)
+           Eig(J) = TmpEig
+           TmpEigI = EigI(II) 
+           EigI(II) = EigI(J)
+           EigI(J) = TmpEigI
+         EndIf
+         EndIf
+      EndDo
+      EndDo
+C
+C      Write(6,*) 'NDeg,Swp',NDeg,NDegSwp     
+C
+      End Subroutine SORT_PINOVECS
+
+
 *Deck CREATE_SPACE 
       Subroutine CREATE_SPACE(Eig,Space1,NDimX,DimV1,Max_NDEG)
       Implicit None
@@ -1000,6 +1048,8 @@ C
       Double Precision :: Tmp
       Double Precision,Parameter :: Thresh=1.d-9
       Integer :: I
+C
+      Space1(3,:) = 0
 C
       I = 1
       DimV1 = 1
@@ -1076,6 +1126,40 @@ C
       EndDo
 C
       End Subroutine ORTHO_DEGVEC
+
+*Deck ZERO_DEGVEC
+      Subroutine ZERO_DEGVEC(EigVecR,Eig,Space1,DimV1,NDimX,Max_NDEG)
+      Implicit None
+C
+      Integer :: DimV1,NDimX,Max_NDEG
+      Integer :: Space1(3,DimV1)
+      Integer :: NDEG,IVEC,JVEC
+      Integer :: I,II,JJ,INFO 
+      Double Precision :: Tmp
+      Double Precision :: EigVecR(NDimX**2),Eig(NDimX)
+      Double Precision,external :: ddot
+C
+      Do I=1,DimV1
+C   
+         NDEG=Space1(3,I)
+         If(NDEG>1) Then
+C
+         EigVecR((Space1(1,I)-1)*NDimX+1:Space1(2,I)*NDimX) = 0
+C  
+         EndIf
+      EndDo
+C
+C     ADDITIONAL TEST
+C      Write(6,*) 'Compare dimensions:',DimV1,NDimX
+C      Do I=1,NDimX
+C!       if(Eig(I).Gt.0) then
+C        Tmp = norm2(EigVecR((I-1)*NDimX+1:(I-1)*NDimX+NDimX))
+C        Write(6,*) Eig(I),Tmp
+C!       endif
+C      EndDo
+C
+C
+      End Subroutine ZERO_DEGVEC
 
 *Deck ERPASYMM0
       Subroutine ERPASYMM0(EigY,EigX,Eig,APLSQRT,ABMIN,NDimX)
@@ -3926,6 +4010,387 @@ C
 C
       Return
       End
+
+*Deck DE_CAS
+      Subroutine DE_CAS(DMAT,DMATM,EMAT,EMATM,URe,Occ,XOne,TwoNO,IPair,
+     $ NBasis,NDim,NInte1,NInte2,ACAlpha)
+C
+C     COMPUTE THE D AND E MATRICES FOR 2-RDM READ FROM A rdm2.dat FILE
+C     
+      Implicit Real*8 (A-H,O-Z)
+C
+      Parameter(Zero=0.D0, Half=0.5D0, One=1.D0, Two=2.D0, Four=4.D0)
+C
+      Include 'commons.inc'
+C
+      Dimension DMAT(NDim,NBasis),EMAT(NBasis,NBasis),
+     $ DMATM(NDim,NBasis),EMATM(NBasis,NBasis),
+     $ URe(NBasis,NBasis),
+     $ Occ(NBasis),XOne(NInte1),TwoNO(NInte2),
+     $ IPair(NBasis,NBasis)
+C
+C     LOCAL ARRAYS
+C
+      Dimension C(NBasis),HNO(NInte1),
+     $ IGFact(NInte2),RDM2(NBasis**2*(NBasis**2+1)/2),
+     $ Ind1(NBasis),WMAT(NBasis,NBasis),
+     $ AuxI(NInte1)
+C
+      Do J=1,NBasis
+      Do I=1,NDim
+      DMAT(I,J)=Zero
+      EndDo
+      Do I=1,NBasis
+      EMAT(I,J)=Zero
+      EndDo
+      EndDo
+C
+C     ONE-ELECTRON MATRIX IN A NO REPRESENTATION
+C   
+      IJ=0
+      Do I=1,NBasis
+      Do J=1,I
+      IJ=IJ+1
+      HNO(IJ)=Zero
+C
+      Do IA=1,NBasis
+      Do IB=1,NBasis
+      IAB=(Max(IA,IB)*(Max(IA,IB)-1))/2+Min(IA,IB)
+      HNO(IJ)=HNO(IJ)+URe(I,IA)*URe(J,IB)*XOne(IAB)
+      EndDo
+      EndDo
+C
+      EndDo
+      EndDo
+C
+      NRDM2 = NBasis**2*(NBasis**2+1)/2
+      RDM2(1:NRDM2)=Zero
+C
+C     READ 2RDM, COMPUTE THE ENERGY
+C
+      NAct=NAcCAS
+      INActive=NInAcCAS
+      NOccup=INActive+NAct
+      Do I=1,NAct
+      Ind1(I)=INActive+I
+      EndDo
+C
+      Open(10,File="rdm2.dat",Status='Old')
+      Write(6,'(/,1X,''Active block of 2-RDM read from rdm2.dat'')')
+C
+   10 Read(10,'(4I4,F19.12)',End=40)I,J,K,L,X
+      I=Ind1(I)
+      J=Ind1(J)
+      K=Ind1(K)
+      L=Ind1(L)
+C
+C     X IS DEFINED AS: < E(IJ)E(KL) > - DELTA(J,K) < E(IL) > = 2 GAM2(JLIK)
+      RDM2(NAddrRDM(J,L,I,K,NBasis))=Half*X
+C
+      GoTo 10
+   40 Continue
+      Close(10)
+C
+      Do IP=1,NBasis
+      Do IQ=1,NBasis
+      Do IR=1,NBasis
+      Do IS=1,NBasis
+      IAdd=NAddrRDM(IP,IQ,IR,IS,NBasis)
+      Hlp=Zero
+      If(IP.Eq.IR.And.IQ.Eq.IS.And. (Occ(IP).Eq.One.Or.Occ(IQ).Eq.One) )
+     $  Hlp=Hlp+Two*Occ(IP)*Occ(IQ)
+      If(IP.Eq.IS.And.IQ.Eq.IR.And. (Occ(IP).Eq.One.Or.Occ(IQ).Eq.One) )
+     $ Hlp=Hlp-Occ(IP)*Occ(IQ)
+      If(Hlp.Ne.Zero) RDM2(IAdd)=Hlp
+      EndDo
+      EndDo
+      EndDo
+      EndDo
+C
+      Do I=1,NBasis
+      C(I)=SQRT(Occ(I))
+      If(Occ(I).Lt.Half) C(I)=-C(I)
+      CICoef(I)=C(I)
+      EndDo
+C
+C     CONSTRUCT ONE-ELECTRON PART OF THE AC ALPHA-HAMILTONIAN
+C
+      IJ=0
+      Do I=1,NBasis
+      Do J=1,I
+      IJ=IJ+1
+C
+      If(IGem(I).Ne.IGem(J)) Then
+C
+      HNO(IJ)=ACAlpha*HNO(IJ)
+C
+      Else
+C
+      Aux=Zero
+C
+      Do IT=1,NBasis
+      If(IGem(IT).Ne.IGem(I))
+     $ Aux=Aux+Occ(IT)*
+     $ (Two*TwoNO(NAddr3(IT,IT,I,J))-TwoNO(NAddr3(IT,I,IT,J)))
+      EndDo
+C
+      Aux=(One-ACAlpha)*Aux
+      HNO(IJ)=HNO(IJ)+Aux
+C
+      EndIf
+C
+      EndDo
+      EndDo
+C
+C     CONSTRUCT TWO-ELECTRON PART OF THE AC ALPHA-HAMILTONIAN      
+C
+      NAdd=Zero
+      IJ=0
+      Do I=1,NBasis
+      Do J=1,I
+      IJ=IJ+1
+      KL=0
+      Do K=1,NBasis
+      Do L=1,K
+      KL=KL+1
+C
+      If(IJ.Ge.KL) Then
+      NAdd=NAdd+1
+C
+      IGFact(NAdd)=1
+      If(.Not.(
+     $IGem(I).Eq.IGem(J).And.IGem(J).Eq.IGem(K).And.IGem(K).Eq.IGem(L)))
+     $ IGFact(NAdd)=0
+C
+      EndIf
+C
+      EndDo
+      EndDo
+      EndDo
+      EndDo
+C    
+C     AUXILIARY MATRIX AuxI  
+C   
+      IPQ=0
+      Do IP=1,NBasis
+      Do IQ=1,IP
+      IPQ=IPQ+1
+      AuxI(IPQ)=Zero
+      Do IT=1,NBasis
+      AuxTwo=One
+      If(IGFact(NAddr3(IT,IT,IP,IQ)).Eq.0) AuxTwo=ACAlpha
+      AuxI(IPQ)=AuxI(IPQ)+Occ(IT)*AuxTwo*
+     $ (Two*TwoNO(NAddr3(IP,IQ,IT,IT))-TwoNO(NAddr3(IP,IT,IQ,IT)))
+      EndDo
+      EndDo
+      EndDo
+C
+C     AUXILIARY MATRIX WMAT
+C
+      Do I=1,NBasis
+      Do J=1,NBasis
+      WMAT(I,J)=Zero
+      EndDo
+      EndDo
+C
+      Do IP=1,NBasis
+      Do IR=1,NOccup
+      Do IT=1,NOccup
+      Do IW=1,NOccup
+      Do IU=1,NOccup
+      AuxTwo=One
+      If(IGFact(NAddr3(IT,IW,IP,IU)).Eq.0) AuxTwo=ACAlpha
+      WMAT(IP,IR)=WMAT(IP,IR)
+     $ +TwoNO(NAddr3(IT,IW,IP,IU))*RDM2(NAddrRDM(IW,IU,IT,IR,NBasis))
+     $ *AuxTwo
+     $ +TwoNO(NAddr3(IT,IU,IP,IW))*RDM2(NAddrRDM(IW,IU,IR,IT,NBasis))
+     $ *AuxTwo
+      EndDo
+      EndDo
+      EndDo
+      EndDo
+      EndDo
+C
+      IRS=0
+      Do IR=1,NBasis
+      Do IS=1,IR
+      If(IS.Lt.IR) IRS=IRS+1
+C
+      If(IPair(IR,IS).Eq.1.Or.IS.Eq.IR) Then 
+C
+      Do IP=1,NBasis
+      IQ=IP
+C
+      IQS=(Max(IS,IQ)*(Max(IS,IQ)-1))/2+Min(IS,IQ)
+      IPR=(Max(IR,IP)*(Max(IR,IP)-1))/2+Min(IR,IP)
+C
+      Arspq=Zero
+C
+      If(IP.Eq.IR) Arspq=Arspq+(Occ(IP)-Occ(IS))*HNO(IQS)
+      If(IS.Eq.IQ) Arspq=Arspq+(Occ(IQ)-Occ(IR))*HNO(IPR)
+C
+      AuxTwoPQRS=One
+      If(IGFact(NAddr3(IP,IQ,IR,IS)).Eq.0) AuxTwoPQRS=ACAlpha
+      AuxPQRS=AuxTwoPQRS*
+     $ (Two*TwoNO(NAddr3(IP,IQ,IR,IS))-TwoNO(NAddr3(IP,IR,IQ,IS)))
+C
+C     T1+T2
+C
+      If(Occ(IP)*Occ(IR).Ne.Zero) Then
+C
+      If(Occ(IP).Eq.One.Or.Occ(IR).Eq.One) Then
+C
+      Arspq=Arspq+Occ(IP)*Occ(IR)*AuxTwoPQRS*
+     $ (Two*TwoNO(NAddr3(IP,IQ,IR,IS))-TwoNO(NAddr3(IP,IR,IQ,IS)))
+      If(IP.Eq.IR) Arspq=Arspq+Occ(IP)*AuxI(IQS)
+C
+      Else
+C
+      Do IT=1,NOccup
+      Do IU=1,NOccup
+C
+      AuxTwoSQTU=One
+      If(IGFact(NAddr3(IS,IQ,IT,IU)).Eq.0) AuxTwoSQTU=ACAlpha
+C
+      Arspq=Arspq
+     $ +TwoNO(NAddr3(IS,IQ,IT,IU))*RDM2(NAddrRDM(IP,IU,IR,IT,NBasis))
+     $  *AuxTwoSQTU
+     $ +TwoNO(NAddr3(IS,IU,IT,IQ))*RDM2(NAddrRDM(IP,IU,IT,IR,NBasis))
+     $  *AuxTwoSQTU
+C
+      EndDo
+      EndDo
+C
+      EndIf
+      EndIf
+C
+C     T3+T4 
+C
+      If(Occ(IQ)*Occ(IS).Ne.Zero) Then
+C
+      If(Occ(IQ).Eq.One.Or.Occ(IS).Eq.One) Then
+C
+      Arspq=Arspq+Occ(IQ)*Occ(IS)*AuxTwoPQRS*
+     $ (Two*TwoNO(NAddr3(IP,IQ,IR,IS))-TwoNO(NAddr3(IP,IR,IQ,IS)))
+      If(IQ.Eq.IS) Arspq=Arspq+Occ(IQ)*AuxI(IPR)
+C
+      Else
+C
+      Do IT=1,NOccup
+      Do IU=1,NOccup
+C
+      AuxTwoUTPR=One
+      If(IGFact(NAddr3(IU,IT,IP,IR)).Eq.0) AuxTwoUTPR=ACAlpha
+C
+      Arspq=Arspq
+     $ +TwoNO(NAddr3(IU,IT,IP,IR))*RDM2(NAddrRDM(IS,IT,IQ,IU,NBasis))
+     $  *AuxTwoUTPR
+     $ +TwoNO(NAddr3(IU,IR,IP,IT))*RDM2(NAddrRDM(IS,IT,IU,IQ,NBasis))
+     $  *AuxTwoUTPR
+C
+      EndDo
+      EndDo
+C
+      EndIf
+C     
+      EndIf
+C
+C     T5
+C
+      If(Occ(IR)*Occ(IQ).Ne.Zero) Then
+C
+      If(Occ(IQ).Eq.One.Or.Occ(IR).Eq.One) Then
+C
+      Arspq=Arspq-Occ(IQ)*Occ(IR)*AuxPQRS
+C
+      Else
+C
+      Do IT=1,NOccup
+      Do IU=1,NOccup
+C
+      AuxTwoPTSU=One
+      If(IGFact(NAddr3(IP,IT,IS,IU)).Eq.0) AuxTwoPTSU=ACAlpha
+C
+      Arspq=Arspq
+     $ -TwoNO(NAddr3(IP,IT,IS,IU))*RDM2(NAddrRDM(IT,IU,IQ,IR,NBasis))
+     $  *AuxTwoPTSU
+C
+      EndDo
+      EndDo
+C
+      EndIf
+      EndIf
+C
+C     T6      
+C
+      If(Occ(IP)*Occ(IS).Ne.Zero) Then
+C
+      If(Occ(IP).Eq.One.Or.Occ(IS).Eq.One) Then
+C
+      Arspq=Arspq-Occ(IP)*Occ(IS)*AuxPQRS
+C
+      Else
+C
+      Do IT=1,NOccup
+      Do IU=1,NOccup
+C
+      AuxTwoTQUR=One
+      If(IGFact(NAddr3(IT,IQ,IU,IR)).Eq.0) AuxTwoTQUR=ACAlpha
+C
+      Arspq=Arspq
+     $ -TwoNO(NAddr3(IT,IQ,IU,IR))*RDM2(NAddrRDM(IS,IP,IU,IT,NBasis))
+     $  *AuxTwoTQUR
+C
+      EndDo
+      EndDo
+C
+      EndIf
+      EndIf
+C
+      If(IS.Eq.IQ) Arspq=Arspq-Half*WMAT(IP,IR)
+      If(IP.Eq.IR) Arspq=Arspq-Half*WMAT(IQ,IS)
+C
+      If(IR.Gt.IS) DMAT(IRS,IP)=DMAT(IRS,IP)+Arspq
+      If(IR.Eq.IS) EMAT(IR,IP)=EMAT(IR,IP)+Arspq
+C    
+      EndDo
+C     If(IPair(IR,IS).Eq.1)
+      EndIf
+      EndDo
+      EndDo
+C
+      Write(*,*)'D AND E MATRICES CONSTRUCTED'
+C
+      IPQ=0
+      Do IP=1,NBasis
+      Do IQ=1,IP
+      If(IQ.Lt.IP) IPQ=IPQ+1
+C
+      Do IR=1,NBasis
+      IS=IR 
+C
+      If(IQ.Lt.IP) Then
+      If((C(IP)+C(IQ))*(C(IR)+C(IS)).Ne.Zero)
+     $ DMAT(IPQ,IR)=DMAT(IPQ,IR)/(C(IP)+C(IQ))/(C(IR)+C(IS))
+      If(Occ(IR).Eq.One) DMAT(IPQ,IR)=Zero 
+      DMATM(IPQ,IR)=DMAT(IPQ,IR)
+      EndIf
+C
+      If(IQ.Eq.IP) Then
+      If((C(IP)+C(IQ))*(C(IR)+C(IS)).Ne.Zero)
+     $ EMAT(IP,IR)=EMAT(IP,IR)/(C(IP)+C(IQ))/(C(IR)+C(IS))
+      If(Occ(IP).Eq.One.Or.Occ(IR).Eq.One) EMAT(IP,IR)=Zero
+      EMATM(IP,IR)=EMAT(IP,IR)
+      EndIf
+C
+      EndDo
+C
+      EndDo
+      EndDo
+C
+      Return
+      End
+
 
 *Deck RDMFT_AB
       Subroutine RDMFT_AB(ABPLUS,ABMIN,URe,Occ,XOne,TwoMO,
