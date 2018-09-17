@@ -486,6 +486,17 @@ end subroutine readoneint
 !
 !end subroutine writeoneint
 
+subroutine delfile(filename)
+implicit none
+
+character(*) :: filename
+integer :: iunit
+
+ open(newunit=iunit,file=trim(filename),status='OLD')
+ close(iunit,status='DELETE')
+
+end subroutine delfile
+
 subroutine read2rdm(Mon,NBas)
 
 implicit none 

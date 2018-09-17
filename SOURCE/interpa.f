@@ -4035,6 +4035,15 @@ C
      $ IGFact(NInte2),RDM2(NBasis**2*(NBasis**2+1)/2),
      $ Ind1(NBasis),WMAT(NBasis,NBasis),
      $ AuxI(NInte1)
+C    
+C     START
+C
+c herer!!! temporary
+     $ ,ABPLUS(NDim*NDim),ABMIN(NDim*NDim),
+     $ CMAT(NDim*NDim),DMAT2(NDim,NBasis),EMAT2(NBasis,NBasis),
+     $ EMAT3(NBasis,NBasis)
+C
+C     STOP
 C
       Do J=1,NBasis
       Do I=1,NDim
@@ -4388,9 +4397,106 @@ C
       EndDo
       EndDo
 C
+c     START
+c      Return
+C
+C     LET US TRY TO "MAP" CAS 2-RDM ON GVB 2-RDM BY COUPLING ORBITALS INTO GEMINALS
+C
+      If(NELE-INActive.Ne.NAct-(NELE-INActive)) Then 
+      Write(6,*) 'Fatal Error: mapping of CAS 
+     $ on GVB only defined for CAS(m,m)'
+      Stop
+      EndIf
+C
+      NGemSave=NGem
+      Do I=1,NBasis
+      IGemSave(I)=IGem(I)
+      EndDo
+      NGem=INActive+NAct/2
+      Do I=1,NBasis
+      If(Occ(I).Ne.Zero) IGem(I)=0
+      If(Occ(I).Eq.Zero) IGem(I)=NGem+1
+      EndDo
+      Do I=1,INActive
+      IGem(I)=I
+      EndDo
+C
+C     COUPLE ORBITALS
+C
+      Write(6,'(/,X,"Mappinng of CAS(n,n) 2-RDM on GVB-like 2-RDM")')
+C
+      Do IP=INActive+1,NELE
+      IGem(IP)=IP
+C
+      XDevMax=Zero
+      Do IQ=NELE+1,NOccup
+C
+      XPQPQ=Abs(RDM2(NAddrRDM(IP,IQ,IP,IQ,NBasis))-
+     $ 2.0D0*Occ(IP)*Occ(IQ))
+      XPQQP=Abs(RDM2(NAddrRDM(IP,IQ,IQ,IP,NBasis))-
+     $ (-Occ(IP)*Occ(IQ)))
+      XDev=Half*(XPQPQ+XPQQP)/Occ(IQ)
+      If(XDev.Gt.XDevMax) Then
+      XDevMax=XDev      
+      IQMax=IQ
+      EndIf
+C
+      Write(*,*)IP,IQ
+      Write(*,*)'PPQQ',RDM2(NAddrRDM(IP,IP,IQ,IQ,NBasis)),
+     $ CICoef(IP)*CICoef(IQ)
+      Write(*,*)'PQPQ',RDM2(NAddrRDM(IP,IQ,IP,IQ,NBasis)),
+     $ 2.0D0*Occ(IP)*Occ(IQ)
+      Write(*,*)'PQQP',RDM2(NAddrRDM(IP,IQ,IQ,IP,NBasis)),
+     $ -Occ(IP)*Occ(IQ)
+C
+      EndDo
+C
+      If(IGem(IQMax).Eq.0) Then 
+      IGem(IQMax)=IP
+      Write(6,'(X,"**** Orbital",I2," coupled with",I2 )')IP,IQMax
+      Else
+      Write(6,*)
+     $ "Warning: more than 2 orbitals assigned to a geminal no",IP
+      EndIf
+C
+      EndDo
+C
+      Do I=1,NGem
+C
+      Write(6,'(/,X,"Geminal no",I2," includes")')I
+      Sum=Zero
+C
+      Do J=1,NBasis
+      If(IGem(J).Eq.I) Then
+      Sum=Sum+Occ(J)
+      Write(6,'(X,"Orbital No: ",I4)')J
+      EndIf
+      EndDo
+      Write(6,'(X,"Norm: ",F12.6)')Sum
+C
+      EndDo
+C
+      Do I=INActive+1,NBasis
+      Do J=INActive+1,NBasis
+      If(IGem(I).Ne.IGem(J)) EMATM(I,J)=EMATM(I,J)+
+     $ Four*C(I)*C(J)*(Two*TwoNO(NAddr3(I,I,J,J))
+     $ -TwoNO(NAddr3(I,J,J,I)))
+      EndDo
+      EndDo
+C
+      Call APSG_NEST(ABPLUS,ABMIN,CMAT,EMAT2,EMAT3,DMAT2,DMATM,
+     $ URe,Occ,XOne,TwoNO,
+     $ NBasis,NDim,NInte1,NInte2,NGem,2)
+C
+      NGem=NGemSave
+      Do I=1,NBasis
+      IGem(I)=IGemSave(I)
+      EndDo
+C
+C     STOP
+C
       Return
       End
-
 
 *Deck RDMFT_AB
       Subroutine RDMFT_AB(ABPLUS,ABMIN,URe,Occ,XOne,TwoMO,

@@ -511,14 +511,12 @@ integer :: i,ione
 double precision,parameter :: One = 1d0, Half = 0.5d0
 character(8) :: label
 character(:),allocatable :: onefile,twofile,propfile0,propfile1,rdmfile
-double precision :: tmp
-integer :: j
 
 ! perform check
- if(Flags%ICASSCF==0) then
-   write(LOUT,*) 'ERROR! E2DISP UNC AVAILABLE ONLY FOR CAS/HF!'
-   stop
- endif
+! if(Flags%ICASSCF==0) then
+!   write(LOUT,*) 'ERROR! E2DISP UNC AVAILABLE ONLY FOR CAS/HF!'
+!   stop
+! endif
 
 ! set filenames
  if(Mon%Monomer==1) then
@@ -567,38 +565,65 @@ integer :: j
  call tran4_full(NBas,MO,MO,fname)
  call LoadSaptTwoEl(Mon%Monomer,TwoMO,NBas,NInte2)
 
- allocate(ABPlus(Mon%NDimX**2),ABMin(Mon%NDimX**2),&
-          EigY(Mon%NDimX**2),EigY1(Mon%NDimX**2), &
-          Eig(Mon%NDimX),Eig1(Mon%NDimX))
+ ! GVB
+ if(Flags%ICASSCF==0.and.Flags%ISERPA==0) then
 
- ! read 2-RDMs
- call read2rdm(Mon,NBas)
- call system('cp '//rdmfile// ' rdm2.dat')
+    allocate(EigY(Mon%NDimX**2), &
+         Eig(Mon%NDimX),Eig1(Mon%NDimX))
+    
+    EigY  = 0
+    Eig   = 0
+    Eig1  = 0
 
- EigY  = 0
- EigY1 = 0
- Eig   = 0
- Eig1  = 0
+    call Y01GVB(TwoMO,Mon%Occ,URe,XOne, &
+         EigY,Eig,Eig1, &
+         Mon%IndN,Mon%IndX,Mon%NDimX,NBas,Mon%NDim,NInte1,NInte2)
+    
+    ! dump uncoupled response
+    call writeresp(EigY,Eig,propfile0)
+    if(Flags%IFlag0==0) then
+       call writeEval(Eig1,propfile1)
+    endif
 
- !call Y01CAS_mithap(Mon%Occ,URe,XOne,ABPlus,ABMin, &
- !     EigY,EigY1,Eig,Eig1, &
- !     Mon%IndN,Mon%IndX,Mon%IGem,Mon%NAct,Mon%INAct,Mon%NDimX, &
- !     NBas,Mon%NDim,NInte1,twofile,Flags%IFlag0)
+    deallocate(Eig1,Eig,EigY)
+    
+    ! CAS
+ elseif(Flags%ICASSCF==1.and.Flags%ISERPA==0) then
 
- call Y01CAS(TwoMO,Mon%Occ,URe,XOne,ABPlus,ABMin, &
-      EigY,EigY1,Eig,Eig1, &
-      Mon%IndN,Mon%IndX,Mon%NDimX,NBas,Mon%NDim,NInte1,NInte2,Flags%IFlag0)
+    allocate(ABPlus(Mon%NDimX**2),ABMin(Mon%NDimX**2),&
+         EigY(Mon%NDimX**2),EigY1(Mon%NDimX**2), &
+         Eig(Mon%NDimX),Eig1(Mon%NDimX))
+    
+    ! read 2-RDMs
+    call read2rdm(Mon,NBas)
+    call system('cp '//rdmfile// ' rdm2.dat')
+ 
+    EigY  = 0
+    EigY1 = 0
+    Eig   = 0
+    Eig1  = 0
+ 
+    !call Y01CAS_mithap(Mon%Occ,URe,XOne,ABPlus,ABMin, &
+    !     EigY,EigY1,Eig,Eig1, &
+    !     Mon%IndN,Mon%IndX,Mon%IGem,Mon%NAct,Mon%INAct,Mon%NDimX, &
+    !     NBas,Mon%NDim,NInte1,twofile,Flags%IFlag0)
+    
+    call Y01CAS(TwoMO,Mon%Occ,URe,XOne,ABPlus,ABMin, &
+         EigY,EigY1,Eig,Eig1, &
+         Mon%IndN,Mon%IndX,Mon%NDimX,NBas,Mon%NDim,NInte1,NInte2,Flags%IFlag0)
 
-! dump response
-! maybe construct smarter resp-files?
- call writeresp(EigY,Eig,propfile0)
- if(Flags%IFlag0==0) then
-    call writeresp(EigY1,Eig1,propfile1)
+    ! dump response
+    call writeresp(EigY,Eig,propfile0)
+    if(Flags%IFlag0==0) then
+       call writeresp(EigY1,Eig1,propfile1)
+    endif
+    
+    deallocate(Eig1,Eig,EigY1,EigY,ABMin,ABPlus)
+   
  endif
 
  close(ione)
  deallocate(TwoMO,URe,XOne,work1,work2)
- deallocate(Eig1,Eig,EigY1,EigY,ABMin,ABPlus)
 
 end subroutine calc_resp_unc
 
@@ -677,7 +702,7 @@ character(:),allocatable :: propfile0,propfile1
 double precision :: tmp
 double precision,parameter :: SmallE=0d0,BigE=1.D20
 double precision,external  :: trace
-integer :: offset
+integer :: INegExcit,offset
 integer,allocatable :: sort(:)
 double precision, allocatable :: EigTmp(:), VecTmp(:)
 ! testy
@@ -750,24 +775,24 @@ double precision, allocatable :: EigTmp(:), VecTmp(:)
  ! GVB
  if(Flags%ICASSCF==0.and.Flags%ISERPA==0) then
 
-   allocate(ABPlus(Mon%NDim**2),ABMin(Mon%NDim**2), &
-  ! allocate(ABPlus(Mon%NDimX**2),ABMin(Mon%NDimX**2), &
+  ! allocate(ABPlus(Mon%NDim**2),ABMin(Mon%NDim**2), &
+   allocate(ABPlus(Mon%NDimX**2),ABMin(Mon%NDimX**2), &
             EigVecR(Mon%NDimX**2),Eig(Mon%NDimX))
 
 
 ! HERE: STARTED WORK ON ACABMAT0_mithap!
   ! ACAlpha=sqrt(2d0)/2.d0
-  ! call ACABMAT0_mithap(ABPlus,ABMin,URe,Mon%Occ,XOne,&
-  !               Mon%IndN,Mon%IndX,Mon%IGem,Mon%CICoef,&
-  !               Mon%NAct,Mon%INAct,NBas,Mon%NDim,Mon%NDimX,NInte1,Mon%NGem,&
-  !               twofile,Flags%ISAPT,ACAlpha,1)
+   call ACABMAT0_mithap(ABPlus,ABMin,URe,Mon%Occ,XOne,&
+                 Mon%IndN,Mon%IndX,Mon%IGem,Mon%CICoef,&
+                 Mon%NAct,Mon%INAct,NBas,Mon%NDim,Mon%NDimX,NInte1,Mon%NGem,&
+                 twofile,Flags%ISAPT,ACAlpha,1)
 !   allocate(ABPlusT(Mon%NDim**2),ABMinT(Mon%NDim**2))
 !   call ACABMAT0(ABPlusT,ABMinT,URe,Mon%Occ,XOne,TwoMO, &
-   call ACABMAT0(ABPlus,ABMin,URe,Mon%Occ,XOne,TwoMO, &
-                 NBas,Mon%NDim,NInte1,NInte2,Mon%NGem,ACAlpha,1)
+!   call ACABMAT0(ABPlus,ABMin,URe,Mon%Occ,XOne,TwoMO, &
+!                 NBas,Mon%NDim,NInte1,NInte2,Mon%NGem,ACAlpha,1)
 
    ! reduce dim
-   call reduce_dim('AB',ABPlus,ABMin,Mon)
+   !call reduce_dim('AB',ABPlus,ABMin,Mon)
 
    ! TESTY
    !call reduce_dim('AB',ABPlusT,ABMinT,Mon)
@@ -791,6 +816,25 @@ double precision, allocatable :: EigTmp(:), VecTmp(:)
       call EneERPA(ETot,ECorr,Mon%PotNuc,EigVecR,Eig,TwoMO,URe,&
            Mon%Occ,XOne,Mon%IndN,NBas,NInte1,NInte2,Mon%NDimX,Mon%NGem)
    endif
+
+   ! uncoupled
+   allocate(EigY0(Mon%NDimX**2),Eig0(Mon%NDimX),Eig1(Mon%NDimX))
+ 
+   EigY0 = 0
+   Eig0 = 0
+   Eig1 = 0
+
+   call Y01GVB(TwoMO,Mon%Occ,URe,XOne, &
+        EigY0,Eig0,Eig1, &
+        Mon%IndN,Mon%IndX,Mon%NDimX,NBas,Mon%NDim,NInte1,NInte2)
+
+   ! dump uncoupled response
+   call writeresp(EigY0,Eig0,propfile0)
+   if(Flags%IFlag0==0) then
+      call writeEval(Eig1,propfile1)
+   endif
+
+   deallocate(Eig1,Eig0,EigY0)
 
  ! CAS-SCF
  elseif(Flags%ICASSCF==1.and.Flags%ISERPA==0) then
@@ -914,8 +958,10 @@ elseif(Flags%ISERPA==2) then
       allocate(ABPlus(Mon%NDimX**2),ABMin(Mon%NDimX**2), &
            EMAT(NBas**2),EMATM(NBas**2),&
            DMAT(Mon%NDim*NBas),DMATK(Mon%NDim*NBas),&
-           EigVecR(2*(Mon%NDimX+Mon%NDimN)*2*(Mon%NDimX+Mon%NDimN)),&
-           Eig(2*(Mon%NDimX+Mon%NDimN)))
+           !EigVecR(2*(Mon%NDimX+Mon%NDimN)*2*(Mon%NDimX+Mon%NDimN)),&
+           EigVecR((Mon%NDimX+Mon%NDimN)*(Mon%NDimX+Mon%NDimN)),&
+           !Eig(2*(Mon%NDimX+Mon%NDimN)))
+           Eig((Mon%NDimX+Mon%NDimN)))
 
       ACAlpha = One
       call AB_CAS(ABPlus,ABMin,ECASSCF,URe,Mon%Occ,XOne,TwoMO,Mon%IPair,&
@@ -930,8 +976,6 @@ elseif(Flags%ISERPA==2) then
 
       print*, 'DMAT',norm2(DMAT),norm2(DMATK)
       print*, 'EMAT',norm2(EMAT),norm2(EMATM)
-      !call reduce_dim('D',DMAT,DMATK,Mon)
-      !call reduce_dim('E',EMAT,EMATM,Mon)
       ij=0
       ij1=0
       do j = 1,Mon%NDimN
@@ -952,12 +996,12 @@ elseif(Flags%ISERPA==2) then
             EMATM(ij) = EMATM(ij1)
          enddo
       enddo
-      print*, 'DMAT-R',norm2(DMAT(1:Mon%NDimX*Mon%NDimN)),&
-           norm2(DMATK(1:Mon%NDimX*Mon%NDimN))
-      print*, 'EMAT-R',norm2(EMAT(1:Mon%NDimN**2)),&
-           norm2(EMATM(1:Mon%NDimN**2))
-      print*, 'ABPlus',norm2(ABPlus),'ABMin',norm2(ABMin)
-      !! code for He/Be only!
+      !print*, 'DMAT-R',norm2(DMAT(1:Mon%NDimX*Mon%NDimN)),&
+      !     norm2(DMATK(1:Mon%NDimX*Mon%NDimN))
+      !print*, 'EMAT-R',norm2(EMAT(1:Mon%NDimN**2)),&
+      !     norm2(EMATM(1:Mon%NDimN**2))
+      !print*, 'ABPlus',norm2(ABPlus),'ABMin',norm2(ABMin)
+      ! code for H2,He/Be only!
      ! allocate(ABPlus(Mon%NDim**2),ABMin(Mon%NDim**2), &
      !      CMAT(Mon%NDim**2),EMAT(NBas**2),EMATM(NBas**2),&
      !      DMAT(Mon%NDim*NBas),DMATK(Mon%NDim*NBas),&
@@ -1015,23 +1059,28 @@ elseif(Flags%ISERPA==2) then
 
    EigVecR = 0
    Eig = 0
-   call PINOVEC(EigVecR,Eig,ABPlus,ABMin,DMAT,DMATK,EMAT,EMATM, &
-        Mon%Occ,NBas,Mon%NDimX,Mon%NDimN)
+  ! call PINOVEC(EigVecR,Eig,ABPlus,ABMin,DMAT,DMATK,EMAT,EMATM, &
+  !      Mon%Occ,NBas,Mon%NDimX,Mon%NDimN)
+  !
 
-   tst =0d0
-   DimEx = 2*(Mon%NDimX+Mon%NDimN)
-   do i=1,DimEx
-   if(Eig(i).gt.0d0) then
-      do j=1,Mon%NDimX
-         tst = tst + EigVecR((i-1)*DimEx+j)**2
-       enddo
-   endif   
-   enddo  
-   print*, 'EigVecR',sqrt(tst)
-
+! reduced version
+   call PINOVECRED(EigVecR,Eig,INegExcit,ABPlus,ABMin,DMAT,DMATK, &
+        EMAT,EMATM,NBas,Mon%NDimX,Mon%NDimN)
+!! the lines below are needed if EnePINO is called subsequently
+!   EigVecR(1:2*(NDim+NBasis)*2*(NDim+NBasis))=Zero 
+!   do i=1,NDimX+NDimN
+!     Eig(i+NDimX+NDimN)=Zero
+!      do j=1,NDimX+NDimN
+!      If(j.Le.NDimX) EigVecR((i-1)*2*(NDimX+NDimN)+j)=
+!     $ EigVecRR((i-1)*(NDimX+NDimN)+J)
+!      If(j.Gt.NDimX) EigVecR((i-1)*2*(NDimX+NDimN)+J+NDimX)=
+!     $ EigVecRR((I-1)*(NDimX+NDimN)+J)
+!      enddo
+!   enddo 
+!
    ETot = 0
-   call EnePINO(ETot,Mon%PotNuc,EigVecR,Eig,TwoMO,URe,Mon%Occ,XOne, &
-        Mon%IndN,NBas,NInte1,NInte2,Mon%NDimX,Mon%NDimN)
+!   call EnePINO(ETot,Mon%PotNuc,EigVecR,Eig,TwoMO,URe,Mon%Occ,XOne, &
+!        Mon%IndN,NBas,NInte1,NInte2,Mon%NDimX,Mon%NDimN)
    
    deallocate(EMAT,EMATM,DMAT,DMATK)
    
@@ -1044,6 +1093,9 @@ endif
 ! deallocate(work1,work2,XOne,URe)
  deallocate(work1,work2,XOne,TwoMO,URe)
  deallocate(ABPlus,ABMin,EigVecR,Eig)
+
+ ! delete TWOMO file
+ !call delfile(twofile)
 
 end subroutine calc_resp_full
 
@@ -1678,6 +1730,19 @@ integer :: iunit
 
 end subroutine writeresp
 
+subroutine writeEval(EVal,mon)
+implicit none
+
+character(*) :: mon
+double precision :: EVal(:)
+integer :: iunit
+
+ open(newunit=iunit,file=mon,form='unformatted')
+ write(iunit) EVal
+ close(iunit)
+
+end subroutine writeEval
+
 !subroutine readresp(EVec,EVal,NDim,fname)
 !implicit none
 !
@@ -2110,9 +2175,9 @@ integer :: test
              ! do not correlate active degenerate orbitals from different geminals 
              if((mon%IndAux(i)==1).and.(mon%IndAux(j)==1)  & 
                   .and.&
-                  (Abs(mon%Occ(i)-mon%Occ(j))/mon%Occ(i).lt.1.d-10) ) then
+                !  (Abs(mon%Occ(i)-mon%Occ(j))/mon%Occ(i).lt.1.d-8) ) then
                 ! here!!!
-                !(Abs(mon%Occ(i)-mon%Occ(j))/mon%Occ(i).lt.0.5d-1) ) then
+                (Abs(mon%Occ(i)-mon%Occ(j))/mon%Occ(i).lt.1d-3) ) then
                 
                 write(LOUT,'(1x,a,2x,2i4)') 'Discarding nearly degenerate pair',i,j 
              else
@@ -2159,7 +2224,7 @@ integer :: test
                   mon%Occ(i)/=1d0.and.mon%Occ(j)/=1d0) ) then
                 
                 ind = ind + 1
-                mon%IndX(ind) = ind
+                mon%IndX(ind) =  ind !ij 
                 mon%IndXh(ind) = ij
                 mon%IndN(1,ind) = i
                 mon%IndN(2,ind) = j
@@ -2189,7 +2254,8 @@ integer :: test
              ! do not correlate active degenerate orbitals from different geminals 
              if((mon%IndAux(i)==1).and.(mon%IndAux(j)==1)  & 
               .and.&
-              (Abs(mon%Occ(i)-mon%Occ(j))/mon%Occ(i).lt.1.d-10) ) then
+              !(Abs(mon%Occ(i)-mon%Occ(j))/mon%Occ(i).lt.1.d-10) ) then
+              (Abs(mon%Occ(i)-mon%Occ(j))/mon%Occ(i).lt.1.d-3) ) then
               write(LOUT,'(1x,a,2x,2i4)') 'Discarding nearly degenerate pair',i,j 
              else
              ! if IFlCore=0 exclude core (inactive) orbitals
@@ -2199,7 +2265,7 @@ integer :: test
                 
                 ind = ind + 1
                 ! active Be
-                mon%IndX(ind) = ind ! ij
+                mon%IndX(ind) = ind !ij 
                 mon%IndXh(ind) = ij
                 mon%IndN(1,ind) = i
                 mon%IndN(2,ind) = j
@@ -2604,6 +2670,9 @@ if(allocated(SAPT%monB%RDM2)) then
   deallocate(SAPT%monB%RDM2,SAPT%monB%RDM2Act)
   deallocate(SAPT%monB%Ind2)
 endif
+
+! delete AOTWOSORT
+ call delfile('AOTWOSORT')
 
 end subroutine free_sapt
 

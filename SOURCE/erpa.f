@@ -1882,7 +1882,7 @@ C     ORTHOGONALISE DEGENERATE VECTORS
 C      Call ZERO_DEGVEC(EigVecR,Eig,Space1,DimV1,NDimEx,Max_NDEG)
 C    
       NDeg = 0
-      Do I=1,NDimEx
+      Do I=1,NI
       If(Space1(3,I).Gt.1) NDeg = NDeg + 1
       EndDo
       Write(6,*) 'NUMBER OF DEGENERATE VECS:', NDeg 
@@ -1943,6 +1943,171 @@ C
       EigVecR((NU-1)*NI+I)=EigVecR((NU-1)*NI+I)*SumNU
       EndDo
 C
+c     enddo NU
+      EndDo
+C
+      Return
+      End
+
+*Deck PINOVECRED
+      Subroutine PINOVECRED(EigVecR,Eig,INegExcit,
+     $ APLUS,AMIN,DPLUS,DMIN,EPLUS,EMIN,
+     $ NBasis,NDimX,NDimN)
+C
+C     A REDUCED NONSYMMETRIC PINO PROBLEM IS SOLVED
+C
+      Implicit Real*8 (A-H,O-Z)
+C
+      Parameter(Zero=0.D0,Half=0.5D0,One=1.D0,Two=2.D0,Three=3.D0,
+     $ Four=4.D0,Small=1.D-2)
+C
+      Integer :: DimV1,Max_NDEG
+      Integer :: Space1(3,2*(NDimX+NDimN))
+C
+      Include 'commons.inc'
+C
+      Dimension
+     $ APLUS(NDimX,NDimX),AMIN(NDimX,NDimX),
+     $ DPLUS(NDimX,NDimN),EPLUS(NDimN,NDimN),
+     $ DMIN(NDimX,NDimN),EMIN(NDimN,NDimN),
+     $ Q1(NDimX+NDimN,NDimX+NDimN),
+     $ Q2(NDimX+NDimN,NDimX+NDimN),
+     $ EigVecR((NDimX+NDimN)*(NDimX+NDimN)),
+     $ Eig(NDimX+NDimN),Work(5*(NDimX+NDimN)),
+     $ HlpAB(NDimX+NDimN,NDimX+NDimN),
+     $ EigI(NDimX+NDimN)
+C
+C     SYMMETRIZE A+,A-
+C
+      Do I=1,NDimX
+      Do J=I+1,NDimX
+      APLUS(I,J)=Half*(APLUS(I,J)+APLUS(J,I))
+      APLUS(J,I)=APLUS(I,J)
+      AMIN(I,J)=Half*(AMIN(I,J)+AMIN(J,I))
+      AMIN(J,I)=AMIN(I,J)
+      EndDo
+      EndDo
+C
+      Do I=1,NDimX+NDimN
+      Do J=1,NDimX+NDimN
+C
+      If(I.Le.NDimX) Then
+C
+      If(J.Le.NDimX) Then
+      Q1(I,J)=APLUS(I,J)
+      Q2(I,J)=AMIN(I,J)
+      Else
+      Q1(I,J)=DPLUS(I,J-NDimX)
+      Q2(I,J)=DMIN(I,J-NDimX)
+      EndIf
+C
+      Else
+C
+      If(J.Le.NDimX) Then
+      Q1(I,J)=Two*DPLUS(J,I-NDimX)
+      Q2(I,J)=Two*DMIN(J,I-NDimX)
+      Else
+      Q1(I,J)=EPLUS(I-NDimX,J-NDimX)
+      Q2(I,J)=EMIN(I-NDimX,J-NDimX)
+      EndIf
+C
+      EndIf
+C
+      EndDo
+      EndDo
+C
+      NI=NDimX+NDimN
+C
+      Call MultpM(HlpAB,Q1,Q2,NI)
+C
+      Call DGEEV('N','V',NI,HlpAB,NI,Eig,EigI,
+     $           Q1,NI,EigVecR,NI,Work,5*I,INFO)
+C
+C     ORTHOGONALISE DEGENERATE VECTORS
+      Write(6,*) 'ORTHOGONALIZE DEGENERATE VECTORS IN PINOVEC'
+      Call SORT_PINOVECS(EigVecR,Eig,EigI,NI)
+      Call CREATE_SPACE(Eig,Space1,NI,DimV1,Max_NDEG)
+      Call ORTHO_DEGVEC(EigVecR,Space1,DimV1,NI,Max_NDEG)
+C      Call ZERO_DEGVEC(EigVecR,Eig,Space1,DimV1,NDimEx,Max_NDEG)
+C    
+      NDeg = 0
+      Do I=1,NI
+      If(Space1(3,I).Gt.1) NDeg = NDeg + 1
+      EndDo
+      Write(6,*) 'NUMBER OF DEGENERATE VECS:', NDeg 
+C      Write(6,*) 'DimV1                    :', DimV1
+      Write(6,*) 'MAXIMUM DEGENERACY       :', Max_NDEG
+      Write(6,*) ' '
+C
+      Do NU=1,NI
+C
+      If(Abs(EigI(NU)).Gt.1.D-12) Then
+C
+      Write(6,'(X,"Complex PINO Eigenvalue",I4,2E12.4)')
+     $ NU,Eig(NU),EigI(NU)
+      Eig(NU)=Zero
+      Do I=1,NI
+      EigVecR((NU-1)*NI+I)=Zero
+      EndDo
+C
+      EndIf
+      EndDo
+C
+C     IMPOSE THE NORMALIZATION 2 Y*X + V*W = 1 ON THE EIGENVECTORS CORRESPONDING TO POSITIVE
+C     OMEGA'S 
+C
+      Write(6,'(X,"Threshold for small PINO Eigenvalue ",E12.4)')
+     $ Small
+C
+      Do NU=1,NI
+      SumNU=Zero
+C
+      If(Eig(NU).Gt.Small) Then
+C    
+      Eig(NU)=SQRT(Eig(NU))
+C
+      Do I=1,NI
+C
+      If(I.Le.NDimX) Then
+C
+      Do J=1,NI
+      SumNU=SumNU+Two/Eig(NU)*Q2(I,J)*
+     $ EigVecR((NU-1)*NI+I)*EigVecR((NU-1)*NI+J)
+      EndDo
+C
+      Else
+C
+      Do J=1,NI
+      SumNU=SumNU+One/Eig(NU)*Q2(I,J)*
+     $ EigVecR((NU-1)*NI+I)*EigVecR((NU-1)*NI+J)
+      EndDo
+C
+      EndIf
+C
+      EndDo
+C
+      If(SumNU.Gt.Zero) Then
+      SumNU=One/Sqrt(SumNU)
+      Else
+      WritE(*,*)'Neg Norm in PINOVECSYMM',SumNU
+      SumNU=Zero
+      EndIf
+C
+      Do I=1,NI
+      EigVecR((NU-1)*NI+I)=EigVecR((NU-1)*NI+I)*SumNU
+      EndDo
+C
+c     If(Eig(NU).Gt.Small) Then
+      Else
+C
+      Write(6,'(X,"Small or Negative PINO Eigenvalue ",I4,E12.4)')
+     $ NU,Eig(NU)
+      Eig(NU)=Zero
+      Do I=1,NI
+      EigVecR((NU-1)*NI+I)=Zero
+      EndDo
+C
+      EndIf
 c     enddo NU
       EndDo
 C

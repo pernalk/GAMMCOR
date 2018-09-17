@@ -2150,6 +2150,139 @@ C
       Return
       End
 
+*Deck Y01GVB
+      Subroutine Y01GVB(TwoNO,Occ,URe,XOne,EigY,Eig,Eig1,
+     $ IndN,IndX,NDimX,NBasis,NDim,NInte1,NInte2)
+C
+C     A ROUTINE FOR COMPUTING 0TH-ORDER Y VECTORS 
+C     AND 0TH and 1ST-ORDER EIGENVALUES OF ERPA
+C     FOR GVB REFERENCE 
+C
+      Implicit Real*8 (A-H,O-Z)
+C
+      Include 'commons.inc'
+c
+      Parameter(Zero=0.D0,Half=0.5D0,One=1.D0,Two=2.D0,Three=3.D0,
+     $ Four=4.D0)
+C
+      Dimension
+     $ URe(NBasis,NBasis),XOne(NInte1),Occ(NBasis),TwoNO(NInte2),
+     $ Eig(NDimX),Eig1(NDimX),
+     $ EigY(NDimX*NDimX),
+     $ IndX(NDim),IndN(2,NDim)
+C
+C     LOCAL ARRAYS
+C
+      Dimension C(NBasis),ABPLUS(NDim*NDim),ABMIN(NDim*NDim),
+     $ INN(NBasis,NBasis),AMAT(NDim*NDim),BMAT(NDim*NDim)
+C
+      EigY(1:NDimX*NDimX)=Zero
+C
+      Do I=1,NBasis
+      C(I)=CICoef(I)
+      EndDo
+C 
+      IPQ=0
+      Do IP=1,NBasis
+      Do IQ=1,IP-1
+      IPQ=IPQ+1
+      INN(IP,IQ)=IPQ
+      INN(IQ,IP)=IPQ
+      EndDo
+      EndDo 
+C
+C     0-TH ORDER EIGENVECTORS AND EIGENVALUES
+C
+      ACAlpha=Zero
+      Call ACABMAT0(ABPLUS,ABMIN,URe,Occ,XOne,TwoNO,
+     $ NBasis,NDim,NInte1,NInte2,NGem,ACAlpha,1)
+C
+      Do NU=1,NDimX
+C
+      NUI=(NU-1)*NDimX+NU
+C
+      IP=IndN(1,NU)
+      IQ=IndN(2,NU)
+      IPQ=INN(IP,IQ)
+      IPQPQ=(IPQ-1)*NDim+IPQ
+C
+C     0TH-ORDER EIGENVALUES
+C
+      Eig(NU)=Zero
+C
+      If(Occ(IP).Ne.Occ(IQ).And.IGem(IP).Ne.IGem(IQ)) Then
+      AA=Half*((C(IP)+C(IQ))**2*ABPLUS(IPQPQ)
+     $       + (C(IP)-C(IQ))**2*ABMIN(IPQPQ))
+      Eig(NU)=ABS(AA/(Occ(IP)-Occ(IQ)))
+      ElseIf(IGem(IP).Eq.IGem(IQ)) Then
+      Eig(NU)=ABS(ABPLUS(IPQPQ))
+      EndIf
+C
+C     0TH-ORDER Y EIGENVECTORS
+C
+      If(IGem(IP).Eq.IGem(IQ)) Then
+C
+      EigY(NUI)=SQRT(Half)
+C
+      Else
+C
+      If(Occ(IP)-Occ(IQ).Ne.Zero) Then
+      If(Occ(IQ).Gt.Occ(IP))EigY(NUI)=
+     $ SQRT(Half)*(C(IQ)-C(IP))/SQRT(Occ(IQ)-Occ(IP))
+      If(Occ(IP).Gt.Occ(IQ))EigY(NUI)=
+     $ SQRT(Half)*(C(IP)-C(IQ))/SQRT(Occ(IP)-Occ(IQ))
+      Else
+      EigY(NUI)=Zero
+      EndIf
+C
+      EndIf
+C
+      EndDo
+C
+      Do I=1,NDim*NDim
+      AMAT(I)=ABPLUS(I)
+      BMAT(I)=ABMIN(I)
+      EndDo
+      ACAlpha=One
+      Call ACABMAT0(ABPLUS,ABMIN,URe,Occ,XOne,TwoNO,
+     $ NBasis,NDim,NInte1,NInte2,NGem,ACAlpha,1)
+C
+C     AMAT AND BMAT WILL INCLUDE 1ST-ORDER A+ AND A- MATRICES, RESPECTIVELY
+C
+      Do I=1,NDim*NDim
+      AMAT(I)=ABPLUS(I)-AMAT(I)
+      BMAT(I)=ABMIN(I)-BMAT(I)
+      EndDo      
+C
+      Do NU=1,NDimX
+C
+      NUI=(NU-1)*NDimX+NU
+C
+      IP=IndN(1,NU)
+      IQ=IndN(2,NU)
+      IPQ=INN(IP,IQ)
+      IPQPQ=(IPQ-1)*NDim+IPQ
+C
+      Eig1(NU)=Zero
+C
+      If(Occ(IP).Ne.Occ(IQ).And.IGem(IP).Ne.IGem(IQ)) Then
+C
+      Y=EigY(NUI)
+      If(Occ(IQ).Gt.Occ(IP)) X=Y/(C(IQ)-C(IP))*(C(IQ)+C(IP))
+      If(Occ(IP).Gt.Occ(IQ)) X=Y/(C(IP)-C(IQ))*(C(IQ)+C(IP))
+      Eig1(NU)=X*AMAT(IPQPQ)*X+Y*BMAT(IPQPQ)*Y
+C
+      ElseIf(IGem(IP).Eq.IGem(IQ)) Then
+C
+      Eig1(NU)=AMAT(IPQPQ)*Half+BMAT(IPQPQ)*Half
+C
+      EndIf
+C
+      EndDo
+C
+      Return
+      End
+
 *Deck SndOrder
       Subroutine SndOrder(ECorr,ECorr0,TwoNO,Occ,URe,XOne,
      $ ABPLUS,ABMIN,Eig,

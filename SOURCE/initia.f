@@ -1678,6 +1678,7 @@ C
      
       If(ICAS.Eq.1) Then
       ICASSCF = ICAS
+      NELE = Mon%NELE
       NAcCAS  = Mon%NAct
       NInAcCAS= Mon%INAct
       EndIf
