@@ -3220,7 +3220,7 @@ C
    40 Continue
       Close(10)
 C
-      Write(*,*) 'RDM2Act',norm2(RDM2Act)
+C      Write(*,*) 'RDM2Act',norm2(RDM2Act)
 C     COMPUTE THE ENERGY FOR CHECKING
 C
       ETot=Zero 
@@ -3280,7 +3280,7 @@ C
       EndDo
       EndDo
 C
-      Write(*,*) 'HNO-Ka', norm2(HNO)
+C      Write(*,*) 'HNO-Ka', norm2(HNO)
 
 C     CONSTRUCT TWO-ELECTRON PART OF THE AC ALPHA-HAMILTONIAN      
 C
@@ -3329,8 +3329,8 @@ C
       EndDo
 C
 C
-      Write(*,*) 'AuxI-Ka',norm2(AuxI)
-      Write(*,*) 'AuxIO-Ka',norm2(AuxIO)
+C      Write(*,*) 'AuxI-Ka',norm2(AuxI)
+C      Write(*,*) 'AuxIO-Ka',norm2(AuxIO)
 C
 C     AUXILIARY MATRIX WMAT
 C
@@ -3360,7 +3360,7 @@ C
       EndDo
       EndDo
 C
-      Write(*,*) 'WMAT-Ka',norm2(WMAT)
+C      Write(*,*) 'WMAT-Ka',norm2(WMAT)
 C
       Do IRow=1,NDimX
 C
@@ -3567,7 +3567,7 @@ C
       EndDo
       EndDo
 C
-      Print*, "AB-Ka",norm2(ABPLUS),norm2(ABMIN)
+C      Print*, "AB-Ka",norm2(ABPLUS),norm2(ABMIN)
 C
       Deallocate(RDM2Act)
 C

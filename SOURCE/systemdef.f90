@@ -38,15 +38,15 @@ select case(CalcParams%JobType)
 !SAPT
 case(5)
    
-   if(CalcParams%InterfaceType.ne.INTER_TYPE_DAL) then
+   if(CalcParams%InterfaceType.eq.INTER_TYPE_OWN) then
       write(6,'(1x,a)') "ERROR! SAPT REQUIRES:"
-      write(6,'(1x,a)') "Interface      DALTON"
+      write(6,'(1x,a)') "Interface    DALTON/MOLPRO"
       stop
    endif
 
-   if(CalcParams%RDMSource.ne.INTER_TYPE_DAL) then
+   if(CalcParams%RDMSource.eq.INTER_TYPE_OWN) then
       write(6,'(1x,a)') "ERROR! SAPT REQUIRES:"
-      write(6,'(1x,a)') "RDMSource      DALTON"
+      write(6,'(1x,a)') "RDMSource    DALTON/MOLPRO"
       stop
    endif
 end select
@@ -66,17 +66,17 @@ case(1)
    endif
 ! Molpro
 case(2)
-   if(CalcParams%RDMSource.ne.INTER_TYPE_OWN) then
+   if(CalcParams%RDMSource.ne.INTER_TYPE_MOL) then
+      print*, 'RDMSource',CalcParams%RDMSource,INTER_TYPE_MOL
       write(LOUT,'(1x,a)') 'ERROR! Molpro INTERFACE REQUIRES:' 
-      write(LOUT,'(1x,a)') 'RDMSource     OWN' 
+      write(LOUT,'(1x,a)') 'RDMSource     MOLPRO' 
       stop
-    elseif(CalcParams%RDMType==RDM_TYPE_CAS.or.&
+    elseif(CalcParams%RDMType==RDM_TYPE_GVB.or.&
            CalcParams%RDMType==RDM_TYPE_DMRG) then
       write(LOUT,'(1x,a)') 'ERROR! INTERFACE Molpro REQUIRES :'
-      write(LOUT,'(1x,a)') 'RDMType     GVB or APSG' 
+      write(LOUT,'(1x,a)') 'RDMType     CAS' 
       stop
    endif
-! OWN ??? 
 end select
 
 ! check Fragments (EERPA)
@@ -130,9 +130,9 @@ else
      
   case(INTER_TYPE_MOL)
      Flags%IDALTON = 0
-!    Flags%IAO     = 0
-!    Flags%INO     = 0
-     Flags%NoSym   = Input%CalcParams%SymType 
+     Flags%IAO     = 1
+     Flags%INO     = 1
+     !Flags%NoSym   = Input%CalcParams%SymType 
      Flags%IA = 1 
 
   case(INTER_TYPE_OWN)
@@ -258,8 +258,10 @@ if(Flags%ISAPT.Eq.0) then
 ! fill SAPT
 elseif(Flags%ISAPT.Eq.1) then
 
+ SAPT%InterfaceType = Input%CalcParams%InterfaceType
  SAPT%IPrint = Input%CalcParams%IPrint
  SAPT%SaptLevel = Input%CalcParams%SaptLevel
+ if(SAPT%InterfaceType==2) SAPT%HFCheck=.false.
 
  associate( monA => SAPT%monA, &
             monB => SAPT%monB ) 

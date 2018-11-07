@@ -101,6 +101,7 @@ type SystemBlock
       integer :: NActS(8), INActS(8)
       integer :: NDim, NDimX
       integer :: NDimN
+      integer :: NoSt = 1
       integer :: NCen = 0
       integer :: UCen = 0  
       integer :: NMonBas(8) = 0
@@ -113,6 +114,7 @@ type SystemBlock
       integer,allocatable :: IGem(:), IndAux(:)
       integer,allocatable :: IndX(:), IndN(:,:), IPair(:,:)
       integer,allocatable :: IndXh(:)
+      integer,allocatable :: NumOSym(:),IndInt(:)
       ! TEST ONLY
       integer,allocatable :: IndNT(:,:)
       integer,allocatable :: Ind2(:)
@@ -176,6 +178,7 @@ type SaptData
      type(SystemBlock) :: monA, monB
      double precision :: Vnn,elst,e2ind,e2disp
      double precision :: e2disp_sc,e2disp_sp,e2disp_unc
+     integer :: InterfaceType = INTER_TYPE_DAL
      integer :: SaptLevel = SAPTLEVEL2
      integer :: IPrint = 1000
      logical :: EnChck = .true., HFCheck=.true.
@@ -422,6 +425,253 @@ integer :: nline
 
 end subroutine print_mo
 
+!HERE!
+subroutine readgridmolpro(iunit,text,npt,r,wt)
+implicit none
+integer :: iunit
+integer :: ios
+integer :: npt
+double precision :: r(:,:),wt(:)
+character(8) :: text, label
+
+rewind(iunit)
+do
+  read(iunit,iostat=ios) label
+  if(ios<0) then
+     write(6,*) 'ERROR!!! LABEL '//text//' not found!'  
+     stop
+  endif
+  if(label==text) then
+
+     read(iunit) npt
+     read(iunit) r(1:3,1:npt) 
+     read(iunit) wt(1:npt)
+     exit
+  endif 
+enddo
+
+end subroutine readgridmolpro
+
+subroutine readorbsmolpro(iunit,text,mapinv,orbval)
+implicit none
+integer :: iunit
+integer :: ios
+integer :: npt, ndiff, ntg
+double precision :: mapinv(:),orbval(:,:,:)
+character(8) :: text, label
+
+rewind(iunit)
+do
+  read(iunit,iostat=ios) label
+  if(ios<0) then
+     write(6,*) 'ERROR!!! LABEL '//text//' not found!'  
+     stop
+  endif
+  if(label==text) then
+
+     read(iunit) npt,ndiff,ntg
+     read(iunit) orbval(1:npt,1:ndiff,1:ntg)
+     read(iunit) mapinv(1:ntg)
+     exit
+  endif 
+enddo
+
+end subroutine readorbsmolpro
+
+subroutine read_2rdm_molpro(twordm,nost,infile,nact)
+implicit none
+! only active part of 2RDM is kept
+
+integer,intent(in) :: nact,nost
+character(*),intent(in) :: infile
+double precision,intent(out) :: twordm(nact**2*(nact**2+1)/2)
+integer :: iunit,ios,ist,nstate,ic1d,TrSq
+integer :: i,j,k,l,ij,kl,ik,jl,ijkl,ikjl,lend
+double precision,allocatable :: work(:)
+character(8) :: label
+
+ TrSq = nact**2*(nact**2+1)/2
+
+ allocate(work(TrSq))
+ open(newunit=iunit,file=infile,status='OLD', &
+      access='SEQUENTIAL',form='UNFORMATTED')
+
+ fileloop: do
+           read(iunit,iostat=ios) label
+           if(ios<0) then
+              write(LOUT,*) 'ERROR!!! LABEL 2RDM     not found!'  
+              stop
+           endif
+           if(label=='2RDM    ') then
+              read(iunit) ic1d,nstate
+              print*, ic1d,TrSq,nstate
+              do i=1,nstate
+                 read(iunit) ist 
+                 read(iunit) work(1:TrSq)
+                 if(ist==nost) exit fileloop
+              enddo
+              write(LOUT,'(1x,a)') 'ERROR!!! 2RDM FOR REQUESTED STATE&
+                          & NOT PRESENT IN 2RDM FILE!'
+              stop
+           endif 
+         enddo fileloop
+
+ close(iunit)
+
+ ijkl = 0
+ do i=1,nact
+    do j=1,nact
+       do k=1,i
+          lend = nact
+          if(k==i) lend = j
+          do l=1,lend
+             ijkl = ijkl + 1
+
+             ik = (i-1)*nact + k
+             jl = (j-1)*nact + l
+             ikjl = max(ik,jl)*(max(ik,jl)-1)/2+min(ik,jl)
+             twordm(ikjl) = work(ijkl)*0.5d0
+
+             ik = (k-1)*nact + i
+             jl = (l-1)*nact + j
+             ikjl = max(ik,jl)*(max(ik,jl)-1)/2+min(ik,jl)
+             twordm(ikjl) = work(ijkl)*0.5d0
+
+          enddo
+       enddo
+    enddo
+ enddo
+
+ deallocate(work)
+
+!!! HERE : in SAPT writing to rdm2.dat will be necessary
+!!!! better loop!!!
+! ijkl = 0
+! open(newunit=iunit,file=outfile,form='unformatted')  
+! do i=1,nact
+!    do j=1,nact
+!       ij = (i-1)*nact+j 
+!       do k=1,nact
+!          do l=1,nact
+!             kl = (k-1)*nact+l
+!             if(ij>=kl) then
+!               ijkl = ijkl + 1  
+!               write(iunit,'(4I4,F19.12)') k,i,l,j,twordm(ijkl)
+!             endif        
+!          enddo
+!       enddo
+!    enddo
+! enddo
+! close(iunit)
+
+end subroutine read_2rdm_molpro
+
+subroutine read_1rdm_molpro(onerdm,nost,infile,nbasis)
+implicit none
+
+integer,intent(in) :: nbasis,nost
+character(*),intent(in) :: infile
+double precision,intent(out) :: onerdm(nbasis*(nbasis+1)/2)
+integer :: iunit,ios,ist,nact,nact2,nstate
+integer :: i,j,ij,idx
+double precision,allocatable :: work(:)
+character(8) :: label
+
+ allocate(work(NBasis**2))
+ open(newunit=iunit,file=infile,status='OLD', &
+      access='SEQUENTIAL',form='UNFORMATTED')
+
+ fileloop: do
+           read(iunit,iostat=ios) label
+           if(ios<0) then
+              write(LOUT,*) 'ERROR!!! LABEL 1RDM     not found!'  
+              stop
+           endif
+           if(label=='1RDM    ') then
+              read(iunit) nact,nact2,nstate
+              !print*, nact2,nstate
+              do i=1,nstate
+                 read(iunit) ist 
+                 read(iunit) work(1:nact2)
+                 if(ist==nost) exit fileloop
+              enddo
+              write(LOUT,'(1x,a)') 'ERROR!!! 1RDM FOR REQUESTED STATE&
+                          & NOT PRESENT IN 2RDM FILE!'
+              stop
+           endif 
+         enddo fileloop
+
+ close(iunit)
+
+ !call sq_to_triang(work,onerdm,nact)
+ onerdm = 0
+ idx = 0 
+ do j=1,nact
+    do i=1,j
+       idx = idx + 1
+       ij = i + (j-1)*nact 
+       onerdm(idx) = work(ij)*0.5d0
+    enddo
+ enddo
+
+ deallocate(work)
+
+end subroutine read_1rdm_molpro
+
+subroutine read_mo_molpro(cmo,infile,text,nbasis)
+implicit none
+
+integer,intent(in) :: nbasis
+character(*),intent(in) :: infile,text
+double precision,intent(out) :: cmo(nbasis,nbasis)
+character(8) :: label
+integer :: iunit,ios
+integer :: nsym,nbas(8),offs(8),ncmot
+integer :: i,j,idx,irep,ioff 
+double precision ::tmp(nbasis**2)
+
+ open(newunit=iunit,file=infile,status='OLD', &
+      access='SEQUENTIAL',form='UNFORMATTED')
+
+ !rewind(iunit)
+ do
+   read(iunit,iostat=ios) label
+   if(ios<0) then
+      write(6,*) 'ERROR!!! LABEL '//text//' not found!'  
+      stop
+   endif
+   if(label==text) then
+      read(iunit) nsym,nbas(1:nsym),offs(1:nsym)
+      ncmot = sum(nbas(1:nsym)**2)
+      !print*, nsym,nbas(1:nsym),offs(1:nsym)
+      !print*, ncmot
+      read(iunit) tmp(1:ncmot)
+      exit
+   endif 
+ enddo
+ 
+!! HERE: should there be a norb-offset?
+ cmo = 0
+ idx = 0
+ do irep=1,nsym
+    ioff = offs(irep)
+    do j=1,nbas(irep)
+       do i=1,nbas(irep)
+          idx = idx + 1 
+          cmo(ioff+i,ioff+j) = tmp(idx)
+       enddo
+    enddo       
+ enddo
+
+  !write(LOUT,*) 'test print'
+  !do i=1,NBasis
+  !   write(*,'(14f11.6)') (cmo(i,j),j=1,nbasis)
+  !end do
+
+ close(iunit)
+
+end subroutine read_mo_molpro 
+
 subroutine readlabel(iunit,text)
 ! sets file pointer 
 ! to first data after text
@@ -470,6 +720,71 @@ do
 enddo
 
 end subroutine readoneint
+
+subroutine readoneint_molpro(mone,infile,text,expand,ntr)
+implicit none
+! reads one-el integrals from a molpro file
+! if expand=.true. destroys symmetry in mone
+
+integer,intent(in) :: ntr
+logical,intent(in) :: expand
+character(*),intent(in) :: infile,text
+character(8) :: label
+integer :: iunit,ios
+integer :: nsym,nbas(8),offs(8),ntdg
+integer :: i,j,idx,irep,ioff,ii 
+double precision,intent(out) :: mone(ntr)
+double precision :: tmp(ntr)
+
+ open(newunit=iunit,file=infile,status='OLD', &
+      access='SEQUENTIAL',form='UNFORMATTED')
+
+ ntdg = 0
+ rewind(iunit)
+ read(iunit) 
+ read(iunit) nsym,nbas(1:nsym),offs(1:nsym)
+ read(iunit)
+ do irep=1,nsym
+    ntdg = ntdg + nbas(irep)*(nbas(irep)+1)/2
+ enddo
+
+ do
+   read(iunit,iostat=ios) label
+   if(ios<0) then
+      write(6,*) 'ERROR!!! LABEL '//text//' not found!'  
+      stop
+   endif
+   if(label==text) then
+      read(iunit) tmp(1:ntdg)
+      exit
+   endif 
+ enddo
+
+ close(iunit)
+
+ if(expand) then
+ ! expand to a large triangle
+    mone = 0
+    ii   = 0
+    idx  = 0
+    ioff = 0   
+    do irep=1,nsym
+      ioff = offs(irep)
+      do j=1,nbas(irep)
+        do i=1,j
+           idx = idx + 1
+           ii = (ioff+j)*(ioff+j-1)/2 + ioff+i
+           mone(ii) = tmp(idx)
+        enddo
+      enddo 
+    enddo
+ else
+ ! return ntdg
+    mone = 0
+    mone(1:ntdg) = tmp(1:ntdg)
+ endif
+
+end subroutine readoneint_molpro
 
 !subroutine writeoneint(iunit,ndim,S,V,H)
 !implicit none 
@@ -526,7 +841,7 @@ integer,external :: NAddrRDM
  enddo
 
   NRDM2Act = Mon%NAct**2*(Mon%NAct**2+1)/2
-  print*, Mon%NAct,NRDM2Act
+  !print*, Mon%NAct,NRDM2Act
 
   allocate(Mon%RDM2(NRDM2Act), &
            Mon%RDM2Act(Mon%NAct,Mon%NAct,Mon%NAct,Mon%NAct))
@@ -576,7 +891,6 @@ integer,external :: NAddrRDM
   allocate(Mon%Ind2(NBas))
 
   Mon%Ind2 = Ind2
-  print*, 'check!?'
 
 end subroutine read2rdm
 
@@ -684,10 +998,10 @@ character(:),allocatable :: onefile
 
 end subroutine get_one_mat
 
-subroutine basinfo(nbasis,basfile)
+subroutine basinfo(nbasis,basfile,intf)
 implicit none
 
-character(*),intent(in) :: basfile
+character(*),intent(in) :: basfile,intf
 integer,intent(out) :: nbasis
 integer :: iunit 
 integer :: nsym,nbas(8),norb(8),nrhf(8),ioprhf
@@ -699,14 +1013,19 @@ logical :: ex
     open(newunit=iunit,file=basfile,status='OLD', &
          access='SEQUENTIAL',form='UNFORMATTED')
    
-    ! read basis info
-    call readlabel(iunit,'BASINFO ')
+    if(trim(intf)=='DALTON') then
+       ! read basis info
+       call readlabel(iunit,'BASINFO ')
    
-    read (iunit) nsym,nbas,norb,nrhf,ioprhf
-    !write(LOUT,*)  nsym,nbas,norb,nrhf,ioprhf
+       read (iunit) nsym,nbas,norb,nrhf,ioprhf
+       !write(LOUT,*)  nsym,nbas,norb,nrhf,ioprhf
+
+    elseif(trim(intf)=='MOLPRO') then
+       read(iunit) nsym
+       read(iunit) nbas(1:nsym)
+    endif
 
     close(iunit)
-
     nbasis = sum(nbas(1:nsym))
 
  else
@@ -875,5 +1194,178 @@ function iscomment(s)
             end if
       end if            
 end function iscomment
+
+subroutine molpro_routines
+implicit none
+
+integer :: NBasis,NGrid
+
+  call basinfo(NBasis,'SIRIUS_A.RST','DALTON')
+  call molprogrid(NGrid,NBasis)
+  print*, 'here-1?'
+  call molprogrid(NGrid,NBasis)
+  print*, 'here-2?'
+ stop
+
+! !... idftgra: functional contains grad rho terms (1) , del.2 rho (2)
+! !... ndiff = (idftgra + 1) * (idftgra + 2) * (idftgra + 3) / 6
+!
+! ! get grid points, integration weights and orbitals and its derivatives
+! ! wt array contains weights of the grid points
+! ! orbval array contains basis functions values and its derivatives at npt
+! ! points of the grid
+! ! e.g. orbval(k, 1, mapinv(i)) is chi_i(r_k) - i-th basis function in the k-th
+! ! grid point value
+!
+!double precision, allocatable :: r(:,:),wt(:),mapinv(:),orbval(:,:,:)
+!integer :: i,j,k,igrid
+!integer(8) :: npt, ndiff, ntg
+!
+! open(newunit=igrid,file='GRID',access='sequential',&
+!      form='unformatted',status='old')
+! read(igrid)
+! read(igrid) npt,ndiff,ntg
+! allocate(r(3,npt),wt(npt),mapinv(ntg),orbval(npt,ndiff,ntg))
+!
+! call readgridmolpro(igrid,'GRIDKS  ',npt,r,wt)
+! call readorbsmolpro(igrid,'ORBVAL  ',mapinv,orbval)
+! 
+! close(igrid)
+!
+! deallocate(orbval,mapinv,wt,r)
+!
+end subroutine molpro_routines
+
+subroutine create_ind(infile,NumOSym,IndInt,NBasis)
+implicit none
+
+character(*) :: infile
+integer :: NumOSym(15),IndInt(NBasis),NBasis
+integer :: ifile,ios,i,j,k,isym
+integer :: NSym,NState,IOld,INew
+integer :: iclos(8),iact(8),nt(8),ivirt(8)
+character(8) :: label
+
+ iclos = 0
+ ivirt = 0
+ iact = 0
+ NumOSym = 0
+ open(newunit=ifile,file=infile,access='sequential',&
+      form='unformatted',status='old')
+
+ do 
+   read(ifile,iostat=ios) label
+    if(ios<0) then
+      write(6,*) 'ERROR!!! LABEL ISORDK   not found!'  
+      stop
+   endif
+   if(label=='BASINFO ') then
+      read(ifile) NSym
+      read(ifile) NState
+      read(ifile) iclos(1:NSym) 
+      read(ifile) iact(1:NSym) 
+      read(ifile) NumOSym(1:NSym) 
+      exit
+   endif 
+ enddo 
+
+ close(ifile)
+ ivirt(1:NSym) = NumOSym(1:NSym)-iclos(1:NSym)-iact(1:NSym)
+
+ if(NSym>1) then
+   ! symmetry 
+   IOld = 0
+   INew = 0
+   do isym=1,NSym
+      do k=1,iclos(isym)
+         IOld = IOld + 1
+         INew = INew + 1
+         IndInt(IOld) = INew
+         !print*, IOld,INew
+      enddo
+      do j=1,iact(isym)
+         IOld = IOld + 1
+      enddo
+      do i=1,ivirt(isym)
+         IOld = IOld + 1
+      enddo
+   enddo
+   IOld = 0
+   do isym=1,NSym
+      do k=1,iclos(isym)
+         IOld = IOld + 1
+      enddo
+      do j=1,iact(isym)
+         IOld = IOld + 1
+         INew = INew + 1
+         IndInt(IOld) = INew
+         !print*, IOld,INew
+      enddo
+      do i=1,ivirt(isym)
+         IOld = IOld + 1
+      enddo
+   enddo
+   IOld = 0
+   do isym=1,NSym
+      do k=1,iclos(isym)
+         IOld = IOld + 1
+      enddo
+      do j=1,iact(isym)
+         IOld = IOld + 1
+      enddo
+      do i=1,ivirt(isym)
+         IOld = IOld + 1
+         INew = INew + 1
+         IndInt(IOld) = INew
+         !print*, IOld,INew
+      enddo
+   enddo
+
+ else
+   ! nosym
+   do i=1,NBasis  
+      IndInt(i) = i
+   enddo
+
+ endif
+
+end subroutine create_ind 
+
+subroutine molprogrid(NGrid,NBasis)
+Implicit Real*8 (A-H,O-Z)
+
+integer ::  NBasis, NGrid
+double precision, allocatable :: r(:,:),wt(:),mapinv(:),orbval(:,:,:)
+integer :: i,j,k,igrid
+integer :: npt, ndiff, ntg
+
+ print*, ' '
+ print*, 'entergin molprogrid' 
+ open(newunit=igrid,file='GRID',access='sequential',&
+      form='unformatted',status='old')
+ read(igrid) npt,ndiff,ntg
+ !If(NBasis.Ne.ntg) Stop 'Fatal Error in molprogrid: NBasis Ne ntg'
+ !If(NGrid.Ne.npt) Stop 'Fatal Error in molprogrid: NGrid Ne npt'
+ 
+ allocate(r(3,npt),wt(npt),mapinv(ntg),orbval(npt,ndiff,ntg))
+ !... idftgra: functional contains grad rho terms (1) , del.2 rho (2)
+ !... ndiff = (idftgra + 1) * (idftgra + 2) * (idftgra + 3) / 6
+
+ ! get grid points, integration weights and orbitals and its derivatives
+ ! wt array contains weights of the grid points
+ ! orbval array contains basis functions values and its derivatives at npt
+ ! points of the grid
+ ! e.g. orbval(k, 1, mapinv(i)) is chi_i(r_k) - i-th basis function in the k-th
+ ! grid point value
+ ! mapinv - orbital mapping array
+
+ call readgridmolpro(igrid,'GRIDKS  ',npt,r,wt)
+! Call CpyV(WGrid,wt,npt)
+ call readorbsmolpro(igrid,'ORBVAL  ',mapinv,orbval)
+
+ close(igrid)
+ deallocate(orbval,wt,r,mapinv)
+
+end subroutine molprogrid
 
 end module types

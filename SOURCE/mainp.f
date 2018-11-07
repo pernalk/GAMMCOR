@@ -321,7 +321,7 @@ C
       MOcc=NELE-NFrac
 C
 C     NBasis READ FROM SIRIUS.RST
-      If(IDALTON.Eq.1) Call basinfo(NBasis,'SIRIUS.RST')
+      If(IDALTON.Eq.1) Call basinfo(NBasis,'SIRIUS.RST','DALTON')
 C
 C     CHECK IF SAPT RUN      
       ISAPT=Flags%ISAPT
@@ -332,9 +332,12 @@ C
 C     *************************************************************************
 C
 C     CALCULATE THE DIMENSIONS
-C
+      If(IDALTON.Eq.0) then
+C        Call CheckNBa(NBasis,Title)
+        Call basinfo(NBasis,'AOTWOINT.mol','MOLPRO')
+      endif
       Call DimSym(NBasis,NInte1,NInte2,MxHVec,MaxXV)
-      If(IDALTON.Eq.0) Call CheckNBa(NBasis,Title)
+C
       If(IFunSR.Ne.0) Then
       Call GetNGrid(NGrid,Title)
       Else
@@ -443,8 +446,12 @@ C     LOAD THE INTEGRALS
 C
       If(IDALTON.Eq.0) Then
 C
-      Call LdInteg(Title,XKin,XNuc,ENuc,Occ,URe,DipX,DipY,DipZ,
-     $ TwoEl,TwoElErf,UMOAO,NSymMO,NInte1,NBasis,NInte2)
+C      Call LdInteg(Title,XKin,XNuc,ENuc,Occ,URe,DipX,DipY,DipZ,
+C     $ TwoEl,TwoElErf,UMOAO,NSymMO,NInte1,NBasis,NInte2)
+      Call LdInteg(Title,XKin,XNuc,ENuc,Occ,URe,TwoEl,UMOAO,NInte1,
+     $ NBasis,NInte2,NGem)
+      IDALTON=1
+      ICASSCF=1
 C
 C     RUN HARTREE-FOCK TO PRODUCE A GUESS (epsilons are needed for guess)
 C
@@ -472,7 +479,8 @@ C
 C
 C     LOAD NO's AND NON's FROM THE MOLPRO OUTPUT
 C
-      Call GetNO(URe,Occ,UMOAO,Title,NBasis) 
+C     modified!  
+C      Call GetNO(URe,Occ,UMOAO,Title,NBasis) 
 C
       EndIf
 C

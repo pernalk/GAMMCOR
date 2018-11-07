@@ -28,21 +28,24 @@ end type SortData
 
 contains 
 
-subroutine readtwoint(NBas,intfile)
+subroutine readtwoint(NBas,aosource,intfile)
 ! read DALTON 2-el integrals,
 ! sort them according to rs index
 ! and dump to a file
 implicit none
 
 integer :: NBas
+integer :: aosource
 character(*) :: intfile
 integer :: iunit,iunit2
 integer :: maxrep, naos(8), lbuf, nibuf, nbits, lenint4
+integer :: nsk, nt(8), ntoff(8)
 type(SortData) :: srt
 integer :: nints, INDX
 integer,allocatable :: idx_buf(:)
 double precision,allocatable :: val_buf(:), mat(:)
-integer :: idx_p, idx_q, idx_r, idx_s, pq, rs
+integer :: idx_p, idx_q, idx_r, idx_s, pq, rs, idx_end
+integer :: sym_p, sym_q, sym_r, sym_s, sym_rs
 logical :: swap_pqrs
 integer :: i
 
@@ -50,80 +53,264 @@ integer :: i
  ! open sorter file 
  call open_Sorter(srt,'TMPSORT',NBas*(NBas+1)/2,NBas*(NBas+1)/2)
 
- ! newunit works with Fortran 2008
- open(newunit=iunit,file=intfile,status='OLD',&
-      access='SEQUENTIAL',form='UNFORMATTED')
 
- ! read info
- call readlabel(iunit,'BASINFO ')
- read(iunit) maxrep, naos, lbuf, nibuf, nbits, lenint4 
+ if(aosource==1) then 
+   ! DALTON
+   open(newunit=iunit,file=intfile,status='OLD',&
+        access='SEQUENTIAL',form='UNFORMATTED')
+  
+   ! read info
+   call readlabel(iunit,'BASINFO ')
+   read(iunit) maxrep, naos, lbuf, nibuf, nbits, lenint4 
+  
+   write(6,'()')
+   write(6,'(1x, a)') 'Dalton two-el. file initialized'
+   write(6,'(1x,4(a,i5))') 'Buffer size: ', lbuf, &
+         & ', integers per index packet: ', nibuf,       &
+         & ', bits: ', nbits, &
+         & ', record lenght in INT*4: ', lenint4
+  
+   allocate(val_buf(lbuf))
+   allocate(idx_buf(nibuf*lbuf))
+  
+   call readlabel(iunit,'BASTWOEL')
+  
+   select case(nibuf)
+   case(1)
+  
+      do
+         read(iunit) val_buf, idx_buf, nints
+         if(nints<0) exit
+         do i=1,nints
+            INDX = idx_buf(i)
+            idx_p = ibits(INDX,0,8)
+            idx_q = ibits(INDX,8,8)
+            idx_r = ibits(INDX,16,8)
+            idx_s = ibits(INDX,24,8)
+  
+            ! pq: position in Batch
+            ! rs: Batch number
+            pq = idx_p + idx_q*(idx_q-1)/2
+            rs = idx_r + idx_s*(idx_s-1)/2 
+            !write(*,*) idx_p,idx_q,idx_r,idx_s 
+            swap_pqrs = (pq<rs)
+            call add_to_Sorter(srt,rs,pq,val_buf(i))
+            if(swap_pqrs) call add_to_Sorter(srt,pq,rs,val_buf(i))
+         enddo
+      enddo
+     
+   case(2)
+  
+      do
+         read(iunit) val_buf, idx_buf, nints
+         if(nints<0) exit
+         do i=1,nints
+            INDX = idx_buf(2*i-1)
+            idx_r = ibits(INDX,0,16)
+            idx_s = ibits(INDX,16,16)
+            INDX = idx_buf(2*i)
+            idx_p = ibits(INDX,0,16)
+            idx_q = ibits(INDX,16,16)
+  
+            pq = idx_p + idx_q*(idx_q-1)/2
+            rs = idx_r + idx_s*(idx_s-1)/2 
+            swap_pqrs = (pq<rs)
+            call add_to_Sorter(srt,rs,pq,val_buf(i))
+            if(swap_pqrs) call add_to_Sorter(srt,pq,rs,val_buf(i))
+  
+         enddo
+      enddo
+  
+   end select
+  
+   deallocate(idx_buf)
+   deallocate(val_buf)
+  ! close AOTWOINT
+   close(unit=iunit)
 
- write(6,'()')
- write(6,'(1x, a)') 'Dalton two-el. file initialized'
- write(6,'(1x,4(a,i5))') 'Buffer size: ', lbuf, &
-       & ', integers per index packet: ', nibuf,       &
-       & ', bits: ', nbits, &
-       & ', record lenght in INT*4: ', lenint4
+ elseif(aosource==2) then
+ ! MOLPRO
 
- allocate(val_buf(lbuf))
- allocate(idx_buf(nibuf*lbuf))
+   open(newunit=iunit,file=intfile,status='OLD',&
+        access='SEQUENTIAL',form='UNFORMATTED')
+  
+   ! read info
+   read(iunit) nsk
+   read(iunit) nt 
 
- call readlabel(iunit,'BASTWOEL')
+   if(sum(nt(1:nsk))/=NBas) then
+     write(LOUT,*) 'ERROR while checking AOTWOINT.mol!!!'
+     stop
+   endif
+  
+   ! offset
+   ntoff = 0
+   do i=2,8
+      ntoff(i) = ntoff(i-1)+nt(i-1)
+   enddo
 
- select case(nibuf)
- case(1)
+   lbuf = 3*maxval(nt(1:nsk))**2
+   allocate(val_buf(lbuf))
 
-    do
-       read(iunit) val_buf, idx_buf, nints
-       if(nints<0) exit
-       do i=1,nints
-          INDX = idx_buf(i)
-          idx_p = ibits(INDX,0,8)
-          idx_q = ibits(INDX,8,8)
-          idx_r = ibits(INDX,16,8)
-          idx_s = ibits(INDX,24,8)
+   do sym_p=1,nsk
+      if(nt(sym_p)==0) cycle
+      read(iunit) 
 
-          ! pq: position in Batch
-          ! rs: Batch number
-          pq = idx_p + idx_q*(idx_q-1)/2
-          rs = idx_r + idx_s*(idx_s-1)/2 
-          !write(*,*) idx_p,idx_q,idx_r,idx_s 
-          swap_pqrs = (pq<rs)
-          call add_to_Sorter(srt,rs,pq,val_buf(i))
-          if(swap_pqrs) call add_to_Sorter(srt,pq,rs,val_buf(i))
+      do  
+        read(iunit) idx_s,idx_r
+        if(idx_s<=0.and.idx_r<=0) exit
+        nints = idx_r + idx_s*(idx_s-1)/2 
+        read(iunit) val_buf(1:nints)
+
+        idx_r = idx_r + ntoff(sym_p)
+        idx_s = idx_s + ntoff(sym_p)
+        rs = idx_r + idx_s*(idx_s-1)/2
+
+        INDX = 0 
+        do idx_q=ntoff(sym_p)+1,idx_s 
+           if(idx_q<idx_s) then 
+             idx_end = idx_q
+           else
+             idx_end = idx_r
+           endif
+           do idx_p=ntoff(sym_p)+1,idx_end
+
+              INDX = INDX + 1
+              if(val_buf(INDX)/=0) then
+                pq = idx_p + idx_q*(idx_q-1)/2
+                swap_pqrs = (pq<rs)
+                call add_to_Sorter(srt,rs,pq,val_buf(INDX))
+                if(swap_pqrs) call add_to_Sorter(srt,pq,rs,val_buf(INDX))
+              endif
+
+           enddo
+        enddo
+
+      enddo
+
+   enddo
+
+   do sym_r=2,nsk
+     do sym_p=1,sym_r-1
+       if(nt(sym_p)==0) cycle
+       if(nt(sym_r)==0) cycle
+       read(iunit)
+       
+       nints=(nt(sym_p)*(nt(sym_p)+1))/2
+       nints=3*nints
+       do
+         read(iunit) idx_s,idx_r
+         if(idx_s<=0.and.idx_r<=0) exit
+         read(iunit) val_buf(1:nints)
+
+         idx_r = idx_r + ntoff(sym_r)
+         idx_s = idx_s + ntoff(sym_r)
+
+         INDX=0
+         do idx_q=ntoff(sym_p)+1,ntoff(sym_p)+nt(sym_p)
+           do idx_p=ntoff(sym_p)+1,idx_q
+ 
+             INDX=INDX+1
+             if(val_buf(INDX)/=0) then
+               pq = idx_p + idx_q*(idx_q-1)/2
+               rs = idx_r + idx_s*(idx_s-1)/2
+               call add_to_Sorter(srt,rs,pq,val_buf(INDX))
+               call add_to_Sorter(srt,pq,rs,val_buf(INDX))
+             endif
+
+             INDX=INDX+1
+             if(val_buf(INDX)/=0) then
+               pq = idx_p + idx_r*(idx_r-1)/2
+               rs = idx_q + idx_s*(idx_s-1)/2
+               swap_pqrs = (pq<rs)
+               call add_to_Sorter(srt,rs,pq,val_buf(INDX))
+               if(swap_pqrs) call add_to_Sorter(srt,pq,rs,val_buf(INDX))
+             endif
+
+             INDX=INDX+1
+             if(val_buf(INDX)/=0) then
+               pq = idx_q + idx_r*(idx_r-1)/2
+               rs = idx_p + idx_s*(idx_s-1)/2
+               swap_pqrs = (pq<rs)
+               call add_to_Sorter(srt,rs,pq,val_buf(INDX))
+               if(swap_pqrs) call add_to_Sorter(srt,pq,rs,val_buf(INDX))
+             endif
+
+           enddo
+         enddo
+
        enddo
-    enddo
-   
- case(2)
 
-    do
-       read(iunit) val_buf, idx_buf, nints
-       if(nints<0) exit
-       do i=1,nints
-          INDX = idx_buf(2*i-1)
-          idx_r = ibits(INDX,0,16)
-          idx_s = ibits(INDX,16,16)
-          INDX = idx_buf(2*i)
-          idx_p = ibits(INDX,0,16)
-          idx_q = ibits(INDX,16,16)
+     enddo
+   enddo
 
- !        pq = idx_p*(idx_p-1)/2+idx_q 
- !        rs = idx_r*(idx_r-1)/2+idx_s 
-          pq = idx_p + idx_q*(idx_q-1)/2
-          rs = idx_r + idx_s*(idx_s-1)/2 
-          swap_pqrs = (pq<rs)
-          call add_to_Sorter(srt,rs,pq,val_buf(i))
-          if(swap_pqrs) call add_to_Sorter(srt,pq,rs,val_buf(i))
+   do sym_s=4,nsk
+     do sym_r=3,sym_s-1
+       sym_rs = ieor(sym_r-1,sym_s-1) + 1
+       do sym_q=2,sym_r-1
+         sym_p = ieor(sym_q-1,sym_rs-1) + 1
+         if(sym_p>=sym_q) cycle
+         if(nt(sym_p)==0) cycle
+         if(nt(sym_q)==0) cycle
+         if(nt(sym_r)==0) cycle
+         if(nt(sym_s)==0) cycle
+         read(iunit)
+         
+         nints=nt(sym_p)*nt(sym_q)
+         nints=3*nints
+         do
+           read(iunit) idx_s,idx_r
+           if(idx_s<=0.and.idx_r<=0) exit
+           read(iunit) val_buf(1:nints)
+
+           idx_r = idx_r + ntoff(sym_r)
+           idx_s = idx_s + ntoff(sym_s)
+
+           INDX=0
+           do idx_q=ntoff(sym_q)+1,ntoff(sym_q)+nt(sym_q)
+             do idx_p=ntoff(sym_p)+1,ntoff(sym_p)+nt(sym_p)
+ 
+               INDX=INDX+1
+               if(val_buf(INDX)/=0) then
+                 pq = idx_p + idx_q*(idx_q-1)/2
+                 rs = idx_r + idx_s*(idx_s-1)/2
+                 call add_to_Sorter(srt,rs,pq,val_buf(INDX))
+                 call add_to_Sorter(srt,pq,rs,val_buf(INDX))
+               endif
+
+               INDX=INDX+1
+               if(val_buf(INDX)/=0) then
+                 pq = idx_p + idx_r*(idx_r-1)/2
+                 rs = idx_q + idx_s*(idx_s-1)/2
+                 call add_to_Sorter(srt,rs,pq,val_buf(INDX))
+                 call add_to_Sorter(srt,pq,rs,val_buf(INDX))
+               endif
+
+               INDX=INDX+1
+               if(val_buf(INDX)/=0) then
+                 pq = idx_q + idx_r*(idx_r-1)/2
+                 rs = idx_p + idx_s*(idx_s-1)/2
+                 call add_to_Sorter(srt,rs,pq,val_buf(INDX))
+                 call add_to_Sorter(srt,pq,rs,val_buf(INDX))
+               endif
+
+             enddo
+           enddo
+
+         enddo
 
        enddo
-    enddo
+     enddo
+   enddo
 
- end select
 
- deallocate(idx_buf)
- deallocate(val_buf)
-! close AOTWOINT
- close(unit=iunit)
+   deallocate(val_buf)
+
+   close(iunit)
+
+   !print*, 'Go Werner, go!'
+
+ endif
 
  call dump_Sorter(srt)
 ! end SORT1
@@ -135,7 +322,11 @@ integer :: i
  allocate(mat(NBas*(NBas+1)/2))
  do rs=1,NBas*(NBas+1)/2
     call get_from_Sorter(srt,rs,mat)
-    ! dump sorted integrals 
+    ! dump sorted integrals
+    ! test print all integrals:
+    !do pq=1, NBas*(NBas+1)/2
+    !   write(LOUT,'(1x,2i6,es20.7)') pq,rs,mat(pq)
+    !enddo 
     write(iunit2,rec=rs) mat
  enddo
  deallocate(mat)

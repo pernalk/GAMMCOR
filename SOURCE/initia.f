@@ -24,7 +24,6 @@ C
 C
 C     ICASSCF=1 - read occ from occupations.dat
       ICASSCF=Flags%ICASSCF
-C      write(*,*) 'Flags:',Flags%ICASSCF, ICASSCF
 C
 C     IDMRG - integrals and RDM's read from external dmrg files
       IDMRG=Flags%IDMRG
@@ -505,99 +504,580 @@ C
       Return
       End
 
+C     HERE GOES UPDATED LdInteg!
 *Deck LdInteg
-      Subroutine LdInteg(Title,XKin,XNuc,ENuc,Occ,URe,DipX,DipY,DipZ,
-     $ TwoEl,TwoElErf,UAOMO,NSymMO,NInte1,NBasis,NInte2)
+      Subroutine LdInteg(Title,XKin,XNuc,ENuc,Occ,URe,
+     $ TwoEl,UAOMO,NInte1,NBasis,NInte2,NGem)
 C
 C     READ/WRITE THE ONE- AND TWO-ELECTRON INTEGRALS 
 C     INTERFACED WITH MOLPRO (INTEGRALS ARE READ FROM FCIDUMP FILES)
 C
+      use sorter
+      use tran   
+C
       Implicit Real*8 (A-H,O-Z)
+      Parameter (Zero=0.D0,Half=0.5D0,One=1.D0,Two=2.D0)
 C
-      Real*8 XKin(*),XNuc(*),DipX(*),DipY(*),DipZ(*),TwoEl(*),
-     $ TwoElErf(*)
-      Dimension NSymMO(NBasis)
+      Real*8 XKin(NInte1),XNuc(NInte1),TwoEl(NInte2),
+     $ UAOMO(NBasis,NBasis),URe(NBasis,NBasis),Occ(NBasis),
+     $ UAux(NBasis,NBasis),
+     $ Tmp(NInte1) 
+C      
+      Real*8, Allocatable :: RDM2Act(:)
+      Dimension Gamma(NInte1),Work(NBasis),PC(NBasis),
+     $ AUXM(NBasis,NBasis),AUXM1(NBasis*NBasis),Ind2(NBasis),
+     $ IndInt(NBasis),NumOSym(15),MultpC(15,15),Fock(NBasis*NBasis),
+     $ GammaF(NInte1),FockF(NInte1),GammaAB(NInte1) 
+c herer!!! delete after tests
+c     $ ,UMOAOInv(NBasis,NBasis),TwoElAO(NInte2)
 C
-      Character*60 Title,FName,FMultTab
+      Character*60 FName,Aux1,Title
 C
       Include 'commons.inc'
-C
-C     LOCAL ARRAYS
-C
-      Dimension MultpC(15,15),NumOSym(15),UAOMO(NBasis,NBasis)
-C
-C     DETERMINE A NUMBER OF ORBITALS OF EACH SYMMETRY
-C
-      Call DetSym(MultpC,NSymMO,NumOSym,NBasis)
-C
-C     READ THE TRANSFORMATION MATRIX FROM AO TO MO
-C
-      Call GetUAOMO(UAOMO,NSymMO,NumOSym,NBasis)
+      NoSt=1
 C
       Do I=1,60
       FName(I:I)=' '
       EndDo
+      XKin(1:NInte1)=Zero
+      TwoEl(1:NInte2)=Zero
 C
       K=1
 C
-C     IF INTEGRALS ARE IN MO REPRESENTATION THEN
+      If(IAO.Eq.0) Then      
 C
-      If(IAO.Eq.0) Then
+C     IF INTEGRALS ARE IN MO REPRESENTATION THEN
 C
       FName(K:K+11)='intcoul.dat'
       Call GetENuc(ENuc,FName,NBasis)
+C
+      Open(10,File='indices_int.dat')
+      Read(10,*) NN
+C
+      If(NN.Eq.1) Then      
 C
       FName(K:K+11)='intcoul.dat'
       Call Int1(XKin,XNuc,NInte1,FName,Nbasis)
 C
       FName(K:K+11)='intcoul.dat'
       Call Int2(TwoEl,FName,NInte2,NBasis) 
-      FName(K:K+11)='interf.dat'
 C
-C     LOAD ERF INTEGRALS ONLY IF REQUIRED
-C
-      If(IFun.Ne.0.And.IFunSR.Ne.0) 
-     $ Call Int2(TwoElErf,FName,NInte2,NBasis)   
-C
-C     Else of (IAO.Eq.0)
       Else
 C
-      Call GetENuc_AO(ENuc,Title)
-C
-C     DETERMINE A NUMBER OF ORBITALS OF EACH SYMMETRY
-C
-      Call DetSym(MultpC,NSymMO,NumOSym,NBasis)
-C
-C     READ THE TRANSFORMATION MATRIX FROM AO TO MO
-C
-      Call GetUAOMO(UAOMO,NSymMO,NumOSym,NBasis)
-C
-      FName(K:K+8)='ekin.dat'
-      Call Int1_AO(XKin,NInte1,FName,UAOMO,NSymMO,NumOSym,NBasis)
-C
-      FName(K:K+8)='epot.dat'
-      Call Int1_AO(XNuc,NInte1,FName,UAOMO,NSymMO,NumOSym,NBasis)
-C
-      Do I=1,60
-      FName(I:I)=' '
+      Do I=1,NBasis
+      Read(10,*) I1,I2
+      IndInt(I1)=I2
       EndDo
 C
-      K=0
-    5 K=K+1
-      If (Title(K:K).Ne.' ') Then
-      FName(K:K)=Title(K:K)
-      GoTo 5
+      Open(20,File=FName)
+    2 Read(20,'(A10)')Aux1
+      If(Aux1(1:6).Eq."  ISYM".Or.Aux1(1:5).Eq." ISYM") Then
+      Read(20,'(A10)')Aux1
+      GoTo 20
+      EndIf
+      GoTo 2
+C
+   20 Continue
+      Read(20,*,End=30) X,I1,I2,I3,I4
+c
+      If((I1+I2.Ne.0).And.(I3+I4.Eq.0)) Then
+      IA=IndInt(I1)
+      IB=IndInt(I2)
+      IAB=(Max(IA,IB)*(Max(IA,IB)-1))/2+Min(IA,IB)        
+      XKin(IAB)=X
+      EndIf
+      If(I3+I4.Ne.0) Then
+      IA1=IndInt(I1)        
+      IA2=IndInt(I2)
+      IA3=IndInt(I3)
+      IA4=IndInt(I4)
+      TwoEl(NAddr3(IA1,IA2,IA3,IA4))=X
+      EndIf        
+C
+      GoTo 20
+C
+   30 Close(20)
+C      
+      EndIf 
+      Close(10)     
+C
+C     If(IAO.Eq.0)      
+      EndIf      
+C
+      If(IAO.Eq.1) Then
+C
+C     HAP 
+C      Call GetENuc_AO(ENuc,Title)
+      Call GetEnuc_AOBin(ENuc,'AOONEINT.mol') 
+C
+C     READ INFORMATION ABOUT SYMMETRY
+C              
+C      Open(10,File='indices_int.dat')
+C      Read(10,*) MxSym
+C      Do I=1,MxSym
+C      Read(10,*) X
+C      NumOSym(I)=X
+C      EndDo
+CC
+C      If(MxSym.Gt.1) Then
+C      Do I=1,NBasis
+C      Read(10,*) I1,I2
+C      IndInt(I1)=I2
+C      EndDo     
+C      Else
+C      Do I=1,NBasis
+C      IndInt(I)=I
+C      EndDo      
+C      EndIf
+CC      
+C      Close(10)
+CC
+CC     
+C      Print*, 'TEST0!'
+C      Do I=1,NBasis
+C      Print*, I,IndInt(I)
+C      EndDo
+ 
+C     HAP
+      Call create_ind('2RDM',NumOSym,IndInt,NBasis)
+
+C     LOAD ONE-ELE INTEGS IN AO
+      FName(K:K+8)='xone.dat'
+C      Call Int1_AO(XKin,NInte1,FName,NumOSym,Nbasis)
+C
+C     HAP
+      Call readoneint_molpro(XKin,'AOONEINT.mol','ONEHAMIL',
+     $     .true.,NInte1)
+C      Print*, ' '
+C      Print*, 'NInte1',NInte1
+C      Do I=1,NInte1
+C      write(*,*) XKin(I),Tmp(I)
+C      EndDo
+
+C     LOAD TWO-ELE INTEGS IN AO
+C      Do I=1,60
+C      FName(I:I)=' '
+C      EndDo
+C      K=0
+C    5 K=K+1
+C      If (Title(K:K).Ne.' ') Then
+C      FName(K:K)=Title(K:K)
+C      GoTo 5
+C      EndIf
+C      FName(K:K+10)='.reg.integ'
+CC     
+C      If(MxSym.Eq.1) Then
+C      MultpC(1,1)=1
+C      Else      
+C      Open(10,File="multip_table.txt")
+C      Do I=1,MxSym
+C      Read(10,*)(MultpC(I,J),J=1,I)
+C      Do J=1,I
+C      MultpC(J,I)=MultpC(I,J)
+C      EndDo
+C      EndDo
+C      Close(10)
+C      EndIf
+CC
+C      Call Int2_AO(TwoEl,NumOSym,MultpC,FName,NInte1,NInte2,NBasis)
+C
+C     HAP
+      Call readtwoint(NBasis,2,'AOTWOINT.mol')
+      Call LoadSaptTwoEl(3,TwoEl,NBasis,NInte2)
+C
+C     LOAD AO TO CAS_MO ORBITAL TRANSFORMATION MATRIX FROM uaomo.dat
+C      
+C      Call GetUAOMO(UAOMO,NumOSym,NBasis)
+C     HAP 
+      Call read_mo_molpro(UAOMO,'MOLPRO.MOPUN','CASORB  ',NBasis)
+C      
+C     If(IAO.Eq.1)      
+      EndIf              
+C
+      URe(1:NBasis,1:NBasis)=Zero
+      Occ(1:NBasis)=Zero
+      PC(1:NBasis)=Zero
+      Gamma(1:NInte1)=Zero
+C
+C     HAP 
+      Call read_1rdm_molpro(Gamma,NoSt,'2RDM',NBasis)
+C     HAP
+C      print*,'Gamma from file:', norm2(Gamma)
+C
+C      Open(10,File='rdmdump.dat')
+C      Read(10,*) NStates
+C      IStart=0
+C   25 Read(10,*,End=35) X,I1,I2,I3,I4
+C      If(X.Eq.NoSt.And.I1+I2+I3+I4.Eq.-4) IStart=1
+C      If(X.Ne.NoSt.And.I1+I2+I3+I4.Eq.-4) IStart=0
+C      If((I1+I2.Ne.0).And.(I3+I4.Eq.0).And.IStart.Eq.1) Then
+C      Ind=(Max(I1,I2)*(Max(I1,I2)-1))/2+Min(I1,I2)
+C      Gamma(Ind)=X
+C      EndIf
+C      GoTo 25
+C  35  Close(10)
+C
+      Call CpySym(AUXM,Gamma,NBasis)
+C
+      Call Diag8(AUXM,NBasis,NBasis,PC,Work)
+      Call SortOcc(PC,AUXM,NBasis)
+C
+      Sum=Zero
+      NAc=0
+      Do I=1,NBasis
+      Sum=Sum+PC(I)
+      If(PC(I).Gt.Zero) NAc=NAc+1
+      EndDo
+C
+      NInAc=NELE-Sum+1.D-1
+c herer!!!
+c      ninac=1.
+c      write(*,*)nele,sum,NInAc
+      Do I=1,NInAc+NAc
+      If(I.Le.NInAc) Then
+      Occ(I)=One
+      Else
+      Occ(I)=PC(I-NInAc)
+      EndIf
+      EndDo
+C
+      If(NInAc.Eq.0) Then
+      NGem=2
+      IGem(1:NInAc+NAc)=1
+      IGem(NInAc+NAc+1:NBasis)=2
+      Else
+      NGem=3
+      IGem(1:NInAc)=1
+      IGem(NInAc+1:NInAc+NAc)=2
+      IGem(NInAc+NAc+1:NBasis)=3
       EndIf
 C
-      FName(K:K+10)='.reg.integ'
-      Call Int2_AO(TwoEl,UAOMO,NSymMO,NumOSym,MultpC,
-     $ FName,NInte1,NInte2,NBasis)
+      NAcCAS=NAc
+      NInAcCAS=NInAc
 C
-      FName(K:K+10)='.erf.integ'
-      Call Int2_AO(TwoElErf,UAOMO,NSymMO,NumOSym,MultpC,
-     $ FName,NInte1,NInte2,NBasis)
+      Write(6,'(2X,"No of inactive and active orbitals: ",2I4)')
+     $ NInAcCAS,NAcCAS
+C
+      Write(6,'(2X,"MCSCF",3X,"Occupancy",4X,"Gem")')
+      Sum=Zero
+      Do I=1,NBasis
+      Write(6,'(X,I3,E16.6,I6)') I,Occ(I),IGem(I)
+      Sum=Sum+Occ(I)
+      EndDo
+      Write(6,'(2X,"Sum of Occupancies: ",F5.2)') Sum
+C
+      NAct=NAcCAS
+      INActive=NInAcCAS
+      NOccup=INActive+NAct
+C 
+C     COPY AUXM TO URe AND OFF SET BY NInAc
+      Do I=1,NBasis
+      IIAct=I-NInAc
+      Do J=1,NBasis
+      If(I.Eq.J) URe(I,J)=One
+      JJAct=J-NInAc
+      If(IIAct.Gt.0.And.IIAct.Le.NAc.And.JJAct.Gt.0.And.JJAct.Le.NAc)
+     $ URe(I,J)=AUXM(IIAct,JJAct)
+      EndDo
+      EndDo
+C
+C      print*, norm2(URe)
+C      Call print_sqmat(URe,NBasis)
+C
+      GammaF(1:NInte1)=Zero
+      IJ=0
+      Do I=1,NBasis
+      Do J=1,I
+      IJ=IJ+1
+      If(I.Le.NInAc.And.J.Le.NInAc.And.I.Eq.J) GammaF(IJ)=One
+      If((I.Gt.NInAc.And.I.Le.NInAc+NAc).And.
+     $ (J.Gt.NInAc.And.J.Le.NInAc+NAc))
+     $ GammaF(IJ)=Gamma(IndSym(I-NInAc,J-NInAc))
+      EndDo
+      EndDo
+C
+C      Print*, 'INACTIVE:'
+C      Do I=1,NInAc*(NInAc+1)/2
+C      Print*, I,GammaF(I)
+C      EndDo
+C      Print*, 'ACTIVE:'
+C      Do I=NInAc*(NInAc+1)/2+1, NOccup*(NOccup+1)/2
+C      Print*, I,GammaF(I)
+C      EndDo
+C      Print*, 'VIRT:'
+C      Do I=NOccup*(NOccup+1)/2+1,NInte1
+C      Print*, I,GammaF(I)
+C      Enddo
+
+C     FIND CANONICAL INACTIVE AND VIRTUAL ORBITALS 
+C      
+      If(IAO.Eq.0) Then
+C
+      Call FockGen(FockF,GammaF,XKin,TwoEl,NInte1,NBasis,NInte2)
+C
+      Else
+C
+      Do I=1,NBasis
+      Do J=1,NBasis
+      UAux(IndInt(I),J)=UAOMO(J,I)
+      EndDo
+      EndDo
+C
+      IAB=0
+      Do IA=1,NBasis
+      Do IB=1,IA
+      IAB=IAB+1
+      GammaAB(IAB)=Zero
+      Do I=1,NBasis
+      Do J=1,NBasis
+      GammaAB(IAB)=GammaAB(IAB)
+     $ +UAux(I,IA)*UAux(J,IB)*GammaF(IndSym(I,J))
+      EndDo
+      EndDo
+      EndDo
+      EndDo
+C
+C     HAP
+C      Call FockGen_mithap(FockF,GammaAB,XKin,NInte1,NBasis)
+C
+C     TESTY:
+C      print*,'AUXM:', norm2(AUXM)
+C      print*,'Gamma:', norm2(Gamma)
+C      print*,'GammaF:', norm2(GammaF)
+C      print*,'GammaAB:', norm2(GammaAB)
+C      print*,'Fock:', norm2(FockF)
+C
+      Call FockGen(FockF,GammaAB,XKin,TwoEl,NInte1,NBasis,NInte2)
+      Call MatTr(FockF,UAux,NBasis)
+C      
+      EndIf
+C
+C     INACTIVE
+      If(NInAc.Ne.Zero) Then
+C      
+      Do I=1,NInAc
+      Do J=1,NInAc
+      IJ=IndSym(I,J)
+      Fock((J-1)*NInAc+I)=FockF(IJ)
+      EndDo
+      EndDo
+      Call Diag8(Fock,NInAc,NInAc,PC,Work)
+      Do I=1,NInAc
+      Do J=1,NInAc
+      URe(I,J)=Fock((J-1)*NInAc+I)
+      EndDo
+      EndDo
+C
+      Print*, PC(1:NInAc)
 C
       EndIf
+C
+C     VIRTUAL
+C
+      NVirt=NBasis-NInAc-NAc
+      If(NVirt.Ne.Zero) Then
+
+      Do I=1,NVirt
+      Do J=1,NVirt
+      IJ=IndSym(I+NInAc+NAc,J+NInAc+NAc)
+      Fock((J-1)*NVirt+I)=FockF(IJ)
+      EndDo
+      EndDo      
+      Call Diag8(Fock,NVirt,NVirt,PC,Work)
+      Print*, PC(1:5)
+      Do I=1,NVirt
+      Do J=1,NVirt
+      II=I+NInAc+NAc
+      JJ=J+NInAc+NAc
+      URe(II,JJ)=Fock((J-1)*NVirt+I)
+      EndDo
+      EndDo
+C
+      EndIf
+C
+C     END OF CANONICALIZING
+C
+C     TRANSFORM INTEGRALS TO NO
+C
+      If(IAO.Eq.0) Then 
+C      
+      Call MatTr(XKin,URe,NBasis)
+      Write(6,'(/," Transforming two-electron integrals ...",/)')
+      Call TwoNO1(TwoEl,URe,NBasis,NInte2)
+C
+C     If(IAO.Eq.0)      
+      Else
+C
+c herer!!!
+c start test
+c      Do I=1,NBasis
+c      Do J=1,NBasis
+cc      UAux(IndInt(I),J)=UAOMO(J,I)
+c      UAux(I,J)=UAOMO(J,I)
+c      EndDo
+c      EndDo
+cC
+c      Call CpyM(UMOAOInv,UAux,NBasis)
+c      tol = 1.0d-7
+c      call minvr(UMOAOInv,tol,det,ier,nbasis)
+c      if (ier.ne.0) then
+c        Write(6,'(/,'' ERROR : transformation from ao to '',
+c     $       ''mo basis is singular'')')
+c        Stop
+c      endif
+c      
+cc      Call TwoNO1(TwoEl,UAux,NBasis,NInte2)
+c      Open(10,File="FCIDUMP")
+cC
+c   22 Read(10,'(A10)')Aux1
+c      If(Aux1(1:6).Eq."  ISYM".Or.Aux1(1:5).Eq." ISYM") Then
+c      Read(10,'(A10)')Aux1
+c      GoTo 21
+c      EndIf
+c      GoTo 22
+c   21 Continue
+c      Read(10,*,End=31) X,I1,I2,I3,I4
+c      If(I3+I4.Ne.0) then
+c      TwoElAO(NAddr3(I1,I2,I3,I4))=X 
+cc      diff=abs(TwoEl(NAddr3(I1,I2,I3,I4))-X)
+cc      if(diff.gt.1.d-5) 
+cc     $ write(*,*) i1,i2,i3,i4,TwoEl(NAddr3(I1,I2,I3,I4)),X
+c      endif
+c      GoTo 21
+cC
+c   31 Close(10)
+c    
+c      Call TwoNO1(TwoElAO,UMOAOInv,NBasis,NInte2)
+cC
+c      ij=0
+c      do i=1,nbasis
+c      do j=1,i
+c      ij=ij+1
+c      kl=0
+c      do k=1,nbasis
+c      do l=1,k
+c      kl=kl+1
+c      if(ij.ge.kl) then
+c      diff=abs(TwoEl(NAddr3(i,j,k,l))-TwoElAO(NAddr3(i,j,k,l)))
+c      if(diff.gt.1.d-5)
+c     $ write(*,*) i,j,k,l,TwoEl(NAddr3(I,j,k,l)),
+c     $ TwoElAO(NAddr3(i,j,k,l))
+c      endif
+c      enddo
+c      enddo
+c      enddo
+c      enddo 
+c      stop
+cc end test
+C      
+C
+      Call MultpM(UAOMO,URe,UAux,NBasis)
+      Call MatTr(XKin,UAOMO,NBasis)
+C  
+      Call print_sqmat(UAOMO,NBasis)
+
+C
+      Write(6,'(/," Transforming two-electron integrals ...",/)')
+      Call TwoNO1(TwoEl,UAOMO,NBasis,NInte2)
+C              
+      EndIf  
+C
+C     READ ACTIVE 2-RDM AND TRANSFORM TO NO'S  
+C
+      Write(6,'(" Reading in 2-RDM ...")')
+      Ind2(1:NBasis)=0
+      Do I=1,NAct
+      Ind2(INActive+I)=I
+      EndDo
+C
+      NRDM2Act=NAct**2*(NAct**2+1)/2
+      Allocate (RDM2Act(NRDM2Act))
+      RDM2Act(1:NRDM2Act)=Zero
+C
+C     HAP
+      call read_2rdm_molpro(RDM2Act,NoSt,'2RDM',NAct)
+C
+C      Open(10,File='rdmdump.dat')
+C      Read(10,*) NStates
+C      IStart=0
+C   55 Read(10,*,End=65) X,I1,I2,I3,I4
+C      If(X.Eq.NoSt.And.I1+I2+I3+I4.Eq.-4) IStart=1
+C      If(X.Ne.NoSt.And.I1+I2+I3+I4.Eq.-4) IStart=0
+CC
+C      If(I3+I4.Gt.0.And.IStart.Eq.1) Then
+C      I=I1
+C      J=I2
+C      K=I3
+C      L=I4        
+C      RDM2Act(NAddrRDM(J,L,I,K,NAct))=X*Half
+C      RDM2Act(NAddrRDM(L,J,K,I,NAct))=X*Half
+C      EndIf
+CC
+C      GoTo 55
+C   65 Close(10)
+C
+C
+      Do I=1,NAct
+      Do J=1,NAct
+      AUXM1((J-1)*NAct+I)=AUXM(I,J)
+      EndDo
+      EndDo
+      Call TrRDM2(RDM2Act,AUXM1,NAct,NRDM2Act)
+C
+C     COMPUTE THE ENERGY FOR CHECKING
+C
+      ETot=Zero
+      Do I=1,NOccup
+      II=(I*(I+1))/2
+      ETot=ETot+Two*Occ(I)*XKin(II)
+      EndDo
+      Write(6,'(/,1X,''One-electron Energy'',5X,F15.8)')ETot
+C
+      ETwo=Zero 
+      Do IP=1,NOccup
+      Do IQ=1,NOccup
+      Do IR=1,NOccup
+      Do IS=1,NOccup
+      Hlp=FRDM2(IP,IQ,IR,IS,RDM2Act,Occ,Ind2,NAct,NBasis)
+     $ *TwoEl(NAddr3(IP,IR,IQ,IS))
+      ETot=ETot+Hlp
+      ETwo=ETwo+Hlp
+      EndDo
+      EndDo
+      EndDo
+      EndDo
+      Write(6,'(/,1X,''Two-electron Energy'',5X,F15.8)')ETwo
+      Write(6,'(/,1X,''MCSCF Molpro Energy'',5X,F15.8)')ETot+ENuc
+C
+C     HAP
+      Write(6,*) ETot+ENuc
+C     SAVE THE ACTIVE PART IN rdm2.dat
+C
+      Open(10,File='rdm2.dat')
+      Do I=1,NAct
+      Do J=1,NAct
+      IJ=(I-1)*NAct+J
+      Do K=1,NAct
+      Do L=1,NAct
+      KL=(K-1)*NAct+L
+      If(IJ.Ge.KL) Write(10,'(4I4,F19.12)')
+     $ K,I,L,J,Two*RDM2Act(NAddrRDM(I,J,K,L,NAct))
+      EndDo
+      EndDo
+      EndDo
+      EndDo
+C      
+      Close(10)
+      Deallocate(RDM2Act)
+C
+C     INTEGRALS ARE TRANSFORMED SO URe IS SET TO A UNIT MATRIX 
+C
+      Do I=1,NBasis
+      Do J=1,NBasis
+      URe(I,J)=Zero
+      If(I.Eq.J) URe(I,J)=One
+      EndDo
+      EndDo
 C
       Return
       End
@@ -924,6 +1404,37 @@ C
       Return
       End  
 
+*Deck GetENuc_AOBin
+      Subroutine GetENuc_AOBin(ENuc,infile)
+C
+      Implicit Real*8 (A-H,O-Z)
+      Character*32 infile
+      Logical ex
+
+      inquire(file=trim(infile),EXIST=ex)
+     
+      if(ex) then
+         open(newunit=iunit,file=trim(infile),status='OLD', 
+     $        access='SEQUENTIAL',form='UNFORMATTED')
+      
+         read(iunit)
+         read(iunit)
+         read(iunit) ENuc
+ 
+         close(iunit)
+
+         print*, 'ENuc:=',ENuc
+ 
+      else
+ 
+        write(LOUT,'(1x,a)') 'WARNING: '// infile //' NOT FOUND!'
+        write(LOUT,'(1x,a)') 'CANNOT READ ENuc!'
+        stop
+
+      endif     
+
+      End
+
 *Deck GetENuc_AO
       Subroutine GetENuc_AO(ENuc,Title)
 C
@@ -955,7 +1466,7 @@ C
       End
 
 *Deck Int1_AO
-      Subroutine Int1_AO(XOne,NInte1,FName,UAOMO,NSymMO,NumOSym,NBasis)
+      Subroutine Int1_AO(XOne,NInte1,FName,NumOSym,NBasis)
 C
 C     READS ONE-ELECTRON INTEGRALS IN AO FROM THE FName FILE
 C     AND STORE THEM IN XOne
@@ -967,9 +1478,7 @@ C
 C
       Character*60 FName,Aux1
 C
-      Dimension XOne(NInte1),UAOMO(NBasis,NBasis),NSymMO(NBasis),
-     $ NumOSym(15)
-C
+      Dimension XOne(NInte1),NumOSym(15)
 C
       Do I=1,NInte1
       XOne(I)=Zero
@@ -984,9 +1493,6 @@ C
       Do ISym=1,MxSym
 C
       Do I=1,NumOSym(ISym)
-      Ind1=Ind+I
-      Ind2=Ind+K
-      Index=(Max(Ind1,Ind2)*(Max(Ind1,Ind2)-1))/2+Min(Ind1,Ind2)
       Read(10,*) (XOne(IndSym(Ind+I,Ind+K)),K=1,NumOSym(ISym))
       EndDo
 C
@@ -995,15 +1501,11 @@ C
       EndDo
       Close(10)
 C
-C     TRANSFORM XOne FROM AO TO MO
-C
-      Call MatTr(XOne,UAOMO,NBasis)
-C
       Return
       End
 
 *Deck Int2_AO
-      Subroutine Int2_AO(TwoEl,UAOMO,NSymMO,NumOSym,MultpC,
+      Subroutine Int2_AO(TwoEl,NumOSym,MultpC,
      $ FName,NInte1,NInte2,NBasis)
 C
 C     READS TWO-ELECTRON INTEGRALS IN AO
@@ -1015,16 +1517,12 @@ C
 C
       Character*60 FName
 C
-      Dimension TwoEl(NInte2),UAOMO(NBasis,NBasis),NSymMO(NBasis),
+      Dimension TwoEl(NInte2),
      $ NumOSym(15),MultpC(15,15),Record(NInte1),NTB(8)
-C
-      Real*8, Allocatable :: TwoAO(:)
 C
       Write(6,'(" Loading two-electron integrals in AO ...",/)')
 C
-      Allocate (TwoAO(NInte2))
-C
-      TwoAO(1:NInte2)=         0.D0
+      TwoEl(1:NInte2)=         0.D0
 C
       Open(10,File=FName,Form='Unformatted')
       Do III=1,8
@@ -1072,7 +1570,7 @@ C
       IRR=IndOrb(IR,NSymR,NumOSym)
       ISS=IndOrb(IS,NSymS,NumOSym)
       NAdd=NAddr3(IPP,IQQ,IRR,ISS)
-      TwoAO(NAdd)=Record(ICounter)
+      TwoEl(NAdd)=Record(ICounter)
       EndDo
       EndDo
 C
@@ -1090,7 +1588,7 @@ C
       IRR=IndOrb(IR,NSymR,NumOSym)
       ISS=IndOrb(IS,NSymS,NumOSym)
       NAdd=NAddr3(IPP,IQQ,IRR,ISS)
-      TwoAO(NAdd)=Record(ICounter)
+      TwoEl(NAdd)=Record(ICounter)
       EndDo
       EndDo
 C
@@ -1114,13 +1612,6 @@ c     enddo sympq
       EndDo
 C
       Close(10)
-C
-C     TRANSFORM THE INTEGRALS TO MO
-C
-      Write(6,'(" Transforming two-electron integrals to MO ...",/)')
-      Call TwoNO(TwoEl,UAOMO,TwoAO,NBasis,NInte2)
-C
-      Deallocate (TwoAO)
 C
       Return
 C
@@ -1196,19 +1687,18 @@ C
       End
 
 *Deck GetUAOMO
-      Subroutine GetUAOMO(UAOMO,NSymMO,NumOSym,NBasis)
+      Subroutine GetUAOMO(UAOMO,NumOSym,NBasis)
 C
-C     LOAD A TRANSFORMATION MATRIX AO->MO FROM orb_hf.dat
+C     LOAD A TRANSFORMATION MATRIX AO->MO FROM uaomo.dat
 C
       Implicit Real*8 (A-H,O-Z)
       Parameter (Zero=0.D0)
 C
-      Character*100 Line
-      Character*5 Aux
+      Character*100 Aux
 C
       Include 'commons.inc'
 C
-      Dimension UAOMO(NBasis,NBasis),NSymMO(NBasis),NumOSym(15)
+      Dimension UAOMO(NBasis,NBasis),NumOSym(15)
 C
       Do I=1,NBasis
       Do J=1,NBasis
@@ -1216,55 +1706,21 @@ C
       EndDo
       EndDo
 C
-      Open(123,File="orb_hf.dat")
+      Open(10,File="uaomo.dat")
+      Read(10,'(A10)')Aux
+      Read(10,'(A10)')Aux
 C
       Ind=0
       Do ISym=1,MxSym
 C
       Do I=1,NumOSym(ISym)
-      Read(123,*) (UAOMO(Ind+I,Ind+K),K=1,NumOSym(ISym))
+      Read(10,*) (UAOMO(Ind+I,Ind+K),K=1,NumOSym(ISym))
       EndDo
 C
       Ind=Ind+NumOSym(ISym)
 C
       EndDo
-      Close(123)
-C
-C     IF ILoc=1 READ UAOMO FROM molden FILE
-C
-      If(ILoc.Eq.1) Then
-C
-      Write(6,'(/,X,"LOCALIZED MO ORBITALS USED AS GUESS")')
-C
-      If(MxSym.Ne.1) 
-     $ Stop 'Fatal Error. Localized orbitals not available'
-C
-      Open(123,File="local.molden")
-C
-   20 Read(123,'(A4)',End=10) Line(1:4)
-C
-      If(Line(1:4).Eq."[MO]") Then
-C
-      Do I=1,NBasis
-      Read(123,'(A5,F9.1)')Aux(1:5),XX
-      IOrb=XX
-      Read(123,*)
-      Read(123,*)
-      Read(123,*)
-      Do J=1,NBasis
-      Read(123,*)X,Y
-      UAOMO(IOrb,J)=Y
-      EndDo
-      EndDo
-C
-      EndIf
-C
-      GoTo 20
-C
-   10 Continue
-      Close(123)
-C
-      EndIf
+      Close(10)
 C
       Return
       End
@@ -1854,6 +2310,37 @@ C
       Return
       End
 
+*Deck FockGen      
+      Subroutine FockGen(Fock,Gamma,XOne,TwoEl,NInte1,NBasis,NInte2)
+C
+C     GENERALIZED FOCK MATRIX
+C
+      Implicit Real*8 (A-H,O-Z)
+      Parameter (Zero=0.D0,Half=0.5D0,One=1.D0,Two=2.D0)
+C
+      Real*8 Fock(NInte1),TwoEl(NInte2),Gamma(NInte1),XOne(NInte1)
+C
+      IJ=0
+      Do I=1,NBasis
+      Do J=1,I
+      IJ=IJ+1
+C
+      FIJ=XOne(IJ)
+      Do K=1,NBasis
+      Do L=1,NBasis
+      KL=IndSym(K,L)
+      FIJ=FIJ+Gamma(KL)*
+     $ (Two*TwoEl(NAddr3(I,J,K,L))-TwoEl(NAddr3(I,L,J,K)))
+      EndDo
+      EndDo
+      Fock(IJ)=FIJ
+C
+      EndDo
+      EndDo
+C      
+      Return
+      End
+
       subroutine readlabel2(iunit,text)
       ! sets file pointer 
       ! to first data after text
@@ -1878,6 +2365,4 @@ C
       enddo
       
       end subroutine readlabel2
-
-
 

@@ -102,7 +102,7 @@ C
 C
       If(ICASSCF.Eq.1) Then
 C
-      ETot=EGOne(1)
+      Tot=EGOne(1)
       Write
      $ (6,'(/,2X,''ECASSCF+ENuc, AC-Corr, AC-ERPA-CASSCF '',4X,3F15.8)')
      $ ETot+ENuc,ECorr,ETot+ENuc+ECorr
@@ -1563,7 +1563,7 @@ C
       EndDo
 C
       Write(*,*) 'EigY1-Ka1',norm2(EigY1)     
-Cmh      Write(*,*) 'EigY-Ka ',norm2(EigY)
+      Write(*,*) 'EigY-Ka ',norm2(EigY)
 C     
       Return
       End
@@ -2648,6 +2648,7 @@ C
       EndDo
       EndDo
 C
+
       If(ISkippedEig.Ne.0) Then
       Write(6,'(/,1X,"The number of discarded eigenvalues is",I4)')
      $  ISkippedEig

@@ -6,7 +6,6 @@ use tran
 use sorter
 use sapt_ener
 
-
 implicit none
 
 contains
@@ -19,6 +18,7 @@ type(SaptData) :: SAPT
 integer :: i
 integer :: NBasis
 double precision :: Tcpu,Twall
+! testowe
 
 ! TEMPORARY - JOBTYPE_2
 ! ERPA
@@ -28,7 +28,6 @@ double precision :: Tcpu,Twall
  write(LOUT,'()')
  write(LOUT,'(1x,a)') 'STARTING SAPT CALCULATIONS'
  write(LOUT,'(8a10)') ('**********',i=1,8)
-
 
  call clock('START',Tcpu,Twall) 
  call sapt_interface(Flags,SAPT)
@@ -63,7 +62,8 @@ double precision :: Tcpu,Twall
 
  call clock('SAPT',Tcpu,Twall)
 
-! call interface to PRDMFT
+! testy molpro grid 
+!  call molpro_routines
 
  stop
 
@@ -88,20 +88,21 @@ integer :: ione,iorb,isiri,i,j,ij
 logical :: exsiri
 double precision :: tmp
 integer :: p,q
-!double precision,allocatable :: work3(:,:)
-double precision,allocatable :: work3(:)
+double precision,allocatable :: AuxA(:,:),AuxB(:,:)
+double precision,allocatable :: OneRdmA(:),OneRdmB(:)
 integer :: tmp1
 double precision ::  potnuc,emy,eactiv,emcscf
 integer :: noccA, nvirtA, noccB, nvirtB
 integer :: ncen
-!integer,parameter :: maxcen = 500
-!double precision :: charga(maxcen),xyza(maxcen,3)
-!double precision :: chargb(maxcen),xyzb(maxcen,3)
 
 ! read basis info
 ! only DCBS 
  NBasis = 0
- call basinfo(NBasis,'SIRIUS_A.RST')
+ if(SAPT%InterfaceType==1) then
+    call basinfo(NBasis,'SIRIUS_A.RST','DALTON')
+ elseif(SAPT%InterfaceType==2) then
+    call basinfo(NBasis,'AOTWOINT.mol','MOLPRO')
+ endif
  if(NBasis==0.and.SAPT%monA%NBasis==0) then
     write(LOUT,'(1x,a)') 'ERROR!!! NBasis NOWHERE TO BE FOUND!'
     stop
@@ -125,231 +126,46 @@ integer :: ncen
  SAPT%monA%NDim = NBasis*(NBasis-1)/2
  SAPT%monB%NDim = NBasis*(NBasis-1)/2
 
- allocate(work1(NInte1),work2(NSq))
- allocate(Ha(NSq),Hb(NSq))
- allocate(Va(NSq),Vb(NSq),S(NSq))
 ! read and dump 1-electron integrals 
-! AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
- open(newunit=ione,file='AOONEINT_A',access='sequential',&
-      form='unformatted',status='old')
- read(ione) 
- read(ione) NSym,NBas(1:NSym),SAPT%monA%PotNuc
- 
- call readlabel(ione,'ONEHAMIL')
- call readoneint(ione,work1)
- call square_oneint(work1,Ha,NBasis,NSym,NBas)
-! call triang_to_sq(work1,Ha,NBasis)
+ if(SAPT%InterfaceType==1) then
+    call onel_dalton(SAPT%monA%Monomer,NBasis,NSq,NInte1,SAPT%monA,SAPT)
+    call onel_dalton(SAPT%monB%Monomer,NBasis,NSq,NInte1,SAPT%monB,SAPT)
+ elseif(SAPT%InterfaceType==2) then
+    call onel_molpro(SAPT%monA%Monomer,NBasis,NSq,NInte1,SAPT%monA,SAPT)
+    call onel_molpro(SAPT%monB%Monomer,NBasis,NSq,NInte1,SAPT%monB,SAPT)
+ endif
 
- call readlabel(ione,'KINETINT')
- call readoneint(ione,work1)
- call square_oneint(work1,work2,NBasis,NSym,NBas)
-! call triang_to_sq(work1,work2,NBasis)
- Va(:) = Ha - work2
-
- call readlabel(ione,'OVERLAP ')
- call readoneint(ione,work1)
- call square_oneint(work1,S,NBasis,NSym,NBas)
-! call triang_to_sq(work1,S,NBasis)
-
- call readlabel(ione,'ISORDK  ')
- read(ione) 
- read(ione) SAPT%monA%charg,ncen,SAPT%monA%xyz 
-
-! print*, 'MONO-A',ncen
-! write(LOUT,*) SAPT%monA%charg(1:ncen)
-! do i=1,ncen
-!    write(LOUT,*) SAPT%monA%xyz(i,:)
-! enddo
-
-! write(*,*) 'VA'
-! call print_sqmat(Va,NBasis)
-! call print_diag(Va,NBasis)
-
- close(ione)
- 
- SAPT%monA%NSym = NSym
- SAPT%monA%NSymBas(1:NSym) = NBas(1:NSym)
-
- ! square form
- call writeoneint('ONEEL_A',NSq,S,Va,Ha)
- 
-!BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB
-
- open(newunit=ione,file='AOONEINT_B',access='sequential',&
-      form='unformatted',status='old')
- read(ione) 
- read(ione) NSym,NBas(1:NSym),SAPT%monB%PotNuc
-
- !print*, '1B!',NSym,NBas,SAPT%monB%PotNuc
-
- call readlabel(ione,'ONEHAMIL')
- call readoneint(ione,work1)
- call square_oneint(work1,Hb,NBasis,NSym,NBas)
- !call triang_to_sq(work1,Hb,NBasis)
-
- call readlabel(ione,'KINETINT')
- call readoneint(ione,work1)
- call square_oneint(work1,work2,NBasis,NSym,NBas)
-! call triang_to_sq(work1,work2,NBasis)
- Vb(:) = Hb - work2
-
- call readlabel(ione,'ISORDK  ')
- read(ione) 
- read(ione) SAPT%monB%charg,ncen,SAPT%monB%xyz 
-
-! print*, 'MONO-B',ncen
-! write(LOUT,*) SAPT%monB%charg(1:ncen)
-! do i=1,ncen
-!    write(LOUT,*) SAPT%monB%xyz(i,:)
-! enddo
-
- SAPT%monB%NSym = NSym
- SAPT%monB%NSymBas(1:NSym) = NBas(1:NSym)
-
-! rearrange in V: (B,A) -> (A,B)
-
- call read_syminf(SAPT%monA,SAPT%monB,NBasis)
-
- call arrange_oneint(S,NBasis,SAPT)
- call arrange_oneint(Vb,NBasis,SAPT)
- call arrange_oneint(Hb,NBasis,SAPT)
-
- !print*, 'VB:'
- !call print_sqmat(Vb,NBasis)
-
- close(ione)
-
- ! square form
- call writeoneint('ONEEL_B',NSq,S,Vb,Hb)
-
-! AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
 ! read coefficient, occupancies
- 
- inquire(file='SIRIFC_A',EXIST=exsiri)
- if(exsiri) then
-    open(newunit=isiri,file='SIRIFC_A',status='OLD', &
-         access='SEQUENTIAL',form='UNFORMATTED')
-    call readlabel(isiri,'TRCCINT ')
-    read(isiri) NSym,NOrbt,NBasist,NCMOt,NOcc(1:NSym),NOrbs(1:NSym)
-
-    SAPT%monA%NOrb = NOrbt
-    SAPT%monA%NSymOrb(1:NSym) = NOrbs(1:NSym)
-
- else
- !   SAPT%monA%NOrb = NOrb
- !   SAPT%monA%GFunc(1) = NOrb
-    NBasist = NBasis
-!    NCMOt = NOrb*NBasis
- endif 
-
-    rewind(isiri)
-    read (isiri)
-    read (isiri) potnuc,emy,eactiv,emcscf
- 
- print*, Flags%ISHF, SAPT%monA%ISHF
- if(Flags%ICASSCF==1.and.Flags%ISHF==0.and.SAPT%monA%NELE/=1.and.(.not.SAPT%monA%ISHF)) then
- !if(Flags%ICASSCF==1.and.Flags%ISHF==0.and.SAPT%monA%NELE/=1) then
-
-    ! CASSCF
-    call readmulti(NBasis,SAPT%monA,.false.,exsiri,isiri,'occupations_A.dat','SIRIUS_A.RST')
-
- elseif(Flags%ICASSCF==1.and.Flags%ISHF==0.and.SAPT%monA%NELE==1.and.Flags%ISERPA==0.and.(.not.SAPT%monA%ISHF)) then
-    print*, 'here?-why so?'
-    ! CASSCF
-    ! for 2-el electron case: read from occupations.dat
-    call readmulti(NBasis,SAPT%monA,.false.,.false.,isiri,'occupations_A.dat','SIRIUS_A.RST')
-
- elseif(Flags%ICASSCF==1.and.Flags%ISHF==0.and.SAPT%monA%NELE==1.and.Flags%ISERPA==2) then
-
-    call readmulti(NBasis,SAPT%monA,.false.,exsiri,isiri,'occupations_A.dat','SIRIUS_A.RST')
-
- elseif(Flags%ICASSCF==1.and.(Flags%ISHF==1.or.SAPT%monA%ISHF)) then
-
-    ! Hartree-Fock
-    call readmulti(NBasis,SAPT%monA,.true.,exsiri,isiri,'occupations_A.dat','SIRIUS_A.RST')
-    call readener(NBasis,SAPT%monA,isiri)
-
- elseif(Flags%IGVB==1) then 
-
-    ! GVB
-    call readgvb(SAPT%monA,NBasis,'coeff_A.dat')
-
+ if(SAPT%InterfaceType==1) then
+    call readocc_dalton(NBasis,SAPT%monA,Flags) 
+    call readocc_dalton(NBasis,SAPT%monB,Flags) 
+ elseif(SAPT%InterfaceType==2) then
+    allocate(AuxA(NBasis,NBasis),AuxB(NBasis,NBasis),&
+             OneRdmA(NInte1),OneRdmB(NInte1))
+    call readocc_molpro(NBasis,SAPT%monA,AuxA,OneRdmA,Flags)
+    call readocc_molpro(NBasis,SAPT%monB,AuxB,OneRdmB,Flags)
  endif
-
- if(exsiri) close(isiri) 
-
-! BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB
- inquire(file='SIRIFC_B',EXIST=exsiri)
-! if(exsiri) then
-    open(newunit=isiri,file='SIRIFC_B',status='OLD', &
-         access='SEQUENTIAL',form='UNFORMATTED')
-    call readlabel(isiri,'TRCCINT ')
-    read(isiri) NSym,NOrbt,NBasist,NCMOt,NOcc(1:NSym),NOrbs(1:NSym)
- !   write(*,*) 'B: ',NSym,NOrbt,NBasist,NCMOt
- !   write(*,*) NOrb, 'NOrb'
-    SAPT%monB%NOrb = NOrbt
-    SAPT%monB%NSymOrb(1:NSym) = NOrbs(1:NSym)
-! else
-!    SAPT%monB%NOrb = NOrb
-!    SAPT%monB%GFunc(1) = NOrb
-    
-!    NBasist = NBasis
-!    NCMOt = NOrb*NBasis
-! endif 
-
-    rewind(isiri)
-    read (isiri)
-    read (isiri) potnuc,emy,eactiv,emcscf
-!    write(*,*)   potnuc,emy,eactiv,emcscf
-
- if(Flags%ICASSCF==1.and.Flags%ISHF==0.and.SAPT%monB%NELE/=1) then
-
-    ! CASSCF
-    call readmulti(NBasis,SAPT%monB,.false.,exsiri,isiri,'occupations_B.dat','SIRIUS_B.RST')
-
- elseif(Flags%ICASSCF==1.and.Flags%ISHF==0.and.SAPT%monB%NELE==1.and.Flags%ISERPA==0) then
-
-    ! CASSCF
-    ! for 2-el electron case: read from occupations.dat
-    ! info in SIRIFC seems wrong in this case?
-     call readmulti(NBasis,SAPT%monB,.false.,.false.,isiri,'occupations_B.dat','SIRIUS_B.RST')
-
- elseif(Flags%ICASSCF==1.and.Flags%ISHF==0.and.SAPT%monB%NELE==1.and.Flags%ISERPA==2) then
-
-    ! CASSCF - TD-APSG
-    call readmulti(NBasis,SAPT%monB,.false.,exsiri,isiri,'occupations_B.dat','SIRIUS_B.RST')
- 
- elseif(Flags%ICASSCF==1.and.Flags%ISHF==1) then
-
-    ! Hartree-Fock
-    call readmulti(NBasis,SAPT%monB,.true.,exsiri,isiri,'occupations_B.dat','SIRIUS_B.RST')
-    call readener(NBasis,SAPT%monB,isiri)
-
- elseif(Flags%IGVB==1) then
-
-    ! GVB 
-    call readgvb(SAPT%monB,NBasis,'coeff_B.dat')
- endif
-
- if(exsiri) close(isiri) 
  call print_occ(NBasis,SAPT,Flags%ICASSCF)
 
 ! read orbitals 
 ! norb.leq.nbas, orbitals mays be deleted due to linear
-! dependecies in large basis sets
-! ncmot = norb*nbas
- !allocate(Ca(NCMOt),Cb(NCMOt))
+! dependecies in large basis sets; ncmot = norb*nbas
  allocate(Ca(NBasis*NBasis),Cb(NBasis*NBasis))
-! allocate(work3(NBasis,NBasis))
 
- call read_mo(Ca,NBasis,SAPT%monA%NSym,SAPT%monA%NSymBas,SAPT%monA%NSymOrb,&
-              'SIRIUS_A.RST','DALTON_A.MOPUN')
- call read_mo(Cb,NBasis,SAPT%monB%NSym,SAPT%monB%NSymBas,SAPT%monB%NSymOrb,&
-              'SIRIUS_B.RST','DALTON_B.MOPUN')
+ if(SAPT%InterfaceType==1) then 
 
- call arrange_mo(Cb,NBasis,SAPT)
+    call read_mo_dalton(Ca,NBasis,SAPT%monA%NSym,SAPT%monA%NSymBas,SAPT%monA%NSymOrb,&
+                 'SIRIUS_A.RST','DALTON_A.MOPUN')
+    call read_mo_dalton(Cb,NBasis,SAPT%monB%NSym,SAPT%monB%NSymBas,SAPT%monB%NSymOrb,&
+                 'SIRIUS_B.RST','DALTON_B.MOPUN')
+    call arrange_mo(Cb,NBasis,SAPT)
 
-! HERE NEW STUFF
+ elseif(SAPT%InterfaceType==2) then
+    call read_mo_molpro(Ca,'MOLPRO_A.MOPUN','CASORB  ',NBasis)
+    call read_mo_molpro(Cb,'MOLPRO_B.MOPUN','CASORB  ',NBasis)
+ endif
+
+! symmetry sorting
  if(SAPT%monA%NSym.gt.1) then
     call sort_sym_mo(Ca,NBasis,SAPT%monA)
  endif
@@ -357,6 +173,21 @@ integer :: ncen
     call sort_sym_mo(Cb,NBasis,SAPT%monB)
  endif
 
+! read 2-el integrals
+ if(SAPT%InterfaceType==1) then
+    call readtwoint(NBasis,1,'AOTWOINT_A')
+ elseif(SAPT%InterfaceType==2) then
+    call readtwoint(NBasis,2,'AOTWOINT.mol')
+ endif
+
+ if(SAPT%InterfaceType==2) then
+    call prepare_no(OneRdmA,AuxA,Ca,SAPT%monA,NBasis)
+    call prepare_no(OneRdmB,AuxB,Cb,SAPT%monB,NBasis)
+  
+    call prepare_rdm2(SAPT%monA,AuxA,NBasis)
+    call prepare_rdm2(SAPT%monB,AuxB,NBasis)
+ endif
+ 
 ! MAYBE: one should print with NOrbt?
  !if(SAPT%IPrint.ne.0) call print_mo(Ca,NBasis,'MONOMER A')
  !if(SAPT%IPrint.ne.0) call print_mo(Cb,NBasis,'MONOMER B')
@@ -379,8 +210,7 @@ integer :: ncen
  call select_active(SAPT%monB,NBasis,Flags)
 
 ! ABABABABABABABABABABABABABABABABABABABABABABABABABABABABAB
-! read and transform 2-el integrals
- call readtwoint(NBasis,'AOTWOINT_A')
+! transform 2-el integrals
 ! full 4-idx tran
 ! call tran4_full(NBasis,Ca,Cb,'TWOMOAB')
 
@@ -480,18 +310,524 @@ integer :: ncen
  endif
 
 
- deallocate(work1,work2)
-
  ! calculate electrostatic potential
  call calc_elpot(SAPT%monA,SAPT%monB,NBasis)
 
 ! calc intermolecular repulsion
  SAPT%Vnn = calc_vnn(SAPT%monA,SAPT%monB)
 
- deallocate(Ha,Hb,Va,Vb,S)
  deallocate(Ca,Cb)
+ if(SAPT%InterfaceType==2) then 
+    deallocate(OneRdmB,OneRdmA,AuxB,AuxA)
+ endif
 
 end subroutine sapt_interface
+
+subroutine onel_molpro(mon,NBasis,NSq,NInte1,MonBlock,SAPT)
+ implicit none
+
+ type(SaptData) :: SAPT
+ type(SystemBlock) :: MonBlock
+
+ integer,intent(in) :: mon,NBasis,NSq,NInte1
+ integer :: ione,ios,NSym,NBas(8),ncen
+ double precision, allocatable :: Hmat(:),Vmat(:),Smat(:) 
+ double precision, allocatable :: work1(:),work2(:)
+ character(8) :: label
+ character(:),allocatable :: infile,outfile
+
+ if(mon==1) then
+   infile =  'AOONEINT_A'
+   outfile = 'ONEEL_A'
+ elseif(mon==2) then
+   infile =  'AOONEINT_B'
+   outfile = 'ONEEL_B'
+ endif 
+ 
+ allocate(work1(NInte1),work2(NSq))
+ allocate(Hmat(NSq),Vmat(NSq),Smat(NSq))
+! read and dump 1-electron integrals 
+ open(newunit=ione,file=infile,access='sequential',&
+      form='unformatted',status='old')
+ read(ione) 
+ read(ione) NSym,NBas(1:NSym)
+ read(ione) MonBlock%PotNuc
+
+ do
+   read(ione,iostat=ios) label
+   if(ios<0) then
+      write(6,*) 'ERROR!!! LABEL ISORDK   not found!'  
+      stop
+   endif
+   if(label=='ISORDK  ') then
+      read(ione) ncen
+      read(ione) MonBlock%charg(1:ncen),MonBlock%xyz(1:ncen,1:3) 
+      exit
+   endif 
+ enddo
+ !print*, 'ncen',MonBlock%charg(1:ncen)
+ !print*, 'ncen',MonBlock%xyz(1:ncen,1:3)
+
+ close(ione)
+
+ call readoneint_molpro(work1,infile,'ONEHAMIL',.false.,NInte1)
+ call square_oneint(work1,Hmat,NBasis,NSym,NBas)
+ !call print_sqmat(Hmat,NBasis)
+
+ call readoneint_molpro(work1,infile,'POTENTAL',.false.,NInte1)
+ call square_oneint(work1,Vmat,NBasis,NSym,NBas)
+ !call print_sqmat(Vmat,NBasis)
+
+ call readoneint_molpro(work1,infile,'OVERLAP ',.false.,NInte1)
+ call square_oneint(work1,Smat,NBasis,NSym,NBas)
+ !call print_sqmat(Smat,NBasis)
+
+
+ MonBlock%NSym = NSym
+ MonBlock%NSymBas(1:NSym) = NBas(1:NSym)
+
+ !square form
+ call writeoneint(outfile,NSq,Smat,Vmat,Hmat)
+
+ deallocate(work2,work1)
+ deallocate(Smat,Vmat,Hmat)
+
+end subroutine onel_molpro
+
+subroutine onel_dalton(mon,NBasis,NSq,NInte1,MonBlock,SAPT)
+ implicit none
+
+ type(SaptData) :: SAPT
+ type(SystemBlock) :: MonBlock
+
+ integer,intent(in) :: mon,NBasis,NSq,NInte1
+ integer :: ione,NSym,NBas(8),ncen
+ double precision, allocatable :: Hmat(:),Vmat(:),Smat(:) 
+ double precision, allocatable :: work1(:),work2(:)
+ character(:),allocatable :: infile,outfile
+
+ if(mon==1) then
+   infile =  'AOONEINT_A'
+   outfile = 'ONEEL_A'
+ elseif(mon==2) then
+   infile =  'AOONEINT_B'
+   outfile = 'ONEEL_B'
+ endif 
+ 
+ allocate(work1(NInte1),work2(NSq))
+ allocate(Hmat(NSq),Vmat(NSq),Smat(NSq))
+! read and dump 1-electron integrals 
+ open(newunit=ione,file=infile,access='sequential',&
+      form='unformatted',status='old')
+ read(ione) 
+ read(ione) NSym,NBas(1:NSym),MonBlock%PotNuc
+ 
+ call readlabel(ione,'ONEHAMIL')
+ call readoneint(ione,work1)
+ call square_oneint(work1,Hmat,NBasis,NSym,NBas)
+
+ call readlabel(ione,'KINETINT')
+ call readoneint(ione,work1)
+ call square_oneint(work1,work2,NBasis,NSym,NBas)
+ Vmat(:) = Hmat - work2
+
+ call readlabel(ione,'OVERLAP ')
+ call readoneint(ione,work1)
+ call square_oneint(work1,Smat,NBasis,NSym,NBas)
+
+ call readlabel(ione,'ISORDK  ')
+ read(ione) 
+ read(ione) MonBlock%charg,ncen,MonBlock%xyz 
+
+! print*, 'MONO-A',ncen
+! write(LOUT,*) SAPT%monA%charg(1:ncen)
+! do i=1,ncen
+!    write(LOUT,*) SAPT%monA%xyz(i,:)
+! enddo
+
+! write(*,*) 'VA'
+! call print_sqmat(Va,NBasis)
+! call print_diag(Va,NBasis)
+
+ close(ione)
+ 
+ MonBlock%NSym = NSym
+ MonBlock%NSymBas(1:NSym) = NBas(1:NSym)
+
+ if(mon==2) then
+ ! rearrange in V: (B,A) -> (A,B)
+    call read_syminf(SAPT%monA,SAPT%monB,NBasis)
+   
+    call arrange_oneint(Smat,NBasis,SAPT)
+    call arrange_oneint(Vmat,NBasis,SAPT)
+    call arrange_oneint(Hmat,NBasis,SAPT)
+ endif
+
+ ! square form
+ call writeoneint(outfile,NSq,Smat,Vmat,Hmat)
+
+end subroutine onel_dalton 
+
+subroutine readocc_dalton(NBasis,Mon,Flags) 
+implicit none 
+
+type(SystemBlock) :: Mon
+type(FlagsData) :: Flags
+
+integer,intent(in) :: NBasis
+integer :: NSym,NOrbt,NBasist,NCMOt,NOcc(8),NOrbs(8)
+integer :: isiri
+double precision :: potnuc,emy,eactiv,emcscf
+character(:),allocatable :: occfile,sirifile,siriusfile,coefile 
+logical :: exsiri
+
+
+ if(Mon%Monomer==1) then
+   coefile='coeff_A.dat'
+   occfile='occupations_A.dat'
+   sirifile='SIRIFC_A'
+   siriusfile='SIRIUS_A.RST'
+ elseif(Mon%Monomer==2) then
+   coefile='coeff_B.dat'
+   occfile='occupations_B.dat'
+   sirifile='SIRIFC_B'
+   siriusfile='SIRIUS_B.RST'
+ endif
+
+ inquire(file=sirifile,EXIST=exsiri)
+ if(exsiri) then
+    open(newunit=isiri,file=sirifile,status='OLD', &
+         access='SEQUENTIAL',form='UNFORMATTED')
+    call readlabel(isiri,'TRCCINT ')
+    read(isiri) NSym,NOrbt,NBasist,NCMOt,NOcc(1:NSym),NOrbs(1:NSym)
+
+    Mon%NOrb = NOrbt
+    Mon%NSymOrb(1:NSym) = NOrbs(1:NSym)
+
+ else
+    NBasist = NBasis
+ endif 
+    rewind(isiri)
+    read (isiri)
+    read (isiri) potnuc,emy,eactiv,emcscf
+ 
+ if(Flags%ICASSCF==1.and.Flags%ISHF==0.and.Mon%NELE/=1.and.(.not.Mon%ISHF)) then
+    ! CASSCF
+    call readmulti(NBasis,Mon,.false.,exsiri,isiri,occfile,siriusfile)
+
+ elseif(Flags%ICASSCF==1.and.Flags%ISHF==0.and.Mon%NELE==1.and.Flags%ISERPA==0.and.(.not.Mon%ISHF)) then
+    ! CASSCF
+    ! for 2-el electron case: read from occupations.dat
+    call readmulti(NBasis,Mon,.false.,.false.,isiri,occfile,siriusfile)
+
+ elseif(Flags%ICASSCF==1.and.Flags%ISHF==0.and.Mon%NELE==1.and.Flags%ISERPA==2) then
+
+    call readmulti(NBasis,Mon,.false.,exsiri,isiri,occfile,siriusfile)
+
+ elseif(Flags%ICASSCF==1.and.(Flags%ISHF==1.or.Mon%ISHF)) then
+
+    ! Hartree-Fock
+    call readmulti(NBasis,Mon,.true.,exsiri,isiri,occfile,siriusfile)
+    call readener(NBasis,Mon,isiri)
+
+ elseif(Flags%IGVB==1) then 
+
+    ! GVB
+    call readgvb(Mon,NBasis,coefile)
+
+ endif
+
+ if(exsiri) close(isiri) 
+
+end subroutine readocc_dalton
+
+subroutine readocc_molpro(NBasis,Mon,OrbAux,OneRdm,Flags)
+implicit none
+
+type(SystemBlock) :: Mon
+type(FlagsData) :: Flags
+
+integer :: NBasis
+integer :: NInte1,HlpDim,NOccup
+integer :: i,info
+double precision :: Tmp
+double precision :: OrbAux(NBasis,NBasis), &
+                    OneRdm(NBasis*(NBasis+1)/2)
+double precision,allocatable :: EVal(:)
+double precision,allocatable :: work(:)
+character(:),allocatable :: rdmfile
+
+ NInte1 = NBasis*(NBasis+1)/2
+ HlpDim = max(NBasis**2,3*NBasis)
+
+ if(Mon%Monomer==1) then
+   rdmfile = '2RDMA'
+ elseif(Mon%Monomer==2) then
+   rdmfile = '2RDMB'
+ endif 
+
+ allocate(Mon%CICoef(NBasis),Mon%IGem(NBasis),Mon%Occ(NBasis))
+ allocate(work(HlpDim),EVal(NBasis))
+ OneRdm = 0
+ call read_1rdm_molpro(OneRdm,Mon%NoSt,rdmfile,NBasis)
+ call triang_to_sq2(OneRdm,OrbAux,NBasis)
+ call Diag8(OrbAux,NBasis,NBasis,Eval,work)
+! call dsyev('V','U',NBasis,OrbAux,NBasis,EVal,work,3*NBasis,info)
+! print*,EVal
+ call SortOcc(EVal,OrbAux,NBasis)
+
+ Mon%NAct = 0
+ Tmp = 0
+ do i=1,NBasis
+    Tmp = Tmp + EVal(i)
+    if(EVal(i)>0.d0) Mon%NAct = Mon%NAct + 1  
+ enddo
+ !Mon%INAct = Mon%NELE-int(Tmp)
+ Mon%INAct = Mon%NELE-Tmp+1.d-1
+ NOccup = Mon%INAct + Mon%NAct
+ Mon%SumOcc = Tmp + Mon%INAct
+!
+ !print*, Mon%NAct,Mon%INAct
+ !print*, Mon%NELE,Tmp
+
+ Mon%Occ = 0
+ do i=1,NOccup
+    if(i<=Mon%INAct) then
+       Mon%Occ(i) = 1.d0   
+    else
+       Mon%Occ(i) = EVal(i-Mon%INAct)
+    endif
+ enddo 
+
+ if(Mon%INAct==0) then
+    Mon%NGem = 2
+
+    Mon%IGem(1:Mon%NAct+Mon%INAct) = 1
+    Mon%IGem(Mon%NAct+Mon%INAct+1:NBasis) = 2
+ else
+    Mon%NGem = 3
+    Mon%IGem(1:Mon%INAct) = 1
+    Mon%IGem(Mon%INAct+1:Mon%INAct+Mon%NAct) = 2
+    Mon%IGem(Mon%INAct+Mon%NAct+1:NBasis) = 3
+ endif
+
+! construct CICoef
+ do i=1,NBasis
+    Mon%CICoef(i)=sqrt(Mon%Occ(i))
+    if(Mon%Occ(i).lt.0.5d0) Mon%CICoef(i)=-Mon%CICoef(i)
+ enddo
+
+! call print_sqmat(OrbAux,NBasis)
+
+ deallocate(EVal,work)
+
+end subroutine readocc_molpro
+
+subroutine prepare_no(OneRdm,OrbAux,OrbCAS,Mon,NBasis)
+implicit none
+! OrbCAS[inout] :: on input AOtoCAS
+!                  on output AOtoNO
+! OrbAux contains CAStoNO
+
+type(SystemBlock) :: Mon
+
+integer :: NBasis
+double precision :: OneRdm(NBasis*(NBasis+1)/2)
+double precision :: OrbAux(NBasis,NBasis),OrbCAS(NBasis,NBasis)
+double precision,allocatable :: URe(:,:),OrbSym(:,:),Fock(:)
+double precision,allocatable :: work1(:),work2(:),work3(:)
+integer :: NOccup,NVirt
+integer :: i,j,ia,ib,iab,ioff,idx,NInte1
+character(:),allocatable :: onefile,rdmfile
+! testy
+integer :: info
+
+ NInte1 = NBasis*(NBasis+1)/2
+ NOccup = Mon%INAct + Mon%NAct
+ NVirt = NBasis - Mon%INAct - Mon%NAct
+
+ if(Mon%Monomer==1) then
+   onefile = 'AOONEINT_A'
+   rdmfile = '2RDMA'
+ elseif(Mon%Monomer==2) then
+   onefile = 'AOONEINT_B'
+   rdmfile = '2RDMB'
+ endif 
+ 
+ allocate(Mon%NumOSym(15),Mon%IndInt(NBasis))
+ allocate(work1(NInte1),work2(NInte1),work3(NBasis),&
+          Fock(NBasis**2),OrbSym(NBasis,NBasis),URe(NBasis,NBasis))
+
+ call create_ind(rdmfile,Mon%NumOSym,Mon%IndInt,NBasis)
+
+! COPY AUXM TO URe AND OFF SET BY NInAc
+ URe = 0
+ forall(i=1:NBasis) URe(i,i)=1d0
+ ! with Diag8:
+ do i=1,Mon%NAct
+    do j=1,Mon%NAct
+       URe(Mon%INAct+i,Mon%INAct+j) = OrbAux(i,j)
+    enddo
+ enddo
+ ! with dsyev 
+ !do i=1,Mon%NAct
+ !   do j=1,Mon%NAct
+ !      URe(Mon%INAct+i,Mon%INAct+j) = OrbAux(NBasis+1-i,NBasis+1-j)
+ !   enddo
+ !enddo
+!print*, norm2(URe)
+! call print_sqmat(URe,NBasis) 
+ 
+! FIND CANONICAL INACTIVE AND VIRTUAL ORBITALS 
+ work1 = 0
+ idx = 0
+ do j=1,Mon%INAct
+    do i=1,j
+       idx = idx + 1
+       if(i==j) work1(idx) = 1.0d0
+    enddo   
+ enddo
+ idx = 0
+ do j=1,Mon%NAct
+    do i=1,j
+       idx = idx + 1
+       ioff = (Mon%INAct+j)*(Mon%INAct+j-1)/2 + Mon%INAct
+       work1(ioff+i) = OneRdm(idx)
+    enddo
+ enddo
+! do i=1,NInte1
+!    print*, i,work1(i)
+! enddo
+ 
+ do i=1,NBasis
+    do j=1,NBasis
+       OrbSym(Mon%IndInt(i),j) = OrbCAS(j,i)
+    enddo
+ enddo
+
+ iab = 0
+ do ia=1,NBasis
+    do ib=1,ia
+       iab = iab + 1
+       OneRdm(iab) = 0.d0 
+       do i=1,NBasis
+          do j=1,NBasis
+             idx = max(i,j)*(max(i,j)-1)/2+min(i,j)
+             OneRdm(iab) = OneRdm(iab) & 
+           + OrbSym(i,ia)*OrbSym(j,ib)*work1(idx)
+          enddo
+       enddo
+    enddo
+ enddo
+
+ ! work1 = XOne 
+ call readoneint_molpro(work1,onefile,'ONEHAMIL',.true.,NInte1)
+ ! work2 = Fock
+ call FockGen_mithap(work2,OneRdm,work1,NInte1,NBasis)
+! call MatTr(work2,OrbSym,NBasis)
+ call tran_matTr(work2,OrbSym,OrbSym,NBasis)
+
+ Fock = 0
+ work3 = 0
+!INACTIVE
+ if(Mon%INAct/=0) then
+    do i=1,Mon%INAct 
+       do j=1,Mon%INAct
+          idx = max(i,j)*(max(i,j)-1)/2+min(i,j)
+          Fock((j-1)*Mon%INAct+i) = work2(idx)
+       enddo
+    enddo
+    call Diag8(Fock,Mon%INAct,Mon%INAct,work3,work1)
+    !call dsyev('V','U',Mon%INAct,Fock,Mon%INAct,work3,work1,3*Mon%INAct,info)
+    print*, work3(1:Mon%INAct)
+    do i=1,Mon%INAct 
+      do j=1,Mon%INAct
+         URe(i,j) = Fock((j-1)*Mon%INAct+i)
+      enddo
+    enddo
+ endif
+
+! VIRTUAL
+ if(NVirt/=0) then
+    do i=1,NVirt
+       do j=1,NVirt
+          idx = max(i+NOccup,j+NOccup)*(max(i+NOccup,j+NOccup)-1)/2&
+              + min(i+NOccup,j+NOccup)
+          Fock((j-1)*NVirt+i) = work2(idx)
+       enddo
+    enddo
+    call Diag8(Fock,NVirt,NVirt,work3,work1)
+    !call dsyev('V','U',NVirt,Fock,NVirt,work3,work1,3*NVirt,info)
+    do i=1,NVirt
+       do j=1,NVirt
+          URe(i+NOccup,j+NOccup) = Fock((j-1)*NVirt+i)
+       enddo
+    enddo
+ endif
+! END OF CANONICALIZING
+
+ call dgemm('N','N',NBasis,NBasis,NBasis,1d0,URe,NBasis,OrbSym,NBasis,0d0,OrbCAS,NBasis)
+ OrbCAS = transpose(OrbCAS)
+
+ deallocate(work3,work2,work1,Fock,OrbSym,URe)
+ deallocate(Mon%IndInt,Mon%NumOSym)
+
+end subroutine prepare_no
+
+subroutine prepare_rdm2(Mon,OrbAux,NBasis)
+implicit none
+
+type(SystemBlock) :: Mon
+
+integer,intent(in) :: NBasis 
+double precision,intent(in) :: OrbAux(NBasis,NBasis)
+integer :: i,j,k,l,ij,kl,iunit,NRDM2Act
+double precision,allocatable :: RDM2Act(:),work1(:)
+character(:),allocatable :: rdmfile,outfile
+integer,external :: NAddrRDM
+
+ if(Mon%Monomer==1) then
+   rdmfile='2RDMA'
+   outfile='rdm2_A.dat'
+ elseif(Mon%Monomer==2) then
+   rdmfile='2RDMB'
+   outfile='rdm2_B.dat'
+ endif
+
+ NRDM2Act = Mon%NAct**2*(Mon%NAct**2+1)/2 
+ allocate(RDM2Act(NRDM2Act),work1(Mon%NAct**2))
+ RDM2Act = 0
+ call read_2rdm_molpro(RDM2Act,Mon%NoSt,rdmfile,Mon%NAct)
+
+ do i=1,Mon%NAct
+    do j=1,Mon%NAct
+       work1((j-1)*Mon%NAct+i) = OrbAux(i,j) 
+    enddo
+ enddo
+ call TrRDM2(RDM2Act,work1,Mon%NAct,NRDM2Act)
+
+ open(newunit=iunit,file=outfile,status='replace',&
+      form='formatted') 
+ do i=1,Mon%NAct
+   do j=1,Mon%NAct
+      ij = (i-1)*Mon%NAct+j
+      do k=1,Mon%NAct
+         do l=1,Mon%NAct
+            kl = (k-1)*Mon%NAct+l
+            if(ij>=kl) then
+              write(iunit,'(4i4,f19.12)') & 
+                k,i,l,j,2d0*RDM2Act(NAddrRDM(i,j,k,l,Mon%NAct))
+            endif
+         enddo  
+      enddo  
+   enddo
+ enddo
+
+ close(iunit)
+
+ deallocate(work1,RDM2Act)
+
+end subroutine prepare_rdm2
 
 subroutine calc_resp_unc(Mon,MO,Flags,NBas,fname)
 implicit none
@@ -779,7 +1115,6 @@ double precision, allocatable :: EigTmp(:), VecTmp(:)
    allocate(ABPlus(Mon%NDimX**2),ABMin(Mon%NDimX**2), &
             EigVecR(Mon%NDimX**2),Eig(Mon%NDimX))
 
-
 ! HERE: STARTED WORK ON ACABMAT0_mithap!
   ! ACAlpha=sqrt(2d0)/2.d0
    call ACABMAT0_mithap(ABPlus,ABMin,URe,Mon%Occ,XOne,&
@@ -813,28 +1148,28 @@ double precision, allocatable :: EigTmp(:), VecTmp(:)
 
    if(EChck) then
       write(LOUT,'(/,1x,a)') 'ERPA-GVB ENERGY CHECK REQUESTED:'
-      call EneERPA(ETot,ECorr,Mon%PotNuc,EigVecR,Eig,TwoMO,URe,&
-           Mon%Occ,XOne,Mon%IndN,NBas,NInte1,NInte2,Mon%NDimX,Mon%NGem)
+      !call EneERPA(ETot,ECorr,Mon%PotNuc,EigVecR,Eig,TwoMO,URe,&
+      !     Mon%Occ,XOne,Mon%IndN,NBas,NInte1,NInte2,Mon%NDimX,Mon%NGem)
    endif
 
-   ! uncoupled
-   allocate(EigY0(Mon%NDimX**2),Eig0(Mon%NDimX),Eig1(Mon%NDimX))
+   !! uncoupled
+   !allocate(EigY0(Mon%NDimX**2),Eig0(Mon%NDimX),Eig1(Mon%NDimX))
  
-   EigY0 = 0
-   Eig0 = 0
-   Eig1 = 0
+   !EigY0 = 0
+   !Eig0 = 0
+   !Eig1 = 0
 
-   call Y01GVB(TwoMO,Mon%Occ,URe,XOne, &
-        EigY0,Eig0,Eig1, &
-        Mon%IndN,Mon%IndX,Mon%NDimX,NBas,Mon%NDim,NInte1,NInte2)
+   !call Y01GVB(TwoMO,Mon%Occ,URe,XOne, &
+   !     EigY0,Eig0,Eig1, &
+   !     Mon%IndN,Mon%IndX,Mon%NDimX,NBas,Mon%NDim,NInte1,NInte2)
 
-   ! dump uncoupled response
-   call writeresp(EigY0,Eig0,propfile0)
-   if(Flags%IFlag0==0) then
-      call writeEval(Eig1,propfile1)
-   endif
+   !! dump uncoupled response
+   !call writeresp(EigY0,Eig0,propfile0)
+   !if(Flags%IFlag0==0) then
+   !   call writeEval(Eig1,propfile1)
+   !endif
 
-   deallocate(Eig1,Eig0,EigY0)
+   !deallocate(Eig1,Eig0,EigY0)
 
  ! CAS-SCF
  elseif(Flags%ICASSCF==1.and.Flags%ISERPA==0) then
@@ -868,7 +1203,7 @@ double precision, allocatable :: EigTmp(:), VecTmp(:)
    ! call AB_CAS_mithap(ABPlus,ABMin,ECASSCF,URe,Mon%Occ,XOne, &
    !             Mon%IndN,Mon%IndX,Mon%IGem,Mon%NAct,Mon%INAct,Mon%NDimX,NBas,Mon%NDimX,&
    !             NInte1,twofile,ACAlpha,.false.)
-
+   !print*, ACAlpha
    call AB_CAS(ABPlus,ABMin,ECASSCF,URe,Mon%Occ,XOne,TwoMO,Mon%IPair,&
                Mon%IndN,Mon%IndX,Mon%NDimX,NBas,Mon%NDimX,NInte1,NInte2,ACAlpha)
    print*, 'ABPlus',norm2(ABPlus),'ABMin',norm2(ABMin)
@@ -881,7 +1216,11 @@ double precision, allocatable :: EigTmp(:), VecTmp(:)
    !call ERPAVEC(EigVecR,Eig,ABPlus,ABMin,NBas,Mon%NDimX)
    !
 
-  print*, 'EigVecR',norm2(EigVecR)
+  !print*, 'EigVecR',norm2(EigVecR)
+
+  !do i=1,size(Eig)
+  !   print*, i,Eig(i)
+  !enddo
 
    if(EChck) then
       ECorr=0
@@ -911,15 +1250,15 @@ double precision, allocatable :: EigTmp(:), VecTmp(:)
       Mon%IndNT(2,i) = Mon%IndN(2,i)
    enddo
 
-   !call Y01CAS_mithap(Mon%Occ,URe,XOne,ABPlus,ABMin, &
-   !       EigY0,EigY1,Eig0,Eig1, &
-   !       Mon%IndN,Mon%IndX,Mon%IGem,Mon%NAct,Mon%INAct,Mon%NDimX, &
-   !       NBas,Mon%NDim,NInte1,twofile,Flags%IFlag0)
-   !
-   call Y01CAS(TwoMO,Mon%Occ,URe,XOne,ABPlus,ABMin, &
-        EigY0,EigY1,Eig0,Eig1, &
-        !Mon%IndNT,Mon%IndX,Mon%NDimX,NBas,Mon%NDim,NInte1,NInte2,Flags%IFlag0)
-        Mon%IndN,Mon%IndX,Mon%NDimX,NBas,Mon%NDim,NInte1,NInte2,Flags%IFlag0)
+   call Y01CAS_mithap(Mon%Occ,URe,XOne,ABPlus,ABMin, &
+          EigY0,EigY1,Eig0,Eig1, &
+          Mon%IndN,Mon%IndX,Mon%IGem,Mon%NAct,Mon%INAct,Mon%NDimX, &
+          NBas,Mon%NDim,NInte1,twofile,Flags%IFlag0)
+   
+   !call Y01CAS(TwoMO,Mon%Occ,URe,XOne,ABPlus,ABMin, &
+   !     EigY0,EigY1,Eig0,Eig1, &
+   !     !Mon%IndNT,Mon%IndX,Mon%NDimX,NBas,Mon%NDim,NInte1,NInte2,Flags%IFlag0)
+   !     Mon%IndN,Mon%IndX,Mon%NDimX,NBas,Mon%NDim,NInte1,NInte2,Flags%IFlag0)
 
    ! dump uncoupled response
    call writeresp(EigY0,Eig0,propfile0)
@@ -1619,7 +1958,7 @@ mat = work
 
 end subroutine swap_cols
 
-subroutine read_mo(cmo,nbasis,nsym,nbas,norb,nsiri,nmopun)
+subroutine read_mo_dalton(cmo,nbasis,nsym,nbas,norb,nsiri,nmopun)
 
 ! in SAPT orbitals kept in AOMO order!
 implicit none
@@ -1647,7 +1986,6 @@ if(isiri) then
          access='SEQUENTIAL',form='UNFORMATTED')
 
    call readlabel(iunit,'NEWORB  ')
-   !read(iunit) cmo
    read(iunit) tmp(1:ncmot)
 
 !  print*, norb,'NORB!!!!'
@@ -1696,7 +2034,7 @@ close(iunit)
 
 ! call print_sqmat(cmo,nbasis)
 
-end subroutine read_mo
+end subroutine read_mo_dalton
 
 subroutine writeoneint(mon,ndim,S,V,H)
 implicit none
@@ -2103,7 +2441,7 @@ integer :: test
     mon%num2 = mon%num2 + 1
  enddo
  mon%num1 = nbas - mon%num0 - mon%num2
- print*, 'TTESSSTT:', mon%num0,mon%num1,mon%num2, nbas
+ !print*, 'TTESSSTT:', mon%num0,mon%num1,mon%num2, nbas
 
 !! test!
 ! do i=1,mon%NELE
@@ -2175,9 +2513,9 @@ integer :: test
              ! do not correlate active degenerate orbitals from different geminals 
              if((mon%IndAux(i)==1).and.(mon%IndAux(j)==1)  & 
                   .and.&
-                !  (Abs(mon%Occ(i)-mon%Occ(j))/mon%Occ(i).lt.1.d-8) ) then
+                  (Abs(mon%Occ(i)-mon%Occ(j))/mon%Occ(i).lt.1.d-8) ) then
                 ! here!!!
-                (Abs(mon%Occ(i)-mon%Occ(j))/mon%Occ(i).lt.1d-3) ) then
+                !(Abs(mon%Occ(i)-mon%Occ(j))/mon%Occ(i).lt.1d-3) ) then
                 
                 write(LOUT,'(1x,a,2x,2i4)') 'Discarding nearly degenerate pair',i,j 
              else

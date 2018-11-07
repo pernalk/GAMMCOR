@@ -525,6 +525,27 @@ double precision,contiguous :: work(:)
 
 end subroutine tran_oneint
 
+subroutine tran_matTr(ints,MO1,MO2,nbas)
+implicit none
+
+integer,intent(in) :: nbas
+double precision,intent(inout) :: ints(nbas*(nbas+1)/2)
+double precision,intent(in) :: MO1(nbas,nbas),MO2(nbas,nbas)
+double precision,allocatable :: work1(:),work2(:)
+
+allocate(work1(nbas*nbas),work2(nbas*nbas))
+ call triang_to_sq(ints,work1,nbas)
+
+ if(nbas>0) then
+    call dgemm('N','N',nbas,nbas,nbas,1d0,MO1,nbas,work1,nbas,0d0,work2,nbas)
+    call dgemm('N','T',nbas,nbas,nbas,1d0,work2,nbas,MO2,nbas,0d0,work1,nbas)
+ endif
+
+ call sq_to_triang(work1,ints,nbas)
+deallocate(work2,work1)
+
+end subroutine tran_matTr
+
 subroutine tran2MO(MatIn,Ca,Cb,MatOut,nbas)
 implicit none
 
@@ -2685,6 +2706,54 @@ write(LOUT,*) 'HNO-tr', norm2(work1(1:NBasis*(NBasis+1)/2))
 deallocate(ints,work2,work1)
 
 end subroutine ACABMAT0_mithap
+
+subroutine FockGen_mithap(Fock,OneRdm,XOne,NInte1,NBasis)
+!
+!     GENERALIZED FOCK MATRIX
+!
+implicit none
+
+integer,intent(in) :: NInte1,NBasis
+double precision,intent(in) :: OneRdm(NInte1),XOne(NInte1)
+double precision,intent(out) :: Fock(Ninte1)
+integer :: iunit,kk,ll,kl,klround,k,l
+double precision,allocatable :: OneRdmSq(:,:),FockSq(:,:),ints(:,:),work1(:)
+
+
+allocate(OneRdmSq(NBasis,NBasis),FockSq(NBasis,NBasis),ints(NBasis,NBasis),work1(NInte1))
+
+call triang_to_sq2(OneRdm,OneRdmSq,NBasis)
+call triang_to_sq2(XOne,FockSq,NBasis)
+
+open(newunit=iunit,file='AOTWOSORT',status='OLD',&
+     access='DIRECT',form='UNFORMATTED',recl=8*NInte1)
+
+kl = 0
+do l=1,NBasis
+   do k=1,l
+      kl = kl + 1
+      read(iunit,rec=kl) work1(1:NBasis*(NBasis+1)/2)
+      call triang_to_sq2(work1,ints,NBasis)
+       
+      if(k==l) then
+        call daxpy(NBasis**2,2.d0*OneRdmSq(k,l),ints,1,FockSq,1)
+        call dgemv('N',NBasis,NBasis,-1.d0,ints,NBasis,OneRdmSq(:,k),1,1.d0,FockSq(:,l),1) 
+      else
+        call daxpy(NBasis**2,2.d0*(OneRdmSq(k,l)+OneRdmSq(l,k)),ints,1,FockSq,1)
+        call dgemv('N',NBasis,NBasis,-1.d0,ints,NBasis,OneRdmSq(:,k),1,1.d0,FockSq(:,l),1) 
+        call dgemv('N',NBasis,NBasis,-1.d0,ints,NBasis,OneRdmSq(:,l),1,1.d0,FockSq(:,k),1) 
+      endif
+
+   enddo
+enddo
+
+close(iunit)
+
+call sq_to_triang2(FockSq,Fock,NBasis) 
+
+deallocate(work1,ints,FockSq,OneRdmSq)
+
+end subroutine FockGen_mithap
 
 end module
 

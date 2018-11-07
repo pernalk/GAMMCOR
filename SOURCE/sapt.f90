@@ -1586,13 +1586,13 @@ double precision :: e2du,e2sp,dea,deb
 double precision :: e2ds,e2ds1,e2ds2
 double precision :: inv_omega
 ! for Be ERPA:
-!double precision,parameter :: SmallE = 1.D-1
-double precision,parameter :: SmallE = 1.D-3
+double precision,parameter :: SmallE = 1.D-1
+!double precision,parameter :: SmallE = 1.D-3
 double precision,parameter :: BigE = 1.D8 
 double precision :: Alpha, Beta
 
 ! Parameter(SmallE=1.D-3,BigE=1.D8)
-
+ 
  if(A%NBasis.ne.B%NBasis) then
     write(LOUT,'(1x,a)') 'ERROR! MCBS not implemented in SAPT!'
     stop
@@ -1614,8 +1614,6 @@ double precision :: Alpha, Beta
  ! print*, nOVA,dimOA,dimVA 
  ! print*, B%num0,B%num1,B%num2
 
- print*, 'NDimX: ',A%NDimX,B%NDimX,Flags%IFlag0
-
 ! read EigValA_B
  allocate(EVecA(A%NDimX*A%NDimX),OmA(A%NDimX),&
           EVecB(B%NDimX*B%NDimX),OmB(B%NDimX),&
@@ -1629,56 +1627,34 @@ double precision :: Alpha, Beta
  call readresp(EVecA,OmA,A%NDimX,'PROP_A')
  call readresp(EVecB,OmB,B%NDimX,'PROP_B')
 
- !if(.not.(Flags%ICASSCF==0.and.Flags%ISERPA==0)) then
- call readresp(EVecA0,OmA0,A%NDimX,'PROP_A0')
- call readresp(EVecB0,OmB0,B%NDimX,'PROP_B0')
+ if(.not.(Flags%ICASSCF==0.and.Flags%ISERPA==0)) then
+    call readresp(EVecA0,OmA0,A%NDimX,'PROP_A0')
+    call readresp(EVecB0,OmB0,B%NDimX,'PROP_B0')
 
- if(Flags%IFlag0==0) then
-    if(.not.(Flags%ICASSCF==0.and.Flags%ISERPA==0)) then
+    if(Flags%IFlag0==0) then
        call readresp(EVecA1,OmA1,A%NDimX,'PROP_A1')
        call readresp(EVecB1,OmB1,B%NDimX,'PROP_B1')
-    else
-       call readEval(OmA1,A%NDimX,'PROP_A1')
-       call readEval(OmB1,B%NDimX,'PROP_B1')
     endif
  endif
 
-! print*, 'Normy:'
-! !print*, norm2(OmA),'OmA'
-! print*, norm2(OmA0),'OmA0'
-! print*, norm2(OmA1),'OmA1'
-! !print*, norm2(OmB),'OmB'
-! print*, norm2(OmB0),'OmB0'
-! print*, norm2(OmB1),'OmB1'
-!
-! !print*, norm2(OmB0)
-! !print*, norm2(OmB1)
-!! print*, norm2(EVecB)
-! print*, norm2(EVecA0), 'A0'
-!! print*, norm2(EVecA1),'A1'
+ !print*, 'Normy:'
+ !print*, norm2(OmA),'OmA'
+ !print*, norm2(OmB),'OmB'
+
+ !print*, norm2(OmB0)
+ !print*, norm2(OmB1)
+! print*, norm2(EVecB)
+! print*, norm2(EVecB0)
+! print*, norm2(EVecA1),'A1'
 ! print*, norm2(EVecB0),'B0'
-!! print*, norm2(EVecB1),'B1'
-!! print*, norm2(EVecB),'B'
-!! print*, norm2(EVecA),'A'
-!!
-! print*, 'EXC ENERGIES-A'
-! do i=1,size(OmA)
-!    if(OmA(i).gt.0d0) write(*,*) OmA(i)
-! enddo
-! print*, 'EXC ENERGIES-A0'
-! do i=1,size(OmA0)
-!    if(OmA0(i).gt.0d0) write(*,*) OmA0(i)
-! enddo
-! print*, 'EXC ENERGIES-A1',size(OmA1)
-! do i=1,size(OmA1)
-!    write(*,*) OmA1(i)
-! enddo
+! print*, norm2(EVecB1),'B1'
+! print*, norm2(EVecB),'B'
+! print*, norm2(EVecA),'A'
 !
-!
-! print*, 'EXC ENERGIES-B'
-! do i=1,size(OmB0)
-!    if(OmB0(i).gt.0d0) write(*,*) OmB0(i)
-! enddo
+ !print*, 'EXC ENERGIES'
+ !do i=1,100!size(OmB)
+ !   if(OmB(i).gt.0d0) write(*,*) OmB(i)
+ !enddo
 
 ! uncoupled
 ! works with tran4_full
@@ -1719,7 +1695,7 @@ allocate(work(nOVB))
 open(newunit=iunit,file='TWOMOAB',status='OLD',&
      access='DIRECT',form='UNFORMATTED',recl=8*nOVB)
 
-if(Flags%ISHF==1) then
+if(Flags%ISHF==1.and.SAPT%HFCheck) then
 
 allocate(tmp01(A%NDimX,B%NDimX),tmp02(A%NDimX,B%NDimX),&
          tmp03(A%NDimX,B%NDimX))
@@ -1843,7 +1819,9 @@ endif
 !   write(*,*) B%CICoef(i),i  
 !enddo
 
+
 ! coupled - 0
+
 if(.not.(Flags%ICASSCF==0.and.Flags%ISERPA==0)) then
 
  tmp1=0
@@ -1907,7 +1885,6 @@ if(.not.(Flags%ICASSCF==0.and.Flags%ISERPA==0)) then
 elseif(Flags%ICASSCF==0.and.Flags%ISERPA==0) then
 
  tmp1=0
- tmp01=0
  do pq=1,A%NDimX
     ip = A%IndN(1,pq)
     iq = A%IndN(2,pq)
@@ -1926,17 +1903,12 @@ elseif(Flags%ICASSCF==0.and.Flags%ISERPA==0) then
                        fact * &
                        EVecA(pq+(i-1)*A%NDimX)
 
-          tmp01(i,rs) = tmp01(i,rs) + & 
-                       fact * &
-                       EVecA0(pq+(i-1)*A%NDimX)
-
        enddo
 
     enddo
  enddo
 
  tmp2=0
- tmp02=0
  do j=1,B%NDimX
     do i=1,A%NDimX
        do rs=1,B%NDimX
@@ -1945,9 +1917,6 @@ elseif(Flags%ICASSCF==0.and.Flags%ISERPA==0) then
        tmp2(i,j) = tmp2(i,j) + &
                     EVecB(rs+(j-1)*B%NDimX)*tmp1(i,rs)
 
-       tmp02(i,j) = tmp02(i,j) + &
-                    EVecB0(rs+(j-1)*B%NDimX)*tmp01(i,rs)
-
        enddo
     enddo  
  enddo
@@ -1955,9 +1924,12 @@ elseif(Flags%ICASSCF==0.and.Flags%ISERPA==0) then
 ! end GVB select
 endif
 
-! uncoupled and semicoupled
+
 if(.not.(Flags%ICASSCF==0.and.Flags%ISERPA==0)) then
+! uncoupled and semicoupled
  e2du=0d0
+! e2ds1=0d0
+! e2ds2=0d0
  do j=1,B%NDimX
     do i=1,A%NDimX
        if(OmA0(i).gt.SmallE.and.OmB0(j).gt.SmallE&
@@ -1981,31 +1953,8 @@ if(.not.(Flags%ICASSCF==0.and.Flags%ISERPA==0)) then
  e2sp = e2du + 16*e2ds2*1000 
  e2ds= e2du+(16*e2ds2-32*e2ds1)*1000
 
-else 
-
- e2du=0d0
- do j=1,B%NDimX
-    do i=1,A%NDimX
-       if(OmA0(i).gt.SmallE.and.OmB0(j).gt.SmallE&
-          .and.OmA0(i).lt.BigE.and.OmB0(j).lt.BigE) then
-
-         inv_omega = 1d0/(OmA0(i)+OmB0(j))
-         e2du = e2du + tmp02(i,j)**2*inv_omega
-         e2ds2 = e2ds2 + (Alpha*OmA1(i)+Beta*OmB1(j))*(tmp02(i,j)*inv_omega)**2
-
-       endif
-    enddo
- enddo
- SAPT%e2disp_unc = -16d0*e2du
- SAPT%e2disp_sp = -16*e2du+16*e2ds2
- SAPT%e2disp_sc = -16*e2du+16*e2ds2-32*e2ds1
-
- e2du = -16d0*e2du*1000d0
- e2sp = e2du + 16*e2ds2*1000 
-
 endif
 
- ! coupled
  e2d = 0d0
  do j=1,B%NDimX
     do i=1,A%NDimX
@@ -2070,6 +2019,8 @@ endif
  deallocate(OmB0,EVecB0,OmA0,EVecA0,OmB,EVecB,OmA,EVecA)
 
 end subroutine e2disp
+
+
 
 subroutine e2disp_apsg(Flags,A,B,SAPT)
 implicit none

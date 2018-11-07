@@ -258,6 +258,7 @@ subroutine read_block_calculation(CalcParams, line)
                CalcParams%InterfaceType = INTER_TYPE_DAL
            elseif (uppercase(val) == "MOLPRO") then
                CalcParams%InterfaceType = INTER_TYPE_MOL
+               CalcParams%RDMSource = INTER_TYPE_MOL
            elseif (uppercase(val) == "OWN".or.&
                    uppercase(val) == "NONE") then
                CalcParams%InterfaceType = INTER_TYPE_OWN
