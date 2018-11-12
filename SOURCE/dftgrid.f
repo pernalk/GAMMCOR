@@ -1,8 +1,12 @@
 *Deck EPotSR
-      Subroutine EPotSR(EnSR,VSR,Occ,URe,OrbGrid,OrbXGrid,OrbYGrid,
-     $ OrbZGrid,WGrid,NSymMO,TwoEl,TwoElErf,NGrid,NInte1,NInte2,NBasis)
+      Subroutine EPotSR(EnSR,VSR,Occ,URe,UNOAO,
+     $ OrbGrid,OrbXGrid,OrbYGrid,
+     $ OrbZGrid,WGrid,NSymMO,TwoEl,TwoElErf,
+     $ Omega,Flag,NGrid,NInte1,NInte2,NBasis) 
 C
 C     RETURNS SR ENERGY AND POTENTIAL = SR_XC + SR_H
+C
+      use tran 
 C
       Implicit Real*8 (A-H,O-Z)
 C
@@ -10,14 +14,22 @@ C
 C
       Parameter (Zero=0.0D0,One=1.D0,Two=2.D0,Three=3.0D0,Four=4.0D0)
 C
+      Real(8) Omega
+      Integer Flag
       Dimension VSR(NInte1),OrbGrid(NBasis,NGrid),WGrid(NGrid),
-     $ Occ(NBasis),URe(NBasis,NBasis),TwoEl(NInte2),TwoElErf(NInte2),
+     $ Occ(NBasis),URe(NBasis,NBasis),
+     $ UNOAO(NBasis,NBasis),
+     $ TwoEl(NInte2),TwoElErf(NInte2),
      $ NSymMO(NBasis)
       Dimension OrbXGrid(*),OrbYGrid(*),OrbZGrid(*)
 C
 C     LOCAL ARRAYS
 C
       Dimension VHSR(NInte1),Gamma(NInte1)
+C
+C     HAP:
+      Alpha = Omega
+      IFunSR = Flag
 C
       If(Alpha.Gt.1.D2.And.IFunSR.Eq.1) 
      $ Stop 'Fatal Error in EPotSR: srLDA procedure is not reliable 
@@ -26,6 +38,7 @@ C
 C     COMPUTE THE HARTREE POTENTIAL AND THE ENERGY
 C
       Call PotHSR(VHSR,Occ,URe,TwoEl,TwoElErf,NInte1,NInte2,NBasis)
+C      Call PotHSR_mithap(VHSR,Occ,UNOAO,NBasis)
 C
       Call VecTr(Gamma,Occ,URe,NBasis)
       EnHSR=Zero
@@ -58,7 +71,9 @@ C
       VSR(I)=VSR(I)+VHSR(I)
       EndDo 
 C
-      EnSR=EnxcSR+EnHSR
+      EnSR=EnxcSR+EnHSR 
+      Write(6,'(/,2x,A,F15.8)') 'EnHSR ',EnHSR 
+      Write(6,'(2x,A,F15.8)') 'EnxcSR',EnxcSR
 C
       Return
       End
@@ -330,7 +345,8 @@ C
 C
 C     LOCAL ARRAYS
 C
-      Dimension SRKer(NGrid),RhoVec(NGrid),XNOGrid(NBasis,NGrid)
+      Dimension SRKer(NGrid),RhoVec(NGrid)
+C     ,XNOGrid(NBasis,NGrid)
 C
       Do I=1,NGrid
       Call DenGrid(I,Rho,Occ,URe,OrbGrid,NGrid,NBasis)
@@ -339,12 +355,12 @@ C
 C
 C     PRODUCE A KERNEL ON A GRID FOR DENSITIES RhoVec
 C
-      Stop 'Fatal Error in GetKerNO: xcfun NOT AVAILABLE!'
-c      Call RhoKernel(RhoVec,SRKer,Alpha,NGrid)
+c      Stop 'Fatal Error in GetKerNO: xcfun NOT AVAILABLE!'
+      Call RhoKernel(RhoVec,SRKer,Alpha,NGrid)
 C
 C     TRANSFORM MO's ON A GRID TO NO's
 C
-      Call TrOrbG(XNOGrid,URe,OrbGrid,NGrid,NBasis)
+c      Call TrOrbG(XNOGrid,URe,OrbGrid,NGrid,NBasis)
 C
       I1234=0
       Do I1=1,NBasis
@@ -358,7 +374,8 @@ C
       ISym=MultpC(I1I2S,I3I4S)
 C
       If(ISym.Eq.1) Then      
-      Call XKerEl(XKer1234,I1,I2,I3,I4,SRKer,XNOGrid,WGrid,NGrid,NBasis)
+c      Call XKerEl(XKer1234,I1,I2,I3,I4,SRKer,XNOGrid,WGrid,NGrid,NBasis)
+      Call XKerEl(XKer1234,I1,I2,I3,I4,SRKer,OrbGrid,WGrid,NGrid,NBasis)
       XKer(I1234)=XKer1234
 C
       Else
@@ -373,6 +390,40 @@ C
 C
       Return
       End
+
+*Deck GetKerNPT
+      Subroutine GetKerNPT(SRKer,Occ,URe,OrbGrid,WGrid,NSymNO,MultpC,
+     $ NBasis,NGrid)
+C
+C     RETURNS a SR-KERNEL IN THE NO's REPRESENTATION
+C
+      Implicit Real*8 (A-H,O-Z)
+C
+      Parameter(Zero=0.D0,Half=0.5D0,One=1.D0,Two=2.D0,Three=3.D0,
+     $ Four=4.D0)
+C
+      Include 'commons.inc'
+C
+      Dimension Occ(NBasis),URe(NBasis,NBasis),SRKer(NGrid),
+     $ OrbGrid(NBasis,NGrid),WGrid(NGrid),NSymNO(NBasis),MultpC(15,15)
+C
+C     LOCAL ARRAYS
+C
+      Dimension RhoVec(NGrid)
+C     ,XNOGrid(NBasis,NGrid)
+C
+      Do I=1,NGrid
+      Call DenGrid(I,Rho,Occ,URe,OrbGrid,NGrid,NBasis)
+      RhoVec(I)=Rho
+      EndDo
+C
+C     PRODUCE A KERNEL ON A GRID FOR DENSITIES RhoVec
+C
+      Call RhoKernel(RhoVec,SRKer,Alpha,NGrid)
+C
+      Return
+      End
+
 
 *Deck TrOrbG
       Subroutine TrOrbG(XNOGrid,URe,OrbGrid,NGrid,NBasis)

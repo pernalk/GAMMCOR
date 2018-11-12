@@ -4,6 +4,7 @@ use iso_fortran_env
 
 implicit none
 
+
 integer :: LOUT = output_unit
 integer,parameter :: LERR = error_unit
 
@@ -43,6 +44,7 @@ integer, parameter :: MONOMER_B = 2
 
 integer, parameter :: RESP_ERPA = 1
 integer, parameter :: RESP_APSG = 2
+integer, parameter :: RESP_DFT  = 3
 
 integer,parameter :: maxcen = 500
 
@@ -933,8 +935,8 @@ double precision, intent(out) :: Den(nbas,nbas)
 integer :: i
 
 Den = 0
-do i = 1,nbas
-    call dger(nbas, nbas, Fac*Occ(i), MO(:, i), 1, MO(:, i), 1, Den, nbas)
+do i=1,nbas
+   call dger(nbas, nbas, Fac*Occ(i), MO(:, i), 1, MO(:, i), 1, Den, nbas)
 enddo
 
 end subroutine get_den
@@ -1195,46 +1197,46 @@ function iscomment(s)
       end if            
 end function iscomment
 
-subroutine molpro_routines
-implicit none
-
-integer :: NBasis,NGrid
-
-  call basinfo(NBasis,'SIRIUS_A.RST','DALTON')
-  call molprogrid(NGrid,NBasis)
-  print*, 'here-1?'
-  call molprogrid(NGrid,NBasis)
-  print*, 'here-2?'
- stop
-
-! !... idftgra: functional contains grad rho terms (1) , del.2 rho (2)
-! !... ndiff = (idftgra + 1) * (idftgra + 2) * (idftgra + 3) / 6
+!subroutine molpro_routines
+!implicit none
 !
-! ! get grid points, integration weights and orbitals and its derivatives
-! ! wt array contains weights of the grid points
-! ! orbval array contains basis functions values and its derivatives at npt
-! ! points of the grid
-! ! e.g. orbval(k, 1, mapinv(i)) is chi_i(r_k) - i-th basis function in the k-th
-! ! grid point value
+!integer :: NBasis,NGrid
 !
-!double precision, allocatable :: r(:,:),wt(:),mapinv(:),orbval(:,:,:)
-!integer :: i,j,k,igrid
-!integer(8) :: npt, ndiff, ntg
+!  call basinfo(NBasis,'SIRIUS_A.RST','DALTON')
+!  call molprogrid(NGrid,NBasis)
+!  print*, 'here-1?'
+!  call molprogrid(NGrid,NBasis)
+!  print*, 'here-2?'
+! stop
 !
-! open(newunit=igrid,file='GRID',access='sequential',&
-!      form='unformatted',status='old')
-! read(igrid)
-! read(igrid) npt,ndiff,ntg
-! allocate(r(3,npt),wt(npt),mapinv(ntg),orbval(npt,ndiff,ntg))
-!
-! call readgridmolpro(igrid,'GRIDKS  ',npt,r,wt)
-! call readorbsmolpro(igrid,'ORBVAL  ',mapinv,orbval)
-! 
-! close(igrid)
-!
-! deallocate(orbval,mapinv,wt,r)
-!
-end subroutine molpro_routines
+!! !... idftgra: functional contains grad rho terms (1) , del.2 rho (2)
+!! !... ndiff = (idftgra + 1) * (idftgra + 2) * (idftgra + 3) / 6
+!!
+!! ! get grid points, integration weights and orbitals and its derivatives
+!! ! wt array contains weights of the grid points
+!! ! orbval array contains basis functions values and its derivatives at npt
+!! ! points of the grid
+!! ! e.g. orbval(k, 1, mapinv(i)) is chi_i(r_k) - i-th basis function in the k-th
+!! ! grid point value
+!!
+!!double precision, allocatable :: r(:,:),wt(:),mapinv(:),orbval(:,:,:)
+!!integer :: i,j,k,igrid
+!!integer(8) :: npt, ndiff, ntg
+!!
+!! open(newunit=igrid,file='GRID',access='sequential',&
+!!      form='unformatted',status='old')
+!! read(igrid)
+!! read(igrid) npt,ndiff,ntg
+!! allocate(r(3,npt),wt(npt),mapinv(ntg),orbval(npt,ndiff,ntg))
+!!
+!! call readgridmolpro(igrid,'GRIDKS  ',npt,r,wt)
+!! call readorbsmolpro(igrid,'ORBVAL  ',mapinv,orbval)
+!! 
+!! close(igrid)
+!!
+!! deallocate(orbval,mapinv,wt,r)
+!!
+!end subroutine molpro_routines
 
 subroutine create_ind(infile,NumOSym,IndInt,NBasis)
 implicit none
@@ -1331,41 +1333,41 @@ character(8) :: label
 
 end subroutine create_ind 
 
-subroutine molprogrid(NGrid,NBasis)
-Implicit Real*8 (A-H,O-Z)
-
-integer ::  NBasis, NGrid
-double precision, allocatable :: r(:,:),wt(:),mapinv(:),orbval(:,:,:)
-integer :: i,j,k,igrid
-integer :: npt, ndiff, ntg
-
- print*, ' '
- print*, 'entergin molprogrid' 
- open(newunit=igrid,file='GRID',access='sequential',&
-      form='unformatted',status='old')
- read(igrid) npt,ndiff,ntg
- !If(NBasis.Ne.ntg) Stop 'Fatal Error in molprogrid: NBasis Ne ntg'
- !If(NGrid.Ne.npt) Stop 'Fatal Error in molprogrid: NGrid Ne npt'
- 
- allocate(r(3,npt),wt(npt),mapinv(ntg),orbval(npt,ndiff,ntg))
- !... idftgra: functional contains grad rho terms (1) , del.2 rho (2)
- !... ndiff = (idftgra + 1) * (idftgra + 2) * (idftgra + 3) / 6
-
- ! get grid points, integration weights and orbitals and its derivatives
- ! wt array contains weights of the grid points
- ! orbval array contains basis functions values and its derivatives at npt
- ! points of the grid
- ! e.g. orbval(k, 1, mapinv(i)) is chi_i(r_k) - i-th basis function in the k-th
- ! grid point value
- ! mapinv - orbital mapping array
-
- call readgridmolpro(igrid,'GRIDKS  ',npt,r,wt)
-! Call CpyV(WGrid,wt,npt)
- call readorbsmolpro(igrid,'ORBVAL  ',mapinv,orbval)
-
- close(igrid)
- deallocate(orbval,wt,r,mapinv)
-
-end subroutine molprogrid
+!subroutine molprogrid(NGrid,NBasis)
+!Implicit Real*8 (A-H,O-Z)
+!
+!integer ::  NBasis, NGrid
+!double precision, allocatable :: r(:,:),wt(:),mapinv(:),orbval(:,:,:)
+!integer :: i,j,k,igrid
+!integer :: npt, ndiff, ntg
+!
+! print*, ' '
+! print*, 'entergin molprogrid' 
+! open(newunit=igrid,file='GRID',access='sequential',&
+!      form='unformatted',status='old')
+! read(igrid) npt,ndiff,ntg
+! !If(NBasis.Ne.ntg) Stop 'Fatal Error in molprogrid: NBasis Ne ntg'
+! !If(NGrid.Ne.npt) Stop 'Fatal Error in molprogrid: NGrid Ne npt'
+! 
+! allocate(r(3,npt),wt(npt),mapinv(ntg),orbval(npt,ndiff,ntg))
+! !... idftgra: functional contains grad rho terms (1) , del.2 rho (2)
+! !... ndiff = (idftgra + 1) * (idftgra + 2) * (idftgra + 3) / 6
+!
+! ! get grid points, integration weights and orbitals and its derivatives
+! ! wt array contains weights of the grid points
+! ! orbval array contains basis functions values and its derivatives at npt
+! ! points of the grid
+! ! e.g. orbval(k, 1, mapinv(i)) is chi_i(r_k) - i-th basis function in the k-th
+! ! grid point value
+! ! mapinv - orbital mapping array
+!
+! call readgridmolpro(igrid,'GRIDKS  ',npt,r,wt)
+!! Call CpyV(WGrid,wt,npt)
+! call readorbsmolpro(igrid,'ORBVAL  ',mapinv,orbval)
+!
+! close(igrid)
+! deallocate(orbval,wt,r,mapinv)
+!
+!end subroutine molprogrid
 
 end module types

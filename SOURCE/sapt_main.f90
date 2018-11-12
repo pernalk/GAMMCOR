@@ -8,6 +8,9 @@ use sapt_ener
 
 implicit none
 
+save
+double precision :: Tcpu,Twall
+
 contains
 
 subroutine sapt_driver(Flags,SAPT)
@@ -17,7 +20,7 @@ type(FlagsData) :: Flags
 type(SaptData) :: SAPT
 integer :: i
 integer :: NBasis
-double precision :: Tcpu,Twall
+!double precision :: Tcpu,Twall
 ! testowe
 
 ! TEMPORARY - JOBTYPE_2
@@ -94,6 +97,7 @@ integer :: tmp1
 double precision ::  potnuc,emy,eactiv,emcscf
 integer :: noccA, nvirtA, noccB, nvirtB
 integer :: ncen
+logical :: doRSH
 
 ! read basis info
 ! only DCBS 
@@ -175,9 +179,12 @@ integer :: ncen
 
 ! read 2-el integrals
  if(SAPT%InterfaceType==1) then
-    call readtwoint(NBasis,1,'AOTWOINT_A')
+    call readtwoint(NBasis,1,'AOTWOINT_A','AOTWOSORT')
  elseif(SAPT%InterfaceType==2) then
-    call readtwoint(NBasis,2,'AOTWOINT.mol')
+    call readtwoint(NBasis,2,'AOTWOINT.mol','AOTWOSORT')
+    !doRSH=.false.
+    doRSH=.true.
+    if(doRSH) call readtwoint(NBasis,2,'AOTWOINT.erf','AOERFSORT')
  endif
 
  if(SAPT%InterfaceType==2) then
@@ -280,8 +287,11 @@ integer :: ncen
  if(SAPT%SaptLevel.eq.0) then
      call calc_resp_unc(SAPT%monA,Ca,Flags,NBasis,'TWOMOAA')
  elseif(SAPT%SaptLevel.gt.0) then
-   ! call calc_resp_unc(SAPT%monA,Ca,Flags,NBasis,'TWOMOAA')
-    call calc_resp_full(SAPT%monA,Ca,Flags,NBasis,'TWOMOAA',SAPT%EnChck) 
+    if(Flags%IFunSR/=0) then
+       call calc_resp_dft(SAPT%monA,Ca,Flags,NBasis)
+    else
+       call calc_resp_full(SAPT%monA,Ca,Flags,NBasis,'TWOMOAA',SAPT%EnChck)
+    endif
  endif
 
 ! mon B
@@ -290,8 +300,11 @@ integer :: ncen
  if(SAPT%SaptLevel.eq.0) then
     call calc_resp_unc(SAPT%monB,Cb,Flags,NBasis,'TWOMOBB')
  elseif(SAPT%SaptLevel.gt.0) then
-    !call calc_resp_unc(SAPT%monB,Cb,Flags,NBasis,'TWOMOBB')
-    call calc_resp_full(SAPT%monB,Cb,Flags,NBasis,'TWOMOBB',SAPT%EnChck)
+    if(Flags%IFunSR/=0) then
+       call calc_resp_dft(SAPT%monB,Cb,Flags,NBasis)
+    else
+       call calc_resp_full(SAPT%monB,Cb,Flags,NBasis,'TWOMOBB',SAPT%EnChck)
+   endif
  endif
 
   if(Flags%ISERPA==2.and.Flags%ISHF==1) then
@@ -898,7 +911,7 @@ character(:),allocatable :: onefile,twofile,propfile0,propfile1,rdmfile
  endif
 
  ! transform and read 2-el integrals
- call tran4_full(NBas,MO,MO,fname)
+ call tran4_full(NBas,MO,MO,fname,'AOTWOSORT')
  call LoadSaptTwoEl(Mon%Monomer,TwoMO,NBas,NInte2)
 
  ! GVB
@@ -962,6 +975,220 @@ character(:),allocatable :: onefile,twofile,propfile0,propfile1,rdmfile
  deallocate(TwoMO,URe,XOne,work1,work2)
 
 end subroutine calc_resp_unc
+
+subroutine calc_resp_dft(Mon,MO,Flags,NBas)
+implicit none
+
+type(SystemBlock) :: Mon
+type(FlagsData) :: Flags
+
+double precision :: MO(:)        
+integer :: NBas
+integer :: NSq,NInte1,NInte2,NGrid,NDimKer
+integer :: NSymNO(NBas),MultpC(15,15)
+double precision, allocatable :: work1(:),work2(:)
+double precision, allocatable :: XOne(:), &
+                                 TwoMO(:), TwoElErf(:), &
+                                 WGrid(:),XKer(:),OrbGrid(:),&
+                                 OrbXGrid(:),OrbYGrid(:),OrbZGrid(:),&
+                                 SRKer(:)
+double precision, allocatable :: ABPlus(:),ABMin(:),URe(:,:),VSR(:), &
+                                 EigY0(:),EigY1(:),Eig0(:),Eig1(:), &
+                                 EigVecR(:), Eig(:) 
+integer :: i,ione
+double precision :: ACAlpha,Omega,EnSR,ECorr,ECASSCF
+character(8) :: label
+character(:),allocatable :: onefile,twofile,twoerffile,&
+                            propfile,propfile0,propfile1,rdmfile
+double precision,parameter :: One = 1d0, Half = 0.5d0
+logical :: doRSH
+
+! tests
+ doRSH=.false.
+
+! set filenames
+ if(Mon%Monomer==1) then
+    onefile = 'ONEEL_A'
+    twofile = 'TWOMOAA'
+    twoerffile = 'MO2ERFAA'
+    propfile = 'PROP_A'
+    propfile0 = 'PROP_A0'
+    propfile1 = 'PROP_A1'
+    rdmfile='rdm2_A.dat'
+ elseif(Mon%Monomer==2) then
+    onefile = 'ONEEL_B'
+    twofile = 'TWOMOBB'
+    twoerffile = 'MO2ERFBB'
+    propfile = 'PROP_B'
+    propfile0 = 'PROP_B0'
+    propfile1 = 'PROP_B1'
+    rdmfile='rdm2_B.dat'
+ endif
+
+! set dimensions
+ NSq = NBas**2
+ NInte1 = NBas*(NBas+1)/2
+ NInte2 = NInte1*(NInte1+1)/2
+
+ allocate(work1(NSq),work2(NSq),XOne(NInte1),URe(NBas,NBas),VSR(NInte1))
+ allocate(TwoMO(NInte2))
+ allocate(TwoElErf(NInte2))
+! if(doRSH) allocate(TwoElErf(NInte2))
+ 
+ URe = 0d0
+ do i=1,NBas
+    URe(i,i) = 1d0
+ enddo
+
+! read 1-el
+ open(newunit=ione,file=onefile,access='sequential',&
+      form='unformatted',status='old')
+
+ read(ione) 
+ read(ione)
+ read(ione) label, work1
+ if(label=='ONEHAMIL') then
+    call tran_oneint(work1,MO,MO,work2,NBas)
+    call sq_to_triang(work1,XOne,NBas) 
+ else
+    write(LOUT,'(a)') 'ERROR! ONEHAMIL NOT FOUND IN '//onefile
+    stop
+ endif
+
+ ! load grid
+ call molprogrid0(NGrid,NBas)
+ write(LOUT,'()')
+ write(LOUT,'(1x,a,i8)') "The number of Grid Points =",NGrid
+
+ allocate(WGrid(NGrid),OrbGrid(NBas*NGrid), &
+          OrbXGrid(NBas*NGrid),OrbYGrid(NBas*NGrid),OrbZGrid(NBas*NGrid))
+ allocate(SRKer(NGrid))
+
+ ! load orbgrid and gradients, and wgrid
+ ! transpose them bastards!!!!
+ call transp_mat1dim(MO,work1,NBas) 
+ call molprogrid(OrbGrid,OrbXGrid,OrbYGrid,OrbZGrid, &
+                 WGrid,work1,NGrid,NBas)
+
+ ! set/load Omega - range separation parameter
+ Omega = 0.5d0
+ 
+ ! transform and read 2-el integrals
+ call tran4_full(NBas,MO,MO,twofile,'AOTWOSORT')
+ call LoadSaptTwoEl(Mon%Monomer,TwoMO,NBas,NInte2)
+
+! if(doRSH) then
+    TwoElErf(1:NInte2) = 0
+    call tran4_full(NBas,MO,MO,twoerffile,'AOERFSORT')
+    call LoadSaptTwoEl(Mon%Monomer+4,TwoElErf,NBas,NInte2)
+! endif
+
+ print*, norm2(TwoElErf)
+ print*, norm2(TwoMO)
+
+ NSymNO(1:NBas) = 1
+ call EPotSR(EnSR,VSR,Mon%Occ,URe,MO,& 
+            OrbGrid,OrbXGrid,OrbYGrid,OrbZGrid,WGrid,&
+            NSymNO,TwoMO,TwoElErf,&
+            Omega,Flags%IFunSR,&
+            NGrid,NInte1,NInte2,NBas)
+ print*, 'VSR:',norm2(VSR)
+ !call clock('EPotSR',Tcpu,Twall)
+ do i=1,NInte1
+    XOne(i) = XOne(i) + VSR(i)
+ enddo
+ write(LOUT,'(1x,a,f15.8)') "SR Energy: ",EnSR
+ 
+ ACAlpha=One
+
+ allocate(ABPlus(Mon%NDimX**2),ABMin(Mon%NDimX**2),&
+          EigVecR(Mon%NDimX**2),Eig(Mon%NDimX))
+
+ ! read 2-RDMs
+ call read2rdm(Mon,NBas)
+
+ call system('cp '//rdmfile// ' rdm2.dat')
+
+ ECASSCF = 0
+ call AB_CAS(ABPlus,ABMin,ECASSCF,URe,Mon%Occ,XOne,TwoElErf,Mon%IPair,&
+             Mon%IndN,Mon%IndX,Mon%NDimX,NBas,Mon%NDimX,NInte1,NInte2,ACAlpha)
+ print*, 'ABPlus',norm2(ABPlus),'ABMin',norm2(ABMin)
+
+ ! ADD CONTRIBUTIONS FROM THE srALDA KERNEL TO AB MATRICES
+ NDimKer=NBas*(1+NBas)*(2+NBas)*(3+NBas)/24
+ allocate(XKer(NDimKer))
+
+ MultpC(1,1)=1
+ call GetKerNO(XKer,Mon%Occ,URe,OrbGrid,WGrid,NSymNO,MultpC, &
+               NDimKer,NBas,NGrid)
+ !call ModABMin(Mon%Occ,TwoMO,TwoElErf,XKer,ABMin,&
+ !              Mon%IndN,Mon%IndX,Mon%NDimX,NDimKer,NInte2,NBas)
+ !call clock('XKer',Tcpu,Twall)
+
+ ! HAP
+ call GetKerNPT(SRKer,Mon%Occ,URe,OrbGrid,WGrid,NSymNO,MultpC, &
+                NBas,NGrid)
+ call ModABMin_2(Mon%Occ,SRKer,WGrid,OrbGrid,TwoMO,TwoElErf,ABMin,&
+                 Mon%IndN,Mon%IndX,Mon%NDimX,NGrid,NInte2,NBas)
+
+ write(LOUT,'(1x,a)') "*** sr-kernel added. ***"
+ !call clock('ModABMin',Tcpu,Twall)
+
+ EigVecR = 0
+ Eig = 0
+ call ERPASYMM1(EigVecR,Eig,ABPlus,ABMin,NBas,Mon%NDimX)
+
+ write(LOUT,'(/," *** LR-CAS-SR-DFT Excitation Energies *** ",/)')
+ do i=1,10
+    write(LOUT,'(i4,4x,e16.6)') i,Eig(i)
+ enddo 
+
+ ECorr=0
+ call ACEneERPA(ECorr,EigVecR,Eig,TwoMO,URe,Mon%Occ,XOne,&
+      Mon%IndN,NBas,NInte1,NInte2,Mon%NDimX,Mon%NGem)
+ ECorr=Ecorr*0.5d0
+ 
+ write(LOUT,'(/,1x,''ECASSCF+ENuc, Corr, ERPA-CASSCF'',6x,3f15.8)') &
+      ECASSCF+Mon%PotNuc,ECorr,ECASSCF+Mon%PotNuc+ECorr
+
+! dump response
+ call writeresp(EigVecR,Eig,propfile)
+
+ ! uncoupled
+ allocate(EigY0(Mon%NDimX**2),EigY1(Mon%NDimX**2),&
+          Eig0(Mon%NDimX),Eig1(Mon%NDimX))
+ 
+ EigY0 = 0
+ EigY1 = 0
+ Eig0 = 0
+ Eig1 = 0
+
+ call Y01CAS_mithap(Mon%Occ,URe,XOne,ABPlus,ABMin, &
+        EigY0,EigY1,Eig0,Eig1, &
+        Mon%IndN,Mon%IndX,Mon%IGem,Mon%NAct,Mon%INAct,Mon%NDimX, &
+        NBas,Mon%NDim,NInte1,twofile,Flags%IFlag0)
+ 
+! call Y01CAS(TwoMO,Mon%Occ,URe,XOne,ABPlus,ABMin, &
+!      EigY0,EigY1,Eig0,Eig1, &
+!      Mon%IndN,Mon%IndX,Mon%NDimX,NBas,Mon%NDim,NInte1,NInte2,Flags%IFlag0)
+
+ ! dump uncoupled response
+ call writeresp(EigY0,Eig0,propfile0)
+ if(Flags%IFlag0==0) then
+    call writeresp(EigY1,Eig1,propfile1)
+ endif
+
+ deallocate(Eig1,Eig0,EigY1,EigY0)
+ 
+ deallocate(Eig,EigVecR,ABMin,ABPlus)
+ deallocate(XKer,OrbZGrid,OrbYGrid,OrbXGrid,OrbGrid,WGrid)
+ deallocate(TwoMO)
+! if(doRSH) deallocate(TwoElErf)
+ deallocate(TwoElErf)
+ deallocate(VSR,URe,XOne,work1,work2)
+ deallocate(SRKer)
+
+end subroutine calc_resp_dft
 
 subroutine test_resp_unc(Mon,URe,XOne,TwoMO,NBas,NInte1,NInte2,IFlag0) 
 implicit none
@@ -1097,7 +1324,7 @@ double precision, allocatable :: EigTmp(:), VecTmp(:)
  endif
 
  ! transform and read 2-el integrals
- call tran4_full(NBas,MO,MO,fname)
+ call tran4_full(NBas,MO,MO,fname,'AOTWOSORT')
  call LoadSaptTwoEl(Mon%Monomer,TwoMO,NBas,NInte2)
 
  if(Flags%ISHF==1.and.Flags%ISERPA==2.and.Mon%NELE==1) then
@@ -1255,10 +1482,10 @@ double precision, allocatable :: EigTmp(:), VecTmp(:)
           Mon%IndN,Mon%IndX,Mon%IGem,Mon%NAct,Mon%INAct,Mon%NDimX, &
           NBas,Mon%NDim,NInte1,twofile,Flags%IFlag0)
    
-   !call Y01CAS(TwoMO,Mon%Occ,URe,XOne,ABPlus,ABMin, &
-   !     EigY0,EigY1,Eig0,Eig1, &
-   !     !Mon%IndNT,Mon%IndX,Mon%NDimX,NBas,Mon%NDim,NInte1,NInte2,Flags%IFlag0)
-   !     Mon%IndN,Mon%IndX,Mon%NDimX,NBas,Mon%NDim,NInte1,NInte2,Flags%IFlag0)
+  ! call Y01CAS(TwoMO,Mon%Occ,URe,XOne,ABPlus,ABMin, &
+  !      EigY0,EigY1,Eig0,Eig1, &
+  !      !Mon%IndNT,Mon%IndX,Mon%NDimX,NBas,Mon%NDim,NInte1,NInte2,Flags%IFlag0)
+  !      Mon%IndN,Mon%IndX,Mon%NDimX,NBas,Mon%NDim,NInte1,NInte2,Flags%IFlag0)
 
    ! dump uncoupled response
    call writeresp(EigY0,Eig0,propfile0)

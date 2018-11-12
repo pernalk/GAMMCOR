@@ -40,7 +40,6 @@ C
 C
       Real*8, Allocatable :: TNO(:),TNOLR(:)
       type(FlagsData) :: Flags
-
 C
 C     FLAGS:  IRes   = 0 ... run the program from the beginning
 C                      1 ... restart the program 

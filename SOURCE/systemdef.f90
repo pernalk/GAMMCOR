@@ -197,6 +197,9 @@ else
      select case(Input%CalcParams%Response)
      case(RESP_ERPA)
         Flags%ISERPA = 0 
+     case(RESP_DFT)
+        Flags%ISERPA = 0 
+        Flags%IFunSR = 1 
      case(RESP_APSG)
         Flags%ISERPA = 2
      end select

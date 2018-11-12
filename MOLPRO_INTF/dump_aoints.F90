@@ -1,19 +1,24 @@
 module dumpintao
 
 private 
-public dump_aoints,dump_molpro_sapt
+public dump_aoints,dump_molpro_sapt,dump_test
 
 contains
 
-subroutine dump_molpro_sapt(mon)
+subroutine dump_molpro_sapt(mon,IsRSH)
       implicit double precision (a-h,o-z)
       include "common/corb"
       include "common/cbas"
       include "common/tapes"
       include "common/big"
-      integer :: mon
+      integer :: mon,IsRSH
+      logical :: doRSH
       character(32) :: onefile,rdmfile,recname,orbname,str
       character(8) :: unit
+
+      ! manage range-seprated hybrids
+      doRSH=.false.
+      if(isRSH==1) doRSH=.true. 
 
       ! two-electron integrals 
       ibase=icorr(0)
@@ -47,13 +52,15 @@ subroutine dump_molpro_sapt(mon)
       ! orbitals
       call dump_orbs(q(iOrbCas),trim(recname),trim(orbname))
 
-      if(mon==2) then 
-        iex=iexcom_status()
-        if(iex.eq.1) call excom(2)
-        ! 2-el integrals
-        call dump_twoints
-        if (iex.eq.1) call excom(1)
+      ! 2-el integrals
+      iex=iexcom_status()
+      if(iex.eq.1) call excom(2)
+      if(mon==1.and.doRSH) then 
+        call dump_twoints('AOTWOINT.erf')
+      elseif(mon==2.and.(.not.doRSH)) then 
+        call dump_twoints('AOTWOINT.mol')
       endif
+      if (iex.eq.1) call excom(1)
 
       call corlsr(ibase)
 
@@ -84,6 +91,27 @@ subroutine dump_monomer(mon)
 
 end subroutine dump_monomer
 
+subroutine dump_test(intfilename)
+      implicit double precision (a-h,o-z)
+      include "common/corb"
+      include "common/cbas"
+      include "common/tapes"
+      include "common/big"
+      character(*) :: intfilename 
+      character(32) :: str,namx
+      character(8) :: unit
+
+      ibase=icorr(0)
+      iex=iexcom_status()
+      if (iex.eq.1) call excom(2)
+
+      call dump_twoints(intfilename)
+
+      if (iex.eq.1) call excom(1)
+      call corlsr(ibase)
+
+end subroutine dump_test
+
 subroutine dump_aoints
       implicit double precision (a-h,o-z)
       include "common/corb"
@@ -97,12 +125,13 @@ subroutine dump_aoints
       iex=iexcom_status()
       if (iex.eq.1) call excom(2)
 
-      call dump_twoints
+      call dump_twoints('AOTWOINT.erf')
+      !call dump_twoints('AOTWOINT.mol')
 
       if (iex.eq.1) call excom(1)
-
+      !
       ! 1- and 2-RDM
-      call dump_gamma('2RDM',2,7200,2,7100)
+       call dump_gamma('2RDM',2,7200,2,7100)
  
       ! one electron integrals
       iS = icorr(ntdg)
@@ -121,8 +150,8 @@ subroutine dump_aoints
       call corlsr(iT)
       call corlsr(iS)
 
-!      ! orbitals
-!
+      ! orbitals
+      ! 
       iOrbCas = icorr(ntqg)
       call dump_orbs(q(iOrbCas),'CASORB','MOLPRO.MOPUN')
 
@@ -212,12 +241,13 @@ subroutine dump_gamma(outfile,i2fil,i2recnum,i1fil,i1recnum)
 
 end subroutine dump_gamma
 
-subroutine dump_twoints
+subroutine dump_twoints(intfilename)
       implicit double precision (a-h,o-z)
       include "common/corb"
       include "common/cbas"
       include "common/tapes"
       include "common/big"
+      character(*) :: intfilename
       character(32) :: str,namx
       character(8) :: unit
 
@@ -227,7 +257,8 @@ subroutine dump_twoints
       ibuf=icorr(length)
 
       call find_free_unit(ifil)
-      open(unit=ifil,file='AOTWOINT.mol',form='unformatted')
+!      open(unit=ifil,file='AOTWOINT.mol',form='unformatted')
+      open(unit=ifil,file=trim(intfilename),form='unformatted')
 
       write(ifil) int(nsk,kind=4)
       write(ifil) int(nt,kind=4)

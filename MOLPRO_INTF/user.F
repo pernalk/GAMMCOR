@@ -12,21 +12,35 @@
       use dumpintao 
       implicit double precision (a-h,o-z)
       include "common/tapes"
+      include "common/chirs"
       integer, parameter :: maxf = 5
       character(len = 16) :: field(maxf)
       character(len = 32) :: prdmft_job
       character(len = 8) :: units
+
+      write(iout,*) 'IsRangeHybrid', IsRangeHybrid
+      write(iout,*) 'IsChi', IsChi,ChiRS
 
        call getx(1, field, maxf)
        if(field(2) == "ORB") then
          call dump_grid()
        elseif(field(2) == "INTAO") then
          call dump_aoints 
+       elseif(field(2) == "PRDMFT") then
+         call dump_grid()
+         call dump_aoints 
+       elseif(field(2) == "WRK") then
+         call dump_test('AOTWOINT.mol')
+       ! PTDMFT-SAPT interface
        elseif(field(2) == "PRDMFT-SAPT") then
-         if(trim(field(3))=='MONOMERA') then
-           call dump_molpro_sapt(1)
+         if(trim(field(3))=='WRK') then
+         call dump_test('AOTWOINT.mol')
+         elseif(trim(field(3))=='GRID') then
+           call dump_grid() 
+         elseif(trim(field(3))=='MONOMERA') then
+           call dump_molpro_sapt(1,IsRangeHybrid)
          else
-           call dump_molpro_sapt(2)
+           call dump_molpro_sapt(2,IsRangeHybrid)
          endif
        else
          write(iout,10)

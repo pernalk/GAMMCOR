@@ -9,6 +9,8 @@ OBJ = $(O)mainp.o $(O)initia.o $(O)dmscf.o $(O)misc.o $(O)optocc.o \
       $(O)nonadia.o $(O)dftgrid.o $(O)lsd_sr.o $(O)dftfun_exerfpbe.o \
       $(O)dftfun_exerf.o $(O)dftfun_ecerfpbe.o $(O)dftfun_ecerf.o \
       $(O)dftacg_pw92c.o $(O)projector.o $(O)ekt.o \
+      $(O)xcfun.o $(O)xcfun_module.o $(O)xcfun_autogen.o \
+      $(O)gridmolpro.o \
       $(O)sorter.o $(O)tran.o $(O)systemdef.o \
       $(O)types.o $(O)inputfill.o \
       $(O)sapt_main.o $(O)sapt.o \
@@ -24,7 +26,8 @@ OBJ = $(O)mainp.o $(O)initia.o $(O)dmscf.o $(O)misc.o $(O)optocc.o \
 
 FCC = ifort -assume byterecl
 FFLAGS = -mkl -heap-arrays  -O2
-LIBS = -L/opt/intel/composer_xe_2015.2.164/mkl/lib/intel64/ -lmkl_intel_ilp64 -lmkl_sequential -lmkl_core
+LIBS = -L/opt/intel/composer_xe_2015.2.164/mkl/lib/intel64/ -lmkl_intel_ilp64 -lmkl_sequential -lmkl_core \
+-L ./xcfun/lib -lxcfun
 
 
 $(PROG) :  $(OBJ) 
@@ -87,6 +90,10 @@ $(O)acfd.o : $(S)acfd.f
 	$(FCC) $(FFLAGS)  -c $(S)acfd.f -o $(O)acfd.o
 $(O)accas.o : $(S)accas.f
 	$(FCC) $(FFLAGS)  -c $(S)accas.f -o $(O)accas.o
+$(O)xcfun.o : $(S)xcfun.f90
+	$(FCC) $(FFLAGS)  -c $(S)xcfun.f90  -o $(O)xcfun.o
+$(O)gridmolpro.o : $(S)gridmolpro.f90
+	$(FCC) $(FFLAGS)  -c $(S)gridmolpro.f90 -o $(O)gridmolpro.o
 $(O)timing.o : $(S)timing.f90
 	$(FCC) $(FFLAGS)  -c $(S)timing.f90 -o $(O)timing.o
 $(O)types.o : $(S)types.f90

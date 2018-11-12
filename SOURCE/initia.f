@@ -59,7 +59,7 @@ C
 C
 C     GET 2-EL NO INTEGRALS AND CICoef
 C 
-C      Call readtwoint(NBasis,'AOTWOINT')
+C      Call readtwoint(NBasis,'AOTWOINT','AOTWOSORT')
       Call read2el(TwoEl,UMOAO,NBasis,NInte2)
 !      Call altread2el(TwoEl,UMOAO,NBasis,NInte2)
 
@@ -682,7 +682,7 @@ CC
 C      Call Int2_AO(TwoEl,NumOSym,MultpC,FName,NInte1,NInte2,NBasis)
 C
 C     HAP
-      Call readtwoint(NBasis,2,'AOTWOINT.mol')
+      Call readtwoint(NBasis,2,'AOTWOINT.mol','AOTWOSORT')
       Call LoadSaptTwoEl(3,TwoEl,NBasis,NInte2)
 C
 C     LOAD AO TO CAS_MO ORBITAL TRANSFORMATION MATRIX FROM uaomo.dat
@@ -796,19 +796,6 @@ C
       EndDo
       EndDo
 C
-C      Print*, 'INACTIVE:'
-C      Do I=1,NInAc*(NInAc+1)/2
-C      Print*, I,GammaF(I)
-C      EndDo
-C      Print*, 'ACTIVE:'
-C      Do I=NInAc*(NInAc+1)/2+1, NOccup*(NOccup+1)/2
-C      Print*, I,GammaF(I)
-C      EndDo
-C      Print*, 'VIRT:'
-C      Do I=NOccup*(NOccup+1)/2+1,NInte1
-C      Print*, I,GammaF(I)
-C      Enddo
-
 C     FIND CANONICAL INACTIVE AND VIRTUAL ORBITALS 
 C      
       If(IAO.Eq.0) Then
@@ -838,7 +825,7 @@ C
       EndDo
 C
 C     HAP
-C      Call FockGen_mithap(FockF,GammaAB,XKin,NInte1,NBasis)
+      Call FockGen_mithap(FockF,GammaAB,XKin,NInte1,NBasis)
 C
 C     TESTY:
 C      print*,'AUXM:', norm2(AUXM)
@@ -847,7 +834,7 @@ C      print*,'GammaF:', norm2(GammaF)
 C      print*,'GammaAB:', norm2(GammaAB)
 C      print*,'Fock:', norm2(FockF)
 C
-      Call FockGen(FockF,GammaAB,XKin,TwoEl,NInte1,NBasis,NInte2)
+C      Call FockGen(FockF,GammaAB,XKin,TwoEl,NInte1,NBasis,NInte2)
       Call MatTr(FockF,UAux,NBasis)
 C      
       EndIf
@@ -2163,6 +2150,12 @@ C
       fname='TWOMOBB '
       ElseIf(Mon.Eq.3) Then
       fname='AOTWOSORT'
+      ElseIf(Mon.Eq.4) Then
+      fname='AOERFSORT'
+      ElseIf(Mon.Eq.5) Then
+      fname='MO2ERFAA'
+      ElseIf(Mon.Eq.6) Then
+      fname='MO2ERFBB'
       EndIf
  
       Work1 = 0d0

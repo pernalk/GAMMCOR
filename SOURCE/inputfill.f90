@@ -315,6 +315,9 @@ subroutine read_block_calculation(CalcParams, line)
            elseif (uppercase(val) == "TD-APSG".or.&
                    uppercase(val) == "FULL") then
                CalcParams%Response = RESP_APSG
+           elseif (uppercase(val) == "TD-KS".or.&
+                   uppercase(val) == "DFT") then
+               CalcParams%Response = RESP_DFT
            endif
 
       case ("RDMSOURCE")

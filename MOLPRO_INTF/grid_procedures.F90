@@ -48,8 +48,8 @@ write(ifil) orbval(1:npt,1:ndiff,1:ntg)
 write(ifil) mapinv(1:ntg)
 close(ifil) 
 
-!print*, 'wt',sum(wt(1:npt))
-!print*, 'mapinv',sum(mapinv(1:ntg))
+print*, 'wt',sum(wt(1:npt))
+print*, 'mapinv',sum(mapinv(1:ntg))
 !do i=1,npt
 !   write(*,*) i,sum(orbval(i,:,:)) 
 !enddo

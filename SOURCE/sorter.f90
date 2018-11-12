@@ -28,7 +28,7 @@ end type SortData
 
 contains 
 
-subroutine readtwoint(NBas,aosource,intfile)
+subroutine readtwoint(NBas,aosource,intfile,sortfile)
 ! read DALTON 2-el integrals,
 ! sort them according to rs index
 ! and dump to a file
@@ -36,7 +36,7 @@ implicit none
 
 integer :: NBas
 integer :: aosource
-character(*) :: intfile
+character(*) :: intfile,sortfile
 integer :: iunit,iunit2
 integer :: maxrep, naos(8), lbuf, nibuf, nbits, lenint4
 integer :: nsk, nt(8), ntoff(8)
@@ -316,7 +316,7 @@ integer :: i
 ! end SORT1
 
 ! start SORT2
- open(newunit=iunit2,file='AOTWOSORT',status='REPLACE',&
+ open(newunit=iunit2,file=trim(sortfile),status='REPLACE',&
       access='DIRECT',form='UNFORMATTED',recl=8*NBas*(NBas+1)/2)
 
  allocate(mat(NBas*(NBas+1)/2))

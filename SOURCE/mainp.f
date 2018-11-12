@@ -183,7 +183,7 @@ C     IFunSR = 0 - do not include a short-range functional
 C     IFunSR = 1 - SR-LSDA, Paziani et al. 
 C     IFunSR = 2 - SR-PBE, Goll et al. PCCP 7, (2005) 3917
 C
-      IFunSR=Flags%IFunSR
+      IFunSR=0 !Flags%IFunSR
       IFunSRKer=Flags%IFunSRKer
 C
       If(IFun.Eq.10.And.IFunSR.Eq.1) 

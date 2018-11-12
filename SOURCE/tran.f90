@@ -203,7 +203,7 @@ integer :: i,rs,ab
 
 end subroutine tran3Q_full
 
-subroutine tran4_full(NBas,CA,CB,fname)
+subroutine tran4_full(NBas,CA,CB,fname,srtfile)
 ! 4-index transformation out of core
 ! dumps all integrals on disk in the (triang,triang) form
 ! CAREFUL: C have to be in AOMO form!
@@ -215,7 +215,7 @@ integer,intent(in) :: NBas
 !integer,intent(in) :: nA,nB,nC,nD
 ! CA(NBas*nA)
 double precision,intent(in) :: CA(*), CB(*)
-character(*) :: fname
+character(*) :: fname, srtfile
 double precision, allocatable :: work1(:), work2(:), work3(:,:)
 integer :: iunit,iunit2,iunit3
 integer :: ntr,nloop
@@ -235,7 +235,8 @@ integer :: i,rs,ab
  allocate(work1(NBas*NBas),work2(NBas*NBas))
  allocate(work3(cbuf,ntr))
 
- open(newunit=iunit,file='AOTWOSORT',status='OLD',&
+ !open(newunit=iunit,file='AOTWOSORT',status='OLD',&
+ open(newunit=iunit,file=trim(srtfile),status='OLD',&
       access='DIRECT',form='UNFORMATTED',recl=8*NBas*(NBas+1)/2)
 
  ! half-transformed file
@@ -386,10 +387,11 @@ integer :: i,rs,ab
 
 end subroutine tran4_gen
 
-subroutine make_J1(NBas,X,J)
+subroutine make_J1(NBas,X,J,intfile)
 implicit none
 integer :: NBas
 double precision :: X(*), J(NBas,NBas)
+character(*) :: intfile
 integer :: iunit, ntr
 integer :: ir,is,irs
 double precision :: tmp
@@ -401,7 +403,7 @@ double precision,external :: ddot
 
  allocate(work1(NBas*NBas),work2(NBas*NBas))
 
- open(newunit=iunit,file='AOTWOSORT',status='OLD',&
+ open(newunit=iunit,file=trim(intfile),status='OLD',&
       access='DIRECT',form='UNFORMATTED',recl=8*ntr)
 
  irs=0
@@ -566,6 +568,22 @@ integer :: i,j
  deallocate(tmp)
 
 end subroutine tran2MO
+
+subroutine transp_mat1dim(matIn,matOut,NBas)
+implicit none
+
+integer,intent(in) :: NBas
+double precision,intent(in) :: matIn(NBas,NBas)
+double precision,intent(out) :: matOut(NBas,NBas)
+integer :: i,j
+
+ do i=1,NBas
+    do j=1,NBas
+       matOut(j,i) = matIn(i,j)
+    enddo
+ enddo
+
+end subroutine transp_mat1dim
 
 subroutine triang_to_sq(matTr,matSq,NBas)
 implicit none
@@ -2754,6 +2772,35 @@ call sq_to_triang2(FockSq,Fock,NBasis)
 deallocate(work1,ints,FockSq,OneRdmSq)
 
 end subroutine FockGen_mithap
+
+subroutine PotHSR_mithap(VHSR,Occ,MO,NBasis)
+!
+!     RETURNS SR HARTREE (COULOMB) POTENTIAL IN AN MO MATRIX REPRESENTATION 
+!
+implicit none
+
+integer,intent(in) :: NBasis
+double precision,intent(in) :: Occ(NBasis),MO(NBasis,NBasis)
+double precision,intent(out) :: VHSR(NBasis*(NBasis+1)/2)
+integer :: i
+double precision,allocatable :: J(:,:),Jerf(:,:),work(:,:)
+
+allocate(Jerf(NBasis,NBasis),J(NBasis,NBasis),work(NBasis,NBasis))
+
+work = 0
+do i=1,NBasis
+   call dger(NBasis,NBasis,2d0*Occ(i),MO(i,:),1,MO(i,:),1,work,NBasis)
+enddo
+
+call make_J1(NBasis,work,J,'AOTWOSORT')
+call make_J1(NBasis,work,Jerf,'AOERFSORT')
+work = J - Jerf
+call sq_to_triang2(work,VHSR,NBasis) 
+call tran_matTr(VHSR,MO,MO,NBasis)
+
+deallocate(work,J,Jerf)
+
+end subroutine PotHSR_mithap
 
 end module
 

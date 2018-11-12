@@ -33,7 +33,7 @@ double precision,external  :: trace
  call get_one_mat('V',Va,A%Monomer,NBas)
  call get_one_mat('V',Vb,B%Monomer,NBas)
 
- call make_J1(NBas,PA,Ja)
+ call make_J1(NBas,PA,Ja,'AOTWOSORT')
 
 ! Tr[Pa.Va + Pb.Vb + Pb.Ja]
  work=0
@@ -2337,6 +2337,101 @@ print*, 'PART1: ',-16d0*e2d1*1000d0
  deallocate(OmB,EVecB,OmA,EVecA)
 
 end subroutine e2disp_apsg
+
+
+subroutine ModABMin(Occ,TwoNO,TwoElErf,XKer,ABMin,IndN,IndX,NDimX,NDimKer,NInte2,NBasis)
+!     ADD CONTRIBUTIONS FROM THE srALDA KERNEL TO AB MATRICES
+implicit none
+
+integer,intent(in) :: NBasis,NDimX,NDimKer,NInte2
+integer,intent(in) :: IndN(2,NDimX),IndX(NDimX)
+double precision,intent(in) :: Occ(NBasis),XKer(NDimKer)
+double precision,intent(in) :: TwoNO(NInte2),TwoElErf(NInte2)
+double precision,intent(inout) :: ABMin(NDimX**2)
+
+double precision :: CICoef(NBasis)
+integer :: i,IRow,ICol,ia,ib,iab,ic,id,icd
+double precision :: XKer1234,TwoSR,CA,CB,CC,CD
+integer,external :: NAddr3,NAddrrK
+
+do i=1,NBasis
+   CICoef(i) = sign(sqrt(Occ(i)),Occ(i)-0.5d0)
+enddo
+
+do IRow=1,NDimX
+   ia = IndN(1,IRow)
+   ib = IndN(2,IRow)
+   iab = IndX(IRow)
+   CA = CICoef(ia)
+   CB = CICoef(ib)
+
+   do ICol=1,NDimX
+      ic=IndN(1,ICol)
+      id=IndN(2,ICol)
+      icd=IndX(ICol)
+      CC=CICoef(ic)
+      CD=CICoef(id)
+      
+      XKer1234 = XKer(NAddrrK(ia,ib,ic,id))
+      TwoSR=TwoNO(NAddr3(ia,ib,ic,id))-TwoElErf(NAddr3(ia,ib,ic,id))
+      
+      ABMin((ICol-1)*NDimX+IRow)=ABMin((ICol-1)*NDimX+IRow) &
+                       +4.0d0*(CA+CB)*(CD+CC)*(XKer1234+TwoSR)
+   
+   enddo
+enddo
+
+end subroutine ModABMin
+
+subroutine ModABMin_2(Occ,SRKer,Wt,OrbGrid,TwoNO,TwoElErf,ABMin,IndN,IndX,NDimX,NGrid,NInte2,NBasis)
+!     ADD CONTRIBUTIONS FROM THE srALDA KERNEL TO AB MATRICES
+implicit none
+
+integer,intent(in) :: NBasis,NDimX,NGrid,NInte2
+integer,intent(in) :: IndN(2,NDimX),IndX(NDimX)
+double precision,intent(in) :: Occ(NBasis),SRKer(NGrid), &
+                               Wt(NGrid),OrbGrid(NBasis,NGrid)
+double precision,intent(in) :: TwoNO(NInte2),TwoElErf(NInte2)
+double precision,intent(inout) :: ABMin(NDimX**2)
+
+double precision :: CICoef(NBasis)
+integer :: i,IRow,ICol,ia,ib,iab,ic,id,icd
+double precision :: XKer1234,TwoSR,CA,CB,CC,CD
+integer,external :: NAddr3,NAddrrK
+
+do i=1,NBasis
+   CICoef(i) = sign(sqrt(Occ(i)),Occ(i)-0.5d0)
+enddo
+
+do IRow=1,NDimX
+   ia = IndN(1,IRow)
+   ib = IndN(2,IRow)
+   iab = IndX(IRow)
+   CA = CICoef(ia)
+   CB = CICoef(ib)
+
+   do ICol=1,NDimX
+      ic=IndN(1,ICol)
+      id=IndN(2,ICol)
+      icd=IndX(ICol)
+      CC=CICoef(ic)
+      CD=CICoef(id)
+      
+!      XKer1234 = XKer(NAddrrK(ia,ib,ic,id))
+      XKer1234 = 0
+      do i=1,NGrid
+         XKer1234 = XKer1234 + Wt(i)*SRKer(i)* &
+         OrbGrid(ia,i)*OrbGrid(ib,i)*OrbGrid(ic,i)*OrbGrid(id,i)
+      enddo
+      TwoSR=TwoNO(NAddr3(ia,ib,ic,id))-TwoElErf(NAddr3(ia,ib,ic,id))
+      
+      ABMin((ICol-1)*NDimX+IRow)=ABMin((ICol-1)*NDimX+IRow) &
+                       +4.0d0*(CA+CB)*(CD+CC)*(XKer1234+TwoSR)
+   
+   enddo
+enddo
+
+end subroutine ModABMin_2
 
 subroutine readresp(EVec,EVal,NDim,fname)
 implicit none

@@ -109,11 +109,28 @@ C
       Subroutine RunACCAS(ETot,ENuc,TwoNO,URe,UNOAO,Occ,XOne,
      $  IndAux,IPair,IndN,IndX,NDimX,Title,NBasis,NInte1,NInte2,NGem)
 C
+      use sorter
+      use tran    
+C
       Implicit Real*8 (A-H,O-Z)
 C
       Character*60 FMultTab,Title
       Include 'commons.inc'
 c
+C     (0) srDFT
+C
+      Real*8, Dimension(:), Allocatable :: TwoElErf
+      Real*8, Dimension(:), Allocatable :: OrbGrid
+      Real*8, Dimension(:), Allocatable :: OrbXGrid
+      Real*8, Dimension(:), Allocatable :: OrbYGrid
+      Real*8, Dimension(:), Allocatable :: OrbZGrid
+      Real*8, Dimension(:), Allocatable :: WGrid
+      Real*8, Dimension(:), Allocatable :: XKer
+      Dimension NSymNO(NBasis),VSR(NInte1),MultpC(15,15)
+      Parameter (Four=4.D0)
+C
+C     (0) END OF srDFT
+C 
       Parameter(Zero=0.D0,Half=0.5D0,One=1.D0,Two=2.D0)
 C
       Dimension
@@ -167,9 +184,127 @@ C
       ACAlpha=One
       Write(6,'(/,X," The number of CASSCF Active Orbitals = ",I4)')
      $ NAcCAS
-C  
-      Call AB_CAS(ABPLUS,ABMIN,ECASSCF,URe,Occ,XOne,TwoNO,IPair,
+C
+C     (1) BEGINNING OF srDFT
+C     ADD CONTRIBUTIONS FROM srKS POTENTIAL 
+C
+C     IFunSR = 1  : LDA
+C              2  : PBE
+C
+      IFunSR=1
+      If(IFunSR.Gt.0) Then
+C
+C     load NGrid
+C
+      Call molprogrid0(NGrid,NBasis)
+      Write(6,'(/,X," The number of Grid Points = ",I8)')
+     $ NGrid
+C
+      Allocate  (TwoElErf(NInte2))
+      Allocate  (WGrid(NGrid))
+      Allocate  (OrbGrid(NBasis*NGrid))
+      Allocate  (OrbXGrid(NBasis*NGrid))
+      Allocate  (OrbYGrid(NBasis*NGrid))
+      Allocate  (OrbZGrid(NBasis*NGrid))
+C
+C     load orbgrid and gradients, and wgrid
+C
+      Call molprogrid(OrbGrid,OrbXGrid,OrbYGrid,OrbZGrid,
+     $ WGrid,UNOAO,NGrid,NBasis)
+C
+C     set/load Alpha - range separation parameter
+C
+      Alpha=0.5d0
+C
+C     set/load long-range two-electron integrals and transform to NO
+C     TwoElErf MUST BE IN NO !!!!
+C
+      TwoElErf(1:NInte2)=Zero
+      call readtwoint(NBasis,2,'AOTWOINT.erf','AOERFSORT')
+      call LoadSaptTwoEl(4,TwoElErf,NBasis,NInte2)
+      Write(6,'(/,2x,a)') 'Transforming two-electron LR integrals ...'
+      Call TwoNO1(TwoElErf,UNOAO,NBasis,NInte2)
+C      print*, norm2(TwoElErf)
+C      print*, norm2(TwoNO)
+C
+C     set/load symmetries of NO's, compute sr potential (vsr=xc+hartree)
+C     as a byproduct a sr energy (ensr=sr-xc+sr-hartree) is obtained
+C
+      NSymNO(1:NBasis)=1
+      Call EPotSR(EnSR,VSR,Occ,URe,UNOAO,OrbGrid,OrbXGrid,OrbYGrid,
+     $ OrbZGrid,WGrid,NSymNO,TwoNO,TwoElErf,
+     $ Alpha,IFunSR,NGrid,NInte1,NInte2,NBasis)
+      Do I=1,NInte1
+      XOne(I)=XOne(I)+VSR(I)
+      EndDo
+      Write(6,'(/,"  SR Energy",F15.8)')EnSR
+C
+C     compute AB matrices with the lr integrals and a modified potential
+C
+      Call AB_CAS(ABPLUS,ABMIN,ECASSCF,URe,Occ,XOne,TwoElErf,IPair,
      $ IndN,IndX,NDimX,NBasis,NDimX,NInte1,NInte2,ACAlpha)
+C
+      EndIf
+C
+C     (1) END OF srDFT
+C
+      If(IFunSR.Eq.0)
+     $ Call AB_CAS(ABPLUS,ABMIN,ECASSCF,URe,Occ,XOne,TwoNO,IPair,
+     $ IndN,IndX,NDimX,NBasis,NDimX,NInte1,NInte2,ACAlpha)
+C
+C     (2) BEGINNING OF srDFT
+C     ADD CONTRIBUTIONS FROM THE srALDA KERNEL TO AB MATRICES
+C
+      If(IFunSR.Gt.0) Then
+C
+      Write(6,'(/,"*** Adding a sr-kernel... ***")')
+      NDimKer=NBasis*(1+NBasis)*(2+NBasis)*(3+NBasis)/24
+      Allocate (XKer(NDimKer))
+C     set/load the group multiplication table 
+C
+      MultpC(1,1)=1
+C
+C     uncomment Call RhoKernel(RhoVec,SRKer,Alpha,NGrid) in GetKerNO and
+C     remove Stop
+C     see other changes in GetKerNO
+      Call GetKerNO(XKer,Occ,URe,OrbGrid,WGrid,NSymNO,MultpC,
+     $ NDimKer,NBasis,NGrid)
+C
+      Do I=1,NBasis
+      CICoef(I)=SQRT(Occ(I))
+      If(Occ(I).Lt.Half) CICoef(I)=-CICoef(I)
+      EndDo
+C
+      Do IRow=1,NDimX
+C
+      IA=IndN(1,IRow)
+      IB=IndN(2,IRow)
+      IAB=IndX(IRow)
+      CA=CICoef(IA)
+      CB=CICoef(IB)
+C
+      Do ICol=1,NDimX
+C
+      IC=IndN(1,ICol)
+      ID=IndN(2,ICol)
+      ICD=IndX(ICol)
+      CC=CICoef(IC)
+      CD=CICoef(ID)
+C
+      XKer1234=XKer(NAddrrK(IA,IB,IC,ID))
+      TwoSR=TwoNO(NAddr3(IA,IB,IC,ID))-TwoElErf(NAddr3(IA,IB,IC,ID))
+C
+      ABMIN((ICol-1)*NDimX+IRow)=ABMIN((ICol-1)*NDimX+IRow)
+     $ +Four*(CA+CB)*(CD+CC)*(XKer1234+TwoSR)
+C
+      EndDo
+      EndDo
+C
+      Write(6,'("*** sr-kernel added. ***")')
+C
+      EndIf
+C
+C     (2) END OF srDFT
 C
       Write(6,'(/,X,''****************************************'',
      $            ''***************************************'')')
@@ -179,17 +314,24 @@ C
 C
 C     FIND EIGENVECTORS (EigVecR) AND COMPUTE THE ENERGY
 C
+C     (3) srDFT
+C
+      If(IFunSR.Gt.0) Then
       Call ERPASYMM1(EigVecR,Eig,ABPLUS,ABMIN,NBasis,NDimX)
-
-!     CHECK FOR SAPT
-!      Do I=1,NBasis
-!       Write(*,*) CICoef(I)
-!      EndDo
-C      TMP = 0
-C      Do I=1,NDimX**2
-C      TMP = TMP + EigVecR(I)**2
-C      EndDo
-C      Write(6,*) TMP
+      Write(6,'(/," *** LR-CAS-SR-DFT Excitation Energies *** ",/)')
+      Do I=1,10
+      Write(6,'(I4,4X,E16.6)') I,Eig(I)
+      EndDo
+      Deallocate(OrbZGrid,OrbYGrid,OrbXGrid,OrbGrid,WGrid)
+      Deallocate(TwoElErf)
+      Stop
+      EndIf
+C
+C     (3) END OF srDFT
+C
+C      Call ERPASYMM1(EigVecR,Eig,ABPLUS,ABMIN,NBasis,NDimX)   
+      If(IFunSR.Eq.0)
+     $ Call ERPAVEC(EigVecR,Eig,ABPLUS,ABMIN,NBasis,NDimX)
 C
       Write(6,'(/," *** Computing ERPA energy *** ",/)')
       Call ACEneERPA(ECorr,EigVecR,Eig,TwoNO,URe,Occ,XOne,
@@ -200,5 +342,7 @@ C
      $ (6,'(/,1X,''ECASSCF+ENuc, Corr, ERPA-CASSCF'',6X,3F15.8)')
      $ ECASSCF+ENuc,ECorr,ECASSCF+ENuc+ECorr
 C
+
       Return
       End
+ 
