@@ -2725,13 +2725,14 @@ deallocate(ints,work2,work1)
 
 end subroutine ACABMAT0_mithap
 
-subroutine FockGen_mithap(Fock,OneRdm,XOne,NInte1,NBasis)
+subroutine FockGen_mithap(Fock,OneRdm,XOne,NInte1,NBasis,IntFileName)
 !
 !     GENERALIZED FOCK MATRIX
 !
 implicit none
 
 integer,intent(in) :: NInte1,NBasis
+character(*) :: IntFileName
 double precision,intent(in) :: OneRdm(NInte1),XOne(NInte1)
 double precision,intent(out) :: Fock(Ninte1)
 integer :: iunit,kk,ll,kl,klround,k,l
@@ -2743,7 +2744,7 @@ allocate(OneRdmSq(NBasis,NBasis),FockSq(NBasis,NBasis),ints(NBasis,NBasis),work1
 call triang_to_sq2(OneRdm,OneRdmSq,NBasis)
 call triang_to_sq2(XOne,FockSq,NBasis)
 
-open(newunit=iunit,file='AOTWOSORT',status='OLD',&
+open(newunit=iunit,file=trim(IntFileName),status='OLD',&
      access='DIRECT',form='UNFORMATTED',recl=8*NInte1)
 
 kl = 0
@@ -2802,6 +2803,36 @@ deallocate(work,J,Jerf)
 
 end subroutine PotHSR_mithap
 
-end module
+subroutine PotCoul_mithap(VHSR,OneRdm,doRSH,NBasis)
+!
+!     RETURNS SR HARTREE (COULOMB) POTENTIAL IN AN MO MATRIX REPRESENTATION 
+!
+implicit none
 
+integer,intent(in) :: NBasis
+logical,intent(in) :: doRSH
+double precision,intent(in) :: OneRdm(NBasis*(NBasis+1)/2)
+double precision :: VHSR(NBasis*(NBasis+1)/2)
+double precision,allocatable :: J(:,:),Jerf(:,:),work(:,:)
+
+allocate(Jerf(NBasis,NBasis),J(NBasis,NBasis),work(NBasis,NBasis))
+
+work = 0
+call triang_to_sq2(OneRdm,work,NBasis)
+
+if(doRSH) then
+  call make_J1(NBasis,work,J,'AOTWOSORT')
+  call make_J1(NBasis,work,Jerf,'AOERFSORT')
+  work = 2.0d0*J - 2.0d0*Jerf
+else
+  call make_J1(NBasis,work,J,'AOTWOSORT')
+  work = 2.0d0*J
+endif
+call sq_to_triang2(work,VHSR,NBasis) 
+
+deallocate(work,J,Jerf)
+
+end subroutine PotCoul_mithap
+
+end module
 

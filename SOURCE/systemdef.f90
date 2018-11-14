@@ -199,7 +199,10 @@ else
         Flags%ISERPA = 0 
      case(RESP_DFT)
         Flags%ISERPA = 0 
-        Flags%IFunSR = 1 
+        Flags%IFunSR = 1
+        if(Input%CalcParams%Dfapp>0) then
+          Flags%IFunSR = Input%CalcParams%Dfapp
+        endif 
      case(RESP_APSG)
         Flags%ISERPA = 2
      end select
@@ -264,7 +267,13 @@ elseif(Flags%ISAPT.Eq.1) then
  SAPT%InterfaceType = Input%CalcParams%InterfaceType
  SAPT%IPrint = Input%CalcParams%IPrint
  SAPT%SaptLevel = Input%CalcParams%SaptLevel
- if(SAPT%InterfaceType==2) SAPT%HFCheck=.false.
+ if(SAPT%InterfaceType==2) SAPT%HFCheck = .false.
+ ! temporary RSH
+ if(Flags%IFunSR<3) then
+   SAPT%doRSH = .true. 
+   SAPT%monA%doRSH = .true.
+   SAPT%monB%doRSH = .true.
+ endif
 
  associate( monA => SAPT%monA, &
             monB => SAPT%monB ) 

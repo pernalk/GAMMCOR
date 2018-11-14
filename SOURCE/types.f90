@@ -39,6 +39,11 @@ integer, parameter :: RDM_TYPE_CAS  = 3
 integer, parameter :: RDM_TYPE_DMRG = 4
 integer, parameter :: RDM_TYPE_HF   = 5
 
+integer, parameter :: DF_NONE       = 0
+integer, parameter :: DF_SRLDA      = 1
+integer, parameter :: DF_SRPBE      = 2
+integer, parameter :: DF_PBE        = 3
+
 integer, parameter :: MONOMER_A = 1
 integer, parameter :: MONOMER_B = 2
 
@@ -74,6 +79,7 @@ type CalculationBlock
       integer :: RDMType = RDM_TYPE_GVB
       integer :: RDMSource = INTER_TYPE_DAL
       integer :: Response = RESP_ERPA
+      integer :: Dfapp = DF_NONE
       integer :: Inactive = FLAG_CORE 
       integer :: SymType = TYPE_NO_SYM
       integer :: SaptLevel = SAPTLEVEL2 
@@ -95,6 +101,7 @@ type SystemBlock
       double precision :: XELE
       double precision :: PotNuc 
       double precision :: SumOcc = 0
+      double precision :: Omega = 1
       integer :: NSym 
       integer :: NSymBas(8),NSymOrb(8)
       integer :: NOrb, NGem
@@ -112,6 +119,7 @@ type SystemBlock
       integer :: icnt
       integer :: num0,num1,num2
       logical :: ISHF = .false. 
+      logical :: doRSH = .false. 
       double precision :: ThrAct = 0.992d0
       integer,allocatable :: IGem(:), IndAux(:)
       integer,allocatable :: IndX(:), IndN(:,:), IPair(:,:)
@@ -125,6 +133,7 @@ type SystemBlock
       double precision,allocatable :: TwoMO(:)
       double precision,allocatable :: CMO(:,:)
       double precision,allocatable :: WPot(:,:)
+      double precision,allocatable :: VHSR(:)
       double precision,allocatable :: RDM2(:),RDM2Act(:,:,:,:)
       double precision  :: charg(maxcen),xyz(maxcen,3)
 
@@ -183,7 +192,7 @@ type SaptData
      integer :: InterfaceType = INTER_TYPE_DAL
      integer :: SaptLevel = SAPTLEVEL2
      integer :: IPrint = 1000
-     logical :: EnChck = .true., HFCheck=.true.
+     logical :: EnChck = .true., HFCheck=.true., doRSH = .false.
 
 end type SaptData
 

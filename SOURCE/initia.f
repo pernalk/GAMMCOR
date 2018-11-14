@@ -825,7 +825,8 @@ C
       EndDo
 C
 C     HAP
-      Call FockGen_mithap(FockF,GammaAB,XKin,NInte1,NBasis)
+C      Call FockGen_mithap(FockF,GammaAB,XKin,NInte1,NBasis)
+      Call FockGen_mithap(FockF,GammaAB,XKin,NInte1,NBasis,'AOTWOSORT')
 C
 C     TESTY:
 C      print*,'AUXM:', norm2(AUXM)

@@ -36,8 +36,9 @@ C
      $ for the range-separation parameter alpha > 100'
 C
 C     COMPUTE THE HARTREE POTENTIAL AND THE ENERGY
+C     HAP: VHSR is computed in AO during canonicalization
 C
-      Call PotHSR(VHSR,Occ,URe,TwoEl,TwoElErf,NInte1,NInte2,NBasis)
+C      Call PotHSR(VHSR,Occ,URe,TwoEl,TwoElErf,NInte1,NInte2,NBasis)
 C      Call PotHSR_mithap(VHSR,Occ,UNOAO,NBasis)
 C
       Call VecTr(Gamma,Occ,URe,NBasis)
@@ -65,14 +66,20 @@ C
       Call GetExcSR_PBE(EnxcSR,VSR,Occ,URe,OrbGrid,OrbXGrid,OrbYGrid,
      $ OrbZGrid,WGrid,NSymMO,NGrid,NInte1,NBasis)
 C
+      ElseIf(IFunSR.Eq.3) Then
+C
+       Call GetExc_PBE(EnxcSR,VSR,Occ,URe,OrbGrid,OrbXGrid,OrbYGrid,
+     $ OrbZGrid,WGrid,NSymMO,NGrid,NInte1,NBasis)
+C
       EndIf
 C
       Do I=1,NInte1
+C     test only
       VSR(I)=VSR(I)+VHSR(I)
       EndDo 
 C
       EnSR=EnxcSR+EnHSR 
-      Write(6,'(/,2x,A,F15.8)') 'EnHSR ',EnHSR 
+C      Write(6,'(/,2x,A,F15.8)') 'EnHSR ',EnHSR 
       Write(6,'(2x,A,F15.8)') 'EnxcSR',EnxcSR
 C
       Return
@@ -327,6 +334,90 @@ C
       Return
       End
 
+*Deck GetExc_PBE
+      Subroutine GetExc_PBE(Enxc,Vxc,Occ,URe,OrbGrid,OrbXGrid,
+     $ OrbYGrid,OrbZGrid,WGrid,NSymMO,NGrid,NInte1,NBasis)
+C
+C     RETURNS A VALUE OF THE SHORT_RANGE PBE EXC FUNCTIONAL 
+C
+      Implicit Real*8 (A-H,O-Z)
+C
+      Include 'commons.inc' 
+C
+      Parameter (Zero=0.0D0,One=1.D0,Two=2.D0,Three=3.0D0,Four=4.0D0)
+      Dimension OrbGrid(NBasis,NGrid),WGrid(NGrid),
+     $ Occ(NBasis),URe(NBasis,NBasis),Vxc(NInte1)
+      Dimension OrbXGrid(NBasis,NGrid),OrbYGrid(NBasis,NGrid),
+     $ OrbZGrid(NBasis,NGrid),NSymMO(NBasis)
+C
+C     Local  
+C
+      Dimension RhoGrid(NGrid),Sigma(NGrid),Zk(NGrid)
+      Double Precision vrhoc(NGrid),vsigmacc(NGrid)
+      Logical FDeriv,Open
+
+      Enxc=Zero
+      FDeriv=.True.
+      Open=.False.
+C
+C     PBE functional
+C
+C     COMPUTE THE DENSITY AND ITS GRAD SQUARED ON THE GRID
+C
+      Do I=1,NGrid
+      vrhoc(I)=Zero
+      vsigmacc(i)=Zero
+      Call DenGrid(I,RhoGrid(I),Occ,URe,OrbGrid,NGrid,NBasis)
+      Call DenGrad(I,RhoX,Occ,URe,OrbGrid,OrbXGrid,NGrid,NBasis)
+      Call DenGrad(I,RhoY,Occ,URe,OrbGrid,OrbYGrid,NGrid,NBasis)
+      Call DenGrad(I,RhoZ,Occ,URe,OrbGrid,OrbZGrid,NGrid,NBasis)
+      Sigma(I)=RhoX**2+RhoY**2+RhoZ**2
+      EndDo      
+C
+      If(IFun.Ne.10) Then      
+      Call dfun_PBE(RhoGrid,Sigma,Zk,vrhoc,vsigmacc,NGrid)
+      EndIf
+
+      Do I=1,NGrid
+      Enxc = Enxc + Zk(I)*WGrid(I)
+      EndDo
+C
+C     XC POTENTIAL IN THE MO REPRESENTATION
+C
+      Vxc = Zero
+C
+      Do I=1,NGrid
+C
+      Call DenGrad(I,RhoX,Occ,URe,OrbGrid,OrbXGrid,NGrid,NBasis)
+      Call DenGrad(I,RhoY,Occ,URe,OrbGrid,OrbYGrid,NGrid,NBasis)
+      Call DenGrad(I,RhoZ,Occ,URe,OrbGrid,OrbZGrid,NGrid,NBasis)
+C
+      JK=0
+      Do J=1,NBasis
+      Do K=1,J
+      JK=JK+1
+C  
+      If(NSymMO(J).Eq.NSymMO(K)) Then
+C
+      Vxc(JK)=Vxc(JK)+OrbGrid(J,I)*OrbGrid(K,I)*vrhoc(I)*WGrid(I)
+C
+C     ADD THE NONLOCAL PART (DERIVATIVE W.R.T. THE GRADIENT OF RHO)
+C
+      Vxc(JK)=Vxc(JK)+Two*WGrid(I)*vsigmacc(I)*
+     $ (RhoX*(OrbXGrid(J,I)*OrbGrid(K,I)+OrbGrid(J,I)*OrbXGrid(K,I))
+     $ +RhoY*(OrbYGrid(J,I)*OrbGrid(K,I)+OrbGrid(J,I)*OrbYGrid(K,I))  
+     $ +RhoZ*(OrbZGrid(J,I)*OrbGrid(K,I)+OrbGrid(J,I)*OrbZGrid(K,I)))
+C
+      EndIf
+C
+      EndDo
+      EndDo
+C
+      EndDo
+C
+      Return
+      End
+
 *Deck GetKerNO
       Subroutine GetKerNO(XKer,Occ,URe,OrbGrid,WGrid,NSymNO,MultpC,
      $ NDimKer,NBasis,NGrid)
@@ -419,7 +510,7 @@ C
 C
 C     PRODUCE A KERNEL ON A GRID FOR DENSITIES RhoVec
 C
-      Call RhoKernel(RhoVec,SRKer,Alpha,NGrid)
+      Call RhoKernel(RhoVec,SRKer,IFunSR,Alpha,NGrid)
 C
       Return
       End

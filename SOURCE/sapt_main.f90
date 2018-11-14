@@ -130,6 +130,10 @@ logical :: doRSH
  SAPT%monA%NDim = NBasis*(NBasis-1)/2
  SAPT%monB%NDim = NBasis*(NBasis-1)/2
 
+! temporary solution
+ doRSH = .false.
+ if(Flags%IFunSR==1.or.Flags%IFunSR==2) doRSH = .true.
+
 ! read and dump 1-electron integrals 
  if(SAPT%InterfaceType==1) then
     call onel_dalton(SAPT%monA%Monomer,NBasis,NSq,NInte1,SAPT%monA,SAPT)
@@ -182,14 +186,12 @@ logical :: doRSH
     call readtwoint(NBasis,1,'AOTWOINT_A','AOTWOSORT')
  elseif(SAPT%InterfaceType==2) then
     call readtwoint(NBasis,2,'AOTWOINT.mol','AOTWOSORT')
-    !doRSH=.false.
-    doRSH=.true.
     if(doRSH) call readtwoint(NBasis,2,'AOTWOINT.erf','AOERFSORT')
  endif
 
  if(SAPT%InterfaceType==2) then
-    call prepare_no(OneRdmA,AuxA,Ca,SAPT%monA,NBasis)
-    call prepare_no(OneRdmB,AuxB,Cb,SAPT%monB,NBasis)
+    call prepare_no(OneRdmA,AuxA,Ca,SAPT%monA,Flags%IFunSR,NBasis)
+    call prepare_no(OneRdmB,AuxB,Cb,SAPT%monB,Flags%IFunSR,NBasis)
   
     call prepare_rdm2(SAPT%monA,AuxA,NBasis)
     call prepare_rdm2(SAPT%monB,AuxB,NBasis)
@@ -636,7 +638,7 @@ character(:),allocatable :: rdmfile
 
 end subroutine readocc_molpro
 
-subroutine prepare_no(OneRdm,OrbAux,OrbCAS,Mon,NBasis)
+subroutine prepare_no(OneRdm,OrbAux,OrbCAS,Mon,IFunSR,NBasis)
 implicit none
 ! OrbCAS[inout] :: on input AOtoCAS
 !                  on output AOtoNO
@@ -644,7 +646,7 @@ implicit none
 
 type(SystemBlock) :: Mon
 
-integer :: NBasis
+integer :: IFunSR,NBasis
 double precision :: OneRdm(NBasis*(NBasis+1)/2)
 double precision :: OrbAux(NBasis,NBasis),OrbCAS(NBasis,NBasis)
 double precision,allocatable :: URe(:,:),OrbSym(:,:),Fock(:)
@@ -733,11 +735,35 @@ integer :: info
     enddo
  enddo
 
+ ! create Fock matrix
  ! work1 = XOne 
  call readoneint_molpro(work1,onefile,'ONEHAMIL',.true.,NInte1)
  ! work2 = Fock
- call FockGen_mithap(work2,OneRdm,work1,NInte1,NBasis)
-! call MatTr(work2,OrbSym,NBasis)
+ if(IFunSR==0) then
+ ! CASSCF,Hartree-Fock 
+
+   call FockGen_mithap(work2,OneRdm,work1,NInte1,NBasis,'AOTWOSORT')
+
+ elseif(IFunSR>0) then
+ ! Kohn-Sham 
+
+   ! RSH
+   if(Mon%doRSH) then
+     ! generate long-range Fock
+     call FockGen_mithap(work2,OneRdm,work1,NInte1,NBasis,'AOERFSORT')
+     ! add and store short-range Coulomb
+     allocate(Mon%VHSR(NInte1))
+     call PotCoul_mithap(Mon%VHSR,OneRdm,Mon%doRSH,NBasis)
+     work2 = work2 + Mon%VHSR
+   else
+   ! plain DFA (not hybrid, e.g. LDA, PBE)
+   !  work2 = work1
+     allocate(Mon%VHSR(NInte1))
+     call PotCoul_mithap(Mon%VHSR,OneRdm,Mon%doRSH,NBasis)
+     work2 = work1 + Mon%VHSR
+   endif
+
+ endif
  call tran_matTr(work2,OrbSym,OrbSym,NBasis)
 
  Fock = 0
@@ -752,7 +778,7 @@ integer :: info
     enddo
     call Diag8(Fock,Mon%INAct,Mon%INAct,work3,work1)
     !call dsyev('V','U',Mon%INAct,Fock,Mon%INAct,work3,work1,3*Mon%INAct,info)
-    print*, work3(1:Mon%INAct)
+    print*, 'INACTIVE:',work3(1:Mon%INAct)
     do i=1,Mon%INAct 
       do j=1,Mon%INAct
          URe(i,j) = Fock((j-1)*Mon%INAct+i)
@@ -1003,8 +1029,9 @@ character(:),allocatable :: onefile,twofile,twoerffile,&
 double precision,parameter :: One = 1d0, Half = 0.5d0
 logical :: doRSH
 
-! tests
- doRSH=.false.
+! temporary RSH solution
+ doRSH = .false.
+ if(Flags%IFunSR==1.or.Flags%IFunSR==2) doRSH = .true.
 
 ! set filenames
  if(Mon%Monomer==1) then
@@ -1041,6 +1068,10 @@ logical :: doRSH
  enddo
 
 ! read 1-el
+
+ !RSH: add sr Coulomb
+ call triang_to_sq(Mon%VHSR,work2,NBas)
+ !if(doRSH) call triang_to_sq(Mon%VHSR,work2,NBas)
  open(newunit=ione,file=onefile,access='sequential',&
       form='unformatted',status='old')
 
@@ -1048,6 +1079,8 @@ logical :: doRSH
  read(ione)
  read(ione) label, work1
  if(label=='ONEHAMIL') then
+    work1 = work1 + work2
+    !if(doRSH) work1 = work1 + work2
     call tran_oneint(work1,MO,MO,work2,NBas)
     call sq_to_triang(work1,XOne,NBas) 
  else
@@ -1060,9 +1093,8 @@ logical :: doRSH
  write(LOUT,'()')
  write(LOUT,'(1x,a,i8)') "The number of Grid Points =",NGrid
 
- allocate(WGrid(NGrid),OrbGrid(NBas*NGrid), &
+ allocate(WGrid(NGrid),SRKer(NGrid),OrbGrid(NBas*NGrid), &
           OrbXGrid(NBas*NGrid),OrbYGrid(NBas*NGrid),OrbZGrid(NBas*NGrid))
- allocate(SRKer(NGrid))
 
  ! load orbgrid and gradients, and wgrid
  ! transpose them bastards!!!!
@@ -1071,20 +1103,24 @@ logical :: doRSH
                  WGrid,work1,NGrid,NBas)
 
  ! set/load Omega - range separation parameter
+! HEREEE!!!!
+ ! For pure DFFT
  Omega = 0.5d0
+ write(LOUT,'(1x,a,f15.8)') "The range-separation parameter =",Omega
  
  ! transform and read 2-el integrals
  call tran4_full(NBas,MO,MO,twofile,'AOTWOSORT')
  call LoadSaptTwoEl(Mon%Monomer,TwoMO,NBas,NInte2)
 
-! if(doRSH) then
+ TwoElErf(1:NInte2) = 0
+ if(doRSH) then
     TwoElErf(1:NInte2) = 0
     call tran4_full(NBas,MO,MO,twoerffile,'AOERFSORT')
     call LoadSaptTwoEl(Mon%Monomer+4,TwoElErf,NBas,NInte2)
-! endif
+ endif
 
- print*, norm2(TwoElErf)
- print*, norm2(TwoMO)
+! print*, norm2(TwoElErf)
+! print*, norm2(TwoMO)
 
  NSymNO(1:NBas) = 1
  call EPotSR(EnSR,VSR,Mon%Occ,URe,MO,& 
@@ -1092,11 +1128,10 @@ logical :: doRSH
             NSymNO,TwoMO,TwoElErf,&
             Omega,Flags%IFunSR,&
             NGrid,NInte1,NInte2,NBas)
- print*, 'VSR:',norm2(VSR)
- !call clock('EPotSR',Tcpu,Twall)
- do i=1,NInte1
-    XOne(i) = XOne(i) + VSR(i)
- enddo
+ ! MODIFY XOne
+ !do i=1,NInte1
+ !   XOne(i) = XOne(i) + VSR(i)
+ !enddo
  write(LOUT,'(1x,a,f15.8)') "SR Energy: ",EnSR
  
  ACAlpha=One
@@ -1110,29 +1145,32 @@ logical :: doRSH
  call system('cp '//rdmfile// ' rdm2.dat')
 
  ECASSCF = 0
- call AB_CAS(ABPlus,ABMin,ECASSCF,URe,Mon%Occ,XOne,TwoElErf,Mon%IPair,&
-             Mon%IndN,Mon%IndX,Mon%NDimX,NBas,Mon%NDimX,NInte1,NInte2,ACAlpha)
- print*, 'ABPlus',norm2(ABPlus),'ABMin',norm2(ABMin)
+! if(doRSH) then 
+   call AB_CAS(ABPlus,ABMin,ECASSCF,URe,Mon%Occ,XOne,TwoElErf,Mon%IPair,&
+               Mon%IndN,Mon%IndX,Mon%NDimX,NBas,Mon%NDimX,NInte1,NInte2,ACAlpha)
+!   call AB_CAS_mithap(ABPlus,ABMin,ECASSCF,URe,Mon%Occ,XOne, &
+!               Mon%IndN,Mon%IndX,Mon%IGem,Mon%NAct,Mon%INAct,Mon%NDimX,NBas,Mon%NDimX,&
+!               NInte1,twoerffile,ACAlpha,.false.)
+   print*, 'ABPlus',norm2(ABPlus),'ABMin',norm2(ABMin)
+!else
+! HERE:: ADD SEPARATE PROCEDURE FOR Kohn-Sham! 
+!endif
 
- ! ADD CONTRIBUTIONS FROM THE srALDA KERNEL TO AB MATRICES
- NDimKer=NBas*(1+NBas)*(2+NBas)*(3+NBas)/24
- allocate(XKer(NDimKer))
+ ! ADD CONTRIBUTIONS FROM THE (sr)ALDA KERNEL TO AB MATRICES
+ !allocate(XKer(NDimKer))
 
  MultpC(1,1)=1
- call GetKerNO(XKer,Mon%Occ,URe,OrbGrid,WGrid,NSymNO,MultpC, &
-               NDimKer,NBas,NGrid)
- !call ModABMin(Mon%Occ,TwoMO,TwoElErf,XKer,ABMin,&
- !              Mon%IndN,Mon%IndX,Mon%NDimX,NDimKer,NInte2,NBas)
- !call clock('XKer',Tcpu,Twall)
-
- ! HAP
  call GetKerNPT(SRKer,Mon%Occ,URe,OrbGrid,WGrid,NSymNO,MultpC, &
                 NBas,NGrid)
- call ModABMin_2(Mon%Occ,SRKer,WGrid,OrbGrid,TwoMO,TwoElErf,ABMin,&
+ call ModABMin(Mon%Occ,SRKer,WGrid,OrbGrid,TwoMO,TwoElErf,ABMin,&
                  Mon%IndN,Mon%IndX,Mon%NDimX,NGrid,NInte2,NBas)
+ print*, 'ABMin-Kasia',norm2(ABMin)
+ !call ModABMin_mithap(Mon%Occ,SRKer,WGrid,OrbGrid,ABMin,&
+ !                Mon%IndN,Mon%IndX,Mon%NDimX,NGrid,NBas,&
+ !                twofile,twoerffile)
+ !print*, 'ABMin-MY',norm2(ABMin)
 
  write(LOUT,'(1x,a)') "*** sr-kernel added. ***"
- !call clock('ModABMin',Tcpu,Twall)
 
  EigVecR = 0
  Eig = 0
@@ -1163,14 +1201,14 @@ logical :: doRSH
  Eig0 = 0
  Eig1 = 0
 
- call Y01CAS_mithap(Mon%Occ,URe,XOne,ABPlus,ABMin, &
-        EigY0,EigY1,Eig0,Eig1, &
-        Mon%IndN,Mon%IndX,Mon%IGem,Mon%NAct,Mon%INAct,Mon%NDimX, &
-        NBas,Mon%NDim,NInte1,twofile,Flags%IFlag0)
+ !call Y01CAS_mithap(Mon%Occ,URe,XOne,ABPlus,ABMin, &
+ !       EigY0,EigY1,Eig0,Eig1, &
+ !       Mon%IndN,Mon%IndX,Mon%IGem,Mon%NAct,Mon%INAct,Mon%NDimX, &
+ !       NBas,Mon%NDim,NInte1,twoerffile,Flags%IFlag0)
  
-! call Y01CAS(TwoMO,Mon%Occ,URe,XOne,ABPlus,ABMin, &
-!      EigY0,EigY1,Eig0,Eig1, &
-!      Mon%IndN,Mon%IndX,Mon%NDimX,NBas,Mon%NDim,NInte1,NInte2,Flags%IFlag0)
+ call Y01CAS(TwoElErf,Mon%Occ,URe,XOne,ABPlus,ABMin, &
+      EigY0,EigY1,Eig0,Eig1, &
+      Mon%IndN,Mon%IndX,Mon%NDimX,NBas,Mon%NDim,NInte1,NInte2,Flags%IFlag0)
 
  ! dump uncoupled response
  call writeresp(EigY0,Eig0,propfile0)
@@ -1181,12 +1219,11 @@ logical :: doRSH
  deallocate(Eig1,Eig0,EigY1,EigY0)
  
  deallocate(Eig,EigVecR,ABMin,ABPlus)
- deallocate(XKer,OrbZGrid,OrbYGrid,OrbXGrid,OrbGrid,WGrid)
+ deallocate(SRKer,OrbZGrid,OrbYGrid,OrbXGrid,OrbGrid,WGrid)
  deallocate(TwoMO)
 ! if(doRSH) deallocate(TwoElErf)
  deallocate(TwoElErf)
  deallocate(VSR,URe,XOne,work1,work2)
- deallocate(SRKer)
 
 end subroutine calc_resp_dft
 
@@ -3234,6 +3271,14 @@ endif
 if(allocated(SAPT%monB%RDM2)) then
   deallocate(SAPT%monB%RDM2,SAPT%monB%RDM2Act)
   deallocate(SAPT%monB%Ind2)
+endif
+
+!RSH
+if(allocated(SAPT%monA%VHSR)) then
+  deallocate(SAPT%monA%VHSR)
+endif
+if(allocated(SAPT%monB%VHSR)) then
+  deallocate(SAPT%monB%VHSR)
 endif
 
 ! delete AOTWOSORT

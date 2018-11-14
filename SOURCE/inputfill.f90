@@ -320,6 +320,17 @@ subroutine read_block_calculation(CalcParams, line)
                CalcParams%Response = RESP_DFT
            endif
 
+      case ("DFUNC")
+           if (uppercase(val) == "SRLDA".or.&
+               uppercase(val) == "SR-LDA") then
+               CalcParams%Dfapp = DF_SRLDA
+           elseif (uppercase(val) == "SRPBE".or.&
+                   uppercase(val) == "SR-PBE") then
+               CalcParams%Dfapp = DF_SRPBE
+           elseif (uppercase(val) == "PBE") then 
+               CalcParams%Dfapp = DF_PBE
+           endif
+
       case ("RDMSOURCE")
            if (uppercase(val) == "DALTON") then
               CalcParams%RDMSource = INTER_TYPE_DAL
@@ -388,6 +399,9 @@ integer :: test,test2
 
  case ("NATOMS")
        read(val, *) SystemParams%NCen
+
+ case ("OMEGA")
+       read(val, *) SystemParams%Omega
 
  case ("UATOMS")
        read(val, *) SystemParams%UCen

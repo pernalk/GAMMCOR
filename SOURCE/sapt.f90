@@ -2338,8 +2338,7 @@ print*, 'PART1: ',-16d0*e2d1*1000d0
 
 end subroutine e2disp_apsg
 
-
-subroutine ModABMin(Occ,TwoNO,TwoElErf,XKer,ABMin,IndN,IndX,NDimX,NDimKer,NInte2,NBasis)
+subroutine ModABMin_old(Occ,TwoNO,TwoElErf,XKer,ABMin,IndN,IndX,NDimX,NDimKer,NInte2,NBasis)
 !     ADD CONTRIBUTIONS FROM THE srALDA KERNEL TO AB MATRICES
 implicit none
 
@@ -2381,9 +2380,9 @@ do IRow=1,NDimX
    enddo
 enddo
 
-end subroutine ModABMin
+end subroutine ModABMin_old
 
-subroutine ModABMin_2(Occ,SRKer,Wt,OrbGrid,TwoNO,TwoElErf,ABMin,IndN,IndX,NDimX,NGrid,NInte2,NBasis)
+subroutine ModABMin(Occ,SRKer,Wt,OrbGrid,TwoNO,TwoElErf,ABMin,IndN,IndX,NDimX,NGrid,NInte2,NBasis)
 !     ADD CONTRIBUTIONS FROM THE srALDA KERNEL TO AB MATRICES
 implicit none
 
@@ -2395,12 +2394,19 @@ double precision,intent(in) :: TwoNO(NInte2),TwoElErf(NInte2)
 double precision,intent(inout) :: ABMin(NDimX**2)
 
 double precision :: CICoef(NBasis)
+double precision,allocatable :: work(:)
 integer :: i,IRow,ICol,ia,ib,iab,ic,id,icd
 double precision :: XKer1234,TwoSR,CA,CB,CC,CD
 integer,external :: NAddr3,NAddrrK
 
+allocate(work(NGrid))
+
 do i=1,NBasis
    CICoef(i) = sign(sqrt(Occ(i)),Occ(i)-0.5d0)
+enddo
+
+do i=1,NGrid
+   work(i) = Wt(i)*SRKer(i)
 enddo
 
 do IRow=1,NDimX
@@ -2417,10 +2423,10 @@ do IRow=1,NDimX
       CC=CICoef(ic)
       CD=CICoef(id)
       
-!      XKer1234 = XKer(NAddrrK(ia,ib,ic,id))
       XKer1234 = 0
       do i=1,NGrid
-         XKer1234 = XKer1234 + Wt(i)*SRKer(i)* &
+         !XKer1234 = XKer1234 + Wt(i)*SRKer(i)* &
+         XKer1234 = XKer1234 + work(i)* &
          OrbGrid(ia,i)*OrbGrid(ib,i)*OrbGrid(ic,i)*OrbGrid(id,i)
       enddo
       TwoSR=TwoNO(NAddr3(ia,ib,ic,id))-TwoElErf(NAddr3(ia,ib,ic,id))
@@ -2431,7 +2437,93 @@ do IRow=1,NDimX
    enddo
 enddo
 
-end subroutine ModABMin_2
+deallocate(work)
+
+end subroutine ModABMin
+
+subroutine ModABMin_mithap(Occ,SRKer,Wt,OrbGrid,ABMin,IndN,IndX,NDimX,NGrid,NBasis,&
+                           twofile,twoerfile)
+!     ADD CONTRIBUTIONS FROM THE srALDA KERNEL TO AB MATRICES
+implicit none
+
+integer,intent(in) :: NBasis,NDimX,NGrid
+integer,intent(in) :: IndN(2,NDimX),IndX(NDimX)
+character(*),intent(in) :: twofile,twoerfile
+double precision,intent(in) :: Occ(NBasis),SRKer(NGrid), &
+                               Wt(NGrid),OrbGrid(NBasis,NGrid)
+double precision,intent(inout) :: ABMin(NDimX,NDimX)
+
+integer :: iunit1,iunit2
+integer :: i,j,k,l,kl,irs,ipq,igrd
+double precision :: XKer1234,TwoSR,Cpq,Crs
+integer :: pos(NBasis,NBasis)
+double precision :: CICoef(NBasis)
+double precision,allocatable :: work1(:),work2(:),WtKer(:)
+double precision,allocatable :: ints1(:,:),ints2(:,:)
+
+do i=1,NBasis
+   CICoef(i) = sign(sqrt(Occ(i)),Occ(i)-0.5d0)
+enddo
+
+allocate(work1(NBasis**2),work2(NBasis**2),ints1(NBasis,NBasis),ints2(NBasis,NBasis),&
+         WtKer(NGrid))
+
+pos = 0
+do i=1,NDimX
+   pos(IndN(1,i),IndN(2,i)) = IndX(i)
+enddo
+
+do i=1,NGrid
+   WtKer(i) = Wt(i)*SRKer(i)
+enddo
+
+open(newunit=iunit1,file=trim(twofile),status='OLD', &
+     access='DIRECT',recl=8*NBasis*(NBasis+1)/2)
+open(newunit=iunit2,file=trim(twoerfile),status='OLD', &
+     access='DIRECT',recl=8*NBasis*(NBasis+1)/2)
+
+kl = 0
+do l=1,NBasis
+   do k=1,l
+      kl = kl + 1   
+      if(pos(l,k)/=0) then
+        irs = pos(l,k)
+        read(iunit1,rec=kl) work1(1:NBasis*(NBasis+1)/2)
+        call triang_to_sq2(work1,ints1,NBasis)
+        read(iunit2,rec=kl) work2(1:NBasis*(NBasis+1)/2)
+        call triang_to_sq2(work2,ints2,NBasis)
+
+        do j=1,NBasis
+           do i=1,j
+              if(pos(j,i)/=0) then
+                ipq = pos(j,i)
+                Crs = CICoef(l)+CICoef(k)
+                Cpq = CICoef(j)+CICoef(i)
+                TwoSR = ints1(i,j)-ints2(i,j)
+
+                XKer1234 = 0
+                do igrd=1,NGrid
+                   XKer1234 = XKer1234 + WtKer(igrd)* &
+                   OrbGrid(l,igrd)*OrbGrid(k,igrd)*OrbGrid(j,igrd)*OrbGrid(i,igrd)
+                enddo
+          
+                ABMIN(ipq,irs) = ABMIN(ipq,irs) & 
+                               + 4.0d0*Cpq*Crs*(TwoSR+XKer1234)
+
+              endif  
+           enddo
+        enddo
+
+      endif 
+   enddo
+enddo 
+
+close(iunit1)
+close(iunit2)
+
+deallocate(WtKer,ints2,ints1,work2,work1)
+
+end subroutine ModABMin_mithap
 
 subroutine readresp(EVec,EVal,NDim,fname)
 implicit none
