@@ -323,12 +323,12 @@ subroutine read_block_calculation(CalcParams, line)
       case ("DFUNC")
            if (uppercase(val) == "SRLDA".or.&
                uppercase(val) == "SR-LDA") then
-               CalcParams%Dfapp = DF_SRLDA
+               CalcParams%DFApp = DF_SRLDA
            elseif (uppercase(val) == "SRPBE".or.&
                    uppercase(val) == "SR-PBE") then
-               CalcParams%Dfapp = DF_SRPBE
+               CalcParams%DFApp = DF_SRPBE
            elseif (uppercase(val) == "PBE") then 
-               CalcParams%Dfapp = DF_PBE
+               CalcParams%DFApp = DF_PBE
            endif
 
       case ("RDMSOURCE")

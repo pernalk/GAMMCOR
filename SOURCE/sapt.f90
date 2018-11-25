@@ -74,7 +74,7 @@ implicit none
 
 type(SystemBlock) :: A, B
 type(SaptData) :: SAPT
-integer :: i, j, ia, jb
+integer :: i, j, k, l, ia, jb
 integer :: ip, iq, ir, is
 integer :: iv, iz, iu, it
 integer :: iunit
@@ -92,7 +92,8 @@ double precision,allocatable :: Va(:,:),Vb(:,:), &
 double precision,allocatable :: tmp1(:,:),tmp2(:,:)
 double precision,allocatable :: tmpA(:,:,:,:),tmpB(:,:,:,:), &
                                 tmpAB(:,:,:,:)
-double precision,allocatable :: work(:,:),rdm2B(:,:,:,:)
+double precision,allocatable :: work(:,:),RDM2Aval(:,:,:,:), &
+                                RDM2Bval(:,:,:,:)
 double precision :: tmp,ea,eb,exchs2
 double precision :: t1(2),t2a(4),t2b(2),t2c(2),t2d
 double precision :: t1f,t2f
@@ -128,6 +129,27 @@ double precision,external  :: trace,FRDM2
 
  call tran2MO(Va,B%CMO,B%CMO,Vabb,NBas) 
  call tran2MO(Vb,A%CMO,A%CMO,Vbaa,NBas) 
+
+ allocate(RDM2Aval(dimOA,dimOA,dimOA,dimOA),&
+          RDM2Bval(dimOB,dimOB,dimOB,dimOB))
+ do l=1,dimOA
+    do k=1,dimOA 
+       do j=1,dimOA
+          do i=1,dimOA
+             RDM2Aval(i,j,k,l) = FRDM2(i,k,j,l,A%RDM2,A%Occ,A%Ind2,A%NAct,NBas)
+          enddo
+       enddo
+    enddo
+ enddo
+ do l=1,dimOB
+    do k=1,dimOB 
+       do j=1,dimOB
+          do i=1,dimOB
+             RDM2Bval(i,j,k,l) = FRDM2(i,k,j,l,B%RDM2,B%Occ,B%Ind2,B%NAct,NBas)
+          enddo
+       enddo
+    enddo
+ enddo
 
 ! USa=0; USb=0
 ! USa,USb in MOAO
@@ -253,21 +275,27 @@ double precision,external  :: trace,FRDM2
 ! write(LOUT,*) 'T2c(2) ',t2c(2)
 
 ! dimOB
+! old
+! t2c(2)=0
+! do ir=1,dimOB
+!    do ip=1,dimOB
+!       do is=1,dimOB
+!          do iq=1,dimOB
+!             t2c(2) = t2c(2) + FRDM2(ip,iq,ir,is,B%RDM2,B%Occ,B%Ind2,B%NAct,NBas) * &
+!                    Vabb(ip,ir)*PAbb(is,iq)
+!          enddo
+!       enddo    
+!    enddo
+! enddo
+! new
  t2c(2)=0
- do ir=1,dimOB
-    do ip=1,dimOB
-       do is=1,dimOB
-          do iq=1,dimOB
-             t2c(2) = t2c(2) + FRDM2(ip,iq,ir,is,B%RDM2,B%Occ,B%Ind2,B%NAct,NBas) * &
-                    Vabb(ip,ir)*PAbb(is,iq)
-          enddo
-       enddo    
+ do is=1,dimOB
+    do iq=1,dimOB
+       t2c(2) = t2c(2) + sum(RDM2Bval(:,:,iq,is)*Vabb(:,:)*PAbb(is,iq))
     enddo
- enddo
+ enddo    
  t2c(2) = -2d0*t2c(2)
- write(LOUT,*)
- write(LOUT,*) 'dim-T2c(2) ',t2c(2)
-
+ write(LOUT,*) 'T2c(2) ',t2c(2)
 ! 
 ! T2b
  t2b=0
@@ -306,17 +334,26 @@ double precision,external  :: trace,FRDM2
 ! write(LOUT,*) 'T2b(2) ',t2b(2)
 !
 ! dimOA
+! old:
+! t2b(2)=0
+! do ir=1,dimOA
+!    do ip=1,dimOA
+!       do is=1,dimOA
+!          do iq=1,dimOA
+!             t2b(2) = t2b(2) + FRDM2(ip,iq,ir,is,A%RDM2,A%Occ,A%Ind2,A%NAct,NBas) * &
+!                    Vbaa(ip,ir)*PBaa(is,iq)
+!          enddo
+!       enddo    
+!    enddo
+! enddo
+!
+!new:
  t2b(2)=0
- do ir=1,dimOA
-    do ip=1,dimOA
-       do is=1,dimOA
-          do iq=1,dimOA
-             t2b(2) = t2b(2) + FRDM2(ip,iq,ir,is,A%RDM2,A%Occ,A%Ind2,A%NAct,NBas) * &
-                    Vbaa(ip,ir)*PBaa(is,iq)
-          enddo
-       enddo    
+ do is=1,dimOA
+    do iq=1,dimOA
+       t2b(2) = t2b(2) + sum(RDM2Aval(:,:,iq,is)*Vbaa(:,:)*PBaa(is,iq))
     enddo
- enddo
+ enddo    
  t2b(2) = -2d0*t2b(2)
  write(LOUT,*) 'T2b(2) ',t2b(2)
 
@@ -469,8 +506,8 @@ double precision,external  :: trace,FRDM2
  close(iunit)
 
 ! T2a(4)
- allocate(tmpA(NBas,NBas,NBas,NBas),tmpB(NBas,NBas,NBas,NBas),&
-          tmpAB(NBas,NBas,NBas,NBas))
+ allocate(tmpA(dimOA,dimOA,dimOA,dimOB),tmpB(dimOB,dimOB,dimOA,dimOB),&
+          tmpAB(dimOA,dimOA,dimOB,dimOB))
 !
 ! Full NBas check:
 !! N^5 
@@ -543,51 +580,64 @@ double precision,external  :: trace,FRDM2
 ! print*, 't2a(4): ',t2a(4)
 
  ! dimOA, dimOB 
- tmpA = 0
- do iz=1,dimOB
-    do ir=1,dimOA
-       do iq=1,dimOA
-          do ip=1,dimOA
-             do is=1,dimOA
-                 tmpA(ip,iq,ir,iz) = tmpA(ip,iq,ir,iz) + &
-                                  Sab(is,iz)* &
-                                  FRDM2(ip,iq,ir,is,A%RDM2,A%Occ,A%Ind2,A%NAct,NBas)
-             enddo
-          enddo
-       enddo
-    enddo
- enddo
+ ! old
+ !tmpA = 0
+ !do iz=1,dimOB
+ !   do ir=1,dimOA
+ !      do iq=1,dimOA
+ !         do ip=1,dimOA
+ !            do is=1,dimOA
+ !                tmpA(ip,iq,ir,iz) = tmpA(ip,iq,ir,iz) + &
+ !                                 Sab(is,iz)* &
+ !                                 !FRDM2(ip,iq,ir,is,A%RDM2,A%Occ,A%Ind2,A%NAct,NBas)
+ !                                 RDM2Aval(ip,ir,iq,is)
+ !            enddo
+ !         enddo
+ !      enddo
+ !   enddo
+ !enddo
+ ! new
+ call dgemm('N','N',dimOA**3,dimOB,dimOA,1d0,RDM2Aval,dimOA**3,Sab,NBas,0d0,tmpA,dimOA**3)
+
 ! N^5
- tmpB = 0
- do iq=1,dimOA
-    do iu=1,dimOB
-       do iz=1,dimOB
-          do iv=1,dimOB
-             do it=1,dimOB
-                 tmpB(iv,iz,iu,iq) = tmpB(iv,iz,iu,iq) + &
-                                  Sab(iq,it)* &
-                                  FRDM2(iv,iz,iu,it,B%RDM2,B%Occ,B%Ind2,B%NAct,NBas)
-             enddo
-          enddo
-       enddo
-    enddo
+!
+! tmpB = 0
+! do iq=1,dimOA
+!    do iu=1,dimOB
+!       do iz=1,dimOB
+!          do iv=1,dimOB
+!             do it=1,dimOB
+!                 tmpB(iv,iz,iu,iq) = tmpB(iv,iz,iu,iq) + &
+!                                  Sab(iq,it)* &
+!                                  !FRDM2(iv,iz,iu,it,B%RDM2,B%Occ,B%Ind2,B%NAct,NBas)
+!                                  RDM2Bval(iv,iu,iz,it)
+!             enddo
+!          enddo
+!       enddo
+!    enddo
+! enddo
+! new
+ do is=1,dimOB
+    call dgemm('N','T',dimOB**2,dimOA,dimOB,1d0,RDM2Bval(:,:,:,is),dimOB**2,Sab,NBas,0d0,tmpB(:,:,:,is),dimOB**2)
  enddo
+
 ! N^6
- tmpAB=0
- do iu=1,dimOB
-    do iv=1,dimOB
-       do ir=1,dimOA
-          do ip=1,dimOA
-             do iz=1,dimOB
-                do iq=1,dimOA
-                   tmpAB(ip,ir,iv,iu) = tmpAB(ip,ir,iv,iu) + &
-                                        tmpA(ip,iq,ir,iz)*tmpB(iv,iz,iu,iq)
-                enddo
-             enddo
-          enddo
-       enddo
-    enddo
- enddo
+! tmpAB=0
+! do iu=1,dimOB
+!    do iv=1,dimOB
+!       do ir=1,dimOA
+!          do ip=1,dimOA
+!             do iz=1,dimOB
+!                do iq=1,dimOA
+!                   tmpAB(ip,ir,iv,iu) = tmpAB(ip,ir,iv,iu) + &
+!                                        tmpA(ip,ir,iq,iz)*tmpB(iv,iu,iz,iq)
+!                enddo
+!             enddo
+!          enddo
+!       enddo
+!    enddo
+! enddo
+ call dgemm('N','T',dimOA**2,dimOB**2,dimOA*dimOB,1d0,tmpA,dimOA**2,tmpB,dimOB**2,0d0,tmpAB,dimOA**2)
 
  work=0
  open(newunit=iunit,file='TMPOOAB',status='OLD',&
@@ -953,6 +1003,7 @@ double precision,external  :: trace,FRDM2
  deallocate(Kb,Qba,Qab,USb,USa) 
  deallocate(tmp2,tmp1,work)
  !deallocate(JJb) 
+ deallocate(RDM2Bval,RDM2Aval)
 
 end subroutine e1exchs2
 
@@ -2386,27 +2437,58 @@ subroutine ModABMin(Occ,SRKer,Wt,OrbGrid,TwoNO,TwoElErf,ABMin,IndN,IndX,NDimX,NG
 !     ADD CONTRIBUTIONS FROM THE srALDA KERNEL TO AB MATRICES
 implicit none
 
+integer,parameter :: maxlen = 64 
 integer,intent(in) :: NBasis,NDimX,NGrid,NInte2
 integer,intent(in) :: IndN(2,NDimX),IndX(NDimX)
 double precision,intent(in) :: Occ(NBasis),SRKer(NGrid), &
-                               Wt(NGrid),OrbGrid(NBasis,NGrid)
+                               Wt(NGrid),OrbGrid(NGrid,NBasis)
 double precision,intent(in) :: TwoNO(NInte2),TwoElErf(NInte2)
-double precision,intent(inout) :: ABMin(NDimX**2)
+double precision,intent(inout) :: ABMin(NDimX,NDimX)
 
 double precision :: CICoef(NBasis)
-double precision,allocatable :: work(:)
-integer :: i,IRow,ICol,ia,ib,iab,ic,id,icd
+double precision,allocatable :: work(:),batch(:,:),ABKer(:,:)
+integer :: i,j,IRow,ICol,ia,ib,iab,ic,id,icd
+integer :: offset,batchlen
 double precision :: XKer1234,TwoSR,CA,CB,CC,CD
 integer,external :: NAddr3,NAddrrK
 
-allocate(work(NGrid))
+allocate(work(maxlen),batch(maxlen,NBasis),ABKer(NDimX,NDimX))
 
 do i=1,NBasis
    CICoef(i) = sign(sqrt(Occ(i)),Occ(i)-0.5d0)
 enddo
 
-do i=1,NGrid
-   work(i) = Wt(i)*SRKer(i)
+ABKer = 0
+
+do offset=0,NGrid,maxlen
+   batchlen = min(NGrid-offset,maxlen)
+   if(batchlen==0) exit
+
+   work(1:batchlen) = Wt(offset+1:offset+batchlen)*SRKer(offset+1:offset+batchlen)
+   batch(1:batchlen,1:NBasis) = OrbGrid(offset+1:offset+batchlen,1:NBasis)
+
+   do IRow=1,NDimX
+      ia = IndN(1,IRow)
+      ib = IndN(2,IRow)
+      iab = IndX(IRow)
+   
+      do ICol=1,NDimX
+         ic=IndN(1,ICol)
+         id=IndN(2,ICol)
+         icd=IndX(ICol)
+         if(icd.gt.iab) cycle
+    
+         XKer1234 = 0
+         do i=1,batchlen
+            XKer1234 = XKer1234 + work(i)* &
+            batch(i,ia)*batch(i,ib)*batch(i,ic)*batch(i,id)
+         enddo
+         
+         ABKer(iab,icd) = ABKer(iab,icd) + XKer1234
+      
+      enddo
+   enddo
+
 enddo
 
 do IRow=1,NDimX
@@ -2422,22 +2504,18 @@ do IRow=1,NDimX
       icd=IndX(ICol)
       CC=CICoef(ic)
       CD=CICoef(id)
-      
-      XKer1234 = 0
-      do i=1,NGrid
-         !XKer1234 = XKer1234 + Wt(i)*SRKer(i)* &
-         XKer1234 = XKer1234 + work(i)* &
-         OrbGrid(ia,i)*OrbGrid(ib,i)*OrbGrid(ic,i)*OrbGrid(id,i)
-      enddo
+      if(icd.gt.iab) cycle
+ 
       TwoSR=TwoNO(NAddr3(ia,ib,ic,id))-TwoElErf(NAddr3(ia,ib,ic,id))
       
-      ABMin((ICol-1)*NDimX+IRow)=ABMin((ICol-1)*NDimX+IRow) &
-                       +4.0d0*(CA+CB)*(CD+CC)*(XKer1234+TwoSR)
-   
+      ABMin(iab,icd) = ABMin(iab,icd) &
+                       +4.0d0*(CA+CB)*(CD+CC)*(ABKer(iab,icd)+TwoSR)
+      ABMin(icd,iab) = ABMin(iab,icd)   
+
    enddo
 enddo
 
-deallocate(work)
+deallocate(ABKer,batch,work)
 
 end subroutine ModABMin
 
@@ -2476,6 +2554,8 @@ enddo
 do i=1,NGrid
    WtKer(i) = Wt(i)*SRKer(i)
 enddo
+
+print*, 'ModABMin_mithap'
 
 open(newunit=iunit1,file=trim(twofile),status='OLD', &
      access='DIRECT',recl=8*NBasis*(NBasis+1)/2)

@@ -14,17 +14,15 @@ integer ::  NBasis, NGrid
  NGrid=npt
 end subroutine molprogrid0
 
-!subroutine molprogrid(OrbGrid,OrbXGrid,OrbYGrid,OrbZGrid,WGrid,NGrid,NBasis)
 subroutine molprogrid(OrbGrid,OrbXGrid,OrbYGrid,OrbZGrid,WGrid,UMOAO,NGrid,NBasis)
-Implicit Real*8 (A-H,O-Z)
+implicit real*8 (A-H,O-Z)
 
-double precision OrbGrid(NBasis,NGrid),WGrid(NGrid),UMOAO(NBasis,NBasis)
-double precision OrbXGrid(NBasis,NGrid),OrbYGrid(NBasis,NGrid),OrbZGrid(NBasis,NGrid),Aux(NBasis,NGrid)
+double precision OrbGrid(NGrid,NBasis),WGrid(NGrid),UMOAO(NBasis,NBasis)
+double precision OrbXGrid(NGrid,NBasis),OrbYGrid(NGrid,NBasis),OrbZGrid(NGrid,NBasis),Aux(NGrid,NBasis)
 integer ::  NBasis, NGrid
 double precision, allocatable :: r(:,:),wt(:),mapinv(:),orbval(:,:,:)
 integer :: i,j,k,igrid
 integer :: npt, ndiff, ntg
-
 
  open(newunit=igrid,file='GRID',access='sequential',&
       form='unformatted',status='old')
@@ -47,25 +45,35 @@ integer :: npt, ndiff, ntg
  call readgridmolpro(igrid,'GRIDKS  ',npt,r,wt)
  Call CpyV(WGrid,wt,npt)
  call readorbsmolpro(igrid,'ORBVAL  ',mapinv,orbval,npt,ndiff,ntg)
- Do I=1,NBasis
- Do J=1,NGrid
- OrbGrid(I,J)=orbval(J,1,mapinv(I))
- If(ndiff.Gt.1) Then
- OrbXGrid(I,J)=orbval(J,2,mapinv(I))
- OrbYGrid(I,J)=orbval(J,3,mapinv(I))
- OrbZGrid(I,J)=orbval(J,4,mapinv(I))
- EndIf
- EndDo
- EndDo
+
+ do J=1,NBasis
+    do I=1,NGrid
+       OrbGrid(I,J)=orbval(I,1,mapinv(J))
+       if(ndiff.gt.1) then
+         OrbXGrid(I,J)=orbval(I,2,mapinv(J))
+         OrbYGrid(I,J)=orbval(I,3,mapinv(J))
+         OrbZGrid(I,J)=orbval(I,4,mapinv(J))
+       endif
+    enddo
+ enddo
+
+! Call CpyV(Aux,OrbGrid,NBasis*NGrid)
+! Call TrOrbG(OrbGrid,UMOAO,Aux,NGrid,NBasis)
+! Call CpyV(Aux,OrbXGrid,NBasis*NGrid)
+! Call TrOrbG(OrbXGrid,UMOAO,Aux,NGrid,NBasis)
+! Call CpyV(Aux,OrbYGrid,NBasis*NGrid)
+! Call TrOrbG(OrbYGrid,UMOAO,Aux,NGrid,NBasis)
+! Call CpyV(Aux,OrbZGrid,NBasis*NGrid)
+! Call TrOrbG(OrbZGrid,UMOAO,Aux,NGrid,NBasis)
 
  Call CpyV(Aux,OrbGrid,NBasis*NGrid)
- Call TrOrbG(OrbGrid,UMOAO,Aux,NGrid,NBasis)
+ call dgemm('N','T',NGrid,NBasis,NBasis,1d0,Aux,NGrid,UMOAO,NBasis,0d0,OrbGrid,NGrid)
  Call CpyV(Aux,OrbXGrid,NBasis*NGrid)
- Call TrOrbG(OrbXGrid,UMOAO,Aux,NGrid,NBasis)
+ call dgemm('N','T',NGrid,NBasis,NBasis,1d0,Aux,NGrid,UMOAO,NBasis,0d0,OrbXGrid,NGrid)
  Call CpyV(Aux,OrbYGrid,NBasis*NGrid)
- Call TrOrbG(OrbYGrid,UMOAO,Aux,NGrid,NBasis)
+ call dgemm('N','T',NGrid,NBasis,NBasis,1d0,Aux,NGrid,UMOAO,NBasis,0d0,OrbYGrid,NGrid)
  Call CpyV(Aux,OrbZGrid,NBasis*NGrid)
- Call TrOrbG(OrbZGrid,UMOAO,Aux,NGrid,NBasis)
+ call dgemm('N','T',NGrid,NBasis,NBasis,1d0,Aux,NGrid,UMOAO,NBasis,0d0,OrbZGrid,NGrid)
 
  close(igrid)
  deallocate(orbval,wt,r,mapinv)

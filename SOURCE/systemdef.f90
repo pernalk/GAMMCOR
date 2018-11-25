@@ -200,8 +200,8 @@ else
      case(RESP_DFT)
         Flags%ISERPA = 0 
         Flags%IFunSR = 1
-        if(Input%CalcParams%Dfapp>0) then
-          Flags%IFunSR = Input%CalcParams%Dfapp
+        if(Input%CalcParams%DFApp>0) then
+          Flags%IFunSR = Input%CalcParams%DFApp
         endif 
      case(RESP_APSG)
         Flags%ISERPA = 2
@@ -281,6 +281,7 @@ elseif(Flags%ISAPT.Eq.1) then
    case(1)
       monA%ZNucl  = Input%SystemInput(1)%ZNucl
       monA%Charge = Input%SystemInput(1)%Charge
+      monA%Omega  = Input%SystemInput(1)%Omega 
       monA%NBasis = Input%CalcParams%NBasis
       monA%Multiplicity = Input%SystemInput(1)%Multiplicity
       monA%ThrAct = Input%SystemInput(1)%ThrAct
@@ -295,6 +296,7 @@ elseif(Flags%ISAPT.Eq.1) then
     
       monB%ZNucl  = Input%SystemInput(2)%ZNucl
       monB%Charge = Input%SystemInput(2)%Charge
+      monB%Omega  = Input%SystemInput(2)%Omega 
       monB%NBasis = Input%CalcParams%NBasis
       monB%Multiplicity = Input%SystemInput(2)%Multiplicity
       monB%ThrAct = Input%SystemInput(2)%ThrAct
@@ -314,6 +316,7 @@ elseif(Flags%ISAPT.Eq.1) then
   
       monA%ZNucl  = Input%SystemInput(2)%ZNucl
       monA%Charge = Input%SystemInput(2)%Charge
+      monA%Omega  = Input%SystemInput(2)%Omega 
       monA%NBasis = Input%CalcParams%NBasis
       monA%Multiplicity = Input%SystemInput(2)%Multiplicity
       monA%ThrAct = Input%SystemInput(2)%ThrAct
@@ -328,6 +331,7 @@ elseif(Flags%ISAPT.Eq.1) then
    
       monB%ZNucl  = Input%SystemInput(1)%ZNucl
       monB%Charge = Input%SystemInput(1)%Charge
+      monB%Omega  = Input%SystemInput(1)%Omega 
       monB%NBasis = Input%CalcParams%NBasis
       monB%Multiplicity = Input%SystemInput(1)%Multiplicity
       monB%ThrAct = Input%SystemInput(1)%ThrAct

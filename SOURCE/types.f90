@@ -65,6 +65,10 @@ character(*),parameter :: PossibleRDMType(5) = &
 [character(8) :: &
 'GVB', 'APSG', 'CASSCF', 'DMRG', 'HF']
 
+character(*),parameter :: PossibleDFAType(3) = &
+[character(8) :: &
+'srLDA', 'srPBE', 'PBE']
+
 character(*),parameter :: PossibleMonomers(2) = &
 [character(8) :: 'A', 'B']
 
@@ -79,7 +83,7 @@ type CalculationBlock
       integer :: RDMType = RDM_TYPE_GVB
       integer :: RDMSource = INTER_TYPE_DAL
       integer :: Response = RESP_ERPA
-      integer :: Dfapp = DF_NONE
+      integer :: DFApp = DF_NONE
       integer :: Inactive = FLAG_CORE 
       integer :: SymType = TYPE_NO_SYM
       integer :: SaptLevel = SAPTLEVEL2 
@@ -133,7 +137,7 @@ type SystemBlock
       double precision,allocatable :: TwoMO(:)
       double precision,allocatable :: CMO(:,:)
       double precision,allocatable :: WPot(:,:)
-      double precision,allocatable :: VHSR(:)
+      double precision,allocatable :: VCoul(:)
       double precision,allocatable :: RDM2(:),RDM2Act(:,:,:,:)
       double precision  :: charg(maxcen),xyz(maxcen,3)
 
@@ -233,12 +237,16 @@ associate( CalcParams => Input%CalcParams)
                       PossibleJobType(CalcParams%JOBtype)
  write(LOUT,' (1x,a,5x,a)') "RDM TYPE: ",  &
               PossibleRDMType(CalcParams%RDMType)
+ if(CalcParams%DFApp>0) then
+    write(LOUT,' (1x,a,5x,a)') "DFA TYPE: ",  &
+                       PossibleDFAType(CalcParams%DFApp)
+ endif
  write(LOUT,' (1x,a,3x,a)') "RDM SOURCE: ",  &
               PossibleInterface(CalcParams%RDMSource)
  write(LOUT,' (1x,a,6x,i3)') "NBASIS: ",  &
               CalcParams%NBasis
  if(CalcParams%Fragments==1) then
- write(LOUT,' (1x,a,4x,a)') "FRAGMENTS: ",  &
+   write(LOUT,' (1x,a,4x,a)') "FRAGMENTS: ",  &
               "TRUE"
  endif
 ! write(LOUT, *) "RPA thresh: ", CalcParams%RPAThresh

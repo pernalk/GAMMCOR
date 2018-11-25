@@ -16,12 +16,13 @@ C
 C
       Real(8) Omega
       Integer Flag
-      Dimension VSR(NInte1),OrbGrid(NBasis,NGrid),WGrid(NGrid),
+      Dimension VSR(NInte1),OrbGrid(NGrid,NBasis),WGrid(NGrid),
      $ Occ(NBasis),URe(NBasis,NBasis),
      $ UNOAO(NBasis,NBasis),
      $ TwoEl(NInte2),TwoElErf(NInte2),
      $ NSymMO(NBasis)
-      Dimension OrbXGrid(*),OrbYGrid(*),OrbZGrid(*)
+      Dimension OrbXGrid(NGrid,NBasis),OrbYGrid(NGrid,NBasis),
+     $ OrbZGrid(NGrid,NBasis)
 C
 C     LOCAL ARRAYS
 C
@@ -38,7 +39,7 @@ C
 C     COMPUTE THE HARTREE POTENTIAL AND THE ENERGY
 C     HAP: VHSR is computed in AO during canonicalization
 C
-C      Call PotHSR(VHSR,Occ,URe,TwoEl,TwoElErf,NInte1,NInte2,NBasis)
+      Call PotHSR(VHSR,Occ,URe,TwoEl,TwoElErf,NInte1,NInte2,NBasis)
 C      Call PotHSR_mithap(VHSR,Occ,UNOAO,NBasis)
 C
       Call VecTr(Gamma,Occ,URe,NBasis)
@@ -57,7 +58,8 @@ C     COMPUTE THE XC PARTS OF THE POTENTIAL AND THE ENERGY
 C
       If(IFunSR.Eq.1) Then
 C
-      Call PotXCSR_LDA(VSR,Occ,URe,OrbGrid,OrbXGrid,OrbYGrid,OrbZGrid,
+      Call PotXCSR_LDA(VSR,Occ,URe,OrbGrid,
+     $ OrbXGrid,OrbYGrid,OrbZGrid,
      $ WGrid,NSymMO,NGrid,NInte1,NBasis)
       Call GetExcSR_LDA(EnxcSR,Occ,URe,OrbGrid,WGrid,NGrid,NBasis)
 C
@@ -74,13 +76,12 @@ C
       EndIf
 C
       Do I=1,NInte1
-C     test only
       VSR(I)=VSR(I)+VHSR(I)
       EndDo 
 C
+      Write(6,'(/," SR_xc Energy",X,F15.8)') EnxcSR
+      Write(6,'(" SR_H  Energy",X,F15.8)')   EnHSR
       EnSR=EnxcSR+EnHSR 
-C      Write(6,'(/,2x,A,F15.8)') 'EnHSR ',EnHSR 
-      Write(6,'(2x,A,F15.8)') 'EnxcSR',EnxcSR
 C
       Return
       End
@@ -99,9 +100,10 @@ C
       Include 'commons.inc'
 C
       Parameter (Zero=0.0D0,One=1.D0,Two=2.D0,Three=3.0D0,Four=4.0D0)
-      Dimension VxcSR(NInte1),OrbGrid(NBasis,NGrid),WGrid(NGrid),
+      Dimension VxcSR(NInte1),OrbGrid(NGrid,NBasis),WGrid(NGrid),
      $ Occ(NBasis),URe(NBasis,NBasis),NSymMO(NBasis)
-      Dimension OrbXGrid(*),OrbYGrid(*),OrbZGrid(*) 
+      Dimension OrbXGrid(NGrid,NBasis),OrbYGrid(NGrid,NBasis),
+     $ OrbZGrid(NGrid,NBasis) 
 C
       Pi2=ASin(One)
       Pi=Two*Pi2
@@ -127,7 +129,7 @@ C
       Do K=1,J
       JK=JK+1
       If(NSymMO(J).Eq.NSymMO(K))
-     $ VxcSR(JK)=VxcSR(JK)+OrbGrid(J,I)*OrbGrid(K,I)*VxcSRi*WGrid(I)
+     $ VxcSR(JK)=VxcSR(JK)+OrbGrid(I,J)*OrbGrid(I,K)*VxcSRi*WGrid(I)
       EndDo
       EndDo 
 C
@@ -185,7 +187,7 @@ C
       Include 'commons.inc' 
 C
       Parameter (Zero=0.0D0,One=1.D0,Two=2.D0,Three=3.0D0,Four=4.0D0)
-      Dimension OrbGrid(NBasis,NGrid),WGrid(NGrid),Occ(NBasis),
+      Dimension OrbGrid(NGrid,NBasis),WGrid(NGrid),Occ(NBasis),
      $ URe(NBasis,NBasis)
 C
       Pi2=ASin(One)
@@ -229,10 +231,10 @@ C
       Include 'commons.inc' 
 C
       Parameter (Zero=0.0D0,One=1.D0,Two=2.D0,Three=3.0D0,Four=4.0D0)
-      Dimension OrbGrid(NBasis,NGrid),WGrid(NGrid),
+      Dimension OrbGrid(NGrid,NBasis),WGrid(NGrid),
      $ Occ(NBasis),URe(NBasis,NBasis),VxcSR(NInte1)
-      Dimension OrbXGrid(NBasis,NGrid),OrbYGrid(NBasis,NGrid),
-     $ OrbZGrid(NBasis,NGrid),NSymMO(NBasis)
+      Dimension OrbXGrid(NGrid,NBasis),OrbYGrid(NGrid,NBasis),
+     $ OrbZGrid(NGrid,NBasis),NSymMO(NBasis)
 C
 C     Local  
 C
@@ -315,14 +317,14 @@ C
 C  
       If(NSymMO(J).Eq.NSymMO(K)) Then
 C
-      VxcSR(JK)=VxcSR(JK)+OrbGrid(J,I)*OrbGrid(K,I)*vrhoc(I)*WGrid(I)
+      VxcSR(JK)=VxcSR(JK)+OrbGrid(I,J)*OrbGrid(I,K)*vrhoc(I)*WGrid(I)
 C
 C     ADD THE NONLOCAL PART (DERIVATIVE W.R.T. THE GRADIENT OF RHO)
 C
       VxcSR(JK)=VxcSR(JK)+Two*WGrid(I)*vsigmacc(I)*
-     $ (RhoX*(OrbXGrid(J,I)*OrbGrid(K,I)+OrbGrid(J,I)*OrbXGrid(K,I))
-     $ +RhoY*(OrbYGrid(J,I)*OrbGrid(K,I)+OrbGrid(J,I)*OrbYGrid(K,I))  
-     $ +RhoZ*(OrbZGrid(J,I)*OrbGrid(K,I)+OrbGrid(J,I)*OrbZGrid(K,I)))
+     $ (RhoX*(OrbXGrid(I,J)*OrbGrid(I,K)+OrbGrid(I,J)*OrbXGrid(I,K))
+     $ +RhoY*(OrbYGrid(I,J)*OrbGrid(I,K)+OrbGrid(I,J)*OrbYGrid(I,K))  
+     $ +RhoZ*(OrbZGrid(I,J)*OrbGrid(I,K)+OrbGrid(I,J)*OrbZGrid(I,K)))
 C
       EndIf
 C
@@ -345,10 +347,10 @@ C
       Include 'commons.inc' 
 C
       Parameter (Zero=0.0D0,One=1.D0,Two=2.D0,Three=3.0D0,Four=4.0D0)
-      Dimension OrbGrid(NBasis,NGrid),WGrid(NGrid),
+      Dimension OrbGrid(NGrid,NBasis),WGrid(NGrid),
      $ Occ(NBasis),URe(NBasis,NBasis),Vxc(NInte1)
-      Dimension OrbXGrid(NBasis,NGrid),OrbYGrid(NBasis,NGrid),
-     $ OrbZGrid(NBasis,NGrid),NSymMO(NBasis)
+      Dimension OrbXGrid(NGrid,NBasis),OrbYGrid(NGrid,NBasis),
+     $ OrbZGrid(NGrid,NBasis),NSymMO(NBasis)
 C
 C     Local  
 C
@@ -371,6 +373,7 @@ C
       Call DenGrad(I,RhoX,Occ,URe,OrbGrid,OrbXGrid,NGrid,NBasis)
       Call DenGrad(I,RhoY,Occ,URe,OrbGrid,OrbYGrid,NGrid,NBasis)
       Call DenGrad(I,RhoZ,Occ,URe,OrbGrid,OrbZGrid,NGrid,NBasis)
+
       Sigma(I)=RhoX**2+RhoY**2+RhoZ**2
       EndDo      
 C
@@ -399,14 +402,14 @@ C
 C  
       If(NSymMO(J).Eq.NSymMO(K)) Then
 C
-      Vxc(JK)=Vxc(JK)+OrbGrid(J,I)*OrbGrid(K,I)*vrhoc(I)*WGrid(I)
+      Vxc(JK)=Vxc(JK)+OrbGrid(I,J)*OrbGrid(I,K)*vrhoc(I)*WGrid(I)
 C
 C     ADD THE NONLOCAL PART (DERIVATIVE W.R.T. THE GRADIENT OF RHO)
 C
       Vxc(JK)=Vxc(JK)+Two*WGrid(I)*vsigmacc(I)*
-     $ (RhoX*(OrbXGrid(J,I)*OrbGrid(K,I)+OrbGrid(J,I)*OrbXGrid(K,I))
-     $ +RhoY*(OrbYGrid(J,I)*OrbGrid(K,I)+OrbGrid(J,I)*OrbYGrid(K,I))  
-     $ +RhoZ*(OrbZGrid(J,I)*OrbGrid(K,I)+OrbGrid(J,I)*OrbZGrid(K,I)))
+     $ (RhoX*(OrbXGrid(I,J)*OrbGrid(I,K)+OrbGrid(I,J)*OrbXGrid(I,K))
+     $ +RhoY*(OrbYGrid(I,J)*OrbGrid(I,K)+OrbGrid(I,J)*OrbYGrid(I,K))
+     $ +RhoZ*(OrbZGrid(I,J)*OrbGrid(I,K)+OrbGrid(I,J)*OrbZGrid(I,K)))
 C
       EndIf
 C
@@ -432,12 +435,13 @@ C
       Include 'commons.inc'
 C
       Dimension XKer(NDimKer),Occ(NBasis),URe(NBasis,NBasis),
-     $ OrbGrid(NBasis,NGrid),WGrid(NGrid),NSymNO(NBasis),MultpC(15,15)
+     $ OrbGrid(NGrid,NBasis),WGrid(NGrid),NSymNO(NBasis),MultpC(15,15)
 C
 C     LOCAL ARRAYS
 C
       Dimension SRKer(NGrid),RhoVec(NGrid)
 C     ,XNOGrid(NBasis,NGrid)
+C
 C
       Do I=1,NGrid
       Call DenGrid(I,Rho,Occ,URe,OrbGrid,NGrid,NBasis)
@@ -496,7 +500,7 @@ C
       Include 'commons.inc'
 C
       Dimension Occ(NBasis),URe(NBasis,NBasis),SRKer(NGrid),
-     $ OrbGrid(NBasis,NGrid),WGrid(NGrid),NSymNO(NBasis),MultpC(15,15)
+     $ OrbGrid(NGrid,NBasis),WGrid(NGrid),NSymNO(NBasis),MultpC(15,15)
 C
 C     LOCAL ARRAYS
 C
@@ -524,15 +528,17 @@ C
       Implicit Real*8 (A-H,O-Z)
 C
       Parameter (Zero=0.0D0,One=1.D0,Two=2.D0,Three=3.0D0,Four=4.0D0)
-      Dimension XNOGrid(NBasis,NGrid),OrbGrid(NBasis,NGrid),
+C      Dimension XNOGrid(NBasis,NGrid),OrbGrid(NBasis,NGrid),
+C     $ URe(NBasis,NBasis)
+      Dimension XNOGrid(NGrid,NBasis),OrbGrid(NGrid,NBasis),
      $ URe(NBasis,NBasis)
 C
-      Do I=1,NBasis
-      Do J=1,NGrid
+      Do J=1,NBasis
+      Do I=1,NGrid
       XNOGrid(I,J)=Zero
 C
       Do IA=1,NBasis
-      XNOGrid(I,J)=XNOGrid(I,J)+URe(I,IA)*OrbGrid(IA,J)
+      XNOGrid(I,J)=XNOGrid(I,J)+OrbGrid(I,IA)*URe(J,IA)
       EndDo
       EndDo
       EndDo
@@ -549,7 +555,7 @@ C
       Implicit Real*8 (A-H,O-Z)
 C
       Parameter (Zero=0.0D0,One=1.D0,Two=2.D0,Three=3.0D0,Four=4.0D0)
-      Dimension SRKer(NGrid),XNOGrid(NBasis,NGrid),WGrid(NGrid)
+      Dimension SRKer(NGrid),XNOGrid(NGrid,NBasis),WGrid(NGrid)
 C
       XKer1234=Zero
 C     
@@ -600,7 +606,7 @@ C
       Include 'commons.inc'
 C
       Parameter (Zero=0.0D0,One=1.D0,Two=2.D0,Three=3.0D0,Four=4.0D0)
-      Dimension OrbGrid(NBasis,NGrid),WGrid(NGrid),
+      Dimension OrbGrid(NGrid,NBasis),WGrid(NGrid),
      $ Occ(NBasis),URe(NBasis,NBasis)
 C
       Pi2=ASin(One)
@@ -630,14 +636,14 @@ C
       Implicit Real*8 (A-H,O-Z)
 C
       Parameter (Zero=0.0D0,Two=2.D0)
-      Dimension OrbGrid(NBasis,NGrid),Occ(NBasis),URe(NBasis,NBasis)
-C 
+      Dimension OrbGrid(NGrid,NBasis),Occ(NBasis),URe(NBasis,NBasis)
+C
       Rho=Zero
       Do I=1,NBasis
 C
       OrbNO=Zero
       Do J=1,NBasis
-      OrbNO=OrbNO+URe(I,J)*OrbGrid(J,KX)
+      OrbNO=OrbNO+OrbGrid(KX,J)*URe(J,I)
       EndDo
 C
       Rho=Rho+Occ(I)*OrbNO**2
@@ -655,8 +661,9 @@ C
       Implicit Real*8 (A-H,O-Z)
 C
       Parameter (Zero=0.0D0,Two=2.D0,Four=4.D0)
-      Dimension OrbGrid(NBasis,NGrid),Occ(NBasis),URe(NBasis,NBasis),
-     $ DOrbGrid(NBasis,NGrid)
+      Dimension OrbGrid(NGrid,NBasis),Occ(NBasis),URe(NBasis,NBasis),
+     $ DOrbGrid(NGrid,NBasis)
+
 C 
       DRho=Zero
       Do I=1,NBasis
@@ -664,8 +671,8 @@ C
       OrbNO=Zero
       DOrbNO=Zero
       Do J=1,NBasis
-      OrbNO=OrbNO+URe(I,J)*OrbGrid(J,KX)
-      DOrbNO=DOrbNO+URe(I,J)*DOrbGrid(J,KX)
+      OrbNO=OrbNO+OrbGrid(KX,J)*URe(J,I)
+      DOrbNO=DOrbNO+DOrbGrid(KX,J)*URe(J,I)
       EndDo
 C
       DRho=DRho+Occ(I)*OrbNO*DOrbNO

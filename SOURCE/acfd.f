@@ -866,6 +866,765 @@ C
       Return
       End
 
+*Deck Y01CASLR
+      Subroutine Y01CASLR(TwoNO,Occ,URe,XOne,ABPLUS,ABMIN,
+     $ EigY,EigY1,Eig,Eig1,
+     $ IndN,IndX,NDimX,NBasis,NDim,NInte1,NInte2,IFlag0
+C DFT START 
+C
+C     it is assumed that erf/r integrals are in TwoNO, 
+C     while TwoEl2 stores 1/r integrals
+C     SRKerW(I) = WGrid(I)*SRKer(I), SRKer: sr-alda kernel 
+C
+     $ ,TwoEl2,OrbGrid,SRKerW,NSymNO,MultpC,NGrid)
+C DFT END
+C
+C     A ROUTINE FOR COMPUTING Y VECTORS AND EIGENVALUES OF ERPA
+C     IN THE 1ST-ORDER APPROXIMATION
+C
+C     IFlag0 = 1 - compute only 0th-order Y [EigY] and 0th-order omega [Eig]
+C              0 - compute both 0th-order and 1st-order Y [EigY1] and omega [Eig1]
+C
+      Implicit Real*8 (A-H,O-Z)
+C
+      Include 'commons.inc'
+c
+      Parameter(Zero=0.D0,Half=0.5D0,One=1.D0,Two=2.D0,Three=3.D0,
+     $ Four=4.D0)
+C
+      Dimension
+     $ URe(NBasis,NBasis),XOne(NInte1),Occ(NBasis),TwoNO(NInte2),
+     $ ABPLUS(NDimX*NDimX),ABMIN(NDimX*NDimX),
+     $ Eig(NDimX),Eig1(NDimX),
+     $ EigY(NDimX*NDimX),EigY1(NDimX*NDimX),
+     $ IndX(NDim),IndN(2,NDim)
+C DFT START
+     $ ,TwoEl2(NInte2),OrbGrid(NBasis*NGrid),SRKerW(NGrid),
+     $ NSymNO(NBasis),MultpC(15,15)
+C DFT END
+C
+C     LOCAL ARRAYS
+C
+      Real*8, Allocatable :: RDM2Act(:)
+      Dimension C(NBasis),HNO(NInte1),
+     $ IGFact(NInte2),
+     $ Ind1(NBasis),Ind2(NBasis),WMAT(NBasis,NBasis),
+     $ AuxI(NInte1),AuxIO(NInte1),IPair(NBasis,NBasis),
+     $ EigX(NDimX*NDimX),
+     $ IEigAddY(2,NDimX),IEigAddInd(2,NDimX),IndBlock(2,NDimX),
+c NEW 11/07/2018
+     $ IMatch(NDimX)
+C
+      IPair(1:NBasis,1:NBasis)=0
+      Do II=1,NDimX
+      I=IndN(1,II)
+      J=IndN(2,II)
+      IPair(I,J)=1
+      IPair(J,I)=1
+      EndDo
+C
+C     AUXILIARY STUFF LATER NEEDED TO GET A+ AND A- MATRICES FOR ALPHA=0
+C
+C     ONE-ELECTRON MATRIX IN A NO REPRESENTATION
+C
+      IJ=0
+      Do I=1,NBasis
+      Do J=1,I
+      IJ=IJ+1
+      HNO(IJ)=Zero
+C
+      Do IA=1,NBasis
+      Do IB=1,NBasis
+      IAB=(Max(IA,IB)*(Max(IA,IB)-1))/2+Min(IA,IB)
+      HNO(IJ)=HNO(IJ)+URe(I,IA)*URe(J,IB)*XOne(IAB)
+      EndDo
+      EndDo
+C
+      EndDo
+      EndDo
+C
+C     READ 2RDM
+C
+      NAct=NAcCAS
+      INActive=NInAcCAS
+      NOccup=INActive+NAct
+      Ind2(1:NBasis)=0
+      Do I=1,NAct
+      Ind1(I)=INActive+I
+      Ind2(INActive+I)=I
+      EndDo
+C
+      NRDM2Act = NAct**2*(NAct**2+1)/2
+      Allocate (RDM2Act(NRDM2Act))
+      RDM2Act(1:NRDM2Act)=Zero
+C
+      Open(10,File="rdm2.dat",Status='Old')
+C
+   10 Read(10,'(4I4,F19.12)',End=40)I,J,K,L,X
+C
+C     X IS DEFINED AS: < E(IJ)E(KL) > - DELTA(J,K) < E(IL) > = 2 GAM2(JLIK)
+C
+      RDM2Act(NAddrRDM(J,L,I,K,NAct))=Half*X
+C
+      I=Ind1(I)
+      J=Ind1(J)
+      K=Ind1(K)
+      L=Ind1(L)
+C
+      GoTo 10
+   40 Continue
+      Close(10)
+C
+      Do I=1,NBasis
+      C(I)=SQRT(Occ(I))
+      If(Occ(I).Lt.Half) C(I)=-C(I)
+      CICoef(I)=C(I)
+      EndDo
+C
+C     CONSTRUCT ONE-ELECTRON PART OF THE AC ALPHA=0 HAMILTONIAN
+C
+      IJ=0
+      Do I=1,NBasis
+      Do J=1,I
+      IJ=IJ+1
+C
+      If(IGem(I).Ne.IGem(J)) Then
+C
+      HNO(IJ)=Zero
+C
+      Else
+C
+      Aux=Zero
+C
+      Do IT=1,NBasis
+      If(IGem(IT).Ne.IGem(I))
+     $ Aux=Aux+Occ(IT)*
+     $ (Two*TwoNO(NAddr3(IT,IT,I,J))-TwoNO(NAddr3(IT,I,IT,J)))
+      EndDo
+C
+      HNO(IJ)=HNO(IJ)+Aux
+C
+      EndIf
+C
+      EndDo
+      EndDo
+C
+C     CONSTRUCT TWO-ELECTRON PART OF THE AC ALPHA-HAMILTONIAN
+C
+      NAdd=Zero
+      IJ=0
+      Do I=1,NBasis
+      Do J=1,I
+      IJ=IJ+1
+      KL=0
+      Do K=1,NBasis
+      Do L=1,K
+      KL=KL+1
+C
+      If(IJ.Ge.KL) Then
+      NAdd=NAdd+1
+C
+      IGFact(NAdd)=1
+      If(.Not.(
+     $IGem(I).Eq.IGem(J).And.IGem(J).Eq.IGem(K).And.IGem(K).Eq.IGem(L)))
+     $ IGFact(NAdd)=0
+C
+      EndIf
+C
+      EndDo
+      EndDo
+      EndDo
+      EndDo
+C
+C     AUXILIARY MATRIX AuxI AND AuxIO
+C
+      IPQ=0
+      Do IP=1,NBasis
+      Do IQ=1,IP
+      IPQ=IPQ+1
+      AuxI(IPQ)=Zero
+      AuxIO(IPQ)=Zero
+      Do IT=1,NOccup
+      If(IGFact(NAddr3(IT,IT,IP,IQ)).Eq.1) Then
+       AuxI(IPQ)=AuxI(IPQ)+Occ(IT)*
+     $ (Two*TwoNO(NAddr3(IP,IQ,IT,IT))-TwoNO(NAddr3(IP,IT,IQ,IT)))
+      If(IT.Le.INActive) AuxIO(IPQ)=AuxIO(IPQ)+Occ(IT)*
+     $ (Two*TwoNO(NAddr3(IP,IQ,IT,IT))-TwoNO(NAddr3(IP,IT,IQ,IT)))
+      EndIf
+      EndDo
+      EndDo
+      EndDo
+C
+C     AUXILIARY MATRIX WMAT
+C
+      Do I=1,NBasis
+      Do J=1,NBasis
+      WMAT(I,J)=Zero
+      EndDo
+      EndDo
+C
+      Do IP=1,NBasis
+      Do IR=1,NOccup
+      Do IT=1,NOccup
+      Do IW=1,NOccup
+      Do IU=1,NOccup
+      If(IGFact(NAddr3(IT,IW,IP,IU)).Eq.1)
+     $ WMAT(IP,IR)=WMAT(IP,IR)
+     $ +TwoNO(NAddr3(IT,IW,IP,IU))
+     $ *FRDM2(IW,IU,IT,IR,RDM2Act,Occ,Ind2,NAct,NBasis)
+     $ +TwoNO(NAddr3(IT,IU,IP,IW))
+     $ *FRDM2(IW,IU,IR,IT,RDM2Act,Occ,Ind2,NAct,NBasis)
+C
+      EndDo
+      EndDo
+      EndDo
+      EndDo
+      EndDo
+C
+C     FIND THE 0TH-ORDER SOLUTION FOR THE ACTIVE-ACTIVE BLOCK
+C
+      Write(6,'(" *** ACTIVE-ACTIVE BLOCK ***")')
+C
+      NFree1=1
+      NFree2=1
+      NoEig=0
+C
+      NDimB=0
+      Do IQQ=1,NAct
+      Do IPP=IQQ+1,NAct
+      IP=Ind1(IPP)
+      IQ=Ind1(IQQ)
+      If(IPair(IP,IQ).Eq.1) Then
+      NDimB=NDimB+1
+      IndBlock(1,NFree1-1+NDimB)=IP
+      IndBlock(2,NFree1-1+NDimB)=IQ
+      EndIf
+      EndDo
+      EndDo
+C
+      Do I=1,NDimB
+      IEigAddY(1,NFree1-1+I)=NFree2+(I-1)*NDimB
+      IEigAddY(2,NFree1-1+I)=IEigAddY(1,NFree1-1+I)+NDimB-1
+      IEigAddInd(1,NFree1-1+I)=NFree1
+      IEigAddInd(2,NFree1-1+I)=NFree1+NDimB-1
+      EndDo
+C
+      IRow=0
+      Do IQQ=1,NAct
+      Do IPP=IQQ+1,NAct
+      IP=Ind1(IPP)
+      IQ=Ind1(IQQ)
+      If(IPair(IP,IQ).Eq.1) Then
+C
+      IRow=IRow+1
+C
+      ICol=0
+      Do ISS=1,NAct
+      Do IRR=ISS+1,NAct
+      IR=Ind1(IRR)
+      IS=Ind1(ISS)
+      If(IPair(IR,IS).Eq.1) Then
+C
+      ICol=ICol+1
+C
+      If(IRow.Ge.ICol) Then
+C
+      Call AB0ELEMENT(ABP,ABM,IP,IQ,IR,IS,Occ,HNO,IGFact,
+     $ TwoNO,AuxI,AuxIO,WMAT,RDM2Act,C,Ind1,Ind2,NAct,NRDM2Act,
+     $ NInte1,NInte2,NBasis)
+C
+C DFT START
+C
+C     ADD A SR KERNEL
+C
+      I1I2S=MultpC(NSymNO(IP),NSymNO(IQ))
+      I3I4S=MultpC(NSymNO(IR),NSymNO(IS))
+      ISym=MultpC(I1I2S,I3I4S)
+      XKer1234=Zero
+      If(ISym.Eq.1) Then
+      Do I=1,NGrid
+      XKer1234=XKer1234+SRKerW(I)*
+     $ OrbGrid(IP+(I-1)*NBasis)*OrbGrid(IQ+(I-1)*NBasis)*
+     $ OrbGrid(IR+(I-1)*NBasis)*OrbGrid(IS+(I-1)*NBasis)
+      EndDo
+      EndIf
+      TwoSR=TwoEl2(NAddr3(IP,IQ,IR,IS))-TwoNO(NAddr3(IP,IQ,IR,IS))
+      ABM=ABM+Four*(C(IP)+C(IQ))*(C(IR)+C(IS))*(XKer1234+TwoSR)
+C
+C DFT END
+C
+      ABPLUS((ICol-1)*NDimB+IRow)=ABP
+      ABPLUS((IRow-1)*NDimB+ICol)=ABP
+      ABMIN((ICol-1)*NDimB+IRow)=ABM
+      ABMIN((IRow-1)*NDimB+ICol)=ABM
+C
+      EndIf
+C
+      EndIf
+      EndDo
+      EndDo
+C
+      EndIf
+      EndDo
+      EndDo
+C
+      If(NDimB.Ne.0)
+     $Call ERPASYMM0(EigY(NFree2),EigX(NFree2),Eig(NFree1),ABPLUS,ABMIN,
+     $ NDimB)
+C
+      NoEig=NoEig+NDimB
+      NFree1=NoEig+1
+      NFree2=NFree2+NDimB*NDimB
+C
+C     FIND THE 0TH-ORDER SOLUTION FOR THE ACTIVE-INACTIVE BLOCKS
+C
+      Write(6,'(" *** ACTIVE-INACTIVE BLOCKS ***")')
+C
+      Do IQ=1,INActive
+C
+      NDimB=0
+      Do IPP=1,NAct
+      IP=Ind1(IPP)
+      If(IPair(IP,IQ).Eq.1) Then
+      NDimB=NDimB+1
+      IndBlock(1,NFree1-1+NDimB)=IP
+      IndBlock(2,NFree1-1+NDimB)=IQ
+      EndIf
+      EndDo
+C
+      Do I=1,NDimB
+      IEigAddY(1,NFree1-1+I)=NFree2+(I-1)*NDimB
+      IEigAddY(2,NFree1-1+I)=IEigAddY(1,NFree1-1+I)+NDimB-1
+      IEigAddInd(1,NFree1-1+I)=NFree1
+      IEigAddInd(2,NFree1-1+I)=NFree1+NDimB-1
+      EndDo
+C
+      IRow=0
+      Do IPP=1,NAct
+      IP=Ind1(IPP)
+C
+      If(IPair(IP,IQ).Eq.1) Then
+C
+      IRow=IRow+1
+C
+      ICol=0
+      IS=IQ
+      Do IRR=1,NAct
+      IR=Ind1(IRR)
+C
+      If(IPair(IR,IS).Eq.1) Then
+C
+      ICol=ICol+1
+C
+      If(IRow.Ge.ICol) Then
+C
+      Call AB0ELEMENT(ABP,ABM,IP,IQ,IR,IS,Occ,HNO,IGFact,
+     $ TwoNO,AuxI,AuxIO,WMAT,RDM2Act,C,Ind1,Ind2,NAct,NRDM2Act,
+     $ NInte1,NInte2,NBasis)
+C
+      ABPLUS((ICol-1)*NDimB+IRow)=ABP
+      ABPLUS((IRow-1)*NDimB+ICol)=ABP
+      ABMIN((ICol-1)*NDimB+IRow)=ABM
+      ABMIN((IRow-1)*NDimB+ICol)=ABM
+C
+      EndIf
+C
+      EndIf
+C
+      EndDo
+C
+      EndIf
+C
+      EndDo
+C
+      If(NDimB.Ne.0)
+     $Call ERPASYMM0(EigY(NFree2),EigX(NFree2),Eig(NFree1),ABPLUS,ABMIN,
+     $ NDimB)
+C
+      NoEig=NoEig+NDimB
+      NFree1=NoEig+1
+      NFree2=NFree2+NDimB*NDimB
+C
+C     Do IP
+      EndDo
+C
+C     FIND THE 0TH-ORDER SOLUTION FOR THE VIRTUAL-ACTIVE BLOCKS
+C
+      Write(6,'(" *** VIRTUAL-ACTIVE BLOCKS ***")')
+C
+      Do IP=NOccup+1,NBasis
+C
+      NDimB=0
+      Do IQQ=1,NAct
+      IQ=Ind1(IQQ)
+      If(IPair(IP,IQ).Eq.1) Then
+      NDimB=NDimB+1
+      IndBlock(1,NFree1-1+NDimB)=IP
+      IndBlock(2,NFree1-1+NDimB)=IQ
+      EndIf
+      EndDo
+C
+      Do I=1,NDimB
+      IEigAddY(1,NFree1-1+I)=NFree2+(I-1)*NDimB
+      IEigAddY(2,NFree1-1+I)=IEigAddY(1,NFree1-1+I)+NDimB-1
+      IEigAddInd(1,NFree1-1+I)=NFree1
+      IEigAddInd(2,NFree1-1+I)=NFree1+NDimB-1
+      EndDo
+C
+      IRow=0
+      Do IQQ=1,NAct
+      IQ=Ind1(IQQ)
+C
+      If(IPair(IP,IQ).Eq.1) Then
+C
+      IRow=IRow+1
+C
+      ICol=0
+      IR=IP
+      Do ISS=1,NAct
+      IS=Ind1(ISS)
+C
+      If(IPair(IR,IS).Eq.1) Then
+C
+      ICol=ICol+1
+C
+      If(IRow.Ge.ICol) Then
+C
+      Call AB0ELEMENT(ABP,ABM,IP,IQ,IR,IS,Occ,HNO,IGFact,
+     $ TwoNO,AuxI,AuxIO,WMAT,RDM2Act,C,Ind1,Ind2,NAct,NRDM2Act,
+     $ NInte1,NInte2,NBasis)
+C
+      ABPLUS((ICol-1)*NDimB+IRow)=ABP
+      ABPLUS((IRow-1)*NDimB+ICol)=ABP
+      ABMIN((ICol-1)*NDimB+IRow)=ABM
+      ABMIN((IRow-1)*NDimB+ICol)=ABM
+C
+      EndIf
+C
+      EndIf
+C
+      EndDo
+C
+      EndIf
+C
+      EndDo
+C
+      If(NDimB.Ne.0)
+     $Call ERPASYMM0(EigY(NFree2),EigX(NFree2),Eig(NFree1),ABPLUS,ABMIN,
+     $ NDimB)
+C
+      NoEig=NoEig+NDimB
+      NFree1=NoEig+1
+      NFree2=NFree2+NDimB*NDimB
+C
+C     Do IP
+      EndDo
+C
+C     FIND THE 0TH-ORDER SOLUTION FOR THE VIRTUAL-INACTIVE BLOCKS
+C
+      Do IP=NOccup+1,NBasis
+      Do IQ=1,INActive
+C
+      NDimB=0
+C
+      If(IPair(IP,IQ).Eq.1) Then
+C
+      NDimB=1
+      IndBlock(1,NFree1)=IP
+      IndBlock(2,NFree1)=IQ
+C
+      IEigAddY(1,NFree1)=NFree2
+      IEigAddY(2,NFree1)=IEigAddY(1,NFree1)
+      IEigAddInd(1,NFree1)=NFree1
+      IEigAddInd(2,NFree1)=NFree1
+C
+      Call AB0ELEMENT(ABP,ABM,IP,IQ,IP,IQ,Occ,HNO,IGFact,
+     $ TwoNO,AuxI,AuxIO,WMAT,RDM2Act,C,Ind1,Ind2,NAct,NRDM2Act,
+     $ NInte1,NInte2,NBasis)
+C
+      Eig(NFree1)=ABP
+      EigY(NFree2)=One/Sqrt(Two)
+      EigX(NFree2)=One/Sqrt(Two)
+C
+      NoEig=NoEig+NDimB
+      NFree1=NoEig+1
+      NFree2=NFree2+NDimB*NDimB
+C
+      EndIf
+C
+      EndDo
+      EndDo
+C
+      Write(6,'(" *** DONE WITH 0TH-ORDER IN Y01CAS ***")')
+C
+C     DONE 0TH-ORDER CALCULATIONS
+C
+C NEW 11/07/2018
+C     Check if NoEig=NDimX - they should be equal!
+      If(NoEig.Ne.NDimX) Stop 'Fatal error in Y01CAS: NoEig.Ne.NDimX!'
+C
+      Do I=1,NDimX
+      IP=IndN(1,I)
+      IQ=IndN(2,I)
+      Do J=1,NDimX
+      If(IP.Eq.IndBlock(1,J).And.IQ.Eq.IndBlock(2,J))
+     $ IMatch(I)=J
+      EndDo
+      EndDo
+C
+      If(IFlag0.Eq.1) Then
+C
+      Do I=1,NFree2
+      EigY1(I)=EigY(I)
+      EndDo
+      Do I=1,NoEig
+      Do J=1,NoEig
+      ABPLUS(I+(J-1)*NoEig)=Zero
+      If(I.Eq.J) ABPLUS(I+(J-1)*NoEig)=One
+      EndDo
+      EndDo
+C
+      Do NU=1,NoEig
+      Do MU=1,NoEig
+C
+      EigY(NU+(MU-1)*NoEig)=Zero
+C
+      IStart=IEigAddY(1,MU)
+      II=0
+      Do I=IEigAddInd(1,MU),IEigAddInd(2,MU)
+      EigY(NU+(MU-1)*NoEig)=EigY(NU+(MU-1)*NoEig)
+     $ +ABPLUS(NU+(I-1)*NoEig)*EigY1(IStart+II)
+      II=II+1
+      EndDo
+C
+      EndDo
+      EndDo
+C
+C NEW 11/07/2017
+C
+C     RESORT Y0 ACCORDING TO IndN
+C
+      Call CpyM(ABPLUS,EigY,NDimX)
+C
+      Do MU=1,NDimX
+      Do I=1,NDimX
+      EigY((MU-1)*NoEig+I)=ABPLUS((MU-1)*NoEig+IMatch(I))
+      EndDo
+      EndDo
+C
+C     RETURN IF ONLY 0TH-ORDER Y REQUESTED
+C
+      Return
+      EndIf
+C
+      Write(6,'(" *** COMPUTING ABPLUS(1) AND ABMIN(1) MATRICES ***"
+     $ )')
+C
+      Call AB1_CAS(ABPLUS,ABMIN,URe,Occ,XOne,TwoNO,
+     $ RDM2Act,NRDM2Act,IGFact,C,Ind1,Ind2,
+     $ IndBlock,NoEig,NDimX,NBasis,NInte1,NInte2)
+C
+C DFT START
+C
+C     ADD A SR KERNEL
+C
+      Write(6,'(/," ***  adding a sr-kernel ***" )')
+C
+      Do IRow=1,NoEig
+C
+      IA=IndBlock(1,IRow)
+      IB=IndBlock(2,IRow)
+      CA=CICoef(IA)
+      CB=CICoef(IB)
+C
+      Do ICol=1,NoEig
+C
+      IC=IndBlock(1,ICol)
+      ID=IndBlock(2,ICol)
+      CC=CICoef(IC)
+      CD=CICoef(ID)
+C
+      XKer1234=Zero
+C
+      I1I2S=MultpC(NSymNO(IA),NSymNO(IB))
+      I3I4S=MultpC(NSymNO(IC),NSymNO(ID))
+      ISym=MultpC(I1I2S,I3I4S)
+C
+      If((ISym.Eq.1).And.(IGFact(NAddr3(IA,IB,IC,ID)).Eq.0)) Then
+      Do I=1,NGrid
+      XKer1234=XKer1234+SRKerW(I)*
+     $ OrbGrid(IA+(I-1)*NBasis)*OrbGrid(IB+(I-1)*NBasis)*
+     $ OrbGrid(IC+(I-1)*NBasis)*OrbGrid(ID+(I-1)*NBasis)
+      EndDo
+      EndIf
+C
+      TwoSR=TwoEl2(NAddr3(IA,IB,IC,ID))-TwoNO(NAddr3(IA,IB,IC,ID))
+C
+      ABMIN((ICol-1)*NoEig+IRow)=ABMIN((ICol-1)*NoEig+IRow)
+     $ +Four*(CA+CB)*(CD+CC)*(XKer1234+TwoSR)
+C
+      EndDo
+      EndDo
+C
+      Write(6,'("*** sr-kernel added ***")')
+C
+C DFT END
+C
+      Deallocate(RDM2Act)
+C
+      Write(6,'(" *** DONE WITH COMPUTING AB(1) MATRICES ***")')
+C
+C     1ST-ORDER PART
+C
+      Do NU=1,NoEig
+      Do MU=1,NoEig
+C
+      EigY1(NU+(MU-1)*NoEig)=Zero
+C
+      IStart=IEigAddY(1,MU)
+      II=0
+      Do I=IEigAddInd(1,MU),IEigAddInd(2,MU)
+      EigY1(NU+(MU-1)*NoEig)=EigY1(NU+(MU-1)*NoEig)
+     $ +ABPLUS(NU+(I-1)*NoEig)*EigX(IStart+II)
+      II=II+1
+      EndDo
+C
+      EndDo
+      EndDo
+C
+      Do NU=1,NoEig
+      Do MU=1,NoEig
+C
+      ABPLUS(NU+(MU-1)*NoEig)=Zero
+C
+      IStart=IEigAddY(1,NU)
+      II=0
+      Do I=IEigAddInd(1,NU),IEigAddInd(2,NU)
+      ABPLUS(NU+(MU-1)*NoEig)=ABPLUS(NU+(MU-1)*NoEig)
+     $ +EigX(IStart+II)*EigY1(I+(MU-1)*NoEig)
+      II=II+1
+      EndDo
+C
+      EndDo
+      EndDo
+C
+      Do NU=1,NoEig
+      Do MU=1,NoEig
+C
+      EigY1(NU+(MU-1)*NoEig)=Zero
+C
+      IStart=IEigAddY(1,MU)
+      II=0
+      Do I=IEigAddInd(1,MU),IEigAddInd(2,MU)
+      EigY1(NU+(MU-1)*NoEig)=EigY1(NU+(MU-1)*NoEig)
+     $ +ABMIN(NU+(I-1)*NoEig)*EigY(IStart+II)
+      II=II+1
+      EndDo
+C
+      EndDo
+      EndDo
+C
+      Do NU=1,NoEig
+      Do MU=1,NoEig
+C
+      ABMIN(NU+(MU-1)*NoEig)=Zero
+C
+      IStart=IEigAddY(1,NU)
+      II=0
+      Do I=IEigAddInd(1,NU),IEigAddInd(2,NU)
+      ABMIN(NU+(MU-1)*NoEig)=ABMIN(NU+(MU-1)*NoEig)
+     $ +EigY(IStart+II)*EigY1(I+(MU-1)*NoEig)
+      II=II+1
+      EndDo
+C
+      EndDo
+      EndDo
+C
+      EigY1(1:NoEig*NoEig)=Zero
+      Do MU=1,NoEig
+C
+      If(Eig(MU).Ne.Zero) Then
+C
+      Do NU=1,NoEig
+C
+      If(Eig(NU).Ne.Zero) Then
+C
+      IStart=IEigAddY(1,NU)
+      II=0
+      Do I=IEigAddInd(1,NU),IEigAddInd(2,NU)
+C
+      Aux1=(ABPLUS(MU+(NU-1)*NoEig)-ABMIN(MU+(NU-1)*NoEig))/
+     $ (Eig(MU)+Eig(NU))
+      Aux2=Zero
+c herer!!!
+      If((MU.Ne.NU).And.(Abs(Eig(MU)-Eig(NU)).Gt.1.D-12)) Aux2=
+c      If(MU.Ne.NU) Aux2=
+     $  (ABPLUS(MU+(NU-1)*NoEig)+ABMIN(MU+(NU-1)*NoEig))/
+     $ (Eig(MU)-Eig(NU))
+C
+      EigY1(I+(MU-1)*NoEig)=EigY1(I+(MU-1)*NoEig)+
+     $(Aux1+Aux2)*EigY(IStart+II)
+C
+      II=II+1
+      EndDo
+C
+      EndIf
+      EndDo
+      EndIf
+      EndDo
+C
+C     1ST-ORDER EIG
+C
+      Do NU=1,NoEig
+      Eig1(NU)=ABPLUS(NU+(NU-1)*NoEig)+ABMIN(NU+(NU-1)*NoEig)
+      EndDo
+C
+      Do I=1,NFree2
+      EigX(I)=EigY(I)
+      EndDo
+      Do I=1,NoEig
+      Do J=1,NoEig
+      ABPLUS(I+(J-1)*NoEig)=Zero
+      If(I.Eq.J) ABPLUS(I+(J-1)*NoEig)=One
+      EndDo
+      EndDo
+C
+      Do NU=1,NoEig
+      Do MU=1,NoEig
+C
+      EigY(NU+(MU-1)*NoEig)=Zero
+C
+      IStart=IEigAddY(1,MU)
+      II=0
+      Do I=IEigAddInd(1,MU),IEigAddInd(2,MU)
+      EigY(NU+(MU-1)*NoEig)=EigY(NU+(MU-1)*NoEig)
+     $ +ABPLUS(NU+(I-1)*NoEig)*EigX(IStart+II)
+      II=II+1
+      EndDo
+C
+C     Y^(1) ALREADY IN EigY1
+C
+      EndDo
+      EndDo
+C NEW 11/07/2018
+C
+C     SORT Y0 AND Y1 ACCORDING TO IndN
+C
+      Call CpyM(ABPLUS,EigY,NDimX)
+      Call CpyM(ABMIN,EigY1,NDimX)
+C
+      Do MU=1,NDimX
+C
+      Do I=1,NDimX
+      EigY((MU-1)*NoEig+I)=ABPLUS((MU-1)*NoEig+IMatch(I))
+      EigY1((MU-1)*NoEig+I)=ABMIN((MU-1)*NoEig+IMatch(I))
+      EndDo
+C
+      EndDo
+C
+      Return
+      End
+
 *Deck AC0CAS
       Subroutine AC0CAS(ECorr,ETot,TwoNO,Occ,URe,XOne,
      $ ABPLUS,ABMIN,EigY,Eig,
