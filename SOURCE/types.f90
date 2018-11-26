@@ -125,6 +125,7 @@ type SystemBlock
       logical :: ISHF = .false. 
       logical :: doRSH = .false. 
       double precision :: ThrAct = 0.992d0
+      double precision :: ThrSelAct = 1.d-8 
       integer,allocatable :: IGem(:), IndAux(:)
       integer,allocatable :: IndX(:), IndN(:,:), IPair(:,:)
       integer,allocatable :: IndXh(:)

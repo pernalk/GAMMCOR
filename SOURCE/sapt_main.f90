@@ -42,7 +42,7 @@ double precision :: Tcpu,Twall
     call e1elst(SAPT%monA,SAPT%monB,SAPT)
     ! temporary here!!!!
     if(Flags%ICASSCF==1) then
-       call e1exchs2(SAPT%monA,SAPT%monB,SAPT)
+       !call e1exchs2(SAPT%monA,SAPT%monB,SAPT)
     endif
     if(SAPT%SaptLevel==0) then
        call e2disp_unc(Flags,SAPT%monA,SAPT%monB,SAPT)
@@ -1164,13 +1164,12 @@ logical :: doRSH
  call clock('START',Tcpu,Twall)
  call ModABMin(Mon%Occ,SRKer,WGrid,OrbGrid,TwoMO,TwoElErf,ABMin,&
                  Mon%IndN,Mon%IndX,Mon%NDimX,NGrid,NInte2,NBas)
-! print*, 'ABMin-Kasia',norm2(ABMin)
- !print*, 'after XCFUN'
+ print*, 'ABMin-Kasia',norm2(ABMin)
  !call ModABMin_mithap(Mon%Occ,SRKer,WGrid,OrbGrid,ABMin,&
  !                Mon%IndN,Mon%IndX,Mon%NDimX,NGrid,NBas,&
  !                twofile,twoerffile)
+ !print*, 'ABMin-MY',norm2(ABMin)
  call clock('Mod ABMin',Tcpu,Twall)
- print*, 'ABMin-MY',norm2(ABMin)
 
  write(LOUT,'(1x,a)') "*** sr-kernel added. ***"
  ! test true energy
@@ -2737,7 +2736,6 @@ integer :: test
  mon%IPair(1:nbas,1:nbas) = 0
 
  if(Flags%ICASSCF==0) then
- print*, 'HERE???'
  ! allocate(mon%IndXh(mon%NDim))
  
     ij=0
@@ -2777,7 +2775,11 @@ integer :: test
     enddo
 
  elseif(Flags%ICASSCF==1.and.Flags%ISERPA==0) then
-
+    write(LOUT,'(1x,a,e15.5)') 'Threshold for active orbitals: ', mon%ThrSelAct
+    if(mon%NCen==1.and.mon%ThrSelAct<1.d-3) then 
+       write(LOUT,'(1x,a)') 'Warning! For single atom ThrSelAct should probably have larger value!'
+       mon%IWarn = mon%IWarn + 1
+    endif 
     ij=0
     ind = 0
     do i=1,nbas
@@ -2789,9 +2791,9 @@ integer :: test
              ! do not correlate active degenerate orbitals from different geminals 
              if((mon%IndAux(i)==1).and.(mon%IndAux(j)==1)  & 
                   .and.&
-                !  (Abs(mon%Occ(i)-mon%Occ(j))/mon%Occ(i).lt.1.d-8) ) then
+                  (Abs(mon%Occ(i)-mon%Occ(j))/mon%Occ(i).lt.mon%ThrSelAct) ) then
                 ! here!!!
-                  (Abs(mon%Occ(i)-mon%Occ(j))/mon%Occ(i).lt.1d-3) ) then
+                !  (Abs(mon%Occ(i)-mon%Occ(j))/mon%Occ(i).lt.1d-3) ) then
                 
                 write(LOUT,'(1x,a,2x,2i4)') 'Discarding nearly degenerate pair',i,j 
              else

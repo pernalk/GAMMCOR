@@ -410,6 +410,9 @@ integer :: test,test2
  case ("THRACT")
        read(val,*) SystemParams%ThrAct
 
+ case ("THRSELACT")
+       read(val,*) SystemParams%ThrSelAct
+
  case ("ISHF")
        read(val,*) SystemParams%ISHF
 
