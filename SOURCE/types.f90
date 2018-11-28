@@ -123,7 +123,8 @@ type SystemBlock
       integer :: icnt
       integer :: num0,num1,num2
       logical :: ISHF = .false. 
-      logical :: doRSH = .false. 
+      logical :: doRSH = .false.
+      logical :: PostCAS =.false. 
       double precision :: ThrAct = 0.992d0
       double precision :: ThrSelAct = 1.d-8 
       integer,allocatable :: IGem(:), IndAux(:)

@@ -413,6 +413,9 @@ integer :: test,test2
  case ("THRSELACT")
        read(val,*) SystemParams%ThrSelAct
 
+ case ("POSTCAS")
+       read(val,*) SystemParams%PostCAS
+
  case ("ISHF")
        read(val,*) SystemParams%ISHF
 

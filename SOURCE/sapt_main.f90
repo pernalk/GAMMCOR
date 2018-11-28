@@ -1116,17 +1116,24 @@ logical :: doRSH
     call LoadSaptTwoEl(Mon%Monomer+4,TwoElErf,NBas,NInte2)
  endif
 
+ print*, 'TwoMO ',norm2(TwoMO)
+ print*, 'TwoErf',norm2(TwoElerf)
+
  NSymNO(1:NBas) = 1
  call EPotSR(EnSR,VSR,Mon%Occ,URe,MO,& 
             OrbGrid,OrbXGrid,OrbYGrid,OrbZGrid,WGrid,&
             NSymNO,TwoMO,TwoElErf,&
             Mon%Omega,Flags%IFunSR,&
             NGrid,NInte1,NInte2,NBas)
- ! MODIFY XOne
- !do i=1,NInte1
- !   XOne(i) = XOne(i) + VSR(i)
- !enddo
+
+ ! MODIFY XOne in PostCAS calculations
+ if(Mon%PostCAS) then
+    write(LOUT,*) 'TEST POSTCAS!'
+    XOne = XOne + VSR 
+ ! here: check energy properly! add VCoul in NOs
+ endif
  write(LOUT,'(1x,a,f15.8)') "SR Energy: ",EnSR
+ print*, 'XOne:',norm2(XOne)
 
  XVSR = 0 
  do i=1,NBas
@@ -1209,16 +1216,16 @@ logical :: doRSH
  !       Mon%IndN,Mon%IndX,Mon%IGem,Mon%NAct,Mon%INAct,Mon%NDimX, &
  !       NBas,Mon%NDim,NInte1,twoerffile,Flags%IFlag0)
  
- !call Y01CAS(TwoElErf,Mon%Occ,URe,XOne,ABPlus,ABMin, &
- !     EigY0,EigY1,Eig0,Eig1, &
- !     Mon%IndN,Mon%IndX,Mon%NDimX,NBas,Mon%NDim,NInte1,NInte2,Flags%IFlag0)
- !do i=1,NGrid
- !   SRKerW(i) = SRKer(i)*WGrid(i)
- !enddo
- !call Y01CASLR(TwoElErf,Mon%Occ,URe,XOne,ABPlus,ABMin, &
- !       EigY0,EigY1,Eig0,Eig1, &
- !       Mon%IndN,Mon%IndX,Mon%NDimX,NBas,Mon%NDim,NInte1,NInte2,Flags%IFlag0, &
- !       TwoMO,OrbGrid,SRKerW,NSymNO,MultpC,NGrid)
+! call Y01CAS(TwoElErf,Mon%Occ,URe,XOne,ABPlus,ABMin, &
+!      EigY0,EigY1,Eig0,Eig1, &
+!      Mon%IndN,Mon%IndX,Mon%NDimX,NBas,Mon%NDim,NInte1,NInte2,Flags%IFlag0)
+! do i=1,NGrid
+!    SRKerW(i) = SRKer(i)*WGrid(i)
+! enddo
+! call Y01CASLR(TwoElErf,Mon%Occ,URe,XOne,ABPlus,ABMin, &
+!        EigY0,EigY1,Eig0,Eig1, &
+!        Mon%IndN,Mon%IndX,Mon%NDimX,NBas,Mon%NDim,NInte1,NInte2,Flags%IFlag0, &
+!        TwoMO,OrbGrid,SRKerW,NSymNO,MultpC,NGrid)
 
  ! dump uncoupled response
  call writeresp(EigY0,Eig0,propfile0)
@@ -3153,7 +3160,7 @@ integer :: i
    do i=1,nbas
       write(LOUT,'(1x,i3,1x,e16.6,1x,i6,7x,e16.6,3x,i6)') i, A%Occ(i),A%IGem(i),B%Occ(i),B%IGem(i) 
    enddo
-   write(LOUT,'(2x,a,f8.4,18x,f6.4)') 'SUM OF OCCUPANCIES: ', A%SumOcc, B%SumOcc
+   write(LOUT,'(2x,a,f8.4,18x,f8.4)') 'SUM OF OCCUPANCIES: ', A%SumOcc, B%SumOcc
    write(LOUT, '()')
  endif
  end associate

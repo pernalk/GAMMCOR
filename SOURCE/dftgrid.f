@@ -76,7 +76,7 @@ C
       EndIf
 C
       Do I=1,NInte1
-      VSR(I)=VSR(I)+VHSR(I)
+C      VSR(I)=VSR(I)+VHSR(I)
       EndDo 
 C
       Write(6,'(/," SR_xc Energy",X,F15.8)') EnxcSR
