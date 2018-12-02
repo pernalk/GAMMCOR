@@ -2,6 +2,7 @@ module sapt_main
 use types
 use systemdef
 use timing
+use abmat
 use tran
 use sorter
 use sapt_ener
@@ -1155,9 +1156,9 @@ logical :: doRSH
 ! if(doRSH) then 
    call AB_CAS(ABPlus,ABMin,ECASSCF,URe,Mon%Occ,XOne,TwoElErf,Mon%IPair,&
                Mon%IndN,Mon%IndX,Mon%NDimX,NBas,Mon%NDimX,NInte1,NInte2,ACAlpha)
-!   call AB_CAS_mithap(ABPlus,ABMin,ECASSCF,URe,Mon%Occ,XOne, &
-!               Mon%IndN,Mon%IndX,Mon%IGem,Mon%NAct,Mon%INAct,Mon%NDimX,NBas,Mon%NDimX,&
-!               NInte1,twoerffile,ACAlpha,.false.)
+  !call AB_CAS_mithap(ABPlus,ABMin,ECASSCF,URe,Mon%Occ,XOne, &
+  !             Mon%IndN,Mon%IndX,Mon%IGem,Mon%NAct,Mon%INAct,Mon%NDimX,NBas,Mon%NDimX,&
+  !             NInte1,twoerffile,ACAlpha,.false.)
    print*, 'ABPlus',norm2(ABPlus),'ABMin',norm2(ABMin)
 !else
 ! HERE:: ADD SEPARATE PROCEDURE FOR Kohn-Sham! 
@@ -1316,6 +1317,7 @@ double precision :: ACAlpha
 double precision :: ECASSCF,ETot,ECorr
 character(8) :: label
 character(:),allocatable :: onefile,twofile,propfile,rdmfile
+character(:),allocatable :: twojfile,twokfile
 character(:),allocatable :: propfile0,propfile1
 double precision :: tmp
 double precision,parameter :: SmallE=0d0,BigE=1.D20
@@ -1337,6 +1339,8 @@ double precision, allocatable :: EigTmp(:), VecTmp(:)
  if(Mon%Monomer==1) then
     onefile  = 'ONEEL_A'
     twofile  = 'TWOMOAA'
+    twojfile = 'FFOOAA'
+    twokfile = 'FOFOAA'
     propfile = 'PROP_A'
     propfile0  = 'PROP_A0' 
     propfile1  = 'PROP_A1' 
@@ -1344,6 +1348,8 @@ double precision, allocatable :: EigTmp(:), VecTmp(:)
  elseif(Mon%Monomer==2) then
     onefile  = 'ONEEL_B'
     twofile  = 'TWOMOBB'
+    twojfile = 'FFOOBB'
+    twokfile = 'FOFOBB'
     propfile = 'PROP_B'
     propfile0  = 'PROP_B0' 
     propfile1  = 'PROP_B1' 
@@ -1379,8 +1385,22 @@ double precision, allocatable :: EigTmp(:), VecTmp(:)
  endif
 
  ! transform and read 2-el integrals
+ ! full - for GVB and CAS
  call tran4_full(NBas,MO,MO,fname,'AOTWOSORT')
- call LoadSaptTwoEl(Mon%Monomer,TwoMO,NBas,NInte2)
+ ! partial: J and K
+ call tran4_gen(NBas,&
+      Mon%num0+Mon%num1,MO(1:NBas*(Mon%num0+Mon%num1)),&
+      Mon%num0+Mon%num1,MO(1:NBas*(Mon%num0+Mon%num1)),&
+      NBas,MO,&
+      NBas,MO,&
+      twojfile)
+ call tran4_gen(NBas,&
+      NBas,MO,&
+      Mon%num0+Mon%num1,MO(1:NBas*(Mon%num0+Mon%num1)),&
+      NBas,MO,&
+      Mon%num0+Mon%num1,MO(1:NBas*(Mon%num0+Mon%num1)),&
+      twokfile)
+  call LoadSaptTwoEl(Mon%Monomer,TwoMO,NBas,NInte2)
 
  if(Flags%ISHF==1.and.Flags%ISERPA==2.and.Mon%NELE==1) then
 
@@ -1481,13 +1501,16 @@ double precision, allocatable :: EigTmp(:), VecTmp(:)
 !   ACAlpha=0.0000001
 ! endif 
 
-   ! ACAlpha=sqrt(2d0)/2d0
-   ! call AB_CAS_mithap(ABPlus,ABMin,ECASSCF,URe,Mon%Occ,XOne, &
-   !             Mon%IndN,Mon%IndX,Mon%IGem,Mon%NAct,Mon%INAct,Mon%NDimX,NBas,Mon%NDimX,&
-   !             NInte1,twofile,ACAlpha,.false.)
-   !print*, ACAlpha
-   call AB_CAS(ABPlus,ABMin,ECASSCF,URe,Mon%Occ,XOne,TwoMO,Mon%IPair,&
-               Mon%IndN,Mon%IndX,Mon%NDimX,NBas,Mon%NDimX,NInte1,NInte2,ACAlpha)
+    ACAlpha=sqrt(2d0)/2d0
+    call AB_CAS_mithap(ABPlus,ABMin,ECASSCF,URe,Mon%Occ,XOne, &
+                Mon%IndN,Mon%IndX,Mon%IGem,Mon%NAct,Mon%INAct,Mon%NDimX,NBas,Mon%NDimX,&
+                NInte1,twofile,ACAlpha,.false.)
+    !call AB_CAS_FOFO(ABPlus,ABMin,ECASSCF,URe,Mon%Occ,XOne, &
+    !            Mon%IndN,Mon%IndX,Mon%IGem,Mon%NAct,Mon%INAct,Mon%NDimX,NBas,Mon%NDimX,&
+    !            NInte1,twojfile,twokfile,ACAlpha,.false.)
+   print*, 'ACAlpha',ACAlpha
+   !call AB_CAS(ABPlus,ABMin,ECASSCF,URe,Mon%Occ,XOne,TwoMO,Mon%IPair,&
+   !            Mon%IndN,Mon%IndX,Mon%NDimX,NBas,Mon%NDimX,NInte1,NInte2,ACAlpha)
    print*, 'ABPlus',norm2(ABPlus),'ABMin',norm2(ABMin)
 
    EigVecR = 0
@@ -1536,7 +1559,7 @@ double precision, allocatable :: EigTmp(:), VecTmp(:)
   !        EigY0,EigY1,Eig0,Eig1, &
   !        Mon%IndN,Mon%IndX,Mon%IGem,Mon%NAct,Mon%INAct,Mon%NDimX, &
   !        NBas,Mon%NDim,NInte1,twofile,Flags%IFlag0)
-   
+   ! test
    call Y01CAS(TwoMO,Mon%Occ,URe,XOne,ABPlus,ABMin, &
         EigY0,EigY1,Eig0,Eig1, &
         !Mon%IndNT,Mon%IndX,Mon%NDimX,NBas,Mon%NDim,NInte1,NInte2,Flags%IFlag0)

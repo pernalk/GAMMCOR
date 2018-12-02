@@ -513,7 +513,7 @@ C     READ/WRITE THE ONE- AND TWO-ELECTRON INTEGRALS
 C     INTERFACED WITH MOLPRO (INTEGRALS ARE READ FROM FCIDUMP FILES)
 C
       use sorter
-      use tran   
+      use abmat 
 C
       Implicit Real*8 (A-H,O-Z)
       Parameter (Zero=0.D0,Half=0.5D0,One=1.D0,Two=2.D0)
