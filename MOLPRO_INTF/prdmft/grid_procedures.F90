@@ -8,7 +8,7 @@ include "common/cdft"
 double precision :: record, thresh
 dimension :: icentres(ntg), map(ntg)
 double precision, allocatable :: r(:,:),wt(:),orbval(:,:,:),mapinv(:)
-double precision, parameter   ::  zero = 0d0, one = 1d0, tolorb = 1.d-15
+double precision, parameter   ::  zero = 0d0, one = 1d0, tolorb = 1.d-12
 
 write(iout,*) 'DUMPING DFT GRID TO A FILE'
 

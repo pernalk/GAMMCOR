@@ -1,7 +1,7 @@
 module dumpintao
 
 private 
-public dump_aoints,dump_molpro_sapt,dump_test
+public dump_aoints,dump_molpro_sapt,dump_intsonly
 
 contains
 
@@ -44,7 +44,8 @@ subroutine dump_molpro_sapt(mon,IsRSH)
       call readm(q(iS), ntdg, 1, 1100, 0, str)
       call readm(q(iT), ntdg, 1, 1400, 0, str)
       call readm(q(iV), ntdg, 1, 1410, 0, str)
-      call readm(q(iH), ntdg, 1, 1200, 0, str)
+      call readm(q(iH), ntdg, 1, 1210, 0, str)
+!      call readm(q(iH), ntdg, 1, 1200, 0, str)
       ! 1-el integrals
       call dump_oneints(trim(onefile),q(iS),q(iT),q(iV),q(iH))
       ! 1- and 2-RDM
@@ -91,7 +92,7 @@ subroutine dump_monomer(mon)
 
 end subroutine dump_monomer
 
-subroutine dump_test(intfilename)
+subroutine dump_intsonly(intfilename)
       implicit double precision (a-h,o-z)
       include "common/corb"
       include "common/cbas"
@@ -110,7 +111,7 @@ subroutine dump_test(intfilename)
       if (iex.eq.1) call excom(1)
       call corlsr(ibase)
 
-end subroutine dump_test
+end subroutine dump_intsonly
 
 subroutine dump_aoints
       implicit double precision (a-h,o-z)

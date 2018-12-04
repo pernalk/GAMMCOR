@@ -30,13 +30,15 @@
          call dump_grid()
          call dump_aoints 
        elseif(field(2) == "WRK") then
-         call dump_test('AOTWOINT.mol')
+         call dump_intsonly('AOTWOINT.mol')
        ! PTDMFT-SAPT interface
        elseif(field(2) == "PRDMFT-SAPT") then
          if(trim(field(3))=='WRK') then
-         call dump_test('AOTWOINT.mol')
+           call dump_intsonly('AOTWOINT.mol')
          elseif(trim(field(3))=='GRID') then
            call dump_grid() 
+         elseif(trim(field(3))=='ERFINT') then
+           call dump_intsonly('AOTWOINT.erf')
          elseif(trim(field(3))=='MONOMERA') then
            call dump_molpro_sapt(1,IsRangeHybrid)
          else
