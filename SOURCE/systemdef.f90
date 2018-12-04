@@ -253,6 +253,8 @@ if(Flags%ISAPT.Eq.0) then
    System%NBasis = Input%CalcParams%NBasis
    System%Multiplicity = Input%SystemInput(1)%Multiplicity
    System%ThrAct = Input%SystemInput(1)%ThrAct
+   System%ThrSelAct = Input%SystemInput(1)%ThrSelAct
+   System%TwoMoInt = Input%SystemInput(1)%TwoMoInt
    System%IPrint = Input%CalcParams%IPrint  
   
    System%XELE = (System%ZNucl - System%Charge)/2.0d0 
@@ -286,6 +288,8 @@ elseif(Flags%ISAPT.Eq.1) then
       monA%Multiplicity = Input%SystemInput(1)%Multiplicity
       monA%ThrAct = Input%SystemInput(1)%ThrAct
       monA%ThrSelAct = Input%SystemInput(1)%ThrSelAct
+      monA%DeclareTwoMo = Input%SystemInput(1)%DeclareTwoMo
+      monA%TwoMoInt = Input%SystemInput(1)%TwoMoInt
       monA%PostCAS = Input%SystemInput(1)%PostCAS
       monA%ISHF = Input%SystemInput(1)%ISHF
 
@@ -304,6 +308,8 @@ elseif(Flags%ISAPT.Eq.1) then
       monB%Multiplicity = Input%SystemInput(2)%Multiplicity
       monB%ThrAct = Input%SystemInput(2)%ThrAct
       monB%ThrSelAct = Input%SystemInput(2)%ThrSelAct
+      monB%DeclareTwoMo = Input%SystemInput(2)%DeclareTwoMo
+      monB%TwoMoInt = Input%SystemInput(2)%TwoMoInt
       monB%PostCAS = Input%SystemInput(2)%PostCAS
       monB%ISHF = Input%SystemInput(2)%ISHF
       monB%NCen = Input%SystemInput(2)%NCen
@@ -326,6 +332,8 @@ elseif(Flags%ISAPT.Eq.1) then
       monA%Multiplicity = Input%SystemInput(2)%Multiplicity
       monA%ThrAct = Input%SystemInput(2)%ThrAct
       monA%ThrSelAct = Input%SystemInput(2)%ThrSelAct
+      monA%DeclareTwoMo = Input%SystemInput(2)%DeclareTwoMo
+      monA%TwoMoInt = Input%SystemInput(2)%TwoMoInt
       monA%PostCAS = Input%SystemInput(2)%PostCAS
       monA%ISHF = Input%SystemInput(2)%ISHF
       monA%NCen = Input%SystemInput(2)%NCen
@@ -343,6 +351,8 @@ elseif(Flags%ISAPT.Eq.1) then
       monB%Multiplicity = Input%SystemInput(1)%Multiplicity
       monB%ThrAct = Input%SystemInput(1)%ThrAct
       monB%ThrSelAct = Input%SystemInput(1)%ThrSelAct
+      monB%DeclareTwoMo = Input%SystemInput(1)%DeclareTwoMo
+      monB%TwoMoInt = Input%SystemInput(1)%TwoMoInt
       monB%PostCAS = Input%SystemInput(1)%PostCAS
       monB%ISHF = Input%SystemInput(1)%ISHF
       monB%NCen = Input%SystemInput(1)%NCen
@@ -358,6 +368,14 @@ elseif(Flags%ISAPT.Eq.1) then
   
    end select
  end associate
+
+ ! set in/out-of-core
+ ! SAPT-CAS: unless defined in input, 
+ !           set FOFO as default!
+ if(Flags%ICASSCF==1.and.Flags%ISERPA==0) then
+    if(.not.SAPT%monA%DeclareTwoMo) SAPT%monA%TwoMoInt = TWOMO_FOFO 
+    if(.not.SAPT%monB%DeclareTwoMo) SAPT%monB%TwoMoInt = TWOMO_FOFO
+ endif
 
 System = SAPT%monB
 

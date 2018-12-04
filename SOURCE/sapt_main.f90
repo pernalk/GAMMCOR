@@ -1361,9 +1361,11 @@ double precision, allocatable :: EigTmp(:), VecTmp(:)
  NInte1 = NBas*(NBas+1)/2
  NInte2 = NInte1*(NInte1+1)/2
 
- allocate(work1(NSq),work2(NSq),XOne(NInte1),URe(NBas,NBas), &
-          TwoMO(NInte2))
- 
+ allocate(work1(NSq),work2(NSq),XOne(NInte1),URe(NBas,NBas))
+ if(Mon%TwoMoInt==TWOMO_INCORE) then
+    allocate(TwoMO(NInte2))
+ endif 
+
  URe = 0d0
  do i=1,NBas
     URe(i,i) = 1d0
@@ -1384,23 +1386,29 @@ double precision, allocatable :: EigTmp(:), VecTmp(:)
     stop
  endif
 
- ! transform and read 2-el integrals
- ! full - for GVB and CAS
- call tran4_full(NBas,MO,MO,fname,'AOTWOSORT')
- ! partial: J and K
- call tran4_gen(NBas,&
-      Mon%num0+Mon%num1,MO(1:NBas*(Mon%num0+Mon%num1)),&
-      Mon%num0+Mon%num1,MO(1:NBas*(Mon%num0+Mon%num1)),&
-      NBas,MO,&
-      NBas,MO,&
-      twojfile)
- call tran4_gen(NBas,&
-      NBas,MO,&
-      Mon%num0+Mon%num1,MO(1:NBas*(Mon%num0+Mon%num1)),&
-      NBas,MO,&
-      Mon%num0+Mon%num1,MO(1:NBas*(Mon%num0+Mon%num1)),&
-      twokfile)
-  call LoadSaptTwoEl(Mon%Monomer,TwoMO,NBas,NInte2)
+ ! transform and 2-el integrals
+ select case(Mon%TwoMoInt)
+
+ case(TWOMO_INCORE,TWOMO_FFFF) 
+   ! full - for GVB and CAS
+   call tran4_full(NBas,MO,MO,fname,'AOTWOSORT')
+
+ case(TWOMO_FOFO) 
+   ! transform J and K
+    call tran4_gen(NBas,&
+         Mon%num0+Mon%num1,MO(1:NBas*(Mon%num0+Mon%num1)),&
+         Mon%num0+Mon%num1,MO(1:NBas*(Mon%num0+Mon%num1)),&
+         NBas,MO,&
+         NBas,MO,&
+         twojfile)
+    call tran4_gen(NBas,&
+         NBas,MO,&
+         Mon%num0+Mon%num1,MO(1:NBas*(Mon%num0+Mon%num1)),&
+         NBas,MO,&
+         Mon%num0+Mon%num1,MO(1:NBas*(Mon%num0+Mon%num1)),&
+         twokfile)
+ end select
+ if(Mon%TwoMoInt==TWOMO_INCORE) call LoadSaptTwoEl(Mon%Monomer,TwoMO,NBas,NInte2)
 
  if(Flags%ISHF==1.and.Flags%ISERPA==2.and.Mon%NELE==1) then
 
@@ -1450,8 +1458,8 @@ double precision, allocatable :: EigTmp(:), VecTmp(:)
 
    if(EChck) then
       write(LOUT,'(/,1x,a)') 'ERPA-GVB ENERGY CHECK REQUESTED:'
-      !call EneERPA(ETot,ECorr,Mon%PotNuc,EigVecR,Eig,TwoMO,URe,&
-      !     Mon%Occ,XOne,Mon%IndN,NBas,NInte1,NInte2,Mon%NDimX,Mon%NGem)
+      call EneERPA(ETot,ECorr,Mon%PotNuc,EigVecR,Eig,TwoMO,URe,&
+           Mon%Occ,XOne,Mon%IndN,NBas,NInte1,NInte2,Mon%NDimX,Mon%NGem)
    endif
 
    !! uncoupled
@@ -1501,16 +1509,24 @@ double precision, allocatable :: EigTmp(:), VecTmp(:)
 !   ACAlpha=0.0000001
 ! endif 
 
-    ACAlpha=sqrt(2d0)/2d0
-    call AB_CAS_mithap(ABPlus,ABMin,ECASSCF,URe,Mon%Occ,XOne, &
-                Mon%IndN,Mon%IndX,Mon%IGem,Mon%NAct,Mon%INAct,Mon%NDimX,NBas,Mon%NDimX,&
-                NInte1,twofile,ACAlpha,.false.)
-    !call AB_CAS_FOFO(ABPlus,ABMin,ECASSCF,URe,Mon%Occ,XOne, &
-    !            Mon%IndN,Mon%IndX,Mon%IGem,Mon%NAct,Mon%INAct,Mon%NDimX,NBas,Mon%NDimX,&
-    !            NInte1,twojfile,twokfile,ACAlpha,.false.)
-   print*, 'ACAlpha',ACAlpha
-   !call AB_CAS(ABPlus,ABMin,ECASSCF,URe,Mon%Occ,XOne,TwoMO,Mon%IPair,&
-   !            Mon%IndN,Mon%IndX,Mon%NDimX,NBas,Mon%NDimX,NInte1,NInte2,ACAlpha)
+   !ACAlpha=sqrt(2d0)/2d0
+   !print*, 'ACAlpha',ACAlpha
+   select case(Mon%TwoMoInt)
+   case(TWOMO_FOFO)
+
+      call AB_CAS_FOFO(ABPlus,ABMin,ECASSCF,URe,Mon%Occ,XOne, &
+                  Mon%IndN,Mon%IndX,Mon%IGem,Mon%NAct,Mon%INAct,Mon%NDimX,NBas,Mon%NDimX,&
+                  NInte1,twojfile,twokfile,ACAlpha,.false.)
+   case(TWOMO_FFFF) 
+
+      call AB_CAS_mithap(ABPlus,ABMin,ECASSCF,URe,Mon%Occ,XOne, &
+                  Mon%IndN,Mon%IndX,Mon%IGem,Mon%NAct,Mon%INAct,Mon%NDimX,NBas,Mon%NDimX,&
+                   NInte1,twofile,ACAlpha,.false.)
+   case(TWOMO_INCORE)
+
+      call AB_CAS(ABPlus,ABMin,ECASSCF,URe,Mon%Occ,XOne,TwoMO,Mon%IPair,&
+                  Mon%IndN,Mon%IndX,Mon%NDimX,NBas,Mon%NDimX,NInte1,NInte2,ACAlpha)
+   end select 
    print*, 'ABPlus',norm2(ABPlus),'ABMin',norm2(ABMin)
 
    EigVecR = 0
@@ -1522,17 +1538,27 @@ double precision, allocatable :: EigTmp(:), VecTmp(:)
    !
 
   !print*, 'EigVecR',norm2(EigVecR)
-
   !do i=1,size(Eig)
   !   print*, i,Eig(i)
   !enddo
 
    if(EChck) then
       ECorr=0
-      call ACEneERPA(ECorr,EigVecR,Eig,TwoMO,URe,Mon%Occ,XOne,&
-           Mon%IndN,NBas,NInte1,NInte2,Mon%NDimX,Mon%NGem)
+      select case(Mon%TwoMoInt) 
+      case(TWOMO_FOFO)
+         call ACEneERPA_FOFO(ECorr,EigVecR,Eig,Mon%Occ, &
+                              Mon%IGem,Mon%IndN,Mon%IndX,Mon%num0+Mon%num1, &
+                              Mon%NDimX,NBas,twokfile)
+      case(TWOMO_FFFF)
+         call ACEneERPA_FFFF(ECorr,EigVecR,Eig,Mon%Occ, &
+                              Mon%IGem,Mon%IndN,Mon%IndX,Mon%num0+Mon%num1, &
+                              Mon%NDimX,NBas,twofile)
+      case(TWOMO_INCORE)
+         call ACEneERPA(ECorr,EigVecR,Eig,TwoMO,URe,Mon%Occ,XOne,&
+                        Mon%IndN,NBas,NInte1,NInte2,Mon%NDimX,Mon%NGem)
+      end select
       ECorr=Ecorr*0.5d0
-      
+
       write(LOUT,'(/,1x,''ECASSCF+ENuc, Corr, ERPA-CASSCF'',6x,3f15.8)') &
            ECASSCF+Mon%PotNuc,ECorr,ECASSCF+Mon%PotNuc+ECorr
    endif
@@ -1555,15 +1581,23 @@ double precision, allocatable :: EigTmp(:), VecTmp(:)
       Mon%IndNT(2,i) = Mon%IndN(2,i)
    enddo
 
-  ! call Y01CAS_mithap(Mon%Occ,URe,XOne,ABPlus,ABMin, &
-  !        EigY0,EigY1,Eig0,Eig1, &
-  !        Mon%IndN,Mon%IndX,Mon%IGem,Mon%NAct,Mon%INAct,Mon%NDimX, &
-  !        NBas,Mon%NDim,NInte1,twofile,Flags%IFlag0)
-   ! test
-   call Y01CAS(TwoMO,Mon%Occ,URe,XOne,ABPlus,ABMin, &
-        EigY0,EigY1,Eig0,Eig1, &
-        !Mon%IndNT,Mon%IndX,Mon%NDimX,NBas,Mon%NDim,NInte1,NInte2,Flags%IFlag0)
-        Mon%IndN,Mon%IndX,Mon%NDimX,NBas,Mon%NDim,NInte1,NInte2,Flags%IFlag0)
+   select case(Mon%TwoMoInt)
+   case(TWOMO_FOFO) 
+      call Y01CAS_FOFO(Mon%Occ,URe,XOne,ABPlus,ABMin, &
+             EigY0,EigY1,Eig0,Eig1, &
+             Mon%IndN,Mon%IndX,Mon%IGem,Mon%NAct,Mon%INAct,Mon%NDimX, &
+             NBas,Mon%NDim,NInte1,twofile,twojfile,twokfile,Flags%IFlag0)
+   case(TWOMO_FFFF) 
+      call Y01CAS_mithap(Mon%Occ,URe,XOne,ABPlus,ABMin, &
+             EigY0,EigY1,Eig0,Eig1, &
+             Mon%IndN,Mon%IndX,Mon%IGem,Mon%NAct,Mon%INAct,Mon%NDimX, &
+             NBas,Mon%NDim,NInte1,twofile,Flags%IFlag0)
+   case(TWOMO_INCORE) 
+      call Y01CAS(TwoMO,Mon%Occ,URe,XOne,ABPlus,ABMin, &
+           EigY0,EigY1,Eig0,Eig1, &
+           !Mon%IndNT,Mon%IndX,Mon%NDimX,NBas,Mon%NDim,NInte1,NInte2,Flags%IFlag0)
+           Mon%IndN,Mon%IndX,Mon%NDimX,NBas,Mon%NDim,NInte1,NInte2,Flags%IFlag0)
+   end select
 
    ! dump uncoupled response
    call writeresp(EigY0,Eig0,propfile0)
@@ -1734,8 +1768,9 @@ endif
  call writeresp(EigVecR,Eig,propfile)
 
  close(ione)
-! deallocate(work1,work2,XOne,URe)
- deallocate(work1,work2,XOne,TwoMO,URe)
+ 
+ deallocate(work1,work2,XOne,URe)
+ if(Mon%TwoMoInt==1) deallocate(TwoMO)
  deallocate(ABPlus,ABMin,EigVecR,Eig)
 
  ! delete TWOMO file

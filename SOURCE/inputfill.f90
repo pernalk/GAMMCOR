@@ -416,6 +416,25 @@ integer :: test,test2
  case ("POSTCAS")
        read(val,*) SystemParams%PostCAS
 
+ case ("TWOMOINT")
+
+      SystemParams%DeclareTwoMo = .true.
+
+      if(uppercase(val) == "FULL".or. &
+         uppercase(val) == "FFFF") then
+
+         SystemParams%TwoMoInt = TWOMO_FFFF
+
+      elseif(uppercase(val) == 'FOFO') then
+          
+         SystemParams%TwoMoInt = TWOMO_FOFO
+
+      elseif(uppercase(val) == 'INCORE'.or. &
+             uppercase(val) == 'IN-CORE') then
+ 
+         SystemParams%TwoMoInt = TWOMO_INCORE
+      endif
+
  case ("ISHF")
        read(val,*) SystemParams%ISHF
 

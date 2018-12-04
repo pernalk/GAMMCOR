@@ -39,6 +39,10 @@ integer, parameter :: RDM_TYPE_CAS  = 3
 integer, parameter :: RDM_TYPE_DMRG = 4
 integer, parameter :: RDM_TYPE_HF   = 5
 
+integer, parameter :: TWOMO_INCORE = 1
+integer, parameter :: TWOMO_FFFF   = 2
+integer, parameter :: TWOMO_FOFO   = 3
+
 integer, parameter :: DF_NONE       = 0
 integer, parameter :: DF_SRLDA      = 1
 integer, parameter :: DF_SRPBE      = 2
@@ -122,9 +126,11 @@ type SystemBlock
       integer :: IWarn = 0
       integer :: icnt
       integer :: num0,num1,num2
+      integer :: TwoMoInt = TWOMO_INCORE
+      logical :: DeclareTwoMo = .false.
       logical :: ISHF = .false. 
       logical :: doRSH = .false.
-      logical :: PostCAS =.false. 
+      logical :: PostCAS =.false.
       double precision :: ThrAct = 0.992d0
       double precision :: ThrSelAct = 1.d-8 
       integer,allocatable :: IGem(:), IndAux(:)
@@ -827,9 +833,15 @@ implicit none
 
 character(*) :: filename
 integer :: iunit
+logical :: iexist
 
- open(newunit=iunit,file=trim(filename),status='OLD')
- close(iunit,status='DELETE')
+ inquire(file=trim(filename),EXIST=iexist)
+ if(iexist) then
+   open(newunit=iunit,file=trim(filename),status='OLD')
+   close(iunit,status='DELETE')
+ else
+   write(LOUT,'(1x,a)') 'WARNING! NOT POSSIBLE TO DELETE '// filename //' FILE'
+ endif
 
 end subroutine delfile
 
