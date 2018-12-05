@@ -1,12 +1,14 @@
 *Deck EPotSR
       Subroutine EPotSR(EnSR,VSR,Occ,URe,UNOAO,
      $ OrbGrid,OrbXGrid,OrbYGrid,
-     $ OrbZGrid,WGrid,NSymMO,TwoEl,TwoElErf,
+C    HAP
+C     $ OrbZGrid,WGrid,NSymMO,TwoEl,TwoElErf,
+     $ OrbZGrid,WGrid,NSymMO,VCoul,
      $ Omega,Flag,NGrid,NInte1,NInte2,NBasis) 
 C
 C     RETURNS SR ENERGY AND POTENTIAL = SR_XC + SR_H
 C
-      use tran 
+      use abmat
 C
       Implicit Real*8 (A-H,O-Z)
 C
@@ -19,7 +21,9 @@ C
       Dimension VSR(NInte1),OrbGrid(NGrid,NBasis),WGrid(NGrid),
      $ Occ(NBasis),URe(NBasis,NBasis),
      $ UNOAO(NBasis,NBasis),
-     $ TwoEl(NInte2),TwoElErf(NInte2),
+C    HAP
+C     $ TwoEl(NInte2),TwoElErf(NInte2),
+     $ VCoul(NInte1),
      $ NSymMO(NBasis)
       Dimension OrbXGrid(NGrid,NBasis),OrbYGrid(NGrid,NBasis),
      $ OrbZGrid(NGrid,NBasis)
@@ -39,8 +43,13 @@ C
 C     COMPUTE THE HARTREE POTENTIAL AND THE ENERGY
 C     HAP: VHSR is computed in AO during canonicalization
 C
-      Call PotHSR(VHSR,Occ,URe,TwoEl,TwoElErf,NInte1,NInte2,NBasis)
-C      Call PotHSR_mithap(VHSR,Occ,UNOAO,NBasis)
+C     sth wrong with PotHSR_mithap
+      !Call PotHSR_mithap(VHSR,Occ,UNOAO,NBasis)
+      Call tran_matTr(VCoul,UNOAO,UNOAO,NBasis,.true.) 
+      VHSR = VCoul
+C     Old:
+C      Call PotHSR(VHSR,Occ,URe,TwoEl,TwoElErf,NInte1,NInte2,NBasis)
+C      Print*,'VHSR-Ka', norm2(VHSR)
 C
       Call VecTr(Gamma,Occ,URe,NBasis)
       EnHSR=Zero

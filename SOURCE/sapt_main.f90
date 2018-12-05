@@ -232,7 +232,7 @@ logical :: doRSH
                   SAPT%monA%num1+SAPT%monA%num2,Ca(NBasis*SAPT%monA%num0+1:NBasis**2),&
                   SAPT%monB%num0+SAPT%monB%num1,Cb,&
                   SAPT%monB%num1+SAPT%monB%num2,Cb(NBasis*SAPT%monB%num0+1:NBasis**2),&
-                  'TWOMOAB')
+                  'TWOMOAB','AOTWOSORT')
 
    ! testing Ecorr ERPASYMM/ERPAVEC
    !call tran4_gen(NBasis,&
@@ -240,19 +240,19 @@ logical :: doRSH
    !               SAPT%monA%num1+SAPT%monA%num2,Ca(NBasis*SAPT%monA%num0+1:NBasis**2),&
    !               SAPT%monA%num0+SAPT%monA%num1,Ca,&
    !               SAPT%monA%num1+SAPT%monA%num2,Ca(NBasis*SAPT%monA%num0+1:NBasis**2),&
-   !               'TMPMOAA')
+   !               'TMPMOAA','AOTWOSORT')
    !call tran4_gen(NBasis,&
    !               SAPT%monB%num0+SAPT%monB%num1,Cb,&
    !               SAPT%monB%num1+SAPT%monB%num2,Cb(NBasis*SAPT%monB%num0+1:NBasis**2),&
    !               SAPT%monB%num0+SAPT%monB%num1,Cb,&
    !               SAPT%monB%num1+SAPT%monB%num2,Cb(NBasis*SAPT%monB%num0+1:NBasis**2),&
-   !               'TMPMOBB')
+   !               'TMPMOBB','AOTWOSORT')
 
    ! this is for testing E1exchS2...
    !call tran4_gen(NBasis,&
    !               NBasis,Ca,NBasis,Ca,&
    !               NBasis,Cb,NBasis,Cb,&
-   !               'TMPMOAB')
+   !               'TMPMOAB','AOTWOSORT')
 
    ! <oo|oo>
    call tran4_gen(NBasis,&
@@ -260,7 +260,7 @@ logical :: doRSH
                   SAPT%monA%num0+SAPT%monA%num1,Ca,&
                   SAPT%monB%num0+SAPT%monB%num1,Cb,&
                   SAPT%monB%num0+SAPT%monB%num1,Cb,&
-                  'TMPOOAB')
+                  'TMPOOAB','AOTWOSORT')
 
  elseif(Flags%ISERPA==2.and.Flags%ISHF==0) then
    ! integrals stored as (oFull,oFull)
@@ -269,12 +269,12 @@ logical :: doRSH
                   NBasis,Ca,&
                   SAPT%monB%num0+SAPT%monB%num1,Cb,&
                   NBasis,Cb,&
-                  'TWOMOAB')
+                  'TWOMOAB','AOTWOSORT')
    ! this is for testing E1exchS2...
    call tran4_gen(NBasis,&
                   NBasis,Ca,NBasis,Ca,&
                   NBasis,Cb,NBasis,Cb,&
-                  'TMPMOAB')
+                  'TMPMOAB','AOTWOSORT')
 
 
  endif
@@ -316,12 +316,12 @@ logical :: doRSH
                       NBasis,SAPT%monA%CMO,&
                       (SAPT%monB%num0+SAPT%monB%num1),SAPT%monB%CMO,&
                       NBasis,SAPT%monB%CMO,&
-                      'TWOMOAB')
+                      'TWOMOAB','AOTWOSORT')
  
      !call tran4_gen(NBasis,&
      !             NBasis,Ca,NBasis,Ca,&
      !             NBasis,Cb,NBasis,Cb,&
-     !             'TMPMOAB')
+     !             'TMPMOAB','AOTWOSORT')
 
  endif
 
@@ -765,7 +765,7 @@ integer :: info
    endif
 
  endif
- call tran_matTr(work2,OrbSym,OrbSym,NBasis)
+ call tran_matTr(work2,OrbSym,OrbSym,NBasis,.false.)
 
  Fock = 0
  work3 = 0
@@ -1027,6 +1027,7 @@ double precision :: ACAlpha,Omega,EnSR,ECorr,ECASSCF,XVSR
 double precision :: Tcpu,Twall
 character(8) :: label
 character(:),allocatable :: onefile,twofile,twoerffile,&
+                            twojfile,twokfile,twojerf,twokerf, & 
                             propfile,propfile0,propfile1,rdmfile
 double precision,parameter :: One = 1d0, Half = 0.5d0
 logical :: doRSH
@@ -1039,7 +1040,11 @@ logical :: doRSH
  if(Mon%Monomer==1) then
     onefile = 'ONEEL_A'
     twofile = 'TWOMOAA'
+    twojfile = 'FFOOAA'
+    twokfile = 'FOFOAA'
     twoerffile = 'MO2ERFAA'
+    twojerf = 'FFOOERFAA'
+    twokerf = 'FOFOERFAA'
     propfile = 'PROP_A'
     propfile0 = 'PROP_A0'
     propfile1 = 'PROP_A1'
@@ -1047,7 +1052,11 @@ logical :: doRSH
  elseif(Mon%Monomer==2) then
     onefile = 'ONEEL_B'
     twofile = 'TWOMOBB'
+    twojfile = 'FFOOBB'
+    twokfile = 'FOFOBB'
     twoerffile = 'MO2ERFBB'
+    twojerf = 'FFOOERFBB'
+    twokerf = 'FOFOERFBB'
     propfile = 'PROP_B'
     propfile0 = 'PROP_B0'
     propfile1 = 'PROP_B1'
@@ -1060,18 +1069,19 @@ logical :: doRSH
  NInte2 = NInte1*(NInte1+1)/2
 
  allocate(work1(NSq),work2(NSq),XOne(NInte1),URe(NBas,NBas),VSR(NInte1))
- allocate(TwoMO(NInte2))
- allocate(TwoElErf(NInte2))
-! if(doRSH) allocate(TwoElErf(NInte2))
+ if(Mon%TwoMoInt==1) then
+    allocate(TwoMO(NInte2))
+    allocate(TwoElErf(NInte2))
+    !if(doRSH) allocate(TwoElErf(NInte2))
+ endif
  
  URe = 0d0
  do i=1,NBas
     URe(i,i) = 1d0
  enddo
 
-! read 1-el
-
- !add Coulomb (RSH: sr Coulomb)
+ ! read 1-el
+ ! add Coulomb (RSH: sr Coulomb)
  call triang_to_sq(Mon%VCoul,work2,NBas)
  open(newunit=ione,file=onefile,access='sequential',&
       form='unformatted',status='old')
@@ -1098,32 +1108,68 @@ logical :: doRSH
           OrbXGrid(NGrid*NBas),OrbYGrid(NGrid*NBas),OrbZGrid(NGrid*NBas))
 
  ! load orbgrid and gradients, and wgrid
- ! transpose them bastards!!!!
  call transp_mat1dim(MO,work1,NBas) 
  call molprogrid(OrbGrid,OrbXGrid,OrbYGrid,OrbZGrid, &
-                 WGrid,work1,NGrid,NBas)
+                                WGrid,work1,NGrid,NBas)
 
  ! set/load Omega - range separation parameter
  write(LOUT,'(1x,a,f15.8)') "The range-separation parameter =",Mon%Omega
  
- ! transform and read 2-el integrals
- call tran4_full(NBas,MO,MO,twofile,'AOTWOSORT')
- call LoadSaptTwoEl(Mon%Monomer,TwoMO,NBas,NInte2)
+ ! transform 2-el integrals
+ select case(Mon%TwoMoInt)
+ case(TWOMO_INCORE,TWOMO_FFFF) 
+    ! full 
+    call tran4_full(NBas,MO,MO,twofile,'AOTWOSORT')
+ case(TWOMO_FOFO) 
+    ! transform J and K
+    call tran4_gen(NBas,&
+             Mon%num0+Mon%num1,MO(1:NBas*(Mon%num0+Mon%num1)),&
+             Mon%num0+Mon%num1,MO(1:NBas*(Mon%num0+Mon%num1)),&
+             NBas,MO,&
+             NBas,MO,&
+             twojfile,'AOTWOSORT')
+    call tran4_gen(NBas,&
+             NBas,MO,&
+             Mon%num0+Mon%num1,MO(1:NBas*(Mon%num0+Mon%num1)),&
+             NBas,MO,&
+             Mon%num0+Mon%num1,MO(1:NBas*(Mon%num0+Mon%num1)),&
+             twokfile,'AOTWOSORT')
+ end select
+ if(Mon%TwoMoInt==TWOMO_INCORE) call LoadSaptTwoEl(Mon%Monomer,TwoMO,NBas,NInte2)
 
- TwoElErf(1:NInte2) = 0
+ ! trasform LR integrals
  if(doRSH) then
-    TwoElErf(1:NInte2) = 0
-    call tran4_full(NBas,MO,MO,twoerffile,'AOERFSORT')
-    call LoadSaptTwoEl(Mon%Monomer+4,TwoElErf,NBas,NInte2)
+   select case(Mon%TwoMoInt)
+   case(TWOMO_INCORE)
+      TwoElErf(1:NInte2) = 0
+      call tran4_full(NBas,MO,MO,twoerffile,'AOERFSORT')
+   case(TWOMO_FFFF) 
+      call tran4_full(NBas,MO,MO,twoerffile,'AOERFSORT')
+   case(TWOMO_FOFO) 
+      call tran4_gen(NBas,&
+              Mon%num0+Mon%num1,MO(1:NBas*(Mon%num0+Mon%num1)),&
+              Mon%num0+Mon%num1,MO(1:NBas*(Mon%num0+Mon%num1)),&
+              NBas,MO,&
+              NBas,MO,&
+              twojerf,'AOERFSORT')
+      call tran4_gen(NBas,&
+              NBas,MO,&
+              Mon%num0+Mon%num1,MO(1:NBas*(Mon%num0+Mon%num1)),&
+              NBas,MO,&
+              Mon%num0+Mon%num1,MO(1:NBas*(Mon%num0+Mon%num1)),&
+              twokerf,'AOERFSORT')
+   end select
+   if(Mon%TwoMoInt==TWOMO_INCORE) call LoadSaptTwoEl(Mon%Monomer+4,TwoElErf,NBas,NInte2)
  endif
 
- print*, 'TwoMO ',norm2(TwoMO)
- print*, 'TwoErf',norm2(TwoElerf)
+ !print*, 'TwoMO ',norm2(TwoMO)
+ !print*, 'TwoErf',norm2(TwoElerf)
 
  NSymNO(1:NBas) = 1
  call EPotSR(EnSR,VSR,Mon%Occ,URe,MO,& 
             OrbGrid,OrbXGrid,OrbYGrid,OrbZGrid,WGrid,&
-            NSymNO,TwoMO,TwoElErf,&
+!            NSymNO,TwoMO,TwoElErf,&
+            NSymNO,Mon%VCoul,&
             Mon%Omega,Flags%IFunSR,&
             NGrid,NInte1,NInte2,NBas)
 
@@ -1131,10 +1177,8 @@ logical :: doRSH
  if(Mon%PostCAS) then
     write(LOUT,*) 'TEST POSTCAS!'
     XOne = XOne + VSR 
- ! here: check energy properly! add VCoul in NOs
  endif
  write(LOUT,'(1x,a,f15.8)') "SR Energy: ",EnSR
- print*, 'XOne:',norm2(XOne)
 
  XVSR = 0 
  do i=1,NBas
@@ -1149,37 +1193,54 @@ logical :: doRSH
 
  ! read 2-RDMs
  call read2rdm(Mon,NBas)
-
  call system('cp '//rdmfile// ' rdm2.dat')
 
  ECASSCF = 0
 ! if(doRSH) then 
-   call AB_CAS(ABPlus,ABMin,ECASSCF,URe,Mon%Occ,XOne,TwoElErf,Mon%IPair,&
-               Mon%IndN,Mon%IndX,Mon%NDimX,NBas,Mon%NDimX,NInte1,NInte2,ACAlpha)
-  !call AB_CAS_mithap(ABPlus,ABMin,ECASSCF,URe,Mon%Occ,XOne, &
-  !             Mon%IndN,Mon%IndX,Mon%IGem,Mon%NAct,Mon%INAct,Mon%NDimX,NBas,Mon%NDimX,&
-  !             NInte1,twoerffile,ACAlpha,.false.)
-   print*, 'ABPlus',norm2(ABPlus),'ABMin',norm2(ABMin)
+ select case(Mon%TwoMoInt)
+ case(TWOMO_INCORE)
+    call AB_CAS(ABPlus,ABMin,ECASSCF,URe,Mon%Occ,XOne,TwoElErf,Mon%IPair,&
+                Mon%IndN,Mon%IndX,Mon%NDimX,NBas,Mon%NDimX,NInte1,NInte2,ACAlpha)
+ case(TWOMO_FFFF)
+    call AB_CAS_mithap(ABPlus,ABMin,ECASSCF,URe,Mon%Occ,XOne, &
+                Mon%IndN,Mon%IndX,Mon%IGem,Mon%NAct,Mon%INAct,Mon%NDimX,NBas,Mon%NDimX,&
+                NInte1,twoerffile,ACAlpha,.false.)
+ case(TWOMO_FOFO)
+    call AB_CAS_FOFO(ABPlus,ABMin,ECASSCF,URe,Mon%Occ,XOne, &
+                Mon%IndN,Mon%IndX,Mon%IGem,Mon%NAct,Mon%INAct,Mon%NDimX,NBas,Mon%NDimX,&
+                NInte1,twojerf,twokerf,ACAlpha,.false.)
 !else
 ! HERE:: ADD SEPARATE PROCEDURE FOR Kohn-Sham! 
 !endif
-
+ end select
+ print*, 'ABPlus',norm2(ABPlus),'ABMin',norm2(ABMin)
+ 
  ! ADD CONTRIBUTIONS FROM THE (sr)ALDA KERNEL TO AB MATRICES
  MultpC(1,1)=1
  call GetKerNPT(SRKer,Mon%Occ,URe,OrbGrid,WGrid,NSymNO,MultpC, &
                 NBas,NGrid)
-
  call clock('START',Tcpu,Twall)
- call ModABMin(Mon%Occ,SRKer,WGrid,OrbGrid,TwoMO,TwoElErf,ABMin,&
-                 Mon%IndN,Mon%IndX,Mon%NDimX,NGrid,NInte2,NBas)
- print*, 'ABMin-Kasia',norm2(ABMin)
- !call ModABMin_mithap(Mon%Occ,SRKer,WGrid,OrbGrid,ABMin,&
- !                Mon%IndN,Mon%IndX,Mon%NDimX,NGrid,NBas,&
- !                twofile,twoerffile)
- !print*, 'ABMin-MY',norm2(ABMin)
+ select case(Mon%TwoMoInt)
+ case(TWOMO_INCORE)
+    !call ModABMin(Mon%Occ,SRKer,WGrid,OrbGrid,TwoMO,TwoElErf,ABMin,&
+    !              Mon%IndN,Mon%IndX,Mon%NDimX,NGrid,NInte2,NBas)
+    call ModABMin_old(Mon%Occ,SRKer,WGrid,OrbGrid,TwoMO,TwoElErf,ABMin,&
+                    Mon%IndN,Mon%IndX,Mon%NDimX,NGrid,NInte2,NBas)
+    print*, 'ABMin-Kasia',norm2(ABMin)
+ case(TWOMO_FFFF)
+    call ModABMin_mithap(Mon%Occ,SRKer,WGrid,OrbGrid,ABMin,&
+                         Mon%IndN,Mon%IndX,Mon%NDimX,NGrid,NBas,&
+                         twofile,twoerffile)
+ case(TWOMO_FOFO)
+    call ModABMin_FOFO(Mon%Occ,SRKer,WGrid,OrbGrid,ABMin,&
+                       Mon%IndN,Mon%IndX,Mon%NDimX,NGrid,NBas,&
+                       Mon%num0+Mon%num1, & 
+                       twokfile,twokerf)
+    print*, 'ABMin-MY',norm2(ABMin)
+ end select
  call clock('Mod ABMin',Tcpu,Twall)
 
- write(LOUT,'(1x,a)') "*** sr-kernel added. ***"
+ !write(LOUT,'(1x,a)') "*** sr-kernel added. ***"
  ! test true energy
  write(LOUT,'(/,1x,a,f15.8)') "Total lrCASSCF+ENuc+srDF Energy", ECASSCF-XVSR+EnSR+Mon%PotNuc
 
@@ -1192,13 +1253,15 @@ logical :: doRSH
     write(LOUT,'(i4,4x,e16.6)') i,Eig(i)
  enddo 
 
- ECorr=0
- call ACEneERPA(ECorr,EigVecR,Eig,TwoMO,URe,Mon%Occ,XOne,&
-      Mon%IndN,NBas,NInte1,NInte2,Mon%NDimX,Mon%NGem)
- ECorr=Ecorr*0.5d0
- 
- write(LOUT,'(/,1x,''ECASSCF+ENuc, Corr, ERPA-CASSCF'',6x,3f15.8)') &
-      ECASSCF+Mon%PotNuc,ECorr,ECASSCF+Mon%PotNuc+ECorr
+ !ECorr=0
+ !!call ACEneERPA(ECorr,EigVecR,Eig,TwoMO,URe,Mon%Occ,XOne,&
+ !!     Mon%IndN,NBas,NInte1,NInte2,Mon%NDimX,Mon%NGem)
+ !  call ACEneERPA_FOFO(ECorr,EigVecR,Eig,Mon%Occ, &
+ !                      Mon%IGem,Mon%IndN,Mon%IndX,Mon%num0+Mon%num1, &
+ !                      Mon%NDimX,NBas,twokfile)
+ !ECorr=Ecorr*0.5d0
+ !write(LOUT,'(/,1x,''ECASSCF+ENuc, Corr, ERPA-CASSCF'',6x,3f15.8)') &
+ !     ECASSCF+Mon%PotNuc,ECorr,ECASSCF+Mon%PotNuc+ECorr
 
 ! dump response
  call writeresp(EigVecR,Eig,propfile)
@@ -1239,9 +1302,11 @@ logical :: doRSH
  
  deallocate(Eig,EigVecR,ABMin,ABPlus)
  deallocate(SRKer,SRKerW,OrbZGrid,OrbYGrid,OrbXGrid,OrbGrid,WGrid)
- deallocate(TwoMO)
-! if(doRSH) deallocate(TwoElErf)
- deallocate(TwoElErf)
+ if(Mon%TwoMoInt==1) then
+    deallocate(TwoMO)
+    ! if(doRSH) deallocate(TwoElErf)
+    deallocate(TwoElErf)
+ endif
  deallocate(VSR,URe,XOne,work1,work2)
 
 end subroutine calc_resp_dft
@@ -1386,7 +1451,7 @@ double precision, allocatable :: EigTmp(:), VecTmp(:)
     stop
  endif
 
- ! transform and 2-el integrals
+ ! transform 2-el integrals
  select case(Mon%TwoMoInt)
 
  case(TWOMO_INCORE,TWOMO_FFFF) 
@@ -1400,13 +1465,13 @@ double precision, allocatable :: EigTmp(:), VecTmp(:)
          Mon%num0+Mon%num1,MO(1:NBas*(Mon%num0+Mon%num1)),&
          NBas,MO,&
          NBas,MO,&
-         twojfile)
+         twojfile,'AOTWOSORT')
     call tran4_gen(NBas,&
          NBas,MO,&
          Mon%num0+Mon%num1,MO(1:NBas*(Mon%num0+Mon%num1)),&
          NBas,MO,&
          Mon%num0+Mon%num1,MO(1:NBas*(Mon%num0+Mon%num1)),&
-         twokfile)
+         twokfile,'AOTWOSORT')
  end select
  if(Mon%TwoMoInt==TWOMO_INCORE) call LoadSaptTwoEl(Mon%Monomer,TwoMO,NBas,NInte2)
 

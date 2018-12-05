@@ -2444,6 +2444,8 @@ integer :: i,IRow,ICol,ia,ib,iab,ic,id,icd
 double precision :: XKer1234,TwoSR,CA,CB,CC,CD
 integer,external :: NAddr3,NAddrrK
 
+print*, 'MOD-OLD!!!!'
+
 allocate(work(NGrid))
 
 do i=1,NBasis
@@ -2539,6 +2541,7 @@ do offset=0,NGrid,maxlen
          enddo
          
          ABKer(iab,icd) = ABKer(iab,icd) + XKer1234
+         ABKer(icd,iab) = ABKer(iab,icd)
       
       enddo
    enddo
@@ -2558,13 +2561,13 @@ do IRow=1,NDimX
       icd=IndX(ICol)
       CC=CICoef(ic)
       CD=CICoef(id)
-      if(icd.gt.iab) cycle
+      !if(icd.gt.iab) cycle
  
       TwoSR=TwoNO(NAddr3(ia,ib,ic,id))-TwoElErf(NAddr3(ia,ib,ic,id))
       
       ABMin(iab,icd) = ABMin(iab,icd) &
                        +4.0d0*(CA+CB)*(CD+CC)*(ABKer(iab,icd)+TwoSR)
-      ABMin(icd,iab) = ABMin(iab,icd)   
+      !ABMin(icd,iab) = ABMin(iab,icd)   
 
    enddo
 enddo
@@ -2572,6 +2575,131 @@ enddo
 deallocate(ABKer,batch,work)
 
 end subroutine ModABMin
+
+subroutine ModABMin_FOFO(Occ,SRKer,Wt,OrbGrid,ABMin,IndN,IndX,NDimX,NGrid,NBasis,&
+                         NOccup,twokfile,twokerf)
+!     ADD CONTRIBUTIONS FROM THE srALDA KERNEL TO AB MATRICES
+implicit none
+
+integer,parameter :: maxlen = 128
+integer,intent(in) :: NBasis,NDimX,NGrid,NOccup
+integer,intent(in) :: IndN(2,NDimX),IndX(NDimX)
+character(*),intent(in) :: twokfile,twokerf
+double precision,intent(in) :: Occ(NBasis),SRKer(NGrid), &
+                               Wt(NGrid),OrbGrid(NGrid,NBasis)
+double precision,intent(inout) :: ABMin(NDimX,NDimX)
+
+integer :: offset,batchlen,iunit1,iunit2
+integer :: iunit3,iunit4
+integer :: i,j,k,l,kl,ip,iq,ir,is,irs,ipq,igrd
+integer :: IRow,ICol
+double precision :: XKer1234,TwoSR,Cpq,Crs
+integer :: pos(NBasis,NBasis)
+double precision :: CICoef(NBasis)
+double precision,allocatable :: work1(:),work2(:),WtKer(:)
+double precision,allocatable :: batch(:,:),ABKer(:,:)
+double precision,allocatable :: ints1(:,:),ints2(:,:)
+
+do i=1,NBasis
+   CICoef(i) = sign(sqrt(Occ(i)),Occ(i)-0.5d0)
+enddo
+
+allocate(work1(NBasis**2),work2(NBasis**2),ints1(NBasis,NBasis),ints2(NBasis,NBasis),&
+         WtKer(maxlen),batch(maxlen,NBasis),ABKer(NDimX,NDimX))
+
+pos = 0
+do i=1,NDimX
+   pos(IndN(1,i),IndN(2,i)) = IndX(i)
+enddo
+
+ABKer = 0
+
+print*, 'ModABMin_FOFO'
+
+do offset=0,NGrid,maxlen
+   batchlen = min(NGrid-offset,maxlen)
+   if(batchlen==0) exit
+
+   WtKer(1:batchlen) = Wt(offset+1:offset+batchlen)*SRKer(offset+1:offset+batchlen)
+   batch(1:batchlen,1:NBasis) = OrbGrid(offset+1:offset+batchlen,1:NBasis)
+
+   do IRow=1,NDimX
+      ip = IndN(1,IRow)
+      iq = IndN(2,IRow)
+      ipq = IndX(IRow)
+   
+      do ICol=1,NDimX
+         ir=IndN(1,ICol)
+         is=IndN(2,ICol)
+         irs=IndX(ICol)
+         if(irs.gt.ipq) cycle
+    
+         XKer1234 = 0
+         do i=1,batchlen
+            XKer1234 = XKer1234 + WtKer(i)* &
+            batch(i,ip)*batch(i,iq)*batch(i,ir)*batch(i,is)
+         enddo
+         
+         ABKer(ipq,irs) = ABKer(ipq,irs) + XKer1234
+         ABKer(irs,ipq) = ABKer(ipq,irs)
+      
+      enddo
+   enddo
+
+enddo
+
+open(newunit=iunit1,file=trim(twokfile),status='OLD', &
+     access='DIRECT',recl=8*NBasis*NOccup)
+open(newunit=iunit2,file=trim(twokerf),status='OLD', &
+     access='DIRECT',recl=8*NBasis*NOccup)
+
+kl = 0
+do k=1,NOccup
+   do l=1,NBasis
+      kl = kl + 1
+      if(pos(l,k)/=0) then
+        irs = pos(l,k)
+        ir = l
+        is = k
+        read(iunit1,rec=kl) work1(1:NBasis*NOccup)
+        read(iunit2,rec=kl) work2(1:NBasis*NOccup)
+        do j=1,NOccup
+           do i=1,NBasis
+              ints1(i,j) = work1((j-1)*NBasis+i)
+              ints2(i,j) = work2((j-1)*NBasis+i)
+           enddo
+        enddo
+        ints1(:,NOccup+1:NBasis) = 0
+        ints2(:,NOccup+1:NBasis) = 0
+
+        do j=1,NBasis
+           do i=1,j
+              if(pos(j,i)/=0) then
+                ipq = pos(j,i)
+                Crs = CICoef(l)+CICoef(k)
+                Cpq = CICoef(j)+CICoef(i)
+                !if(irs.gt.ipq) cycle
+
+                TwoSR = ints1(j,i)-ints2(j,i)
+
+                ABMIN(ipq,irs) = ABMIN(ipq,irs) & 
+                               + 4.0d0*Cpq*Crs*(TwoSR+ABKer(ipq,irs))
+                !ABMIN(irs,ipq) = ABMIN(ipq,irs) 
+
+              endif  
+           enddo
+        enddo
+
+      endif 
+   enddo
+enddo 
+
+close(iunit2)
+close(iunit1)
+
+deallocate(ABKer,batch,WtKer,ints2,ints1,work2,work1)
+
+end subroutine ModABMin_FOFO
 
 subroutine ModABMin_mithap(Occ,SRKer,Wt,OrbGrid,ABMin,IndN,IndX,NDimX,NGrid,NBasis,&
                            twofile,twoerfile)
@@ -2637,6 +2765,7 @@ do offset=0,NGrid,maxlen
          enddo
          
          ABKer(ipq,irs) = ABKer(ipq,irs) + XKer1234
+         ABKer(irs,ipq) = ABKer(ipq,irs)
       
       enddo
    enddo
@@ -2665,13 +2794,13 @@ do l=1,NBasis
                 ipq = pos(j,i)
                 Crs = CICoef(l)+CICoef(k)
                 Cpq = CICoef(j)+CICoef(i)
-                if(irs.gt.ipq) cycle
+                !if(irs.gt.ipq) cycle
 
                 TwoSR = ints1(i,j)-ints2(i,j)
 
                 ABMIN(ipq,irs) = ABMIN(ipq,irs) & 
                                + 4.0d0*Cpq*Crs*(TwoSR+ABKer(ipq,irs))
-                ABMIN(irs,ipq) = ABMIN(ipq,irs) 
+                !ABMIN(irs,ipq) = ABMIN(ipq,irs) 
 
               endif  
            enddo

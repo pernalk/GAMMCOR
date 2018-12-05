@@ -295,7 +295,7 @@ integer :: i,rs,ab
 
 end subroutine tran4_full
 
-subroutine tran4_gen(NBas,nA,CA,nB,CB,nC,CC,nD,CD,fname)
+subroutine tran4_gen(NBas,nA,CA,nB,CB,nC,CC,nD,CD,fname,srtfile)
 ! 4-index transformation out of core
 ! dumps all integrals on disk in the (square,square) form
 ! CAREFUL: C have to be in AOMO form!
@@ -307,7 +307,7 @@ integer,intent(in) :: NBas
 integer,intent(in) :: nA,nB,nC,nD
 ! CA(NBas*nA)
 double precision,intent(in) :: CA(*), CB(*), CC(*), CD(*)
-character(*) :: fname
+character(*) :: fname,srtfile
 double precision, allocatable :: work1(:), work2(:), work3(:,:)
 integer :: iunit,iunit2,iunit3
 integer :: ntr,nAB,nCD,nloop
@@ -330,7 +330,8 @@ integer :: i,rs,ab
  allocate(work3(cbuf,nAB))
 
 
- open(newunit=iunit,file='AOTWOSORT',status='OLD',&
+ !open(newunit=iunit,file='AOTWOSORT',status='OLD',&
+ open(newunit=iunit,file=trim(srtfile),status='OLD',&
       access='DIRECT',form='UNFORMATTED',recl=8*ntr)
 
  ! half-transformed file
@@ -527,10 +528,11 @@ double precision,contiguous :: work(:)
 
 end subroutine tran_oneint
 
-subroutine tran_matTr(ints,MO1,MO2,nbas)
+subroutine tran_matTr(ints,MO1,MO2,nbas,tran)
 implicit none
 
 integer,intent(in) :: nbas
+logical,intent(in) :: tran
 double precision,intent(inout) :: ints(nbas*(nbas+1)/2)
 double precision,intent(in) :: MO1(nbas,nbas),MO2(nbas,nbas)
 double precision,allocatable :: work1(:),work2(:)
@@ -539,8 +541,13 @@ allocate(work1(nbas*nbas),work2(nbas*nbas))
  call triang_to_sq(ints,work1,nbas)
 
  if(nbas>0) then
-    call dgemm('N','N',nbas,nbas,nbas,1d0,MO1,nbas,work1,nbas,0d0,work2,nbas)
-    call dgemm('N','T',nbas,nbas,nbas,1d0,work2,nbas,MO2,nbas,0d0,work1,nbas)
+    if(tran) then
+       call dgemm('T','N',nbas,nbas,nbas,1d0,MO1,nbas,work1,nbas,0d0,work2,nbas)
+       call dgemm('N','N',nbas,nbas,nbas,1d0,work2,nbas,MO2,nbas,0d0,work1,nbas)
+    else
+       call dgemm('N','N',nbas,nbas,nbas,1d0,MO1,nbas,work1,nbas,0d0,work2,nbas)
+       call dgemm('N','T',nbas,nbas,nbas,1d0,work2,nbas,MO2,nbas,0d0,work1,nbas)
+    endif    
  endif
 
  call sq_to_triang(work1,ints,nbas)

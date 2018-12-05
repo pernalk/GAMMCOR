@@ -4554,7 +4554,7 @@ call make_J1(NBasis,work,J,'AOTWOSORT')
 call make_J1(NBasis,work,Jerf,'AOERFSORT')
 work = J - Jerf
 call sq_to_triang2(work,VHSR,NBasis) 
-call tran_matTr(VHSR,MO,MO,NBasis)
+call tran_matTr(VHSR,MO,MO,NBasis,.false.)
 
 deallocate(work,J,Jerf)
 
