@@ -1959,6 +1959,8 @@ C
       Implicit Real*8 (A-H,O-Z)
 C
       Parameter(Zero=0.D0,Half=0.5D0,One=1.D0,Two=2.D0,Three=3.D0,
+C     OLD:
+C     $ Four=4.D0,Small=1.D-10)
      $ Four=4.D0,Small=1.D-2)
 C
       Integer :: DimV1,Max_NDEG

@@ -1687,6 +1687,13 @@ double precision :: Alpha, Beta
     NBas = A%NBasis 
  endif
 
+! print thresholds
+ if(SAPT%IPrint>1) then 
+    write(LOUT,'(/,1x,a)') 'Thresholds in E2disp:'
+    write(LOUT,'(1x,a,2x,e15.4)') 'SmallE      =', SmallE
+    write(LOUT,'(1x,a,2x,e15.4)') 'BigE        =', BigE
+ endif
+
 ! set dimensions
  NInte1 = NBas*(NBas+1)/2
  NInte2 = NInte1*(NInte1+1)/2
@@ -2129,8 +2136,8 @@ double precision,allocatable :: work(:)
 double precision :: fact
 double precision :: e2d1,e2d2,e2d3,e2d4,e2d,tmp
 double precision :: e2du,dea,deb
-!double precision,parameter :: SmallE = 1.d-6
-double precision,parameter :: SmallE = 1.d-1
+double precision,parameter :: SmallE = 1.d-6
+!double precision,parameter :: SmallE = 1.d-1
 
 
  if(A%NBasis.ne.B%NBasis) then

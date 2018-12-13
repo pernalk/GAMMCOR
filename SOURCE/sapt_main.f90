@@ -187,7 +187,14 @@ logical :: doRSH
     call readtwoint(NBasis,1,'AOTWOINT_A','AOTWOSORT')
  elseif(SAPT%InterfaceType==2) then
     call readtwoint(NBasis,2,'AOTWOINT.mol','AOTWOSORT')
-    if(doRSH) call readtwoint(NBasis,2,'AOTWOINT.erf','AOERFSORT')
+    if(doRSH) then
+       if(SAPT%SameOm) then
+          call readtwoint(NBasis,2,'AOTWOINT.erf','AOERFSORT')
+       else 
+          call readtwoint(NBasis,2,'AOTWOINT.erf','AOERFSORT')
+          call readtwoint(NBasis,2,'AOTWOINT.erfB','AOERFSORTB')
+       endif
+    endif
  endif
 
  if(SAPT%InterfaceType==2) then
@@ -644,7 +651,7 @@ subroutine prepare_no(OneRdm,OrbAux,OrbCAS,Mon,IFunSR,NBasis)
 implicit none
 ! OrbCAS[inout] :: on input AOtoCAS
 !                  on output AOtoNO
-! OrbAux contains CAStoNO
+! OrbAux        :: on input CAStoNO
 
 type(SystemBlock) :: Mon
 
@@ -655,7 +662,7 @@ double precision,allocatable :: URe(:,:),OrbSym(:,:),Fock(:)
 double precision,allocatable :: work1(:),work2(:),work3(:)
 integer :: NOccup,NVirt
 integer :: i,j,ia,ib,iab,ioff,idx,NInte1
-character(:),allocatable :: onefile,rdmfile
+character(:),allocatable :: onefile,rdmfile,aoerfile
 ! testy
 integer :: info
 
@@ -666,9 +673,15 @@ integer :: info
  if(Mon%Monomer==1) then
    onefile = 'AOONEINT_A'
    rdmfile = '2RDMA'
+   aoerfile = 'AOERFSORT'
  elseif(Mon%Monomer==2) then
    onefile = 'AOONEINT_B'
    rdmfile = '2RDMB'
+   if(Mon%SameOm) then
+      aoerfile = 'AOERFSORT'
+   else
+      aoerfile = 'AOERFSORTB'
+   endif
  endif 
  
  allocate(Mon%NumOSym(15),Mon%IndInt(NBasis))
@@ -752,11 +765,12 @@ integer :: info
    ! add and store Coulomb 
    ! for RSH short-range Coulomb is stored
    allocate(Mon%VCoul(NInte1))
-   call PotCoul_mithap(Mon%VCoul,OneRdm,Mon%doRSH,NBasis)
+   call PotCoul_mithap(Mon%VCoul,OneRdm,Mon%doRSH,aoerfile,NBasis)
    ! RSH
    if(Mon%doRSH) then
      ! generate long-range Fock
-     call FockGen_mithap(work2,OneRdm,work1,NInte1,NBasis,'AOERFSORT')
+     print*, 'Check: prepare_no:',aoerfile
+     call FockGen_mithap(work2,OneRdm,work1,NInte1,NBasis,aoerfile)
      work2 = work2 + Mon%VCoul
    else
    ! non-hybrid DFAs
@@ -1026,7 +1040,7 @@ integer :: i,j,ii,ione
 double precision :: ACAlpha,Omega,EnSR,ECorr,ECASSCF,XVSR
 double precision :: Tcpu,Twall
 character(8) :: label
-character(:),allocatable :: onefile,twofile,twoerffile,&
+character(:),allocatable :: onefile,aoerfile,twofile,twoerffile,&
                             twojfile,twokfile,twojerf,twokerf, & 
                             propfile,propfile0,propfile1,rdmfile
 double precision,parameter :: One = 1d0, Half = 0.5d0
@@ -1049,6 +1063,7 @@ logical :: doRSH
     propfile0 = 'PROP_A0'
     propfile1 = 'PROP_A1'
     rdmfile='rdm2_A.dat'
+    aoerfile = 'AOERFSORT'
  elseif(Mon%Monomer==2) then
     onefile = 'ONEEL_B'
     twofile = 'TWOMOBB'
@@ -1061,6 +1076,11 @@ logical :: doRSH
     propfile0 = 'PROP_B0'
     propfile1 = 'PROP_B1'
     rdmfile='rdm2_B.dat'
+    if(Mon%SameOm) then
+       aoerfile = 'AOERFSORT'
+    else
+       aoerfile = 'AOERFSORTB'
+    endif
  endif
 
 ! set dimensions
@@ -1142,22 +1162,23 @@ logical :: doRSH
    select case(Mon%TwoMoInt)
    case(TWOMO_INCORE)
       TwoElErf(1:NInte2) = 0
-      call tran4_full(NBas,MO,MO,twoerffile,'AOERFSORT')
+     print*, 'Check: calc_resp_dft:',Mon%SameOm,aoerfile
+      call tran4_full(NBas,MO,MO,twoerffile,aoerfile)
    case(TWOMO_FFFF) 
-      call tran4_full(NBas,MO,MO,twoerffile,'AOERFSORT')
+      call tran4_full(NBas,MO,MO,twoerffile,aoerfile)
    case(TWOMO_FOFO) 
       call tran4_gen(NBas,&
               Mon%num0+Mon%num1,MO(1:NBas*(Mon%num0+Mon%num1)),&
               Mon%num0+Mon%num1,MO(1:NBas*(Mon%num0+Mon%num1)),&
               NBas,MO,&
               NBas,MO,&
-              twojerf,'AOERFSORT')
+              twojerf,aoerfile)
       call tran4_gen(NBas,&
               NBas,MO,&
               Mon%num0+Mon%num1,MO(1:NBas*(Mon%num0+Mon%num1)),&
               NBas,MO,&
               Mon%num0+Mon%num1,MO(1:NBas*(Mon%num0+Mon%num1)),&
-              twokerf,'AOERFSORT')
+              twokerf,aoerfile)
    end select
    if(Mon%TwoMoInt==TWOMO_INCORE) call LoadSaptTwoEl(Mon%Monomer+4,TwoElErf,NBas,NInte2)
  endif
@@ -1201,6 +1222,7 @@ logical :: doRSH
  case(TWOMO_INCORE)
     call AB_CAS(ABPlus,ABMin,ECASSCF,URe,Mon%Occ,XOne,TwoElErf,Mon%IPair,&
                 Mon%IndN,Mon%IndX,Mon%NDimX,NBas,Mon%NDimX,NInte1,NInte2,ACAlpha)
+    call EKT(URe,Mon%Occ,XOne,TwoElErf,NBas,NInte1,NInte2)
  case(TWOMO_FFFF)
     call AB_CAS_mithap(ABPlus,ABMin,ECASSCF,URe,Mon%Occ,XOne, &
                 Mon%IndN,Mon%IndX,Mon%IGem,Mon%NAct,Mon%INAct,Mon%NDimX,NBas,Mon%NDimX,&
@@ -1213,7 +1235,7 @@ logical :: doRSH
 ! HERE:: ADD SEPARATE PROCEDURE FOR Kohn-Sham! 
 !endif
  end select
- print*, 'ABPlus',norm2(ABPlus),'ABMin',norm2(ABMin)
+ write(LOUT,'(/,1x,a,f16.8,a,1x,f16.8)') 'ABPlus',norm2(ABPlus),'ABMin',norm2(ABMin)
  
  ! ADD CONTRIBUTIONS FROM THE (sr)ALDA KERNEL TO AB MATRICES
  MultpC(1,1)=1
@@ -1222,10 +1244,10 @@ logical :: doRSH
  call clock('START',Tcpu,Twall)
  select case(Mon%TwoMoInt)
  case(TWOMO_INCORE)
-    !call ModABMin(Mon%Occ,SRKer,WGrid,OrbGrid,TwoMO,TwoElErf,ABMin,&
-    !              Mon%IndN,Mon%IndX,Mon%NDimX,NGrid,NInte2,NBas)
-    call ModABMin_old(Mon%Occ,SRKer,WGrid,OrbGrid,TwoMO,TwoElErf,ABMin,&
-                    Mon%IndN,Mon%IndX,Mon%NDimX,NGrid,NInte2,NBas)
+    call ModABMin(Mon%Occ,SRKer,WGrid,OrbGrid,TwoMO,TwoElErf,ABMin,&
+                  Mon%IndN,Mon%IndX,Mon%NDimX,NGrid,NInte2,NBas)
+    !call ModABMin_old(Mon%Occ,SRKer,WGrid,OrbGrid,TwoMO,TwoElErf,ABMin,&
+    !                Mon%IndN,Mon%IndX,Mon%NDimX,NGrid,NInte2,NBas)
     print*, 'ABMin-Kasia',norm2(ABMin)
  case(TWOMO_FFFF)
     call ModABMin_mithap(Mon%Occ,SRKer,WGrid,OrbGrid,ABMin,&
@@ -1252,6 +1274,8 @@ logical :: doRSH
  do i=1,10
     write(LOUT,'(i4,4x,e16.6)') i,Eig(i)
  enddo 
+
+ !print*, 'Check! Eig,EigVecR',norm2(Eig),norm2(EigVecR)
 
  !ECorr=0
  !!call ACEneERPA(ECorr,EigVecR,Eig,TwoMO,URe,Mon%Occ,XOne,&
@@ -1591,8 +1615,11 @@ double precision, allocatable :: EigTmp(:), VecTmp(:)
 
       call AB_CAS(ABPlus,ABMin,ECASSCF,URe,Mon%Occ,XOne,TwoMO,Mon%IPair,&
                   Mon%IndN,Mon%IndX,Mon%NDimX,NBas,Mon%NDimX,NInte1,NInte2,ACAlpha)
+
+      call EKT(URe,Mon%Occ,XOne,TwoMO,NBas,NInte1,NInte2)
+
    end select 
-   print*, 'ABPlus',norm2(ABPlus),'ABMin',norm2(ABMin)
+   write(LOUT,'(/,1x,a,f16.8,a,1x,f16.8)') 'ABPlus',norm2(ABPlus),'ABMin',norm2(ABMin)
 
    EigVecR = 0
    Eig = 0
@@ -1698,75 +1725,75 @@ elseif(Flags%ISERPA==2) then
    ! print*, 'NDimN: ',Mon%NDimN
    if(Flags%ICASSCF==1.and.Flags%ISHF==0) then
 
-      allocate(ABPlus(Mon%NDimX**2),ABMin(Mon%NDimX**2), &
-           EMAT(NBas**2),EMATM(NBas**2),&
-           DMAT(Mon%NDim*NBas),DMATK(Mon%NDim*NBas),&
-           !EigVecR(2*(Mon%NDimX+Mon%NDimN)*2*(Mon%NDimX+Mon%NDimN)),&
-           EigVecR((Mon%NDimX+Mon%NDimN)*(Mon%NDimX+Mon%NDimN)),&
-           !Eig(2*(Mon%NDimX+Mon%NDimN)))
-           Eig((Mon%NDimX+Mon%NDimN)))
+    !  allocate(ABPlus(Mon%NDimX**2),ABMin(Mon%NDimX**2), &
+    !       EMAT(NBas**2),EMATM(NBas**2),&
+    !       DMAT(Mon%NDim*NBas),DMATK(Mon%NDim*NBas),&
+    !       !EigVecR(2*(Mon%NDimX+Mon%NDimN)*2*(Mon%NDimX+Mon%NDimN)),&
+    !       EigVecR((Mon%NDimX+Mon%NDimN)*(Mon%NDimX+Mon%NDimN)),&
+    !       !Eig(2*(Mon%NDimX+Mon%NDimN)))
+    !       Eig((Mon%NDimX+Mon%NDimN)))
 
-      ACAlpha = One
-      call AB_CAS(ABPlus,ABMin,ECASSCF,URe,Mon%Occ,XOne,TwoMO,Mon%IPair,&
-           Mon%IndN,Mon%IndX,Mon%NDimX,NBas,Mon%NDimX,NInte1,NInte2,ACAlpha)
-      !call AB_CAS_mithap(ABPlus,ABMin,ECASSCF,URe,Mon%Occ,XOne, &
-      !          Mon%IndN,Mon%IndX,Mon%IGem,Mon%NAct,Mon%INAct,Mon%NDimX,NBas,Mon%NDimX,&
-      !          NInte1,twofile,ACAlpha,.false.)
-      write(*,*) 'DE_CAS!'
-      !Mon%NDimN = 0
-      call DE_CAS(DMAT,DMATK,EMAT,EMATM,URe,Mon%Occ,XOne,TwoMO,Mon%IPair,&
-           NBas,Mon%NDim,NInte1,NInte2,ACAlpha)
+    !  ACAlpha = One
+    !  call AB_CAS(ABPlus,ABMin,ECASSCF,URe,Mon%Occ,XOne,TwoMO,Mon%IPair,&
+    !       Mon%IndN,Mon%IndX,Mon%NDimX,NBas,Mon%NDimX,NInte1,NInte2,ACAlpha)
+    !  !call AB_CAS_mithap(ABPlus,ABMin,ECASSCF,URe,Mon%Occ,XOne, &
+    !  !          Mon%IndN,Mon%IndX,Mon%IGem,Mon%NAct,Mon%INAct,Mon%NDimX,NBas,Mon%NDimX,&
+    !  !          NInte1,twofile,ACAlpha,.false.)
+    !  write(*,*) 'DE_CAS!'
+    !  !Mon%NDimN = 0
+    !  call DE_CAS(DMAT,DMATK,EMAT,EMATM,URe,Mon%Occ,XOne,TwoMO,Mon%IPair,&
+    !       NBas,Mon%NDim,NInte1,NInte2,ACAlpha)
 
-      print*, 'DMAT',norm2(DMAT),norm2(DMATK)
-      print*, 'EMAT',norm2(EMAT),norm2(EMATM)
-      ij=0
-      ij1=0
-      do j = 1,Mon%NDimN
-         do i = 1,Mon%NDimX
-            ij  = ij + 1 !(j-1)*Mon%NDimX + i
-            ij1 = (j-1)*Mon%NDim + Mon%IndXh(i)
-            DMAT(ij) = DMAT(ij1)
-            DMATK(ij) = DMATK(ij1)
-         enddo
-      enddo
-      ij=0
-      ij1=0 
-      do j=1,Mon%NDimN
-         do i=1,Mon%NDimN
-            ij  = (j-1)*Mon%NDimN + i
-            ij1 = (j-1)*Mon%NBasis + i
-            EMAT(ij) = EMAT(ij1)
-            EMATM(ij) = EMATM(ij1)
-         enddo
-      enddo
+    !  print*, 'DMAT',norm2(DMAT),norm2(DMATK)
+    !  print*, 'EMAT',norm2(EMAT),norm2(EMATM)
+    !  ij=0
+    !  ij1=0
+    !  do j = 1,Mon%NDimN
+    !     do i = 1,Mon%NDimX
+    !        ij  = ij + 1 !(j-1)*Mon%NDimX + i
+    !        ij1 = (j-1)*Mon%NDim + Mon%IndXh(i)
+    !        DMAT(ij) = DMAT(ij1)
+    !        DMATK(ij) = DMATK(ij1)
+    !     enddo
+    !  enddo
+    !  ij=0
+    !  ij1=0 
+    !  do j=1,Mon%NDimN
+    !     do i=1,Mon%NDimN
+    !        ij  = (j-1)*Mon%NDimN + i
+    !        ij1 = (j-1)*Mon%NBasis + i
+    !        EMAT(ij) = EMAT(ij1)
+    !        EMATM(ij) = EMATM(ij1)
+    !     enddo
+    !  enddo
       !print*, 'DMAT-R',norm2(DMAT(1:Mon%NDimX*Mon%NDimN)),&
       !     norm2(DMATK(1:Mon%NDimX*Mon%NDimN))
       !print*, 'EMAT-R',norm2(EMAT(1:Mon%NDimN**2)),&
       !     norm2(EMATM(1:Mon%NDimN**2))
       !print*, 'ABPlus',norm2(ABPlus),'ABMin',norm2(ABMin)
-      ! code for H2,He/Be only!
-     ! allocate(ABPlus(Mon%NDim**2),ABMin(Mon%NDim**2), &
-     !      CMAT(Mon%NDim**2),EMAT(NBas**2),EMATM(NBas**2),&
-     !      DMAT(Mon%NDim*NBas),DMATK(Mon%NDim*NBas),&
-     !      EigVecR(2*(Mon%NDimX+Mon%NDimN)*2*(Mon%NDimX+Mon%NDimN)),&
-     !      Eig(2*(Mon%NDimX+Mon%NDimN)))
+     ! code for H2,He/Be only!
+      allocate(ABPlus(Mon%NDim**2),ABMin(Mon%NDim**2), &
+           CMAT(Mon%NDim**2),EMAT(NBas**2),EMATM(NBas**2),&
+           DMAT(Mon%NDim*NBas),DMATK(Mon%NDim*NBas),&
+           EigVecR(2*(Mon%NDimX+Mon%NDimN)*2*(Mon%NDimX+Mon%NDimN)),&
+           Eig(2*(Mon%NDimX+Mon%NDimN)))
 
-     ! !Mon%NDimN = 0 
-     ! CMAT=0
-     ! call APSG_NEST(ABPlus,ABMin,CMAT,EMAT,EMATM,DMAT,DMATK,&
-     !      URe,Mon%Occ,XOne,TwoMO,&
-     !      NBas,Mon%NDim,NInte1,NInte2,Mon%NGem,Flags%ISERPA)
+      !Mon%NDimN = 0 
+      CMAT=0
+      call APSG_NEST(ABPlus,ABMin,CMAT,EMAT,EMATM,DMAT,DMATK,&
+           URe,Mon%Occ,XOne,TwoMO,&
+           NBas,Mon%NDim,NInte1,NInte2,Mon%NGem,Flags%ISERPA)
 
-     ! !reduce dimensions
-     ! call reduce_dim('AB',ABPlus,ABMin,Mon)
-     ! call reduce_dim('D',DMAT,DMATK,Mon)
-     ! call reduce_dim('E',EMAT,EMATM,Mon)
-     ! print*, 'DMAT-R',norm2(DMAT(1:Mon%NDimX*Mon%NDimN)),&
-     !      norm2(DMATK(1:Mon%NDimX*Mon%NDimN))
-     ! print*, 'EMAT-R',norm2(EMAT(1:Mon%NDimN**2)),&
-     !      norm2(EMATM(1:Mon%NDimN**2))
-     ! print*, 'ABPlus',norm2(ABPlus(1:Mon%NDimX**2)),&
-     !      'ABMin',norm2(ABMin(1:Mon%NDimX**2))
+      !reduce dimensions
+      call reduce_dim('AB',ABPlus,ABMin,Mon)
+      call reduce_dim('D',DMAT,DMATK,Mon)
+      call reduce_dim('E',EMAT,EMATM,Mon)
+      print*, 'DMAT-R',norm2(DMAT(1:Mon%NDimX*Mon%NDimN)),&
+           norm2(DMATK(1:Mon%NDimX*Mon%NDimN))
+      print*, 'EMAT-R',norm2(EMAT(1:Mon%NDimN**2)),&
+           norm2(EMATM(1:Mon%NDimN**2))
+      print*, 'ABPlus',norm2(ABPlus(1:Mon%NDimX**2)),&
+           'ABMin',norm2(ABMin(1:Mon%NDimX**2))
 
    else
   
@@ -2983,7 +3010,8 @@ integer :: test
     enddo
 
  elseif(Flags%ICASSCF==1.and.Flags%ISERPA==2.and.mon%NELE/=1) then
-    ! write(*,*) 'Be!'
+    write(LOUT,'(1x,a)') 'WARNING!!! Be!'
+    write(LOUT,'(1x,a,e15.5)') 'Threshold for active orbitals: ', mon%ThrSelAct
     ! write(*,*) 'Be?, ONLY ACTIVE PAIRS!'
     allocate(mon%IndXh(mon%NDim))
 
@@ -3001,7 +3029,7 @@ integer :: test
              if((mon%IndAux(i)==1).and.(mon%IndAux(j)==1)  & 
               .and.&
               !(Abs(mon%Occ(i)-mon%Occ(j))/mon%Occ(i).lt.1.d-10) ) then
-              (Abs(mon%Occ(i)-mon%Occ(j))/mon%Occ(i).lt.1.d-3) ) then
+              (Abs(mon%Occ(i)-mon%Occ(j))/mon%Occ(i).lt.Mon%ThrSelAct) ) then
               write(LOUT,'(1x,a,2x,2i4)') 'Discarding nearly degenerate pair',i,j 
              else
              ! if IFlCore=0 exclude core (inactive) orbitals
@@ -3011,7 +3039,7 @@ integer :: test
                 
                 ind = ind + 1
                 ! active Be
-                mon%IndX(ind) = ind !ij 
+                mon%IndX(ind) = ij !ind 
                 mon%IndXh(ind) = ij
                 mon%IndN(1,ind) = i
                 mon%IndN(2,ind) = j

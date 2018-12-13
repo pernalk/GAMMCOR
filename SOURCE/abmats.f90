@@ -4560,7 +4560,7 @@ deallocate(work,J,Jerf)
 
 end subroutine PotHSR_mithap
 
-subroutine PotCoul_mithap(VHSR,OneRdm,doRSH,NBasis)
+subroutine PotCoul_mithap(VHSR,OneRdm,doRSH,aoerfile,NBasis)
 !
 !     RETURNS SR HARTREE (COULOMB) POTENTIAL IN AN MO MATRIX REPRESENTATION 
 !
@@ -4568,6 +4568,7 @@ implicit none
 
 integer,intent(in) :: NBasis
 logical,intent(in) :: doRSH
+character(*),intent(in) :: aoerfile
 double precision,intent(in) :: OneRdm(NBasis*(NBasis+1)/2)
 double precision :: VHSR(NBasis*(NBasis+1)/2)
 double precision,allocatable :: J(:,:),Jerf(:,:),work(:,:)
@@ -4579,7 +4580,7 @@ call triang_to_sq2(OneRdm,work,NBasis)
 
 if(doRSH) then
   call make_J1(NBasis,work,J,'AOTWOSORT')
-  call make_J1(NBasis,work,Jerf,'AOERFSORT')
+  call make_J1(NBasis,work,Jerf,aoerfile)
   work = 2.0d0*J - 2.0d0*Jerf
 else
   call make_J1(NBasis,work,J,'AOTWOSORT')

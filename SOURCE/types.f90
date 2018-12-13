@@ -129,7 +129,7 @@ type SystemBlock
       integer :: TwoMoInt = TWOMO_INCORE
       logical :: DeclareTwoMo = .false.
       logical :: ISHF = .false. 
-      logical :: doRSH = .false.
+      logical :: doRSH = .false., SameOm = .true.
       logical :: PostCAS =.false.
       double precision :: ThrAct = 0.992d0
       double precision :: ThrSelAct = 1.d-8 
@@ -204,7 +204,8 @@ type SaptData
      integer :: InterfaceType = INTER_TYPE_DAL
      integer :: SaptLevel = SAPTLEVEL2
      integer :: IPrint = 1000
-     logical :: EnChck = .true., HFCheck=.true., doRSH = .false.
+     logical :: EnChck = .true., HFCheck=.true. 
+     logical :: doRSH = .false., SameOm = .true.
 
 end type SaptData
 

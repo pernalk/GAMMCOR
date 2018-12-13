@@ -370,11 +370,19 @@ elseif(Flags%ISAPT.Eq.1) then
  end associate
 
  ! set in/out-of-core
- ! SAPT-CAS: unless defined in input, 
- !           set FOFO as default!
+ ! SAPT-CAS: unless defined in input, set FOFO as default!
  if(Flags%ICASSCF==1.and.Flags%ISERPA==0) then
     if(.not.SAPT%monA%DeclareTwoMo) SAPT%monA%TwoMoInt = TWOMO_FOFO 
     if(.not.SAPT%monB%DeclareTwoMo) SAPT%monB%TwoMoInt = TWOMO_FOFO
+ endif
+
+ ! set SameOm for SAPT-RSH
+ if(SAPT%doRSH) then
+    if(SAPT%monA%Omega/=SAPT%monB%Omega) then
+      SAPT%SameOm = .false.
+      SAPT%monA%SameOm = .false.
+      SAPT%monB%SameOm = .false.
+    endif
  endif
 
 System = SAPT%monB
