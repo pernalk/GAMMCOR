@@ -1,0 +1,222 @@
+********************************* 
+Compilation
+********************************* 
+unpack the prdmft.tar.gz package and inside the directory run 
+make 
+
+To complie with gfortran change flags in Makefie.
+
+********************************* 
+SAPT: GENERAL REMARKS
+********************************* 
+
+1) Current SAPT implementation works only in the dimer-centered basis (DCBS).
+2) Extension to open-shell monomers does not work yet.
+3) In default settings AO integrals are sorted and transformed out-of-core. 
+   Storage of integrals requires a considerable amount of disc space.
+   Largest calculations to date were performed for 384 basis functions 
+   (PCCP dimer in aug-cc-pVTZ) and took ca. 100 GB of disc space. 
+   No SCRATCH directory option has been added so far, so either make sure 
+   that you have enough space in the current working directory, or run jobs 
+   straight from your scratch directory.
+4) The default settings do not make use of symmetry.
+5) Currently, only 1st and 2nd order Rayleigh-Schrodinger energy contributions
+   are available (1st order ExchS2 is also implemented, but not made avaiable).
+
+********************************* 
+SAPT: INPUT FILE
+*********************************
+Several remarks on the input file:
+
+a) for now, the SAPT input file should have a fixed name "input.inp" and be 
+   present in the current working directory, 
+b) definitions of three blocks are required: one Calculation block 
+   and two System blocks,
+c) neither the order of blocks nor order of keywords within a block matters,
+d) each block terminates with the "end" keyword,
+e) keywords are not case sensitive,
+f) comments are possible and follow the "!" character (see the example below), 
+g) although the geometry is defined separately either in Molpro or Dalton files, 
+   SAPT calculation requires defining both the number of atoms and nuclear charge 
+   for each monomer (NAtoms and ZNucl keywords in the System block, respectively),
+h) default settings in the Calculation block are set to SAPT-CAS calculation
+   via Dalton interface.
+
+Available keywords:
+1) Calculation block
+   a) JobTitle:
+                put anything, it will be printed in the output 
+   b) Interface:
+                 Dalton
+                 Molpro
+   c) JobType:    
+               AC
+               AC0
+               AC1
+               ERPA 
+               SAPT
+   d) RDMType: 
+               CAS (default)
+               HF
+               GVB 
+
+      *note that GVB works only with Dalton interface,
+
+   e) Response: 
+               ERPA (default)
+               TD-APSG
+               DFT
+               
+      *for SAPT-CAS and SAPT-GVB calculations ERPA is the default,
+      **SAPT-DFT calculations are still under development and require
+        both the Molpro interface and xcfun library.
+
+   f) DFunc:
+            srLDA
+            srPBE
+            PBE 
+
+      *functional choice is possible only with the "Response DFT" option,
+      **srLDA: doi:10.1103/PhysRevB.73.155111
+      **srPBE: no idea, adapted from Molpro
+      ***PBE:  doi:10.1103/PhysRevLett.77.3865
+
+   g) SaptLevel:
+                SAPT0
+                SAPT2 (default)
+      *SAPT0 calculates only uncoupled/single-pole and semicoupled E2disp          
+               
+2) System block
+   a) Monomer:
+              A or B
+   b) NAtoms (required)
+   c) ZNucl  (required)
+   d) Charge (default=0)
+   e) Multiplicity (default=0)
+   f) TwoMoInt:
+               InCore (default for SAPT-GVB)
+               Full
+               FOFO (default for SAPT-CAS/HF)
+      *chooses between in-core and out-of-core 2-el MO transformation
+       FOFO creates (FF|OO) and (FO|FO) integrals and requires less disc
+       space than (FF|FF)                 
+
+   g) ThrSelAct (default=1.d-8 for CAS
+                 default=1.d-2 for GVB)
+      *threshold for discarding pairs of degenerate or nearly
+       degenerate orbitals which may cause instabilities in hessian
+       matrices (will appear in the output as "Skipped" eigenvalues
+
+********************************* 
+INPUT EXAMPLES:
+********************************* 
+
+1) input for SAPT-CAS calculation:
+
+! input for SAPT-CAS with Dalton interface
+  
+  Calculation
+  JobTitle   H2-H2
+  Interface  DALTON
+  JobType    SAPT
+  RDMType    CAS
+  IPrint     1  
+  end
+
+  ! define monA
+  System
+  Monomer A
+  NAtoms  2
+  ZNucl   2
+  Charge  0
+  Multiplicity 1
+  end
+
+  ! define monB
+  System
+  Monomer B
+  NAtoms  2
+  ZNucl   2
+  Charge  0
+  Multiplicity 1
+  end
+
+2) input for SAPT-GVB calculation:
+
+! H2O-H2O SAPT-GVB with Dalton
+  
+  Calculation
+  JobTitle   H2O-H2O
+  Interface  DALTON
+  JobType    SAPT
+  RDMType    GVB
+  IPrint     1
+  end
+
+  ! define monA
+  System
+  Monomer A
+  NAtoms  3
+  ZNucl   10
+  Charge  0
+  Multiplicity 1
+  end
+
+  ! define monB
+  System
+  Monomer B
+  NAtoms  3
+  ZNucl   10
+  Charge  0
+  Multiplicity 1
+  end
+
+3) See the /EXAMPLES directory for more. 
+
+
+********************************* 
+RUNNING A SAPT-DALTON CALCULATION
+********************************* 
+
+To run a SAPT-CAS, SAPT-GVB or SAPT-HF calculation based on Dalton files:
+1) Prepare *.mol and .dal files for each monomer (see examples). 
+   a) unfortunately, in Dalton2015 ghost (dummy) atoms cannot be placed 
+      before regular atoms, so the active monomer should always 
+      be defined first,
+   b) basis functions in *.mol files have to be defined explicitly (Dalton2015 
+      does not offer an easy way to define ghost atoms); basis sets in Dalton
+      format can be found in the /basis subdirectory of your Dalton directory.
+2) Prepare "input.inp" file for SAPT calculation.
+3) Run Dalton CAS or GVB calculations for each of the monomers and store 
+   the following files on disc: 
+   - for GVB calculation: AOTWOINT AOONEINT AMFI_SYMINFO.TXT SIRIFC SIRIUS.RST DALTON.MOPUN ,
+   - for CAS calculations additionally store: rdm2.dat .
+
+   An example Dalton run of job.mol and job.dal files:
+   yourdaltondir/build/dalton -get "AOTWOINT AOONEINT AMFI_SYMINFO.TXT SIRIFC SIRIUS.RST DALTON.MOPUN " job  > skas
+4) Run SAPT:
+   yourprdmftdir/prdmft.exe > OUTPUT
+
+The /EXAMPLES directory contains a bash script (run_Dalton_PRDMFT.sh) 
+that handles both the Dalton and SAPT jobs.
+
+To summarize, the Dalton+SAPT run requires 5 input files: 4 files for Dalton
+calculations (two *.dal and two *.mol files for every monomer) 
+and 1 input.inp file for SAPT-CAS/GVB calculation.
+
+********************************* 
+RUNNING A SAPT-MOLPRO CALCULATION
+********************************* 
+
+To run a SAPT-CAS, SAPT-HF or SAPT-DFT calculation based on Molpro files:
+1) Prepare input for Molpro. To dump the necessary AOs and RDMs use 
+   the "user,prdmft-sapt,..." keywords (see examples).
+2) Prepare "input.inp" file for SAPT calculation.  
+3) Run Molpro calculation with "-d ." option to store scratch files:
+   yourmolprodir/src/prdmft/molpro -d . run.inp 
+4) Run SAPT:
+   yourprdmftdir/prdmft.exe > OUTPUT
+
+To summarize, the Molpro+SAPT run requires 2 input files: 
+1 file for Molpro calculation and 1 "input.inp" file for SAPT-CAS/DFT calculaton.
+
