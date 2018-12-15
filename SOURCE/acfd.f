@@ -103,9 +103,13 @@ C
       If(ICASSCF.Eq.1) Then
 C
       ETot=EGOne(1)
+      If(IFunSR.Eq.0) Then
       Write
      $ (6,'(/,2X,''ECASSCF+ENuc, AC-Corr, AC-ERPA-CASSCF '',4X,3F15.8)')
      $ ETot+ENuc,ECorr,ETot+ENuc+ECorr
+      Else
+      EGOne(1)=ECorr
+      EndIf
 C
       Else 
 C
@@ -797,10 +801,9 @@ C
       Aux1=(ABPLUS(MU+(NU-1)*NoEig)-ABMIN(MU+(NU-1)*NoEig))/
      $ (Eig(MU)+Eig(NU))
       Aux2=Zero
-c herer!!!
+C
       If((MU.Ne.NU).And.(Abs(Eig(MU)-Eig(NU)).Gt.1.D-12)) Aux2=
-c      If(MU.Ne.NU) Aux2= 
-     $  (ABPLUS(MU+(NU-1)*NoEig)+ABMIN(MU+(NU-1)*NoEig))/
+     $ (ABPLUS(MU+(NU-1)*NoEig)+ABMIN(MU+(NU-1)*NoEig))/
      $ (Eig(MU)-Eig(NU))
 C
       EigY1(I+(MU-1)*NoEig)=EigY1(I+(MU-1)*NoEig)+
@@ -1899,13 +1902,6 @@ C
       ABPLUS((IRow-1)*NDimB+ICol)=ABP
       ABMIN((ICol-1)*NDimB+IRow)=ABM
       ABMIN((IRow-1)*NDimB+ICol)=ABM
-c herer!!!
-      abp1=abp
-      Call AB0ELEMENT(ABP,ABM,IR,IS,IP,IQ,Occ,HNO,IGFact,
-     $ TwoNO,AuxI,AuxIO,WMAT,RDM2Act,C,Ind1,Ind2,NAct,NRDM2Act,
-     $ NInte1,NInte2,NBasis)      
-      if(abs(abp-abp1).gt.1.d-3) write(*,*)'act',abp,abp1
-
 C
       EndIf
 C
@@ -1977,12 +1973,6 @@ C
       ABPLUS((IRow-1)*NDimB+ICol)=ABP
       ABMIN((ICol-1)*NDimB+IRow)=ABM
       ABMIN((IRow-1)*NDimB+ICol)=ABM
-c herer!!!
-      abp1=abp
-      Call AB0ELEMENT(ABP,ABM,IR,IQ,IP,IS,Occ,HNO,IGFact,
-     $ TwoNO,AuxI,AuxIO,WMAT,RDM2Act,C,Ind1,Ind2,NAct,NRDM2Act,
-     $ NInte1,NInte2,NBasis)
-      if(abs(abp-abp1).gt.1.d-3) write(*,*)'in-act',abp,abp1      
 C
       EndIf
 C
@@ -2057,12 +2047,6 @@ C
       ABPLUS((IRow-1)*NDimB+ICol)=ABP
       ABMIN((ICol-1)*NDimB+IRow)=ABM
       ABMIN((IRow-1)*NDimB+ICol)=ABM
-c herer!!!
-      abp1=abp
-      Call AB0ELEMENT(ABP,ABM,IP,IS,IR,IQ,Occ,HNO,IGFact,
-     $ TwoNO,AuxI,AuxIO,WMAT,RDM2Act,C,Ind1,Ind2,NAct,NRDM2Act,
-     $ NInte1,NInte2,NBasis)
-      if(abs(abp-abp1).gt.1.d-3) write(*,*)'virt-act',abp,abp1      
 C
       EndIf
 C
@@ -2837,212 +2821,6 @@ C
       Return
       End
 
-*Deck AB0ELEMENT
-CC    STH WRONG WITH THIS VERSION :(?????
-C      Subroutine AB0ELEMENT(ABPL,ABMIN,IR,IS,IPP,IQQ,Occ,HNO,AuxCoeff, 
-C     $ TwoNO,AuxI,AuxIO,WMAT,RDM2Act,C,Ind1,Ind2,NAct,NRDM2Act,NInte1,
-C     $ NInte2,NBasis)
-CC
-CC     FOR A GIVEN SET OF INDICES IR,IS,IPP,IQQ RETURNS 
-CC     VALUES OF ABPLUS AND ABMIN MATRICES FOR ALPHA=0
-CC
-C      Implicit Real*8 (A-H,O-Z)
-CC
-C      Parameter(Zero=0.D0, Half=0.5D0, One=1.D0, Two=2.D0, Four=4.D0)
-CC
-C      Include 'commons.inc'
-CC
-C      Dimension
-C     $ Occ(NBasis),HNO(NInte1),
-CC    $ IGFact(NInte2),
-C     $ AuxCoeff(3,3,3,3), 
-C     $ TwoNO(NInte2),AuxI(NInte1),AuxIO(NInte1),
-C     $ WMAT(NBasis,NBasis),RDM2Act(NRDM2Act),
-C     $ C(NBasis),Ind1(NBasis),Ind2(NBasis)
-CC
-C      ABPL=Zero
-C      ABMIN=Zero
-CC
-C      Do IP=IQQ,IPP,IPP-IQQ
-C      Do IQ=IQQ,IPP,IPP-IQQ
-C      If(IP.Ne.IQ) Then
-CC
-C      If(IP.Gt.IQ) IPQ=(IP**2-3*IP+2)/2+IQ
-C      If(IQ.Gt.IP) IQP=(IQ**2-3*IQ+2)/2+IP
-CC
-C      IQS=(Max(IS,IQ)*(Max(IS,IQ)-1))/2+Min(IS,IQ)
-C      IPR=(Max(IR,IP)*(Max(IR,IP)-1))/2+Min(IR,IP)
-CC
-C      Arspq=Zero
-CC
-C      If(IP.Eq.IR) Arspq=Arspq+(Occ(IP)-Occ(IS))*HNO(IQS)
-C      If(IS.Eq.IQ) Arspq=Arspq+(Occ(IQ)-Occ(IR))*HNO(IPR)
-CC
-C      AuxTwoPQRS=AuxCoeff(IGem(IP),IGem(IQ),IGem(IR),IGem(IS))
-Cc     AuxTwoPQRS=One
-Cc      If(IGFact(NAddr3(IP,IQ,IR,IS)).Eq.0) AuxTwoPQRS=Zero
-CC
-C      AuxPQRS=Zero
-C      If(AuxTwoPQRS.Eq.One)
-C     $ AuxPQRS=Two*TwoNO(NAddr3(IP,IQ,IR,IS))-TwoNO(NAddr3(IP,IR,IQ,IS))
-CC
-CC     T1+T2
-CC
-C      If(Occ(IP)*Occ(IR).Ne.Zero) Then
-CC
-C      If(Occ(IP).Eq.One.Or.Occ(IR).Eq.One) Then
-CC
-C      If(AuxTwoPQRS.Eq.One) Arspq=Arspq+Occ(IP)*Occ(IR)*
-C     $ (Two*TwoNO(NAddr3(IP,IQ,IR,IS))-TwoNO(NAddr3(IP,IR,IQ,IS)))
-C      If(IP.Eq.IR) Arspq=Arspq+Occ(IP)*AuxI(IQS)
-CC
-C      Else
-CC
-C      If(IGem(IS).Eq.IGem(IQ)) Then
-C      Do ITT=1,NAct
-C      Do IUU=1,NAct
-C      IT=Ind1(ITT)
-C      IU=Ind1(IUU)
-CC
-C      If(AuxCoeff(IGem(IS),IGem(IQ),IGem(IT),IGem(IU)).Eq.1)
-CC     If(IGFact(NAddr3(IS,IQ,IT,IU)).Eq.1) 
-C     $ Arspq=Arspq
-C     $ +TwoNO(NAddr3(IS,IQ,IT,IU))*
-C     $  FRDM2(IP,IU,IR,IT,RDM2Act,Occ,Ind2,NAct,NBasis)
-C     $ +TwoNO(NAddr3(IS,IU,IT,IQ))*
-C     $  FRDM2(IP,IU,IT,IR,RDM2Act,Occ,Ind2,NAct,NBasis)
-CC
-C      EndDo
-C      EndDo
-C      EndIf
-CC
-C      If(IP.Eq.IR) Arspq=Arspq+Occ(IP)*AuxIO(IQS)
-CC
-C      EndIf
-C      EndIf
-CC
-CC     T3+T4 
-CC
-C      If(Occ(IQ)*Occ(IS).Ne.Zero) Then
-CC
-C      If(Occ(IQ).Eq.One.Or.Occ(IS).Eq.One) Then
-CC
-C      If(AuxTwoPQRS.Eq.One) Arspq=Arspq+Occ(IQ)*Occ(IS)*
-C     $ (Two*TwoNO(NAddr3(IP,IQ,IR,IS))-TwoNO(NAddr3(IP,IR,IQ,IS)))
-C      If(IQ.Eq.IS) Arspq=Arspq+Occ(IQ)*AuxI(IPR)
-CC
-C      Else
-CC
-C      If(IGem(IP).Eq.IGem(IR)) Then
-C      Do ITT=1,NAct
-C      Do IUU=1,NAct
-C      IT=Ind1(ITT)
-C      IU=Ind1(IUU)
-CC
-C      If(AuxCoeff(IGem(IU),IGem(IT),IGem(IP),IGem(IR)).Eq.1)     
-CC      If(IGFact(NAddr3(IU,IT,IP,IR)).Eq.1)
-C     $ Arspq=Arspq
-C     $ +TwoNO(NAddr3(IU,IT,IP,IR))*
-C     $ FRDM2(IS,IT,IQ,IU,RDM2Act,Occ,Ind2,NAct,NBasis)
-C     $ +TwoNO(NAddr3(IU,IR,IP,IT))*
-C     $ FRDM2(IS,IT,IU,IQ,RDM2Act,Occ,Ind2,NAct,NBasis)
-CC
-C      EndDo
-C      EndDo
-C      EndIf
-CC
-C      If(IQ.Eq.IS) Arspq=Arspq+Occ(IQ)*AuxIO(IPR)
-CC
-C      EndIf
-CC     
-C      EndIf
-CC
-CC     T5
-CC
-C      If(Occ(IR)*Occ(IQ).Ne.Zero) Then
-CC
-C      If(Occ(IQ).Eq.One.Or.Occ(IR).Eq.One) Then
-CC
-C      Arspq=Arspq-Occ(IQ)*Occ(IR)*AuxPQRS
-CC
-C      Else
-CC
-C      If(IGem(IP).Eq.IGem(IS)) Then
-C      Do ITT=1,NAct
-C      Do IUU=1,NAct
-C      IT=Ind1(ITT)
-C      IU=Ind1(IUU)
-CC
-C      If(AuxCoeff(IGem(IP),IGem(IT),IGem(IS),IGem(IU)).Eq.1)
-CC     If(IGFact(NAddr3(IP,IT,IS,IU)).Eq.1) 
-C     $ Arspq=Arspq
-C     $ -TwoNO(NAddr3(IP,IT,IS,IU))*
-C     $ FRDM2(IT,IU,IQ,IR,RDM2Act,Occ,Ind2,NAct,NBasis)
-CC
-C      EndDo
-C      EndDo
-C      EndIf
-CC
-C      EndIf
-C      EndIf
-CC
-CC     T6      
-CC
-C      If(Occ(IP)*Occ(IS).Ne.Zero) Then
-CC
-C      If(Occ(IP).Eq.One.Or.Occ(IS).Eq.One) Then
-CC
-C      Arspq=Arspq-Occ(IP)*Occ(IS)*AuxPQRS
-CC
-C      Else
-CC
-C      If(IGem(IR).Eq.IGem(IQ)) Then
-C      Do ITT=1,NAct
-C      Do IUU=1,NAct
-C      IT=Ind1(ITT)
-C      IU=Ind1(IUU)
-CC
-C      If(AuxCoeff(IGem(IT),IGem(IQ),IGem(IU),IGem(IR)).Eq.1)
-CC      If(IGFact(NAddr3(IT,IQ,IU,IR)).Eq.1) 
-C     $ Arspq=Arspq
-C     $ -TwoNO(NAddr3(IT,IQ,IU,IR))*
-C     $ FRDM2(IS,IP,IU,IT,RDM2Act,Occ,Ind2,NAct,NBasis)
-CC
-C      EndDo
-C      EndDo
-C      EndIf
-CC
-C      EndIf
-C      EndIf
-CC
-C      If(IS.Eq.IQ) Arspq=Arspq-Half*WMAT(IP,IR)
-C      If(IP.Eq.IR) Arspq=Arspq-Half*WMAT(IQ,IS)
-CC
-C      ABPL=ABPL+Arspq
-C      If(IP.Gt.IQ) Then
-C      ABMIN=ABMIN+Arspq
-C      Else
-C      ABMIN=ABMIN-Arspq
-C      EndIf
-CC    
-Cc     If(IP.Ne.IQ)
-C      EndIf
-CC     end of IP,IQ LOOPS
-C      EndDo
-C      EndDo
-CC
-C      IP=IPP
-C      IQ=IQQ
-CC
-C      If((C(IP)+C(IQ))*(C(IR)+C(IS)).Ne.Zero)
-C     $ ABPL=ABPL/(C(IP)+C(IQ))/(C(IR)+C(IS))
-C      If((C(IP)-C(IQ))*(C(IR)-C(IS)).Ne.Zero)
-C     $ ABMIN=ABMIN/(C(IP)-C(IQ))/(C(IR)-C(IS))
-CC
-C      Return
-C      End
-
-
 *Deck Y01GVB
       Subroutine Y01GVB(TwoNO,Occ,URe,XOne,EigY,Eig,Eig1,
      $ IndN,IndX,NDimX,NBasis,NDim,NInte1,NInte2)
@@ -3465,6 +3243,37 @@ C
       ABMIN(IJ)=ABMIN(IJ1) 
       EndDo
       EndDo
+C
+C     ADD A SR KERNEL
+C
+      If(IFunSR.Ne.0.And.IFunSRKer.Eq.1) Then
+C
+      Open(20,File="srdump",Form='UNFORMATTED')
+C
+      Do IRow=1,NDimX
+C
+      IA=IndN(1,IRow)
+      IB=IndN(2,IRow)
+C
+      Do ICol=1,NDimX
+C
+      IC=IndN(1,ICol)
+      ID=IndN(2,ICol)
+C
+      Read(20) XKer
+      If(.Not.(
+     $IGem(IA).Eq.IGem(IB).And.IGem(IB).Eq.IGem(IC).
+     $ And.IGem(IC).Eq.IGem(ID))) XKer=XKer*ACAlpha
+C
+      ABMIN((ICol-1)*NDimX+IRow)=ABMIN((ICol-1)*NDimX+IRow)
+     $ + XKer
+C
+      EndDo
+      EndDo
+C
+      Close(20)
+C
+      EndIf
 C
 C     FIND EIGENVECTORS (EigVecR) AND COMPUTE THE ENERGY
 C

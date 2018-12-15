@@ -107,6 +107,40 @@ enddo
 
 end subroutine readgridmolpro
 
+subroutine readalphamolpro(alpha)
+implicit none
+double precision :: alpha,tmp
+integer :: iunit
+integer :: ios
+character(8) :: text, label
+
+text = 'CHIVAL  '
+
+open(newunit=iunit,file='GRID',access='sequential',&
+     form='unformatted',status='old')
+do
+  read(iunit,iostat=ios) label
+  if(ios<0) then
+     write(6,*) 'ERROR!!! LABEL '//text//' not found!'
+     stop
+  endif
+  if(label==text) then
+     read(iunit) tmp 
+     exit
+  endif
+enddo
+
+close(iunit)
+
+if(tmp/=alpha) then
+   write(6,'(/,1x,a,f12.5)') 'WARNING! RS PARAM IN INPUT:',  alpha
+   write(6,'(1x,a,f12.5)')   '         RS PARAM IN MOLPRO:', tmp
+   write(6,'(1x,a)') 'ASSUMING INPUT VALUE!'
+   alpha = tmp
+endif
+
+end subroutine readalphamolpro
+
 subroutine readorbsmolpro(iunit,text,mapinv,orbval,npt,ndiff,ntg)
 implicit none
 integer :: iunit

@@ -1,489 +1,38 @@
 *Deck DMSCF 
       Subroutine DMSCF 
-     $ (ETot,Title,URe,Occ,Eps,XKin,XNuc,ENuc,UMOAO,
-     $ DipX,DipY,DipZ,TwoEl,TwoElErf,NBasis,NInte1,NInte2,
-     $ OrbGrid,OrbXGrid,OrbYGrid,OrbZGrid,WGrid,NSymMO,NGrid,
-     $ IAPSG,ISERPA,QMAX,IModG,NGOcc,Small,NGem,
-     $ Flags)
+     $ (Title,URe,Occ,XKin,XNuc,ENuc,UMOAO,TwoEl,NBasis,NInte1,NInte2,
+     $ NGem,System)
 C
+      use types
 C     !!! XKin CONTAINS BOTH KINETIC AND EL-N CONTRIBUTIONS !!!
 C     !!! XNuc IS EMPTY 
-C
-C     CALLS AN OPTIMIZER FOR THE ORBITALS AND OCCUPANCIES
-C
-      use types 
 C
       Implicit Real*8 (A-H,O-Z)
 C
       Character*60 Title,FMultTab
 C
       Include 'commons.inc'
-      Common/CPMFT/ MFrac,MOcc,NFrac
 C
       Parameter(Zero=0.0D0,Half=0.50D0,One=1.0D0,Two=2.0D0,Four=4.0D0)
 C
-      Parameter (MXIT=50, ETol=1.D-5, DampG=0.2D0)
+      Dimension URe(Nbasis,NBasis),Occ(NBasis),XKin(NInte1),
+     $ XNuc(NInte1),TwoEl(NInte2),UMOAO(Nbasis,NBasis)
 C
-      Dimension URe(Nbasis,NBasis),Occ(NBasis),Eps(NBasis),XKin(NInte1),
-     $ XNuc(NInte1),DipX(*),DipY(*),DipZ(*),TwoEl(NInte2),TwoElErf(*),
-     $ OrbGrid(NBasis,NGrid),
-     $ WGrid(NGrid),UMOAO(Nbasis,NBasis),NSymMO(NBasis)
-C
-      Dimension OrbXGrid(*),OrbYGrid(*),OrbZGrid(*)
+      type(SystemBlock) :: System
 C
 C     LOCAL ARRAYS
 C
-      Dimension VSR(NInte1),Gamma(NInte1),
-     $ XOne(NInte1),UNOAO(Nbasis,NBasis),GammaOld(NInte1),Work(NBasis),
-     $ NSymNO(NBasis),OccSav(NBasis),UReSav(NBasis,NBasis),
-     $ IGemSav(NBasis),Work2(NBasis,NBasis)
+      Dimension XOne(NInte1),UReSav(Nbasis,NBasis)
 C
-      Real*8, Allocatable :: TNO(:),TNOLR(:)
-      type(FlagsData) :: Flags
-C
-C     FLAGS:  IRes   = 0 ... run the program from the beginning
-C                      1 ... restart the program 
-C
-C     IF IAO=1 ADD XNuc TO XKin AND EMPTY XNuc
-C
-      If(IAO.Eq.1) Then
-      Do I=1,NInte1
-      XKin(I)=XKin(I)+XNuc(I)
-      XNuc(I)=Zero
-      EndDo
-      EndIf
-C
-C     RESTART CALCULATIONS 
-C
-      If (IRes.Eq.1) Then
-C
-      If(IFun.Eq.13) Then
-C
-      Call ReWrAPSG(0,Occ,URe,UReSav,Title,NGem,NBasis)
-C
-C     check phases of the mo's and change phases of no's if needed
-      Do IMO=1,NBasis
-      IPhase=1
-C
-      Do IA=1,NBasis
-      If(Abs(UReSav(IMO,IA)).Gt.Half) Then
-      If(UReSav(IMO,IA)*UMOAO(IMO,IA).Lt.Zero) IPhase=-1
-      EndIf
-      EndDo
-C
-      Do IA=1,NBasis
-      URe(IA,IMO)=IPhase*URe(IA,IMO)
-      EndDo
-C
-      EndDo
-C
-      If(IGVB.Eq.0) Then
-      Write(6,'('' ***  RESTARTED APSG CALCULATION  *** '',
-     $      25X,''*'')')
-      Else
-      Write(6,'('' ***  RESTARTED GVB  CALCULATION  *** '',
-     $      25X,''*'')')
-      EndIf
-C   
-      Else
-C
-      Call ReWr(0,Occ,URe,Title,NBasis) 
-C
-      If(IPrint.Ge.1) Then
-C
-      Write(6,'('' ***  RESTARTED CALCULATION  *** '',
-     $      30X,''*'')')
-      Write(6,'('' * DENSITY MATRIX FUNCTIONAL CALCULATION'',
-     $      23X,''*'')') 
-      Write(6,
-     $ '('' * Functional : '',I3 , 44X,''*'')') IFun
-      Write(6, '('' **********************************************'',
-     $            ''*****************'')') 
-C
-      EndIf
-C
-C     CHECK THE NORM
-C
-      Sum=Zero
-      Do 5 I=1,NBasis
-    5 Sum=Sum+Occ(I)
-      If(Abs(Sum-XELE).Gt.1.D-10) Call NormN(Occ,NBasis,IFAIL)
-      If(IFAIL.Eq.1) 
-     $ Stop'Occ retrieved from a restart file cannot be normalized!'
-      Sum=Zero
-      Do 6 I=1,NBasis
-    6 Sum=Sum+Occ(I)
-C
-C     EndIf of IFun.Eq.13)
-      EndIf
-C
-C     EndIf of IRes.Eq.1
-      EndIf
-C
-      If(IDALTON.Eq.1) Then
       Do I=1,NInte1
       XOne(I)=XKin(I)
-      EndDo
-      EnSR=Zero
-      Do I=1,NInte1
-      VSR(I)=Zero
-      EndDo
-      XVSR=Zero
-      GoTo 333
-      EndIf
-C
-      If(IRes.Eq.0) Then
-C
-C     GENERATE A GUESS FOR THE APSG 
-C
-      Do I=1,NBasis
-      IGem(I)=1
-      EndDo
-C
-      If(IFun.Eq.13) Then
-C
-      If(INO.Eq.0) Then
-C
-C     SORT ORBITALS ACC. TO THE HF ORBITAL ENERGIES
-C
-      Do I=1,NBasis
-      NSymNO(I)=NSymMO(I)     
-      EndDo
-      If(ILoc.Eq.0)
-     $ Call HF(URe,Eps,Occ,XKin,XNuc,TwoEl,NSymNO,NInte1,NInte2,NBasis,
-     $ NELE,IPrint,1)
-C
-      NGem=NELE
-      ICount=0
-      Do I=1,NBasis
-C
-      CICoef(I)=Sqrt(Occ(I))
-C
-      ICount=ICount+1
-      IGem(I)=ICount
-      If(ICount.Eq.NGem) ICount=0
-C
-      EndDo
-C
-C     IF IGVB=1 ASSIGN ORBITALS TO GEMINALS BY HAND
-C
-c      If(IGVB.Eq.1) Then
-c      NGem=NGem+1
-c      Do I=3,NBasis
-c      IGem(I)=NGem
-c      EndDo
-c      EndIf
-C
-C     DISTRIBUTE ORBITALS AMONG NGOcc+1,...,NGem GEMINALS
-C
-      If(NGOcc.Ne.0) Then
-C
-C     IF NGOcc=NELE ASSIGN VIRTUAL ORBITALS TO THE LAST GEMINAL
-C
-C KP 24.11.14
-C     IF NGOcc=NELE -> ASSIGN ALL VIRTUALS TO A FICTITIOUS GEMINAL NELE+1
-C
-      If(NGOcc.Eq.NELE) NGem=NELE+1
-C
-      ICount=NGOcc
-      Do I=NGOcc+1,NBasis
-      ICount=ICount+1
-      IGem(I)=ICount
-      If(ICount.Eq.NGem) ICount=NGOcc
-      EndDo
-C
-c      Call Partition(UMOAO,NGOcc,NGem,NBasis)
-C
-      Write (*,'(/,X,
-     $ "The number of orbitals with occupancy fixed to 1 is ",I1,/)')
-     $ NGOcc 
-C
-      EndIf
-C
-      GoTo 91
-C
-C     else of INO.Eq.0
-      Else
-C
-      Do I=1,NBasis
-      NSymNO(I)=0
-      Do J=1,NBasis
-      If(Abs(URe(I,J)).Gt.0.1) Then
-      ISym=NSymMO(J)
-      If(NSymNO(I).Eq.0) Then
-      NSymNO(I)=ISym
-      Else
-      If(NSymNO(I).Ne.ISym)
-     $ Write(6,'("Symm of NO cannot be established",I3)')I
-      EndIf
-      EndIf
-      EndDo
-      Write(6,'(I4,7X,I4,2X,E16.6)')I,NSymNO(I),Occ(I)
-      EndDo
-C
-      NGem=NELE
-      ICount=0
-      Do I=1,NBasis
-      CICoef(I)=Sqrt(Occ(I))
-      ICount=ICount+1
-      IGem(I)=ICount
-      If(ICount.Eq.NGem) ICount=0
-      EndDo
-C
-c     endif INO=0
-      EndIf 
-C
-   91 Write(6,'(2X,''NO OF GEMINALS: '',I3)') NGem
-      Write(6,'(2X,"Orb",2X,"Occupancy  HF Orb Energies",
-     $ X,"Gem",3X,"Sym")')
-      Do I=1,NBasis
-      Write(6,'(X,I3,E12.2,E14.4,2I6)')I,Occ(I),Eps(I),IGem(I),NSymNO(I)
-      EndDo
-C
-c      If (IFreeze.Eq.1) Then
-C
-      Call MultpM(UReSav,URe,UMOAO,NBasis)
-      NLine=NBasis/10
-      If(NLine*10-NBasis.Ne.0)NLine=NLine+1
-      Do I=1,NBasis
-      Write(*,'(I3)') I
-C
-      Do LL=0,NLine-1
-
-      NN=NBasis-10*LL
-      If(NN.Le.10) Then
-      Write(*,98) (UReSav(I,K),K=10*LL+1,NBasis)
-      Else
-      Write(*,98) (UReSav(I,K),K=10*LL+1,10*(LL+1))
-      EndIf
-C
-      EndDo
-      Write(*,*)
-      EndDo
-C
-c      EndIf 
-C
-c     endif Ifun=13
-      EndIf
-C
-c     endif of IRes.Eq.0
-      EndIf
-CCCC
-C     BEGINNING OF THE ITERATION OF DENSITY/DENSITY MATRIX SCHEME 
-CCCC
-C
-      EOld=Zero
-C
-      Call VecTr(Gamma,Occ,URe,NBasis)
-C
-      Do II=1,MXIT
-C
-C     IF IFunSR=1 AND IFun=13 SAVE THE Occ AND URe 
-C
-      If(IFunSR.Ne.0.And.IFun.Eq.13) Then
-      Call CpyM(UReSav,URe,NBasis)
-      Call CpyV(OccSav,Occ,NBasis)
-      Do I=1,NBasis
-      IGemSav(I)=IGem(I)
-      EndDo
-      EndIf
-C
-C     AVERAGE THE DENSITY MATRIX
-C
-      If(II.Gt.1) Then
-C
-      Do L=1,NInte1
-      GammaOld(L)=Gamma(L)
-      EndDo
-C 
-      Call VecTr(Gamma,Occ,URe,NBasis)
-C
-      Do L=1,NInte1
-      Gamma(L)=DampG*Gamma(L)+(One-DampG)*GammaOld(L)
-      EndDo
-C
-C     RESTORE SYMMETRY
-C
-      KL=0
-      Do K=1,NBasis
-      Do L=1,K
-      KL=KL+1
-      If(NSymMO(K).Ne.NSymMO(L)) Gamma(KL)=Zero
-      EndDo
-      EndDo  
-C
-      Call CpySym(URe,Gamma,NBasis)
-      Call Diag8(URe,NBasis,NBasis,Occ,Work)
-C     sometimes very small occ's come out negative so zero them
-      Do I=1,NBasis
-      Occ(I)=Abs(Occ(I))
-      EndDo
-C    
-      Call SortOcc(Occ,URe,NBasis)
-C
-      If(MFrac.Ne.NBasis) Then
-      Do I=1,NBasis
-      If(I.Le.MOcc) Occ(I)=One
-      If(I.Gt.MOcc+MFrac) Occ(I)=Zero
-      EndDo
-      Call NormN(Occ,NBasis,IFAIL)
-      EndIf
-C
-c     endif of If(II.Gt.1) 
-      EndIf   
-C
-C     COMPUTE THE SR POTENTIAL (H+XC) IN THE MO REP FOR THE DENSITY U*Occ*U+
-C
-      If(IFunSR.Eq.0) Then
-C
-      EnSR=Zero
-      Do I=1,NInte1
-      VSR(I)=Zero
-      EndDo
-      XVSR=Zero
-C
-      Else 
-C
-      Call EPotSR(EnSR,VSR,Occ,URe,OrbGrid,OrbXGrid,OrbYGrid,OrbZGrid,
-     $ WGrid,NSymMO,TwoEl,TwoElErf,NGrid,NInte1,NInte2,NBasis)
-C
-C     COMPUTE THE EXPECTATION VALUE OF THE VSR POTENTIAL FOR Gamma
-C
-      XVSR=Zero
-      IJ=0
-      Do I=1,NBasis
-      Do J=1,I
-      IJ=IJ+1
-      Fac=Four
-      If(I.Eq.J) Fac=Two
-      XVSR=XVSR+Fac*Gamma(IJ)*VSR(IJ)
-      EndDo
-      EndDo
-C
-c     endif of If(IFunSR.Eq.0)
-      EndIf
-C
-C     BEGIN THE ITERATION WITH THE SAVED Occ AND URe
-C
-      If(IFunSR.Ne.0.And.IFun.Eq.13) Then
-      Call CpyM(URe,UReSav,NBasis)
-      Call CpyV(Occ,OccSav,NBasis)
-      Do I=1,NBasis
-      IGem(I)=IGemSav(I)
-      EndDo
-      EndIf
-C
-C     ADD THE SR HXC POTENTIAL TO THE ONE-ELECTRON PART 
-C
-      Do I=1,NInte1
-      XOne(I)=XKin(I)+XNuc(I)+VSR(I) 
-      EndDo
-C
-      If(IFunSR.Ne.0) Then
-C
-      If(IFun.Eq.1) Then
-C
-c      Call OptTwo(ETot,URe,Occ,XOne,TwoElErf,NSymMO,
-c     $ NBasis,NInte1,NInte2,1)
-      Call OPTNORB(ETot,URe,Occ,XOne,XNuc,DipX,DipY,DipZ,
-     $ TwoElErf,UMOAO,NSymMO,
-     $ Title,NBasis,NInte1,NInte2,NGem,NGOcc,IModG)
-C
-      ElseIf(IFun.Eq.2.Or.IFun.Eq.8) Then
-C
-      Call OptGam2(ETot,Occ,URe,XOne,XNuc,TwoElErf,TwoEl,
-     $ OrbGrid,OrbXGrid,OrbYGrid,OrbZGrid,WGrid,NSymMO,NGrid,
-     $ NInte1,NInte2,NBasis)
-C
-      Else
-C
-      Call OPTNORB(ETot,URe,Occ,XOne,XNuc,DipX,DipY,DipZ,TwoElErf,
-     $ UMOAO,NSymMO,Title,NBasis,NInte1,NInte2,NGem,NGOcc,IModG) 
-C
-c     endif of If(IFun.Eq.1)
-      EndIf
-C
-C     FOR IFunSR=0 
-C
-      Else
-C
-      If(IFun.Eq.1) Then
-C
-      Call OptTwo(ETot,URe,Occ,XOne,TwoEl,NSymMO,
-     $ NBasis,NInte1,NInte2,1)
-c      Call OPTNORB(ETot,URe,Occ,XOne,XNuc,DipX,DipY,DipZ,TwoEl,
-c     $ UMOAO,NSymMO,
-c     $ Title,NBasis,NInte1,NInte2,NGem,NGOcc,IModG)
-C
-      ElseIf(IFun.Eq.2) Then
-C
-      Call OptGam2(ETot,Occ,URe,XOne,XNuc,TwoEl,TwoEl,
-     $ OrbGrid,OrbXGrid,OrbYGrid,OrbZGrid,WGrid,NSymMO,NGrid,
-     $ NInte1,NInte2,NBasis)
-C
-      Else
-C
-  333 Continue
-      Call OPTNORB(ETot,URe,Occ,XOne,XNuc,DipX,DipY,DipZ,TwoEl,UMOAO,
-     $ NSymMO,Title,NBasis,NInte1,NInte2,NGem,NGOcc,IModG)
-C
-c     endif of If(IFun.Eq.1)
-      EndIf
-C
-c     endif of If(IFunSR.Ne.0)
-      EndIf
-C
-      Call ReWr(1,Occ,URe,Title,NBasis)
-C
-      ENew=ETot+EnSR-XVSR
-      If(IFunSR.Ne.0) Then
-      Write(6,'(/,X,''****************************************'',
-     $            ''***************************************'')')
-      Write(6,'(X,''DFT/DMFT ITER'',I3,2X,''ENERGY'',F14.8,2X,
-     $ ''ENE DIFF '',E10.3)') II,Enew,ENew-EOld
-      Write(6,'(X,''****************************************'',
-     $            ''***************************************'',/)')
-      EndIf
-C
-      Err=Abs((EOld-ENew))
-C
-      If(Err.Lt.ETol.Or.IFunSR.Eq.0) Then
-C
-C     PRINT THE TOTAL ENERGY (TOGETHER WITH THE NUCLEAR INTERACTION)
-C
-      If(IDALTON.Ne.1) 
-     $ Write
-     $ (6,'(/,10X,''CONVERGENCE ATTAINED WITH THE TOTAL ENERGY '',
-     $ F14.8)')ENew+ENuc
-C
-      Call ReWrAPSG(1,Occ,URe,UMOAO,Title,NGem,NBasis)
-C
-C     PRINT MO's IN AO's REPRESENTATION 
-C
-c      Write(6,'(/,X,"MOLECULAR ORBITALS IN AO BASIS SET")')
-C
-   98 Format(X,10F10.6)
-      NLine=NBasis/10
-      If(NLine*10-NBasis.Ne.0)NLine=NLine+1
-      Do I=1,NBasis
-C
-      Do LL=0,NLine-1
-
-      NN=NBasis-10*LL
-      If(NN.Le.10) Then
-c      Write(*,98) (UMOAO(I,K),K=10*LL+1,NBasis)
-      Else
-c      Write(*,98) (UMOAO(I,K),K=10*LL+1,10*(LL+1))
-      EndIf
-C
-      EndDo
-c      Write(*,*)
       EndDo
 C
 C     PRINT FINAL NO's IN AO's REPRESENTATION 
 C
-      Write(6,'(/,X,"FINAL NATURAL ORBITALS IN AO BASIS SET")')
+      Write(6,'(/,X,"NATURAL ORBITALS IN AO BASIS SET")')
 C
+   98 Format(X,10F10.6)
       Call MultpM(UReSav,URe,UMOAO,NBasis)
       NLine=NBasis/10
       If(NLine*10-NBasis.Ne.0)NLine=NLine+1
@@ -503,37 +52,6 @@ C
       Write(*,*)
       EndDo
 C
-c      Call PrintAPSG(Title,UMOAO,UReSav,URe,Occ,
-c     $           XOne,TwoEl,NGem,NBasis,NInte1,NInte2)
-C
-C     PREPARE MOLDEN FILES TO VISUALIZE GEMINAL DENSITIES
-C
-      If(IDALTON.Eq.0) Call MoldenPrep(Title,Occ,UReSav,NGem,NBasis)
-C
-c     move on to compute excitations
-      GoTo 444
-C
-c     endif of If(Err.Lt.ETol.Or.IFunSR.Eq.0)
-      EndIf
-C
-      EOld=ENew
-C
-      EndDo
-C
-      Write(6,'(/,10X,''NO CONVERGENCE IN DFT/DMFT !!!'')')
-C
-  444 Continue
-C
-C     DYNAMIC PROPERTIES 
-C
-C     SORT OCCUPATION NUMBERS AND ORBITALS      
-C
-C DO NOT SORT ORBITALS IF FRAGMENT ASSIGNMENT IS READ FROM A FILE
-c      Call SortOcc(Occ,URe,NBasis)
-c      Write(6,'(/,X,''  ORBITAL OCCUPANCIES AFTER SORTING'')')
-c
-c the orbitals must be sorted if NActOrb is set different from zero since 
-c the last "occupied" orbitals and the first "virtual" orbitals are taken as active 
       Write(6,'(/,X,'' UNSORTED ORBITAL OCCUPANCIES'')')
 
       Write(6,'(2X,"Orb",3X,"Occupancy",7X,"CICoef",7X,"Gem")')
@@ -541,79 +59,25 @@ c the last "occupied" orbitals and the first "virtual" orbitals are taken as act
       Write(6,'(X,I3,2E16.6,I6)') I,Occ(I),CICoef(I),IGem(I)
       EndDo
 C
-      If(IFunSR.Eq.0) Then
-C
-      EnSR=Zero
-      Do I=1,NInte1
-      VSR(I)=Zero
-      EndDo
-C
-      Else
-C
-      Call EPotSR(EnSR,VSR,Occ,URe,OrbGrid,OrbXGrid,OrbYGrid,OrbZGrid,
-     $ WGrid,NSymMO,TwoEl,TwoElErf,NGrid,NInte1,NInte2,NBasis)
-C
-      EndIf
-C
-      Do I=1,NInte1
-      XOne(I)=XKin(I)+XNuc(I)+VSR(I)
-      EndDo
-C
       NDim=NBasis*(NBasis-1)/2
       NDimKer=NBasis*(1+NBasis)*(2+NBasis)*(3+NBasis)/24
 C
-      If(IDALTON.Ne.1) Then
-C
-      Allocate (TNO(NInte2))
-      Allocate (TNOLR(NInte2))
-      TNOLR(1:NInte2)=Zero
-      Call TwoNO(TNO,URe,TwoEl,NBasis,NInte2)
-C
-      If(IFunSR.Ne.0.And.IFun.Ne.0)
-     $ Call TwoNO(TNOLR,URe,TwoElErf,NBasis,NInte2)
-C
-      IFunSR=IFunSRKer
-C
-      If(IFunSR.Ne.0) 
-     $ Call ERPA(TNO,TNOLR,URe,Occ,XOne,
-     $  OrbGrid,WGrid,NSymMO,NBasis,NInte1,NInte2,NGrid,NDim,NDimKer,
-     $  NGem,IAPSG,ISERPA,QMAX,Small)
-C
-      Deallocate (TNO)
-      Deallocate (TNOLR)
-C
-c     If(IDALTON.Ne.1) Then
-      EndIf
-C
-      If(IDALTON.Eq.1) Then
-C
-C     IFlAC   = 1 - adiabatic connection formula calculation
-C               0 - AC not used
-      IFlAC=Flags%IFlAC
-C
-C     IFlSnd  = 1 - run AC0 (linerized in alpha, MP2-like expression for AC is used)
-C             = 0 - do not run AC0
-      IFlSnd=Flags%IFlSnd
-C
-C     IFlCore = 1 - core (inactive) orbitals included in ERPA correlation 
-C             = 0 - core (inactive) orbitals excluded from ERPA correlation
-      IFlCore=Flags%IFlCore
-C
-      IFlFrag1=Flags%IFlFrag
-      IFl12=Flags%IFl12
-C
       If(ICASSCF.Eq.1) Then
+C
       Call ACCAS(ETot,ENuc,TwoEl,URe,UReSav,Occ,XOne,
-     $  Title,NBasis,NInte1,NInte2,NGem)
-      Return
+     $  Title,NBasis,NInte1,NInte2,NGem,System)
+C
+      Else
+C
+      NGOcc=0
+      Call INTERPA(ETot,ENuc,TwoEl,URe,UReSav,Occ,XOne,
+     $  Title,NBasis,NInte1,NInte2,NDim,NGem,NGOcc)
+C
       EndIf
 C
-C     TwoEl - two-electron integrals in NO 
-
-      Call INTERPA(ETot,ENuc,TwoEl,URe,UReSav,Occ,XOne,Title,
-     $  OrbGrid,WGrid,NSymMO,NBasis,NInte1,NInte2,NGrid,NDim,
-     $  NGem,IAPSG,ISERPA,QMAX,NGOcc,Small)
-      EndIf
+c      NoEig=3
+c      Call ACPINO(ENuc,TwoEl,Occ,XOne,NBasis,NInte1,NInte2,NDim,NGem,
+c     $ NoEig)
 C
       Return
       End

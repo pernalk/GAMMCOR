@@ -682,8 +682,13 @@ CC
 C      Call Int2_AO(TwoEl,NumOSym,MultpC,FName,NInte1,NInte2,NBasis)
 C
 C     HAP
+      If (IFunSR.Eq.0.Or.IFunSR.Eq.3) Then
       Call readtwoint(NBasis,2,'AOTWOINT.mol','AOTWOSORT')
       Call LoadSaptTwoEl(3,TwoEl,NBasis,NInte2)
+      Else
+      Call readtwoint(NBasis,2,'AOTWOINT.erf','AOERFSORT')
+      Call LoadSaptTwoEl(4,TwoEl,NBasis,NInte2)
+      EndIf
 C
 C     LOAD AO TO CAS_MO ORBITAL TRANSFORMATION MATRIX FROM uaomo.dat
 C      
@@ -825,8 +830,11 @@ C
       EndDo
 C
 C     HAP
-C      Call FockGen_mithap(FockF,GammaAB,XKin,NInte1,NBasis)
+      If (IFunSR.Eq.0.Or.IFunSR.Eq.3) Then
       Call FockGen_mithap(FockF,GammaAB,XKin,NInte1,NBasis,'AOTWOSORT')
+      Else
+      Call FockGen_mithap(FockF,GammaAB,XKin,NInte1,NBasis,'AOERFSORT')
+      EndIf
 C
 C     TESTY:
 C      print*,'AUXM:', norm2(AUXM)
@@ -872,7 +880,7 @@ C
       EndDo
       EndDo      
       Call Diag8(Fock,NVirt,NVirt,PC,Work)
-      Print*, PC(1:5)
+C      Print*, PC(1:5)
       Do I=1,NVirt
       Do J=1,NVirt
       II=I+NInAc+NAc

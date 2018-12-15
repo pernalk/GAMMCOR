@@ -163,6 +163,7 @@ type FlagsData
      integer :: IFun    = 13
      integer :: IFunSR    = 0 
      integer :: IFunSRKer = 0
+     double precision :: Alpha = 0
      integer :: IModG   = 1
      integer :: NGOcc   = 0
      integer :: ILoc    = 1

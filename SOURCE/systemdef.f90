@@ -175,15 +175,17 @@ else
   select case(Input%CalcParams%JobType)
   case(JOB_TYPE_AC)
      Flags%IFlAC  = 1
-     Flags%IFlSnd = 0   
+     Flags%IFlSnd = 0
+     if(Input%CalcParams%DFApp==2) Flags%IFunSR = 4
 
   case(JOB_TYPE_AC0)
     ! HERE WILL BE CHANGED TO:
     !Flags%IFlAC = 0
      Flags%IFlAC  = 1
      Flags%IFlSnd = 1
+     if(Input%CalcParams%DFApp==2) Flags%IFunSR = 4
 
-  ! same as ERPA  
+  ! same as ERPA
   case(JOB_TYPE_AC1)
      Flags%IFlAC  = 0
      Flags%IFlSnd = 0
@@ -252,6 +254,7 @@ if(Flags%ISAPT.Eq.0) then
    System%Charge = Input%SystemInput(1)%Charge
    System%NBasis = Input%CalcParams%NBasis
    System%Multiplicity = Input%SystemInput(1)%Multiplicity
+   System%Omega  = Input%SystemInput(1)%Omega
    System%ThrAct = Input%SystemInput(1)%ThrAct
    System%ThrSelAct = Input%SystemInput(1)%ThrSelAct
    System%TwoMoInt = Input%SystemInput(1)%TwoMoInt
