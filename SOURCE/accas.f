@@ -221,6 +221,7 @@ C
 C
       use types
       use sorter
+      use abmat
 C
       Implicit Real*8 (A-H,O-Z)
 C
@@ -244,7 +245,8 @@ C
       Dimension
      $ URe(NBasis,NBasis),UNOAO(NBasis,NBasis),Occ(NBasis),
      $ TwoNO(NInte2),XOne(NInte1),IndX(NDimX),IndN(2,NDimX),
-     $ IndAux(NBasis),IPair(NBasis,NBasis)
+     $ IndAux(NBasis),IPair(NBasis,NBasis),
+     $ VCoul(NInte1),Den(NBasis,NBasis),Work2(NInte1)
 C
 C     LOCAL ARRAYS
 C
@@ -363,22 +365,49 @@ C      Call Int2_AO(TwoEl2,NumOSym,MultpC,FName,NInte1,NInte2,NBasis)
 C
       Write(6,'(" Transforming two-electron erf integrals ...",/)')
       Call TwoNO1(TwoEl2,UNOAO,NBasis,NInte2)
-C
+C 
 C     compute sr potential (vsr=xc+hartree)
 C     as a byproduct a sr energy (ensr=sr-xc+sr-hartree) is obtained
 C
       IFunSave=IFunSR
       If(IFunSR.Eq.4) IFunSR=2
 C
-      Call EPotSR(EnSR,EnHSR,VSR,Occ,URe,OrbGrid,OrbXGrid,OrbYGrid,
-     $ OrbZGrid,WGrid,NSymNO,TwoEl2,TwoNO,NGrid,NInte1,NInte2,NBasis)
+C     HERE FINISHED? WHERE TO GET OneRdm FROM?
+C     
+      Den=0
+      Work2=0
+      Do I=1,NBasis
+      Call dger(NBasis,NBasis,1d0*Occ(I),
+     $          UNOAO(I,:),1,UNOAO(I,:),1,Den,NBasis)
+      EndDo
+C 
+      IJ = 0
+      Do J=1,NBasis      
+      Do I=1,J
+      IJ = IJ + 1
+      Work2(IJ) = Den(I,J)
+      EndDo
+      EndDo
+C
+      Print*, 'Work2',norm2(Work2)
+      Print*, 'Alpha',Alpha
+C
+      Call PotCoul_mithap(VCoul,Work2,.true.,'AOERFSORT',NBasis)
+      Print*, 'VCOul',norm2(VCoul)
+      Call EPotSR(EnSR,EnHSR,VSR,Occ,URe,UNOAO,.false.,
+     $        OrbGrid,OrbXGrid,OrbYGrid,OrbZGrid,WGrid,
+     $        NSymNO,VCoul,Alpha,IFunSR,
+     $        NGrid,NInte1,NInte2,NBasis)
+C
+C      Call EPotSR(EnSR,EnHSR,VSR,Occ,URe,OrbGrid,OrbXGrid,OrbYGrid,
+C     $ OrbZGrid,WGrid,NSymNO,TwoEl2,TwoNO,NGrid,NInte1,NInte2,NBasis)
       Write(6,'(" SR xcH Energy",F15.8)')EnSR
 C
 C     CALCULATE THE SR_XC_PBE ENERGY WITH "TRANSLATED" ALPHA AND BETA DENSITIES
 C     [as in Gagliardi J. Chem. Phys. 146, 034101 (2017)]
 C
-      Call SR_PBE_ONTOP(EXCTOP,URe,Occ,OrbGrid,OrbXGrid,OrbYGrid,
-     $ OrbZGrid,WGrid,NGrid,NBasis)
+C      Call SR_PBE_ONTOP(EXCTOP,URe,Occ,OrbGrid,OrbXGrid,OrbYGrid,
+C     $ OrbZGrid,WGrid,NGrid,NBasis)
       Write(6,'(/," SR_xc_PBE with translated densities",F15.8,/)')
      $ EXCTOP
 C
@@ -1220,6 +1249,8 @@ C
       XKer1234=XKer1234+SRKerW(I)*
      $ OrbGrid(IA+(I-1)*NBasis)*OrbGrid(IB+(I-1)*NBasis)*
      $ OrbGrid(IC+(I-1)*NBasis)*OrbGrid(ID+(I-1)*NBasis)
+C     $ OrbGrid(I+(IA-1)*NBasis)*OrbGrid(I+(IB-1)*NBasis)*
+C     $ OrbGrid(I+(IC-1)*NBasis)*OrbGrid(I+(ID-1)*NBasis)
       EndDo
       EndIf
 C
@@ -1409,8 +1440,10 @@ C
 C
       Dimension URe(NBasis,NBasis),Occ(NBasis),
      $ Ind1(NBasis),Ind2(NBasis),
-     $ WGrid(NGrid),OrbGrid(NBasis,NGrid),OrbXGrid(NBasis,NGrid),
-     $ OrbYGrid(NBasis,NGrid),OrbZGrid(NBasis,NGrid)
+     $ WGrid(NGrid),OrbGrid(NGrid,NBasis),OrbXGrid(NGrid,NBasis),
+     $ OrbYGrid(NGrid,NBasis),OrbZGrid(NGrid,NBasis)
+C     $ WGrid(NGrid),OrbGrid(NBasis,NGrid),OrbXGrid(NBasis,NGrid),
+C     $ OrbYGrid(NBasis,NGrid),OrbZGrid(NBasis,NGrid)
 C
 ! input
       Dimension Zk(NGrid),RhoGrid(NGrid),RhoO(NGrid),
@@ -1468,7 +1501,8 @@ C
       Do IS=1,NOccup
       OnTop=OnTop
      $ +Two*FRDM2(IP,IQ,IR,IS,RDM2Act,Occ,Ind2,NAct,NBasis)
-     $ *OrbGrid(IP,I)*OrbGrid(IQ,I)*OrbGrid(IR,I)*OrbGrid(IS,I)
+C     $ *OrbGrid(IP,I)*OrbGrid(IQ,I)*OrbGrid(IR,I)*OrbGrid(IS,I)
+     $ *OrbGrid(I,IP)*OrbGrid(I,IQ)*OrbGrid(I,IR)*OrbGrid(I,IS)
       EndDo
       EndDo
       EndDo
@@ -1521,12 +1555,14 @@ C
       EXCTOP=Zero
       FDeriv=.False.
       Open=.True.
+C 
 C
+      Print*, 'HERE DOES NOT FLY...'
       Call dftfun_exerfpbe(name,FDeriv,Open,igrad,NGrid,RhoGrid,RhoO,
      >                   Sigma,SigmaCO,SigmaOO,
      >                   Zk,vrhoc,vrhoo,
      >                   vsigmacc,vsigmaco,vsigmaoo,Alpha)
-C
+
       Do I=1,NGrid
       EXCTOP=EXCTOP+Zk(I)*WGrid(I)
       EndDo

@@ -1,5 +1,6 @@
 *Deck EPotSR
-      Subroutine EPotSR(EnSR,VSR,Occ,URe,UNOAO,
+      Subroutine EPotSR(EnSR,EnHSR,VSR,Occ,URe,
+     $ UNOAO,Transp,
      $ OrbGrid,OrbXGrid,OrbYGrid,
 C    HAP
 C     $ OrbZGrid,WGrid,NSymMO,TwoEl,TwoElErf,
@@ -18,6 +19,7 @@ C
 C
       Real(8) Omega
       Integer Flag
+      Logical Transp 
       Dimension VSR(NInte1),OrbGrid(NGrid,NBasis),WGrid(NGrid),
      $ Occ(NBasis),URe(NBasis,NBasis),
      $ UNOAO(NBasis,NBasis),
@@ -45,7 +47,7 @@ C     HAP: VHSR is computed in AO during canonicalization
 C
 C     sth wrong with PotHSR_mithap
       !Call PotHSR_mithap(VHSR,Occ,UNOAO,NBasis)
-      Call tran_matTr(VCoul,UNOAO,UNOAO,NBasis,.true.) 
+      Call tran_matTr(VCoul,UNOAO,UNOAO,NBasis,Transp)
       VHSR = VCoul
 C     Old:
 C      Call PotHSR(VHSR,Occ,URe,TwoEl,TwoElErf,NInte1,NInte2,NBasis)

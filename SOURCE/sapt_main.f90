@@ -1037,7 +1037,7 @@ double precision, allocatable :: ABPlus(:),ABMin(:),URe(:,:),VSR(:), &
                                  EigY0(:),EigY1(:),Eig0(:),Eig1(:), &
                                  EigVecR(:), Eig(:) 
 integer :: i,j,ii,ione
-double precision :: ACAlpha,Omega,EnSR,ECorr,ECASSCF,XVSR
+double precision :: ACAlpha,Omega,EnSR,EnHSR,ECorr,ECASSCF,XVSR
 double precision :: Tcpu,Twall
 character(8) :: label
 character(:),allocatable :: onefile,aoerfile,twofile,twoerffile,&
@@ -1187,7 +1187,7 @@ logical :: doRSH
  !print*, 'TwoErf',norm2(TwoElerf)
 
  NSymNO(1:NBas) = 1
- call EPotSR(EnSR,VSR,Mon%Occ,URe,MO,& 
+ call EPotSR(EnSR,EnHSR,VSR,Mon%Occ,URe,MO,.true.,& 
             OrbGrid,OrbXGrid,OrbYGrid,OrbZGrid,WGrid,&
 !            NSymNO,TwoMO,TwoElErf,&
             NSymNO,Mon%VCoul,&

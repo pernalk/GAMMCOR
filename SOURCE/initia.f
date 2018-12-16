@@ -840,7 +840,7 @@ C     TESTY:
 C      print*,'AUXM:', norm2(AUXM)
 C      print*,'Gamma:', norm2(Gamma)
 C      print*,'GammaF:', norm2(GammaF)
-C      print*,'GammaAB:', norm2(GammaAB)
+      print*,'GammaAB:', norm2(GammaAB)
 C      print*,'Fock:', norm2(FockF)
 C
 C      Call FockGen(FockF,GammaAB,XKin,TwoEl,NInte1,NBasis,NInte2)
