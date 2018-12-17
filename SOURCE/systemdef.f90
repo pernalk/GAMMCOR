@@ -176,20 +176,42 @@ else
   case(JOB_TYPE_AC)
      Flags%IFlAC  = 1
      Flags%IFlSnd = 0
-     if(Input%CalcParams%DFApp==2) Flags%IFunSR = 4
+     if(Input%CalcParams%DFApp==2) then
+        if(Input%CalcParams%PostCAS) then
+           Flags%IFunSR = 4
+        else
+           Flags%IFunSR = 2
+        endif
+     endif
+     if(Input%CalcParams%DFApp==2) Flags%IFunSRKer = 1
 
   case(JOB_TYPE_AC0)
     ! HERE WILL BE CHANGED TO:
     !Flags%IFlAC = 0
      Flags%IFlAC  = 1
      Flags%IFlSnd = 1
-     if(Input%CalcParams%DFApp==2) Flags%IFunSR = 4
+     if(Input%CalcParams%DFApp==2) then
+        if(Input%CalcParams%PostCAS) then
+           Flags%IFunSR = 4
+        else
+           Flags%IFunSR = 2
+        endif
+     endif
+     if(Input%CalcParams%DFApp==2) Flags%IFunSRKer = 1
 
   ! same as ERPA
   case(JOB_TYPE_AC1)
      Flags%IFlAC  = 0
      Flags%IFlSnd = 0
- 
+     if(Input%CalcParams%DFApp==2) then
+        if(Input%CalcParams%PostCAS) then
+           Flags%IFunSR = 4
+        else
+           Flags%IFunSR = 2
+        endif
+     endif
+     if(Input%CalcParams%DFApp==2) Flags%IFunSRKer = 1
+
   case(JOB_TYPE_SAPT)
      Flags%ISAPT  = 1
      Flags%IFlAC  = 0
@@ -208,6 +230,11 @@ else
      case(RESP_APSG)
         Flags%ISERPA = 2
      end select
+
+  case(JOB_TYPE_PDFT)
+     Flags%IFlAC  = 0
+     Flags%IFlSnd = 0
+     Flags%IFunSR = 3 
  
   end select
 

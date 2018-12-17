@@ -310,7 +310,7 @@ C      NumOSym(I)=X
 C      EndDo
 C      Close(10)
 C     HAP
-      Call create_ind('2RDM',NumOSym,IndInt,NBasis)
+      Call create_ind('2RDM',NumOSym,IndInt,NSym,NBasis)
 C
       NSymNO(1:NBasis)=0
       IStart=0
@@ -389,11 +389,11 @@ C
       EndDo
       EndDo
 C
-      Print*, 'Work2',norm2(Work2)
-      Print*, 'Alpha',Alpha
+C      Print*, 'Work2',norm2(Work2)
+C      Print*, 'Alpha',Alpha
 C
       Call PotCoul_mithap(VCoul,Work2,.true.,'AOERFSORT',NBasis)
-      Print*, 'VCOul',norm2(VCoul)
+C      Print*, 'VCOul',norm2(VCoul)
       Call EPotSR(EnSR,EnHSR,VSR,Occ,URe,UNOAO,.false.,
      $        OrbGrid,OrbXGrid,OrbYGrid,OrbZGrid,WGrid,
      $        NSymNO,VCoul,Alpha,IFunSR,
@@ -406,8 +406,8 @@ C
 C     CALCULATE THE SR_XC_PBE ENERGY WITH "TRANSLATED" ALPHA AND BETA DENSITIES
 C     [as in Gagliardi J. Chem. Phys. 146, 034101 (2017)]
 C
-C      Call SR_PBE_ONTOP(EXCTOP,URe,Occ,OrbGrid,OrbXGrid,OrbYGrid,
-C     $ OrbZGrid,WGrid,NGrid,NBasis)
+      Call SR_PBE_ONTOP(EXCTOP,URe,Occ,OrbGrid,OrbXGrid,OrbYGrid,
+     $ OrbZGrid,WGrid,NGrid,NBasis)
       Write(6,'(/," SR_xc_PBE with translated densities",F15.8,/)')
      $ EXCTOP
 C
@@ -429,6 +429,8 @@ C
 C
       Allocate (SRKer(NGrid))
       SRKer(1:NGrid)=Zero
+C
+C      IFunSRKer = 1
 C
       If(IFunSRKer.Eq.1) Then
 C
@@ -507,8 +509,10 @@ C
       If(ISym.Eq.1) Then
       Do I=1,NGrid
       XKer1234=XKer1234+Work(I)*
-     $ OrbGrid(IA+(I-1)*NBasis)*OrbGrid(IB+(I-1)*NBasis)*
-     $ OrbGrid(IC+(I-1)*NBasis)*OrbGrid(ID+(I-1)*NBasis)
+C     $ OrbGrid(IA+(I-1)*NBasis)*OrbGrid(IB+(I-1)*NBasis)*
+C     $ OrbGrid(IC+(I-1)*NBasis)*OrbGrid(ID+(I-1)*NBasis)
+     $ OrbGrid(I+(IA-1)*NGrid)*OrbGrid(I+(IB-1)*NGrid)*
+     $ OrbGrid(I+(IC-1)*NGrid)*OrbGrid(I+(ID-1)*NGrid)
       EndDo
       EndIf
 C
@@ -593,8 +597,10 @@ C
       If(ISym.Eq.1) Then
       Do I=1,NGrid
       XKer1234=XKer1234+Work(I)* 
-     $ OrbGrid(IA+(I-1)*NBasis)*OrbGrid(IB+(I-1)*NBasis)*
-     $ OrbGrid(IC+(I-1)*NBasis)*OrbGrid(ID+(I-1)*NBasis)
+C     $ OrbGrid(IA+(I-1)*NBasis)*OrbGrid(IB+(I-1)*NBasis)*
+C     $ OrbGrid(IC+(I-1)*NBasis)*OrbGrid(ID+(I-1)*NBasis)
+     $ OrbGrid(I+(IA-1)*NGrid)*OrbGrid(I+(IB-1)*NGrid)*
+     $ OrbGrid(I+(IC-1)*NGrid)*OrbGrid(I+(ID-1)*NGrid)
       EndDo
       EndIf
 C
@@ -691,7 +697,8 @@ C
       Include 'commons.inc'
 C
       Dimension SRKer(NGrid),Occ(NBasis),URe(NBasis,NBasis),
-     $ OrbGrid(NBasis,NGrid),WGrid(NGrid)
+C     $ OrbGrid(NBasis,NGrid),WGrid(NGrid)
+     $ OrbGrid(NGrid,NBasis),WGrid(NGrid)
 C
 C     LOCAL ARRAYS
 C
@@ -702,7 +709,7 @@ C
       RhoVec(I)=Rho
       EndDo
 C
-      Call RhoKernel(RhoVec,SRKer,Alpha,NGrid)
+      Call RhoKernel(RhoVec,SRKer,2,Alpha,NGrid)
 C
       Return
       End
@@ -990,8 +997,10 @@ C
       If(ISym.Eq.1) Then
       Do I=1,NGrid
       XKer1234=XKer1234+SRKerW(I)*
-     $ OrbGrid(IP+(I-1)*NBasis)*OrbGrid(IQ+(I-1)*NBasis)*
-     $ OrbGrid(IR+(I-1)*NBasis)*OrbGrid(IS+(I-1)*NBasis)
+C     $ OrbGrid(IP+(I-1)*NBasis)*OrbGrid(IQ+(I-1)*NBasis)*
+C     $ OrbGrid(IR+(I-1)*NBasis)*OrbGrid(IS+(I-1)*NBasis)
+     $ OrbGrid(I+(IP-1)*NGrid)*OrbGrid(I+(IQ-1)*NGrid)*
+     $ OrbGrid(I+(IR-1)*NGrid)*OrbGrid(I+(IS-1)*NGrid)
       EndDo
       EndIf  
       TwoSR=TwoEl2(NAddr3(IP,IQ,IR,IS))-TwoNO(NAddr3(IP,IQ,IR,IS))
@@ -1247,10 +1256,11 @@ C
       If((ISym.Eq.1).And.(IGFact(NAddr3(IA,IB,IC,ID)).Eq.0)) Then
       Do I=1,NGrid
       XKer1234=XKer1234+SRKerW(I)*
-     $ OrbGrid(IA+(I-1)*NBasis)*OrbGrid(IB+(I-1)*NBasis)*
-     $ OrbGrid(IC+(I-1)*NBasis)*OrbGrid(ID+(I-1)*NBasis)
-C     $ OrbGrid(I+(IA-1)*NBasis)*OrbGrid(I+(IB-1)*NBasis)*
-C     $ OrbGrid(I+(IC-1)*NBasis)*OrbGrid(I+(ID-1)*NBasis)
+C     $ OrbGrid(IA+(I-1)*NBasis)*OrbGrid(IB+(I-1)*NBasis)*
+C     $ OrbGrid(IC+(I-1)*NBasis)*OrbGrid(ID+(I-1)*NBasis)
+     $ OrbGrid(I+(IA-1)*NGrid)*OrbGrid(I+(IB-1)*NGrid)*
+     $ OrbGrid(I+(IC-1)*NGrid)*OrbGrid(I+(ID-1)*NGrid)
+
       EndDo
       EndIf
 C
@@ -1557,7 +1567,6 @@ C
       Open=.True.
 C 
 C
-      Print*, 'HERE DOES NOT FLY...'
       Call dftfun_exerfpbe(name,FDeriv,Open,igrad,NGrid,RhoGrid,RhoO,
      >                   Sigma,SigmaCO,SigmaOO,
      >                   Zk,vrhoc,vrhoo,

@@ -660,7 +660,7 @@ double precision :: OneRdm(NBasis*(NBasis+1)/2)
 double precision :: OrbAux(NBasis,NBasis),OrbCAS(NBasis,NBasis)
 double precision,allocatable :: URe(:,:),OrbSym(:,:),Fock(:)
 double precision,allocatable :: work1(:),work2(:),work3(:)
-integer :: NOccup,NVirt
+integer :: NOccup,NVirt,NSym
 integer :: i,j,ia,ib,iab,ioff,idx,NInte1
 character(:),allocatable :: onefile,rdmfile,aoerfile
 ! testy
@@ -688,7 +688,7 @@ integer :: info
  allocate(work1(NInte1),work2(NInte1),work3(NBasis),&
           Fock(NBasis**2),OrbSym(NBasis,NBasis),URe(NBasis,NBasis))
 
- call create_ind(rdmfile,Mon%NumOSym,Mon%IndInt,NBasis)
+ call create_ind(rdmfile,Mon%NumOSym,Mon%IndInt,NSym,NBasis)
 
 ! COPY AUXM TO URe AND OFF SET BY NInAc
  URe = 0

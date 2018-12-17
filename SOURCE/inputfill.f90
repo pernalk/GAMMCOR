@@ -277,6 +277,8 @@ subroutine read_block_calculation(CalcParams, line)
                CalcParams%JobType = JOB_TYPE_EERPA
            elseif (uppercase(val) == "SAPT" ) then
                CalcParams%JobType = JOB_TYPE_SAPT
+           elseif (uppercase(val) == "PDFT" ) then
+               CalcParams%JobType = JOB_TYPE_PDFT
            endif
 
       case ("FRAGMENTS") 
@@ -344,6 +346,9 @@ subroutine read_block_calculation(CalcParams, line)
            elseif (uppercase(val) == "SYM" ) then
               CalcParams%SymType = TYPE_SYM 
            endif
+
+      case ("POSTCAS")
+           read(val,*) CalcParams%PostCAS
 
       case ("SAPTLEVEL")
            if (uppercase(val) == "0".or.&

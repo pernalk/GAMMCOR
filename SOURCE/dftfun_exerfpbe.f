@@ -49,10 +49,10 @@ c      include "common/chirs"
       double precision exerfpbe,dexerfpbedrho,dexerfpbeddrho2
       double precision t1,t2,t3,t4
       double precision kappa,sq,sqs,sqss,fx,fxs,ksig
-      double precision q
+      double precision qq(npt),q
 
 c herer!!!
-      izk=0
+      izk=1
 c izk=icorr(npt)
       do i=1,npt
       zk(i)=z0
@@ -68,7 +68,6 @@ C debug end
 
 C Description of the functional for output of molpro
       name='SR PBE exchange erf'
-
       if(.not.open) then
 
 C Compute LDA part
@@ -152,14 +151,11 @@ C Compute LDA part
          vrhocxerflda(i)=z0
          vrhooxerflda(i)=z0
       end do
-
       do i=1,npt
-         q(izk-1+i)=max((rhoc(i)+rhoo(i))*.5d0,0d0)*2.D0
+         qq(izk-1+i)=max((rhoc(i)+rhoo(i))*.5d0,0d0)*2.D0
       end do
-
-      call dftfun_exerf(namedummy,fderiv,.false.,igrad,npt,q(izk),rhoo,
+      call dftfun_exerf(namedummy,fderiv,.false.,igrad,npt,qq,rhoo,
      >                   zkxerflda,vrhocxerflda,vrhooxerflda,mu)
-
 C     Loop over the grid
       do 2 i=1,npt
 
@@ -223,10 +219,10 @@ C Compute LDA part
       end do
 
       do i=1,npt
-         q(izk-1+i)=max((rhoc(i)-rhoo(i))*.5d0,0d0)*2.D0
+         qq(izk-1+i)=max((rhoc(i)-rhoo(i))*.5d0,0d0)*2.D0
       end do
 
-      call dftfun_exerf(namedummy,fderiv,.false.,igrad,npt,q(izk),rhoo,
+      call dftfun_exerf(namedummy,fderiv,.false.,igrad,npt,qq(izk),rhoo,
      >                   zkxerflda,vrhocxerflda,vrhooxerflda,mu)
 
 C     Loop over the grid

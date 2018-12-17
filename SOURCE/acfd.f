@@ -39,7 +39,8 @@ C
       EndIf
 C
       If(ICASSCF.Eq.1) Then
-C 
+C
+      Print*, norm2(TwoNO)
       Call AC0CAS(ECorr,ETot,TwoNO,Occ,URe,XOne,
      $ ABPLUS,ABMIN,EigVecR,Eig,
      $ IndN,IndX,NDimX,NBasis,NDim,NInte1,NInte2)
@@ -1692,6 +1693,7 @@ C
       NAct=NAcCAS
       INActive=NInAcCAS
       NOccup=INActive+NAct
+
       Ind2(1:NBasis)=0
       Do I=1,NAct
       Ind1(I)=INActive+I
@@ -2420,17 +2422,17 @@ C
       If( .NOT.(IGem(IR).Eq.IGem(IS).And.IGem(IR).Eq.IGem(IPP)
      $ .And.IGem(IR).Eq.IGem(IQQ)) ) Then
 C
-      If( (Occ(IR)*Occ(IS).Eq.Zero.And.Occ(IPP)*Occ(IQQ).Eq.Zero
-     $ .And.Abs(TwoNO(NAddr3(IR,IS,IPP,IQQ))).Lt.1.D-7)
-     $.Or.
-     $((Occ(IR).Eq.One.Or.Occ(IS).Eq.One)
-     $ .And.
-     $ (Occ(IPP).Eq.One.Or.Occ(IQQ).Eq.One)
-     $ .And.Abs(TwoNO(NAddr3(IR,IS,IPP,IQQ))).Lt.1.D-7)) Then
-C
-      icount=icount+1
-C
-      Else  
+C      If( (Occ(IR)*Occ(IS).Eq.Zero.And.Occ(IPP)*Occ(IQQ).Eq.Zero
+C     $ .And.Abs(TwoNO(NAddr3(IR,IS,IPP,IQQ))).Lt.1.D-25)
+C     $.Or.
+C     $((Occ(IR).Eq.One.Or.Occ(IS).Eq.One)
+C     $ .And.
+C     $ (Occ(IPP).Eq.One.Or.Occ(IQQ).Eq.One)
+C     $ .And.Abs(TwoNO(NAddr3(IR,IS,IPP,IQQ))).Lt.1.D-25)) Then
+CC
+C      icount=icount+1
+CC
+C      Else  
 C
       Do IP=IQQ,IPP,IPP-IQQ
       Do IQ=IQQ,IPP,IPP-IQQ
@@ -2587,7 +2589,8 @@ C     end of IP,IQ LOOPS
       EndDo
 C
  1000 Continue
-      EndIf
+C     icount?
+C      EndIf
 c     If IGem ....
       EndIf
 C

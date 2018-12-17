@@ -639,7 +639,7 @@ C      Print*, I,IndInt(I)
 C      EndDo
  
 C     HAP
-      Call create_ind('2RDM',NumOSym,IndInt,NBasis)
+      Call create_ind('2RDM',NumOSym,IndInt,MxSym,NBasis)
 
 C     LOAD ONE-ELE INTEGS IN AO
       FName(K:K+8)='xone.dat'
@@ -734,10 +734,7 @@ C
       If(PC(I).Gt.Zero) NAc=NAc+1
       EndDo
 C
-      NInAc=NELE-Sum+1.D-1
-c herer!!!
-c      ninac=1.
-c      write(*,*)nele,sum,NInAc
+      NInAc=XELE-Sum+1.D-2
       Do I=1,NInAc+NAc
       If(I.Le.NInAc) Then
       Occ(I)=One

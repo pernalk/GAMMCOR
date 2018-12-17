@@ -21,6 +21,7 @@ integer, parameter :: JOB_TYPE_AC1   = 3
 integer, parameter :: JOB_TYPE_ERPA  = 3
 integer, parameter :: JOB_TYPE_EERPA = 4
 integer, parameter :: JOB_TYPE_SAPT  = 5
+integer, parameter :: JOB_TYPE_PDFT  = 6
 
 integer, parameter :: SAPTLEVEL0 = 0
 integer, parameter :: SAPTLEVEL1 = 1
@@ -54,6 +55,8 @@ integer, parameter :: MONOMER_B = 2
 integer, parameter :: RESP_ERPA = 1
 integer, parameter :: RESP_APSG = 2
 integer, parameter :: RESP_DFT  = 3
+
+logical, parameter :: FLAG_POSTCAS = .FALSE.
 
 integer,parameter :: maxcen = 500
 
@@ -92,6 +95,7 @@ type CalculationBlock
       integer :: SymType = TYPE_NO_SYM
       integer :: SaptLevel = SAPTLEVEL2 
       logical :: Restart = FLAG_RESTART
+      logical :: PostCAS = FLAG_POSTCAS
       integer :: IPrint  = 0 !FLAG_PRINT_LEVEL 
       double precision :: RPAThresh = 1.0D-6
       integer :: imon = 1
@@ -1271,13 +1275,13 @@ end function iscomment
 !!
 !end subroutine molpro_routines
 
-subroutine create_ind(infile,NumOSym,IndInt,NBasis)
+subroutine create_ind(infile,NumOSym,IndInt,NSym,NBasis)
 implicit none
 
 character(*) :: infile
-integer :: NumOSym(15),IndInt(NBasis),NBasis
+integer :: NumOSym(15),IndInt(NBasis),NSym,NBasis
 integer :: ifile,ios,i,j,k,isym
-integer :: NSym,NState,IOld,INew
+integer :: NState,IOld,INew
 integer :: iclos(8),iact(8),nt(8),ivirt(8)
 character(8) :: label
 
