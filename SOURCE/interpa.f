@@ -1047,7 +1047,7 @@ C
       Integer :: NDimX,DimV1,Max_NDEG
       Integer :: Space1(3,NDimX)
       Double Precision :: Tmp
-      Double Precision,Parameter :: Thresh=1.d-9
+      Double Precision,Parameter :: Thresh=1.d-8
       Integer :: I
 C
       Space1(3,:) = 0
@@ -1145,6 +1145,7 @@ C
          NDEG=Space1(3,I)
          If(NDEG>1) Then
 C
+         Print*, 'ZERO!'
          EigVecR((Space1(1,I)-1)*NDimX+1:Space1(2,I)*NDimX) = 0
 C  
          EndIf
@@ -1171,6 +1172,9 @@ C
 c     set small being a square of small in Deck EneERPA
      $ Four=4.D0, Small=1.D-6)
 C
+      Integer :: DimV1,Max_NDEG
+      Integer :: Space1(3,NDimX)
+C
       Include 'commons.inc'
 C
       Dimension
@@ -1194,6 +1198,13 @@ C
 C
       Call DGEEV('N','V',NDimX,HlpAB,NDimX,Eig,EigI,
      $           EigVecL,NDimX,EigVecR,NDimX,Work,5*NDimX,INFO)
+C
+C     ORTHOGONALISE DEGENERATE VECTORS
+      Call SORT_PINOVECS(EigVecR,Eig,EigI,NDimX)
+      Call CREATE_SPACE(Eig,Space1,NDimX,DimV1,Max_NDEG)
+      Call ORTHO_DEGVEC(EigVecR,Space1,DimV1,NDimX,Max_NDEG)
+C     For tests only:
+c      Call ZERO_DEGVEC(EigVecR,Eig,Space1,DimV1,NDimEx,Max_NDEG)
 C
 C     IMPOSE THE NORMALIZATION 2 Y*X = 1 ON THE EIGENVECTORS CORRESPONDING TO POSITIVE
 C     OMEGA'S 
