@@ -10,5 +10,5 @@ C
       Common/EMBEDD/ IFrag,NGemSave,IAuxGem(1000),
      $ IGemSave(1000), IOrbA(1000),NGemB, NActive,
      $ IConnect(1000,1000)
-      Common/AC/ IFlAC, IFlSnd, IFlCore, IFlFrag1, IFl12
+      Common/AC/ IFlAC, IFlSnd, IFlCore, IFlFrag1, IFl12, NoSt
 C

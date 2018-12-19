@@ -508,6 +508,7 @@ C     HERE GOES UPDATED LdInteg!
 *Deck LdInteg
       Subroutine LdInteg(Title,XKin,XNuc,ENuc,Occ,URe,
      $ TwoEl,UAOMO,NInte1,NBasis,NInte2,NGem)
+C     $ TwoEl,UAOMO,NInte1,NBasis,NInte2,NGem,NoSt)
 C
 C     READ/WRITE THE ONE- AND TWO-ELECTRON INTEGRALS 
 C     INTERFACED WITH MOLPRO (INTEGRALS ARE READ FROM FCIDUMP FILES)
@@ -534,7 +535,6 @@ C
       Character*60 FName,Aux1,Title
 C
       Include 'commons.inc'
-      NoSt=1
 C
       Do I=1,60
       FName(I:I)=' '

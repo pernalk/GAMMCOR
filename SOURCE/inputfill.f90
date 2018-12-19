@@ -393,13 +393,16 @@ integer :: test,test2
 
  call split(line, key, val)
  select case (uppercase(key))
+ case ("STATE")
+       read(val, *) SystemParams%NoSt
+
  case ("CHARGE")
        read(val, *) SystemParams%Charge
 
  case ("MULTIPLICITY")
        read(val, *) SystemParams%Multiplicity
 
- case ("ZNUCL")      
+ case ("ZNUCL")
        read(val, *) SystemParams%ZNucl
 
  case ("NATOMS")

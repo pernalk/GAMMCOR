@@ -248,6 +248,9 @@ else
 
 endif
 
+! SELECT ELECTRONIC STATE
+Flags%NoSt = Input%SystemInput(1)%NoSt
+
 if(allocated(Input%CalcParams%JobTitle)) then
   Flags%JobTitle = Input%CalcParams%JobTitle
 else
@@ -277,6 +280,7 @@ if(Flags%ISAPT.Eq.0) then
      stop
    endif   
   
+   System%NoSt   = Input%SystemInput(1)%NoSt
    System%ZNucl  = Input%SystemInput(1)%ZNucl
    System%Charge = Input%SystemInput(1)%Charge
    System%NBasis = Input%CalcParams%NBasis
@@ -311,6 +315,8 @@ elseif(Flags%ISAPT.Eq.1) then
             monB => SAPT%monB ) 
    select case(Input%SystemInput(1)%Monomer)
    case(1)
+
+      monA%NoSt   = Input%SystemInput(1)%NoSt
       monA%ZNucl  = Input%SystemInput(1)%ZNucl
       monA%Charge = Input%SystemInput(1)%Charge
       monA%Omega  = Input%SystemInput(1)%Omega 
@@ -331,6 +337,7 @@ elseif(Flags%ISAPT.Eq.1) then
       monA%XELE = (SAPT%monA%ZNucl - SAPT%monA%Charge)/2.0d0 
       monA%NELE = (SAPT%monA%ZNucl - SAPT%monA%Charge)/2 
     
+      monB%NoSt   = Input%SystemInput(2)%NoSt
       monB%ZNucl  = Input%SystemInput(2)%ZNucl
       monB%Charge = Input%SystemInput(2)%Charge
       monB%Omega  = Input%SystemInput(2)%Omega 
@@ -355,6 +362,7 @@ elseif(Flags%ISAPT.Eq.1) then
    
    case(2)
   
+      monA%NoSt   = Input%SystemInput(2)%NoSt
       monA%ZNucl  = Input%SystemInput(2)%ZNucl
       monA%Charge = Input%SystemInput(2)%Charge
       monA%Omega  = Input%SystemInput(2)%Omega 
@@ -374,6 +382,7 @@ elseif(Flags%ISAPT.Eq.1) then
       monA%XELE = (monA%ZNucl - monA%Charge)/2.0d0 
       monA%NELE = (monA%ZNucl - monA%Charge)/2 
    
+      monB%NoSt   = Input%SystemInput(1)%NoSt
       monB%ZNucl  = Input%SystemInput(1)%ZNucl
       monB%Charge = Input%SystemInput(1)%Charge
       monB%Omega  = Input%SystemInput(1)%Omega 

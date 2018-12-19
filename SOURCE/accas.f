@@ -193,8 +193,11 @@ C
 C
 C     FIND EIGENVECTORS (EigVecR) AND COMPUTE THE ENERGY
 C
-c      Call ERPASYMM1(EigVecR,Eig,ABPLUS,ABMIN,NBasis,NDimX)   
+      If(NoSt.Eq.1) Then
+      Call ERPASYMM1(EigVecR,Eig,ABPLUS,ABMIN,NBasis,NDimX)
+      Else
       Call ERPAVEC(EigVecR,Eig,ABPLUS,ABMIN,NBasis,NDimX)
+      EndIf
       Write(6,'(/,
      $ " *** ERPA-CAS Excitation Energies (a.u., eV) *** ")')
 C     the purpose of sorting is only to print a few highest (sorted) eigenvectors
@@ -620,8 +623,11 @@ C
 C
 C     FIND EIGENVECTORS (EigVecR) AND COMPUTE THE ENERGY
 C
+      If(NoSt.Eq.1) Then
       Call ERPASYMM1(EigVecR,Eig,ABPLUS,ABMIN,NBasis,NDimX)
-c      Call ERPAVEC(EigVecR,Eig,ABPLUS,ABMIN,NBasis,NDimX)
+      Else
+      Call ERPAVEC(EigVecR,Eig,ABPLUS,ABMIN,NBasis,NDimX)
+      EndIf
       Write(6,'(/,
      $ " *** LR-CAS-SR-DFT Excitation Energies (a.u., eV) *** ")')
 C     the purpose of sorting is only to print a few highest (sorted) eigenvectors
@@ -1022,11 +1028,15 @@ C
       EndDo
       EndDo
 C
-      If(NDimB.Ne.0)
-c     $Call ERPASYMM0(EigY(NFree2),EigX(NFree2),Eig(NFree1),ABPLUS,ABMIN,
-c     $ NDimB)
-     $Call ERPAVECYX(EigY(NFree2),EigX(NFree2),Eig(NFree1),ABPLUS,ABMIN,
+      If(NDimB.Ne.0) Then
+      If(NoSt.Eq.1) Then
+      Call ERPASYMM0(EigY(NFree2),EigX(NFree2),Eig(NFree1),ABPLUS,ABMIN,
      $ NDimB)
+      Else
+      Call ERPAVECYX(EigY(NFree2),EigX(NFree2),Eig(NFree1),ABPLUS,ABMIN,
+     $ NDimB)
+      EndIf
+      EndIf
 C
       NoEig=NoEig+NDimB
       NFree1=NoEig+1
@@ -1093,11 +1103,15 @@ C
 C
       EndDo
 C
-      If(NDimB.Ne.0)
-c     $Call ERPASYMM0(EigY(NFree2),EigX(NFree2),Eig(NFree1),ABPLUS,ABMIN,
-c     $ NDimB)
-     $Call ERPAVECYX(EigY(NFree2),EigX(NFree2),Eig(NFree1),ABPLUS,ABMIN,
-     $ NDimB)
+      If(NDimB.Ne.0) Then
+      If(NoSt.Eq.1) Then
+      Call ERPASYMM0(EigY(NFree2),EigX(NFree2),Eig(NFree1),ABPLUS,ABMIN,
+     $   NDimB)
+      Else
+      Call ERPAVECYX(EigY(NFree2),EigX(NFree2),Eig(NFree1),ABPLUS,ABMIN,
+     $   NDimB)
+      EndIf
+      EndIf
 C
       NoEig=NoEig+NDimB
       NFree1=NoEig+1
@@ -1167,11 +1181,15 @@ C
 C
       EndDo
 C
-      If(NDimB.Ne.0)
-c     $Call ERPASYMM0(EigY(NFree2),EigX(NFree2),Eig(NFree1),ABPLUS,ABMIN,
-c     $ NDimB)
-     $Call ERPAVECYX(EigY(NFree2),EigX(NFree2),Eig(NFree1),ABPLUS,ABMIN,
-     $ NDimB)
+      If(NDimB.Ne.0) Then
+      If(NoSt.Eq.1) Then
+      Call ERPASYMM0(EigY(NFree2),EigX(NFree2),Eig(NFree1),ABPLUS,ABMIN,
+     $   NDimB)
+      Else
+      Call ERPAVECYX(EigY(NFree2),EigX(NFree2),Eig(NFree1),ABPLUS,ABMIN,
+     $    NDimB)
+      EndIf
+      EndIf
 C
       NoEig=NoEig+NDimB
       NFree1=NoEig+1
@@ -1594,6 +1612,11 @@ C
 *Deck RunDFOnTop
       Subroutine RunDFOnTop(ETot,ENuc,TwoNO,URe,UNOAO,Occ,XOne,
      $  IndAux,IPair,IndN,IndX,NDimX,Title,NBasis,NInte1,NInte2,NGem)
+C 
+C     ETot is calculated from MC-PDFT
+C     with PBE xc functional
+C     see Eq.(6) in Manni, et al. JCTC 10, 3669-3680 (2014)
+C     doi: 10.1021/ct500483t 
 C
       Implicit Real*8 (A-H,O-Z)
 C

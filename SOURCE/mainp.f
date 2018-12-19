@@ -169,6 +169,10 @@ C
 C      Write(*,'(/,"IFunSR=",I1)')IFunSR
 C      Write(*,'(/,"IFunSRKer=",I1,/)')IFunSRKer
 C
+C     *************************************************************************
+C         
+C     SELECT ELECTRONIC STATE  
+      NoSt = Flags%NoSt
 C
 C     READ THE INPUT AND PRINT THE INPUT DATA 
 C

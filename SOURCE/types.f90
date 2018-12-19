@@ -104,6 +104,7 @@ type CalculationBlock
 end type CalculationBlock
 
 type SystemBlock
+      integer :: NoSt = 1
       integer :: Multiplicity = 1
       integer :: Charge = 0
       integer :: ZNucl   = 0
@@ -122,7 +123,6 @@ type SystemBlock
       integer :: NActS(8), INActS(8)
       integer :: NDim, NDimX
       integer :: NDimN
-      integer :: NoSt = 1
       integer :: NCen = 0
       integer :: UCen = 0  
       integer :: NMonBas(8) = 0
@@ -163,6 +163,7 @@ type FlagsData
      integer :: IAO     = 0
      integer :: INO     = 0
      integer :: NoSym   = 1
+     integer :: NoSt    = 1
      integer :: IGVB    = 1
      integer :: IFun    = 13
      integer :: IFunSR    = 0 

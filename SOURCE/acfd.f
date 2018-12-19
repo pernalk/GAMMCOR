@@ -460,9 +460,15 @@ C
       EndDo
       EndDo
 C
-      If(NDimB.Ne.0)
-     $Call ERPASYMM0(EigY(NFree2),EigX(NFree2),Eig(NFree1),ABPLUS,ABMIN,
-     $ NDimB)      
+      If(NDimB.Ne.0) Then
+      If(NoSt.Eq.1) Then
+      Call ERPASYMM0(EigY(NFree2),EigX(NFree2),Eig(NFree1),ABPLUS,ABMIN,
+     $ NDimB)
+      Else
+      Call ERPAVECYX(EigY(NFree2),EigX(NFree2),Eig(NFree1),ABPLUS,ABMIN,
+     $ NDimB)
+      EndIf
+      EndIf
 C
       NoEig=NoEig+NDimB
       NFree1=NoEig+1
@@ -529,9 +535,15 @@ C
 C
       EndDo
 C
-      If(NDimB.Ne.0)
-     $Call ERPASYMM0(EigY(NFree2),EigX(NFree2),Eig(NFree1),ABPLUS,ABMIN,
+      If(NDimB.Ne.0) Then
+      If(NoSt.Eq.1) Then
+      Call ERPASYMM0(EigY(NFree2),EigX(NFree2),Eig(NFree1),ABPLUS,ABMIN,
      $ NDimB)
+      Else
+      Call ERPAVECYX(EigY(NFree2),EigX(NFree2),Eig(NFree1),ABPLUS,ABMIN,
+     $ NDimB)
+      EndIf
+      EndIf
 C
       NoEig=NoEig+NDimB
       NFree1=NoEig+1
@@ -601,9 +613,15 @@ C
 C
       EndDo
 C
-      If(NDimB.Ne.0)
-     $Call ERPASYMM0(EigY(NFree2),EigX(NFree2),Eig(NFree1),ABPLUS,ABMIN,
+      If(NDimB.Ne.0) Then
+      If(NoSt.Eq.1) Then
+      Call ERPASYMM0(EigY(NFree2),EigX(NFree2),Eig(NFree1),ABPLUS,ABMIN,
      $ NDimB)
+      Else
+      Call ERPAVECYX(EigY(NFree2),EigX(NFree2),Eig(NFree1),ABPLUS,ABMIN,
+     $ NDimB)
+      EndIf
+      EndIf
 C
       NoEig=NoEig+NDimB
       NFree1=NoEig+1
@@ -1172,9 +1190,15 @@ C
       EndDo
       EndDo
 C
-      If(NDimB.Ne.0)
-     $Call ERPASYMM0(EigY(NFree2),EigX(NFree2),Eig(NFree1),ABPLUS,ABMIN,
+      If(NDimB.Ne.0) Then
+      If(NoSt.Eq.1) Then
+      Call ERPASYMM0(EigY(NFree2),EigX(NFree2),Eig(NFree1),ABPLUS,ABMIN,
      $ NDimB)
+      Else
+      Call ERPAVECYX(EigY(NFree2),EigX(NFree2),Eig(NFree1),ABPLUS,ABMIN,
+     $ NDimB)
+      EndIf
+      EndIf
 C
       NoEig=NoEig+NDimB
       NFree1=NoEig+1
@@ -1241,9 +1265,15 @@ C
 C
       EndDo
 C
-      If(NDimB.Ne.0)
-     $Call ERPASYMM0(EigY(NFree2),EigX(NFree2),Eig(NFree1),ABPLUS,ABMIN,
+      If(NDimB.Ne.0) Then
+      If(NoSt.Eq.1) Then
+      Call ERPASYMM0(EigY(NFree2),EigX(NFree2),Eig(NFree1),ABPLUS,ABMIN,
      $ NDimB)
+      Else
+      Call ERPAVECYX(EigY(NFree2),EigX(NFree2),Eig(NFree1),ABPLUS,ABMIN,
+     $ NDimB)
+      EndIf
+      EndIf
 C
       NoEig=NoEig+NDimB
       NFree1=NoEig+1
@@ -1313,9 +1343,15 @@ C
 C
       EndDo
 C
-      If(NDimB.Ne.0)
-     $Call ERPASYMM0(EigY(NFree2),EigX(NFree2),Eig(NFree1),ABPLUS,ABMIN,
+      If(NDimB.Ne.0) Then
+      If(NoSt.Eq.1) Then
+      Call ERPASYMM0(EigY(NFree2),EigX(NFree2),Eig(NFree1),ABPLUS,ABMIN,
      $ NDimB)
+      Else
+      Call ERPAVECYX(EigY(NFree2),EigX(NFree2),Eig(NFree1),ABPLUS,ABMIN,
+     $ NDimB)
+      EndIf
+      EndIf
 C
       NoEig=NoEig+NDimB
       NFree1=NoEig+1
@@ -1915,11 +1951,15 @@ C
       EndDo
       EndDo      
 C
-      If(NDimB.Ne.0)
-c     $Call ERPASYMM0(EigY(NFree2),EigX(NFree2),Eig(NFree1),ABPLUS,ABMIN,
-c     $ NDimB)      
-     $Call ERPAVECYX(EigY(NFree2),EigX(NFree2),Eig(NFree1),ABPLUS,ABMIN,
+      If(NDimB.Ne.0) Then
+      If(NoSt.Eq.1) Then
+      Call ERPASYMM0(EigY(NFree2),EigX(NFree2),Eig(NFree1),ABPLUS,ABMIN,
+     $ NDimB)      
+      Else
+      Call ERPAVECYX(EigY(NFree2),EigX(NFree2),Eig(NFree1),ABPLUS,ABMIN,
      $ NDimB)
+      EndIf
+      EndIf
 C
       NoEig=NoEig+NDimB
       NFree1=NoEig+1
@@ -1986,11 +2026,15 @@ C
 C
       EndDo
 C
-      If(NDimB.Ne.0)
-c     $Call ERPASYMM0(EigY(NFree2),EigX(NFree2),Eig(NFree1),ABPLUS,ABMIN,
-c     $ NDimB)
-     $Call ERPAVECYX(EigY(NFree2),EigX(NFree2),Eig(NFree1),ABPLUS,ABMIN,
+      If(NDimB.Ne.0) Then
+      If(NoSt.Eq.1) Then
+      Call ERPASYMM0(EigY(NFree2),EigX(NFree2),Eig(NFree1),ABPLUS,ABMIN,
      $ NDimB)
+      Else
+      Call ERPAVECYX(EigY(NFree2),EigX(NFree2),Eig(NFree1),ABPLUS,ABMIN,
+     $ NDimB)
+      EndIf
+      EndIf
 C
       NoEig=NoEig+NDimB
       NFree1=NoEig+1
@@ -2060,11 +2104,15 @@ C
 C
       EndDo
 C
-      If(NDimB.Ne.0) 
-c     $Call ERPASYMM0(EigY(NFree2),EigX(NFree2),Eig(NFree1),ABPLUS,ABMIN,
-c     $ NDimB)
-     $Call ERPAVECYX(EigY(NFree2),EigX(NFree2),Eig(NFree1),ABPLUS,ABMIN,
+      If(NDimB.Ne.0) Then
+      If(NoSt.Eq.1) Then 
+      Call ERPASYMM0(EigY(NFree2),EigX(NFree2),Eig(NFree1),ABPLUS,ABMIN,
      $ NDimB)
+      Else
+      Call ERPAVECYX(EigY(NFree2),EigX(NFree2),Eig(NFree1),ABPLUS,ABMIN,
+     $ NDimB)
+      EndIf
+      EndIf
 C
       NoEig=NoEig+NDimB
       NFree1=NoEig+1
@@ -2422,18 +2470,18 @@ C
       If( .NOT.(IGem(IR).Eq.IGem(IS).And.IGem(IR).Eq.IGem(IPP)
      $ .And.IGem(IR).Eq.IGem(IQQ)) ) Then
 C
-C      If( (Occ(IR)*Occ(IS).Eq.Zero.And.Occ(IPP)*Occ(IQQ).Eq.Zero
-C     $ .And.Abs(TwoNO(NAddr3(IR,IS,IPP,IQQ))).Lt.1.D-25)
-C     $.Or.
-C     $((Occ(IR).Eq.One.Or.Occ(IS).Eq.One)
-C     $ .And.
-C     $ (Occ(IPP).Eq.One.Or.Occ(IQQ).Eq.One)
-C     $ .And.Abs(TwoNO(NAddr3(IR,IS,IPP,IQQ))).Lt.1.D-25)) Then
-CC
-C      icount=icount+1
-CC
-C      Else  
+      If( (Occ(IR)*Occ(IS).Eq.Zero.And.Occ(IPP)*Occ(IQQ).Eq.Zero
+     $ .And.Abs(TwoNO(NAddr3(IR,IS,IPP,IQQ))).Lt.1.D-25)
+     $.Or.
+     $((Occ(IR).Eq.One.Or.Occ(IS).Eq.One)
+     $ .And.
+     $ (Occ(IPP).Eq.One.Or.Occ(IQQ).Eq.One)
+     $ .And.Abs(TwoNO(NAddr3(IR,IS,IPP,IQQ))).Lt.1.D-25)) Then
 C
+      icount=icount+1
+C
+      Else  
+
       Do IP=IQQ,IPP,IPP-IQQ
       Do IQ=IQQ,IPP,IPP-IQQ
       If(IP.Ne.IQ) Then
@@ -2589,8 +2637,8 @@ C     end of IP,IQ LOOPS
       EndDo
 C
  1000 Continue
-C     icount?
-C      EndIf
+C     end icount
+      EndIf
 c     If IGem ....
       EndIf
 C
@@ -3280,8 +3328,11 @@ C
 C
 C     FIND EIGENVECTORS (EigVecR) AND COMPUTE THE ENERGY
 C
-c      Call ERPASYMM1(EigVecR,Eig,ABPLUS,ABMIN,NBasis,NDimX)
+      If(NoSt.Eq.1) Then
+      Call ERPASYMM1(EigVecR,Eig,ABPLUS,ABMIN,NBasis,NDimX)
+      Else
       Call ERPAVEC(EigVecR,Eig,ABPLUS,ABMIN,NBasis,NDimX)
+      EndIf
 C
       Call ACEneERPA(ECorr,EigVecR,Eig,TwoNO,URe,Occ,XOne,
      $ IndN,NBasis,NInte1,NInte2,NDimX,NGem)

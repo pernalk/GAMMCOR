@@ -1268,7 +1268,11 @@ logical :: doRSH
 
  EigVecR = 0
  Eig = 0
- call ERPASYMM1(EigVecR,Eig,ABPlus,ABMin,NBas,Mon%NDimX)
+ if(Mon%NoSt==1) then
+    call ERPASYMM1(EigVecR,Eig,ABPlus,ABMin,NBas,Mon%NDimX)
+ else
+    call ERPAVEC(EigVecR,Eig,ABPlus,ABMin,NBas,Mon%NDimX)
+ endif
 
  write(LOUT,'(/," *** LR-CAS-SR-DFT Excitation Energies *** ",/)')
  do i=1,10
@@ -1623,7 +1627,11 @@ double precision, allocatable :: EigTmp(:), VecTmp(:)
 
    EigVecR = 0
    Eig = 0
-   call ERPASYMM1(EigVecR,Eig,ABPlus,ABMin,NBas,Mon%NDimX)
+   if(Mon%NoSt==1) then
+      call ERPASYMM1(EigVecR,Eig,ABPlus,ABMin,NBas,Mon%NDimX)
+   else
+      call ERPAVEC(EigVecR,Eig,ABPlus,ABMin,NBas,Mon%NDimX)
+   endif
 
    !print*, 'Entering ERPAVEC...' 
    !call ERPAVEC(EigVecR,Eig,ABPlus,ABMin,NBas,Mon%NDimX)
