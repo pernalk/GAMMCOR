@@ -182,8 +182,9 @@ else
         else
            Flags%IFunSR = 2
         endif
+        Flags%IFunSRKer = Input%CalcParams%Kernel 
      endif
-     if(Input%CalcParams%DFApp==2) Flags%IFunSRKer = 1
+!     if(Input%CalcParams%DFApp==2) Flags%IFunSRKer = 1
 
   case(JOB_TYPE_AC0)
     ! HERE WILL BE CHANGED TO:
@@ -196,8 +197,9 @@ else
         else
            Flags%IFunSR = 2
         endif
+        Flags%IFunSRKer = Input%CalcParams%Kernel 
      endif
-     if(Input%CalcParams%DFApp==2) Flags%IFunSRKer = 1
+!     if(Input%CalcParams%DFApp==2) Flags%IFunSRKer = 1
 
   ! same as ERPA
   case(JOB_TYPE_AC1)
@@ -209,8 +211,9 @@ else
         else
            Flags%IFunSR = 2
         endif
+        Flags%IFunSRKer = Input%CalcParams%Kernel 
      endif
-     if(Input%CalcParams%DFApp==2) Flags%IFunSRKer = 1
+!     if(Input%CalcParams%DFApp==2) Flags%IFunSRKer = 1
 
   case(JOB_TYPE_SAPT)
      Flags%ISAPT  = 1

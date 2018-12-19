@@ -91,6 +91,7 @@ type CalculationBlock
       integer :: RDMSource = INTER_TYPE_DAL
       integer :: Response = RESP_ERPA
       integer :: DFApp = DF_NONE
+      integer :: Kernel = 1
       integer :: Inactive = FLAG_CORE 
       integer :: SymType = TYPE_NO_SYM
       integer :: SaptLevel = SAPTLEVEL2 

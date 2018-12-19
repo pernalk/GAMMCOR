@@ -333,6 +333,9 @@ subroutine read_block_calculation(CalcParams, line)
                CalcParams%DFApp = DF_PBE
            endif
 
+      case ("KERNEL")
+           read(val,*) CalcParams%Kernel
+
       case ("RDMSOURCE")
            if (uppercase(val) == "DALTON") then
               CalcParams%RDMSource = INTER_TYPE_DAL
