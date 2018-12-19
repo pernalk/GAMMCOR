@@ -601,7 +601,7 @@ integer :: imon
  if(Input%CalcParams%InterfaceType.ne.INTER_TYPE_DAL) then
     if(Input%CalcParams%NBasis==0) then
        !write(LOUT,'(1x,a)') 'FATAL ERROR: NBasis ENTRY MISSING'
-       write(LOUT,'(1x,a)') 'NBasis WILL BE READ FROM DALTON' 
+       write(LOUT,'(1x,a)') 'NBasis WILL BE READ FROM MOLPRO' 
        !stop
     endif
  elseif(Input%CalcParams%NBasis.lt.0) then

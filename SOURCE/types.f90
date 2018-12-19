@@ -64,9 +64,9 @@ character(*),parameter :: PossibleInterface(3) = &
 [character(8) :: &
 'DALTON', 'MOLPRO', 'OWN']
 
-character(*),parameter :: PossibleJobType(5) = &
+character(*),parameter :: PossibleJobType(6) = &
 [character(8) :: &
-'AC', 'AC0', 'ERPA', 'AC1', 'SAPT']
+'AC', 'AC0', 'ERPA', 'AC1', 'SAPT', 'PDFT']
 
 character(*),parameter :: PossibleRDMType(5) = &
 [character(8) :: &
@@ -259,8 +259,8 @@ associate( CalcParams => Input%CalcParams)
  endif
  write(LOUT,' (1x,a,3x,a)') "RDM SOURCE: ",  &
               PossibleInterface(CalcParams%RDMSource)
- write(LOUT,' (1x,a,6x,i3)') "NBASIS: ",  &
-              CalcParams%NBasis
+! write(LOUT,' (1x,a,6x,i3)') "NBASIS: ",  &
+!              CalcParams%NBasis
  if(CalcParams%Fragments==1) then
    write(LOUT,' (1x,a,4x,a)') "FRAGMENTS: ",  &
               "TRUE"
@@ -281,7 +281,6 @@ associate( CalcParams => Input%CalcParams)
                     PossibleMonomers(System%Monomer)
       write(LOUT, '(1x,a,6x,i3)') "ZNUCL: ", System%ZNucl
       write(LOUT, '(1x,a,5x,i3)') "CHARGE: ", System%Charge
-      write(LOUT, '(1x,a,i2)') "MULTIPLICITY: ", System%Multiplicity
       if(System%NCen.gt.0) then
          write(LOUT, '(1x,a,i2)') "NO. OF ATOMS: ", System%NCen 
       endif
@@ -539,7 +538,7 @@ character(8) :: label
            endif
            if(label=='2RDM    ') then
               read(iunit) ic1d,nstate
-              print*, ic1d,TrSq,nstate
+              !print*, ic1d,TrSq,nstate
               do i=1,nstate
                  read(iunit) ist 
                  read(iunit) work(1:TrSq)

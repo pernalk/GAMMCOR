@@ -294,8 +294,8 @@ if(Flags%ISAPT.Eq.0) then
    System%TwoMoInt = Input%SystemInput(1)%TwoMoInt
    System%IPrint = Input%CalcParams%IPrint  
   
-   System%XELE = (System%ZNucl - System%Charge)/2.0d0 
-   System%NELE = (System%ZNucl - System%Charge)/2 
+   System%XELE = (System%ZNucl - System%Charge)/2.0d0
+   System%NELE = (System%ZNucl - System%Charge)/2
    
   ! write(*,*) "ZNucl:",Input%SystemInput(1)%ZNucl
   ! write(*,*) "Sys-val:",System%XELE, System%NELE
@@ -466,8 +466,8 @@ elseif(Flags%ISAPT.Eq.1) then
 
 endif
 
-   write(LOUT,'()')
-   write(LOUT,'(1x,a,1x,i3)') 'NO. OF CONTRACTIONS: ', System%NBasis
+!   write(LOUT,'()')
+!   write(LOUT,'(1x,a,1x,i3)') 'NO. OF CONTRACTIONS: ', System%NBasis
 
    if(Flags%IRes.Ne.1) then
 !      write(LOUT,'()')

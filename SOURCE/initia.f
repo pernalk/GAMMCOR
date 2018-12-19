@@ -837,7 +837,6 @@ C     TESTY:
 C      print*,'AUXM:', norm2(AUXM)
 C      print*,'Gamma:', norm2(Gamma)
 C      print*,'GammaF:', norm2(GammaF)
-      print*,'GammaAB:', norm2(GammaAB)
 C      print*,'Fock:', norm2(FockF)
 C
 C      Call FockGen(FockF,GammaAB,XKin,TwoEl,NInte1,NBasis,NInte2)
@@ -860,8 +859,6 @@ C
       URe(I,J)=Fock((J-1)*NInAc+I)
       EndDo
       EndDo
-C
-      Print*, PC(1:NInAc)
 C
       EndIf
 C
@@ -967,8 +964,8 @@ C
       Call MultpM(UAOMO,URe,UAux,NBasis)
       Call MatTr(XKin,UAOMO,NBasis)
 C  
-      Call print_sqmat(UAOMO,NBasis)
-
+C      Call print_sqmat(UAOMO,NBasis)
+C
 C
       Write(6,'(/," Transforming two-electron integrals ...",/)')
       Call TwoNO1(TwoEl,UAOMO,NBasis,NInte2)
@@ -1042,8 +1039,6 @@ C
       Write(6,'(/,1X,''Two-electron Energy'',5X,F15.8)')ETwo
       Write(6,'(/,1X,''MCSCF Molpro Energy'',5X,F15.8)')ETot+ENuc
 C
-C     HAP
-      Write(6,*) ETot+ENuc
 C     SAVE THE ACTIVE PART IN rdm2.dat
 C
       Open(10,File='rdm2.dat')
@@ -1416,8 +1411,6 @@ C
  
          close(iunit)
 
-         print*, 'ENuc:=',ENuc
- 
       else
  
         write(LOUT,'(1x,a)') 'WARNING: '// infile //' NOT FOUND!'

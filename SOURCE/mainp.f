@@ -60,6 +60,7 @@ C
 C     FILL COMMONS AND CONSTANTS
       XELE = System%XELE
       NELE = System%NELE
+      Charge = System%Charge
       NBasis = System%NBasis
       Title = Flags%JobTitle
 C
