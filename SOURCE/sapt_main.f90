@@ -1719,7 +1719,8 @@ elseif(Flags%ISERPA==2) then
       ! read 2-RDMs
       call read2rdm(Mon,NBas)
       ! CAS-SCF
-      call execute_command_line('cp '//rdmfile// ' rdm2.dat')
+      !call execute_command_line('cp '//rdmfile// ' rdm2.dat')
+      call system('cp '//rdmfile// ' rdm2.dat')
    elseif(Flags%ICASSCF==1.and.Flags%ISHF==1) then
       ! PINO
       call read2rdm(Mon,NBas)
