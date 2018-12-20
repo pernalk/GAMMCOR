@@ -11,6 +11,7 @@ OBJ = $(O)mainp.o $(O)initia.o $(O)dmscf.o $(O)misc.o $(O)optocc.o \
       $(O)dftacg_pw92c.o $(O)projector.o $(O)ekt.o \
       $(O)xcfun.o $(O)xcfun_module.o $(O)xcfun_autogen.o \
       $(O)gridmolpro.o \
+      $(O)caspidft.o \
       $(O)sorter.o $(O)tran.o $(O)systemdef.o \
       $(O)types.o $(O)inputfill.o $(O)abmats.o \
       $(O)sapt_main.o $(O)sapt.o \
@@ -94,6 +95,8 @@ $(O)xcfun.o : $(S)xcfun.f90
 	$(FCC) $(FFLAGS)  -c $(S)xcfun.f90  -o $(O)xcfun.o
 $(O)gridmolpro.o : $(S)gridmolpro.f90
 	$(FCC) $(FFLAGS)  -c $(S)gridmolpro.f90 -o $(O)gridmolpro.o
+$(O)caspidft.o : $(S)caspidft.f
+	$(FCC) $(FFLAGS)  -c $(S)caspidft.f  -o $(O)caspidft.o
 $(O)timing.o : $(S)timing.f90
 	$(FCC) $(FFLAGS)  -c $(S)timing.f90 -o $(O)timing.o
 $(O)types.o : $(S)types.f90

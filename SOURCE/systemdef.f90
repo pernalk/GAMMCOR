@@ -118,6 +118,8 @@ if(Input%iflag==1) then
    write(LOUT,'(8a10)') ('**********',i=1,8)
 
 else
+  ! set JobType
+   Flags%JobType = Input%CalcParams%JobType
 
   ! Interface 
   select case(Input%CalcParams%InterfaceType)
@@ -238,7 +240,10 @@ else
      Flags%IFlAC  = 0
      Flags%IFlSnd = 0
      Flags%IFunSR = 3 
- 
+
+  case(JOB_TYPE_CASPIDFT)
+     Flags%IFunSR = 5 
+
   end select
 
  ! Inactive

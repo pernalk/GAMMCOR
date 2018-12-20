@@ -892,6 +892,8 @@ C
       Subroutine Y01CASLR(TwoNO,Occ,URe,XOne,ABPLUS,ABMIN,
      $ EigY,EigY1,Eig,Eig1,
      $ IndN,IndX,NDimX,NBasis,NDim,NInte1,NInte2,IFlag0
+C WARNING!!!!! STH WRONG WITH THIS PROCEDURE! CHANGE ADDING sr Kernel!
+C   
 C DFT START 
 C
 C     it is assumed that erf/r integrals are in TwoNO, 

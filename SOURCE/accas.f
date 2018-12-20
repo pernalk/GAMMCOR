@@ -225,6 +225,7 @@ C
       use types
       use sorter
       use abmat
+      use timing
 C
       Implicit Real*8 (A-H,O-Z)
 C
@@ -577,49 +578,57 @@ C
 C
 C     ADD A SR-ALDA KERNEL
 C
-      Do IRow=1,NDimX
+      Call clock('START',Tcpu,Twall)
 C
-      IA=IndN(1,IRow)
-      IB=IndN(2,IRow)
-      CA=CICoef(IA)
-      CB=CICoef(IB)
+C      WITHOUT BATCHES:
 C
-      Do ICol=1,NDimX
+C      Do IRow=1,NDimX
+CC
+C      IA=IndN(1,IRow)
+C      IB=IndN(2,IRow)
+C      CA=CICoef(IA)
+C      CB=CICoef(IB)
+CC
+C      Do ICol=1,NDimX
+CC
+C      IC=IndN(1,ICol)
+C      ID=IndN(2,ICol)
+C      CC=CICoef(IC)
+C      CD=CICoef(ID)
+CC
+C      XKer1234=Zero
+CC
+C      I1I2S=MultpC(NSymNO(IA),NSymNO(IB))
+C      I3I4S=MultpC(NSymNO(IC),NSymNO(ID))
+C      ISym=MultpC(I1I2S,I3I4S)
+CC
+C      If(ISym.Eq.1) Then
+C      Do I=1,NGrid
+C      XKer1234=XKer1234+Work(I)* 
+CC     $ OrbGrid(IA+(I-1)*NBasis)*OrbGrid(IB+(I-1)*NBasis)*
+CC     $ OrbGrid(IC+(I-1)*NBasis)*OrbGrid(ID+(I-1)*NBasis)
+C     $ OrbGrid(I+(IA-1)*NGrid)*OrbGrid(I+(IB-1)*NGrid)*
+C     $ OrbGrid(I+(IC-1)*NGrid)*OrbGrid(I+(ID-1)*NGrid)
+C      EndDo
+C      EndIf
+CC
+C      TwoSR=TwoEl2(NAddr3(IA,IB,IC,ID))-TwoNO(NAddr3(IA,IB,IC,ID))
+CC
+C      ABMIN((ICol-1)*NDimX+IRow)=ABMIN((ICol-1)*NDimX+IRow)
+C     $ +Four*(CA+CB)*(CD+CC)*(XKer1234+TwoSR)
+CC
+C      EndDo
+C      EndDo
 C
-      IC=IndN(1,ICol)
-      ID=IndN(2,ICol)
-      CC=CICoef(IC)
-      CD=CICoef(ID)
+      Call ModABMinSym(Occ,SRKer,WGrid,OrbGrid,TwoEl2,TwoNO,ABMIN,
+     $          MultpC,NSymNO,IndN,IndX,NDimX,NGrid,NInte2,NBasis)
 C
-      XKer1234=Zero
+      Write(6,'(1X,"*** sr-kernel added ***")')
+      Call clock('sr-kernel',Tcpu,Twall)
 C
-      I1I2S=MultpC(NSymNO(IA),NSymNO(IB))
-      I3I4S=MultpC(NSymNO(IC),NSymNO(ID))
-      ISym=MultpC(I1I2S,I3I4S)
-C
-      If(ISym.Eq.1) Then
-      Do I=1,NGrid
-      XKer1234=XKer1234+Work(I)* 
-C     $ OrbGrid(IA+(I-1)*NBasis)*OrbGrid(IB+(I-1)*NBasis)*
-C     $ OrbGrid(IC+(I-1)*NBasis)*OrbGrid(ID+(I-1)*NBasis)
-     $ OrbGrid(I+(IA-1)*NGrid)*OrbGrid(I+(IB-1)*NGrid)*
-     $ OrbGrid(I+(IC-1)*NGrid)*OrbGrid(I+(ID-1)*NGrid)
-      EndDo
       EndIf
 C
-      TwoSR=TwoEl2(NAddr3(IA,IB,IC,ID))-TwoNO(NAddr3(IA,IB,IC,ID))
-C
-      ABMIN((ICol-1)*NDimX+IRow)=ABMIN((ICol-1)*NDimX+IRow)
-     $ +Four*(CA+CB)*(CD+CC)*(XKer1234+TwoSR)
-C
-      EndDo
-      EndDo
-C
-      Write(6,'("*** sr-kernel added ***")')
-C
-      EndIf
-C
-      Write(6,'(  X,"*** LR-ERPA-CAS CALCULATION *** ")')
+      Write(6,'(/,1X,"*** LR-ERPA-CAS CALCULATION *** ")')
 C
 C     FIND EIGENVECTORS (EigVecR) AND COMPUTE THE ENERGY
 C
@@ -727,6 +736,8 @@ C
      $ TwoEl2,OrbGrid,SRKerW,NSymNO,MultpC,NGrid)
 C
 C     A ROUTINE FOR COMPUTING AC INTEGRAND
+C   
+      use timing
 C
       Implicit Real*8 (A-H,O-Z)
 C
@@ -734,6 +745,8 @@ C
 c
       Parameter(Zero=0.D0,Half=0.5D0,One=1.D0,Two=2.D0,Three=3.D0,
      $ Four=4.D0)
+C
+      Integer,Parameter :: Maxlen = 128
 C
       Dimension
      $ URe(NBasis,NBasis),XOne(NInte1),Occ(NBasis),TwoNO(NInte2),
@@ -745,7 +758,9 @@ C
 C
 C     LOCAL ARRAYS
 C
+      Integer :: Offset,Batchlen
       Real*8, Allocatable :: RDM2Act(:)
+      Double Precision, Allocatable :: Work(:),Batch(:,:)
       Dimension C(NBasis),HNO(NInte1),
      $ IGFact(NInte2),
      $ Ind1(NBasis),Ind2(NBasis),WMAT(NBasis,NBasis),
@@ -1251,6 +1266,56 @@ C
 C
       Write(6,'(/," *** ADDING THE SR KERNEL ***" )')
 C
+C      Do IRow=1,NoEig
+CC
+C      IA=IndBlock(1,IRow)
+C      IB=IndBlock(2,IRow)
+C      CA=CICoef(IA)
+C      CB=CICoef(IB)
+CC
+C      Do ICol=1,NoEig
+CC
+C      IC=IndBlock(1,ICol)
+C      ID=IndBlock(2,ICol)
+C      CC=CICoef(IC)
+C      CD=CICoef(ID)
+CC
+C      XKer1234=Zero
+CC
+C      I1I2S=MultpC(NSymNO(IA),NSymNO(IB))
+C      I3I4S=MultpC(NSymNO(IC),NSymNO(ID))
+C      ISym=MultpC(I1I2S,I3I4S)
+CC
+C      If((ISym.Eq.1).And.(IGFact(NAddr3(IA,IB,IC,ID)).Eq.0)) Then
+C      Do I=1,NGrid
+C      XKer1234=XKer1234+SRKerW(I)*
+CC     $ OrbGrid(IA+(I-1)*NBasis)*OrbGrid(IB+(I-1)*NBasis)*
+CC     $ OrbGrid(IC+(I-1)*NBasis)*OrbGrid(ID+(I-1)*NBasis)
+C     $ OrbGrid(I+(IA-1)*NGrid)*OrbGrid(I+(IB-1)*NGrid)*
+C     $ OrbGrid(I+(IC-1)*NGrid)*OrbGrid(I+(ID-1)*NGrid)
+C
+C      EndDo
+C      EndIf
+CC
+C      TwoSR=TwoEl2(NAddr3(IA,IB,IC,ID))-TwoNO(NAddr3(IA,IB,IC,ID))
+CC
+C      ABMIN((ICol-1)*NoEig+IRow)=ABMIN((ICol-1)*NoEig+IRow)
+C     $ +Four*(CA+CB)*(CD+CC)*(XKer1234+TwoSR)
+CC
+C      EndDo
+C      EndDo
+CC
+C     ADD KERNEL IN BATCHES:
+      call clock('START',Tcpu,Twall)
+      Allocate(Work(Maxlen),Batch(Maxlen,NBasis))
+C
+      Do Offset=0,NGrid,Maxlen
+      Batchlen = min(NGrid-Offset,Maxlen)
+      If(Batchlen==0) exit
+C    
+      Work(1:Batchlen) = SRKerW(Offset+1:Offset+Batchlen)
+      Call FILL_BATCH(OrbGrid,Batch,Batchlen,Offset,NGrid,NBasis)
+C
       Do IRow=1,NoEig
 C
       IA=IndBlock(1,IRow)
@@ -1272,25 +1337,47 @@ C
       ISym=MultpC(I1I2S,I3I4S)
 C
       If((ISym.Eq.1).And.(IGFact(NAddr3(IA,IB,IC,ID)).Eq.0)) Then
-      Do I=1,NGrid
-      XKer1234=XKer1234+SRKerW(I)*
-C     $ OrbGrid(IA+(I-1)*NBasis)*OrbGrid(IB+(I-1)*NBasis)*
-C     $ OrbGrid(IC+(I-1)*NBasis)*OrbGrid(ID+(I-1)*NBasis)
-     $ OrbGrid(I+(IA-1)*NGrid)*OrbGrid(I+(IB-1)*NGrid)*
-     $ OrbGrid(I+(IC-1)*NGrid)*OrbGrid(I+(ID-1)*NGrid)
-
-      EndDo
+      Do I=1,Batchlen
+      XKer1234=XKer1234+Work(I)*
+     $ Batch(I,IA)*Batch(I,IB)*Batch(I,IC)*Batch(I,ID)
+      endDo
       EndIf
+C
+      ABMIN((ICol-1)*NoEig+IRow)=ABMIN((ICol-1)*NoEig+IRow)
+     $ +Four*(CA+CB)*(CD+CC)*XKer1234
+C
+      EndDo
+      EndDo
+      EndDo
+C
+C     ADD INTEGRALS      
+C
+      Do IRow=1,NoEig
+C
+      IA=IndBlock(1,IRow)
+      IB=IndBlock(2,IRow)
+      CA=CICoef(IA)
+      CB=CICoef(IB)
+C
+      Do ICol=1,NoEig
+C
+      IC=IndBlock(1,ICol)
+      ID=IndBlock(2,ICol)
+      CC=CICoef(IC)
+      CD=CICoef(ID)
 C
       TwoSR=TwoEl2(NAddr3(IA,IB,IC,ID))-TwoNO(NAddr3(IA,IB,IC,ID))
 C
       ABMIN((ICol-1)*NoEig+IRow)=ABMIN((ICol-1)*NoEig+IRow)
-     $ +Four*(CA+CB)*(CD+CC)*(XKer1234+TwoSR)
+     $ +Four*(CA+CB)*(CD+CC)*TwoSR
 C
       EndDo
       EndDo
+C 
+      Deallocate(Batch,Work)
 C
       Write(6,'("*** sr-kernel added ***")')
+      call clock('sr-kernel AB(1)',Tcpu,Twall)
 C
       EndIf
 C
@@ -1449,7 +1536,22 @@ C
 C
       Return
       End
+C
+*Deck fil_Batch
+      Subroutine FILL_BATCH(OrbGrid,Batch,Batchlen,Offset,NGrid,NBasis)
+C
+C     FILLS BATCHES FOR GRID CALCULATIONS
+C
+      Implicit None
+C
+      Integer :: Batchlen,Offset,NGrid,NBasis
+      Double Precision :: Batch(Batchlen,NBasis),OrbGrid(NGrid,NBasis)
 
+      Batch(1:Batchlen,1:NBasis) =
+     $ OrbGrid(Offset+1:Offset+Batchlen,1:NBasis)
+
+      End Subroutine FILL_BATCH
+C
 *Deck SR_PBE_ONTOP
       Subroutine SR_PBE_ONTOP(EXCTOP,URe,Occ,
      $ OrbGrid,OrbXGrid,OrbYGrid,OrbZGrid,WGrid,NGrid,NBasis)

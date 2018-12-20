@@ -4482,6 +4482,101 @@ deallocate(ints,work2,work1)
 
 end subroutine ACABMAT0_mithap
 
+subroutine ModABMinSym(Occ,SRKer,Wt,OrbGrid,TwoNO,TwoElErf,ABMin,&
+           MultpC,NSymNO,IndN,IndX,NDimX,NGrid,NInte2,NBasis)
+!     ADD CONTRIBUTIONS FROM THE srALDA KERNEL TO AB MATRICES
+implicit none
+
+integer,parameter :: maxlen = 128
+integer,intent(in) :: NBasis,NDimX,NGrid,NInte2
+integer,intent(in) :: IndN(2,NDimX),IndX(NDimX), &
+                      MultpC(15,15),NSymNO(NBasis)
+double precision,intent(in) :: Occ(NBasis),SRKer(NGrid), &
+                               Wt(NGrid),OrbGrid(NGrid,NBasis)
+double precision,intent(in) :: TwoNO(NInte2),TwoElErf(NInte2)
+double precision,intent(inout) :: ABMin(NDimX,NDimX)
+
+double precision :: CICoef(NBasis)
+double precision,allocatable :: work(:),batch(:,:),ABKer(:,:)
+integer :: i,j,IRow,ICol,ia,ib,iab,ic,id,icd
+integer :: i1i2s,i3i4s,iSym
+integer :: offset,batchlen
+double precision :: XKer1234,TwoSR,CA,CB,CC,CD
+integer,external :: NAddr3,NAddrrK
+
+allocate(work(maxlen),batch(maxlen,NBasis),ABKer(NDimX,NDimX))
+
+do i=1,NBasis
+   CICoef(i) = sign(sqrt(Occ(i)),Occ(i)-0.5d0)
+enddo
+
+ABKer = 0
+
+do offset=0,NGrid,maxlen
+   batchlen = min(NGrid-offset,maxlen)
+   if(batchlen==0) exit
+
+   work(1:batchlen) = Wt(offset+1:offset+batchlen)*SRKer(offset+1:offset+batchlen)
+   batch(1:batchlen,1:NBasis) = OrbGrid(offset+1:offset+batchlen,1:NBasis)
+
+   do IRow=1,NDimX
+      ia = IndN(1,IRow)
+      ib = IndN(2,IRow)
+      iab = IndX(IRow)
+   
+      do ICol=1,NDimX
+         ic=IndN(1,ICol)
+         id=IndN(2,ICol)
+         icd=IndX(ICol)
+         if(icd.gt.iab) cycle
+    
+         i1i2s = MultpC(NSymNO(ia),NSymNO(ib))
+         i3i4s = MultpC(NSymNO(ic),NSymNO(id))
+         iSym = MultpC(i1i2s,i3i4s)
+         if(iSym/=1) cycle
+
+         XKer1234 = 0
+         do i=1,batchlen
+            XKer1234 = XKer1234 + work(i)* &
+            batch(i,ia)*batch(i,ib)*batch(i,ic)*batch(i,id)
+         enddo
+         
+         ABKer(iab,icd) = ABKer(iab,icd) + XKer1234
+         ABKer(icd,iab) = ABKer(iab,icd)
+      
+      enddo
+   enddo
+
+enddo
+
+do IRow=1,NDimX
+   ia = IndN(1,IRow)
+   ib = IndN(2,IRow)
+   iab = IndX(IRow)
+   CA = CICoef(ia)
+   CB = CICoef(ib)
+
+   do ICol=1,NDimX
+      ic=IndN(1,ICol)
+      id=IndN(2,ICol)
+      icd=IndX(ICol)
+      CC=CICoef(ic)
+      CD=CICoef(id)
+      !if(icd.gt.iab) cycle
+ 
+      TwoSR=TwoNO(NAddr3(ia,ib,ic,id))-TwoElErf(NAddr3(ia,ib,ic,id))
+      
+      ABMin(iab,icd) = ABMin(iab,icd) &
+                       +4.0d0*(CA+CB)*(CD+CC)*(ABKer(iab,icd)+TwoSR)
+      !ABMin(icd,iab) = ABMin(iab,icd)   
+
+   enddo
+enddo
+
+deallocate(ABKer,batch,work)
+
+end subroutine ModABMinSym
+
 subroutine FockGen_mithap(Fock,OneRdm,XOne,NInte1,NBasis,IntFileName)
 !
 !     GENERALIZED FOCK MATRIX

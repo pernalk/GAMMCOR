@@ -22,6 +22,7 @@ integer, parameter :: JOB_TYPE_ERPA  = 3
 integer, parameter :: JOB_TYPE_EERPA = 4
 integer, parameter :: JOB_TYPE_SAPT  = 5
 integer, parameter :: JOB_TYPE_PDFT  = 6
+integer, parameter :: JOB_TYPE_CASPIDFT = 7
 
 integer, parameter :: SAPTLEVEL0 = 0
 integer, parameter :: SAPTLEVEL1 = 1
@@ -64,9 +65,9 @@ character(*),parameter :: PossibleInterface(3) = &
 [character(8) :: &
 'DALTON', 'MOLPRO', 'OWN']
 
-character(*),parameter :: PossibleJobType(6) = &
+character(*),parameter :: PossibleJobType(7) = &
 [character(8) :: &
-'AC', 'AC0', 'ERPA', 'AC1', 'SAPT', 'PDFT']
+'AC', 'AC0', 'ERPA', 'AC1', 'SAPT', 'PDFT', 'CASPiDFT']
 
 character(*),parameter :: PossibleRDMType(5) = &
 [character(8) :: &
@@ -179,6 +180,7 @@ type FlagsData
      integer :: ISAPT   = 0
      integer :: ISHF    = 0
      character(:), allocatable :: JobTitle
+     integer :: JobType = 0
      ! initia.f
      integer :: IA = 1
      integer :: ICASSCF = 0

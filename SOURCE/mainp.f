@@ -14,6 +14,7 @@ C
       use inputfill
       use systemdef
       use sapt_main
+      use timing
 C
       Implicit Real*8 (A-H,O-Z)
 C
@@ -239,6 +240,7 @@ C
       write(LOUT,'(1x,a)') 'STARTING CALCULATIONS '
       write(LOUT,'(8a10)') ('**********',i=1,8)
 C
+      Call clock('START',Tcpu,Twall)
 C     LOAD THE INTEGRALS
 C
       If(IDALTON.Eq.0) Then
@@ -255,10 +257,15 @@ C
 C
       EndIf  
 C
-C
+C      If(IFunSR.Eq.5) Then
+C     $ Call CASPIDFT(ENuc,URe,UMOAO,Occ,XKin,TwoEl,
+C     $ NBasis,NInte1,NInte2)
+C      Else
       Call DMSCF(Title,URe,Occ,XKin,XNuc,ENuc,UMOAO,
      $ TwoEl,NBasis,NInte1,NInte2,NGem,System)
+C      EndIf
 C
+      Call clock(PossibleJobType(Flags%JobType),Tcpu,Twall)
 C      Stop
       End
 C
