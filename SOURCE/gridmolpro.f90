@@ -135,7 +135,7 @@ close(iunit)
 if(tmp/=alpha) then
    write(6,'(/,1x,a,f12.5)') 'WARNING! RS PARAM IN INPUT:',  alpha
    write(6,'(1x,a,f12.5)')   '         RS PARAM IN MOLPRO:', tmp
-   write(6,'(1x,a)') 'ASSUMING INPUT VALUE!'
+!   write(6,'(1x,a,f12.5)') 'ASSUMING INPUT VALUE!',alpha
    alpha = tmp
 endif
 

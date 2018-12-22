@@ -393,8 +393,7 @@ C
       EndDo
       EndDo
 C
-C      Print*, 'Work2',norm2(Work2)
-C      Print*, 'Alpha',Alpha
+      Write(*,'(" RANGE PARAMETER ",F8.3)')Alpha
 C
       Call PotCoul_mithap(VCoul,Work2,.true.,'AOERFSORT',NBasis)
 C      Print*, 'VCOul',norm2(VCoul)
@@ -623,7 +622,7 @@ C
       Call ModABMinSym(Occ,SRKer,WGrid,OrbGrid,TwoEl2,TwoNO,ABMIN,
      $          MultpC,NSymNO,IndN,IndX,NDimX,NGrid,NInte2,NBasis)
 C
-      Write(6,'(1X,"*** sr-kernel added ***")')
+      Write(6,'(1X," *** sr-kernel added ***")')
       Call clock('sr-kernel',Tcpu,Twall)
 C
       EndIf
