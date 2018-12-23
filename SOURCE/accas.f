@@ -1535,7 +1535,7 @@ C
 C
       Return
       End
-C
+
 *Deck fil_Batch
       Subroutine FILL_BATCH(OrbGrid,Batch,Batchlen,Offset,NGrid,NBasis)
 C
@@ -1550,7 +1550,129 @@ C
      $ OrbGrid(Offset+1:Offset+Batchlen,1:NBasis)
 
       End Subroutine FILL_BATCH
+
+*Deck GGA_ONTOP
+      Subroutine GGA_ONTOP(EXCTOP,URe,Occ,
+     $ OrbGrid,OrbXGrid,OrbYGrid,OrbZGrid,WGrid,NGrid,NBasis)
 C
+C     RETURNS A GGA_XC ENERGY IF THE DENSITY AND SPIN-DENSITY ARE COMPUTED AS:
+C     RHO_A/B = 1/2 ( RHO +/- SQRT(RHO^2 - 2 PI )  )
+C     WHERE PI IS THE ON-TOP PAIR DENSITY, see Gagliardi JCP 146, 034101 (2017)
+C
+C     XCFUN IS USED !!!
+C
+      Implicit Real*8 (A-H,O-Z)
+C
+      Parameter(Zero=0.D0, Half=0.5D0, One=1.D0, Two=2.D0, Four=4.D0)
+C
+      Include 'commons.inc'
+C
+      Real*8, Allocatable :: RDM2Act(:)
+C
+      Dimension URe(NBasis,NBasis),Occ(NBasis),
+     $ Ind1(NBasis),Ind2(NBasis),
+     $ WGrid(NGrid),OrbGrid(NGrid,NBasis),OrbXGrid(NGrid,NBasis),
+     $ OrbYGrid(NGrid,NBasis),OrbZGrid(NGrid,NBasis)
+C
+      Dimension Zk(NGrid),RhoA(NGrid),RhoB(NGrid),
+     & SigmaAA(NGrid),SigmaAB(NGrid),SigmaBB(NGrid)
+C
+C     READ 2RDM, COMPUTE THE ENERGY
+C
+      NAct=NAcCAS
+      INActive=NInAcCAS
+      NOccup=INActive+NAct
+      Ind2(1:NBasis)=0
+      Do I=1,NAct
+      Ind1(I)=INActive+I
+      Ind2(INActive+I)=I
+      EndDo
+C
+      NRDM2Act = NAct**2*(NAct**2+1)/2
+      Allocate (RDM2Act(NRDM2Act))
+      RDM2Act(1:NRDM2Act)=Zero
+C
+      Open(10,File="rdm2.dat",Status='Old')
+      Write(6,'(/,1X,''Active block of 2-RDM read from rdm2.dat'')')
+C
+   10 Read(10,'(4I4,F19.12)',End=40)I,J,K,L,X
+C
+C     X IS DEFINED AS: < E(IJ)E(KL) > - DELTA(J,K) < E(IL) > = 2 GAM2(JLIK)
+C
+      RDM2Act(NAddrRDM(J,L,I,K,NAct))=Half*X
+C
+      I=Ind1(I)
+      J=Ind1(J)
+      K=Ind1(K)
+      L=Ind1(L)
+C
+      GoTo 10
+   40 Continue
+      Close(10)
+C
+      Do I=1,NGrid
+C
+      Call DenGrid(I,RhoGrid,Occ,URe,OrbGrid,NGrid,NBasis)
+C
+      If(RhoGrid.Gt.1.D-12) Then
+C
+      OnTop=Zero
+      Do IP=1,NOccup
+      Do IQ=1,NOccup
+      Do IR=1,NOccup
+      Do IS=1,NOccup
+      OnTop=OnTop
+     $ +Two*FRDM2(IP,IQ,IR,IS,RDM2Act,Occ,Ind2,NAct,NBasis)
+     $ *OrbGrid(I,IP)*OrbGrid(I,IQ)*OrbGrid(I,IR)*OrbGrid(I,IS)
+      EndDo
+      EndDo
+      EndDo
+      EndDo
+C
+      Call DenGrad(I,RhoX,Occ,URe,OrbGrid,OrbXGrid,NGrid,NBasis)
+      Call DenGrad(I,RhoY,Occ,URe,OrbGrid,OrbYGrid,NGrid,NBasis)
+      Call DenGrad(I,RhoZ,Occ,URe,OrbGrid,OrbZGrid,NGrid,NBasis)
+C
+      Rho=RhoGrid
+      R=Two*OnTop/Rho**2
+      XFactor=Zero
+      If(R.Lt.One) XFactor=SQRT(One-R)
+C 
+      RhoA(I)=Rho/Two*(One+XFactor)
+      RhoB(I)=Rho/Two*(One-XFactor)
+C
+      RhoXa=RhoX/Two*(One+XFactor)
+      RhoXb=RhoX/Two*(One-XFactor)
+      RhoYa=RhoY/Two*(One+XFactor)
+      RhoYb=RhoY/Two*(One-XFactor)
+      RhoZa=RhoZ/Two*(One+XFactor)
+      RhoZb=RhoZ/Two*(One-XFactor)
+C
+      SigmaAA(I)=RhoXa*RhoXa+RhoYa*RhoYa+RhoZa*RhoZa
+      SigmaAB(I)=RhoXa*RhoXb+RhoYa*RhoYb+RhoZa*RhoZb
+      SigmaBB(I)=RhoXb*RhoXb+RhoYb*RhoYb+RhoZb*RhoZb
+C
+      Else
+      RhoA(I)=Zero
+      RhoB(I)=Zero
+      SigmaAA(I)=Zero
+      SigmaAB(I)=Zero
+      SigmaBB(I)=Zero
+C
+      EndIf
+C
+      EndDo
+C
+      Call dfun_PBE_AB(RhoA,RhoB,SigmaAA,SigmaAB,SigmaBB,Zk,NGrid)
+C
+      EXCTOP=Zero
+      Do I=1,NGrid
+      EXCTOP=EXCTOP+Zk(I)*WGrid(I)
+      EndDo  
+C
+      Return
+      End
+
 *Deck SR_PBE_ONTOP
       Subroutine SR_PBE_ONTOP(EXCTOP,URe,Occ,
      $ OrbGrid,OrbXGrid,OrbYGrid,OrbZGrid,WGrid,NGrid,NBasis)
@@ -1685,7 +1807,6 @@ C
       FDeriv=.False.
       Open=.True.
 C 
-C
       Call dftfun_exerfpbe(name,FDeriv,Open,igrad,NGrid,RhoGrid,RhoO,
      >                   Sigma,SigmaCO,SigmaOO,
      >                   Zk,vrhoc,vrhoo,
@@ -1821,13 +1942,18 @@ C     load orbgrid and gradients, and wgrid
 C
       Call molprogrid(OrbGrid,OrbXGrid,OrbYGrid,OrbZGrid,
      $ WGrid,UNOAO,NGrid,NBasis)
-C 
-      Alpha=1.D-12
-
-      Call SR_PBE_ONTOP(EXCTOP,URe,Occ,OrbGrid,OrbXGrid,OrbYGrid,
+C
+      Call GGA_ONTOP(EXCTOP,URe,Occ,OrbGrid,OrbXGrid,OrbYGrid,
      $ OrbZGrid,WGrid,NGrid,NBasis)
-      Write(6,'(/," PBE_xc with translated densities",F15.8,/)')
+      Write(6,'(/," PBE_xc from xcfun with tr densities",F15.8,/)')
      $ EXCTOP
+C
+c herer!!! 
+c      Alpha=1.D-12
+c      Call SR_PBE_ONTOP(EXCTOP,URe,Occ,OrbGrid,OrbXGrid,OrbYGrid,
+c     $ OrbZGrid,WGrid,NGrid,NBasis)
+c      Write(6,'(/," PBE_xc with translated densities",F15.8,/)')
+c     $ EXCTOP
 C
       EnH=Zero
       Do I=1,NOccup
