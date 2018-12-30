@@ -1663,7 +1663,7 @@ C
 C
       EndDo
 C
-      Call dfun_PBE_AB(RhoA,RhoB,SigmaAA,SigmaAB,SigmaBB,Zk,NGrid)
+      Call dfun_GGA_AB(RhoA,RhoB,SigmaAA,SigmaAB,SigmaBB,Zk,NGrid)
 C
       EXCTOP=Zero
       Do I=1,NGrid
@@ -1945,8 +1945,8 @@ C
 C
       Call GGA_ONTOP(EXCTOP,URe,Occ,OrbGrid,OrbXGrid,OrbYGrid,
      $ OrbZGrid,WGrid,NGrid,NBasis)
-      Write(6,'(/," PBE_xc from xcfun with tr densities",F15.8,/)')
-     $ EXCTOP
+      Write(6,'(/," PBE_xc from xcfun with translated densities",
+     $ F15.8,/)') EXCTOP
 C
 c herer!!! 
 c      Alpha=1.D-12

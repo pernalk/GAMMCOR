@@ -175,9 +175,9 @@ subroutine dfun_PBE(Rho,Sigma,Ene,vrhoc,vsigmacc,NGrid)
 
 end subroutine dfun_PBE
 
-subroutine dfun_PBE_AB(RhoA,RhoB,SigmaAA,SigmaAB,SigmaBB,Ene,NGrid)
+subroutine dfun_GGA_AB(RhoA,RhoB,SigmaAA,SigmaAB,SigmaBB,Ene,NGrid)
 !
-! computes PBE_XC energy density on a grid for spin-up and spin-down inputs
+! computes GGA_XC energy density on a grid for spin-up and spin-down inputs
 !
    use xcfun
 
@@ -232,4 +232,4 @@ subroutine dfun_PBE_AB(RhoA,RhoB,SigmaAA,SigmaAB,SigmaBB,Ene,NGrid)
 
    call xc_free_functional(id)
 
-end subroutine dfun_PBE_AB
+end subroutine dfun_GGA_AB

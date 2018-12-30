@@ -734,6 +734,16 @@ C
       If(PC(I).Gt.Zero) NAc=NAc+1
       EndDo
 C
+C     KP
+      Call read_nact_molpro(nact,'2RDM')
+      If(NAc.Ne.nact) Then
+      Write(6,'( "The number of partially occ orbitals 
+     $ different from nact read from molpro. Some active orbitals 
+     $ must be unoccupied.")')
+      NAc=nact
+      EndIf
+C     KP
+C
       NInAc=XELE-Sum+1.D-2
       Do I=1,NInAc+NAc
       If(I.Le.NInAc) Then

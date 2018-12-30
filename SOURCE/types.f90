@@ -602,6 +602,34 @@ character(8) :: label
 
 end subroutine read_2rdm_molpro
 
+subroutine read_nact_molpro(nact,infile)
+implicit none
+
+character(*),intent(in) :: infile
+integer :: iunit,ios,ist,nact,nact2,nstate
+integer :: i,j,ij,idx
+character(8) :: label
+
+ open(newunit=iunit,file=infile,status='OLD', &
+      access='SEQUENTIAL',form='UNFORMATTED')
+
+ fileloop: do
+           read(iunit,iostat=ios) label
+           if(ios<0) then
+              write(LOUT,*) 'ERROR!!! LABEL 1RDM     not found!'
+              stop
+           endif
+           if(label=='1RDM    ') then
+              read(iunit) nact,nact2,nstate
+              exit fileloop
+!              print*, nact,nact2,nstate
+           endif
+         enddo fileloop
+
+ close(iunit)
+
+end subroutine read_nact_molpro
+
 subroutine read_1rdm_molpro(onerdm,nost,infile,nbasis)
 implicit none
 
