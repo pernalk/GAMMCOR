@@ -1,10 +1,11 @@
-subroutine dump_grid
+subroutine dump_grid(ChiRS)
 implicit double precision (a-h, o-z)
 
 include "common/tapes"
 include "common/cbas"
 include "common/cdft"
 !integer :: idiff, ndiff, npt, nmap, ndfx, ndfc, ndf, ndf0
+double precision :: ChiRS
 double precision :: record, thresh
 dimension :: icentres(ntg), map(ntg)
 double precision, allocatable :: r(:,:),wt(:),orbval(:,:,:),mapinv(:)
@@ -46,6 +47,8 @@ write(ifil) 'ORBVAL  '
 write(ifil) int(npt,kind=4), int(ndiff,kind=4), int(ntg,kind=4)
 write(ifil) orbval(1:npt,1:ndiff,1:ntg)
 write(ifil) mapinv(1:ntg)
+write(ifil) 'CHIVAL  '
+write(ifil) ChiRS
 close(ifil) 
 
 print*, 'wt',sum(wt(1:npt))

@@ -514,6 +514,7 @@ C     READ/WRITE THE ONE- AND TWO-ELECTRON INTEGRALS
 C     INTERFACED WITH MOLPRO (INTEGRALS ARE READ FROM FCIDUMP FILES)
 C
       use sorter
+      use tran
       use abmat 
 C
       Implicit Real*8 (A-H,O-Z)
@@ -525,10 +526,12 @@ C
      $ Tmp(NInte1) 
 C      
       Real*8, Allocatable :: RDM2Act(:)
+      Real*8, Allocatable :: HlpRDM2(:)
       Dimension Gamma(NInte1),Work(NBasis),PC(NBasis),
      $ AUXM(NBasis,NBasis),AUXM1(NBasis*NBasis),Ind2(NBasis),
      $ IndInt(NBasis),NumOSym(15),MultpC(15,15),Fock(NBasis*NBasis),
-     $ GammaF(NInte1),FockF(NInte1),GammaAB(NInte1) 
+     $ GammaF(NInte1),FockF(NInte1),GammaAB(NInte1),
+     $ work1(NBasis,NBasis) 
 c herer!!! delete after tests
 c     $ ,UMOAOInv(NBasis,NBasis),TwoElAO(NInte2)
 C
@@ -704,9 +707,18 @@ C
       PC(1:NBasis)=Zero
       Gamma(1:NInte1)=Zero
 C
-C     HAP 
-      Call read_1rdm_molpro(Gamma,NoSt,'2RDM',NBasis)
-C     HAP
+C     READ RDMs: OLD
+      Call read_1rdm_molpro(Gamma,InSt(1,1),InSt(2,1),'2RDM',NBasis)
+CCC     READ RDMs: NEW
+C      Wght=One/Float(NStates)
+C      Do I=1,NStates
+C      GammaAB(1:NInte1)=Zero
+C      Call read_1rdm_molpro(GammaAB,InSt(1,I),InSt(2,I),'2RDM',NBasis)
+C      Do K=1,NInte1
+C      Gamma(K)=Gamma(K)+Wght*GammaAB(K)
+C      EndDo
+C      EndDo
+CC     
 C      print*,'Gamma from file:', norm2(Gamma)
 C
 C      Open(10,File='rdmdump.dat')
@@ -979,6 +991,26 @@ C
 C
       Write(6,'(/," Transforming two-electron integrals ...",/)')
       Call TwoNO1(TwoEl,UAOMO,NBasis,NInte2)
+
+C     ITwoEl
+      If(ITwoEl.eq.3) Then
+C     PREPARE POINTERS: NOccup=num0+num1
+      Call prepare_nums(Occ,Num0,Num1,NBasis)
+C     TRANSFORM J AND K
+      UAux=transpose(UAOMO)
+      Call tran4_gen(NBasis,
+     $        Num0+Num1,UAux(1:NBasis,1:(Num0+Num1)),
+     $        Num0+Num1,UAux(1:NBasis,1:(Num0+Num1)),
+     $        NBasis,UAux,
+     $        NBasis,UAux,
+     $        'FFOO','AOTWOSORT')
+      Call tran4_gen(NBasis,
+     $        NBasis,UAux,
+     $        Num0+Num1,UAux(1:NBasis,1:(Num0+Num1)),
+     $        NBasis,UAux,
+     $        Num0+Num1,UAux(1:NBasis,1:(Num0+Num1)),
+     $        'FOFO','AOTWOSORT')
+      EndIf
 C              
       EndIf  
 C
@@ -991,11 +1023,26 @@ C
       EndDo
 C
       NRDM2Act=NAct**2*(NAct**2+1)/2
-      Allocate (RDM2Act(NRDM2Act))
+      Allocate (RDM2Act(NRDM2Act),HlpRDM2(NRDM2Act))
       RDM2Act(1:NRDM2Act)=Zero
+      HlpRDM2(1:NRDM2Act)=Zero
 C
-C     HAP
-      call read_2rdm_molpro(RDM2Act,NoSt,'2RDM',NAct)
+C     READ RDMs: OLD
+      call read_2rdm_molpro(RDM2Act,InSt(1,1),InSt(2,1),'2RDM',NAct)
+C
+CC     READ RDMs: NEW
+C      Wght=One/Float(NStates)
+C      Do I=1,NStates
+C      GammaAB(1:NInte1)=Zero
+C      call read_2rdm_molpro(HlpRDM2,InSt(1,I),InSt(2,I),'2RDM',NAct)
+C      Do K=1,NRDM2Act
+C      RDM2Act(K)=RDM2Act(K)+Wght*HlpRDM2(K)
+C      EndDo
+C      EndDo
+CC
+      Deallocate(HlpRDM2)
+C
+
 C
 C      Open(10,File='rdmdump.dat')
 C      Read(10,*) NStates
@@ -1033,6 +1080,8 @@ C
       EndDo
       Write(6,'(/,1X,''One-electron Energy'',5X,F15.8)')ETot
 C
+      EOne=ETot
+C
       ETwo=Zero 
       Do IP=1,NOccup
       Do IQ=1,NOccup
@@ -1040,14 +1089,18 @@ C
       Do IS=1,NOccup
       Hlp=FRDM2(IP,IQ,IR,IS,RDM2Act,Occ,Ind2,NAct,NBasis)
      $ *TwoEl(NAddr3(IP,IR,IQ,IS))
-      ETot=ETot+Hlp
+C      ETot=ETot+Hlp
       ETwo=ETwo+Hlp
       EndDo
       EndDo
       EndDo
       EndDo
+C     ITwoEl
+      If(ITwoEl.eq.3) Then
+      Call TwoEneChck(ETwo,RDM2Act,Occ,INActive,NAct,NBasis)
+      EndIf
       Write(6,'(/,1X,''Two-electron Energy'',5X,F15.8)')ETwo
-      Write(6,'(/,1X,''MCSCF Molpro Energy'',5X,F15.8)')ETot+ENuc
+      Write(6,'(/,1X,''MCSCF Molpro Energy'',5X,F15.8)')EOne+ETwo+ENuc
 C
 C     SAVE THE ACTIVE PART IN rdm2.dat
 C
@@ -2367,4 +2420,116 @@ C
       enddo
       
       end subroutine readlabel2
+
+
+      subroutine prepare_nums(Occ,Num0,Num1,NBasis)
+      Implicit Real*8 (A-H,O-Z)
+C       
+      Include 'commons.inc'
+C
+      Parameter(Zero=0.D0,Half=0.5D0,One=1.D0,Two=2.D0)
+C
+      Dimension Occ(NBasis)
+C
+C     LOCAL ARRAYS
+C
+      Dimension IndAux(NBasis)
+C
+      Do I=1,NELE
+      IndAux(I)=0
+      EndDo
+      Do I=1+NELE,NBasis
+      IndAux(I)=2
+      EndDo
+C
+      Do I=1,NBasis
+C
+      If(Occ(I).Lt.One.And.Occ(I).Ne.Zero) Then
+      IndAux(I)=1
+      EndIf
+      EndDo
+C
+      Num0=0
+      Do I=1,NBasis
+      If(IndAux(I).ne.0) Exit
+      Num0=Num0+1
+      EndDo
+      Num2=0
+      Do I=NBasis,1,-1
+      If(IndAux(I).ne.2) Exit
+      Num2=Num2+1
+      EndDo
+      Num1=NBasis-Num0-Num2
+C
+      end subroutine prepare_nums
+
+      subroutine TwoEneChck(ETwo,RDM2Act,Occ,INActive,NAct,NBasis)
+      Implicit Real*8 (A-H,O-Z)
+C       
+      Include 'commons.inc'
+C
+      Parameter(Zero=0.D0,Half=0.5D0,One=1.D0,Two=2.D0)
+C
+      Integer INActive,NAct,NBasis
+      Double Precision ETwo
+      Dimension Occ(NBasis),RDM2Act(NAct**2*(NAct**2+1)/2)
+C
+C     LOCAL ARRAYS
+C
+      Dimension Ind(NBasis)
+      Double Precision, Allocatable :: RDM2val(:,:,:,:),
+     $                                 work(:),ints(:,:)
+C   
+C     SET DIMENSIONS
+      NOccup=NAct+INActive
+      Ind=0
+      Do I=1,NAct
+      Ind(INActive+I)=I
+      EndDo
+C
+      Allocate(work(NBasis**2),ints(NBasis,NBasis))
+      Allocate(RDM2val(NOccup,NOccup,NOccup,NOccup))
+C
+      Do L=1,NOccup
+      Do K=1,NOccup
+      Do J=1,NOccup
+      Do I=1,NOccup
+      RDM2val(I,J,K,L) = FRDM2(I,K,J,L,RDM2Act,Occ,Ind,NAct,NBasis)
+      EndDo
+      EndDo
+      EndDo
+      EndDo
+C
+      Open(newunit=iunit,file='FFOO',status='OLD',
+     $     access='DIRECT',recl=8*NBasis**2)
+C
+      ETwo=0
+C     COULOMB LOOP (FF|OO)
+      kl=0
+      Do ll=1,NOccup
+      Do kk=1,NOccup
+      kl=kl+1
+      read(iunit,rec=kl) work(1:NBasis**2)
+      Do j=1,NBasis
+      Do i=1,NBasis
+      ints(i,j) = work((j-1)*NBasis+i)
+      EndDo
+      EndDo
+C 
+      k = kk
+      l = ll
+C
+      If(k>NOccup.or.l>NOccup) Cycle
+C
+      ETwo = ETwo + sum(RDM2val(:,:,k,l)*ints(1:NOccup,1:NOccup))
+C
+      EndDo
+      EndDo
+C
+      Close(iunit)
+C
+      Deallocate(ints,work)
+      Deallocate(RDM2val)
+C
+      end subroutine TwoEneChck
 

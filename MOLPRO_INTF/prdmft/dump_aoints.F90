@@ -3,22 +3,38 @@ module dumpintao
 private 
 public dump_aoints,dump_molpro_sapt,dump_intsonly
 
+double precision :: ChiSave
+
 contains
 
-subroutine dump_molpro_sapt(mon,IsRSH)
+subroutine dump_molpro_sapt(mon,IsRSH,Omega)
       implicit double precision (a-h,o-z)
       include "common/corb"
       include "common/cbas"
       include "common/tapes"
       include "common/big"
       integer :: mon,IsRSH
-      logical :: doRSH
+      double precision :: Omega
+      logical :: doRSH,DiffOm
       character(32) :: onefile,rdmfile,recname,orbname,str
       character(8) :: unit
 
       ! manage range-seprated hybrids
       doRSH=.false.
-      if(isRSH==1) doRSH=.true. 
+      if(isRSH==1) doRSH=.true.
+       
+      if(doRSH) then
+        DiffOm = .false.
+        if(mon==1) then
+           ChiSave = Omega
+        elseif(mon==2) then
+           if(Omega/=ChiSave) DiffOm = .true.
+           ChiSave = Omega
+        endif
+      endif
+
+      write(6,*) 'mon,DiffOm',mon,DiffOm
+      write(6,*) 'ChiSave,Omega',ChiSave,Omega
 
       ! two-electron integrals 
       ibase=icorr(0)
@@ -58,6 +74,8 @@ subroutine dump_molpro_sapt(mon,IsRSH)
       if(iex.eq.1) call excom(2)
       if(mon==1.and.doRSH) then 
         call dump_twoints('AOTWOINT.erf')
+      elseif(mon==2.and.doRSH.and.DiffOm) then 
+        call dump_twoints('AOTWOINT.erfB')
       elseif(mon==2.and.(.not.doRSH)) then 
         call dump_twoints('AOTWOINT.mol')
       endif
@@ -126,8 +144,9 @@ subroutine dump_aoints
       iex=iexcom_status()
       if (iex.eq.1) call excom(2)
 
-      call dump_twoints('AOTWOINT.erf')
-      !call dump_twoints('AOTWOINT.mol')
+!     here!
+!      call dump_twoints('AOTWOINT.erf')
+!      call dump_twoints('AOTWOINT.mol')
 
       if (iex.eq.1) call excom(1)
       !
@@ -142,7 +161,8 @@ subroutine dump_aoints
       call readm(q(iS), ntdg, 1, 1100, 0, str)
       call readm(q(iT), ntdg, 1, 1400, 0, str)
       call readm(q(iV), ntdg, 1, 1410, 0, str)
-      call readm(q(iH), ntdg, 1, 1200, 0, str)
+!      call readm(q(iH), ntdg, 1, 1200, 0, str)
+      call readm(q(iH), ntdg, 1, 1210, 0, str)
       ! add symmetries
       call dump_oneints('AOONEINT.mol',q(iS),q(iT),q(iV),q(iH))
 

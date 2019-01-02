@@ -22,28 +22,40 @@
       write(iout,*) 'IsChi', IsChi,ChiRS
 
        call getx(1, field, maxf)
-       if(field(2) == "ORB") then
-         call dump_grid()
-       elseif(field(2) == "INTAO") then
-         call dump_aoints 
-       elseif(field(2) == "PRDMFT") then
-         call dump_grid()
-         call dump_aoints 
-       elseif(field(2) == "WRK") then
-         call dump_intsonly('AOTWOINT.mol')
+       ! PTDMFT interface
+       if(field(2) == "PRDMFT") then
+
+         if(trim(field(3))=='ORB') then
+            call dump_grid(ChiRS)
+         elseif(field(3) == "INTAO") then
+            call dump_intsonly('AOTWOINT.mol')
+         elseif(field(3) == "INTAOMU") then
+            call dump_intsonly('AOTWOINT.erf')
+         elseif(field(3) == "CAS") then
+            call dump_aoints 
+            call dump_intsonly('AOTWOINT.mol')
+         elseif(field(3) == "LRCAS") then
+            call dump_aoints 
+            call dump_intsonly('AOTWOINT.erf')
+
+         endif
        ! PTDMFT-SAPT interface
        elseif(field(2) == "PRDMFT-SAPT") then
+
          if(trim(field(3))=='WRK') then
            call dump_intsonly('AOTWOINT.mol')
+         elseif(trim(field(3))=='MUB') then
+           call dump_intsonly('AOTWOINT.erfB')
          elseif(trim(field(3))=='GRID') then
-           call dump_grid() 
+           call dump_grid(ChiRS) 
          elseif(trim(field(3))=='ERFINT') then
            call dump_intsonly('AOTWOINT.erf')
          elseif(trim(field(3))=='MONOMERA') then
-           call dump_molpro_sapt(1,IsRangeHybrid)
+           call dump_molpro_sapt(1,IsRangeHybrid,ChiRS)
          else
-           call dump_molpro_sapt(2,IsRangeHybrid)
+           call dump_molpro_sapt(2,IsRangeHybrid,ChiRS)
          endif
+
        else
          write(iout,10)
  10   format(' USER command: Please provide keyword for USER')

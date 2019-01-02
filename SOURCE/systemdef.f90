@@ -121,6 +121,9 @@ else
   ! set JobType
    Flags%JobType = Input%CalcParams%JobType
 
+  ! set TwoEl type
+   Flags%ITwoEl = Input%CalcParams%TwoMoInt
+
   ! Interface 
   select case(Input%CalcParams%InterfaceType)
   case(INTER_TYPE_DAL)
@@ -288,7 +291,17 @@ if(Flags%ISAPT.Eq.0) then
      stop
    endif   
   
-   System%NoSt   = Input%SystemInput(1)%NoSt
+   System%NoSt = Input%SystemInput(1)%NoSt
+   if(Input%SystemInput(1)%DeclareSt) then
+      System%NStates = Input%SystemInput(1)%NStates
+      allocate(System%InSt(2,System%NStates)) 
+      System%InSt = Input%SystemInput(1)%InSt 
+   else
+      ! assume 1.1 state
+      allocate(System%InSt(2,1))
+      System%InSt(:,1) = 1
+   endif
+
    System%ZNucl  = Input%SystemInput(1)%ZNucl
    System%Charge = Input%SystemInput(1)%Charge
    System%NBasis = Input%CalcParams%NBasis
@@ -484,11 +497,11 @@ endif
 
 if(Flags%ISAPT.Eq.0) then
 !   write(LOUT,'()')
-   write(LOUT,'(1x,a,1x,i3)') 'PRINT LEVEL: ', System%IPrint
+   write(LOUT,'(1x,a,1x,i5)') 'PRINT LEVEL: ', System%IPrint
 
 elseif(Flags%ISAPT.Eq.1) then
 !   write(LOUT,'()')
-   write(LOUT,'(1x,a,1x,i3)') 'PRINT LEVEL: ', SAPT%monA%IPrint
+   write(LOUT,'(1x,a,1x,i5)') 'PRINT LEVEL: ', SAPT%monA%IPrint
  
 endif
 
