@@ -593,7 +593,8 @@ character(:),allocatable :: rdmfile
  allocate(work(HlpDim),EVal(NBasis))
  OneRdm = 0
  ! HERE!!! FIRST STATE FOR NOW
- call read_1rdm_molpro(OneRdm,Mon%InSt(1,1),Mon%InSt(2,1),rdmfile,NBasis)
+ call read_1rdm_molpro(OneRdm,Mon%InSt(1,1),Mon%InSt(2,1),&
+                       rdmfile,Mon%IWarn,NBasis)
  call triang_to_sq2(OneRdm,OrbAux,NBasis)
  call Diag8(OrbAux,NBasis,NBasis,Eval,work)
 ! call dsyev('V','U',NBasis,OrbAux,NBasis,EVal,work,3*NBasis,info)
@@ -852,7 +853,8 @@ integer,external :: NAddrRDM
  NRDM2Act = Mon%NAct**2*(Mon%NAct**2+1)/2 
  allocate(RDM2Act(NRDM2Act),work1(Mon%NAct**2))
  RDM2Act = 0
- call read_2rdm_molpro(RDM2Act,Mon%InSt(1,1),Mon%InSt(2,1),rdmfile,Mon%NAct)
+ call read_2rdm_molpro(RDM2Act,Mon%InSt(1,1),Mon%InSt(2,1),&
+                       rdmfile,Mon%IWarn,Mon%NAct)
 
  do i=1,Mon%NAct
     do j=1,Mon%NAct

@@ -64,7 +64,8 @@ C     FILL COMMONS AND CONSTANTS
       Charge = System%Charge
       NBasis = System%NBasis
       Title = Flags%JobTitle
-      ITwoEl = Flags%ITwoEl 
+      ITwoEl = Flags%ITwoEl
+      IWarn = 0 
 C
 C     *************************************************************************
 C
@@ -180,8 +181,8 @@ C      NoSt = Flags%NoSt
       NStates = System%NStates
       InSt(1:2,1:NStates) = System%InSt
 C
-      Print*, 'NoSt:',NoSt
-      Print*, 'InSt', InSt(1,1),InSt(2,1)
+C      Print*, 'NoSt:',NoSt
+C      Print*, 'InSt', InSt(1,1),InSt(2,1)
 C
 C     READ THE INPUT AND PRINT THE INPUT DATA 
 C
@@ -271,6 +272,11 @@ C      Else
       Call DMSCF(Title,URe,Occ,XKin,XNuc,ENuc,UMOAO,
      $ TwoEl,NBasis,NInte1,NInte2,NGem,System)
 C      EndIf
+C
+      If(IWarn.Gt.0) Then
+      Write(6,'(/,1x,a,i2,1x,a)') 'CHECK OUTPUT FOR',IWarn,'WARNINGS!'
+C      Write(6,'(8a10)') ('**********',i=1,9)
+      EndIf
 C
       Call free_System(System)
       Call clock(PossibleJobType(Flags%JobType),Tcpu,Twall)

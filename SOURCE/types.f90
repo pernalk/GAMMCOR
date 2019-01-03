@@ -528,18 +528,25 @@ enddo
 
 end subroutine readorbsmolpro
 
-subroutine read_2rdm_molpro(twordm,nost,nosym,infile,nact)
+subroutine read_2rdm_molpro(twordm,nost,nosym,infile,iwarn,nact)
 implicit none
 ! only active part of 2RDM is kept
 
 integer,intent(in) :: nact,nost,nosym
+integer,intent(inout) :: iwarn
 character(*),intent(in) :: infile
 double precision,intent(out) :: twordm(nact**2*(nact**2+1)/2)
+
 integer :: iunit,ios,ist,ic1d,TrSq
 integer :: istsym,isym,nstate,nstsym
 integer :: i,j,k,l,ij,kl,ik,jl,ijkl,ikjl,lend
 double precision,allocatable :: work(:)
+logical :: scanfile
 character(8) :: label
+
+ !check if any states declared in input
+ scanfile = .false.
+ if(nosym>0) scanfile = .true.
 
  TrSq = nact**2*(nact**2+1)/2
 
@@ -557,17 +564,27 @@ character(8) :: label
               !read(iunit) ic1d,nstate
               read(iunit) ic1d,nstsym
               !print*, ic1d,TrSq,nstsym
-              do istsym=1,nstsym
-                 read(iunit) isym,nstate
-                 do i=1,nstate
-                    read(iunit) ist 
-                    read(iunit) work(1:TrSq)
-                    if(ist==nost.and.isym==nosym) exit fileloop
+              if(scanfile) then 
+                 do istsym=1,nstsym
+                    read(iunit) isym,nstate
+                    do i=1,nstate
+                       read(iunit) ist 
+                       read(iunit) work(1:TrSq)
+                       if(ist==nost.and.isym==nosym) exit fileloop
+                    enddo
                  enddo
-              enddo
-              write(LOUT,'(1x,a,i2,a,i1,a)') 'ERROR!!! 1RDM FOR STATE',nost,'.',nosym,&
-                          & ' NOT PRESENT IN 2RDM FILE!'
-              stop
+                 write(LOUT,'(1x,a,i2,a,i1,a)') 'ERROR!!! 2RDM FOR STATE',&
+                             & nost,'.',nosym,' NOT PRESENT IN 2RDM FILE!'
+                 stop
+              else
+                 read(iunit) isym,nstate 
+                 read(iunit) ist
+                 read(iunit) work(1:TrSq)
+                 write(LOUT,'(1x,a,i2,a,i1,a)') 'WARNING! 2RDM FOR STATE',&
+                             & ist,'.',isym,' WILL BE USED IN CALCULATIONS!'
+                 iwarn = iwarn + 1
+                 exit fileloop
+              endif
            endif 
          enddo fileloop
 
@@ -649,16 +666,23 @@ character(8) :: label
 
 end subroutine read_nact_molpro
 
-subroutine read_1rdm_molpro(onerdm,nost,nosym,infile,nbasis)
+subroutine read_1rdm_molpro(onerdm,nost,nosym,infile,iwarn,nbasis)
 implicit none
 
 integer,intent(in) :: nbasis,nost,nosym
+integer,intent(inout) :: iwarn 
 character(*),intent(in) :: infile
 double precision,intent(out) :: onerdm(nbasis*(nbasis+1)/2)
+
 integer :: iunit,ios,ist,isym,nact,nact2,nstate,nstsym
 integer :: i,j,ij,idx,istsym
 double precision,allocatable :: work(:)
+logical :: scanfile
 character(8) :: label
+
+ !check if any states declared in input
+ scanfile = .false.
+ if(nosym>0) scanfile = .true.
 
  allocate(work(NBasis**2))
  open(newunit=iunit,file=infile,status='OLD', &
@@ -673,17 +697,28 @@ character(8) :: label
            if(label=='1RDM    ') then
               read(iunit) nact,nact2,nstsym
               !print*, nact2,nstate
-              do istsym=1,nstsym
-                 read(iunit) isym,nstate 
-                 do i=1,nstate
-                    read(iunit) ist 
-                    read(iunit) work(1:nact2)
-                    if(ist==nost.and.isym==nosym) exit fileloop
+              if(scanfile) then
+                 do istsym=1,nstsym
+                    read(iunit) isym,nstate 
+                    do i=1,nstate
+                       read(iunit) ist 
+                       read(iunit) work(1:nact2)
+                       if(ist==nost.and.isym==nosym) exit fileloop
+                    enddo
                  enddo
-              enddo
-              write(LOUT,'(1x,a,i2,a,i1,a)') 'ERROR!!! 1RDM FOR STATE',nost,'.',nosym,&
-                          & ' NOT PRESENT IN 1RDM FILE!'
-              stop
+                 write(LOUT,'(1x,a,i2,a,i1,a)') 'ERROR!!! 1RDM FOR STATE',&
+                             & nost,'.',nosym,' NOT PRESENT IN 1RDM FILE!'
+                 stop
+              else
+                 read(iunit) isym,nstate 
+                 read(iunit) ist
+                 read(iunit) work(1:nact2)
+                 write(LOUT,'(1x,a,i2,a,i1,a)') 'WARNING! 1RDM FOR STATE',&
+                             & ist,'.',isym,' WILL BE USED IN CALCULATIONS!'
+                 write(LOUT,'()')
+                 iwarn = iwarn + 1 
+                 exit fileloop
+              endif
            endif 
          enddo fileloop
 

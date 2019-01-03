@@ -708,17 +708,20 @@ C
       Gamma(1:NInte1)=Zero
 C
 C     READ RDMs: OLD
-      Call read_1rdm_molpro(Gamma,InSt(1,1),InSt(2,1),'2RDM',NBasis)
-CCC     READ RDMs: NEW
+      Write(6,'(/," Reading in 1-RDM ...")')
+      Call read_1rdm_molpro(Gamma,InSt(1,1),InSt(2,1),
+     $ '2RDM',IWarn,NBasis)
+CC     READ RDMs: NEW
 C      Wght=One/Float(NStates)
 C      Do I=1,NStates
 C      GammaAB(1:NInte1)=Zero
-C      Call read_1rdm_molpro(GammaAB,InSt(1,I),InSt(2,I),'2RDM',NBasis)
+C      Call read_1rdm_molpro(GammaAB,InSt(1,I),InSt(2,I),
+C     $ '2RDM',IWarn,NBasis)
 C      Do K=1,NInte1
 C      Gamma(K)=Gamma(K)+Wght*GammaAB(K)
 C      EndDo
 C      EndDo
-CC     
+C     
 C      print*,'Gamma from file:', norm2(Gamma)
 C
 C      Open(10,File='rdmdump.dat')
@@ -749,10 +752,11 @@ C
 C     KP
       Call read_nact_molpro(nact,'2RDM')
       If(NAc.Ne.nact) Then
-      Write(6,'( "The number of partially occ orbitals 
-     $ different from nact read from molpro. Some active orbitals 
-     $ must be unoccupied.")')
+      Write(6,'(1x,"WARNING! The number of partially occ orbitals
+     $ different from nact read from molpro. Some active orbitals
+     $ must be unoccupied.",/)')
       NAc=nact
+      IWarn=IWarn+1
       EndIf
 C     KP
 C
@@ -1028,18 +1032,20 @@ C
       HlpRDM2(1:NRDM2Act)=Zero
 C
 C     READ RDMs: OLD
-      call read_2rdm_molpro(RDM2Act,InSt(1,1),InSt(2,1),'2RDM',NAct)
+      Call read_2rdm_molpro(RDM2Act,InSt(1,1),InSt(2,1),
+     $ '2RDM',IWarn,NAct)
 C
 CC     READ RDMs: NEW
 C      Wght=One/Float(NStates)
 C      Do I=1,NStates
 C      GammaAB(1:NInte1)=Zero
-C      call read_2rdm_molpro(HlpRDM2,InSt(1,I),InSt(2,I),'2RDM',NAct)
+C      Call read_2rdm_molpro(HlpRDM2,InSt(1,I),InSt(2,I),
+C     $ '2RDM',IWarn,NAct)
 C      Do K=1,NRDM2Act
 C      RDM2Act(K)=RDM2Act(K)+Wght*HlpRDM2(K)
 C      EndDo
 C      EndDo
-CC
+C
       Deallocate(HlpRDM2)
 C
 
