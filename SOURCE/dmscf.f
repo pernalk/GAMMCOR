@@ -16,7 +16,7 @@ C
       Parameter(Zero=0.0D0,Half=0.50D0,One=1.0D0,Two=2.0D0,Four=4.0D0)
 C
       Dimension URe(Nbasis,NBasis),Occ(NBasis),XKin(NInte1),
-     $ XNuc(NInte1),TwoEl(NInte2),UMOAO(Nbasis,NBasis)
+     $ XNuc(NInte1),TwoEl(NInte2),UMOAO(NBasis,NBasis)
 C
       type(SystemBlock) :: System
 C

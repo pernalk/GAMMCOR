@@ -93,6 +93,7 @@ type CalculationBlock
       integer :: Response = RESP_ERPA
       integer :: DFApp = DF_NONE
       integer :: Kernel = 1
+      integer :: TwoMoInt = TWOMO_INCORE
       integer :: Inactive = FLAG_CORE 
       integer :: SymType = TYPE_NO_SYM
       integer :: SaptLevel = SAPTLEVEL2 
@@ -107,6 +108,7 @@ end type CalculationBlock
 
 type SystemBlock
       integer :: NoSt = 1
+      integer :: NStates = 1
       integer :: Multiplicity = 1
       integer :: Charge = 0
       integer :: ZNucl   = 0
@@ -134,11 +136,13 @@ type SystemBlock
       integer :: num0,num1,num2
       integer :: TwoMoInt = TWOMO_INCORE
       logical :: DeclareTwoMo = .false.
+      logical :: DeclareSt  = .false.
       logical :: ISHF = .false. 
       logical :: doRSH = .false., SameOm = .true.
       logical :: PostCAS =.false.
       double precision :: ThrAct = 0.992d0
       double precision :: ThrSelAct = 1.d-8 
+      integer,allocatable :: InSt(:,:)
       integer,allocatable :: IGem(:), IndAux(:)
       integer,allocatable :: IndX(:), IndN(:,:), IPair(:,:)
       integer,allocatable :: IndXh(:)
@@ -167,6 +171,7 @@ type FlagsData
      integer :: NoSym   = 1
      integer :: NoSt    = 1
      integer :: IGVB    = 1
+     integer :: ITwoEl  = TWOMO_INCORE 
      integer :: IFun    = 13
      integer :: IFunSR    = 0 
      integer :: IFunSRKer = 0
@@ -220,10 +225,19 @@ end type SaptData
 
 contains 
 
+subroutine free_System(System)
+implicit none
+type(SystemBlock) :: System 
+
+deallocate(System%InSt)
+
+end subroutine free_System
+
 subroutine free_Input(Input)
 implicit none
 type(InputData) :: Input
 
+deallocate(Input%SystemInput(1)%InSt)
 deallocate(Input%SystemInput)
 
 end subroutine free_Input
@@ -514,17 +528,25 @@ enddo
 
 end subroutine readorbsmolpro
 
-subroutine read_2rdm_molpro(twordm,nost,infile,nact)
+subroutine read_2rdm_molpro(twordm,nost,nosym,infile,iwarn,nact)
 implicit none
 ! only active part of 2RDM is kept
 
-integer,intent(in) :: nact,nost
+integer,intent(in) :: nact,nost,nosym
+integer,intent(inout) :: iwarn
 character(*),intent(in) :: infile
 double precision,intent(out) :: twordm(nact**2*(nact**2+1)/2)
-integer :: iunit,ios,ist,nstate,ic1d,TrSq
+
+integer :: iunit,ios,ist,ic1d,TrSq
+integer :: istsym,isym,nstate,nstsym
 integer :: i,j,k,l,ij,kl,ik,jl,ijkl,ikjl,lend
 double precision,allocatable :: work(:)
+logical :: scanfile
 character(8) :: label
+
+ !check if any states declared in input
+ scanfile = .false.
+ if(nosym>0) scanfile = .true.
 
  TrSq = nact**2*(nact**2+1)/2
 
@@ -539,16 +561,30 @@ character(8) :: label
               stop
            endif
            if(label=='2RDM    ') then
-              read(iunit) ic1d,nstate
-              !print*, ic1d,TrSq,nstate
-              do i=1,nstate
-                 read(iunit) ist 
+              !read(iunit) ic1d,nstate
+              read(iunit) ic1d,nstsym
+              !print*, ic1d,TrSq,nstsym
+              if(scanfile) then 
+                 do istsym=1,nstsym
+                    read(iunit) isym,nstate
+                    do i=1,nstate
+                       read(iunit) ist 
+                       read(iunit) work(1:TrSq)
+                       if(ist==nost.and.isym==nosym) exit fileloop
+                    enddo
+                 enddo
+                 write(LOUT,'(1x,a,i2,a,i1,a)') 'ERROR!!! 2RDM FOR STATE',&
+                             & nost,'.',nosym,' NOT PRESENT IN 2RDM FILE!'
+                 stop
+              else
+                 read(iunit) isym,nstate 
+                 read(iunit) ist
                  read(iunit) work(1:TrSq)
-                 if(ist==nost) exit fileloop
-              enddo
-              write(LOUT,'(1x,a)') 'ERROR!!! 2RDM FOR REQUESTED STATE&
-                          & NOT PRESENT IN 2RDM FILE!'
-              stop
+                 write(LOUT,'(1x,a,i2,a,i1,a)') 'WARNING! 2RDM FOR STATE',&
+                             & ist,'.',isym,' WILL BE USED IN CALCULATIONS!'
+                 iwarn = iwarn + 1
+                 exit fileloop
+              endif
            endif 
          enddo fileloop
 
@@ -602,16 +638,51 @@ character(8) :: label
 
 end subroutine read_2rdm_molpro
 
-subroutine read_1rdm_molpro(onerdm,nost,infile,nbasis)
+subroutine read_nact_molpro(nact,infile)
 implicit none
 
-integer,intent(in) :: nbasis,nost
 character(*),intent(in) :: infile
-double precision,intent(out) :: onerdm(nbasis*(nbasis+1)/2)
 integer :: iunit,ios,ist,nact,nact2,nstate
 integer :: i,j,ij,idx
-double precision,allocatable :: work(:)
 character(8) :: label
+
+ open(newunit=iunit,file=infile,status='OLD', &
+      access='SEQUENTIAL',form='UNFORMATTED')
+
+ fileloop: do
+           read(iunit,iostat=ios) label
+           if(ios<0) then
+              write(LOUT,*) 'ERROR!!! LABEL 1RDM     not found!'
+              stop
+           endif
+           if(label=='1RDM    ') then
+              read(iunit) nact,nact2,nstate
+              exit fileloop
+!              print*, nact,nact2,nstate
+           endif
+         enddo fileloop
+
+ close(iunit)
+
+end subroutine read_nact_molpro
+
+subroutine read_1rdm_molpro(onerdm,nost,nosym,infile,iwarn,nbasis)
+implicit none
+
+integer,intent(in) :: nbasis,nost,nosym
+integer,intent(inout) :: iwarn 
+character(*),intent(in) :: infile
+double precision,intent(out) :: onerdm(nbasis*(nbasis+1)/2)
+
+integer :: iunit,ios,ist,isym,nact,nact2,nstate,nstsym
+integer :: i,j,ij,idx,istsym
+double precision,allocatable :: work(:)
+logical :: scanfile
+character(8) :: label
+
+ !check if any states declared in input
+ scanfile = .false.
+ if(nosym>0) scanfile = .true.
 
  allocate(work(NBasis**2))
  open(newunit=iunit,file=infile,status='OLD', &
@@ -624,16 +695,30 @@ character(8) :: label
               stop
            endif
            if(label=='1RDM    ') then
-              read(iunit) nact,nact2,nstate
+              read(iunit) nact,nact2,nstsym
               !print*, nact2,nstate
-              do i=1,nstate
-                 read(iunit) ist 
+              if(scanfile) then
+                 do istsym=1,nstsym
+                    read(iunit) isym,nstate 
+                    do i=1,nstate
+                       read(iunit) ist 
+                       read(iunit) work(1:nact2)
+                       if(ist==nost.and.isym==nosym) exit fileloop
+                    enddo
+                 enddo
+                 write(LOUT,'(1x,a,i2,a,i1,a)') 'ERROR!!! 1RDM FOR STATE',&
+                             & nost,'.',nosym,' NOT PRESENT IN 1RDM FILE!'
+                 stop
+              else
+                 read(iunit) isym,nstate 
+                 read(iunit) ist
                  read(iunit) work(1:nact2)
-                 if(ist==nost) exit fileloop
-              enddo
-              write(LOUT,'(1x,a)') 'ERROR!!! 1RDM FOR REQUESTED STATE&
-                          & NOT PRESENT IN 2RDM FILE!'
-              stop
+                 write(LOUT,'(1x,a,i2,a,i1,a)') 'WARNING! 1RDM FOR STATE',&
+                             & ist,'.',isym,' WILL BE USED IN CALCULATIONS!'
+                 write(LOUT,'()')
+                 iwarn = iwarn + 1 
+                 exit fileloop
+              endif
            endif 
          enddo fileloop
 
@@ -1135,6 +1220,78 @@ function uppercase(s)
       end do
 end function uppercase
 
+subroutine read_statearray(val,inst,instates,delim)
+
+     character(*), intent(in) :: val
+     character(1), intent(in) :: delim
+     integer,intent(inout) :: instates
+
+     integer :: ii,k
+     logical :: dot
+     integer,allocatable :: inst(:,:)
+     character(:), allocatable :: w,v,s1,s2
+
+     w = trim(adjustl(val))
+     v = trim(adjustl(val))
+      
+     if (len(w) == 0) then
+           write(LOUT,'(1x,a)') 'ERROR!!! NO STATES GIVEN FOR Ensamble!'
+           stop
+     else
+           ! check for dots
+           k = index(v,'.')
+           if(k /= 0) then 
+              dot=.true.
+           else
+              dot=.false.
+           endif
+         
+           ! get number of states 
+           instates = 0
+           dimloop: do 
+                     k = index(v, delim)
+                     instates = instates + 1
+                     v = trim(adjustl(v(k+1:)))
+                     if (k == 0) exit dimloop
+                    enddo dimloop
+
+           ! assign states
+           allocate(inst(2,instates))
+           instates = 0
+           arrloop: do 
+                     k = index(w, delim)
+                     instates = instates + 1
+                     if(k /= 0) then
+                         if(dot) then
+                            call split(w(1:k-1),s1,s2,'.')
+                            read(s1, *) inst(1,instates) 
+                            read(s2, *) inst(2,instates) 
+                         else
+                            s1 = w(1:k-1)
+                            read(s1, *) inst(1,instates) 
+                            inst(2,instates) = 1  
+                         endif
+                         w = trim(adjustl(w(k+1:)))
+                         !print*, '1 2',inst(1,instates),inst(2,instates)
+                     elseif (k == 0) then 
+                         !print*, 'last ', w
+                         if(dot) then
+                            call split(w,s1,s2,'.')
+                            read(s1, *) inst(1,instates)
+                            read(s2, *) inst(2,instates)
+                         else
+                            s1 = w
+                            read(s1, *) inst(1,instates) 
+                            inst(2,instates) = 1  
+                         endif
+                         !print*, '1 2',inst(1,instates),inst(2,instates)
+                         exit arrloop
+                     endif 
+                  enddo arrloop
+
+     end if
+
+end subroutine read_statearray
 
 subroutine split(s, s1, s2, delimiter)
       !
@@ -1284,13 +1441,15 @@ implicit none
 character(*) :: infile
 integer :: NumOSym(15),IndInt(NBasis),NSym,NBasis
 integer :: ifile,ios,i,j,k,isym
-integer :: NState,IOld,INew
-integer :: iclos(8),iact(8),nt(8),ivirt(8)
+integer :: NState,NStSym,IOld,INew
+integer :: iclos(8),iact(8),nt(8),ivirt(8),istsy(16),nstats(16)
 character(8) :: label
 
  iclos = 0
  ivirt = 0
  iact = 0
+ nstats = 0
+ istsy = 0
  NumOSym = 0
  open(newunit=ifile,file=infile,access='sequential',&
       form='unformatted',status='old')
@@ -1303,7 +1462,9 @@ character(8) :: label
    endif
    if(label=='BASINFO ') then
       read(ifile) NSym
-      read(ifile) NState
+      read(ifile) NStSym
+      read(ifile) nstats(1:NStSym)
+      read(ifile) istsy(1:NStSym)
       read(ifile) iclos(1:NSym) 
       read(ifile) iact(1:NSym) 
       read(ifile) NumOSym(1:NSym) 
@@ -1313,6 +1474,8 @@ character(8) :: label
 
  close(ifile)
  ivirt(1:NSym) = NumOSym(1:NSym)-iclos(1:NSym)-iact(1:NSym)
+
+! print*, 'nact',iact(1:NSym)
 
  if(NSym>1) then
    ! symmetry 

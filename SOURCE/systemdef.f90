@@ -121,6 +121,9 @@ else
   ! set JobType
    Flags%JobType = Input%CalcParams%JobType
 
+  ! set TwoEl type
+   Flags%ITwoEl = Input%CalcParams%TwoMoInt
+
   ! Interface 
   select case(Input%CalcParams%InterfaceType)
   case(INTER_TYPE_DAL)
@@ -288,7 +291,16 @@ if(Flags%ISAPT.Eq.0) then
      stop
    endif   
   
-   System%NoSt   = Input%SystemInput(1)%NoSt
+   System%NoSt = Input%SystemInput(1)%NoSt
+   System%NStates = Input%SystemInput(1)%NStates
+   allocate(System%InSt(2,System%NStates)) 
+   if(Input%SystemInput(1)%DeclareSt) then
+      System%InSt = Input%SystemInput(1)%InSt 
+   else
+      ! assume 1.1 state
+      System%InSt(:,1) = -255
+   endif
+
    System%ZNucl  = Input%SystemInput(1)%ZNucl
    System%Charge = Input%SystemInput(1)%Charge
    System%NBasis = Input%CalcParams%NBasis
@@ -324,7 +336,15 @@ elseif(Flags%ISAPT.Eq.1) then
    select case(Input%SystemInput(1)%Monomer)
    case(1)
 
-      monA%NoSt   = Input%SystemInput(1)%NoSt
+      monA%NoSt    = Input%SystemInput(1)%NoSt
+      monA%NStates = Input%SystemInput(1)%NStates
+      allocate(monA%InSt(2,System%NStates)) 
+      if(Input%SystemInput(1)%DeclareSt) then
+         monA%InSt = Input%SystemInput(1)%InSt 
+      else
+         ! assume 1.1 state
+         monA%InSt(:,1) = -255
+      endif
       monA%ZNucl  = Input%SystemInput(1)%ZNucl
       monA%Charge = Input%SystemInput(1)%Charge
       monA%Omega  = Input%SystemInput(1)%Omega 
@@ -346,6 +366,14 @@ elseif(Flags%ISAPT.Eq.1) then
       monA%NELE = (SAPT%monA%ZNucl - SAPT%monA%Charge)/2 
     
       monB%NoSt   = Input%SystemInput(2)%NoSt
+      monB%NStates = Input%SystemInput(2)%NStates
+      allocate(monB%InSt(2,System%NStates)) 
+      if(Input%SystemInput(2)%DeclareSt) then
+         monB%InSt = Input%SystemInput(2)%InSt 
+      else
+         ! assume 1.1 state
+         monB%InSt(:,1) = -255
+      endif
       monB%ZNucl  = Input%SystemInput(2)%ZNucl
       monB%Charge = Input%SystemInput(2)%Charge
       monB%Omega  = Input%SystemInput(2)%Omega 
@@ -371,6 +399,14 @@ elseif(Flags%ISAPT.Eq.1) then
    case(2)
   
       monA%NoSt   = Input%SystemInput(2)%NoSt
+      monA%NStates = Input%SystemInput(2)%NStates
+      allocate(monA%InSt(2,System%NStates)) 
+      if(Input%SystemInput(2)%DeclareSt) then
+         monA%InSt = Input%SystemInput(2)%InSt 
+      else
+         ! assume 1.1 state
+         monA%InSt(:,1) = -255
+      endif
       monA%ZNucl  = Input%SystemInput(2)%ZNucl
       monA%Charge = Input%SystemInput(2)%Charge
       monA%Omega  = Input%SystemInput(2)%Omega 
@@ -391,6 +427,14 @@ elseif(Flags%ISAPT.Eq.1) then
       monA%NELE = (monA%ZNucl - monA%Charge)/2 
    
       monB%NoSt   = Input%SystemInput(1)%NoSt
+      monB%NStates = Input%SystemInput(1)%NStates
+      allocate(monB%InSt(2,System%NStates)) 
+      if(Input%SystemInput(1)%DeclareSt) then
+         monB%InSt = Input%SystemInput(1)%InSt 
+      else
+         ! assume 1.1 state
+         monB%InSt(:,1) = -255
+      endif
       monB%ZNucl  = Input%SystemInput(1)%ZNucl
       monB%Charge = Input%SystemInput(1)%Charge
       monB%Omega  = Input%SystemInput(1)%Omega 
@@ -484,11 +528,11 @@ endif
 
 if(Flags%ISAPT.Eq.0) then
 !   write(LOUT,'()')
-   write(LOUT,'(1x,a,1x,i3)') 'PRINT LEVEL: ', System%IPrint
+   write(LOUT,'(1x,a,1x,i5)') 'PRINT LEVEL: ', System%IPrint
 
 elseif(Flags%ISAPT.Eq.1) then
 !   write(LOUT,'()')
-   write(LOUT,'(1x,a,1x,i3)') 'PRINT LEVEL: ', SAPT%monA%IPrint
+   write(LOUT,'(1x,a,1x,i5)') 'PRINT LEVEL: ', SAPT%monA%IPrint
  
 endif
 

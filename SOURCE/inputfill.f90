@@ -309,6 +309,23 @@ subroutine read_block_calculation(CalcParams, line)
            elseif (uppercase(val) == "DMRG" ) then
               CalcParams%RDMType = RDM_TYPE_DMRG
            endif
+
+      case ("TWOMOINT")
+         if(uppercase(val) == "FULL".or. &
+            uppercase(val) == "FFFF") then
+
+            CalcParams%TwoMoInt = TWOMO_FFFF
+
+         elseif(uppercase(val) == 'FOFO') then
+          
+            CalcParams%TwoMoInt = TWOMO_FOFO
+
+         elseif(uppercase(val) == 'INCORE'.or. &
+                uppercase(val) == 'IN-CORE') then
+ 
+            CalcParams%TwoMoInt = TWOMO_INCORE
+         endif
+
       ! here not sure
       case ("RESPONSE")
            if (uppercase(val) == "ERPA-APSG".or.&
@@ -396,8 +413,12 @@ integer :: test,test2
 
  call split(line, key, val)
  select case (uppercase(key))
- case ("STATE")
-       read(val, *) SystemParams%NoSt
+ case("STATE")
+       SystemParams%DeclareSt = .true.
+       call read_statearray(val,SystemParams%InSt,SystemParams%NStates,',')
+
+! case ("STATE")
+!      read(val, *) SystemParams%NoSt
 
  case ("CHARGE")
        read(val, *) SystemParams%Charge
@@ -644,7 +665,9 @@ integer :: imon
          stop 
       endif
 
-
+      if(.not.System%DeclareSt) then
+         allocate(System%InSt(2,1))
+      endif
       !write(LOUT, '(1x,a,6x,a)') "Monomer: ", &
       !              PossibleMonomers(System%Monomer)
       !write(LOUT, '(1x,a,i2)') "Multiplicity: ", System%Multiplicity

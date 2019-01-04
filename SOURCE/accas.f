@@ -482,7 +482,14 @@ C
       If(IFunSRKer.Eq.1) Then 
 C
 C     GENERATE A SR KERNEL AND DUMP IT
-C   
+C
+      If(ITwoEl.Eq.3) Then
+      Call ModABMin_FOFO(Occ,SRKer,WGrid,OrbGrid,ABMIN,
+     $                   IndN,IndX,NDimX,NGrid,NBasis,
+     $                   NAcCAS+NInAcCAS,'FOFO','FOFOERF',
+     $                   'srdump')
+C 
+      ElseIf(ITwoEl.Eq.1) Then
       Open(20,File="srdump",Form='UNFORMATTED')
 C
       Do I=1,NBasis
@@ -527,6 +534,9 @@ C
       EndDo      
 C
       Close(20)
+C
+C     if TwoEl
+      EndIf
 C
       EndIf
 C

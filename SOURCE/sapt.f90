@@ -2583,134 +2583,144 @@ deallocate(ABKer,batch,work)
 
 end subroutine ModABMin
 
-subroutine ModABMin_FOFO(Occ,SRKer,Wt,OrbGrid,ABMin,IndN,IndX,NDimX,NGrid,NBasis,&
-                         NOccup,twokfile,twokerf)
-!     ADD CONTRIBUTIONS FROM THE srALDA KERNEL TO AB MATRICES
-implicit none
-
-integer,parameter :: maxlen = 128
-integer,intent(in) :: NBasis,NDimX,NGrid,NOccup
-integer,intent(in) :: IndN(2,NDimX),IndX(NDimX)
-character(*),intent(in) :: twokfile,twokerf
-double precision,intent(in) :: Occ(NBasis),SRKer(NGrid), &
-                               Wt(NGrid),OrbGrid(NGrid,NBasis)
-double precision,intent(inout) :: ABMin(NDimX,NDimX)
-
-integer :: offset,batchlen,iunit1,iunit2
-integer :: iunit3,iunit4
-integer :: i,j,k,l,kl,ip,iq,ir,is,irs,ipq,igrd
-integer :: IRow,ICol
-double precision :: XKer1234,TwoSR,Cpq,Crs
-integer :: pos(NBasis,NBasis)
-double precision :: CICoef(NBasis)
-double precision,allocatable :: work1(:),work2(:),WtKer(:)
-double precision,allocatable :: batch(:,:),ABKer(:,:)
-double precision,allocatable :: ints1(:,:),ints2(:,:)
-
-do i=1,NBasis
-   CICoef(i) = sign(sqrt(Occ(i)),Occ(i)-0.5d0)
-enddo
-
-allocate(work1(NBasis**2),work2(NBasis**2),ints1(NBasis,NBasis),ints2(NBasis,NBasis),&
-         WtKer(maxlen),batch(maxlen,NBasis),ABKer(NDimX,NDimX))
-
-pos = 0
-do i=1,NDimX
-   pos(IndN(1,i),IndN(2,i)) = IndX(i)
-enddo
-
-ABKer = 0
-
-print*, 'ModABMin_FOFO'
-
-do offset=0,NGrid,maxlen
-   batchlen = min(NGrid-offset,maxlen)
-   if(batchlen==0) exit
-
-   WtKer(1:batchlen) = Wt(offset+1:offset+batchlen)*SRKer(offset+1:offset+batchlen)
-   batch(1:batchlen,1:NBasis) = OrbGrid(offset+1:offset+batchlen,1:NBasis)
-
-   do IRow=1,NDimX
-      ip = IndN(1,IRow)
-      iq = IndN(2,IRow)
-      ipq = IndX(IRow)
-   
-      do ICol=1,NDimX
-         ir=IndN(1,ICol)
-         is=IndN(2,ICol)
-         irs=IndX(ICol)
-         if(irs.gt.ipq) cycle
-    
-         XKer1234 = 0
-         do i=1,batchlen
-            XKer1234 = XKer1234 + WtKer(i)* &
-            batch(i,ip)*batch(i,iq)*batch(i,ir)*batch(i,is)
-         enddo
-         
-         ABKer(ipq,irs) = ABKer(ipq,irs) + XKer1234
-         ABKer(irs,ipq) = ABKer(ipq,irs)
-      
-      enddo
-   enddo
-
-enddo
-
-open(newunit=iunit1,file=trim(twokfile),status='OLD', &
-     access='DIRECT',recl=8*NBasis*NOccup)
-open(newunit=iunit2,file=trim(twokerf),status='OLD', &
-     access='DIRECT',recl=8*NBasis*NOccup)
-
-kl = 0
-do k=1,NOccup
-   do l=1,NBasis
-      kl = kl + 1
-      if(pos(l,k)/=0) then
-        irs = pos(l,k)
-        ir = l
-        is = k
-        read(iunit1,rec=kl) work1(1:NBasis*NOccup)
-        read(iunit2,rec=kl) work2(1:NBasis*NOccup)
-        do j=1,NOccup
-           do i=1,NBasis
-              ints1(i,j) = work1((j-1)*NBasis+i)
-              ints2(i,j) = work2((j-1)*NBasis+i)
-           enddo
-        enddo
-        ints1(:,NOccup+1:NBasis) = 0
-        ints2(:,NOccup+1:NBasis) = 0
-
-        do j=1,NBasis
-           do i=1,j
-              if(pos(j,i)/=0) then
-                ipq = pos(j,i)
-                Crs = CICoef(l)+CICoef(k)
-                Cpq = CICoef(j)+CICoef(i)
-                !if(irs.gt.ipq) cycle
-
-                TwoSR = ints1(j,i)-ints2(j,i)
-
-                ABMIN(ipq,irs) = ABMIN(ipq,irs) & 
-                               + 4.0d0*Cpq*Crs*(TwoSR+ABKer(ipq,irs))
-                !ABMIN(irs,ipq) = ABMIN(ipq,irs) 
-
-              endif  
-           enddo
-        enddo
-
-      endif 
-   enddo
-enddo 
-
-close(iunit2)
-close(iunit1)
-
-deallocate(ABKer,batch,WtKer,ints2,ints1,work2,work1)
-
-end subroutine ModABMin_FOFO
+!subroutine ModABMin_FOFO(Occ,SRKer,Wt,OrbGrid,ABMin,IndN,IndX,NDimX,NGrid,NBasis,&
+!                         NOccup,twokfile,twokerf,dfile)
+!!     ADD CONTRIBUTIONS FROM THE srALDA KERNEL TO AB MATRICES
+!implicit none
+!
+!integer,parameter :: maxlen = 128
+!integer,intent(in) :: NBasis,NDimX,NGrid,NOccup
+!integer,intent(in) :: IndN(2,NDimX),IndX(NDimX)
+!character(*),intent(in) :: twokfile,twokerf
+!double precision,intent(in) :: Occ(NBasis),SRKer(NGrid), &
+!                               Wt(NGrid),OrbGrid(NGrid,NBasis)
+!double precision,intent(inout) :: ABMin(NDimX,NDimX)
+!character(*),intent(in),optional :: dfile
+!
+!integer :: offset,batchlen,iunit1,iunit2
+!integer :: iunit3,iunit4
+!integer :: i,j,k,l,kl,ip,iq,ir,is,irs,ipq,igrd
+!integer :: IRow,ICol
+!double precision :: XKer1234,TwoSR,Cpq,Crs
+!integer :: pos(NBasis,NBasis)
+!double precision :: CICoef(NBasis)
+!double precision,allocatable :: work1(:),work2(:),WtKer(:)
+!double precision,allocatable :: batch(:,:),ABKer(:,:)
+!double precision,allocatable :: ints1(:,:),ints2(:,:)
+!logical :: dump
+!
+!dump = .false.
+!if(present(dfile)) dump=.true. 
+!print*, dfile
+!
+!do i=1,NBasis
+!   CICoef(i) = sign(sqrt(Occ(i)),Occ(i)-0.5d0)
+!enddo
+!
+!allocate(work1(NBasis**2),work2(NBasis**2),ints1(NBasis,NBasis),ints2(NBasis,NBasis),&
+!         WtKer(maxlen),batch(maxlen,NBasis),ABKer(NDimX,NDimX))
+!
+!pos = 0
+!do i=1,NDimX
+!   pos(IndN(1,i),IndN(2,i)) = IndX(i)
+!enddo
+!
+!ABKer = 0
+!
+!print*, 'ModABMin_FOFO'
+!
+!do offset=0,NGrid,maxlen
+!   batchlen = min(NGrid-offset,maxlen)
+!   if(batchlen==0) exit
+!
+!   WtKer(1:batchlen) = Wt(offset+1:offset+batchlen)*SRKer(offset+1:offset+batchlen)
+!   batch(1:batchlen,1:NBasis) = OrbGrid(offset+1:offset+batchlen,1:NBasis)
+!
+!   do IRow=1,NDimX
+!      ip = IndN(1,IRow)
+!      iq = IndN(2,IRow)
+!      ipq = IndX(IRow)
+!   
+!      do ICol=1,NDimX
+!         ir=IndN(1,ICol)
+!         is=IndN(2,ICol)
+!         irs=IndX(ICol)
+!         if(irs.gt.ipq) cycle
+!    
+!         XKer1234 = 0
+!         do i=1,batchlen
+!            XKer1234 = XKer1234 + WtKer(i)* &
+!            batch(i,ip)*batch(i,iq)*batch(i,ir)*batch(i,is)
+!         enddo
+!         
+!         ABKer(ipq,irs) = ABKer(ipq,irs) + XKer1234
+!         ABKer(irs,ipq) = ABKer(ipq,irs)
+!      
+!      enddo
+!   enddo
+!
+!enddo
+!
+!open(newunit=iunit1,file=trim(twokfile),status='OLD', &
+!     access='DIRECT',recl=8*NBasis*NOccup)
+!open(newunit=iunit2,file=trim(twokerf),status='OLD', &
+!     access='DIRECT',recl=8*NBasis*NOccup)
+!
+!if(dump) open(newunit=iunit3,file=trim(dfile),form='unformatted')
+!
+!kl = 0
+!do k=1,NOccup
+!   do l=1,NBasis
+!      kl = kl + 1
+!      if(pos(l,k)/=0) then
+!        irs = pos(l,k)
+!        ir = l
+!        is = k
+!        read(iunit1,rec=kl) work1(1:NBasis*NOccup)
+!        read(iunit2,rec=kl) work2(1:NBasis*NOccup)
+!        do j=1,NOccup
+!           do i=1,NBasis
+!              ints1(i,j) = work1((j-1)*NBasis+i)
+!              ints2(i,j) = work2((j-1)*NBasis+i)
+!           enddo
+!        enddo
+!        ints1(:,NOccup+1:NBasis) = 0
+!        ints2(:,NOccup+1:NBasis) = 0
+!
+!        do j=1,NBasis
+!           do i=1,j
+!              if(pos(j,i)/=0) then
+!                ipq = pos(j,i)
+!                Crs = CICoef(l)+CICoef(k)
+!                Cpq = CICoef(j)+CICoef(i)
+!                !if(irs.gt.ipq) cycle
+!
+!                TwoSR = ints1(j,i)-ints2(j,i)
+!
+!                ABMIN(ipq,irs) = ABMIN(ipq,irs) & 
+!                               + 4.0d0*Cpq*Crs*(TwoSR+ABKer(ipq,irs))
+!                !ABMIN(irs,ipq) = ABMIN(ipq,irs) 
+!                if(dump) write(iunit3) 4.0d0*Cpq*Crs*(TwoSR+ABKer(ipq,irs))
+!
+!              endif  
+!           enddo
+!        enddo
+!
+!      endif 
+!   enddo
+!enddo 
+!
+!if(dump) close(iunit3)
+!close(iunit2)
+!close(iunit1)
+!
+!deallocate(ABKer,batch,WtKer,ints2,ints1,work2,work1)
+!
+!end subroutine ModABMin_FOFO
 
 subroutine ModABMin_mithap(Occ,SRKer,Wt,OrbGrid,ABMin,IndN,IndX,NDimX,NGrid,NBasis,&
                            twofile,twoerfile)
-!     ADD CONTRIBUTIONS FROM THE srALDA KERNEL TO AB MATRICES
+! ADD CONTRIBUTIONS FROM THE srALDA KERNEL TO AB MATRICES
 implicit none
 
 integer,parameter :: maxlen = 128
@@ -2944,130 +2954,130 @@ deallocate(ints,work)
 
 end subroutine ACEneERPA_FFFF
 
-subroutine ACEneERPA_FOFO(ECorr,EVec,EVal,Occ,IGem, &
-                          IndN,IndX,NOccup,NDimX,NBasis,IntKFile)
-implicit none
-
-integer,intent(in) :: NDimX,NBasis
-integer,intent(in) :: IGem(NBasis),IndN(2,NDimX),IndX(NDimX)
-integer,intent(in) :: NOccup
-character(*),intent(in) :: IntKFile
-double precision,intent(out) :: ECorr
-double precision,intent(in) :: EVec(NDimX,NDimX),EVal(NDimX)
-double precision :: Occ(NBasis)
-
-integer :: i,j,k,l,kl,kk,ip,iq,ir,is,ipq,irs
-integer :: iunit,ISkippedEig
-integer :: pos(NBasis,NBasis)
-logical :: AuxCoeff(3,3,3,3)
-double precision :: CICoef(NBasis),Cpq,Crs,SumY,Aux
-double precision,allocatable :: work(:),ints(:,:),Skipped(:)
-double precision,parameter :: SmallE = 1.d-3,BigE = 1.d8
-
-do i=1,NBasis
-   CICoef(i) = sign(sqrt(Occ(i)),Occ(i)-0.5d0)
-enddo
-
-pos = 0
-do i=1,NDimX
-   pos(IndN(1,i),IndN(2,i)) = IndX(i)
-enddo
-
-AuxCoeff = .true.
-do l=1,3
-   do k=1,3
-      do j=1,3
-         do i=1,3
-            if((i==j).and.(j==k).and.(k==l)) then
-               AuxCoeff(i,j,k,l) = .false.
-            endif
-         enddo
-      enddo
-   enddo
-enddo
-
-allocate(work(NBasis**2),ints(NBasis,NBasis),Skipped(NDimX))
-
-ISkippedEig = 0
-ECorr = 0
-
-open(newunit=iunit,file=trim(IntKFile),status='OLD', &
-     access='DIRECT',recl=8*NBasis*NOccup)
-
-kl = 0
-do k=1,NOccup
-   do l=1,NBasis
-      kl = kl + 1
-      if(pos(l,k)/=0) then
-        irs = pos(l,k)
-        ir = l
-        is = k
-        read(iunit,rec=kl) work(1:NBasis*NOccup)
-        do j=1,NOccup
-           do i=1,NBasis
-              ints(i,j) = work((j-1)*NBasis+i)
-           enddo
-        enddo
-        ints(:,NOccup+1:NBasis) = 0
-
-        do j=1,NBasis
-           do i=1,j
-              if(pos(j,i)/=0) then
-                ipq = pos(j,i)
-                ip = j
-                iq = i
-                Crs = CICoef(l)+CICoef(k)
-                Cpq = CICoef(j)+CICoef(i)
-
-                !if(.not.(IGem(ir).eq.IGem(is).and.IGem(ip).eq.IGem(iq)&
-                !.and.IGem(ir).eq.IGem(ip)).and.ir.gt.is.and.ip.gt.iq) then
-                if(AuxCoeff(IGem(ip),IGem(iq),IGem(ir),IGem(is))) then
-
-                   ISkippedEig = 0
-                   SumY = 0 
-                   do kk=1,NDimX
-                      if(EVal(kk).gt.SmallE.and.EVal(kk).lt.BigE) then
-                         SumY = SumY + EVec(ipq,kk)*EVec(irs,kk)
-                      else
-                         ISkippedEig = ISkippedEig + 1
-                         Skipped(ISkippedEig) = EVal(kk)
-                      endif
-                   enddo
-          
-                   Aux = 2*Crs*Cpq*SumY
-          
-                   if(iq.Eq.is.and.ip.Eq.ir) then
-                      Aux = Aux - Occ(ip)*(1d0-Occ(is))-Occ(is)*(1d0-Occ(ip))
-                   endif  
-
-                   ECorr = ECorr + Aux*ints(j,i)
-          
-                ! endinf of If(IP.Gt.IR.And.IQ.Gt.IS) 
-                endif
-
-              endif
-           enddo
-        enddo
-
-      endif
-
-   enddo
-enddo
-
-close(iunit)
-
-if(ISkippedEig/=0) then
-  write(LOUT,'(/,1x,"The number of discarded eigenvalues is",i4)') &
-       ISkippedEig
-  do i=1,ISkippedEig
-     write(LOUT,'(1x,a,i4,f15.8)') 'Skipped',i,Skipped(i)
-  enddo
-endif
-
-deallocate(Skipped)
-deallocate(ints,work)
-
-end subroutine ACEneERPA_FOFO
+!subroutine ACEneERPA_FOFO(ECorr,EVec,EVal,Occ,IGem, &
+!                          IndN,IndX,NOccup,NDimX,NBasis,IntKFile)
+!implicit none
+!
+!integer,intent(in) :: NDimX,NBasis
+!integer,intent(in) :: IGem(NBasis),IndN(2,NDimX),IndX(NDimX)
+!integer,intent(in) :: NOccup
+!character(*),intent(in) :: IntKFile
+!double precision,intent(out) :: ECorr
+!double precision,intent(in) :: EVec(NDimX,NDimX),EVal(NDimX)
+!double precision :: Occ(NBasis)
+!
+!integer :: i,j,k,l,kl,kk,ip,iq,ir,is,ipq,irs
+!integer :: iunit,ISkippedEig
+!integer :: pos(NBasis,NBasis)
+!logical :: AuxCoeff(3,3,3,3)
+!double precision :: CICoef(NBasis),Cpq,Crs,SumY,Aux
+!double precision,allocatable :: work(:),ints(:,:),Skipped(:)
+!double precision,parameter :: SmallE = 1.d-3,BigE = 1.d8
+!
+!do i=1,NBasis
+!   CICoef(i) = sign(sqrt(Occ(i)),Occ(i)-0.5d0)
+!enddo
+!
+!pos = 0
+!do i=1,NDimX
+!   pos(IndN(1,i),IndN(2,i)) = IndX(i)
+!enddo
+!
+!AuxCoeff = .true.
+!do l=1,3
+!   do k=1,3
+!      do j=1,3
+!         do i=1,3
+!            if((i==j).and.(j==k).and.(k==l)) then
+!               AuxCoeff(i,j,k,l) = .false.
+!            endif
+!         enddo
+!      enddo
+!   enddo
+!enddo
+!
+!allocate(work(NBasis**2),ints(NBasis,NBasis),Skipped(NDimX))
+!
+!ISkippedEig = 0
+!ECorr = 0
+!
+!open(newunit=iunit,file=trim(IntKFile),status='OLD', &
+!     access='DIRECT',recl=8*NBasis*NOccup)
+!
+!kl = 0
+!do k=1,NOccup
+!   do l=1,NBasis
+!      kl = kl + 1
+!      if(pos(l,k)/=0) then
+!        irs = pos(l,k)
+!        ir = l
+!        is = k
+!        read(iunit,rec=kl) work(1:NBasis*NOccup)
+!        do j=1,NOccup
+!           do i=1,NBasis
+!              ints(i,j) = work((j-1)*NBasis+i)
+!           enddo
+!        enddo
+!        ints(:,NOccup+1:NBasis) = 0
+!
+!        do j=1,NBasis
+!           do i=1,j
+!              if(pos(j,i)/=0) then
+!                ipq = pos(j,i)
+!                ip = j
+!                iq = i
+!                Crs = CICoef(l)+CICoef(k)
+!                Cpq = CICoef(j)+CICoef(i)
+!
+!                !if(.not.(IGem(ir).eq.IGem(is).and.IGem(ip).eq.IGem(iq)&
+!                !.and.IGem(ir).eq.IGem(ip)).and.ir.gt.is.and.ip.gt.iq) then
+!                if(AuxCoeff(IGem(ip),IGem(iq),IGem(ir),IGem(is))) then
+!
+!                   ISkippedEig = 0
+!                   SumY = 0 
+!                   do kk=1,NDimX
+!                      if(EVal(kk).gt.SmallE.and.EVal(kk).lt.BigE) then
+!                         SumY = SumY + EVec(ipq,kk)*EVec(irs,kk)
+!                      else
+!                         ISkippedEig = ISkippedEig + 1
+!                         Skipped(ISkippedEig) = EVal(kk)
+!                      endif
+!                   enddo
+!          
+!                   Aux = 2*Crs*Cpq*SumY
+!          
+!                   if(iq.Eq.is.and.ip.Eq.ir) then
+!                      Aux = Aux - Occ(ip)*(1d0-Occ(is))-Occ(is)*(1d0-Occ(ip))
+!                   endif  
+!
+!                   ECorr = ECorr + Aux*ints(j,i)
+!          
+!                ! endinf of If(IP.Gt.IR.And.IQ.Gt.IS) 
+!                endif
+!
+!              endif
+!           enddo
+!        enddo
+!
+!      endif
+!
+!   enddo
+!enddo
+!
+!close(iunit)
+!
+!if(ISkippedEig/=0) then
+!  write(LOUT,'(/,1x,"The number of discarded eigenvalues is",i4)') &
+!       ISkippedEig
+!  do i=1,ISkippedEig
+!     write(LOUT,'(1x,a,i4,f15.8)') 'Skipped',i,Skipped(i)
+!  enddo
+!endif
+!
+!deallocate(Skipped)
+!deallocate(ints,work)
+!
+!end subroutine ACEneERPA_FOFO
 
 subroutine readresp(EVec,EVal,NDim,fname)
 implicit none
@@ -3265,5 +3275,117 @@ double precision,parameter :: SmallE = 1.d-6
   enddo
 
 end subroutine calc_resp_apsg
+
+subroutine check_loop(ABPLUS,Occ,IndN,IndBlock,NAct,INActive,NDim,NDimX,NBasis)
+implicit none
+
+integer,intent(in) :: NAct,INActive,NDim,NDimX,NBasis
+integer,intent(in) :: IndN(2,NDim),IndBlock(2,NDimX)
+double precision,intent(in) :: ABPLUS(NDimX,NDimX),Occ(NBasis)
+
+integer :: i,j,k,l,ip,iq,ir,is,ipq,irs
+integer :: NOccup 
+integer :: IGem(NBasis),Ind(NBasis),AuxInd(3,3),pos(NBasis,NBasis)
+double precision :: C(NBasis),Cpq,Crs,EAll,EIntra,Aux
+double precision :: AuxCoeff(3,3,3,3),AuxVal,val
+integer :: iunit
+integer :: ii,jj,kl,ipos
+double precision,allocatable :: work1(:),work2(:)
+double precision,allocatable :: ints(:,:)
+
+! set dimensions
+NOccup = NAct + INActive
+Ind = 0
+do i=1,NAct
+   Ind(INActive+i) = i
+enddo
+
+! fix IGem
+do i=1,INActive
+   IGem(i) = 1
+enddo
+do i=INActive+1,NOccup
+   IGem(i) = 2
+enddo
+do i=NOccup+1,NBasis
+   IGem(i) = 3
+enddo
+
+allocate(work1(NBasis**2),work2(NBasis**2),ints(NBasis,NBasis))
+
+do l=1,3
+   do k=1,3
+      do j=1,3
+         do i=1,3
+            if((i==j).and.(j==k).and.(k==l)) then
+               AuxCoeff(i,j,k,l) = 1
+            else
+               AuxCoeff(i,j,k,l) = 0
+            endif
+         enddo
+      enddo
+   enddo
+enddo
+
+do i=1,NBasis
+   C(i) = sign(sqrt(Occ(i)),Occ(i)-0.5d0)
+enddo
+
+pos = 0
+do i=1,NDimX
+   pos(IndBlock(1,i),IndBlock(2,i)) = i
+enddo
+
+EAll = 0
+EIntra = 0
+open(newunit=iunit,file='FOFO',status='OLD', &
+     access='DIRECT',recl=8*NBasis*NOccup)
+
+kl = 0
+do k=1,NOccup
+   do l=1,NBasis
+      kl = kl + 1
+      if(pos(l,k)/=0) then
+        irs = pos(l,k)
+        ir = l
+        is = k
+        read(iunit,rec=kl) work1(1:NBasis*NOccup)
+        do j=1,NOccup
+           do i=1,NBasis
+              ints(i,j) = work1((j-1)*NBasis+i)
+           enddo
+        enddo
+        ints(:,NOccup+1:NBasis) = 0
+
+        do j=1,NBasis
+           do i=1,j
+              if(pos(j,i)/=0) then
+                ipq = pos(j,i)
+                ip = j
+                iq = i
+                Crs = C(ir)+C(is)
+                Cpq = C(ip)+C(iq)
+!
+                Aux = Crs*Cpq*ABPLUS(irs,ipq)
+                EAll = EAll + Aux*ints(j,i)
+
+                if(AuxCoeff(IGem(ip),IGem(iq),IGem(ir),IGem(is))==1) EIntra = EIntra + Aux*ints(j,i)
+
+              endif
+           enddo
+        enddo
+
+      endif
+   enddo
+enddo
+
+close(iunit)
+
+print*, 'FAKE-LOOP',EAll,EIntra
+print*, '',EAll-EIntra
+
+deallocate(ints,work2,work1)
+
+end subroutine check_loop
 
 end module sapt_ener
