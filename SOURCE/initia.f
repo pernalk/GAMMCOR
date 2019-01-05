@@ -1483,7 +1483,7 @@ C
       Subroutine GetENuc_AOBin(ENuc,infile)
 C
       Implicit Real*8 (A-H,O-Z)
-      Character*32 infile
+      Character(*) infile
       Logical ex
 
       inquire(file=trim(infile),EXIST=ex)

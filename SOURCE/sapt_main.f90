@@ -1687,7 +1687,8 @@ double precision, allocatable :: EigTmp(:), VecTmp(:)
    select case(Mon%TwoMoInt)
    case(TWOMO_FOFO) 
       call Y01CAS_FOFO(Mon%Occ,URe,XOne,ABPlus,ABMin, &
-             EigY0,EigY1,Eig0,Eig1, &
+             !EigY0,EigY1,Eig0,Eig1, &
+             propfile0,propfile1, &
              Mon%IndN,Mon%IndX,Mon%IGem,Mon%NAct,Mon%INAct,Mon%NDimX, &
              NBas,Mon%NDim,NInte1,twofile,twojfile,twokfile,Flags%IFlag0)
    case(TWOMO_FFFF) 
@@ -1703,9 +1704,11 @@ double precision, allocatable :: EigTmp(:), VecTmp(:)
    end select
 
    ! dump uncoupled response
-   call writeresp(EigY0,Eig0,propfile0)
-   if(Flags%IFlag0==0) then
-      call writeresp(EigY1,Eig1,propfile1)
+   if(Mon%TwoMoInt/=TWOMO_FOFO) then 
+      call writeresp(EigY0,Eig0,propfile0)
+      if(Flags%IFlag0==0) then
+         call writeresp(EigY1,Eig1,propfile1)
+      endif
    endif
   
    deallocate(Eig1,Eig0,EigY1,EigY0)

@@ -44,28 +44,23 @@ C
 C
       If(ICASSCF.Eq.1) Then
 C
+      If(ITwoEl.eq.1) Then
+C      
       Call AC0CAS(ECorr,ETot,TwoNO,Occ,URe,XOne,
      $ ABPLUS,ABMIN,EigVecR,Eig,
      $ IndN,IndX,NDimX,NBasis,NDim,NInte1,NInte2)
 C 
-CC      HERE
-C      Allocate(WorkVec(NDim*NDim),WorkEig(NDim),MYAP(NDimX*NDimX))
-C      Call Y01CAS_FOFO(Occ,URe,XOne,ABPLUS,ABMIN,
-CC      Call Y01CAS_FOFO(Occ,URe,XOne,MYAP,ABMIN,
-C     $ EigVecR,WorkVec,Eig,WorkEig,
-C     $ IndN,IndX,IGem,NAcCAS,NInAcCAS,NDimX,
-C     $ NBasis,NDim,NInte1,'EMPTY','FFOO','FOFO',0)
-CCC
-CC      Do I=1,NDimX
-CC      Do J=1,NDimX
-CC      Write(6,*) ABPLUS(NDimX*(I-1)+J),MYAP(NDimX*(I-1)+J)
-CC      EndDo
-CC      EndDo
-CCC
-CC      Write(6,*) norm2(ABPLUS),norm2(MYAP)
-CC
-C      Deallocate(WorkEig,WorkVec,MYAP)
+      ElseIf(ITwoEl.eq.3) Then
 C
+      Call Y01CAS_FOFO(Occ,URe,XOne,ABPLUS,ABMIN,
+     $ 'PROP0','PROP1',
+     $ IndN,IndX,IGem,NAcCAS,NInAcCAS,NDimX,
+     $ NBasis,NDim,NInte1,'EMPTY','FFOO','FOFO',0,
+     $ ETot,ECorr)
+C
+C     ITwoEl
+      EndIf
+C      
       Write
      $ (6,'(/,X,''ECASSCF+ENuc, AC0-Corr, AC0-CASSCF '',4X,3F15.8)')
      $ ETot+ENuc,ECorr,ETot+ENuc+ECorr
@@ -2311,7 +2306,6 @@ C
       EndDo
 C
       Print*, 'FIRST',norm2(XMAux)
-C      Print*, 'FIRST',XMAux(1),XMAux(NDimX*NDimX)
 C
       ABPLUS(1:NoEig*NoEig)=Zero 
 C
@@ -2353,16 +2347,12 @@ C
 C
       SumY=ABPLUS(I+(J-1)*NoEig)
       Aux=(C(IS)+C(IQ))*(C(IP)+C(IR))*SumY
-C      Aux=SumY
 C
       EAll=EAll+Aux*TwoNO(NAddr3(IP,IR,IQ,IS))
 C
       If(IGem(IP).Eq.IGem(IR).And.IGem(IQ).Eq.IGem(IS).
      $ And.IGem(IP).Eq.IGem(IQ))
      $ EIntra=EIntra+Aux*TwoNO(NAddr3(IP,IR,IQ,IS))
-C     $ EIntra=EIntra+Aux
-c     $ Write(6,'(4i5,3x,4i2,es20.9)') IP,IR,IQ,IS,IGem(IP),IGem(IR),
-c     $  IGem(IQ),IGem(IS),Aux
 C
 C     endinf of If(IP.Gt.IR.And.IQ.Gt.IS) 
       EndIf
@@ -2371,7 +2361,6 @@ C
       EndDo
 C
       ECorr=EAll-EIntra
-      Print*, 'NDimX,NoEig',NDimX,NoEig
       Print*, 'EAll,EIntra',EAll,EIntra
 C
 C ----------------------------------------------------------------    

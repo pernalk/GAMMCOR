@@ -3184,9 +3184,10 @@ deallocate(ints,work2,work1)
 end subroutine Y01CAS_mithap
 
 subroutine Y01CAS_FOFO(Occ,URe,XOne,ABPLUS,ABMIN, &
-     EigY,EigY1,Eig,Eig1, &
+!     EigY,EigY1,Eig,Eig1, &
+     propfile0,propfile1, & 
      IndN,IndX,IGemIN,NAct,INActive,NDimX,NBasis,NDim,NInte1, &
-     IntFileName,IntJFile,IntKFile,IFlag0)
+     IntFileName,IntJFile,IntKFile,IFlag0,ETot,ECorr)
 !
 !     A ROUTINE FOR COMPUTING Y VECTORS AND EIGENVALUES OF ERPA 
 !     IN THE 1ST-ORDER APPROXIMATION
@@ -3197,11 +3198,13 @@ implicit none
 
 integer,intent(in) :: NAct,INActive,NDimX,NBasis,NDim,NInte1
 character(*) :: IntFileName,IntJFile,IntKFile
+character(*) :: propfile0,propfile1
 double precision,intent(out) :: ABPLUS(NDimX,NDimX),ABMIN(NDimX,NDimX)
-double precision,intent(out) :: EigY(NDimX,NDimX),EigY1(NDimX,NDimX)
-double precision,intent(out) :: Eig(NDimX),Eig1(NDimX)
+!double precision,intent(out) :: EigY(NDimX,NDimX),EigY1(NDimX,NDimX)
+!double precision,intent(out) :: Eig(NDimX),Eig1(NDimX)
 double precision,intent(in)  :: URe(NBasis,NBasis),Occ(NBasis),XOne(NInte1)
 integer,intent(in) :: IndN(2,NDim),IndX(NDim),IGemIN(NBasis),IFlag0
+double precision,intent(out),optional :: ETot,ECorr
 
 integer :: i,j,k,l,ij,kl,kk,ll,klround
 integer :: ip,iq,ir,is,it,iu,iw,ipq,irs,ICol,IRow
@@ -3213,6 +3216,8 @@ double precision :: C(NBasis)
 double precision :: HNO(NBasis,NBasis),AuxI(NBasis,NBasis),AuxIO(NBasis,NBasis),WMAT(NBasis,NBasis)
 double precision :: AuxCoeff(3,3,3,3),AuxVal,val
 double precision :: EnDummy,Aux,Crs,Cpq,EIntra,EAll
+double precision,allocatable :: EigY(:,:),EigY1(:,:)
+double precision,allocatable :: Eig(:),Eig1(:)
 double precision,allocatable :: RDM2val(:,:,:,:),RDM2Act(:)
 double precision,allocatable :: work1(:),work2(:)
 double precision,allocatable :: ints(:,:)
@@ -3229,6 +3234,7 @@ double precision,parameter :: Thresh = 1.D-12
 
 ABPLUS = 0
 ABMIN  = 0
+ETot = 0
 
 ! set dimensions
 NOccup = NAct + INActive
@@ -3250,6 +3256,8 @@ enddo
 
 allocate(work1(NBasis**2),work2(NBasis**2),ints(NBasis,NBasis))
 allocate(RDM2val(NOccup,NOccup,NOccup,NOccup))
+allocate(EigY(NDimX,NDimX),Eig(NDimX))
+allocate(EigY1(NDimX,NDimX),Eig1(NDimX))
 
 NRDM2Act = NAct**2*(NAct**2+1)/2
 allocate(RDM2Act(NRDM2Act))
@@ -3280,6 +3288,12 @@ call triang_to_sq(XOne,work1,NBasis)
 call dgemm('N','N',NBasis,NBasis,NBasis,1d0,URe,NBasis,work1,NBasis,0d0,work2,NBasis)
 call dgemm('N','T',NBasis,NBasis,NBasis,1d0,work2,NBasis,URe,NBasis,0d0,HNO,NBasis)
 call sq_symmetrize(HNO,NBasis)
+
+val = 0
+do i=1,NOccup
+   val = val + Occ(i)*HNO(i,i)
+enddo
+ETot = ETot + 2*val
 
 do j=1,NBasis
    do i=1,NBasis
@@ -3710,6 +3724,9 @@ do ll=1,NOccup
 
       if(k>NOccup.or.l>NOccup) cycle
 
+      ! COMPUTE THE ENERGY FOR CHECKING
+      if((k<=NOccup).and.(l<=NOccup)) ETot = ETot + sum(RDM2val(:,:,k,l)*ints(1:NOccup,1:NOccup))
+
       ! CONSTRUCT ONE-ELECTRON PART OF THE AC ALPHA-HAMILTONIAN
 
       ! Coulomb
@@ -4100,7 +4117,7 @@ call AB_CAS_FOFO(ABPLUS,ABMIN,EnDummy,URe,Occ,XOne,&
               IndN,IndX,IGem,NAct,INActive,NDimX,NBasis,NDimX,&
               NInte1,IntJFile,IntKFile,1d0,.true.)
 
- print*, 'AB1-MY',norm2(ABPLUS),norm2(ABMIN)
+! print*, 'AB1-MY',norm2(ABPLUS),norm2(ABMIN)
 ! here!!!! can this be made cheaper?
 allocate(work1(NDimX**2))
 ! work1=ABPLUS.EigX
@@ -4113,32 +4130,47 @@ call dgemm('T','N',NDimX,NDimX,NDimX,1d0,work1,NDimX,EigY1,NDimX,0d0,ABPLUS,NDim
 call dgemm('N','N',NDimX,NDimX,NDimX,1d0,ABMIN,NDimX,EigY,NDimX,0d0,work1,NDimX) 
 call dgemm('T','N',NDimX,NDimX,NDimX,1d0,work1,NDimX,EigY,NDimX,0d0,ABMIN,NDimX)
 
+if(.not.present(ECorr)) then
 ! this part for E2disp
 ! ------------------------------------------------------------------------------
-!do i=1,NDimX
-!   Eig1(i)=ABPLUS(i,i)+ABMIN(i,i)
-!enddo
-!
-!EigY1 = 0
-!do j=1,NDimX
-!   if(Eig(j)/=0d0) then
-!      do i=1,NDimX
-!         if(Eig(i)/=0d0) then
-!            val = (ABPLUS(i,j)-ABMIN(i,j))/(Eig(i)+Eig(j))
-!            if(Abs(Eig(i)-Eig(j))>Thresh) then
-!               val = val + (ABPLUS(i,j)+ABMIN(i,j))/(Eig(j)-Eig(i))
-!            endif
-!            do ii=1,NDimX
-!               EigY1(ii,j) = EigY1(ii,j) + val*EigY(ii,i)
-!            enddo
-!         endif
-!      enddo
-!   endif
-!enddo
+do i=1,NDimX
+   Eig1(i)=ABPLUS(i,i)+ABMIN(i,i)
+enddo
+
+EigY1 = 0
+do j=1,NDimX
+   if(Eig(j)/=0d0) then
+      do i=1,NDimX
+         if(Eig(i)/=0d0) then
+            val = (ABPLUS(i,j)-ABMIN(i,j))/(Eig(i)+Eig(j))
+            if(Abs(Eig(i)-Eig(j))>Thresh) then
+               val = val + (ABPLUS(i,j)+ABMIN(i,j))/(Eig(j)-Eig(i))
+            endif
+            do ii=1,NDimX
+               EigY1(ii,j) = EigY1(ii,j) + val*EigY(ii,i)
+            enddo
+         endif
+      enddo
+   endif
+enddo
+
+ ! dump response to a file!
+ open(newunit=iunit,file=propfile0,form='unformatted')
+ write(iunit) EigY
+ write(iunit) Eig
+ close(iunit)
+ if(IFlag0==0) then
+ open(newunit=iunit,file=propfile1,form='unformatted')
+ write(iunit) EigY1
+ write(iunit) Eig1
+ close(iunit)
+ endif
+
 ! ------------------------------------------------------------------------------
 
-!! for AC0Corr
-!! ------------------------------------------------------------------------------
+elseif(present(ECorr)) then
+! for AC0Corr
+! ------------------------------------------------------------------------------
 
 do i=1,NBasis
    C(i) = sign(sqrt(Occ(i)),Occ(i)-0.5d0)
@@ -4158,15 +4190,18 @@ do j=1,NDimX
       enddo
    endif
 enddo
-!
- print*, 'FIRST',norm2(EigY1)
-! print*, 'FIRST',EigY1(1,1),EigY1(NDimX,NDimX)
-!! second loop ...
-!!call dgemm('N','T',NDimX,NDimX,NDimX,1d0,EigY1,NDimX,EigY,NDimX,0d0,ABPLUS,NDimX)
-!!print*, 'ABPLUS-MY-2',norm2(ABPLUS)
-!
+
+print*, 'FIRST',norm2(EigY1)
+! second loop ...
+!call dgemm('N','T',NDimX,NDimX,NDimX,1d0,EigY1,NDimX,EigY,NDimX,0d0,ABPLUS,NDimX)
+!print*, 'ABPLUS-MY-2',norm2(ABPLUS)
 call dgemm('N','T',NDimX,NDimX,NDimX,1d0,EigY,NDimX,EigY1,NDimX,0d0,ABPLUS,NDimX)
 print*, 'ABPLUS-MY',norm2(ABPLUS)
+
+pos = 0
+do i=1,NDimX
+   pos(IndN(1,i),IndN(2,i)) = IndX(i)
+enddo
 !
 ! energy loop
 EAll = 0
@@ -4198,15 +4233,11 @@ do k=1,NOccup
                 iq = i
                 Crs = C(ir)+C(is)
                 Cpq = C(ip)+C(iq)
-!
+
                 Aux = Crs*Cpq*ABPLUS(ipq,irs)
-                !Aux = Crs*Cpq
                 EAll = EAll + Aux*ints(j,i)
 
                 if(AuxCoeff(IGem(ip),IGem(iq),IGem(ir),IGem(is))==1) EIntra = EIntra + Aux*ints(j,i)
-                !if(AuxCoeff(IGem(ip),IGem(iq),IGem(ir),IGem(is))==1) then 
-                !write(6,'(4i5,3x,4i2,es20.9)') ip,ir,iq,is,IGem(ip),IGem(ir),IGem(iq),IGem(is),Aux
-                !endif
 
               endif
            enddo
@@ -4218,11 +4249,17 @@ enddo
 
 close(iunit)
 
-print*, 'test',EAll,EIntra
-print*, '',EAll-EIntra
+ECorr = EAll-EIntra
+
+print*, 'EAll,EIntra',EAll,EIntra
+print*, 'ECorr',ECorr
+
+endif
 
 deallocate(RDM2val)
 deallocate(ints,work2,work1)
+deallocate(Eig1,EigY1)
+deallocate(Eig,EigY)
 
 end subroutine Y01CAS_FOFO
 
