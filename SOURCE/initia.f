@@ -1002,6 +1002,7 @@ C     PREPARE POINTERS: NOccup=num0+num1
       Call prepare_nums(Occ,Num0,Num1,NBasis)
 C     TRANSFORM J AND K
       UAux=transpose(UAOMO)
+      If (IFunSR.Eq.0.Or.IFunSR.Eq.3) Then
       Call tran4_gen(NBasis,
      $        Num0+Num1,UAux(1:NBasis,1:(Num0+Num1)),
      $        Num0+Num1,UAux(1:NBasis,1:(Num0+Num1)),
@@ -1015,8 +1016,7 @@ C     TRANSFORM J AND K
      $        Num0+Num1,UAux(1:NBasis,1:(Num0+Num1)),
      $        'FOFO','AOTWOSORT')
 C
-      If (IFunSR.Ne.0.and.IFunSR.Ne.3) Then
-      Print*, 'IFUN',IfunSR
+      Else
       Call tran4_gen(NBasis,
      $        Num0+Num1,UAux(1:NBasis,1:(Num0+Num1)),
      $        Num0+Num1,UAux(1:NBasis,1:(Num0+Num1)),
@@ -2503,7 +2503,15 @@ C
       Dimension Ind(NBasis)
       Double Precision, Allocatable :: RDM2val(:,:,:,:),
      $                                 work(:),ints(:,:)
-C   
+      Character(:),Allocatable :: IntJFile
+C  
+C     SET FILES
+      If (IFunSR.Eq.0.Or.IFunSR.Eq.3) Then
+      IntJFile='FFOO'
+      Else
+      IntJFile='FFOOERF'
+      EndIf
+C
 C     SET DIMENSIONS
       NOccup=NAct+INActive
       Ind=0
@@ -2524,7 +2532,7 @@ C
       EndDo
       EndDo
 C
-      Open(newunit=iunit,file='FFOO',status='OLD',
+      Open(newunit=iunit,file=IntJFile,status='OLD',
      $     access='DIRECT',recl=8*NBasis**2)
 C
       ETwo=0

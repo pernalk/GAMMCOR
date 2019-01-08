@@ -123,6 +123,8 @@ C
       Subroutine RunACCAS(ETot,ENuc,TwoNO,URe,UNOAO,Occ,XOne,
      $  IndAux,IPair,IndN,IndX,NDimX,Title,NBasis,NInte1,NInte2,NGem)
 C
+      use abmat
+C
       Implicit Real*8 (A-H,O-Z)
 C
       Character*60 FMultTab,Title
@@ -182,8 +184,16 @@ C
       Write(6,'(/,X," The number of CASSCF Active Orbitals = ",I4)')
      $ NAcCAS
 C
+      If(ITwoEl.Eq.3) Then
+      Call AB_CAS_FOFO(ABPLUS,ABMIN,ECASSCF,URe,Occ,XOne,
+     $ IndN,IndX,IGem,NAcCAS,NInAcCAS,NDimX,NBasis,NDimX,
+     $ NInte1,'FFOO','FOFO',ACAlpha,.false.)
+C
+      ElseIf(ITwoEl.Eq.1) Then
       Call AB_CAS(ABPLUS,ABMIN,ECASSCF,URe,Occ,XOne,TwoNO,IPair,
      $ IndN,IndX,NDimX,NBasis,NDimX,NInte1,NInte2,ACAlpha)
+C
+      EndIf
 C
       Write(6,'(/,X,''****************************************'',
      $            ''***************************************'')')
@@ -208,8 +218,16 @@ C     the purpose of sorting is only to print a few highest (sorted) eigenvector
 C
       Write(6,'(/," *** Computing ERPA energy *** ",/)')
 
+      If(ITwoEl.Eq.3) Then
+      Call ACEneERPA_FOFO(ECorr,EigVecR,Eig,Occ,
+     $ IGem,IndN,IndX,NAcCAS+NInAcCAS,
+     $ NDimX,NBasis,'FOFO')
+C
+      ElseIf(ITwoEl.Eq.1) Then
       Call ACEneERPA(ECorr,EigVecR,Eig,TwoNO,URe,Occ,XOne,
      $ IndN,NBasis,NInte1,NInte2,NDimX,NGem)
+C
+      EndIf
       ECorr=Ecorr*Half
       Write
      $ (6,'(/,1X,''ECASSCF+ENuc, Corr, ERPA-CASSCF'',6X,3F15.8)')
@@ -257,7 +275,8 @@ C
       Dimension
      $ ABPLUS(NDimX*NDimX),ABMIN(NDimX*NDimX),
      $ EigVecR(NDimX*NDimX),Eig(NDimX),
-     $ ECorrG(NGem),EGOne(NGem)
+     $ ECorrG(NGem),EGOne(NGem),
+     $ UAux(NBasis,NBasis)
 C
 C     IFlAC   = 1 - adiabatic connection formula calculation
 C               0 - AC not used
@@ -281,11 +300,11 @@ C
       Write(6,'(/,X,''****************************************'',
      $            ''***************************************'')')
 C
-      Write(6,'(/,X," The number of CASSCF Active Orbitals = ",I4)')
+      Write(6,'(/,1X,"The number of CASSCF Active Orbitals = ",I4)')
      $ NAcCAS
 C
       Call molprogrid0(NGrid,NBasis)
-      Write(6,'(/,X," The number of Grid Points = ",I8)')
+      Write(6,'(/,1X,"The number of Grid Points = ",I8)')
      $ NGrid
 C
       Allocate  (TwoEl2(NInte2))
@@ -367,17 +386,35 @@ C      Call Int2_AO(TwoEl2,NumOSym,MultpC,FName,NInte1,NInte2,NBasis)
       Call readtwoint(NBasis,2,'AOTWOINT.mol','AOTWOSORT')
       Call LoadSaptTwoEl(3,TwoEl2,NBasis,NInte2)
 C
-      Write(6,'(" Transforming two-electron erf integrals ...",/)')
+      Write(6,'(" Transforming two-electron erf integrals ...")')
       Call TwoNO1(TwoEl2,UNOAO,NBasis,NInte2)
-C 
+C
+      If(ITwoEl.Eq.3) Then
+C     PREPARE POINTERS: NOccup=num0+num1
+      Call prepare_nums(Occ,Num0,Num1,NBasis)
+C     TRANSFORM J AND K
+      UAux=transpose(UNOAO)
+      Call tran4_gen(NBasis,
+     $        Num0+Num1,UAux(1:NBasis,1:(Num0+Num1)),
+     $        Num0+Num1,UAux(1:NBasis,1:(Num0+Num1)),
+     $        NBasis,UAux,
+     $        NBasis,UAux,
+     $        'FFOO','AOTWOSORT')
+      Call tran4_gen(NBasis,
+     $        NBasis,UAux,
+     $        Num0+Num1,UAux(1:NBasis,1:(Num0+Num1)),
+     $        NBasis,UAux,
+     $        Num0+Num1,UAux(1:NBasis,1:(Num0+Num1)),
+     $        'FOFO','AOTWOSORT')
+C
+      EndIf
+C     
 C     compute sr potential (vsr=xc+hartree)
 C     as a byproduct a sr energy (ensr=sr-xc+sr-hartree) is obtained
 C
       IFunSave=IFunSR
       If(IFunSR.Eq.4) IFunSR=2
 C
-C     HERE FINISHED? WHERE TO GET OneRdm FROM?
-C     
       Den=0
       Work2=0
       Do I=1,NBasis
@@ -393,7 +430,7 @@ C
       EndDo
       EndDo
 C
-      Write(*,'(" RANGE PARAMETER ",F8.3)')Alpha
+      Write(6,'(/,1X,"RANGE PARAMETER ",F8.3)')Alpha
 C
       Call PotCoul_mithap(VCoul,Work2,.true.,'AOERFSORT',NBasis)
 C      Print*, 'VCOul',norm2(VCoul)
@@ -452,6 +489,24 @@ C     ***** LR-AC0 CALCULATION **********************
 C
       Write(6,'(  X,"*** LR-AC0-CAS CALCULATION *** ")')
 C
+C      Call Y01CASLR_FOFO(Occ,URe,XOne,ABPLUS,ABMIN,
+C     $ MultpC,NSymNO,
+C     $ SRKer,WGrid,OrbGrid,
+C     $ 'PROP0','PROP1',
+C     $ IndN,IndX,IGem,NAcCAS,NInAcCAS,
+C     $ NGrid,NDimX,NBasis,NDimX,NInte1,
+C     $ 'EMPTY','FFOOERF','FOFOERF',0,ECASSCF,ECorr)
+CC
+C      Call Y01CAS_FOFO(Occ,URe,XOne,ABPLUS,ABMIN,
+C     $ 'PROP0','PROP1',
+C     $ IndN,IndX,IGem,NAcCAS,NInAcCAS,NDimX,
+C     $ NBasis,NDimX,NInte1,'EMPTY','FFOOERF','FOFOERF',0,
+C     $ ETot,ECorr)
+CCCC
+C      Call AC0CAS(ECorr,ETot,TwoNO,Occ,URe,XOne,
+C     $ ABPLUS,ABMIN,EigVecR,Eig,
+C     $ IndN,IndX,NDimX,NBasis,NDim,NInte1,NInte2)
+C
       Call AC0CASLR(ECorr,ECASSCF,TwoNO,Occ,URe,XOne,
      $ ABPLUS,ABMIN,EigVecR,Eig,
      $ IndN,IndX,NDimX,NBasis,NDim,NInte1,NInte2,
@@ -485,6 +540,7 @@ C     GENERATE A SR KERNEL AND DUMP IT
 C
       If(ITwoEl.Eq.3) Then
       Call ModABMin_FOFO(Occ,SRKer,WGrid,OrbGrid,ABMIN,
+     $                   MultpC,NSymNO,
      $                   IndN,IndX,NDimX,NGrid,NBasis,
      $                   NAcCAS+NInAcCAS,'FOFO','FOFOERF',
      $                   'srdump')
@@ -570,8 +626,17 @@ C     compute AB matrices with the lr integrals and a modified potential
 C     TwoNO are lr-integrals!  xone already includes vsr (if properly saved in molpro)
 C
       ACAlpha=One
+C
+      If(ITwoEl.Eq.3) Then
+      Call AB_CAS_FOFO(ABPLUS,ABMIN,ECASSCF,URe,Occ,XOne,
+     $ IndN,IndX,IGem,NAcCAS,NInAcCAS,NDimX,NBasis,NDimX,
+     $ NInte1,'FFOOERF','FOFOERF',ACAlpha,.false.)
+C
+      ElseIf(ITwoEl.Eq.1) Then
       Call AB_CAS(ABPLUS,ABMIN,ECASSCF,URe,Occ,XOne,TwoNO,IPair,
      $ IndN,IndX,NDimX,NBasis,NDimX,NInte1,NInte2,ACAlpha)
+C
+      EndIf
 C
       Write(6,'(/,1X,  ''lrCASSCF+ENuc Energy       '',4X,F15.8)')
      $ ECASSCF-XVSR+ENuc
@@ -629,8 +694,20 @@ CC
 C      EndDo
 C      EndDo
 C
+C
+      If(ITwoEl.Eq.3) Then
+      Call ModABMin_FOFO(Occ,SRKer,WGrid,OrbGrid,ABMIN,
+     $                   MultpC,NSymNO,
+     $                   IndN,IndX,NDimX,NGrid,NBasis,
+     $                   NAcCAS+NInAcCAS,'FOFO','FOFOERF')
+C      Print*,'ABMIN-MY',norm2(ABMIN)
+C     
+      ElseIf(ITwoEl.Eq.1) Then
       Call ModABMinSym(Occ,SRKer,WGrid,OrbGrid,TwoEl2,TwoNO,ABMIN,
      $          MultpC,NSymNO,IndN,IndX,NDimX,NGrid,NInte2,NBasis)
+C      Print*,'ABMIN-KA',norm2(ABMIN)
+C
+      EndIf
 C
       Write(6,'(1X," *** sr-kernel added ***")')
       Call clock('sr-kernel',Tcpu,Twall)
@@ -683,8 +760,18 @@ C
       EndDo
 C
       Write(6,'(/," *** Computing LR-ERPA energy *** ",/)')
+
+      If(ITwoEl.Eq.3) Then
+      Call ACEneERPA_FOFO(ECorr,EigVecR,Eig,Occ,
+     $ IGem,IndN,IndX,NAcCAS+NInAcCAS,
+     $ NDimX,NBasis,'FOFOERF')
+C
+      ElseIf(ITwoEl.Eq.1) Then
       Call ACEneERPA(ECorr,EigVecR,Eig,TwoNO,URe,Occ,XOne,
      $ IndN,NBasis,NInte1,NInte2,NDimX,NGem)
+C
+      EndIf
+C
       ECorr=Ecorr*Half
       Write
      $ (6,'(1X,''lrCASSCF+srDF+ENuc, lrAC1-Corr, Total'',6X,3F15.8)')
@@ -1016,6 +1103,7 @@ C
       Call AB0ELEMENT(ABP,ABM,IP,IQ,IR,IS,Occ,HNO,IGFact,
      $ TwoNO,AuxI,AuxIO,WMAT,RDM2Act,C,Ind1,Ind2,NAct,NRDM2Act,
      $ NInte1,NInte2,NBasis)
+C    
 C
 C     ADD A SR KERNEL
 C
@@ -1041,6 +1129,7 @@ C
       ABPLUS((IRow-1)*NDimB+ICol)=ABP
       ABMIN((ICol-1)*NDimB+IRow)=ABM
       ABMIN((IRow-1)*NDimB+ICol)=ABM
+
 C
       EndIf
 C
@@ -1054,6 +1143,7 @@ C
 C
       If(NDimB.Ne.0) Then
       If(NoSt.Eq.1) Then
+C      Print*,'ABM0-Ka', norm2(ABMIN(1:NDimB**2))
       Call ERPASYMM0(EigY(NFree2),EigX(NFree2),Eig(NFree1),ABPLUS,ABMIN,
      $ NDimB)
       Else
@@ -1259,6 +1349,7 @@ C
 C
       Write(6,'(/," *** DONE WITH 0TH-ORDER IN AC0-CASSCF ***")')
 C
+      Print*, 'Eig,Y,X',norm2(Eig),norm2(EigY),norm2(EigX)
 C     DONE 0TH-ORDER CALCULATIONS
 C
       Write(6,'(/,
@@ -1269,6 +1360,7 @@ C
      $ RDM2Act,NRDM2Act,IGFact,C,Ind1,Ind2,
      $ IndBlock,NoEig,NDimX,NBasis,NInte1,NInte2)
 C
+      Print*, 'AB1-KA',norm2(ABPLUS),norm2(ABMIN)
 C     ADD A SR KERNEL
 C
       If(IFunSRKer.Eq.1) Then
@@ -1392,6 +1484,8 @@ C
 C
       Deallocate(RDM2Act)
 C
+      Print*, 'ABM-KA',norm2(ABMIN)
+C      
       Write(6,'(/," *** DONE WITH COMPUTING AB(1) MATRICES ***")')
 C
 C     1ST-ORDER PART

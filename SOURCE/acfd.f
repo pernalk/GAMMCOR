@@ -1984,9 +1984,11 @@ C
 C
       If(NDimB.Ne.0) Then
       If(NoSt.Eq.1) Then
+      Print*, 'ABP-KA',norm2(ABPLUS),norm2(ABMIN)
       Call ERPASYMM0(EigY(NFree2),EigX(NFree2),Eig(NFree1),ABPLUS,ABMIN,
      $ NDimB)      
       Else
+      Print*, '?ABP-KA',norm2(ABPLUS),norm2(ABMIN)
       Call ERPAVECYX(EigY(NFree2),EigX(NFree2),Eig(NFree1),ABPLUS,ABMIN,
      $ NDimB)
       EndIf
@@ -2188,6 +2190,8 @@ C
       EndDo
 C
       Write(6,'(/," *** DONE WITH 0TH-ORDER IN AC0-CASSCF ***")')
+      Print*, 'NoEig,NDimX',NoEig,NDimX
+      Print*, 'Eig,Y,X',norm2(Eig(1:NoEig)),norm2(EigY),norm2(EigX)
 C
 C     DONE 0TH-ORDER CALCULATIONS
 C

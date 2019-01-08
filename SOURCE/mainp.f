@@ -177,11 +177,13 @@ C     *************************************************************************
 C         
 C     SELECT ELECTRONIC STATE  
 C      NoSt = Flags%NoSt
-      NoSt = System%InSt(1,1) 
+C      HERE ERROR!!!!
+C      NoSt = System%InSt(1,1) 
+      NoSt =1
       NStates = System%NStates
       InSt(1:2,1:NStates) = System%InSt
 C
-C      Print*, 'NoSt:',NoSt
+      Print*, 'NoSt:',NoSt
 C      Print*, 'InSt', InSt(1,1),InSt(2,1)
 C
 C     READ THE INPUT AND PRINT THE INPUT DATA 

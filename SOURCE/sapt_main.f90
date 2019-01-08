@@ -1091,6 +1091,8 @@ logical :: doRSH
  NInte1 = NBas*(NBas+1)/2
  NInte2 = NInte1*(NInte1+1)/2
 
+ call create_symmats(Mon,MO,NBas)
+
  allocate(work1(NSq),work2(NSq),XOne(NInte1),URe(NBas,NBas),VSR(NInte1))
  if(Mon%TwoMoInt==1) then
     allocate(TwoMO(NInte2))
@@ -1258,6 +1260,7 @@ logical :: doRSH
                          twofile,twoerffile)
  case(TWOMO_FOFO)
     call ModABMin_FOFO(Mon%Occ,SRKer,WGrid,OrbGrid,ABMin,&
+                       Mon%MultpC,Mon%NSymNO,&
                        Mon%IndN,Mon%IndX,Mon%NDimX,NGrid,NBas,&
                        Mon%num0+Mon%num1, & 
                        twokfile,twokerf)
