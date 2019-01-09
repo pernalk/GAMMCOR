@@ -824,6 +824,9 @@ C
       EndDo
       EndDo
 C
+C      ISkip=1
+C      If(ISkip.Ne.1) Then
+C      Print*, 'CANONI!!!!'
 C     FIND CANONICAL INACTIVE AND VIRTUAL ORBITALS 
 C      
       If(IAO.Eq.0) Then
@@ -912,6 +915,8 @@ C
       EndIf
 C
 C     END OF CANONICALIZING
+C     ISkip
+C      EndIf
 C
 C     TRANSFORM INTEGRALS TO NO
 C
@@ -1029,7 +1034,7 @@ C
      $        NBasis,UAux,
      $        Num0+Num1,UAux(1:NBasis,1:(Num0+Num1)),
      $        'FOFOERF','AOERFSORT')
-C
+
       EndIF
 C
       EndIf
@@ -1121,7 +1126,7 @@ C      ETot=ETot+Hlp
       EndDo
 C     ITwoEl
       If(ITwoEl.eq.3) Then
-      Call TwoEneChck(ETwo,RDM2Act,Occ,INActive,NAct,NBasis)
+C      Call TwoEneChck(ETwo,RDM2Act,Occ,INActive,NAct,NBasis)
       EndIf
       Write(6,'(/,1X,''Two-electron Energy'',5X,F15.8)')ETwo
       Write(6,'(/,1X,''MCSCF Molpro Energy'',5X,F15.8)')EOne+ETwo+ENuc

@@ -2516,7 +2516,7 @@ C
 C
       If( .NOT.(IGem(IR).Eq.IGem(IS).And.IGem(IR).Eq.IGem(IPP)
      $ .And.IGem(IR).Eq.IGem(IQQ)) ) Then
-C
+CC
       If( (Occ(IR)*Occ(IS).Eq.Zero.And.Occ(IPP)*Occ(IQQ).Eq.Zero
      $ .And.Abs(TwoNO(NAddr3(IR,IS,IPP,IQQ))).Lt.1.D-25)
      $.Or.

@@ -2984,11 +2984,12 @@ if(nAA>0) then
    Eig(i:j) = Eigt(1:nAA)
 
    deallocate(Eigt,EigXt,EigYt,ABM,ABP)
-
+endif
+   
    do iq=1,INActive
       i = limAI(1,iq)
       j = limAI(2,iq)
-
+      if(nAI(iq)>0) then
 !!$   write(*,*) 'ABai-my',iq,norm2(ABPLUS(i:j,i:j)),norm2(ABMIN(i:j,i:j))
 !!$   write(*,*) 'AB+',iq,norm2(ABPLUS(i:j,i:j)-transpose(ABPLUS(i:j,i:j)))
 !!$   write(*,*) 'AB-',iq,norm2(ABMIN(i:j,i:j)-transpose(ABMIN(i:j,i:j)))
@@ -3008,7 +3009,7 @@ if(nAA>0) then
       Eig(i:j) = Eigt(1:nAI(iq))
       
       deallocate(Eigt,EigXt,EigYt,ABM,ABP)
-      
+      endif 
    enddo
 
    do ip=NOccup+1,NBasis
@@ -3017,7 +3018,7 @@ if(nAA>0) then
 !!$   write(*,*) 'ABav-my',ip,norm2(ABPLUS(i:j,i:j)),norm2(ABMIN(i:j,i:j))
 !!$   write(*,*) 'AB+',ip,norm2(ABPLUS(i:j,i:j)-transpose(ABPLUS(i:j,i:j)))
 !!$   write(*,*) 'AB-',ip,norm2(ABMIN(i:j,i:j)-transpose(ABMIN(i:j,i:j)))
-
+      if(nAV(ip)>0) then
       allocate(ABP(nAV(ip),nAV(ip)),ABM(nAV(ip),nAV(ip)),&
            EigYt(nAV(ip),nAV(ip)),EigXt(nAV(ip),nAV(ip)),Eigt(nAV(ip)))
 
@@ -3033,9 +3034,9 @@ if(nAA>0) then
       Eig(i:j) = Eigt(1:nAV(ip))
    
       deallocate(Eigt,EigXt,EigYt,ABM,ABP)
-      
+      endif
    enddo
-endif
+!endif
 
 do i=limIV(1),limIV(2)
    ii = tmpIV(i-limIV(1)+1)
@@ -3234,12 +3235,13 @@ integer :: nAV(INActive+NAct+1:NBasis),tmpAV(NAct,INActive+NAct+1:NBasis),limAV(
 integer :: nIV,tmpIV(INActive*(NBasis-NAct-INActive)),limIV(2)
 double precision,parameter :: Thresh = 1.D-12
 
-ABPLUS = 0
 ABMIN  = 0
-ETot = 0
+if(present(ETot)) ETot = 0
 
 ! set dimensions
 NOccup = NAct + INActive
+print*,'NOccup,NAct,INActive',NOccup,NAct,INActive
+
 Ind = 0
 do i=1,NAct
    Ind(INActive+i) = i
@@ -3256,6 +3258,7 @@ do i=NOccup+1,NBasis
    IGem(i) = 3
 enddo
 
+
 allocate(work1(NBasis**2),work2(NBasis**2),ints(NBasis,NBasis))
 allocate(RDM2val(NOccup,NOccup,NOccup,NOccup))
 allocate(EigY(NDimX,NDimX),Eig(NDimX))
@@ -3264,6 +3267,7 @@ allocate(EigY1(NDimX,NDimX),Eig1(NDimX))
 NRDM2Act = NAct**2*(NAct**2+1)/2
 allocate(RDM2Act(NRDM2Act))
 
+ABPLUS = 0
 RDM2Act = 0
 open(newunit=iunit,file='rdm2.dat',status='old')
 write(LOUT,'(/,1x,''Active block of 2-RDM read from rdm2.dat'')')
@@ -3295,7 +3299,7 @@ val = 0
 do i=1,NOccup
    val = val + Occ(i)*HNO(i,i)
 enddo
-ETot = ETot + 2*val
+if(present(ETot)) ETot = ETot + 2*val
 
 do j=1,NBasis
    do i=1,NBasis
@@ -3725,8 +3729,10 @@ do ll=1,NOccup
 
       if(k>NOccup.or.l>NOccup) cycle
 
+      if(present(ETot)) then  
       ! COMPUTE THE ENERGY FOR CHECKING
       if((k<=NOccup).and.(l<=NOccup)) ETot = ETot + sum(RDM2val(:,:,k,l)*ints(1:NOccup,1:NOccup))
+      endif
 
       ! CONSTRUCT ONE-ELECTRON PART OF THE AC ALPHA-HAMILTONIAN
 
@@ -4033,6 +4039,8 @@ EigY = 0
 i = limAA(1)
 j = limAA(2)
 
+print*, 'nAA',nAA,limAA(1),limAA(2)
+
 if(nAA>0) then
    allocate(ABP(nAA,nAA),ABM(nAA,nAA),EigYt(nAA,nAA),EigXt(nAA,nAA),Eigt(nAA))
 
@@ -4049,51 +4057,53 @@ if(nAA>0) then
    Eig(i:j) = Eigt(1:nAA)
 
    deallocate(Eigt,EigXt,EigYt,ABM,ABP)
+endif
 
    do iq=1,INActive
       i = limAI(1,iq)
       j = limAI(2,iq)
 
-      allocate(ABP(nAI(iq),nAI(iq)),ABM(nAI(iq),nAI(iq)),&
-           EigYt(nAI(iq),nAI(iq)),EigXt(nAI(iq),nAI(iq)),Eigt(nAI(iq)))
+      if(nAI(iq)>0) then
+         allocate(ABP(nAI(iq),nAI(iq)),ABM(nAI(iq),nAI(iq)),&
+              EigYt(nAI(iq),nAI(iq)),EigXt(nAI(iq),nAI(iq)),Eigt(nAI(iq)))
 
-      ABP = ABPLUS(i:j,i:j)
-      ABM = ABMIN(i:j,i:j)
-      call ERPASYMM0(EigYt,EigXt,Eigt,ABP,ABM,nAI(iq))
+         ABP = ABPLUS(i:j,i:j)
+         ABM = ABMIN(i:j,i:j)
+         call ERPASYMM0(EigYt,EigXt,Eigt,ABP,ABM,nAI(iq))
    
-      do ii=1,nAI(iq)
-         ipos = tmpAI(ii,iq)
-         EigY(ipos,i:j) = EigYt(ii,1:nAI(iq))
-         if(IFlag0==0) EigY1(ipos,i:j) = EigXt(ii,1:nAI(iq))
-      enddo
-      Eig(i:j) = Eigt(1:nAI(iq))
-      
-      deallocate(Eigt,EigXt,EigYt,ABM,ABP)
-      
+         do ii=1,nAI(iq)
+            ipos = tmpAI(ii,iq)
+            EigY(ipos,i:j) = EigYt(ii,1:nAI(iq))
+            if(IFlag0==0) EigY1(ipos,i:j) = EigXt(ii,1:nAI(iq))
+         enddo
+         Eig(i:j) = Eigt(1:nAI(iq))
+         
+         deallocate(Eigt,EigXt,EigYt,ABM,ABP)
+      endif 
    enddo
-
    do ip=NOccup+1,NBasis
       i = limAV(1,ip)
       j = limAV(2,ip)
 
-      allocate(ABP(nAV(ip),nAV(ip)),ABM(nAV(ip),nAV(ip)),&
-           EigYt(nAV(ip),nAV(ip)),EigXt(nAV(ip),nAV(ip)),Eigt(nAV(ip)))
+      if(nAV(ip)>0) then
+         allocate(ABP(nAV(ip),nAV(ip)),ABM(nAV(ip),nAV(ip)),&
+              EigYt(nAV(ip),nAV(ip)),EigXt(nAV(ip),nAV(ip)),Eigt(nAV(ip)))
 
-      ABP = ABPLUS(i:j,i:j)
-      ABM = ABMIN(i:j,i:j)
-      call ERPASYMM0(EigYt,EigXt,Eigt,ABP,ABM,nAV(ip))
+         ABP = ABPLUS(i:j,i:j)
+         ABM = ABMIN(i:j,i:j)
+         call ERPASYMM0(EigYt,EigXt,Eigt,ABP,ABM,nAV(ip))
 
-      do ii=1,nAV(ip)
-         ipos = tmpAV(ii,ip)
-         EigY(ipos,i:j) = EigYt(ii,1:nAV(ip))
-         if(IFlag0==0) EigY1(ipos,i:j) = EigXt(ii,1:nAV(ip))
-      enddo
-      Eig(i:j) = Eigt(1:nAV(ip))
+         do ii=1,nAV(ip)
+            ipos = tmpAV(ii,ip)
+            EigY(ipos,i:j) = EigYt(ii,1:nAV(ip))
+            if(IFlag0==0) EigY1(ipos,i:j) = EigXt(ii,1:nAV(ip))
+         enddo
+         Eig(i:j) = Eigt(1:nAV(ip))
    
-      deallocate(Eigt,EigXt,EigYt,ABM,ABP)
-      
+         deallocate(Eigt,EigXt,EigYt,ABM,ABP)
+      endif 
    enddo
-endif
+!endif
 
 do i=limIV(1),limIV(2)
    ii = tmpIV(i-limIV(1)+1)
@@ -4119,7 +4129,6 @@ if(IFlag0==1) return
 call AB_CAS_FOFO(ABPLUS,ABMIN,EnDummy,URe,Occ,XOne,&
               IndN,IndX,IGem,NAct,INActive,NDimX,NBasis,NDimX,&
               NInte1,IntJFile,IntKFile,1d0,.true.)
-
 
 print*, 'AB1-MY',norm2(ABPLUS),norm2(ABMIN)
 ! here!!!! can this be made cheaper?
@@ -5164,51 +5173,53 @@ if(nAA>0) then
    Eig(i:j) = Eigt(1:nAA)
 
    deallocate(Eigt,EigXt,EigYt,ABM,ABP)
+endif
 
    do iq=1,INActive
       i = limAI(1,iq)
       j = limAI(2,iq)
-
-      allocate(ABP(nAI(iq),nAI(iq)),ABM(nAI(iq),nAI(iq)),&
-           EigYt(nAI(iq),nAI(iq)),EigXt(nAI(iq),nAI(iq)),Eigt(nAI(iq)))
-
-      ABP = ABPLUS(i:j,i:j)
-      ABM = ABMIN(i:j,i:j)
-      call ERPASYMM0(EigYt,EigXt,Eigt,ABP,ABM,nAI(iq))
    
-      do ii=1,nAI(iq)
-         ipos = tmpAI(ii,iq)
-         EigY(ipos,i:j) = EigYt(ii,1:nAI(iq))
-         if(IFlag0==0) EigY1(ipos,i:j) = EigXt(ii,1:nAI(iq))
-      enddo
-      Eig(i:j) = Eigt(1:nAI(iq))
-      
-      deallocate(Eigt,EigXt,EigYt,ABM,ABP)
-      
+      if(nAI(iq)>0) then
+         allocate(ABP(nAI(iq),nAI(iq)),ABM(nAI(iq),nAI(iq)),&
+              EigYt(nAI(iq),nAI(iq)),EigXt(nAI(iq),nAI(iq)),Eigt(nAI(iq)))
+
+         ABP = ABPLUS(i:j,i:j)
+         ABM = ABMIN(i:j,i:j)
+         call ERPASYMM0(EigYt,EigXt,Eigt,ABP,ABM,nAI(iq))
+   
+         do ii=1,nAI(iq)
+            ipos = tmpAI(ii,iq)
+            EigY(ipos,i:j) = EigYt(ii,1:nAI(iq))
+            if(IFlag0==0) EigY1(ipos,i:j) = EigXt(ii,1:nAI(iq))
+         enddo
+         Eig(i:j) = Eigt(1:nAI(iq))
+         
+         deallocate(Eigt,EigXt,EigYt,ABM,ABP)
+      endif 
    enddo
 
    do ip=NOccup+1,NBasis
       i = limAV(1,ip)
       j = limAV(2,ip)
+      if(nAV(ip)>0) then
+         allocate(ABP(nAV(ip),nAV(ip)),ABM(nAV(ip),nAV(ip)),&
+              EigYt(nAV(ip),nAV(ip)),EigXt(nAV(ip),nAV(ip)),Eigt(nAV(ip)))
 
-      allocate(ABP(nAV(ip),nAV(ip)),ABM(nAV(ip),nAV(ip)),&
-           EigYt(nAV(ip),nAV(ip)),EigXt(nAV(ip),nAV(ip)),Eigt(nAV(ip)))
+         ABP = ABPLUS(i:j,i:j)
+         ABM = ABMIN(i:j,i:j)
+         call ERPASYMM0(EigYt,EigXt,Eigt,ABP,ABM,nAV(ip))
 
-      ABP = ABPLUS(i:j,i:j)
-      ABM = ABMIN(i:j,i:j)
-      call ERPASYMM0(EigYt,EigXt,Eigt,ABP,ABM,nAV(ip))
-
-      do ii=1,nAV(ip)
-         ipos = tmpAV(ii,ip)
-         EigY(ipos,i:j) = EigYt(ii,1:nAV(ip))
-         if(IFlag0==0) EigY1(ipos,i:j) = EigXt(ii,1:nAV(ip))
-      enddo
-      Eig(i:j) = Eigt(1:nAV(ip))
+         do ii=1,nAV(ip)
+            ipos = tmpAV(ii,ip)
+            EigY(ipos,i:j) = EigYt(ii,1:nAV(ip))
+            if(IFlag0==0) EigY1(ipos,i:j) = EigXt(ii,1:nAV(ip))
+         enddo
+         Eig(i:j) = Eigt(1:nAV(ip))
    
-      deallocate(Eigt,EigXt,EigYt,ABM,ABP)
+         deallocate(Eigt,EigXt,EigYt,ABM,ABP)
       
+      endif
    enddo
-endif
 
 do i=limIV(1),limIV(2)
    ii = tmpIV(i-limIV(1)+1)
