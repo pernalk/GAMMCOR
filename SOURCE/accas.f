@@ -489,28 +489,32 @@ C     ***** LR-AC0 CALCULATION **********************
 C
       Write(6,'(  X,"*** LR-AC0-CAS CALCULATION *** ")')
 C
-C      Call Y01CASLR_FOFO(Occ,URe,XOne,ABPLUS,ABMIN,
-C     $ MultpC,NSymNO,
-C     $ SRKer,WGrid,OrbGrid,
-C     $ 'PROP0','PROP1',
-C     $ IndN,IndX,IGem,NAcCAS,NInAcCAS,
-C     $ NGrid,NDimX,NBasis,NDimX,NInte1,
-C     $ 'EMPTY','FFOOERF','FOFOERF',0,ECASSCF,ECorr)
+      If(ITwoEl.Eq.3) Then
+      Call Y01CASLR_FOFO(Occ,URe,XOne,ABPLUS,ABMIN,
+     $ MultpC,NSymNO,
+     $ SRKer,WGrid,OrbGrid,
+     $ 'PROP0','PROP1',
+     $ IndN,IndX,IGem,NAcCAS,NInAcCAS,
+     $ NGrid,NDimX,NBasis,NDimX,NInte1,
+     $ 'EMPTY','FFOOERF','FOFOERF',0,ECASSCF,ECorr)
 CC
 C      Call Y01CAS_FOFO(Occ,URe,XOne,ABPLUS,ABMIN,
 C     $ 'PROP0','PROP1',
 C     $ IndN,IndX,IGem,NAcCAS,NInAcCAS,NDimX,
 C     $ NBasis,NDimX,NInte1,'EMPTY','FFOOERF','FOFOERF',0,
 C     $ ETot,ECorr)
-CCCC
+CC
 C      Call AC0CAS(ECorr,ETot,TwoNO,Occ,URe,XOne,
 C     $ ABPLUS,ABMIN,EigVecR,Eig,
 C     $ IndN,IndX,NDimX,NBasis,NDim,NInte1,NInte2)
-C
+CC
+      ElseIf(ITWoEl.Eq.1) Then
       Call AC0CASLR(ECorr,ECASSCF,TwoNO,Occ,URe,XOne,
      $ ABPLUS,ABMIN,EigVecR,Eig,
      $ IndN,IndX,NDimX,NBasis,NDim,NInte1,NInte2,
      $ TwoEl2,OrbGrid,Work,NSymNO,MultpC,NGrid)
+C
+      EndIf
 C
       Write(6,'(/,1X,  ''lrCASSCF+ENuc Energy       '',4X,F15.8)')
      $ ECASSCF-XVSR+ENuc
@@ -1104,7 +1108,6 @@ C
      $ TwoNO,AuxI,AuxIO,WMAT,RDM2Act,C,Ind1,Ind2,NAct,NRDM2Act,
      $ NInte1,NInte2,NBasis)
 C    
-C
 C     ADD A SR KERNEL
 C
       If(IFunSRKer.Eq.1) Then
@@ -1143,7 +1146,6 @@ C
 C
       If(NDimB.Ne.0) Then
       If(NoSt.Eq.1) Then
-C      Print*,'ABM0-Ka', norm2(ABMIN(1:NDimB**2))
       Call ERPASYMM0(EigY(NFree2),EigX(NFree2),Eig(NFree1),ABPLUS,ABMIN,
      $ NDimB)
       Else
@@ -1635,6 +1637,7 @@ C
       EndDo
       EndDo
 C
+      Print*, 'EAll,EIntra',EAll,EIntra
       ECorr=EAll-EIntra
 C
       Return

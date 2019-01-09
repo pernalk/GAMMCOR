@@ -1470,7 +1470,7 @@ istart = 0
 do i=1,Mon%NSym
    do j=istart+1,istart+Mon%NumOSym(i)
       do iorb=1,NBasis
-         if(abs(MO(j,iorb).gt.1.d-1)) Mon%NSymNO(iorb) = i
+         if(abs(MO(j,iorb)).gt.1.d-1) Mon%NSymNO(iorb) = i
       enddo
    enddo
    istart=istart+Mon%NumOSym(i)

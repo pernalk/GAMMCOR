@@ -5062,8 +5062,6 @@ enddo
 
 close(iunit2)
 
-print*, 'TEST-ETot',ETot
-
 do i=1,NBasis
    C(i) = sign(sqrt(Occ(i)),Occ(i)-0.5d0)
 enddo
@@ -5145,22 +5143,15 @@ j = limAA(2)
 
 if(nAA>0) then
 
-
    allocate(ABP(nAA,nAA),ABM(nAA,nAA),EigYt(nAA,nAA),EigXt(nAA,nAA),Eigt(nAA))
-
-  !call ModABMin_Act_FOFO(Occ,SRKer,Wt,OrbGrid,ABMIN,&
-  !        MultpC,NSymNO,pos,tmpAA,&
-  !        limAA,&
-  !        IndN,IndX,NDimX,NGrid,NBasis,&
-  !        NOccup,NAct,INActive,nAA,'FOFO','FOFOERF')
 
    ABP = ABPLUS(i:j,i:j)
    ABM = ABMIN(i:j,i:j)
 
-   !call ModABMin_Act_FOFO(Occ,SRKer,Wt,OrbGrid,ABM,&
-   !       MultpC,NSymNO,pos,tmpAA,limAA,&
-   !       IndN,IndX,NDimX,NGrid,NBasis,&
-   !       NOccup,NAct,INActive,nAA,'FOFO','FOFOERF')
+   call ModABMin_Act_FOFO(Occ,SRKer,Wt,OrbGrid,ABM,&
+          MultpC,NSymNO,tmpAA,&
+          IndN,IndX,NDimX,NGrid,NBasis,&
+          NOccup,NAct,INActive,nAA,'FOFO','FOFOERF')
 
    !print*, 'ABM0-MY',norm2(ABM)
    call ERPASYMM0(EigYt,EigXt,Eigt,ABP,ABM,nAA)
@@ -6045,8 +6036,7 @@ deallocate(ints,work)
 end subroutine ACEneERPA_FOFO
 
 subroutine ModABMin_Act_FOFO(Occ,SRKer,Wt,OrbGrid,ABMin,&
-                         MultpC,NSymNO,pos,posAA,&
-                         limAA,&
+                         MultpC,NSymNO,posAA,&
                          IndN,IndX,NDimX,NGrid,NBasis,&
                          NOccup,NAct,INActive,nAA,twokfile,twokerf)
 ! ADD CONTRIBUTIONS FROM THE srALDA KERNEL TO ABMIN
@@ -6056,42 +6046,37 @@ integer,parameter :: maxlen = 128
 integer,intent(in) :: NBasis,NDimX,NGrid,NOccup,NAct,INActive,nAA
 integer,intent(in) :: IndN(2,NDimX),IndX(NDimX),&
                       MultpC(15,15),NSymNO(NBasis),&
-                      posAA(NAct*(NAct-1)/2),&
-                      limAA(2)
-integer :: pos(NBasis,NBasis)
+                      posAA(NAct*(NAct-1)/2)
 character(*),intent(in) :: twokfile,twokerf
 double precision,intent(in) :: Occ(NBasis),SRKer(NGrid), &
                                Wt(NGrid),OrbGrid(NGrid,NBasis)
-!double precision,intent(inout) :: ABMin(NDimX,NDimX)
 double precision,intent(inout) :: ABMin(nAA,nAA)
 
 integer :: offset,batchlen,iunit1,iunit2
-integer :: iunit3,iunit4
 integer :: i,j,k,l,kl,ip,iq,ir,is,irs,ipq,igrd
 integer :: IRow,ICol
 integer :: i1i2s,i3i4s,iSym
+integer :: pos(NBasis,NBasis)
 double precision :: XKer1234,TwoSR,Cpq,Crs
-!integer :: pos(NBasis,NBasis)
 double precision :: CICoef(NBasis)
 double precision,allocatable :: work1(:),work2(:),WtKer(:)
 double precision,allocatable :: batch(:,:),ABKer(:,:)
 double precision,allocatable :: ints1(:,:),ints2(:,:)
 
-do i=1,NBasis
-   CICoef(i) = sign(sqrt(Occ(i)),Occ(i)-0.5d0)
+pos=0
+do i=1,nAA
+   j=posAA(i)
+   pos(IndN(1,j),IndN(2,j)) = i
 enddo
 
-pos = 0
-do i=1,NDimX
-   pos(IndN(1,i),IndN(2,i)) = IndX(i)
+do i=1,NBasis
+   CICoef(i) = sign(sqrt(Occ(i)),Occ(i)-0.5d0)
 enddo
 
 allocate(work1(NBasis**2),work2(NBasis**2),ints1(NBasis,NBasis),ints2(NBasis,NBasis),&
          WtKer(maxlen),batch(maxlen,NBasis),ABKer(nAA,nAA))
 
 ABKer = 0
-
-!print*, 'ModABMin_FOFO'
 do offset=0,NGrid,maxlen
    batchlen = min(NGrid-offset,maxlen)
    if(batchlen==0) exit
@@ -6130,86 +6115,51 @@ do offset=0,NGrid,maxlen
 
 enddo
 
-print*, 'ABKer-MY',norm2(ABKer)
-
 open(newunit=iunit1,file=trim(twokfile),status='OLD', &
      access='DIRECT',recl=8*NBasis*NOccup)
 open(newunit=iunit2,file=trim(twokerf),status='OLD', &
      access='DIRECT',recl=8*NBasis*NOccup)
 
-! test
-ABMIN = 0
+kl  = 0
+do k=1,NOccup
+   do l=1,NBasis
+      kl = kl + 1
+      if(k>INActive.and.(l>INActive.and.l<=NOccup).and.pos(l,k)/=0) then
+        irs = pos(l,k) 
+        ir = l
+        is = k
+        read(iunit1,rec=kl) work1(1:NBasis*NOccup)
+        read(iunit2,rec=kl) work2(1:NBasis*NOccup)
+        do j=1,NOccup
+           do i=1,NBasis
+              ints1(i,j) = work1((j-1)*NBasis+i)
+              ints2(i,j) = work2((j-1)*NBasis+i)
+           enddo
+        enddo
+        ints1(:,NOccup+1:NBasis) = 0
+        ints2(:,NOccup+1:NBasis) = 0
+  
+        do j=1,NBasis
+           do i=1,j 
+              if((j>INActive.and.j<=NOccup).and.i>INActive.and.pos(j,i)/=0) then
+                ipq = pos(j,i)
+                Crs = CICoef(l)+CICoef(k)
+                Cpq = CICoef(j)+CICoef(i)
+                if(irs.gt.ipq) cycle
 
-!irs = 0
-!ipq = 0
-!kl  = 0
-!do k=1,NOccup
-!   do l=1,NOccup
-!      kl = kl + 1
-!      if(k>INActive.and.l>INActive.and.pos(l,k)/=0) then
-!        irs = irs + 1
-!        ir = l
-!        is = k
-!        read(iunit1,rec=kl) work1(1:NBasis*NOccup)
-!        read(iunit2,rec=kl) work2(1:NBasis*NOccup)
-!        do j=1,NOccup
-!           do i=1,NBasis
-!              ints1(i,j) = work1((j-1)*NBasis+i)
-!              ints2(i,j) = work2((j-1)*NBasis+i)
-!           enddo
-!        enddo
-!        ints1(:,NOccup+1:NBasis) = 0
-!        ints2(:,NOccup+1:NBasis) = 0
-!  
-!        ipq=0
-!        do j=1,NOccup
-!           do i=1,j
-!              if(j>INActive.and.i>INActive.and.pos(j,i)/=0) then
-!                ipq = ipq + 1 
-!                Crs = CICoef(l)+CICoef(k)
-!                Cpq = CICoef(j)+CICoef(i)
-!                !if(irs.gt.ipq) cycle
-!
-!                TwoSR = ints1(j,i)-ints2(j,i)
-!
-!                ABMIN(ipq,irs) = ABMIN(ipq,irs) &
-!                !                + ABKer(ipq,irs)
-!                               + 4d0*Cpq*Crs*ABKer(ipq,irs) 
-!                !               + 4.0d0*Cpq*Crs*(TwoSR+ABKer(ipq,irs))
-!                !ABMIN(irs,ipq) = ABMIN(ipq,irs) 
-!
-!              endif  
-!           enddo
-!        enddo
-!!
-!      endif 
-!   enddo
-!enddo 
+                TwoSR = ints1(j,i)-ints2(j,i)
 
-! silly test - works?
-! do IRow=1,nAA
-!    ipq = posAA(IRow)
-!    ip = IndN(1,ipq)
-!    iq = IndN(2,ipq)
-!   
-!    do ICol=1,nAA
-!       irs = posAA(ICol)
-!       ir=IndN(1,irs)
-!       is=IndN(2,irs)
-!
-!         if(irs.gt.ipq) cycle
-!
-!         Crs = CICoef(ir)+CICoef(is)
-!         Cpq = CICoef(ip)+CICoef(iq)
-!!
-!         ABMIN(IRow,ICol) = ABMIN(IRow,ICol) &
-!                        + 4d0*Cpq*Crs*ABKer(IRow,ICol)
-!!
-!    enddo
-! enddo
+                ABMIN(ipq,irs) = ABMIN(ipq,irs) &
+                               + 4.0d0*Cpq*Crs*(TwoSR+ABKer(ipq,irs))
+                ABMIN(irs,ipq) = ABMIN(ipq,irs) 
 
-print*, 'ipq,irs,nAA',ipq,irs,nAA
-print*, 'ABMIN',norm2(ABMIN)
+              endif  
+           enddo
+        enddo
+
+      endif 
+   enddo
+enddo 
 
 close(iunit2)
 close(iunit1)
