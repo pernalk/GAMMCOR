@@ -46,13 +46,13 @@ C
 C     COMPUTE THE HARTREE POTENTIAL AND THE ENERGY
 C     HAP: VHSR is computed in AO during canonicalization
 C
-C      Call tran_matTr(VCoul,UNOAO,UNOAO,NBasis,Transp)
-C      VHSR = VCoul
+      Call tran_matTr(VCoul,UNOAO,UNOAO,NBasis,Transp)
+      VHSR = VCoul
 C      Print*, 'VHSR',VHSR
-C      Print*, 'VHSR-MY',norm2(VHSR)
+      Print*, 'VHSR-MY',norm2(VHSR)
 C     Old:
-      Call PotHSR(VHSR,Occ,URe,TwoEl,TwoElErf,NInte1,NInte2,NBasis)
-      Print*,'VHSR-Ka', norm2(VHSR)
+C      Call PotHSR(VHSR,Occ,URe,TwoEl,TwoElErf,NInte1,NInte2,NBasis)
+C      Print*,'VHSR-Ka', norm2(VHSR)
 C
       Call VecTr(Gamma,Occ,URe,NBasis)
       EnHSR=Zero

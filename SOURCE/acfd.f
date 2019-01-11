@@ -2407,6 +2407,14 @@ C
       ABMIN(I)=Zero
       EndDo
 C
+C     FOR POSTCAS CALCULATE ALL ELEMENTS OF
+C     AB MATRICES AND SYMMETRIZE
+      If(IFunSR.Eq.4) Then
+      IColEnd=NoEig
+      Else
+      IColEnd=IRow
+      EndIf
+C
 C     ONE-ELECTRON MATRIX IN A NO REPRESENTATION
 C   
       IJ=0
@@ -2509,7 +2517,10 @@ C
       IR=IndBlock(1,IRow)
       IS=IndBlock(2,IRow)
 C
-      Do ICol=1,IRow
+C     HAP
+C      Do ICol=1,IRow
+C      Do ICol=1,NoEig
+      Do ICol=1,IColEnd
 C
       IPP=IndBlock(1,ICol)
       IQQ=IndBlock(2,ICol)
@@ -2696,12 +2707,44 @@ C
      $ ,F10.2)')END_TIME-START_TIME
       write(*,*)'icount',icount
 C
-C     DIVIDE BY C'c AND SYMMETRIZE
+      If(IFunSR.Eq.4) Then
+C
+C     POSTCAS: DIVIDE BY C'c AND SYMMETRIZE
 C
       Do I=1,NoEig
       IP=IndBlock(1,I)
       IQ=IndBlock(2,I)
-c      Do J=1,NoEig
+      Do J=1,NoEig
+      IR=IndBlock(1,J)
+      IS=IndBlock(2,J)
+C
+      If((C(IP)+C(IQ))*(C(IR)+C(IS)).Ne.Zero)
+     $ ABPLUS(I+(J-1)*NoEig)=ABPLUS(I+(J-1)*NoEig)
+     $/(C(IP)+C(IQ))/(C(IR)+C(IS))
+      If((C(IP)-C(IQ))*(C(IR)-C(IS)).Ne.Zero)
+     $ ABMIN(I+(J-1)*NoEig)=ABMIN(I+(J-1)*NoEig)
+     $/(C(IP)-C(IQ))/(C(IR)-C(IS))
+C
+      EndDo
+      EndDo
+C
+      Do I=1,NoEig
+      Do J=I+1,NoEig
+      ABPLUS((J-1)*NoEig+I)=
+     $ Half*(ABPLUS((J-1)*NoEig+I)+ABPLUS((I-1)*NoEig+J))
+      ABPLUS((I-1)*NoEig+J)=ABPLUS((J-1)*NoEig+I)
+      ABMIN((J-1)*NoEig+I)=
+     $ Half*(ABMIN((J-1)*NoEig+I)+ABMIN((I-1)*NoEig+J))
+      ABMIN((I-1)*NoEig+J)=ABMIN((J-1)*NoEig+I)
+      EndDo
+      EndDo
+C
+      Else
+C     DIVIDE BY C'c AND COPY TRIANGLE
+C
+      Do I=1,NoEig
+      IP=IndBlock(1,I)
+      IQ=IndBlock(2,I)
       Do J=1,I
       IR=IndBlock(1,J)
       IS=IndBlock(2,J)
@@ -2718,6 +2761,9 @@ C
 C
       EndDo
       EndDo
+C
+C     end IFunSR
+      EndIf
 C
       Return
       End

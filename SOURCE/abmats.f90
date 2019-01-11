@@ -708,27 +708,27 @@ enddo
 
 !print*, "AB-my",norm2(ABPLUS),norm2(ABMIN)
 
-!!$call sq_to_triang2(HNO,work1,NBasis)
-!!$write(LOUT,*) 'HNO-my', norm2(work1(1:NBasis*(NBasis+1)/2))
-!!$HNO=transpose(HNO)
-!!$call sq_to_triang2(HNO,work1,NBasis)
-!!$write(LOUT,*) 'HNO-tr', norm2(work1(1:NBasis*(NBasis+1)/2))
-!!$
-!!$write(LOUT,'(/,1X,''CASSCF Energy (w/o ENuc)'',5X,F15.8)') ETot
-!!$
-!!$call sq_to_triang2(AuxI,work1,NBasis)
-!!$write(LOUT,*) 'AuxI-my', norm2(work1(1:NBasis*(NBasis+1)/2))
-!!$AuxI=transpose(AuxI)
-!!$call sq_to_triang2(AuxI,work1,NBasis)
-!!$write(LOUT,*) 'AuxI-tr', norm2(work1(1:NBasis*(NBasis+1)/2))
-!!$
-!!$call sq_to_triang2(AuxIO,work1,NBasis)
-!!$write(LOUT,*) 'AuxIO-my', norm2(work1(1:NBasis*(NBasis+1)/2))
-!!$AuxIO=transpose(AuxIO)
-!!$call sq_to_triang2(AuxIO,work1,NBasis)
-!!$write(LOUT,*) 'AuxIO-tr', norm2(work1(1:NBasis*(NBasis+1)/2))
-!!$
-!!$write(LOUT,*) 'WMAT-my', 2d0*norm2(WMAT)
+call sq_to_triang2(HNO,work1,NBasis)
+write(LOUT,*) 'HNO-my', norm2(work1(1:NBasis*(NBasis+1)/2))
+HNO=transpose(HNO)
+call sq_to_triang2(HNO,work1,NBasis)
+write(LOUT,*) 'HNO-tr', norm2(work1(1:NBasis*(NBasis+1)/2))
+
+write(LOUT,'(/,1X,''CASSCF Energy (w/o ENuc)'',5X,F15.8)') ETot
+
+call sq_to_triang2(AuxI,work1,NBasis)
+write(LOUT,*) 'AuxI-my', norm2(work1(1:NBasis*(NBasis+1)/2))
+AuxI=transpose(AuxI)
+call sq_to_triang2(AuxI,work1,NBasis)
+write(LOUT,*) 'AuxI-tr', norm2(work1(1:NBasis*(NBasis+1)/2))
+
+call sq_to_triang2(AuxIO,work1,NBasis)
+write(LOUT,*) 'AuxIO-my', norm2(work1(1:NBasis*(NBasis+1)/2))
+AuxIO=transpose(AuxIO)
+call sq_to_triang2(AuxIO,work1,NBasis)
+write(LOUT,*) 'AuxIO-tr', norm2(work1(1:NBasis*(NBasis+1)/2))
+
+write(LOUT,*) 'WMAT-my', 2d0*norm2(WMAT)
 
 deallocate(RDM2val)
 deallocate(ints,work2,work1)
@@ -1525,29 +1525,35 @@ do ICol=1,NDimX
    endif
 enddo
 
+if(AB1) then
+   ! symmetrize AB1
+   call sq_symmetrize(ABPLUS,NDimX)
+   call sq_symmetrize(ABMIN,NDimX)
+endif
+
 !print*, "AB-my",norm2(ABPLUS),norm2(ABMIN)
 
-!!$call sq_to_triang2(HNO,work1,NBasis)
-!!$write(LOUT,*) 'HNO-my', norm2(work1(1:NBasis*(NBasis+1)/2))
-!!$HNO=transpose(HNO)
-!!$call sq_to_triang2(HNO,work1,NBasis)
-!!$write(LOUT,*) 'HNO-tr', norm2(work1(1:NBasis*(NBasis+1)/2))
-!!$
-!!$write(LOUT,'(/,1X,''CASSCF Energy (w/o ENuc)'',5X,F15.8)') ETot
-!!$
-!!$call sq_to_triang2(AuxI,work1,NBasis)
-!!$write(LOUT,*) 'AuxI-my', norm2(work1(1:NBasis*(NBasis+1)/2))
-!!$AuxI=transpose(AuxI)
-!!$call sq_to_triang2(AuxI,work1,NBasis)
-!!$write(LOUT,*) 'AuxI-tr', norm2(work1(1:NBasis*(NBasis+1)/2))
-!!$
-!!$call sq_to_triang2(AuxIO,work1,NBasis)
-!!$write(LOUT,*) 'AuxIO-my', norm2(work1(1:NBasis*(NBasis+1)/2))
-!!$AuxIO=transpose(AuxIO)
-!!$call sq_to_triang2(AuxIO,work1,NBasis)
-!!$write(LOUT,*) 'AuxIO-tr', norm2(work1(1:NBasis*(NBasis+1)/2))
-!!$
-!!$write(LOUT,*) 'WMAT-my', 2d0*norm2(WMAT)
+!call sq_to_triang2(HNO,work1,NBasis)
+!write(LOUT,*) 'HNO-my', norm2(work1(1:NBasis*(NBasis+1)/2))
+!HNO=transpose(HNO)
+!call sq_to_triang2(HNO,work1,NBasis)
+!write(LOUT,*) 'HNO-tr', norm2(work1(1:NBasis*(NBasis+1)/2))
+!!!$
+!!!$write(LOUT,'(/,1X,''CASSCF Energy (w/o ENuc)'',5X,F15.8)') ETot
+!!!$
+!call sq_to_triang2(AuxI,work1,NBasis)
+!write(LOUT,*) 'AuxI-my', norm2(work1(1:NBasis*(NBasis+1)/2))
+!AuxI=transpose(AuxI)
+!call sq_to_triang2(AuxI,work1,NBasis)
+!write(LOUT,*) 'AuxI-tr', norm2(work1(1:NBasis*(NBasis+1)/2))
+!
+!call sq_to_triang2(AuxIO,work1,NBasis)
+!write(LOUT,*) 'AuxIO-my', norm2(work1(1:NBasis*(NBasis+1)/2))
+!AuxIO=transpose(AuxIO)
+!call sq_to_triang2(AuxIO,work1,NBasis)
+!write(LOUT,*) 'AuxIO-tr', norm2(work1(1:NBasis*(NBasis+1)/2))
+!
+!write(LOUT,*) 'WMAT-my', 2d0*norm2(WMAT)
 
 deallocate(RDM2val)
 deallocate(ints,work2,work1)
@@ -3240,7 +3246,6 @@ if(present(ETot)) ETot = 0
 
 ! set dimensions
 NOccup = NAct + INActive
-print*,'NOccup,NAct,INActive',NOccup,NAct,INActive
 
 Ind = 0
 do i=1,NAct
@@ -4046,7 +4051,6 @@ if(nAA>0) then
 
    ABP = ABPLUS(i:j,i:j)
    ABM = ABMIN(i:j,i:j)
-   print*, 'ABac-MY',norm2(ABP),norm2(ABM)
    call ERPASYMM0(EigYt,EigXt,Eigt,ABP,ABM,nAA)
    
    do ii=1,nAA
@@ -5143,6 +5147,9 @@ do ICol=1,NDimX
       enddo
 enddo
 
+! symmetrize AB(0)
+call sq_symmetrize(ABPLUS,NDimX)
+call sq_symmetrize(ABMIN,NDimX)
 
 EigY1 = 0
 EigY = 0
@@ -5162,7 +5169,7 @@ if(nAA>0) then
           IndN,IndX,NDimX,NGrid,NBasis,&
           NOccup,NAct,INActive,nAA,'FOFO','FOFOERF')
 
-   !print*, 'ABM0-MY',norm2(ABM)
+   print*, 'ACT-ACT-MY',nAA,norm2(ABP),norm2(ABM)
    call ERPASYMM0(EigYt,EigXt,Eigt,ABP,ABM,nAA)
    
    do ii=1,nAA
@@ -5185,6 +5192,7 @@ endif
 
          ABP = ABPLUS(i:j,i:j)
          ABM = ABMIN(i:j,i:j)
+         print*, 'AI-MY',iq,norm2(ABP),norm2(ABM)
          call ERPASYMM0(EigYt,EigXt,Eigt,ABP,ABM,nAI(iq))
    
          do ii=1,nAI(iq)
@@ -5207,6 +5215,7 @@ endif
 
          ABP = ABPLUS(i:j,i:j)
          ABM = ABMIN(i:j,i:j)
+         print*, 'AV-MY',ip,norm2(ABP),norm2(ABM)
          call ERPASYMM0(EigYt,EigXt,Eigt,ABP,ABM,nAV(ip))
 
          do ii=1,nAV(ip)
@@ -5390,6 +5399,29 @@ print*, 'EAll,EIntra',EAll,EIntra
 print*, 'ECorr',ECorr
 
 endif
+
+!call sq_to_triang2(HNO,work1,NBasis)
+!write(LOUT,*) 'HNO-my', norm2(work1(1:NBasis*(NBasis+1)/2))
+!HNO=transpose(HNO)
+!call sq_to_triang2(HNO,work1,NBasis)
+!write(LOUT,*) 'HNO-tr', norm2(work1(1:NBasis*(NBasis+1)/2))
+!
+!write(LOUT,'(/,1X,''CASSCF Energy (w/o ENuc)'',5X,F15.8)') ETot
+!
+!call sq_to_triang2(AuxI,work1,NBasis)
+!write(LOUT,*) 'AuxI-my', norm2(work1(1:NBasis*(NBasis+1)/2))
+!AuxI=transpose(AuxI)
+!call sq_to_triang2(AuxI,work1,NBasis)
+!write(LOUT,*) 'AuxI-tr', norm2(work1(1:NBasis*(NBasis+1)/2))
+!
+!call sq_to_triang2(AuxIO,work1,NBasis)
+!write(LOUT,*) 'AuxIO-my', norm2(work1(1:NBasis*(NBasis+1)/2))
+!AuxIO=transpose(AuxIO)
+!call sq_to_triang2(AuxIO,work1,NBasis)
+!write(LOUT,*) 'AuxIO-tr', norm2(work1(1:NBasis*(NBasis+1)/2))
+!
+!write(LOUT,*) 'WMAT-my', 2d0*norm2(WMAT)
+
 
 deallocate(RDM2val)
 deallocate(ints,work2,work1)
@@ -6313,6 +6345,8 @@ do k=1,NOccup
       endif 
    enddo
 enddo 
+
+!call sq_symmetrize(ABMIN,NDimX)
 
 if(dump) close(iunit3)
 close(iunit2)

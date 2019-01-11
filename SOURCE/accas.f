@@ -114,6 +114,10 @@ C
       Call RunACCASLR(ETot,ENuc,TwoNO,URe,UNOAO,Occ,XOne,
      $  IndAux,IPair,IndN,IndX,NDimX,Title,NBasis,NInte1,NInte2,NGem)
 C
+C      TEST...
+C      Call RunACCAS(ETot,ENuc,TwoNO,URe,UNOAO,Occ,XOne,
+C     $  IndAux,IPair,IndN,IndX,NDimX,Title,NBasis,NInte1,NInte2,NGem)
+C
       EndIf
 C
       Return
@@ -307,22 +311,6 @@ C
       Write(6,'(/,1X,"The number of Grid Points = ",I8)')
      $ NGrid
 C
-CC     HAP-TEST
-C      UAux=transpose(UNOAO)
-C      NOccup=NAcCAS+NInAcCAS
-C      Call tran4_gen(NBasis,
-C     $        NOccup,UAux(1:NBasis,1:(NOccup)),
-C     $        NOccup,UAux(1:NBasis,1:(NOccup)),
-C     $        NBasis,UAux,
-C     $        NBasis,UAux,
-C     $        'FFOOERF','AOERFSORT')
-C      Call tran4_gen(NBasis,
-C     $        NBasis,UAux,
-C     $        NOccup,UAux(1:NBasis,1:(NOccup)),
-C     $        NBasis,UAux,
-C     $        NOccup,UAux(1:NBasis,1:(NOccup)),
-C     $        'FOFOERF','AOERFSORT')
-
       Allocate  (TwoEl2(NInte2))
       Allocate  (WGrid(NGrid))
       Allocate  (OrbGrid(NBasis*NGrid))
@@ -476,14 +464,13 @@ C
       XVSR=XVSR+Two*Occ(I)*VSR(II)
       EndDo
 C
-      If(IFunSR.Eq.4) Then
-      Print*, 'VSR',norm2(VSR)
-      Write(6,'(X,/,
-     $"*** ADDING VSR_HXC TO A ONE-ELECTRON HAMILTONIAN*** ",/)')
-      Do I=1,NInte1
-      XOne(I)=XOne(I)+VSR(I)
-      EndDo
-      EndIf
+C      If(IFunSR.Eq.4) Then
+C      Write(6,'(X,/,
+C     $"*** ADDING VSR_HXC TO A ONE-ELECTRON HAMILTONIAN*** ",/)')
+C      Do I=1,NInte1
+C      XOne(I)=XOne(I)+VSR(I)
+C      EndDo
+C      EndIf
 C
       Allocate (SRKer(NGrid))
       SRKer(1:NGrid)=Zero
@@ -508,6 +495,7 @@ C
       Write(6,'(  X,"*** LR-AC0-CAS CALCULATION *** ")')
 C
       If(ITwoEl.Eq.3) Then
+C
       Call Y01CASLR_FOFO(Occ,URe,XOne,ABPLUS,ABMIN,
      $ MultpC,NSymNO,
      $ SRKer,WGrid,OrbGrid,
@@ -515,13 +503,13 @@ C
      $ IndN,IndX,IGem,NAcCAS,NInAcCAS,
      $ NGrid,NDimX,NBasis,NDimX,NInte1,
      $ 'EMPTY','FFOOERF','FOFOERF',0,ECASSCF,ECorr)
-CC
+C
 C      Call Y01CAS_FOFO(Occ,URe,XOne,ABPLUS,ABMIN,
 C     $ 'PROP0','PROP1',
 C     $ IndN,IndX,IGem,NAcCAS,NInAcCAS,NDimX,
 C     $ NBasis,NDimX,NInte1,'EMPTY','FFOOERF','FOFOERF',0,
 C     $ ETot,ECorr)
-CC
+CCC
 C      Call AC0CAS(ECorr,ETot,TwoNO,Occ,URe,XOne,
 C     $ ABPLUS,ABMIN,EigVecR,Eig,
 C     $ IndN,IndX,NDimX,NBasis,NDim,NInte1,NInte2)
@@ -1121,7 +1109,7 @@ C
 C
       ICol=ICol+1
 C
-      If(IRow.Ge.ICol) Then
+C      If(IRow.Ge.ICol) Then
 C
       Call AB0ELEMENT(ABP,ABM,IP,IQ,IR,IS,Occ,HNO,IGFact,
      $ TwoNO,AuxI,AuxIO,WMAT,RDM2Act,C,Ind1,Ind2,NAct,NRDM2Act,
@@ -1137,8 +1125,6 @@ C
       If(ISym.Eq.1) Then
       Do I=1,NGrid
       XKer1234=XKer1234+SRKerW(I)*
-C     $ OrbGrid(IP+(I-1)*NBasis)*OrbGrid(IQ+(I-1)*NBasis)*
-C     $ OrbGrid(IR+(I-1)*NBasis)*OrbGrid(IS+(I-1)*NBasis)
      $ OrbGrid(I+(IP-1)*NGrid)*OrbGrid(I+(IQ-1)*NGrid)*
      $ OrbGrid(I+(IR-1)*NGrid)*OrbGrid(I+(IS-1)*NGrid)
       EndDo
@@ -1147,13 +1133,12 @@ C     $ OrbGrid(IR+(I-1)*NBasis)*OrbGrid(IS+(I-1)*NBasis)
       ABM=ABM+Four*(C(IP)+C(IQ))*(C(IR)+C(IS))*(XKer1234+TwoSR)
       EndIf
 C
-      ABPLUS((ICol-1)*NDimB+IRow)=ABP
+C      ABPLUS((ICol-1)*NDimB+IRow)=ABP
       ABPLUS((IRow-1)*NDimB+ICol)=ABP
-      ABMIN((ICol-1)*NDimB+IRow)=ABM
+C      ABMIN((ICol-1)*NDimB+IRow)=ABM
       ABMIN((IRow-1)*NDimB+ICol)=ABM
-
 C
-      EndIf
+C      EndIf
 C
       EndIf
       EndDo
@@ -1164,6 +1149,20 @@ C
       EndDo
 C
       If(NDimB.Ne.0) Then
+C     SYMMETRIZE BLOCK     
+      Do I=1,NDimB
+      Do J=I+1,NDimB
+      ABPLUS((J-1)*NDimB+I)=
+     $ Half*(ABPLUS((J-1)*NDimB+I)+ABPLUS((I-1)*NDimB+J))
+      ABPLUS((I-1)*NDimB+J)=ABPLUS((J-1)*NDimB+I)
+      ABMIN((J-1)*NDimB+I)=
+     $ Half*(ABMIN((J-1)*NDimB+I)+ABMIN((I-1)*NDimB+J))
+      ABMIN((I-1)*NDimB+J)=ABMIN((J-1)*NDimB+I)
+      EndDo
+      EndDo
+
+      Print*, 'ACT-ACT-Ka',NDimB,norm2(ABPLUS(1:NDimB**2)),
+     $ norm2(ABMIN(1:NDimB**2))
       If(NoSt.Eq.1) Then
       Call ERPASYMM0(EigY(NFree2),EigX(NFree2),Eig(NFree1),ABPLUS,ABMIN,
      $ NDimB)
@@ -1217,18 +1216,19 @@ C
 C
       ICol=ICol+1
 C
-      If(IRow.Ge.ICol) Then
+C     HAP
+C      If(IRow.Ge.ICol) Then
 C
       Call AB0ELEMENT(ABP,ABM,IP,IQ,IR,IS,Occ,HNO,IGFact,
      $ TwoNO,AuxI,AuxIO,WMAT,RDM2Act,C,Ind1,Ind2,NAct,NRDM2Act,
      $ NInte1,NInte2,NBasis)
 C
       ABPLUS((ICol-1)*NDimB+IRow)=ABP
-      ABPLUS((IRow-1)*NDimB+ICol)=ABP
+C      ABPLUS((IRow-1)*NDimB+ICol)=ABP
       ABMIN((ICol-1)*NDimB+IRow)=ABM
-      ABMIN((IRow-1)*NDimB+ICol)=ABM
+C      ABMIN((IRow-1)*NDimB+ICol)=ABM
 C
-      EndIf
+C      EndIf
 C
       EndIf
 C
@@ -1239,6 +1239,20 @@ C
       EndDo
 C
       If(NDimB.Ne.0) Then
+C     SYMMETRIZE BLOCK     
+      Do I=1,NDimB
+      Do J=I+1,NDimB
+      ABPLUS((J-1)*NDimB+I)=
+     $ Half*(ABPLUS((J-1)*NDimB+I)+ABPLUS((I-1)*NDimB+J))
+      ABPLUS((I-1)*NDimB+J)=ABPLUS((J-1)*NDimB+I)
+      ABMIN((J-1)*NDimB+I)=
+     $ Half*(ABMIN((J-1)*NDimB+I)+ABMIN((I-1)*NDimB+J))
+      ABMIN((I-1)*NDimB+J)=ABMIN((J-1)*NDimB+I)
+      EndDo
+      EndDo
+C
+      Print*, 'AI-Ka',IP,norm2(ABPLUS(1:NDimB**2)),
+     $ norm2(ABMIN(1:NDimB**2))
       If(NoSt.Eq.1) Then
       Call ERPASYMM0(EigY(NFree2),EigX(NFree2),Eig(NFree1),ABPLUS,ABMIN,
      $   NDimB)
@@ -1295,18 +1309,19 @@ C
 C
       ICol=ICol+1
 C
-      If(IRow.Ge.ICol) Then
+C     HAP
+C      If(IRow.Ge.ICol) Then
 C
       Call AB0ELEMENT(ABP,ABM,IP,IQ,IR,IS,Occ,HNO,IGFact,
      $ TwoNO,AuxI,AuxIO,WMAT,RDM2Act,C,Ind1,Ind2,NAct,NRDM2Act,
      $ NInte1,NInte2,NBasis)
 C
       ABPLUS((ICol-1)*NDimB+IRow)=ABP
-      ABPLUS((IRow-1)*NDimB+ICol)=ABP
+C      ABPLUS((IRow-1)*NDimB+ICol)=ABP
       ABMIN((ICol-1)*NDimB+IRow)=ABM
-      ABMIN((IRow-1)*NDimB+ICol)=ABM
+C      ABMIN((IRow-1)*NDimB+ICol)=ABM
 C
-      EndIf
+C      EndIf
 C
       EndIf
 C
@@ -1317,6 +1332,20 @@ C
       EndDo
 C
       If(NDimB.Ne.0) Then
+C     SYMMETRIZE BLOCK     
+      Do I=1,NDimB
+      Do J=I+1,NDimB
+      ABPLUS((J-1)*NDimB+I)=
+     $ Half*(ABPLUS((J-1)*NDimB+I)+ABPLUS((I-1)*NDimB+J))
+      ABPLUS((I-1)*NDimB+J)=ABPLUS((J-1)*NDimB+I)
+      ABMIN((J-1)*NDimB+I)=
+     $ Half*(ABMIN((J-1)*NDimB+I)+ABMIN((I-1)*NDimB+J))
+      ABMIN((I-1)*NDimB+J)=ABMIN((J-1)*NDimB+I)
+      EndDo
+      EndDo
+C
+      Print*, 'VA-Ka',IP,norm2(ABPLUS(1:NDimB**2)),
+     $ norm2(ABMIN(1:NDimB**2))
       If(NoSt.Eq.1) Then
       Call ERPASYMM0(EigY(NFree2),EigX(NFree2),Eig(NFree1),ABPLUS,ABMIN,
      $   NDimB)
@@ -1387,12 +1416,19 @@ C     $ IndN,IndX,IGem,NAcCAS,NInAcCAS,NDimX,NBasis,NDimX,
 C     $ NInte1,'FFOOERF','FOFOERF',1d0,.true.)
 CC
 C      Print*, 'AB1-MY',norm2(ABPLUS),norm2(ABMIN)
+C
+C      Call AB_CAS_mithap(ABPLUS,ABMIN,EnDummy,URe,Occ,XOne,
+C     $ IndN,IndX,IGem,NAct,INActive,NDimX,NBasis,NDimX,
+C     $ NInte1,'MO2ERF',1d0,.true.)
+CC
+C      Print*, 'AB1-mithap',norm2(ABPLUS),norm2(ABMIN)
+C
 C     ADD A SR KERNEL
 C
       If(IFunSRKer.Eq.1) Then
 C
       Write(6,'(/," *** ADDING THE SR KERNEL ***" )')
-C
+
       Do IRow=1,NoEig
 C
       IA=IndBlock(1,IRow)
@@ -1432,7 +1468,7 @@ C
       EndDo
       EndDo
 C
-CC     ADD KERNEL IN BATCHES:
+CCC     ADD KERNEL IN BATCHES:
 C      call clock('START',Tcpu,Twall)
 C      Allocate(Work(Maxlen),Batch(Maxlen,NBasis))
 CC

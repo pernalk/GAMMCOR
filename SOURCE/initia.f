@@ -826,7 +826,6 @@ C
 C
 C      ISkip=1
 C      If(ISkip.Ne.1) Then
-C      Print*, 'CANONI!!!!'
 C     FIND CANONICAL INACTIVE AND VIRTUAL ORBITALS 
 C      
       If(IAO.Eq.0) Then
@@ -1020,6 +1019,8 @@ C     TRANSFORM J AND K
      $        NBasis,UAux,
      $        Num0+Num1,UAux(1:NBasis,1:(Num0+Num1)),
      $        'FOFO','AOTWOSORT')
+C     TEST MITHAP
+C      call tran4_full(NBasis,UAux,UAux,'TWOMO','AOTWOSORT')
 C
       Else
       Call tran4_gen(NBasis,
@@ -1034,6 +1035,8 @@ C
      $        NBasis,UAux,
      $        Num0+Num1,UAux(1:NBasis,1:(Num0+Num1)),
      $        'FOFOERF','AOERFSORT')
+C     TEST MITHAP
+C      call tran4_full(NBasis,UAux,UAux,'MO2ERF','AOERFSORT')
 
       EndIF
 C
@@ -1126,7 +1129,7 @@ C      ETot=ETot+Hlp
       EndDo
 C     ITwoEl
       If(ITwoEl.eq.3) Then
-C      Call TwoEneChck(ETwo,RDM2Act,Occ,INActive,NAct,NBasis)
+      Call TwoEneChck(ETwo,RDM2Act,Occ,INActive,NAct,NBasis)
       EndIf
       Write(6,'(/,1X,''Two-electron Energy'',5X,F15.8)')ETwo
       Write(6,'(/,1X,''MCSCF Molpro Energy'',5X,F15.8)')EOne+ETwo+ENuc
