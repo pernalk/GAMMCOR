@@ -4124,7 +4124,6 @@ enddo
 
 deallocate(work1)
 
-print*, 'Eig-MY',norm2(Eig),norm2(EigY),norm2(EigY1)
 
 if(IFlag0==1) return
 !return
@@ -4134,7 +4133,7 @@ call AB_CAS_FOFO(ABPLUS,ABMIN,EnDummy,URe,Occ,XOne,&
               IndN,IndX,IGem,NAct,INActive,NDimX,NBasis,NDimX,&
               NInte1,IntJFile,IntKFile,1d0,.true.)
 
-print*, 'AB1-MY',norm2(ABPLUS),norm2(ABMIN)
+!print*, 'AB1-MY',norm2(ABPLUS),norm2(ABMIN)
 ! here!!!! can this be made cheaper?
 allocate(work1(NDimX**2))
 ! work1=ABPLUS.EigX
@@ -4193,7 +4192,7 @@ do i=1,NBasis
    C(i) = sign(sqrt(Occ(i)),Occ(i)-0.5d0)
 enddo
 
-print*, 'AB-MY',norm2(ABPLUS),norm2(ABMIN)
+!print*, 'AB-MY',norm2(ABPLUS),norm2(ABMIN)
 EigY1 = 0
 do j=1,NDimX
    if(Eig(j)/=0d0) then
@@ -4207,13 +4206,13 @@ do j=1,NDimX
       enddo
    endif
 enddo
+!print*, 'FIRST',norm2(EigY1)
 
-print*, 'FIRST',norm2(EigY1)
 ! second loop ...
 !call dgemm('N','T',NDimX,NDimX,NDimX,1d0,EigY1,NDimX,EigY,NDimX,0d0,ABPLUS,NDimX)
 !print*, 'ABPLUS-MY-2',norm2(ABPLUS)
 call dgemm('N','T',NDimX,NDimX,NDimX,1d0,EigY,NDimX,EigY1,NDimX,0d0,ABPLUS,NDimX)
-print*, 'ABPLUS-MY',norm2(ABPLUS)
+!print*, 'ABPLUS-MY',norm2(ABPLUS)
 
 pos = 0
 do i=1,NDimX
@@ -4270,7 +4269,6 @@ close(iunit)
 ECorr = EAll-EIntra
 
 print*, 'EAll,EIntra',EAll,EIntra
-print*, 'ECorr',ECorr
 
 endif
 
@@ -5259,9 +5257,8 @@ call AB_CAS_FOFO(ABPLUS,ABMIN,EnDummy,URe,Occ,XOne,&
 call ModABMin_FOFO(Occ,SRKer,Wt,OrbGrid,ABMIN,&
               MultpC,NSymNO,&
               IndN,IndX,NDimX,NGrid,NBasis,&
-              NOccup,'FOFO','FOFOERF')
+              NAct,INActive,'FOFO','FOFOERF',.true.)
  print*, 'ABM-MY',norm2(ABMIN)
-! print*, 'AB1-MY',norm2(ABPLUS),norm2(ABMIN)
 ! here!!!! can this be made cheaper?
 allocate(work1(NDimX**2))
 ! work1=ABPLUS.EigX
@@ -6214,17 +6211,19 @@ end subroutine ModABMin_Act_FOFO
 subroutine ModABMin_FOFO(Occ,SRKer,Wt,OrbGrid,ABMin,&
                          MultpC,NSymNO,&
                          IndN,IndX,NDimX,NGrid,NBasis,&
-                         NOccup,twokfile,twokerf,dfile)
+                         NAct,INActive,twokfile,twokerf,&
+                         AB1,dfile)
 ! ADD CONTRIBUTIONS FROM THE srALDA KERNEL TO AB MATRICES
 implicit none
 
 integer,parameter :: maxlen = 128
-integer,intent(in) :: NBasis,NDimX,NGrid,NOccup
+integer,intent(in) :: NBasis,NDimX,NGrid,NAct,INActive
 integer,intent(in) :: IndN(2,NDimX),IndX(NDimX),&
                       MultpC(15,15),NSymNO(NBasis)
 character(*),intent(in) :: twokfile,twokerf
 double precision,intent(in) :: Occ(NBasis),SRKer(NGrid), &
                                Wt(NGrid),OrbGrid(NGrid,NBasis)
+logical,intent(in) :: AB1
 double precision,intent(inout) :: ABMin(NDimX,NDimX)
 character(*),intent(in),optional :: dfile
 
@@ -6235,6 +6234,7 @@ integer :: IRow,ICol
 integer :: i1i2s,i3i4s,iSym
 double precision :: XKer1234,TwoSR,Cpq,Crs
 integer :: pos(NBasis,NBasis)
+integer :: NOccup,IGem(NBasis),AuxCoeff(3,3,3,3)
 double precision :: CICoef(NBasis)
 double precision,allocatable :: work1(:),work2(:),WtKer(:)
 double precision,allocatable :: batch(:,:),ABKer(:,:)
@@ -6245,17 +6245,47 @@ dump = .false.
 if(present(dfile)) dump=.true. 
 print*, dfile
 
-do i=1,NBasis
-   CICoef(i) = sign(sqrt(Occ(i)),Occ(i)-0.5d0)
+NOccup = NAct + INActive
+! fix IGem
+do i=1,INActive
+   IGem(i) = 1
 enddo
-
-allocate(work1(NBasis**2),work2(NBasis**2),ints1(NBasis,NBasis),ints2(NBasis,NBasis),&
-         WtKer(maxlen),batch(maxlen,NBasis),ABKer(NDimX,NDimX))
+do i=INActive+1,NOccup
+   IGem(i) = 2
+enddo
+do i=NOccup+1,NBasis
+   IGem(i) = 3
+enddo
 
 pos = 0
 do i=1,NDimX
    pos(IndN(1,i),IndN(2,i)) = IndX(i)
 enddo
+
+AuxCoeff = 1
+if(AB1) then
+   do l=1,3
+      do k=1,3
+         do j=1,3
+            do i=1,3
+               if((i==j).and.(j==k).and.(k==l)) then
+                  AuxCoeff(i,j,k,l) = 0
+               else
+                  AuxCoeff(i,j,k,l) = 1
+               endif
+            enddo
+         enddo
+      enddo
+   enddo
+endif
+
+do i=1,NBasis
+   CICoef(i) = sign(sqrt(Occ(i)),Occ(i)-0.5d0)
+enddo
+
+
+allocate(work1(NBasis**2),work2(NBasis**2),ints1(NBasis,NBasis),ints2(NBasis,NBasis),&
+         WtKer(maxlen),batch(maxlen,NBasis),ABKer(NDimX,NDimX))
 
 ABKer = 0
 
@@ -6286,7 +6316,8 @@ do offset=0,NGrid,maxlen
          XKer1234 = 0
          do i=1,batchlen
             XKer1234 = XKer1234 + WtKer(i)* &
-            batch(i,ip)*batch(i,iq)*batch(i,ir)*batch(i,is)
+                       AuxCoeff(IGem(ip),IGem(iq),IGem(ir),IGem(is))* & 
+                       batch(i,ip)*batch(i,iq)*batch(i,ir)*batch(i,is)
          enddo
          
          ABKer(ipq,irs) = ABKer(ipq,irs) + XKer1234
@@ -6345,8 +6376,6 @@ do k=1,NOccup
       endif 
    enddo
 enddo 
-
-!call sq_symmetrize(ABMIN,NDimX)
 
 if(dump) close(iunit3)
 close(iunit2)

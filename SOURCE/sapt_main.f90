@@ -1262,8 +1262,8 @@ logical :: doRSH
     call ModABMin_FOFO(Mon%Occ,SRKer,WGrid,OrbGrid,ABMin,&
                        Mon%MultpC,Mon%NSymNO,&
                        Mon%IndN,Mon%IndX,Mon%NDimX,NGrid,NBas,&
-                       Mon%num0+Mon%num1, & 
-                       twokfile,twokerf)
+                       Mon%num0,Mon%num1, & 
+                       twokfile,twokerf,.false.)
     print*, 'ABMin-MY',norm2(ABMin)
  end select
  call clock('Mod ABMin',Tcpu,Twall)
