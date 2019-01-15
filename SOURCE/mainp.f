@@ -168,20 +168,27 @@ C
       IFunSRKer=Flags%IFunSRKer
 C
       If(IFunSRKer.Eq.2)Stop'Fatal Error: Kernel for PBE not available!'
-      Write(*,'(/,"IFunSR=",I1)')IFunSR
-      Write(*,'(/,"IFunSRKer=",I1,/)')IFunSRKer
-C      Write(*,'(/,"IFunSR=",I1)')IFunSR
-C      Write(*,'(/,"IFunSRKer=",I1,/)')IFunSRKer
+      Write(*,'(/,1x,"IFunSR=",I1)')IFunSR
+      Write(*,'(/,1x,"IFunSRKer=",I1,/)')IFunSRKer
 C
 C     *************************************************************************
 C         
-C     SELECT ELECTRONIC STATE  
-C      NoSt = Flags%NoSt
-C      HERE ERROR!!!!
-C      NoSt = System%InSt(1,1) 
-      NoSt =1
+C     SELECT ELECTRONIC STATE
       NStates = System%NStates
       InSt(1:2,1:NStates) = System%InSt
+C
+      If(InSt(2,1).Gt.0) Then
+      NoSt = System%InSt(1,1)
+      Print*,'W INPUCIE JEST: ',NoSt
+C
+      ElseIf(IDALTON.Eq.0) Then
+      Call read_NoSt_molpro(NoSt,'2RDM')
+      ElseIf(IDALTON.Eq.1) Then
+      NoSt = 1
+      Write(6,'(/,1x,a)') 'WARNING! ASSUMING RMDs CORRESPOND TO
+     $                     GROUND STATE FROM DALTON OUTPUT (NoSt=1)!'
+C
+      EndIf
 C
       Print*, 'NoSt:',NoSt
 C      Print*, 'InSt', InSt(1,1),InSt(2,1)

@@ -127,7 +127,7 @@ C
       Subroutine RunACCAS(ETot,ENuc,TwoNO,URe,UNOAO,Occ,XOne,
      $  IndAux,IPair,IndN,IndX,NDimX,Title,NBasis,NInte1,NInte2,NGem)
 C
-      use abmat
+      use abfofo
 C
       Implicit Real*8 (A-H,O-Z)
 C
@@ -234,7 +234,7 @@ C
       EndIf
       ECorr=Ecorr*Half
       Write
-     $ (6,'(/,1X,''ECASSCF+ENuc, Corr, ERPA-CASSCF'',6X,3F15.8)')
+     $ (6,'(/,1X,''ECASSCF+ENuc, AC1-Corr, ERPA-CASSCF'',6X,3F15.8)')
      $ ECASSCF+ENuc,ECorr,ECASSCF+ENuc+ECorr
 C
       Return
@@ -247,6 +247,7 @@ C
       use types
       use sorter
       use abmat
+      use abfofo
       use timing
 C
       Implicit Real*8 (A-H,O-Z)
@@ -503,19 +504,9 @@ C
      $ SRKer,WGrid,OrbGrid,
      $ 'PROP0','PROP1',
      $ IndN,IndX,IGem,NAcCAS,NInAcCAS,
-     $ NGrid,NDimX,NBasis,NDimX,NInte1,
-     $ 'EMPTY','FFOOERF','FOFOERF',0,ECASSCF,ECorr)
+     $ NGrid,NDimX,NBasis,NDimX,NInte1,NoSt,
+     $ 'EMPTY','FFOOERF','FOFOERF',0,IFunSRKer,ECASSCF,ECorr)
 C
-C      Call Y01CAS_FOFO(Occ,URe,XOne,ABPLUS,ABMIN,
-C     $ 'PROP0','PROP1',
-C     $ IndN,IndX,IGem,NAcCAS,NInAcCAS,NDimX,
-C     $ NBasis,NDimX,NInte1,'EMPTY','FFOOERF','FOFOERF',0,
-C     $ ETot,ECorr)
-CCC
-C      Call AC0CAS(ECorr,ETot,TwoNO,Occ,URe,XOne,
-C     $ ABPLUS,ABMIN,EigVecR,Eig,
-C     $ IndN,IndX,NDimX,NBasis,NDim,NInte1,NInte2)
-CC
       ElseIf(ITWoEl.Eq.1) Then
       Call AC0CASLR(ECorr,ECASSCF,TwoNO,Occ,URe,XOne,
      $ ABPLUS,ABMIN,EigVecR,Eig,
@@ -620,7 +611,7 @@ C
       Write(6,'(1X,  ''Total lrCASSCF+ENuc+srDF Energy'',F15.8,/)')
      $ ECASSCF-XVSR+EnSR+ENuc
       Write
-     $ (6,'(1X,''lrCASSCF+srDF+ENuc, lrAC-Corr, Total'',6X,3F15.8)')
+     $ (6,'(1X,''lrCASSCF+srDF+ENuc, lrAC-Corr, Total'',7X,3F15.8)')
      $ ECASSCF-XVSR+EnSR+ENuc,ECorr,ECASSCF-XVSR+EnSR+ENuc+ECorr
       Del=EnHSR+EXCTOP
       Write
@@ -846,7 +837,7 @@ C
 C     A ROUTINE FOR COMPUTING AC INTEGRAND
 C   
       use timing
-      use abmat
+C      use abmat
 C
       Implicit Real*8 (A-H,O-Z)
 C
@@ -1136,8 +1127,8 @@ C
       EndIf
 C
 C      ABPLUS((ICol-1)*NDimB+IRow)=ABP
-      ABPLUS((IRow-1)*NDimB+ICol)=ABP
 C      ABMIN((ICol-1)*NDimB+IRow)=ABM
+      ABPLUS((IRow-1)*NDimB+ICol)=ABP
       ABMIN((IRow-1)*NDimB+ICol)=ABM
 C
 C      EndIf
@@ -1162,9 +1153,9 @@ C     SYMMETRIZE BLOCK
       ABMIN((I-1)*NDimB+J)=ABMIN((J-1)*NDimB+I)
       EndDo
       EndDo
-
-      Print*, 'ACT-ACT-Ka',NDimB,norm2(ABPLUS(1:NDimB**2)),
-     $ norm2(ABMIN(1:NDimB**2))
+C
+C      Print*, 'ACT-ACT-Ka',NDimB,norm2(ABPLUS(1:NDimB**2)),
+C     $ norm2(ABMIN(1:NDimB**2))
       If(NoSt.Eq.1) Then
       Call ERPASYMM0(EigY(NFree2),EigX(NFree2),Eig(NFree1),ABPLUS,ABMIN,
      $ NDimB)
@@ -1218,7 +1209,6 @@ C
 C
       ICol=ICol+1
 C
-C     HAP
 C      If(IRow.Ge.ICol) Then
 C
       Call AB0ELEMENT(ABP,ABM,IP,IQ,IR,IS,Occ,HNO,IGFact,
@@ -1226,8 +1216,8 @@ C
      $ NInte1,NInte2,NBasis)
 C
       ABPLUS((ICol-1)*NDimB+IRow)=ABP
-C      ABPLUS((IRow-1)*NDimB+ICol)=ABP
       ABMIN((ICol-1)*NDimB+IRow)=ABM
+C      ABPLUS((IRow-1)*NDimB+ICol)=ABP
 C      ABMIN((IRow-1)*NDimB+ICol)=ABM
 C
 C      EndIf
@@ -1253,8 +1243,8 @@ C     SYMMETRIZE BLOCK
       EndDo
       EndDo
 C
-      Print*, 'AI-Ka',IP,norm2(ABPLUS(1:NDimB**2)),
-     $ norm2(ABMIN(1:NDimB**2))
+C      Print*, 'AI-Ka',IP,norm2(ABPLUS(1:NDimB**2)),
+C     $ norm2(ABMIN(1:NDimB**2))
       If(NoSt.Eq.1) Then
       Call ERPASYMM0(EigY(NFree2),EigX(NFree2),Eig(NFree1),ABPLUS,ABMIN,
      $   NDimB)
@@ -1311,7 +1301,6 @@ C
 C
       ICol=ICol+1
 C
-C     HAP
 C      If(IRow.Ge.ICol) Then
 C
       Call AB0ELEMENT(ABP,ABM,IP,IQ,IR,IS,Occ,HNO,IGFact,
@@ -1319,8 +1308,8 @@ C
      $ NInte1,NInte2,NBasis)
 C
       ABPLUS((ICol-1)*NDimB+IRow)=ABP
-C      ABPLUS((IRow-1)*NDimB+ICol)=ABP
       ABMIN((ICol-1)*NDimB+IRow)=ABM
+C      ABPLUS((IRow-1)*NDimB+ICol)=ABP
 C      ABMIN((IRow-1)*NDimB+ICol)=ABM
 C
 C      EndIf
@@ -1346,8 +1335,8 @@ C     SYMMETRIZE BLOCK
       EndDo
       EndDo
 C
-      Print*, 'VA-Ka',IP,norm2(ABPLUS(1:NDimB**2)),
-     $ norm2(ABMIN(1:NDimB**2))
+C      Print*, 'VA-Ka',IP,norm2(ABPLUS(1:NDimB**2)),
+C     $ norm2(ABMIN(1:NDimB**2))
       If(NoSt.Eq.1) Then
       Call ERPASYMM0(EigY(NFree2),EigX(NFree2),Eig(NFree1),ABPLUS,ABMIN,
      $   NDimB)
@@ -1413,12 +1402,6 @@ C
      $ IndBlock,NoEig,NDimX,NBasis,NInte1,NInte2)
       Print*, 'AB1-KA',norm2(ABPLUS),norm2(ABMIN)
 C
-C      Call AB_CAS_FOFO(ABPLUS,ABMIN,EnDummy,URe,Occ,XOne,
-C     $ IndN,IndX,IGem,NAcCAS,NInAcCAS,NDimX,NBasis,NDimX,
-C     $ NInte1,'FFOOERF','FOFOERF',1d0,.true.)
-CC
-C      Print*, 'AB1-MY',norm2(ABPLUS),norm2(ABMIN)
-C
 C     ADD A SR KERNEL
 C
       If(IFunSRKer.Eq.1) Then
@@ -1463,7 +1446,7 @@ C      EndDo
 C      EndDo
 CC
 C     ALTERNATIVELY:
-C     ADD INTEGRALS      
+C     1st: ADD INTEGRALS      
 C
       Do IRow=1,NoEig
 C
@@ -1487,7 +1470,7 @@ C
       EndDo
       EndDo
 C      
-C     ADD KERNEL IN BATCHES:
+C     2nd: ADD KERNEL IN BATCHES:
 C
       call clock('START',Tcpu,Twall)
       Allocate(Work(Maxlen),Batch(Maxlen,NBasis))
@@ -1691,6 +1674,8 @@ C     endinf of If(IP.Gt.IR.And.IQ.Gt.IS)
 C
       EndDo
       EndDo
+C
+C      Print*, EAll,EIntra
 C
       ECorr=EAll-EIntra
 C

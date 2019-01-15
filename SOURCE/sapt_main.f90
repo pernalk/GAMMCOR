@@ -3,6 +3,7 @@ use types
 use systemdef
 use timing
 use abmat
+use abfofo
 use tran
 use sorter
 use sapt_ener
@@ -1693,7 +1694,7 @@ double precision, allocatable :: EigTmp(:), VecTmp(:)
              !EigY0,EigY1,Eig0,Eig1, &
              propfile0,propfile1, &
              Mon%IndN,Mon%IndX,Mon%IGem,Mon%NAct,Mon%INAct,Mon%NDimX, &
-             NBas,Mon%NDim,NInte1,twofile,twojfile,twokfile,Flags%IFlag0)
+             NBas,Mon%NDim,NInte1,Mon%NoSt,twofile,twojfile,twokfile,Flags%IFlag0)
    case(TWOMO_FFFF) 
       call Y01CAS_mithap(Mon%Occ,URe,XOne,ABPlus,ABMin, &
              EigY0,EigY1,Eig0,Eig1, &

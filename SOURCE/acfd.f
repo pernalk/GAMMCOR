@@ -5,6 +5,7 @@
      $ IndN,IndX,NDimX)
 C
       use abmat
+      use abfofo
 C 
 C     A ROUTINE FOR COMPUTING ELECTRONIC ENERGY USING AC CORRELATION ENERGY FORMULA
 C
@@ -55,8 +56,8 @@ C
       Call Y01CAS_FOFO(Occ,URe,XOne,ABPLUS,ABMIN,
      $ 'PROP0','PROP1',
      $ IndN,IndX,IGem,NAcCAS,NInAcCAS,NDimX,
-     $ NBasis,NDim,NInte1,'EMPTY','FFOO','FOFO',0,
-     $ ETot,ECorr)
+     $ NBasis,NDim,NInte1,NoSt,'EMPTY','FFOO',
+     $ 'FOFO',0,ETot,ECorr)
 C
 C     ITwoEl
       EndIf
@@ -1983,12 +1984,11 @@ C
       EndDo      
 C
       If(NDimB.Ne.0) Then
+      Print*, 'ACT-KA',norm2(ABPLUS(1:NDimB**2)),norm2(ABMIN)
       If(NoSt.Eq.1) Then
-      Print*, 'ABP-KA',norm2(ABPLUS),norm2(ABMIN)
       Call ERPASYMM0(EigY(NFree2),EigX(NFree2),Eig(NFree1),ABPLUS,ABMIN,
      $ NDimB)      
       Else
-      Print*, '?ABP-KA',norm2(ABPLUS),norm2(ABMIN)
       Call ERPAVECYX(EigY(NFree2),EigX(NFree2),Eig(NFree1),ABPLUS,ABMIN,
      $ NDimB)
       EndIf
@@ -2060,6 +2060,7 @@ C
       EndDo
 C
       If(NDimB.Ne.0) Then
+      Print*, 'AI-KA',norm2(ABPLUS(1:NDimB**2)),norm2(ABMIN)
       If(NoSt.Eq.1) Then
       Call ERPASYMM0(EigY(NFree2),EigX(NFree2),Eig(NFree1),ABPLUS,ABMIN,
      $ NDimB)
@@ -2138,6 +2139,7 @@ C
       EndDo
 C
       If(NDimB.Ne.0) Then
+      Print*, 'AV-KA',norm2(ABPLUS(1:NDimB**2)),norm2(ABMIN(1:NDimB**2))
       If(NoSt.Eq.1) Then 
       Call ERPASYMM0(EigY(NFree2),EigX(NFree2),Eig(NFree1),ABPLUS,ABMIN,
      $ NDimB)
@@ -2191,7 +2193,8 @@ C
 C
       Write(6,'(/," *** DONE WITH 0TH-ORDER IN AC0-CASSCF ***")')
       Print*, 'NoEig,NDimX',NoEig,NDimX
-      Print*, 'Eig,Y,X',norm2(Eig(1:NoEig)),norm2(EigY),norm2(EigX)
+      Print*, 'Eig,Y,X',norm2(Eig(1:NoEig)),
+     $ norm2(EigY(1:NoEig**2)),norm2(EigX(1:NoEig**2))
 C
 C     DONE 0TH-ORDER CALCULATIONS
 C
@@ -2407,14 +2410,6 @@ C
       ABMIN(I)=Zero
       EndDo
 C
-C     FOR POSTCAS CALCULATE ALL ELEMENTS OF
-C     AB MATRICES AND SYMMETRIZE
-      If(IFunSR.Eq.4) Then
-      IColEnd=NoEig
-      Else
-      IColEnd=IRow
-      EndIf
-C
 C     ONE-ELECTRON MATRIX IN A NO REPRESENTATION
 C   
       IJ=0
@@ -2512,14 +2507,21 @@ C
 C
       icount=0
       Call CPU_TIME(START_TIME)
+C
+C     HAP-TEST!
+C      IFunSR=4
+C
       Do IRow=1,NoEig
 C
       IR=IndBlock(1,IRow)
       IS=IndBlock(2,IRow)
 C
-C     HAP
-C      Do ICol=1,IRow
-C      Do ICol=1,NoEig
+      If(IFunSR.Eq.4) Then
+      IColEnd=NoEig
+      Else
+      IColEnd=IRow
+      EndIf
+C
       Do ICol=1,IColEnd
 C
       IPP=IndBlock(1,ICol)

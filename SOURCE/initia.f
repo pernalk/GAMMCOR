@@ -1072,6 +1072,7 @@ C      RDM2Act(K)=RDM2Act(K)+Wght*HlpRDM2(K)
 C      EndDo
 C      EndDo
 C
+C
       Deallocate(HlpRDM2)
 C
 
