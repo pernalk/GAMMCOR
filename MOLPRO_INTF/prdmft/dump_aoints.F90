@@ -1,7 +1,7 @@
 module dumpintao
 
 private 
-public dump_aoints,dump_molpro_sapt,dump_intsonly
+public dump_aoints,dump_molpro_sapt,dump_intsonly,dump_dens
 
 double precision :: ChiSave
 
@@ -180,34 +180,345 @@ subroutine dump_aoints
 
 end subroutine dump_aoints
 
-subroutine dump_basinfo(iunit,nstate)
+subroutine dump_basinfo(iunit,nstats,istsy,nstsym,mxstsy)
       implicit double precision (a-h,o-z)
       include "common/corb"
       include "common/cbas"
       include "common/tapes"
       include "common/big"
 
-      integer :: iunit,nstate
+      integer :: iunit,nstsym
+      integer :: istsy(mxstsy),nstats(mxstsy)
 
-      !print*, nocc,ncore,nclos,nval,nact
-      !print*, 'Act:',iact(1:nsk)
-      !print*, 'Closed:',iclos(1:nsk)
-      !print*, 'Total:',nt(1:nsk)
+      !print*, 'nstsym',nstsym
+      !print*, nstats(1:nstsym)
+      !print*, istsy(1:nstsym)
+      !!print*, nocc,ncore,nclos,nval,nact
+      !!print*, 'Act:',iact(1:nsk)
+      !!print*, 'Closed:',iclos(1:nsk)
+      !!print*, 'Total:',nt(1:nsk)
       write(iunit) 'BASINFO '
       write(iunit) int(nsk,kind=4)
-      write(iunit) int(nstate,kind=4)
+      write(iunit) int(nstsym,kind=4)
+      write(iunit) int(nstats(1:nstsym),kind=4)
+      write(iunit) int(istsy(1:nstsym),kind=4)
       write(iunit) int(iclos(1:nsk),kind=4)
       write(iunit) int(iact(1:nsk),kind=4)
       write(iunit) int(nt(1:nsk),kind=4) 
 
 end subroutine dump_basinfo 
 
+subroutine dump_dens(i1fil,i1recnum,ensmble)
+
+      implicit double precision (a-h,o-z)
+      include "common/big"
+      include "common/cbas"
+      include "common/maxatm"
+      include "common/tapes"
+      include "common/cstate"
+      include "common/maxbfn"
+      include "common/corbdim"
+      include "common/casscf"
+      include "common/syminf"
+      integer :: i1fil,i1recnum,ensmble
+      integer :: i1off,itr
+      integer :: icasrec,icasfil
+      integer :: IndInt(ntg)
+      double precision :: wght
+      double precision :: d1mat(nact*nact),onerdm(ntdgx)
+      double precision,allocatable :: GammaEns(:)
+      double precision :: GammaI(ntg*(ntg+1)/2),GammaF(ntg*(ntg+1)/2)
+      double precision :: OrbCas(ntqg),OrbAux(ntg,ntg),OrbSym(ntg,ntg)
+
+      ! set dimensions
+      nact2 = nact*nact       
+      ntr = ntg*(ntg+1)/2
+
+      i1off = 0
+      isymoff = 0
+      if(ensmble==0) then
+
+         do istsym=1,nstsym
+            nstate = nstats(istsym)
+            isym   = istsy(istsym)
+            do i=1,nstate
+               itr = i*(i-1)/2 + i
+               i1off = isymoff + (itr-1)*nact2
+               !print*, 'isym,i1off',isym,i1off
+               call lesw(d1mat,nact*nact,i1fil,i1recnum,i1off)
+            enddo
+            isymoff = isymoff + nstate*(nstate+1)/2*nact2
+         enddo
+
+         GammaI = 0 
+         idx = 0  
+         do j=1,nact 
+            do i=1,j
+               idx = idx + 1
+               ij = i + (j-1)*nact
+               GammaI(idx) = d1mat(ij)*0.5d0
+            enddo
+         enddo
+
+      elseif(ensmble==1) then
+           
+          GammaI=0
+          wght=1d0/nstsym
+          !print*, 'nstsym,wght',nstsym,wght
+          allocate(GammaEns(ntr))
+
+          do istsym=1,nstsym
+             nstate = nstats(istsym)
+             isym   = istsy(istsym)
+
+             if(nstate>1) then
+                write(iout,'(1x,a)') 'CANNOT MAKE ENSAMBLE FOR MORE & 
+                                      THAN 1 STATE IN GIVEN SYM!'
+                call fehler 
+             endif
+
+             do i=1,nstate
+                itr = i*(i-1)/2 + i
+                i1off = isymoff + (itr-1)*nact2
+                !print*, 'isym,i1off',isym,i1off
+                call lesw(d1mat,nact*nact,i1fil,i1recnum,i1off)
+             enddo
+             isymoff = isymoff + nstate*(nstate+1)/2*nact2
+
+             GammaEns = 0 
+             idx = 0  
+             do j=1,nact 
+                do i=1,j
+                   idx = idx + 1
+                   ij = i + (j-1)*nact
+                   GammaEns(idx) = d1mat(ij)*0.5d0
+                enddo
+             enddo
+
+             ! make ensemble density
+             do i=1,ntr
+                GammaI(i) = GammaI(i) + wght*GammaEns(i)
+             enddo
+            
+           enddo
+
+           deallocate(GammaEns)
+
+           ! test
+           !do i=1,ntr
+           !   print*, i, GammaI(i)
+           !enddo
+
+      endif
+
+      !print*,'Active:',nactt(1:8)
+      !print*,'Closed',ncor(1:8)
+      inact=sum(ncor(1:8))
+      iact=sum(nactt(1:8))
+
+      ! expand Gamma
+      GammaF = 0
+      idx = 0
+      do j=1,inact
+         do i=1,j
+            idx = idx + 1
+            if(i==j) GammaF(idx) = 1.0d0
+         enddo
+      enddo
+      idx = 0
+      do j=1,iact
+         do i=1,j
+            idx = idx + 1
+            ioff = (inact+j)*(inact+j-1)/2 + inact
+            GammaF(ioff+i) = GammaI(idx)
+         enddo
+      enddo
+
+      ! get orbs
+      call find_rec('CASORB',icasrec,icasfil)
+      call read_info(icasrec, icasfil, 0, idiffCAS, method)
+      call read_orb(OrbCas, 1)
+      call flush_dump
+
+      ! expand Orbs
+      OrbAux=0
+      idx = 0
+      do irep=1,8
+         ioff = nts(irep)
+         do j=1,nt(irep)
+            do i=1,nt(irep)
+               idx = idx + 1
+               OrbAux(ioff+i,ioff+j) = OrbCas(idx)
+            enddo
+         enddo
+      enddo
+
+      call create_ind(IndInt,ntg)
+
+      ! adapt to symmetry
+      do i=1,ntg
+         do j=1,ntg   
+            OrbSym(IndInt(i),j)=OrbAux(j,i)
+         enddo
+      enddo
+
+      ! get expanded Gamma
+      iab = 0
+      do ia=1,ntg
+         do ib=1,ia
+            iab = iab + 1
+            GammaI(iab) = 0.d0
+            do i=1,ntg
+               do j=1,ntg
+                  idx = max(i,j)*(max(i,j)-1)/2+min(i,j)
+                  GammaI(iab) = GammaI(iab) &
+                + OrbSym(i,ia)*OrbSym(j,ib)*GammaF(idx)
+               enddo
+            enddo
+         enddo
+      enddo
+
+      !do i=1,ntr
+      !   write(*,*) i,GammaI(i)
+      !enddo
+
+      ! collapse GammaI to onerdm
+      idx  = 0
+      do irep=1,8
+        ioff = nts(irep)
+        do j=1,nt(irep)
+           do i=1,j
+              idx = idx + 1
+              ii = (ioff+j)*(ioff+j-1)/2 + ioff+i
+              onerdm(idx) = 2d0*GammaI(ii)
+           enddo
+         enddo
+       enddo
+      !print*, 'idx',idx,ntdg
+ 
+      ! dump to record 
+      call dump_1rdm_st1sym1(onerdm,ensmble)
+
+end subroutine dump_dens
+
+subroutine create_ind(IndInt,NBasis)
+      implicit double precision (a-h,o-z)
+      include "common/corb"
+      include "common/cbas"
+      include "common/tapes"
+      include "common/big"
+
+      integer :: IndInt(NBasis),ivirt(8)
+
+      NSym = nsk
+      ivirt(1:NSym) = nt(1:NSym)-iclos(1:NSym)-iact(1:NSym)
+      !print*,'iclos',iclos(1:NSym)
+      !print*,'iact',iact(1:NSym)
+      !print*,'ivirt',ivirt(1:NSym)
+      if(NSym>1) then
+        ! symmetry 
+        IOld = 0
+        INew = 0
+        do isym=1,NSym
+           do k=1,iclos(isym)
+              IOld = IOld + 1
+              INew = INew + 1
+              IndInt(IOld) = INew
+           enddo
+           do j=1,iact(isym)
+              IOld = IOld + 1
+           enddo
+           do i=1,ivirt(isym)
+              IOld = IOld + 1
+           enddo
+        enddo
+        IOld = 0
+        do isym=1,NSym
+           do k=1,iclos(isym)
+              IOld = IOld + 1
+           enddo
+           do j=1,iact(isym)
+              IOld = IOld + 1
+              INew = INew + 1
+              IndInt(IOld) = INew
+           enddo
+           do i=1,ivirt(isym)
+              IOld = IOld + 1
+           enddo
+        enddo
+        IOld = 0
+        do isym=1,NSym
+           do k=1,iclos(isym)
+              IOld = IOld + 1
+           enddo
+           do j=1,iact(isym)
+              IOld = IOld + 1
+           enddo
+           do i=1,ivirt(isym)
+              IOld = IOld + 1
+              INew = INew + 1
+              IndInt(IOld) = INew
+           enddo
+        enddo
+     
+      else
+        ! nosym
+        do i=1,NBasis
+           IndInt(i) = i
+        enddo
+     
+      endif
+
+end subroutine create_ind
+
+subroutine dump_1rdm_st1sym1(onerdm,ensmble)
+      implicit double precision (a-h,o-z)
+      include "common/tapes"
+      include "common/cbas"
+      include "common/code"
+      include "common/corb"
+      include "common/cref"
+      include "common/clseg"
+      include "common/cgeom"
+      include "common/czmat"
+      include "common/cstat"
+      include "common/cfreeze"
+      include "common/dumpinfow"
+
+      double precision :: onerdm(ntdgx)
+      integer :: ensmble
+      integer :: idenrec,idenfil     
+
+      isyref_save = isyref
+      istate_save = istate
+      isyref = 1
+      istate = 1
+
+      call find_rec('CASDEN',idenrec,idenfil)
+      write(iout,'(1x,a)') 'USER-PRDMFT INTERFACE:'
+      if(ensmble==0) then
+         write(iout,'(1x,a,i1,a,i1,a,i4,a,i1,a)') 'CHARGE DENSITY FOR STATE ',&
+               istate_save,'.',isyref_save, ' DUMPED TO RECORD ',&
+               idenrec,'.',idenfil, ': NOW RECOGNIZED AS THE 1.1 STATE'
+      elseif(ensmble==1) then
+         write(iout,'(1x,a,i4,a,i1,a)') 'CHARGE DENSITY FOR ENSEMBLE &
+               DUMPED TO RECORD ',&
+               idenrec,'.',idenfil, ': NOW RECOGNIZED AS THE 1.1 STATE'
+      endif
+      call reserve_dump(idenrec, idenfil, 'PRDMFT', ntdgx)
+      call write_den(onerdm(1:ntdgx), 1, 'CHARGE')
+      call flush_dump
+      isyref = isyref_save
+      istate = istate_save
+
+end subroutine dump_1rdm_st1sym1
+
 subroutine dump_gamma(outfile,i2fil,i2recnum,i1fil,i1recnum)
       implicit double precision (a-h,o-z)
       include "common/maxatm"
       include "common/tapes"
 !      include "common/dumpinfow"
-!      include "common/cstate"
+      include "common/cstate"
       include "common/maxbfn"
       include "common/corbdim"
       include "common/casscf"
@@ -227,35 +538,54 @@ subroutine dump_gamma(outfile,i2fil,i2recnum,i1fil,i1recnum)
 
       nact2 = nact*nact       
 
+      print*,'istsy',istsy(1:nstsym) 
+
       call find_free_unit(ifil)
       open(unit=ifil,file=trim(outfile),form='unformatted')
 
-      call dump_basinfo(ifil,nstate)
+      call dump_basinfo(ifil,nstats,istsy,nstsym,mxstsy)
 
-      write(ifil) '2RDM    '
-      write(ifil) int(ic1d,kind=4),int(nstate,kind=4)
       i2off = 0
-      do i=1,nstate
-         itr = i*(i-1)/2 + i
-         i2off = (itr-1)*ic1d
-         call lesw(d2mat,ic1d,i2fil,i2recnum,i2off)
-         !write(6,*) i,itr,i2off
-         !write(6,*) d2mat(1:ic1d)
-         write(ifil) int(i,kind=4) 
-         write(ifil) d2mat(1:ic1d)
+      isymoff = 0
+      nstate = 3
+      write(ifil) '2RDM    '
+      !write(ifil) int(ic1d,kind=4),int(nstate,kind=4)
+      write(ifil) int(ic1d,kind=4),int(nstsym,kind=4)
+      do istsym=1,nstsym
+         nstate = nstats(istsym)
+         isym   = istsy(istsym)
+         write(ifil) int(isym,kind=4),int(nstate,kind=4)
+         do i=1,nstate
+            itr = i*(i-1)/2 + i
+            i2off = isymoff + (itr-1)*ic1d
+            call lesw(d2mat,ic1d,i2fil,i2recnum,i2off)
+            !write(6,*) i,itr,i2off
+            !write(6,*) d2mat(1:ic1d)
+            write(ifil) int(i,kind=4) 
+            write(ifil) d2mat(1:ic1d)
+         enddo
+         isymoff = isymoff + nstate*(nstate+1)/2*ic1d
       enddo
 
-      write(ifil) '1RDM    '
-      write(ifil) int(nact,kind=4),int(nact2,kind=4),int(nstate,kind=4)
       i1off = 0
-      do i=1,nstate
-         itr = i*(i-1)/2 + i
-         i1off = (itr-1)*nact2
-         call lesw(d1mat,nact*nact,i1fil,i1recnum,i1off)
-         !write(6,*) i,itr,i1off
-         !write(6,*) d1mat(1:nact2)*0.5d0
-         write(ifil) int(i,kind=4) 
-         write(ifil) d1mat(1:nact2)
+      isymoff = 0
+      write(ifil) '1RDM    '
+      write(ifil) int(nact,kind=4),int(nact2,kind=4),int(nstsym,kind=4)
+      do istsym=1,nstsym
+         nstate = nstats(istsym)
+         isym   = istsy(istsym)
+         write(ifil) int(isym,kind=4),int(nstate,kind=4)
+         do i=1,nstate
+            itr = i*(i-1)/2 + i
+            i1off = isymoff + (itr-1)*nact2
+            print*, 'isym,i1off',isym,i1off
+            call lesw(d1mat,nact*nact,i1fil,i1recnum,i1off)
+            !write(6,*) i,itr,i1off
+            !write(6,*) d1mat(1:nact2)*0.5d0
+            write(ifil) int(i,kind=4) 
+            write(ifil) d1mat(1:nact2)
+         enddo
+         isymoff = isymoff + nstate*(nstate+1)/2*nact2
       enddo
 
       close(ifil)
@@ -439,6 +769,7 @@ end subroutine dump_orbs
 
 subroutine find_rec(str,irec,ifil)
       implicit double precision (a-h,o-z)
+      include "common/tapes"
       character(*) :: str
       integer :: irec,ifil
       character(8) :: unit
@@ -453,12 +784,16 @@ subroutine find_rec(str,irec,ifil)
       ifil=int((xtmp-dble(irec))*10.1d0)
 
       if(irec==0.and.trim(str)=='NATORB') then
-        write(6,*) 'WARNING: NATORB label not defined! Assuming rec=2140.2!'
+        write(iout,*) 'WARNING: NATORB LABEL NOT DEFINED! ASSUMING rec=2140.2!'
         irec=2140
         ifil=2
       elseif(irec==0.and.trim(str)=='CASORB') then
-        write(6,*) 'WARNING: CASORB label not defined! Assuming rec=2144.2!'
+        write(iout,*) 'WARNING: CASORB LABEL NOT DEFINED! ASSUMING rec=2144.2!'
         irec=2144
+        ifil=2
+      elseif(irec==0.and.trim(str)=='CASDEN') then
+        write(iout,'(1x,a)') 'WARNING: CASDEN LABEL NOT DEFINED! ASSUMING rec=6200.2!'
+        irec=6200
         ifil=2
       endif
 

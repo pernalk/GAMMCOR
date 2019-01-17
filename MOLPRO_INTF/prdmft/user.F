@@ -18,8 +18,8 @@
       character(len = 32) :: prdmft_job
       character(len = 8) :: units
 
-      write(iout,*) 'IsRangeHybrid', IsRangeHybrid
-      write(iout,*) 'IsChi', IsChi,ChiRS
+      !write(iout,*) 'IsRangeHybrid', IsRangeHybrid
+      !write(iout,*) 'IsChi', IsChi,ChiRS
 
        call getx(1, field, maxf)
        ! PTDMFT interface
@@ -34,9 +34,15 @@
          elseif(field(3) == "CAS") then
             call dump_aoints 
             call dump_intsonly('AOTWOINT.mol')
+         elseif(field(3) == "POSTCAS") then
+            call dump_aoints 
          elseif(field(3) == "LRCAS") then
             call dump_aoints 
             call dump_intsonly('AOTWOINT.erf')
+         elseif(field(3) == "DENSAVE") then
+            call dump_dens(2,7100,0)
+         elseif(field(3) == "ENS") then
+            call dump_dens(2,7100,1)
 
          endif
        ! PTDMFT-SAPT interface
