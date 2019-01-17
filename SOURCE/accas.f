@@ -114,10 +114,6 @@ C
       Call RunACCASLR(ETot,ENuc,TwoNO,URe,UNOAO,Occ,XOne,
      $  IndAux,IPair,IndN,IndX,NDimX,Title,NBasis,NInte1,NInte2,NGem)
 C
-C      TEST...
-C      Call RunACCAS(ETot,ENuc,TwoNO,URe,UNOAO,Occ,XOne,
-C     $  IndAux,IPair,IndN,IndX,NDimX,Title,NBasis,NInte1,NInte2,NGem)
-C
       EndIf
 C
       Return
@@ -389,12 +385,13 @@ C
       FName(K:K+10)='.reg.integ'
 C      Call Int2_AO(TwoEl2,NumOSym,MultpC,FName,NInte1,NInte2,NBasis)
       Call readtwoint(NBasis,2,'AOTWOINT.mol','AOTWOSORT')
-      Call LoadSaptTwoEl(3,TwoEl2,NBasis,NInte2)
+      If(ITwoEl.Eq.1) Call LoadSaptTwoEl(3,TwoEl2,NBasis,NInte2)
 C
+      If(ITwoEl.Eq.1) Then
       Write(6,'(" Transforming two-electron erf integrals ...")')
       Call TwoNO1(TwoEl2,UNOAO,NBasis,NInte2)
 C
-      If(ITwoEl.Eq.3) Then
+      ElseIf(ITwoEl.Eq.3) Then
 C     PREPARE POINTERS: NOccup=num0+num1
       Call prepare_nums(Occ,Num0,Num1,NBasis)
 C     TRANSFORM J AND K
@@ -425,8 +422,8 @@ C
       Do I=1,NBasis
       VecAux=UNOAO(I,:)
       Call dger(NBasis,NBasis,1d0*Occ(I),
-C     $          UNOAO(I,:),1,UNOAO(I,:),1,Den,NBasis)
      $          VecAux,1,VecAux,1,Den,NBasis)
+C     $          UNOAO(I,:),1,UNOAO(I,:),1,Den,NBasis)
       EndDo
 C 
       IJ = 0
@@ -443,8 +440,8 @@ C
       Print*, 'VCoul',norm2(VCoul)
       Call EPotSR(EnSR,EnHSR,VSR,Occ,URe,UNOAO,.false.,
      $        OrbGrid,OrbXGrid,OrbYGrid,OrbZGrid,WGrid,
-C     $        NSymNO,VCoul,Alpha,IFunSR,
-     $        NSymNO,VCoul,TwoEl2,TwoNO,Alpha,IFunSR,
+     $        NSymNO,VCoul,Alpha,IFunSR,
+C     $        NSymNO,VCoul,TwoEl2,TwoNO,Alpha,IFunSR,
      $        NGrid,NInte1,NInte2,NBasis)
 C
 C      Call EPotSR(EnSR,EnHSR,VSR,Occ,URe,OrbGrid,OrbXGrid,OrbYGrid,
@@ -2060,6 +2057,9 @@ C
       EndDo
       Write(6,'(/,1X,''One-Electron Energy'',6X,F15.8)')EOne
 C
+C     ITwoEl
+      If(ITwoEl.Eq.1) Then
+C
       ETot=EOne
       Do IP=1,NOccup
       Do IQ=1,NOccup
@@ -2071,6 +2071,13 @@ C
       EndDo
       EndDo
       EndDo
+C
+      ElseIf(ITwoEl.Eq.3) Then       
+C
+      Call TwoEneChck(ETot,RDM2Act,Occ,INActive,NAct,NBasis)
+C
+C     ITwoEl
+      EndIf
 C
       Write(6,'(1X,''CASSCF Energy (w/o ENuc)'',X,F15.8)')ETot
       Write(6,'(1X,''Total CASSCF Energy '',5X,F15.8)')ETot+ENuc
@@ -2102,12 +2109,20 @@ c     $ OrbZGrid,WGrid,NGrid,NBasis)
 c      Write(6,'(/," PBE_xc with translated densities",F15.8,/)')
 c     $ EXCTOP
 C
+C     ITwoEl
+      If(ITwoEl.Eq.1) Then
       EnH=Zero
       Do I=1,NOccup
       Do J=1,NOccup
       EnH=EnH+Two*Occ(I)*Occ(J)*TwoNO(NAddr3(I,I,J,J))
       EndDo
       EndDo
+C
+      ElseIf(ITwoEl.Eq.3) Then
+C
+      Call TwoEHartree(EnH,RDM2Act,Occ,INActive,NAct,NBasis)
+C
+      EndIf
 C
       ETot=EOne+EnH+EXCTOP
       Write(6,'(1X,''E_Hartree                     '',X,F15.8)') EnH 

@@ -179,7 +179,7 @@ C     SELECT ELECTRONIC STATE
 C
       If(InSt(2,1).Gt.0) Then
       NoSt = System%InSt(1,1)
-      Print*,'W INPUCIE JEST: ',NoSt
+C      Print*,'VALUE DECLARED IN INPUT: ',NoSt
 C
       ElseIf(IDALTON.Eq.0) Then
       Call read_NoSt_molpro(NoSt,'2RDM')
@@ -190,7 +190,7 @@ C
 C
       EndIf
 C
-      Print*, 'NoSt:',NoSt
+      Write(6,'(1x,"NoSt=",I2)')NoSt
 C      Print*, 'InSt', InSt(1,1),InSt(2,1)
 C
 C     READ THE INPUT AND PRINT THE INPUT DATA 
@@ -237,6 +237,8 @@ C      Call GetAlpha(Title)
 C
 C     ALLOCATE THE MATRICES
 C
+      If(ITwoEl.Eq.3) NInte2=1
+C
       Allocate  (Occ(NBasis))
       Allocate  (URe(NBasis*NBasis))
       Allocate  (XKin(NInte1))
@@ -262,8 +264,6 @@ C     LOAD THE INTEGRALS
 C
       If(IDALTON.Eq.0) Then
 C
-C      Call LdInteg(Title,XKin,XNuc,ENuc,Occ,URe,DipX,DipY,DipZ,
-C     $ TwoEl,TwoElErf,UMOAO,NSymMO,NInte1,NBasis,NInte2)
       Call LdInteg(Title,XKin,XNuc,ENuc,Occ,URe,TwoEl,UMOAO,NInte1,
      $ NBasis,NInte2,NGem)
 C

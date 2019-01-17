@@ -5,7 +5,7 @@
 C    HAP
 C     $ OrbZGrid,WGrid,NSymMO,TwoEl,TwoElErf,
      $ OrbZGrid,WGrid,NSymMO,VCoul,
-     $ TwoEl,TwoElErf,
+C     $ TwoEl,TwoElErf,
      $ Omega,Flag,NGrid,NInte1,NInte2,NBasis) 
 C
 C     RETURNS SR ENERGY AND POTENTIAL = SR_XC + SR_H
@@ -48,8 +48,7 @@ C     HAP: VHSR is computed in AO during canonicalization
 C
       Call tran_matTr(VCoul,UNOAO,UNOAO,NBasis,Transp)
       VHSR = VCoul
-C      Print*, 'VHSR',VHSR
-      Print*, 'VHSR-MY',norm2(VHSR)
+C      Print*, 'VHSR-MY',norm2(VHSR)
 C     Old:
 C      Call PotHSR(VHSR,Occ,URe,TwoEl,TwoElErf,NInte1,NInte2,NBasis)
 C      Print*,'VHSR-Ka', norm2(VHSR)

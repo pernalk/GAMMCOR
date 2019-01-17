@@ -1782,7 +1782,7 @@ call AB_CAS_FOFO(ABPLUS,ABMIN,EnDummy,URe,Occ,XOne,&
               IndN,IndX,IGem,NAct,INActive,NDimX,NBasis,NDimX,&
               NInte1,IntJFile,IntKFile,1d0,.true.)
 
-print*, 'AB1-MY',norm2(ABPLUS),norm2(ABMIN)
+!print*, 'AB1-MY',norm2(ABPLUS),norm2(ABMIN)
 ! here!!!! can this be made cheaper?
 allocate(work1(NDimX**2))
 ! work1=ABPLUS.EigX
@@ -1841,7 +1841,7 @@ do i=1,NBasis
    C(i) = sign(sqrt(Occ(i)),Occ(i)-0.5d0)
 enddo
 
-print*, 'AB-MY',norm2(ABPLUS),norm2(ABMIN)
+!print*, 'AB-MY',norm2(ABPLUS),norm2(ABMIN)
 EigY1 = 0
 do j=1,NDimX
    if(Eig(j)/=0d0) then
@@ -1858,8 +1858,6 @@ enddo
 !print*, 'FIRST',norm2(EigY1)
 
 ! second loop ...
-!call dgemm('N','T',NDimX,NDimX,NDimX,1d0,EigY1,NDimX,EigY,NDimX,0d0,ABPLUS,NDimX)
-!print*, 'ABPLUS-MY-2',norm2(ABPLUS)
 call dgemm('N','T',NDimX,NDimX,NDimX,1d0,EigY,NDimX,EigY1,NDimX,0d0,ABPLUS,NDimX)
 !print*, 'ABPLUS-MY',norm2(ABPLUS)
 
@@ -1871,7 +1869,6 @@ enddo
 ! energy loop
 EAll = 0
 EIntra = 0
-!open(newunit=iunit,file='FOFOERF',status='OLD', &
 open(newunit=iunit,file='FOFO',status='OLD', &
      access='DIRECT',recl=8*NBasis*NOccup)
 
@@ -2816,7 +2813,7 @@ if(nAA>0) then
              NOccup,NAct,INActive,nAA,'FOFO','FOFOERF')
    endif
 
-   print*, 'ACT-ACT-MY',nAA,norm2(ABP),norm2(ABM)
+   !print*, 'ACT-ACT-MY',nAA,norm2(ABP),norm2(ABM)
    if(NoSt==1) then
       call ERPASYMM0(EigYt,EigXt,Eigt,ABP,ABM,nAA)
    elseif(NoSt>1) then
@@ -2843,7 +2840,7 @@ do iq=1,INActive
 
       ABP = ABPLUS(i:j,i:j)
       ABM = ABMIN(i:j,i:j)
-      print*, 'AI-MY',iq,norm2(ABP),norm2(ABM)
+      !print*, 'AI-MY',iq,norm2(ABP),norm2(ABM)
       if(NoSt==1) then
          call ERPASYMM0(EigYt,EigXt,Eigt,ABP,ABM,nAI(iq))
       elseif(NoSt>1) then
@@ -2870,7 +2867,7 @@ do ip=NOccup+1,NBasis
 
       ABP = ABPLUS(i:j,i:j)
       ABM = ABMIN(i:j,i:j)
-      print*, 'AV-MY',ip,norm2(ABP),norm2(ABM)
+      !print*, 'AV-MY',ip,norm2(ABP),norm2(ABM)
       if(NoSt==1) then
          call ERPASYMM0(EigYt,EigXt,Eigt,ABP,ABM,nAV(ip))
       elseif(NoSt>1) then
@@ -2913,15 +2910,14 @@ if(IFlag0==1) return
 call AB_CAS_FOFO(ABPLUS,ABMIN,EnDummy,URe,Occ,XOne,&
               IndN,IndX,IGem,NAct,INActive,NDimX,NBasis,NDimX,&
               NInte1,IntJFile,IntKFile,1d0,.true.)
- print*, 'AB1-MY',norm2(ABPLUS),norm2(ABMIN)
+!print*, 'AB1-MY',norm2(ABPLUS),norm2(ABMIN)
 
 if(IFunSRKer==1) then
-   Print*, 'dupa'
    call ModABMin_FOFO(Occ,SRKer,Wt,OrbGrid,ABMIN,&
                  MultpC,NSymNO,&
                  IndN,IndX,NDimX,NGrid,NBasis,&
                  NAct,INActive,'FOFO','FOFOERF',.true.)
-   print*, 'ABM-MY',norm2(ABMIN)
+   !print*, 'ABM-MY',norm2(ABMIN)
 endif
 ! here!!!! can this be made cheaper?
 allocate(work1(NDimX**2))
@@ -2996,12 +2992,10 @@ do j=1,NDimX
    endif
 enddo
 
-print*, 'FIRST',norm2(EigY1)
+!print*, 'FIRST',norm2(EigY1)
 ! second loop ...
-!call dgemm('N','T',NDimX,NDimX,NDimX,1d0,EigY1,NDimX,EigY,NDimX,0d0,ABPLUS,NDimX)
-!print*, 'ABPLUS-MY-2',norm2(ABPLUS)
 call dgemm('N','T',NDimX,NDimX,NDimX,1d0,EigY,NDimX,EigY1,NDimX,0d0,ABPLUS,NDimX)
-print*, 'ABPLUS-MY',norm2(ABPLUS)
+!print*, 'ABPLUS-MY',norm2(ABPLUS)
 
 pos = 0
 do i=1,NDimX
@@ -3057,7 +3051,6 @@ close(iunit)
 ECorr = EAll-EIntra
 
 print*, 'EAll,EIntra',EAll,EIntra
-print*, 'ECorr',ECorr
 
 endif
 
