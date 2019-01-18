@@ -170,24 +170,6 @@ C
       If(IFunSRKer.Eq.2)Stop'Fatal Error: Kernel for PBE not available!'
       Write(*,'(/,"IFunSR=",I1)')IFunSR
       Write(*,'(/,"IFunSRKer=",I1,/)')IFunSRKer
-C      Write(*,'(/,"IFunSR=",I1)')IFunSR
-C      Write(*,'(/,"IFunSRKer=",I1,/)')IFunSRKer
-C
-C     *************************************************************************
-C         
-C     SELECT ELECTRONIC STATE  
-C      NoSt = Flags%NoSt
-      NoSt = System%InSt(1,1) 
-      NStates = System%NStates
-      InSt(1:2,1:NStates) = System%InSt
-C
-C      Print*, 'NoSt:',NoSt
-C      Print*, 'InSt', InSt(1,1),InSt(2,1)
-C
-C     READ THE INPUT AND PRINT THE INPUT DATA 
-C
-C     OLD INPUT-READ
-C      Call RWInput(Title,ZNucl,Charge,NBasis)
 C
 C     *************************************************************************
 C
@@ -200,6 +182,32 @@ C
       If(ISAPT.Eq.1) Call sapt_driver(Flags,Sapt)
 C
 C     *************************************************************************
+C         
+C     SELECT ELECTRONIC STATE  
+C
+      NStates = System%NStates
+      InSt(1:2,1:NStates) = System%InSt
+C
+      If(InSt(2,1).Gt.0) Then
+      NoSt = System%InSt(1,1)
+C      Print*,'VALUE DECLARED IN INPUT: ',NoSt
+C
+      ElseIf(IDALTON.Eq.0) Then
+      Call read_NoSt_molpro(NoSt,'2RDM')
+      ElseIf(IDALTON.Eq.1) Then
+      NoSt = 1
+      Write(6,'(/,1x,a)') 'WARNING! ASSUMING RMDs CORRESPOND TO
+     $                     GROUND STATE FROM DALTON OUTPUT (NoSt=1)!'
+C
+      EndIf
+C
+      Write(6,'(1x,"NoSt=",I2)')NoSt
+C
+C     READ THE INPUT AND PRINT THE INPUT DATA 
+C
+C     OLD INPUT-READ
+C      Call RWInput(Title,ZNucl,Charge,NBasis)
+C
 C
 C     CALCULATE THE DIMENSIONS
       If(IDALTON.Eq.0) then
@@ -253,8 +261,6 @@ C     LOAD THE INTEGRALS
 C
       If(IDALTON.Eq.0) Then
 C
-C      Call LdInteg(Title,XKin,XNuc,ENuc,Occ,URe,DipX,DipY,DipZ,
-C     $ TwoEl,TwoElErf,UMOAO,NSymMO,NInte1,NBasis,NInte2)
       Call LdInteg(Title,XKin,XNuc,ENuc,Occ,URe,TwoEl,UMOAO,NInte1,
      $ NBasis,NInte2,NGem)
 C

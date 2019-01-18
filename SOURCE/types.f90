@@ -638,6 +638,38 @@ character(8) :: label
 
 end subroutine read_2rdm_molpro
 
+subroutine read_NoSt_molpro(NoSt,infile)
+! when State variable not given in input, read the state number (NoSt)
+! for which calculations will be performed
+implicit none
+
+integer,intent(inout) :: NoSt
+character(*),intent(in) :: infile
+
+integer :: iunit,ios,isym,nstate
+character(8) :: label
+
+ open(newunit=iunit,file=infile,status='OLD', &
+      access='SEQUENTIAL',form='UNFORMATTED')
+
+ fileloop: do
+           read(iunit,iostat=ios) label
+           if(ios<0) then
+              write(LOUT,*) 'ERROR!!! LABEL 1RDM     not found!'  
+              stop
+           endif
+           if(label=='1RDM    ') then
+              read(iunit)
+              read(iunit) isym,nstate 
+              read(iunit) NoSt
+              exit fileloop
+           endif 
+         enddo fileloop
+
+ close(iunit)
+
+end subroutine read_NoSt_molpro
+
 subroutine read_nact_molpro(nact,infile)
 implicit none
 
