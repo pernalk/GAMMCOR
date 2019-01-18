@@ -642,7 +642,7 @@ C      EndDo
  
 C     HAP
       Call create_ind('2RDM',NumOSym,IndInt,MxSym,NBasis)
-
+      
 C     LOAD ONE-ELE INTEGS IN AO
       FName(K:K+8)='xone.dat'
 C      Call Int1_AO(XKin,NInte1,FName,NumOSym,Nbasis)

@@ -173,6 +173,16 @@ C
 C
 C     *************************************************************************
 C         
+C     NBasis READ FROM SIRIUS.RST
+      If(IDALTON.Eq.1) Call basinfo(NBasis,'SIRIUS.RST','DALTON')
+C
+C     CHECK IF SAPT RUN      
+      ISAPT=Flags%ISAPT
+C
+      If(ISAPT.Eq.1) Call sapt_driver(Flags,Sapt)
+C
+C     *************************************************************************
+C
 C     SELECT ELECTRONIC STATE
       NStates = System%NStates
       InSt(1:2,1:NStates) = System%InSt
@@ -197,18 +207,6 @@ C     READ THE INPUT AND PRINT THE INPUT DATA
 C
 C     OLD INPUT-READ
 C      Call RWInput(Title,ZNucl,Charge,NBasis)
-C
-C     *************************************************************************
-C
-C     NBasis READ FROM SIRIUS.RST
-      If(IDALTON.Eq.1) Call basinfo(NBasis,'SIRIUS.RST','DALTON')
-C
-C     CHECK IF SAPT RUN      
-      ISAPT=Flags%ISAPT
-C
-      If(ISAPT.Eq.1) Call sapt_driver(Flags,Sapt)
-C
-C     *************************************************************************
 C
 C     CALCULATE THE DIMENSIONS
       If(IDALTON.Eq.0) then

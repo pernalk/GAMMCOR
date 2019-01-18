@@ -114,20 +114,20 @@ integer :: r,s,rs
 
 end subroutine tran4_unsym2
 
-subroutine tran3Q_full(NBas,CX,Q,fname)
+subroutine tran3Q_full(NBas,nocc,CX,Q,fname)
 ! 3-index transformation out of core
 implicit none
 
-integer,intent(in) :: NBas
+integer,intent(in) :: NBas,nocc
 !integer,intent(in) :: nA,nB,nC,nD
 ! CA(NBas*nA)
 double precision,intent(in) :: CX(*),Q(*)
 character(*) :: fname
 double precision, allocatable :: work1(:), work2(:), work3(:,:)
 integer :: iunit,iunit2,iunit3
-integer :: ntr,nsq,nloop
+integer :: ntr,nsq,noccsq,nloop
 integer,parameter :: cbuf=512
-integer :: i,rs,ab
+integer :: i,j,ij,rs,ab
 
  write(6,'()') 
 ! write(6,'(1x,a)') 'TRAN3'
@@ -136,6 +136,7 @@ integer :: i,rs,ab
 
  ntr = NBas*(NBas+1)/2
  nsq = NBas**2
+ noccsq = nocc**2
 
  ! set no. of triangles in buffer
  nloop = (ntr-1)/cbuf+1
@@ -178,7 +179,8 @@ integer :: i,rs,ab
 
 ! |qa) pr-triang, qa-square
  open(newunit=iunit3,file=fname,status='REPLACE',&
-     access='DIRECT',form='UNFORMATTED',recl=8*nsq)
+     !access='DIRECT',form='UNFORMATTED',recl=8*nsq)
+     access='DIRECT',form='UNFORMATTED',recl=8*noccsq)
 
  do ab=1,ntr
 
@@ -193,9 +195,20 @@ integer :: i,rs,ab
     call dgemm('T','N',NBas,NBas,NBas,1d0,CX,NBas,work2,NBas,0d0,work1,NBas)
     call dgemm('N','N',NBas,NBas,NBas,1d0,work1,NBas,Q,NBas,0d0,work2,NBas)
 
-    write(iunit3,rec=ab) work2(1:nsq)
+    ij = 0
+    do j=1,nocc
+       do i=1,nocc
+          ij = ij + 1
+          work1(ij) = work2((j-1)*NBas+i)
+       enddo
+    enddo
+
+    !write(iunit3,rec=ab) work2(1:nsq)
+    write(iunit3,rec=ab) work1(1:noccsq)
 
  enddo
+
+ write(LOUT,'(1x,a)') 'ACHTUNG-BABY! NEW TRAN3Q USED!'
 
  deallocate(work1,work2,work3)
  close(iunit3)

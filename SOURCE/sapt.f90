@@ -169,11 +169,8 @@ double precision,external  :: trace,FRDM2
  call dgemm('N','N',NBas,NBas,NBas,1d0,PA,NBas,USb,NBas,0d0,Qab,NBas)
  call dgemm('N','N',NBas,NBas,NBas,1d0,PB,NBas,USa,NBas,0d0,Qba,NBas)
 
- call tran3Q_full(NBas,A%CMO,Qba,'TWOA3B')
- !call tran3Q_full(dimOA,A%CMO(1:dimOA,1:dimOA),Qba(1:dimOA,1:dimOA),'TWOA3B')
- call tran3Q_full(NBas,B%CMO,Qab,'TWOB3A')
-! HERE!!!
- ! Design tran3Q_lim
+ call tran3Q_full(NBas,dimOA,A%CMO,Qba,'TWOA3B')
+ call tran3Q_full(NBas,dimOB,B%CMO,Qab,'TWOB3A')
 
  call make_K(NBas,PB,Kb)
 
@@ -291,7 +288,8 @@ double precision,external  :: trace,FRDM2
  t2c(2)=0
  do is=1,dimOB
     do iq=1,dimOB
-       t2c(2) = t2c(2) + sum(RDM2Bval(:,:,iq,is)*Vabb(:,:)*PAbb(is,iq))
+       !t2c(2) = t2c(2) + sum(RDM2Bval(:,:,iq,is)*Vabb(:,:)*PAbb(is,iq))
+       t2c(2) = t2c(2) + sum(RDM2Bval(1:dimOB,1:dimOB,iq,is)*Vabb(1:dimOB,1:dimoB)*PAbb(is,iq))
     enddo
  enddo    
  t2c(2) = -2d0*t2c(2)
@@ -351,7 +349,8 @@ double precision,external  :: trace,FRDM2
  t2b(2)=0
  do is=1,dimOA
     do iq=1,dimOA
-       t2b(2) = t2b(2) + sum(RDM2Aval(:,:,iq,is)*Vbaa(:,:)*PBaa(is,iq))
+       !t2b(2) = t2b(2) + sum(RDM2Aval(:,:,iq,is)*Vbaa(:,:)*PBaa(is,iq))
+       t2b(2) = t2b(2) + sum(RDM2Aval(1:dimOA,1:dimOA,iq,is)*Vbaa(1:dimOA,1:dimOA)*PBaa(is,iq))
     enddo
  enddo    
  t2b(2) = -2d0*t2b(2)
@@ -436,13 +435,15 @@ double precision,external  :: trace,FRDM2
  write(LOUT,*),'T2a(1)',t2a(1)
 
  open(newunit=iunit,file='TWOA3B',status='OLD',&
-     access='DIRECT',form='UNFORMATTED',recl=8*NBas**2)
+     !access='DIRECT',form='UNFORMATTED',recl=8*NBas**2)
+     access='DIRECT',form='UNFORMATTED',recl=8*dimOA**2)
 
 ! Qba
 ! old: 
  do ir=1,NBas
     do ip=1,ir
-       read(iunit,rec=ip+ir*(ir-1)/2) work
+       !read(iunit,rec=ip+ir*(ir-1)/2) work
+       read(iunit,rec=ip+ir*(ir-1)/2) work(1:dimOA,1:dimOA)
 
        if(ip==ir) then
  
@@ -468,11 +469,12 @@ double precision,external  :: trace,FRDM2
 
     enddo
  enddo
-! new?
-! Qba 
+! new - but more tests needed!
+!! Qba 
 ! do ir=1,NBas
 !    do ip=1,ir
-!       read(iunit,rec=ip+ir*(ir-1)/2) work
+!      !read(iunit,rec=ip+ir*(ir-1)/2) work
+!      read(iunit,rec=ip+ir*(ir-1)/2) work(1:dimOA,1:dimOA)
 !
 !       if(ip==ir) then
 !
@@ -512,11 +514,13 @@ double precision,external  :: trace,FRDM2
 
 ! Qab
  open(newunit=iunit,file='TWOB3A',status='OLD',&
-     access='DIRECT',form='UNFORMATTED',recl=8*NBas**2)
+     access='DIRECT',form='UNFORMATTED',recl=8*dimOB**2)
+     !access='DIRECT',form='UNFORMATTED',recl=8*NBas**2)
 
  do ir=1,NBas
     do ip=1,ir
-       read(iunit,rec=ip+ir*(ir-1)/2) work
+       !read(iunit,rec=ip+ir*(ir-1)/2) work
+       read(iunit,rec=ip+ir*(ir-1)/2) work(1:dimOB,1:dimOB)
 
        if(ip==ir) then
  

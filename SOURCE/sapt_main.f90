@@ -44,7 +44,7 @@ double precision :: Tcpu,Twall
     call e1elst(SAPT%monA,SAPT%monB,SAPT)
     ! temporary here!!!!
     if(Flags%ICASSCF==1) then
-       !call e1exchs2(SAPT%monA,SAPT%monB,SAPT)
+       call e1exchs2(SAPT%monA,SAPT%monB,SAPT)
     endif
     if(SAPT%SaptLevel==0) then
        call e2disp_unc(Flags,SAPT%monA,SAPT%monB,SAPT)
