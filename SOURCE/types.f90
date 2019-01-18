@@ -145,6 +145,7 @@ type SystemBlock
       integer,allocatable :: InSt(:,:)
       integer,allocatable :: IGem(:), IndAux(:)
       integer,allocatable :: IndX(:), IndN(:,:), IPair(:,:)
+      integer,allocatable :: MultpC(:,:),NSymNO(:)
       integer,allocatable :: IndXh(:)
       integer,allocatable :: NumOSym(:),IndInt(:)
       ! TEST ONLY
@@ -563,7 +564,6 @@ character(8) :: label
            if(label=='2RDM    ') then
               !read(iunit) ic1d,nstate
               read(iunit) ic1d,nstsym
-              !print*, ic1d,TrSq,nstsym
               if(scanfile) then 
                  do istsym=1,nstsym
                     read(iunit) isym,nstate
@@ -580,9 +580,11 @@ character(8) :: label
                  read(iunit) isym,nstate 
                  read(iunit) ist
                  read(iunit) work(1:TrSq)
-                 write(LOUT,'(1x,a,i2,a,i1,a)') 'WARNING! 2RDM FOR STATE',&
-                             & ist,'.',isym,' WILL BE USED IN CALCULATIONS!'
-                 iwarn = iwarn + 1
+                 if(isym/=1.or.ist/=1) then
+                    write(LOUT,'(1x,a,i2,a,i1,a)') 'WARNING! 2RDM FOR STATE',&
+                                & ist,'.',isym,' WILL BE USED IN CALCULATIONS!'
+                    iwarn = iwarn + 1
+                 endif
                  exit fileloop
               endif
            endif 
@@ -745,10 +747,12 @@ character(8) :: label
                  read(iunit) isym,nstate 
                  read(iunit) ist
                  read(iunit) work(1:nact2)
-                 write(LOUT,'(1x,a,i2,a,i1,a)') 'WARNING! 1RDM FOR STATE',&
-                             & ist,'.',isym,' WILL BE USED IN CALCULATIONS!'
-                 write(LOUT,'()')
-                 iwarn = iwarn + 1 
+                 if(isym/=1.or.ist/=1) then
+                    write(LOUT,'(1x,a,i2,a,i1,a)') 'WARNING! 1RDM FOR STATE',&
+                                & ist,'.',isym,' WILL BE USED IN CALCULATIONS!'
+                    write(LOUT,'()')
+                    iwarn = iwarn + 1
+                 endif 
                  exit fileloop
               endif
            endif 
@@ -1466,6 +1470,56 @@ end function iscomment
 !! deallocate(orbval,mapinv,wt,r)
 !!
 !end subroutine molpro_routines
+
+subroutine create_symmats(Mon,MO,NBasis)
+implicit none
+! create MultpC and NSymNO 
+! WARNING!!!! THIS PROCEDURE STILL REQUIRES VERIFICATION
+! WITH A SAPT LR-PBE JOB!!!
+
+integer,intent(in) :: NBasis
+double precision,intent(in) :: MO(NBasis,NBasis)
+type(SystemBlock) :: Mon
+
+integer :: i,j,iorb,istart
+
+allocate(Mon%NSymNO(NBasis),Mon%MultpC(15,15))
+
+if(Mon%NSym==1) then
+   Mon%MultpC(1,1)=1
+else
+   do i=1,Mon%NSym
+      do j=1,i
+         Mon%MultpC(i,j) = ieor(i-1,j-1)+1
+         Mon%MultpC(j,i) = Mon%MultpC(i,j)
+      enddo
+   enddo
+endif
+
+Mon%NSymNO(1:NBasis) = 0
+istart = 0
+do i=1,Mon%NSym
+   do j=istart+1,istart+Mon%NumOSym(i)
+      do iorb=1,NBasis
+         if(abs(MO(j,iorb)).gt.1.d-1) Mon%NSymNO(iorb) = i
+      enddo
+   enddo
+   istart=istart+Mon%NumOSym(i)
+enddo
+
+! check
+do i=1,Mon%NSym
+   j = 0
+   do iorb=1,NBasis
+      if(Mon%NSymNO(iorb)==i) j = j + 1
+   enddo
+   if(j/=Mon%NumOSym(i)) then
+      write(LOUT,'(1x,a)') 'ERROR IN create_symmats! SYMMETRY OF NO CANNOT BE ESTABLISHED!'
+      stop
+   endif
+enddo
+
+end subroutine create_symmats
 
 subroutine create_ind(infile,NumOSym,IndInt,NSym,NBasis)
 implicit none

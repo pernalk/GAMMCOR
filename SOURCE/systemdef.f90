@@ -297,7 +297,7 @@ if(Flags%ISAPT.Eq.0) then
    if(Input%SystemInput(1)%DeclareSt) then
       System%InSt = Input%SystemInput(1)%InSt 
    else
-      ! assume 1.1 state
+      ! read 1st available state
       System%InSt(:,1) = -255
    endif
 

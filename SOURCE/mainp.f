@@ -168,11 +168,11 @@ C
       IFunSRKer=Flags%IFunSRKer
 C
       If(IFunSRKer.Eq.2)Stop'Fatal Error: Kernel for PBE not available!'
-      Write(*,'(/,"IFunSR=",I1)')IFunSR
-      Write(*,'(/,"IFunSRKer=",I1,/)')IFunSRKer
+      Write(*,'(/,1x,"IFunSR=",I1)')IFunSR
+      Write(*,'(/,1x,"IFunSRKer=",I1,/)')IFunSRKer
 C
 C     *************************************************************************
-C
+C         
 C     NBasis READ FROM SIRIUS.RST
       If(IDALTON.Eq.1) Call basinfo(NBasis,'SIRIUS.RST','DALTON')
 C
@@ -203,11 +203,11 @@ C
 C
       Write(6,'(1x,"NoSt=",I2)')NoSt
 C
+C     *************************************************************************
 C     READ THE INPUT AND PRINT THE INPUT DATA 
 C
 C     OLD INPUT-READ
 C      Call RWInput(Title,ZNucl,Charge,NBasis)
-C
 C
 C     CALCULATE THE DIMENSIONS
       If(IDALTON.Eq.0) then
@@ -235,6 +235,8 @@ C      Call GetAlpha(Title)
       EndIf
 C
 C     ALLOCATE THE MATRICES
+C
+      If(ITwoEl.Eq.3) NInte2=1
 C
       Allocate  (Occ(NBasis))
       Allocate  (URe(NBasis*NBasis))

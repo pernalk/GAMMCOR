@@ -504,7 +504,6 @@ C
       Return
       End
 
-C     HERE GOES UPDATED LdInteg!
 *Deck LdInteg
       Subroutine LdInteg(Title,XKin,XNuc,ENuc,Occ,URe,
      $ TwoEl,UAOMO,NInte1,NBasis,NInte2,NGem)
@@ -643,7 +642,7 @@ C      EndDo
  
 C     HAP
       Call create_ind('2RDM',NumOSym,IndInt,MxSym,NBasis)
-
+      
 C     LOAD ONE-ELE INTEGS IN AO
       FName(K:K+8)='xone.dat'
 C      Call Int1_AO(XKin,NInte1,FName,NumOSym,Nbasis)
@@ -687,10 +686,10 @@ C
 C     HAP
       If (IFunSR.Eq.0.Or.IFunSR.Eq.3) Then
       Call readtwoint(NBasis,2,'AOTWOINT.mol','AOTWOSORT')
-      Call LoadSaptTwoEl(3,TwoEl,NBasis,NInte2)
+      If(ITwoEl.Eq.1) Call LoadSaptTwoEl(3,TwoEl,NBasis,NInte2)
       Else
       Call readtwoint(NBasis,2,'AOTWOINT.erf','AOERFSORT')
-      Call LoadSaptTwoEl(4,TwoEl,NBasis,NInte2)
+      If(ITwoEl.Eq.1) Call LoadSaptTwoEl(4,TwoEl,NBasis,NInte2)
       EndIf
 C
 C     LOAD AO TO CAS_MO ORBITAL TRANSFORMATION MATRIX FROM uaomo.dat
@@ -709,21 +708,21 @@ C
 C
 C     READ RDMs: OLD
       Write(6,'(/," Reading in 1-RDM ...")')
-      Call read_1rdm_molpro(Gamma,InSt(1,1),InSt(2,1),
-     $ '2RDM',IWarn,NBasis)
-CC     READ RDMs: NEW
-C      Wght=One/Float(NStates)
-C      Do I=1,NStates
-C      GammaAB(1:NInte1)=Zero
-C      Call read_1rdm_molpro(GammaAB,InSt(1,I),InSt(2,I),
-C     $ '2RDM',IWarn,NBasis)
-C      Do K=1,NInte1
-C      Gamma(K)=Gamma(K)+Wght*GammaAB(K)
-C      EndDo
-C      EndDo
-C     
-C      print*,'Gamma from file:', norm2(Gamma)
 C
+C      Call read_1rdm_molpro(Gamma,InSt(1,1),InSt(2,1),
+C     $ '2RDM',IWarn,NBasis)
+C
+C     READ RDMs: NEW
+      Wght=One/Float(NStates)
+      Do I=1,NStates
+      GammaAB(1:NInte1)=Zero
+      Call read_1rdm_molpro(GammaAB,InSt(1,I),InSt(2,I),
+     $ '2RDM',IWarn,NBasis)
+      Do K=1,NInte1
+      Gamma(K)=Gamma(K)+Wght*GammaAB(K)
+      EndDo
+      EndDo
+C   
 C      Open(10,File='rdmdump.dat')
 C      Read(10,*) NStates
 C      IStart=0
@@ -756,6 +755,7 @@ C     KP
      $ different from nact read from molpro. Some active orbitals
      $ must be unoccupied.",/)')
       NAc=nact
+      ISwitch=1
       IWarn=IWarn+1
       EndIf
 C     KP
@@ -809,9 +809,6 @@ C     COPY AUXM TO URe AND OFF SET BY NInAc
       EndDo
       EndDo
 C
-C      print*, norm2(URe)
-C      Call print_sqmat(URe,NBasis)
-C
       GammaF(1:NInte1)=Zero
       IJ=0
       Do I=1,NBasis
@@ -852,7 +849,6 @@ C
       EndDo
       EndDo
 C
-C     HAP
       If (IFunSR.Eq.0.Or.IFunSR.Eq.3) Then
       Call FockGen_mithap(FockF,GammaAB,XKin,NInte1,NBasis,'AOTWOSORT')
       Else
@@ -989,19 +985,20 @@ C
 C
       Call MultpM(UAOMO,URe,UAux,NBasis)
       Call MatTr(XKin,UAOMO,NBasis)
-C  
-C      Call print_sqmat(UAOMO,NBasis)
 C
-C
+C     ITwoEl
+      If(ITwoEl.Eq.1) Then
       Write(6,'(/," Transforming two-electron integrals ...",/)')
       Call TwoNO1(TwoEl,UAOMO,NBasis,NInte2)
-
-C     ITwoEl
-      If(ITwoEl.eq.3) Then
+C     
+      ElseIf(ITwoEl.eq.3) Then
 C     PREPARE POINTERS: NOccup=num0+num1
       Call prepare_nums(Occ,Num0,Num1,NBasis)
+      If(ISwitch.Eq.1) Num0=NInAC
+      If(ISwitch.Eq.1) Num1=NAc
 C     TRANSFORM J AND K
       UAux=transpose(UAOMO)
+      If (IFunSR.Eq.0.Or.IFunSR.Eq.3) Then
       Call tran4_gen(NBasis,
      $        Num0+Num1,UAux(1:NBasis,1:(Num0+Num1)),
      $        Num0+Num1,UAux(1:NBasis,1:(Num0+Num1)),
@@ -1014,6 +1011,27 @@ C     TRANSFORM J AND K
      $        NBasis,UAux,
      $        Num0+Num1,UAux(1:NBasis,1:(Num0+Num1)),
      $        'FOFO','AOTWOSORT')
+C     TEST MITHAP
+C      call tran4_full(NBasis,UAux,UAux,'TWOMO','AOTWOSORT')
+C
+      Else
+      Call tran4_gen(NBasis,
+     $        Num0+Num1,UAux(1:NBasis,1:(Num0+Num1)),
+     $        Num0+Num1,UAux(1:NBasis,1:(Num0+Num1)),
+     $        NBasis,UAux,
+     $        NBasis,UAux,
+     $        'FFOOERF','AOERFSORT')
+      Call tran4_gen(NBasis,
+     $        NBasis,UAux,
+     $        Num0+Num1,UAux(1:NBasis,1:(Num0+Num1)),
+     $        NBasis,UAux,
+     $        Num0+Num1,UAux(1:NBasis,1:(Num0+Num1)),
+     $        'FOFOERF','AOERFSORT')
+C     TEST MITHAP
+C      call tran4_full(NBasis,UAux,UAux,'MO2ERF','AOERFSORT')
+
+      EndIF
+C
       EndIf
 C              
       EndIf  
@@ -1032,23 +1050,22 @@ C
       HlpRDM2(1:NRDM2Act)=Zero
 C
 C     READ RDMs: OLD
-      Call read_2rdm_molpro(RDM2Act,InSt(1,1),InSt(2,1),
-     $ '2RDM',IWarn,NAct)
-C
-CC     READ RDMs: NEW
-C      Wght=One/Float(NStates)
-C      Do I=1,NStates
-C      GammaAB(1:NInte1)=Zero
-C      Call read_2rdm_molpro(HlpRDM2,InSt(1,I),InSt(2,I),
+C      Call read_2rdm_molpro(RDM2Act,InSt(1,1),InSt(2,1),
 C     $ '2RDM',IWarn,NAct)
-C      Do K=1,NRDM2Act
-C      RDM2Act(K)=RDM2Act(K)+Wght*HlpRDM2(K)
-C      EndDo
-C      EndDo
+C
+C     READ RDMs: NEW
+      Wght=One/Float(NStates)
+      Do I=1,NStates
+      GammaAB(1:NInte1)=Zero
+      Call read_2rdm_molpro(HlpRDM2,InSt(1,I),InSt(2,I),
+     $ '2RDM',IWarn,NAct)
+      Do K=1,NRDM2Act
+      RDM2Act(K)=RDM2Act(K)+Wght*HlpRDM2(K)
+      EndDo
+      EndDo
+
 C
       Deallocate(HlpRDM2)
-C
-
 C
 C      Open(10,File='rdmdump.dat')
 C      Read(10,*) NStates
@@ -1088,6 +1105,8 @@ C
 C
       EOne=ETot
 C
+C     ITwoEl
+      If(ITwoEl.Eq.1) Then 
       ETwo=Zero 
       Do IP=1,NOccup
       Do IQ=1,NOccup
@@ -1101,10 +1120,11 @@ C      ETot=ETot+Hlp
       EndDo
       EndDo
       EndDo
-C     ITwoEl
-      If(ITwoEl.eq.3) Then
+C     
+      ElseIf(ITwoEl.eq.3) Then
       Call TwoEneChck(ETwo,RDM2Act,Occ,INActive,NAct,NBasis)
       EndIf
+C
       Write(6,'(/,1X,''Two-electron Energy'',5X,F15.8)')ETwo
       Write(6,'(/,1X,''MCSCF Molpro Energy'',5X,F15.8)')EOne+ETwo+ENuc
 C
@@ -1465,7 +1485,7 @@ C
       Subroutine GetENuc_AOBin(ENuc,infile)
 C
       Implicit Real*8 (A-H,O-Z)
-      Character*32 infile
+      Character(*) infile
       Logical ex
 
       inquire(file=trim(infile),EXIST=ex)
@@ -2485,7 +2505,15 @@ C
       Dimension Ind(NBasis)
       Double Precision, Allocatable :: RDM2val(:,:,:,:),
      $                                 work(:),ints(:,:)
-C   
+      Character(:),Allocatable :: IntJFile
+C  
+C     SET FILES
+      If (IFunSR.Eq.0.Or.IFunSR.Eq.3) Then
+      IntJFile='FFOO'
+      Else
+      IntJFile='FFOOERF'
+      EndIf
+C
 C     SET DIMENSIONS
       NOccup=NAct+INActive
       Ind=0
@@ -2506,7 +2534,7 @@ C
       EndDo
       EndDo
 C
-      Open(newunit=iunit,file='FFOO',status='OLD',
+      Open(newunit=iunit,file=IntJFile,status='OLD',
      $     access='DIRECT',recl=8*NBasis**2)
 C
       ETwo=0
@@ -2538,4 +2566,87 @@ C
       Deallocate(RDM2val)
 C
       end subroutine TwoEneChck
+
+      subroutine TwoEHartree(EnH,RDM2Act,Occ,INActive,NAct,NBasis)
+      Implicit Real*8 (A-H,O-Z)
+C       
+      Include 'commons.inc'
+C
+      Parameter(Zero=0.D0,Half=0.5D0,One=1.D0,Two=2.D0)
+C
+      Integer INActive,NAct,NBasis
+      Double Precision EnH
+      Dimension Occ(NBasis),RDM2Act(NAct**2*(NAct**2+1)/2)
+C
+C     LOCAL ARRAYS
+C
+      Dimension Ind(NBasis)
+      Double Precision, Allocatable :: RDM2val(:,:,:,:),
+     $                                 work(:),ints(:,:)
+      Character(:),Allocatable :: IntJFile
+C
+C     SET FILES
+      If (IFunSR.Eq.0.Or.IFunSR.Eq.3) Then
+      IntJFile='FFOO'
+      Else
+      IntJFile='FFOOERF'
+      EndIf
+C
+C     SET DIMENSIONS
+      NOccup=NAct+INActive
+      Ind=0
+      Do I=1,NAct
+      Ind(INActive+I)=I
+      EndDo
+C
+      Allocate(work(NBasis**2),ints(NBasis,NBasis))
+      Allocate(RDM2val(NOccup,NOccup,NOccup,NOccup))
+C
+      Do L=1,NOccup
+      Do K=1,NOccup
+      Do J=1,NOccup
+      Do I=1,NOccup
+      RDM2val(I,J,K,L) = FRDM2(I,K,J,L,RDM2Act,Occ,Ind,NAct,NBasis)
+      EndDo
+      EndDo
+      EndDo
+      EndDo
+C
+      Open(newunit=iunit,file=IntJFile,status='OLD',
+     $     access='DIRECT',recl=8*NBasis**2)
+
+C     GET E_HARTREE     
+      EnH=0
+C
+      kl=0
+      Do ll=1,NOccup
+      Do kk=1,NOccup
+      kl=kl+1
+      If(ll==kk) Then
+      read(iunit,rec=kl) work(1:NBasis**2)
+      Do j=1,NBasis
+      Do i=1,NBasis
+      ints(i,j) = work((j-1)*NBasis+i)
+      EndDo
+      EndDo
+C 
+      k = kk
+      l = ll
+C
+      If(k>NOccup.or.l>NOccup) Cycle
+C
+      Do i=1,NOccup
+      EnH = EnH + Occ(k)*Occ(i)*ints(i,i)
+      EndDo
+C
+      EndIf
+C
+      EndDo
+      EndDo
+C
+      EnH = 2d0*EnH
+C
+      Close(iunit)
+C
+      end subroutine TwoEHartree
 

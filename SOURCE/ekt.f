@@ -85,6 +85,7 @@ C
       EndDo
       EndDo
 C
+C
 C     READ 2RDM, COMPUTE THE ENERGY
 C
       NAct=NAcCAS
@@ -112,6 +113,8 @@ C
    40 Continue
       Close(10)
 C
+      XLag = 0
+C      
       Do I=1,NOccup
       Do J=1,NOccup
 C
@@ -136,6 +139,8 @@ C
       EndDo
 C
       Deallocate (RDM2Act)
+C
+      Write(*,*) 'XLag-Ka',norm2(XLag)
 C
       Return
       End

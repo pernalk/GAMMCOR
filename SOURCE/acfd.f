@@ -4,6 +4,9 @@
      $ Title,NBasis,NInte1,NInte2,NDim,NGOcc,NGem,
      $ IndN,IndX,NDimX)
 C
+      use abmat
+      use abfofo
+C 
 C     A ROUTINE FOR COMPUTING ELECTRONIC ENERGY USING AC CORRELATION ENERGY FORMULA
 C
       Implicit Real*8 (A-H,O-Z)
@@ -26,6 +29,8 @@ C
 C     LOCAL ARRAYS
 C
       Dimension XGrid(100), WGrid(100)
+C     HAP
+      Double precision,Allocatable :: WorkVec(:),WorkEig(:),MYAP(:) 
 C
       If(IFlSnd.Eq.1) Then
 C
@@ -40,10 +45,23 @@ C
 C
       If(ICASSCF.Eq.1) Then
 C
-      Print*, norm2(TwoNO)
+      If(ITwoEl.eq.1) Then
+C      
       Call AC0CAS(ECorr,ETot,TwoNO,Occ,URe,XOne,
      $ ABPLUS,ABMIN,EigVecR,Eig,
      $ IndN,IndX,NDimX,NBasis,NDim,NInte1,NInte2)
+C 
+      ElseIf(ITwoEl.eq.3) Then
+C
+      Call Y01CAS_FOFO(Occ,URe,XOne,ABPLUS,ABMIN,
+     $ 'PROP0','PROP1',
+     $ IndN,IndX,IGem,NAcCAS,NInAcCAS,NDimX,
+     $ NBasis,NDim,NInte1,NoSt,'EMPTY','FFOO',
+     $ 'FOFO',0,ETot,ECorr)
+C
+C     ITwoEl
+      EndIf
+C      
       Write
      $ (6,'(/,X,''ECASSCF+ENuc, AC0-Corr, AC0-CASSCF '',4X,3F15.8)')
      $ ETot+ENuc,ECorr,ETot+ENuc+ECorr
@@ -86,14 +104,24 @@ C
 C 
       ECorr=Zero
       Do I=1,NGrid
-C
+C   
       ACAlpha=XGrid(I)
-C  
+C
+      If(ITwoEl.eq.1) Then
       Call ACEInteg(ECorrA,TwoNO,URe,Occ,XOne,UNOAO,
      $ ABPLUS,ABMIN,EigVecR,Eig,
      $ EGOne,NGOcc,
      $ Title,NBasis,NInte1,NInte2,NDim,NGem,IndAux,ACAlpha,
      $ IndN,IndX,NDimX)
+C
+      ElseIf(ITwoEl.eq.3) Then
+      Call ACEInteg_FOFO(ECorrA,URe,Occ,XOne,UNOAO,
+     $ ABPLUS,ABMIN,EigVecR,Eig,
+     $ EGOne,NGOcc,
+     $ NBasis,NInte1,NDimX,NGem,IndAux,ACAlpha,
+     $ IGem,NAcCAS,NInAcCAS,IndN,IndX,NDimX,
+     $ NoSt,ICASSCF,IFlFrag1,IFunSR,IFunSRKer)
+      EndIf
 C
       Write(*,*)'ACAlpha ',ACAlpha,' W_ALPHA ',ECorrA
 C
@@ -1674,6 +1702,8 @@ C
 C
 C     A ROUTINE FOR COMPUTING AC INTEGRAND
 C
+      use sapt_ener
+C
       Implicit Real*8 (A-H,O-Z)
 C
       Include 'commons.inc'
@@ -1954,6 +1984,7 @@ C
       EndDo      
 C
       If(NDimB.Ne.0) Then
+      Print*, 'ACT-KA',norm2(ABPLUS(1:NDimB**2)),norm2(ABMIN)
       If(NoSt.Eq.1) Then
       Call ERPASYMM0(EigY(NFree2),EigX(NFree2),Eig(NFree1),ABPLUS,ABMIN,
      $ NDimB)      
@@ -2029,6 +2060,7 @@ C
       EndDo
 C
       If(NDimB.Ne.0) Then
+      Print*, 'AI-KA',norm2(ABPLUS(1:NDimB**2)),norm2(ABMIN)
       If(NoSt.Eq.1) Then
       Call ERPASYMM0(EigY(NFree2),EigX(NFree2),Eig(NFree1),ABPLUS,ABMIN,
      $ NDimB)
@@ -2107,6 +2139,7 @@ C
       EndDo
 C
       If(NDimB.Ne.0) Then
+      Print*, 'AV-KA',norm2(ABPLUS(1:NDimB**2)),norm2(ABMIN(1:NDimB**2))
       If(NoSt.Eq.1) Then 
       Call ERPASYMM0(EigY(NFree2),EigX(NFree2),Eig(NFree1),ABPLUS,ABMIN,
      $ NDimB)
@@ -2159,8 +2192,11 @@ C
       EndDo
 C
       Write(6,'(/," *** DONE WITH 0TH-ORDER IN AC0-CASSCF ***")')
+      Print*, 'NoEig,NDimX',NoEig,NDimX
+      Print*, 'Eig,Y,X',norm2(Eig(1:NoEig)),
+     $ norm2(EigY(1:NoEig**2)),norm2(EigX(1:NoEig**2))
 C
-C     DONE 0TH-ORDER CALCULATIONS  
+C     DONE 0TH-ORDER CALCULATIONS
 C
       Write(6,'(/,
      $" *** COMPUTING ABPLUS(1) AND ABMIN(1) MATRICES ***"
@@ -2174,6 +2210,8 @@ C
 C
       Write(6,'(/," *** DONE WITH COMPUTING AB(1) MATRICES ***")')
 C
+      Print*, 'AB1-Ka',norm2(ABPLUS),norm2(ABMIN)
+C ----------------------------------------------------------------    
 C     1ST-ORDER PART
 C
       Do NU=1,NoEig
@@ -2240,6 +2278,8 @@ C
       EndDo
       EndDo
 C
+      print*, 'AB-KA',norm2(ABPLUS),norm2(ABMIN)
+C
       XMAux(1:NoEig*NoEig)=Zero
 C
       Do MU=1,NoEig
@@ -2272,6 +2312,8 @@ C
 C
       EndDo
 C
+      Print*, 'FIRST',norm2(XMAux)
+C
       ABPLUS(1:NoEig*NoEig)=Zero 
 C
       Do MU=1,NoEig
@@ -2288,8 +2330,12 @@ C
       II=II+1
       EndDo
       EndDo
+      Print*, 'ABPLUS-Ka',norm2(ABPLUS(1:NoEig*NoEig))
 C
 C     FINALLY THE ENERGY CORRECTION
+C     TESTY Z sapt.f90 -- remove later! 
+C      Call check_loop(ABPLUS,Occ,IndN,IndBlock,
+C     $ NAct,INActive,NDimX,NDimX,NBasis)
 C
       EAll=Zero
       EIntra=Zero
@@ -2322,7 +2368,9 @@ C
       EndDo
 C
       ECorr=EAll-EIntra
+      Print*, 'EAll,EIntra',EAll,EIntra
 C
+C ----------------------------------------------------------------    
       Return
       End
 
@@ -2459,19 +2507,29 @@ C
 C
       icount=0
       Call CPU_TIME(START_TIME)
+C
+C     HAP-TEST!
+C      IFunSR=4
+C
       Do IRow=1,NoEig
 C
       IR=IndBlock(1,IRow)
       IS=IndBlock(2,IRow)
 C
-      Do ICol=1,IRow
+      If(IFunSR.Eq.4) Then
+      IColEnd=NoEig
+      Else
+      IColEnd=IRow
+      EndIf
+C
+      Do ICol=1,IColEnd
 C
       IPP=IndBlock(1,ICol)
       IQQ=IndBlock(2,ICol)
 C
       If( .NOT.(IGem(IR).Eq.IGem(IS).And.IGem(IR).Eq.IGem(IPP)
      $ .And.IGem(IR).Eq.IGem(IQQ)) ) Then
-C
+CC
       If( (Occ(IR)*Occ(IS).Eq.Zero.And.Occ(IPP)*Occ(IQQ).Eq.Zero
      $ .And.Abs(TwoNO(NAddr3(IR,IS,IPP,IQQ))).Lt.1.D-25)
      $.Or.
@@ -2651,12 +2709,44 @@ C
      $ ,F10.2)')END_TIME-START_TIME
       write(*,*)'icount',icount
 C
-C     DIVIDE BY C'c AND SYMMETRIZE
+      If(IFunSR.Eq.4) Then
+C
+C     POSTCAS: DIVIDE BY C'c AND SYMMETRIZE
 C
       Do I=1,NoEig
       IP=IndBlock(1,I)
       IQ=IndBlock(2,I)
-c      Do J=1,NoEig
+      Do J=1,NoEig
+      IR=IndBlock(1,J)
+      IS=IndBlock(2,J)
+C
+      If((C(IP)+C(IQ))*(C(IR)+C(IS)).Ne.Zero)
+     $ ABPLUS(I+(J-1)*NoEig)=ABPLUS(I+(J-1)*NoEig)
+     $/(C(IP)+C(IQ))/(C(IR)+C(IS))
+      If((C(IP)-C(IQ))*(C(IR)-C(IS)).Ne.Zero)
+     $ ABMIN(I+(J-1)*NoEig)=ABMIN(I+(J-1)*NoEig)
+     $/(C(IP)-C(IQ))/(C(IR)-C(IS))
+C
+      EndDo
+      EndDo
+C
+      Do I=1,NoEig
+      Do J=I+1,NoEig
+      ABPLUS((J-1)*NoEig+I)=
+     $ Half*(ABPLUS((J-1)*NoEig+I)+ABPLUS((I-1)*NoEig+J))
+      ABPLUS((I-1)*NoEig+J)=ABPLUS((J-1)*NoEig+I)
+      ABMIN((J-1)*NoEig+I)=
+     $ Half*(ABMIN((J-1)*NoEig+I)+ABMIN((I-1)*NoEig+J))
+      ABMIN((I-1)*NoEig+J)=ABMIN((J-1)*NoEig+I)
+      EndDo
+      EndDo
+C
+      Else
+C     DIVIDE BY C'c AND COPY TRIANGLE
+C
+      Do I=1,NoEig
+      IP=IndBlock(1,I)
+      IQ=IndBlock(2,I)
       Do J=1,I
       IR=IndBlock(1,J)
       IS=IndBlock(2,J)
@@ -2673,6 +2763,9 @@ C
 C
       EndDo
       EndDo
+C
+C     end IFunSR
+      EndIf
 C
       Return
       End

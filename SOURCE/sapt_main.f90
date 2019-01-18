@@ -3,6 +3,7 @@ use types
 use systemdef
 use timing
 use abmat
+use abfofo
 use tran
 use sorter
 use sapt_ener
@@ -43,7 +44,7 @@ double precision :: Tcpu,Twall
     call e1elst(SAPT%monA,SAPT%monB,SAPT)
     ! temporary here!!!!
     if(Flags%ICASSCF==1) then
-       !call e1exchs2(SAPT%monA,SAPT%monB,SAPT)
+       call e1exchs2(SAPT%monA,SAPT%monB,SAPT)
     endif
     if(SAPT%SaptLevel==0) then
        call e2disp_unc(Flags,SAPT%monA,SAPT%monB,SAPT)
@@ -1091,6 +1092,8 @@ logical :: doRSH
  NInte1 = NBas*(NBas+1)/2
  NInte2 = NInte1*(NInte1+1)/2
 
+ call create_symmats(Mon,MO,NBas)
+
  allocate(work1(NSq),work2(NSq),XOne(NInte1),URe(NBas,NBas),VSR(NInte1))
  if(Mon%TwoMoInt==1) then
     allocate(TwoMO(NInte2))
@@ -1258,9 +1261,10 @@ logical :: doRSH
                          twofile,twoerffile)
  case(TWOMO_FOFO)
     call ModABMin_FOFO(Mon%Occ,SRKer,WGrid,OrbGrid,ABMin,&
+                       Mon%MultpC,Mon%NSymNO,&
                        Mon%IndN,Mon%IndX,Mon%NDimX,NGrid,NBas,&
-                       Mon%num0+Mon%num1, & 
-                       twokfile,twokerf)
+                       Mon%num0,Mon%num1, & 
+                       twokfile,twokerf,.false.)
     print*, 'ABMin-MY',norm2(ABMin)
  end select
  call clock('Mod ABMin',Tcpu,Twall)
@@ -1687,9 +1691,10 @@ double precision, allocatable :: EigTmp(:), VecTmp(:)
    select case(Mon%TwoMoInt)
    case(TWOMO_FOFO) 
       call Y01CAS_FOFO(Mon%Occ,URe,XOne,ABPlus,ABMin, &
-             EigY0,EigY1,Eig0,Eig1, &
+             !EigY0,EigY1,Eig0,Eig1, &
+             propfile0,propfile1, &
              Mon%IndN,Mon%IndX,Mon%IGem,Mon%NAct,Mon%INAct,Mon%NDimX, &
-             NBas,Mon%NDim,NInte1,twofile,twojfile,twokfile,Flags%IFlag0)
+             NBas,Mon%NDim,NInte1,Mon%NoSt,twofile,twojfile,twokfile,Flags%IFlag0)
    case(TWOMO_FFFF) 
       call Y01CAS_mithap(Mon%Occ,URe,XOne,ABPlus,ABMin, &
              EigY0,EigY1,Eig0,Eig1, &
@@ -1703,9 +1708,11 @@ double precision, allocatable :: EigTmp(:), VecTmp(:)
    end select
 
    ! dump uncoupled response
-   call writeresp(EigY0,Eig0,propfile0)
-   if(Flags%IFlag0==0) then
-      call writeresp(EigY1,Eig1,propfile1)
+   if(Mon%TwoMoInt/=TWOMO_FOFO) then 
+      call writeresp(EigY0,Eig0,propfile0)
+      if(Flags%IFlag0==0) then
+         call writeresp(EigY1,Eig1,propfile1)
+      endif
    endif
   
    deallocate(Eig1,Eig0,EigY1,EigY0)

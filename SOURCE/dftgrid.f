@@ -5,6 +5,7 @@
 C    HAP
 C     $ OrbZGrid,WGrid,NSymMO,TwoEl,TwoElErf,
      $ OrbZGrid,WGrid,NSymMO,VCoul,
+C     $ TwoEl,TwoElErf,
      $ Omega,Flag,NGrid,NInte1,NInte2,NBasis) 
 C
 C     RETURNS SR ENERGY AND POTENTIAL = SR_XC + SR_H
@@ -24,7 +25,7 @@ C
      $ Occ(NBasis),URe(NBasis,NBasis),
      $ UNOAO(NBasis,NBasis),
 C    HAP
-C     $ TwoEl(NInte2),TwoElErf(NInte2),
+     $ TwoEl(NInte2),TwoElErf(NInte2),
      $ VCoul(NInte1),
      $ NSymMO(NBasis)
       Dimension OrbXGrid(NGrid,NBasis),OrbYGrid(NGrid,NBasis),
@@ -45,10 +46,9 @@ C
 C     COMPUTE THE HARTREE POTENTIAL AND THE ENERGY
 C     HAP: VHSR is computed in AO during canonicalization
 C
-C     sth wrong with PotHSR_mithap
-      !Call PotHSR_mithap(VHSR,Occ,UNOAO,NBasis)
       Call tran_matTr(VCoul,UNOAO,UNOAO,NBasis,Transp)
       VHSR = VCoul
+C      Print*, 'VHSR-MY',norm2(VHSR)
 C     Old:
 C      Call PotHSR(VHSR,Occ,URe,TwoEl,TwoElErf,NInte1,NInte2,NBasis)
 C      Print*,'VHSR-Ka', norm2(VHSR)
