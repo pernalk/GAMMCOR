@@ -1387,7 +1387,7 @@ C
 C
       Write(6,'(/," *** DONE WITH 0TH-ORDER IN AC0-CASSCF ***")')
 C
-      Print*, 'Eig,Y,X',norm2(Eig),norm2(EigY),norm2(EigX)
+C      Print*, 'Eig,Y,X',norm2(Eig),norm2(EigY),norm2(EigX)
 C     DONE 0TH-ORDER CALCULATIONS
 C
       Write(6,'(/,
@@ -1397,7 +1397,7 @@ C
       Call AB1_CAS(ABPLUS,ABMIN,URe,Occ,XOne,TwoNO,
      $ RDM2Act,NRDM2Act,IGFact,C,Ind1,Ind2,
      $ IndBlock,NoEig,NDimX,NBasis,NInte1,NInte2)
-      Print*, 'AB1-KA',norm2(ABPLUS),norm2(ABMIN)
+C      Print*, 'AB1-KA',norm2(ABPLUS),norm2(ABMIN)
 C
 C     ADD A SR KERNEL
 C
@@ -1521,7 +1521,7 @@ CC
 C
       Deallocate(RDM2Act)
 C
-      Print*, 'ABM-KA',norm2(ABMIN(1:NoEig**2))
+C      Print*, 'ABM-KA',norm2(ABMIN(1:NoEig**2))
 C      
       Write(6,'(/," *** DONE WITH COMPUTING AB(1) MATRICES ***")')
 C

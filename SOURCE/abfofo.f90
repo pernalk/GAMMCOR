@@ -2901,7 +2901,7 @@ enddo
 
 deallocate(work1)
 
-print*, 'Eig-MY',norm2(Eig),norm2(EigY),norm2(EigY1)
+!print*, 'Eig-MY',norm2(Eig),norm2(EigY),norm2(EigY1)
 
 if(IFlag0==1) return
 !return
@@ -2977,7 +2977,7 @@ do i=1,NBasis
    C(i) = sign(sqrt(Occ(i)),Occ(i)-0.5d0)
 enddo
 
-print*, 'AB-MY',norm2(ABPLUS),norm2(ABMIN)
+!print*, 'AB-MY',norm2(ABPLUS),norm2(ABMIN)
 EigY1 = 0
 do j=1,NDimX
    if(Eig(j)/=0d0) then
@@ -3050,7 +3050,7 @@ close(iunit)
 
 ECorr = EAll-EIntra
 
-print*, 'EAll,EIntra',EAll,EIntra
+!print*, 'EAll,EIntra',EAll,EIntra
 
 endif
 
