@@ -1289,6 +1289,52 @@ C
       Return
       End
 
+*Deck ERPASYMMXY
+      Subroutine ERPASYMMXY(EigY,EigX,Eig,ABPLUS,ABMIN,Occ,IndN,
+     $ NDimX,NBasis)
+C
+C     RETURNS X,Y VECTORS (PROPERLY NORMALIZED), WHICH ARE SOLUTIONS
+C     OF THE ORIGINAL ERPA PROBLEM:
+C     AX + BY = Om N X
+C     BX + AY =-Om N Y 
+C
+C     THIS IS ACHIEVED BY CALLING ERPASYMM0, SOLVING A SYMMETRIZED PROBLEM     
+C     A+^(1/2) A- A+^(1/2) [A+^(-1/2)] Y = om^2 [A+^(-1/2)] Y IS SOLVED
+C
+C     ON EXIT ABPLUS CONTAINS ABPLUS^(1/2) !!!
+C
+      Implicit Real*8 (A-H,O-Z)
+C
+      Parameter(Zero=0.D0,Half=0.5D0,One=1.D0,Two=2.D0)
+C
+      Include 'commons.inc'
+C
+      Dimension
+     $ ABPLUS(NDimX,NDimX),ABMIN(NDimX,NDimX),
+     $ EigY(NDimX*NDimX),EigX(NDimX*NDimX),Eig(NDimX),
+     $ Occ(NBasis),IndN(2,NDimX)
+C
+      Call ERPASYMM0(EigY,EigX,Eig,ABPLUS,ABMIN,NDimX)
+C
+      Do K=1,NDimX
+C
+      Do I=1,NDimX
+C
+      IP=IndN(1,I)
+      IQ=IndN(2,I)
+C
+      X=EigX((K-1)*NDimX+I)/(CICoef(IP)+CICoef(IQ))
+      Y=EigY((K-1)*NDimX+I)/(CICoef(IP)-CICoef(IQ))
+C
+      EigX((K-1)*NDimX+I)=Half*(X-Y)
+      EigY((K-1)*NDimX+I)=Half*(X+Y)
+C
+      EndDo
+C
+      EndDo
+C
+      Return
+      End
 
 *Deck ERPASYMM0
       Subroutine ERPASYMM0(EigY,EigX,Eig,APLSQRT,ABMIN,NDimX)
