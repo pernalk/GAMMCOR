@@ -208,7 +208,7 @@ integer :: i,j,ij,rs,ab
 
  enddo
 
- write(LOUT,'(1x,a)') 'ACHTUNG-BABY! NEW TRAN3Q USED!'
+! write(LOUT,'(1x,a)') 'ACHTUNG-BABY! NEW TRAN3Q USED!'
 
  deallocate(work1,work2,work3)
  close(iunit3)

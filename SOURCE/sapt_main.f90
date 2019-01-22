@@ -827,7 +827,7 @@ integer :: info
  OrbCAS = transpose(OrbCAS)
 
  deallocate(work3,work2,work1,Fock,OrbSym,URe)
- deallocate(Mon%IndInt,Mon%NumOSym)
+ deallocate(Mon%IndInt)
 
 end subroutine prepare_no
 
@@ -3439,6 +3439,14 @@ deallocate(SAPT%monB%CICoef,SAPT%monB%IGem,SAPT%monB%Occ, &
            SAPT%monB%IndAux,SAPT%monB%IndX,SAPT%monB%IndN,&
            SAPT%monB%CMO,&
            SAPT%monB%IPair)
+
+! symmetry matrices
+if(allocated(SAPT%monA%NumOSym)) then
+  deallocate(SAPT%monA%NumOSym)
+endif
+if(allocated(SAPT%monB%NumOSym)) then
+  deallocate(SAPT%monB%NumOSym)
+endif
 
 ! HERE - change to SAPTLEVEL?
 if(allocated(SAPT%monA%WPot)) then
