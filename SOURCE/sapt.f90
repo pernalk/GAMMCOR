@@ -1722,8 +1722,8 @@ double precision :: e2du,e2sp,dea,deb
 double precision :: e2ds,e2ds1,e2ds2
 double precision :: inv_omega
 ! for Be ERPA:
-double precision,parameter :: SmallE = 1.D-1
-!double precision,parameter :: SmallE = 1.D-3
+!double precision,parameter :: SmallE = 1.D-1
+double precision,parameter :: SmallE = 1.D-3
 double precision,parameter :: BigE = 1.D8 
 double precision :: Alpha, Beta
 
