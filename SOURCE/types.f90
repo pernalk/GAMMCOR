@@ -118,6 +118,7 @@ type SystemBlock
       double precision :: XELE
       double precision :: PotNuc 
       double precision :: SumOcc = 0
+      double precision :: ACAlpha = 1d0
       double precision :: Omega = 1
       integer :: NSym 
       integer :: NSymBas(8),NSymOrb(8)

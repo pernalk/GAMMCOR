@@ -432,6 +432,9 @@ integer :: test,test2
  case ("NATOMS")
        read(val, *) SystemParams%NCen
 
+ case ("ACALPHA")
+       read(val, *) SystemParams%ACAlpha
+
  case ("OMEGA")
        read(val, *) SystemParams%Omega
 

@@ -1517,7 +1517,11 @@ double precision, allocatable :: EigTmp(:), VecTmp(:)
 
  endif
 
- ACAlpha=One
+ ! setting ACAlpha parameter
+ ACAlpha=Mon%ACAlpha
+ write(LOUT,'(/,1x,a,f16.8)') 'ACAlpha Parameter:',Mon%ACAlpha
+ !ACAlpha=One
+ 
  ! GVB
  if(Flags%ICASSCF==0.and.Flags%ISERPA==0) then
 
