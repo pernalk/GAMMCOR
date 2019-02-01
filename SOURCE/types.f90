@@ -67,7 +67,7 @@ character(*),parameter :: PossibleInterface(3) = &
 
 character(*),parameter :: PossibleJobType(7) = &
 [character(8) :: &
-'AC', 'AC0', 'ERPA', 'AC1', 'SAPT', 'PDFT', 'CASPiDFT']
+'AC', 'AC0', 'ERPA', 'AC1', 'SAPT', 'PDFT', 'CASPIDFT']
 
 character(*),parameter :: PossibleRDMType(5) = &
 [character(8) :: &

@@ -684,7 +684,7 @@ CC
 C      Call Int2_AO(TwoEl,NumOSym,MultpC,FName,NInte1,NInte2,NBasis)
 C
 C     HAP
-      If (IFunSR.Eq.0.Or.IFunSR.Eq.3) Then
+      If (IFunSR.Eq.0.Or.IFunSR.Eq.3.Or.IFunSR.Eq.5) Then
       Call readtwoint(NBasis,2,'AOTWOINT.mol','AOTWOSORT')
       If(ITwoEl.Eq.1) Call LoadSaptTwoEl(3,TwoEl,NBasis,NInte2)
       Else
@@ -849,7 +849,7 @@ C
       EndDo
       EndDo
 C
-      If (IFunSR.Eq.0.Or.IFunSR.Eq.3) Then
+      If (IFunSR.Eq.0.Or.IFunSR.Eq.3.Or.IFunSR.Eq.5) Then
       Call FockGen_mithap(FockF,GammaAB,XKin,NInte1,NBasis,'AOTWOSORT')
       Else
       Call FockGen_mithap(FockF,GammaAB,XKin,NInte1,NBasis,'AOERFSORT')
@@ -998,7 +998,7 @@ C     PREPARE POINTERS: NOccup=num0+num1
       If(ISwitch.Eq.1) Num1=NAc
 C     TRANSFORM J AND K
       UAux=transpose(UAOMO)
-      If (IFunSR.Eq.0.Or.IFunSR.Eq.3) Then
+      If (IFunSR.Eq.0.Or.IFunSR.Eq.3.Or.IFunSR.Eq.5) Then
       Call tran4_gen(NBasis,
      $        Num0+Num1,UAux(1:NBasis,1:(Num0+Num1)),
      $        Num0+Num1,UAux(1:NBasis,1:(Num0+Num1)),
@@ -2508,7 +2508,7 @@ C
       Character(:),Allocatable :: IntJFile
 C  
 C     SET FILES
-      If (IFunSR.Eq.0.Or.IFunSR.Eq.3) Then
+      If (IFunSR.Eq.0.Or.IFunSR.Eq.3.Or.IFunSR.Eq.5) Then
       IntJFile='FFOO'
       Else
       IntJFile='FFOOERF'
@@ -2586,7 +2586,7 @@ C
       Character(:),Allocatable :: IntJFile
 C
 C     SET FILES
-      If (IFunSR.Eq.0.Or.IFunSR.Eq.3) Then
+      If (IFunSR.Eq.0.Or.IFunSR.Eq.3.Or.IFunSR.Eq.5) Then
       IntJFile='FFOO'
       Else
       IntJFile='FFOOERF'

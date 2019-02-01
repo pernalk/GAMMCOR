@@ -273,13 +273,15 @@ C
 C
       EndIf  
 C
-C      If(IFunSR.Eq.5) Then
+      If(IFunSR.Eq.5) Then
+      Write(6,'(/,1x,a)') '*****************************'
+      Write(6,*) 'GOT AS FAR AS HERE in main.f!'
 C     $ Call CASPIDFT(ENuc,URe,UMOAO,Occ,XKin,TwoEl,
 C     $ NBasis,NInte1,NInte2)
-C      Else
+      Else
       Call DMSCF(Title,URe,Occ,XKin,XNuc,ENuc,UMOAO,
      $ TwoEl,NBasis,NInte1,NInte2,NGem,System)
-C      EndIf
+      EndIf
 C
       If(IWarn.Gt.0) Then
       Write(6,'(/,1x,a,i2,1x,a)') 'CHECK OUTPUT FOR',IWarn,'WARNINGS!'
