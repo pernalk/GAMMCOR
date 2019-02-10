@@ -50,8 +50,8 @@ C
 C
       IPair(1:NBasis,1:NBasis)=0
 C
-      Write(LOUT,'(2x,a,e15.5)') 'Threshold for active orbitals: ',
-     $ System%ThrSelAct
+      Write(LOUT,'(2x,a,2e15.5)') 'Threshold for active orbitals: ',
+     $ ThrSelAct
       IJ=0
       Ind=0
       Do I=1,NBasis
@@ -62,7 +62,7 @@ C
       If(IndAux(I)+IndAux(J).Ne.0.And.IndAux(I)+IndAux(J).Ne.4) Then
 C
       If((IndAux(I).Eq.1).And.(IndAux(J).Eq.1)
-     $ .And.(Abs(Occ(I)-Occ(J))/Occ(I).Lt.System%ThrSelAct)
+     $ .And.(Abs(Occ(I)-Occ(J))/Occ(I).Lt.ThrSelAct)
      $ ) Then
 C
       Write(6,'(2X,"Discarding nearly degenerate pair ",2I4)')I,J

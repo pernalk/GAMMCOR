@@ -203,6 +203,9 @@ C
 C
       Write(6,'(1x,"NoSt=",I2)')NoSt
 C
+C     SET THRESHOLD FOR ACTIVE ORBITALS IN CAS
+      ThrSelAct = System%ThrSelAct
+C
 C     *************************************************************************
 C     READ THE INPUT AND PRINT THE INPUT DATA 
 C

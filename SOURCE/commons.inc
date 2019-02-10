@@ -2,7 +2,7 @@ C
       Common/MISCFL/ XELE,IFun,IFunSR,IFunSRKer,NELE,IRes,INO,IPrint,
      $ IInteg,IAO,IGVB,IDALTON,IFreeze,ILoc,NInActOrb,NActOrb,NVirtOrb,
      $ ISAPT,IWarn,ITwoEl
-      Common/CAS/ ICASSCF,NAcCAS,NInAcCAS,NStates,InSt(2,100)
+      Common/CAS/ ICASSCF,NAcCAS,NInAcCAS,NStates,InSt(2,100),ThrSelAct
       Common/BBC3/ IType(1000)
       Common/DFTSR/ Alpha,Cmix
       Common/Sym/ MxSym,FMultTab,NoSym
