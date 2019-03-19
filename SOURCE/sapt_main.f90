@@ -74,7 +74,7 @@ double precision :: Tcpu,Twall
 
 end subroutine sapt_driver
 
-subroutine sapt_interface(Flags,SAPT) 
+subroutine sapt_interface(Flags,SAPT)
 implicit none
 
 type(FlagsData) :: Flags
@@ -609,8 +609,8 @@ character(:),allocatable :: rdmfile
     if(EVal(i)>0.d0) Mon%NAct = Mon%NAct + 1  
  enddo
  !Mon%INAct = Mon%NELE-int(Tmp)
-!!! OPEN-SHELL CASE?
- Mon%INAct = Mon%NELE-Tmp+1.d-1
+!!!! OPEN-SHELL CASE?
+ Mon%INAct = Mon%XELE-Tmp+1.d-1
  NOccup = Mon%INAct + Mon%NAct
  Mon%SumOcc = Tmp + Mon%INAct
 !
