@@ -230,7 +230,7 @@ C
 C     GET THE VALUE OF THE SEPARATION PARAMETER OM
 C
       Alpha = System%Omega
-      If(IFunSR.Ne.0.And.IFunSR.Ne.3) Then
+      If(IFunSR.Ne.0.And.IFunSR.Ne.3.And.IFunSR.Ne.5) Then
 C      Call GetAlpha(Title)
       Call readalphamolpro(Alpha)
       Else
@@ -277,10 +277,8 @@ C
       EndIf  
 C
       If(IFunSR.Eq.5) Then
-      Write(6,'(/,1x,a)') '*****************************'
-      Write(6,*) 'GOT AS FAR AS HERE in main.f!'
-C     $ Call CASPIDFT(ENuc,URe,UMOAO,Occ,XKin,TwoEl,
-C     $ NBasis,NInte1,NInte2)
+      Call CASPIDFT(ENuc,URe,UMOAO,Occ,XKin,TwoEl,
+     $ NBasis,NInte1,NInte2)
       Else
       Call DMSCF(Title,URe,Occ,XKin,XNuc,ENuc,UMOAO,
      $ TwoEl,NBasis,NInte1,NInte2,NGem,System)

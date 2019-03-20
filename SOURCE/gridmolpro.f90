@@ -4,7 +4,7 @@ Implicit Real*8 (A-H,O-Z)
 integer :: i,j,k,igrid
 integer :: npt, ndiff, ntg
 integer ::  NBasis, NGrid
- 
+
  open(newunit=igrid,file='GRID',access='sequential',&
       form='unformatted',status='old')
 ! read(igrid)
@@ -13,6 +13,23 @@ integer ::  NBasis, NGrid
  If(NBasis.Ne.ntg) Stop 'Fatal Error in molprogrid0: NBasis Ne ntg'
  NGrid=npt
 end subroutine molprogrid0
+
+subroutine molprogrid1(RR,NGrid)
+Implicit Real*8 (A-H,O-Z)
+double precision RR(3,NGrid)
+double precision, allocatable :: wt(:)
+integer :: i,j,k,igrid
+integer :: npt, ndiff, ntg
+integer ::  NGrid
+ open(newunit=igrid,file='GRID',access='sequential',&
+      form='unformatted',status='old')
+! read(igrid)
+ read(igrid) npt,ndiff,ntg
+ allocate(wt(npt))
+ call readgridmolpro(igrid,'GRIDKS  ',npt,RR,wt)
+ close(igrid)
+ deallocate(wt)
+end subroutine molprogrid1
 
 subroutine molprogrid(OrbGrid,OrbXGrid,OrbYGrid,OrbZGrid,WGrid,UMOAO,NGrid,NBasis)
 implicit real*8 (A-H,O-Z)

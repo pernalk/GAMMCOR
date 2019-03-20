@@ -143,6 +143,8 @@ C
      $ ABPLUS(NDimX*NDimX),ABMIN(NDimX*NDimX),
      $ EigVecR(NDimX*NDimX),Eig(NDimX),
      $ ECorrG(NGem), EGOne(NGem)
+c herer!!! delete after tests
+c     $ ,EigX(NDimX*NDimX)
 C
 C     IFlAC   = 1 - adiabatic connection formula calculation
 C               0 - AC not used
@@ -181,6 +183,8 @@ C
      $            ''***************************************'')')
 C
       ACAlpha=One
+c herer!!!
+c      ACAlpha=zero
       Write(6,'(/,X," The number of CASSCF Active Orbitals = ",I4)')
      $ NAcCAS
 C
@@ -204,7 +208,22 @@ C
 C     FIND EIGENVECTORS (EigVecR) AND COMPUTE THE ENERGY
 C
       If(NoSt.Eq.1) Then
+c herer!!!
       Call ERPASYMM1(EigVecR,Eig,ABPLUS,ABMIN,NBasis,NDimX)
+c      Call ERPASYMMXY(EigVecR,EigX,Eig,ABPLUS,ABMIN,Occ,IndN,
+c     $ NDimX,NBasis)
+c       do i=1,ndimx
+c       write(*,*)'I',indn(1,i),indn(2,i),eig(i)
+c       do j=1,ndimx
+c       yy=eigvecr((i-1)*NDimX+j)
+c       xx=eigx((i-1)*NDimX+j)
+c       if(abs(yy).gt.1.d-7) write(*,*)'y',i,j,yy
+c       if(abs(xx).gt.1.d-7) write(*,*)'x',i,j,xx
+c       enddo
+c       enddo
+c
+c       stop
+
       Else
       Call ERPAVEC(EigVecR,Eig,ABPLUS,ABMIN,NBasis,NDimX)
       EndIf

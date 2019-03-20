@@ -1336,6 +1336,53 @@ C
       Return
       End
 
+*Deck ERPAVECTRANS
+      Subroutine ERPAVECTRANS(EigY,EigX,Eig,ABPLUS,ABMIN,Occ,IndN,
+     $ NDimX,NBasis)
+C
+C     RETURNS X,Y VECTORS (PROPERLY NORMALIZED), WHICH ARE SOLUTIONS
+C     OF THE ORIGINAL ERPA PROBLEM:
+C     AX + BY = Om N X
+C     BX + AY =-Om N Y 
+C
+C     BY TRANSFORMING TILDED X,Y OBTAINED IN ERPAVECYX WHERE A NONSYMMETRIC 
+C     PROBLEM IS SOLVED
+C
+C     A+ A- Y_TILDA = om^2 Y_TILDA
+C
+      Implicit Real*8 (A-H,O-Z)
+C
+      Parameter(Zero=0.D0,Half=0.5D0,One=1.D0,Two=2.D0)
+C
+      Include 'commons.inc'
+C
+      Dimension
+     $ ABPLUS(NDimX,NDimX),ABMIN(NDimX,NDimX),
+     $ EigY(NDimX*NDimX),EigX(NDimX*NDimX),Eig(NDimX),
+     $ Occ(NBasis),IndN(2,NDimX)
+C
+      Call ERPAVECYX(EigY,EigX,Eig,ABPLUS,ABMIN,NDimX)
+C
+      Do K=1,NDimX
+C
+      Do I=1,NDimX
+C
+      IP=IndN(1,I)
+      IQ=IndN(2,I)
+C
+      X=EigX((K-1)*NDimX+I)/(CICoef(IP)+CICoef(IQ))
+      Y=EigY((K-1)*NDimX+I)/(CICoef(IP)-CICoef(IQ))
+C
+      EigX((K-1)*NDimX+I)=Half*(X-Y)
+      EigY((K-1)*NDimX+I)=Half*(X+Y)
+C
+      EndDo
+C
+      EndDo
+C
+      Return
+      End
+
 *Deck ERPASYMM0
       Subroutine ERPASYMM0(EigY,EigX,Eig,APLSQRT,ABMIN,NDimX)
 C
@@ -4900,6 +4947,17 @@ C
 C
       Dimension RDM2Act(NAct**2*(NAct**2+1)/2),Occ(NBasis),Ind2(NBasis)
 C
+c herer!!! KP
+c ***************************
+c      RDM2=Zero
+c      If(IP.Eq.IR.And.IQ.Eq.IS )
+c     $  RDM2=RDM2+Two*Occ(IP)*Occ(IQ)
+c      If(IP.Eq.IS.And.IQ.Eq.IR )
+c     $ RDM2=RDM2-(Occ(IP)*Occ(IQ))**(0.5)
+c      FRDM2=RDM2
+c      return
+c ***************************
+
       RDM2=Zero
       If(IP.Eq.IR.And.IQ.Eq.IS.And. (Occ(IP).Eq.One.Or.Occ(IQ).Eq.One) )
      $  RDM2=RDM2+Two*Occ(IP)*Occ(IQ)

@@ -120,6 +120,62 @@ subroutine LYP(Rho,Sigma,Ene,NGrid)
 return
 end subroutine LYP 
 
+subroutine PBECor(Rho,Sigma,Ene,NGrid)
+!   
+! computes short-range kernel for densities stored in a vector Rho
+!   
+   use xcfun
+    
+   implicit none
+
+   character(1000)      :: text
+   integer              :: id, order, ilen, olen
+   real(8), allocatable :: density_variables(:, :), derivatives(:, :)
+
+   integer              :: NGrid, i
+
+   real(8)              :: Rho,Sigma,Ene
+! ,VKS
+   dimension Rho(NGrid),Sigma(NGrid),Ene(NGrid)
+! ,VKS(NGrid)
+
+!  create a new functional
+   id = xc_new_functional()
+!  use the following functionals
+   call xc_set_param(id, XC_PBEC, 1.0d0)
+! use XC_VARS_N for closed-shell calculations
+   call xc_set_mode(id, XC_VARS_N)
+!   call xc_set_mode(id, XC_VARS_NS)
+! order=0 -> only xc energy on a grid
+   order=0
+
+   ilen = xc_input_length(id)
+   olen = xc_output_length(id, order)
+
+   allocate(density_variables(ilen, NGrid))
+   allocate(derivatives(olen, NGrid))
+
+   do i=1,NGrid
+   density_variables(1, i) = Rho(i)
+   density_variables(2, i) = Sigma(i)
+   enddo
+
+! evaluate what you need
+   call xc_eval(id, order, NGrid, density_variables, derivatives)
+
+   do i=1,NGrid
+   Ene(i)=derivatives(1, i)
+!   VKS(i)=derivatives(2, i) 
+   enddo
+
+   deallocate(density_variables)
+   deallocate(derivatives)
+
+   call xc_free_functional(id)
+
+return
+end subroutine PBECor
+
 subroutine dfun_PBE(Rho,Sigma,Ene,vrhoc,vsigmacc,NGrid)
 !
 ! computes stuff 
