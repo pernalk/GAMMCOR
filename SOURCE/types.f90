@@ -115,6 +115,7 @@ type SystemBlock
       integer :: NBasis = 0
       integer :: Monomer = MONOMER_A
       integer :: NELE
+      integer :: EigFCI = 1
       double precision :: XELE
       double precision :: PotNuc 
       double precision :: SumOcc = 0
@@ -159,6 +160,8 @@ type SystemBlock
       double precision,allocatable :: WPot(:,:)
       double precision,allocatable :: VCoul(:)
       double precision,allocatable :: RDM2(:),RDM2Act(:,:,:,:)
+      double precision,allocatable :: Fmat(:,:) 
+      double precision,allocatable :: Eig(:),EigX(:),EigY(:) 
       double precision  :: charg(maxcen),xyz(maxcen,3)
 
 end type SystemBlock
@@ -1161,6 +1164,40 @@ character(:),allocatable :: onefile
  close(ione)
 
 end subroutine get_one_mat
+
+subroutine fill_Fmat(Fmat,Occ,NBas,variant)
+implicit none
+
+integer,intent(in) :: NBas,variant
+double precision,intent(in)  :: Occ(NBas)
+double precision,intent(out) :: Fmat(NBas,NBas)
+
+integer :: i,j
+
+Fmat = 0
+select case(variant)
+case(0)
+   ! HF
+   do j=1,NBas
+      do i=1,NBas
+         Fmat(i,j) = Occ(i)*Occ(j)
+      enddo
+   enddo
+case(1)
+   ! BB functional
+   do j=1,NBas
+      do i=1,NBas
+         Fmat(i,j) = sqrt(Occ(i)*Occ(j))
+      enddo
+   enddo
+case(3)
+   ! Power functional
+   write(LOUT,*) 'POWER FUNCITONAL NOT READY YET!'
+   stop
+
+end select
+
+end subroutine fill_Fmat
 
 subroutine basinfo(nbasis,basfile,intf)
 implicit none

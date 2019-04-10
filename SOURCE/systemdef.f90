@@ -349,6 +349,7 @@ elseif(Flags%ISAPT.Eq.1) then
       monA%Charge = Input%SystemInput(1)%Charge
       monA%ACAlpha = Input%SystemInput(1)%ACAlpha
       monA%Omega  = Input%SystemInput(1)%Omega 
+      monA%EigFCI = Input%SystemInput(1)%EigFCI
       monA%NBasis = Input%CalcParams%NBasis
       monA%Multiplicity = Input%SystemInput(1)%Multiplicity
       monA%ThrAct = Input%SystemInput(1)%ThrAct
@@ -378,7 +379,8 @@ elseif(Flags%ISAPT.Eq.1) then
       monB%ZNucl  = Input%SystemInput(2)%ZNucl
       monB%Charge = Input%SystemInput(2)%Charge
       monB%ACAlpha = Input%SystemInput(2)%ACAlpha
-      monB%Omega  = Input%SystemInput(2)%Omega 
+      monB%Omega  = Input%SystemInput(2)%Omega
+      monB%EigFCI = Input%SystemInput(2)%EigFCI
       monB%NBasis = Input%CalcParams%NBasis
       monB%Multiplicity = Input%SystemInput(2)%Multiplicity
       monB%ThrAct = Input%SystemInput(2)%ThrAct
@@ -413,6 +415,7 @@ elseif(Flags%ISAPT.Eq.1) then
       monA%Charge = Input%SystemInput(2)%Charge
       monA%ACAlpha = Input%SystemInput(2)%ACAlpha
       monA%Omega  = Input%SystemInput(2)%Omega 
+      monA%EigFCI = Input%SystemInput(2)%EigFCI
       monA%NBasis = Input%CalcParams%NBasis
       monA%Multiplicity = Input%SystemInput(2)%Multiplicity
       monA%ThrAct = Input%SystemInput(2)%ThrAct
@@ -441,7 +444,8 @@ elseif(Flags%ISAPT.Eq.1) then
       monB%ZNucl  = Input%SystemInput(1)%ZNucl
       monB%Charge = Input%SystemInput(1)%Charge
       monB%ACAlpha = Input%SystemInput(1)%ACAlpha
-      monB%Omega  = Input%SystemInput(1)%Omega 
+      monB%Omega  = Input%SystemInput(1)%Omega
+      monB%EigFCI = Input%SystemInput(1)%EigFCI
       monB%NBasis = Input%CalcParams%NBasis
       monB%Multiplicity = Input%SystemInput(1)%Multiplicity
       monB%ThrAct = Input%SystemInput(1)%ThrAct

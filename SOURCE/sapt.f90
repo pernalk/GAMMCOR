@@ -1,6 +1,7 @@
 module sapt_ener
 use types
 use tran
+use exmisc
 use timing
 
 implicit none
@@ -1692,7 +1693,7 @@ endif
 
 end subroutine e2disp_unc
 
-! HERE!!!!
+! HERE!!!
 subroutine e2disp(Flags,A,B,SAPT)
 implicit none
 
@@ -1965,6 +1966,14 @@ endif
 
 ! coupled - 0
 
+do i=1,A%NDimX
+   if(OmA(i)<0d0) write(LOUT,*) 'Negative A!',i,OmA(i)
+enddo
+do i=1,B%NDimX
+   if(OmB(i)<0d0) write(LOUT,*) 'Negative B!',i,OmB(i)
+enddo
+
+
 if(.not.(Flags%ICASSCF==0.and.Flags%ISERPA==0)) then
 
  tmp1=0
@@ -2067,7 +2076,6 @@ elseif(Flags%ICASSCF==0.and.Flags%ISERPA==0) then
 ! end GVB select
 endif
 
-
 if(.not.(Flags%ICASSCF==0.and.Flags%ISERPA==0)) then
 ! uncoupled and semicoupled
  e2du=0d0
@@ -2075,16 +2083,21 @@ if(.not.(Flags%ICASSCF==0.and.Flags%ISERPA==0)) then
 ! e2ds2=0d0
  do j=1,B%NDimX
     do i=1,A%NDimX
-       if(OmA0(i).gt.SmallE.and.OmB0(j).gt.SmallE&
-          .and.OmA0(i).lt.BigE.and.OmB0(j).lt.BigE) then
+      ! if(OmA0(i).gt.SmallE.and.OmB0(j).gt.SmallE&
+      !    .and.OmA0(i).lt.BigE.and.OmB0(j).lt.BigE) then
+
+       if(abs(OmA0(i)).gt.SmallE.and.abs(OmB0(j)).gt.SmallE&
+          .and.abs(OmA0(i)).lt.BigE.and.abs(OmB0(j)).lt.BigE) then
+
+
        inv_omega = 1d0/(OmA0(i)+OmB0(j))
 
        e2du = e2du + tmp02(i,j)**2*inv_omega
        e2ds2 = e2ds2 + (Alpha*OmA1(i)+Beta*OmB1(j))*(tmp02(i,j)*inv_omega)**2
-!!       !e2ds1 = e2ds1 + tmp02(i,j)*(Alpha*sc10b(i,j)+Beta*sc01b(i,j))*inv_omega
+       !e2ds1 = e2ds1 + tmp02(i,j)*(Alpha*sc10b(i,j)+Beta*sc01b(i,j))*inv_omega
        e2ds1 = e2ds1 + tmp02(i,j)*(sc10b(i,j)+sc01b(i,j))*inv_omega
-!!!       e2ds1 = e2ds1 + tmp02(i,j)*(sc01b(i,j))*inv_omega
-!!
+       !e2ds1 = e2ds1 + tmp02(i,j)*(sc01b(i,j))*inv_omega
+
        endif
     enddo
  enddo
@@ -2101,11 +2114,10 @@ endif
  e2d = 0d0
  do j=1,B%NDimX
     do i=1,A%NDimX
-       ! remove this if later!!!!
-       if(OmA(i).gt.SmallE.and.OmB(j).gt.SmallE&
-          .and.OmA(i).lt.BigE.and.OmB(j).lt.BigE) then
+       if(abs(OmA(i)).gt.SmallE.and.abs(OmB(j)).gt.SmallE&
+          .and.abs(OmA(i)).lt.BigE.and.abs(OmB(j)).lt.BigE) then
 
-       e2d = e2d + tmp2(i,j)**2/(OmA(i)+OmB(j))
+          e2d = e2d + tmp2(i,j)**2/(OmA(i)+OmB(j))
 
        endif
     enddo
@@ -2118,6 +2130,9 @@ endif
  write(LOUT,'(1x,a,f16.8)')'E2disp(sc) =  ', e2ds
 
  write(LOUT,'(/1x,a,f16.8)') 'E2disp      = ',e2d
+
+ ! write amplitude to a file
+ call writeampl(tmp2,'PROP_AB')
 
 !! coupled - TEST FULL LOOP
 ! e2d = 0d0
@@ -2163,6 +2178,2602 @@ endif
 
 end subroutine e2disp
 
+subroutine term_Y_SR(tpqrs,Sab,elst,vnn,ADimX,BDimX,NBas,A,B)
+
+implicit none
+
+type(SystemBlock) :: A, B
+
+integer,intent(in) :: ADimX,BDimX,NBas
+double precision,intent(in) :: elst,vnn
+double precision,intent(in) :: Sab(NBas,NBas),tpqrs(2*ADimX,2*BDimX)
+
+integer :: i,j
+integer :: ip,iq,ir,is,ipq,irs
+double precision :: termY,tmp(NBas,NBas)
+
+tmp = transpose(Sab)
+
+termY = 0
+do j=1,BDimX
+
+   ir = B%IndN(1,j) 
+   is = B%IndN(2,j)
+   irs = j
+
+   do i=1,ADimX
+
+      ip = A%IndN(1,i)
+      iq = A%IndN(2,i)
+      ipq = i
+  
+      termY = termY + tpqrs(ipq,irs)*Sab(ip,is)*tmp(ir,iq) &
+                    + tpqrs(ipq,BDimX+irs)*Sab(ip,ir)*tmp(is,iq) &
+                    + tpqrs(ADimX+ipq,irs)*Sab(iq,is)*tmp(ir,ip) &
+                    + tpqrs(ADimX+ipq,BDimX+irs)*Sab(iq,ir)*tmp(is,ip)
+
+ 
+   enddo
+enddo
+!print*, 'termY-000',termY/16d0
+termY = 0.5d0*(elst-vnn)*termY
+
+print*, 'termY-t',termY
+
+end subroutine term_Y_SR
+
+subroutine term_X_A1_SR(tpqrs,Sab,Vaab,Vbab,posA,posB,ADimX,BDimX,NBas,A,B)
+
+implicit none
+
+type(SystemBlock) :: A, B
+
+integer,intent(in) :: ADimX,BDimX,NBas
+integer,intent(in) :: posA(NBas,NBas),posB(NBas,NBas)
+double precision,intent(in) :: Sab(NBas,NBas), &
+                               Vaab(NBas,NBas),Vbab(NBas,NBas), &
+                               tpqrs(2*ADimX,2*BDimX)
+
+integer :: i,j,k,l,kl
+integer :: ip,iq,ir,is,ipq,irs
+integer :: iunit
+integer :: dimOA,dimVA,dimOB,dimVB,nOVA,nOVB
+double precision :: termA1,nelA,nelB,tmp(NBas,NBas)
+double precision,allocatable :: work(:),ints(:,:)
+
+ ! dimensions
+ dimOA = A%INAct+A%NAct
+ dimVA = A%num1+A%num2
+ dimOB = B%INAct+B%NAct
+ dimVB = B%num1+B%num2
+ nOVA = dimOA*dimVA
+ nOVB = dimOB*dimVB
+
+ nelA = 2d0*A%XELE
+ nelB = 2d0*B%XELE
+
+ allocate(work(NBas*NBas),ints(NBas,NBas))
+
+ !(FO|FO):(AB|BA)
+ open(newunit=iunit,file='FOFOABBA',status='OLD', &
+     access='DIRECT',recl=8*NBas*dimOB)
+
+ termA1 = 0
+ work = 0
+ ints = 0
+ kl = 0
+ do l=1,dimOA
+    do k=1,NBas
+       kl = kl + 1
+       read(iunit,rec=kl) work(1:NBas*dimOB)
+
+       ir = k
+       iq = l
+
+       call ints_modify(NBas,dimOB,ints,NBas,work,Sab(iq,ir)/nelA,Vaab,Vbab(iq,ir)/nelB,Sab)
+
+       do ip=1,NBas
+          do is=1,dimOB
+
+             ipq = posA(ip,iq)
+             irs = posB(ir,is)
+
+             if(ipq/=0.and.irs/=0) then
+
+                termA1 = termA1 + tpqrs(ipq,irs)*ints(ip,is)
+ 
+             endif
+
+          enddo
+       enddo
+
+       ! YY
+       ir = k
+       iq = l  
+  
+       call ints_modify(NBas,dimOB,ints,NBas,work,Vaab(iq,ir)/nelA,Sab,Sab(iq,ir)/nelB,Vbab)
+
+       do ip=1,NBas
+          do is=1,dimOB
+
+             ipq = posA(ip,iq)
+             irs = posB(ir,is)
+
+             if(ipq/=0.and.irs/=0) then
+
+                termA1 = termA1 + tpqrs(ADimX+ipq,BDimX+irs)*ints(ip,is)
+
+             endif
+   
+          enddo
+       enddo
+
+    enddo
+ enddo
+ 
+ close(iunit)
+
+! (FF|OO):(AB|AB)
+ open(newunit=iunit,file='FFOOABAB',status='OLD', &
+     access='DIRECT',recl=8*NBas*NBas)
+
+ ints = 0
+ kl = 0
+ do l=1,dimOB
+    do k=1,dimOA
+       kl = kl + 1
+       read(iunit,rec=kl) work(1:NBas*NBas)
+
+       iq = k
+       is = l
+
+       call ints_modify(NBas,NBas,ints,NBas,work,Sab(iq,is)/nelA,Vaab,Vbab(iq,is)/nelB,Sab)
+
+       do ir=1,NBas
+          do ip=1,NBas
+
+             ipq = posA(ip,iq)
+             irs = posB(ir,is)
+             
+             if(ipq/=0.and.irs/=0) then
+
+               termA1 = termA1 + tpqrs(ipq,BDimX+irs)*ints(ip,ir)
+
+             endif
+
+          enddo
+       enddo
+
+       ! YX 
+       call ints_modify(NBas,NBas,ints,NBas,work,Vaab(iq,is)/nelA,Sab,Sab(iq,is)/nelB,Vbab)
+
+       do ir=1,NBas
+          do ip=1,NBas
+
+             ipq = posA(ip,iq)
+             irs = posB(ir,is)
+             
+             if(ipq/=0.and.irs/=0) then
+
+               termA1 = termA1 + tpqrs(ADimX+ipq,irs)*ints(ip,ir)
+
+             endif
+
+          enddo
+       enddo
+
+    enddo
+ enddo
+
+ close(iunit)
+
+ termA1 = -0.5d0*termA1 
+ print*, 'termA1',termA1
+
+ ! test full
+ call tran4_gen(NBas,&
+          NBas,B%CMO,&
+          NBas,A%CMO,&
+          NBas,A%CMO,&
+          NBas,B%CMO,&
+          'FFFFABBA','AOTWOSORT')
+
+ !(FF|FF):(AB|BA)
+ open(newunit=iunit,file='FFFFABBA',status='OLD', &
+     access='DIRECT',recl=8*NBas*NBas)
+
+ termA1 = 0
+ work = 0
+ ints = 0
+ kl = 0
+ do l=1,NBas
+    do k=1,NBas
+       kl = kl + 1
+       read(iunit,rec=kl) work(1:NBas*NBas)
+
+       is = k
+       ip = l
+
+       call ints_modify(NBas,NBas,ints,NBas,work,Sab(ip,is)/nelA,Vaab,Vbab(ip,is)/nelB,Sab)
+
+       do iq=1,NBas
+          do ir=1,NBas
+
+             ipq = posA(ip,iq)
+             irs = posB(ir,is)
+  
+             if(ipq/=0.and.irs/=0) then
+
+                termA1 = termA1 + tpqrs(ipq,irs)*ints(iq,ir)
+
+             endif
+ 
+          enddo
+       enddo
+
+    enddo
+ enddo
+
+ close(iunit,status='delete')
+
+ termA1 = -0.5d0*termA1 
+ print*, 'termA1(F)',termA1
+
+ deallocate(ints,work)
+
+end subroutine term_X_A1_SR
+
+subroutine term_X_A3_XX_SR(dim1,dim2,tpqrs,IntKFile,Sab,Vabb,Vbaa,posA,posB,ADimX,BDimX,NBas,A,B,isYY)
+
+implicit none
+
+type(SystemBlock) :: A, B
+
+integer,intent(in) :: dim1,dim2,ADimX,BDimX,NBas
+integer,intent(in) :: posA(NBas,NBas),posB(NBas,NBas)
+double precision,intent(in) :: Sab(NBas,NBas), &
+                               Vabb(NBas,NBas),Vbaa(NBas,NBas), &
+                               tpqrs(2*dim1,2*dim2)
+logical,intent(in) :: isYY
+character(*),intent(in) :: IntKFile
+
+integer :: i,j,k,l,kl
+integer :: iq,ib,ip,ir,ia,ic,iac,ipr
+integer :: iunit,offA,offB
+integer :: dimOA,dimVA,dimOB,dimVB,nOVA,nOVB
+double precision :: fact,val,valTr,val3B,val4B,termXX
+double precision :: nelA,nelB
+double precision :: Sxx(NBas,NBas),Sbb(NBas,NBas)
+double precision :: Emat(NBas,NBas),Amat(NBas,NBas)
+double precision,allocatable :: work(:),ints(:,:)
+
+ ! dimensions
+ dimOA = A%INAct+A%NAct
+ dimVA = A%num1+A%num2
+ dimOB = B%INAct+B%NAct
+ dimVB = B%num1+B%num2
+ nOVA = dimOA*dimVA
+ nOVB = dimOB*dimVB
+
+ nelA = 2d0*A%XELE
+ nelB = 2d0*B%XELE
+
+ Sxx = 0
+ do i=1,NBas
+    Sxx(i,i) = 1d0
+ enddo
+
+ allocate(work(NBas*NBas),ints(NBas,NBas))
+
+ Amat = 0
+ do ib=1,dimOB
+    do ir=1,NBas 
+       do ip=1,NBas
+          Amat(ip,ir) = Amat(ip,ir) + B%Occ(ib)*Sab(ip,ib)*Sab(ir,ib)
+       enddo
+    enddo
+ enddo
+ 
+ valTr = 0
+ do iq=1,dimOA
+    valTr = valTr + A%Occ(iq)*Amat(iq,iq)
+ enddo
+ 
+ Sbb = 0
+ do ic=1,NBas
+    do ia=1,NBas
+       do iq=1,dimOA
+          Sbb(ia,ic) = Sbb(ia,ic) + A%Occ(iq)*Sab(iq,ia)*Sab(iq,ic)
+       enddo
+    enddo
+ enddo
+
+ if(isYY) then
+    offA = ADimX
+    offB = BDimX
+ else
+    offA = 0
+    offB = 0 
+ endif
+
+!(FO|FO):(AA|BB)
+open(newunit=iunit,file=trim(IntKFile),status='OLD', &
+     access='DIRECT',recl=8*NBas*dimOA)
+
+ ! one loop over integrals
+ termXX = 0
+ Emat = 0
+ ints = 0
+ kl = 0
+ do l=1,dimOB
+    do k=1,NBas
+       kl = kl + 1
+       read(iunit,rec=kl) work(1:NBas*dimOA)
+ 
+       call ints_modify(NBas,dimOA,ints,NBas,work,&
+                        Vabb(k,l)/nelA,Sxx,Sxx(l,k)/nelB,Vbaa)
+
+       ic = l
+       ia = k
+
+       iac = posB(ia,ic)
+
+       if(iac/=0) then
+
+          do i=1,ADimX
+             ip = A%IndN(1,i)
+             ir = A%IndN(2,i)
+             ipr = posA(ip,ir)
+             
+             ! 1A-1B
+             termXX = termXX - 2d0*tpqrs(offA+ipr,offB+iac)*valTr*ints(ip,ir)
+
+             val = 0
+             do iq=1,dimOA
+                val = val + A%Occ(iq)*ints(iq,iq)
+             enddo
+
+             ! 2A-1B
+             termXX = termXX - 2d0*val*tpqrs(offA+ipr,offB+iac)*Amat(ip,ir)
+
+             val = 0
+             do iq=1,dimOA
+                val = val + A%Occ(iq)*ints(ip,iq)*Amat(iq,ir)
+             enddo
+
+             ! 3A-1B
+             termXX = termXX + val*tpqrs(offA+ipr,offB+iac)
+
+             val = 0
+             do iq=1,dimOA
+                val = val + A%Occ(iq)*ints(iq,ir)*Amat(iq,ip)
+             enddo
+
+             ! 4A-1B
+             termXX = termXX + val*tpqrs(offA+ipr,offB+iac)
+
+          enddo
+       endif
+
+       ! 2B terms
+       if(k==l) then
+
+          ib = k
+          Emat(1:NBas,1:dimOA) = Emat(1:NBas,1:dimOA) + B%Occ(ib)*ints(1:NBas,1:dimOA)
+
+       endif
+
+       ib = l
+       ia = k
+
+       val3B = 0
+       do iq=1,dimOA
+          val3B = val3B + A%Occ(iq)*ints(iq,iq)
+       enddo
+
+       do ic=1,dimOB
+
+          iac = posB(ia,ic)
+ 
+          if(iac/=0) then
+
+             do i=1,ADimX
+
+                ip = A%IndN(1,i)
+                ir = A%IndN(2,i)
+                ipr = posA(ip,ir)
+
+                ! 1A-3B
+                termXX = termXX + ints(ip,ir)*Sbb(ic,ib)*tpqrs(offA+ipr,offB+iac)
+
+                ! 2A-3B
+                termXX = termXX + val3B*B%Occ(ib)*Sab(ip,ic)*Sab(ir,ib)*tpqrs(offA+ipr,offB+iac)
+
+                val = 0
+                do iq=1,dimOA
+                   val = val + 0.5d0*A%Occ(iq)*ints(ip,iq)*Sab(iq,ic)
+                enddo
+
+                ! 3A-3B
+                termXX = termXX - val*B%Occ(ib)*Sab(ir,ib)*tpqrs(offA+ipr,offB+iac)
+ 
+                val = 0
+                do iq=1,dimOA
+                   val = val + 0.5d0*A%Occ(iq)*ints(iq,ir)*Sab(iq,ib)
+                enddo
+
+                ! 4A-3B
+                termXX = termXX - val*B%Occ(ib)*Sab(ip,ic)*tpqrs(offA+ipr,offB+iac)
+
+             enddo
+
+          endif
+       enddo
+
+       if(k<=dimOB) then
+
+          ib = k
+          ic = l
+
+          val4B = 0
+          do iq=1,dimOA
+             val4B = val4B + A%Occ(iq)*ints(iq,iq)
+          enddo
+
+          do ia=1,NBas
+
+             iac = posB(ia,ic)
+ 
+             if(iac/=0) then
+
+                do i=1,ADimX
+
+                   ip = A%IndN(1,i)
+                   ir = A%IndN(2,i)
+                   ipr = posA(ip,ir)
+
+                   ! 1A-4B
+                   termXX = termXX + B%Occ(ib)*Sbb(ia,ib)*ints(ip,ir)*tpqrs(offA+ipr,offB+iac)
+
+                   ! 2A-4B
+                   termXX = termXX + val4B*B%Occ(ib)*Sab(ip,ib)*Sab(ir,ia)*tpqrs(offA+ipr,offB+iac)
+
+                   val = 0
+                   do iq=1,dimOA
+                      val = val + 0.5d0*A%Occ(iq)*ints(ip,iq)*Sab(iq,ib)
+                   enddo 
+
+                   ! 3A-4B
+                   termXX = termXX - val*B%Occ(ib)*Sab(ir,ia)*tpqrs(offA+ipr,offB+iac)
+
+                   val = 0
+                   do iq=1,dimOA
+                      val = val + 0.5d0*A%Occ(iq)*ints(iq,ir)*Sab(iq,ia)
+                   enddo 
+
+                   ! 4A-4B
+                   termXX = termXX - val*B%Occ(ib)*Sab(ip,ib)*tpqrs(offA+ipr,offB+iac)
+
+                enddo
+             endif
+
+          enddo
+       endif
+
+    enddo
+ enddo
+
+ close(iunit)
+
+ ! 2B terms
+ do j=1,BDimX
+
+    ia = B%IndN(1,j)
+    ic = B%IndN(2,j)
+    iac = posB(ia,ic) 
+
+    do i=1,ADimX
+
+       ip = A%IndN(1,i)
+       ir = A%IndN(2,i)
+       ipr = posA(ip,ir)
+
+       ! 1A-2B 
+       termXX = termXX - 2d0*Emat(ip,ir)*Sbb(ia,ic)*tpqrs(offA+ipr,offB+iac)
+
+       val = 0
+       do iq=1,dimOA
+          val = val + A%Occ(iq)*Emat(iq,iq) 
+       enddo
+
+       ! 2A-2B 
+       termXX = termXX - 2d0*val*Sab(ip,ic)*Sab(ir,ia)*tpqrs(offA+ipr,offB+iac)
+
+       val = 0
+       do iq=1,dimOA
+          val = val + A%Occ(iq)*Emat(ip,iq)*Sab(iq,ic)
+       enddo
+
+       ! 3A-2B 
+       termXX = termXX + val*Sab(ir,ia)*tpqrs(offA+ipr,offB+iac)
+
+       val = 0
+       do iq=1,dimOA
+          val = val + A%Occ(iq)*Emat(iq,ir)*Sab(iq,ia)
+       enddo
+
+       ! 4A-2B 
+       termXX = termXX + val*Sab(ip,ic)*tpqrs(offA+ipr,offB+iac)
+ 
+    enddo
+ enddo
+
+ print*, 'A3-XX',termXX
+
+ deallocate(ints,work) 
+
+end subroutine term_X_A3_XX_SR
+
+subroutine term_X_A3_XY_SR(dim1,dim2,tpqrs,IntKFile,Sab,Vabb,Vbaa,posA,posB,ADimX,BDimX,NBas,A,B,isXY)
+
+implicit none
+
+type(SystemBlock) :: A, B
+
+integer,intent(in) :: dim1,dim2,ADimX,BDimX,NBas
+integer,intent(in) :: posA(NBas,NBas),posB(NBas,NBas)
+double precision,intent(in) :: Sab(NBas,NBas), &
+                               Vabb(NBas,NBas),Vbaa(NBas,NBas), &
+                               tpqrs(2*dim1,2*dim2)
+logical,intent(in) :: isXY
+character(*),intent(in) :: IntKFile
+
+integer :: i,j,k,l,kl
+integer :: iq,ib,ip,ir,ia,ic,iac,ipr
+integer :: iunit,offA,offB
+integer :: dimOA,dimVA,dimOB,dimVB,nOVA,nOVB
+double precision :: fact,val,valTr,val2A,val3B,val4B,termXY
+double precision :: nelA,nelB
+double precision :: Sxx(NBas,NBas),Sbb(NBas,NBas)
+double precision :: Emat(NBas,NBas),Amat(NBas,NBas)
+double precision,allocatable :: work(:),ints(:,:)
+
+ ! dimensions
+ dimOA = A%INAct+A%NAct
+ dimVA = A%num1+A%num2
+ dimOB = B%INAct+B%NAct
+ dimVB = B%num1+B%num2
+ nOVA = dimOA*dimVA
+ nOVB = dimOB*dimVB
+
+ nelA = 2d0*A%XELE
+ nelB = 2d0*B%XELE
+
+ Sxx = 0
+ do i=1,NBas
+    Sxx(i,i) = 1d0
+ enddo
+
+ allocate(work(NBas*NBas),ints(NBas,NBas))
+
+ Amat = 0
+ do ib=1,dimOB
+    do ir=1,NBas 
+       do ip=1,NBas
+          Amat(ip,ir) = Amat(ip,ir) + B%Occ(ib)*Sab(ip,ib)*Sab(ir,ib)
+       enddo
+    enddo
+ enddo
+ 
+ valTr = 0
+ do iq=1,dimOA
+    valTr = valTr + A%Occ(iq)*Amat(iq,iq)
+ enddo
+ 
+ Sbb = 0
+ do ic=1,NBas
+    do ia=1,NBas
+       do iq=1,dimOA
+          Sbb(ia,ic) = Sbb(ia,ic) + A%Occ(iq)*Sab(iq,ia)*Sab(iq,ic)
+       enddo
+    enddo
+ enddo
+
+ if(isXY) then
+    offA = 0
+    offB = BDimX
+ else
+    offA = ADimX
+    offB = 0 
+ endif
+
+!(FO|FO):(AA|BB)
+open(newunit=iunit,file=trim(IntKFile),status='OLD', &
+     access='DIRECT',recl=8*NBas*dimOA)
+
+ ! one loop over integrals
+ termXY = 0
+ Emat = 0
+ ints = 0
+ kl = 0
+ do l=1,dimOB
+    do k=1,NBas
+       kl = kl + 1
+       read(iunit,rec=kl) work(1:NBas*dimOA)
+
+       call ints_modify(NBas,dimOA,ints,NBas,work,&
+                       Vabb(k,l)/nelA,Sxx,Sxx(k,l)/nelB,Vbaa)
+
+       ic = l
+       ia = k
+
+       iac = posB(ia,ic)
+
+       if(iac/=0) then
+
+          val2A = 0
+          do iq=1,dimOA
+             val2A = val2A + 2d0*A%Occ(iq)*ints(iq,iq)
+          enddo
+ 
+          do i=1,ADimX
+
+             ip = A%IndN(1,i)
+             ir = A%IndN(2,i)
+             ipr = posA(ip,ir)
+
+             ! 1A-1B
+             termXY = termXY - 2d0*valTr*ints(ip,ir)*tpqrs(offA+ipr,offB+iac)
+
+             ! 2A-1B
+             termXY = termXY - val2A*Amat(ip,ir)*tpqrs(offA+ipr,offB+iac)
+
+             val = 0
+             do iq=1,dimOA
+                val = val + A%Occ(iq)*ints(ip,iq)*Amat(iq,ir)
+             enddo
+
+             ! 3A-1B
+             termXY = termXY + val*tpqrs(offA+ipr,offB+iac)
+
+             val = 0
+             do iq=1,dimOA
+                val = val + A%Occ(iq)*ints(iq,ir)*Amat(ip,iq)
+             enddo
+
+             ! 4A-1B
+             termXY = termXY + val*tpqrs(offA+ipr,offB+iac)
+
+          enddo
+       endif
+
+!       ! 2B terms 
+       if(k==l.and.k<=dimOB) then
+
+          ib = k
+          Emat(1:NBas,1:dimOA) = Emat(1:NBas,1:dimOA) + B%Occ(ib)*ints(1:NBas,1:dimOA)
+
+       endif
+
+       ia = k
+       ib = l
+
+       val4B = 0
+       do iq=1,dimOA
+          val4B = val4B + A%Occ(iq)*ints(iq,iq)
+       enddo
+       val4B = val4B*B%Occ(ib)
+
+       do ic=1,dimOB
+
+          iac = posB(ia,ic)
+
+          if(iac/=0) then
+
+             fact = B%Occ(ib)*Sbb(ic,ib)
+
+             do i=1,ADimX
+
+                ip = A%IndN(1,i)
+                ir = A%IndN(2,i)
+                ipr = posA(ip,ir)
+
+                ! 1A-4B
+                termXY = termXY + fact*ints(ip,ir)*tpqrs(offA+ipr,offB+iac)
+
+                ! 2A-4B
+                termXY = termXY + val4B*Sab(ip,ib)*Sab(ir,ic)*tpqrs(offA+ipr,offB+iac)
+
+                val = 0
+                do iq=1,dimOA
+                   val = val + 0.5d0*A%Occ(iq)*ints(ip,iq)*Sab(iq,ib)
+                enddo
+
+                ! 3A-4B
+                termXY = termXY - val*B%Occ(ib)*Sab(ir,ic)*tpqrs(offA+ipr,offB+iac)
+
+                val = 0
+                do iq=1,dimOA
+                   val = val + 0.5d0*A%Occ(iq)*ints(iq,ir)*Sab(iq,ic)
+                enddo
+
+                ! 4A-4B
+                termXY = termXY - val*B%Occ(ib)*Sab(ip,ib)*tpqrs(offA+ipr,offB+iac)
+
+             enddo
+          endif
+
+       enddo
+
+       if(k<=dimOB) then
+
+          ib = k
+          ic = l
+
+          val3B = 0
+          do iq=1,dimOA
+             val3B = val3B + A%Occ(iq)*B%Occ(ib)*ints(iq,iq)
+          enddo
+
+          do ia=1,NBas
+
+             iac = posB(ia,ic)
+
+             if(iac/=0) then
+
+                fact = B%Occ(ib)*Sbb(ia,ib)
+
+                do i=1,ADimX
+ 
+                   ip = A%IndN(1,i)
+                   ir = A%IndN(2,i)
+                   ipr = posA(ip,ir)
+
+                   ! 1A-3B
+                   termXY = termXY + fact*ints(ip,ir)*tpqrs(offA+ipr,offB+iac)
+
+                   ! 2A-3B 
+                   termXY = termXY + val3B*Sab(ip,ia)*Sab(ir,ib)*tpqrs(offA+ipr,offB+iac)
+
+                   val = 0
+                   do iq=1,dimOA
+                      val = val + 0.5d0*A%Occ(iq)*ints(ip,iq)*Sab(iq,ia)
+                   enddo
+
+                   ! 3A-3B 
+                   termXY = termXY - val*B%Occ(ib)*Sab(ir,ib)*tpqrs(offA+ipr,offB+iac)
+
+                   val = 0
+                   do iq=1,dimOA
+                      val = val + 0.5d0*A%Occ(iq)*ints(iq,ir)*Sab(iq,ib)
+                   enddo
+
+                   ! 4A-3B 
+                   termXY = termXY - val*B%Occ(ib)*Sab(ip,ia)*tpqrs(offA+ipr,offB+iac)
+
+                enddo
+
+             endif
+          enddo
+
+       endif
+
+    enddo
+ enddo
+
+ close(iunit)
+
+ ! 2B terms
+ do j=1,BDimX
+   
+    ia = B%IndN(1,j)
+    ic = B%IndN(2,j)
+    iac = posB(ia,ic)
+
+    fact = 2d0*Sbb(ia,ic)
+
+    do i=1,ADimX
+
+       ip = A%IndN(1,i)
+       ir = A%IndN(2,i)
+       ipr = posA(ip,ir)
+
+       ! 1A-2B
+       termXY = termXY - fact*Emat(ip,ir)*tpqrs(offA+ipr,offB+iac)
+
+       val = 0
+       do iq=1,dimOA
+          val = val + 2d0*A%Occ(iq)*Emat(iq,iq)
+       enddo 
+
+       ! 2A-2B
+       termXY = termXY - val*Sab(ip,ia)*Sab(ir,ic)*tpqrs(offA+ipr,offB+iac)
+
+       val = 0
+       do iq=1,dimOA
+          val = val + A%Occ(iq)*Emat(ip,iq)*Sab(iq,ia)
+       enddo
+
+       ! 3A-2B
+       termXY = termXY + val*Sab(ir,ic)*tpqrs(offA+ipr,offB+iac)
+
+       val = 0
+       do iq=1,dimOA
+          val = val + A%Occ(iq)*Emat(iq,ir)*Sab(iq,ic)
+       enddo
+
+       ! 4A-2B
+       termXY = termXY + val*Sab(ip,ia)*tpqrs(offA+ipr,offB+iac)
+
+    enddo
+ enddo
+
+ print*, 'termXY',termXY
+
+ deallocate(ints,work)
+
+end subroutine term_X_A3_XY_SR
+
+subroutine term_X_A2_XX_SR(dim1,dim2,tpqrs,IntKFile,Sab,Vabb,Vbab,posA,posB,ADimX,BDimX,NBas,A,B,trans)
+
+implicit none
+
+type(SystemBlock) :: A, B
+
+integer,intent(in) :: dim1,dim2,ADimX,BDimX,NBas
+integer,intent(in) :: posA(NBas,NBas),posB(NBas,NBas)
+double precision,intent(in) :: Sab(NBas,NBas), &
+                               Vabb(NBas,NBas),Vbab(NBas,NBas), &
+                               tpqrs(2*dim1,2*dim2)
+logical,intent(in) :: trans
+character(*),intent(in) :: IntKFile
+
+integer :: i,j,k,l,kl
+integer :: iq,ip,ir,it,iu,itu,ipr
+integer :: iunit
+integer :: dimOA,dimVA,dimOB,dimVB,nOVA,nOVB
+double precision :: fact,val,termXX,nelA,nelB
+double precision :: Sxx(NBas,NBas)
+double precision,allocatable :: work(:),ints(:,:)
+
+ ! dimensions
+ dimOA = A%INAct+A%NAct
+ dimVA = A%num1+A%num2
+ dimOB = B%INAct+B%NAct
+ dimVB = B%num1+B%num2
+ nOVA = dimOA*dimVA
+ nOVB = dimOB*dimVB
+
+ nelA = 2d0*A%XELE
+ nelB = 2d0*B%XELE
+
+ Sxx = 0
+ do i=1,NBas
+    Sxx(i,i) = 1d0
+ enddo
+
+ allocate(work(NBas*NBas),ints(NBas,NBas))
+
+!(FO|FO):(BB|BA) or (AA|AB)
+open(newunit=iunit,file=trim(IntKFile),status='OLD', &
+     access='DIRECT',recl=8*NBas*dimOB)
+
+ ! one loop over integrals
+ termXX = 0
+ ints = 0
+ kl = 0
+ do l=1,dimOA
+    do k=1,NBas
+       kl = kl + 1
+       read(iunit,rec=kl) work(1:NBas*dimOB)
+ 
+       call ints_modify(NBas,dimOB,ints,NBas,work,&
+                        Sab(l,k)/nelA,Vabb,Vbab(l,k)/nelB,Sxx)
+ 
+       ! 1 and 4
+       if(k<=dimOB) then
+
+          iq = k
+          iu = l
+
+          do it=1,NBas
+
+             itu = posA(it,iu)
+ 
+             fact = 2d0*Sab(it,iq)*B%Occ(iq)           
+
+             if(itu/=0) then
+
+                do i=1,BDimX 
+
+                   ip = B%IndN(1,i)
+                   ir = B%IndN(2,i)
+                   ipr = posB(ip,ir)
+
+                   if(trans) then
+                      termXX = termXX + fact*tpqrs(ipr,itu)*ints(ip,ir)
+                      termXX = termXX - tpqrs(ipr,itu)*ints(ip,iq)*B%Occ(iq)*Sab(it,ir)
+                   else
+                      termXX = termXX + fact*tpqrs(itu,ipr)*ints(ip,ir)
+                      termXX = termXX - tpqrs(itu,ipr)*ints(ip,iq)*B%Occ(iq)*Sab(it,ir)
+                   endif
+
+                enddo
+             endif 
+
+          enddo
+       endif
+
+       ip = k
+       iu = l
+
+       do ir=1,dimOB
+  
+          ipr = posB(ip,ir)
+         
+          if(ipr/=0) then
+
+             do it=1,NBas
+
+                itu = posA(it,iu) 
+                
+                if(itu/=0) then
+                 
+                   ! 2  
+                   val = 0
+                   do iq=1,dimOB
+                      val = val + ints(iq,ir)*B%Occ(iq)*Sab(it,iq)
+                   enddo
+
+                   if(trans) then
+                      termXX = termXX - val*tpqrs(ipr,itu)
+                   else
+                      termXX = termXX - val*tpqrs(itu,ipr)
+                   endif
+
+                   ! 3
+                   val = 0
+                   do iq=1,dimOB
+                      val = val + 2d0*ints(iq,iq)*B%Occ(iq)
+                   enddo
+
+                   if(trans) then
+                      termXX = termXX + val*tpqrs(ipr,itu)*Sab(it,ir)
+                   else
+                      termXX = termXX + val*tpqrs(itu,ipr)*Sab(it,ir)
+                   endif
+                 
+                endif   
+
+             enddo
+          endif
+       enddo
+
+    enddo
+ enddo
+
+ termXX = -0.5d0*termXX
+
+ close(iunit)
+
+ print*, 'termXX',termXX
+
+ deallocate(ints,work)
+
+end subroutine term_X_A2_XX_SR
+
+subroutine term_X_A2_YY_SR(dim1,dim2,tpqrs,IntKFile,Sab,Vabb,Vbab,posA,posB,ADimX,BDimX,NBas,A,B,trans)
+
+implicit none
+
+type(SystemBlock) :: A, B
+
+integer,intent(in) :: dim1,dim2,ADimX,BDimX,NBas
+integer,intent(in) :: posA(NBas,NBas),posB(NBas,NBas)
+double precision,intent(in) :: Sab(NBas,NBas), &
+                               Vabb(NBas,NBas),Vbab(NBas,NBas), &
+                               tpqrs(2*dim1,2*dim2)
+logical,intent(in) :: trans
+character(*),intent(in) :: IntKFile
+
+integer :: i,j,k,l,kl
+integer :: iq,ip,ir,it,iu,itu,ipr
+integer :: iunit
+integer :: dimOA,dimVA,dimOB,dimVB,nOVA,nOVB
+double precision :: fact,val,termYY,nelA,nelB
+double precision :: Sxx(NBas,NBas)
+double precision,allocatable :: work(:),ints(:,:)
+
+ ! dimensions
+ dimOA = A%INAct+A%NAct
+ dimVA = A%num1+A%num2
+ dimOB = B%INAct+B%NAct
+ dimVB = B%num1+B%num2
+ nOVA = dimOA*dimVA
+ nOVB = dimOB*dimVB
+
+ nelA = 2d0*A%XELE
+ nelB = 2d0*B%XELE
+
+ Sxx = 0
+ do i=1,NBas
+    Sxx(i,i) = 1d0
+ enddo
+
+ allocate(work(NBas*NBas),ints(NBas,NBas))
+
+!(FO|FO):(BB|AB) or (AA|BA)
+ open(newunit=iunit,file=trim(IntKFile),status='OLD', &
+      access='DIRECT',recl=8*NBas*dimOB)
+
+ termYY = 0
+ ints = 0
+ work = 0
+ kl = 0
+ do l=1,dimOB
+    do k=1,NBas
+       kl = kl + 1
+       read(iunit,rec=kl) work(1:NBas*dimOB)
+ 
+       call ints_modify(NBas,dimOB,ints,NBas,work,&
+                        Sab(k,l)/nelA,Vabb,Vbab(k,l)/nelB,Sxx)
+      
+       it = k
+       iq = l
+
+       do iu=1,dimOA
+
+          itu = posA(it,iu)
+          fact = 2d0*B%Occ(iq)*Sab(iu,iq)
+
+          if(itu/=0) then
+
+             do i=1,B%NDimX
+
+                ip = B%IndN(1,i)
+                ir = B%IndN(2,i)
+                ipr = posB(ip,ir)
+
+                ! 1 and 4
+                if(trans) then
+                   termYY = termYY + fact*tpqrs(BDimX+ipr,ADimX+itu)*ints(ip,ir)
+                   termYY = termYY - tpqrs(BDimX+ipr,ADimX+itu)*ints(ir,iq)*Sab(iu,ip)*B%Occ(iq)
+                else
+                   termYY = termYY + fact*tpqrs(ADimX+itu,BDimX+ipr)*ints(ip,ir)
+                   termYY = termYY - tpqrs(ADimX+itu,BDimX+ipr)*ints(ir,iq)*Sab(iu,ip)*B%Occ(iq)
+                endif
+
+             enddo 
+
+          endif 
+       enddo
+
+       it = k
+       ir = l
+
+       do ip=1,NBas
+
+          ipr = posB(ip,ir)
+
+          if(ipr/=0) then
+
+             do iu=1,dimOA
+
+                itu = posA(it,iu)
+
+                if(itu/=0) then
+ 
+                   val = 0
+                   do iq=1,dimOB
+                      val = val + ints(ip,iq)*Sab(iu,iq)*B%Occ(iq)
+                   enddo
+
+                   ! 2
+                   if(trans) then
+                      termYY = termYY - val*tpqrs(BDimX+ipr,ADimX+itu)
+                   else
+                      termYY = termYY - val*tpqrs(ADimX+itu,BDimX+ipr)
+                   endif
+
+                   val = 0
+                   do iq=1,dimOB
+                      val = val + 2d0*ints(iq,iq)*B%Occ(iq)
+                   enddo
+
+                   ! 3
+                   if(trans) then
+                      termYY = termYY + val*tpqrs(BDimX+ipr,ADimX+itu)*Sab(iu,ip)
+                   else
+                      termYY = termYY + val*tpqrs(ADimX+itu,BDimX+ipr)*Sab(iu,ip)
+                   endif
+
+                endif
+
+             enddo
+          endif
+       enddo
+
+    enddo
+ enddo
+
+ termYY = -0.5d0*termYY
+ 
+ close(iunit)
+ 
+ print*, 'termYY',termYY
+
+ deallocate(ints,work)
+
+end subroutine term_X_A2_YY_SR 
+
+subroutine term_X_A2_XY_SR(dim1,dim2,tpqrs,IntKFile,Sab,Vabb,Vbab,posA,posB,ADimX,BDimX,NBas,A,B,trans)
+
+implicit none
+
+type(SystemBlock) :: A, B
+
+integer,intent(in) :: dim1,dim2,ADimX,BDimX,NBas
+integer,intent(in) :: posA(NBas,NBas),posB(NBas,NBas)
+double precision,intent(in) :: Sab(NBas,NBas), &
+                               Vabb(NBas,NBas),Vbab(NBas,NBas), &
+                               tpqrs(2*dim1,2*dim2)
+logical,intent(in) :: trans
+character(*),intent(in) :: IntKFile
+
+integer :: i,j,k,l,kl
+integer :: iq,ip,ir,it,iu,itu,ipr
+integer :: iunit
+integer :: dimOA,dimVA,dimOB,dimVB,nOVA,nOVB
+double precision :: fact,val,termXY,nelA,nelB
+double precision :: Sxx(NBas,NBas)
+double precision,allocatable :: work(:),ints(:,:)
+
+ ! dimensions
+ dimOA = A%INAct+A%NAct
+ dimVA = A%num1+A%num2
+ dimOB = B%INAct+B%NAct
+ dimVB = B%num1+B%num2
+ nOVA = dimOA*dimVA
+ nOVB = dimOB*dimVB
+
+ nelA = 2d0*A%XELE
+ nelB = 2d0*B%XELE
+
+ Sxx = 0
+ do i=1,NBas
+    Sxx(i,i) = 1d0
+ enddo
+
+ allocate(work(NBas*NBas),ints(NBas,NBas))
+
+!(FO|FO):(BB|AB) or (AA|BA)
+ open(newunit=iunit,file=trim(IntKFile),status='OLD', &
+      access='DIRECT',recl=8*NBas*dimOB)
+
+ ints = 0
+ kl = 0
+ 
+ do l=1,dimOB
+    do k=1,NBas
+       kl = kl + 1
+       read(iunit,rec=kl) work(1:NBas*dimOB)
+
+       if(k<=dimOA) then
+
+         call ints_modify(NBas,dimOB,ints,NBas,work,&
+                        Sab(k,l)/nelA,Vabb,Vbab(k,l)/nelB,Sxx)
+
+         iu = k 
+         iq = l
+
+         do it=1,NBas
+
+            itu = posA(it,iu)
+
+            fact = 2d0*B%Occ(iq)*Sab(it,iq)
+
+            if(itu/=0) then
+
+               do i=1,BDimX
+
+                  ip = B%IndN(1,i)
+                  ir = B%IndN(2,i)
+                  ipr = posB(ip,ir)
+
+                  ! 1 and 4 
+                  if(trans) then
+                     termXY = termXY + fact*tpqrs(BDimX+ipr,itu)*ints(ip,ir)
+                     termXY = termXY - tpqrs(BDimX+ipr,itu)*ints(ir,iq)*Sab(it,ip)*B%Occ(iq)
+                  else
+                     termXY = termXY + fact*tpqrs(itu,BDimX+ipr)*ints(ip,ir)
+                     termXY = termXY - tpqrs(itu,BDimX+ipr)*ints(ir,iq)*Sab(it,ip)*B%Occ(iq)
+                  endif
+
+               enddo 
+
+            endif
+         enddo
+
+         iu = k
+         ir = l
+ 
+         do ip=1,NBas
+
+            ipr = posB(ip,ir)
+ 
+            if(ipr/=0) then
+
+               do it=1,NBas
+
+                  itu = posA(it,iu)
+
+                  if(itu/=0) then
+
+                     val = 0
+                     do iq=1,dimOB
+                        val = val + B%Occ(iq)*ints(ip,iq)*Sab(it,iq)
+                     enddo
+
+                     ! 2
+                     if(trans) then
+                        termXY = termXY - val*tpqrs(BDimX+ipr,itu)
+                     else
+                        termXY = termXY - val*tpqrs(itu,BDimX+ipr)
+                     endif
+
+                     val = 0
+                     do iq=1,dimOB
+                        val = val + 2d0*B%Occ(iq)*ints(iq,iq)
+                     enddo
+
+                     ! 3
+                     if(trans) then
+                        termXY = termXY + val*tpqrs(BDimX+ipr,itu)*Sab(it,ip)
+                     else
+                        termXY = termXY + val*tpqrs(itu,BDimX+ipr)*Sab(it,ip)
+                     endif
+                    
+                  endif
+               enddo
+            endif
+         enddo
+
+       endif
+
+    enddo
+ enddo
+
+ termXY = -0.5d0*termXY
+
+ close(iunit)
+
+ print*, 'termXY',termXY
+
+ deallocate(ints,work)
+
+end subroutine term_X_A2_XY_SR
+
+subroutine term_X_A2_YX_SR(dim1,dim2,tpqrs,IntKFile,IntJFile, &
+                           Sab,Vabb,Vbab,posA,posB,ADimX,BDimX,NBas,A,B,trans)
+
+implicit none
+
+type(SystemBlock) :: A, B
+
+integer,intent(in) :: dim1,dim2,ADimX,BDimX,NBas
+integer,intent(in) :: posA(NBas,NBas),posB(NBas,NBas)
+double precision,intent(in) :: Sab(NBas,NBas), &
+                               Vabb(NBas,NBas),Vbab(NBas,NBas), &
+                               tpqrs(2*dim1,2*dim2)
+logical,intent(in) :: trans
+character(*),intent(in) :: IntKFile,IntJFile
+
+integer :: i,j,k,l,kl
+integer :: iq,ip,ir,it,iu,itu,ipr
+integer :: iunit
+integer :: dimOA,dimVA,dimOB,dimVB,nOVA,nOVB
+double precision :: fact,val,termYX,nelA,nelB
+double precision :: Sxx(NBas,NBas)
+double precision,allocatable :: work(:),ints(:,:)
+
+ ! dimensions
+ dimOA = A%INAct+A%NAct
+ dimVA = A%num1+A%num2
+ dimOB = B%INAct+B%NAct
+ dimVB = B%num1+B%num2
+ nOVA = dimOA*dimVA
+ nOVB = dimOB*dimVB
+
+ nelA = 2d0*A%XELE
+ nelB = 2d0*B%XELE
+
+ Sxx = 0
+ do i=1,NBas
+    Sxx(i,i) = 1d0
+ enddo
+
+ allocate(work(NBas*NBas),ints(NBas,NBas))
+
+!(FO|FO):(BB|AB) or (AA|BA)
+ open(newunit=iunit,file=trim(IntKFile),status='OLD', &
+      access='DIRECT',recl=8*NBas*dimOB)
+
+ termYX = 0
+ work = 0
+ ints = 0
+ kl = 0
+ 
+ do l=1,dimOB
+    do k=1,NBas
+       kl = kl + 1
+       read(iunit,rec=kl) work(1:NBas*dimOB)
+
+       call ints_modify(NBas,dimOB,ints,NBas,work,&
+                        Sab(k,l)/nelA,Vabb,Vbab(k,l)/nelB,Sxx)
+
+       it = k
+       iq = l
+
+       do iu=1,dimOA
+
+          itu = posA(it,iu)
+
+          fact = 2d0*B%Occ(iq)*Sab(iu,iq)
+
+          if(itu/=0) then
+
+             do i=1,BDimX
+
+                ip = B%IndN(1,i)
+                ir = B%IndN(2,i)
+                ipr = posB(ip,ir)
+
+                ! 1 and 4
+                if(trans) then
+                   termYX = termYX + fact*tpqrs(ipr,ADimX+itu)*ints(ip,ir)
+                   termYX = termYX - tpqrs(ipr,ADimX+itu)*ints(ip,iq)*Sab(iu,ir)*B%Occ(iq)
+                else
+                   termYX = termYX + fact*tpqrs(ADimX+itu,ipr)*ints(ip,ir)
+                   termYX = termYX - tpqrs(ADimX+itu,ipr)*ints(ip,iq)*Sab(iu,ir)*B%Occ(iq)
+                endif
+
+             enddo
+
+          endif
+       enddo
+
+    enddo
+ enddo
+
+ close(iunit)
+
+!(FF|OO):(AB|BB) or (BA|AA)
+ open(newunit=iunit,file=trim(IntJFile),status='OLD', &
+      access='DIRECT',recl=8*NBas*NBas)
+
+ work = 0
+ ints = 0
+ kl = 0
+ do l=1,dimOB
+    do k=1,dimOB
+       kl = kl + 1
+       read(iunit,rec=kl) work(1:NBas*NBas)
+
+       call ints_modify(NBas,NBas,ints,NBas,work,&
+                        Vabb(k,l)/nelA,Sab,Sxx(k,l)/nelB,Vbab)
+
+       iq = k
+       ir = l
+
+       do ip=1,NBas
+
+          ipr = posB(ip,ir)
+
+          if(ipr/=0) then
+
+             do i=1,ADimX
+
+                it = A%IndN(1,i)
+                iu = A%IndN(2,i)
+                itu = posA(it,iu)
+
+                if(trans) then
+                   ! 2
+                   termYX = termYX - B%Occ(iq)*tpqrs(ipr,ADimX+itu)*ints(it,ip)*Sab(iu,iq)
+                   ! 3
+                   if(iq==ir) then 
+                      termYX = termYX + 2d0*B%Occ(iq)*tpqrs(ipr,ADimX+itu)*ints(it,ip)*Sab(iu,ir)
+                   endif
+                else 
+                   ! 2
+                   termYX = termYX - B%Occ(iq)*tpqrs(ADimX+itu,ipr)*ints(it,ip)*Sab(iu,iq)
+                   ! 3
+                   if(iq==ir) then 
+                      termYX = termYX + 2d0*B%Occ(iq)*tpqrs(ADimX+itu,ipr)*ints(it,ip)*Sab(iu,ir)
+                   endif
+                endif
+
+             enddo
+          endif
+
+       enddo
+
+    enddo
+ enddo
+
+ close(iunit)
+
+ termYX = -0.5d0*termYX
+
+ print*, 'termYX',termYX
+
+ deallocate(ints,work)
+
+end subroutine term_X_A2_YX_SR
+
+subroutine e2exdisp(Flags,A,B,SAPT)
+
+implicit none
+
+type(FlagsData) :: Flags
+type(SystemBlock) :: A, B
+type(SaptData) :: SAPT
+
+integer :: NBas,NInte1
+integer :: dimOA,dimVA,dimOB,dimVB,nOVA,nOVB
+integer :: GdimOA,GdimOB
+integer :: iunit
+integer :: i,j,k,l,kl,ij,ii,jj,pq,rs
+integer :: ip,iq,ir,is,ipq,irs
+integer :: kc,ik,ic
+logical :: approx
+logical :: ipropab 
+integer,allocatable :: posA(:,:),posB(:,:)
+double precision,allocatable :: OmA(:), OmB(:)
+double precision,allocatable :: EVecA(:), EVecB(:)
+double precision,allocatable :: tmp1(:,:),tmp2(:,:),tmp3(:,:),&
+                                work(:),workSq(:,:),&
+                                sij(:,:),&
+                                tpqrs(:,:)
+double precision :: nelA,nelB
+double precision :: fact,val,termZ,termY,termX
+!test
+double precision :: fact2
+double precision,allocatable :: ints2(:,:)
+! 
+double precision,allocatable :: S(:,:),Sab(:,:),Sba(:,:)
+double precision,allocatable :: PA(:,:),PB(:,:), &
+                                PAbb(:,:),PBaa(:,:)
+double precision,allocatable :: Va(:,:),Vb(:,:), &
+                                Vabb(:,:),Vbaa(:,:),&
+                                Vaba(:,:),Vaab(:,:),Vbab(:,:)
+double precision,allocatable :: RDM2Aval(:,:,:,:), &
+                                RDM2Bval(:,:,:,:)
+double precision,allocatable :: ints(:,:) 
+double precision :: Tcpu,Twall
+double precision,external  :: trace,FRDM2
+! test for Be
+!double precision,parameter :: SmallE = 1.D-1
+double precision,parameter :: SmallE = 1.D-3
+double precision,parameter :: BigE = 1.D8 
+
+! set dimensions
+ NBas = A%NBasis 
+ dimOA = A%INAct+A%NAct
+ GdimOA = A%num0+A%num1
+ dimVA = A%num1+A%num2
+ dimOB = B%INAct+B%NAct
+ GdimOB = B%num0+B%num1
+ dimVB = B%num1+B%num2
+ nOVA = dimOA*dimVA
+ nOVB = dimOB*dimVB
+
+ nelA = 2d0*A%XELE
+ nelB = 2d0*B%XELE
+
+! set e2exd_version
+ !approx=.true.
+ approx=.false.
+
+! approximate RDM2
+ allocate(A%Fmat(NBas,NBas),B%Fmat(NBas,NBas))
+ call fill_Fmat(A%Fmat,A%Occ,NBas,1)
+ call fill_Fmat(B%Fmat,B%Occ,NBas,1)
+
+ allocate(S(NBas,NBas),Sab(NBas,NBas),&
+          Sba(NBas,NBas),&
+          PA(NBas,NBas),PB(NBas,NBas),&
+          Va(NBas,NBas),Vb(NBas,NBas),&
+          Vabb(NBas,NBas),Vbaa(NBas,NBas),&
+          Vaba(NBas,NBas),Vaab(NBas,NBas),Vbab(NBas,NBas))
+ allocate(tmp1(NBas,NBas),tmp2(NBas,NBas))
+
+ call get_den(NBas,A%CMO,A%Occ,1d0,PA)
+ call get_den(NBas,B%CMO,B%Occ,1d0,PB)
+
+ call get_one_mat('S',S,A%Monomer,NBas)
+ call tran2MO(S,A%CMO,B%CMO,Sab,NBas)
+ call tran2MO(S,B%CMO,A%CMO,Sba,NBas)
+
+ call get_one_mat('V',Va,A%Monomer,NBas)
+ call get_one_mat('V',Vb,B%Monomer,NBas)
+
+ call tran2MO(Va,B%CMO,B%CMO,Vabb,NBas)
+ call tran2MO(Vb,A%CMO,A%CMO,Vbaa,NBas)
+
+ call tran2MO(Va,B%CMO,A%CMO,Vaba,NBas)
+ call tran2MO(Va,A%CMO,B%CMO,Vaab,NBas)
+ call tran2MO(Vb,A%CMO,B%CMO,Vbab,NBas)
+
+ allocate(RDM2Aval(dimOA,dimOA,dimOA,dimOA),&
+          RDM2Bval(dimOB,dimOB,dimOB,dimOB))
+ do l=1,dimOA
+    do k=1,dimOA 
+       do j=1,dimOA
+          do i=1,dimOA
+             RDM2Aval(i,j,k,l) = FRDM2(i,k,j,l,A%RDM2,A%Occ,A%Ind2,A%NAct,NBas)
+          enddo
+       enddo
+    enddo
+ enddo
+ do l=1,dimOB
+    do k=1,dimOB 
+       do j=1,dimOB
+          do i=1,dimOB
+             RDM2Bval(i,j,k,l) = FRDM2(i,k,j,l,B%RDM2,B%Occ,B%Ind2,B%NAct,NBas)
+          enddo
+       enddo
+    enddo
+ enddo
+
+ allocate(posA(NBas,NBas),posB(NBas,NBas))
+ posA = 0
+ do i=1,A%NDimX
+    posA(A%IndN(1,i),A%IndN(2,i)) = A%IndX(i)
+ enddo
+ posB = 0
+ do i=1,B%NDimX
+    posB(B%IndN(1,i),B%IndN(2,i)) = B%IndX(i)
+ enddo
+
+ ! termZ
+ ! PA(ab).S(bc)
+ ! S(ad).PB(dc)
+ tmp1 = 0
+ tmp2 = 0
+ termZ = 0
+ call dgemm('N','N',NBas,NBas,NBas,1d0,PA,NBas,S,NBas,0d0,tmp1,NBas)
+ call dgemm('N','N',NBas,NBas,NBas,1d0,S,NBas,PB,NBas,0d0,tmp2,NBas)
+ do j=1,NBas
+    do i=1,NBas
+       termZ = termZ + tmp1(i,j)*tmp2(i,j)
+    enddo
+ enddo
+
+ termZ = 2d0*SAPT%e2disp*termZ
+ !write(LOUT,*) 'termZ ',termZ
+ write(LOUT,'(1x,a,f16.8)') 'term Z      = ',  termZ*1.0d3
+
+ deallocate(tmp2,tmp1)
+
+ allocate(tmp1(A%NDimX,B%NDimX),tmp2(A%NDimX,B%NDimX),&
+          tmp3(A%NDimX,B%NDimX),work(nOVB),workSq(NBas,NBas))
+ allocate(sij(A%NDimX,B%NDimX))
+
+ ! term A1
+ ! transform J and K
+ call tran4_gen(NBas,&
+          A%num0+A%num1,A%CMO(1:NBas,1:(A%num0+A%num1)),&
+          B%num0+B%num1,B%CMO(1:NBas,1:(B%num0+B%num1)),&
+          NBas,A%CMO,&
+          NBas,B%CMO,&
+          'FFOOABAB','AOTWOSORT')
+ call tran4_gen(NBas,&
+          NBas,B%CMO,&
+          A%num0+A%num1,A%CMO(1:NBas,1:(A%num0+A%num1)),&
+          NBas,A%CMO,&
+          B%num0+B%num1,B%CMO(1:NBas,1:(B%num0+B%num1)),&
+          'FOFOABBA','AOTWOSORT')
+ ! term A2
+ ! A2A(B): XX
+ call tran4_gen(NBas,&
+          NBas,B%CMO,&
+          A%num0+A%num1,A%CMO(1:NBas,1:(A%num0+A%num1)),&
+          NBas,B%CMO,&
+          B%num0+B%num1,B%CMO(1:NBas,1:(B%num0+B%num1)),&
+          'FOFOBBBA','AOTWOSORT')
+ call tran4_gen(NBas,&
+          NBas,A%CMO,&
+          B%num0+B%num1,B%CMO(1:NBas,1:(B%num0+B%num1)),&
+          NBas,A%CMO,&
+          A%num0+A%num1,A%CMO(1:NBas,1:(A%num0+A%num1)),&
+          'FOFOAAAB','AOTWOSORT')
+ ! A2A(B): YY
+ call tran4_gen(NBas,&
+          NBas,A%CMO,&
+          B%num0+B%num1,B%CMO(1:NBas,1:(B%num0+B%num1)),&
+          NBas,B%CMO,&
+          B%num0+B%num1,B%CMO(1:NBas,1:(B%num0+B%num1)),&
+          'FOFOBBAB','AOTWOSORT')
+ call tran4_gen(NBas,&
+          NBas,B%CMO,&
+          A%num0+A%num1,A%CMO(1:NBas,1:(A%num0+A%num1)),&
+          NBas,A%CMO,&
+          A%num0+A%num1,A%CMO(1:NBas,1:(A%num0+A%num1)),&
+          'FOFOAABA','AOTWOSORT')
+ ! term A3
+ call tran4_gen(NBas,&
+          NBas,B%CMO,&
+          B%num0+B%num1,B%CMO(1:NBas,1:(B%num0+B%num1)),&
+          NBas,A%CMO,&
+          A%num0+A%num1,A%CMO(1:NBas,1:(A%num0+A%num1)),&
+          'FOFOAABB','AOTWOSORT')
+ ! XY and YX, A2
+ call tran4_gen(NBas,&
+          B%num0+B%num1,B%CMO(1:NBas,1:(B%num0+B%num1)),&
+          B%num0+B%num1,B%CMO(1:NBas,1:(B%num0+B%num1)),&
+          NBas,A%CMO,&
+          NBas,B%CMO,&
+          'FFOOABBB','AOTWOSORT')
+ call tran4_gen(NBas,&
+          A%num0+A%num1,A%CMO(1:NBas,1:(A%num0+A%num1)),&
+          A%num0+A%num1,A%CMO(1:NBas,1:(A%num0+A%num1)),&
+          NBas,B%CMO,&
+         NBas,A%CMO,&
+          'FFOOBAAA','AOTWOSORT')
+
+
+ deallocate(work)
+ allocate(work(NBas**2),ints(NBas,NBas),ints2(NBas,NBas))
+
+ ! A3: XX
+ tmp1=0
+ if(approx) then
+
+    call app_A3_XX(A%NDimX,B%NDimX,tmp1,A%Occ,B%Occ,A%Fmat,B%Fmat,Sab,nelA,Vabb,nelB,Vbaa,'FOFOAABB',&
+                   B%IndN,A%IndN,posB,posA,dimOB,dimOA,B%NDimX,A%NDimX,NBas)
+
+ else
+
+    call inter_A3_XX(A%NDimX,B%NDimX,tmp1,A%Occ,B%Occ,RDM2Aval,RDM2Bval,Sab,nelA,Vabb,nelB,Vbaa,'FOFOAABB',&
+                     B%IndN,A%IndN,posB,posA,dimOB,dimOA,B%NDimX,A%NDimX,NBas)
+
+ endif
+
+ ! TERMS XX, YY
+ !(FO|FO):(AB|BA)
+ open(newunit=iunit,file='FOFOABBA',status='OLD', &
+     access='DIRECT',recl=8*NBas*dimOB)
+
+ ints = 0
+ ints2 = 0
+ kl = 0
+ do l=1,dimOA
+    do k=1,NBas
+       kl = kl + 1
+       read(iunit,rec=kl) work(1:NBas*dimOB)
+
+       ir = k
+       iq = l
+
+       do ip=1,NBas
+          do is=1,dimOB
+
+             ipq = posA(ip,iq)
+             irs = posB(ir,is)
+
+             if(ipq/=0.and.irs/=0) then
+
+                do j=1,dimOB
+                   do i=1,NBas
+                      ints(i,j) = work((j-1)*NBas+i)
+                   enddo
+                enddo
+
+                fact = -2d0*(A%Occ(ip)-A%Occ(iq)) * &
+                            (B%Occ(ir)-B%Occ(is)) * &
+                            ints(ip,is)
+
+                tmp1(ipq,irs) = tmp1(ipq,irs) + fact
+ 
+             endif
+          enddo
+       enddo
+ 
+    enddo
+ enddo
+ close(iunit)
+
+ sij = tmp1
+
+ ! A1:XX
+ call A1_Mod_1el(tmp1,Vaab,Vbab,Sab,posA,posB,A,B,NBas,'XX')
+
+ ! A2:XX
+ if(approx) then
+
+    call app_A2_XX(A%NDimX,B%NDimX,tmp1,B%Occ,B%Fmat, &
+                   Sab,nelA,Vabb,nelB,Vbab,'FOFOBBBA',&
+                   A%Occ,B%IndN,A%IndN,posB,posA,     &
+                   dimOB,dimOA,B%NDimX,A%NDimX,NBas,.false.)
+    call app_A2_XX(A%NDimX,B%NDimX,tmp1,A%Occ,A%Fmat, & 
+                   Sba,nelB,Vbaa,nelA,Vaba,'FOFOAAAB',&
+                   B%Occ,A%IndN,B%IndN,posA,posB,     &
+                   dimOA,dimOB,A%NDimX,B%NDimX,NBas,.true.)
+
+ else
+
+    call inter_A2_XX(A%NDimX,B%NDimX,tmp1,RDM2Bval,     &
+                     Sab,nelA,Vabb,nelB,Vbab,'FOFOBBBA',&
+                     A%Occ,B%IndN,A%IndN,posB,posA,     &
+                     dimOB,dimOA,B%NDimX,A%NDimX,NBas,.false.)
+    call inter_A2_XX(A%NDimX,B%NDimX,tmp1,RDM2Aval,     &
+                     Sba,nelB,Vbaa,nelA,Vaba,'FOFOAAAB',&
+                     B%Occ,A%IndN,B%IndN,posA,posB,     &
+                     dimOA,dimOB,A%NDimX,B%NDimX,NBas,.true.)
+
+ endif
+
+ !X_A.I.X_B
+ call dgemm('T','N',A%NDimX,B%NDimX,A%NDimX,1d0,A%EigX,A%NDimX,tmp1,A%NDimX,0d0,tmp2,A%NDimX)
+ call dgemm('N','N',A%NDimX,B%NDimX,B%NDimX,1d0,tmp2,A%NDimX,B%EigX,B%NDimX,0d0,tmp3,A%NDimX)
+! print*, 'Xa.I.Xb:',norm2(tmp3)
+
+ tmp1 = sij
+
+ ! A1:YY
+ call A1_Mod_1el(tmp1,Vaab,Vbab,Sab,posA,posB,A,B,NBas,'YY')
+
+ ! A2:YY
+ if(approx) then
+
+    call app_A2_YY(A%NDimX,B%NDimX,tmp1,B%Occ,B%Fmat,Sab,nelA,Vabb,nelB,Vbab,'FOFOBBAB',&
+              A%Occ,B%IndN,A%IndN,posB,posA,dimOB,dimOA,B%NDimX,A%NDimX,NBas,.false.)
+    call app_A2_YY(A%NDimX,B%NDimX,tmp1,A%Occ,A%Fmat,Sba,nelB,Vbaa,nelA,Vaba,'FOFOAABA',&
+              B%Occ,A%IndN,B%IndN,posA,posB,dimOA,dimOB,A%NDimX,B%NDimX,NBas,.true.)
+
+ else
+
+    call inter_A2_YY(A%NDimX,B%NDimX,tmp1,RDM2Bval,Sab,nelA,Vabb,nelB,Vbab,'FOFOBBAB',&
+             A%Occ,B%IndN,A%IndN,posB,posA,dimOB,dimOA,B%NDimX,A%NDimX,NBas,.false.)
+    call inter_A2_YY(A%NDimX,B%NDimX,tmp1,RDM2Aval,Sba,nelB,Vbaa,nelA,Vaba,'FOFOAABA',&
+              B%Occ,A%IndN,B%IndN,posA,posB,dimOA,dimOB,A%NDimX,B%NDimX,NBas,.true.)
+
+ endif
+
+ !Y_A.I.Y_B
+ call dgemm('T','N',A%NDimX,B%NDimX,A%NDimX,1d0,A%EigY,A%NDimX,tmp1,A%NDimX,0d0,tmp2,A%NDimX)
+ call dgemm('N','N',A%NDimX,B%NDimX,B%NDimX,1d0,tmp2,A%NDimX,B%EigY,B%NDimX,1d0,tmp3,A%NDimX)
+! print*, 'Ya.I.Yb:',norm2(tmp3)
+
+! TERMS XY, YX
+! A3:XY
+ tmp1 = 0
+ if(approx) then
+
+    call app_A3_XY(A%NDimX,B%NDimX,tmp1,A%Occ,B%Occ,A%Fmat,B%Fmat,Sab,nelA,Vabb,nelB,Vbaa,'FOFOAABB',&
+                   B%IndN,A%IndN,posB,posA,dimOB,dimOA,B%NDimX,A%NDimX,NBas)
+
+ else
+
+   call inter_A3_XY(A%NDimX,B%NDimX,tmp1,A%Occ,B%Occ,RDM2Aval,RDM2Bval,Sab,nelA,Vabb,nelB,Vbaa,'FOFOAABB',&
+                  B%IndN,A%IndN,posB,posA,dimOB,dimOA,B%NDimX,A%NDimX,NBas)
+
+ endif
+
+! (FF|OO):(AB|AB)
+ open(newunit=iunit,file='FFOOABAB',status='OLD', &
+     access='DIRECT',recl=8*NBas*NBas)
+
+ ints = 0
+ ints2 = 0
+ kl = 0
+ do l=1,dimOB
+    do k=1,dimOA
+       kl = kl + 1
+       read(iunit,rec=kl) work(1:NBas*NBas)
+
+       iq = k
+       is = l
+
+       do j=1,NBas
+          do i=1,NBas
+             ints(i,j) = work((j-1)*NBas+i)
+          enddo
+       enddo
+
+       do ir=1,NBas
+          do ip=1,NBas
+
+             ipq = posA(ip,iq)
+             irs = posB(ir,is)
+
+             if(ipq/=0.and.irs/=0) then
+
+
+                fact = 2d0*(A%Occ(ip)-A%Occ(iq)) * &
+                           (B%Occ(ir)-B%Occ(is)) * &
+                           ints(ip,ir)
+
+                tmp1(ipq,irs) = tmp1(ipq,irs) + fact
+ 
+             endif
+            enddo
+         enddo
+ 
+    enddo
+ enddo
+ close(iunit)
+
+ sij = tmp1
+
+ ! A1:XY
+ call A1_Mod_1el(tmp1,Vaab,Vbab,Sab,posA,posB,A,B,NBas,'XY')
+
+! A2:XY
+ if(approx) then
+
+    call app_A2_XY(A%NDimX,B%NDimX,tmp1,B%Occ,B%Fmat,Sab,nelA,Vabb,nelB,Vbab,'FOFOBBAB',&
+              A%Occ,B%IndN,A%IndN,posB,posA,dimOB,dimOA,B%NDimX,A%NDimX,NBas,.false.)
+    call app_A2_YX(A%NDimX,B%NDimX,tmp1,A%Occ,A%Fmat,Sba,nelB,Vbaa,nelA,Vaba,'FOFOAABA','FFOOBAAA',&
+              B%Occ,A%IndN,B%IndN,posA,posB,dimOA,dimOB,A%NDimX,B%NDimX,NBas,.true.)
+
+ else
+
+    call inter_A2_XY(A%NDimX,B%NDimX,tmp1,RDM2Bval,Sab,nelA,Vabb,nelB,Vbab,'FOFOBBAB',&
+              A%Occ,B%IndN,A%IndN,posB,posA,dimOB,dimOA,B%NDimX,A%NDimX,NBas,.false.)
+    call inter_A2_YX(A%NDimX,B%NDimX,tmp1,RDM2Aval,Sba,nelB,Vbaa,nelA,Vaba,'FOFOAABA','FFOOBAAA',&
+              B%Occ,A%IndN,B%IndN,posA,posB,dimOA,dimOB,A%NDimX,B%NDimX,NBas,.true.,B)
+
+ endif
+
+ !X_A.I.Y_B
+ call dgemm('T','N',A%NDimX,B%NDimX,A%NDimX,1d0,A%EigX,A%NDimX,tmp1,A%NDimX,0d0,tmp2,A%NDimX)
+ call dgemm('N','N',A%NDimX,B%NDimX,B%NDimX,1d0,tmp2,A%NDimX,B%EigY,B%NDimX,1d0,tmp3,A%NDimX)
+!! print*, 'Xa.I.Yb:',norm2(tmp3)
+
+ tmp1 = sij
+
+ ! A1:YX
+ call A1_Mod_1el(tmp1,Vaab,Vbab,Sab,posA,posB,A,B,NBas,'YX')
+
+! A2: YX 
+ if(approx) then
+
+    call app_A2_YX(A%NDimX,B%NDimX,tmp1,B%Occ,B%Fmat,Sab,nelA,Vabb,nelB,Vbab,'FOFOBBAB','FFOOABBB',&
+              A%Occ,B%IndN,A%IndN,posB,posA,dimOB,dimOA,B%NDimX,A%NDimX,NBas,.false.)
+    call app_A2_XY(A%NDimX,B%NDimX,tmp1,A%Occ,A%Fmat,Sba,nelB,Vbaa,nelA,Vaba,'FOFOAABA',&
+              B%Occ,A%IndN,B%IndN,posA,posB,dimOA,dimOB,A%NDimX,B%NDimX,NBas,.true.)
+
+ else
+
+    call inter_A2_YX(A%NDimX,B%NDimX,tmp1,RDM2Bval,Sab,nelA,Vabb,nelB,Vbab,'FOFOBBAB','FFOOABBB',&
+              A%Occ,B%IndN,A%IndN,posB,posA,dimOB,dimOA,B%NDimX,A%NDimX,NBas,.false.,B)
+    call inter_A2_XY(A%NDimX,B%NDimX,tmp1,RDM2Aval,Sba,nelB,Vbaa,nelA,Vaba,'FOFOAABA',&
+              B%Occ,A%IndN,B%IndN,posA,posB,dimOA,dimOB,A%NDimX,B%NDimX,NBas,.true.)
+
+ endif
+
+ !Y_A.I.X_B
+ call dgemm('T','N',A%NDimX,B%NDimX,A%NDimX,1d0,A%EigY,A%NDimX,tmp1,A%NDimX,0d0,tmp2,A%NDimX)
+ call dgemm('N','N',A%NDimX,B%NDimX,B%NDimX,1d0,tmp2,A%NDimX,B%EigX,B%NDimX,1d0,tmp3,A%NDimX)
+! print*, 'Ya.I.Xb:',norm2(tmp3)
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+! WORKING VERSION XX, YY :: 
+! ! TERMS XX, YY
+! !(FO|FO):(AB|BA)
+! open(newunit=iunit,file='FOFOABBA',status='OLD', &
+!     access='DIRECT',recl=8*NBas*dimOB)
+!
+! tmp1 = 0
+! ints = 0
+! kl = 0
+! do l=1,dimOA
+!    do k=1,NBas
+!       kl = kl + 1
+!       read(iunit,rec=kl) work(1:NBas*dimOB)
+!
+!       ir = k
+!       iq = l
+!
+!       do ip=1,NBas
+!          do is=1,dimOB
+!
+!             ipq = posA(ip,iq)
+!             irs = posB(ir,is)
+!
+!             if(ipq/=0.and.irs/=0) then
+!
+!                call ints_modify(NBas,dimOB,ints,NBas,work,Sab(iq,ir)/nelA,Vaab,Vbab(iq,ir)/nelB,Sab)
+!
+!                fact = -2d0*(A%Occ(ip)-A%Occ(iq)) * &
+!                            (B%Occ(ir)-B%Occ(is)) * &
+!                            ints(ip,is)
+!
+!                tmp1(ipq,irs) = tmp1(ipq,irs) + fact
+! 
+!             endif
+!          enddo
+!       enddo
+! 
+!    enddo
+! enddo
+! close(iunit)
+!
+! !X_A.I.X_B
+! call dgemm('T','N',A%NDimX,B%NDimX,A%NDimX,1d0,A%EigX,A%NDimX,tmp1,A%NDimX,0d0,tmp2,A%NDimX)
+! call dgemm('N','N',A%NDimX,B%NDimX,B%NDimX,1d0,tmp2,A%NDimX,B%EigX,B%NDimX,0d0,tmp3,A%NDimX)
+! print*, 'Xa.I.Xb:',norm2(tmp3)
+!
+! !(FO|FO):(AB|BA)
+! open(newunit=iunit,file='FOFOABBA',status='OLD', &
+!     access='DIRECT',recl=8*NBas*dimOB)
+!
+! tmp1 = 0
+! ints = 0
+! kl = 0
+! do l=1,dimOA
+!    do k=1,NBas
+!       kl = kl + 1
+!       read(iunit,rec=kl) work(1:NBas*dimOB)
+!
+!       ir = k
+!       iq = l
+!
+!       do ip=1,NBas
+!          do is=1,dimOB
+!
+!             ipq = posA(ip,iq)
+!             irs = posB(ir,is)
+!
+!             if(ipq/=0.and.irs/=0) then
+!
+!                call ints_modify(NBas,dimOB,ints,NBas,work,Vaab(iq,ir)/nelA,Sab,Sab(iq,ir)/nelB,Vbab)
+!
+!                fact = -2d0*(A%Occ(ip)-A%Occ(iq)) * &
+!                            (B%Occ(ir)-B%Occ(is)) * &
+!                            ints(ip,is)
+!
+!                tmp1(ipq,irs) = tmp1(ipq,irs) + fact
+! 
+!             endif
+!          enddo
+!       enddo
+! 
+!    enddo
+! enddo
+! close(iunit)
+!
+! !Y_A.I.Y_B
+! call dgemm('T','N',A%NDimX,B%NDimX,A%NDimX,1d0,A%EigY,A%NDimX,tmp1,A%NDimX,0d0,tmp2,A%NDimX)
+! call dgemm('N','N',A%NDimX,B%NDimX,B%NDimX,1d0,tmp2,A%NDimX,B%EigY,B%NDimX,1d0,tmp3,A%NDimX)
+! print*, 'Ya.I.Yb:',norm2(tmp3)
+!
+! ! A3: XX
+! tmp1=0
+! if(approx) then
+!
+!    call app_A3_XX(A%NDimX,B%NDimX,tmp1,A%Occ,B%Occ,A%Fmat,B%Fmat,Sab,nelA,Vabb,nelB,Vbaa,'FOFOAABB',&
+!                   B%IndN,A%IndN,posB,posA,dimOB,dimOA,B%NDimX,A%NDimX,NBas)
+!
+! else
+!
+!    call inter_A3_XX(A%NDimX,B%NDimX,tmp1,A%Occ,B%Occ,RDM2Aval,RDM2Bval,Sab,nelA,Vabb,nelB,Vbaa,'FOFOAABB',&
+!                     B%IndN,A%IndN,posB,posA,dimOB,dimOA,B%NDimX,A%NDimX,NBas)
+!
+! endif
+!
+! !X_A.I.X_B
+! call dgemm('T','N',A%NDimX,B%NDimX,A%NDimX,1d0,A%EigX,A%NDimX,tmp1,A%NDimX,0d0,tmp2,A%NDimX)
+! call dgemm('N','N',A%NDimX,B%NDimX,B%NDimX,1d0,tmp2,A%NDimX,B%EigX,B%NDimX,1d0,tmp3,A%NDimX)
+!! print*, 'Xa.I.Xb:',norm2(tmp3)
+! !Y_A.I.Y_B
+! call dgemm('T','N',A%NDimX,B%NDimX,A%NDimX,1d0,A%EigY,A%NDimX,tmp1,A%NDimX,0d0,tmp2,A%NDimX)
+! call dgemm('N','N',A%NDimX,B%NDimX,B%NDimX,1d0,tmp2,A%NDimX,B%EigY,B%NDimX,1d0,tmp3,A%NDimX)
+!! print*, 'Ya.I.Yb:',norm2(tmp3)
+!
+! ! A2:XX
+! tmp1 = 0
+! if(approx) then
+!
+!    call app_A2_XX(A%NDimX,B%NDimX,tmp1,B%Occ,B%Fmat, &
+!                   Sab,nelA,Vabb,nelB,Vbab,'FOFOBBBA',&
+!                   A%Occ,B%IndN,A%IndN,posB,posA,     &
+!                   dimOB,dimOA,B%NDimX,A%NDimX,NBas,.false.)
+!    call app_A2_XX(A%NDimX,B%NDimX,tmp1,A%Occ,A%Fmat, & 
+!                   Sba,nelB,Vbaa,nelA,Vaba,'FOFOAAAB',&
+!                   B%Occ,A%IndN,B%IndN,posA,posB,     &
+!                   dimOA,dimOB,A%NDimX,B%NDimX,NBas,.true.)
+!
+! else
+!
+!    call inter_A2_XX(A%NDimX,B%NDimX,tmp1,RDM2Bval,     &
+!                     Sab,nelA,Vabb,nelB,Vbab,'FOFOBBBA',&
+!                     A%Occ,B%IndN,A%IndN,posB,posA,     &
+!                     dimOB,dimOA,B%NDimX,A%NDimX,NBas,.false.)
+!    call inter_A2_XX(A%NDimX,B%NDimX,tmp1,RDM2Aval,     &
+!                     Sba,nelB,Vbaa,nelA,Vaba,'FOFOAAAB',&
+!                     B%Occ,A%IndN,B%IndN,posA,posB,     &
+!                     dimOA,dimOB,A%NDimX,B%NDimX,NBas,.true.)
+!
+! endif
+!
+! !X_A.I.X_B
+! call dgemm('T','N',A%NDimX,B%NDimX,A%NDimX,1d0,A%EigX,A%NDimX,tmp1,A%NDimX,0d0,tmp2,A%NDimX)
+! call dgemm('N','N',A%NDimX,B%NDimX,B%NDimX,1d0,tmp2,A%NDimX,B%EigX,B%NDimX,1d0,tmp3,A%NDimX)
+!! print*, 'Xa.I.Xb:',norm2(tmp3)
+!
+! ! A2:YY
+! tmp1 = 0
+! if(approx) then
+!
+!    call app_A2_YY(A%NDimX,B%NDimX,tmp1,B%Occ,B%Fmat,Sab,nelA,Vabb,nelB,Vbab,'FOFOBBAB',&
+!              A%Occ,B%IndN,A%IndN,posB,posA,dimOB,dimOA,B%NDimX,A%NDimX,NBas,.false.)
+!    call app_A2_YY(A%NDimX,B%NDimX,tmp1,A%Occ,A%Fmat,Sba,nelB,Vbaa,nelA,Vaba,'FOFOAABA',&
+!              B%Occ,A%IndN,B%IndN,posA,posB,dimOA,dimOB,A%NDimX,B%NDimX,NBas,.true.)
+!
+! else
+!
+!    call inter_A2_YY(A%NDimX,B%NDimX,tmp1,RDM2Bval,Sab,nelA,Vabb,nelB,Vbab,'FOFOBBAB',&
+!             A%Occ,B%IndN,A%IndN,posB,posA,dimOB,dimOA,B%NDimX,A%NDimX,NBas,.false.)
+!    call inter_A2_YY(A%NDimX,B%NDimX,tmp1,RDM2Aval,Sba,nelB,Vbaa,nelA,Vaba,'FOFOAABA',&
+!              B%Occ,A%IndN,B%IndN,posA,posB,dimOA,dimOB,A%NDimX,B%NDimX,NBas,.true.)
+!
+! endif
+!
+! !Y_A.I.Y_B
+! call dgemm('T','N',A%NDimX,B%NDimX,A%NDimX,1d0,A%EigY,A%NDimX,tmp1,A%NDimX,0d0,tmp2,A%NDimX)
+! call dgemm('N','N',A%NDimX,B%NDimX,B%NDimX,1d0,tmp2,A%NDimX,B%EigY,B%NDimX,1d0,tmp3,A%NDimX)
+!! print*, 'Ya.I.Yb:',norm2(tmp3)
+
+!! WORKING VERSION: XY, YX
+!! TERMS XY, YX
+!! (FF|OO):(AB|AB)
+! open(newunit=iunit,file='FFOOABAB',status='OLD', &
+!     access='DIRECT',recl=8*NBas*NBas)
+!
+! ints = 0
+! tmp1 = 0
+! kl = 0
+! do l=1,dimOB
+!    do k=1,dimOA
+!       kl = kl + 1
+!       read(iunit,rec=kl) work(1:NBas*NBas)
+!
+!       iq = k
+!       is = l
+!
+!       call ints_modify(NBas,NBas,ints,NBas,work,Sab(iq,is)/nelA,Vaab,Vbab(iq,is)/nelB,Sab)
+!
+!       do ir=1,NBas
+!          do ip=1,NBas
+!
+!             ipq = posA(ip,iq)
+!             irs = posB(ir,is)
+!
+!             if(ipq/=0.and.irs/=0) then
+!
+!
+!                fact = 2d0*(A%Occ(ip)-A%Occ(iq)) * &
+!                           (B%Occ(ir)-B%Occ(is)) * &
+!                           ints(ip,ir)
+!
+!                tmp1(ipq,irs) = tmp1(ipq,irs) + fact
+! 
+!             endif
+!            enddo
+!         enddo
+! 
+!    enddo
+! enddo
+! close(iunit)
+!
+! !X_A.I.Y_B
+! call dgemm('T','N',A%NDimX,B%NDimX,A%NDimX,1d0,A%EigX,A%NDimX,tmp1,A%NDimX,0d0,tmp2,A%NDimX)
+! call dgemm('N','N',A%NDimX,B%NDimX,B%NDimX,1d0,tmp2,A%NDimX,B%EigY,B%NDimX,1d0,tmp3,A%NDimX)
+! print*, 'Xa.I.Yb:',norm2(tmp3)
+!!
+! open(newunit=iunit,file='FFOOABAB',status='OLD', &
+!     access='DIRECT',recl=8*NBas*NBas)
+!
+! ints = 0
+! tmp1 = 0
+! kl = 0
+! do l=1,dimOB
+!    do k=1,dimOA
+!       kl = kl + 1
+!       read(iunit,rec=kl) work(1:NBas*NBas)
+!
+!       iq = k
+!       is = l
+!
+!       call ints_modify(NBas,NBas,ints,NBas,work,Vaab(iq,is)/nelA,Sab,Sab(iq,is)/nelB,Vbab)
+!
+!       do ir=1,NBas
+!          do ip=1,NBas
+!
+!             ipq = posA(ip,iq)
+!             irs = posB(ir,is)
+!
+!             if(ipq/=0.and.irs/=0) then
+!
+!
+!                fact = 2d0*(A%Occ(ip)-A%Occ(iq)) * &
+!                           (B%Occ(ir)-B%Occ(is)) * &
+!                           ints(ip,ir)
+!
+!                tmp1(ipq,irs) = tmp1(ipq,irs) + fact
+! 
+!             endif
+!            enddo
+!         enddo
+! 
+!    enddo
+! enddo
+! close(iunit)
+! !Y_A.I.X_B
+! call dgemm('T','N',A%NDimX,B%NDimX,A%NDimX,1d0,A%EigY,A%NDimX,tmp1,A%NDimX,0d0,tmp2,A%NDimX)
+! call dgemm('N','N',A%NDimX,B%NDimX,B%NDimX,1d0,tmp2,A%NDimX,B%EigX,B%NDimX,1d0,tmp3,A%NDimX)
+! print*, 'Ya.I.Xb:',norm2(tmp3)
+!
+!! A3:XY
+! tmp1 = 0
+! if(approx) then
+!
+!    call app_A3_XY(A%NDimX,B%NDimX,tmp1,A%Occ,B%Occ,A%Fmat,B%Fmat,Sab,nelA,Vabb,nelB,Vbaa,'FOFOAABB',&
+!                   B%IndN,A%IndN,posB,posA,dimOB,dimOA,B%NDimX,A%NDimX,NBas)
+!
+! else
+!
+!   call inter_A3_XY(A%NDimX,B%NDimX,tmp1,A%Occ,B%Occ,RDM2Aval,RDM2Bval,Sab,nelA,Vabb,nelB,Vbaa,'FOFOAABB',&
+!                  B%IndN,A%IndN,posB,posA,dimOB,dimOA,B%NDimX,A%NDimX,NBas)
+!
+! endif
+!
+! !X_A.I.Y_B
+! call dgemm('T','N',A%NDimX,B%NDimX,A%NDimX,1d0,A%EigX,A%NDimX,tmp1,A%NDimX,0d0,tmp2,A%NDimX)
+! call dgemm('N','N',A%NDimX,B%NDimX,B%NDimX,1d0,tmp2,A%NDimX,B%EigY,B%NDimX,1d0,tmp3,A%NDimX)
+! print*, 'Xa.I.Yb:',norm2(tmp3)
+! !Y_A.I.X_B
+! call dgemm('T','N',A%NDimX,B%NDimX,A%NDimX,1d0,A%EigY,A%NDimX,tmp1,A%NDimX,0d0,tmp2,A%NDimX)
+! call dgemm('N','N',A%NDimX,B%NDimX,B%NDimX,1d0,tmp2,A%NDimX,B%EigX,B%NDimX,1d0,tmp3,A%NDimX)
+! print*, 'Ya.I.Xb:',norm2(tmp3)
+!
+!! A2:XY
+! tmp1 = 0
+! if(approx) then
+!
+!    call app_A2_XY(A%NDimX,B%NDimX,tmp1,B%Occ,B%Fmat,Sab,nelA,Vabb,nelB,Vbab,'FOFOBBAB',&
+!              A%Occ,B%IndN,A%IndN,posB,posA,dimOB,dimOA,B%NDimX,A%NDimX,NBas,.false.)
+!    call app_A2_YX(A%NDimX,B%NDimX,tmp1,A%Occ,A%Fmat,Sba,nelB,Vbaa,nelA,Vaba,'FOFOAABA','FFOOBAAA',&
+!              B%Occ,A%IndN,B%IndN,posA,posB,dimOA,dimOB,A%NDimX,B%NDimX,NBas,.true.)
+!
+! else
+!
+!    call inter_A2_XY(A%NDimX,B%NDimX,tmp1,RDM2Bval,Sab,nelA,Vabb,nelB,Vbab,'FOFOBBAB',&
+!              A%Occ,B%IndN,A%IndN,posB,posA,dimOB,dimOA,B%NDimX,A%NDimX,NBas,.false.)
+!    call inter_A2_YX(A%NDimX,B%NDimX,tmp1,RDM2Aval,Sba,nelB,Vbaa,nelA,Vaba,'FOFOAABA','FFOOBAAA',&
+!              B%Occ,A%IndN,B%IndN,posA,posB,dimOA,dimOB,A%NDimX,B%NDimX,NBas,.true.,B)
+!
+! endif
+!
+! !X_A.I.Y_B
+! call dgemm('T','N',A%NDimX,B%NDimX,A%NDimX,1d0,A%EigX,A%NDimX,tmp1,A%NDimX,0d0,tmp2,A%NDimX)
+! call dgemm('N','N',A%NDimX,B%NDimX,B%NDimX,1d0,tmp2,A%NDimX,B%EigY,B%NDimX,1d0,tmp3,A%NDimX)
+!!! print*, 'Xa.I.Yb:',norm2(tmp3)
+!!
+!! A2: YX 
+! tmp1 = 0
+! if(approx) then
+!
+!    call app_A2_YX(A%NDimX,B%NDimX,tmp1,B%Occ,B%Fmat,Sab,nelA,Vabb,nelB,Vbab,'FOFOBBAB','FFOOABBB',&
+!              A%Occ,B%IndN,A%IndN,posB,posA,dimOB,dimOA,B%NDimX,A%NDimX,NBas,.false.)
+!    call app_A2_XY(A%NDimX,B%NDimX,tmp1,A%Occ,A%Fmat,Sba,nelB,Vbaa,nelA,Vaba,'FOFOAABA',&
+!              B%Occ,A%IndN,B%IndN,posA,posB,dimOA,dimOB,A%NDimX,B%NDimX,NBas,.true.)
+!
+! else
+!
+!    call inter_A2_YX(A%NDimX,B%NDimX,tmp1,RDM2Bval,Sab,nelA,Vabb,nelB,Vbab,'FOFOBBAB','FFOOABBB',&
+!              A%Occ,B%IndN,A%IndN,posB,posA,dimOB,dimOA,B%NDimX,A%NDimX,NBas,.false.,B)
+!    call inter_A2_XY(A%NDimX,B%NDimX,tmp1,RDM2Aval,Sba,nelB,Vbaa,nelA,Vaba,'FOFOAABA',&
+!              B%Occ,A%IndN,B%IndN,posA,posB,dimOA,dimOB,A%NDimX,B%NDimX,NBas,.true.)
+!
+! endif
+!
+! !Y_A.I.X_B
+! call dgemm('T','N',A%NDimX,B%NDimX,A%NDimX,1d0,A%EigY,A%NDimX,tmp1,A%NDimX,0d0,tmp2,A%NDimX)
+! call dgemm('N','N',A%NDimX,B%NDimX,B%NDimX,1d0,tmp2,A%NDimX,B%EigX,B%NDimX,1d0,tmp3,A%NDimX)
+!! print*, 'Ya.I.Xb:',norm2(tmp3)
+
+ !! TEST sRef
+ !allocate(tpqrs(2*A%NDimX,2*B%NDimX))
+ !call prep_tpqrs(sij,tpqrs,posA,posB,A%NDimX,B%NDimX,NBas,A,B) 
+ !call term_Y_SR(tpqrs,Sab,SAPT%elst,SAPT%Vnn,A%NDimX,B%NDimX,NBas,A,B)
+ !call term_X_A1_SR(tpqrs,Sab,Vaab,Vbab,posA,posB,A%NDimX,B%NDimX,NBas,A,B)
+
+ !call term_X_A2_XX_SR(A%NDimX,B%NDimX,tpqrs,'FOFOBBBA',Sab,Vabb,Vbab,posA,posB,A%NDimX,B%NDimX,NBas,A,B,.false.)
+ !call term_X_A2_XX_SR(A%NDimX,B%NDimX,tpqrs,'FOFOAAAB',Sba,Vbaa,Vaba,posB,posA,B%NDimX,A%NDimX,NBas,B,A,.true.)
+
+ !call term_X_A2_YY_SR(A%NDimX,B%NDimX,tpqrs,'FOFOBBAB',Sab,Vabb,Vbab,posA,posB,A%NDimX,B%NDimX,NBas,A,B,.false.)
+ !call term_X_A2_YY_SR(A%NDimX,B%NDimX,tpqrs,'FOFOAABA',Sba,Vbaa,Vaba,posB,posA,B%NDimX,A%NDimX,NBas,B,A,.true.)
+
+ !call term_X_A2_XY_SR(A%NDimX,B%NDimX,tpqrs,'FOFOBBAB',Sab,Vabb,Vbab,posA,posB,A%NDimX,B%NDimX,NBas,A,B,.false.)
+ !call term_X_A2_YX_SR(A%NDimX,B%NDimX,tpqrs,'FOFOAABA','FFOOBAAA',Sba,Vbaa,Vaba,posB,posA,B%NDimX,A%NDimX,NBas,B,A,.true.)
+
+ !call term_X_A2_YX_SR(A%NDimX,B%NDimX,tpqrs,'FOFOBBAB','FFOOABBB',Sab,Vabb,Vbab,posA,posB,A%NDimX,B%NDimX,NBas,A,B,.false.)
+ !call term_X_A2_XY_SR(A%NDimX,B%NDimX,tpqrs,'FOFOAABA',Sba,Vbaa,Vaba,posB,posA,B%NDimX,A%NDimX,NBas,B,A,.true.)
+
+ !call term_X_A3_XX_SR(A%NDimX,B%NDimX,tpqrs,'FOFOAABB',Sab,Vabb,Vbaa,posA,posB,A%NDimX,B%NDimX,NBas,A,B,.false.)
+ !call term_X_A3_XX_SR(A%NDimX,B%NDimX,tpqrs,'FOFOAABB',Sab,Vabb,Vbaa,posA,posB,A%NDimX,B%NDimX,NBas,A,B,.true.)
+
+ !call term_X_A3_XY_SR(A%NDimX,B%NDimX,tpqrs,'FOFOAABB',Sab,Vabb,Vbaa,posA,posB,A%NDimX,B%NDimX,NBas,A,B,.true.)
+ !call term_X_A3_XY_SR(A%NDimX,B%NDimX,tpqrs,'FOFOAABB',Sab,Vabb,Vbaa,posA,posB,A%NDimX,B%NDimX,NBas,A,B,.false.)
+ !
+ !deallocate(tpqrs)
+
+ sij = 0
+ inquire(file='PROP_AB',EXIST=ipropab)
+ if(ipropab) then
+    ! read s_ij
+    open(newunit=iunit,file='PROP_AB',form='UNFORMATTED',&
+       access='SEQUENTIAL',status='OLD')
+    read(iunit) sij
+    close(iunit)
+
+ else
+ 
+    ! make s_ij
+    call make_sij_Y(sij,tmp1,A,B,nOVB,NBas)
+
+ endif
+
+ ! term X
+ termX = 0d0
+ do j=1,B%NDimX
+    do i=1,A%NDimX
+        
+   !    if(A%Eig(i).gt.SmallE.and.B%Eig(j).gt.SmallE&
+   !       .and.A%Eig(i).lt.BigE.and.B%Eig(j).lt.BigE) then
+
+       if(abs(A%Eig(i)).gt.SmallE.and.abs(B%Eig(j)).gt.SmallE&
+          .and.abs(A%Eig(i)).lt.BigE.and.abs(B%Eig(j)).lt.BigE) then
+
+
+          termX = termX + tmp3(i,j)*sij(i,j)/(A%Eig(i)+B%Eig(j))
+
+       endif
+    enddo
+ enddo
+ termX = -4d0*termX
+
+! write(LOUT,*) 'termX ', termX
+ write(LOUT,'(/1x,a,f16.8)') 'term X      = ',  termX*1.0d3
+
+ ! termY
+ ! term Y: t_ij 
+ call make_tij_Y(tmp3,tmp2,tmp1,posA,posB,Sab,Sba,A,B,NBas)
+
+ ! term Y
+ termY = 0d0
+ do j=1,B%NDimX
+    do i=1,A%NDimX
+        
+      ! if(A%Eig(i).gt.SmallE.and.B%Eig(j).gt.SmallE&
+      !    .and.A%Eig(i).lt.BigE.and.B%Eig(j).lt.BigE) then
+
+       if(abs(A%Eig(i)).gt.SmallE.and.abs(B%Eig(j)).gt.SmallE&
+          .and.abs(A%Eig(i)).lt.BigE.and.abs(B%Eig(j)).lt.BigE) then
+
+          termY = termY + sij(i,j)*tmp3(i,j)/(A%Eig(i)+B%Eig(j))
+
+       endif
+    enddo
+ enddo
+
+ termY = -8d0*(SAPT%elst-SAPT%Vnn)*termY
+ write(LOUT,'(1x,a,f16.8)') 'term Y      = ',  termY*1.0d3
+
+ write(LOUT,'(/1x,a,f16.8)') 'E2exch-disp = ', (termX+termY+termZ)*1.0d3
+ deallocate(sij)
+
+ deallocate(posB,posA,ints)
+ deallocate(Vbab,Vaba,Vaab,Vbaa,Vabb,Vb,Va,PB,PA,Sab,S)
+ deallocate(workSq,work,tmp2,tmp1)
+
+end subroutine e2exdisp
+
+subroutine e2exd_app(A,B,SAPT)
+
+implicit none
+
+type(SystemBlock),intent(in) :: A, B
+type(SaptData),intent(in)    :: SAPT
+
+integer :: iunit
+integer :: i,j,k,l
+integer :: ip,iq,ir,is,ipq,irs
+integer :: NBas,dimOA,dimOB 
+double precision :: nelA,nelB,fact,test
+double precision :: termZ,termY,termX 
+double precision,allocatable :: S(:,:),Sab(:,:),Sba(:,:),&
+                                posA(:,:),posB(:,:)
+double precision,allocatable :: PA(:,:),PB(:,:), &
+                                PAbb(:,:),PBaa(:,:)
+double precision,allocatable :: Va(:,:),Vb(:,:), &
+                                Vabb(:,:),Vbaa(:,:),&
+                                Vaba(:,:),Vaab(:,:),Vbab(:,:)
+double precision,allocatable :: RDM2Aval(:,:,:,:), &
+                                RDM2Bval(:,:,:,:)
+double precision,allocatable :: tmp1(:,:),tmp2(:,:),tmp3(:,:),&
+                                EVecA(:),EVecB(:), &
+                                EigA(:), EigB(:)
+double precision,external  :: trace,FRDM2
+double precision,parameter :: SmallE = 1.D-3
+double precision,parameter :: BigE = 1.D8 
+
+
+ ! dimensions
+ NBas = A%NBasis 
+ dimOA = A%INAct+A%NAct
+ dimOB = B%INAct+B%NAct
+
+ nelA = 2d0*A%XELE
+ nelB = 2d0*B%XELE
+
+ allocate(S(NBas,NBas),Sab(NBas,NBas),&
+          Sba(NBas,NBas),&
+          PA(NBas,NBas),PB(NBas,NBas),&
+          Va(NBas,NBas),Vb(NBas,NBas),&
+          Vabb(NBas,NBas),Vbaa(NBas,NBas),&
+          Vaba(NBas,NBas),Vaab(NBas,NBas),Vbab(NBas,NBas))
+ allocate(tmp1(NBas,NBas),tmp2(NBas,NBas))
+
+ call get_den(NBas,A%CMO,A%Occ,1d0,PA)
+ call get_den(NBas,B%CMO,B%Occ,1d0,PB)
+
+ call get_one_mat('S',S,A%Monomer,NBas)
+ call tran2MO(S,A%CMO,B%CMO,Sab,NBas)
+ call tran2MO(S,B%CMO,A%CMO,Sba,NBas)
+
+ call get_one_mat('V',Va,A%Monomer,NBas)
+ call get_one_mat('V',Vb,B%Monomer,NBas)
+
+ call tran2MO(Va,B%CMO,B%CMO,Vabb,NBas)
+ call tran2MO(Vb,A%CMO,A%CMO,Vbaa,NBas)
+
+ call tran2MO(Va,B%CMO,A%CMO,Vaba,NBas)
+ call tran2MO(Va,A%CMO,B%CMO,Vaab,NBas)
+ call tran2MO(Vb,A%CMO,B%CMO,Vbab,NBas)
+
+ allocate(RDM2Aval(dimOA,dimOA,dimOA,dimOA),&
+          RDM2Bval(dimOB,dimOB,dimOB,dimOB))
+ do l=1,dimOA
+    do k=1,dimOA 
+       do j=1,dimOA
+          do i=1,dimOA
+             RDM2Aval(i,j,k,l) = FRDM2(i,k,j,l,A%RDM2,A%Occ,A%Ind2,A%NAct,NBas)
+          enddo
+       enddo
+    enddo
+ enddo
+ do l=1,dimOB
+    do k=1,dimOB 
+       do j=1,dimOB
+          do i=1,dimOB
+             RDM2Bval(i,j,k,l) = FRDM2(i,k,j,l,B%RDM2,B%Occ,B%Ind2,B%NAct,NBas)
+          enddo
+       enddo
+    enddo
+ enddo
+
+ allocate(posA(NBas,NBas),posB(NBas,NBas))
+
+ posA = 0
+ do i=1,A%NDimX
+    posA(A%IndN(1,i),A%IndN(2,i)) = A%IndX(i)
+ enddo
+ posB = 0
+ do i=1,B%NDimX
+    posB(B%IndN(1,i),B%IndN(2,i)) = B%IndX(i)
+ enddo
+
+ ! termZ
+ tmp1 = 0
+ tmp2 = 0
+ termZ = 0
+ call dgemm('N','N',NBas,NBas,NBas,1d0,PA,NBas,S,NBas,0d0,tmp1,NBas)
+ call dgemm('N','N',NBas,NBas,NBas,1d0,S,NBas,PB,NBas,0d0,tmp2,NBas)
+ do j=1,NBas
+    do i=1,NBas
+       termZ = termZ + tmp1(i,j)*tmp2(i,j)
+    enddo
+ enddo
+
+ termZ = 2d0*SAPT%e2disp*termZ
+ write(LOUT,*) 'termZ ',termZ
+
+ deallocate(tmp2,tmp1)
+
+ allocate(EVecA(A%NDimX*A%NDimX),EVecB(B%NDimX*B%NDimX))
+ allocate(tmp1(A%NDimX,B%NDimX),tmp2(A%NDimX,B%NDimX),tmp3(A%NDimX,B%NDimX))
+ allocate(EigA(A%NDimX),EigB(B%NDimX))
+
+ ! termY
+ tmp1 = 0
+ do j=1,B%NDimX
+
+    ir = B%IndN(1,j)
+    is = B%IndN(2,j)
+    irs = posB(ir,is)
+
+    do i=1,A%NDimX
+
+       ip = A%IndN(1,i)
+       iq = A%IndN(2,i)
+       ipq = posA(ip,iq)
+
+       fact = (B%Occ(ir)-B%Occ(is)) * &
+              (A%Occ(ip)-A%Occ(iq))
+
+       tmp1(ipq,irs) = tmp1(ipq,irs) + Sab(iq,ir)*Sba(is,ip)*fact
+
+    enddo
+ enddo
+
+ call readresp(EVecA,EigA,A%NDimX,'PROP_A')
+ call readresp(EVecB,EigB,B%NDimX,'PROP_B')
+
+ !Z_A.I.Z_B
+ call dgemm('T','N',A%NDimX,B%NDimX,A%NDimX,1d0,EVecA,A%NDimX,tmp1,A%NDimX,0d0,tmp2,A%NDimX)
+ call dgemm('N','N',A%NDimX,B%NDimX,B%NDimX,1d0,tmp2,A%NDimX,EVecB,B%NDimX,0d0,tmp3,A%NDimX)
+
+ tmp2 = 0
+ open(newunit=iunit,file='PROP_AB',form='UNFORMATTED',&
+    access='SEQUENTIAL',status='OLD')
+ read(iunit) tmp2
+ close(iunit)
+
+ ! term Y
+ termY = 0d0
+ do j=1,B%NDimX
+    do i=1,A%NDimX
+        
+       if(A%Eig(i).gt.SmallE.and.B%Eig(j).gt.SmallE&
+          .and.A%Eig(i).lt.BigE.and.B%Eig(j).lt.BigE) then
+
+          termY = termY + tmp3(i,j)/(A%Eig(i)+B%Eig(j))
+         ! termY = termY + tmp2(i,j)*tmp3(i,j)/(A%Eig(i)+B%Eig(j))
+         ! termY = termY + sij(i,j)*tmp3(i,j)/(A%Eig(i)+B%Eig(j))
+
+       endif
+    enddo
+ enddo
+
+ termY = -8d0*(SAPT%elst-SAPT%Vnn)*termY
+ write(LOUT,*) 'termY ', termY
+
+
+ tmp1 = 0
+ !! A2
+!call inter_XX(A%NDimX,B%NDimX,tmp1,RDM2Bval,Sab,nelA,Vabb,nelB,Vbab,'FOFOBBBA',&
+!              A%Occ,B%IndN,A%IndN,posB,posA,dimOB,dimOA,B%NDimX,A%NDimX,NBas,.false.)
+!call inter_XX(A%NDimX,B%NDimX,tmp1,RDM2Aval,Sba,nelB,Vbaa,nelA,Vaba,'FOFOAAAB',&
+!              B%Occ,A%IndN,B%IndN,posA,posB,dimOA,dimOB,A%NDimX,B%NDimX,NBas,.true.)
+!
+!tmp1 = -0.5d0*tmp1
+!
+!! A3
+!call app_A3_XX(A%NDimX,B%NDimX,tmp1,A%Occ,B%Occ,A%Fmat,B%Fmat,Sab,nelA,Vabb,nelB,Vbaa,'FOFOAABB',&
+!               B%IndN,A%IndN,posB,posA,dimOB,dimOA,B%NDimX,A%NDimX,NBas)
+!
+!
+!test = 0
+!
+! do j=1,B%NDimX
+!    do i=1,A%NDimX
+!        
+!       if(A%Eig(i).gt.SmallE.and.B%Eig(j).gt.SmallE&
+!          .and.A%Eig(i).lt.BigE.and.B%Eig(j).lt.BigE) then
+!
+!          test = test + tmp3(i,j)*sij(i,j)/(A%Eig(i)+B%Eig(j))
+!
+!       endif
+!    enddo
+! enddo
+!
+! print*, 'test',test 
+!
+!
+deallocate(EVecB,EVecA,tmp1)
+deallocate(posB,posA)
+deallocate(RDM2Bval,RDM2Aval)
+deallocate(Vbab,Vaab,Vaba,Vbaa,Vabb,Vb,Va,PB,PA,Sba,Sab,S)
+
+end subroutine e2exd_app
+
+subroutine make_VVmm(OccA,OccB,mat1,mat2,EigA,EigB,OutMat,IndNA,IndNB,NDimXA,NDimXB,NBasis,idx)
+implicit none
+
+integer,intent(in) :: NDimXA,NDimXB,NBasis
+integer,intent(in) :: idx,IndNA(2,NDimXA),IndNB(2,NDimXB)
+double precision,intent(in) :: OccA(NBasis),OccB(NBasis),&
+                               mat1(NBasis,NBasis),mat2(NBasis,NBasis),&
+                               EigA(NDimXA*NDimXA),EigB(NDimXB*NDimXB)
+double precision,intent(out) :: OutMat(NDimXA,NDimXB)
+
+integer :: ip,iq,ir,is,pq,rs,i,j
+double precision :: fact
+double precision,allocatable :: tmp1(:,:)
+
+allocate(tmp1(NDimXA,NDimXB))
+
+ !first big loop
+ tmp1=0
+ do pq=1,NDimXA
+    ip = IndNA(1,pq)
+    iq = IndNA(2,pq)
+    do rs=1,NDimXB
+       ir = IndNB(1,rs)
+       is = IndNB(2,rs)
+
+       if(idx==1) then
+          ! qr | sp
+          fact = (OccA(ip)-OccA(iq)) * &
+                 (OccB(ir)-OccB(is)) * &
+                  mat1(iq,ir)*mat2(is,ip)
+       elseif(idx==2) then
+          ! pr | sq
+          fact = (OccA(ip)-OccA(iq)) * &
+                 (OccB(ir)-OccB(is)) * &
+                  mat1(ip,ir)*mat2(is,iq)
+       elseif(idx==3) then
+          ! ps | qr
+          fact = (OccA(ip)-OccA(iq)) * &
+                 (OccB(ir)-OccB(is)) * &
+                  mat1(ip,is)*mat2(iq,ir)
+       elseif(idx==4) then
+          ! qr | ps
+          fact = (OccA(ip)-OccA(iq)) * &
+                 (OccB(ir)-OccB(is)) * &
+                  mat1(iq,ir)*mat2(ip,is)
+       elseif(idx==5) then
+          ! pr | qs
+          fact = (OccA(ip)-OccA(iq)) * &
+                 (OccB(ir)-OccB(is)) * &
+                  mat1(ip,ir)*mat2(iq,is)
+       elseif(idx==6) then
+          ! qs | pr
+          fact = (OccA(ip)-OccA(iq)) * &
+                 (OccB(ir)-OccB(is)) * &
+                  mat1(iq,is)*mat2(ip,ir)
+       endif
+
+       do i=1,NDimXA
+          tmp1(i,rs) = tmp1(i,rs) + & 
+                       fact * EigA(pq+(i-1)*NDimXA)
+       enddo
+
+    enddo
+ enddo
+
+ OutMat=0
+ do j=1,NDimXB
+    do i=1,NDimXB
+       do rs=1,NDimXB
+          ir = IndNB(1,rs)
+          is = IndNB(2,rs)
+          OutMat(i,j) = OutMat(i,j) + &
+                        EigB(rs+(j-1)*NDimXB)*tmp1(i,rs)
+       enddo
+    enddo  
+ enddo
+
+deallocate(tmp1)
+
+end subroutine make_VVmm
+
 subroutine e2disp_apsg(Flags,A,B,SAPT)
 implicit none
 
@@ -2183,9 +4794,15 @@ double precision,allocatable :: work(:)
 double precision :: fact
 double precision :: e2d1,e2d2,e2d3,e2d4,e2d,tmp
 double precision :: e2du,dea,deb
-double precision,parameter :: SmallE = 1.d-6
+! testy
+integer,allocatable :: AIndEx(:,:),BIndEx(:,:)
+double precision,allocatable :: AVecEx(:),BVecEx(:)
+
+!double precision,parameter :: SmallE = 1.d-6
+double precision,parameter :: SmallE = 1.d-2
 !double precision,parameter :: SmallE = 1.d-1
 
+ write(LOUT,'(1x,a,e12.4)') 'SmallE in E2Disp PINO:',SmallE
 
  if(A%NBasis.ne.B%NBasis) then
     write(LOUT,'(1x,a)') 'ERROR! MCBS not implemented in SAPT!'
@@ -2210,6 +4827,10 @@ double precision,parameter :: SmallE = 1.d-6
  ! Use these coefficients for PINOVEC
  !coef  = 2
  !coef2 = 4
+
+! WARNING !!! 
+! NOW IT WON'T WORK WIH PINOVEC I THINK
+! BECAUSE OF ABS(Om) IN LOOPS...
 
  print*, A%num0,A%num1,A%num2
  print*, B%num0,B%num1,B%num2
@@ -2241,236 +4862,412 @@ double precision,parameter :: SmallE = 1.d-6
 
  allocate(tmp1(coef*ADimEx,coef*BDimEx),tmp2(coef*ADimEx,coef*BDimEx))
 
-! PART 1: p>q,r>s
- tmp1=0
- do pq=1,A%NDimX
-    ip = A%IndN(1,pq)
-    iq = A%IndN(2,pq)
-!   ! print*, iq,ip,iq+(ip-A%num0-1)*dimOA,nOFA
-    read(iunit,rec=iq+(ip-1)*dimOA) work(1:nOFB)
-    do rs=1,B%NDimX
-       ir = B%IndN(1,rs)
-       is = B%IndN(2,rs)
-!      !print*, is,ir,is+(ir-B%num0-1)*dimOB,nOFB
 
-       fact = (A%CICoef(iq)+A%CICoef(ip)) * &
-              (B%CICoef(is)+B%CICoef(ir)) * work(is+(ir-1)*dimOB)
- !      print*, work(is+(ir-1)*dimOB)
-       !print*, fact
+! big test of a single loop
+ allocate(AIndEx(2,ADimEx),BIndEx(2,BDimEx))
+ allocate(AVecEx(coef2*ADimEx**2),BVecEx(coef2*BDimEx**2))
+
+ do pq=1,ADimEx
+    if(pq<=A%NDimX) then 
+       AIndEx(1,pq) = A%IndN(1,pq)
+       AIndEx(2,pq) = A%IndN(2,pq)
+    elseif(pq>A%NDimX) then
+       AIndEx(1,pq) = pq - A%NDimX
+       AIndEx(2,pq) = pq - A%NDimX
+    endif
+ enddo
+ do rs=1,BDimEx
+    if(rs<=B%NDimX) then 
+       BIndEx(1,rs) = B%IndN(1,rs)
+       BIndEx(2,rs) = B%IndN(2,rs)
+    elseif(rs>B%NDimX) then
+       BIndEx(1,rs) = rs - B%NDimX
+       BIndEx(2,rs) = rs - B%NDimX
+    endif
+ enddo
+ !do i=A%NDimX+1,ADimEx
+ !   print*, i,AIndEx(1,i),AIndEx(2,i)
+ !enddo
+
+ ! prepare vectors
+ AVecEx = 0
+ BVecEx = 0
+ do pq=1,ADimEx
+    if(pq<=A%NDimX) then
+
+        ip = A%IndN(1,pq)
+        iq = A%IndN(2,pq)
+
+        fact = A%CICoef(iq)+A%CICoef(ip)
+        do i=1,coef*ADimEx
+           AVecEx((i-1)*coef*ADimEx+pq) = fact * &
+                                          EVecA((i-1)*coef*ADimEx+pq)
+        enddo
+ 
+    elseif(pq>A%NDimX) then
+
+        ir = pq - A%NDimX
+        fact = A%CICoef(ir)
+        do i=1,coef*ADimEx
+           AVecEx((i-1)*coef*ADimEx+pq) = fact * &
+                                          EVecA((i-1)*coef*ADimEx+pq)
+        enddo
+
+    endif
+ enddo
+
+ do rs=1,BDimEx
+     if(rs<=B%NDimX) then
+
+        ir = B%IndN(1,rs)
+        is = B%IndN(2,rs)
+
+        fact = B%CICoef(ir)+B%CICoef(is)
+        do i=1,coef*BDimEx
+           BVecEx((i-1)*coef*BDimEx+rs) = fact * &
+                                          EVecB((i-1)*coef*BDimEx+rs)
+        enddo
+ 
+    elseif(rs>B%NDimX) then
+
+        ip = rs - B%NDimX
+        fact = B%CICoef(ip)
+        do i=1,coef*BDimEx
+           BVecEx((i-1)*coef*BDimEx+rs) = fact * &
+                                          EVecB((i-1)*coef*BDimEx+rs)
+        enddo
+
+    endif
+ enddo
+
+ do i=1,coef*ADimEx
+    if(OmA(i)<0d0) then 
+      ! !do pq=A%NDimX+1,ADimEx
+      ! do pq=1,ADimEx
+      !     AVecEx((pq-1)*coef*ADimEx+i) = 0d0 
+      ! enddo
+       write(LOUT,'(1x,"Monomer A: Negative EVal",i4,f16.8)') i,OmA(i)
+    endif
+ enddo
+ do i=1,coef*BDimEx
+    if(OmB(i)<0d0) then
+
+       !!do rs=B%NDimX+1,BDimEx
+       !do rs=1,BDimEx
+       !    BVecEx((i-1)*coef*BDimEx+rs) = 0d0 
+       !enddo
+       write(LOUT,'(1x,"Monomer B: Negative EVal",i4,f16.8)') i,OmB(i)
+    endif
+ enddo
+
+ tmp1=0
+ do pq=1,ADimEx
+    ip = AIndEx(1,pq)
+    iq = AIndEx(2,pq)
+    read(iunit,rec=iq+(ip-1)*dimOA) work(1:nOFB)
+    do rs=1,BDimEx
+       ir = BIndEx(1,rs)
+       is = BIndEx(2,rs)
+
+       fact = work(is+(ir-1)*dimOB)
+
        do i=1,coef*ADimEx
-          if(OmA(i).gt.SmallE.and.OmA(i).lt.1d20) then
-          !if(abs(OmA(i)).gt.SmallE.and.abs(OmA(i)).lt.1d20) then
+          if(abs(OmA(i)).gt.SmallE.and.abs(OmA(i)).lt.1d20) then
 
              tmp1(i,rs) = tmp1(i,rs) + & 
-                  fact*EVecA((i-1)*coef*ADimEx+pq)
+                  fact*AVecEx((i-1)*coef*ADimEx+pq)
 
           endif
        enddo
+
     enddo
  enddo
 
  tmp2=0
  do j=1,coef*BDimEx
-    if(OmB(j).gt.SmallE.and.OmB(j).lt.1d20) then
-    !if(abs(OmB(j)).gt.SmallE.and.abs(OmB(j)).lt.1d20) then
+    if(abs(OmB(j)).gt.SmallE.and.abs(OmB(j)).lt.1d20) then
        do i=1,coef*ADimEx
-          if(OmA(i).gt.SmallE.and.OmA(i).lt.1d20) then
-          !if(abs(OmA(i)).gt.SmallE.and.abs(OmA(i)).lt.1d20) then
-             do rs=1,B%NDimX
-                ir = B%IndN(1,rs)
-                is = B%IndN(2,rs)
-                
+          if(abs(OmA(i)).gt.SmallE.and.abs(OmA(i)).lt.1d20) then
+             do rs=1,BDimEx
+                ir = BIndEx(1,rs)
+                is = BIndEx(2,rs)
+
                 tmp2(i,j) = tmp2(i,j) + &
-                     EVecB((j-1)*coef*BDimEx+rs)*tmp1(i,rs)
-             
+                     BVecEx((j-1)*coef*BDimEx+rs)*tmp1(i,rs)
+
              enddo
           endif
        enddo
     endif
  enddo
-
-!write(*,*) 'tmp1,tmp2:',norm2(tmp1),norm2(tmp2)
 
  e2d1 = 0d0
  do i=1,coef*ADimEx
-    if(OmA(i).gt.SmallE.and.OmA(i).lt.1d20) then
-    !if(abs(OmA(i)).gt.SmallE.and.abs(OmA(i)).lt.1d20) then
+    if(abs(OmA(i)).gt.SmallE.and.abs(OmA(i)).lt.1d20) then
        do j=1,coef*BDimEx
-          if(OmB(j).gt.SmallE.and.OmB(j).lt.1d20) then
-          !if(abs(OmB(j)).gt.SmallE.and.abs(OmB(j)).lt.1d20) then
+          if(abs(OmB(j)).gt.SmallE.and.abs(OmB(j)).lt.1d20) then
              e2d1 = e2d1 + tmp2(i,j)**2/(OmA(i)+OmB(j))
-             ! print*, OmA(i),OmB(j)
           endif
        enddo
     endif
  enddo
 
-print*, ''
-print*, 'PART1: ',-16d0*e2d1*1000d0
+ print*, ''
+ print*, 'TEST: ',-16d0*e2d1*1000d0
+ write(LOUT,'(1x,a,f16.8)') 'E2disp      = ',-16*(e2d1+e2d2+e2d3+e2d4)*1000
 
-! PART 2: p>q,r=s
- tmp1=0
- do pq=1,A%NDimX
-    ip = A%IndN(1,pq)
-    iq = A%IndN(2,pq)
-!   ! print*, iq,ip,iq+(ip-A%num0-1)*dimOA,nOFA
-    read(iunit,rec=iq+(ip-1)*dimOA) work(1:nOFB)
-    do ir=1,B%NDimN
-!      !print*, is,ir,is+(ir-B%num0-1)*dimOB,nOFB
+ e2d1=0
 
-       fact = B%CICoef(ir)*(A%CICoef(iq)+A%CICoef(ip)) &
-            * work(ir+(ir-1)*dimOB)
+ deallocate(BVecEx,AVecEx)
+ deallocate(BIndEx,AIndEx)
 
-       do i=1,coef*ADimEx
-          if(OmA(i).gt.SmallE.and.OmA(i).lt.1d20) then
-
-             tmp1(i,ir) = tmp1(i,ir) + &
-                  fact*EVecA((i-1)*coef*ADimEx+pq)
-
-          endif
-       enddo
-    enddo
- enddo
+!! PART 1: p>q,r>s
+! tmp1=0
+! do pq=1,A%NDimX
+!    ip = A%IndN(1,pq)
+!    iq = A%IndN(2,pq)
+!!   ! print*, iq,ip,iq+(ip-A%num0-1)*dimOA,nOFA
+!    read(iunit,rec=iq+(ip-1)*dimOA) work(1:nOFB)
+!    do rs=1,B%NDimX
+!       ir = B%IndN(1,rs)
+!       is = B%IndN(2,rs)
+!!      !print*, is,ir,is+(ir-B%num0-1)*dimOB,nOFB
 !
- tmp2=0
- do j=1,coef*BDimEx
-    if(OmB(j).gt.SmallE.and.OmB(j).lt.1d20) then
-       do i=1,coef*ADimEx
-          if(OmA(i).gt.SmallE.and.OmA(i).lt.1d20) then
-             do ir=1,B%NDimN
-          
-                tmp2(i,j) = tmp2(i,j) + &
-                     EVecB((j-1)*coef*BDimEx+coef*B%NDimX+ir) * &
-                     tmp1(i,ir)
-                
-             enddo
-          endif
-       enddo
-    endif
- enddo
-
- e2d2 = 0d0
- do i=1,coef*ADimEx
-    if(OmA(i).gt.SmallE.and.OmA(i).lt.1d20) then
-       do j=1,coef*BDimEx
-          if(OmB(j).gt.SmallE.and.OmB(j).lt.1d20) then
-             e2d2 = e2d2 + tmp2(i,j)**2/(OmA(i)+OmB(j))
-          endif
-       enddo
-    endif
- enddo
- write(LOUT,*) 'PART2: ',-16d0*e2d2*1000d0
-
-! PART 3: p=q,r>s
- tmp1=0
- do ip=1,A%NDimN
-    !   ! print*, iq,ip,iq+(ip-1)*dimOA,nOFA
-    read(iunit,rec=ip+(ip-1)*dimOA) work(1:nOFB)
-    do rs=1,B%NDimX
-       ir = B%IndN(1,rs)
-       is = B%IndN(2,rs)
-       !      !print*, is,ir,is+(ir-1)*dimOB,nOFB
-       fact = A%CICoef(ip) * &
-            (B%CICoef(is)+B%CICoef(ir)) * &
-            work(is+(ir-1)*dimOB)
-       
-       do i=1,coef*ADimEx
-          if(OmA(i).gt.SmallE.and.OmA(i).lt.1d20) then
-             
-             tmp1(i,rs) = tmp1(i,rs) + & 
-                  fact*EVecA((i-1)*coef*ADimEx+coef*A%NDimX+ip)
-             
-          endif
-       enddo
-    enddo
- enddo
+!       fact = (A%CICoef(iq)+A%CICoef(ip)) * &
+!              (B%CICoef(is)+B%CICoef(ir)) * work(is+(ir-1)*dimOB)
+! !      print*, work(is+(ir-1)*dimOB)
+!       !print*, fact
+!       do i=1,coef*ADimEx
+!          !if(OmA(i).gt.SmallE.and.OmA(i).lt.1d20) then
+!          if(abs(OmA(i)).gt.SmallE.and.abs(OmA(i)).lt.1d20) then
 !
- tmp2=0
- do j=1,coef*BDimEx
-    if(OmB(j).gt.SmallE.and.OmB(j).lt.1d20) then
-       do i=1,coef*ADimEx
-          if(OmA(i).gt.SmallE.and.OmA(i).lt.1d20) then
-             do rs=1,B%NDimX
-                ir = B%IndN(1,rs)
-                is = B%IndN(2,rs)
-                
-                tmp2(i,j) = tmp2(i,j) + &
-                     EVecB((j-1)*coef*BDimEx+rs)*tmp1(i,rs)
-                
-             enddo
-          endif
-       enddo
-    endif
- enddo
- 
- e2d3 = 0d0
- do i=1,coef*ADimEx
-    if(OmA(i).gt.SmallE.and.OmA(i).lt.1d20) then
-       do j=1,coef*BDimEx
-          if(OmB(j).gt.SmallE.and.OmB(j).lt.1d20) then
-             e2d3 = e2d3 + tmp2(i,j)**2/(OmA(i)+OmB(j))
-          endif
-       enddo
-    endif
- enddo
- write(LOUT,*) 'PART3: ', -16d0*e2d3*1000d0
-
-! PART 4: p=q,r=s
- tmp1=0
- do ip=1,A%NDimN
-    ! print*, iq,ip,iq+(ip-1)*dimOA,nOFA
-    read(iunit,rec=ip+(ip-1)*dimOA) work(1:nOFB)
-    do ir=1,B%NDimN
-       !print*, is,ir,is+(ir-1)*dimOB,nOFB
-       fact = A%CICoef(ip)*B%CICoef(ir)* &
-              work(ir+(ir-1)*dimOB)
-       do i=1,coef*ADimEx
-          if(OmA(i).gt.SmallE.and.OmA(i).lt.1d20) then
-
-             tmp1(i,ir) = tmp1(i,ir) + &
-                  fact*EVecA((i-1)*coef*ADimEx+coef*A%NDimX+ip)
-
-          endif
-       enddo
-    enddo
- enddo
- 
-! print*, 'tmp1', norm2(tmp1(1:2*ADimEx,1:B%NDimN))
+!             tmp1(i,rs) = tmp1(i,rs) + & 
+!                  fact*EVecA((i-1)*coef*ADimEx+pq)
 !
- tmp2=0
- do j=1,coef*BDimEx
-    if(OmB(j).gt.SmallE.and.OmB(j).lt.1d20) then
-       do i=1,coef*ADimEx
-          if(OmA(i).gt.SmallE.and.OmA(i).lt.1d20) then
-             do ir=1,B%NDimN
-
-                tmp2(i,j) = tmp2(i,j) + &
-                     EVecB((j-1)*coef*BDimEx+coef*B%NDimX+ir) * &
-                     tmp1(i,ir)
-                
-             enddo
-          endif
-       enddo
-    endif
- enddo
-
-! print*, 'tmp2: ',norm2(tmp2)
-
- e2d4 = 0d0
- do j=1,coef*BDimEx
-    if(OmB(j).gt.SmallE.and.OmB(j).lt.1d20) then
-       do i=1,coef*ADimEx
-          if(OmA(i).gt.SmallE.and.OmA(i).lt.1d20) then
-             e2d4 = e2d4 + tmp2(i,j)**2/(OmA(i)+OmB(j))
-            ! print*, tmp2(i,j)**2,OmA(i),OmB(j)
-          endif
-       enddo
-    endif
- enddo
- print*, 'PART4: ',-16*e2d4*1000
+!          endif
+!       enddo
+!    enddo
+! enddo
+!
+! tmp2=0
+! do j=1,coef*BDimEx
+!    !if(OmB(j).gt.SmallE.and.OmB(j).lt.1d20) then
+!    if(abs(OmB(j)).gt.SmallE.and.abs(OmB(j)).lt.1d20) then
+!       do i=1,coef*ADimEx
+!          !if(OmA(i).gt.SmallE.and.OmA(i).lt.1d20) then
+!          if(abs(OmA(i)).gt.SmallE.and.abs(OmA(i)).lt.1d20) then
+!             do rs=1,B%NDimX
+!                ir = B%IndN(1,rs)
+!                is = B%IndN(2,rs)
+!                
+!                tmp2(i,j) = tmp2(i,j) + &
+!                     EVecB((j-1)*coef*BDimEx+rs)*tmp1(i,rs)
+!             
+!             enddo
+!          endif
+!       enddo
+!    endif
+! enddo
+!
+!!write(*,*) 'tmp1,tmp2:',norm2(tmp1),norm2(tmp2)
+!
+!! e2d1 = 0d0
+!! do i=1,coef*ADimEx
+!!    !if(OmA(i).gt.SmallE.and.OmA(i).lt.1d20) then
+!!    if(abs(OmA(i)).gt.SmallE.and.abs(OmA(i)).lt.1d20) then
+!!       do j=1,coef*BDimEx
+!!          !if(OmB(j).gt.SmallE.and.OmB(j).lt.1d20) then
+!!          if(abs(OmB(j)).gt.SmallE.and.abs(OmB(j)).lt.1d20) then
+!!             e2d1 = e2d1 + tmp2(i,j)**2/(OmA(i)+OmB(j))
+!!             ! print*, OmA(i),OmB(j)
+!!          endif
+!!       enddo
+!!    endif
+!! enddo
+!!
+!!print*, ''
+!!print*, 'PART1: ',-16d0*e2d1*1000d0
+!!
+!! !print*, 'test?',dimOB,B%NDimN
+!
+!! PART 2: p>q,r=s
+! tmp1=0
+! do pq=1,A%NDimX
+!    ip = A%IndN(1,pq)
+!    iq = A%IndN(2,pq)
+!!   ! print*, iq,ip,iq+(ip-A%num0-1)*dimOA,nOFA
+!    read(iunit,rec=iq+(ip-1)*dimOA) work(1:nOFB)
+!    do ir=1,B%NDimN
+!!      !print*, is,ir,is+(ir-B%num0-1)*dimOB,nOFB
+!
+!       fact = B%CICoef(ir)*(A%CICoef(iq)+A%CICoef(ip)) &
+!            * work(ir+(ir-1)*dimOB)
+!
+!       do i=1,coef*ADimEx
+!          !if(OmA(i).gt.SmallE.and.OmA(i).lt.1d20) then
+!          if(abs(OmA(i)).gt.SmallE.and.abs(OmA(i)).lt.1d20) then
+!
+!             tmp1(i,ir) = tmp1(i,ir) + &
+!                  fact*EVecA((i-1)*coef*ADimEx+pq)
+!
+!          endif
+!       enddo
+!    enddo
+! enddo
+!!
+!! tmp2=0
+! do j=1,coef*BDimEx
+!    !if(OmB(j).gt.SmallE.and.OmB(j).lt.1d20) then
+!    if(abs(OmB(j)).gt.SmallE.and.abs(OmB(j)).lt.1d20) then
+!       do i=1,coef*ADimEx
+!          !if(OmA(i).gt.SmallE.and.OmA(i).lt.1d20) then
+!          if(abs(OmA(i)).gt.SmallE.and.abs(OmA(i)).lt.1d20) then
+!             do ir=1,B%NDimN
+!          
+!                tmp2(i,j) = tmp2(i,j) + &
+!!                tmp2(i,j) = tmp2(i,j) + &
+!                     EVecB((j-1)*coef*BDimEx+coef*B%NDimX+ir) * &
+!                     tmp1(i,ir)
+!                
+!             enddo
+!          endif
+!       enddo
+!    endif
+! enddo
+!
+!! e2d2 = 0d0
+!! do i=1,coef*ADimEx
+!!    !if(OmA(i).gt.SmallE.and.OmA(i).lt.1d20) then
+!!    if(abs(OmA(i)).gt.SmallE.and.abs(OmA(i)).lt.1d20) then
+!!       do j=1,coef*BDimEx
+!!          !if(OmB(j).gt.SmallE.and.OmB(j).lt.1d20) then
+!!          if(abs(OmB(j)).gt.SmallE.and.abs(OmB(j)).lt.1d20) then
+!!             e2d2 = e2d2 + tmp2(i,j)**2/(OmA(i)+OmB(j))
+!!          endif
+!!       enddo
+!!    endif
+!! enddo
+!! write(LOUT,*) 'PART2: ',-16d0*e2d2*1000d0
+!
+!! PART 3: p=q,r>s
+! tmp1=0
+! do ip=1,A%NDimN
+!    !   ! print*, iq,ip,iq+(ip-1)*dimOA,nOFA
+!    read(iunit,rec=ip+(ip-1)*dimOA) work(1:nOFB)
+!    do rs=1,B%NDimX
+!       ir = B%IndN(1,rs)
+!       is = B%IndN(2,rs)
+!       !      !print*, is,ir,is+(ir-1)*dimOB,nOFB
+!       fact = A%CICoef(ip) * &
+!            (B%CICoef(is)+B%CICoef(ir)) * &
+!            work(is+(ir-1)*dimOB)
+!
+!       do i=1,coef*ADimEx
+!          !if(OmA(i).gt.SmallE.and.OmA(i).lt.1d20) then
+!          if(abs(OmA(i)).gt.SmallE.and.abs(OmA(i)).lt.1d20) then
+!
+!             tmp1(i,rs) = tmp1(i,rs) + &
+!                  fact*EVecA((i-1)*coef*ADimEx+coef*A%NDimX+ip)
+!
+!          endif
+!       enddo
+!    enddo
+! enddo
+!!
+!! tmp2=0
+! do j=1,coef*BDimEx
+!    if(OmB(j).gt.SmallE.and.OmB(j).lt.1d20) then
+!       do i=1,coef*ADimEx
+!          !if(OmA(i).gt.SmallE.and.OmA(i).lt.1d20) then
+!          if(abs(OmA(i)).gt.SmallE.and.abs(OmA(i)).lt.1d20) then
+!             do rs=1,B%NDimX
+!                ir = B%IndN(1,rs)
+!                is = B%IndN(2,rs)
+!
+!                tmp2(i,j) = tmp2(i,j) + &
+!                     EVecB((j-1)*coef*BDimEx+rs)*tmp1(i,rs)
+!
+!             enddo
+!          endif
+!       enddo
+!    endif
+! enddo
+!
+!! e2d3 = 0d0
+!! do i=1,coef*ADimEx
+!!    !if(OmA(i).gt.SmallE.and.OmA(i).lt.1d20) then
+!!    if(abs(OmA(i)).gt.SmallE.and.abs(OmA(i)).lt.1d20) then
+!!       do j=1,coef*BDimEx
+!!          !if(OmB(j).gt.SmallE.and.OmB(j).lt.1d20) then
+!!          if(abs(OmB(j)).gt.SmallE.and.abs(OmB(j)).lt.1d20) then
+!!             e2d3 = e2d3 + tmp2(i,j)**2/(OmA(i)+OmB(j))
+!!          endif
+!!       enddo
+!!    endif
+!! enddo
+!! write(LOUT,*) 'PART3: ', -16d0*e2d3*1000d0
+!
+!! PART 4: p=q,r=s
+! tmp1=0
+! do ip=1,A%NDimN
+!    ! print*, iq,ip,iq+(ip-1)*dimOA,nOFA
+!    read(iunit,rec=ip+(ip-1)*dimOA) work(1:nOFB)
+!    do ir=1,B%NDimN
+!       !print*, is,ir,is+(ir-1)*dimOB,nOFB
+!       fact = A%CICoef(ip)*B%CICoef(ir)* &
+!              work(ir+(ir-1)*dimOB)
+!       do i=1,coef*ADimEx
+!          !if(OmA(i).gt.SmallE.and.OmA(i).lt.1d20) then
+!          if(abs(OmA(i)).gt.SmallE.and.abs(OmA(i)).lt.1d20) then
+!
+!             tmp1(i,ir) = tmp1(i,ir) + &
+!                  fact*EVecA((i-1)*coef*ADimEx+coef*A%NDimX+ip)
+!
+!          endif
+!       enddo
+!    enddo
+! enddo
+! 
+!! print*, 'tmp1', norm2(tmp1(1:2*ADimEx,1:B%NDimN))
+!!
+!! tmp2=0
+! do j=1,coef*BDimEx
+!    !if(OmB(j).gt.SmallE.and.OmB(j).lt.1d20) then
+!    if(abs(OmB(j)).gt.SmallE.and.abs(OmB(j)).lt.1d20) then
+!       do i=1,coef*ADimEx
+!          !if(OmA(i).gt.SmallE.and.OmA(i).lt.1d20) then
+!          if(abs(OmA(i)).gt.SmallE.and.abs(OmA(i)).lt.1d20) then
+!             do ir=1,B%NDimN
+!
+!                tmp2(i,j) = tmp2(i,j) + &
+!                     EVecB((j-1)*coef*BDimEx+coef*B%NDimX+ir) * &
+!                     tmp1(i,ir)
+!                
+!             enddo
+!          endif
+!       enddo
+!    endif
+! enddo
+!
+!! print*, 'tmp2: ',norm2(tmp2)
+!
+! e2d4 = 0d0
+! do j=1,coef*BDimEx
+!    !if(OmB(j).gt.SmallE.and.OmB(j).lt.1d20) then
+!    if(abs(OmB(j)).gt.SmallE.and.abs(OmB(j)).lt.1d20) then
+!       do i=1,coef*ADimEx
+!          !if(OmA(i).gt.SmallE.and.OmA(i).lt.1d20) then
+!          if(abs(OmA(i)).gt.SmallE.and.abs(OmA(i)).lt.1d20) then
+!             e2d4 = e2d4 + tmp2(i,j)**2/(OmA(i)+OmB(j))
+!            ! print*, tmp2(i,j)**2,OmA(i),OmB(j)
+!          endif
+!       enddo
+!    endif
+! enddo
+! print*, 'PART4: ',-16*e2d4*1000
 
  ! SAPT%e2disp = -16d0*e2d
- write(LOUT,'(1x,a,f16.8)') 'E2disp      = ',-16*(e2d1+e2d2+e2d3+e2d4)*1000
+! write(LOUT,'(1x,a,f16.8)') 'E2disp      = ',-16*(e2d1+e2d2+e2d3+e2d4)*1000
 
  close(iunit)
  deallocate(work)
@@ -3062,6 +5859,19 @@ double precision,parameter :: SmallE = 1.d-6
   enddo
 
 end subroutine calc_resp_apsg
+
+subroutine writeampl(sij,ampfile)
+implicit none
+
+character(*) :: ampfile
+double precision :: sij(:,:)
+integer :: iunit
+
+ open(newunit=iunit,file=ampfile,form='unformatted')
+ write(iunit) sij 
+ close(iunit)
+
+end subroutine writeampl
 
 subroutine check_loop(ABPLUS,Occ,IndN,IndBlock,NAct,INActive,NDim,NDimX,NBasis)
 implicit none

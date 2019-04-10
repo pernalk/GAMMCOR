@@ -440,6 +440,9 @@ integer :: test,test2
  case ("OMEGA")
        read(val, *) SystemParams%Omega
 
+ case ("EIGFCI")
+       read(val, *) SystemParams%EigFCI
+
  case ("UATOMS")
        read(val, *) SystemParams%UCen
 ! maybe sth more fancy i.e. swapping monomers

@@ -34,7 +34,7 @@ double precision :: Tcpu,Twall
  write(LOUT,'(1x,a)') 'STARTING SAPT CALCULATIONS'
  write(LOUT,'(8a10)') ('**********',i=1,8)
 
- call clock('START',Tcpu,Twall) 
+ call clock('START',Tcpu,Twall)
  call sapt_interface(Flags,SAPT)
 
  ! SAPT components
@@ -42,15 +42,17 @@ double precision :: Tcpu,Twall
  if(Flags%ISERPA==0) then
 
     call e1elst(SAPT%monA,SAPT%monB,SAPT)
-    ! temporary here!!!!
+    ! add GVB also!!!
     if(Flags%ICASSCF==1) then
-    !   call e1exchs2(SAPT%monA,SAPT%monB,SAPT)
+     !  call e1exchs2(SAPT%monA,SAPT%monB,SAPT)
     endif
     if(SAPT%SaptLevel==0) then
        call e2disp_unc(Flags,SAPT%monA,SAPT%monB,SAPT)
    else
        call e2ind(Flags,SAPT%monA,SAPT%monB,SAPT)
        call e2disp(Flags,SAPT%monA,SAPT%monB,SAPT)
+       call e2exdisp(Flags,SAPT%monA,SAPT%monB,SAPT)
+       !call e2exd_app(SAPT%monA,SAPT%monB,SAPT)
     endif
 
  elseif(Flags%ISERPA==2) then
@@ -74,7 +76,7 @@ double precision :: Tcpu,Twall
 
 end subroutine sapt_driver
 
-subroutine sapt_interface(Flags,SAPT)
+subroutine sapt_interface(Flags,SAPT) 
 implicit none
 
 type(FlagsData) :: Flags
@@ -609,7 +611,7 @@ character(:),allocatable :: rdmfile
     if(EVal(i)>0.d0) Mon%NAct = Mon%NAct + 1  
  enddo
  !Mon%INAct = Mon%NELE-int(Tmp)
-!!!! OPEN-SHELL CASE?
+!!! OPEN-SHELL CASE?
  Mon%INAct = Mon%XELE-Tmp+1.d-1
  NOccup = Mon%INAct + Mon%NAct
  Mon%SumOcc = Tmp + Mon%INAct
@@ -904,6 +906,7 @@ double precision, allocatable :: ABPlus(:), ABMin(:), URe(:,:), &
 integer :: i,ione
 double precision,parameter :: One = 1d0, Half = 0.5d0
 character(8) :: label
+character(:),allocatable :: twojfile,twokfile
 character(:),allocatable :: onefile,twofile,propfile0,propfile1,rdmfile
 
 ! perform check
@@ -916,12 +919,16 @@ character(:),allocatable :: onefile,twofile,propfile0,propfile1,rdmfile
  if(Mon%Monomer==1) then
     onefile = 'ONEEL_A'
     twofile = 'TWOMOAA'
+    twojfile = 'FFOOAA'
+    twokfile = 'FOFOAA'
     propfile0 = 'PROP_A0'
     propfile1 = 'PROP_A1'
     rdmfile='rdm2_A.dat'
  elseif(Mon%Monomer==2) then
     onefile = 'ONEEL_B'
     twofile = 'TWOMOBB'
+    twojfile = 'FFOOBB'
+    twokfile = 'FOFOBB'
     propfile0 = 'PROP_B0'
     propfile1 = 'PROP_B1'
     rdmfile='rdm2_B.dat'
@@ -955,9 +962,33 @@ character(:),allocatable :: onefile,twofile,propfile0,propfile1,rdmfile
     stop
  endif
 
- ! transform and read 2-el integrals
- call tran4_full(NBas,MO,MO,fname,'AOTWOSORT')
- call LoadSaptTwoEl(Mon%Monomer,TwoMO,NBas,NInte2)
+! ! transform and read 2-el integrals
+! call tran4_full(NBas,MO,MO,fname,'AOTWOSORT')
+! call LoadSaptTwoEl(Mon%Monomer,TwoMO,NBas,NInte2)
+!
+ ! transform 2-el integrals
+ select case(Mon%TwoMoInt)
+
+ case(TWOMO_INCORE,TWOMO_FFFF) 
+   ! full - for GVB and CAS
+   call tran4_full(NBas,MO,MO,fname,'AOTWOSORT')
+
+ case(TWOMO_FOFO) 
+   ! transform J and K
+    call tran4_gen(NBas,&
+         Mon%num0+Mon%num1,MO(1:NBas*(Mon%num0+Mon%num1)),&
+         Mon%num0+Mon%num1,MO(1:NBas*(Mon%num0+Mon%num1)),&
+         NBas,MO,&
+         NBas,MO,&
+         twojfile,'AOTWOSORT')
+    call tran4_gen(NBas,&
+         NBas,MO,&
+         Mon%num0+Mon%num1,MO(1:NBas*(Mon%num0+Mon%num1)),&
+         NBas,MO,&
+         Mon%num0+Mon%num1,MO(1:NBas*(Mon%num0+Mon%num1)),&
+         twokfile,'AOTWOSORT')
+ end select
+ if(Mon%TwoMoInt==TWOMO_INCORE) call LoadSaptTwoEl(Mon%Monomer,TwoMO,NBas,NInte2)
 
  ! GVB
  if(Flags%ICASSCF==0.and.Flags%ISERPA==0) then
@@ -1001,17 +1032,45 @@ character(:),allocatable :: onefile,twofile,propfile0,propfile1,rdmfile
     !     EigY,EigY1,Eig,Eig1, &
     !     Mon%IndN,Mon%IndX,Mon%IGem,Mon%NAct,Mon%INAct,Mon%NDimX, &
     !     NBas,Mon%NDim,NInte1,twofile,Flags%IFlag0)
-    
-    call Y01CAS(TwoMO,Mon%Occ,URe,XOne,ABPlus,ABMin, &
-         EigY,EigY1,Eig,Eig1, &
-         Mon%IndN,Mon%IndX,Mon%NDimX,NBas,Mon%NDim,NInte1,NInte2,Flags%IFlag0)
+    ! 
+    !call Y01CAS(TwoMO,Mon%Occ,URe,XOne,ABPlus,ABMin, &
+    !     EigY,EigY1,Eig,Eig1, &
+    !     Mon%IndN,Mon%IndX,Mon%NDimX,NBas,Mon%NDim,NInte1,NInte2,Flags%IFlag0)
 
-    ! dump response
-    call writeresp(EigY,Eig,propfile0)
-    if(Flags%IFlag0==0) then
-       call writeresp(EigY1,Eig1,propfile1)
-    endif
-    
+   select case(Mon%TwoMoInt)
+   case(TWOMO_FOFO)
+      print*, 'Flag0',Flags%IFlag0 
+      call Y01CAS_FOFO(Mon%Occ,URe,XOne,ABPlus,ABMin, &
+             !EigY0,EigY1,Eig0,Eig1, &
+             propfile0,propfile1, &
+             Mon%IndN,Mon%IndX,Mon%IGem,Mon%NAct,Mon%INAct,Mon%NDimX, &
+             NBas,Mon%NDim,NInte1,Mon%NoSt,twofile,twojfile,twokfile,Flags%IFlag0)
+   case(TWOMO_FFFF) 
+      call Y01CAS_mithap(Mon%Occ,URe,XOne,ABPlus,ABMin, &
+             EigY,EigY1,Eig,Eig1, &
+             Mon%IndN,Mon%IndX,Mon%IGem,Mon%NAct,Mon%INAct,Mon%NDimX, &
+             NBas,Mon%NDim,NInte1,twofile,Flags%IFlag0)
+   case(TWOMO_INCORE) 
+      call Y01CAS(TwoMO,Mon%Occ,URe,XOne,ABPlus,ABMin, &
+           EigY,EigY1,Eig,Eig1, &
+           !Mon%IndNT,Mon%IndX,Mon%NDimX,NBas,Mon%NDim,NInte1,NInte2,Flags%IFlag0)
+           Mon%IndN,Mon%IndX,Mon%NDimX,NBas,Mon%NDim,NInte1,NInte2,Flags%IFlag0)
+   end select
+
+    !! dump response
+    !call writeresp(EigY,Eig,propfile0)
+    !if(Flags%IFlag0==0) then
+    !   call writeresp(EigY1,Eig1,propfile1)
+    !endif
+   
+   ! dump uncoupled response
+   if(Mon%TwoMoInt/=TWOMO_FOFO) then 
+      call writeresp(EigY,Eig,propfile0)
+      if(Flags%IFlag0==0) then
+         call writeresp(EigY1,Eig1,propfile1)
+      endif
+   endif
+ 
     deallocate(Eig1,Eig,EigY1,EigY,ABMin,ABPlus)
    
  endif
@@ -1040,7 +1099,7 @@ double precision, allocatable :: XOne(:), &
 double precision, allocatable :: ABPlus(:),ABMin(:),URe(:,:),VSR(:), &
                                  EigY0(:),EigY1(:),Eig0(:),Eig1(:), &
                                  EigVecR(:), Eig(:) 
-integer :: i,j,ii,ione
+integer :: i,j,ip,iq,ii,ione
 double precision :: ACAlpha,Omega,EnSR,EnHSR,ECorr,ECASSCF,XVSR
 double precision :: Tcpu,Twall
 character(8) :: label
@@ -1092,7 +1151,9 @@ logical :: doRSH
  NInte1 = NBas*(NBas+1)/2
  NInte2 = NInte1*(NInte1+1)/2
 
+ print*, 'here?'
  call create_symmats(Mon,MO,NBas)
+ print*, 'here?'
 
  allocate(work1(NSq),work2(NSq),XOne(NInte1),URe(NBas,NBas),VSR(NInte1))
  if(Mon%TwoMoInt==1) then
@@ -1276,7 +1337,29 @@ logical :: doRSH
  EigVecR = 0
  Eig = 0
  if(Mon%NoSt==1) then
-    call ERPASYMM1(EigVecR,Eig,ABPlus,ABMin,NBas,Mon%NDimX)
+!    call ERPASYMM1(EigVecR,Eig,ABPlus,ABMin,NBas,Mon%NDimX)
+
+    allocate(Mon%EigY(Mon%NDimX**2),Mon%EigX(Mon%NDimX**2),&
+             Mon%Eig(Mon%NDimX))
+    call ERPASYMMXY(Mon%EigY,Mon%EigX,Mon%Eig,ABPlus,ABMin,&
+                    Mon%Occ,Mon%IndN,Mon%NDimX,NBas)
+
+    print*, 'EigY:',norm2(Mon%EigY),norm2(Mon%EigX)
+
+    Eig = Mon%Eig
+    do j=1,Mon%NDimX
+       do i=1,Mon%NDimX
+          ip = Mon%IndN(1,i)
+          iq = Mon%IndN(2,i)
+          EigVecR((j-1)*Mon%NDimX+i)=(Mon%CICoef(ip)-Mon%CICoef(iq))& 
+                                    *(Mon%EigY((j-1)*Mon%NDimX+i)-Mon%EigX((j-1)*Mon%NDimX+i))
+       enddo
+    enddo
+
+ ! TEST COUPLED ANDREAS
+ !  Mon%EigX = EigVecR
+ !  Mon%EigY = 0
+
  else
     call ERPAVEC(EigVecR,Eig,ABPlus,ABMin,NBas,Mon%NDimX)
  endif
@@ -1412,7 +1495,7 @@ double precision, allocatable :: Eig0(:), Eig1(:), EigY0(:), EigY1(:)
 double precision :: Dens(NBas,NBas)
 double precision,parameter :: One = 1d0, Half = 0.5d0
 integer :: i,j,ij,ij1,ione,itwo 
-integer :: ind
+integer :: ip,iq,ind
 double precision :: ACAlpha
 double precision :: ECASSCF,ETot,ECorr
 character(8) :: label
@@ -1517,11 +1600,7 @@ double precision, allocatable :: EigTmp(:), VecTmp(:)
 
  endif
 
- ! setting ACAlpha parameter
- ACAlpha=Mon%ACAlpha
- write(LOUT,'(/,1x,a,f16.8)') 'ACAlpha Parameter:',Mon%ACAlpha
- !ACAlpha=One
- 
+ ACAlpha=One
  ! GVB
  if(Flags%ICASSCF==0.and.Flags%ISERPA==0) then
 
@@ -1614,7 +1693,8 @@ double precision, allocatable :: EigTmp(:), VecTmp(:)
 ! endif 
 
    !ACAlpha=sqrt(2d0)/2d0
-   !print*, 'ACAlpha',ACAlpha
+   !ACAlpha=0d0
+   !print*, 'UNCOUPLED,ACAlpha',ACAlpha
    select case(Mon%TwoMoInt)
    case(TWOMO_FOFO)
 
@@ -1639,9 +1719,52 @@ double precision, allocatable :: EigTmp(:), VecTmp(:)
    EigVecR = 0
    Eig = 0
    if(Mon%NoSt==1) then
-      call ERPASYMM1(EigVecR,Eig,ABPlus,ABMin,NBas,Mon%NDimX)
-   else
-      call ERPAVEC(EigVecR,Eig,ABPlus,ABMin,NBas,Mon%NDimX)
+   !   !call ERPASYMM1(EigVecR,Eig,ABPlus,ABMin,NBas,Mon%NDimX)
+   !   ! temporary solution!!!
+   !   ! for exch-disp/exch-ind
+
+   !   print*, 'GROUND STATE!'
+   !   allocate(Mon%EigY(Mon%NDimX**2),Mon%EigX(Mon%NDimX**2),&
+   !            Mon%Eig(Mon%NDimX))
+   !   call ERPASYMMXY(Mon%EigY,Mon%EigX,Mon%Eig,ABPlus,ABMin,&
+   !                   Mon%Occ,Mon%IndN,Mon%NDimX,NBas)
+
+   !   print*, 'EigY:',norm2(Mon%EigY),norm2(Mon%EigX)
+
+   !   Eig = Mon%Eig
+   !   do j=1,Mon%NDimX
+   !      do i=1,Mon%NDimX
+   !         ip = Mon%IndN(1,i)
+   !         iq = Mon%IndN(2,i)
+   !         EigVecR((j-1)*Mon%NDimX+i)=(Mon%CICoef(ip)-Mon%CICoef(iq))& 
+   !                                   *(Mon%EigY((j-1)*Mon%NDimX+i)-Mon%EigX((j-1)*Mon%NDimX+i))
+   !      enddo
+   !   enddo
+
+   !! TEST COUPLED ANDREAS
+   !!  Mon%EigX = EigVecR
+   !!  Mon%EigY = 0
+
+   !else
+
+      allocate(Mon%EigY(Mon%NDimX**2),Mon%EigX(Mon%NDimX**2),&
+               Mon%Eig(Mon%NDimX))
+
+   !   call ERPAVEC(EigVecR,Eig,ABPlus,ABMin,NBas,Mon%NDimX)
+       print*, 'ERPAVECTRANS'
+       call ERPAVECTRANS(Mon%EigY,Mon%EigX,Mon%Eig,ABPlus,ABMin,&
+                         Mon%Occ,Mon%IndN,Mon%NDimX,NBas)
+
+      Eig = Mon%Eig
+      do j=1,Mon%NDimX
+         do i=1,Mon%NDimX
+            ip = Mon%IndN(1,i)
+            iq = Mon%IndN(2,i)
+            EigVecR((j-1)*Mon%NDimX+i)=(Mon%CICoef(ip)-Mon%CICoef(iq))& 
+                                      *(Mon%EigY((j-1)*Mon%NDimX+i)-Mon%EigX((j-1)*Mon%NDimX+i))
+         enddo
+      enddo
+
    endif
 
    !print*, 'Entering ERPAVEC...' 
@@ -1801,6 +1924,8 @@ elseif(Flags%ISERPA==2) then
            EigVecR(2*(Mon%NDimX+Mon%NDimN)*2*(Mon%NDimX+Mon%NDimN)),&
            Eig(2*(Mon%NDimX+Mon%NDimN)))
 
+      print*, 'HERE-1?'
+      print*, 'NDimN: ',Mon%NDimN
       !Mon%NDimN = 0 
       CMAT=0
       call APSG_NEST(ABPlus,ABMin,CMAT,EMAT,EMATM,DMAT,DMATK,&
@@ -1820,6 +1945,8 @@ elseif(Flags%ISERPA==2) then
 
    else
   
+      print*, 'HERE-2?'
+      print*, 'NDimN: ',Mon%NDimN
       allocate(ABPlus(Mon%NDim**2),ABMin(Mon%NDim**2), &
            CMAT(Mon%NDim**2),EMAT(NBas**2),EMATM(NBas**2),&
            DMAT(Mon%NDim*NBas),DMATK(Mon%NDim*NBas),&
@@ -1852,13 +1979,12 @@ elseif(Flags%ISERPA==2) then
 
    EigVecR = 0
    Eig = 0
-  ! call PINOVEC(EigVecR,Eig,ABPlus,ABMin,DMAT,DMATK,EMAT,EMATM, &
-  !      Mon%Occ,NBas,Mon%NDimX,Mon%NDimN)
-  !
-
+   !call PINOVEC(EigVecR,Eig,ABPlus,ABMin,DMAT,DMATK,EMAT,EMATM, &
+   !     Mon%Occ,NBas,Mon%NDimX,Mon%NDimN)
+  
 ! reduced version
-   call PINOVECRED(EigVecR,Eig,INegExcit,ABPlus,ABMin,DMAT,DMATK, &
-        EMAT,EMATM,NBas,Mon%NDimX,Mon%NDimN)
+    call PINOVECRED(EigVecR,Eig,INegExcit,ABPlus,ABMin,DMAT,DMATK, &
+                    EMAT,EMATM,NBas,Mon%NDimX,Mon%NDimN)
 !! the lines below are needed if EnePINO is called subsequently
 !   EigVecR(1:2*(NDim+NBasis)*2*(NDim+NBasis))=Zero 
 !   do i=1,NDimX+NDimN
@@ -1910,12 +2036,14 @@ integer :: EigNum
 
  NSymMO = 1
  ETot=0
-   
- if(Mon%Monomer==1) then
-    EigNum=1
- elseif(Mon%Monomer==2) then
-    EigNum=1
- endif
+
+ print*, 'TEST!!!',Mon%EigFCI
+ EigNum=Mon%EigFCI  
+ !if(Mon%Monomer==1) then
+ !   EigNum=1
+ !elseif(Mon%Monomer==2) then
+ !   EigNum=1
+ !endif
 
  call OptTwo1(ETot,Mon%PotNuc,URe,Mon%Occ,XOne,TwoMO,NSymMO, &
               Mon%CICoef,NBas,NInte1,NInte2,EigNum)
@@ -3446,10 +3574,10 @@ deallocate(SAPT%monB%CICoef,SAPT%monB%IGem,SAPT%monB%Occ, &
 
 ! symmetry matrices
 if(allocated(SAPT%monA%NumOSym)) then
-  deallocate(SAPT%monA%NumOSym)
+   deallocate(SAPT%monA%NumOSym)
 endif
 if(allocated(SAPT%monB%NumOSym)) then
-  deallocate(SAPT%monB%NumOSym)
+   deallocate(SAPT%monB%NumOSym)
 endif
 
 ! HERE - change to SAPTLEVEL?
@@ -3474,6 +3602,21 @@ endif
 if(allocated(SAPT%monB%RDM2)) then
   deallocate(SAPT%monB%RDM2,SAPT%monB%RDM2Act)
   deallocate(SAPT%monB%Ind2)
+endif
+
+! 2nd order exchange
+if(allocated(SAPT%monA%Eig)) then
+   deallocate(SAPT%monA%Eig,SAPT%monA%EigX,SAPT%monA%EigY)
+endif
+if(allocated(SAPT%monB%Eig)) then
+   deallocate(SAPT%monB%Eig,SAPT%monB%EigX,SAPT%monB%EigY)
+endif
+! 2-RDM approximations
+if(allocated(SAPT%monA%Fmat)) then
+   deallocate(SAPT%monA%Fmat)
+endif
+if(allocated(SAPT%monB%Fmat)) then
+   deallocate(SAPT%monB%Fmat)
 endif
 
 !RSH
