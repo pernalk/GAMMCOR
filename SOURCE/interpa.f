@@ -963,8 +963,15 @@ C
      $ EigVecR((NU-1)*NDimX+I)*EigVecR((NU-1)*NDimX+J)
       EndDo
       EndDo 
-      If(SumNu.Lt.Zero) Write(6,'(X,"Negative Excit Norm",I4,2E12.4)')
+C      If(SumNu.Lt.Zero) Write(6,'(X,"Negative Excit Norm",I4,2E12.4)')
+C     $  NU,Eig(NU),SumNU
+C     CHANGE 1 
+      If(SumNu.Lt.Zero) Then
+      Eig(NU)=-Eig(NU)
+      Write(6,'(X,"Negative Excit Norm",I4,2E12.4)')
      $  NU,Eig(NU),SumNU
+      EndIf
+C
 C
 C     If SumNU < 0 the eigenvector corresponds to deexcitation, normalize it to -1
 C
@@ -1239,8 +1246,15 @@ C
       EndDo
       EndDo
 C
-      If(SumNu.Lt.Zero) Write(6,'(X,"Negative Excit Norm",I4,2E12.4)')
-     $  NU,Eig(NU),SumNU 
+C      If(SumNu.Lt.Zero) Write(6,'(X,"Negative Excit Norm",I4,2E12.4)')
+C     $  NU,Eig(NU),SumNU 
+C     CHANGE 2
+      If(SumNu.Lt.Zero) Then
+      Eig(NU)=-Eig(NU)
+      Write(6,'(X,"Negative Excit Norm",I4,2E12.4)')
+     $  NU,Eig(NU),SumNU
+      EndIf
+C
 C      
       Work(NU)=One
       If(SumNU.Lt.Zero) Work(NU)=-One
@@ -1265,26 +1279,49 @@ C     COMPUTE EigX
 C
       Do NU=1,NDimX
 C
-      If(Eig(NU).Gt.Small) Then
+C      If(Eig(NU).Gt.Small) Then
 C    
       Do I=1,NDimX
       EigVecL((NU-1)*NDimX+I)=Zero
       Do J=1,NDimX
+C      EigVecL((NU-1)*NDimX+I)=EigVecL((NU-1)*NDimX+I)
+C     $ +Work(NU)*One/Eig(NU)*ABMIN(I,J)*EigVecR((NU-1)*NDimX+J)
+C     CHANGE 3
       EigVecL((NU-1)*NDimX+I)=EigVecL((NU-1)*NDimX+I)
-     $ +Work(NU)*One/Eig(NU)*ABMIN(I,J)*EigVecR((NU-1)*NDimX+J)
+     $ +One/Eig(NU)*ABMIN(I,J)*EigVecR((NU-1)*NDimX+J)
+C
       EndDo
       EndDo
 C
-      Else
-C
-      Do I=1,NDimX
-      EigVecR((NU-1)*NDimX+I)=Zero
-      EigVecL((NU-1)*NDimX+I)=Zero
-      EndDo
-C
-      EndIf
+C      Else
+CC
+C      Do I=1,NDimX
+C      EigVecR((NU-1)*NDimX+I)=Zero
+C      EigVecL((NU-1)*NDimX+I)=Zero
+C      EndDo
+CC
+C      EndIf
 c     enddo NU
       EndDo
+C
+C     CHECK XY NORM AND OMEGA
+C
+      Do NU=1,NDimX
+C
+      SumNU=0d0
+      Do I=1,NDimX
+      SumNU=SumNU+
+     $ EigVecR((NU-1)*NDimX+I)*EigVecL((NU-1)*NDimX+I)
+      EndDo
+C
+      If(SumNU.Lt.Zero)Write(6,'(X,"Problems with XY Norm!",I4,2E12.4)')
+     $   NU,SumNU,Eig(NU)
+C
+      EndDo
+C
+      If(Eig(NU).Lt.Zero) 
+     $ Write(6,'(X,"Double Check Negative Excit",I4,2E12.4)') 
+     $ NU,Eig(NU),SumNU
 C
       Return
       End
@@ -1345,7 +1382,8 @@ C     OF THE ORIGINAL ERPA PROBLEM:
 C     AX + BY = Om N X
 C     BX + AY =-Om N Y 
 C
-C     BY TRANSFORMING TILDED X,Y OBTAINED IN ERPAVECYX WHERE A NONSYMMETRIC 
+C     BY TRANSFORMING TILDED X,Y OBTAINED IN ERPAVECYX WHERE A
+C     NONSYMMETRIC 
 C     PROBLEM IS SOLVED
 C
 C     A+ A- Y_TILDA = om^2 Y_TILDA
@@ -4947,17 +4985,6 @@ C
 C
       Dimension RDM2Act(NAct**2*(NAct**2+1)/2),Occ(NBasis),Ind2(NBasis)
 C
-c herer!!! KP
-c ***************************
-c      RDM2=Zero
-c      If(IP.Eq.IR.And.IQ.Eq.IS )
-c     $  RDM2=RDM2+Two*Occ(IP)*Occ(IQ)
-c      If(IP.Eq.IS.And.IQ.Eq.IR )
-c     $ RDM2=RDM2-(Occ(IP)*Occ(IQ))**(0.5)
-c      FRDM2=RDM2
-c      return
-c ***************************
-
       RDM2=Zero
       If(IP.Eq.IR.And.IQ.Eq.IS.And. (Occ(IP).Eq.One.Or.Occ(IQ).Eq.One) )
      $  RDM2=RDM2+Two*Occ(IP)*Occ(IQ)

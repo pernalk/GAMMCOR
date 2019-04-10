@@ -1929,14 +1929,26 @@ C
       EndIf
       EndDo
 C     
-      If(SumNU.Gt.Zero) Then      
+C      OLD
+C      If(SumNU.Gt.Zero) Then      
+C      SumNU=One/SQRT(SumNU)
+C      If(Eig(NU).Lt.Zero) Write(6,'(X,"Negative Excit Norm",I4,2E12.4)')
+C     $  NU,Eig(NU),SumNU
+C      Eig(NU)=Abs(Eig(NU))
+C      Else
+C      SumNU=Zero
+C      Eig(NU)=-Abs(Eig(NU))
+C      EndIf
+C
+C     CHANGE 4
+C
+      If(SumNU.Gt.Zero) Then
       SumNU=One/SQRT(SumNU)
       If(Eig(NU).Lt.Zero) Write(6,'(X,"Negative Excit Norm",I4,2E12.4)')
      $  NU,Eig(NU),SumNU
-      Eig(NU)=Abs(Eig(NU))
       Else
       SumNU=Zero
-      Eig(NU)=-Abs(Eig(NU))
+      Eig(NU)=Zero
       EndIf
 C
       Do I=1,NI
@@ -1960,8 +1972,8 @@ C
 C
       Parameter(Zero=0.D0,Half=0.5D0,One=1.D0,Two=2.D0,Three=3.D0,
 C     OLD:
-C     $ Four=4.D0,Small=1.D-10)
-     $ Four=4.D0,Small=1.D-2)
+     $ Four=4.D0,Small=1.D-10)
+C     $ Four=4.D0,Small=1.D-2)
 C
       Integer :: DimV1,Max_NDEG
       Integer :: Space1(3,2*(NDimX+NDimN))
@@ -2055,8 +2067,7 @@ C
       EndIf
       EndDo
 C
-C     IMPOSE THE NORMALIZATION 2 Y*X + V*W = 1 ON THE EIGENVECTORS CORRESPONDING TO POSITIVE
-C     OMEGA'S 
+C     IMPOSE THE NORMALIZATION 2 Y*X + V*W = 1 ON THE EIGENVECTORS
 C
       Write(6,'(X,"Threshold for small PINO Eigenvalue ",E12.4)')
      $ Small
@@ -2088,11 +2099,21 @@ C
 C
       EndDo
 C
+C     OLD
+C      If(SumNU.Gt.Zero) Then
+C      SumNU=One/Sqrt(SumNU)
+C      Else
+C      WritE(*,*)'Neg Norm in PINOVECSYMM',SumNU
+C      SumNU=Zero
+C      EndIf
+C
+CC     CHANGE 5
       If(SumNU.Gt.Zero) Then
       SumNU=One/Sqrt(SumNU)
       Else
-      WritE(*,*)'Neg Norm in PINOVECSYMM',SumNU
-      SumNU=Zero
+      Eig(NU)=-Eig(NU)
+      Write(*,*) 'Neg Norm in PINOVECSYMM', NU,Eig(NU),SumNU
+      SumNU=One/Sqrt(Abs(SumNU))
       EndIf
 C
       Do I=1,NI
