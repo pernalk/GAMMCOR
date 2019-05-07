@@ -7,6 +7,7 @@ use abfofo
 use tran
 use sorter
 use sapt_ener
+use exd_pino
 
 implicit none
 
@@ -43,24 +44,29 @@ double precision :: Tcpu,Twall
 
     call e1elst(SAPT%monA,SAPT%monB,SAPT)
     ! add GVB also!!!
-    if(Flags%ICASSCF==1) then
-     !  call e1exchs2(SAPT%monA,SAPT%monB,SAPT)
-    endif
+!    if(Flags%ICASSCF==1) then
+       !call e1exchs2(Flags,SAPT%monA,SAPT%monB,SAPT)
+!    endif
     if(SAPT%SaptLevel==0) then
        call e2disp_unc(Flags,SAPT%monA,SAPT%monB,SAPT)
-   else
+    else
        call e2ind(Flags,SAPT%monA,SAPT%monB,SAPT)
        call e2disp(Flags,SAPT%monA,SAPT%monB,SAPT)
-       call e2exdisp(Flags,SAPT%monA,SAPT%monB,SAPT)
-       !call e2exd_app(SAPT%monA,SAPT%monB,SAPT)
+       if(Flags%ICASSCF==1) then
+          call e2exdisp(Flags,SAPT%monA,SAPT%monB,SAPT)
+          !call e2exd_app(SAPT%monA,SAPT%monB,SAPT)
+       endif
     endif
 
  elseif(Flags%ISERPA==2) then
 
     call e1elst(SAPT%monA,SAPT%monB,SAPT)
     !call e1exchs2(SAPT%monA,SAPT%monB,SAPT)
-!    call e2ind_apsg(Flags,SAPT%monA,SAPT%monB,SAPT)
-    call e2disp_apsg(Flags,SAPT%monA,SAPT%monB,SAPT)
+    !call e2ind_apsg(Flags,SAPT%monA,SAPT%monB,SAPT)
+    ! HERE!!!
+    !call e2disp_apsg(Flags,SAPT%monA,SAPT%monB,SAPT)
+    call e2disp_pino(Flags,SAPT%monA,SAPT%monB,SAPT)
+    call e2exdisp_apsg(Flags,SAPT%monA,SAPT%monB,SAPT)
 
  endif
 
@@ -235,6 +241,25 @@ logical :: doRSH
 ! call tran4_full(NBasis,Ca,Cb,'TWOMOAB')
 
  if(Flags%ISERPA==0) then
+
+   if(SAPT%monA%num1/=SAPT%monA%NAct) then
+      write(LOUT,'(1x,a)') 'ERROR!!! Active orbitals in A have 0 occupancy!'
+      !stop
+      ! uncomment this part if want to do it anyway
+      SAPT%monA%num0=SAPT%monA%INAct
+      SAPT%monA%num1=SAPT%monA%NAct
+      SAPT%monA%num2=NBasis-SAPT%monA%NAct-SAPT%monA%INAct
+   endif
+
+   if(SAPT%monB%num1/=SAPT%monB%NAct) then
+      write(LOUT,*) 'ERROR!!! Active orbitals in B have 0 occupancy!'
+      !stop
+      ! uncomment this part if want to do it anyway
+      SAPT%monB%num0=SAPT%monB%INAct
+      SAPT%monB%num1=SAPT%monB%NAct
+      SAPT%monB%num2=NBasis-SAPT%monB%NAct-SAPT%monB%INAct
+
+   endif
 
    ! integrals stored as (ov|ov)
    call tran4_gen(NBasis,&
@@ -973,6 +998,7 @@ character(:),allocatable :: onefile,twofile,propfile0,propfile1,rdmfile
    ! full - for GVB and CAS
    call tran4_full(NBas,MO,MO,fname,'AOTWOSORT')
 
+
  case(TWOMO_FOFO) 
    ! transform J and K
     call tran4_gen(NBas,&
@@ -1495,7 +1521,7 @@ double precision, allocatable :: Eig0(:), Eig1(:), EigY0(:), EigY1(:)
 double precision :: Dens(NBas,NBas)
 double precision,parameter :: One = 1d0, Half = 0.5d0
 integer :: i,j,ij,ij1,ione,itwo 
-integer :: ip,iq,ind
+integer :: ip,iq,pq,ind
 double precision :: ACAlpha
 double precision :: ECASSCF,ETot,ECorr
 character(8) :: label
@@ -1719,33 +1745,33 @@ double precision, allocatable :: EigTmp(:), VecTmp(:)
    EigVecR = 0
    Eig = 0
    if(Mon%NoSt==1) then
-   !   !call ERPASYMM1(EigVecR,Eig,ABPlus,ABMin,NBas,Mon%NDimX)
-   !   ! temporary solution!!!
-   !   ! for exch-disp/exch-ind
+      !call ERPASYMM1(EigVecR,Eig,ABPlus,ABMin,NBas,Mon%NDimX)
+      ! temporary solution!!!
+      ! for exch-disp/exch-ind
 
-   !   print*, 'GROUND STATE!'
-   !   allocate(Mon%EigY(Mon%NDimX**2),Mon%EigX(Mon%NDimX**2),&
-   !            Mon%Eig(Mon%NDimX))
-   !   call ERPASYMMXY(Mon%EigY,Mon%EigX,Mon%Eig,ABPlus,ABMin,&
-   !                   Mon%Occ,Mon%IndN,Mon%NDimX,NBas)
+      print*, 'GROUND STATE!'
+      allocate(Mon%EigY(Mon%NDimX**2),Mon%EigX(Mon%NDimX**2),&
+               Mon%Eig(Mon%NDimX))
+      call ERPASYMMXY(Mon%EigY,Mon%EigX,Mon%Eig,ABPlus,ABMin,&
+                      Mon%Occ,Mon%IndN,Mon%NDimX,NBas)
 
-   !   print*, 'EigY:',norm2(Mon%EigY),norm2(Mon%EigX)
+      print*, 'EigY:',norm2(Mon%EigY),norm2(Mon%EigX)
 
-   !   Eig = Mon%Eig
-   !   do j=1,Mon%NDimX
-   !      do i=1,Mon%NDimX
-   !         ip = Mon%IndN(1,i)
-   !         iq = Mon%IndN(2,i)
-   !         EigVecR((j-1)*Mon%NDimX+i)=(Mon%CICoef(ip)-Mon%CICoef(iq))& 
-   !                                   *(Mon%EigY((j-1)*Mon%NDimX+i)-Mon%EigX((j-1)*Mon%NDimX+i))
-   !      enddo
-   !   enddo
+      Eig = Mon%Eig
+      do j=1,Mon%NDimX
+         do i=1,Mon%NDimX
+            ip = Mon%IndN(1,i)
+            iq = Mon%IndN(2,i)
+            EigVecR((j-1)*Mon%NDimX+i)=(Mon%CICoef(ip)-Mon%CICoef(iq))& 
+                                      *(Mon%EigY((j-1)*Mon%NDimX+i)-Mon%EigX((j-1)*Mon%NDimX+i))
+         enddo
+      enddo
 
-   !! TEST COUPLED ANDREAS
-   !!  Mon%EigX = EigVecR
-   !!  Mon%EigY = 0
+   ! TEST COUPLED ANDREAS
+   !  Mon%EigX = EigVecR
+   !  Mon%EigY = 0
 
-   !else
+   else
 
       allocate(Mon%EigY(Mon%NDimX**2),Mon%EigX(Mon%NDimX**2),&
                Mon%Eig(Mon%NDimX))
@@ -1983,8 +2009,59 @@ elseif(Flags%ISERPA==2) then
    !     Mon%Occ,NBas,Mon%NDimX,Mon%NDimN)
   
 ! reduced version
-    call PINOVECRED(EigVecR,Eig,INegExcit,ABPlus,ABMin,DMAT,DMATK, &
-                    EMAT,EMATM,NBas,Mon%NDimX,Mon%NDimN)
+   !call PINOVECRED(EigVecR,Eig,INegExcit,ABPlus,ABMin,DMAT,DMATK, &
+   !                 EMAT,EMATM,NBas,Mon%NDimX,Mon%NDimN)
+
+   !print*, 'EigVecR',norm2(EigVecR)
+
+   allocate(Mon%EigY((Mon%NDimX+Mon%NDimN)**2),Mon%EigX((Mon%NDimX+Mon%NDimN)**2),&
+            Mon%Eig(Mon%NDimX+Mon%NDimN))
+
+   call PINOVECREDXY(Mon%EigY,Mon%EigX,Mon%Eig,INegExcit,&
+                     ABPlus,ABMin,DMAT,DMATK,EMAT,EMATM,Mon%IndN,&
+                     NBas,Mon%NDimX,Mon%NDimN)
+
+  ! print*,'AAAA?',norm2(Mon%EigY),norm2(Mon%EigX)
+  Eig = Mon%Eig
+
+  ! prepare tables and dimensions 
+  DimEx = Mon%NDimX+Mon%NDimN
+  Mon%DimEx = DimEx
+
+  allocate(Mon%IndNx(2,DimEx))
+
+  do pq=1,DimEx
+     if(pq<=Mon%NDimX) then 
+        Mon%IndNx(1,pq) = Mon%IndN(1,pq)
+        Mon%IndNx(2,pq) = Mon%IndN(2,pq)
+     elseif(pq>Mon%NDimX) then
+        Mon%IndNx(1,pq) = pq - Mon%NDimX
+        Mon%IndNx(2,pq) = pq - Mon%NDimX
+     endif
+  enddo
+
+  ! prepare EigVecR for E2disp
+  do j=1,DimEx
+     if(j<=Mon%NDimX) then
+
+        ip = Mon%IndN(1,j)
+        iq = Mon%IndN(2,j)
+
+        do i=1,DimEx
+           EigVecR((i-1)*DimEx+j) = (Mon%CICoef(ip)-Mon%CICoef(iq))* &
+                                     (Mon%EigY((i-1)*DimEx+j)-Mon%EigX((i-1)*DimEx+j))
+        enddo
+
+     elseif(j>Mon%NDimX) then 
+
+        ii = j - Mon%NDimX
+        do i=1,DimEx
+           EigVecR((i-1)*DimEx+j) = Mon%EigY((i-1)*DimEx+j)/Mon%CICoef(ii)
+        enddo
+
+     endif
+  enddo
+
 !! the lines below are needed if EnePINO is called subsequently
 !   EigVecR(1:2*(NDim+NBasis)*2*(NDim+NBasis))=Zero 
 !   do i=1,NDimX+NDimN
@@ -2033,21 +2110,33 @@ integer :: EigNum
  write(LOUT,'(/,1x,a)') 'ENTERING FCI FOR 2-EL SYSTEMS...'
    
  allocate(Ctmp(NBas,NBas),Dtmp(NBas,NBas),NSymMO(NBas),TwoMOt(NInte2))
+ ! new for OptTwoP
+ allocate(Mon%AP(NInte1,NInte1),Mon%PP(NInte1))
+
+ Mon%AP = 0
+ Mon%PP = 0
 
  NSymMO = 1
  ETot=0
-
- print*, 'TEST!!!',Mon%EigFCI
- EigNum=Mon%EigFCI  
+ 
+ EigNum = Mon%EigFCI 
+ !print*, 'EigFCI-A',Mon%EigFCI
  !if(Mon%Monomer==1) then
  !   EigNum=1
  !elseif(Mon%Monomer==2) then
- !   EigNum=1
+ !   EigNum=2
  !endif
 
- call OptTwo1(ETot,Mon%PotNuc,URe,Mon%Occ,XOne,TwoMO,NSymMO, &
+! print*, 'IGEM:',Mon%IGem
+! call OptTwo1(ETot,Mon%PotNuc,URe,Mon%Occ,XOne,TwoMO,NSymMO, &
+!              Mon%CICoef,NBas,NInte1,NInte2,EigNum)
+
+ call OptTwoP(ETot,Mon%PotNuc,URe,Mon%Occ,Mon%AP,Mon%PP,XOne,TwoMO,NSymMO, &
               Mon%CICoef,NBas,NInte1,NInte2,EigNum)
-        
+
+ print*, 'AP:', norm2(Mon%AP)
+ print*, 'PP:', norm2(Mon%PP)
+
  ! Transform orbitals from MO to NO 
  call dgemm('N','T',NBas,NBas,NBas,1d0,Mon%CMO,NBas,URe,NBas,0d0,Ctmp,NBas)
 
@@ -2075,7 +2164,10 @@ implicit none
 
 integer,intent(in) :: NBas, ICASSCF
 type(SystemBlock) :: Mon
+integer :: NInte1
 integer :: i,j,ij,ind
+
+ NInte1 = NBas*(NBas+1)/2
 
  ! set IGem
  Mon%NGem=1
@@ -2153,8 +2245,20 @@ integer :: i,j,ij,ind
 
  Mon%NDimX = ind
 ! write(LOUT,*) Mon%NDim,Mon%NDimX,Mon%NDimN
- write(LOUT,*) 'init PINO!!!'
 
+! for OptTwoP procedures
+ allocate(Mon%IndNT(2,NInte1))
+ Mon%IndNT = 0
+ ij = 0
+ do j=1,NBas
+    do i=1,j
+       ij = ij + 1
+       Mon%IndNT(1,ij) = j
+       Mon%IndNT(2,ij) = i
+    enddo
+ enddo
+
+ write(LOUT,*) 'init PINO!!!'
 
 end subroutine init_pino
 
@@ -3603,6 +3707,20 @@ if(allocated(SAPT%monB%RDM2)) then
   deallocate(SAPT%monB%RDM2,SAPT%monB%RDM2Act)
   deallocate(SAPT%monB%Ind2)
 endif
+
+! for PINO only
+if(allocated(SAPT%monA%IndNx)) then
+   deallocate(SAPT%monA%IndNx)
+endif 
+if(allocated(SAPT%monB%IndNx)) then
+   deallocate(SAPT%monB%IndNx)
+endif 
+if(allocated(SAPT%monA%IndNT)) then
+   deallocate(SAPT%monA%IndNT)
+endif 
+if(allocated(SAPT%monB%IndNT)) then
+   deallocate(SAPT%monB%IndNT)
+endif 
 
 ! 2nd order exchange
 if(allocated(SAPT%monA%Eig)) then

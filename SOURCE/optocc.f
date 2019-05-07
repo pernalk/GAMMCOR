@@ -1087,6 +1087,8 @@ C
       Return
       End
 
+
+
 *Deck OptTwo
       Subroutine OptTwo(ETot,URe,Occ,XOne,TwoEl,NSymMO,
      $ NBasis,NInte1,NInte2,NoEig)
@@ -2312,6 +2314,10 @@ C     WRITE CICoef FOR SAPT
       CISapt(I) = CICoef(I)
       Enddo
 
+C      Do I=1,NBasis
+C         Print*, I, IGem(I)
+C      EndDo
+
       Return
       End
 
@@ -2612,6 +2618,165 @@ C     WRITE CICoef FOR SAPT
       Return
       End
 
+*Deck OptTwoP
+      Subroutine OptTwoP(ETot,ENuc,URe,Occ,
+     $ AP,PP, 
+     $ XOne,TwoEl,NSymMO,
+     $ CISapt,NBasis,NInte1,NInte2,NoEig)
+C
+C     OPTIMIZATION ALGORITHM FOR TWO-ELECTRON SYSTEMS
+C     THE WHOLE DENISTY MATRIX IS FOUND IN ONE STEP
+C
+      Implicit Real*8 (A-H,O-Z)
+C
+      Parameter(Zero=0.0D0,Half=0.50D0,One=1.0D0,Two=2.0D0,Four=4.0D0)
+C
+      Character*60 FMultTab
+      Include 'commons.inc'
+C
+      Dimension URe(Nbasis,NBasis),Occ(NBasis),XOne(NInte1),
+     $ TwoEl(NInte2),NSymMO(NBasis),CISapt(NBasis),MultpC(15,15)
+C
+C     LOCAL ARRAYS
+C
+      Dimension AP(NInte1,NInte1),PP(NInte1),PWork(NInte1)
+C
+      IAB=0
+      Do IA=1,NBasis
+      Do IB=1,IA
+      IAB=IAB+1
+C
+      FAB=One
+      If(IA.Eq.IB) FAB=SQRT(Half)
+C
+      ICD=0
+      Do IC=1,NBasis
+      Do ID=1,IC
+      ICD=ICD+1
+      FCD=One
+      If(IC.Eq.ID) FCD=SQRT(Half)
+C
+      AP(IAB,ICD)=TwoEl(NAddr3(IA,IC,ID,IB))+TwoEl(NAddr3(IA,ID,IC,IB))
+      IAC=(Max(IA,IC)*(Max(IA,IC)-1))/2+Min(IA,IC)
+      IAD=(Max(IA,ID)*(Max(IA,ID)-1))/2+Min(IA,ID)
+      IBC=(Max(IC,IB)*(Max(IC,IB)-1))/2+Min(IC,IB)
+      IBD=(Max(ID,IB)*(Max(ID,IB)-1))/2+Min(ID,IB)
+C
+      If(IB.Eq.ID) AP(IAB,ICD)=AP(IAB,ICD)+XOne(IAC)
+      If(IA.Eq.ID) AP(IAB,ICD)=AP(IAB,ICD)+XOne(IBC)
+      If(IB.Eq.IC) AP(IAB,ICD)=AP(IAB,ICD)+XOne(IAD)
+      If(IA.Eq.IC) AP(IAB,ICD)=AP(IAB,ICD)+XOne(IBD)
+C
+      AP(IAB,ICD)=FAB*FCD*AP(IAB,ICD)
+C
+      EndDo
+      EndDo
+      EndDo
+      EndDo
+C
+      Write(6,'(/,X,
+     $''DIAGONALIZATION IN THE TWO-ELECTRON FUNCTIONAL OPTIMIZATION'')')
+C
+      Call Diag8(AP,NInte1,NInte1,PP,PWork)
+      ETot=PP(NoEig)
+C
+      Write(6,'(/,X,
+     $ ''RESULTS FROM THE TWO-ELECTRON FUNCTIONAL OPTIMIZATION'')')
+C
+      Write(6,'(/,X,''State no'',I3,'' Total Energy'',F16.10,/)') NoEig,
+     $ ETot+ENuc
+C
+      IAB=0
+      Do IA=1,NBasis
+      Do IB=1,IA
+      IAB=IAB+1
+      PWork(IAB)=AP(NoEig,IAB)
+C
+      If(IA.Eq.IB) PWork(IAB)=SQRT(Two)*PWork(IAB)
+      EndDo
+      EndDo
+      Call CpySym(URe,PWork,NBasis)
+      Call Diag8(URe,NBasis,NBasis,Occ,PWork)
+C
+      Sum=Zero
+      Do I=1,NBasis
+      CICoef(I)=Occ(I)
+      Occ(I)=Occ(I)**2
+      Sum=Sum+Occ(I)
+      EndDo
+      Do I=1,NBasis
+      Occ(I)=Occ(I)/Sum
+      CICoef(I)=CICoef(I)/Sqrt(Sum)
+      EndDo
+C
+      Call SortOcc(Occ,URe,NBasis)
+C
+      Write(6,'('' COEFFICIENTS AND ORBITAL OCCUPANCIES'')')
+      Do 100 I=1,NBasis
+  100 Write(6,'(X,I3,2E16.6)') I,CICoef(I),Occ(I)
+C
+C     WRITE CICoef FOR SAPT
+      Do I=1,NBasis
+      CISapt(I) = CICoef(I)
+      EndDo
+C
+C     TRANSFORM ALL P VECTORS (STATES) TO NO's OF THE NoEig's STATES
+C
+      Do INU=1,NInte1 
+C
+C     SAVE IN PP EXCITATION ENERGIES FROM THE STATE NoEig
+C
+      PP(INU)=PP(INU)-ETot
+C
+      IAB=0
+      Do IA=1,NBasis
+      Do IB=1,IA
+      IAB=IAB+1
+      PWork(IAB)=AP(INU,IAB)
+C
+      If(IA.Eq.IB) PWork(IAB)=SQRT(Two)*PWork(IAB)
+      EndDo
+      EndDo
+C
+      IJ=0
+      Do I=1,NBasis
+      Do J=1,I
+      IJ=IJ+1
+C
+      AP(INU,IJ)=Zero
+C
+      Do IA=1,NBasis
+      Do IB=1,NBasis
+      IAB=(Max(IA,IB)*(Max(IA,IB)-1))/2+Min(IA,IB)
+      AP(INU,IJ)=AP(INU,IJ)+SQRT(Half)*URe(I,IA)*URe(J,IB)*PWork(IAB)
+      EndDo
+      EndDo
+C
+C check
+c      If(PP(INU).Lt.Zero) Write(*,*)'check AP',I,J,AP(INU,IJ)
+C
+      EndDo   
+      EndDo
+C
+C     GET THE NORM AND PRINT (FOR CHECKING)
+C
+c      PNorm=Zero
+c      IAB=0
+c      Do IA=1,NBasis
+c      Do IB=1,IA
+c      IAB=IAB+1
+c      Factor=Two
+c      If(IA.Eq.IB) Factor=One
+c      PNorm=PNorm+Factor*AP(INU,IAB)**2
+c      EndDo
+c      EndDo
+C
+c      Write(*,*)'INU, ExcitEn, PNorm',INU,PP(INU),PNorm 
+C     INU
+      EndDo
+C
+      Return
+      End
 
 
 

@@ -2139,7 +2139,7 @@ C
       EndDo
 C
       If(NDimB.Ne.0) Then
-      Print*, 'AV-KA',norm2(ABPLUS(1:NDimB**2)),norm2(ABMIN(1:NDimB**2))
+C      Print*, 'AV-KA',norm2(ABPLUS(1:NDimB**2)),norm2(ABMIN(1:NDimB**2))
       If(NoSt.Eq.1) Then 
       Call ERPASYMM0(EigY(NFree2),EigX(NFree2),Eig(NFree1),ABPLUS,ABMIN,
      $ NDimB)
@@ -3107,6 +3107,9 @@ C
 C
 C     A ROUTINE FOR COMPUTING AC INTEGRAND
 C
+      use abmat
+      use abfofo
+C
       Implicit Real*8 (A-H,O-Z)
 C
       Character*60 FMultTab,Title
@@ -3159,8 +3162,33 @@ C
 C     FIND THE 0TH-ORDER EPSILONS
 C
       ACAlpha=Zero
+C
+      If(ITwoEl.Eq.1) Then
       Call ACABMAT0(ABPLUS,ABMIN,URe,Occ,XOne,TwoNO,
      $ NBasis,NDim,NInte1,NInte2,NGem,ACAlpha,1)
+C
+      ElseIf(ITwoEl.Eq.2) Then
+C
+      Call LookUp_mithap(NAct,INAct,Occ,
+     $                  IndAux,IndP,IndN,IndX,NDimX,NDim,NBasis)
+      Print*, 'NAct,INAct',NAct,INAct,NDimX,NDim,NGem
+
+      Call ACABMAT0_mithap(ABPLUS,ABMIN,URe,Occ,XOne,
+     $            IndN,IndX,IGem,CICoef,
+     $            NAct,INAct,NBasis,NDim,NDimX,NInte1,NGem,
+     $            'TWOMO',0,ACAlpha,1)
+
+      ElseIf(ITwoEl.Eq.3) Then
+C
+      Call LookUp_mithap(NAct,INAct,Occ,
+     $                  IndAux,IndP,IndN,IndX,NDimX,NDim,NBasis)
+C
+      Call ACABMAT0_FOFO(ABPLUS,ABMIN,URe,Occ,XOne,
+     $            IndN,IndX,IGem,CICoef,
+     $            NAct,INAct,NBasis,NDim,NDimX,NInte1,NGem,
+     $            'TWOMO','FFOO','FOFO',0,ACAlpha,1)
+C
+      EndIf
 C
       Do I=1,NDim*NDim
       AMAT(I)=ABPLUS(I)
@@ -3186,8 +3214,29 @@ C
       EndDo
 C
       ACAlpha=One
+      If(ITwoEl.Eq.1) Then
       Call ACABMAT0(ABPLUS,ABMIN,URe,Occ,XOne,TwoNO,
      $ NBasis,NDim,NInte1,NInte2,NGem,ACAlpha,1)
+C
+      ElseIf(ITwoEl.Eq.2) Then
+C
+      Call ACABMAT0_mithap(ABPLUS,ABMIN,URe,Occ,XOne,
+     $            IndN,IndX,IGem,CICoef,
+     $            NAct,INAct,NBasis,NDim,NDimX,NInte1,NGem,
+     $            'TWOMO',0,ACAlpha,1)
+C
+      ElseIf(ITwoEl.Eq.3) Then
+C
+C      TEST!
+C      ACAlpha=sqrt(2d0)/2.d0
+C      Print*, 'ACAlpha',ACAlpha
+C
+      Call ACABMAT0_FOFO(ABPLUS,ABMIN,URe,Occ,XOne,
+     $            IndN,IndX,IGem,CICoef,
+     $            NAct,INAct,NBasis,NDim,NDimX,NInte1,NGem,
+     $            'TWOMO','FFOO','FOFO',0,ACAlpha,1)
+C 
+      EndIf
 C
 C     AMAT AND BMAT WILL INCLUDE 1ST-ORDER A+ AND A- MATRICES, RESPECTIVELY
 C
@@ -3240,6 +3289,8 @@ C
       ECorr=Zero
       ECorr0=Zero
 C
+      If(ITwoEl.Eq.1) Then
+C
       Do I=1,NDimX
 C
       IP=IndN(1,I)
@@ -3290,6 +3341,24 @@ C
       EndDo
       EndDo
 C 
+      ElseIf(ITwoEl.Eq.2) Then
+
+      Call ECorrAC0GVB_mithap(ECorr0,ECorr,AMAT,BMAT,ABPLUS,
+     $                        EigVY2,Occ,C,Eig,
+     $                        IndP,IndN,IndX,IGem,
+     $                        'TWOMO',NDim,NDimX,NGem,NBasis)
+C
+      ElseIf(ITwoEl.Eq.3) Then
+
+      Call ECorrAC0GVB_FOFO(ECorr0,ECorr,AMAT,BMAT,ABPLUS,
+     $                        EigVY2,Occ,C,Eig,
+     $                        IndP,IndN,IndX,IGem,
+     $                        'FOFO',NAct,INAct,NDim,NDimX,NGem,NBasis)
+C
+C      Write(6,'(1x,a)') "SORRY!"
+C      Stop
+      EndIf
+
       ECorr=ECorr+ECorr0
 C
       Write
@@ -4317,3 +4386,299 @@ C
       Return
       End
 
+      Subroutine LookUp_mithap(NAct,INAct,Occ,IndAux,
+     $                         IndP,IndN,IndX,NDimX,NDim,NBasis)
+C
+      Implicit Real*8 (A-H,O-Z)
+C
+      Integer :: IndAux(NBasis)
+      Integer :: IndX(NDim),IndN(2,NDim)
+      Dimension :: IndP(NBasis,NBasis)
+      Dimension :: Occ(NBasis)
+      Parameter(Zero=0.D0, Half=0.5D0, One=1.D0, Two=2.D0, Four=4.D0)
+      Parameter(Delta=1.D-6)
+C     
+      Include 'commons.inc'
+
+C
+      INAct = 0
+      Do I=1,NBasis
+      If(IndAux(I)/=0) exit
+       INAct = INAct + 1
+      EndDo
+      NVir = 0
+      Do I=NBasis,1,-1
+      If(IndAux(I)/=2) exit
+      NVir = NVir + 1
+      EndDo
+      NAct = NBasis - INAct - NVir
+C
+C     CONSTRUCT LOOK-UP TABLES
+C
+      IJ=0
+      Ind=0
+      Do I=1,NBasis
+      Do J=1,I-1
+C
+      IJ=IJ+1
+      IndP(I,J)=0
+      IndP(J,I)=0
+C
+      Ind=Ind+1
+      IndX(Ind)=IJ
+      IndN(1,Ind)=I
+      IndN(2,Ind)=J
+C
+      If(IndAux(I)+IndAux(J).Ne.0.And.IndAux(I)+IndAux(J).Ne.4) Then
+C
+C     do not correlate active degenerate orbitals if from different
+C     geminals
+      If((IGem(I).Ne.IGem(J)).And.(IndAux(I).Eq.1).And.(IndAux(J).Eq.1)
+     $ .And.(Abs(Occ(I)-Occ(J))/Occ(I).Lt.1.D-2) ) Then
+C      Write(*,*)"Discarding nearly degenerate pair",I,J
+      Else
+C    
+      If((IFlCore.Eq.1).Or.
+     $ (IFlCore.Eq.0.And.Occ(I).Ne.One.And.Occ(J).Ne.One)) Then
+C
+      IndP(I,J)=1
+      IndP(J,I)=1
+      EndIf
+C
+      EndIf
+C
+      EndIf
+C
+      EndDo
+      EndDo
+C
+      NDimX=Ind
+C
+      end Subroutine LookUp_mithap
+
+      Subroutine ECorrAC0GVB_mithap(ECorr0,ECorr,AMAT,BMAT,ABPLUS,
+     $                 EigVY2,Occ,C,Eig,IndP,IndN,IndX,IGem,
+     $                 IntFile,NDim,NDimX,NGem,NBasis)
+C
+      use tran
+C
+      Implicit None
+
+      Integer :: NDim,NDimX,NGem,NBasis
+      Integer :: IndX(NDim),IndN(2,NDim),IndP(NBasis,NBasis),
+     $           IGem(NBasis)
+      Character(*) :: IntFile
+      Double Precision :: ECorr0,ECorr
+      Double Precision :: Occ(NBasis),C(NBasis),Eig(NDim),
+     $                    EigVY2(NBasis*(NBasis-1)),
+     $                    AMAT(NDimX,NDimX),BMAT(NDimX,NDimX),
+     $                    ABPLUS(NDimX,NDimX)
+C
+      Integer :: iunit
+      Integer :: ip,iq,ir,is,ipq,irs
+      Integer :: i,j,k,l,kl
+      Integer :: pos(NBasis,NBasis)
+      Logical :: AuxCoeff(NGem,NGem,NGem,NGem)
+      Double Precision :: Cpq,Crs,Aux,EPSJI
+      Double Precision,Allocatable :: Work(:),ints(:,:)
+
+      pos = 0
+      Do I=1,NDimX
+      pos(IndN(1,I),IndN(2,I)) = IndX(I)
+      EndDo
+C
+      AuxCoeff = .true.
+      Do l=1,NGem
+      Do k=1,NGem
+      Do j=1,NGem
+      Do i=1,NGem
+      If((i==j).and.(j==k).and.(k==l)) Then
+         AuxCoeff(i,j,k,l) = .false.
+      EndIf
+      EndDo
+      EndDo
+      EndDo
+      EndDo
+C
+      Allocate(work(NBasis**2),ints(NBasis,NBasis))
+C     FULL INTS
+      Open(newunit=iunit,file=trim(IntFile),status='OLD',
+     $     access='DIRECT',recl=8*NBasis*(NBasis+1)/2)
+      kl = 0
+      do l=1,NBasis
+         do k=1,l
+            kl = kl + 1
+            if(pos(l,k)/=0) then
+              irs = pos(l,k)
+              ir = l
+              is = k
+              read(iunit,rec=kl) work(1:NBasis*(NBasis+1)/2)
+              call triang_to_sq2(work,ints,NBasis)
+
+              Crs = (C(l)+C(k))*IndP(l,k)
+
+              If(Occ(ir).Gt.Occ(is)) Then
+              Aux=Occ(is)*(Occ(ir)-1d0)
+              Else
+              Aux=Occ(ir)*(Occ(is)-1d0)
+              EndIf
+  
+C             0th-order correlation only if (IP,IQ) pair is allowed
+              If(IGem(ir).Ne.IGem(is)) Then
+                 ECorr0 = ECorr0 + 2d0*Aux*ints(ir,is)*IndP(ir,is)
+              EndIf
+ 
+              do j=1,NBasis
+                 do i=1,j
+                    if(pos(j,i)/=0) then
+                      ipq = pos(j,i)
+                      ip = j
+                      iq = i
+                      Cpq = (C(j)+C(i))*IndP(j,i)
+
+                      EPSJI=Eig(IRS)+Eig(IPQ)
+                      If(EPSJI/=0d0) Then
+                         EPSJI=1d0/EPSJI 
+                      Else
+                         EPSJI=0d0
+                      EndIf
+
+                      Aux = (0.5d0*AMAT(irs,ipq) 
+     $                    -  2d0*EigVY2(irs)*EigVY2(ipq)*BMAT(irs,ipq))
+     $                    *  EPSJI
+
+                     if(AuxCoeff(IGem(ip),IGem(iq),
+     $                           IGem(ir),IGem(is))) then
+
+                         ECorr = ECorr + Cpq*Crs*Aux*ints(ip,iq)
+                      EndIf
+
+                    endif
+                 enddo
+              enddo 
+
+            endif
+         enddo
+       enddo
+
+      Close(iunit)
+
+      Deallocate(ints,work)
+C
+      End Subroutine ECorrAC0GVB_mithap
+
+      Subroutine ECorrAC0GVB_FOFO(ECorr0,ECorr,AMAT,BMAT,ABPLUS,
+     $                 EigVY2,Occ,C,Eig,IndP,IndN,IndX,IGem,
+     $                 IntKFile,NAct,INActive,NDim,NDimX,NGem,NBasis)
+C
+      use tran
+C
+      Implicit None
+
+      Integer :: NAct,INActive,NDim,NDimX,NGem,NBasis
+      Integer :: IndX(NDim),IndN(2,NDim),IndP(NBasis,NBasis),
+     $           IGem(NBasis)
+      Character(*) :: IntKFile
+      Double Precision :: ECorr0,ECorr
+      Double Precision :: Occ(NBasis),C(NBasis),Eig(NDim),
+     $                    EigVY2(NBasis*(NBasis-1)),
+     $                    AMAT(NDimX,NDimX),BMAT(NDimX,NDimX),
+     $                    ABPLUS(NDimX,NDimX)
+C
+      Integer :: iunit
+      Integer :: NOccup
+      Integer :: ip,iq,ir,is,ipq,irs
+      Integer :: i,j,k,l,kl
+      Integer :: pos(NBasis,NBasis)
+      Logical :: AuxCoeff(NGem,NGem,NGem,NGem)
+      Double Precision :: Cpq,Crs,Aux,EPSJI
+      Double Precision,Allocatable :: Work(:),ints(:,:)
+
+      NOccup = NAct + INActive
+
+      pos = 0
+      Do I=1,NDimX
+      pos(IndN(1,I),IndN(2,I)) = IndX(I)
+      EndDo
+C
+      AuxCoeff = .true.
+      Do l=1,NGem
+      Do k=1,NGem
+      Do j=1,NGem
+      Do i=1,NGem
+      If((i==j).and.(j==k).and.(k==l)) Then
+         AuxCoeff(i,j,k,l) = .false.
+      EndIf
+      EndDo
+      EndDo
+      EndDo
+      EndDo
+C
+      Allocate(work(NBasis**2),ints(NBasis,NBasis))
+C     FOFO INTS
+      Open(newunit=iunit,file=trim(IntKFile),status='OLD',
+     $      access='DIRECT',recl=8*NBasis*NOccup)
+      
+      kl = 0
+      do k=1,NOccup
+         do l=1,NBasis
+            kl = kl + 1
+            if(pos(l,k)/=0) then
+              irs = pos(l,k)
+              ir = l
+              is = k
+              read(iunit,rec=kl) work(1:NBasis*NOccup)
+              do j=1,NOccup
+                 do i=1,NBasis
+                    ints(i,j) = work((j-1)*NBasis+i)
+                 enddo
+              enddo
+              ints(:,NOccup+1:NBasis) = 0
+
+              Crs = (C(l)+C(k))*IndP(l,k)
+
+              If(Occ(ir).Gt.Occ(is)) Then
+              Aux=Occ(is)*(Occ(ir)-1d0)
+              Else
+              Aux=Occ(ir)*(Occ(is)-1d0)
+              EndIf
+  
+C             0th-order correlation only if (IP,IQ) pair is allowed
+              If(IGem(ir).Ne.IGem(is)) Then
+                 ECorr0 = ECorr0 + 2d0*Aux*ints(ir,is)*IndP(ir,is)
+              EndIf
+
+              do j=1,NBasis
+                 do i=1,j
+                    if(pos(j,i)/=0) then
+                      ipq = pos(j,i)
+                      ip = j
+                      iq = i
+                      Cpq = (C(j)+C(i))*IndP(j,i)
+
+                      EPSJI=Eig(IRS)+Eig(IPQ)
+                      If(EPSJI/=0d0) Then
+                         EPSJI=1d0/EPSJI 
+                      Else
+                         EPSJI=0d0
+                      EndIf
+
+                      Aux = (0.5d0*AMAT(irs,ipq) 
+     $                    -  2d0*EigVY2(irs)*EigVY2(ipq)*BMAT(irs,ipq))
+     $                    *  EPSJI
+
+                     if(AuxCoeff(IGem(ip),IGem(iq),
+     $                           IGem(ir),IGem(is))) then
+
+                         ECorr = ECorr + Cpq*Crs*Aux*ints(ip,iq)
+                      EndIf
+
+                    endif
+                 enddo
+              enddo 
+
+            endif
+         enddo
+      enddo
+
+      End Subroutine ECorrAC0GVB_FOFO

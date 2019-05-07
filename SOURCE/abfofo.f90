@@ -830,6 +830,418 @@ deallocate(ints,work2,work1)
 
 end subroutine AB_CAS_FOFO  
 
+subroutine ACABMAT0_FOFO(AMAT,BMAT,URe,Occ,XOne, &
+                         IndN,IndX,IGem,C, &
+                         NAct,INActive,NBasis,NDim,NDimX,NInte1,NGem, &
+                         IntFileName,IntJFile,IntKFile,ISAPT,ACAlpha,IFlag)
+!     IFlag = 1 - AMAT AND BMAT WILL CONTAIN (A+B)/C+/C+ AND (A-B)/C-/C-, RESPECTIVELY
+!             0 - AMAT AND BMAT WILL CONTAIN A ANB B MATRICES, RESPECTIVELY
+!
+!     ACAlpha - Alpha-connection parameter in AC
+!     HNO AND TwoMO are modified to correspond to an alpha-Hamiltonian
+!
+!     STRAIGHTFORWARD IMPLEMENTATION OF THE AMAT AND BMAT DEFINITIONS (NO SPECIAL CASES CONSIDERED) 
+!     
+!     COMPUTE THE A+B AND A-B MATRICES IN ERPA WITH APSG APPROXIMATION
+!
+!     NESTED COMMUTATOR 
+!
+implicit none
+
+integer,intent(in) :: NAct,INActive,NBasis,NDim,NDimX,NInte1,ISAPT,NGem
+character(*) :: IntJFile,IntKFile,IntFileName
+double precision,intent(out) :: AMAT(NDimX,NDimX),BMAT(NDimX,NDimX)
+double precision,intent(in)  :: URe(NBasis,NBasis),Occ(NBasis),XOne(NInte1),C(NBasis)
+double precision,intent(in)  :: ACAlpha
+integer,intent(in) :: IndN(2,NDim),IndX(NDim)
+integer,intent(in) :: IGem(NBasis),IFlag
+
+integer :: i,j,k,l,ij,kl,kk,ll,klround
+integer :: ip,iq,ir,is,it,iu,iw,ipq,irs,ICol,IRow
+integer :: iunit,iunit1,iunit2,ios
+integer :: NOccup
+integer :: IGemType
+integer :: Ind(NBasis),AuxInd(3,3),pos(NBasis,NBasis)
+double precision :: HNO(NBasis,NBasis),HNOCoef
+double precision :: AuxCoeff(NGem,NGem,NGem,NGem),AuxVal,val
+double precision :: OccProd(NBasis,NBasis),CProd(NBasis,NBasis)
+double precision :: AuxH(NBasis,NBasis,NGem),AuxXC(NBasis,NBasis,NGem)
+double precision :: SaveA,SaveB
+double precision,allocatable :: work1(:),work2(:)
+double precision,allocatable :: ints(:,:)
+double precision,parameter :: Delta = 1.d-6
+
+if(ISAPT==1) then
+   write(6,'(1x,a)') 'Computing response-my'
+else
+   write(6,'(/,X,"***** COMPUTING AMAT, BMAT IN ACABMAT0 *****",/)')
+endif
+
+AMAT = 0
+BMAT = 0
+
+! set dimensions
+NOccup = NAct + INActive
+
+allocate(work1(NBasis**2),work2(NBasis**2),ints(NBasis,NBasis))
+
+call triang_to_sq(XOne,work1,NBasis)
+call dgemm('N','N',NBasis,NBasis,NBasis,1d0,URe,NBasis,work1,NBasis,0d0,work2,NBasis)
+call dgemm('N','T',NBasis,NBasis,NBasis,1d0,work2,NBasis,URe,NBasis,0d0,HNO,NBasis)
+call sq_symmetrize(HNO,NBasis)
+
+print*, 'HNO-test',norm2(HNO)
+
+do j=1,NBasis
+   do i=1,NBasis
+      if(IGem(i)/=IGem(j)) HNO(i,j) = ACAlpha*HNO(i,j)
+   enddo
+enddo
+
+do l=1,NGem
+   do k=1,NGem
+      do j=1,NGem
+         do i=1,NGem
+            if((i==j).and.(j==k).and.(k==l)) then
+               AuxCoeff(i,j,k,l) = 1
+            else
+               AuxCoeff(i,j,k,l) = ACAlpha
+            endif
+         enddo
+      enddo
+   enddo
+enddo
+
+pos = 0
+do i=1,NDimX
+   pos(IndN(1,i),IndN(2,i)) = i
+enddo
+
+CProd = 0
+OccProd = 0
+do j=1,NBasis
+   do i=1,NBasis
+      if(IGem(i)==IGem(j)) then
+         CProd(i,j) = C(i)*C(j)         
+      else
+         OccProd(i,j) = Occ(i)*Occ(j)
+      endif
+   enddo
+enddo
+
+AuxH = 0
+AuxXC = 0
+
+HNOCoef = 1 - ACAlpha
+
+open(newunit=iunit1,file=trim(IntKFile),status='OLD', &
+     access='DIRECT',recl=8*NBasis*NOccup)
+
+! exchange loop (FO|FO)
+kl = 0
+do l=1,NOccup
+   do k=1,NBasis
+      kl = kl + 1
+      read(iunit1,rec=kl) work1(1:NBasis*NOccup)
+      do j=1,NOccup
+         do i=1,NBasis
+            ints(i,j) = work1((j-1)*NBasis+i)
+         enddo
+      enddo
+      ints(:,NOccup+1:NBasis) = 0
+
+      ! CONSTRUCT ONE-ELECTRON PART OF THE AC ALPHA-HAMILTONIAN
+      if(IGem(k)/=IGem(l)) then
+         val = HNOCoef*Occ(l) 
+         do i=1,NBasis
+            if(IGem(i)==IGem(k)) HNO(i,k) = HNO(i,k) - val*ints(i,l)
+         enddo
+      endif
+
+
+      do IGemType=1,NGem-1
+
+         if(IGem(l)==IGemType) then
+            do i=1,NBasis
+                AuxXC(i,k,IGemType) = AuxXC(i,k,IGemType) + AuxCoeff(IGem(i),IGem(l),IGem(l),IGem(k))*C(l)*ints(i,l)
+            enddo
+         else
+            do i=1,NBasis
+                AuxH(i,k,IGemType) = AuxH(i,k,IGemType) - AuxCoeff(IGem(i),IGem(l),IGem(l),IGem(k))*Occ(l)*ints(i,l)
+            enddo
+         endif
+
+      enddo
+
+      ! INTERGEMINAL PART
+
+      ir = k
+      is = l
+      irs = pos(ir,is)
+      if(irs>0) then
+         do iq=1,NOccup
+            do ip=1,NBasis
+               ipq = pos(ip,iq)
+               if(ipq>0) then
+
+                  val = 2*AuxCoeff(IGem(ip),IGem(iq),IGem(ir),IGem(is)) &
+                       *(-OccProd(ip,ir)+OccProd(ip,is)+OccProd(iq,ir)-OccProd(iq,is))*ints(ip,iq)   
+                  BMAT(ipq,irs) = BMAT(ipq,irs) + val
+                  AMAT(ipq,irs) = AMAT(ipq,irs) - val
+
+               endif
+            enddo    
+         enddo
+      endif
+
+      ip = k
+      is = l
+      do iq=1,min(ip-1,NOccup)
+         ipq = pos(ip,iq)
+         if(ipq>0) then
+            do ir=is+1,NBasis
+               irs = pos(ir,is)
+               if(irs>0) then
+ 
+                  val = -AuxCoeff(IGem(ip),IGem(iq),IGem(ir),IGem(is)) &
+                       *(-OccProd(ip,ir)+OccProd(ip,is)+OccProd(iq,ir)-OccProd(iq,is))*ints(ir,iq)
+                  BMAT(ipq,irs) = BMAT(ipq,irs) + val
+ 
+               endif
+            enddo
+         endif
+      enddo
+
+      ! INTRAGEMINAL PART
+
+      ir = k
+      iq = l
+      do ip=iq+1,NBasis
+         ipq = pos(ip,iq)
+         if(ipq>0) then
+            do is=1,min(ir-1,NOccup)
+               irs = pos(ir,is)
+               if(irs>0) then
+
+                  val = AuxCoeff(IGem(ip),IGem(iq),IGem(ir),IGem(is)) &
+                       *(CProd(iq,ir)+CProd(ip,is))*ints(ip,is)
+                  BMAT(ipq,irs) = BMAT(ipq,irs) + val
+                  
+               endif
+            enddo
+         endif
+      enddo
+
+      ip = k
+      is = l
+      do iq=1,min(ip-1,NOccup)
+         ipq = pos(ip,iq)
+         if(ipq>0) then
+            do ir=is+1,NBasis
+               irs = pos(ir,is)
+               if(irs>0) then
+
+                  val = AuxCoeff(IGem(ip),IGem(iq),IGem(ir),IGem(is)) &
+                       *(CProd(ip,ir)+CProd(iq,is))*ints(ir,iq)
+                  AMAT(ipq,irs) = AMAT(ipq,irs) + val
+                  
+               endif
+            enddo
+         endif
+      enddo
+
+
+   enddo
+enddo
+
+close(iunit1)
+
+open(newunit=iunit2,file=trim(IntJFile),status='OLD', &
+     access='DIRECT',recl=8*NBasis**2)
+
+! Coulomb loop (FF|OO)
+kl = 0
+do l=1,NOccup
+   do k=1,NOccup
+      kl = kl + 1
+      read(iunit2,rec=kl) work1(1:NBasis**2)
+      do j=1,NBasis
+         do i=1,NBasis
+            ints(i,j) = work1((j-1)*NBasis+i)
+         enddo
+      enddo
+
+      ! CONSTRUCT ONE-ELECTRON PART OF THE AC ALPHA-HAMILTONIAN
+
+      if(k==l) then
+
+         val = 2*HNOCoef*Occ(k)
+         do j=1,NBasis
+            if(IGem(j)/=IGem(k)) then
+               do i=1,NBasis
+                  if(IGem(i)==IGem(j)) HNO(i,j) = HNO(i,j) + val*ints(i,j)
+               enddo
+            endif   
+         enddo
+
+         do IGemType=1,NGem
+            if(IGem(k)/=IGemType) then
+               val = 2*Occ(k)
+               do j=1,NBasis
+                  do i=1,NBasis
+                     AuxH(i,j,IGemType) = AuxH(i,j,IGemType) & 
+                                        + val*AuxCoeff(IGem(i),IGem(j),IGem(k),IGem(k))*ints(i,j)
+                  enddo
+               enddo
+            endif
+         enddo
+
+      endif
+
+      ! INTERGEMINAL PART
+
+      iq = k
+      is = l
+      do ip=iq+1,NBasis
+         ipq = pos(ip,iq)
+         if(ipq>0) then
+            do ir=is+1,NBasis
+               irs = pos(ir,is)
+               if(irs>0) then
+ 
+                  val = -AuxCoeff(IGem(ip),IGem(iq),IGem(ir),IGem(is)) &
+                       *(-OccProd(ip,ir)+OccProd(ip,is)+OccProd(iq,ir)-OccProd(iq,is))*ints(ir,ip)
+                  AMAT(ipq,irs) = AMAT(ipq,irs) - val
+ 
+               endif
+            enddo
+         endif
+      enddo
+
+      ! INTRAGEMINAL PART
+
+      iq = k
+      is = l
+      do ir=is+1,NBasis
+         irs = pos(ir,is)
+         if(irs>0) then
+            do ip=iq+1,NBasis
+               ipq = pos(ip,iq)
+               if(ipq>0) then
+
+                  val = AuxCoeff(IGem(ip),IGem(iq),IGem(ir),IGem(is)) &
+                       *(CProd(iq,ir)+CProd(ip,is))*ints(ip,ir)
+                  BMAT(ipq,irs) = BMAT(ipq,irs) + val
+                  
+               endif
+            enddo
+         endif
+      enddo
+
+      iq = k
+      is = l
+      do ir=is+1,NBasis
+         irs = pos(ir,is)
+         if(irs>0) then
+            do ip=iq+1,NBasis
+               ipq = pos(ip,iq)
+               if(ipq>0) then
+
+                  val = AuxCoeff(IGem(ip),IGem(iq),IGem(ir),IGem(is)) &
+                       *(CProd(ip,ir)+CProd(iq,is))*ints(ip,ir)
+                  AMAT(ipq,irs) = AMAT(ipq,irs) + val
+                  
+               endif
+            enddo
+         endif
+      enddo
+
+   enddo
+enddo
+
+close(iunit2)
+
+do ICol=1,NDimX
+   ip = IndN(1,ICol)
+   iq = IndN(2,ICol)
+   ipq = ICol
+ 
+   if(ip/=iq) then
+      do IRow=1,NDimX
+         ir = IndN(1,IRow)
+         is = IndN(2,IRow)
+         irs = IRow
+
+            val = 0
+            if(iq==ir) val = val &
+                 + (Occ(ir)-Occ(is))*HNO(ip,is) &
+                 + Occ(iq)*AuxH(ip,is,IGem(iq)) &
+                 - Occ(is)*AuxH(ip,is,IGem(is)) &
+                 - C(is)*AuxXC(ip,is,IGem(is))
+            if(ip==is) val = val &
+                 - (Occ(ir)-Occ(is))*HNO(iq,ir) &
+                 + Occ(ip)*AuxH(iq,ir,IGem(ip)) &
+                 - Occ(ir)*AuxH(iq,ir,IGem(ir)) &
+                 - C(ir)*AuxXC(iq,ir,IGem(ir))
+            if(ip==ir) val = val &
+                 - C(ip)*AuxXC(iq,is,IGem(ip))
+            if(iq==is) val = val &
+                 - C(iq)*AuxXC(ip,ir,IGem(iq))
+            BMAT(irs,ipq) = BMAT(irs,ipq) + val
+         
+            val = 0
+            if(ip==ir) val = val &
+                 + (Occ(ir)-Occ(is))*HNO(iq,is) &
+                 + Occ(ip)*AuxH(iq,is,IGem(ip)) &
+                 - Occ(is)*AuxH(iq,is,IGem(is)) &
+                 - C(is)*AuxXC(iq,is,IGem(is))
+            if(iq==is) val = val &
+                 - (Occ(ir)-Occ(is))*HNO(ip,ir) &
+                 + Occ(iq)*AuxH(ip,ir,IGem(iq)) &
+                 - Occ(ir)*AuxH(ip,ir,IGem(ir)) & 
+                 - C(ir)*AuxXC(ip,ir,IGem(ir))
+            if(iq==ir) val = val &
+                 - C(iq)*AuxXC(ip,is,IGem(iq))
+            if(ip==is) val = val &
+                 - C(ip)*AuxXC(iq,ir,IGem(ip))
+            AMAT(irs,ipq) = AMAT(irs,ipq) + val
+
+            if(IFlag/=0) then
+!!$               if(abs(abs(C(ip))-abs(C(iq)))<=Delta*abs(C(iq)).or.& 
+!!$                    abs(abs(C(ir))-abs(C(is)))<=Delta*abs(C(ir))) then
+!!$               
+!!$                  AMAT(irs,ipq) = 0
+!!$                  BMAT(irs,ipq) = 0
+!!$               else
+                  
+                  SaveA = AMAT(irs,ipq)
+                  SaveB = BMAT(irs,ipq)
+                  
+                  val = (C(ip) + C(iq))*(C(ir) + C(is))
+                  if(val==0) then
+                     AMAT(irs,ipq) = 0
+                  else
+                     AMAT(irs,ipq) = (SaveA+SaveB)/val
+                  endif
+                  val = (C(ip) - C(iq))*(C(ir) - C(is))
+                  if(val==0) then
+                     BMAT(irs,ipq) = 0
+                  else
+                     BMAT(irs,ipq) = (SaveA-SaveB)/val
+                  endif
+               endif
+!!$            endif
+                        
+         enddo
+      endif
+   enddo
+
+print*, "AB-my",norm2(AMAT),norm2(BMAT)
+
+deallocate(ints,work2,work1)
+
+end subroutine ACABMAT0_FOFO
+
 subroutine Y01CAS_FOFO(Occ,URe,XOne,ABPLUS,ABMIN, &
      propfile0,propfile1, & 
      IndN,IndX,IGemIN,NAct,INActive,NDimX,NBasis,NDim,NInte1, &
@@ -840,6 +1252,8 @@ subroutine Y01CAS_FOFO(Occ,URe,XOne,ABPLUS,ABMIN, &
 !
 !     IFlag0 = 1 - compute only 0th-order Y [EigY] and 0th-order omega [Eig] 
 !              0 - compute both 0th-order and 1st-order Y [EigY1] and omega [Eig1]
+use timing
+
 implicit none
 
 integer,intent(in) :: NAct,INActive,NDimX,NBasis,NDim,NInte1,NoSt
@@ -858,6 +1272,7 @@ integer :: iunit,ios
 integer :: iunit1,iunit2
 integer :: NOccup,NRDM2Act
 integer :: IGem(NBasis),Ind(NBasis),AuxInd(3,3),pos(NBasis,NBasis)
+logical :: EigChck(NDimX)
 double precision :: C(NBasis)
 double precision :: HNO(NBasis,NBasis),AuxI(NBasis,NBasis),AuxIO(NBasis,NBasis),WMAT(NBasis,NBasis)
 double precision :: AuxCoeff(3,3,3,3),AuxVal,val
@@ -877,7 +1292,11 @@ integer :: nAI(INActive),tmpAI(NAct,1:INActive),limAI(2,1:INActive)
 integer :: nAV(INActive+NAct+1:NBasis),tmpAV(NAct,INActive+NAct+1:NBasis),limAV(2,INActive+NAct+1:NBasis)
 integer :: nIV,tmpIV(INActive*(NBasis-NAct-INActive)),limIV(2)
 double precision,parameter :: Thresh = 1.D-12
+double precision :: Tcpu,Twall
 
+
+call clock('START',Tcpu,Twall)
+ 
 ABMIN  = 0
 if(present(ETot)) ETot = 0
 
@@ -1673,6 +2092,9 @@ do ICol=1,NDimX
       enddo
 enddo
 
+call clock('Y01CAS:ABMAT',Tcpu,Twall)
+call clock('START',Tcpu,Twall)
+
 EigY1 = 0
 EigY = 0
 
@@ -1773,6 +2195,8 @@ enddo
 
 deallocate(work1)
 
+call clock('Y01CAS:DIAG',Tcpu,Twall)
+call clock('START',Tcpu,Twall)
 
 if(IFlag0==1) return
 !return
@@ -1795,6 +2219,9 @@ call dgemm('T','N',NDimX,NDimX,NDimX,1d0,work1,NDimX,EigY1,NDimX,0d0,ABPLUS,NDim
 call dgemm('N','N',NDimX,NDimX,NDimX,1d0,ABMIN,NDimX,EigY,NDimX,0d0,work1,NDimX) 
 call dgemm('T','N',NDimX,NDimX,NDimX,1d0,work1,NDimX,EigY,NDimX,0d0,ABMIN,NDimX)
 
+call clock('Y01CAS:dgemm',Tcpu,Twall)
+call clock('START',Tcpu,Twall)
+
 if(.not.present(ECorr)) then
 ! this part for E2disp
 ! ------------------------------------------------------------------------------
@@ -1811,13 +2238,17 @@ do j=1,NDimX
             if(Abs(Eig(i)-Eig(j))>Thresh) then
                val = val + (ABPLUS(i,j)+ABMIN(i,j))/(Eig(j)-Eig(i))
             endif
-            do ii=1,NDimX
-               EigY1(ii,j) = EigY1(ii,j) + val*EigY(ii,i)
-            enddo
+            call daxpy(NDimX,val,EigY(:,i),1,EigY1(:,j),1)
+            !do ii=1,NDimX
+            !   EigY1(ii,j) = EigY1(ii,j) + val*EigY(ii,i)
+            !enddo
          endif
       enddo
    endif
 enddo
+
+ print*, 'AAAAA',norm2(EigY)
+ print*, 'Y1',norm2(EigY1)
 
  ! dump response to a file!
  open(newunit=iunit,file=propfile0,form='unformatted')
@@ -1841,25 +2272,39 @@ do i=1,NBasis
    C(i) = sign(sqrt(Occ(i)),Occ(i)-0.5d0)
 enddo
 
+EigChck = .true.
+do i=1,NDimX
+   if(Eig(i)==0d0) EigChck(i) = .false.
+enddo
+
 !print*, 'AB-MY',norm2(ABPLUS),norm2(ABMIN)
 EigY1 = 0
 do j=1,NDimX
-   if(Eig(j)/=0d0) then
+   !if(Eig(j)/=0d0) then
+   if(EigChck(j)) then
       do i=1,NDimX
-         if(Eig(i)/=0d0) then
+         !if(Eig(i)/=0d0) then
+         if(EigChck(i)) then
             val = 2d0*(ABPLUS(i,j)-ABMIN(i,j))/(Eig(i)+Eig(j))
-            do ii=1,NDimX
-               EigY1(ii,j) = EigY1(ii,j) + val*EigY(ii,i)
-            enddo
+            call daxpy(NDimX,val,EigY(:,i),1,EigY1(:,j),1)
+            !do ii=1,NDimX
+            !   EigY1(ii,j) = EigY1(ii,j) + val*EigY(ii,i)
+            !enddo
          endif
       enddo
    endif
 enddo
 !print*, 'FIRST',norm2(EigY1)
 
+call clock('Y01CAS:EigY1',Tcpu,Twall)
+call clock('START',Tcpu,Twall)
+
 ! second loop ...
 call dgemm('N','T',NDimX,NDimX,NDimX,1d0,EigY,NDimX,EigY1,NDimX,0d0,ABPLUS,NDimX)
 !print*, 'ABPLUS-MY',norm2(ABPLUS)
+
+call clock('Y01CAS:dgemm',Tcpu,Twall)
+call clock('START',Tcpu,Twall)
 
 pos = 0
 do i=1,NDimX
@@ -1945,6 +2390,8 @@ deallocate(ints,work2,work1)
 deallocate(Eig1,EigY1)
 deallocate(Eig,EigY)
 
+call clock('Y01CAS:ENE',Tcpu,Twall)
+
 end subroutine Y01CAS_FOFO
 
 subroutine Y01CASLR_FOFO(Occ,URe,XOne,ABPLUS,ABMIN, &
@@ -1959,6 +2406,8 @@ subroutine Y01CASLR_FOFO(Occ,URe,XOne,ABPLUS,ABMIN, &
 !
 !     IFlag0 = 1 - compute only 0th-order Y [EigY] and 0th-order omega [Eig] 
 !              0 - compute both 0th-order and 1st-order Y [EigY1] and omega [Eig1]
+use timing
+
 implicit none
 ! here!!!!
 integer,intent(in) :: NAct,INActive,NGrid,NDimX,NBasis,NDim,NInte1,NoSt
@@ -1977,6 +2426,7 @@ integer :: iunit,ios
 integer :: iunit1,iunit2
 integer :: NOccup,NRDM2Act
 integer :: IGem(NBasis),Ind(NBasis),AuxInd(3,3),pos(NBasis,NBasis)
+logical :: EigChck(NDimX)
 double precision :: C(NBasis)
 double precision :: HNO(NBasis,NBasis),AuxI(NBasis,NBasis),AuxIO(NBasis,NBasis),WMAT(NBasis,NBasis)
 double precision :: AuxCoeff(3,3,3,3),AuxVal,val
@@ -1996,6 +2446,9 @@ integer :: nAI(INActive),tmpAI(NAct,1:INActive),limAI(2,1:INActive)
 integer :: nAV(INActive+NAct+1:NBasis),tmpAV(NAct,INActive+NAct+1:NBasis),limAV(2,INActive+NAct+1:NBasis)
 integer :: nIV,tmpIV(INActive*(NBasis-NAct-INActive)),limIV(2)
 double precision,parameter :: Thresh = 1.D-12
+double precision :: Tcpu,Twall
+
+call clock('START',Tcpu,Twall)
 
 ABPLUS = 0
 ABMIN  = 0
@@ -2789,6 +3242,9 @@ do ICol=1,NDimX
       enddo
 enddo
 
+call clock('Y01CASLR:ABMAT',Tcpu,Twall)
+call clock('START',Tcpu,Twall)
+
 ! symmetrize AB(0)
 call sq_symmetrize(ABPLUS,NDimX)
 call sq_symmetrize(ABMIN,NDimX)
@@ -2902,6 +3358,8 @@ enddo
 deallocate(work1)
 
 !print*, 'Eig-MY',norm2(Eig),norm2(EigY),norm2(EigY1)
+call clock('Y01CAS:DIAG',Tcpu,Twall)
+call clock('START',Tcpu,Twall)
 
 if(IFlag0==1) return
 !return
@@ -2912,6 +3370,8 @@ call AB_CAS_FOFO(ABPLUS,ABMIN,EnDummy,URe,Occ,XOne,&
               NInte1,IntJFile,IntKFile,1d0,.true.)
 !print*, 'AB1-MY',norm2(ABPLUS),norm2(ABMIN)
 
+call clock('AB_CAS_FOFO',Tcpu,Twall)
+
 if(IFunSRKer==1) then
    call ModABMin_FOFO(Occ,SRKer,Wt,OrbGrid,ABMIN,&
                  MultpC,NSymNO,&
@@ -2920,6 +3380,7 @@ if(IFunSRKer==1) then
    !print*, 'ABM-MY',norm2(ABMIN)
 endif
 ! here!!!! can this be made cheaper?
+call clock('START',Tcpu,Twall)
 allocate(work1(NDimX**2))
 ! work1=ABPLUS.EigX
 ! ABPLUS=work1.EigX
@@ -2930,6 +3391,8 @@ call dgemm('T','N',NDimX,NDimX,NDimX,1d0,work1,NDimX,EigY1,NDimX,0d0,ABPLUS,NDim
 ! ABMIN=work1.EigY
 call dgemm('N','N',NDimX,NDimX,NDimX,1d0,ABMIN,NDimX,EigY,NDimX,0d0,work1,NDimX) 
 call dgemm('T','N',NDimX,NDimX,NDimX,1d0,work1,NDimX,EigY,NDimX,0d0,ABMIN,NDimX)
+
+call clock('Y01CAS:dgemm',Tcpu,Twall)
 
 if(.not.present(ECorr)) then
 ! this part for E2disp
@@ -2973,29 +3436,45 @@ elseif(present(ECorr)) then
 ! for AC0Corr
 ! ------------------------------------------------------------------------------
 
+call clock('START',Tcpu,Twall)
 do i=1,NBasis
    C(i) = sign(sqrt(Occ(i)),Occ(i)-0.5d0)
+enddo
+
+do i=1,NDimX
+    EigChck(i) = (Eig(i)/=0d0)
 enddo
 
 !print*, 'AB-MY',norm2(ABPLUS),norm2(ABMIN)
 EigY1 = 0
 do j=1,NDimX
-   if(Eig(j)/=0d0) then
+!   if(Eig(j)/=0d0) then
+   if(EigChck(j)) then
       do i=1,NDimX
-         if(Eig(i)/=0d0) then
+!         if(Eig(i)/=0d0) then
+          if(EigChck(i)) then
             val = 2d0*(ABPLUS(i,j)-ABMIN(i,j))/(Eig(i)+Eig(j))
-            do ii=1,NDimX
-               EigY1(ii,j) = EigY1(ii,j) + val*EigY(ii,i)
-            enddo
+            call daxpy(NDimX,val,EigY(:,i),1,EigY1(:,j),1)
+!            do ii=1,NDimX
+!               EigY1(ii,j) = EigY1(ii,j) + val*EigY(ii,i)
+!            enddo
          endif
       enddo
    endif
 enddo
 
+print*, 'EigY1',norm2(EigY1)
+
+call clock('Y01CAS:EigY1',Tcpu,Twall)
+call clock('START',Tcpu,Twall)
+
 !print*, 'FIRST',norm2(EigY1)
 ! second loop ...
 call dgemm('N','T',NDimX,NDimX,NDimX,1d0,EigY,NDimX,EigY1,NDimX,0d0,ABPLUS,NDimX)
 !print*, 'ABPLUS-MY',norm2(ABPLUS)
+
+call clock('Y01CAS:dgemm',Tcpu,Twall)
+call clock('START',Tcpu,Twall)
 
 pos = 0
 do i=1,NDimX
@@ -3050,7 +3529,7 @@ close(iunit)
 
 ECorr = EAll-EIntra
 
-!print*, 'EAll,EIntra',EAll,EIntra
+print*, 'EAll,EIntra',EAll,EIntra
 
 endif
 
@@ -3081,6 +3560,8 @@ deallocate(RDM2val)
 deallocate(ints,work2,work1)
 deallocate(Eig1,EigY1)
 deallocate(Eig,EigY)
+
+call clock('Y01CASLR:ENE',Tcpu,Twall)
 
 end subroutine Y01CASLR_FOFO
 
@@ -3223,6 +3704,7 @@ subroutine ModABMin_FOFO(Occ,SRKer,Wt,OrbGrid,ABMin,&
                          NAct,INActive,twokfile,twokerf,&
                          AB1,dfile)
 ! ADD CONTRIBUTIONS FROM THE srALDA KERNEL TO AB MATRICES
+use timing
 implicit none
 
 integer,parameter :: maxlen = 128
@@ -3249,6 +3731,9 @@ double precision,allocatable :: work1(:),work2(:),WtKer(:)
 double precision,allocatable :: batch(:,:),ABKer(:,:)
 double precision,allocatable :: ints1(:,:),ints2(:,:)
 logical :: dump
+double precision :: Tcpu,Twall
+
+call clock('START',Tcpu,Twall)
 
 dump = .false.
 if(present(dfile)) dump=.true. 
@@ -3333,9 +3818,14 @@ do offset=0,NGrid,maxlen
          ABKer(irs,ipq) = ABKer(ipq,irs)
       
       enddo
+
+
    enddo
 
 enddo
+
+call clock('ModABMin:Ker',Tcpu,Twall)
+call clock('START',Tcpu,Twall)
 
 open(newunit=iunit1,file=trim(twokfile),status='OLD', &
      access='DIRECT',recl=8*NBasis*NOccup)
@@ -3391,6 +3881,8 @@ close(iunit2)
 close(iunit1)
 
 deallocate(ABKer,batch,WtKer,ints2,ints1,work2,work1)
+
+call clock('ModABMin',Tcpu,Twall)
 
 end subroutine ModABMin_FOFO
 

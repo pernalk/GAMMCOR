@@ -67,7 +67,7 @@ character(*),parameter :: PossibleInterface(3) = &
 
 character(*),parameter :: PossibleJobType(7) = &
 [character(8) :: &
-'AC', 'AC0', 'ERPA', 'AC1', 'SAPT', 'PDFT', 'CASPIDFT']
+'AC', 'AC0', 'ERPA', 'AC1', 'SAPT', 'PDFT', 'CASPiDFT']
 
 character(*),parameter :: PossibleRDMType(5) = &
 [character(8) :: &
@@ -109,13 +109,13 @@ end type CalculationBlock
 type SystemBlock
       integer :: NoSt = 1
       integer :: NStates = 1
+      integer :: EigFCI = 1
       integer :: Multiplicity = 1
       integer :: Charge = 0
       integer :: ZNucl   = 0
       integer :: NBasis = 0
       integer :: Monomer = MONOMER_A
       integer :: NELE
-      integer :: EigFCI = 1
       double precision :: XELE
       double precision :: PotNuc 
       double precision :: SumOcc = 0
@@ -128,7 +128,7 @@ type SystemBlock
       integer :: NAct, INAct
       integer :: NActS(8), INActS(8)
       integer :: NDim, NDimX
-      integer :: NDimN
+      integer :: NDimN, DimEx
       integer :: NCen = 0
       integer :: UCen = 0  
       integer :: NMonBas(8) = 0
@@ -150,6 +150,7 @@ type SystemBlock
       integer,allocatable :: MultpC(:,:),NSymNO(:)
       integer,allocatable :: IndXh(:)
       integer,allocatable :: NumOSym(:),IndInt(:)
+      integer,allocatable :: IndNx(:,:)
       ! TEST ONLY
       integer,allocatable :: IndNT(:,:)
       integer,allocatable :: Ind2(:)
@@ -162,6 +163,7 @@ type SystemBlock
       double precision,allocatable :: RDM2(:),RDM2Act(:,:,:,:)
       double precision,allocatable :: Fmat(:,:) 
       double precision,allocatable :: Eig(:),EigX(:),EigY(:) 
+      double precision,allocatable :: AP(:,:),PP(:)
       double precision  :: charg(maxcen),xyz(maxcen,3)
 
 end type SystemBlock
@@ -199,7 +201,7 @@ type FlagsData
      integer :: IFlAC   = 0
      integer :: IFlSnd  = 0
      integer :: IFlCore = 1
-     integer :: IFlFrag = 0
+     integer :: IFlFrag1 = 0
      integer :: IFl12 = 1
      ! sapt_main.f90
      integer :: IFlag0 = 0
@@ -362,8 +364,8 @@ end associate
                  (Input%Flags%IFlSnd)
      write(LOUT, '(1x,a,6x,i3)') "IFlCore ", &
                  (Input%Flags%IFlCore)
-     write(LOUT, '(1x,a,6x,i3)') "IFlFrag ", &
-                 (Input%Flags%IFlFrag)
+     write(LOUT, '(1x,a,6x,i3)') "IFlFrag1 ", &
+                 (Input%Flags%IFlFrag1)
      write(LOUT, '(1x,a,6x,i3)') "IFl12   ", &
                  (Input%Flags%IFl12)
      write(LOUT, '(1x,a,6x,i3)') "ISAPT   ", &
@@ -947,6 +949,35 @@ double precision :: tmp(ntr)
 
 end subroutine readoneint_molpro
 
+subroutine readoneint_eugene(mone,enuc,infile,ntr,ipos)
+implicit none
+! reads one-el integrals from a eugene's file
+
+integer,intent(in) :: ntr,ipos
+character(*),intent(in) :: infile
+double precision,intent(out) :: mone(ntr),enuc
+
+integer :: iunit
+integer :: i,j,k,l,ind
+double precision :: val
+
+ open(newunit=iunit,file=trim(infile),form='unformatted',access='stream',status='old')
+ read(iunit,pos=ipos)
+ do
+    read(iunit) val,i,j,k,l
+    if(i+j==0) then 
+       enuc = val
+       exit
+    else
+       ind=(max(i,j)*(max(i,j)-1))/2+min(i,j)
+       mone(ind) = val
+    endif
+ enddo
+
+ close(iunit)
+
+end subroutine readoneint_eugene
+
 !subroutine writeoneint(iunit,ndim,S,V,H)
 !implicit none 
 !
@@ -1523,6 +1554,8 @@ integer :: i,j,iorb,istart
 
 allocate(Mon%NSymNO(NBasis),Mon%MultpC(15,15))
 
+print*, 'NSym',Mon%NSym
+Mon%MultpC=0
 if(Mon%NSym==1) then
    Mon%MultpC(1,1)=1
 else
@@ -1533,6 +1566,7 @@ else
       enddo
    enddo
 endif
+
 
 Mon%NSymNO(1:NBasis) = 0
 istart = 0
@@ -1556,7 +1590,7 @@ do i=1,Mon%NSym
       stop
    endif
 enddo
-
+!
 end subroutine create_symmats
 
 subroutine create_ind(infile,NumOSym,IndInt,NSym,NBasis)

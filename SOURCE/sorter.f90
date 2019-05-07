@@ -28,7 +28,7 @@ end type SortData
 
 contains 
 
-subroutine readtwoint(NBas,aosource,intfile,sortfile)
+subroutine readtwoint(NBas,aosource,intfile,sortfile,outinfo)
 ! read DALTON 2-el integrals,
 ! sort them according to rs index
 ! and dump to a file
@@ -37,12 +37,14 @@ implicit none
 integer :: NBas
 integer :: aosource
 character(*) :: intfile,sortfile
+integer,optional :: outinfo
 integer :: iunit,iunit2
 integer :: maxrep, naos(8), lbuf, nibuf, nbits, lenint4
 integer :: nsk, nt(8), ntoff(8)
 type(SortData) :: srt
 integer :: nints, INDX
 integer,allocatable :: idx_buf(:)
+double precision :: val
 double precision,allocatable :: val_buf(:), mat(:)
 integer :: idx_p, idx_q, idx_r, idx_s, pq, rs, idx_end
 integer :: sym_p, sym_q, sym_r, sym_s, sym_rs
@@ -309,6 +311,29 @@ integer :: i
    close(iunit)
 
    !print*, 'Go Werner, go!'
+
+ elseif(aosource==3) then
+ ! Eugene
+   open(newunit=iunit,file=intfile,status='OLD',&
+        access='STREAM',form='UNFORMATTED')
+  
+      do
+         read(iunit) val,idx_p,idx_q,idx_r,idx_s
+         if(idx_r+idx_s==0) exit
+  
+         ! pq: position in Batch
+         ! rs: Batch number
+         pq = min(idx_p,idx_q) + max(idx_p,idx_q)*(max(idx_p,idx_q)-1)/2
+         rs = min(idx_r,idx_s) + max(idx_r,idx_s)*(max(idx_r,idx_s)-1)/2
+         call add_to_Sorter(srt,rs,pq,val)
+         call add_to_Sorter(srt,pq,rs,val)
+      enddo
+
+   ! find position in file
+   inquire(unit=iunit,pos=i)
+   if(present(outinfo)) outinfo = i-24
+
+   close(iunit)
 
  endif
 

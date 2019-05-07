@@ -554,7 +554,7 @@ subroutine read_block_flags(Flags, line)
          read(val, *) Flags%IFlCore
 
       case ("IFLFRAG")
-         read(val, *) Flags%IFlFrag
+         read(val, *) Flags%IFlFrag1
 
       case ("IFL12")
          read(val, *) Flags%IFl12

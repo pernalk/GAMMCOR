@@ -71,9 +71,10 @@ double precision,external  :: trace
 
 end subroutine e1elst
 
-subroutine e1exchs2(A,B,SAPT)
+subroutine e1exchs2(Flags,A,B,SAPT)
 implicit none
 
+type(FlagsData) :: Flags
 type(SystemBlock) :: A, B
 type(SaptData) :: SAPT
 integer :: i, j, k, l, ia, jb
@@ -101,13 +102,15 @@ double precision :: t1(2),t2a(4),t2b(2),t2c(2),t2d
 double precision :: t1f,t2f
 double precision :: Tcpu,Twall
 double precision,parameter :: Half=0.5d0
-double precision,external  :: trace,FRDM2
+double precision,external  :: trace,FRDM2,FRDM2GVB
 
 ! set dimensions
  NBas = A%NBasis 
- dimOA = A%INAct+A%NAct 
+ !dimOA = A%INAct+A%NAct 
+ dimOA = A%num0+A%num1
  GdimOA = A%num0+A%num1
- dimOB = B%INAct+B%NAct 
+ !dimOB = B%INAct+B%NAct 
+ dimOB = B%num0+B%num1
  GdimOB = B%num0+B%num1
 
  call clock('START',Tcpu,Twall)
@@ -135,26 +138,59 @@ double precision,external  :: trace,FRDM2
  call tran2MO(Va,B%CMO,B%CMO,Vabb,NBas) 
  call tran2MO(Vb,A%CMO,A%CMO,Vbaa,NBas) 
 
+! allocate(RDM2Aval(dimOA,dimOA,dimOA,dimOA),&
+!          RDM2Bval(dimOB,dimOB,dimOB,dimOB))
+
  allocate(RDM2Aval(dimOA,dimOA,dimOA,dimOA),&
           RDM2Bval(dimOB,dimOB,dimOB,dimOB))
- do l=1,dimOA
-    do k=1,dimOA 
-       do j=1,dimOA
-          do i=1,dimOA
-             RDM2Aval(i,j,k,l) = FRDM2(i,k,j,l,A%RDM2,A%Occ,A%Ind2,A%NAct,NBas)
+
+ if(Flags%ICASSCF==1) then
+    ! CAS
+    do l=1,dimOA
+       do k=1,dimOA 
+          do j=1,dimOA
+             do i=1,dimOA
+                RDM2Aval(i,j,k,l) = FRDM2(i,k,j,l,A%RDM2,A%Occ,A%Ind2,A%NAct,NBas)
+             enddo
           enddo
        enddo
     enddo
- enddo
- do l=1,dimOB
-    do k=1,dimOB 
-       do j=1,dimOB
-          do i=1,dimOB
-             RDM2Bval(i,j,k,l) = FRDM2(i,k,j,l,B%RDM2,B%Occ,B%Ind2,B%NAct,NBas)
+    do l=1,dimOB
+       do k=1,dimOB 
+          do j=1,dimOB
+             do i=1,dimOB
+                RDM2Bval(i,j,k,l) = FRDM2(i,k,j,l,B%RDM2,B%Occ,B%Ind2,B%NAct,NBas)
+             enddo
           enddo
        enddo
     enddo
- enddo
+
+ elseif(Flags%ICASSCF==0) then
+
+    ! GVB
+    do l=1,dimOA
+       do k=1,dimOA 
+          do j=1,dimOA
+             do i=1,dimOA
+                RDM2Aval(i,j,k,l) = FRDM2GVB(i,k,j,l,A%Occ,NBas)
+             enddo
+          enddo
+       enddo
+    enddo
+    do l=1,dimOB
+       do k=1,dimOB 
+          do j=1,dimOB
+             do i=1,dimOB
+                RDM2Bval(i,j,k,l) = FRDM2GVB(i,k,j,l,B%Occ,NBas)
+             enddo
+          enddo
+       enddo
+    enddo
+
+ endif
+
+ print*, 'TEST-A',norm2(RDM2Aval)
+ print*, 'TEST-B',norm2(RDM2Bval)
 
 ! USa=0; USb=0
 ! USa,USb in MOAO
@@ -322,12 +358,13 @@ double precision,external  :: trace,FRDM2
 ! call dgemm('N','T',NBas,NBas,NBas,1d0,tmp1,NBas,tmp2,NBas,0d0,work,NBas)
 ! print*, 'TEST:TN', -2d0*trace(work,NBas)  
 
-! Full NBas 
+!! Full NBas 
 ! do ir=1,NBas
 !    do ip=1,NBas
 !       do is=1,NBas
 !          do iq=1,NBas
-!             t2b(2) = t2b(2) + FRDM2(ip,iq,ir,is,A%RDM2,A%Occ,A%Ind2,A%NAct,NBas) * &
+!             !t2b(2) = t2b(2) + FRDM2(ip,iq,ir,is,A%RDM2,A%Occ,A%Ind2,A%NAct,NBas) * &
+!             t2b(2) = t2b(2) + FRDM2GVB(ip,iq,ir,is,A%Occ,NBas) * &
 !                    Vbaa(ip,ir)*PBaa(is,iq)
 !          enddo
 !       enddo    
@@ -443,39 +480,75 @@ double precision,external  :: trace,FRDM2
      !access='DIRECT',form='UNFORMATTED',recl=8*NBas**2)
      access='DIRECT',form='UNFORMATTED',recl=8*dimOA**2)
 
-!! Qba
-!! old: 
-! do ir=1,NBas
-!    do ip=1,ir
-!       !read(iunit,rec=ip+ir*(ir-1)/2) work
-!       read(iunit,rec=ip+ir*(ir-1)/2) work(1:dimOA,1:dimOA)
-!
-!       if(ip==ir) then
-! 
-!         do is=1,dimOA !NBas
-!             do iq=1,dimOA !NBas
-!                  t2a(2) = t2a(2) + work(iq,is)* &
-!                           FRDM2(ip,iq,ir,is,A%RDM2,A%Occ,A%Ind2,A%NAct,NBas)
+!!! Qba
+!!! old: 
+! If(Flags%ICASSCF==1) then
+!    do ir=1,NBas
+!       do ip=1,ir
+!          !read(iunit,rec=ip+ir*(ir-1)/2) work
+!          read(iunit,rec=ip+ir*(ir-1)/2) work(1:dimOA,1:dimOA)
+!   
+!          if(ip==ir) then
+!    
+!            do is=1,dimOA !NBas
+!                do iq=1,dimOA !NBas
+!                     t2a(2) = t2a(2) + work(iq,is)* &
+!                              FRDM2(ip,iq,ir,is,A%RDM2,A%Occ,A%Ind2,A%NAct,NBas)
+!                enddo
 !             enddo
-!          enddo
-!
-!       else
-!         
-!          do is=1,dimOA !NBas
-!             do iq=1,dimOA !NBas
-!                t2a(2) = t2a(2) + work(iq,is)* &
-!                        (FRDM2(ip,iq,ir,is,A%RDM2,A%Occ,A%Ind2,A%NAct,NBas)+ &
-!                         FRDM2(ir,iq,ip,is,A%RDM2,A%Occ,A%Ind2,A%NAct,NBas))
-!
+!   
+!          else
+!            
+!             do is=1,dimOA !NBas
+!                do iq=1,dimOA !NBas
+!                   t2a(2) = t2a(2) + work(iq,is)* &
+!                           (FRDM2(ip,iq,ir,is,A%RDM2,A%Occ,A%Ind2,A%NAct,NBas)+ &
+!                            FRDM2(ir,iq,ip,is,A%RDM2,A%Occ,A%Ind2,A%NAct,NBas))
+!   
+!                enddo
 !             enddo
-!          enddo
-!  
-!       endif
-!
+!     
+!          endif
+!   
+!       enddo
 !    enddo
-! enddo
-! new - but more tests needed!
-!! Qba 
+!
+! elseif(Flags%ICASSCF==0) then
+!
+!    do ir=1,NBas
+!       do ip=1,ir
+!          !read(iunit,rec=ip+ir*(ir-1)/2) work
+!          read(iunit,rec=ip+ir*(ir-1)/2) work(1:dimOA,1:dimOA)
+!   
+!          if(ip==ir) then
+!    
+!            do is=1,dimOA !NBas
+!                do iq=1,dimOA !NBas
+!                     t2a(2) = t2a(2) + work(iq,is)* &
+!                              FRDM2GVB(ip,iq,ir,is,A%Occ,NBas)
+!                enddo
+!             enddo
+!   
+!          else
+!            
+!             do is=1,dimOA !NBas
+!                do iq=1,dimOA !NBas
+!                   t2a(2) = t2a(2) + work(iq,is)* &
+!                           (FRDM2GVB(ip,iq,ir,is,A%Occ,NBas)+ &
+!                            FRDM2GVB(ir,iq,ip,is,A%Occ,NBas))
+!   
+!                enddo
+!             enddo
+!     
+!          endif
+!   
+!       enddo
+!    enddo
+!
+! endif
+
+!! new - but more tests needed!
+! Qba 
  do ir=1,NBas
     do ip=1,ir
       !read(iunit,rec=ip+ir*(ir-1)/2) work
@@ -522,71 +595,105 @@ double precision,external  :: trace,FRDM2
      access='DIRECT',form='UNFORMATTED',recl=8*dimOB**2)
      !access='DIRECT',form='UNFORMATTED',recl=8*NBas**2)
 
+ If(Flags%ICASSCF==1) then
+
+    do ir=1,NBas
+       do ip=1,ir
+          !read(iunit,rec=ip+ir*(ir-1)/2) work
+          read(iunit,rec=ip+ir*(ir-1)/2) work(1:dimOB,1:dimOB)
+
+          if(ip==ir) then
+    
+            do is=1,dimOB !NBas
+                do iq=1,dimOB !NBas
+                     t2a(3) = t2a(3) + work(iq,is)* &
+                              FRDM2(ip,iq,ir,is,B%RDM2,B%Occ,B%Ind2,B%NAct,NBas)
+                enddo
+             enddo
+
+          else
+            
+             do is=1,dimOB !NBas
+                do iq=1,dimOB !NBas
+                   t2a(3) = t2a(3) + work(iq,is)* &
+                           (FRDM2(ip,iq,ir,is,B%RDM2,B%Occ,B%Ind2,B%NAct,NBas)+ &
+                            FRDM2(ir,iq,ip,is,B%RDM2,B%Occ,B%Ind2,B%NAct,NBas))
+                enddo
+             enddo
+     
+          endif
+
+       enddo
+    enddo
+
+ elseif(Flags%ICASSCF==0) then
+
+    do ir=1,NBas
+       do ip=1,ir
+          read(iunit,rec=ip+ir*(ir-1)/2) work(1:dimOB,1:dimOB)
+
+          if(ip==ir) then
+    
+            do is=1,dimOB
+                do iq=1,dimOB
+                     t2a(3) = t2a(3) + work(iq,is)* &
+                              FRDM2GVB(ip,iq,ir,is,B%Occ,NBas)
+                enddo
+             enddo
+
+          else
+            
+             do is=1,dimOB
+                do iq=1,dimOB
+                   t2a(3) = t2a(3) + work(iq,is)* &
+                           (FRDM2GVB(ip,iq,ir,is,B%Occ,NBas)+ &
+                            FRDM2GVB(ir,iq,ip,is,B%Occ,NBas))
+                enddo
+             enddo
+     
+          endif
+
+       enddo
+    enddo
+
+ endif
+!
+!! Qab - new 
 ! do ir=1,NBas
 !    do ip=1,ir
-!       !read(iunit,rec=ip+ir*(ir-1)/2) work
-!       read(iunit,rec=ip+ir*(ir-1)/2) work(1:dimOB,1:dimOB)
+!      read(iunit,rec=ip+ir*(ir-1)/2) work(1:dimOB,1:dimOB)
 !
 !       if(ip==ir) then
-! 
-!         do is=1,dimOB !NBas
-!             do iq=1,dimOB !NBas
-!                  t2a(3) = t2a(3) + work(iq,is)* &
-!                           FRDM2(ip,iq,ir,is,B%RDM2,B%Occ,B%Ind2,B%NAct,NBas)
-!             enddo
-!          enddo
 !
-!       else
-!         
-!          do is=1,dimOB !NBas
-!             do iq=1,dimOB !NBas
-!                t2a(3) = t2a(3) + work(iq,is)* &
-!                        (FRDM2(ip,iq,ir,is,B%RDM2,B%Occ,B%Ind2,B%NAct,NBas)+ &
-!                         FRDM2(ir,iq,ip,is,B%RDM2,B%Occ,B%Ind2,B%NAct,NBas))
+!         if(ip<=dimOB) then 
+!            do is=1,dimOB
+!               do iq=1,dimOB
+!                    t2a(3) = t2a(3) + work(iq,is)* &
+!                             RDM2Bval(ip,ir,iq,is)
+!                enddo
 !             enddo
-!          enddo
-!  
+!         else
+!             do iq=1,dimOB
+!                  t2a(3) = t2a(3) + work(iq,iq)* &
+!                           2d0*B%Occ(ip)*B%Occ(iq)
+!             enddo
+!         endif 
+!      
+!       else
+!
+!          if(ir<=dimOB) then
+!             do is=1,dimOB 
+!                do iq=1,dimOB 
+!                     t2a(3) = t2a(3) + work(iq,is)* &
+!                              (RDM2Bval(ip,ir,iq,is)+RDM2Bval(ir,ip,iq,is))
+!                enddo
+!             enddo
+!          endif
+!
 !       endif
 !
 !    enddo
 ! enddo
-!
-! Qab - new 
- do ir=1,NBas
-    do ip=1,ir
-      read(iunit,rec=ip+ir*(ir-1)/2) work(1:dimOB,1:dimOB)
-
-       if(ip==ir) then
-
-         if(ip<=dimOB) then 
-            do is=1,dimOB
-               do iq=1,dimOB
-                    t2a(3) = t2a(3) + work(iq,is)* &
-                             RDM2Bval(ip,ir,iq,is)
-                enddo
-             enddo
-         else
-             do iq=1,dimOB
-                  t2a(3) = t2a(3) + work(iq,iq)* &
-                           2d0*B%Occ(ip)*B%Occ(iq)
-             enddo
-         endif 
-      
-       else
-
-          if(ir<=dimOB) then
-             do is=1,dimOB 
-                do iq=1,dimOB 
-                     t2a(3) = t2a(3) + work(iq,is)* &
-                              (RDM2Bval(ip,ir,iq,is)+RDM2Bval(ir,ip,iq,is))
-                enddo
-             enddo
-          endif
-
-       endif
-
-    enddo
- enddo
 
  t2a(3) = -2*t2a(3)
  print*, 'T2a(3) ',t2a(3)
@@ -1199,6 +1306,7 @@ double precision,allocatable :: WaBB(:,:),WbAA(:,:)
 double precision,allocatable :: AlphaA(:,:),AlphaB(:,:)
 integer :: i,j,pq,ip,iq,rs,ir,is
 double precision :: termsBA(3), termsAB(3)
+integer :: coef,coef2
 double precision :: e2ba,e2ab
 double precision :: e2iu,e2ic 
 double precision :: e2tmp, tmp
@@ -1209,20 +1317,26 @@ double precision :: e2tmp, tmp
  else
     NBas = A%NBasis 
  endif
- ADimEx = 2*(A%NDimX + A%NDimN)
- BDimEx = 2*(B%NDimX + B%NDimN)
+
+ coef  = 1
+ coef2 = 1
+ 
+ ADimEx = A%NDimX + A%NDimN
+ BDimEx = B%NDimX + B%NDimN
 
 ! read EigValA_B
- allocate(EVecA(ADimEx,BDimEx),OmA(ADimEx), &
-          EVecB(BDimEx,BDimEx),OmB(BDimEx))
+ allocate(EVecA(coef*ADimEx,coef*ADimEx),OmA(coef*ADimEx),&
+          EVecB(coef*BDimEx,coef*BDimEx),OmB(coef*BDimEx))
  allocate(AlphaA(ADimEx,ADimEx),AlphaB(BDimEx,BDimEx), &
           WaBB(NBas,NBas),WbAA(NBas,NBas))
 
- call readresp(EVecA,OmA,ADimEx,'PROP_A')
- call readresp(EVecB,OmB,BDimEx,'PROP_B')
- 
+ call readresp(EVecA,OmA,coef*ADimEx,'PROP_A')
+ call readresp(EVecB,OmB,coef*BDimEx,'PROP_B')
+
  call tran2MO(A%WPot,B%CMO,B%CMO,WaBB,NBas) 
  call tran2MO(B%WPot,A%CMO,A%CMO,WbAA,NBas) 
+
+ print*, 'HERE?'
 
  call calc_resp_apsg(EVecA,OmA,AlphaA,0d0,A)
  call calc_resp_apsg(EVecB,OmB,AlphaB,0d0,B)
@@ -1315,6 +1429,9 @@ double precision :: e2tmp, tmp
 
  e2ic = (e2ab + e2ba)
  write(LOUT,'(1x,a,f16.8)') 'E2ind       = ', e2ic*1000d0 
+
+ deallocate(EVecA,OmA,EVecB,OmB)
+ deallocate(AlphaA,AlphaB,WaBB,WbAA)
 
 end subroutine e2ind_apsg
 
@@ -1754,9 +1871,10 @@ double precision :: Alpha, Beta
  nOVA = dimOA*dimVA
  nOVB = dimOB*dimVB
 
- ! print*, A%num0,A%num1,A%num2
- ! print*, nOVA,dimOA,dimVA 
- ! print*, B%num0,B%num1,B%num2
+  !print*, 'e2disp'
+  !print*, A%num0,A%num1,A%num2
+  !print*, nOVA,dimOA,dimVA 
+  !print*, B%num0,B%num1,B%num2
 
 ! read EigValA_B
  allocate(EVecA(A%NDimX*A%NDimX),OmA(A%NDimX),&
@@ -3819,7 +3937,7 @@ double precision,parameter :: BigE = 1.D8
           A%num0+A%num1,A%CMO(1:NBas,1:(A%num0+A%num1)),&
           A%num0+A%num1,A%CMO(1:NBas,1:(A%num0+A%num1)),&
           NBas,B%CMO,&
-         NBas,A%CMO,&
+          NBas,A%CMO,&
           'FFOOBAAA','AOTWOSORT')
 
 
@@ -4037,7 +4155,8 @@ double precision,parameter :: BigE = 1.D8
  ! A1:YX
  call A1_Mod_1el(tmp1,Vaab,Vbab,Sab,posA,posB,A,B,NBas,'YX')
 
-! A2: YX 
+
+ !A2: YX 
  if(approx) then
 
     call app_A2_YX(A%NDimX,B%NDimX,tmp1,B%Occ,B%Fmat,Sab,nelA,Vabb,nelB,Vbab,'FOFOBBAB','FFOOABBB',&
@@ -4054,10 +4173,10 @@ double precision,parameter :: BigE = 1.D8
 
  endif
 
- !Y_A.I.X_B
+! !Y_A.I.X_B
  call dgemm('T','N',A%NDimX,B%NDimX,A%NDimX,1d0,A%EigY,A%NDimX,tmp1,A%NDimX,0d0,tmp2,A%NDimX)
  call dgemm('N','N',A%NDimX,B%NDimX,B%NDimX,1d0,tmp2,A%NDimX,B%EigX,B%NDimX,1d0,tmp3,A%NDimX)
-! print*, 'Ya.I.Xb:',norm2(tmp3)
+!! print*, 'Ya.I.Xb:',norm2(tmp3)
 
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
@@ -4412,6 +4531,7 @@ double precision,parameter :: BigE = 1.D8
  !call term_X_A3_XY_SR(A%NDimX,B%NDimX,tpqrs,'FOFOAABB',Sab,Vabb,Vbaa,posA,posB,A%NDimX,B%NDimX,NBas,A,B,.false.)
  !
  !deallocate(tpqrs)
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
  sij = 0
  inquire(file='PROP_AB',EXIST=ipropab)
@@ -4428,6 +4548,9 @@ double precision,parameter :: BigE = 1.D8
     call make_sij_Y(sij,tmp1,A,B,nOVB,NBas)
 
  endif
+
+ print*, 'sij',norm2(sij)
+ print*, 'tmp3-exd',norm2(tmp3)
 
  ! term X
  termX = 0d0
@@ -4774,6 +4897,166 @@ deallocate(tmp1)
 
 end subroutine make_VVmm
 
+subroutine e2disp_pino(Flags,A,B,SAPT)
+implicit none
+
+type(FlagsData) :: Flags
+type(SystemBlock) :: A, B
+type(SaptData) :: SAPT
+integer :: NBas, NInte1,NInte2
+integer :: dimOA,dimFA,dimOB,dimFB,nOFA,nOFB
+integer :: iunit
+integer :: i,j,pq,rs
+integer :: ip,iq,ir,is
+integer :: ipq,irs
+integer :: i1,i2,j1,j2,ii,jj,ij
+integer :: coef,coef2,ADimEx,BDimEx
+integer,allocatable :: AuxT(:,:)
+double precision,allocatable :: OmA(:),OmB(:)
+double precision,allocatable :: EVecA(:),EVecB(:)
+double precision,allocatable :: tmp1(:,:),tmp2(:,:) 
+double precision,allocatable :: work(:)
+double precision :: fact,fpq,frs
+double precision :: e2d,tmp
+! testy
+integer,allocatable :: AIndEx(:,:),BIndEx(:,:)
+double precision,allocatable :: AVecEx(:),BVecEx(:)
+
+!double precision,parameter :: SmallE = 1.d-6
+double precision,parameter :: SmallE = 1.d-2
+!double precision,parameter :: SmallE = 1.d-1
+
+ write(LOUT,'(1x,a,e12.4)') 'SmallE in E2Disp PINO:',SmallE
+
+ if(A%NBasis.ne.B%NBasis) then
+    write(LOUT,'(1x,a)') 'ERROR! MCBS not implemented in SAPT!'
+    stop
+ else
+    NBas = A%NBasis 
+ endif
+
+! set dimensions
+ ADimEx = A%NDimX + A%NDimN
+ BDimEx = B%NDimX + B%NDimN
+ NInte1 = NBas*(NBas+1)/2
+ NInte2 = NInte1*(NInte1+1)/2
+ dimOA = A%num0+A%num1
+ dimFA = NBas
+ dimOB = B%num0+B%num1
+ dimFB = NBas 
+ nOFA = dimOA*dimFA
+ nOFB = dimOB*dimFB
+ coef  = 1 
+ coef2 = 1
+
+ do i=1,coef*ADimEx
+    if(A%PP(i)<0d0) then 
+       write(LOUT,'(1x,"Monomer A: Negative EVal",i4,f16.8)') i,OmA(i)
+    endif
+ enddo
+ do i=1,coef*BDimEx
+    if(B%PP(i)<0d0) then
+       write(LOUT,'(1x,"Monomer B: Negative EVal",i4,f16.8)') i,OmB(i)
+    endif
+ enddo
+
+ allocate(AuxT(2,NInte1))
+ AuxT = 0
+ ij = 0
+ do j=1,NBas
+    do i=1,j
+       ij = ij + 1
+       AuxT(1,ij) = j
+       AuxT(2,ij) = i
+    enddo
+ enddo
+
+ print*, 'ij:',ij,NINte1
+
+ ! tran4_gen
+ allocate(work(nOFB))
+ open(newunit=iunit,file='TWOMOAB',status='OLD',&
+     access='DIRECT',form='UNFORMATTED',recl=8*nOFB)
+
+ allocate(tmp1(coef*ADimEx,coef*BDimEx),tmp2(coef*ADimEx,coef*BDimEx))
+
+ tmp1=0
+ do pq=1,ADimEx
+    ip = AuxT(1,pq)
+    iq = AuxT(2,pq)
+
+    fpq = 1d0
+    if(ip==iq) fpq=0.5d0
+
+    read(iunit,rec=iq+(ip-1)*dimOA) work(1:nOFB)
+    do rs=1,BDimEx
+       ir = AuxT(1,rs)
+       is = AuxT(2,rs)
+
+       frs = 1d0
+       if(ir==is) frs=0.5d0
+
+       fact = fpq*frs &
+             * (A%CICoef(iq)*B%CICoef(is)+A%CICoef(ip)*B%CICoef(ir) &
+             + A%CICoef(iq)*B%CICoef(ir)+A%CICoef(ip)*B%CICoef(is)) & 
+             * work(is+(ir-1)*dimOB)
+
+       do i=1,coef*ADimEx
+
+          if(abs(A%PP(i)).gt.SmallE.and.abs(A%PP(i)).lt.1d20) then
+
+             tmp1(i,rs) = tmp1(i,rs) + & 
+                  fact*A%AP(i,pq)
+
+          endif
+       enddo
+
+    enddo
+ enddo
+
+ tmp2=0
+ do j=1,coef*BDimEx
+
+    if(abs(B%PP(j)).gt.SmallE.and.abs(B%PP(j)).lt.1d20) then
+       do i=1,coef*ADimEx
+          if(abs(A%PP(i)).gt.SmallE.and.abs(A%PP(i)).lt.1d20) then
+             do rs=1,BDimEx
+
+                tmp2(i,j) = tmp2(i,j) + &
+                     B%AP(j,rs)*tmp1(i,rs)
+
+             enddo
+          endif
+       enddo
+    endif
+ enddo
+
+ e2d = 0d0
+ do i=1,coef*ADimEx
+
+    if(abs(A%PP(i)).gt.SmallE.and.abs(A%PP(i)).lt.1d20) then
+       do j=1,coef*BDimEx
+
+          if(abs(B%PP(j)).gt.SmallE.and.abs(B%PP(j)).lt.1d20) then
+             e2d = e2d + tmp2(i,j)**2/(A%PP(i)+B%PP(j))
+          endif
+       enddo
+    endif
+ enddo
+
+ print*, ''
+ print*, 'TEST: ',-16d0*e2d*1000d0
+ SAPT%e2disp = -16d0*e2d
+ write(LOUT,'(1x,a,f16.8)') 'E2disp      = ',-16*(e2d)*1000
+
+ call writeampl(tmp2,'PROP_AB')
+
+ deallocate(AuxT)
+ deallocate(tmp2,tmp1)
+ deallocate(work)
+
+end subroutine e2disp_pino
+
 subroutine e2disp_apsg(Flags,A,B,SAPT)
 implicit none
 
@@ -4785,8 +5068,10 @@ integer :: dimOA,dimFA,dimOB,dimFB,nOFA,nOFB
 integer :: iunit
 integer :: i,j,pq,rs
 integer :: ip,iq,ir,is
-integer :: ii,jj
+integer :: ipq,irs
+integer :: i1,i2,j1,j2,ii,jj,ij
 integer :: coef,coef2,ADimEx,BDimEx
+integer,allocatable :: AuxT(:,:)
 double precision,allocatable :: OmA(:),OmB(:)
 double precision,allocatable :: EVecA(:),EVecB(:)
 double precision,allocatable :: tmp1(:,:),tmp2(:,:) 
@@ -4825,15 +5110,15 @@ double precision,parameter :: SmallE = 1.d-2
  coef  = 1 
  coef2 = 1
  ! Use these coefficients for PINOVEC
- !coef  = 2
+ ! coef  = 2
  !coef2 = 4
-
-! WARNING !!! 
-! NOW IT WON'T WORK WIH PINOVEC I THINK
-! BECAUSE OF ABS(Om) IN LOOPS...
 
  print*, A%num0,A%num1,A%num2
  print*, B%num0,B%num1,B%num2
+
+ !print*, A%IGem
+ !print*, ''
+ !print*, B%IGem
 
 ! read EigValA_B
  allocate(EVecA(coef2*ADimEx**2),OmA(coef*ADimEx),&
@@ -4841,6 +5126,10 @@ double precision,parameter :: SmallE = 1.d-2
 
  call readresp(EVecA,OmA,coef*ADimEx,'PROP_A')
  call readresp(EVecB,OmB,coef*BDimEx,'PROP_B')
+
+! do i=1,coef*BDimEx
+!    print*, 'OmB',i,OmB(i)
+! enddo
 
 ! print*, norm2(EVecA),norm2(EVecB)
 ! print*, 'OmA'
@@ -4862,32 +5151,12 @@ double precision,parameter :: SmallE = 1.d-2
 
  allocate(tmp1(coef*ADimEx,coef*BDimEx),tmp2(coef*ADimEx,coef*BDimEx))
 
-
 ! big test of a single loop
  allocate(AIndEx(2,ADimEx),BIndEx(2,BDimEx))
  allocate(AVecEx(coef2*ADimEx**2),BVecEx(coef2*BDimEx**2))
 
- do pq=1,ADimEx
-    if(pq<=A%NDimX) then 
-       AIndEx(1,pq) = A%IndN(1,pq)
-       AIndEx(2,pq) = A%IndN(2,pq)
-    elseif(pq>A%NDimX) then
-       AIndEx(1,pq) = pq - A%NDimX
-       AIndEx(2,pq) = pq - A%NDimX
-    endif
- enddo
- do rs=1,BDimEx
-    if(rs<=B%NDimX) then 
-       BIndEx(1,rs) = B%IndN(1,rs)
-       BIndEx(2,rs) = B%IndN(2,rs)
-    elseif(rs>B%NDimX) then
-       BIndEx(1,rs) = rs - B%NDimX
-       BIndEx(2,rs) = rs - B%NDimX
-    endif
- enddo
- !do i=A%NDimX+1,ADimEx
- !   print*, i,AIndEx(1,i),AIndEx(2,i)
- !enddo
+ AIndEx=A%IndNx
+ BIndEx=B%IndNx
 
  ! prepare vectors
  AVecEx = 0
@@ -4899,6 +5168,7 @@ double precision,parameter :: SmallE = 1.d-2
         iq = A%IndN(2,pq)
 
         fact = A%CICoef(iq)+A%CICoef(ip)
+        !fact = 1d0
         do i=1,coef*ADimEx
            AVecEx((i-1)*coef*ADimEx+pq) = fact * &
                                           EVecA((i-1)*coef*ADimEx+pq)
@@ -4907,10 +5177,14 @@ double precision,parameter :: SmallE = 1.d-2
     elseif(pq>A%NDimX) then
 
         ir = pq - A%NDimX
+        !fact = 1d0
         fact = A%CICoef(ir)
         do i=1,coef*ADimEx
            AVecEx((i-1)*coef*ADimEx+pq) = fact * &
                                           EVecA((i-1)*coef*ADimEx+pq)
+           !! for PINOVEC
+           !AVecEx((i-1)*coef*ADimEx+pq) = fact * &
+           !                               EVecA((i-1)*coef*ADimEx+coef*A%NDimX+ir)
         enddo
 
     endif
@@ -4923,6 +5197,7 @@ double precision,parameter :: SmallE = 1.d-2
         is = B%IndN(2,rs)
 
         fact = B%CICoef(ir)+B%CICoef(is)
+        !fact = 1d0
         do i=1,coef*BDimEx
            BVecEx((i-1)*coef*BDimEx+rs) = fact * &
                                           EVecB((i-1)*coef*BDimEx+rs)
@@ -4932,9 +5207,13 @@ double precision,parameter :: SmallE = 1.d-2
 
         ip = rs - B%NDimX
         fact = B%CICoef(ip)
+        !fact = 1d0
         do i=1,coef*BDimEx
            BVecEx((i-1)*coef*BDimEx+rs) = fact * &
                                           EVecB((i-1)*coef*BDimEx+rs)
+           !! for PINOVEC
+           !BVecEx((i-1)*coef*BDimEx+rs) = fact * &
+           !          EVecB((i-1)*coef*BDimEx+coef*B%NDimX+ip)
         enddo
 
     endif
@@ -4960,6 +5239,7 @@ double precision,parameter :: SmallE = 1.d-2
     endif
  enddo
 
+! good old stuff
  tmp1=0
  do pq=1,ADimEx
     ip = AIndEx(1,pq)
@@ -5003,8 +5283,10 @@ double precision,parameter :: SmallE = 1.d-2
 
  e2d1 = 0d0
  do i=1,coef*ADimEx
+
     if(abs(OmA(i)).gt.SmallE.and.abs(OmA(i)).lt.1d20) then
        do j=1,coef*BDimEx
+
           if(abs(OmB(j)).gt.SmallE.and.abs(OmB(j)).lt.1d20) then
              e2d1 = e2d1 + tmp2(i,j)**2/(OmA(i)+OmB(j))
           endif
@@ -5012,15 +5294,95 @@ double precision,parameter :: SmallE = 1.d-2
     endif
  enddo
 
+allocate(AuxT(2,NInte1))
+
+AuxT = 0
+ij = 0
+do j=1,NBas
+   do i=1,j
+      ij = ij + 1
+      AuxT(1,ij) = j
+      AuxT(2,ij) = i
+   enddo
+enddo
+
+!print*, 'ij:',ij,NINte1
+!
+!! try P matrices
+! tmp1=0
+! do pq=1,ADimEx
+!    ip = AuxT(1,pq)
+!    iq = AuxT(2,pq)
+!
+!    read(iunit,rec=iq+(ip-1)*dimOA) work(1:nOFB)
+!    do rs=1,BDimEx
+!       ir = AuxT(1,rs)
+!       is = AuxT(2,rs)
+!
+!       fact = (A%CICoef(iq)*B%CICoef(is)+A%CICoef(ip)*B%CICoef(ir) &
+!               + A%CICoef(iq)*B%CICoef(ir)+A%CICoef(ip)*B%CICoef(is))*work(is+(ir-1)*dimOB)
+!       !fact = work(is+(ir-1)*dimOB)
+!
+!       do i=1,coef*ADimEx
+!
+!          if(abs(A%PP(i)).gt.SmallE.and.abs(A%PP(i)).lt.1d20) then
+!
+!             tmp1(i,rs) = tmp1(i,rs) + & 
+!                  !fact*AVecEx((i-1)*coef*ADimEx+pq)
+!                  fact*A%AP(i,pq)
+!
+!          endif
+!       enddo
+!
+!    enddo
+! enddo
+!
+! tmp2=0
+! do j=1,coef*BDimEx
+!
+!    if(abs(B%PP(j)).gt.SmallE.and.abs(B%PP(j)).lt.1d20) then
+!       do i=1,coef*ADimEx
+!          if(abs(A%PP(i)).gt.SmallE.and.abs(A%PP(i)).lt.1d20) then
+!             do rs=1,BDimEx
+!
+!                tmp2(i,j) = tmp2(i,j) + &
+!                     !BVecEx((j-1)*coef*BDimEx+rs)*tmp1(i,rs)
+!                     B%AP(j,rs)*tmp1(i,rs)
+!
+!             enddo
+!          endif
+!       enddo
+!    endif
+! enddo
+!
+! e2d1 = 0d0
+! do i=1,coef*ADimEx
+!
+!    if(abs(A%PP(i)).gt.SmallE.and.abs(A%PP(i)).lt.1d20) then
+!       do j=1,coef*BDimEx
+!
+!          if(abs(B%PP(j)).gt.SmallE.and.abs(B%PP(j)).lt.1d20) then
+!             e2d1 = e2d1 + tmp2(i,j)**2/(A%PP(i)+B%PP(j))
+!          endif
+!       enddo
+!    endif
+! enddo
+!
  print*, ''
  print*, 'TEST: ',-16d0*e2d1*1000d0
+ SAPT%e2disp = -16d0*e2d1
  write(LOUT,'(1x,a,f16.8)') 'E2disp      = ',-16*(e2d1+e2d2+e2d3+e2d4)*1000
+
+ call writeampl(tmp2,'PROP_AB')
 
  e2d1=0
 
  deallocate(BVecEx,AVecEx)
  deallocate(BIndEx,AIndEx)
 
+ deallocate(AuxT)
+
+!! old code in parts
 !! PART 1: p>q,r>s
 ! tmp1=0
 ! do pq=1,A%NDimX
@@ -5266,7 +5628,7 @@ double precision,parameter :: SmallE = 1.d-2
 ! enddo
 ! print*, 'PART4: ',-16*e2d4*1000
 
- ! SAPT%e2disp = -16d0*e2d
+! SAPT%e2disp = -16d0*e2d
 ! write(LOUT,'(1x,a,f16.8)') 'E2disp      = ',-16*(e2d1+e2d2+e2d3+e2d4)*1000
 
  close(iunit)
@@ -5747,16 +6109,19 @@ subroutine calc_resp_apsg(EVec,EVal,Alpha,Freq,Mon)
 implicit none
 
 type(SystemBlock) :: Mon
-double precision,intent(in) :: EVec(2*(Mon%NDimX+Mon%NDimN),2*(Mon%NDimX+Mon%NDimN)), &
-                               EVal(2*(Mon%NDimX+Mon%NdimN))
+!double precision,intent(in) :: EVec(2*(Mon%NDimX+Mon%NDimN),2*(Mon%NDimX+Mon%NDimN)), &
+!                               EVal(2*(Mon%NDimX+Mon%NdimN))
+double precision,intent(in) :: EVec((Mon%NDimX+Mon%NDimN),(Mon%NDimX+Mon%NDimN)), &
+                               EVal((Mon%NDimX+Mon%NdimN))
 double precision,intent(in) :: Freq
-double precision,intent(out) :: Alpha(2*(Mon%NDimX+Mon%NDimN),2*(Mon%NDimX+Mon%NDimN))
+!double precision,intent(out) :: Alpha(2*(Mon%NDimX+Mon%NDimN),2*(Mon%NDimX+Mon%NDimN))
+double precision,intent(out) :: Alpha((Mon%NDimX+Mon%NDimN),(Mon%NDimX+Mon%NDimN))
 double precision :: frac
 integer :: pq,rs,t,ip,iq,ir,is
 integer :: NDimEx
 double precision,parameter :: SmallE = 1.d-6
 
- NDimEx = 2*(Mon%NDimX + Mon%NDimN)
+ NDimEx = (Mon%NDimX + Mon%NDimN)
 
  Alpha = 0
  ! p>q, r>s

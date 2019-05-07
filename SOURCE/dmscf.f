@@ -69,6 +69,12 @@ C
 C
       Else
 C
+C     MH: LATER REPLACE OPTNORB BY ENERGY CHECK!!!
+      If(ITwoEl.Eq.1) Then
+      Call OPTNORB(ETot,URe,Occ,XOne,XNuc,DipX,DipY,DipZ,TwoEl,UMOAO,
+     $ NSymMO,Title,NBasis,NInte1,NInte2,NGem,NGOcc,IModG)
+      EndIf
+C
       NGOcc=0
       Call INTERPA(ETot,ENuc,TwoEl,URe,UReSav,Occ,XOne,
      $  Title,NBasis,NInte1,NInte2,NDim,NGem,NGOcc)

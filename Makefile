@@ -14,7 +14,7 @@ OBJ = $(O)mainp.o $(O)initia.o $(O)dmscf.o $(O)misc.o $(O)optocc.o \
       $(O)sorter.o $(O)tran.o $(O)systemdef.o \
       $(O)types.o $(O)inputfill.o $(O)abmats.o $(O)abfofo.o \
       $(O)sapt_main.o $(O)sapt.o \
-      $(O)exmisc.o \
+      $(O)exmisc.o $(O)exdpino.o \
       $(O)timing.o \
       $(O)srlrdynamic.o $(O)erpa.o $(O)interpa.o  $(O)exact2el.o $(O)optapsg.o $(O)newton.o $(O)acfd.o $(O)accas.o \
       $(O)caspidft.o
@@ -29,8 +29,8 @@ OBJ = $(O)mainp.o $(O)initia.o $(O)dmscf.o $(O)misc.o $(O)optocc.o \
 FCC = ifort -assume byterecl
 FFLAGS = -mkl -heap-arrays  -O3 -I /home/kasia/xcfun_intel/fortran 
 LIBS = -L/opt/intel/composer_xe_2015.2.164/mkl/lib/intel64/ -lmkl_intel_ilp64 -lmkl_sequential -lmkl_core \
--L ./xcfun/lib -lxcfun
-#-L/home/kasia/xcfun_intel/lib -lxcfun
+-L/home/kasia/xcfun_intel/lib -lxcfun
+#-L ./xcfun/lib -lxcfun
 
 
 $(PROG) :  $(OBJ) 
@@ -115,6 +115,8 @@ $(O)abfofo.o : $(S)abfofo.f90 $(O)types.o $(O)tran.o
 	$(FCC) $(FFLAGS)  -c $(S)abfofo.f90 -o $(O)abfofo.o
 $(O)exmisc.o : $(S)exmisc.f90 $(O)types.o
 	$(FCC) $(FFLAGS)  -c $(S)exmisc.f90 -o $(O)exmisc.o
+$(O)exdpino.o : $(S)exdpino.f90 $(O)types.o $(O)tran.o $(O)timing.o $(O)exmisc.o
+	$(FCC) $(FFLAGS)  -c $(S)exdpino.f90 -o $(O)exdpino.o
 $(O)sapt_main.o : $(S)sapt_main.f90 $(O)types.o $(O)systemdef.o $(O)tran.o $(O)sorter.o $(O)sapt.o $(O)abmats.o $(O)abfofo.o
 	$(FCC) $(FFLAGS)  -c $(S)sapt_main.f90 -o $(O)sapt_main.o
 $(O)sapt.o : $(S)sapt.f90 $(O)types.o $(O)tran.o $(O)exmisc.o $(O)timing.o 

@@ -12,7 +12,10 @@ C
       Implicit Real*8 (A-H,O-Z)
 C
       Real*8 XKin(NInte1),XNuc(NInte1),Occ(NBasis),URe(NBasis,NBasis),
-     $ TwoEl(NInte2),UMOAO(NBasis,NBasis)
+     $ TwoEl(NInte2),UMOAO(NBasis,NBasis),
+     $ UAux(NBasis,NBasis)
+      integer :: ione,NBas(8)
+      logical :: exione 
       double precision, allocatable :: TMPMO(:,:)
 C
       Character*60 Line
@@ -60,7 +63,14 @@ C
 C     GET 2-EL NO INTEGRALS AND CICoef
 C 
 C      Call readtwoint(NBasis,'AOTWOINT','AOTWOSORT')
+      If(ITwoEl.Eq.1) Then
       Call read2el(TwoEl,UMOAO,NBasis,NInte2)
+      Else
+      Call readtwoint(NBasis,1,'AOTWOINT','AOTWOSORT')
+C      Call LoadSaptTwoEl(3,TwoEl,NBasis,NInte2)
+C      Write(6,'(" Transforming two-electron integrals ...",/)')
+C      Call TwoNO1(TwoEl,UMOAO,NBasis,NInte2)
+      EndIf
 !      Call altread2el(TwoEl,UMOAO,NBasis,NInte2)
 
 C
@@ -210,17 +220,69 @@ C
 c     If(ICASSCF.Eq.0)
       EndIf
 C
+
+C     OUT-OF-CORE INTEGRAL TRANSFORMATIONS
+      If(ITwoEl.Ne.1) Then
+C     PREPARE POINTERS: NOccup=num0+num1
+      Call prepare_nums(Occ,Num0,Num1,NBasis)
+      If(ISwitch.Eq.1) Num0=NInAC
+      If(ISwitch.Eq.1) Num1=NAc
+      EndIf
+C
+      If(ITwoEl.Eq.2) Then
+C     FULL TRANSFORMATION FOR "mithap" VARIANT
+      UAux=transpose(UMOAO)
+      Call tran4_full(NBasis,UAux,UAux,'TWOMO','AOTWOSORT')
+C
+      ElseIf(ITwoEl.Eq.3) Then
+C     TRANSFORM J AND K
+      UAux=transpose(UMOAO)
+      Call tran4_gen(NBasis,
+     $        Num0+Num1,UAux(1:NBasis,1:(Num0+Num1)),
+     $        Num0+Num1,UAux(1:NBasis,1:(Num0+Num1)),
+     $        NBasis,UAux,
+     $        NBasis,UAux,
+     $        'FFOO','AOTWOSORT')
+      Call tran4_gen(NBasis,
+     $        NBasis,UAux,
+     $        Num0+Num1,UAux(1:NBasis,1:(Num0+Num1)),
+     $        NBasis,UAux,
+     $        Num0+Num1,UAux(1:NBasis,1:(Num0+Num1)),
+     $        'FOFO','AOTWOSORT')
+C
+      EndIf
+C
+      Inquire(File='AOONEINT',EXIST=exione)
+      If(exione) Then
+C
+      Open(newunit=ione,File='AOONEINT',access='SEQUENTIAL',
+     $     Form='UNFORMATTED',Status='OLD')
+      Read(ione) 
+      Read(ione) NSym,NBas(1:NSym),ENuc 
+      Write(6,'(/,"  Nuclear repulsion:",F20.12)')ENuc
+      Close(ione)
+C
+      Else
+C
       Open(10,File='enuc.dat',Form='Formatted',Status='Old')
       Read(10,'(A31,F20.12)')Line,ENuc
       Write(6,'(/,"  Nuclear repulsion:",F20.12)')ENuc
       Close(10)
+      EndIf
 C
       Return
       End
 
+C
+C     ReadDMRG: VERSION THAT WORKS WITH EUGENE'S INTS
+C
 *Deck ReadDMRG
       Subroutine ReadDMRG(XKin,XNuc,ENuc,Occ,URe,
      $ TwoEl,UMOAO,NInte1,NBasis,NInte2,NGem)
+C
+      use sorter
+      use tran
+      use abmat 
 C
 C     READ Integrals and 1-RDM - needed for AC-DMRG CALCULATION
 C
@@ -239,8 +301,14 @@ C     LOCAL ARRAYS
 C
       Real*8, Allocatable :: RDM2(:),RDMAB2(:)
       Dimension Gamma(NInte1),Work(NBasis),PC(NBasis),
-     $ AUXM(NBasis,NBasis)
-c      Real*8, Allocatable :: TwoAux(:)
+     $ AUXM(NBasis,NBasis),AUXM1(NBasis,NBasis),
+     $ Fock(NBasis*NBasis),
+     $ UAux(NBasis,NBasis),
+     $ FockF(NInte1),GammaAB(NInte1)
+C 
+C herer!!!
+      IEugene=1
+C     IEugene=0
 C
       UMOAO(1:NBasis*NBasis)=Zero
       URe(1:NBasis,1:NBasis)=Zero
@@ -249,8 +317,10 @@ C
       Gamma(1:NInte1)=Zero
 C
 C     READ IN 1-RDM AND DIAGONALIZE IT
+C
+      If(IEugene.Eq.0) Then
 C     
-      Open(10,File='rdmdump.dat')
+      Open(10,File='rdmdump.dat',Status='Old')
    20 Read(10,*,End=30) X,I1,I2,I3,I4
       If((I1+I2.Ne.0).And.(I3+I4.Eq.0)) Then
       Ind=(Max(I1,I2)*(Max(I1,I2)-1))/2+Min(I1,I2)
@@ -258,6 +328,22 @@ C
       EndIf
       GoTo 20
   30  Close(10)
+C
+      Else
+C
+      Open(10,File='rdmdump.dat',form='unformatted',access='stream',
+     $ Status='Old')
+   27 Read(10,End=37) X,I1,I2,I3,I4
+      If((I1+I2.Ne.0).And.(I3+I4.Eq.0)) Then
+      Ind=(Max(I1,I2)*(Max(I1,I2)-1))/2+Min(I1,I2)
+      Gamma(Ind)=X/Two
+      write(*,*)i1,i2,x 
+      EndIf
+      GoTo 27
+   37 Close(10)
+C
+      EndIf
+C
       Call CpySym(AUXM,Gamma,NBasis)
       Call Diag8(AUXM,NBasis,NBasis,PC,Work)
       Call SortOcc(PC,AUXM,NBasis)
@@ -269,7 +355,7 @@ C
       If(PC(I).Gt.Zero) NAc=NAc+1
       EndDo
 C
-      NInAc=NELE-Sum+1.D-11
+      NInAc=NELE-Sum+1.D-1
       Do I=1,NInAc+NAc
       If(I.Le.NInAc) Then
       Occ(I)=One
@@ -320,39 +406,333 @@ C     COPY AUXM TO URe AND OFF SET BY NInAc
       EndDo
       EndDo
 C
-C     READ XOne (SAVE IN XKin), TRANSFORM TO NO'S 
+      TwoEl(1:NInte2)=Zero
+C
+      If(IEugene.Eq.0) Then
+C
+C IBin=1 - integrals in binary files
+C IBin=0 - integrals in text files
+C      
+      IBin=1
+c      IBin=0
+C
+      If(IBin.Eq.0) Then
+C              
       Write(6,'(" Reading in one-ele integrals ...",/)')
-      K=1
-      FName(K:K+11)='intcoul.dat'
+      FName(1:12)='intcoul.dat'
       Call GetENuc(ENuc,FName,NBasis)
       Call Int1(XKin,XNuc,NInte1,FName,Nbasis)
-C
-      Call MatTr(XKin,URe,NBasis)
-C
-C     READ 2-EL INTEGRALS AND TRANSFORM TO NO's
-      TwoEl(1:NInte2)=Zero
       Write(6,'(" Reading in two-ele integrals ...",/)')
       Call Int2(TwoEl,FName,NInte2,NBasis)
 C
+      ElseIf(IBin.Eq.1) Then
+C
+      Open(10,File='NUC_REP.bin',form='unformatted',access='stream',
+     $ Status='Old')
+      Read(10) X
+      ENuc=X
+      Close(10)
+C
+      Open(10,File='FACT.bin',form='unformatted',access='stream',
+     $ Status='Old')
+      ICount=0
+      IJ=0
+      Do I=1,NBasis
+      Do J=1,I
+      IJ=IJ+1
+      Read(10,End=31) X
+      Ind=I*(I-1)/2+J
+      XKin(Ind)=X
+      ICount=ICount+1
+      EndDo
+      EndDo
+   31 Close(10)
+      Write(6,'(" The number of 1-el integrals read vs. expected",
+     $ 2I10)') ICount,NInte1 
+C     
+      Open(10,File='DPQRS.bin',form='unformatted',access='stream',
+     $ Status='Old')
+      ICount=0
+      IJ=0
+      Do I=1,NBasis
+      Do J=1,I
+      IJ=IJ+1
+      KL=0
+      Do K=1,NBasis
+      Do L=1,K
+      KL=KL+1
+      If(IJ.Ge.KL) Then
+      Read(10,End=35) X
+      TwoEl(NAddr3(I,J,K,L))=X
+      ICount=ICount+1
+      EndIf
+      EndDo
+      EndDo
+      EndDo
+      EndDo
+   35 Close(10)
+      Write(6,'(" The number of 2-el integrals read vs. expected",
+     $ 2I15)') ICount,NInte2
+
+c     If(IBin.Eq.0)      
+      EndIf
+C
+C else of IEugene.Eq.1
+      Else
+C
+      If(ITwoEl.Eq.1) Then
+C
+      Open(10,File='intcoul.dat',form='unformatted',access='stream',
+     $ Status='Old')
+   40 Read(10,End=39) X,I1,I2,I3,I4
+C
+      If(I3+I4.Ne.0) Then
+      TwoEl(NAddr3(I1,I2,I3,I4))=X
+      Else
+      If(I1+I2.Ne.0) Then
+      Ind=(Max(I1,I2)*(Max(I1,I2)-1))/2+Min(I1,I2)
+      XKin(Ind)=X
+      EndIf
+      If(I1+I2.Eq.0) ENuc=X
+      EndIf
+C
+      GoTo 40
+   39 Close(10)
+C
+      ElseIf(ITwoEl.Gt.1) Then
+C
+      Call readtwoint(NBasis,3,'intcoul.dat','AOTWOSORT',IOutInfo)
+C      Call CheckSaptTwoEl(3,TwoEl,NBasis,NInte2)
+C      Call LoadSaptTwoEl(3,TwoEl,NBasis,NInte2)
+      Call readoneint_eugene(XKin,ENuc,'intcoul.dat',NInte1,IOutInfo)
+C
+      EndIf
+C
+      EndIf
+C
+C     FIND CANONICAL INACTIVE ORBITALS
+C
+      Call CpySym(AUXM1,Gamma,NBasis)
+C
+      If(ITWoEl.Eq.3) Then
+C
+      UAux = 0
+      Do I=1,NInAc
+      UAux(I,I) = Occ(I)
+      EndDo
+      Do J=1,NAc
+      Do I=1,NAc
+      UAux(NInAc+I,NInAc+J) = AUXM1(I,J)
+      EndDo
+      EndDo
+      Call sq_to_triang2(UAux,GammaAB,NBasis)
+C
+      Call FockGen_mithap(FockF,GammaAB,XKin,NInte1,NBasis,'AOTWOSORT')
+C
+C     INACTIVE
+      If(NInAc.Ne.Zero) Then
+C      
+      Do I=1,NInAc
+      Do J=1,NInAc
+      IJ=(Max(I,J)*(Max(I,J)-1))/2+Min(I,J)
+      Fock((J-1)*NInAc+I)=FockF(IJ)
+      EndDo
+      EndDo
+      Call Diag8(Fock,NInAc,NInAc,PC,Work)
+
+      Do I=1,NInAc
+      Do J=1,NInAc
+      URe(I,J)=Fock((J-1)*NInAc+I)
+      EndDo
+      EndDo
+C
+C      Print*, 'INAct-MY', norm2(URe)
+C
+      EndIf
+C
+C     VIRTUAL
+C
+      NVirt=NBasis-NInAc-NAc 
+
+      If(NVirt.Ne.Zero) Then
+
+      Do I=1,NVirt
+      Do J=1,NVirt
+      IJ=IndSym(I+NInAc+NAc,J+NInAc+NAc)
+      Fock((J-1)*NVirt+I)=FockF(IJ)
+      EndDo
+      EndDo      
+      Call Diag8(Fock,NVirt,NVirt,PC,Work)
+C      Print*, PC(1:5)
+C      Print*, 'VIRT-MY',norm2(Fock)
+      Do I=1,NVirt
+      Do J=1,NVirt
+      II=I+NInAc+NAc
+      JJ=J+NInAc+NAc
+      URe(II,JJ)=Fock((J-1)*NVirt+I)
+      EndDo
+      EndDo
+C
+      EndIf
+C
+      ElseIf(ITWoEl.Eq.1) Then
+C      
+C     INACTIVE
+C
+      If(NInAc.Ne.0) Then
+C
+      Do I=1,NInAc
+      Do J=1,NInAc
+      IJ=(Max(I,J)*(Max(I,J)-1))/2+Min(I,J)
+      FIJ=XKin(IJ)
+      Do K=1,NInAc
+      FIJ=FIJ+Occ(K)*(Two*TwoEl(NAddr3(I,J,K,K))-TwoEl(NAddr3(I,K,J,K)))
+      EndDo
+      Do K=1+NInAc,NInAc+NAc
+      Do L=1+NInAc,NInAc+NAc
+      FIJ=FIJ+AUXM1(K-NInAc,L-NInAc)*
+     $ (Two*TwoEl(NAddr3(I,J,K,L))-TwoEl(NAddr3(I,L,J,K)))
+      EndDo
+      EndDo
+      Fock((J-1)*NInAc+I)=FIJ
+      EndDo
+      EndDo
+C
+      Call Diag8(Fock,NInAc,NInAc,PC,Work)
+C
+      Do I=1,NInAc
+      Do J=1,NInAc
+      URe(I,J)=Fock((J-1)*NInAc+I) 
+      EndDo
+      EndDo
+C
+C      Print*, 'INAct-KA',norm2(URe)
+      EndIf
+C
+C     VIRTUAL
+C
+      NVirt=NBasis-NInAc-NAc 
+C
+      If(NVirt.Ne.0) Then
+C
+      Do I=1,NVirt
+      Do J=1,NVirt
+      II=I+NInAc+NAc
+      JJ=J+NInAc+NAc
+      IJ=(Max(II,JJ)*(Max(II,JJ)-1))/2+Min(II,JJ)
+      FIJ=XKin(IJ)
+      Do K=1,NInAc
+      FIJ=FIJ+Occ(K)*
+     $ (Two*TwoEl(NAddr3(II,JJ,K,K))-TwoEl(NAddr3(II,K,JJ,K)))
+      EndDo
+      Do K=1+NInAc,NInAc+NAc
+      Do L=1+NInAc,NInAc+NAc
+      FIJ=FIJ+AUXM1(K-NInAc,L-NInAc)*
+     $ (Two*TwoEl(NAddr3(II,JJ,K,L))-TwoEl(NAddr3(II,L,JJ,K)))
+      EndDo
+      EndDo
+      Fock((J-1)*NVirt+I)=FIJ
+      EndDo
+      EndDo
+C
+      Call Diag8(Fock,NVirt,NVirt,PC,Work)
+C
+C      Print*, 'VIRT-Ka',norm2(Fock)
+C
+      Do I=1,NVirt
+      Do J=1,NVirt
+      II=I+NInAc+NAc
+      JJ=J+NInAc+NAc
+      URe(II,JJ)=Fock((J-1)*NVirt+I)
+      EndDo
+      EndDo
+C
+      EndIf
+C     end of ITwoEl==1      
+      EndIf
+C
+C     END OF CANONICALIZING
+C
+      Call MatTr(XKin,URe,NBasis)
+C
+      If(ITwoEl.Eq.1) Then
       Write(6,'(" Transforming two-electron integrals ...",/)')
       Call TwoNO1(TwoEl,URe,NBasis,NInte2)
-C herer!!! ???
+C
+      ElseIf(ITwoEl.Eq.3) Then
+C     PREPARE POINTERS: NOccup=num0+num1
+      Call prepare_nums(Occ,Num0,Num1,NBasis)
+      If(ISwitch.Eq.1) Num0=NInAC
+      If(ISwitch.Eq.1) Num1=NAc
+C     TRANSFORM J AND K
+      UAux=transpose(URe)
+      Call tran4_gen(NBasis,
+     $        Num0+Num1,UAux(1:NBasis,1:(Num0+Num1)),
+     $        Num0+Num1,UAux(1:NBasis,1:(Num0+Num1)),
+     $        NBasis,UAux,
+     $        NBasis,UAux,
+     $        'FFOO','AOTWOSORT')
+      Call tran4_gen(NBasis,
+     $        NBasis,UAux,
+     $        Num0+Num1,UAux(1:NBasis,1:(Num0+Num1)),
+     $        NBasis,UAux,
+     $        Num0+Num1,UAux(1:NBasis,1:(Num0+Num1)),
+     $        'FOFO','AOTWOSORT')
+C
+      EndIf
+C
+C     CHECK IF INACT AND VIRT ORBITALS ARE CANONICAL
+C
+      GoTo 555
+      Do I=1,NInAc
+      Do J=1,I
+      IJ=(Max(I,J)*(Max(I,J)-1))/2+Min(I,J)
+      FIJ=XKin(IJ)
+      Do K=1,NInAc+NAc
+      FIJ=FIJ+Occ(K)*(Two*TwoEl(NAddr3(I,J,K,K))-TwoEl(NAddr3(I,K,J,K)))
+      EndDo
+      If(Abs(FIJ).Gt.1.D-7) Write(*,*)'Inactive FIJ',I,J,FIJ
+      EndDo
+      EndDo
+C
+      Do I=NInAc+NAc+1,NBasis
+      Do J=I,NBasis
+      IJ=(Max(I,J)*(Max(I,J)-1))/2+Min(I,J)
+      FIJ=XKin(IJ)
+      Do K=1,NInAc+NAc
+      FIJ=FIJ+Occ(K)*(Two*TwoEl(NAddr3(I,J,K,K))-TwoEl(NAddr3(I,K,J,K)))
+      EndDo
+      If(Abs(FIJ).Gt.1.D-7) Write(*,*)'Virt FIJ',I,J,FIJ
+      EndDo
+      EndDo
+      stop
+  555 Continue
+C      
+      If(IBin.Ge.0) Then
+      NBSave=NBasis        
+      NBasis=NAc
+      NInAc=0
+      EndIf
+C
 c      Write(6,'(" Skipping reading 2-RDM from rdmdump.dat.",/)')
 c      Write(6,'(" 2-RDM will be read from rdm2.dat file ...",/)')
 c      GoTo 888
 C
 C     READ ACTIVE 2-RDM AND TRANSFORM TO NO'S  
 C
-      Write(6,'(" Reading in 2-RDM ...")')
+      Write(6,'(" Reading 2-RDM ...")')
       NRDM2 = NBasis**2*(NBasis**2+1)/2
       Allocate (RDM2(NRDM2))
       RDM2(1:NRDM2)=Zero
+C
+      If(IEugene.Eq.0) Then
+C
       Allocate (RDMAB2(NRDM2))
       RDMAB2(1:NRDM2)=Zero
 C
       IAAAA=1
       IABBA=0
-      Open(10,File='rdmdump.dat')
+      Open(10,File='rdmdump.dat',Status='Old')
    22 Read(10,*,End=33) X,I1,I2,I3,I4
 C
       I=I1+NInAc
@@ -388,6 +768,41 @@ C
       Do I=1,NRDM2 
       RDM2(I)=RDM2(I)+RDMAB2(I)
       EndDo
+C
+c else of IEugene.Eq.0
+      Else
+C
+      Open(10,File='rdmdump.dat',form='unformatted',access='stream',
+     $ Status='Old')
+   28 Read(10,End=38) X,I1,I2,I3,I4
+C
+      If((I3+I4.Ne.0)) Then
+      X=X/Two
+      I=I1+NInAc
+      J=I2+NInAc
+      K=I3+NInAc
+      L=I4+NInAc
+      RDM2(NAddrRDM(I,J,K,L,NBasis))=X
+      RDM2(NAddrRDM(J,I,L,K,NBasis))=X
+      EndIf
+C
+      GoTo 28
+   38 Close(10)
+C
+      EndIf
+C
+      If(IBin.Ge.0) Then
+C
+      Do I=1,NBasis
+      Do J=1,NBasis
+      UMOAO((J-1)*NBasis+I)=AUXM(I,J)
+      EndDo
+      EndDo
+C      
+      Call TrRDM2(RDM2,UMOAO,NBasis,NRDM2)
+      GoTo 777
+C
+      EndIf      
 C 
       Call TrRDM2(RDM2,URe,NBasis,NRDM2)
 C
@@ -413,7 +828,7 @@ C     THE INACTIVE PART INActive
       ETot=Zero
       Do I=1,INActive
       II=(I*(I+1))/2
-      ETot=ETot+Two*Occ(I)*xkin(II)
+      ETot=ETot+Two*Occ(I)*XKin(II)
       EndDo
 C
       Do IP=1,INActive
@@ -421,7 +836,7 @@ C
       Do IR=1,INActive
       Do IS=1,INActive
       IAdd=NAddrRDM(IP,IQ,IR,IS,NBasis)
-      ETot=ETot+RDM2(IAdd)*Twoel(NAddr3(IP,IR,IQ,IS))
+      ETot=ETot+RDM2(IAdd)*TwoEl(NAddr3(IP,IR,IQ,IS))
       EndDo
       EndDo
       EndDo
@@ -438,7 +853,7 @@ C
       sum=zero
       Do J=1,INActive
       sum=sum+
-     $ 2.D0*Twoel(NAddr3(I,I,J,J))-Twoel(NAddr3(I,J,I,J))
+     $ 2.D0*TwoEl(NAddr3(I,I,J,J))-TwoEl(NAddr3(I,J,I,J))
       EndDo
       eact=eact+Two*Occ(I)*(XKin(II)+sum)
       EndIf
@@ -452,10 +867,10 @@ C
       Do IR=1,NOccup
       Do IS=1,NOccup
       IAdd=NAddrRDM(IP,IQ,IR,IS,NBasis)
-      ETot=ETot+RDM2(IAdd)*Twoel(NAddr3(IP,IR,IQ,IS))
+      ETot=ETot+RDM2(IAdd)*TwoEl(NAddr3(IP,IR,IQ,IS))
       if(occ(ip).ne.1.d0.and.occ(ir).ne.1.d0.and.occ(iq).ne.1.d0.and.
      $ occ(is).ne.1.d0) then
-      etot2=etot2+RDM2(IAdd)*Twoel(NAddr3(IP,IR,IQ,IS))
+      etot2=etot2+RDM2(IAdd)*TwoEl(NAddr3(IP,IR,IQ,IS))
       endif
       EndDo
       EndDo
@@ -466,6 +881,7 @@ C
 c *****************************************
 
 C
+  777 Continue    
 C     SAVE THE ACTIVE PART IN rdm2.dat
       Open(10,File='rdm2.dat')
       Do I=NInAc+1,NInAc+NAc
@@ -480,16 +896,20 @@ C     SAVE THE ACTIVE PART IN rdm2.dat
       KL=(K-1)*NBasis+L
       If(IJ.Ge.KL) Write(10,'(4I4,F19.12)') 
      $ KKAct,IIAct,LLAct,JJAct,Two*RDM2(NAddrRDM(I,J,K,L,NBasis))
+c herer!!!
+c      If(IJ.Ge.KL) Write(*,'(8I4,F19.12)')
+c     $ KKAct,IIAct,LLAct,JJAct,I,J,K,L,
+c     $Two*RDM2(NAddrRDM(I,J,K,L,NBasis))      
       EndDo
       EndDo
       EndDo
       EndDo 
       Close(10)
       Deallocate(RDM2)
-      Deallocate(RDMAB2)
+      If(IEugene.Eq.0) Deallocate(RDMAB2)
+      If(IBin.Ge.0) NBasis=NBSave
 
 c herer!!! ???
-c      stop
   888 Continue
 C
 C     INTEGRALS ARE TRANSFORMED SO URe IS SET AS A UNIT MATRIX 
@@ -503,6 +923,7 @@ C
 C
       Return
       End
+
 
 *Deck LdInteg
       Subroutine LdInteg(Title,XKin,XNuc,ENuc,Occ,URe,
@@ -1878,6 +2299,7 @@ C
       Call MatTr(XKin,UMOAO,NBasis)
         write(56,*) XKin
 
+      close(iunit77)
       return
       end
 
@@ -2261,7 +2683,7 @@ C      write(*,*) trim(fname)
       Do IQ=1,NBasis
       Do IP=1,IQ
       IPQ = IPQ + 1
-      TwoNO(NAddr3(IP,IQ,IR,IS)) = Work1(IPQ)   
+      TwoNO(NAddr3(IP,IQ,IR,IS)) = Work1(IPQ)
 C      Write(6,*) IP,IQ,IR,IS, Work1(IPQ)
 C      Write(6,*) IP,IQ,IR,IS, TwoNO(NAddr3(IP,IQ,IR,IS)) 
       EndDo
@@ -2283,6 +2705,58 @@ C      EndDo
 C      EndDo
 C      EndDo
 C      EndIf
+
+      close(iunit)
+      End
+
+*Deck CheckSaptTwoEl
+      Subroutine CheckSaptTwoEl(Mon,TwoNO,NBasis,NInte2)
+C
+      Implicit Real*8 (A-H,O-Z)
+C   
+      Integer :: Mon, NInte2, NBasis
+      Integer :: IRS, IS, IR, IPQ, IQ, IP
+      Integer :: iunit
+      Integer(8),external :: NAddr3
+      Dimension :: TwoNO(NInte2), Work1(NBasis**2)    
+      Character*9 :: fname
+
+      If(Mon.Eq.1) Then
+      fname='TWOMOAA '
+      ElseIf(Mon.Eq.2) Then
+      fname='TWOMOBB '
+      ElseIf(Mon.Eq.3) Then
+      fname='AOTWOSORT'
+      ElseIf(Mon.Eq.4) Then
+      fname='AOERFSORT'
+      ElseIf(Mon.Eq.5) Then
+      fname='MO2ERFAA'
+      ElseIf(Mon.Eq.6) Then
+      fname='MO2ERFBB'
+      EndIf
+ 
+      Work1 = 0d0
+      open(newunit=iunit,file=trim(fname),status='OLD',
+     $ access='DIRECT',recl=8*NBasis*(NBasis+1)/2)
+
+      IRS=0
+      Do IS=1,NBasis
+      Do IR=1,IS
+      IRS=IRS+1
+      read(iunit,rec=IRS) Work1(1:NBasis*(NBasis+1)/2)
+      IPQ=0
+      Do IQ=1,NBasis
+      Do IP=1,IQ
+      IPQ = IPQ + 1
+      TMP=Abs(TwoNO(NAddr3(IP,IQ,IR,IS))-Work1(IPQ))
+      If(TMP>1.D-6) Write(*,*) IP,IQ,IR,IS,
+     $ TwoNO(NAddr3(IP,IQ,IR,IS)),Work1(IPQ) 
+C      Write(6,*) IP,IQ,IR,IS, Work1(IPQ)
+C      Write(6,*) IP,IQ,IR,IS, TwoNO(NAddr3(IP,IQ,IR,IS)) 
+      EndDo
+      EndDo
+      EndDo
+      EndDo
 
       close(iunit)
       End

@@ -1,8 +1,11 @@
 *Deck INTERPA
       Subroutine INTERPA(ETot,ENuc,TwoNO,URe,UNOAO,Occ,XOne,
-     $  Title,OrbGrid,WGrid,NSymMO,NBasis,NInte1,NInte2,NGrid,NDim,
-     $  NGem,IAPSG,ISERPA,QMAX,NGOcc,Small)
+     $  Title,NBasis,NInte1,NInte2,NDim,
+     $  NGem,NGOcc)
 C
+C      Subroutine INTERPA(ETot,ENuc,TwoNO,URe,UNOAO,Occ,XOne,
+C     $  Title,OrbGrid,WGrid,NSymMO,NBasis,NInte1,NInte2,NGrid,NDim,
+C     $  NGem,IAPSG,ISERPA,QMAX,NGOcc,Small)
 C     A ROUTINE FOR COMPUTING ELECTRONIC ENERGY USING ERPA TRANSITION
 C     DENSITY MATRIX ELEMENTS
 C
@@ -16,8 +19,8 @@ c
 C
       Dimension
      $ URe(NBasis,NBasis),UNOAO(NBasis,NBasis),Occ(NBasis),
-     $ TwoNO(NInte2),
-     $ XOne(NInte1),OrbGrid(NBasis,NGrid),WGrid(NGrid)
+     $ TwoNO(NInte2),XOne(NInte1)
+C     $ XOne(NInte1),OrbGrid(NBasis,NGrid),WGrid(NGrid)
 C
 C     LOCAL ARRAYS
 C
@@ -199,7 +202,6 @@ C
 C     CALL AC If IFlaAC=1 OR IFlSnd=1
 C
       If(IFlAC.Eq.1.Or.IFlSnd.Eq.1) Then
-      Print*, 'HERE?'
       Call ACECORR(ETot,ENuc,TwoNO,URe,Occ,XOne,UNOAO,
      $ IndAux,ABPLUS,ABMIN,EigVecR,Eig,EGOne,
      $ Title,NBasis,NInte1,NInte2,NDim,NGOcc,NGem,
@@ -4991,7 +4993,7 @@ C
       If(IP.Eq.IS.And.IQ.Eq.IR.And. (Occ(IP).Eq.One.Or.Occ(IQ).Eq.One) )
      $ RDM2=RDM2-Occ(IP)*Occ(IQ)
 C
-C     ACTIVE PART?
+C     ACTIVE PART
 C
       If(Ind2(IP)*Ind2(IQ)*Ind2(IR)*Ind2(IS).Ne.Zero) Then 
       RDM2=RDM2Act(NAddrRDM(Ind2(IP),Ind2(IQ),Ind2(IR),Ind2(IS),NAct))
@@ -5001,3 +5003,37 @@ C
 C
       Return
       End 
+
+*Deck FRDM2GVB
+      Real*8 Function FRDM2GVB(IP,IQ,IR,IS,Occ,NBasis)
+C
+C     FOR A GIVEN SET OF INDICES AND THE KNOWN CICoef AND IGem
+C     RETURNS THE ELEMENT OF RDM2_PQRS FOR GVB
+C
+      Implicit Real*8 (A-H,O-Z)
+C
+      Parameter(Zero=0.D0, Half=0.5D0, One=1.D0, Two=2.D0)
+C
+      Include 'commons.inc'
+C
+      Dimension Occ(NBasis)
+C
+      RDM2=Zero
+C
+C     INTRA PAIR
+C
+      If(IP.Eq.IQ.And.IR.Eq.IS.And.IGem(IP).Eq.IGem(IR))
+     $ RDM2=RDM2+CICoef(IP)*CICoef(IR)
+C
+C     INTER COULOMB AND EXCHANGE
+C
+      If(IP.Eq.IR.And.IQ.Eq.IS.And.IGem(IP).Ne.IGem(IQ))
+     $ RDM2=RDM2+Two*Occ(IP)*Occ(IQ)
+      If(IP.Eq.IS.And.IQ.Eq.IR.And.IGem(IP).Ne.IGem(IQ))
+     $ RDM2=RDM2-Occ(IP)*Occ(IQ)
+C
+      FRDM2GVB=RDM2
+C     
+      Return
+      End
+

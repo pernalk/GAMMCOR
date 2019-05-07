@@ -21,11 +21,7 @@ write(LOUT,'()')
 
 !check RDMType
 if(CalcParams%RDMType==RDM_TYPE_DMRG) then
-   if(CalcParams%InterfaceType.ne.INTER_TYPE_OWN) then
-      write(6,'(1x,a)') "ERROR! RDMType DMRG REQUIRES:"
-      write(6,'(1x,a)') "Interface      OWN"
-      stop
-   elseif(CalcParams%RDMSource.ne.INTER_TYPE_OWN) then
+   if(CalcParams%RDMSource.ne.INTER_TYPE_OWN) then
       write(6,'(1x,a)') "ERROR! RDMType DMRG REQUIRES:"
       write(6,'(1x,a)') "RDMSource      OWN"
       stop
@@ -56,9 +52,11 @@ select case(CalcParams%InterfaceType)
 ! Dalton
 case(1)
    if(CalcParams%RDMSource==INTER_TYPE_OWN) then
-      write(LOUT,'(1x,a)') 'ERROR! Dalton INTERFACE REQUIRES:' 
-      write(LOUT,'(1x,a)') 'RDMSource     DALTON'
-      stop
+     ! write(LOUT,'(1x,a)') 'ERROR! Dalton INTERFACE REQUIRES:' 
+     ! write(LOUT,'(1x,a)') 'RDMSource     DALTON'
+     ! stop
+      write(LOUT,'(1x,a)') 'WARNING! Dalton INTERFACE USED WITH:' 
+      write(LOUT,'(1x,a)') 'RDMSource     OWN'
    elseif(CalcParams%SymType==TYPE_SYM) then 
       write(LOUT,'(1x,a)') 'ERROR! Dalton INTERFACE REQUIRES:' 
       write(LOUT,'(1x,a)') 'Symmetry      NOSYM'
@@ -253,7 +251,7 @@ else
   Flags%IFlCore = Input%CalcParams%Inactive
  
  ! EERPA
- if(Input%CalcParams%Fragments==1) Flags%IFlFrag = 1
+ if(Input%CalcParams%Fragments==1) Flags%IFlFrag1 = 1
 
  Flags%IFl12 = FLAG_DEBUG_FL12
 
@@ -306,6 +304,7 @@ if(Flags%ISAPT.Eq.0) then
    System%NBasis = Input%CalcParams%NBasis
    System%Multiplicity = Input%SystemInput(1)%Multiplicity
    System%Omega  = Input%SystemInput(1)%Omega
+   System%EigFCI = Input%SystemInput(1)%EigFCI
    System%ThrAct = Input%SystemInput(1)%ThrAct
    System%ThrSelAct = Input%SystemInput(1)%ThrSelAct
    System%TwoMoInt = Input%SystemInput(1)%TwoMoInt
@@ -379,7 +378,7 @@ elseif(Flags%ISAPT.Eq.1) then
       monB%ZNucl  = Input%SystemInput(2)%ZNucl
       monB%Charge = Input%SystemInput(2)%Charge
       monB%ACAlpha = Input%SystemInput(2)%ACAlpha
-      monB%Omega  = Input%SystemInput(2)%Omega
+      monB%Omega  = Input%SystemInput(2)%Omega 
       monB%EigFCI = Input%SystemInput(2)%EigFCI
       monB%NBasis = Input%CalcParams%NBasis
       monB%Multiplicity = Input%SystemInput(2)%Multiplicity
@@ -596,7 +595,7 @@ write(LOUT, '(1x,a,6x,i3)') "IFLSnd  ", &
 write(LOUT, '(1x,a,6x,i3)') "IFlCore ", &
              (Flags%IFlCore)
 write(LOUT, '(1x,a,6x,i3)') "IFlFrag ", &
-             (Flags%IFlFrag)
+             (Flags%IFlFrag1)
 write(LOUT, '(1x,a,6x,i3)') "IFl12   ", &
               (Flags%IFl12)
 write(LOUT, '(1x,a,6x,i3)') "ISAPT   ", &

@@ -2137,6 +2137,237 @@ C
       Return
       End
 
+*Deck PINOVECREDXY
+      Subroutine PINOVECREDXY(EigVecY,EigVecX,Eig,INegExcit,
+     $ APLUS,AMIN,DPLUS,DMIN,EPLUS,EMIN,IndN,
+     $ NBasis,NDimX,NDimN)
+C
+C     A REDUCED NONSYMMETRIC PINO PROBLEM IS SOLVED
+C     UNTILDED! [Y,W]->EigVecY and [X,0]->EigVecX VECTORS ARE RETURNED
+C
+      Implicit Real*8 (A-H,O-Z)
+C
+      Parameter(Zero=0.D0,Half=0.5D0,One=1.D0,Two=2.D0,Three=3.D0,
+C     OLD:
+     $ Four=4.D0,Small=1.D-10)
+C     $ Four=4.D0,Small=1.D-2)
+C
+      Integer :: DimV1,Max_NDEG
+      Integer :: Space1(3,2*(NDimX+NDimN))
+C
+      Include 'commons.inc'
+C
+      Dimension
+     $ APLUS(NDimX,NDimX),AMIN(NDimX,NDimX),
+     $ DPLUS(NDimX,NDimN),EPLUS(NDimN,NDimN),
+     $ DMIN(NDimX,NDimN),EMIN(NDimN,NDimN),
+     $ Q1(NDimX+NDimN,NDimX+NDimN),
+     $ Q2(NDimX+NDimN,NDimX+NDimN),
+     $ EigVecY((NDimX+NDimN)*(NDimX+NDimN)),
+     $ EigVecX((NDimX+NDimN)*(NDimX+NDimN)),
+     $ Eig(NDimX+NDimN),Work(5*(NDimX+NDimN)),
+     $ HlpAB(NDimX+NDimN,NDimX+NDimN),
+     $ EigI(NDimX+NDimN),
+     $ IndN(2,NDimX)
+C
+C     SYMMETRIZE A+,A-
+C
+      Do I=1,NDimX
+      Do J=I+1,NDimX
+      APLUS(I,J)=Half*(APLUS(I,J)+APLUS(J,I))
+      APLUS(J,I)=APLUS(I,J)
+      AMIN(I,J)=Half*(AMIN(I,J)+AMIN(J,I))
+      AMIN(J,I)=AMIN(I,J)
+      EndDo
+      EndDo
+C
+      Do I=1,NDimX+NDimN
+      Do J=1,NDimX+NDimN
+C
+      If(I.Le.NDimX) Then
+C
+      If(J.Le.NDimX) Then
+      Q1(I,J)=APLUS(I,J)
+      Q2(I,J)=AMIN(I,J)
+      Else
+      Q1(I,J)=DPLUS(I,J-NDimX)
+      Q2(I,J)=DMIN(I,J-NDimX)
+      EndIf
+C
+      Else
+C
+      If(J.Le.NDimX) Then
+      Q1(I,J)=Two*DPLUS(J,I-NDimX)
+      Q2(I,J)=Two*DMIN(J,I-NDimX)
+      Else
+      Q1(I,J)=EPLUS(I-NDimX,J-NDimX)
+      Q2(I,J)=EMIN(I-NDimX,J-NDimX)
+      EndIf
+C
+      EndIf
+C
+      EndDo
+      EndDo
+C
+      NI=NDimX+NDimN
+C
+      Call MultpM(HlpAB,Q1,Q2,NI)
+C
+      Call DGEEV('N','V',NI,HlpAB,NI,Eig,EigI,
+     $           Q1,NI,EigVecY,NI,Work,5*I,INFO)
+C
+C     ORTHOGONALISE DEGENERATE VECTORS
+      Write(6,*) 'ORTHOGONALIZE DEGENERATE VECTORS IN PINOVECREDXY'
+      Call SORT_PINOVECS(EigVecY,Eig,EigI,NI)
+      Call CREATE_SPACE(Eig,Space1,NI,DimV1,Max_NDEG)
+      Call ORTHO_DEGVEC(EigVecY,Space1,DimV1,NI,Max_NDEG)
+C      Call ZERO_DEGVEC(EigVecY,Eig,Space1,DimV1,NDimEx,Max_NDEG)
+C
+      NDeg = 0
+      Do I=1,NI
+      If(Space1(3,I).Gt.1) NDeg = NDeg + 1
+      EndDo
+      Write(6,*) 'NUMBER OF DEGENERATE VECS:', NDeg
+C      Write(6,*) 'DimV1                    :', DimV1
+      Write(6,*) 'MAXIMUM DEGENERACY       :', Max_NDEG
+      Write(6,*) ' '
+C
+      Do NU=1,NI
+C
+      If(Abs(EigI(NU)).Gt.1.D-12) Then
+C
+      Write(6,'(X,"Complex PINO Eigenvalue",I4,2E12.4)')
+     $ NU,Eig(NU),EigI(NU)
+      Eig(NU)=Zero
+      Do I=1,NI
+      EigVecY((NU-1)*NI+I)=Zero
+      EndDo
+C
+      EndIf
+      EndDo
+C
+C     IMPOSE THE NORMALIZATION 2 Y*X + V*W = 1 ON THE EIGENVECTORS
+C
+      Write(6,'(X,"Threshold for small PINO Eigenvalue ",E12.4)')
+     $ Small
+C
+      Do NU=1,NI
+      SumNU=Zero
+C
+      If(Eig(NU).Gt.Small) Then
+C
+      Eig(NU)=SQRT(Eig(NU))
+C
+      Do I=1,NI
+C
+      EigVecX((NU-1)*NI+I)=Zero
+      Do J=1,NI
+      EigVecX((NU-1)*NI+I)=EigVecX((NU-1)*NI+I)+One/Eig(NU)*Q2(I,J)*
+     $                                          EigVecY((NU-1)*NI+J)
+      EndDo
+C
+      If(I.Le.NDimX) Then
+      SumNU=SumNU+Two*EigVecY((NU-1)*NI+I)*EigVecX((NU-1)*NI+I)
+      Else
+      SumNU=SumNU+EigVecY((NU-1)*NI+I)*EigVecX((NU-1)*NI+I)
+      EndIf
+C
+      EndDo
+C
+CC     CHANGE 5
+      If(SumNU.Gt.Zero) Then
+      SumNU=One/Sqrt(SumNU)
+      Else
+      Eig(NU)=-Eig(NU)
+      Write(*,*) 'Neg Norm in PINOVECSYMM', NU,Eig(NU),SumNU
+      SumNU=One/Sqrt(Abs(SumNU))
+      EndIf
+C
+C     VECTORS ARE NORMALIZED TO A POSITIVE NUMEBR FOR POSITIVE AND NEGATIVE Omega
+C
+      Do I=1,NI
+      EigVecY((NU-1)*NI+I)=EigVecY((NU-1)*NI+I)*SumNU
+      If(Eig(NU).Gt.Zero) Then
+      EigVecX((NU-1)*NI+I)=EigVecX((NU-1)*NI+I)*SumNU
+      Else
+      EigVecX((NU-1)*NI+I)=-EigVecX((NU-1)*NI+I)*SumNU 
+      EndIf
+      EndDo
+C
+c     If(Eig(NU).Gt.Small) Then
+      Else
+C
+      Write(6,'(X,"Small or Negative PINO Eigenvalue ",I4,E12.4)')
+     $ NU,Eig(NU)
+      Eig(NU)=Zero
+      Do I=1,NI
+      EigVecY((NU-1)*NI+I)=Zero
+      EigVecX((NU-1)*NI+I)=Zero
+      EndDo
+C
+      EndIf
+c     enddo NU
+      EndDo
+C
+C     DOUBLE CHECKING OF THE NORMALIZATION
+C
+      Do NU=1,NI
+      SumNU=Zero
+      If(Eig(NU).Ne.Zero) Then 
+      Do I=1,NI
+      If(I.Le.NDimX) Then
+      SumNU=SumNU+Two*EigVecY((NU-1)*NI+I)*EigVecX((NU-1)*NI+I)
+      Else
+      SumNU=SumNU+EigVecY((NU-1)*NI+I)*EigVecX((NU-1)*NI+I)
+      EndIf
+      EndDo
+C
+      If(SumNU.Le.Zero) Then
+      Write(*,*)'NU Omega(NU)',NU,Eig(NU)
+      Stop 'Error in PINOVECREDXY: wrong SumN'
+      EndIf
+C
+      EndIf
+      EndDo
+C
+C     FIND UNTILDED Y,X,W, SET V TO ZERO (IT SHOULD HAVE NO CONTRIBUTION TO ANYTHING
+C     BECAUSE IT DOES NOT CORRESPOND TO 1-TRDM
+C 
+C     IN TERMS OF UNTILDED VECTORS WE HAVE:
+C  
+C     p>q,  1-TRDM_pq = -(n_p - n_q) X_pq
+C     p>q,  1-TRDM_qp =  (n_p - n_q) Y_pq
+C     p=q   1-TRDM_pp = W_pp 
+C
+C     EigVecX=[X,0] and EigVecY = [Y,W]
+C
+      Do K=1,NI
+      Do I=1,NI
+C
+      If(I.Le.NDimX) Then
+C
+      IP=IndN(1,I)
+      IQ=IndN(2,I)
+C
+      X=EigVecX((K-1)*NI+I)/(CICoef(IP)+CICoef(IQ))
+      Y=EigVecY((K-1)*NI+I)/(CICoef(IP)-CICoef(IQ))
+C
+      EigVecX((K-1)*NI+I)=Half*(X-Y)
+      EigVecY((K-1)*NI+I)=Half*(X+Y)
+C
+      Else
+C
+      EigVecX((K-1)*NI+I)=Zero
+      EigVecY((K-1)*NI+I)=CICoef(I-NDimX)*EigVecY((K-1)*NI+I)
+C
+      EndIf
+C
+      EndDo
+      EndDo
+C
+      Return
+      End
+
 *Deck Get_APL
       Subroutine Get_APL(IR,IS,IP,IQ,APL,HNO,XMu,TwoMO,AuxH,
      $ NBasis,NInte1,NInte2)
