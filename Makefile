@@ -117,7 +117,7 @@ $(O)exmisc.o : $(S)exmisc.f90 $(O)types.o
 	$(FCC) $(FFLAGS)  -c $(S)exmisc.f90 -o $(O)exmisc.o
 $(O)exdpino.o : $(S)exdpino.f90 $(O)types.o $(O)tran.o $(O)timing.o $(O)exmisc.o
 	$(FCC) $(FFLAGS)  -c $(S)exdpino.f90 -o $(O)exdpino.o
-$(O)sapt_main.o : $(S)sapt_main.f90 $(O)types.o $(O)systemdef.o $(O)tran.o $(O)sorter.o $(O)sapt.o $(O)abmats.o $(O)abfofo.o
+$(O)sapt_main.o : $(S)sapt_main.f90 $(O)types.o $(O)systemdef.o $(O)tran.o $(O)sorter.o $(O)sapt.o $(O)abmats.o $(O)abfofo.o $(O)exdpino.o
 	$(FCC) $(FFLAGS)  -c $(S)sapt_main.f90 -o $(O)sapt_main.o
 $(O)sapt.o : $(S)sapt.f90 $(O)types.o $(O)tran.o $(O)exmisc.o $(O)timing.o 
 	$(FCC) $(FFLAGS)  -c $(S)sapt.f90 -o $(O)sapt.o
