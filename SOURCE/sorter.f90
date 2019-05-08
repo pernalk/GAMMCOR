@@ -37,7 +37,7 @@ implicit none
 integer :: NBas
 integer :: aosource
 character(*) :: intfile,sortfile
-integer,optional :: outinfo
+integer(8),optional :: outinfo
 integer :: iunit,iunit2
 integer :: maxrep, naos(8), lbuf, nibuf, nbits, lenint4
 integer :: nsk, nt(8), ntoff(8)
@@ -49,7 +49,7 @@ double precision,allocatable :: val_buf(:), mat(:)
 integer :: idx_p, idx_q, idx_r, idx_s, pq, rs, idx_end
 integer :: sym_p, sym_q, sym_r, sym_s, sym_rs
 logical :: swap_pqrs
-integer :: i
+integer(8) :: i
 
  ! start SORT1
  ! open sorter file 

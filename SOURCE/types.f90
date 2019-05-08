@@ -953,7 +953,8 @@ subroutine readoneint_eugene(mone,enuc,infile,ntr,ipos)
 implicit none
 ! reads one-el integrals from a eugene's file
 
-integer,intent(in) :: ntr,ipos
+integer,intent(in) :: ntr
+integer(8),intent(in) :: ipos
 character(*),intent(in) :: infile
 double precision,intent(out) :: mone(ntr),enuc
 

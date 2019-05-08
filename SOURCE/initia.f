@@ -305,6 +305,7 @@ C
      $ Fock(NBasis*NBasis),
      $ UAux(NBasis,NBasis),
      $ FockF(NInte1),GammaAB(NInte1)
+      Integer(8) IOutInfo
 C 
 C herer!!!
       IEugene=1
@@ -923,6 +924,7 @@ C
 C
       Return
       End
+
 
 
 *Deck LdInteg
