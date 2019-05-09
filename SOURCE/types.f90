@@ -23,6 +23,7 @@ integer, parameter :: JOB_TYPE_EERPA = 4
 integer, parameter :: JOB_TYPE_SAPT  = 5
 integer, parameter :: JOB_TYPE_PDFT  = 6
 integer, parameter :: JOB_TYPE_CASPIDFT = 7
+integer, parameter :: JOB_TYPE_EERPA_OLD = 8
 
 integer, parameter :: SAPTLEVEL0 = 0
 integer, parameter :: SAPTLEVEL1 = 1
@@ -65,9 +66,9 @@ character(*),parameter :: PossibleInterface(3) = &
 [character(8) :: &
 'DALTON', 'MOLPRO', 'OWN']
 
-character(*),parameter :: PossibleJobType(7) = &
+character(*),parameter :: PossibleJobType(8) = &
 [character(8) :: &
-'AC', 'AC0', 'ERPA', 'AC1', 'SAPT', 'PDFT', 'CASPiDFT']
+'AC', 'AC0', 'ERPA', 'EERPA', 'SAPT', 'PDFT', 'CASPiDFT','EERPA-1']
 
 character(*),parameter :: PossibleRDMType(5) = &
 [character(8) :: &
@@ -94,7 +95,7 @@ type CalculationBlock
       integer :: DFApp = DF_NONE
       integer :: Kernel = 1
       integer :: TwoMoInt = TWOMO_INCORE
-      integer :: Inactive = FLAG_CORE 
+      integer :: Core = FLAG_CORE
       integer :: SymType = TYPE_NO_SYM
       integer :: SaptLevel = SAPTLEVEL2 
       logical :: Restart = FLAG_RESTART

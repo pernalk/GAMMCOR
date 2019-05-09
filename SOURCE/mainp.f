@@ -207,7 +207,7 @@ C
 C     SET THRESHOLD FOR ACTIVE ORBITALS IN CAS
       ThrSelAct = System%ThrSelAct
 C
-C     *************************************************************************
+C*************************************************************************
 C     READ THE INPUT AND PRINT THE INPUT DATA 
 C
 C     OLD INPUT-READ

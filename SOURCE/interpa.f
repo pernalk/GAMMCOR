@@ -54,7 +54,8 @@ C             USED IN FragEcorr and OneTwoBody
 C             
 C             IFlag12 IS ONLY IN EFFECT WHEN IFlFrag1=1
 C
-      IFl12=1
+C     MH: SWITCHING IT OFF!!!
+c      IFl12=1
 C
 C     RPAX: IFlCore=1, IFlFrag1=0
 C     ERPA without core orbitals: IFlCore=0, IFlFrag1=0

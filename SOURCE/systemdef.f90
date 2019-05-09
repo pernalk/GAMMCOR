@@ -245,15 +245,21 @@ else
   case(JOB_TYPE_CASPIDFT)
      Flags%IFunSR = 5 
 
+  case(JOB_TYPE_EERPA)
+     Flags%IFl12 = 1
+
+  case(JOB_TYPE_EERPA_OLD)
+     Flags%IFl12 = 2
+
   end select
 
  ! Inactive
-  Flags%IFlCore = Input%CalcParams%Inactive
+  Flags%IFlCore = Input%CalcParams%Core
  
  ! EERPA
  if(Input%CalcParams%Fragments==1) Flags%IFlFrag1 = 1
 
- Flags%IFl12 = FLAG_DEBUG_FL12
+ !Flags%IFl12 = FLAG_DEBUG_FL12
 
 endif
 

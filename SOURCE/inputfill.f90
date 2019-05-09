@@ -273,8 +273,12 @@ subroutine read_block_calculation(CalcParams, line)
                CalcParams%JobType = JOB_TYPE_ERPA
            elseif (uppercase(val) == "AC1" ) then
                CalcParams%JobType = JOB_TYPE_ERPA
-           elseif (uppercase(val) == "EERPA" ) then
+           elseif (uppercase(val) == "EERPA".or. & 
+                   uppercase(val) == "ERPA-2") then
                CalcParams%JobType = JOB_TYPE_EERPA
+           elseif (uppercase(val) == "EERPA-OLD".or. & 
+                   uppercase(val) == "ERPA-1") then
+               CalcParams%JobType = JOB_TYPE_EERPA_OLD
            elseif (uppercase(val) == "SAPT" ) then
                CalcParams%JobType = JOB_TYPE_SAPT
            elseif (uppercase(val) == "PDFT" ) then
@@ -290,8 +294,8 @@ subroutine read_block_calculation(CalcParams, line)
                CalcParams%Fragments = 1
            endif
 
-      case ("INACTIVE") 
-         read(val, *) CalcParams%Inactive
+      case ("CORE") 
+         read(val, *) CalcParams%Core
 
       case ("NBASIS") 
          read(val, *) CalcParams%NBasis

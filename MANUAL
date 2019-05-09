@@ -6,6 +6,22 @@ make
 
 To complie with gfortran change flags in Makefie.
 
+
+
+
+********************************* 
+EERPA
+********************************* 
+Available keywords:
+1) Calculation block
+   a) JobType
+              EERPA     (alternatively: EERPA-2)
+              EERPA-OLD (alternatively: EERPA-1)
+
+   *EERPA or EERPA-2 sets     IFl12 = 1
+   *EERPA-OLD or EERPA-1 sets IFl12 = 2
+
+
 ********************************* 
 SAPT: GENERAL REMARKS
 ********************************* 
