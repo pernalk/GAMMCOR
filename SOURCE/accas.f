@@ -50,7 +50,7 @@ C
 C
       IPair(1:NBasis,1:NBasis)=0
 C
-      Write(LOUT,'(2x,a,2e15.5)') 'Threshold for active orbitals: ',
+      Write(LOUT,'(2x,a,2e15.5)') 'Threshold for quasi-degeneracy ',
      $ ThrSelAct
       IJ=0
       Ind=0

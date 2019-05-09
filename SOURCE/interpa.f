@@ -45,12 +45,16 @@ C     IFlFrag1 = 1 : run embedding: call FragEcorr
 C                0 : do not call FragEcorr
 C              USED IN EneERPA 
 C
-C     IFlag12 = 0  : A+,A- MATRICES NOT TRUNCATED
+C     IFl12   = 0  : A+,A- MATRICES NOT TRUNCATED
 C             = 1  : A+,A- MATRICES ARE TRUNCATED TO INCLUDE ONLY INDICES
 C                          OF ORBITALS BELONGING TO GEMINALS NEEDED FOR 
 C                          A GIVEN ONE- TWO- THREE- OR FOUR-BODY INTERACTION
+C             = 2  : OLD VARIANT OF EERPA (PARTITIONING INTO MONOMERS AND IFlag12 IS SET TO 1)
 C             USED IN FragEcorr and OneTwoBody
+C             
 C             IFlag12 IS ONLY IN EFFECT WHEN IFlFrag1=1
+C
+      IFl12=1
 C
 C     RPAX: IFlCore=1, IFlFrag1=0
 C     ERPA without core orbitals: IFlCore=0, IFlFrag1=0
@@ -106,15 +110,16 @@ C
 C
       If(ICASSCF.Eq.0) Then
 C
-      ThrAct=0.992
-      Write(6,'(/,X," Threshold for Active Orbitals: ",E14.4)')ThrAct
+      ThrAct=0.991
+      Write(6,'(/,X," Threshold for Active Orbitals in GVB: ",E14.4)')
+     $ ThrAct
       Do I=1,NELE
       If(Occ(I).Lt.ThrAct) Then
       IndAux(I)=1
-      Write(6,'(/,X," Active Orbital: ",I4,E14.4)')
+      Write(6,'(/,X," Active GVB Orbital: ",I4,E14.4)')
      $ I, Occ(I)
       IndAux(IFindG(I))=1
-      Write(6,'(X," Active Orbital: ",I4,E14.4)')
+      Write(6,'(X," Active GVB Orbital: ",I4,E14.4)')
      $ IFindG(I), Occ(IFindG(I))
       ICount=ICount+2
       EndIf
@@ -140,6 +145,9 @@ C
 C
 C     CONSTRUCT LOOK-UP TABLES
 C
+      Write(LOUT,'(2x,a,2e15.5)') 'Threshold for quasi-degeneracy ',
+     $ ThrSelAct
+C
       IPair(1:NBasis,1:NBasis)=0
 C
       IJ=0
@@ -153,16 +161,12 @@ C
 C
 C     do not correlate active degenerate orbitals if from different geminals
       If((ICASSCF.Eq.0.And.(IGem(I).Ne.IGem(J)).And.(IndAux(I).Eq.1)
-     $ .And.(IndAux(J).Eq.1).And.(Abs(Occ(I)-Occ(J))/Occ(I).Lt.1.D-2))
+     $ .And.(IndAux(J).Eq.1).And.
+     $ (Abs(Occ(I)-Occ(J))/Occ(I).Lt.ThrSelAct))
      $.Or.
      $ (ICASSCF.Eq.1.
      $ .And.(IndAux(I).Eq.1).And.(IndAux(J).Eq.1) 
-c herer!!!
-     $ .And.(Abs(Occ(I)-Occ(J))/Occ(I).Lt.1.D-10)) ) Then
-c herer!!! ???
-c     $ .And.(Abs(Occ(I)-Occ(J))/Occ(I).Lt.1.D-2)) ) Then
-c     $ .And.( (Occ(I).Gt.0.5.And.Occ(J).Gt.0.5)
-c     $    .Or.(Occ(I).lt.0.5.And.Occ(J).lt.0.5) ) ) ) Then 
+     $ .And.(Abs(Occ(I)-Occ(J))/Occ(I).Lt.1.D-2)) ) Then
 C
       Write(6,'(2X,"Discarding nearly degenerate pair ",2I4)')I,J
 C
@@ -271,7 +275,8 @@ c     $ Occ,TwoNO,IndAux,NBasis,NInte1,NInte2,NDim,NGem,NGOcc,IFl12)
 c      NFrag=NGem-1
 c      Return
 C
-      Write(6,'(/,X," Entering FragEcorr with IFl12 = ",I4)'),IFl12
+      Write(6,'(/,X," Entering FragEcorr with IFlCore = ",I4)'),IFlCore
+      Write(6,'(X," Entering FragEcorr with IFl12 = ",I4,/)'),IFl12
       Call FragEcorr(ETot,ENuc,ECorrTot,EGOne,EigVecR,Eig,ABPLUS,ABMIN,
      $ UNOAO,Occ,TwoNO,URe,XOne,IndAux,NBasis,NInte1,NInte2,NDim,NGem,
      $ NGOcc,IFl12,NFrag)
@@ -1846,7 +1851,8 @@ C      EndDo
       End
 
 * Deck OneTwoBody
-      Subroutine OneTwoBody(ETot,ENuc,ECorrTot,EGOne,EigVecR,Eig,
+      Subroutine OneTwoBody(ETot,ENuc,ECorrTot,EGOne,EGOneTwo,
+     $ EigVecR,Eig,
      $ ABPLUS,ABMIN,
      $ Occ,TwoNO,IndAux,NBasis,NInte1,NInte2,NDim,NGem,NGOcc,IFlag)
 C
@@ -2300,7 +2306,7 @@ cC
       Write(6,'(/,2X,"EGVB + ENuc + 1,2-body",5X,F15.8)')
      $ ETot+ENuc+EOneTot+ETwoTot
 C
-c      Return
+      Return
 C
 C     THREE-BODY CONTRIBUTIONS
 C
@@ -2875,6 +2881,7 @@ C     IFlag = 0  : A+,A- MATRICES NOT TRUNCATED
 C           = 1  : A+,A- MATRICES ARE TRUNCATED TO INCLUDE ONLY INDICES
 C                        OF ORBITALS BELONGING TO GEMINALS NEEDED FOR 
 C                        A GIVEN ONE- TWO- THREE- OR FOUR-BODY INTERACTION
+C           = 2  : OLD VERSION OF EERPA
 C
       Implicit Real*8 (A-H,O-Z)
 C
@@ -2886,8 +2893,8 @@ c
 C
       Dimension
      $ EGOne(NGem),
-     $ EigVecR(NDim*NDim),Eig(NDim),
-     $ IndAux(NBasis),ABPLUS(NDim*NDim),
+     $ EigVecR(2*(NDim+NBasis)*2*(NDim+NBasis)),
+     $ Eig(2*(NDim+NBasis)),IndAux(NBasis),ABPLUS(NDim*NDim),
      $ ABMIN(NDim*NDim),Occ(NBasis),TwoNO(NInte2),UNOAO(NBasis,NBasis),
      $ XOne(NInte1),URe(NBasis,NBasis)
 C
@@ -2895,7 +2902,8 @@ C     LOCAL ARRAYS
 C
       Character*5 ATCENT(100),CENT
       Dimension HNO(NInte1),Work(NBasis,NBasis),XKinNO(NInte1),
-     $ XNucNO(NInte1),IndAA(NBasis),GCHAR(NGEM,100),IFragG(NGEM)
+     $ XNucNO(NInte1),IndAA(NBasis),GCHAR(NGEM,100),IFragG(NGEM),
+     $ IMonomerG(NBasis),EGOneTwo(NGem*NGem)
 C
       If(IGVB.Ne.1) Stop 'Fatal error: FragEcorr works only for GVB'
 C
@@ -2950,6 +2958,9 @@ C     first inactive geminal (by assumption the first geminal is inactive)
       EndIf
       EndDo
 C
+c XXX
+      If(IFlag.Ne.2) Then
+C
       Do IG=1,NoIG
 C
       If(IFragG(IG+InActG).Eq.0) Then
@@ -2981,6 +2992,90 @@ C
 C  
       EndDo
 C
+c XXX
+c if IFlag==2 - OLD EERPA => assign geminals to two fragments
+      Else
+C
+      Do IG=1,NoIG
+      If(IFragG(IG+InActG).Eq.0) Then
+C
+      NoFrag=NoFrag+1
+      IFragG(IG+InActG)=NoFrag
+C
+C     check if other geminals belong to the same fragment
+      Do II=1,2*NoIG
+      Do JG=IG+1,NoIG
+      If(IFragG(JG+InActG).Eq.0) Then
+      IShare=0
+      Do KG=1,NoIG
+      If(IFragG(KG+InActG).Eq.NoFrag) Then
+      Do IC=1,NoICENT
+      If(GCHAR(KG,IC).Gt.1.D-1.And.GCHAR(JG,IC).Gt.1.D-1) IShare=1
+      EndDo
+      EndIf
+      EndDo
+      If(IShare.Eq.1) IFragG(JG+InActG)=NoFrag
+      EndIf
+      EndDo
+      EndDo
+C
+      EndIf
+      EndDo
+C
+c if iflag.ne.2
+      EndIf
+C
+C     Assign geminals to monomers (nonoverlapping fragments) 
+C
+      IMonomerG(1:NBasis)=4
+      Do I=1,NELE
+      If(Occ(I).Eq.One) Then
+      NoFragM=1
+      IMonomerG(I)=1
+      EndIf
+      EndDo
+      Do IG=1,NoIG
+      IMonomerG(IG+InActG)=0
+      EndDo 
+C   
+      Do IG=1,NoIG
+      If(IMonomerG(IG+InActG).Eq.0) Then
+C
+      NoFragM=NoFragM+1
+      IMonomerG(IG+InActG)=NoFragM
+C
+C     check if other geminals belong to the same fragment
+      Do II=1,2*NoIG
+      Do JG=IG+1,NoIG
+      If(IMonomerG(JG+InActG).Eq.0) Then
+      IShare=0
+      Do KG=1,NoIG
+      If(IMonomerG(KG+InActG).Eq.NoFragM) Then
+      Do IC=1,NoICENT
+      If(GCHAR(KG,IC).Gt.1.D-1.And.GCHAR(JG,IC).Gt.1.D-1) IShare=1
+      EndDo
+      EndIf
+      EndDo
+      If(IShare.Eq.1) IMonomerG(JG+InActG)=NoFragM
+      EndIf
+      EndDo
+      EndDo
+C
+      EndIf
+C
+      Do I=1,NELE
+      IndAA(I)=IMonomerG(IGem(I)) 
+      EndDo
+C
+      EndDo
+      Do I=1,NELE
+      IA=IndAA(I)
+      IMonomerG(I)=IA
+      IMonomerG(IFindG(I))=IA
+      EndDo
+C
+C
+C
   555 FORMAT(/,2X,'Geminal no',I3,' in fragment:',I3)
 C     set connectivity matrix for active fragments
       Do IG=1,NoIG
@@ -2990,6 +3085,11 @@ C     set connectivity matrix for active fragments
       If(GCHAR(IG,IC).Gt.1.D-1) Write(6,'(16X,A4)')ATCENT(IC)
       EndDo
       EndDo
+c XXX
+      If(IFlag.Eq.2) Then
+      IFlag=1
+      IFl12=1
+      EndIf
 C
       Do IG=1,NoIG
       Do JG=IG,NoIG
@@ -3016,6 +3116,19 @@ C
       Do I=1,NELE
       IndAA(I)=IFragG(IGem(I))
       EndDo 
+C herer!!! all connect => no extra excitations
+c      write(*,*)
+c      write(*,*)' ************************************************** '
+c      write(*,*)' ***** ALL FRAGMS CONNECTED - NO EXTRA EXCITATIONS! '
+c      write(*,*)' ************************************************** '
+c      write(*,*)
+c      do i=1,nofrag
+c      do j=1,nofrag
+c      IConnect(i,j)=1
+c      IConnect(j,i)=1
+c      enddo
+c      enddo
+
 C
       NGem=NoFrag
 C      Write(*,*)'Orbital assignment to frags read from frag_assign.dat'
@@ -3042,14 +3155,18 @@ C
       EndDo
 C
       Write(6,'(2X,''NUMBER OF FRAGMENTS: '',I3)') NGem-1
-      Write(6,'(2X,"Orb",2X,"Occupancy",X,"Fragment")')
+c      Write(6,'(2X,"Orb",2X,"Occupancy",X,"Fragment")')
+c      Do I=1,NBasis
+c      Write(6,'(X,I3,E16.6,I6)') I,Occ(I),IGem(I)
+c      EndDo
+      Write(6,'(2X,"Orb",2X,"Occupancy",X,"Fragment",X,"Monomer")')
       Do I=1,NBasis
-      Write(6,'(X,I3,E16.6,I6)') I,Occ(I),IGem(I)
+      Write(6,'(X,I3,E16.6,2I6)') I,Occ(I),IGem(I),IMonomerG(I)
       EndDo
 C
-      Call OneTwoBody(ETot,ENuc,ECorrTot,EGOne,EigVecR,Eig,ABPLUS,ABMIN,
-     $ Occ,TwoNO,IndAux,NBasis,NInte1,NInte2,NDim,NGem,NGOcc,IFlag)
-c herer!!!
+      Call OneTwoBody(ETot,ENuc,ECorrTot,EGOne,EGOneTwo,EigVecR,Eig,
+     $ ABPLUS,ABMIN,Occ,TwoNO,IndAux,
+     $ NBasis,NInte1,NInte2,NDim,NGem,NGOcc,IFlag)
       GoTo 444
 C
 C     FIND THE INTERFRAGMENT EXCHANGE AND COULOMB INTERACTION
@@ -3092,7 +3209,7 @@ C
 C
       EndDo
       EndDo
-c herer!!!
+C
       GoTo 444
 C
 C     READ THE EKIN AND EPOT AO MATRICES AND GET CONTRIBUTIONS TO EKIN AND EPOT FROM FRAGMENTS
@@ -3203,6 +3320,42 @@ C
       Write(6,'(X,"TOTAL",F16.8)')EOneTot
 C
   444 Continue
+C
+C     WATCH OUT: orbitals are assigned to monomers IMonomerG(I)
+C                and to fragments by IFrag(I)
+C     ASSIGN FRAGMENTS TO MONOMERS
+      Do I=1,NELE
+      IFragG(IGem(I))=IMonomerG(I)
+      EndDo
+C
+C     LOOP OVER FRAGMENTS
+C
+      Write(6,'(/,X, " FRAGMENT  IN   MONOMER")')
+      Do IG=1,NGem-1
+      Write(6,'(X,2I4)') IG,IFragG(IG)
+      EndDo
+C
+      Write(6,'(/,2X,
+     $ "*** 2-body correlation for fragments in different monomers")')
+C
+      Do IGG1=1,NGem-1
+      Do IGG2=1,IGG1-1
+C
+C     if fragments are in different monomers then      
+C   
+      If(InActG.Ne.0) Then
+      If(IFragG(IGG1).Ne.1.And. IFragG(IGG2).Ne.1.
+     $ And.IFragG(IGG1).Ne.IFragG(IGG2)) 
+     $ Write(6,'(X,2I4,F15.8)')IGG1,IGG2,EGOneTwo(IGG1+(IGG2-1)*NGem)
+      EndIf
+C
+      If(InActG.Eq.0) Then
+      If(IFragG(IGG1).Ne.IFragG(IGG2))
+     $ Write(6,'(X,2I4,E17.6)')IGG1,IGG2,EGOneTwo(IGG1+(IGG2-1)*NGem)
+      EndIf
+C
+      EndDo
+      EndDo
 C
       NFrag=NGem
       If(IGVB.Eq.1) NFrag=NGem-1
