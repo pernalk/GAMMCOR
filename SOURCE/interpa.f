@@ -3339,6 +3339,7 @@ C
       Write(6,'(/,2X,
      $ "*** 2-body correlation for fragments in different monomers")')
 C
+      SumTwo=Zero
       Do IGG1=1,NGem-1
       Do IGG2=1,IGG1-1
 C
@@ -3346,17 +3347,23 @@ C     if fragments are in different monomers then
 C   
       If(InActG.Ne.0) Then
       If(IFragG(IGG1).Ne.1.And. IFragG(IGG2).Ne.1.
-     $ And.IFragG(IGG1).Ne.IFragG(IGG2)) 
-     $ Write(6,'(X,2I4,F15.8)')IGG1,IGG2,EGOneTwo(IGG1+(IGG2-1)*NGem)
+     $ And.IFragG(IGG1).Ne.IFragG(IGG2)) Then
+      Write(6,'(X,2I4,F15.8)')IGG1,IGG2,EGOneTwo(IGG1+(IGG2-1)*NGem)
+      SumTwo=SumTwo+EGOneTwo(IGG1+(IGG2-1)*NGem)
+      EndIf
       EndIf
 C
       If(InActG.Eq.0) Then
-      If(IFragG(IGG1).Ne.IFragG(IGG2))
-     $ Write(6,'(X,2I4,E17.6)')IGG1,IGG2,EGOneTwo(IGG1+(IGG2-1)*NGem)
+      If(IFragG(IGG1).Ne.IFragG(IGG2)) Then
+      Write(6,'(X,2I4,E17.6)')IGG1,IGG2,EGOneTwo(IGG1+(IGG2-1)*NGem)
+      SumTwo=SumTwo+EGOneTwo(IGG1+(IGG2-1)*NGem)
+      EndIf
       EndIf
 C
       EndDo
       EndDo
+C
+      Write(6,'(X," Sum : ",1X,F15.8)') SumTwo
 C
       NFrag=NGem
       If(IGVB.Eq.1) NFrag=NGem-1
