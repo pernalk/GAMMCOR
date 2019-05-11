@@ -21,6 +21,12 @@ Available keywords:
    *EERPA or EERPA-2 sets     IFl12 = 1
    *EERPA-OLD or EERPA-1 sets IFl12 = 2
 
+*********************************
+AC,AC0,EERPA
+*********************************
+1) Calculation block
+ Core       0  - inactive orbitals not correlated
+            1  - inactive orbitals contribute to correlation
 
 ********************************* 
 SAPT: GENERAL REMARKS
