@@ -29,7 +29,6 @@ integer, parameter :: SAPTLEVEL0 = 0
 integer, parameter :: SAPTLEVEL1 = 1
 integer, parameter :: SAPTLEVEL2 = 2
 
-integer, parameter :: FLAG_FRAG = 0
 integer, parameter :: FLAG_CORE = 1
 integer, parameter :: FLAG_NOBASIS = 0
 logical, parameter :: FLAG_RESTART = .FALSE.
@@ -88,7 +87,6 @@ type CalculationBlock
       integer :: InterfaceType = INTER_TYPE_DAL
       integer :: NBasis = FLAG_NOBASIS
       integer :: JobType = JOB_TYPE_AC
-      integer :: Fragments = FLAG_FRAG
       integer :: RDMType = RDM_TYPE_GVB
       integer :: RDMSource = INTER_TYPE_DAL
       integer :: Response = RESP_ERPA
@@ -285,10 +283,6 @@ associate( CalcParams => Input%CalcParams)
               PossibleInterface(CalcParams%RDMSource)
 ! write(LOUT,' (1x,a,6x,i3)') "NBASIS: ",  &
 !              CalcParams%NBasis
- if(CalcParams%Fragments==1) then
-   write(LOUT,' (1x,a,4x,a)') "FRAGMENTS: ",  &
-              "TRUE"
- endif
 ! write(LOUT, *) "RPA thresh: ", CalcParams%RPAThresh
  if (allocated(CalcParams%IntegralsFilePath)) then
        write(*, *) "Ints file: ", CalcParams%IntegralsFilePath

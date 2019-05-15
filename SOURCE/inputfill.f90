@@ -287,12 +287,12 @@ subroutine read_block_calculation(CalcParams, line)
                CalcParams%JobType = JOB_TYPE_CASPIDFT
            endif
 
-      case ("FRAGMENTS") 
-           if (uppercase(val) == ".TRUE.".or. &
-               uppercase(val) == "TRUE".or.   &
-               uppercase(val) == "T") then
-               CalcParams%Fragments = 1
-           endif
+      !case ("FRAGMENTS") 
+      !     if (uppercase(val) == ".TRUE.".or. &
+      !         uppercase(val) == "TRUE".or.   &
+      !         uppercase(val) == "T") then
+      !         CalcParams%Fragments = 1
+      !     endif
 
       case ("CORE") 
          read(val, *) CalcParams%Core

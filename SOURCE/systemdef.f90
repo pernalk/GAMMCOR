@@ -77,17 +77,17 @@ case(2)
    endif
 end select
 
-! check Fragments (EERPA)
-if(CalcParams%Fragments==1) then
-  write(6,'(1x,a)') 'EERPA CALCULATIONS REQUESTED'
-  write(LOUT,'()') 
-  if(CalcParams%RDMType==RDM_TYPE_CAS.or.&
-     CalcParams%RDMType==RDM_TYPE_DMRG) then
-     write(6,'(1x,a)') 'ERROR! EERPA REQUIRES:'
-     write(6,'(1x,a)') 'RDMType     GVB or APSG'
-     stop 
-  endif
-endif
+!! check Fragments (EERPA)
+!if(CalcParams%Fragments==1) then
+!  write(6,'(1x,a)') 'EERPA CALCULATIONS REQUESTED'
+!  write(LOUT,'()') 
+!  if(CalcParams%RDMType==RDM_TYPE_CAS.or.&
+!     CalcParams%RDMType==RDM_TYPE_DMRG) then
+!     write(6,'(1x,a)') 'ERROR! EERPA REQUIRES:'
+!     write(6,'(1x,a)') 'RDMType     GVB or APSG'
+!     stop 
+!  endif
+!endif
 
 write(LOUT,'(1x,a)') 'INPUT CHECK PASSED'
 write(LOUT,'(8a10)') ('**********',i=1,8)
@@ -247,18 +247,17 @@ else
 
   case(JOB_TYPE_EERPA)
      Flags%IFl12 = 1
+     Flags%IFlFrag1 = 1
 
   case(JOB_TYPE_EERPA_OLD)
      Flags%IFl12 = 2
+     Flags%IFlFrag1 = 1
 
   end select
 
  ! Inactive
   Flags%IFlCore = Input%CalcParams%Core
  
- ! EERPA
- if(Input%CalcParams%Fragments==1) Flags%IFlFrag1 = 1
-
  !Flags%IFl12 = FLAG_DEBUG_FL12
 
 endif

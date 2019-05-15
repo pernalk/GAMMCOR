@@ -103,6 +103,7 @@ C
       IFlFrag1=Flags%IFlFrag1
       IFl12=Flags%IFl12
 C
+      Print*, 'IFlFrag1',IFlFrag1
 C     NoSym = 1 - DO NOT IMPOSE SYMMETRY (RUN molpro WITH 'nosym')
 C           = 0 - IMPOSE SYMMETRY (RUN molpro WITHOUT 'nosym')
 C
