@@ -1305,6 +1305,13 @@ C
       EndDo
       EndDo
 C
+C KP 15.05.2019
+      Do I=1,NInAc
+      Do J=1,NBasis
+      work1(J,I)=PC(I)
+      EndDo
+      EndDo
+C
       EndIf
 C
 C     VIRTUAL
@@ -1320,6 +1327,16 @@ C
       EndDo      
       Call Diag8(Fock,NVirt,NVirt,PC,Work)
 C      Print*, PC(1:5)
+c KP 15.05.2019
+      open(10,file='fock.dat')
+      Do IP=NOccup+1,NBasis
+      Do IQ=1,INActive
+      work1(IP,IQ)=PC(IP-NOccup)-work1(IP,IQ)
+      write(10,*)ip,iq,work1(ip,iq)
+      EndDo
+      EndDo
+      close(10)
+C
       Do I=1,NVirt
       Do J=1,NVirt
       II=I+NInAc+NAc

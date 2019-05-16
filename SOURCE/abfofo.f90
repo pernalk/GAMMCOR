@@ -1276,7 +1276,7 @@ logical :: EigChck(NDimX)
 double precision :: C(NBasis)
 double precision :: HNO(NBasis,NBasis),AuxI(NBasis,NBasis),AuxIO(NBasis,NBasis),WMAT(NBasis,NBasis)
 double precision :: AuxCoeff(3,3,3,3),AuxVal,val
-double precision :: EnDummy,Aux,Crs,Cpq,EIntra,EAll
+double precision :: EMP2,EnDummy,Aux,Crs,Cpq,EIntra,EAll
 double precision,allocatable :: EigY(:,:),EigY1(:,:)
 double precision,allocatable :: Eig(:),Eig1(:)
 double precision,allocatable :: RDM2val(:,:,:,:),RDM2Act(:)
@@ -2356,6 +2356,8 @@ do k=1,NOccup
 enddo
 
 close(iunit)
+
+call check_mp2(EMP2,'FOFO',INActive,NOccup,NBasis)
 
 ECorr = EAll-EIntra
 
@@ -4224,5 +4226,72 @@ deallocate(Skipped)
 deallocate(ints,work)
 
 end subroutine ACEneERPA_FOFO
+
+subroutine check_mp2(EMP2,IntKFIle,INActive,NOccup,NBasis)
+! check MP2 energy (only inactive-vritual enter) 
+! to compare with molpro use {mp2;core,0}    
+implicit none
+
+integer,intent(in) :: INActive,NOccup,NBasis
+character(*),intent(in) :: IntKFile
+double precision,intent(inout) :: EMP2
+
+integer :: i,j,k,l,a,b
+integer :: iunit
+double precision :: val,eps(NBasis,NBasis)
+double precision,allocatable :: work(:),ints_bj(:,:),ints_bi(:,:)
+
+allocate(work(NBasis**2),ints_bj(NBasis,NBasis),ints_bi(NBasis,NBasis))
+
+eps = 0
+open(10,file='fock.dat')
+do i=NOccup+1,NBasis
+   do j=1,INActive
+      read(10,*) k,l,val
+      eps(k,l) = val
+   enddo
+enddo
+close(10)
+
+open(newunit=iunit,file=trim(IntKFile),status='OLD', &
+     access='DIRECT',recl=8*NBasis*NOccup)
+
+EMP2 = 0
+do j=1,INActive
+   do b=NOccup+1,NBasis
+     
+      read(iunit,rec=(b+(j-1)*NBasis)) work(1:NBasis*NOccup)
+      ! ints_bj
+      do l=1,NOccup
+         do k=1,NBasis
+            ints_bj(k,l) = work((l-1)*NBasis+k)
+         enddo
+      enddo
+      ints_bj(:,NOccup+1:NBasis) = 0
+
+      do i=1,INActive
+         read(iunit,rec=(b+(i-1)*NBasis)) work(1:NBasis*NOccup)
+         ! ints_bi
+         do l=1,NOccup
+            do k=1,NBasis
+               ints_bi(k,l) = work((l-1)*NBasis+k)
+            enddo
+         enddo
+         ints_bi(:,NOccup+1:NBasis) = 0
+
+         do a=NOccup+1,NBasis
+            EMP2 = EMP2 - ints_bj(a,i)*(2d0*ints_bj(a,i)-ints_bi(a,j)) / &
+                          (eps(a,i)+eps(b,j))
+         enddo
+      enddo
+
+   enddo
+enddo
+
+write(LOUT,'(/,1x,a,13x,f16.8,/)') 'EMP2   Energy', EMP2 
+
+deallocate(ints_bi,ints_bj,work)
+
+end subroutine check_mp2
 
 end module

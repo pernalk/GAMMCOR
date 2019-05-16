@@ -1726,7 +1726,7 @@ C
      $ AuxI(NInte1),AuxIO(NInte1),IPair(NBasis,NBasis),
      $ EigX(NDimX*NDimX),
      $ IEigAddY(2,NDimX),IEigAddInd(2,NDimX),IndBlock(2,NDimX),
-     $ XMAux(NDimX*NDimX)
+     $ XMAux(NDimX*NDimX),work1(NBasis,NBasis)
 C
       IPair(1:NBasis,1:NBasis)=0
       Do II=1,NDimX
@@ -2157,6 +2157,17 @@ C     Do IP
       EndDo
 C      
 C     FIND THE 0TH-ORDER SOLUTION FOR THE VIRTUAL-INACTIVE BLOCKS
+
+C KP 15.05.2019
+      open(10,file='fock.dat')
+      work1=0
+      Do IP=NOccup+1,NBasis
+      Do IQ=1,INActive
+      read(10,*)iip,iiq,xx
+      work1(iip,iiq)=xx
+      EndDo
+      EndDo
+      close(10)
 C
       Do IP=NOccup+1,NBasis
       Do IQ=1,INActive
@@ -2179,6 +2190,9 @@ C
      $ NInte1,NInte2,NBasis)
 C
       Eig(NFree1)=ABP
+c KP 15.05.2019
+      If(abs(ABP-work1(ip,iq)).gt.1.d-7)
+     $Write(*,*)'ABP inconsistent with eps_a-eps_i for',ip,iq
       EigY(NFree2)=One/Sqrt(Two)
       EigX(NFree2)=One/Sqrt(Two)
 C
@@ -2193,8 +2207,8 @@ C
 C
       Write(6,'(/," *** DONE WITH 0TH-ORDER IN AC0-CASSCF ***")')
       Print*, 'NoEig,NDimX',NoEig,NDimX
-      Print*, 'Eig,Y,X',norm2(Eig(1:NoEig)),
-     $ norm2(EigY(1:NoEig**2)),norm2(EigX(1:NoEig**2))
+C      Print*, 'Eig,Y,X',norm2(Eig(1:NoEig)),
+C     $ norm2(EigY(1:NoEig**2)),norm2(EigX(1:NoEig**2))
 C
 C     DONE 0TH-ORDER CALCULATIONS
 C
@@ -2312,7 +2326,7 @@ C
 C
       EndDo
 C
-      Print*, 'FIRST',norm2(XMAux)
+C      Print*, 'FIRST',norm2(XMAux)
 C
       ABPLUS(1:NoEig*NoEig)=Zero 
 C
@@ -2369,6 +2383,27 @@ C
 C
       ECorr=EAll-EIntra
       Print*, 'EAll,EIntra',EAll,EIntra
+C
+C KP 15.05.2019 MP2 energy (only inactive-virtual enter)
+C to compare with molpro use {mp2;core,0}
+      EMP2=Zero
+      Do IP=NOccup+1,NBasis
+c herer!!!???
+      Do IR=1,INActive
+c      Do IR=1,INActive+1
+      Do IQ=NOccup+1,NBasis
+c herer!!!???
+      Do IS=1,INActive
+c      Do IS=1,INActive+1
+      EMP2=EMP2-(Two*TwoNO(NAddr3(IP,IR,IQ,IS))
+     $ -TwoNO(NAddr3(IP,IS,IQ,IR)))*TwoNO(NAddr3(IP,IR,IQ,IS))/
+     $ (work1(IP,IR)+work1(IQ,IS))
+C
+      EndDo
+      EndDo
+      EndDo
+      EndDo
+      Write(6,'(/,1x,a,13x,f16.8)') 'EMP2   Energy', EMP2 
 C
 C ----------------------------------------------------------------    
       Return
