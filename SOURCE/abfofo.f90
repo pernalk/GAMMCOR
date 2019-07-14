@@ -2357,7 +2357,7 @@ enddo
 
 close(iunit)
 
-call check_mp2(EMP2,'FOFO',INActive,NOccup,NBasis)
+!call check_mp2(EMP2,'FOFO',INActive,NOccup,NBasis)
 
 ECorr = EAll-EIntra
 
