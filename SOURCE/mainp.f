@@ -189,6 +189,7 @@ C     SELECT ELECTRONIC STATE
 C
       NStates = System%NStates
       InSt(1:2,1:NStates) = System%InSt
+      InTrSt(1:2,1:1) = System%InTrSt
 C
       If(InSt(2,1).Gt.0) Then
       NoSt = System%InSt(1,1)

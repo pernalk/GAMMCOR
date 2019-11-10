@@ -21,6 +21,11 @@ write(LOUT,'()')
 
 !check RDMType
 if(CalcParams%RDMType==RDM_TYPE_DMRG) then
+   !if(CalcParams%InterfaceType.ne.INTER_TYPE_OWN) then
+   !   write(6,'(1x,a)') "ERROR! RDMType DMRG REQUIRES:"
+   !   write(6,'(1x,a)') "Interface      OWN"
+   !   stop
+   !elseif(CalcParams%RDMSource.ne.INTER_TYPE_OWN) then
    if(CalcParams%RDMSource.ne.INTER_TYPE_OWN) then
       write(6,'(1x,a)') "ERROR! RDMType DMRG REQUIRES:"
       write(6,'(1x,a)') "RDMSource      OWN"
@@ -245,14 +250,6 @@ else
   case(JOB_TYPE_CASPIDFT)
      Flags%IFunSR = 5 
 
-  case(JOB_TYPE_EERPA)
-     Flags%IFl12 = 1
-     Flags%IFlFrag1 = 1
-
-  case(JOB_TYPE_EERPA_OLD)
-     Flags%IFl12 = 2
-     Flags%IFlFrag1 = 1
-
   end select
 
  ! Inactive
@@ -303,6 +300,16 @@ if(Flags%ISAPT.Eq.0) then
       ! read 1st available state
       System%InSt(:,1) = -255
    endif
+   ! only one TrSt alllowed
+   allocate(System%InTrSt(2,1))
+   if(Input%SystemInput(1)%DeclareTrSt) then
+      System%InTrSt = Input%SystemInput(1)%InTrSt
+   else
+      ! read 1st available state
+      System%InTrSt(:,1) = -255
+   endif
+
+   Print*, 'InTrSt',System%InTrSt(1,1),System%InTrSt(2,1)
 
    System%ZNucl  = Input%SystemInput(1)%ZNucl
    System%Charge = Input%SystemInput(1)%Charge
@@ -327,6 +334,7 @@ elseif(Flags%ISAPT.Eq.1) then
  SAPT%InterfaceType = Input%CalcParams%InterfaceType
  SAPT%IPrint = Input%CalcParams%IPrint
  SAPT%SaptLevel = Input%CalcParams%SaptLevel
+ SAPT%ic6 = Input%CalcParams%vdWCoef
  if(SAPT%InterfaceType==2) SAPT%HFCheck = .false.
  ! temporary RSH
  if(Flags%IFunSR<3) then

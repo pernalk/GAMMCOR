@@ -289,3 +289,61 @@ subroutine dfun_GGA_AB(RhoA,RhoB,SigmaAA,SigmaAB,SigmaBB,Ene,NGrid)
    call xc_free_functional(id)
 
 end subroutine dfun_GGA_AB
+
+subroutine LYP_SPIN(RhoA,RhoB,SigmaAA,SigmaAB,SigmaBB,Ene,NGrid)
+!
+! computes LYP correlation energy density on a grid for spin-up and spin-down inputs
+!
+   use xcfun
+
+   implicit none
+
+   integer,intent(in)  :: NGrid
+   double precision,intent(in)  :: RhoA(NGrid),RhoB(NGrid),SigmaAA(NGrid),SigmaAB(NGrid),SigmaBB(NGrid)
+   double precision,intent(out) :: Ene(NGrid)
+
+   character(1000)      :: text
+   integer              :: i,id,order,ilen,olen
+   double precision, allocatable :: density_variables(:, :), derivatives(:, :)
+
+!  create a new functional
+   id = xc_new_functional()
+!  use the following functionals
+! herer!!!
+   call xc_set_param(id, XC_LYPC, 1.0d0)
+!   call xc_set_param(id, XC_VWN5C, 1.0d0)
+!  call xc_set_param(id, XC_PBEC, 1.0d0) 
+! use XC_VARS_AB for alpha,beta inputs
+   call xc_set_mode(id, XC_VARS_AB)
+! order=0 -> only xc energy on a grid
+   order=0
+
+   ilen = xc_input_length(id)
+   olen = xc_output_length(id, order)
+!   print *, 'Length of input (how many input variables):', ilen
+!   print *, 'Length of output (how many derivatives):', olen
+
+   allocate(density_variables(ilen, NGrid))
+   allocate(derivatives(olen, NGrid))
+
+   do i=1,NGrid
+      density_variables(1, i) = RhoA(i)
+      density_variables(2, i) = RhoB(i)
+      density_variables(3, i) = SigmaAA(i)
+      density_variables(4, i) = SigmaAB(i)
+      density_variables(5, i) = SigmaBB(i)
+   enddo
+
+! evaluate what you need
+   call xc_eval(id, order, NGrid, density_variables, derivatives)
+
+   do i=1,NGrid
+      Ene(i)=derivatives(1, i)
+   enddo
+
+   deallocate(density_variables)
+   deallocate(derivatives)
+
+   call xc_free_functional(id)
+
+end subroutine LYP_SPIN

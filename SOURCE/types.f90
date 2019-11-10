@@ -95,10 +95,11 @@ type CalculationBlock
       integer :: TwoMoInt = TWOMO_INCORE
       integer :: Core = FLAG_CORE
       integer :: SymType = TYPE_NO_SYM
-      integer :: SaptLevel = SAPTLEVEL2 
+      integer :: SaptLevel = SAPTLEVEL2
+      integer :: vdWCoef = 0
       logical :: Restart = FLAG_RESTART
       logical :: PostCAS = FLAG_POSTCAS
-      integer :: IPrint  = 0 !FLAG_PRINT_LEVEL 
+      integer :: IPrint  = 0 !FLAG_PRINT_LEVEL
       double precision :: RPAThresh = 1.0D-6
       integer :: imon = 1
       character(:), allocatable :: JobTitle
@@ -116,11 +117,11 @@ type SystemBlock
       integer :: Monomer = MONOMER_A
       integer :: NELE
       double precision :: XELE
-      double precision :: PotNuc 
+      double precision :: PotNuc
       double precision :: SumOcc = 0
       double precision :: ACAlpha = 1d0
       double precision :: Omega = 1
-      integer :: NSym 
+      integer :: NSym
       integer :: NSymBas(8),NSymOrb(8)
       integer :: NOrb, NGem
       integer :: NActOrb = 1
@@ -129,7 +130,7 @@ type SystemBlock
       integer :: NDim, NDimX
       integer :: NDimN, DimEx
       integer :: NCen = 0
-      integer :: UCen = 0  
+      integer :: UCen = 0
       integer :: NMonBas(8) = 0
       integer :: IPrint = 0
       integer :: IWarn = 0
@@ -137,13 +138,14 @@ type SystemBlock
       integer :: num0,num1,num2
       integer :: TwoMoInt = TWOMO_INCORE
       logical :: DeclareTwoMo = .false.
-      logical :: DeclareSt  = .false.
-      logical :: ISHF = .false. 
+      logical :: DeclareSt = .false.
+      logical :: DeclareTrSt = .false.
+      logical :: ISHF = .false.
       logical :: doRSH = .false., SameOm = .true.
       logical :: PostCAS =.false.
       double precision :: ThrAct = 0.992d0
-      double precision :: ThrSelAct = 1.d-8 
-      integer,allocatable :: InSt(:,:)
+      double precision :: ThrSelAct = 1.d-8
+      integer,allocatable :: InSt(:,:),InTrSt(:,:)
       integer,allocatable :: IGem(:), IndAux(:)
       integer,allocatable :: IndX(:), IndN(:,:), IPair(:,:)
       integer,allocatable :: MultpC(:,:),NSymNO(:)
@@ -160,7 +162,9 @@ type SystemBlock
       double precision,allocatable :: WPot(:,:)
       double precision,allocatable :: VCoul(:)
       double precision,allocatable :: RDM2(:),RDM2Act(:,:,:,:)
+      double precision,allocatable :: RDM2val(:,:,:,:)
       double precision,allocatable :: Fmat(:,:) 
+      double precision,allocatable :: dipm(:,:,:)
       double precision,allocatable :: Eig(:),EigX(:),EigY(:) 
       double precision,allocatable :: AP(:,:),PP(:)
       double precision  :: charg(maxcen),xyz(maxcen,3)
@@ -223,6 +227,7 @@ type SaptData
      double precision :: e2disp_sc,e2disp_sp,e2disp_unc
      integer :: InterfaceType = INTER_TYPE_DAL
      integer :: SaptLevel = SAPTLEVEL2
+     integer :: ic6 = 0
      integer :: IPrint = 1000
      logical :: EnChck = .true., HFCheck=.true. 
      logical :: doRSH = .false., SameOm = .true.
@@ -420,7 +425,7 @@ integer :: i,j
 
  do i=1,ndim
     write(LOUT,*) i
-    write(LOUT,'(10f11.6)') (mat(i,j),j=1,ndim)
+    write(LOUT,'(10f13.8)') (mat(i,j),j=1,ndim)
  enddo
  write(LOUT,'()') 
  
@@ -776,6 +781,216 @@ character(8) :: label
 
 end subroutine read_1rdm_molpro
 
+subroutine read_1trdm_molpro(onerdm,stbrIn,stketIn,infile,nbasis)
+implicit none
+
+integer,intent(in) :: nbasis,stbrIn,stketIn
+character(*),intent(in) :: infile
+double precision,intent(out) :: onerdm(nbasis,nbasis)
+!double precision,intent(out) :: onerdm(nbasis*(nbasis+1)/2)
+
+integer :: iunit,ios,ist,isym,nact,nact2,nstate,nstsym
+integer :: stbr,stket,istbr,istket
+integer :: i,j,ij,idx,istsym
+double precision,allocatable :: work(:)
+logical :: scanfile
+character(8) :: label
+
+ !order states
+ if(stbrIn.gt.stketIn) then
+    stbr  = stketIn 
+    stket = stbrIn
+ else
+    stbr =  stbrIn
+    stket = stketIn
+ endif
+
+ write(LOUT,'(1x,a,i1,a,i1,a)') &
+       'Reading <',stbr,'|',stket,'> 1-TRDM...'
+
+ !check if any states declared in input
+ scanfile = .false.
+ if(stket>0) scanfile = .true.
+
+ allocate(work(NBasis**2))
+ work=0
+ open(newunit=iunit,file=infile,status='OLD', &
+      access='SEQUENTIAL',form='UNFORMATTED')
+
+ fileloop: do
+           read(iunit,iostat=ios) label
+           if(ios<0) then
+              write(LOUT,*) 'ERROR!!! LABEL 1TRMD    not found!'  
+              stop
+           endif
+           if(label=='1TRDM    ') then
+              read(iunit) nact,nact2,nstsym
+              !print*, nact2,nstate
+              if(scanfile) then
+                 do istsym=1,nstsym
+                    read(iunit) isym,nstate 
+                    do j=1,nstate
+                       do i=1,j-1
+                          read(iunit) istbr,istket 
+                          read(iunit) work(1:nact2)
+                          if(istbr==stbr.and.istket==stket) exit fileloop
+                       enddo
+                    enddo
+                 enddo
+                 write(LOUT,'(1x,a,i2,a,i1,a)') 'ERROR!!! 1TRDM FOR STATE',&
+                             & stbr,'.',stket,' NOT PRESENT IN 1RDM FILE!'
+                 stop
+              else
+                 read(iunit) isym,nstate 
+                 read(iunit) istbr,istket
+                 read(iunit) work(1:nact2)
+                 if(isym/=1.or.ist/=1) then
+                    write(LOUT,'(1x,a,i2,a,i1,a)') 'WARNING! 1TRDM FOR STATE',&
+                                & istbr,'.',istket,' WILL BE USED IN CALCULATIONS!'
+                    write(LOUT,'()')
+                 endif 
+                 exit fileloop
+              endif
+           endif 
+         enddo fileloop
+
+ close(iunit)
+
+ !call sq_to_triang(work,onerdm,nact)
+ onerdm = 0
+ do j=1,nact
+    do i=1,nact
+       ij = i + (j-1)*nact 
+       onerdm(i,j) = work(ij)*0.5d0
+    enddo
+ enddo
+
+ deallocate(work)
+
+end subroutine read_1trdm_molpro
+
+!subroutine read_dip_molpro(mon,infile,nbasis)
+subroutine read_dip_molpro(matdx,matdy,matdz,infile,nbasis)
+implicit none
+
+!type(SystemBlock) :: mon
+
+integer,intent(in) :: nbasis
+character(*),intent(in) :: infile
+double precision :: matdx(nbasis,nbasis),matdy(nbasis,nbasis),matdz(nbasis,nbasis)
+double precision,allocatable :: dipx(:),dipy(:),dipz(:) 
+
+integer :: iunit,ios,ictrl
+integer :: nsym,nbas(8),offs(8),ntqg
+integer :: isx,isy,isz,isym_p,isym_q
+integer :: i,j,ij,irep
+logical :: scanfile
+character(8) :: label
+
+ open(newunit=iunit,file=infile,status='OLD', &
+      access='SEQUENTIAL',form='UNFORMATTED')
+
+ ntqg = 0
+ rewind(iunit)
+ read(iunit) 
+ read(iunit) nsym,nbas(1:nsym),offs(1:nsym)
+ do irep=1,nsym
+    ntqg = ntqg + nbas(irep)**2
+ enddo
+
+ allocate(dipx(ntqg),dipy(ntqg),dipz(ntqg))
+
+ ictrl = 0
+ do
+   read(iunit,iostat=ios) label
+   if(ios<0) then
+      write(6,*) 'ERROR!!! LABEL DIPMOMX not found!'  
+      stop
+   endif
+   if(label=='DIPMOMX ') then
+      ictrl = ictrl + 1
+      read(iunit) isx
+      read(iunit) dipx(1:ntqg)
+   elseif(label=='DIPMOMY ') then
+      ictrl = ictrl + 1
+      read(iunit) isy
+      read(iunit) dipy(1:ntqg)
+   elseif(label=='DIPMOMZ ') then
+      ictrl = ictrl + 1
+      read(iunit) isz
+      read(iunit) dipz(1:ntqg)
+   endif 
+   if(ictrl==3) exit
+ enddo
+
+ close(iunit)
+
+ !print*, 'dmx',dipx(1:ntqg)
+ !print*,'' 
+ !print*, 'dmy',dipy(1:ntqg)
+ !print*,'' 
+ !print*, 'dmz',dipz(1:ntqg)
+ 
+ !allocate(mon%dipm(3,nbasis,nbasis))
+ !mon%dipm=0d0
+ matdx=0
+ matdy=0
+ matdz=0
+
+ ij = 0
+ do isym_p=1,nsym
+    isym_q = ieor(isx-1,isym_p-1)+1 
+    if(nbas(isym_p)>0.and.nbas(isym_q)>0) then
+       !print*, isym_p,isym_q
+       !print*, 'offs_p(q)',offs(isym_p),offs(isym_q)
+       !print*, 'nbas_p(q)',nbas(isym_p),nbas(isym_q)
+       do j=1,nbas(isym_q)
+          do i=1,nbas(isym_p)
+             ij = ij + 1
+             !print*, i,j,dipx(ij)
+             !mon%dipm(1,offs(isym_p)+i,offs(isym_q)+j) = -1d0*dipx(ij)
+             matdx(offs(isym_p)+i,offs(isym_q)+j) = -1d0*dipx(ij)
+          enddo
+       enddo
+    endif
+ enddo
+! call print_sqmat(mon%dipm(1,:,:),nbasis)
+
+ ij = 0
+ do isym_p=1,nsym
+    isym_q = ieor(isy-1,isym_p-1)+1 
+    if(nbas(isym_p)>0.and.nbas(isym_q)>0) then
+       !print*, isym_p,isym_q
+       do j=1,nbas(isym_q)
+          do i=1,nbas(isym_p)
+             ij = ij + 1
+             !mon%dipm(2,offs(isym_p)+i,offs(isym_q)+j) = -1d0*dipy(ij)
+             matdy(offs(isym_p)+i,offs(isym_q)+j) = -1d0*dipy(ij)
+          enddo
+       enddo
+    endif
+ enddo
+ !call print_sqmat(mon%dipm(2,:,:),nbasis)
+
+ ij = 0
+ do isym_p=1,nsym
+    isym_q = ieor(isz-1,isym_p-1)+1 
+    if(nbas(isym_p)>0.and.nbas(isym_q)>0) then
+       do j=1,nbas(isym_q)
+          do i=1,nbas(isym_p)
+             ij = ij + 1
+             !mon%dipm(3,offs(isym_p)+i,offs(isym_q)+j) = -1d0*dipz(ij)
+             matdz(offs(isym_p)+i,offs(isym_q)+j) = -1d0*dipz(ij)
+          enddo
+       enddo
+    endif
+ enddo
+! call print_sqmat(mon%dipm(3,:,:),nbasis)
+
+ deallocate(dipx,dipy,dipz)
+
+end subroutine read_dip_molpro
+
 subroutine read_mo_molpro(cmo,infile,text,nbasis)
 implicit none
 
@@ -1037,6 +1252,8 @@ integer,external :: NAddrRDM
   NRDM2Act = Mon%NAct**2*(Mon%NAct**2+1)/2
   !print*, Mon%NAct,NRDM2Act
 
+ if(allocated(Mon%RDM2)) print*, 'RDM2'
+ if(allocated(Mon%RDM2Act)) print*, 'RDM2Act'
   allocate(Mon%RDM2(NRDM2Act), &
            Mon%RDM2Act(Mon%NAct,Mon%NAct,Mon%NAct,Mon%NAct))
   Mon%RDM2(1:NRDM2Act)=0
@@ -1071,7 +1288,6 @@ integer,external :: NAddrRDM
   enddo
   close(iunit)
 
- ! not elegant
   do i=1,Mon%NAct
      do j=1,Mon%NAct
         do k=1,Mon%NAct
@@ -1393,6 +1609,72 @@ subroutine read_statearray(val,inst,instates,delim)
      end if
 
 end subroutine read_statearray
+
+subroutine read_trstatearray(val,intrst,delim)
+
+     character(*), intent(in) :: val
+     character(1), intent(in) :: delim
+
+     integer :: ii,k
+     logical :: dot
+     integer,allocatable :: intrst(:,:)
+     integer :: instates
+     character(:), allocatable :: w,v,s1,s2
+
+     w = trim(adjustl(val))
+     v = trim(adjustl(val))
+      
+     if (len(w) == 0) then
+           write(LOUT,'(1x,a)') 'ERROR!!! NO STATES GIVEN FOR Ensamble!'
+           stop
+     else
+           ! check for dots
+           k = index(v,'.')
+           if(k /= 0) then 
+              dot=.true.
+           else
+              dot=.false.
+           endif
+         
+           ! get number of states 
+           instates = 0
+           dimloop: do 
+                     k = index(v, delim)
+                     instates = instates + 1
+                     v = trim(adjustl(v(k+1:)))
+                     if (k == 0) exit dimloop
+                    enddo dimloop
+
+           if(instates.gt.1) then
+              write(lout,*) 'ONLY SINGLE TRDM POSSIBLE!'
+              stop
+           endif
+
+           ! assign states
+           allocate(intrst(2,instates))
+           instates = 0
+           arrloop: do 
+                     k = index(w, delim)
+                     instates = instates + 1
+                     if(k == 0) then
+                         !print*, 'last ', w
+                         if(dot) then
+                            call split(w,s1,s2,'.')
+                            read(s1, *) intrst(1,instates)
+                            read(s2, *) intrst(2,instates)
+                         else
+                            s1 = w
+                            read(s1, *) intrst(1,instates) 
+                            intrst(2,instates) = 1  
+                         endif
+                         !print*, '1 2',inst(1,instates),inst(2,instates)
+                         exit arrloop
+                     endif 
+                  enddo arrloop
+
+     end if
+
+end subroutine read_trstatearray
 
 subroutine split(s, s1, s2, delimiter)
       !

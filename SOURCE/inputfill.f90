@@ -287,12 +287,12 @@ subroutine read_block_calculation(CalcParams, line)
                CalcParams%JobType = JOB_TYPE_CASPIDFT
            endif
 
-      !case ("FRAGMENTS") 
-      !     if (uppercase(val) == ".TRUE.".or. &
-      !         uppercase(val) == "TRUE".or.   &
-      !         uppercase(val) == "T") then
-      !         CalcParams%Fragments = 1
-      !     endif
+     !case ("FRAGMENTS") 
+     !     if (uppercase(val) == ".TRUE.".or. &
+     !         uppercase(val) == "TRUE".or.   &
+     !         uppercase(val) == "T") then
+     !         CalcParams%Fragments = 1
+     !     endif
 
       case ("CORE") 
          read(val, *) CalcParams%Core
@@ -385,6 +385,9 @@ subroutine read_block_calculation(CalcParams, line)
            elseif (uppercase(val) == "2".or.&
                    uppercase(val) == "SAPT2" ) then
               CalcParams%SaptLevel = SAPTLEVEL2 
+           elseif (uppercase(val) == "C6") then
+              CalcParams%SaptLevel = SAPTLEVEL2 
+              CalcParams%vdWCoef = 1
            endif
 
       case("RESTART") 
@@ -423,6 +426,9 @@ integer :: test,test2
        SystemParams%DeclareSt = .true.
        call read_statearray(val,SystemParams%InSt,SystemParams%NStates,',')
 
+ case("TRDM")
+       SystemParams%DeclareTrSt = .true.
+       call read_trstatearray(val,SystemParams%InTrSt,',')
 ! case ("STATE")
 !      read(val, *) SystemParams%NoSt
 

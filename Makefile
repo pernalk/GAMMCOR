@@ -27,10 +27,11 @@ OBJ = $(O)mainp.o $(O)initia.o $(O)dmscf.o $(O)misc.o $(O)optocc.o \
 -L ./xcfun/lib -lxcfun
 
 FCC = ifort -assume byterecl
-FFLAGS = -mkl -heap-arrays  -O3 -I /home/kasia/xcfun_intel/fortran 
-LIBS = -L/opt/intel/composer_xe_2015.2.164/mkl/lib/intel64/ -lmkl_intel_ilp64 -lmkl_sequential -lmkl_core \
--L/home/kasia/xcfun_intel/lib -lxcfun
-#-L ./xcfun/lib -lxcfun
+FFLAGS = -heap-arrays  -O3 -I /home/kasia/xcfun_intel/fortran 
+#FFLAGS = -mkl -heap-arrays  -O3 -I /home/kasia/xcfun_intel/fortran 
+#LIBS = -L/opt/intel/composer_xe_2015.2.164/mkl/lib/intel64/ -lmkl_intel_ilp64 -lmkl_sequential -lmkl_core \
+-L ./xcfun/lib -lxcfun
+LIBS = -L ./xcfun/lib -lxcfun -lopenblas
 
 
 $(PROG) :  $(OBJ) 
@@ -121,7 +122,7 @@ $(O)sapt_main.o : $(S)sapt_main.f90 $(O)types.o $(O)systemdef.o $(O)tran.o $(O)s
 	$(FCC) $(FFLAGS)  -c $(S)sapt_main.f90 -o $(O)sapt_main.o
 $(O)sapt.o : $(S)sapt.f90 $(O)types.o $(O)tran.o $(O)exmisc.o $(O)timing.o 
 	$(FCC) $(FFLAGS)  -c $(S)sapt.f90 -o $(O)sapt.o
-$(O)caspidft.o : $(S)caspidft.f
+$(O)caspidft.o : $(S)caspidft.f $(O)types.o
 	$(FCC) $(FFLAGS)  -c $(S)caspidft.f -o $(O)caspidft.o
 
 .PHONY : clean

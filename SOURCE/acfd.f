@@ -4715,5 +4715,68 @@ C             0th-order correlation only if (IP,IQ) pair is allowed
             endif
          enddo
       enddo
-
+C
       End Subroutine ECorrAC0GVB_FOFO
+
+*Deck SortP
+      Subroutine SortP(Occ,URe,NBasis)
+C
+      Implicit Real*8 (A-H,O-Z)
+C
+      Dimension Occ(NBasis),URe(NBasis,NBasis)
+C
+C     LOCAL ARRAYS
+C
+      Dimension UReOld(NBasis,NBasis),Ind(1000),IndOcc(1000)
+C
+C     SORT THE OCCUPATION NUMBERS IN A DESCENDING ORDER
+C
+      Do I=1,NBasis
+      Ind(I)=I
+      EndDo
+C
+      IStart=1
+C
+      Do I=1,NBasis
+C
+      OccMx=Occ(IStart)
+      IndMx=IStart
+C
+      Do J=IStart,NBasis
+      If(Occ(J).Gt.OccMx) Then
+      OccMx=Occ(J)
+      IndMx=J
+      EndIf
+      EndDo
+C
+      Hlp=Occ(IStart)
+      IndHlp=Ind(IStart)
+
+      Occ(IStart)=OccMx
+      Ind(IStart)=Ind(IndMx)
+
+      Occ(IndMx)=Hlp
+      Ind(IndMx)=IndHlp
+C
+      IStart=IStart+1
+C
+      EndDo
+C
+C     SWAP THE ORBITALS
+C
+      Do I=1,NBasis
+      Do J=1,NBasis
+      UReOld(J,I)=URe(J,I)
+      EndDo
+      EndDo
+C
+      Do J=1,NBasis
+      Do I=1,NBasis
+      URe(I,J)=UReOld(Ind(I),J)
+      EndDo
+      EndDo
+C
+C
+      Return
+      End
+
