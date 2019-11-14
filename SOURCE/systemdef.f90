@@ -308,8 +308,7 @@ if(Flags%ISAPT.Eq.0) then
       ! read 1st available state
       System%InTrSt(:,1) = -255
    endif
-
-   Print*, 'InTrSt',System%InTrSt(1,1),System%InTrSt(2,1)
+!   Print*, 'InTrSt',System%InTrSt(1,1),System%InTrSt(2,1)
 
    System%ZNucl  = Input%SystemInput(1)%ZNucl
    System%Charge = Input%SystemInput(1)%Charge
