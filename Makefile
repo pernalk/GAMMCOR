@@ -17,7 +17,7 @@ OBJ = $(O)mainp.o $(O)initia.o $(O)dmscf.o $(O)misc.o $(O)optocc.o \
       $(O)exmisc.o $(O)exdpino.o \
       $(O)timing.o \
       $(O)srlrdynamic.o $(O)erpa.o $(O)interpa.o  $(O)exact2el.o $(O)optapsg.o $(O)newton.o $(O)acfd.o $(O)accas.o \
-      $(O)caspidft.o
+      $(O)caspidft.o $(O)ac_exact_2el.o
 
 #FCC = gfortran
 #FFLAGS = -O3 -fno-align-commons -fcheck=all -I ./xcfun/fortran  
@@ -27,11 +27,13 @@ OBJ = $(O)mainp.o $(O)initia.o $(O)dmscf.o $(O)misc.o $(O)optocc.o \
 -L ./xcfun/lib -lxcfun
 
 FCC = ifort -assume byterecl
-FFLAGS = -heap-arrays  -O3 -I /home/kasia/xcfun_intel/fortran 
+FFLAGS = -mkl -heap-arrays  -O3 -I /home/kasia/xcfun_intel/fortran 
 #FFLAGS = -mkl -heap-arrays  -O3 -I /home/kasia/xcfun_intel/fortran 
 #LIBS = -L/opt/intel/composer_xe_2015.2.164/mkl/lib/intel64/ -lmkl_intel_ilp64 -lmkl_sequential -lmkl_core \
 -L ./xcfun/lib -lxcfun
-LIBS = -L ./xcfun/lib -lxcfun -lopenblas
+#LIBS = -L ./xcfun/lib -lxcfun -lopenblas
+LIBS = -L/opt/intel/composer_xe_2015.2.164/mkl/lib/intel64/ -lmkl_intel_ilp64 -lmkl_sequential -lmkl_core \
+-L/home/pkowalski/xcfun_intel/lib -lxcfun
 
 
 $(PROG) :  $(OBJ) 
@@ -124,6 +126,9 @@ $(O)sapt.o : $(S)sapt.f90 $(O)types.o $(O)tran.o $(O)exmisc.o $(O)timing.o
 	$(FCC) $(FFLAGS)  -c $(S)sapt.f90 -o $(O)sapt.o
 $(O)caspidft.o : $(S)caspidft.f $(O)types.o
 	$(FCC) $(FFLAGS)  -c $(S)caspidft.f -o $(O)caspidft.o
+$(O)ac_exact_2el.o : $(S)ac_exact_2el.f
+	$(FCC) $(FFLAGS)  -c $(S)ac_exact_2el.f -o $(O)ac_exact_2el.o
+
 
 .PHONY : clean
 clean :

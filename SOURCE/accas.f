@@ -25,7 +25,6 @@ C
 C
       type(SystemBlock) :: System
 C
-C
 C     CONSTRUCT LOOK-UP TABLES
 C
       Do I=1,NELE
@@ -73,12 +72,17 @@ C     If IFlCore=0 do not include core (inactive) orbitals
       If((IFlCore.Eq.1).Or.
      $ (IFlCore.Eq.0.And.Occ(I).Ne.One.And.Occ(J).Ne.One)) Then
 C
+c herer!!!
+c      if(occ(i).ne.one.and.occ(j).ne.one) then
       Ind=Ind+1
       IndX(Ind)=Ind
       IndN(1,Ind)=I
       IndN(2,Ind)=J
       IPair(I,J)=1
       IPair(J,I)=1
+
+c herer!!!
+c      endif
 C
       EndIf
 C
@@ -174,6 +178,16 @@ C
      $ IndAux,ABPLUS,ABMIN,EigVecR,Eig,EGOne,
      $ Title,NBasis,NInte1,NInte2,NDimX,NGOcc,NGem,
      $ IndN,IndX,NDimX)
+c herer!!!
+c      Call CASPIDFT(ENuc,URe,UNOAO,Occ,XOne,TwoNO,
+c     $ NBasis,NInte1,NInte2)
+c 
+c exact AC
+c      NoEig=1
+c      NDimFull=NBasis*(NBasis-1)/2
+c      Call ACPINO(ENuc,TwoNO,Occ,XOne,
+c     $ NBasis,NInte1,NInte2,NDimFull,NGem,NoEig) 
+      
       Return
       EndIf
 C
@@ -375,7 +389,7 @@ C     checking
       If(NSymNO(IOrb).Eq.I) II=II+1
       EndDo
       If(II.Ne.NumOSym(I)) 
-     $ Stop 'Error in RunACCASLR. Symmetry of NO cannot be established!'
+     $ Write(*,*) 'In RunACCASLR. Symmetry of NO cannot be established!'
       EndDo
 C
       If(MxSym.Eq.1) Then
@@ -475,6 +489,13 @@ C
       Write(6,'(/," SR_xc_PBE with translated densities",F15.8,/)')
      $ EXCTOP
 C
+      Call PBE_ONTOP_MD(PBEMD,URe,Occ,
+     $ OrbGrid,OrbXGrid,OrbYGrid,OrbZGrid,WGrid,NGrid,NBasis)
+      Write(6,'(/," SR_PBE_corr_md ",F15.8,/)') PBEMD
+C
+c      Call CASPI_SR_PBE(URe,Occ,
+c     $ OrbGrid,OrbXGrid,OrbYGrid,OrbZGrid,WGrid,NGrid,NBasis)
+C
       IFunSR=IFunSave
 C
       XVSR=Zero
@@ -483,13 +504,20 @@ C
       XVSR=XVSR+Two*Occ(I)*VSR(II)
       EndDo
 C
-C      If(IFunSR.Eq.4) Then
-C      Write(6,'(X,/,
-C     $"*** ADDING VSR_HXC TO A ONE-ELECTRON HAMILTONIAN*** ",/)')
-C      Do I=1,NInte1
-C      XOne(I)=XOne(I)+VSR(I)
-C      EndDo
-C      EndIf
+c ???
+      If(IFunSR.Eq.4) Then
+c      Write(6,'(X,/,
+c     $"*** REMOVING VSR_HXC FROM A ONE-ELECTRON HAMILTONIAN*** ",/)')
+      Do I=1,NInte1
+c ??? uncomment for srcaspi calculations
+c      XOne(I)=XOne(I)-VSR(I)
+      EndDo
+      eone=zero
+      Do I=1,NBasis
+      II=(I*(I+1))/2
+      eone=eone+Two*Occ(I)*xone(II)
+      EndDo
+      EndIf
 C
       Allocate (SRKer(NGrid))
       SRKer(1:NGrid)=Zero
@@ -524,12 +552,22 @@ C
      $ 'EMPTY','FFOOERF','FOFOERF',0,IFunSRKer,ECASSCF,ECorr)
 C
       ElseIf(ITWoEl.Eq.1) Then
+C 
       Call AC0CASLR(ECorr,ECASSCF,TwoNO,Occ,URe,XOne,
      $ ABPLUS,ABMIN,EigVecR,Eig,
      $ IndN,IndX,NDimX,NBasis,NDim,NInte1,NInte2,
      $ TwoEl2,OrbGrid,Work,NSymNO,MultpC,NGrid)
+
+c      Call AC0CASLR(ECorr,ECASSCF,TwoEl2,Occ,URe,XOne,
+c     $ ABPLUS,ABMIN,EigVecR,Eig,
+c     $ IndN,IndX,NDimX,NBasis,NDim,NInte1,NInte2,
+c     $ TwoNO,OrbGrid,Work,NSymNO,MultpC,NGrid)
+
 C
       EndIf
+C
+      Write(6,*)"lrAC0 Correlation",ECorr
+      write(*,*)"One-ele Energy",eone-XVSR
 C
       Write(6,'(/,1X,  ''lrCASSCF+ENuc Energy       '',4X,F15.8)')
      $ ECASSCF-XVSR+ENuc
@@ -1167,6 +1205,11 @@ C     SYMMETRIZE BLOCK
       ABMIN((J-1)*NDimB+I)=
      $ Half*(ABMIN((J-1)*NDimB+I)+ABMIN((I-1)*NDimB+J))
       ABMIN((I-1)*NDimB+J)=ABMIN((J-1)*NDimB+I)
+c herer!!!
+c      ABMIN((I-1)*NDimB+J)=Zero
+c      ABMIN((J-1)*NDimB+I)=Zero
+c      ABPLUS((I-1)*NDimB+J)=Zero
+c      ABPLUS((J-1)*NDimB+I)=Zero
       EndDo
       EndDo
 C
@@ -1256,6 +1299,11 @@ C     SYMMETRIZE BLOCK
       ABMIN((J-1)*NDimB+I)=
      $ Half*(ABMIN((J-1)*NDimB+I)+ABMIN((I-1)*NDimB+J))
       ABMIN((I-1)*NDimB+J)=ABMIN((J-1)*NDimB+I)
+c herer!!!
+c      ABMIN((I-1)*NDimB+J)=zero
+c      ABMIN((J-1)*NDimB+I)=zero
+c      ABPLUS((I-1)*NDimB+J)=Zero
+c      ABPLUS((J-1)*NDimB+I)=Zero
       EndDo
       EndDo
 C
@@ -1348,6 +1396,11 @@ C     SYMMETRIZE BLOCK
       ABMIN((J-1)*NDimB+I)=
      $ Half*(ABMIN((J-1)*NDimB+I)+ABMIN((I-1)*NDimB+J))
       ABMIN((I-1)*NDimB+J)=ABMIN((J-1)*NDimB+I)
+c herer!!!
+c      ABMIN((I-1)*NDimB+J)=zero
+c      ABMIN((J-1)*NDimB+I)=zero
+c      ABPLUS((I-1)*NDimB+J)=Zero
+c      ABPLUS((J-1)*NDimB+I)=Zero
       EndDo
       EndDo
 C
@@ -1679,11 +1732,15 @@ C
       SumY=ABPLUS(I+(J-1)*NoEig)
       Aux=(C(IS)+C(IQ))*(C(IP)+C(IR))*SumY
 C
+c herer!!!
       EAll=EAll+Aux*TwoNO(NAddr3(IP,IR,IQ,IS))
+c      EAll=EAll+Aux*TwoEl2(NAddr3(IP,IR,IQ,IS))
 C
       If(IGem(IP).Eq.IGem(IR).And.IGem(IQ).Eq.IGem(IS).
      $ And.IGem(IP).Eq.IGem(IQ))
+c herer!!!
      $ EIntra=EIntra+Aux*TwoNO(NAddr3(IP,IR,IQ,IS))
+c     $ EIntra=EIntra+Aux*TwoEl2(NAddr3(IP,IR,IQ,IS))
 C
 C     endinf of If(IP.Gt.IR.And.IQ.Gt.IS)
       EndIf
@@ -1978,6 +2035,7 @@ C
       Do I=1,NGrid
       EXCTOP=EXCTOP+Zk(I)*WGrid(I)
       EndDo
+      Exch=EXCTOP
 C
       Call dftfun_ecerfpbe(name,FDeriv,Open,igrad,NGrid,RhoGrid,RhoO,
      >                   Sigma,SigmaCO,SigmaOO,
@@ -1990,6 +2048,9 @@ C
       EndDo
 C
       EXCTOP=EXCTOP+EnC
+C
+      Write(6,'(/," SR_xch_PBE with translated densities",F15.8)')Exch
+      Write(6,'(" SR_cor_PBE with translated densities",F15.8)')EnC
 C
       Return
       End
@@ -2157,3 +2218,225 @@ C
 C
       Return
       End
+
+*Deck CASPI_SR_PBE
+      Subroutine CASPI_SR_PBE(URe,Occ,
+     $ OrbGrid,OrbXGrid,OrbYGrid,OrbZGrid,WGrid,NGrid,NBasis)
+C
+C     COMPUTES A CASPIDFT VERSION OF SR-PBE_CORR ENERGY AS:
+C     P(X) eps_corr^SR_PBE
+C     X(r) = 2 OnTop(r,r) / Rho^2(r)
+C
+      Implicit Real*8 (A-H,O-Z)
+C
+      Parameter(Zero=0.D0, Half=0.5D0, One=1.D0, Two=2.D0, Four=4.D0)
+C
+      Include 'commons.inc'
+C
+      Real*8, Allocatable :: RDM2Act(:)
+C
+      Dimension URe(NBasis,NBasis),Occ(NBasis),
+     $ WGrid(NGrid),OrbGrid(NGrid,NBasis),OrbXGrid(NGrid,NBasis),
+     $ OrbYGrid(NGrid,NBasis),OrbZGrid(NGrid,NBasis),Ind2(NBasis)
+C
+! input
+      Dimension Zk(NGrid),RhoGrid(NGrid),Sigma(NGrid),OnTop(NGrid)
+      logical fderiv,open
+      double precision rhoo(ngrid)
+      double precision sigmaco(ngrid),sigmaoo(ngrid)
+! output
+      integer igrad
+      character*(30) name
+      double precision vrhoc(ngrid),vrhoo(ngrid)
+      double precision vsigmacc(ngrid),vsigmaco(ngrid),vsigmaoo(ngrid)
+C
+      EnxcSR=Zero
+      FDeriv=.True.
+      Open=.False.
+C
+C     READ 2RDM
+C
+      NAct=NAcCAS
+      INActive=NInAcCAS
+      NOccup=INActive+NAct
+      Ind2(1:NBasis)=0
+      Do I=1,NAct
+      Ind2(INActive+I)=I
+      EndDo
+C
+      NRDM2Act = NAct**2*(NAct**2+1)/2
+      Allocate (RDM2Act(NRDM2Act))
+      RDM2Act(1:NRDM2Act)=Zero
+C
+      Open(10,File="rdm2.dat",Status='Old')
+      Write(6,'(/,1X,''Active block of 2-RDM read from rdm2.dat'')')
+C
+   10 Read(10,'(4I4,F19.12)',End=40)I,J,K,L,X
+C
+C     X IS DEFINED AS: < E(IJ)E(KL) > - DELTA(J,K) < E(IL) > = 2 GAM2(JLIK)
+C
+      RDM2Act(NAddrRDM(J,L,I,K,NAct))=Half*X
+C
+      GoTo 10
+   40 Continue
+      Close(10)
+C
+      Do I=1,NGrid
+C
+      vrhoc(I)=Zero
+      vsigmacc(i)=Zero
+      Call DenGrid(I,RhoGrid(I),Occ,URe,OrbGrid,NGrid,NBasis)
+      Call DenGrad(I,RhoX,Occ,URe,OrbGrid,OrbXGrid,NGrid,NBasis)
+      Call DenGrad(I,RhoY,Occ,URe,OrbGrid,OrbYGrid,NGrid,NBasis)
+      Call DenGrad(I,RhoZ,Occ,URe,OrbGrid,OrbZGrid,NGrid,NBasis)
+      Sigma(I)=RhoX**2+RhoY**2+RhoZ**2
+C
+      OnTop(I)=Zero
+      Do IP=1,NOccup
+      Do IQ=1,NOccup
+      Do IR=1,NOccup
+      Do IS=1,NOccup
+      OnTop(I)=OnTop(I)
+     $ +Two*FRDM2(IP,IQ,IR,IS,RDM2Act,Occ,Ind2,NAct,NBasis)
+     $ *OrbGrid(I,IP)*OrbGrid(I,IQ)*OrbGrid(I,IR)*OrbGrid(I,IS)
+      EndDo
+      EndDo
+      EndDo
+      EndDo
+C
+      EndDo
+C
+      Call dftfun_ecerfpbe(name,FDeriv,Open,igrad,NGrid,RhoGrid,rhoo,
+     >                   Sigma,sigmaco,sigmaoo,
+     >                   Zk,vrhoc,vrhoo,
+     >                   vsigmacc,vsigmaco,vsigmaoo,Alpha)
+C
+      A=0.2D0
+      B=A-One
+      C=2.2D0
+      G=1.5D0
+      D=(C-One)/(One-G)**2
+C
+      EDYN=Zero
+      SR_PBE_c=Zero
+      Do I=1,NGrid
+C
+      If(RhoGrid(I).Ne.Zero) Then
+C 
+      XX=Two*OnTop(I)/RhoGrid(I)**2
+      If(XX.Le.One) Then
+      PX=A*XX/(One+B*XX)
+      Else
+      PX=C*XX**0.25-D*(XX-G)**2
+      EndIf
+C
+      EDYN=EDYN+PX*Zk(I)*WGrid(I)
+      SR_PBE_c=SR_PBE_c+Zk(I)*WGrid(I)
+C
+      EndIf
+C
+      EndDo
+C
+      Write(6,'(/,1X,''SR-PBE Correlation'',7X,F15.8)')SR_PBE_c
+      Write(6,'(1X,''CASPIDFT Correlation'',5X,F15.8,/)')EDYN
+C
+      Return
+      End
+
+*Deck PBE_ONTOP_MD
+      Subroutine PBE_ONTOP_MD(PBEMD,URe,Occ,
+     $ OrbGrid,OrbXGrid,OrbYGrid,OrbZGrid,WGrid,NGrid,NBasis)
+C
+C     RETURNS A SR-PBE ONTOP CORRELATION DEFINED IN Eq.(25)-(29), Toulouse JCP 150, 084103 (2019)
+C
+      Implicit Real*8 (A-H,O-Z)
+C
+      Parameter(Zero=0.D0, Half=0.5D0, One=1.D0, Two=2.D0, Three=3.0D0, 
+     $ Four=4.D0)
+C
+      Include 'commons.inc'
+C
+      Real*8, Allocatable :: RDM2Act(:)
+C
+      Dimension URe(NBasis,NBasis),Occ(NBasis),
+     $ Ind1(NBasis),Ind2(NBasis),
+     $ WGrid(NGrid),OrbGrid(NGrid,NBasis),OrbXGrid(NGrid,NBasis),
+     $ OrbYGrid(NGrid,NBasis),OrbZGrid(NGrid,NBasis)
+C
+      Dimension Zk(NGrid),RhoGrid(NGrid),Sigma(NGrid),OnTop(NGrid)
+C
+      Write(6,'(/,1X,"COMPUTING SR-PBE_CORR_MD FOR THE RANGE PARAMETER "
+     $ ,F8.3)')Alpha
+C
+      NAct=NAcCAS
+      INActive=NInAcCAS
+      NOccup=INActive+NAct
+      Ind2(1:NBasis)=0
+      Do I=1,NAct
+      Ind1(I)=INActive+I
+      Ind2(INActive+I)=I
+      EndDo
+C
+      NRDM2Act = NAct**2*(NAct**2+1)/2
+      Allocate (RDM2Act(NRDM2Act))
+      RDM2Act(1:NRDM2Act)=Zero
+C
+      Open(10,File="rdm2.dat",Status='Old')
+C
+   10 Read(10,'(4I4,F19.12)',End=40)I,J,K,L,X
+C
+C     X IS DEFINED AS: < E(IJ)E(KL) > - DELTA(J,K) < E(IL) > = 2 GAM2(JLIK)
+C
+      RDM2Act(NAddrRDM(J,L,I,K,NAct))=Half*X
+C
+      I=Ind1(I)
+      J=Ind1(J)
+      K=Ind1(K)
+      L=Ind1(L)
+C
+      GoTo 10
+   40 Continue
+      Close(10)
+C
+      Do I=1,NGrid
+C
+      Call DenGrid(I,RhoGrid(I),Occ,URe,OrbGrid,NGrid,NBasis)
+      Call DenGrad(I,RhoX,Occ,URe,OrbGrid,OrbXGrid,NGrid,NBasis)
+      Call DenGrad(I,RhoY,Occ,URe,OrbGrid,OrbYGrid,NGrid,NBasis)
+      Call DenGrad(I,RhoZ,Occ,URe,OrbGrid,OrbZGrid,NGrid,NBasis)
+      Sigma(I)=RhoX**2+RhoY**2+RhoZ**2
+C
+      OnTop(I)=Zero
+      Do IP=1,NOccup
+      Do IQ=1,NOccup
+      Do IR=1,NOccup
+      Do IS=1,NOccup
+      OnTop(I)=OnTop(I)
+     $ +Two*FRDM2(IP,IQ,IR,IS,RDM2Act,Occ,Ind2,NAct,NBasis)
+     $ *OrbGrid(I,IP)*OrbGrid(I,IQ)*OrbGrid(I,IR)*OrbGrid(I,IS)
+      EndDo
+      EndDo
+      EndDo
+      EndDo
+C     
+      EndDo
+C
+      Call PBECor(RhoGrid,Sigma,Zk,NGrid)
+C
+      SPi=SQRT(3.141592653589793)
+      Const=Three/Two/SPi/(One-SQRT(Two))
+C
+      PBEMD=Zero      
+      Do I=1,NGrid
+C
+      Bet=Zero
+      OnTopC=OnTop(I)/(One+Two/SPi/Alpha)
+      If(OnTopC.Ne.Zero) Bet=Const*Zk(I)/OnTopC
+C
+      PBEMD=PBEMD+Zk(I)/(One+Bet*Alpha**3)*WGrid(I)
+C
+      EndDo
+C
+      Return
+      End
+
