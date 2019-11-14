@@ -49,6 +49,7 @@ C
 C
       IPair(1:NBasis,1:NBasis)=0
 C
+      ThrSelAct=1.D-4
       Write(LOUT,'(2x,a,2e15.5)') 'Threshold for quasi-degeneracy ',
      $ ThrSelAct
       IJ=0
