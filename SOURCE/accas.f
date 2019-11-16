@@ -72,17 +72,14 @@ C     If IFlCore=0 do not include core (inactive) orbitals
       If((IFlCore.Eq.1).Or.
      $ (IFlCore.Eq.0.And.Occ(I).Ne.One.And.Occ(J).Ne.One)) Then
 C
-c herer!!!
-c      if(occ(i).ne.one.and.occ(j).ne.one) then
+      If(Abs(Occ(i)+Occ(j)-Two).Gt.1.D-10) Then
       Ind=Ind+1
       IndX(Ind)=Ind
       IndN(1,Ind)=I
       IndN(2,Ind)=J
       IPair(I,J)=1
       IPair(J,I)=1
-
-c herer!!!
-c      endif
+      EndIf
 C
       EndIf
 C

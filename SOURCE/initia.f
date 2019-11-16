@@ -1209,6 +1209,7 @@ C
       Write(6,'(2X,"No of inactive and active orbitals: ",2I4)')
      $ NInAcCAS,NAcCAS
 C
+      write(*,*)'occ(7)',occ(7)
       Write(6,'(2X,"MCSCF",3X,"Occupancy",4X,"Gem")')
       Sum=Zero
       Do I=1,NBasis
