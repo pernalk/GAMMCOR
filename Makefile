@@ -31,8 +31,8 @@ FFLAGS = -mkl -heap-arrays  -O3 -I /home/kasia/xcfun_intel/fortran
 #FFLAGS = -mkl -heap-arrays  -O3 -I /home/kasia/xcfun_intel/fortran 
 #LIBS = -L/opt/intel/composer_xe_2015.2.164/mkl/lib/intel64/ -lmkl_intel_ilp64 -lmkl_sequential -lmkl_core \
 -L ./xcfun/lib -lxcfun
-#LIBS = -L ./xcfun/lib -lxcfun -lopenblas
-LIBS = -L/opt/intel/composer_xe_2015.2.164/mkl/lib/intel64/ -lmkl_intel_ilp64 -lmkl_sequential -lmkl_core \
+LIBS = -L ./xcfun/lib -lxcfun -lopenblas
+#LIBS = -L/opt/intel/composer_xe_2015.2.164/mkl/lib/intel64/ -lmkl_intel_ilp64 -lmkl_sequential -lmkl_core \
 -L/home/pkowalski/xcfun_intel/lib -lxcfun
 
 
@@ -114,7 +114,7 @@ $(O)tran.o : $(S)tran.f90 $(O)types.o
 	$(FCC) $(FFLAGS)  -c $(S)tran.f90 -o $(O)tran.o
 $(O)abmats.o : $(S)abmats.f90 $(O)types.o $(O)tran.o
 	$(FCC) $(FFLAGS)  -c $(S)abmats.f90 -o $(O)abmats.o
-$(O)abfofo.o : $(S)abfofo.f90 $(O)types.o $(O)tran.o
+$(O)abfofo.o : $(S)abfofo.f90 $(O)types.o $(O)tran.o $(O)timing.o
 	$(FCC) $(FFLAGS)  -c $(S)abfofo.f90 -o $(O)abfofo.o
 $(O)exmisc.o : $(S)exmisc.f90 $(O)types.o
 	$(FCC) $(FFLAGS)  -c $(S)exmisc.f90 -o $(O)exmisc.o
