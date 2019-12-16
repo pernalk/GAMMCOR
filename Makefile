@@ -24,7 +24,7 @@ OBJ = $(O)mainp.o $(O)initia.o $(O)dmscf.o $(O)misc.o $(O)optocc.o \
 ##-fdefault-real-8 
 ##-Wall -Wextra -Warray-temporaries -Wrealloc-lhs-all -pedantic
 #LIBS = -L/usr/lib -lopenblas \
--L ./xcfun/lib -lxcfun
+#-L ./xcfun/lib -lxcfun
 
 FCC = ifort -assume byterecl
 FFLAGS = -mkl -heap-arrays  -O3 -I /home/kasia/xcfun_intel/fortran 

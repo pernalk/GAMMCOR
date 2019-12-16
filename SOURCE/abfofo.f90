@@ -2399,7 +2399,6 @@ elseif(present(ECorr)) then
 do i=1,NBasis
    C(i) = sign(sqrt(Occ(i)),Occ(i)-0.5d0)
 enddo
-
 ! original
 !EigY1 = 0
 !do j=1,NDimX
@@ -2417,7 +2416,6 @@ enddo
 
 !prepare new AMAT
 allocate(workA(NDimX,NDimX))
-EigY1 = 0
 workA=0
 do j=1,NDimX
    if(Eig(j)/=0d0) then
