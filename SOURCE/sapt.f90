@@ -1810,6 +1810,129 @@ endif
 
 end subroutine e2disp_unc
 
+subroutine e2dispCAS(Flags,A,B,SAPT,ACAlpha)
+implicit none
+
+type(FlagsData)   :: Flags
+type(SystemBlock) :: A, B
+type(SaptData)    :: SAPT
+double precision,intent(in) :: ACAlpha
+
+integer          :: iunit
+integer          :: i,j,pq,rs
+integer          :: ip,iq,ir,is
+integer          :: dimOA,dimVA, &
+                    dimOB,dimVB,nOVA,nOVB
+double precision :: fact1,fact2,e2d
+double precision,allocatable :: OmA(:),OmB(:), &
+                                EVecA(:),EVecB(:)
+double precision,allocatable :: work(:)
+double precision,allocatable :: tmp(:,:),tmp1(:,:),tmp2(:,:)
+! for Be ERPA:
+!double precision,parameter :: SmallE = 1.D-1
+double precision,parameter :: BigE   = 1.D8 
+double precision,parameter :: SmallE = 1.D-3
+
+! print thresholds
+if(SAPT%IPrint>1) then 
+   write(LOUT,'(/,1x,a)') 'Thresholds in E2disp:'
+   write(LOUT,'(1x,a,2x,e15.4)') 'SmallE      =', SmallE
+   write(LOUT,'(1x,a,2x,e15.4)') 'BigE        =', BigE
+endif
+
+! set dimensions
+dimOA = A%num0+A%num1
+dimVA = A%num1+A%num2
+dimOB = B%num0+B%num1
+dimVB = B%num1+B%num2
+nOVA  = dimOA*dimVA
+nOVB  = dimOB*dimVB
+
+allocate(EVecA(A%NDimX*A%NDimX),EVecB(B%NDimX*B%NDimX),&
+         OmA(A%NDimX),OmB(B%NDimX))
+allocate(tmp(A%NDimX,B%NDimX),tmp1(A%NDimX,B%NDimX),tmp2(A%NDimX,B%NDimX))
+
+call readresp(EVecA,OmA,A%NDimX,'PROP_A')
+call readresp(EVecB,OmB,B%NDimX,'PROP_B')
+
+! check for negative eigenvalues
+do i=1,A%NDimX
+   if(OmA(i)<0d0) write(LOUT,*) 'Negative A!',i,OmA(i)
+enddo
+do i=1,B%NDimX
+   if(OmB(i)<0d0) write(LOUT,*) 'Negative B!',i,OmB(i)
+enddo
+
+allocate(work(nOVB))
+open(newunit=iunit,file='TWOMOAB',status='OLD',&
+     access='DIRECT',form='UNFORMATTED',recl=8*nOVB)
+
+tmp1 = 0
+tmp2 = 0
+do pq=1,A%NDimX
+   ip = A%IndN(1,pq)
+   iq = A%IndN(2,pq)
+   read(iunit,rec=iq+(ip-A%num0-1)*dimOA) work(1:nOVB)
+   do rs=1,B%NDimX
+      ir = B%IndN(1,rs)
+      is = B%IndN(2,rs)
+
+      fact1 = (A%CICoef(iq)+A%CICoef(ip)) * &
+              (B%CICoef(is)+B%CICoef(ir)) * &
+              work(is+(ir-B%num0-1)*dimOB)
+
+      fact2 = ACAlpha*fact1
+
+      ! remove active part 
+      if(A%IGem(ip)==2.and.A%IGem(iq)==2.and. &
+         B%IGem(ir)==2.and.B%IGem(is)==2) then
+         fact2 = fact1
+         fact1 = 0d0
+      endif
+ 
+      do i=1,A%NDimX
+         tmp1(i,rs) = tmp1(i,rs) + &
+                      fact1 * &
+                      EVecA(pq+(i-1)*A%NDimX)
+
+         tmp2(i,rs) = tmp2(i,rs) + &
+                      fact2 * &
+                      EVecA(pq+(i-1)*A%NDimX)
+      enddo
+
+   enddo
+enddo
+
+close(iunit)
+deallocate(work)
+
+! second multiplication
+call dgemm('N','N',A%NDimX,B%NDimX,B%NDimX,1d0,tmp1,A%NDimX,EVecB,B%NDimX,0d0,tmp,A%NDimX)
+tmp1 = tmp
+call dgemm('N','N',A%NDimX,B%NDimX,B%NDimX,1d0,tmp2,A%NDimX,EVecB,B%NDimX,0d0,tmp,A%NDimX)
+tmp2 = tmp
+
+e2d = 0d0
+do j=1,B%NDimX
+   do i=1,A%NDimX
+      if(abs(OmA(i)).gt.SmallE.and.abs(OmB(j)).gt.SmallE&
+         .and.abs(OmA(i)).lt.BigE.and.abs(OmB(j)).lt.BigE) then
+
+         e2d = e2d + tmp1(i,j)*tmp2(i,j)/(OmA(i)+OmB(j))
+
+      endif
+   enddo
+enddo
+SAPT%e2disp = -32d0*e2d
+e2d  = -32d0*e2d*1000d0
+
+write(LOUT,'(/1x,a,f16.8)') 'E2disp(CAS) = ',e2d
+
+deallocate(tmp2,tmp1)
+deallocate(OmB,OmA,EVecB,EVecA)
+ 
+end subroutine e2dispCAS
+
 ! HERE!!!
 subroutine e2disp(Flags,A,B,SAPT)
 implicit none

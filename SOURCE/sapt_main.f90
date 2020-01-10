@@ -36,26 +36,43 @@ double precision :: Tcpu,Twall
  write(LOUT,'(8a10)') ('**********',i=1,8)
 
  call clock('START',Tcpu,Twall)
- call sapt_interface(Flags,SAPT)
+ call sapt_basinfo(SAPT,NBasis)
+ call sapt_interface(Flags,SAPT,NBasis)
+ call sapt_mon_ints(SAPT%monA,NBasis)
+ call sapt_mon_ints(SAPT%monB,NBasis)
+ if(SAPT%SaptLevel/=10) then
+   call sapt_response(Flags,SAPT%monA,SAPT%SaptLevel,SAPT%EnChck,NBasis)
+   call sapt_response(Flags,SAPT%monB,SAPT%SaptLevel,SAPT%EnChck,NBasis)
+ endif
 
  ! SAPT components
  write(LOUT,'()')
  if(Flags%ISERPA==0) then
 
     call e1elst(SAPT%monA,SAPT%monB,SAPT)
-    ! add GVB also!!!
-!    if(Flags%ICASSCF==1) then
-       !call e1exchs2(Flags,SAPT%monA,SAPT%monB,SAPT)
-!    endif
+   !call e1exchs2(Flags,SAPT%monA,SAPT%monB,SAPT)
+
+    ! UNCOUPLED E2DISP
     if(SAPT%SaptLevel==0) then
+
        call e2disp_unc(Flags,SAPT%monA,SAPT%monB,SAPT)
-    else
+
+    ! E2DISP(CAS)!
+    elseif(SAPT%SaptLevel==10) then
+
+       call e2dispCAS_Alpha(Flags,SAPT%monA,SAPT%monB,SAPT,NBasis)
+       
+    ! COUPLED SAPT
+    elseif(SAPT%SaptLevel==2) then
+
        call e2ind(Flags,SAPT%monA,SAPT%monB,SAPT)
        call e2disp(Flags,SAPT%monA,SAPT%monB,SAPT)
+
        if(Flags%ICASSCF==1) then
           call e2exdisp(Flags,SAPT%monA,SAPT%monB,SAPT)
           !call e2exd_app(SAPT%monA,SAPT%monB,SAPT)
        endif
+
     endif
 
  elseif(Flags%ISERPA==2) then
@@ -82,13 +99,34 @@ double precision :: Tcpu,Twall
 
 end subroutine sapt_driver
 
-subroutine sapt_interface(Flags,SAPT) 
+subroutine e2dispCAS_Alpha(Flags,A,B,SAPT,NBasis)
+implicit none
+
+type(SystemBlock)  :: A,B
+type(FlagsData)    :: Flags
+type(SaptData)     :: SAPT
+integer,intent(in) :: NBasis
+
+! set ACAlpha for the monomers
+
+ SAPT%ACAlpha = 1.d0
+ A%ACAlpha    = SAPT%ACAlpha
+ B%ACAlpha    = SAPT%ACAlpha
+ call sapt_response(Flags,A,SAPT%SaptLevel,SAPT%EnChck,NBasis)
+ call sapt_response(Flags,B,SAPT%SaptLevel,SAPT%EnChck,NBasis)
+
+ call e2dispCAS(Flags,SAPT%monA,SAPT%monB,SAPT,SAPT%ACAlpha)
+
+end subroutine e2dispCAS_Alpha
+
+subroutine sapt_interface(Flags,SAPT,NBasis)
 implicit none
 
 type(FlagsData) :: Flags
-type(SaptData) :: SAPT
+type(SaptData)  :: SAPT
+integer,intent(in) :: NBasis
 
-integer :: NBasis,NSq,NInte1,NInte2
+integer :: NSq,NInte1,NInte2
 integer :: NCMOt, NOrbt, NBasist 
 integer :: NSym, NBas(8)
 integer :: NOcc(8),NOrbs(8)
@@ -108,30 +146,6 @@ double precision ::  potnuc,emy,eactiv,emcscf
 integer :: noccA, nvirtA, noccB, nvirtB
 integer :: ncen
 logical :: doRSH
-
-! read basis info
-! only DCBS 
- NBasis = 0
- if(SAPT%InterfaceType==1) then
-    call basinfo(NBasis,'SIRIUS_A.RST','DALTON')
- elseif(SAPT%InterfaceType==2) then
-    call basinfo(NBasis,'AOTWOINT.mol','MOLPRO')
- endif
- if(NBasis==0.and.SAPT%monA%NBasis==0) then
-    write(LOUT,'(1x,a)') 'ERROR!!! NBasis NOWHERE TO BE FOUND!'
-    stop
- elseif(NBasis==0.and.SAPT%monA%NBasis/=0) then
-    ! basis only in input
-    NBasis = SAPT%monA%NBasis
- elseif(NBasis/=0.and.SAPT%monA%NBasis==0) then
-    ! basis only in SIRIFC
-    SAPT%monA%NBasis = NBasis
-    SAPT%monB%NBasis = NBasis
- elseif(NBasis/=0.and.SAPT%monA%NBasis/=0) then
-    ! choose SIRIFC values
-    SAPT%monA%NBasis = NBasis
-    SAPT%monB%NBasis = NBasis
- endif
 
 ! set dimensions
  NSq = NBasis**2
@@ -318,32 +332,32 @@ logical :: doRSH
 
  call print_active(SAPT,NBasis)
 
-! calculate response
-! mon A
- call SaptInter(NBasis,SAPT%monA,Flags%ICASSCF)
-! call COMMTST(NBasis)
- if(SAPT%SaptLevel.eq.0) then
-     call calc_resp_unc(SAPT%monA,Ca,Flags,NBasis,'TWOMOAA')
- elseif(SAPT%SaptLevel.gt.0) then
-    if(Flags%IFunSR/=0) then
-       call calc_resp_dft(SAPT%monA,Ca,Flags,NBasis)
-    else
-       call calc_resp_full(SAPT%monA,Ca,Flags,NBasis,'TWOMOAA',SAPT%EnChck)
-    endif
- endif
-
-! mon B
-    call SaptInter(NBasis,SAPT%monB,Flags%ICASSCF)
-!   call COMMTST(NBasis) 
- if(SAPT%SaptLevel.eq.0) then
-    call calc_resp_unc(SAPT%monB,Cb,Flags,NBasis,'TWOMOBB')
- elseif(SAPT%SaptLevel.gt.0) then
-    if(Flags%IFunSR/=0) then
-       call calc_resp_dft(SAPT%monB,Cb,Flags,NBasis)
-    else
-       call calc_resp_full(SAPT%monB,Cb,Flags,NBasis,'TWOMOBB',SAPT%EnChck)
-   endif
- endif
+!! calculate response
+!! mon A
+! call SaptInter(NBasis,SAPT%monA,Flags%ICASSCF)
+!! call COMMTST(NBasis)
+! if(SAPT%SaptLevel.eq.0) then
+!     call calc_resp_unc(SAPT%monA,Ca,Flags,NBasis)
+! elseif(SAPT%SaptLevel.gt.0) then
+!    if(Flags%IFunSR/=0) then
+!       call calc_resp_dft(SAPT%monA,Ca,Flags,NBasis)
+!    else
+!       call calc_resp_full(SAPT%monA,Ca,Flags,NBasis,SAPT%EnChck)
+!    endif
+! endif
+!
+!! mon B
+!    call SaptInter(NBasis,SAPT%monB,Flags%ICASSCF)
+!!   call COMMTST(NBasis) 
+! if(SAPT%SaptLevel.eq.0) then
+!    call calc_resp_unc(SAPT%monB,Cb,Flags,NBasis)
+! elseif(SAPT%SaptLevel.gt.0) then
+!    if(Flags%IFunSR/=0) then
+!       call calc_resp_dft(SAPT%monB,Cb,Flags,NBasis)
+!    else
+!       call calc_resp_full(SAPT%monB,Cb,Flags,NBasis,SAPT%EnChck)
+!   endif
+! endif
 
   if(Flags%ISERPA==2.and.Flags%ISHF==1) then
      call tran4_gen(NBasis,&
@@ -373,6 +387,69 @@ logical :: doRSH
  endif
 
 end subroutine sapt_interface
+
+subroutine sapt_basinfo(SAPT,NBasis)
+implicit none 
+
+type(SaptData)      :: SAPT
+integer,intent(out) :: NBasis
+
+ NBasis = 0
+ if(SAPT%InterfaceType==1) then
+    call basinfo(NBasis,'SIRIUS_A.RST','DALTON')
+ elseif(SAPT%InterfaceType==2) then
+    call basinfo(NBasis,'AOTWOINT.mol','MOLPRO')
+ endif
+ if(NBasis==0.and.SAPT%monA%NBasis==0) then
+    write(LOUT,'(1x,a)') 'ERROR!!! NBasis NOWHERE TO BE FOUND!'
+    stop
+ elseif(NBasis==0.and.SAPT%monA%NBasis/=0) then
+    ! basis only in input
+    NBasis = SAPT%monA%NBasis
+ elseif(NBasis/=0.and.SAPT%monA%NBasis==0) then
+    ! basis only in SIRIFC
+    SAPT%monA%NBasis = NBasis
+    SAPT%monB%NBasis = NBasis
+ elseif(NBasis/=0.and.SAPT%monA%NBasis/=0) then
+    ! choose SIRIFC values
+    SAPT%monA%NBasis = NBasis
+    SAPT%monB%NBasis = NBasis
+ endif
+
+end subroutine sapt_basinfo
+
+subroutine sapt_response(Flags,Mon,SaptLevel,EnChck,NBasis)
+implicit none
+
+type(FlagsData)    :: Flags
+type(SystemBlock)  :: Mon
+integer,intent(in) :: SaptLevel,NBasis
+logical,intent(in) :: EnChck 
+
+integer          :: i,j,ij
+double precision :: MO(NBasis*NBasis)
+
+ ij = 0
+ do j=1,NBasis
+    do i=1,NBasis
+       ij = ij + 1
+       MO(ij) = Mon%CMO(i,j)   
+    enddo
+ enddo
+
+! calculate response
+ call SaptInter(NBasis,Mon,Flags%ICASSCF)
+ if(SaptLevel.eq.0) then
+     call calc_resp_unc(Mon,MO,Flags,NBasis)
+ elseif(SaptLevel.gt.0) then
+    if(Flags%IFunSR/=0) then
+       call calc_resp_dft(Mon,MO,Flags,NBasis)
+    else
+       call calc_resp_full(Mon,MO,Flags,NBasis,EnChck)
+    endif
+ endif
+
+end subroutine sapt_response
 
 subroutine onel_molpro(mon,NBasis,NSq,NInte1,MonBlock,SAPT)
  implicit none
@@ -914,14 +991,13 @@ integer,external :: NAddrRDM
 
 end subroutine prepare_rdm2
 
-subroutine calc_resp_unc(Mon,MO,Flags,NBas,fname)
+subroutine calc_resp_unc(Mon,MO,Flags,NBas)
 implicit none
 
 type(SystemBlock) :: Mon
 type(FlagsData) :: Flags
 double precision :: MO(:)        
 integer :: NBas
-character(*) :: fname
 integer :: NSq,NInte1,NInte2
 double precision, allocatable :: work1(:),work2(:),XOne(:),TwoMO(:) 
 double precision, allocatable :: ABPlus(:), ABMin(:), URe(:,:), &
@@ -996,7 +1072,7 @@ character(:),allocatable :: onefile,twofile,propfile0,propfile1,rdmfile
 
  case(TWOMO_INCORE,TWOMO_FFFF) 
    ! full - for GVB and CAS
-   call tran4_full(NBas,MO,MO,fname,'AOTWOSORT')
+   call tran4_full(NBas,MO,MO,twofile,'AOTWOSORT')
 
 
  case(TWOMO_FOFO) 
@@ -1501,68 +1577,152 @@ double precision, allocatable :: EigY0(:),EigY1(:), &
 
 end subroutine test_resp_unc
 
-subroutine calc_resp_full(Mon,MO,Flags,NBas,fname,EChck)
-implicit none
+subroutine sapt_mon_ints(Mon,NBas)
+implicit none 
 
 type(SystemBlock) :: Mon
-type(FlagsData) :: Flags
-double precision :: MO(:)        
 integer :: NBas
-character(*) :: fname
-logical :: EChck
+integer :: i,j,ij,ione
 integer :: NSq,NInte1,NInte2
-double precision, allocatable :: work1(:),work2(:),XOne(:),TwoMO(:) 
-double precision, allocatable :: ABPlus(:), ABMin(:), URe(:,:), &
-                                 CMAT(:),EMAT(:),EMATM(:), &
-                                 DMAT(:),DMATK(:), &
-                                 EigVecR(:), Eig(:), &
-                                 ABPlusT(:), ABMinT(:)
-double precision, allocatable :: Eig0(:), Eig1(:), EigY0(:), EigY1(:) 
-double precision :: Dens(NBas,NBas)
-double precision,parameter :: One = 1d0, Half = 0.5d0
-integer :: i,j,ij,ij1,ione,itwo 
-integer :: ip,iq,pq,ind
-double precision :: ACAlpha
-double precision :: ECASSCF,ETot,ECorr
-character(8) :: label
-character(:),allocatable :: onefile,twofile,propfile,rdmfile
-character(:),allocatable :: twojfile,twokfile
-character(:),allocatable :: propfile0,propfile1
-double precision :: tmp
-double precision,parameter :: SmallE=0d0,BigE=1.D20
-double precision,external  :: trace
-integer :: INegExcit,offset
-integer,allocatable :: sort(:)
-double precision, allocatable :: EigTmp(:), VecTmp(:)
-! testy
- integer :: ii,jj,dimV1
- double precision,parameter :: thresh=1.d-10
- integer :: space1(2,Mon%NDimX)
- integer :: IndN_tmp(2,Mon%NDim)
- double precision :: work(Mon%NDimX)
- double precision,external :: ddot
- double precision :: tst
- integer :: DimEx
 
-! set filenames
+double precision             :: URe(NBas,NBas),MO(NBas*NBas)
+double precision,allocatable :: TwoMO(:)
+double precision,allocatable :: work1(:),work2(:),XOne(:)
+character(8)                 :: label
+character(:),allocatable     :: onefile,twofile
+character(:),allocatable     :: twojfile,twokfile
+
+
+! set dimensions
+ NSq = NBas**2
+ NInte1 = NBas*(NBas+1)/2
+ NInte2 = NInte1*(NInte1+1)/2
+
+! set file names
  if(Mon%Monomer==1) then
     onefile  = 'ONEEL_A'
     twofile  = 'TWOMOAA'
     twojfile = 'FFOOAA'
     twokfile = 'FOFOAA'
-    propfile = 'PROP_A'
-    propfile0  = 'PROP_A0' 
-    propfile1  = 'PROP_A1' 
-    rdmfile='rdm2_A.dat'
  elseif(Mon%Monomer==2) then
     onefile  = 'ONEEL_B'
     twofile  = 'TWOMOBB'
     twojfile = 'FFOOBB'
     twokfile = 'FOFOBB'
-    propfile = 'PROP_B'
+ endif
+
+ allocate(work1(NSq),work2(NSq),XOne(NInte1))
+
+ !if(Mon%TwoMoInt==TWOMO_INCORE) then
+ !   allocate(TwoMO(NInte2))
+ !endif 
+
+ URe = 0d0
+ do i=1,NBas
+    URe(i,i) = 1d0
+ enddo
+
+ MO = 0
+ ij = 0
+ do j=1,NBas
+ do i=1,NBas
+    ij = ij + 1
+    MO(ij) = Mon%CMO(i,j)
+ enddo
+ enddo
+
+! read 1-el
+ open(newunit=ione,file=onefile,access='sequential',&
+      form='unformatted',status='old')
+
+ read(ione) 
+ read(ione)
+ read(ione) label, work1
+ if(label=='ONEHAMIL') then
+    call tran_oneint(work1,MO,MO,work2,NBas)
+    call sq_to_triang(work1,XOne,NBas) 
+ else
+    write(LOUT,'(a)') 'ERROR! ONEHAMIL NOT FOUND IN '//onefile
+    stop
+ endif
+
+ ! transform 2-el integrals
+ select case(Mon%TwoMoInt)
+ case(TWOMO_INCORE,TWOMO_FFFF) 
+   ! full - for GVB and CAS
+   call tran4_full(NBas,MO,MO,twofile,'AOTWOSORT')
+
+ case(TWOMO_FOFO) 
+   ! transform J and K
+    call tran4_gen(NBas,&
+         Mon%num0+Mon%num1,MO(1:NBas*(Mon%num0+Mon%num1)),&
+         Mon%num0+Mon%num1,MO(1:NBas*(Mon%num0+Mon%num1)),&
+         NBas,MO,&
+         NBas,MO,&
+         twojfile,'AOTWOSORT')
+    call tran4_gen(NBas,&
+         NBas,MO,&
+         Mon%num0+Mon%num1,MO(1:NBas*(Mon%num0+Mon%num1)),&
+         NBas,MO,&
+         Mon%num0+Mon%num1,MO(1:NBas*(Mon%num0+Mon%num1)),&
+         twokfile,'AOTWOSORT')
+ end select
+ !if(Mon%TwoMoInt==TWOMO_INCORE) call LoadSaptTwoEl(Mon%Monomer,TwoMO,NBas,NInte2)
+
+ deallocate(XOne,work2,work1)
+ !if(Mon%TwoMoInt==1) deallocate(TwoMO)
+
+end subroutine sapt_mon_ints
+
+subroutine calc_resp_full(Mon,MO,Flags,NBas,EChck)
+implicit none
+
+type(SystemBlock)  :: Mon
+type(FlagsData)    :: Flags
+integer,intent(in) :: NBas
+double precision   :: MO(:)        
+logical,intent(in) :: EChck
+
+integer          :: NSq,NInte1,NInte2,DimEx
+integer          :: INegExcit
+integer          :: i,j,ii,jj,ij,ij1,ione
+integer          :: ip,iq,pq
+double precision :: ACAlpha
+double precision :: ECASSCF,ETot,ECorr
+double precision, allocatable :: work1(:),work2(:),XOne(:),TwoMO(:) 
+double precision, allocatable :: ABPlus(:), ABMin(:), URe(:,:), &
+                                 CMAT(:),EMAT(:),EMATM(:), &
+                                 DMAT(:),DMATK(:),   &
+                                 EigVecR(:), Eig(:), &
+                                 ABPlusT(:), ABMinT(:)
+double precision, allocatable :: Eig0(:), Eig1(:), EigY0(:), EigY1(:)
+character(8) :: label
+character(:),allocatable :: onefile,twofile,propfile,rdmfile
+character(:),allocatable :: twojfile,twokfile
+character(:),allocatable :: propfile0,propfile1
+double precision,parameter :: One = 1d0, Half = 0.5d0
+double precision,parameter :: SmallE=0d0,BigE=1.D20
+double precision,external  :: trace
+
+! set filenames
+ if(Mon%Monomer==1) then
+    onefile    = 'ONEEL_A'
+    twofile    = 'TWOMOAA'
+    twojfile   = 'FFOOAA'
+    twokfile   = 'FOFOAA'
+    propfile   = 'PROP_A'
+    propfile0  = 'PROP_A0' 
+    propfile1  = 'PROP_A1' 
+    rdmfile    = 'rdm2_A.dat'
+ elseif(Mon%Monomer==2) then
+    onefile    = 'ONEEL_B'
+    twofile    = 'TWOMOBB'
+    twojfile   = 'FFOOBB'
+    twokfile   = 'FOFOBB'
+    propfile   = 'PROP_B'
     propfile0  = 'PROP_B0' 
     propfile1  = 'PROP_B1' 
-    rdmfile='rdm2_B.dat'
+    rdmfile    = 'rdm2_B.dat'
  endif
 
 ! set dimensions
@@ -1595,28 +1755,7 @@ double precision, allocatable :: EigTmp(:), VecTmp(:)
     stop
  endif
 
- ! transform 2-el integrals
- select case(Mon%TwoMoInt)
-
- case(TWOMO_INCORE,TWOMO_FFFF) 
-   ! full - for GVB and CAS
-   call tran4_full(NBas,MO,MO,fname,'AOTWOSORT')
-
- case(TWOMO_FOFO) 
-   ! transform J and K
-    call tran4_gen(NBas,&
-         Mon%num0+Mon%num1,MO(1:NBas*(Mon%num0+Mon%num1)),&
-         Mon%num0+Mon%num1,MO(1:NBas*(Mon%num0+Mon%num1)),&
-         NBas,MO,&
-         NBas,MO,&
-         twojfile,'AOTWOSORT')
-    call tran4_gen(NBas,&
-         NBas,MO,&
-         Mon%num0+Mon%num1,MO(1:NBas*(Mon%num0+Mon%num1)),&
-         NBas,MO,&
-         Mon%num0+Mon%num1,MO(1:NBas*(Mon%num0+Mon%num1)),&
-         twokfile,'AOTWOSORT')
- end select
+ ! INCORE: load 2-el integrals
  if(Mon%TwoMoInt==TWOMO_INCORE) call LoadSaptTwoEl(Mon%Monomer,TwoMO,NBas,NInte2)
 
  if(Flags%ISHF==1.and.Flags%ISERPA==2.and.Mon%NELE==1) then
@@ -1709,18 +1848,14 @@ double precision, allocatable :: EigTmp(:), VecTmp(:)
 !                  NBas,Mon%NDim,NInte1,NInte2,ACAlpha)
 
    ECASSCF = 0
-!
-! test semicoupled
-!  ACAlpha = 0.000000001
-! if(Mon%Monomer==1) then
-!   ACAlpha=0.010  
-! else
-!   ACAlpha=0.0000001
-! endif 
 
    !ACAlpha=sqrt(2d0)/2d0
    !ACAlpha=0d0
    !print*, 'UNCOUPLED,ACAlpha',ACAlpha
+
+   ! SET ACAlpha
+   ACAlpha = Mon%ACAlpha
+   
    select case(Mon%TwoMoInt)
    case(TWOMO_FOFO)
 
@@ -1827,7 +1962,7 @@ double precision, allocatable :: EigTmp(:), VecTmp(:)
    ! call test_resp_unc(Mon,URe,XOne,TwoMO,NBas,NInte1,NInte2,Flags%IFlag0) 
 
    allocate(EigY0(Mon%NDimX**2),EigY1(Mon%NDimX**2),&
-        Eig0(Mon%NDimX),Eig1(Mon%NDimX))
+            Eig0(Mon%NDimX),Eig1(Mon%NDimX))
  
    EigY0 = 0
    EigY1 = 0
@@ -1844,7 +1979,6 @@ double precision, allocatable :: EigTmp(:), VecTmp(:)
    select case(Mon%TwoMoInt)
    case(TWOMO_FOFO) 
       call Y01CAS_FOFO(Mon%Occ,URe,XOne,ABPlus,ABMin, &
-             !EigY0,EigY1,Eig0,Eig1, &
              propfile0,propfile1, &
              Mon%IndN,Mon%IndX,Mon%IGem,Mon%NAct,Mon%INAct,Mon%NDimX, &
              NBas,Mon%NDim,NInte1,Mon%NoSt,twofile,twojfile,twokfile,Flags%IFlag0)
@@ -1856,7 +1990,6 @@ double precision, allocatable :: EigTmp(:), VecTmp(:)
    case(TWOMO_INCORE) 
       call Y01CAS(TwoMO,Mon%Occ,URe,XOne,ABPlus,ABMin, &
            EigY0,EigY1,Eig0,Eig1, &
-           !Mon%IndNT,Mon%IndX,Mon%NDimX,NBas,Mon%NDim,NInte1,NInte2,Flags%IFlag0)
            Mon%IndN,Mon%IndX,Mon%NDimX,NBas,Mon%NDim,NInte1,NInte2,Flags%IFlag0)
    end select
 

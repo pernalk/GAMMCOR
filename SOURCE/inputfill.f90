@@ -381,13 +381,15 @@ subroutine read_block_calculation(CalcParams, line)
                uppercase(val) == "SAPT0") then
               CalcParams%SaptLevel = SAPTLEVEL0
            elseif (uppercase(val) == "1" ) then
-              CalcParams%SaptLevel = SAPTLEVEL1 
+              CalcParams%SaptLevel = SAPTLEVEL1
            elseif (uppercase(val) == "2".or.&
                    uppercase(val) == "SAPT2" ) then
-              CalcParams%SaptLevel = SAPTLEVEL2 
+              CalcParams%SaptLevel = SAPTLEVEL2
            elseif (uppercase(val) == "C6") then
-              CalcParams%SaptLevel = SAPTLEVEL2 
+              CalcParams%SaptLevel = SAPTLEVEL2
               CalcParams%vdWCoef = 1
+           elseif (uppercase(val) == "DISP-CAS") then
+              CalcParams%SaptLevel = 10 
            endif
 
       case("RESTART") 

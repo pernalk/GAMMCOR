@@ -2620,7 +2620,7 @@ C     WRITE CICoef FOR SAPT
 
 *Deck OptTwoP
       Subroutine OptTwoP(ETot,ENuc,URe,Occ,
-     $ AP,PP, 
+     $ AP,PP,
      $ XOne,TwoEl,NSymMO,
      $ CISapt,NBasis,NInte1,NInte2,NoEig)
 C
