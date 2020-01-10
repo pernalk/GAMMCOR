@@ -1978,6 +1978,7 @@ double precision,external  :: trace
 
    select case(Mon%TwoMoInt)
    case(TWOMO_FOFO) 
+   print*, 'SOME BUG HERE',Flags%IFlag0
       call Y01CAS_FOFO(Mon%Occ,URe,XOne,ABPlus,ABMin, &
              propfile0,propfile1, &
              Mon%IndN,Mon%IndX,Mon%IGem,Mon%NAct,Mon%INAct,Mon%NDimX, &

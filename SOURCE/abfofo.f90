@@ -1,14 +1,8 @@
 module abfofo
-use types,only : LOUT
+use types,only : LOUT,EblockData
 use tran
 implicit none
 
-type EblockData
-integer :: n
-integer :: l1,l2
-integer,allocatable :: pos(:)
-double precision,allocatable :: vec(:), matX(:,:),matY(:,:)
-end type
 
 contains 
 
@@ -1299,13 +1293,13 @@ integer :: nAA,tmpAA(NAct*(NAct-1)/2),limAA(2)
 integer :: nAI(INActive),tmpAI(NAct,1:INActive),limAI(2,1:INActive)
 integer :: nAV(INActive+NAct+1:NBasis),tmpAV(NAct,INActive+NAct+1:NBasis),limAV(2,INActive+NAct+1:NBasis)
 integer :: nIV,tmpIV(INActive*(NBasis-NAct-INActive)),limIV(2)
-!
-type(EblockData) :: Eblock(1+NBasis-NAct)
+!!
+type(EblockData),allocatable :: Eblock(:) 
 type(EblockData) :: EblockIV
-!
+!!
 double precision,parameter :: Thresh = 1.D-12
 double precision :: tmpEn
-! test timings
+!! test timings
 double precision :: Tcpu,Twall
 
 ! timing 
@@ -2111,6 +2105,8 @@ enddo
 
 call clock('AB0MAT',Tcpu,Twall)
 
+allocate(EBlock(1+NBasis-NAct))
+
 nblk = 0
 
 ! put pack into separate subroutine
@@ -2305,7 +2301,7 @@ if(.not.present(ECorr)) then
 allocate(EigY(NDimX,NDimX),EigY1(NDimX,NDimX))
 
 EigY1 = 0
-EigY = 0
+EigY  = 0
 
 ! unpack (1)
 do iblk=1,nblk
@@ -2337,6 +2333,8 @@ associate(B => EblockIV)
   deallocate(B%pos)
 
 end associate
+
+print*, 'wtf?'
 
 do i=1,NDimX
    Eig1(i)=ABPLUS(i,i)+ABMIN(i,i)
@@ -2373,6 +2371,7 @@ do j=1,NDimX
    endif
 enddo
 
+print*, 'wtf-2?'
 call dgemm('N','N',NDimX,NDimX,NDimX,1d0,EigY,NDimX,workA,NDimX,0d0,EigY1,NDimX)
 
  ! dump response to a file!
@@ -2381,10 +2380,10 @@ call dgemm('N','N',NDimX,NDimX,NDimX,1d0,EigY,NDimX,workA,NDimX,0d0,EigY1,NDimX)
  write(iunit) Eig
  close(iunit)
  if(IFlag0==0) then
- open(newunit=iunit,file=propfile1,form='unformatted')
- write(iunit) EigY1
- write(iunit) Eig1
- close(iunit)
+    open(newunit=iunit,file=propfile1,form='unformatted')
+    write(iunit) EigY1
+    write(iunit) Eig1
+    close(iunit)
  endif
 
 deallocate(workA)
@@ -2516,6 +2515,7 @@ ECorr = EAll-EIntra
 deallocate(work1)
 
 endif
+
 
 !call sq_to_triang2(HNO,work1,NBasis)
 !write(LOUT,*) 'HNO-my', norm2(work1(1:NBasis*(NBasis+1)/2))

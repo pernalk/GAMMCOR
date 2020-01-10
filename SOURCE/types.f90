@@ -235,6 +235,13 @@ type SaptData
 
 end type SaptData
 
+type EblockData
+integer :: n
+integer :: l1,l2
+integer,allocatable :: pos(:)
+double precision,allocatable :: vec(:), matX(:,:),matY(:,:)
+end type EblockData
+
 contains 
 
 subroutine free_System(System)
