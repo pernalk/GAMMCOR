@@ -1810,20 +1810,23 @@ endif
 
 end subroutine e2disp_unc
 
-subroutine e2dispCAS(Flags,A,B,SAPT,ACAlpha)
+subroutine e2dispCAS(e2d,Flags,A,B,SAPT,ACAlpha,NBasis)
 implicit none
 
 type(FlagsData)   :: Flags
 type(SystemBlock) :: A, B
 type(SaptData)    :: SAPT
-double precision,intent(in) :: ACAlpha
+integer,intent(in)           :: NBasis
+double precision,intent(in)  :: ACAlpha
+double precision,intent(out) :: e2d
 
 integer          :: iunit
 integer          :: i,j,pq,rs
 integer          :: ip,iq,ir,is
 integer          :: dimOA,dimVA, &
                     dimOB,dimVB,nOVA,nOVB
-double precision :: fact1,fact2,e2d
+double precision :: fact1,fact2
+integer,allocatable          :: IGemA(:),IGemB(:)
 double precision,allocatable :: OmA(:),OmB(:), &
                                 EVecA(:),EVecB(:)
 double precision,allocatable :: work(:)
@@ -1848,6 +1851,32 @@ dimVB = B%num1+B%num2
 nOVA  = dimOA*dimVA
 nOVB  = dimOB*dimVB
 
+! fix IGem for A
+allocate(IGemA(NBasis),IGemB(NBasis))
+do i=1,A%INAct
+   IGemA(i) = 1
+enddo
+do i=A%INAct+1,dimOA
+   IGemA(i) = 2
+enddo
+do i=dimOA+1,NBasis
+   IGemA(i) = 3
+enddo
+! fix IGem for B
+do i=1,B%INAct
+   IGemB(i) = 1
+enddo
+do i=B%INAct+1,dimOB
+   IGemB(i) = 2
+enddo
+do i=dimOB+1,NBasis
+   IGemB(i) = 3
+enddo
+
+!do i=1,NBasis
+!   print*, i, IGemA(i),IGemA(i)
+!enddo
+
 allocate(EVecA(A%NDimX*A%NDimX),EVecB(B%NDimX*B%NDimX),&
          OmA(A%NDimX),OmB(B%NDimX))
 allocate(tmp(A%NDimX,B%NDimX),tmp1(A%NDimX,B%NDimX),tmp2(A%NDimX,B%NDimX))
@@ -1866,6 +1895,8 @@ enddo
 allocate(work(nOVB))
 open(newunit=iunit,file='TWOMOAB',status='OLD',&
      access='DIRECT',form='UNFORMATTED',recl=8*nOVB)
+
+
 
 tmp1 = 0
 tmp2 = 0
@@ -1928,6 +1959,11 @@ e2d  = -32d0*e2d*1000d0
 
 write(LOUT,'(/1x,a,f16.8)') 'E2disp(CAS) = ',e2d
 
+! here 
+!deallocate(A%EigY,A%EigX,A%Eig)
+!deallocate(B%EigY,B%EigX,B%Eig)
+
+deallocate(IGemB,IGemA)
 deallocate(tmp2,tmp1)
 deallocate(OmB,OmA,EVecB,EVecA)
  

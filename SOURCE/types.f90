@@ -193,6 +193,7 @@ type FlagsData
      integer :: IAPSG   = 1
      integer :: ISERPA  = 0
      integer :: ISAPT   = 0
+     integer :: SaptLevel = 0
      integer :: ISHF    = 0
      character(:), allocatable :: JobTitle
      integer :: JobType = 0
@@ -1260,8 +1261,8 @@ integer,external :: NAddrRDM
   NRDM2Act = Mon%NAct**2*(Mon%NAct**2+1)/2
   !print*, Mon%NAct,NRDM2Act
 
- if(allocated(Mon%RDM2)) print*, 'RDM2'
- if(allocated(Mon%RDM2Act)) print*, 'RDM2Act'
+ if(allocated(Mon%RDM2))    deallocate(Mon%RDM2)
+ if(allocated(Mon%RDM2Act)) deallocate(Mon%RDM2Act)
   allocate(Mon%RDM2(NRDM2Act), &
            Mon%RDM2Act(Mon%NAct,Mon%NAct,Mon%NAct,Mon%NAct))
   Mon%RDM2(1:NRDM2Act)=0
@@ -1306,6 +1307,7 @@ integer,external :: NAddrRDM
      enddo
   enddo
 
+  if(allocated(Mon%Ind2)) deallocate(Mon%Ind2)
   allocate(Mon%Ind2(NBas))
 
   Mon%Ind2 = Ind2

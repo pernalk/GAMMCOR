@@ -2334,7 +2334,6 @@ associate(B => EblockIV)
 
 end associate
 
-print*, 'wtf?'
 
 do i=1,NDimX
    Eig1(i)=ABPLUS(i,i)+ABMIN(i,i)
@@ -2371,7 +2370,6 @@ do j=1,NDimX
    endif
 enddo
 
-print*, 'wtf-2?'
 call dgemm('N','N',NDimX,NDimX,NDimX,1d0,EigY,NDimX,workA,NDimX,0d0,EigY1,NDimX)
 
  ! dump response to a file!
@@ -2700,61 +2698,63 @@ enddo
 
 associate(B => EblockIV)
 
-  do iblk=1,nblk
-     associate(iB => Eblock(iblk))
+  if(B%n>0) then
+     do iblk=1,nblk
+        associate(iB => Eblock(iblk))
 
-       allocate(ABP(iB%n,B%n),ABM(iB%n,B%n))
-       do j=1,B%n
-          jpos = B%pos(j)
-          do i=1,iB%n
-             ipos = iB%pos(i)
-             ABP(i,j) = AMAT(ipos,jpos)
+          allocate(ABP(iB%n,B%n),ABM(iB%n,B%n))
+          do j=1,B%n
+             jpos = B%pos(j)
+             do i=1,iB%n
+                ipos = iB%pos(i)
+                ABP(i,j) = AMAT(ipos,jpos)
+             enddo
           enddo
-       enddo
-       if(isPl) then
-          call dgemm('T','N',iB%n,B%n,iB%n,fac,iB%matX,iB%n,ABP,iB%n,0d0,ABM,iB%n) 
-       else
-          call dgemm('T','N',iB%n,B%n,iB%n,fac,iB%matY,iB%n,ABP,iB%n,0d0,ABM,iB%n) 
-       endif
+          if(isPl) then
+             call dgemm('T','N',iB%n,B%n,iB%n,fac,iB%matX,iB%n,ABP,iB%n,0d0,ABM,iB%n) 
+          else
+             call dgemm('T','N',iB%n,B%n,iB%n,fac,iB%matY,iB%n,ABP,iB%n,0d0,ABM,iB%n) 
+          endif
 
-       AOUT(iB%l1:iB%l2,B%l1:B%l2) = ABM
-       deallocate(ABM,ABP)
+          AOUT(iB%l1:iB%l2,B%l1:B%l2) = ABM
+          deallocate(ABM,ABP)
 
-     end associate
-  enddo
-
-  do jblk=1,nblk
-     associate(jB => Eblock(jblk))
-
-       allocate(ABP(B%n,jB%n),ABM(B%n,jB%n))
-       do j=1,jB%n
-          jpos = jB%pos(j)
-          do i=1,B%n
-             ipos = B%pos(i)
-             ABP(i,j) = AMAT(ipos,jpos)
-          enddo
-       enddo
-       if(isPl) then
-          call dgemm('N','N',B%n,jB%n,jB%n,fac,ABP,B%n,jB%matX,jB%n,0d0,ABM,B%n)
-       else
-          call dgemm('N','N',B%n,jB%n,jB%n,fac,ABP,B%n,jB%matY,jB%n,0d0,ABM,B%n)
-       endif
-
-       AOUT(B%l1:B%l2,jB%l1:jB%l2) = ABM
-       deallocate(ABM,ABP)
-
-     end associate
-  enddo
-
-  do j=1,B%n
-     jj = B%l1+j-1
-     jpos = B%pos(j)
-     do i=1,B%n
-        ii = B%l1+i-1
-        ipos = B%pos(i)
-        AOUT(ii,jj) = AMAT(ipos,jpos)*0.5d0
+        end associate
      enddo
-  enddo
+
+     do jblk=1,nblk
+        associate(jB => Eblock(jblk))
+
+          allocate(ABP(B%n,jB%n),ABM(B%n,jB%n))
+          do j=1,jB%n
+             jpos = jB%pos(j)
+             do i=1,B%n
+                ipos = B%pos(i)
+                ABP(i,j) = AMAT(ipos,jpos)
+             enddo
+          enddo
+          if(isPl) then
+             call dgemm('N','N',B%n,jB%n,jB%n,fac,ABP,B%n,jB%matX,jB%n,0d0,ABM,B%n)
+          else
+             call dgemm('N','N',B%n,jB%n,jB%n,fac,ABP,B%n,jB%matY,jB%n,0d0,ABM,B%n)
+          endif
+
+          AOUT(B%l1:B%l2,jB%l1:jB%l2) = ABM
+          deallocate(ABM,ABP)
+
+        end associate
+     enddo
+
+     do j=1,B%n
+        jj = B%l1+j-1
+        jpos = B%pos(j)
+        do i=1,B%n
+           ii = B%l1+i-1
+           ipos = B%pos(i)
+           AOUT(ii,jj) = AMAT(ipos,jpos)*0.5d0
+        enddo
+     enddo
+  endif
 
 end associate
 

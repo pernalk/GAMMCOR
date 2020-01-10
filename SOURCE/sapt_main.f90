@@ -24,12 +24,14 @@ type(SaptData) :: SAPT
 integer :: i
 integer :: NBasis
 double precision :: Tcpu,Twall
-! testowe
+
+ Flags%SaptLevel = SAPT%SaptLevel
 
 ! TEMPORARY - JOBTYPE_2
 ! ERPA
  Flags%IFlAC  = 0
  Flags%IFlSnd = 0
+
 
  write(LOUT,'()')
  write(LOUT,'(1x,a)') 'STARTING SAPT CALCULATIONS'
@@ -107,15 +109,31 @@ type(FlagsData)    :: Flags
 type(SaptData)     :: SAPT
 integer,intent(in) :: NBasis
 
+integer            :: i, NGrid
+double precision   :: XGrid(1000), WGrid(1000),DispAlph, e2d
+
 ! set ACAlpha for the monomers
 
- SAPT%ACAlpha = 1.d0
- A%ACAlpha    = SAPT%ACAlpha
- B%ACAlpha    = SAPT%ACAlpha
- call sapt_response(Flags,A,SAPT%SaptLevel,SAPT%EnChck,NBasis)
- call sapt_response(Flags,B,SAPT%SaptLevel,SAPT%EnChck,NBasis)
+ NGrid=5
+ call GauLeg(0.D0,1.D0,XGrid,WGrid,NGrid)
+ 
+ DispAlph=0.D0
+ do i=1,NGrid
 
- call e2dispCAS(Flags,SAPT%monA,SAPT%monB,SAPT,SAPT%ACAlpha)
+    SAPT%ACAlpha = XGrid(i)
+    A%ACAlpha    = SAPT%ACAlpha
+    B%ACAlpha    = SAPT%ACAlpha
+    call sapt_response(Flags,A,SAPT%SaptLevel,SAPT%EnChck,NBasis)
+    call sapt_response(Flags,B,SAPT%SaptLevel,SAPT%EnChck,NBasis)
+
+    call e2dispCAS(e2d,Flags,SAPT%monA,SAPT%monB,SAPT,SAPT%ACAlpha,NBasis)
+    DispAlph = DispAlph + e2d * WGrid(i)
+
+    write(LOUT,*) 'ACAlpha ',SAPT%ACAlpha,' W_ALPHA ',e2d
+
+ enddo
+
+ write(LOUT,'(/,1x,''EDispCAS  '',4x,f15.8)') DispAlph
 
 end subroutine e2dispCAS_Alpha
 
@@ -1875,7 +1893,7 @@ double precision,external  :: trace
       call EKT(URe,Mon%Occ,XOne,TwoMO,NBas,NInte1,NInte2)
 
    end select 
-   write(LOUT,'(/,1x,a,f16.8,a,1x,f16.8)') 'ABPlus',norm2(ABPlus),'ABMin',norm2(ABMin)
+   !write(LOUT,'(/,1x,a,f16.8,a,1x,f16.8)') 'ABPlus',norm2(ABPlus),'ABMin',norm2(ABMin)
 
    EigVecR = 0
    Eig = 0
@@ -1884,13 +1902,17 @@ double precision,external  :: trace
       ! temporary solution!!!
       ! for exch-disp/exch-ind
 
-      print*, 'GROUND STATE!'
+      !print*, 'GROUND STATE!'
+      ! safety check for DISP-CAS (SaptLevel==10)
+      if(allocated(Mon%EigY)) deallocate(Mon%EigY)
+      if(allocated(Mon%EigX)) deallocate(Mon%EigX)
+      if(allocated(Mon%Eig))  deallocate(Mon%Eig)
       allocate(Mon%EigY(Mon%NDimX**2),Mon%EigX(Mon%NDimX**2),&
                Mon%Eig(Mon%NDimX))
       call ERPASYMMXY(Mon%EigY,Mon%EigX,Mon%Eig,ABPlus,ABMin,&
                       Mon%Occ,Mon%IndN,Mon%NDimX,NBas)
 
-      print*, 'EigY:',norm2(Mon%EigY),norm2(Mon%EigX)
+      !print*, 'EigY:',norm2(Mon%EigY),norm2(Mon%EigX)
 
       Eig = Mon%Eig
       do j=1,Mon%NDimX
@@ -1912,7 +1934,7 @@ double precision,external  :: trace
                Mon%Eig(Mon%NDimX))
 
    !   call ERPAVEC(EigVecR,Eig,ABPlus,ABMin,NBas,Mon%NDimX)
-       print*, 'ERPAVECTRANS'
+       write(LOUT,'(1x,a)') 'Excited State Calculation! (ERPAVECTRANS)'
        call ERPAVECTRANS(Mon%EigY,Mon%EigX,Mon%Eig,ABPlus,ABMin,&
                          Mon%Occ,Mon%IndN,Mon%NDimX,NBas)
 
@@ -1958,51 +1980,53 @@ double precision,external  :: trace
            ECASSCF+Mon%PotNuc,ECorr,ECASSCF+Mon%PotNuc+ECorr
    endif
 
-   ! uncoupled
-   ! call test_resp_unc(Mon,URe,XOne,TwoMO,NBas,NInte1,NInte2,Flags%IFlag0) 
+   if(Flags%SaptLevel/=10) then
+      ! uncoupled
+      ! call test_resp_unc(Mon,URe,XOne,TwoMO,NBas,NInte1,NInte2,Flags%IFlag0) 
 
-   allocate(EigY0(Mon%NDimX**2),EigY1(Mon%NDimX**2),&
-            Eig0(Mon%NDimX),Eig1(Mon%NDimX))
+      allocate(EigY0(Mon%NDimX**2),EigY1(Mon%NDimX**2),&
+               Eig0(Mon%NDimX),Eig1(Mon%NDimX))
  
-   EigY0 = 0
-   EigY1 = 0
-   Eig0 = 0
-   Eig1 = 0
+      EigY0 = 0
+      EigY1 = 0
+      Eig0 = 0
+      Eig1 = 0
 
-   allocate(Mon%IndNT(2,Mon%NDim)) 
-   Mon%IndNT=0 
-   do i=1,Mon%NDim
-      Mon%IndNT(1,i) = Mon%IndN(1,i)
-      Mon%IndNT(2,i) = Mon%IndN(2,i)
-   enddo
+      if(allocated(Mon%IndNT)) deallocate(Mon%IndNT)
+      allocate(Mon%IndNT(2,Mon%NDim)) 
+      Mon%IndNT=0 
+      do i=1,Mon%NDim
+         Mon%IndNT(1,i) = Mon%IndN(1,i)
+         Mon%IndNT(2,i) = Mon%IndN(2,i)
+      enddo
 
-   select case(Mon%TwoMoInt)
-   case(TWOMO_FOFO) 
-   print*, 'SOME BUG HERE',Flags%IFlag0
-      call Y01CAS_FOFO(Mon%Occ,URe,XOne,ABPlus,ABMin, &
-             propfile0,propfile1, &
-             Mon%IndN,Mon%IndX,Mon%IGem,Mon%NAct,Mon%INAct,Mon%NDimX, &
-             NBas,Mon%NDim,NInte1,Mon%NoSt,twofile,twojfile,twokfile,Flags%IFlag0)
-   case(TWOMO_FFFF) 
-      call Y01CAS_mithap(Mon%Occ,URe,XOne,ABPlus,ABMin, &
-             EigY0,EigY1,Eig0,Eig1, &
-             Mon%IndN,Mon%IndX,Mon%IGem,Mon%NAct,Mon%INAct,Mon%NDimX, &
-             NBas,Mon%NDim,NInte1,twofile,Flags%IFlag0)
-   case(TWOMO_INCORE) 
-      call Y01CAS(TwoMO,Mon%Occ,URe,XOne,ABPlus,ABMin, &
-           EigY0,EigY1,Eig0,Eig1, &
-           Mon%IndN,Mon%IndX,Mon%NDimX,NBas,Mon%NDim,NInte1,NInte2,Flags%IFlag0)
-   end select
+      select case(Mon%TwoMoInt)
+      case(TWOMO_FOFO) 
+         call Y01CAS_FOFO(Mon%Occ,URe,XOne,ABPlus,ABMin, &
+                propfile0,propfile1, &
+                Mon%IndN,Mon%IndX,Mon%IGem,Mon%NAct,Mon%INAct,Mon%NDimX, &
+                NBas,Mon%NDim,NInte1,Mon%NoSt,twofile,twojfile,twokfile,Flags%IFlag0)
+      case(TWOMO_FFFF) 
+         call Y01CAS_mithap(Mon%Occ,URe,XOne,ABPlus,ABMin, &
+                EigY0,EigY1,Eig0,Eig1, &
+                Mon%IndN,Mon%IndX,Mon%IGem,Mon%NAct,Mon%INAct,Mon%NDimX, &
+                NBas,Mon%NDim,NInte1,twofile,Flags%IFlag0)
+      case(TWOMO_INCORE) 
+         call Y01CAS(TwoMO,Mon%Occ,URe,XOne,ABPlus,ABMin, &
+              EigY0,EigY1,Eig0,Eig1, &
+              Mon%IndN,Mon%IndX,Mon%NDimX,NBas,Mon%NDim,NInte1,NInte2,Flags%IFlag0)
+      end select
 
-   ! dump uncoupled response
-   if(Mon%TwoMoInt/=TWOMO_FOFO) then 
-      call writeresp(EigY0,Eig0,propfile0)
-      if(Flags%IFlag0==0) then
-         call writeresp(EigY1,Eig1,propfile1)
+      ! dump uncoupled response
+      if(Mon%TwoMoInt/=TWOMO_FOFO) then 
+         call writeresp(EigY0,Eig0,propfile0)
+         if(Flags%IFlag0==0) then
+            call writeresp(EigY1,Eig1,propfile1)
+         endif
       endif
-   endif
   
-   deallocate(Eig1,Eig0,EigY1,EigY0)
+      deallocate(Eig1,Eig0,EigY1,EigY0)
+   endif
 
 elseif(Flags%ISERPA==2) then
    ! TD-APSG response: GVB, CASSCF, FCI
@@ -3879,8 +3903,30 @@ if(allocated(SAPT%monB%VCoul)) then
   deallocate(SAPT%monB%VCoul)
 endif
 
-! delete AOTWOSORT
- call delfile('AOTWOSORT')
+! delete files
+call delfile('AOTWOSORT')
+if(SAPT%monA%TwoMoInt==TWOMO_INCORE.or.&
+   SAPT%monA%TwoMoInt==TWOMO_FFFF) then
+   call delfile('TWOMOAA')
+endif
+if(SAPT%monB%TwoMoInt==TWOMO_INCORE.or.&
+   SAPT%monB%TwoMoInt==TWOMO_FFFF) then
+   call delfile('TWOMOBB')
+endif
+call delfile('TWOMOAB')
+call delfile('TMPOOAB')
+call delfile ('ONEEL_A')
+call delfile ('ONEEL_B')
+if(SAPT%monA%TwoMoInt==TWOMO_FOFO) then
+   call delfile('FFOOAA')
+   call delfile('FOFOAA')
+endif
+if(SAPT%monB%TwoMoInt==TWOMO_FOFO) then
+   call delfile('FFOOBB')
+   call delfile('FOFOBB')
+endif
+
+
 
 end subroutine free_sapt
 
