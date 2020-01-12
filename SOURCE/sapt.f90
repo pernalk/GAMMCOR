@@ -1915,8 +1915,8 @@ do pq=1,A%NDimX
       fact2 = ACAlpha*fact1
 
       ! remove active part 
-      if(A%IGem(ip)==2.and.A%IGem(iq)==2.and. &
-         B%IGem(ir)==2.and.B%IGem(is)==2) then
+      if(IGemA(ip)==2.and.IGemA(iq)==2.and. &
+         IGemB(ir)==2.and.IGemB(is)==2) then
          fact2 = fact1
          fact1 = 0d0
       endif
