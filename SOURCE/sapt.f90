@@ -5108,6 +5108,15 @@ double precision,parameter :: SmallE = 1.d-2
  coef  = 1 
  coef2 = 1
 
+ if(allocated(A%PP)) then
+    print*, size(A%PP),ADimEX
+ else
+    print*, 'A%PP not allocated?!'
+ endif
+ if(allocated(A%PP)) then
+    print*, size(B%PP),ADimEx
+ endif
+
  do i=1,coef*ADimEx
     if(A%PP(i)<0d0) then 
        write(LOUT,'(1x,"Monomer A: Negative EVal",i4,f16.8)') i,OmA(i)
@@ -5130,7 +5139,27 @@ double precision,parameter :: SmallE = 1.d-2
     enddo
  enddo
 
- print*, 'ij:',ij,NINte1
+ do i=1,coef*ADimEx
+    if(A%PP(i)<0d0) then
+       write(LOUT,'(1x,"Monomer A: Negative EVal",i4,f16.8)') i,A%PP(i)
+      !!! test: Zero elements A
+      ! do pq=1,ADimEx
+      !     A%AP(i,pq) = 0d0 
+      ! enddo
+
+    endif
+ enddo
+ do i=1,coef*BDimEx
+    if(B%PP(i)<0d0) then
+       write(LOUT,'(1x,"Monomer B: Negative EVal",i4,f16.8)') i,B%PP(i)
+      !!! test: Zero elements B
+      ! do rs=1,BDimEx
+      !     B%AP(i,rs) = 0d0 
+      ! enddo
+    endif
+ enddo
+
+ print*, 'DIMENSIONS ::',ij,NINte1,ADimEx
 
  ! tran4_gen
  allocate(work(nOFB))
@@ -5215,6 +5244,73 @@ double precision,parameter :: SmallE = 1.d-2
  deallocate(work)
 
 end subroutine e2disp_pino
+
+subroutine e2dispCAS_pino(e2d,Flags,A,B,SAPT)
+implicit none
+
+type(FlagsData)   :: Flags
+type(SaptData)    :: SAPT
+type(SystemBlock) :: A, B
+double precision,intent(inout) :: e2d
+
+integer :: NBas, NInte1,NInte2
+integer :: dimOA,dimFA,dimOB,dimFB,nOFA,nOFB
+integer :: iunit
+integer :: i,j,pq,rs
+integer :: ip,iq,ir,is
+integer :: ipq,irs
+integer :: i1,i2,j1,j2,ii,jj,ij
+integer :: coef,ADimEx,BDimEx
+integer,allocatable :: AuxT(:,:)
+double precision,allocatable :: OmA(:),OmB(:)
+double precision,allocatable :: EVecA(:),EVecB(:)
+double precision,allocatable :: tmp1(:,:),tmp2(:,:) 
+double precision,allocatable :: work(:)
+double precision :: fact,fpq,frs
+! testy
+integer,allocatable :: AIndEx(:,:),BIndEx(:,:)
+double precision,allocatable :: AVecEx(:),BVecEx(:)
+
+double precision,parameter :: SmallE = 1.d-6
+!double precision,parameter :: SmallE = 1.d-1
+
+ write(LOUT,'(1x,a,e12.4)') 'SmallE in E2Disp PINO:',SmallE
+
+ if(A%NBasis.ne.B%NBasis) then
+    write(LOUT,'(1x,a)') 'ERROR! MCBS not implemented in SAPT!'
+    stop
+ else
+    NBas = A%NBasis 
+ endif
+
+! set dimensions
+ ADimEx = A%NDimX + A%NDimN
+ BDimEx = B%NDimX + B%NDimN
+ NInte1 = NBas*(NBas+1)/2
+ dimOA  = A%num0+A%num1
+ dimFA  = NBas
+ dimOB  = B%num0+B%num1
+ dimFB  = NBas 
+ nOFA   = dimOA*dimFA
+ nOFB   = dimOB*dimFB
+
+ print*, 'TESTA?',norm2(A%AP),norm2(A%PP) 
+ print*, 'TESTB?',norm2(B%AP),norm2(A%PP)
+ print*, 'URe   ',norm2(A%Fmat),norm2(B%Fmat)
+ print*, 'DIMENSIONS ::',NINte1,ADimEx,NBas**2
+
+ ! tran4_gen
+ allocate(work(nOFB))
+ !open(newunit=iunit,file='TWOMOAB',status='OLD',&
+ !    access='DIRECT',form='UNFORMATTED',recl=8*nOFB)
+
+
+ !close(iunit)
+
+
+ deallocate(work)
+
+end subroutine e2dispCAS_pino
 
 subroutine e2disp_apsg(Flags,A,B,SAPT)
 implicit none

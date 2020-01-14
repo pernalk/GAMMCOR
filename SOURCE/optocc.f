@@ -2778,5 +2778,215 @@ C
       Return
       End
 
+*Deck OptTwoPAlph
+      Subroutine OptTwoPAlph(ETot,ENuc,URe,Occ,
+     $ AP,PP,
+     $ XOne,TwoEl,NSymMO,
+     $ CISapt,NBasis,NInte1,NInte2,NoEig,ACAlpha)
+C
+C     DIAGONALIZATION OF THE AC-HAMILTONIAN FOR A GIVEN ALPHA
+C
+C     RETURNS:
+C     AP - P MATRICES IN THE REPRESENTATION OF THE NoEig-TH STATE NO's
+C     PP - TRANSITION ENERGIES WITH RESPECT TO THE NoEig-th STATE 
+C
+      Implicit Real*8 (A-H,O-Z)
+C
+      Parameter(Zero=0.0D0,Half=0.50D0,One=1.0D0,Two=2.0D0,Four=4.0D0)
+C
+      Character*60 FMultTab
+      Include 'commons.inc'
+C
+      Dimension URe(Nbasis,NBasis),Occ(NBasis),XOne(NInte1),
+     $ TwoEl(NInte2),NSymMO(NBasis),CISapt(NBasis),MultpC(15,15)
+C
+      Dimension AP(NInte1,NInte1),PP(NInte1),PWork(NInte1),
+     $H1Alph(NInte1),HNO(NInte1),TwoElAlph(NInte2)
+C
+C     CONSTRUCT ONE-ELECTRON PART OF THE AC ALPHA-HAMILTONIAN
+C
+      Do I=1,NInte1
+      H1Alph(I)=XOne(I)
+      EndDo
+C
+      IJ=0
+      Do I=1,NBasis
+      Do J=1,I
+      IJ=IJ+1
+C
+      If(IGem(I).Ne.IGem(J)) Then
+C
+      H1Alph(IJ)=ACAlpha*H1Alph(IJ)
+C
+      Else
+C
+      Aux=Zero
+C
+      Do IT=1,NBasis
+      If(IGem(IT).Ne.IGem(I))
+     $ Aux=Aux+Occ(IT)*
+     $ (Two*TwoEl(NAddr3(IT,IT,I,J))-TwoEl(NAddr3(IT,I,IT,J)))
+      EndDo
+C
+      Aux=(One-ACAlpha)*Aux
+      H1Alph(IJ)=H1Alph(IJ)+Aux
+C
+      EndIf
+C
+      EndDo
+      EndDo
+C
+C     CONSTRUCT TWO-ELECTRON PART OF THE AC ALPHA-HAMILTONIAN      
+C
+      Do I=1,NInte2
+      TwoElAlph(I)=TwoEl(I)
+      EndDo
+C
+      NAdd=Zero
+      IJ=0
+      Do I=1,NBasis
+      Do J=1,I
+      IJ=IJ+1
+      KL=0
+      Do K=1,NBasis
+      Do L=1,K
+      KL=KL+1
+C
+      If(IJ.Ge.KL) Then
+      NAdd=NAdd+1
+C
+      If(.Not.(
+     $IGem(I).Eq.IGem(J).And.IGem(J).Eq.IGem(K).And.IGem(K).Eq.IGem(L)))
+     $ TwoElAlph(NAdd)=ACAlpha*TwoElAlph(NAdd)
+C
+      EndIf
+C
+      EndDo
+      EndDo
+      EndDo
+      EndDo
+C
+      IAB=0
+      Do IA=1,NBasis
+      Do IB=1,IA
+      IAB=IAB+1
+C
+      FAB=One
+      If(IA.Eq.IB) FAB=SQRT(Half)
+C
+      ICD=0
+      Do IC=1,NBasis
+      Do ID=1,IC
+      ICD=ICD+1
+      FCD=One
+      If(IC.Eq.ID) FCD=SQRT(Half)
+C
+      AP(IAB,ICD)=TwoElAlph(NAddr3(IA,IC,ID,IB))
+     $                +TwoElAlph(NAddr3(IA,ID,IC,IB))
+C
+      IAC=(Max(IA,IC)*(Max(IA,IC)-1))/2+Min(IA,IC)
+      IAD=(Max(IA,ID)*(Max(IA,ID)-1))/2+Min(IA,ID)
+      IBC=(Max(IC,IB)*(Max(IC,IB)-1))/2+Min(IC,IB)
+      IBD=(Max(ID,IB)*(Max(ID,IB)-1))/2+Min(ID,IB)
+C
+      If(IB.Eq.ID) AP(IAB,ICD)=AP(IAB,ICD)+H1Alph(IAC)
+      If(IA.Eq.ID) AP(IAB,ICD)=AP(IAB,ICD)+H1Alph(IBC)
+      If(IB.Eq.IC) AP(IAB,ICD)=AP(IAB,ICD)+H1Alph(IAD)
+      If(IA.Eq.IC) AP(IAB,ICD)=AP(IAB,ICD)+H1Alph(IBD)
+C
+      AP(IAB,ICD)=FAB*FCD*AP(IAB,ICD)
+C
+      EndDo
+      EndDo
+      EndDo
+      EndDo
+C
+      Write(6,'(/,X,
+     $''DIAGONALIZATION IN THE TWO-ELECTRON FUNCTIONAL OPTIMIZATION'')')
+C
+      Call Diag8(AP,NInte1,NInte1,PP,PWork)
+      ETot=PP(NoEig)
+C
+      Write(6,'(/,X,
+     $ ''RESULTS FROM THE TWO-ELECTRON FUNCTIONAL OPTIMIZATION'')')
+C
+      Write(6,'(/,X,''State no'',I3,'' Total Energy'',F16.10,/)') NoEig,
+     $ ETot+ENuc
+C
+      IAB=0
+      Do IA=1,NBasis
+      Do IB=1,IA
+      IAB=IAB+1
+      PWork(IAB)=AP(NoEig,IAB)
+C
+      If(IA.Eq.IB) PWork(IAB)=SQRT(Two)*PWork(IAB)
+      EndDo
+      EndDo
+      Call CpySym(URe,PWork,NBasis)
+      Call Diag8(URe,NBasis,NBasis,Occ,PWork)
+C
+      Sum=Zero
+      Do I=1,NBasis
+      CICoef(I)=Occ(I)
+      Occ(I)=Occ(I)**2
+      Sum=Sum+Occ(I)
+      EndDo
+      Do I=1,NBasis
+      Occ(I)=Occ(I)/Sum
+      CICoef(I)=CICoef(I)/Sqrt(Sum)
+      EndDo
+C
+      Call SortOcc(Occ,URe,NBasis)
+C
+      Write(6,'('' COEFFICIENTS AND ORBITAL OCCUPANCIES'')')
+      Do 100 I=1,NBasis
+  100 Write(6,'(X,I3,2E16.6)') I,CICoef(I),Occ(I)
+C
+C     WRITE CICoef FOR SAPT
+      Do I=1,NBasis
+      CISapt(I) = CICoef(I)
+      EndDo
+C
+C     TRANSFORM ALL P VECTORS (STATES) TO NO's OF THE NoEig's STATES
+C
+      Do INU=1,NInte1
+C
+C     SAVE IN PP EXCITATION ENERGIES FROM THE STATE NoEig
+C
+      PP(INU)=PP(INU)-ETot
+C
+      IAB=0
+      Do IA=1,NBasis
+      Do IB=1,IA
+      IAB=IAB+1
+      PWork(IAB)=AP(INU,IAB)
+C
+      If(IA.Eq.IB) PWork(IAB)=SQRT(Two)*PWork(IAB)
+      EndDo
+      EndDo
+C
+      IJ=0
+      Do I=1,NBasis
+      Do J=1,I
+      IJ=IJ+1
+C
+      AP(INU,IJ)=Zero
+C
+      Do IA=1,NBasis
+      Do IB=1,NBasis
+      IAB=(Max(IA,IB)*(Max(IA,IB)-1))/2+Min(IA,IB)
+      AP(INU,IJ)=AP(INU,IJ)+SQRT(Half)*URe(I,IA)*URe(J,IB)*PWork(IAB)
+      EndDo
+      EndDo
+C
+      EndDo
+      EndDo
+C
+C     INU
+      EndDo
+C
+      Return
+      End
+
 
 

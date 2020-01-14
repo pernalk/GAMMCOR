@@ -356,29 +356,29 @@ elseif(Flags%ISAPT.Eq.1) then
          ! assume 1.1 state
          monA%InSt(:,1) = -255
       endif
-      monA%ZNucl  = Input%SystemInput(1)%ZNucl
-      monA%Charge = Input%SystemInput(1)%Charge
+      monA%ZNucl   = Input%SystemInput(1)%ZNucl
+      monA%Charge  = Input%SystemInput(1)%Charge
       monA%ACAlpha = Input%SystemInput(1)%ACAlpha
-      monA%Omega  = Input%SystemInput(1)%Omega 
-      monA%EigFCI = Input%SystemInput(1)%EigFCI
-      monA%NBasis = Input%CalcParams%NBasis
-      monA%Multiplicity = Input%SystemInput(1)%Multiplicity
-      monA%ThrAct = Input%SystemInput(1)%ThrAct
-      monA%ThrSelAct = Input%SystemInput(1)%ThrSelAct
+      monA%Omega   = Input%SystemInput(1)%Omega 
+      monA%EigFCI  = Input%SystemInput(1)%EigFCI
+      monA%NBasis  = Input%CalcParams%NBasis
+      monA%ThrAct       = Input%SystemInput(1)%ThrAct
+      monA%ThrSelAct    = Input%SystemInput(1)%ThrSelAct
       monA%DeclareTwoMo = Input%SystemInput(1)%DeclareTwoMo
       monA%TwoMoInt = Input%SystemInput(1)%TwoMoInt
-      monA%PostCAS = Input%SystemInput(1)%PostCAS
-      monA%ISHF = Input%SystemInput(1)%ISHF
+      monA%PostCAS  = Input%SystemInput(1)%PostCAS
+      monA%ISHF     = Input%SystemInput(1)%ISHF
+      monA%Multiplicity = Input%SystemInput(1)%Multiplicity
 
-      monA%NCen = Input%SystemInput(1)%NCen
-      monA%UCen = Input%SystemInput(1)%UCen
+      monA%NCen    = Input%SystemInput(1)%NCen
+      monA%UCen    = Input%SystemInput(1)%UCen
       monA%Monomer = Input%SystemInput(1)%Monomer
-      monA%IPrint = Input%CalcParams%IPrint  
+      monA%IPrint  = Input%CalcParams%IPrint  
      
       monA%XELE = (SAPT%monA%ZNucl - SAPT%monA%Charge)/2.0d0 
       monA%NELE = (SAPT%monA%ZNucl - SAPT%monA%Charge)/2 
     
-      monB%NoSt   = Input%SystemInput(2)%NoSt
+      monB%NoSt    = Input%SystemInput(2)%NoSt
       monB%NStates = Input%SystemInput(2)%NStates
       allocate(monB%InSt(2,System%NStates)) 
       if(Input%SystemInput(2)%DeclareSt) then

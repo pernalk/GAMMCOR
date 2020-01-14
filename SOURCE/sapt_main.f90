@@ -43,9 +43,10 @@ double precision :: Tcpu,Twall
  call sapt_mon_ints(SAPT%monA,NBasis)
  call sapt_mon_ints(SAPT%monB,NBasis)
  if(SAPT%SaptLevel/=10) then
-   call sapt_response(Flags,SAPT%monA,SAPT%SaptLevel,SAPT%EnChck,NBasis)
-   call sapt_response(Flags,SAPT%monB,SAPT%SaptLevel,SAPT%EnChck,NBasis)
+   call sapt_response(Flags,SAPT%monA,SAPT%EnChck,NBasis)
+   call sapt_response(Flags,SAPT%monB,SAPT%EnChck,NBasis)
  endif
+ call sapt_ab_ints(Flags,SAPT%monA,SAPT%monB,NBasis)
 
  ! SAPT components
  write(LOUT,'()')
@@ -79,13 +80,13 @@ double precision :: Tcpu,Twall
 
  elseif(Flags%ISERPA==2) then
 
-    call e1elst(SAPT%monA,SAPT%monB,SAPT)
-    !call e1exchs2(SAPT%monA,SAPT%monB,SAPT)
-    !call e2ind_apsg(Flags,SAPT%monA,SAPT%monB,SAPT)
-    ! HERE!!!
-    !call e2disp_apsg(Flags,SAPT%monA,SAPT%monB,SAPT)
-    call e2disp_pino(Flags,SAPT%monA,SAPT%monB,SAPT)
-    call e2exdisp_apsg(Flags,SAPT%monA,SAPT%monB,SAPT)
+    if(SAPT%SaptLevel/=10) then
+       call e1elst(SAPT%monA,SAPT%monB,SAPT)
+       call e2disp_pino(Flags,SAPT%monA,SAPT%monB,SAPT)
+       call e2exdisp_apsg(Flags,SAPT%monA,SAPT%monB,SAPT)
+    elseif(SAPT%SaptLevel==10) then
+       call e2dispCAS_Alpha(Flags,SAPT%monA,SAPT%monB,SAPT,NBasis)
+    endif
 
  endif
 
@@ -118,15 +119,20 @@ double precision   :: XGrid(1000), WGrid(1000),DispAlph, e2d
  call GauLeg(0.D0,1.D0,XGrid,WGrid,NGrid)
  
  DispAlph=0.D0
- do i=1,NGrid
+ do i=1,1
+ !do i=1,NGrid
 
     SAPT%ACAlpha = XGrid(i)
     A%ACAlpha    = SAPT%ACAlpha
     B%ACAlpha    = SAPT%ACAlpha
-    call sapt_response(Flags,A,SAPT%SaptLevel,SAPT%EnChck,NBasis)
-    call sapt_response(Flags,B,SAPT%SaptLevel,SAPT%EnChck,NBasis)
+    call sapt_response(Flags,A,SAPT%EnChck,NBasis)
+    call sapt_response(Flags,B,SAPT%EnChck,NBasis)
 
-    call e2dispCAS(e2d,Flags,SAPT%monA,SAPT%monB,SAPT,SAPT%ACAlpha,NBasis)
+    if(Flags%ISERPA==0) then
+       call e2dispCAS(e2d,Flags,SAPT%monA,SAPT%monB,SAPT,SAPT%ACAlpha,NBasis)
+    elseif(Flags%ISERPA==2) then
+       call e2dispCAS_pino(e2d,Flags,SAPT%monA,SAPT%monB,SAPT)
+    endif
     DispAlph = DispAlph + e2d * WGrid(i)
 
     write(LOUT,*) 'ACAlpha ',SAPT%ACAlpha,' W_ALPHA ',e2d
@@ -267,84 +273,89 @@ logical :: doRSH
  call select_active(SAPT%monA,NBasis,Flags)
  call select_active(SAPT%monB,NBasis,Flags)
 
-! ABABABABABABABABABABABABABABABABABABABABABABABABABABABABAB
-! transform 2-el integrals
-! full 4-idx tran
-! call tran4_full(NBasis,Ca,Cb,'TWOMOAB')
+ print*, 'after-selAct-A',SAPT%monA%num0,SAPT%monA%num1
+ print*, 'after-selAct-B',SAPT%monB%num0,SAPT%monB%num1
 
- if(Flags%ISERPA==0) then
-
-   if(SAPT%monA%num1/=SAPT%monA%NAct) then
-      write(LOUT,'(1x,a)') 'ERROR!!! Active orbitals in A have 0 occupancy!'
-      !stop
-      ! uncomment this part if want to do it anyway
-      SAPT%monA%num0=SAPT%monA%INAct
-      SAPT%monA%num1=SAPT%monA%NAct
-      SAPT%monA%num2=NBasis-SAPT%monA%NAct-SAPT%monA%INAct
-   endif
-
-   if(SAPT%monB%num1/=SAPT%monB%NAct) then
-      write(LOUT,*) 'ERROR!!! Active orbitals in B have 0 occupancy!'
-      !stop
-      ! uncomment this part if want to do it anyway
-      SAPT%monB%num0=SAPT%monB%INAct
-      SAPT%monB%num1=SAPT%monB%NAct
-      SAPT%monB%num2=NBasis-SAPT%monB%NAct-SAPT%monB%INAct
-
-   endif
-
-   ! integrals stored as (ov|ov)
-   call tran4_gen(NBasis,&
-                  SAPT%monA%num0+SAPT%monA%num1,Ca,&
-                  SAPT%monA%num1+SAPT%monA%num2,Ca(NBasis*SAPT%monA%num0+1:NBasis**2),&
-                  SAPT%monB%num0+SAPT%monB%num1,Cb,&
-                  SAPT%monB%num1+SAPT%monB%num2,Cb(NBasis*SAPT%monB%num0+1:NBasis**2),&
-                  'TWOMOAB','AOTWOSORT')
-
-   ! testing Ecorr ERPASYMM/ERPAVEC
-   !call tran4_gen(NBasis,&
-   !               SAPT%monA%num0+SAPT%monA%num1,Ca,&
-   !               SAPT%monA%num1+SAPT%monA%num2,Ca(NBasis*SAPT%monA%num0+1:NBasis**2),&
-   !               SAPT%monA%num0+SAPT%monA%num1,Ca,&
-   !               SAPT%monA%num1+SAPT%monA%num2,Ca(NBasis*SAPT%monA%num0+1:NBasis**2),&
-   !               'TMPMOAA','AOTWOSORT')
-   !call tran4_gen(NBasis,&
-   !               SAPT%monB%num0+SAPT%monB%num1,Cb,&
-   !               SAPT%monB%num1+SAPT%monB%num2,Cb(NBasis*SAPT%monB%num0+1:NBasis**2),&
-   !               SAPT%monB%num0+SAPT%monB%num1,Cb,&
-   !               SAPT%monB%num1+SAPT%monB%num2,Cb(NBasis*SAPT%monB%num0+1:NBasis**2),&
-   !               'TMPMOBB','AOTWOSORT')
-
-   ! this is for testing E1exchS2...
-   !call tran4_gen(NBasis,&
-   !               NBasis,Ca,NBasis,Ca,&
-   !               NBasis,Cb,NBasis,Cb,&
-   !               'TMPMOAB','AOTWOSORT')
-
-   ! <oo|oo>
-   call tran4_gen(NBasis,&
-                  SAPT%monA%num0+SAPT%monA%num1,Ca,&
-                  SAPT%monA%num0+SAPT%monA%num1,Ca,&
-                  SAPT%monB%num0+SAPT%monB%num1,Cb,&
-                  SAPT%monB%num0+SAPT%monB%num1,Cb,&
-                  'TMPOOAB','AOTWOSORT')
-
- elseif(Flags%ISERPA==2.and.Flags%ISHF==0) then
-   ! integrals stored as (oFull,oFull)
-   call tran4_gen(NBasis,&
-                  SAPT%monA%num0+SAPT%monA%num1,Ca,&
-                  NBasis,Ca,&
-                  SAPT%monB%num0+SAPT%monB%num1,Cb,&
-                  NBasis,Cb,&
-                  'TWOMOAB','AOTWOSORT')
-   ! this is for testing E1exchS2...
-   call tran4_gen(NBasis,&
-                  NBasis,Ca,NBasis,Ca,&
-                  NBasis,Cb,NBasis,Cb,&
-                  'TMPMOAB','AOTWOSORT')
-
-
- endif
+!! ABABABABABABABABABABABABABABABABABABABABABABABABABABABABAB
+!! transform 2-el integrals
+!! full 4-idx tran
+!! call tran4_full(NBasis,Ca,Cb,'TWOMOAB')
+! print*, 'A-0,1,2',SAPT%monA%num0,SAPT%monA%num1,SAPT%monA%num2
+! print*, 'B-0,1,2',SAPT%monB%num0,SAPT%monB%num1,SAPT%monB%num2
+!
+! if(Flags%ISERPA==0) then
+!
+!   if(SAPT%monA%num1/=SAPT%monA%NAct) then
+!      write(LOUT,'(1x,a)') 'ERROR!!! Active orbitals in A have 0 occupancy!'
+!      !stop
+!      ! uncomment this part if want to do it anyway
+!      SAPT%monA%num0=SAPT%monA%INAct
+!      SAPT%monA%num1=SAPT%monA%NAct
+!      SAPT%monA%num2=NBasis-SAPT%monA%NAct-SAPT%monA%INAct
+!   endif
+!
+!   if(SAPT%monB%num1/=SAPT%monB%NAct) then
+!      write(LOUT,*) 'ERROR!!! Active orbitals in B have 0 occupancy!'
+!      !stop
+!      ! uncomment this part if want to do it anyway
+!      SAPT%monB%num0=SAPT%monB%INAct
+!      SAPT%monB%num1=SAPT%monB%NAct
+!      SAPT%monB%num2=NBasis-SAPT%monB%NAct-SAPT%monB%INAct
+!
+!   endif
+!
+!   ! integrals stored as (ov|ov)
+!   call tran4_gen(NBasis,&
+!                  SAPT%monA%num0+SAPT%monA%num1,Ca,&
+!                  SAPT%monA%num1+SAPT%monA%num2,Ca(NBasis*SAPT%monA%num0+1:NBasis**2),&
+!                  SAPT%monB%num0+SAPT%monB%num1,Cb,&
+!                  SAPT%monB%num1+SAPT%monB%num2,Cb(NBasis*SAPT%monB%num0+1:NBasis**2),&
+!                  'TWOMOAB','AOTWOSORT')
+!
+!   ! testing Ecorr ERPASYMM/ERPAVEC
+!   !call tran4_gen(NBasis,&
+!   !               SAPT%monA%num0+SAPT%monA%num1,Ca,&
+!   !               SAPT%monA%num1+SAPT%monA%num2,Ca(NBasis*SAPT%monA%num0+1:NBasis**2),&
+!   !               SAPT%monA%num0+SAPT%monA%num1,Ca,&
+!   !               SAPT%monA%num1+SAPT%monA%num2,Ca(NBasis*SAPT%monA%num0+1:NBasis**2),&
+!   !               'TMPMOAA','AOTWOSORT')
+!   !call tran4_gen(NBasis,&
+!   !               SAPT%monB%num0+SAPT%monB%num1,Cb,&
+!   !               SAPT%monB%num1+SAPT%monB%num2,Cb(NBasis*SAPT%monB%num0+1:NBasis**2),&
+!   !               SAPT%monB%num0+SAPT%monB%num1,Cb,&
+!   !               SAPT%monB%num1+SAPT%monB%num2,Cb(NBasis*SAPT%monB%num0+1:NBasis**2),&
+!   !               'TMPMOBB','AOTWOSORT')
+!
+!   ! this is for testing E1exchS2...
+!   !call tran4_gen(NBasis,&
+!   !               NBasis,Ca,NBasis,Ca,&
+!   !               NBasis,Cb,NBasis,Cb,&
+!   !               'TMPMOAB','AOTWOSORT')
+!
+!   ! <oo|oo>
+!   call tran4_gen(NBasis,&
+!                  SAPT%monA%num0+SAPT%monA%num1,Ca,&
+!                  SAPT%monA%num0+SAPT%monA%num1,Ca,&
+!                  SAPT%monB%num0+SAPT%monB%num1,Cb,&
+!                  SAPT%monB%num0+SAPT%monB%num1,Cb,&
+!                  'TMPOOAB','AOTWOSORT')
+!
+! elseif(Flags%ISERPA==2.and.Flags%ISHF==0) then
+!   ! integrals stored as (oFull,oFull)
+!   call tran4_gen(NBasis,&
+!                  SAPT%monA%num0+SAPT%monA%num1,Ca,&
+!                  NBasis,Ca,&
+!                  SAPT%monB%num0+SAPT%monB%num1,Cb,&
+!                  NBasis,Cb,&
+!                  'TWOMOAB','AOTWOSORT')
+!   ! this is for testing E1exchS2...
+!   call tran4_gen(NBasis,&
+!                  NBasis,Ca,NBasis,Ca,&
+!                  NBasis,Cb,NBasis,Cb,&
+!                  'TMPMOAB','AOTWOSORT')
+!
+!
+! endif
 
  if(SAPT%IPrint.gt.100) call print_TwoInt(NBasis)
 
@@ -377,20 +388,21 @@ logical :: doRSH
 !   endif
 ! endif
 
-  if(Flags%ISERPA==2.and.Flags%ISHF==1) then
-     call tran4_gen(NBasis,&
-                      (SAPT%monA%num0+SAPT%monA%num1),SAPT%monA%CMO,&
-                      NBasis,SAPT%monA%CMO,&
-                      (SAPT%monB%num0+SAPT%monB%num1),SAPT%monB%CMO,&
-                      NBasis,SAPT%monB%CMO,&
-                      'TWOMOAB','AOTWOSORT')
- 
-     !call tran4_gen(NBasis,&
-     !             NBasis,Ca,NBasis,Ca,&
-     !             NBasis,Cb,NBasis,Cb,&
-     !             'TMPMOAB','AOTWOSORT')
-
- endif
+!  if(Flags%ISERPA==2.and.Flags%ISHF==1) then
+!     print*, 'TWOMOAB?',SAPT%monA%num0,SAPT%monA%num1
+!     call tran4_gen(NBasis,&
+!                      (SAPT%monA%num0+SAPT%monA%num1),SAPT%monA%CMO,&
+!                      NBasis,SAPT%monA%CMO,&
+!                      (SAPT%monB%num0+SAPT%monB%num1),SAPT%monB%CMO,&
+!                      NBasis,SAPT%monB%CMO,&
+!                      'TWOMOAB','AOTWOSORT')
+! 
+!     !call tran4_gen(NBasis,&
+!     !             NBasis,Ca,NBasis,Ca,&
+!     !             NBasis,Cb,NBasis,Cb,&
+!     !             'TMPMOAB','AOTWOSORT')
+!
+! endif
 
 
  ! calculate electrostatic potential
@@ -436,16 +448,19 @@ integer,intent(out) :: NBasis
 
 end subroutine sapt_basinfo
 
-subroutine sapt_response(Flags,Mon,SaptLevel,EnChck,NBasis)
+subroutine sapt_response(Flags,Mon,EnChck,NBasis)
 implicit none
 
 type(FlagsData)    :: Flags
 type(SystemBlock)  :: Mon
-integer,intent(in) :: SaptLevel,NBasis
+integer,intent(in) :: NBasis
 logical,intent(in) :: EnChck 
 
 integer          :: i,j,ij
+integer          :: SaptLevel
 double precision :: MO(NBasis*NBasis)
+
+ SaptLevel = Flags%SaptLevel
 
  ij = 0
  do j=1,NBasis
@@ -457,30 +472,90 @@ double precision :: MO(NBasis*NBasis)
 
 ! calculate response
  call SaptInter(NBasis,Mon,Flags%ICASSCF)
- if(SaptLevel.eq.0) then
-     call calc_resp_unc(Mon,MO,Flags,NBasis)
- elseif(SaptLevel.gt.0) then
-    if(Flags%IFunSR/=0) then
-       call calc_resp_dft(Mon,MO,Flags,NBasis)
-    else
-       call calc_resp_full(Mon,MO,Flags,NBasis,EnChck)
+ if(Flags%ISERPA==0) then
+    if(SaptLevel.eq.0) then
+        call calc_resp_unc(Mon,MO,Flags,NBasis)
+    elseif(SaptLevel.gt.0) then
+       if(Flags%IFunSR/=0) then
+          call calc_resp_dft(Mon,MO,Flags,NBasis)
+       else
+          call calc_resp_full(Mon,MO,Flags,NBasis,EnChck)
+       endif
     endif
+ elseif(Flags%ISERPA==2) then
+    call calc_resp_pino(Mon,MO,Flags,NBasis)
  endif
 
 end subroutine sapt_response
 
+subroutine sapt_ab_ints (Flags,A,B,NBasis)
+implicit none
+
+type(FlagsData)    :: Flags
+type(SystemBlock)  :: A,B
+integer,intent(in) :: NBasis
+
+if(Flags%ISERPA==0) then
+
+  if(A%num1/=A%NAct) then
+     write(LOUT,'(1x,a)') 'ERROR!!! Active orbitals in A have 0 occupancy!'
+     !stop
+     ! uncomment this part if want to do it anyway
+     A%num0 = A%INAct
+     A%num1 = A%NAct
+     A%num2 = NBasis - A%NAct - A%INAct
+  endif
+
+  if(B%num1/=B%NAct) then
+     write(LOUT,*) 'ERROR!!! Active orbitals in B have 0 occupancy!'
+     !stop
+     ! uncomment this part if want to do it anyway
+     B%num0 = B%INAct
+     B%num1 = B%NAct
+     B%num2 = NBasis - B%NAct - B%INAct
+
+  endif
+
+  ! integrals stored as (ov|ov)
+  call tran4_gen(NBasis,&
+                 A%num0+A%num1,A%CMO,&
+                 A%num1+A%num2,A%CMO(1:NBasis,A%num0+1:NBasis),&
+                 B%num0+B%num1,B%CMO,&
+                 B%num1+B%num2,B%CMO(1:NBasis,B%num0+1:NBasis),&
+                 'TWOMOAB','AOTWOSORT')
+
+  ! <oo|oo>
+  call tran4_gen(NBasis,&
+                 A%num0+A%num1,A%CMO,&
+                 A%num0+A%num1,A%CMO,&
+                 B%num0+B%num1,B%CMO,&
+                 B%num0+B%num1,B%CMO,&
+                 'TMPOOAB','AOTWOSORT')
+
+elseif(Flags%ISERPA==2) then
+
+   call tran4_gen(NBasis,&
+                 (A%num0+A%num1),A%CMO,&
+                  NBasis,A%CMO,&
+                 (B%num0+B%num1),B%CMO,&
+                  NBasis,B%CMO,&
+                  'TWOMOAB','AOTWOSORT')
+endif
+
+end subroutine sapt_ab_ints
+
 subroutine onel_molpro(mon,NBasis,NSq,NInte1,MonBlock,SAPT)
  implicit none
 
- type(SaptData) :: SAPT
+ type(SaptData)    :: SAPT
  type(SystemBlock) :: MonBlock
 
  integer,intent(in) :: mon,NBasis,NSq,NInte1
- integer :: ione,ios,NSym,NBas(8),ncen
+ integer                       :: ione,ios,NSym,NBas(8),ncen
  double precision, allocatable :: Hmat(:),Vmat(:),Smat(:) 
  double precision, allocatable :: work1(:),work2(:)
  character(8) :: label
- character(:),allocatable :: infile,outfile
+ character(:),allocatable      :: infile,outfile
 
  if(mon==1) then
    infile =  'AOONEINT_A'
@@ -1715,9 +1790,9 @@ double precision, allocatable :: ABPlus(:), ABMin(:), URe(:,:), &
                                  ABPlusT(:), ABMinT(:)
 double precision, allocatable :: Eig0(:), Eig1(:), EigY0(:), EigY1(:)
 character(8) :: label
-character(:),allocatable :: onefile,twofile,propfile,rdmfile
-character(:),allocatable :: twojfile,twokfile
-character(:),allocatable :: propfile0,propfile1
+character(:),allocatable   :: onefile,twofile,propfile,rdmfile
+character(:),allocatable   :: twojfile,twokfile
+character(:),allocatable   :: propfile0,propfile1
 double precision,parameter :: One = 1d0, Half = 0.5d0
 double precision,parameter :: SmallE=0d0,BigE=1.D20
 double precision,external  :: trace
@@ -1758,28 +1833,14 @@ double precision,external  :: trace
     URe(i,i) = 1d0
  enddo
 
-! read 1-el
- open(newunit=ione,file=onefile,access='sequential',&
-      form='unformatted',status='old')
-
- read(ione) 
- read(ione)
- read(ione) label, work1
- if(label=='ONEHAMIL') then
-    call tran_oneint(work1,MO,MO,work2,NBas)
-    call sq_to_triang(work1,XOne,NBas) 
- else
-    write(LOUT,'(a)') 'ERROR! ONEHAMIL NOT FOUND IN '//onefile
-    stop
- endif
-
+ call get_1el_h_mo(XOne,MO,NBas,onefile)
  ! INCORE: load 2-el integrals
  if(Mon%TwoMoInt==TWOMO_INCORE) call LoadSaptTwoEl(Mon%Monomer,TwoMO,NBas,NInte2)
 
  if(Flags%ISHF==1.and.Flags%ISERPA==2.and.Mon%NELE==1) then
 
     ! Calculate FCI for 2-el systems
-    call calc_fci(NBas,NInte1,NInte2,XOne,URe,TwoMO,Mon)
+    call calc_fci(NBas,NInte1,NInte2,XOne,URe,TwoMO,Mon,0)
 
  endif
 
@@ -2132,55 +2193,55 @@ elseif(Flags%ISERPA==2) then
       print*, 'HERE-2?'
       print*, 'NDimN: ',Mon%NDimN
       allocate(ABPlus(Mon%NDim**2),ABMin(Mon%NDim**2), &
-           CMAT(Mon%NDim**2),EMAT(NBas**2),EMATM(NBas**2),&
-           DMAT(Mon%NDim*NBas),DMATK(Mon%NDim*NBas),&
+ !          CMAT(Mon%NDim**2),EMAT(NBas**2),EMATM(NBas**2),&
+ !          DMAT(Mon%NDim*NBas),DMATK(Mon%NDim*NBas),&
            EigVecR(2*(Mon%NDimX+Mon%NDimN)*2*(Mon%NDimX+Mon%NDimN)),&
                  Eig(2*(Mon%NDimX+Mon%NDimN)))
 
-      !Mon%NDimN = 0 
-      CMAT=0
-      call APSG_NEST(ABPlus,ABMin,CMAT,EMAT,EMATM,DMAT,DMATK,&
-           URe,Mon%Occ,XOne,TwoMO,&
-           NBas,Mon%NDim,NInte1,NInte2,Mon%NGem,Flags%ISERPA)
+ !     !Mon%NDimN = 0 
+ !     CMAT=0
+ !     call APSG_NEST(ABPlus,ABMin,CMAT,EMAT,EMATM,DMAT,DMATK,&
+ !          URe,Mon%Occ,XOne,TwoMO,&
+ !          NBas,Mon%NDim,NInte1,NInte2,Mon%NGem,Flags%ISERPA)
 
-      !reduce dimensions
-      call reduce_dim('AB',ABPlus,ABMin,Mon)
-      call reduce_dim('D',DMAT,DMATK,Mon)
-      call reduce_dim('E',EMAT,EMATM,Mon)
+ !     !reduce dimensions
+ !     call reduce_dim('AB',ABPlus,ABMin,Mon)
+ !     call reduce_dim('D',DMAT,DMATK,Mon)
+ !     call reduce_dim('E',EMAT,EMATM,Mon)
 
-      !print*, 'DMAT-R',norm2(DMAT(1:Mon%NDimX*Mon%NDimN)),&
-      !         norm2(DMATK(1:Mon%NDimX*Mon%NDimN))
-      !print*, 'EMAT-R',norm2(EMAT(1:Mon%NDimN**2)),&
-      !         norm2(EMATM(1:Mon%NDimN**2))
-      !print*, 'ABPlus',norm2(ABPlus(1:Mon%NDimX**2)),&
-      !         norm2(ABMin(1:Mon%NDimX**2))
+ !     !print*, 'DMAT-R',norm2(DMAT(1:Mon%NDimX*Mon%NDimN)),&
+ !     !         norm2(DMATK(1:Mon%NDimX*Mon%NDimN))
+ !     !print*, 'EMAT-R',norm2(EMAT(1:Mon%NDimN**2)),&
+ !     !         norm2(EMATM(1:Mon%NDimN**2))
+ !     !print*, 'ABPlus',norm2(ABPlus(1:Mon%NDimX**2)),&
+ !     !         norm2(ABMin(1:Mon%NDimX**2))
 
-      deallocate(CMAT)
+ !     deallocate(CMAT)
 
    endif
-   !    write(*,*) Mon%NGem,Mon%NDimN,Mon%NDimX
-   !    write(*,*) Mon%Occ,NBas
+ !  !    write(*,*) Mon%NGem,Mon%NDimN,Mon%NDimX
+ !  !    write(*,*) Mon%Occ,NBas
 
-   EigVecR = 0
-   Eig = 0
-   !call PINOVEC(EigVecR,Eig,ABPlus,ABMin,DMAT,DMATK,EMAT,EMATM, &
-   !     Mon%Occ,NBas,Mon%NDimX,Mon%NDimN)
-  
-! reduced version
-   !call PINOVECRED(EigVecR,Eig,INegExcit,ABPlus,ABMin,DMAT,DMATK, &
-   !                 EMAT,EMATM,NBas,Mon%NDimX,Mon%NDimN)
+ !  EigVecR = 0
+ !  Eig = 0
+ !  !call PINOVEC(EigVecR,Eig,ABPlus,ABMin,DMAT,DMATK,EMAT,EMATM, &
+ !  !     Mon%Occ,NBas,Mon%NDimX,Mon%NDimN)
+ ! 
+!! reduced version
+ !  !call PINOVECRED(EigVecR,Eig,INegExcit,ABPlus,ABMin,DMAT,DMATK, &
+ !  !                 EMAT,EMATM,NBas,Mon%NDimX,Mon%NDimN)
 
-   !print*, 'EigVecR',norm2(EigVecR)
+ !  !print*, 'EigVecR',norm2(EigVecR)
 
-   allocate(Mon%EigY((Mon%NDimX+Mon%NDimN)**2),Mon%EigX((Mon%NDimX+Mon%NDimN)**2),&
-            Mon%Eig(Mon%NDimX+Mon%NDimN))
+ !  allocate(Mon%EigY((Mon%NDimX+Mon%NDimN)**2),Mon%EigX((Mon%NDimX+Mon%NDimN)**2),&
+ !           Mon%Eig(Mon%NDimX+Mon%NDimN))
 
-   call PINOVECREDXY(Mon%EigY,Mon%EigX,Mon%Eig,INegExcit,&
-                     ABPlus,ABMin,DMAT,DMATK,EMAT,EMATM,Mon%IndN,&
-                     NBas,Mon%NDimX,Mon%NDimN)
+ !  call PINOVECREDXY(Mon%EigY,Mon%EigX,Mon%Eig,INegExcit,&
+ !                    ABPlus,ABMin,DMAT,DMATK,EMAT,EMATM,Mon%IndN,&
+ !                    NBas,Mon%NDimX,Mon%NDimN)
 
-  ! print*,'AAAA?',norm2(Mon%EigY),norm2(Mon%EigX)
-  Eig = Mon%Eig
+ ! ! print*,'AAAA?',norm2(Mon%EigY),norm2(Mon%EigX)
+ ! Eig = Mon%Eig
 
   ! prepare tables and dimensions 
   DimEx = Mon%NDimX+Mon%NDimN
@@ -2198,45 +2259,45 @@ elseif(Flags%ISERPA==2) then
      endif
   enddo
 
-  ! prepare EigVecR for E2disp
-  do j=1,DimEx
-     if(j<=Mon%NDimX) then
+ ! ! prepare EigVecR for E2disp
+ ! do j=1,DimEx
+ !    if(j<=Mon%NDimX) then
 
-        ip = Mon%IndN(1,j)
-        iq = Mon%IndN(2,j)
+ !       ip = Mon%IndN(1,j)
+ !       iq = Mon%IndN(2,j)
 
-        do i=1,DimEx
-           EigVecR((i-1)*DimEx+j) = (Mon%CICoef(ip)-Mon%CICoef(iq))* &
-                                     (Mon%EigY((i-1)*DimEx+j)-Mon%EigX((i-1)*DimEx+j))
-        enddo
+ !       do i=1,DimEx
+ !          EigVecR((i-1)*DimEx+j) = (Mon%CICoef(ip)-Mon%CICoef(iq))* &
+ !                                    (Mon%EigY((i-1)*DimEx+j)-Mon%EigX((i-1)*DimEx+j))
+ !       enddo
 
-     elseif(j>Mon%NDimX) then 
+ !    elseif(j>Mon%NDimX) then 
 
-        ii = j - Mon%NDimX
-        do i=1,DimEx
-           EigVecR((i-1)*DimEx+j) = Mon%EigY((i-1)*DimEx+j)/Mon%CICoef(ii)
-        enddo
+ !       ii = j - Mon%NDimX
+ !       do i=1,DimEx
+ !          EigVecR((i-1)*DimEx+j) = Mon%EigY((i-1)*DimEx+j)/Mon%CICoef(ii)
+ !       enddo
 
-     endif
-  enddo
+ !    endif
+ ! enddo
 
-!! the lines below are needed if EnePINO is called subsequently
-!   EigVecR(1:2*(NDim+NBasis)*2*(NDim+NBasis))=Zero 
-!   do i=1,NDimX+NDimN
-!     Eig(i+NDimX+NDimN)=Zero
-!      do j=1,NDimX+NDimN
-!      If(j.Le.NDimX) EigVecR((i-1)*2*(NDimX+NDimN)+j)=
-!     $ EigVecRR((i-1)*(NDimX+NDimN)+J)
-!      If(j.Gt.NDimX) EigVecR((i-1)*2*(NDimX+NDimN)+J+NDimX)=
-!     $ EigVecRR((I-1)*(NDimX+NDimN)+J)
-!      enddo
-!   enddo 
-!
-   ETot = 0
-!   call EnePINO(ETot,Mon%PotNuc,EigVecR,Eig,TwoMO,URe,Mon%Occ,XOne, &
-!        Mon%IndN,NBas,NInte1,NInte2,Mon%NDimX,Mon%NDimN)
-   
-   deallocate(EMAT,EMATM,DMAT,DMATK)
+!!! the lines below are needed if EnePINO is called subsequently
+!!   EigVecR(1:2*(NDim+NBasis)*2*(NDim+NBasis))=Zero 
+!!   do i=1,NDimX+NDimN
+!!     Eig(i+NDimX+NDimN)=Zero
+!!      do j=1,NDimX+NDimN
+!!      If(j.Le.NDimX) EigVecR((i-1)*2*(NDimX+NDimN)+j)=
+!!     $ EigVecRR((i-1)*(NDimX+NDimN)+J)
+!!      If(j.Gt.NDimX) EigVecR((i-1)*2*(NDimX+NDimN)+J+NDimX)=
+!!     $ EigVecRR((I-1)*(NDimX+NDimN)+J)
+!!      enddo
+!!   enddo 
+!!
+ !  ETot = 0
+!!   call EnePINO(ETot,Mon%PotNuc,EigVecR,Eig,TwoMO,URe,Mon%Occ,XOne, &
+!!        Mon%IndN,NBas,NInte1,NInte2,Mon%NDimX,Mon%NDimN)
+ !  
+ !  deallocate(EMAT,EMATM,DMAT,DMATK)
    
 endif
 
@@ -2254,13 +2315,140 @@ endif
 
 end subroutine calc_resp_full
 
-subroutine calc_fci(NBas,NInte1,NInte2,XOne,URe,TwoMO,Mon)
+subroutine calc_resp_pino(M,MO,Flags,NBas)
+! obtain FCI response based on PINO functional
+! also: solve full TD-APSG equations 
 implicit none
 
-integer,intent(in) :: NBas, NInte1, NInte2
+type(SystemBlock)  :: M
+type(FlagsData)    :: Flags
+integer,intent(in) :: NBas
+double precision   :: MO(NBas*NBas)
+
+integer          :: iPINO
+integer          :: i,pq
+integer          :: NInte1,NInte2,DimEx
+double precision :: URe(NBas,NBas)
+character(:),allocatable      :: onefile,twofile,rdmfile
+double precision, allocatable :: work1(:),work2(:),XOne(:),TwoMO(:) 
+
+! checks
+ if(M%TwoMoInt/=TWOMO_INCORE) then
+   write(LOUT,'(/,1x,a)') 'ERROR! FCI possible only with INCORE 2-el ints!'
+   stop
+ endif 
+
+! set PINO variant
+ if(Flags%ICASSCF==1.and.Flags%ISHF==1.and.M%NELE==1.and.Flags%SaptLevel/=10) then
+    ! 2-electron FCI
+    iPINO = 0
+ elseif(Flags%ICASSCF==1.and.Flags%ISHF==1.and.M%NELE==1.and.Flags%SaptLevel==10) then
+    ! 2-electron e2dispCAS
+    iPINO = 1
+ elseif(Flags%ICASSCF==1.and.Flags%ISHF==0.and.Flags%SaptLevel/=10) then
+    ! CAS/LR
+    iPINO = 2
+ elseif(Flags%ICASSCF==0.and.Flags%SaptLevel/=10) then
+    ! TEST IS MISSING!
+    ! GVB
+    iPINO = 3
+ endif
+
+! set filenames
+ if(M%Monomer==1) then
+    onefile    = 'ONEEL_A'
+    twofile    = 'TWOMOAA'
+    rdmfile    = 'rdm2_A.dat'
+ elseif(M%Monomer==2) then
+    onefile    = 'ONEEL_B'
+    twofile    = 'TWOMOBB'
+    rdmfile    = 'rdm2_B.dat'
+ endif
+
+! set dimensions
+ NInte1 = NBas*(NBas+1)/2
+ NInte2 = NInte1*(NInte1+1)/2
+
+ URe = 0d0
+ do i=1,NBas
+    URe(i,i) = 1d0
+ enddo
+
+ allocate(XOne(NInte1),TwoMO(NInte2))
+
+ ! get integrals
+ call get_1el_h_mo(XOne,MO,NBas,onefile)
+ call LoadSaptTwoEl(M%Monomer,TwoMO,NBas,NInte2)
+
+ ! Calculate FCI for 2-el systems
+ !if(Flags%ISHF==1.and.M%NELE==1) then
+ if(iPINO==0.or.iPINO==1) then
+    ! FCI
+    call calc_fci(NBas,NInte1,NInte2,XOne,URe,TwoMO,M,iPINO)
+    call read2rdm(M,NBas)
+    call init_pino(NBas,M,Flags%ICASSCF) 
+
+ elseif(iPINO==2) then
+
+    ! CAS
+    call read2rdm(M,NBas)
+    call system('cp '//rdmfile// ' rdm2.dat')
+
+ endif
+
+ !if(Flags%ICASSCF==1.and.Flags%ISHF==0) then
+ !   ! read 2-RDMs
+ !   call read2rdm(M,NBas)
+ !   ! CAS-SCF
+ !   call system('cp '//rdmfile// ' rdm2.dat')
+ !elseif(Flags%ICASSCF==1.and.Flags%ISHF==1) then
+ !   ! PINO
+ !   call read2rdm(M,NBas)
+ !   call init_pino(NBas,M,Flags%ICASSCF) 
+ !endif
+
+! ! prepare tables and dimensions 
+! M%NDimN=0
+! do i=1,NBas
+!    if(M%Occ(i).gt.0d0) M%NDimN = M%NDimN + 1
+! enddo
+!
+! DimEx   = M%NDimX+M%NDimN
+! M%DimEx = DimEx
+!
+! allocate(M%IndNx(2,DimEx))
+!
+! do pq=1,DimEx
+!    if(pq<=M%NDimX) then
+!       M%IndNx(1,pq) = M%IndN(1,pq)
+!       M%IndNx(2,pq) = M%IndN(2,pq)
+!    elseif(pq>M%NDimX) then
+!       M%IndNx(1,pq) = pq - M%NDimX
+!       M%IndNx(2,pq) = pq - M%NDimX
+!    endif
+! enddo
+
+ !if(Flags%ICASSCF==1.and.Flags%ISHF==0) then
+ if(iPINO==2) then
+ ! sth here for CAS/LR -- full linear response for CAS wfn
+
+ elseif(iPINO==3) then
+ ! here  GVB: TD-APSG and PINOVECREDXY
+ ! ... 
+
+ endif
+
+ deallocate(TwoMO,XOne)
+
+end subroutine calc_resp_pino
+
+subroutine calc_fci(NBas,NInte1,NInte2,XOne,URe,TwoMO,Mon,iPINO)
+implicit none
+
+integer,intent(in) :: NBas, NInte1, NInte2, iPINO
 double precision   :: URe(NBas,NBas),XOne(NInte1),TwoMO(NInte2)
 type(SystemBlock)  :: Mon
-double precision   :: ETot
+double precision   :: ACAlpha,ETot
 double precision, allocatable :: Ctmp(:,:),Dtmp(:,:), &
                                  NSymMO(:), TwoMOt(:)
 integer :: EigNum
@@ -2268,6 +2456,8 @@ integer :: EigNum
  write(LOUT,'(/,1x,a)') 'ENTERING FCI FOR 2-EL SYSTEMS...'
    
  allocate(Ctmp(NBas,NBas),Dtmp(NBas,NBas),NSymMO(NBas),TwoMOt(NInte2))
+ if(iPINO==0) allocate(TwoMOt(NInte2))
+
  ! new for OptTwoP
  allocate(Mon%AP(NInte1,NInte1),Mon%PP(NInte1))
 
@@ -2288,41 +2478,59 @@ integer :: EigNum
 ! print*, 'IGEM:',Mon%IGem
 ! call OptTwo1(ETot,Mon%PotNuc,URe,Mon%Occ,XOne,TwoMO,NSymMO, &
 !              Mon%CICoef,NBas,NInte1,NInte2,EigNum)
+ if(iPINO==0) then
 
- call OptTwoP(ETot,Mon%PotNuc,URe,Mon%Occ,Mon%AP,Mon%PP,XOne,TwoMO,NSymMO, &
-              Mon%CICoef,NBas,NInte1,NInte2,EigNum)
+    call OptTwoP(ETot,Mon%PotNuc,URe,Mon%Occ,Mon%AP,Mon%PP,XOne,TwoMO,NSymMO, &
+                 Mon%CICoef,NBas,NInte1,NInte2,EigNum)
 
- print*, 'AP:', norm2(Mon%AP)
- print*, 'PP:', norm2(Mon%PP)
+    print*, 'AP:', norm2(Mon%AP)
+    print*, 'PP:', norm2(Mon%PP)
 
- ! Transform orbitals from MO to NO 
- call dgemm('N','T',NBas,NBas,NBas,1d0,Mon%CMO,NBas,URe,NBas,0d0,Ctmp,NBas)
+    ! Transform orbitals from MO to NO 
+    call dgemm('N','T',NBas,NBas,NBas,1d0,Mon%CMO,NBas,URe,NBas,0d0,Ctmp,NBas)
 
- Dtmp=0
- ! call get_den(NBas,Ctmp,2d0*Mon%Occ,Dtmp)
- ! print*, 'Trace test',trace(Dtmp,NBas)
- ! call print_mo(Ctmp,NBas,'MONOMER X')
+    Dtmp=0
+    ! call get_den(NBas,Ctmp,2d0*Mon%Occ,Dtmp)
+    ! print*, 'Trace test',trace(Dtmp,NBas)
+    ! call print_mo(Ctmp,NBas,'MONOMER X')
 
- ! Save NO orbitals
- Mon%CMO = Ctmp
+    ! Save NO orbitals
+    Mon%CMO = Ctmp
 
- ! MO->NO transform 2-el ints
- TwoMOt(1:NInte2) = 0
- call TwoNO(TwoMOt,URe,TwoMO,NBas,NInte2)
+    ! MO->NO transform 2-el ints
+    TwoMOt(1:NInte2) = 0
+    call TwoNO(TwoMOt,URe,TwoMO,NBas,NInte2)
 
- ! Save transformed ints
- TwoMO = TwoMOt
+    ! Save transformed ints
+    TwoMO = TwoMOt
 
- deallocate(TwoMOt,NSymMO,Ctmp,Dtmp)
+ elseif(iPINO==1) then
+
+    ACAlpha = Mon%ACAlpha
+    call OptTwoPAlph(ETot,Mon%PotNuc,URe,Mon%Occ,     &
+                     Mon%AP,Mon%PP,XOne,TwoMO,NSymMO, &
+                     Mon%CICoef,NBas,NInte1,NInte2,EigNum,ACAlpha)
+
+    ! use Fmat to store URe
+    allocate(Mon%Fmat(NBas,NBas))
+    Mon%FMat = URe
+
+ endif
+
+ deallocate(NSymMO,Ctmp,Dtmp)
+ if(iPINO==0) deallocate(TwoMOt)
 
 end subroutine calc_fci
 
 subroutine init_pino(NBas,Mon,ICASSCF)
+! recalculate IGem,IndAux,num0-2,
+! IndN,IndX,
 implicit none
 
-integer,intent(in) :: NBas, ICASSCF
 type(SystemBlock) :: Mon
+integer,intent(in) :: NBas, ICASSCF
 integer :: NInte1
+integer :: DimEx,pq
 integer :: i,j,ij,ind
 
  NInte1 = NBas*(NBas+1)/2
@@ -2416,9 +2624,64 @@ integer :: i,j,ij,ind
     enddo
  enddo
 
- write(LOUT,*) 'init PINO!!!'
+ ! prepare tables and dimensions 
+ Mon%NDimN=0
+ do i=1,NBas
+    if(Mon%Occ(i).gt.0d0) Mon%NDimN = Mon%NDimN + 1
+ enddo
+
+ DimEx   = Mon%NDimX+Mon%NDimN
+ Mon%DimEx = DimEx
+
+ allocate(Mon%IndNx(2,DimEx))
+
+ do pq=1,DimEx
+    if(pq<=Mon%NDimX) then
+       Mon%IndNx(1,pq) = Mon%IndN(1,pq)
+       Mon%IndNx(2,pq) = Mon%IndN(2,pq)
+    elseif(pq>Mon%NDimX) then
+       Mon%IndNx(1,pq) = pq - Mon%NDimX
+       Mon%IndNx(2,pq) = pq - Mon%NDimX
+    endif
+ enddo
+
+ write(LOUT,'(/,1x,a)') 'Recalculated dimensions for PINO!'
+ write(LOUT,'(/,1x,a,i6)') 'NDimEx = ',DimEx
 
 end subroutine init_pino
+
+subroutine get_1el_h_mo(XOne,MO,NBas,onefile)
+! read 1-el Hamiltonian and transform with MO coefs
+implicit none
+
+integer,intent(in)          :: NBas
+character(*),intent(in)     :: onefile
+double precision,intent(in) :: MO(NBas*NBas)
+double precision,intent(in) :: XOne(NBas*(NBas+1)/2)
+double precision,allocatable :: work1(:),work2(:)
+
+integer      :: iunit
+character(8) :: label
+
+ allocate(work1(NBas**2),work2(NBas**2))
+ open(newunit=iunit,file=onefile,access='sequential',&
+      form='unformatted',status='old')
+
+ read(iunit) 
+ read(iunit)
+ read(iunit) label, work1
+ if(label=='ONEHAMIL') then
+    call tran_oneint(work1,MO,MO,work2,NBas)
+    call sq_to_triang(work1,XOne,NBas) 
+ else
+    write(LOUT,'(a)') 'ERROR! ONEHAMIL NOT FOUND IN '//onefile
+    stop
+ endif
+
+ close(iunit)
+ deallocate(work2,work1)
+
+end subroutine get_1el_h_mo
 
 subroutine calc_elpot(A,B,NBas)
 implicit none
@@ -3219,6 +3482,9 @@ integer :: NISHT,NASHT,NOCCT,NORBT,NBAST,NCONF,NWOPT,NWOPH,&
 end subroutine readmulti
 
 subroutine select_active(mon,nbas,Flags)
+! set dimensions: NDimX,num0,num1,num2
+! set matrices: IndN,IndX,IPair,IndAux
+!
 implicit none
 
 type(SystemBlock) :: mon
@@ -3410,7 +3676,7 @@ integer :: test
                   mon%Occ(i)/=1d0.and.mon%Occ(j)/=1d0) ) then
                 
                 ind = ind + 1
-                mon%IndX(ind) =  ind !ij 
+                mon%IndX(ind) =  ij !ind 
                 mon%IndXh(ind) = ij
                 mon%IndN(1,ind) = i
                 mon%IndN(2,ind) = j
