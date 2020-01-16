@@ -2240,8 +2240,7 @@ endif
 !enddo
 
 
-! coupled - 0
-
+! coupled 
 do i=1,A%NDimX
    if(OmA(i)<0d0) write(LOUT,*) 'Negative A!',i,OmA(i)
 enddo
@@ -5343,9 +5342,8 @@ double precision,parameter :: SmallE = 1.d-6
              fact1 = work(is+(ir-1)*dimOB)
              fact2 = ACAlpha*fact1
 
-             ! remove active part
-             if(IGemA(ip)==2.and.IGemA(iq)==2.and. &
-                IGemB(ir)==2.and.IGemB(is)==2) then
+             ! remove excitations form the same group
+             if(IGemA(ip)==IGemA(iq)==IGemB(ir)==IGemB(is)) then
                 fact2 = fact1
                 fact1 = 0d0
              endif
@@ -5423,6 +5421,7 @@ double precision,allocatable :: AVecEx(:),BVecEx(:)
 double precision,parameter :: SmallE = 1.d-2
 !double precision,parameter :: SmallE = 1.d-1
 
+ write(LOUT,'(/,1x,a)') 'Thresholds in E2disp-APSG:'
  write(LOUT,'(1x,a,e12.4)') 'SmallE in E2Disp PINO:',SmallE
 
  if(A%NBasis.ne.B%NBasis) then
@@ -5449,8 +5448,8 @@ double precision,parameter :: SmallE = 1.d-2
  ! coef  = 2
  !coef2 = 4
 
- print*, A%num0,A%num1,A%num2
- print*, B%num0,B%num1,B%num2
+ !print*, A%num0,A%num1,A%num2
+ !print*, B%num0,B%num1,B%num2
 
  !print*, A%IGem
  !print*, ''
