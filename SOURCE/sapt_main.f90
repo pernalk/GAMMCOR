@@ -46,7 +46,7 @@ double precision :: Tcpu,Twall
    call sapt_response(Flags,SAPT%monA,SAPT%EnChck,NBasis)
    call sapt_response(Flags,SAPT%monB,SAPT%EnChck,NBasis)
  endif
- call sapt_ab_ints(Flags,SAPT%monA,SAPT%monB,NBasis)
+ call sapt_ab_ints(Flags,SAPT%monA,SAPT%monB,SAPT%iPINO,NBasis)
 
  ! SAPT components
  write(LOUT,'()')
@@ -119,8 +119,7 @@ double precision   :: XGrid(1000), WGrid(1000),DispAlph, e2d
  call GauLeg(0.D0,1.D0,XGrid,WGrid,NGrid)
  
  DispAlph=0.D0
- do i=1,1
- !do i=1,NGrid
+ do i=1,NGrid
 
     SAPT%ACAlpha = XGrid(i)
     A%ACAlpha    = SAPT%ACAlpha
@@ -131,11 +130,11 @@ double precision   :: XGrid(1000), WGrid(1000),DispAlph, e2d
     if(Flags%ISERPA==0) then
        call e2dispCAS(e2d,Flags,SAPT%monA,SAPT%monB,SAPT,SAPT%ACAlpha,NBasis)
     elseif(Flags%ISERPA==2) then
-       call e2dispCAS_pino(e2d,Flags,SAPT%monA,SAPT%monB,SAPT)
+       call e2dispCAS_pino(e2d,Flags,SAPT%monA,SAPT%monB,SAPT,SAPT%ACAlpha)
     endif
     DispAlph = DispAlph + e2d * WGrid(i)
 
-    write(LOUT,*) 'ACAlpha ',SAPT%ACAlpha,' W_ALPHA ',e2d
+    write(LOUT,'(1x,a,f12.6,a,f14.8)') 'ACAlpha ',SAPT%ACAlpha,' W_Alpha ',e2d
 
  enddo
 
@@ -404,6 +403,25 @@ logical :: doRSH
 !
 ! endif
 
+ if(Flags%ISERPA==2) then
+    ! set iPINO
+    if(Flags%ICASSCF==1.and.Flags%ISHF==1.and.Flags%SaptLevel/=10) then
+       ! 2-electron FCI
+       SAPT%iPINO = 0
+    elseif(Flags%ICASSCF==1.and.Flags%ISHF==1.and.Flags%SaptLevel==10) then
+       ! 2-electron e2dispCAS
+       SAPT%iPINO = 1
+    elseif(Flags%ICASSCF==1.and.Flags%ISHF==0.and.Flags%SaptLevel/=10) then
+       ! CAS/LR
+       SAPT%iPINO = 2
+    elseif(Flags%ICASSCF==0.and.Flags%SaptLevel/=10) then
+       ! TEST IS MISSING!
+       ! GVB
+       SAPT%iPINO = 3
+    else
+       write(LOUT,'(/,1x,a)') 'UNRECOGNIZED PINO VARIANT!'
+    endif
+ endif
 
  ! calculate electrostatic potential
  call calc_elpot(SAPT%monA,SAPT%monB,NBasis)
@@ -488,12 +506,12 @@ double precision :: MO(NBasis*NBasis)
 
 end subroutine sapt_response
 
-subroutine sapt_ab_ints (Flags,A,B,NBasis)
+subroutine sapt_ab_ints(Flags,A,B,iPINO,NBasis)
 implicit none
 
 type(FlagsData)    :: Flags
 type(SystemBlock)  :: A,B
-integer,intent(in) :: NBasis
+integer,intent(in) :: iPINO,NBasis
 
 if(Flags%ISERPA==0) then
 
@@ -534,12 +552,26 @@ if(Flags%ISERPA==0) then
 
 elseif(Flags%ISERPA==2) then
 
-   call tran4_gen(NBasis,&
-                 (A%num0+A%num1),A%CMO,&
-                  NBasis,A%CMO,&
-                 (B%num0+B%num1),B%CMO,&
-                  NBasis,B%CMO,&
-                  'TWOMOAB','AOTWOSORT')
+   write(LOUT,'(/,1x,a,i2)') 'Calculate AB integrals for iPINO=', iPINO
+   if(iPINO==0.or.iPINO==1) then
+      ! FCI 
+      call tran4_gen(NBasis,&
+                     NBasis,A%CMO,&
+                     NBasis,A%CMO,&
+                     NBasis,B%CMO,&
+                     NBasis,B%CMO,&
+                     'TWOMOAB','AOTWOSORT')
+
+   else
+      ! CAS/LR, GVB(TD-APSG)
+      call tran4_gen(NBasis,&
+                    (A%num0+A%num1),A%CMO,&
+                     NBasis,A%CMO,&
+                    (B%num0+B%num1),B%CMO,&
+                     NBasis,B%CMO,&
+                     'TWOMOAB','AOTWOSORT')
+   endif
+
 endif
 
 end subroutine sapt_ab_ints
@@ -1346,9 +1378,7 @@ logical :: doRSH
  NInte1 = NBas*(NBas+1)/2
  NInte2 = NInte1*(NInte1+1)/2
 
- print*, 'here?'
  call create_symmats(Mon,MO,NBas)
- print*, 'here?'
 
  allocate(work1(NSq),work2(NSq),XOne(NInte1),URe(NBas,NBas),VSR(NInte1))
  if(Mon%TwoMoInt==1) then
@@ -2386,8 +2416,9 @@ double precision, allocatable :: work1(:),work2(:),XOne(:),TwoMO(:)
     ! FCI
     call calc_fci(NBas,NInte1,NInte2,XOne,URe,TwoMO,M,iPINO)
     call read2rdm(M,NBas)
-    call init_pino(NBas,M,Flags%ICASSCF) 
-
+    if(iPINO==0) call init_pino(NBas,M,Flags%ICASSCF)
+    !call init_pino(NBas,M,Flags%ICASSCF) 
+    
  elseif(iPINO==2) then
 
     ! CAS
@@ -2451,14 +2482,20 @@ type(SystemBlock)  :: Mon
 double precision   :: ACAlpha,ETot
 double precision, allocatable :: Ctmp(:,:),Dtmp(:,:), &
                                  NSymMO(:), TwoMOt(:)
+integer,allocatable           :: IndAux(:)
+double precision, allocatable :: CICoef(:),Occ(:),APMAT(:,:)
 integer :: EigNum
+!test
+integer :: i
 
  write(LOUT,'(/,1x,a)') 'ENTERING FCI FOR 2-EL SYSTEMS...'
    
- allocate(Ctmp(NBas,NBas),Dtmp(NBas,NBas),NSymMO(NBas),TwoMOt(NInte2))
+ allocate(Ctmp(NBas,NBas),Dtmp(NBas,NBas),NSymMO(NBas))
  if(iPINO==0) allocate(TwoMOt(NInte2))
 
  ! new for OptTwoP
+ if(allocated(Mon%AP)) deallocate(Mon%AP)
+ if(allocated(Mon%PP)) deallocate(Mon%PP)
  allocate(Mon%AP(NInte1,NInte1),Mon%PP(NInte1))
 
  Mon%AP = 0
@@ -2504,16 +2541,27 @@ integer :: EigNum
     ! Save transformed ints
     TwoMO = TwoMOt
 
+ ! e2disp_pino
  elseif(iPINO==1) then
 
-    ACAlpha = Mon%ACAlpha
-    call OptTwoPAlph(ETot,Mon%PotNuc,URe,Mon%Occ,     &
-                     Mon%AP,Mon%PP,XOne,TwoMO,NSymMO, &
-                     Mon%CICoef,NBas,NInte1,NInte2,EigNum,ACAlpha)
+    allocate(Occ(NBas),CICoef(NBas),&
+             IndAux(NBas),&
+             APMAT(NInte1,NBas*NBas))
 
-    ! use Fmat to store URe
-    allocate(Mon%Fmat(NBas,NBas))
-    Mon%FMat = URe
+    Occ    = Mon%Occ
+    CICoef = Mon%CICoef
+    ACAlpha = Mon%ACAlpha
+
+    call OptTwoPAlph(ETot,Mon%PotNuc,URe,Occ,         &
+                     Mon%AP,Mon%PP,XOne,TwoMO,NSymMO, &
+                     CICoef,NBas,NInte1,NInte2,EigNum,ACAlpha)
+    call tran_AP(Mon%AP,APMAT,CICoef,URe,NInte1,NBas)
+
+    deallocate(Mon%AP)
+    allocate(Mon%AP(NInte1,NBas*NBas))
+    Mon%AP = APMAT
+
+    deallocate(APMAT,IndAux,CICoef,Occ)
 
  endif
 
@@ -2521,6 +2569,72 @@ integer :: EigNum
  if(iPINO==0) deallocate(TwoMOt)
 
 end subroutine calc_fci
+
+subroutine tran_AP(AP,AOUT,CICoef,URe,NInte1,NBas)
+implicit none
+
+integer,intent(in)           :: NInte1,NBas
+double precision,intent(in)  :: AP(NInte1,NInte1),CICoef(NBas),URe(NBas,NBas)
+double precision             :: AOUT(NInte1,NBas**2)
+integer :: i,ia,ib,iab,ab,ba
+double precision,allocatable :: tmp(:,:)
+
+ AOUT = 0
+
+ allocate(tmp(NInte1,NBas*NBas))
+
+ do i=1,NInte1
+    iab = 0
+    do ib=1,NBas
+       do ia=1,ib
+          iab = iab + 1
+          ab = ia + (ib-1)*NBas
+          ba = ib + (ia-1)*NBas
+          AOUT(i,ab) = CICoef(ia)*AP(i,iab)
+          AOUT(i,ba) = CICoef(ib)*AP(i,iab)
+       enddo
+    enddo
+ enddo 
+ do i=1,NInte1
+    call dgemm('T','N',NBas,NBas,NBas,1d0,URe,NBas,AOUT(i,:),NBas,0d0,tmp(i,:),NBas)
+    call dgemm('N','N',NBas,NBas,NBas,1d0,tmp(i,:),NBas,URe,NBas,0d0,AOUT(i,:),NBas)
+ enddo
+
+ ! test
+ ! monomerA
+ ! test
+ !tmp1 = 0 
+ !do i=1,ADimEx
+ !   do ib=1,NBas
+ !      do ip=1,NBas
+ !         pb = ip + (ib-1)*NBas
+ !         do ia=1,NBas
+ !            iab = max(ia,ib)*(max(ia,ib)-1)/2+min(ia,ib)
+ !            tmp1(i,pb) = tmp1(i,pb) + URe(ip,ia)*A%CICoef(ia)*A%AP(i,iab)
+ !         enddo
+ !      enddo
+ !   enddo
+ !enddo
+ !print*,'tmp1',norm2(tmp1)
+ !tmp2 = 0
+ !do i=1,ADimEx
+ !   do iq=1,NBas
+ !      do ip=1,NBas 
+ !         pq = ip + (iq-1)*NBas
+ !         do ib=1,NBas
+ !            pb = ip + (ib-1)*NBas
+ !            tmp2(i,pq) = tmp2(i,pq) + tmp1(i,pb)*URe(ib,iq)
+ !            !tmp2(i,pq) = tmp2(i,pq) + tmp1(i,pb)*URe(iq,ib)
+ !         enddo
+ !      enddo
+ !   enddo
+ !enddo
+ !print*,'tmp2',norm2(tmp2)
+ !print*,'tmp2(3,2),tmp2(2,3)',tmp2(3,2),tmp2(2,3)
+
+ deallocate(tmp)
+
+end subroutine tran_AP
 
 subroutine init_pino(NBas,Mon,ICASSCF)
 ! recalculate IGem,IndAux,num0-2,
@@ -2819,7 +2933,6 @@ end subroutine reduce_dim
 !  enddo 
 ! 
 !  print*, '2nd'
-!! map(pq) here?
 !  do i=1,NDimEx
 !    do pq=1,NDimEx
 !       if(pq.le.Mon%NDimX) then

@@ -228,6 +228,7 @@ type SaptData
      integer           :: SaptLevel = SAPTLEVEL2
      integer           :: ic6 = 0
      integer           :: IPrint = 1000
+     integer           :: iPINO=-1
      double precision  :: ACAlpha = 1d0
      double precision  :: Vnn,elst,e2ind,e2disp
      double precision  :: e2disp_sc,e2disp_sp,e2disp_unc

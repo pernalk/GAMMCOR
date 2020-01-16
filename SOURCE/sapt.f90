@@ -1897,7 +1897,6 @@ open(newunit=iunit,file='TWOMOAB',status='OLD',&
      access='DIRECT',form='UNFORMATTED',recl=8*nOVB)
 
 
-
 tmp1 = 0
 tmp2 = 0
 do pq=1,A%NDimX
@@ -5245,12 +5244,13 @@ double precision,parameter :: SmallE = 1.d-2
 
 end subroutine e2disp_pino
 
-subroutine e2dispCAS_pino(e2d,Flags,A,B,SAPT)
+subroutine e2dispCAS_pino(e2d,Flags,A,B,SAPT,ACAlpha)
 implicit none
 
 type(FlagsData)   :: Flags
 type(SaptData)    :: SAPT
 type(SystemBlock) :: A, B
+double precision,intent(in)    :: ACAlpha
 double precision,intent(inout) :: e2d
 
 integer :: NBas, NInte1,NInte2
@@ -5259,18 +5259,17 @@ integer :: iunit
 integer :: i,j,pq,rs
 integer :: ip,iq,ir,is
 integer :: ipq,irs
-integer :: i1,i2,j1,j2,ii,jj,ij
-integer :: coef,ADimEx,BDimEx
-integer,allocatable :: AuxT(:,:)
+integer,allocatable          :: AuxT(:,:)
+integer,allocatable          :: IGemA(:),IGemB(:)
 double precision,allocatable :: OmA(:),OmB(:)
 double precision,allocatable :: EVecA(:),EVecB(:)
-double precision,allocatable :: tmp1(:,:),tmp2(:,:) 
+double precision,allocatable :: tmp1(:,:),tmp2(:,:),& 
+                                tmp(:,:)
 double precision,allocatable :: work(:)
-double precision :: fact,fpq,frs
+double precision :: fact1,fact2
 ! testy
-integer,allocatable :: AIndEx(:,:),BIndEx(:,:)
-double precision,allocatable :: AVecEx(:),BVecEx(:)
-
+double precision,allocatable :: URe(:,:)
+!
 double precision,parameter :: SmallE = 1.d-6
 !double precision,parameter :: SmallE = 1.d-1
 
@@ -5284,31 +5283,113 @@ double precision,parameter :: SmallE = 1.d-6
  endif
 
 ! set dimensions
- ADimEx = A%NDimX + A%NDimN
- BDimEx = B%NDimX + B%NDimN
  NInte1 = NBas*(NBas+1)/2
- dimOA  = A%num0+A%num1
+ dimOA  = NBas
  dimFA  = NBas
- dimOB  = B%num0+B%num1
+ dimOB  = NBas
  dimFB  = NBas 
  nOFA   = dimOA*dimFA
  nOFB   = dimOB*dimFB
 
- print*, 'TESTA?',norm2(A%AP),norm2(A%PP) 
- print*, 'TESTB?',norm2(B%AP),norm2(A%PP)
- print*, 'URe   ',norm2(A%Fmat),norm2(B%Fmat)
- print*, 'DIMENSIONS ::',NINte1,ADimEx,NBas**2
+ ! fix IGem for A
+ allocate(IGemA(NBas),IGemB(NBas))
+ do i=1,A%INAct
+    IGemA(i) = 1
+ enddo
+ do i=A%INAct+1,A%INAct+A%NAct
+    IGemA(i) = 2
+ enddo
+ do i=A%INAct+A%NAct+1,NBas
+    IGemA(i) = 3
+ enddo
+ ! fix IGem for B
+ do i=1,B%INAct
+    IGemB(i) = 1
+ enddo
+ do i=B%INAct+1,B%INAct+B%NAct
+    IGemB(i) = 2
+ enddo
+ do i=B%INAct+B%NAct+1,NBas
+    IGemB(i) = 3
+ enddo
+ 
+ !do i=1,NBas
+ !   print*, i,IGemA(i),IGemB(i)
+ !enddo
+
+ !print*, 'DIMENSIONS ::',NINte1,ADimEx,NBas**2
+
+ ! transform AP
+ allocate(tmp1(NInte1,NBas**2),tmp2(NInte1,NBas**2),&
+          tmp(NInte1,NInte1))
 
  ! tran4_gen
  allocate(work(nOFB))
- !open(newunit=iunit,file='TWOMOAB',status='OLD',&
- !    access='DIRECT',form='UNFORMATTED',recl=8*nOFB)
+ open(newunit=iunit,file='TWOMOAB',status='OLD',&
+     access='DIRECT',form='UNFORMATTED',recl=8*nOFB)
 
+ tmp1 = 0
+ tmp2 = 0
+ do iq=1,NBas
+    do ip=1,NBas
+       pq=ip+(iq-1)*NBas
 
- !close(iunit)
+       read(iunit,rec=iq+(ip-1)*dimOA) work(1:nOFB)
 
+       do is=1,NBas
+          do ir=1,NBas
+             rs=ir+(is-1)*NBas
 
+             fact1 = work(is+(ir-1)*dimOB)
+             fact2 = ACAlpha*fact1
+
+             ! remove active part
+             if(IGemA(ip)==2.and.IGemA(iq)==2.and. &
+                IGemB(ir)==2.and.IGemB(is)==2) then
+                fact2 = fact1
+                fact1 = 0d0
+             endif
+
+             do i=1,NInte1
+                tmp1(i,rs) =  tmp1(i,rs)+fact1*A%AP(i,pq)
+             enddo
+
+             do i=1,NInte1
+                tmp2(i,rs) =  tmp2(i,rs)+fact2*A%AP(i,pq)
+             enddo
+
+          enddo
+       enddo
+
+    enddo
+ enddo
+
+ close(iunit)
  deallocate(work)
+
+ ! second multiplication
+ call dgemm('N','T',NInte1,NInte1,NBas**2,1d0,tmp1,NInte1,B%AP,NInte1,0d0,tmp,NInte1)
+ tmp1(1:NInte1,1:NInte1) = tmp(1:NInte1,1:NInte1)
+ call dgemm('N','T',NInte1,NInte1,NBas**2,1d0,tmp2,NInte1,B%AP,NInte1,0d0,tmp,NInte1)
+ tmp2(1:NInte1,1:NInte1) = tmp(1:NInte1,1:NInte1)
+
+ e2d = 0
+ do j=1,NInte1
+    if(abs(B%PP(j)).gt.SmallE.and.abs(B%PP(j)).lt.1d20) then
+       do i=1,NInte1
+          if(abs(A%PP(i)).gt.SmallE.and.abs(A%PP(i)).lt.1d20) then
+             e2d = e2d + tmp1(i,j)*tmp2(i,j)/(A%PP(i)+B%PP(j))
+          endif
+       enddo 
+    endif
+ enddo
+
+ SAPT%e2disp = -32d0*e2d
+ e2d  = -32d0*e2d*1000d0
+ write(LOUT,'(/,1x,a,f16.8)') 'E2disp(CAS) = ',e2d
+
+ deallocate(tmp,tmp2,tmp1)
+ deallocate(IGemB,IGemA)
 
 end subroutine e2dispCAS_pino
 
