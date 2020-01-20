@@ -2448,6 +2448,9 @@ endif
     deallocate(OmB1,EVecB1,OmA1,EVecA1)
  endif
 
+ if(allocated(EVecA0)) print*, 'EVecA0'
+ if(allocated(EVecB0)) print*, 'EVecB0'
+
  deallocate(tmp02,tmp01,tmp2,tmp1)
  deallocate(OmB0,EVecB0,OmA0,EVecA0,OmB,EVecB,OmA,EVecA)
 
@@ -5080,7 +5083,7 @@ integer,allocatable :: AIndEx(:,:),BIndEx(:,:)
 double precision,allocatable :: AVecEx(:),BVecEx(:)
 
 !double precision,parameter :: SmallE = 1.d-6
-double precision,parameter :: SmallE = 1.d-2
+double precision,parameter :: SmallE = 1.d-12
 !double precision,parameter :: SmallE = 1.d-1
 
  write(LOUT,'(1x,a,e12.4)') 'SmallE in E2Disp PINO:',SmallE
@@ -5269,7 +5272,7 @@ double precision :: fact1,fact2
 ! testy
 double precision,allocatable :: URe(:,:)
 !
-double precision,parameter :: SmallE = 1.d-6
+double precision,parameter :: SmallE = 1.d-12
 !double precision,parameter :: SmallE = 1.d-1
 
  write(LOUT,'(1x,a,e12.4)') 'SmallE in E2Disp PINO:',SmallE
@@ -5280,6 +5283,9 @@ double precision,parameter :: SmallE = 1.d-6
  else
     NBas = A%NBasis 
  endif
+
+ print*, 'Aalpha',norm2(A%AP),norm2(A%PP)
+ print*, 'Balpha',norm2(B%AP),norm2(B%PP)
 
 ! set dimensions
  NInte1 = NBas*(NBas+1)/2
@@ -5332,18 +5338,22 @@ double precision,parameter :: SmallE = 1.d-6
  do iq=1,NBas
     do ip=1,NBas
        pq=ip+(iq-1)*NBas
+       !pq=iq+(ip-1)*NBas
 
        read(iunit,rec=iq+(ip-1)*dimOA) work(1:nOFB)
 
        do is=1,NBas
           do ir=1,NBas
              rs=ir+(is-1)*NBas
+             !rs=is+(ir-1)*NBas
 
              fact1 = work(is+(ir-1)*dimOB)
              fact2 = ACAlpha*fact1
 
              ! remove excitations form the same group
-             if(IGemA(ip)==IGemA(iq)==IGemB(ir)==IGemB(is)) then
+             if(IGemA(ip)==IGemA(iq).and. &
+                IGemB(ir)==IGemB(is) .and. IGemA(ip)==IGemB(ir)) then
+
                 fact2 = fact1
                 fact1 = 0d0
              endif
@@ -5367,8 +5377,10 @@ double precision,parameter :: SmallE = 1.d-6
 
  ! second multiplication
  call dgemm('N','T',NInte1,NInte1,NBas**2,1d0,tmp1,NInte1,B%AP,NInte1,0d0,tmp,NInte1)
+ tmp1=0
  tmp1(1:NInte1,1:NInte1) = tmp(1:NInte1,1:NInte1)
  call dgemm('N','T',NInte1,NInte1,NBas**2,1d0,tmp2,NInte1,B%AP,NInte1,0d0,tmp,NInte1)
+ tmp2=0
  tmp2(1:NInte1,1:NInte1) = tmp(1:NInte1,1:NInte1)
 
  e2d = 0
@@ -5377,6 +5389,7 @@ double precision,parameter :: SmallE = 1.d-6
        do i=1,NInte1
           if(abs(A%PP(i)).gt.SmallE.and.abs(A%PP(i)).lt.1d20) then
              e2d = e2d + tmp1(i,j)*tmp2(i,j)/(A%PP(i)+B%PP(j))
+             !e2d = e2d + tmp2(i,j)**2/(A%PP(i)+B%PP(j))
           endif
        enddo 
     endif
@@ -5385,6 +5398,7 @@ double precision,parameter :: SmallE = 1.d-6
  SAPT%e2disp = -32d0*e2d
  e2d  = -32d0*e2d*1000d0
  write(LOUT,'(/,1x,a,f16.8)') 'E2disp(CAS) = ',e2d
+! write(LOUT,'(/,1x,a,f16.8)') 'E2disp(t) = ',e2d/2d0
 
  deallocate(tmp,tmp2,tmp1)
  deallocate(IGemB,IGemA)
@@ -5418,7 +5432,7 @@ integer,allocatable :: AIndEx(:,:),BIndEx(:,:)
 double precision,allocatable :: AVecEx(:),BVecEx(:)
 
 !double precision,parameter :: SmallE = 1.d-6
-double precision,parameter :: SmallE = 1.d-2
+double precision,parameter :: SmallE = 1.d-12
 !double precision,parameter :: SmallE = 1.d-1
 
  write(LOUT,'(/,1x,a)') 'Thresholds in E2disp-APSG:'
