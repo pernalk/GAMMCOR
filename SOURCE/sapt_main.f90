@@ -53,7 +53,7 @@ double precision :: Tcpu,Twall
  if(Flags%ISERPA==0) then
 
     call e1elst(SAPT%monA,SAPT%monB,SAPT)
-   !call e1exchs2(Flags,SAPT%monA,SAPT%monB,SAPT)
+    call e1exchs2(Flags,SAPT%monA,SAPT%monB,SAPT)
 
     ! UNCOUPLED E2DISP
     if(SAPT%SaptLevel==0) then
