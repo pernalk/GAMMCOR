@@ -53,7 +53,7 @@ double precision :: Tcpu,Twall
  if(Flags%ISERPA==0) then
 
     call e1elst(SAPT%monA,SAPT%monB,SAPT)
-   !call e1exchs2(Flags,SAPT%monA,SAPT%monB,SAPT)
+    call e1exchs2(Flags,SAPT%monA,SAPT%monB,SAPT)
 
     ! UNCOUPLED E2DISP
     if(SAPT%SaptLevel==0) then
@@ -71,10 +71,10 @@ double precision :: Tcpu,Twall
        call e2ind(Flags,SAPT%monA,SAPT%monB,SAPT)
        call e2disp(Flags,SAPT%monA,SAPT%monB,SAPT)
 
-       !if(Flags%ICASSCF==1) then
+       if(Flags%ICASSCF==1) then
           call e2exdisp(Flags,SAPT%monA,SAPT%monB,SAPT)
           !call e2exd_app(SAPT%monA,SAPT%monB,SAPT)
-       !endif
+       endif
 
     endif
 
@@ -83,6 +83,7 @@ double precision :: Tcpu,Twall
     if(Flags%ICASSCF==1.and.SAPT%SaptLevel/=10) then
        call e1elst(SAPT%monA,SAPT%monB,SAPT)
        call e2disp_pino(Flags,SAPT%monA,SAPT%monB,SAPT)
+       !call e2disp_apsg(Flags,SAPT%monA,SAPT%monB,SAPT)
        call e2exdisp_apsg(Flags,SAPT%monA,SAPT%monB,SAPT)
     elseif(Flags%ICASSCF==0.and.SAPT%SaptLevel/=10) then
        call e1elst(SAPT%monA,SAPT%monB,SAPT)
@@ -97,9 +98,6 @@ double precision :: Tcpu,Twall
  call free_sapt(SAPT)
 
  call clock('SAPT',Tcpu,Twall)
-
-! testy molpro grid 
-!  call molpro_routines
 
  stop
 
@@ -442,7 +440,7 @@ logical :: doRSH
     if(Flags%ICASSCF==1.and.Flags%ISHF==1.and.Flags%SaptLevel/=10) then
        ! 2-electron FCI
        SAPT%iPINO = 0
-    elseif(Flags%ICASSCF==1.and.Flags%ISHF==1.and.Flags%SaptLevel==10) then
+    elseif(Flags%ICASSCF==1.and.Flags%SaptLevel==10) then
        ! 2-electron e2dispCAS
        SAPT%iPINO = 1
     elseif(Flags%ICASSCF==1.and.Flags%ISHF==0.and.Flags%SaptLevel/=10) then
@@ -587,7 +585,7 @@ if(Flags%ISERPA==0) then
 
 elseif(Flags%ISERPA==2) then
 
-   write(LOUT,'(/,1x,a,i2)') 'Calculate AB integrals for iPINO=', iPINO
+   write(LOUT,'(/,1x,a,i2)') 'Calculate AB integrals for iPINO =', iPINO
    if(iPINO==0.or.iPINO==1) then
       ! FCI 
       call tran4_gen(NBasis,&
@@ -2246,12 +2244,6 @@ elseif(Flags%ISERPA==2) then
       call reduce_dim('AB',ABPlus,ABMin,Mon)
       call reduce_dim('D',DMAT,DMATK,Mon)
       call reduce_dim('E',EMAT,EMATM,Mon)
-      print*, 'DMAT-R',norm2(DMAT(1:Mon%NDimX*Mon%NDimN)),&
-           norm2(DMATK(1:Mon%NDimX*Mon%NDimN))
-      print*, 'EMAT-R',norm2(EMAT(1:Mon%NDimN**2)),&
-           norm2(EMATM(1:Mon%NDimN**2))
-      print*, 'ABPlus',norm2(ABPlus(1:Mon%NDimX**2)),&
-           'ABMin',norm2(ABMin(1:Mon%NDimX**2))
 
    else
   
@@ -2298,6 +2290,7 @@ elseif(Flags%ISERPA==2) then
 
    !print*, 'EigVecR',norm2(EigVecR)
 
+   print*, '1'
    allocate(Mon%EigY((Mon%NDimX+Mon%NDimN)**2),Mon%EigX((Mon%NDimX+Mon%NDimN)**2),&
             Mon%Eig(Mon%NDimX+Mon%NDimN))
 
@@ -2305,14 +2298,14 @@ elseif(Flags%ISERPA==2) then
                      ABPlus,ABMin,DMAT,DMATK,EMAT,EMATM,Mon%IndN,&
                      NBas,Mon%NDimX,Mon%NDimN)
 
-  ! print*,'AAAA?',norm2(Mon%EigY),norm2(Mon%EigX)
+  print*,'AAAA?',norm2(Mon%EigY),norm2(Mon%EigX)
   Eig = Mon%Eig
 
   ! prepare tables and dimensions 
   DimEx = Mon%NDimX+Mon%NDimN
   Mon%DimEx = DimEx
 
-  allocate(Mon%IndNx(2,DimEx))
+  if(.not.allocated(Mon%IndNX)) allocate(Mon%IndNx(2,DimEx))
 
   do pq=1,DimEx
      if(pq<=Mon%NDimX) then 
@@ -2358,11 +2351,11 @@ elseif(Flags%ISERPA==2) then
 !!      enddo
 !!   enddo 
 !!
- !  ETot = 0
+   ETot = 0
 !!   call EnePINO(ETot,Mon%PotNuc,EigVecR,Eig,TwoMO,URe,Mon%Occ,XOne, &
 !!        Mon%IndN,NBas,NInte1,NInte2,Mon%NDimX,Mon%NDimN)
- !  
- !  deallocate(EMAT,EMATM,DMAT,DMATK)
+   
+   deallocate(EMAT,EMATM,DMAT,DMATK)
    
 endif
 
@@ -2391,11 +2384,14 @@ integer,intent(in) :: NBas
 double precision   :: MO(NBas*NBas)
 
 integer          :: iPINO
-integer          :: i,pq
+integer          :: i,j,ii,ip,iq,pq
 integer          :: NInte1,NInte2,DimEx
+integer          :: INegExcit
 double precision :: URe(NBas,NBas)
-character(:),allocatable      :: onefile,twofile,rdmfile
+character(:),allocatable      :: onefile,twofile,rdmfile,propfile
 double precision, allocatable :: work1(:),work2(:),XOne(:),TwoMO(:) 
+double precision, allocatable :: ABPlus(:),ABMin(:),DMAT(:),DMATK(:),&
+                                 CMAT(:),EMAT(:),EMATM(:),EigVecR(:),Eig(:)
 
 ! checks
  if(M%TwoMoInt/=TWOMO_INCORE) then
@@ -2407,7 +2403,7 @@ double precision, allocatable :: work1(:),work2(:),XOne(:),TwoMO(:)
  if(Flags%ICASSCF==1.and.Flags%ISHF==1.and.M%NELE==1.and.Flags%SaptLevel/=10) then
     ! 2-electron FCI
     iPINO = 0
- elseif(Flags%ICASSCF==1.and.Flags%ISHF==1.and.M%NELE==1.and.Flags%SaptLevel==10) then
+ elseif(Flags%ICASSCF==1.and.M%NELE==1.and.Flags%SaptLevel==10) then
     ! 2-electron e2dispCAS
     iPINO = 1
  elseif(Flags%ICASSCF==1.and.Flags%ISHF==0.and.Flags%SaptLevel/=10) then
@@ -2424,10 +2420,12 @@ double precision, allocatable :: work1(:),work2(:),XOne(:),TwoMO(:)
     onefile    = 'ONEEL_A'
     twofile    = 'TWOMOAA'
     rdmfile    = 'rdm2_A.dat'
+    propfile   = 'PROP_A'
  elseif(M%Monomer==2) then
     onefile    = 'ONEEL_B'
     twofile    = 'TWOMOBB'
     rdmfile    = 'rdm2_B.dat'
+    propfile   = 'PROP_B'
  endif
 
 ! set dimensions
@@ -2452,8 +2450,7 @@ double precision, allocatable :: work1(:),work2(:),XOne(:),TwoMO(:)
     call calc_fci(NBas,NInte1,NInte2,XOne,URe,TwoMO,M,iPINO)
     call read2rdm(M,NBas)
     if(iPINO==0) call init_pino(NBas,M,Flags%ICASSCF)
-    !call init_pino(NBas,M,Flags%ICASSCF) 
-    
+ 
  elseif(iPINO==2) then
 
     ! CAS
@@ -2462,45 +2459,93 @@ double precision, allocatable :: work1(:),work2(:),XOne(:),TwoMO(:)
 
  endif
 
- !if(Flags%ICASSCF==1.and.Flags%ISHF==0) then
- !   ! read 2-RDMs
- !   call read2rdm(M,NBas)
- !   ! CAS-SCF
- !   call system('cp '//rdmfile// ' rdm2.dat')
- !elseif(Flags%ICASSCF==1.and.Flags%ISHF==1) then
- !   ! PINO
- !   call read2rdm(M,NBas)
- !   call init_pino(NBas,M,Flags%ICASSCF) 
- !endif
+ M%NDimN=0
+ do i=1,NBas
+    if(M%Occ(i).gt.0d0) M%NDimN=M%NDimN+1
+ enddo
 
-! ! prepare tables and dimensions 
-! M%NDimN=0
-! do i=1,NBas
-!    if(M%Occ(i).gt.0d0) M%NDimN = M%NDimN + 1
-! enddo
-!
-! DimEx   = M%NDimX+M%NDimN
-! M%DimEx = DimEx
-!
-! allocate(M%IndNx(2,DimEx))
-!
-! do pq=1,DimEx
-!    if(pq<=M%NDimX) then
-!       M%IndNx(1,pq) = M%IndN(1,pq)
-!       M%IndNx(2,pq) = M%IndN(2,pq)
-!    elseif(pq>M%NDimX) then
-!       M%IndNx(1,pq) = pq - M%NDimX
-!       M%IndNx(2,pq) = pq - M%NDimX
-!    endif
-! enddo
-
- !if(Flags%ICASSCF==1.and.Flags%ISHF==0) then
  if(iPINO==2) then
  ! sth here for CAS/LR -- full linear response for CAS wfn
 
+ ! GVB/TD-APSG
  elseif(iPINO==3) then
- ! here  GVB: TD-APSG and PINOVECREDXY
- ! ... 
+
+    allocate(ABPlus(M%NDim**2),ABMin(M%NDim**2),  &
+             CMAT(M%NDim**2),EMAT(NBas**2),EMATM(NBas**2), &
+             DMAT(M%NDim*NBas),DMATK(M%NDim*NBas), &
+             EigVecR(2*(M%NDimX+M%NDimN)*2*(M%NDimX+M%NDimN)),&
+             Eig(2*(M%NDimX+M%NDimN)))
+
+    CMAT = 0
+    call APSG_NEST(ABPlus,ABMin,CMAT,EMAT,EMATM,DMAT,DMATK,&
+         URe,M%Occ,XOne,TwoMO,&
+         NBas,M%NDim,NInte1,NInte2,M%NGem,Flags%ISERPA)
+
+    !reduce dimensions
+    call reduce_dim('AB',ABPlus,ABMin,M)
+    call reduce_dim('D',DMAT,DMATK,M)
+    call reduce_dim('E',EMAT,EMATM,M)
+
+    deallocate(CMAT)
+
+ endif
+
+ if(iPINO==2.or.iPINO==3) then
+
+    EigVecR = 0
+    Eig = 0
+
+    allocate(M%EigY((M%NDimX+M%NDimN)**2),M%EigX((M%NDimX+M%NDimN)**2),&
+             M%Eig(M%NDimX+M%NDimN))
+
+    call PINOVECREDXY(M%EigY,M%EigX,M%Eig,INegExcit,&
+                      ABPlus,ABMin,DMAT,DMATK,EMAT,EMATM,M%IndN,&
+                      NBas,M%NDimX,M%NDimN)
+
+    Eig = M%Eig
+
+    ! prepare tables and dimensions 
+    DimEx = M%NDimX+M%NDimN
+    M%DimEx = DimEx
+
+    allocate(M%IndNx(2,DimEx))
+
+    do pq=1,DimEx
+       if(pq<=M%NDimX) then 
+          M%IndNx(1,pq) = M%IndN(1,pq)
+          M%IndNx(2,pq) = M%IndN(2,pq)
+       elseif(pq>M%NDimX) then
+          M%IndNx(1,pq) = pq - M%NDimX
+          M%IndNx(2,pq) = pq - M%NDimX
+       endif
+    enddo
+
+    ! prepare EigVecR for E2disp
+    do j=1,DimEx
+       if(j<=M%NDimX) then
+
+          ip = M%IndN(1,j)
+          iq = M%IndN(2,j)
+
+          do i=1,DimEx
+             EigVecR((i-1)*DimEx+j) = (M%CICoef(ip)-M%CICoef(iq))* &
+                                      (M%EigY((i-1)*DimEx+j)-M%EigX((i-1)*DimEx+j))
+          enddo
+
+       elseif(j>M%NDimX) then 
+
+          ii = j - M%NDimX
+          do i=1,DimEx
+             EigVecR((i-1)*DimEx+j) = M%EigY((i-1)*DimEx+j)/M%CICoef(ii)
+          enddo
+
+       endif
+    enddo
+    ! dump response
+    call writeresp(EigVecR,Eig,propfile)
+
+    deallocate(EMAT,EMATM,DMAT,DMATK)
+    deallocate(ABMin,ABPlus,EigVecR,Eig)
 
  endif
 
@@ -2590,6 +2635,11 @@ integer :: i
     call OptTwoPAlph(ETot,Mon%PotNuc,URe,Occ,         &
                      Mon%AP,Mon%PP,XOne,TwoMO,NSymMO, &
                      CICoef,NBas,NInte1,NInte2,EigNum,ACAlpha)
+
+    print*, 'AP:', norm2(Mon%AP)
+    print*, 'PP:', norm2(Mon%PP)
+
+
     call tran_AP(Mon%AP,APMAT,CICoef,URe,NInte1,NBas)
 
     deallocate(Mon%AP)
@@ -2618,11 +2668,12 @@ double precision,allocatable :: tmp(:,:)
 
  allocate(tmp(NInte1,NBas*NBas))
 
- do i=1,NInte1
     iab = 0
     do ib=1,NBas
        do ia=1,ib
           iab = iab + 1
+ do i=1,NInte1
+ !         iab = iab + 1
           ab = ia + (ib-1)*NBas
           ba = ib + (ia-1)*NBas
           AOUT(i,ab) = CICoef(ia)*AP(i,iab)
