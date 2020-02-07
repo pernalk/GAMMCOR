@@ -2854,7 +2854,6 @@ C
 C
       If(IJ.Ge.KL) Then
       NAdd=NAdd+1
-C
       If(.Not.(
      $IGem(I).Eq.IGem(J).And.IGem(J).Eq.IGem(K).And.IGem(K).Eq.IGem(L)))
      $ TwoElAlph(NAdd)=ACAlpha*TwoElAlph(NAdd)
@@ -2895,6 +2894,10 @@ C
       If(IA.Eq.IC) AP(IAB,ICD)=AP(IAB,ICD)+H1Alph(IBD)
 C
       AP(IAB,ICD)=FAB*FCD*AP(IAB,ICD)
+c herer!!!
+c      If(.Not.(
+c     $IGem(IA).Eq.IGem(IB).And.IGem(IB).Eq.IGem(IC).
+c     $ And.IGem(IC).Eq.IGem(ID))) AP(IAB,ICD)=Zero
 C
       EndDo
       EndDo
@@ -2960,6 +2963,9 @@ C
       Do IB=1,IA
       IAB=IAB+1
       PWork(IAB)=AP(INU,IAB)
+c herer!!!
+c      if(abs(PP(INU)+ETot).gt.1.d-10.and.abs(AP(INU,IAB)).gt.1.d-7)
+c     $ write(*,*)inu,ia,ib,PP(INU)
 C
       If(IA.Eq.IB) PWork(IAB)=SQRT(Two)*PWork(IAB)
       EndDo

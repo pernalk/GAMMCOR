@@ -1907,17 +1907,30 @@ do pq=1,A%NDimX
       ir = B%IndN(1,rs)
       is = B%IndN(2,rs)
 
-      fact1 = (A%CICoef(iq)+A%CICoef(ip)) * &
-              (B%CICoef(is)+B%CICoef(ir)) * &
-              work(is+(ir-B%num0-1)*dimOB)
-
-      fact2 = ACAlpha*fact1
-
+! the version below was our trial of computing dispersion which must be ADDED TO supermoleculr CAS
+!      fact1 = (A%CICoef(iq)+A%CICoef(ip)) * &
+!              (B%CICoef(is)+B%CICoef(ir)) * &
+!              work(is+(ir-B%num0-1)*dimOB)
+!
+!      fact2 = ACAlpha*fact1
+!
       ! remove active part 
+!      if(IGemA(ip)==2.and.IGemA(iq)==2.and. &
+!         IGemB(ir)==2.and.IGemB(is)==2) then
+!         fact2 = fact1
+!         fact1 = 0d0
+!      endif
+!
+! dispersion included in supermolecular CAS is computed
       if(IGemA(ip)==2.and.IGemA(iq)==2.and. &
          IGemB(ir)==2.and.IGemB(is)==2) then
+         fact1 = (A%CICoef(iq)+A%CICoef(ip)) * &
+              (B%CICoef(is)+B%CICoef(ir)) * &
+              work(is+(ir-B%num0-1)*dimOB)
          fact2 = fact1
-         fact1 = 0d0
+      else
+         fact1=0.d0
+         fact2=0.d0   
       endif
  
       do i=1,A%NDimX
@@ -5326,7 +5339,6 @@ double precision,parameter :: SmallE = 1.d-6
  allocate(work(nOFB))
  open(newunit=iunit,file='TWOMOAB',status='OLD',&
      access='DIRECT',form='UNFORMATTED',recl=8*nOFB)
-
  tmp1 = 0
  tmp2 = 0
  do iq=1,NBas
@@ -5339,14 +5351,29 @@ double precision,parameter :: SmallE = 1.d-6
           do ir=1,NBas
              rs=ir+(is-1)*NBas
 
-             fact1 = work(is+(ir-1)*dimOB)
-             fact2 = ACAlpha*fact1
-
-             ! remove excitations form the same group
-             if(IGemA(ip)==IGemA(iq)==IGemB(ir)==IGemB(is)) then
-                fact2 = fact1
-                fact1 = 0d0
+! the version below was our trial of computing dispersion which must be ADDED TO supermoleculr CAS
+!             fact1 = work(is+(ir-1)*dimOB)
+!             fact2 = ACAlpha*fact1
+!
+!             ! remove excitations form the same group
+!              if(IGemA(ip)==IGemA(iq).and. &
+!         IGemB(ir)==IGemB(is) .and. IGemA(ip)==IGemB(ir)) then
+!                fact2 = fact1
+!                fact1 = 0d0
+!             endif
+!
+! dispersion included in supermolecular CAS is computed 
+             if(IGemA(ip)==2.and. &
+         IGemB(iq)==2.and.IGemA(ir)==2.and.IGemB(is)==2) then
+                fact2 = work(is+(ir-1)*dimOB)
+                fact1 = work(is+(ir-1)*dimOB)
+             else
+             fact1=0.d0
+             fact2=0.d0
              endif
+ 
+
+!!!!!!!!!!!!!!!!!!!!
 
              do i=1,NInte1
                 tmp1(i,rs) =  tmp1(i,rs)+fact1*A%AP(i,pq)

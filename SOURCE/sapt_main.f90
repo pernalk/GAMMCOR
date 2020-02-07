@@ -115,33 +115,64 @@ integer,intent(in) :: NBasis
 
 integer            :: i, NGrid
 double precision   :: XGrid(1000), WGrid(1000),DispAlph, e2d
-
-! set ACAlpha for the monomers
-
- NGrid=5
- call GauLeg(0.D0,1.D0,XGrid,WGrid,NGrid)
- 
- DispAlph=0.D0
- do i=1,NGrid
-
-    SAPT%ACAlpha = XGrid(i)
+!
+! compute dispersion energy present in supermolecular CAS
+!
+    SAPT%ACAlpha = 0.0
     A%ACAlpha    = SAPT%ACAlpha
     B%ACAlpha    = SAPT%ACAlpha
     call sapt_response(Flags,A,SAPT%EnChck,NBasis)
     call sapt_response(Flags,B,SAPT%EnChck,NBasis)
-
     if(Flags%ISERPA==0) then
        call e2dispCAS(e2d,Flags,SAPT%monA,SAPT%monB,SAPT,SAPT%ACAlpha,NBasis)
     elseif(Flags%ISERPA==2) then
        call e2dispCAS_pino(e2d,Flags,SAPT%monA,SAPT%monB,SAPT,SAPT%ACAlpha)
     endif
-    DispAlph = DispAlph + e2d * WGrid(i)
+! multiply by 1/2 to restore the correct prefactor "16" 
+    e2d=e2d/2.d0
+    write(LOUT,'(/,1x,''***** EDisp-in-CAS ***** '',4x,f17.10)') e2d
 
-    write(LOUT,'(1x,a,f12.6,a,f14.8)') 'ACAlpha ',SAPT%ACAlpha,' W_Alpha ',e2d
+! set ACAlpha for the monomers
+!
+! NGrid=5
+! call GauLeg(0.D0,1.D0,XGrid,WGrid,NGrid)
+! 
+! DispAlph=0.D0
+! do i=1,NGrid
+!
+!    SAPT%ACAlpha = XGrid(i)
+!
+!    A%ACAlpha    = SAPT%ACAlpha
+!    B%ACAlpha    = SAPT%ACAlpha
+!    call sapt_response(Flags,A,SAPT%EnChck,NBasis)
+!    call sapt_response(Flags,B,SAPT%EnChck,NBasis)
+!
+!    if(Flags%ISERPA==0) then
+!       call e2dispCAS(e2d,Flags,SAPT%monA,SAPT%monB,SAPT,SAPT%ACAlpha,NBasis)
+!    elseif(Flags%ISERPA==2) then
+!       call e2dispCAS_pino(e2d,Flags,SAPT%monA,SAPT%monB,SAPT,SAPT%ACAlpha)
+!    endif
+!    DispAlph = DispAlph + e2d * WGrid(i)
+!
+!    write(LOUT,'(1x,a,f12.6,a,f14.8)') 'ACAlpha ',SAPT%ACAlpha,' W_Alpha ',e2d
+! enddo
+!
+! write(LOUT,'(/,1x,''***** EDispCAS ***** '',4x,f15.8)') DispAlph
 
- enddo
+! DispAlph from extrapolation from alpha=1 to alpha=0
+!    SAPT%ACAlpha = 1.D0
+!
+!    A%ACAlpha    = SAPT%ACAlpha
+!    B%ACAlpha    = SAPT%ACAlpha
+!    call sapt_response(Flags,A,SAPT%EnChck,NBasis)
+!    call sapt_response(Flags,B,SAPT%EnChck,NBasis)
+!    if(Flags%ISERPA==0) then
+!       call e2dispCAS(e2d,Flags,SAPT%monA,SAPT%monB,SAPT,SAPT%ACAlpha,NBasis)
+!    elseif(Flags%ISERPA==2) then
+!       call e2dispCAS_pino(e2d,Flags,SAPT%monA,SAPT%monB,SAPT,SAPT%ACAlpha)
+!    endif
+!    write(LOUT,'(/,1x,a,f13.8)') '***** EDispCAS_Extrapol *****',e2d/2.D0 
 
- write(LOUT,'(/,1x,''EDispCAS  '',4x,f15.8)') DispAlph
 
 end subroutine e2dispCAS_Alpha
 
