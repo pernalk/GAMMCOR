@@ -335,6 +335,36 @@ integer(8) :: i
 
    close(iunit)
 
+elseif(aosource==4) then
+ ! Libor
+   open(newunit=iunit,file=intfile,status='OLD',&
+        access='STREAM',form='UNFORMATTED')
+      read(iunit)idx_p, idx_q, idx_r
+
+      pq=0
+      Do idx_p=1,nbas
+      Do idx_q=1,idx_p
+      pq=pq+1
+      rs=0
+      Do idx_r=1,nbas
+      Do idx_s=1,idx_r
+      rs=rs+1
+      If(pq.Ge.rs) Then
+      read(iunit) val
+         call add_to_Sorter(srt,rs,pq,val)
+         call add_to_Sorter(srt,pq,rs,val)
+      EndIf
+      EndDo
+      EndDo
+      EndDo
+      EndDo
+
+   ! find position in file
+   inquire(unit=iunit,pos=i)
+   if(present(outinfo)) outinfo = i-24
+
+   close(iunit)
+
  endif
 
  call dump_Sorter(srt)

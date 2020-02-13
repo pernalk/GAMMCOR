@@ -274,7 +274,8 @@ C
       End
 
 C
-C     ReadDMRG: VERSION THAT WORKS WITH EUGENE'S INTS
+C     ReadDMRG: VERSION THAT WORKS WITH EUGENE'S INTS (IEugene=1)
+C               IT WORKS WITH ORCA OUTPUTS (IEugene=0)
 C
 *Deck ReadDMRG
       Subroutine ReadDMRG(XKin,XNuc,ENuc,Occ,URe,
@@ -304,12 +305,13 @@ C
      $ AUXM(NBasis,NBasis),AUXM1(NBasis,NBasis),
      $ Fock(NBasis*NBasis),
      $ UAux(NBasis,NBasis),
-     $ FockF(NInte1),GammaAB(NInte1)
+     $ FockF(NInte1),GammaAB(NInte1),Eps(NBasis,NBasis)
       Integer(8) IOutInfo
 C 
 C herer!!!
-      IEugene=1
-C     IEugene=0
+c      IEugene=1
+      IEugene=0
+      LiborNew=1 
 C
       UMOAO(1:NBasis*NBasis)=Zero
       URe(1:NBasis,1:NBasis)=Zero
@@ -320,7 +322,27 @@ C
 C     READ IN 1-RDM AND DIAGONALIZE IT
 C
       If(IEugene.Eq.0) Then
-C     
+C   
+      If(LiborNew.Eq.1) Then
+C
+      Open(10,File='G1.bin',form='unformatted', access='stream',
+     $ Status='Old')
+      Read(10)i,j,k
+      ICount=0
+      IJ=0
+      Do I=1,NBasis
+      Do J=1,I
+      IJ=IJ+1
+      Read(10,End=61) X
+      Ind=I*(I-1)/2+J
+      Gamma(Ind)=X/Two
+      ICount=ICount+1
+      EndDo
+      EndDo
+   61 Close(10)
+C
+      Else
+C
       Open(10,File='rdmdump.dat',Status='Old')
    20 Read(10,*,End=30) X,I1,I2,I3,I4
       If((I1+I2.Ne.0).And.(I3+I4.Eq.0)) Then
@@ -330,6 +352,9 @@ C
       GoTo 20
   30  Close(10)
 C
+C     If(LiborNew.Eq.1) Then
+      EndIf
+C
       Else
 C
       Open(10,File='rdmdump.dat',form='unformatted',access='stream',
@@ -338,7 +363,6 @@ C
       If((I1+I2.Ne.0).And.(I3+I4.Eq.0)) Then
       Ind=(Max(I1,I2)*(Max(I1,I2)-1))/2+Min(I1,I2)
       Gamma(Ind)=X/Two
-      write(*,*)i1,i2,x 
       EndIf
       GoTo 27
    37 Close(10)
@@ -436,6 +460,7 @@ C
 C
       Open(10,File='FACT.bin',form='unformatted',access='stream',
      $ Status='Old')
+      If(LiborNew.Eq.1) Read(10)I,J,K
       ICount=0
       IJ=0
       Do I=1,NBasis
@@ -450,9 +475,12 @@ C
    31 Close(10)
       Write(6,'(" The number of 1-el integrals read vs. expected",
      $ 2I10)') ICount,NInte1 
-C     
+C
+      If(ITwoEl.Eq.1) Then    
+C 
       Open(10,File='DPQRS.bin',form='unformatted',access='stream',
      $ Status='Old')
+      If(LiborNew.Eq.1) Read(10)I,J,K
       ICount=0
       IJ=0
       Do I=1,NBasis
@@ -474,11 +502,17 @@ C
    35 Close(10)
       Write(6,'(" The number of 2-el integrals read vs. expected",
      $ 2I15)') ICount,NInte2
-
+C
+      ElseIf(ITwoEl.Gt.1) Then
+C
+      Call readtwoint(NBasis,4,'DPQRS.bin','AOTWOSORT',IOutInfo)
+C
+      EndIf
+C
 c     If(IBin.Eq.0)      
       EndIf
 C
-C else of IEugene.Eq.1
+C else of IEugene.Eq.0
       Else
 C
       If(ITwoEl.Eq.1) Then
@@ -545,7 +579,7 @@ C
       Do J=1,NInAc
       URe(I,J)=Fock((J-1)*NInAc+I)
       EndDo
-      EndDo
+      EndDo 
 C
 C      Print*, 'INAct-MY', norm2(URe)
 C
@@ -564,6 +598,7 @@ C
       EndDo
       EndDo      
       Call Diag8(Fock,NVirt,NVirt,PC,Work)
+C
 C      Print*, PC(1:5)
 C      Print*, 'VIRT-MY',norm2(Fock)
       Do I=1,NVirt
@@ -607,6 +642,12 @@ C
       EndDo
       EndDo
 C
+      Do I=1,NInAc
+      Do J=1,NBasis
+      Eps(J,I)=PC(I)
+      EndDo
+      EndDo
+C
 C      Print*, 'INAct-KA',norm2(URe)
       EndIf
 C
@@ -638,6 +679,15 @@ C
 C
       Call Diag8(Fock,NVirt,NVirt,PC,Work)
 C
+      Open(10,file='fock.dat')
+      Do IP=NOccup+1,NBasis
+      Do IQ=1,INActive
+      Eps(IP,IQ)=PC(IP-NOccup)-Eps(IP,IQ)
+      Write(10,*)IP,IQ,Eps(IP,IQ)
+      EndDo
+      EndDo
+      Close(10)
+C
 C      Print*, 'VIRT-Ka',norm2(Fock)
 C
       Do I=1,NVirt
@@ -653,6 +703,25 @@ C     end of ITwoEl==1
       EndIf
 C
 C     END OF CANONICALIZING
+C
+C     CHECK IF URe IS A UNIT MATRIX
+C
+      IUNIT=1
+      Err=Zero
+      Do I=1,NBasis
+      Do J=1,NBasis
+      If(I.Eq.J) Err=Err+Abs(One-Abs(URe(I,J)))
+      If(I.Ne.J) Err=Err+Abs(URe(I,J))
+      EndDo
+      EndDo
+      If(Err.Gt.1.D-5) IUNIT=0
+C
+      If(IUNIT.Eq.1) Then
+      Write(6,'(/,X,"URe is a unit matrix up to ",E16.6)') ERR
+      Write(6,'(X,"do not transform integrals")') 
+      EndIf
+C
+      If(IUNIT.Eq.0) Then
 C
       Call MatTr(XKin,URe,NBasis)
 C
@@ -682,33 +751,10 @@ C     TRANSFORM J AND K
 C
       EndIf
 C
+      EndIf
+C
 C     CHECK IF INACT AND VIRT ORBITALS ARE CANONICAL
 C
-      GoTo 555
-      Do I=1,NInAc
-      Do J=1,I
-      IJ=(Max(I,J)*(Max(I,J)-1))/2+Min(I,J)
-      FIJ=XKin(IJ)
-      Do K=1,NInAc+NAc
-      FIJ=FIJ+Occ(K)*(Two*TwoEl(NAddr3(I,J,K,K))-TwoEl(NAddr3(I,K,J,K)))
-      EndDo
-      If(Abs(FIJ).Gt.1.D-7) Write(*,*)'Inactive FIJ',I,J,FIJ
-      EndDo
-      EndDo
-C
-      Do I=NInAc+NAc+1,NBasis
-      Do J=I,NBasis
-      IJ=(Max(I,J)*(Max(I,J)-1))/2+Min(I,J)
-      FIJ=XKin(IJ)
-      Do K=1,NInAc+NAc
-      FIJ=FIJ+Occ(K)*(Two*TwoEl(NAddr3(I,J,K,K))-TwoEl(NAddr3(I,K,J,K)))
-      EndDo
-      If(Abs(FIJ).Gt.1.D-7) Write(*,*)'Virt FIJ',I,J,FIJ
-      EndDo
-      EndDo
-      stop
-  555 Continue
-C      
       If(IBin.Ge.0) Then
       NBSave=NBasis        
       NBasis=NAc
@@ -727,6 +773,36 @@ C
       RDM2(1:NRDM2)=Zero
 C
       If(IEugene.Eq.0) Then
+C
+      If(LiborNew.Eq.1) Then
+C
+      Open(10,File='G2.bin',form='unformatted',access='stream',
+     $ Status='Old')
+      Read(10)I,J,K
+C
+      Do K1=1,NAc
+      Do J1=1,NAc
+      Do L1=1,NAc
+      Do I1=1,NAc
+C
+      Read(10) X
+C
+      I=I1+NInAc
+      J=J1+NInAc
+      K=K1+NInAc
+      L=L1+NInAc
+      RDM2(NAddrRDM(L,K,I,J,NBasis))=X
+      RDM2(NAddrRDM(K,L,J,I,NBasis))=X
+C
+      EndDo
+      EndDo
+      EndDo
+      EndDo
+C
+      Close(10)
+C
+C     If(LiborNew.Eq.1) Then
+      Else
 C
       Allocate (RDMAB2(NRDM2))
       RDMAB2(1:NRDM2)=Zero
@@ -770,6 +846,9 @@ C
       RDM2(I)=RDM2(I)+RDMAB2(I)
       EndDo
 C
+C     If(LiborNew.Eq.1) Then
+      EndIf
+C
 c else of IEugene.Eq.0
       Else
 C
@@ -800,7 +879,7 @@ C
       EndDo
       EndDo
 C      
-      Call TrRDM2(RDM2,UMOAO,NBasis,NRDM2)
+      If(IUNIT.Eq.0) Call TrRDM2(RDM2,UMOAO,NBasis,NRDM2)
       GoTo 777
 C
       EndIf      
@@ -907,10 +986,10 @@ c     $Two*RDM2(NAddrRDM(I,J,K,L,NBasis))
       EndDo 
       Close(10)
       Deallocate(RDM2)
-      If(IEugene.Eq.0) Deallocate(RDMAB2)
+      If(IEugene.Eq.0.And.LiborNew.Eq.0) Deallocate(RDMAB2)
       If(IBin.Ge.0) NBasis=NBSave
 
-c herer!!! ???
+c herer!!! 
   888 Continue
 C
 C     INTEGRALS ARE TRANSFORMED SO URe IS SET AS A UNIT MATRIX 
