@@ -323,7 +323,13 @@ if(Flags%ISAPT.Eq.0) then
   
    System%XELE = (System%ZNucl - System%Charge)/2.0d0
    System%NELE = (System%ZNucl - System%Charge)/2
-   
+  
+   ! checkif Active Declared
+   if(.not.Input%SystemInput(1)%NActFromRDM) then
+      System%NAct=Input%SystemInput(1)%NAct 
+      print*, 'NAct from input!',System%NAct
+   endif   
+
   ! write(*,*) "ZNucl:",Input%SystemInput(1)%ZNucl
   ! write(*,*) "Sys-val:",System%XELE, System%NELE
 
@@ -377,7 +383,12 @@ elseif(Flags%ISAPT.Eq.1) then
      
       monA%XELE = (SAPT%monA%ZNucl - SAPT%monA%Charge)/2.0d0 
       monA%NELE = (SAPT%monA%ZNucl - SAPT%monA%Charge)/2 
-    
+
+      if(.not.Input%SystemInput(1)%NActFromRDM) then
+         monA%NAct=Input%SystemInput(1)%NAct
+         monA%NActFromRDM = Input%SystemInput(1)%NActFromRDM
+      endif
+
       monB%NoSt    = Input%SystemInput(2)%NoSt
       monB%NStates = Input%SystemInput(2)%NStates
       allocate(monB%InSt(2,System%NStates)) 
@@ -407,7 +418,12 @@ elseif(Flags%ISAPT.Eq.1) then
      
       monB%XELE = (monB%ZNucl - monB%Charge)/2.0d0 
       monB%NELE = (monB%ZNucl - monB%Charge)/2 
-    
+
+      if(.not.Input%SystemInput(2)%NActFromRDM) then
+         monB%NAct=Input%SystemInput(2)%NAct
+         monB%NActFromRDM = Input%SystemInput(2)%NActFromRDM
+      endif
+
    ! write(LOUT,*) monA%ZNucl,'MONO(1)A,case1,dupaaa'
    ! write(LOUT,*) monB%ZNucl,'MONO(1)B,case1'
    
@@ -442,7 +458,12 @@ elseif(Flags%ISAPT.Eq.1) then
      
       monA%XELE = (monA%ZNucl - monA%Charge)/2.0d0 
       monA%NELE = (monA%ZNucl - monA%Charge)/2 
-   
+
+      if(.not.Input%SystemInput(2)%NActFromRDM) then
+         monA%NAct=Input%SystemInput(2)%NAct
+         monA%NActFromRDM = Input%SystemInput(2)%NActFromRDM
+      endif
+
       monB%NoSt   = Input%SystemInput(1)%NoSt
       monB%NStates = Input%SystemInput(1)%NStates
       allocate(monB%InSt(2,System%NStates)) 
@@ -472,10 +493,12 @@ elseif(Flags%ISAPT.Eq.1) then
      
       monB%XELE = (monB%ZNucl - monB%Charge)/2.0d0 
       monB%NELE = (monB%ZNucl - monB%Charge)/2 
-   
-  !  write(LOUT,*) monA%ZNucl,'MONO(1)A,case2'
-  !  write(LOUT,*) monB%ZNucl,'MONO(2)B,case2,dupaa'
-  
+ 
+      if(.not.Input%SystemInput(1)%NActFromRDM) then
+         monB%NActFromRDM = Input%SystemInput(1)%NActFromRDM
+         monB%NAct=Input%SystemInput(1)%NAct
+      endif
+
    end select
  end associate
 

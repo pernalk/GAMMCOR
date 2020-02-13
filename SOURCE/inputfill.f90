@@ -434,6 +434,10 @@ integer :: test,test2
 ! case ("STATE")
 !      read(val, *) SystemParams%NoSt
 
+ case ("NACTIVE")
+       read(val, *) SystemParams%NAct
+       SystemParams%NActFromRDM = .false.
+
  case ("CHARGE")
        read(val, *) SystemParams%Charge
 

@@ -118,9 +118,10 @@ type SystemBlock
       integer :: NELE
       double precision :: XELE
       double precision :: PotNuc
-      double precision :: SumOcc = 0
+      double precision :: SumOcc  = 0d0 
       double precision :: ACAlpha = 1d0
-      double precision :: Omega = 1
+      double precision :: Omega   = 1d0
+      double precision :: ECASSCF = 0d0
       integer :: NSym
       integer :: NSymBas(8),NSymOrb(8)
       integer :: NOrb, NGem
@@ -142,7 +143,8 @@ type SystemBlock
       logical :: DeclareTrSt = .false.
       logical :: ISHF = .false.
       logical :: doRSH = .false., SameOm = .true.
-      logical :: PostCAS =.false.
+      logical :: PostCAS = .false.
+      logical :: NActFromRDM = .true.
       double precision :: ThrAct = 0.992d0
       double precision :: ThrSelAct = 1.d-8
       integer,allocatable :: InSt(:,:),InTrSt(:,:)
@@ -230,19 +232,25 @@ type SaptData
      integer           :: IPrint = 1000
      integer           :: iPINO=-1
      double precision  :: ACAlpha = 1d0
-     double precision  :: Vnn,elst,e2ind,e2disp
+     double precision  :: Vnn,elst,exchs2,e2ind,e2disp
      double precision  :: e2disp_sc,e2disp_sp,e2disp_unc
      logical           :: EnChck = .true., HFCheck =.true.
      logical           :: doRSH = .false., SameOm = .true.
 
 end type SaptData
 
+type Y01BlockData
+     integer :: n
+     integer :: l1, l2
+     double precision,allocatable :: vec0(:)
+end type Y01BlockData
+
 type EblockData
 integer :: n
 integer :: l1,l2
 integer,allocatable :: pos(:)
 double precision,allocatable :: vec(:), matX(:,:),matY(:,:)
-end type EblockData
+end type
 
 contains 
 

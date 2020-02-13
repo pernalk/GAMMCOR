@@ -53,7 +53,7 @@ double precision :: Tcpu,Twall
  if(Flags%ISERPA==0) then
 
     call e1elst(SAPT%monA,SAPT%monB,SAPT)
-    call e1exchs2(Flags,SAPT%monA,SAPT%monB,SAPT)
+    !call e1exchs2(Flags,SAPT%monA,SAPT%monB,SAPT)
 
     ! UNCOUPLED E2DISP
     if(SAPT%SaptLevel==0) then
@@ -112,6 +112,7 @@ type(SaptData)     :: SAPT
 integer,intent(in) :: NBasis
 
 integer            :: i, NGrid
+integer            :: SaptLevel_Save
 double precision   :: XGrid(1000), WGrid(1000),DispAlph, e2d
 !
 ! compute dispersion energy present in supermolecular CAS
@@ -119,6 +120,11 @@ double precision   :: XGrid(1000), WGrid(1000),DispAlph, e2d
     SAPT%ACAlpha = 0.0
     A%ACAlpha    = SAPT%ACAlpha
     B%ACAlpha    = SAPT%ACAlpha
+
+    SaptLevel_Save = Flags%SaptLevel
+    Flags%SaptLevel = 0
+    Flags%IFlag0 = 1
+
     call sapt_response(Flags,A,SAPT%EnChck,NBasis)
     call sapt_response(Flags,B,SAPT%EnChck,NBasis)
     if(Flags%ISERPA==0) then
@@ -128,7 +134,9 @@ double precision   :: XGrid(1000), WGrid(1000),DispAlph, e2d
     endif
 ! multiply by 1/2 to restore the correct prefactor "16" 
     e2d=e2d/2.d0
-    write(LOUT,'(/,1x,''***** EDisp-in-CAS ***** '',4x,f17.10)') e2d
+    write(LOUT,'(/,1x,''EDisp-in-CAS ='',1x,f17.10)') e2d
+    
+    Flags%SaptLevel = SaptLevel_Save
 
 ! set ACAlpha for the monomers
 !
@@ -522,6 +530,17 @@ double precision :: MO(NBasis*NBasis)
 
 ! calculate response
  call SaptInter(NBasis,Mon,Flags%ICASSCF)
+
+ ! prepare RDM2
+ if(Flags%ICASSCF==1) then
+    call read2rdm(Mon,NBasis)
+    if(Mon%Monomer==1) call system('cp rdm2_A.dat rdm2.dat')
+    if(Mon%Monomer==2) call system('cp rdm2_B.dat rdm2.dat')
+ endif
+ !if(Flags%ICASSCF==1) call system('cp rdm2_A.dat rdm2.dat')
+
+ call prepare_RDM2val(Mon,Flags%ICASSCF,NBasis)
+
  if(Flags%ISERPA==0) then
     if(SaptLevel.eq.0) then
         call calc_resp_unc(Mon,MO,Flags,NBasis)
@@ -864,12 +883,14 @@ character(:),allocatable :: rdmfile
 ! print*,EVal
  call SortOcc(EVal,OrbAux,NBasis)
 
- Mon%NAct = 0
+ ! read NAct from 1RDM
+ if(Mon%NActFromRDM) Mon%NAct = 0
  Tmp = 0
  do i=1,NBasis
     Tmp = Tmp + EVal(i)
-    if(EVal(i)>0.d0) Mon%NAct = Mon%NAct + 1  
+    if(Mon%NActFromRDM.and.EVal(i)>0.d0) Mon%NAct = Mon%NAct + 1
  enddo
+
  !Mon%INAct = Mon%NELE-int(Tmp)
 !!! OPEN-SHELL CASE?
  Mon%INAct = Mon%XELE-Tmp+1.d-1
@@ -1149,24 +1170,77 @@ integer,external :: NAddrRDM
 
 end subroutine prepare_rdm2
 
+subroutine prepare_RDM2val(Mon,ICASSCF,NBasis)
+! prepare RDM2val(dimOcc,dimOcc,dimOcc,dimOcc) for SAPT
+implicit none
+
+type(SystemBlock) :: Mon
+integer,intent(in) :: ICASSCF
+integer,intent(in) :: NBasis
+
+integer :: i,j,k,l
+integer :: dimOcc
+double precision, external :: FRDM2,FRDM2GVB
+
+dimOcc = Mon%num0+Mon%num1
+if(allocated(Mon%RDM2val)) deallocate(Mon%RDM2val)
+allocate(Mon%RDM2val(dimOcc,dimOcc,dimOcc,dimOcc))
+
+!print*, Mon%Occ
+!print*, ''
+!print*, 'NACT',Mon%NAct
+!print*, ''
+!print*, 'Ind2',Mon%Ind2
+!print*, ''
+!print*, 'RDM2',Mon%RDM2
+
+if(ICASSCF==1) then
+! CAS
+   do l=1,dimOcc
+      do k=1,dimOcc
+         do j=1,dimOcc
+            do i=1,dimOcc
+               Mon%RDM2val(i,j,k,l) = &
+               FRDM2(i,k,j,l,Mon%RDM2,Mon%Occ,Mon%Ind2,Mon%NAct,NBasis)
+            enddo
+         enddo
+      enddo
+   enddo
+elseif(ICASSCF==0) then
+! GVB
+   do l=1,dimOcc
+     do k=1,dimOcc
+        do j=1,dimOcc
+           do i=1,dimOcc
+              Mon%RDM2val(i,j,k,l) = FRDM2GVB(i,k,j,l,Mon%Occ,NBasis)
+           enddo
+        enddo
+     enddo
+   enddo
+endif
+
+end subroutine prepare_RDM2val
+
 subroutine calc_resp_unc(Mon,MO,Flags,NBas)
 implicit none
 
 type(SystemBlock) :: Mon
-type(FlagsData) :: Flags
-double precision :: MO(:)        
-integer :: NBas
-integer :: NSq,NInte1,NInte2
-double precision, allocatable :: work1(:),work2(:),XOne(:),TwoMO(:) 
-double precision, allocatable :: ABPlus(:), ABMin(:), URe(:,:), &
-     EigY(:), EigY1(:), Eig(:), Eig1(:), &
-     testY(:),testEig(:)
+type(FlagsData)   :: Flags
 
-integer :: i,ione
-double precision,parameter :: One = 1d0, Half = 0.5d0
+double precision :: MO(:)        
+integer          :: NBas
+integer          :: NSq,NInte1,NInte2
+double precision :: ETot
+double precision, allocatable :: work1(:),work2(:),XOne(:),TwoMO(:)
+double precision, allocatable :: ABPlus(:), ABMin(:), URe(:,:), &
+                                 EigY(:), EigY1(:), Eig(:), Eig1(:)
+
+integer      :: i,ione
 character(8) :: label
-character(:),allocatable :: twojfile,twokfile
-character(:),allocatable :: onefile,twofile,propfile0,propfile1,rdmfile
+character(:),allocatable   :: twojfile,twokfile
+character(:),allocatable   :: onefile,twofile,rdmfile
+character(:),allocatable   :: propfile0,propfile1,xy0file
+double precision,parameter :: One = 1d0, Half = 0.5d0
 
 ! perform check
 ! if(Flags%ICASSCF==0) then
@@ -1176,21 +1250,23 @@ character(:),allocatable :: onefile,twofile,propfile0,propfile1,rdmfile
 
 ! set filenames
  if(Mon%Monomer==1) then
-    onefile = 'ONEEL_A'
-    twofile = 'TWOMOAA'
-    twojfile = 'FFOOAA'
-    twokfile = 'FOFOAA'
+    onefile   = 'ONEEL_A'
+    twofile   = 'TWOMOAA'
+    twojfile  = 'FFOOAA'
+    twokfile  = 'FOFOAA'
     propfile0 = 'PROP_A0'
     propfile1 = 'PROP_A1'
-    rdmfile='rdm2_A.dat'
+    rdmfile   = 'rdm2_A.dat'
+    xy0file   = 'XY0_A'
  elseif(Mon%Monomer==2) then
-    onefile = 'ONEEL_B'
-    twofile = 'TWOMOBB'
-    twojfile = 'FFOOBB'
-    twokfile = 'FOFOBB'
+    onefile   = 'ONEEL_B'
+    twofile   = 'TWOMOBB'
+    twojfile  = 'FFOOBB'
+    twokfile  = 'FOFOBB'
     propfile0 = 'PROP_B0'
     propfile1 = 'PROP_B1'
-    rdmfile='rdm2_B.dat'
+    rdmfile   = 'rdm2_B.dat'
+    xy0file   = 'XY0_B'
  endif
 
 ! set dimensions
@@ -1231,7 +1307,6 @@ character(:),allocatable :: onefile,twofile,propfile0,propfile1,rdmfile
  case(TWOMO_INCORE,TWOMO_FFFF) 
    ! full - for GVB and CAS
    call tran4_full(NBas,MO,MO,twofile,'AOTWOSORT')
-
 
  case(TWOMO_FOFO) 
    ! transform J and K
@@ -1303,8 +1378,9 @@ character(:),allocatable :: onefile,twofile,propfile0,propfile1,rdmfile
       call Y01CAS_FOFO(Mon%Occ,URe,XOne,ABPlus,ABMin, &
              !EigY0,EigY1,Eig0,Eig1, &
              propfile0,propfile1, &
+             xy0file,&
              Mon%IndN,Mon%IndX,Mon%IGem,Mon%NAct,Mon%INAct,Mon%NDimX, &
-             NBas,Mon%NDim,NInte1,Mon%NoSt,twofile,twojfile,twokfile,Flags%IFlag0)
+             NBas,Mon%NDim,NInte1,Mon%NoSt,twofile,twojfile,twokfile,Flags%IFlag0,ETot)
    case(TWOMO_FFFF) 
       call Y01CAS_mithap(Mon%Occ,URe,XOne,ABPlus,ABMin, &
              EigY,EigY1,Eig,Eig1, &
@@ -1330,8 +1406,11 @@ character(:),allocatable :: onefile,twofile,propfile0,propfile1,rdmfile
          call writeresp(EigY1,Eig1,propfile1)
       endif
    endif
- 
-    deallocate(Eig1,Eig,EigY1,EigY,ABMin,ABPlus)
+
+   Mon%ECASSCF = ETot+Mon%PotNuc
+   write(LOUT,'(/,1x,a,5x,f15.8)') "CASSCF Energy           ",Mon%ECASSCF
+
+   deallocate(Eig1,Eig,EigY1,EigY,ABMin,ABPlus)
    
  endif
 
@@ -1855,30 +1934,32 @@ double precision, allocatable :: Eig0(:), Eig1(:), EigY0(:), EigY1(:)
 character(8) :: label
 character(:),allocatable   :: onefile,twofile,propfile,rdmfile
 character(:),allocatable   :: twojfile,twokfile
-character(:),allocatable   :: propfile0,propfile1
+character(:),allocatable   :: propfile0,propfile1,xy0file
 double precision,parameter :: One = 1d0, Half = 0.5d0
 double precision,parameter :: SmallE=0d0,BigE=1.D20
 double precision,external  :: trace
 
 ! set filenames
  if(Mon%Monomer==1) then
-    onefile    = 'ONEEL_A'
-    twofile    = 'TWOMOAA'
-    twojfile   = 'FFOOAA'
-    twokfile   = 'FOFOAA'
-    propfile   = 'PROP_A'
-    propfile0  = 'PROP_A0' 
-    propfile1  = 'PROP_A1' 
-    rdmfile    = 'rdm2_A.dat'
+    onefile   = 'ONEEL_A'
+    twofile   = 'TWOMOAA'
+    twojfile  = 'FFOOAA'
+    twokfile  = 'FOFOAA'
+    propfile  = 'PROP_A'
+    propfile0 = 'PROP_A0' 
+    propfile1 = 'PROP_A1' 
+    rdmfile   = 'rdm2_A.dat'
+    xy0file   = 'XY0_A'
  elseif(Mon%Monomer==2) then
-    onefile    = 'ONEEL_B'
-    twofile    = 'TWOMOBB'
-    twojfile   = 'FFOOBB'
-    twokfile   = 'FOFOBB'
-    propfile   = 'PROP_B'
-    propfile0  = 'PROP_B0' 
-    propfile1  = 'PROP_B1' 
-    rdmfile    = 'rdm2_B.dat'
+    onefile   = 'ONEEL_B'
+    twofile   = 'TWOMOBB'
+    twojfile  = 'FFOOBB'
+    twokfile  = 'FOFOBB'
+    propfile  = 'PROP_B'
+    propfile0 = 'PROP_B0' 
+    propfile1 = 'PROP_B1' 
+    rdmfile   = 'rdm2_B.dat'
+    xy0file   = 'XY0_B'
  endif
 
 ! set dimensions
@@ -2128,6 +2209,7 @@ double precision,external  :: trace
       case(TWOMO_FOFO) 
          call Y01CAS_FOFO(Mon%Occ,URe,XOne,ABPlus,ABMin, &
                 propfile0,propfile1, &
+                xy0file, &
                 Mon%IndN,Mon%IndX,Mon%IGem,Mon%NAct,Mon%INAct,Mon%NDimX, &
                 NBas,Mon%NDim,NInte1,Mon%NoSt,twofile,twojfile,twokfile,Flags%IFlag0)
       case(TWOMO_FFFF) 
@@ -3727,7 +3809,7 @@ integer :: test
        do i=1,nbas
           if(mon%Occ(i).lt.1d0.and.mon%Occ(i).ne.0d0) then
              ! here!!!
-             !if(mon%Occ(i).lt.1d0.and.mon%Occ(i).gt.1d-6) then
+             !if(mon%Occ(i).lt.1d0.and.mon%Occ(i).gt.1d-10) then
              ! HERE!!! ACTIVE!!!! 
              mon%IndAux(i) = 1
              write(6,'(X," Active Orbital: ",I4,E14.4)') i, mon%Occ(i)

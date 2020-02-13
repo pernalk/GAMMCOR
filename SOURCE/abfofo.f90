@@ -1244,7 +1244,8 @@ deallocate(ints,work2,work1)
 end subroutine ACABMAT0_FOFO
 
 subroutine Y01CAS_FOFO(Occ,URe,XOne,ABPLUS,ABMIN, &
-     propfile0,propfile1, & 
+     propfile0,propfile1, &
+     xy0file, &
      IndN,IndX,IGemIN,NAct,INActive,NDimX,NBasis,NDim,NInte1, &
      NoSt,IntFileName,IntJFile,IntKFile,IFlag0,ETot,ECorr)
 !
@@ -1259,7 +1260,7 @@ implicit none
 
 integer,intent(in) :: NAct,INActive,NDimX,NBasis,NDim,NInte1,NoSt
 character(*) :: IntFileName,IntJFile,IntKFile
-character(*) :: propfile0,propfile1
+character(*) :: propfile0,propfile1,xy0file
 double precision,intent(out) :: ABPLUS(NDimX,NDimX),ABMIN(NDimX,NDimX)
 !double precision,intent(out) :: EigY(NDimX,NDimX),EigY1(NDimX,NDimX)
 !double precision,intent(out) :: Eig(NDimX),Eig1(NDimX)
@@ -1293,7 +1294,7 @@ integer :: nAA,tmpAA(NAct*(NAct-1)/2),limAA(2)
 integer :: nAI(INActive),tmpAI(NAct,1:INActive),limAI(2,1:INActive)
 integer :: nAV(INActive+NAct+1:NBasis),tmpAV(NAct,INActive+NAct+1:NBasis),limAV(2,INActive+NAct+1:NBasis)
 integer :: nIV,tmpIV(INActive*(NBasis-NAct-INActive)),limIV(2)
-!!
+!
 type(EblockData),allocatable :: Eblock(:) 
 type(EblockData) :: EblockIV
 !!
@@ -2138,6 +2139,8 @@ if(nAA>0) then
 
 endif
 
+print*, 'Act-Act block diagonalized!'
+
 !pack AI
 do iq=1,INActive
    if(nAI(iq)>0) then
@@ -2167,6 +2170,8 @@ do iq=1,INActive
 
    endif
 enddo
+
+print*, 'Act-InAct block diagonalized!'
 
 !pack AV
 do ip=NOccup+1,NBasis
@@ -2198,6 +2203,8 @@ do ip=NOccup+1,NBasis
     endif
 enddo
 
+print*, 'Act-Virt block diagonalized!'
+
 !pack IV
 associate(B => EblockIV)
 
@@ -2216,6 +2223,11 @@ associate(B => EblockIV)
 end associate
 
  call clock('PACK',Tcpu,Twall)
+
+ print*, 'nblk-check',nblk
+
+!! dump EBLOCKS: X(0),Y(0)
+call dump_Eblock(Eblock,EblockIV,Occ,IndN,nblk,NBasis,NDimX,xy0file)
 
 if(IFlag0==0) then
    
@@ -2291,6 +2303,9 @@ if(IFlag0==0) then
    ! deallocate(work1)
 
 endif
+
+deallocate(RDM2val,work2)
+deallocate(ints)
 
 If(IFlag0==1) return
 
@@ -2458,13 +2473,14 @@ do i=1,NDimX
 enddo
 !
 ! energy loop
-allocate(work1(NBasis*NBasis))
+allocate(work1(NBasis*NBasis),ints(NBasis,NBasis))
 EAll = 0
 EIntra = 0
 open(newunit=iunit,file='FOFO',status='OLD', &
      access='DIRECT',recl=8*NBasis*NOccup)
 
-kl = 0
+ints = 0
+kl   = 0
 do k=1,NOccup
    do l=1,NBasis
       kl = kl + 1
@@ -2510,7 +2526,7 @@ call clock('ENE-loop',Tcpu,Twall)
 ECorr = EAll-EIntra
 !print*, 'EAll,EIntra',EAll,EIntra
 
-deallocate(work1)
+deallocate(ints,work1)
 
 endif
 
@@ -2537,8 +2553,6 @@ endif
 !
 !write(LOUT,*) 'WMAT-my', 2d0*norm2(WMAT)
 
-deallocate(RDM2val)
-deallocate(ints,work2)
 deallocate(Eig1,Eig)
 
 end subroutine Y01CAS_FOFO
@@ -4590,6 +4604,117 @@ deallocate(Skipped)
 deallocate(ints,work)
 
 end subroutine ACEneERPA_FOFO
+
+subroutine dump_Eblock(Eblock,EblockIV,Occ,IndN,nblk,NBasis,NDimX,xy0file)
+implicit none
+
+integer,intent(in)           :: nblk,NBasis,NDimX
+integer,intent(in)           :: IndN(2,NDimX)
+character(*),intent(in)      :: xy0file
+double precision,intent(in)  :: Occ(NBasis)
+type(EBlockData),intent(in)  :: EBlock(nblk),EBlockIV
+type(EBlockData),allocatable :: SBlock(:)
+type(EBlockData)             :: SBlockIV
+
+integer                      :: iunit
+integer                      :: i,j,k,ii,ipos,iblk,ip,iq
+double precision             :: C(NBasis),fac,valY,valX
+double precision,allocatable :: EigY(:,:),EigX(:,:),Eig(:)
+double precision,allocatable :: work(:,:)
+
+fac = 1d0/sqrt(2d0)
+
+do i=1,NBasis
+   C(i) = sign(sqrt(Occ(i)),Occ(i)-0.5d0)
+enddo
+
+allocate(SBlock(nblk))
+
+! repack
+do iblk=1,nblk
+   associate(B => Eblock(iblk),&
+             A => Sblock(iblk))
+
+     A%n  = B%n
+     A%l1 = B%l1
+     A%l2 = B%l2
+     allocate(A%pos(A%n),A%vec(A%n))
+     A%pos(1:A%n)=B%pos(1:B%n)
+     A%vec(1:A%n)=B%vec(1:B%n)
+
+     allocate(A%matX(A%n,A%n),A%matY(A%n,A%n))
+     do i=1,B%n
+        ipos = B%pos(i)
+        ip = IndN(1,ipos)
+        iq = IndN(2,ipos)
+
+        valX = 1d0/(C(ip)+C(iq))
+        valY = 1d0/(C(ip)-C(iq))
+        A%matX(i,1:B%n) = 0.5d0*(B%matX(i,1:B%n)*valX - B%matY(i,1:B%n)*valY)
+        A%matY(i,1:B%n) = 0.5d0*(B%matX(i,1:B%n)*valX + B%matY(i,1:B%n)*valY)
+
+     enddo
+
+   end associate
+enddo
+! repack IV
+associate(B => EblockIV, &
+          A => SBlockIV )
+
+  A%n  = B%n
+  A%l1 = B%l1
+  A%l2 = B%l2
+  allocate(A%pos(A%n))
+  A%pos(1:A%n) = B%pos(1:B%n)
+
+  allocate(A%vec(A%n),A%matX(A%n,1),A%matY(A%n,1))
+  do i=1,A%n
+     ipos = B%pos(i)
+     ip = IndN(1,ipos)
+     iq = IndN(2,ipos)
+
+     valX = 1d0/(C(ip)+C(iq))
+     valY = 1d0/(C(ip)-C(iq))
+
+     A%matX(i,1) = 0.5d0*fac*(valX-valY)
+     A%matY(i,1) = 0.5d0*fac*(valX+valY)
+
+     A%vec(i) = B%vec(i)
+  enddo
+
+end associate
+
+! dump to a file
+open(newunit=iunit,file=xy0file,form='unformatted')
+write(iunit) nblk
+do iblk=1,nblk
+   associate(B => SBlock(iblk))
+     write(iunit) iblk, B%n, B%l1, B%l2
+     write(iunit) B%pos,B%matX,B%matY,B%vec
+   end associate
+enddo
+associate(B => SBlockIV)
+  write(iunit) B%n,B%l1,B%l2
+  write(iunit) B%pos,B%vec
+  write(iunit) B%matX,B%matY
+end associate
+close(iunit)
+! deallocate blocks
+do iblk=1,nblk
+   associate(B => Sblock(iblk))
+     deallocate(B%matY,B%matX,B%vec)
+     deallocate(B%pos)
+   end associate
+enddo
+! deallocate IV blocks 
+associate(B => SblockIV)
+  deallocate(B%vec)
+  deallocate(B%pos)
+end associate
+
+deallocate(Sblock)
+
+end subroutine dump_Eblock
 
 subroutine check_mp2(EMP2,IntKFIle,INActive,NOccup,NBasis)
 ! check MP2 energy (only inactive-vritual enter) 

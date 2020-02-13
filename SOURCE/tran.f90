@@ -114,7 +114,7 @@ integer :: r,s,rs
 
 end subroutine tran4_unsym2
 
-subroutine tran3Q_full(NBas,nocc,CX,Q,fname)
+subroutine tran3MO_Q(NBas,nocc,CX,Q,fname)
 ! 3-index transformation out of core
 implicit none
 
@@ -192,19 +192,22 @@ integer :: i,j,ij,rs,ab
     call triang_to_sq(work1,work2,NBas)
     ! work1=CX^T.work2
     ! work2=work1.Q 
-    call dgemm('T','N',NBas,NBas,NBas,1d0,CX,NBas,work2,NBas,0d0,work1,NBas)
-    call dgemm('N','N',NBas,NBas,NBas,1d0,work1,NBas,Q,NBas,0d0,work2,NBas)
+    !call dgemm('T','N',NBas,NBas,NBas,1d0,CX,NBas,work2,NBas,0d0,work1,NBas)
+    !call dgemm('N','N',NBas,NBas,NBas,1d0,work1,NBas,Q,NBas,0d0,work2,NBas)
 
-    ij = 0
-    do j=1,nocc
-       do i=1,nocc
-          ij = ij + 1
-          work1(ij) = work2((j-1)*NBas+i)
-       enddo
-    enddo
+    !ij = 0
+    !do j=1,nocc
+    !   do i=1,nocc
+    !      ij = ij + 1
+    !      work1(ij) = work2((j-1)*NBas+i)
+    !   enddo
+    !enddo
+
+    call dgemm('T','N',nocc,NBas,NBas,1d0,CX,NBas,work2,NBas,0d0,work1,nocc)
+    call dgemm('N','N',nocc,nocc,NBas,1d0,work1,nocc,Q,NBas,0d0,work2,nocc)
 
     !write(iunit3,rec=ab) work2(1:nsq)
-    write(iunit3,rec=ab) work1(1:noccsq)
+    write(iunit3,rec=ab) work2(1:noccsq)
 
  enddo
 
@@ -214,7 +217,7 @@ integer :: i,j,ij,rs,ab
  close(iunit3)
  close(iunit2,status='DELETE')
 
-end subroutine tran3Q_full
+end subroutine tran3MO_Q
 
 subroutine tran4_full(NBas,CA,CB,fname,srtfile)
 ! 4-index transformation out of core
