@@ -26,11 +26,11 @@ if(CalcParams%RDMType==RDM_TYPE_DMRG) then
    !   write(6,'(1x,a)') "Interface      OWN"
    !   stop
    !elseif(CalcParams%RDMSource.ne.INTER_TYPE_OWN) then
-   if(CalcParams%RDMSource.ne.INTER_TYPE_OWN) then
-      write(6,'(1x,a)') "ERROR! RDMType DMRG REQUIRES:"
-      write(6,'(1x,a)') "RDMSource      OWN"
-      stop
-   endif
+   !if(CalcParams%RDMSource.ne.INTER_TYPE_OWN) then
+   !   write(6,'(1x,a)') "ERROR! RDMType DMRG REQUIRES:"
+   !   write(6,'(1x,a)') "RDMSource      OWN"
+   !   stop
+   !endif
 
 endif
 
@@ -146,6 +146,16 @@ else
   case(INTER_TYPE_OWN)
      Flags%IDALTON = 0
      Flags%IA = 1 
+ 
+  case(INTER_TYPE_ORCA)
+     Flags%IDALTON = 1
+     Flags%ICASSCF = 1
+     Flags%IDMRG   = 1
+     Flags%iORCA   = 1
+     Flags%IAO     = 0
+     Flags%INO     = 0
+     Flags%NoSym   = 1
+     Flags%IA = 1 
   ! ????
   end select
 
@@ -173,6 +183,10 @@ else
      FLags%IGVB = 0
      Flags%ICASSCF = 1
      Flags%ISHF = 1
+  case default
+     write(LOUT,'(1x,a)') 'RDMType not declared! Assuming ICASSCF=1!'
+     FLags%IGVB    = 0
+     Flags%ICASSCF = 1
   end select
 
   ! excitations

@@ -2139,7 +2139,7 @@ if(nAA>0) then
 
 endif
 
-print*, 'Act-Act block diagonalized!'
+write(*,'(/,1x,a)') 'Act-Act   block diagonalized!'
 
 !pack AI
 do iq=1,INActive
@@ -2203,7 +2203,7 @@ do ip=NOccup+1,NBasis
     endif
 enddo
 
-print*, 'Act-Virt block diagonalized!'
+print*, 'Act-Virt  block diagonalized!'
 
 !pack IV
 associate(B => EblockIV)
@@ -2223,8 +2223,6 @@ associate(B => EblockIV)
 end associate
 
  call clock('PACK',Tcpu,Twall)
-
- print*, 'nblk-check',nblk
 
 !! dump EBLOCKS: X(0),Y(0)
 call dump_Eblock(Eblock,EblockIV,Occ,IndN,nblk,NBasis,NDimX,xy0file)

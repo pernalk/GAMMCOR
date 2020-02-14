@@ -55,6 +55,7 @@ C
 C
       Call Y01CAS_FOFO(Occ,URe,XOne,ABPLUS,ABMIN,
      $ 'PROP0','PROP1',
+     $ 'XY0',
      $ IndN,IndX,IGem,NAcCAS,NInAcCAS,NDimX,
      $ NBasis,NDim,NInte1,NoSt,'EMPTY','FFOO',
      $ 'FOFO',0,ETot,ECorr)

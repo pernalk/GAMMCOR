@@ -30,11 +30,12 @@ C     ICASSCF=1 - read occ from occupations.dat
 C
 C     IDMRG - integrals and RDM's read from external dmrg files
       IDMRG=Flags%IDMRG
+      iORCA=Flags%iORCA
       If(IDMRG.Eq.1.And.ICASSCF.Eq.0) Stop 'Set ICASSCF TO 1'
 C
       If(IDMRG.Eq.1) Then
       Call ReadDMRG(XKin,XNuc,ENuc,Occ,URe,
-     $ TwoEl,UMOAO,NInte1,NBasis,NInte2,NGem)
+     $ TwoEl,UMOAO,NInte1,NBasis,NInte2,NGem,iORCA)
       Return
       EndIf
 C
@@ -279,7 +280,7 @@ C               IT WORKS WITH ORCA OUTPUTS (IEugene=0)
 C
 *Deck ReadDMRG
       Subroutine ReadDMRG(XKin,XNuc,ENuc,Occ,URe,
-     $ TwoEl,UMOAO,NInte1,NBasis,NInte2,NGem)
+     $ TwoEl,UMOAO,NInte1,NBasis,NInte2,NGem,iORCA)
 C
       use sorter
       use tran
@@ -307,11 +308,13 @@ C
      $ UAux(NBasis,NBasis),
      $ FockF(NInte1),GammaAB(NInte1),Eps(NBasis,NBasis)
       Integer(8) IOutInfo
-C 
-C herer!!!
-c      IEugene=1
+
+      If(iORCA==1) then
+      LiborNew=1
       IEugene=0
-      LiborNew=1 
+      ElseIf(iORCA==0) then
+      IEugene=1
+      EndIf
 C
       UMOAO(1:NBasis*NBasis)=Zero
       URe(1:NBasis,1:NBasis)=Zero
@@ -730,6 +733,8 @@ C
       Call TwoNO1(TwoEl,URe,NBasis,NInte2)
 C
       ElseIf(ITwoEl.Eq.3) Then
+C
+C     CREATE FOFO and FFOO ?
 C     PREPARE POINTERS: NOccup=num0+num1
       Call prepare_nums(Occ,Num0,Num1,NBasis)
       If(ISwitch.Eq.1) Num0=NInAC
@@ -748,8 +753,32 @@ C     TRANSFORM J AND K
      $        NBasis,UAux,
      $        Num0+Num1,UAux(1:NBasis,1:(Num0+Num1)),
      $        'FOFO','AOTWOSORT')
-C
+CC
       EndIf
+C
+      ElseIf(IUNIT.Eq.1.And.ITwoEl.Eq.3) Then
+C
+C     PREPARE POINTERS: NOccup=num0+num1
+      Call prepare_nums(Occ,Num0,Num1,NBasis)
+      If(ISwitch.Eq.1) Num0=NInAC
+      If(ISwitch.Eq.1) Num1=NAc
+C     READ J AND K AND DUMP TO DISC
+      UAux = 0d0
+      Do I=1,NBasis
+      UAux(I,I) = 1d0
+      EndDo
+      Call read4_gen(NBasis,
+     $        Num0+Num1,UAux(1:NBasis,1:(Num0+Num1)),
+     $        Num0+Num1,UAux(1:NBasis,1:(Num0+Num1)),
+     $        NBasis,UAux,
+     $        NBasis,UAux,
+     $        'FFOO','AOTWOSORT')
+      Call read4_gen(NBasis,
+     $        NBasis,UAux,
+     $        Num0+Num1,UAux(1:NBasis,1:(Num0+Num1)),
+     $        NBasis,UAux,
+     $        Num0+Num1,UAux(1:NBasis,1:(Num0+Num1)),
+     $        'FOFO','AOTWOSORT')
 C
       EndIf
 C
@@ -767,7 +796,7 @@ c      GoTo 888
 C
 C     READ ACTIVE 2-RDM AND TRANSFORM TO NO'S  
 C
-      Write(6,'(" Reading 2-RDM ...")')
+      Write(6,'(/," Reading 2-RDM ...")')
       NRDM2 = NBasis**2*(NBasis**2+1)/2
       Allocate (RDM2(NRDM2))
       RDM2(1:NRDM2)=Zero

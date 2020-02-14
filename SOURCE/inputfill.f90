@@ -262,6 +262,10 @@ subroutine read_block_calculation(CalcParams, line)
            elseif (uppercase(val) == "OWN".or.&
                    uppercase(val) == "NONE") then
                CalcParams%InterfaceType = INTER_TYPE_OWN
+           elseif (uppercase(val) == "ORCA") then
+               CalcParams%InterfaceType = INTER_TYPE_ORCA
+               CalcParams%RDMSource = INTER_TYPE_ORCA
+               CalcParams%RDMType   = RDM_TYPE_DMRG
            endif
 
       case ("JOBTYPE")

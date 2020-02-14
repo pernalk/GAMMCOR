@@ -1477,6 +1477,8 @@ double precision :: inv_omega, inv_om12,tmp
 double precision,parameter :: SmallE = 1.D-3
 double precision,parameter :: BigE = 1.D8 
 double precision :: Alpha, Beta
+!  test
+double precision,allocatable :: IGemA(:),IGemB(:)
 
 ! Parameter(SmallE=1.D-3,BigE=1.D8)
 
@@ -1618,6 +1620,52 @@ endif
 
 ! uncoupled E20disp
 
+!! test Disp-in-CAS
+!
+!! fix IGem for A
+!allocate(IGemA(NBas),IGemB(NBas))
+!do i=1,A%INAct
+!   IGemA(i) = 1
+!enddo
+!do i=A%INAct+1,dimOA
+!   IGemA(i) = 2
+!enddo
+!do i=dimOA+1,NBas
+!   IGemA(i) = 3
+!enddo
+!! fix IGem for B
+!do i=1,B%INAct
+!   IGemB(i) = 1
+!enddo
+!do i=B%INAct+1,dimOB
+!   IGemB(i) = 2
+!enddo
+!do i=dimOB+1,NBas
+!   IGemB(i) = 3
+!enddo
+!
+!do pq=1,A%NDimX
+!   ip = A%IndN(1,pq)
+!   iq = A%IndN(2,pq)
+!   do rs=1,B%NDimX
+!      ir = B%IndN(1,rs)
+!      is = B%IndN(2,rs)
+!
+!      if(IGemA(ip)==2.and.IGemA(iq)==2.and. &
+!         IGemB(ir)==2.and.IGemB(is)==2) then
+!         fact = 1
+!      else
+!         fact = 0
+!      endif
+!
+!      associate(YA => Y01BlockA(pq))
+!         YA%vec0(1:YA%n) = fact * YA%vec0(1:YA%n)
+!      end associate
+!   enddo
+!enddo
+!
+!! end test disp-in-CAS
+
 tmp01 = 0
 if(Flags%IFlag0==0.and.Flags%ICASSCF==1) then
    y1y0h = 0
@@ -1687,6 +1735,7 @@ else
    enddo
 
 endif
+deallocate(IGemB,IGemA)
 
 y0y0 = 0
 if(Flags%IFlag0==1.or.(Flags%IFlag0==0.and.Flags%ICASSCF==0)) then

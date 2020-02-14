@@ -8,9 +8,10 @@ implicit none
 integer :: LOUT = output_unit
 integer,parameter :: LERR = error_unit
 
-integer, parameter :: INTER_TYPE_DAL = 1
-integer, parameter :: INTER_TYPE_MOL = 2
-integer, parameter :: INTER_TYPE_OWN = 3
+integer, parameter :: INTER_TYPE_DAL  = 1
+integer, parameter :: INTER_TYPE_MOL  = 2
+integer, parameter :: INTER_TYPE_OWN  = 3
+integer, parameter :: INTER_TYPE_ORCA = 4
 
 integer, parameter :: TYPE_NO_SYM = 1
 integer, parameter :: TYPE_SYM = 0
@@ -61,9 +62,9 @@ logical, parameter :: FLAG_POSTCAS = .FALSE.
 
 integer,parameter :: maxcen = 500
 
-character(*),parameter :: PossibleInterface(3) = &
+character(*),parameter :: PossibleInterface(4) = &
 [character(8) :: &
-'DALTON', 'MOLPRO', 'OWN']
+'DALTON', 'MOLPRO', 'OWN', 'ORCA']
 
 character(*),parameter :: PossibleJobType(8) = &
 [character(8) :: &
@@ -87,7 +88,7 @@ type CalculationBlock
       integer :: InterfaceType = INTER_TYPE_DAL
       integer :: NBasis = FLAG_NOBASIS
       integer :: JobType = JOB_TYPE_AC
-      integer :: RDMType = RDM_TYPE_GVB
+      integer :: RDMType ! = RDM_TYPE_GVB
       integer :: RDMSource = INTER_TYPE_DAL
       integer :: Response = RESP_ERPA
       integer :: DFApp = DF_NONE
@@ -177,6 +178,7 @@ type FlagsData
 ! default setting: ERPA-GVB
      ! mainp.f
      integer :: IDALTON = 1
+     integer :: iORCA   = 0
      integer :: IRes    = 0
      integer :: IAO     = 0
      integer :: INO     = 0

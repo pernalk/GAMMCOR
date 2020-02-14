@@ -329,6 +329,8 @@ integer :: iunit,iunit2,iunit3
 integer :: ntr,nAB,nCD,nloop
 integer,parameter :: cbuf=512
 integer :: i,rs,ab
+!  test
+integer :: l,k,kl
 
  write(6,'()') 
 ! write(6,'(1x,a)') 'TRAN4_SYM_OUT_OF_CORE'
@@ -344,7 +346,6 @@ integer :: i,rs,ab
 
  allocate(work1(NBas*NBas),work2(NBas*NBas))
  allocate(work3(cbuf,nAB))
-
 
  !open(newunit=iunit,file='AOTWOSORT',status='OLD',&
  open(newunit=iunit,file=trim(srtfile),status='OLD',&
@@ -367,6 +368,15 @@ integer :: i,rs,ab
        call dgemm('N','N',nA,nB,NBas,1d0,work1,nA,CB,NBas,0d0,work2,nA)
        ! transpose
        work3(rs-(i-1)*cbuf,1:nAB) = work2(1:nAB)
+       !work1 = 0
+       !kl = 0 
+       !do l=1,nB
+       !do k=1,nA
+       !   kl = kl + 1
+       !   work1(kl) = work2((k-1)*NBas+l)
+       !enddo
+       !enddo
+       !work3(rs-(i-1)*cbuf,1:nAB) = work1(1:nAB)
 
     enddo
 
@@ -395,6 +405,15 @@ integer :: i,rs,ab
     call dgemm('T','N',nC,NBas,NBas,1d0,CC,NBas,work2,NBas,0d0,work1,nC)
     call dgemm('N','N',nC,nD,NBas,1d0,work1,nC,CD,NBas,0d0,work2,nC)
     write(iunit3,rec=ab) work2(1:nCD)
+    !work1 = 0
+    !kl = 0 
+    !do l=1,nD
+    !do k=1,nC
+    !   kl = kl + 1
+    !   work1(kl) = work2((k-1)*NBas+l)
+    !enddo
+    !enddo
+    !write(iunit3,rec=ab) work1(1:nCD)
 
  enddo
 
@@ -403,6 +422,105 @@ integer :: i,rs,ab
  close(iunit2,status='DELETE')
 
 end subroutine tran4_gen
+
+subroutine read4_gen(NBas,nA,CA,nB,CB,nC,CC,nD,CD,fname,srtfile)
+! reads 4-index ints from sorted file 
+! dumps all integrals on disk in the (square,square) form
+! CAREFUL: C have to be in AOMO form!
+!!! CAREFUL: write to simpler form
+!!! ie. (NBas,n,C)
+implicit none
+
+integer,intent(in) :: NBas
+integer,intent(in) :: nA,nB,nC,nD
+! CA(NBas*nA)
+double precision,intent(in) :: CA(*), CB(*), CC(*), CD(*)
+character(*) :: fname,srtfile
+double precision, allocatable :: work1(:), work2(:), work3(:,:)
+integer :: iunit,iunit2,iunit3
+integer :: ntr,nAB,nCD,nloop
+integer,parameter :: cbuf=512
+integer :: i,rs,ab
+!  test
+integer :: l,k,kl
+
+ write(6,'()') 
+ write(6,'(1x,a)') 'Reading integrals for '//fname
+
+ ntr = NBas*(NBas+1)/2
+ nAB = nA*nB
+ nCD = nC*nD
+
+ ! set no. of triangles in buffer
+ nloop = (ntr-1)/cbuf+1
+
+ allocate(work1(NBas*NBas),work2(NBas*NBas))
+ allocate(work3(cbuf,nAB))
+
+ !open(newunit=iunit,file='AOTWOSORT',status='OLD',&
+ open(newunit=iunit,file=trim(srtfile),status='OLD',&
+      access='DIRECT',form='UNFORMATTED',recl=8*ntr)
+
+ ! half-transformed file
+ open(newunit=iunit2,file='TMPMO',status='REPLACE',&
+     access='DIRECT',form='UNFORMATTED',recl=8*cbuf)
+
+! (ab|
+ do i=1,nloop
+    ! loop over cbuf
+    do rs=(i-1)*cbuf+1,min(i*cbuf,ntr)
+
+       read(iunit,rec=rs) work1(1:ntr)
+       call triang_to_sq(work1,work2,NBas)
+       work1 = 0
+       kl = 0 
+       do l=1,nB
+          do k=1,nA
+             kl = kl + 1
+             work1(kl) = work2((k-1)*NBas+l)
+          enddo
+       enddo
+       work3(rs-(i-1)*cbuf,1:nAB) = work1(1:nAB)
+
+    enddo
+
+    do ab=1,nAB
+       write(iunit2,rec=(i-1)*nAB+ab) work3(1:cbuf,ab)
+    enddo
+
+ enddo
+
+ close(iunit)
+
+! |cd)
+ open(newunit=iunit3,file=fname,status='REPLACE',&
+     access='DIRECT',form='UNFORMATTED',recl=8*nCD)
+
+ do ab=1,nAB
+
+    do i=1,nloop
+       ! get all (ab| for given |rs)
+       read(iunit2,rec=(i-1)*nAB+ab) work1((i-1)*cbuf+1:min(i*cbuf,ntr))
+    enddo
+
+    call triang_to_sq(work1,work2,NBas)
+    work1 = 0
+    kl = 0 
+    do l=1,nD
+       do k=1,nC
+          kl = kl + 1
+          work1(kl) = work2((k-1)*NBas+l)
+       enddo
+    enddo
+    write(iunit3,rec=ab) work1(1:nCD)
+
+ enddo
+
+ deallocate(work1,work2,work3)
+ close(iunit3)
+ close(iunit2,status='DELETE')
+
+end subroutine read4_gen
 
 subroutine make_J1(NBas,X,J,intfile)
 implicit none
