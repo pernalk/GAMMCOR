@@ -30,34 +30,35 @@ C
 C
 C     PRINT FINAL NO's IN AO's REPRESENTATION 
 C
-      Write(6,'(/,X,"NATURAL ORBITALS IN AO BASIS SET")')
+c      Write(6,'(/,X,"NATURAL ORBITALS IN AO BASIS SET")')
+cC
+c   98 Format(X,10F10.6)
+c      Call MultpM(UReSav,URe,UMOAO,NBasis)
+c      NLine=NBasis/10
+c      If(NLine*10-NBasis.Ne.0)NLine=NLine+1
+c      Do I=1,NBasis
+c      Write(*,'(I3)') I      
+cC
+c      Do LL=0,NLine-1
+c
+c      NN=NBasis-10*LL
+c      If(NN.Le.10) Then
+c      Write(*,98) (UReSav(I,K),K=10*LL+1,NBasis)
+c      Else
+c      Write(*,98) (UReSav(I,K),K=10*LL+1,10*(LL+1))
+c      EndIf
+cC
+c      EndDo
+c      Write(*,*)
+c      EndDo
 C
-   98 Format(X,10F10.6)
-      Call MultpM(UReSav,URe,UMOAO,NBasis)
-      NLine=NBasis/10
-      If(NLine*10-NBasis.Ne.0)NLine=NLine+1
-      Do I=1,NBasis
-      Write(*,'(I3)') I      
-C
-      Do LL=0,NLine-1
-
-      NN=NBasis-10*LL
-      If(NN.Le.10) Then
-      Write(*,98) (UReSav(I,K),K=10*LL+1,NBasis)
-      Else
-      Write(*,98) (UReSav(I,K),K=10*LL+1,10*(LL+1))
-      EndIf
-C
-      EndDo
-      Write(*,*)
-      EndDo
-C
-      Write(6,'(/,X,'' UNSORTED ORBITAL OCCUPANCIES'')')
+      Write(6,'(/,X,'' NATURAL ORBITAL OCCUPANCIES'')')
 
       Write(6,'(2X,"Orb",3X,"Occupancy",7X,"CICoef",7X,"Gem")')
       Do I=1,NBasis
       Write(6,'(X,I3,2E16.6,I6)') I,Occ(I),CICoef(I),IGem(I)
       EndDo
+      Write(6,'()')
 C
       NDim=NBasis*(NBasis-1)/2
       NDimKer=NBasis*(1+NBasis)*(2+NBasis)*(3+NBasis)/24
