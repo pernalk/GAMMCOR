@@ -228,16 +228,19 @@ end type InputData
 type SaptData
 
      type(SystemBlock) :: monA, monB
-     integer           :: InterfaceType = INTER_TYPE_DAL
-     integer           :: SaptLevel = SAPTLEVEL2
-     integer           :: ic6 = 0
-     integer           :: IPrint = 1000
-     integer           :: iPINO=-1
      double precision  :: ACAlpha = 1d0
      double precision  :: Vnn,elst,exchs2,e2ind,e2disp
      double precision  :: e2disp_sc,e2disp_sp,e2disp_unc
-     logical           :: EnChck = .true., HFCheck =.true.
-     logical           :: doRSH = .false., SameOm = .true.
+     double precision  :: e2exdisp_unc,e2exdisp
+     double precision  :: e2dispinCAS
+     integer :: InterfaceType = INTER_TYPE_DAL
+     integer :: SaptLevel = SAPTLEVEL2
+     integer :: ic6 = 0
+     integer :: IPrint = 1000
+     integer :: iPINO=-1
+     logical :: iCpld = .true.
+     logical :: EnChck = .true., HFCheck =.true.
+     logical :: doRSH = .false., SameOm = .true.
 
 end type SaptData
 

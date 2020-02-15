@@ -757,8 +757,8 @@ do j=1,BDimX
 enddo
 
 intXY = -2d0*intXY
-print*, 'intXY-A3',norm2(intXY)
-print*, ''
+!print*, 'intXY-A3',norm2(intXY)
+!print*, ''
 
 deallocate(intsr,tints,ints,work)
 deallocate(calkB,calkA)
@@ -1261,9 +1261,9 @@ enddo
 
 close(iunit)
 
-print*, 'calkA',norm2(calkA)
-print*, 'calkB',norm2(calkB)
-print*, 'intV:', norm2(intV)
+!print*, 'calkA',norm2(calkA)
+!print*, 'calkB',norm2(calkB)
+!print*, 'intV:', norm2(intV)
 
 ! 2XX
 ABmat = 0
@@ -1393,8 +1393,8 @@ deallocate(intV,intA,intB,intAB)
 
 intXX = -2d0*intXX
 
-print*, 'intXX-A3',norm2(intXX)
-print*, ''
+!print*, 'intXX-A3',norm2(intXX)
+!print*, ''
 
 end subroutine inter_A3_XX
 
@@ -2635,7 +2635,7 @@ enddo
 
 close(iunit)
 
-print*, 'intYX',norm2(intYX)
+!print*, 'intYX',norm2(intYX)
 
 deallocate(ints,work,tmp)
 
@@ -2797,7 +2797,7 @@ do l=1,BDimX
 
 enddo
 
-print*, 'intXY:',norm2(intXY)
+!print*, 'intXY:',norm2(intXY)
 
 close(iunit)
 
@@ -2965,46 +2965,6 @@ do l=1,BDimX
       enddo
 enddo
 
-print*, 'intYY',norm2(intYY)
-
-!!!! test 4th term -- very bizzarre!!!
-!intYY = 0
-!ints = 0
-!kl = 0
-!do iq=1,dimOB
-!   do it=1,NBas
-!      kl = kl + 1
-!      read(iunit,rec=kl) work(1:NBas*dimOB)
-!
-!      call ints_modify(NBas,dimOB,ints,NBas,work,&
-!                      Smat(it,iq)/AXELE,Vabb,Vbab(it,iq)/BXELE,Sxx)
-!
-!       do iu=1,NBas
-!
-!          itu=posA(it,iu)
-!        
-!          if(itu/=0) then
-!             
-!             fact = 2d0*(AOcc(it)-AOcc(iu))
-!             do i=1,BDimX
-!                ip = BIndN(1,i)
-!                iw = BIndN(2,i)
-!                ipw=posB(ip,iw) 
-!
-!                val = 0
-!                do is=1,dimOB
-!                   do ir=1,dimOB
-!                      val = val + RDM2val(ir,is,iq,iw)*ints(ir,is)*Smat(iu,ip)
-!                    enddo
-!                enddo 
-!
-!                intYY(itu,ipw) = intYY(itu,ipw) + fact*val
-!
-!             enddo
-!          endif
-!       enddo
-!   enddo
-!enddo
 !print*, 'intYY',norm2(intYY)
 
 close(iunit)
@@ -3199,7 +3159,7 @@ do l=1,BDimX
    endif
 enddo
 
-print*,'intXX:', norm2(intXX)
+!print*,'intXX:', norm2(intXX)
 
 deallocate(ints,work,tmp)
 

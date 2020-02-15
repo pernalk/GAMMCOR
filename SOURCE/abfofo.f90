@@ -2163,7 +2163,7 @@ do iq=1,INActive
         elseif(NoSt>1) then
            call ERPAVECYX(B%matY,B%matX,B%vec,ABP,ABM,B%n)
         endif
-      
+
         deallocate(ABM,ABP)
 
       end associate
@@ -2195,7 +2195,7 @@ do ip=NOccup+1,NBasis
         elseif(NoSt>1) then
            call ERPAVECYX(B%matY,B%matX,B%vec,ABP,ABM,B%n)
         endif
-      
+
         deallocate(ABM,ABP)
 
       end associate

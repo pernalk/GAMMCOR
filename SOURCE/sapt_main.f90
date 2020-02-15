@@ -32,7 +32,6 @@ double precision :: Tcpu,Twall
  Flags%IFlAC  = 0
  Flags%IFlSnd = 0
 
-
  write(LOUT,'()')
  write(LOUT,'(1x,a)') 'STARTING SAPT CALCULATIONS'
  write(LOUT,'(8a10)') ('**********',i=1,8)
@@ -40,8 +39,10 @@ double precision :: Tcpu,Twall
  call clock('START',Tcpu,Twall)
  call sapt_basinfo(SAPT,NBasis)
  call sapt_interface(Flags,SAPT,NBasis)
+
  call sapt_mon_ints(SAPT%monA,NBasis)
  call sapt_mon_ints(SAPT%monB,NBasis)
+
  if(SAPT%SaptLevel/=10) then
    call sapt_response(Flags,SAPT%monA,SAPT%EnChck,NBasis)
    call sapt_response(Flags,SAPT%monB,SAPT%EnChck,NBasis)
@@ -57,8 +58,9 @@ double precision :: Tcpu,Twall
 
     ! UNCOUPLED E2DISP
     if(SAPT%SaptLevel==0) then
-
+       SAPT%iCpld = .false.
        call e2disp_unc(Flags,SAPT%monA,SAPT%monB,SAPT)
+       call e2exdisp(Flags,SAPT%monA,SAPT%monB,SAPT)
 
     ! E2DISP(CAS)!
     elseif(SAPT%SaptLevel==10) then
@@ -121,19 +123,21 @@ double precision   :: XGrid(1000), WGrid(1000),DispAlph, e2d
     A%ACAlpha    = SAPT%ACAlpha
     B%ACAlpha    = SAPT%ACAlpha
 
-    SaptLevel_Save = Flags%SaptLevel
+    SaptLevel_Save  = Flags%SaptLevel
     Flags%SaptLevel = 0
-    Flags%IFlag0 = 1
+    Flags%IFlag0    = 1
+    SAPT%iCpld      = .false.
 
     call sapt_response(Flags,A,SAPT%EnChck,NBasis)
     call sapt_response(Flags,B,SAPT%EnChck,NBasis)
+
     if(Flags%ISERPA==0) then
        call e2dispCAS(e2d,Flags,SAPT%monA,SAPT%monB,SAPT,SAPT%ACAlpha,NBasis)
+       call e2exdisp(Flags,SAPT%monA,SAPT%monB,SAPT)
     elseif(Flags%ISERPA==2) then
        call e2dispCAS_pino(e2d,Flags,SAPT%monA,SAPT%monB,SAPT,SAPT%ACAlpha)
     endif
-! multiply by 1/2 to restore the correct prefactor "16" 
-    e2d=e2d/2.d0
+
     write(LOUT,'(/,1x,''EDisp-in-CAS ='',1x,f17.10)') e2d
     
     Flags%SaptLevel = SaptLevel_Save
@@ -4391,26 +4395,26 @@ endif
 
 ! HERE - change to SAPTLEVEL?
 if(allocated(SAPT%monA%WPot)) then
-  deallocate(SAPT%monA%WPot)
+   deallocate(SAPT%monA%WPot)
 endif
 if(allocated(SAPT%monB%WPot)) then
-  deallocate(SAPT%monB%WPot)
+   deallocate(SAPT%monB%WPot)
 endif
 
 if(allocated(SAPT%monA%OrbE)) then
-  deallocate(SAPT%monA%OrbE)
+   deallocate(SAPT%monA%OrbE)
 endif
 if(allocated(SAPT%monB%OrbE)) then
-  deallocate(SAPT%monB%OrbE)
+   deallocate(SAPT%monB%OrbE)
 endif
 
 if(allocated(SAPT%monA%RDM2)) then
-  deallocate(SAPT%monA%RDM2,SAPT%monA%RDM2Act)
-  deallocate(SAPT%monA%Ind2)
+   deallocate(SAPT%monA%RDM2,SAPT%monA%RDM2Act)
+   deallocate(SAPT%monA%Ind2)
 endif
 if(allocated(SAPT%monB%RDM2)) then
-  deallocate(SAPT%monB%RDM2,SAPT%monB%RDM2Act)
-  deallocate(SAPT%monB%Ind2)
+   deallocate(SAPT%monB%RDM2,SAPT%monB%RDM2Act)
+   deallocate(SAPT%monB%Ind2)
 endif
 
 ! for PINO only
@@ -4465,6 +4469,8 @@ call delfile('TWOMOAB')
 call delfile('TMPOOAB')
 call delfile ('ONEEL_A')
 call delfile ('ONEEL_B')
+call delfile ('XY0_A')
+call delfile ('XY0_B')
 if(SAPT%monA%TwoMoInt==TWOMO_FOFO) then
    call delfile('FFOOAA')
    call delfile('FOFOAA')
@@ -4473,8 +4479,7 @@ if(SAPT%monB%TwoMoInt==TWOMO_FOFO) then
    call delfile('FFOOBB')
    call delfile('FOFOBB')
 endif
-
-
+if(SAPT%SaptLevel==10) call delfile('PROP_AB0')
 
 end subroutine free_sapt
 

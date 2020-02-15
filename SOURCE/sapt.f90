@@ -18,6 +18,7 @@ integer :: NBas
 double precision,allocatable :: PA(:,:),PB(:,:) 
 double precision,allocatable :: Va(:,:),Vb(:,:),Ja(:,:) 
 double precision,allocatable :: work(:,:)
+double precision,allocatable :: AOcc(:),BOcc(:) 
 double precision :: tmp,ea,eb,elst
 double precision,parameter :: Half=0.5d0
 double precision,external  :: trace
@@ -29,8 +30,38 @@ double precision,external  :: trace
           Va(NBas,NBas),Vb(NBas,NBas),Ja(NBas,NBas))
  allocate(work(NBas,NBas))
 
- call get_den(NBas,A%CMO,A%Occ,2d0,PA)
- call get_den(NBas,B%CMO,B%Occ,2d0,PB)
+ !if(SAPT%SaptLevel==10) then
+
+ !   allocate(AOcc(NBas),BOcc(NBas))
+
+ !   AOcc = A%Occ
+ !   BOcc = B%Occ
+
+ !   print*, 'aaa? ',A%INAct
+ !   print*, 'bbb? ',B%INAct
+
+ !   do i=1,A%INAct
+ !      AOcc(i) = 0d0
+ !   enddo
+ !   do i=1,B%INAct
+ !      BOcc(i) = 0d0 
+ !   enddo
+
+ !   do i=1,NBas
+ !      print*, i,AOcc(i),A%Occ(i)
+ !   enddo
+
+ !   call get_den(NBas,A%CMO,AOcc,2d0,PA)
+ !   call get_den(NBas,B%CMO,BOcc,2d0,PB)
+ ! 
+ !   deallocate(BOcc,AOcc)
+
+ !else
+
+    call get_den(NBas,A%CMO,A%Occ,2d0,PA)
+    call get_den(NBas,B%CMO,B%Occ,2d0,PB)
+
+ !endif
 
  call get_one_mat('V',Va,A%Monomer,NBas)
  call get_one_mat('V',Vb,B%Monomer,NBas)
@@ -41,17 +72,18 @@ double precision,external  :: trace
  work=0
  call dgemm('N','N',NBas,NBas,NBas,1d0,PA,NBas,Vb,NBas,0d0,work,NBas)
  ea = trace(work,NBas)
-! print*, ea
+ print*, 'ea',ea
  call dgemm('N','N',NBas,NBas,NBas,1d0,PB,NBas,Va,NBas,0d0,work,NBas)
  eb = trace(work,NBas) 
-! print*, eb
+ print*, 'eb',eb
  call dgemm('N','N',NBas,NBas,NBas,1d0,PB,NBas,Ja,NBas,0d0,work,NBas)
+ print*, 'Pb.JA',trace(work,NBas)
  ea = ea + trace(work,NBas)
-! print*, trace(work,NBas) 
- elst = ea + eb + SAPT%Vnn 
+! print*, trace(work,NBas)
+ elst = ea + eb + SAPT%Vnn
 
  write(LOUT,'(1x,a,f16.8)') 'V_nn        = ', SAPT%Vnn
- write(LOUT,'(1x,a,f16.8)') 'Eelst       = ', elst*1000d0 
+ write(LOUT,'(1x,a,f16.8)') 'Eelst       = ', elst*1000d0
  SAPT%elst = elst
 
 !! test wabb
@@ -1620,30 +1652,30 @@ endif
 
 ! uncoupled E20disp
 
-!! test Disp-in-CAS
-!
-!! fix IGem for A
-!allocate(IGemA(NBas),IGemB(NBas))
-!do i=1,A%INAct
-!   IGemA(i) = 1
-!enddo
-!do i=A%INAct+1,dimOA
-!   IGemA(i) = 2
-!enddo
-!do i=dimOA+1,NBas
-!   IGemA(i) = 3
-!enddo
-!! fix IGem for B
-!do i=1,B%INAct
-!   IGemB(i) = 1
-!enddo
-!do i=B%INAct+1,dimOB
-!   IGemB(i) = 2
-!enddo
-!do i=dimOB+1,NBas
-!   IGemB(i) = 3
-!enddo
-!
+! test Disp-in-CAS
+
+! fix IGem for A
+allocate(IGemA(NBas),IGemB(NBas))
+do i=1,A%INAct
+   IGemA(i) = 1
+enddo
+do i=A%INAct+1,dimOA
+   IGemA(i) = 2
+enddo
+do i=dimOA+1,NBas
+   IGemA(i) = 3
+enddo
+! fix IGem for B
+do i=1,B%INAct
+   IGemB(i) = 1
+enddo
+do i=B%INAct+1,dimOB
+   IGemB(i) = 2
+enddo
+do i=dimOB+1,NBas
+   IGemB(i) = 3
+enddo
+!!
 !do pq=1,A%NDimX
 !   ip = A%IndN(1,pq)
 !   iq = A%IndN(2,pq)
@@ -1683,6 +1715,15 @@ if(Flags%IFlag0==0.and.Flags%ICASSCF==1) then
          fact = (A%CICoef(iq)+A%CICoef(ip)) * &
                 (B%CICoef(is)+B%CICoef(ir)) * &
                 work(is+(ir-B%num0-1)*dimOB)
+
+      !if(IGemA(ip)==2.and.IGemA(iq)==2.and. &
+      !   IGemB(ir)==2.and.IGemB(is)==2) then
+      !   fact = (A%CICoef(iq)+A%CICoef(ip)) * &
+      !          (B%CICoef(is)+B%CICoef(ir)) * &
+      !          work(is+(ir-B%num0-1)*dimOB)
+      !else
+      !   fact = 0.d0
+      !endif
     
          do i=1,A%NDimX
   
@@ -1872,6 +1913,8 @@ endif
     enddo
 
  endif
+
+ call writeampl(y0y0,'PROP_AB0')
 
  SAPT%e2disp_unc = -16d0*e2du
  SAPT%e2disp_sp = -16*e2du+16*e2ds2
@@ -2092,8 +2135,10 @@ do j=1,B%NDimX
       endif
    enddo
 enddo
-SAPT%e2disp = -32d0*e2d
-e2d  = -32d0*e2d*1000d0
+SAPT%e2dispinCAS = -16d0*e2d
+e2d  = -16d0*e2d*1000d0
+
+ call writeampl(tmp1,'PROP_AB0')
 
 write(LOUT,'(/1x,a,f16.8)') 'E2disp(CAS) = ',e2d
 
@@ -2151,8 +2196,8 @@ double precision :: e2du,e2sp,dea,deb
 double precision :: e2ds,e2ds1,e2ds2
 double precision :: inv_omega
 ! for Be ERPA:
-!double precision,parameter :: SmallE = 1.D-1
-double precision,parameter :: SmallE = 1.D-3
+double precision,parameter :: SmallE = 1.D-1
+!double precision,parameter :: SmallE = 1.D-3
 double precision,parameter :: BigE = 1.D8 
 double precision :: Alpha, Beta
 
@@ -2536,6 +2581,8 @@ if(.not.(Flags%ICASSCF==0.and.Flags%ISERPA==0)) then
  e2du = -16d0*e2du*1000d0
  e2sp = e2du + 16*e2ds2*1000 
  e2ds= e2du+(16*e2ds2-32*e2ds1)*1000
+
+ call writeampl(tmp02,'PROP_AB0')
 
 endif
 
@@ -4046,9 +4093,9 @@ subroutine e2exdisp(Flags,A,B,SAPT)
 
 implicit none
 
-type(FlagsData) :: Flags
+type(FlagsData)   :: Flags
 type(SystemBlock) :: A, B
-type(SaptData) :: SAPT
+type(SaptData)    :: SAPT
 
 integer :: NBas,NInte1
 integer :: dimOA,dimVA,dimOB,dimVB,nOVA,nOVB
@@ -4056,22 +4103,21 @@ integer :: GdimOA,GdimOB
 integer :: iunit
 integer :: i,j,k,l,kl,ij,ii,jj,pq,rs
 integer :: ip,iq,ir,is,ipq,irs
+integer :: iblk,nblkA,nblkB
 integer :: kc,ik,ic
-logical :: approx
-logical :: ipropab 
-integer,allocatable :: posA(:,:),posB(:,:)
+logical :: both,approx,ipropab 
+integer,allocatable          :: posA(:,:),posB(:,:)
 double precision,allocatable :: OmA(:), OmB(:)
 double precision,allocatable :: EVecA(:), EVecB(:)
 double precision,allocatable :: tmp1(:,:),tmp2(:,:),tmp3(:,:),&
-                                work(:),workSq(:,:),&
                                 sij(:,:),&
-                                tpqrs(:,:)
+                                tmp_u(:,:),&
+                                work(:),workSq(:,:)
 double precision :: nelA,nelB
 double precision :: fact,val,termZ,termY,termX
-!test
-double precision :: fact2
-double precision,allocatable :: ints2(:,:)
-! 
+double precision :: termZ_u,termY_u,termX_u
+double precision :: e2exd_u,e2exd
+
 double precision,allocatable :: S(:,:),Sab(:,:),Sba(:,:)
 double precision,allocatable :: PA(:,:),PB(:,:), &
                                 PAbb(:,:),PBaa(:,:)
@@ -4080,12 +4126,17 @@ double precision,allocatable :: Va(:,:),Vb(:,:), &
                                 Vaba(:,:),Vaab(:,:),Vbab(:,:)
 double precision,allocatable :: RDM2Aval(:,:,:,:), &
                                 RDM2Bval(:,:,:,:)
+type(EBlockData)             :: SBlockAIV,SBlockBIV
+type(EBlockData),allocatable :: SBlockA(:),SBlockB(:)
+
+double precision,allocatable :: OmA0(:),OmB0(:)
 double precision,allocatable :: ints(:,:) 
+double precision,allocatable :: AOcc(:),BOcc(:)
 double precision :: Tcpu,Twall
 double precision,external  :: trace,FRDM2
 ! test for Be
-!double precision,parameter :: SmallE = 1.D-1
-double precision,parameter :: SmallE = 1.D-3
+double precision,parameter :: SmallE = 1.D-1
+!double precision,parameter :: SmallE = 1.D-3
 double precision,parameter :: BigE = 1.D8 
 
 ! set dimensions
@@ -4102,25 +4153,77 @@ double precision,parameter :: BigE = 1.D8
  nelA = 2d0*A%XELE
  nelB = 2d0*B%XELE
 
+! print thresholds
+ if(SAPT%IPrint>1) then
+    write(LOUT,'(/,1x,a)') 'Thresholds in E2exch-disp:'
+    write(LOUT,'(1x,a,2x,e15.4)') 'SmallE      =', SmallE
+    write(LOUT,'(1x,a,2x,e15.4,/)') 'BigE        =', BigE
+ endif
+
 ! set e2exd_version
  !approx=.true.
- approx=.false.
+ approx = .false.
+ both   = SAPT%iCpld
 
 ! approximate RDM2
- allocate(A%Fmat(NBas,NBas),B%Fmat(NBas,NBas))
- call fill_Fmat(A%Fmat,A%Occ,NBas,1)
- call fill_Fmat(B%Fmat,B%Occ,NBas,1)
+ if(approx) then
+    allocate(A%Fmat(NBas,NBas),B%Fmat(NBas,NBas))
+    call fill_Fmat(A%Fmat,A%Occ,NBas,1)
+    call fill_Fmat(B%Fmat,B%Occ,NBas,1)
+ endif
 
- allocate(S(NBas,NBas),Sab(NBas,NBas),&
-          Sba(NBas,NBas),&
-          PA(NBas,NBas),PB(NBas,NBas),&
-          Va(NBas,NBas),Vb(NBas,NBas),&
+ ! uncoupled
+ allocate(OmA0(A%NDimX),OmB0(B%NDimX))
+
+ call read_SBlock(SBlockA,SBlockAIV,nblkA,'XY0_A')
+ call read_SBlock(SBlockB,SBlockBIV,nblkB,'XY0_B')
+
+ ! ExDisp-in-CAS
+ if(SAPT%SaptLevel==10) then
+    !print*, 'Separate Act-Act blocks'
+    call separate_SBlockAA(SBlockA,SBlockAIV,A%IndN,&
+                           nblkA,A%num0,A%num1,A%num2,NBas,A%NDimX)
+    call separate_SBlockAA(SBlockB,SBlockBIV,B%IndN,&
+                           nblkB,B%num0,B%num1,B%num2,NBas,B%NDimX)
+ endif
+
+ call unpack_Eig(SBlockA,SBlockAIV,nblkA,OmA0,A%NDimX)
+ call unpack_Eig(SBlockB,SBlockBIV,nblkB,OmB0,B%NDimX)
+
+ allocate(S(NBas,NBas),&
+          Sab(NBas,NBas),Sba(NBas,NBas),&
+          PA(NBas,NBas),PB(NBas,NBas),  &
+          Va(NBas,NBas),Vb(NBas,NBas),  &
           Vabb(NBas,NBas),Vbaa(NBas,NBas),&
           Vaba(NBas,NBas),Vaab(NBas,NBas),Vbab(NBas,NBas))
  allocate(tmp1(NBas,NBas),tmp2(NBas,NBas))
 
- call get_den(NBas,A%CMO,A%Occ,1d0,PA)
- call get_den(NBas,B%CMO,B%Occ,1d0,PB)
+
+! if(SAPT%SaptLevel==10) then
+!
+!    allocate(AOcc(NBas),BOcc(NBas))
+!
+!    AOcc = A%Occ
+!    BOcc = B%Occ
+!
+!    !do i=1,A%INAct
+!    !   AOcc(i) = 0d0
+!    !enddo
+!    !do i=1,B%INAct
+!    !   BOcc(i) = 0d0
+!    !enddo
+!
+!    call get_den(NBas,A%CMO,AOcc,1d0,PA)
+!    call get_den(NBas,B%CMO,BOcc,1d0,PB)
+!
+!    deallocate(BOcc,AOcc)
+!
+! else
+
+    call get_den(NBas,A%CMO,A%Occ,1d0,PA)
+    call get_den(NBas,B%CMO,B%Occ,1d0,PB)
+
+! endif
 
  call get_one_mat('S',S,A%Monomer,NBas)
  call tran2MO(S,A%CMO,B%CMO,Sab,NBas)
@@ -4158,14 +4261,25 @@ double precision,parameter :: BigE = 1.D8
  enddo
 
  allocate(posA(NBas,NBas),posB(NBas,NBas))
- posA = 0
- do i=1,A%NDimX
-    posA(A%IndN(1,i),A%IndN(2,i)) = A%IndX(i)
- enddo
- posB = 0
- do i=1,B%NDimX
-    posB(B%IndN(1,i),B%IndN(2,i)) = B%IndX(i)
- enddo
+ if(Flags%ICASSCF==1) then
+    posA = 0
+    do i=1,A%NDimX
+       posA(A%IndN(1,i),A%IndN(2,i)) = A%IndX(i)
+    enddo
+    posB = 0
+    do i=1,B%NDimX
+       posB(B%IndN(1,i),B%IndN(2,i)) = B%IndX(i)
+    enddo
+ elseif(Flags%ICASSCF==0) then
+    posA = 0
+    do i=1,A%NDimX
+       posA(A%IndN(1,i),A%IndN(2,i)) = i
+    enddo
+    posB = 0
+    do i=1,B%NDimX
+       posB(B%IndN(1,i),B%IndN(2,i)) = i
+    enddo
+ endif
 
  ! termZ
  ! PA(ab).S(bc)
@@ -4181,15 +4295,21 @@ double precision,parameter :: BigE = 1.D8
     enddo
  enddo
 
+ termZ_u = termZ
  termZ = 2d0*SAPT%e2disp*termZ
+ if(SAPT%SaptLevel/=10) then
+    termZ_u = 2d0*SAPT%e2disp_unc*termZ_u
+ elseif(SAPT%SaptLevel==10) then
+    termZ_u = 2d0*SAPT%e2dispinCAS*termZ_u
+ endif
  !write(LOUT,*) 'termZ ',termZ
- write(LOUT,'(1x,a,f16.8)') 'term Z      = ',  termZ*1.0d3
+ !write(LOUT,'(1x,a,f16.8)') 'term Z      = ',  termZ*1.0d3
 
  deallocate(tmp2,tmp1)
 
  allocate(tmp1(A%NDimX,B%NDimX),tmp2(A%NDimX,B%NDimX),&
-          tmp3(A%NDimX,B%NDimX),work(nOVB),workSq(NBas,NBas))
- allocate(sij(A%NDimX,B%NDimX))
+          tmp_u(A%NDimX,B%NDimX),sij(A%NDimX,B%NDimX),work(nOVB),workSq(NBas,NBas))
+ if(both) allocate(tmp3(A%NDimX,B%NDimX))
 
  ! term A1
  ! transform J and K
@@ -4255,7 +4375,7 @@ double precision,parameter :: BigE = 1.D8
 
 
  deallocate(work)
- allocate(work(NBas**2),ints(NBas,NBas),ints2(NBas,NBas))
+ allocate(work(NBas**2),ints(NBas,NBas))
 
  ! A3: XX
  tmp1=0
@@ -4277,7 +4397,6 @@ double precision,parameter :: BigE = 1.D8
      access='DIRECT',recl=8*NBas*dimOB)
 
  ints = 0
- ints2 = 0
  kl = 0
  do l=1,dimOA
     do k=1,NBas
@@ -4346,9 +4465,16 @@ double precision,parameter :: BigE = 1.D8
  endif
 
  !X_A.I.X_B
- call dgemm('T','N',A%NDimX,B%NDimX,A%NDimX,1d0,A%EigX,A%NDimX,tmp1,A%NDimX,0d0,tmp2,A%NDimX)
- call dgemm('N','N',A%NDimX,B%NDimX,B%NDimX,1d0,tmp2,A%NDimX,B%EigX,B%NDimX,0d0,tmp3,A%NDimX)
+ if(both) then
+   call dgemm('T','N',A%NDimX,B%NDimX,A%NDimX,1d0,A%EigX,A%NDimX,tmp1,A%NDimX,0d0,tmp2,A%NDimX)
+   call dgemm('N','N',A%NDimX,B%NDimX,B%NDimX,1d0,tmp2,A%NDimX,B%EigX,B%NDimX,0d0,tmp3,A%NDimX)
 ! print*, 'Xa.I.Xb:',norm2(tmp3)
+ endif
+
+ ! UNC
+ tmp_u = 0
+ call abpm_tran_gen(tmp1,tmp_u,SBlockA,SBlockAIV,SBlockB,SBlockBIV, &
+                    nblkA,nblkB,A%NDimX,B%NDimX,'XX')
 
  tmp1 = sij
 
@@ -4373,9 +4499,16 @@ double precision,parameter :: BigE = 1.D8
  endif
 
  !Y_A.I.Y_B
- call dgemm('T','N',A%NDimX,B%NDimX,A%NDimX,1d0,A%EigY,A%NDimX,tmp1,A%NDimX,0d0,tmp2,A%NDimX)
- call dgemm('N','N',A%NDimX,B%NDimX,B%NDimX,1d0,tmp2,A%NDimX,B%EigY,B%NDimX,1d0,tmp3,A%NDimX)
+ if(both) then
+    call dgemm('T','N',A%NDimX,B%NDimX,A%NDimX,1d0,A%EigY,A%NDimX,tmp1,A%NDimX,0d0,tmp2,A%NDimX)
+    call dgemm('N','N',A%NDimX,B%NDimX,B%NDimX,1d0,tmp2,A%NDimX,B%EigY,B%NDimX,1d0,tmp3,A%NDimX)
+ endif
 ! print*, 'Ya.I.Yb:',norm2(tmp3)
+
+ ! UNC
+ ! Y(0)_A.I.Y(0)_B
+ call abpm_tran_gen(tmp1,tmp_u,SBlockA,SBlockAIV,SBlockB,SBlockBIV, &
+                    nblkA,nblkB,A%NDimX,B%NDimX,'YY')
 
 ! TERMS XY, YX
 ! A3:XY
@@ -4397,7 +4530,6 @@ double precision,parameter :: BigE = 1.D8
      access='DIRECT',recl=8*NBas*NBas)
 
  ints = 0
- ints2 = 0
  kl = 0
  do l=1,dimOB
     do k=1,dimOA
@@ -4459,8 +4591,15 @@ double precision,parameter :: BigE = 1.D8
  endif
 
  !X_A.I.Y_B
- call dgemm('T','N',A%NDimX,B%NDimX,A%NDimX,1d0,A%EigX,A%NDimX,tmp1,A%NDimX,0d0,tmp2,A%NDimX)
- call dgemm('N','N',A%NDimX,B%NDimX,B%NDimX,1d0,tmp2,A%NDimX,B%EigY,B%NDimX,1d0,tmp3,A%NDimX)
+ if(both) then
+    call dgemm('T','N',A%NDimX,B%NDimX,A%NDimX,1d0,A%EigX,A%NDimX,tmp1,A%NDimX,0d0,tmp2,A%NDimX)
+    call dgemm('N','N',A%NDimX,B%NDimX,B%NDimX,1d0,tmp2,A%NDimX,B%EigY,B%NDimX,1d0,tmp3,A%NDimX)
+ endif
+
+ ! UNC
+ !X(0)_A.I.Y(0)_B
+ call abpm_tran_gen(tmp1,tmp_u,SBlockA,SBlockAIV,SBlockB,SBlockBIV, &
+                    nblkA,nblkB,A%NDimX,B%NDimX,'XY')
 !! print*, 'Xa.I.Yb:',norm2(tmp3)
 
  tmp1 = sij
@@ -4487,9 +4626,15 @@ double precision,parameter :: BigE = 1.D8
  endif
 
 ! !Y_A.I.X_B
- call dgemm('T','N',A%NDimX,B%NDimX,A%NDimX,1d0,A%EigY,A%NDimX,tmp1,A%NDimX,0d0,tmp2,A%NDimX)
- call dgemm('N','N',A%NDimX,B%NDimX,B%NDimX,1d0,tmp2,A%NDimX,B%EigX,B%NDimX,1d0,tmp3,A%NDimX)
+ if(both) then
+    call dgemm('T','N',A%NDimX,B%NDimX,A%NDimX,1d0,A%EigY,A%NDimX,tmp1,A%NDimX,0d0,tmp2,A%NDimX)
+    call dgemm('N','N',A%NDimX,B%NDimX,B%NDimX,1d0,tmp2,A%NDimX,B%EigX,B%NDimX,1d0,tmp3,A%NDimX)
+ endif
 !! print*, 'Ya.I.Xb:',norm2(tmp3)
+
+ ! UNC
+ call abpm_tran_gen(tmp1,tmp_u,SBlockA,SBlockAIV,SBlockB,SBlockBIV, &
+                    nblkA,nblkB,A%NDimX,B%NDimX,'YX')
 
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
@@ -4846,77 +4991,178 @@ double precision,parameter :: BigE = 1.D8
  !deallocate(tpqrs)
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
+ ! UNC
  sij = 0
- inquire(file='PROP_AB',EXIST=ipropab)
+ inquire(file='PROP_AB0',EXIST=ipropab)
  if(ipropab) then
     ! read s_ij
-    open(newunit=iunit,file='PROP_AB',form='UNFORMATTED',&
+    open(newunit=iunit,file='PROP_AB0',form='UNFORMATTED',&
        access='SEQUENTIAL',status='OLD')
     read(iunit) sij
     close(iunit)
 
  else
- 
-    ! make s_ij
-    call make_sij_Y(sij,tmp1,A,B,nOVB,NBas)
+
+    ! make s_ij uncoupled
+    !call make_sij_Yunc(sij,tmp1,A%Occ,B%Occ,A%EigY,A%EigX,B%EigY,B%EigX,&
+    !                A%num0,B%num0,dimOA,dimOB,nOVB,A%IndN,B%IndN,A%NDimX,B%NDimX,NBas)
+    write(LOUT,'(1x,a)') 'ERROR! Zrob make_sij(unc)!!!'
+    stop
 
  endif
 
- print*, 'sij',norm2(sij)
- print*, 'tmp3-exd',norm2(tmp3)
-
- ! term X
- termX = 0d0
+ ! term X(unc)
+ termX_u = 0d0
  do j=1,B%NDimX
     do i=1,A%NDimX
-        
-   !    if(A%Eig(i).gt.SmallE.and.B%Eig(j).gt.SmallE&
-   !       .and.A%Eig(i).lt.BigE.and.B%Eig(j).lt.BigE) then
 
-       if(abs(A%Eig(i)).gt.SmallE.and.abs(B%Eig(j)).gt.SmallE&
-          .and.abs(A%Eig(i)).lt.BigE.and.abs(B%Eig(j)).lt.BigE) then
+       if(abs(OmA0(i)).gt.SmallE.and.abs(OmB0(j)).gt.SmallE&
+          .and.abs(OmA0(i)).lt.BigE.and.abs(OmB0(j)).lt.BigE) then
 
-
-          termX = termX + tmp3(i,j)*sij(i,j)/(A%Eig(i)+B%Eig(j))
+          termX_u = termX_u + tmp_u(i,j)*sij(i,j)/(OmA0(i)+OmB0(j))
 
        endif
     enddo
  enddo
- termX = -4d0*termX
+ termX_u = -4d0*termX_u
 
-! write(LOUT,*) 'termX ', termX
- write(LOUT,'(/1x,a,f16.8)') 'term X      = ',  termX*1.0d3
+ call make_tij_Y_unc(tmp_u,tmp1,A%Occ,B%Occ,SBlockA,SBlockAIV,SBlockB,SBlockBIV, &
+                     A%IndN,B%IndN,posA,posB,Sab,Sba,nblkA,nblkB,A%NDimX,B%NDimX,NBas)
 
- ! termY
- ! term Y: t_ij 
- call make_tij_Y(tmp3,tmp2,tmp1,posA,posB,Sab,Sba,A,B,NBas)
-
- ! term Y
- termY = 0d0
+ ! term Y(unc)
+ termY_u = 0d0
  do j=1,B%NDimX
     do i=1,A%NDimX
-        
-      ! if(A%Eig(i).gt.SmallE.and.B%Eig(j).gt.SmallE&
-      !    .and.A%Eig(i).lt.BigE.and.B%Eig(j).lt.BigE) then
 
-       if(abs(A%Eig(i)).gt.SmallE.and.abs(B%Eig(j)).gt.SmallE&
-          .and.abs(A%Eig(i)).lt.BigE.and.abs(B%Eig(j)).lt.BigE) then
+       if(abs(OmA0(i)).gt.SmallE.and.abs(OmB0(j)).gt.SmallE&
+          .and.abs(OmA0(i)).lt.BigE.and.abs(OmB0(j)).lt.BigE) then
 
-          termY = termY + sij(i,j)*tmp3(i,j)/(A%Eig(i)+B%Eig(j))
+          termY_u = termY_u + sij(i,j)*tmp_u(i,j)/(OmA0(i)+OmB0(j))
 
        endif
     enddo
  enddo
 
- termY = -8d0*(SAPT%elst-SAPT%Vnn)*termY
- write(LOUT,'(1x,a,f16.8)') 'term Y      = ',  termY*1.0d3
+ termY_u = -8d0*(SAPT%elst-SAPT%Vnn)*termY_u
 
- write(LOUT,'(/1x,a,f16.8)') 'E2exch-disp = ', (termX+termY+termZ)*1.0d3
+ if(SAPT%IPrint>2) write(LOUT,'(/1x,a,f16.8)') 'term Z(unc) = ',  termZ_u*1.0d3
+ if(SAPT%IPrint>2) write(LOUT,'(1x,a,f16.8)')  'term X(unc) = ',  termX_u*1.0d3
+ if(SAPT%IPrint>2) write(LOUT,'(1x,a,f16.8)')  'term Y(unc) = ',  termY_u*1.0d3
+
+ e2exd_u = termX_u + termY_u + termZ_u
+ SAPT%e2exdisp_unc = e2exd_u
+ write(LOUT,'(/1x,a,f11.8)') 'E2exch-disp(unc) = ', e2exd_u*1.0d3
+
+ ! deallocate SBLOCK
+ do iblk=1,nblkA
+    associate(A => SBlockA(iblk))
+      deallocate(A%matY,A%matX,A%vec)
+      deallocate(A%pos)
+    end associate
+ enddo
+ do iblk=1,nblkB
+    associate(B => SBlockB(iblk))
+      deallocate(B%matY,B%matX,B%vec)
+      deallocate(B%pos)
+    end associate
+ enddo
+ ! deallocate IV part 
+ associate(A => SBlockAIV)
+   if(A%n>0) then
+      deallocate(A%vec)
+      deallocate(A%pos)
+   endif
+ end associate
+ associate(B => SBlockBIV)
+   if(B%n>0) then
+      deallocate(B%vec)
+      deallocate(B%pos)
+   endif
+ end associate
+
+ deallocate(OmB0,OmA0)
+
+ ! !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+ if(both) then
+    ! coupled
+    sij = 0
+    inquire(file='PROP_AB',EXIST=ipropab)
+    if(ipropab) then
+       ! read s_ij
+       open(newunit=iunit,file='PROP_AB',form='UNFORMATTED',&
+          access='SEQUENTIAL',status='OLD')
+       read(iunit) sij
+       close(iunit)
+
+    else
+    
+       ! make s_ij
+       call make_sij_Y(sij,tmp1,A,B,nOVB,NBas)
+
+    endif
+
+    !print*, 'sij',norm2(sij)
+    !print*, 'tmp3-exd',norm2(tmp3)
+
+    ! term X
+    termX = 0d0
+    do j=1,B%NDimX
+       do i=1,A%NDimX
+           
+      !    if(A%Eig(i).gt.SmallE.and.B%Eig(j).gt.SmallE&
+      !       .and.A%Eig(i).lt.BigE.and.B%Eig(j).lt.BigE) then
+
+          if(abs(A%Eig(i)).gt.SmallE.and.abs(B%Eig(j)).gt.SmallE&
+             .and.abs(A%Eig(i)).lt.BigE.and.abs(B%Eig(j)).lt.BigE) then
+
+
+             termX = termX + tmp3(i,j)*sij(i,j)/(A%Eig(i)+B%Eig(j))
+
+          endif
+       enddo
+    enddo
+    termX = -4d0*termX
+
+!    write(LOUT,*) 'termX ', termX
+    write(LOUT,'(/1x,a,f16.8)') 'term X      = ',  termX*1.0d3
+
+    ! termY
+    ! term Y: t_ij 
+    call make_tij_Y(tmp3,tmp2,tmp1,posA,posB,Sab,Sba,A,B,NBas)
+
+    ! term Y
+    termY = 0d0
+    do j=1,B%NDimX
+       do i=1,A%NDimX
+           
+         ! if(A%Eig(i).gt.SmallE.and.B%Eig(j).gt.SmallE&
+         !    .and.A%Eig(i).lt.BigE.and.B%Eig(j).lt.BigE) then
+
+          if(abs(A%Eig(i)).gt.SmallE.and.abs(B%Eig(j)).gt.SmallE&
+             .and.abs(A%Eig(i)).lt.BigE.and.abs(B%Eig(j)).lt.BigE) then
+
+             termY = termY + sij(i,j)*tmp3(i,j)/(A%Eig(i)+B%Eig(j))
+
+          endif
+       enddo
+    enddo
+
+    termY = -8d0*(SAPT%elst-SAPT%Vnn)*termY
+    write(LOUT,'(1x,a,f16.8)') 'term Y      = ',  termY*1.0d3
+
+    e2exd = termX + termY + termZ
+    SAPT%e2exdisp     = e2exd
+    write(LOUT,'(/1x,a,f16.8)') 'E2exch-disp = ', e2exd*1.0d3
+
+ ! end coupled
+ endif
+
  deallocate(sij)
 
  deallocate(posB,posA,ints)
  deallocate(Vbab,Vaba,Vaab,Vbaa,Vabb,Vb,Va,PB,PA,Sab,S)
- deallocate(workSq,work,tmp2,tmp1)
+ deallocate(workSq,work,tmp_u,tmp2,tmp1)
+ if(both) deallocate(tmp3)
 
 end subroutine e2exdisp
 
@@ -6798,6 +7044,65 @@ end associate
 
 end subroutine create_Y0tilde
 
+subroutine separate_SBlockAA(SBlock,SBlockIV,IndN,nblk,num0,num1,num2,NBasis,NDimX)
+implicit none
+
+type(EBlockData)   :: Sblock(nblk),SblockIV
+
+integer,intent(in)           :: nblk,NBasis,num0,num1,num2,NDimX
+integer,intent(in)           :: IndN(2,NDimX)
+
+integer          :: i,ii,ipos,iblk,ip,iq
+integer          :: dimO,IGemT(NBasis)
+double precision :: fact
+
+dimO = num0+num1
+
+do i=1,num0
+   IGemT(i) = 1
+enddo
+do i=num0+1,dimO
+   IGemT(i) = 2
+enddo
+do i=dimO+1,NBasis
+   IGemT(i) = 3
+enddo
+
+do iblk=1,nblk
+   associate(A => SBlock(iblk))
+
+     do i=1,A%n
+        ipos = A%pos(i)
+
+        ip   = IndN(1,ipos)
+        iq   = IndN(2,ipos)
+        if(IGemT(ip)==2.and.IGemT(iq)==2) then
+          fact = 1d0 
+        else
+          fact = 0d0
+        endif
+        A%matY(i,1:A%n) = fact * A%matY(i,1:A%n)
+        A%matX(i,1:A%n) = fact * A%matX(i,1:A%n)
+
+     enddo
+   end associate
+enddo
+associate(A => SBlockIV)
+
+  do i=1,A%n
+
+     A%matX(i,1) = 0d0
+     A%matY(i,1) = 0d0
+     A%vec(i)    = 0d0
+     
+  enddo
+
+end associate
+
+!print*, 'Act-Act block separated'
+
+end subroutine separate_SBlockAA
+
 subroutine read_SBlock(SBlock,SBlockIV,nblk,xy0file)
 implicit none
 
@@ -6848,6 +7153,9 @@ integer :: iunit
 integer :: i,iblk,nblk,ival,ipos
 
 call read_SBlock(SBlock,SBlockIV,nblk,xy0file)
+!! test Disp-in-CAS
+!call separate_SBlockAA(SBlock,SBlockIV,Mon%IndN,&
+!                       nblk,Mon%num0,Mon%num1,Mon%num2,NBasis,Mon%NDimX)
 
 call create_Y0tilde(Y01Block,SBlock,SBlockIV,Eig0,Mon%CICoef,Mon%IndN,nblk,NBasis,Mon%NDimX)
 
@@ -6867,6 +7175,103 @@ call create_Y0tilde(Y01Block,SBlock,SBlockIV,Eig0,Mon%CICoef,Mon%IndN,nblk,NBasi
  end associate
 
 end subroutine convert_XY0_to_Y01
+
+subroutine unpack_Eig(SBlock,SBlockIV,nblk,Eig,NDimX)
+implicit none
+
+type(EBlockData)             :: SBlock(nblk),SBlockIV
+integer,intent(in)           :: nblk,NDimX
+double precision,intent(out) :: Eig(NDimX)
+
+integer :: i,ii,iblk
+
+do iblk=1,nblk
+   associate(B => SBlock(iblk))
+     Eig(B%l1:B%l2) = B%vec(1:B%n)
+   end associate
+enddo
+associate(B => SBlockIV)
+  do i=1,B%n
+     ii = B%l1+i-1
+     Eig(ii) = B%vec(i)
+  enddo
+end associate
+
+end subroutine unpack_Eig
+
+subroutine make_tij_Y_unc(tmp2,tmp1,AOcc,BOcc,SBlockA,SBlockAIV,SBlockB,SBlockBIV,&
+                          AIndN,BIndN,posA,posB,Sab,Sba,nblkA,nblkB,ANDimX,BNDimX,NBas)
+implicit none
+
+type(EBlockData)               :: SBlockA(nblkA),SBlockAIV,&
+                                  SBlockB(nblkB),SBlockBIV
+integer,intent(in)             :: nblkA,nblkB,ANDimX,BNDimX,NBas
+integer,intent(in)             :: posA(NBas,NBas),posB(NBas,NBas),&
+                                  AIndN(2,ANDimX),BIndN(2,BNDimX)
+double precision,intent(in)    :: Sab(NBas,NBas),Sba(NBas,NBas),&
+                                  AOcc(NBas),BOcc(NBas)
+double precision,intent(inout) :: tmp1(ANDimX,BNDimX),&
+                                  tmp2(ANDimX,BNDimX)
+
+integer :: i,j,ir,is,irs,ip,iq,ipq
+double precision :: fact
+
+tmp1=0
+do j=1,BNDimX
+
+   ir = BIndN(1,j)
+   is = BIndN(2,j)
+   irs = posB(ir,is)
+
+   do i=1,ANDimX
+
+      ip = AIndN(1,i)
+      iq = AIndN(2,i)
+      ipq = posA(ip,iq)
+
+      fact = (BOcc(ir)-BOcc(is)) * &
+             (AOcc(ip)-AOcc(iq))
+
+      tmp1(ipq,irs) = tmp1(ipq,irs) + Sab(iq,ir)*Sba(is,ip)*fact
+
+   enddo
+enddo
+tmp2 = 0
+!X_A.I.X_B
+call abpm_tran_gen(tmp1,tmp2,SBlockA,SBlockAIV,SBlockB,SBlockBIV, &
+                   nblkA,nblkB,ANDimX,BNDimX,'XX')
+!Y_A.I.Y_B
+call abpm_tran_gen(tmp1,tmp2,SBlockA,SBlockAIV,SBlockB,SBlockBIV, &
+                   nblkA,nblkB,ANDimX,BNDimX,'YY')
+
+tmp1 = 0
+do j=1,BNDimX
+
+   ir = BIndN(1,j)
+   is = BIndN(2,j)
+   irs = posB(ir,is)
+
+   do i=1,ANDimX
+
+      ip = AIndN(1,i)
+      iq = AIndN(2,i)
+      ipq = posA(ip,iq)
+
+      fact = (BOcc(ir)-BOcc(is)) * &
+             (AOcc(ip)-AOcc(iq))
+
+      tmp1(ipq,irs) = tmp1(ipq,irs) - Sab(ip,ir)*Sba(is,iq)*fact
+
+   enddo
+enddo
+!X_A.I.Y_B
+call abpm_tran_gen(tmp1,tmp2,SBlockA,SBlockAIV,SBlockB,SBlockBIV, &
+                   nblkA,nblkB,ANDimX,BNDimX,'XY')
+!Y_A.I.X_B
+call abpm_tran_gen(tmp1,tmp2,SBlockA,SBlockAIV,SBlockB,SBlockBIV, &
+                   nblkA,nblkB,ANDimX,BNDimX,'YX')
+
+end subroutine make_tij_Y_unc
 
 subroutine writeampl(sij,ampfile)
 implicit none
