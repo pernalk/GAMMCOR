@@ -264,6 +264,9 @@ else
   case(JOB_TYPE_CASPIDFT)
      Flags%IFunSR = 5 
 
+  case(JOB_TYPE_CASPIDFTOPT)
+     Flags%IFunSR = 6
+
   end select
 
  ! Inactive

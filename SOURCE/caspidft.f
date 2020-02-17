@@ -428,7 +428,7 @@ c      B=A-One
       D=(C-One)/(One-G)**2
 C
       Write(6,'(/,1X,''Values of A, B, C, G parameters in CASPIDFT'',
-     $ 2X,4F10.3)')A,B,C,G
+     $ 2X,4F12.6)')A,B,C,G
 C
       EDYN=Zero
       ELYP=Zero

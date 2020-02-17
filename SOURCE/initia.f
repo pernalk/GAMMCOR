@@ -1069,6 +1069,9 @@ C
 C
       Include 'commons.inc'
 C
+      IFunSR = 5
+C
+C
       Do I=1,60
       FName(I:I)=' '
       EndDo
@@ -1215,10 +1218,10 @@ CC
 C      Call Int2_AO(TwoEl,NumOSym,MultpC,FName,NInte1,NInte2,NBasis)
 C
 C     HAP
-      If (IFunSR.Eq.0.Or.IFunSR.Eq.3.Or.IFunSR.Eq.5) Then
+      If (IFunSR.Eq.0.Or.IFunSR.Eq.3.Or.IFunSR.Eq.5.Or.IFunSR.Eq.6) Then
       Call readtwoint(NBasis,2,'AOTWOINT.mol','AOTWOSORT')
       If(ITwoEl.Eq.1) Call LoadSaptTwoEl(3,TwoEl,NBasis,NInte2)
-      Else
+      ElseIf(IFunSR.Eq.1.Or.IFunSR.Eq.2.Or.IFunSR.Eq.4) Then
       Call readtwoint(NBasis,2,'AOTWOINT.erf','AOERFSORT')
       If(ITwoEl.Eq.1) Call LoadSaptTwoEl(4,TwoEl,NBasis,NInte2)
       EndIf
@@ -1380,9 +1383,9 @@ C
       EndDo
       EndDo
 C
-      If (IFunSR.Eq.0.Or.IFunSR.Eq.3.Or.IFunSR.Eq.5) Then
+      If (IFunSR.Eq.0.Or.IFunSR.Eq.3.Or.IFunSR.Eq.5.Or.IFunSR.Eq.6) Then
       Call FockGen_mithap(FockF,GammaAB,XKin,NInte1,NBasis,'AOTWOSORT')
-      Else
+      ElseIf (IFunSR.Eq.1.Or.IFunSR.Eq.2.Or.IFunSR.Eq.4) Then
       Call FockGen_mithap(FockF,GammaAB,XKin,NInte1,NBasis,'AOERFSORT')
       EndIf
 C
@@ -1458,7 +1461,7 @@ C
 C     END OF CANONICALIZING
 C
 C     If CASPiDFT then skip integral transformation
-      If(IFunSR.Eq.5) Then
+      If(IFunSR.Eq.6) Then
       Call MultpM(UAOMO,URe,UAux,NBasis)
       Write(6,'(/," CASPIDFT - skip integral transformation",/)')
       Else
@@ -1590,7 +1593,7 @@ C
 C
 C     COMPUTE THE ENERGY FOR CHECKING
 C
-      If(IFunSR.Ne.5) Then
+      If(IFunSR.Ne.6) Then
 C
       ETot=Zero
       Do I=1,NOccup
@@ -1653,6 +1656,9 @@ C
       If(I.Eq.J) URe(I,J)=One
       EndDo
       EndDo
+C
+C     TEST
+      IFunSR = 6
 C
       Return
       End

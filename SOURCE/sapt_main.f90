@@ -54,6 +54,8 @@ double precision :: Tcpu,Twall
  if(Flags%ISERPA==0) then
 
     call e1elst(SAPT%monA,SAPT%monB,SAPT)
+    !if(SAPT%SaptLevel==10) call e1elst_in_CAS(SAPT%monA,SAPT%monB,SAPT)
+
     !call e1exchs2(Flags,SAPT%monA,SAPT%monB,SAPT)
 
     ! UNCOUPLED E2DISP
@@ -133,7 +135,7 @@ double precision   :: XGrid(1000), WGrid(1000),DispAlph, e2d
 
     if(Flags%ISERPA==0) then
        call e2dispCAS(e2d,Flags,SAPT%monA,SAPT%monB,SAPT,SAPT%ACAlpha,NBasis)
-       call e2exdisp(Flags,SAPT%monA,SAPT%monB,SAPT)
+       !call e2exdisp(Flags,SAPT%monA,SAPT%monB,SAPT)
     elseif(Flags%ISERPA==2) then
        call e2dispCAS_pino(e2d,Flags,SAPT%monA,SAPT%monB,SAPT,SAPT%ACAlpha)
     endif

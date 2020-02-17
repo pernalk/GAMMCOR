@@ -289,6 +289,9 @@ subroutine read_block_calculation(CalcParams, line)
                CalcParams%JobType = JOB_TYPE_PDFT
            elseif (uppercase(val) == "CASPIDFT" ) then
                CalcParams%JobType = JOB_TYPE_CASPIDFT
+           elseif (uppercase(val) == "CASPIDFTOPT" ) then
+               CalcParams%JobType = JOB_TYPE_CASPIDFTOPT
+
            endif
 
      !case ("FRAGMENTS") 

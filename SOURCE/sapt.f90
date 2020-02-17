@@ -18,7 +18,6 @@ integer :: NBas
 double precision,allocatable :: PA(:,:),PB(:,:) 
 double precision,allocatable :: Va(:,:),Vb(:,:),Ja(:,:) 
 double precision,allocatable :: work(:,:)
-double precision,allocatable :: AOcc(:),BOcc(:) 
 double precision :: tmp,ea,eb,elst
 double precision,parameter :: Half=0.5d0
 double precision,external  :: trace
@@ -30,38 +29,8 @@ double precision,external  :: trace
           Va(NBas,NBas),Vb(NBas,NBas),Ja(NBas,NBas))
  allocate(work(NBas,NBas))
 
- !if(SAPT%SaptLevel==10) then
-
- !   allocate(AOcc(NBas),BOcc(NBas))
-
- !   AOcc = A%Occ
- !   BOcc = B%Occ
-
- !   print*, 'aaa? ',A%INAct
- !   print*, 'bbb? ',B%INAct
-
- !   do i=1,A%INAct
- !      AOcc(i) = 0d0
- !   enddo
- !   do i=1,B%INAct
- !      BOcc(i) = 0d0 
- !   enddo
-
- !   do i=1,NBas
- !      print*, i,AOcc(i),A%Occ(i)
- !   enddo
-
- !   call get_den(NBas,A%CMO,AOcc,2d0,PA)
- !   call get_den(NBas,B%CMO,BOcc,2d0,PB)
- ! 
- !   deallocate(BOcc,AOcc)
-
- !else
-
-    call get_den(NBas,A%CMO,A%Occ,2d0,PA)
-    call get_den(NBas,B%CMO,B%Occ,2d0,PB)
-
- !endif
+ call get_den(NBas,A%CMO,A%Occ,2d0,PA)
+ call get_den(NBas,B%CMO,B%Occ,2d0,PB)
 
  call get_one_mat('V',Va,A%Monomer,NBas)
  call get_one_mat('V',Vb,B%Monomer,NBas)
@@ -72,12 +41,12 @@ double precision,external  :: trace
  work=0
  call dgemm('N','N',NBas,NBas,NBas,1d0,PA,NBas,Vb,NBas,0d0,work,NBas)
  ea = trace(work,NBas)
- print*, 'ea',ea
+ !print*, 'ea',ea
  call dgemm('N','N',NBas,NBas,NBas,1d0,PB,NBas,Va,NBas,0d0,work,NBas)
  eb = trace(work,NBas) 
- print*, 'eb',eb
+ !print*, 'eb',eb
  call dgemm('N','N',NBas,NBas,NBas,1d0,PB,NBas,Ja,NBas,0d0,work,NBas)
- print*, 'Pb.JA',trace(work,NBas)
+ !print*, 'Pb.JA',trace(work,NBas)
  ea = ea + trace(work,NBas)
 ! print*, trace(work,NBas)
  elst = ea + eb + SAPT%Vnn
@@ -4300,6 +4269,7 @@ double precision,parameter :: BigE = 1.D8
  if(SAPT%SaptLevel/=10) then
     termZ_u = 2d0*SAPT%e2disp_unc*termZ_u
  elseif(SAPT%SaptLevel==10) then
+    print*,'SAPT-in-CAS!',SAPT%e2dispinCAS
     termZ_u = 2d0*SAPT%e2dispinCAS*termZ_u
  endif
  !write(LOUT,*) 'termZ ',termZ
@@ -5043,7 +5013,12 @@ double precision,parameter :: BigE = 1.D8
     enddo
  enddo
 
- termY_u = -8d0*(SAPT%elst-SAPT%Vnn)*termY_u
+ 
+! if(SAPT%SaptLevel/=10) then
+    termY_u = -8d0*(SAPT%elst-SAPT%Vnn)*termY_u
+! elseif(SAPT%SaptLevel==10) then
+!    !termY_u = -8d0*(SAPT%elstinCAS-SAPT%Vnn)*termY_u
+! endif 
 
  if(SAPT%IPrint>2) write(LOUT,'(/1x,a,f16.8)') 'term Z(unc) = ',  termZ_u*1.0d3
  if(SAPT%IPrint>2) write(LOUT,'(1x,a,f16.8)')  'term X(unc) = ',  termX_u*1.0d3

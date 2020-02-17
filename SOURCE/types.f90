@@ -24,7 +24,8 @@ integer, parameter :: JOB_TYPE_EERPA = 4
 integer, parameter :: JOB_TYPE_SAPT  = 5
 integer, parameter :: JOB_TYPE_PDFT  = 6
 integer, parameter :: JOB_TYPE_CASPIDFT = 7
-integer, parameter :: JOB_TYPE_EERPA_OLD = 8
+integer, parameter :: JOB_TYPE_CASPIDFTOPT = 8
+integer, parameter :: JOB_TYPE_EERPA_OLD = 9
 
 integer, parameter :: SAPTLEVEL0 = 0
 integer, parameter :: SAPTLEVEL1 = 1
@@ -66,9 +67,9 @@ character(*),parameter :: PossibleInterface(4) = &
 [character(8) :: &
 'DALTON', 'MOLPRO', 'OWN', 'ORCA']
 
-character(*),parameter :: PossibleJobType(8) = &
-[character(8) :: &
-'AC', 'AC0', 'ERPA', 'EERPA', 'SAPT', 'PDFT', 'CASPiDFT','EERPA-1']
+character(*),parameter :: PossibleJobType(9) = &
+[character(9) :: &
+'AC', 'AC0', 'ERPA', 'EERPA', 'SAPT', 'PDFT', 'CASPiDFT','CASPiDFTOpt','EERPA-1']
 
 character(*),parameter :: PossibleRDMType(5) = &
 [character(8) :: &
@@ -232,7 +233,7 @@ type SaptData
      double precision  :: Vnn,elst,exchs2,e2ind,e2disp
      double precision  :: e2disp_sc,e2disp_sp,e2disp_unc
      double precision  :: e2exdisp_unc,e2exdisp
-     double precision  :: e2dispinCAS
+     double precision  :: elstinCAS,e2dispinCAS
      integer :: InterfaceType = INTER_TYPE_DAL
      integer :: SaptLevel = SAPTLEVEL2
      integer :: ic6 = 0
