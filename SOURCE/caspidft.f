@@ -36,10 +36,9 @@ c      double precision vsigmacc(ngrid),vsigmaco(ngrid),vsigmaoo(ngrid)
 C
       FDeriv=.True.
       Open=.False.
-c      Alpha=0.5
       Alpha=0.4
       CMix=0.5
-      Write(*,'(/,X,"ALPHA CMix",X,2F5.2)')Alpha,CMix
+c      Write(*,'(/,X,"ALPHA CMix",X,2F5.2)')Alpha,CMix
 C
       Write(6,'(/,X,"***************** CASPIDFT ***************** ")')
 C
@@ -156,6 +155,27 @@ C
 C
       EndDo
 C
+C     OVERLAP OF ORBITALS
+C
+      Do I=1,NOccup
+      If(Occ(I).Lt.0.8.And.Occ(I).Gt.0.2) Then
+      Do J=1,I-1
+      If(Occ(J).Lt.0.8.And.Occ(J).Gt.0.2) Then
+C
+      SIJ=Zero
+      Do IG=1,NGrid
+      SIJ=SIJ+Abs(OrbGrid(IG,I)*OrbGrid(IG,J))*WGrid(IG)
+      EndDo 
+C
+      Write(6,'(/,X,"Abs Overlap S",2I4,2F8.5,E12.5)')
+     $ I,J,Occ(I),Occ(J),SIJ
+C
+      EndIf
+      EndDo
+C
+      EndIf
+      EndDo
+C
       Call LYP(RhoGrid,Sigma,Zk,NGrid)
 c      Call PBECor(RhoGrid,Sigma,Zk,NGrid)
 c      Call GGA_SPIN(Zk1,URe,Occ,
@@ -167,18 +187,16 @@ C     >                   Zk1,vrhoc,vrhoo,
 C     >                   vsigmacc,vsigmaco,vsigmaoo,Alpha)
 C
 C
-      IVer=1
-      Call MCORRECTION(ELSM,Occ,TwoNO,URe,
-     $                 OrbGrid,WGrid,
-     $                 OrbXGrid,OrbYGrid,OrbZGrid,
-     $                 NGrid,NBasis,NInte1,NInte2,IVer)
+c      IVer=1
+c      Call MCORRECTION(ELSM,Occ,TwoNO,URe,
+c     $                 OrbGrid,WGrid,
+c     $                 OrbXGrid,OrbYGrid,OrbZGrid,
+c     $                 NGrid,NBasis,NInte1,NInte2,IVer)
 C
       ConCorr(1:200)=Zero
-c      A=0.35D0
       A=0.2D0
       B=A-One
       C=2.6D0
-c      c=2.0
       G=1.5D0
       D=(C-One)/(One-G)**2
 C
@@ -188,8 +206,7 @@ C
       EDYN=Zero
       ELYP=Zero
       ESR=Zero
-      Sum1=Zero
-      Sum2=Zero
+C
       Do I=1,NGrid
 C
       If(RhoGrid(I).Ne.Zero) Then
@@ -205,49 +222,240 @@ C
       EDYN=EDYN+PX*Zk(I)*WGrid(I)
 c      EDYN=EDYN+PX*Zk1(I)*WGrid(I)
       ELYP=ELYP+Zk(I)*WGrid(I)
-c      ELYP=ELYP+PX*Zk1(I)*WGrid(I)
 c      ESR=ESR+Zk1(I)*WGrid(I)
-
-c      if(abs(Zk(I)*WGrid(I)).gt.1.d-4) 
-c       write(*,'(i4,x,6e15.4)')i,RhoGrid(I),xx,PX*Zk(I)*WGrid(I),
-c     $ Zk(I)*WGrid(I),EDYN,ELYP
 C
       EndIf
 C
       EndDo
 C     TEST TRDMs
-      Call TEST_TRDMs(Occ,UNOAO,NInte1,NBasis)
-C
-c      Sum=Zero
-c      Sum11=Zero
-c      Sum07=Zero
-c      Do I=1,120
-c      if(abs(ConCorr(I)).gt.1.d-5) Write(*,'(i4,x,e17.6)'),I,ConCorr(I)
-c      Sum=Sum+ConCorr(I)
-c      If(I.Gt.100) Sum11=Sum11+ConCorr(I)
-c      If(I.Gt.59.And.I.Lt.91) Sum07=Sum07+ConCorr(I)
-c      EndDo
-c      Write(*,'("Sum:",x,e17.6)')Sum
-c      Write(*,'("Contribution from X>1 region: ",x,e17.6)')Sum11
-c      Write(*,'("Contribution from 0.90.0>X>0.60 region: ",x,e17.6)')
-c     $ Sum07
+c      Call TEST_TRDMs(Occ,UNOAO,NInte1,NBasis)
 C
       Write(6,'(/,1X,''LYP Correlation'',7X,F15.8)')ELYP
       Write(6,'(1X,''CASPIDFT Correlation'',2X,F15.8)')EDYN
 C      Write(6,'(1X,''SR  Correlation'',7X,F15.8)')ESR
       Write(6,'(1X,''Total CAS+ LYP Energy'',X,F15.8)')ELYP+ETot+ENuc
       Write(6,'(1X,''Total CASPIDFT Energy'',X,F15.8)')EDYN+ETot+ENuc
-      Write(6,'(1X,''Total CASPI(M)DFT Energy'',X,F15.8)')
-     $ EDYN+ETot+ENuc+ELSM
-C
-c      Write(6,'(/,1X,'' 1-P(X) Weight'',2X,F15.8)')Sum1
-c      Write(6,'(1X,  ''    W=1 Weight'',2X,F15.8)')Sum2
-c      Write(6,'(1X,''Total hybrid'',X,F15.8)')
-c     $ CMix*ESR+(One-CMix)*Sum1+ETot+ENuc+Sum2
-c      Write(6,'(1X,''Total SR-LR'',X,F15.8)')
-c     $ ESR+ETot+ENuc+Sum2
+c      Write(6,'(1X,''Total CASPI(M)DFT Energy'',X,F15.8)')
+c     $ EDYN+ETot+ENuc+ELSM
 C
       Stop 
+C
+      Return
+      End
+
+*Deck CASPIDFTOPT
+      Subroutine CASPIDFTOPT(URe,UNOAO,Occ,NBasis)
+C
+      Implicit Real*8 (A-H,O-Z)
+C
+      Parameter(Zero=0.D0, Half=0.5D0, One=1.D0, Two=2.D0, Four=4.D0)
+C
+      Include 'commons.inc'
+C
+c      Real*8, Dimension(:), Allocatable :: OrbGrid(:,:)
+      Real*8, Dimension(:), Allocatable :: OrbXGrid
+      Real*8, Dimension(:), Allocatable :: OrbYGrid
+      Real*8, Dimension(:), Allocatable :: OrbZGrid
+      Real*8, Dimension(:), Allocatable :: WGrid
+      Real*8, Dimension(:), Allocatable :: RhoGrid
+      Real*8, Dimension(:), Allocatable :: Sigma
+      Real*8, Dimension(:), Allocatable :: Zk,Zk1
+      Real*8, Dimension(:), Allocatable :: rhoo,sigmaco,sigmaoo,vrhoc,
+     $ vrhoo,vsigmacc,vsigmaco,vsigmaoo
+      Real*8, Allocatable :: RDM2Act(:),OrbGrid(:,:)
+      Real*8, Allocatable :: RR(:,:)
+      Real*8, Allocatable :: OnTop(:)
+      CHARACTER(100) :: num1char,num2char,num3char
+C
+      Dimension URe(NBasis,NBasis),UNOAO(NBasis,NBasis),Occ(NBasis),
+     $ Ind1(NBasis),Ind2(NBasis),
+     $ ConCorr(200)
+     $ ,EpsC(NBasis,NBasis),EpsCI(NBasis),EpsDiag(NBasis)
+      logical fderiv,open
+c      double precision rhoo(ngrid)
+c      double precision sigmaco(ngrid),sigmaoo(ngrid)
+      integer igrad
+      character*(30) name
+C
+C     IFlagRead = 0 - generate grid data, do not write to a file
+C     IFlagRead = 1 - read grid data (density, ontop, and lyp energy density) from a file
+C     IFlagRead = 2 - write grid data to a file
+C
+      IFlagRead=0
+C
+      IF(COMMAND_ARGUMENT_COUNT().Eq.0)THEN
+      WRITE(*,*)'ERROR, COMMAND-LINE ARGUMENTS REQUIRED, STOPPING'
+      STOP
+      ENDIF
+
+      CALL GET_COMMAND_ARGUMENT(1,num1char)   !first, read in the two values
+      CALL GET_COMMAND_ARGUMENT(2,num2char)
+c      CALL GET_COMMAND_ARGUMENT(3,num3char)
+
+      READ(num1char,*)xnum1                    !then, convert them to REALs
+      READ(num2char,*)xnum2
+c      READ(num3char,*)xnum3
+C
+      A1=XNum1
+      B1=XNum2
+C
+      Write(6,'(/,X,"***************** CASPIDFT ***************** ")')
+C
+      Call molprogrid0(NGrid,NBasis)
+C
+      Allocate  (WGrid(NGrid))
+      Allocate  (OrbGrid(NGrid,NBasis))
+      Allocate  (OrbXGrid(NBasis*NGrid))
+      Allocate  (OrbYGrid(NBasis*NGrid))
+      Allocate  (OrbZGrid(NBasis*NGrid))
+      Allocate  (RhoGrid(NGrid))
+      Allocate  (Sigma(NGrid))
+      Allocate  (Zk(NGrid))
+      Allocate  (Zk1(NGrid))
+      Allocate  (RR(3,NGrid))
+      Allocate  (OnTop(NGrid))
+C
+C      Call molprogrid1(RR,NGrid)
+C
+C     READ 2RDM, COMPUTE THE ENERGY
+C
+      NAct=NAcCAS
+      INActive=NInAcCAS
+      NOccup=INActive+NAct
+      Ind2(1:NBasis)=0
+      Do I=1,NAct
+      Ind1(I)=INActive+I
+      Ind2(INActive+I)=I
+      EndDo
+C
+      NRDM2Act = NAct**2*(NAct**2+1)/2
+      Allocate (RDM2Act(NRDM2Act))
+      RDM2Act(1:NRDM2Act)=Zero
+C
+      Open(10,File="rdm2.dat",Status='Old')
+C
+   10 Read(10,'(4I4,F19.12)',End=40)I,J,K,L,X
+C
+C     X IS DEFINED AS: < E(IJ)E(KL) > - DELTA(J,K) < E(IL) > = 2 GAM2(JLIK)
+C
+      RDM2Act(NAddrRDM(J,L,I,K,NAct))=Half*X
+C
+      I=Ind1(I)
+      J=Ind1(J)
+      K=Ind1(K)
+      L=Ind1(L)
+C
+      GoTo 10
+   40 Continue
+      Close(10)
+C
+C     load orbgrid and gradients, and wgrid
+C
+      Call molprogrid(OrbGrid,OrbXGrid,OrbYGrid,OrbZGrid,
+     $ WGrid,UNOAO,NGrid,NBasis)
+C
+      If(IFlagRead.Eq.1) Then
+      Open(10,File="data_on_grid.dat",form='unformatted')
+      Read(10) (OnTop(I),I=1,NGrid)
+      Read(10) (RhoGrid(I),I=1,NGrid)
+      Read(10) (Zk(I),I=1,NGrid)
+      Close(10)
+      GoTo 300
+      EndIf
+C
+      Do I=1,NGrid
+C
+      Call DenGrid(I,RhoGrid(I),Occ,URe,OrbGrid,NGrid,NBasis)
+      Call DenGrad(I,RhoX,Occ,URe,OrbGrid,OrbXGrid,NGrid,NBasis)
+      Call DenGrad(I,RhoY,Occ,URe,OrbGrid,OrbYGrid,NGrid,NBasis)
+      Call DenGrad(I,RhoZ,Occ,URe,OrbGrid,OrbZGrid,NGrid,NBasis)
+      Sigma(I)=RhoX**2+RhoY**2+RhoZ**2
+C
+      OnTop(I)=Zero
+      Do IP=1,NOccup
+      Do IQ=1,NOccup
+      Do IR=1,NOccup
+      Do IS=1,NOccup
+      OnTop(I)=OnTop(I)
+     $ +Two*FRDM2(IP,IQ,IR,IS,RDM2Act,Occ,Ind2,NAct,NBasis)
+     $ *OrbGrid(I,IP)*OrbGrid(I,IQ)*OrbGrid(I,IR)*OrbGrid(I,IS)
+      EndDo
+      EndDo
+      EndDo
+      EndDo
+C
+      EndDo
+C
+C     OVERLAP OF ORBITALS
+C
+      Do I=1,NOccup
+      If(Occ(I).Lt.0.8.And.Occ(I).Gt.0.2) Then
+      Do J=1,I-1
+      If(Occ(J).Lt.0.8.And.Occ(J).Gt.0.2) Then
+C
+      SIJ=Zero
+      Do IG=1,NGrid
+      SIJ=SIJ+Abs(OrbGrid(IG,I)*OrbGrid(IG,J))*WGrid(IG)
+      EndDo
+C
+      Write(6,'(/,X,"Abs Overlap S",2I4,2F8.5,E12.5)')
+     $ I,J,Occ(I),Occ(J),SIJ
+C
+      EndIf
+      EndDo
+C
+      EndIf
+      EndDo
+C
+      Call LYP(RhoGrid,Sigma,Zk,NGrid)
+C
+C
+      If(IFlagRead.Eq.2) Then
+      Open(10,File="data_on_grid.dat",form='unformatted')
+      Write(10) (OnTop(I),I=1,NGrid)
+      Write(10) (RhoGrid(I),I=1,NGrid)
+      Write(10) (Zk(I),I=1,NGrid)
+      Close(10)
+      EndIf
+  300 Continue
+C
+      A=A1
+      B=B1
+c      A=0.2D0
+c      B=A-One
+      C=2.6D0
+      G=1.5D0
+      D=(C-One)/(One-G)**2
+C
+      Write(6,'(/,1X,''Values of A, B, C, G parameters in CASPIDFT'',
+     $ 2X,4F10.3)')A,B,C,G
+C
+      EDYN=Zero
+      ELYP=Zero
+C
+      Do I=1,NGrid
+C
+      If(RhoGrid(I).Ne.Zero) Then
+C
+      XX=Two*OnTop(I)/RhoGrid(I)**2
+C
+c herer!!! one segment only
+c      If(XX.Le.One) Then
+      PX=A*XX/(One+B*XX)
+c      Else
+c      PX=C*XX**0.25-D*(XX-G)**2
+c      EndIf
+C
+      EDYN=EDYN+PX*Zk(I)*WGrid(I)
+      ELYP=ELYP+Zk(I)*WGrid(I)
+C
+      EndIf
+C
+      EndDo
+      Write(6,'(/,1X,''LYP Correlation'',7X,F15.8)')ELYP
+      Write(6,'(1X,''CASPIDFT Correlation'',2X,F15.8)')EDYN
+C
+      Stop
 C
       Return
       End

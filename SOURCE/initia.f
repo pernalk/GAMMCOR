@@ -1317,7 +1317,6 @@ C
       Write(6,'(2X,"No of inactive and active orbitals: ",2I4)')
      $ NInAcCAS,NAcCAS
 C
-      write(*,*)'occ(7)',occ(7)
       Write(6,'(2X,"MCSCF",3X,"Occupancy",4X,"Gem")')
       Sum=Zero
       Do I=1,NBasis
@@ -1458,6 +1457,12 @@ C
 C
 C     END OF CANONICALIZING
 C
+C     If CASPiDFT then skip integral transformation
+      If(IFunSR.Eq.5) Then
+      Call MultpM(UAOMO,URe,UAux,NBasis)
+      Write(6,'(/," CASPIDFT - skip integral transformation",/)')
+      Else
+C
 C     TRANSFORM INTEGRALS TO NO
 C
       If(IAO.Eq.0) Then 
@@ -1468,69 +1473,6 @@ C
 C
 C     If(IAO.Eq.0)      
       Else
-C
-c herer!!!
-c start test
-c      Do I=1,NBasis
-c      Do J=1,NBasis
-cc      UAux(IndInt(I),J)=UAOMO(J,I)
-c      UAux(I,J)=UAOMO(J,I)
-c      EndDo
-c      EndDo
-cC
-c      Call CpyM(UMOAOInv,UAux,NBasis)
-c      tol = 1.0d-7
-c      call minvr(UMOAOInv,tol,det,ier,nbasis)
-c      if (ier.ne.0) then
-c        Write(6,'(/,'' ERROR : transformation from ao to '',
-c     $       ''mo basis is singular'')')
-c        Stop
-c      endif
-c      
-cc      Call TwoNO1(TwoEl,UAux,NBasis,NInte2)
-c      Open(10,File="FCIDUMP")
-cC
-c   22 Read(10,'(A10)')Aux1
-c      If(Aux1(1:6).Eq."  ISYM".Or.Aux1(1:5).Eq." ISYM") Then
-c      Read(10,'(A10)')Aux1
-c      GoTo 21
-c      EndIf
-c      GoTo 22
-c   21 Continue
-c      Read(10,*,End=31) X,I1,I2,I3,I4
-c      If(I3+I4.Ne.0) then
-c      TwoElAO(NAddr3(I1,I2,I3,I4))=X 
-cc      diff=abs(TwoEl(NAddr3(I1,I2,I3,I4))-X)
-cc      if(diff.gt.1.d-5) 
-cc     $ write(*,*) i1,i2,i3,i4,TwoEl(NAddr3(I1,I2,I3,I4)),X
-c      endif
-c      GoTo 21
-cC
-c   31 Close(10)
-c    
-c      Call TwoNO1(TwoElAO,UMOAOInv,NBasis,NInte2)
-cC
-c      ij=0
-c      do i=1,nbasis
-c      do j=1,i
-c      ij=ij+1
-c      kl=0
-c      do k=1,nbasis
-c      do l=1,k
-c      kl=kl+1
-c      if(ij.ge.kl) then
-c      diff=abs(TwoEl(NAddr3(i,j,k,l))-TwoElAO(NAddr3(i,j,k,l)))
-c      if(diff.gt.1.d-5)
-c     $ write(*,*) i,j,k,l,TwoEl(NAddr3(I,j,k,l)),
-c     $ TwoElAO(NAddr3(i,j,k,l))
-c      endif
-c      enddo
-c      enddo
-c      enddo
-c      enddo 
-c      stop
-cc end test
-C      
 C
       Call MultpM(UAOMO,URe,UAux,NBasis)
       Call MatTr(XKin,UAOMO,NBasis)
@@ -1584,6 +1526,9 @@ C
       EndIf
 C              
       EndIf  
+C
+c     If(IFunSR.Eq.5) Then
+      EndIf
 C
 C     READ ACTIVE 2-RDM AND TRANSFORM TO NO'S  
 C
@@ -1645,6 +1590,8 @@ C
 C
 C     COMPUTE THE ENERGY FOR CHECKING
 C
+      If(IFunSR.Ne.5) Then
+C
       ETot=Zero
       Do I=1,NOccup
       II=(I*(I+1))/2
@@ -1676,6 +1623,8 @@ C
 C
       Write(6,'(/,1X,''Two-electron Energy'',5X,F15.8)')ETwo
       Write(6,'(/,1X,''MCSCF Molpro Energy'',5X,F15.8)')EOne+ETwo+ENuc
+C
+      EndIf
 C
 C     SAVE THE ACTIVE PART IN rdm2.dat
 C

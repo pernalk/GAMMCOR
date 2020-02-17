@@ -281,8 +281,9 @@ C
       EndIf  
 C
       If(IFunSR.Eq.5) Then
-      Call CASPIDFT(ENuc,URe,UMOAO,Occ,XKin,TwoEl,
-     $ NBasis,NInte1,NInte2)
+c      Call CASPIDFT(ENuc,URe,UMOAO,Occ,XKin,TwoEl,
+c     $ NBasis,NInte1,NInte2)
+      Call CASPIDFTOPT(URe,UMOAO,Occ,NBasis)
       Else
       Call DMSCF(Title,URe,Occ,XKin,XNuc,ENuc,UMOAO,
      $ TwoEl,NBasis,NInte1,NInte2,NGem,System)
