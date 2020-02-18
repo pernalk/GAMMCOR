@@ -1033,8 +1033,6 @@ C
       Return
       End
 
-
-
 *Deck LdInteg
       Subroutine LdInteg(Title,XKin,XNuc,ENuc,Occ,URe,
      $ TwoEl,UAOMO,NInte1,NBasis,NInte2,NGem)
@@ -1068,9 +1066,6 @@ C
       Character*60 FName,Aux1,Title
 C
       Include 'commons.inc'
-C
-      IFunSR = 5
-C
 C
       Do I=1,60
       FName(I:I)=' '
@@ -1146,34 +1141,6 @@ C     HAP
 C      Call GetENuc_AO(ENuc,Title)
       Call GetEnuc_AOBin(ENuc,'AOONEINT.mol') 
 C
-C     READ INFORMATION ABOUT SYMMETRY
-C              
-C      Open(10,File='indices_int.dat')
-C      Read(10,*) MxSym
-C      Do I=1,MxSym
-C      Read(10,*) X
-C      NumOSym(I)=X
-C      EndDo
-CC
-C      If(MxSym.Gt.1) Then
-C      Do I=1,NBasis
-C      Read(10,*) I1,I2
-C      IndInt(I1)=I2
-C      EndDo     
-C      Else
-C      Do I=1,NBasis
-C      IndInt(I)=I
-C      EndDo      
-C      EndIf
-CC      
-C      Close(10)
-CC
-CC     
-C      Print*, 'TEST0!'
-C      Do I=1,NBasis
-C      Print*, I,IndInt(I)
-C      EndDo
- 
 C     HAP
       Call create_ind('2RDM',NumOSym,IndInt,MxSym,NBasis)
       
@@ -1184,41 +1151,10 @@ C
 C     HAP
       Call readoneint_molpro(XKin,'AOONEINT.mol','ONEHAMIL',
      $     .true.,NInte1)
-C      Print*, ' '
-C      Print*, 'NInte1',NInte1
-C      Do I=1,NInte1
-C      write(*,*) XKin(I),Tmp(I)
-C      EndDo
-
-C     LOAD TWO-ELE INTEGS IN AO
-C      Do I=1,60
-C      FName(I:I)=' '
-C      EndDo
-C      K=0
-C    5 K=K+1
-C      If (Title(K:K).Ne.' ') Then
-C      FName(K:K)=Title(K:K)
-C      GoTo 5
-C      EndIf
-C      FName(K:K+10)='.reg.integ'
-CC     
-C      If(MxSym.Eq.1) Then
-C      MultpC(1,1)=1
-C      Else      
-C      Open(10,File="multip_table.txt")
-C      Do I=1,MxSym
-C      Read(10,*)(MultpC(I,J),J=1,I)
-C      Do J=1,I
-C      MultpC(J,I)=MultpC(I,J)
-C      EndDo
-C      EndDo
-C      Close(10)
-C      EndIf
-CC
-C      Call Int2_AO(TwoEl,NumOSym,MultpC,FName,NInte1,NInte2,NBasis)
 C
 C     HAP
-      If (IFunSR.Eq.0.Or.IFunSR.Eq.3.Or.IFunSR.Eq.5.Or.IFunSR.Eq.6) Then
+C     KP: If IFunSR=6 integrals are not needed and are not loaded
+      If (IFunSR.Eq.0.Or.IFunSR.Eq.3.Or.IFunSR.Eq.5) Then
       Call readtwoint(NBasis,2,'AOTWOINT.mol','AOTWOSORT')
       If(ITwoEl.Eq.1) Call LoadSaptTwoEl(3,TwoEl,NBasis,NInte2)
       ElseIf(IFunSR.Eq.1.Or.IFunSR.Eq.2.Or.IFunSR.Eq.4) Then
@@ -1257,19 +1193,6 @@ C     READ RDMs: NEW
       EndDo
       EndDo
 C   
-C      Open(10,File='rdmdump.dat')
-C      Read(10,*) NStates
-C      IStart=0
-C   25 Read(10,*,End=35) X,I1,I2,I3,I4
-C      If(X.Eq.NoSt.And.I1+I2+I3+I4.Eq.-4) IStart=1
-C      If(X.Ne.NoSt.And.I1+I2+I3+I4.Eq.-4) IStart=0
-C      If((I1+I2.Ne.0).And.(I3+I4.Eq.0).And.IStart.Eq.1) Then
-C      Ind=(Max(I1,I2)*(Max(I1,I2)-1))/2+Min(I1,I2)
-C      Gamma(Ind)=X
-C      EndIf
-C      GoTo 25
-C  35  Close(10)
-C
       Call CpySym(AUXM,Gamma,NBasis)
 C
       Call Diag8(AUXM,NBasis,NBasis,PC,Work)
@@ -1342,6 +1265,10 @@ C     COPY AUXM TO URe AND OFF SET BY NInAc
      $ URe(I,J)=AUXM(IIAct,JJAct)
       EndDo
       EndDo
+C
+c herer!!!
+C     skip canonicalization if CASPIDFTOPT is called
+      If(IFunSR.Eq.6) GoTo 543
 C
       GammaF(1:NInte1)=Zero
       IJ=0
@@ -1460,10 +1387,19 @@ C
 C
 C     END OF CANONICALIZING
 C
+  543 Continue
+C
 C     If CASPiDFT then skip integral transformation
       If(IFunSR.Eq.6) Then
+C
+      Do I=1,NBasis
+      Do J=1,NBasis
+      UAux(IndInt(I),J)=UAOMO(J,I)
+      EndDo
+      EndDo
       Call MultpM(UAOMO,URe,UAux,NBasis)
       Write(6,'(/," CASPIDFT - skip integral transformation",/)')
+C
       Else
 C
 C     TRANSFORM INTEGRALS TO NO
@@ -1656,9 +1592,6 @@ C
       If(I.Eq.J) URe(I,J)=One
       EndDo
       EndDo
-C
-C     TEST
-      IFunSR = 6
 C
       Return
       End

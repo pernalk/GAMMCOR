@@ -372,18 +372,28 @@ C
       Sigma(I)=RhoX**2+RhoY**2+RhoZ**2
 C
       OnTop(I)=Zero
+C
+      EndDo
+C
       Do IP=1,NOccup
       Do IQ=1,NOccup
       Do IR=1,NOccup
       Do IS=1,NOccup
+C
+      Gam2=FRDM2(IP,IQ,IR,IS,RDM2Act,Occ,Ind2,NAct,NBasis)
+C
+      If(Abs(Gam2).Gt.1.D-8) Then
+C
+      Do I=1,NGrid
       OnTop(I)=OnTop(I)
-     $ +Two*FRDM2(IP,IQ,IR,IS,RDM2Act,Occ,Ind2,NAct,NBasis)
-     $ *OrbGrid(I,IP)*OrbGrid(I,IQ)*OrbGrid(I,IR)*OrbGrid(I,IS)
-      EndDo
-      EndDo
-      EndDo
+     $ +Two*Gam2*OrbGrid(I,IP)*OrbGrid(I,IQ)*OrbGrid(I,IR)*OrbGrid(I,IS)
       EndDo
 C
+      EndIf
+C
+      EndDo
+      EndDo
+      EndDo
       EndDo
 C
 C     OVERLAP OF ORBITALS
