@@ -187,11 +187,16 @@ C     >                   Zk1,vrhoc,vrhoo,
 C     >                   vsigmacc,vsigmaco,vsigmaoo,Alpha)
 C
 C
-c      IVer=1
-c      Call MCORRECTION(ELSM,Occ,TwoNO,URe,
-c     $                 OrbGrid,WGrid,
-c     $                 OrbXGrid,OrbYGrid,OrbZGrid,
-c     $                 NGrid,NBasis,NInte1,NInte2,IVer)
+Cc      IVer=1
+      Call MCORRECTION(ELSM,Occ,TwoNO,URe,
+     $                 OrbGrid,WGrid,
+     $                 OrbXGrid,OrbYGrid,OrbZGrid,
+     $                 NGrid,NBasis,NInte1,NInte2,IVer)
+C
+C      Call MCORROPT(ELSM,Occ,TwoNO,URe,
+C     $                 OrbGrid,WGrid,
+C     $                 OrbXGrid,OrbYGrid,OrbZGrid,
+C     $                 NGrid,NBasis,NInte1,NInte2,IVer)
 C
       ConCorr(1:200)=Zero
       A=0.2D0
@@ -235,8 +240,8 @@ C
 C      Write(6,'(1X,''SR  Correlation'',7X,F15.8)')ESR
       Write(6,'(1X,''Total CAS+ LYP Energy'',X,F15.8)')ELYP+ETot+ENuc
       Write(6,'(1X,''Total CASPIDFT Energy'',X,F15.8)')EDYN+ETot+ENuc
-c      Write(6,'(1X,''Total CASPI(M)DFT Energy'',X,F15.8)')
-c     $ EDYN+ETot+ENuc+ELSM
+      Write(6,'(1X,''Total CASPI(M)DFT Energy'',X,F15.8)')
+     $ EDYN+ETot+ENuc+ELSM
 C
       Stop 
 C
@@ -283,21 +288,25 @@ C     IFlagRead = 2 - write grid data to a file
 C
       IFlagRead=0
 C
-      IF(COMMAND_ARGUMENT_COUNT().Eq.0)THEN
-      WRITE(*,*)'ERROR, COMMAND-LINE ARGUMENTS REQUIRED, STOPPING'
-      STOP
-      ENDIF
-
-      CALL GET_COMMAND_ARGUMENT(1,num1char)   !first, read in the two values
-      CALL GET_COMMAND_ARGUMENT(2,num2char)
-c      CALL GET_COMMAND_ARGUMENT(3,num3char)
-
-      READ(num1char,*)xnum1                    !then, convert them to REALs
-      READ(num2char,*)xnum2
-c      READ(num3char,*)xnum3
+C      IF(COMMAND_ARGUMENT_COUNT().Eq.0)THEN
+C      WRITE(*,*)'ERROR, COMMAND-LINE ARGUMENTS REQUIRED, STOPPING'
+C      STOP
+C      ENDIF
 C
-      A1=XNum1
-      B1=XNum2
+C     FOR EXC. STATES
+C
+C      CALL GET_COMMAND_ARGUMENT(1,num1char)   !first, read in the two values
+C      CALL GET_COMMAND_ARGUMENT(2,num2char)
+Cc      CALL GET_COMMAND_ARGUMENT(3,num3char)
+C
+C      READ(num1char,*)xnum1                    !then, convert them to REALs
+C      READ(num2char,*)xnum2
+Cc      READ(num3char,*)xnum3
+CC
+C      A1=XNum1
+C      B1=XNum2
+C
+C      END EXC. STATES
 C
       Write(6,'(/,X,"***************** CASPIDFT ***************** ")')
 C
@@ -419,7 +428,6 @@ C
 C
       Call LYP(RhoGrid,Sigma,Zk,NGrid)
 C
-C
       If(IFlagRead.Eq.2) Then
       Open(10,File="data_on_grid.dat",form='unformatted')
       Write(10) (OnTop(I),I=1,NGrid)
@@ -429,10 +437,11 @@ C
       EndIf
   300 Continue
 C
-      A=A1
-      B=B1
-c      A=0.2D0
-c      B=A-One
+C FOR OPT
+C      A=A1
+C      B=B1
+      A=0.2D0
+      B=A-One
       C=2.6D0
       G=1.5D0
       D=(C-One)/(One-G)**2
@@ -450,11 +459,11 @@ C
       XX=Two*OnTop(I)/RhoGrid(I)**2
 C
 c herer!!! one segment only
-c      If(XX.Le.One) Then
+      If(XX.Le.One) Then
       PX=A*XX/(One+B*XX)
-c      Else
-c      PX=C*XX**0.25-D*(XX-G)**2
-c      EndIf
+      Else
+      PX=C*XX**0.25-D*(XX-G)**2
+      EndIf
 C
       EDYN=EDYN+PX*Zk(I)*WGrid(I)
       ELYP=ELYP+Zk(I)*WGrid(I)
@@ -464,6 +473,7 @@ C
       EndDo
       Write(6,'(/,1X,''LYP Correlation'',7X,F15.8)')ELYP
       Write(6,'(1X,''CASPIDFT Correlation'',2X,F15.8)')EDYN
+      Write(6,'(1X,''CASPI(M)DFT Correlation'',2X,F15.8)')EDYN+ELSM
 C
       Stop
 C
@@ -850,6 +860,271 @@ C
 C
       Return
       End
+
+*Deck MCORR-OPT
+      Subroutine MCORROPT(ELSM,Occ,TwoNO,URe,OrbGrid,WGrid,
+     $                       OrbXGrid,OrbYGrid,OrbZGrid,
+     $                       NGrid,NBasis,NInte1,NInte2,IVer)
+C
+C     "MAP" CAS 2-RDM ON GVB 2-RDM BY COUPLING ORBITALS INTO GEMINALS
+C
+      Implicit Real*8 (A-H,O-Z)
+C
+      Parameter(Zero=0.D0, Half=0.5D0, One=1.D0, Two=2.D0, Four=4.D0)
+C
+      Include 'commons.inc'
+C
+      Dimension Occ(NBasis),TwoNO(NInte2),URe(NBasis,NBasis)
+      Dimension OrbGrid(NGrid,NBasis),WGrid(NGrid),
+     $          OrbXGrid(NGrid,NBasis),
+     $          OrbYGrid(NGrid,NBasis),OrbZGrid(NGrid,NBasis)
+C
+C     LOCAL ARRAYS
+C
+      Dimension C(NBasis),RDM2(NBasis**2*(NBasis**2+1)/2),Ind1(NBasis)
+      Double Precision, Allocatable :: OccGH(:),OrbGem(:,:),
+     $                                 Zk(:),Sigma(:),
+     $                                 RhoGridG(:),RhoGridH(:)
+      CHARACTER(100) :: num1char,num2char,num3char
+C
+      NRDM2 = NBasis**2*(NBasis**2+1)/2
+      RDM2(1:NRDM2)=Zero
+      NAct=NAcCAS
+      INActive=NInAcCAS
+      NOccup=INActive+NAct 
+C
+      IF(COMMAND_ARGUMENT_COUNT().Eq.0)THEN
+      WRITE(*,*)'ERROR, COMMAND-LINE ARGUMENTS REQUIRED, STOPPING'
+      STOP
+      ENDIF
+C
+      CALL GET_COMMAND_ARGUMENT(1,num1char)
+C      CALL GET_COMMAND_ARGUMENT(2,num2char)
+C
+      READ(num1char,*)xnum1
+C      READ(num2char,*)xnum2
+C
+      ACoef=XNum1
+C      Alpha=XNum2
+C
+      Alpha=0.5d0
+C
+C      Print*, 'PARAMS FROM COMMAND LINE', ACoef,Alpha
+      Print*, 'PARAMS FROM COMMAND LINE', ACoef
+C
+C     scaling of M2 CORRECTION
+C      ACoef = 2.5d0
+C
+      Do I=1,NAct
+      Ind1(I)=INActive+I
+      EndDo
+C
+      Open(10,File="rdm2.dat",Status='Old')
+      Write(6,'(/,1X,''Active block of 2-RDM read from rdm2.dat'')')
+C
+   10 Read(10,'(4I4,F19.12)',End=40)I,J,K,L,X
+      I=Ind1(I)
+      J=Ind1(J)
+      K=Ind1(K)
+      L=Ind1(L)
+C
+C     X IS DEFINED AS: < E(IJ)E(KL) > - DELTA(J,K) < E(IL) > = 2 GAM2(JLIK)
+      RDM2(NAddrRDM(J,L,I,K,NBasis))=Half*X
+C
+      GoTo 10
+   40 Continue
+      Close(10)
+C
+      Do IP=1,NBasis
+      Do IQ=1,NBasis
+      Do IR=1,NBasis
+      Do IS=1,NBasis
+      IAdd=NAddrRDM(IP,IQ,IR,IS,NBasis)
+      Hlp=Zero
+      If(IP.Eq.IR.And.IQ.Eq.IS.And. (Occ(IP).Eq.One.Or.Occ(IQ).Eq.One) )
+     $  Hlp=Hlp+Two*Occ(IP)*Occ(IQ)
+      If(IP.Eq.IS.And.IQ.Eq.IR.And. (Occ(IP).Eq.One.Or.Occ(IQ).Eq.One) )
+     $ Hlp=Hlp-Occ(IP)*Occ(IQ)
+      If(Hlp.Ne.Zero) RDM2(IAdd)=Hlp
+      EndDo
+      EndDo
+      EndDo
+      EndDo
+C
+      If(NELE-INActive.Ne.NAct-(NELE-INActive)) Then
+      Write(6,*) 'Fatal Error: mapping of CAS
+     $ on GVB only defined for CAS(m,m)'
+c      Stop
+      EndIf
+C
+      NGemSave=NGem
+      Do I=1,NBasis
+      IGemSave(I)=IGem(I)
+      EndDo
+      NGem=INActive+NAct/2
+      Do I=1,NBasis
+      If(Occ(I).Ne.Zero) IGem(I)=0
+      If(Occ(I).Eq.Zero) IGem(I)=NGem+1
+      EndDo
+      Do I=1,INActive
+      IGem(I)=I
+      EndDo
+C
+C     COUPLE ORBITALS
+C
+      Write(6,'(/,X,"Mappinng of CAS(n,n) 2-RDM on GVB-like 2-RDM")')
+C
+      Allocate(OrbGem(NELE-INActive,2))
+C
+      II=1
+      Do IP=INActive+1,NELE
+      IGem(IP)=IP
+C
+      XDevMax=Zero
+      Do IQ=NELE+1,NOccup
+C
+      XPQPQ=Abs(RDM2(NAddrRDM(IP,IQ,IP,IQ,NBasis))-
+     $ 2.0D0*Occ(IP)*Occ(IQ))
+      XPQQP=Abs(RDM2(NAddrRDM(IP,IQ,IQ,IP,NBasis))-
+     $ (-Occ(IP)*Occ(IQ)))
+      XDev=Half*(XPQPQ+XPQQP)/Occ(IQ)
+      If(XDev.Gt.XDevMax) Then
+      XDevMax=XDev
+      IQMax=IQ
+      EndIf
+C
+      CP=SQRT(Occ(IP))
+      If(Occ(IP).Lt.Half) CP=-CP
+      CQ=SQRT(Occ(IQ))
+      If(Occ(IQ).Lt.Half) CQ=-CQ
+      Write(*,*)IP,IQ
+      Write(*,*)'PPQQ',RDM2(NAddrRDM(IP,IP,IQ,IQ,NBasis)),CP*CQ
+      Write(*,*)'PQPQ',RDM2(NAddrRDM(IP,IQ,IP,IQ,NBasis)),
+     $ 2.0D0*Occ(IP)*Occ(IQ)
+      Write(*,*)'PQQP',RDM2(NAddrRDM(IP,IQ,IQ,IP,NBasis)),
+     $ -Occ(IP)*Occ(IQ)
+C
+      EndDo
+C
+      If(IGem(IQMax).Eq.0) Then
+      IGem(IQMax)=IP
+      Write(6,'(X,"**** Orbital",I2," coupled with ",I2 )')IP,IQMax
+      OrbGem(II,1)=IP
+      OrbGem(II,2)=IQMax
+      II = II + 1
+      Else
+      Write(6,*)
+     $ "Warning: more than 2 orbitals assigned to a geminal no",IP
+      EndIf
+C
+      EndDo
+C
+      Do I=1,NGem
+C
+      Write(6,'(/,X,"Geminal no",I2," includes")')I
+      Sum=Zero
+C
+      II=0
+      Do J=1,NBasis
+      If(IGem(J).Eq.I) Then
+      Sum=Sum+Occ(J)
+      Write(6,'(X,"Orbital No: ",I4)')J
+      EndIf
+      EndDo
+      Write(6,'(X,"Norm: ",F12.6)')Sum
+C
+      EndDo
+C
+C     MODIFIED M-EXP CORRECTION
+c
+      Allocate(Zk(NGrid),RhoGridH(NGrid),RhoGridG(NGrid))
+      Allocate(OccGH(NBasis),Sigma(NGrid))
+C
+      ELSM=Zero
+      Do IG=1,NELE-INActive
+C
+      IQ=OrbGem(IG,1)
+      IP=OrbGem(IG,2)
+C      Print*, 'OccG',IQ,IP,max(Occ(IQ),Occ(IP))
+C
+      Do IH=1,IG-1
+C
+      IS=OrbGem(IH,1)
+      IR=OrbGem(IH,2)
+C
+C      Print*, 'OccH',IS,IR,max(Occ(IS),Occ(IR))
+C
+C    CCCCCCCCCCCCCCCCCCCCCCCCCCCC 
+C     SQRT[..]*Exp[-Alpha*xx**2]
+C    CCCCCCCCCCCCCCCCCCCCCCCCCCCC  
+C
+C      C1=max(Occ(IQ),Occ(IP))*(One-max(Occ(IQ),Occ(IP)))
+C      C2=max(Occ(IS),Occ(IR))*(One-max(Occ(IS),Occ(IR)))
+C
+C      XX=Exp(-Alpha*(max(Occ(IQ),Occ(IP))-Half)**2)
+C      YY=Exp(-Alpha*(max(Occ(IS),Occ(IR))-Half)**2)
+C
+C      Coef=SQRT(C1*C2)*XX*YY
+C
+C    CCCCCCCCCCCCCCCCCCCCCCCC  
+C     A*(n(1-n)n(1-n))^Alpha
+C    CCCCCCCCCCCCCCCCCCCCCCCC  
+C
+      XX=max(Occ(IQ),Occ(IP))*(One-max(Occ(IQ),Occ(IP)))
+      YY=max(Occ(IS),Occ(IR))*(One-max(Occ(IS),Occ(IR)))
+C
+C    CCCCCCCCCCCCCCCCCCCCCCCC  
+C     A*(1-n)(1-n)^0.5
+C    CCCCCCCCCCCCCCCCCCCCCCCC  
+C
+C      XX=(One-max(Occ(IQ),Occ(IP)))
+C      YY=(One-max(Occ(IS),Occ(IR)))
+C
+      Coef=SQRT(XX*YY)
+C
+      OccGH=0
+      OccGH(IP)=Occ(IP)
+      OccGH(IQ)=Occ(IQ)
+      OccGH(IR)=Occ(IR)
+      OccGH(IS)=Occ(IS)
+C
+      Do I=1,NGrid
+      Call DenGrid(I,RhoGridH(I),OccGH,URe,OrbGrid,NGrid,NBasis)
+      Call DenGrad(I,RhoX,OccGH,URe,OrbGrid,OrbXGrid,NGrid,NBasis)
+      Call DenGrad(I,RhoY,OccGH,URe,OrbGrid,OrbYGrid,NGrid,NBasis)
+      Call DenGrad(I,RhoZ,OccGH,URe,OrbGrid,OrbZGrid,NGrid,NBasis)
+      Sigma(I)=RhoX**2+RhoY**2+RhoZ**2
+      EndDo
+C
+      Call LYP(RhoGridH,Sigma,Zk,NGrid)
+C
+      VAL=0
+      Do I=1,NGrid
+      VAL = VAL + Zk(I)*WGrid(I)
+      EndDo
+C   
+      ELSM = ELSM + Coef*VAL
+C
+      EndDo
+      EndDo
+C
+      ELSM=ACoef*ELSM
+C
+      Deallocate(OrbGem,OccGH)
+      Deallocate(Sigma)
+      Deallocate(Zk,RhoGridH,RhoGridG)
+C
+C      EndIf
+C
+      Write(6,'(/,1X,''M Correlation Correction '',5X,F15.8)')ELSM
+C
+      NGem=NGemSave
+      Do I=1,NBasis
+      IGem(I)=IGemSave(I)
+      EndDo
+C
+      Return
+      End Subroutine MCORROPT
 
 *Deck FM
       Real*8 Function FM(X,Y)

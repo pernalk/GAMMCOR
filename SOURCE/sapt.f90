@@ -1958,7 +1958,7 @@ double precision,allocatable :: tmp(:,:),tmp1(:,:)
 ! for Be ERPA:
 !double precision,parameter :: SmallE = 1.D-1
 double precision,parameter :: BigE   = 1.D8 
-double precision,parameter :: SmallE = 1.D-3
+double precision,parameter :: SmallE = 1.D-8
 
 ! print thresholds
 if(SAPT%IPrint>1) then 
@@ -2165,8 +2165,8 @@ double precision :: e2du,e2sp,dea,deb
 double precision :: e2ds,e2ds1,e2ds2
 double precision :: inv_omega
 ! for Be ERPA:
-double precision,parameter :: SmallE = 1.D-1
-!double precision,parameter :: SmallE = 1.D-3
+!double precision,parameter :: SmallE = 1.D-1
+double precision,parameter :: SmallE = 1.D-3
 double precision,parameter :: BigE = 1.D8 
 double precision :: Alpha, Beta
 
@@ -4104,8 +4104,8 @@ double precision,allocatable :: AOcc(:),BOcc(:)
 double precision :: Tcpu,Twall
 double precision,external  :: trace,FRDM2
 ! test for Be
-double precision,parameter :: SmallE = 1.D-1
-!double precision,parameter :: SmallE = 1.D-3
+!double precision,parameter :: SmallE = 1.D-1
+double precision,parameter :: SmallE = 1.D-3
 double precision,parameter :: BigE = 1.D8 
 
 ! set dimensions
@@ -5646,7 +5646,7 @@ double precision :: fact1,fact2
 ! testy
 double precision,allocatable :: URe(:,:)
 !
-double precision,parameter :: SmallE = 1.d-12
+double precision,parameter :: SmallE = 1.d-10
 !double precision,parameter :: SmallE = 1.d-1
 
  write(LOUT,'(1x,a,e12.4)') 'SmallE in E2Disp PINO:',SmallE
@@ -5691,7 +5691,18 @@ double precision,parameter :: SmallE = 1.d-12
  do i=B%INAct+B%NAct+1,NBas
     IGemB(i) = 3
  enddo
- 
+
+ do i=1,NInte1
+    if(A%PP(i)<0d0) then 
+       write(LOUT,'(1x,"Monomer A: Negative EVal",i4,f16.8)') i,A%PP(i)
+    endif
+ enddo
+ do i=1,NInte1
+    if(B%PP(i)<0d0) then
+       write(LOUT,'(1x,"Monomer B: Negative EVal",i4,f16.8)') i,B%PP(i)
+    endif
+ enddo
+
  !do i=1,NBas
  !   print*, i,IGemA(i),IGemB(i)
  !enddo
@@ -5781,8 +5792,8 @@ double precision,parameter :: SmallE = 1.d-12
     endif
  enddo
 
- SAPT%e2disp = -32d0*e2d
- e2d  = -32d0*e2d*1000d0
+ SAPT%e2disp = -16d0*e2d
+ e2d  = -16d0*e2d*1000d0
  write(LOUT,'(/,1x,a,f16.8)') 'E2disp(CAS) = ',e2d
 ! write(LOUT,'(/,1x,a,f16.8)') 'E2disp(t) = ',e2d/2d0
 

@@ -125,10 +125,12 @@ double precision   :: XGrid(1000), WGrid(1000),DispAlph, e2d
     A%ACAlpha    = SAPT%ACAlpha
     B%ACAlpha    = SAPT%ACAlpha
 
+    if(Flags%ISERPA==0) then
     SaptLevel_Save  = Flags%SaptLevel
     Flags%SaptLevel = 0
     Flags%IFlag0    = 1
     SAPT%iCpld      = .false.
+    endif
 
     call sapt_response(Flags,A,SAPT%EnChck,NBasis)
     call sapt_response(Flags,B,SAPT%EnChck,NBasis)
