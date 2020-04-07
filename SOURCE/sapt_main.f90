@@ -3879,17 +3879,18 @@ integer :: test
                 write(LOUT,'(1x,a,2x,2i4)') 'Discarding nearly degenerate pair',i,j 
              else
                 ! if IFlCore=0 exclude core (inactive) orbitals
+
                 if(Flags%IFlCore==1.or.&
                      (Flags%IFlCore==0.and.&
                      mon%Occ(i)/=1d0.and.mon%Occ(j)/=1d0) ) then
-                   
-                   ind = ind + 1
-                   mon%IndX(ind) = ij
-                   ! mon%IndXh(ind) = ind
-                   mon%IndN(1,ind) = i
-                   mon%IndN(2,ind) = j
-                   mon%IPair(i,j) = 1
-                   mon%IPair(j,i) = 1
+
+                     ind = ind + 1
+                     mon%IndX(ind) = ij
+                     ! mon%IndXh(ind) = ind
+                     mon%IndN(1,ind) = i
+                     mon%IndN(2,ind) = j
+                     mon%IPair(i,j) = 1
+                     mon%IPair(j,i) = 1 
                    
                 endif
              endif
@@ -3926,13 +3927,18 @@ integer :: test
                 if(Flags%IFlCore==1.or.&
                      (Flags%IFlCore==0.and.&
                      mon%Occ(i)/=1d0.and.mon%Occ(j)/=1d0) ) then
-                   
-                   ind = ind + 1
-                   mon%IndX(ind) = ind
-                   mon%IndN(1,ind) = i
-                   mon%IndN(2,ind) = j
-                   mon%IPair(i,j) = 1
-                   mon%IPair(j,i) = 1
+                     ! exclude pairs of nearly/virtual orbitals
+      
+                     if(mon%Occ(i)+mon%Occ(j).lt.1.D-7) then
+                        write(LOUT,'(1x,a,2x,2i4)') 'Discarding nearly virtual-orbitals pair',i,j
+                     else
+                        ind = ind + 1
+                        mon%IndX(ind) = ind
+                        mon%IndN(1,ind) = i
+                        mon%IndN(2,ind) = j
+                        mon%IPair(i,j) = 1
+                        mon%IPair(j,i) = 1
+                     endif
                    
                 endif
              endif
