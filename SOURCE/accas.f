@@ -365,6 +365,7 @@ C      EndDo
 C      Close(10)
 C     HAP
       Call create_ind('2RDM',NumOSym,IndInt,NSym,NBasis)
+      MxSym=NSym
 C
       NSymNO(1:NBasis)=0
       IStart=0
