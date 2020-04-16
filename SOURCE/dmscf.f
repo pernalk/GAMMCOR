@@ -65,7 +65,7 @@ C
 C
       If(ICASSCF.Eq.1) Then
 C
-      Call ACCAS(ETot,ENuc,TwoEl,URe,UReSav,Occ,XOne,
+      Call ACCAS(ETot,ENuc,TwoEl,URe,UMOAO,Occ,XOne,
      $  Title,NBasis,NInte1,NInte2,NGem,System)
 C
       Else
