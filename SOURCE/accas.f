@@ -846,6 +846,16 @@ C
       DeAllocate  (OrbZGrid)
       DeAllocate  (Work)
       DeAllocate (SRKer)
+C     
+      Call delfile('AOTWOSORT')
+      Call delfile('AOERFSORT')
+C
+      If(ITwoEl.Eq.3) Then
+      Call delfile('FFOO')
+      Call delfile('FOFO')
+      Call delfile('FOFOERF')
+      Call delfile('FFOOERF')
+      EndIf
 C
       Return
       End
