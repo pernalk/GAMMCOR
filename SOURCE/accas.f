@@ -62,6 +62,7 @@ C
 C
       If((IndAux(I).Eq.1).And.(IndAux(J).Eq.1)
      $ .And.(Abs(Occ(I)-Occ(J))/Occ(I).Lt.ThrSelAct)
+C     $ .And.(I.Eq.84).And.(J.Eq.83)
      $ ) Then
 C
       Write(6,'(2X,"Discarding nearly degenerate pair ",2I4)')I,J
