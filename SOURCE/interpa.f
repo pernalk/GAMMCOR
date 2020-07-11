@@ -1325,12 +1325,12 @@ C
       If(SumNU.Lt.Zero)Write(6,'(X,"Problems with XY Norm!",I4,2E12.4)')
      $   NU,SumNU,Eig(NU)
 C
-      EndDo
-C
       If(Eig(NU).Lt.Zero) 
      $ Write(6,'(X,"Double Check Negative Excit",I4,2E12.4)') 
      $ NU,Eig(NU),SumNU
 C
+      EndDo
+C      
       Return
       End
 
