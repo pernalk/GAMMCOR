@@ -1195,8 +1195,28 @@ C     READ RDMs: NEW
 C   
       Call CpySym(AUXM,Gamma,NBasis)
 C
-      Call Diag8(AUXM,NBasis,NBasis,PC,Work)
-      Call SortOcc(PC,AUXM,NBasis)
+C KP 30.07.2020
+      Call read_nact_molpro(nact,'2RDM')
+      NAc=nact
+C
+C     DIAGONALIZE ONLY THE ACTIVE BLOCK OF Gamma TO AVOID THROWING AWAY 
+C     ACTIVE ORBITAL OF ZERO-OCCUPANCY (which may happen for atoms for some states)
+C
+      Do I=1,NAc
+      Do J=1,NAc
+      AUXM1((J-1)*NAc+I)=AUXM(I,J)
+      EndDo
+      EndDo
+      Call Diag8(AUXM1,NAc,NAc,PC,Work)
+      Call SortP(PC,AUXM1,NAc)
+C
+C KP 30.07.2020
+      AUXM(1:NBasis,1:NBasis)=Zero
+      Do I=1,NAc
+      Do J=1,NAc
+      AUXM(I,J)=AUXM1((J-1)*NAc+I)
+      EndDo
+      EndDo
 C
       Sum=Zero
       NAc=0
@@ -1206,7 +1226,7 @@ C
       EndDo
 C
 C     KP
-      Call read_nact_molpro(nact,'2RDM')
+C      Call read_nact_molpro(nact,'2RDM')
       If(NAc.Ne.nact) Then
       Write(6,'(1x,"WARNING! The number of partially occ orbitals
      $ different from nact read from molpro. Some active orbitals

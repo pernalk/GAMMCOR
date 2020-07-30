@@ -1287,7 +1287,7 @@ C     COMPUTE EigX
 C
       Do NU=1,NDimX
 C
-C      If(Eig(NU).Gt.Small) Then
+      If(Eig(NU).Ne.Zero) Then
 C    
       Do I=1,NDimX
       EigVecL((NU-1)*NDimX+I)=Zero
@@ -1301,14 +1301,14 @@ C
       EndDo
       EndDo
 C
-C      Else
-CC
-C      Do I=1,NDimX
-C      EigVecR((NU-1)*NDimX+I)=Zero
-C      EigVecL((NU-1)*NDimX+I)=Zero
-C      EndDo
-CC
-C      EndIf
+      Else
+C
+      Do I=1,NDimX
+      EigVecR((NU-1)*NDimX+I)=Zero
+      EigVecL((NU-1)*NDimX+I)=Zero
+      EndDo
+C
+      EndIf
 c     enddo NU
       EndDo
 C
