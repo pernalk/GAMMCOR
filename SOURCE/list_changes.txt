@@ -1,0 +1,2 @@
+Deck ERPAVECYX
+C 21.07.2020 KP: avoid dividing by 0 if Eig(NU)=0
