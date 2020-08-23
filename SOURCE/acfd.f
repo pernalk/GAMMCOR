@@ -2423,7 +2423,7 @@ C ----------------------------------------------------------------
       Subroutine AC0CDEXCIT(IH0St,ECorr,ETot,TwoNO,Occ,URe,XOne,
      $ UNOAO,IndN,IndX,NBasis,NDimX,NDimD,NInte1,NInte2) 
 C
-C     AC0 WITH DEEXCITATIONS FROM SA-CAS TRDM's
+C     AC0 AND DEEXCITATION CORRECTIONS BASED ON OVERLAP OF ERPA AND SA-CAS TRDM's
 C
       use sapt_ener
 C
