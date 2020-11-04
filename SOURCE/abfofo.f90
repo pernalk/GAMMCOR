@@ -2227,6 +2227,30 @@ end associate
 !! dump EBLOCKS: X(0),Y(0)
 call dump_Eblock(Eblock,EblockIV,Occ,IndN,nblk,NBasis,NDimX,xy0file)
 
+!! test for deexcit
+!! unpack active EigY
+!!allocate(Eig(NDimX),EigY(NDimX,NDimX))
+!!Eig = 0
+!!EigY = 0
+!if(nAA > 1) then
+!   associate(B => Eblock(1))
+!     write(lout,*) 'test-AA',B%n
+!     allocate(Eig(B%n),EigY(maxval(B%pos),maxval(B%pos)))
+!     Eig = 0
+!     EigY = 0
+!     do i=1,B%n
+!        ipos = B%pos(i)
+!     !   print*, 'ipos',ipos
+!        EigY(ipos,B%l1:B%l2) = B%matY(i,1:B%n)
+!     enddo
+!     Eig(B%l1:B%l2) = B%vec(1:B%n)
+!
+!   end associate
+!endif
+!write(lout,*) 'Eig',norm2(Eig)
+!write(lout,*) 'EigY',norm2(EigY)
+!deallocate(EigY,Eig)
+
 if(IFlag0==0) then
    
    ! AB(1) PART
