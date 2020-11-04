@@ -12,5 +12,5 @@ C
      $ IGemSave(1000), IOrbA(1000),NGemB, NActive,
      $ IConnect(1000,1000)
       Common/AC/ IFlAC, IFlSnd, IFlCore, IFlFrag1, IFl12, NoSt
-      Common/THR/ ThrSelAct
+      Common/THR/ ThrSelAct, ThrAct
 C

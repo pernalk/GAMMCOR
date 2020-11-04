@@ -31,7 +31,6 @@ FFLAGS = -mkl -heap-arrays  -O3 -I /home/kasia/xcfun_intel/fortran
 LIBS = -L/opt/intel/composer_xe_2015.2.164/mkl/lib/intel64/ -lmkl_intel_ilp64 -lmkl_sequential -lmkl_core \
 -L/home/pkowalski/xcfun_intel/lib -lxcfun
 
-
 $(PROG) :  $(OBJ) 
 	$(FCC) $(FFLAGS) -o $(PROG) $(OBJ) $(LIBS)
 $(O)mainp.o : $(S)mainp.f $(S)commons.inc $(O)types.o $(O)inputfill.o $(O)systemdef.o $(O)sapt_main.o

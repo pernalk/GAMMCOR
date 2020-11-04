@@ -208,6 +208,8 @@ C
 C
 C     SET THRESHOLD FOR ACTIVE ORBITALS IN CAS
       ThrSelAct = System%ThrSelAct
+C     SET THRESHOLD FOR ACTIVE ORBITALS IN GVB
+      ThrAct = System%ThrAct
 C
 C*************************************************************************
 C     READ THE INPUT AND PRINT THE INPUT DATA 
@@ -244,6 +246,7 @@ C     ALLOCATE THE MATRICES
 C
 C     FOR TESTS SWITCHIG IT OFF...
       If(ITwoEl.Eq.3) NInte2=1
+      If(ITwoEl.Eq.2) NInte2=1
 C
       Allocate  (Occ(NBasis))
       Allocate  (URe(NBasis*NBasis))

@@ -38,6 +38,12 @@ C
        Call SndOrder(ECorr1,ECorr01,TwoNO,Occ,URe,XOne,
      $ ABPLUS,ABMIN,Eig,
      $ Title,NBasis,NInte1,NInte2,NDim,NGem,IndAux)
+C
+      If(ITwoEl.Eq.2) Then
+      Call EneGVB_FFFF(ETot,URe,Occ,CICoef,XOne,
+     $                  IGem,IndN,NBasis,NInte1,'TWOMO',NDimX,NGem)
+      EndIf
+C
       Write
      $ (6,'(/,2X,''EGVB+ENuc, 0th+1st-order ECorr, AC0-GVB '',
      $ 4X,3F15.8,/)') ETot+ENuc,ECorr1,ETot+ENuc+ECorr1
@@ -89,6 +95,17 @@ C
      $ 4X,3F15.8,/)') ETot+ENuc,ECorr2,ETot+ENuc+ECorr2
 C
 C     If(IFlFrag1.Eq.0)
+      EndIf
+C
+C     DELETE MO INTEGRALS 
+      If(ITwoel.Eq.2) Then
+        Open(newunit=iunit,file='TWOMO',status='OLD')
+        Close(iunit,status='DELETE')
+      ElseIf(ITwoel.Eq.3) Then
+        Open(newunit=iunit,file='FFOO',status='OLD')
+        Close(iunit,status='DELETE')
+        Open(newunit=iunit,file='FOFO',status='OLD')
+        Close(iunit,status='DELETE')
       EndIf
 C
       Return
@@ -3157,20 +3174,20 @@ C
       Dimension
      $ URe(NBasis,NBasis),XOne(NInte1),Occ(NBasis),TwoNO(NInte2),
      $ IndAux(NBasis),
-     $ ABPLUS(NDim*NDim),ABMIN(NDim*NDim),
+     $ ABPLUS(NDim,NDim),ABMIN(NDim,NDim),
      $ Eig(NDim),EGOne(NGem)
 C
 C     LOCAL ARRAYS
 C
       Dimension IndX(NDim),IndN(2,NDim),C(NBasis),
      $ EigVY2(NBasis*(NBasis-1)),IndP(NBasis,NBasis),
-     $ AMAT(NDim*NDim),BMAT(NDim*NDim)
+     $ AMAT(NDim,NDim),BMAT(NDim,NDim)
 C
       Do I=1,NBasis
       C(I)=CICoef(I)
       EndDo
 C
-C     0-TH ORDER EIGENVECTORS 
+C     0-TH ORDER EIGENVECTORS
 C
       IPQ=0
       Do IP=1,NBasis
@@ -3207,7 +3224,6 @@ C
 C
       Call LookUp_mithap(NAct,INAct,Occ,
      $                  IndAux,IndP,IndN,IndX,NDimX,NDim,NBasis)
-      Print*, 'NAct,INAct',NAct,INAct,NDimX,NDim,NGem
 
       Call ACABMAT0_mithap(ABPLUS,ABMIN,URe,Occ,XOne,
      $            IndN,IndX,IGem,CICoef,
@@ -3226,24 +3242,26 @@ C
 C
       EndIf
 C
-      Do I=1,NDim*NDim
-      AMAT(I)=ABPLUS(I)
-      BMAT(I)=ABMIN(I)
+      Do J=1,NDim
+      Do I=1,NDim
+      AMAT(I,J)=ABPLUS(I,J)
+      BMAT(I,J)=ABMIN(I,J)
+      EndDo
       EndDo
 C
       IRS=0
       Do IR=1,NBasis
       Do IS=1,IR-1
       IRS=IRS+1
-      IRSIRS=(IRS-1)*NDim+IRS
+C      IRSIRS=(IRS-1)*NDim+IRS
       Eig(IRS)=Zero
 C
       If(Occ(IR).Ne.Occ(IS).And.IGem(IR).Ne.IGem(IS)) Then
-      AA=Half*((C(IR)+C(IS))**2*ABPLUS(IRSIRS)
-     $       + (C(IR)-C(IS))**2*ABMIN(IRSIRS))
+      AA=Half*((C(IR)+C(IS))**2*ABPLUS(IRS,IRS)
+     $       + (C(IR)-C(IS))**2*ABMIN(IRS,IRS))
       Eig(IRS)=ABS(AA/(Occ(IR)-Occ(IS)))
       Else
-      Eig(IRS)=ABS(ABPLUS(IRSIRS))
+      Eig(IRS)=ABS(ABPLUS(IRS,IRS))
       EndIf
 C
       EndDo
@@ -3276,10 +3294,12 @@ C
 C
 C     AMAT AND BMAT WILL INCLUDE 1ST-ORDER A+ AND A- MATRICES, RESPECTIVELY
 C
-      Do I=1,NDim*NDim
-      AMAT(I)=ABPLUS(I)-AMAT(I)
-      BMAT(I)=ABMIN(I)-BMAT(I)
-      EndDo 
+      Do J=1,NDim
+      Do I=1,NDim
+      AMAT(I,J)=ABPLUS(I,J)-AMAT(I,J)
+      BMAT(I,J)=ABMIN(I,J)-BMAT(I,J)
+      EndDo
+      EndDo
 C
 C     CONSTRUCT LOOK-UP TABLES
 C
@@ -3301,7 +3321,8 @@ C
 C
 C     do not correlate active degenerate orbitals if from different geminals
       If((IGem(I).Ne.IGem(J)).And.(IndAux(I).Eq.1).And.(IndAux(J).Eq.1)
-     $ .And.(Abs(Occ(I)-Occ(J))/Occ(I).Lt.1.D-2) ) Then
+C     $ .And.(Abs(Occ(I)-Occ(J))/Occ(I).Lt.1.D-2) ) Then
+     $ .And.(Abs(Occ(I)-Occ(J))/Occ(I).Lt.ThrSelAct) ) Then
       Write(*,*)"Discarding nearly degenerate pair",I,J
       Else
 C    
@@ -3358,12 +3379,15 @@ C
       EPSJI=Zero
       EndIf
 C
-      IJ=(IRS-1)*NDim+IPQ 
-      Aux=(Half*AMAT(IJ)-Two*EigVY2(IPQ)*EigVY2(IRS)*BMAT(IJ))
-     $    *EPSJI 
+C      IJ=(IRS-1)*NDim+IPQ 
+C      Aux=(Half*AMAT(IJ)-Two*EigVY2(IPQ)*EigVY2(IRS)*BMAT(IJ))
+C     $    *EPSJI 
+      Aux=(Half*AMAT(IPQ,IRS)-Two*EigVY2(IPQ)*EigVY2(IRS)*BMAT(IPQ,IRS))
+     $    *EPSJI
 C
 C     Save Aux - it may be needed in embedding calculations
-      ABPLUS((J-1)*NDimX+I)=(C(IP)+C(IQ))*(C(IR)+C(IS))*Aux
+C      ABPLUS((J-1)*NDimX+I)=(C(IP)+C(IQ))*(C(IR)+C(IS))*Aux
+      ABPLUS(I,J)=(C(IP)+C(IQ))*(C(IR)+C(IS))*Aux
 C
 C     only if indices not from the same geminals and (IP,IQ) and 
 C     (IR,IS) pairs are accepted

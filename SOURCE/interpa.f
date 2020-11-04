@@ -111,7 +111,7 @@ C
 C
       If(ICASSCF.Eq.0) Then
 C
-      ThrAct=0.991
+c      ThrAct=0.990
       Write(6,'(/,X," Threshold for Active Orbitals in GVB: ",E14.4)')
      $ ThrAct
       Do I=1,NELE
@@ -146,7 +146,7 @@ C
 C
 C     CONSTRUCT LOOK-UP TABLES
 C
-      Write(LOUT,'(2x,a,2e15.5)') 'Threshold for quasi-degeneracy ',
+      Write(6,'(2x,a,2e15.5)') 'Threshold for quasi-degeneracy ',
      $ ThrSelAct
 C
       IPair(1:NBasis,1:NBasis)=0

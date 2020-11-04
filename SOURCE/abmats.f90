@@ -2407,7 +2407,6 @@ double precision,allocatable :: work1(:),work2(:)
 double precision,allocatable :: ints(:,:)
 double precision,parameter :: Delta = 1.d-6
 
-print*, 'Wszystko od nowa!'
 if(ISAPT==1) then
    write(6,'(1x,a)') 'Computing response-my'
 else
@@ -2880,5 +2879,106 @@ call sq_to_triang2(work,VHSR,NBasis)
 deallocate(work,J,Jerf)
 
 end subroutine PotCoul_mithap
+
+subroutine EneGVB_FFFF(ETot,URe,Occ,C,XOne, &
+                        IGem,IndN,NBasis,NInte1,IntFileName,NDimX,NGem)
+implicit none
+
+integer,intent(in) :: NBasis,NInte1,NDimX,NGem
+character(*) :: IntFileName
+double precision :: ETot
+
+integer :: IndN(2,NDimX),IGem(NBasis)
+double precision :: URe(NBasis,NBasis),Occ(NBasis),C(NBasis)
+double precision :: XOne(NInte1)
+
+integer :: i,j,ii,ij,ia,ib,iab
+integer :: k,l,kl,kk,ll,klround
+integer :: iunit
+integer,external :: NAddr3
+double precision :: FacIJ,FacIK
+double precision :: EOne, EIntraGem, EInterCoul, EInterExch
+
+integer :: pos(NBasis,NBasis)
+double precision :: HNO(NBasis,NBasis)
+double precision,allocatable :: work1(:),work2(:)
+double precision,allocatable :: ints(:,:)
+
+write(lout,'(/A)') ' Electronic GVB energy check:'
+
+allocate(work1(NBasis**2),work2(NBasis**2),ints(NBasis,NBasis))
+
+call triang_to_sq(XOne,work1,NBasis)
+call dgemm('N','N',NBasis,NBasis,NBasis,1d0,URe,NBasis,work1,NBasis,0d0,work2,NBasis)
+call dgemm('N','T',NBasis,NBasis,NBasis,1d0,work2,NBasis,URe,NBasis,0d0,HNO,NBasis)
+call sq_symmetrize(HNO,NBasis)
+
+!call sq_to_triang2(HNO,work1,NBasis)
+!write(LOUT,*) 'HNO-my', norm2(work1(1:NBasis*(NBasis+1)/2))
+!HNO=transpose(HNO)
+!call sq_to_triang2(HNO,work1,NBasis)
+!write(LOUT,*) 'HNO-tr', norm2(work1(1:NBasis*(NBasis+1)/2))
+
+pos = 0
+do i=1,NDimX
+   pos(IndN(1,i),IndN(2,i)) = i
+enddo
+
+EOne = 0d0
+EIntraGem  = 0d0
+EInterCoul = 0d0
+EInterExch = 0d0
+
+do i=1,NBasis
+   EOne = EOne + 2d0*Occ(i)*HNO(i,i)
+enddo
+
+open(newunit=iunit,file=trim(IntFileName),status='OLD', &
+     access='DIRECT',recl=8*NBasis*(NBasis+1)/2)
+
+kl = 0
+do ll=1,NBasis
+   do kk=1,ll
+      kl = kl + 1
+      read(iunit,rec=kl) work1(1:NBasis*(NBasis+1)/2)
+      call triang_to_sq2(work1,ints,NBasis)
+      k = kk
+      l = ll
+
+      FacIJ = 2d0
+      if(k==l) FacIJ = 1d0
+      if(IGem(k)==IGem(l)) then
+         EIntraGem = EIntraGem + FacIJ*C(k)*C(l)*ints(k,l)
+      else
+        EInterExch = EInterExch - FacIJ*Occ(k)*Occ(l)*ints(k,l)
+      endif
+
+      FacIK = 2d0
+      if(k==l) then
+         do i=k,NBasis
+            if(IGem(i)/=IGem(k)) then
+            if(i==k) FacIK = 1d0
+            EInterCoul = EInterCoul + 2d0*FacIK*Occ(i)*Occ(k)*ints(i,i)
+            endif
+         enddo
+      endif
+
+   enddo
+enddo
+
+close(iunit)
+
+write(LOUT,'(" One-electron energy",25X,F17.8)') EOne
+write(LOUT,'(" GVB intra-gem electron interaction",10X,F17.8)') EIntraGem
+write(LOUT,'(" GVB inter-gem Coulomb interaction",11X,F17.8)')  EInterCoul
+write(LOUT,'(" GVB inter-gem exchange interaction",10X,F17.8)') EInterExch
+write(LOUT,'(" Total GVB",34X,F18.8)') EOne+EIntraGem+EInterCoul+EInterExch
+
+ETot = EOne + EIntraGem + EInterCoul + EInterExch
+
+deallocate(ints,work2,work1)
+
+end subroutine EneGVB_FFFF
+
 
 end module abmat
