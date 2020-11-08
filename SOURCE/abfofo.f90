@@ -833,7 +833,7 @@ end subroutine AB_CAS_FOFO
 
 subroutine ACABMAT0_FOFO(AMAT,BMAT,URe,Occ,XOne, &
                          IndN,IndX,IGem,C, &
-                         NAct,INActive,NBasis,NDim,NDimX,NInte1,NGem, &
+                         NAct,NElHlf,NBasis,NDim,NDimX,NInte1,NGem, &
                          IntFileName,IntJFile,IntKFile,ISAPT,ACAlpha,IFlag)
 !     IFlag = 1 - AMAT AND BMAT WILL CONTAIN (A+B)/C+/C+ AND (A-B)/C-/C-, RESPECTIVELY
 !             0 - AMAT AND BMAT WILL CONTAIN A ANB B MATRICES, RESPECTIVELY
@@ -849,7 +849,7 @@ subroutine ACABMAT0_FOFO(AMAT,BMAT,URe,Occ,XOne, &
 !
 implicit none
 
-integer,intent(in) :: NAct,INActive,NBasis,NDim,NDimX,NInte1,ISAPT,NGem
+integer,intent(in) :: NAct,NElHlf,NBasis,NDim,NDimX,NInte1,ISAPT,NGem
 character(*) :: IntJFile,IntKFile,IntFileName
 double precision,intent(out) :: AMAT(NDimX,NDimX),BMAT(NDimX,NDimX)
 double precision,intent(in)  :: URe(NBasis,NBasis),Occ(NBasis),XOne(NInte1),C(NBasis)
@@ -860,7 +860,7 @@ integer,intent(in) :: IGem(NBasis),IFlag
 integer :: i,j,k,l,ij,kl,kk,ll,klround
 integer :: ip,iq,ir,is,it,iu,iw,ipq,irs,ICol,IRow
 integer :: iunit,iunit1,iunit2,ios
-integer :: NOccup
+integer :: INActive,NOccup
 integer :: IGemType
 integer :: Ind(NBasis),AuxInd(3,3),pos(NBasis,NBasis)
 double precision :: HNO(NBasis,NBasis),HNOCoef
@@ -882,7 +882,8 @@ AMAT = 0
 BMAT = 0
 
 ! set dimensions
-NOccup = NAct + INActive
+INActive = NElHlf - NAct
+NOccup = 2*NAct + INActive
 
 allocate(work1(NBasis**2),work2(NBasis**2),ints(NBasis,NBasis))
 
@@ -891,7 +892,7 @@ call dgemm('N','N',NBasis,NBasis,NBasis,1d0,URe,NBasis,work1,NBasis,0d0,work2,NB
 call dgemm('N','T',NBasis,NBasis,NBasis,1d0,work2,NBasis,URe,NBasis,0d0,HNO,NBasis)
 call sq_symmetrize(HNO,NBasis)
 
-print*, 'HNO-test',norm2(HNO)
+!print*, 'HNO-test',norm2(HNO)
 
 do j=1,NBasis
    do i=1,NBasis

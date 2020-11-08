@@ -2008,7 +2008,7 @@ double precision,external  :: trace
   ! ACAlpha=sqrt(2d0)/2.d0
    call ACABMAT0_mithap(ABPlus,ABMin,URe,Mon%Occ,XOne,&
                  Mon%IndN,Mon%IndX,Mon%IGem,Mon%CICoef,&
-                 Mon%NAct,Mon%INAct,NBas,Mon%NDim,Mon%NDimX,NInte1,Mon%NGem,&
+                 NBas,Mon%NDim,Mon%NDimX,NInte1,Mon%NGem,&
                  twofile,Flags%ISAPT,ACAlpha,1)
 !   allocate(ABPlusT(Mon%NDim**2),ABMinT(Mon%NDim**2))
 !   call ACABMAT0(ABPlusT,ABMinT,URe,Mon%Occ,XOne,TwoMO, &

@@ -2369,7 +2369,7 @@ end subroutine Y01CAS_mithap
 
 subroutine ACABMAT0_mithap(AMAT,BMAT,URe,Occ,XOne,&
                IndN,IndX,IGem,C, &
-               NAct,INActive,NBasis,NDim,NDimX,NInte1,NGem,IntFileName,ISAPT,ACAlpha,IFlag)
+               NBasis,NDim,NDimX,NInte1,NGem,IntFileName,ISAPT,ACAlpha,IFlag)
 !     IFlag = 1 - AMAT AND BMAT WILL CONTAIN (A+B)/C+/C+ AND (A-B)/C-/C-, RESPECTIVELY
 !             0 - AMAT AND BMAT WILL CONTAIN A ANB B MATRICES, RESPECTIVELY
 !
@@ -2384,7 +2384,7 @@ subroutine ACABMAT0_mithap(AMAT,BMAT,URe,Occ,XOne,&
 !
 implicit none
 
-integer,intent(in) :: NAct,INActive,NBasis,NDim,NDimX,NInte1,ISAPT,NGem
+integer,intent(in) :: NBasis,NDim,NDimX,NInte1,ISAPT,NGem
 character(*) :: IntFileName
 double precision,intent(out) :: AMAT(NDimX,NDimX),BMAT(NDimX,NDimX)
 double precision,intent(in)  :: URe(NBasis,NBasis),Occ(NBasis),XOne(NInte1),C(NBasis)
@@ -2395,7 +2395,6 @@ integer,intent(in) :: IGem(NBasis),IFlag
 integer :: i,j,k,l,ij,kl,kk,ll,klround
 integer :: ip,iq,ir,is,it,iu,iw,ipq,irs,ICol,IRow
 integer :: iunit,ios
-integer :: NOccup
 integer :: IGemType
 integer :: Ind(NBasis),AuxInd(3,3),pos(NBasis,NBasis)
 double precision :: HNO(NBasis,NBasis),HNOCoef
@@ -2415,9 +2414,6 @@ endif
 
 AMAT = 0
 BMAT = 0
-
-! set dimensions
-NOccup = NAct + INActive
 
 allocate(work1(NBasis**2),work2(NBasis**2),ints(NBasis,NBasis))
 
@@ -2743,12 +2739,12 @@ do ICol=1,NDimX
 
 print*, "AB-my",norm2(AMAT),norm2(BMAT)
 
-call sq_to_triang2(HNO,work1,NBasis)
-write(LOUT,*) 'HNO-my', norm2(work1(1:NBasis*(NBasis+1)/2))
-HNO=transpose(HNO)
-call sq_to_triang2(HNO,work1,NBasis)
-write(LOUT,*) 'HNO-tr', norm2(work1(1:NBasis*(NBasis+1)/2))
-
+!call sq_to_triang2(HNO,work1,NBasis)
+!write(LOUT,*) 'HNO-my', norm2(work1(1:NBasis*(NBasis+1)/2))
+!HNO=transpose(HNO)
+!call sq_to_triang2(HNO,work1,NBasis)
+!write(LOUT,*) 'HNO-tr', norm2(work1(1:NBasis*(NBasis+1)/2))
+!
 !!$do IGemType=1,NGem
 !!$   call sq_to_triang2(AuxH(:,:,IGemType),work1,NBasis)
 !!$   write(LOUT,*) 'AuxH-my', IGemType,norm2(work1(1:NBasis*(NBasis+1)/2))

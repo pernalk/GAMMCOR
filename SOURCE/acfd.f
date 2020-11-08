@@ -3222,22 +3222,20 @@ C
 C
       ElseIf(ITwoEl.Eq.2) Then
 C
-      Call LookUp_mithap(NAct,INAct,Occ,
-     $                  IndAux,IndP,IndN,IndX,NDimX,NDim,NBasis)
+      Call LookUp_mithap(Occ,IndAux,IndP,IndN,IndX,NDimX,NDim,NBasis)
 
       Call ACABMAT0_mithap(ABPLUS,ABMIN,URe,Occ,XOne,
      $            IndN,IndX,IGem,CICoef,
-     $            NAct,INAct,NBasis,NDim,NDimX,NInte1,NGem,
+     $            NBasis,NDim,NDimX,NInte1,NGem,
      $            'TWOMO',0,ACAlpha,1)
 
       ElseIf(ITwoEl.Eq.3) Then
 C
-      Call LookUp_mithap(NAct,INAct,Occ,
-     $                  IndAux,IndP,IndN,IndX,NDimX,NDim,NBasis)
+      Call LookUp_mithap(Occ,IndAux,IndP,IndN,IndX,NDimX,NDim,NBasis)
 C
       Call ACABMAT0_FOFO(ABPLUS,ABMIN,URe,Occ,XOne,
      $            IndN,IndX,IGem,CICoef,
-     $            NAct,INAct,NBasis,NDim,NDimX,NInte1,NGem,
+     $            NActive,NELE,NBasis,NDim,NDimX,NInte1,NGem,
      $            'TWOMO','FFOO','FOFO',0,ACAlpha,1)
 C
       EndIf
@@ -3276,7 +3274,7 @@ C
 C
       Call ACABMAT0_mithap(ABPLUS,ABMIN,URe,Occ,XOne,
      $            IndN,IndX,IGem,CICoef,
-     $            NAct,INAct,NBasis,NDim,NDimX,NInte1,NGem,
+     $            NBasis,NDim,NDimX,NInte1,NGem,
      $            'TWOMO',0,ACAlpha,1)
 C
       ElseIf(ITwoEl.Eq.3) Then
@@ -3287,7 +3285,7 @@ C      Print*, 'ACAlpha',ACAlpha
 C
       Call ACABMAT0_FOFO(ABPLUS,ABMIN,URe,Occ,XOne,
      $            IndN,IndX,IGem,CICoef,
-     $            NAct,INAct,NBasis,NDim,NDimX,NInte1,NGem,
+     $            NActive,NELE,NBasis,NDim,NDimX,NInte1,NGem,
      $            'TWOMO','FFOO','FOFO',0,ACAlpha,1)
 C 
       EndIf
@@ -3411,9 +3409,9 @@ C
       ElseIf(ITwoEl.Eq.3) Then
 
       Call ECorrAC0GVB_FOFO(ECorr0,ECorr,AMAT,BMAT,ABPLUS,
-     $                        EigVY2,Occ,C,Eig,
-     $                        IndP,IndN,IndX,IGem,
-     $                        'FOFO',NAct,INAct,NDim,NDimX,NGem,NBasis)
+     $                      EigVY2,Occ,C,Eig,
+     $                      IndP,IndN,IndX,IGem,
+     $                      'FOFO',NActive,NELE,NDim,NDimX,NGem,NBasis)
 C
 C      Write(6,'(1x,a)') "SORRY!"
 C      Stop
@@ -4446,7 +4444,7 @@ C
       Return
       End
 
-      Subroutine LookUp_mithap(NAct,INAct,Occ,IndAux,
+      Subroutine LookUp_mithap(Occ,IndAux,
      $                         IndP,IndN,IndX,NDimX,NDim,NBasis)
 C
       Implicit Real*8 (A-H,O-Z)
@@ -4460,18 +4458,6 @@ C
 C     
       Include 'commons.inc'
 
-C
-      INAct = 0
-      Do I=1,NBasis
-      If(IndAux(I)/=0) exit
-       INAct = INAct + 1
-      EndDo
-      NVir = 0
-      Do I=NBasis,1,-1
-      If(IndAux(I)/=2) exit
-      NVir = NVir + 1
-      EndDo
-      NAct = NBasis - INAct - NVir
 C
 C     CONSTRUCT LOOK-UP TABLES
 C
@@ -4629,13 +4615,13 @@ C
 
       Subroutine ECorrAC0GVB_FOFO(ECorr0,ECorr,AMAT,BMAT,ABPLUS,
      $                 EigVY2,Occ,C,Eig,IndP,IndN,IndX,IGem,
-     $                 IntKFile,NAct,INActive,NDim,NDimX,NGem,NBasis)
+     $                 IntKFile,NAct,NElHlf,NDim,NDimX,NGem,NBasis)
 C
       use tran
 C
       Implicit None
 
-      Integer :: NAct,INActive,NDim,NDimX,NGem,NBasis
+      Integer :: NAct,NElHlf,NDim,NDimX,NGem,NBasis
       Integer :: IndX(NDim),IndN(2,NDim),IndP(NBasis,NBasis),
      $           IGem(NBasis)
       Character(*) :: IntKFile
@@ -4646,7 +4632,7 @@ C
      $                    ABPLUS(NDimX,NDimX)
 C
       Integer :: iunit
-      Integer :: NOccup
+      Integer :: INActive,NOccup
       Integer :: ip,iq,ir,is,ipq,irs
       Integer :: i,j,k,l,kl
       Integer :: pos(NBasis,NBasis)
@@ -4654,7 +4640,8 @@ C
       Double Precision :: Cpq,Crs,Aux,EPSJI
       Double Precision,Allocatable :: Work(:),ints(:,:)
 
-      NOccup = NAct + INActive
+      INActive = NElHlf - NAct
+      NOccup = 2*NAct + INActive
 
       pos = 0
       Do I=1,NDimX
