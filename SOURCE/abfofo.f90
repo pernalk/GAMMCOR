@@ -4817,6 +4817,102 @@ deallocate(ints,work)
 
 end subroutine ACEneERPA_FOFO
 
+subroutine EneGVB_FOFO(NAct,NElHlf,ETot,URe,Occ,C,XOne, &
+                       IGem,IndN,NBasis,NInte1,IntKFile,NDimX,NGem)
+implicit none
+
+integer,intent(in) :: NAct,NElHlf,NBasis,NInte1,NDimX,NGem
+character(*) :: IntKFile
+double precision :: ETot
+
+integer :: IndN(2,NDimX),IGem(NBasis)
+double precision :: URe(NBasis,NBasis),Occ(NBasis),C(NBasis)
+double precision :: XOne(NInte1)
+
+integer :: i,j,ii,ij,ia,ib,iab
+integer :: k,l,kl,kk,ll,klround
+integer :: iunit
+integer :: INActive,NOccup
+integer,external :: NAddr3
+double precision :: FacIJ,FacIK
+double precision :: EOne, EIntraGem, EInterCoul, EInterExch
+
+double precision :: HNO(NBasis,NBasis)
+double precision,allocatable :: work1(:),work2(:)
+double precision,allocatable :: ints(:,:)
+
+write(lout,'(/A)') ' Electronic GVB energy check:'
+
+! set dimensions
+INActive = NElHlf - NAct
+NOccup = 2*NAct + INActive
+
+allocate(work1(NBasis**2),work2(NBasis**2),ints(NBasis,NBasis))
+
+call triang_to_sq(XOne,work1,NBasis)
+call dgemm('N','N',NBasis,NBasis,NBasis,1d0,URe,NBasis,work1,NBasis,0d0,work2,NBasis)
+call dgemm('N','T',NBasis,NBasis,NBasis,1d0,work2,NBasis,URe,NBasis,0d0,HNO,NBasis)
+call sq_symmetrize(HNO,NBasis)
+
+EOne = 0d0
+EIntraGem  = 0d0
+EInterCoul = 0d0
+EInterExch = 0d0
+
+do i=1,NBasis
+   EOne = EOne + 2d0*Occ(i)*HNO(i,i)
+enddo
+
+open(newunit=iunit,file=trim(IntKFile),status='OLD', &
+     access='DIRECT',recl=8*NBasis*NOccup)
+
+kl = 0
+do k=1,NOccup
+   do l=1,NBasis
+      kl = kl + 1
+      if(l>NOccup) cycle
+
+      read(iunit,rec=kl) work1(1:NBasis*NOccup)
+      do j=1,NOccup
+         do i=1,NBasis
+            ints(i,j) = work1((j-1)*NBasis+i)
+         enddo
+      enddo
+      ints(:,NOccup+1:NBasis) = 0
+
+      if(IGem(k)==IGem(l)) then
+         EIntraGem = EIntraGem + C(k)*C(l)*ints(k,l)
+      else
+         EInterExch = EInterExch - Occ(k)*Occ(l)*ints(k,l)
+      endif
+
+      FacIK = 4d0
+      if(k==l) then
+         do i=k,NOccup
+            if(IGem(i)/=IGem(k)) then
+            if(i==k) FacIK = 2d0
+            EInterCoul = EInterCoul + FacIK*Occ(i)*Occ(k)*ints(i,i)
+            endif
+         enddo
+     endif
+
+   enddo
+enddo
+
+close(iunit)
+
+write(LOUT,'(" One-electron energy",24X,F17.8)') EOne
+write(LOUT,'(" GVB intra-gem electron interaction",9X,F17.8)') EIntraGem
+write(LOUT,'(" GVB inter-gem Coulomb interaction",10X,F17.8)')  EInterCoul
+write(LOUT,'(" GVB inter-gem exchange interaction",9X,F17.8)') EInterExch
+write(LOUT,'(" Total GVB",33X,F18.8)') EOne+EIntraGem+EInterCoul+EInterExch
+
+ETot = EOne + EIntraGem + EInterCoul + EInterExch
+
+deallocate(ints,work2,work1)
+
+end subroutine EneGVB_FOFO
+
 subroutine dump_Eblock(Eblock,EblockIV,Occ,IndN,nblk,NBasis,NDimX,xy0file)
 implicit none
 

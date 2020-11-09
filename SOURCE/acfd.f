@@ -42,6 +42,9 @@ C
       If(ITwoEl.Eq.2) Then
       Call EneGVB_FFFF(ETot,URe,Occ,CICoef,XOne,
      $                  IGem,IndN,NBasis,NInte1,'TWOMO',NDimX,NGem)
+      ElseIf(ITwoEl.Eq.3) Then
+      Call EneGVB_FOFO(NActive,NELE,ETot,URe,Occ,CICoef,XOne,
+     $                 IGem,IndN,NBasis,NInte1,'FOFO',NDimX,NGem)
       EndIf
 C
       Write
@@ -3420,7 +3423,7 @@ C      Stop
       ECorr=ECorr+ECorr0
 C
       Write
-     $ (6,'(/,2X,''0-ALPHA-ORDER CORRELATION '',2X,F15.8)') ECorr0
+     $ (6,'(/,1X,''0-ALPHA-ORDER CORRELATION '',2X,F15.8)') ECorr0
 C
       Return
       End
