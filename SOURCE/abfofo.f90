@@ -875,7 +875,7 @@ double precision,parameter :: Delta = 1.d-6
 if(ISAPT==1) then
    write(6,'(1x,a)') 'Computing response-my'
 else
-   write(6,'(/,X,"***** COMPUTING AMAT, BMAT IN ACABMAT0 *****",/)')
+   write(6,'(/,X,"***** COMPUTING AMAT, BMAT IN ACABMAT0: FOFO *****",/)')
 endif
 
 AMAT = 0
@@ -1209,30 +1209,40 @@ do ICol=1,NDimX
             AMAT(irs,ipq) = AMAT(irs,ipq) + val
 
             if(IFlag/=0) then
-!!$               if(abs(abs(C(ip))-abs(C(iq)))<=Delta*abs(C(iq)).or.& 
-!!$                    abs(abs(C(ir))-abs(C(is)))<=Delta*abs(C(ir))) then
-!!$               
-!!$                  AMAT(irs,ipq) = 0
-!!$                  BMAT(irs,ipq) = 0
-!!$               else
-                  
-                  SaveA = AMAT(irs,ipq)
-                  SaveB = BMAT(irs,ipq)
-                  
-                  val = (C(ip) + C(iq))*(C(ir) + C(is))
-                  if(val==0) then
-                     AMAT(irs,ipq) = 0
-                  else
-                     AMAT(irs,ipq) = (SaveA+SaveB)/val
-                  endif
-                  val = (C(ip) - C(iq))*(C(ir) - C(is))
-                  if(val==0) then
-                     BMAT(irs,ipq) = 0
-                  else
-                     BMAT(irs,ipq) = (SaveA-SaveB)/val
-                  endif
+             !! Kasia's way:
+             !  if(abs(abs(C(ip))-abs(C(iq)))<=Delta*abs(C(iq)).or.& 
+             !       abs(abs(C(ir))-abs(C(is)))<=Delta*abs(C(ir))) then
+             !  
+             !     AMAT(irs,ipq) = 0
+             !     BMAT(irs,ipq) = 0
+             !  else
+
+             !     SaveA = AMAT(irs,ipq)
+             !     SaveB = BMAT(irs,ipq)
+
+             !     val = (C(ip) + C(iq))*(C(ir) + C(is))
+             !     AMAT(irs,ipq) = (SaveA+SaveB)/val
+             !     val = (C(ip) - C(iq))*(C(ir) - C(is))
+             !     BMAT(irs,ipq) = (SaveA-SaveB)/val
+
+               !  our way:
+               SaveA = AMAT(irs,ipq)
+               SaveB = BMAT(irs,ipq)
+                
+               val = (C(ip) + C(iq))*(C(ir) + C(is))
+               if(val==0) then
+                  AMAT(irs,ipq) = 0
+               else
+                  AMAT(irs,ipq) = (SaveA+SaveB)/val
                endif
-!!$            endif
+               val = (C(ip) - C(iq))*(C(ir) - C(is))
+               if(val==0) then
+                  BMAT(irs,ipq) = 0
+               else
+                  BMAT(irs,ipq) = (SaveA-SaveB)/val
+               endif
+              ! endif ! KP
+            endif
                         
          enddo
       endif
@@ -4816,6 +4826,160 @@ deallocate(Skipped)
 deallocate(ints,work)
 
 end subroutine ACEneERPA_FOFO
+
+subroutine EERPA_FOFO(ECorr,EVec,EVal,Occ,CICoef,IGem,   &
+                      IAuxGem,IG1,IG2,IG3,IG4,IB, &
+                      IndN,NOccup,NDimX,NBasis,IntKFile,IFrag)
+implicit none
+
+integer,intent(in) :: NDimX,NBasis
+integer,intent(in) :: IG1,IG2,IG3,IG4,IB 
+integer,intent(in) :: IGem(NBasis),IAuxGem(NBasis),IndN(2,NDimX)
+integer,intent(in) :: NOccup,IFrag
+character(*),intent(in) :: IntKFile
+double precision,intent(out) :: ECorr
+double precision,intent(in) :: Occ(NBasis),CICoef(NBasis)
+double precision,intent(in) :: EVec(NDimX,NDimX),EVal(NDimX)
+
+integer :: i,j,k,l,kl,kk,ip,iq,ir,is,ipq,irs
+integer :: iunit,ISkippedEig
+integer :: pos(NBasis,NBasis)
+integer :: OccProd(NBasis,NBasis),AuxIG(NBasis)
+integer :: IFlPQRS,IFlP,IFlQ,IFlR,IFlS
+integer :: NoVirtP,NoVirtQ,NoVirtR,NoVirtS,NoVirt
+integer :: IBdy,IBdyG,ICond
+double precision :: Cpq,Crs,SumY,Aux
+double precision,allocatable :: work(:),ints(:,:),Skipped(:)
+double precision,parameter :: SmallE = 1.d-3,BigE = 1.d8
+integer :: itmp
+
+!do i=1,NBasis
+!   CICoef(i) = sign(sqrt(Occ(i)),Occ(i)-0.5d0)
+!enddo
+
+pos = 0
+do i=1,NDimX
+   pos(IndN(1,i),IndN(2,i)) = i
+enddo
+
+OccProd = 0
+do j=1,NBasis
+   do i=1,NBasis
+      if(Occ(i)*Occ(j)/=0d0) OccProd(i,j) = 1
+   enddo
+enddo
+
+AuxIG = 0
+do i=1,NBasis
+   if(IGem(i)==IG1.or.IGem(i)==IG2.or.IGem(i)==IG3.or.IGem(i)==IG4) AuxIG(i) = 1
+enddo
+
+
+allocate(work(NBasis**2),ints(NBasis,NBasis),Skipped(NDimX))
+
+ISkippedEig = 0
+ECorr = 0
+
+open(newunit=iunit,file=trim(IntKFile),status='OLD', &
+     access='DIRECT',recl=8*NBasis*NOccup)
+
+kl = 0
+itmp = 0
+do k=1,NOccup
+   do l=1,NBasis
+      kl = kl + 1
+      if(pos(l,k)/=0) then
+        irs = pos(l,k)
+        ir = l
+        is = k
+        read(iunit,rec=kl) work(1:NBasis*NOccup)
+        do j=1,NOccup
+           do i=1,NBasis
+              ints(i,j) = work((j-1)*NBasis+i)
+           enddo
+        enddo
+        ints(:,NOccup+1:NBasis) = 0
+
+        do j=1,NBasis
+           do i=1,j
+              if(pos(j,i)/=0) then
+                ipq = pos(j,i)
+                ip = j
+                iq = i
+                Crs = CICoef(l)+CICoef(k)
+                Cpq = CICoef(j)+CICoef(i)
+
+                NoVirt  = 0
+                IFlPQRS = 0
+                if(OccProd(ir,is)*OccProd(ip,iq)/=0) NoVirt = 1
+                if(AuxIG(ir)*AuxIG(is)*AuxIG(ip)*AuxIG(iq)/=0) IFlPQRS = 1
+
+                call IBody(IBdy,IGem(ip),IGem(iq),IGem(ir),IGem(is))
+
+                ICond = 0
+                if(IFlPQRS==1) then
+
+                   if((IBdy.eq.IB)) ICond = 1
+
+                   ! FOR GVB ONLY
+                   if((IB.gt.2.and.NoVirt.Eq.1.and. &
+                       IBdy.eq.IB-1)) ICond = 1
+
+                   ! FOR GVB ONLY: IF IFrag=1,IB=2 (ONE-BODY), ALLOW ALL CASES 
+                   ! EXCEPT WHEN ALL ORBITALS ARE FROM THE SAME GEMINAL
+                   if(IFrag.Eq.1.and.IB.Eq.2) then
+                      call IBody(IBdyG,IAuxGem(ip),IAuxGem(iq),IAuxGem(ir),IAuxGem(is))
+                      If(IBdyG.Ne.1) ICond = 1
+                   endif
+
+                endif !IFlPQRS
+
+                if(ICond.Eq.1) then
+
+                   ISkippedEig = 0
+                   SumY = 0
+                   do kk=1,NDimX
+                      if(EVal(kk).gt.SmallE.and.EVal(kk).lt.BigE) then
+                         SumY = SumY + EVec(ipq,kk)*EVec(irs,kk)
+                      else
+                         ISkippedEig = ISkippedEig + 1
+                         Skipped(ISkippedEig) = EVal(kk)
+                      endif
+                   enddo
+
+                   Aux = Crs*Cpq*SumY
+ 
+                   if(iq.Eq.is.and.ip.Eq.ir) then
+                      Aux = Aux - 0.5d0*(Occ(ip)*(1d0-Occ(is))+Occ(is)*(1d0-Occ(ip)))
+                   endif  
+
+                   ECorr = ECorr + Aux*ints(j,i)
+
+                endif ! ICond
+
+              endif
+           enddo
+        enddo
+
+      endif
+
+   enddo
+enddo
+
+close(iunit)
+
+if(ISkippedEig/=0) then
+  write(LOUT,'(/,1x,"The number of discarded eigenvalues is",i4)') &
+       ISkippedEig
+  do i=1,ISkippedEig
+     write(LOUT,'(1x,a,i4,f15.8)') 'Skipped',i,Skipped(i)
+  enddo
+endif
+
+deallocate(Skipped)
+deallocate(ints,work)
+
+end subroutine EERPA_FOFO
 
 subroutine EneGVB_FOFO(NAct,NElHlf,ETot,URe,Occ,C,XOne, &
                        IGem,IndN,NBasis,NInte1,IntKFile,NDimX,NGem)

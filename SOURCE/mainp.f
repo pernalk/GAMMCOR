@@ -96,6 +96,16 @@ C     IFlSnd  = 1 - run AC0 (linerized in alpha, MP2-like expression for AC is u
 C             = 0 - do not run AC0
       IFlSnd=Flags%IFlSnd
 C
+C     IFlAC0D = 1 - run AC0D ()
+C             = 0 - do not run AC0D
+      IFlAC0D=Flags%IFlAC0D
+C
+C     ISymmAC0D = 1 : AC0D corrections will be computed based on symmetry (dafault)
+C                 0 : AC0D corrections will be computed based on overlap with SA-CAS
+C                     states (run molpro with symmetry,nosym) 
+C
+      ISymmAC0D=Flags%ISymmAC0D
+C
 C     IFlCore = 1 - core (inactive) orbitals included in ERPA correlation 
 C             = 0 - core (inactive) orbitals excluded from ERPA correlation
       IFlCore=Flags%IFlCore
@@ -193,6 +203,7 @@ C
 C
       If(InSt(2,1).Gt.0) Then
       NoSt = System%InSt(1,1)
+C
 C      Print*,'VALUE DECLARED IN INPUT: ',NoSt
 C
       ElseIf(IDALTON.Eq.0.and.IDMRG.Eq.0) Then
@@ -297,6 +308,13 @@ C
       Write(6,'(/,1x,a,i2,1x,a)') 'CHECK OUTPUT FOR',IWarn,'WARNINGS!'
 C      Write(6,'(8a10)') ('**********',i=1,9)
       EndIf
+C
+      If(ITwoEl.Eq.2) Then
+      Call delfile('TWOMO')
+      ElseIf(ITwoEl.Eq.3) Then
+      Call delfile('FOFO')
+      Call delfile('FFOO')
+      EndIF
 C
       Call free_System(System)
       Call clock(PossibleJobType(Flags%JobType),Tcpu,Twall)

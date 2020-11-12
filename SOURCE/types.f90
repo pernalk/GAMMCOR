@@ -26,6 +26,8 @@ integer, parameter :: JOB_TYPE_PDFT  = 6
 integer, parameter :: JOB_TYPE_CASPIDFT = 7
 integer, parameter :: JOB_TYPE_CASPIDFTOPT = 8
 integer, parameter :: JOB_TYPE_EERPA_OLD = 9
+integer, parameter :: JOB_TYPE_AC0D = 10
+integer, parameter :: JOB_TYPE_AC0DNOSYMM = 11
 
 integer, parameter :: SAPTLEVEL0 = 0
 integer, parameter :: SAPTLEVEL1 = 1
@@ -209,6 +211,8 @@ type FlagsData
      ! interpa.f  
      integer :: IFlAC   = 0
      integer :: IFlSnd  = 0
+     integer :: IFlAC0D = 0
+     integer :: ISymmAC0D = 1
      integer :: IFlCore = 1
      integer :: IFlFrag1 = 0
      integer :: IFl12 = 1
@@ -316,7 +320,6 @@ associate( CalcParams => Input%CalcParams)
  if (allocated(CalcParams%IntegralsFilePath)) then
        write(*, *) "Ints file: ", CalcParams%IntegralsFilePath
  end if
-
   switch = 0
   if(Input%SystemInput(1)%Monomer==2) switch = 3
 
@@ -1068,6 +1071,46 @@ double precision ::tmp(nbasis**2)
  close(iunit)
 
 end subroutine read_mo_molpro 
+
+subroutine read_sym_molpro(NSymMO,nsym,nbas,infile,text,nbasis)
+implicit none
+
+integer,intent(in) :: nbasis
+character(*),intent(in) :: infile,text
+integer :: NSymMO(nbasis)
+character(8) :: label
+integer :: iunit,ios
+integer :: nsym,nbas(8),offs(8),ncmot
+integer :: i,j,idx,irep,ioff
+double precision ::tmp(nbasis**2)
+
+ open(newunit=iunit,file=infile,status='OLD', &
+      access='SEQUENTIAL',form='UNFORMATTED')
+
+ do
+   read(iunit,iostat=ios) label
+   if(ios<0) then
+      write(6,*) 'ERROR!!! LABEL '//text//' not found!'
+      stop
+   endif
+   if(label==text) then
+      read(iunit) nsym,nbas(1:nsym),offs(1:nsym)
+      ncmot = sum(nbas(1:nsym)**2)
+      read(iunit) tmp(1:ncmot)
+      exit
+   endif
+ enddo
+
+ close(iunit)
+
+ do irep=1,nsym
+    ioff = offs(irep)
+    do j=1,nbas(irep)
+      NSymMO(ioff+j)=irep
+    enddo
+ enddo
+
+end subroutine read_sym_molpro
 
 subroutine readlabel(iunit,text)
 ! sets file pointer 
@@ -1895,6 +1938,53 @@ do i=1,Mon%NSym
 enddo
 !
 end subroutine create_symmats
+
+subroutine sym_inf(infile,NumOSym,NSym,nstats,istsy,NStSym,NSymAO,NBasis)
+implicit none
+
+character(*) :: infile
+integer :: NumOSym(8),NSym,NBasis
+integer :: ifile,ios,i,j,k,isym
+integer :: NState,NStSym,IOld,INew,ioff
+integer :: iclos(8),iact(8),nt(8),ivirt(8),istsy(16),nstats(16),NSymAO(NBasis)
+character(8) :: label
+
+ iclos = 0
+ ivirt = 0
+ iact = 0
+ nstats = 0
+ istsy = 0
+ NumOSym = 0
+ open(newunit=ifile,file=infile,access='sequential',&
+      form='unformatted',status='old')
+
+ do
+   read(ifile,iostat=ios) label
+    if(ios<0) then
+      write(6,*) 'ERROR!!! LABEL ISORDK   not found!'
+      stop
+   endif
+   if(label=='BASINFO ') then
+      read(ifile) NSym
+      read(ifile) NStSym
+      read(ifile) nstats(1:NStSym)
+      read(ifile) istsy(1:NStSym)
+      read(ifile) iclos(1:NSym)
+      read(ifile) iact(1:NSym)
+      read(ifile) NumOSym(1:NSym)
+      exit
+   endif
+ enddo
+
+ioff=0
+do i=1,Nsym
+    do j=1,NumOSym(i)
+      ioff=ioff+1
+      NSymAO(ioff)=i
+    enddo
+ enddo
+
+end subroutine sym_inf
 
 subroutine create_ind(infile,NumOSym,IndInt,NSym,NBasis)
 implicit none

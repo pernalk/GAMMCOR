@@ -3,6 +3,9 @@
      $  Title,NBasis,NInte1,NInte2,NDim,
      $  NGem,NGOcc)
 C
+      use abmat
+      use abfofo
+C
 C      Subroutine INTERPA(ETot,ENuc,TwoNO,URe,UNOAO,Occ,XOne,
 C     $  Title,OrbGrid,WGrid,NSymMO,NBasis,NInte1,NInte2,NGrid,NDim,
 C     $  NGem,IAPSG,ISERPA,QMAX,NGOcc,Small)
@@ -27,6 +30,7 @@ C
       Dimension
      $ ABPLUS(NDim*NDim),ABMIN(NDim*NDim),
      $ IndX(NDim),IndN(2,NDim),
+     $ IndP(NBasis,NBasis),
      $ NSymMO(NBasis),NSymNO(NBasis),
      $ EigVecR(NDim*NDim),Eig(NDim),
      $ IndAux(NBasis),
@@ -80,7 +84,7 @@ C
       Write(6,'(/," *** IFlCore=1: Inactive orbitals (n_p=1) 
      $ included in ERPA correlation ***",/)')
       EndIf
-
+C
       Write(6,'(X," IFlFrag1 ",I4,/)') IFlFrag1
       If(IFlFrag1.Eq.1) Write(6,'(X," IFl12    ",I4,/)') IFl12 
 C
@@ -230,8 +234,45 @@ C
       ACAlpha=One
       If(ICASSCF.Eq.0) Then
 C
+      If(ITwoEl.Eq.1) Then
+
       Call ACABMAT0(ABPLUS,ABMIN,URe,Occ,XOne,TwoNO,
      $ NBasis,NDim,NInte1,NInte2,NGem,ACAlpha,1)
+
+c      print*, 'ABPLUS-Ka',norm2(ABPLUS(1:NDim**2))
+c      print*, 'ABMIN -Ka',norm2(ABMIN(1:NDim**2))
+
+      ElseIf(ITwoEl.Eq.2) Then
+
+      Call LookUp_mithap(Occ,IndAux,IndP,IndN,IndX,NDimX,NDim,NBasis)
+C
+      Call ACABMAT0_mithap(ABPLUS,ABMIN,URe,Occ,XOne,
+     $            IndN,IndX,IGem,CICoef,
+     $            NBasis,NDim,NDimX,NInte1,NGem,
+     $            'TWOMO',0,ACAlpha,1)
+
+c      print*, 'ABPLUS-my',norm2(ABPLUS(1:NDim**2))
+c      print*, 'ABMIN -my',norm2(ABMIN(1:NDim**2))
+
+      Call EneGVB_FFFF(ETot,URe,Occ,CICoef,XOne,
+     $                 IGem,IndN,NBasis,NInte1,'TWOMO',NDimX,NGem)
+
+      ElseIf(ITwoEl.Eq.3) Then
+C      
+      Call LookUp_mithap(Occ,IndAux,IndP,IndN,IndX,NDimX,NDim,NBasis)
+C
+      Call ACABMAT0_FOFO(ABPLUS,ABMIN,URe,Occ,XOne,
+     $            IndN,IndX,IGem,CICoef,
+     $            NActive,NELE,NBasis,NDim,NDimX,NInte1,NGem,
+     $            'TWOMO','FFOO','FOFO',0,ACAlpha,1)
+
+c      print*, 'ABPLUS-my',norm2(ABPLUS)
+c      print*, 'ABMIN -my',norm2(ABMIN)
+
+      Call EneGVB_FOFO(NActive,NELE,ETot,URe,Occ,CICoef,XOne,
+     $                 IGem,IndN,NBasis,NInte1,'FOFO',NDimX,NGem)
+
+      EndIf
 C
 C     Test diagonal part:
 C      Do I=1,NDim
@@ -270,7 +311,7 @@ C
 C
       Write(6,'(/,X,"***** EMBEDDING ERPA (EERPA) CALCULATIONS *****")')
 C
-c      Write(6,'(/,X," Entering OneTwoBody with IFl12 = ",I4)'),IFl12
+c      Write(6,'(/,X," Entering FOFO not ready...OneTwoBody with IFl12 = ",I4)'),IFl12
 c      Call OneTwoBody(ETot,ENuc,ECorrTot,EGOne,EigVecR,Eig,ABPLUS,ABMIN,
 c     $ Occ,TwoNO,IndAux,NBasis,NInte1,NInte2,NDim,NGem,NGOcc,IFl12)
 c      NFrag=NGem-1
@@ -1287,6 +1328,7 @@ C     COMPUTE EigX
 C
       Do NU=1,NDimX
 C
+C 21.07.2020 KP: avoid dividing by 0 if Eig(NU)=0
       If(Eig(NU).Ne.Zero) Then
 C    
       Do I=1,NDimX
@@ -1301,6 +1343,7 @@ C
       EndDo
       EndDo
 C
+C 21.07.2020 KP: put to zero EigVec's corresponding to Eig(NU)=0
       Else
 C
       Do I=1,NDimX
@@ -1330,7 +1373,7 @@ C
      $ NU,Eig(NU),SumNU
 C
       EndDo
-C      
+C
       Return
       End
 
@@ -1875,16 +1918,18 @@ c
 C
       Dimension
      $ EGOne(NGem),EGOneTwo(NGem,NGem),
-     $ EigVecR(NDim*NDim),Eig(NDim),
-     $ IndAux(NBasis),ABPLUS(NDim*NDim),
-     $ ABMIN(NDim*NDim),Occ(NBasis),TwoNO(NInte2)
+     $ EigVecR(NDim,NDim),Eig(NDim),
+     $ IndAux(NBasis),Occ(NBasis),TwoNO(NInte2),
+     $ ABPLUS(NDim,NDim),ABMIN(NDim,NDim)
 C
 C     LOCAL ARRAYS
 C
-      Dimension IndN(2,NDim),IndX(NDim),ABPRed(NDim*NDim),
-     $ ABMRed(NDim*NDim),IAux(NBasis)
+      Dimension IndN(2,NDim),IndX(NDim),IAux(NBasis),
+     $          ABPRed(NDim,NDim),ABMRed(NDim,NDim)
+C
 C
       ECorrTot=Zero
+C
 C
       If(IGVB.Eq.1) Then
 C
@@ -1898,6 +1943,9 @@ C
       Do IGG=IStart,NGem-1
 C
       Write(6,'(/,X,"COMPUTING CORR FOR THE FRAGMENT: ",I4)')IGG
+C      
+      Eig(1:NDim) = 0
+      EigVecR = 0
 C
       Do I=1,NBasis
       IGemSave(I)=IGem(I)
@@ -1940,11 +1988,11 @@ C     check if fragments are not connected
       If(IConnect(IGG,IGem(I)).Eq.0) Then
        Write(6,'(X," Active Orbital Included (I, Frag, Occ): ",
      $ 2I4,E14.4)') I, IGem(I), Occ(I)
-      IGem(I)=NGem 
+      IGem(I)=NGem
       EndIf 
       EndIf
 C
-c     Do I=1      
+c     Do I=1
       EndDo
 C
 c     If(ICore.Eq.1)
@@ -2021,10 +2069,12 @@ C
       Do I=1,NDimX
       IJ=(J-1)*NDimX+I
       IJ1=(IndX(J)-1)*NDim+IndX(I)
-      ABPRed(IJ)=ABPLUS(IJ1)
-      ABMRed(IJ)=ABMIN(IJ1)
+      ABPRed(I,J) = ABPLUS(IndX(I),IndX(J))
+      ABMRed(I,J) =  ABMIN(IndX(I),IndX(J))
       EndDo
       EndDo
+c      Print*, 'ABPRed',norm2(ABPRed)
+c      Print*, 'ABMRed',norm2(ABMRed)
 C
 C     COMPUTE THE ONE-BODY CORRELATION
 C
@@ -2033,18 +2083,24 @@ C
       If(IFlSnd.Eq.0) Then
 C
       If(IFlag.Eq.1.Or.(IFlag.Eq.0.And.IGG.Eq.IStart)) Then
-      Call ERPASYMM(EigVecR,Eig,ABPRed,ABMRed,NBasis,NDimX)
+      Call ERPASYMM(EigVecR(1:NDimX,1:NDimX),Eig,
+     $  ABPRed(1:NDimX,1:NDimX),ABMRed(1:NDimX,1:NDimX),NBasis,NDimX)
       EndIf
 C
       Else
 C
-      Do I=1,NDimX*NDimX
-      EigVecR(I)=ABPRed(I)
+      Do J=1,NDimX
+      Do I=1,NDimX
+      EigVecR(I,J)=ABPRed(I,J)
+      EndDo
       EndDo
 C
       EndIf
 C
-      Call EInterG(ECorr,EigVecR,Eig,TwoNO,Occ, 
+c     print*, 'EigVecR',norm2(EigVecR)
+c     print*, 'Eig    ',norm2(Eig)
+C
+      Call EInterG(ECorr,EigVecR(1:NDimX,1:NDimX),Eig,TwoNO,Occ,
      $ IndN,NBasis,NInte1,NInte2,NDimX,NGem,2,IGG,IGG,NGem,NGem)
       EGOne(IGG)=ECorr
 C
@@ -2240,10 +2296,13 @@ C
       Do I=1,NDimX
       IJ=(J-1)*NDimX+I
       IJ1=(IndX(J)-1)*NDim+IndX(I)
-      ABPRed(IJ)=ABPLUS(IJ1)
-      ABMRed(IJ)=ABMIN(IJ1)
+      ABPRed(I,J) = ABPLUS(IndX(I),IndX(J))
+      ABMRed(I,J) =  ABMIN(IndX(I),IndX(J))
       EndDo
       EndDo
+C
+      Print*, 'ABPRed',norm2(ABPRed)
+      Print*, 'ABMRed',norm2(ABMRed)
 C
 C     COMPUTE THE TWO-BODY CORRELATION
 C
@@ -2252,18 +2311,24 @@ C
       If(IFlSnd.Eq.0) Then
 C
       If(IFlag.Eq.1) Then
-      Call ERPASYMM(EigVecR,Eig,ABPRed,ABMRed,NBasis,NDimX)
+      Call ERPASYMM(EigVecR(1:NDimX,1:NDimX),Eig,
+     $  ABPRed(1:NDimX,1:NDimX),ABMRed(1:NDimX,1:NDimX),NBasis,NDimX)
       EndIf
-C
+CC
       Else
 C
-      Do I=1,NDimX*NDimX
-      EigVecR(I)=ABPRed(I)
+      Do J=1,NDimX
+      Do I=1,NDimX
+      EigVecR(I,J)=ABPRed(I,J)
+      EndDo
       EndDo
 C
       EndIf
 C
-      Call EInterG(ECorr,EigVecR,Eig,TwoNO,Occ,
+      print*, 'EigVecR',norm2(EigVecR)
+      print*, 'Eig    ',norm2(Eig)
+C
+      Call EInterG(ECorr,EigVecR(1:NDimX,1:NDimX),Eig,TwoNO,Occ,
      $ IndN,NBasis,NInte1,NInte2,NDimX,NGem,3,IGG1,IGG2,NGem,NGem)
       EGOneTwo(IGG1,IGG2)=ECorr
 C
@@ -2471,8 +2536,8 @@ C
       Do I=1,NDimX
       IJ=(J-1)*NDimX+I
       IJ1=(IndX(J)-1)*NDim+IndX(I)
-      ABPRed(IJ)=ABPLUS(IJ1)
-      ABMRed(IJ)=ABMIN(IJ1)
+      ABPRed(I,J) = ABPLUS(IndX(I),IndX(J))
+      ABMRed(I,J) =  ABMIN(IndX(I),IndX(J))
       EndDo
       EndDo
 C
@@ -2483,18 +2548,21 @@ C
       If(IFlSnd.Eq.0) Then
 C
       If(IFlag.Eq.1) Then
-      Call ERPASYMM(EigVecR,Eig,ABPRed,ABMRed,NBasis,NDimX)
+      Call ERPASYMM(EigVecR(1:NDimX,1:NDimX),Eig,
+     $ ABPRed(1:NDimX,1:NDimX),ABMRed(1:NDimX,1:NDimX),NBasis,NDimX)
       EndIf
 C
       Else
 C
-      Do I=1,NDimX*NDimX
-      EigVecR(I)=ABPRed(I)
+      Do J=1,NDimX
+      Do I=1,NDimX
+      EigVecR(I,J)=ABPRed(I,J)
+      EndDo
       EndDo
 C
       EndIf
 C
-      Call EInterG(ECorr,EigVecR,Eig,TwoNO,Occ,
+      Call EInterG(ECorr,EigVecR(1:NDimX,1:NDimX),Eig,TwoNO,Occ,
      $ IndN,NBasis,NInte1,NInte2,NDimX,NGem,4,IGG1,IGG2,IGG3,NGem)
 C
       EThreeTot=EThreeTot+ECorr
@@ -2580,17 +2648,17 @@ C
       Do I=1,NDimX
       IJ=(J-1)*NDimX+I
       IJ1=(IndX(J)-1)*NDim+IndX(I)
-      ABPRed(IJ)=ABPLUS(IJ1)
-      ABMRed(IJ)=ABMIN(IJ1)
+      ABPRed(I,J) = ABPLUS(IndX(I),IndX(J))
+      ABMRed(I,J) =  ABMIN(IndX(I),IndX(J))
       EndDo
       EndDo
 C
 C     COMPUTE THE TWO-BODY CORRELATION
 C
-c      Call ERPAVEC(EigVecR,Eig,ABPRed,ABMRed,NBasis,NDimX)
-      Call ERPASYMM(EigVecR,Eig,ABPRed,ABMRed,NBasis,NDimX)
+      Call ERPASYMM(EigVecR(1:NDimX,1:NDimX),Eig,
+     $  ABPRed(1:NDimX,1:NDimX),ABMRed(1:NDimX,1:NDimX),NBasis,NDimX)
 C
-      Call EInterG(ECorr,EigVecR,Eig,TwoNO,Occ,
+      Call EInterG(ECorr,EigVecR(1:NDimX,1:NDimX),Eig,TwoNO,Occ,
      $ IndN,NBasis,NInte1,NInte2,NDimX,NGem,2,IGG1,IGG1,IGG2,IGG2)
       EGOneTwo(IGG1,IGG2)=ECorr
 C
@@ -2627,13 +2695,16 @@ C
       Subroutine EInterG(ECorr,EigVecR,Eig,TwoNO,Occ,
      $ IndN,NBasis,NInte1,NInte2,NDimX,NGem,IB,IG1,IG2,IG3,IG4)
 C
+      use abfofo
+      use abmat
+C
 C     IB = 2 - ONLY TWO-BODY CONTRIBUTIONS (ONE-BODY FOR GVB)
 C          3 - ONLY THREE-BODY (TWO-BODY FOR GVB)
 C          4   ONLY FOUR-BODY
 C     INDICES IP,IQ,IR,IS MUST BELONG TO ONE OF THE G1-G4 GEMINALS
 C
       Implicit Real*8 (A-H,O-Z)
-C
+c
       Parameter(Zero=0.D0, Half=0.5D0, One=1.D0, Two=2.D0, Four=4.D0)
 C
       Parameter(SmallE=1.D-3,BigE=5.D2)
@@ -2656,6 +2727,8 @@ C
 C     COMPUTE INTERGEMINAL CORRELATION, ECorr
 C
       ECorr=Zero
+C
+      If(ITwoEl.Eq.1) Then
 C
       Do I=1,NDimX
 C
@@ -2696,9 +2769,9 @@ C
 C
       ICond=0
 C
-      If((IP.Gt.IR.And.IQ.Gt.IS.And.IBdy.Eq.IB.And.IFlPRQS.Eq.1)) 
-     $ ICond=1
-C
+      If((IP.Gt.IR.And.IQ.Gt.IS.And.IBdy.Eq.IB.And.IFlPRQS.Eq.1))
+     $   ICond=1
+
 C     FOR GVB ONLY
 C
       If(IGVB.Eq.1.And.IB.Gt.2.And.NoVirt.Eq.1.And.
@@ -2706,23 +2779,22 @@ C
      $ ICond=1
 C   
 C     FOR GVB ONLY: IF IFrag=1,IB=2 (ONE-BODY), ALLOW ALL CASES 
-C     EXCEPT WHEN ALL ORBITALS ARE FROM THE SAME GMEINAL
+C     EXCEPT WHEN ALL ORBITALS ARE FROM THE SAME GEMINAL
 C
       If(IFrag.Eq.1.And.IGVB.Eq.1.And.IB.Eq.2.And.
      $   IP.Gt.IR.And.IQ.Gt.IS.And.IFlPRQS.Eq.1) Then
-C  
+  
 C     IF IFrag=1 THEN IAuxGem STORES ASSIGNMENTS OF ORBS TO GEMINALS 
 C     (IGem STORES ASSIGNMENTS TO FRAGMENTS)
       Call IBody(IBdyG,IAuxGem(IP),IAuxGem(IR),IAuxGem(IQ),IAuxGem(IS))
       If(IBdyG.Ne.1) ICond=1
-C
       EndIf
 C
       If(ICond.Eq.1) Then
 C
       ISkippedEig=0
 C
-      If(IFlSnd.Eq.0) Then
+      If(IFlSnd.EQ.0) Then
 C
       SumY=Zero
       Do K=1,NDimX
@@ -2742,7 +2814,7 @@ C
       ECorr=ECorr+Aux*TwoNO(NAddr3(IP,IR,IQ,IS))
 C
       Else
-C 
+C
       Aux=EigVecR((J-1)*NDimX+I) 
 C
       If(IR.Eq.IS.And.IP.Eq.IQ) Then
@@ -2755,7 +2827,7 @@ C
       EndIf
 C
       ECorr=ECorr+Aux*TwoNO(NAddr3(IP,IR,IQ,IS))
-C
+
 C     If(IFlSnd.Eq.0) 
       EndIf
 C
@@ -2771,6 +2843,24 @@ C
       Do II=1,ISkippedEig
       Write(6,*)'Skipped',II,Skipped(II)
       EndDo
+      EndIf
+
+      ElseIf(ITwoEl.Eq.2) Then
+C
+      Call EERPA_FFFF(ECorr,EigVecR,Eig,Occ,
+     $                C,IGem,IAuxGem,
+     $                IG1,IG2,IG3,IG4,IB,
+     $                IndN,NDimX,NBasis,
+     $                'TWOMO',IFrag)
+C
+      ElseIf(ITwoEl.Eq.3) Then
+C
+      Call EERPA_FOFO(ECorr,EigVecR,Eig,Occ,
+     $                C,IGem,IAuxGem,
+     $                IG1,IG2,IG3,IG4,IB,
+     $                IndN,NELE+NActive,
+     $                NDimX,NBasis,'FOFO',IFrag)
+C
       EndIf
 C
       Return
@@ -3011,7 +3101,7 @@ C     check if other geminals belong to the same fragment
       Do KG=1,NoIG
       If(IFragG(KG+InActG).Eq.NoFrag) Then
       Do IC=1,NoICENT
-      If(GCHAR(KG,IC).Gt.1.D-1.And.GCHAR(JG,IC).Gt.1.D-1) IShare=1
+      If(GCHAR(KG,IC).Gt.0.1.And.GCHAR(JG,IC).Gt.0.1) IShare=1
       EndDo
       EndIf
       EndDo
@@ -3075,8 +3165,6 @@ C
       IMonomerG(IFindG(I))=IA
       EndDo
 C
-C
-C
   555 FORMAT(/,2X,'Geminal no',I3,' in fragment:',I3)
 C     set connectivity matrix for active fragments
       Do IG=1,NoIG
@@ -3117,19 +3205,6 @@ C
       Do I=1,NELE
       IndAA(I)=IFragG(IGem(I))
       EndDo 
-C herer!!! all connect => no extra excitations
-c      write(*,*)
-c      write(*,*)' ************************************************** '
-c      write(*,*)' ***** ALL FRAGMS CONNECTED - NO EXTRA EXCITATIONS! '
-c      write(*,*)' ************************************************** '
-c      write(*,*)
-c      do i=1,nofrag
-c      do j=1,nofrag
-c      IConnect(i,j)=1
-c      IConnect(j,i)=1
-c      enddo
-c      enddo
-
 C
       NGem=NoFrag
 C      Write(*,*)'Orbital assignment to frags read from frag_assign.dat'
@@ -3321,6 +3396,9 @@ C
       Write(6,'(X,"TOTAL",F16.8)')EOneTot
 C
   444 Continue
+C
+C     If new EERPA is called and partitioning of the correlation energy into monomer-monomer is needed
+C     than continue
 C
 C     WATCH OUT: orbitals are assigned to monomers IMonomerG(I)
 C                and to fragments by IFrag(I)
