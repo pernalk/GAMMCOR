@@ -64,7 +64,7 @@ C
 C
 C     ITwoEl
       EndIf
-C      
+C     
       Write
      $ (6,'(/,X,''ECASSCF+ENuc, AC0-Corr, AC0-CASSCF '',4X,3F15.8)')
      $ ETot+ENuc,ECorr,ETot+ENuc+ECorr
@@ -74,12 +74,14 @@ c      Call DEEXCIT(TrGamm,EExcit,Occ,UNOAO,XOne,TwoNO,ENuc,NGem,NInte1,
 c     $ NInte2,NBasis)
 c      Stop
 C
+C     If(ICASSCF.Eq.1)
       EndIf
 C
       If(IFlFrag1.Eq.1) Then
 C
       Write(6,'(/,2X,''*** Embedding-AC0-GVB Calculation ***'',/)')
 C
+C This is not going to work
       NFrag=NGem-1
       Call FragEcorr(ETot,ENuc,ECorr2,EGOne,EigVecR,Eig,ABPLUS,ABMIN,
      $  UNOAO,Occ,TwoNO,URe,XOne,IndAux,NBasis,NInte1,
@@ -2454,8 +2456,8 @@ C
      $ TrGamm(NInte1,NInte1),EExcit(NInte1),
      $ XCAS(NBasis,NInte1),YCAS(NBasis,NInte1),
      $ GammaS(100,NInte1)
-C Y(1) and X(1)
-     $ ,IMatch(NDimX),EigY1(NDimD*NDimD),EigX1(NDimD*NDimD),
+     $ ,IMatch(NDimX),EigY1(NDimD*NDimD),
+c EigX1(NDimD*NDimD),
      $ Eig1(NDimD),
      $ DipX(NBasis,NBasis),DipY(NBasis,NBasis),DipZ(NBasis,NBasis)
 C
@@ -2484,10 +2486,12 @@ C
       Call ReadDip(DipX,DipY,DipZ,UNOAO,NBasis)
 C
       NoStMx=0
-      Write(6,'(/,X,"********** SA-CAS FROM MOLPRO **********",/)')
+      Write(6,'(X,"**** SA-CAS FROM MOLPRO ****",/)')
+      IPr=0
+      If(IH0St.Eq.NoSt) IPr=1
       Call RDM_SACAS(GammaS,XCAS,YCAS,EExcit,C,UNOAO,IPair,
-     $ DipX,DipY,DipZ,NoSt,NoStMx,NInte1,NBasis)
-      Write(6,'(/,X,"The number of states in SA-CAS: ",I4,/)')NoStMx
+     $ DipX,DipY,DipZ,NoSt,NoStMx,NInte1,NBasis,IPr)
+      Write(6,'(X,"The number of states in SA-CAS: ",I4,/)')NoStMx
       If(IH0St.Gt.NoStMx) Stop'Stop in AC0CDEXCIT: IH0St is greater
      $ than the number of states in SA-CAS!'
       Do NU=1,NoSt-1
@@ -2498,7 +2502,6 @@ C
       Write(6,'(X,"SA-CAS Excitation   from ",I4," to",I4,2E15.6)') 
      $ NoSt,NU,EExcit(NU)
       EndDo
-      Write(6,'(/,X,"*****************************************",/)')
 C
       If(IH0St.Ne.NoSt.And.EExcit(IH0St).Eq.Zero) Then
       Write(6,'(/,X,"Transition energy of interest is zero, quitting")')
@@ -2588,8 +2591,8 @@ C
 C
 C     CONSTRUCT ONE-ELECTRON PART OF THE AC ALPHA=0 HAMILTONIAN
 C
-      Write(6,'(/,X,"****** H0 constructed for SA-CAS state no",I4,
-     $ " ******")') IH0St
+      Write(6,'(/,X,"*** H0 constructed for SA-CAS state no",I4,
+     $ " ***")') IH0St
 C
       IJ=0
       Do I=1,NBasis
@@ -2868,6 +2871,7 @@ C
 C
       IPositive=0
       Do NU=1,NDimB
+C
       If(Eig(NFree1-1+NU).Gt.Zero) Then
       IPositive=IPositive+1
       If(IPositive.Eq.IH0St-NoSt) IStERPA=NU
@@ -2877,7 +2881,7 @@ C
       Do I=1,NDimB
       If(Abs(EigY(NFree2-1+(NU-1)*NDimB+I))
      $  +Abs(EigX(NFree2-1+(NU-1)*NDimB+I)).Gt.1.d-7)
-     $ Write(6,'(X,"YCAS, XCAS    ",2I3,2E15.6)')IndBlock(1,NFree1-1+I),
+     $ Write(6,'(X,"Y_ERPA, X_ERPA",2I3,2E15.6)')IndBlock(1,NFree1-1+I),
      $ IndBlock(2,NFree1-1+I),
      $ EigY(NFree2-1+(NU-1)*NDimB+I),EigX(NFree2-1+(NU-1)*NDimB+I)
       EndDo
@@ -2927,12 +2931,16 @@ C     Find X,Y of the highest overlap with YCAS(IH0St),XCAS(IH0St)
 C
       Write(6,*)
       OvMax=Zero
+      OvXMax=Zero
+      OvYMax=Zero
       Do NU=1,NDimB
 C
 c      SOv=Zero
 C
       SumERY=Zero
+      SumERX=Zero
       SumCAY=Zero
+      SumCAX=Zero
       Do I=1,NDimB
       IA=IndBlock(1,NFree1-1+I)
       IB=IndBlock(2,NFree1-1+I)
@@ -2948,10 +2956,10 @@ C
       SumERY=SumERY+YER*YER
       SumCAY=SumCAY+YCA*YCA
       EndDo
-      SumERX=One/Sqrt(Abs(SumERX))
-      SumCAX=One/Sqrt(Abs(SumCAX))
-      SumERY=One/Sqrt(Abs(SumERY))
-      SumCAY=One/Sqrt(Abs(SumCAY))
+      If(Abs(SumERX).Gt.1.D-12) SumERX=One/Sqrt(Abs(SumERX))
+      If(Abs(SumCAX).Gt.1.D-12) SumCAX=One/Sqrt(Abs(SumCAX))
+      If(Abs(SumERY).Gt.1.D-12) SumERY=One/Sqrt(Abs(SumERY))
+      If(Abs(SumCAY).Gt.1.D-12) SumCAY=One/Sqrt(Abs(SumCAY))
 C
       SOvY=Zero
       SOvX=Zero
@@ -2976,12 +2984,15 @@ C
 C
       If((SOvY+SovX)/Two.Gt.OvMax) Then
       OvMax=(SOvY+SovX)/Two
+      OvXMax=SOvX
+      OvYMax=SOvY
       NUMx=NU
       EndIf
 C
       EndDo  
 C
-      If(OvMax.Ge.0.5) Then
+      If((OvMax.Ge.0.5).Or.
+     $ ( (OvMax.Lt.0.5).And.(OvXMax.Gt.0.5.Or.OvYMax.Gt.0.5) )) Then
 C
       IStERPA=NUMx
 C
@@ -3099,6 +3110,7 @@ c      Print*, 'AI-KA',norm2(ABPLUS(1:NDimB**2)),norm2(ABMIN)
       EndIf
 C
       Do NU=1,NDimB
+C
       If(Eig(NFree1-1+NU).Lt.Zero) Then
       Write(6,'(X,"Setting to Zero Negative Eigs",E15.6)')
      $ Eig(NFree1-1+NU)
@@ -3108,6 +3120,7 @@ C
       EigX(NFree2-1+(NU-1)*NDimB+I)=Zero
       EndDo
       EndIf
+C
       EndDo
 C
       NoEig=NoEig+NDimB
@@ -3190,6 +3203,7 @@ C      Print*, 'AV-KA',norm2(ABPLUS(1:NDimB**2)),norm2(ABMIN(1:NDimB**2))
       EndIf
 C
       Do NU=1,NDimB
+C
       If(Eig(NFree1-1+NU).Lt.Zero) Then
       Write(6,'(X,"Setting to Zero Negative Eigs",E15.6)')
      $ Eig(NFree1-1+NU)
@@ -3199,6 +3213,7 @@ C
       EigX(NFree2-1+(NU-1)*NDimB+I)=Zero
       EndDo
       EndIf
+C
       EndDo
 C
       NoEig=NoEig+NDimB
@@ -3331,8 +3346,8 @@ C
 C
       If(IH0St.Ne.NoSt.And.IStERPA.Ne.0) 
      $ Write(6,'(/,X,
-     $ "Deexcitation correction is computed for ERPA vector no",I2)') 
-     $ IStERPA
+     $ "Deexcitation correction is computed for ERPA vector no ",
+     $ I2," Eig=",F15.8)')  IStERPA,Eig(IStERPA)
       If(IH0St.Ne.NoSt.And.IStERPA.Eq.0) 
      $ Write(6,'(/," ERPA vector for deexcitation correction could not 
      $ be determined. The correction will be set to 0.")')
@@ -3369,7 +3384,7 @@ C
 C     COMPUTE 1st-ORDER Y AND X PART 1
 C
       EigY1(1:NoEig*NoEig)=Zero
-      EigX1(1:NoEig*NoEig)=Zero
+c      EigX1(1:NoEig*NoEig)=Zero
       Do MU=1,NoEig
 C
       If(Eig(MU).Ne.Zero) Then
@@ -3393,8 +3408,8 @@ C
       EigY1(I+(MU-1)*NoEig)=EigY1(I+(MU-1)*NoEig)+
      $(Aux1+Aux2)*EigY(IStart+II)
 C
-      EigX1(I+(MU-1)*NoEig)=EigX1(I+(MU-1)*NoEig)+
-     $(Aux2-Aux1)*EigX(IStart+II)
+c      EigX1(I+(MU-1)*NoEig)=EigX1(I+(MU-1)*NoEig)+
+c     $(Aux2-Aux1)*EigX(IStart+II)
 C
       II=II+1
       EndDo
@@ -3464,7 +3479,7 @@ C
 C
       ECorr=EAll-EIntra
 C
-C     TRANSITION DIPOLE MOMENTS ARE COMPUTED ONLY FOR A GRPUND STATE (NoSt=1)
+C     TRANSITION DIPOLE MOMENTS ARE COMPUTED ONLY FOR A GROUND STATE (NoSt=1)
 C
       If(NoSt.Eq.1) Then
 C
@@ -3479,22 +3494,22 @@ C
 C
       Do I=1,NFree2
       ABMIN(I)=EigY(I)
-      XMAux(I)=EigX(I)
+c      XMAux(I)=EigX(I)
       EndDo
 C
       Do NU=1,NoEig
       Do MU=1,NoEig
 C
       EigY(NU+(MU-1)*NoEig)=Zero
-      EigX(NU+(MU-1)*NoEig)=Zero
+c      EigX(NU+(MU-1)*NoEig)=Zero
 C
       IStart=IEigAddY(1,MU)
       II=0
       Do I=IEigAddInd(1,MU),IEigAddInd(2,MU)
       EigY(NU+(MU-1)*NoEig)=EigY(NU+(MU-1)*NoEig)
      $ +ABPLUS(NU+(I-1)*NoEig)*ABMIN(IStart+II)
-      EigX(NU+(MU-1)*NoEig)=EigX(NU+(MU-1)*NoEig)
-     $ +ABPLUS(NU+(I-1)*NoEig)*XMAux(IStart+II)
+c      EigX(NU+(MU-1)*NoEig)=EigX(NU+(MU-1)*NoEig)
+c     $ +ABPLUS(NU+(I-1)*NoEig)*XMAux(IStart+II)
       II=II+1
       EndDo
 C
@@ -3525,23 +3540,24 @@ C
       EndDo
       EndDo
 C
-      Call CpyM(ABPLUS,EigX,NDimX)
-      Call CpyM(ABMIN,EigX1,NDimX)
+c      Call CpyM(ABPLUS,EigX,NDimX)
+c      Call CpyM(ABMIN,EigX1,NDimX)
 C
-      Do MU=1,NDimX
-      Do I=1,NDimX
-      EigX((MU-1)*NoEig+I)=ABPLUS((MU-1)*NoEig+IMatch(I))
-      EigX1((MU-1)*NoEig+I)=ABMIN((MU-1)*NoEig+IMatch(I))
-      EndDo
-      EndDo
+c      Do MU=1,NDimX
+c      Do I=1,NDimX
+c      EigX((MU-1)*NoEig+I)=ABPLUS((MU-1)*NoEig+IMatch(I))
+c      EigX1((MU-1)*NoEig+I)=ABMIN((MU-1)*NoEig+IMatch(I))
+c      EndDo
+c      EndDo
 C
       If(IStERPA.Ne.0) Then
-C
+C ???
       Write(6,'(/,X,"Y(0) corresponding to SA-CAS best-matching
      $ vector no",I2)')IStERPA
       Call TrDipMoms(IStERPA,TDIP2,EigY,
      $ C,IndN,DipX,DipY,DipZ,NDimX,NBasis)
-      Write(6,'(X,"Y(0) <X>^2+<Y>^2+<Z>^2",F15.8,/)')TDIP2
+      Write(6,'(X,I2,"->",I2,"  Y(0) <X>^2+<Y>^2+<Z>^2",F15.8,/)')
+     $ NoSt,IH0St,TDIP2
 C
       Write(6,'(X,"Y(0)+Y(1) corresponding to SA-CAS best-matching
      $ vector no",I2)')IStERPA
@@ -3552,13 +3568,16 @@ C
       EndDo
       Call TrDipMoms(IStERPA,TDIP2,XMAux,
      $ C,IndN,DipX,DipY,DipZ,NDimX,NBasis)
-      Write(6,'(X,"Y(0)+Y(1) <X>^2+<Y>^2+<Z>^2",F15.8,/)')TDIP2
+      Write(6,'(X,I2,"->",I2,"  Y(0)+Y(1) <X>^2+<Y>^2+<Z>^2",F15.8,/)')
+     $ NoSt,IH0St,TDIP2
 C
       Else
 C
       If(IH0St.Ne.NoSt) Then 
-      Write(6,'(/,X,"Y(0) <X>^2+<Y>^2+<Z>^2",F15.8,/)') Zero
-      Write(6,'(X,"Y(0)+Y(1) <X>^2+<Y>^2+<Z>^2",F15.8,/)')Zero
+      Write(6,'(X,I2,"->",I2,"  Y(0) <X>^2+<Y>^2+<Z>^2",F15.8,/)')
+     $ NoSt,IH0St,Zero
+      Write(6,'(X,I2,"->",I2,"  Y(0)+Y(1) <X>^2+<Y>^2+<Z>^2",F15.8,/)')
+     $ NoSt,IH0St,Zero 
       EndIf
 
 c      IStERPA=1
@@ -3584,35 +3603,35 @@ C     If( IStERPA.Ne.0) Then
 C
 c print out for testing       
 C
-      Do NU=1,5
-C
-c      Write(6,'(X,"Eig(0), Eig(1), Eig(01) ",I3,3E15.6)') 
-c     $ NU,Eig(NU),Eig1(NU),Eig(NU)+Eig1(NU)
-C
-      Sum0=Zero
-      Sum01=Zero
-      Do I=1,NDimX
-C
-      Y0=EigY((NU-1)*NoEig+I)
-      Y1=EigY1((NU-1)*NoEig+I)
-      X0=EigX((NU-1)*NoEig+I)
-      X1=EigX1((NU-1)*NoEig+I)
-c      If(Abs(Y0)+Abs(Y1).Gt.1.D-7) 
-c     $  Write(6,'(X,"Y(0),Y(1),X(0),X(1)",2I3,4E15.6)')
-c     $ IndN(1,I),IndN(2,I),Y0,Y1,X0,X1
-C
-      Sum0=Sum0+X0*Y0
-      Sum01=Sum01+X0*Y1+X1*Y0
-C
-      EndDo
-C
-      if(abs(sum01).gt.1.d-10) Write(6,'(X,"NU Sum01 ",I2,E15.6,/)')
-     $ nu,Sum01
-c      Write(6,'(X,"Sum0, Sum01 ",2E15.6,/)')
-c     $ Sum0,Sum01
-C
-      EndDo
-C
+c      Do NU=1,5
+cC
+cc      Write(6,'(X,"Eig(0), Eig(1), Eig(01) ",I3,3E15.6)') 
+cc     $ NU,Eig(NU),Eig1(NU),Eig(NU)+Eig1(NU)
+cC
+c      Sum0=Zero
+c      Sum01=Zero
+c      Do I=1,NDimX
+cC
+c      Y0=EigY((NU-1)*NoEig+I)
+c      Y1=EigY1((NU-1)*NoEig+I)
+c      X0=EigX((NU-1)*NoEig+I)
+c      X1=EigX1((NU-1)*NoEig+I)
+cc      If(Abs(Y0)+Abs(Y1).Gt.1.D-7) 
+cc     $  Write(6,'(X,"Y(0),Y(1),X(0),X(1)",2I3,4E15.6)')
+cc     $ IndN(1,I),IndN(2,I),Y0,Y1,X0,X1
+cC
+c      Sum0=Sum0+X0*Y0
+c      Sum01=Sum01+X0*Y1+X1*Y0
+cC
+c      EndDo
+cC
+c      if(abs(sum01).gt.1.d-10) Write(6,'(X,"NU Sum01 ",I2,E15.6,/)')
+c     $ nu,Sum01
+cc      Write(6,'(X,"Sum0, Sum01 ",2E15.6,/)')
+cc     $ Sum0,Sum01
+cC
+c      EndDo
+cC
 C     If(NoSt.Eq.1) Then
       EndIf
 C
@@ -4409,6 +4428,7 @@ C
       ACAlpha=Zero
 C
       If(ITwoEl.Eq.1) Then
+C
       Call ACABMAT0(ABPLUS,ABMIN,URe,Occ,XOne,TwoNO,
      $ NBasis,NDim,NInte1,NInte2,NGem,ACAlpha,1)
 C
@@ -4422,7 +4442,7 @@ C
      $            IndN,IndX,IGem,CICoef,
      $            NAct,INAct,NBasis,NDim,NDimX,NInte1,NGem,
      $            'TWOMO',0,ACAlpha,1)
-
+C
       ElseIf(ITwoEl.Eq.3) Then
 C
       Call LookUp_mithap(NAct,INAct,Occ,
@@ -5992,7 +6012,7 @@ C
 
 *Deck RDM_SACAS
       Subroutine RDM_SACAS(GammaS,XCAS,YCAS,EExcit,C,UNOAO,IPair,
-     $ DipX,DipY,DipZ,NoState,NoStMx,NInte1,NBasis)
+     $ DipX,DipY,DipZ,NoState,NoStMx,NInte1,NBasis,IPr)
 C
 C     READS 1RDMs FOR STATES FROM 1 TO NoStMx AND TRANSFROM THEM 
 C     TO THE REPRESENTATION OF NO's OF THE NoState's STATE
@@ -6026,7 +6046,8 @@ C
       NoStMx=0
 c      Do I=1,NoStMx
    20 Read(10,'(A32,F22.12)',End=40) Str,EExcit(NoStMx+1)
-      Write(6,'(X,"SA-CAS Energy for state no ",I3,4X,F12.7)')
+      If(IPr.Eq.1) 
+     $ Write(6,'(X,"SA-CAS Energy for state no ",I3,4X,F12.7)')
      $ NoStMx+1,EExcit(NoStMx+1)
       Read(10,*)
 c      EndDo
@@ -6113,7 +6134,7 @@ C
 C     IBra is the index of the state of interest.
 C     Stop if IBra is greater than NBasis (dimension of XCAS, YCAS would be exceeded)
       If(IBra.Gt.NBasis) Stop 'Fatal error in TRDM_SACAS'
-      Write(6,'(/," Read TRDMs FROM STATE NO",I3,/)') IBra
+      If(IPr.Eq.1) Write(6,'(/," Read TRDMs FROM STATE NO",I3,/)') IBra
 C
       Do IKet=1,NoStMx
       If(IKet.Ne.IBra) Then
@@ -6149,7 +6170,7 @@ c      If(IA.Ne.IB) Then
      $ (trdm(IB,IA)-trdm(IA,IB))/(C(IA)-C(IB))
       EndIf
 C
-      If(Abs(trdm(IA,IB))+Abs(trdm(IB,IA)).gt.1.d-6) Then
+      If(IPr.Eq.1.And.Abs(trdm(IA,IB))+Abs(trdm(IB,IA)).gt.1.d-6) Then
       Write(6,'(X,"TRDM_ab 1-TRDM_ba",2I3,2E15.6)')IA,IB,
      $ trdm(IA,IB),trdm(IB,IA)
 c      Write(6,'(X,"YCAS, XCAS    ",6X,2E15.6)')
@@ -6162,7 +6183,8 @@ C
       EndDo
 C
       SSgn=One
-      Write(6,'(X,"SumNu Y*X before normalization",E15.6)')SumNU
+      If(IPr.Eq.1) 
+     $ Write(6,'(X,"SumNu Y*X before normalization",E15.6)')SumNU
       If(SumNU.Lt.Zero) SSgn=-One
       If(Abs(SumNu).Gt.1.D-8) Then
       SumNU=One/Sqrt(Two*Abs(SumNU))
@@ -6178,8 +6200,9 @@ C
      $ *SumNU
       XCAS(IKet,IAB)=SSgn*XCAS(IKet,IAB)
      $ *SumNU
-      If(Abs(YCAS(IKet,IAB))+Abs(XCAS(IKet,IAB)).Gt.1.d-6) Then
-      Write(6,'(X,"NORMALIZED Y_SA-CAS X_SA-CAS",2I3,2E15.6)')
+      If(IPr.Eq.1.And.Abs(YCAS(IKet,IAB))+Abs(XCAS(IKet,IAB)).Gt.1.d-6)
+     $  Then 
+       Write(6,'(X,"NORMALIZED Y_SA-CAS X_SA-CAS",2I3,2E15.6)')
      $ IA,IB,YCAS(IKet,IAB),XCAS(IKet,IAB)
       EndIf
       EndDo
@@ -6198,7 +6221,7 @@ C
       TSDipX = TSDipX + Two*trdm(J,I)*dipx(I,J)
       Enddo
       Enddo
-      Write(6,
+      If(IPr.Eq.1) Write(6,
      $ '(X,I2,"->",I2,
      $ " Transition DipMoms <X> <Y> <Z> <X>^2+<Y>^2+<Z>^2 ",
      $ 4F15.8,/)')
@@ -6678,4 +6701,1026 @@ C
       Return
       End
 
+*Deck AC0DSYMM
+      Subroutine AC0DSYMM(ICAS,NoStMx,ICORR,EExcit,IStCAS,NSym,NSymNO,
+     $ MultpC,ECorrSym,
+     $ ETot,TwoNO,Occ,URe,XOne,
+     $ UNOAO,IndN,IndX,NBasis,NDimX,NInte1,NInte2) 
+C
+C     AC0 AND DEEXCITATION CORRECTIONS BASED ON SYMMETRY
+C
+      use sapt_ener
+C
+      Implicit Real*8 (A-H,O-Z)
+C
+      Include 'commons.inc'
+c
+      Parameter(Zero=0.D0,Half=0.5D0,One=1.D0,Two=2.D0,Three=3.D0,
+     $ Four=4.D0)
+C
+      Dimension
+     $ URe(NBasis,NBasis),XOne(NInte1),Occ(NBasis),TwoNO(NInte2),
+     $ IndX(NDimX),IndN(2,NDimX),
+     $ UNOAO(NBasis,NBasis)
+C
+C     LOCAL ARRAYS
+C
+      Real*8, Allocatable :: RDM2Act(:)
+      Integer, Allocatable :: Ind(:)
+      Real*8, Allocatable :: AuxY(:)
+      Dimension C(NBasis),HNO(NInte1),
+     $ IGFact(NInte2),
+     $ Ind1(NBasis),Ind2(NBasis),WMAT(NBasis,NBasis),
+     $ AuxI(NInte1),AuxIO(NInte1),IPair(NBasis,NBasis),
+     $ ABPLUS(NDimX*NDimX),ABMIN(NDimX*NDimX),
+     $ Eig(NDimX),EigY(NDimX*NDimX),
+     $ EigX(NDimX*NDimX),
+     $ IEigAddY(2,NDimX),IEigAddInd(2,NDimX),IndBlock(2,NDimX),
+     $ XMAux(NDimX*NDimX),work1(NBasis,NBasis),
+     $ TrGamm(NInte1,NInte1),
+     $ GammaS(100,NInte1)
+     $ ,IMatch(NDimX),EigY1(NDimX*NDimX),
+     $ Eig1(NDimX),
+     $ DipX(NBasis,NBasis),DipY(NBasis,NBasis),DipZ(NBasis,NBasis),
+     $ ECorrSym(100),EExcit(100),NSymNO(NBasis),MultpC(8,8),
+     $ IStCAS(2,100),ICORR(100),IStERPA(2,100)
+C
+      IPair(1:NBasis,1:NBasis)=0
+      Do II=1,NDimX
+      I=IndN(1,II)
+      J=IndN(2,II)
+      IPair(I,J)=1
+      IPair(J,I)=1
+      EndDo
+C
+      If(IStCAS(1,ICAS).Eq.1.And.IStCAS(2,ICAS).Eq.1) 
+     $ Call ReadDip(DipX,DipY,DipZ,UNOAO,NBasis)
+C
+C     AUXILIARY STUFF LATER NEEDED TO GET A+ AND A- MATRICES FOR ALPHA=0
+C
+C     ONE-ELECTRON MATRIX IN A NO REPRESENTATION
+C
+      IJ=0
+      Do I=1,NBasis
+      Do J=1,I
+      IJ=IJ+1
+      HNO(IJ)=Zero
+C
+      Do IA=1,NBasis
+      Do IB=1,NBasis
+      IAB=(Max(IA,IB)*(Max(IA,IB)-1))/2+Min(IA,IB)
+      HNO(IJ)=HNO(IJ)+URe(I,IA)*URe(J,IB)*XOne(IAB)
+      EndDo
+      EndDo
+C
+      EndDo
+      EndDo
+C
+C     READ 2RDM, COMPUTE THE ENERGY
+C
+      NAct=NAcCAS
+      INActive=NInAcCAS
+      NOccup=INActive+NAct
 
+      Ind2(1:NBasis)=0
+      Do I=1,NAct
+      Ind1(I)=INActive+I
+      Ind2(INActive+I)=I
+      EndDo
+C
+      NRDM2Act = NAct**2*(NAct**2+1)/2
+      Allocate (RDM2Act(NRDM2Act))
+      RDM2Act(1:NRDM2Act)=Zero
+C
+      Open(10,File="rdm2.dat",Status='Old')
+      Write(6,'(/,1X,''Active block of 2-RDM read from rdm2.dat'')')
+C
+   10 Read(10,'(4I4,F19.12)',End=40)I,J,K,L,X
+C
+C     X IS DEFINED AS: < E(IJ)E(KL) > - DELTA(J,K) < E(IL) > = 2 GAM2(JLIK)
+C
+      RDM2Act(NAddrRDM(J,L,I,K,NAct))=Half*X
+C
+      I=Ind1(I)
+      J=Ind1(J)
+      K=Ind1(K)
+      L=Ind1(L)
+C
+      GoTo 10
+   40 Continue
+      Close(10)
+C
+C     COMPUTE THE ENERGY FOR CHECKING
+C
+      ETot=Zero
+      Do I=1,NBasis
+      II=(I*(I+1))/2
+      ETot=ETot+Two*Occ(I)*HNO(II)
+      EndDo
+C
+      Do IP=1,NOccup
+      Do IQ=1,NOccup
+      Do IR=1,NOccup
+      Do IS=1,NOccup
+      ETot=ETot+FRDM2(IP,IQ,IR,IS,RDM2Act,Occ,Ind2,NAct,NBasis)
+     $ *TwoNO(NAddr3(IP,IR,IQ,IS))
+      EndDo
+      EndDo
+      EndDo
+      EndDo
+C
+      Write(6,'(/,X,''CASSCF Energy (w/o ENuc)'',5X,F15.8)')ETot
+      Do I=1,NBasis
+      C(I)=SQRT(Occ(I))
+      If(Occ(I).Lt.Half) C(I)=-C(I)
+      CICoef(I)=C(I)
+      EndDo
+C
+      IJ=0
+      Do I=1,NBasis
+      Do J=1,I
+      IJ=IJ+1
+C
+      If(IGem(I).Ne.IGem(J)) Then
+C
+      HNO(IJ)=Zero
+C
+      Else
+C
+      Aux=Zero
+C
+      Do IT=1,NBasis
+      If(IGem(IT).Ne.IGem(I))
+     $ Aux=Aux+Occ(IT)*
+     $ (Two*TwoNO(NAddr3(IT,IT,I,J))-TwoNO(NAddr3(IT,I,IT,J)))
+      EndDo
+C
+      HNO(IJ)=HNO(IJ)+Aux
+C
+      EndIf
+C
+      EndDo
+      EndDo
+C
+C     CONSTRUCT TWO-ELECTRON PART OF THE AC ALPHA-HAMILTONIAN
+C
+      NAdd=Zero
+      IJ=0
+      Do I=1,NBasis
+      Do J=1,I
+      IJ=IJ+1
+      KL=0
+      Do K=1,NBasis
+      Do L=1,K
+      KL=KL+1
+C
+      If(IJ.Ge.KL) Then
+      NAdd=NAdd+1
+C
+      IGFact(NAdd)=1
+      If(.Not.(
+     $IGem(I).Eq.IGem(J).And.IGem(J).Eq.IGem(K).And.IGem(K).Eq.IGem(L)))
+     $ IGFact(NAdd)=0
+C
+      EndIf
+C
+      EndDo
+      EndDo
+      EndDo
+      EndDo
+C
+C     AUXILIARY MATRIX AuxI AND AuxIO
+C
+      IPQ=0
+      Do IP=1,NBasis
+      Do IQ=1,IP
+      IPQ=IPQ+1
+      AuxI(IPQ)=Zero
+      AuxIO(IPQ)=Zero
+      Do IT=1,NOccup
+      If(IGFact(NAddr3(IT,IT,IP,IQ)).Eq.1) Then
+       AuxI(IPQ)=AuxI(IPQ)+Occ(IT)*
+     $ (Two*TwoNO(NAddr3(IP,IQ,IT,IT))-TwoNO(NAddr3(IP,IT,IQ,IT)))
+      If(IT.Le.INActive) AuxIO(IPQ)=AuxIO(IPQ)+Occ(IT)*
+     $ (Two*TwoNO(NAddr3(IP,IQ,IT,IT))-TwoNO(NAddr3(IP,IT,IQ,IT)))
+      EndIf
+      EndDo
+      EndDo
+      EndDo
+C
+C     AUXILIARY MATRIX WMAT
+C
+      Do I=1,NBasis
+      Do J=1,NBasis
+      WMAT(I,J)=Zero
+      EndDo
+      EndDo
+C
+      Do IP=1,NBasis
+      Do IR=1,NOccup
+      Do IT=1,NOccup
+      Do IW=1,NOccup
+      Do IU=1,NOccup
+      If(IGFact(NAddr3(IT,IW,IP,IU)).Eq.1)
+     $ WMAT(IP,IR)=WMAT(IP,IR)
+     $ +TwoNO(NAddr3(IT,IW,IP,IU))
+     $ *FRDM2(IW,IU,IT,IR,RDM2Act,Occ,Ind2,NAct,NBasis)
+     $ +TwoNO(NAddr3(IT,IU,IP,IW))
+     $ *FRDM2(IW,IU,IR,IT,RDM2Act,Occ,Ind2,NAct,NBasis)
+C
+      EndDo
+      EndDo
+      EndDo
+      EndDo
+      EndDo
+C
+C     FIND THE 0TH-ORDER SOLUTION FOR THE ACTIVE-ACTIVE BLOCK
+C
+      Write(6,'(/," *** ACTIVE-ACTIVE BLOCK ***")')
+C
+      NFree1=1
+      NFree2=1
+      NoEig=0
+C
+      NDimB=0
+      Do IQQ=1,NAct
+      Do IPP=IQQ+1,NAct
+      IP=Ind1(IPP)
+      IQ=Ind1(IQQ)
+      If(IPair(IP,IQ).Eq.1) Then
+      NDimB=NDimB+1
+      IndBlock(1,NFree1-1+NDimB)=IP
+      IndBlock(2,NFree1-1+NDimB)=IQ
+      EndIf
+      EndDo
+      EndDo
+C
+      Do I=1,NDimB
+      IEigAddY(1,NFree1-1+I)=NFree2+(I-1)*NDimB
+      IEigAddY(2,NFree1-1+I)=IEigAddY(1,NFree1-1+I)+NDimB-1
+      IEigAddInd(1,NFree1-1+I)=NFree1
+      IEigAddInd(2,NFree1-1+I)=NFree1+NDimB-1
+      EndDo
+C
+      IRow=0
+      Do IQQ=1,NAct
+      Do IPP=IQQ+1,NAct
+      IP=Ind1(IPP)
+      IQ=Ind1(IQQ)
+      If(IPair(IP,IQ).Eq.1) Then
+C
+      IRow=IRow+1
+C
+      ICol=0
+      Do ISS=1,NAct
+      Do IRR=ISS+1,NAct
+      IR=Ind1(IRR)
+      IS=Ind1(ISS)
+      If(IPair(IR,IS).Eq.1) Then
+C
+      ICol=ICol+1
+C
+      If(IRow.Ge.ICol) Then
+C
+      Call AB0ELEMENT(ABP,ABM,IP,IQ,IR,IS,Occ,HNO,IGFact,
+     $ TwoNO,AuxI,AuxIO,WMAT,RDM2Act,C,Ind1,Ind2,NAct,NRDM2Act,
+     $ NInte1,NInte2,NBasis)
+      ABPLUS((ICol-1)*NDimB+IRow)=ABP
+      ABPLUS((IRow-1)*NDimB+ICol)=ABP
+      ABMIN((ICol-1)*NDimB+IRow)=ABM
+      ABMIN((IRow-1)*NDimB+ICol)=ABM
+      Else
+      ABPLUS((ICol-1)*NDimB+IRow)=Zero
+      ABPLUS((IRow-1)*NDimB+ICol)=Zero
+      ABMIN((ICol-1)*NDimB+IRow)=Zero
+      ABMIN((IRow-1)*NDimB+ICol)=Zero
+C
+      EndIf
+C
+      EndIf
+      EndDo
+      EndDo
+C
+      EndIf
+      EndDo
+      EndDo
+C
+      If(NDimB.Ne.0) Then
+C
+c      Print*, 'ACT-KA',norm2(ABPLUS(1:NDimB**2)),norm2(ABMIN)
+C
+      If(NoSt.Eq.1) Then
+      Call ERPASYMM0(EigY(NFree2),EigX(NFree2),Eig(NFree1),ABPLUS,ABMIN,
+     $ NDimB)
+      Else
+      Call ERPAVECYX(EigY(NFree2),EigX(NFree2),Eig(NFree1),ABPLUS,ABMIN,
+     $ NDimB)
+C
+      EndIf
+C
+      EndIf
+C
+      Write(6,'(X,"Active ERPA Eigenvalues")')
+C
+C     set negative eigs (dexcit correction will be added so there is no need to count it twice)
+C
+      Do NU=1,NDimB
+      If(Eig(NFree1-1+NU).Lt.Zero) Then
+      Write(6,'(X,"Setting to Zero Negative Eigs",E15.6)')
+     $ Eig(NFree1-1+NU)
+      Eig(NFree1-1+NU)=Zero
+      Do I=1,NDimB
+      EigY(NFree2-1+(NU-1)*NDimB+I)=Zero
+      EigX(NFree2-1+(NU-1)*NDimB+I)=Zero
+      EndDo
+      EndIf
+      EndDo
+C
+C     find symmetry of excitation
+C
+      Do NU=1,NDimB
+C
+      IStERPA(2,NU)=0
+C
+      Do I=1,NDimB
+C
+      If(Abs(EigY(NFree2-1+(NU-1)*NDimB+I))+
+     $ Abs(EigY(NFree2-1+(NU-1)*NDimB+I)).Gt.0.1) Then
+C
+      IP=IndBlock(1,NFree1-1+I)
+      IQ=IndBlock(2,NFree1-1+I)
+      ISym=MultpC(NSymNO(IP),NSymNO(IQ)) 
+C
+      If(IStERPA(2,NU).Eq.0) Then
+      IStERPA(2,NU)=ISym
+      Else
+      If(IStERPA(2,NU).Ne.ISym)
+     $ Write(6,'("In AC0DSYMM: Symm of act-act excit ",I3,
+     $ " cannot be established")')NU
+      EndIf
+C
+C     If(Abs(EigY...
+      EndIf
+C
+      EndDo      
+C
+      EndDo
+C
+C     find the order within each irrep     
+C
+      Allocate(Ind(1:NDimB))
+      Do I=1,NDimB
+      Ind(I)=I
+      EndDo
+
+      Do ISym=1,NSym
+C
+      Eig1(1:NDimB)=Eig(1:NDimB)
+      IStart=1
+      ICount=1
+C
+      Do NU=1,NDimB
+      If(IStERPA(2,NU).Eq.ISym) Then
+C
+      EigMin=Eig1(NU)
+      IndMin=IStart
+C
+      Do MU=IStart,NDimB
+      If(IStERPA(2,MU).Eq.ISym.And.Eig1(MU).Lt.EigMin) Then
+      EigMin=Eig1(MU)
+      IndMin=MU
+      EndIf 
+      EndDo
+C
+      Hlp=Eig1(IStart)
+      IndHlp=Ind(IStart)
+
+      Eig1(IStart)=EigMin
+      Ind(IStart)=Ind(IndMin)
+
+      IStERPA(1,Ind(IndMin))=ICount
+      Eig1(IndMin)=Hlp
+      Ind(IndMin)=IndHlp
+C
+      ICount=ICount+1
+C
+      EndIf
+C
+      IStart=IStart+1
+C     Do NU=1
+      EndDo
+C     Do ISym=1
+      EndDo
+C
+C     Shift labels in each irrep depending on the number of states in SA of the energy 
+C     lower or equal than that of ICAS
+C
+      Do I=1,NoStMx
+      If(ICORR(I).Eq.0.Or.I.Eq.ICAS) Then
+C
+      ISym=IStCAS(2,I)
+      Do NU=1,NDimB
+      If(IStERPA(2,NU).Eq.ISym) IStERPA(1,NU)=IStERPA(1,NU)+1
+      EndDo 
+C
+      EndIf 
+      EndDo
+C
+      Do NU=1,NDimB
+      Write(6,'(X,I2,2X,I2,".",I1,E15.6)') NU,IStERPA(1,NU),
+     $ IStERPA(2,NU),Eig(NFree1-1+NU)
+      EndDo
+c hererxxx
+c      Do I=1,NoStMx
+c      Write(6,'(X,"Excit Energy ",I1,".",I1,2F22.12)')
+c     $ IStCAS(1,I),IStCAS(2,I),EExcit(I),EExcit(I)-EExcit(ICAS)
+c      EndDo
+c      stop
+C
+      NoEigAct=NDimB
+C
+      Deallocate(Ind)
+C
+      NoEig=NoEig+NDimB
+      NFree1=NoEig+1
+      NFree2=NFree2+NDimB*NDimB
+C
+C     FIND THE 0TH-ORDER SOLUTION FOR THE ACTIVE-INACTIVE BLOCKS
+C
+      Write(6,'(/," *** ACTIVE-INACTIVE BLOCKS ***")')
+C
+      Do IQ=1,INActive
+C
+      NDimB=0
+      Do IPP=1,NAct
+      IP=Ind1(IPP)
+      If(IPair(IP,IQ).Eq.1) Then
+      NDimB=NDimB+1
+      IndBlock(1,NFree1-1+NDimB)=IP
+      IndBlock(2,NFree1-1+NDimB)=IQ
+      EndIf
+      EndDo
+C
+      Do I=1,NDimB
+      IEigAddY(1,NFree1-1+I)=NFree2+(I-1)*NDimB
+      IEigAddY(2,NFree1-1+I)=IEigAddY(1,NFree1-1+I)+NDimB-1
+      IEigAddInd(1,NFree1-1+I)=NFree1
+      IEigAddInd(2,NFree1-1+I)=NFree1+NDimB-1
+      EndDo
+C
+      IRow=0
+      Do IPP=1,NAct
+      IP=Ind1(IPP)
+C
+      If(IPair(IP,IQ).Eq.1) Then
+C
+      IRow=IRow+1
+C
+      ICol=0
+      IS=IQ
+      Do IRR=1,NAct
+      IR=Ind1(IRR)
+C
+      If(IPair(IR,IS).Eq.1) Then
+C
+      ICol=ICol+1
+C
+      If(IRow.Ge.ICol) Then
+C
+      Call AB0ELEMENT(ABP,ABM,IP,IQ,IR,IS,Occ,HNO,IGFact,
+     $ TwoNO,AuxI,AuxIO,WMAT,RDM2Act,C,Ind1,Ind2,NAct,NRDM2Act,
+     $ NInte1,NInte2,NBasis)
+C
+      ABPLUS((ICol-1)*NDimB+IRow)=ABP
+      ABPLUS((IRow-1)*NDimB+ICol)=ABP
+      ABMIN((ICol-1)*NDimB+IRow)=ABM
+      ABMIN((IRow-1)*NDimB+ICol)=ABM
+C
+      EndIf
+C
+      EndIf
+C
+      EndDo
+C
+      EndIf
+C
+      EndDo
+C
+      If(NDimB.Ne.0) Then
+c      Print*, 'AI-KA',norm2(ABPLUS(1:NDimB**2)),norm2(ABMIN)
+      If(NoSt.Eq.1) Then
+      Call ERPASYMM0(EigY(NFree2),EigX(NFree2),Eig(NFree1),ABPLUS,ABMIN,
+     $ NDimB)
+      Else
+      Call ERPAVECYX(EigY(NFree2),EigX(NFree2),Eig(NFree1),ABPLUS,ABMIN,
+     $ NDimB)
+      EndIf
+      EndIf
+C
+      Do NU=1,NDimB
+C
+      If(Eig(NFree1-1+NU).Lt.Zero) Then
+      Write(6,'(X,"Setting to Zero Negative Eigs",E15.6)')
+     $ Eig(NFree1-1+NU)
+      Eig(NFree1-1+NU)=Zero
+      Do I=1,NDimB
+      EigY(NFree2-1+(NU-1)*NDimB+I)=Zero
+      EigX(NFree2-1+(NU-1)*NDimB+I)=Zero
+      EndDo
+      EndIf
+C
+      EndDo
+C
+      NoEig=NoEig+NDimB
+      NFree1=NoEig+1
+      NFree2=NFree2+NDimB*NDimB
+C
+C     Do IP
+      EndDo
+C
+C     FIND THE 0TH-ORDER SOLUTION FOR THE VIRTUAL-ACTIVE BLOCKS
+C
+      Write(6,'(" *** VIRTUAL-ACTIVE BLOCKS ***")')
+C
+      Do IP=NOccup+1,NBasis
+C
+      NDimB=0
+      Do IQQ=1,NAct
+      IQ=Ind1(IQQ)
+      If(IPair(IP,IQ).Eq.1) Then
+      NDimB=NDimB+1
+      IndBlock(1,NFree1-1+NDimB)=IP
+      IndBlock(2,NFree1-1+NDimB)=IQ
+      EndIf
+      EndDo
+C
+      Do I=1,NDimB
+      IEigAddY(1,NFree1-1+I)=NFree2+(I-1)*NDimB
+      IEigAddY(2,NFree1-1+I)=IEigAddY(1,NFree1-1+I)+NDimB-1
+      IEigAddInd(1,NFree1-1+I)=NFree1
+      IEigAddInd(2,NFree1-1+I)=NFree1+NDimB-1
+      EndDo
+C
+      IRow=0
+      Do IQQ=1,NAct
+      IQ=Ind1(IQQ)
+C
+      If(IPair(IP,IQ).Eq.1) Then
+C
+      IRow=IRow+1
+C
+      ICol=0
+      IR=IP
+      Do ISS=1,NAct
+      IS=Ind1(ISS)
+C
+      If(IPair(IR,IS).Eq.1) Then
+C
+      ICol=ICol+1
+C
+      If(IRow.Ge.ICol) Then
+C
+      Call AB0ELEMENT(ABP,ABM,IP,IQ,IR,IS,Occ,HNO,IGFact,
+     $ TwoNO,AuxI,AuxIO,WMAT,RDM2Act,C,Ind1,Ind2,NAct,NRDM2Act,
+     $ NInte1,NInte2,NBasis)
+C
+      ABPLUS((ICol-1)*NDimB+IRow)=ABP
+      ABPLUS((IRow-1)*NDimB+ICol)=ABP
+      ABMIN((ICol-1)*NDimB+IRow)=ABM
+      ABMIN((IRow-1)*NDimB+ICol)=ABM
+C
+      EndIf
+C
+      EndIf
+C
+      EndDo
+C
+      EndIf
+C
+      EndDo
+C
+      If(NDimB.Ne.0) Then
+C      Print*, 'AV-KA',norm2(ABPLUS(1:NDimB**2)),norm2(ABMIN(1:NDimB**2))
+      If(NoSt.Eq.1) Then
+      Call ERPASYMM0(EigY(NFree2),EigX(NFree2),Eig(NFree1),ABPLUS,ABMIN,
+     $ NDimB)
+      Else
+      Call ERPAVECYX(EigY(NFree2),EigX(NFree2),Eig(NFree1),ABPLUS,ABMIN,
+     $ NDimB)
+      EndIf
+      EndIf
+C
+      Do NU=1,NDimB
+C
+      If(Eig(NFree1-1+NU).Lt.Zero) Then
+      Write(6,'(X,"Setting to Zero Negative Eigs",E15.6)')
+     $ Eig(NFree1-1+NU)
+      Eig(NFree1-1+NU)=Zero
+      Do I=1,NDimB
+      EigY(NFree2-1+(NU-1)*NDimB+I)=Zero
+      EigX(NFree2-1+(NU-1)*NDimB+I)=Zero
+      EndDo
+      EndIf
+C
+      EndDo
+C
+      NoEig=NoEig+NDimB
+      NFree1=NoEig+1
+      NFree2=NFree2+NDimB*NDimB
+C
+C     Do IP
+      EndDo
+C
+C     FIND THE 0TH-ORDER SOLUTION FOR THE VIRTUAL-INACTIVE BLOCKS
+C
+      Do IP=NOccup+1,NBasis
+      Do IQ=1,INActive
+C
+      NDimB=0
+C
+      If(IPair(IP,IQ).Eq.1) Then
+C
+      NDimB=1
+      IndBlock(1,NFree1)=IP
+      IndBlock(2,NFree1)=IQ
+C
+      IEigAddY(1,NFree1)=NFree2
+      IEigAddY(2,NFree1)=IEigAddY(1,NFree1)
+      IEigAddInd(1,NFree1)=NFree1
+      IEigAddInd(2,NFree1)=NFree1
+C
+      Call AB0ELEMENT(ABP,ABM,IP,IQ,IP,IQ,Occ,HNO,IGFact,
+     $ TwoNO,AuxI,AuxIO,WMAT,RDM2Act,C,Ind1,Ind2,NAct,NRDM2Act,
+     $ NInte1,NInte2,NBasis)
+C
+      Eig(NFree1)=ABP
+      EigY(NFree2)=One/Sqrt(Two)
+      EigX(NFree2)=One/Sqrt(Two)
+C
+      NoEig=NoEig+NDimB
+      NFree1=NoEig+1
+      NFree2=NFree2+NDimB*NDimB
+C
+      EndIf
+C
+      EndDo
+      EndDo
+C
+      Write(6,'(/," *** DONE WITH 0TH-ORDER IN AC0-CASSCF ***")')
+      Print*, 'NoEig,NDimX',NoEig,NDimX
+C
+C     DONE 0TH-ORDER CALCULATIONS
+C
+      Write(6,'(/,
+     $" *** COMPUTING ABPLUS(1) AND ABMIN(1) MATRICES ***"
+     $ )')
+C
+      Call AB1_CAS(ABPLUS,ABMIN,URe,Occ,XOne,TwoNO,
+     $ RDM2Act,NRDM2Act,IGFact,C,Ind1,Ind2,
+     $ IndBlock,NoEig,NDimX,NBasis,NInte1,NInte2)
+C
+      Deallocate(RDM2Act)
+C
+      Write(6,'(/," *** DONE WITH COMPUTING AB(1) MATRICES ***")')
+C
+C ----------------------------------------------------------------
+C     1ST-ORDER PART
+C
+      Do NU=1,NoEig
+      Do MU=1,NoEig
+C
+      XMAux(NU+(MU-1)*NoEig)=Zero
+C
+      IStart=IEigAddY(1,MU)
+      II=0
+      Do I=IEigAddInd(1,MU),IEigAddInd(2,MU)
+      XMAux(NU+(MU-1)*NoEig)=XMAux(NU+(MU-1)*NoEig)
+     $ +ABPLUS(NU+(I-1)*NoEig)*EigX(IStart+II)
+      II=II+1
+      EndDo
+C
+      EndDo
+      EndDo
+C
+      Do NU=1,NoEig
+      Do MU=1,NoEig
+C
+      ABPLUS(NU+(MU-1)*NoEig)=Zero
+C
+      IStart=IEigAddY(1,NU)
+      II=0
+      Do I=IEigAddInd(1,NU),IEigAddInd(2,NU)
+      ABPLUS(NU+(MU-1)*NoEig)=ABPLUS(NU+(MU-1)*NoEig)
+     $ +EigX(IStart+II)*XMAux(I+(MU-1)*NoEig)
+      II=II+1
+      EndDo
+C
+      EndDo
+      EndDo
+C
+      Do NU=1,NoEig
+      Do MU=1,NoEig
+C
+      XMAux(NU+(MU-1)*NoEig)=Zero
+C
+      IStart=IEigAddY(1,MU)
+      II=0
+      Do I=IEigAddInd(1,MU),IEigAddInd(2,MU)
+      XMAux(NU+(MU-1)*NoEig)=XMAux(NU+(MU-1)*NoEig)
+     $ +ABMIN(NU+(I-1)*NoEig)*EigY(IStart+II)
+      II=II+1
+      EndDo
+C
+      EndDo
+      EndDo
+C
+      Do NU=1,NoEig
+      Do MU=1,NoEig
+C
+      ABMIN(NU+(MU-1)*NoEig)=Zero
+C
+      IStart=IEigAddY(1,NU)
+      II=0
+      Do I=IEigAddInd(1,NU),IEigAddInd(2,NU)
+      ABMIN(NU+(MU-1)*NoEig)=ABMIN(NU+(MU-1)*NoEig)
+     $ +EigY(IStart+II)*XMAux(I+(MU-1)*NoEig)
+      II=II+1
+      EndDo
+C
+      EndDo
+      EndDo
+C
+      Do IDCORR=1,NoStMx
+      If (ICORR(IDCORR).Eq.1) Then
+C
+C     COMPUTE THE AC0 or AC0D CORRELATION ENERGY 
+C
+      XMAux(1:NoEig*NoEig)=Zero
+C
+      IERPA=0
+      Do NU=1,NoEigAct
+      If(IStERPA(1,NU).Eq.IStCAS(1,IDCORR).And.
+     $   IStERPA(2,NU).Eq.IStCAS(2,IDCORR)) IERPA=NU
+      EndDo       
+C
+      IAC0=0
+      If(IStCAS(1,ICAS).Eq.IStCAS(1,IDCORR).And.
+     $ IStCAS(2,ICAS).Eq.IStCAS(2,IDCORR)) IAC0=1
+C
+      If(IAC0.Eq.0.And.IERPA.Ne.0)
+     $ Write(6,'(X,
+     $ "Deexcitation correction is computed for ERPA vector no",
+     $ I2," Sym=",I1,".",I1," Eig=",F15.8)')  IERPA,
+     $ IStERPA(1,IERPA),IStERPA(2,IERPA),Eig(IERPA)
+      If(IAC0.Eq.0.And.IERPA.Eq.0)
+     $ Write(6,'(/," ERPA vector for deexcitation correction could not
+     $ be determined. The correction will be set to 0.")')
+      If(IAC0.Eq.1) Write(6,'(X,
+     $ "AC0 correction is computed for SA-CAS state",I2," Sym=",
+     $ I1,".",I1)')  ICAS, IStCAS(1,ICAS),IStCAS(2,ICAS)
+C
+      Do MU=1,NoEig
+      If(Eig(MU).Ne.Zero) Then
+C
+      Do NU=1,NoEig
+      If(Eig(NU).Ne.Zero) Then
+C
+      If(IAC0.Eq.1.Or.MU.Eq.IERPA.Or.NU.Eq.IERPA) Then 
+C
+      IStart=IEigAddY(1,NU)
+      II=0
+      Do I=IEigAddInd(1,NU),IEigAddInd(2,NU)
+C
+      XMAux(MU+(I-1)*NoEig)=XMAux(MU+(I-1)*NoEig)+Two*
+     $ (ABPLUS(MU+(NU-1)*NoEig)-ABMIN(MU+(NU-1)*NoEig))/
+     $ (Eig(MU)+Eig(NU))*EigY(IStart+II)
+C
+      II=II+1
+      EndDo
+C
+      EndIf
+C
+C     If(Eig(NU).Ne.Zero)
+      EndIf
+      EndDo
+C
+C     If(Eig(MU).Ne.Zero)
+      EndIf
+      EndDo
+C
+C     COMPUTE 1st-ORDER Y AND X PART 1 ONLY FOR THE 1.1 STATE
+C
+      If(IStCAS(1,ICAS).Eq.1.And.IStCAS(2,ICAS).Eq.1) Then
+C
+      EigY1(1:NoEig*NoEig)=Zero
+      Do MU=1,NoEig
+C
+      If(Eig(MU).Ne.Zero) Then
+C
+      Do NU=1,NoEig
+C
+      If(Eig(NU).Ne.Zero) Then
+C
+      IStart=IEigAddY(1,NU)
+      II=0
+      Do I=IEigAddInd(1,NU),IEigAddInd(2,NU)
+C
+      Aux1=(ABPLUS(MU+(NU-1)*NoEig)-ABMIN(MU+(NU-1)*NoEig))/
+     $ (Eig(MU)+Eig(NU))
+      Aux2=Zero
+C
+      If((MU.Ne.NU).And.(Abs(Eig(MU)-Eig(NU)).Gt.1.D-12)) Aux2=
+     $ (ABPLUS(MU+(NU-1)*NoEig)+ABMIN(MU+(NU-1)*NoEig))/
+     $ (Eig(MU)-Eig(NU))
+C
+      EigY1(I+(MU-1)*NoEig)=EigY1(I+(MU-1)*NoEig)+
+     $(Aux1+Aux2)*EigY(IStart+II)
+C
+      II=II+1
+      EndDo
+C
+      EndIf
+      EndDo
+      EndIf
+      EndDo
+C
+C     1ST-ORDER EIG
+C
+      Do NU=1,NoEig
+      Eig1(NU)=ABPLUS(NU+(NU-1)*NoEig)+ABMIN(NU+(NU-1)*NoEig)
+      EndDo
+C
+C     If(IStCAS(1,ICAS).Eq.1 ....
+      EndIf
+C
+C     CONTINUATION OF AC0
+C
+      EigX(1:NoEig*NoEig)=Zero
+C
+      Do MU=1,NoEig
+C
+      IStart=IEigAddY(1,MU)
+C
+      II=0
+      Do I=IEigAddInd(1,MU),IEigAddInd(2,MU)
+C
+      Do J=1,NoEig
+      EigX(I+(J-1)*NoEig)=EigX(I+(J-1)*NoEig)+XMAux(MU+(J-1)*NoEig)
+     $ *EigY(IStart+II)
+      EndDo
+C
+      II=II+1
+      EndDo
+      EndDo
+C
+C     FINALLY THE ENERGY CORRECTION
+C
+      EAll=Zero
+      EIntra=Zero
+C
+      Do I=1,NoEig
+C
+      IP=IndBlock(1,I)
+      IR=IndBlock(2,I)
+C
+      Do J=1,NoEig
+C
+      IQ=IndBlock(1,J)
+      IS=IndBlock(2,J)
+C
+      If(IP.Gt.IR.And.IQ.Gt.IS) Then
+C
+      SumY=EigX(I+(J-1)*NoEig)
+      Aux=(C(IS)+C(IQ))*(C(IP)+C(IR))*SumY
+C
+      EAll=EAll+Aux*TwoNO(NAddr3(IP,IR,IQ,IS))
+C
+      If(IGem(IP).Eq.IGem(IR).And.IGem(IQ).Eq.IGem(IS).
+     $ And.IGem(IP).Eq.IGem(IQ))
+     $ EIntra=EIntra+Aux*TwoNO(NAddr3(IP,IR,IQ,IS))
+C
+C     endinf of If(IP.Gt.IR.And.IQ.Gt.IS)
+      EndIf
+C
+      EndDo
+      EndDo
+C
+      ECorr=EAll-EIntra
+      ECorrSym(IDCORR)=ECorr
+C
+C     TRANSITION DIPOLE MOMENTS ARE COMPUTED ONLY FOR THE 1.1 STATE
+C
+      If(IStCAS(1,ICAS).Eq.1.And.IStCAS(2,ICAS).Eq.1) Then
+C
+      Allocate (AuxY(NoEig*NoEig)) 
+C
+C     Y(0) AND X(0) IN COLUMNS
+C
+      Do I=1,NoEig
+      Do J=1,NoEig
+      EigX(I+(J-1)*NoEig)=Zero
+      If(I.Eq.J) EigX(I+(J-1)*NoEig)=One
+      EndDo
+      EndDo
+C
+      Do I=1,NFree2
+      XMAux(I)=EigY(I)
+      EndDo
+C
+      Do NU=1,NoEig
+      Do MU=1,NoEig
+C
+c      EigY(NU+(MU-1)*NoEig)=Zero
+      AuxY(NU+(MU-1)*NoEig)=Zero
+C
+      IStart=IEigAddY(1,MU)
+      II=0
+      Do I=IEigAddInd(1,MU),IEigAddInd(2,MU)
+      AuxY(NU+(MU-1)*NoEig)=AuxY(NU+(MU-1)*NoEig) 
+     $ +EigX(NU+(I-1)*NoEig)*XMAux(IStart+II)
+c      EigY(NU+(MU-1)*NoEig)=EigY(NU+(MU-1)*NoEig)
+c     $ +EigX(NU+(I-1)*NoEig)*XMAux(IStart+II)
+      II=II+1
+      EndDo
+C
+      EndDo
+      EndDo
+C
+C     SORT Y0,X0 AND Y1,X1 ACCORDING TO IndN
+C
+C     Check if NoEig=NDimX - they should be equal!
+      If(NoEig.Ne.NDimX) Stop 'Fatal error in AC0DSYMM: NoEig.Ne.NDimX!'
+C
+      Do I=1,NDimX
+      IP=IndN(1,I)
+      IQ=IndN(2,I)
+      Do J=1,NDimX
+      If(IP.Eq.IndBlock(1,J).And.IQ.Eq.IndBlock(2,J))
+     $ IMatch(I)=J
+      EndDo
+      EndDo
+C
+      Call CpyM(EigX,AuxY,NDimX) 
+c      Call CpyM(EigX,EigY,NDimX)
+      Call CpyM(XMAux,EigY1,NDimX)
+C
+      Do MU=1,NDimX
+      Do I=1,NDimX
+      AuxY((MU-1)*NoEig+I)=EigX((MU-1)*NoEig+IMatch(I))
+c      EigY((MU-1)*NoEig+I)=EigX((MU-1)*NoEig+IMatch(I))
+      EigY1((MU-1)*NoEig+I)=XMAux((MU-1)*NoEig+IMatch(I))
+      EndDo
+      EndDo
+C
+      If(IERPA.Ne.0) Then
+C
+      Write(6,'(/,X,"Y(0) corresponding to vector no",I2,
+     $ " Sym=",I1,".",I1)')IERPA,IStERPA(1,IERPA),IStERPA(2,IERPA)
+      Call TrDipMoms(IERPA,TDIP2,AuxY,
+c      Call TrDipMoms(IERPA,TDIP2,EigY,
+     $ C,IndN,DipX,DipY,DipZ,NDimX,NBasis)
+      Write(6,'(X,"1.1->",I1,".",
+     $ I1,"  Y(0) <X>^2+<Y>^2+<Z>^2",F15.8,/)')IStERPA(1,IERPA),
+     $ IStERPA(2,IERPA),TDIP2
+C
+      Write(6,'(/,X,"Y(0)+Y(1) corresponding to vector no",I2,
+     $ " Sym=",I1,".",I1)')IERPA,IStERPA(1,IERPA),IStERPA(2,IERPA)
+C
+      Do I=1,NdimX
+      XMAux((IERPA-1)*NoEig+I)=AuxY((IERPA-1)*NoEig+I)
+c      XMAux((IERPA-1)*NoEig+I)=EigY((IERPA-1)*NoEig+I)
+     $ +EigY1((IERPA-1)*NoEig+I)
+      EndDo
+      Call TrDipMoms(IERPA,TDIP2,XMAux,
+     $ C,IndN,DipX,DipY,DipZ,NDimX,NBasis)
+      Write(6,'(X,"1.1->",I1,".",
+     $ I1,"  Y(0)+Y(1) <X>^2+<Y>^2+<Z>^2",F15.8,/)')IStERPA(1,IERPA),
+     $ IStERPA(2,IERPA),TDIP2
+C
+      Else
+C
+      If(IAC0.Ne.1) Then 
+      Write(6,'(X,"1.1->",I1,".",
+     $ I1,"  Y(0) <X>^2+<Y>^2+<Z>^2",F15.8,/)')IStERPA(1,IERPA),
+     $ IStERPA(2,IERPA),Zero
+      Write(6,'(X,"1.1->",I1,".",
+     $ I1,"  Y(0)+Y(1) <X>^2+<Y>^2+<Z>^2",F15.8,/)')IStERPA(1,IERPA),
+     $ IStERPA(2,IERPA),Zero
+      EndIf
+C
+C     If( IERPA.Ne.0) Then
+      EndIf
+C
+      Deallocate(AuxY)
+C
+C     If(IStCAS(1,ICAS).Eq.1 ....
+      EndIf
+C
+C     If (ICORR(IDCORR).Eq.1)...
+      EndIf
+C     Do IDCORR ....
+      EndDo
+C
+C end of AC0DSYMM
+      Return
+      End
