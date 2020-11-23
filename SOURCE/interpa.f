@@ -239,45 +239,45 @@ C
       Call ACABMAT0(ABPLUS,ABMIN,URe,Occ,XOne,TwoNO,
      $ NBasis,NDim,NInte1,NInte2,NGem,ACAlpha,1)
 
-c      print*, 'ABPLUS-Ka',norm2(ABPLUS(1:NDim**2))
-c      print*, 'ABMIN -Ka',norm2(ABMIN(1:NDim**2))
+C      print*, 'ABPLUS-Ka',norm2(ABPLUS(1:NDim**2))
+C      print*, 'ABMIN -Ka',norm2(ABMIN(1:NDim**2))
 
       ElseIf(ITwoEl.Eq.2) Then
 
-      Call LookUp_mithap(Occ,IndAux,IndP,IndN,IndX,NDimX,NDim,NBasis)
+      If(IFlFrag1.Eq.1) Then
+C        this should be avoided somehow...
+         Call LookUp_mithap(Occ,IndAux,IndP,IndN,IndX,NDimX,NDim,NBasis)
+      EndIf
 C
       Call ACABMAT0_mithap(ABPLUS,ABMIN,URe,Occ,XOne,
      $            IndN,IndX,IGem,CICoef,
      $            NBasis,NDim,NDimX,NInte1,NGem,
      $            'TWOMO',0,ACAlpha,1)
 
-c      print*, 'ABPLUS-my',norm2(ABPLUS(1:NDim**2))
-c      print*, 'ABMIN -my',norm2(ABMIN(1:NDim**2))
+C      print*, 'ABPLUS-my',norm2(ABPLUS(1:NDim**2))
+C      print*, 'ABMIN -my',norm2(ABMIN(1:NDim**2))
 
       Call EneGVB_FFFF(ETot,URe,Occ,CICoef,XOne,
      $                 IGem,IndN,NBasis,NInte1,'TWOMO',NDimX,NGem)
 
       ElseIf(ITwoEl.Eq.3) Then
 C      
-      Call LookUp_mithap(Occ,IndAux,IndP,IndN,IndX,NDimX,NDim,NBasis)
+      If(IFlFrag1.Eq.1) Then
+         Call LookUp_mithap(Occ,IndAux,IndP,IndN,IndX,NDimX,NDim,NBasis)
+      EndIf
 C
       Call ACABMAT0_FOFO(ABPLUS,ABMIN,URe,Occ,XOne,
      $            IndN,IndX,IGem,CICoef,
      $            NActive,NELE,NBasis,NDim,NDimX,NInte1,NGem,
      $            'TWOMO','FFOO','FOFO',0,ACAlpha,1)
 
-c      print*, 'ABPLUS-my',norm2(ABPLUS)
-c      print*, 'ABMIN -my',norm2(ABMIN)
+      print*, 'ABPLUS-my',norm2(ABPLUS)
+      print*, 'ABMIN -my',norm2(ABMIN)
 
       Call EneGVB_FOFO(NActive,NELE,ETot,URe,Occ,CICoef,XOne,
      $                 IGem,IndN,NBasis,NInte1,'FOFO',NDimX,NGem)
 
       EndIf
-C
-C     Test diagonal part:
-C      Do I=1,NDim
-C      Write(6,*) ABPLUS(NDim*(I-1)+I), ABMIN(NDim*(I-1)+I)
-C      EndDo
 C
       ElseIf(ICASSCF.Eq.1) Then
 C
@@ -348,6 +348,8 @@ C     REDUCE THE MATRICES
 C
       NDimN=NBasis
 C
+      If(ITwoEl.Eq.1) Then
+C
       Do J=1,NDimX
       Do I=1,NDimX
       IJ=(J-1)*NDimX+I
@@ -356,6 +358,10 @@ C
       ABMIN(IJ)=ABMIN(IJ1) 
       EndDo
       EndDo
+C
+C     FFFF and FOFO: ABMATs ALREADY TRUNCATED
+C
+      EndIf
 C
 CC     Test diagonal part:
 C!      Do I=1,NDimX
@@ -383,9 +389,23 @@ C      Write(6,*) I, Eig(I), EigVecR(NDimX*(I-1)+I)
 C      EndDo
       Write(6,'(/," *** Computing ERPA energy *** ",/)')
 C
+      If(ITwoEl.Eq.1) Then
+
       ECorr=EOneTot
       Call EneERPA(ETot,ECorr,ENuc,EigVecR,Eig,TwoNO,URe,Occ,XOne,
      $ IndN,NBasis,NInte1,NInte2,NDimX,NGem)
+
+      ElseIf(ITwoEl.Eq.2) Then
+
+      Call EneERPA_FFFF(ETot,ECorr,ENuc,EigVecR,Eig,Occ,CICoef,
+     $                  IGem,IndN,NDimX,NBasis,'TWOMO')
+
+      ElseIf(ITwoEl.Eq.3) Then
+
+      Call EneERPA_FOFO(ETot,ECorr,ENuc,EigVecR,Eig,Occ,CICoef,
+     $                  IGem,IndN,NDimX,NELE+NActive,NBasis,'FOFO')
+
+      EndIf
 C
 c      Write(6,'(/," *** Computing ERPA 2-RDM *** ")')
 cC
@@ -1368,8 +1388,8 @@ C
       If(SumNU.Lt.Zero)Write(6,'(X,"Problems with XY Norm!",I4,2E12.4)')
      $   NU,SumNU,Eig(NU)
 C
-      If(Eig(NU).Lt.Zero) 
-     $ Write(6,'(X,"Double Check Negative Excit",I4,2E12.4)') 
+      If(Eig(NU).Lt.Zero)
+     $ Write(6,'(X,"Double Check Negative Excit",I4,2E12.4)')
      $ NU,Eig(NU),SumNU
 C
       EndDo
@@ -2372,7 +2392,8 @@ cC
       Write(6,'(/,2X,"EGVB + ENuc + 1,2-body",5X,F15.8)')
      $ ETot+ENuc+EOneTot+ETwoTot
 C
-      Return
+C    TESTING...
+C      Return
 C
 C     THREE-BODY CONTRIBUTIONS
 C

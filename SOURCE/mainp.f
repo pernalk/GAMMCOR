@@ -314,7 +314,7 @@ C
       ElseIf(ITwoEl.Eq.3) Then
       Call delfile('FOFO')
       Call delfile('FFOO')
-      EndIF
+      EndIf
 C
       Call free_System(System)
       Call clock(PossibleJobType(Flags%JobType),Tcpu,Twall)

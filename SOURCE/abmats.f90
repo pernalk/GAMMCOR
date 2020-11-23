@@ -3151,4 +3151,108 @@ deallocate(ints,work)
 
 end subroutine EERPA_FFFF
 
+subroutine EneERPA_FFFF(ETot,ECorr,ENuc,EVec,EVal,Occ,CICoef,IGem,   &
+                        IndN,NDimX,NBasis,IntFile)
+implicit none
+
+integer,intent(in) :: NDimX,NBasis
+integer,intent(in) :: IGem(NBasis),IndN(2,NDimX)
+character(*),intent(in) :: IntFile
+double precision,intent(in)    :: ENuc
+double precision,intent(inout) :: ETot,ECorr
+double precision,intent(in) :: CICoef(NBasis),Occ(NBasis)
+double precision,intent(in) :: EVec(NDimX,NDimX),EVal(NDimX)
+
+integer :: i,j,k,l,kl,kk,ip,iq,ir,is,ipq,irs
+integer :: iunit,ISkippedEig
+integer :: pos(NBasis,NBasis)
+integer :: OccProd(NBasis,NBasis)
+double precision :: Cpq,Crs,SumY,Aux,EIntra
+double precision,allocatable :: work(:),ints(:,:),Skipped(:)
+double precision,parameter :: SmallE = 1.d-3,BigE = 5.d2
+
+pos = 0
+do i=1,NDimX
+   pos(IndN(1,i),IndN(2,i)) = i
+enddo
+
+allocate(work(NBasis**2),ints(NBasis,NBasis),Skipped(NDimX))
+
+ISkippedEig = 0
+ECorr = 0
+EIntra= 0
+
+! FULL INTS
+open(newunit=iunit,file=trim(IntFile),status='OLD', &
+     access='DIRECT',recl=8*NBasis*(NBasis+1)/2)
+kl = 0
+do l=1,NBasis
+   do k=1,l
+      kl = kl + 1
+      if(pos(l,k)/=0) then
+        irs = pos(l,k)
+        ir = l
+        is = k
+        read(iunit,rec=kl) work(1:NBasis*(NBasis+1)/2)
+        call triang_to_sq2(work,ints,NBasis)
+
+        do j=1,NBasis
+           do i=1,j
+              if(pos(j,i)/=0) then
+                ipq = pos(j,i)
+                ip = j
+                iq = i
+
+                Crs = CICoef(l)+CICoef(k)
+                Cpq = CICoef(j)+CICoef(i)
+
+                ISkippedEig = 0
+                SumY = 0
+                do kk=1,NDimX
+                   if(EVal(kk).gt.SmallE.and.EVal(kk).lt.BigE) then
+                      SumY = SumY + EVec(ipq,kk)*EVec(irs,kk)
+                   else
+                      ISkippedEig = ISkippedEig + 1
+                      Skipped(ISkippedEig) = EVal(kk)
+                   endif
+                enddo
+
+                Aux = 2d0*Crs*Cpq*SumY
+
+                if(iq.Eq.is.and.ip.Eq.ir) then
+                   Aux = Aux - Occ(ip)*(1d0-Occ(is))-Occ(is)*(1d0-Occ(ip))
+                endif
+
+                ECorr = ECorr + Aux*ints(j,i)
+
+                if(IGem(ip).eq.IGem(iq).and.IGem(ir).eq.IGem(is).and.IGem(ip).eq.IGem(ir)) then
+                   EIntra = EIntra + Aux*ints(j,i)
+                endif
+
+              endif
+           enddo
+        enddo
+
+      endif
+   enddo
+enddo
+
+close(iunit)
+
+if(ISkippedEig/=0) then
+  write(LOUT,'(/,1x,"The number of discarded eigenvalues is",i4)') &
+       ISkippedEig
+  do i=1,ISkippedEig
+     write(LOUT,'(1x,a,i4,f15.8)') 'Skipped',i,Skipped(i)
+  enddo
+endif
+
+ECorr = 0.5d0*(ECorr-EIntra)
+write(lout,'(1x,a,3f15.8)') 'EGVB+ENuc, Corr, ERPA-GVB',ETot+ENuc,ECorr,ETot+ENuc+ECorr
+
+deallocate(Skipped)
+deallocate(ints,work)
+
+end subroutine EneERPA_FFFF
+
 end module abmat

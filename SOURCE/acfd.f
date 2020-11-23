@@ -4444,7 +4444,6 @@ C
       ElseIf(ITwoEl.Eq.2) Then
 C
       Call LookUp_mithap(Occ,IndAux,IndP,IndN,IndX,NDimX,NDim,NBasis)
-
       Call ACABMAT0_mithap(ABPLUS,ABMIN,URe,Occ,XOne,
      $            IndN,IndX,IGem,CICoef,
      $            NBasis,NDim,NDimX,NInte1,NGem,
