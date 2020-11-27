@@ -402,8 +402,12 @@ C
 
       ElseIf(ITwoEl.Eq.3) Then
 
-      Call EneERPA_FOFO(ETot,ECorr,ENuc,EigVecR,Eig,Occ,CICoef,
+      Call EneERPA_FOFO(ECorr,EigVecR,Eig,Occ,CICoef,
      $                  IGem,IndN,NDimX,NELE+NActive,NBasis,'FOFO')
+
+      ECorr = 0.5d0*ECorr
+      Write(LOUT,'(1x,a,3f15.8)') 'EGVB+ENuc, Corr, ERPA-GVB',
+     $      ETot+ENuc,ECorr,ETot+ENuc+ECorr
 
       EndIf
 C

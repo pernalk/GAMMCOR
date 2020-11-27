@@ -4585,19 +4585,20 @@ end subroutine ModABMinSym
 
 subroutine ACEInteg_FOFO(ECorr,URe,Occ,XOne,UNOAO,&
       ABPLUS,ABMIN,EigVecR,Eig,&
-      EGOne,NGOcc,&
+      EGOne,NGOcc,CICoef,&
       NBasis,NInte1,NDim,NGem,IndAux,ACAlpha,&
-      IGemIN,NAct,INActive,IndN,IndX,NDimX,&
+      IGemIN,NAct,INActive,NELE,IndN,IndX,NDimX,&
       NoSt,ICASSCF,IFlFrag1,IFunSR,IFunSRKer)
 !
 !  A ROUTINE FOR COMPUTING AC INTEGRAND
 !
 implicit none
 integer,intent(in) :: NGOcc,NBasis,NInte1,NDim,NGem,NDimX
-integer,intent(in) :: NAct,INActive,NoSt,ICASSCF,IFlFrag1,IFunSR,IFunSRKer 
+integer,intent(in) :: NAct,INActive,NELE,NoSt,ICASSCF,IFlFrag1,IFunSR,IFunSRKer
 integer,intent(in) :: IndN(2,NDim),IndX(NDim),IndAux(NBasis),&
                       IGemIN(NBasis)
 double precision,intent(in) :: ACAlpha
+double precision,intent(in) :: CICoef(NBasis)
 double precision,intent(in) :: URe(NBasis,NBasis),Occ(NBasis),&
                                UNOAO(NBasis,NBasis),XONe(NInte1) 
 double precision,intent(out) :: ABPLUS(NDim,NDim),ABMIN(NDim,NDim),&
@@ -4610,7 +4611,7 @@ integer :: i,j,k,l,kl,ip,iq,ir,is,ipq,irs
 integer :: pos(NBasis,NBasis)
 double precision :: ECASSCF,XKer
 character(:),allocatable :: twojfile,twokfile
-  
+
  NOccup = NAct + INActive
 
  if(IFunSR.Ne.0.And.IFunSRKer.Eq.1) then
@@ -4637,8 +4638,10 @@ character(:),allocatable :: twojfile,twokfile
 
  elseif(ICASSCF==0) then
 
-    write(LOUT,'(1x,a)') 'ERROR! ACABMAT0 NOT AVAILABLE FOR FOFO!'
-    stop
+    call ACABMAT0_FOFO(ABPLUS,ABMIN,URe,Occ,XOne, &
+                  IndN,IndX,IGemIN,CICoef, &
+                  NAct,NELE,NBasis,NDim,NDimX,NInte1,NGem, &
+                 'TWOMO','FFOO','FOFO',0,ACAlpha,1)
 
  endif
 
@@ -4696,9 +4699,14 @@ character(:),allocatable :: twojfile,twokfile
     call ERPAVEC(EigVecR,Eig,ABPLUS,ABMIN,NBasis,NDimX)
  endif
 
- call ACEneERPA_FOFO(ECorr,EigVecR,Eig,Occ, &
-                     IGemIN,IndN,IndX,INActive+NAct, &
-                     NDimX,NBasis,twokfile)
+ if(ICASSCF==1) then
+    call ACEneERPA_FOFO(ECorr,EigVecR,Eig,Occ, &
+                        IGemIN,IndN,IndX,INActive+NAct, &
+                        NDimX,NBasis,twokfile)
+ else
+    call EneERPA_FOFO(ECorr,EigVecR,Eig,Occ,CICoef, &
+                      IGemIN,IndN,NDimX,NELE+NAct,NBasis,'FOFO')
+ endif
 
 end subroutine ACEInteg_FOFO
 
@@ -4981,15 +4989,16 @@ deallocate(ints,work)
 
 end subroutine EERPA_FOFO
 
-subroutine EneERPA_FOFO(ETot,ECorr,ENuc,EVec,EVal,Occ,CICoef,IGem,   &
+!subroutine EneERPA_FOFO(ETot,ECorr,ENuc,EVec,EVal,Occ,CICoef,IGem,   &
+!                        IndN,NDimX,NOccup,NBasis,IntKFile)
+subroutine EneERPA_FOFO(ECorr,EVec,EVal,Occ,CICoef,IGem,   &
                         IndN,NDimX,NOccup,NBasis,IntKFile)
 implicit none
 
 integer,intent(in) :: NDimX,NOccup,NBasis
 integer,intent(in) :: IGem(NBasis),IndN(2,NDimX)
 character(*),intent(in) :: IntKFile
-double precision,intent(in)    :: ENuc
-double precision,intent(inout) :: ETot,ECorr
+double precision,intent(inout) :: ECorr
 double precision,intent(in) :: CICoef(NBasis),Occ(NBasis)
 double precision,intent(in) :: EVec(NDimX,NDimX),EVal(NDimX)
 
@@ -5082,8 +5091,9 @@ if(ISkippedEig/=0) then
   enddo
 endif
 
-ECorr = 0.5d0*(ECorr-EIntra)
-write(lout,'(1x,a,3f15.8)') 'EGVB+ENuc, Corr, ERPA-GVB',ETot+ENuc,ECorr,ETot+ENuc+ECorr
+ECorr = ECorr-EIntra
+!ECorr = 0.5d0*(ECorr-EIntra)
+!write(lout,'(1x,a,3f15.8)') 'EGVB+ENuc, Corr, ERPA-GVB',ETot+ENuc,ECorr,ETot+ENuc+ECorr
 
 deallocate(Skipped)
 deallocate(ints,work)

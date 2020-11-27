@@ -129,6 +129,7 @@ C
       ACAlpha=XGrid(I)
 C
       If(ITwoEl.eq.1) Then
+
       Call ACEInteg(ECorrA,TwoNO,URe,Occ,XOne,UNOAO,
      $ ABPLUS,ABMIN,EigVecR,Eig,
      $ EGOne,NGOcc,
@@ -136,12 +137,26 @@ C
      $ IndN,IndX,NDimX)
 C
       ElseIf(ITwoEl.eq.3) Then
+
+      If(ICASSCF.Eq.1) Then
+
       Call ACEInteg_FOFO(ECorrA,URe,Occ,XOne,UNOAO,
      $ ABPLUS,ABMIN,EigVecR,Eig,
-     $ EGOne,NGOcc,
+     $ EGOne,NGOcc,CICoef,
      $ NBasis,NInte1,NDimX,NGem,IndAux,ACAlpha,
-     $ IGem,NAcCAS,NInAcCAS,IndN,IndX,NDimX,
+     $ IGem,NAcCAS,NInAcCAS,NELE,IndN,IndX,NDimX,
      $ NoSt,ICASSCF,IFlFrag1,IFunSR,IFunSRKer)
+
+      ElseIf(ICASSCF.Ne.1) Then
+
+      Call ACEInteg_FOFO(ECorrA,URe,Occ,XOne,UNOAO,
+     $ ABPLUS,ABMIN,EigVecR,Eig,
+     $ EGOne,NGOcc,CICoef,
+     $ NBasis,NInte1,NDim,NGem,IndAux,ACAlpha,
+     $ IGem,NActive,NInAcCAS,NELE,IndN,IndX,NDimX,
+     $ NoSt,ICASSCF,IFlFrag1,IFunSR,IFunSRKer)
+
+      EndIf
       EndIf
 C
       Write(*,*)'ACAlpha ',ACAlpha,' W_ALPHA ',ECorrA
@@ -162,6 +177,11 @@ C
       EndIf
 C
       Else 
+C
+      If(ITwoEl.Eq.3) Then
+      Call EneGVB_FOFO(NActive,NELE,ETot,URe,Occ,CICoef,XOne,
+     $                 IGem,IndN,NBasis,NInte1,'FOFO',NDimX,NGem)
+      EndIf
 C
       Write
      $ (6,'(/,2X,''EGVB+ENuc, Corr, AC-ERPA-GVB '',4X,3F15.8)')
