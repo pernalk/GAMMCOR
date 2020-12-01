@@ -311,7 +311,7 @@ C
 C
       Write(6,'(/,X,"***** EMBEDDING ERPA (EERPA) CALCULATIONS *****")')
 C
-c      Write(6,'(/,X," Entering FOFO not ready...OneTwoBody with IFl12 = ",I4)'),IFl12
+c      Write(6,'(/,X," Entering OneTwoBody with IFl12 = ",I4)'),IFl12
 c      Call OneTwoBody(ETot,ENuc,ECorrTot,EGOne,EigVecR,Eig,ABPLUS,ABMIN,
 c     $ Occ,TwoNO,IndAux,NBasis,NInte1,NInte2,NDim,NGem,NGOcc,IFl12)
 c      NFrag=NGem-1
