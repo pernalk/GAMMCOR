@@ -2397,7 +2397,7 @@ cC
      $ ETot+ENuc+EOneTot+ETwoTot
 C
 C    TESTING...
-C      Return
+      Return
 C
 C     THREE-BODY CONTRIBUTIONS
 C
