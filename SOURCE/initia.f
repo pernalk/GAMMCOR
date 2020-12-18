@@ -15,7 +15,7 @@ C
      $ TwoEl(NInte2),UMOAO(NBasis,NBasis),
      $ UAux(NBasis,NBasis)
       integer :: ione,NBas(8)
-      logical :: exione 
+      logical :: exione, exaosrt
       double precision, allocatable :: TMPMO(:,:)
 C
       Character*60 Line
@@ -65,9 +65,20 @@ C     GET 2-EL NO INTEGRALS AND CICoef
 C 
 C      Call readtwoint(NBasis,'AOTWOINT','AOTWOSORT')
       If(ITwoEl.Eq.1) Then
-      Call read2el(TwoEl,UMOAO,NBasis,NInte2)
-      Else
-      Call readtwoint(NBasis,1,'AOTWOINT','AOTWOSORT')
+         Call read2el(TwoEl,UMOAO,NBasis,NInte2)
+      Else ! out-of-core routines
+         If(IRes.Eq.0) Then
+            Call readtwoint(NBasis,1,'AOTWOINT','AOTWOSORT')
+         Else If(IRes.Eq.1) Then
+            ! use the existing sorted 2-el ints
+            Inquire(file='AOTWOSORT',EXIST=exaosrt)
+            If(exaosrt) Then
+               Write(6,*) 'Assume AOTWOSORT is correct!'
+            Else
+               Write(6,*) 'Error! IRes=1 but no AOTWOSORT file!'
+               Stop
+            EndIf
+         EndIf
 C      Call LoadSaptTwoEl(3,TwoEl,NBasis,NInte2)
 C      Write(6,'(" Transforming two-electron integrals ...",/)')
 C      Call TwoNO1(TwoEl,UMOAO,NBasis,NInte2)
@@ -253,11 +264,11 @@ C     TRANSFORM J AND K
 C
       EndIf
 C
-      If(ITwoEl.Gt.1) Then
-C     DELETE SORTED AOTWOINTS FOFO
-      Write(6,'(/A)') 'SORTED 2-el AO ints deleted after tran4_gen!'
-      Call delfile('AOTWOSORT')
-      EndIf
+C      If(ITwoEl.Gt.1) Then
+CC     DELETE SORTED AOTWOINTS FOFO
+C      Write(6,'(/A)') 'SORTED 2-el AO ints deleted after tran4_gen!'
+C      Call delfile('AOTWOSORT')
+C      EndIf
 C
       Inquire(File='AOONEINT',EXIST=exione)
       If(exione) Then
