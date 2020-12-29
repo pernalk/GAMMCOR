@@ -1059,7 +1059,7 @@ C
      $ AUXM(NBasis,NBasis),AUXM1(NBasis*NBasis),Ind2(NBasis),
      $ IndInt(NBasis),NumOSym(15),MultpC(15,15),Fock(NBasis*NBasis),
      $ GammaF(NInte1),FockF(NInte1),GammaAB(NInte1),
-     $ work1(NBasis,NBasis) 
+     $ work1(NBasis,NBasis)
 c herer!!! delete after tests
 c     $ ,UMOAOInv(NBasis,NBasis),TwoElAO(NInte2)
 C
@@ -1143,7 +1143,7 @@ C      Call GetENuc_AO(ENuc,Title)
 C
 C     HAP
       Call create_ind('2RDM',NumOSym,IndInt,MxSym,NBasis)
-      
+C
 C     LOAD ONE-ELE INTEGS IN AO
       FName(K:K+8)='xone.dat'
 C      Call Int1_AO(XKin,NInte1,FName,NumOSym,Nbasis)
@@ -3081,6 +3081,74 @@ C
 C
       end subroutine TwoEneChck
 
+      subroutine TwoEneGVBChck(ETwo,Occ,NOccup,NBasis)
+      Implicit Real*8 (A-H,O-Z)
+C
+      Include 'commons.inc'
+C
+      Parameter(Zero=0.D0,Half=0.5D0,One=1.D0,Two=2.D0)
+C
+      Dimension Occ(NBasis)
+C
+C     LOCAL ARRAYS
+C
+      Double Precision, Allocatable :: RDM2val(:,:,:,:),
+     $                                 work(:),ints(:,:)
+      Character(:),Allocatable :: IntJFile
+C
+C     SET FILES
+      If (IFunSR.Eq.0.Or.IFunSR.Eq.3.Or.IFunSR.Eq.5) Then
+      IntJFile='FFOO'
+      Else
+      IntJFile='FFOOERF'
+      EndIf
+C
+      Allocate(work(NBasis**2),ints(NBasis,NBasis))
+      Allocate(RDM2val(NOccup,NOccup,NOccup,NOccup))
+C
+      Do L=1,NOccup
+      Do K=1,NOccup
+      Do J=1,NOccup
+      Do I=1,NOccup
+      RDM2val(I,J,K,L) = FRDM2GVB(I,K,J,L,Occ,NBasis)
+      EndDo
+      EndDo
+      EndDo
+      EndDo
+C
+      Open(newunit=iunit,file=IntJFile,status='OLD',
+     $     access='DIRECT',recl=8*NBasis**2)
+C
+      ETwo=0    
+C     COULOMB LOOP (FF|OO)
+      kl=0
+      Do ll=1,NOccup
+      Do kk=1,NOccup
+      kl=kl+1
+      read(iunit,rec=kl) work(1:NBasis**2)
+      Do j=1,NBasis
+      Do i=1,NBasis
+      ints(i,j) = work((j-1)*NBasis+i)
+      EndDo
+      EndDo
+C
+      k = kk
+      l = ll
+C
+      If(k>NOccup.or.l>NOccup) Cycle
+C
+      ETwo = ETwo + sum(RDM2val(:,:,k,l)*ints(1:NOccup,1:NOccup))
+C
+      EndDo
+      EndDo
+C
+      Close(iunit)
+C
+      Deallocate(ints,work)
+      Deallocate(RDM2val)
+C
+      end subroutine TwoEneGVBChck
+      
       subroutine TwoEHartree(EnH,RDM2Act,Occ,INActive,NAct,NBasis)
       Implicit Real*8 (A-H,O-Z)
 C       
