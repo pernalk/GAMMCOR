@@ -102,14 +102,19 @@ C
 C
       If(IFunSR.Eq.0) Then 
 C
-c      Call RunACCAS(ETot,ENuc,TwoNO,URe,UNOAO,Occ,XOne,
-c     $  IndAux,IPair,IndN,IndX,NDimX,Title,NBasis,NInte1,NInte2,NGem)
-c      stop
+      If(IFlAC0D.Eq.1) Then
 C
 C this is a version of AC0 which takes special care of deexcitations (SA-CAS is required)
 C
       Call RunACDEXIT(ETot,ENuc,TwoNO,URe,UNOAO,Occ,XOne,
      $  IndAux,IPair,IndN,IndX,NDimX,Title,NBasis,NInte1,NInte2,NGem)
+C
+      Else
+C
+      Call RunACCAS(ETot,ENuc,TwoNO,URe,UNOAO,Occ,XOne,
+     $  IndAux,IPair,IndN,IndX,NDimX,Title,NBasis,NInte1,NInte2,NGem)
+C
+      EndIf
 C
       ElseIf(IFunSR.Eq.3) Then
 C
@@ -276,13 +281,15 @@ C
       Subroutine RunACDEXIT(ETot,ENuc,TwoNO,URe,UNOAO,Occ,XOne,
      $  IndAux,IPair,IndN,IndX,NDimX,Title,NBasis,NInte1,NInte2,NGem)
 C
+c      use abmat
+      use types
       use abfofo
-      use abmat
 C
       Implicit Real*8 (A-H,O-Z)
 C
       Character*60 FMultTab,Title
       CHARACTER(100) :: num1char
+      Character*32 Str 
 C
       Include 'commons.inc'
 C
@@ -291,7 +298,153 @@ C
       Dimension
      $ URe(NBasis,NBasis),UNOAO(NBasis,NBasis),Occ(NBasis),
      $ TwoNO(NInte2),XOne(NInte1),IndX(NDimX),IndN(2,NDimX),
-     $ IndAux(NBasis),IPair(NBasis,NBasis)
+     $ IndAux(NBasis),IPair(NBasis,NBasis),NSymAO(NBasis),
+     $ NSymNO(NBasis),MultpC(8,8),NumOSym(8),NumStSym(16),IStSy(16),
+     $ IStCAS(2,100),EExcit(100),ICORR(100),ECorrSym(100)
+C
+C
+C     ***************************************
+      If(ISymmAC0D.Eq.1) Then
+C     ***************************************
+C
+C     AC0D corrections are computed for states of the same symmetries as 
+C     the symmetries of SA-CAS states 
+C
+C
+C     Symmetry of NO's
+C
+      Call read_sym_molpro(NSymAO,MxSym,NumOSym,
+     $ 'MOLPRO.MOPUN','CASORB  ',NBasis)
+C 
+      Call sym_inf('2RDM',NumOSym,NSym,NumStSym,IStSy,
+     $ NStSym,NSymAO,NBasis) 
+C     number of irreps
+      write(*,*)'NSym',NSym
+C     number of atomic orbitals in each irrep 
+      write(*,*)'NumOSym',NumOSym(1:NSym)
+C     number of irreps in SA-CAS
+      write(*,*)'NStSym',NStSym
+C     number of states in SA-CAS in each irrep
+      write(*,*)'NumStSym',NumStSym(1:NStSym)
+C     which irrep (a label) in SA-CAS
+      write(*,*)'IStSy',IStSy(1:NStSym)
+C
+      Write(6,'(2/,X,"SYMMETRY OF NATURAL ORBITALS")')
+      Write(6,'(X,"Orbital",3X,"Symmetry",3X,"Occupancy")')
+C
+      Do I=1,NBasis
+      NSymNO(I)=0
+C
+      Do J=1,NBasis
+C
+      If(Abs(UNOAO(I,J)).Gt.0.1) Then
+C
+      ISym=NSymAO(J)
+      If(NSymNO(I).Eq.0) Then
+      NSymNO(I)=ISym
+      Else
+      If(NSymNO(I).Ne.ISym)
+     $ Write(6,'("In RunACDEXIT. Symm of NO cannot be established",
+     $ I3)')I
+      EndIf
+C
+      EndIf
+      EndDo
+      Write(6,'(I4,7X,I4,2X,E16.6)')I,NSymNO(I),Occ(I)
+      EndDo
+C
+C     checking
+      Do I=1,MxSym
+      II=0
+      Do IOrb=1,NBasis
+      If(NSymNO(IOrb).Eq.I) II=II+1
+      EndDo
+      If(II.Ne.NumOSym(I))
+     $ Write(*,*) 'In RunACDEXIT. Symmetry of NO cannot be established!'
+      EndDo
+C
+      If(MxSym.Eq.1) Then
+      MultpC(1,1)=1
+      Else
+      Do I=1,MxSym
+      Do J=1,I
+      MultpC(I,J)=IEOR(I-1,J-1)+1
+      MultpC(J,I)=MultpC(I,J)
+      EndDo
+      EndDo
+      EndIf
+C
+c      write(*,*) 'st, sym',inst(1,1),inst(2,1)
+C
+C     determine a number of states in the SA-CAS calculation
+C
+C     grep ' !MCSCF STATE' filename.out > sacas_ene.dat
+      Open(10,File="sacas_ene.dat",Status='Old')
+      NoStMx=0
+      I=0
+   20 I=I+1
+      Read(10,'(A14,I1,A1,I1,A15,F22.12)',End=40) 
+     $Str,IStCAS(1,I),Str,IStCAS(2,I),Str,EExcit(I)
+      Write(6,'(X,"SA-CAS Energy  ",I1,".",I1,F22.12)') 
+     $ IStCAS(1,I),IStCAS(2,I),EExcit(I)
+      Read(10,*)
+      NoStMx=NoStMx+1
+      GoTo 20
+   40 Continue
+      Close(10)
+      Write(6,'(/,X,"The number of states in SA-CAS: ",I4,/)')NoStMx
+C
+      Do I=1,NoStMx
+      If(IStCAS(1,I).Eq.inst(1,1).And.IStCAS(2,I).Eq.inst(2,1)) ICAS=I
+      EndDo
+      Write(6,'(X,"Energy of the NoSt ",I1,".",I1,F22.12)')
+     $ IStCAS(1,ICAS),IStCAS(2,ICAS),EExcit(ICAS)
+C
+      Do I=1,NoStMx
+      ICORR(I)=0
+      If(EExcit(I).Ge.EExcit(ICAS)) ICORR(I)=1
+      EndDo
+C
+      If(ITwoEl.eq.1) Then
+C
+      Call AC0DSYMM(ICAS,NoStMx,ICORR,EExcit,IStCAS,NSym,NSymNO,MultpC,
+     $ ECorrSym,
+     $ ETot,TwoNO,Occ,URe,XOne,
+     $ UNOAO,IndN,IndX,NBasis,NDimX,NInte1,NInte2)
+C
+      ElseIf(ITwoEl.eq.3) Then
+C
+      Call Y01CASDSYM_FOFO(ICAS,NoStMx,ICORR,EExcit,IStCAS,NSym,NSymNO,
+     $ MultpC,
+     $ ECorrSym,Occ,URe,XOne,
+     $ 'PROP0','PROP1',
+     $ 'XY0',UNOAO,
+     $ IndN,IndX,IGem,NAcCAS,NInAcCAS,NDimX,
+     $ NBasis,NDimX,NInte1,NoSt,'EMPTY','FFOO',
+     $ 'FOFO',ETot) 
+C
+      EndIf
+C
+      Write(6,*)
+      Write
+     $ (6,'(X,''ECASSCF+ENuc, AC0DE-Corr, AC0DE-CASSCF '',4X,3F15.8)')
+     $ ETot+ENuc,ECorrSym(ICAS),ETot+ENuc+ECorrSym(ICAS)
+      Write(6,*)
+
+      Do I=1,NoStMx
+      If(ICORR(I).Eq.1.And.I.Ne.ICAS) 
+     $  Write
+     $ (6,'(X,''Dexcitation correction for AC0 for '',
+     $ I1,".",I1,"->",I1,".",I1," transition ",F15.8)')
+     $ IStCAS(1,I),IStCAS(2,I),IStCAS(1,ICAS),IStCAS(2,ICAS),ECorrSym(I)
+      EndDo
+C
+C     ***************************************
+      ElseIf(ISymmAC0D.Eq.0) Then
+C     ***************************************
+C
+C     AC0D corrections will be computed for states which have best overlap 
+C     with SA-CAS states
 C
       NDimD=0
       IJ=0
@@ -315,18 +468,47 @@ C
 C
       NDimD=Ind
 C
-      IF(COMMAND_ARGUMENT_COUNT().Eq.0)THEN
-      WRITE(*,*)'ERROR, COMMAND-LINE ARGUMENTS REQUIRED, STOPPING'
-      STOP
-      ENDIF
-      CALL GET_COMMAND_ARGUMENT(1,num1char)
-      READ(num1char,*)xnum1
-      IH0St=xnum1
-      Write(6,'(/,X,"H0 in AC0 will be constructed for state number",
-     $ I2)') IH0St
-C      IH0St=1
+C     determine a number of states in the SA-CAS calculation
+C
+C     grep ' !MCSCF STATE' filename.out > sacas_ene.dat
+      Open(10,File="sacas_ene.dat",Status='Old')
+      NoStMx=0
+      I=0
+   22 Read(10,'(A32,F22.12)',End=42) Str,EE
+      Write(6,'(X,"SA-CAS Energy  ",I2,F22.12)')
+     $ NoStMx+1,EE
+      Read(10,*)
+      NoStMx=NoStMx+1
+      GoTo 22
+   42 Continue
+      Close(10)
+      Write(6,'(/,X,"The number of states in SA-CAS: ",I4,/)')NoStMx
+C
+      Do IH0St=NoSt,NoStMx 
+C
+      Write(6,'(/,X,86("*"))')
+      Write(6,'(X,"**** AC0D calculation for SA-CAS state no",
+     $ I3," with H0 constructed for state no",I4,
+     $ " ****")')
+     $ NoSt,IH0St
+      Write(6,'(X,86("*"),/)')
+C
+      If(ITwoEl.eq.1) Then
+C
       Call AC0CDEXCIT(IH0St,ECorr,ETot,TwoNO,Occ,URe,XOne,
      $ UNOAO,IndN,IndX,NBasis,NDimX,NDimD,NInte1,NInte2)
+C
+      ElseIf(ITwoEl.eq.3) Then
+C
+      Call Y01CASD_FOFO(IH0St,Occ,URe,XOne,
+     $ 'PROP0','PROP1',
+     $ 'XY0',UNOAO,
+     $ IndN,IndX,IGem,NAcCAS,NInAcCAS,NDimX,
+     $ NBasis,NDimX,NInte1,NoSt,'EMPTY','FFOO',
+     $ 'FOFO',ETot,ECorr)
+C
+C     ITwoEl
+      EndIf
 C
       If(IH0St.Eq.NoSt) Then
 C
@@ -340,11 +522,18 @@ C
       Else
 C
       Write
-     $ (6,'(/,X,''Dexcitation correction for AC0 for '',I2," <-",I2,
+     $ (6,'(/,X,''Dexcitation correction for AC0 for '',I2," ->",I2,
      $ " transition ",F15.8)')
-     $ NoSt,IH0St,ECorr
+     $ IH0St,NoSt,ECorr
 C
       EndIf
+C
+C     Do IH0St=NoSt,NoStMx
+      EndDo
+C
+C     ***************************************
+      EndIf
+C     ***************************************
 C
       Return
       End
