@@ -10,9 +10,9 @@ To compile with gfortran change flags in Makefie.
 The code:
 - is interfaced either  with Dalton (CASSCF, GVB) or with Molpro (CASSCF),
 - requires: 1- and 2-electron integrals in the AO representation
-  in Dalton we use the AOONEINT and AOTWOINT files available, e.g, through the "-get" option,
+  in Dalton we use the AOONEINT and AOTWOINT files available, e.g, through the `-get` option,
   in Molpro damping of the integrals is done through the "user" interface
-           (based on the internal "printints1-3" Molpro procedures).
+           (based on the internal `printints1-3` Molpro procedures).
 
 All AO integrals are sorted in our code and saved on disk (currently we keep all integrals, i.e.
 numerical zero values are not discarded).
@@ -36,7 +36,7 @@ can be transformed by a different NO-coefficient matrix (belonging to different 
 
 EERPA or EERPA-2 sets     IFl12 = 1. EERPA-OLD or EERPA-1 sets IFl12 = 2. Both keywords set IFlAC=0 so ERPA-GVB is carried our for fragments.
 
-## AC,AC0,AC1
+## AC, AC0, AC1
 Calculation block
 * Core
   * 0  - inactive orbitals not correlated
@@ -180,35 +180,36 @@ Available keywords:
 ##### Input for SAPT-CAS calculation:
 
 * input for SAPT-CAS with Dalton interface
-``
-  Calculation
-  JobTitle   H2-H2
-  Interface  DALTON
-  JobType    SAPT
-  RDMType    CAS
-  IPrint     1  
-  end
 
-  ! define monA
-  System
-  Monomer A
-  NAtoms  2
-  ZNucl   2
-  Charge  0
-  Multiplicity 1
-  end
+```Calculation
+   JobTitle   H2-H2
+   Interface  DALTON
+   JobType    SAPT
+   RDMType    CAS
+   IPrint     1  
+   end
 
-  ! define monB
-  System
-  Monomer B
-  NAtoms  2
-  ZNucl   2
-  Charge  0
-  Multiplicity 1
-  end
-``
+   ! define monA
+   System
+   Monomer A
+   NAtoms  2
+   ZNucl   2
+   Charge  0
+   Multiplicity 1
+   end
+
+   ! define monB
+   System
+   Monomer B
+   NAtoms  2
+   ZNucl   2
+   Charge  0
+   Multiplicity 1
+   end
+```
 
 * input for SAPT-GVB calculation:
+```
   ! H2O-H2O SAPT-GVB with Dalton
   Calculation
   JobTitle   H2O-H2O
@@ -235,6 +236,7 @@ Available keywords:
   Charge  0
   Multiplicity 1
   end
+```
 
 ### RUNNING A SAPT-DALTON CALCULATION
 
