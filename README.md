@@ -1,4 +1,5 @@
 # GAMMCOR
+Authors: Kasia Pernal and Michal Hapka
 
 ### Compilation
 Unpack the gammcor.tar.gz package and inside the directory run
