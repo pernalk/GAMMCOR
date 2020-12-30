@@ -211,8 +211,9 @@ else
   case(JOB_TYPE_AC0)
     ! HERE WILL BE CHANGED TO:
     !Flags%IFlAC = 0
-     Flags%IFlAC  = 1
-     Flags%IFlSnd = 1
+     Flags%IFlAC   = 1
+     Flags%IFlSnd  = 1
+     Flags%IFlAC0D = 0
      if(Input%CalcParams%DFApp==2) then
         if(Input%CalcParams%PostCAS) then
            Flags%IFunSR = 4
@@ -222,6 +223,36 @@ else
         Flags%IFunSRKer = Input%CalcParams%Kernel 
      endif
 !     if(Input%CalcParams%DFApp==2) Flags%IFunSRKer = 1
+
+  case(JOB_TYPE_AC0D)
+    ! HERE WILL BE CHANGED TO:
+     Flags%IFlAC   = 1
+     Flags%IFlSnd  = 1
+     Flags%IFlAC0D = 1
+     Flags%ISymmAC0D = 1
+     if(Input%CalcParams%DFApp==2) then
+        if(Input%CalcParams%PostCAS) then
+           Flags%IFunSR = 4
+        else
+           Flags%IFunSR = 2
+        endif
+        Flags%IFunSRKer = Input%CalcParams%Kernel 
+     endif
+
+  case(JOB_TYPE_AC0DNOSYMM)
+    ! HERE WILL BE CHANGED TO:
+     Flags%IFlAC   = 1
+     Flags%IFlSnd  = 1
+     Flags%IFlAC0D = 1
+     Flags%ISymmAC0D = 0
+     if(Input%CalcParams%DFApp==2) then
+        if(Input%CalcParams%PostCAS) then
+           Flags%IFunSR = 4
+        else
+           Flags%IFunSR = 2
+        endif
+        Flags%IFunSRKer = Input%CalcParams%Kernel
+     endif
 
   ! same as ERPA
   case(JOB_TYPE_AC1)
@@ -236,6 +267,18 @@ else
         Flags%IFunSRKer = Input%CalcParams%Kernel 
      endif
 !     if(Input%CalcParams%DFApp==2) Flags%IFunSRKer = 1
+  
+  case(JOB_TYPE_EERPA_OLD)
+     Flags%IFlAC  = 0
+     Flags%IFlSnd = 0 
+     Flags%IFlFrag1 = 1
+     Flags%IFl12 = 2 
+
+  case(JOB_TYPE_EERPA)
+     Flags%IFlAC  = 0
+     Flags%IFlSnd = 0 
+     Flags%IFlFrag1 = 1
+     Flags%IFl12 = 1
 
   case(JOB_TYPE_SAPT)
      Flags%ISAPT  = 1

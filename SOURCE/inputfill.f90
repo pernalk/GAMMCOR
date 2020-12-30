@@ -291,6 +291,10 @@ subroutine read_block_calculation(CalcParams, line)
                CalcParams%JobType = JOB_TYPE_CASPIDFT
            elseif (uppercase(val) == "CASPIDFTOPT" ) then
                CalcParams%JobType = JOB_TYPE_CASPIDFTOPT
+           elseif (uppercase(val) == "AC0D" ) then
+               CalcParams%JobType = JOB_TYPE_AC0D
+           elseif (uppercase(val) == "AC0DNOSYMM" ) then
+               CalcParams%JobType = JOB_TYPE_AC0DNOSYMM
 
            endif
 

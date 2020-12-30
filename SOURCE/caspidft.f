@@ -255,13 +255,21 @@ C
 *Deck CASPIDFTOPT
       Subroutine CASPIDFTOPT(URe,UNOAO,Occ,NBasis)
 C
+C     CASPiDFT correlation energy is returned (and others, like LYP)
+C     Two-electron integrals are not needed
+C     If no parameters (order: A B G C D) are provided in the command line, the parameters used are:
+C     ground state (state 1.1): 0.2 -0.8 1.5 2.6 6.4
+C     excited state (state neq 1.1): 0.19185565 -0.81488859  1.50106868  2.56648139  6.31514676
+C     see: Hapka et al., J. Phys. Chem. Lett. 2020, 11, 5883−5889
+C
+      use types
+C
       Implicit Real*8 (A-H,O-Z)
 C
       Parameter(Zero=0.D0, Half=0.5D0, One=1.D0, Two=2.D0, Four=4.D0)
 C
       Include 'commons.inc'
 C
-c      Real*8, Dimension(:), Allocatable :: OrbGrid(:,:)
       Real*8, Dimension(:), Allocatable :: OrbXGrid
       Real*8, Dimension(:), Allocatable :: OrbYGrid
       Real*8, Dimension(:), Allocatable :: OrbZGrid
@@ -274,7 +282,6 @@ c      Real*8, Dimension(:), Allocatable :: OrbGrid(:,:)
       Real*8, Allocatable :: RDM2Act(:),OrbGrid(:,:)
       Real*8, Allocatable :: RR(:,:)
       Real*8, Allocatable :: OnTop(:)
-C new
       Real*8, Dimension(:), Allocatable ::RhoAct,OnTopAct,SigmaAct,
      $ ZkAct,ZkPBE
       Dimension OccAct(NBasis)
@@ -286,22 +293,43 @@ C
      $ ConCorr(200)
      $ ,EpsC(NBasis,NBasis),EpsCI(NBasis),EpsDiag(NBasis)
       logical fderiv,open
-c      double precision rhoo(ngrid)
-c      double precision sigmaco(ngrid),sigmaoo(ngrid)
       integer igrad
       character*(30) name
 C
 C     IFlagRead = 0 - generate grid data, do not write to a file
+C     if parameteres in caspidft are optimized it is useful to use flags different from 0 to avoid generating data on grid more than once
 C     IFlagRead = 1 - read grid data (density, ontop, and lyp energy density) from a file
 C     IFlagRead = 2 - write grid data to a file
 C
-      IFlagRead=2
+      IFlagRead=0
 C
-      IF(COMMAND_ARGUMENT_COUNT().Eq.0)THEN
-      WRITE(*,*)'ERROR, COMMAND-LINE ARGUMENTS REQUIRED, STOPPING'
-      STOP
-      ENDIF
-
+      Write(6,'(/,X,"***************** CASPIDFT ******************* ")')
+      Write(6,'(X,"STATE : ",I1,".", I1,/)')inst(1,1),inst(2,1)
+C
+      IF(COMMAND_ARGUMENT_COUNT().Eq.0) THEN
+C
+      If(inst(1,1).Eq.1.And.inst(2,1).Eq.1) Then
+      Write(6,'(/,X,"Ground-state optimal parameteres 
+     $ will be used in PiDFT")')
+      A1= 0.2D0
+      B1=-0.8D0
+      G1= 1.5D0
+      C1= 2.6D0 
+      D1= 6.4D0
+      Else
+      Write(6,'(/,X,"Excited-state optimal parameteres
+     $ will be used in PiDFT")')
+      A1= 0.19185565
+      B1=-0.81488859  
+      G1= 1.50106868  
+      C1= 2.56648139  
+      D1= 6.31514676
+      EndIf
+C
+      ELSE
+      Write(6,'(/,X,"Parameters read from a command line 
+     $ will be used in PiDFT")')
+C
       CALL GET_COMMAND_ARGUMENT(1,num1char)   !first, read in the two values
       CALL GET_COMMAND_ARGUMENT(2,num2char)
       CALL GET_COMMAND_ARGUMENT(3,num3char)
@@ -320,7 +348,7 @@ C
       C1=XNum4 
       D1=XNum5
 C
-      Write(6,'(/,X,"***************** CASPIDFT ***************** ")')
+      ENDIF 
 C
       Call molprogrid0(NGrid,NBasis)
 C
@@ -334,7 +362,7 @@ C
       Allocate  (Zk(NGrid))
       Allocate  (RR(3,NGrid))
       Allocate  (OnTop(NGrid))
-C new
+C 
       Allocate  (RhoAct(NGrid))
       Allocate  (OnTopAct(NGrid))
       Allocate  (SigmaAct(NGrid)) 
@@ -388,19 +416,23 @@ C
       Close(10)
       GoTo 300
       EndIf
-C new
+C
+C     APPROXIMATE PROJECTION ON CAS(4,4) [used only in definition of ionicity index]
+C
+      Write(6,'(/,X,
+     $ "Occupancies projected on CAS(4,4) for ionicity index")')
       Do I=1,NBasis
       OccAct(I)=Occ(I)
-cc      If(I.Le.NInAcCAS) OccAct(I)=Zero
+c      If(I.Le.NInAcCAS) OccAct(I)=Zero
 C ONLY HOMO-LUMO
 c      If(I.Gt.NELE+1) OccAct(I)=Zero
 c      If(I.Gt.NInAcCAS.And.I.Lt.NELE) OccAct(I)=One
 C HOMO-1 TO LUMO+1
       If(I.Gt.NELE+2) OccAct(I)=Zero
       If(I.Gt.NInAcCAS.And.I.Lt.NELE-1) OccAct(I)=One 
-      If(occact(i).ne.zero) write(*,*)i,occact(i) 
+      If(OccAct(I).Ne.Zero) 
+     $ Write(6,'(X,I4,3X,E12.5)')I,OccAct(I) 
       EndDo 
-
 C
       Do I=1,NGrid
       Call DenGrid(I,RhoAct(I),OccAct,URe,OrbGrid,NGrid,NBasis)
@@ -426,7 +458,6 @@ c      Gam2=FRDM2(IP,IQ,IR,IS,RDM2Act,OccAct,Ind2,NAct,NBasis)
       EndDo
       EndDo
       EndDo
-c end of new
 C
       Do I=1,NGrid
 C
@@ -463,27 +494,27 @@ C
 C
 C     OVERLAP OF ORBITALS
 C
-      Do I=1,NOccup
-      If(Occ(I).Lt.0.8.And.Occ(I).Gt.0.2) Then
-      Do J=1,I-1
-      If(Occ(J).Lt.0.8.And.Occ(J).Gt.0.2) Then
-C
-      SIJ=Zero
-      Do IG=1,NGrid
-      SIJ=SIJ+Abs(OrbGrid(IG,I)*OrbGrid(IG,J))*WGrid(IG)
-      EndDo
-C
-      Write(6,'(/,X,"Abs Overlap S",2I4,2F8.5,E12.5)')
-     $ I,J,Occ(I),Occ(J),SIJ
-C
-      EndIf
-      EndDo
-C
-      EndIf
-      EndDo
+c      Do I=1,NOccup
+c      If(Occ(I).Lt.0.8.And.Occ(I).Gt.0.2) Then
+c      Do J=1,I-1
+c      If(Occ(J).Lt.0.8.And.Occ(J).Gt.0.2) Then
+cC
+c      SIJ=Zero
+c      Do IG=1,NGrid
+c      SIJ=SIJ+Abs(OrbGrid(IG,I)*OrbGrid(IG,J))*WGrid(IG)
+c      EndDo
+cC
+c      Write(6,'(/,X,"Abs Overlap S",2I4,2F8.5,E12.5)')
+c     $ I,J,Occ(I),Occ(J),SIJ
+cC
+c      EndIf
+c      EndDo
+cC
+c      EndIf
+c      EndDo
 C
       Call LYP(RhoGrid,Sigma,Zk,NGrid)
-C new
+C 
       Call LYP(RhoAct,SigmaAct,ZkAct,NGrid)
       Call PBECor(RhoAct,SigmaAct,ZkPBE,NGrid)
 C
@@ -498,30 +529,18 @@ C
 C
       A=A1
       B=B1
-c      A=0.2D0
-c      B=A-One
-c      C=2.6D0
       C=C1
-c      G=1.5D0
       G=G1
-C D is fixed so that P1(X=1) = P2(X=1), where P1 and P2 are the 1st and 2nd segments. 
-c      D=(C-One)/(One-G)**2
-c      D=(C-A/(One+B))/(One-G)**2
       D=D1
 C
-      Write(6,'(/,1X,''Values of A, B, C, G, D parameters in CASPIDFT'',
-     $ 2X,5F12.6)')A,B,C,G,D
+      Write(6,'(/,1X,''Values of A, B, C, G, D parameters in PiDFT:'',
+     $ 5F12.6)')A,B,C,G,D
 C
       EDYN=Zero
       ELYP=Zero
-      e09=zero
-      e09P=zero
-      edynh=zero
-      edynhP=zero 
-      e10=zero
-      e10P=zero
-      eionic=zero
-C new
+      EIonLYP=Zero
+      EIon=Zero
+C     
       EDYNAct=Zero       
       EIonAct=Zero
       ELYPAct=Zero
@@ -534,24 +553,23 @@ C
       If(RhoGrid(I).Ne.Zero) Then
 C
       XX=Two*OnTop(I)/RhoGrid(I)**2
-c herer!!!
 c      If(Abs(RR(1,I)).Lt.1.D-10.And.Abs(RR(2,I)).Lt.1.D-10)
 c     $ Write(*,'(F10.4,E13.4,F10.4)') RR(3,I),RhoGrid(I),XX
 C
       If(XX.Le.One) Then
 C
       PX=A*XX/(One+B*XX)
-      If(Rhogrid(I).Lt.1.d-10)PX=Zero
+      If(RhoGrid(I).Lt.1.d-10)PX=Zero
 C
       Else
 C
       PX=C*XX**0.25-D*(XX-G)**2
 c herer!!! condition P(2)=1.48 is the maximum allowed value
-      If(XX.Gt.2.0.Or.PX.Gt.1.48) PX=1.48
-      If(Abs(Zk(I)).Lt.1.D-7.And.XX.Gt.1.5) PX=One
+c      If(XX.Gt.2.0.Or.PX.Gt.1.48) PX=1.48
+c      If(Abs(Zk(I)).Lt.1.D-7.And.XX.Gt.1.5) PX=One
 C     
       EndIf
-c new
+C
       PXA=Zero
       If(RhoAct(I).Gt.1.d-10) Then
       XXA=Two*OnTopAct(I)/RhoAct(I)**2
@@ -561,69 +579,47 @@ c new
       PXA=C*XXA**0.25-D*(XXA-G)**2
       EndIf 
       EndIf
-c end of new
-
-c      if(xx.gt.1.1.and.abs(zk(i)*WGrid(I)).gt.1.D-5) then
-c       write(*,*)xx,px,Zk(I)*WGrid(I)
-c      if(xx.gt.1.05) then
-c       write(*,*)xx,px,edyn
-c      endif
 C
-      SUPP=One/(A-B)
-      if(xx.lt.SUPP) e09=e09+Zk(I)*WGrid(I)
-      if(xx.lt.SUPP) e09P=e09P+PX*Zk(I)*WGrid(I)
-      if(xx.ge.SUPP.and.xx.lt.One) edynh=edynh+Zk(I)*WGrid(I)
-      if(xx.ge.SUPP.and.xx.lt.One) edynhP=edynhP+PX*Zk(I)*WGrid(I)
-      if(xx.ge.One) e10=e10+Zk(I)*WGrid(I)
-      if(xx.ge.One) e10P=e10P+PX*Zk(I)*WGrid(I)
-      if(xx.ge.One.and.PX.Gt.One) eionic=eionic+PX*Zk(I)*WGrid(I)
+      If(XX.Gt.One) EIonLYP=EIonLYP+Zk(I)*WGrid(I)
+      If(XX.Gt.One) EIon=EIon+PX*Zk(I)*WGrid(I)
       EDYN=EDYN+PX*Zk(I)*WGrid(I)
       ELYP=ELYP+Zk(I)*WGrid(I)
-C new
-c      EDYNAct=EDYNAct+PXA*Zk(I)*WGrid(I)
-c      If(XXA.Ge.One) EIonAct=EIonAct+PXA*Zk(I)*WGrid(I)
+C 
       EDYNAct=EDYNAct+PXA*ZkAct(I)*WGrid(I)
-      If(XXA.Ge.One) EIonAct=EIonAct+PXA*ZkAct(I)*WGrid(I)
+      If(XXA.Gt.One) EIonAct=EIonAct+PXA*ZkAct(I)*WGrid(I)
       ELYPAct=ELYPAct+ZkAct(I)*WGrid(I)
-      If(XXA.Ge.One) EIonLYPAct=EIonLYPAct+ZkAct(I)*WGrid(I)
+      If(XXA.Gt.One) EIonLYPAct=EIonLYPAct+ZkAct(I)*WGrid(I)
       EPBEAct=EPBEAct+ZkPBE(I)*WGrid(I)
-      If(XXA.Ge.One) EIonPBEAct=EIonPBEAct+ZkPBE(I)*WGrid(I)
+      If(XXA.Gt.One) EIonPBEAct=EIonPBEAct+ZkPBE(I)*WGrid(I)
 C
       EndIf
 C
       EndDo
-      Write(6,'(/,1X,''LYP Correlation'',7X,F15.8)')ELYP
-      Write(6,'(1X,''CASPIDFT Correlation'',2X,F15.8)')EDYN
+      Write(6,'(/,1X,''LYP Correlation'',12X,F15.8)')ELYP
+      Write(6,'(1X,''PiDFT Correlation'',10X,F15.8)')EDYN
 C    
-      Write(6,'(/,30X,"PiDFT           LYP")') 
-      Write(6,'(1X,''X < '',F10.8)') SUPP
-      Write(6,'(1X,''Corr suppressed    '',1X,2F15.8)') e09P,e09
-      Write(6,'(1X,F10.8," < X < 1")') SUPP
-      Write(6,'(1X,''Corr enhanced      '',1X,2F15.8)') 
-     $ edynhP,edynh
-      Write(6,'(1X,"X > 1 ")')
-      Write(6,'(1X,''Corr Ionic         '',1X,2F15.8)') e10P,e10
-      Write(6,'(1X,''PX>1 contribution  '',1X,F15.8)') eionic
-      Write(6,'(1X,''Tot Ionicity Index'', 1X,2F15.1,"%")')
-     $ e10P/EDYN*100.,e10/ELYP*100
-c new
-      Write(6,'(1X,''CASPIDFT with Active P     '',2X,2F15.8)')EDYNAct,
+      Write(6,'(/,36X,"PiDFT           LYP")') 
+      Write(6,'(1X,''Corr Energy, X>1'',11X,2F15.8)') 
+     $ EIon,EIonLYP
+      Write(6,'(1X,''Tot Ionicity Index'', 5X,F12.1,"%",2X,F12.1,"%")')
+     $ EIon/EDYN*100.,EIonLYP/ELYP*100
+C
+      Write(6,'(/,1X,''Corr Energy CAS(4,4)_P'',5X,2F15.8)')EDYNAct,
      $ ELYPAct
-      Write(6,'(1X,''CASPIDFT with Active P, X>1'',2X,2F15.8)') EIonAct,
+      Write(6,'(1X,''Corr Energy CAS(4,4)_P, X>1'',2F15.8)') EIonAct,
      $ EIonLYPAct
       Write(6,
-     $ '(1X,''Ionicity Index (Active P) '', 2X,F15.1,"%",F15.1,"%")') 
+     $ '(1X,''Ionicity Index CAS(4,4)_P'', F10.1,"%",4X,F10.1,"%")') 
      $ EIonAct/EDYNAct*100.,EIonLYPAct/ELYPAct*100
 C
 C PBE PRINT
 C
-      Write(6,'(1X,''PBE with Active      '',2X,F15.8)')EPBEAct
-      Write(6,'(1X,''PBE  with Active, X>1'',2X,F15.8)')EIonPBEAct
-      Write(6,
-     $ '(1X,''Ionicity Index PBE (Active) '', 2X,F15.1,"%")')
-     $ EIonPBEAct/EPBEAct*100
+c      Write(6,'(/,1X,''PBE Corr CAS(4,4)_P'',8X,F15.8)')EPBEAct
+c      Write(6,'(1X,''PBE Corr CAS(4,4)_P, X>1'',3X,F15.8)')EIonPBEAct
+c      Write(6,
+c     $ '(1X,''Ionicity Index PBE CAS(4,4)_P'',F11.1,"%")')
+c     $ EIonPBEAct/EPBEAct*100
 C
-      Stop
 C
       Return
       End
@@ -1076,6 +1072,7 @@ C
       Return
       End
 
+*Deck TEST_TRDMS
       Subroutine TEST_TRDMS(Occ,UNOAO,NInte1,NBasis) 
 C
       use types
