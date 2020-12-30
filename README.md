@@ -180,6 +180,7 @@ Available keywords:
 ##### Input for SAPT-CAS calculation:
 
 * input for SAPT-CAS with Dalton interface
+``
   Calculation
   JobTitle   H2-H2
   Interface  DALTON
@@ -205,6 +206,7 @@ Available keywords:
   Charge  0
   Multiplicity 1
   end
+``
 
 * input for SAPT-GVB calculation:
   ! H2O-H2O SAPT-GVB with Dalton
