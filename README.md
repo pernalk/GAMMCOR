@@ -1,12 +1,12 @@
 # GAMMCOR
 
-## Compilation
-unpack the prdmft.tar.gz package and inside the directory run
+### Compilation
+Unpack the gammcor.tar.gz package and inside the directory run
 `make`
 
 To compile with gfortran change flags in Makefie.
 
-## TWO-ELECTRON INTEGRALS
+### Electron integrals
 The code:
 - is interfaced either  with Dalton (CASSCF, GVB) or with Molpro (CASSCF),
 - requires: 1- and 2-electron integrals in the AO representation
@@ -67,8 +67,8 @@ Output:
 ## CASPiDFT
 * JobType: CASPIDFTOPT
 
-PiDFT optimal parameters from Hapka et al., J. Phys. Chem. Lett. 2020, 11, 5883 are used
-or they can be read from the command line in the order: A B G C D 
+PiDFT optimal parameters from _Hapka et al., J. Phys. Chem. Lett. 2020, 11, 5883_ are used
+or they can be read from the command line in the order: A B G C D. 
 
 Input: 1RDM, 2RDM, GRID, AO Orb on grid, CAS orbs.
 Input files (generated from molpro): 2RDM, GRID, MOLPRO.MOPUN, 
@@ -175,12 +175,11 @@ Available keywords:
        degenerate orbitals which may cause instabilities in hessian
        matrices (will appear in the output as "Skipped" eigenvalues
 
-### INPUT EXAMPLES:
+### INPUT EXAMPLES
 
-Input for SAPT-CAS calculation:
+##### Input for SAPT-CAS calculation:
 
 * input for SAPT-CAS with Dalton interface
-  
   Calculation
   JobTitle   H2-H2
   Interface  DALTON
@@ -207,10 +206,8 @@ Input for SAPT-CAS calculation:
   Multiplicity 1
   end
 
-2) input for SAPT-GVB calculation:
-
-! H2O-H2O SAPT-GVB with Dalton
-  
+* input for SAPT-GVB calculation:
+  ! H2O-H2O SAPT-GVB with Dalton
   Calculation
   JobTitle   H2O-H2O
   Interface  DALTON
@@ -237,12 +234,7 @@ Input for SAPT-CAS calculation:
   Multiplicity 1
   end
 
-3) See the /EXAMPLES directory for more. 
-
-
-********************************* 
-RUNNING A SAPT-DALTON CALCULATION
-********************************* 
+### RUNNING A SAPT-DALTON CALCULATION
 
 To run a SAPT-CAS, SAPT-GVB or SAPT-HF calculation based on Dalton files:
 1) Prepare *.mol and .dal files for each monomer (see examples). 
@@ -270,9 +262,7 @@ To summarize, the Dalton+SAPT run requires 5 input files: 4 files for Dalton
 calculations (two *.dal and two *.mol files for every monomer) 
 and 1 input.inp file for SAPT-CAS/GVB calculation.
 
-********************************* 
-RUNNING A SAPT-MOLPRO CALCULATION
-********************************* 
+### RUNNING A SAPT-MOLPRO CALCULATION
 
 To run a SAPT-CAS, SAPT-HF or SAPT-DFT calculation based on Molpro files:
 1) Prepare input for Molpro. To dump the necessary AOs and RDMs use 
