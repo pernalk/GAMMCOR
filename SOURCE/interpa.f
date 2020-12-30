@@ -80,7 +80,7 @@ C
       Write(6,'(/," *** IFlCore=1: Inactive orbitals (n_p=1) 
      $ included in ERPA correlation ***",/)')
       EndIf
-
+C
       Write(6,'(X," IFlFrag1 ",I4,/)') IFlFrag1
       If(IFlFrag1.Eq.1) Write(6,'(X," IFl12    ",I4,/)') IFl12 
 C
@@ -3015,7 +3015,7 @@ C     check if other geminals belong to the same fragment
       Do KG=1,NoIG
       If(IFragG(KG+InActG).Eq.NoFrag) Then
       Do IC=1,NoICENT
-      If(GCHAR(KG,IC).Gt.1.D-1.And.GCHAR(JG,IC).Gt.1.D-1) IShare=1
+      If(GCHAR(KG,IC).Gt.0.1.And.GCHAR(JG,IC).Gt.0.1) IShare=1
       EndDo
       EndIf
       EndDo
@@ -3079,8 +3079,6 @@ C
       IMonomerG(IFindG(I))=IA
       EndDo
 C
-C
-C
   555 FORMAT(/,2X,'Geminal no',I3,' in fragment:',I3)
 C     set connectivity matrix for active fragments
       Do IG=1,NoIG
@@ -3121,19 +3119,6 @@ C
       Do I=1,NELE
       IndAA(I)=IFragG(IGem(I))
       EndDo 
-C herer!!! all connect => no extra excitations
-c      write(*,*)
-c      write(*,*)' ************************************************** '
-c      write(*,*)' ***** ALL FRAGMS CONNECTED - NO EXTRA EXCITATIONS! '
-c      write(*,*)' ************************************************** '
-c      write(*,*)
-c      do i=1,nofrag
-c      do j=1,nofrag
-c      IConnect(i,j)=1
-c      IConnect(j,i)=1
-c      enddo
-c      enddo
-
 C
       NGem=NoFrag
 C      Write(*,*)'Orbital assignment to frags read from frag_assign.dat'
@@ -3325,6 +3310,9 @@ C
       Write(6,'(X,"TOTAL",F16.8)')EOneTot
 C
   444 Continue
+C
+C     If new EERPA is called and partitioning of the correlation energy into monomer-monomer is needed
+C     than continue
 C
 C     WATCH OUT: orbitals are assigned to monomers IMonomerG(I)
 C                and to fragments by IFrag(I)

@@ -7205,6 +7205,7 @@ EndIf
 If(IStCAS(1,ICAS).Ne.1.Or.IStCAS(2,ICAS).Ne.1) Then
    INQUIRE(FILE="eig_1.1.dat",EXIST=file_exists)
    If(file_exists) Then
+      Write(6,'(X," *** AC0D WITH replacements of omegas [eig_1.1.dat available] *** ")')
       Open(10,File='eig_1.1.dat')
       Read(10,*) NoEig11
       Do NU=1,NoEig11
@@ -7220,13 +7221,15 @@ If(IStCAS(1,ICAS).Ne.1.Or.IStCAS(2,ICAS).Ne.1) Then
        ISt11ERPA(1,NU),ISt11ERPA(2,NU),Eig11(NU),Eig11(NU)-AuxVal
       Eig11(NU)=Eig11(NU)-AuxVal
       EndDo
-
+   Else
+   Write(6,'(X," *** AC0D WITHOUT replacements of omegas [eig_1.1.dat not available] *** ")')
+   NoEig11=0
    EndIf 
 EndIf
 
       NegSym(1:8)=0
       Do I=1,NoStMx
-      Write(6,'(X,"Excit Energy ",I1,".",I1,2F22.12)') &
+      Write(6,'(X,"SA-CAS Excit Energy ",I1,".",I1,2F22.12)') &
       IStCAS(1,I),IStCAS(2,I),EExcit(I),EExcit(I)-EExcit(ICAS)
       If(EExcit(I)-EExcit(ICAS).Lt.0) NegSym(IStCAS(2,I))=NegSym(IStCAS(2,I))+1
       EndDo
@@ -7497,6 +7500,7 @@ Do I=1,NoEig11
         Do NU=1,NoEig
              If(IStERPA(1,NU).Eq.ISt11ERPA(1,I).And.IStERPA(2,NU).Eq.ISt11ERPA(2,I)) Then
 
+! hererxxx
                 If(IStateInSACAS(IStERPA(1,NU),IStERPA(2,NU)).Eq.1) Then    
 
 !                    If(Eig(NU).Gt.AuxVal) Then
@@ -7504,7 +7508,7 @@ Do I=1,NoEig11
                        Write(6,'(X,"Replacing Eig ",I2,".",I1,F22.12," with ERPA(1.1) ",F22.12)') &
                        IStERPA(1,NU),IStERPA(2,NU),Eig(NU),AuxVal
                        Eig(NU)=AuxVal
-                    EndIf
+                     EndIf
 
                 EndIf
 
