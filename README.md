@@ -93,7 +93,7 @@ Output: PiDFT and LYP Correlation Energy and the Ionicity Index.
 * Currently, only 1st and 2nd order Rayleigh-Schrodinger energy contributions
    are available (1st order ExchS2 is also implemented, but not made avaiable).
 
-### SAPT: INPUT FILE
+### INPUT FILE
 Several remarks on the input file:
 
 * for now, the SAPT input file should have a fixed name "input.inp" and be 
