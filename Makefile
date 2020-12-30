@@ -58,7 +58,7 @@ $(O)cpdmft.o : $(S)cpdmft.f
 	$(FCC) $(FFLAGS)  -c $(S)cpdmft.f -o $(O)cpdmft.o
 $(O)nonadia.o : $(S)nonadia.f
 	$(FCC) $(FFLAGS)  -c $(S)nonadia.f -o $(O)nonadia.o
-$(O)dftgrid.o : $(S)dftgrid.f $(S)commons.inc
+$(O)dftgrid.o : $(S)dftgrid.f $(S)commons.inc $(O)abmats.o
 	$(FCC) $(FFLAGS)  -c $(S)dftgrid.f -o $(O)dftgrid.o
 $(O)lsd_sr.o : $(S)lsd_sr.f
 	$(FCC) $(FFLAGS)  -c $(S)lsd_sr.f  -o $(O)lsd_sr.o
@@ -80,7 +80,7 @@ $(O)srlrdynamic.o : $(S)srlrdynamic.f
 	$(FCC) $(FFLAGS)  -c $(S)srlrdynamic.f -o $(O)srlrdynamic.o
 $(O)erpa.o : $(S)erpa.f
 	$(FCC) $(FFLAGS)  -c $(S)erpa.f -o $(O)erpa.o
-$(O)interpa.o : $(S)interpa.f
+$(O)interpa.o : $(S)interpa.f $(O)abmats.o $(O)abfofo.o
 	$(FCC) $(FFLAGS)  -c $(S)interpa.f -o $(O)interpa.o
 $(O)exact2el.o : $(S)exact2el.f
 	$(FCC) $(FFLAGS)  -c $(S)exact2el.f -o $(O)exact2el.o
@@ -88,7 +88,7 @@ $(O)optapsg.o : $(S)optapsg.f
 	$(FCC) $(FFLAGS)  -c $(S)optapsg.f -o $(O)optapsg.o
 $(O)newton.o : $(S)newton.f
 	$(FCC) $(FFLAGS)  -c $(S)newton.f -o $(O)newton.o
-$(O)acfd.o : $(S)acfd.f
+$(O)acfd.o : $(S)acfd.f $(O)abmats.o $(O)abfofo.o
 	$(FCC) $(FFLAGS)  -c $(S)acfd.f -o $(O)acfd.o
 $(O)accas.o : $(S)accas.f
 	$(FCC) $(FFLAGS)  -c $(S)accas.f -o $(O)accas.o
