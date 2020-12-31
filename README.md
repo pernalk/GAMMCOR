@@ -19,7 +19,7 @@ make
 
 4. Run the verification suite:
 ```
-gammcor verify
+gammcor_verify.py
 ```
 ## Third party software
 Third party software used in GammCor:
