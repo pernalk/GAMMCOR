@@ -797,16 +797,9 @@ do ICol=1,NDimX
 enddo
 
 if(AB1) then
-! symmetrize AB1
-! hererxxx
+   ! symmetrize AB1
    call sq_symmetrize(ABPLUS,NDimX)
    call sq_symmetrize(ABMIN,NDimX)
-!  do ip=1,ndimx
-!  do is=1,ip-1
-!  ABPLUS(ip,is)=ABPLUS(is,ip)
-!  ABMIN(ip,is)=ABMIN(is,ip)
-!  enddo
-!  enddo
 endif
 
 !print*, "AB-my",norm2(ABPLUS),norm2(ABMIN)
@@ -840,7 +833,7 @@ end subroutine AB_CAS_FOFO
 
 subroutine ACABMAT0_FOFO(AMAT,BMAT,URe,Occ,XOne, &
                          IndN,IndX,IGem,C, &
-                         NAct,INActive,NBasis,NDim,NDimX,NInte1,NGem, &
+                         NAct,NElHlf,NBasis,NDim,NDimX,NInte1,NGem, &
                          IntFileName,IntJFile,IntKFile,ISAPT,ACAlpha,IFlag)
 !     IFlag = 1 - AMAT AND BMAT WILL CONTAIN (A+B)/C+/C+ AND (A-B)/C-/C-, RESPECTIVELY
 !             0 - AMAT AND BMAT WILL CONTAIN A ANB B MATRICES, RESPECTIVELY
@@ -856,7 +849,7 @@ subroutine ACABMAT0_FOFO(AMAT,BMAT,URe,Occ,XOne, &
 !
 implicit none
 
-integer,intent(in) :: NAct,INActive,NBasis,NDim,NDimX,NInte1,ISAPT,NGem
+integer,intent(in) :: NAct,NElHlf,NBasis,NDim,NDimX,NInte1,ISAPT,NGem
 character(*) :: IntJFile,IntKFile,IntFileName
 double precision,intent(out) :: AMAT(NDimX,NDimX),BMAT(NDimX,NDimX)
 double precision,intent(in)  :: URe(NBasis,NBasis),Occ(NBasis),XOne(NInte1),C(NBasis)
@@ -867,7 +860,7 @@ integer,intent(in) :: IGem(NBasis),IFlag
 integer :: i,j,k,l,ij,kl,kk,ll,klround
 integer :: ip,iq,ir,is,it,iu,iw,ipq,irs,ICol,IRow
 integer :: iunit,iunit1,iunit2,ios
-integer :: NOccup
+integer :: INActive,NOccup
 integer :: IGemType
 integer :: Ind(NBasis),AuxInd(3,3),pos(NBasis,NBasis)
 double precision :: HNO(NBasis,NBasis),HNOCoef
@@ -882,14 +875,15 @@ double precision,parameter :: Delta = 1.d-6
 if(ISAPT==1) then
    write(6,'(1x,a)') 'Computing response-my'
 else
-   write(6,'(/,X,"***** COMPUTING AMAT, BMAT IN ACABMAT0 *****",/)')
+   write(6,'(/,X,"***** COMPUTING AMAT, BMAT IN ACABMAT0: FOFO *****",/)')
 endif
 
 AMAT = 0
 BMAT = 0
 
 ! set dimensions
-NOccup = NAct + INActive
+INActive = NElHlf - NAct
+NOccup = 2*NAct + INActive
 
 allocate(work1(NBasis**2),work2(NBasis**2),ints(NBasis,NBasis))
 
@@ -898,7 +892,7 @@ call dgemm('N','N',NBasis,NBasis,NBasis,1d0,URe,NBasis,work1,NBasis,0d0,work2,NB
 call dgemm('N','T',NBasis,NBasis,NBasis,1d0,work2,NBasis,URe,NBasis,0d0,HNO,NBasis)
 call sq_symmetrize(HNO,NBasis)
 
-print*, 'HNO-test',norm2(HNO)
+!print*, 'HNO-test',norm2(HNO)
 
 do j=1,NBasis
    do i=1,NBasis
@@ -1215,30 +1209,40 @@ do ICol=1,NDimX
             AMAT(irs,ipq) = AMAT(irs,ipq) + val
 
             if(IFlag/=0) then
-!!$               if(abs(abs(C(ip))-abs(C(iq)))<=Delta*abs(C(iq)).or.& 
-!!$                    abs(abs(C(ir))-abs(C(is)))<=Delta*abs(C(ir))) then
-!!$               
-!!$                  AMAT(irs,ipq) = 0
-!!$                  BMAT(irs,ipq) = 0
-!!$               else
-                  
-                  SaveA = AMAT(irs,ipq)
-                  SaveB = BMAT(irs,ipq)
-                  
-                  val = (C(ip) + C(iq))*(C(ir) + C(is))
-                  if(val==0) then
-                     AMAT(irs,ipq) = 0
-                  else
-                     AMAT(irs,ipq) = (SaveA+SaveB)/val
-                  endif
-                  val = (C(ip) - C(iq))*(C(ir) - C(is))
-                  if(val==0) then
-                     BMAT(irs,ipq) = 0
-                  else
-                     BMAT(irs,ipq) = (SaveA-SaveB)/val
-                  endif
+             !! Kasia's way:
+             !  if(abs(abs(C(ip))-abs(C(iq)))<=Delta*abs(C(iq)).or.& 
+             !       abs(abs(C(ir))-abs(C(is)))<=Delta*abs(C(ir))) then
+             !  
+             !     AMAT(irs,ipq) = 0
+             !     BMAT(irs,ipq) = 0
+             !  else
+
+             !     SaveA = AMAT(irs,ipq)
+             !     SaveB = BMAT(irs,ipq)
+
+             !     val = (C(ip) + C(iq))*(C(ir) + C(is))
+             !     AMAT(irs,ipq) = (SaveA+SaveB)/val
+             !     val = (C(ip) - C(iq))*(C(ir) - C(is))
+             !     BMAT(irs,ipq) = (SaveA-SaveB)/val
+
+               !  our way:
+               SaveA = AMAT(irs,ipq)
+               SaveB = BMAT(irs,ipq)
+                
+               val = (C(ip) + C(iq))*(C(ir) + C(is))
+               if(val==0) then
+                  AMAT(irs,ipq) = 0
+               else
+                  AMAT(irs,ipq) = (SaveA+SaveB)/val
                endif
-!!$            endif
+               val = (C(ip) - C(iq))*(C(ir) - C(is))
+               if(val==0) then
+                  BMAT(irs,ipq) = 0
+               else
+                  BMAT(irs,ipq) = (SaveA-SaveB)/val
+               endif
+              ! endif ! KP
+            endif
                         
          enddo
       endif
@@ -2234,6 +2238,30 @@ end associate
 !! dump EBLOCKS: X(0),Y(0)
 call dump_Eblock(Eblock,EblockIV,Occ,IndN,nblk,NBasis,NDimX,xy0file)
 
+!! test for deexcit
+!! unpack active EigY
+!!allocate(Eig(NDimX),EigY(NDimX,NDimX))
+!!Eig = 0
+!!EigY = 0
+!if(nAA > 1) then
+!   associate(B => Eblock(1))
+!     write(lout,*) 'test-AA',B%n
+!     allocate(Eig(B%n),EigY(maxval(B%pos),maxval(B%pos)))
+!     Eig = 0
+!     EigY = 0
+!     do i=1,B%n
+!        ipos = B%pos(i)
+!     !   print*, 'ipos',ipos
+!        EigY(ipos,B%l1:B%l2) = B%matY(i,1:B%n)
+!     enddo
+!     Eig(B%l1:B%l2) = B%vec(1:B%n)
+!
+!   end associate
+!endif
+!write(lout,*) 'Eig',norm2(Eig)
+!write(lout,*) 'EigY',norm2(EigY)
+!deallocate(EigY,Eig)
+
 if(IFlag0==0) then
    
    ! AB(1) PART
@@ -2610,6 +2638,7 @@ enddo
 
 associate(B => EblockIV)
 
+if(B%n>0) then
   do iblk=1,nblk
      associate(iB => Eblock(iblk))
 
@@ -2663,6 +2692,7 @@ associate(B => EblockIV)
         AOUT(ipos,jpos) = AMAT(ii,jj)*0.5d0
      enddo
   enddo
+endif
 
 end associate
 
@@ -2811,7 +2841,7 @@ integer :: iunit,ios
 integer :: iunit1,iunit2
 integer :: NOccup,NRDM2Act
 integer :: IGem(NBasis),Ind(NBasis),AuxInd(3,3),pos(NBasis,NBasis)
-logical :: EigChck(NDimX)
+!logical :: EigChck(NDimX)
 double precision :: C(NBasis)
 double precision :: HNO(NBasis,NBasis),AuxI(NBasis,NBasis),AuxIO(NBasis,NBasis),WMAT(NBasis,NBasis)
 double precision :: AuxCoeff(3,3,3,3),AuxVal,val
@@ -2820,16 +2850,22 @@ double precision,allocatable :: EigY(:,:),EigY1(:,:)
 double precision,allocatable :: Eig(:),Eig1(:)
 double precision,allocatable :: RDM2val(:,:,:,:),RDM2Act(:)
 double precision,allocatable :: work1(:),work2(:)
+double precision,allocatable :: workA(:,:)
 double precision,allocatable :: ints(:,:)
 double precision,allocatable :: EigYt(:,:),EigXt(:,:),Eigt(:)
 double precision,allocatable :: ABP(:,:),ABM(:,:)
 integer,external :: NAddrRDM
 double precision,external :: FRDM2
 integer :: ii,jj,ipos
+integer :: iblk,jblk,nblk
 integer :: nAA,tmpAA(NAct*(NAct-1)/2),limAA(2)
 integer :: nAI(INActive),tmpAI(NAct,1:INActive),limAI(2,1:INActive)
 integer :: nAV(INActive+NAct+1:NBasis),tmpAV(NAct,INActive+NAct+1:NBasis),limAV(2,INActive+NAct+1:NBasis)
 integer :: nIV,tmpIV(INActive*(NBasis-NAct-INActive)),limIV(2)
+!
+type(EblockData),allocatable :: Eblock(:) 
+type(EblockData) :: EblockIV
+!
 double precision,parameter :: Thresh = 1.D-12
 double precision :: Tcpu,Twall
 
@@ -2859,8 +2895,6 @@ enddo
 
 allocate(work1(NBasis**2),work2(NBasis**2),ints(NBasis,NBasis))
 allocate(RDM2val(NOccup,NOccup,NOccup,NOccup))
-allocate(EigY(NDimX,NDimX),Eig(NDimX))
-allocate(EigY1(NDimX,NDimX),Eig1(NDimX))
 
 NRDM2Act = NAct**2*(NAct**2+1)/2
 allocate(RDM2Act(NRDM2Act))
@@ -3634,113 +3668,235 @@ call clock('START',Tcpu,Twall)
 call sq_symmetrize(ABPLUS,NDimX)
 call sq_symmetrize(ABMIN,NDimX)
 
-EigY1 = 0
+allocate(EigY(NDimX,NDimX),Eig(NDimX))
+allocate(EBlock(1+NBasis-NAct))
+
 EigY = 0
+nblk = 0
 
-i = limAA(1)
-j = limAA(2)
-
+!pack AA
 if(nAA>0) then
 
-   allocate(ABP(nAA,nAA),ABM(nAA,nAA),EigYt(nAA,nAA),EigXt(nAA,nAA),Eigt(nAA))
+   nblk = nblk + 1
+   associate(B => Eblock(nblk))
+     B%n  = nAA
+     B%l1 = limAA(1)
+     B%l2 = limAA(2)
+     allocate(B%pos(B%n))
+     B%pos(1:B%n) = tmpAA(1:B%n)
 
-   ABP = ABPLUS(i:j,i:j)
-   ABM = ABMIN(i:j,i:j)
- 
-   if(IFunSRKer==1) then
-      call ModABMin_Act_FOFO(Occ,SRKer,Wt,OrbGrid,ABM,&
-             MultpC,NSymNO,tmpAA,&
-             IndN,IndX,NDimX,NGrid,NBasis,&
-             NOccup,NAct,INActive,nAA,'FOFO','FOFOERF')
-   endif
+     allocate(B%vec(B%n),B%matX(B%n,B%n),B%matY(B%n,B%n))
+     allocate(ABP(B%n,B%n),ABM(B%n,B%n))
 
-   !print*, 'ACT-ACT-MY',nAA,norm2(ABP),norm2(ABM)
-   if(NoSt==1) then
-      call ERPASYMM0(EigYt,EigXt,Eigt,ABP,ABM,nAA)
-   elseif(NoSt>1) then
-      call ERPAVECYX(EigYt,EigXt,Eigt,ABP,ABM,nAA)
-   endif
+     ABP = ABPLUS(B%l1:B%l2,B%l1:B%l2)
+     ABM = ABMIN(B%l1:B%l2,B%l1:B%l2)
+     if(IFunSRKer==1) then
+        call ModABMin_Act_FOFO(Occ,SRKer,Wt,OrbGrid,ABM,&
+               MultpC,NSymNO,tmpAA,&
+               IndN,IndX,NDimX,NGrid,NBasis,&
+               NOccup,NAct,INActive,nAA,'FOFO','FOFOERF')
+     endif
+
+     if(NoSt==1) then
+        call ERPASYMM0(B%matY,B%matX,B%vec,ABP,ABM,B%n)
+     elseif(NoSt>1) then
+        call ERPAVECYX(B%matY,B%matX,B%vec,ABP,ABM,B%n)
+     endif
    
-   do ii=1,nAA
-      ipos = tmpAA(ii)
-      EigY(ipos,i:j) = EigYt(ii,1:nAA)
-      if(IFlag0==0) EigY1(ipos,i:j) = EigXt(ii,1:nAA)
-   enddo
-   Eig(i:j) = Eigt(1:nAA)
+     deallocate(ABM,ABP)
+   
+   end associate
 
-   deallocate(Eigt,EigXt,EigYt,ABM,ABP)
 endif
 
+write(*,'(/,1x,a)') 'Act-Act   block diagonalized!'
+
+!pack AI
 do iq=1,INActive
-   i = limAI(1,iq)
-   j = limAI(2,iq)
-
    if(nAI(iq)>0) then
-      allocate(ABP(nAI(iq),nAI(iq)),ABM(nAI(iq),nAI(iq)),&
-           EigYt(nAI(iq),nAI(iq)),EigXt(nAI(iq),nAI(iq)),Eigt(nAI(iq)))
 
-      ABP = ABPLUS(i:j,i:j)
-      ABM = ABMIN(i:j,i:j)
-      !print*, 'AI-MY',iq,norm2(ABP),norm2(ABM)
-      if(NoSt==1) then
-         call ERPASYMM0(EigYt,EigXt,Eigt,ABP,ABM,nAI(iq))
-      elseif(NoSt>1) then
-         call ERPAVECYX(EigYt,EigXt,Eigt,ABP,ABM,nAI(iq))
-      endif
+      nblk = nblk + 1
+      associate(B => Eblock(nblk))
+        B%n  = nAI(iq)
+        B%l1 = limAI(1,iq)
+        B%l2 = limAI(2,iq)
+        allocate(B%pos(B%n))
+        B%pos(1:B%n) = tmpAI(1:B%n,iq)
 
-      do ii=1,nAI(iq)
-         ipos = tmpAI(ii,iq)
-         EigY(ipos,i:j) = EigYt(ii,1:nAI(iq))
-         if(IFlag0==0) EigY1(ipos,i:j) = EigXt(ii,1:nAI(iq))
-      enddo
-      Eig(i:j) = Eigt(1:nAI(iq))
-      
-      deallocate(Eigt,EigXt,EigYt,ABM,ABP)
-   endif 
-enddo
+        allocate(B%vec(B%n),B%matX(B%n,B%n),B%matY(B%n,B%n))
+        allocate(ABP(B%n,B%n),ABM(B%n,B%n))
+  
+        ABP = ABPLUS(B%l1:B%l2,B%l1:B%l2)
+        ABM = ABMIN(B%l1:B%l2,B%l1:B%l2)
+        if(NoSt==1) then
+           call ERPASYMM0(B%matY,B%matX,B%vec,ABP,ABM,B%n)
+        elseif(NoSt>1) then
+           call ERPAVECYX(B%matY,B%matX,B%vec,ABP,ABM,B%n)
+        endif
 
-do ip=NOccup+1,NBasis
-   i = limAV(1,ip)
-   j = limAV(2,ip)
-   if(nAV(ip)>0) then
-      allocate(ABP(nAV(ip),nAV(ip)),ABM(nAV(ip),nAV(ip)),&
-           EigYt(nAV(ip),nAV(ip)),EigXt(nAV(ip),nAV(ip)),Eigt(nAV(ip)))
+        deallocate(ABM,ABP)
 
-      ABP = ABPLUS(i:j,i:j)
-      ABM = ABMIN(i:j,i:j)
-      !print*, 'AV-MY',ip,norm2(ABP),norm2(ABM)
-      if(NoSt==1) then
-         call ERPASYMM0(EigYt,EigXt,Eigt,ABP,ABM,nAV(ip))
-      elseif(NoSt>1) then
-         call ERPAVECYX(EigYt,EigXt,Eigt,ABP,ABM,nAV(ip))
-      endif
+      end associate
 
-      do ii=1,nAV(ip)
-         ipos = tmpAV(ii,ip)
-         EigY(ipos,i:j) = EigYt(ii,1:nAV(ip))
-         if(IFlag0==0) EigY1(ipos,i:j) = EigXt(ii,1:nAV(ip))
-      enddo
-      Eig(i:j) = Eigt(1:nAV(ip))
-
-      deallocate(Eigt,EigXt,EigYt,ABM,ABP)
-   
    endif
 enddo
 
-do i=limIV(1),limIV(2)
-   ii = tmpIV(i-limIV(1)+1)
-   ip = IndN(1,ii)
-   iq = IndN(2,ii)
-   ! write(*,*) 'ABiv-my',ip,iq,ABPLUS(i,i)
-   Eig(i) = ABPLUS(i,i)
-enddo
-do ii=1,nIV
-   i = tmpiV(ii)
-   EigY(i,limIV(1)+ii-1) = 1d0/sqrt(2d0)
-   if(IFlag0==0) EigY1(i,limIV(1)+ii-1) = 1d0/sqrt(2d0)
+print*, 'Act-InAct block diagonalized!'
+
+!pack AV
+do ip=NOccup+1,NBasis
+   if(nAV(ip)>0) then
+
+      nblk = nblk + 1
+      associate(B => Eblock(nblk))
+        B%n  = nAV(ip)
+        B%l1 = limAV(1,ip)
+        B%l2 = limAV(2,ip)
+        allocate(B%pos(B%n))
+        B%pos(1:B%n) = tmpAV(1:B%n,ip)
+
+        allocate(B%vec(B%n),B%matX(B%n,B%n),B%matY(B%n,B%n))
+        allocate(ABP(B%n,B%n),ABM(B%n,B%n))
+  
+        ABP = ABPLUS(B%l1:B%l2,B%l1:B%l2)
+        ABM = ABMIN(B%l1:B%l2,B%l1:B%l2)
+        if(NoSt==1) then
+           call ERPASYMM0(B%matY,B%matX,B%vec,ABP,ABM,B%n)
+        elseif(NoSt>1) then
+           call ERPAVECYX(B%matY,B%matX,B%vec,ABP,ABM,B%n)
+        endif
+
+        deallocate(ABM,ABP)
+
+      end associate
+
+    endif
 enddo
 
-deallocate(work1)
+print*, 'Act-Virt  block diagonalized!'
+
+!pack IV
+associate(B => EblockIV)
+
+  B%l1 = limIV(1)
+  B%l2 = limIV(2)
+  B%n  = B%l2-B%l1+1
+  allocate(B%pos(B%n))
+  B%pos(1:B%n) = tmpIV(1:B%n)
+
+  allocate(B%vec(B%n))
+  do i=1,B%n
+     ii = B%l1+i-1
+     B%vec(i) = ABPLUS(ii,ii)
+  enddo
+
+end associate
+
+! OLD DIAG
+!i = limAA(1)
+!j = limAA(2)
+!
+!if(nAA>0) then
+!
+!   allocate(ABP(nAA,nAA),ABM(nAA,nAA),EigYt(nAA,nAA),EigXt(nAA,nAA),Eigt(nAA))
+!
+!   ABP = ABPLUS(i:j,i:j)
+!   ABM = ABMIN(i:j,i:j)
+! 
+!   if(IFunSRKer==1) then
+!      call ModABMin_Act_FOFO(Occ,SRKer,Wt,OrbGrid,ABM,&
+!             MultpC,NSymNO,tmpAA,&
+!             IndN,IndX,NDimX,NGrid,NBasis,&
+!             NOccup,NAct,INActive,nAA,'FOFO','FOFOERF')
+!   endif
+!
+!   !print*, 'ACT-ACT-MY',nAA,norm2(ABP),norm2(ABM)
+!   if(NoSt==1) then
+!      call ERPASYMM0(EigYt,EigXt,Eigt,ABP,ABM,nAA)
+!   elseif(NoSt>1) then
+!      call ERPAVECYX(EigYt,EigXt,Eigt,ABP,ABM,nAA)
+!   endif
+!   
+!   do ii=1,nAA
+!      ipos = tmpAA(ii)
+!      EigY(ipos,i:j) = EigYt(ii,1:nAA)
+!      if(IFlag0==0) EigY1(ipos,i:j) = EigXt(ii,1:nAA)
+!   enddo
+!   Eig(i:j) = Eigt(1:nAA)
+!
+!   deallocate(Eigt,EigXt,EigYt,ABM,ABP)
+!endif
+!
+!do iq=1,INActive
+!   i = limAI(1,iq)
+!   j = limAI(2,iq)
+!
+!   if(nAI(iq)>0) then
+!      allocate(ABP(nAI(iq),nAI(iq)),ABM(nAI(iq),nAI(iq)),&
+!           EigYt(nAI(iq),nAI(iq)),EigXt(nAI(iq),nAI(iq)),Eigt(nAI(iq)))
+!
+!      ABP = ABPLUS(i:j,i:j)
+!      ABM = ABMIN(i:j,i:j)
+!      !print*, 'AI-MY',iq,norm2(ABP),norm2(ABM)
+!      if(NoSt==1) then
+!         call ERPASYMM0(EigYt,EigXt,Eigt,ABP,ABM,nAI(iq))
+!      elseif(NoSt>1) then
+!         call ERPAVECYX(EigYt,EigXt,Eigt,ABP,ABM,nAI(iq))
+!      endif
+!
+!      do ii=1,nAI(iq)
+!         ipos = tmpAI(ii,iq)
+!         EigY(ipos,i:j) = EigYt(ii,1:nAI(iq))
+!         if(IFlag0==0) EigY1(ipos,i:j) = EigXt(ii,1:nAI(iq))
+!      enddo
+!      Eig(i:j) = Eigt(1:nAI(iq))
+!      
+!      deallocate(Eigt,EigXt,EigYt,ABM,ABP)
+!   endif 
+!enddo
+!
+!do ip=NOccup+1,NBasis
+!   i = limAV(1,ip)
+!   j = limAV(2,ip)
+!   if(nAV(ip)>0) then
+!      allocate(ABP(nAV(ip),nAV(ip)),ABM(nAV(ip),nAV(ip)),&
+!           EigYt(nAV(ip),nAV(ip)),EigXt(nAV(ip),nAV(ip)),Eigt(nAV(ip)))
+!
+!      ABP = ABPLUS(i:j,i:j)
+!      ABM = ABMIN(i:j,i:j)
+!      !print*, 'AV-MY',ip,norm2(ABP),norm2(ABM)
+!      if(NoSt==1) then
+!         call ERPASYMM0(EigYt,EigXt,Eigt,ABP,ABM,nAV(ip))
+!      elseif(NoSt>1) then
+!         call ERPAVECYX(EigYt,EigXt,Eigt,ABP,ABM,nAV(ip))
+!      endif
+!
+!      do ii=1,nAV(ip)
+!         ipos = tmpAV(ii,ip)
+!         EigY(ipos,i:j) = EigYt(ii,1:nAV(ip))
+!         if(IFlag0==0) EigY1(ipos,i:j) = EigXt(ii,1:nAV(ip))
+!      enddo
+!      Eig(i:j) = Eigt(1:nAV(ip))
+!
+!      deallocate(Eigt,EigXt,EigYt,ABM,ABP)
+!   
+!   endif
+!enddo
+!
+!do i=limIV(1),limIV(2)
+!   ii = tmpIV(i-limIV(1)+1)
+!   ip = IndN(1,ii)
+!   iq = IndN(2,ii)
+!   ! write(*,*) 'ABiv-my',ip,iq,ABPLUS(i,i)
+!   Eig(i) = ABPLUS(i,i)
+!enddo
+!do ii=1,nIV
+!   i = tmpiV(ii)
+!   EigY(i,limIV(1)+ii-1) = 1d0/sqrt(2d0)
+!   if(IFlag0==0) EigY1(i,limIV(1)+ii-1) = 1d0/sqrt(2d0)
+!enddo
+!
+!deallocate(work1)
 
 !print*, 'Eig-MY',norm2(Eig),norm2(EigY),norm2(EigY1)
 call clock('Y01CAS:DIAG',Tcpu,Twall)
@@ -3766,22 +3922,57 @@ if(IFunSRKer==1) then
 endif
 ! here!!!! can this be made cheaper?
 call clock('START',Tcpu,Twall)
-allocate(work1(NDimX**2))
-! work1=ABPLUS.EigX
-! ABPLUS=work1.EigX
-call dgemm('N','N',NDimX,NDimX,NDimX,1d0,ABPLUS,NDimX,EigY1,NDimX,0d0,work1,NDimX) 
-call dgemm('T','N',NDimX,NDimX,NDimX,1d0,work1,NDimX,EigY1,NDimX,0d0,ABPLUS,NDimX)
 
-! work1=ABMIN.EigY
-! ABMIN=work1.EigY
-call dgemm('N','N',NDimX,NDimX,NDimX,1d0,ABMIN,NDimX,EigY,NDimX,0d0,work1,NDimX) 
-call dgemm('T','N',NDimX,NDimX,NDimX,1d0,work1,NDimX,EigY,NDimX,0d0,ABMIN,NDimX)
+   allocate(workA(NDimX,NDimX))
 
-call clock('Y01CAS:dgemm',Tcpu,Twall)
+   call ABPM_TRAN(ABPLUS,workA,EBlock,EBlockIV,nblk,NDimX,.true.)
+   call clock('MULT-1',Tcpu,Twall)
+   ABPLUS=workA
+   call ABPM_TRAN(ABMIN,workA,EBlock,EBlockIV,nblk,NDimX,.false.)
+   ABMIN=workA
+
+   call clock('MULT-2',Tcpu,Twall)
+
+   deallocate(workA)
+
+! OLD
+!allocate(work1(NDimX**2))
+!! work1=ABPLUS.EigX
+!! ABPLUS=work1.EigX
+!call dgemm('N','N',NDimX,NDimX,NDimX,1d0,ABPLUS,NDimX,EigY1,NDimX,0d0,work1,NDimX) 
+!call dgemm('T','N',NDimX,NDimX,NDimX,1d0,work1,NDimX,EigY1,NDimX,0d0,ABPLUS,NDimX)
+!
+!! work1=ABMIN.EigY
+!! ABMIN=work1.EigY
+!call dgemm('N','N',NDimX,NDimX,NDimX,1d0,ABMIN,NDimX,EigY,NDimX,0d0,work1,NDimX) 
+!call dgemm('T','N',NDimX,NDimX,NDimX,1d0,work1,NDimX,EigY,NDimX,0d0,ABMIN,NDimX)
+
+ ! unpack Eig (1)
+ do iblk=1,nblk
+    associate(B => Eblock(iblk))
+      Eig(B%l1:B%l2) = B%vec(1:B%n)
+    end associate
+ enddo
+ associate(B => EblockIV)
+   do i=1,B%n
+      ii = B%l1+i-1
+      ipos = B%pos(i)
+      Eig(ii) = B%vec(i)
+   enddo
+ end associate
+
+call clock('ABPMTRAN',Tcpu,Twall)
+!call clock('Y01CAS:dgemm',Tcpu,Twall)
 
 if(.not.present(ECorr)) then
 ! this part for E2disp
 ! ------------------------------------------------------------------------------
+
+allocate(EigY1(NDimX,NDimX),Eig1(NDimX))
+
+print*, 'WARNING! ADD UNPACKING EigY at Y01CASLR_FOFO!'
+
+!EigY1 = 0
 do i=1,NDimX
    Eig1(i)=ABPLUS(i,i)+ABMIN(i,i)
 enddo
@@ -3815,6 +4006,7 @@ enddo
  close(iunit)
  endif
 
+ deallocate(Eig1,EigY1)
 ! ------------------------------------------------------------------------------
 
 elseif(present(ECorr)) then
@@ -3826,39 +4018,66 @@ do i=1,NBasis
    C(i) = sign(sqrt(Occ(i)),Occ(i)-0.5d0)
 enddo
 
-do i=1,NDimX
-    EigChck(i) = (Eig(i)/=0d0)
-enddo
+!do i=1,NDimX
+!    EigChck(i) = (Eig(i)/=0d0)
+!enddo
 
+allocate(workA(NDimX,NDimX))
 !print*, 'AB-MY',norm2(ABPLUS),norm2(ABMIN)
-EigY1 = 0
+!EigY1 = 0
 do j=1,NDimX
-!   if(Eig(j)/=0d0) then
-   if(EigChck(j)) then
+   if(Eig(j)/=0d0) then
       do i=1,NDimX
-!         if(Eig(i)/=0d0) then
-          if(EigChck(i)) then
-            val = 2d0*(ABPLUS(i,j)-ABMIN(i,j))/(Eig(i)+Eig(j))
-            call daxpy(NDimX,val,EigY(:,i),1,EigY1(:,j),1)
-!            do ii=1,NDimX
-!               EigY1(ii,j) = EigY1(ii,j) + val*EigY(ii,i)
-!            enddo
-         endif
+         if(Eig(i)/=0d0) workA(i,j) = 2d0*(ABPLUS(i,j)-ABMIN(i,j))/(Eig(i)+Eig(j))
       enddo
    endif
+!   if(EigChck(j)) then
+!      do i=1,NDimX
+!!         if(Eig(i)/=0d0) then
+!          if(EigChck(i)) then
+!            val = 2d0*(ABPLUS(i,j)-ABMIN(i,j))/(Eig(i)+Eig(j))
+!            call daxpy(NDimX,val,EigY(:,i),1,EigY1(:,j),1)
+!!            do ii=1,NDimX
+!!               EigY1(ii,j) = EigY1(ii,j) + val*EigY(ii,i)
+!!            enddo
+!         endif
+!      enddo
+!   endif
 enddo
 
-print*, 'EigY1',norm2(EigY1)
+!print*, 'EigY1',norm2(EigY1)
 
 call clock('Y01CAS:EigY1',Tcpu,Twall)
 call clock('START',Tcpu,Twall)
 
-!print*, 'FIRST',norm2(EigY1)
-! second loop ...
-call dgemm('N','T',NDimX,NDimX,NDimX,1d0,EigY,NDimX,EigY1,NDimX,0d0,ABPLUS,NDimX)
-!print*, 'ABPLUS-MY',norm2(ABPLUS)
+!! old ways
+!call dgemm('N','N',NDimX,NDimX,NDimX,1d0,EigY,NDimX,workA,NDimX,0d0,EigY1,NDimX)
+!call dgemm('N','T',NDimX,NDimX,NDimX,1d0,EigY,NDimX,EigY1,NDimX,0d0,ABPLUS,NDimX)
+!!print*, 'ABPLUS-MY',norm2(ABPLUS)
+!call clock('Y01CAS:dgemm',Tcpu,Twall)
 
-call clock('Y01CAS:dgemm',Tcpu,Twall)
+! new
+call ABPM_BACKTRAN(workA,ABPLUS,EBlock,EBlockIV,nblk,NDimX)
+
+deallocate(workA)
+
+! deallocate blocks
+do iblk=1,nblk
+   associate(B => Eblock(iblk))
+
+     deallocate(B%matY,B%matX,B%vec)
+     deallocate(B%pos)
+
+   end associate
+enddo
+! (IV part)
+associate(B => EblockIV)
+
+  deallocate(B%vec)
+  deallocate(B%pos)
+
+end associate
+
 call clock('START',Tcpu,Twall)
 
 pos = 0
@@ -3940,10 +4159,8 @@ endif
 !
 !write(LOUT,*) 'WMAT-my', 2d0*norm2(WMAT)
 
-
 deallocate(RDM2val)
 deallocate(ints,work2,work1)
-deallocate(Eig1,EigY1)
 deallocate(Eig,EigY)
 
 call clock('Y01CASLR:ENE',Tcpu,Twall)
@@ -4368,19 +4585,20 @@ end subroutine ModABMinSym
 
 subroutine ACEInteg_FOFO(ECorr,URe,Occ,XOne,UNOAO,&
       ABPLUS,ABMIN,EigVecR,Eig,&
-      EGOne,NGOcc,&
+      EGOne,NGOcc,CICoef,&
       NBasis,NInte1,NDim,NGem,IndAux,ACAlpha,&
-      IGemIN,NAct,INActive,IndN,IndX,NDimX,&
+      IGemIN,NAct,INActive,NELE,IndN,IndX,NDimX,&
       NoSt,ICASSCF,IFlFrag1,IFunSR,IFunSRKer)
 !
 !  A ROUTINE FOR COMPUTING AC INTEGRAND
 !
 implicit none
 integer,intent(in) :: NGOcc,NBasis,NInte1,NDim,NGem,NDimX
-integer,intent(in) :: NAct,INActive,NoSt,ICASSCF,IFlFrag1,IFunSR,IFunSRKer 
+integer,intent(in) :: NAct,INActive,NELE,NoSt,ICASSCF,IFlFrag1,IFunSR,IFunSRKer
 integer,intent(in) :: IndN(2,NDim),IndX(NDim),IndAux(NBasis),&
                       IGemIN(NBasis)
 double precision,intent(in) :: ACAlpha
+double precision,intent(in) :: CICoef(NBasis)
 double precision,intent(in) :: URe(NBasis,NBasis),Occ(NBasis),&
                                UNOAO(NBasis,NBasis),XONe(NInte1) 
 double precision,intent(out) :: ABPLUS(NDim,NDim),ABMIN(NDim,NDim),&
@@ -4393,7 +4611,7 @@ integer :: i,j,k,l,kl,ip,iq,ir,is,ipq,irs
 integer :: pos(NBasis,NBasis)
 double precision :: ECASSCF,XKer
 character(:),allocatable :: twojfile,twokfile
-  
+
  NOccup = NAct + INActive
 
  if(IFunSR.Ne.0.And.IFunSRKer.Eq.1) then
@@ -4420,8 +4638,10 @@ character(:),allocatable :: twojfile,twokfile
 
  elseif(ICASSCF==0) then
 
-    write(LOUT,'(1x,a)') 'ERROR! ACABMAT0 NOT AVAILABLE FOR FOFO!'
-    stop
+    call ACABMAT0_FOFO(ABPLUS,ABMIN,URe,Occ,XOne, &
+                  IndN,IndX,IGemIN,CICoef, &
+                  NAct,NELE,NBasis,NDim,NDimX,NInte1,NGem, &
+                 'TWOMO','FFOO','FOFO',0,ACAlpha,1)
 
  endif
 
@@ -4479,9 +4699,14 @@ character(:),allocatable :: twojfile,twokfile
     call ERPAVEC(EigVecR,Eig,ABPLUS,ABMIN,NBasis,NDimX)
  endif
 
- call ACEneERPA_FOFO(ECorr,EigVecR,Eig,Occ, &
-                     IGemIN,IndN,IndX,INActive+NAct, &
-                     NDimX,NBasis,twokfile)
+ if(ICASSCF==1) then
+    call ACEneERPA_FOFO(ECorr,EigVecR,Eig,Occ, &
+                        IGemIN,IndN,IndX,INActive+NAct, &
+                        NDimX,NBasis,twokfile)
+ else
+    call EneERPA_FOFO(ECorr,EigVecR,Eig,Occ,CICoef, &
+                      IGemIN,IndN,NDimX,NELE+NAct,NBasis,'FOFO')
+ endif
 
 end subroutine ACEInteg_FOFO
 
@@ -4609,6 +4834,367 @@ deallocate(Skipped)
 deallocate(ints,work)
 
 end subroutine ACEneERPA_FOFO
+
+subroutine EERPA_FOFO(ECorr,EVec,EVal,Occ,CICoef,IGem,   &
+                      IAuxGem,IG1,IG2,IG3,IG4,IB, &
+                      IndN,NOccup,NDimX,NBasis,IntKFile,IFrag)
+implicit none
+
+integer,intent(in) :: NDimX,NBasis
+integer,intent(in) :: IG1,IG2,IG3,IG4,IB 
+integer,intent(in) :: IGem(NBasis),IAuxGem(NBasis),IndN(2,NDimX)
+integer,intent(in) :: NOccup,IFrag
+character(*),intent(in) :: IntKFile
+double precision,intent(out) :: ECorr
+double precision,intent(in) :: Occ(NBasis),CICoef(NBasis)
+double precision,intent(in) :: EVec(NDimX,NDimX),EVal(NDimX)
+
+integer :: i,j,k,l,kl,kk,ip,iq,ir,is,ipq,irs
+integer :: iunit,ISkippedEig
+integer :: pos(NBasis,NBasis)
+integer :: OccProd(NBasis,NBasis),AuxIG(NBasis)
+integer :: IFlPQRS,IFlP,IFlQ,IFlR,IFlS
+integer :: NoVirtP,NoVirtQ,NoVirtR,NoVirtS,NoVirt
+integer :: IBdy,IBdyG,ICond
+double precision :: Cpq,Crs,SumY,Aux
+double precision,allocatable :: work(:),ints(:,:),Skipped(:)
+double precision,parameter :: SmallE = 1.d-3,BigE = 1.d8
+integer :: itmp
+
+!do i=1,NBasis
+!   CICoef(i) = sign(sqrt(Occ(i)),Occ(i)-0.5d0)
+!enddo
+
+pos = 0
+do i=1,NDimX
+   pos(IndN(1,i),IndN(2,i)) = i
+enddo
+
+OccProd = 0
+do j=1,NBasis
+   do i=1,NBasis
+      if(Occ(i)*Occ(j)/=0d0) OccProd(i,j) = 1
+   enddo
+enddo
+
+AuxIG = 0
+do i=1,NBasis
+   if(IGem(i)==IG1.or.IGem(i)==IG2.or.IGem(i)==IG3.or.IGem(i)==IG4) AuxIG(i) = 1
+enddo
+
+
+allocate(work(NBasis**2),ints(NBasis,NBasis),Skipped(NDimX))
+
+ISkippedEig = 0
+ECorr = 0
+
+open(newunit=iunit,file=trim(IntKFile),status='OLD', &
+     access='DIRECT',recl=8*NBasis*NOccup)
+
+kl = 0
+itmp = 0
+do k=1,NOccup
+   do l=1,NBasis
+      kl = kl + 1
+      if(pos(l,k)/=0) then
+        irs = pos(l,k)
+        ir = l
+        is = k
+        read(iunit,rec=kl) work(1:NBasis*NOccup)
+        do j=1,NOccup
+           do i=1,NBasis
+              ints(i,j) = work((j-1)*NBasis+i)
+           enddo
+        enddo
+        ints(:,NOccup+1:NBasis) = 0
+
+        do j=1,NBasis
+           do i=1,j
+              if(pos(j,i)/=0) then
+                ipq = pos(j,i)
+                ip = j
+                iq = i
+                Crs = CICoef(l)+CICoef(k)
+                Cpq = CICoef(j)+CICoef(i)
+
+                NoVirt  = 0
+                IFlPQRS = 0
+                if(OccProd(ir,is)*OccProd(ip,iq)/=0) NoVirt = 1
+                if(AuxIG(ir)*AuxIG(is)*AuxIG(ip)*AuxIG(iq)/=0) IFlPQRS = 1
+
+                call IBody(IBdy,IGem(ip),IGem(iq),IGem(ir),IGem(is))
+
+                ICond = 0
+                if(IFlPQRS==1) then
+
+                   if((IBdy.eq.IB)) ICond = 1
+
+                   ! FOR GVB ONLY
+                   if((IB.gt.2.and.NoVirt.Eq.1.and. &
+                       IBdy.eq.IB-1)) ICond = 1
+
+                   ! FOR GVB ONLY: IF IFrag=1,IB=2 (ONE-BODY), ALLOW ALL CASES 
+                   ! EXCEPT WHEN ALL ORBITALS ARE FROM THE SAME GEMINAL
+                   if(IFrag.Eq.1.and.IB.Eq.2) then
+                      call IBody(IBdyG,IAuxGem(ip),IAuxGem(iq),IAuxGem(ir),IAuxGem(is))
+                      If(IBdyG.Ne.1) ICond = 1
+                   endif
+
+                endif !IFlPQRS
+
+                if(ICond.Eq.1) then
+
+                   ISkippedEig = 0
+                   SumY = 0
+                   do kk=1,NDimX
+                      if(EVal(kk).gt.SmallE.and.EVal(kk).lt.BigE) then
+                         SumY = SumY + EVec(ipq,kk)*EVec(irs,kk)
+                      else
+                         ISkippedEig = ISkippedEig + 1
+                         Skipped(ISkippedEig) = EVal(kk)
+                      endif
+                   enddo
+
+                   Aux = Crs*Cpq*SumY
+ 
+                   if(iq.Eq.is.and.ip.Eq.ir) then
+                      Aux = Aux - 0.5d0*(Occ(ip)*(1d0-Occ(is))+Occ(is)*(1d0-Occ(ip)))
+                   endif  
+
+                   ECorr = ECorr + Aux*ints(j,i)
+
+                endif ! ICond
+
+              endif
+           enddo
+        enddo
+
+      endif
+
+   enddo
+enddo
+
+close(iunit)
+
+if(ISkippedEig/=0) then
+  write(LOUT,'(/,1x,"The number of discarded eigenvalues is",i4)') &
+       ISkippedEig
+  do i=1,ISkippedEig
+     write(LOUT,'(1x,a,i4,f15.8)') 'Skipped',i,Skipped(i)
+  enddo
+endif
+
+deallocate(Skipped)
+deallocate(ints,work)
+
+end subroutine EERPA_FOFO
+
+!subroutine EneERPA_FOFO(ETot,ECorr,ENuc,EVec,EVal,Occ,CICoef,IGem,   &
+!                        IndN,NDimX,NOccup,NBasis,IntKFile)
+subroutine EneERPA_FOFO(ECorr,EVec,EVal,Occ,CICoef,IGem,   &
+                        IndN,NDimX,NOccup,NBasis,IntKFile)
+implicit none
+
+integer,intent(in) :: NDimX,NOccup,NBasis
+integer,intent(in) :: IGem(NBasis),IndN(2,NDimX)
+character(*),intent(in) :: IntKFile
+double precision,intent(inout) :: ECorr
+double precision,intent(in) :: CICoef(NBasis),Occ(NBasis)
+double precision,intent(in) :: EVec(NDimX,NDimX),EVal(NDimX)
+
+integer :: i,j,k,l,kl,kk,ip,iq,ir,is,ipq,irs
+integer :: iunit,ISkippedEig
+integer :: pos(NBasis,NBasis)
+double precision :: Cpq,Crs,SumY,Aux,EIntra
+double precision,allocatable :: work(:),ints(:,:),Skipped(:)
+double precision,parameter :: SmallE = 1.d-3,BigE = 1.d8
+integer :: itmp
+
+pos = 0
+do i=1,NDimX
+   pos(IndN(1,i),IndN(2,i)) = i
+enddo
+
+allocate(work(NBasis**2),ints(NBasis,NBasis),Skipped(NDimX))
+
+ISkippedEig = 0
+EIntra = 0
+ECorr  = 0
+
+open(newunit=iunit,file=trim(IntKFile),status='OLD', &
+     access='DIRECT',recl=8*NBasis*NOccup)
+
+kl = 0
+do k=1,NOccup
+   do l=1,NBasis
+      kl = kl + 1
+      if(pos(l,k)/=0) then
+        irs = pos(l,k)
+        ir = l
+        is = k
+        read(iunit,rec=kl) work(1:NBasis*NOccup)
+        do j=1,NOccup
+           do i=1,NBasis
+              ints(i,j) = work((j-1)*NBasis+i)
+           enddo
+        enddo
+        ints(:,NOccup+1:NBasis) = 0
+
+        do j=1,NBasis
+           do i=1,j
+              if(pos(j,i)/=0) then
+                ipq = pos(j,i)
+                ip = j
+                iq = i
+                Crs = CICoef(l)+CICoef(k)
+                Cpq = CICoef(j)+CICoef(i)
+
+                ISkippedEig = 0
+                SumY = 0
+                do kk=1,NDimX
+                   if(EVal(kk).gt.SmallE.and.EVal(kk).lt.BigE) then
+                      SumY = SumY + EVec(ipq,kk)*EVec(irs,kk)
+                   else
+                      ISkippedEig = ISkippedEig + 1
+                      Skipped(ISkippedEig) = EVal(kk)
+                   endif
+                enddo
+
+                Aux = 2d0*Crs*Cpq*SumY
+ 
+                if(iq.Eq.is.and.ip.Eq.ir) then
+                   Aux = Aux - Occ(ip)*(1d0-Occ(is))-Occ(is)*(1d0-Occ(ip))
+                endif
+
+                ECorr = ECorr + Aux*ints(j,i)
+
+                if(IGem(ip).eq.IGem(iq).and.IGem(ir).eq.IGem(is).and.IGem(ip).eq.IGem(ir)) then
+                   EIntra = EIntra + Aux*ints(j,i)
+                endif
+
+              endif
+           enddo
+        enddo
+
+      endif
+
+   enddo
+enddo
+
+close(iunit)
+
+if(ISkippedEig/=0) then
+  write(LOUT,'(/,1x,"The number of discarded eigenvalues is",i4)') &
+       ISkippedEig
+  do i=1,ISkippedEig
+     write(LOUT,'(1x,a,i4,f15.8)') 'Skipped',i,Skipped(i)
+  enddo
+endif
+
+ECorr = ECorr-EIntra
+!ECorr = 0.5d0*(ECorr-EIntra)
+!write(lout,'(1x,a,3f15.8)') 'EGVB+ENuc, Corr, ERPA-GVB',ETot+ENuc,ECorr,ETot+ENuc+ECorr
+
+deallocate(Skipped)
+deallocate(ints,work)
+
+end subroutine EneERPA_FOFO
+
+subroutine EneGVB_FOFO(NAct,NElHlf,ETot,URe,Occ,C,XOne, &
+                       IGem,IndN,NBasis,NInte1,IntKFile,NDimX,NGem)
+implicit none
+
+integer,intent(in) :: NAct,NElHlf,NBasis,NInte1,NDimX,NGem
+character(*) :: IntKFile
+double precision :: ETot
+
+integer :: IndN(2,NDimX),IGem(NBasis)
+double precision :: URe(NBasis,NBasis),Occ(NBasis),C(NBasis)
+double precision :: XOne(NInte1)
+
+integer :: i,j,ii,ij,ia,ib,iab
+integer :: k,l,kl,kk,ll,klround
+integer :: iunit
+integer :: INActive,NOccup
+integer,external :: NAddr3
+double precision :: FacIJ,FacIK
+double precision :: EOne, EIntraGem, EInterCoul, EInterExch
+
+double precision :: HNO(NBasis,NBasis)
+double precision,allocatable :: work1(:),work2(:)
+double precision,allocatable :: ints(:,:)
+
+write(lout,'(/A)') ' Electronic GVB energy check:'
+
+! set dimensions
+INActive = NElHlf - NAct
+NOccup = 2*NAct + INActive
+
+allocate(work1(NBasis**2),work2(NBasis**2),ints(NBasis,NBasis))
+
+call triang_to_sq(XOne,work1,NBasis)
+call dgemm('N','N',NBasis,NBasis,NBasis,1d0,URe,NBasis,work1,NBasis,0d0,work2,NBasis)
+call dgemm('N','T',NBasis,NBasis,NBasis,1d0,work2,NBasis,URe,NBasis,0d0,HNO,NBasis)
+call sq_symmetrize(HNO,NBasis)
+
+EOne = 0d0
+EIntraGem  = 0d0
+EInterCoul = 0d0
+EInterExch = 0d0
+
+do i=1,NBasis
+   EOne = EOne + 2d0*Occ(i)*HNO(i,i)
+enddo
+
+open(newunit=iunit,file=trim(IntKFile),status='OLD', &
+     access='DIRECT',recl=8*NBasis*NOccup)
+
+kl = 0
+do k=1,NOccup
+   do l=1,NBasis
+      kl = kl + 1
+      if(l>NOccup) cycle
+
+      read(iunit,rec=kl) work1(1:NBasis*NOccup)
+      do j=1,NOccup
+         do i=1,NBasis
+            ints(i,j) = work1((j-1)*NBasis+i)
+         enddo
+      enddo
+      ints(:,NOccup+1:NBasis) = 0
+
+      if(IGem(k)==IGem(l)) then
+         EIntraGem = EIntraGem + C(k)*C(l)*ints(k,l)
+      else
+         EInterExch = EInterExch - Occ(k)*Occ(l)*ints(k,l)
+      endif
+
+      FacIK = 4d0
+      if(k==l) then
+         do i=k,NOccup
+            if(IGem(i)/=IGem(k)) then
+            if(i==k) FacIK = 2d0
+            EInterCoul = EInterCoul + FacIK*Occ(i)*Occ(k)*ints(i,i)
+            endif
+         enddo
+     endif
+
+   enddo
+enddo
+
+close(iunit)
+
+write(LOUT,'(" One-electron energy",24X,F17.8)') EOne
+write(LOUT,'(" GVB intra-gem electron interaction",9X,F17.8)') EIntraGem
+write(LOUT,'(" GVB inter-gem Coulomb interaction",10X,F17.8)')  EInterCoul
+write(LOUT,'(" GVB inter-gem exchange interaction",9X,F17.8)') EInterExch
+write(LOUT,'(" Total GVB",33X,F18.8)') EOne+EIntraGem+EInterCoul+EInterExch
+
+ETot = EOne + EIntraGem + EInterCoul + EInterExch
+
+deallocate(ints,work2,work1)
+
+end subroutine EneGVB_FOFO
 
 subroutine dump_Eblock(Eblock,EblockIV,Occ,IndN,nblk,NBasis,NDimX,xy0file)
 implicit none
@@ -4840,7 +5426,7 @@ double precision :: GammaS(100,NInte1),XCAS(NBasis,NInte1),YCAS(NBasis,NInte1),E
 double precision :: OvMax,OvXMax,OvYMax,SumERY,SumCAY,SumERX,SumCAX,YER,XER,YCA,XCA,SOvY,SOvX,TDIP2,EigOv
 double precision,allocatable :: ABPLUS(:,:),ABMIN(:,:)
 !
-type(EblockData),allocatable :: Eblock(:) 
+type(EblockData),allocatable :: Eblock(:)
 type(EblockData) :: EblockIV
 !!
 double precision,parameter :: Thresh = 1.D-12
@@ -4848,7 +5434,7 @@ double precision :: tmpEn
 !! test timings
 double precision :: Tcpu,Twall
 
-! timing 
+! timing
 call clock('START',Tcpu,Twall)
 
 IStERPA=0
@@ -5035,7 +5621,7 @@ do is=1,INActive
       ip = IndN(1,i)
       iq = IndN(2,i)
       ipos = ipos + 1
-      pos(ip,iq) = ipos      
+      pos(ip,iq) = ipos
    enddo
    limAI(2,is) = ipos
 enddo
@@ -5048,7 +5634,7 @@ do ir=NOccup+1,NBasis
       ip = IndN(1,i)
       iq = IndN(2,i)
       ipos = ipos + 1
-      pos(ip,iq) = ipos      
+      pos(ip,iq) = ipos
    enddo
    limAV(2,ir) = ipos
 enddo
@@ -5111,7 +5697,7 @@ do ll=1,NOccup
                enddo
             endif
          endif
-         
+
          if(IGem(l)==2) then
             if(IGem(k)==1) then
                do i=1,INActive
@@ -5126,8 +5712,8 @@ do ll=1,NOccup
       endif
 
       ! AUXILIARY MATRIX AuxI AND AuxIO
-      
-      ! exchange 
+
+      ! exchange
       if(l<=INActive) then
          do i=1,NBasis
             AuxIO(i,k) = AuxIO(i,k) - AuxCoeff(IGem(i),IGem(i),IGem(k),IGem(l))*Occ(l)*ints(i,l)
@@ -5163,21 +5749,21 @@ do ll=1,NOccup
          is = l
          irs = pos(ir,is)
          if(irs>0) then
-            
+
             do iq=1,NOccup
                do ip=INActive+1,NBasis
                   ipq = pos(ip,iq)
                   if(ipq>0) then
 
                      AuxVal = AuxCoeff(IGem(ip),IGem(iq),IGem(ir),IGem(is))
-                     
+
                      val = 0
                      if(AuxInd(IGem(ip),IGem(ir))==1) val = val + Occ(ip)*Occ(ir)
                      if(AuxInd(IGem(iq),IGem(is))==1) val = val + Occ(iq)*Occ(is)
                      if(AuxInd(IGem(iq),IGem(ir))==1) val = val - Occ(iq)*Occ(ir)
                      if(AuxInd(IGem(ip),IGem(is))==1) val = val - Occ(ip)*Occ(is)
                      val = 2*AuxVal*val*ints(ip,iq)
-                  
+
                      ABPLUS(ipq,irs) = ABPLUS(ipq,irs) + val
                      ABMIN(ipq,irs) = ABMIN(ipq,irs) + val
 
@@ -5187,10 +5773,10 @@ do ll=1,NOccup
                      if(AuxInd(IGem(ip),IGem(ir))==1) val = val - Occ(ip)*Occ(ir)
                      if(AuxInd(IGem(iq),IGem(is))==1) val = val - Occ(iq)*Occ(is)
                      val = 2*AuxVal*val*ints(ip,iq)
-                     
+
                      ABPLUS(ipq,irs) = ABPLUS(ipq,irs) + val
                      ABMIN(ipq,irs) = ABMIN(ipq,irs) - val
-                     
+
                   endif
                enddo
             enddo
@@ -5206,23 +5792,23 @@ do ll=1,NOccup
 
             do ir=INActive+1,NBasis
                irs = pos(ir,is)
-               if(irs>0) then                  
+               if(irs>0) then
                   do iq=1,NOccup
                      ipq = pos(ip,iq)
                      if(ipq>0) then
-                        
+
                         AuxVal = AuxCoeff(IGem(ip),IGem(iq),IGem(ir),IGem(is))
-                        
+
                         val = 0
                         if(AuxInd(IGem(iq),IGem(ir))==1) val = val + Occ(iq)*Occ(ir)
                         if(AuxInd(IGem(ip),IGem(is))==1) val = val + Occ(ip)*Occ(is)
                         if(AuxInd(IGem(ip),IGem(ir))==1) val = val - Occ(ip)*Occ(ir)
                         if(AuxInd(IGem(iq),IGem(is))==1) val = val - Occ(iq)*Occ(is)
                         val = - AuxVal*val*ints(ir,iq)
-                        
+
                         ABPLUS(ipq,irs) = ABPLUS(ipq,irs) + val
                         ABMIN(ipq,irs) = ABMIN(ipq,irs) - val
-                        
+
                      endif
                   enddo
                endif
@@ -5234,32 +5820,32 @@ do ll=1,NOccup
       if((k>INActive).and.(l<=NOccup)) then
          ip = k
          is = l
-         
+
          do ir=INActive+1,NOccup
             irs = pos(ir,is)
             if(irs>0) then
                do iq=INActive+1,NOccup
                   ipq = pos(ip,iq)
                   if(ipq>0) then
-                     
+
                      val = AuxCoeff(IGem(ip),IGem(is),2,2)* &
                           sum(RDM2val(INActive+1:NOccup,INActive+1:NOccup,iq,ir)*ints(INActive+1:NOccup,INActive+1:NOccup))
-                     
+
                      ABPLUS(ipq,irs) = ABPLUS(ipq,irs) + val
                      ABMIN(ipq,irs) = ABMIN(ipq,irs) - val
-                     
+
                   endif
                enddo
             endif
          enddo
-         
+
       endif
 
       ! T3
       if((l<=NOccup).and.(k>INActive)) then
          iq = l
          ir = k
-         
+
          do is=INActive+1,NOccup
             irs = pos(ir,is)
             if(irs>0) then
@@ -5268,15 +5854,15 @@ do ll=1,NOccup
                   if(ipq>0) then
                      val = AuxCoeff(IGem(iq),IGem(ir),2,2)* &
                           sum(RDM2val(INActive+1:NOccup,INActive+1:NOccup,ip,is)*ints(INActive+1:NOccup,INActive+1:NOccup))
-                     
+
                      ABPLUS(ipq,irs) = ABPLUS(ipq,irs) + val
                      ABMIN(ipq,irs) = ABMIN(ipq,irs) - val
-                     
+
                   endif
                enddo
             endif
          enddo
-         
+
       endif
 
       ! T4+T6: AuxInd = 2
@@ -5294,10 +5880,10 @@ do ll=1,NOccup
                      if(ipq>0) then
                         val = AuxCoeff(IGem(ip),IGem(ir),IGem(iu),2)* &
                              sum(RDM2val(INActive+1:NOccup,iq,is,iu)*ints(ip,INActive+1:NOccup))
-                        
+
                         ABPLUS(ipq,irs) = ABPLUS(ipq,irs) + val
                         ABMIN(ipq,irs) = ABMIN(ipq,irs) + val
-                           
+
                      endif
                   enddo
                enddo
@@ -5313,16 +5899,16 @@ do ll=1,NOccup
                      if(ipq>0) then
                         val = AuxCoeff(IGem(iq),IGem(ir),IGem(iu),2)* &
                              sum(RDM2val(INActive+1:NOccup,ip,is,iu)*ints(INActive+1:NOccup,iq))
-                        
+
                         ABPLUS(ipq,irs) = ABPLUS(ipq,irs) + val
                         ABMIN(ipq,irs) = ABMIN(ipq,irs) - val
-                        
+
                      endif
                   enddo
                enddo
             endif
          enddo
-         
+
          ! T6
          do is=INActive+1,NOccup
             irs = pos(ir,is)
@@ -5330,13 +5916,13 @@ do ll=1,NOccup
                do iq=1,NOccup
                   do ip=INActive+1,NOccup
                      ipq = pos(ip,iq)
-                     if(ipq>0) then                        
+                     if(ipq>0) then
                         val = - AuxCoeff(IGem(iq),IGem(ir),IGem(iu),2)* &
                              sum(RDM2val(INActive+1:NOccup,ip,iu,is)*ints(INActive+1:NOccup,iq))
-                        
+
                         ABPLUS(ipq,irs) = ABPLUS(ipq,irs) + val
                         ABMIN(ipq,irs) = ABMIN(ipq,irs) + val
-                        
+
                      endif
                   enddo
                enddo
@@ -5349,19 +5935,19 @@ do ll=1,NOccup
                do iq=INActive+1,NOccup
                   do ip=INActive+1,NBasis
                      ipq = pos(ip,iq)
-                     if(ipq>0) then  
+                     if(ipq>0) then
                         val = - AuxCoeff(IGem(ip),IGem(ir),IGem(iu),2)* &
                              sum(RDM2val(INActive+1:NOccup,iq,iu,is)*ints(ip,INActive+1:NOccup))
-                        
+
                         ABPLUS(ipq,irs) = ABPLUS(ipq,irs) + val
                         ABMIN(ipq,irs) = ABMIN(ipq,irs) - val
-                        
+
                      endif
                   enddo
                enddo
             endif
          enddo
-         
+
       endif
 
    enddo
@@ -5383,13 +5969,13 @@ do ll=1,NOccup
             ints(i,j) = work1((j-1)*NBasis+i)
          enddo
       enddo
-      
+
       k = kk
       l = ll
 
       if(k>NOccup.or.l>NOccup) cycle
 
-      if(present(ETot)) then  
+      if(present(ETot)) then
       ! COMPUTE THE ENERGY FOR CHECKING
       if((k<=NOccup).and.(l<=NOccup)) ETot = ETot + sum(RDM2val(:,:,k,l)*ints(1:NOccup,1:NOccup))
       endif
@@ -5399,7 +5985,7 @@ do ll=1,NOccup
       ! Coulomb
       if(k==l.and.k<=NOccup) then
          val = 2*Occ(k)
-         if(k>INActive) then 
+         if(k>INActive) then
             do j=1,INActive
                do i=1,INActive
                   HNO(i,j) = HNO(i,j) + val*ints(i,j)
@@ -5418,7 +6004,7 @@ do ll=1,NOccup
                HNO(i,j) = HNO(i,j) + val*ints(i,j)
             enddo
          enddo
-         
+
       endif
 
       ! AUXILIARY MATRIX AuxI AND AuxIO
@@ -5445,68 +6031,68 @@ do ll=1,NOccup
 
       ! CONSTRUCT TWO-ELECTRON PART OF THE AC ALPHA-HAMILTONIAN
       ! T1+T2+T3+T4+T5+T6: AuxInd = 1
-      
+
       ! exchange
       if(l<=NOccup) then
          if(k<=NOccup) then
             iq = k
             is = l
-            
+
             do ir=INActive+1,NBasis
                irs = pos(ir,is)
                if(irs>0) then
                   do ip=INActive+1,NBasis
                      ipq = pos(ip,iq)
                      if(ipq>0) then
-                        
+
                         AuxVal = AuxCoeff(IGem(ip),IGem(iq),IGem(ir),IGem(is))
-                        
+
                         val = 0
                         if(AuxInd(IGem(ip),IGem(ir))==1) val = val + Occ(ip)*Occ(ir)
                         if(AuxInd(IGem(iq),IGem(is))==1) val = val + Occ(iq)*Occ(is)
                         if(AuxInd(IGem(iq),IGem(ir))==1) val = val - Occ(iq)*Occ(ir)
                         if(AuxInd(IGem(ip),IGem(is))==1) val = val - Occ(ip)*Occ(is)
                         val = - AuxVal*val*ints(ip,ir)
-                        
+
                         ABPLUS(ipq,irs) = ABPLUS(ipq,irs) + val
                         ABMIN(ipq,irs) = ABMIN(ipq,irs) + val
-                        
+
                      endif
                   enddo
                endif
             enddo
-               
+
          endif
       endif
 
-      ! T1 
+      ! T1
       if((k<=NOccup).and.(l<=NOccup)) then
          iq = k
          is = l
-         
+
          do ir=INActive+1,NOccup
             irs = pos(ir,is)
             if(irs>0) then
                do ip=INActive+1,NOccup
                   ipq = pos(ip,iq)
                   if(ipq>0) then
-                     
+
                      val = AuxCoeff(IGem(iq),IGem(is),2,2)* &
                           sum(RDM2val(INActive+1:NOccup,INActive+1:NOccup,ip,ir)*ints(INActive+1:NOccup,INActive+1:NOccup))
-                     
+
                      ABPLUS(ipq,irs) = ABPLUS(ipq,irs) + val
                      ABMIN(ipq,irs) = ABMIN(ipq,irs) + val
-                     
+
                   endif
                enddo
             endif
          enddo
-            
+
       endif
 
       ! T3
       if(IGem(k)==2.and.IGem(l)==2) then
-         
+
          do is=INActive+1,NOccup
             do ir=INActive+1,NBasis
                irs = pos(ir,is)
@@ -5515,13 +6101,13 @@ do ll=1,NOccup
                      do ip=INActive+1,NBasis
                         ipq = pos(ip,iq)
                         if(ipq>0) then
-                           
+
                            val = AuxCoeff(IGem(ip),IGem(ir),2,2)* &
                                 RDM2val(iq,is,k,l)*ints(ip,ir)
-                           
+
                            ABPLUS(ipq,irs) = ABPLUS(ipq,irs) + val
                            ABMIN(ipq,irs) = ABMIN(ipq,irs) + val
-                           
+
                         endif
                      enddo
                   enddo
@@ -5534,7 +6120,7 @@ do ll=1,NOccup
       if((k<=NOccup).and.(l>INActive.and.l<=NOccup)) then
          is = k
          iu = l
-         
+
          ! T2
          do ir=INActive+1,NOccup
             irs = pos(ir,is)
@@ -5545,10 +6131,10 @@ do ll=1,NOccup
                      if(ipq>0) then
                         val = AuxCoeff(IGem(iq),IGem(is),IGem(iu),2)* &
                              sum(RDM2val(INActive+1:NOccup,ip,ir,iu)*ints(INActive+1:NOccup,iq))
-                        
+
                         ABPLUS(ipq,irs) = ABPLUS(ipq,irs) + val
                         ABMIN(ipq,irs) = ABMIN(ipq,irs) + val
-                        
+
                      endif
                   enddo
                enddo
@@ -5564,10 +6150,10 @@ do ll=1,NOccup
                      if(ipq>0) then
                         val = AuxCoeff(IGem(ip),IGem(is),IGem(iu),2)* &
                              sum(RDM2val(INActive+1:NOccup,iq,ir,iu)*ints(INActive+1:NOccup,ip))
-                        
+
                         ABPLUS(ipq,irs) = ABPLUS(ipq,irs) + val
                         ABMIN(ipq,irs) = ABMIN(ipq,irs) - val
-                        
+
                      endif
                   enddo
                enddo
@@ -5584,10 +6170,10 @@ do ll=1,NOccup
                      if(ipq>0) then
                         val = - AuxCoeff(IGem(ip),IGem(is),IGem(iu),2)* &
                              sum(RDM2val(INActive+1:NOccup,iq,iu,ir)*ints(INActive+1:NOccup,ip))
-                        
+
                         ABPLUS(ipq,irs) = ABPLUS(ipq,irs) + val
                         ABMIN(ipq,irs) = ABMIN(ipq,irs) + val
-                        
+
                      endif
                   enddo
                enddo
@@ -5603,16 +6189,16 @@ do ll=1,NOccup
                      if(ipq>0) then
                         val = - AuxCoeff(IGem(iq),IGem(is),IGem(iu),2)* &
                              sum(RDM2val(INActive+1:NOccup,ip,iu,ir)*ints(INActive+1:NOccup,iq))
-                        
+
                         ABPLUS(ipq,irs) = ABPLUS(ipq,irs) + val
                         ABMIN(ipq,irs) = ABMIN(ipq,irs) - val
-                        
+
                      endif
                   enddo
                enddo
             endif
          enddo
-         
+
       endif
 
    enddo
@@ -5629,7 +6215,7 @@ do ICol=1,NDimX
    ir = IndN(1,ICol)
    is = IndN(2,ICol)
    irs = pos(ir,is)
-      
+
       do IRow=1,NDimX
          ip = IndN(1,IRow)
          iq = IndN(2,IRow)
@@ -5689,7 +6275,7 @@ do ICol=1,NDimX
          if(val/=0d0) ABPLUS(ipq,irs) = ABPLUS(ipq,irs)/val
          val = (C(ip) - C(iq))*(C(ir) - C(is))
          if(val/=0d0) ABMIN(ipq,irs)  = ABMIN(ipq,irs)/val
-         
+
       enddo
 enddo
 
@@ -5721,7 +6307,7 @@ if(nAA>0) then
      elseif(NoSt>1) then
         call ERPAVECYX(B%matY,B%matX,B%vec,ABP,ABM,B%n)
      endif
-   
+
      deallocate(ABM,ABP)
    end associate
 
@@ -5760,7 +6346,7 @@ if(nAA > 0) then
    do i=1,nAA
       Write(6,'(X,I4,E15.6)') i,eig(i)
       do iq=1,nAA
-         if(abs(eigy(iq,i))+abs(eigx(iq,i)).gt.1.d-7) Write(6,'(X,"Y_ERPA, X_ERPA",2I3,2E15.6)') & 
+         if(abs(eigy(iq,i))+abs(eigx(iq,i)).gt.1.d-7) Write(6,'(X,"Y_ERPA, X_ERPA",2I3,2E15.6)') &
          IndN(1,iaddr(iq)),IndN(2,iaddr(iq)),eigy(iq,i),eigx(iq,i)
       enddo
    enddo
@@ -5828,7 +6414,7 @@ If(IH0St.Ne.NoSt) Then
       NUMx=NU
       EndIf
 
-      EndDo 
+      EndDo
 
       If((OvMax.Ge.0.5).Or. &
        ( (OvMax.Lt.0.5).And.(OvXMax.Gt.0.5.Or.OvYMax.Gt.0.5) )) Then
@@ -5884,7 +6470,7 @@ do iq=1,INActive
 
         allocate(B%vec(B%n),B%matX(B%n,B%n),B%matY(B%n,B%n))
         allocate(ABP(B%n,B%n),ABM(B%n,B%n))
-  
+
         ABP = ABPLUS(B%l1:B%l2,B%l1:B%l2)
         ABM = ABMIN(B%l1:B%l2,B%l1:B%l2)
         if(NoSt==1) then
@@ -5916,7 +6502,7 @@ do ip=NOccup+1,NBasis
 
         allocate(B%vec(B%n),B%matX(B%n,B%n),B%matY(B%n,B%n))
         allocate(ABP(B%n,B%n),ABM(B%n,B%n))
-  
+
         ABP = ABPLUS(B%l1:B%l2,B%l1:B%l2)
         ABM = ABMIN(B%l1:B%l2,B%l1:B%l2)
         if(NoSt==1) then
@@ -5976,11 +6562,11 @@ call dump_Eblock(Eblock,EblockIV,Occ,IndN,nblk,NBasis,NDimX,xy0file)
    deallocate(workA)
 
    allocate(Eig(NDimX),Eig1(NDimX))
- 
+
    ! unpack Eig (1)
    do iblk=1,nblk
       associate(B => Eblock(iblk))
- 
+
         Eig(B%l1:B%l2) = B%vec(1:B%n)
 
       end associate
@@ -5988,7 +6574,7 @@ call dump_Eblock(Eblock,EblockIV,Occ,IndN,nblk,NBasis,NDimX,xy0file)
 
    !unpack Eig (2, IV part)
    associate(B => EblockIV)
- 
+
      do i=1,B%n
         ii = B%l1+i-1
         ipos = B%pos(i)
@@ -6079,7 +6665,7 @@ deallocate(workA)
 deallocate(EigY1,EigY)
 
 ! ------------------------------------------------------------------------------
-! If(NoSt.Eq.1) 
+! If(NoSt.Eq.1)
 EndIf
 !
 ! for AC0Corr
@@ -6089,7 +6675,7 @@ EndIf
 allocate(workA(NDimX,NDimX))
 workA=0
 
-If(IH0St.Ne.NoSt.And.IStERPA.Ne.0) & 
+If(IH0St.Ne.NoSt.And.IStERPA.Ne.0) &
 Write(6,'(/,X,"Deexcitation correction is computed for ERPA vector no",I2," Eig=",F15.8)') IStERPA,Eig(IStERPA)
 
 If(IH0St.Ne.NoSt.And.IStERPA.Eq.0) &
@@ -6100,7 +6686,7 @@ do j=1,NDimX
       do i=1,NDimX
          If(IH0St.Eq.NoSt.Or.(I.Eq.IStERPA.Or.J.Eq.IStERPA)) Then
          if(Eig(i)/=0d0) workA(i,j) = 2d0*(ABPLUS(i,j)-ABMIN(i,j))/(Eig(i)+Eig(j))
-         EndIf 
+         EndIf
       enddo
    endif
 enddo
@@ -6252,7 +6838,7 @@ integer :: NSym,NSymNO(NBasis),MultpC(8,8),IStCAS(2,100),ICORR(100),IStERPA(2,10
 integer,allocatable :: IZeroNU(:)
 logical :: file_exists
 !
-type(EblockData),allocatable :: Eblock(:) 
+type(EblockData),allocatable :: Eblock(:)
 type(EblockData) :: EblockIV
 !!
 double precision,parameter :: Thresh = 1.D-12
@@ -6260,7 +6846,7 @@ double precision :: tmpEn
 !! test timings
 double precision :: Tcpu,Twall
 
-! timing 
+! timing
 call clock('START',Tcpu,Twall)
 Do I=1,NBasis
    C(I)=SQRT(Occ(I))
@@ -6412,7 +6998,7 @@ do is=1,INActive
       ip = IndN(1,i)
       iq = IndN(2,i)
       ipos = ipos + 1
-      pos(ip,iq) = ipos      
+      pos(ip,iq) = ipos
    enddo
    limAI(2,is) = ipos
 enddo
@@ -6425,7 +7011,7 @@ do ir=NOccup+1,NBasis
       ip = IndN(1,i)
       iq = IndN(2,i)
       ipos = ipos + 1
-      pos(ip,iq) = ipos      
+      pos(ip,iq) = ipos
    enddo
    limAV(2,ir) = ipos
 enddo
@@ -6480,7 +7066,7 @@ do ll=1,NOccup
                enddo
             endif
          endif
-         
+
          if(IGem(l)==2) then
             if(IGem(k)==1) then
                do i=1,INActive
@@ -6495,8 +7081,8 @@ do ll=1,NOccup
       endif
 
       ! AUXILIARY MATRIX AuxI AND AuxIO
-      
-      ! exchange 
+
+      ! exchange
       if(l<=INActive) then
          do i=1,NBasis
             AuxIO(i,k) = AuxIO(i,k) - AuxCoeff(IGem(i),IGem(i),IGem(k),IGem(l))*Occ(l)*ints(i,l)
@@ -6532,21 +7118,21 @@ do ll=1,NOccup
          is = l
          irs = pos(ir,is)
          if(irs>0) then
-            
+
             do iq=1,NOccup
                do ip=INActive+1,NBasis
                   ipq = pos(ip,iq)
                   if(ipq>0) then
 
                      AuxVal = AuxCoeff(IGem(ip),IGem(iq),IGem(ir),IGem(is))
-                     
+
                      val = 0
                      if(AuxInd(IGem(ip),IGem(ir))==1) val = val + Occ(ip)*Occ(ir)
                      if(AuxInd(IGem(iq),IGem(is))==1) val = val + Occ(iq)*Occ(is)
                      if(AuxInd(IGem(iq),IGem(ir))==1) val = val - Occ(iq)*Occ(ir)
                      if(AuxInd(IGem(ip),IGem(is))==1) val = val - Occ(ip)*Occ(is)
                      val = 2*AuxVal*val*ints(ip,iq)
-                  
+
                      ABPLUS(ipq,irs) = ABPLUS(ipq,irs) + val
                      ABMIN(ipq,irs) = ABMIN(ipq,irs) + val
 
@@ -6556,10 +7142,10 @@ do ll=1,NOccup
                      if(AuxInd(IGem(ip),IGem(ir))==1) val = val - Occ(ip)*Occ(ir)
                      if(AuxInd(IGem(iq),IGem(is))==1) val = val - Occ(iq)*Occ(is)
                      val = 2*AuxVal*val*ints(ip,iq)
-                     
+
                      ABPLUS(ipq,irs) = ABPLUS(ipq,irs) + val
                      ABMIN(ipq,irs) = ABMIN(ipq,irs) - val
-                     
+
                   endif
                enddo
             enddo
@@ -6575,23 +7161,23 @@ do ll=1,NOccup
 
             do ir=INActive+1,NBasis
                irs = pos(ir,is)
-               if(irs>0) then                  
+               if(irs>0) then
                   do iq=1,NOccup
                      ipq = pos(ip,iq)
                      if(ipq>0) then
-                        
+
                         AuxVal = AuxCoeff(IGem(ip),IGem(iq),IGem(ir),IGem(is))
-                        
+
                         val = 0
                         if(AuxInd(IGem(iq),IGem(ir))==1) val = val + Occ(iq)*Occ(ir)
                         if(AuxInd(IGem(ip),IGem(is))==1) val = val + Occ(ip)*Occ(is)
                         if(AuxInd(IGem(ip),IGem(ir))==1) val = val - Occ(ip)*Occ(ir)
                         if(AuxInd(IGem(iq),IGem(is))==1) val = val - Occ(iq)*Occ(is)
                         val = - AuxVal*val*ints(ir,iq)
-                        
+
                         ABPLUS(ipq,irs) = ABPLUS(ipq,irs) + val
                         ABMIN(ipq,irs) = ABMIN(ipq,irs) - val
-                        
+
                      endif
                   enddo
                endif
@@ -6603,32 +7189,32 @@ do ll=1,NOccup
       if((k>INActive).and.(l<=NOccup)) then
          ip = k
          is = l
-         
+
          do ir=INActive+1,NOccup
             irs = pos(ir,is)
             if(irs>0) then
                do iq=INActive+1,NOccup
                   ipq = pos(ip,iq)
                   if(ipq>0) then
-                     
+
                      val = AuxCoeff(IGem(ip),IGem(is),2,2)* &
                           sum(RDM2val(INActive+1:NOccup,INActive+1:NOccup,iq,ir)*ints(INActive+1:NOccup,INActive+1:NOccup))
-                     
+
                      ABPLUS(ipq,irs) = ABPLUS(ipq,irs) + val
                      ABMIN(ipq,irs) = ABMIN(ipq,irs) - val
-                     
+
                   endif
                enddo
             endif
          enddo
-         
+
       endif
 
       ! T3
       if((l<=NOccup).and.(k>INActive)) then
          iq = l
          ir = k
-         
+
          do is=INActive+1,NOccup
             irs = pos(ir,is)
             if(irs>0) then
@@ -6637,15 +7223,15 @@ do ll=1,NOccup
                   if(ipq>0) then
                      val = AuxCoeff(IGem(iq),IGem(ir),2,2)* &
                           sum(RDM2val(INActive+1:NOccup,INActive+1:NOccup,ip,is)*ints(INActive+1:NOccup,INActive+1:NOccup))
-                     
+
                      ABPLUS(ipq,irs) = ABPLUS(ipq,irs) + val
                      ABMIN(ipq,irs) = ABMIN(ipq,irs) - val
-                     
+
                   endif
                enddo
             endif
          enddo
-         
+
       endif
 
       ! T4+T6: AuxInd = 2
@@ -6663,10 +7249,10 @@ do ll=1,NOccup
                      if(ipq>0) then
                         val = AuxCoeff(IGem(ip),IGem(ir),IGem(iu),2)* &
                              sum(RDM2val(INActive+1:NOccup,iq,is,iu)*ints(ip,INActive+1:NOccup))
-                        
+
                         ABPLUS(ipq,irs) = ABPLUS(ipq,irs) + val
                         ABMIN(ipq,irs) = ABMIN(ipq,irs) + val
-                           
+
                      endif
                   enddo
                enddo
@@ -6682,16 +7268,16 @@ do ll=1,NOccup
                      if(ipq>0) then
                         val = AuxCoeff(IGem(iq),IGem(ir),IGem(iu),2)* &
                              sum(RDM2val(INActive+1:NOccup,ip,is,iu)*ints(INActive+1:NOccup,iq))
-                        
+
                         ABPLUS(ipq,irs) = ABPLUS(ipq,irs) + val
                         ABMIN(ipq,irs) = ABMIN(ipq,irs) - val
-                        
+
                      endif
                   enddo
                enddo
             endif
          enddo
-         
+
          ! T6
          do is=INActive+1,NOccup
             irs = pos(ir,is)
@@ -6699,13 +7285,13 @@ do ll=1,NOccup
                do iq=1,NOccup
                   do ip=INActive+1,NOccup
                      ipq = pos(ip,iq)
-                     if(ipq>0) then                        
+                     if(ipq>0) then
                         val = - AuxCoeff(IGem(iq),IGem(ir),IGem(iu),2)* &
                              sum(RDM2val(INActive+1:NOccup,ip,iu,is)*ints(INActive+1:NOccup,iq))
-                        
+
                         ABPLUS(ipq,irs) = ABPLUS(ipq,irs) + val
                         ABMIN(ipq,irs) = ABMIN(ipq,irs) + val
-                        
+
                      endif
                   enddo
                enddo
@@ -6718,19 +7304,19 @@ do ll=1,NOccup
                do iq=INActive+1,NOccup
                   do ip=INActive+1,NBasis
                      ipq = pos(ip,iq)
-                     if(ipq>0) then  
+                     if(ipq>0) then
                         val = - AuxCoeff(IGem(ip),IGem(ir),IGem(iu),2)* &
                              sum(RDM2val(INActive+1:NOccup,iq,iu,is)*ints(ip,INActive+1:NOccup))
-                        
+
                         ABPLUS(ipq,irs) = ABPLUS(ipq,irs) + val
                         ABMIN(ipq,irs) = ABMIN(ipq,irs) - val
-                        
+
                      endif
                   enddo
                enddo
             endif
          enddo
-         
+
       endif
 
    enddo
@@ -6752,13 +7338,13 @@ do ll=1,NOccup
             ints(i,j) = work1((j-1)*NBasis+i)
          enddo
       enddo
-      
+
       k = kk
       l = ll
 
       if(k>NOccup.or.l>NOccup) cycle
 
-      if(present(ETot)) then  
+      if(present(ETot)) then
       ! COMPUTE THE ENERGY FOR CHECKING
       if((k<=NOccup).and.(l<=NOccup)) ETot = ETot + sum(RDM2val(:,:,k,l)*ints(1:NOccup,1:NOccup))
       endif
@@ -6768,7 +7354,7 @@ do ll=1,NOccup
       ! Coulomb
       if(k==l.and.k<=NOccup) then
          val = 2*Occ(k)
-         if(k>INActive) then 
+         if(k>INActive) then
             do j=1,INActive
                do i=1,INActive
                   HNO(i,j) = HNO(i,j) + val*ints(i,j)
@@ -6787,7 +7373,7 @@ do ll=1,NOccup
                HNO(i,j) = HNO(i,j) + val*ints(i,j)
             enddo
          enddo
-         
+
       endif
 
       ! AUXILIARY MATRIX AuxI AND AuxIO
@@ -6814,68 +7400,68 @@ do ll=1,NOccup
 
       ! CONSTRUCT TWO-ELECTRON PART OF THE AC ALPHA-HAMILTONIAN
       ! T1+T2+T3+T4+T5+T6: AuxInd = 1
-      
+
       ! exchange
       if(l<=NOccup) then
          if(k<=NOccup) then
             iq = k
             is = l
-            
+
             do ir=INActive+1,NBasis
                irs = pos(ir,is)
                if(irs>0) then
                   do ip=INActive+1,NBasis
                      ipq = pos(ip,iq)
                      if(ipq>0) then
-                        
+
                         AuxVal = AuxCoeff(IGem(ip),IGem(iq),IGem(ir),IGem(is))
-                        
+
                         val = 0
                         if(AuxInd(IGem(ip),IGem(ir))==1) val = val + Occ(ip)*Occ(ir)
                         if(AuxInd(IGem(iq),IGem(is))==1) val = val + Occ(iq)*Occ(is)
                         if(AuxInd(IGem(iq),IGem(ir))==1) val = val - Occ(iq)*Occ(ir)
                         if(AuxInd(IGem(ip),IGem(is))==1) val = val - Occ(ip)*Occ(is)
                         val = - AuxVal*val*ints(ip,ir)
-                        
+
                         ABPLUS(ipq,irs) = ABPLUS(ipq,irs) + val
                         ABMIN(ipq,irs) = ABMIN(ipq,irs) + val
-                        
+
                      endif
                   enddo
                endif
             enddo
-               
+
          endif
       endif
 
-      ! T1 
+      ! T1
       if((k<=NOccup).and.(l<=NOccup)) then
          iq = k
          is = l
-         
+
          do ir=INActive+1,NOccup
             irs = pos(ir,is)
             if(irs>0) then
                do ip=INActive+1,NOccup
                   ipq = pos(ip,iq)
                   if(ipq>0) then
-                     
+
                      val = AuxCoeff(IGem(iq),IGem(is),2,2)* &
                           sum(RDM2val(INActive+1:NOccup,INActive+1:NOccup,ip,ir)*ints(INActive+1:NOccup,INActive+1:NOccup))
-                     
+
                      ABPLUS(ipq,irs) = ABPLUS(ipq,irs) + val
                      ABMIN(ipq,irs) = ABMIN(ipq,irs) + val
-                     
+
                   endif
                enddo
             endif
          enddo
-            
+
       endif
 
       ! T3
       if(IGem(k)==2.and.IGem(l)==2) then
-         
+
          do is=INActive+1,NOccup
             do ir=INActive+1,NBasis
                irs = pos(ir,is)
@@ -6884,13 +7470,13 @@ do ll=1,NOccup
                      do ip=INActive+1,NBasis
                         ipq = pos(ip,iq)
                         if(ipq>0) then
-                           
+
                            val = AuxCoeff(IGem(ip),IGem(ir),2,2)* &
                                 RDM2val(iq,is,k,l)*ints(ip,ir)
-                           
+
                            ABPLUS(ipq,irs) = ABPLUS(ipq,irs) + val
                            ABMIN(ipq,irs) = ABMIN(ipq,irs) + val
-                           
+
                         endif
                      enddo
                   enddo
@@ -6903,7 +7489,7 @@ do ll=1,NOccup
       if((k<=NOccup).and.(l>INActive.and.l<=NOccup)) then
          is = k
          iu = l
-         
+
          ! T2
          do ir=INActive+1,NOccup
             irs = pos(ir,is)
@@ -6914,10 +7500,10 @@ do ll=1,NOccup
                      if(ipq>0) then
                         val = AuxCoeff(IGem(iq),IGem(is),IGem(iu),2)* &
                              sum(RDM2val(INActive+1:NOccup,ip,ir,iu)*ints(INActive+1:NOccup,iq))
-                        
+
                         ABPLUS(ipq,irs) = ABPLUS(ipq,irs) + val
                         ABMIN(ipq,irs) = ABMIN(ipq,irs) + val
-                        
+
                      endif
                   enddo
                enddo
@@ -6933,10 +7519,10 @@ do ll=1,NOccup
                      if(ipq>0) then
                         val = AuxCoeff(IGem(ip),IGem(is),IGem(iu),2)* &
                              sum(RDM2val(INActive+1:NOccup,iq,ir,iu)*ints(INActive+1:NOccup,ip))
-                        
+
                         ABPLUS(ipq,irs) = ABPLUS(ipq,irs) + val
                         ABMIN(ipq,irs) = ABMIN(ipq,irs) - val
-                        
+
                      endif
                   enddo
                enddo
@@ -6953,10 +7539,10 @@ do ll=1,NOccup
                      if(ipq>0) then
                         val = - AuxCoeff(IGem(ip),IGem(is),IGem(iu),2)* &
                              sum(RDM2val(INActive+1:NOccup,iq,iu,ir)*ints(INActive+1:NOccup,ip))
-                        
+
                         ABPLUS(ipq,irs) = ABPLUS(ipq,irs) + val
                         ABMIN(ipq,irs) = ABMIN(ipq,irs) + val
-                        
+
                      endif
                   enddo
                enddo
@@ -6972,16 +7558,16 @@ do ll=1,NOccup
                      if(ipq>0) then
                         val = - AuxCoeff(IGem(iq),IGem(is),IGem(iu),2)* &
                              sum(RDM2val(INActive+1:NOccup,ip,iu,ir)*ints(INActive+1:NOccup,iq))
-                        
+
                         ABPLUS(ipq,irs) = ABPLUS(ipq,irs) + val
                         ABMIN(ipq,irs) = ABMIN(ipq,irs) - val
-                        
+
                      endif
                   enddo
                enddo
             endif
          enddo
-         
+
       endif
 
    enddo
@@ -6998,7 +7584,7 @@ do ICol=1,NDimX
    ir = IndN(1,ICol)
    is = IndN(2,ICol)
    irs = pos(ir,is)
-      
+
       do IRow=1,NDimX
          ip = IndN(1,IRow)
          iq = IndN(2,IRow)
@@ -7058,7 +7644,7 @@ do ICol=1,NDimX
          if(val/=0d0) ABPLUS(ipq,irs) = ABPLUS(ipq,irs)/val
          val = (C(ip) - C(iq))*(C(ir) - C(is))
          if(val/=0d0) ABMIN(ipq,irs)  = ABMIN(ipq,irs)/val
-         
+
       enddo
 enddo
 
@@ -7090,7 +7676,7 @@ if(nAA>0) then
      elseif(NoSt>1) then
         call ERPAVECYX(B%matY,B%matX,B%vec,ABP,ABM,B%n)
      endif
- 
+
      deallocate(ABM,ABP)
    end associate
 
@@ -7130,7 +7716,7 @@ if(nAA > 0) then
          if(abs(eigy(iq,i))+abs(eigx(iq,i)).gt.0.1) then
                ia=IndN(1,iaddr(iq))
                ib=IndN(2,iaddr(iq))
-               ISym=MultpC(NSymNO(ia),NSymNO(ib)) 
+               ISym=MultpC(NSymNO(ia),NSymNO(ib))
 
                If(IStERPA(2,i).Eq.0) Then
                   IStERPA(2,i)=ISym
@@ -7198,7 +7784,7 @@ If (IStCAS(1,ICAS).Eq.1.And.IStCAS(2,ICAS).Eq.1) Then
    Write(10,*)nAA
    Do NU=1,nAA
       Write(10,*) IStERPA(1,NU),IStERPA(2,NU),Eig(NU)
-   EndDo 
+   EndDo
    Close(10)
 EndIf
 
@@ -7209,13 +7795,13 @@ If(IStCAS(1,ICAS).Ne.1.Or.IStCAS(2,ICAS).Ne.1) Then
       Open(10,File='eig_1.1.dat')
       Read(10,*) NoEig11
       Do NU=1,NoEig11
-         Read(10,*) ISt11ERPA(1,NU),ISt11ERPA(2,NU),Eig11(NU) 
+         Read(10,*) ISt11ERPA(1,NU),ISt11ERPA(2,NU),Eig11(NU)
          If(ISt11ERPA(1,NU).Eq.IStCAS(1,ICAS).And.ISt11ERPA(2,NU).Eq.IStCAS(2,ICAS)) Then
             AuxVal=Eig11(NU)
          EndIf
       EndDo
       Close(10)
-      
+
       Do NU=1,NoEig11
       Write(6,'(X,"ERPA_1.1 Excit Energy ",I2,".",I1,2F22.12)') &
        ISt11ERPA(1,NU),ISt11ERPA(2,NU),Eig11(NU),Eig11(NU)-AuxVal
@@ -7224,7 +7810,7 @@ If(IStCAS(1,ICAS).Ne.1.Or.IStCAS(2,ICAS).Ne.1) Then
    Else
    Write(6,'(X," *** AC0D WITHOUT replacements of omegas [eig_1.1.dat not available] *** ")')
    NoEig11=0
-   EndIf 
+   EndIf
 EndIf
 
       NegSym(1:8)=0
@@ -7250,7 +7836,7 @@ do iq=1,INActive
 
         allocate(B%vec(B%n),B%matX(B%n,B%n),B%matY(B%n,B%n))
         allocate(ABP(B%n,B%n),ABM(B%n,B%n))
-  
+
         ABP = ABPLUS(B%l1:B%l2,B%l1:B%l2)
         ABM = ABMIN(B%l1:B%l2,B%l1:B%l2)
         if(NoSt==1) then
@@ -7282,7 +7868,7 @@ do ip=NOccup+1,NBasis
 
         allocate(B%vec(B%n),B%matX(B%n,B%n),B%matY(B%n,B%n))
         allocate(ABP(B%n,B%n),ABM(B%n,B%n))
-  
+
         ABP = ABPLUS(B%l1:B%l2,B%l1:B%l2)
         ABM = ABMIN(B%l1:B%l2,B%l1:B%l2)
         if(NoSt==1) then
@@ -7342,11 +7928,11 @@ call dump_Eblock(Eblock,EblockIV,Occ,IndN,nblk,NBasis,NDimX,xy0file)
    deallocate(workA)
 
    allocate(Eig(NDimX),Eig1(NDimX))
- 
+
    ! unpack Eig (1)
    do iblk=1,nblk
       associate(B => Eblock(iblk))
- 
+
         Eig(B%l1:B%l2) = B%vec(1:B%n)
 
       end associate
@@ -7354,7 +7940,7 @@ call dump_Eblock(Eblock,EblockIV,Occ,IndN,nblk,NBasis,NDimX,xy0file)
 
    !unpack Eig (2, IV part)
    associate(B => EblockIV)
- 
+
      do i=1,B%n
         ii = B%l1+i-1
         ipos = B%pos(i)
@@ -7433,7 +8019,7 @@ allocate(EigY(NDimX,NDimX),EigY1(NDimX,NDimX))
          IStCAS(2,ICAS).Eq.IStCAS(2,IDCORR)) IAC0=1
 
       If(IERPA.Ne.0) Then
-            Write(6,'(/,X,"Y(0) corresponding to vector no",I2," Sym=",I1,".",I1)') & 
+            Write(6,'(/,X,"Y(0) corresponding to vector no",I2," Sym=",I1,".",I1)') &
                           IERPA,IStERPA(1,IERPA),IStERPA(2,IERPA)
             Call TrDipMoms(IERPA,TDIP2,EigY,C,IndN,DipX,DipY,DipZ,NDimX,NBasis)
             Write(6,'(X,"1.1->",I1,".",I1,"  Y(0) <X>^2+<Y>^2+<Z>^2",F15.8,/)')IStERPA(1,IERPA), &
@@ -7441,7 +8027,7 @@ allocate(EigY(NDimX,NDimX),EigY1(NDimX,NDimX))
 
             Write(6,'(/,X,"Y(0)+Y(1) corresponding to vector no",I2, " Sym=",I1,".",I1)') &
                            IERPA,IStERPA(1,IERPA),IStERPA(2,IERPA)
-   
+
             Do I=1,NdimX
             EigY(I,IERPA)=EigY(I,IERPA)+EigY1(I,IERPA)
             EndDo
@@ -7476,7 +8062,7 @@ ABP=0
 IStateInSACAS=0
 ! hererxxx replace eig's with excitation energies from SA-CAS
 Do I=1,NoStMx
-    AuxVal=EExcit(I)-EExcit(ICAS) 
+    AuxVal=EExcit(I)-EExcit(ICAS)
     If (AuxVal.Gt.0) Then
         Do NU=1,NoEig
              If(IStERPA(1,NU).Eq.IStCAS(1,I).And.IStERPA(2,NU).Eq.IStCAS(2,I)) Then
@@ -7487,7 +8073,7 @@ Do I=1,NoStMx
 !                    Eig(NU)=AuxVal
                     Write(6,'(X,"Ratio of Eig ",I1,".",I1,F22.12," to SA-CAS ",2F22.12)') &
                     IStERPA(1,NU),IStERPA(2,NU),Eig(NU),AuxVal,Eig(NU)/AuxVal
-             EndIf  
+             EndIf
         EndDo
     EndIf
 EndDo
@@ -7501,7 +8087,7 @@ Do I=1,NoEig11
              If(IStERPA(1,NU).Eq.ISt11ERPA(1,I).And.IStERPA(2,NU).Eq.ISt11ERPA(2,I)) Then
 
 ! hererxxx
-                If(IStateInSACAS(IStERPA(1,NU),IStERPA(2,NU)).Eq.1) Then    
+                If(IStateInSACAS(IStERPA(1,NU),IStERPA(2,NU)).Eq.1) Then
 
 !                    If(Eig(NU).Gt.AuxVal) Then
                      If(Eig(NU).Gt.Abs(AuxVal)) Then
@@ -7529,7 +8115,7 @@ IZeroNU(1:NDimX)=0
 Do I=1,8
    If(NegSym(I).Ne.0) Then
 ! hererxxx
-!      Do J=1,NegSym(I) 
+!      Do J=1,NegSym(I)
       Do J=1,NegSym(I)-1
          ISym=NoERPASym(I)-J+1
             Do NU=1,NoEig
@@ -7577,7 +8163,7 @@ do j=1,NDimX
 !         If(IAC0.Eq.1.Or.I.Eq.IERPA.Or.J.Eq.IERPA) Then
          If((IAC0.Eq.1.And.IZeroNU(i).Eq.0.And.IZeroNU(j).Eq.0).Or.(IAC0.Eq.0.And.(I.Eq.IERPA.Or.J.Eq.IERPA))) Then
          if(Eig(i)/=0d0) workA(i,j) = 2d0*(ABPLUS(i,j)-ABMIN(i,j))/(Eig(i)+Eig(j))
-         EndIf 
+         EndIf
       enddo
    endif
 enddo

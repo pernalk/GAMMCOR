@@ -2030,9 +2030,6 @@ tmp1 = 0
 do pq=1,A%NDimX
    ip = A%IndN(1,pq)
    iq = A%IndN(2,pq)
-! herer!!
-!   write(*,*)ip,iq,"A",IGemA(ip),IGemA(iq)
-
    read(iunit,rec=iq+(ip-A%num0-1)*dimOA) work(1:nOVB)
    do rs=1,B%NDimX
       ir = B%IndN(1,rs)

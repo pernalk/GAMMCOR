@@ -2369,7 +2369,7 @@ end subroutine Y01CAS_mithap
 
 subroutine ACABMAT0_mithap(AMAT,BMAT,URe,Occ,XOne,&
                IndN,IndX,IGem,C, &
-               NAct,INActive,NBasis,NDim,NDimX,NInte1,NGem,IntFileName,ISAPT,ACAlpha,IFlag)
+               NBasis,NDim,NDimX,NInte1,NGem,IntFileName,ISAPT,ACAlpha,IFlag)
 !     IFlag = 1 - AMAT AND BMAT WILL CONTAIN (A+B)/C+/C+ AND (A-B)/C-/C-, RESPECTIVELY
 !             0 - AMAT AND BMAT WILL CONTAIN A ANB B MATRICES, RESPECTIVELY
 !
@@ -2384,7 +2384,7 @@ subroutine ACABMAT0_mithap(AMAT,BMAT,URe,Occ,XOne,&
 !
 implicit none
 
-integer,intent(in) :: NAct,INActive,NBasis,NDim,NDimX,NInte1,ISAPT,NGem
+integer,intent(in) :: NBasis,NDim,NDimX,NInte1,ISAPT,NGem
 character(*) :: IntFileName
 double precision,intent(out) :: AMAT(NDimX,NDimX),BMAT(NDimX,NDimX)
 double precision,intent(in)  :: URe(NBasis,NBasis),Occ(NBasis),XOne(NInte1),C(NBasis)
@@ -2395,11 +2395,11 @@ integer,intent(in) :: IGem(NBasis),IFlag
 integer :: i,j,k,l,ij,kl,kk,ll,klround
 integer :: ip,iq,ir,is,it,iu,iw,ipq,irs,ICol,IRow
 integer :: iunit,ios
-integer :: NOccup
 integer :: IGemType
 integer :: Ind(NBasis),AuxInd(3,3),pos(NBasis,NBasis)
 double precision :: HNO(NBasis,NBasis),HNOCoef
 double precision :: AuxCoeff(NGem,NGem,NGem,NGem),AuxVal,val
+double precision :: valPQ,valRS
 double precision :: OccProd(NBasis,NBasis),CProd(NBasis,NBasis)
 double precision :: AuxH(NBasis,NBasis,NGem),AuxXC(NBasis,NBasis,NGem)
 double precision :: SaveA,SaveB
@@ -2407,18 +2407,14 @@ double precision,allocatable :: work1(:),work2(:)
 double precision,allocatable :: ints(:,:)
 double precision,parameter :: Delta = 1.d-6
 
-print*, 'Wszystko od nowa!'
 if(ISAPT==1) then
    write(6,'(1x,a)') 'Computing response-my'
 else
-   write(6,'(/,X,"***** COMPUTING AMAT, BMAT IN ACABMAT0 *****",/)')
+   write(6,'(/,X,"***** COMPUTING AMAT, BMAT IN ACABMAT0: FFFF *****",/)')
 endif
 
 AMAT = 0
 BMAT = 0
-
-! set dimensions
-NOccup = NAct + INActive
 
 allocate(work1(NBasis**2),work2(NBasis**2),ints(NBasis,NBasis))
 
@@ -2713,30 +2709,42 @@ do ICol=1,NDimX
             AMAT(irs,ipq) = AMAT(irs,ipq) + val
 
             if(IFlag/=0) then
-!!$               if(abs(abs(C(ip))-abs(C(iq)))<=Delta*abs(C(iq)).or.& 
-!!$                    abs(abs(C(ir))-abs(C(is)))<=Delta*abs(C(ir))) then
-!!$               
-!!$                  AMAT(irs,ipq) = 0
-!!$                  BMAT(irs,ipq) = 0
-!!$               else
-                  
-                  SaveA = AMAT(irs,ipq)
-                  SaveB = BMAT(irs,ipq)
-                  
-                  val = (C(ip) + C(iq))*(C(ir) + C(is))
-                  if(val==0) then
-                     AMAT(irs,ipq) = 0
-                  else
-                     AMAT(irs,ipq) = (SaveA+SaveB)/val
-                  endif
-                  val = (C(ip) - C(iq))*(C(ir) - C(is))
-                  if(val==0) then
-                     BMAT(irs,ipq) = 0
-                  else
-                     BMAT(irs,ipq) = (SaveA-SaveB)/val
-                  endif
+               !! Kasia's way
+               !if(abs(abs(C(ip))-abs(C(iq)))<=Delta*abs(C(iq)).or.& 
+               !     abs(abs(C(ir))-abs(C(is)))<=Delta*abs(C(ir))) then
+               !
+               !   AMAT(irs,ipq) = 0
+               !   BMAT(irs,ipq) = 0
+
+               !else
+               !   
+               !   SaveA = AMAT(irs,ipq)
+               !   SaveB = BMAT(irs,ipq)
+               !   
+               !   val = (C(ip) + C(iq))*(C(ir) + C(is))
+               !   AMAT(irs,ipq) = (SaveA+SaveB)/val
+               !   val = (C(ip) - C(iq))*(C(ir) - C(is))
+               !   BMAT(irs,ipq) = (SaveA-SaveB)/val
+
+               ! our way
+               SaveA = AMAT(irs,ipq)
+               SaveB = BMAT(irs,ipq)
+
+               val = (C(ip) + C(iq))*(C(ir) + C(is))
+               if(val==0) then
+                  AMAT(irs,ipq) = 0
+               else
+                  AMAT(irs,ipq) = (SaveA+SaveB)/val
                endif
-!!$            endif
+                val = (C(ip) - C(iq))*(C(ir) - C(is))
+               if(val==0) then
+                  BMAT(irs,ipq) = 0
+               else
+                  BMAT(irs,ipq) = (SaveA-SaveB)/val
+               endif
+
+               !endif ! KP
+            endif
                         
          enddo
       endif
@@ -2744,12 +2752,12 @@ do ICol=1,NDimX
 
 print*, "AB-my",norm2(AMAT),norm2(BMAT)
 
-call sq_to_triang2(HNO,work1,NBasis)
-write(LOUT,*) 'HNO-my', norm2(work1(1:NBasis*(NBasis+1)/2))
-HNO=transpose(HNO)
-call sq_to_triang2(HNO,work1,NBasis)
-write(LOUT,*) 'HNO-tr', norm2(work1(1:NBasis*(NBasis+1)/2))
-
+!call sq_to_triang2(HNO,work1,NBasis)
+!write(LOUT,*) 'HNO-my', norm2(work1(1:NBasis*(NBasis+1)/2))
+!HNO=transpose(HNO)
+!call sq_to_triang2(HNO,work1,NBasis)
+!write(LOUT,*) 'HNO-tr', norm2(work1(1:NBasis*(NBasis+1)/2))
+!
 !!$do IGemType=1,NGem
 !!$   call sq_to_triang2(AuxH(:,:,IGemType),work1,NBasis)
 !!$   write(LOUT,*) 'AuxH-my', IGemType,norm2(work1(1:NBasis*(NBasis+1)/2))
@@ -2880,5 +2888,371 @@ call sq_to_triang2(work,VHSR,NBasis)
 deallocate(work,J,Jerf)
 
 end subroutine PotCoul_mithap
+
+subroutine EneGVB_FFFF(ETot,URe,Occ,C,XOne, &
+                        IGem,IndN,NBasis,NInte1,IntFileName,NDimX,NGem)
+implicit none
+
+integer,intent(in) :: NBasis,NInte1,NDimX,NGem
+character(*) :: IntFileName
+double precision :: ETot
+
+integer :: IndN(2,NDimX),IGem(NBasis)
+double precision :: URe(NBasis,NBasis),Occ(NBasis),C(NBasis)
+double precision :: XOne(NInte1)
+
+integer :: i,j,ii,ij,ia,ib,iab
+integer :: k,l,kl,kk,ll,klround
+integer :: iunit
+integer,external :: NAddr3
+double precision :: FacIJ,FacIK
+double precision :: EOne, EIntraGem, EInterCoul, EInterExch
+
+integer :: pos(NBasis,NBasis)
+double precision :: HNO(NBasis,NBasis)
+double precision,allocatable :: work1(:),work2(:)
+double precision,allocatable :: ints(:,:)
+
+write(lout,'(/A)') ' Electronic GVB energy check:'
+
+allocate(work1(NBasis**2),work2(NBasis**2),ints(NBasis,NBasis))
+
+call triang_to_sq(XOne,work1,NBasis)
+call dgemm('N','N',NBasis,NBasis,NBasis,1d0,URe,NBasis,work1,NBasis,0d0,work2,NBasis)
+call dgemm('N','T',NBasis,NBasis,NBasis,1d0,work2,NBasis,URe,NBasis,0d0,HNO,NBasis)
+call sq_symmetrize(HNO,NBasis)
+
+!call sq_to_triang2(HNO,work1,NBasis)
+!write(LOUT,*) 'HNO-my', norm2(work1(1:NBasis*(NBasis+1)/2))
+!HNO=transpose(HNO)
+!call sq_to_triang2(HNO,work1,NBasis)
+!write(LOUT,*) 'HNO-tr', norm2(work1(1:NBasis*(NBasis+1)/2))
+
+pos = 0
+do i=1,NDimX
+   pos(IndN(1,i),IndN(2,i)) = i
+enddo
+
+EOne = 0d0
+EIntraGem  = 0d0
+EInterCoul = 0d0
+EInterExch = 0d0
+
+do i=1,NBasis
+   EOne = EOne + 2d0*Occ(i)*HNO(i,i)
+enddo
+
+open(newunit=iunit,file=trim(IntFileName),status='OLD', &
+     access='DIRECT',recl=8*NBasis*(NBasis+1)/2)
+
+kl = 0
+do ll=1,NBasis
+   do kk=1,ll
+      kl = kl + 1
+      read(iunit,rec=kl) work1(1:NBasis*(NBasis+1)/2)
+      call triang_to_sq2(work1,ints,NBasis)
+      k = kk
+      l = ll
+
+      FacIJ = 2d0
+      if(k==l) FacIJ = 1d0
+      if(IGem(k)==IGem(l)) then
+         EIntraGem = EIntraGem + FacIJ*C(k)*C(l)*ints(k,l)
+      else
+        EInterExch = EInterExch - FacIJ*Occ(k)*Occ(l)*ints(k,l)
+      endif
+
+      FacIK = 2d0
+      if(k==l) then
+         do i=k,NBasis
+            if(IGem(i)/=IGem(k)) then
+            if(i==k) FacIK = 1d0
+            EInterCoul = EInterCoul + 2d0*FacIK*Occ(i)*Occ(k)*ints(i,i)
+            endif
+         enddo
+      endif
+
+   enddo
+enddo
+
+close(iunit)
+
+write(LOUT,'(" One-electron energy",25X,F17.8)') EOne
+write(LOUT,'(" GVB intra-gem electron interaction",10X,F17.8)') EIntraGem
+write(LOUT,'(" GVB inter-gem Coulomb interaction",11X,F17.8)')  EInterCoul
+write(LOUT,'(" GVB inter-gem exchange interaction",10X,F17.8)') EInterExch
+write(LOUT,'(" Total GVB",34X,F18.8)') EOne+EIntraGem+EInterCoul+EInterExch
+
+ETot = EOne + EIntraGem + EInterCoul + EInterExch
+
+deallocate(ints,work2,work1)
+
+end subroutine EneGVB_FFFF
+
+subroutine EERPA_FFFF(ECorr,EVec,EVal,Occ,CICoef,IGem,   &
+                      IAuxGem,IG1,IG2,IG3,IG4,IB, &
+                      IndN,NDimX,NBasis,IntFile,IFrag)
+implicit none
+
+integer,intent(in) :: NDimX,NBasis
+integer,intent(in) :: IG1,IG2,IG3,IG4,IB 
+integer,intent(in) :: IGem(NBasis),IAuxGem(NBasis),IndN(2,NDimX)
+integer,intent(in) :: IFrag
+character(*),intent(in) :: IntFile
+double precision,intent(out) :: ECorr
+double precision,intent(in) :: Occ(NBasis)
+double precision,intent(in) :: EVec(NDimX,NDimX),EVal(NDimX)
+
+integer :: i,j,k,l,kl,kk,ip,iq,ir,is,ipq,irs
+integer :: iunit,ISkippedEig
+integer :: pos(NBasis,NBasis)
+integer :: OccProd(NBasis,NBasis),AuxIG(NBasis)
+integer :: IFlPQRS,IFlP,IFlQ,IFlR,IFlS
+integer :: NoVirtP,NoVirtQ,NoVirtR,NoVirtS,NoVirt
+integer :: IBdy,IBdyG,ICond
+double precision :: CICoef(NBasis),Cpq,Crs,SumY,Aux
+double precision,allocatable :: work(:),ints(:,:),Skipped(:)
+double precision,parameter :: SmallE = 1.d-3,BigE = 5.d2
+integer :: itmp1,itmp2
+
+pos = 0
+do i=1,NDimX
+   pos(IndN(1,i),IndN(2,i)) = i
+enddo
+
+OccProd = 0
+do j=1,NBasis
+   do i=1,NBasis
+      if(Occ(i)*Occ(j)/=0d0) OccProd(i,j) = 1
+   enddo
+enddo
+
+AuxIG = 0
+do i=1,NBasis
+   if(IGem(i)==IG1.or.IGem(i)==IG2.or.IGem(i)==IG3.or.IGem(i)==IG4) AuxIG(i) = 1
+enddo
+
+allocate(work(NBasis**2),ints(NBasis,NBasis),Skipped(NDimX))
+
+ISkippedEig = 0
+ECorr = 0
+
+itmp1 = 0
+itmp2 = 0
+! FULL INTS
+open(newunit=iunit,file=trim(IntFile),status='OLD', &
+     access='DIRECT',recl=8*NBasis*(NBasis+1)/2)
+kl = 0
+do l=1,NBasis
+   do k=1,l
+      kl = kl + 1
+      if(pos(l,k)/=0) then
+        irs = pos(l,k)
+        ir = l
+        is = k
+        read(iunit,rec=kl) work(1:NBasis*(NBasis+1)/2)
+        call triang_to_sq2(work,ints,NBasis)
+
+        !IFlS=0
+        !If(IGem(IS).Eq.IG1.Or.IGem(IS).Eq.IG2.Or.IGem(IS).Eq.IG3.Or.IGem(IS).Eq.IG4) IFlS=1
+        !NoVirtS=1
+        !If(Occ(IS).Eq.0d0) NoVirtS=0
+
+        !IFlR=0
+        !If(IGem(IR).Eq.IG1.Or.IGem(IR).Eq.IG2.Or.IGem(IR).Eq.IG3.Or.IGem(IR).Eq.IG4) IFlR=1
+        !NoVirtR=1
+        !If(Occ(IR).Eq.0d0) NoVirtR=0
+
+        do j=1,NBasis
+           do i=1,j
+              if(pos(j,i)/=0) then
+                ipq = pos(j,i)
+                ip = j
+                iq = i
+
+                !IFlP=0
+                !If(IGem(ip).Eq.IG1.Or.IGem(ip).Eq.IG2.Or.IGem(ip).Eq.IG3.Or.IGem(ip).Eq.IG4) IFlP=1
+                !NoVirtP=1
+                !If(Occ(IP).Eq.0d0) NoVirtP=0
+
+                !IFlQ=0
+                !If(IGem(iq).Eq.IG1.Or.IGem(iq).Eq.IG2.Or.IGem(iq).Eq.IG3.Or.IGem(iq).Eq.IG4) IFlQ=1
+                !NoVirtQ=1
+                !If(Occ(IQ).Eq.0d0) NoVirtQ=0
+
+                Crs = CICoef(l)+CICoef(k)
+                Cpq = CICoef(j)+CICoef(i)
+
+                NoVirt  = 0
+                IFlPQRS = 0
+                if(OccProd(ir,is)*OccProd(ip,iq)/=0) NoVirt = 1
+                if(AuxIG(ir)*AuxIG(is)*AuxIG(ip)*AuxIG(iq)/=0) IFlPQRS = 1
+               
+                call IBody(IBdy,IGem(ip),IGem(iq),IGem(ir),IGem(is))
+
+                ICond = 0
+                if(IFlPQRS==1.and.IBdy.eq.IB) ICond = 1
+
+                !! FOR GVB ONLY
+                if(IB.gt.2.and.NoVirt.Eq.1.and. &
+                    IBdy.eq.IB-1.and.IFlPQRS==1) ICond = 1
+
+                ! FOR GVB ONLY: IF IFrag=1,IB=2 (ONE-BODY), ALLOW ALL CASES 
+                ! EXCEPT WHEN ALL ORBITALS ARE FROM THE SAME GEMINAL
+                if(IFrag.Eq.1.and.IB.Eq.2.and.IFlPQRS==1) then
+                   call IBody(IBdyG,IAuxGem(ip),IAuxGem(iq),IAuxGem(ir),IAuxGem(is))
+                   If(IBdyG.Ne.1) ICond = 1
+                endif
+
+                if(ICond.Eq.1) then
+
+                   ISkippedEig = 0
+                   SumY = 0
+                   do kk=1,NDimX
+                      if(EVal(kk).gt.SmallE.and.EVal(kk).lt.BigE) then
+                         SumY = SumY + EVec(ipq,kk)*EVec(irs,kk)
+                      else
+                         ISkippedEig = ISkippedEig + 1
+                         Skipped(ISkippedEig) = EVal(kk)
+                      endif
+                   enddo
+
+                   Aux = Crs*Cpq*SumY
+ 
+                   if(iq.Eq.is.and.ip.Eq.ir) then
+                      Aux = Aux - 0.5d0*(Occ(ip)*(1d0-Occ(is))+Occ(is)*(1d0-Occ(ip)))
+                   endif  
+
+                   ECorr = ECorr + Aux*ints(j,i)
+
+                endif ! ICond
+
+              endif
+           enddo
+        enddo
+
+      endif
+
+   enddo
+enddo
+
+close(iunit)
+
+if(ISkippedEig/=0) then
+  write(LOUT,'(/,1x,"The number of discarded eigenvalues is",i4)') &
+       ISkippedEig
+  do i=1,ISkippedEig
+     write(LOUT,'(1x,a,i4,f15.8)') 'Skipped',i,Skipped(i)
+  enddo
+endif
+
+deallocate(Skipped)
+deallocate(ints,work)
+
+end subroutine EERPA_FFFF
+
+subroutine EneERPA_FFFF(ETot,ECorr,ENuc,EVec,EVal,Occ,CICoef,IGem,   &
+                        IndN,NDimX,NBasis,IntFile)
+implicit none
+
+integer,intent(in) :: NDimX,NBasis
+integer,intent(in) :: IGem(NBasis),IndN(2,NDimX)
+character(*),intent(in) :: IntFile
+double precision,intent(in)    :: ENuc
+double precision,intent(inout) :: ETot,ECorr
+double precision,intent(in) :: CICoef(NBasis),Occ(NBasis)
+double precision,intent(in) :: EVec(NDimX,NDimX),EVal(NDimX)
+
+integer :: i,j,k,l,kl,kk,ip,iq,ir,is,ipq,irs
+integer :: iunit,ISkippedEig
+integer :: pos(NBasis,NBasis)
+integer :: OccProd(NBasis,NBasis)
+double precision :: Cpq,Crs,SumY,Aux,EIntra
+double precision,allocatable :: work(:),ints(:,:),Skipped(:)
+double precision,parameter :: SmallE = 1.d-3,BigE = 5.d2
+
+pos = 0
+do i=1,NDimX
+   pos(IndN(1,i),IndN(2,i)) = i
+enddo
+
+allocate(work(NBasis**2),ints(NBasis,NBasis),Skipped(NDimX))
+
+ISkippedEig = 0
+ECorr = 0
+EIntra= 0
+
+! FULL INTS
+open(newunit=iunit,file=trim(IntFile),status='OLD', &
+     access='DIRECT',recl=8*NBasis*(NBasis+1)/2)
+kl = 0
+do l=1,NBasis
+   do k=1,l
+      kl = kl + 1
+      if(pos(l,k)/=0) then
+        irs = pos(l,k)
+        ir = l
+        is = k
+        read(iunit,rec=kl) work(1:NBasis*(NBasis+1)/2)
+        call triang_to_sq2(work,ints,NBasis)
+
+        do j=1,NBasis
+           do i=1,j
+              if(pos(j,i)/=0) then
+                ipq = pos(j,i)
+                ip = j
+                iq = i
+
+                Crs = CICoef(l)+CICoef(k)
+                Cpq = CICoef(j)+CICoef(i)
+
+                ISkippedEig = 0
+                SumY = 0
+                do kk=1,NDimX
+                   if(EVal(kk).gt.SmallE.and.EVal(kk).lt.BigE) then
+                      SumY = SumY + EVec(ipq,kk)*EVec(irs,kk)
+                   else
+                      ISkippedEig = ISkippedEig + 1
+                      Skipped(ISkippedEig) = EVal(kk)
+                   endif
+                enddo
+
+                Aux = 2d0*Crs*Cpq*SumY
+
+                if(iq.Eq.is.and.ip.Eq.ir) then
+                   Aux = Aux - Occ(ip)*(1d0-Occ(is))-Occ(is)*(1d0-Occ(ip))
+                endif
+
+                ECorr = ECorr + Aux*ints(j,i)
+
+                if(IGem(ip).eq.IGem(iq).and.IGem(ir).eq.IGem(is).and.IGem(ip).eq.IGem(ir)) then
+                   EIntra = EIntra + Aux*ints(j,i)
+                endif
+
+              endif
+           enddo
+        enddo
+
+      endif
+   enddo
+enddo
+
+close(iunit)
+
+if(ISkippedEig/=0) then
+  write(LOUT,'(/,1x,"The number of discarded eigenvalues is",i4)') &
+       ISkippedEig
+  do i=1,ISkippedEig
+     write(LOUT,'(1x,a,i4,f15.8)') 'Skipped',i,Skipped(i)
+  enddo
+endif
+
+ECorr = 0.5d0*(ECorr-EIntra)
+write(lout,'(1x,a,3f15.8)') 'EGVB+ENuc, Corr, ERPA-GVB',ETot+ENuc,ECorr,ETot+ENuc+ECorr
+
+deallocate(Skipped)
+deallocate(ints,work)
+
+end subroutine EneERPA_FFFF
 
 end module abmat

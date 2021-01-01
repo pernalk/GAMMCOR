@@ -29,8 +29,6 @@ C
 C     LOCAL ARRAYS
 C
       Dimension XGrid(100), WGrid(100)
-C     21.07.2020 KP
-      Dimension TrGamm(NInte1,NInte1),EExcit(NInte1)
 C     HAP
       Double precision,Allocatable :: WorkVec(:),WorkEig(:),MYAP(:) 
 C
@@ -40,6 +38,15 @@ C
        Call SndOrder(ECorr1,ECorr01,TwoNO,Occ,URe,XOne,
      $ ABPLUS,ABMIN,Eig,
      $ Title,NBasis,NInte1,NInte2,NDim,NGem,IndAux)
+C
+      If(ITwoEl.Eq.2) Then
+      Call EneGVB_FFFF(ETot,URe,Occ,CICoef,XOne,
+     $                 IGem,IndN,NBasis,NInte1,'TWOMO',NDimX,NGem)
+      ElseIf(ITwoEl.Eq.3) Then
+      Call EneGVB_FOFO(NActive,NELE,ETot,URe,Occ,CICoef,XOne,
+     $                 IGem,IndN,NBasis,NInte1,'FOFO',NDimX,NGem)
+      EndIf
+C
       Write
      $ (6,'(/,2X,''EGVB+ENuc, 0th+1st-order ECorr, AC0-GVB '',
      $ 4X,3F15.8,/)') ETot+ENuc,ECorr1,ETot+ENuc+ECorr1
@@ -64,17 +71,11 @@ C
 C
 C     ITwoEl
       EndIf
-C     
+C      
       Write
      $ (6,'(/,X,''ECASSCF+ENuc, AC0-Corr, AC0-CASSCF '',4X,3F15.8)')
      $ ETot+ENuc,ECorr,ETot+ENuc+ECorr
-C 
 C
-c      Call DEEXCIT(TrGamm,EExcit,Occ,UNOAO,XOne,TwoNO,ENuc,NGem,NInte1,
-c     $ NInte2,NBasis)
-c      Stop
-C
-C     If(ICASSCF.Eq.1)
       EndIf
 C
       If(IFlFrag1.Eq.1) Then
@@ -100,6 +101,17 @@ C
 C     If(IFlFrag1.Eq.0)
       EndIf
 C
+C     DELETE MO INTEGRALS 
+      If(ITwoel.Eq.2) Then
+        Open(newunit=iunit,file='TWOMO',status='OLD')
+        Close(iunit,status='DELETE')
+      ElseIf(ITwoel.Eq.3) Then
+        Open(newunit=iunit,file='FFOO',status='OLD')
+        Close(iunit,status='DELETE')
+        Open(newunit=iunit,file='FOFO',status='OLD')
+        Close(iunit,status='DELETE')
+      EndIf
+C
       Return
 C
 C     If(IFlSnd.Eq.1)
@@ -118,6 +130,7 @@ C
       ACAlpha=XGrid(I)
 C
       If(ITwoEl.eq.1) Then
+
       Call ACEInteg(ECorrA,TwoNO,URe,Occ,XOne,UNOAO,
      $ ABPLUS,ABMIN,EigVecR,Eig,
      $ EGOne,NGOcc,
@@ -125,12 +138,26 @@ C
      $ IndN,IndX,NDimX)
 C
       ElseIf(ITwoEl.eq.3) Then
+
+      If(ICASSCF.Eq.1) Then
+
       Call ACEInteg_FOFO(ECorrA,URe,Occ,XOne,UNOAO,
      $ ABPLUS,ABMIN,EigVecR,Eig,
-     $ EGOne,NGOcc,
+     $ EGOne,NGOcc,CICoef,
      $ NBasis,NInte1,NDimX,NGem,IndAux,ACAlpha,
-     $ IGem,NAcCAS,NInAcCAS,IndN,IndX,NDimX,
+     $ IGem,NAcCAS,NInAcCAS,NELE,IndN,IndX,NDimX,
      $ NoSt,ICASSCF,IFlFrag1,IFunSR,IFunSRKer)
+
+      ElseIf(ICASSCF.Ne.1) Then
+
+      Call ACEInteg_FOFO(ECorrA,URe,Occ,XOne,UNOAO,
+     $ ABPLUS,ABMIN,EigVecR,Eig,
+     $ EGOne,NGOcc,CICoef,
+     $ NBasis,NInte1,NDim,NGem,IndAux,ACAlpha,
+     $ IGem,NActive,NInAcCAS,NELE,IndN,IndX,NDimX,
+     $ NoSt,ICASSCF,IFlFrag1,IFunSR,IFunSRKer)
+
+      EndIf
       EndIf
 C
       Write(*,*)'ACAlpha ',ACAlpha,' W_ALPHA ',ECorrA
@@ -151,6 +178,11 @@ C
       EndIf
 C
       Else 
+C
+      If(ITwoEl.Eq.3) Then
+      Call EneGVB_FOFO(NActive,NELE,ETot,URe,Occ,CICoef,XOne,
+     $                 IGem,IndN,NBasis,NInte1,'FOFO',NDimX,NGem)
+      EndIf
 C
       Write
      $ (6,'(/,2X,''EGVB+ENuc, Corr, AC-ERPA-GVB '',4X,3F15.8)')
@@ -1725,8 +1757,7 @@ C
      $ URe(NBasis,NBasis),XOne(NInte1),Occ(NBasis),TwoNO(NInte2),
      $ IndAux(NBasis),
      $ ABPLUS(NDimX*NDimX),ABMIN(NDimX*NDimX),
-     $ Eig(NDimX),EigY(NDimX*NDimX),IndX(NDim),IndN(2,NDim),
-     $ UNOAO(NBasis,NBasis)
+     $ Eig(NDimX),EigY(NDimX*NDimX),IndX(NDim),IndN(2,NDim)
 C
 C     LOCAL ARRAYS
 C
@@ -1992,17 +2023,16 @@ C
 C
       EndIf
       EndDo
-      EndDo      
+      EndDo
 C
       If(NDimB.Ne.0) Then
-      Print*, 'ACT-KA',norm2(ABPLUS(1:NDimB**2)),norm2(ABMIN)
+C      Print*, 'ACT-KA',norm2(ABPLUS(1:NDimB**2)),norm2(ABMIN)
       If(NoSt.Eq.1) Then
       Call ERPASYMM0(EigY(NFree2),EigX(NFree2),Eig(NFree1),ABPLUS,ABMIN,
-     $ NDimB)      
+     $ NDimB)
       Else
       Call ERPAVECYX(EigY(NFree2),EigX(NFree2),Eig(NFree1),ABPLUS,ABMIN,
      $ NDimB)
-C
       EndIf
       EndIf
 C
@@ -2072,7 +2102,7 @@ C
       EndDo
 C
       If(NDimB.Ne.0) Then
-      Print*, 'AI-KA',norm2(ABPLUS(1:NDimB**2)),norm2(ABMIN)
+C      Print*, 'AI-KA',norm2(ABPLUS(1:NDimB**2)),norm2(ABMIN)
       If(NoSt.Eq.1) Then
       Call ERPASYMM0(EigY(NFree2),EigX(NFree2),Eig(NFree1),ABPLUS,ABMIN,
      $ NDimB)
@@ -2169,7 +2199,7 @@ C     Do IP
       EndDo
 C      
 C     FIND THE 0TH-ORDER SOLUTION FOR THE VIRTUAL-INACTIVE BLOCKS
-C
+
 C KP 15.05.2019
       open(10,file='fock.dat')
       work1=0
@@ -4385,20 +4415,20 @@ C
       Dimension
      $ URe(NBasis,NBasis),XOne(NInte1),Occ(NBasis),TwoNO(NInte2),
      $ IndAux(NBasis),
-     $ ABPLUS(NDim*NDim),ABMIN(NDim*NDim),
+     $ ABPLUS(NDim,NDim),ABMIN(NDim,NDim),
      $ Eig(NDim),EGOne(NGem)
 C
 C     LOCAL ARRAYS
 C
       Dimension IndX(NDim),IndN(2,NDim),C(NBasis),
      $ EigVY2(NBasis*(NBasis-1)),IndP(NBasis,NBasis),
-     $ AMAT(NDim*NDim),BMAT(NDim*NDim)
+     $ AMAT(NDim,NDim),BMAT(NDim,NDim)
 C
       Do I=1,NBasis
       C(I)=CICoef(I)
       EndDo
 C
-C     0-TH ORDER EIGENVECTORS 
+C     0-TH ORDER EIGENVECTORS
 C
       IPQ=0
       Do IP=1,NBasis
@@ -4434,45 +4464,43 @@ C
 C
       ElseIf(ITwoEl.Eq.2) Then
 C
-      Call LookUp_mithap(NAct,INAct,Occ,
-     $                  IndAux,IndP,IndN,IndX,NDimX,NDim,NBasis)
-      Print*, 'NAct,INAct',NAct,INAct,NDimX,NDim,NGem
-
+      Call LookUp_mithap(Occ,IndAux,IndP,IndN,IndX,NDimX,NDim,NBasis)
       Call ACABMAT0_mithap(ABPLUS,ABMIN,URe,Occ,XOne,
      $            IndN,IndX,IGem,CICoef,
-     $            NAct,INAct,NBasis,NDim,NDimX,NInte1,NGem,
+     $            NBasis,NDim,NDimX,NInte1,NGem,
      $            'TWOMO',0,ACAlpha,1)
 C
       ElseIf(ITwoEl.Eq.3) Then
 C
-      Call LookUp_mithap(NAct,INAct,Occ,
-     $                  IndAux,IndP,IndN,IndX,NDimX,NDim,NBasis)
+      Call LookUp_mithap(Occ,IndAux,IndP,IndN,IndX,NDimX,NDim,NBasis)
 C
       Call ACABMAT0_FOFO(ABPLUS,ABMIN,URe,Occ,XOne,
      $            IndN,IndX,IGem,CICoef,
-     $            NAct,INAct,NBasis,NDim,NDimX,NInte1,NGem,
+     $            NActive,NELE,NBasis,NDim,NDimX,NInte1,NGem,
      $            'TWOMO','FFOO','FOFO',0,ACAlpha,1)
 C
       EndIf
 C
-      Do I=1,NDim*NDim
-      AMAT(I)=ABPLUS(I)
-      BMAT(I)=ABMIN(I)
+      Do J=1,NDim
+      Do I=1,NDim
+      AMAT(I,J)=ABPLUS(I,J)
+      BMAT(I,J)=ABMIN(I,J)
+      EndDo
       EndDo
 C
       IRS=0
       Do IR=1,NBasis
       Do IS=1,IR-1
       IRS=IRS+1
-      IRSIRS=(IRS-1)*NDim+IRS
+C      IRSIRS=(IRS-1)*NDim+IRS
       Eig(IRS)=Zero
 C
       If(Occ(IR).Ne.Occ(IS).And.IGem(IR).Ne.IGem(IS)) Then
-      AA=Half*((C(IR)+C(IS))**2*ABPLUS(IRSIRS)
-     $       + (C(IR)-C(IS))**2*ABMIN(IRSIRS))
+      AA=Half*((C(IR)+C(IS))**2*ABPLUS(IRS,IRS)
+     $       + (C(IR)-C(IS))**2*ABMIN(IRS,IRS))
       Eig(IRS)=ABS(AA/(Occ(IR)-Occ(IS)))
       Else
-      Eig(IRS)=ABS(ABPLUS(IRSIRS))
+      Eig(IRS)=ABS(ABPLUS(IRS,IRS))
       EndIf
 C
       EndDo
@@ -4487,7 +4515,7 @@ C
 C
       Call ACABMAT0_mithap(ABPLUS,ABMIN,URe,Occ,XOne,
      $            IndN,IndX,IGem,CICoef,
-     $            NAct,INAct,NBasis,NDim,NDimX,NInte1,NGem,
+     $            NBasis,NDim,NDimX,NInte1,NGem,
      $            'TWOMO',0,ACAlpha,1)
 C
       ElseIf(ITwoEl.Eq.3) Then
@@ -4498,17 +4526,19 @@ C      Print*, 'ACAlpha',ACAlpha
 C
       Call ACABMAT0_FOFO(ABPLUS,ABMIN,URe,Occ,XOne,
      $            IndN,IndX,IGem,CICoef,
-     $            NAct,INAct,NBasis,NDim,NDimX,NInte1,NGem,
+     $            NActive,NELE,NBasis,NDim,NDimX,NInte1,NGem,
      $            'TWOMO','FFOO','FOFO',0,ACAlpha,1)
 C 
       EndIf
 C
 C     AMAT AND BMAT WILL INCLUDE 1ST-ORDER A+ AND A- MATRICES, RESPECTIVELY
 C
-      Do I=1,NDim*NDim
-      AMAT(I)=ABPLUS(I)-AMAT(I)
-      BMAT(I)=ABMIN(I)-BMAT(I)
-      EndDo 
+      Do J=1,NDim
+      Do I=1,NDim
+      AMAT(I,J)=ABPLUS(I,J)-AMAT(I,J)
+      BMAT(I,J)=ABMIN(I,J)-BMAT(I,J)
+      EndDo
+      EndDo
 C
 C     CONSTRUCT LOOK-UP TABLES
 C
@@ -4530,7 +4560,8 @@ C
 C
 C     do not correlate active degenerate orbitals if from different geminals
       If((IGem(I).Ne.IGem(J)).And.(IndAux(I).Eq.1).And.(IndAux(J).Eq.1)
-     $ .And.(Abs(Occ(I)-Occ(J))/Occ(I).Lt.1.D-2) ) Then
+C     $ .And.(Abs(Occ(I)-Occ(J))/Occ(I).Lt.1.D-2) ) Then
+     $ .And.(Abs(Occ(I)-Occ(J))/Occ(I).Lt.ThrSelAct) ) Then
       Write(*,*)"Discarding nearly degenerate pair",I,J
       Else
 C    
@@ -4587,12 +4618,15 @@ C
       EPSJI=Zero
       EndIf
 C
-      IJ=(IRS-1)*NDim+IPQ 
-      Aux=(Half*AMAT(IJ)-Two*EigVY2(IPQ)*EigVY2(IRS)*BMAT(IJ))
-     $    *EPSJI 
+C      IJ=(IRS-1)*NDim+IPQ 
+C      Aux=(Half*AMAT(IJ)-Two*EigVY2(IPQ)*EigVY2(IRS)*BMAT(IJ))
+C     $    *EPSJI 
+      Aux=(Half*AMAT(IPQ,IRS)-Two*EigVY2(IPQ)*EigVY2(IRS)*BMAT(IPQ,IRS))
+     $    *EPSJI
 C
 C     Save Aux - it may be needed in embedding calculations
-      ABPLUS((J-1)*NDimX+I)=(C(IP)+C(IQ))*(C(IR)+C(IS))*Aux
+C      ABPLUS((J-1)*NDimX+I)=(C(IP)+C(IQ))*(C(IR)+C(IS))*Aux
+      ABPLUS(I,J)=(C(IP)+C(IQ))*(C(IR)+C(IS))*Aux
 C
 C     only if indices not from the same geminals and (IP,IQ) and 
 C     (IR,IS) pairs are accepted
@@ -4616,9 +4650,9 @@ C
       ElseIf(ITwoEl.Eq.3) Then
 
       Call ECorrAC0GVB_FOFO(ECorr0,ECorr,AMAT,BMAT,ABPLUS,
-     $                        EigVY2,Occ,C,Eig,
-     $                        IndP,IndN,IndX,IGem,
-     $                        'FOFO',NAct,INAct,NDim,NDimX,NGem,NBasis)
+     $                      EigVY2,Occ,C,Eig,
+     $                      IndP,IndN,IndX,IGem,
+     $                      'FOFO',NActive,NELE,NDim,NDimX,NGem,NBasis)
 C
 C      Write(6,'(1x,a)') "SORRY!"
 C      Stop
@@ -4627,7 +4661,7 @@ C      Stop
       ECorr=ECorr+ECorr0
 C
       Write
-     $ (6,'(/,2X,''0-ALPHA-ORDER CORRELATION '',2X,F15.8)') ECorr0
+     $ (6,'(/,1X,''0-ALPHA-ORDER CORRELATION '',2X,F15.8)') ECorr0
 C
       Return
       End
@@ -5651,7 +5685,7 @@ C
       Return
       End
 
-      Subroutine LookUp_mithap(NAct,INAct,Occ,IndAux,
+      Subroutine LookUp_mithap(Occ,IndAux,
      $                         IndP,IndN,IndX,NDimX,NDim,NBasis)
 C
       Implicit Real*8 (A-H,O-Z)
@@ -5664,19 +5698,6 @@ C
       Parameter(Delta=1.D-6)
 C     
       Include 'commons.inc'
-
-C
-      INAct = 0
-      Do I=1,NBasis
-      If(IndAux(I)/=0) exit
-       INAct = INAct + 1
-      EndDo
-      NVir = 0
-      Do I=NBasis,1,-1
-      If(IndAux(I)/=2) exit
-      NVir = NVir + 1
-      EndDo
-      NAct = NBasis - INAct - NVir
 C
 C     CONSTRUCT LOOK-UP TABLES
 C
@@ -5834,13 +5855,13 @@ C
 
       Subroutine ECorrAC0GVB_FOFO(ECorr0,ECorr,AMAT,BMAT,ABPLUS,
      $                 EigVY2,Occ,C,Eig,IndP,IndN,IndX,IGem,
-     $                 IntKFile,NAct,INActive,NDim,NDimX,NGem,NBasis)
+     $                 IntKFile,NAct,NElHlf,NDim,NDimX,NGem,NBasis)
 C
       use tran
 C
       Implicit None
 
-      Integer :: NAct,INActive,NDim,NDimX,NGem,NBasis
+      Integer :: NAct,NElHlf,NDim,NDimX,NGem,NBasis
       Integer :: IndX(NDim),IndN(2,NDim),IndP(NBasis,NBasis),
      $           IGem(NBasis)
       Character(*) :: IntKFile
@@ -5851,7 +5872,7 @@ C
      $                    ABPLUS(NDimX,NDimX)
 C
       Integer :: iunit
-      Integer :: NOccup
+      Integer :: INActive,NOccup
       Integer :: ip,iq,ir,is,ipq,irs
       Integer :: i,j,k,l,kl
       Integer :: pos(NBasis,NBasis)
@@ -5859,7 +5880,8 @@ C
       Double Precision :: Cpq,Crs,Aux,EPSJI
       Double Precision,Allocatable :: Work(:),ints(:,:)
 
-      NOccup = NAct + INActive
+      INActive = NElHlf - NAct
+      NOccup = 2*NAct + INActive
 
       pos = 0
       Do I=1,NDimX

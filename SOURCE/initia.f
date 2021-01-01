@@ -253,6 +253,12 @@ C     TRANSFORM J AND K
 C
       EndIf
 C
+      If(ITwoEl.Gt.1) Then
+C     DELETE SORTED AOTWOINTS FOFO
+      Write(6,'(/A)') 'SORTED 2-el AO ints deleted after tran4_gen!'
+      Call delfile('AOTWOSORT')
+      EndIf
+C
       Inquire(File='AOONEINT',EXIST=exione)
       If(exione) Then
 C
@@ -1143,7 +1149,7 @@ C      Call GetENuc_AO(ENuc,Title)
 C
 C     HAP
       Call create_ind('2RDM',NumOSym,IndInt,MxSym,NBasis)
-C
+C 
 C     LOAD ONE-ELE INTEGS IN AO
       FName(K:K+8)='xone.dat'
 C      Call Int1_AO(XKin,NInte1,FName,NumOSym,Nbasis)
@@ -1194,7 +1200,7 @@ C     READ RDMs: NEW
       EndDo
 C
       Call CpySym(AUXM,Gamma,NBasis)
-C  
+C
 C KP 30.07.2020
       Call read_nact_molpro(nact,'2RDM')
       NAc=nact
@@ -1209,8 +1215,6 @@ C
       EndDo
       Call Diag8(AUXM1,NAc,NAc,PC,Work)
       Call SortP(PC,AUXM1,NAc)
-c      Call Diag8(AUXM,NBasis,NBasis,PC,Work)
-c      Call SortOcc(PC,AUXM,NBasis)
 C
 C KP 30.07.2020
       AUXM(1:NBasis,1:NBasis)=Zero
@@ -1218,7 +1222,7 @@ C KP 30.07.2020
       Do J=1,NAc
       AUXM(I,J)=AUXM1((J-1)*NAc+I)
       EndDo
-      EndDo 
+      EndDo
 C
       Sum=Zero
       NAc=0
