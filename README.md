@@ -7,8 +7,9 @@ Authors: Kasia Pernal and Michal Hapka
 git clone https://github.com/pernalk/GAMMCOR.git 
 ```
 
-2. Create a directory OBJ:
+2. Change directory to GAMMCOR and create a directory OBJ:
 ```
+chdir GAMMCOR
 mkdir OBJ
 ```
 
