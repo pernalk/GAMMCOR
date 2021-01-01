@@ -400,7 +400,7 @@ subroutine read_block_calculation(CalcParams, line)
               CalcParams%SaptLevel = SAPTLEVEL2
               CalcParams%vdWCoef = 1
            elseif (uppercase(val) == "DISP-CAS") then
-              CalcParams%SaptLevel = 10 
+              CalcParams%SaptLevel = 10
            endif
 
       case("RESTART") 

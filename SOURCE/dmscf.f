@@ -72,35 +72,14 @@ C
 C
 C     MH: LATER REPLACE OPTNORB BY ENERGY CHECK!!!
       If(ITwoEl.Eq.1) Then
-C
       Call OPTNORB(ETot,URe,Occ,XOne,XNuc,DipX,DipY,DipZ,TwoEl,UMOAO,
      $ NSymMO,Title,NBasis,NInte1,NInte2,NGem,NGOcc,IModG)
-C
-      ElseIf(ITwoEl.Eq.3) Then
-C
-      NOccup=Zero
-      Do I=1,NBasis
-      If(Occ(I).Gt.Zero) NOccup=NOccup+1
-      EndDo
-      ETot=Zero
-      Do I=1,NOccup
-      II=(I*(I+1))/2
-      ETot=ETot+Two*Occ(I)*XOne(II)
-      EndDo
-      Write(6,'(/,1X,''One-electron Energy'',5X,F15.8)')ETot
-      Call TwoEneGVBChck(ETwo,Occ,NOccup,NBasis)
-      ETot=ETwo+ETot
-      Write(6,'(1X,''Two-electron Energy'',5X,F15.8)')ETwo
-      Write(6,'(1X,''Electronic   Energy'',5X,F15.8)')ETot
-      Write(6,'(1X,''Total GVB Energy   '',5X,F15.8)')ETot+ENuc
-C
       EndIf
 C
       NGOcc=0
       Call INTERPA(ETot,ENuc,TwoEl,URe,UReSav,Occ,XOne,
      $  Title,NBasis,NInte1,NInte2,NDim,NGem,NGOcc)
 C
-C     If(ICASSCF.Eq.1)
       EndIf
 C
 c      NoEig=3

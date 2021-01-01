@@ -72,10 +72,8 @@ C     If IFlCore=0 do not include core (inactive) orbitals
       If((IFlCore.Eq.1).Or.
      $ (IFlCore.Eq.0.And.Occ(I).Ne.One.And.Occ(J).Ne.One)) Then
 C
-C KP 08.12.2020 : avoid the case when the active orbital of the occupancy<10^-7 is paired with virtual orbs 
-C      If(Abs(Occ(i)+Occ(j)-Two).Gt.1.D-10) Then
-      If(Abs(Occ(i)+Occ(j)-Two).Gt.1.D-10.And.
-     $   Abs(Occ(i)+Occ(j)).Gt.1.D-15) Then
+      If(Abs(Occ(i)+Occ(j)-Two).Gt.1.D-10.And. 
+     $   Abs(Occ(i)+Occ(j)).Gt.1.D-7) Then
       Ind=Ind+1
       IndX(Ind)=Ind
       IndN(1,Ind)=I
@@ -640,6 +638,7 @@ C      EndDo
 C      Close(10)
 C     HAP
       Call create_ind('2RDM',NumOSym,IndInt,NSym,NBasis)
+      MxSym=NSym
 C
       NSymNO(1:NBasis)=0
       IStart=0
@@ -1120,6 +1119,16 @@ C
       DeAllocate  (OrbZGrid)
       DeAllocate  (Work)
       DeAllocate (SRKer)
+C     
+      Call delfile('AOTWOSORT')
+      Call delfile('AOERFSORT')
+C
+      If(ITwoEl.Eq.3) Then
+      Call delfile('FFOO')
+      Call delfile('FOFO')
+      Call delfile('FOFOERF')
+      Call delfile('FFOOERF')
+      EndIf
 C
       Return
       End
