@@ -33,7 +33,7 @@ C
 c      Write(6,'(/,X,"NATURAL ORBITALS IN AO BASIS SET")')
 cC
 c   98 Format(X,10F10.6)
-c      Call MultpM(UReSav,URe,UMOAO,NBasis)
+      Call MultpM(UReSav,URe,UMOAO,NBasis)
 c      NLine=NBasis/10
 c      If(NLine*10-NBasis.Ne.0)NLine=NLine+1
 c      Do I=1,NBasis

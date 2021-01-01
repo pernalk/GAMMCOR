@@ -60,10 +60,20 @@ C
       Write(6,'(/,X,''  DATA READ FROM DALTON OUTPUT. GRAD NORM = 
      $ '',E16.6)')GradNo
 C
-      If(GradNo.Lt.1.D-5) Return
+C      If(GradNo.Lt.1.D-5) Return
+CC
+C      Stop 'DALTON GVB CALCULATIONS HAS NOT BEEN CONVERGED. EXIT.'
+CC
+C     MH: for testing decrease Grad Threshold
+      If(GradNo.Lt.1.D-4) Then 
+         Return
+      Else
+         Write(6,*) 'DALTON GVB CALCULATIONS NOT CONVERGED',GradNo
+      Stop
+      End If
 C
-      Stop 'DALTON GVB CALCULATIONS HAS NOT BEEN CONVERGED. EXIT.'
-C
+
+
 c     If(IDALTON.Eq.1) 
       EndIf
 C

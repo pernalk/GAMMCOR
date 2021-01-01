@@ -6,9 +6,6 @@ make
 
 To compile with gfortran change flags in Makefie.
 
-
-
-
 ********************************* 
 EERPA
 ********************************* 
@@ -59,6 +56,22 @@ Output:
 * in addition, for state 1.1 transition dipole moments in:
               - CAS approximation (based on transition matrices from molpro)
               - the (0) and (1)-order ERPA approximations
+
+*********************************
+CASPiDFT
+*********************************
+JobType:
+CASPIDFTOPT
+
+PiDFT optimal parameters from Hapka et al., J. Phys. Chem. Lett. 2020, 11, 5883 are used
+or they can be read from the command line in the order: A B G C D 
+
+Input: 1RDM, 2RDM, GRID, AO Orb on grid, CAS orbs.
+Input files (generated from molpro): 2RDM, GRID, MOLPRO.MOPUN, 
+AOONEINT.mol, AOTWOINT.mol (must be present). xcfun library is used.
+
+Output: PiDFT and LYP Correlation Energy and the Ionicity Index.
+
 ********************************* 
 SAPT: GENERAL REMARKS
 ********************************* 

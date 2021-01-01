@@ -34,6 +34,9 @@ c      double precision sigmaco(ngrid),sigmaoo(ngrid)
 c      double precision vrhoc(ngrid),vrhoo(ngrid)
 c      double precision vsigmacc(ngrid),vsigmaco(ngrid),vsigmaoo(ngrid)
 C
+      Call CORRELON(URe,UNOAO,Occ,NBasis)
+      stop
+C
       FDeriv=.True.
       Open=.False.
       Alpha=0.4
@@ -67,7 +70,7 @@ C
       Allocate  (RR(3,NGrid))
       Allocate  (OnTop(NGrid))
 C
-C      Call molprogrid1(RR,NGrid)
+      Call molprogrid1(RR,NGrid)
 C
 C     READ 2RDM, COMPUTE THE ENERGY
 C
@@ -187,11 +190,11 @@ C     >                   Zk1,vrhoc,vrhoo,
 C     >                   vsigmacc,vsigmaco,vsigmaoo,Alpha)
 C
 C
-c      IVer=1
-c      Call MCORRECTION(ELSM,Occ,TwoNO,URe,
-c     $                 OrbGrid,WGrid,
-c     $                 OrbXGrid,OrbYGrid,OrbZGrid,
-c     $                 NGrid,NBasis,NInte1,NInte2,IVer)
+      IVer=1
+      Call MCORRECTION(ELSM,Occ,TwoNO,URe,
+     $                 OrbGrid,WGrid,
+     $                 OrbXGrid,OrbYGrid,OrbZGrid,
+     $                 NGrid,NBasis,NInte1,NInte2,IVer)
 C
       ConCorr(1:200)=Zero
       A=0.2D0
@@ -212,6 +215,12 @@ C
       If(RhoGrid(I).Ne.Zero) Then
 C 
       XX=Two*OnTop(I)/RhoGrid(I)**2
+C
+c      If(Abs(RR(1,I)).eq.zero.And.Abs(RR(2,I)).eq.zero)
+c     $ Write(*,'(5E15.6)')RR(1,I),RR(2,I),RR(3,I),RhoGrid(I),XX
+c     $ Zk(I),WGrid(I)
+c      If(Abs(RR(1,I)).eq.zero.And.Abs(RR(2,I)-0.8).Lt.0.02)
+c     $ Write(*,'(5E15.6)')RR(1,I),RR(2,I),RR(3,I),RhoGrid(I),XX
 C
       If(XX.Le.One) Then      
       PX=A*XX/(One+B*XX)
@@ -246,13 +255,21 @@ C
 *Deck CASPIDFTOPT
       Subroutine CASPIDFTOPT(URe,UNOAO,Occ,NBasis)
 C
+C     CASPiDFT correlation energy is returned (and others, like LYP)
+C     Two-electron integrals are not needed
+C     If no parameters (order: A B G C D) are provided in the command line, the parameters used are:
+C     ground state (state 1.1): 0.2 -0.8 1.5 2.6 6.4
+C     excited state (state neq 1.1): 0.19185565 -0.81488859  1.50106868  2.56648139  6.31514676
+C     see: Hapka et al., J. Phys. Chem. Lett. 2020, 11, 5883−5889
+C
+      use types
+C
       Implicit Real*8 (A-H,O-Z)
 C
       Parameter(Zero=0.D0, Half=0.5D0, One=1.D0, Two=2.D0, Four=4.D0)
 C
       Include 'commons.inc'
 C
-c      Real*8, Dimension(:), Allocatable :: OrbGrid(:,:)
       Real*8, Dimension(:), Allocatable :: OrbXGrid
       Real*8, Dimension(:), Allocatable :: OrbYGrid
       Real*8, Dimension(:), Allocatable :: OrbZGrid
@@ -265,41 +282,73 @@ c      Real*8, Dimension(:), Allocatable :: OrbGrid(:,:)
       Real*8, Allocatable :: RDM2Act(:),OrbGrid(:,:)
       Real*8, Allocatable :: RR(:,:)
       Real*8, Allocatable :: OnTop(:)
-      CHARACTER(100) :: num1char,num2char,num3char
+      Real*8, Dimension(:), Allocatable ::RhoAct,OnTopAct,SigmaAct,
+     $ ZkAct,ZkPBE
+      Dimension OccAct(NBasis)
+C
+      CHARACTER(100) :: num1char,num2char,num3char,num4char,num5char
 C
       Dimension URe(NBasis,NBasis),UNOAO(NBasis,NBasis),Occ(NBasis),
      $ Ind1(NBasis),Ind2(NBasis),
      $ ConCorr(200)
      $ ,EpsC(NBasis,NBasis),EpsCI(NBasis),EpsDiag(NBasis)
       logical fderiv,open
-c      double precision rhoo(ngrid)
-c      double precision sigmaco(ngrid),sigmaoo(ngrid)
       integer igrad
       character*(30) name
 C
 C     IFlagRead = 0 - generate grid data, do not write to a file
+C     if parameteres in caspidft are optimized it is useful to use flags different from 0 to avoid generating data on grid more than once
 C     IFlagRead = 1 - read grid data (density, ontop, and lyp energy density) from a file
 C     IFlagRead = 2 - write grid data to a file
 C
       IFlagRead=0
 C
-      IF(COMMAND_ARGUMENT_COUNT().Eq.0)THEN
-      WRITE(*,*)'ERROR, COMMAND-LINE ARGUMENTS REQUIRED, STOPPING'
-      STOP
-      ENDIF
-
+      Write(6,'(/,X,"***************** CASPIDFT ******************* ")')
+      Write(6,'(X,"STATE : ",I1,".", I1,/)')inst(1,1),inst(2,1)
+C
+      IF(COMMAND_ARGUMENT_COUNT().Eq.0) THEN
+C
+      If(inst(1,1).Eq.1.And.inst(2,1).Eq.1) Then
+      Write(6,'(/,X,"Ground-state optimal parameteres 
+     $ will be used in PiDFT")')
+      A1= 0.2D0
+      B1=-0.8D0
+      G1= 1.5D0
+      C1= 2.6D0 
+      D1= 6.4D0
+      Else
+      Write(6,'(/,X,"Excited-state optimal parameteres
+     $ will be used in PiDFT")')
+      A1= 0.19185565
+      B1=-0.81488859  
+      G1= 1.50106868  
+      C1= 2.56648139  
+      D1= 6.31514676
+      EndIf
+C
+      ELSE
+      Write(6,'(/,X,"Parameters read from a command line 
+     $ will be used in PiDFT")')
+C
       CALL GET_COMMAND_ARGUMENT(1,num1char)   !first, read in the two values
       CALL GET_COMMAND_ARGUMENT(2,num2char)
-c      CALL GET_COMMAND_ARGUMENT(3,num3char)
+      CALL GET_COMMAND_ARGUMENT(3,num3char)
+      CALL GET_COMMAND_ARGUMENT(4,num4char)
+      CALL GET_COMMAND_ARGUMENT(5,num5char)
 
       READ(num1char,*)xnum1                    !then, convert them to REALs
       READ(num2char,*)xnum2
-c      READ(num3char,*)xnum3
+      READ(num3char,*)xnum3
+      READ(num4char,*)xnum4
+      READ(num5char,*)xnum5
 C
       A1=XNum1
       B1=XNum2
+      G1=XNum3
+      C1=XNum4 
+      D1=XNum5
 C
-      Write(6,'(/,X,"***************** CASPIDFT ***************** ")')
+      ENDIF 
 C
       Call molprogrid0(NGrid,NBasis)
 C
@@ -311,11 +360,16 @@ C
       Allocate  (RhoGrid(NGrid))
       Allocate  (Sigma(NGrid))
       Allocate  (Zk(NGrid))
-      Allocate  (Zk1(NGrid))
       Allocate  (RR(3,NGrid))
       Allocate  (OnTop(NGrid))
+C 
+      Allocate  (RhoAct(NGrid))
+      Allocate  (OnTopAct(NGrid))
+      Allocate  (SigmaAct(NGrid)) 
+      Allocate  (ZkAct(NGrid))
+      Allocate  (ZkPBE(NGrid))
 C
-C      Call molprogrid1(RR,NGrid)
+c      Call molprogrid1(RR,NGrid)
 C
 C     READ 2RDM, COMPUTE THE ENERGY
 C
@@ -363,6 +417,48 @@ C
       GoTo 300
       EndIf
 C
+C     APPROXIMATE PROJECTION ON CAS(4,4) [used only in definition of ionicity index]
+C
+      Write(6,'(/,X,
+     $ "Occupancies projected on CAS(4,4) for ionicity index")')
+      Do I=1,NBasis
+      OccAct(I)=Occ(I)
+c      If(I.Le.NInAcCAS) OccAct(I)=Zero
+C ONLY HOMO-LUMO
+c      If(I.Gt.NELE+1) OccAct(I)=Zero
+c      If(I.Gt.NInAcCAS.And.I.Lt.NELE) OccAct(I)=One
+C HOMO-1 TO LUMO+1
+      If(I.Gt.NELE+2) OccAct(I)=Zero
+      If(I.Gt.NInAcCAS.And.I.Lt.NELE-1) OccAct(I)=One 
+      If(OccAct(I).Ne.Zero) 
+     $ Write(6,'(X,I4,3X,E12.5)')I,OccAct(I) 
+      EndDo 
+C
+      Do I=1,NGrid
+      Call DenGrid(I,RhoAct(I),OccAct,URe,OrbGrid,NGrid,NBasis)
+      Call DenGrad(I,RhoX,OccAct,URe,OrbGrid,OrbXGrid,NGrid,NBasis)
+      Call DenGrad(I,RhoY,OccAct,URe,OrbGrid,OrbYGrid,NGrid,NBasis)
+      Call DenGrad(I,RhoZ,OccAct,URe,OrbGrid,OrbZGrid,NGrid,NBasis)
+      SigmaAct(I)=RhoX**2+RhoY**2+RhoZ**2
+      OnTopAct(I)=Zero
+      EndDo
+      Do IP=1,NOccup
+      Do IQ=1,NOccup
+      Do IR=1,NOccup
+      Do IS=1,NOccup
+c      Gam2=FRDM2(IP,IQ,IR,IS,RDM2Act,OccAct,Ind2,NAct,NBasis)
+      Gam2=FRDM2R(IP,IQ,IR,IS,RDM2Act,OccAct,Ind2,NAct,NBasis)
+      If(Abs(Gam2).Gt.1.D-8) Then
+      Do I=1,NGrid
+      OnTopAct(I)=OnTopAct(I)
+     $ +Two*Gam2*OrbGrid(I,IP)*OrbGrid(I,IQ)*OrbGrid(I,IR)*OrbGrid(I,IS)
+      EndDo
+      EndIf
+      EndDo
+      EndDo
+      EndDo
+      EndDo
+C
       Do I=1,NGrid
 C
       Call DenGrid(I,RhoGrid(I),Occ,URe,OrbGrid,NGrid,NBasis)
@@ -398,27 +494,29 @@ C
 C
 C     OVERLAP OF ORBITALS
 C
-      Do I=1,NOccup
-      If(Occ(I).Lt.0.8.And.Occ(I).Gt.0.2) Then
-      Do J=1,I-1
-      If(Occ(J).Lt.0.8.And.Occ(J).Gt.0.2) Then
-C
-      SIJ=Zero
-      Do IG=1,NGrid
-      SIJ=SIJ+Abs(OrbGrid(IG,I)*OrbGrid(IG,J))*WGrid(IG)
-      EndDo
-C
-      Write(6,'(/,X,"Abs Overlap S",2I4,2F8.5,E12.5)')
-     $ I,J,Occ(I),Occ(J),SIJ
-C
-      EndIf
-      EndDo
-C
-      EndIf
-      EndDo
+c      Do I=1,NOccup
+c      If(Occ(I).Lt.0.8.And.Occ(I).Gt.0.2) Then
+c      Do J=1,I-1
+c      If(Occ(J).Lt.0.8.And.Occ(J).Gt.0.2) Then
+cC
+c      SIJ=Zero
+c      Do IG=1,NGrid
+c      SIJ=SIJ+Abs(OrbGrid(IG,I)*OrbGrid(IG,J))*WGrid(IG)
+c      EndDo
+cC
+c      Write(6,'(/,X,"Abs Overlap S",2I4,2F8.5,E12.5)')
+c     $ I,J,Occ(I),Occ(J),SIJ
+cC
+c      EndIf
+c      EndDo
+cC
+c      EndIf
+c      EndDo
 C
       Call LYP(RhoGrid,Sigma,Zk,NGrid)
-C
+C 
+      Call LYP(RhoAct,SigmaAct,ZkAct,NGrid)
+      Call PBECor(RhoAct,SigmaAct,ZkPBE,NGrid)
 C
       If(IFlagRead.Eq.2) Then
       Open(10,File="data_on_grid.dat",form='unformatted')
@@ -431,41 +529,97 @@ C
 C
       A=A1
       B=B1
-c      A=0.2D0
-c      B=A-One
-      C=2.6D0
-      G=1.5D0
-      D=(C-One)/(One-G)**2
+      C=C1
+      G=G1
+      D=D1
 C
-      Write(6,'(/,1X,''Values of A, B, C, G parameters in CASPIDFT'',
-     $ 2X,4F12.6)')A,B,C,G
+      Write(6,'(/,1X,''Values of A, B, C, G, D parameters in PiDFT:'',
+     $ 5F12.6)')A,B,C,G,D
 C
       EDYN=Zero
       ELYP=Zero
+      EIonLYP=Zero
+      EIon=Zero
+C     
+      EDYNAct=Zero       
+      EIonAct=Zero
+      ELYPAct=Zero
+      EIonLYPAct=Zero
+      EPBEAct=Zero
+      EIonPBEAct=Zero
 C
       Do I=1,NGrid
 C
       If(RhoGrid(I).Ne.Zero) Then
 C
       XX=Two*OnTop(I)/RhoGrid(I)**2
+c      If(Abs(RR(1,I)).Lt.1.D-10.And.Abs(RR(2,I)).Lt.1.D-10)
+c     $ Write(*,'(F10.4,E13.4,F10.4)') RR(3,I),RhoGrid(I),XX
 C
-c herer!!! one segment only
-c      If(XX.Le.One) Then
+      If(XX.Le.One) Then
+C
       PX=A*XX/(One+B*XX)
-c      Else
-c      PX=C*XX**0.25-D*(XX-G)**2
-c      EndIf
+      If(RhoGrid(I).Lt.1.d-10)PX=Zero
 C
+      Else
+C
+      PX=C*XX**0.25-D*(XX-G)**2
+c herer!!! condition P(2)=1.48 is the maximum allowed value
+c      If(XX.Gt.2.0.Or.PX.Gt.1.48) PX=1.48
+c      If(Abs(Zk(I)).Lt.1.D-7.And.XX.Gt.1.5) PX=One
+C     
+      EndIf
+C
+      PXA=Zero
+      If(RhoAct(I).Gt.1.d-10) Then
+      XXA=Two*OnTopAct(I)/RhoAct(I)**2
+      If(XXA.Le.One) Then
+      PXA=A*XXA/(One+B*XXA)
+      Else
+      PXA=C*XXA**0.25-D*(XXA-G)**2
+      EndIf 
+      EndIf
+C
+      If(XX.Gt.One) EIonLYP=EIonLYP+Zk(I)*WGrid(I)
+      If(XX.Gt.One) EIon=EIon+PX*Zk(I)*WGrid(I)
       EDYN=EDYN+PX*Zk(I)*WGrid(I)
       ELYP=ELYP+Zk(I)*WGrid(I)
+C 
+      EDYNAct=EDYNAct+PXA*ZkAct(I)*WGrid(I)
+      If(XXA.Gt.One) EIonAct=EIonAct+PXA*ZkAct(I)*WGrid(I)
+      ELYPAct=ELYPAct+ZkAct(I)*WGrid(I)
+      If(XXA.Gt.One) EIonLYPAct=EIonLYPAct+ZkAct(I)*WGrid(I)
+      EPBEAct=EPBEAct+ZkPBE(I)*WGrid(I)
+      If(XXA.Gt.One) EIonPBEAct=EIonPBEAct+ZkPBE(I)*WGrid(I)
 C
       EndIf
 C
       EndDo
-      Write(6,'(/,1X,''LYP Correlation'',7X,F15.8)')ELYP
-      Write(6,'(1X,''CASPIDFT Correlation'',2X,F15.8)')EDYN
+      Write(6,'(/,1X,''LYP Correlation'',12X,F15.8)')ELYP
+      Write(6,'(1X,''PiDFT Correlation'',10X,F15.8)')EDYN
+C    
+      Write(6,'(/,36X,"PiDFT           LYP")') 
+      Write(6,'(1X,''Corr Energy, X>1'',11X,2F15.8)') 
+     $ EIon,EIonLYP
+      Write(6,'(1X,''Tot Ionicity Index'', 5X,F12.1,"%",2X,F12.1,"%")')
+     $ EIon/EDYN*100.,EIonLYP/ELYP*100
 C
-      Stop
+      Write(6,'(/,1X,''Corr Energy CAS(4,4)_P'',5X,2F15.8)')EDYNAct,
+     $ ELYPAct
+      Write(6,'(1X,''Corr Energy CAS(4,4)_P, X>1'',2F15.8)') EIonAct,
+     $ EIonLYPAct
+      Write(6,
+     $ '(1X,''Ionicity Index CAS(4,4)_P'', F10.1,"%",4X,F10.1,"%")') 
+     $ EIonAct/EDYNAct*100.,EIonLYPAct/ELYPAct*100
+C
+C PBE PRINT
+C
+c      Write(6,'(/,1X,''PBE Corr CAS(4,4)_P'',8X,F15.8)')EPBEAct
+c      Write(6,'(1X,''PBE Corr CAS(4,4)_P, X>1'',3X,F15.8)')EIonPBEAct
+c      Write(6,
+c     $ '(1X,''Ionicity Index PBE CAS(4,4)_P'',F11.1,"%")')
+c     $ EIonPBEAct/EPBEAct*100
+C
 C
       Return
       End
@@ -713,11 +867,17 @@ C
       Allocate(OrbGem(NELE-INActive,2))
 C
       II=1
+c herer!!!
+c      INActive=4 
+
       Do IP=INActive+1,NELE
       IGem(IP)=IP
 C
       XDevMax=Zero
+c herer!!!
       Do IQ=NELE+1,NOccup
+c herer!!! do not go through all weakly occupied orbitals but only through the strongly-correlated ones
+c      Do IQ=NELE+1,NELE+NELE-INActive
 C
       XPQPQ=Abs(RDM2(NAddrRDM(IP,IQ,IP,IQ,NBasis))-
      $ 2.0D0*Occ(IP)*Occ(IQ))
@@ -812,6 +972,43 @@ C
       OccGH(IQ)=Occ(IQ)
       OccGH(IR)=Occ(IR)
       OccGH(IS)=Occ(IS)
+C 24.04.2020 
+C MODIFICATION: IF WEAKLY OCC ORBITALS ARE DEGENERATE INCLUDE THEM ALL IN THE DENSITY!
+      Do I=NELE+1,NBasis
+C
+      If(Occ(I).Gt.1.D-8.And.Abs(Occ(I)-Occ(IP))/Occ(IP).Le.1.D-2.
+     $ And.I.Ne.IP)Then
+C
+C MAKE SURE THAT I IS NOT ASSIGNED TO A GEMINAL   
+C
+      IOK=1
+      Do IGG=1,NELE-INActive
+      If(OrbGem(IGG,1).Eq.I.Or.OrbGem(IGG,2).Eq.I) IOK=0
+      EndDo
+C
+      If(IOK.Eq.1) Then
+      OccGH(I)=Occ(I)
+      Write(*,*)'Include additional orbital',I,'in density for Mmdc'
+      EndIf
+C
+      EndIf
+C
+      If(Occ(I).Gt.1.D-8.And.Abs(Occ(I)-Occ(IR))/Occ(IR).Le.1.D-2.
+     $ And.I.Ne.IR)Then
+C
+      IOK=1
+      Do IGG=1,NELE-INActive
+      If(OrbGem(IGG,1).Eq.I.Or.OrbGem(IGG,2).Eq.I) IOK=0
+      EndDo
+C
+      If(IOK.Eq.1) Then
+      OccGH(I)=Occ(I)
+      Write(*,*)'Include additional orbital',I,'in density for Mmdc'
+      EndIf
+C
+      EndIf 
+
+      EndDo
 C
       Do I=1,NGrid
       Call DenGrid(I,RhoGridH(I),OccGH,URe,OrbGrid,NGrid,NBasis)
@@ -841,7 +1038,7 @@ C
 C
 C      EndIf
 C
-      Write(6,'(/,1X,''M Correlation Correction '',5X,F15.8)')ELSM
+      Write(6,'(/,1X,''MDC Correlation Correction '',3X,F15.8)')ELSM
 C
       NGem=NGemSave
       Do I=1,NBasis
@@ -875,6 +1072,7 @@ C
       Return
       End
 
+*Deck TEST_TRDMS
       Subroutine TEST_TRDMS(Occ,UNOAO,NInte1,NBasis) 
 C
       use types
@@ -978,3 +1176,325 @@ C
 C
       End
 
+*Deck FRDM2R
+      Real*8 Function FRDM2R(IP,IQ,IR,IS,RDM2Act,Occ,Ind2,NAct,NBasis)
+C
+C     FOR A GIVEN SET OF INDICES AND THE KNOWN PART OF ACTIVE RDM2
+C     RETURNS THE ELEMENT OF RDM2_PQRS FOR CAS
+C
+C     It does the same as FRDM2 but here it is used to test different options
+C
+      Implicit Real*8 (A-H,O-Z)
+C
+      Parameter(Zero=0.D0, Half=0.5D0, One=1.D0, Two=2.D0, Four=4.D0)
+C
+      Include 'commons.inc'
+C
+      Dimension RDM2Act(NAct**2*(NAct**2+1)/2),Occ(NBasis),Ind2(NBasis)
+C
+      RDM2=Zero
+      If(IP.Eq.IR.And.IQ.Eq.IS.And. (Occ(IP).Eq.One.Or.Occ(IQ).Eq.One) )
+     $  RDM2=RDM2+Two*Occ(IP)*Occ(IQ)
+      If(IP.Eq.IS.And.IQ.Eq.IR.And. (Occ(IP).Eq.One.Or.Occ(IQ).Eq.One) )
+     $ RDM2=RDM2-Occ(IP)*Occ(IQ)
+C
+      If(Occ(IP).Eq.One.Or.Occ(IQ).Eq.One.Or.Occ(IR).Eq.One.
+     $ Or.Occ(IS).Eq.One) Then
+      FRDM2R=RDM2
+      Return
+      EndIf
+C
+C     ACTIVE PART
+C
+      If(Ind2(IP)*Ind2(IQ)*Ind2(IR)*Ind2(IS).Ne.Zero) Then
+      RDM2=RDM2Act(NAddrRDM(Ind2(IP),Ind2(IQ),Ind2(IR),Ind2(IS),NAct))
+      EndIf
+C
+      FRDM2R=RDM2
+C
+      Return
+      End
+
+*Deck CORRELON
+      Subroutine CORRELON(URe,UNOAO,Occ,NBasis)
+C
+      Implicit Real*8 (A-H,O-Z)
+C
+      Parameter(Zero=0.D0, Half=0.5D0, One=1.D0, Two=2.D0, Four=4.D0)
+C
+      Include 'commons.inc'
+C
+      Real*8, Dimension(:), Allocatable :: OrbXGrid
+      Real*8, Dimension(:), Allocatable :: OrbYGrid
+      Real*8, Dimension(:), Allocatable :: OrbZGrid
+      Real*8, Dimension(:), Allocatable :: WGrid
+      Real*8, Dimension(:), Allocatable :: RhoGrid
+      Real*8, Dimension(:), Allocatable :: Sigma
+      Real*8, Dimension(:), Allocatable :: Zk,Zk1
+      Real*8, Dimension(:), Allocatable :: rhoo,sigmaco,sigmaoo,vrhoc,
+     $ vrhoo,vsigmacc,vsigmaco,vsigmaoo
+      Real*8, Allocatable :: RDM2Act(:),OrbGrid(:,:)
+      Real*8, Allocatable :: RR(:,:),RX(:),RY(:),RZ(:)
+      Real*8, Allocatable :: OnTop(:), CCov(:),CIon(:), XX(:)
+C new
+      Real*8, Dimension(:), Allocatable ::RhoAct,OnTopAct,SigmaAct,
+     $ ZkAct,ZkPBE
+      Dimension OccAct(NBasis)
+C
+      Dimension URe(NBasis,NBasis),UNOAO(NBasis,NBasis),Occ(NBasis),
+     $ Ind1(NBasis),Ind2(NBasis),
+     $ ConCorr(200)
+      integer igrad
+      character*(30) name
+C
+      Call molprogrid0(NGrid,NBasis)
+C
+      Allocate  (WGrid(NGrid))
+      Allocate  (OrbGrid(NGrid,NBasis))
+      Allocate  (OrbXGrid(NBasis*NGrid))
+      Allocate  (OrbYGrid(NBasis*NGrid))
+      Allocate  (OrbZGrid(NBasis*NGrid))
+      Allocate  (RhoGrid(NGrid))
+      Allocate  (Sigma(NGrid))
+      Allocate  (Zk(NGrid))
+      Allocate  (RR(3,NGrid))
+      Allocate  (RX(NGrid))
+      Allocate  (RY(NGrid))
+      Allocate  (RZ(NGrid))
+      Allocate  (OnTop(NGrid))
+      Allocate  (CCov(NGrid))
+      Allocate  (CIon(NGrid))
+      Allocate  (XX(NGrid))
+C new
+      Allocate  (RhoAct(NGrid))
+      Allocate  (OnTopAct(NGrid))
+      Allocate  (SigmaAct(NGrid))
+c      Allocate  (ZkAct(NGrid))
+c      Allocate  (ZkPBE(NGrid))
+C
+      Call molprogrid1(RR,NGrid)
+C
+      NAct=NAcCAS
+      INActive=NInAcCAS
+      NOccup=INActive+NAct
+      Ind2(1:NBasis)=0
+      Do I=1,NAct
+      Ind1(I)=INActive+I
+      Ind2(INActive+I)=I
+      EndDo
+C
+      NRDM2Act = NAct**2*(NAct**2+1)/2
+      Allocate (RDM2Act(NRDM2Act))
+      RDM2Act(1:NRDM2Act)=Zero
+C
+      Open(10,File="rdm2.dat",Status='Old')
+C
+   10 Read(10,'(4I4,F19.12)',End=40)I,J,K,L,X
+C
+C     X IS DEFINED AS: < E(IJ)E(KL) > - DELTA(J,K) < E(IL) > = 2 GAM2(JLIK)
+C
+      RDM2Act(NAddrRDM(J,L,I,K,NAct))=Half*X
+C
+      I=Ind1(I)
+      J=Ind1(J)
+      K=Ind1(K)
+      L=Ind1(L)
+C
+      GoTo 10
+   40 Continue
+      Close(10)
+C
+C     load orbgrid and gradients, and wgrid
+C
+      Call molprogrid(OrbGrid,OrbXGrid,OrbYGrid,OrbZGrid,
+     $ WGrid,UNOAO,NGrid,NBasis)
+C
+C new
+      Do I=1,NBasis
+      OccAct(I)=Occ(I)
+      If(I.Gt.NELE+2) OccAct(I)=Zero
+      If(I.Gt.NInAcCAS.And.I.Lt.NELE-1) OccAct(I)=One
+c      If(occact(i).ne.zero) write(*,*)i,occact(i)
+      EndDo
+C
+      Do I=1,NGrid
+      Call DenGrid(I,RhoAct(I),OccAct,URe,OrbGrid,NGrid,NBasis)
+      Call DenGrad(I,RhoX,OccAct,URe,OrbGrid,OrbXGrid,NGrid,NBasis)
+      Call DenGrad(I,RhoY,OccAct,URe,OrbGrid,OrbYGrid,NGrid,NBasis)
+      Call DenGrad(I,RhoZ,OccAct,URe,OrbGrid,OrbZGrid,NGrid,NBasis)
+      SigmaAct(I)=RhoX**2+RhoY**2+RhoZ**2
+      OnTopAct(I)=Zero
+      EndDo
+      Do IP=1,NOccup
+      Do IQ=1,NOccup
+      Do IR=1,NOccup
+      Do IS=1,NOccup
+      Gam2=FRDM2R(IP,IQ,IR,IS,RDM2Act,OccAct,Ind2,NAct,NBasis)
+      If(Abs(Gam2).Gt.1.D-8) Then
+      Do I=1,NGrid
+      OnTopAct(I)=OnTopAct(I)
+     $ +Two*Gam2*OrbGrid(I,IP)*OrbGrid(I,IQ)*OrbGrid(I,IR)*OrbGrid(I,IS)
+      EndDo
+      EndIf
+      EndDo
+      EndDo
+      EndDo
+      EndDo
+c end of new
+C
+      Do I=1,NGrid
+C
+      Call DenGrid(I,RhoGrid(I),Occ,URe,OrbGrid,NGrid,NBasis)
+      Call DenGrad(I,RhoX,Occ,URe,OrbGrid,OrbXGrid,NGrid,NBasis)
+      Call DenGrad(I,RhoY,Occ,URe,OrbGrid,OrbYGrid,NGrid,NBasis)
+      Call DenGrad(I,RhoZ,Occ,URe,OrbGrid,OrbZGrid,NGrid,NBasis)
+      Sigma(I)=RhoX**2+RhoY**2+RhoZ**2
+C
+      OnTop(I)=Zero
+C
+      EndDo
+C
+      Do IP=1,NOccup
+      Do IQ=1,NOccup
+      Do IR=1,NOccup
+      Do IS=1,NOccup
+C
+      Gam2=FRDM2(IP,IQ,IR,IS,RDM2Act,Occ,Ind2,NAct,NBasis)
+C
+      If(Abs(Gam2).Gt.1.D-8) Then
+C
+      Do I=1,NGrid
+      OnTop(I)=OnTop(I)
+     $ +Two*Gam2*OrbGrid(I,IP)*OrbGrid(I,IQ)*OrbGrid(I,IR)*OrbGrid(I,IS)
+      EndDo
+C
+      EndIf
+C
+      EndDo
+      EndDo
+      EndDo
+      EndDo
+C
+      Do I=1,NGrid
+C
+c      AP=0.01
+      AP=0.01
+      XX(I)=Zero
+      CCov(I)=Zero
+      CIon(I)=Zero
+      XPade=RhoGrid(I)/(AP+RhoGrid(I))
+      If(RhoGrid(I).Gt.1.D-7) Then
+C
+      XX(I)=Two*OnTop(I)/RhoGrid(I)**2
+c      write(*,'(7F8.4)')
+c     $ rr(1,i),rr(2,i),rr(3,i),rhogrid(i),xpade,xx,xx*xpade
+C
+      If(XX(I).Le.One) Then
+C
+      CIon(I)=Zero
+      CCov(I)=SQRT(Half*(One-XX(I))*XPade)
+C
+      Else
+C
+      CCov(I)=Zero
+      CIon(I)=SQRT(Half*(XX(I)-One)*XPade)
+C
+      EndIf
+      EndIf
+C
+      EndDo
+C
+      XNormC=Zero
+C
+      Do I=1,NGrid
+C
+      RX(I)=RR(1,I)
+      RY(I)=RR(2,I)
+      RZ(I)=RR(3,I)
+C
+      XNormC=XNormC+(CCov(I)**2+CIon(I)**2)
+C
+      EndDo
+      XNormC=SQRT(XNormC)
+C
+      Call SortVecs(RZ,RX,RY,RhoGrid,XX,CCov,CIon,NGrid)
+C
+      Write(*,'("   z(bohr)      Rho",10X,"X       cs_cov   cs_ionic")')
+      Do I=1,NGrid
+      CCov(I)=CCov(I)/XNormC
+      CIon(I)=CIon(I)/XNormC
+      If(Abs(RX(I)).Lt.1.D-10.And.Abs(RY(I)).Lt.1.D-10)
+     $ Write(*,'(F10.4,E13.4,3F10.4)')
+     $ RZ(I),RhoGrid(I),XX(I),CCov(I),CIon(I) 
+      EndDo
+C
+      Return
+      End 
+
+*Deck SortVecs
+      Subroutine SortVecs(XX,YY1,YY2,YY3,YY4,YY5,YY6,N)
+C
+C     SORT XX IN AN ASCENDING ORDER 
+C     AND CHANGE THE ORDER OF YY's 
+C
+      Implicit Real*8 (A-H,O-Z)
+C
+      Dimension XX(N),YY1(N),YY2(N),YY3(N),YY4(N),YY5(N),YY6(N)
+C
+C     LOCAL ARRAYS
+C
+      Dimension Save1(N),Save2(N),Save3(N),Save4(N),Save5(N),Save6(N),
+     $ Ind(N)
+C
+      Do I=1,N
+      Ind(I)=I
+      EndDo
+C
+      IStart=1
+C
+      Do I=1,N
+C
+      EMin=XX(IStart)
+      IndMin=IStart
+C
+      Do J=IStart,N
+      If(XX(J).Lt.EMin) Then
+      EMin=XX(J)
+      IndMin=J
+      EndIf
+      EndDo
+C
+      Hlp=XX(IStart)
+      IndHlp=Ind(IStart)
+
+      XX(IStart)=XX(IndMin)
+      Ind(IStart)=Ind(IndMin)
+
+      XX(IndMin)=Hlp
+      Ind(IndMin)=IndHlp
+C
+      IStart=IStart+1
+C
+      EndDo
+C
+C     YY
+C
+      Do I=1,N
+      Save1(I)=YY1(I)
+      Save2(I)=YY2(I)
+      Save3(I)=YY3(I)
+      Save4(I)=YY4(I)
+      Save5(I)=YY5(I)
+      Save6(I)=YY6(I)
+      EndDo
+      Do I=1,N
+      YY1(I)=Save1(Ind(I))
+      YY2(I)=Save2(Ind(I))
+      YY3(I)=Save3(Ind(I))
+      YY4(I)=Save4(Ind(I))
+      YY5(I)=Save5(Ind(I))
+      YY6(I)=Save6(Ind(I))
+      EndDo
+C
+      Return
+      End

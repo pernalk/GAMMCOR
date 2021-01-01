@@ -125,10 +125,12 @@ double precision   :: XGrid(1000), WGrid(1000),DispAlph, e2d
     A%ACAlpha    = SAPT%ACAlpha
     B%ACAlpha    = SAPT%ACAlpha
 
+    if(Flags%ISERPA==0) then
     SaptLevel_Save  = Flags%SaptLevel
     Flags%SaptLevel = 0
     Flags%IFlag0    = 1
     SAPT%iCpld      = .false.
+    endif
 
     call sapt_response(Flags,A,SAPT%EnChck,NBasis)
     call sapt_response(Flags,B,SAPT%EnChck,NBasis)
@@ -2006,7 +2008,7 @@ double precision,external  :: trace
   ! ACAlpha=sqrt(2d0)/2.d0
    call ACABMAT0_mithap(ABPlus,ABMin,URe,Mon%Occ,XOne,&
                  Mon%IndN,Mon%IndX,Mon%IGem,Mon%CICoef,&
-                 Mon%NAct,Mon%INAct,NBas,Mon%NDim,Mon%NDimX,NInte1,Mon%NGem,&
+                 NBas,Mon%NDim,Mon%NDimX,NInte1,Mon%NGem,&
                  twofile,Flags%ISAPT,ACAlpha,1)
 !   allocate(ABPlusT(Mon%NDim**2),ABMinT(Mon%NDim**2))
 !   call ACABMAT0(ABPlusT,ABMinT,URe,Mon%Occ,XOne,TwoMO, &
@@ -3877,17 +3879,18 @@ integer :: test
                 write(LOUT,'(1x,a,2x,2i4)') 'Discarding nearly degenerate pair',i,j 
              else
                 ! if IFlCore=0 exclude core (inactive) orbitals
+
                 if(Flags%IFlCore==1.or.&
                      (Flags%IFlCore==0.and.&
                      mon%Occ(i)/=1d0.and.mon%Occ(j)/=1d0) ) then
-                   
-                   ind = ind + 1
-                   mon%IndX(ind) = ij
-                   ! mon%IndXh(ind) = ind
-                   mon%IndN(1,ind) = i
-                   mon%IndN(2,ind) = j
-                   mon%IPair(i,j) = 1
-                   mon%IPair(j,i) = 1
+
+                     ind = ind + 1
+                     mon%IndX(ind) = ij
+                     ! mon%IndXh(ind) = ind
+                     mon%IndN(1,ind) = i
+                     mon%IndN(2,ind) = j
+                     mon%IPair(i,j) = 1
+                     mon%IPair(j,i) = 1 
                    
                 endif
              endif
@@ -3924,13 +3927,18 @@ integer :: test
                 if(Flags%IFlCore==1.or.&
                      (Flags%IFlCore==0.and.&
                      mon%Occ(i)/=1d0.and.mon%Occ(j)/=1d0) ) then
-                   
-                   ind = ind + 1
-                   mon%IndX(ind) = ind
-                   mon%IndN(1,ind) = i
-                   mon%IndN(2,ind) = j
-                   mon%IPair(i,j) = 1
-                   mon%IPair(j,i) = 1
+                     ! exclude pairs of nearly/virtual orbitals
+      
+                     if(mon%Occ(i)+mon%Occ(j).lt.1.D-7) then
+                        write(LOUT,'(1x,a,2x,2i4)') 'Discarding nearly virtual-orbitals pair',i,j
+                     else
+                        ind = ind + 1
+                        mon%IndX(ind) = ind
+                        mon%IndN(1,ind) = i
+                        mon%IndN(2,ind) = j
+                        mon%IPair(i,j) = 1
+                        mon%IPair(j,i) = 1
+                     endif
                    
                 endif
              endif
