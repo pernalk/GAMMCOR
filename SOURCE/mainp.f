@@ -309,12 +309,7 @@ C
 C      Write(6,'(8a10)') ('**********',i=1,9)
       EndIf
 C
-      If(ITwoEl.Eq.2) Then
-      Call delfile('TWOMO')
-      ElseIf(ITwoEl.Eq.3) Then
-      Call delfile('FOFO')
-      Call delfile('FFOO')
-      EndIf
+      If(ITwoEl.Eq.2) Call delfile('TWOMO')
 C
       Call free_System(System)
       Call clock(PossibleJobType(Flags%JobType),Tcpu,Twall)

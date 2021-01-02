@@ -69,9 +69,9 @@ character(*),parameter :: PossibleInterface(4) = &
 [character(8) :: &
 'DALTON', 'MOLPRO', 'OWN', 'ORCA']
 
-character(*),parameter :: PossibleJobType(9) = &
+character(*),parameter :: PossibleJobType(11) = &
 [character(9) :: &
-'AC', 'AC0', 'ERPA', 'EERPA', 'SAPT', 'PDFT', 'CASPiDFT','CASPiDFTOpt','EERPA-1']
+'AC', 'AC0', 'ERPA', 'EERPA', 'SAPT', 'PDFT', 'CASPiDFT','CASPiDFTOpt','EERPA-1','AC0D', 'AC0DNOSYMM']
 
 character(*),parameter :: PossibleRDMType(5) = &
 [character(8) :: &
@@ -2022,7 +2022,7 @@ character(8) :: label
       exit
    endif 
  enddo 
-
+ 
  close(ifile)
  ivirt(1:NSym) = NumOSym(1:NSym)-iclos(1:NSym)-iact(1:NSym)
 

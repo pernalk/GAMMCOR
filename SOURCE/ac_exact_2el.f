@@ -611,12 +611,30 @@ C
 C
 C change to ISpin=0 for singlets or ISpin=1 for triplets
 c herer!!!
-      ISpin=1
+      ISpin=0
 C
       SpinFac=One
       If(ISpin.Eq.1) SpinFac=-One
 C
       ISkip(1:NInte1)=0
+C
+C     CORE ENERGY (IF ANY)
+C
+      NCore=Zero
+      Do I=1,NBasis
+      If(IGem(I).Eq.1.And.Occ(I).Eq.One) NCore=NCore+1
+      EndDo
+      ECore=Zero
+      Do I=1,NCore
+      II=(I*(I+1))/2
+      ECore=ECore+Two*Occ(I)*XOne(II)
+      EndDo
+      Do IP=1,NCore
+      Do IQ=1,NCore
+      ECore=ECore+
+     $ Two*TwoEl(NAddr3(IP,IP,IQ,IQ))-TwoEl(NAddr3(IP,IQ,IP,IQ))
+      EndDo
+      EndDo
 C
 C     CONSTRUCT ONE-ELECTRON PART OF THE AC ALPHA-HAMILTONIAN
 C
@@ -629,6 +647,13 @@ C
       Do J=1,I
       IJ=IJ+1
 C
+C     ADD INTERACTION WITH CORE
+C
+      Do IT=1,NCore
+      H1Alph(IJ)=H1Alph(IJ)+
+     $ Two*TwoEl(NAddr3(IT,IT,I,J))-TwoEl(NAddr3(IT,I,IT,J))
+      EndDo      
+C
       If(IGem(I).Ne.IGem(J)) Then
 C
       H1Alph(IJ)=ACAlpha*H1Alph(IJ)
@@ -637,13 +662,12 @@ C
 C
       Aux=Zero
 C
-      Do IT=1,NBasis
-      If(IGem(IT).Ne.IGem(I))
-     $ Aux=Aux+Occ(IT)*
+      Do IT=NCore+1,NBasis
+      If(IGem(IT).Ne.IGem(I)) 
+     $  Aux=Aux+(One-ACAlpha)*Occ(IT)*
      $ (Two*TwoEl(NAddr3(IT,IT,I,J))-TwoEl(NAddr3(IT,I,IT,J)))
-      EndDo
+      Enddo
 C
-      Aux=(One-ACAlpha)*Aux
       H1Alph(IJ)=H1Alph(IJ)+Aux
 C
       EndIf
@@ -709,21 +733,60 @@ C
 C
       AP(IAB,ICD)=FAB*FCD*AP(IAB,ICD)
 C
+C     If core is present, put to zero the corresponding elements 
+C     of AP to remove core from diagonalization
+C
+      If(IA.Le.NCore.Or.IB.Le.NCore.Or.IC.Le.NCore.Or.ID.Le.NCore)
+     $ AP(IAB,ICD)=Zero
+C
       EndDo
       EndDo
       EndDo
       EndDo
 C
+      write(*,*)'beginning of diag8',ninte1
       Call Diag8(AP,NInte1,NInte1,PP,PWork)
+      write(*,*)'1','end of diag8' 
       ETotAlph=PP(NoEig)
 C
       Do I=1,NInte1
       EExcit(I)=PP(I)-PP(NoEig)
+C
+C     becaouse the core-core block (if any) is set to 0, 
+C     almost-exact-zero-eigenvalues appear, set them exactly to 0
+C     to exclude the pertinent eigenvectors from the correlation energy
+C
+      If(Abs(PP(I)).Lt.1.D-10) EExcit(I)=Zero
+C     do not account for zero excitation corresponding to noeig
+c      If(Abs(PP(I)-PP(NoEig)).Lt.1.D-10) EExcit(I)=Zero
+      If(I.Eq.NoEig) EExcit(I)=Zero 
+c herer!!! this is for test only
+c      if(EExcit(I).lt.zero)EExcit(I)=0
       EndDo 
+
+c      write(*,*)'alpha',ACAlpha
+cc      Do I=1,NInte1
+      Do I=1,12
+      write(*,*)i,'ene',pp(i),pp(i)+ecore+enuc
+c      write(*,*)i,'excit ene',EExcit(I)
+c      IAB=0
+c      Do IA=1,NBasis
+c      Do IB=1,IA
+c      IAB=IAB+1
+c      write(*,*)i,ia,ib,ap(i,iab)
+c      enddo
+c      enddo
+      enddo
+c      return
+c      stop  
 C
       Write(6,'(/,X,
      $ ''RESULTS FROM THE TWO-ELECTRON FUNCTIONAL OPTIMIZATION'')')
 C
+      Write(6,'(X,''ACAlpha:'',F11.8,3X,"ETwoEl:",F12.8)')
+     $ACAlpha,ETotAlph
+      ETotAlph=ETotAlph+ECore
+      If(ECore.Ne.Zero) Write(6,'(" Core Energy: ",F15.8)')ECore
       Write(6,'(X,''State no'',I3,'' Total Energy'',F15.8)') NoEig,
      $ ETotAlph+ENuc
 C
@@ -927,7 +990,8 @@ C
       If(Eig(NU).Gt.Zero.And.Eig(NU).Le.SmallE) 
      $ Write(*,*)'Small omega=',Eig(NU),
      $ ' The corresponding eigenvector excluded from Ecorr'
-      If(Eig(NU).Gt.SmallE.And.Eig(NU).Lt.BigE) Then
+c      If(Eig(NU).Gt.SmallE.And.Eig(NU).Lt.BigE) Then
+      If(Abs(Eig(NU)).Gt.Zero) Then
 C
       Do I=1,NDimX+NDimN
 C
@@ -982,6 +1046,7 @@ C
 C     end of the loop w.r.t NU
 C
       EndIf
+C
       EndDo
 C
       ECorr=Zero
@@ -1012,9 +1077,9 @@ C
 C
       SumY=Zero
       Do K=1,NI
-      If(Eig(K).Gt.SmallE.And.Eig(K).Lt.BigE) Then
+c      If(Eig(K).Gt.SmallE.And.Eig(K).Lt.BigE) Then
       SumY=SumY+EigVecTr((K-1)*NI+I)*EigVecTr((K-1)*NI+J)
-      EndIf
+c      EndIf
       EndDo
 C
       Aux=Two*SumY
@@ -1028,9 +1093,9 @@ C
 C
       SumY=Zero
       Do K=1,NI
-      If(Eig(K).Gt.SmallE.And.Eig(K).Lt.BigE) Then
+c      If(Eig(K).Gt.SmallE.And.Eig(K).Lt.BigE) Then
       SumY=SumY+EigVecTr((K-1)*NI+I)*EigVecTr((K-1)*NI+NDimX+J)
-      EndIf
+c      EndIf
       EndDo
 C
       ECorr=ECorr+Four*SumY*TwoNO(NAddr3(IP,IR,IQ,IQ))
@@ -1041,9 +1106,9 @@ C
 C
       SumY=Zero
       Do K=1,NI
-      If(Eig(K).Gt.SmallE.And.Eig(K).Lt.BigE) Then
+c      If(Eig(K).Gt.SmallE.And.Eig(K).Lt.BigE) Then
       SumY=SumY+EigVecTr((K-1)*NI+NDimX+I)*EigVecTr((K-1)*NI+NDimX+J)
-      EndIf
+c      EndIf
       EndDo
 C
       ECorr=ECorr+Two*SumY*TwoNO(NAddr3(IP,IP,IQ,IQ))
@@ -1121,9 +1186,6 @@ C
       Implicit Real*8 (A-H,O-Z)
 C
       Parameter(Zero=0.D0, Half=0.5D0, One=1.D0, Two=2.D0, Four=4.D0)
-      Parameter(SmallE=1.D-4,BigE=1.D20)
-C
-C     ONLY EXCITATIONS > SmallE AND < BigE ARE INCLUDED
 C
       Include 'commons.inc'
 C
@@ -1135,9 +1197,32 @@ C
 C
 C     LOCAL ARRAYS
 C
-      Dimension OccAlph(NBasis),GammaAlph(NInte1)
+      Dimension GammaAlph(NInte1),H1(NInte1),IOCore(NBasis)
 C
       NI=2*(NDimX+NDimN)
+C
+C     ADD INTERACTON WITH CORE TO HNO
+C
+      NCore=Zero
+      Do I=1,NBasis
+      IOCore(I)=0
+      If(IGem(I).Eq.1.And.Occ(I).Eq.One) Then
+      NCore=NCore+1
+      IOCore(I)=1
+      EndIf
+      EndDo
+C
+      IJ=0
+      Do I=1,NBasis
+      Do J=1,I
+      IJ=IJ+1
+      H1(IJ)=HNO(IJ)
+      Do IT=1,NCore
+      H1(IJ)=H1(IJ)+
+     $ Two*TwoNO(NAddr3(IT,IT,I,J))-TwoNO(NAddr3(IT,I,IT,J))
+      EndDo 
+      EndDo
+      EndDo
 C
       ECorr=Zero
       Do I=1,NDimX+NDimN
@@ -1163,18 +1248,22 @@ C
       IQS=(Max(IS,IQ)*(Max(IS,IQ)-1))/2+Min(IS,IQ)
 C
       If(.NOT.(IGem(IP).Eq.IGem(IR).And.IGem(IQ).Eq.IGem(IS).
-     $ And.IGem(IP).Eq.IGem(IQ))) Then
+     $ And.IGem(IP).Eq.IGem(IQ))
+     $ .And.(IOCore(IP)+IOCore(IR)+IOCore(IQ)+IOCore(IS).Eq.0) ) Then
 C
       If(IP.Gt.IR.And.IQ.Gt.IS) Then
 C
       SumY=Zero
       Do K=1,NInte1
-      If(EExcit(K).Gt.SmallE.And.EExcit(K).Lt.BigE) Then
+c herer!!!
+      If(Abs(EExcit(K)).Gt.1.D-8) Then
+c      If(EExcit(K).Lt.Zero) Then
       SumY=SumY+TrGamm(IPR,K)*TrGamm(IQS,K)
       EndIf
       EndDo
 C
       Aux=Two*SumY
+c herer!!!
       If(IR.Eq.IS.And.IP.Eq.IQ) Aux=Aux+
      $ (-Occ(IP)*(One-Occ(IS))-Occ(IS)*(One-Occ(IP)) )
       ECorr=ECorr+Aux*TwoNO(NAddr3(IP,IR,IQ,IS))
@@ -1185,7 +1274,9 @@ C
 C
       SumY=Zero
       Do K=1,NInte1
-      If(EExcit(K).Gt.SmallE.And.EExcit(K).Lt.BigE) Then
+c herer!!!
+      If(Abs(EExcit(K)).Gt.1.D-8) Then
+c      If(EExcit(K).Lt.Zero) Then
       SumY=SumY+TrGamm(IPR,K)*TrGamm(IQS,K)
       EndIf
       EndDo
@@ -1198,7 +1289,9 @@ C
 C
       SumY=Zero
       Do K=1,NInte1
-      If(EExcit(K).Gt.SmallE.And.EExcit(K).Lt.BigE) Then
+c herer!!!
+      If(Abs(EExcit(K)).Gt.1.D-8) Then 
+c      If(EExcit(K).Lt.Zero) Then 
       SumY=SumY+TrGamm(IPR,K)*TrGamm(IQS,K)
       EndIf
       EndDo
@@ -1216,10 +1309,10 @@ C     COMPUTE DELTA
 C
       Delta=Zero
 C
-      Do IP=1,NBasis
-      Do IQ=1,NBasis
-      Do IR=1,NBasis
-      Do IS=1,NBasis
+      Do IP=NCore+1,NBasis
+      Do IQ=NCore+1,NBasis
+      Do IR=NCore+1,NBasis
+      Do IS=NCore+1,NBasis
       If(.NOT.(IGem(IP).Eq.IGem(IR).And.IGem(IQ).Eq.IGem(IS).
      $ And.IGem(IP).Eq.IGem(IQ))) Then
 C
@@ -1240,9 +1333,9 @@ C
       EndDo
       EndDo
 C
-      Do IP=1,NBasis
-      Do IQ=1,NBasis
-      Do IR=1,NBasis
+      Do IP=NCore+1,NBasis
+      Do IQ=NCore+1,NBasis
+      Do IR=NCore+1,NBasis
       If((IGem(IP).Eq.IGem(IQ)).And.(IGem(IP).Ne.IGem(IR))) Then
 C
       IPQ=(Max(IQ,IP)*(Max(IQ,IP)-1))/2+Min(IQ,IP)
@@ -1257,12 +1350,12 @@ C
       EndDo
       EndDo
 C
-      Do IP=1,NBasis
-      Do IQ=1,NBasis
+      Do IP=NCore+1,NBasis
+      Do IQ=NCore+1,NBasis
       If(IGem(IP).Ne.IGem(IQ)) Then
 C
       IPQ=(Max(IQ,IP)*(Max(IQ,IP)-1))/2+Min(IQ,IP)
-      Delta=Delta+Two*HNO(IPQ)*GammaAlph(IPQ)
+      Delta=Delta+Two*H1(IPQ)*GammaAlph(IPQ)
 C
       EndIf
       EndDo
