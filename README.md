@@ -17,7 +17,10 @@ mkdir OBJ
 ```
 make
 ```
-
+This will create GAMMCOR executable:
+```
+gammcor
+```
 4. Run the verification suite:
 ```
 gammcor_verify.py
