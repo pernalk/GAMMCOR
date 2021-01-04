@@ -62,12 +62,17 @@ C
 C 
       ElseIf(ITwoEl.eq.3) Then
 C
-      Call Y01CAS_FOFO(Occ,URe,XOne,ABPLUS,ABMIN,
-     $ 'PROP0','PROP1',
-     $ 'XY0',
-     $ IndN,IndX,IGem,NAcCAS,NInAcCAS,NDimX,
-     $ NBasis,NDim,NInte1,NoSt,'EMPTY','FFOO',
-     $ 'FOFO',0,ETot,ECorr)
+      Call AC0CAS_FOFO(ECorr,ETot,Occ,URe,XOne,ABPLUS,ABMIN,
+     $ IndN,IndX,IGem,NAcCAS,NInAcCAS,NDimX,NBasis,NDim,NInte1,
+     $ NoSt,'FFOO','FOFO')
+C
+C     now Y01CAS_FOFO is used in SAPT only
+C      Call Y01CAS_FOFO(Occ,URe,XOne,ABPLUS,ABMIN,
+C     $ 'PROP0','PROP1',
+C     $ 'Y01FILE',
+C     $ IndN,IndX,IGem,NAcCAS,NInAcCAS,NDimX,
+C     $ NBasis,NDim,NInte1,NoSt,'EMPTY','FFOO',
+C     $ 'FOFO',0,ETot,ECorr)
 C
 C     ITwoEl
       EndIf
