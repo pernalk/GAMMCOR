@@ -73,8 +73,6 @@ C     If IFlCore=0 do not include core (inactive) orbitals
      $ (IFlCore.Eq.0.And.Occ(I).Ne.One.And.Occ(J).Ne.One)) Then
 C
       If(Abs(Occ(i)+Occ(j)-Two).Gt.1.D-10.And. 
-C     $   Abs(Occ(i)+Occ(j)).Gt.1.D-7) Then
-C KP
      $   Abs(Occ(i)+Occ(j)).Gt.1.D-13) Then
       Ind=Ind+1
       IndX(Ind)=Ind
