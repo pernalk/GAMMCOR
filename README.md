@@ -22,9 +22,17 @@ This will create GAMMCOR executable:
 gammcor
 ```
 4. Run the verification suite:
-```
-gammcor_verify.py
-```
+   1. Obtain test input files
+   ```
+   git clone https://gitlab.version.fz-juelich.de/trex/GammCor
+   ```
+   2. Copy TESTS to a main GAMMCORR directory with a compiled code
+   3. Run test suit
+
+   ```
+   gammcor_verify.py
+   ```
+
 ## Third party software
 Third party software used in GammCor:
 #### Intel Math Kernel Library
