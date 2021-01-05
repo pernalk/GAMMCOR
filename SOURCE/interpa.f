@@ -322,6 +322,9 @@ C
       Call FragEcorr(ETot,ENuc,ECorrTot,EGOne,EigVecR,Eig,ABPLUS,ABMIN,
      $ UNOAO,Occ,TwoNO,URe,XOne,IndAux,NBasis,NInte1,NInte2,NDim,NGem,
      $ NGOcc,IFl12,NFrag)
+C
+      If(ITwoEl.ne.1) Call DelInts(ITwoEl)
+C      
       Return
 C
       IFlFrag1=1
