@@ -54,43 +54,43 @@ $(O)hf.o : $(S)hf.f
 	$(FCC) $(FFLAGS)  -c $(S)hf.f -o $(O)hf.o
 $(O)matrix.o : $(S)matrix.f
 	$(FCC) $(FFLAGS)  -c $(S)matrix.f -o $(O)matrix.o
-$(O)cpdmft.o : $(S)cpdmft.f
+$(O)cpdmft.o : $(S)cpdmft.f $(S)commons.inc
 	$(FCC) $(FFLAGS)  -c $(S)cpdmft.f -o $(O)cpdmft.o
-$(O)nonadia.o : $(S)nonadia.f
+$(O)nonadia.o : $(S)nonadia.f $(S)commons.inc
 	$(FCC) $(FFLAGS)  -c $(S)nonadia.f -o $(O)nonadia.o
 $(O)dftgrid.o : $(S)dftgrid.f $(S)commons.inc $(O)abmats.o abmat.mod
 	$(FCC) $(FFLAGS)  -c $(S)dftgrid.f -o $(O)dftgrid.o
 $(O)lsd_sr.o : $(S)lsd_sr.f 
 	$(FCC) $(FFLAGS)  -c $(S)lsd_sr.f  -o $(O)lsd_sr.o
-$(O)dftfun_exerfpbe.o : $(S)dftfun_exerfpbe.f
+$(O)dftfun_exerfpbe.o : $(S)dftfun_exerfpbe.f $(S)commons.inc
 	$(FCC) $(FFLAGS)  -c $(S)dftfun_exerfpbe.f  -o $(O)dftfun_exerfpbe.o
-$(O)dftfun_exerf.o : $(S)dftfun_exerf.f
+$(O)dftfun_exerf.o : $(S)dftfun_exerf.f $(S)commons.inc
 	$(FCC) $(FFLAGS)  -c $(S)dftfun_exerf.f  -o $(O)dftfun_exerf.o
-$(O)dftfun_ecerfpbe.o : $(S)dftfun_ecerfpbe.f
+$(O)dftfun_ecerfpbe.o : $(S)dftfun_ecerfpbe.f $(S)commons.inc
 	$(FCC) $(FFLAGS)  -c $(S)dftfun_ecerfpbe.f  -o $(O)dftfun_ecerfpbe.o
-$(O)dftfun_ecerf.o : $(S)dftfun_ecerf.f
+$(O)dftfun_ecerf.o : $(S)dftfun_ecerf.f $(S)commons.inc
 	$(FCC) $(FFLAGS)  -c $(S)dftfun_ecerf.f  -o $(O)dftfun_ecerf.o
 $(O)dftacg_pw92c.o : $(S)dftacg_pw92c.f
 	$(FCC) $(FFLAGS)  -c $(S)dftacg_pw92c.f  -o $(O)dftacg_pw92c.o
-$(O)projector.o : $(S)projector.f
+$(O)projector.o : $(S)projector.f $(S)commons.inc
 	$(FCC) $(FFLAGS)  -c $(S)projector.f  -o $(O)projector.o
-$(O)ekt.o : $(S)ekt.f
+$(O)ekt.o : $(S)ekt.f $(S)commons.inc
 	$(FCC) $(FFLAGS)  -c $(S)ekt.f  -o $(O)ekt.o
-$(O)srlrdynamic.o : $(S)srlrdynamic.f
+$(O)srlrdynamic.o : $(S)srlrdynamic.f $(S)commons.inc
 	$(FCC) $(FFLAGS)  -c $(S)srlrdynamic.f -o $(O)srlrdynamic.o
-$(O)erpa.o : $(S)erpa.f 
+$(O)erpa.o : $(S)erpa.f $(S)commons.inc
 	$(FCC) $(FFLAGS)  -c $(S)erpa.f -o $(O)erpa.o
-$(O)interpa.o : $(S)interpa.f $(O)abmats.o $(O)abfofo.o 
+$(O)interpa.o : $(S)interpa.f $(S)commons.inc $(O)abmats.o $(O)abfofo.o 
 	$(FCC) $(FFLAGS)  -c $(S)interpa.f -o $(O)interpa.o
-$(O)exact2el.o : $(S)exact2el.f
+$(O)exact2el.o : $(S)exact2el.f $(S)commons.inc
 	$(FCC) $(FFLAGS)  -c $(S)exact2el.f -o $(O)exact2el.o
-$(O)optapsg.o : $(S)optapsg.f
+$(O)optapsg.o : $(S)optapsg.f $(S)commons.inc
 	$(FCC) $(FFLAGS)  -c $(S)optapsg.f -o $(O)optapsg.o
-$(O)newton.o : $(S)newton.f
+$(O)newton.o : $(S)newton.f $(S)commons.inc
 	$(FCC) $(FFLAGS)  -c $(S)newton.f -o $(O)newton.o
-$(O)acfd.o : $(S)acfd.f $(O)abmats.o $(O)abfofo.o abmat.mod abfofo.mod tran.mod types.mod sapt_ener.mod
+$(O)acfd.o : $(S)acfd.f $(S)commons.inc $(O)abmats.o $(O)abfofo.o abmat.mod abfofo.mod tran.mod types.mod sapt_ener.mod
 	$(FCC) $(FFLAGS)  -c $(S)acfd.f -o $(O)acfd.o
-$(O)accas.o : $(S)accas.f timing.mod types.mod abfofo.mod sorter.mod abmat.mod sorter.mod 
+$(O)accas.o : $(S)accas.f $(S)commons.inc timing.mod types.mod abfofo.mod sorter.mod abmat.mod sorter.mod 
 	$(FCC) $(FFLAGS)  -c $(S)accas.f -o $(O)accas.o
 $(O)xcfun.o : $(S)xcfun.f90 
 	$(FCC) $(FFLAGS)  -c $(S)xcfun.f90  -o $(O)xcfun.o
@@ -120,9 +120,9 @@ $(O)sapt_main.o : $(S)sapt_main.f90 $(O)types.o $(O)systemdef.o $(O)tran.o $(O)s
 	$(FCC) $(FFLAGS)  -c $(S)sapt_main.f90 -o $(O)sapt_main.o
 $(O)sapt.o : $(S)sapt.f90 $(O)types.o $(O)tran.o $(O)exmisc.o $(O)timing.o types.mod tran.mod timing.mod exmisc.mod
 	$(FCC) $(FFLAGS)  -c $(S)sapt.f90 -o $(O)sapt.o
-$(O)caspidft.o : $(S)caspidft.f $(O)types.o types.mod
+$(O)caspidft.o : $(S)caspidft.f $(S)commons.inc $(O)types.o types.mod
 	$(FCC) $(FFLAGS)  -c $(S)caspidft.f -o $(O)caspidft.o
-$(O)ac_exact_2el.o : $(S)ac_exact_2el.f 
+$(O)ac_exact_2el.o : $(S)ac_exact_2el.f $(S)commons.inc
 	$(FCC) $(FFLAGS)  -c $(S)ac_exact_2el.f -o $(O)ac_exact_2el.o
 timing.mod : 
 	$(FCC) $(FFLAGS)  -c $(S)timing.f90 -o $(O)timing.o
