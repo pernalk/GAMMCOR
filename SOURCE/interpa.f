@@ -363,30 +363,12 @@ C     FFFF and FOFO: ABMATs ALREADY TRUNCATED
 C
       EndIf
 C
-CC     Test diagonal part:
-C!      Do I=1,NDimX
-C!      Write(6,*) ABPLUS(NDimX*(I-1)+I), ABMIN(NDimX*(I-1)+I)
-C!      EndDo
-C      Do I=1,NDim**2
-C      TMP = TMP + ABMIN(I)**2
-C      EndDo
-C      Write(6,*) TMP
-
-C
 C     FIND EIGENVECTORS (EigVecR) AND COMPUTE THE ENERGY
 C
       If(ISERPA.Eq.0) Then
 C
       Call ERPASYMM(EigVecR,Eig,ABPLUS,ABMIN,NBasis,NDimX)
-C      TMP = 0
-C      Do I=1,NDimX**2
-C      TMP = TMP + EigVecR(I)**2
-C      EndDo
-C      Write(6,*) TMP
-C
-C      Do I=1,NDimX
-C      Write(6,*) I, Eig(I), EigVecR(NDimX*(I-1)+I)
-C      EndDo
+
       Write(6,'(/," *** Computing ERPA energy *** ",/)')
 C
       If(ITwoEl.Eq.1) Then
@@ -409,6 +391,17 @@ C
       Write(LOUT,'(1x,a,3f15.8)') 'EGVB+ENuc, Corr, ERPA-GVB',
      $      ETot+ENuc,ECorr,ETot+ENuc+ECorr
 
+      EndIf
+
+C     DELETE MO INTEGRALS 
+      If(ITwoel.Eq.2) Then
+        Open(newunit=iunit,file='TWOMO',status='OLD')
+        Close(iunit,status='DELETE')
+      ElseIf(ITwoel.Eq.3) Then
+        Open(newunit=iunit,file='FFOO',status='OLD')
+        Close(iunit,status='DELETE')
+        Open(newunit=iunit,file='FOFO',status='OLD')
+        Close(iunit,status='DELETE')
       EndIf
 C
 c      Write(6,'(/," *** Computing ERPA 2-RDM *** ")')
