@@ -74,7 +74,7 @@ def run_test(dirl,fun):
 		assert_allclose(test_val,ref_val,rtol=0,atol=tolene)
 		print 'passed with tol',tolene
 	except:
-		print test_name,' failed with errors:'
+		print 'test failed with errors:'
 		print numpy.subtract(test_val,ref_val)	
 	return 
 
