@@ -1247,7 +1247,8 @@ integer      :: i,ione
 character(8) :: label
 character(:),allocatable   :: twojfile,twokfile
 character(:),allocatable   :: onefile,twofile,rdmfile
-character(:),allocatable   :: propfile0,propfile1,xy0file
+character(:),allocatable   :: propfile0,propfile1
+character(:),allocatable   :: y01file,xy0file
 double precision,parameter :: One = 1d0, Half = 0.5d0
 
 ! perform check
@@ -1265,6 +1266,7 @@ double precision,parameter :: One = 1d0, Half = 0.5d0
     propfile0 = 'PROP_A0'
     propfile1 = 'PROP_A1'
     rdmfile   = 'rdm2_A.dat'
+    y01file   = 'Y01_A'
     xy0file   = 'XY0_A'
  elseif(Mon%Monomer==2) then
     onefile   = 'ONEEL_B'
@@ -1274,6 +1276,7 @@ double precision,parameter :: One = 1d0, Half = 0.5d0
     propfile0 = 'PROP_B0'
     propfile1 = 'PROP_B1'
     rdmfile   = 'rdm2_B.dat'
+    y01file   = 'Y01_B'
     xy0file   = 'XY0_B'
  endif
 
@@ -1383,12 +1386,17 @@ double precision,parameter :: One = 1d0, Half = 0.5d0
    select case(Mon%TwoMoInt)
    case(TWOMO_FOFO)
       print*, 'Flag0',Flags%IFlag0 
-      call Y01CAS_FOFO(Mon%Occ,URe,XOne,ABPlus,ABMin, &
-             !EigY0,EigY1,Eig0,Eig1, &
+     ! call Y01CAS_FOFO(Mon%Occ,URe,XOne,ABPlus,ABMin, &
+     !        !EigY0,EigY1,Eig0,Eig1, &
+     !        propfile0,propfile1, &
+     !        xy0file,&
+     !        Mon%IndN,Mon%IndX,Mon%IGem,Mon%NAct,Mon%INAct,Mon%NDimX, &
+     !        NBas,Mon%NDim,NInte1,Mon%NoSt,twofile,twojfile,twokfile,Flags%IFlag0,ETot)
+      call Y01CAS_FOFO(Mon%Occ,URe,XOne,ABPlus,ABMin,ETot, &
              propfile0,propfile1, &
-             xy0file,&
+             y01file,xy0file,     &
              Mon%IndN,Mon%IndX,Mon%IGem,Mon%NAct,Mon%INAct,Mon%NDimX, &
-             NBas,Mon%NDim,NInte1,Mon%NoSt,twofile,twojfile,twokfile,Flags%IFlag0,ETot)
+             NBas,Mon%NDim,NInte1,Mon%NoSt,twofile,twojfile,twokfile,Flags%IFlag0)
    case(TWOMO_FFFF) 
       call Y01CAS_mithap(Mon%Occ,URe,XOne,ABPlus,ABMin, &
              EigY,EigY1,Eig,Eig1, &
@@ -1942,7 +1950,8 @@ double precision, allocatable :: Eig0(:), Eig1(:), EigY0(:), EigY1(:)
 character(8) :: label
 character(:),allocatable   :: onefile,twofile,propfile,rdmfile
 character(:),allocatable   :: twojfile,twokfile
-character(:),allocatable   :: propfile0,propfile1,xy0file
+character(:),allocatable   :: propfile0,propfile1
+character(:),allocatable   :: y01file,xy0file
 double precision,parameter :: One = 1d0, Half = 0.5d0
 double precision,parameter :: SmallE=0d0,BigE=1.D20
 double precision,external  :: trace
@@ -1957,6 +1966,7 @@ double precision,external  :: trace
     propfile0 = 'PROP_A0' 
     propfile1 = 'PROP_A1' 
     rdmfile   = 'rdm2_A.dat'
+    y01file   = 'Y01_A'
     xy0file   = 'XY0_A'
  elseif(Mon%Monomer==2) then
     onefile   = 'ONEEL_B'
@@ -1967,6 +1977,7 @@ double precision,external  :: trace
     propfile0 = 'PROP_B0' 
     propfile1 = 'PROP_B1' 
     rdmfile   = 'rdm2_B.dat'
+    y01file   = 'Y01_B'
     xy0file   = 'XY0_B'
  endif
 
@@ -2215,11 +2226,16 @@ double precision,external  :: trace
 
       select case(Mon%TwoMoInt)
       case(TWOMO_FOFO) 
-         call Y01CAS_FOFO(Mon%Occ,URe,XOne,ABPlus,ABMin, &
-                propfile0,propfile1, &
-                xy0file, &
-                Mon%IndN,Mon%IndX,Mon%IGem,Mon%NAct,Mon%INAct,Mon%NDimX, &
-                NBas,Mon%NDim,NInte1,Mon%NoSt,twofile,twojfile,twokfile,Flags%IFlag0)
+       !  call Y01CAS_FOFO(Mon%Occ,URe,XOne,ABPlus,ABMin, &
+       !         propfile0,propfile1, &
+       !         xy0file, &
+       !         Mon%IndN,Mon%IndX,Mon%IGem,Mon%NAct,Mon%INAct,Mon%NDimX, &
+       !         NBas,Mon%NDim,NInte1,Mon%NoSt,twofile,twojfile,twokfile,Flags%IFlag0)
+      call Y01CAS_FOFO(Mon%Occ,URe,XOne,ABPlus,ABMin,ECASSCF, &
+             propfile0,propfile1, &
+             y01file,xy0file,     &
+             Mon%IndN,Mon%IndX,Mon%IGem,Mon%NAct,Mon%INAct,Mon%NDimX, &
+             NBas,Mon%NDimX,NInte1,Mon%NoSt,twofile,twojfile,twokfile,Flags%IFlag0)
       case(TWOMO_FFFF) 
          call Y01CAS_mithap(Mon%Occ,URe,XOne,ABPlus,ABMin, &
                 EigY0,EigY1,Eig0,Eig1, &
