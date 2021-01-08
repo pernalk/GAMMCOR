@@ -7,7 +7,6 @@ TESTS/*
 *.o
 *.f90#
 *.f90~
-*.exe
 SOURCE/*.f_*
 SOURCE/*.f90_*
 SOURCE/list_changes.txt
