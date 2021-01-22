@@ -151,6 +151,7 @@ type SystemBlock
       logical :: NActFromRDM = .true.
       double precision :: ThrAct = 0.992d0
       double precision :: ThrSelAct = 1.d-8
+      double precision :: ThrQVirt  = 1.d-7
       integer,allocatable :: InSt(:,:),InTrSt(:,:)
       integer,allocatable :: IGem(:), IndAux(:)
       integer,allocatable :: IndX(:), IndN(:,:), IPair(:,:)
