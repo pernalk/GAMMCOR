@@ -62,12 +62,17 @@ C
 C 
       ElseIf(ITwoEl.eq.3) Then
 C
-      Call Y01CAS_FOFO(Occ,URe,XOne,ABPLUS,ABMIN,
-     $ 'PROP0','PROP1',
-     $ 'XY0',
-     $ IndN,IndX,IGem,NAcCAS,NInAcCAS,NDimX,
-     $ NBasis,NDim,NInte1,NoSt,'EMPTY','FFOO',
-     $ 'FOFO',0,ETot,ECorr)
+      Call AC0CAS_FOFO(ECorr,ETot,Occ,URe,XOne,ABPLUS,ABMIN,
+     $ IndN,IndX,IGem,NAcCAS,NInAcCAS,NDimX,NBasis,NDim,NInte1,
+     $ NoSt,'FFOO','FOFO')
+C
+C     now Y01CAS_FOFO is used in SAPT only
+C      Call Y01CAS_FOFO(Occ,URe,XOne,ABPLUS,ABMIN,
+C     $ 'PROP0','PROP1',
+C     $ 'Y01FILE',
+C     $ IndN,IndX,IGem,NAcCAS,NInAcCAS,NDimX,
+C     $ NBasis,NDim,NInte1,NoSt,'EMPTY','FFOO',
+C     $ 'FOFO',0,ETot,ECorr)
 C
 C     ITwoEl
       EndIf
@@ -101,16 +106,7 @@ C
 C     If(IFlFrag1.Eq.0)
       EndIf
 C
-C     DELETE MO INTEGRALS 
-      If(ITwoel.Eq.2) Then
-        Open(newunit=iunit,file='TWOMO',status='OLD')
-        Close(iunit,status='DELETE')
-      ElseIf(ITwoel.Eq.3) Then
-        Open(newunit=iunit,file='FFOO',status='OLD')
-        Close(iunit,status='DELETE')
-        Open(newunit=iunit,file='FOFO',status='OLD')
-        Close(iunit,status='DELETE')
-      EndIf
+      Call DelInts(ITwoEl)
 C
       Return
 C
@@ -189,6 +185,8 @@ C
      $ ETot+ENuc,ECorr,ETot+ENuc+ECorr
 C
       EndIf
+C
+      Call DelInts(ITwoEl)
 C
       return
       GoTo 888
@@ -7746,3 +7744,24 @@ C
 C end of AC0DSYMM
       Return
       End
+
+*Deck ACECORR
+      Subroutine DelInts(ITwoEl)
+C
+C     DELETE MO INTEGRALS 
+C
+      Implicit Real*8 (A-H,O-Z)
+
+      If(ITwoel.Eq.2) Then
+        Open(newunit=iunit,file='TWOMO',status='OLD')
+        Close(iunit,status='DELETE')
+      ElseIf(ITwoel.Eq.3) Then
+        Open(newunit=iunit,file='FFOO',status='OLD')
+        Close(iunit,status='DELETE')
+        Open(newunit=iunit,file='FOFO',status='OLD')
+        Close(iunit,status='DELETE')
+      EndIf
+
+      Return
+      End
+

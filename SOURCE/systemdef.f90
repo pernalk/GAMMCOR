@@ -378,6 +378,7 @@ if(Flags%ISAPT.Eq.0) then
    System%EigFCI = Input%SystemInput(1)%EigFCI
    System%ThrAct = Input%SystemInput(1)%ThrAct
    System%ThrSelAct = Input%SystemInput(1)%ThrSelAct
+   System%ThrQVirt  = Input%SystemInput(1)%ThrQVirt
    System%TwoMoInt = Input%SystemInput(1)%TwoMoInt
    System%IPrint = Input%CalcParams%IPrint  
   
@@ -430,6 +431,7 @@ elseif(Flags%ISAPT.Eq.1) then
       monA%NBasis  = Input%CalcParams%NBasis
       monA%ThrAct       = Input%SystemInput(1)%ThrAct
       monA%ThrSelAct    = Input%SystemInput(1)%ThrSelAct
+      monA%ThrQVirt     = Input%SystemInput(1)%ThrQVirt
       monA%DeclareTwoMo = Input%SystemInput(1)%DeclareTwoMo
       monA%TwoMoInt = Input%SystemInput(1)%TwoMoInt
       monA%PostCAS  = Input%SystemInput(1)%PostCAS
@@ -467,6 +469,7 @@ elseif(Flags%ISAPT.Eq.1) then
       monB%Multiplicity = Input%SystemInput(2)%Multiplicity
       monB%ThrAct = Input%SystemInput(2)%ThrAct
       monB%ThrSelAct = Input%SystemInput(2)%ThrSelAct
+      monB%ThrQVirt  = Input%SystemInput(2)%ThrQVirt
       monB%DeclareTwoMo = Input%SystemInput(2)%DeclareTwoMo
       monB%TwoMoInt = Input%SystemInput(2)%TwoMoInt
       monB%PostCAS = Input%SystemInput(2)%PostCAS
@@ -507,6 +510,7 @@ elseif(Flags%ISAPT.Eq.1) then
       monA%Multiplicity = Input%SystemInput(2)%Multiplicity
       monA%ThrAct = Input%SystemInput(2)%ThrAct
       monA%ThrSelAct = Input%SystemInput(2)%ThrSelAct
+      monA%ThrQVirt  = Input%SystemInput(2)%ThrQVirt
       monA%DeclareTwoMo = Input%SystemInput(2)%DeclareTwoMo
       monA%TwoMoInt = Input%SystemInput(2)%TwoMoInt
       monA%PostCAS = Input%SystemInput(2)%PostCAS
@@ -542,6 +546,7 @@ elseif(Flags%ISAPT.Eq.1) then
       monB%Multiplicity = Input%SystemInput(1)%Multiplicity
       monB%ThrAct = Input%SystemInput(1)%ThrAct
       monB%ThrSelAct = Input%SystemInput(1)%ThrSelAct
+      monB%ThrQVirt  = Input%SystemInput(1)%ThrQVirt
       monB%DeclareTwoMo = Input%SystemInput(1)%DeclareTwoMo
       monB%TwoMoInt = Input%SystemInput(1)%TwoMoInt
       monB%PostCAS = Input%SystemInput(1)%PostCAS

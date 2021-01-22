@@ -13,5 +13,5 @@ C
      $ IConnect(1000,1000)
       Common/AC/ IFlAC,IFlSnd,IFlAC0D,IFlCore,IFlFrag1,IFl12,NoSt,
      $ ISymmAC0D
-      Common/THR/ ThrSelAct, ThrAct
+      Common/THR/ ThrSelAct,ThrAct,ThrQVirt
 C

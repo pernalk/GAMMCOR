@@ -221,6 +221,9 @@ C     SET THRESHOLD FOR ACTIVE ORBITALS IN CAS
       ThrSelAct = System%ThrSelAct
 C     SET THRESHOLD FOR ACTIVE ORBITALS IN GVB
       ThrAct = System%ThrAct
+C     SET THRESHOLD FOR QUASI-VIRTUAL ORBITALS IN CAS 
+      write(lout,*) System%ThrQVirt
+      ThrQVirt = System%ThrQVirt
 C
 C*************************************************************************
 C     READ THE INPUT AND PRINT THE INPUT DATA 
@@ -309,12 +312,7 @@ C
 C      Write(6,'(8a10)') ('**********',i=1,9)
       EndIf
 C
-      If(ITwoEl.Eq.2) Then
-      Call delfile('TWOMO')
-      ElseIf(ITwoEl.Eq.3) Then
-      Call delfile('FOFO')
-      Call delfile('FFOO')
-      EndIf
+      If(ITwoEl.Eq.2)  Call delfile('TWOMO')
 C
       Call free_System(System)
       Call clock(PossibleJobType(Flags%JobType),Tcpu,Twall)

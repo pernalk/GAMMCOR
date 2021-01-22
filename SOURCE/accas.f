@@ -49,8 +49,12 @@ C
 C
       IPair(1:NBasis,1:NBasis)=0
 C
-      Write(LOUT,'(2x,a,2e15.5)') 'Threshold for quasi-degeneracy ',
+      Write(LOUT,'(2x,a,4x,2e15.5)') 'Threshold for quasi-degeneracy ',
      $ ThrSelAct
+
+      Write(LOUT,'(2x,a,2e15.5)') 'Threshold for quasi-virtual orbital',
+     $ ThrQVirt
+
       IJ=0
       Ind=0
       Do I=1,NBasis
@@ -72,8 +76,8 @@ C     If IFlCore=0 do not include core (inactive) orbitals
       If((IFlCore.Eq.1).Or.
      $ (IFlCore.Eq.0.And.Occ(I).Ne.One.And.Occ(J).Ne.One)) Then
 C
-      If(Abs(Occ(i)+Occ(j)-Two).Gt.1.D-10.And. 
-     $   Abs(Occ(i)+Occ(j)).Gt.1.D-13) Then
+      If(Abs(Occ(i)+Occ(j)-Two).Gt.1.D-10.And.
+     $   Abs(Occ(i)+Occ(j)).Gt.ThrQVirt) Then
       Ind=Ind+1
       IndX(Ind)=Ind
       IndN(1,Ind)=I
@@ -93,7 +97,7 @@ C
       EndDo
 C
       NDimX=Ind
-      Write(6,'(2X,"Number of pairs reduced to:",I6)')Ind
+      Write(6,'(/2X,"Number of pairs reduced to:",I6)')Ind
       Write(6,'(2X,"Accepted pairs read:")')
       Do I=1,Ind
       Ind1=IndN(1,I)
