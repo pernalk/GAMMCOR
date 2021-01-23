@@ -295,7 +295,8 @@ subroutine read_block_calculation(CalcParams, line)
                CalcParams%JobType = JOB_TYPE_AC0D
            elseif (uppercase(val) == "AC0DNOSYMM" ) then
                CalcParams%JobType = JOB_TYPE_AC0DNOSYMM
-
+           elseif (uppercase(val) == "NLOCCORR" ) then
+               CalcParams%JobType = JOB_TYPE_NLOCCORR
            endif
 
      !case ("FRAGMENTS") 

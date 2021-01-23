@@ -28,6 +28,7 @@ integer, parameter :: JOB_TYPE_CASPIDFTOPT = 8
 integer, parameter :: JOB_TYPE_EERPA_OLD = 9
 integer, parameter :: JOB_TYPE_AC0D = 10
 integer, parameter :: JOB_TYPE_AC0DNOSYMM = 11
+integer, parameter :: JOB_TYPE_NLOCCORR = 12
 
 integer, parameter :: SAPTLEVEL0 = 0
 integer, parameter :: SAPTLEVEL1 = 1
@@ -69,9 +70,9 @@ character(*),parameter :: PossibleInterface(4) = &
 [character(8) :: &
 'DALTON', 'MOLPRO', 'OWN', 'ORCA']
 
-character(*),parameter :: PossibleJobType(11) = &
+character(*),parameter :: PossibleJobType(12) = &
 [character(9) :: &
-'AC', 'AC0', 'ERPA', 'EERPA', 'SAPT', 'PDFT', 'CASPiDFT','CASPiDFTOpt','EERPA-1','AC0D', 'AC0DNOSYMM']
+'AC', 'AC0', 'ERPA', 'EERPA', 'SAPT', 'PDFT', 'CASPiDFT','CASPiDFTOpt','EERPA-1','AC0D', 'AC0DNOSYMM', 'NLOCCORR']
 
 character(*),parameter :: PossibleRDMType(5) = &
 [character(8) :: &
