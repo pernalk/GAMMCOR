@@ -310,6 +310,9 @@ else
   case(JOB_TYPE_CASPIDFTOPT)
      Flags%IFunSR = 6
 
+  case(JOB_TYPE_NLOCCORR)
+     Flags%IFunSR = 7
+
   end select
 
  ! Inactive
