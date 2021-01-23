@@ -17,7 +17,7 @@ OBJ = $(O)mainp.o $(O)initia.o $(O)dmscf.o $(O)misc.o $(O)optocc.o \
       $(O)exmisc.o $(O)exdpino.o \
       $(O)timing.o \
       $(O)srlrdynamic.o $(O)erpa.o $(O)interpa.o  $(O)exact2el.o $(O)optapsg.o $(O)newton.o $(O)acfd.o $(O)accas.o \
-      $(O)caspidft.o $(O)ac_exact_2el.o
+      $(O)caspidft.o $(O)ac_exact_2el.o $(O)vv10.o
 
 #FCC = gfortran
 #FFLAGS = -O3 -fno-align-commons -fcheck=all -I ./xcfun/fortran  
@@ -128,6 +128,8 @@ $(O)sapt.o : $(S)sapt.f90 $(O)types.o $(O)tran.o $(O)exmisc.o $(O)timing.o
 	$(FCC) $(FFLAGS)  -c $(S)sapt.f90 -o $(O)sapt.o
 $(O)caspidft.o : $(S)caspidft.f $(O)types.o
 	$(FCC) $(FFLAGS)  -c $(S)caspidft.f -o $(O)caspidft.o
+$(O)vv10.o : $(S)vv10.f $(O)types.o
+	$(FCC) $(FFLAGS)  -c $(S)vv10.f -o $(O)vv10.o
 $(O)ac_exact_2el.o : $(S)ac_exact_2el.f
 	$(FCC) $(FFLAGS)  -c $(S)ac_exact_2el.f -o $(O)ac_exact_2el.o
 

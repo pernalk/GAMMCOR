@@ -174,7 +174,12 @@ C     IFunSR = 1 - SR-LSDA, Paziani et al.
 C     IFunSR = 2 - SR-PBE, Goll et al. PCCP 7, (2005) 3917
 C     IFunSR = 3 - Gagliardi-Truhlar with PBE
 C     IFunSR = 4 - LR-CAS+SR-PBE+LR-AC/AC0 (with full range CAS RDM's)
-C     IFunSR = 5 - CASPiDFT
+C
+C     OTHERS
+C
+C     IFunSR = 5 - CASPiDFT (CASPIDFT procedure)
+C     IFunSR = 6 - CASPiDFT (CASPIDFTOPT, integrals not loaded)
+C     IFunSR = 7 - VV10 (nonlocal correlation functional, integrals not loaded)
 C
       IFunSR=Flags%IFunSR
       IFunSRKer=Flags%IFunSRKer
@@ -249,7 +254,8 @@ C
 C     GET THE VALUE OF THE SEPARATION PARAMETER OM
 C
       Alpha = System%Omega
-      If(IFunSR.Ne.0.And.IFunSR.Ne.3.And.IFunSR.Ne.5) Then
+c      If(IFunSR.Ne.0.And.IFunSR.Ne.3.And.IFunSR.Ne.5) Then
+      If(IFunSR.Eq.1.Or.IFunSR.Eq.2.Or.IFunSR.Eq.4) Then
 C      Call GetAlpha(Title)
       Call readalphamolpro(Alpha)
       Else
@@ -283,12 +289,23 @@ C
       write(LOUT,'(8a10)') ('**********',i=1,8)
 C
       Call clock('START',Tcpu,Twall)
+C
 C     LOAD THE INTEGRALS
 C
       If(IDALTON.Eq.0) Then
 C
+      IFFSR=0
+      If(IFunSR.Eq.7) Then
+C     temporarily set IFunSR to 6 to avoid loading integrals and their transformation in LdInteg
+      IFunSR=6
+      IFFSR=7
+      EndIf
+C
       Call LdInteg(Title,XKin,XNuc,ENuc,Occ,URe,TwoEl,UMOAO,NInte1,
      $ NBasis,NInte2,NGem)
+C
+C     set back IFunSR to IFFSR
+      If(IFFSR.Ne.0) IFunSR=IFFSR
 C
       Else
 C
@@ -302,6 +319,8 @@ C
      $ NBasis,NInte1,NInte2)
       ElseIf(IFunSR.Eq.6) Then
       Call CASPIDFTOPT(URe,UMOAO,Occ,NBasis)
+      ElseIf(IFunSR.Eq.7) Then
+      Call VV10(URe,UMOAO,Occ,NBasis)
       Else
       Call DMSCF(Title,URe,Occ,XKin,XNuc,ENuc,UMOAO,
      $ TwoEl,NBasis,NInte1,NInte2,NGem,System)
