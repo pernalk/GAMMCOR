@@ -1,5 +1,6 @@
 OBJ/*
 *.mod
-xcfun_intel/lib/.svn
+xcfun/lib/.svn
 TESTS/
 SOURCE/compare_with_prdmft.py
+/build/
