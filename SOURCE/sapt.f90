@@ -2135,52 +2135,48 @@ deallocate(OmB,OmA)
  
 end subroutine e2dispCAS
 
-! HERE!!!
 subroutine e2disp(Flags,A,B,SAPT)
+! calculate 2nd order dispersion energy
+! in coupled and uncoupled approximations
 implicit none
 
-type(FlagsData) :: Flags
+type(FlagsData)   :: Flags
 type(SystemBlock) :: A, B
-type(SaptData) :: SAPT
+type(SaptData)    :: SAPT
+type(Y01BlockData),allocatable :: Y01BlockA(:),Y01BlockB(:)
+
 integer :: NBas, NInte1,NInte2
 integer :: dimOA,dimVA,dimOB,dimVB,nOVA,nOVB
 integer :: iunit
 integer :: i,j,pq,rs
 integer :: ip,iq,ir,is
-integer :: kc, ik, ic
+integer :: kc,ik,ic
 double precision,allocatable :: OmA(:), OmB(:), &
-                                OmA0(:),OmB0(:),&
-                                OmA1(:),OmB1(:)
-double precision,allocatable :: EVecA(:), EVecB(:), &
-                                EVecA0(:),EVecB0(:),& 
-                                EVecA1(:),EVecB1(:)
+                                OmA0(:),OmB0(:)
+double precision,allocatable :: EVecA(:), EVecB(:)
 double precision,allocatable :: tmp1(:,:),tmp2(:,:),&
-                                tmp01(:,:),tmp02(:,:),&  
-                                sc10a(:,:),sc10b(:,:),&
-                                sc01b(:,:)
+                                tmp01(:,:),tmp02(:,:)
 double precision,allocatable :: work(:)
-double precision,allocatable :: tmp03(:,:) 
 double precision :: e2d,fact,tmp
-double precision :: e2du,e2sp,dea,deb
-double precision :: e2ds,e2ds1,e2ds2
+double precision :: e2du,dea,deb
 double precision :: inv_omega
-! for Be ERPA:
-double precision,parameter :: SmallE = 1.D-1
-!double precision,parameter :: SmallE = 1.D-3
-double precision,parameter :: BigE = 1.D8 
 double precision :: Alpha, Beta
+! for Be ERPA:
+!double precision,parameter :: SmallE = 1.D-1
+double precision,parameter :: BigE = 1.D8
+double precision,parameter :: SmallE = 1.D-3
 
 ! Parameter(SmallE=1.D-3,BigE=1.D8)
- 
+
  if(A%NBasis.ne.B%NBasis) then
     write(LOUT,'(1x,a)') 'ERROR! MCBS not implemented in SAPT!'
     stop
  else
-    NBas = A%NBasis 
+    NBas = A%NBasis
  endif
 
 ! print thresholds
- if(SAPT%IPrint>1) then 
+ if(SAPT%IPrint>1) then
     write(LOUT,'(/,1x,a)') 'Thresholds in E2disp:'
     write(LOUT,'(1x,a,2x,e15.4)') 'SmallE      =', SmallE
     write(LOUT,'(1x,a,2x,e15.4)') 'BigE        =', BigE
@@ -2196,225 +2192,41 @@ double precision :: Alpha, Beta
  nOVA = dimOA*dimVA
  nOVB = dimOB*dimVB
 
-  !print*, 'e2disp'
-  !print*, A%num0,A%num1,A%num2
-  !print*, nOVA,dimOA,dimVA 
-  !print*, B%num0,B%num1,B%num2
-
 ! read EigValA_B
- allocate(EVecA(A%NDimX*A%NDimX),OmA(A%NDimX),&
-          EVecB(B%NDimX*B%NDimX),OmB(B%NDimX),&
-          EVecA0(A%NDimX*A%NDimX),OmA0(A%NDimX),&
-          EVecB0(B%NDimX*B%NDimX),OmB0(B%NDimX))  
- if(Flags%IFlag0==0) then
-    allocate(EVecA1(A%NDimX*A%NDimX),OmA1(A%NDimX),&
-             EVecB1(B%NDimX*B%NDimX),OmB1(B%NDimX))  
- endif           
+ allocate(EVecA(A%NDimX*A%NDimX),OmA(A%NDimX),  &
+          EVecB(B%NDimX*B%NDimX),OmB(B%NDimX),  &
+          OmA0(A%NDimX),OmB0(B%NDimX))
 
  call readresp(EVecA,OmA,A%NDimX,'PROP_A')
  call readresp(EVecB,OmB,B%NDimX,'PROP_B')
 
- if(.not.(Flags%ICASSCF==0.and.Flags%ISERPA==0)) then
-    call readresp(EVecA0,OmA0,A%NDimX,'PROP_A0')
-    call readresp(EVecB0,OmB0,B%NDimX,'PROP_B0')
+ ! uncoupled - works for CAS only
+ if(Flags%ICASSCF==1) then
+    allocate(Y01BlockA(A%NDimX),Y01BlockB(B%NDimX))
 
-    if(Flags%IFlag0==0) then
-       call readresp(EVecA1,OmA1,A%NDimX,'PROP_A1')
-       call readresp(EVecB1,OmB1,B%NDimX,'PROP_B1')
-    endif
+    call convert_XY0_to_Y01(A,Y01BlockA,OmA0,NBas,'XY0_A')
+    call convert_XY0_to_Y01(B,Y01BlockB,OmB0,NBas,'XY0_B')
  endif
 
- !print*, 'Normy:'
- !print*, norm2(OmA),'OmA'
- !print*, norm2(OmB),'OmB'
-
- !print*, norm2(OmB0)
- !print*, norm2(OmB1)
-! print*, norm2(EVecB)
-! print*, norm2(EVecB0)
-! print*, norm2(EVecA1),'A1'
-! print*, norm2(EVecB0),'B0'
-! print*, norm2(EVecB1),'B1'
-! print*, norm2(EVecB),'B'
-! print*, norm2(EVecA),'A'
-!
- !print*, 'EXC ENERGIES'
- !do i=1,100!size(OmB)
- !   if(OmB(i).gt.0d0) write(*,*) OmB(i)
- !enddo
-
-! uncoupled
-! works with tran4_full
-!allocate(work(NInte1))
-!open(newunit=iunit,file='TWOMOAB',status='OLD',&
-!     access='DIRECT',form='UNFORMATTED',recl=8*NInte1)
-!
-!
-!e2du=0d0
-!do pq=1,A%NDimX
-!   ip = A%IndN(1,pq)
-!   iq = A%IndN(2,pq)
-!   dea = A%OrbE(ip)-A%OrbE(iq)
-!   !print*, iq,ip,iq+ip*(ip-1)/2,NInte1
-!   read(iunit,rec=iq+ip*(ip-1)/2) work(1:NInte1)
-!   do rs=1,B%NDimX
-!      ir = B%IndN(1,rs)
-!      is = B%IndN(2,rs)
-!      deb = B%OrbE(ir)-B%OrbE(is) 
-!      !print*, is,ir,is+ir*(ir-1)/2,NInte1
-!      e2du = e2du + work(is+ir*(ir-1)/2)**2/(dea+deb)
-!   enddo
-!enddo
-! write(LOUT,'()') 
-! write(LOUT,'(1x,a,f16.8)')'E2disp(unc) = ', -4d0*e2du*1000d0 
-
-! uncoupled
-! tran4_full
-!allocate(work(NInte1))
-!open(newunit=iunit,file='TWOMOAB',status='OLD',&
-!     access='DIRECT',form='UNFORMATTED',recl=8*NInte1)
-
  Alpha = 1.000d0
- Beta  = 1.000d0 
+ Beta  = 1.000d0
 
 ! tran4_gen
 allocate(work(nOVB))
 open(newunit=iunit,file='TWOMOAB',status='OLD',&
      access='DIRECT',form='UNFORMATTED',recl=8*nOVB)
 
-if(Flags%ISHF==1.and.SAPT%HFCheck) then
-
-allocate(tmp01(A%NDimX,B%NDimX),tmp02(A%NDimX,B%NDimX),&
-         tmp03(A%NDimX,B%NDimX))
- tmp01=0
- tmp03=0
- do pq=1,A%NDimX
-    ip = A%IndN(1,pq)
-    iq = A%IndN(2,pq)
-    !print*, iq,ip,iq+(ip-A%num0-1)*dimOA,nOVA
-   read(iunit,rec=iq+(ip-A%num0-1)*dimOA) work(1:nOVB)
-    do rs=1,B%NDimX
-       ir = B%IndN(1,rs)
-       is = B%IndN(2,rs)
-
-       fact = &
-              work(is+(ir-B%num0-1)*dimOB)
-
-       do i=1,A%NDimX
-
-          tmp01(i,rs) = tmp01(i,rs) + &
-                       fact * &
-                       EVecA1(pq+(i-1)*A%NDimX)
-
-!          tmp03(i,rs) = tmp03(i,rs) + &
-!                       !fact * sqrt(2d0) * &
-!                       fact * sqrt(2d0) * &
-!                       EVecA0(pq+(i-1)*A%NDimX)
-
-       enddo
-
-    enddo
- enddo
-
-! tmp02=0
-! do j=1,B%NDimX
-!    do pq=1,A%NDimX
-!    ip = A%IndN(1,pq)
-!    iq = A%IndN(2,pq)
-!    ! print*, iq,ip,iq+(ip-A%num0-1)*dimOA,nOVA
-!    read(iunit,rec=iq+(ip-A%num0-1)*dimOA) work(1:nOVB)
-! 
-!       do rs=1,B%NDimX
-!       ir = B%IndN(1,rs)
-!       is = B%IndN(2,rs)
-!
-!       tmp02(pq,j) = tmp02(pq,j) + &
-!                    EVecB1(rs+(j-1)*B%NDimX)*&!tmp01(i,rs)
-!                    !work(is+(ir-B%num0-1)*dimOB)
-!                    tmp03(pq,rs)
-!       enddo
-!    enddo  
-! enddo
-
-   e2du=0d0
-   e2ds2=0d0
-   e2ds1=0d0
-   tmp=0d0
-   do pq=1,A%NDimX
-      ip = A%IndN(1,pq)
-      iq = A%IndN(2,pq)
-      dea = A%OrbE(ip)-A%OrbE(iq)
-   !   print*, iq,ip,iq+(ip-A%num0-1)*dimOA,nOVA
-      read(iunit,rec=iq+(ip-A%num0-1)*dimOA) work(1:nOVB)
-      do rs=1,B%NDimX
-         ir = B%IndN(1,rs)
-         is = B%IndN(2,rs)
-         deb = B%OrbE(ir)-B%OrbE(is) 
-   !      print*, is,ir,is+(ir-B%num0-1)*dimOB,nOVB
-
-       if(OmA0(pq).gt.SmallE.and.OmB0(rs).gt.SmallE&
-        .and.OmA0(pq).lt.BigE.and.OmB0(rs).lt.BigE) then
-
-         tmp=0
-         do kc=1,B%NDimX
-            ik = B%IndN(1,kc)
-            ic = B%IndN(2,kc)
-            tmp = tmp + work(ic+(ik-B%num0-1)*dimOB)*EVecB1(kc+(rs-1)*B%NDimX)
-         enddo
-
-         e2du = e2du + work(is+(ir-B%num0-1)*dimOB)**2/(dea+deb)
-         e2ds2 = e2ds2 + work(is+(ir-B%num0-1)*dimOB)**2*(Alpha*OmA1(pq)+Beta*OmB1(rs))/(dea+deb)**2
-        ! e2ds1 = e2ds1 + (tmp02(pq,rs)+tmp01(pq,rs))*work(is+(ir-B%num0-1)*dimOB)/(OmA0(pq)+OmB0(rs))
-         e2ds1 = e2ds1 + (Beta*tmp+Alpha*tmp01(pq,rs))*work(is+(ir-B%num0-1)*dimOB)/(dea+deb) !(OmA0(pq)+OmB0(rs))
-
-       endif
- 
-      enddo
-   enddo
-    write(LOUT,'()') 
-    e2ds = (-4d0*e2du-16/sqrt(2d0)*e2ds1+4d0*e2ds2)*1000
-    print*, 'DS1', -16/sqrt(2d0)*e2ds1*1000
-    write(LOUT,'(1x,a,f16.8)')'SPOLE:      = ', -4d0*e2du*1000d0 + 4d0*e2ds2*1000d0
-    write(LOUT,'(1x,a,f16.8)')'E2disp(sc)  = ', e2ds
-    write(LOUT,'(1x,a,f16.8)')'E2disp(unc) = ', -4d0*e2du*1000d0
-    write(LOUT,'()') 
-    e2ds  = 0
-    e2ds1 = 0
-    e2ds2 = 0 
-
-deallocate(tmp01,tmp02,tmp03)
-! end Hartree-Fock check
-endif
 
 allocate(tmp1(A%NDimX,B%NDimX),tmp2(A%NDimX,B%NDimX),&
         tmp01(A%NDimX,B%NDimX),tmp02(A%NDimX,B%NDimX))
 
-if(Flags%IFlag0==0) then
- allocate(sc10a(A%NDimX,B%NDimX),sc10b(A%NDimX,B%NDimX),&
-          sc01b(A%NDimX,B%NDimX))
- sc10a = 0
- sc10b = 0
- sc01b = 0
-endif
-
-!print*, 'A-ndimX',A%NDimX
-
-!print*, 'E2disp,CICoeff=1'
-!B%CICoef = 0d0
-!do i=1,B%NELE !size(B%CICoef)
-!   B%CICoef(i)=1d0
-!   write(*,*) B%CICoef(i),i  
-!enddo
-
-
-! coupled 
+! coupled
 do i=1,A%NDimX
-   if(OmA(i)<0d0) write(LOUT,*) 'Negative A!',i,OmA(i)
+   if(OmA(i)<0d0) write(LOUT,*) 'Negative omega A!',i,OmA(i)
 enddo
 do i=1,B%NDimX
-   if(OmB(i)<0d0) write(LOUT,*) 'Negative B!',i,OmB(i)
+   if(OmB(i)<0d0) write(LOUT,*) 'Negative omega B!',i,OmB(i)
 enddo
-
 
 if(.not.(Flags%ICASSCF==0.and.Flags%ISERPA==0)) then
 
@@ -2432,53 +2244,35 @@ if(.not.(Flags%ICASSCF==0.and.Flags%ISERPA==0)) then
        fact = (A%CICoef(iq)+A%CICoef(ip)) * &
               (B%CICoef(is)+B%CICoef(ir)) * &
                work(is+(ir-B%num0-1)*dimOB)
-  
+
        do i=1,A%NDimX
-          tmp1(i,rs) = tmp1(i,rs) + & 
+          tmp1(i,rs) = tmp1(i,rs) + &
                        fact * &
                        EVecA(pq+(i-1)*A%NDimX)
-
-          tmp01(i,rs) = tmp01(i,rs) + & 
-                       fact * &
-                       EVecA0(pq+(i-1)*A%NDimX)
-
-          sc10a(i,rs) = sc10a(i,rs) + & 
-                       fact * &
-                       Alpha * &
-                       EVecA1(pq+(i-1)*A%NDimX)
-
        enddo
+
+       associate(Y => Y01BlockA(pq))
+          tmp01(Y%l1:Y%l2,rs) = tmp01(Y%l1:Y%l2,rs) + fact * Y%vec0(1:Y%n)
+       end associate
 
     enddo
  enddo
+ ! coupled
+ call dgemm('N','N',A%NDimX,B%NDimX,B%NDimX,1d0,tmp1,A%NDimX,EVecB,B%NDimX,0d0,tmp2,A%NDimX)
 
- tmp2=0
+ ! uncoupled
+ ! call
+ ! dgemm('N','N',A%NDimX,B%NDimX,B%NDimX,1d0,tmp01,A%NDimX,EVecB0,B%NDimX,0d0,tmp02,A%NDimX)
  tmp02=0
- do j=1,B%NDimX
-    do i=1,A%NDimX
-       do rs=1,B%NDimX
-       ir = B%IndN(1,rs)
-       is = B%IndN(2,rs)
-       tmp2(i,j) = tmp2(i,j) + &
-                    EVecB(rs+(j-1)*B%NDimX)*tmp1(i,rs)
-
-       tmp02(i,j) = tmp02(i,j) + &
-                    EVecB0(rs+(j-1)*B%NDimX)*tmp01(i,rs)
-
-       sc10b(i,j) = sc10b(i,j) + &
-                    EVecB0(rs+(j-1)*B%NDimX)*sc10a(i,rs)
-
-       sc01b(i,j) = sc01b(i,j) + &
-                    Beta * &
-                    EVecB1(rs+(j-1)*B%NDimX)*tmp01(i,rs)
-
-       enddo
-    enddo  
+ do rs=1,B%NDimX
+    associate(Y => Y01BlockB(rs))
+      call dger(A%NDimX,Y%n,1d0,tmp01(:,rs),1,Y%vec0,1,tmp02(:,Y%l1:Y%l2),A%NDimX)
+    end associate
  enddo
 
 elseif(Flags%ICASSCF==0.and.Flags%ISERPA==0) then
 
- tmp1=0
+ tmp1 = 0
  do pq=1,A%NDimX
     ip = A%IndN(1,pq)
     iq = A%IndN(2,pq)
@@ -2491,12 +2285,11 @@ elseif(Flags%ICASSCF==0.and.Flags%ISERPA==0) then
        fact = (A%CICoef(iq)+A%CICoef(ip)) * &
               (B%CICoef(is)+B%CICoef(ir)) * &
                work(is+(ir-B%num0-1)*dimOB)
-  
+
        do i=1,A%NDimX
-          tmp1(i,rs) = tmp1(i,rs) + & 
+          tmp1(i,rs) = tmp1(i,rs) + &
                        fact * &
                        EVecA(pq+(i-1)*A%NDimX)
-
        enddo
 
     enddo
@@ -2510,48 +2303,33 @@ elseif(Flags%ICASSCF==0.and.Flags%ISERPA==0) then
        is = B%IndN(2,rs)
        tmp2(i,j) = tmp2(i,j) + &
                     EVecB(rs+(j-1)*B%NDimX)*tmp1(i,rs)
-
        enddo
-    enddo  
- enddo
-
-! end GVB select
-endif
-
-if(.not.(Flags%ICASSCF==0.and.Flags%ISERPA==0)) then
-! uncoupled and semicoupled
- e2du=0d0
-! e2ds1=0d0
-! e2ds2=0d0
- do j=1,B%NDimX
-    do i=1,A%NDimX
-      ! if(OmA0(i).gt.SmallE.and.OmB0(j).gt.SmallE&
-      !    .and.OmA0(i).lt.BigE.and.OmB0(j).lt.BigE) then
-
-       if(abs(OmA0(i)).gt.SmallE.and.abs(OmB0(j)).gt.SmallE&
-          .and.abs(OmA0(i)).lt.BigE.and.abs(OmB0(j)).lt.BigE) then
-
-
-       inv_omega = 1d0/(OmA0(i)+OmB0(j))
-
-       e2du = e2du + tmp02(i,j)**2*inv_omega
-       e2ds2 = e2ds2 + (Alpha*OmA1(i)+Beta*OmB1(j))*(tmp02(i,j)*inv_omega)**2
-       !e2ds1 = e2ds1 + tmp02(i,j)*(Alpha*sc10b(i,j)+Beta*sc01b(i,j))*inv_omega
-       e2ds1 = e2ds1 + tmp02(i,j)*(sc10b(i,j)+sc01b(i,j))*inv_omega
-       !e2ds1 = e2ds1 + tmp02(i,j)*(sc01b(i,j))*inv_omega
-
-       endif
     enddo
  enddo
- SAPT%e2disp_unc = -16d0*e2du
- SAPT%e2disp_sp = -16*e2du+16*e2ds2
- SAPT%e2disp_sc = -16*e2du+16*e2ds2-32*e2ds1
 
- e2du = -16d0*e2du*1000d0
- e2sp = e2du + 16*e2ds2*1000 
- e2ds= e2du+(16*e2ds2-32*e2ds1)*1000
+endif ! end GVB select
 
- call writeampl(tmp02,'PROP_AB0')
+if(.not.(Flags%ICASSCF==0.and.Flags%ISERPA==0)) then
+   ! uncoupled
+    e2du = 0d0
+    do j=1,B%NDimX
+       do i=1,A%NDimX
+
+          if(abs(OmA0(i)).gt.SmallE.and.abs(OmB0(j)).gt.SmallE&
+             .and.abs(OmA0(i)).lt.BigE.and.abs(OmB0(j)).lt.BigE) then
+
+
+          inv_omega = 1d0/(OmA0(i)+OmB0(j))
+          e2du = e2du + tmp02(i,j)**2*inv_omega
+
+          endif
+       enddo
+    enddo
+    SAPT%e2disp_unc = -16d0*e2du
+
+    e2du = -16d0*e2du*1000d0
+
+    call writeampl(tmp02,'PROP_AB0')
 
 endif
 
@@ -2566,62 +2344,41 @@ endif
        endif
     enddo
  enddo
- SAPT%e2disp = -16d0*e2d
+ SAPT%e2disp  = -16d0*e2d
 
  e2d  = -16d0*e2d*1000d0
- write(LOUT,'(/1x,a,f16.8)')'E2disp(unc) = ', e2du
- write(LOUT,'(1x,a,f16.8)')'E2disp(sp) =  ', e2sp
- write(LOUT,'(1x,a,f16.8)')'E2disp(sc) =  ', e2ds
 
- write(LOUT,'(/1x,a,f16.8)') 'E2disp      = ',e2d
+ write(LOUT,'(/1x,a,f16.8)')'E2disp      = ', e2d
+ write(LOUT,'(/1x,a,f16.8)')'E2disp(unc) = ', e2du
+! write(LOUT,*) 'E2DISP',e2d
 
  ! write amplitude to a file
  call writeampl(tmp2,'PROP_AB')
 
-!! coupled - TEST FULL LOOP
-! e2d = 0d0
-! do i=1,A%NDimX
-!    do j=1,B%NDimX
-!    tmp=0
-!    do pq=1,A%NDimX
-!       ip = A%IndN(1,pq)
-!       iq = A%IndN(2,pq)
-!       read(iunit,rec=iq+(ip-A%num0-1)*dimOA) work(1:nOVB)
-!   
-!       do rs=1,B%NDimX
-!          ir = B%IndN(1,rs)
-!          is = B%IndN(2,rs)
-!
-!             tmp = tmp + &
-!                   (A%CICoef(ip)+A%CICoef(iq)) * &
-!                   (B%CICoef(ir)+B%CICoef(is)) * &
-!                   EVecA((i-1)*A%NDimX+pq)* & !*work(is+ir*(ir-1)/2)*&
-!                   work(is+(ir-B%num0-1)*dimOB)*&
-!                   EVecB((j-1)*B%NDimX+rs)
-!
-!          enddo
-!       enddo
-!
-!          e2d = e2d  + tmp**2/(OmA(i)+OmB(j))
-!    enddo
-! enddo
-! e2d = -16d0*e2d
-! 
-! print*, 'e2disp: ',e2d*1000
+ ! calucate semicoupled and dexcitations
+ !if(SAPT%SemiCoupled) call e2disp_semi(Flags,A,B,SAPT)
+ !if(SAPT%DispExc)     call e2disp_dexc(Flags,A,B,SAPT)
 
  close(iunit)
  deallocate(work)
 
- if(Flags%IFlag0==0) then
-    deallocate(sc10b,sc01b)
-    deallocate(OmB1,EVecB1,OmA1,EVecA1)
+ if(Flags%ICASSCF==1) then
+    ! deallocate Y01Block
+    do i=1,A%NDimX
+       associate(Y => Y01BlockA(i))
+         deallocate(Y%vec0)
+       end associate
+    enddo
+    do i=1,B%NDimX
+       associate(Y => Y01BlockB(i))
+         deallocate(Y%vec0)
+       end associate
+    enddo
+    deallocate(Y01BlockB,Y01BlockA)
  endif
 
- if(allocated(EVecA0)) print*, 'EVecA0'
- if(allocated(EVecB0)) print*, 'EVecB0'
-
  deallocate(tmp02,tmp01,tmp2,tmp1)
- deallocate(OmB0,EVecB0,OmA0,EVecA0,OmB,EVecB,OmA,EVecA)
+ deallocate(OmB0,OmA0,OmB,EVecB,OmA,EVecA)
 
 end subroutine e2disp
 
