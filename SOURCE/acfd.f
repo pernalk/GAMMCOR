@@ -1742,7 +1742,7 @@ C
 C
 C     A ROUTINE FOR COMPUTING AC INTEGRAND
 C
-      use sapt_ener
+C      use sapt_ener
 C
       Implicit Real*8 (A-H,O-Z)
 C
@@ -2455,7 +2455,7 @@ C ----------------------------------------------------------------
 C
 C     AC0 AND DEEXCITATION CORRECTIONS BASED ON OVERLAP OF ERPA AND SA-CAS TRDM's
 C
-      use sapt_ener
+C      use sapt_ener
 C
       Implicit Real*8 (A-H,O-Z)
 C
@@ -6729,7 +6729,7 @@ C
 C
 C     AC0 AND DEEXCITATION CORRECTIONS BASED ON SYMMETRY
 C
-      use sapt_ener
+C      use sapt_ener
 C
       Implicit Real*8 (A-H,O-Z)
 C

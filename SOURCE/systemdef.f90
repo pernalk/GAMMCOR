@@ -351,6 +351,7 @@ if(Flags%ISAPT.Eq.0) then
 
    if(Input%CalcParams%imon/=1) then
      write(LOUT,'(a)') 'ERROR! TOO MANY SYSTEM BLOCKS!'
+     write(LOUT,'(a)') 'SYSTEM? !'
      stop
    endif   
   

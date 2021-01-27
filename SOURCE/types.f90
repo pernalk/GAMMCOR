@@ -36,6 +36,7 @@ integer, parameter :: SAPTLEVEL2 = 2
 
 integer, parameter :: FLAG_CORE = 1
 integer, parameter :: FLAG_NOBASIS = 0
+integer, parameter :: FLAG_REDVIRT = 0
 logical, parameter :: FLAG_RESTART = .FALSE.
 integer, parameter :: FLAG_PRINT_LEVEL = 0
 integer, parameter :: FLAG_DEBUG_FL12 = 1
@@ -132,6 +133,7 @@ type SystemBlock
       integer :: NOrb, NGem
       integer :: NActOrb = 1
       integer :: NAct, INAct
+      integer :: ISwitchAct = 0
       integer :: NActS(8), INActS(8)
       integer :: NDim, NDimX
       integer :: NDimN, DimEx
@@ -142,6 +144,7 @@ type SystemBlock
       integer :: IWarn = 0
       integer :: icnt
       integer :: num0,num1,num2
+      integer :: NVZero = 0
       integer :: TwoMoInt = TWOMO_INCORE
       logical :: DeclareTwoMo = .false.
       logical :: DeclareSt = .false.
@@ -150,6 +153,7 @@ type SystemBlock
       logical :: doRSH = .false., SameOm = .true.
       logical :: PostCAS = .false.
       logical :: NActFromRDM = .true.
+      logical :: reduceV = .false.
       double precision :: ThrAct = 0.992d0
       double precision :: ThrSelAct = 1.d-8
       double precision :: ThrQVirt  = 1.d-7
@@ -191,6 +195,7 @@ type FlagsData
      integer :: NoSt    = 1
      integer :: IGVB    = 1
      integer :: ITwoEl  = TWOMO_INCORE 
+     integer :: IRedVirt  = FLAG_REDVIRT
      integer :: IFun    = 13
      integer :: IFunSR    = 0 
      integer :: IFunSRKer = 0
@@ -220,6 +225,9 @@ type FlagsData
      integer :: IFl12 = 1
      ! sapt_main.f90
      integer :: IFlag0 = 0
+     ! sapt_utils.f90
+     integer :: DIISN = 6
+     integer :: DIISOn = 2
 
 end type FlagsData
 
@@ -234,20 +242,30 @@ end type InputData
 
 type SaptData
 
-     type(SystemBlock) :: monA, monB
-     double precision  :: ACAlpha = 1d0
+  type(SystemBlock) :: monA,monB
      double precision  :: Vnn,elst,exchs2,e2ind,e2disp
-     double precision  :: e2disp_sc,e2disp_sp,e2disp_unc
+     double precision  :: e2disp_sc,e2disp_sp
+     double precision  :: e2ind_unc,e2disp_unc
+     double precision  :: e2dispR_unc,e2dispR
      double precision  :: e2exdisp_unc,e2exdisp
-     double precision  :: elstinCAS,e2dispinCAS
+     double precision  :: e2exdispR_unc,e2exdispR
+     double precision  :: e2exind,e2exind_unc
+     double precision  :: esapt2,esapt0
+     double precision  :: e2dispinCAS
+     double precision  :: exch_part(5)
      integer :: InterfaceType = INTER_TYPE_DAL
      integer :: SaptLevel = SAPTLEVEL2
      integer :: ic6 = 0
-     integer :: IPrint = 1000
      integer :: iPINO=-1
-     logical :: iCpld = .true.
-     logical :: EnChck = .true., HFCheck =.true.
-     logical :: doRSH = .false., SameOm = .true.
+     integer :: IPrint = 1000
+     logical :: iCpld   = .true.
+     ! MH : add keyword!
+     logical :: SemiCoupled = .true.
+     logical :: DispExc = .true.
+     logical :: noE2exi = .true.
+     logical :: EnChck  = .true., HFCheck=.true.
+     logical :: doRSH   = .false., SameOm = .true.
+     logical :: reduceV = .false.
 
 end type SaptData
 

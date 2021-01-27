@@ -115,6 +115,7 @@ integer :: imon
 
     if(isys>1) then
        write(LOUT,'(1x,a)') "ERROR! TOO MANY SYSTEM BLOCKS!"
+       write(LOUT,'(1x,a)') "ERROR! TOO MANY SYSTEM BLOCKS ???!"
        stop
     endif
  
