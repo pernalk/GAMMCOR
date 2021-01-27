@@ -86,9 +86,9 @@ double precision :: Tcpu,Twall
  elseif(Flags%ISERPA==2) then
 
     call e1elst(SAPT%monA,SAPT%monB,SAPT)
-    call e1exchs2(Flags,SAPT%monA,SAPT%monB,SAPT)
+    !call e1exchs2(Flags,SAPT%monA,SAPT%monB,SAPT)
     call e2ind_apsg(Flags,SAPT%monA,SAPT%monB,SAPT)
-    call e2disp_apsg(Flags,SAPT%monA,SAPT%monB,SAPT)
+    !call e2disp_apsg(Flags,SAPT%monA,SAPT%monB,SAPT)
     if(Flags%ISHF.Ne.0) then
     
        call e2disp_pino(Flags,SAPT%monA,SAPT%monB,SAPT)
@@ -2738,7 +2738,8 @@ elseif(Flags%ISERPA==2) then
    do i=1,NBas
       if(Mon%Occ(i).gt.0d0) Mon%NDimN=Mon%NDimN+1
    enddo
-   ! print*, 'NDimN: ',Mon%NDimN
+   ! print*,  'NDimN: ',Mon%NDimN
+   
    if(Flags%ICASSCF==1.and.Flags%ISHF==0) then
 
     !  allocate(ABPlus(Mon%NDimX**2),ABMin(Mon%NDimX**2), &
@@ -3024,6 +3025,7 @@ double precision, allocatable :: ABPlus(:),ABMin(:),DMAT(:),DMATK(:),&
     ! FCI
     call calc_fci(NBas,NInte1,NInte2,XOne,URe,TwoMO,M,iPINO)
     call read2rdm(M,NBas)
+    
     if(iPINO==0) call init_pino(NBas,M,Flags%ICASSCF)
  
  elseif(iPINO==2) then
@@ -3039,7 +3041,7 @@ double precision, allocatable :: ABPlus(:),ABMin(:),DMAT(:),DMATK(:),&
     if(M%Occ(i).gt.0d0) M%NDimN=M%NDimN+1
  enddo
 
- if(iPINO==2) then
+ if((iPINO==2).or.(iPINO==0)) then
  ! sth here for CAS/LR -- full linear response for CAS wfn
     allocate(ABPlus(M%NDim**2),ABMin(M%NDim**2), &
              CMAT(M%NDim**2),EMAT(NBas**2),EMATM(NBas**2),&
@@ -3083,7 +3085,7 @@ double precision, allocatable :: ABPlus(:),ABMin(:),DMAT(:),DMATK(:),&
 
  endif
 
- if(iPINO==2.or.iPINO==3) then
+ !if(iPINO==1.or.iPINO==2.or.iPINO==3) then
 
     EigVecR = 0
     Eig = 0
@@ -3154,7 +3156,7 @@ double precision, allocatable :: ABPlus(:),ABMin(:),DMAT(:),DMATK(:),&
     deallocate(EMAT,EMATM,DMAT,DMATK)
     deallocate(ABMin,ABPlus,EigVecR,Eig)
 
- endif
+ !endif
 
  deallocate(TwoMO,XOne)
 
@@ -4818,12 +4820,11 @@ endif
 
 end subroutine summary_sapt_verbose
 
-
-
 subroutine free_sapt(SAPT)
 implicit none
 
 type(SaptData) :: SAPT
+integer        :: ISERPA
 
 deallocate(SAPT%monA%CICoef,SAPT%monA%IGem,SAPT%monA%Occ, &
            SAPT%monA%IndAux,SAPT%monA%IndX,SAPT%monA%IndN,&
@@ -4833,6 +4834,9 @@ deallocate(SAPT%monB%CICoef,SAPT%monB%IGem,SAPT%monB%Occ, &
            SAPT%monB%IndAux,SAPT%monB%IndX,SAPT%monB%IndN,&
            SAPT%monB%CMO,&
            SAPT%monB%IPair)
+
+! for PINO
+ISERPA = 0
 
 ! symmetry matrices
 if(allocated(SAPT%monA%NumOSym)) then
@@ -4875,6 +4879,7 @@ endif
 
 ! for PINO only
 if(allocated(SAPT%monA%IndNx)) then
+   ISERPA = 1
    deallocate(SAPT%monA%IndNx)
 endif 
 if(allocated(SAPT%monB%IndNx)) then
@@ -4937,18 +4942,23 @@ if(SAPT%SaptLevel==2) then
    call delfile('TWOMOAB')
 endif
 
-call delfile('FOFOABBA')
-call delfile('FOFOBBBA')
-call delfile('FOFOAAAB')
-call delfile('FOFOBBAB')
-call delfile('FOFOAABA')
-call delfile('FOFOAABB')
-call delfile('FFOOABAB')
-call delfile('FFOOABBB')
-call delfile('FFOOBAAA')
-
-call delfile('XY0_A')
-call delfile('XY0_B')
+if(ISERPA==0) then
+   call delfile('FOFOABBA')
+   call delfile('FOFOBBBA')
+   call delfile('FOFOAAAB')
+   call delfile('FOFOBBAB')
+   call delfile('FOFOAABA')
+   call delfile('FOFOAABB')
+   call delfile('FFOOABAB')
+   call delfile('FFOOABBB')
+   call delfile('FFOOBAAA')
+   
+   call delfile('XY0_A')
+   call delfile('XY0_B')
+elseif(ISERPA==1) then
+   call delfile('FFFFABBB')
+   call delfile('FFFFBAAA')
+endif
 
 if(SAPT%monA%TwoMoInt==TWOMO_FOFO) then
    call delfile('FFOOAA')
