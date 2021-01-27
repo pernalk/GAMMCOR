@@ -68,6 +68,7 @@ double precision :: Tcpu,Twall
        SAPT%iCpld = .false.
        call e2ind_unc(Flags,SAPT%monA,SAPT%monB,SAPT)
        call e2disp_unc(Flags,SAPT%monA,SAPT%monB,SAPT)
+       call e2exind(Flags,SAPT%monA,SAPT%monB,SAPT)
        call e2exdisp(Flags,SAPT%monA,SAPT%monB,SAPT)
     
     elseif(SAPT%SaptLevel==10) then
@@ -1621,8 +1622,6 @@ character(:),allocatable     :: twojfile,twokfile
    call tran4_full(NBas,MO,MO,twofile,'AOTWOSORT')
 
  case(TWOMO_FOFO) 
-   print*, 'num0-1:',Mon%num0,Mon%num1
-   print*, 'NELE',Mon%NELE
    ! transform J and K
     call tran4_gen(NBas,&
          Mon%num0+Mon%num1,MO(1:NBas*(Mon%num0+Mon%num1)),&
@@ -2392,10 +2391,9 @@ double precision, external :: FRDM2GVB
    case(TWOMO_FOFO)
       call ACABMAT0_FOFO(ABPlus,ABMin,URe,Mon%Occ,XOne,&
                     Mon%IndN,Mon%IndX,Mon%IGem,Mon%CICoef,&
-                    Mon%NAct,Mon%INAct,NBas,Mon%NDim,Mon%NDimX,NInte1,Mon%NGem,&
+                    Mon%NAct,Mon%NELE,NBas,Mon%NDim,Mon%NDimX,NInte1,Mon%NGem,&
                     twofile,twojfile,twokfile,0,ACAlpha,1)
 
-   ! ????
    case(TWOMO_FFFF,TWOMO_INCORE)
 
       call ACABMAT0_mithap(ABPlus,ABMin,URe,Mon%Occ,XOne,&
@@ -4941,28 +4939,28 @@ call delfile('TMPOOAB')
 
 if(SAPT%SaptLevel==2) then
    call delfile('TWOMOAB')
-   call delfile('FFOOABAB')
-   call delfile('FOFOABBA')
-   call delfile('FOFOBBBA')
-   call delfile('FOFOAAAB')
-   call delfile('FOFOBBAB')
-   call delfile('FOFOAABA')
-   call delfile('FOFOAABB')
-   call delfile('FFOOABBB')
-   call delfile('FFOOBAAA')
-! test exch-ind
-!   call delfile('FOFOBBAA')
-   call delfile('XY0_A')
-   call delfile('XY0_B')
+endif
 
-   if(SAPT%monA%TwoMoInt==TWOMO_FOFO) then
-      call delfile('FFOOAA')
-      call delfile('FOFOAA')
-   endif
-   if(SAPT%monB%TwoMoInt==TWOMO_FOFO) then
-      call delfile('FFOOBB')
-      call delfile('FOFOBB')
-   endif
+call delfile('FOFOABBA')
+call delfile('FOFOBBBA')
+call delfile('FOFOAAAB')
+call delfile('FOFOBBAB')
+call delfile('FOFOAABA')
+call delfile('FOFOAABB')
+call delfile('FFOOABAB')
+call delfile('FFOOABBB')
+call delfile('FFOOBAAA')
+
+call delfile('XY0_A')
+call delfile('XY0_B')
+
+if(SAPT%monA%TwoMoInt==TWOMO_FOFO) then
+   call delfile('FFOOAA')
+   call delfile('FOFOAA')
+endif
+if(SAPT%monB%TwoMoInt==TWOMO_FOFO) then
+   call delfile('FFOOBB')
+   call delfile('FOFOBB')
 endif
 
 if(SAPT%SaptLevel==2) then

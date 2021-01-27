@@ -345,7 +345,7 @@ BMAT = 0
 INActive = NElHlf - NAct
 NOccup = 2*NAct + INActive
 
-print*, 'NOccup',NOccup
+!print*, 'NOccup',NOccup
 
 allocate(work1(NBasis**2),work2(NBasis**2),ints(NBasis,NBasis))
 
