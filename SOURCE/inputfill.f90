@@ -345,6 +345,13 @@ subroutine read_block_calculation(CalcParams, line)
             CalcParams%TwoMoInt = TWOMO_INCORE
          endif
 
+      case ("REDVIRT")
+           if (uppercase(val) == ".TRUE.".or. &
+               uppercase(val) == "TRUE".or.   &
+               uppercase(val) == "T") then
+               CalcParams%RedVirt = 1
+           endif
+
       ! here not sure
       case ("RESPONSE")
            if (uppercase(val) == "ERPA-APSG".or.&
@@ -484,6 +491,9 @@ integer :: test,test2
 
  case ("THRQVIRT")
        read(val,*) SystemParams%ThrQVirt
+
+ case ("THRVIRT")
+       read(val,*) SystemParams%ThrVirt
 
  case ("POSTCAS")
        read(val,*) SystemParams%PostCAS

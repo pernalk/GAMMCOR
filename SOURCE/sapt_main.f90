@@ -1453,9 +1453,6 @@ subroutine reduce_virt(Flags,Mon,NBas)
  write(LOUT,'(/,1x,a)') 'TRUNCATE VIRTUAL ORBITAL SPACE'
  write(LOUT,'(8a10)') ('**********',i=1,6)
 
- write(LOUT,*) 'Error! ReduceVirt not ready on this branch!'
- stop
-
  ! reduce virt space
  ! set filenames
  if(Mon%Monomer==1) then
@@ -1506,26 +1503,25 @@ subroutine reduce_virt(Flags,Mon,NBas)
  allocate(Eps(NBas,NBas),workSq(NBas,NBas))
  workSq = transpose(Mon%CMO)
 
- !select case(Mon%TwoMoInt)
- !case(TWOMO_INCORE)
- !   call MP2RDM(TwoMO,Eps,Mon%Occ,URe,workSq,XOne,&
- !               Mon%IndN,Mon%IndX,Mon%IndAux,Mon%NDimX,&
- !               NBas,Mon%NDim,NInte1,NInte2,NVirt,&
- !               twofile,Mon%ThrVirt,.false.)
+ select case(Mon%TwoMoInt)
+ case(TWOMO_INCORE)
+    call MP2RDM(TwoMO,Eps,Mon%Occ,URe,workSq,XOne,&
+                Mon%IndN,Mon%IndX,Mon%IndAux,Mon%NDimX,&
+                NBas,Mon%NDim,NInte1,NInte2,NVirt,&
+                twofile,Mon%ThrVirt,.false.)
 
- !case(TWOMO_FOFO)
+ case(TWOMO_FOFO)
 
- !   call MP2RDM_FOFO(Eps,Mon%Occ,URe,workSq,XOne,Mon%IndN,Mon%IndX,Mon%IndAux,Mon%IGem,&
- !                    Mon%NAct,Mon%INAct,Mon%NDimX,Mon%NDim,NBas,NInte1,&
- !                    twojfile,twokfile,Mon%ThrVirt,Mon%NVZero,Mon%IPrint)
+    call MP2RDM_FOFO(Eps,Mon%Occ,URe,workSq,XOne,Mon%IndN,Mon%IndX,Mon%IndAux,Mon%IGem,&
+                     Mon%NAct,Mon%INAct,Mon%NDimX,Mon%NDim,NBas,NInte1,&
+                     twojfile,twokfile,Mon%ThrVirt,Mon%NVZero,Mon%IPrint)
 
- !case(TWOMO_FFFF)
+ case(TWOMO_FFFF)
 
- !   write(LOUT,'(1x,a)') 'ERROR! REDVIRT NOT AVAILABLE WITH FFFF (FULL) TWOMOINT'
- !   stop
+    write(LOUT,'(1x,a)') 'ERROR! REDVIRT NOT AVAILABLE WITH FFFF (FULL) TWOMOINT'
+    stop
 
- !end select
-
+ end select
 
  ! get AO->NO(d) matrix
  call dgemm('N','T',NBas,NBas,NBas,1d0,MO,NBas,Eps,NBas,0d0,workSq,NBas)

@@ -91,22 +91,24 @@ character(:), allocatable :: InputPath
 
 type CalculationBlock
       integer :: InterfaceType = INTER_TYPE_DAL
-      integer :: NBasis = FLAG_NOBASIS
-      integer :: JobType = JOB_TYPE_AC
+      integer :: NBasis    = FLAG_NOBASIS
+      integer :: JobType   = JOB_TYPE_AC
       integer :: RDMType ! = RDM_TYPE_GVB
       integer :: RDMSource = INTER_TYPE_DAL
-      integer :: Response = RESP_ERPA
-      integer :: DFApp = DF_NONE
-      integer :: Kernel = 1
-      integer :: TwoMoInt = TWOMO_INCORE
-      integer :: Core = FLAG_CORE
-      integer :: SymType = TYPE_NO_SYM
+      integer :: Response  = RESP_ERPA
+      integer :: DFApp     = DF_NONE
+      integer :: Kernel    = 1
+      integer :: TwoMoInt  = TWOMO_INCORE
+      integer :: Core      = FLAG_CORE
+      integer :: SymType   = TYPE_NO_SYM
       integer :: SaptLevel = SAPTLEVEL2
-      integer :: vdWCoef = 0
-      logical :: Restart = FLAG_RESTART
-      logical :: PostCAS = FLAG_POSTCAS
-      integer :: IPrint  = 0 !FLAG_PRINT_LEVEL
-      double precision :: RPAThresh = 1.0D-6
+      integer :: vdWCoef   = 0
+      integer :: RedVirt   = FLAG_REDVIRT
+      logical :: Restart   = FLAG_RESTART
+      logical :: PostCAS   = FLAG_POSTCAS
+      integer :: IPrint    = 0 !FLAG_PRINT_LEVEL
+      double precision :: RPAThresh  = 1.0D-6
+      double precision :: ThreshVirt = 1.0D-6
       integer :: imon = 1
       character(:), allocatable :: JobTitle
       character(:), allocatable :: IntegralsFilePath
@@ -154,8 +156,12 @@ type SystemBlock
       logical :: PostCAS = .false.
       logical :: NActFromRDM = .true.
       logical :: reduceV = .false.
-      double precision :: ThrAct = 0.992d0
+      ! ThrAct for active geminals selection
+      double precision :: ThrAct    = 0.992d0
       double precision :: ThrSelAct = 1.d-8
+      ! ThrVirt for reduction of virtual orbs
+      double precision :: ThrVirt   = 1.d-6
+      ! ThrQVirt for quasi-virtual orbs
       double precision :: ThrQVirt  = 1.d-7
       integer,allocatable :: InSt(:,:),InTrSt(:,:)
       integer,allocatable :: IGem(:), IndAux(:)
