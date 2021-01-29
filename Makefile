@@ -13,8 +13,9 @@ OBJ = $(O)mainp.o $(O)initia.o $(O)dmscf.o $(O)misc.o $(O)optocc.o \
       $(O)gridmolpro.o \
       $(O)sorter.o $(O)tran.o $(O)systemdef.o \
       $(O)types.o $(O)inputfill.o $(O)abmats.o $(O)abfofo.o \
-      $(O)sapt_main.o $(O)sapt.o \
-      $(O)exmisc.o $(O)exdpino.o \
+      $(O)sapt_main.o $(O)sapt_exch.o $(O)sapt_pol.o $(O)sapt_utils.o \
+      $(O)exmisc.o $(O)exdpino.o $(O)exi.o $(O)exappr.o \
+      $(O)srefex.o $(O)diis.o \
       $(O)timing.o \
       $(O)srlrdynamic.o $(O)erpa.o $(O)interpa.o  $(O)exact2el.o $(O)optapsg.o $(O)newton.o $(O)acfd.o $(O)accas.o \
       $(O)caspidft.o $(O)ac_exact_2el.o $(O)vv10.o
@@ -32,10 +33,10 @@ OBJ = $(O)mainp.o $(O)initia.o $(O)dmscf.o $(O)misc.o $(O)optocc.o \
 #-L/home/pkowalski/xcfun_intel/lib -lxcfun
 
 FCC = ifort -assume byterecl
-#FFLAGS = -heap-arrays  -O3 -I /home/kasia/xcfun_intel/fortran 
 FFLAGS = -mkl -heap-arrays  -O3 -I /home/kasia/xcfun_intel/fortran 
-LIBS = -L/opt/intel/composer_xe_2015.2.164/mkl/lib/intel64/ -lmkl_intel_ilp64 -lmkl_sequential -lmkl_core \
+#LIBS = -L/opt/intel/composer_xe_2015.2.164/mkl/lib/intel64/ -lmkl_intel_ilp64 -lmkl_sequential -lmkl_core \
 -L/home/kasia/xcfun_intel/lib -lxcfun
+LIBS = -L ./xcfun/lib -lxcfun -lopenblas
 
 
 $(PROG) :  $(OBJ) 
@@ -114,18 +115,30 @@ $(O)sorter.o : $(S)sorter.f90 $(O)types.o
 	$(FCC) $(FFLAGS)  -c $(S)sorter.f90 -o $(O)sorter.o
 $(O)tran.o : $(S)tran.f90 $(O)types.o
 	$(FCC) $(FFLAGS)  -c $(S)tran.f90 -o $(O)tran.o
+$(O)diis.o : $(S)diis.f90 $(O)types.o
+	$(FCC) $(FFLAGS)  -c $(S)diis.f90 -o $(O)diis.o
 $(O)abmats.o : $(S)abmats.f90 $(O)types.o $(O)tran.o
 	$(FCC) $(FFLAGS)  -c $(S)abmats.f90 -o $(O)abmats.o
 $(O)abfofo.o : $(S)abfofo.f90 $(O)types.o $(O)tran.o
 	$(FCC) $(FFLAGS)  -c $(S)abfofo.f90 -o $(O)abfofo.o
+$(O)srefex.o : $(S)srefex.f90 $(O)types.o $(O)exmisc.o
+	$(FCC) $(FFLAGS)  -c $(S)srefex.f90 -o $(O)srefex.o
+$(O)exi.o : $(S)exi.f90
+	$(FCC) $(FFLAGS)  -c $(S)exi.f90 -o $(O)exi.o
 $(O)exmisc.o : $(S)exmisc.f90 $(O)types.o
 	$(FCC) $(FFLAGS)  -c $(S)exmisc.f90 -o $(O)exmisc.o
+$(O)exappr.o : $(S)exappr.f90 $(O)exmisc.o
+	$(FCC) $(FFLAGS)  -c $(S)exappr.f90 -o $(O)exappr.o
 $(O)exdpino.o : $(S)exdpino.f90 $(O)types.o $(O)tran.o $(O)timing.o $(O)exmisc.o
 	$(FCC) $(FFLAGS)  -c $(S)exdpino.f90 -o $(O)exdpino.o
-$(O)sapt_main.o : $(S)sapt_main.f90 $(O)types.o $(O)systemdef.o $(O)tran.o $(O)sorter.o $(O)sapt.o $(O)abmats.o $(O)abfofo.o $(O)exdpino.o
+$(O)sapt_main.o : $(S)sapt_main.f90 $(O)types.o $(O)systemdef.o $(O)tran.o $(O)sorter.o $(O)sapt_exch.o $(O)sapt_pol.o $(O)sapt_utils.o $(O)abmats.o $(O)abfofo.o $(O)exdpino.o
 	$(FCC) $(FFLAGS)  -c $(S)sapt_main.f90 -o $(O)sapt_main.o
-$(O)sapt.o : $(S)sapt.f90 $(O)types.o $(O)tran.o $(O)exmisc.o $(O)timing.o 
-	$(FCC) $(FFLAGS)  -c $(S)sapt.f90 -o $(O)sapt.o
+$(O)sapt_utils.o : $(S)sapt_utils.f90 $(O)types.o $(O)tran.o $(O)diis.o
+	$(FCC) $(FFLAGS)  -c $(S)sapt_utils.f90 -o $(O)sapt_utils.o
+$(O)sapt_pol.o : $(S)sapt_pol.f90 $(O)types.o $(O)tran.o $(O)sapt_utils.o
+	$(FCC) $(FFLAGS)  -c $(S)sapt_pol.f90 -o $(O)sapt_pol.o
+$(O)sapt_exch.o : $(S)sapt_exch.f90 $(O)types.o $(O)tran.o $(O)timing.o $(O)sapt_utils.o $(O)exmisc.o $(O)exi.o $(O)exappr.o $(O)srefex.o
+	$(FCC) $(FFLAGS)  -c $(S)sapt_exch.f90 -o $(O)sapt_exch.o
 $(O)caspidft.o : $(S)caspidft.f $(O)types.o
 	$(FCC) $(FFLAGS)  -c $(S)caspidft.f -o $(O)caspidft.o
 $(O)vv10.o : $(S)vv10.f $(O)types.o
