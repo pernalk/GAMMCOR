@@ -29,6 +29,7 @@ C
 C     LOCAL ARRAYS
 C
       Dimension XGrid(100), WGrid(100)
+      Integer Points
 C     HAP
       Double precision,Allocatable :: WorkVec(:),WorkEig(:),MYAP(:) 
 C
@@ -261,7 +262,8 @@ C
 *Deck Y01CAS
       Subroutine Y01CAS(TwoNO,Occ,URe,XOne,ABPLUS,ABMIN,
      $ EigY,EigY1,Eig,Eig1,
-     $ IndN,IndX,NDimX,NBasis,NDim,NInte1,NInte2,IFlag0)
+     $ IndN,IndX,NDimX,NBasis,NDim,NInte1,NInte2,IFlag0,
+     $ filename)
 C
 C     A ROUTINE FOR COMPUTING Y VECTORS AND EIGENVALUES OF ERPA 
 C     IN THE 1ST-ORDER APPROXIMATION
@@ -282,6 +284,8 @@ C
      $ Eig(NDimX),Eig1(NDimX),
      $ EigY(NDimX*NDimX),EigY1(NDimX*NDimX),
      $ IndX(NDim),IndN(2,NDim)
+C UNCOUPLED 01/02/2021
+      Character(*),Optional :: filename
 C
 C     LOCAL ARRAYS
 C
@@ -741,6 +745,11 @@ C NEW 11/07/2018
 C     Check if NoEig=NDimX - they should be equal!
       If(NoEig.Ne.NDimX) Stop 'Fatal error in Y01CAS: NoEig.Ne.NDimX!'
 C
+C     UNCOUPLED
+      Call ConvertXYtilde(EigY,EigX,Eig,CICoef,IEigAddY,IEigAddInd,
+     $                    IndN,IndBlock,NFree2,NBasis,NDimX,NDim,
+     $                    filename,.true.)
+C
       Do I=1,NDimX
       IP=IndN(1,I)
       IQ=IndN(2,I)
@@ -955,6 +964,126 @@ C
 C
       Return
       End
+
+      Subroutine ConvertXYtilde(EigY,EigX,Eig,C,IEigAddY,IEigAddInd,
+     $ IndN,IndBlock,NFree2,NBasis,NDimX,NDim,filename,ifdump)
+C
+      use abfofo,only : reduce_to_XY0CAS
+C
+      Implicit Real*8 (A-H,O-Z)
+C
+      Include 'commons.inc'
+C
+      Integer :: NFree2,NBasis,NDimX,NDim
+      Integer :: IndN(2,NDim),IndBlock(2,NDimX),
+     $           IEigAddY(2,NDimX),IEigAddInd(2,NDimX)
+      Double precision :: EigY(NFree2),EigX(NFree2),
+     $                    Eig(NDimX),C(NBasis)
+      Logical      :: ifdump
+      Character(*) :: filename
+      Double precision,allocatable :: Work(:),WorkY(:),WorkX(:)
+C
+      Integer :: IMatch(NDimX)
+C
+      NAct=NAcCAS
+      INActive=NInAcCAS
+C
+      Print*, 'NFree2,NDimX',NFree2,NDimX
+C
+      NoEig=NDimX
+C
+      Do I=1,NDimX
+      IP=IndN(1,I)
+      IQ=IndN(2,I)
+      Do J=1,NDimX
+      If(IP.Eq.IndBlock(1,J).And.IQ.Eq.IndBlock(2,J))
+     $ IMatch(I)=J
+      EndDo
+      EndDo
+C
+      Allocate(Work(NDimX**2),WorkY(NDimX**2),WorkX(NDimX**2))
+C
+      Do I=1,NoEig
+      Do J=1,NoEig
+      Work(I+(J-1)*NoEig)=0d0
+      If(I.Eq.J) Work(I+(J-1)*NoEig)=1d0
+      EndDo
+      EndDo
+C
+      Do NU=1,NoEig
+      Do MU=1,NoEig
+C
+      WorkY(NU+(MU-1)*NoEig)=0d0
+      WorkX(NU+(MU-1)*NoEig)=0d0
+C
+      IStart=IEigAddY(1,MU)
+      II=0
+      Do I=IEigAddInd(1,MU),IEigAddInd(2,MU)
+      WorkY(NU+(MU-1)*NoEig)=WorkY(NU+(MU-1)*NoEig)
+     $ +Work(NU+(I-1)*NoEig)*EigY(IStart+II)
+      WorkX(NU+(MU-1)*NoEig)=WorkX(NU+(MU-1)*NoEig)
+     $ +Work(NU+(I-1)*NoEig)*EigX(IStart+II)
+      II=II+1
+      EndDo
+C
+      EndDo
+      EndDo
+C  
+c     RESORT ACCORDING TO IndN
+C
+      Call CpyM(Work,WorkY,NDimX)
+      Do MU=1,NDimX
+      Do I=1,NDimX
+      WorkY((MU-1)*NoEig+I)=Work((MU-1)*NoEig+IMatch(I))
+      EndDo
+      EndDo
+C
+      Call CpyM(Work,WorkX,NDimX)
+      Do MU=1,NDimX
+      Do I=1,NDimX
+      WorkX((MU-1)*NoEig+I)=Work((MU-1)*NoEig+IMatch(I))
+      EndDo
+      EndDo
+C
+      Do K=1,NDimX
+      Do I=1,NDimX
+C
+      IP=IndN(1,I)
+      IQ=IndN(2,I)
+C
+      X=WorkX((K-1)*NDimX+I)/(C(IP)+C(IQ))
+      Y=WorkY((K-1)*NDimX+I)/(C(IP)-C(IQ))
+C
+      WorkX((K-1)*NDimX+I)=0.5d0*(X-Y)
+      WorkY((K-1)*NDimX+I)=0.5d0*(X+Y)
+C
+      EndDo
+      EndDo
+C
+C
+      Print*, 'TEST-X:',norm2(WorkX)
+      Print*, 'TEST-Y:',norm2(WorkY)
+C
+      If(ifdump) Then
+C      
+C      Open(newunit=iunit,file=filename,form='unformatted')
+C      write(iunit) WorkX
+C      write(iunit) WorkY
+C      Close(iunit)
+C
+      Call reduce_to_XY0CAS(WorkX,WorkY,Eig,C,
+     $  IndN,NAct,INActive,NDimX,NBasis,filename)
+      Else
+C     RETURN X(0) and Y(0)
+C
+      EigX = WorkX
+      EigY = WorkY
+C
+      EndIf
+C
+      Deallocate(WorkX,WorkY,Work)
+C
+      End Subroutine
 
 *Deck Y01CASLR
       Subroutine Y01CASLR(TwoNO,Occ,URe,XOne,ABPLUS,ABMIN,

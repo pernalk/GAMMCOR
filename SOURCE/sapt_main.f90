@@ -91,6 +91,7 @@ double precision :: Tcpu,Twall
     !call e2disp_apsg(Flags,SAPT%monA,SAPT%monB,SAPT)
     if(Flags%ISHF.Ne.0) then
     
+       call e2ind_pino(Flags,SAPT%monA,SAPT%monB,SAPT)
        call e2disp_pino(Flags,SAPT%monA,SAPT%monB,SAPT)
        call e2exdisp_apsg(Flags,SAPT%monA,SAPT%monB,SAPT)
     endif
@@ -2498,7 +2499,6 @@ double precision, external :: FRDM2GVB
    select case(Mon%TwoMoInt)
    case(TWOMO_FOFO)
 
-
       call AB_CAS_FOFO(ABPlus,ABMin,ECASSCF,URe,Mon%Occ,XOne, &
                   Mon%IndN,Mon%IndX,Mon%IGem,Mon%NAct,Mon%INAct,Mon%NDimX,NBas,Mon%NDimX,&
                   NInte1,twojfile,twokfile,ACAlpha,.false.)
@@ -2566,7 +2566,7 @@ double precision, external :: FRDM2GVB
     ! Mon%EigY = 0
 
 
-!    else  ! MH 1 Dec 2020: disable ERPAVECTRANS
+!!    else  ! MH 1 Dec 2020: disable ERPAVECTRANS
 !   
 !      allocate(Mon%EigY(Mon%NDimX**2),Mon%EigX(Mon%NDimX**2),&
 !               Mon%Eig(Mon%NDimX))
@@ -2587,8 +2587,8 @@ double precision, external :: FRDM2GVB
 !                                      *(Mon%EigY((j-1)*Mon%NDimX+i)-Mon%EigX((j-1)*Mon%NDimX+i))
 !         enddo
 !      enddo
-!
-!   endif
+!!
+!!   endif
 
    !print*, 'STOP AFTER RESPONSE FOR CHECKS!'
    !Stop

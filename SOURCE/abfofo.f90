@@ -5119,7 +5119,7 @@ IPr=0
 If(IH0St.Eq.NoSt) IPr=1
 Call RDM_SACAS(GammaS,XCAS,YCAS,EExcit,C,UNOAO,IPair,DipX,DipY,DipZ,NoSt,NoStMx,NInte1,NBasis,IPr)
 Write(6,'(X,"The number of states in SA-CAS: ",I4,/)')NoStMx
-If(IH0St.Gt.NoStMx) Stop'Stop in AC0CDEXCIT: IH0St is greater than the number of states in SA-CAS!'
+If(IH0St.Gt.NoStMx) Stop 'Stop in AC0CDEXCIT: IH0St is greater than the number of states in SA-CAS!'
 Do NU=1,NoSt-1
   Write(6,'(X,"SA-CAS Deexcitation from ",I4," to",I4,2E15.6)')NoSt,NU,EExcit(NU)
 EndDo
@@ -7917,5 +7917,258 @@ deallocate(ABPLUS,ABMIN,ABP)
 
 deallocate(IZeroNU)
 end subroutine Y01CASDSYM_FOFO
+
+subroutine reduce_to_XY0CAS(EigX0,EigY0,Eig0,C,IndN,NAct,INActive,NDimX,NBasis,xy0file)
+! reduce to XY0tilde blocks
+implicit none
+
+integer,intent(in)      :: NAct,INActive,NDimX,NBasis
+integer,intent(in)      :: IndN(2,NDimX)
+character(*),intent(in) :: xy0file
+double precision,intent(in) :: C(NBasis),Eig0(NDimX), & 
+                               EigX0(NDimX,NDimX),EigY0(NDimX,NDimX)
+
+integer :: i,ii,ip,iq,ir,is,ipos,iblk,nblk
+integer :: iunit
+integer :: NOccup,IGem(NBasis)
+integer :: nAA,tmpAA(NAct*(NAct-1)/2),limAA(2)
+integer :: nAI(INActive),tmpAI(NAct,1:INActive),limAI(2,1:INActive)
+integer :: nAV(INActive+NAct+1:NBasis),tmpAV(NAct,INActive+NAct+1:NBasis),limAV(2,INActive+NAct+1:NBasis)
+integer :: nIV,tmpIV(INActive*(NBasis-NAct-INActive)),limIV(2)
+double precision :: fac,val,valX,valY
+
+type(EblockData) :: Eblock(1+NBasis-NAct)
+type(EblockData) :: EblockIV
+
+double precision,allocatable :: work(:)
+
+! set dimensions
+NOccup = NAct + INActive
+
+! fix IGem
+do i=1,INActive
+   IGem(i) = 1
+enddo
+do i=INActive+1,NOccup
+   IGem(i) = 2
+enddo
+do i=NOccup+1,NBasis
+   IGem(i) = 3
+enddo
+
+fac = 1d0/sqrt(2d0)
+
+nAA = 0
+nAI = 0
+nAV = 0
+nIV = 0
+tmpAA = 0
+tmpAI = 0
+tmpAV = 0
+tmpIV = 0
+limAA = 0
+limAI = 0
+limAV = 0
+limIV = 0
+
+do i=1,NDimX
+   ip = IndN(1,i)
+   iq = IndN(2,i)
+   if(IGem(ip)==2.and.IGem(iq)==2) then
+      nAA = nAA + 1
+      tmpAA(nAA) = i
+   elseif(IGem(ip)==2.and.IGem(iq)==1) then
+      nAI(iq) = nAI(iq) + 1
+      tmpAI(nAI(iq),iq) = i
+   elseif(IGem(ip)==3.and.IGem(iq)==2) then
+      nAV(ip) = nAV(ip) + 1
+      tmpAV(nAV(ip),ip) = i
+   elseif(IGem(ip)==3.and.IGem(iq)==1) then
+      nIV = nIV + 1
+      tmpIV(nIV) = i
+  endif
+enddo
+
+ipos = 0
+limAA(1) = ipos + 1
+do ii=1,nAA
+   i = tmpAA(ii)
+   ip = IndN(1,i)
+   iq = IndN(2,i)
+   ipos = ipos + 1
+enddo
+limAA(2) = ipos
+do is=1,INActive
+   limAI(1,is) = ipos + 1
+   do ii=1,nAI(is)
+      i = tmpAI(ii,is)
+      ip = IndN(1,i)
+      iq = IndN(2,i)
+      ipos = ipos + 1
+   enddo
+   limAI(2,is) = ipos
+enddo
+do ir=NOccup+1,NBasis
+   limAV(1,ir) = ipos + 1
+   do ii=1,nAV(ir)
+      i = tmpAV(ii,ir)
+      ip = IndN(1,i)
+      iq = IndN(2,i)
+      ipos = ipos + 1
+   enddo
+   limAV(2,ir) = ipos
+enddo
+limIV(1) = ipos + 1
+do ii=1,nIV
+   i = tmpIV(ii)
+   ip = IndN(1,i)
+   iq = IndN(2,i)
+   ipos = ipos + 1
+enddo
+limIV(2) = ipos
+
+nblk =0
+!pack AA
+if(nAA>0) then
+
+   nblk = nblk + 1
+   associate(B => Eblock(nblk))
+     B%n  = nAA
+     B%l1 = limAA(1)
+     B%l2 = limAA(2)
+     allocate(B%pos(B%n))
+     B%pos(1:B%n) = tmpAA(1:B%n)
+
+     allocate(B%vec(B%n),B%matX(B%n,B%n),B%matY(B%n,B%n))
+
+     do i=1,B%n
+        ipos = B%pos(i)
+        B%matX(i,1:B%n) = EigX0(ipos,B%l1:B%l2)
+        B%matY(i,1:B%n) = EigY0(ipos,B%l1:B%l2)
+     enddo
+
+     B%vec  = Eig0(B%l1:B%l2)
+
+    !print*, 'AA-pack',B%n,norm2(B%matY)
+    !print*, 'vec-pack',norm2(B%vec)
+
+   end associate
+
+endif
+
+!pack AI
+do iq=1,INActive
+   if(nAI(iq)>0) then
+
+
+      nblk = nblk + 1
+      associate(B => Eblock(nblk))
+        B%n  = nAI(iq)
+        B%l1 = limAI(1,iq)
+        B%l2 = limAI(2,iq)
+        allocate(B%pos(B%n))
+        B%pos(1:B%n) = tmpAI(1:B%n,iq)
+
+        allocate(B%vec(B%n),B%matX(B%n,B%n),B%matY(B%n,B%n))
+
+        do i=1,B%n
+           ipos = B%pos(i)
+           B%matX(i,1:B%n) = EigX0(ipos,B%l1:B%l2)
+           B%matY(i,1:B%n) = EigY0(ipos,B%l1:B%l2)
+        enddo
+
+        !B%matY(1:B%n,1:B%n)= EigY0(B%l1:B%l2,B%l1:B%l2)
+        B%vec  = Eig0(B%l1:B%l2)
+  
+      end associate
+
+   endif
+enddo
+
+!pack AV
+do ip=NOccup+1,NBasis
+   if(nAV(ip)>0) then
+
+      nblk = nblk + 1
+      associate(B => Eblock(nblk))
+        B%n  = nAV(ip)
+        B%l1 = limAV(1,ip)
+        B%l2 = limAV(2,ip)
+        allocate(B%pos(B%n))
+        B%pos(1:B%n) = tmpAV(1:B%n,ip)
+
+        allocate(B%vec(B%n),B%matX(B%n,B%n),B%matY(B%n,B%n))
+
+        do i=1,B%n
+           ipos = B%pos(i)
+           B%matX(i,1:B%n) = EigX0(ipos,B%l1:B%l2)
+           B%matY(i,1:B%n) = EigY0(ipos,B%l1:B%l2)
+        enddo
+
+!       B%matY(1:B%n,1:B%n) = EigY0(B%l1:B%l2,B%l1:B%l2)
+        B%vec  = Eig0(B%l1:B%l2)
+
+      end associate
+
+    endif
+enddo
+
+!pack IV
+associate(B => EblockIV)
+
+  B%l1 = limIV(1)
+  B%l2 = limIV(2)
+  B%n  = B%l2-B%l1+1
+  allocate(B%pos(B%n))
+  B%pos(1:B%n) = tmpIV(1:B%n)
+
+  allocate(B%vec(B%n),B%matX(B%n,1),B%matY(B%n,1))
+  do i=1,B%n
+     ii = B%l1+i-1
+     ipos = B%pos(i)
+     ip = IndN(1,ipos)
+     iq = IndN(2,ipos)
+
+     valX = 1d0/(C(ip)+C(iq))
+     valY = 1d0/(C(ip)-C(iq))
+
+     B%matX(i,1) = 0.5d0*fac*(valX-valY)
+     B%matY(i,1) = 0.5d0*fac*(valX+valY)
+
+     B%vec(i) = Eig0(ii)
+  enddo
+
+end associate
+
+! dump to a file
+open(newunit=iunit,file=xy0file,form='unformatted')
+write(iunit) nblk
+do iblk=1,nblk
+   associate(B => EBlock(iblk))
+     write(iunit) iblk, B%n, B%l1, B%l2
+     write(iunit) B%pos,B%matX,B%matY,B%vec
+   end associate
+enddo
+associate(B => EBlockIV)
+  write(iunit) B%n,B%l1,B%l2
+  write(iunit) B%pos,B%vec
+  write(iunit) B%matX,B%matY
+end associate
+close(iunit)
+
+! deallocate Eblock
+do iblk=1,nblk
+   associate(B => Eblock(iblk))
+     deallocate(B%matX,B%matY,B%vec)
+     deallocate(B%pos)
+   end associate
+enddo
+! (IV part)
+associate(B => EblockIV)
+  deallocate(B%vec)
+  deallocate(B%pos)
+end associate
+
+end subroutine reduce_to_XY0CAS 
 
 end module
