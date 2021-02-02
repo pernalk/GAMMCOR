@@ -345,6 +345,8 @@ BMAT = 0
 INActive = NElHlf - NAct
 NOccup = 2*NAct + INActive
 
+!print*, 'NOccup',NOccup
+
 allocate(work1(NBasis**2),work2(NBasis**2),ints(NBasis,NBasis))
 
 call triang_to_sq(XOne,work1,NBasis)
@@ -713,6 +715,387 @@ print*, "AB-my",norm2(AMAT),norm2(BMAT)
 deallocate(ints,work2,work1)
 
 end subroutine ACABMAT0_FOFO
+
+subroutine MP2RDM_FOFO(Eps,Occ,URe,UNOAO,XOne,IndN,IndX,IndAux,IGemIN, &
+                       NAct,INActive,NDimX,NDim,NBasis,NInte1,     &
+                       IntJFile,IntKFile,ThrVirt,NVZero,IPrint)
+implicit none
+
+integer,intent(in)           :: NAct,INActive,NDimX,NDim,NBasis,NInte1
+integer,intent(in)           :: IPrint
+integer,intent(in)           :: IndN(2,NDim),IndX(NDim),IndAux(NBasis),IGemIN(NBasis)
+integer,intent(out)          :: NVZero
+double precision,intent(in)  :: ThrVirt
+double precision,intent(in)  :: Occ(NBasis),XOne(NInte1),UNOAO(NBasis,NBasis)
+double precision,intent(out) :: Eps(NBasis,NBasis)
+character(*)                 :: IntJFile,IntKFile
+
+integer                      :: iunit1,iunit2
+integer                      :: i,j,k,l,a,b,c,ij,ac,ii,jj,ip,iq,ir,is,ipos
+!integer                      :: NOccup,NVirt,NVirtOld,NVZero,iOccup,iVirt
+integer                      :: NOccup,NVirt,NVirtOld,iOccup,iVirt
+integer                      :: IGem(NBasis),pos(NBasis,NBasis),IPair(NBasis,NBasis)
+integer                      :: nAA,nAI(INActive),nAV(INActive+NAct+1:NBasis),nIV
+integer                      :: tmpAA(NAct*(NAct-1)/2),tmpAI(NAct,1:INActive),&
+                                tmpAV(NAct,INActive+NAct+1:NBasis),&
+                                tmpIV(INActive*(NBasis-NAct-INActive))
+integer                      :: limAA(2),limAI(2,1:INActive),&
+                                limAV(2,INActive+NAct+1:NBasis),limIV(2)
+double precision             :: val,ETot
+double precision             :: URe(NBasis,NBasis) 
+double precision             :: AuxMat(NBasis,NBasis),&
+                                Gamma(NInte1),PC(NBasis),Fock(NBasis*NBasis)
+double precision,allocatable :: ABPLUS(:,:),ABMIN(:,:)
+double precision,allocatable :: AuxI(:,:),Aux2(:,:)
+double precision,allocatable :: ints_J(:,:),ints_K(:,:),   &
+                                ints_bi(:,:),ints_bk(:,:), &
+                                work(:),workTr(:),workSq(:,:)
+integer          :: EndVirt,NBasisNew
+character(100)   :: num1char
+double precision :: xnum1,PerThr
+
+! TEST!
+if(COMMAND_ARGUMENT_COUNT()==0) then
+   write(LOUT,*)'ERROR, COMMAND-LINE ARGUMENTS REQUIRED, STOPPING'
+   stop
+endif 
+
+CALL GET_COMMAND_ARGUMENT(1,num1char)
+READ(num1char,*)xnum1
+PerThr = xnum1
+
+! set dimensions
+NOccup   = INActive + NAct
+NVirtOld = NBasis - NOccup
+
+!print*, 'NOccup',NOccup,INActive,NAct
+
+! fix IGem
+do i=1,INActive
+   IGem(i) = 1
+enddo
+do i=INActive+1,NOccup
+   IGem(i) = 2
+enddo
+do i=NOccup+1,NBasis
+   IGem(i) = 3
+enddo
+
+IPair = 0
+do ii=1,NDimX
+   i = IndN(1,ii)
+   j = IndN(2,ii)
+   IPair(i,j) = 1
+   IPair(j,i) = 1
+enddo
+
+! construct ABPLUS(0)
+allocate(ABPLUS(NDimX,NDimX),ABMIN(NDimX,NDimX))
+
+call create_blocks_ABPL0(nAA,nAI,nAV,nIV,tmpAA,tmpAI,tmpAV,tmpIV,&
+                         limAA,limAI,limAV,limIV,pos,&
+                         IGem,IndN,INActive,NAct,NBasis,NDimX)
+
+call ABPM0_FOFO(Occ,URe,XOne,ABPLUS,ABMIN, &
+                IndN,IndX,IGemIN,NAct,INActive,NDimX,NBasis,NDim,NInte1, &
+                IntJFile,IntKFile,ETot)
+
+Eps = 0
+!get AV
+do ir=NOccup+1,NBasis
+   do ii=1,nAV(ir)
+      i = tmpAV(ii,ir)
+      ip = IndN(1,i)
+      iq = IndN(2,i)
+      ipos = pos(ip,iq)
+      Eps(ip,iq) = ABPLUS(ipos,ipos)
+   enddo
+enddo
+!get IV
+do ii=1,nIV
+   i = tmpIV(ii)
+   ip = IndN(1,i)
+   iq = IndN(2,i)
+   ipos = pos(ip,iq)
+   Eps(ip,iq) = ABPLUS(ipos,ipos)
+enddo
+
+deallocate(ABMIN,ABPLUS)
+
+allocate(work(NBasis**2),ints_bi(NBasis,NBasis),ints_bk(NBasis,NBasis))
+open(newunit=iunit1,file=trim(IntKFile),status='OLD', &
+     access='DIRECT',recl=8*NBasis*NOccup)
+
+Gamma = 0
+ij = 0
+do j=1,NOccup
+   do i=1,j
+      ij = (max(i,j)*(max(i,j)-1))/2 + min(i,j)
+      if(i==j) Gamma(ij) = Occ(i)
+   enddo
+enddo
+
+do k=1,NOccup
+   do b=NOccup+1,NBasis
+
+      read(iunit1,rec=(b+(k-1)*NBasis)) work(1:NBasis*NOccup)
+      ! ints_bk
+      do l=1,NOccup
+         do j=1,NBasis
+            ints_bk(j,l) = work((l-1)*NBasis+j)
+         enddo
+      enddo
+      ints_bk(:,NOccup+1:NBasis) = 0
+
+      ij = 0
+      do i=1,NOccup
+         read(iunit1,rec=(b+(i-1)*NBasis)) work(1:NBasis*NOccup)
+         ! ints_bi
+         do l=1,NOccup
+            do ii=1,NBasis
+               ints_bi(ii,l) = work((l-1)*NBasis+ii)
+            enddo
+         enddo
+         ints_bi(:,NOccup+1:NBasis) = 0
+
+         do a=NOccup+1,NBasis
+            do j=1,i
+               ij = (max(i,j)*(max(i,j)-1))/2 + min(i,j)
+               Gamma(ij) = Gamma(ij) - ints_bk(a,j)*(2d0*ints_bk(a,i)-ints_bi(a,k)) / &
+                           (Eps(a,i)+Eps(b,k)) / (Eps(a,j)+Eps(b,k))
+            enddo
+         enddo
+
+         do c=NOccup+1,NBasis
+            do a=NOccup+1,c
+               ac = (c*(c-1))/2 + a
+               Gamma(ac) = Gamma(ac) + ints_bk(c,i)*(2d0*ints_bk(a,i)-ints_bi(a,k)) / &
+                           (Eps(a,i)+Eps(b,k)) / (Eps(c,i)+Eps(b,k))
+            enddo
+         enddo
+
+      enddo
+
+   enddo
+enddo
+
+close(iunit1)
+deallocate(ints_bi,ints_bk)
+
+!print*, 'Gamma-my',norm2(Gamma)
+!do j=1,NBasis
+!   do i=1,j
+!      ij = (max(i,j)*(max(i,j)-1))/2 + min(i,j)
+!      print*, i,j,Gamma(ij)
+!   enddo
+!enddo
+
+call triang_to_sq2(Gamma,AuxMat,NBasis)
+call Diag8(AuxMat,NBasis,NBasis,PC,work(1:NBasis))
+
+val = 0d0 
+if(IPrint>2) write(LOUT,'(2x,"MP2",3x,"Unsorted Occupancy")')
+do i=NBasis,1,-1
+   if(IPrint>2) write(LOUT,'(X,I3,E16.6,I6)') i,PC(i)
+   val = val + PC(i)
+enddo
+write(LOUT,'(/,1x,"Sum of MP2 Occupancies: ",F5.2,/)') val
+
+! SET Occ of the obitals belonging to NOccup to 1 before sorting 
+! to make sure that after sorting all NOccup orbitals come first 
+do i=1,NBasis
+   iOccup = 0
+   iVirt  = 0
+   do j=1,NBasis
+      if(AuxMat(i,j)/=0d0.and.j<=NOccup) iOccup = 1
+      if(AuxMat(i,j)/=0d0.and.j>NOccup)  iVirt  = 1
+   enddo
+   
+   if(iOccup==1.and.iVirt==0) PC(i)=1d0
+   if(iOccup*iVirt==1.or.iOccup+iVirt==0) then 
+      write(LOUT,'(1x,a)') 'MP2 1RDM is messed up. Quitting.'
+      stop
+   endif
+enddo
+
+call SortP(PC,AuxMat,NBasis)
+
+! transformation matrix to new virtual orbitals
+do i=1,NBasis
+   do k=1,NOccup
+      AuxMat(k,i) = 0d0 
+      if(i==k) AuxMat(k,i) = 1d0
+   enddo 
+enddo
+
+NVZero = 0
+NVirtOld = NBasis - NOccup
+
+!! occupancy threshold
+!do i=NOccup+1,NBasis
+!   if(PC(i)<=ThrVirt) then
+!      if(IPrint>2) write(LOUT,'(1x,"Virtual MP2 orbital no",i3," of the occup", e14.6," removed")') i,PC(i)
+!      AuxMat(i,:) = 0d0
+!      NVZero = NVZero + 1
+!   endif
+!enddo 
+!write(LOUT,'(1x,"Threshold for virt occup number :",e16.6)') ThrVirt
+!write(LOUT,'(/,1x,"Total number of removed orbitals: ",i3)')   NVZero
+!!
+! percentage threshold
+PerThr = PerThr/100d0
+val    = floor(dble(NVirtOld)*PerThr)
+EndVirt = NBasis - int(val) + 1
+do i=NBasis,EndVirt,-1
+   if(IPrint>2) write(LOUT,'(1x,"Virtual MP2 orbital no",i3," of the occup", e14.6," removed")') i,PC(i)
+   AuxMat(i,:) = 0d0
+   NVZero = NVZero + 1
+enddo
+write(LOUT,'(1x,"Threshold for %virt occup number :",f16.6)') PerThr*100
+write(LOUT,'(/,1x,"Total number of removed orbitals: ",i3)')   NVZero
+
+NVirt    = NBasis - NOccup - NVZero
+val = (1d0 - dble(NVirt)/dble(NVirtOld) ) * 100d0
+write(LOUT,'(1x,"NVirt/NVirtOld",18x,": ",i3," / ",i3)')  NVirt, NVirtOld
+write(LOUT,'(1x,"Percent of removed orbitals     : ",f6.2)') Val
+
+NVirt = NBasis - NOccup
+
+! If the new are orbitals are to be used in AC0 they must be 
+! cannonicalized
+
+allocate(ints_J(NBasis,NBasis),ints_K(NBasis,NBasis))
+allocate(AuxI(NVirt,NVirt),Aux2(NVirt,NVirt))
+open(newunit=iunit1,file=trim(IntJFile),status='OLD', &
+     access='DIRECT',recl=8*NBasis*NBasis)
+open(newunit=iunit2,file=trim(IntKFile),status='OLD', &
+     access='DIRECT',recl=8*NBasis*NOccup)
+
+AuxI = 0
+Aux2 = 0
+
+ii = 0
+jj = 0
+do i=1,NVirt
+   do j=1,NVirt
+      ii = NOccup + i
+      jj = NOccup + j
+      ij=(max(ii,jj)*(max(ii,jj)-1))/2+min(ii,jj)
+      AuxI(i,j) = AuxI(i,j) + XOne(ij)
+      Aux2(i,j) = AuxMat(ii,jj)
+   enddo
+enddo
+
+do k=1,NOccup
+
+   read(iunit1,rec=k+(k-1)*NOccup) work(1:NBasis*NBasis)
+   do j=1,NBasis
+      do i=1,NBasis
+         ints_J(i,j) = work((j-1)*NBasis+i)
+      enddo
+   enddo
+
+   work = 0
+   do jj=NOccup+1,NBasis
+      j = jj - NOccup
+      read(iunit2,rec=(jj+(k-1)*NBasis)) work(1:NBasis*NOccup)
+      ! ints_bk
+      do l=1,NOccup
+         do i=1,NBasis
+            ints_K(i,l) = work((l-1)*NBasis+i)
+         enddo
+      enddo
+      ints_K(:,NOccup+1:NBasis) = 0
+
+      do ii=NOccup+1,NBasis
+         i = ii - NOccup
+         AuxI(i,j) = AuxI(i,j) + Occ(k)*(2d0*ints_J(jj,ii)-ints_K(ii,k))
+      enddo  
+
+   enddo
+enddo
+
+close(iunit2)
+close(iunit1)
+
+Fock = 0
+allocate(workTr(NVirt*(NVirt+1)/2))
+! transform Fock to the new basis
+workTr = 0
+call sq_to_triang2(AuxI,workTr,NVirt)
+call MatTr(workTr,Aux2,NVirt)
+! diagonalize and sort
+call triang_to_sq(workTr,Fock,NVirt)
+call Diag8(Fock,NVirt,NVirt,PC,work(1:NVirt))
+call SortF(PC,Fock,NVirt)
+deallocate(workTr)
+
+!print*, 'Fock,PC',norm2(Fock),norm2(PC(1:NVirt))
+!print*, 'Aux2',norm2(AuxI),norm2(Aux2)
+!print*, 'AUXM-my',norm2(AuxMat)
+
+do i=1,NVirt
+   do j=1,NVirt
+      ii = NOccup + i
+      jj = NOccup + j
+      URe(ii,jj)=Fock((j-1)*NVirt+i)
+   endDo
+endDo
+
+! Set elements corresponding to the removed orbitals to zero
+NVirt=NBasis-NOccup-NVZero
+ 
+do i=NOccup+NVirt+1,NBasis
+   do j=1,NBasis
+      URe(i,j) = 0d0
+      URe(j,i) = 0d0
+   enddo
+enddo
+
+! get NO --> NOMP2(canon) tran mat
+call MultpM(Eps,URe,AuxMat,NBasis)
+!Print*, 'Eps-MY',norm2(Eps)
+
+write(LOUT,'(/,1x,"Integral transformation in progress ... ",/)') 
+call MatTr(XOne,Eps,NBasis)
+
+! get AO --> NOMP2(canon) tran mat
+allocate(workSq(NBasis,NBasis))
+workSq=transpose(UNOAO)
+
+call dgemm('N','T',NBasis,NBasis,NBasis,1d0,workSq,NBasis,Eps,NBasis,0d0,AuxMat,NBasis)
+NBasisNew = NBasis-NVZero
+AuxMat(1:NBasis,NOccup+NVirt+1:NBasis)=0d0
+!print*, 'AONOMP2',norm2(AuxMat)
+deallocate(workSq)
+
+! transform J and K
+call tran4_gen(NBasis,&
+               NOccup,AuxMat(1:NBasis,1:NOccup),&
+               NOccup,AuxMat(1:NBasis,1:NOccup),&
+               NBasis,AuxMat,&
+               NBasis,AuxMat,&
+               IntJFile,'AOTWOSORT')
+call tran4_gen(NBasis,&
+               NBasis,AuxMat,&
+               NOccup,AuxMat(1:NBasis,1:NOccup),&
+               NBasis,AuxMat,&
+               NOccup,AuxMat(1:NBasis,1:NOccup),&
+               IntKFile,'AOTWOSORT')
+!
+! restore URe
+URe = 0
+do i=1,NBasis
+   URe(i,i) = 1d0
+enddo
+
+! after "truncating" of the virtual space, find a new set of accepted pairs
+call AcceptPair(IndN,IndX,NDimX,IndAux,Occ,NOccup,NVirt,NBasis,IPrint)
+
+deallocate(AuxI,Aux2)
+deallocate(ints_J,ints_K,work)
+
+end subroutine MP2RDM_FOFO
 
 subroutine ABPM0_FOFO(Occ,URe,XOne,ABPLUS,ABMIN, &
                       IndN,IndX,IGemIN,NAct,INActive,NDimX,NBasis,NDim,NInte1, &
@@ -1917,116 +2300,116 @@ end associate
 
 end subroutine ABPM_HALFBACKTRAN
 
-subroutine ABPM_TRAN(AMAT,AOUT,EBlock,EBlockIV,nblk,NDimX,isPl)
-implicit none
-
-integer,intent(in) :: nblk,NDimX
-logical,intent(in) :: isPl
-double precision,intent(in) :: AMAT(NDimX,NDimX)
-double precision,intent(inout) :: AOUT(NDimX,NDimX)
-
-type(EBlockData),intent(in) :: EBlock(nblk),EBlockIV
-
-integer :: i,j,ii,jj,ipos,jpos,iblk,jblk
-double precision,allocatable :: ABP(:,:),ABM(:,:)
-double precision :: fac
-
-fac = 1.d0/sqrt(2.d0)
-
-AOUT=0
-
-do jblk=1,nblk
-   associate( jB => Eblock(jblk) )
-   do iblk=1,nblk
-      associate( iB => Eblock(iblk))
-
-        allocate(ABP(iB%n,jB%n),ABM(iB%n,jB%n))
-        do j=1,jB%n
-           jpos = jB%pos(j)
-           do i=1,iB%n
-              ipos = iB%pos(i)
-              ABP(i,j) = AMAT(ipos,jpos)
-           enddo
-        enddo
-        if(isPl) then
-           call dgemm('N','N',iB%n,jB%n,jB%n,1d0,ABP,iB%n,jB%matX,jB%n,0d0,ABM,iB%n)
-           call dgemm('T','N',iB%n,jB%n,iB%n,1d0,iB%matX,iB%n,ABM,iB%n,0d0,ABP,iB%n)
-        else
-           call dgemm('N','N',iB%n,jB%n,jB%n,1d0,ABP,iB%n,jB%matY,jB%n,0d0,ABM,iB%n)
-           call dgemm('T','N',iB%n,jB%n,iB%n,1d0,iB%matY,iB%n,ABM,iB%n,0d0,ABP,iB%n)
-        endif
-
-        AOUT(iB%l1:iB%l2,jB%l1:jB%l2) = ABP
-        deallocate(ABM,ABP)
-
-      end associate
-   enddo
-   end associate
-enddo
-
-associate(B => EblockIV)
-
-  if(B%n>0) then
-     do iblk=1,nblk
-        associate(iB => Eblock(iblk))
-
-          allocate(ABP(iB%n,B%n),ABM(iB%n,B%n))
-          do j=1,B%n
-             jpos = B%pos(j)
-             do i=1,iB%n
-                ipos = iB%pos(i)
-                ABP(i,j) = AMAT(ipos,jpos)
-             enddo
-          enddo
-          if(isPl) then
-             call dgemm('T','N',iB%n,B%n,iB%n,fac,iB%matX,iB%n,ABP,iB%n,0d0,ABM,iB%n) 
-          else
-             call dgemm('T','N',iB%n,B%n,iB%n,fac,iB%matY,iB%n,ABP,iB%n,0d0,ABM,iB%n) 
-          endif
-
-          AOUT(iB%l1:iB%l2,B%l1:B%l2) = ABM
-          deallocate(ABM,ABP)
-
-        end associate
-     enddo
-
-     do jblk=1,nblk
-        associate(jB => Eblock(jblk))
-
-          allocate(ABP(B%n,jB%n),ABM(B%n,jB%n))
-          do j=1,jB%n
-             jpos = jB%pos(j)
-             do i=1,B%n
-                ipos = B%pos(i)
-                ABP(i,j) = AMAT(ipos,jpos)
-             enddo
-          enddo
-          if(isPl) then
-             call dgemm('N','N',B%n,jB%n,jB%n,fac,ABP,B%n,jB%matX,jB%n,0d0,ABM,B%n)
-          else
-             call dgemm('N','N',B%n,jB%n,jB%n,fac,ABP,B%n,jB%matY,jB%n,0d0,ABM,B%n)
-          endif
-
-          AOUT(B%l1:B%l2,jB%l1:jB%l2) = ABM
-          deallocate(ABM,ABP)
-
-        end associate
-     enddo
-
-     do j=1,B%n
-        jj = B%l1+j-1
-        jpos = B%pos(j)
-        do i=1,B%n
-           ii = B%l1+i-1
-           ipos = B%pos(i)
-           AOUT(ii,jj) = AMAT(ipos,jpos)*0.5d0
-        enddo
-     enddo
-  endif
-
-end associate
-
-end subroutine ABPM_TRAN
+!subroutine ABPM_TRAN(AMAT,AOUT,EBlock,EBlockIV,nblk,NDimX,isPl)
+!implicit none
+!
+!integer,intent(in) :: nblk,NDimX
+!logical,intent(in) :: isPl
+!double precision,intent(in) :: AMAT(NDimX,NDimX)
+!double precision,intent(inout) :: AOUT(NDimX,NDimX)
+!
+!type(EBlockData),intent(in) :: EBlock(nblk),EBlockIV
+!
+!integer :: i,j,ii,jj,ipos,jpos,iblk,jblk
+!double precision,allocatable :: ABP(:,:),ABM(:,:)
+!double precision :: fac
+!
+!fac = 1.d0/sqrt(2.d0)
+!
+!AOUT=0
+!
+!do jblk=1,nblk
+!   associate( jB => Eblock(jblk) )
+!   do iblk=1,nblk
+!      associate( iB => Eblock(iblk))
+!
+!        allocate(ABP(iB%n,jB%n),ABM(iB%n,jB%n))
+!        do j=1,jB%n
+!           jpos = jB%pos(j)
+!           do i=1,iB%n
+!              ipos = iB%pos(i)
+!              ABP(i,j) = AMAT(ipos,jpos)
+!           enddo
+!        enddo
+!        if(isPl) then
+!           call dgemm('N','N',iB%n,jB%n,jB%n,1d0,ABP,iB%n,jB%matX,jB%n,0d0,ABM,iB%n)
+!           call dgemm('T','N',iB%n,jB%n,iB%n,1d0,iB%matX,iB%n,ABM,iB%n,0d0,ABP,iB%n)
+!        else
+!           call dgemm('N','N',iB%n,jB%n,jB%n,1d0,ABP,iB%n,jB%matY,jB%n,0d0,ABM,iB%n)
+!           call dgemm('T','N',iB%n,jB%n,iB%n,1d0,iB%matY,iB%n,ABM,iB%n,0d0,ABP,iB%n)
+!        endif
+!
+!        AOUT(iB%l1:iB%l2,jB%l1:jB%l2) = ABP
+!        deallocate(ABM,ABP)
+!
+!      end associate
+!   enddo
+!   end associate
+!enddo
+!
+!associate(B => EblockIV)
+!
+!  if(B%n>0) then
+!     do iblk=1,nblk
+!        associate(iB => Eblock(iblk))
+!
+!          allocate(ABP(iB%n,B%n),ABM(iB%n,B%n))
+!          do j=1,B%n
+!             jpos = B%pos(j)
+!             do i=1,iB%n
+!                ipos = iB%pos(i)
+!                ABP(i,j) = AMAT(ipos,jpos)
+!             enddo
+!          enddo
+!          if(isPl) then
+!             call dgemm('T','N',iB%n,B%n,iB%n,fac,iB%matX,iB%n,ABP,iB%n,0d0,ABM,iB%n) 
+!          else
+!             call dgemm('T','N',iB%n,B%n,iB%n,fac,iB%matY,iB%n,ABP,iB%n,0d0,ABM,iB%n) 
+!          endif
+!
+!          AOUT(iB%l1:iB%l2,B%l1:B%l2) = ABM
+!          deallocate(ABM,ABP)
+!
+!        end associate
+!     enddo
+!
+!     do jblk=1,nblk
+!        associate(jB => Eblock(jblk))
+!
+!          allocate(ABP(B%n,jB%n),ABM(B%n,jB%n))
+!          do j=1,jB%n
+!             jpos = jB%pos(j)
+!             do i=1,B%n
+!                ipos = B%pos(i)
+!                ABP(i,j) = AMAT(ipos,jpos)
+!             enddo
+!          enddo
+!          if(isPl) then
+!             call dgemm('N','N',B%n,jB%n,jB%n,fac,ABP,B%n,jB%matX,jB%n,0d0,ABM,B%n)
+!          else
+!             call dgemm('N','N',B%n,jB%n,jB%n,fac,ABP,B%n,jB%matY,jB%n,0d0,ABM,B%n)
+!          endif
+!
+!          AOUT(B%l1:B%l2,jB%l1:jB%l2) = ABM
+!          deallocate(ABM,ABP)
+!
+!        end associate
+!     enddo
+!
+!     do j=1,B%n
+!        jj = B%l1+j-1
+!        jpos = B%pos(j)
+!        do i=1,B%n
+!           ii = B%l1+i-1
+!           ipos = B%pos(i)
+!           AOUT(ii,jj) = AMAT(ipos,jpos)*0.5d0
+!        enddo
+!     enddo
+!  endif
+!
+!end associate
+!
+!end subroutine ABPM_TRAN
 
 subroutine Y01CASLR_FOFO(Occ,URe,XOne,ABPLUS,ABMIN, &
      MultpC,NSymNO, &

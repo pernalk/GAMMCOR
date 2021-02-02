@@ -1742,7 +1742,7 @@ C
 C
 C     A ROUTINE FOR COMPUTING AC INTEGRAND
 C
-      use sapt_ener
+C      use sapt_ener
 C
       Implicit Real*8 (A-H,O-Z)
 C
@@ -2455,7 +2455,7 @@ C ----------------------------------------------------------------
 C
 C     AC0 AND DEEXCITATION CORRECTIONS BASED ON OVERLAP OF ERPA AND SA-CAS TRDM's
 C
-      use sapt_ener
+C      use sapt_ener
 C
       Implicit Real*8 (A-H,O-Z)
 C
@@ -5968,6 +5968,569 @@ C             0th-order correlation only if (IP,IQ) pair is allowed
 C
       End Subroutine ECorrAC0GVB_FOFO
 
+*Deck MP2RDM
+      Subroutine MP2RDM(TwoNO,Eps,Occ,URe,UNOAO,XOne,
+     $ IndN,IndX,IndAux,NDimX,NBasis,NDim,NInte1,NInte2,
+     $ NVirt,IntFile,ThrVirtIN,iTwoNOout)
+C
+      use tran,only : tran4_full
+C
+C     A ROUTINE FOR COMPUTING AC INTEGRAND
+C
+      Implicit Real*8 (A-H,O-Z)
+C
+      Include 'commons.inc'
+c
+      Parameter(Zero=0.D0,Half=0.5D0,One=1.D0,Two=2.D0,Three=3.D0,
+     $ Four=4.D0)
+c      Parameter(ThrVirt=3.D-5)
+C
+      Dimension
+     $ URe(NBasis,NBasis),XOne(NInte1),UNOAO(NBasis,NBasis),
+     $ Occ(NBasis),TwoNO(NInte2),
+     $ IndAux(NBasis),IndX(NDim),IndN(2,NDim),
+     $ Eps(NBasis,NBasis)
+      Integer :: NVirt,NInte1,NInte2
+      Double Precision,intent(in) :: ThrVirtIN
+      Logical          :: iTwoNOout
+      Character(*)     :: IntFile
+C
+C     LOCAL ARRAYS
+C
+      Real*8, Allocatable :: RDM2Act(:)
+      Dimension C(NBasis),HNO(NInte1),
+     $ IGFact(NInte2),
+     $ Ind1(NBasis),Ind2(NBasis),WMAT(NBasis,NBasis),
+     $ AuxI(NInte1),AuxIO(NInte1),IPair(NBasis,NBasis),
+     $ Gamma(NInte1),
+     $ PC(NBasis),AUXM(NBasis,NBasis),Work(NBasis),Fock(NBasis*NBasis),
+     $ AUX2(NBasis*NBasis),work1(NBasis,NBasis),epsi(nbasis)
+      CHARACTER(100) :: num1char
+C
+C      IF(COMMAND_ARGUMENT_COUNT().Eq.0)THEN
+C      WRITE(*,*)'ERROR, COMMAND-LINE ARGUMENTS REQUIRED, STOPPING'
+C      STOP
+C      ENDIF
+C
+C      CALL GET_COMMAND_ARGUMENT(1,num1char)   !first, read in the two values
+C      READ(num1char,*)xnum1
+C      ThrVirt=xnum1
+C
+      ThrVirt = ThrVirtIN
+C
+      IPair(1:NBasis,1:NBasis)=0
+      Do II=1,NDimX
+      I=IndN(1,II)
+      J=IndN(2,II)
+      IPair(I,J)=1
+      IPair(J,I)=1
+      EndDo
+C
+C     AUXILIARY STUFF LATER NEEDED TO GET A+ AND A- MATRICES FOR ALPHA=0
+C
+C     ONE-ELECTRON MATRIX IN A NO REPRESENTATION
+C   
+      IJ=0
+      Do I=1,NBasis
+      Do J=1,I
+      IJ=IJ+1
+      HNO(IJ)=Zero
+C
+      Do IA=1,NBasis
+      Do IB=1,NBasis
+      IAB=(Max(IA,IB)*(Max(IA,IB)-1))/2+Min(IA,IB)
+      HNO(IJ)=HNO(IJ)+URe(I,IA)*URe(J,IB)*XOne(IAB)
+      EndDo
+      EndDo
+C
+      EndDo
+      EndDo
+C
+C
+C     READ 2RDM, COMPUTE THE ENERGY
+C
+      NAct=NAcCAS
+      INActive=NInAcCAS
+      NOccup=INActive+NAct
+
+      Ind2(1:NBasis)=0
+      Do I=1,NAct
+      Ind1(I)=INActive+I
+      Ind2(INActive+I)=I
+      EndDo
+C
+      NRDM2Act = NAct**2*(NAct**2+1)/2
+      Allocate (RDM2Act(NRDM2Act))
+      RDM2Act(1:NRDM2Act)=Zero
+C
+      Open(10,File="rdm2.dat",Status='Old')
+      Write(6,'(/,1X,''Active block of 2-RDM read from rdm2.dat'')')
+C
+   10 Read(10,'(4I4,F19.12)',End=40)I,J,K,L,X
+C
+C     X IS DEFINED AS: < E(IJ)E(KL) > - DELTA(J,K) < E(IL) > = 2 GAM2(JLIK)
+C
+      RDM2Act(NAddrRDM(J,L,I,K,NAct))=Half*X
+C
+      I=Ind1(I)
+      J=Ind1(J)
+      K=Ind1(K)
+      L=Ind1(L)
+C
+      GoTo 10
+   40 Continue
+      Close(10)
+C
+C     COMPUTE THE ENERGY FOR CHECKING
+C
+      ETot=Zero
+      Do I=1,NBasis
+      II=(I*(I+1))/2
+      ETot=ETot+Two*Occ(I)*HNO(II)
+      EndDo
+C
+       Write(6,'(/,X,''One-Electron CASSCF Energy'',3X,F15.8)')ETot
+C
+      Do IP=1,NOccup
+      Do IQ=1,NOccup
+      Do IR=1,NOccup
+      Do IS=1,NOccup
+      ETot=ETot+FRDM2(IP,IQ,IR,IS,RDM2Act,Occ,Ind2,NAct,NBasis)
+     $ *TwoNO(NAddr3(IP,IR,IQ,IS))
+      EndDo
+      EndDo
+      EndDo
+      EndDo
+C
+      Write(6,'(/,X,''CASSCF Energy (w/o ENuc)'',5X,F15.8)')ETot
+      Do I=1,NBasis
+      C(I)=SQRT(Occ(I))
+      If(Occ(I).Lt.Half) C(I)=-C(I)
+      CICoef(I)=C(I)
+      EndDo
+C
+C     CONSTRUCT ONE-ELECTRON PART OF THE AC ALPHA=0 HAMILTONIAN
+C
+      IJ=0
+      Do I=1,NBasis
+      Do J=1,I
+      IJ=IJ+1
+C
+      If(IGem(I).Ne.IGem(J)) Then
+C
+      HNO(IJ)=Zero
+C
+      Else
+C
+      Aux=Zero
+C
+      Do IT=1,NBasis
+      If(IGem(IT).Ne.IGem(I))
+     $ Aux=Aux+Occ(IT)*
+     $ (Two*TwoNO(NAddr3(IT,IT,I,J))-TwoNO(NAddr3(IT,I,IT,J)))
+      EndDo
+C
+      HNO(IJ)=HNO(IJ)+Aux
+C
+      EndIf
+C
+      EndDo
+      EndDo
+C
+C     CONSTRUCT TWO-ELECTRON PART OF THE AC ALPHA-HAMILTONIAN      
+C
+      NAdd=Zero
+      IJ=0
+      Do I=1,NBasis
+      Do J=1,I
+      IJ=IJ+1
+      KL=0
+      Do K=1,NBasis
+      Do L=1,K
+      KL=KL+1
+C
+      If(IJ.Ge.KL) Then
+      NAdd=NAdd+1
+C
+      IGFact(NAdd)=1
+      If(.Not.(
+     $IGem(I).Eq.IGem(J).And.IGem(J).Eq.IGem(K).And.IGem(K).Eq.IGem(L)))
+     $ IGFact(NAdd)=0
+C
+      EndIf
+C
+      EndDo
+      EndDo
+      EndDo
+      EndDo
+C
+C     AUXILIARY MATRIX AuxI AND AuxIO  
+C   
+      IPQ=0
+      Do IP=1,NBasis
+      Do IQ=1,IP
+      IPQ=IPQ+1
+      AuxI(IPQ)=Zero
+      AuxIO(IPQ)=Zero
+      Do IT=1,NOccup
+      If(IGFact(NAddr3(IT,IT,IP,IQ)).Eq.1) Then
+       AuxI(IPQ)=AuxI(IPQ)+Occ(IT)*
+     $ (Two*TwoNO(NAddr3(IP,IQ,IT,IT))-TwoNO(NAddr3(IP,IT,IQ,IT)))
+      If(IT.Le.INActive) AuxIO(IPQ)=AuxIO(IPQ)+Occ(IT)*
+     $ (Two*TwoNO(NAddr3(IP,IQ,IT,IT))-TwoNO(NAddr3(IP,IT,IQ,IT)))
+      EndIf
+      EndDo
+      EndDo
+      EndDo
+C
+C     AUXILIARY MATRIX WMAT
+C
+      Do I=1,NBasis
+      Do J=1,NBasis
+      WMAT(I,J)=Zero
+      EndDo
+      EndDo
+C
+      Do IP=1,NBasis
+      Do IR=1,NOccup
+      Do IT=1,NOccup
+      Do IW=1,NOccup
+      Do IU=1,NOccup
+      If(IGFact(NAddr3(IT,IW,IP,IU)).Eq.1)
+     $ WMAT(IP,IR)=WMAT(IP,IR)
+     $ +TwoNO(NAddr3(IT,IW,IP,IU))
+     $ *FRDM2(IW,IU,IT,IR,RDM2Act,Occ,Ind2,NAct,NBasis)
+     $ +TwoNO(NAddr3(IT,IU,IP,IW))
+     $ *FRDM2(IW,IU,IR,IT,RDM2Act,Occ,Ind2,NAct,NBasis)
+C
+      EndDo
+      EndDo
+      EndDo
+      EndDo
+      EndDo
+C
+C     VIRTUAL-INACTIVE
+C
+      Do IP=NOccup+1,NBasis
+      Do IQ=1,NOccup
+C
+      If(IPair(IP,IQ).Eq.1) Then
+C
+      Call AB0ELEMENT(ABP,ABM,IP,IQ,IP,IQ,Occ,HNO,IGFact,
+     $ TwoNO,AuxI,AuxIO,WMAT,RDM2Act,C,Ind1,Ind2,NAct,NRDM2Act,
+     $ NInte1,NInte2,NBasis)
+C
+      Eps(IP,IQ)=ABP
+C
+      EndIf
+C     
+      EndDo
+      EndDo
+C
+C      Do IP=NOccup+1,NBasis
+C      Do IQ=1,NOccup
+C      write(*,*)'Eps',IP,IQ,Eps(IP,IQ)
+C      EndDo
+C      EndDo
+C
+      Gamma(1:NInte1)=Zero
+C
+      IJ=0
+      Do I=1,NOccup
+      Do J=1,I
+      IJ=(Max(I,J)*(Max(I,J)-1))/2+Min(I,J)
+C
+      Gamma(IJ)=Zero
+      If(I.Eq.J) Gamma(IJ)=Occ(I)
+C
+      Do K=1,NOccup
+      Do IA=NOccup+1,NBasis
+      Do IB=NOccup+1,NBasis
+C
+      Gamma(IJ)=Gamma(IJ)
+     $ - ( Two*TwoNO(NAddr3(I,IA,K,IB))-TwoNO(NAddr3(I,IB,K,IA)) )
+     $ *TwoNO(NAddr3(J,IA,K,IB))/
+     $ (Eps(IA,I)+Eps(IB,K))/(Eps(IA,J)+Eps(IB,K))
+C
+      EndDo
+      EndDo
+      EndDo 
+C
+      EndDo
+      EndDo
+C
+C
+      Do IA=NOccup+1,NBasis
+      Do IB=IA,NBasis
+      IAB=(Max(IA,IB)*(Max(IA,IB)-1))/2+Min(IA,IB)
+      Gamma(IAB)=Zero
+C
+      Do IC=NOccup+1,NBasis
+      Do I=1,NOccup
+      Do J=1,NOccup
+C
+      Gamma(IAB)=Gamma(IAB)
+     $ + ( Two*TwoNO(NAddr3(I,IA,J,IC))-TwoNO(NAddr3(I,IC,J,IA)) )
+     $ *TwoNO(NAddr3(I,IB,J,IC))/
+     $ (Eps(IA,I)+Eps(IC,J))/(Eps(IB,I)+Eps(IC,J))
+C
+      EndDo
+      EndDo
+      EndDo
+C
+      EndDo
+      EndDo
+C
+      Call CpySym(AUXM,Gamma,NBasis)
+      Call Diag8(AUXM,NBasis,NBasis,PC,Work)
+C
+      Write(6,'(2X,"MP2",3X,"Unsorted Occupancy")')
+      Sum=Zero
+      Do I=NBasis,1,-1
+      Write(6,'(X,I3,E16.6,I6)') I,PC(I)
+      Sum=Sum+PC(I)
+      EndDo
+      Write(6,'(2X,"Sum of MP2 Occupancies: ",F5.2)') Sum
+C
+C     SET Occ of the robitals belonging to NOccup to 1 before sorting 
+C     to make sure that after sorting all NOccup orbitals come first 
+C
+      Do I=1,NBasis
+C
+      IOccup=0
+      IVirt=0
+      Do J=1,NBasis
+      If(AUXM(I,J).Ne.Zero.And.J.Le.NOccup) IOccup=1
+      If(AUXM(I,J).Ne.Zero.And.J.Gt.NOccup) IVirt=1
+      EndDo
+C
+      If(IOccup.Eq.1.And.IVirt.Eq.0) PC(I)=One
+      If(IOccup*IVirt.Eq.1.Or.IOccup+IVirt.Eq.0) Stop
+     $ 'MP2 1RDM is messed up. Quitting.'
+C
+      EndDo
+C
+      Call SortP(PC,AUXM,NBasis)
+C
+C     TRANSFORMATION MATRIX TO NEW VIRTUAL ORBITALS
+C
+      Do I=1,NBasis
+      Do K=1,NOccup
+      AUXM(K,I)=Zero
+      If(I.Eq.K) AUXM(K,I)=One
+      EndDo 
+      EndDo
+C
+      NVZero=0
+      Do I=NOccup+1,NBasis
+      If(PC(I).Le.ThrVirt) Then
+      Write(6,'(2X,"Virtual MP2 orbital no",I3," of the occup",
+     $ E14.6," removed")') I,PC(I)
+      Do K=1,NBasis
+      AUXM(I,K)=Zero
+      EndDo
+      NVZero=NVZero+1
+      EndIf
+      EndDo 
+      Write(6,'(/,2X,"Threshold for virt occup number :",E16.6)')ThrVirt
+      Write(6,'(/,2X,"Total number of removed orbitals: ",I3)') NVZero
+C
+      NVirtOld = NBasis - NOccup
+      NVirt    = NBasis - NOccup - NVZero
+      Val = (1d0 - dble(NVirt)/dble(NVirtOld) ) * 100d0
+      Write(6,'(2x,"NVirt/NVirtOld",18x,": ",i3," / ",i3)') 
+     $ NVirt, NVirtOld
+      Write(6,'(2x,"Percent of removed orbitals     : ",f7.2,/)') Val
+
+C     If the new are orbitals are to be used in AC0 they must be 
+C     cannonicalized
+C
+c new line
+      NVirt=NBasis-NOccup
+C
+      Aux2=0d0
+C
+      Do I=1,NVirt
+      Do J=1,NVirt
+      II=I+NOccup
+      JJ=J+NOccup
+      IJ=(Max(II,JJ)*(Max(II,JJ)-1))/2+Min(II,JJ)
+      FIJ=XOne(IJ)
+      Do K=1,NOccup 
+      FIJ=FIJ+Occ(K)*
+     $ (Two*TwoNO(NAddr3(II,JJ,K,K))-TwoNO(NAddr3(II,K,JJ,K)))
+      EndDo
+      IJF=(Max(I,J)*(Max(I,J)-1))/2+Min(I,J)
+      AuxI(IJF)=FIJ 
+      AUX2((J-1)*NVirt+I)=AUXM(II,JJ)
+      EndDo
+      EndDo
+C
+      Call MatTr(AuxI,AUX2,NVirt)
+C
+      Call CpySym(Fock,AuxI,NVirt)
+      Call Diag8(Fock,NVirt,NVirt,PC,Work)
+C
+c new line
+      Call SortF(PC,Fock,NVirt) 
+C     TEST
+C      Print*, 'Fock,PC-Ka',norm2(Fock),norm2(PC(1:NVirt))
+C
+C      BLOCK THIS TEST TEMPORARILY
+C      open(20,file='epsi.dat')
+C      Do IQ=1,INActive 
+C      read(20,*)i,epsi(i)
+C      enddo
+C      close(20)
+C      open(10,file='fock.dat')
+C      Do IP=NOccup+1,NBasis
+C      Do IQ=1,INActive
+C      work1(IP,IQ)=PC(IP-NOccup)-epsi(iq)
+C      write(10,*)ip,iq,work1(ip,iq)
+C      EndDo
+C      EndDo
+C      close(10)
+C
+      Do I=1,NVirt
+      Do J=1,NVirt
+      II=I+NOccup
+      JJ=J+NOccup
+      URe(II,JJ)=Fock((J-1)*NVirt+I)
+      EndDo
+      EndDo
+C
+C     Set elements corresponding to the removed orbitals to zero
+C
+c new line
+      NVirt=NBasis-NOccup-NVZero
+C 
+      Do I=NOccup+NVirt+1,NBasis
+      Do J=1,NBasis
+      URe(I,J)=Zero
+      URe(J,I)=Zero
+      EndDo
+      EndDo
+C
+      Call MultpM(Eps,URe,AUXM,NBasis)
+C
+C      Print*, 'Eps-Ka',norm2(Eps)
+C
+C     TRANSFORM INTEGRALS
+C     this step should be made more efficient - transform only virtuals!
+      Write(6,'(/,2X,"Integral transformation in progress ... ",/)') 
+      Call MatTr(XOne,Eps,NBasis)
+C      Print*, 'XOne-Ka',norm2(XOne)
+C
+      If(iTwoNOout) Then
+C     TRANSFORM 2-el INTEGRALS INCORE
+      Call TwoNO1(TwoNO,Eps,NBasis,NInte2)
+C
+      Else
+C     DUMP TO DISC
+C     get AO --> NOMP2(canon) tran mat
+      work1=transpose(UNOAO)
+      Call dgemm('N','T',NBasis,NBasis,NBasis,1d0,work1,NBasis,
+     $ Eps,NBasis,0d0,AUXM,NBasis)
+       Call tran4_full(NBasis,AUXM,AUXM,IntFile,'AOTWOSORT')
+      EndIf
+C
+C     INTEGRALS ARE TRANSFORMED SO URe IS SET TO A UNIT MATRIX 
+C
+      Do I=1,NBasis
+      Do J=1,NBasis
+      URe(I,J)=Zero
+      If(I.Eq.J) URe(I,J)=One
+      EndDo
+      EndDo
+C
+C     AFTER "TRUNCATING" OF THE VIRTUAL SPACE, FIND A NEW SET OF ACCEPTED PAIRS
+C
+      Call AcceptPair(IndN,IndX,NDimX,IndAux,Occ,NOccup,NVirt,NBasis)
+C
+      Return
+      End
+
+*Deck AcceptPair
+      Subroutine AcceptPair(IndN,IndX,NDimX,IndAux,Occ,
+     $ NOccup,NVirt,NBasis)
+C
+      use types 
+C
+      Implicit Real*8 (A-H,O-Z)
+C
+      Include 'commons.inc' 
+C
+      Dimension IndX(NBasis*(NBasis-1)/2),IndN(2,NBasis*(NBasis-1)/2),
+     $ IndAux(NBasis),Occ(NBasis)
+C
+      type(SystemBlock) :: System
+C
+      NOK=NOccup+NVirt
+C
+C      ThrSelAct=System%ThrSelAct
+      Write(LOUT,'(1x,a,2e15.5)') 'Threshold for quasi-degeneracy ',
+     $ ThrSelAct
+C
+      IJ=0
+      Ind=0
+      Do I=1,NBasis
+      Do J=1,I-1
+C
+      IJ=IJ+1
+C
+      If(IndAux(I)+IndAux(J).Ne.0.And.IndAux(I)+IndAux(J).Ne.4) Then
+C
+      If((IndAux(I).Eq.1).And.(IndAux(J).Eq.1)
+     $ .And.(Abs(Occ(I)-Occ(J))/Occ(I).Lt.ThrSelAct)
+     $ ) Then
+C
+      Write(6,'(1X,"Discarding nearly degenerate pair ",2I4)')I,J
+C
+      Else
+C
+C     If IFlCore=0 do not include core (inactive) orbitals  
+      If((IFlCore.Eq.1).Or.
+     $ (IFlCore.Eq.0.And.Occ(I).Ne.One.And.Occ(J).Ne.One)) Then
+C
+C     EXCLUDE EXCITATIONS TO REMOVED VIRTUAL ORBITALS
+C
+      If(I.Le.NOK.And.J.Le.NOK) Then
+C
+      Ind=Ind+1
+      IndX(Ind)=Ind
+      IndN(1,Ind)=I
+      IndN(2,Ind)=J
+C
+      EndIf
+C
+      EndIf
+C
+      EndIf
+C
+c     If(IndAux(I)+IndAux(J).Ne.0 ...
+      EndIf
+C
+      EndDo
+      EndDo
+C
+      Write(6,'(/1X,"AFTER TRUNCATING VIRTUAL ORBITAL SPACE: ")')
+C
+      NDimX=Ind
+      Write(6,'(1X,"Number of pairs reduced to:",I6)')Ind
+C
+      If(IPrint.gt.2) Then
+      Write(6,'(1X,"Accepted pairs read:")')
+      Do I=1,Ind
+      Ind1=IndN(1,I)
+      Ind2=IndN(2,I)
+      Write(6,'(1X,3I5,2E14.4)')I,Ind1,Ind2,Occ(Ind1),Occ(Ind2)
+      EndDo
+      EndIf
+C
+      Return
+      End
+
+
 *Deck SortP
       Subroutine SortP(Occ,URe,NBasis)
 C
@@ -6026,6 +6589,67 @@ C
       EndDo
       EndDo
 C
+C
+      Return
+      End
+
+*Deck SortF
+      Subroutine SortF(Pcc,URe,NBasis)
+C
+      Implicit Real*8 (A-H,O-Z)
+C
+      Dimension Pcc(NBasis),URe(NBasis,NBasis)
+C
+C     LOCAL ARRAYS
+C
+      Dimension UReOld(NBasis,NBasis),Ind(1000),IndPcc(1000)
+C
+C     SORT THE Pcc NUMBERS IN A DESCENDING ORDER OF THEIR ABS VALUES
+C
+      Do I=1,NBasis
+      Ind(I)=I
+      EndDo
+C
+      IStart=1
+C
+      Do I=1,NBasis
+C
+      PccMx=Pcc(IStart)
+      IndMx=IStart
+C
+      Do J=IStart,NBasis
+      If(Abs(Pcc(J)).Gt.Abs(PccMx)) Then
+      PccMx=Pcc(J)
+      IndMx=J
+      EndIf
+      EndDo
+C
+      Hlp=Pcc(IStart)
+      IndHlp=Ind(IStart)
+
+      Pcc(IStart)=PccMx
+      Ind(IStart)=Ind(IndMx)
+
+      Pcc(IndMx)=Hlp
+      Ind(IndMx)=IndHlp
+C
+      IStart=IStart+1
+C
+      EndDo
+C
+C     SWAP THE ORBITALS
+C
+      Do I=1,NBasis
+      Do J=1,NBasis
+      UReOld(J,I)=URe(J,I)
+      EndDo
+      EndDo
+C
+      Do J=1,NBasis
+      Do I=1,NBasis
+      URe(I,J)=UReOld(Ind(I),J)
+      EndDo
+      EndDo
 C
       Return
       End
@@ -6729,7 +7353,7 @@ C
 C
 C     AC0 AND DEEXCITATION CORRECTIONS BASED ON SYMMETRY
 C
-      use sapt_ener
+C      use sapt_ener
 C
       Implicit Real*8 (A-H,O-Z)
 C

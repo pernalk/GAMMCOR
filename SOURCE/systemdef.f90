@@ -127,6 +127,9 @@ else
   ! set TwoEl type
    Flags%ITwoEl = Input%CalcParams%TwoMoInt
 
+  ! reduce virtuals 
+   Flags%IRedVirt = Input%CalcParams%RedVirt
+
   ! Interface 
   select case(Input%CalcParams%InterfaceType)
   case(INTER_TYPE_DAL)
@@ -351,6 +354,7 @@ if(Flags%ISAPT.Eq.0) then
 
    if(Input%CalcParams%imon/=1) then
      write(LOUT,'(a)') 'ERROR! TOO MANY SYSTEM BLOCKS!'
+     write(LOUT,'(a)') 'SYSTEM? !'
      stop
    endif   
   
@@ -381,6 +385,7 @@ if(Flags%ISAPT.Eq.0) then
    System%EigFCI = Input%SystemInput(1)%EigFCI
    System%ThrAct = Input%SystemInput(1)%ThrAct
    System%ThrSelAct = Input%SystemInput(1)%ThrSelAct
+   System%ThrVirt = Input%SystemInput(1)%ThrVirt
    System%ThrQVirt  = Input%SystemInput(1)%ThrQVirt
    System%TwoMoInt = Input%SystemInput(1)%TwoMoInt
    System%IPrint = Input%CalcParams%IPrint  
@@ -434,6 +439,7 @@ elseif(Flags%ISAPT.Eq.1) then
       monA%NBasis  = Input%CalcParams%NBasis
       monA%ThrAct       = Input%SystemInput(1)%ThrAct
       monA%ThrSelAct    = Input%SystemInput(1)%ThrSelAct
+      monA%ThrVirt     = Input%SystemInput(1)%ThrVirt
       monA%ThrQVirt     = Input%SystemInput(1)%ThrQVirt
       monA%DeclareTwoMo = Input%SystemInput(1)%DeclareTwoMo
       monA%TwoMoInt = Input%SystemInput(1)%TwoMoInt
@@ -472,6 +478,7 @@ elseif(Flags%ISAPT.Eq.1) then
       monB%Multiplicity = Input%SystemInput(2)%Multiplicity
       monB%ThrAct = Input%SystemInput(2)%ThrAct
       monB%ThrSelAct = Input%SystemInput(2)%ThrSelAct
+      monB%ThrVirt   = Input%SystemInput(2)%ThrVirt
       monB%ThrQVirt  = Input%SystemInput(2)%ThrQVirt
       monB%DeclareTwoMo = Input%SystemInput(2)%DeclareTwoMo
       monB%TwoMoInt = Input%SystemInput(2)%TwoMoInt
@@ -513,6 +520,7 @@ elseif(Flags%ISAPT.Eq.1) then
       monA%Multiplicity = Input%SystemInput(2)%Multiplicity
       monA%ThrAct = Input%SystemInput(2)%ThrAct
       monA%ThrSelAct = Input%SystemInput(2)%ThrSelAct
+      monA%ThrVirt   = Input%SystemInput(2)%ThrVirt
       monA%ThrQVirt  = Input%SystemInput(2)%ThrQVirt
       monA%DeclareTwoMo = Input%SystemInput(2)%DeclareTwoMo
       monA%TwoMoInt = Input%SystemInput(2)%TwoMoInt
@@ -549,6 +557,7 @@ elseif(Flags%ISAPT.Eq.1) then
       monB%Multiplicity = Input%SystemInput(1)%Multiplicity
       monB%ThrAct = Input%SystemInput(1)%ThrAct
       monB%ThrSelAct = Input%SystemInput(1)%ThrSelAct
+      monB%ThrVirt   = Input%SystemInput(1)%ThrVirt
       monB%ThrQVirt  = Input%SystemInput(1)%ThrQVirt
       monB%DeclareTwoMo = Input%SystemInput(1)%DeclareTwoMo
       monB%TwoMoInt = Input%SystemInput(1)%TwoMoInt
