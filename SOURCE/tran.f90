@@ -422,6 +422,7 @@ integer :: l,k,kl
 
 end subroutine tran4_gen
 
+
 subroutine read4_gen(NBas,nA,CA,nB,CB,nC,CC,nD,CD,fname,srtfile)
 ! reads 4-index ints from sorted file 
 ! dumps all integrals on disk in the (square,square) form
@@ -483,6 +484,117 @@ integer :: ip,iq,ir,is,pq,rs
  deallocate(work1,work2)
 
 end subroutine read4_gen
+
+subroutine abpm_tran(AMAT,AOUT,EBlock,EBlockIV,nblk,NDimX,isPl)
+implicit none
+
+integer,intent(in) :: nblk,NDimX
+logical,intent(in) :: isPl
+double precision,intent(in) :: AMAT(NDimX,NDimX)
+double precision,intent(inout) :: AOUT(NDimX,NDimX)
+
+type(EBlockData),intent(in) :: EBlock(nblk),EBlockIV
+
+integer :: i,j,ii,jj,ipos,jpos,iblk,jblk
+double precision,allocatable :: ABP(:,:),ABM(:,:)
+double precision :: fac
+
+fac = 1.d0/sqrt(2.d0)
+
+AOUT=0
+
+do jblk=1,nblk
+   associate( jB => Eblock(jblk) )
+   do iblk=1,nblk
+      associate( iB => Eblock(iblk))
+
+        allocate(ABP(iB%n,jB%n),ABM(iB%n,jB%n))
+        do j=1,jB%n
+           jpos = jB%pos(j)
+           do i=1,iB%n
+              ipos = iB%pos(i)
+              ABP(i,j) = AMAT(ipos,jpos)
+           enddo
+        enddo
+        if(isPl) then
+           call dgemm('N','N',iB%n,jB%n,jB%n,1d0,ABP,iB%n,jB%matX,jB%n,0d0,ABM,iB%n)
+           call dgemm('T','N',iB%n,jB%n,iB%n,1d0,iB%matX,iB%n,ABM,iB%n,0d0,ABP,iB%n)
+        else
+           call dgemm('N','N',iB%n,jB%n,jB%n,1d0,ABP,iB%n,jB%matY,jB%n,0d0,ABM,iB%n)
+           call dgemm('T','N',iB%n,jB%n,iB%n,1d0,iB%matY,iB%n,ABM,iB%n,0d0,ABP,iB%n)
+        endif
+
+        AOUT(iB%l1:iB%l2,jB%l1:jB%l2) = ABP
+        deallocate(ABM,ABP)
+
+      end associate
+   enddo
+   end associate
+enddo
+
+associate(B => EblockIV)
+
+  if(B%n>0) then
+     do iblk=1,nblk
+        associate(iB => Eblock(iblk))
+
+          allocate(ABP(iB%n,B%n),ABM(iB%n,B%n))
+          do j=1,B%n
+             jpos = B%pos(j)
+             do i=1,iB%n
+                ipos = iB%pos(i)
+                ABP(i,j) = AMAT(ipos,jpos)
+             enddo
+          enddo
+          if(isPl) then
+             call dgemm('T','N',iB%n,B%n,iB%n,fac,iB%matX,iB%n,ABP,iB%n,0d0,ABM,iB%n) 
+          else
+             call dgemm('T','N',iB%n,B%n,iB%n,fac,iB%matY,iB%n,ABP,iB%n,0d0,ABM,iB%n) 
+          endif
+
+          AOUT(iB%l1:iB%l2,B%l1:B%l2) = ABM
+          deallocate(ABM,ABP)
+
+        end associate
+     enddo
+
+     do jblk=1,nblk
+        associate(jB => Eblock(jblk))
+
+          allocate(ABP(B%n,jB%n),ABM(B%n,jB%n))
+          do j=1,jB%n
+             jpos = jB%pos(j)
+             do i=1,B%n
+                ipos = B%pos(i)
+                ABP(i,j) = AMAT(ipos,jpos)
+             enddo
+          enddo
+          if(isPl) then
+             call dgemm('N','N',B%n,jB%n,jB%n,fac,ABP,B%n,jB%matX,jB%n,0d0,ABM,B%n)
+          else
+             call dgemm('N','N',B%n,jB%n,jB%n,fac,ABP,B%n,jB%matY,jB%n,0d0,ABM,B%n)
+          endif
+
+          AOUT(B%l1:B%l2,jB%l1:jB%l2) = ABM
+          deallocate(ABM,ABP)
+
+        end associate
+     enddo
+
+     do j=1,B%n
+        jj = B%l1+j-1
+        jpos = B%pos(j)
+        do i=1,B%n
+           ii = B%l1+i-1
+           ipos = B%pos(i)
+           AOUT(ii,jj) = AMAT(ipos,jpos)*0.5d0
+        enddo
+     enddo
+  endif
+
+end associate
+
+end subroutine abpm_tran
 
 subroutine abpm_tran_gen(AMAT,AOUT,EBlockA,EBlockAIV,EBlockB,EBlockBIV,&
                          nblkA,nblkB,ANDimX,BNDimX,xyvar)

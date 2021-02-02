@@ -238,6 +238,7 @@ C
       ElseIf(ITwoEl.Eq.3) Then
 C     TRANSFORM J AND K
       UAux=transpose(UMOAO)
+      print*, 'Num0-1',Num0,Num1
       Call tran4_gen(NBasis,
      $        Num0+Num1,UAux(1:NBasis,1:(Num0+Num1)),
      $        Num0+Num1,UAux(1:NBasis,1:(Num0+Num1)),
