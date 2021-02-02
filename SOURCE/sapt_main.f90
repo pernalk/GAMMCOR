@@ -2658,7 +2658,7 @@ double precision, external :: FRDM2GVB
         Eig0 = 0
         Eig1 = 0
 
-        !! glupi  test energii AC0
+        !! silly AC0 energy test
         ! Call AC0CAS(ECorr,ETot,TwoMO,Mon%Occ,URe,XOne,&
         !             ABPLUS,ABMIN,EigY0,Eig0, &
         !             Mon%IndN,Mon%IndX,Mon%NDimX,NBas,Mon%NDim,NInte1,NInte2)

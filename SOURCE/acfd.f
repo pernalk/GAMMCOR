@@ -988,7 +988,7 @@ C
       NAct=NAcCAS
       INActive=NInAcCAS
 C
-      Print*, 'NFree2,NDimX',NFree2,NDimX
+C      Print*, 'NFree2,NDimX',NFree2,NDimX
 C
       NoEig=NDimX
 C
@@ -1060,9 +1060,8 @@ C
       EndDo
       EndDo
 C
-C
-      Print*, 'TEST-X:',norm2(WorkX)
-      Print*, 'TEST-Y:',norm2(WorkY)
+c      Print*, 'TEST-X:',norm2(WorkX)
+c      Print*, 'TEST-Y:',norm2(WorkY)
 C
       If(ifdump) Then
 C      
