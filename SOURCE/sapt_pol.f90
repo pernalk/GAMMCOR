@@ -1272,7 +1272,11 @@ double precision,parameter :: SmallE = 1.D-3
  allocate(tmp1(A%NDimX,B%NDimX),tmp2(A%NDimX,B%NDimX))
  print*, 'alloc tmp1,tmp2'
 
- call readEvec(EVecA,A%NDimX,'PROP_A') 
+ if(A%E2dExt) then
+   call readEvec(EVecA,A%NDimX,'PROP_AX') 
+ else
+   call readEvec(EVecA,A%NDimX,'PROP_A') 
+ endif
 
  allocate(work(nOVB))
  open(newunit=iunit,file='TWOMOAB',status='OLD',&
@@ -1306,7 +1310,12 @@ double precision,parameter :: SmallE = 1.D-3
  deallocate(EVecA)
 
  allocate(EVecB(B%NDimX*B%NDimX))
- call readEvec(EVecB,B%NDimX,'PROP_B') 
+
+ if(B%E2dExt) then
+   call readEvec(EVecB,B%NDimX,'PROP_BX') 
+ else
+   call readEvec(EVecB,B%NDimX,'PROP_B') 
+ endif
 
  call dgemm('N','N',A%NDimX,B%NDimX,B%NDimX,1d0,tmp1,A%NDimX,EVecB,B%NDimX,0d0,tmp2,A%NDimX)
 
@@ -1650,6 +1659,11 @@ endif
 
  ! calucate semicoupled and dexcitations
  if(SAPT%SemiCoupled) call e2disp_semi(Flags,A,B,SAPT)
+ ! calculate extrapolated E2disp
+ print*, 'A: E2dExtr',A%E2dExt
+ print*, 'B: E2dExtr',B%E2dExt
+ if(A%E2dExt.or.B%E2dExt) call e2disp_cpld(Flags,A,B,SAPT)
+
  ! here: make it a keyword
  !if(SAPT%DispExc)     call e2disp_dexc(Flags,A,B,SAPT)
 
