@@ -1204,7 +1204,6 @@ double precision :: tmp(ntr)
 
  open(newunit=iunit,file=infile,status='OLD', &
       access='SEQUENTIAL',form='UNFORMATTED')
-
  ntdg = 0
  rewind(iunit)
  read(iunit) 
@@ -1559,8 +1558,8 @@ logical :: ex
        !write(LOUT,*)  nsym,nbas,norb,nrhf,ioprhf
 
     elseif(trim(intf)=='MOLPRO') then
-       read(iunit) nsym
-       read(iunit) nbas(1:nsym)
+       read(iunit)
+       read(iunit) nsym,nbas(1:nsym)
     endif
 
     close(iunit)

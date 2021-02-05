@@ -35,8 +35,8 @@ c      double precision vrhoc(ngrid),vrhoo(ngrid)
 c      double precision vsigmacc(ngrid),vsigmaco(ngrid),vsigmaoo(ngrid)
 C
 c      Call CORRELON(URe,UNOAO,Occ,NBasis)
-      Call DELCORREL(URe,UNOAO,Occ,NBasis)
-      stop
+c      Call DELCORREL(URe,UNOAO,Occ,NBasis)
+c      stop
 C
       FDeriv=.True.
       Open=.False.
@@ -296,6 +296,9 @@ C
       logical fderiv,open
       integer igrad
       character*(30) name
+
+      Call DELCORREL(URe,UNOAO,Occ,NBasis)
+      stop 
 C
 C     IFlagRead = 0 - generate grid data, do not write to a file
 C     if parameteres in caspidft are optimized it is useful to use flags different from 0 to avoid generating data on grid more than once
@@ -1606,9 +1609,17 @@ C
 C
       Write(*,'("   z(bohr)     Rho",10X,"DELX     Psi_Re   Psi_Im")')
       Do I=1,NGrid
-      If(Abs(RX(I)).Lt.1.D-10.And.Abs(RY(I)).Lt.1.D-10)
-     $ Write(*,'(F10.4,E13.4,3F10.4)')
-     $ RZ(I),RhoGrid(I),DELXX(I),CRe(I),CIm(I)
+c      if(RhoGrid(I).gt.1.d-2.and. CRe(I)+CIm(I).gt.0.05) 
+c     $ Write(*,'(F10.4,E13.4,3F10.4)')
+c     $ RZ(I),RX(I),RY(I),CRe(I),CIm(I)
+
+c      If(Abs(RX(I)).Lt.1.D-10.And.Abs(RY(I)).Lt.1.D-10)
+      If(Abs(RX(I)).Lt.0.5.And.Abs(RX(I)).Gt.0.10)
+c.And.
+c     $ Abs(RY(I)).Lt.1.D-10)
+     $ Write(*,'(2F10.4,E13.4,3F10.4)')
+     $ RZ(I),RY(I),RhoGrid(I),DELXX(I),CRe(I),CIm(I)
+
       EndDo
 C
 C     If(inst(1,1).Eq.1.And.inst(2,1).Eq.1) Then

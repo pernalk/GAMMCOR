@@ -2,7 +2,7 @@ gm
 OBJ/*
 EXAMPLES/*
 BACKUP/*
-TESTS/*
+TESTS/
 *.mod
 *.o
 *.f90#

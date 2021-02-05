@@ -2491,6 +2491,15 @@ double precision, external :: FRDM2GVB
 ! else
 !   ACAlpha=0.0000001
 ! endif 
+! KP 31.01.2021 instability test
+!   if(Mon%Monomer==1) then
+!   IF(COMMAND_ARGUMENT_COUNT().Ne.0) THEN
+!   CALL GET_COMMAND_ARGUMENT(1,label)
+!   READ(label,*)ACAlpha
+!   ENDIF
+!   print*,'*********************'
+!   print*,'*** MONOMER ALPHA ***',Mon%Monomer,ACAlpha 
+!   endif
 
    !ACAlpha=sqrt(2d0)/2d0
    !ACAlpha=1d-12
