@@ -10,4 +10,4 @@ TESTS/
 SOURCE/*.f_*
 SOURCE/*.f90_*
 SOURCE/list_changes.txt
-prdmft.exe
+./prdmft.exe
