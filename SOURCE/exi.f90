@@ -32,7 +32,6 @@ integer :: i,ip,iq,ir,ipq
 integer :: ii,j,k
 double precision,allocatable :: tmp1(:),tmp2(:)
 double precision :: fact,val
-!                    Sba(NBas,NBAs)
 
 tvec = 0
 
@@ -44,13 +43,13 @@ do i=1,NDimX
    ip = AIndN(1,i)
    iq = AIndN(2,i)
    ipq = posA(ip,iq)
-   
+
    fact = (AOcc(ip)-AOcc(iq))
 
    val = 0
    do ir=1,NBas
       !tmp1(ipq) = tmp1(ipq) + fact*BOcc(ir)*Sab(iq,ir)*Sba(ir,ip)
-      val = val + BOcc(ir)*Sab(ip,ir)*Sab(iq,ir)       
+      val = val + BOcc(ir)*Sab(ip,ir)*Sab(iq,ir)
    enddo
    tmp1(ipq) = tmp1(ipq) + fact*val
 

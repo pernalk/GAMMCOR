@@ -461,9 +461,6 @@ integer :: test,test2
  case ("CHARGE")
        read(val, *) SystemParams%Charge
 
- case ("MULTIPLICITY")
-       read(val, *) SystemParams%Multiplicity
-
  case ("ZNUCL")
        read(val, *) SystemParams%ZNucl
 
@@ -519,6 +516,9 @@ integer :: test,test2
 
  case ("ISHF")
        read(val,*) SystemParams%ISHF
+
+ case ("E2DAX3")
+       read(val,*) SystemParams%E2dExt
 
  end select
 end subroutine read_block_system
@@ -708,19 +708,11 @@ integer :: imon
          stop   
       endif
 
-      if(System%Multiplicity.lt.0) then
-         write(LOUT,'(1x,a)') 'FATAL ERROR: INCORRECT ENTRY&
-                     & Multiplicity IN THE INPUT FILE'
-      write(LOUT, '(1x,a,3x,i3)') 'Multiplicity', System%Multiplicity
-         stop 
-      endif
-
       if(.not.System%DeclareSt) then
          allocate(System%InSt(2,1))
       endif
       !write(LOUT, '(1x,a,6x,a)') "Monomer: ", &
       !              PossibleMonomers(System%Monomer)
-      !write(LOUT, '(1x,a,i2)') "Multiplicity: ", System%Multiplicity
     end associate
  enddo
 

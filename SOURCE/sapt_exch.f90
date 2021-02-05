@@ -1551,10 +1551,11 @@ double precision :: termZ_u,termY_u,termX_u
 double precision :: e2exi_unc
 double precision,allocatable :: uA0(:),uB0(:)
 double precision,allocatable :: OmA0(:),OmB0(:)
+!double precision,allocatable :: OmA01(:),OmB01(:)
 integer                      :: iblk,nblkA,nblkB
 ! full test
-double precision,allocatable :: AVecX0(:),AVecY0(:), &
-                                BVecX0(:),BVecY0(:)
+!double precision,allocatable :: AVecX0(:),AVecY0(:), &
+!                                BVecX0(:),BVecY0(:)
 
 double precision,allocatable :: tmp1(:,:),tmp2(:,:)
 double precision,allocatable :: tmpXA(:),tmpYA(:),&
@@ -1591,27 +1592,27 @@ double precision,parameter :: BigE = 1.D8
     write(LOUT,'(1x,a,2x,e15.4,/)') 'BigE        =', BigE
  endif
 
- ! unc -- docelowo:
- !if(Flags%ICASSCF==1) then
- !   allocate(OmA0(A%NDimX),OmB0(B%NDimX))
-
- !   call read_SBlock(SBlockA,SBlockAIV,nblkA,'XY0_A')
- !   call read_SBlock(SBlockB,SBlockBIV,nblkB,'XY0_B')
-
- !   call unpack_Eig(SBlockA,SBlockAIV,nblkA,OmA0,A%NDimX)
- !   call unpack_Eig(SBlockB,SBlockBIV,nblkB,OmB0,B%NDimX)
- !endif
-
- ! unc -- full
+ ! unc
  if(Flags%ICASSCF==1) then
-    allocate(AVecX0(A%NDimX*A%NDimX),OmA0(A%NDimX), &
-             AVecY0(A%NDimX*A%NDimX), &
-             BVecX0(B%NDimX*B%NDimX),OmB0(B%NDimX), &
-             BVecY0(B%NDimX*B%NDimX))
+    allocate(OmA0(A%NDimX),OmB0(B%NDimX))
 
-    call unpack_XY0_full(AVecX0,AVecY0,OmA0,A%CICoef,A%IndN,A%NDimX,NBas,'XY0_A')
-    call unpack_XY0_full(BVecX0,BVecY0,OmB0,B%CICoef,B%IndN,B%NDimX,NBas,'XY0_B')
+    call read_SBlock(SBlockA,SBlockAIV,nblkA,'XY0_A')
+    call read_SBlock(SBlockB,SBlockBIV,nblkB,'XY0_B')
+
+    call unpack_Eig(SBlockA,SBlockAIV,nblkA,OmA0,A%NDimX)
+    call unpack_Eig(SBlockB,SBlockBIV,nblkB,OmB0,B%NDimX)
  endif
+
+ ! full unc
+ !if(Flags%ICASSCF==1) then
+ !   allocate(AVecX0(A%NDimX*A%NDimX),OmA0(A%NDimX), &
+ !            AVecY0(A%NDimX*A%NDimX), &
+ !            BVecX0(B%NDimX*B%NDimX),OmB0(B%NDimX), &
+ !            BVecY0(B%NDimX*B%NDimX))
+
+ !   call unpack_XY0_full(AVecX0,AVecY0,OmA0,A%CICoef,A%IndN,A%NDimX,NBas,'XY0_A')
+ !   call unpack_XY0_full(BVecX0,BVecY0,OmB0,B%CICoef,B%IndN,B%NDimX,NBas,'XY0_B')
+ !endif
 
 ! read EigValA_B
 ! allocate(EVecA(A%NDimX,A%NDimX),OmA(A%NDimX), &
@@ -1709,66 +1710,6 @@ double precision,parameter :: BigE = 1.D8
 
 !! Y term
 
-! allocate(tindX(A%NDimX))
-!
-! ! Y(A<--B)
-! uA = 0
-! tindX = 0
-! do i=1,A%NDimX
-!    ip = A%IndN(1,i)
-!    iq = A%IndN(2,i)
-!    ipq = posA(ip,iq)
-!
-!    tindX(ipq) = tindX(ipq) + (A%Occ(ip)-A%Occ(iq))*WbAA(ip,iq)
-!
-! enddo
-! call dgemv('T',A%NDimX,A%NDimX,1d0,A%EigY-A%EigX,A%NDimX,tindX,1,0d0,uA,1)
-! print*, 'uA',norm2(uA)
-! !call make_tind2(tindB,B%EigX,B%EigY,Sab,PAaa,B%Occ,B%IndN,posB,dimOA,B%NDimX,NBas)
-! !print*, 'tindA-1',norm2(tindA)
-! !print*, 'tindB-2',norm2(tindB)
-!
-! !call make_tind(tindX,A%EigX,A%EigY,Sab,A%Occ,B%Occ,A%IndN,posA,A%NDimX,NBas)
-! call make_tind2(tindX,A%EigX,A%EigY,Sab,PBbb,A%Occ,A%IndN,posA,dimOB,A%NDimX,NBas)
-! print*, 'tindA',norm2(tindX)
-!
-! termY=0d0
-! do i=1,A%NDimX
-!    if(abs(A%Eig(i)).gt.SmallE.and.abs(A%Eig(i)).lt.BigE) then
-!       termY = termY + (tindX(i)*uA(i))/A%Eig(i)
-!    endif   
-! enddo
-! print*, 'termY-1',termY
-!
-! deallocate(tindX)
-! allocate(tindX(B%NDimX))
-!
-! ! Y(A-->B)
-! uB = 0
-! tindX = 0
-! do j=1,B%NDimX
-!    ir = B%IndN(1,j)
-!    is = B%IndN(2,j)
-!    irs = posB(ir,is)
-!
-!    tindX(irs) = tindX(irs) + (B%Occ(ir)-B%Occ(is))*WaBB(ir,is)
-!
-! enddo
-! call dgemv('T',B%NDimX,B%NDimX,1d0,B%EigY-B%EigX,B%NDimX,tindX,1,0d0,uB,1)
-! print*, 'uB',norm2(uB)
-!
-! !call make_tind(tindX,B%EigX,B%EigY,Sba,B%Occ,A%Occ,B%IndN,posB,B%NDimX,NBas)
-! call make_tind2(tindX,A%EigX,A%EigY,Sab,PBbb,A%Occ,A%IndN,posA,dimOB,A%NDimX,NBas)
-! print*, 'tindB',norm2(tindX)
-!
-! do i=1,B%NDimX
-!    if(abs(B%Eig(i)).gt.SmallE.and.abs(B%Eig(i)).lt.BigE) then
-!       termY = termY + (tindX(i)*uB(i))/B%Eig(i)
-!    endif
-! enddo
-! print*, 'termY-2',termY
-!! end split Y
-
  allocate(tindA(A%NDimX),tindB(B%NDimX))
 
  ! unc 
@@ -1785,8 +1726,10 @@ double precision,parameter :: BigE = 1.D8
        tindA(ipq) = tindA(ipq) + (A%Occ(ip)-A%Occ(iq))*WbAA(ip,iq)
 
     enddo
-    call dgemv('T',A%NDimX,A%NDimX,1d0,AVecY0-AVecX0,A%NDimX,tindA,1,0d0,uA0,1)
-    !print*, 'uA0',norm2(uA0)
+
+    call abpm_dgemv_gen(tindA,uA0,SBlockA,SBlockAIV,nblkA,A%NDimX,'YX')
+    ! full unc
+    !call dgemv('T',A%NDimX,A%NDimX,1d0,AVecY0-AVecX0,A%NDimX,tindA,1,0d0,uA0,1)
 
     uB0 = 0
     tindB = 0
@@ -1798,11 +1741,17 @@ double precision,parameter :: BigE = 1.D8
        tindB(irs) = tindB(irs) + (B%Occ(ir)-B%Occ(is))*WaBB(ir,is)
 
     enddo
-    call dgemv('T',B%NDimX,B%NDimX,1d0,BVecY0-BVecX0,B%NDimX,tindB,1,0d0,uB0,1)
-    !print*, 'uA0',norm2(uB0)
 
-    call make_tind(tindA,AVecX0,AVecY0,Sab,A%Occ,B%Occ,A%IndN,posA,A%NDimX,NBas)
-    call make_tind(tindB,BVecX0,BVecY0,Sba,B%Occ,A%Occ,B%IndN,posB,B%NDimX,NBas)
+    call abpm_dgemv_gen(tindB,uB0,SBlockB,SBlockBIV,nblkB,B%NDimX,'YX')
+    ! full unc
+    !call dgemv('T',B%NDimX,B%NDimX,1d0,BVecY0-BVecX0,B%NDimX,tindB,1,0d0,uB0,1)
+
+    call make_tind_unc(tindA,SBlockA,SblockAIV,Sab,A%Occ,B%Occ,A%IndN,posA,nblkA,A%NDimX,NBas)
+    call make_tind_unc(tindB,SblockB,SblockBIV,Sba,B%Occ,A%Occ,B%IndN,posB,nblkB,B%NDimX,NBas)
+
+    ! full unc
+    !call make_tind(tindA,AVecX0,AVecY0,Sab,A%Occ,B%Occ,A%IndN,posA,A%NDimX,NBas)
+    !call make_tind(tindB,BVecX0,BVecY0,Sba,B%Occ,A%Occ,B%IndN,posB,B%NDimX,NBas)
 
     termY_u = 0d0
     do i=1,A%NDimX
@@ -1817,13 +1766,7 @@ double precision,parameter :: BigE = 1.D8
     enddo
 
     termY_u=-4d0*(SAPT%elst-SAPT%Vnn)*termY_u
-    !print*, 'termY_u',termY_u
 
-    ! not working..?
-    !allocate(uA0(A%NDimX))
-    !   call make_uX_unc(A,WbAA,posA,uA0,A%NDimX,NBas)
-    !   print*, 'uA0',norm2(uA0)
-    !deallocate(uA0)
  endif
 
  ! cpld
@@ -1860,9 +1803,6 @@ double precision,parameter :: BigE = 1.D8
      call make_tind(tindA,A%EigX,A%EigY,Sab,A%Occ,B%Occ,A%IndN,posA,A%NDimX,NBas)
      call make_tind(tindB,B%EigX,B%EigY,Sba,B%Occ,A%Occ,B%IndN,posB,B%NDimX,NBas)
     
-    !call make_tind2(tindA,A%EigX,A%EigY,Sab,PBbb,A%Occ,A%IndN,posA,dimOB,A%NDimX,NBas)
-    !call make_tind2(tindB,B%EigX,B%EigY,Sba,PAaa,B%Occ,B%IndN,posB,dimOA,B%NDimX,NBas)
-
     termY=0d0
     do i=1,A%NDimX
        if(abs(A%Eig(i)).gt.SmallE.and.abs(A%Eig(i)).lt.BigE) then
@@ -2003,9 +1943,13 @@ double precision,parameter :: BigE = 1.D8
  if(Flags%ICASSCF==1) then
 
     allocate(VindX(A%NDimX))
+    VindX = 0d0
+    call abpm_dgemv_gen(tmpXA,VindX,SBlockA,SBlockAIV,nblkA,A%NDimX,'X')
+    call abpm_dgemv_gen(tmpYA,VindX,SBlockA,SBlockAIV,nblkA,A%NDimX,'Y')
 
-    call dgemv('T',A%NDimX,A%NDimX,1d0,AVecX0,A%NDimX,tmpXA,1,0d0,VindX,1)
-    call dgemv('T',A%NDimX,A%NDimX,1d0,AVecY0,A%NDimX,tmpYA,1,1d0,VindX,1)
+    ! full unc
+    !call dgemv('T',A%NDimX,A%NDimX,1d0,AVecX0,A%NDimX,tmpXA,1,0d0,VindX,1)
+    !call dgemv('T',A%NDimX,A%NDimX,1d0,AVecY0,A%NDimX,tmpYA,1,1d0,VindX,1)
 
     termX_u = 0
     do i=1,A%NDimX
@@ -2013,13 +1957,16 @@ double precision,parameter :: BigE = 1.D8
           termX_u = termX_u + (VindX(i)*uA0(i))/OmA0(i)
        endif   
     enddo
-    !print*, 'termX_unc-1',termX_u
 
     deallocate(VindX)
     allocate(VindX(B%NDimX))
+    VindX = 0d0
+    call abpm_dgemv_gen(tmpXB,VindX,SBlockB,SBlockBIV,nblkB,B%NDimX,'X')
+    call abpm_dgemv_gen(tmpYB,VindX,SBlockB,SBlockBIV,nblkB,B%NDimX,'Y')
 
-    call dgemv('T',B%NDimX,B%NDimX,1d0,BVecX0,B%NDimX,tmpXB,1,0d0,VindX,1)
-    call dgemv('T',B%NDimX,B%NDimX,1d0,BVecY0,B%NDimX,tmpYB,1,1d0,VindX,1)
+    ! full unc
+    !call dgemv('T',B%NDimX,B%NDimX,1d0,BVecX0,B%NDimX,tmpXB,1,0d0,VindX,1)
+    !call dgemv('T',B%NDimX,B%NDimX,1d0,BVecY0,B%NDimX,tmpYB,1,1d0,VindX,1)
 
     do i=1,B%NDimX
        if(abs(OmB0(i)).gt.SmallE.and.abs(OmB0(i)).lt.BigE) then
@@ -2083,6 +2030,43 @@ double precision,parameter :: BigE = 1.D8
     deallocate(uB,uA)
 
  endif
+
+ if(Flags%ICASSCF==1) then
+
+    ! unc
+    ! deallocate SBLOCK
+    do iblk=1,nblkA
+       associate(A => SBlockA(iblk))
+         deallocate(A%matY,A%matX,A%vec)
+         deallocate(A%pos)
+       end associate
+    enddo
+    do iblk=1,nblkB
+       associate(B => SBlockB(iblk))
+         deallocate(B%matY,B%matX,B%vec)
+         deallocate(B%pos)
+       end associate
+    enddo
+    ! deallocate IV part
+    associate(A => SBlockAIV)
+      if(A%n>0) then
+         deallocate(A%vec)
+         deallocate(A%pos)
+      endif
+    end associate
+    associate(B => SBlockBIV)
+      if(B%n>0) then
+         deallocate(B%vec)
+         deallocate(B%pos)
+      endif
+    end associate
+
+    deallocate(OmB0,OmA0)
+
+    ! full unc
+    ! deallocate(AVecY0,AVecX0,BVecY0,BVecX0)
+ endif
+
 
 ! deallocate(VindB,VindA)
  deallocate(tmpYB,tmpXB)
@@ -2448,9 +2432,6 @@ double precision,parameter :: SmallE = 1.D-3
  !X_A.I.X_B
  if(both) then
     call dgemm('T','N',A%NDimX,B%NDimX,A%NDimX,1d0,A%EigX,A%NDimX,tmp1,A%NDimX,0d0,tmp2,A%NDimX)
-   ! Agnieszka-test
-   ! tmp2=0
-   ! call mnoz_jeden(NBas,A%NDimX,B%NDimX,A%EigX,tmp1,tmp2,A,B)
     call dgemm('N','N',A%NDimX,B%NDimX,B%NDimX,1d0,tmp2,A%NDimX,B%EigX,B%NDimX,0d0,tmp3,A%NDimX)
  endif
 
@@ -2493,9 +2474,6 @@ double precision,parameter :: SmallE = 1.D-3
  !Y_A.I.Y_B
  if(both) then
     call dgemm('T','N',A%NDimX,B%NDimX,A%NDimX,1d0,A%EigY,A%NDimX,tmp1,A%NDimX,0d0,tmp2,A%NDimX)
-   ! Agnieszka-test
-   ! tmp2=0
-   ! call mnoz_jeden(NBas,A%NDimX,B%NDimX,A%EigY,tmp1,tmp2,A,B)
     call dgemm('N','N',A%NDimX,B%NDimX,B%NDimX,1d0,tmp2,A%NDimX,B%EigY,B%NDimX,1d0,tmp3,A%NDimX)
  endif
 
@@ -2597,9 +2575,6 @@ double precision,parameter :: SmallE = 1.D-3
  !X_A.I.Y_B
  if(both) then
     call dgemm('T','N',A%NDimX,B%NDimX,A%NDimX,1d0,A%EigX,A%NDimX,tmp1,A%NDimX,0d0,tmp2,A%NDimX)
-    ! Agnieszka-test
-    ! tmp2=0
-    ! call mnoz_jeden(NBas,A%NDimX,B%NDimX,A%EigX,tmp1,tmp2,A,B)
     call dgemm('N','N',A%NDimX,B%NDimX,B%NDimX,1d0,tmp2,A%NDimX,B%EigY,B%NDimX,1d0,tmp3,A%NDimX)
  endif
 
@@ -2642,9 +2617,6 @@ double precision,parameter :: SmallE = 1.D-3
  !Y_A.I.X_B
  if(both) then
     call dgemm('T','N',A%NDimX,B%NDimX,A%NDimX,1d0,A%EigY,A%NDimX,tmp1,A%NDimX,0d0,tmp2,A%NDimX)
-    !! Agnieszka-test
-    ! tmp2=0
-    ! call mnoz_jeden(NBas,A%NDimX,B%NDimX,A%EigY,tmp1,tmp2,A,B)
     call dgemm('N','N',A%NDimX,B%NDimX,B%NDimX,1d0,tmp2,A%NDimX,B%EigX,B%NDimX,1d0,tmp3,A%NDimX)
  endif
 
@@ -2942,241 +2914,45 @@ deallocate(ABKer,batch,work)
 
 end subroutine ModABMin
 
-subroutine ModABMin_mithap(Occ,SRKer,Wt,OrbGrid,ABMin,IndN,IndX,NDimX,NGrid,NBasis,&
-                           twofile,twoerfile)
-! ADD CONTRIBUTIONS FROM THE srALDA KERNEL TO AB MATRICES
+subroutine make_tind_unc(tvec,SBlock,SBlockIV,Sab,AOcc,BOcc,AIndN,posA,nblk,NDimX,NBas)
 implicit none
 
-integer,parameter :: maxlen = 128
-integer,intent(in) :: NBasis,NDimX,NGrid
-integer,intent(in) :: IndN(2,NDimX),IndX(NDimX)
-character(*),intent(in) :: twofile,twoerfile
-double precision,intent(in) :: Occ(NBasis),SRKer(NGrid), &
-                               Wt(NGrid),OrbGrid(NGrid,NBasis)
-double precision,intent(inout) :: ABMin(NDimX,NDimX)
+integer,intent(in) :: nblk,NBas,NDimX
+integer,intent(in) :: AIndN(2,NDimX),posA(NBas,NBas)
+double precision,intent(in)    :: Sab(NBas,NBas),&
+                                  AOcc(NBas),BOcc(NBas)
+type(EBlockData)               :: SBlock(nblk),SBlockIV
+double precision,intent(inout) :: tvec(NDimX)
 
-integer :: offset,batchlen,iunit1,iunit2
-integer :: i,j,k,l,kl,ip,iq,ir,is,irs,ipq,igrd
-integer :: IRow,ICol
-double precision :: XKer1234,TwoSR,Cpq,Crs
-integer :: pos(NBasis,NBasis)
-double precision :: CICoef(NBasis)
-double precision,allocatable :: work1(:),work2(:),WtKer(:)
-double precision,allocatable :: batch(:,:),ABKer(:,:)
-double precision,allocatable :: ints1(:,:),ints2(:,:)
+integer :: i,ip,iq,ir,ipq
+integer :: ii,j,k
+double precision,allocatable :: tmp1(:),tmp2(:)
+double precision :: fact,val
 
-do i=1,NBasis
-   CICoef(i) = sign(sqrt(Occ(i)),Occ(i)-0.5d0)
-enddo
+tvec = 0
 
-allocate(work1(NBasis**2),work2(NBasis**2),ints1(NBasis,NBasis),ints2(NBasis,NBasis),&
-         WtKer(maxlen),batch(maxlen,NBasis),ABKer(NDimX,NDimX))
-
-pos = 0
+allocate(tmp1(NDimX))
+tmp1 = 0
 do i=1,NDimX
-   pos(IndN(1,i),IndN(2,i)) = IndX(i)
-enddo
+   ip = AIndN(1,i)
+   iq = AIndN(2,i)
+   ipq = posA(ip,iq)
 
-ABKer = 0
+   fact = (AOcc(ip)-AOcc(iq))
 
-!print*, 'ModABMin_mithap'
-
-do offset=0,NGrid,maxlen
-   batchlen = min(NGrid-offset,maxlen)
-   if(batchlen==0) exit
-
-   WtKer(1:batchlen) = Wt(offset+1:offset+batchlen)*SRKer(offset+1:offset+batchlen)
-   batch(1:batchlen,1:NBasis) = OrbGrid(offset+1:offset+batchlen,1:NBasis)
-
-   do IRow=1,NDimX
-      ip = IndN(1,IRow)
-      iq = IndN(2,IRow)
-      ipq = IndX(IRow)
-   
-      do ICol=1,NDimX
-         ir=IndN(1,ICol)
-         is=IndN(2,ICol)
-         irs=IndX(ICol)
-         if(irs.gt.ipq) cycle
-    
-         XKer1234 = 0
-         do i=1,batchlen
-            XKer1234 = XKer1234 + WtKer(i)* &
-            batch(i,ip)*batch(i,iq)*batch(i,ir)*batch(i,is)
-         enddo
-         
-         ABKer(ipq,irs) = ABKer(ipq,irs) + XKer1234
-         ABKer(irs,ipq) = ABKer(ipq,irs)
-      
-      enddo
+   val = 0
+   do ir=1,NBas
+      val = val + BOcc(ir)*Sab(ip,ir)*Sab(iq,ir)
    enddo
+   tmp1(ipq) = tmp1(ipq) + fact*val
 
 enddo
 
-open(newunit=iunit1,file=trim(twofile),status='OLD', &
-     access='DIRECT',recl=8*NBasis*(NBasis+1)/2)
-open(newunit=iunit2,file=trim(twoerfile),status='OLD', &
-     access='DIRECT',recl=8*NBasis*(NBasis+1)/2)
+call abpm_dgemv_gen(tmp1,tvec,SBlock,SBlockIV,nblk,NDimX,'YX')
 
-kl = 0
-do l=1,NBasis
-   do k=1,l
-      kl = kl + 1   
-      if(pos(l,k)/=0) then
-        irs = pos(l,k)
-        read(iunit1,rec=kl) work1(1:NBasis*(NBasis+1)/2)
-        call triang_to_sq2(work1,ints1,NBasis)
-        read(iunit2,rec=kl) work2(1:NBasis*(NBasis+1)/2)
-        call triang_to_sq2(work2,ints2,NBasis)
+deallocate(tmp1)
 
-        do j=1,NBasis
-           do i=1,j
-              if(pos(j,i)/=0) then
-                ipq = pos(j,i)
-                Crs = CICoef(l)+CICoef(k)
-                Cpq = CICoef(j)+CICoef(i)
-                !if(irs.gt.ipq) cycle
-
-                TwoSR = ints1(i,j)-ints2(i,j)
-
-                ABMIN(ipq,irs) = ABMIN(ipq,irs) & 
-                               + 4.0d0*Cpq*Crs*(TwoSR+ABKer(ipq,irs))
-                !ABMIN(irs,ipq) = ABMIN(ipq,irs) 
-
-              endif  
-           enddo
-        enddo
-
-      endif 
-   enddo
-enddo 
-
-close(iunit1)
-close(iunit2)
-
-deallocate(ABKer,batch,WtKer,ints2,ints1,work2,work1)
-
-end subroutine ModABMin_mithap
-
-subroutine ACEneERPA_FFFF(ECorr,EVec,EVal,Occ,IGem, &
-                          IndN,IndX,NOccup,NDimX,NBasis,IntFile)
-implicit none
-
-integer,intent(in) :: NDimX,NBasis
-integer,intent(in) :: IGem(NBasis),IndN(2,NDimX),IndX(NDimX)
-integer,intent(in) :: NOccup
-character(*),intent(in) :: IntFile
-double precision,intent(out) :: ECorr
-double precision,intent(in) :: EVec(NDimX,NDimX),EVal(NDimX)
-double precision :: Occ(NBasis)
-
-integer :: i,j,k,l,kl,kk,ip,iq,ir,is,ipq,irs
-integer :: iunit,ISkippedEig
-integer :: pos(NBasis,NBasis)
-logical :: AuxCoeff(3,3,3,3)
-double precision :: CICoef(NBasis),Cpq,Crs,SumY,Aux
-double precision,allocatable :: work(:),ints(:,:),Skipped(:)
-double precision,parameter :: SmallE = 1.d-3,BigE = 1.d8
-
-do i=1,NBasis
-   CICoef(i) = sign(sqrt(Occ(i)),Occ(i)-0.5d0)
-enddo
-
-pos = 0
-do i=1,NDimX
-   pos(IndN(1,i),IndN(2,i)) = IndX(i)
-enddo
-
-AuxCoeff = .true.
-do l=1,3
-   do k=1,3
-      do j=1,3
-         do i=1,3
-            if((i==j).and.(j==k).and.(k==l)) then
-               AuxCoeff(i,j,k,l) = .false.
-            endif
-         enddo
-      enddo
-   enddo
-enddo
-
-allocate(work(NBasis**2),ints(NBasis,NBasis),Skipped(NDimX))
-
-ISkippedEig = 0
-ECorr = 0
-
-! FULL INTS
-open(newunit=iunit,file=trim(IntFile),status='OLD', &
-     access='DIRECT',recl=8*NBasis*(NBasis+1)/2)
-kl = 0
-do l=1,NBasis
-   do k=1,l
-      kl = kl + 1
-      if(pos(l,k)/=0) then
-        irs = pos(l,k)
-        ir = l
-        is = k
-        read(iunit,rec=kl) work(1:NBasis*(NBasis+1)/2)
-        call triang_to_sq2(work,ints,NBasis)
-
-        do j=1,NBasis
-           do i=1,j
-              if(pos(j,i)/=0) then
-                ipq = pos(j,i)
-                ip = j
-                iq = i
-                Crs = CICoef(l)+CICoef(k)
-                Cpq = CICoef(j)+CICoef(i)
-
-                !if(.not.(IGem(ir).eq.IGem(is).and.IGem(ip).eq.IGem(iq)&
-                !.and.IGem(ir).eq.IGem(ip)).and.ir.gt.is.and.ip.gt.iq) then
-                if(AuxCoeff(IGem(ip),IGem(iq),IGem(ir),IGem(is))) then
-
-                   ISkippedEig = 0
-                   SumY = 0 
-                   do kk=1,NDimX
-                      if(EVal(kk).gt.SmallE.and.EVal(kk).lt.BigE) then
-                         SumY = SumY + EVec(ipq,kk)*EVec(irs,kk)
-                      else
-                         ISkippedEig = ISkippedEig + 1
-                         Skipped(ISkippedEig) = EVal(kk)
-                      endif
-                   enddo
-          
-                   Aux = 2*Crs*Cpq*SumY
-          
-                   if(iq.Eq.is.and.ip.Eq.ir) then
-                      Aux = Aux - Occ(ip)*(1d0-Occ(is))-Occ(is)*(1d0-Occ(ip))
-                   endif  
-
-                   ECorr = ECorr + Aux*ints(j,i)
-          
-                ! endinf of If(IP.Gt.IR.And.IQ.Gt.IS) 
-                endif
-
-              endif
-           enddo
-        enddo
-
-      endif
-
-   enddo
-enddo
-
-close(iunit)
-
-if(ISkippedEig/=0) then
-  write(LOUT,'(/,1x,"The number of discarded eigenvalues is",i4)') &
-       ISkippedEig
-  do i=1,ISkippedEig
-     write(LOUT,'(1x,a,i4,f15.8)') 'Skipped',i,Skipped(i)
-  enddo
-endif
-
-deallocate(Skipped)
-deallocate(ints,work)
-
-end subroutine ACEneERPA_FFFF
+end subroutine make_tind_unc
 
 subroutine make_tij_Y_unc(tmp2,tmp1,AOcc,BOcc,SBlockA,SBlockAIV,SBlockB,SBlockBIV,&
                           AIndN,BIndN,posA,posB,Sab,Sba,nblkA,nblkB,ANDimX,BNDimX,NBas)
@@ -3251,92 +3027,5 @@ call abpm_tran_gen(tmp1,tmp2,SBlockA,SBlockAIV,SBlockB,SBlockBIV, &
                    nblkA,nblkB,ANDimX,BNDimX,'YX')
 
 end subroutine make_tij_Y_unc
-
-subroutine make_uX_unc(Mon,WPot,pos,uX,NDimX,NBas)
-implicit none
-
-type(SystemBlock)  :: Mon
-integer,intent(in) :: pos(NBas,NBas)
-integer,intent(in) :: NBas,NDimX
-double precision,intent(in)  :: WPot(NBas,NBas)
-double precision,intent(out) :: uX(NDimX)
-
-type(Y01BlockData),allocatable :: Y01BlockM(:)
-integer :: i,j,ip,iq,ipq
-double precision :: fact
-double precision,allocatable :: OmM0(:),tind(:),test(:)
-character(:),allocatable :: filexy0 
-
- if(Mon%Monomer==1) then
-   filexy0 = 'XY0_A'
- elseif(Mon%Monomer==2) then
-   filexy0 = 'XY0_B'
- endif
-
- allocate(Y01BlockM(Mon%NDimX),OmM0(Mon%NDimX))
-
- call convert_XY0_to_Y01(Mon,Y01BlockM,OmM0,NBas,filexy0)
-
- uX = 0
- do i=1,Mon%NDimX
-    ip = Mon%IndN(1,i)
-    iq = Mon%IndN(2,i)
-    ipq = pos(ip,iq)
-
-    fact = (Mon%Occ(ip)-Mon%Occ(iq)) * WPot(ip,iq)
-
-    associate(Y => Y01BlockM(ipq))
-       uX(Y%l1:Y%l2) = uX(Y%l1:Y%l2) + fact*Y%vec0(1:Y%n)
-    end associate
-
- enddo
- ! here I guess mat-vec needed?
- !call dgemv('T',Mon%NDimX,Mon%NDimX,1d0,test,Mon%NDimX,tindA,1,0d0,uX,1)
-
- do i=1,Mon%NDimX
-    associate(Y => Y01BlockM(i))
-      deallocate(Y%vec0)
-    end associate
- enddo
- deallocate(OmM0,Y01BlockM)
-
-end subroutine make_uX_unc
-
-subroutine mnoz_jeden(NBasis,ANDimX,BNDimX,EigVecA,IntAB,Amat,A,B)
-implicit none
-
-type(SystemBlock) :: A, B
-integer,intent(in) :: NBasis,ANDimX,BNDimX
-double precision,intent(in) :: EigVecA(ANDimX**2),IntAB(ANDimX,BNDimX)
-
-integer :: i,j,ip,iq,ir,is,pq,rs
-double precision :: fact
-double precision,intent(inout) :: Amat(ANDimX,BNDimX)
-double precision,allocatable :: tmp(:,:)
-
-!allocate(tmp(ANDimX,BNDimX))
-
-! (pq,i).(pq,rs)
-do pq=1,A%NDimX
-   ip = A%IndN(1,pq)
-   iq = A%IndN(2,pq)
-   do rs=1,B%NDimX
-      ir = B%IndN(1,rs)
-      is = B%IndN(2,rs)
-
-      fact=1.0d0
-      if(A%IGem(ip)==2.and.A%IGem(iq)==2.and. &
-         B%IGem(ir)==2.and.B%IGem(is)==2) fact = 0d0
-
-      do i=1,A%NDimX
-         Amat(i,rs) = Amat(i,rs) + fact*EigVecA(pq+(i-1)*A%NDimX)*IntAB(pq,rs)
-      enddo
-
-   enddo
-enddo
-
-!deallocate(tmp)
-
-end subroutine mnoz_jeden
 
 end module sapt_exch

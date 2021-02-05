@@ -380,7 +380,6 @@ if(Flags%ISAPT.Eq.0) then
    System%ZNucl  = Input%SystemInput(1)%ZNucl
    System%Charge = Input%SystemInput(1)%Charge
    System%NBasis = Input%CalcParams%NBasis
-   System%Multiplicity = Input%SystemInput(1)%Multiplicity
    System%Omega  = Input%SystemInput(1)%Omega
    System%EigFCI = Input%SystemInput(1)%EigFCI
    System%ThrAct = Input%SystemInput(1)%ThrAct
@@ -445,7 +444,7 @@ elseif(Flags%ISAPT.Eq.1) then
       monA%TwoMoInt = Input%SystemInput(1)%TwoMoInt
       monA%PostCAS  = Input%SystemInput(1)%PostCAS
       monA%ISHF     = Input%SystemInput(1)%ISHF
-      monA%Multiplicity = Input%SystemInput(1)%Multiplicity
+      monA%E2dExt   = Input%SystemInput(1)%E2dExt
 
       monA%NCen    = Input%SystemInput(1)%NCen
       monA%UCen    = Input%SystemInput(1)%UCen
@@ -475,15 +474,15 @@ elseif(Flags%ISAPT.Eq.1) then
       monB%Omega  = Input%SystemInput(2)%Omega 
       monB%EigFCI = Input%SystemInput(2)%EigFCI
       monB%NBasis = Input%CalcParams%NBasis
-      monB%Multiplicity = Input%SystemInput(2)%Multiplicity
       monB%ThrAct = Input%SystemInput(2)%ThrAct
       monB%ThrSelAct = Input%SystemInput(2)%ThrSelAct
       monB%ThrVirt   = Input%SystemInput(2)%ThrVirt
       monB%ThrQVirt  = Input%SystemInput(2)%ThrQVirt
       monB%DeclareTwoMo = Input%SystemInput(2)%DeclareTwoMo
-      monB%TwoMoInt = Input%SystemInput(2)%TwoMoInt
-      monB%PostCAS = Input%SystemInput(2)%PostCAS
-      monB%ISHF = Input%SystemInput(2)%ISHF
+      monB%TwoMoInt  = Input%SystemInput(2)%TwoMoInt
+      monB%PostCAS   = Input%SystemInput(2)%PostCAS
+      monB%ISHF      = Input%SystemInput(2)%ISHF
+      monB%E2dExt    = Input%SystemInput(2)%E2dExt
       monB%NCen = Input%SystemInput(2)%NCen
       monB%UCen = Input%SystemInput(2)%UCen
       monB%Monomer = Input%SystemInput(2)%Monomer
@@ -517,7 +516,6 @@ elseif(Flags%ISAPT.Eq.1) then
       monA%Omega  = Input%SystemInput(2)%Omega 
       monA%EigFCI = Input%SystemInput(2)%EigFCI
       monA%NBasis = Input%CalcParams%NBasis
-      monA%Multiplicity = Input%SystemInput(2)%Multiplicity
       monA%ThrAct = Input%SystemInput(2)%ThrAct
       monA%ThrSelAct = Input%SystemInput(2)%ThrSelAct
       monA%ThrVirt   = Input%SystemInput(2)%ThrVirt
@@ -525,11 +523,12 @@ elseif(Flags%ISAPT.Eq.1) then
       monA%DeclareTwoMo = Input%SystemInput(2)%DeclareTwoMo
       monA%TwoMoInt = Input%SystemInput(2)%TwoMoInt
       monA%PostCAS = Input%SystemInput(2)%PostCAS
-      monA%ISHF = Input%SystemInput(2)%ISHF
-      monA%NCen = Input%SystemInput(2)%NCen
-      monA%UCen = Input%SystemInput(2)%UCen
+      monA%ISHF    = Input%SystemInput(2)%ISHF
+      monA%E2dExt  = Input%SystemInput(2)%E2dExt
+      monA%NCen    = Input%SystemInput(2)%NCen
+      monA%UCen    = Input%SystemInput(2)%UCen
       monA%Monomer = Input%SystemInput(2)%Monomer
-      monA%IPrint = Input%CalcParams%IPrint  
+      monA%IPrint  = Input%CalcParams%IPrint  
      
       monA%XELE = (monA%ZNucl - monA%Charge)/2.0d0 
       monA%NELE = (monA%ZNucl - monA%Charge)/2 
@@ -548,25 +547,24 @@ elseif(Flags%ISAPT.Eq.1) then
          ! assume 1.1 state
          monB%InSt(:,1) = -255
       endif
-      monB%ZNucl  = Input%SystemInput(1)%ZNucl
-      monB%Charge = Input%SystemInput(1)%Charge
+      monB%ZNucl   = Input%SystemInput(1)%ZNucl
+      monB%Charge  = Input%SystemInput(1)%Charge
       monB%ACAlpha = Input%SystemInput(1)%ACAlpha
-      monB%Omega  = Input%SystemInput(1)%Omega
-      monB%EigFCI = Input%SystemInput(1)%EigFCI
-      monB%NBasis = Input%CalcParams%NBasis
-      monB%Multiplicity = Input%SystemInput(1)%Multiplicity
-      monB%ThrAct = Input%SystemInput(1)%ThrAct
+      monB%Omega   = Input%SystemInput(1)%Omega
+      monB%EigFCI  = Input%SystemInput(1)%EigFCI
+      monB%ThrAct  = Input%SystemInput(1)%ThrAct
       monB%ThrSelAct = Input%SystemInput(1)%ThrSelAct
       monB%ThrVirt   = Input%SystemInput(1)%ThrVirt
       monB%ThrQVirt  = Input%SystemInput(1)%ThrQVirt
       monB%DeclareTwoMo = Input%SystemInput(1)%DeclareTwoMo
       monB%TwoMoInt = Input%SystemInput(1)%TwoMoInt
-      monB%PostCAS = Input%SystemInput(1)%PostCAS
-      monB%ISHF = Input%SystemInput(1)%ISHF
-      monB%NCen = Input%SystemInput(1)%NCen
-      monB%UCen = Input%SystemInput(1)%UCen
-      monB%Monomer = Input%SystemInput(1)%Monomer
-      monB%IPrint = Input%CalcParams%IPrint  
+      monB%PostCAS  = Input%SystemInput(1)%PostCAS
+      monB%ISHF     = Input%SystemInput(1)%ISHF
+      monB%E2dExt   = Input%SystemInput(1)%E2dExt
+      monB%NCen     = Input%SystemInput(1)%NCen
+      monB%UCen     = Input%SystemInput(1)%UCen
+      monB%Monomer  = Input%SystemInput(1)%Monomer
+      monB%IPrint   = Input%CalcParams%IPrint  
      
       monB%XELE = (monB%ZNucl - monB%Charge)/2.0d0 
       monB%NELE = (monB%ZNucl - monB%Charge)/2 
