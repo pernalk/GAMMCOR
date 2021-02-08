@@ -1268,14 +1268,15 @@ double precision,parameter :: SmallE = 1.D-3
  nOVB = dimOB*dimVB
 
  allocate(EVecA(A%NDimX*A%NDimX))
- print*, 'alloc EVecA'
  allocate(tmp1(A%NDimX,B%NDimX),tmp2(A%NDimX,B%NDimX))
- print*, 'alloc tmp1,tmp2'
 
- if(A%E2dExt) then
-   call readEvec(EVecA,A%NDimX,'PROP_AX') 
+ if(A%E2dExt.and.B%E2dExt) then
+   call convert_XY_to_Z(EVecA,A%CICoef,A%IndN,A%NDimX,NBas,'PROP_AX') 
+ elseif(.not.(A%E2dExt.and.B%E2dExt)) then
+   write(lout,'(/1x,a)') 'Declare E2dAx3 for both monomers!'
+   return
  else
-   call readEvec(EVecA,A%NDimX,'PROP_A') 
+   call readEvecZ(EVecA,A%NDimX,'PROP_A') 
  endif
 
  allocate(work(nOVB))
@@ -1311,10 +1312,12 @@ double precision,parameter :: SmallE = 1.D-3
 
  allocate(EVecB(B%NDimX*B%NDimX))
 
- if(B%E2dExt) then
-   call readEvec(EVecB,B%NDimX,'PROP_BX') 
+ if(B%E2dExt.and.A%E2dExt) then
+   call convert_XY_to_Z(EVecB,B%CICoef,B%IndN,B%NDimX,NBas,'PROP_BX') 
+ elseif(.not.(B%E2dExt.and.A%E2dExt)) then
+   write(lout,'(/1x,a)') 'Declare E2dAx3 for both monomers!'
  else
-   call readEvec(EVecB,B%NDimX,'PROP_B') 
+   call readEvecZ(EVecB,B%NDimX,'PROP_B') 
  endif
 
  call dgemm('N','N',A%NDimX,B%NDimX,B%NDimX,1d0,tmp1,A%NDimX,EVecB,B%NDimX,0d0,tmp2,A%NDimX)
@@ -1322,8 +1325,13 @@ double precision,parameter :: SmallE = 1.D-3
  deallocate(EVecB,tmp1)
 
  allocate(OmA(A%NDimX),OmB(B%NDimX))
- call readEval2(OmA,A%NDimX,'PROP_A')
- call readEval2(OmB,B%NDimX,'PROP_B')
+ if(A%E2dExt.and.B%E2dExt) then
+   call readEvalXY(OmA,A%NDimX,'PROP_AX')
+   call readEvalXY(OmB,B%NDimX,'PROP_BX')
+ else
+   call readEvalZ(OmA,A%NDimX,'PROP_A')
+   call readEvalZ(OmB,B%NDimX,'PROP_B')
+ endif
 
  do i=1,A%NDimX
     if(OmA(i)<0d0) write(LOUT,*) 'Negative A!',i,OmA(i)
@@ -1343,16 +1351,65 @@ double precision,parameter :: SmallE = 1.D-3
        endif
     enddo
  enddo
- SAPT%e2disp  = -16d0*e2d
 
- e2d  = -16d0*e2d*1000d0
- write(LOUT,'(/1x,a,f16.8)') 'E2disp      = ',e2d
+ e2d  = -16d0*e2d
+
+ if(A%E2dExt.or.B%E2dExt) then
+
+   SAPT%e2disp_ax3 = e2d
+   write(LOUT,'(/1x,a)') 'E2disp for the ax^3+bx+c model'
+   write(LOUT,'(1x,a,f16.8)') 'A: Alpha      = ',A%ACAlpha
+   write(LOUT,'(1x,a,f16.8)') 'B: Alpha      = ',B%ACAlpha
+   write(LOUT,'(1x,a,f16.8)') 'E2disp(Alpha) = ',e2d*1000
+
+   call e2disp_ax3bxc(Flags,A,B,SAPT)
+
+ else
+
+   SAPT%e2disp  = e2d
+   write(LOUT,'(/1x,a,f16.8)') 'E2disp       = ',e2d*1000
+
+ endif 
 
  deallocate(OmB,OmA)
  deallocate(tmp2)
  deallocate(work)
 
 end subroutine e2disp_cpld
+
+subroutine e2disp_ax3bxc(Flags,A,B,SAPT)
+! calculate 2nd order dispersion energy
+! extrapolated according to E2disp = ax^3+bx+c formula
+implicit none
+
+type(FlagsData)   :: Flags
+type(SystemBlock) :: A, B
+type(SaptData)    :: SAPT
+
+double precision  :: xVar
+double precision  :: coefA,coefB,coefC
+double precision  :: e2disp_ext
+
+if(A%E2dExt) then
+   xVar = A%ACAlpha
+else
+   xVar = B%ACAlpha
+endif
+
+coefC = SAPT%e2disp_unc
+coefB = SAPT%e2disp_sc-SAPT%e2disp_unc
+coefA = (SAPT%e2disp_ax3 - coefB*xVar - coefC ) / xVar**3
+
+print*,'A = ', coefA
+print*,'B = ', coefB
+print*,'C = ', coefC
+
+xVar = 1
+e2disp_ext = coefA * xVar**3 + coefB * xVar + coefC
+
+write(LOUT,'(/1x,a,f16.8)') 'E2disp-ax3   = ',e2disp_ext*1000
+
+end subroutine e2disp_ax3bxc
 
 subroutine e2disp(Flags,A,B,SAPT)
 ! calculate 2nd order dispersion energy
@@ -1660,8 +1717,6 @@ endif
  ! calucate semicoupled and dexcitations
  if(SAPT%SemiCoupled) call e2disp_semi(Flags,A,B,SAPT)
  ! calculate extrapolated E2disp
- print*, 'A: E2dExtr',A%E2dExt
- print*, 'B: E2dExtr',B%E2dExt
  if(A%E2dExt.or.B%E2dExt) call e2disp_cpld(Flags,A,B,SAPT)
 
  ! here: make it a keyword
@@ -1788,8 +1843,8 @@ deallocate(EVecA1)
 ! semicoupled
 allocate(EVecB1(B%NDimX*B%NDimX),OmB1(B%NDimX))
 
-call readEVec(EVecB1,B%NDimX,'PROP_B1')
-call readEVal2(OmB1,B%NDimX,'PROP_B1')
+call readEVecZ(EVecB1,B%NDimX,'PROP_B1')
+call readEValZ(OmB1,B%NDimX,'PROP_B1')
 
 call dgemm('N','N',A%NDimX,B%NDimX,B%NDimX,1d0,tmp01,A%NDimX,EVecB1,B%NDimX,0d0,sc01b,A%NDimX)
 
