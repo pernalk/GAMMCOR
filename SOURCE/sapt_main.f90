@@ -841,7 +841,7 @@ type(FlagsData) :: Flags
 
 integer,intent(in) :: NBasis
 integer :: NSym,NOrbt,NBasist,NCMOt,NOcc(8),NOrbs(8)
-integer :: isiri
+integer :: i,isiri
 double precision :: potnuc,emy,eactiv,emcscf
 character(:),allocatable :: occfile,sirifile,siriusfile,coefile
 logical :: exsiri
@@ -876,18 +876,43 @@ logical :: exsiri
     read (isiri)
     read (isiri) potnuc,emy,eactiv,emcscf
 
- if(Flags%ICASSCF==1.and.Flags%ISHF==0.and.Mon%NELE/=1.and.(.not.Mon%ISHF)) then
+ !if(Flags%ICASSCF==1.and.Flags%ISHF==0.and.Mon%NELE/=1.and.(.not.Mon%ISHF)) then
     ! CASSCF
-    call readmulti(NBasis,Mon,.false.,exsiri,isiri,occfile,siriusfile)
-
- elseif(Flags%ICASSCF==1.and.Flags%ISHF==0.and.Mon%NELE==1.and.Flags%ISERPA==0.and.(.not.Mon%ISHF)) then
+ !   call readmulti(NBasis,Mon,.false.,exsiri,isiri,occfile,siriusfile)
+ !elseif(Flags%ICASSCF==1.and.Flags%ISHF==0.and.Mon%NELE==1.and.Flags%ISERPA==0.and.(.not.Mon%ISHF)) then
     ! CASSCF
     ! for 2-el electron case: read from occupations.dat
-    call readmulti(NBasis,Mon,.false.,.false.,isiri,occfile,siriusfile)
+    !call readmulti(NBasis,Mon,.false.,.false.,isiri,occfile,siriusfile)
+ !elseif(Flags%ICASSCF==1.and.Flags%ISHF==0.and.Mon%NELE==1.and.Flags%ISERPA==2) then
+ !
+ !   call readmulti(NBasis,Mon,.false.,exsiri,isiri,occfile,siriusfile)
 
- elseif(Flags%ICASSCF==1.and.Flags%ISHF==0.and.Mon%NELE==1.and.Flags%ISERPA==2) then
+ if(Flags%ICASSCF==1.and.Flags%ISHF==0.and.(.not.Mon%ISHF)) then
+    ! CASSCF
+    !call readmulti(NBasis,Mon,.false.,exsiri,isiri,occfile,siriusfile)
+    if(exsiri) close(isiri)
+    !call readocc_cas_siri(Mon,NBasis)
+    call readocc_cas_occu(Mon,NBasis)
 
-    call readmulti(NBasis,Mon,.false.,exsiri,isiri,occfile,siriusfile)
+    ! construct IGem
+    allocate(Mon%IGem(NBasis))
+    if(Mon%INAct==0) then
+       Mon%NGem = 2
+       Mon%IGem(1:Mon%NAct+Mon%INAct)        = 1
+       Mon%IGem(Mon%NAct+Mon%INAct+1:NBasis) = 2
+    else
+       Mon%NGem = 3
+       Mon%IGem(1:Mon%INAct) = 1
+       Mon%IGem(Mon%INAct+1:Mon%INAct+Mon%NAct) = 2
+       Mon%IGem(Mon%INAct+Mon%NAct+1:NBasis)    = 3
+    endif
+
+    ! construct CICoef
+    allocate(Mon%CICoef(NBasis))
+    do i=1,NBasis
+       Mon%CICoef(i)=sqrt(Mon%Occ(I))
+       if(Mon%Occ(i).lt.0.5d0) Mon%CICoef(i)=-Mon%CICoef(i)
+    enddo
 
  elseif(Flags%ICASSCF==1.and.(Flags%ISHF==1.or.Mon%ISHF)) then
 
@@ -902,7 +927,7 @@ logical :: exsiri
 
  endif
 
- if(exsiri) close(isiri)
+ !if(exsiri) close(isiri)
 
 end subroutine readocc_dalton
 
@@ -3119,6 +3144,10 @@ type(SystemBlock) :: Mon
 type(FileNames)   :: FNam 
 
  if(Mon%Monomer==1) then
+    FNam%sirifile   = 'SIRIFC_A'
+    FNam%siriusfile = 'SIRIUS_A.RST'
+    FNam%coefile    = 'coeff_A.dat'
+    FNam%occfile    = 'occupations_A.dat'
     FNam%onefile    = 'ONEEL_A'
     FNam%twofile    = 'TWOMOAA'
     FNam%twojfile   = 'FFOOAA'
@@ -3132,6 +3161,10 @@ type(FileNames)   :: FNam
     FNam%rdmfile    = 'rdm2_A.dat'
     FNam%testfile   = 'TEST_A'
  elseif(Mon%Monomer==2) then
+    FNam%sirifile   = 'SIRIFC_B'
+    FNam%siriusfile = 'SIRIUS_B.RST'
+    FNam%coefile    = 'coeff_B.dat'
+    FNam%occfile    = 'occupations_B.dat'
     FNam%onefile    = 'ONEEL_B'
     FNam%twofile    = 'TWOMOBB'
     FNam%twojfile   = 'FFOOBB'
@@ -3750,6 +3783,186 @@ close(iunit)
 
 end subroutine readgvb
 
+subroutine readocc_cas_siri(mon,nbas)
+!
+! a) read number of active inactive orbs for SAPT-DALTON
+!    total: NAct and INAct
+!    in a given symmetry: INActS(1:NSym), NActS(1:NSym)
+! b) read occupation numbers
+! a) is read from SIRIFC b) from SIRIUS.RST
+!
+implicit none
+
+type(SystemBlock) :: mon
+integer,intent(in):: nbas
+
+logical           :: ioccsir,exsiri
+integer           :: i,iunit,ios
+integer           :: isym,off_i,off_a,off_x
+integer           :: NISHT,NASHT,NOCCT,NORBT,NBAST,NCONF,NWOPT,NWOPH,&
+                     NCDETS, NCMOT,NNASHX,NNASHY,NNORBT,N2ORBT,&
+                     NSYM,MULD2H(8,8),NRHF(8),NFRO(8),NISH(8),NASH(8),NORB(8),NBASM(8)
+
+double precision             :: sum1,sum2
+double precision,allocatable :: OccX(:)
+character(:),allocatable     :: sirfile,sirifile
+
+ ! set filnames
+ if(Mon%Monomer==1) then
+    sirfile  = 'SIRIUS_A.RST'
+    sirifile = 'SIRIFC_A'
+ elseif(Mon%Monomer==2) then
+    sirfile  = 'SIRIUS_B.RST'
+    sirifile = 'SIRIFC_B'
+ endif
+
+ allocate(mon%Occ(nbas))
+
+ inquire(file=sirifile,EXIST=exsiri)
+ if(exsiri) then
+    open(newunit=iunit,file=sirifile,status='OLD', &
+         access='SEQUENTIAL',form='UNFORMATTED')
+    call readlabel(iunit,'TRCCINT ')
+
+    rewind(iunit)
+    read (iunit)
+    read (iunit)
+    read (iunit) NISHT,NASHT,NOCCT,NORBT,NBAST,NCONF,NWOPT,NWOPH,&
+                 NCDETS,NCMOT,NNASHX,NNASHY,NNORBT,N2ORBT,&
+                 NSYM,MULD2H,NRHF,NFRO,NISH,NASH,NORB,NBASM
+
+    close(iunit)
+ else
+    write(lout,'(1x,a)') 'SIRI not available!'
+ endif
+
+ mon%INAct = nisht
+ mon%NAct  = nasht
+
+ if(NSym/=mon%NSym) stop "NSym from SIRI and AOONEINT do not match!"
+
+ mon%INActS(1:mon%NSym) = NISH(1:NSym)
+ mon%NActS(1:mon%NSym)  = NASH(1:NSym)
+
+ if(nbast.ne.nbas) then
+   write(LOUT,'(1x,a)') 'WARNING! NBasis FROM SIRIFC DOES NOT MATCH!'
+   write(LOUT,'(1x,a,i5,1x,a,i5)') 'NBasis: ',nbas, 'SIRIFC: ', nbast
+   write(LOUT,'()')
+   mon%IWarn = mon%IWarn + 1
+ endif
+
+ ! CASCF
+ inquire(file=sirfile,EXIST=ioccsir)
+ if(ioccsir) then
+    allocate(OccX(1:norbt))
+    open(newunit=iunit,file=sirfile,status='OLD', &
+         access='SEQUENTIAL',form='UNFORMATTED')
+
+    call readlabel(iunit,'NATOCC  ')
+    read(iunit) OccX(1:NORBT)
+
+    close(iunit)
+
+    ! save occupations in mon%Occ
+    ! order from sym ordering to inact-act (ISW/ISX in Dalton)
+    mon%Occ = 0d0
+    off_i = 0
+    off_a = NISHT
+    off_x = 0
+    do isym=1,NSym
+       mon%Occ(off_i+1:off_i+NISH(isym)) = OccX(off_x+1:off_x+NISH(isym))
+       mon%Occ(off_a+1:off_a+NASH(isym)) = OccX(off_x+NISH(isym)+1:off_x+NISH(isym)+NASH(isym))
+       off_i = off_i + NISH(isym)
+       off_a = off_a + NASH(isym)
+       off_x = off_x + NORB(isym)
+    enddo
+
+    deallocate(OccX)
+ else 
+    write(lout,'(1x,a)') 'SIRIUS.RST not available!'
+ endif
+
+ ! Hartree-Fock case
+ !mon%Occ = 0d0
+ !mon%Occ(1:mon%NAct+mon%INAct) = 2d0
+
+ sum1 = 0d0
+ do i=1,mon%INAct+mon%NAct
+     mon%Occ(i) = mon%Occ(i)/2d0
+     sum1 = sum1 + mon%Occ(i)
+ enddo
+ mon%SumOcc = sum1
+
+ write(LOUT,'(/1x,a,i2,a)') 'OCCUPANCIES FOR MONOMER',mon%Monomer,' READ FROM '// sirfile
+
+end subroutine readocc_cas_siri
+
+subroutine readocc_cas_occu(mon,nbas)
+!
+! a) read number of active inactive orbs for SAPT-DALTON
+!    total: NAct and INAct
+!    in a given symmetry: INActS(1:NSym), NActS(1:NSym)
+! b) read occupation numbers
+! all is read from occupations.dat
+!
+implicit none
+
+type(SystemBlock) :: mon
+integer,intent(in):: nbas
+
+integer                      :: i
+integer                      :: iunit,ios
+logical                      :: iocc
+double precision             :: sum1
+character(:),allocatable     :: occfile
+
+ ! set filenames
+ if(Mon%Monomer==1) then
+    occfile='occupations_A.dat'
+ elseif(Mon%Monomer==2) then
+    occfile='occupations_B.dat'
+ endif
+
+ allocate(mon%Occ(nbas))
+
+ inquire(file=occfile,EXIST=iocc)
+ if(iocc) then
+
+    mon%Occ    = 0d0
+    mon%INActS = 0
+    mon%NActS  = 0
+    open(newunit=iunit,file=occfile,form='FORMATTED',status='OLD')
+
+    ! read inactive,active,occupations
+    read(iunit,*) mon%INAct, mon%NAct
+    mon%INAct = mon%INAct/2
+    read(iunit,*) (mon%Occ(i),i=1,mon%INAct+mon%NAct)
+
+    sum1 = 0d0
+    do i=1,mon%INAct+mon%NAct
+       mon%Occ(i) = mon%Occ(i)/2d0
+       sum1 = sum1 + mon%Occ(i)
+    enddo
+    mon%SumOcc = sum1
+
+    ! active and inactive orbs in each symmetry
+    read(iunit,*,iostat=ios) (mon%NActS(i),i=1,mon%NSym)
+    if(ios==0) then
+       read(iunit,*) (mon%INActS(i),i=1,mon%NSym)
+    endif
+
+    if(mon%NSym.gt.1) then
+      call sort_sym_occ(nbas,mon%NSym,mon%INAct,mon%NAct,mon%Occ)
+    endif
+
+ else
+    write(lout,'(1x,a)') 'occupations.dat not available!'
+ endif
+
+ write(LOUT,'(1x,a,i2,a)') 'OCCUPANCIES FOR MONOMER',mon%Monomer,' READ FROM '// occfile
+
+end subroutine readocc_cas_occu
+
 subroutine readmulti(nbas,mon,ihf,exsiri,isiri,occfile,occsir)
 !
 ! a) read number of active  inactive orbs for SAPT-DALTON
@@ -3765,7 +3978,7 @@ implicit none
 
 type(SystemBlock) :: mon
 integer           :: isiri, nbas
-character(*)      :: occfile, occsir 
+character(*)      :: occfile, occsir
 logical           :: ihf
 logical           :: exsiri, ioccsir
 
@@ -3783,7 +3996,7 @@ integer           :: NISHT,NASHT,NOCCT,NORBT,NBAST,NCONF,NWOPT,NWOPH,&
                      NSYM,MULD2H(8,8),NRHF(8),NFRO(8),NISH(8),NASH(8),NORB(8),NBASM(8)
 
  allocate(mon%CICoef(nbas),mon%IGem(nbas),mon%Occ(nbas))
- ioccsir=.false.
+ !ioccsir=.false.
  if(exsiri) then
 
     rewind(isiri)
@@ -3794,7 +4007,7 @@ integer           :: NISHT,NASHT,NOCCT,NORBT,NBAST,NCONF,NWOPT,NWOPH,&
     read (isiri) NISHT,NASHT,NOCCT,NORBT,NBAST,NCONF,NWOPT,NWOPH,&
               NCDETS, NCMOT,NNASHX,NNASHY,NNORBT,N2ORBT,&
               NSYM,MULD2H,NRHF,NFRO,NISH,NASH,NORB,NBASM
-  
+
 !    print*,    potnuc,emy,eactiv,emcscf, &
 !               istate,ispin,nactel,lsym
 !   print*, 'READM-TEST'
@@ -3849,7 +4062,6 @@ integer           :: NISHT,NASHT,NOCCT,NORBT,NBAST,NCONF,NWOPT,NWOPH,&
          enddo
 
       endif
-      !print*, 'mon%Occ  ',mon%Occ(1:NISHT+NASHT)
       deallocate(OccX)
 
    elseif(ihf) then
@@ -3866,17 +4078,19 @@ integer           :: NISHT,NASHT,NOCCT,NORBT,NBAST,NCONF,NWOPT,NWOPH,&
    enddo
    mon%SumOcc = sum1
 
+   write(LOUT,'(1x,a,i2,a)') 'OCCUPANCIES FOR MONOMER',mon%Monomer,' READ FROM '// occsir
+   write(LOUT,'()')
+
  endif
 
-! occupations.dat 
+! occupations.dat
  inquire(file=occfile,EXIST=iocc)
- iocc=.false.
  if(iocc) then
- 
-    Occ = 0d0
+
+    Occ    = 0d0
     INActS = 0
     NActS  = 0
-    open(newunit=iunit,file=occfile,form='FORMATTED',status='OLD') 
+    open(newunit=iunit,file=occfile,form='FORMATTED',status='OLD')
 
     read(iunit,*) INAct, NAct
     INAct = INAct/2
@@ -3901,24 +4115,24 @@ integer           :: NISHT,NASHT,NOCCT,NORBT,NBAST,NCONF,NWOPT,NWOPH,&
 
     if(.not.ioccsir) then
     !   if(Abs(sum2-mon%XELE).gt.1.0d-8) then
-    !      write(LOUT,'(1x,a)') 'ERROR! OCCUPANCIES DO NOT SUM TO NELE!'  
+    !      write(LOUT,'(1x,a)') 'ERROR! OCCUPANCIES DO NOT SUM TO NELE!'
     !      write(LOUT,'(1x,a,1x,f10.6,5x,a,i3)') 'SUM(OCC): ', sum2, 'MONOMER: ', mon%Monomer
-    !      write(LOUT,'(1x,a)') 'CHECK occupations.dat!'  
+    !      write(LOUT,'(1x,a)') 'CHECK occupations.dat!'
     !      stop
     !   endif
        mon%INAct = INAct
        mon%NAct  = NAct
        mon%Occ   = Occ
        mon%SumOcc = sum2
-       ! SIRIUS.RST not there  
-       write(LOUT,'(1x,a,i2,a)') 'OCCUPANCIES FOR MONOMER',mon%Monomer,' READ FROM '// occfile 
+       ! SIRIUS.RST not there
+       write(LOUT,'(1x,a,i2,a)') 'OCCUPANCIES FOR MONOMER',mon%Monomer,' READ FROM '// occfile
        write(LOUT,'()')
 
-    else !compare SIRIUS.RST and occupations.dat 
+    else !compare SIRIUS.RST and occupations.dat
        if(Abs(sum1-mon%XELE).gt.1.0d-8) then
 
           if(Abs(sum2-mon%XELE).gt.1.0d-8) then
-             write(LOUT,'(1x,a,1x,i3)') 'ERROR! OCCUPANCIES DO NOT SUM TO NELE! MONOMER: ', mon%Monomer  
+             write(LOUT,'(1x,a,1x,i3)') 'ERROR! OCCUPANCIES DO NOT SUM TO NELE! MONOMER: ', mon%Monomer
              write(LOUT,'(1x,a,1x,f10.6,5x,a,4x,f10.6)') 'OCC(SIRIUS): ', sum1,&
                           'OCC(occupations.dat)', sum2
              stop
@@ -3927,10 +4141,10 @@ integer           :: NISHT,NASHT,NOCCT,NORBT,NBAST,NCONF,NWOPT,NWOPH,&
           mon%INAct = INAct
           mon%NAct  = NAct
           mon%Occ   = Occ
-          print*, 'sum1 zle' 
+          print*, 'sum1 zle'
        endif
 
-       ! both files correct     
+       ! both files correct
        if(any(abs(Occ-mon%Occ).gt.1.d-9)) then
           write(LOUT,'(1x,a)') 'WARNING! DIFFERENT OCCUPANCIES IN SIRIUS.RST&
                 & AND occupations.dat!'
@@ -3943,42 +4157,41 @@ integer           :: NISHT,NASHT,NOCCT,NORBT,NBAST,NCONF,NWOPT,NWOPH,&
           mon%SumOcc = sum2
        endif
 
-       write(LOUT,'(1x,a,i2,a)') 'OCCUPANCIES FOR MONOMER',mon%Monomer,' READ FROM '// occsir 
+       write(LOUT,'(1x,a,i2,a)') 'OCCUPANCIES FOR MONOMER',mon%Monomer,' READ FROM '// occsir
        write(LOUT,'()')
 
     endif
- 
+
     close(iunit)
 
  elseif(ioccsir) then
     if(Abs(sum1-mon%XELE).gt.1.0d-8) then
-       write(LOUT,'(1x,a)') 'ERROR! OCCUPANCIES DO NOT SUM TO NELE!'  
+       write(LOUT,'(1x,a)') 'ERROR! OCCUPANCIES DO NOT SUM TO NELE!'
        write(LOUT,*) 'Occ: ', sum1
-       write(LOUT,'(1x,a)') 'CHECK DALTON CALCULATIONS!'  
+       write(LOUT,'(1x,a)') 'CHECK DALTON CALCULATIONS!'
        stop
-    endif 
+    endif
 
  elseif(.not.ioccsir) then
-     write(LOUT,'(1x,a)') 'ERROR! CANNOT READ OCCUPANCIES!'  
+     write(LOUT,'(1x,a)') 'ERROR! CANNOT READ OCCUPANCIES!'
      stop
- endif
+ endif ! occupations.dat ?
 
 
  if(mon%INAct==0) then
     mon%NGem = 2
 
-    mon%IGem(1:mon%NAct+mon%INAct) = 1
+    mon%IGem(1:mon%NAct+mon%INAct)      = 1
     mon%IGem(mon%NAct+mon%INAct+1:nbas) = 2
  else
     mon%NGem = 3
     mon%IGem(1:mon%INAct) = 1
     mon%IGem(mon%INAct+1:mon%INAct+mon%NAct) = 2
-    mon%IGem(mon%INAct+mon%NAct+1:nbas) = 3
+    mon%IGem(mon%INAct+mon%NAct+1:nbas)      = 3
  endif
 
-! construct CICoef
- !print*, 'here? CICOEf'
- do i=1,nbas 
+ ! construct CICoef
+ do i=1,nbas
     mon%CICoef(i)=sqrt(mon%Occ(I))
     if(mon%Occ(i).lt.0.5d0) mon%CICoef(i)=-mon%CICoef(i)
  enddo

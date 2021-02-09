@@ -193,6 +193,8 @@ type FileNames
 
      character(:),allocatable :: rdmfile
      character(:),allocatable :: onefile
+     character(:),allocatable :: sirifile,siriusfile
+     character(:),allocatable :: occfile,coefile
      character(:),allocatable :: testfile
      character(:),allocatable :: twofile,twojfile,twokfile
      character(:),allocatable :: y01file,xy0file
