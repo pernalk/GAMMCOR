@@ -226,7 +226,7 @@ integer,intent(out) :: NBasis
  if(SAPT%InterfaceType==1) then
     call basinfo(NBasis,'SIRIUS_A.RST','DALTON')
  elseif(SAPT%InterfaceType==2) then
-    call basinfo(NBasis,'AOTWOINT.mol','MOLPRO')
+    call basinfo(NBasis,'AOONEINT_A','MOLPRO')
  endif
  if(NBasis==0.and.SAPT%monA%NBasis==0) then
     write(LOUT,'(1x,a)') 'ERROR! NBasis NOWHERE TO BE FOUND!'
@@ -294,13 +294,13 @@ double precision :: MO(NBasis*NBasis)
        if(Flags%IFunSR/=0) then
           call calc_resp_dft(Mon,MO,Flags,NBasis)
        else
-          call calc_resp_full(Mon,MO,Flags,NBasis,EnChck)
+          call calc_resp_casgvb(Mon,MO,Flags,NBasis,EnChck)
        endif
 
     endif
  elseif(Flags%ISERPA==2) then
     call calc_resp_pino(Mon,MO,Flags,NBasis)
-   ! call calc_resp_full(Mon,MO,Flags,NBasis,EnChck)
+   ! call calc_resp_casgvb(Mon,MO,Flags,NBasis,EnChck)
  endif
 
 end subroutine sapt_response
@@ -638,147 +638,9 @@ logical :: doRSH
 ! full 4-idx tran
 ! call tran4_full(NBasis,Ca,Cb,'TWOMOAB')
 
- if(Flags%ISERPA==0) then
-
-!   !if(SAPT%monA%num1/=SAPT%monA%NAct) then
-!   !   write(LOUT,'(1x,a)') 'ERROR!!! Active orbitals in A have 0 occupancy!'
-!   !   !stop
-!   !   ! uncomment this part if want to do it anyway
-!   !   SAPT%monA%num0=SAPT%monA%INAct
-!   !   SAPT%monA%num1=SAPT%monA%NAct
-!   !   SAPT%monA%num2=NBasis-SAPT%monA%NAct-SAPT%monA%INAct
-!   !endif
-!
-!   !if(SAPT%monB%num1/=SAPT%monB%NAct) then
-!   !   write(LOUT,*) 'ERROR!!! Active orbitals in B have 0 occupancy!'
-!   !   !stop
-!   !   ! uncomment this part if want to do it anyway
-!   !   SAPT%monB%num0=SAPT%monB%INAct
-!   !   SAPT%monB%num1=SAPT%monB%NAct
-!   !   SAPT%monB%num2=NBasis-SAPT%monB%NAct-SAPT%monB%INAct
-!
-!   !endif
-!
-!   ! test
-!   !SAPT%reduceV=.true.
-!   !if(.not.SAPT%reduceV) then
-!   !! integrals stored as (ov|ov)
-!   !call tran4_gen(NBasis,&
-!   !               SAPT%monA%num0+SAPT%monA%num1,Ca,&
-!   !               SAPT%monA%num1+SAPT%monA%num2,Ca(NBasis*SAPT%monA%num0+1:NBasis**2),&
-!   !               SAPT%monB%num0+SAPT%monB%num1,Cb,&
-!   !               SAPT%monB%num1+SAPT%monB%num2,Cb(NBasis*SAPT%monB%num0+1:NBasis**2),&
-!   !               'TWOMOAB','AOTWOSORT')
-!   !endif
-!
-!   ! testing Ecorr ERPASYMM/ERPAVEC
-!   !call tran4_gen(NBasis,&
-!   !               SAPT%monA%num0+SAPT%monA%num1,Ca,&
-!   !               SAPT%monA%num1+SAPT%monA%num2,Ca(NBasis*SAPT%monA%num0+1:NBasis**2),&
-!   !               SAPT%monA%num0+SAPT%monA%num1,Ca,&
-!   !               SAPT%monA%num1+SAPT%monA%num2,Ca(NBasis*SAPT%monA%num0+1:NBasis**2),&
-!   !               'TMPMOAA','AOTWOSORT')
-!   !call tran4_gen(NBasis,&
-!   !               SAPT%monB%num0+SAPT%monB%num1,Cb,&
-!   !               SAPT%monB%num1+SAPT%monB%num2,Cb(NBasis*SAPT%monB%num0+1:NBasis**2),&
-!   !               SAPT%monB%num0+SAPT%monB%num1,Cb,&
-!   !               SAPT%monB%num1+SAPT%monB%num2,Cb(NBasis*SAPT%monB%num0+1:NBasis**2),&
-!   !               'TMPMOBB','AOTWOSORT')
-!
-!   ! this is for testing E1exchS2...
-!   !call tran4_gen(NBasis,&
-!   !               NBasis,Ca,NBasis,Ca,&
-!   !               NBasis,Cb,NBasis,Cb,&
-!   !               'TMPMOAB','AOTWOSORT')
-!
-!   ! <oo|oo>
-!   call tran4_gen(NBasis,&
-!                  SAPT%monA%num0+SAPT%monA%num1,Ca,&
-!                  SAPT%monA%num0+SAPT%monA%num1,Ca,&
-!                  SAPT%monB%num0+SAPT%monB%num1,Cb,&
-!                  SAPT%monB%num0+SAPT%monB%num1,Cb,&
-!                  'TMPOOAB','AOTWOSORT')
-!
-! elseif(Flags%ISERPA==2.and.Flags%ISHF==0) then
-!   ! integrals stored as (oFull,oFull)
-!   call tran4_gen(NBasis,&
-!                  SAPT%monA%num0+SAPT%monA%num1,Ca,&
-!                  NBasis,Ca,&
-!                  SAPT%monB%num0+SAPT%monB%num1,Cb,&
-!                  NBasis,Cb,&
-!                  'TWOMOAB','AOTWOSORT')
-!   ! this is for testing E1exchS2...
-!   call tran4_gen(NBasis,&
-!                  NBasis,Ca,NBasis,Ca,&
-!                  NBasis,Cb,NBasis,Cb,&
-!                  'TMPMOAB','AOTWOSORT')
-!
-
- endif
-
  if(SAPT%IPrint.gt.100) call print_TwoInt(NBasis)
 
  call print_active(SAPT,NBasis)
-
-!!! calculate response
-!! mon A
-! call SaptInter(NBasis,SAPT%monA,Flags%ICASSCF)
-!! prepare RDM2
-! if(Flags%ICASSCF==1) call read2rdm(SAPT%monA,NBasis)
-! if(Flags%ICASSCF==1) call system('cp rdm2_A.dat rdm2.dat')
-! 
-! call prepare_RDM2val(SAPT%monA,Flags%ICASSCF,NBasis) 
-!
-!! call COMMTST(NBasis)
-! if(SAPT%SaptLevel.eq.0) then
-!     call calc_resp_unc(SAPT%monA,Ca,Flags,NBasis)
-! elseif(SAPT%SaptLevel.gt.0) then
-!    if(Flags%IFunSR/=0) then
-!       call calc_resp_dft(SAPT%monA,Ca,Flags,NBasis)
-!    else
-!       call calc_resp_full(SAPT%monA,Ca,Flags,NBasis,SAPT%EnChck)
-!    endif
-! endif
-!
-!! mon B
-! call SaptInter(NBasis,SAPT%monB,Flags%ICASSCF)
-!! prepare RDM2
-! if(Flags%ICASSCF==1) call read2rdm(SAPT%monB,NBasis)
-! if(Flags%ICASSCF==1) call system('cp rdm2_B.dat rdm2.dat')
-! call prepare_RDM2val(SAPT%monB,Flags%ICASSCF,NBasis) 
-!
-!!   call COMMTST(NBasis) 
-! if(SAPT%SaptLevel.eq.0) then
-!    call calc_resp_unc(SAPT%monB,Cb,Flags,NBasis)
-! elseif(SAPT%SaptLevel.gt.0) then
-!    if(Flags%IFunSR/=0) then
-!       call calc_resp_dft(SAPT%monB,Cb,Flags,NBasis)
-!    else
-!       call calc_resp_full(SAPT%monB,Cb,Flags,NBasis,SAPT%EnChck)
-!   endif
-! endif
-!
-!   call tran4_gen(NBasis,&
-!                  SAPT%monA%num0+SAPT%monA%num1,SAPT%monA%CMO,&
-!                  SAPT%monA%num1+SAPT%monA%num2,SAPT%monA%CMO(1:NBasis,SAPT%monA%num0+1:NBasis),&
-!                  SAPT%monB%num0+SAPT%monB%num1,SAPT%monB%CMO,&
-!                  SAPT%monB%num1+SAPT%monB%num2,SAPT%monB%CMO(1:NBasis,SAPT%monB%num0+1:NBasis),&
-!                  'TWOMOAB','AOTWOSORT')
-!
-!  if(Flags%ISERPA==2.and.Flags%ISHF==1) then
-!     call tran4_gen(NBasis,&
-!                      (SAPT%monA%num0+SAPT%monA%num1),SAPT%monA%CMO,&
-!                      NBasis,SAPT%monA%CMO,&
-!                      (SAPT%monB%num0+SAPT%monB%num1),SAPT%monB%CMO,&
-!                      NBasis,SAPT%monB%CMO,&
-!                      'TWOMOAB','AOTWOSORT')
-! 
-!     !call tran4_gen(NBasis,&
-!     !             NBasis,Ca,NBasis,Ca,&
-!     !             NBasis,Cb,NBasis,Cb,&
-!     !             'TMPMOAB','AOTWOSORT')
-
-! endif
 
  if(Flags%ISERPA==2) then
     ! set iPINO
@@ -1579,10 +1441,6 @@ character(:),allocatable     :: twojfile,twokfile
 
  allocate(work1(NSq),work2(NSq),XOne(NInte1))
 
- !if(Mon%TwoMoInt==TWOMO_INCORE) then
- !   allocate(TwoMO(NInte2))
- !endif 
-
  URe = 0d0
  do i=1,NBas
     URe(i,i) = 1d0
@@ -2179,7 +2037,7 @@ logical :: doRSH
 
 end subroutine calc_resp_dft
 
-subroutine calc_resp_full(Mon,MO,Flags,NBas,EChck)
+subroutine calc_resp_casgvb(Mon,MO,Flags,NBas,EChck)
 implicit none
 
 type(SystemBlock) :: Mon
@@ -2196,39 +2054,29 @@ double precision, allocatable :: ABPlus(:), ABMin(:), URe(:,:), &
                                  ABPlusT(:), ABMinT(:)
 double precision, allocatable :: Eig0(:), Eig1(:), EigY0(:), EigY1(:) 
 double precision :: Dens(NBas,NBas)
-double precision,parameter :: One = 1d0, Half = 0.5d0
+
 integer :: dimOcc
-integer :: i,j,k,l,ij,ij1,ione,itwo 
+integer :: i,j,k,l,ii,jj,ij,ij1,ione,itwo 
 integer :: ip,iq,pq,ind
+integer :: iunit
+integer :: DimEx
+integer :: INegExcit,offset
+
 double precision :: ACAlpha
 double precision :: ECASSCF,ETot,ECorr
+
 character(8) :: label
 character(:),allocatable :: onefile,twofile,propfile,rdmfile
 character(:),allocatable :: twojfile,twokfile
 character(:),allocatable :: propfile0,propfile1
 character(:),allocatable :: y01file,xy0file
 character(:),allocatable :: testfile
-double precision :: tmp
+
+double precision,allocatable :: Eps(:,:),workSq(:,:)
+double precision,external :: ddot
+double precision :: tst
+double precision,parameter :: One = 1d0, Half = 0.5d0
 double precision,parameter :: SmallE=0d0,BigE=1.D20
-double precision,external  :: trace
-integer :: INegExcit,offset
-integer,allocatable :: sort(:)
-double precision, allocatable :: EigTmp(:), VecTmp(:)
-double precision, external :: FRDM2GVB
-!
-! testy
- integer :: NVirt
- integer :: ii,jj,dimV1
- double precision,parameter :: thresh=1.d-10
- integer :: space1(2,Mon%NDimX)
- integer :: IndN_tmp(2,Mon%NDim)
- double precision :: work(Mon%NDimX)
- double precision,allocatable :: Eps(:,:),workSq(:,:)
- double precision,external :: ddot
- double precision :: tst
- integer :: NBasisRed
- integer :: DimEx
- integer :: iunit
 
 ! set filenames
  if(Mon%Monomer==1) then
@@ -2260,10 +2108,17 @@ double precision, external :: FRDM2GVB
 ! set dimensions
  NSq = NBas**2
  NInte1 = NBas*(NBas+1)/2
- NInte2 = NInte1*(NInte1+1)/2
+ if(Mon%TwoMoInt==TWOMO_INCORE) then
+    NInte2 = NInte1*(NInte1+1)/2
+ else
+    NInte2 = 1
+    print*, 'NInte2:',NInte2
+    print*, Mon%TwoMoInt==TWOMO_INCORE
+ endif
 
  allocate(work1(NSq),work2(NSq),XOne(NInte1),URe(NBas,NBas))
- if(Mon%TwoMoInt==TWOMO_INCORE) allocate(TwoMO(NInte2))
+ !if(Mon%TwoMoInt==TWOMO_INCORE) allocate(TwoMO(NInte2))
+ allocate(TwoMO(NInte2))
 
  URe = 0d0
  do i=1,NBas
@@ -2440,7 +2295,7 @@ double precision, external :: FRDM2GVB
 
    EigVecR = 0
    Eig = 0
-  ! HERE WORTH CHECKING SOME MORE FOR EXCITED STATE SELECTION...
+   ! HERE WORTH CHECKING SOME MORE FOR EXCITED STATE SELECTION...
    if(Mon%InSt(1,1) > 0) then
       write(lout,'(/1x,a,i2,a,i1)') 'Calculating reponse for state:',Mon%InSt(1,1),'.',Mon%InSt(2,1)
    else
@@ -2451,30 +2306,30 @@ double precision, external :: FRDM2GVB
    !                due to poor quality of deexcitation energies from ERPA (in general)
    !if(Mon%InSt(1,1)<0.or.Mon%InSt(1,1)==1) then
 
-      write(lout,'(1x,a/)') 'Solving symmetric eigenvalue equation...'
+   write(lout,'(1x,a/)') 'Solving symmetric eigenvalue equation...'
 
-      allocate(Mon%EigY(Mon%NDimX**2),Mon%EigX(Mon%NDimX**2),&
-               Mon%Eig(Mon%NDimX))
-      call ERPASYMMXY(Mon%EigY,Mon%EigX,Mon%Eig,ABPlus,ABMin,&
-                      Mon%Occ,Mon%IndN,Mon%NDimX,NBas)
+   allocate(Mon%EigY(Mon%NDimX**2),Mon%EigX(Mon%NDimX**2),&
+            Mon%Eig(Mon%NDimX))
+   call ERPASYMMXY(Mon%EigY,Mon%EigX,Mon%Eig,ABPlus,ABMin,&
+                   Mon%Occ,Mon%IndN,Mon%NDimX,NBas)
 
-      !print*, 'EigY:',norm2(Mon%EigY),norm2(Mon%EigX)
+   !print*, 'EigY:',norm2(Mon%EigY),norm2(Mon%EigX)
 
-      Eig = Mon%Eig
-      do j=1,Mon%NDimX
-         do i=1,Mon%NDimX
-            ip = Mon%IndN(1,i)
-            iq = Mon%IndN(2,i)
-            EigVecR((j-1)*Mon%NDimX+i)=(Mon%CICoef(ip)-Mon%CICoef(iq))& 
-                                      *(Mon%EigY((j-1)*Mon%NDimX+i)-Mon%EigX((j-1)*Mon%NDimX+i))
-         enddo
+   Eig = Mon%Eig
+   do j=1,Mon%NDimX
+      do i=1,Mon%NDimX
+         ip = Mon%IndN(1,i)
+         iq = Mon%IndN(2,i)
+         EigVecR((j-1)*Mon%NDimX+i)=(Mon%CICoef(ip)-Mon%CICoef(iq))& 
+                                   *(Mon%EigY((j-1)*Mon%NDimX+i)-Mon%EigX((j-1)*Mon%NDimX+i))
       enddo
-      !print*, 'EigVecR',norm2(EigVecR)
-      !print*, 'Eig    ',norm2(Mon%Eig)
+   enddo
+   !print*, 'EigVecR',norm2(EigVecR)
+   !print*, 'Eig    ',norm2(Mon%Eig)
 
-      !do i=1,Mon%NDimX
-      !   print*, i, Eig(i)
-      !enddo
+   !do i=1,Mon%NDimX
+   !   print*, i, Eig(i)
+   !enddo
 
    !! TEST COUPLED ANDREAS
     ! print*, 'CPLD-ANDREAS:'
@@ -2628,6 +2483,13 @@ double precision, external :: FRDM2GVB
       deallocate(Eig1,Eig0,EigY1,EigY0)
 
    end select
+
+   ! EXTRAPOLATED E2DISP
+   ! for now: change ACalpha in both monomers 
+   if(Mon%E2dExt) then
+      Mon%ACAlpha=0.45d0
+      call calc_cas_resp(Mon%ACAlpha,XOne,TwoMO,Mon,NInte1,NInte2,NBas) 
+   endif
 
 elseif(Flags%ISERPA==2) then
    ! TD-APSG response: GVB, CASSCF, FCI
@@ -2857,13 +2719,86 @@ endif
  call writeresp(EigVecR,Eig,propfile)
 
  deallocate(work1,work2,XOne,URe)
- if(Mon%TwoMoInt==1) deallocate(TwoMO)
+ !if(Mon%TwoMoInt==1) deallocate(TwoMO)
+ deallocate(TwoMO)
  deallocate(ABPlus,ABMin,EigVecR,Eig)
 
  ! delete TWOMO file
  !call delfile(twofile)
 
-end subroutine calc_resp_full
+end subroutine calc_resp_casgvb
+
+subroutine calc_cas_resp(ACAlpha,XOne,TwoMO,Mon,NInte1,NInte2,NBas)
+! Two steps: 1) calculate A+B, A-B for alpha=ACAlpha
+!            2) solve symmetric ERPA eigenproblem
+implicit none
+
+type(SystemBlock)            :: Mon
+type(FileNames)              :: FNam
+integer, intent(in)          :: NInte1,NInte2,NBas
+double precision, intent(in) :: ACAlpha
+double precision, intent(in) :: XOne(NInte1),TwoMO(NInte2)
+
+integer                      :: i
+double precision             :: ECASSCF
+
+double precision, allocatable :: URe(:,:)
+double precision, allocatable :: ABPlus(:), ABMin(:)
+double precision, allocatable :: EigX(:),EigY(:),Eig(:)
+
+ call set_filenames(Mon,FNam)
+
+ allocate(URe(NBas,NBas))
+
+ URe = 0d0
+ do i=1,NBas
+    URe(i,i) = 1d0
+ enddo
+
+ allocate(ABPlus(Mon%NDimX**2),ABMin(Mon%NDimX**2))
+ allocate(EigX(Mon%NDimX**2),EigY(Mon%NDimX**2),Eig(Mon%NDimX))
+
+ ECASSCF = 0
+
+ select case(Mon%TwoMoInt)
+ case(TWOMO_FOFO)
+
+    call AB_CAS_FOFO(ABPlus,ABMin,ECASSCF,URe,Mon%Occ,XOne, &
+                Mon%IndN,Mon%IndX,Mon%IGem,Mon%NAct,Mon%INAct,Mon%NDimX,NBas,Mon%NDimX,&
+                NInte1,FNam%twojfile,FNam%twokfile,ACAlpha,.false.)
+ case(TWOMO_FFFF) 
+
+    call AB_CAS_mithap(ABPlus,ABMin,ECASSCF,URe,Mon%Occ,XOne, &
+                Mon%IndN,Mon%IndX,Mon%IGem,Mon%NAct,Mon%INAct,Mon%NDimX,NBas,Mon%NDimX,&
+                 NInte1,FNam%twofile,ACAlpha,.false.)
+ case(TWOMO_INCORE)
+
+    call AB_CAS(ABPlus,ABMin,ECASSCF,URe,Mon%Occ,XOne,TwoMO,Mon%IPair,&
+                Mon%IndN,Mon%IndX,Mon%NDimX,NBas,Mon%NDimX,NInte1,NInte2,ACAlpha)
+
+ end select 
+
+ if(Mon%InSt(1,1) > 0) then
+    write(lout,'(/1x,a,i2,a,i1)') &
+    'Calculating reponse for state:',Mon%InSt(1,1),'.',Mon%InSt(2,1)
+ else
+    write(lout,'(1x,a)') 'Calculating reponse for the ground state'
+ endif
+
+ write(lout,'(1x,a/)') 'Solving symmetric eigenvalue equation...'
+
+ call ERPASYMMXY(EigY,EigX,Eig,ABPlus,ABMin,&
+                 Mon%Occ,Mon%IndN,Mon%NDimX,NBas)
+
+ ! dump response vecs
+ call writerespXY(EigX,EigY,Eig,FNam%propfile2)
+ 
+ deallocate(Eig,EigY,EigX)
+ deallocate(ABMin,ABPlus)
+ deallocate(URe)
+
+end subroutine calc_cas_resp
+
 
 subroutine calc_resp_pino(M,MO,Flags,NBas)
 ! obtain FCI response based on PINO functional
@@ -3192,6 +3127,42 @@ character(8) :: label
  deallocate(work2,work1)
 
 end subroutine get_1el_h_mo
+
+subroutine set_filenames(Mon,FNam)
+implicit none
+
+type(SystemBlock) :: Mon
+type(FileNames)   :: FNam 
+
+ if(Mon%Monomer==1) then
+    FNam%onefile    = 'ONEEL_A'
+    FNam%twofile    = 'TWOMOAA'
+    FNam%twojfile   = 'FFOOAA'
+    FNam%twokfile   = 'FOFOAA'
+    FNam%propfile   = 'PROP_A'
+    FNam%propfile0  = 'PROP_A0'
+    FNam%propfile1  = 'PROP_A1'
+    FNam%propfile2  = 'PROP_AX'
+    FNam%y01file    = 'Y01_A'
+    FNam%xy0file    = 'XY0_A'
+    FNam%rdmfile    = 'rdm2_A.dat'
+    FNam%testfile   = 'TEST_A'
+ elseif(Mon%Monomer==2) then
+    FNam%onefile    = 'ONEEL_B'
+    FNam%twofile    = 'TWOMOBB'
+    FNam%twojfile   = 'FFOOBB'
+    FNam%twokfile   = 'FOFOBB'
+    FNam%propfile   = 'PROP_B'
+    FNam%propfile0  = 'PROP_B0'
+    FNam%propfile1  = 'PROP_B1'
+    FNam%propfile2  = 'PROP_BX'
+    FNam%y01file    = 'Y01_B'
+    FNam%xy0file    = 'XY0_B'
+    FNam%rdmfile    = 'rdm2_B.dat'
+    FNam%testfile   = 'TEST_B'
+ endif
+
+end subroutine set_filenames
 
 subroutine init_pino(NBas,Mon,ICASSCF)
 implicit none
@@ -3525,8 +3496,9 @@ subroutine gen_swap_rows(mat,nbas,nsym,nA,nB)
 implicit none
 
 integer,intent(in) :: nbas,nsym,nA(8),nB(8)
-double precision :: mat(nbas,nbas)
-double precision :: work(nbas,nbas)
+double precision   :: mat(nbas,nbas)
+double precision   :: work(nbas,nbas)
+
 integer :: irep,iA,iB,iAB,offset
 
 offset = 0
@@ -3543,8 +3515,8 @@ do irep=1,nsym
    mat(offset+1:offset+iAB,:) = work(1:iAB,:)
 
    offset = offset + iAB
-enddo
 
+enddo
 
 end subroutine gen_swap_rows
 
@@ -3568,8 +3540,9 @@ subroutine gen_swap_cols(mat,nbas,nsym,nA,nB)
 implicit none
 
 integer,intent(in) :: nbas,nsym,nA(8),nB(8)
-double precision :: mat(nbas,nbas)
-double precision :: work(nbas,nbas)
+double precision   :: mat(nbas,nbas)
+double precision   :: work(nbas,nbas)
+
 integer :: irep,iA,iB,iAB,offset
 
 offset = 0
@@ -3704,19 +3677,34 @@ double precision,dimension(ndim) :: S, V, H
 
 end subroutine writeoneint
 
-subroutine writeresp(EVec,EVal,mon)
+subroutine writeresp(EVecZ,EVal,mon)
 implicit none
 
 character(*) :: mon
-double precision :: EVec(:), EVal(:)
+double precision :: EVecZ(:), EVal(:)
 integer :: iunit
 
  open(newunit=iunit,file=mon,form='unformatted')
- write(iunit) EVec
+ write(iunit) EVecZ
  write(iunit) EVal
  close(iunit)
 
 end subroutine writeresp
+
+subroutine writerespXY(EVecX,EvecY,EVal,mon)
+implicit none
+
+character(*) :: mon
+double precision :: EVecX(:),EVecY(:),EVal(:)
+integer :: iunit
+
+ open(newunit=iunit,file=mon,form='unformatted')
+ write(iunit) EVecX
+ write(iunit) EVecY
+ write(iunit) EVal
+ close(iunit)
+
+end subroutine writerespXY
 
 subroutine writeEval(EVal,mon)
 implicit none
