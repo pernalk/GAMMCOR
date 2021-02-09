@@ -29,6 +29,7 @@ C
 C     LOCAL ARRAYS
 C
       Dimension XGrid(100), WGrid(100)
+      Integer Points
 C     HAP
       Double precision,Allocatable :: WorkVec(:),WorkEig(:),MYAP(:) 
 C
@@ -261,7 +262,8 @@ C
 *Deck Y01CAS
       Subroutine Y01CAS(TwoNO,Occ,URe,XOne,ABPLUS,ABMIN,
      $ EigY,EigY1,Eig,Eig1,
-     $ IndN,IndX,NDimX,NBasis,NDim,NInte1,NInte2,IFlag0)
+     $ IndN,IndX,NDimX,NBasis,NDim,NInte1,NInte2,IFlag0,
+     $ filename)
 C
 C     A ROUTINE FOR COMPUTING Y VECTORS AND EIGENVALUES OF ERPA 
 C     IN THE 1ST-ORDER APPROXIMATION
@@ -282,6 +284,8 @@ C
      $ Eig(NDimX),Eig1(NDimX),
      $ EigY(NDimX*NDimX),EigY1(NDimX*NDimX),
      $ IndX(NDim),IndN(2,NDim)
+C UNCOUPLED 01/02/2021
+      Character(*),Optional :: filename
 C
 C     LOCAL ARRAYS
 C
@@ -741,6 +745,11 @@ C NEW 11/07/2018
 C     Check if NoEig=NDimX - they should be equal!
       If(NoEig.Ne.NDimX) Stop 'Fatal error in Y01CAS: NoEig.Ne.NDimX!'
 C
+C     UNCOUPLED
+      Call ConvertXYtilde(EigY,EigX,Eig,CICoef,IEigAddY,IEigAddInd,
+     $                    IndN,IndBlock,NFree2,NBasis,NDimX,NDim,
+     $                    filename,.true.)
+C
       Do I=1,NDimX
       IP=IndN(1,I)
       IQ=IndN(2,I)
@@ -955,6 +964,125 @@ C
 C
       Return
       End
+
+      Subroutine ConvertXYtilde(EigY,EigX,Eig,C,IEigAddY,IEigAddInd,
+     $ IndN,IndBlock,NFree2,NBasis,NDimX,NDim,filename,ifdump)
+C
+      use abfofo,only : reduce_to_XY0CAS
+C
+      Implicit Real*8 (A-H,O-Z)
+C
+      Include 'commons.inc'
+C
+      Integer :: NFree2,NBasis,NDimX,NDim
+      Integer :: IndN(2,NDim),IndBlock(2,NDimX),
+     $           IEigAddY(2,NDimX),IEigAddInd(2,NDimX)
+      Double precision :: EigY(NFree2),EigX(NFree2),
+     $                    Eig(NDimX),C(NBasis)
+      Logical      :: ifdump
+      Character(*) :: filename
+      Double precision,allocatable :: Work(:),WorkY(:),WorkX(:)
+C
+      Integer :: IMatch(NDimX)
+C
+      NAct=NAcCAS
+      INActive=NInAcCAS
+C
+C      Print*, 'NFree2,NDimX',NFree2,NDimX
+C
+      NoEig=NDimX
+C
+      Do I=1,NDimX
+      IP=IndN(1,I)
+      IQ=IndN(2,I)
+      Do J=1,NDimX
+      If(IP.Eq.IndBlock(1,J).And.IQ.Eq.IndBlock(2,J))
+     $ IMatch(I)=J
+      EndDo
+      EndDo
+C
+      Allocate(Work(NDimX**2),WorkY(NDimX**2),WorkX(NDimX**2))
+C
+      Do I=1,NoEig
+      Do J=1,NoEig
+      Work(I+(J-1)*NoEig)=0d0
+      If(I.Eq.J) Work(I+(J-1)*NoEig)=1d0
+      EndDo
+      EndDo
+C
+      Do NU=1,NoEig
+      Do MU=1,NoEig
+C
+      WorkY(NU+(MU-1)*NoEig)=0d0
+      WorkX(NU+(MU-1)*NoEig)=0d0
+C
+      IStart=IEigAddY(1,MU)
+      II=0
+      Do I=IEigAddInd(1,MU),IEigAddInd(2,MU)
+      WorkY(NU+(MU-1)*NoEig)=WorkY(NU+(MU-1)*NoEig)
+     $ +Work(NU+(I-1)*NoEig)*EigY(IStart+II)
+      WorkX(NU+(MU-1)*NoEig)=WorkX(NU+(MU-1)*NoEig)
+     $ +Work(NU+(I-1)*NoEig)*EigX(IStart+II)
+      II=II+1
+      EndDo
+C
+      EndDo
+      EndDo
+C  
+c     RESORT ACCORDING TO IndN
+C
+      Call CpyM(Work,WorkY,NDimX)
+      Do MU=1,NDimX
+      Do I=1,NDimX
+      WorkY((MU-1)*NoEig+I)=Work((MU-1)*NoEig+IMatch(I))
+      EndDo
+      EndDo
+C
+      Call CpyM(Work,WorkX,NDimX)
+      Do MU=1,NDimX
+      Do I=1,NDimX
+      WorkX((MU-1)*NoEig+I)=Work((MU-1)*NoEig+IMatch(I))
+      EndDo
+      EndDo
+C
+      Do K=1,NDimX
+      Do I=1,NDimX
+C
+      IP=IndN(1,I)
+      IQ=IndN(2,I)
+C
+      X=WorkX((K-1)*NDimX+I)/(C(IP)+C(IQ))
+      Y=WorkY((K-1)*NDimX+I)/(C(IP)-C(IQ))
+C
+      WorkX((K-1)*NDimX+I)=0.5d0*(X-Y)
+      WorkY((K-1)*NDimX+I)=0.5d0*(X+Y)
+C
+      EndDo
+      EndDo
+C
+c      Print*, 'TEST-X:',norm2(WorkX)
+c      Print*, 'TEST-Y:',norm2(WorkY)
+C
+      If(ifdump) Then
+C      
+C      Open(newunit=iunit,file=filename,form='unformatted')
+C      write(iunit) WorkX
+C      write(iunit) WorkY
+C      Close(iunit)
+C
+      Call reduce_to_XY0CAS(WorkX,WorkY,Eig,C,
+     $  IndN,NAct,INActive,NDimX,NBasis,filename)
+      Else
+C     RETURN X(0) and Y(0)
+C
+      EigX = WorkX
+      EigY = WorkY
+C
+      EndIf
+C
+      Deallocate(WorkX,WorkY,Work)
+C
+      End Subroutine
 
 *Deck Y01CASLR
       Subroutine Y01CASLR(TwoNO,Occ,URe,XOne,ABPLUS,ABMIN,
@@ -2199,6 +2327,7 @@ C
 C     FIND THE 0TH-ORDER SOLUTION FOR THE VIRTUAL-INACTIVE BLOCKS
 
 C KP 15.05.2019
+      if(idalton.eq.0) then
       open(10,file='fock.dat')
       work1=0
       Do IP=NOccup+1,NBasis
@@ -2208,6 +2337,7 @@ C KP 15.05.2019
       EndDo
       EndDo
       close(10)
+      endif
 C
       Do IP=NOccup+1,NBasis
       Do IQ=1,INActive
@@ -2230,9 +2360,12 @@ C
      $ NInte1,NInte2,NBasis)
 C
       Eig(NFree1)=ABP
-c KP 15.05.2019
-      If(abs(ABP-work1(ip,iq)).gt.1.d-7)
-     $Write(*,*)'ABP inconsistent with eps_a-eps_i for',ip,iq
+C
+      If(IDALTON.Eq.0) Then
+      If(ABS(ABP-work1(IP,IQ)).Gt.1.d-7)
+     $Write(*,*)'ABP inconsistent with eps_a-eps_i for',IP,IQ
+      EndIf
+C
       EigY(NFree2)=One/Sqrt(Two)
       EigX(NFree2)=One/Sqrt(Two)
 C
@@ -2424,26 +2557,22 @@ C
       ECorr=EAll-EIntra
       Print*, 'EAll,EIntra',EAll,EIntra
 C
-C KP 15.05.2019 MP2 energy (only inactive-virtual enter)
-C to compare with molpro use {mp2;core,0}
-      EMP2=Zero
-      Do IP=NOccup+1,NBasis
-c herer!!!???
-      Do IR=1,INActive
-c      Do IR=1,INActive+1
-      Do IQ=NOccup+1,NBasis
-c herer!!!???
-      Do IS=1,INActive
-c      Do IS=1,INActive+1
-      EMP2=EMP2-(Two*TwoNO(NAddr3(IP,IR,IQ,IS))
-     $ -TwoNO(NAddr3(IP,IS,IQ,IR)))*TwoNO(NAddr3(IP,IR,IQ,IS))/
-     $ (work1(IP,IR)+work1(IQ,IS))
-C
-      EndDo
-      EndDo
-      EndDo
-      EndDo
-      Write(6,'(/,1x,a,13x,f16.8)') 'EMP2   Energy', EMP2 
+C     MP2 energy (only inactive-virtual enter)
+C     to compare with molpro use {mp2;core,0}
+c      EMP2=Zero
+c      Do IP=NOccup+1,NBasis
+c      Do IR=1,INActive
+c      Do IQ=NOccup+1,NBasis
+c      Do IS=1,INActive
+c      EMP2=EMP2-(Two*TwoNO(NAddr3(IP,IR,IQ,IS))
+c     $ -TwoNO(NAddr3(IP,IS,IQ,IR)))*TwoNO(NAddr3(IP,IR,IQ,IS))/
+c     $ (work1(IP,IR)+work1(IQ,IS))
+cC
+c      EndDo
+c      EndDo
+c      EndDo
+c      EndDo
+c      Write(6,'(/,1x,a,13x,f16.8)') 'EMP2   Energy', EMP2 
 C
 C ----------------------------------------------------------------    
       Return
@@ -6227,12 +6356,6 @@ C
       EndDo
       EndDo
 C
-C      Do IP=NOccup+1,NBasis
-C      Do IQ=1,NOccup
-C      write(*,*)'Eps',IP,IQ,Eps(IP,IQ)
-C      EndDo
-C      EndDo
-C
       Gamma(1:NInte1)=Zero
 C
       IJ=0
@@ -6376,20 +6499,6 @@ c new line
 C     TEST
 C      Print*, 'Fock,PC-Ka',norm2(Fock),norm2(PC(1:NVirt))
 C
-C      BLOCK THIS TEST TEMPORARILY
-C      open(20,file='epsi.dat')
-C      Do IQ=1,INActive 
-C      read(20,*)i,epsi(i)
-C      enddo
-C      close(20)
-C      open(10,file='fock.dat')
-C      Do IP=NOccup+1,NBasis
-C      Do IQ=1,INActive
-C      work1(IP,IQ)=PC(IP-NOccup)-epsi(iq)
-C      write(10,*)ip,iq,work1(ip,iq)
-C      EndDo
-C      EndDo
-C      close(10)
 C
       Do I=1,NVirt
       Do J=1,NVirt

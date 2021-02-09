@@ -118,7 +118,6 @@ type SystemBlock
       integer :: NoSt = 1
       integer :: NStates = 1
       integer :: EigFCI = 1
-      integer :: Multiplicity = 1
       integer :: Charge = 0
       integer :: ZNucl   = 0
       integer :: NBasis = 0
@@ -151,8 +150,9 @@ type SystemBlock
       logical :: DeclareTwoMo = .false.
       logical :: DeclareSt = .false.
       logical :: DeclareTrSt = .false.
-      logical :: ISHF = .false.
-      logical :: doRSH = .false., SameOm = .true.
+      logical :: ISHF    = .false.
+      logical :: E2dExt  = .false.
+      logical :: doRSH   = .false., SameOm = .true.
       logical :: PostCAS = .false.
       logical :: NActFromRDM = .true.
       logical :: reduceV = .false.
@@ -251,6 +251,7 @@ type SaptData
   type(SystemBlock) :: monA,monB
      double precision  :: Vnn,elst,exchs2,e2ind,e2disp
      double precision  :: e2disp_sc,e2disp_sp
+     double precision  :: e2disp_ax3
      double precision  :: e2ind_unc,e2disp_unc
      double precision  :: e2dispR_unc,e2dispR
      double precision  :: e2exdisp_unc,e2exdisp
@@ -265,6 +266,7 @@ type SaptData
      integer :: iPINO=-1
      integer :: IPrint = 1000
      logical :: iCpld   = .true.
+     logical :: E2dExt  = .false.
      ! MH : add keyword!
      logical :: SemiCoupled = .true.
      logical :: DispExc = .true.
@@ -1204,7 +1206,6 @@ double precision :: tmp(ntr)
 
  open(newunit=iunit,file=infile,status='OLD', &
       access='SEQUENTIAL',form='UNFORMATTED')
-
  ntdg = 0
  rewind(iunit)
  read(iunit) 
@@ -1559,8 +1560,8 @@ logical :: ex
        !write(LOUT,*)  nsym,nbas,norb,nrhf,ioprhf
 
     elseif(trim(intf)=='MOLPRO') then
-       read(iunit) nsym
-       read(iunit) nbas(1:nsym)
+       read(iunit)
+       read(iunit) nsym,nbas(1:nsym)
     endif
 
     close(iunit)

@@ -596,6 +596,79 @@ end associate
 
 end subroutine abpm_tran
 
+subroutine abpm_dgemv_gen(AMAT,AOUT,EBlock,EBlockIV,&
+                         nblk,NDimX,xyvar)
+implicit none
+
+integer,intent(in)      :: nblk,NDimX
+character(*),intent(in) :: xyvar
+double precision,intent(in)    :: AMAT(NDimX)
+double precision,intent(inout) :: AOUT(NDimX)
+
+type(EBlockData),intent(in)    :: EBlock(nblk),EBlockIV
+
+integer :: i,j,ii,jj,ipos,jpos,iblk,jblk
+double precision :: fact
+double precision,allocatable :: ABP(:),ABM(:)
+
+fact = 1d0/sqrt(2d0)
+
+do iblk=1,nblk
+   associate( A => Eblock(iblk) )
+
+   allocate(ABP(A%n),ABM(A%n))
+   do i=1,A%n
+      ipos = A%pos(i)
+      ABP(i) = AMAT(ipos)
+   enddo
+
+   select case(xyvar)
+   case('X','x')
+      call dgemv('T',A%n,A%n,1d0,A%matX,A%n,ABP,1,0d0,ABM,1)
+   case('Y','y')
+      call dgemv('T',A%n,A%n,1d0,A%matY,A%n,ABP,1,0d0,ABM,1)
+   case('YX','yx')
+      call dgemv('T',A%n,A%n,1d0,A%matY-A%matX,A%n,ABP,1,0d0,ABM,1)
+   end select
+
+   AOUT(A%l1:A%l2) = AOUT(A%l1:A%l2) + ABM
+
+   deallocate(ABM,ABP)
+
+   end associate
+enddo
+
+associate(A => EblockIV)
+
+  if(A%n>0) then
+
+     select case(xyvar)
+     case('X','x')
+        do i=1,A%n
+           ii = A%l1+i-1
+           ipos = A%pos(i)
+           AOUT(ii) = AOUT(ii) + AMAT(ipos)*A%matX(i,1)
+        enddo
+    case('Y','y')
+        do i=1,A%n
+           ii = A%l1+i-1
+           ipos = A%pos(i)
+           AOUT(ii) = AOUT(ii) + AMAT(ipos)*A%matY(i,1)
+        enddo
+    case('YX','yx')
+        do i=1,A%n
+           ii = A%l1+i-1
+           ipos = A%pos(i)
+           AOUT(ii) = AOUT(ii) - AMAT(ipos)*fact
+        enddo
+
+    end select
+ 
+  endif
+end associate
+
+end subroutine abpm_dgemv_gen
+
 subroutine abpm_tran_gen(AMAT,AOUT,EBlockA,EBlockAIV,EBlockB,EBlockBIV,&
                          nblkA,nblkB,ANDimX,BNDimX,xyvar)
 implicit none
@@ -610,9 +683,6 @@ type(EBlockData),intent(in)    :: EBlockA(nblkA),EBlockAIV, &
 
 integer :: i,j,ii,jj,ipos,jpos,iblk,jblk
 double precision,allocatable :: ABP(:,:),ABM(:,:)
-double precision :: fac
-
-fac = 1.d0/sqrt(2.d0)
 
 do jblk=1,nblkB
    associate( B => EblockB(jblk) )
