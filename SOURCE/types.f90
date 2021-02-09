@@ -189,6 +189,18 @@ type SystemBlock
 
 end type SystemBlock
 
+type FileNames
+
+     character(:),allocatable :: rdmfile
+     character(:),allocatable :: onefile
+     character(:),allocatable :: testfile
+     character(:),allocatable :: twofile,twojfile,twokfile
+     character(:),allocatable :: y01file,xy0file
+     character(:),allocatable :: propfile
+     character(:),allocatable :: propfile0,propfile1,propfile2
+
+end type FileNames
+
 type FlagsData
 ! default setting: ERPA-GVB
      ! mainp.f

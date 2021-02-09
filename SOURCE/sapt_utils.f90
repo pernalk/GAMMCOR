@@ -223,6 +223,36 @@ end associate
 
 end subroutine unpack_XY0_full
 
+subroutine convert_XY_to_Z(EVecZ,CICoef,IndN,NDimX,NBasis,xyfile)
+implicit none
+
+integer,intent(in)           :: NDimX,NBasis
+integer,intent(in)           :: IndN(2,NDimX)
+character(*),intent(in)      :: xyfile
+double precision,intent(in)  :: CICoef(NBasis)
+double precision,intent(out) :: EVecZ(NDimX,NDimX)
+
+integer                      :: i,j,ip,iq
+double precision             :: fact
+double precision,allocatable :: EVecX(:,:),EVecY(:,:)
+
+allocate(EVecX(NDimX,NDimX),EVecY(NDimX,NDimX))
+
+call readEVecXY(EVecX,EVecY,NDimX,xyfile)
+
+do j=1,NDimX
+   do i=1,NDimX
+      ip = IndN(1,i)
+      iq = IndN(2,i)
+      fact = CICoef(ip) - CICoef(iq)
+      EVecZ(i,j) = fact*(EVecY(i,j)-EVecX(i,j))
+   enddo
+enddo
+
+deallocate(EVecY,EVecX)
+
+end subroutine convert_XY_to_Z
+
 subroutine writeampl(sij,ampfile)
 implicit none
 
@@ -388,7 +418,7 @@ integer :: iunit
 
 end subroutine readEval
 
-subroutine readEval2(EVal,NDim,fname)
+subroutine readEvalZ(EVal,NDim,fname)
 implicit none
 
 integer :: NDim
@@ -404,24 +434,64 @@ integer :: iunit
 
  close(iunit)
 
-end subroutine readEval2
+end subroutine readEvalZ
 
-subroutine readEvec(EVec,NDim,fname)
+subroutine readEvalXY(EVal,NDim,fname)
 implicit none
 
-integer :: NDim
-double precision :: EVec(NDim,NDim)
-character(*) :: fname
+integer,intent(in)           :: NDim
+character(*),intent(in)      :: fname
+double precision,intent(out) :: EVal(NDim)
+
 integer :: iunit
 
  open(newunit=iunit,file=fname,form='UNFORMATTED',&
     access='SEQUENTIAL',status='OLD')
 
- read(iunit) EVec
+ read(iunit)
+ read(iunit)
+ read(iunit) EVal
 
  close(iunit)
 
-end subroutine readEvec
+end subroutine readEvalXY
+
+subroutine readEvecZ(EVecZ,NDim,fname)
+implicit none
+
+integer          :: NDim
+character(*)     :: fname
+double precision :: EVecZ(NDim,NDim)
+
+integer :: iunit
+
+ open(newunit=iunit,file=fname,form='UNFORMATTED',&
+    access='SEQUENTIAL',status='OLD')
+
+ read(iunit) EVecZ
+
+ close(iunit)
+
+end subroutine readEvecZ
+
+subroutine readEvecXY(EVecX,EVecY,NDim,fname)
+implicit none
+
+integer,intent(in)           :: NDim
+character(*),intent(in)      :: fname
+double precision,intent(out) :: EVecX(NDim,NDim),EVecY(NDim,NDim)
+
+integer :: iunit
+
+ open(newunit=iunit,file=fname,form='UNFORMATTED',&
+    access='SEQUENTIAL',status='OLD')
+
+ read(iunit) EVecX
+ read(iunit) EVecY
+
+ close(iunit)
+
+end subroutine readEvecXY
 
 subroutine unpack_Eig(SBlock,SBlockIV,nblk,Eig,NDimX)
 implicit none
