@@ -28,7 +28,6 @@ double precision :: Tcpu,Twall
 
  Flags%SaptLevel = SAPT%SaptLevel
 
-! TEMPORARY - JOBTYPE_2
 ! ERPA
  Flags%IFlAC  = 0
  Flags%IFlSnd = 0
@@ -54,8 +53,9 @@ double precision :: Tcpu,Twall
 
  ! SAPT components
  write(LOUT,'()')
- if(Flags%ISERPA==0.and.SAPT%ic6==1) then
+
  ! calculate only C6
+ if(Flags%ISERPA==0.and.SAPT%ic6==1) then
     call c6_dummy(Flags,SAPT%monA,SAPT%monB,SAPT)
 
  elseif(Flags%ISERPA==0.and.SAPT%ic6==0) then
@@ -91,6 +91,7 @@ double precision :: Tcpu,Twall
     !call e2disp_apsg(Flags,SAPT%monA,SAPT%monB,SAPT)
     if(Flags%ISHF.Ne.0) then
     
+       call e2ind_pino(Flags,SAPT%monA,SAPT%monB,SAPT)
        call e2disp_pino(Flags,SAPT%monA,SAPT%monB,SAPT)
        call e2exdisp_apsg(Flags,SAPT%monA,SAPT%monB,SAPT)
     endif
@@ -954,9 +955,13 @@ subroutine onel_dalton(mon,NBasis,NSq,NInte1,MonBlock,SAPT)
  ! rearrange in V: (B,A) -> (A,B)
     call read_syminf(SAPT%monA,SAPT%monB,NBasis)
    
+    print*, 'NMonBas-A',SAPT%monA%NMonBas(1:SAPT%monA%NSym)
+    print*, 'NMonBas-B',SAPT%monB%NMonBas(1:SAPT%monB%NSym)
+
     call arrange_oneint(Smat,NBasis,SAPT)
     call arrange_oneint(Vmat,NBasis,SAPT)
     call arrange_oneint(Hmat,NBasis,SAPT)
+
  endif
 
  ! square form
@@ -2060,7 +2065,6 @@ logical :: doRSH
  case(TWOMO_INCORE)
     call ModABMin(Mon%Occ,SRKer,WGrid,OrbGrid,TwoMO,TwoElErf,ABMin,&
                   Mon%IndN,Mon%IndX,Mon%NDimX,NGrid,NInte2,NBas)
-    print*, 'ABMin-Kasia',norm2(ABMin)
  case(TWOMO_FFFF)
     call ModABMin_mithap(Mon%Occ,SRKer,WGrid,OrbGrid,ABMin,&
                          Mon%IndN,Mon%IndX,Mon%NDimX,NGrid,NBas,&
@@ -2266,90 +2270,12 @@ double precision, external :: FRDM2GVB
     URe(i,i) = 1d0
  enddo
 
-! read 1-el
+ ! read 1-el
  call get_1el_h_mo(XOne,MO,NBas,onefile)
- !open(newunit=ione,file=onefile,access='sequential',&
- !     form='unformatted',status='old')
-
- !read(ione) 
- !read(ione)
- !read(ione) label, work1
- !if(label=='ONEHAMIL') then
- !   call tran_oneint(work1,MO,MO,work2,NBas)
- !   call sq_to_triang(work1,XOne,NBas)
- !else
- !   write(LOUT,'(a)') 'ERROR! ONEHAMIL NOT FOUND IN '//onefile
- !   stop
- !endif
- !close(ione)
- !
- !call sapt_mon_ints(Mon,NBas)
- !
- !! transform 2-el integrals
- !select case(Mon%TwoMoInt)
- !case(TWOMO_INCORE,TWOMO_FFFF)
- !  ! full - for GVB and CAS
- !  !call tran4_full(NBas,MO,MO,fname,'AOTWOSORT')
- !  call tran4_full(NBas,MO,MO,twofile,'AOTWOSORT')
-
- !case(TWOMO_FOFO) 
- !  ! transform J and K
- !   call tran4_gen(NBas,&
- !        Mon%num0+Mon%num1,MO(1:NBas*(Mon%num0+Mon%num1)),&
- !        Mon%num0+Mon%num1,MO(1:NBas*(Mon%num0+Mon%num1)),&
- !        NBas,MO,&
- !        NBas,MO,&
- !        twojfile,'AOTWOSORT')
- !   call tran4_gen(NBas,&
- !        NBas,MO,&
- !        Mon%num0+Mon%num1,MO(1:NBas*(Mon%num0+Mon%num1)),&
- !        NBas,MO,&
- !        Mon%num0+Mon%num1,MO(1:NBas*(Mon%num0+Mon%num1)),&
- !        twokfile,'AOTWOSORT')
- !
- ! end select
 
  ! INCORE: load 2-el integrals
  if(Mon%TwoMoInt==TWOMO_INCORE) call LoadSaptTwoEl(Mon%Monomer,TwoMO,NBas,NInte2)
  
- !!! TESTS!!!
- !! reduce virt space
- !if(Flags%IRedVirt==1) then
-
- !   allocate(Eps(NBas,NBas),workSq(NBas,NBas))
-
- !   select case(Mon%TwoMoInt)
- !   case(TWOMO_INCORE)
- !      call MP2RDM(TwoMO,Eps,Mon%Occ,URe,XOne,&
- !                  Mon%IndN,Mon%IndX,Mon%IndAux,Mon%NDimX,&
- !                  NBas,Mon%NDim,NInte1,NInte2,NVirt,Mon%ThrVirt)
- !  
- !   case(TWOMO_FOFO)
-
- !      workSq = transpose(Mon%CMO)
- !      call MP2RDM_FOFO(Eps,Mon%Occ,URe,workSq,XOne,Mon%IndN,Mon%IndX,Mon%IndAux,Mon%IGem,&
- !                       Mon%NAct,Mon%INAct,Mon%NDimX,Mon%NDim,NBas,NInte1,&
- !                       twojfile,twokfile,Mon%ThrVirt,Mon%IPrint)
-
- !   case(TWOMO_FFFF)
-
- !      write(LOUT,'(1x,a)') 'ERROR! REDVIRT NOT AVAILABLE WITH FFFF (FULL) TWOMOINT'
- !      stop
-
- !   end select
-
- !     ! get AO->NO(d) matrix
- !     call dgemm('N','T',NBas,NBas,NBas,1d0,MO,NBas,Eps,NBas,0d0,workSq,NBas)
- !     do j=1,NBas
- !        do i=1,NBas
- !           Mon%CMO(i,j) = workSq(i,j)
- !        enddo
- !     enddo
-
- !  deallocate(workSq,Eps)
-
- !endif
-
  if(Flags%ISHF==1.and.Flags%ISERPA==2.and.Mon%NELE==1) then
 
     ! Calculate FCI for 2-el systems
@@ -2360,19 +2286,6 @@ double precision, external :: FRDM2GVB
  ACAlpha=One
  ! GVB
  if(Flags%ICASSCF==0.and.Flags%ISERPA==0) then
-
-   !! prepare RDM2val
-   !dimOcc = Mon%num0+Mon%num1
-   !allocate(Mon%RDM2val(dimOcc,dimOcc,dimOcc,dimOcc))
-   !do l=1,dimOcc
-   !  do k=1,dimOcc 
-   !     do j=1,dimOcc
-   !        do i=1,dimOcc
-   !           Mon%RDM2val(i,j,k,l) = FRDM2GVB(i,k,j,l,Mon%Occ,NBas)
-   !        enddo
-   !     enddo
-   !  enddo
-   !enddo
 
    allocate(ABPlus(Mon%NDimX**2),ABMin(Mon%NDimX**2), &
             EigVecR(Mon%NDimX**2),Eig(Mon%NDimX))
@@ -2492,21 +2405,20 @@ double precision, external :: FRDM2GVB
 !   ACAlpha=0.0000001
 ! endif 
 ! KP 31.01.2021 instability test
-   if(Mon%Monomer==1) then
-   IF(COMMAND_ARGUMENT_COUNT().Ne.0) THEN
-   CALL GET_COMMAND_ARGUMENT(1,label)
-   READ(label,*)ACAlpha
-   ENDIF
-   print*,'*********************'
-   print*,'*** MONOMER ALPHA ***',Mon%Monomer,ACAlpha 
-   endif
+!   if(Mon%Monomer==1) then
+!   IF(COMMAND_ARGUMENT_COUNT().Ne.0) THEN
+!   CALL GET_COMMAND_ARGUMENT(1,label)
+!   READ(label,*)ACAlpha
+!   ENDIF
+!   print*,'*********************'
+!   print*,'*** MONOMER ALPHA ***',Mon%Monomer,ACAlpha 
+!   endif
 
    !ACAlpha=sqrt(2d0)/2d0
    !ACAlpha=1d-12
    !Print*, 'UNCOUPLED,ACAlpha',ACAlpha
    select case(Mon%TwoMoInt)
    case(TWOMO_FOFO)
-
 
       call AB_CAS_FOFO(ABPlus,ABMin,ECASSCF,URe,Mon%Occ,XOne, &
                   Mon%IndN,Mon%IndX,Mon%IGem,Mon%NAct,Mon%INAct,Mon%NDimX,NBas,Mon%NDimX,&
@@ -2525,11 +2437,6 @@ double precision, external :: FRDM2GVB
 
    end select 
    write(LOUT,'(/,1x,a,f16.8,a,1x,f16.8)') 'ABPlus',norm2(ABPlus),'ABMin',norm2(ABMin)
-
-   ! test for e2ind
-   allocate(Mon%PP(Mon%NDimX**2)) 
-   Mon%PP = ABMin 
-   !Mon%PP = ABMin 
 
    EigVecR = 0
    Eig = 0
@@ -2575,7 +2482,7 @@ double precision, external :: FRDM2GVB
     ! Mon%EigY = 0
 
 
-!    else  ! MH 1 Dec 2020: disable ERPAVECTRANS
+!!    else  ! MH 1 Dec 2020: disable ERPAVECTRANS
 !   
 !      allocate(Mon%EigY(Mon%NDimX**2),Mon%EigX(Mon%NDimX**2),&
 !               Mon%Eig(Mon%NDimX))
@@ -2596,8 +2503,8 @@ double precision, external :: FRDM2GVB
 !                                      *(Mon%EigY((j-1)*Mon%NDimX+i)-Mon%EigX((j-1)*Mon%NDimX+i))
 !         enddo
 !      enddo
-!
-!   endif
+!!
+!!   endif
 
    !print*, 'STOP AFTER RESPONSE FOR CHECKS!'
    !Stop
@@ -2667,7 +2574,7 @@ double precision, external :: FRDM2GVB
         Eig0 = 0
         Eig1 = 0
 
-        !! glupi  test energii AC0
+        !! silly AC0 energy test
         ! Call AC0CAS(ECorr,ETot,TwoMO,Mon%Occ,URe,XOne,&
         !             ABPLUS,ABMIN,EigY0,Eig0, &
         !             Mon%IndN,Mon%IndX,Mon%NDimX,NBas,Mon%NDim,NInte1,NInte2)

@@ -135,8 +135,7 @@ C
      $            func_phi = (-1.5) / ((func_g_prim + func_g) *
      $                                           (func_g_prim * func_g))
 C
-C Q to Reza: should it be "or" or "and" below?
-                  If((RhoGrid(K).Gt.thresh).or.(RhoGrid(L).Gt.thresh))
+                  If((RhoGrid(K).Gt.thresh).And.(RhoGrid(L).Gt.thresh))
      $            ffunc(K) = ffunc(K) +
      $            (0.5 * func_phi * RhoGrid(L) * WGrid(L) * RhoGrid(K))
             EndDo

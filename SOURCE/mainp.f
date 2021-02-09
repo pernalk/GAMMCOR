@@ -239,7 +239,7 @@ C
 C     CALCULATE THE DIMENSIONS
       If(IDALTON.Eq.0) then
 C        Call CheckNBa(NBasis,Title)
-        Call basinfo(NBasis,'AOTWOINT.mol','MOLPRO')
+        Call basinfo(NBasis,'AOONEINT.mol','MOLPRO')
       endif
 C
       Call DimSym(NBasis,NInte1,NInte2,MxHVec,MaxXV)

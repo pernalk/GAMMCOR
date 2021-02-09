@@ -8,14 +8,15 @@ C
       use types   
       use sorter
       use tran   
+      use sapt_main
 C
       Implicit Real*8 (A-H,O-Z)
 C
       Real*8 XKin(NInte1),XNuc(NInte1),Occ(NBasis),URe(NBasis,NBasis),
      $ TwoEl(NInte2),UMOAO(NBasis,NBasis),
      $ UAux(NBasis,NBasis)
-      integer :: ione,NBas(8)
-      logical :: exione 
+      integer :: ione,NBas(8),NSymBas(8),NSymOrb(8),nrhf(8),ioprhf
+      logical :: exione,ex 
       double precision, allocatable :: TMPMO(:,:)
 C
       Character*60 Line
@@ -39,17 +40,51 @@ C
       Return
       EndIf
 C
-C     READ UMOAO FROM DALTON.MOPUN
+      If(ICASSCF.Eq.1) Then
+C
+C     READ UMOAO FROM SIRIUS.RST
+C
+      inquire(file='SIRIUS.RST',EXIST=ex)
+      if(ex) then
+      open(newunit=iunit,file='SIRIUS.RST',status='OLD', 
+     $    access='SEQUENTIAL',form='UNFORMATTED')
+      call readlabel(iunit,'BASINFO ')
+      read (iunit) NSym,NSymBas,NSymOrb,nrhf,ioprhf
+      close(iunit)
+      else
+      stop 'WARNING: SIRIUS.RST NOT FOUND!'
+      endif
+C
+      Call read_mo_dalton(UAux,NBasis,NSym,NSymBas,NSymOrb,
+     $            'SIRIUS.RST','DALTON.MOPUN')
+C
+      Do I=1,NBasis
+      Do J=1,NBasis
+      UMOAO(J,I)=UAux(I,J)
+      EndDo
+      EndDo
+C      
+      Call SortOrbDal(UMOAO,Occ,NInAc,NAc,NSym,NSymOrb,NBasis)
+      Do I=1,NInAc+NAc
+      Occ(I)=Occ(I)/2.D0
+      EndDo
+C
+      Call read1elsym(XKin,UMOAO,NSym,NSymBas,NBasis,NInte1)
+C
+      Else
+C
+C     READ UMOAO FROM DALTON.MOPUN 
 C
       Open(10,File='DALTON.MOPUN',Form='Formatted',Status='Old')
       Read(10,'(A60)') Line
-      IEND=0
       Do J=1,NBasis
-      IST=IEND+1
-      IEND=IEND+NBasis
       Read(10,'(4F18.14)') (UMOAO(J,I),I=1,NBasis)
       EndDo
       Close(10)
+      Call read1el(XKin,UMOAO,NBasis,NInte1)
+C
+      EndIf
+C
       Do I=1,NBasis
       Do J=1,NBasis
       URe(I,J)=0.D0
@@ -57,101 +92,13 @@ C
       EndDo
       EndDo
 C
-C     READ 1-EL NO HAMILTONIAN FROM AOONEINT
-C
-      Call read1el(XKin,UMOAO,NBasis,NInte1)
-C
 C     GET 2-EL NO INTEGRALS AND CICoef
 C 
-C      Call readtwoint(NBasis,'AOTWOINT','AOTWOSORT')
       If(ITwoEl.Eq.1) Then
       Call read2el(TwoEl,UMOAO,NBasis,NInte2)
       Else
       Call readtwoint(NBasis,1,'AOTWOINT','AOTWOSORT')
-C      Call LoadSaptTwoEl(3,TwoEl,NBasis,NInte2)
-C      Write(6,'(" Transforming two-electron integrals ...",/)')
-C      Call TwoNO1(TwoEl,UMOAO,NBasis,NInte2)
       EndIf
-!      Call altread2el(TwoEl,UMOAO,NBasis,NInte2)
-
-C
-C     TESTING TRAN4
-C      allocate(TMPMO(NBasis**2,NBasis**2))
-C
-C      call tran4_unsym2(NBasis,NBasis,UMOAO,NBasis,UMOAO,
-C     $     NBasis,UMOAO,NBasis,UMOAO,TMPMO)
-C
-C       block
-C       integer :: ip,iq,ir,is,irs,ipq 
-C       irs=0
-C       do is=1,NBasis
-C       do ir=1,NBasis
-C       irs=irs+1
-C       ipq=0
-C       do iq=1,NBasis
-C       do ip=1,NBasis
-C       ipq=ipq+1
-CC
-C       write(6,*) ip,iq,ir,is,TwoEl(NAddr3(ip,iq,ir,is))
-CC       write(6,*) TwoEl(NAddr3(ip,iq,ir,is)),TMPMO(ipq,irs)
-CCC       write(6,*) TMPMO(ipq,irs), TMPMO(irs,ipq)
-C       enddo
-C       enddo
-C       enddo
-C       enddo
-C       end block
-C      call tran4_sym(NBasis,NBasis,transpose(UMOAO),
-C     $ NBasis,transpose(UMOAO),
-C     $ NBasis,transpose(UMOAO),NBasis,transpose(UMOAO),
-C     $ 'TWOMOAA')
-CC
-C      block
-C      integer :: ip,iq,ir,is,irs,ipq
-C      integer :: iunit
-C      double precision :: work1(NBasis*NBasis)
-C      double precision :: work2(NBasis*NBasis)
-CC
-C      open(newunit=iunit,file='TWOMOAA',status='OLD',
-C     $ access='DIRECT',recl=8*NBasis*(NBasis+1)/2)
-CC
-CC      CHECK-1
-CC      irs=0
-CC      do is=1,NBasis
-CC      do ir=1,NBasis
-CC      !irs=irs+1
-CC      irs = min(ir,is) + max(ir,is)*(max(ir,is)-1)/2
-CC      read(iunit,rec=irs) work1(1:NBasis*(NBasis+1)/2)
-CC      call triang_to_sq(work1,work2,NBasis)
-CC      ipq=0
-CC      do iq=1,NBasis
-CC      do ip=1,NBasis
-CC      ipq=ipq+1
-CC      write(6,*) TwoEl(NAddr3(ip,iq,ir,is)), work2(ipq)
-CC      enddo
-CC      enddo
-CC      enddo
-CC      enddo
-CC     CHECK-2
-C      irs=0
-C      do is=1,NBasis
-C      do ir=1,is
-C      irs=irs+1
-C      read(iunit,rec=irs) work1(1:NBasis*(NBasis+1)/2)
-C      ipq=0
-C      do iq=1,NBasis
-C      do ip=1,iq
-C      ipq = ipq+1
-C      write(6,*) TwoEl(NAddr3(ip,iq,ir,is)), work1(ipq)   
-C!      write(6,*) ip,iq,ir,is,TwoEl(NAddr3(ip,iq,ir,is))
-C      enddo
-C      enddo
-C      enddo
-C      enddo
-C
-C      close(iunit)
-C      end block
-C
-C      deallocate(TMPMO)
 C
       If(ICASSCF.Eq.0) Then
 C
@@ -177,16 +124,20 @@ C
 C
       ElseIf(ICASSCF.Eq.1) Then
 C
-      Occ(1:NBasis)=0.D0
-C
-      Open(10,File='occupations.dat',Form='Formatted',Status='Old') 
-C
-      Read(10,*) NInAc,NAc
-      NInAc=NInAc/2
-      Read(10,*) (Occ(I),I=1,NInAc+NAc)
+c      Occ(1:NBasis)=0.D0
+cC
+c      Open(10,File='occupations.dat',Form='Formatted',Status='Old') 
+cC
+c      Read(10,*) NInAc,NAc
+c      NInAc=NInAc/2
+c      Read(10,*) (Occ(I),I=1,NInAc+NAc)
+c      Sum=0.D0
+c      Do I=1,NInAc+NAc
+c      Occ(I)=Occ(I)/2.D0
+c      Sum=Sum+Occ(I)
+c      EndDo
       Sum=0.D0
       Do I=1,NInAc+NAc
-      Occ(I)=Occ(I)/2.D0
       Sum=Sum+Occ(I)
       EndDo
 C
@@ -2296,7 +2247,7 @@ C
 ****** PIOTR KOWALSKI, 01/2018 ***********************
       subroutine read1el(XKin,UMOAO,NBasis,NInte1)
 C
-C     Reads 1-el integrals in AO and ttransform to NO
+C     Reads 1-el integrals in AO and transform to NO
 C     Returns XKin in NO
 C
       Implicit Real*8 (A-H,O-Z)
@@ -2345,6 +2296,79 @@ C
         write(56,*) XKin
 
       close(iunit77)
+      return
+      end
+
+      subroutine read1elsym(XKin,UMOAO,NSym,NSymBas,NBasis,NInte1)
+C
+C     Reads 1-el integrals in AO in symm blocks and transform to NO
+      Implicit Real*8 (A-H,O-Z)
+C
+      Dimension XKin(NInte1),UMOAO(NBasis,NBasis),NSymBas(8)
+C
+      parameter (mxbuf = 10000)  ! KP
+      double precision  dbuf(mxbuf)
+      integer ibuf(mxbuf*2),iibuf(mxbuf*2)
+      integer iunit77,iunit88, iunit99, ndim, norb, nbas, nfone
+      logical iprtvc
+      integer  maxrep, naos, lbuf, nibuf, nbits
+      common /daltwoel/  maxrep, naos(8), lbuf, nibuf, nbits
+      integer nxx
+C
+      XKin(1:NInte1)=         0.D0
+C
+      ip=0
+      ipq=0
+      ipqs=0
+      do i=1,NSym
+      do ii=1,NSymBas(i)
+      ip=ip+1
+c
+      iq=0
+      do j=1,NSym
+      do jj=1,NSymBas(j)
+      iq=iq+1
+c
+      if(ip.ge.iq) then
+c
+      ipq=ipq+1
+      if(i.eq.j) then
+      ipqs=ipqs+1
+      iibuf(ipqs)=ipq
+      endif
+c
+      endif
+c
+      enddo
+      enddo
+      enddo
+      enddo
+C
+      iunit77=77
+      iunit88=88
+      iunit99=99
+
+      OPEN(UNIT=iunit77,FILE='AOONEINT',STATUS='OLD',
+     &           ACCESS='SEQUENTIAL',FORM='UNFORMATTED')
+
+      call initoneel(iunit77)
+
+10    continue
+      call readoneel(iunit77, dbuf, ibuf, lbuf, nibuf, nxx)
+
+      do i=1,nxx
+      XKin(iibuf(ibuf(i))) = dbuf(i)
+      end do
+
+      if (nxx .ge. 0) go to 10
+C
+C     TRANSFORM THE INTEGRALS
+C
+      Write(6,'(" Transforming One-electron integrals ...",/)')
+        write(55,*) XKin
+      Call MatTr(XKin,UMOAO,NBasis)
+        write(56,*) XKin
+
       return
       end
 
@@ -3236,4 +3260,117 @@ C
       Close(iunit)
 C
       end subroutine TwoEHartree
+
+*Deck SortOrbDal 
+      Subroutine SortOrbDal(URe1,Occ2,NNIn,NNAct,NSym,IOrbSym,NBasis)
+C     sorts the orbitals in URe1 so that the
+C     inactive orbitals go first, then active, and secondary orbitals
+C
+      Implicit Real*8 (A-H,O-Z)
+C
+      Real*8 URe1(NBasis*NBasis),URe2(NBasis*NBasis),
+     $ Occ1(NBasis),Occ2(NBasis)
+      Dimension IOrbSym(8),IActOrb(NBasis),InActOrb(NBasis)
+      Dimension LabelAct(NBasis),LabelIAct(NBasis),
+     $ ICpy1(NBasis),ICpy2(NBasis)
+C
+      Occ2(1:NBasis)=0.0
+C
+      Open(10,File="occupations.dat",Form='Formatted',Status='Old')
+      Read(10,*)NNIn,NNAct
+      NNIn=NNIn/2
+      Read(10,*)(Occ1(I),I=1,NNAct+NNIn)
+      Read(10,*) (IActOrb(I),I=1,NSym)
+      Read(10,*) (InActOrb(I),I=1,NSym)
+      Close(10)
+C
+      II=0
+      Do I=1,NSym
+      Do J=1,IOrbSym(I)
+      II=II+1
+      LabelAct(II)=0
+      If(J.Gt.InActOrb(I).And.J.Le.IActOrb(I)+InActOrb(I))
+     $ LabelAct(II)=1
+      LabelIAct(II)=0
+      If(J.Le.InActOrb(I)) LabelIAct(II)=1
+      EndDo
+      EndDo
+C
+      Do I=1,NNIn+NNAct
+      ICpy1(I)=0
+      ICpy2(I)=0
+      EndDo
+C
+      Do II=1,NNIn+NNAct
+C
+      Do I=1,NNIn+NNAct
+      If(ICpy2(I).Eq.0.And.ICpy1(II).Eq.0.And.Occ1(I).Eq.2.0D0) Then
+      ICpy2(I)=1
+      ICpy1(II)=1
+      Occ2(II)=Occ1(I)
+      EndIf
+      EndDo
+C
+      If(ICpy1(II).Eq.0) Then
+      Do I=1,NNIn+NNAct
+      If(ICpy2(I).Eq.0.And.ICpy1(II).Eq.0) Then
+      ICpy2(I)=1
+      ICpy1(II)=1
+      Occ2(II)=Occ1(I)
+      EndIf
+      EndDo
+      EndIf
+C
+      EndDo
+C
+      Do I=1,NBasis
+      ICpy1(I)=0
+      ICpy2(I)=0
+      EndDo
+C
+      Do II=1,NBasis
+C
+      Do I=1,NBasis
+      If(LabelIAct(I).Eq.1.And.ICpy2(I).Eq.0.And.ICpy1(II).Eq.0) Then
+      ICpy2(I)=1
+      ICpy1(II)=1
+      Do J=1,NBasis
+      URe2(II+(J-1)*NBasis)=URe1(I+(J-1)*NBasis)
+      EndDo
+      EndIf
+      EndDo
+C
+      If(ICpy1(II).Eq.0) Then
+      Do I=1,NBasis
+      If(LabelAct(I).Eq.1.And.ICpy2(I).Eq.0.And.ICpy1(II).Eq.0) Then
+      ICpy2(I)=1
+      ICpy1(II)=1
+      Do J=1,NBasis
+      URe2(II+(J-1)*NBasis)=URe1(I+(J-1)*NBasis)
+      EndDo
+      EndIf
+      EndDo
+      EndIf
+C
+      If(ICpy1(II).Eq.0) Then
+      Do I=1,NBasis
+      If(ICpy2(I).Eq.0.And.ICpy1(II).Eq.0) Then
+      ICpy2(I)=1
+      ICpy1(II)=1
+      Do J=1,NBasis
+      URe2(II+(J-1)*NBasis)=URe1(I+(J-1)*NBasis)
+      EndDo
+      EndIf
+      EndDo
+      EndIf
+C
+C     Do II
+      EndDo
+C
+      Do I=1,NBasis*NBasis
+      URe1(I)=URe2(I)
+      EndDo
+C
+      Return
+      End
 

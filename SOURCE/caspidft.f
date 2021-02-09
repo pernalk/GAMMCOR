@@ -34,8 +34,9 @@ c      double precision sigmaco(ngrid),sigmaoo(ngrid)
 c      double precision vrhoc(ngrid),vrhoo(ngrid)
 c      double precision vsigmacc(ngrid),vsigmaco(ngrid),vsigmaoo(ngrid)
 C
-      Call CORRELON(URe,UNOAO,Occ,NBasis)
-      stop
+c      Call CORRELON(URe,UNOAO,Occ,NBasis)
+c      Call DELCORREL(URe,UNOAO,Occ,NBasis)
+c      stop
 C
       FDeriv=.True.
       Open=.False.
@@ -295,6 +296,9 @@ C
       logical fderiv,open
       integer igrad
       character*(30) name
+
+c      Call DELCORREL(URe,UNOAO,Occ,NBasis)
+c      stop 
 C
 C     IFlagRead = 0 - generate grid data, do not write to a file
 C     if parameteres in caspidft are optimized it is useful to use flags different from 0 to avoid generating data on grid more than once
@@ -1430,6 +1434,199 @@ C
 C
       Return
       End 
+
+*Deck DELCORREL
+      Subroutine DELCORREL(URe,UNOAO,Occ,NBasis)
+C
+C     DELTA-CORRELONS
+C
+      use types
+C
+      Implicit Real*8 (A-H,O-Z)
+C
+      Parameter(Zero=0.D0, Half=0.5D0, One=1.D0, Two=2.D0, Four=4.D0)
+C
+      Include 'commons.inc'
+C
+      Real*8, Dimension(:), Allocatable :: OrbXGrid
+      Real*8, Dimension(:), Allocatable :: OrbYGrid
+      Real*8, Dimension(:), Allocatable :: OrbZGrid
+      Real*8, Dimension(:), Allocatable :: WGrid
+      Real*8, Dimension(:), Allocatable :: RhoGrid
+      Real*8, Allocatable :: RDM2Act(:),OrbGrid(:,:)
+      Real*8, Allocatable :: RR(:,:),RX(:),RY(:),RZ(:)
+      Real*8, Allocatable :: OnTop(:), CRe(:),CIm(:), DELXX(:)
+C
+      Dimension URe(NBasis,NBasis),UNOAO(NBasis,NBasis),Occ(NBasis),
+     $ Ind1(NBasis),Ind2(NBasis)
+C
+      Call molprogrid0(NGrid,NBasis)
+C
+      Allocate  (WGrid(NGrid))
+      Allocate  (OrbGrid(NGrid,NBasis))
+      Allocate  (OrbXGrid(NBasis*NGrid))
+      Allocate  (OrbYGrid(NBasis*NGrid))
+      Allocate  (OrbZGrid(NBasis*NGrid))
+      Allocate  (RhoGrid(NGrid))
+      Allocate  (RR(3,NGrid))
+      Allocate  (RX(NGrid))
+      Allocate  (RY(NGrid))
+      Allocate  (RZ(NGrid))
+      Allocate  (OnTop(NGrid))
+      Allocate  (CRe(NGrid))
+      Allocate  (CIm(NGrid))
+      Allocate  (DELXX(NGrid))
+C
+      Call molprogrid1(RR,NGrid) 
+C
+      NAct=NAcCAS
+      INActive=NInAcCAS
+      NOccup=INActive+NAct
+      Ind2(1:NBasis)=0
+      Do I=1,NAct
+      Ind1(I)=INActive+I
+      Ind2(INActive+I)=I
+      EndDo
+C
+      NRDM2Act = NAct**2*(NAct**2+1)/2
+      Allocate (RDM2Act(NRDM2Act))
+      RDM2Act(1:NRDM2Act)=Zero
+C
+      Open(10,File="rdm2.dat",Status='Old')
+C
+   10 Read(10,'(4I4,F19.12)',End=40)I,J,K,L,X
+C
+C     X IS DEFINED AS: < E(IJ)E(KL) > - DELTA(J,K) < E(IL) > = 2 GAM2(JLIK)
+C
+      RDM2Act(NAddrRDM(J,L,I,K,NAct))=Half*X
+C
+      I=Ind1(I)
+      J=Ind1(J)
+      K=Ind1(K)
+      L=Ind1(L)
+C
+      GoTo 10
+   40 Continue
+      Close(10)
+C
+C     load orbgrid and gradients, and wgrid
+C
+      Call molprogrid(OrbGrid,OrbXGrid,OrbYGrid,OrbZGrid,
+     $ WGrid,UNOAO,NGrid,NBasis)
+C
+      Do I=1,NGrid
+      Call DenGrid(I,RhoGrid(I),Occ,URe,OrbGrid,NGrid,NBasis)
+      OnTop(I)=Zero
+      EndDo
+C
+      Do IP=1,NOccup
+      Do IQ=1,NOccup
+      Do IR=1,NOccup
+      Do IS=1,NOccup
+C
+      Gam2=FRDM2(IP,IQ,IR,IS,RDM2Act,Occ,Ind2,NAct,NBasis)
+C
+      If(Abs(Gam2).Gt.1.D-8) Then
+C
+      Do I=1,NGrid
+      OnTop(I)=OnTop(I)
+     $ +Two*Gam2*OrbGrid(I,IP)*OrbGrid(I,IQ)*OrbGrid(I,IR)*OrbGrid(I,IS)
+      EndDo
+C
+      EndIf
+C
+      EndDo
+      EndDo
+      EndDo
+      EndDo
+C
+      Write(6,'(/,X,"STATE : ",I1,".", I1)')inst(1,1),inst(2,1)
+C
+      AP=0.01
+C
+      If(inst(1,1).Eq.1.And.inst(2,1).Eq.1) Then
+C
+C     if ground state: compute X(r)*Pade and save it
+C
+      Write(6,'(/,X,"**** COMPUTE GROUND STATE X(r) **** ")')
+C
+      Open(10,File="x_gs.dat")
+C
+      Do I=1,NGrid
+C 
+      XX=Zero
+      XPade=RhoGrid(I)/(AP+RhoGrid(I))
+      If(RhoGrid(I).Gt.1.D-7) XX=Two*OnTop(I)/RhoGrid(I)**2*XPade
+      Write(10,*)I,XX
+C
+      EndDo
+C
+      Close(10)
+C
+C     If(inst(1,1).Eq.1.And.inst(2,1).Eq.1) Then
+      Else
+C
+C     if excited state: compute delta-correlon wavefunction
+C
+      Write(6,'(/,X,"**** COMPUTE X_exct-X_gs **** ")')
+      Open(10,File="x_gs.dat",Status='Old')
+C       
+      Do I=1,NGrid
+C
+      XXES=Zero
+      XPade=RhoGrid(I)/(AP+RhoGrid(I))
+      If(RhoGrid(I).Gt.1.D-7) XXES=Two*OnTop(I)/RhoGrid(I)**2*XPade
+      Read(10,*)II,XXGS
+      DELXX(I)=XXES-XXGS
+C
+      EndDo
+C
+      Close(10)
+C
+      XNorm=Zero
+      Do I=1,NGrid
+      XNorm=XNorm+WGrid(I)*Abs(DELXX(I))
+      EndDo
+C
+      Do I=1,NGrid
+C
+      RX(I)=RR(1,I)
+      RY(I)=RR(2,I)
+      RZ(I)=RR(3,I)
+C 
+      CRe(I)=Zero
+      CIm(I)=Zero
+C
+      If(DELXX(I).Ge.Zero) Then
+      CRe(I)=Sqrt(DELXX(I)/XNorm)
+      Else
+      CIm(I)=Sqrt(-DELXX(I)/XNorm)
+      EndIf
+C
+      EndDo 
+C
+      Call SortVecs(RZ,RX,RY,RhoGrid,DELXX,CRe,CIm,NGrid)
+C
+      Write(*,'("   z(bohr)     Rho",10X,"DELX     Psi_Re   Psi_Im")')
+      Do I=1,NGrid
+c      if(RhoGrid(I).gt.1.d-2.and. CRe(I)+CIm(I).gt.0.05) 
+c     $ Write(*,'(F10.4,E13.4,3F10.4)')
+c     $ RZ(I),RX(I),RY(I),CRe(I),CIm(I)
+
+c      If(Abs(RX(I)).Lt.1.D-10.And.Abs(RY(I)).Lt.1.D-10)
+      If(Abs(RX(I)).Lt.0.5.And.Abs(RX(I)).Gt.0.10)
+c.And.
+c     $ Abs(RY(I)).Lt.1.D-10)
+     $ Write(*,'(2F10.4,E13.4,3F10.4)')
+     $ RZ(I),RY(I),RhoGrid(I),DELXX(I),CRe(I),CIm(I)
+
+      EndDo
+C
+C     If(inst(1,1).Eq.1.And.inst(2,1).Eq.1) Then
+      EndIf
+C
+      Return
+      End
 
 *Deck SortVecs
       Subroutine SortVecs(XX,YY1,YY2,YY3,YY4,YY5,YY6,N)
