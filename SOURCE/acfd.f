@@ -2327,6 +2327,7 @@ C
 C     FIND THE 0TH-ORDER SOLUTION FOR THE VIRTUAL-INACTIVE BLOCKS
 
 C KP 15.05.2019
+      if(idalton.eq.0) then
       open(10,file='fock.dat')
       work1=0
       Do IP=NOccup+1,NBasis
@@ -2336,6 +2337,7 @@ C KP 15.05.2019
       EndDo
       EndDo
       close(10)
+      endif
 C
       Do IP=NOccup+1,NBasis
       Do IQ=1,INActive
@@ -2358,9 +2360,12 @@ C
      $ NInte1,NInte2,NBasis)
 C
       Eig(NFree1)=ABP
-c KP 15.05.2019
-      If(abs(ABP-work1(ip,iq)).gt.1.d-7)
-     $Write(*,*)'ABP inconsistent with eps_a-eps_i for',ip,iq
+C
+      If(IDALTON.Eq.0) Then
+      If(ABS(ABP-work1(IP,IQ)).Gt.1.d-7)
+     $Write(*,*)'ABP inconsistent with eps_a-eps_i for',IP,IQ
+      EndIf
+C
       EigY(NFree2)=One/Sqrt(Two)
       EigX(NFree2)=One/Sqrt(Two)
 C
@@ -2552,26 +2557,22 @@ C
       ECorr=EAll-EIntra
       Print*, 'EAll,EIntra',EAll,EIntra
 C
-C KP 15.05.2019 MP2 energy (only inactive-virtual enter)
-C to compare with molpro use {mp2;core,0}
-      EMP2=Zero
-      Do IP=NOccup+1,NBasis
-c herer!!!???
-      Do IR=1,INActive
-c      Do IR=1,INActive+1
-      Do IQ=NOccup+1,NBasis
-c herer!!!???
-      Do IS=1,INActive
-c      Do IS=1,INActive+1
-      EMP2=EMP2-(Two*TwoNO(NAddr3(IP,IR,IQ,IS))
-     $ -TwoNO(NAddr3(IP,IS,IQ,IR)))*TwoNO(NAddr3(IP,IR,IQ,IS))/
-     $ (work1(IP,IR)+work1(IQ,IS))
-C
-      EndDo
-      EndDo
-      EndDo
-      EndDo
-      Write(6,'(/,1x,a,13x,f16.8)') 'EMP2   Energy', EMP2 
+C     MP2 energy (only inactive-virtual enter)
+C     to compare with molpro use {mp2;core,0}
+c      EMP2=Zero
+c      Do IP=NOccup+1,NBasis
+c      Do IR=1,INActive
+c      Do IQ=NOccup+1,NBasis
+c      Do IS=1,INActive
+c      EMP2=EMP2-(Two*TwoNO(NAddr3(IP,IR,IQ,IS))
+c     $ -TwoNO(NAddr3(IP,IS,IQ,IR)))*TwoNO(NAddr3(IP,IR,IQ,IS))/
+c     $ (work1(IP,IR)+work1(IQ,IS))
+cC
+c      EndDo
+c      EndDo
+c      EndDo
+c      EndDo
+c      Write(6,'(/,1x,a,13x,f16.8)') 'EMP2   Energy', EMP2 
 C
 C ----------------------------------------------------------------    
       Return
@@ -6355,12 +6356,6 @@ C
       EndDo
       EndDo
 C
-C      Do IP=NOccup+1,NBasis
-C      Do IQ=1,NOccup
-C      write(*,*)'Eps',IP,IQ,Eps(IP,IQ)
-C      EndDo
-C      EndDo
-C
       Gamma(1:NInte1)=Zero
 C
       IJ=0
@@ -6504,20 +6499,6 @@ c new line
 C     TEST
 C      Print*, 'Fock,PC-Ka',norm2(Fock),norm2(PC(1:NVirt))
 C
-C      BLOCK THIS TEST TEMPORARILY
-C      open(20,file='epsi.dat')
-C      Do IQ=1,INActive 
-C      read(20,*)i,epsi(i)
-C      enddo
-C      close(20)
-C      open(10,file='fock.dat')
-C      Do IP=NOccup+1,NBasis
-C      Do IQ=1,INActive
-C      work1(IP,IQ)=PC(IP-NOccup)-epsi(iq)
-C      write(10,*)ip,iq,work1(ip,iq)
-C      EndDo
-C      EndDo
-C      close(10)
 C
       Do I=1,NVirt
       Do J=1,NVirt
