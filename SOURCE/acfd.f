@@ -344,7 +344,7 @@ C
 C
       Open(10,File="rdm2.dat",Status='Old')
 C
-   10 Read(10,'(4I4,F19.12)',End=40)I,J,K,L,X
+   10 Read(10,*,End=40)I,J,K,L,X
 C
 C     X IS DEFINED AS: < E(IJ)E(KL) > - DELTA(J,K) < E(IL) > = 2 GAM2(JLIK)
 C
@@ -1180,7 +1180,7 @@ C
 C
       Open(10,File="rdm2.dat",Status='Old')
 C
-   10 Read(10,'(4I4,F19.12)',End=40)I,J,K,L,X
+   10 Read(10,*,End=40)I,J,K,L,X
 C
 C     X IS DEFINED AS: < E(IJ)E(KL) > - DELTA(J,K) < E(IL) > = 2 GAM2(JLIK)
 C
@@ -1943,7 +1943,7 @@ C
       Open(10,File="rdm2.dat",Status='Old')
       Write(6,'(/,1X,''Active block of 2-RDM read from rdm2.dat'')')
 C
-   10 Read(10,'(4I4,F19.12)',End=40)I,J,K,L,X
+   10 Read(10,*,End=40)I,J,K,L,X
 C
 C     X IS DEFINED AS: < E(IJ)E(KL) > - DELTA(J,K) < E(IL) > = 2 GAM2(JLIK)
 C
@@ -2705,7 +2705,7 @@ C
       Open(10,File="rdm2.dat",Status='Old')
       Write(6,'(/,1X,''Active block of 2-RDM read from rdm2.dat'')')
 C
-   10 Read(10,'(4I4,F19.12)',End=40)I,J,K,L,X
+   10 Read(10,*,End=40)I,J,K,L,X
 C
 C     X IS DEFINED AS: < E(IJ)E(KL) > - DELTA(J,K) < E(IL) > = 2 GAM2(JLIK)
 C
@@ -6195,7 +6195,7 @@ C
       Open(10,File="rdm2.dat",Status='Old')
       Write(6,'(/,1X,''Active block of 2-RDM read from rdm2.dat'')')
 C
-   10 Read(10,'(4I4,F19.12)',End=40)I,J,K,L,X
+   10 Read(10,*,End=40)I,J,K,L,X
 C
 C     X IS DEFINED AS: < E(IJ)E(KL) > - DELTA(J,K) < E(IL) > = 2 GAM2(JLIK)
 C
@@ -7548,7 +7548,7 @@ C
       Open(10,File="rdm2.dat",Status='Old')
       Write(6,'(/,1X,''Active block of 2-RDM read from rdm2.dat'')')
 C
-   10 Read(10,'(4I4,F19.12)',End=40)I,J,K,L,X
+   10 Read(10,*,End=40)I,J,K,L,X
 C
 C     X IS DEFINED AS: < E(IJ)E(KL) > - DELTA(J,K) < E(IL) > = 2 GAM2(JLIK)
 C
