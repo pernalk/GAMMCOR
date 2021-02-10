@@ -3275,6 +3275,7 @@ C
      $ ICpy1(NBasis),ICpy2(NBasis)
 C
       Occ2(1:NBasis)=0.0
+      Occ1(1:NBasis)=0.0
 C
       Open(10,File="occupations.dat",Form='Formatted',Status='Old')
       Read(10,*)NNIn,NNAct

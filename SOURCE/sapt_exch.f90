@@ -135,9 +135,9 @@ double precision,allocatable :: work1(:)
  call dgemm('N','N',NBas,NBas,NBas,1d0,PB,NBas,USa,NBas,0d0,Qba,NBas)
 
 ! old (too large)
- print*, 'A: num0, num1',A%num0,A%num1
- print*, 'B: num0, num1',B%num0,B%num1
- print*, 'dimOA,dimOB',dimOA,dimOB
+ !print*, 'A: num0, num1',A%num0,A%num1
+ !print*, 'B: num0, num1',B%num0,B%num1
+ !print*, 'dimOA,dimOB',dimOA,dimOB
 ! call tran3MO_Q(NBas,dimOA,A%CMO,Qba,'TWOA3B')
 ! call tran3MO_Q(NBas,dimOB,B%CMO,Qab,'TWOB3A')
 
@@ -2082,8 +2082,8 @@ end subroutine e2exind
 
 subroutine e2exdisp(Flags,A,B,SAPT)
 
-use exappr 
-use sref_exch 
+!use exappr 
+!use sref_exch 
 
 implicit none
 
@@ -2146,7 +2146,7 @@ double precision,parameter :: SmallE = 1.D-3
  nelA = 2d0*A%XELE
  nelB = 2d0*B%XELE
 
-! print thresholds
+ ! print thresholds
  if(SAPT%IPrint>5) then 
     write(LOUT,'(/,1x,a)') 'Thresholds in E2exch-disp:'
     write(LOUT,'(1x,a,2x,e15.4)') 'SmallE      =', SmallE

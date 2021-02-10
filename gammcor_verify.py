@@ -135,10 +135,12 @@ dir_ac0gvb=["TESTS/AC0GVB/TEST1","TESTS/AC0GVB/TEST1/INCORE_INTEG"]
 dir_acgvb=["TESTS/ACGVB/TEST1","TESTS/ACGVB/TEST1/INCORE_INTEG"]
 ## AC1-GVB ##
 dir_ac1gvb=["TESTS/AC1GVB/TEST1","TESTS/AC1GVB/TEST1/INCORE_INTEG"]
-## EERPA-GVB
+## EERPA-GVB ##
 dir_eerpagvb=["TESTS/EERPAGVB/TEST1","TESTS/EERPAGVB/TEST2","TESTS/EERPAGVB/TEST3","TESTS/EERPAGVB/TEST4"]
-## AC0_DALTON
+## AC0_DALTON WITH CASSCF ##
 dir_ac0dalton=["TESTS/AC0_DALTON/TEST1","TESTS/AC0_DALTON/TEST1/INCORE","TESTS/AC0_DALTON/TEST2","TESTS/AC0_DALTON/TEST2/INCORE"]
+## AC0_DALTON WITH HF WAVEFUNCTION ##
+dir_ac0_hf_dalton=["TESTS/AC0_HF_DALTON"]
 #
 # run tests
 #
@@ -159,6 +161,9 @@ run_test(dir_ac0,ac0_en)
 #
 print "* testing AC0-CAS[dalton] energy"
 run_test(dir_ac0dalton,ac0_en)
+#
+print "* testing AC0-HF[dalton] energy"
+run_test(dir_ac0_hf_dalton,ac0_en)
 #
 print "* testing AC-CAS[molpro] energy"
 run_test(dir_ac,ac_en)
