@@ -1556,20 +1556,20 @@ implicit none
 
 character(*),intent(in) :: basfile,intf
 integer,intent(out) :: nbasis
-integer :: iunit 
+integer :: iunit
 integer :: nsym,nbas(8),norb(8),nrhf(8),ioprhf
 logical :: ex
 
  inquire(file=basfile,EXIST=ex)
 
- if(ex) then 
+ if(ex) then
     open(newunit=iunit,file=basfile,status='OLD', &
          access='SEQUENTIAL',form='UNFORMATTED')
-   
+
     if(trim(intf)=='DALTON') then
        ! read basis info
        call readlabel(iunit,'BASINFO ')
-   
+
        read (iunit) nsym,nbas,norb,nrhf,ioprhf
        !write(LOUT,*)  nsym,nbas,norb,nrhf,ioprhf
 

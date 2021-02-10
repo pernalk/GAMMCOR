@@ -1822,6 +1822,7 @@ double precision,parameter :: BigE = 1.D8
  deallocate(tindB,tindA)
 
  ! term A3
+ write(LOUT,'()')
  call tran4_gen(NBas,&
           NBas,B%CMO,&
           B%num0+B%num1,B%CMO(1:NBas,1:(B%num0+B%num1)),&
@@ -2288,6 +2289,7 @@ double precision,parameter :: SmallE = 1.D-3
  ! term A2
  ! A2A(B): XX
  if(SAPT%noE2exi) then
+    write(LOUT,'()')
     call tran4_gen(NBas,&
              NBas,B%CMO,&
              A%num0+A%num1,A%CMO(1:NBas,1:(A%num0+A%num1)),&
@@ -2324,6 +2326,7 @@ double precision,parameter :: SmallE = 1.D-3
              'FOFOAABB','AOTWOSORT')
  endif
  ! XY and YX, A2
+ write(LOUT,'()')
  call tran4_gen(NBas,&
           B%num0+B%num1,B%CMO(1:NBas,1:(B%num0+B%num1)),&
           B%num0+B%num1,B%CMO(1:NBas,1:(B%num0+B%num1)),&

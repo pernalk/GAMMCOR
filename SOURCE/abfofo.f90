@@ -1826,8 +1826,8 @@ call ABPM0_FOFO(Occ,URe,XOne,ABPLUS,ABMIN, &
                 IndN,IndX,IGemIN,NAct,INActive,NDimX,NBasis,NDim,NInte1, &
                 IntJFile,IntKFile,ETot)
 
-print*, 'ABPLUS-new',norm2(ABPLUS)
-print*, 'ABMIN -new',norm2(ABMIN)
+!print*, 'ABPLUS-new',norm2(ABPLUS)
+!print*, 'ABMIN -new',norm2(ABMIN)
 
 call clock('ABPM(0)',Tcpu,Twall)
 

@@ -461,6 +461,10 @@ endif
 end subroutine sapt_ab_ints_red
 
 subroutine sapt_interface(Flags,SAPT,NBasis)
+!
+! SAPT-DALTON requires SIRIFC and SIRIUS.RST 
+!                   or SIRIFC and occupations.dat
+!
 implicit none
 
 type(FlagsData)    :: Flags
@@ -472,10 +476,7 @@ integer :: NCMOt, NOrbt, NBasist
 integer :: NSym, NBas(8)
 integer :: NOcc(8),NOrbs(8)
 integer :: ione,iorb,isiri,i,j,ij
-integer :: noccA, nvirtA, noccB, nvirtB
-integer :: ncen
 integer :: p,q
-integer :: tmp1
 double precision :: tmp
 double precision :: potnucA,potnucB
 double precision :: potnuc,emy,eactiv,emcscf
@@ -487,7 +488,6 @@ double precision,allocatable :: Ca(:),Cb(:)
 double precision,allocatable :: AuxA(:,:),AuxB(:,:)
 double precision,allocatable :: OneRdmA(:),OneRdmB(:)
 
-logical :: exsiri
 logical :: doRSH
 
 !! read basis info
@@ -542,6 +542,9 @@ logical :: doRSH
     call onel_molpro(SAPT%monA%Monomer,NBasis,NSq,NInte1,SAPT%monA,SAPT)
     call onel_molpro(SAPT%monB%Monomer,NBasis,NSq,NInte1,SAPT%monB,SAPT)
  endif
+
+! add empty line
+ write(lout,'()')
 
 ! read coefficient, occupancies
  if(SAPT%InterfaceType==1) then
@@ -617,8 +620,7 @@ logical :: doRSH
  !if(SAPT%IPrint.ne.0) call print_mo(Ca,NBasis,'MONOMER A')
  !if(SAPT%IPrint.ne.0) call print_mo(Cb,NBasis,'MONOMER B')
 
-
-! maybe better: add writing Ca, Cb to file?!!
+! maybe better: add writing Ca, Cb to file?!
  allocate(SAPT%monA%CMO(NBasis,NBasis),SAPT%monB%CMO(NBasis,NBasis))
  ij=0
  SAPT%monA%CMO = 0
@@ -636,10 +638,6 @@ logical :: doRSH
  call select_active(SAPT%monB,NBasis,Flags)
 
 ! ABABABABABABABABABABABABABABABABABABABABABABABABABABABABAB
-! transform 2-el integrals
-! full 4-idx tran
-! call tran4_full(NBasis,Ca,Cb,'TWOMOAB')
-
  if(SAPT%IPrint.gt.100) call print_TwoInt(NBasis)
 
  call print_active(SAPT,NBasis)
@@ -664,7 +662,7 @@ logical :: doRSH
     endif
  endif
 
- ! calculate electrostatic potential
+! calculate electrostatic potential
  call calc_elpot(SAPT%monA,SAPT%monB,NBasis)
 
 ! calc intermolecular repulsion
@@ -836,15 +834,15 @@ end subroutine onel_dalton
 subroutine readocc_dalton(NBasis,Mon,Flags)
 implicit none
 
-type(SystemBlock) :: Mon
-type(FlagsData) :: Flags
-
+type(SystemBlock)  :: Mon
+type(FlagsData)    :: Flags
 integer,intent(in) :: NBasis
-integer :: NSym,NOrbt,NBasist,NCMOt,NOcc(8),NOrbs(8)
-integer :: i,isiri
-double precision :: potnuc,emy,eactiv,emcscf
+
+integer                  :: NSym,NOrbt,NBasist,NCMOt,NOcc(8),NOrbs(8)
+integer                  :: i,isiri
+double precision         :: potnuc,emy,eactiv,emcscf
+logical                  :: exsiri,noSiri,noOccu
 character(:),allocatable :: occfile,sirifile,siriusfile,coefile
-logical :: exsiri
 
 
  if(Mon%Monomer==1) then
@@ -869,12 +867,12 @@ logical :: exsiri
     Mon%NOrb = NOrbt
     Mon%NSymOrb(1:NSym) = NOrbs(1:NSym)
 
- else
-    NBasist = NBasis
- endif
     rewind(isiri)
     read (isiri)
     read (isiri) potnuc,emy,eactiv,emcscf
+ else
+    NBasist = NBasis
+ endif
 
  !if(Flags%ICASSCF==1.and.Flags%ISHF==0.and.Mon%NELE/=1.and.(.not.Mon%ISHF)) then
     ! CASSCF
@@ -888,11 +886,19 @@ logical :: exsiri
  !   call readmulti(NBasis,Mon,.false.,exsiri,isiri,occfile,siriusfile)
 
  if(Flags%ICASSCF==1.and.Flags%ISHF==0.and.(.not.Mon%ISHF)) then
+
     ! CASSCF
     !call readmulti(NBasis,Mon,.false.,exsiri,isiri,occfile,siriusfile)
     if(exsiri) close(isiri)
-    !call readocc_cas_siri(Mon,NBasis)
-    call readocc_cas_occu(Mon,NBasis)
+
+    call readocc_cas_siri(Mon,NBasis,noSiri)
+    if(noSiri) call readocc_cas_occu(Mon,NBasis,noOccu)
+
+    if(nosiri.and.nooccu) then
+       write(lout,'(1x,a)') &
+             'ERROR in readocc_dalton! No SIRI or occupations files!'
+       stop
+    endif
 
     ! construct IGem
     allocate(Mon%IGem(NBasis))
@@ -1599,12 +1605,12 @@ double precision,parameter    :: One = 1d0, Half = 0.5d0
 ! ! transform 2-el integrals
 ! select case(Mon%TwoMoInt)
 !
-! case(TWOMO_INCORE,TWOMO_FFFF) 
+! case(TWOMO_INCORE,TWOMO_FFFF)
 !   ! full - for GVB and CAS
 !   call tran4_full(NBas,MO,MO,twofile,'AOTWOSORT')
 !
 !
-! case(TWOMO_FOFO) 
+! case(TWOMO_FOFO)
 !   ! transform J and K
 !    call tran4_gen(NBas,&
 !         Mon%num0+Mon%num1,MO(1:NBas*(Mon%num0+Mon%num1)),&
@@ -2121,8 +2127,6 @@ double precision,parameter :: SmallE=0d0,BigE=1.D20
     NInte2 = NInte1*(NInte1+1)/2
  else
     NInte2 = 1
-    print*, 'NInte2:',NInte2
-    print*, Mon%TwoMoInt==TWOMO_INCORE
  endif
 
  allocate(work1(NSq),work2(NSq),XOne(NInte1),URe(NBas,NBas))
@@ -3598,8 +3602,11 @@ mat = work
 end subroutine swap_cols
 
 subroutine read_mo_dalton(cmo,nbasis,nsym,nbas,norb,nsiri,nmopun)
-
+!
+! reads MOs either from SIRIUS.RST or DALTON.MOPUN
+! unpacks symmetry blocks to (NBasis,NOrb) form
 ! in SAPT orbitals kept in AOMO order!
+!
 implicit none
 
 integer,intent(in) :: nbasis,nsym,nbas(8),norb(8)
@@ -3627,50 +3634,63 @@ if(isiri) then
    call readlabel(iunit,'NEWORB  ')
    read(iunit) tmp(1:ncmot)
 
-!  print*, norb,'NORB!!!!'
-   cmo = 0  
-   off_i = 0
-   off_j = 0
-   idx = 0
-
-   do irep=1,nsym
-      do j=off_j+1,off_j+norb(irep)
+!   cmo = 0  
+!   off_i = 0
+!   off_j = 0
+!   idx = 0
+!
+!   do irep=1,nsym
+!      do j=off_j+1,off_j+norb(irep)
+! 
+!         do i=off_i+1,off_i+nbas(irep)   
+!            idx = idx + 1
+!            cmo(i,j) = tmp(idx)
+!         enddo
+!      
+!      enddo
+!      off_i = off_i + nbas(irep)
+!      off_j = off_j + norb(irep)
+!   enddo
  
-         do i=off_i+1,off_i+nbas(irep)   
-            idx = idx + 1
-            cmo(i,j) = tmp(idx)
-         enddo
-      
-      enddo
-      off_i = off_i + nbas(irep)
-      off_j = off_j + norb(irep)
-   enddo
- 
- !   do i=1,norb
- !     do j=1,nbas
- !        cmo(j,i) = tmp((i-1)*nbas + j)
- !     end do
- !  end do
-
    write(LOUT,'(1x,a)') 'Orbitals read from '//nsiri 
 
 else
-    write(LOUT,'(1x,a)') 'FIX READING ORBITALS FROM DALTON.MOPUN'
-!   print*, 'Achtung!!!',norb,nbasis
-!   open(newunit=iunit,file=nmopun, &
-!        form='FORMATTED',status='OLD')
-!   read(iunit,'(a60)') line
-!   !do j=1,norb     
-!   do j=1,nbas     
-!      read(iunit,'(4f18.14)') (cmo(i,j),i=1,nbasis)
-!   enddo
-!!   print*, line
-!
-!   write(LOUT,'(1x,a)') 'Orbitals read from '//nmopun 
+
+   open(newunit=iunit,file=nmopun,form='FORMATTED',status='OLD')
+   read(iunit,'(a60)') line
+   off_i = 0
+   idx   = 0 
+   do irep=1,nsym
+      do j=1,norb(irep)
+         read(iunit,'(4f18.14)') (tmp(off_i+i),i=1,norb(irep))
+         off_i = off_i + norb(irep)
+      enddo
+   enddo
+
+   write(LOUT,'(1x,a)') 'Orbitals read from '//nmopun 
 endif
 
 close(iunit)
 
+! unpack orbitals
+cmo = 0  
+off_i = 0
+off_j = 0
+idx = 0
+
+do irep=1,nsym
+   do j=off_j+1,off_j+norb(irep)
+
+      do i=off_i+1,off_i+nbas(irep)   
+         idx = idx + 1
+         cmo(i,j) = tmp(idx)
+      enddo
+   
+   enddo
+   off_i = off_i + nbas(irep)
+   off_j = off_j + norb(irep)
+enddo
+ 
 ! call print_sqmat(cmo,nbasis)
 
 end subroutine read_mo_dalton
@@ -3690,7 +3710,6 @@ double precision,dimension(ndim) :: S, V, H
  close(ione)
 
  write(LOUT,'(1x,a)') 'One-electron integrals written to file: '//mon
- write(LOUT,'()')
 
 end subroutine writeoneint
 
@@ -3783,24 +3802,26 @@ close(iunit)
 
 end subroutine readgvb
 
-subroutine readocc_cas_siri(mon,nbas)
+subroutine readocc_cas_siri(mon,nbas,noSiri)
 !
+! From SIRIFC
 ! a) read number of active inactive orbs for SAPT-DALTON
 !    total: NAct and INAct
 !    in a given symmetry: INActS(1:NSym), NActS(1:NSym)
+! From SIRIUST.RST 
 ! b) read occupation numbers
-! a) is read from SIRIFC b) from SIRIUS.RST
 !
 implicit none
 
-type(SystemBlock) :: mon
-integer,intent(in):: nbas
+type(SystemBlock)   :: mon
+integer,intent(in)  :: nbas
+logical,intent(out) :: noSiri
 
 logical           :: ioccsir,exsiri
 integer           :: i,iunit,ios
 integer           :: isym,off_i,off_a,off_x
 integer           :: NISHT,NASHT,NOCCT,NORBT,NBAST,NCONF,NWOPT,NWOPH,&
-                     NCDETS, NCMOT,NNASHX,NNASHY,NNORBT,N2ORBT,&
+                     NCDETS,NCMOT,NNASHX,NNASHY,NNORBT,N2ORBT,       &
                      NSYM,MULD2H(8,8),NRHF(8),NFRO(8),NISH(8),NASH(8),NORB(8),NBASM(8)
 
 double precision             :: sum1,sum2
@@ -3816,7 +3837,6 @@ character(:),allocatable     :: sirfile,sirifile
     sirifile = 'SIRIFC_B'
  endif
 
- allocate(mon%Occ(nbas))
 
  inquire(file=sirifile,EXIST=exsiri)
  if(exsiri) then
@@ -3832,29 +3852,35 @@ character(:),allocatable     :: sirfile,sirifile
                  NSYM,MULD2H,NRHF,NFRO,NISH,NASH,NORB,NBASM
 
     close(iunit)
+
+    mon%INAct = nisht
+    mon%NAct  = nasht
+
+    if(NSym/=mon%NSym) stop "NSym from SIRI and AOONEINT do not match!"
+
+    mon%INActS(1:mon%NSym) = NISH(1:NSym)
+    mon%NActS(1:mon%NSym)  = NASH(1:NSym)
+
+    if(nbast.ne.nbas) then
+      write(LOUT,'(1x,a)') 'WARNING! NBasis FROM SIRIFC DOES NOT MATCH!'
+      write(LOUT,'(1x,a,i5,1x,a,i5)') 'NBasis: ',nbas, 'SIRIFC: ', nbast
+      write(LOUT,'()')
+      mon%IWarn = mon%IWarn + 1
+    endif
+
  else
     write(lout,'(1x,a)') 'SIRI not available!'
- endif
-
- mon%INAct = nisht
- mon%NAct  = nasht
-
- if(NSym/=mon%NSym) stop "NSym from SIRI and AOONEINT do not match!"
-
- mon%INActS(1:mon%NSym) = NISH(1:NSym)
- mon%NActS(1:mon%NSym)  = NASH(1:NSym)
-
- if(nbast.ne.nbas) then
-   write(LOUT,'(1x,a)') 'WARNING! NBasis FROM SIRIFC DOES NOT MATCH!'
-   write(LOUT,'(1x,a,i5,1x,a,i5)') 'NBasis: ',nbas, 'SIRIFC: ', nbast
-   write(LOUT,'()')
-   mon%IWarn = mon%IWarn + 1
+    stop
  endif
 
  ! CASCF
  inquire(file=sirfile,EXIST=ioccsir)
  if(ioccsir) then
+
+    noSiri=.false.
+    allocate(mon%Occ(nbas))
     allocate(OccX(1:norbt))
+
     open(newunit=iunit,file=sirfile,status='OLD', &
          access='SEQUENTIAL',form='UNFORMATTED')
 
@@ -3878,8 +3904,15 @@ character(:),allocatable     :: sirfile,sirifile
     enddo
 
     deallocate(OccX)
+
+    write(LOUT,'(1x,a,i2,a)') 'Occupancies for monomer',mon%Monomer,' read from '// sirfile
+
  else 
+
+    noSiri=.true.
     write(lout,'(1x,a)') 'SIRIUS.RST not available!'
+    return
+
  endif
 
  ! Hartree-Fock case
@@ -3893,22 +3926,22 @@ character(:),allocatable     :: sirfile,sirifile
  enddo
  mon%SumOcc = sum1
 
- write(LOUT,'(/1x,a,i2,a)') 'OCCUPANCIES FOR MONOMER',mon%Monomer,' READ FROM '// sirfile
 
 end subroutine readocc_cas_siri
 
-subroutine readocc_cas_occu(mon,nbas)
+subroutine readocc_cas_occu(mon,nbas,noOccu)
 !
-! a) read number of active inactive orbs for SAPT-DALTON
-!    total: NAct and INAct
+! From occupations.dat
+! a) read total number of active (NAct)
+!    and inactive (INAct) orbitals for SAPT-DALTON,
 !    in a given symmetry: INActS(1:NSym), NActS(1:NSym)
 ! b) read occupation numbers
-! all is read from occupations.dat
 !
 implicit none
 
-type(SystemBlock) :: mon
-integer,intent(in):: nbas
+type(SystemBlock)  :: mon
+integer,intent(in) :: nbas
+logical,intent(out):: noOccu
 
 integer                      :: i
 integer                      :: iunit,ios
@@ -3924,10 +3957,11 @@ character(:),allocatable     :: occfile
  endif
 
  allocate(mon%Occ(nbas))
-
+ print*, 'here2?'
  inquire(file=occfile,EXIST=iocc)
  if(iocc) then
 
+    noOccu     = .false.
     mon%Occ    = 0d0
     mon%INActS = 0
     mon%NActS  = 0
@@ -3955,11 +3989,15 @@ character(:),allocatable     :: occfile
       call sort_sym_occ(nbas,mon%NSym,mon%INAct,mon%NAct,mon%Occ)
     endif
 
+    write(LOUT,'(1x,a,i2,a)') 'Occupancies for monomer',mon%Monomer,' read from '// occfile
+
  else
+
+    noOccu = .true.
     write(lout,'(1x,a)') 'occupations.dat not available!'
+
  endif
 
- write(LOUT,'(1x,a,i2,a)') 'OCCUPANCIES FOR MONOMER',mon%Monomer,' READ FROM '// occfile
 
 end subroutine readocc_cas_occu
 
