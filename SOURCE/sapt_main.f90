@@ -489,6 +489,7 @@ double precision,allocatable :: AuxA(:,:),AuxB(:,:)
 double precision,allocatable :: OneRdmA(:),OneRdmB(:)
 
 logical :: doRSH
+double precision,allocatable :: Sa(:,:),Sb(:,:)
 
 !! read basis info
 !! only DCBS
@@ -550,6 +551,14 @@ logical :: doRSH
  if(SAPT%InterfaceType==1) then
     call readocc_dalton(NBasis,SAPT%monA,Flags)
     call readocc_dalton(NBasis,SAPT%monB,Flags)
+
+ !! test 1
+ ! allocate(Sa(NBasis,NBasis),Sb(NBasis,NBasis))
+ ! call get_one_mat('S',Sa,1,nbasis)
+ ! call get_one_mat('S',Sb,2,nbasis)
+ ! print*, 'Sb-Sa',norm2(Sb-Sa)
+ ! deallocate(Sb,Sa)
+
  elseif(SAPT%InterfaceType==2) then
     allocate(AuxA(NBasis,NBasis),AuxB(NBasis,NBasis),&
              OneRdmA(NInte1),OneRdmB(NInte1))
@@ -781,6 +790,9 @@ subroutine onel_dalton(mon,NBasis,NSq,NInte1,MonBlock,SAPT)
  read(ione)
  read(ione) NSym,NBas(1:NSym),MonBlock%PotNuc
 
+ ! HERE!!! temp!
+ MonBlock%NSymOrb(1:NSym) = NBas(1:NSym)
+
  call readlabel(ione,'ONEHAMIL')
  call readoneint(ione,work1)
  call square_oneint(work1,Hmat,NBasis,NSym,NBas)
@@ -875,12 +887,13 @@ character(:),allocatable :: occfile,sirifile,siriusfile,coefile
  endif
 
  !if(Flags%ICASSCF==1.and.Flags%ISHF==0.and.Mon%NELE/=1.and.(.not.Mon%ISHF)) then
-    ! CASSCF
+ !  ! CASSCF
  !   call readmulti(NBasis,Mon,.false.,exsiri,isiri,occfile,siriusfile)
  !elseif(Flags%ICASSCF==1.and.Flags%ISHF==0.and.Mon%NELE==1.and.Flags%ISERPA==0.and.(.not.Mon%ISHF)) then
-    ! CASSCF
-    ! for 2-el electron case: read from occupations.dat
-    !call readmulti(NBasis,Mon,.false.,.false.,isiri,occfile,siriusfile)
+ !  ! CASSCF
+ !  ! for 2-el electron case: read from occupations.dat
+ !  call readmulti(NBasis,Mon,.false.,.false.,isiri,occfile,siriusfile)
+
  !elseif(Flags%ICASSCF==1.and.Flags%ISHF==0.and.Mon%NELE==1.and.Flags%ISERPA==2) then
  !
  !   call readmulti(NBasis,Mon,.false.,exsiri,isiri,occfile,siriusfile)
@@ -888,7 +901,7 @@ character(:),allocatable :: occfile,sirifile,siriusfile,coefile
  if(Flags%ICASSCF==1.and.Flags%ISHF==0.and.(.not.Mon%ISHF)) then
 
     ! CASSCF
-    !call readmulti(NBasis,Mon,.false.,exsiri,isiri,occfile,siriusfile)
+
     if(exsiri) close(isiri)
 
     call readocc_cas_siri(Mon,NBasis,noSiri)
@@ -900,6 +913,22 @@ character(:),allocatable :: occfile,sirifile,siriusfile,coefile
        stop
     endif
 
+ elseif(Flags%ICASSCF==1.and.(Flags%ISHF==1.or.Mon%ISHF)) then
+
+    if(exsiri) close(isiri)
+
+    ! HARTREE-FOCK
+    !call readmulti(NBasis,Mon,.true.,exsiri,isiri,occfile,siriusfile)
+    call readocc_hf_siri(Mon,NBasis)
+
+ elseif(Flags%IGVB==1) then
+
+    ! GVB
+    call readgvb(Mon,NBasis,coefile)
+
+ endif
+
+ if(Flags%ICASSCF==1) then
     ! construct IGem
     allocate(Mon%IGem(NBasis))
     if(Mon%INAct==0) then
@@ -919,18 +948,6 @@ character(:),allocatable :: occfile,sirifile,siriusfile,coefile
        Mon%CICoef(i)=sqrt(Mon%Occ(I))
        if(Mon%Occ(i).lt.0.5d0) Mon%CICoef(i)=-Mon%CICoef(i)
     enddo
-
- elseif(Flags%ICASSCF==1.and.(Flags%ISHF==1.or.Mon%ISHF)) then
-
-    ! Hartree-Fock
-    call readmulti(NBasis,Mon,.true.,exsiri,isiri,occfile,siriusfile)
-    call readener(NBasis,Mon,isiri)
-
- elseif(Flags%IGVB==1) then
-
-    ! GVB
-    call readgvb(Mon,NBasis,coefile)
-
  endif
 
  !if(exsiri) close(isiri)
@@ -1872,9 +1889,6 @@ logical :: doRSH
    end select
    if(Mon%TwoMoInt==TWOMO_INCORE) call LoadSaptTwoEl(Mon%Monomer+4,TwoElErf,NBas,NInte2)
  endif
-
- !print*, 'TwoMO ',norm2(TwoMO)
- !print*, 'TwoErf',norm2(TwoElerf)
 
  NSymNO(1:NBas) = 1
  call EPotSR(EnSR,EnHSR,VSR,Mon%Occ,URe,MO,.true.,&
@@ -3422,7 +3436,6 @@ type(SaptData) :: SAPT
 integer :: nbas
 double precision :: mat(nbas,nbas)
 
-!print*, NOrbA,NOrbB,size(mat)
 call gen_swap_rows(mat,nbas,SAPT%monA%NSym,&
                    SAPT%monA%NMonBas,SAPT%monB%NMonBas)
 
@@ -3432,20 +3445,24 @@ end subroutine arrange_mo
 
 subroutine read_syminf(A,B,nbas)
 ! reads number of basis functions on each monomer
-! from SYMINFO file!
+! from SYMINFO(B) file!
 implicit none
 
 type(SystemBlock) :: A, B
 integer :: nbas
 integer :: iunit,ios
 integer :: ibas,icen,last_ibas,last_icen
-integer :: irep,offset
+integer :: irep,ifun,offset
 logical :: ex,dump
 integer :: tmp
 integer :: ACenTst, ACenBeg, ACenEnd
 
+! sanity checks : in
 !print*, A%NCen, B%NCen
 !print*, A%UCen, B%UCen
+if(A%NSym/=B%NSym) then
+  write(lout,*) 'ERROR in read_syminf: NSym different for A and B!'
+endif
 
 inquire(file='SYMINFO_B',EXIST=ex)
 
@@ -3454,62 +3471,61 @@ if(ex) then
         form='FORMATTED')
    read(iunit,*)
    read(iunit,*)
-   offset=0
-   irep=1
-   read(iunit,'(i5,i6)',iostat=ios) last_ibas,last_icen
-   do
-     read(iunit,'(i5,i6)',iostat=ios) ibas,icen
-     if(ios/=0) then
-        A%NMonBas(irep)=last_ibas-offset 
-        exit
-     elseif(icen/=last_icen) then
-          if(last_icen==B%UCen) then
-             B%NMonBas(irep) = last_ibas-offset
-             offset=last_ibas
-          elseif(icen==1) then
-             A%NMonBas(irep) = last_ibas-offset
-             offset=last_ibas
-             irep = irep + 1
-          endif
-     endif
-     last_ibas=ibas
-     last_icen=icen
-  enddo
 
-!   dump = .TRUE.
-!   do
-!     read(iunit,'(i5,i6)',iostat=ios) ibas,icen
-!     if((icen.gt.B%NCen).and.dump) then 
-!        B%NMonOrb = ibas-1
-!        ACenBeg = icen
-!        dump = .FALSE.
-!     elseif(.not.dump.and.ios==0) then
-!        last_icen = icen
-!        last_ibas = ibas
-!     elseif(ios/=0) then
-!        tmp = last_ibas
-!        ACenEnd = last_icen
-!        exit
-!     endif
-!     !write(*,*) ibas,icen,dump
-!   enddo
+   ! old version: does not work with sym
+   ! offset = 0
+   ! irep   = 1
+   ! read(iunit,'(i5,i6)',iostat=ios) last_ibas,last_icen
+   ! do
+   !   read(iunit,'(i5,i6)',iostat=ios) ibas,icen
+   !   if(ios/=0) then
+   !      A%NMonBas(irep)=last_ibas-offset 
+   !      exit
+   !   elseif(icen/=last_icen) then
+   !        if(last_icen==B%UCen) then
+   !           B%NMonBas(irep) = last_ibas-offset
+   !           offset = last_ibas
+   !        elseif(icen==1) then
+   !           A%NMonBas(irep) = last_ibas-offset
+   !           offset = last_ibas
+   !           irep   = irep + 1
+   !        endif
+   !   endif
+   !   last_ibas=ibas
+   !   last_icen=icen
+   !enddo
 
-! check later somehow...?   
-!   ACenTst = ACenEnd - ACenBeg + 1
-!   if(ACenTst/=A%NCen) then
-!      write(LOUT,'(1x,a)') 'ERROR! MISMATCH IN NUMBER OF ATOMS FOR MONONOMER A!'
-!      write(LOUT,'(1x,a,i3,4x,a,i3)') 'INPUT: ', A%NCen, 'SYMINFO_B: ', ACenTst
-!      stop
-!   endif
-!   A%NMonOrb = tmp - B%NMonOrb
+   ! new version : ok with sym
+   do irep=1,B%NSym
+      do ifun=1,B%NSymOrb(irep)
+         read(iunit,'(i5,i6)',iostat=ios) ibas,icen
+         if(icen.le.B%UCen) then
+            B%NMonBas(irep) = B%NMonBas(irep) + 1
+         else
+            A%NMonBas(irep) = A%NMonBas(irep) + 1
+         endif
+      enddo
+   enddo
 
    close(iunit)
 else
    write(LOUT,'(1x,a)') 'ERROR! MISSING SYMINFO_B FILE!'
    stop
 endif
-! HERE
-! maybe add test: tmp vs. NBasis? 
+
+! sanity checks : out
+do irep=1,B%NSym
+   ibas = A%NMonBas(irep)+B%NmonBas(irep)
+   if(ibas/=A%NSymOrb(irep)) then
+      write(lout,'(1x,a)') 'ERROR in read_syminf!'
+      write(lout,'(1x,a,i3,a)') 'For irep =',irep, ':'
+      write(lout,*) 'A-NMonBas',A%NMonBas(1:A%NSym)
+      write(lout,*) 'B-NMonBas',B%NMonBas(1:B%NSym)
+      write(lout,*) 'Sum:     ',A%NMonBas(1:A%NSym)+B%NMonBas(1:B%NSym)
+      write(lout,*) 'Should be',A%NSymOrb(1:A%NSym)
+      stop
+   endif
+enddo
 
 end subroutine read_syminf
 
@@ -3610,22 +3626,22 @@ subroutine read_mo_dalton(cmo,nbasis,nsym,nbas,norb,nsiri,nmopun)
 implicit none
 
 integer,intent(in) :: nbasis,nsym,nbas(8),norb(8)
-integer :: iunit,irep,idx
-integer :: ncmot
-!double precision :: cmo(norb,nbas)
-double precision :: cmo(nbasis,nbasis)
-character(*) :: nsiri,nmopun
-logical :: isiri
-character(60) :: line
-integer :: i,j
-integer :: off_i, off_j
+character(*)       :: nsiri,nmopun
+double precision   :: cmo(nbasis,nbasis)
+
+integer          :: i,j,idx
+integer          :: iunit,irep
+integer          :: ncmot
+integer          :: off_i,off_j
+logical          :: isiri
+character(60)    :: line
 double precision :: natocc(10)
 double precision :: tmp(nbasis**2)
 
-ncmot = sum(nbas(1:nsym)*norb(1:nsym))
+tmp =    0
+ncmot    = sum(nbas(1:nsym)*norb(1:nsym))
 
 inquire(file=nsiri,EXIST=isiri)
-
 if(isiri) then
 
    open(newunit=iunit,file=nsiri,status='OLD', &
@@ -3651,7 +3667,6 @@ if(isiri) then
 !      off_i = off_i + nbas(irep)
 !      off_j = off_j + norb(irep)
 !   enddo
- 
    write(LOUT,'(1x,a)') 'Orbitals read from '//nsiri 
 
 else
@@ -3662,8 +3677,8 @@ else
    idx   = 0 
    do irep=1,nsym
       do j=1,norb(irep)
-         read(iunit,'(4f18.14)') (tmp(off_i+i),i=1,norb(irep))
-         off_i = off_i + norb(irep)
+         read(iunit,'(4f18.14)') (tmp(off_i+i),i=1,nbas(irep))
+         off_i = off_i + nbas(irep)
       enddo
    enddo
 
@@ -3673,15 +3688,15 @@ endif
 close(iunit)
 
 ! unpack orbitals
-cmo = 0  
+cmo   = 0
 off_i = 0
 off_j = 0
-idx = 0
+idx   = 0
 
 do irep=1,nsym
    do j=off_j+1,off_j+norb(irep)
 
-      do i=off_i+1,off_i+nbas(irep)   
+      do i=off_i+1,off_i+nbas(irep)
          idx = idx + 1
          cmo(i,j) = tmp(idx)
       enddo
@@ -3837,7 +3852,6 @@ character(:),allocatable     :: sirfile,sirifile
     sirifile = 'SIRIFC_B'
  endif
 
-
  inquire(file=sirifile,EXIST=exsiri)
  if(exsiri) then
     open(newunit=iunit,file=sirifile,status='OLD', &
@@ -3907,7 +3921,7 @@ character(:),allocatable     :: sirfile,sirifile
 
     write(LOUT,'(1x,a,i2,a)') 'Occupancies for monomer',mon%Monomer,' read from '// sirfile
 
- else 
+ else
 
     noSiri=.true.
     write(lout,'(1x,a)') 'SIRIUS.RST not available!'
@@ -3998,8 +4012,91 @@ character(:),allocatable     :: occfile
 
  endif
 
-
 end subroutine readocc_cas_occu
+
+subroutine readocc_hf_siri(mon,nbasis)
+implicit none
+
+type(SystemBlock)  :: mon
+integer,intent(in) :: nbasis
+
+integer                      :: MMORBT
+integer                      :: NISHT,NASHT,NOCCT,NORBT,NBAST,NCONF,NWOPT,NWOPH,&
+                                NCDETS, NCMOT,NNASHX,NNASHY,NNORBT,N2ORBT,&
+                                NSYM,MULD2H(8,8),NRHF(8),NFRO(8),NISH(8),NASH(8),NORB(8),NBAS(8)
+integer                      :: i,iunit,idx,irep,offset
+double precision,allocatable :: fock(:)
+character(:),allocatable     :: sirifile
+logical                      :: exsiri
+
+ ! set filnames
+ if(Mon%Monomer==1) then
+    sirifile  = 'SIRIFC_A'
+ elseif(Mon%Monomer==2) then
+    sirifile  = 'SIRIFC_B'
+ endif
+
+ inquire(file=sirifile,EXIST=exsiri)
+ if(exsiri) then
+    open(newunit=iunit,file=sirifile,status='OLD', &
+         access='SEQUENTIAL',form='UNFORMATTED')
+    call readlabel(iunit,'TRCCINT ')
+
+    rewind(iunit)
+    read (iunit)
+    read (iunit)
+    read (iunit) NISHT,NASHT,NOCCT,NORBT,NBAST,NCONF,NWOPT,NWOPH,&
+                 NCDETS, NCMOT,NNASHX,NNASHY,NNORBT,N2ORBT,      &
+                 NSYM,MULD2H,NRHF,NFRO,NISH,NASH,NORB,NBAS
+    read(iunit)
+    read(iunit)
+    read(iunit)
+    read(iunit)
+    read(iunit)
+
+    mon%INAct = nisht
+    mon%NAct  = nasht
+
+    !print*, 'nisht,nasht',nisht,nasht
+    !print*, 'nisht(1:ns)',nish(1:NSym)
+    !print*, 'nasht(1:ns)',nash(1:NSym)
+
+    mon%INActS(1:mon%NSym) = NISH(1:NSym)
+    mon%NActS(1:mon%NSym)  = NASH(1:NSym)
+
+    MMORBT = max(4,NNORBT)
+    allocate(fock(MMORBT),mon%OrbE(NORBT))
+
+    read(iunit) fock
+    ! orb energies: diag of Fock
+    offset = 0
+    idx = 0
+    do irep=1,NSYM
+
+       do i=1,NORB(irep)
+          idx = idx + 1
+          mon%OrbE(idx) = fock(offset+i*(i+1)/2)
+       enddo
+
+          offset = offset + NORB(irep)*(NORB(irep)+1)/2
+    enddo
+!    print*, mon%OrbE
+
+    deallocate(fock)
+
+ endif
+
+ close(iunit)
+
+ ! Hartree-Fock case
+ allocate(mon%Occ(nbasis))
+
+ mon%Occ = 0d0
+ mon%Occ(1:mon%NAct+mon%INAct) = 1d0
+
+ !print*, 'Occ:',mon%Occ(1:nisht+nasht)
+
+end subroutine readocc_hf_siri
 
 subroutine readmulti(nbas,mon,ihf,exsiri,isiri,occfile,occsir)
 !
@@ -4245,7 +4342,7 @@ end subroutine readmulti
 
 subroutine select_active(mon,nbas,Flags)
 ! set dimensions: NDimX,num0,num1,num2
-! set matrices: IndN,IndX,IPair,IndAux
+! set matrices  : IndN,IndX,IPair,IndAux
 !
 implicit none
 
@@ -4290,13 +4387,13 @@ character(1) :: mname
        enddo
     elseif(Flags%ICASSCF==1.and.Flags%ISHF==0) then
        write(LOUT,'()')
-       if(mon%Monomer==1) write(LOUT,'(1x,a)') 'Monomer A' 
-       if(mon%Monomer==2) write(LOUT,'(1x,a)') 'Monomer B' 
+       if(mon%Monomer==1) write(LOUT,'(1x,a)') 'Monomer A'
+       if(mon%Monomer==2) write(LOUT,'(1x,a)') 'Monomer B'
        do i=1,nbas
           if(mon%Occ(i).lt.1d0.and.mon%Occ(i).ne.0d0) then
              ! here!!!
              !if(mon%Occ(i).lt.1d0.and.mon%Occ(i).gt.1d-6) then
-             ! HERE!!! ACTIVE!!!! 
+             ! HERE!!! ACTIVE!!!!
              mon%IndAux(i) = 1
              write(6,'(X," Active Orbital: ",I4,E14.4)') i, mon%Occ(i)
              mon%icnt = mon%icnt + 1
@@ -4336,7 +4433,7 @@ if(Flags%ICASSCF==0) then
    mon%num1 = nbas - mon%num0 - mon%num2
 
 elseif(Flags%ICASSCF==1) then
-   mon%num0 = 0 
+   mon%num0 = 0
    do i=1,nbas
       if(mon%IndAux(i)/=0) exit
       mon%num0 = mon%num0 + 1
@@ -4347,7 +4444,7 @@ elseif(Flags%ICASSCF==1) then
       mon%num2 = mon%num2 + 1
    enddo
    mon%num1 = nbas - mon%num0 - mon%num2
-endif 
+endif
 
  ! num0-3 are set based on occupancies
  ! sometimes active orbitals in Molpro have 0.0 occupancy
@@ -4358,7 +4455,7 @@ endif
     write(lout,'(1x,3a,i4,a,i4/)') 'In monomer ', mname, &
                ' changing num1 from ', mon%num1, ' to', mon%NAct
     mon%num0 = mon%InAct
-    mon%num1 = mon%NAct 
+    mon%num1 = mon%NAct
  endif
 
 ! active pairs
@@ -4368,27 +4465,27 @@ endif
 
  if(Flags%ICASSCF==0) then
  ! allocate(mon%IndXh(mon%NDim))
- 
+
     ij=0
     ind = 0
     do i=1,nbas
        do j=1,i-1
-   
+
           ij = ij + 1
           ind_ij = mon%IndAux(i)+mon%IndAux(j)
           if((ind_ij/=0).and.(ind_ij/=4)) then
-             ! do not correlate active degenerate orbitals from different geminals 
+             ! do not correlate active degenerate orbitals from different geminals
              if((mon%IGem(i).ne.mon%IGem(j)).and.&
                   (mon%IndAux(i)==1).and.(mon%IndAux(j)==1).and.&
                   (Abs(mon%Occ(i)-mon%Occ(j))/mon%Occ(i).lt.1.d-2)) then
-                  
+
                 write(LOUT,'(1x,a,2x,2i4)') 'Discarding nearly degenerate pair',i,j 
              else
                 ! if IFlCore=0 exclude core (inactive) orbitals
                 if(Flags%IFlCore==1.or.&
                      (Flags%IFlCore==0.and.&
                      mon%Occ(i)/=1d0.and.mon%Occ(j)/=1d0) ) then
-                   
+
                    ind = ind + 1
                    mon%IndX(ind) = ij
                    ! mon%IndXh(ind) = ind
@@ -4396,39 +4493,39 @@ endif
                    mon%IndN(2,ind) = j
                    mon%IPair(i,j) = 1
                    mon%IPair(j,i) = 1
-                   
+
                 endif
              endif
-             
+
           endif
-   
+
        enddo
     enddo
 
  elseif(Flags%ICASSCF==1.and.Flags%ISERPA==0) then
     write(LOUT,'(1x,a,e15.5)') 'Threshold for active orbitals: ', mon%ThrSelAct
 
-    if(mon%NCen==1.and.mon%ThrSelAct<1.d-3.and.mon%NAct>1) then 
+    if(mon%NCen==1.and.mon%ThrSelAct<1.d-3.and.mon%NAct>1) then
        write(LOUT,'(1x,a)') 'Warning! For single atom ThrSelAct should probably have larger value!'
        mon%IWarn = mon%IWarn + 1
-    endif 
+    endif
 
-    ij=0
+    ij  = 0
     ind = 0
     do i=1,nbas
        do j=1,i-1
-   
+
           ij = ij + 1
           ind_ij = mon%IndAux(i)+mon%IndAux(j)
           if((ind_ij/=0).and.(ind_ij/=4)) then
-             ! do not correlate active degenerate orbitals from different geminals 
-             if((mon%IndAux(i)==1).and.(mon%IndAux(j)==1)  & 
+             ! do not correlate active degenerate orbitals from different geminals
+             if((mon%IndAux(i)==1).and.(mon%IndAux(j)==1)  &
                   .and.&
                   (Abs(mon%Occ(i)-mon%Occ(j))/mon%Occ(i).lt.mon%ThrSelAct) ) then
                 ! here!!!
                 !  (Abs(mon%Occ(i)-mon%Occ(j))/mon%Occ(i).lt.1d-3) ) then
-                
-                write(LOUT,'(1x,a,2x,2i4)') 'Discarding nearly degenerate pair',i,j 
+
+                write(LOUT,'(1x,a,2x,2i4)') 'Discarding nearly degenerate pair',i,j
              else
                 ! if IFlCore=0 exclude core (inactive) orbitals
                 if(Flags%IFlCore==1.or.&
@@ -4439,7 +4536,7 @@ endif
                      if(abs(mon%Occ(i)+mon%Occ(j)).lt.1.D-7) then
                         write(LOUT,'(1x,a,2x,2i4)') 'Discarding nearly virtual-orbitals pair',i,j
                      elseif(abs(mon%Occ(i)+mon%Occ(j)-2d0).gt.1.D-10) then
- 
+
                         ind = ind + 1
                         mon%IndX(ind) = ind
                         mon%IndN(1,ind) = i
@@ -4447,15 +4544,15 @@ endif
                         mon%IPair(i,j) = 1
                         mon%IPair(j,i) = 1
                      endif
-                   
+
                 endif
              endif
-             
+
           endif
-          
+
        enddo
     enddo
-    
+
  elseif(Flags%ICASSCF==1.and.Flags%ISERPA==2.and.mon%NELE==1) then
 
     allocate(mon%IndXh(mon%NDim))
@@ -4463,7 +4560,7 @@ endif
     ind = 0
     do i=1,nbas
        do j=1,i-1
-   
+
           ij = ij + 1
           ind_ij = mon%IndAux(i)+mon%IndAux(j)
           if((ind_ij/=0).and.(ind_ij/=4)) then
@@ -4477,7 +4574,7 @@ endif
              if(Flags%IFlCore==1.or.&
                   (Flags%IFlCore==0.and.&
                   mon%Occ(i)/=1d0.and.mon%Occ(j)/=1d0) ) then
-                
+
                 ind = ind + 1
                 mon%IndX(ind) =  ij !ind
                 mon%IndXh(ind) = ij
@@ -4485,7 +4582,7 @@ endif
                 mon%IndN(2,ind) = j
                 mon%IPair(i,j) = 1
                 mon%IPair(j,i) = 1
-                
+
              endif
              !endif
           endif
@@ -4502,7 +4599,7 @@ endif
     ind = 0
     do i=1,nbas
        do j=1,i-1
-   
+
           ij = ij + 1
           ind_ij = mon%IndAux(i)+mon%IndAux(j)
           if((ind_ij/=0).and.(ind_ij/=4)) then
@@ -4519,7 +4616,7 @@ endif
              if(Flags%IFlCore==1.or.&
                   (Flags%IFlCore==0.and.&
                   mon%Occ(i)/=1d0.and.mon%Occ(j)/=1d0) ) then
-                
+
                 ind = ind + 1
                 ! active Be
                 mon%IndX(ind) = ij !ind 
@@ -4528,22 +4625,22 @@ endif
                 mon%IndN(2,ind) = j
                 mon%IPair(i,j) = 1
                 mon%IPair(j,i) = 1
-                
+
              endif
              endif
-             
+
           endif
-          
+
        enddo
     enddo
- 
+
  endif
  mon%NDimX = ind
 
 ! Write(6,'(/,2X,"Total number of pairs:",I6)') mon%NDim !nbas*(nbas-1)/2 
 ! Write(6,'(2X,"Reduced to:",I6)') mon%NDimX 
 
-contains 
+contains
 
 function FindGem(io,mon) result(IFindG)
 implicit none
@@ -4555,7 +4652,7 @@ integer :: IFindG,i,io
  do i=1,2*mon%NELE
     if((mon%IGem(io).eq.mon%IGem(i)).and.(io.ne.i))  IFindG=i 
  enddo
- 
+
  if(IFindG==0) IFindG = io
 
 end function FindGem
@@ -4565,7 +4662,7 @@ end subroutine select_active
 subroutine sort_sym_occ(nbas,nsym,INAct,NAct,Occ)
 implicit none
 
-integer,intent(in) :: nbas, nsym, INAct, NAct 
+integer,intent(in) :: nbas, nsym, INAct, NAct
 double precision,intent(inout) :: Occ(nbas)
 integer :: TotEl
 integer :: i,ii
@@ -4580,9 +4677,9 @@ double precision :: OccOrd(nbas)
  ICpy1 = 0
  ICpy2 = 0
 
- do ii=1,TotEl 
+ do ii=1,TotEl
 
-    ! inactive 
+    ! inactive
     do i=1,TotEl
        if(ICpy2(i).eq.0.and.ICpy1(ii).eq.0.and.Occ(i).eq.1.0D0) then
        !if(ICpy2(i).eq.0.and.ICpy1(ii).eq.0.and.Occ(i).eq.2.0D0) then
@@ -4611,7 +4708,7 @@ double precision :: OccOrd(nbas)
 ! enddo
 
  Occ = OccOrd
-   
+
  deallocate(ICpy2,ICpy1)
 
 end subroutine sort_sym_occ
@@ -4631,10 +4728,10 @@ double precision,allocatable :: COrd(:,:)
 
  TotEl = mon%INAct + mon%NAct
 
- !print*, 'NSym   ',mon%NSym
- !print*, 'NSymOrb',mon%NSymOrb
- !print*, 'INActS',mon%InActS(1:mon%NSym)
- !print*, 'NActS ',mon%NActS(1:mon%NSym)
+! print*, 'NSym   ',mon%NSym
+! print*, 'NSymOrb',mon%NSymOrb
+! print*, 'INActS',mon%InActS(1:mon%NSym)
+! print*, 'NActS ',mon%NActS(1:mon%NSym)
 
  allocate(ICpy1(nbas),ICpy2(nbas))
  allocate(LabelAct(nbas),LabelIAct(nbas),COrd(nbas,nbas))
@@ -4661,15 +4758,15 @@ double precision,allocatable :: COrd(:,:)
     enddo
  enddo
 
- do ii=1,nbas 
+ do ii=1,nbas
 
-   ! inactive 
-   do i=1,nbas  
+   ! inactive
+   do i=1,nbas
       if(LabelIAct(i).eq.1.and.ICpy2(i).eq.0.and.ICpy1(ii).eq.0) then
          ICpy2(i)  = 1
          ICpy1(ii) = 1
 
-         do j=1,nbas  
+         do j=1,nbas
              COrd(j,ii) = CMO(j,i)
          enddo
       endif
@@ -4677,11 +4774,11 @@ double precision,allocatable :: COrd(:,:)
 
    ! active
    if(ICpy1(ii).eq.0) then
-      do i=1,nbas  
+      do i=1,nbas
          if(LabelAct(i).eq.1.and.ICpy2(i).eq.0.and.ICpy1(ii).eq.0) then
             ICpy2(i)  = 1
             ICpy1(ii) = 1
-            do j=1,nbas  
+            do j=1,nbas
                COrd(j,ii) = CMO(j,i)
             enddo
          endif
@@ -4690,7 +4787,7 @@ double precision,allocatable :: COrd(:,:)
 
    ! virtual
    if(ICpy1(ii).Eq.0) then
-      do i=1,nbas  
+      do i=1,nbas
          if(ICpy2(i).eq.0.and.ICpy1(ii).eq.0) then
             ICpy2(i)  = 1
             ICpy1(ii) = 1
@@ -4710,65 +4807,12 @@ double precision,allocatable :: COrd(:,:)
 
 end subroutine sort_sym_mo
 
-subroutine readener(nbasis,mon,isiri)
-implicit none
-
-type(SystemBlock) :: mon
-integer :: nbasis, isiri
-integer :: MMORBT
-integer :: NISHT,NASHT,NOCCT,NORBT,NBAST,NCONF,NWOPT,NWOPH,&
-           NCDETS, NCMOT,NNASHX,NNASHY,NNORBT,N2ORBT,&
-           NSYM,MULD2H(8,8),NRHF(8),NFRO(8),NISH(8),NASH(8),NORB(8),NBAS(8) 
-integer :: i,idx,irep,offset
-double precision,allocatable :: fock(:)
-
-! set dimensions
- rewind(isiri)
-
- read (isiri)
- read (isiri) 
- read (isiri) NISHT,NASHT,NOCCT,NORBT,NBAST,NCONF,NWOPT,NWOPH,&
-              NCDETS, NCMOT,NNASHX,NNASHY,NNORBT,N2ORBT,&
-              NSYM,MULD2H,NRHF,NFRO,NISH,NASH,NORB,NBAS 
- read(isiri)
- read(isiri)
- read(isiri)
- read(isiri)
- read(isiri)
-
-
- MMORBT = max(4,NNORBT)
- allocate(fock(MMORBT),mon%OrbE(NORBT))
-
- read(isiri) fock 
- ! orb energies: diag of Fock
- offset = 0
- idx = 0
- do irep=1,NSYM
-
-    do i=1,NORB(irep)
-       idx = idx + 1
-       mon%OrbE(idx) = fock(offset+i*(i+1)/2)
-    enddo 
-
-       offset = offset + NORB(irep)*(NORB(irep)+1)/2
- enddo
-
-! print*, mon%OrbE
-!
-! do i=1,NORBT
-!    mon%OrbE(i) = fock(i+i*(i-1)/2)
-! enddo
-
- deallocate(fock)
-
-end subroutine readener 
-
 subroutine print_occ(nbas,SAPT,ICASSCF)
 implicit none
-!!! HERE : Change to A/B monomers!
-type(SaptData) :: SAPT
-integer :: nbas, ICASSCF
+! HERE : Change to A/B monomers!
+type(SaptData)     :: SAPT
+integer,intent(in) :: nbas, ICASSCF
+
 integer :: i
 
  associate(A => SAPT%monA, B => SAPT%monB)
@@ -4808,8 +4852,8 @@ subroutine print_active(SAPT, nbas)
 implicit none
 
 type(SaptData) :: SAPT
-integer :: nbas, i, ip 
-integer :: NDimX
+integer        :: nbas
+integer        :: i,ip,NDimX
 
 ! print orbs  
  write(LOUT,'()')

@@ -99,6 +99,7 @@ call dgemm('N','N',NBasis,NBasis,NBasis,1d0,URe,NBasis,work1,NBasis,0d0,work2,NB
 call dgemm('N','T',NBasis,NBasis,NBasis,1d0,work2,NBasis,URe,NBasis,0d0,HNO,NBasis)
 call sq_symmetrize(HNO,NBasis)
 
+
 val = 0
 do i=1,NOccup
    val = val + Occ(i)*HNO(i,i)
@@ -269,21 +270,21 @@ endif
 !HNO=transpose(HNO)
 !call sq_to_triang2(HNO,work1,NBasis)
 !write(LOUT,*) 'HNO-tr', norm2(work1(1:NBasis*(NBasis+1)/2))
-!!!$
-!!!$write(LOUT,'(/,1X,''CASSCF Energy (w/o ENuc)'',5X,F15.8)') ETot
-!!!$
+!!!!$
+!!!!$write(LOUT,'(/,1X,''CASSCF Energy (w/o ENuc)'',5X,F15.8)') ETot
+!!!!$
 !call sq_to_triang2(AuxI,work1,NBasis)
 !write(LOUT,*) 'AuxI-my', norm2(work1(1:NBasis*(NBasis+1)/2))
 !AuxI=transpose(AuxI)
 !call sq_to_triang2(AuxI,work1,NBasis)
 !write(LOUT,*) 'AuxI-tr', norm2(work1(1:NBasis*(NBasis+1)/2))
-!
+!!
 !call sq_to_triang2(AuxIO,work1,NBasis)
 !write(LOUT,*) 'AuxIO-my', norm2(work1(1:NBasis*(NBasis+1)/2))
 !AuxIO=transpose(AuxIO)
 !call sq_to_triang2(AuxIO,work1,NBasis)
 !write(LOUT,*) 'AuxIO-tr', norm2(work1(1:NBasis*(NBasis+1)/2))
-!
+!!
 !write(LOUT,*) 'WMAT-my', 2d0*norm2(WMAT)
 
 deallocate(RDM2val)
