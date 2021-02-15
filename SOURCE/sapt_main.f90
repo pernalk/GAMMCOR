@@ -1,6 +1,5 @@
 module sapt_main
 use types
-use systemdef
 use timing
 use abmat
 use abfofo
@@ -48,14 +47,18 @@ double precision :: Tcpu,Twall
 
  call sapt_response(Flags,SAPT%monA,SAPT%EnChck,NBasis)
  call sapt_response(Flags,SAPT%monB,SAPT%EnChck,NBasis)
- 
+
  call sapt_ab_ints(Flags,SAPT%monA,SAPT%monB,SAPT%iPINO,NBasis)
 
  ! SAPT components
  write(LOUT,'()')
 
- ! calculate only C6
+ ! switch to extrapolated SAPT
+ if(SAPT%monA%E2dExt.or.SAPT%monB%E2dExt) call sapt_extrapol(Flags,SAPT,NBasis)
+
  if(Flags%ISERPA==0.and.SAPT%ic6==1) then
+
+    ! calculate only C6
     call c6_dummy(Flags,SAPT%monA,SAPT%monB,SAPT)
 
  elseif(Flags%ISERPA==0.and.SAPT%ic6==0) then
@@ -70,10 +73,10 @@ double precision :: Tcpu,Twall
        call e2disp_unc(Flags,SAPT%monA,SAPT%monB,SAPT)
        call e2exind(Flags,SAPT%monA,SAPT%monB,SAPT)
        call e2exdisp(Flags,SAPT%monA,SAPT%monB,SAPT)
-    
+
     elseif(SAPT%SaptLevel==10) then
       call e2dispCAS(Flags,SAPT%monA,SAPT%monB,SAPT,NBasis)
- 
+
     elseif(SAPT%SaptLevel==2) then
        call e2ind(Flags,SAPT%monA,SAPT%monB,SAPT)
       !call e2ind_resp(Flags,SAPT%monA,SAPT%monB,SAPT) ! version using alpha(0)
@@ -86,11 +89,11 @@ double precision :: Tcpu,Twall
  elseif(Flags%ISERPA==2) then
 
     call e1elst(SAPT%monA,SAPT%monB,SAPT)
-    !call e1exchs2(Flags,SAPT%monA,SAPT%monB,SAPT)
+    !call e1exchs2_pino(Flags,SAPT%monA,SAPT%monB,SAPT)
     call e2ind_apsg(Flags,SAPT%monA,SAPT%monB,SAPT)
     !call e2disp_apsg(Flags,SAPT%monA,SAPT%monB,SAPT)
     if(Flags%ISHF.Ne.0) then
-    
+
        call e2ind_pino(Flags,SAPT%monA,SAPT%monB,SAPT)
        call e2disp_pino(Flags,SAPT%monA,SAPT%monB,SAPT)
        call e2exdisp_apsg(Flags,SAPT%monA,SAPT%monB,SAPT)
@@ -120,8 +123,8 @@ type(SaptData)   :: SAPT
 integer          :: i
 integer          :: NBasis,NBasisRed
 integer          :: SAPT_LEVEL_SAVE
-double precision :: e2d,e2d_unc,e2dR,e2dR_unc   
-double precision :: e2exd,e2exd_unc,e2exdR,e2exdR_unc 
+double precision :: e2d,e2d_unc,e2dR,e2dR_unc
+double precision :: e2exd,e2exd_unc,e2exdR,e2exdR_unc
 double precision :: coefDisp,coefExDisp,coefGen
 double precision :: Tcpu,Twall
 logical          :: onlyDisp
@@ -152,7 +155,7 @@ logical          :: onlyDisp
 
  write(LOUT,'(/,1x,a)') 'SAPT COMPONENTS'
  write(LOUT,'(8a10)') ('**********',i=1,6)
- 
+
  call e1elst(SAPT%monA,SAPT%monB,SAPT)
  !call e1exchs2(Flags,SAPT%monA,SAPT%monB,SAPT)
  call e2disp_unc(Flags,SAPT%monA,SAPT%monB,SAPT)
@@ -162,14 +165,14 @@ logical          :: onlyDisp
  if(onlyDisp.eqv..false.) e2exd_unc = SAPT%e2exdisp_unc*1000d0
 
  call clock('SAPT(FULL SPACE)',Tcpu,Twall)
- 
+
  call reduce_virt(Flags,SAPT%monA,NBasis)
  call reduce_virt(Flags,SAPT%monB,NBasis)
 
  ! new
  NBasisRed = NBasis - min(SAPT%monA%NVZero,SAPT%monB%NVZero)
 
- if(SAPT_LEVEL_SAVE/=0) then 
+ if(SAPT_LEVEL_SAVE/=0) then
     SAPT%SaptLevel  = 2
     Flags%SaptLevel = 2
     SAPT%iCpld      = .true.
@@ -178,7 +181,7 @@ logical          :: onlyDisp
 
  call sapt_response(Flags,SAPT%monA,SAPT%EnChck,NBasis)
  call sapt_response(Flags,SAPT%monB,SAPT%EnChck,NBasis)
- 
+
  call sapt_ab_ints_red(Flags,SAPT%monA,SAPT%monB,SAPT%iPINO,NBasis,NBasisRed)
 
  call e2disp_unc(Flags,SAPT%monA,SAPT%monB,SAPT)
@@ -216,8 +219,55 @@ logical          :: onlyDisp
 
 end subroutine sapt_driver_red
 
+subroutine sapt_extrapol(Flags,SAPT,NBasis)
+implicit none
+
+type(SaptData)     :: SAPT
+type(FlagsData)    :: Flags
+integer,intent(in) :: NBasis
+
+ ! test
+ if(.not.(SAPT%monA%E2dExt).and..not.(SAPT%monB%E2dExt)) then
+   write(lout,'(1x,a)') 'ERROR! Wrong call of sapt_extrapol!'
+   stop
+ endif
+
+ ! first order
+ call e1elst(SAPT%monA,SAPT%monB,SAPT)
+ call e1exchs2(Flags,SAPT%monA,SAPT%monB,SAPT)
+
+ ! E2disp = a*alpha^3 + b*alpha + c
+
+ ! second order : uncoupled (for c coefficient)
+ if(SAPT%monA%E2dExt) SAPT%monA%ACAlpha=SAPT%monA%ACAlpha0
+ if(SAPT%monB%E2dExt) SAPT%monB%ACAlpha=SAPT%monB%ACAlpha0
+ call e2ind_cpld(Flags,SAPT%monA,SAPT%monB,SAPT)
+ call e2disp_cpld(Flags,SAPT%monA,SAPT%monB,SAPT)
+
+ !              : semicoupled (for b coefficient)
+ if(SAPT%monA%E2dExt) SAPT%monA%ACAlpha=SAPT%monA%ACAlpha1
+ if(SAPT%monB%E2dExt) SAPT%monB%ACAlpha=SAPT%monB%ACAlpha1
+ call e2ind_cpld(Flags,SAPT%monA,SAPT%monB,SAPT)
+ call e2disp_cpld(Flags,SAPT%monA,SAPT%monB,SAPT)
+
+ !              : coupled (for a coefficient)
+ if(SAPT%monA%E2dExt) SAPT%monA%ACAlpha=SAPT%monA%ACAlpha2
+ if(SAPT%monB%E2dExt) SAPT%monB%ACAlpha=SAPT%monB%ACAlpha2
+ call e2ind_cpld(Flags,SAPT%monA,SAPT%monB,SAPT)
+ call e2disp_cpld(Flags,SAPT%monA,SAPT%monB,SAPT)
+
+ call summary_sapt(SAPT)
+ !call summary_sapt_verbose(SAPT)
+
+ call print_warn(SAPT)
+ call free_sapt(SAPT)
+
+ stop
+
+end subroutine sapt_extrapol
+
 subroutine sapt_basinfo(SAPT,NBasis)
-implicit none 
+implicit none
 
 type(SaptData)      :: SAPT
 integer,intent(out) :: NBasis
@@ -252,19 +302,29 @@ implicit none
 type(FlagsData)    :: Flags
 type(SystemBlock)  :: Mon
 integer,intent(in) :: NBasis
-logical,intent(in) :: EnChck 
+logical,intent(in) :: EnChck
 
 integer          :: i,j,ij
 integer          :: SaptLevel
+logical          :: regular,extrapolate
 double precision :: MO(NBasis*NBasis)
 
  SaptLevel = Flags%SaptLevel
+ print*, 'Mon%Monomer',Mon%Monomer
+ print*, 'Mon%E2dExt ',Mon%E2dExt
+ if(Mon%E2dExt) then
+    extrapolate = .true.
+    regular     = .false.
+ else
+    extrapolate = .false.
+    regular     = .true.
+ endif
 
  ij = 0
  do j=1,NBasis
     do i=1,NBasis
        ij = ij + 1
-       MO(ij) = Mon%CMO(i,j)   
+       MO(ij) = Mon%CMO(i,j)
     enddo
  enddo
 
@@ -274,12 +334,12 @@ double precision :: MO(NBasis*NBasis)
  ! prepare RDM2
  if(Flags%ICASSCF==1) then
     call read2rdm(Mon,NBasis)
-    if(Mon%Monomer==1) call system('cp rdm2_A.dat rdm2.dat') 
-    if(Mon%Monomer==2) call system('cp rdm2_B.dat rdm2.dat') 
+    if(Mon%Monomer==1) call system('cp rdm2_A.dat rdm2.dat')
+    if(Mon%Monomer==2) call system('cp rdm2_B.dat rdm2.dat')
  endif
  !if(Flags%ICASSCF==1) call system('cp rdm2_A.dat rdm2.dat')
 
- call prepare_RDM2val(Mon,Flags%ICASSCF,NBasis) 
+ call prepare_RDM2val(Mon,Flags%ICASSCF,NBasis)
 
  if(SaptLevel.eq.1) return
 
@@ -291,10 +351,18 @@ double precision :: MO(NBasis*NBasis)
 
     elseif(SaptLevel.gt.0) then
 
-       if(Flags%IFunSR/=0) then
-          call calc_resp_dft(Mon,MO,Flags,NBasis)
-       else
-          call calc_resp_casgvb(Mon,MO,Flags,NBasis,EnChck)
+       if(regular) then
+
+          if(Flags%IFunSR/=0) then
+             call calc_resp_dft(Mon,MO,Flags,NBasis)
+          else
+             call calc_resp_casgvb(Mon,MO,Flags,NBasis,EnChck)
+          endif
+
+       elseif(extrapolate) then
+
+            call calc_resp_extrapolate(Mon,Flags,NBasis)
+
        endif
 
     endif
@@ -687,22 +755,22 @@ end subroutine sapt_interface
 subroutine onel_molpro(mon,NBasis,NSq,NInte1,MonBlock,SAPT)
  implicit none
 
- type(SaptData) :: SAPT
- type(SystemBlock) :: MonBlock
-
+ type(SaptData)     :: SAPT
+ type(SystemBlock)  :: MonBlock
  integer,intent(in) :: mon,NBasis,NSq,NInte1
- integer :: ione,ios,NSym,NBas(8),ncen
+
+ integer                       :: ione,ios,NSym,NBas(8),ncen
  double precision, allocatable :: Hmat(:),Vmat(:),Smat(:)
  double precision, allocatable :: Kmat(:)
  double precision, allocatable :: work1(:),work2(:)
- character(8) :: label
- character(:),allocatable :: infile,outfile
+ character(8)                  :: label
+ character(:),allocatable      :: infile,outfile
 
  if(mon==1) then
-   infile =  'AOONEINT_A'
+   infile  = 'AOONEINT_A'
    outfile = 'ONEEL_A'
  elseif(mon==2) then
-   infile =  'AOONEINT_B'
+   infile  = 'AOONEINT_B'
    outfile = 'ONEEL_B'
  endif
 
@@ -2082,14 +2150,13 @@ double precision, allocatable :: ABPlus(:), ABMin(:), URe(:,:), &
                                  EigVecR(:), Eig(:), &
                                  ABPlusT(:), ABMinT(:)
 double precision, allocatable :: Eig0(:), Eig1(:), EigY0(:), EigY1(:) 
-double precision :: Dens(NBas,NBas)
 
 integer :: dimOcc
 integer :: i,j,k,l,ii,jj,ij,ij1,ione,itwo 
-integer :: ip,iq,pq,ind
+integer :: ip,iq,pq
 integer :: iunit
 integer :: DimEx
-integer :: INegExcit,offset
+integer :: INegExcit
 
 double precision :: ACAlpha
 double precision :: ECASSCF,ETot,ECorr
@@ -2135,15 +2202,11 @@ double precision,parameter :: SmallE=0d0,BigE=1.D20
  endif
 
 ! set dimensions
- NSq = NBas**2
  NInte1 = NBas*(NBas+1)/2
- if(Mon%TwoMoInt==TWOMO_INCORE) then
-    NInte2 = NInte1*(NInte1+1)/2
- else
-    NInte2 = 1
- endif
+ NInte2 = 1
+ if(Mon%TwoMoInt==TWOMO_INCORE) NInte2 = NInte1*(NInte1+1)/2
 
- allocate(work1(NSq),work2(NSq),XOne(NInte1),URe(NBas,NBas))
+ allocate(work1(NBas**2),work2(NBas**2),XOne(NInte1),URe(NBas,NBas))
  !if(Mon%TwoMoInt==TWOMO_INCORE) allocate(TwoMO(NInte2))
  allocate(TwoMO(NInte2))
 
@@ -2157,7 +2220,7 @@ double precision,parameter :: SmallE=0d0,BigE=1.D20
 
  ! INCORE: load 2-el integrals
  if(Mon%TwoMoInt==TWOMO_INCORE) call LoadSaptTwoEl(Mon%Monomer,TwoMO,NBas,NInte2)
- 
+
  if(Flags%ISHF==1.and.Flags%ISERPA==2.and.Mon%NELE==1) then
 
     ! Calculate FCI for 2-el systems
@@ -2511,13 +2574,6 @@ double precision,parameter :: SmallE=0d0,BigE=1.D20
 
    end select
 
-   ! EXTRAPOLATED E2DISP
-   ! for now: change ACalpha in both monomers 
-   if(Mon%E2dExt) then
-      Mon%ACAlpha=0.45d0
-      call calc_cas_resp(Mon%ACAlpha,XOne,TwoMO,Mon,NInte1,NInte2,NBas) 
-   endif
-
 elseif(Flags%ISERPA==2) then
    ! TD-APSG response: GVB, CASSCF, FCI
 
@@ -2755,7 +2811,48 @@ endif
 
 end subroutine calc_resp_casgvb
 
-subroutine calc_cas_resp(ACAlpha,XOne,TwoMO,Mon,NInte1,NInte2,NBas)
+subroutine calc_resp_extrapolate(Mon,Flags,NBasis)
+! calculate response for extrapolated SAPT formulas
+!
+implicit none
+
+type(SystemBlock)            :: Mon
+type(FlagsData)              :: Flags
+integer,intent(in)           :: NBasis
+
+type(FileNames)              :: FNam
+integer                      :: NInte1,NInte2
+double precision             :: ACAlpha0,ACAlpha1,ACAlpha2
+double precision,allocatable :: XOne(:),TwoNO(:)
+double precision,allocatable :: work(:)
+
+ NInte1 = NBasis*(NBasis+1)/2
+ NInte2 = 1
+ if(Mon%TwoMoInt==TWOMO_INCORE) NInte2 = NInte1*(NInte1+1)/2
+
+ call set_filenames(Mon,FNam)
+
+ allocate(XOne(NInte1),TwoNO(NInte2))
+ allocate(work(NBasis*NBasis))
+
+ ! read 1-el hamiltonian
+ call get_one_mat('H',work,Mon%Monomer,NBasis)
+ call sq_to_triang(work,XOne,NBasis)
+ call tran_matTr(XOne,Mon%CMO,Mon%CMO,NBasis,.true.)
+
+ ! INCORE: load 2-el integrals
+ if(Mon%TwoMoInt==TWOMO_INCORE) call LoadSaptTwoEl(Mon%Monomer,TwoNO,NBasis,NInte2)
+
+ call calc_cas_resp(Mon%ACAlpha0,XOne,TwoNO,Mon,FNam%propfile0,NInte1,NInte2,NBasis)
+ call calc_cas_resp(Mon%ACAlpha1,XOne,TwoNO,Mon,FNam%propfile1,NInte1,NInte2,NBasis)
+ call calc_cas_resp(Mon%ACAlpha2,XOne,TwoNO,Mon,FNam%propfile2,NInte1,NInte2,NBasis)
+
+ deallocate(work)
+ deallocate(TwoNO,XOne)
+
+end subroutine calc_resp_extrapolate
+
+subroutine calc_cas_resp(ACAlpha,XOne,TwoMO,Mon,propfile,NInte1,NInte2,NBas)
 ! Two steps: 1) calculate A+B, A-B for alpha=ACAlpha
 !            2) solve symmetric ERPA eigenproblem
 implicit none
@@ -2765,6 +2862,7 @@ type(FileNames)              :: FNam
 integer, intent(in)          :: NInte1,NInte2,NBas
 double precision, intent(in) :: ACAlpha
 double precision, intent(in) :: XOne(NInte1),TwoMO(NInte2)
+character(*)                 :: propfile
 
 integer                      :: i
 double precision             :: ECASSCF
@@ -2803,7 +2901,9 @@ double precision, allocatable :: EigX(:),EigY(:),Eig(:)
     call AB_CAS(ABPlus,ABMin,ECASSCF,URe,Mon%Occ,XOne,TwoMO,Mon%IPair,&
                 Mon%IndN,Mon%IndX,Mon%NDimX,NBas,Mon%NDimX,NInte1,NInte2,ACAlpha)
 
- end select 
+    call EKT(URe,Mon%Occ,XOne,TwoMO,NBas,NInte1,NInte2)
+
+ end select
 
  if(Mon%InSt(1,1) > 0) then
     write(lout,'(/1x,a,i2,a,i1)') &
@@ -2818,14 +2918,13 @@ double precision, allocatable :: EigX(:),EigY(:),Eig(:)
                  Mon%Occ,Mon%IndN,Mon%NDimX,NBas)
 
  ! dump response vecs
- call writerespXY(EigX,EigY,Eig,FNam%propfile2)
+ call writerespXY(EigX,EigY,Eig,propfile)
  
  deallocate(Eig,EigY,EigX)
  deallocate(ABMin,ABPlus)
  deallocate(URe)
 
 end subroutine calc_cas_resp
-
 
 subroutine calc_resp_pino(M,MO,Flags,NBas)
 ! obtain FCI response based on PINO functional
@@ -3173,7 +3272,7 @@ type(FileNames)   :: FNam
     FNam%propfile   = 'PROP_A'
     FNam%propfile0  = 'PROP_A0'
     FNam%propfile1  = 'PROP_A1'
-    FNam%propfile2  = 'PROP_AX'
+    FNam%propfile2  = 'PROP_A2'
     FNam%y01file    = 'Y01_A'
     FNam%xy0file    = 'XY0_A'
     FNam%rdmfile    = 'rdm2_A.dat'
@@ -3190,7 +3289,7 @@ type(FileNames)   :: FNam
     FNam%propfile   = 'PROP_B'
     FNam%propfile0  = 'PROP_B0'
     FNam%propfile1  = 'PROP_B1'
-    FNam%propfile2  = 'PROP_BX'
+    FNam%propfile2  = 'PROP_B2'
     FNam%y01file    = 'Y01_B'
     FNam%xy0file    = 'XY0_B'
     FNam%rdmfile    = 'rdm2_B.dat'
@@ -5116,6 +5215,19 @@ endif
 if(allocated(SAPT%monB%VCoul)) then
    deallocate(SAPT%monB%VCoul)
 endif
+
+! cubic dispersion
+if(SAPT%monA%E2dExt) then
+  call delfile('PROP_A0')
+  call delfile('PROP_A1')
+  call delfile('PROP_A2')
+endif
+if(SAPT%monB%E2dExt) then
+  call delfile('PROP_B0')
+  call delfile('PROP_B1')
+  call delfile('PROP_B2')
+endif
+! ....
 
 ! delete files 
 call delfile('AOTWOSORT')

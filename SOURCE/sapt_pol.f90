@@ -234,6 +234,162 @@ double precision :: tmp
 
 end subroutine e2ind_resp
 
+subroutine e2ind_cpld(Flags,A,B,SAPT)
+! calculate only coupled E2ind
+! used also for  cubic E2ind
+implicit none
+
+type(FlagsData) :: Flags
+type(SystemBlock) :: A, B
+type(SaptData) :: SAPT
+type(Y01BlockData),allocatable :: Y01BlockA(:),Y01BlockB(:)
+
+double precision,allocatable :: OmA(:),OmB(:)
+double precision,allocatable :: EVecA(:,:),EVecB(:,:)
+double precision,allocatable :: WaBB(:,:),WbAA(:,:)
+double precision,allocatable :: tmpA(:),tmpB(:)
+
+integer          :: NBas,info
+integer          :: i,j,pq,ip,iq,rs,ir,is
+double precision :: fact
+double precision :: e2ba,e2ab,e2iu,e2ic
+double precision :: e2ab_unc,e2ba_unc,e2ic_unc
+character(:),allocatable   :: propA,propB
+double precision,parameter :: BigE   = 1.D10
+double precision,parameter :: SmallE = 1.D-6
+
+ if(A%NBasis.ne.B%NBasis) then
+    write(LOUT,'(1x,a)') 'ERROR! MCBS not implemented in SAPT!'
+    stop
+ else
+    NBas = A%NBasis
+ endif
+
+ ! E2IND(B<--A)
+
+ allocate(EVecB(B%NDimX,B%NDimX),OmB(B%NDimX))
+ allocate(tmpB(B%NDimX),WaBB(NBas,NBas))
+
+ if(B%E2dExt) then
+   if(B%ACAlpha==B%ACAlpha0) then
+      propB = 'PROP_B0'
+   elseif(B%ACAlpha==B%ACAlpha1) then
+      propB = 'PROP_B1'
+   elseif(B%ACAlpha==B%ACAlpha2) then
+      propB = 'PROP_B2'
+   endif
+   call convert_XY_to_Z(EVecB,B%CICoef,B%IndN,B%NDimX,NBas,propB)
+   call readEvalXY(OmB,B%NDimX,propB)
+ else
+   !call readresp(EVecB,OmB,B%NDimX,'PROP_B')
+   call readEvecZ(EVecB,B%NDimX,'PROP_B')
+   call readEvalZ(OmB,B%NDimX,'PROP_B')
+ endif
+
+ call tran2MO(A%WPot,B%CMO,B%CMO,WaBB,NBas)
+
+ tmpB = 0d0
+ do rs=1,B%NDimX
+    ir = B%IndN(1,rs)
+    is = B%IndN(2,rs)
+
+    fact = (B%CICoef(is)+B%CICoef(ir))*WaBB(ir,is)
+
+    do j=1,B%NDimX
+       tmpB(j) = tmpB(j) + fact*EVecB(rs,j)
+    enddo
+
+ enddo
+
+ e2ab = 0d0
+ do j=1,B%NDimX
+    if(OmB(j).lt.BigE.and.OmB(j).gt.SmallE) then
+       e2ab = e2ab + tmpB(j)**2 / OmB(j)
+    endif
+ enddo
+
+ e2ab = -4.0d0*e2ab
+ write(LOUT,'(/1x,a,f16.8)') 'Ind(B<--A)     = ', e2ab*1000d0
+
+ deallocate(tmpB)
+ deallocate(EVecB,OmB)
+
+ ! E2IND(A<--B)
+
+ allocate(EVecA(A%NDimX,A%NDimX),OmA(A%NDimX))
+ allocate(tmpA(A%NDimX),WbAA(NBas,NBas))
+
+ if(A%E2dExt) then
+   if(A%ACAlpha==A%ACAlpha0) then
+      propA = 'PROP_A0'
+   elseif(A%ACAlpha==A%ACAlpha1) then
+      propA = 'PROP_A1'
+   elseif(A%ACAlpha==A%ACAlpha2) then
+      propA = 'PROP_A2'
+   endif
+   call convert_XY_to_Z(EVecA,A%CICoef,A%IndN,A%NDimX,NBas,propA)
+   call readEvalXY(OmA,A%NDimX,propA)
+ else
+   !call readresp(EVecA,OmA,A%NDimX,'PROP_A')
+   call readEvecZ(EVecA,A%NDimX,'PROP_A')
+   call readEvalZ(OmA,A%NDimX,'PROP_A')
+ endif
+
+ call tran2MO(B%WPot,A%CMO,A%CMO,WbAA,NBas)
+
+ tmpA = 0d0
+ do pq=1,A%NDimX
+    ip = A%IndN(1,pq)
+    iq = A%IndN(2,pq)
+
+    fact = (A%CICoef(iq)+A%CICoef(ip))*WbAA(ip,iq)
+
+    do i=1,A%NDimX
+       tmpA(i) = tmpA(i) + fact*EVecA(pq,i)
+    enddo
+
+ enddo
+
+ e2ba = 0d0
+ do i=1,A%NDimX
+    if(OmA(i).lt.BigE.and.OmA(i).gt.SmallE) then
+       e2ba = e2ba + tmpA(i)**2 / OmA(i)
+    endif
+ enddo
+
+ e2ba = -4.0d0*e2ba
+ write(LOUT,'(1x,a,f16.8)') 'Ind(A<--B)     = ', e2ba*1000d0
+
+ e2ic = (e2ab + e2ba)
+
+ if(A%E2dExt.or.B%E2dExt) then
+
+   if(A%ACAlpha==A%ACAlpha0.or.B%ACAlpha==B%ACAlpha0) SAPT%e2ind_a0 = e2ic
+   if(A%ACAlpha==A%ACAlpha1.or.B%ACAlpha==B%ACAlpha1) SAPT%e2ind_a1 = e2ic
+   if(A%ACAlpha==A%ACAlpha2.or.B%ACAlpha==B%ACAlpha2) SAPT%e2ind_a2 = e2ic
+
+   write(LOUT,'(/1x,a)') 'E2disp for the ax^3+bx+c model'
+   write(LOUT,'(1x,a,f16.8)') 'A: Alpha     = ',A%ACAlpha
+   write(LOUT,'(1x,a,f16.8)') 'B: Alpha     = ',B%ACAlpha
+   write(LOUT,'(1x,a,f16.8)') 'E2ind(Alpha) = ',e2ic*1000d0
+
+   if(A%ACAlpha==A%ACAlpha2.or.B%ACAlpha==B%ACAlpha2) then
+      call e2ind_cubic(Flags,A,B,SAPT)
+   endif
+
+ else
+
+    SAPT%e2ind = e2ic
+    write(LOUT,'(1x,a,f16.8)') 'E2ind          = ', e2ic*1000d0
+
+ endif
+
+ deallocate(tmpA)
+ deallocate(WaBB,WbAA)
+ deallocate(EVecA,OmA)
+
+end subroutine e2ind_cpld
+
 subroutine e2ind_unc(Flags,A,B,SAPT)
 implicit none
 
@@ -1216,26 +1372,31 @@ deallocate(OmB,OmA)
 end subroutine e2dispCAS
 
 subroutine e2disp_cpld(Flags,A,B,SAPT)
-! CALCULATE ONLY COUPLED E2DISP
+! calculate only coupled E2disp
+! used also for  cubic E2disp
 ! does not work for GVB yet
 implicit none
 
 type(FlagsData)   :: Flags
 type(SystemBlock) :: A, B
 type(SaptData)    :: SAPT
+
 integer :: NBas
 integer :: dimOA,dimVA,dimOB,dimVB,nOVA,nOVB
 integer :: iunit
 integer :: i,j,pq,rs
 integer :: ip,iq,ir,is
+
 double precision             :: fact,e2d
-double precision,allocatable :: OmA(:), OmB(:)
-double precision,allocatable :: EVecA(:), EVecB(:)
+double precision,allocatable :: OmA(:),OmB(:)
+double precision,allocatable :: EVecA(:),EVecB(:)
 double precision,allocatable :: tmp1(:,:),tmp2(:,:)
 double precision,allocatable :: work(:)
 
+character(:),allocatable     :: propA,propB
+
 !double precision,parameter :: SmallE = 1.D-1
-double precision,parameter :: BigE = 1.D8 
+double precision,parameter :: BigE   = 1.D8 
 double precision,parameter :: SmallE = 1.D-3
 
  ! NOWE
@@ -1253,7 +1414,7 @@ double precision,parameter :: SmallE = 1.D-3
  endif
 
 ! print thresholds
- if(SAPT%IPrint>1) then 
+ if(SAPT%IPrint>5) then 
     write(LOUT,'(/,1x,a)') 'Thresholds in E2disp:'
     write(LOUT,'(1x,a,2x,e15.4)') 'SmallE      =', SmallE
     write(LOUT,'(1x,a,2x,e15.4)') 'BigE        =', BigE
@@ -1264,19 +1425,23 @@ double precision,parameter :: SmallE = 1.D-3
  dimVA = A%num1+A%num2
  dimOB = B%num0+B%num1
  dimVB = B%num1+B%num2
- nOVA = dimOA*dimVA
- nOVB = dimOB*dimVB
+ nOVA  = dimOA*dimVA
+ nOVB  = dimOB*dimVB
 
  allocate(EVecA(A%NDimX*A%NDimX))
  allocate(tmp1(A%NDimX,B%NDimX),tmp2(A%NDimX,B%NDimX))
 
- if(A%E2dExt.and.B%E2dExt) then
-   call convert_XY_to_Z(EVecA,A%CICoef,A%IndN,A%NDimX,NBas,'PROP_AX') 
- elseif(.not.(A%E2dExt.and.B%E2dExt)) then
-   write(lout,'(/1x,a)') 'Declare E2dAx3 for both monomers!'
-   return
+ if(A%E2dExt) then
+   if(A%ACAlpha==A%ACAlpha0) then
+      propA = 'PROP_A0'
+   elseif(A%ACAlpha==A%ACAlpha1) then
+      propA = 'PROP_A1'
+   elseif(A%ACAlpha==A%ACAlpha2) then
+      propA = 'PROP_A2'
+   endif
+   call convert_XY_to_Z(EVecA,A%CICoef,A%IndN,A%NDimX,NBas,propA)
  else
-   call readEvecZ(EVecA,A%NDimX,'PROP_A') 
+   call readEvecZ(EVecA,A%NDimX,'PROP_A')
  endif
 
  allocate(work(nOVB))
@@ -1312,12 +1477,17 @@ double precision,parameter :: SmallE = 1.D-3
 
  allocate(EVecB(B%NDimX*B%NDimX))
 
- if(B%E2dExt.and.A%E2dExt) then
-   call convert_XY_to_Z(EVecB,B%CICoef,B%IndN,B%NDimX,NBas,'PROP_BX') 
- elseif(.not.(B%E2dExt.and.A%E2dExt)) then
-   write(lout,'(/1x,a)') 'Declare E2dAx3 for both monomers!'
+ if(B%E2dExt) then
+   if(B%ACAlpha==B%ACAlpha0) then
+      propB = 'PROP_B0'
+   elseif(B%ACAlpha==B%ACAlpha1) then
+      propB = 'PROP_B1'
+   elseif(B%ACAlpha==B%ACAlpha2) then
+      propB = 'PROP_B2'
+   endif
+   call convert_XY_to_Z(EVecB,B%CICoef,B%IndN,B%NDimX,NBas,propB)
  else
-   call readEvecZ(EVecB,B%NDimX,'PROP_B') 
+   call readEvecZ(EVecB,B%NDimX,'PROP_B')
  endif
 
  call dgemm('N','N',A%NDimX,B%NDimX,B%NDimX,1d0,tmp1,A%NDimX,EVecB,B%NDimX,0d0,tmp2,A%NDimX)
@@ -1325,11 +1495,15 @@ double precision,parameter :: SmallE = 1.D-3
  deallocate(EVecB,tmp1)
 
  allocate(OmA(A%NDimX),OmB(B%NDimX))
- if(A%E2dExt.and.B%E2dExt) then
-   call readEvalXY(OmA,A%NDimX,'PROP_AX')
-   call readEvalXY(OmB,B%NDimX,'PROP_BX')
+ if(A%E2dExt) then
+   call readEvalXY(OmA,A%NDimX,propA)
  else
    call readEvalZ(OmA,A%NDimX,'PROP_A')
+ endif 
+ 
+ if(B%E2dExt) then
+   call readEvalXY(OmB,B%NDimX,propB)
+ else
    call readEvalZ(OmB,B%NDimX,'PROP_B')
  endif
 
@@ -1356,13 +1530,18 @@ double precision,parameter :: SmallE = 1.D-3
 
  if(A%E2dExt.or.B%E2dExt) then
 
-   SAPT%e2disp_ax3 = e2d
+   if(A%ACAlpha==A%ACAlpha0.or.B%ACAlpha==B%ACAlpha0) SAPT%e2disp_a0 = e2d
+   if(A%ACAlpha==A%ACAlpha1.or.B%ACAlpha==B%ACAlpha1) SAPT%e2disp_a1 = e2d
+   if(A%ACAlpha==A%ACAlpha2.or.B%ACAlpha==B%ACAlpha2) SAPT%e2disp_a2 = e2d
+
    write(LOUT,'(/1x,a)') 'E2disp for the ax^3+bx+c model'
    write(LOUT,'(1x,a,f16.8)') 'A: Alpha      = ',A%ACAlpha
    write(LOUT,'(1x,a,f16.8)') 'B: Alpha      = ',B%ACAlpha
    write(LOUT,'(1x,a,f16.8)') 'E2disp(Alpha) = ',e2d*1000
 
-   call e2disp_ax3bxc(Flags,A,B,SAPT)
+   if(A%ACAlpha==A%ACAlpha2.or.B%ACAlpha==B%ACAlpha2) then
+      call e2disp_cubic(Flags,A,B,SAPT)
+   endif
 
  else
 
@@ -1377,7 +1556,7 @@ double precision,parameter :: SmallE = 1.D-3
 
 end subroutine e2disp_cpld
 
-subroutine e2disp_ax3bxc(Flags,A,B,SAPT)
+subroutine e2disp_cubic(Flags,A,B,SAPT)
 ! calculate 2nd order dispersion energy
 ! extrapolated according to E2disp = ax^3+bx+c formula
 implicit none
@@ -1386,30 +1565,74 @@ type(FlagsData)   :: Flags
 type(SystemBlock) :: A, B
 type(SaptData)    :: SAPT
 
-double precision  :: xVar
+double precision  :: xVar,Alpha10
 double precision  :: coefA,coefB,coefC
-double precision  :: e2disp_ext
+double precision  :: e2disp_cub
 
 if(A%E2dExt) then
    xVar = A%ACAlpha
+   Alpha10 = (A%ACAlpha1 - A%ACAlpha0)
 else
    xVar = B%ACAlpha
+   Alpha10 = (B%ACAlpha1 - B%ACAlpha0)
 endif
 
-coefC = SAPT%e2disp_unc
-coefB = SAPT%e2disp_sc-SAPT%e2disp_unc
-coefA = (SAPT%e2disp_ax3 - coefB*xVar - coefC ) / xVar**3
+coefC = SAPT%e2disp_a0
+coefB = (SAPT%e2disp_a1 - SAPT%e2disp_a0) / Alpha10 
+coefA = (SAPT%e2disp_a2 - coefB*xVar - coefC ) / xVar**3
 
+print*,'Coefficients:'
+print*,'x = ', xVar
 print*,'A = ', coefA
 print*,'B = ', coefB
 print*,'C = ', coefC
 
 xVar = 1
-e2disp_ext = coefA * xVar**3 + coefB * xVar + coefC
+e2disp_cub = coefA * xVar**3 + coefB * xVar + coefC
 
-write(LOUT,'(/1x,a,f16.8)') 'E2disp-ax3   = ',e2disp_ext*1000
+SAPT%e2disp  = e2disp_cub
+write(LOUT,'(/1x,a,f16.8)') 'E2disp(cubic) = ',e2disp_cub*1000
 
-end subroutine e2disp_ax3bxc
+end subroutine e2disp_cubic
+
+subroutine e2ind_cubic(Flags,A,B,SAPT)
+! calculate 2nd order induction energy
+! extrapolated according to E2ind= ax^3+bx+c formula
+implicit none
+
+type(FlagsData)   :: Flags
+type(SystemBlock) :: A, B
+type(SaptData)    :: SAPT
+
+double precision  :: xVar,Alpha10
+double precision  :: coefA,coefB,coefC
+double precision  :: e2ind_cub
+
+if(A%E2dExt) then
+   xVar = A%ACAlpha
+   Alpha10 = (A%ACAlpha1 - A%ACAlpha0)
+else
+   xVar = B%ACAlpha
+   Alpha10 = (B%ACAlpha1 - B%ACAlpha0)
+endif
+
+coefC = SAPT%e2ind_a0
+coefB = (SAPT%e2ind_a1 - SAPT%e2ind_a0) / Alpha10 
+coefA = (SAPT%e2ind_a2 - coefB*xVar - coefC ) / xVar**3
+
+print*,'Coefficients:'
+print*,'x = ', xVar
+print*,'A = ', coefA
+print*,'B = ', coefB
+print*,'C = ', coefC
+
+xVar = 1
+e2ind_cub = coefA * xVar**3 + coefB * xVar + coefC
+
+SAPT%e2ind = e2ind_cub
+write(LOUT,'(/1x,a,f16.8)') 'E2ind(cubic)=  ',e2ind_cub*1000
+
+end subroutine e2ind_cubic
 
 subroutine e2disp(Flags,A,B,SAPT)
 ! calculate 2nd order dispersion energy

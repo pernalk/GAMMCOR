@@ -156,6 +156,10 @@ type SystemBlock
       logical :: PostCAS = .false.
       logical :: NActFromRDM = .true.
       logical :: reduceV = .false.
+      ! for extrapolated SAPT 
+      double precision :: ACAlpha0  = 1.d-10
+      double precision :: ACAlpha1  = 0.01d0
+      double precision :: ACAlpha2  = 0.45d0
       ! ThrAct for active geminals selection
       double precision :: ThrAct    = 0.992d0
       double precision :: ThrSelAct = 1.d-8
@@ -216,7 +220,7 @@ type FlagsData
      integer :: IGVB    = 1
      integer :: ITwoEl  = TWOMO_INCORE 
      integer :: IRedVirt  = FLAG_REDVIRT
-     integer :: IFun    = 13
+     integer :: IFun      = 13
      integer :: IFunSR    = 0 
      integer :: IFunSRKer = 0
      double precision :: Alpha = 0
@@ -228,25 +232,25 @@ type FlagsData
      integer :: ISERPA  = 0
      integer :: ISAPT   = 0
      integer :: SaptLevel = 0
-     integer :: ISHF    = 0
+     integer :: ISHF      = 0
      character(:), allocatable :: JobTitle
      integer :: JobType = 0
      ! initia.f
-     integer :: IA = 1
-     integer :: ICASSCF = 0
-     integer :: IDMRG   = 0  
+     integer :: IA        = 1
+     integer :: ICASSCF   = 0
+     integer :: IDMRG     = 0  
      ! interpa.f  
-     integer :: IFlAC   = 0
-     integer :: IFlSnd  = 0
-     integer :: IFlAC0D = 0
+     integer :: IFlAC     = 0
+     integer :: IFlSnd    = 0
+     integer :: IFlAC0D   = 0
      integer :: ISymmAC0D = 1
-     integer :: IFlCore = 1
-     integer :: IFlFrag1 = 0
-     integer :: IFl12 = 1
+     integer :: IFlCore   = 1
+     integer :: IFlFrag1  = 0
+     integer :: IFl12     = 1
      ! sapt_main.f90
      integer :: IFlag0 = 0
      ! sapt_utils.f90
-     integer :: DIISN = 6
+     integer :: DIISN  = 6
      integer :: DIISOn = 2
 
 end type FlagsData
@@ -265,8 +269,9 @@ type SaptData
   type(SystemBlock) :: monA,monB
      double precision  :: Vnn,elst,exchs2,e2ind,e2disp
      double precision  :: e2disp_sc,e2disp_sp
-     double precision  :: e2disp_ax3
+     double precision  :: e2disp_a0,e2disp_a1,e2disp_a2
      double precision  :: e2ind_unc,e2disp_unc
+     double precision  :: e2ind_a0,e2ind_a1,e2ind_a2
      double precision  :: e2dispR_unc,e2dispR
      double precision  :: e2exdisp_unc,e2exdisp
      double precision  :: e2exdispR_unc,e2exdispR
@@ -1461,12 +1466,13 @@ end subroutine get_den
 subroutine get_one_mat(var,mat,mono,nbas)
 implicit none
 
-character(1),intent(in) :: var
-integer,intent(in) :: nbas,mono
+character(1),intent(in)      :: var
+integer,intent(in)           :: nbas,mono
 double precision,intent(out) :: mat(nbas,nbas)
-integer :: ione
-logical :: valid
-character(8) :: label
+
+integer                  :: ione
+logical                  :: valid
+character(8)             :: label
 character(:),allocatable :: onefile
 
  if(mono==1) then
@@ -1516,40 +1522,6 @@ character(:),allocatable :: onefile
  close(ione)
 
 end subroutine get_one_mat
-
-subroutine fill_Fmat(Fmat,Occ,NBas,variant)
-implicit none
-
-integer,intent(in) :: NBas,variant
-double precision,intent(in)  :: Occ(NBas)
-double precision,intent(out) :: Fmat(NBas,NBas)
-
-integer :: i,j
-
-Fmat = 0
-select case(variant)
-case(0)
-   ! HF
-   do j=1,NBas
-      do i=1,NBas
-         Fmat(i,j) = Occ(i)*Occ(j)
-      enddo
-   enddo
-case(1)
-   ! BB functional
-   do j=1,NBas
-      do i=1,NBas
-         Fmat(i,j) = sqrt(Occ(i)*Occ(j))
-      enddo
-   enddo
-case(3)
-   ! Power functional
-   write(LOUT,*) 'POWER FUNCITONAL NOT READY YET!'
-   stop
-
-end select
-
-end subroutine fill_Fmat
 
 subroutine basinfo(nbasis,basfile,intf)
 implicit none
