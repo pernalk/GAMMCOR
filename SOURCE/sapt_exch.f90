@@ -1577,7 +1577,7 @@ double precision,parameter :: BigE = 1.D8
 
  uncoupled = .true.
  if(Flags%ICASSCF==0)     uncoupled = .false.
- if(A%E2dExt.or.B%E2dExt) uncoupled = .false.
+ if(A%Cubic.or.B%Cubic) uncoupled = .false.
 
 ! set dimensions
  NBas = A%NBasis
@@ -1593,7 +1593,7 @@ double precision,parameter :: BigE = 1.D8
 
  ! SAPT cubic
  ! A: get response properites
- if(A%E2dExt) then
+ if(A%Cubic) then
    allocate(A%EigX(A%NDimX*A%NDimX),A%EigY(A%NDimX*A%NDimX),&
             A%Eig(A%NDimX))
    if(A%ACAlpha==A%ACAlpha0) then
@@ -1607,7 +1607,7 @@ double precision,parameter :: BigE = 1.D8
    call readEvalXY(A%Eig,A%NDimX,propA)
  endif
  ! B: get response properties
- if(B%E2dExt) then
+ if(B%Cubic) then
    allocate(B%EigX(B%NDimX*B%NDimX),B%EigY(B%NDimX*B%NDimX),&
             B%Eig(B%NDimX))
 
@@ -1742,7 +1742,7 @@ double precision,parameter :: BigE = 1.D8
 
  if(uncoupled) termZ_u = 2d0*SAPT%e2ind_unc*termZ
 
- if(A%E2dExt.or.B%E2dExt) then
+ if(A%Cubic.or.B%Cubic) then
    if(A%ACAlpha==A%ACAlpha0.or.B%ACAlpha==B%ACAlpha0) termZ = 2d0*SAPT%e2ind_a0*termZ
    if(A%ACAlpha==A%ACAlpha1.or.B%ACAlpha==B%ACAlpha1) termZ = 2d0*SAPT%e2ind_a1*termZ
    if(A%ACAlpha==A%ACAlpha2.or.B%ACAlpha==B%ACAlpha2) termZ = 2d0*SAPT%e2ind_a2*termZ
@@ -2047,7 +2047,7 @@ double precision,parameter :: BigE = 1.D8
 
     e2exi = termX + termY + termZ
 
-    if(A%E2dExt.or.B%E2dExt) then
+    if(A%Cubic.or.B%Cubic) then
 
       ! cubic
       if(A%ACAlpha==A%ACAlpha0.or.B%ACAlpha==B%ACAlpha0) SAPT%e2exi_a0 = e2exi
@@ -2108,8 +2108,8 @@ double precision,parameter :: BigE = 1.D8
  endif
 
  ! SAPT cubic
- if(A%E2dExt) deallocate(A%Eig,A%EigY,A%EigX)
- if(B%E2dExt) deallocate(B%Eig,B%EigY,B%EigX)
+ if(A%Cubic) deallocate(A%Eig,A%EigY,A%EigX)
+ if(B%Cubic) deallocate(B%Eig,B%EigY,B%EigX)
 
 ! deallocate(VindB,VindA)
  deallocate(tmpYB,tmpXB)
@@ -2195,11 +2195,11 @@ double precision,parameter :: SmallE = 1.D-3
  both      = SAPT%iCpld
  uncoupled = .true.
  if(Flags%ICASSCF==0)     uncoupled = .false.
- if(A%E2dExt.or.B%E2dExt) uncoupled = .false.
+ if(A%Cubic.or.B%Cubic) uncoupled = .false.
 
  ! SAPT cubic
  ! A: get response properites
- if(A%E2dExt) then
+ if(A%Cubic) then
    allocate(A%EigX(A%NDimX*A%NDimX),A%EigY(A%NDimX*A%NDimX),&
             A%Eig(A%NDimX))
    if(A%ACAlpha==A%ACAlpha0) then
@@ -2213,7 +2213,7 @@ double precision,parameter :: SmallE = 1.D-3
    call readEvalXY(A%Eig,A%NDimX,propA)
  endif
  ! B: get response properties
- if(B%E2dExt) then
+ if(B%Cubic) then
    allocate(B%EigX(B%NDimX*B%NDimX),B%EigY(B%NDimX*B%NDimX),&
             B%Eig(B%NDimX))
 
@@ -2337,7 +2337,7 @@ double precision,parameter :: SmallE = 1.D-3
  termZ_u = termZ
  termZ_u = 2d0*SAPT%e2disp_unc*termZ_u
 
- if(A%E2dExt.or.B%E2dExt) then
+ if(A%Cubic.or.B%Cubic) then
     if(A%ACAlpha==A%ACAlpha0.or.B%ACAlpha==B%ACAlpha0) termZ = 2d0*SAPT%e2disp_a0*termZ
     if(A%ACAlpha==A%ACAlpha1.or.B%ACAlpha==B%ACAlpha1) termZ = 2d0*SAPT%e2disp_a1*termZ
     if(A%ACAlpha==A%ACAlpha2.or.B%ACAlpha==B%ACAlpha2) termZ = 2d0*SAPT%e2disp_a2*termZ
@@ -2900,7 +2900,7 @@ double precision,parameter :: SmallE = 1.D-3
 
     e2exd = termX + termY + termZ
 
- if(A%E2dExt.or.B%E2dExt) then
+ if(A%Cubic.or.B%Cubic) then
 
    ! cubic
    if(A%ACAlpha==A%ACAlpha0.or.B%ACAlpha==B%ACAlpha0) SAPT%e2exd_a0 = e2exd
@@ -2930,8 +2930,8 @@ double precision,parameter :: SmallE = 1.D-3
  if(both) deallocate(tmp3)
 
  ! SAPT cubic
- if(A%E2dExt) deallocate(A%Eig,A%EigY,A%EigX)
- if(B%E2dExt) deallocate(B%Eig,B%EigY,B%EigX)
+ if(A%Cubic) deallocate(A%Eig,A%EigY,A%EigX)
+ if(B%Cubic) deallocate(B%Eig,B%EigY,B%EigX)
 
 end subroutine e2exdisp
 

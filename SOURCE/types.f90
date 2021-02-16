@@ -151,7 +151,7 @@ type SystemBlock
       logical :: DeclareSt = .false.
       logical :: DeclareTrSt = .false.
       logical :: ISHF    = .false.
-      logical :: E2dExt  = .false.
+      logical :: Cubic   = .false.
       logical :: doRSH   = .false., SameOm = .true.
       logical :: PostCAS = .false.
       logical :: NActFromRDM = .true.
@@ -286,8 +286,8 @@ type SaptData
      integer :: ic6 = 0
      integer :: iPINO=-1
      integer :: IPrint = 1000
-     logical :: iCpld   = .true.
-     logical :: E2dExt  = .false.
+     logical :: iCpld  = .true.
+     logical :: Cubic  = .false.
      ! MH : add keyword!
      logical :: SemiCoupled = .true.
      logical :: DispExc = .true.

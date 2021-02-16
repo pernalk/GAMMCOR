@@ -270,7 +270,7 @@ double precision,parameter :: SmallE = 1.D-6
  allocate(EVecB(B%NDimX,B%NDimX),OmB(B%NDimX))
  allocate(tmpB(B%NDimX),WaBB(NBas,NBas))
 
- if(B%E2dExt) then
+ if(B%Cubic) then
    if(B%ACAlpha==B%ACAlpha0) then
       propB = 'PROP_B0'
    elseif(B%ACAlpha==B%ACAlpha1) then
@@ -319,7 +319,7 @@ double precision,parameter :: SmallE = 1.D-6
  allocate(EVecA(A%NDimX,A%NDimX),OmA(A%NDimX))
  allocate(tmpA(A%NDimX),WbAA(NBas,NBas))
 
- if(A%E2dExt) then
+ if(A%Cubic) then
    if(A%ACAlpha==A%ACAlpha0) then
       propA = 'PROP_A0'
    elseif(A%ACAlpha==A%ACAlpha1) then
@@ -362,7 +362,7 @@ double precision,parameter :: SmallE = 1.D-6
 
  e2ic = (e2ab + e2ba)
 
- if(A%E2dExt.or.B%E2dExt) then
+ if(A%Cubic.or.B%Cubic) then
 
    if(A%ACAlpha==A%ACAlpha0.or.B%ACAlpha==B%ACAlpha0) SAPT%e2ind_a0 = e2ic
    if(A%ACAlpha==A%ACAlpha1.or.B%ACAlpha==B%ACAlpha1) SAPT%e2ind_a1 = e2ic
@@ -1430,7 +1430,7 @@ double precision,parameter :: SmallE = 1.D-3
  allocate(EVecA(A%NDimX*A%NDimX))
  allocate(tmp1(A%NDimX,B%NDimX),tmp2(A%NDimX,B%NDimX))
 
- if(A%E2dExt) then
+ if(A%Cubic) then
    if(A%ACAlpha==A%ACAlpha0) then
       propA = 'PROP_A0'
    elseif(A%ACAlpha==A%ACAlpha1) then
@@ -1476,7 +1476,7 @@ double precision,parameter :: SmallE = 1.D-3
 
  allocate(EVecB(B%NDimX*B%NDimX))
 
- if(B%E2dExt) then
+ if(B%Cubic) then
    if(B%ACAlpha==B%ACAlpha0) then
       propB = 'PROP_B0'
    elseif(B%ACAlpha==B%ACAlpha1) then
@@ -1494,13 +1494,13 @@ double precision,parameter :: SmallE = 1.D-3
  deallocate(EVecB,tmp1)
 
  allocate(OmA(A%NDimX),OmB(B%NDimX))
- if(A%E2dExt) then
+ if(A%Cubic) then
    call readEvalXY(OmA,A%NDimX,propA)
  else
    call readEvalZ(OmA,A%NDimX,'PROP_A')
  endif 
  
- if(B%E2dExt) then
+ if(B%Cubic) then
    call readEvalXY(OmB,B%NDimX,propB)
  else
    call readEvalZ(OmB,B%NDimX,'PROP_B')
@@ -1527,7 +1527,7 @@ double precision,parameter :: SmallE = 1.D-3
 
  e2d  = -16d0*e2d
 
- if(A%E2dExt.or.B%E2dExt) then
+ if(A%Cubic.or.B%Cubic) then
 
    if(A%ACAlpha==A%ACAlpha0.or.B%ACAlpha==B%ACAlpha0) SAPT%e2disp_a0 = e2d
    if(A%ACAlpha==A%ACAlpha1.or.B%ACAlpha==B%ACAlpha1) SAPT%e2disp_a1 = e2d
@@ -1568,11 +1568,11 @@ type(SaptData)    :: SAPT
 
 integer           :: i
 double precision  :: xVar,Alpha10
-double precision  :: coefA,coefB,coefC
+double precision  :: coefA(4),coefB(4),coefC(4)
 double precision  :: e2ind_cub,e2disp_cub
 double precision  :: e2exi_cub,e2exd_cub
 
-if(A%E2dExt) then
+if(A%Cubic) then
    xVar = A%ACAlpha
    Alpha10 = (A%ACAlpha1 - A%ACAlpha0)
 else
@@ -1581,46 +1581,49 @@ else
 endif
 
 ! induction
-coefC = SAPT%e2ind_a0
-coefB = (SAPT%e2ind_a1 - SAPT%e2ind_a0) / Alpha10 
-coefA = (SAPT%e2ind_a2 - coefB*xVar - coefC ) / xVar**3
+coefC(1) = SAPT%e2ind_a0
+coefB(1) = (SAPT%e2ind_a1 - SAPT%e2ind_a0) / Alpha10 
+coefA(1) = (SAPT%e2ind_a2 - coefB(1)*xVar - coefC(1) ) / xVar**3
 
-!print*,'Coefficients:'
-!print*,'x = ', xVar
-!print*,'A = ', coefA
-!print*,'B = ', coefB
-!print*,'C = ', coefC
-
-e2ind_cub  = coefA + coefB + coefC
+e2ind_cub  = coefA(1) + coefB(1) + coefC(1)
 SAPT%e2ind = e2ind_cub
 
 ! dispersion
-coefC = SAPT%e2disp_a0
-coefB = (SAPT%e2disp_a1 - SAPT%e2disp_a0) / Alpha10 
-coefA = (SAPT%e2disp_a2 - coefB*xVar - coefC ) / xVar**3
+coefC(2) = SAPT%e2disp_a0
+coefB(2) = (SAPT%e2disp_a1 - SAPT%e2disp_a0) / Alpha10 
+coefA(2) = (SAPT%e2disp_a2 - coefB(2)*xVar - coefC(2) ) / xVar**3
 
-e2disp_cub  = coefA + coefB + coefC
+e2disp_cub  = coefA(2) + coefB(2) + coefC(2)
 SAPT%e2disp = e2disp_cub
 
-! exch-dispersion
-coefC = SAPT%e2exi_a0
-coefB = (SAPT%e2exi_a1 - SAPT%e2exi_a0) / Alpha10 
-coefA = (SAPT%e2exi_a2 - coefB*xVar - coefC ) / xVar**3
+! exch-induction
+coefC(3) = SAPT%e2exi_a0
+coefB(3) = (SAPT%e2exi_a1 - SAPT%e2exi_a0) / Alpha10 
+coefA(3) = (SAPT%e2exi_a2 - coefB(3)*xVar - coefC(3) ) / xVar**3
 
-e2exi_cub    = coefA + coefB + coefC
+e2exi_cub    = coefA(3) + coefB(3) + coefC(3)
 SAPT%e2exind = e2exi_cub
 
 ! exch-dispersion
-coefC = SAPT%e2exd_a0
-coefB = (SAPT%e2exd_a1 - SAPT%e2exd_a0) / Alpha10 
-coefA = (SAPT%e2exd_a2 - coefB*xVar - coefC ) / xVar**3
+coefC(4) = SAPT%e2exd_a0
+coefB(4) = (SAPT%e2exd_a1 - SAPT%e2exd_a0) / Alpha10 
+coefA(4) = (SAPT%e2exd_a2 - coefB(4)*xVar - coefC(4) ) / xVar**3
 
-e2exd_cub = coefA + coefB + coefC
+e2exd_cub = coefA(4) + coefB(4) + coefC(4)
 SAPT%e2exdisp = e2exd_cub
 
 write(LOUT,'(/,8a10)') ('**********',i=1,4)
 write(LOUT,'(1x,a)') 'SAPT(E2,cubic)'
 write(LOUT,'(8a10)') ('**********',i=1,4)
+
+if(SAPT%IPrint>=5) then
+   coefA = coefA*1d3; coefB = coefB*1d3; coefC = coefC*1d3
+   write(lout,'(1x,a,4a10)')   'coef','IND ','DISP','EXIND','EXDISP'
+   write(lout,'(1x,a,4f10.6)') 'A   ', coefA(1), coefA(2), coefA(3), coefA(4)
+   write(lout,'(1x,a,4f10.6)') 'B   ', coefB(1), coefB(2), coefB(3), coefB(4)
+   write(lout,'(1x,a,4f10.6)') 'C   ', coefC(1), coefC(2), coefC(3), coefC(4)
+endif
+
 write(LOUT,'(/1x,a,f16.8)')'E2ind(cubic)       = ', e2ind_cub*1.0d3
 write(LOUT,'(1x,a,f16.8)') 'E2exch-ind(cubic)  = ', e2exi_cub*1.0d3
 write(LOUT,'(1x,a,f16.8)') 'E2disp(cubic)      = ', e2disp_cub*1.0d3
@@ -1641,7 +1644,7 @@ double precision  :: xVar,Alpha10
 double precision  :: coefA,coefB,coefC
 double precision  :: e2disp_cub
 
-if(A%E2dExt) then
+if(A%Cubic) then
    xVar = A%ACAlpha
    Alpha10 = (A%ACAlpha1 - A%ACAlpha0)
 else
@@ -1680,7 +1683,7 @@ double precision  :: xVar,Alpha10
 double precision  :: coefA,coefB,coefC
 double precision  :: e2ind_cub
 
-if(A%E2dExt) then
+if(A%Cubic) then
    xVar = A%ACAlpha
    Alpha10 = (A%ACAlpha1 - A%ACAlpha0)
 else
@@ -2012,7 +2015,7 @@ endif
  ! calucate semicoupled and dexcitations
  if(SAPT%SemiCoupled) call e2disp_semi(Flags,A,B,SAPT)
  ! calculate extrapolated E2disp
- if(A%E2dExt.or.B%E2dExt) call e2disp_cpld(Flags,A,B,SAPT)
+ if(A%Cubic.or.B%Cubic) call e2disp_cpld(Flags,A,B,SAPT)
 
  ! here: make it a keyword
  !if(SAPT%DispExc)     call e2disp_dexc(Flags,A,B,SAPT)

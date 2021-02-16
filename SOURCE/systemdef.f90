@@ -444,7 +444,7 @@ elseif(Flags%ISAPT.Eq.1) then
       monA%TwoMoInt = Input%SystemInput(1)%TwoMoInt
       monA%PostCAS  = Input%SystemInput(1)%PostCAS
       monA%ISHF     = Input%SystemInput(1)%ISHF
-      monA%E2dExt   = Input%SystemInput(1)%E2dExt
+      monA%Cubic    = Input%SystemInput(1)%Cubic
 
       monA%NCen    = Input%SystemInput(1)%NCen
       monA%UCen    = Input%SystemInput(1)%UCen
@@ -482,7 +482,7 @@ elseif(Flags%ISAPT.Eq.1) then
       monB%TwoMoInt  = Input%SystemInput(2)%TwoMoInt
       monB%PostCAS   = Input%SystemInput(2)%PostCAS
       monB%ISHF      = Input%SystemInput(2)%ISHF
-      monB%E2dExt    = Input%SystemInput(2)%E2dExt
+      monB%Cubic     = Input%SystemInput(2)%Cubic
       monB%NCen = Input%SystemInput(2)%NCen
       monB%UCen = Input%SystemInput(2)%UCen
       monB%Monomer = Input%SystemInput(2)%Monomer
@@ -524,7 +524,7 @@ elseif(Flags%ISAPT.Eq.1) then
       monA%TwoMoInt = Input%SystemInput(2)%TwoMoInt
       monA%PostCAS = Input%SystemInput(2)%PostCAS
       monA%ISHF    = Input%SystemInput(2)%ISHF
-      monA%E2dExt  = Input%SystemInput(2)%E2dExt
+      monA%Cubic   = Input%SystemInput(2)%Cubic
       monA%NCen    = Input%SystemInput(2)%NCen
       monA%UCen    = Input%SystemInput(2)%UCen
       monA%Monomer = Input%SystemInput(2)%Monomer
@@ -560,7 +560,7 @@ elseif(Flags%ISAPT.Eq.1) then
       monB%TwoMoInt = Input%SystemInput(1)%TwoMoInt
       monB%PostCAS  = Input%SystemInput(1)%PostCAS
       monB%ISHF     = Input%SystemInput(1)%ISHF
-      monB%E2dExt   = Input%SystemInput(1)%E2dExt
+      monB%Cubic    = Input%SystemInput(1)%Cubic
       monB%NCen     = Input%SystemInput(1)%NCen
       monB%UCen     = Input%SystemInput(1)%UCen
       monB%Monomer  = Input%SystemInput(1)%Monomer

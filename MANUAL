@@ -166,7 +166,7 @@ Available keywords:
        this option is for SAPT-MOLPRO
    f) Omega (default=1.0d0)
       *specifies the range-separation parameter
-   f) TwoMoInt:
+   g) TwoMoInt:
                InCore (default for SAPT-GVB)
                Full
                FOFO (default for SAPT-CAS/HF)
@@ -174,11 +174,18 @@ Available keywords:
        FOFO creates (FF|OO) and (FO|FO) integrals and requires less disc
        space than (FF|FF)
 
-   g) ThrSelAct (default=1.d-8 for CAS
+   h) ThrSelAct (default=1.d-8 for CAS
                  default=1.d-2 for GVB)
       *threshold for discarding pairs of degenerate or nearly
        degenerate orbitals which may cause instabilities in hessian
        matrices (will appear in the output as "Skipped" eigenvalues
+
+   i) Cubic (default=.false.)
+      * in excited states one may encounter numerical 
+        instabilities when solving ERPA equations; this keyword avoids
+        this by approximating all second-order energy components with 
+        the cubic formula; the calculation is three times as expensive
+        as a regular coupled SAPT
 
 *********************************
 INPUT EXAMPLES:

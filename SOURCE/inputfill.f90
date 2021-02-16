@@ -519,8 +519,8 @@ character(:), allocatable :: first, last
  case ("ISHF")
        read(val,*) SystemParams%ISHF
 
- case ("E2DAX3")
-       read(val,*) SystemParams%E2dExt
+ case ("CUBIC")
+       read(val,*) SystemParams%Cubic
 
  end select
 end subroutine read_block_system

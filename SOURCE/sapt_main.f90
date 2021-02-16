@@ -54,7 +54,7 @@ double precision :: Tcpu,Twall
  write(LOUT,'()')
 
  ! switch to extrapolated SAPT
- if(SAPT%monA%E2dExt.or.SAPT%monB%E2dExt) call sapt_extrapol(Flags,SAPT,NBasis)
+ if(SAPT%monA%Cubic.or.SAPT%monB%Cubic) call sapt_extrapol(Flags,SAPT,NBasis)
 
  if(Flags%ISERPA==0.and.SAPT%ic6==1) then
 
@@ -229,7 +229,7 @@ integer,intent(in) :: NBasis
 integer            :: i
 
  ! test
- if(.not.(SAPT%monA%E2dExt).and..not.(SAPT%monB%E2dExt)) then
+ if(.not.(SAPT%monA%Cubic).and..not.(SAPT%monB%Cubic)) then
    write(lout,'(1x,a)') 'ERROR! Wrong call of sapt_extrapol!'
    stop
  endif
@@ -243,8 +243,8 @@ integer            :: i
  write(lout,'(/1x,a)') 'SAPT, E(2) cubic'
  write(LOUT,'(8a10)') ('----------',i=1,4)
  ! second order : uncoupled (for c coefficient)
- if(SAPT%monA%E2dExt) SAPT%monA%ACAlpha=SAPT%monA%ACAlpha0
- if(SAPT%monB%E2dExt) SAPT%monB%ACAlpha=SAPT%monB%ACAlpha0
+ if(SAPT%monA%Cubic) SAPT%monA%ACAlpha=SAPT%monA%ACAlpha0
+ if(SAPT%monB%Cubic) SAPT%monB%ACAlpha=SAPT%monB%ACAlpha0
  write(lout,'(1x,a,f9.6)') 'ACAlpha(A) =',SAPT%monA%ACAlpha
  write(lout,'(1x,a,f9.6)') 'ACAlpha(B) =',SAPT%monB%ACAlpha
 
@@ -254,8 +254,8 @@ integer            :: i
  call e2exdisp(Flags,SAPT%monA,SAPT%monB,SAPT)
 
  !              : semicoupled (for b coefficient)
- if(SAPT%monA%E2dExt) SAPT%monA%ACAlpha=SAPT%monA%ACAlpha1
- if(SAPT%monB%E2dExt) SAPT%monB%ACAlpha=SAPT%monB%ACAlpha1
+ if(SAPT%monA%Cubic) SAPT%monA%ACAlpha=SAPT%monA%ACAlpha1
+ if(SAPT%monB%Cubic) SAPT%monB%ACAlpha=SAPT%monB%ACAlpha1
  write(lout,'(/1x,a,f9.6)') 'ACAlpha(A) =',SAPT%monA%ACAlpha
  write(lout,'(1x,a,f9.6)') 'ACAlpha(B) =',SAPT%monB%ACAlpha
 
@@ -265,8 +265,8 @@ integer            :: i
  call e2exdisp(Flags,SAPT%monA,SAPT%monB,SAPT)
 
  !              : coupled (for a coefficient)
- if(SAPT%monA%E2dExt) SAPT%monA%ACAlpha=SAPT%monA%ACAlpha2
- if(SAPT%monB%E2dExt) SAPT%monB%ACAlpha=SAPT%monB%ACAlpha2
+ if(SAPT%monA%Cubic) SAPT%monA%ACAlpha=SAPT%monA%ACAlpha2
+ if(SAPT%monB%Cubic) SAPT%monB%ACAlpha=SAPT%monB%ACAlpha2
  write(lout,'(/1x,a,f9.6)') 'ACAlpha(A) =',SAPT%monA%ACAlpha
  write(lout,'(1x,a,f9.6)') 'ACAlpha(B) =',SAPT%monB%ACAlpha
 
@@ -331,9 +331,7 @@ logical          :: regular,extrapolate
 double precision :: MO(NBasis*NBasis)
 
  SaptLevel = Flags%SaptLevel
- print*, 'Mon%Monomer',Mon%Monomer
- print*, 'Mon%E2dExt ',Mon%E2dExt
- if(Mon%E2dExt) then
+ if(Mon%Cubic) then
     extrapolate = .true.
     regular     = .false.
  else
@@ -5306,12 +5304,12 @@ if(allocated(SAPT%monB%VCoul)) then
 endif
 
 ! cubic dispersion
-if(SAPT%monA%E2dExt) then
+if(SAPT%monA%Cubic) then
   call delfile('PROP_A0')
   call delfile('PROP_A1')
   call delfile('PROP_A2')
 endif
-if(SAPT%monB%E2dExt) then
+if(SAPT%monB%Cubic) then
   call delfile('PROP_B0')
   call delfile('PROP_B1')
   call delfile('PROP_B2')
@@ -5348,8 +5346,8 @@ if(ISERPA==0) then
    call delfile('FFOOABBB')
    call delfile('FFOOBAAA')
 
-   call delfile('XY0_A')
-   call delfile('XY0_B')
+   if(.not.SAPT%monA%Cubic) call delfile('XY0_A')
+   if(.not.SAPT%monB%Cubic) call delfile('XY0_B')
 elseif(ISERPA==1) then
    call delfile('FFFFABBB')
    call delfile('FFFFBAAA')
@@ -5365,8 +5363,8 @@ if(SAPT%monB%TwoMoInt==TWOMO_FOFO) then
 endif
 
 if(SAPT%SaptLevel==2) then
-   call delfile('PROP_A')
-   call delfile('PROP_B')
+   if(.not.SAPT%monA%Cubic) call delfile('PROP_A')
+   if(.not.SAPT%monB%Cubic) call delfile('PROP_B')
    call delfile('PROP_AB')
 endif
 
