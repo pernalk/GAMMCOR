@@ -269,13 +269,15 @@ type SaptData
   type(SystemBlock) :: monA,monB
      double precision  :: Vnn,elst,exchs2,e2ind,e2disp
      double precision  :: e2disp_sc,e2disp_sp
-     double precision  :: e2disp_a0,e2disp_a1,e2disp_a2
      double precision  :: e2ind_unc,e2disp_unc
-     double precision  :: e2ind_a0,e2ind_a1,e2ind_a2
      double precision  :: e2dispR_unc,e2dispR
      double precision  :: e2exdisp_unc,e2exdisp
      double precision  :: e2exdispR_unc,e2exdispR
      double precision  :: e2exind,e2exind_unc
+     double precision  :: e2ind_a0,e2ind_a1,e2ind_a2
+     double precision  :: e2disp_a0,e2disp_a1,e2disp_a2
+     double precision  :: e2exd_a0,e2exd_a1,e2exd_a2
+     double precision  :: e2exi_a0,e2exi_a1,e2exi_a2
      double precision  :: esapt2,esapt0
      double precision  :: e2dispinCAS
      double precision  :: exch_part(5)

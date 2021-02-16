@@ -368,14 +368,13 @@ double precision,parameter :: SmallE = 1.D-6
    if(A%ACAlpha==A%ACAlpha1.or.B%ACAlpha==B%ACAlpha1) SAPT%e2ind_a1 = e2ic
    if(A%ACAlpha==A%ACAlpha2.or.B%ACAlpha==B%ACAlpha2) SAPT%e2ind_a2 = e2ic
 
-   write(LOUT,'(/1x,a)') 'E2disp for the ax^3+bx+c model'
-   write(LOUT,'(1x,a,f16.8)') 'A: Alpha     = ',A%ACAlpha
-   write(LOUT,'(1x,a,f16.8)') 'B: Alpha     = ',B%ACAlpha
-   write(LOUT,'(1x,a,f16.8)') 'E2ind(Alpha) = ',e2ic*1000d0
+   !write(LOUT,'(1x,a,f16.8)') 'A: Alpha     = ',A%ACAlpha
+   !write(LOUT,'(1x,a,f16.8)') 'B: Alpha     = ',B%ACAlpha
+   write(LOUT,'(1x,a,f16.8)') 'E2ind(Alpha)   = ',e2ic*1000d0
 
-   if(A%ACAlpha==A%ACAlpha2.or.B%ACAlpha==B%ACAlpha2) then
-      call e2ind_cubic(Flags,A,B,SAPT)
-   endif
+   !if(A%ACAlpha==A%ACAlpha2.or.B%ACAlpha==B%ACAlpha2) then
+   !   call e2ind_cubic(Flags,A,B,SAPT)
+   !endif
 
  else
 
@@ -1534,14 +1533,13 @@ double precision,parameter :: SmallE = 1.D-3
    if(A%ACAlpha==A%ACAlpha1.or.B%ACAlpha==B%ACAlpha1) SAPT%e2disp_a1 = e2d
    if(A%ACAlpha==A%ACAlpha2.or.B%ACAlpha==B%ACAlpha2) SAPT%e2disp_a2 = e2d
 
-   write(LOUT,'(/1x,a)') 'E2disp for the ax^3+bx+c model'
-   write(LOUT,'(1x,a,f16.8)') 'A: Alpha      = ',A%ACAlpha
-   write(LOUT,'(1x,a,f16.8)') 'B: Alpha      = ',B%ACAlpha
-   write(LOUT,'(1x,a,f16.8)') 'E2disp(Alpha) = ',e2d*1000
+   !write(LOUT,'(1x,a,f16.8)') 'A: Alpha      = ',A%ACAlpha
+   !write(LOUT,'(1x,a,f16.8)') 'B: Alpha      = ',B%ACAlpha
+   write(LOUT,'(1x,a,f16.8)') 'E2disp(Alpha)  = ',e2d*1000
 
-   if(A%ACAlpha==A%ACAlpha2.or.B%ACAlpha==B%ACAlpha2) then
-      call e2disp_cubic(Flags,A,B,SAPT)
-   endif
+   !if(A%ACAlpha==A%ACAlpha2.or.B%ACAlpha==B%ACAlpha2) then
+   !   call e2disp_cubic(Flags,A,B,SAPT)
+   !endif
 
  else
 
@@ -1550,11 +1548,85 @@ double precision,parameter :: SmallE = 1.D-3
 
  endif 
 
+ ! write amplitude to a file
+ call writeampl(tmp2,'PROP_AB')
+
  deallocate(OmB,OmA)
  deallocate(tmp2)
  deallocate(work)
 
 end subroutine e2disp_cpld
+
+subroutine e2_cubic(Flags,A,B,SAPT)
+! calculate 2nd order dispersion energy
+! extrapolated according to E2disp = ax^3+bx+c formula
+implicit none
+
+type(FlagsData)   :: Flags
+type(SystemBlock) :: A, B
+type(SaptData)    :: SAPT
+
+integer           :: i
+double precision  :: xVar,Alpha10
+double precision  :: coefA,coefB,coefC
+double precision  :: e2ind_cub,e2disp_cub
+double precision  :: e2exi_cub,e2exd_cub
+
+if(A%E2dExt) then
+   xVar = A%ACAlpha
+   Alpha10 = (A%ACAlpha1 - A%ACAlpha0)
+else
+   xVar = B%ACAlpha
+   Alpha10 = (B%ACAlpha1 - B%ACAlpha0)
+endif
+
+! induction
+coefC = SAPT%e2ind_a0
+coefB = (SAPT%e2ind_a1 - SAPT%e2ind_a0) / Alpha10 
+coefA = (SAPT%e2ind_a2 - coefB*xVar - coefC ) / xVar**3
+
+!print*,'Coefficients:'
+!print*,'x = ', xVar
+!print*,'A = ', coefA
+!print*,'B = ', coefB
+!print*,'C = ', coefC
+
+e2ind_cub  = coefA + coefB + coefC
+SAPT%e2ind = e2ind_cub
+
+! dispersion
+coefC = SAPT%e2disp_a0
+coefB = (SAPT%e2disp_a1 - SAPT%e2disp_a0) / Alpha10 
+coefA = (SAPT%e2disp_a2 - coefB*xVar - coefC ) / xVar**3
+
+e2disp_cub  = coefA + coefB + coefC
+SAPT%e2disp = e2disp_cub
+
+! exch-dispersion
+coefC = SAPT%e2exi_a0
+coefB = (SAPT%e2exi_a1 - SAPT%e2exi_a0) / Alpha10 
+coefA = (SAPT%e2exi_a2 - coefB*xVar - coefC ) / xVar**3
+
+e2exi_cub    = coefA + coefB + coefC
+SAPT%e2exind = e2exi_cub
+
+! exch-dispersion
+coefC = SAPT%e2exd_a0
+coefB = (SAPT%e2exd_a1 - SAPT%e2exd_a0) / Alpha10 
+coefA = (SAPT%e2exd_a2 - coefB*xVar - coefC ) / xVar**3
+
+e2exd_cub = coefA + coefB + coefC
+SAPT%e2exdisp = e2exd_cub
+
+write(LOUT,'(/,8a10)') ('**********',i=1,4)
+write(LOUT,'(1x,a)') 'SAPT(E2,cubic)'
+write(LOUT,'(8a10)') ('**********',i=1,4)
+write(LOUT,'(/1x,a,f16.8)')'E2ind(cubic)       = ', e2ind_cub*1.0d3
+write(LOUT,'(1x,a,f16.8)') 'E2exch-ind(cubic)  = ', e2exi_cub*1.0d3
+write(LOUT,'(1x,a,f16.8)') 'E2disp(cubic)      = ', e2disp_cub*1.0d3
+write(LOUT,'(1x,a,f16.8)') 'E2exch-disp(cubic) = ', e2exd_cub*1.0d3
+
+end subroutine e2_cubic
 
 subroutine e2disp_cubic(Flags,A,B,SAPT)
 ! calculate 2nd order dispersion energy
