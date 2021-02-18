@@ -1897,13 +1897,13 @@ double precision, allocatable :: XOne(:), &
 double precision, allocatable :: ABPlus(:),ABMin(:),URe(:,:),VSR(:), &
                                  EigY0(:),EigY1(:),Eig0(:),Eig1(:), &
                                  EigVecR(:), Eig(:)
-integer :: i,j,ip,iq,ii,ione
+integer          :: i,j,ip,iq,ii,ione
 double precision :: ACAlpha,Omega,EnSR,EnHSR,ECorr,ECASSCF,XVSR
 double precision :: Tcpu,Twall
-character(8) :: label
+character(8)     :: label
 character(:),allocatable :: onefile,aoerfile,twofile,twoerffile,&
                             twojfile,twokfile,twojerf,twokerf,  &
-                            propfile,propfile0,propfile1,rdmfile
+                            propfile,propfile0,propfile1,xy0file,rdmfile
 double precision,parameter :: One = 1d0, Half = 0.5d0
 logical :: doRSH
 
@@ -1913,30 +1913,32 @@ logical :: doRSH
 
 ! set filenames
  if(Mon%Monomer==1) then
-    onefile = 'ONEEL_A'
-    twofile = 'TWOMOAA'
-    twojfile = 'FFOOAA'
-    twokfile = 'FOFOAA'
+    onefile    = 'ONEEL_A'
+    twofile    = 'TWOMOAA'
+    twojfile   = 'FFOOAA'
+    twokfile   = 'FOFOAA'
     twoerffile = 'MO2ERFAA'
-    twojerf = 'FFOOERFAA'
-    twokerf = 'FOFOERFAA'
-    propfile = 'PROP_A'
-    propfile0 = 'PROP_A0'
-    propfile1 = 'PROP_A1'
-    rdmfile='rdm2_A.dat'
-    aoerfile = 'AOERFSORT'
+    twojerf    = 'FFOOERFAA'
+    twokerf    = 'FOFOERFAA'
+    propfile   = 'PROP_A'
+    propfile0  = 'PROP_A0'
+    propfile1  = 'PROP_A1'
+    xy0file    = 'XY0_A'
+    rdmfile    = 'rdm2_A.dat'
+    aoerfile   = 'AOERFSORT'
  elseif(Mon%Monomer==2) then
-    onefile = 'ONEEL_B'
-    twofile = 'TWOMOBB'
-    twojfile = 'FFOOBB'
-    twokfile = 'FOFOBB'
+    onefile    = 'ONEEL_B'
+    twofile    = 'TWOMOBB'
+    twojfile   = 'FFOOBB'
+    twokfile   = 'FOFOBB'
     twoerffile = 'MO2ERFBB'
-    twojerf = 'FFOOERFBB'
-    twokerf = 'FOFOERFBB'
-    propfile = 'PROP_B'
-    propfile0 = 'PROP_B0'
-    propfile1 = 'PROP_B1'
-    rdmfile='rdm2_B.dat'
+    twojerf    = 'FFOOERFBB'
+    twokerf    = 'FOFOERFBB'
+    propfile   = 'PROP_B'
+    propfile0  = 'PROP_B0'
+    propfile1  = 'PROP_B1'
+    xy0file    = 'XY0_B'
+    rdmfile    = 'rdm2_B.dat'
     if(Mon%SameOm) then
        aoerfile = 'AOERFSORT'
     else
@@ -2020,7 +2022,7 @@ logical :: doRSH
  end select
  if(Mon%TwoMoInt==TWOMO_INCORE) call LoadSaptTwoEl(Mon%Monomer,TwoMO,NBas,NInte2)
 
- ! trasform LR integrals
+ ! transform LR integrals
  if(doRSH) then
    select case(Mon%TwoMoInt)
    case(TWOMO_INCORE)
@@ -2068,6 +2070,8 @@ logical :: doRSH
  enddo
 
  ACAlpha=One
+ ! UNCOUPLED-TEST
+ !ACAlpha=1d-9
 
  allocate(ABPlus(Mon%NDimX**2),ABMin(Mon%NDimX**2),&
           EigVecR(Mon%NDimX**2),Eig(Mon%NDimX))
@@ -2148,10 +2152,10 @@ logical :: doRSH
        enddo
     enddo
 
- !!! TEST COUPLED ANDREAS
- !  print*, 'CPLD-ANDREAS:'
- !  Mon%EigX = EigVecR
- !  Mon%EigY = 0
+  !! TEST COUPLED ANDREAS
+  ! print*, 'CPLD-ANDREAS:'
+  ! Mon%EigX = EigVecR
+  ! Mon%EigY = 0
 
  else
     call ERPAVEC(EigVecR,Eig,ABPlus,ABMin,NBas,Mon%NDimX)
@@ -2178,13 +2182,13 @@ logical :: doRSH
  call writeresp(EigVecR,Eig,propfile)
 
  ! uncoupled
- allocate(EigY0(Mon%NDimX**2),EigY1(Mon%NDimX**2),&
-          Eig0(Mon%NDimX),Eig1(Mon%NDimX))
+ !allocate(EigY0(Mon%NDimX**2),Eig0(Mon%NDimX))
+ allocate(EigY1(Mon%NDimX**2),Eig1(Mon%NDimX))
 
- EigY0 = 0
+ !EigY0 = 0
+ !Eig0  = 0
  EigY1 = 0
- Eig0 = 0
- Eig1 = 0
+ Eig1  = 0
 
  !call Y01CAS_mithap(Mon%Occ,URe,XOne,ABPlus,ABMin, &
  !       EigY0,EigY1,Eig0,Eig1, &
@@ -2202,14 +2206,33 @@ logical :: doRSH
 !        Mon%IndN,Mon%IndX,Mon%NDimX,NBas,Mon%NDim,NInte1,NInte2,Flags%IFlag0, &
 !        TwoMO,OrbGrid,SRKerW,NSymNO,MultpC,NGrid)
 
+ select case(Mon%TwoMoInt)
+ case(TWOMO_INCORE)
+   write(lout,'(1x,a)') 'Error! Uncoupled not working for INCORE!'
+   stop
+ case(TWOMO_FOFO)
+
+   write(lout,*) 'Flag0',Flags%IFlag0
+   write(lout,*) 'NoSt ',Mon%NoSt
+
+   call Y01CASLR_FOFO(Mon%Occ,URe,XOne,ABPlus,ABMin,&
+                  Mon%MultpC,Mon%NSymNO,SRKer,WGrid,OrbGrid,&
+                  propfile0,propfile1,xy0file,&
+                  Mon%IndN,Mon%IndX,Mon%IGem,Mon%NAct,Mon%INAct,&
+                  NGrid,Mon%NDimX,NBas,Mon%NDimX,NInte1,Mon%NoSt,&
+                  twokfile,Twojerf,twokerf,1,1)
+
+ end select 
+
  ! dump uncoupled response
- call writeresp(EigY0,Eig0,propfile0)
+ !call writeresp(EigY0,Eig0,propfile0)
  if(Flags%IFlag0==0) then
     call writeresp(EigY1,Eig1,propfile1)
  endif
 
  close(ione)
- deallocate(Eig1,Eig0,EigY1,EigY0)
+ !deallocate(Eig0,EigY0)
+ deallocate(Eig1,EigY1)
 
  deallocate(Eig,EigVecR,ABMin,ABPlus)
  deallocate(SRKer,SRKerW,OrbZGrid,OrbYGrid,OrbXGrid,OrbGrid,WGrid)
@@ -2603,8 +2626,8 @@ double precision,parameter :: SmallE=0d0,BigE=1.D20
 
         EigY0 = 0
         EigY1 = 0
-        Eig0 = 0
-        Eig1 = 0
+        Eig0  = 0
+        Eig1  = 0
 
         !! silly AC0 energy test
         ! Call AC0CAS(ECorr,ETot,TwoMO,Mon%Occ,URe,XOne,&
@@ -2930,6 +2953,7 @@ double precision,allocatable :: work(:)
  ! INCORE: load 2-el integrals
  if(Mon%TwoMoInt==TWOMO_INCORE) call LoadSaptTwoEl(Mon%Monomer,TwoNO,NBasis,NInte2)
 
+ print*, 'Monomer',Mon%Monomer
  call calc_cas_resp(Mon%ACAlpha0,XOne,TwoNO,Mon,FNam%propfile0,NInte1,NInte2,NBasis)
  call calc_cas_resp(Mon%ACAlpha1,XOne,TwoNO,Mon,FNam%propfile1,NInte1,NInte2,NBasis)
  call calc_cas_resp(Mon%ACAlpha2,XOne,TwoNO,Mon,FNam%propfile2,NInte1,NInte2,NBasis)
@@ -5302,6 +5326,11 @@ endif
 if(allocated(SAPT%monB%VCoul)) then
    deallocate(SAPT%monB%VCoul)
 endif
+if(SAPT%doRSH) call delfile('AOERFSORT')
+if(SAPT%doRSH) call delfile('FFOOERFAA')
+if(SAPT%doRSH) call delfile('FFOOERFBB')
+if(SAPT%doRSH) call delfile('FOFOERFAA')
+if(SAPT%doRSH) call delfile('FOFOERFBB')
 
 ! cubic dispersion
 if(SAPT%monA%Cubic) then

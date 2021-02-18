@@ -214,7 +214,7 @@ double precision,allocatable :: work1(:)
  if(SAPT%IPrint>=10) write(LOUT,'(1x,a,f16.8)') 'ExchS2(T2d  ) = ', t2d*1000d0
 
 ! T2c
- t2c=0
+ t2c =0
  tmp1=0
  tmp2=0
  call dgemm('N','N',NBas,NBas,NBas,1d0,Va,NBas,PB,NBas,0d0,tmp1,NBas)
@@ -229,14 +229,14 @@ double precision,allocatable :: work1(:)
  if(SAPT%IPrint>=10) write(LOUT,'(1x,a,f16.8)') 'ExchS2(T2c-1) = ', t2c(1)*1000d0
 
 ! new
- t2c(2)=0
+ tmp = 0
  do is=1,dimOB
     do iq=1,dimOB
        !t2c(2) = t2c(2) + sum(RDM2Bval(:,:,iq,is)*Vabb(:,:)*PAbb(is,iq))
-       t2c(2) = t2c(2) + sum(RDM2Bval(1:dimOB,1:dimOB,iq,is)*Vabb(1:dimOB,1:dimoB)*PAbb(is,iq))
+       tmp = tmp + sum(RDM2Bval(1:dimOB,1:dimOB,iq,is)*Vabb(1:dimOB,1:dimoB)*PAbb(is,iq))
     enddo
  enddo
- t2c(2) = -2d0*t2c(2)
+ t2c(2) = -2d0*tmp
  !write(LOUT,*) 'T2c(2) ',t2c(2)
  if(SAPT%IPrint>=10) write(LOUT,'(1x,a,f16.8)') 'ExchS2(T2c-2) = ', t2c(2)*1000d0
 !
@@ -268,7 +268,7 @@ double precision,allocatable :: work1(:)
  if(SAPT%IPrint>=10) write(LOUT,'(1x,a,f16.8)') 'ExchS2(T2b-2) = ', t2b(2)*1000d0
 
 ! T2a
- t2a=0
+ t2a = 0
  do jb=1,NBas
     do ia=1,NBas
        t2a(1) = t2a(1) + PA(ia,jb)*Kb(jb,ia)
@@ -344,13 +344,14 @@ double precision,allocatable :: work1(:)
      !access='DIRECT',form='UNFORMATTED',recl=8*NBas**2)
 ! new
 ! Qab
+ tmp = 0
  do ir=1,dimOB
     do ip=1,dimOB
        read(iunit,rec=ip+(ir-1)*dimOB) work(1:dimOB,1:dimOB)
            do is=1,dimOB
               do iq=1,dimOB
-                     t2a(3) = t2a(3) + work(iq,is)* &
-                              RDM2Bval(ip,ir,iq,is)
+                     tmp = tmp + work(iq,is)* &
+                           RDM2Bval(ip,ir,iq,is)
               enddo
            enddo
     enddo
@@ -394,7 +395,7 @@ double precision,allocatable :: work1(:)
 !    enddo
 ! enddo
 
- t2a(3) = -2*t2a(3)
+ t2a(3) = -2*tmp
  !write(LOUT,*) 'T2a(3) ',t2a(3)
  if(SAPT%IPrint>=10) write(LOUT,'(1x,a,f16.8)') 'ExchS2(T2a-3) = ', t2a(3)*1000d0
  close(iunit,status='DELETE')
@@ -550,25 +551,23 @@ double precision,allocatable :: work1(:)
  open(newunit=iunit,file='TMPOOAB',status='OLD',&
      access='DIRECT',form='UNFORMATTED',recl=8*GdimOB**2)
 
-! do ir=1,A%INAct+A%NAct
-!    do ip=1,A%INAct+A%NAct
+ tmp = 0
  do ir=1,dimOA
     do ip=1,dimOA
-!  print*, ip,ir,ip+(ir-1)*GdimOA
       read(iunit,rec=ip+(ir-1)*GdimOA) work(1:GdimOB,1:GdimOB)
 
-      t2a(4) = t2a(4) + sum(work(1:dimOB,1:dimOB)*tmpAB(ip,ir,1:dimOB,1:dimOB))
+      tmp = tmp + sum(work(1:dimOB,1:dimOB)*tmpAB(ip,ir,1:dimOB,1:dimOB))
 
     enddo
  enddo
  close(iunit)
- t2a(4) = -2*t2a(4)
+ t2a(4) = -2*tmp
  ! write(LOUT,*) 't2a(4): ',t2a(4)
  if(SAPT%IPrint>=10) write(LOUT,'(1x,a,f16.8)') 'ExchS2(T2a-4) = ', t2a(4)*1000d0
 
  deallocate(tmpAB,tmpB,tmpA)
 
- exchs2=t1f+sum(t2a)+sum(t2b)+sum(t2c)+t2d
+ exchs2      = t1f+sum(t2a)+sum(t2b)+sum(t2c)+t2d
  SAPT%exchs2 = exchs2
  write(LOUT,'(/1x,a,f16.8)') 'ExchS2        = ', exchs2*1000d0
 

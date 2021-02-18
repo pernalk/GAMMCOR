@@ -156,7 +156,7 @@ type SystemBlock
       logical :: PostCAS = .false.
       logical :: NActFromRDM = .true.
       logical :: reduceV = .false.
-      ! for extrapolated SAPT 
+      ! for cubic SAPT
       double precision :: ACAlpha0  = 1.d-10
       double precision :: ACAlpha1  = 0.01d0
       double precision :: ACAlpha2  = 0.45d0

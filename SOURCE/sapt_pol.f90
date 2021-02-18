@@ -11,7 +11,8 @@ subroutine e1elst(A,B,SAPT)
 implicit none
 
 type(SystemBlock) :: A, B
-type(SaptData) :: SAPT
+type(SaptData)    :: SAPT
+
 integer :: i, j
 integer :: NBas
 double precision,allocatable :: PA(:,:),PB(:,:) 
@@ -96,23 +97,23 @@ end subroutine e2ind_hf_icphf
 subroutine e2ind_resp(Flags,A,B,SAPT)
 implicit none
 
-type(FlagsData) :: Flags
+type(FlagsData)   :: Flags
 type(SystemBlock) :: A, B
-type(SaptData) :: SAPT
+type(SaptData)    :: SAPT
+
 integer :: NBas
 double precision,allocatable :: OmA(:),OmB(:)
 double precision,allocatable :: EVecA(:,:),EVecB(:,:)
 double precision,allocatable :: WaBB(:,:),WbAA(:,:)
 double precision,allocatable :: AlphaA(:,:),AlphaB(:,:)
 ! test
-integer :: info
+integer             :: info
 integer,allocatable :: ipiv(:)
 double precision,allocatable :: wtest(:),car(:),Work(:)
 !
 integer :: i,j,pq,ip,iq,rs,ir,is
 double precision :: e2ba,e2ab,e2iu,e2ic 
 double precision :: tmp
-
 
  if(A%NBasis.ne.B%NBasis) then
     write(LOUT,'(1x,a)') 'ERROR! MCBS not implemented in SAPT!'

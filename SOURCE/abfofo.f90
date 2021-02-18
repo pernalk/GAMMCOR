@@ -2415,7 +2415,7 @@ end subroutine ABPM_HALFBACKTRAN
 subroutine Y01CASLR_FOFO(Occ,URe,XOne,ABPLUS,ABMIN, &
      MultpC,NSymNO, &
      SRKer,Wt,OrbGrid, &
-     propfile0,propfile1, & 
+     propfile0,propfile1,xy0file, &
      IndN,IndX,IGemIN,NAct,INActive,NGrid,NDimX,NBasis,NDim,NInte1, &
      NoSt,IntFileName,IntJFile,IntKFile,IFlag0,IFunSRKer,ETot,ECorr)
 !
@@ -2429,11 +2429,11 @@ use timing
 implicit none
 ! here!!!!
 integer,intent(in) :: NAct,INActive,NGrid,NDimX,NBasis,NDim,NInte1,NoSt
-character(*) :: IntFileName,IntJFile,IntKFile
-character(*) :: propfile0,propfile1
+character(*)       :: IntFileName,IntJFile,IntKFile
+character(*)       :: propfile0,propfile1,xy0filE
 double precision,intent(out) :: ABPLUS(NDimX,NDimX),ABMIN(NDimX,NDimX)
 double precision,intent(in)  :: URe(NBasis,NBasis),Occ(NBasis),XOne(NInte1)
-double precision,intent(in) :: SRKer(NGrid),Wt(NGrid),OrbGrid(NGrid,NBasis)
+double precision,intent(in)  :: SRKer(NGrid),Wt(NGrid),OrbGrid(NGrid,NBasis)
 integer,intent(in) :: IndN(2,NDim),IndX(NDim),IGemIN(NBasis),IFlag0,IFunSRKer, &
                       MultpC(15,15),NSymNO(NBasis)
 double precision,intent(out),optional :: ETot,ECorr
@@ -2476,7 +2476,7 @@ call clock('START',Tcpu,Twall)
 
 ABPLUS = 0
 ABMIN  = 0
-ETot = 0
+if(present(ETot)) ETot   = 0
 
 ! set dimensions
 NOccup = NAct + INActive
@@ -2533,7 +2533,7 @@ val = 0
 do i=1,NOccup
    val = val + Occ(i)*HNO(i,i)
 enddo
-ETot = ETot + 2*val
+if(present(ETot)) ETot = ETot + 2*val
 
 do j=1,NBasis
    do i=1,NBasis
@@ -2763,7 +2763,8 @@ if(nAA>0) then
         call ModABMin_Act_FOFO(Occ,SRKer,Wt,OrbGrid,ABM,&
                MultpC,NSymNO,tmpAA,&
                IndN,IndX,NDimX,NGrid,NBasis,&
-               NOccup,NAct,INActive,nAA,'FOFO','FOFOERF')
+               !NOccup,NAct,INActive,nAA,'FOFO','FOFOERF')
+               NOccup,NAct,INActive,nAA,IntFileName,IntKFile)
      endif
 
      if(NoSt==1) then
@@ -2971,6 +2972,9 @@ end associate
 call clock('Y01CAS:DIAG',Tcpu,Twall)
 call clock('START',Tcpu,Twall)
 
+! dump EBLOCKS: X(0),Y(0)
+call dump_Eblock(Eblock,EblockIV,Occ,IndN,nblk,NBasis,NDimX,xy0file)
+
 if(IFlag0==1) return
 !return
 
@@ -2986,7 +2990,8 @@ if(IFunSRKer==1) then
    call ModABMin_FOFO(Occ,SRKer,Wt,OrbGrid,ABMIN,&
                  MultpC,NSymNO,&
                  IndN,IndX,NDimX,NGrid,NBasis,&
-                 NAct,INActive,'FOFO','FOFOERF',.true.)
+                 !NAct,INActive,'FOFO','FOFOERF',.true.)
+                 NAct,INActive,IntFileName,IntKFile,.true.)
    !print*, 'ABM-MY',norm2(ABMIN)
 endif
 ! here!!!! can this be made cheaper?
@@ -3063,16 +3068,16 @@ do j=1,NDimX
    endif
 enddo
 
- ! dump response to a file!
- open(newunit=iunit,file=propfile0,form='unformatted')
- write(iunit) EigY
- write(iunit) Eig
- close(iunit)
+ !! dump response to a file!
+ !open(newunit=iunit,file=propfile0,form='unformatted')
+ !write(iunit) EigY
+ !write(iunit) Eig
+ !close(iunit)
  if(IFlag0==0) then
- open(newunit=iunit,file=propfile1,form='unformatted')
- write(iunit) EigY1
- write(iunit) Eig1
- close(iunit)
+    open(newunit=iunit,file=propfile1,form='unformatted')
+    write(iunit) EigY1
+    write(iunit) Eig1
+    close(iunit)
  endif
 
  deallocate(Eig1,EigY1)
@@ -3378,15 +3383,15 @@ subroutine ModABMin_FOFO(Occ,SRKer,Wt,OrbGrid,ABMin,&
 use timing
 implicit none
 
-integer,parameter :: maxlen = 128
+integer,parameter  :: maxlen = 128
 integer,intent(in) :: NBasis,NDimX,NGrid,NAct,INActive
 integer,intent(in) :: IndN(2,NDimX),IndX(NDimX),&
                       MultpC(15,15),NSymNO(NBasis)
-character(*),intent(in) :: twokfile,twokerf
+character(*),intent(in)     :: twokfile,twokerf
 double precision,intent(in) :: Occ(NBasis),SRKer(NGrid), &
                                Wt(NGrid),OrbGrid(NGrid,NBasis)
-logical,intent(in) :: AB1
-double precision,intent(inout) :: ABMin(NDimX,NDimX)
+logical,intent(in)               :: AB1
+double precision,intent(inout)   :: ABMin(NDimX,NDimX)
 character(*),intent(in),optional :: dfile
 
 integer :: offset,batchlen,iunit1,iunit2
