@@ -683,8 +683,9 @@ double precision,allocatable :: Sa(:,:),Sb(:,:)
  SAPT%monB%NDim = NBasis*(NBasis-1)/2
 
 ! set RSH
- doRSH = .false.
- if(Flags%IFunSR==1.or.Flags%IFunSR==2) doRSH = .true.
+ SAPT%doRSH = .false.
+ if(Flags%IFunSR==1.or.Flags%IFunSR==2) SAPT%doRSH = .true.
+ doRSH = SAPT%doRSH
 
 ! set semicoupled dispersion
  if(Flags%ICASSCF==0) then
@@ -708,7 +709,7 @@ double precision,allocatable :: Sa(:,:),Sb(:,:)
     call readocc_dalton(NBasis,SAPT%monA,Flags)
     call readocc_dalton(NBasis,SAPT%monB,Flags)
 
- !! test 1
+ !! test readsymfino
  ! allocate(Sa(NBasis,NBasis),Sb(NBasis,NBasis))
  ! call get_one_mat('S',Sa,1,nbasis)
  ! call get_one_mat('S',Sb,2,nbasis)
@@ -2472,6 +2473,7 @@ double precision,parameter :: SmallE=0d0,BigE=1.D20
    !ACAlpha=sqrt(2d0)/2d0
    !ACAlpha=1d-12
    !Print*, 'UNCOUPLED,ACAlpha',ACAlpha
+
    select case(Mon%TwoMoInt)
    case(TWOMO_FOFO)
 
@@ -3683,6 +3685,7 @@ if(ex) then
    read(iunit,*)
 
    ! old version: does not work with sym
+   ! print*, 'old version'
    ! offset = 0
    ! irep   = 1
    ! read(iunit,'(i5,i6)',iostat=ios) last_ibas,last_icen
@@ -5326,6 +5329,7 @@ endif
 if(allocated(SAPT%monB%VCoul)) then
    deallocate(SAPT%monB%VCoul)
 endif
+
 if(SAPT%doRSH) call delfile('AOERFSORT')
 if(SAPT%doRSH) call delfile('FFOOERFAA')
 if(SAPT%doRSH) call delfile('FFOOERFBB')
@@ -5391,11 +5395,16 @@ if(SAPT%monB%TwoMoInt==TWOMO_FOFO) then
    call delfile('FOFOBB')
 endif
 
+call delfile('PROP_AB0')
+
 if(SAPT%SaptLevel==2) then
    if(.not.SAPT%monA%Cubic) call delfile('PROP_A')
    if(.not.SAPT%monB%Cubic) call delfile('PROP_B')
    call delfile('PROP_AB')
 endif
+
+if(SAPT%SemiCoupled) call delfile('PROP_A1')
+if(SAPT%SemiCoupled) call delfile('PROP_B1')
 
 end subroutine free_sapt
 
