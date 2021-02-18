@@ -7943,8 +7943,9 @@ integer :: nAV(INActive+NAct+1:NBasis),tmpAV(NAct,INActive+NAct+1:NBasis),limAV(
 integer :: nIV,tmpIV(INActive*(NBasis-NAct-INActive)),limIV(2)
 double precision :: fac,val,valX,valY
 
-type(EblockData) :: Eblock(1+NBasis-NAct)
-type(EblockData) :: EblockIV
+!type(EblockData) :: Eblock(1+NBasis-NAct)
+type(EblockData),allocatable :: Eblock(:)
+type(EblockData)             :: EblockIV
 
 double precision,allocatable :: work(:)
 
@@ -8032,6 +8033,8 @@ do ii=1,nIV
    ipos = ipos + 1
 enddo
 limIV(2) = ipos
+
+allocate(Eblock(1+NBasis-NAct))
 
 nblk =0
 !pack AA

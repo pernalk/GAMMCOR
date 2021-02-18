@@ -988,8 +988,6 @@ C
       NAct=NAcCAS
       INActive=NInAcCAS
 C
-C      Print*, 'NFree2,NDimX',NFree2,NDimX
-C
       NoEig=NDimX
 C
       Do I=1,NDimX
