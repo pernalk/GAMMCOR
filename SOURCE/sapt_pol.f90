@@ -1967,6 +1967,8 @@ elseif(Flags%ICASSCF==0.and.Flags%ISERPA==0) then
 
 endif ! end GVB select
 
+close(iunit)
+
 if(.not.(Flags%ICASSCF==0.and.Flags%ISERPA==0)) then
    ! uncoupled
     e2du = 0d0
@@ -2021,7 +2023,6 @@ endif
  ! here: make it a keyword
  !if(SAPT%DispExc)     call e2disp_dexc(Flags,A,B,SAPT)
 
- close(iunit)
  deallocate(work)
 
  if(Flags%ICASSCF==1) then
