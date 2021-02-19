@@ -1350,7 +1350,6 @@ e2d  = -16d0*e2d*1000d0
 call writeampl(tmp1,'PROP_AB0')
 
 write(LOUT,'(/1x,a,f16.8)') 'E2disp(CAS) = ',e2d
-print*, 'E2DISP(CAS) = ',e2d
 
 ! deallocate Y01Block
 do i=1,A%NDimX

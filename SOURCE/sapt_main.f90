@@ -75,7 +75,8 @@ double precision :: Tcpu,Twall
        call e2exdisp(Flags,SAPT%monA,SAPT%monB,SAPT)
 
     elseif(SAPT%SaptLevel==10) then
-      call e2dispCAS(Flags,SAPT%monA,SAPT%monB,SAPT,NBasis)
+       SAPT%SemiCoupled = .false.
+       call e2dispCAS(Flags,SAPT%monA,SAPT%monB,SAPT,NBasis)
 
     elseif(SAPT%SaptLevel==2) then
        call e2ind(Flags,SAPT%monA,SAPT%monB,SAPT)
@@ -432,7 +433,7 @@ if(Flags%ISERPA==0) then
 
   endif
 
-  if(Flags%SaptLevel.ge.2) then
+  if(Flags%SaptLevel.eq.2) then
 
      write(LOUT,'(/1x,a)') 'Transforming E2exch-ind integrals...'
      ! term A3-ind
@@ -2212,9 +2213,6 @@ logical :: doRSH
    write(lout,'(1x,a)') 'Error! Uncoupled not working for INCORE!'
    stop
  case(TWOMO_FOFO)
-
-   write(lout,*) 'Flag0',Flags%IFlag0
-   write(lout,*) 'NoSt ',Mon%NoSt
 
    call Y01CASLR_FOFO(Mon%Occ,URe,XOne,ABPlus,ABMin,&
                   Mon%MultpC,Mon%NSymNO,SRKer,WGrid,OrbGrid,&
@@ -5171,7 +5169,7 @@ write(LOUT,'(/,8a10)') ('**********',i=1,4)
 write(LOUT,'(1x,a)') 'SAPT SUMMARY / milliHartree'
 write(LOUT,'(8a10)') ('**********',i=1,4)
 
-write(LOUT,'(1x,a,i2)') 'SAPT level  =', SAPT%SaptLevel
+write(LOUT,'(1x,a,i3)') 'SAPT level  =', SAPT%SaptLevel
 
 write(LOUT,'(1x,a,f16.8)') 'E1elst      = ', SAPT%elst*1.d03
 write(LOUT,'(1x,a,f16.8)') 'E1exch(S2)  = ', SAPT%exchs2*1.d03
@@ -5181,15 +5179,17 @@ if(SAPT%SaptLevel==2) then
    write(LOUT,'(1x,a,f16.8)') 'E2exch-ind  = ', SAPT%e2exind*1.0d3
    write(LOUT,'(1x,a,f16.8)') 'E2disp      = ', SAPT%e2disp*1.d03
    write(LOUT,'(1x,a,f16.8)') 'E2exch-disp = ', SAPT%e2exdisp*1.0d3
-   write(LOUT,'(1x,a,f16.8)') 'EInt(SAPT2) = ', SAPT%esapt2*1.0d3
+   write(LOUT,'(1x,a,f16.8)') 'Eint(SAPT2) = ', SAPT%esapt2*1.0d3
 elseif(SAPT%SaptLevel==1) then
-   write(LOUT,'(1x,a,f16.8)') 'EInt(SAPT1) = ', SAPT%esapt2*1.0d3
+   write(LOUT,'(1x,a,f16.8)') 'Eint(SAPT1) = ', SAPT%esapt2*1.0d3
+elseif(SAPT%SaptLevel==10) then
+   write(LOUT,'(1x,a,f16.8)') 'E2disp(CAS) = ', SAPT%e2dispinCAS*1.d03
 elseif(SAPT%SaptLevel==0) then
    write(LOUT,'(1x,a,f16.8)') 'E2ind(unc)  = ', SAPT%e2ind_unc*1.d03
    write(LOUT,'(1x,a,f16.8)') 'E2exch-ind  = ', SAPT%e2exind_unc*1.0d3
    write(LOUT,'(1x,a,f16.8)') 'E2disp(unc) = ', SAPT%e2disp_unc*1.d03
    write(LOUT,'(1x,a,f16.8)') 'E2exch-disp = ', SAPT%e2exdisp_unc*1.0d3
-   write(LOUT,'(1x,a,f16.8)') 'EInt(SAPT0) = ', SAPT%esapt0*1.0d3
+   write(LOUT,'(1x,a,f16.8)') 'Eint(SAPT0) = ', SAPT%esapt0*1.0d3
 endif
 
 end subroutine summary_sapt
@@ -5220,9 +5220,9 @@ if(SAPT%SaptLevel/=1) then
    write(LOUT,*) 'E2exch-ind  = ', SAPT%e2exind*1.0d3
    write(LOUT,*) 'E2disp      = ', SAPT%e2disp*1.d03
    write(LOUT,*) 'E2exch-disp = ', SAPT%e2exdisp*1.0d3
-   write(LOUT,*) 'EInt(SAPT2) = ', SAPT%esapt2*1.0d3
+   write(LOUT,*) 'Eint(SAPT2) = ', SAPT%esapt2*1.0d3
 elseif(SAPT%SaptLevel==1) then
-   write(LOUT,*) 'EInt(SAPT1) = ', SAPT%esapt2*1.0d3
+   write(LOUT,*) 'Eint(SAPT1) = ', SAPT%esapt2*1.0d3
 endif
 
 end subroutine summary_sapt_verbose
@@ -5330,11 +5330,14 @@ if(allocated(SAPT%monB%VCoul)) then
    deallocate(SAPT%monB%VCoul)
 endif
 
-if(SAPT%doRSH) call delfile('AOERFSORT')
-if(SAPT%doRSH) call delfile('FFOOERFAA')
-if(SAPT%doRSH) call delfile('FFOOERFBB')
-if(SAPT%doRSH) call delfile('FOFOERFAA')
-if(SAPT%doRSH) call delfile('FOFOERFBB')
+if(SAPT%doRSH) then
+   call delfile('AOERFSORT')
+   call delfile('FFOOERFAA')
+   call delfile('FFOOERFBB')
+   call delfile('FOFOERFAA')
+   call delfile('FOFOERFBB')
+   if(.not.SAPT%SameOm) call delfile('AOERFSORTB')
+endif
 
 ! cubic dispersion
 if(SAPT%monA%Cubic) then
@@ -5364,11 +5367,11 @@ call delfile ('ONEEL_B')
 
 call delfile('TMPOOAB')
 
-if(SAPT%SaptLevel==2) then
+if(SAPT%SaptLevel/=1) then
    call delfile('TWOMOAB')
 endif
 
-if(ISERPA==0) then
+if(ISERPA==0.and.SAPT%SaptLevel==2) then
    call delfile('FOFOABBA')
    call delfile('FOFOBBBA')
    call delfile('FOFOAAAB')
@@ -5381,6 +5384,9 @@ if(ISERPA==0) then
 
    if(.not.SAPT%monA%Cubic) call delfile('XY0_A')
    if(.not.SAPT%monB%Cubic) call delfile('XY0_B')
+elseif(ISERPA==0.and.SAPT%SaptLevel==10) then
+   call delfile('XY0_A')
+   call delfile('XY0_B')
 elseif(ISERPA==1) then
    call delfile('FFFFABBB')
    call delfile('FFFFBAAA')

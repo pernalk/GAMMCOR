@@ -569,7 +569,7 @@ double precision,allocatable :: work1(:)
 
  exchs2      = t1f+sum(t2a)+sum(t2b)+sum(t2c)+t2d
  SAPT%exchs2 = exchs2
- write(LOUT,'(/1x,a,f16.8)') 'ExchS2        = ', exchs2*1000d0
+ write(LOUT,'(/1x,a,f16.8)') 'ExchS2      = ', exchs2*1000d0
 
  deallocate(Vbaa,Vabb,PBaa,PAbb,Vb,Va,PB,PA,Sab,S)
  deallocate(Kb,Qba,Qab,USb,USa)
@@ -1575,7 +1575,7 @@ double precision,parameter :: BigE = 1.D8
  both = SAPT%iCpld
 
  uncoupled = .true.
- if(Flags%ICASSCF==0)     uncoupled = .false.
+ if(Flags%ICASSCF==0)   uncoupled = .false.
  if(A%Cubic.or.B%Cubic) uncoupled = .false.
 
 ! set dimensions
