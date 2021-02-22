@@ -152,6 +152,7 @@ type SystemBlock
       logical :: DeclareTrSt = .false.
       logical :: ISHF    = .false.
       logical :: Cubic   = .false.
+      logical :: Wexcit  = .false.
       logical :: doRSH   = .false., SameOm = .true.
       logical :: PostCAS = .false.
       logical :: NActFromRDM = .true.
@@ -290,7 +291,7 @@ type SaptData
      logical :: Cubic  = .false.
      ! MH : add keyword!
      logical :: SemiCoupled = .true.
-     logical :: DispExc = .true.
+     logical :: Wexcit  = .false.
      logical :: noE2exi = .true.
      logical :: EnChck  = .true., HFCheck=.true.
      logical :: doRSH   = .false., SameOm = .true.

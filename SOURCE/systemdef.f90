@@ -445,6 +445,7 @@ elseif(Flags%ISAPT.Eq.1) then
       monA%PostCAS  = Input%SystemInput(1)%PostCAS
       monA%ISHF     = Input%SystemInput(1)%ISHF
       monA%Cubic    = Input%SystemInput(1)%Cubic
+      monA%Wexcit   = Input%SystemInput(1)%Wexcit
 
       monA%NCen    = Input%SystemInput(1)%NCen
       monA%UCen    = Input%SystemInput(1)%UCen
@@ -483,6 +484,7 @@ elseif(Flags%ISAPT.Eq.1) then
       monB%PostCAS   = Input%SystemInput(2)%PostCAS
       monB%ISHF      = Input%SystemInput(2)%ISHF
       monB%Cubic     = Input%SystemInput(2)%Cubic
+      monB%Wexcit    = Input%SystemInput(2)%Wexcit
       monB%NCen = Input%SystemInput(2)%NCen
       monB%UCen = Input%SystemInput(2)%UCen
       monB%Monomer = Input%SystemInput(2)%Monomer
@@ -525,6 +527,7 @@ elseif(Flags%ISAPT.Eq.1) then
       monA%PostCAS = Input%SystemInput(2)%PostCAS
       monA%ISHF    = Input%SystemInput(2)%ISHF
       monA%Cubic   = Input%SystemInput(2)%Cubic
+      monA%Wexcit  = Input%SystemInput(2)%Wexcit
       monA%NCen    = Input%SystemInput(2)%NCen
       monA%UCen    = Input%SystemInput(2)%UCen
       monA%Monomer = Input%SystemInput(2)%Monomer
@@ -561,6 +564,7 @@ elseif(Flags%ISAPT.Eq.1) then
       monB%PostCAS  = Input%SystemInput(1)%PostCAS
       monB%ISHF     = Input%SystemInput(1)%ISHF
       monB%Cubic    = Input%SystemInput(1)%Cubic
+      monB%Wexcit   = Input%SystemInput(1)%Wexcit
       monB%NCen     = Input%SystemInput(1)%NCen
       monB%UCen     = Input%SystemInput(1)%UCen
       monB%Monomer  = Input%SystemInput(1)%Monomer
@@ -592,6 +596,9 @@ elseif(Flags%ISAPT.Eq.1) then
       SAPT%monB%SameOm = .false.
     endif
  endif
+
+ ! set Wexcit terms
+ if(SAPT%monA%Wexcit.or.SAPT%monB%Wexcit) SAPT%Wexcit = .true.
 
 System = SAPT%monB
 

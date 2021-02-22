@@ -522,6 +522,9 @@ character(:), allocatable :: first, last
  case ("CUBIC")
        read(val,*) SystemParams%Cubic
 
+ case ("WEXCIT")
+       read(val,*) SystemParams%Wexcit
+
  end select
 end subroutine read_block_system
 
