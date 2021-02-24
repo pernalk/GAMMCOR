@@ -3800,9 +3800,12 @@ integer :: i,j,k,l,kl,kk,ip,iq,ir,is,ipq,irs
 integer :: iunit,ISkippedEig
 integer :: pos(NBasis,NBasis)
 logical :: AuxCoeff(3,3,3,3)
-double precision :: CICoef(NBasis),Cpq,Crs,SumY,Aux
+logical,allocatable          :: condition(:)
+double precision             :: CICoef(NBasis),Cpq,Crs,SumY,Aux
 double precision,allocatable :: work(:),ints(:,:),Skipped(:)
-double precision,parameter :: SmallE = 1.d-3,BigE = 1.d8
+double precision,allocatable :: tVec(:,:)
+double precision,parameter   :: SmallE = 1.d-3,BigE = 1.d8
+double precision,external    :: ddot
 
 do i=1,NBasis
    CICoef(i) = sign(sqrt(Occ(i)),Occ(i)-0.5d0)
@@ -3828,13 +3831,31 @@ enddo
 
 allocate(work(NBasis**2),ints(NBasis,NBasis),Skipped(NDimX))
 
-ISkippedEig = 0
 ECorr = 0
+
+allocate(condition(NDimX),tVec(NDimX,NDimX))
+
+condition = (EVal.gt.SmallE.and.EVal.lt.BigE)
+
+ISkippedEig = 0
+do kk=1,NDimX
+    if(.not.condition(kk)) then
+       ISkippedEig = ISkippedEig + 1
+       Skipped(ISkippedEig) = EVal(kk)
+    endif
+enddo
+
+! transpose
+tVec = 0
+do kk=1,NDimX
+   if(condition(kk)) tVec(kk,:) = EVec(:,kk)
+enddo
 
 open(newunit=iunit,file=trim(IntKFile),status='OLD', &
      access='DIRECT',recl=8*NBasis*NOccup)
 
-kl = 0
+kl   = 0
+SumY = 0
 do k=1,NOccup
    do l=1,NBasis
       kl = kl + 1
@@ -3863,17 +3884,8 @@ do k=1,NOccup
                 !.and.IGem(ir).eq.IGem(ip)).and.ir.gt.is.and.ip.gt.iq) then
                 if(AuxCoeff(IGem(ip),IGem(iq),IGem(ir),IGem(is))) then
 
-                   ISkippedEig = 0
-                   SumY = 0 
-                   do kk=1,NDimX
-                      if(EVal(kk).gt.SmallE.and.EVal(kk).lt.BigE) then
-                         SumY = SumY + EVec(ipq,kk)*EVec(irs,kk)
-                      else
-                         ISkippedEig = ISkippedEig + 1
-                         Skipped(ISkippedEig) = EVal(kk)
-                      endif
-                   enddo
-          
+                   SumY = ddot(NDimX,tVec(:,ipq),1,tVec(:,irs),1)
+
                    Aux = 2*Crs*Cpq*SumY
           
                    if(iq.Eq.is.and.ip.Eq.ir) then
@@ -3904,6 +3916,7 @@ if(ISkippedEig/=0) then
   enddo
 endif
 
+deallocate(tVec,condition)
 deallocate(Skipped)
 deallocate(ints,work)
 

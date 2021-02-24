@@ -235,6 +235,8 @@ integer            :: i
    stop
  endif
 
+ SAPT%SemiCoupled = .false.
+
  ! first order
  call e1elst(SAPT%monA,SAPT%monB,SAPT)
  call e1exchs2(Flags,SAPT%monA,SAPT%monB,SAPT)
@@ -5180,10 +5182,13 @@ if(SAPT%SaptLevel==2) then
    write(LOUT,'(1x,a,f16.8)') 'E2disp      = ', SAPT%e2disp*1.d03
    write(LOUT,'(1x,a,f16.8)') 'E2exch-disp = ', SAPT%e2exdisp*1.0d3
    write(LOUT,'(1x,a,f16.8)') 'Eint(SAPT2) = ', SAPT%esapt2*1.0d3
+
 elseif(SAPT%SaptLevel==1) then
    write(LOUT,'(1x,a,f16.8)') 'Eint(SAPT1) = ', SAPT%esapt2*1.0d3
+
 elseif(SAPT%SaptLevel==10) then
    write(LOUT,'(1x,a,f16.8)') 'E2disp(CAS) = ', SAPT%e2dispinCAS*1.d03
+
 elseif(SAPT%SaptLevel==0) then
    write(LOUT,'(1x,a,f16.8)') 'E2ind(unc)  = ', SAPT%e2ind_unc*1.d03
    write(LOUT,'(1x,a,f16.8)') 'E2exch-ind  = ', SAPT%e2exind_unc*1.0d3
@@ -5401,7 +5406,9 @@ if(SAPT%monB%TwoMoInt==TWOMO_FOFO) then
    call delfile('FOFOBB')
 endif
 
-call delfile('PROP_AB0')
+if((.not.SAPT%monA%Cubic).or.(.not.SAPT%monB%Cubic)) then
+   call delfile('PROP_AB0')
+endif
 
 if(SAPT%SaptLevel==2) then
    if(.not.SAPT%monA%Cubic) call delfile('PROP_A')

@@ -1638,6 +1638,7 @@ integer :: iunit
 integer :: i,j,pq,rs
 integer :: ip,iq,ir,is
 integer :: kc,ik,ic
+logical,allocatable          :: condOmA(:),condOmB(:)
 double precision,allocatable :: OmA(:), OmB(:), &
                                 OmA0(:),OmB0(:)
 double precision,allocatable :: EVecA(:), EVecB(:)
@@ -1905,16 +1906,22 @@ if(.not.(Flags%ICASSCF==0.and.Flags%ISERPA==0)) then
 
 endif
 
+ allocate(condOmA(A%NDimX),condOmB(B%NDimX)) 
+ condOmA = (abs(OmA).gt.SmallE.and.abs(OmA).lt.BigE)
+ condOmB = (abs(OmB).gt.SmallE.and.abs(OmB).lt.BigE)
+
  e2d = 0d0
  do j=1,B%NDimX
-    do i=1,A%NDimX
-       if(abs(OmA(i)).gt.SmallE.and.abs(OmB(j)).gt.SmallE&
-          .and.abs(OmA(i)).lt.BigE.and.abs(OmB(j)).lt.BigE) then
+    if(condOmB(j)) then
+       do i=1,A%NDimX
+!          if(abs(OmA(i)).gt.SmallE.and.abs(OmB(j)).gt.SmallE&
+!             .and.abs(OmA(i)).lt.BigE.and.abs(OmB(j)).lt.BigE) then
 
-          e2d = e2d + tmp2(i,j)**2/(OmA(i)+OmB(j))
-
-       endif
-    enddo
+             if(condOmA(i)) then
+                e2d = e2d + tmp2(i,j)**2/(OmA(i)+OmB(j))
+             endif
+       enddo
+    endif
  enddo
  SAPT%e2disp  = -16d0*e2d
 
@@ -1953,6 +1960,7 @@ endif
     deallocate(Y01BlockB,Y01BlockA)
  endif
  
+ deallocate(condOmB,condOmA)
  deallocate(tmp02,tmp01,tmp2,tmp1)
  deallocate(OmB0,OmA0,OmB,EVecB,OmA,EVecA)
 
