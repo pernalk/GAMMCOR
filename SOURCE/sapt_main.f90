@@ -160,7 +160,7 @@ logical          :: onlyDisp
  call e1elst(SAPT%monA,SAPT%monB,SAPT)
  !call e1exchs2(Flags,SAPT%monA,SAPT%monB,SAPT)
  call e2disp_unc(Flags,SAPT%monA,SAPT%monB,SAPT)
- if(onlyDisp.eqv..false.)  call e2exdisp(Flags,SAPT%monA,SAPT%monB,SAPT)
+ if(onlyDisp.eqv..false.) call e2exdisp(Flags,SAPT%monA,SAPT%monB,SAPT)
 
  e2d_unc   = SAPT%e2disp_unc*1000d0
  if(onlyDisp.eqv..false.) e2exd_unc = SAPT%e2exdisp_unc*1000d0
@@ -435,7 +435,7 @@ if(Flags%ISERPA==0) then
 
   endif
 
-  if(Flags%SaptLevel.eq.2) then
+  if((Flags%SaptLevel.eq.2).or.(Flags%IRedVirt.eq.1)) then
 
      write(LOUT,'(/1x,a)') 'Transforming E2exch-ind integrals...'
      ! term A3-ind
@@ -577,6 +577,71 @@ if(Flags%ISERPA==0) then
 
   ! integrals stored as (ov|ov)
   print*, 'NBASISRED',NBasisRed
+
+  write(LOUT,'(/1x,a)') 'Transforming E2exch-ind integrals...'
+  ! term A3-ind
+  call tran4_gen(NBasis,&
+           NBasis,B%CMO,&
+           B%num0+B%num1,B%CMO(1:NBasis,1:(B%num0+B%num1)),&
+           NBasis,A%CMO,&
+           A%num0+A%num1,A%CMO(1:NBasis,1:(A%num0+A%num1)),&
+           'FOFOAABB','AOTWOSORT')
+  ! term A1-ind
+  call tran4_gen(NBasis,&
+           A%num0+A%num1,A%CMO(1:NBasis,1:(A%num0+A%num1)),&
+           B%num0+B%num1,B%CMO(1:NBasis,1:(B%num0+B%num1)),&
+           NBasis,A%CMO,&
+           NBasis,B%CMO,&
+           'FFOOABAB','AOTWOSORT')
+  ! term A2-ind
+  ! A2A(B): XX
+  call tran4_gen(NBasis,&
+           NBasis,B%CMO,&
+           A%num0+A%num1,A%CMO(1:NBasis,1:(A%num0+A%num1)),&
+           NBasis,B%CMO,&
+           B%num0+B%num1,B%CMO(1:NBasis,1:(B%num0+B%num1)),&
+           'FOFOBBBA','AOTWOSORT')
+  call tran4_gen(NBasis,&
+           NBasis,A%CMO,&
+           B%num0+B%num1,B%CMO(1:NBasis,1:(B%num0+B%num1)),&
+           NBasis,A%CMO,&
+           A%num0+A%num1,A%CMO(1:NBasis,1:(A%num0+A%num1)),&
+           'FOFOAAAB','AOTWOSORT')
+  !! A2A(B): YY
+  call tran4_gen(NBasis,&
+           NBasis,A%CMO,&
+           B%num0+B%num1,B%CMO(1:NBasis,1:(B%num0+B%num1)),&
+           NBasis,B%CMO,&
+           B%num0+B%num1,B%CMO(1:NBasis,1:(B%num0+B%num1)),&
+           'FOFOBBAB','AOTWOSORT')
+  call tran4_gen(NBasis,&
+           NBasis,B%CMO,&
+           A%num0+A%num1,A%CMO(1:NBasis,1:(A%num0+A%num1)),&
+           NBasis,A%CMO,&
+           A%num0+A%num1,A%CMO(1:NBasis,1:(A%num0+A%num1)),&
+           'FOFOAABA','AOTWOSORT')
+
+  write(LOUT,'(/1x,a)') 'Transforming E2exch-disp integrals...'
+  call tran4_gen(NBasis,&
+           NBasis,B%CMO,&
+           A%num0+A%num1,A%CMO(1:NBasis,1:(A%num0+A%num1)),&
+           NBasis,A%CMO,&
+           B%num0+B%num1,B%CMO(1:NBasis,1:(B%num0+B%num1)),&
+           'FOFOABBA','AOTWOSORT')
+  ! XY and YX, A2
+  call tran4_gen(NBasis,&
+           B%num0+B%num1,B%CMO(1:NBasis,1:(B%num0+B%num1)),&
+           B%num0+B%num1,B%CMO(1:NBasis,1:(B%num0+B%num1)),&
+           NBasis,A%CMO,&
+           NBasis,B%CMO,&
+           'FFOOABBB','AOTWOSORT')
+  call tran4_gen(NBasis,&
+           A%num0+A%num1,A%CMO(1:NBasis,1:(A%num0+A%num1)),&
+           A%num0+A%num1,A%CMO(1:NBasis,1:(A%num0+A%num1)),&
+           NBasis,B%CMO,&
+           NBasis,A%CMO,&
+           'FFOOBAAA','AOTWOSORT')
+
   call tran4_gen(NBasis,&
                  A%num0+A%num1,A%CMO,&
                  A%num1+A%num2,A%CMO(1:NBasis,A%num0+1:NBasisRed),&
