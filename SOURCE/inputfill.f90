@@ -475,6 +475,9 @@ character(:), allocatable :: first, last
  case ("OMEGA")
        read(val, *) SystemParams%Omega
 
+ case ("PERVIRT")
+       read(val, *) SystemParams%PerVirt
+
  case ("EIGFCI")
        read(val, *) SystemParams%EigFCI
 

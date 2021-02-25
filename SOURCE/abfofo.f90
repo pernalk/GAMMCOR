@@ -717,7 +717,7 @@ deallocate(ints,work2,work1)
 
 end subroutine ACABMAT0_FOFO
 
-subroutine MP2RDM_FOFO(Eps,Occ,URe,UNOAO,XOne,IndN,IndX,IndAux,IGemIN, &
+subroutine MP2RDM_FOFO(PerVirt,Eps,Occ,URe,UNOAO,XOne,IndN,IndX,IndAux,IGemIN, &
                        NAct,INActive,NDimX,NDim,NBasis,NInte1,     &
                        IntJFile,IntKFile,ThrVirt,NVZero,IPrint)
 implicit none
@@ -726,7 +726,7 @@ integer,intent(in)           :: NAct,INActive,NDimX,NDim,NBasis,NInte1
 integer,intent(in)           :: IPrint
 integer,intent(in)           :: IndN(2,NDim),IndX(NDim),IndAux(NBasis),IGemIN(NBasis)
 integer,intent(out)          :: NVZero
-double precision,intent(in)  :: ThrVirt
+double precision,intent(in)  :: PerVirt,ThrVirt
 double precision,intent(in)  :: Occ(NBasis),XOne(NInte1),UNOAO(NBasis,NBasis)
 double precision,intent(out) :: Eps(NBasis,NBasis)
 character(*)                 :: IntJFile,IntKFile
@@ -742,6 +742,7 @@ integer                      :: tmpAA(NAct*(NAct-1)/2),tmpAI(NAct,1:INActive),&
                                 tmpIV(INActive*(NBasis-NAct-INActive))
 integer                      :: limAA(2),limAI(2,1:INActive),&
                                 limAV(2,INActive+NAct+1:NBasis),limIV(2)
+double precision             :: PerThr
 double precision             :: val,ETot
 double precision             :: URe(NBasis,NBasis) 
 double precision             :: AuxMat(NBasis,NBasis),&
@@ -753,17 +754,20 @@ double precision,allocatable :: ints_J(:,:),ints_K(:,:),   &
                                 work(:),workTr(:),workSq(:,:)
 integer          :: EndVirt,NBasisNew
 character(100)   :: num1char
-double precision :: xnum1,PerThr
+!double precision :: xnum1,PerThr
 
-! TEST!
-if(COMMAND_ARGUMENT_COUNT()==0) then
-   write(LOUT,*)'ERROR, COMMAND-LINE ARGUMENTS REQUIRED, STOPPING'
-   stop
-endif 
+! use PerVirt/100
+PerThr = PerVirt
 
-CALL GET_COMMAND_ARGUMENT(1,num1char)
-READ(num1char,*)xnum1
-PerThr = xnum1
+!! TEST!
+!if(COMMAND_ARGUMENT_COUNT()==0) then
+!   write(LOUT,*)'ERROR, COMMAND-LINE ARGUMENTS REQUIRED, STOPPING'
+!   stop
+!endif 
+!
+!CALL GET_COMMAND_ARGUMENT(1,num1char)
+!READ(num1char,*)xnum1
+!PerThr = xnum1
 
 ! set dimensions
 NOccup   = INActive + NAct

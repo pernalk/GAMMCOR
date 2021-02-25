@@ -128,6 +128,7 @@ type SystemBlock
       double precision :: SumOcc  = 0d0 
       double precision :: ACAlpha = 1d0
       double precision :: Omega   = 1d0
+      double precision :: PerVirt = 0d0
       double precision :: ECASSCF = 0d0
       integer :: NSym
       integer :: NSymBas(8),NSymOrb(8)

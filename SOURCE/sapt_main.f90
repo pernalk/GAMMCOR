@@ -134,7 +134,8 @@ logical          :: onlyDisp
  onlyDisp = .false.
  !onlyDisp = .true.
 
- SAPT_LEVEL_SAVE = SAPT%SaptLevel
+ SAPT_LEVEL_SAVE  = SAPT%SaptLevel
+ SAPT%SemiCoupled = .false.
 
  ! 1) uncoupled response
  SAPT%SaptLevel  = 0
@@ -197,6 +198,7 @@ logical          :: onlyDisp
  write(LOUT,'(/,1x,a)') 'SAPT SCALED SUMMARY'
  write(LOUT,'(8a10)') ('**********',i=1,6)
 
+ write(LOUT,'(1x,a,i3)') 'SAPT level  =', SAPT%SaptLevel
  write(LOUT,'(1x,a,f16.8,f16.8)') 'E2disp(unc) = ',e2d_unc,e2dR_unc
  write(LOUT,'(1x,a,f16.8)')       'E2dispR     = ',e2dR
  if(onlyDisp.eqv..false.) write(LOUT,'(1x,a,f16.8,f16.8)') 'E2exd(unc)  = ',e2exd_unc,e2exdR_unc
@@ -1650,7 +1652,8 @@ subroutine reduce_virt(Flags,Mon,NBas)
 
  case(TWOMO_FOFO)
 
-    call MP2RDM_FOFO(Eps,Mon%Occ,URe,workSq,XOne,Mon%IndN,Mon%IndX,Mon%IndAux,Mon%IGem,&
+    call MP2RDM_FOFO(Mon%PerVirt,Eps,Mon%Occ,URe,workSq,XOne,&
+                     Mon%IndN,Mon%IndX,Mon%IndAux,Mon%IGem,  &
                      Mon%NAct,Mon%INAct,Mon%NDimX,Mon%NDim,NBas,NInte1,&
                      twojfile,twokfile,Mon%ThrVirt,Mon%NVZero,Mon%IPrint)
 
@@ -5223,7 +5226,7 @@ implicit none
 
 type(SaptData) :: SAPT
 
-integer :: i
+integer          :: i
 double precision :: esapt2
 
 SAPT%esapt2 = SAPT%elst + SAPT%exchs2 + SAPT%e2ind &
