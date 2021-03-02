@@ -297,8 +297,8 @@ C
       integer igrad
       character*(30) name
 
-      Call DELCORREL(URe,UNOAO,Occ,NBasis)
-      stop 
+c      Call DELCORREL(URe,UNOAO,Occ,NBasis)
+c      stop 
 C
 C     IFlagRead = 0 - generate grid data, do not write to a file
 C     if parameteres in caspidft are optimized it is useful to use flags different from 0 to avoid generating data on grid more than once
@@ -1557,7 +1557,7 @@ C
       XX=Zero
       XPade=RhoGrid(I)/(AP+RhoGrid(I))
       If(RhoGrid(I).Gt.1.D-7) XX=Two*OnTop(I)/RhoGrid(I)**2*XPade
-      Write(10,*)I,XX
+      Write(10,*)I,XX,XPade
 C
       EndDo
 C
@@ -1573,10 +1573,11 @@ C
 C       
       Do I=1,NGrid
 C
+      Read(10,*)II,XXGS,XPade
+C
       XXES=Zero
-      XPade=RhoGrid(I)/(AP+RhoGrid(I))
+c      XPade=RhoGrid(I)/(AP+RhoGrid(I))
       If(RhoGrid(I).Gt.1.D-7) XXES=Two*OnTop(I)/RhoGrid(I)**2*XPade
-      Read(10,*)II,XXGS
       DELXX(I)=XXES-XXGS
 C
       EndDo
@@ -1613,12 +1614,12 @@ c      if(RhoGrid(I).gt.1.d-2.and. CRe(I)+CIm(I).gt.0.05)
 c     $ Write(*,'(F10.4,E13.4,3F10.4)')
 c     $ RZ(I),RX(I),RY(I),CRe(I),CIm(I)
 
-c      If(Abs(RX(I)).Lt.1.D-10.And.Abs(RY(I)).Lt.1.D-10)
-      If(Abs(RX(I)).Lt.0.5.And.Abs(RX(I)).Gt.0.10)
+      If(Abs(RX(I)).Lt.1.D-10.And.Abs(RY(I)).Lt.1.D-10)
+c      If(Abs(RX(I)).Lt.0.5.And.Abs(RX(I)).Gt.0.10)
 c.And.
 c     $ Abs(RY(I)).Lt.1.D-10)
-     $ Write(*,'(2F10.4,E13.4,3F10.4)')
-     $ RZ(I),RY(I),RhoGrid(I),DELXX(I),CRe(I),CIm(I)
+     $ Write(*,'(F10.4,E13.4,3F10.4)')
+     $ RZ(I),RhoGrid(I),DELXX(I),CRe(I),CIm(I)
 
       EndDo
 C

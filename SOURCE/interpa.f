@@ -171,7 +171,7 @@ C     do not correlate active degenerate orbitals if from different geminals
      $.Or.
      $ (ICASSCF.Eq.1.
      $ .And.(IndAux(I).Eq.1).And.(IndAux(J).Eq.1) 
-     $ .And.(Abs(Occ(I)-Occ(J))/Occ(I).Lt.1.D-2)) ) Then
+     $ .And.(Abs(Occ(I)-Occ(J))/Occ(I).Lt.ThrSelAct)) ) Then
 C
       Write(6,'(2X,"Discarding nearly degenerate pair ",2I4)')I,J
 C
@@ -2036,7 +2036,7 @@ C
 C     do not correlate active degenerate orbitals if from different geminals
       If((IAuxGem(I).Ne.IAuxGem(J)).And.(IndAux(I).Eq.1).And.
      $ (IndAux(J).Eq.1)
-     $ .And.(Abs(Occ(I)-Occ(J))/Occ(I).Lt.1.D-2) ) Then
+     $ .And.(Abs(Occ(I)-Occ(J))/Occ(I).Lt.ThrSelAct) ) Then
 C
       Write(*,*)"Discarding nearly degenerate pair",I,J
 C
@@ -2262,7 +2262,8 @@ C
 C
 C     do not correlate degenerate active degenerate orbitals if from different geminals
       If((IAuxGem(I).Ne.IAuxGem(J)).And.(IndAux(I).Eq.1).And.
-     $ (IndAux(J).Eq.1).And.(Abs(Occ(I)-Occ(J))/Occ(I).Lt.1.D-2) ) Then
+     $ (IndAux(J).Eq.1).And.(Abs(Occ(I)-Occ(J))/Occ(I).Lt.ThrSelAct) )
+     $ Then
 C
       Write(*,*)"Discarding nearly degenerate pair",I,J
 C
@@ -2509,7 +2510,7 @@ C
 C     do not correlate idegenerate active degenerate orbitals if from different geminals
       If((IAuxGem(I).Ne.IAuxGem(J)).And.(IndAux(I).Eq.1).And.
      $ (IndAux(J).Eq.1)
-     $ .And.(Abs(Occ(I)-Occ(J))/Occ(I).Lt.1.D-2) ) Then
+     $ .And.(Abs(Occ(I)-Occ(J))/Occ(I).Lt.ThrSelAct) ) Then
 C     
       Write(*,*)"Discarding nearly degenerate pair",I,J
 C
