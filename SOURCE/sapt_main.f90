@@ -75,7 +75,8 @@ double precision :: Tcpu,Twall
        call e2exdisp(Flags,SAPT%monA,SAPT%monB,SAPT)
 
     elseif(SAPT%SaptLevel==10) then
-      call e2dispCAS(Flags,SAPT%monA,SAPT%monB,SAPT,NBasis)
+       SAPT%SemiCoupled = .false.
+       call e2dispCAS(Flags,SAPT%monA,SAPT%monB,SAPT,NBasis)
 
     elseif(SAPT%SaptLevel==2) then
        call e2ind(Flags,SAPT%monA,SAPT%monB,SAPT)
@@ -133,7 +134,8 @@ logical          :: onlyDisp
  onlyDisp = .false.
  !onlyDisp = .true.
 
- SAPT_LEVEL_SAVE = SAPT%SaptLevel
+ SAPT_LEVEL_SAVE  = SAPT%SaptLevel
+ SAPT%SemiCoupled = .false.
 
  ! 1) uncoupled response
  SAPT%SaptLevel  = 0
@@ -159,7 +161,7 @@ logical          :: onlyDisp
  call e1elst(SAPT%monA,SAPT%monB,SAPT)
  !call e1exchs2(Flags,SAPT%monA,SAPT%monB,SAPT)
  call e2disp_unc(Flags,SAPT%monA,SAPT%monB,SAPT)
- if(onlyDisp.eqv..false.)  call e2exdisp(Flags,SAPT%monA,SAPT%monB,SAPT)
+ if(onlyDisp.eqv..false.) call e2exdisp(Flags,SAPT%monA,SAPT%monB,SAPT)
 
  e2d_unc   = SAPT%e2disp_unc*1000d0
  if(onlyDisp.eqv..false.) e2exd_unc = SAPT%e2exdisp_unc*1000d0
@@ -196,6 +198,7 @@ logical          :: onlyDisp
  write(LOUT,'(/,1x,a)') 'SAPT SCALED SUMMARY'
  write(LOUT,'(8a10)') ('**********',i=1,6)
 
+ write(LOUT,'(1x,a,i3)') 'SAPT level  =', SAPT%SaptLevel
  write(LOUT,'(1x,a,f16.8,f16.8)') 'E2disp(unc) = ',e2d_unc,e2dR_unc
  write(LOUT,'(1x,a,f16.8)')       'E2dispR     = ',e2dR
  if(onlyDisp.eqv..false.) write(LOUT,'(1x,a,f16.8,f16.8)') 'E2exd(unc)  = ',e2exd_unc,e2exdR_unc
@@ -233,6 +236,8 @@ integer            :: i
    write(lout,'(1x,a)') 'ERROR! Wrong call of sapt_extrapol!'
    stop
  endif
+
+ SAPT%SemiCoupled = .false.
 
  ! first order
  call e1elst(SAPT%monA,SAPT%monB,SAPT)
@@ -432,7 +437,7 @@ if(Flags%ISERPA==0) then
 
   endif
 
-  if(Flags%SaptLevel.ge.2) then
+  if((Flags%SaptLevel.eq.2).or.(Flags%IRedVirt.eq.1)) then
 
      write(LOUT,'(/1x,a)') 'Transforming E2exch-ind integrals...'
      ! term A3-ind
@@ -574,6 +579,71 @@ if(Flags%ISERPA==0) then
 
   ! integrals stored as (ov|ov)
   print*, 'NBASISRED',NBasisRed
+
+  write(LOUT,'(/1x,a)') 'Transforming E2exch-ind integrals...'
+  ! term A3-ind
+  call tran4_gen(NBasis,&
+           NBasis,B%CMO,&
+           B%num0+B%num1,B%CMO(1:NBasis,1:(B%num0+B%num1)),&
+           NBasis,A%CMO,&
+           A%num0+A%num1,A%CMO(1:NBasis,1:(A%num0+A%num1)),&
+           'FOFOAABB','AOTWOSORT')
+  ! term A1-ind
+  call tran4_gen(NBasis,&
+           A%num0+A%num1,A%CMO(1:NBasis,1:(A%num0+A%num1)),&
+           B%num0+B%num1,B%CMO(1:NBasis,1:(B%num0+B%num1)),&
+           NBasis,A%CMO,&
+           NBasis,B%CMO,&
+           'FFOOABAB','AOTWOSORT')
+  ! term A2-ind
+  ! A2A(B): XX
+  call tran4_gen(NBasis,&
+           NBasis,B%CMO,&
+           A%num0+A%num1,A%CMO(1:NBasis,1:(A%num0+A%num1)),&
+           NBasis,B%CMO,&
+           B%num0+B%num1,B%CMO(1:NBasis,1:(B%num0+B%num1)),&
+           'FOFOBBBA','AOTWOSORT')
+  call tran4_gen(NBasis,&
+           NBasis,A%CMO,&
+           B%num0+B%num1,B%CMO(1:NBasis,1:(B%num0+B%num1)),&
+           NBasis,A%CMO,&
+           A%num0+A%num1,A%CMO(1:NBasis,1:(A%num0+A%num1)),&
+           'FOFOAAAB','AOTWOSORT')
+  !! A2A(B): YY
+  call tran4_gen(NBasis,&
+           NBasis,A%CMO,&
+           B%num0+B%num1,B%CMO(1:NBasis,1:(B%num0+B%num1)),&
+           NBasis,B%CMO,&
+           B%num0+B%num1,B%CMO(1:NBasis,1:(B%num0+B%num1)),&
+           'FOFOBBAB','AOTWOSORT')
+  call tran4_gen(NBasis,&
+           NBasis,B%CMO,&
+           A%num0+A%num1,A%CMO(1:NBasis,1:(A%num0+A%num1)),&
+           NBasis,A%CMO,&
+           A%num0+A%num1,A%CMO(1:NBasis,1:(A%num0+A%num1)),&
+           'FOFOAABA','AOTWOSORT')
+
+  write(LOUT,'(/1x,a)') 'Transforming E2exch-disp integrals...'
+  call tran4_gen(NBasis,&
+           NBasis,B%CMO,&
+           A%num0+A%num1,A%CMO(1:NBasis,1:(A%num0+A%num1)),&
+           NBasis,A%CMO,&
+           B%num0+B%num1,B%CMO(1:NBasis,1:(B%num0+B%num1)),&
+           'FOFOABBA','AOTWOSORT')
+  ! XY and YX, A2
+  call tran4_gen(NBasis,&
+           B%num0+B%num1,B%CMO(1:NBasis,1:(B%num0+B%num1)),&
+           B%num0+B%num1,B%CMO(1:NBasis,1:(B%num0+B%num1)),&
+           NBasis,A%CMO,&
+           NBasis,B%CMO,&
+           'FFOOABBB','AOTWOSORT')
+  call tran4_gen(NBasis,&
+           A%num0+A%num1,A%CMO(1:NBasis,1:(A%num0+A%num1)),&
+           A%num0+A%num1,A%CMO(1:NBasis,1:(A%num0+A%num1)),&
+           NBasis,B%CMO,&
+           NBasis,A%CMO,&
+           'FFOOBAAA','AOTWOSORT')
+
   call tran4_gen(NBasis,&
                  A%num0+A%num1,A%CMO,&
                  A%num1+A%num2,A%CMO(1:NBasis,A%num0+1:NBasisRed),&
@@ -683,8 +753,9 @@ double precision,allocatable :: Sa(:,:),Sb(:,:)
  SAPT%monB%NDim = NBasis*(NBasis-1)/2
 
 ! set RSH
- doRSH = .false.
- if(Flags%IFunSR==1.or.Flags%IFunSR==2) doRSH = .true.
+ SAPT%doRSH = .false.
+ if(Flags%IFunSR==1.or.Flags%IFunSR==2) SAPT%doRSH = .true.
+ doRSH = SAPT%doRSH
 
 ! set semicoupled dispersion
  if(Flags%ICASSCF==0) then
@@ -708,7 +779,7 @@ double precision,allocatable :: Sa(:,:),Sb(:,:)
     call readocc_dalton(NBasis,SAPT%monA,Flags)
     call readocc_dalton(NBasis,SAPT%monB,Flags)
 
- !! test 1
+ !! test readsymfino
  ! allocate(Sa(NBasis,NBasis),Sb(NBasis,NBasis))
  ! call get_one_mat('S',Sa,1,nbasis)
  ! call get_one_mat('S',Sb,2,nbasis)
@@ -1581,7 +1652,8 @@ subroutine reduce_virt(Flags,Mon,NBas)
 
  case(TWOMO_FOFO)
 
-    call MP2RDM_FOFO(Eps,Mon%Occ,URe,workSq,XOne,Mon%IndN,Mon%IndX,Mon%IndAux,Mon%IGem,&
+    call MP2RDM_FOFO(Mon%PerVirt,Eps,Mon%Occ,URe,workSq,XOne,&
+                     Mon%IndN,Mon%IndX,Mon%IndAux,Mon%IGem,  &
                      Mon%NAct,Mon%INAct,Mon%NDimX,Mon%NDim,NBas,NInte1,&
                      twojfile,twokfile,Mon%ThrVirt,Mon%NVZero,Mon%IPrint)
 
@@ -1897,13 +1969,13 @@ double precision, allocatable :: XOne(:), &
 double precision, allocatable :: ABPlus(:),ABMin(:),URe(:,:),VSR(:), &
                                  EigY0(:),EigY1(:),Eig0(:),Eig1(:), &
                                  EigVecR(:), Eig(:)
-integer :: i,j,ip,iq,ii,ione
+integer          :: i,j,ip,iq,ii,ione
 double precision :: ACAlpha,Omega,EnSR,EnHSR,ECorr,ECASSCF,XVSR
 double precision :: Tcpu,Twall
-character(8) :: label
+character(8)     :: label
 character(:),allocatable :: onefile,aoerfile,twofile,twoerffile,&
                             twojfile,twokfile,twojerf,twokerf,  &
-                            propfile,propfile0,propfile1,rdmfile
+                            propfile,propfile0,propfile1,xy0file,rdmfile
 double precision,parameter :: One = 1d0, Half = 0.5d0
 logical :: doRSH
 
@@ -1913,30 +1985,32 @@ logical :: doRSH
 
 ! set filenames
  if(Mon%Monomer==1) then
-    onefile = 'ONEEL_A'
-    twofile = 'TWOMOAA'
-    twojfile = 'FFOOAA'
-    twokfile = 'FOFOAA'
+    onefile    = 'ONEEL_A'
+    twofile    = 'TWOMOAA'
+    twojfile   = 'FFOOAA'
+    twokfile   = 'FOFOAA'
     twoerffile = 'MO2ERFAA'
-    twojerf = 'FFOOERFAA'
-    twokerf = 'FOFOERFAA'
-    propfile = 'PROP_A'
-    propfile0 = 'PROP_A0'
-    propfile1 = 'PROP_A1'
-    rdmfile='rdm2_A.dat'
-    aoerfile = 'AOERFSORT'
+    twojerf    = 'FFOOERFAA'
+    twokerf    = 'FOFOERFAA'
+    propfile   = 'PROP_A'
+    propfile0  = 'PROP_A0'
+    propfile1  = 'PROP_A1'
+    xy0file    = 'XY0_A'
+    rdmfile    = 'rdm2_A.dat'
+    aoerfile   = 'AOERFSORT'
  elseif(Mon%Monomer==2) then
-    onefile = 'ONEEL_B'
-    twofile = 'TWOMOBB'
-    twojfile = 'FFOOBB'
-    twokfile = 'FOFOBB'
+    onefile    = 'ONEEL_B'
+    twofile    = 'TWOMOBB'
+    twojfile   = 'FFOOBB'
+    twokfile   = 'FOFOBB'
     twoerffile = 'MO2ERFBB'
-    twojerf = 'FFOOERFBB'
-    twokerf = 'FOFOERFBB'
-    propfile = 'PROP_B'
-    propfile0 = 'PROP_B0'
-    propfile1 = 'PROP_B1'
-    rdmfile='rdm2_B.dat'
+    twojerf    = 'FFOOERFBB'
+    twokerf    = 'FOFOERFBB'
+    propfile   = 'PROP_B'
+    propfile0  = 'PROP_B0'
+    propfile1  = 'PROP_B1'
+    xy0file    = 'XY0_B'
+    rdmfile    = 'rdm2_B.dat'
     if(Mon%SameOm) then
        aoerfile = 'AOERFSORT'
     else
@@ -2020,7 +2094,7 @@ logical :: doRSH
  end select
  if(Mon%TwoMoInt==TWOMO_INCORE) call LoadSaptTwoEl(Mon%Monomer,TwoMO,NBas,NInte2)
 
- ! trasform LR integrals
+ ! transform LR integrals
  if(doRSH) then
    select case(Mon%TwoMoInt)
    case(TWOMO_INCORE)
@@ -2068,6 +2142,8 @@ logical :: doRSH
  enddo
 
  ACAlpha=One
+ ! UNCOUPLED-TEST
+ !ACAlpha=1d-9
 
  allocate(ABPlus(Mon%NDimX**2),ABMin(Mon%NDimX**2),&
           EigVecR(Mon%NDimX**2),Eig(Mon%NDimX))
@@ -2148,10 +2224,10 @@ logical :: doRSH
        enddo
     enddo
 
- !!! TEST COUPLED ANDREAS
- !  print*, 'CPLD-ANDREAS:'
- !  Mon%EigX = EigVecR
- !  Mon%EigY = 0
+  !! TEST COUPLED ANDREAS
+  ! print*, 'CPLD-ANDREAS:'
+  ! Mon%EigX = EigVecR
+  ! Mon%EigY = 0
 
  else
     call ERPAVEC(EigVecR,Eig,ABPlus,ABMin,NBas,Mon%NDimX)
@@ -2178,13 +2254,13 @@ logical :: doRSH
  call writeresp(EigVecR,Eig,propfile)
 
  ! uncoupled
- allocate(EigY0(Mon%NDimX**2),EigY1(Mon%NDimX**2),&
-          Eig0(Mon%NDimX),Eig1(Mon%NDimX))
+ !allocate(EigY0(Mon%NDimX**2),Eig0(Mon%NDimX))
+ allocate(EigY1(Mon%NDimX**2),Eig1(Mon%NDimX))
 
- EigY0 = 0
+ !EigY0 = 0
+ !Eig0  = 0
  EigY1 = 0
- Eig0 = 0
- Eig1 = 0
+ Eig1  = 0
 
  !call Y01CAS_mithap(Mon%Occ,URe,XOne,ABPlus,ABMin, &
  !       EigY0,EigY1,Eig0,Eig1, &
@@ -2202,14 +2278,30 @@ logical :: doRSH
 !        Mon%IndN,Mon%IndX,Mon%NDimX,NBas,Mon%NDim,NInte1,NInte2,Flags%IFlag0, &
 !        TwoMO,OrbGrid,SRKerW,NSymNO,MultpC,NGrid)
 
+ select case(Mon%TwoMoInt)
+ case(TWOMO_INCORE)
+   write(lout,'(1x,a)') 'Error! Uncoupled not working for INCORE!'
+   stop
+ case(TWOMO_FOFO)
+
+   call Y01CASLR_FOFO(Mon%Occ,URe,XOne,ABPlus,ABMin,&
+                  Mon%MultpC,Mon%NSymNO,SRKer,WGrid,OrbGrid,&
+                  propfile0,propfile1,xy0file,&
+                  Mon%IndN,Mon%IndX,Mon%IGem,Mon%NAct,Mon%INAct,&
+                  NGrid,Mon%NDimX,NBas,Mon%NDimX,NInte1,Mon%NoSt,&
+                  twokfile,Twojerf,twokerf,1,1)
+
+ end select 
+
  ! dump uncoupled response
- call writeresp(EigY0,Eig0,propfile0)
+ !call writeresp(EigY0,Eig0,propfile0)
  if(Flags%IFlag0==0) then
     call writeresp(EigY1,Eig1,propfile1)
  endif
 
  close(ione)
- deallocate(Eig1,Eig0,EigY1,EigY0)
+ !deallocate(Eig0,EigY0)
+ deallocate(Eig1,EigY1)
 
  deallocate(Eig,EigVecR,ABMin,ABPlus)
  deallocate(SRKer,SRKerW,OrbZGrid,OrbYGrid,OrbXGrid,OrbGrid,WGrid)
@@ -2449,6 +2541,7 @@ double precision,parameter :: SmallE=0d0,BigE=1.D20
    !ACAlpha=sqrt(2d0)/2d0
    !ACAlpha=1d-12
    !Print*, 'UNCOUPLED,ACAlpha',ACAlpha
+
    select case(Mon%TwoMoInt)
    case(TWOMO_FOFO)
 
@@ -2603,8 +2696,8 @@ double precision,parameter :: SmallE=0d0,BigE=1.D20
 
         EigY0 = 0
         EigY1 = 0
-        Eig0 = 0
-        Eig1 = 0
+        Eig0  = 0
+        Eig1  = 0
 
         !! silly AC0 energy test
         ! Call AC0CAS(ECorr,ETot,TwoMO,Mon%Occ,URe,XOne,&
@@ -2930,6 +3023,7 @@ double precision,allocatable :: work(:)
  ! INCORE: load 2-el integrals
  if(Mon%TwoMoInt==TWOMO_INCORE) call LoadSaptTwoEl(Mon%Monomer,TwoNO,NBasis,NInte2)
 
+ print*, 'Monomer',Mon%Monomer
  call calc_cas_resp(Mon%ACAlpha0,XOne,TwoNO,Mon,FNam%propfile0,NInte1,NInte2,NBasis)
  call calc_cas_resp(Mon%ACAlpha1,XOne,TwoNO,Mon,FNam%propfile1,NInte1,NInte2,NBasis)
  call calc_cas_resp(Mon%ACAlpha2,XOne,TwoNO,Mon,FNam%propfile2,NInte1,NInte2,NBasis)
@@ -3659,6 +3753,7 @@ if(ex) then
    read(iunit,*)
 
    ! old version: does not work with sym
+   ! print*, 'old version'
    ! offset = 0
    ! irep   = 1
    ! read(iunit,'(i5,i6)',iostat=ios) last_ibas,last_icen
@@ -5131,7 +5226,7 @@ implicit none
 
 type(SaptData) :: SAPT
 
-integer :: i
+integer          :: i
 double precision :: esapt2
 
 SAPT%esapt2 = SAPT%elst + SAPT%exchs2 + SAPT%e2ind &
@@ -5144,7 +5239,7 @@ write(LOUT,'(/,8a10)') ('**********',i=1,4)
 write(LOUT,'(1x,a)') 'SAPT SUMMARY / milliHartree'
 write(LOUT,'(8a10)') ('**********',i=1,4)
 
-write(LOUT,'(1x,a,i2)') 'SAPT level  =', SAPT%SaptLevel
+write(LOUT,'(1x,a,i3)') 'SAPT level  =', SAPT%SaptLevel
 
 write(LOUT,'(1x,a,f16.8)') 'E1elst      = ', SAPT%elst*1.d03
 write(LOUT,'(1x,a,f16.8)') 'E1exch(S2)  = ', SAPT%exchs2*1.d03
@@ -5154,15 +5249,20 @@ if(SAPT%SaptLevel==2) then
    write(LOUT,'(1x,a,f16.8)') 'E2exch-ind  = ', SAPT%e2exind*1.0d3
    write(LOUT,'(1x,a,f16.8)') 'E2disp      = ', SAPT%e2disp*1.d03
    write(LOUT,'(1x,a,f16.8)') 'E2exch-disp = ', SAPT%e2exdisp*1.0d3
-   write(LOUT,'(1x,a,f16.8)') 'EInt(SAPT2) = ', SAPT%esapt2*1.0d3
+   write(LOUT,'(1x,a,f16.8)') 'Eint(SAPT2) = ', SAPT%esapt2*1.0d3
+
 elseif(SAPT%SaptLevel==1) then
-   write(LOUT,'(1x,a,f16.8)') 'EInt(SAPT1) = ', SAPT%esapt2*1.0d3
+   write(LOUT,'(1x,a,f16.8)') 'Eint(SAPT1) = ', SAPT%esapt2*1.0d3
+
+elseif(SAPT%SaptLevel==10) then
+   write(LOUT,'(1x,a,f16.8)') 'E2disp(CAS) = ', SAPT%e2dispinCAS*1.d03
+
 elseif(SAPT%SaptLevel==0) then
    write(LOUT,'(1x,a,f16.8)') 'E2ind(unc)  = ', SAPT%e2ind_unc*1.d03
    write(LOUT,'(1x,a,f16.8)') 'E2exch-ind  = ', SAPT%e2exind_unc*1.0d3
    write(LOUT,'(1x,a,f16.8)') 'E2disp(unc) = ', SAPT%e2disp_unc*1.d03
    write(LOUT,'(1x,a,f16.8)') 'E2exch-disp = ', SAPT%e2exdisp_unc*1.0d3
-   write(LOUT,'(1x,a,f16.8)') 'EInt(SAPT0) = ', SAPT%esapt0*1.0d3
+   write(LOUT,'(1x,a,f16.8)') 'Eint(SAPT0) = ', SAPT%esapt0*1.0d3
 endif
 
 end subroutine summary_sapt
@@ -5193,9 +5293,9 @@ if(SAPT%SaptLevel/=1) then
    write(LOUT,*) 'E2exch-ind  = ', SAPT%e2exind*1.0d3
    write(LOUT,*) 'E2disp      = ', SAPT%e2disp*1.d03
    write(LOUT,*) 'E2exch-disp = ', SAPT%e2exdisp*1.0d3
-   write(LOUT,*) 'EInt(SAPT2) = ', SAPT%esapt2*1.0d3
+   write(LOUT,*) 'Eint(SAPT2) = ', SAPT%esapt2*1.0d3
 elseif(SAPT%SaptLevel==1) then
-   write(LOUT,*) 'EInt(SAPT1) = ', SAPT%esapt2*1.0d3
+   write(LOUT,*) 'Eint(SAPT1) = ', SAPT%esapt2*1.0d3
 endif
 
 end subroutine summary_sapt_verbose
@@ -5303,6 +5403,15 @@ if(allocated(SAPT%monB%VCoul)) then
    deallocate(SAPT%monB%VCoul)
 endif
 
+if(SAPT%doRSH) then
+   call delfile('AOERFSORT')
+   call delfile('FFOOERFAA')
+   call delfile('FFOOERFBB')
+   call delfile('FOFOERFAA')
+   call delfile('FOFOERFBB')
+   if(.not.SAPT%SameOm) call delfile('AOERFSORTB')
+endif
+
 ! cubic dispersion
 if(SAPT%monA%Cubic) then
   call delfile('PROP_A0')
@@ -5331,11 +5440,11 @@ call delfile ('ONEEL_B')
 
 call delfile('TMPOOAB')
 
-if(SAPT%SaptLevel==2) then
+if(SAPT%SaptLevel/=1) then
    call delfile('TWOMOAB')
 endif
 
-if(ISERPA==0) then
+if(ISERPA==0.and.SAPT%SaptLevel==2) then
    call delfile('FOFOABBA')
    call delfile('FOFOBBBA')
    call delfile('FOFOAAAB')
@@ -5348,6 +5457,9 @@ if(ISERPA==0) then
 
    if(.not.SAPT%monA%Cubic) call delfile('XY0_A')
    if(.not.SAPT%monB%Cubic) call delfile('XY0_B')
+elseif(ISERPA==0.and.SAPT%SaptLevel==10) then
+   call delfile('XY0_A')
+   call delfile('XY0_B')
 elseif(ISERPA==1) then
    call delfile('FFFFABBB')
    call delfile('FFFFBAAA')
@@ -5362,11 +5474,18 @@ if(SAPT%monB%TwoMoInt==TWOMO_FOFO) then
    call delfile('FOFOBB')
 endif
 
+if((.not.SAPT%monA%Cubic).or.(.not.SAPT%monB%Cubic)) then
+   call delfile('PROP_AB0')
+endif
+
 if(SAPT%SaptLevel==2) then
    if(.not.SAPT%monA%Cubic) call delfile('PROP_A')
    if(.not.SAPT%monB%Cubic) call delfile('PROP_B')
    call delfile('PROP_AB')
 endif
+
+if(SAPT%SemiCoupled) call delfile('PROP_A1')
+if(SAPT%SemiCoupled) call delfile('PROP_B1')
 
 end subroutine free_sapt
 

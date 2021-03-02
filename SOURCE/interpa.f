@@ -1547,11 +1547,7 @@ C
 C 
       Do K=1,NDimX
 C
-      If(Eig(K).Ge.Zero) Then
-      SQRTEig=SQRT(Eig(K))
-      Else
       SQRTEig=SQRT(Abs(Eig(K)))
-      EndIf
 C
       APLSQRT(I,J)=APLSQRT(I,J)+HlpAB(K,I)*SQRTEig*HlpAB(K,J)
 C
@@ -1567,8 +1563,13 @@ C
       Write(6,*)"The number of negative eigenvalues of A+ is",NoNeg
       EndIf
 C
-      Call MultpM(HlpAB,ABMIN,APLSQRT,NDimX)
-      Call MultpM(EigY,APLSQRT,HlpAB,NDimX)
+C      Call MultpM(HlpAB,ABMIN,APLSQRT,NDimX)
+C      Call MultpM(EigY,APLSQRT,HlpAB,NDimX)
+C
+      Call dgemm('N','N',NDimX,NDimX,NDimX,1d0,ABMIN,NDimX,
+     $           APLSQRT,NDimX,0d0,HlpAB,NDimX)
+      Call dgemm('N','N',NDimX,NDimX,NDimX,1d0,APLSQRT,NDimX,
+     $           HlpAB,NDimX,0d0,EigY,NDimX)
 C
       Call Diag8(EigY,NDimX,NDimX,Eig,Work)
 C
@@ -1580,7 +1581,11 @@ C
       HlpAB(J,I)=EigY(NDimX*(J-1)+I)
       EndDo
       EndDo
-      Call MultpM(EigY,APLSQRT,HlpAB,NDimX)
+
+C      Call MultpM(EigY,APLSQRT,HlpAB,NDimX)
+C
+      Call dgemm('N','N',NDimX,NDimX,NDimX,1d0,APLSQRT,NDimX,
+     $           HlpAB,NDimX,0d0,EigY,NDimX)
 C
 C     IMPOSE THE NORMALIZATION 2 Y*X = 1 ON THE EIGENVECTORS CORRESPONDING TO POSITIVE
 C     OMEGA'S 

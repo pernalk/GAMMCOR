@@ -128,6 +128,7 @@ type SystemBlock
       double precision :: SumOcc  = 0d0 
       double precision :: ACAlpha = 1d0
       double precision :: Omega   = 1d0
+      double precision :: PerVirt = 0d0
       double precision :: ECASSCF = 0d0
       integer :: NSym
       integer :: NSymBas(8),NSymOrb(8)
@@ -152,11 +153,12 @@ type SystemBlock
       logical :: DeclareTrSt = .false.
       logical :: ISHF    = .false.
       logical :: Cubic   = .false.
+      logical :: Wexcit  = .false.
       logical :: doRSH   = .false., SameOm = .true.
       logical :: PostCAS = .false.
       logical :: NActFromRDM = .true.
       logical :: reduceV = .false.
-      ! for extrapolated SAPT 
+      ! for cubic SAPT
       double precision :: ACAlpha0  = 1.d-10
       double precision :: ACAlpha1  = 0.01d0
       double precision :: ACAlpha2  = 0.45d0
@@ -290,7 +292,7 @@ type SaptData
      logical :: Cubic  = .false.
      ! MH : add keyword!
      logical :: SemiCoupled = .true.
-     logical :: DispExc = .true.
+     logical :: Wexcit  = .false.
      logical :: noE2exi = .true.
      logical :: EnChck  = .true., HFCheck=.true.
      logical :: doRSH   = .false., SameOm = .true.

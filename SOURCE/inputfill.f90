@@ -475,6 +475,9 @@ character(:), allocatable :: first, last
  case ("OMEGA")
        read(val, *) SystemParams%Omega
 
+ case ("PERVIRT")
+       read(val, *) SystemParams%PerVirt
+
  case ("EIGFCI")
        read(val, *) SystemParams%EigFCI
 
@@ -521,6 +524,9 @@ character(:), allocatable :: first, last
 
  case ("CUBIC")
        read(val,*) SystemParams%Cubic
+
+ case ("WEXCIT")
+       read(val,*) SystemParams%Wexcit
 
  end select
 end subroutine read_block_system
