@@ -63,7 +63,7 @@ C
       UMOAO(J,I)=UAux(I,J)
       EndDo
       EndDo
-C      
+C
       Call SortOrbDal(UMOAO,Occ,NInAc,NAc,NSym,NSymOrb,NBasis)
       Do I=1,NInAc+NAc
       Occ(I)=Occ(I)/2.D0

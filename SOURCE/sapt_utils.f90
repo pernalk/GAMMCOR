@@ -516,6 +516,40 @@ end associate
 
 end subroutine unpack_Eig
 
+subroutine fill_Fmat(Fmat,Occ,NBas,variant)
+implicit none
+
+integer,intent(in)           :: NBas,variant
+double precision,intent(in)  :: Occ(NBas)
+double precision,intent(out) :: Fmat(NBas,NBas)
+
+integer :: i,j
+
+Fmat = 0
+select case(variant)
+case(0)
+   ! HF
+   do j=1,NBas
+      do i=1,NBas
+         Fmat(i,j) = Occ(i)*Occ(j)
+      enddo
+   enddo
+case(1)
+   ! BB functional
+   do j=1,NBas
+      do i=1,NBas
+         Fmat(i,j) = sqrt(Occ(i)*Occ(j))
+      enddo
+   enddo
+case(3)
+   ! Power functional
+   write(LOUT,*) 'POWER FUNCITONAL NOT READY YET!'
+   stop
+
+end select
+
+end subroutine fill_Fmat
+
 subroutine calc_resp(EVec,EVal,Alpha,Freq,Mon)
 implicit none
 

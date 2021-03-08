@@ -3,54 +3,6 @@ import os,sys,string,math,numpy
 from numpy.testing import assert_allclose
 from numpy.testing import assert_approx_equal
 
-### functions reading components of SAPT
-def elst(file):
-        f=open(file,'r')
-        s=f.read()
-        f.close()
-        a=s.find(" E1elst      =")
-        S=s[a+18:a+31]
-        return float(S)
-#
-def exch(file):
-        f=open(file,'r')
-        s=f.read()
-        f.close()
-        a=s.find(" E1exch(S2)  =")
-        S=s[a+18:a+31]
-        return float(S)
-#
-def ind(file):
-        f=open(file,'r')
-        s=f.read()
-        f.close()
-        a=s.find(" E2ind       =")
-        S=s[a+18:a+31]
-        return float(S)
-#
-def indBA(file):
-        f=open(file,'r')
-        s=f.read()
-        f.close()
-        a=s.find(" Ind(B<--A)     =")
-        S=s[a+19:a+35]
-        return float(S)
-#
-def indAB(file):
-        f=open(file,'r')
-        s=f.read()
-        f.close()
-        a=s.find(" Ind(A<--B)     =")
-        S=s[a+19:a+35]
-        return float(S)
-#
-def exch_ind(file):
-        f=open(file,'r')
-        s=f.read()
-        f.close()
-        a=s.find(" E2exch-ind  =")
-        S=s[a+18:a+31]
-        return float(S)
 #
 def disp(file):
         f=open(file,'r')
@@ -59,15 +11,6 @@ def disp(file):
         a=s.find(" E2disp      =")
         S=s[a+18:a+31]
         return float(S)
-#
-def exch_disp(file):
-        f=open(file,'r')
-        s=f.read()
-        f.close()
-        a=s.find(" E2exch-disp =")
-        S=s[a+18:a+31]
-        return float(S)
-#
 #
 def ac0_en(file):
 	f=open(file,'r')
@@ -174,65 +117,16 @@ def run_test(dirl,fun):
 	print 'test:',test_val
 	try:
 		assert_allclose(test_val,ref_val,rtol=0,atol=tolene)
-		print 'passed with tol=',tolene,'[Ha] \n'
+		print 'passed with tol=',tolene,'\n'
 	except:
-		print ' failed with errors:'
+		print test_name,' failed with errors:'
 		print numpy.subtract(test_val,ref_val)	
 	return 
-#
-def run_test_sapt(dirl):
-#
-	tolsapt=1.e-5
-	ref_val=[]
-        test_val=[]
-	cwd=os.getcwd()
-        for dir in dirl:
-		wrkdir=cwd+"/"+dir
-		os.chdir(wrkdir)
-		os.system(cwd+"/gammcor > "+cwd+"/test.out")
-		os.chdir(cwd)
-# elst
-                ref_val.append(elst(dir+"/gammcor.out"))
-                test_val.append(elst("test.out"))
-# exch
-                ref_val.append(exch(dir+"/gammcor.out"))
-                test_val.append(exch("test.out"))
-# ind
-                ref_val.append(ind(dir+"/gammcor.out"))
-                test_val.append(ind("test.out"))
-# indBA
-                ref_val.append(indBA(dir+"/gammcor.out"))
-                test_val.append(indBA("test.out"))
-# indAB
-                ref_val.append(indAB(dir+"/gammcor.out"))
-                test_val.append(indAB("test.out"))
-# exch_ind
-                ref_val.append(exch_ind(dir+"/gammcor.out"))
-                test_val.append(exch_ind("test.out"))
-# disp
-		ref_val.append(disp(dir+"/gammcor.out"))
-		test_val.append(disp("test.out"))	
-# exch_disp
-		ref_val.append(exch_disp(dir+"/gammcor.out"))
-                test_val.append(exch_disp("test.out"))   
-#       
-	print 'ref :',ref_val
-        print 'test:',test_val
-#
-        try:
-                assert_allclose(test_val,ref_val,rtol=0,atol=tolsapt)
-                print 'passed with tol=',tolsapt,'[mHa] \n'
-        except:
-                print ' failed with errors:'
-                print numpy.subtract(test_val,ref_val)
-        return
-#
+
 ###### BEGIN TESTS ######
+tolene=1.e-7
 ## SAPT(CAS) ##
 dir_sapt=["TESTS/SAPT/TEST1"]
-#
-#
-tolene=1.e-7
 ## AC0 ##
 dir_ac0=["TESTS/AC0/TEST1","TESTS/AC0/TEST1/INCORE_INTEG" \
         ]
@@ -261,8 +155,9 @@ dir_ac0_hf_dalton=["TESTS/AC0_HF_DALTON"]
 #
 # run tests
 #
-print "* testing SAPT energy components"
-run_test_sapt(dir_sapt)
+print "* testing SAPT dispersion energy"
+run_test(dir_sapt,disp)
+sys.exit()
 #
 print "* testing EERPA-GVB energy"
 run_test(dir_eerpagvb,eerpagvb_en)

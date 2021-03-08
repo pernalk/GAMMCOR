@@ -12,7 +12,7 @@ type(InputData) :: Input
 character(:), allocatable :: InputPath
 
  InputPath = "./input.inp"
- call sapt_scan_inputfile(InputPath, Input%CalcParams) 
+ call sapt_scan_inputfile(InputPath, Input%CalcParams)
  call init_Input(InputPath, Input)
  call read_inputfile(InputPath, Input)
 
@@ -46,37 +46,37 @@ integer :: imon
  select case(Input%CalcParams%JobType)
  ! SAPT case
  case(5)
-  
+
     current_block = block_none
     isys = 0
     lines: do
-   
+
              call io_text_readline(line, u, EndOfFile)
-   
+
              if (EndOfFile) then
                  exit lines
              end if
              if (isblank(line) .or. iscomment(line)) then
                  cycle lines
              end if
-             
+
              select case (uppercase(line))
              case("SYSTEM")
                 current_block = block_system
                 cycle lines
              end select
-   
+
              if(current_block==block_system) then
                 call read_sapt_mon(Input,line,isys)
              endif
-   
+
     enddo lines
 
     ! check two monomers
     if(isys==1) then
        write(LOUT,'(1x,a)') 'ERROR! DEFINE TWO MONOMERS FOR SAPT!'
        stop
-    endif   
+    endif
 
     ! check different monomers
     associate( monA => Input%SystemInput(1)%Monomer, &
@@ -94,9 +94,9 @@ integer :: imon
     current_block = block_none
     isys = 0
     lines2: do
-   
+
              call io_text_readline(line, u, EndOfFile)
-   
+
              if (EndOfFile) then
                  exit lines2
              end if
@@ -110,7 +110,7 @@ integer :: imon
                 isys = isys + 1
                 cycle lines2
              end select
-   
+
     enddo lines2
 
     if(isys>1) then
@@ -118,7 +118,7 @@ integer :: imon
        write(LOUT,'(1x,a)') "ERROR! TOO MANY SYSTEM BLOCKS ???!"
        stop
     endif
- 
+
  end select
 
  close(u)
@@ -127,18 +127,19 @@ end subroutine init_Input
 
 subroutine read_inputfile(filename, Input)
 implicit none
-character(len=*), intent(in) :: filename
-type(InputData), intent(inout) :: Input 
+character(len=*), intent(in)   :: filename
+type(InputData), intent(inout) :: Input
+
 logical :: EndOfFile
 integer :: u
-character(:), allocatable :: line
 integer :: isys, iflag
 integer :: current_block
-integer, parameter :: block_none = 0
-integer, parameter :: block_calculation = 1
-integer, parameter :: block_system = 2
-integer, parameter :: block_flags = 3
- 
+integer, parameter        :: block_none        = 0
+integer, parameter        :: block_calculation = 1
+integer, parameter        :: block_system      = 2
+integer, parameter        :: block_flags       = 3
+character(:), allocatable :: line
+
  open(newunit=u, file=filename, status="old", &
        access="sequential", position="rewind")
  !
@@ -148,7 +149,7 @@ integer, parameter :: block_flags = 3
  current_block = block_none
  lines: do
        call io_text_readline(line, u, EndOfFile)
-       
+
        if (EndOfFile) then
              exit lines
        end if
@@ -166,7 +167,7 @@ integer, parameter :: block_flags = 3
              isys = isys + 1
              current_block = block_system
              cycle lines
-             
+
        case ("CALCULATION")
              current_block = block_calculation
              cycle lines
@@ -175,7 +176,7 @@ integer, parameter :: block_flags = 3
              Input%iflag = Input%iflag + 1
              current_block = block_flags
              cycle lines
- 
+
        case ("END")
              current_block = block_none
              cycle lines
@@ -192,20 +193,21 @@ integer, parameter :: block_flags = 3
  end do lines
 
 end subroutine read_inputfile
-                  
+
 subroutine sapt_scan_inputfile(filename, CalcParams)
 ! SEARCH INPUT FOR SAPT KEYWORD
 implicit none
-character(len=*), intent(in) :: filename
-type(CalculationBlock), intent(out) :: CalcParams 
-logical :: EndOfFile
+character(len=*), intent(in)        :: filename
+type(CalculationBlock), intent(out) :: CalcParams
+
 integer :: u
-character(:), allocatable :: line
 integer :: isys
 integer :: current_block
-integer, parameter :: block_none = 0
+integer, parameter :: block_none        = 0
 integer, parameter :: block_calculation = 1
 integer, parameter :: block_system      = 2
+logical            :: EndOfFile
+character(:), allocatable :: line
 
 open(newunit=u, file=filename, status="old", &
       access="sequential", position="rewind")
@@ -216,7 +218,7 @@ open(newunit=u, file=filename, status="old", &
  lines: do
 
           call io_text_readline(line, u, EndOfFile)
- 
+
           if (EndOfFile) then
               exit lines
           end if
@@ -227,11 +229,11 @@ open(newunit=u, file=filename, status="old", &
               cycle lines
           end if
           !
-          ! Check for SAPT keyword in input 
+          ! Check for SAPT keyword in input
           !
           select case (uppercase(line))
           case ("CALCULATION")
-             current_block = block_calculation 
+             current_block = block_calculation
              cycle lines
 
           end select
@@ -239,7 +241,7 @@ open(newunit=u, file=filename, status="old", &
           if(current_block==block_calculation) then
              call read_sapt_val(CalcParams, line)
           endif
- 
+
  enddo lines
 close(u)
 
@@ -248,9 +250,9 @@ end subroutine sapt_scan_inputfile
 subroutine read_block_calculation(CalcParams, line)
       type(CalculationBlock), intent(inout) :: CalcParams
       character(*), intent(in) :: line
-      
+
       character(:), allocatable :: key, val
-      
+
       call split(line, key, val)
       select case (uppercase(key))
 
@@ -278,10 +280,10 @@ subroutine read_block_calculation(CalcParams, line)
                CalcParams%JobType = JOB_TYPE_ERPA
            elseif (uppercase(val) == "AC1" ) then
                CalcParams%JobType = JOB_TYPE_ERPA
-           elseif (uppercase(val) == "EERPA".or. & 
+           elseif (uppercase(val) == "EERPA".or. &
                    uppercase(val) == "ERPA-2") then
                CalcParams%JobType = JOB_TYPE_EERPA
-           elseif (uppercase(val) == "EERPA-OLD".or. & 
+           elseif (uppercase(val) == "EERPA-OLD".or. &
                    uppercase(val) == "ERPA-1") then
                CalcParams%JobType = JOB_TYPE_EERPA_OLD
            elseif (uppercase(val) == "SAPT" ) then
@@ -300,17 +302,17 @@ subroutine read_block_calculation(CalcParams, line)
                CalcParams%JobType = JOB_TYPE_NLOCCORR
            endif
 
-     !case ("FRAGMENTS") 
+     !case ("FRAGMENTS")
      !     if (uppercase(val) == ".TRUE.".or. &
      !         uppercase(val) == "TRUE".or.   &
      !         uppercase(val) == "T") then
      !         CalcParams%Fragments = 1
      !     endif
 
-      case ("CORE") 
+      case ("CORE")
          read(val, *) CalcParams%Core
 
-      case ("NBASIS") 
+      case ("NBASIS")
          read(val, *) CalcParams%NBasis
 
       case ("RDMTYPE")
@@ -319,10 +321,10 @@ subroutine read_block_calculation(CalcParams, line)
            elseif (uppercase(val) == "APSG" ) then
               CalcParams%RDMType = RDM_TYPE_APSG
            elseif (uppercase(val) == "CASSCF".or.&
-                 & uppercase(val) == "CAS") then 
+                 & uppercase(val) == "CAS") then
               CalcParams%RDMType = RDM_TYPE_CAS
            elseif (uppercase(val) == "HF".or.    &
-                 & uppercase(val) == "HFOCK".or. & 
+                 & uppercase(val) == "HFOCK".or. &
                  & uppercase(val) == "HARTREE-FOCK") then
               CalcParams%RDMType = RDM_TYPE_HF
            elseif (uppercase(val) == "DMRG" ) then
@@ -336,12 +338,12 @@ subroutine read_block_calculation(CalcParams, line)
             CalcParams%TwoMoInt = TWOMO_FFFF
 
          elseif(uppercase(val) == 'FOFO') then
-          
+
             CalcParams%TwoMoInt = TWOMO_FOFO
 
          elseif(uppercase(val) == 'INCORE'.or. &
                 uppercase(val) == 'IN-CORE') then
- 
+
             CalcParams%TwoMoInt = TWOMO_INCORE
          endif
 
@@ -372,7 +374,7 @@ subroutine read_block_calculation(CalcParams, line)
            elseif (uppercase(val) == "SRPBE".or.&
                    uppercase(val) == "SR-PBE") then
                CalcParams%DFApp = DF_SRPBE
-           elseif (uppercase(val) == "PBE") then 
+           elseif (uppercase(val) == "PBE") then
                CalcParams%DFApp = DF_PBE
            endif
 
@@ -388,9 +390,9 @@ subroutine read_block_calculation(CalcParams, line)
 
       case ("SYMMETRY")
            if (uppercase(val) == "NOSYM") then
-              CalcParams%SymType = TYPE_NO_SYM 
+              CalcParams%SymType = TYPE_NO_SYM
            elseif (uppercase(val) == "SYM" ) then
-              CalcParams%SymType = TYPE_SYM 
+              CalcParams%SymType = TYPE_SYM
            endif
 
       case ("POSTCAS")
@@ -412,7 +414,7 @@ subroutine read_block_calculation(CalcParams, line)
               CalcParams%SaptLevel = 10
            endif
 
-      case("RESTART") 
+      case("RESTART")
            if (uppercase(val) == "TRUE".or.  &
                uppercase(val) == ".TRUE.".or.&
                uppercase(val) == "T") then
@@ -427,9 +429,9 @@ subroutine read_block_calculation(CalcParams, line)
 
       case ("INTEGRALSFILEPATH")
             CalcParams%IntegralsFilePath = val
-     
+
       case ("IPRINT")
-            read(val,*) CalcParams%IPrint 
+            read(val,*) CalcParams%IPrint
 
       end select
 end subroutine read_block_calculation
@@ -437,10 +439,10 @@ end subroutine read_block_calculation
 subroutine read_block_system(SystemParams, line)
 implicit none
 type(SystemBlock), intent(inout) :: SystemParams
-character(*), intent(in) :: line
+
+character(*), intent(in)  :: line
 character(:), allocatable :: key, val
 character(:), allocatable :: first, last
-integer :: test,test2
 
  call split(line, key, val)
  select case (uppercase(key))
@@ -472,6 +474,9 @@ integer :: test,test2
 
  case ("OMEGA")
        read(val, *) SystemParams%Omega
+
+ case ("PERVIRT")
+       read(val, *) SystemParams%PerVirt
 
  case ("EIGFCI")
        read(val, *) SystemParams%EigFCI
@@ -505,36 +510,40 @@ integer :: test,test2
          SystemParams%TwoMoInt = TWOMO_FFFF
 
       elseif(uppercase(val) == 'FOFO') then
-          
+
          SystemParams%TwoMoInt = TWOMO_FOFO
 
       elseif(uppercase(val) == 'INCORE'.or. &
              uppercase(val) == 'IN-CORE') then
- 
+
          SystemParams%TwoMoInt = TWOMO_INCORE
       endif
 
  case ("ISHF")
        read(val,*) SystemParams%ISHF
 
- case ("E2DAX3")
-       read(val,*) SystemParams%E2dExt
+ case ("CUBIC")
+       read(val,*) SystemParams%Cubic
+
+ case ("WEXCIT")
+       read(val,*) SystemParams%Wexcit
 
  end select
 end subroutine read_block_system
 
 subroutine read_block_flags(Flags, line)
-      type(FlagsData), intent(inout) :: Flags 
-      character(*), intent(in) :: line
-      
-      character(:), allocatable :: key, val
-      
+
+type(FlagsData), intent(inout) :: Flags
+character(*), intent(in)       :: line
+
+character(:), allocatable :: key, val
+
       call split(line, key, val)
       select case (uppercase(key))
 
       case ("IDALTON")
          read(val, *) Flags%IDALTON
- 
+
       case ("IRES")
          read(val, *) Flags%IRes
 
@@ -545,34 +554,34 @@ subroutine read_block_flags(Flags, line)
          read(val, *) Flags%INO
 
       case ("NOSYM")
-         read(val, *) Flags%NoSym 
-   
+         read(val, *) Flags%NoSym
+
       case ("IGVB")
-         read(val, *) Flags%IGVB 
+         read(val, *) Flags%IGVB
 
       case ("IFUN")
-         read(val, *) Flags%IFun 
+         read(val, *) Flags%IFun
 
       case ("IFUNSR")
          read(val, *) Flags%IFunSR
 
       case ("IFUNSRKER")
          read(val, *) Flags%IFunSRKer
-     
+
       case ("IMODG")
-         read(val, *) Flags%IModG 
- 
+         read(val, *) Flags%IModG
+
       case ("NGOCC")
-         read(val, *) Flags%NGOcc 
+         read(val, *) Flags%NGOcc
 
       case ("ILOC")
-         read(val, *) Flags%ILoc 
+         read(val, *) Flags%ILoc
 
       case ("IFREEZE")
          read(val, *) Flags%IFreeze
 
       case ("IAPSG")
-         read(val, *) Flags%IAPSG 
+         read(val, *) Flags%IAPSG
 
       case ("ISERPA")
          read(val, *) Flags%ISERPA
@@ -608,10 +617,10 @@ end subroutine read_block_flags
 subroutine read_sapt_val(CalcParams, line)
 implicit none
 
- type(CalculationBlock), intent(inout) :: CalcParams
- character(*), intent(in) :: line
- character(:), allocatable :: key, val
- 
+type(CalculationBlock), intent(inout) :: CalcParams
+character(*), intent(in)  :: line
+character(:), allocatable :: key, val
+
  call split(line, key, val)
  select case (uppercase(key))
   case ("JOBTYPE")
@@ -625,10 +634,11 @@ end subroutine read_sapt_val
 
 subroutine read_sapt_mon(Input, line, isys)
 implicit none
+
 type(InputData), intent(inout) :: Input
-character(*), intent(in) :: line
-integer :: isys
-character(:), allocatable :: key, val
+character(*), intent(in)       :: line
+integer                        :: isys
+character(:), allocatable      :: key, val
 
  call split(line, key, val)
  select case (uppercase(key))
@@ -672,18 +682,18 @@ integer :: imon
  if(Input%CalcParams%InterfaceType.ne.INTER_TYPE_DAL) then
     if(Input%CalcParams%NBasis==0) then
        !write(LOUT,'(1x,a)') 'FATAL ERROR: NBasis ENTRY MISSING'
-       write(LOUT,'(1x,a)') 'NBasis WILL BE READ FROM MOLPRO' 
+       write(LOUT,'(1x,a)') 'NBasis WILL BE READ FROM MOLPRO'
        !stop
     endif
  elseif(Input%CalcParams%NBasis.lt.0) then
      write(LOUT,'(1x,a)') 'FATAL ERROR: INCORRECT ENTRY&
                  & NBasis IN THE INPUT FILE'
      write(LOUT, '(1x,a,3x,i3)') 'NBasis', Input%CalcParams%NBasis
-     stop 
+     stop
  endif
 
  do imon=1,Input%CalcParams%imon
-    associate(System => Input%SystemInput(imon)) 
+    associate(System => Input%SystemInput(imon))
 
       if(System%ZNucl==0) then
          write(LOUT,'(1x,a)') 'FATAL ERROR: Znucl ENTRY MISSING&
@@ -697,7 +707,7 @@ integer :: imon
       elseif(System%NCen==0.and.Input%CalcParams%imon.gt.1) then
          write(LOUT,'(1x,a)') 'FATAL ERROR: NAtoms ENTRY MISSING!&
                     & HAS TO BE GIVEN FOR SAPT!'
-         write(LOUT, '(1x,a,3x,i3)') 'NCen', System%NCen 
+         write(LOUT, '(1x,a,3x,i3)') 'NCen', System%NCen
          stop
       endif
     
@@ -705,7 +715,7 @@ integer :: imon
         System%UCen = System%NCen
       elseif(System%UCen.lt.0) then
          write(LOUT,'(1x,a)') 'FATAL ERROR: UAtoms .LT. 0!'
-         stop   
+         stop
       endif
 
       if(.not.System%DeclareSt) then
@@ -716,7 +726,6 @@ integer :: imon
     end associate
  enddo
 
-
-end subroutine check_Input 
+end subroutine check_Input
 
 end module inputfill

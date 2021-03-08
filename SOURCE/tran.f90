@@ -1098,10 +1098,18 @@ integer :: t,p,q,pq,qp
     do p=1,q
        t = t + 1
        pq = p + (q-1)*NBas
-       qp = q + (p-1)*NBas
        matSq(pq) = matTr(t)
+    enddo
+ enddo
+
+ t = 0
+ do q=1,NBas
+    do p=1,q-1
+       t = t + 1
+       qp = q + (p-1)*NBas
        matSq(qp) = matTr(t)
     enddo
+    t = t + 1
  enddo
 
 end subroutine triang_to_sq

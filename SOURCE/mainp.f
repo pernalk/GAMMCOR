@@ -6,7 +6,7 @@ C                 FROM ATMOL AND THEY ARE USED AS A GUESS WITH U=1
 C                 GAUSSIAN BASIS SET USED
 C
 C
-C     K.PERNAL 2018 
+C     K.PERNAL 2018
 C
       Program PRDMFT
 C
@@ -44,11 +44,11 @@ C
       type(SaptData) :: Sapt
 C
       Include 'commons.inc'
-C     
+C
 C     COMMON BLOCK USED IN OPTCPMFT
-C     
+C
       Common/CPMFT/ MFrac,MOcc,NFrac
-C     
+C
 C     *************************************************************************
 C
       Call read_Input(Input)
@@ -57,15 +57,15 @@ C
       Call create_System(Input,Flags,System,Sapt)
 C
       Call free_Input(Input)
-C    
+C
 C     FILL COMMONS AND CONSTANTS
-      XELE = System%XELE
-      NELE = System%NELE
+      XELE   = System%XELE
+      NELE   = System%NELE
       Charge = System%Charge
       NBasis = System%NBasis
-      Title = Flags%JobTitle
+      Title  = Flags%JobTitle
       ITwoEl = Flags%ITwoEl
-      IWarn = 0 
+      IWarn  = 0
 C
 C     *************************************************************************
 C
@@ -102,11 +102,11 @@ C             = 0 - do not run AC0D
 C
 C     ISymmAC0D = 1 : AC0D corrections will be computed based on symmetry (dafault)
 C                 0 : AC0D corrections will be computed based on overlap with SA-CAS
-C                     states (run molpro with symmetry,nosym) 
+C                     states (run molpro with symmetry,nosym)
 C
       ISymmAC0D=Flags%ISymmAC0D
 C
-C     IFlCore = 1 - core (inactive) orbitals included in ERPA correlation 
+C     IFlCore = 1 - core (inactive) orbitals included in ERPA correlation
 C             = 0 - core (inactive) orbitals excluded from ERPA correlation
       IFlCore=Flags%IFlCore
 C
@@ -119,7 +119,7 @@ C           = 0 - IMPOSE SYMMETRY (RUN molpro WITHOUT 'nosym')
 C
       NoSym=Flags%NoSym
 C
-C     ************************************************************************* 
+C     *************************************************************************
 C
 C     SELECT A LONG-RANGE DMFT FUNCTIONAL
 C
@@ -132,7 +132,7 @@ C
 C     IFun   = 2 - USE THE BUIJSE-BAERENDS FUNCTIONAL:
 C                  Eee = np nq <pq|pq> - sqrt(np nq) <pq|qp>
 C
-C     IFun   =20 - BB WITH A "+" SIGN FOR THE BONDING-ANTIBONDING PAIR 
+C     IFun   =20 - BB WITH A "+" SIGN FOR THE BONDING-ANTIBONDING PAIR
 C
 C     IFun   = 3 - USE THE GOEDECKER-UMRIGAR FUNCTIONAL:
 C                  Eee = np nq <pq|pq> - sqrt(np nq) <pq|qp>
@@ -151,8 +151,8 @@ C     IFun   = 8 - BB AND HF HYBRID FUNCTIONAL
 C                  (1-Cmix)*Eee_BB + Cmix*Eee_HF
 C     IFun   = 10 - LR-BB+SR-HF+SR-PBE_CORR
 C                  Eee_LRBB + Eee_SRPBE
-C     IFun   = 11 - CPMFT method of Scuseria et al. 
-C                   (define the active space: NActive, MActive 
+C     IFun   = 11 - CPMFT method of Scuseria et al.
+C                   (define the active space: NActive, MActive
 C                    - the number of active elecrons and orbitals)
 C
 C     IFun   = 12 - Hartree-Fock
@@ -166,11 +166,11 @@ C
       IFun=Flags%IFun
 C
 C     *************************************************************************
-C      
-C     SELECT A SHORT-RANGE DFT FUNCTIONAL 
+C
+C     SELECT A SHORT-RANGE DFT FUNCTIONAL
 C
 C     IFunSR = 0 - do not include a short-range functional
-C     IFunSR = 1 - SR-LSDA, Paziani et al. 
+C     IFunSR = 1 - SR-LSDA, Paziani et al.
 C     IFunSR = 2 - SR-PBE, Goll et al. PCCP 7, (2005) 3917
 C     IFunSR = 3 - Gagliardi-Truhlar with PBE
 C     IFunSR = 4 - LR-CAS+SR-PBE+LR-AC/AC0 (with full range CAS RDM's)
@@ -189,18 +189,18 @@ C
       Write(*,'(/,1x,"IFunSRKer=",I1,/)')IFunSRKer
 C
 C     *************************************************************************
-C         
-C     NBasis READ FROM SIRIUS.RST
-      If(IDALTON.Eq.1) Call basinfo(NBasis,'SIRIUS.RST','DALTON')
 C
-C     CHECK IF SAPT RUN      
+C     CHECK IF SAPT RUN
       ISAPT=Flags%ISAPT
 C
       If(ISAPT.Eq.1) Call sapt_driver(Flags,Sapt)
 C
+C     NBasis READ FROM SIRIUS.RST
+      If(IDALTON.Eq.1) Call basinfo(NBasis,'SIRIUS.RST','DALTON')
+CC
 C     *************************************************************************
-C         
-C     SELECT ELECTRONIC STATE  
+C
+C     SELECT ELECTRONIC STATE
 C
       NStates = System%NStates
       InSt(1:2,1:NStates) = System%InSt
@@ -226,12 +226,12 @@ C     SET THRESHOLD FOR ACTIVE ORBITALS IN CAS
       ThrSelAct = System%ThrSelAct
 C     SET THRESHOLD FOR ACTIVE ORBITALS IN GVB
       ThrAct = System%ThrAct
-C     SET THRESHOLD FOR QUASI-VIRTUAL ORBITALS IN CAS 
+C     SET THRESHOLD FOR QUASI-VIRTUAL ORBITALS IN CAS
       write(lout,*) System%ThrQVirt
       ThrQVirt = System%ThrQVirt
 C
 C*************************************************************************
-C     READ THE INPUT AND PRINT THE INPUT DATA 
+C     READ THE INPUT AND PRINT THE INPUT DATA
 C
 C     OLD INPUT-READ
 C      Call RWInput(Title,ZNucl,Charge,NBasis)
@@ -310,9 +310,9 @@ C
       Else
 C
       Call ReadDAL(XKin,XNuc,ENuc,Occ,URe,TwoEl,UMOAO,
-     $ NInte1,NBasis,NInte2,NGem,Flags)     
+     $ NInte1,NBasis,NInte2,NGem,Flags)
 C
-      EndIf  
+      EndIf
 C
       If(IFunSR.Eq.5) Then
       Call CASPIDFT(ENuc,URe,UMOAO,Occ,XKin,TwoEl,

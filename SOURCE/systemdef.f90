@@ -14,10 +14,10 @@ implicit none
 type(CalculationBlock) :: CalcParams
 integer :: i
 
-write(LOUT,'()') 
+write(LOUT,'()')
 !write(LOUT,'(1x,a)') 'RUN INPUT CHECK'
 !write(LOUT,'(8a10)') ('**********',i=1,8)
-!write(LOUT,'()') 
+!write(LOUT,'()')
 
 !check RDMType
 if(CalcParams%RDMType==RDM_TYPE_DMRG) then
@@ -38,7 +38,7 @@ endif
 select case(CalcParams%JobType)
 !SAPT
 case(5)
-   
+
    if(CalcParams%InterfaceType.eq.INTER_TYPE_OWN) then
       write(6,'(1x,a)') "ERROR! SAPT REQUIRES:"
       write(6,'(1x,a)') "Interface    DALTON/MOLPRO"
@@ -57,13 +57,13 @@ select case(CalcParams%InterfaceType)
 ! Dalton
 case(1)
    if(CalcParams%RDMSource==INTER_TYPE_OWN) then
-     ! write(LOUT,'(1x,a)') 'ERROR! Dalton INTERFACE REQUIRES:' 
+     ! write(LOUT,'(1x,a)') 'ERROR! Dalton INTERFACE REQUIRES:'
      ! write(LOUT,'(1x,a)') 'RDMSource     DALTON'
      ! stop
-      write(LOUT,'(1x,a)') 'WARNING! Dalton INTERFACE USED WITH:' 
+      write(LOUT,'(1x,a)') 'WARNING! Dalton INTERFACE USED WITH:'
       write(LOUT,'(1x,a)') 'RDMSource     OWN'
-   elseif(CalcParams%SymType==TYPE_SYM) then 
-      write(LOUT,'(1x,a)') 'ERROR! Dalton INTERFACE REQUIRES:' 
+   elseif(CalcParams%SymType==TYPE_SYM) then
+      write(LOUT,'(1x,a)') 'ERROR! Dalton INTERFACE REQUIRES:'
       write(LOUT,'(1x,a)') 'Symmetry      NOSYM'
       stop
    endif
@@ -71,13 +71,13 @@ case(1)
 case(2)
    if(CalcParams%RDMSource.ne.INTER_TYPE_MOL) then
       print*, 'RDMSource',CalcParams%RDMSource,INTER_TYPE_MOL
-      write(LOUT,'(1x,a)') 'ERROR! Molpro INTERFACE REQUIRES:' 
-      write(LOUT,'(1x,a)') 'RDMSource     MOLPRO' 
+      write(LOUT,'(1x,a)') 'ERROR! Molpro INTERFACE REQUIRES:'
+      write(LOUT,'(1x,a)') 'RDMSource     MOLPRO'
       stop
     elseif(CalcParams%RDMType==RDM_TYPE_GVB.or.&
            CalcParams%RDMType==RDM_TYPE_DMRG) then
       write(LOUT,'(1x,a)') 'ERROR! INTERFACE Molpro REQUIRES :'
-      write(LOUT,'(1x,a)') 'RDMType     CAS' 
+      write(LOUT,'(1x,a)') 'RDMType     CAS'
       stop
    endif
 end select
@@ -85,12 +85,12 @@ end select
 !! check Fragments (EERPA)
 !if(CalcParams%Fragments==1) then
 !  write(6,'(1x,a)') 'EERPA CALCULATIONS REQUESTED'
-!  write(LOUT,'()') 
+!  write(LOUT,'()')
 !  if(CalcParams%RDMType==RDM_TYPE_CAS.or.&
 !     CalcParams%RDMType==RDM_TYPE_DMRG) then
 !     write(6,'(1x,a)') 'ERROR! EERPA REQUIRES:'
 !     write(6,'(1x,a)') 'RDMType     GVB or APSG'
-!     stop 
+!     stop
 !  endif
 !endif
 
@@ -108,7 +108,7 @@ type(FlagsData) :: Flags
 integer :: i
 
 ! if block FLAGS present: CALCULATION block ignored
-! default AC-GVB flags are overwritten by the user - good luck!  
+! default AC-GVB flags are overwritten by the user - good luck!
 if(Input%iflag==1) then
 
    Flags = Input%Flags
@@ -127,29 +127,29 @@ else
   ! set TwoEl type
    Flags%ITwoEl = Input%CalcParams%TwoMoInt
 
-  ! reduce virtuals 
+  ! reduce virtuals
    Flags%IRedVirt = Input%CalcParams%RedVirt
 
-  ! Interface 
+  ! Interface
   select case(Input%CalcParams%InterfaceType)
   case(INTER_TYPE_DAL)
      Flags%IDALTON = 1
      Flags%IAO     = 0
      Flags%INO     = 0
      Flags%NoSym   = 1
-     Flags%IA = 1 
-     
+     Flags%IA = 1
+
   case(INTER_TYPE_MOL)
      Flags%IDALTON = 0
      Flags%IAO     = 1
      Flags%INO     = 1
-     !Flags%NoSym   = Input%CalcParams%SymType 
-     Flags%IA = 1 
+     !Flags%NoSym   = Input%CalcParams%SymType
+     Flags%IA = 1
 
   case(INTER_TYPE_OWN)
      Flags%IDALTON = 0
-     Flags%IA = 1 
- 
+     Flags%IA = 1
+
   case(INTER_TYPE_ORCA)
      Flags%IDALTON = 1
      Flags%ICASSCF = 1
@@ -158,13 +158,13 @@ else
      Flags%IAO     = 0
      Flags%INO     = 0
      Flags%NoSym   = 1
-     Flags%IA = 1 
+     Flags%IA = 1
   ! ????
   end select
 
-  if(Input%CalcParams%Restart) Flags%IRes = 1 
-  
-! RDMType  
+  if(Input%CalcParams%Restart) Flags%IRes = 1
+
+! RDMType
   select case(Input%CalcParams%RDMType)
   case(RDM_TYPE_GVB)
      Flags%IGVB = 1
@@ -207,7 +207,7 @@ else
         else
            Flags%IFunSR = 2
         endif
-        Flags%IFunSRKer = Input%CalcParams%Kernel 
+        Flags%IFunSRKer = Input%CalcParams%Kernel
      endif
 !     if(Input%CalcParams%DFApp==2) Flags%IFunSRKer = 1
 
@@ -223,7 +223,7 @@ else
         else
            Flags%IFunSR = 2
         endif
-        Flags%IFunSRKer = Input%CalcParams%Kernel 
+        Flags%IFunSRKer = Input%CalcParams%Kernel
      endif
 !     if(Input%CalcParams%DFApp==2) Flags%IFunSRKer = 1
 
@@ -239,7 +239,7 @@ else
         else
            Flags%IFunSR = 2
         endif
-        Flags%IFunSRKer = Input%CalcParams%Kernel 
+        Flags%IFunSRKer = Input%CalcParams%Kernel
      endif
 
   case(JOB_TYPE_AC0DNOSYMM)
@@ -267,19 +267,19 @@ else
         else
            Flags%IFunSR = 2
         endif
-        Flags%IFunSRKer = Input%CalcParams%Kernel 
+        Flags%IFunSRKer = Input%CalcParams%Kernel
      endif
 !     if(Input%CalcParams%DFApp==2) Flags%IFunSRKer = 1
-  
+
   case(JOB_TYPE_EERPA_OLD)
      Flags%IFlAC  = 0
-     Flags%IFlSnd = 0 
+     Flags%IFlSnd = 0
      Flags%IFlFrag1 = 1
-     Flags%IFl12 = 2 
+     Flags%IFl12 = 2
 
   case(JOB_TYPE_EERPA)
      Flags%IFlAC  = 0
-     Flags%IFlSnd = 0 
+     Flags%IFlSnd = 0
      Flags%IFlFrag1 = 1
      Flags%IFl12 = 1
 
@@ -291,13 +291,13 @@ else
      ! Response for SAPT
      select case(Input%CalcParams%Response)
      case(RESP_ERPA)
-        Flags%ISERPA = 0 
+        Flags%ISERPA = 0
      case(RESP_DFT)
-        Flags%ISERPA = 0 
+        Flags%ISERPA = 0
         Flags%IFunSR = 1
         if(Input%CalcParams%DFApp>0) then
           Flags%IFunSR = Input%CalcParams%DFApp
-        endif 
+        endif
      case(RESP_APSG)
         Flags%ISERPA = 2
      end select
@@ -305,10 +305,10 @@ else
   case(JOB_TYPE_PDFT)
      Flags%IFlAC  = 0
      Flags%IFlSnd = 0
-     Flags%IFunSR = 3 
+     Flags%IFunSR = 3
 
   case(JOB_TYPE_CASPIDFT)
-     Flags%IFunSR = 5 
+     Flags%IFunSR = 5
 
   case(JOB_TYPE_CASPIDFTOPT)
      Flags%IFunSR = 6
@@ -320,7 +320,7 @@ else
 
  ! Inactive
   Flags%IFlCore = Input%CalcParams%Core
- 
+
  !Flags%IFl12 = FLAG_DEBUG_FL12
 
 endif
@@ -356,13 +356,13 @@ if(Flags%ISAPT.Eq.0) then
      write(LOUT,'(a)') 'ERROR! TOO MANY SYSTEM BLOCKS!'
      write(LOUT,'(a)') 'SYSTEM? !'
      stop
-   endif   
-  
+   endif
+
    System%NoSt = Input%SystemInput(1)%NoSt
    System%NStates = Input%SystemInput(1)%NStates
-   allocate(System%InSt(2,System%NStates)) 
+   allocate(System%InSt(2,System%NStates))
    if(Input%SystemInput(1)%DeclareSt) then
-      System%InSt = Input%SystemInput(1)%InSt 
+      System%InSt = Input%SystemInput(1)%InSt
    else
       ! read 1st available state
       System%InSt(:,1) = -255
@@ -381,22 +381,23 @@ if(Flags%ISAPT.Eq.0) then
    System%Charge = Input%SystemInput(1)%Charge
    System%NBasis = Input%CalcParams%NBasis
    System%Omega  = Input%SystemInput(1)%Omega
+   System%PerVirt= Input%SystemInput(1)%PerVirt
    System%EigFCI = Input%SystemInput(1)%EigFCI
    System%ThrAct = Input%SystemInput(1)%ThrAct
    System%ThrSelAct = Input%SystemInput(1)%ThrSelAct
    System%ThrVirt = Input%SystemInput(1)%ThrVirt
    System%ThrQVirt  = Input%SystemInput(1)%ThrQVirt
    System%TwoMoInt = Input%SystemInput(1)%TwoMoInt
-   System%IPrint = Input%CalcParams%IPrint  
-  
+   System%IPrint = Input%CalcParams%IPrint
+
    System%XELE = (System%ZNucl - System%Charge)/2.0d0
    System%NELE = (System%ZNucl - System%Charge)/2
-  
+
    ! checkif Active Declared
    if(.not.Input%SystemInput(1)%NActFromRDM) then
-      System%NAct=Input%SystemInput(1)%NAct 
+      System%NAct=Input%SystemInput(1)%NAct
       print*, 'NAct from input!',System%NAct
-   endif   
+   endif
 
   ! write(*,*) "ZNucl:",Input%SystemInput(1)%ZNucl
   ! write(*,*) "Sys-val:",System%XELE, System%NELE
@@ -411,21 +412,21 @@ elseif(Flags%ISAPT.Eq.1) then
  if(SAPT%InterfaceType==2) SAPT%HFCheck = .false.
  ! temporary RSH
  if(Flags%IFunSR<3) then
-   SAPT%doRSH = .true. 
+   SAPT%doRSH = .true.
    SAPT%monA%doRSH = .true.
    SAPT%monB%doRSH = .true.
  endif
 
  associate( monA => SAPT%monA, &
-            monB => SAPT%monB ) 
+            monB => SAPT%monB )
    select case(Input%SystemInput(1)%Monomer)
    case(1)
 
       monA%NoSt    = Input%SystemInput(1)%NoSt
       monA%NStates = Input%SystemInput(1)%NStates
-      allocate(monA%InSt(2,System%NStates)) 
+      allocate(monA%InSt(2,System%NStates))
       if(Input%SystemInput(1)%DeclareSt) then
-         monA%InSt = Input%SystemInput(1)%InSt 
+         monA%InSt = Input%SystemInput(1)%InSt
       else
          ! assume 1.1 state
          monA%InSt(:,1) = -255
@@ -433,7 +434,8 @@ elseif(Flags%ISAPT.Eq.1) then
       monA%ZNucl   = Input%SystemInput(1)%ZNucl
       monA%Charge  = Input%SystemInput(1)%Charge
       monA%ACAlpha = Input%SystemInput(1)%ACAlpha
-      monA%Omega   = Input%SystemInput(1)%Omega 
+      monA%Omega   = Input%SystemInput(1)%Omega
+      monA%PerVirt = Input%SystemInput(1)%PerVirt
       monA%EigFCI  = Input%SystemInput(1)%EigFCI
       monA%NBasis  = Input%CalcParams%NBasis
       monA%ThrAct       = Input%SystemInput(1)%ThrAct
@@ -444,15 +446,16 @@ elseif(Flags%ISAPT.Eq.1) then
       monA%TwoMoInt = Input%SystemInput(1)%TwoMoInt
       monA%PostCAS  = Input%SystemInput(1)%PostCAS
       monA%ISHF     = Input%SystemInput(1)%ISHF
-      monA%E2dExt   = Input%SystemInput(1)%E2dExt
+      monA%Cubic    = Input%SystemInput(1)%Cubic
+      monA%Wexcit   = Input%SystemInput(1)%Wexcit
 
       monA%NCen    = Input%SystemInput(1)%NCen
       monA%UCen    = Input%SystemInput(1)%UCen
       monA%Monomer = Input%SystemInput(1)%Monomer
-      monA%IPrint  = Input%CalcParams%IPrint  
-     
-      monA%XELE = (SAPT%monA%ZNucl - SAPT%monA%Charge)/2.0d0 
-      monA%NELE = (SAPT%monA%ZNucl - SAPT%monA%Charge)/2 
+      monA%IPrint  = Input%CalcParams%IPrint
+
+      monA%XELE = (SAPT%monA%ZNucl - SAPT%monA%Charge)/2.0d0
+      monA%NELE = (SAPT%monA%ZNucl - SAPT%monA%Charge)/2
 
       if(.not.Input%SystemInput(1)%NActFromRDM) then
          monA%NAct=Input%SystemInput(1)%NAct
@@ -461,17 +464,18 @@ elseif(Flags%ISAPT.Eq.1) then
 
       monB%NoSt    = Input%SystemInput(2)%NoSt
       monB%NStates = Input%SystemInput(2)%NStates
-      allocate(monB%InSt(2,System%NStates)) 
+      allocate(monB%InSt(2,System%NStates))
       if(Input%SystemInput(2)%DeclareSt) then
-         monB%InSt = Input%SystemInput(2)%InSt 
+         monB%InSt = Input%SystemInput(2)%InSt
       else
          ! assume 1.1 state
          monB%InSt(:,1) = -255
       endif
-      monB%ZNucl  = Input%SystemInput(2)%ZNucl
-      monB%Charge = Input%SystemInput(2)%Charge
+      monB%ZNucl   = Input%SystemInput(2)%ZNucl
+      monB%Charge  = Input%SystemInput(2)%Charge
       monB%ACAlpha = Input%SystemInput(2)%ACAlpha
-      monB%Omega  = Input%SystemInput(2)%Omega 
+      monB%Omega   = Input%SystemInput(2)%Omega
+      monB%PerVirt = Input%SystemInput(2)%PerVirt
       monB%EigFCI = Input%SystemInput(2)%EigFCI
       monB%NBasis = Input%CalcParams%NBasis
       monB%ThrAct = Input%SystemInput(2)%ThrAct
@@ -482,14 +486,15 @@ elseif(Flags%ISAPT.Eq.1) then
       monB%TwoMoInt  = Input%SystemInput(2)%TwoMoInt
       monB%PostCAS   = Input%SystemInput(2)%PostCAS
       monB%ISHF      = Input%SystemInput(2)%ISHF
-      monB%E2dExt    = Input%SystemInput(2)%E2dExt
+      monB%Cubic     = Input%SystemInput(2)%Cubic
+      monB%Wexcit    = Input%SystemInput(2)%Wexcit
       monB%NCen = Input%SystemInput(2)%NCen
       monB%UCen = Input%SystemInput(2)%UCen
       monB%Monomer = Input%SystemInput(2)%Monomer
-      monB%IPrint = Input%CalcParams%IPrint  
-     
-      monB%XELE = (monB%ZNucl - monB%Charge)/2.0d0 
-      monB%NELE = (monB%ZNucl - monB%Charge)/2 
+      monB%IPrint = Input%CalcParams%IPrint
+
+      monB%XELE = (monB%ZNucl - monB%Charge)/2.0d0
+      monB%NELE = (monB%ZNucl - monB%Charge)/2
 
       if(.not.Input%SystemInput(2)%NActFromRDM) then
          monB%NAct=Input%SystemInput(2)%NAct
@@ -498,22 +503,23 @@ elseif(Flags%ISAPT.Eq.1) then
 
    ! write(LOUT,*) monA%ZNucl,'MONO(1)A,case1,dupaaa'
    ! write(LOUT,*) monB%ZNucl,'MONO(1)B,case1'
-   
+
    case(2)
-  
+
       monA%NoSt   = Input%SystemInput(2)%NoSt
       monA%NStates = Input%SystemInput(2)%NStates
-      allocate(monA%InSt(2,System%NStates)) 
+      allocate(monA%InSt(2,System%NStates))
       if(Input%SystemInput(2)%DeclareSt) then
-         monA%InSt = Input%SystemInput(2)%InSt 
+         monA%InSt = Input%SystemInput(2)%InSt
       else
          ! assume 1.1 state
          monA%InSt(:,1) = -255
       endif
-      monA%ZNucl  = Input%SystemInput(2)%ZNucl
-      monA%Charge = Input%SystemInput(2)%Charge
+      monA%ZNucl   = Input%SystemInput(2)%ZNucl
+      monA%Charge  = Input%SystemInput(2)%Charge
       monA%ACAlpha = Input%SystemInput(2)%ACAlpha
-      monA%Omega  = Input%SystemInput(2)%Omega 
+      monA%Omega   = Input%SystemInput(2)%Omega
+      monA%PerVirt = Input%SystemInput(2)%PerVirt
       monA%EigFCI = Input%SystemInput(2)%EigFCI
       monA%NBasis = Input%CalcParams%NBasis
       monA%ThrAct = Input%SystemInput(2)%ThrAct
@@ -524,14 +530,15 @@ elseif(Flags%ISAPT.Eq.1) then
       monA%TwoMoInt = Input%SystemInput(2)%TwoMoInt
       monA%PostCAS = Input%SystemInput(2)%PostCAS
       monA%ISHF    = Input%SystemInput(2)%ISHF
-      monA%E2dExt  = Input%SystemInput(2)%E2dExt
+      monA%Cubic   = Input%SystemInput(2)%Cubic
+      monA%Wexcit  = Input%SystemInput(2)%Wexcit
       monA%NCen    = Input%SystemInput(2)%NCen
       monA%UCen    = Input%SystemInput(2)%UCen
       monA%Monomer = Input%SystemInput(2)%Monomer
-      monA%IPrint  = Input%CalcParams%IPrint  
-     
-      monA%XELE = (monA%ZNucl - monA%Charge)/2.0d0 
-      monA%NELE = (monA%ZNucl - monA%Charge)/2 
+      monA%IPrint  = Input%CalcParams%IPrint
+
+      monA%XELE = (monA%ZNucl - monA%Charge)/2.0d0
+      monA%NELE = (monA%ZNucl - monA%Charge)/2
 
       if(.not.Input%SystemInput(2)%NActFromRDM) then
          monA%NAct=Input%SystemInput(2)%NAct
@@ -540,9 +547,9 @@ elseif(Flags%ISAPT.Eq.1) then
 
       monB%NoSt   = Input%SystemInput(1)%NoSt
       monB%NStates = Input%SystemInput(1)%NStates
-      allocate(monB%InSt(2,System%NStates)) 
+      allocate(monB%InSt(2,System%NStates))
       if(Input%SystemInput(1)%DeclareSt) then
-         monB%InSt = Input%SystemInput(1)%InSt 
+         monB%InSt = Input%SystemInput(1)%InSt
       else
          ! assume 1.1 state
          monB%InSt(:,1) = -255
@@ -551,6 +558,7 @@ elseif(Flags%ISAPT.Eq.1) then
       monB%Charge  = Input%SystemInput(1)%Charge
       monB%ACAlpha = Input%SystemInput(1)%ACAlpha
       monB%Omega   = Input%SystemInput(1)%Omega
+      monB%PerVirt = Input%SystemInput(1)%PerVirt
       monB%EigFCI  = Input%SystemInput(1)%EigFCI
       monB%ThrAct  = Input%SystemInput(1)%ThrAct
       monB%ThrSelAct = Input%SystemInput(1)%ThrSelAct
@@ -560,15 +568,16 @@ elseif(Flags%ISAPT.Eq.1) then
       monB%TwoMoInt = Input%SystemInput(1)%TwoMoInt
       monB%PostCAS  = Input%SystemInput(1)%PostCAS
       monB%ISHF     = Input%SystemInput(1)%ISHF
-      monB%E2dExt   = Input%SystemInput(1)%E2dExt
+      monB%Cubic    = Input%SystemInput(1)%Cubic
+      monB%Wexcit   = Input%SystemInput(1)%Wexcit
       monB%NCen     = Input%SystemInput(1)%NCen
       monB%UCen     = Input%SystemInput(1)%UCen
       monB%Monomer  = Input%SystemInput(1)%Monomer
-      monB%IPrint   = Input%CalcParams%IPrint  
-     
-      monB%XELE = (monB%ZNucl - monB%Charge)/2.0d0 
-      monB%NELE = (monB%ZNucl - monB%Charge)/2 
- 
+      monB%IPrint   = Input%CalcParams%IPrint
+
+      monB%XELE = (monB%ZNucl - monB%Charge)/2.0d0
+      monB%NELE = (monB%ZNucl - monB%Charge)/2
+
       if(.not.Input%SystemInput(1)%NActFromRDM) then
          monB%NActFromRDM = Input%SystemInput(1)%NActFromRDM
          monB%NAct=Input%SystemInput(1)%NAct
@@ -580,7 +589,7 @@ elseif(Flags%ISAPT.Eq.1) then
  ! set in/out-of-core
  ! SAPT-CAS: unless defined in input, set FOFO as default!
  if(Flags%ICASSCF==1.and.Flags%ISERPA==0) then
-    if(.not.SAPT%monA%DeclareTwoMo) SAPT%monA%TwoMoInt = TWOMO_FOFO 
+    if(.not.SAPT%monA%DeclareTwoMo) SAPT%monA%TwoMoInt = TWOMO_FOFO
     if(.not.SAPT%monB%DeclareTwoMo) SAPT%monB%TwoMoInt = TWOMO_FOFO
  endif
 
@@ -592,6 +601,9 @@ elseif(Flags%ISAPT.Eq.1) then
       SAPT%monB%SameOm = .false.
     endif
  endif
+
+ ! set Wexcit terms
+ if(SAPT%monA%Wexcit.or.SAPT%monB%Wexcit) SAPT%Wexcit = .true.
 
 System = SAPT%monB
 
@@ -640,8 +652,8 @@ endif
 !      write(LOUT,'(1x,a)') 'DENSITY MATRIX FUNCTIONAL CALCULATION'
 !      write(LOUT,'(1x,a,1x,i3)') 'FUNCTIONAL', Flags%IFun
    elseif(Flags%IRes.Eq.1) then
-      write(LOUT,'(1x,a)') 'RESTART REQUESTED' 
-   endif   
+      write(LOUT,'(1x,a)') 'RESTART REQUESTED'
+   endif
 
 if(Flags%ISAPT.Eq.0) then
 !   write(LOUT,'()')
@@ -650,7 +662,7 @@ if(Flags%ISAPT.Eq.0) then
 elseif(Flags%ISAPT.Eq.1) then
 !   write(LOUT,'()')
    write(LOUT,'(1x,a,1x,i5)') 'PRINT LEVEL: ', SAPT%monA%IPrint
- 
+
 endif
 
    write(LOUT,'()')

@@ -99,6 +99,7 @@ call dgemm('N','N',NBasis,NBasis,NBasis,1d0,URe,NBasis,work1,NBasis,0d0,work2,NB
 call dgemm('N','T',NBasis,NBasis,NBasis,1d0,work2,NBasis,URe,NBasis,0d0,HNO,NBasis)
 call sq_symmetrize(HNO,NBasis)
 
+
 val = 0
 do i=1,NOccup
    val = val + Occ(i)*HNO(i,i)
@@ -269,21 +270,21 @@ endif
 !HNO=transpose(HNO)
 !call sq_to_triang2(HNO,work1,NBasis)
 !write(LOUT,*) 'HNO-tr', norm2(work1(1:NBasis*(NBasis+1)/2))
-!!!$
-!!!$write(LOUT,'(/,1X,''CASSCF Energy (w/o ENuc)'',5X,F15.8)') ETot
-!!!$
+!!!!$
+!!!!$write(LOUT,'(/,1X,''CASSCF Energy (w/o ENuc)'',5X,F15.8)') ETot
+!!!!$
 !call sq_to_triang2(AuxI,work1,NBasis)
 !write(LOUT,*) 'AuxI-my', norm2(work1(1:NBasis*(NBasis+1)/2))
 !AuxI=transpose(AuxI)
 !call sq_to_triang2(AuxI,work1,NBasis)
 !write(LOUT,*) 'AuxI-tr', norm2(work1(1:NBasis*(NBasis+1)/2))
-!
+!!
 !call sq_to_triang2(AuxIO,work1,NBasis)
 !write(LOUT,*) 'AuxIO-my', norm2(work1(1:NBasis*(NBasis+1)/2))
 !AuxIO=transpose(AuxIO)
 !call sq_to_triang2(AuxIO,work1,NBasis)
 !write(LOUT,*) 'AuxIO-tr', norm2(work1(1:NBasis*(NBasis+1)/2))
-!
+!!
 !write(LOUT,*) 'WMAT-my', 2d0*norm2(WMAT)
 
 deallocate(RDM2val)
@@ -716,7 +717,7 @@ deallocate(ints,work2,work1)
 
 end subroutine ACABMAT0_FOFO
 
-subroutine MP2RDM_FOFO(Eps,Occ,URe,UNOAO,XOne,IndN,IndX,IndAux,IGemIN, &
+subroutine MP2RDM_FOFO(PerVirt,Eps,Occ,URe,UNOAO,XOne,IndN,IndX,IndAux,IGemIN, &
                        NAct,INActive,NDimX,NDim,NBasis,NInte1,     &
                        IntJFile,IntKFile,ThrVirt,NVZero,IPrint)
 implicit none
@@ -725,7 +726,7 @@ integer,intent(in)           :: NAct,INActive,NDimX,NDim,NBasis,NInte1
 integer,intent(in)           :: IPrint
 integer,intent(in)           :: IndN(2,NDim),IndX(NDim),IndAux(NBasis),IGemIN(NBasis)
 integer,intent(out)          :: NVZero
-double precision,intent(in)  :: ThrVirt
+double precision,intent(in)  :: PerVirt,ThrVirt
 double precision,intent(in)  :: Occ(NBasis),XOne(NInte1),UNOAO(NBasis,NBasis)
 double precision,intent(out) :: Eps(NBasis,NBasis)
 character(*)                 :: IntJFile,IntKFile
@@ -741,6 +742,7 @@ integer                      :: tmpAA(NAct*(NAct-1)/2),tmpAI(NAct,1:INActive),&
                                 tmpIV(INActive*(NBasis-NAct-INActive))
 integer                      :: limAA(2),limAI(2,1:INActive),&
                                 limAV(2,INActive+NAct+1:NBasis),limIV(2)
+double precision             :: PerThr
 double precision             :: val,ETot
 double precision             :: URe(NBasis,NBasis) 
 double precision             :: AuxMat(NBasis,NBasis),&
@@ -752,17 +754,20 @@ double precision,allocatable :: ints_J(:,:),ints_K(:,:),   &
                                 work(:),workTr(:),workSq(:,:)
 integer          :: EndVirt,NBasisNew
 character(100)   :: num1char
-double precision :: xnum1,PerThr
+!double precision :: xnum1,PerThr
 
-! TEST!
-if(COMMAND_ARGUMENT_COUNT()==0) then
-   write(LOUT,*)'ERROR, COMMAND-LINE ARGUMENTS REQUIRED, STOPPING'
-   stop
-endif 
+! use PerVirt/100
+PerThr = PerVirt
 
-CALL GET_COMMAND_ARGUMENT(1,num1char)
-READ(num1char,*)xnum1
-PerThr = xnum1
+!! TEST!
+!if(COMMAND_ARGUMENT_COUNT()==0) then
+!   write(LOUT,*)'ERROR, COMMAND-LINE ARGUMENTS REQUIRED, STOPPING'
+!   stop
+!endif 
+!
+!CALL GET_COMMAND_ARGUMENT(1,num1char)
+!READ(num1char,*)xnum1
+!PerThr = xnum1
 
 ! set dimensions
 NOccup   = INActive + NAct
@@ -1826,8 +1831,8 @@ call ABPM0_FOFO(Occ,URe,XOne,ABPLUS,ABMIN, &
                 IndN,IndX,IGemIN,NAct,INActive,NDimX,NBasis,NDim,NInte1, &
                 IntJFile,IntKFile,ETot)
 
-print*, 'ABPLUS-new',norm2(ABPLUS)
-print*, 'ABMIN -new',norm2(ABMIN)
+!print*, 'ABPLUS-new',norm2(ABPLUS)
+!print*, 'ABMIN -new',norm2(ABMIN)
 
 call clock('ABPM(0)',Tcpu,Twall)
 
@@ -2414,7 +2419,7 @@ end subroutine ABPM_HALFBACKTRAN
 subroutine Y01CASLR_FOFO(Occ,URe,XOne,ABPLUS,ABMIN, &
      MultpC,NSymNO, &
      SRKer,Wt,OrbGrid, &
-     propfile0,propfile1, & 
+     propfile0,propfile1,xy0file, &
      IndN,IndX,IGemIN,NAct,INActive,NGrid,NDimX,NBasis,NDim,NInte1, &
      NoSt,IntFileName,IntJFile,IntKFile,IFlag0,IFunSRKer,ETot,ECorr)
 !
@@ -2428,11 +2433,11 @@ use timing
 implicit none
 ! here!!!!
 integer,intent(in) :: NAct,INActive,NGrid,NDimX,NBasis,NDim,NInte1,NoSt
-character(*) :: IntFileName,IntJFile,IntKFile
-character(*) :: propfile0,propfile1
+character(*)       :: IntFileName,IntJFile,IntKFile
+character(*)       :: propfile0,propfile1,xy0filE
 double precision,intent(out) :: ABPLUS(NDimX,NDimX),ABMIN(NDimX,NDimX)
 double precision,intent(in)  :: URe(NBasis,NBasis),Occ(NBasis),XOne(NInte1)
-double precision,intent(in) :: SRKer(NGrid),Wt(NGrid),OrbGrid(NGrid,NBasis)
+double precision,intent(in)  :: SRKer(NGrid),Wt(NGrid),OrbGrid(NGrid,NBasis)
 integer,intent(in) :: IndN(2,NDim),IndX(NDim),IGemIN(NBasis),IFlag0,IFunSRKer, &
                       MultpC(15,15),NSymNO(NBasis)
 double precision,intent(out),optional :: ETot,ECorr
@@ -2475,7 +2480,7 @@ call clock('START',Tcpu,Twall)
 
 ABPLUS = 0
 ABMIN  = 0
-ETot = 0
+if(present(ETot)) ETot   = 0
 
 ! set dimensions
 NOccup = NAct + INActive
@@ -2532,7 +2537,7 @@ val = 0
 do i=1,NOccup
    val = val + Occ(i)*HNO(i,i)
 enddo
-ETot = ETot + 2*val
+if(present(ETot)) ETot = ETot + 2*val
 
 do j=1,NBasis
    do i=1,NBasis
@@ -2762,7 +2767,8 @@ if(nAA>0) then
         call ModABMin_Act_FOFO(Occ,SRKer,Wt,OrbGrid,ABM,&
                MultpC,NSymNO,tmpAA,&
                IndN,IndX,NDimX,NGrid,NBasis,&
-               NOccup,NAct,INActive,nAA,'FOFO','FOFOERF')
+               !NOccup,NAct,INActive,nAA,'FOFO','FOFOERF')
+               NOccup,NAct,INActive,nAA,IntFileName,IntKFile)
      endif
 
      if(NoSt==1) then
@@ -2970,6 +2976,9 @@ end associate
 call clock('Y01CAS:DIAG',Tcpu,Twall)
 call clock('START',Tcpu,Twall)
 
+! dump EBLOCKS: X(0),Y(0)
+call dump_Eblock(Eblock,EblockIV,Occ,IndN,nblk,NBasis,NDimX,xy0file)
+
 if(IFlag0==1) return
 !return
 
@@ -2985,7 +2994,8 @@ if(IFunSRKer==1) then
    call ModABMin_FOFO(Occ,SRKer,Wt,OrbGrid,ABMIN,&
                  MultpC,NSymNO,&
                  IndN,IndX,NDimX,NGrid,NBasis,&
-                 NAct,INActive,'FOFO','FOFOERF',.true.)
+                 !NAct,INActive,'FOFO','FOFOERF',.true.)
+                 NAct,INActive,IntFileName,IntKFile,.true.)
    !print*, 'ABM-MY',norm2(ABMIN)
 endif
 ! here!!!! can this be made cheaper?
@@ -3062,16 +3072,16 @@ do j=1,NDimX
    endif
 enddo
 
- ! dump response to a file!
- open(newunit=iunit,file=propfile0,form='unformatted')
- write(iunit) EigY
- write(iunit) Eig
- close(iunit)
+ !! dump response to a file!
+ !open(newunit=iunit,file=propfile0,form='unformatted')
+ !write(iunit) EigY
+ !write(iunit) Eig
+ !close(iunit)
  if(IFlag0==0) then
- open(newunit=iunit,file=propfile1,form='unformatted')
- write(iunit) EigY1
- write(iunit) Eig1
- close(iunit)
+    open(newunit=iunit,file=propfile1,form='unformatted')
+    write(iunit) EigY1
+    write(iunit) Eig1
+    close(iunit)
  endif
 
  deallocate(Eig1,EigY1)
@@ -3377,15 +3387,15 @@ subroutine ModABMin_FOFO(Occ,SRKer,Wt,OrbGrid,ABMin,&
 use timing
 implicit none
 
-integer,parameter :: maxlen = 128
+integer,parameter  :: maxlen = 128
 integer,intent(in) :: NBasis,NDimX,NGrid,NAct,INActive
 integer,intent(in) :: IndN(2,NDimX),IndX(NDimX),&
                       MultpC(15,15),NSymNO(NBasis)
-character(*),intent(in) :: twokfile,twokerf
+character(*),intent(in)     :: twokfile,twokerf
 double precision,intent(in) :: Occ(NBasis),SRKer(NGrid), &
                                Wt(NGrid),OrbGrid(NGrid,NBasis)
-logical,intent(in) :: AB1
-double precision,intent(inout) :: ABMin(NDimX,NDimX)
+logical,intent(in)               :: AB1
+double precision,intent(inout)   :: ABMin(NDimX,NDimX)
 character(*),intent(in),optional :: dfile
 
 integer :: offset,batchlen,iunit1,iunit2
@@ -3794,9 +3804,12 @@ integer :: i,j,k,l,kl,kk,ip,iq,ir,is,ipq,irs
 integer :: iunit,ISkippedEig
 integer :: pos(NBasis,NBasis)
 logical :: AuxCoeff(3,3,3,3)
-double precision :: CICoef(NBasis),Cpq,Crs,SumY,Aux
+logical,allocatable          :: condition(:)
+double precision             :: CICoef(NBasis),Cpq,Crs,SumY,Aux
 double precision,allocatable :: work(:),ints(:,:),Skipped(:)
-double precision,parameter :: SmallE = 1.d-3,BigE = 1.d8
+double precision,allocatable :: tVec(:,:)
+double precision,parameter   :: SmallE = 1.d-3,BigE = 1.d8
+double precision,external    :: ddot
 
 do i=1,NBasis
    CICoef(i) = sign(sqrt(Occ(i)),Occ(i)-0.5d0)
@@ -3822,13 +3835,31 @@ enddo
 
 allocate(work(NBasis**2),ints(NBasis,NBasis),Skipped(NDimX))
 
-ISkippedEig = 0
 ECorr = 0
+
+allocate(condition(NDimX),tVec(NDimX,NDimX))
+
+condition = (EVal.gt.SmallE.and.EVal.lt.BigE)
+
+ISkippedEig = 0
+do kk=1,NDimX
+    if(.not.condition(kk)) then
+       ISkippedEig = ISkippedEig + 1
+       Skipped(ISkippedEig) = EVal(kk)
+    endif
+enddo
+
+! transpose
+tVec = 0
+do kk=1,NDimX
+   if(condition(kk)) tVec(kk,:) = EVec(:,kk)
+enddo
 
 open(newunit=iunit,file=trim(IntKFile),status='OLD', &
      access='DIRECT',recl=8*NBasis*NOccup)
 
-kl = 0
+kl   = 0
+SumY = 0
 do k=1,NOccup
    do l=1,NBasis
       kl = kl + 1
@@ -3857,17 +3888,8 @@ do k=1,NOccup
                 !.and.IGem(ir).eq.IGem(ip)).and.ir.gt.is.and.ip.gt.iq) then
                 if(AuxCoeff(IGem(ip),IGem(iq),IGem(ir),IGem(is))) then
 
-                   ISkippedEig = 0
-                   SumY = 0 
-                   do kk=1,NDimX
-                      if(EVal(kk).gt.SmallE.and.EVal(kk).lt.BigE) then
-                         SumY = SumY + EVec(ipq,kk)*EVec(irs,kk)
-                      else
-                         ISkippedEig = ISkippedEig + 1
-                         Skipped(ISkippedEig) = EVal(kk)
-                      endif
-                   enddo
-          
+                   SumY = ddot(NDimX,tVec(:,ipq),1,tVec(:,irs),1)
+
                    Aux = 2*Crs*Cpq*SumY
           
                    if(iq.Eq.is.and.ip.Eq.ir) then
@@ -3898,6 +3920,7 @@ if(ISkippedEig/=0) then
   enddo
 endif
 
+deallocate(tVec,condition)
 deallocate(Skipped)
 deallocate(ints,work)
 
@@ -7937,8 +7960,9 @@ integer :: nAV(INActive+NAct+1:NBasis),tmpAV(NAct,INActive+NAct+1:NBasis),limAV(
 integer :: nIV,tmpIV(INActive*(NBasis-NAct-INActive)),limIV(2)
 double precision :: fac,val,valX,valY
 
-type(EblockData) :: Eblock(1+NBasis-NAct)
-type(EblockData) :: EblockIV
+!type(EblockData) :: Eblock(1+NBasis-NAct)
+type(EblockData),allocatable :: Eblock(:)
+type(EblockData)             :: EblockIV
 
 double precision,allocatable :: work(:)
 
@@ -8026,6 +8050,8 @@ do ii=1,nIV
    ipos = ipos + 1
 enddo
 limIV(2) = ipos
+
+allocate(Eblock(1+NBasis-NAct))
 
 nblk =0
 !pack AA
