@@ -128,6 +128,7 @@ type SystemBlock
       double precision :: SumOcc  = 0d0 
       double precision :: ACAlpha = 1d0
       double precision :: Omega   = 1d0
+      double precision :: PerVirt = 0d0
       double precision :: ECASSCF = 0d0
       integer :: NSym
       integer :: NSymBas(8),NSymOrb(8)
@@ -151,11 +152,16 @@ type SystemBlock
       logical :: DeclareSt = .false.
       logical :: DeclareTrSt = .false.
       logical :: ISHF    = .false.
-      logical :: E2dExt  = .false.
+      logical :: Cubic   = .false.
+      logical :: Wexcit  = .false.
       logical :: doRSH   = .false., SameOm = .true.
       logical :: PostCAS = .false.
       logical :: NActFromRDM = .true.
       logical :: reduceV = .false.
+      ! for cubic SAPT
+      double precision :: ACAlpha0  = 1.d-10
+      double precision :: ACAlpha1  = 0.01d0
+      double precision :: ACAlpha2  = 0.45d0
       ! ThrAct for active geminals selection
       double precision :: ThrAct    = 0.992d0
       double precision :: ThrSelAct = 1.d-8
@@ -193,6 +199,8 @@ type FileNames
 
      character(:),allocatable :: rdmfile
      character(:),allocatable :: onefile
+     character(:),allocatable :: sirifile,siriusfile
+     character(:),allocatable :: occfile,coefile
      character(:),allocatable :: testfile
      character(:),allocatable :: twofile,twojfile,twokfile
      character(:),allocatable :: y01file,xy0file
@@ -214,7 +222,7 @@ type FlagsData
      integer :: IGVB    = 1
      integer :: ITwoEl  = TWOMO_INCORE 
      integer :: IRedVirt  = FLAG_REDVIRT
-     integer :: IFun    = 13
+     integer :: IFun      = 13
      integer :: IFunSR    = 0 
      integer :: IFunSRKer = 0
      double precision :: Alpha = 0
@@ -226,25 +234,25 @@ type FlagsData
      integer :: ISERPA  = 0
      integer :: ISAPT   = 0
      integer :: SaptLevel = 0
-     integer :: ISHF    = 0
+     integer :: ISHF      = 0
      character(:), allocatable :: JobTitle
      integer :: JobType = 0
      ! initia.f
-     integer :: IA = 1
-     integer :: ICASSCF = 0
-     integer :: IDMRG   = 0  
+     integer :: IA        = 1
+     integer :: ICASSCF   = 0
+     integer :: IDMRG     = 0  
      ! interpa.f  
-     integer :: IFlAC   = 0
-     integer :: IFlSnd  = 0
-     integer :: IFlAC0D = 0
+     integer :: IFlAC     = 0
+     integer :: IFlSnd    = 0
+     integer :: IFlAC0D   = 0
      integer :: ISymmAC0D = 1
-     integer :: IFlCore = 1
-     integer :: IFlFrag1 = 0
-     integer :: IFl12 = 1
+     integer :: IFlCore   = 1
+     integer :: IFlFrag1  = 0
+     integer :: IFl12     = 1
      ! sapt_main.f90
      integer :: IFlag0 = 0
      ! sapt_utils.f90
-     integer :: DIISN = 6
+     integer :: DIISN  = 6
      integer :: DIISOn = 2
 
 end type FlagsData
@@ -263,12 +271,15 @@ type SaptData
   type(SystemBlock) :: monA,monB
      double precision  :: Vnn,elst,exchs2,e2ind,e2disp
      double precision  :: e2disp_sc,e2disp_sp
-     double precision  :: e2disp_ax3
      double precision  :: e2ind_unc,e2disp_unc
      double precision  :: e2dispR_unc,e2dispR
      double precision  :: e2exdisp_unc,e2exdisp
      double precision  :: e2exdispR_unc,e2exdispR
      double precision  :: e2exind,e2exind_unc
+     double precision  :: e2ind_a0,e2ind_a1,e2ind_a2
+     double precision  :: e2disp_a0,e2disp_a1,e2disp_a2
+     double precision  :: e2exd_a0,e2exd_a1,e2exd_a2
+     double precision  :: e2exi_a0,e2exi_a1,e2exi_a2
      double precision  :: esapt2,esapt0
      double precision  :: e2dispinCAS
      double precision  :: exch_part(5)
@@ -277,11 +288,11 @@ type SaptData
      integer :: ic6 = 0
      integer :: iPINO=-1
      integer :: IPrint = 1000
-     logical :: iCpld   = .true.
-     logical :: E2dExt  = .false.
+     logical :: iCpld  = .true.
+     logical :: Cubic  = .false.
      ! MH : add keyword!
      logical :: SemiCoupled = .true.
-     logical :: DispExc = .true.
+     logical :: Wexcit  = .false.
      logical :: noE2exi = .true.
      logical :: EnChck  = .true., HFCheck=.true.
      logical :: doRSH   = .false., SameOm = .true.
@@ -1459,12 +1470,13 @@ end subroutine get_den
 subroutine get_one_mat(var,mat,mono,nbas)
 implicit none
 
-character(1),intent(in) :: var
-integer,intent(in) :: nbas,mono
+character(1),intent(in)      :: var
+integer,intent(in)           :: nbas,mono
 double precision,intent(out) :: mat(nbas,nbas)
-integer :: ione
-logical :: valid
-character(8) :: label
+
+integer                  :: ione
+logical                  :: valid
+character(8)             :: label
 character(:),allocatable :: onefile
 
  if(mono==1) then
@@ -1515,59 +1527,25 @@ character(:),allocatable :: onefile
 
 end subroutine get_one_mat
 
-subroutine fill_Fmat(Fmat,Occ,NBas,variant)
-implicit none
-
-integer,intent(in) :: NBas,variant
-double precision,intent(in)  :: Occ(NBas)
-double precision,intent(out) :: Fmat(NBas,NBas)
-
-integer :: i,j
-
-Fmat = 0
-select case(variant)
-case(0)
-   ! HF
-   do j=1,NBas
-      do i=1,NBas
-         Fmat(i,j) = Occ(i)*Occ(j)
-      enddo
-   enddo
-case(1)
-   ! BB functional
-   do j=1,NBas
-      do i=1,NBas
-         Fmat(i,j) = sqrt(Occ(i)*Occ(j))
-      enddo
-   enddo
-case(3)
-   ! Power functional
-   write(LOUT,*) 'POWER FUNCITONAL NOT READY YET!'
-   stop
-
-end select
-
-end subroutine fill_Fmat
-
 subroutine basinfo(nbasis,basfile,intf)
 implicit none
 
 character(*),intent(in) :: basfile,intf
 integer,intent(out) :: nbasis
-integer :: iunit 
+integer :: iunit
 integer :: nsym,nbas(8),norb(8),nrhf(8),ioprhf
 logical :: ex
 
  inquire(file=basfile,EXIST=ex)
 
- if(ex) then 
+ if(ex) then
     open(newunit=iunit,file=basfile,status='OLD', &
          access='SEQUENTIAL',form='UNFORMATTED')
-   
+
     if(trim(intf)=='DALTON') then
        ! read basis info
        call readlabel(iunit,'BASINFO ')
-   
+
        read (iunit) nsym,nbas,norb,nrhf,ioprhf
        !write(LOUT,*)  nsym,nbas,norb,nrhf,ioprhf
 

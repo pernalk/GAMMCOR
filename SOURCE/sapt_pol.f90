@@ -11,7 +11,8 @@ subroutine e1elst(A,B,SAPT)
 implicit none
 
 type(SystemBlock) :: A, B
-type(SaptData) :: SAPT
+type(SaptData)    :: SAPT
+
 integer :: i, j
 integer :: NBas
 double precision,allocatable :: PA(:,:),PB(:,:) 
@@ -96,23 +97,23 @@ end subroutine e2ind_hf_icphf
 subroutine e2ind_resp(Flags,A,B,SAPT)
 implicit none
 
-type(FlagsData) :: Flags
+type(FlagsData)   :: Flags
 type(SystemBlock) :: A, B
-type(SaptData) :: SAPT
+type(SaptData)    :: SAPT
+
 integer :: NBas
 double precision,allocatable :: OmA(:),OmB(:)
 double precision,allocatable :: EVecA(:,:),EVecB(:,:)
 double precision,allocatable :: WaBB(:,:),WbAA(:,:)
 double precision,allocatable :: AlphaA(:,:),AlphaB(:,:)
 ! test
-integer :: info
+integer             :: info
 integer,allocatable :: ipiv(:)
 double precision,allocatable :: wtest(:),car(:),Work(:)
 !
 integer :: i,j,pq,ip,iq,rs,ir,is
 double precision :: e2ba,e2ab,e2iu,e2ic 
 double precision :: tmp
-
 
  if(A%NBasis.ne.B%NBasis) then
     write(LOUT,'(1x,a)') 'ERROR! MCBS not implemented in SAPT!'
@@ -233,6 +234,157 @@ double precision :: tmp
  deallocate(OmB,EVecB,Oma,EVecA)
 
 end subroutine e2ind_resp
+
+subroutine e2ind_cpld(Flags,A,B,SAPT)
+! calculate only coupled E2ind
+! used also for  cubic E2ind
+implicit none
+
+type(FlagsData) :: Flags
+type(SystemBlock) :: A, B
+type(SaptData) :: SAPT
+type(Y01BlockData),allocatable :: Y01BlockA(:),Y01BlockB(:)
+
+double precision,allocatable :: OmA(:),OmB(:)
+double precision,allocatable :: EVecA(:,:),EVecB(:,:)
+double precision,allocatable :: WaBB(:,:),WbAA(:,:)
+double precision,allocatable :: tmpA(:),tmpB(:)
+
+integer          :: NBas,info
+integer          :: i,j,pq,ip,iq,rs,ir,is
+double precision :: fact
+double precision :: e2ba,e2ab,e2iu,e2ic
+double precision :: e2ab_unc,e2ba_unc,e2ic_unc
+character(:),allocatable   :: propA,propB
+double precision,parameter :: BigE   = 1.D10
+double precision,parameter :: SmallE = 1.D-6
+
+ if(A%NBasis.ne.B%NBasis) then
+    write(LOUT,'(1x,a)') 'ERROR! MCBS not implemented in SAPT!'
+    stop
+ else
+    NBas = A%NBasis
+ endif
+
+ ! E2IND(B<--A)
+
+ allocate(EVecB(B%NDimX,B%NDimX),OmB(B%NDimX))
+ allocate(tmpB(B%NDimX),WaBB(NBas,NBas))
+
+ if(B%Cubic) then
+   if(B%ACAlpha==B%ACAlpha0) then
+      propB = 'PROP_B0'
+   elseif(B%ACAlpha==B%ACAlpha1) then
+      propB = 'PROP_B1'
+   elseif(B%ACAlpha==B%ACAlpha2) then
+      propB = 'PROP_B2'
+   endif
+   call convert_XY_to_Z(EVecB,B%CICoef,B%IndN,B%NDimX,NBas,propB)
+   call readEvalXY(OmB,B%NDimX,propB)
+ else
+   !call readresp(EVecB,OmB,B%NDimX,'PROP_B')
+   call readEvecZ(EVecB,B%NDimX,'PROP_B')
+   call readEvalZ(OmB,B%NDimX,'PROP_B')
+ endif
+
+ call tran2MO(A%WPot,B%CMO,B%CMO,WaBB,NBas)
+
+ tmpB = 0d0
+ do rs=1,B%NDimX
+    ir = B%IndN(1,rs)
+    is = B%IndN(2,rs)
+
+    fact = (B%CICoef(is)+B%CICoef(ir))*WaBB(ir,is)
+
+    do j=1,B%NDimX
+       tmpB(j) = tmpB(j) + fact*EVecB(rs,j)
+    enddo
+
+ enddo
+
+ e2ab = 0d0
+ do j=1,B%NDimX
+    if(OmB(j).lt.BigE.and.OmB(j).gt.SmallE) then
+       e2ab = e2ab + tmpB(j)**2 / OmB(j)
+    endif
+ enddo
+
+ e2ab = -4.0d0*e2ab
+ write(LOUT,'(/1x,a,f16.8)') 'Ind(B<--A)     = ', e2ab*1000d0
+
+ deallocate(tmpB)
+ deallocate(EVecB,OmB)
+
+ ! E2IND(A<--B)
+
+ allocate(EVecA(A%NDimX,A%NDimX),OmA(A%NDimX))
+ allocate(tmpA(A%NDimX),WbAA(NBas,NBas))
+
+ if(A%Cubic) then
+   if(A%ACAlpha==A%ACAlpha0) then
+      propA = 'PROP_A0'
+   elseif(A%ACAlpha==A%ACAlpha1) then
+      propA = 'PROP_A1'
+   elseif(A%ACAlpha==A%ACAlpha2) then
+      propA = 'PROP_A2'
+   endif
+   call convert_XY_to_Z(EVecA,A%CICoef,A%IndN,A%NDimX,NBas,propA)
+   call readEvalXY(OmA,A%NDimX,propA)
+ else
+   !call readresp(EVecA,OmA,A%NDimX,'PROP_A')
+   call readEvecZ(EVecA,A%NDimX,'PROP_A')
+   call readEvalZ(OmA,A%NDimX,'PROP_A')
+ endif
+
+ call tran2MO(B%WPot,A%CMO,A%CMO,WbAA,NBas)
+
+ tmpA = 0d0
+ do pq=1,A%NDimX
+    ip = A%IndN(1,pq)
+    iq = A%IndN(2,pq)
+
+    fact = (A%CICoef(iq)+A%CICoef(ip))*WbAA(ip,iq)
+
+    do i=1,A%NDimX
+       tmpA(i) = tmpA(i) + fact*EVecA(pq,i)
+    enddo
+
+ enddo
+
+ e2ba = 0d0
+ do i=1,A%NDimX
+    if(OmA(i).lt.BigE.and.OmA(i).gt.SmallE) then
+       e2ba = e2ba + tmpA(i)**2 / OmA(i)
+    endif
+ enddo
+
+ e2ba = -4.0d0*e2ba
+ write(LOUT,'(1x,a,f16.8)') 'Ind(A<--B)     = ', e2ba*1000d0
+
+ e2ic = (e2ab + e2ba)
+
+ if(A%Cubic.or.B%Cubic) then
+
+   if(A%ACAlpha==A%ACAlpha0.or.B%ACAlpha==B%ACAlpha0) SAPT%e2ind_a0 = e2ic
+   if(A%ACAlpha==A%ACAlpha1.or.B%ACAlpha==B%ACAlpha1) SAPT%e2ind_a1 = e2ic
+   if(A%ACAlpha==A%ACAlpha2.or.B%ACAlpha==B%ACAlpha2) SAPT%e2ind_a2 = e2ic
+
+   !write(LOUT,'(1x,a,f16.8)') 'A: Alpha     = ',A%ACAlpha
+   !write(LOUT,'(1x,a,f16.8)') 'B: Alpha     = ',B%ACAlpha
+   write(LOUT,'(1x,a,f16.8)') 'E2ind(Alpha)   = ',e2ic*1000d0
+
+ else
+
+    SAPT%e2ind = e2ic
+    write(LOUT,'(1x,a,f16.8)') 'E2ind          = ', e2ic*1000d0
+
+ endif
+
+ deallocate(tmpA)
+ deallocate(WaBB,WbAA)
+ deallocate(EVecA,OmA)
+
+end subroutine e2ind_cpld
 
 subroutine e2ind_unc(Flags,A,B,SAPT)
 implicit none
@@ -534,7 +686,7 @@ double precision,parameter :: SmallE = 1.D-6
  endif
 
  ! calculate deexcitations
- !if(SAPT%DispExc) call e2ind_dexc(Flags,A,B,SAPT)
+ !if(SAPT%Wexcit) call e2ind_dexc(Flags,A,B,SAPT)
 
  deallocate(tmpA)
  deallocate(WaBB,WbAA)
@@ -1027,8 +1179,7 @@ endif
  close(iunit)
  deallocate(work)
 
- ! add keyword!
- !if(SAPT%DispExc)  call e2disp_unc_dexc(Flags,A,B,SAPT)
+ if(SAPT%Wexcit)  call e2disp_unc_dexc(Flags,A,B,SAPT)
 
  ! deallocate Y01Block
  do i=1,A%NDimX
@@ -1194,7 +1345,6 @@ e2d  = -16d0*e2d*1000d0
 call writeampl(tmp1,'PROP_AB0')
 
 write(LOUT,'(/1x,a,f16.8)') 'E2disp(CAS) = ',e2d
-print*, 'E2DISP(CAS) = ',e2d
 
 ! deallocate Y01Block
 do i=1,A%NDimX
@@ -1216,26 +1366,31 @@ deallocate(OmB,OmA)
 end subroutine e2dispCAS
 
 subroutine e2disp_cpld(Flags,A,B,SAPT)
-! CALCULATE ONLY COUPLED E2DISP
+! calculate only coupled E2disp
+! used also for  cubic E2disp
 ! does not work for GVB yet
 implicit none
 
 type(FlagsData)   :: Flags
 type(SystemBlock) :: A, B
 type(SaptData)    :: SAPT
+
 integer :: NBas
 integer :: dimOA,dimVA,dimOB,dimVB,nOVA,nOVB
 integer :: iunit
 integer :: i,j,pq,rs
 integer :: ip,iq,ir,is
+
 double precision             :: fact,e2d
-double precision,allocatable :: OmA(:), OmB(:)
-double precision,allocatable :: EVecA(:), EVecB(:)
+double precision,allocatable :: OmA(:),OmB(:)
+double precision,allocatable :: EVecA(:),EVecB(:)
 double precision,allocatable :: tmp1(:,:),tmp2(:,:)
 double precision,allocatable :: work(:)
 
+character(:),allocatable     :: propA,propB
+
 !double precision,parameter :: SmallE = 1.D-1
-double precision,parameter :: BigE = 1.D8 
+double precision,parameter :: BigE   = 1.D8 
 double precision,parameter :: SmallE = 1.D-3
 
  ! NOWE
@@ -1253,7 +1408,7 @@ double precision,parameter :: SmallE = 1.D-3
  endif
 
 ! print thresholds
- if(SAPT%IPrint>1) then 
+ if(SAPT%IPrint>5) then 
     write(LOUT,'(/,1x,a)') 'Thresholds in E2disp:'
     write(LOUT,'(1x,a,2x,e15.4)') 'SmallE      =', SmallE
     write(LOUT,'(1x,a,2x,e15.4)') 'BigE        =', BigE
@@ -1264,19 +1419,23 @@ double precision,parameter :: SmallE = 1.D-3
  dimVA = A%num1+A%num2
  dimOB = B%num0+B%num1
  dimVB = B%num1+B%num2
- nOVA = dimOA*dimVA
- nOVB = dimOB*dimVB
+ nOVA  = dimOA*dimVA
+ nOVB  = dimOB*dimVB
 
  allocate(EVecA(A%NDimX*A%NDimX))
  allocate(tmp1(A%NDimX,B%NDimX),tmp2(A%NDimX,B%NDimX))
 
- if(A%E2dExt.and.B%E2dExt) then
-   call convert_XY_to_Z(EVecA,A%CICoef,A%IndN,A%NDimX,NBas,'PROP_AX') 
- elseif(.not.(A%E2dExt.and.B%E2dExt)) then
-   write(lout,'(/1x,a)') 'Declare E2dAx3 for both monomers!'
-   return
+ if(A%Cubic) then
+   if(A%ACAlpha==A%ACAlpha0) then
+      propA = 'PROP_A0'
+   elseif(A%ACAlpha==A%ACAlpha1) then
+      propA = 'PROP_A1'
+   elseif(A%ACAlpha==A%ACAlpha2) then
+      propA = 'PROP_A2'
+   endif
+   call convert_XY_to_Z(EVecA,A%CICoef,A%IndN,A%NDimX,NBas,propA)
  else
-   call readEvecZ(EVecA,A%NDimX,'PROP_A') 
+   call readEvecZ(EVecA,A%NDimX,'PROP_A')
  endif
 
  allocate(work(nOVB))
@@ -1312,12 +1471,17 @@ double precision,parameter :: SmallE = 1.D-3
 
  allocate(EVecB(B%NDimX*B%NDimX))
 
- if(B%E2dExt.and.A%E2dExt) then
-   call convert_XY_to_Z(EVecB,B%CICoef,B%IndN,B%NDimX,NBas,'PROP_BX') 
- elseif(.not.(B%E2dExt.and.A%E2dExt)) then
-   write(lout,'(/1x,a)') 'Declare E2dAx3 for both monomers!'
+ if(B%Cubic) then
+   if(B%ACAlpha==B%ACAlpha0) then
+      propB = 'PROP_B0'
+   elseif(B%ACAlpha==B%ACAlpha1) then
+      propB = 'PROP_B1'
+   elseif(B%ACAlpha==B%ACAlpha2) then
+      propB = 'PROP_B2'
+   endif
+   call convert_XY_to_Z(EVecB,B%CICoef,B%IndN,B%NDimX,NBas,propB)
  else
-   call readEvecZ(EVecB,B%NDimX,'PROP_B') 
+   call readEvecZ(EVecB,B%NDimX,'PROP_B')
  endif
 
  call dgemm('N','N',A%NDimX,B%NDimX,B%NDimX,1d0,tmp1,A%NDimX,EVecB,B%NDimX,0d0,tmp2,A%NDimX)
@@ -1325,11 +1489,15 @@ double precision,parameter :: SmallE = 1.D-3
  deallocate(EVecB,tmp1)
 
  allocate(OmA(A%NDimX),OmB(B%NDimX))
- if(A%E2dExt.and.B%E2dExt) then
-   call readEvalXY(OmA,A%NDimX,'PROP_AX')
-   call readEvalXY(OmB,B%NDimX,'PROP_BX')
+ if(A%Cubic) then
+   call readEvalXY(OmA,A%NDimX,propA)
  else
    call readEvalZ(OmA,A%NDimX,'PROP_A')
+ endif 
+ 
+ if(B%Cubic) then
+   call readEvalXY(OmB,B%NDimX,propB)
+ else
    call readEvalZ(OmB,B%NDimX,'PROP_B')
  endif
 
@@ -1354,15 +1522,15 @@ double precision,parameter :: SmallE = 1.D-3
 
  e2d  = -16d0*e2d
 
- if(A%E2dExt.or.B%E2dExt) then
+ if(A%Cubic.or.B%Cubic) then
 
-   SAPT%e2disp_ax3 = e2d
-   write(LOUT,'(/1x,a)') 'E2disp for the ax^3+bx+c model'
-   write(LOUT,'(1x,a,f16.8)') 'A: Alpha      = ',A%ACAlpha
-   write(LOUT,'(1x,a,f16.8)') 'B: Alpha      = ',B%ACAlpha
-   write(LOUT,'(1x,a,f16.8)') 'E2disp(Alpha) = ',e2d*1000
+   if(A%ACAlpha==A%ACAlpha0.or.B%ACAlpha==B%ACAlpha0) SAPT%e2disp_a0 = e2d
+   if(A%ACAlpha==A%ACAlpha1.or.B%ACAlpha==B%ACAlpha1) SAPT%e2disp_a1 = e2d
+   if(A%ACAlpha==A%ACAlpha2.or.B%ACAlpha==B%ACAlpha2) SAPT%e2disp_a2 = e2d
 
-   call e2disp_ax3bxc(Flags,A,B,SAPT)
+   !write(LOUT,'(1x,a,f16.8)') 'A: Alpha      = ',A%ACAlpha
+   !write(LOUT,'(1x,a,f16.8)') 'B: Alpha      = ',B%ACAlpha
+   write(LOUT,'(1x,a,f16.8)') 'E2disp(Alpha)  = ',e2d*1000
 
  else
 
@@ -1371,13 +1539,16 @@ double precision,parameter :: SmallE = 1.D-3
 
  endif 
 
+ ! write amplitude to a file
+ call writeampl(tmp2,'PROP_AB')
+
  deallocate(OmB,OmA)
  deallocate(tmp2)
  deallocate(work)
 
 end subroutine e2disp_cpld
 
-subroutine e2disp_ax3bxc(Flags,A,B,SAPT)
+subroutine e2_cubic(Flags,A,B,SAPT)
 ! calculate 2nd order dispersion energy
 ! extrapolated according to E2disp = ax^3+bx+c formula
 implicit none
@@ -1386,30 +1557,70 @@ type(FlagsData)   :: Flags
 type(SystemBlock) :: A, B
 type(SaptData)    :: SAPT
 
-double precision  :: xVar
-double precision  :: coefA,coefB,coefC
-double precision  :: e2disp_ext
+integer           :: i
+double precision  :: xVar,Alpha10
+double precision  :: coefA(4),coefB(4),coefC(4)
+double precision  :: e2ind_cub,e2disp_cub
+double precision  :: e2exi_cub,e2exd_cub
 
-if(A%E2dExt) then
+if(A%Cubic) then
    xVar = A%ACAlpha
+   Alpha10 = (A%ACAlpha1 - A%ACAlpha0)
 else
    xVar = B%ACAlpha
+   Alpha10 = (B%ACAlpha1 - B%ACAlpha0)
 endif
 
-coefC = SAPT%e2disp_unc
-coefB = SAPT%e2disp_sc-SAPT%e2disp_unc
-coefA = (SAPT%e2disp_ax3 - coefB*xVar - coefC ) / xVar**3
+! induction
+coefC(1) = SAPT%e2ind_a0
+coefB(1) = (SAPT%e2ind_a1 - SAPT%e2ind_a0) / Alpha10 
+coefA(1) = (SAPT%e2ind_a2 - coefB(1)*xVar - coefC(1) ) / xVar**3
 
-print*,'A = ', coefA
-print*,'B = ', coefB
-print*,'C = ', coefC
+e2ind_cub  = coefA(1) + coefB(1) + coefC(1)
+SAPT%e2ind = e2ind_cub
 
-xVar = 1
-e2disp_ext = coefA * xVar**3 + coefB * xVar + coefC
+! dispersion
+coefC(2) = SAPT%e2disp_a0
+coefB(2) = (SAPT%e2disp_a1 - SAPT%e2disp_a0) / Alpha10 
+coefA(2) = (SAPT%e2disp_a2 - coefB(2)*xVar - coefC(2) ) / xVar**3
 
-write(LOUT,'(/1x,a,f16.8)') 'E2disp-ax3   = ',e2disp_ext*1000
+e2disp_cub  = coefA(2) + coefB(2) + coefC(2)
+SAPT%e2disp = e2disp_cub
 
-end subroutine e2disp_ax3bxc
+! exch-induction
+coefC(3) = SAPT%e2exi_a0
+coefB(3) = (SAPT%e2exi_a1 - SAPT%e2exi_a0) / Alpha10 
+coefA(3) = (SAPT%e2exi_a2 - coefB(3)*xVar - coefC(3) ) / xVar**3
+
+e2exi_cub    = coefA(3) + coefB(3) + coefC(3)
+SAPT%e2exind = e2exi_cub
+
+! exch-dispersion
+coefC(4) = SAPT%e2exd_a0
+coefB(4) = (SAPT%e2exd_a1 - SAPT%e2exd_a0) / Alpha10 
+coefA(4) = (SAPT%e2exd_a2 - coefB(4)*xVar - coefC(4) ) / xVar**3
+
+e2exd_cub = coefA(4) + coefB(4) + coefC(4)
+SAPT%e2exdisp = e2exd_cub
+
+write(LOUT,'(/,8a10)') ('**********',i=1,4)
+write(LOUT,'(1x,a)') 'SAPT(E2,cubic)'
+write(LOUT,'(8a10)') ('**********',i=1,4)
+
+if(SAPT%IPrint>=5) then
+   coefA = coefA*1d3; coefB = coefB*1d3; coefC = coefC*1d3
+   write(lout,'(1x,a,4a10)')   'coef','IND ','DISP','EXIND','EXDISP'
+   write(lout,'(1x,a,4f10.6)') 'A   ', coefA(1), coefA(2), coefA(3), coefA(4)
+   write(lout,'(1x,a,4f10.6)') 'B   ', coefB(1), coefB(2), coefB(3), coefB(4)
+   write(lout,'(1x,a,4f10.6)') 'C   ', coefC(1), coefC(2), coefC(3), coefC(4)
+endif
+
+write(LOUT,'(/1x,a,f16.8)')'E2ind(cubic)       = ', e2ind_cub*1.0d3
+write(LOUT,'(1x,a,f16.8)') 'E2exch-ind(cubic)  = ', e2exi_cub*1.0d3
+write(LOUT,'(1x,a,f16.8)') 'E2disp(cubic)      = ', e2disp_cub*1.0d3
+write(LOUT,'(1x,a,f16.8)') 'E2exch-disp(cubic) = ', e2exd_cub*1.0d3
+
+end subroutine e2_cubic
 
 subroutine e2disp(Flags,A,B,SAPT)
 ! calculate 2nd order dispersion energy
@@ -1427,6 +1638,7 @@ integer :: iunit
 integer :: i,j,pq,rs
 integer :: ip,iq,ir,is
 integer :: kc,ik,ic
+logical,allocatable          :: condOmA(:),condOmB(:)
 double precision,allocatable :: OmA(:), OmB(:), &
                                 OmA0(:),OmB0(:)
 double precision,allocatable :: EVecA(:), EVecB(:)
@@ -1668,6 +1880,8 @@ elseif(Flags%ICASSCF==0.and.Flags%ISERPA==0) then
 
 endif ! end GVB select
 
+close(iunit)
+
 if(.not.(Flags%ICASSCF==0.and.Flags%ISERPA==0)) then
    ! uncoupled
     e2du = 0d0
@@ -1692,16 +1906,22 @@ if(.not.(Flags%ICASSCF==0.and.Flags%ISERPA==0)) then
 
 endif
 
+ allocate(condOmA(A%NDimX),condOmB(B%NDimX)) 
+ condOmA = (abs(OmA).gt.SmallE.and.abs(OmA).lt.BigE)
+ condOmB = (abs(OmB).gt.SmallE.and.abs(OmB).lt.BigE)
+
  e2d = 0d0
  do j=1,B%NDimX
-    do i=1,A%NDimX
-       if(abs(OmA(i)).gt.SmallE.and.abs(OmB(j)).gt.SmallE&
-          .and.abs(OmA(i)).lt.BigE.and.abs(OmB(j)).lt.BigE) then
+    if(condOmB(j)) then
+       do i=1,A%NDimX
+!          if(abs(OmA(i)).gt.SmallE.and.abs(OmB(j)).gt.SmallE&
+!             .and.abs(OmA(i)).lt.BigE.and.abs(OmB(j)).lt.BigE) then
 
-          e2d = e2d + tmp2(i,j)**2/(OmA(i)+OmB(j))
-
-       endif
-    enddo
+             if(condOmA(i)) then
+                e2d = e2d + tmp2(i,j)**2/(OmA(i)+OmB(j))
+             endif
+       enddo
+    endif
  enddo
  SAPT%e2disp  = -16d0*e2d
 
@@ -1716,13 +1936,13 @@ endif
 
  ! calucate semicoupled and dexcitations
  if(SAPT%SemiCoupled) call e2disp_semi(Flags,A,B,SAPT)
+
  ! calculate extrapolated E2disp
- if(A%E2dExt.or.B%E2dExt) call e2disp_cpld(Flags,A,B,SAPT)
+ if(A%Cubic.or.B%Cubic) call e2disp_cpld(Flags,A,B,SAPT)
 
- ! here: make it a keyword
- !if(SAPT%DispExc)     call e2disp_dexc(Flags,A,B,SAPT)
+ ! calculate Wterms (deexcitations)
+ if(SAPT%Wexcit) call e2disp_dexc(Flags,A,B,SAPT)
 
- close(iunit)
  deallocate(work)
 
  if(Flags%ICASSCF==1) then
@@ -1740,6 +1960,7 @@ endif
     deallocate(Y01BlockB,Y01BlockA)
  endif
  
+ deallocate(condOmB,condOmA)
  deallocate(tmp02,tmp01,tmp2,tmp1)
  deallocate(OmB0,OmA0,OmB,EVecB,OmA,EVecA)
 
@@ -1916,9 +2137,9 @@ end subroutine e2disp_semi
 subroutine e2ind_dexc(Flags,A,B,SAPT)
 implicit none
 
-type(FlagsData) :: Flags
+type(FlagsData)   :: Flags
 type(SystemBlock) :: A, B
-type(SaptData) :: SAPT
+type(SaptData)    :: SAPT
 
 double precision,allocatable :: OmA(:),OmB(:)
 double precision,allocatable :: EVecA(:,:),EVecB(:,:)
@@ -1941,6 +2162,14 @@ double precision,parameter :: SmallE = 1.D-6
 NBas = A%NBasis 
 
 write(lout,'(/1x,a)') 'W_ij corrections for E2ind in excited states: (A*<-B)'
+
+! safety check
+! in the future this subroutine should work
+! also for the (A-B*) case
+if(B%Wexcit) then
+   write(lout,'(/1x,a)') '(B*-A) not avail. Set (A*-B) for W_ij corrections!'
+   return
+endif
 
 ! establish the type of correction: W_0j, W_1j, ...
 ! get info about monomer A
@@ -1982,9 +2211,9 @@ do i=1,A%NDimX
    endif
    
 enddo
-write(lout,'(1x,a,i3)') 'offset = ', offset
-write(lout,'(1x,a,f6.4)')  'OmA(1): ', OmA(1+offset)
-write(lout,'(1x,a,f6.4)')  'OmA(2): ', OmA(2+offset)
+!write(lout,'(1x,a,i3)') 'offset = ', offset
+!write(lout,'(1x,a,f6.4)')  'OmA(1): ', OmA(1+offset)
+!write(lout,'(1x,a,f6.4)')  'OmA(2): ', OmA(2+offset)
 
 tmpA = 0d0
 do pq=1,A%NDimX
@@ -2000,7 +2229,7 @@ do pq=1,A%NDimX
 
 enddo
 
-print*, 'tmpA',norm2(tmpA)
+!print*, 'tmpA',norm2(tmpA)
 
 Wij = 0d0
 do i=1+offset,nStSum+offset
@@ -2052,6 +2281,14 @@ double precision,parameter :: SmallE = 1.D-4
 
 write(lout,'(/1x,a)') 'W_ij corrections for E2ind and E2disp in excited states: (A*-B)'
 
+! safety check
+! in the future this subroutine should work
+! also for the (A-B*) case
+if(B%Wexcit) then
+   write(lout,'(/1x,a)') '(B*-A) not avail. Set (A*-B) for W_ij corrections!'
+   return
+endif
+
 ! set dimensions
 NBas = A%NBasis
 
@@ -2076,8 +2313,8 @@ iStA = A%InSt(1,1)
 
 ! number of state above the reference
 ! accessible from SA-CAS calculation
-!nStSum = nStates - istA + 1
-nStSum = 2
+nStSum = nStates - istA + 1
+!nStSum = 2
 
 write(lout,'(1x,a,i2)') 'The number of available states is: ', nStates
 write(lout,'(1x,a,i2,a,i1/)') 'The reference state is:',A%InSt(1,1),'.',A%InSt(2,1)
@@ -2103,12 +2340,12 @@ do i=1,A%NDimX
    
 enddo
 
-write(lout,'(1x,a,3x,i3)') 'offset: ', offset
-write(lout,'(1x,a,3x,i3)') 'nStSum: ', nStSum
-
-write(lout,'(1x,a,f6.4)')  'OmA(1): ', OmA(1+offset)
-write(lout,'(1x,a,f6.4)')  'OmA(2): ', OmA(2+offset)
-write(lout,'(1x,a,f6.4/)') 'OmA(3): ', OmA(3+offset)
+!write(lout,'(1x,a,3x,i3)') 'offset: ', offset
+!write(lout,'(1x,a,3x,i3)') 'nStSum: ', nStSum
+!
+!write(lout,'(1x,a,f6.4)')  'OmA(1): ', OmA(1+offset)
+!write(lout,'(1x,a,f6.4)')  'OmA(2): ', OmA(2+offset)
+!write(lout,'(1x,a,f6.4/)') 'OmA(3): ', OmA(3+offset)
 
 ! induction part
 ! E2IND(A<--B)
@@ -2156,7 +2393,7 @@ Wij = 4.0d0*Wij
 j = iStA
 do i=1,nStSum
    write(lout,'(1x,a,2i1,a,f12.6)') 'Wind_',iStA-1,j,'  =',Wij(i)*1000d0
-   write(lout,*) Wij(i)
+   !write(lout,*) Wij(i)
    j = j + 1
 enddo
 

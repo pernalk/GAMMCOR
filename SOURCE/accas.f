@@ -821,10 +821,10 @@ C
       Call Y01CASLR_FOFO(Occ,URe,XOne,ABPLUS,ABMIN,
      $ MultpC,NSymNO,
      $ SRKer,WGrid,OrbGrid,
-     $ 'PROP0','PROP1',
+     $ 'PROP0','PROP1','XY0',
      $ IndN,IndX,IGem,NAcCAS,NInAcCAS,
      $ NGrid,NDimX,NBasis,NDimX,NInte1,NoSt,
-     $ 'EMPTY','FFOOERF','FOFOERF',0,IFunSRKer,ECASSCF,ECorr)
+     $ 'FOFO','FFOOERF','FOFOERF',0,IFunSRKer,ECASSCF,ECorr)
 C
       ElseIf(ITWoEl.Eq.1) Then
 C 

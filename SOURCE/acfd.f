@@ -988,8 +988,6 @@ C
       NAct=NAcCAS
       INActive=NInAcCAS
 C
-C      Print*, 'NFree2,NDimX',NFree2,NDimX
-C
       NoEig=NDimX
 C
       Do I=1,NDimX
@@ -7057,7 +7055,7 @@ C
       Character*32 Str
 C
 C     grep ' !MCSCF STATE' filename.out > sacas_ene.dat
-      Write(6,'(\)')
+      Write(6,'()')
       Open(10,File="sacas_ene.dat",Status='Old')
       NoState=InSt(1,1)
       Do I=1,NoState

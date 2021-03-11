@@ -171,7 +171,7 @@ C     do not correlate active degenerate orbitals if from different geminals
      $.Or.
      $ (ICASSCF.Eq.1.
      $ .And.(IndAux(I).Eq.1).And.(IndAux(J).Eq.1) 
-     $ .And.(Abs(Occ(I)-Occ(J))/Occ(I).Lt.1.D-2)) ) Then
+     $ .And.(Abs(Occ(I)-Occ(J))/Occ(I).Lt.ThrSelAct)) ) Then
 C
       Write(6,'(2X,"Discarding nearly degenerate pair ",2I4)')I,J
 C
@@ -1547,11 +1547,7 @@ C
 C 
       Do K=1,NDimX
 C
-      If(Eig(K).Ge.Zero) Then
-      SQRTEig=SQRT(Eig(K))
-      Else
       SQRTEig=SQRT(Abs(Eig(K)))
-      EndIf
 C
       APLSQRT(I,J)=APLSQRT(I,J)+HlpAB(K,I)*SQRTEig*HlpAB(K,J)
 C
@@ -1567,8 +1563,13 @@ C
       Write(6,*)"The number of negative eigenvalues of A+ is",NoNeg
       EndIf
 C
-      Call MultpM(HlpAB,ABMIN,APLSQRT,NDimX)
-      Call MultpM(EigY,APLSQRT,HlpAB,NDimX)
+C      Call MultpM(HlpAB,ABMIN,APLSQRT,NDimX)
+C      Call MultpM(EigY,APLSQRT,HlpAB,NDimX)
+C
+      Call dgemm('N','N',NDimX,NDimX,NDimX,1d0,ABMIN,NDimX,
+     $           APLSQRT,NDimX,0d0,HlpAB,NDimX)
+      Call dgemm('N','N',NDimX,NDimX,NDimX,1d0,APLSQRT,NDimX,
+     $           HlpAB,NDimX,0d0,EigY,NDimX)
 C
       Call Diag8(EigY,NDimX,NDimX,Eig,Work)
 C
@@ -1580,7 +1581,11 @@ C
       HlpAB(J,I)=EigY(NDimX*(J-1)+I)
       EndDo
       EndDo
-      Call MultpM(EigY,APLSQRT,HlpAB,NDimX)
+
+C      Call MultpM(EigY,APLSQRT,HlpAB,NDimX)
+C
+      Call dgemm('N','N',NDimX,NDimX,NDimX,1d0,APLSQRT,NDimX,
+     $           HlpAB,NDimX,0d0,EigY,NDimX)
 C
 C     IMPOSE THE NORMALIZATION 2 Y*X = 1 ON THE EIGENVECTORS CORRESPONDING TO POSITIVE
 C     OMEGA'S 
@@ -2031,7 +2036,7 @@ C
 C     do not correlate active degenerate orbitals if from different geminals
       If((IAuxGem(I).Ne.IAuxGem(J)).And.(IndAux(I).Eq.1).And.
      $ (IndAux(J).Eq.1)
-     $ .And.(Abs(Occ(I)-Occ(J))/Occ(I).Lt.1.D-2) ) Then
+     $ .And.(Abs(Occ(I)-Occ(J))/Occ(I).Lt.ThrSelAct) ) Then
 C
       Write(*,*)"Discarding nearly degenerate pair",I,J
 C
@@ -2257,7 +2262,8 @@ C
 C
 C     do not correlate degenerate active degenerate orbitals if from different geminals
       If((IAuxGem(I).Ne.IAuxGem(J)).And.(IndAux(I).Eq.1).And.
-     $ (IndAux(J).Eq.1).And.(Abs(Occ(I)-Occ(J))/Occ(I).Lt.1.D-2) ) Then
+     $ (IndAux(J).Eq.1).And.(Abs(Occ(I)-Occ(J))/Occ(I).Lt.ThrSelAct) )
+     $ Then
 C
       Write(*,*)"Discarding nearly degenerate pair",I,J
 C
@@ -2504,7 +2510,7 @@ C
 C     do not correlate idegenerate active degenerate orbitals if from different geminals
       If((IAuxGem(I).Ne.IAuxGem(J)).And.(IndAux(I).Eq.1).And.
      $ (IndAux(J).Eq.1)
-     $ .And.(Abs(Occ(I)-Occ(J))/Occ(I).Lt.1.D-2) ) Then
+     $ .And.(Abs(Occ(I)-Occ(J))/Occ(I).Lt.ThrSelAct) ) Then
 C     
       Write(*,*)"Discarding nearly degenerate pair",I,J
 C
