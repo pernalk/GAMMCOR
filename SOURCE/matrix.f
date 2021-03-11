@@ -4,7 +4,13 @@ c*** matrix multiplication c = a*b, with a, b and c square matrices
 c
       implicit real*8 (a-h,o-z),integer(i-n)
       dimension a(ndim*ndim),b(ndim*ndim),c(ndim*ndim)
-c
+
+! Suggestion:
+!      dimension a(ndim,ndim),b(ndim,ndim),c(ndim,ndim)
+!      call dgemm('N','N',ndim,ndim,ndim,1.d0, &
+!        a, ndim, b, ndim, 0.d0, c, ndim)
+!      return
+
       c(1:ndim*ndim)=0.d0
       do i=1,ndim
         ii=(i-1)*ndim
@@ -28,6 +34,9 @@ c
 c**  multiplication of vector * matrix
 c**    vec2(i) = vec1(j) * xmat(j,i) sum over j
 c
+! Suggestion:
+!  Use dgemv
+
       implicit real*8 (a-h,o-z),integer(i-n)
       dimension vec1(ndim),xmat(ndim,ndim),vec2(ndim)
       do i=1,ndim
