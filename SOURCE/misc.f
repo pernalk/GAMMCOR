@@ -45,14 +45,14 @@ C
       Close(10)
 C
       EndIf
-C 
+C
       Return
       End
 
 *Deck TrTwoEl
-      Subroutine TrTwoEl(CoulNO,ExchNO,URe,TwoEl,NBasis,NInte2) 
+      Subroutine TrTwoEl(CoulNO,ExchNO,URe,TwoEl,NBasis,NInte2)
 C
-C     CALCULATE COULOMB AND EXCHANGE INTEGRALS IN NO REPRESENTATION 
+C     CALCULATE COULOMB AND EXCHANGE INTEGRALS IN NO REPRESENTATION
 C
       Implicit Real*8 (A-H,O-Z)
 C
@@ -60,7 +60,7 @@ C
 C
       Parameter(Tol=1.D-12)
 C
-      Dimension 
+      Dimension
      $ CoulNO(NBasis*(NBasis+1)/2),ExchNO(NBasis*(NBasis+1)/2),
      $ URe(NBasis,NBasis),TwoEl(NInte2)
 C
@@ -90,7 +90,7 @@ C
       Do 30 L=1,K
       KL=KL+1
 C
-      If(IJ.Lt.KL) GoTo 30 
+      If(IJ.Lt.KL) GoTo 30
       NAddr=NAddr+1
       TwoZet=Two*TwoEl(NAddr)
 C
@@ -126,7 +126,7 @@ C
 C
    40 Continue
 C
-      If(K.Eq.L.Or.I.Eq.J) GoTo 30 
+      If(K.Eq.L.Or.I.Eq.J) GoTo 30
 C
       Do 50 IA=1,NBasis
 C
@@ -146,9 +146,9 @@ C
    20 Continue
 C
       IJ=0
-      Do 60 I=1,NBasis 
+      Do 60 I=1,NBasis
       Do 60 J=1,I
-      IJ=IJ+1 
+      IJ=IJ+1
 C
       IAB=0
       Do 60 IA=1,NBasis
@@ -156,8 +156,8 @@ C
       IAB=IAB+1
       FacAB=Two
       If (IA.Eq.IB) FacAB=One
-      CoulNO(IJ)=CoulNO(IJ)+FacAB*URe(J,IA)*URe(J,IB)*Hlp2(I,IAB)      
-   60 ExchNO(IJ)=ExchNO(IJ)+FacAB*URe(J,IA)*URe(J,IB)*Hlp1(I,IAB)   
+      CoulNO(IJ)=CoulNO(IJ)+FacAB*URe(J,IA)*URe(J,IB)*Hlp2(I,IAB)
+   60 ExchNO(IJ)=ExchNO(IJ)+FacAB*URe(J,IA)*URe(J,IB)*Hlp1(I,IAB)
 C
       Return
       End
@@ -315,7 +315,7 @@ C
 C
       Return
       End
-      
+
 *Deck TwoNO
       Subroutine TwoNO(TNO,URe,TwoEl,NBasis,NInte2)
 C
@@ -524,20 +524,97 @@ C
       Return
       End
 
-
 *Deck Diag8
-      Subroutine Diag8(C,NDim,NVar,AII,AJJ)
-C
+      Subroutine Diag8_old(C,NDim,NVar,AII,AJJ)
+
       Real*8 C,AII,AJJ
-C
-C     GENERAL PURPOSE DIAGONALIZATION ROUTINE
-C
+!
+!     GENERAL PURPOSE DIAGONALIZATION ROUTINE
+!
       Call Tred8(NDim,NVar,AII,AJJ,C)
       Call Tql8(NDim,NVar,AII,AJJ,C,IErr)
       If(IErr.Eq.0) Return
-C
+
       Stop
       End
+
+      subroutine Diag8(A, nmax, n, eigenvalues, Work_unused)
+      ! replaces the old diag8 above
+      implicit none
+      integer, intent(in)            :: nmax,n
+      double precision, intent(inout):: A(nmax,n)
+      double precision, intent(out)  :: eigenvalues(n)
+      double precision, intent(in)   :: work_unused(*)
+
+      double precision, allocatable  :: work(:,:)
+      integer         , allocatable  :: iwork(:)
+      integer                        :: lwork, liwork, info
+      integer                        :: i,j
+
+      lwork = 1
+      liwork = 1
+      allocate (work(lwork,1),iwork(liwork))
+
+      ! Determine optimal size for work arrays
+      lwork = -1
+      liwork = -1
+      call DSYEVD( 'V', 'L', n, A, nmax, eigenvalues, work, lwork,
+     $             iwork, liwork, info )
+      if (info < 0) then
+         deallocate (work,iwork)
+         print *, 'Diag8: ',
+     $     ' DSYEVD: the ',-info,'-th argument had an illegal value'
+         stop 2
+      endif
+
+      lwork  = max(int(work(1,1)), 2*n*n + 6*n+ 1)
+      liwork = max(iwork(1), 5*n + 3)
+
+!     /!\ liwork becomes negative when > 2147483648 (integer*4 overflow)
+      if ((liwork < 0) .or. (lwork < 0)) then
+         deallocate (work,iwork)
+         print *, 'Diag8: ',
+     $     ' Required work space too large'
+         stop 3
+      endif
+
+      ! Allocate temporary arrays
+      deallocate (work,iwork)
+      allocate (work(lwork,1),iwork(liwork))
+
+      ! Diagonalize
+      call DSYEVD( 'V', 'L', n, A, nmax, eigenvalues, work, lwork,
+     $      iwork, liwork, info)
+
+      deallocate(work,iwork)
+
+      if (info < 0) then
+         deallocate (work,iwork)
+         print *, 'Diag8:',
+     $      ': DSYEVD: the ',-info,'-th argument had an illegal value'
+         stop 2
+      else if( info > 0 ) then
+         deallocate (work,iwork)
+         write(*,*)'DSYEVD Failed'
+         stop 1
+      end if
+
+      ! Transpose result
+      allocate(work(size(A,1),size(A,2)))
+      work(:,:) = A(:,:)
+      do j=1,n
+        do i=1,n
+          A(i,j) = work(j,i)
+        enddo
+      enddo
+      deallocate(work)
+
+! Suggestion :
+!   Remove the transposition, and use the eigenvectors as column vectors
+!   outside of this routine
+
+      end
+
 
 *Deck Tred8
       Subroutine Tred8(NM,N,D,E,Z)
@@ -751,9 +828,9 @@ C
       Subroutine GauLeg(x1,x2,x,w,n)
 C
 C     From "Numerical Recipes, Ch.4.5:
-C     Given the lower and upper limits of integration x1,x2 and given n, 
+C     Given the lower and upper limits of integration x1,x2 and given n,
 C     this routine scales the range of integration from (x1,x2) to
-C     (-1,1) and provides abscissas x(1:n) and weights w(1:n) 
+C     (-1,1) and provides abscissas x(1:n) and weights w(1:n)
 C     of the Gauss-Legendre n-point quadrature formula
 C
       Implicit Real*8 (A-H,O-Z)

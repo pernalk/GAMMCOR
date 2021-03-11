@@ -23,8 +23,7 @@ OBJ = $(O)mainp.o $(O)initia.o $(O)dmscf.o $(O)misc.o $(O)optocc.o \
 
 FCC = ifort -assume byterecl
 FFLAGS = -mkl -heap-arrays  -O3 -I xcfun_intel/fortran
-LIBS = -L/opt/intel/composer_xe_2015.2.164/mkl/lib/intel64/ -lmkl_intel_ilp64 -lmkl_sequential -lmkl_core \
--L./xcfun_intel/lib -lxcfun -lopenblas
+LIBS = - -L./xcfun_intel/lib -lxcfun 
 
 $(PROG) :  $(OBJ) 
 	$(FCC) $(FFLAGS) -o $(PROG) $(OBJ) $(LIBS)
