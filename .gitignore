@@ -4,3 +4,4 @@ xcfun_intel/lib/.svn
 TESTS/
 SOURCE/compare_with_prdmft.py
 Makefile_old
+gammcor_verify.py_old
