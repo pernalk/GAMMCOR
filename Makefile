@@ -22,9 +22,11 @@ OBJ = $(O)mainp.o $(O)initia.o $(O)dmscf.o $(O)misc.o $(O)optocc.o \
       xcfun_intel/fortran/xcfun_module.o xcfun_intel/fortran/xcfun_autogen.o
 
 FCC = ifort -assume byterecl
-FFLAGS = -mkl -heap-arrays  -O3 -I xcfun_intel/fortran
-LIBS = -L/opt/intel/composer_xe_2015.2.164/mkl/lib/intel64/ -lmkl_intel_ilp64 -lmkl_sequential -lmkl_core \
--L./xcfun_intel/lib -lxcfun -lopenblas
+#FFLAGS = -mkl -heap-arrays  -O3 -I xcfun_intel/fortran
+#LIBS = - -L./xcfun_intel/lib -lxcfun 
+
+FFLAGS = -mkl=parallel -heap-arrays  -O3 -xHost -I xcfun_intel/fortran
+LIBS = - -L./xcfun_intel/lib -lxcfun
 
 $(PROG) :  $(OBJ) 
 	$(FCC) $(FFLAGS) -o $(PROG) $(OBJ) $(LIBS)
@@ -84,7 +86,7 @@ $(O)newton.o : $(S)newton.f
 	$(FCC) $(FFLAGS)  -c $(S)newton.f -o $(O)newton.o
 $(O)acfd.o : $(S)acfd.f $(O)abmats.o $(O)abfofo.o
 	$(FCC) $(FFLAGS)  -c $(S)acfd.f -o $(O)acfd.o
-$(O)accas.o : $(S)accas.f
+$(O)accas.o : $(S)accas.f $(O)abmats.o $(O)abfofo.o
 	$(FCC) $(FFLAGS)  -c $(S)accas.f -o $(O)accas.o
 $(O)xcfun.o : $(S)xcfun.f90
 	$(FCC) $(FFLAGS)  -c $(S)xcfun.f90  -o $(O)xcfun.o
@@ -137,4 +139,3 @@ $(O)ac_exact_2el.o : $(S)ac_exact_2el.f
 .PHONY : clean
 clean :
 	rm $(O)*.o *.mod $(PROG)
-
