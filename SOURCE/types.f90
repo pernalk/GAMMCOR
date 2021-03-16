@@ -283,6 +283,7 @@ type SaptData
      double precision  :: esapt2,esapt0
      double precision  :: e2dispinCAS
      double precision  :: exch_part(5)
+     double precision,allocatable :: Wind(:),Wdisp(:)
      integer :: InterfaceType = INTER_TYPE_DAL
      integer :: SaptLevel = SAPTLEVEL2
      integer :: ic6 = 0
