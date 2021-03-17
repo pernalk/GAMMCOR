@@ -24,8 +24,9 @@ OBJ = $(O)mainp.o $(O)initia.o $(O)dmscf.o $(O)misc.o $(O)optocc.o \
 FCC = ifort -assume byterecl
 #FFLAGS = -mkl -heap-arrays  -O3 -I xcfun_intel/fortran
 #LIBS = - -L./xcfun_intel/lib -lxcfun 
+#-xCommon-avx512 can raplce -xHost 
 
-FFLAGS = -mkl=parallel -heap-arrays  -O3 -xHost -I xcfun_intel/fortran
+FFLAGS = -mkl=parallel -heap-arrays  -O3 -xCommon-avx512 -I xcfun_intel/fortran
 LIBS = - -L./xcfun_intel/lib -lxcfun
 
 $(PROG) :  $(OBJ) 
