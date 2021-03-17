@@ -1,0 +1,17 @@
+K 25
+svn:wc:ra_dav:version-url
+V 36
+/svn/xcfun/!svn/ver/60/trunk/fortran
+END
+xcfun_module.F90
+K 25
+svn:wc:ra_dav:version-url
+V 53
+/svn/xcfun/!svn/ver/60/trunk/fortran/xcfun_module.F90
+END
+example.F90
+K 25
+svn:wc:ra_dav:version-url
+V 48
+/svn/xcfun/!svn/ver/32/trunk/fortran/example.F90
+END
