@@ -5,9 +5,11 @@ import subprocess
 from numpy.testing import assert_allclose
 from numpy.testing import assert_approx_equal
 
+SCRIPT_PATH = os.path.dirname(os.path.abspath(__file__)) + "/"
+os.chdir(SCRIPT_PATH)
+
 ## user defined 
-#RUN_GAMMCOR = "/home/kasia/GAMMCOR/gammcor"
-RUN_GAMMCOR = "/home/kasia/GAMMCOR/prdmft.exe
+RUN_GAMMCOR = "gammcor"
 
 ### functions reading components of SAPT
 ## SAPT ENERGY TAGS
