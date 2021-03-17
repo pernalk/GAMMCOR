@@ -1,3 +1,17 @@
+# NEW README
+
+## Building
+* Using Intel compilers (icc/ipcp & ifort):
+
+    `make`
+
+* Using GCC (gcc/g++ & gfortran):
+
+    `make -f Makefile.gcc`
+
+
+# ORIGINAL README
+
 ** Arbitrary order Exchange-Correlation functional library **
 
 Copyright Ulf Ekstrom <uekstrom@gmail.com> and contributors 2009-2010. 
