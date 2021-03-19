@@ -7456,7 +7456,6 @@ Do NU=1,nAA
                                         Eig(NU)
 EndDo
 
-! hererxxx
 If (IStCAS(1,ICAS).Eq.1.And.IStCAS(2,ICAS).Eq.1) Then
    Open(10,File='eig_1.1.dat')
    Write(10,*)nAA
@@ -7466,30 +7465,33 @@ If (IStCAS(1,ICAS).Eq.1.And.IStCAS(2,ICAS).Eq.1) Then
    Close(10)
 EndIf
 
-If(IStCAS(1,ICAS).Ne.1.Or.IStCAS(2,ICAS).Ne.1) Then
-   INQUIRE(FILE="eig_1.1.dat",EXIST=file_exists)
-   If(file_exists) Then
-      Write(6,'(X," *** AC0D WITH replacements of omegas [eig_1.1.dat available] *** ")')
-      Open(10,File='eig_1.1.dat')
-      Read(10,*) NoEig11
-      Do NU=1,NoEig11
-         Read(10,*) ISt11ERPA(1,NU),ISt11ERPA(2,NU),Eig11(NU)
-         If(ISt11ERPA(1,NU).Eq.IStCAS(1,ICAS).And.ISt11ERPA(2,NU).Eq.IStCAS(2,ICAS)) Then
-            AuxVal=Eig11(NU)
-         EndIf
-      EndDo
-      Close(10)
-
-      Do NU=1,NoEig11
-      Write(6,'(X,"ERPA_1.1 Excit Energy ",I2,".",I1,2F22.12)') &
-       ISt11ERPA(1,NU),ISt11ERPA(2,NU),Eig11(NU),Eig11(NU)-AuxVal
-      Eig11(NU)=Eig11(NU)-AuxVal
-      EndDo
-   Else
-   Write(6,'(X," *** AC0D WITHOUT replacements of omegas [eig_1.1.dat not available] *** ")')
-   NoEig11=0
-   EndIf
-EndIf
+NoEig11=0
+! AC0D' is turned off - no replacement of omegas, even in eig_1.1.dat file exists
+! uncomment to turn AC0D' on
+!If(IStCAS(1,ICAS).Ne.1.Or.IStCAS(2,ICAS).Ne.1) Then
+!   INQUIRE(FILE="eig_1.1.dat",EXIST=file_exists)
+!   If(file_exists) Then
+!      Write(6,'(X," *** AC0D WITH replacements of omegas [eig_1.1.dat available] *** ")')
+!      Open(10,File='eig_1.1.dat')
+!      Read(10,*) NoEig11
+!      Do NU=1,NoEig11
+!         Read(10,*) ISt11ERPA(1,NU),ISt11ERPA(2,NU),Eig11(NU)
+!         If(ISt11ERPA(1,NU).Eq.IStCAS(1,ICAS).And.ISt11ERPA(2,NU).Eq.IStCAS(2,ICAS)) Then
+!            AuxVal=Eig11(NU)
+!         EndIf
+!      EndDo
+!      Close(10)
+!
+!      Do NU=1,NoEig11
+!      Write(6,'(X,"ERPA_1.1 Excit Energy ",I2,".",I1,2F22.12)') &
+!       ISt11ERPA(1,NU),ISt11ERPA(2,NU),Eig11(NU),Eig11(NU)-AuxVal
+!      Eig11(NU)=Eig11(NU)-AuxVal
+!      EndDo
+!   Else
+!   Write(6,'(X," *** AC0D WITHOUT replacements of omegas [eig_1.1.dat not available] *** ")')
+!   NoEig11=0
+!   EndIf
+!EndIf
 
       NegSym(1:8)=0
       Do I=1,NoStMx
@@ -7790,23 +7792,20 @@ EndDo
 
 allocate(IZeroNU(NDimX))
 IZeroNU(1:NDimX)=0
-Do I=1,8
-   If(NegSym(I).Ne.0) Then
-! hererxxx
-!      Do J=1,NegSym(I)
-      Do J=1,NegSym(I)-1
-         ISym=NoERPASym(I)-J+1
-            Do NU=1,NoEig
-               If(IStERPA(1,NU).Eq.ISym.And.IStERPA(2,NU).Eq.I) Then
-! hererxxx
+!Do I=1,8
+!   If(NegSym(I).Ne.0) Then
+!      Do J=1,NegSym(I)-1
+!         ISym=NoERPASym(I)-J+1
+!            Do NU=1,NoEig
+!               If(IStERPA(1,NU).Eq.ISym.And.IStERPA(2,NU).Eq.I) Then
 !                  Write(6,'(X,"Zeroing ERPA EigVal and EigVec in AC0",I2,".",I1,F22.12)') &
 !                       IStERPA(1,NU),IStERPA(2,NU),Eig(NU)
 !                  IZeroNU(NU)=1
-               EndIf
-            EndDo
-      EndDo
-   EndIf
-EndDo
+!               EndIf
+!            EndDo
+!      EndDo
+!   EndIf
+!EndDo
 
 Do IDCORR=1,NoStMx
 If (ICORR(IDCORR).Eq.1) Then

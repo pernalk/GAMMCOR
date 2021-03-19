@@ -263,6 +263,9 @@ C     ground state (state 1.1): 0.2 -0.8 1.5 2.6 6.4
 C     excited state (state neq 1.1): 0.19185565 -0.81488859  1.50106868  2.56648139  6.31514676
 C     see: Hapka et al., J. Phys. Chem. Lett. 2020, 11, 5883−5889
 C
+C     WARNING! The P(X) function is discontinuous at X=1. As a result numerical instability 
+C     (related to the X>1.D0 condition) may occur. The final PiDFT energy value is reliable ONLY up to the 4th decimal place. 
+C
       use types
 C
       Implicit Real*8 (A-H,O-Z)

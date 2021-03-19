@@ -5,8 +5,11 @@ import subprocess
 from numpy.testing import assert_allclose
 from numpy.testing import assert_approx_equal
 
+SCRIPT_PATH = os.path.dirname(os.path.abspath(__file__)) + "/"
+os.chdir(SCRIPT_PATH)
+
 ## user defined 
-RUN_GAMMCOR = "/home/kasia/GAMMCOR/gammcor"
+RUN_GAMMCOR = "gammcor"
 
 ### functions reading components of SAPT
 ## SAPT ENERGY TAGS
@@ -318,7 +321,8 @@ dir_ac1=["TESTS/AC1/TEST1","TESTS/AC1/TEST1/INCORE_INTEG"]
 ### AC0D ##
 dir_ac0d=["TESTS/AC0D/TEST2"]
 ### CASPIDFT ##
-dir_caspidft=["TESTS/CASPIDFT/TEST1","TESTS/CASPIDFT/TEST2"]
+dir_caspidft=["TESTS/CASPIDFT/TEST1"]
+# "TESTS/CASPIDFT/TEST2"] - this calculation is numerically unstable
 ### AC0-GVB ##
 dir_ac0gvb=["TESTS/AC0GVB/TEST1","TESTS/AC0GVB/TEST1/INCORE_INTEG"]
 ### AC-GVB ##
@@ -334,10 +338,6 @@ dir_ac0_hf_dalton=["TESTS/AC0_HF_DALTON"]
 #
 # run tests
 #
-print ("* testing PIDFT energy")
-run_test(dir_caspidft,caspidft_en)
-sys.exit()
-
 print("* testing SAPT energy components \n")
 run_test_sapt(dir_sapt2,'sapt2')
 #run_test_sapt(dir_sapt0,'sapt0')

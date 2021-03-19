@@ -1941,7 +1941,7 @@ endif
  if(A%Cubic.or.B%Cubic) call e2disp_cpld(Flags,A,B,SAPT)
 
  ! calculate Wterms (deexcitations)
- if(SAPT%Wexcit) call e2disp_dexc(Flags,A,B,SAPT)
+ if(SAPT%Wexcit) call e2inddisp_dexc(Flags,A,B,SAPT)
 
  deallocate(work)
 
@@ -2254,7 +2254,7 @@ deallocate(EVecA,OmA)
 
 end subroutine e2ind_dexc
 
-subroutine e2disp_dexc(Flags,A,B,SAPT)
+subroutine e2inddisp_dexc(Flags,A,B,SAPT)
 type(FlagsData)   :: Flags
 type(SystemBlock) :: A, B
 type(SaptData)    :: SAPT
@@ -2397,6 +2397,10 @@ do i=1,nStSum
    j = j + 1
 enddo
 
+! save Wind
+allocate(SAPT%Wind(nStSum))
+SAPT%Wind = Wij
+
 deallocate(WbAA,tmpA)
 write(lout,*) ''
 
@@ -2452,6 +2456,10 @@ do i=1,nStSum
    j = j + 1
 enddo
 
+! save Wdisp
+allocate(SAPT%Wdisp(nStSum))
+SAPT%Wdisp = Wij
+
 close(iunit)
 
 deallocate(work)
@@ -2461,7 +2469,7 @@ deallocate(Wij)
 deallocate(EVecB,OmB)
 deallocate(EVecA,OmA)
 
-end subroutine e2disp_dexc
+end subroutine e2inddisp_dexc
 
 subroutine e2disp_unc_dexc(Flags,A,B,SAPT)
 type(FlagsData)   :: Flags
