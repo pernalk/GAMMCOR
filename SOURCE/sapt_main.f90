@@ -5226,7 +5226,7 @@ implicit none
 
 type(SaptData) :: SAPT
 
-integer          :: i
+integer          :: i,j
 double precision :: esapt2
 
 SAPT%esapt2 = SAPT%elst + SAPT%exchs2 + SAPT%e2ind &
@@ -5250,6 +5250,22 @@ if(SAPT%SaptLevel==2) then
    write(LOUT,'(1x,a,f16.8)') 'E2disp      = ', SAPT%e2disp*1.d03
    write(LOUT,'(1x,a,f16.8)') 'E2exch-disp = ', SAPT%e2exdisp*1.0d3
    write(LOUT,'(1x,a,f16.8)') 'Eint(SAPT2) = ', SAPT%esapt2*1.0d3
+
+   if(SAPT%Wexcit) then
+     write(lout,'(/1x,a)') 'Dexcitation corrections' 
+     j = SAPT%monA%InSt(1,1)
+     do i=1,size(SAPT%Wind)
+        write(lout,'(1x,a,2i1,a,f12.6)') & 
+             'Wind_',SAPT%monA%InSt(1,1)-1,j,'     =', SAPT%Wind(i)*1000d0
+        j = j + 1
+     enddo
+     j = SAPT%monA%InSt(1,1)
+     do i=1,size(SAPT%Wdisp)
+        write(lout,'(1x,a,2i1,a,f12.6)') & 
+             'Wdisp_',SAPT%monA%InSt(1,1)-1,j,'    =', SAPT%Wdisp(i)*1000d0
+        j = j + 1
+     enddo
+   endif
 
 elseif(SAPT%SaptLevel==1) then
    write(LOUT,'(1x,a,f16.8)') 'Eint(SAPT1) = ', SAPT%esapt2*1.0d3
@@ -5410,6 +5426,14 @@ if(SAPT%doRSH) then
    call delfile('FOFOERFAA')
    call delfile('FOFOERFBB')
    if(.not.SAPT%SameOm) call delfile('AOERFSORTB')
+endif
+
+! Wind,Wdisp terms
+if(allocated(SAPT%Wind)) then
+   deallocate(SAPT%Wind)
+endif
+if(allocated(SAPT%Wdisp)) then
+   deallocate(SAPT%Wdisp)
 endif
 
 ! cubic dispersion
