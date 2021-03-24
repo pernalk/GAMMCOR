@@ -14,5 +14,6 @@ GAMMCOR_PATH=$PWD/gammcor
 
 # run tests
 echo Running $TEST_SCRIPT_PATH
+# $1 is a testing level
 $TEST_SCRIPT_PATH $GAMMCOR_PATH $1
 #srun --time=30:00 --mem=5G $TEST_SCRIPT_PATH $GAMMCOR_PATH
