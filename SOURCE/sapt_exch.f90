@@ -569,7 +569,8 @@ double precision,allocatable :: work1(:)
 
  exchs2      = t1f+sum(t2a)+sum(t2b)+sum(t2c)+t2d
  SAPT%exchs2 = exchs2
- write(LOUT,'(/1x,a,f16.8)') 'ExchS2      = ', exchs2*1000d0
+ !write(LOUT,'(/1x,a,f16.8)') 'ExchS2      = ', exchs2*1000d0
+ call print_en('ExchS2',exchs2*1000,.true.)
 
  deallocate(Vbaa,Vabb,PBaa,PAbb,Vb,Va,PB,PA,Sab,S)
  deallocate(Kb,Qba,Qab,USb,USa)
@@ -1624,8 +1625,8 @@ double precision,parameter :: BigE = 1.D8
 ! print thresholds
  if(SAPT%IPrint>5) then
     write(LOUT,'(/,1x,a)') 'Thresholds in E2exch-ind:'
-    write(LOUT,'(1x,a,2x,e15.4)') 'SmallE      =', SmallE
-    write(LOUT,'(1x,a,2x,e15.4,/)') 'BigE        =', BigE
+    write(LOUT,'(1x,a,t18,a,e15.4)') 'SmallE','=', SmallE
+    write(LOUT,'(1x,a,t18,a,e15.4)') 'BigE',  '=', BigE
  endif
 
  ! unc
@@ -2002,7 +2003,8 @@ double precision,parameter :: BigE = 1.D8
     e2exi_unc = termX_u + termY_u + termZ_u
 
     SAPT%e2exind_unc = e2exi_unc
-    write(LOUT,'(/1x,a,f16.8)') 'E2exch-ind(unc) =', e2exi_unc*1.0d3
+    !write(LOUT,'(/1x,a,f16.8)') 'E2exch-ind(unc) =', e2exi_unc*1.0d3
+    call print_en('E2exch-ind(unc)',e2exi_unc*1.0d3,.true.)
 
     deallocate(VindX)
     deallocate(uB0,uA0)
@@ -2040,9 +2042,13 @@ double precision,parameter :: BigE = 1.D8
     termX=-2d0*termX
 
     !print*, 'termX',termX
-    if(SAPT%IPrint>=5) write(LOUT,'(/1x,a,f16.8)') 'term Z      = ',  termZ*1.0d3
-    if(SAPT%IPrint>=5) write(LOUT,'(1x,a,f16.8)')  'term Y      = ',  termY*1.0d3
-    if(SAPT%IPrint>=5) write(LOUT,'(1x,a,f16.8)')  'term X      = ',  termX*1.0d3
+    !if(SAPT%IPrint>=5) write(LOUT,'(/1x,a,f16.8)') 'term Z      = ',  termZ*1.0d3
+    !if(SAPT%IPrint>=5) write(LOUT,'(1x,a,f16.8)')  'term Y      = ',  termY*1.0d3
+    !if(SAPT%IPrint>=5) write(LOUT,'(1x,a,f16.8)')  'term X      = ',  termX*1.0d3
+
+    if(SAPT%IPrint>=5) call print_en('term Z',termZ*1.0d3,.true.) 
+    if(SAPT%IPrint>=5) call print_en('term Y',termY*1.0d3,.false.)
+    if(SAPT%IPrint>=5) call print_en('term X',termX*1.0d3,.false.)
 
     e2exi = termX + termY + termZ
 
@@ -2061,7 +2067,8 @@ double precision,parameter :: BigE = 1.D8
 
       ! regular
       SAPT%e2exind = e2exi
-      write(LOUT,'(/1x,a,f16.8)') 'E2exch-ind  = ', e2exi*1.0d3
+      !write(LOUT,'(/1x,a,f16.8)') 'E2exch-ind  = ', e2exi*1.0d3
+      call print_en('E2exch-ind',e2exi*1.0d3,.true.)
 
     endif
 
@@ -2230,8 +2237,8 @@ double precision,parameter :: SmallE = 1.D-3
  ! print thresholds
  if(SAPT%IPrint>5) then
     write(LOUT,'(/,1x,a)') 'Thresholds in E2exch-disp:'
-    write(LOUT,'(1x,a,2x,e15.4)') 'SmallE      =', SmallE
-    write(LOUT,'(1x,a,2x,e15.4,/)') 'BigE        =', BigE
+    write(LOUT,'(1x,a,t18,a,e15.4)') 'SmallE','=', SmallE
+    write(LOUT,'(1x,a,t18,a,e15.4)') 'BigE',  '=', BigE
  endif
 
 ! approximate RDM2
@@ -2786,13 +2793,18 @@ double precision,parameter :: SmallE = 1.D-3
 
     termY_u = -8d0*(SAPT%elst-SAPT%Vnn)*termY_u
 
-    if(SAPT%IPrint>2) write(LOUT,'(/1x,a,f16.8)') 'term Z(unc) = ',  termZ_u*1.0d3
-    if(SAPT%IPrint>2) write(LOUT,'(1x,a,f16.8)')  'term X(unc) = ',  termX_u*1.0d3
-    if(SAPT%IPrint>2) write(LOUT,'(1x,a,f16.8)')  'term Y(unc) = ',  termY_u*1.0d3
+    !if(SAPT%IPrint>2) write(LOUT,'(/1x,a,f16.8)') 'term Z(unc) = ',  termZ_u*1.0d3
+    !if(SAPT%IPrint>2) write(LOUT,'(1x,a,f16.8)')  'term X(unc) = ',  termX_u*1.0d3
+    !if(SAPT%IPrint>2) write(LOUT,'(1x,a,f16.8)')  'term Y(unc) = ',  termY_u*1.0d3
+
+    if(SAPT%IPrint>2) call print_en('term Z(unc)',termZ_u*1.0d3,.true.) 
+    if(SAPT%IPrint>2) call print_en('term X(unc)',termX_u*1.0d3,.false.)
+    if(SAPT%IPrint>2) call print_en('term Y(unc)',termY_u*1.0d3,.false.)
 
     e2exd_u = termX_u + termY_u + termZ_u
     SAPT%e2exdisp_unc = e2exd_u
-    write(LOUT,'(/1x,a,f11.8)') 'E2exch-disp(unc) = ', e2exd_u*1.0d3
+    !write(LOUT,'(/1x,a,f11.8)') 'E2exch-disp(unc) = ', e2exd_u*1.0d3
+    call print_en('E2exch-disp(unc)',e2exd_u*1.0d3,.true.)
 
     ! deallocate SBLOCK
     do iblk=1,nblkA
@@ -2866,9 +2878,11 @@ double precision,parameter :: SmallE = 1.D-3
     enddo
     termX = -4d0*termX
 
-    if(SAPT%IPrint>5) write(LOUT,'(/1x,a,f16.8)') 'term Z      = ',  termZ*1.0d3
-    !write(LOUT,*) 'termX ', termX
-    if(SAPT%IPrint>5)write(LOUT,'(1x,a,f16.8)') 'term X      = ',  termX*1.0d3
+    !if(SAPT%IPrint>5) write(LOUT,'(/1x,a,f16.8)') 'term Z      = ',  termZ*1.0d3
+    !if(SAPT%IPrint>5) write(LOUT,'(1x,a,f16.8)') 'term X      = ',  termX*1.0d3
+   
+    if(SAPT%IPrint>5) call print_en('term Z',termZ*1.0d3,.true.) 
+    if(SAPT%IPrint>5) call print_en('term X',termZ*1.0d3,.false.) 
 
     ! termY
     ! term Y: t_ij
@@ -2895,7 +2909,8 @@ double precision,parameter :: SmallE = 1.D-3
     enddo
 
     termY = -8d0*(SAPT%elst-SAPT%Vnn)*termY
-    if(SAPT%IPrint>5) write(LOUT,'(1x,a,f16.8)') 'term Y      = ',  termY*1.0d3
+    !if(SAPT%IPrint>5) write(LOUT,'(1x,a,f16.8)') 'term Y      = ',  termY*1.0d3
+    if(SAPT%IPrint>5) call print_en('term Y',termY*1.0d3,.false.) 
 
     e2exd = termX + termY + termZ
 
@@ -2914,7 +2929,8 @@ double precision,parameter :: SmallE = 1.D-3
 
     ! regular
     SAPT%e2exdisp     = e2exd
-    write(LOUT,'(/1x,a,f16.8)') 'E2exch-disp = ', e2exd*1.0d3
+    !write(LOUT,'(/1x,a,f16.8)') 'E2exch-disp = ', e2exd*1.0d3
+    call print_en('E2exch-disp',e2exd*1.0d3,.true.)
 
  endif
 
