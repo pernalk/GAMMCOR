@@ -4,7 +4,7 @@ Authors: Kasia Pernal and Michal Hapka
 ## Installation
 #### 1. Clone the repository
 ```
-git clone https://github.com/pernalk/GAMMCOR.git 
+git clone git@gitlab.com:michal.hapka/pr-dmft.git
 ```
 
 #### 2. Change directory to GAMMCOR and create a directory OBJ:
