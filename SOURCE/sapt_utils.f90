@@ -805,4 +805,20 @@ deallocate(VecEx)
 
 end subroutine calc_resp_apsg2
 
+subroutine print_en(string,val,nline)
+implicit none
+
+character(*),intent(in)     :: string
+double precision,intent(in) :: val
+logical,intent(in)          :: nline
+
+if(nline) then
+   write(LOUT,'(/1x,a,t19,a,f16.8)') string, "=", val
+else
+   write(LOUT,'(1x,a,t19,a,f16.8)')  string, "=", val
+endif
+
+end subroutine print_en
+
+
 end module sapt_utils

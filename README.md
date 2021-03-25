@@ -4,7 +4,7 @@ Authors: Kasia Pernal and Michal Hapka
 ## Installation
 #### 1. Clone the repository
 ```
-git clone https://github.com/pernalk/GAMMCOR.git 
+git clone git@gitlab.com:michal.hapka/pr-dmft.git
 ```
 
 #### 2. Change directory to GAMMCOR and create a directory OBJ:
@@ -50,14 +50,8 @@ gammcor
 
 ### Preparation
 1. Obtain test input files from repository:
-
-* For TUL only:
 ```
 git clone git@172.20.50.110:qchem/TESTS
-```
-* Public:
-```
-git clone https://gitlab.version.fz-juelich.de/trex/GammCor
 ```
 2. Open _gammcor_verify.bash_ in the main GAMMCOR directory and assign variable ```TEST_SCRIPT_PATH``` the path to the file ```run_test.py``` located in your TESTS directory
 

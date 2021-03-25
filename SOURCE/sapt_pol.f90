@@ -50,8 +50,10 @@ double precision,external  :: trace
 ! print*, trace(work,NBas) 
  elst = ea + eb + SAPT%Vnn 
 
- write(LOUT,'(1x,a,f16.8)') 'V_nn        = ', SAPT%Vnn
- write(LOUT,'(1x,a,f16.8,/)') 'Eelst       = ', elst*1000d0
+ !write(LOUT,'(1x,a,f16.8)') 'V_nn        = ', SAPT%Vnn
+ !write(LOUT,'(1x,a,f16.8,/)') 'Eelst       = ', elst*1000d0
+ call print_en('V_nn',SAPT%Vnn,.false.)
+ call print_en('Eelst',elst*1000,.false.)
  SAPT%elst = elst
 
 !! test wabb
@@ -208,7 +210,8 @@ double precision :: tmp
     enddo
  enddo
  e2ba = -0.5d0*e2ba
- write(LOUT,'(/,1x,a,f16.8)') 'Ind(B-->A)   = ', e2ba*1000d0 
+ !write(LOUT,'(/,1x,a,f16.8)') 'Ind(B-->A)   = ', e2ba*1000d0 
+ call print_en('Ind(B-->A)',e2ba*1000,.true.)
 
  e2ab=0
  do pq=1,B%NDimX
@@ -224,10 +227,13 @@ double precision :: tmp
     enddo
  enddo
  e2ab = -0.5d0*e2ab
- write(LOUT,'(1x,a,f16.8)') 'Ind(A-->B)   = ', e2ab*1000d0 
+ !write(LOUT,'(1x,a,f16.8)') 'Ind(A-->B)   = ', e2ab*1000d0 
+ call print_en('Ind(A-->B)',e2ab*1000,.false.)
 
  e2ic = (e2ab + e2ba)
- write(LOUT,'(1x,a,f16.8)') 'E2ind       = ', e2ic*1000d0 
+ !write(LOUT,'(1x,a,f16.8)') 'E2ind       = ', e2ic*1000d0 
+ call print_en('E2ind',e2ic*1000,.false.)
+
  SAPT%e2ind = e2ic
 
  deallocate(WaBB,WbAA,AlphaB,AlphaA)
@@ -565,7 +571,8 @@ double precision,parameter :: SmallE = 1.D-6
  enddo
 
  e2ab = -4.0d0*e2ab
- write(LOUT,'(/1x,a,f16.8)') 'Ind(B<--A)     = ', e2ab*1000d0
+ !write(LOUT,'(/1x,a,f16.8)') 'Ind(B<--A)     = ', e2ab*1000d0
+ call print_en('Ind(B<--A)',e2ab*1000,.true.)
 
  deallocate(tmpB)
  deallocate(EVecB,OmB)
@@ -640,11 +647,13 @@ double precision,parameter :: SmallE = 1.D-6
  enddo
 
  e2ba = -4.0d0*e2ba
- write(LOUT,'(1x,a,f16.8)') 'Ind(A<--B)     = ', e2ba*1000d0
+ !write(LOUT,'(1x,a,f16.8)') 'Ind(A<--B)     = ', e2ba*1000d0
+ call print_en('Ind(A<--B)',e2ba*1000,.false.)
 
  e2ic = (e2ab + e2ba)
  SAPT%e2ind = e2ic
- write(LOUT,'(1x,a,f16.8)') 'E2ind          = ', e2ic*1000d0
+ !write(LOUT,'(1x,a,f16.8)') 'E2ind          = ', e2ic*1000d0
+ call print_en('E2ind',e2ic*1000,.false.)
 
  if(Flags%ICASSCF==1) then
 
@@ -672,9 +681,13 @@ double precision,parameter :: SmallE = 1.D-6
     e2ic_unc = (e2ab_unc + e2ba_unc)
     SAPT%e2ind_unc = e2ic_unc
 
-    write(LOUT,'(/1x,a,f16.8)') 'Ind(B<--A,unc) = ', e2ab_unc*1000d0
-    write(LOUT,'(1x,a,f16.8)')  'Ind(A<--B,unc) = ', e2ba_unc*1000d0
-    write(LOUT,'(1x,a,f16.8)')  'E2ind(unc)     = ', e2ic_unc*1000d0
+    !write(LOUT,'(/1x,a,f16.8)') 'Ind(B<--A,unc) = ', e2ab_unc*1000d0
+    !write(LOUT,'(1x,a,f16.8)')  'Ind(A<--B,unc) = ', e2ba_unc*1000d0
+    !write(LOUT,'(1x,a,f16.8)')  'E2ind(unc)     = ', e2ic_unc*1000d0
+
+    call print_en('Ind(B<--A,unc)',e2ab_unc*1000d0,.true.)
+    call print_en('Ind(A<--B,unc)',e2ba_unc*1000d0,.false.)
+    call print_en('E2ind(unc)',e2ic_unc*1000d0,.false.)
 
     do i=1,A%NDimX
        associate(Y => Y01BlockA(i))
@@ -1666,8 +1679,8 @@ double precision,parameter :: SmallE = 1.D-3
 ! print thresholds
  if(SAPT%IPrint>1) then 
     write(LOUT,'(/,1x,a)') 'Thresholds in E2disp:'
-    write(LOUT,'(1x,a,2x,e15.4)') 'SmallE      =', SmallE
-    write(LOUT,'(1x,a,2x,e15.4)') 'BigE        =', BigE
+    write(LOUT,'(1x,a,t18,a,e15.4)') 'SmallE','=', SmallE
+    write(LOUT,'(1x,a,t18,a,e15.4)') 'BigE',  '=', BigE
  endif
 
 ! set dimensions
@@ -1927,9 +1940,11 @@ endif
 
  e2d  = -16d0*e2d*1000d0
 
- write(LOUT,'(/1x,a,f16.8)')'E2disp      = ', e2d
- write(LOUT,'(/1x,a,f16.8)')'E2disp(unc) = ', e2du
-! write(LOUT,*) 'E2DISP',e2d
+ !write(LOUT,'(/1x,a,f16.8)')'E2disp      = ', e2d
+ !write(LOUT,'(/1x,a,f16.8)')'E2disp(unc) = ', e2du
+
+ call print_en('E2disp',e2d,.true.)
+ call print_en('E2disp(unc)',e2du,.false.)
 
  ! write amplitude to a file
  call writeampl(tmp2,'PROP_AB')
@@ -2107,8 +2122,11 @@ e2du  = -16d0*e2du*1000d0
 e2dsp = e2du + 16*e2ds2*1000 
 e2dsc = e2du + (16*e2ds2-32*e2ds1)*1000
 
-write(LOUT,'(1x,a,f16.8)')'E2disp(sp) =  ', e2dsp
-write(LOUT,'(1x,a,f16.8)')'E2disp(sc) =  ', e2dsc
+!write(LOUT,'(1x,a,f16.8)')'E2disp(sp) =  ', e2dsp
+!write(LOUT,'(1x,a,f16.8)')'E2disp(sc) =  ', e2dsc
+
+call print_en('E2disp(sp)',e2dsp,.false.)
+call print_en('E2disp(sc)',e2dsc,.false.)
 
 close(iunit)
 deallocate(work)
