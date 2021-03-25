@@ -40,22 +40,48 @@ cd ..
 make -f Makefile.gcc
 ```
 
-
 This will create GAMMCOR executable:
 ```
 gammcor
 ```
-#### 5. Run the verification suite (optional):
-1. Obtain test input files:
-```
-git clone https://gitlab.version.fz-juelich.de/trex/GammCor
-```
-2. Copy TESTS to a main GAMMCOR directory with a compiled code
-3. Run test suit :
 
+
+## Testing
+
+### Preparation
+1. Obtain test input files from repository:
 ```
-gammcor_verify.py
+git clone git@172.20.50.110:qchem/TESTS
 ```
+2. Open _gammcor_verify.bash_ in the main GAMMCOR directory and assign variable ```TEST_SCRIPT_PATH``` the path to the file ```run_test.py``` located in your TESTS directory
+
+### Manual testing
+Run test script located in the main GAMMCOR directory:
+```
+./gammcor_verify.bash
+```
+
+### Automatic testing
+* ##### Enabling
+1. Go to ```GAMMCOR/_auto_test``` directory
+2. Run ```./install-hooks.bash``` to install test scripts: ```pre-commit.bash```, ```pre-push.bash``` and ```post-merge.bash```
+3. From now on, the tests will be performed before each ```commit``` and ```push``` commands as well as after the ```merge``` command
+
+* ##### Skipping
+To bypass ```pre-commit``` or ```pre-push``` tests, you can use ```--no-verify``` option, e.g.
+```
+git commit --no-verify
+```
+
+* ##### Disabling
+To permanently disable the automatic testing feature, go to ```GAMMCOR/_auto_test``` directory and run ```./uninstall-hooks.bash```
+
+* ##### Adjusting the level of testing
+To customize the list of tests performed for a given _git_ command, you can change level parameter passed to ```gammcor_verify.bash``` in ```pre-commit.bash```, ```pre-push.bash``` and ```post-merge.bash``` scripts. There are three levels: ```'short'```, ```'long'``` and ```'full'``` (default), which correspond to the levels defined for individual tests listed in ```TESTS/scripts/test_list.py```.
+* ```'full'``` will perfom tests with ```'full'```, ```'long'``` and ```'short'``` levels
+* ```'long'``` will perfom tests with ```'long'``` and ```'short'``` levels
+* ```'short'``` will only perfom tests with ```'short'``` level
+
 
 ## Third party software
 Third party software used in GAMMCOR:
