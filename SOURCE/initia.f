@@ -18,6 +18,8 @@ C
       integer :: ione,NBas(8),NSymBas(8),NSymOrb(8),nrhf(8),ioprhf
       logical :: exione,ex 
       double precision, allocatable :: TMPMO(:,:)
+C     test sorter
+      integer(8) :: mem_size
 C
       Character*60 Line
       Character*30 Line1
@@ -97,7 +99,7 @@ C
       If(ITwoEl.Eq.1) Then
       Call read2el(TwoEl,UMOAO,NBasis,NInte2)
       Else
-      Call readtwoint(NBasis,1,'AOTWOINT','AOTWOSORT')
+      Call readtwoint(NBasis,1,'AOTWOINT','AOTWOSORT',mem_size)
       EndIf
 C
       If(ICASSCF.Eq.0) Then
@@ -240,6 +242,7 @@ C
       Subroutine ReadDMRG(XKin,XNuc,ENuc,Occ,URe,
      $ TwoEl,UMOAO,NInte1,NBasis,NInte2,NGem,iORCA)
 C
+      use types
       use sorter
       use tran
       use abmat 
@@ -252,7 +255,7 @@ C
 C
       Real*8 XKin(NInte1),XNuc(NInte1),Occ(NBasis),URe(NBasis,NBasis),
      $ TwoEl(NInte2),UMOAO(NBasis*NBasis)
-C
+C 
       Character*60 FName,Aux1
 C
       Include 'commons.inc'
@@ -265,6 +268,7 @@ C
      $ Fock(NBasis*NBasis),
      $ UAux(NBasis,NBasis),
      $ FockF(NInte1),GammaAB(NInte1),Eps(NBasis,NBasis)
+      Integer(8) mem_size
       Integer(8) IOutInfo
 
       If(iORCA==1) then
@@ -466,7 +470,8 @@ C
 C
       ElseIf(ITwoEl.Gt.1) Then
 C
-      Call readtwoint(NBasis,4,'DPQRS.bin','AOTWOSORT',IOutInfo)
+      Call readtwoint(NBasis,4,'DPQRS.bin','AOTWOSORT',
+     $                mem_size,IOutInfo)
 C
       EndIf
 C
@@ -497,7 +502,8 @@ C
 C
       ElseIf(ITwoEl.Gt.1) Then
 C
-      Call readtwoint(NBasis,3,'intcoul.dat','AOTWOSORT',IOutInfo)
+      Call readtwoint(NBasis,3,'intcoul.dat','AOTWOSORT',
+     $                mem_size,IOutInfo)
 C      Call CheckSaptTwoEl(3,TwoEl,NBasis,NInte2)
 C      Call LoadSaptTwoEl(3,TwoEl,NBasis,NInte2)
       Call readoneint_eugene(XKin,ENuc,'intcoul.dat',NInte1,IOutInfo)
@@ -999,6 +1005,7 @@ C
 C     READ/WRITE THE ONE- AND TWO-ELECTRON INTEGRALS 
 C     INTERFACED WITH MOLPRO (INTEGRALS ARE READ FROM FCIDUMP FILES)
 C
+      use types
       use sorter
       use tran
       use abmat 
@@ -1018,6 +1025,7 @@ C
      $ IndInt(NBasis),NumOSym(15),MultpC(15,15),Fock(NBasis*NBasis),
      $ GammaF(NInte1),FockF(NInte1),GammaAB(NInte1),
      $ work1(NBasis,NBasis)
+      Integer(8) :: mem_size
 c herer!!! delete after tests
 c     $ ,UMOAOInv(NBasis,NBasis),TwoElAO(NInte2)
 C
@@ -1113,10 +1121,10 @@ C
 C     HAP
 C     KP: If IFunSR=6 integrals are not needed and are not loaded
       If (IFunSR.Eq.0.Or.IFunSR.Eq.3.Or.IFunSR.Eq.5) Then
-      Call readtwoint(NBasis,2,'AOTWOINT.mol','AOTWOSORT')
+      Call readtwoint(NBasis,2,'AOTWOINT.mol','AOTWOSORT',mem_size)
       If(ITwoEl.Eq.1) Call LoadSaptTwoEl(3,TwoEl,NBasis,NInte2)
       ElseIf(IFunSR.Eq.1.Or.IFunSR.Eq.2.Or.IFunSR.Eq.4) Then
-      Call readtwoint(NBasis,2,'AOTWOINT.erf','AOERFSORT')
+      Call readtwoint(NBasis,2,'AOTWOINT.erf','AOERFSORT',mem_size)
       If(ITwoEl.Eq.1) Call LoadSaptTwoEl(4,TwoEl,NBasis,NInte2)
       EndIf
 C

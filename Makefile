@@ -6,7 +6,7 @@
 #-L./xcfun/lib -lxcfun -lopenblas
 
 FFLAGS = -O3 -Ixcfun/fortran
-LIBS   = -L./xcfun/lib -lxcfun -L/home/mitek/programy/ATLAS-3.11.39/build/lib -llapack -lcblas -lf77blas -latlas
+LIBS   = -L./xcfun/lib -lxcfun -lopenblas
 FCC = gfortran
 
 include Makefile.common

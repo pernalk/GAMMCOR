@@ -713,6 +713,8 @@ double precision,allocatable :: Va(:),Vb(:),S(:)
 double precision,allocatable :: Ca(:),Cb(:)
 double precision,allocatable :: AuxA(:,:),AuxB(:,:)
 double precision,allocatable :: OneRdmA(:),OneRdmB(:)
+! test sorter
+integer(8) :: mem_size
 
 logical :: doRSH
 double precision,allocatable :: Sa(:,:),Sb(:,:)
@@ -831,16 +833,17 @@ double precision,allocatable :: Sa(:,:),Sb(:,:)
  endif
 
 ! read 2-el integrals
+ mem_size = 134*1024_8**2
  if(SAPT%InterfaceType==1) then
-    call readtwoint(NBasis,1,'AOTWOINT_A','AOTWOSORT')
+    call readtwoint(NBasis,1,'AOTWOINT_A','AOTWOSORT',mem_size)
  elseif(SAPT%InterfaceType==2) then
-    call readtwoint(NBasis,2,'AOTWOINT.mol','AOTWOSORT')
+    call readtwoint(NBasis,2,'AOTWOINT.mol','AOTWOSORT',mem_size)
     if(doRSH) then
        if(SAPT%SameOm) then
-          call readtwoint(NBasis,2,'AOTWOINT.erf','AOERFSORT')
+          call readtwoint(NBasis,2,'AOTWOINT.erf','AOERFSORT',mem_size)
        else
-          call readtwoint(NBasis,2,'AOTWOINT.erf','AOERFSORT')
-          call readtwoint(NBasis,2,'AOTWOINT.erfB','AOERFSORTB')
+          call readtwoint(NBasis,2,'AOTWOINT.erf','AOERFSORT',mem_size)
+          call readtwoint(NBasis,2,'AOTWOINT.erfB','AOERFSORTB',mem_size)
        endif
     endif
  endif

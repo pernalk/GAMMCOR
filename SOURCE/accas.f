@@ -692,7 +692,7 @@ C
       EndIf
       FName(K:K+10)='.reg.integ'
 C      Call Int2_AO(TwoEl2,NumOSym,MultpC,FName,NInte1,NInte2,NBasis)
-      Call readtwoint(NBasis,2,'AOTWOINT.mol','AOTWOSORT')
+      Call readtwoint(NBasis,2,'AOTWOINT.mol','AOTWOSORT',134*1024_8**2)
       If(ITwoEl.Eq.1) Call LoadSaptTwoEl(3,TwoEl2,NBasis,NInte2)
 C
       If(ITwoEl.Eq.1) Then

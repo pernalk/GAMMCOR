@@ -1,6 +1,7 @@
 module tran
 !!! CAREFUL :: unsym procedures yet to be tested!!!
 use types,only: LOUT,EblockData
+use sorter
 implicit none
 
 contains
@@ -318,6 +319,8 @@ subroutine tran4_gen(NBas,nA,CA,nB,CB,nC,CC,nD,CD,fname,srtfile)
 !!! ie. (NBas,n,C)
 implicit none
 
+type(AOReaderData) :: reader
+
 integer,intent(in) :: NBas
 integer,intent(in) :: nA,nB,nC,nD
 ! CA(NBas*nA)
@@ -346,9 +349,10 @@ integer :: l,k,kl
  allocate(work1(NBas*NBas),work2(NBas*NBas))
  allocate(work3(cbuf,nAB))
 
- !open(newunit=iunit,file='AOTWOSORT',status='OLD',&
- open(newunit=iunit,file=trim(srtfile),status='OLD',&
-      access='DIRECT',form='UNFORMATTED',recl=8*ntr)
+ !!open(newunit=iunit,file='AOTWOSORT',status='OLD',&
+ !open(newunit=iunit,file=trim(srtfile),status='OLD',&
+ !     access='DIRECT',form='UNFORMATTED',recl=8*ntr)
+ call reader%open('AOTWOSORT')
 
  ! half-transformed file
  open(newunit=iunit2,file='TMPMO',status='REPLACE',&
@@ -359,7 +363,8 @@ integer :: l,k,kl
     ! loop over cbuf
     do rs=(i-1)*cbuf+1,min(i*cbuf,ntr)
 
-       read(iunit,rec=rs) work1(1:ntr)
+       !read(iunit,rec=rs) work1(1:ntr)
+       call reader%get(rs,work1(1:ntr))
        call triang_to_sq(work1,work2,NBas)
        ! work1=CA^T.work2
        ! work2=work1.CB
@@ -385,7 +390,8 @@ integer :: l,k,kl
 
  enddo
 
- close(iunit)
+! close(iunit)
+ call reader%close
 
 ! |cd)
  open(newunit=iunit3,file=fname,status='REPLACE',&
@@ -884,9 +890,12 @@ end subroutine abpm_tran_gen
 
 subroutine make_J1(NBas,X,J,intfile)
 implicit none
+
 integer :: NBas
 double precision :: X(*), J(NBas,NBas)
 character(*) :: intfile
+
+type(AOReaderData) :: reader
 integer :: iunit, ntr
 integer :: ir,is,irs
 double precision :: tmp
@@ -898,14 +907,17 @@ double precision,external :: ddot
 
  allocate(work1(NBas*NBas),work2(NBas*NBas))
 
- open(newunit=iunit,file=trim(intfile),status='OLD',&
-      access='DIRECT',form='UNFORMATTED',recl=8*ntr)
+ !open(newunit=iunit,file=trim(intfile),status='OLD',&
+ !     access='DIRECT',form='UNFORMATTED',recl=8*ntr)
+ !     
+ call reader%open('AOTWOSORT')
 
  irs=0
  do is=1,NBas
     do ir=1,is
     irs = irs + 1
-    read(iunit,rec=irs) work1(1:ntr)
+    !read(iunit,rec=irs) work1(1:ntr)
+    call reader%get(irs,work1(1:ntr))
     call triang_to_sq(work1,work2,NBas)
 
     tmp = ddot(NBas**2,work2,1,X,1)
@@ -916,12 +928,16 @@ double precision,external :: ddot
  enddo
 
  deallocate(work1,work2)
- close(iunit)
+ !close(iunit)
+ call reader%close
 
 end subroutine make_J1
 
 subroutine make_J2(NBas,XA,XB,JA,JB)
 implicit none
+
+type(AOReaderData) :: reader
+
 integer :: NBas
 double precision :: XA(*), XB(*), JA(NBas,NBas), JB(NBas,NBas)
 integer :: iunit, ntr
@@ -935,14 +951,17 @@ double precision,external :: ddot
 
  allocate(work1(NBas*NBas),work2(NBas*NBas))
 
- open(newunit=iunit,file='AOTWOSORT',status='OLD',&
-      access='DIRECT',form='UNFORMATTED',recl=8*ntr)
+ !open(newunit=iunit,file='AOTWOSORT',status='OLD',&
+ !     access='DIRECT',form='UNFORMATTED',recl=8*ntr)
+ !
+ call reader%open('AOTWOSORT')
 
  irs=0
  do is=1,NBas
     do ir=1,is
     irs = irs + 1
-    read(iunit,rec=irs) work1(1:ntr)    
+    !read(iunit,rec=irs) work1(1:ntr)
+    call reader%get(irs,work1(1:ntr))
     call triang_to_sq(work1,work2,NBas)
 
     tmp = ddot(NBas**2,work2,1,XA,1)
@@ -958,12 +977,15 @@ double precision,external :: ddot
 
 
  deallocate(work1,work2)
- close(iunit)
+ !close(iunit)
+ call reader%close
 
 end subroutine make_J2
 
 subroutine make_K(NBas,X,K)
 implicit none
+
+type(AOReaderData) :: reader
 integer,intent(in) :: NBas
 double precision,intent(in) :: X(NBas,NBas)
 double precision,intent(inout) :: K(NBas,NBas)
@@ -978,14 +1000,17 @@ double precision,allocatable :: work1(:),work2(:)
 
  allocate(work1(NBas*NBas),work2(NBas*NBas))
 
- open(newunit=iunit,file='AOTWOSORT',status='OLD',&
-      access='DIRECT',form='UNFORMATTED',recl=8*ntr)
+ !open(newunit=iunit,file='AOTWOSORT',status='OLD',&
+ !     access='DIRECT',form='UNFORMATTED',recl=8*ntr)
+ !
+ call reader%open('AOTWOSORT')
 
  irs = 0
  do is=1,NBas
     do ir=1,is
     irs = irs + 1
-    read(iunit,rec=irs) work1(1:ntr)
+    !read(iunit,rec=irs) work1(1:ntr)
+    call reader%get(irs,work1(1:ntr))
     call triang_to_sq(work1,work2,NBas)
 
     if(ir==is) then
@@ -1003,7 +1028,8 @@ double precision,allocatable :: work1(:),work2(:)
  enddo
 
  deallocate(work2,work1)
- close(iunit)
+ !close(iunit)
+ call reader%close
 
 end subroutine make_K
 
