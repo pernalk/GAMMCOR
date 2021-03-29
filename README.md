@@ -63,7 +63,7 @@ Run test script located in the main GAMMCOR directory:
 
 ### Automatic testing
 * ##### Enabling
-1. Go to ```GAMMCOR/_auto_test``` directory
+1. Go to ```GAMMCOR/auto_test``` directory
 2. Run ```./install-hooks.bash``` to install test scripts: ```pre-commit.bash```, ```pre-push.bash``` and ```post-merge.bash```
 3. From now on, the tests will be performed before each ```commit``` and ```push``` commands as well as after the ```merge``` command
 
@@ -74,7 +74,7 @@ git commit --no-verify
 ```
 
 * ##### Disabling
-To permanently disable the automatic testing feature, go to ```GAMMCOR/_auto_test``` directory and run ```./uninstall-hooks.bash```
+To permanently disable the automatic testing feature, go to ```GAMMCOR/auto_test``` directory and run ```./uninstall-hooks.bash```
 
 * ##### Adjusting the level of testing
 To customize the list of tests performed for a given _git_ command, you can change level parameter passed to ```gammcor_verify.bash``` in ```pre-commit.bash```, ```pre-push.bash``` and ```post-merge.bash``` scripts. There are three levels: ```'short'```, ```'long'``` and ```'full'``` (default), which correspond to the levels defined for individual tests listed in ```TESTS/scripts/test_list.py```.
