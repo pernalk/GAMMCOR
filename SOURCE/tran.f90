@@ -366,23 +366,30 @@ integer :: l,k,kl
 
        !read(iunit,rec=rs) work1(1:ntr)
        call reader%getTR(rs,work1,empty)
-       if(empty) cycle
-       call triang_to_sq(work1,work2,NBas)
-       ! work1=CA^T.work2
-       ! work2=work1.CB
-       call dgemm('T','N',nA,NBas,NBas,1d0,CA,NBas,work2,NBas,0d0,work1,nA) 
-       call dgemm('N','N',nA,nB,NBas,1d0,work1,nA,CB,NBas,0d0,work2,nA)
-       ! transpose
-       work3(rs-(i-1)*cbuf,1:nAB) = work2(1:nAB)
-       !work1 = 0
-       !kl = 0 
-       !do l=1,nB
-       !do k=1,nA
-       !   kl = kl + 1
-       !   work1(kl) = work2((k-1)*NBas+l)
-       !enddo
-       !enddo
-       !work3(rs-(i-1)*cbuf,1:nAB) = work1(1:nAB)
+       if(empty) then
+
+          work3(rs-(i-1)*cbuf,1:nAB) = 0
+
+       else
+
+          call triang_to_sq(work1,work2,NBas)
+          ! work1=CA^T.work2
+          ! work2=work1.CB
+          call dgemm('T','N',nA,NBas,NBas,1d0,CA,NBas,work2,NBas,0d0,work1,nA) 
+          call dgemm('N','N',nA,nB,NBas,1d0,work1,nA,CB,NBas,0d0,work2,nA)
+          ! transpose
+          work3(rs-(i-1)*cbuf,1:nAB) = work2(1:nAB)
+          !work1 = 0
+          !kl = 0 
+          !do l=1,nB
+          !do k=1,nA
+          !   kl = kl + 1
+          !   work1(kl) = work2((k-1)*NBas+l)
+          !enddo
+          !enddo
+          !work3(rs-(i-1)*cbuf,1:nAB) = work1(1:nAB)
+
+       endif
 
     enddo
 
@@ -906,6 +913,7 @@ double precision,allocatable :: work1(:),work2(:)
 double precision,external :: ddot
 ! works in DCBS
 
+ J = 0
  ntr = NBas*(NBas+1)/2
 
  allocate(work1(NBas*NBas),work2(NBas*NBas))
@@ -952,6 +960,8 @@ double precision,allocatable :: work1(:),work2(:)
 double precision,external :: ddot
 ! works in DCBS
 
+ JA = 0
+ JB = 0
  ntr = NBas*(NBas+1)/2
 
  allocate(work1(NBas*NBas),work2(NBas*NBas))
