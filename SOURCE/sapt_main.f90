@@ -1136,7 +1136,7 @@ character(:),allocatable :: occfile,sirifile,siriusfile,coefile
 
     if(nosiri.and.nooccu) then
        write(lout,'(1x,a)') &
-             'ERROR in readocc_dalton! No SIRI or occupations files!'
+             'ERROR in readocc_dalton! No SIRIFC or occupations files!'
        stop
     endif
 
@@ -4151,7 +4151,7 @@ character(:),allocatable     :: sirfile,sirifile
     mon%INAct = nisht
     mon%NAct  = nasht
 
-    if(NSym/=mon%NSym) stop "NSym from SIRI and AOONEINT do not match!"
+    if(NSym/=mon%NSym) stop "NSym from SIRIFC and AOONEINT do not match!"
 
     mon%INActS(1:mon%NSym) = NISH(1:NSym)
     mon%NActS(1:mon%NSym)  = NASH(1:NSym)
@@ -4164,7 +4164,7 @@ character(:),allocatable     :: sirfile,sirifile
     endif
 
  else
-    write(lout,'(1x,a)') 'SIRI not available!'
+    write(lout,'(1x,a)') 'SIRIFC not available!'
     stop
  endif
 
