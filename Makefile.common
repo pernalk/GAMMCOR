@@ -25,7 +25,7 @@ $(PROG) :  $(OBJ)
 	$(FCC) $(FFLAGS) -o $(PROG) $(OBJ) $(LIBS)
 $(O)mainp.o : $(S)mainp.f $(S)commons.inc $(O)types.o $(O)inputfill.o $(O)systemdef.o $(O)sapt_main.o
 	$(FCC) $(FFLAGS)  -c $(S)mainp.f -o $(O)mainp.o
-$(O)initia.o : $(S)initia.f $(S)commons.inc $(O)types.o $(O)sorter.o $(O)tran.o $(O)abmats.o 
+$(O)initia.o : $(S)initia.f $(S)commons.inc $(O)types.o $(O)sorter.o $(O)tran.o $(O)abmats.o $(O)sapt_main.o
 	$(FCC) $(FFLAGS)  -c $(S)initia.f -o $(O)initia.o 
 $(O)misc.o : $(S)misc.f $(S)commons.inc
 	$(FCC) $(FFLAGS)  -c $(S)misc.f -o $(O)misc.o
@@ -79,7 +79,7 @@ $(O)newton.o : $(S)newton.f
 	$(FCC) $(FFLAGS)  -c $(S)newton.f -o $(O)newton.o
 $(O)acfd.o : $(S)acfd.f $(O)abmats.o $(O)abfofo.o
 	$(FCC) $(FFLAGS)  -c $(S)acfd.f -o $(O)acfd.o
-$(O)accas.o : $(S)accas.f
+$(O)accas.o : $(S)accas.f $(O)sorter.o $(O)types.o $(O)abmats.o $(O)abfofo.o
 	$(FCC) $(FFLAGS)  -c $(S)accas.f -o $(O)accas.o
 $(O)xcfun.o : $(S)xcfun.f90
 	$(FCC) $(FFLAGS)  -c $(S)xcfun.f90  -o $(O)xcfun.o

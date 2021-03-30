@@ -716,6 +716,7 @@ double precision,allocatable :: OneRdmA(:),OneRdmB(:)
 
 logical :: doRSH
 double precision,allocatable :: Sa(:,:),Sb(:,:)
+double precision :: Tcpu,Twall
 
 !! read basis info
 !! only DCBS
@@ -831,6 +832,7 @@ double precision,allocatable :: Sa(:,:),Sb(:,:)
  endif
 
 ! read 2-el integrals
+ call clock('START',Tcpu,Twall)
  if(SAPT%InterfaceType==1) then
     call readtwoint(NBasis,1,'AOTWOINT_A','AOTWOSORT')
  elseif(SAPT%InterfaceType==2) then
@@ -844,6 +846,7 @@ double precision,allocatable :: Sa(:,:),Sb(:,:)
        endif
     endif
  endif
+ call clock('2ints',Tcpu,Twall)
 
  if(SAPT%InterfaceType==2) then
     call prepare_no(OneRdmA,AuxA,Ca,SAPT%monA,Flags%IFunSR,NBasis)
@@ -5450,7 +5453,7 @@ endif
 ! ....
 
 ! delete files
-call delfile('AOTWOSORT')
+!call delfile('AOTWOSORT')
 if(SAPT%monA%TwoMoInt==TWOMO_INCORE.or.&
    SAPT%monA%TwoMoInt==TWOMO_FFFF) then
    call delfile('TWOMOAA')
