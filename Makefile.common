@@ -95,7 +95,7 @@ $(O)systemdef.o : $(S)systemdef.f90 $(O)types.o
 	$(FCC) $(FFLAGS)  -c $(S)systemdef.f90 -o $(O)systemdef.o
 $(O)sorter.o : $(S)sorter.f90 $(O)types.o
 	$(FCC) $(FFLAGS)  -c $(S)sorter.f90 -o $(O)sorter.o
-$(O)tran.o : $(S)tran.f90 $(O)types.o
+$(O)tran.o : $(S)tran.f90 $(O)types.o $(O)sorter.o
 	$(FCC) $(FFLAGS)  -c $(S)tran.f90 -o $(O)tran.o
 $(O)diis.o : $(S)diis.f90 $(O)types.o
 	$(FCC) $(FFLAGS)  -c $(S)diis.f90 -o $(O)diis.o
