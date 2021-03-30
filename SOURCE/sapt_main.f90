@@ -835,7 +835,7 @@ double precision :: Tcpu,Twall
 
 ! read 2-el integrals
  call clock('START',Tcpu,Twall)
- mem_size = 20*1024_8**2
+ mem_size = 200*1024_8**2
  if(SAPT%InterfaceType==1) then
     call readtwoint(NBasis,1,'AOTWOINT_A','AOTWOSORT',mem_size)
  elseif(SAPT%InterfaceType==2) then

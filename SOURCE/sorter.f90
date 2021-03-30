@@ -436,13 +436,13 @@ srt%bck_size = min( availmem1/bck_bytes , srt%seg_size )
 srt%maxdmp = int((srt%seg_size-1)/srt%bck_size+1)
 
 write(LOUT,'()')
-write(LOUT,'(a,t36,i18)') 'Number of basis functions:',        srt%nbas
-write(LOUT,'(a,t36,i18)') 'Number of independent pairs:',      srt%nelm
-write(LOUT,'(a,t36,i18)') 'Number of columns in segment:',     srt%ncol
-write(LOUT,'(a,t36,i18)') 'Number of segments:',               srt%nbck
-write(LOUT,'(a,t36,i18)') 'Size of segment:',                  srt%seg_size
-write(LOUT,'(a,t36,i18)') 'Size of bucket:',                   srt%bck_size
-write(LOUT,'(a,t36,i18)') 'Maximal number of writes/segment:', srt%maxdmp
+write(LOUT,'(1x,a,t36,i18)') 'Number of basis functions:',        srt%nbas
+write(LOUT,'(1x,a,t36,i18)') 'Number of independent pairs:',      srt%nelm
+write(LOUT,'(1x,a,t36,i18)') 'Number of columns in segment:',     srt%ncol
+write(LOUT,'(1x,a,t36,i18)') 'Number of segments:',               srt%nbck
+write(LOUT,'(1x,a,t36,i18)') 'Size of segment:',                  srt%seg_size
+write(LOUT,'(1x,a,t36,i18)') 'Size of bucket:',                   srt%bck_size
+write(LOUT,'(1x,a,t36,i18)') 'Maximal number of writes/segment:', srt%maxdmp
 
 allocate(srt%rs_diag(srt%nelm))
 allocate(srt%rs_nelm(srt%nelm))
