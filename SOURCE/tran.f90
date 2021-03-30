@@ -331,6 +331,7 @@ integer :: iunit,iunit2,iunit3
 integer :: ntr,nAB,nCD,nloop
 integer,parameter :: cbuf=512
 integer :: i,rs,ab
+logical :: empty
 !  test
 integer :: l,k,kl
 
@@ -364,7 +365,8 @@ integer :: l,k,kl
     do rs=(i-1)*cbuf+1,min(i*cbuf,ntr)
 
        !read(iunit,rec=rs) work1(1:ntr)
-       call reader%get(rs,work1(1:ntr))
+       call reader%getTR(rs,work1,empty)
+       if(empty) cycle
        call triang_to_sq(work1,work2,NBas)
        ! work1=CA^T.work2
        ! work2=work1.CB
@@ -898,6 +900,7 @@ character(*) :: intfile
 type(AOReaderData) :: reader
 integer :: iunit, ntr
 integer :: ir,is,irs
+logical :: empty
 double precision :: tmp
 double precision,allocatable :: work1(:),work2(:)
 double precision,external :: ddot
@@ -917,7 +920,8 @@ double precision,external :: ddot
     do ir=1,is
     irs = irs + 1
     !read(iunit,rec=irs) work1(1:ntr)
-    call reader%get(irs,work1(1:ntr))
+    call reader%getTR(irs,work1,empty)
+    if(empty) cycle
     call triang_to_sq(work1,work2,NBas)
 
     tmp = ddot(NBas**2,work2,1,X,1)
@@ -942,6 +946,7 @@ integer :: NBas
 double precision :: XA(*), XB(*), JA(NBas,NBas), JB(NBas,NBas)
 integer :: iunit, ntr
 integer :: ir,is,irs
+logical :: empty
 double precision :: tmp
 double precision,allocatable :: work1(:),work2(:)
 double precision,external :: ddot
@@ -961,7 +966,8 @@ double precision,external :: ddot
     do ir=1,is
     irs = irs + 1
     !read(iunit,rec=irs) work1(1:ntr)
-    call reader%get(irs,work1(1:ntr))
+    call reader%getTR(irs,work1,empty)
+    if(empty) cycle
     call triang_to_sq(work1,work2,NBas)
 
     tmp = ddot(NBas**2,work2,1,XA,1)
@@ -991,6 +997,7 @@ double precision,intent(in) :: X(NBas,NBas)
 double precision,intent(inout) :: K(NBas,NBas)
 integer :: iunit, ntr
 integer :: ir,is,irs
+logical :: empty
 double precision :: tmp
 double precision,allocatable :: work1(:),work2(:)
 ! works in DCBS
@@ -1010,7 +1017,8 @@ double precision,allocatable :: work1(:),work2(:)
     do ir=1,is
     irs = irs + 1
     !read(iunit,rec=irs) work1(1:ntr)
-    call reader%get(irs,work1(1:ntr))
+    call reader%getTR(irs,work1,empty)
+    if(empty) cycle
     call triang_to_sq(work1,work2,NBas)
 
     if(ir==is) then

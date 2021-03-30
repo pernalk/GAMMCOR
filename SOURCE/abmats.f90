@@ -3197,6 +3197,7 @@ character(*) :: IntFileName
 double precision,intent(in)  :: OneRdm(NInte1),XOne(NInte1)
 double precision,intent(out) :: Fock(Ninte1)
 integer :: iunit,kl,k,l
+logical :: empty
 double precision,allocatable :: OneRdmSq(:,:),FockSq(:,:),ints(:,:),work1(:)
 
 
@@ -3214,7 +3215,8 @@ do l=1,NBasis
    do k=1,l
       kl = kl + 1
       !read(iunit,rec=kl) work1(1:NBasis*(NBasis+1)/2)
-      call reader%get(kl,work1(1:NBasis*(NBasis+1)/2))
+      call reader%getTR(kl,work1,empty)
+      if(empty) cycle
       call triang_to_sq2(work1,ints,NBasis)
        
       if(k==l) then

@@ -53,7 +53,7 @@ integer,allocatable :: pq(:)
 double precision,allocatable :: val(:)
 contains
 procedure :: open => open_AOReader
-procedure :: get => get_AOReader
+procedure :: getTR => getTR_AOReader
 procedure :: close => close_AOReader
 end type AOReaderData
 
@@ -500,9 +500,10 @@ character(*),intent(in) :: srtname
 integer :: unit
 integer :: ibck,idmp
 integer :: rs,rs_str,rs_end
-integer(8) :: max_seg_size,max_bck_size,i
-integer(8),allocatable :: seg_str(:)
+integer(8) :: total_ints,max_seg_size,max_bck_size,i,i_seg
+integer(8),allocatable :: seg_off(:)
 integer(8) :: pos_diag,pos_nelm,pos_pos
+double precision :: ratio
 
 do ibck=srt%nbck,1,-1
    associate(bck => srt%bck(ibck))
@@ -512,6 +513,7 @@ do ibck=srt%nbck,1,-1
    end associate
 enddo
 
+total_ints   = 0
 max_seg_size = 0
 max_bck_size = 0
 
@@ -524,11 +526,20 @@ do ibck=1,srt%nbck
         deallocate(bck%first)
         bck%first => bck%last
      enddo
+     total_ints   = total_ints + bck%ntot
      max_seg_size = max(max_seg_size,bck%ntot)
      max_bck_size = max(max_bck_size,maxval(bck%dmp%n))
    end associate
 enddo
+total_ints = total_ints + count(abs(srt%rs_diag)>0)
 max_seg_size = max_seg_size + srt%ncol
+
+ratio = total_ints
+ratio = ratio/srt%nelm**2
+ratio = ratio*100
+
+write(LOUT,'()')
+write(LOUT,'(1x,a,f7.2,a)') 'Ratio of non-zero integrals:',ratio,' %'
 
 allocate(srt%seg_pq(max_seg_size))
 allocate(srt%seg_val(max_seg_size))
@@ -551,12 +562,13 @@ inquire(unit,pos=pos_pos)
 write(unit) srt%rs_pos
 
 do ibck=1,srt%nbck
+
    rs_str = (ibck-1)*srt%ncol + 1
    rs_end = min(ibck*srt%ncol,srt%nelm)
-   allocate(seg_str(rs_str:rs_end))
-   seg_str(rs_str) = 1
+   allocate(seg_off(rs_str:rs_end))
+   seg_off(rs_str) = 0
    do rs=rs_str+1,rs_end
-      seg_str(rs) = seg_str(rs-1) + srt%rs_nelm(rs-1) + 1
+      seg_off(rs) = seg_off(rs-1) + srt%rs_nelm(rs-1) + 1
    enddo
    srt%rs_nelm(rs_str:rs_end) = 0
 
@@ -566,18 +578,20 @@ do ibck=1,srt%nbck
           read(srt%unit,pos=dmp%pos) srt%pqrs(:,1:dmp%n),srt%val(1:dmp%n)
           do i=1,dmp%n
              rs = srt%pqrs(2,i)
-             call insert_seg(srt%pqrs(1,i),srt%val(i),&
-                  srt%rs_nelm(rs),&
-                  srt%seg_pq(seg_str(rs):),srt%seg_val(seg_str(rs):))
+             srt%rs_nelm(rs) = srt%rs_nelm(rs) + 1
+             i_seg = seg_off(rs) + srt%rs_nelm(rs)
+             srt%seg_pq(i_seg)  = srt%pqrs(1,i)
+             srt%seg_val(i_seg) = srt%val(i)
           enddo
         end associate
      enddo
    end associate
    do rs=rs_str,rs_end
       if(abs(srt%rs_diag(rs))>0) then
-         call insert_seg(rs,srt%rs_diag(rs),&
-              srt%rs_nelm(rs),&
-              srt%seg_pq(seg_str(rs):),srt%seg_val(seg_str(rs):))
+         srt%rs_nelm(rs) = srt%rs_nelm(rs) + 1
+         i_seg = seg_off(rs) + srt%rs_nelm(rs)
+         srt%seg_pq(i_seg)  = rs
+         srt%seg_val(i_seg) = srt%rs_diag(rs)
       endif
    enddo
 
@@ -585,12 +599,12 @@ do ibck=1,srt%nbck
       if(srt%rs_nelm(rs)>0) then
          inquire(unit,pos=srt%rs_pos(rs))
          write(unit) &
-              srt%seg_pq(seg_str(rs):seg_str(rs)+srt%rs_nelm(rs)-1),&
-              srt%seg_val(seg_str(rs):seg_str(rs)+srt%rs_nelm(rs)-1)
+              srt%seg_pq(seg_off(rs)+1:seg_off(rs)+srt%rs_nelm(rs)),&
+              srt%seg_val(seg_off(rs)+1:seg_off(rs)+srt%rs_nelm(rs))
       endif
    enddo
 
-   deallocate(seg_str)
+   deallocate(seg_off)
 enddo
 
 write(unit,pos=1) srt%nbas,srt%nelm,pos_diag,pos_nelm,pos_pos
@@ -618,49 +632,6 @@ deallocate(srt%rs_diag)
 close(srt%unit,status='delete')
 
 end subroutine close_AOSorter
-
-subroutine insert_seg(pq,val,nelm,seg_pq,seg_val)
-implicit none
-integer,intent(in) :: pq
-double precision,intent(in) :: val
-integer,intent(inout) :: nelm
-integer,intent(inout) :: seg_pq(:)
-double precision,intent(inout) :: seg_val(:)
-integer :: i,j
-
-!simple
-
-nelm = nelm + 1
-
-seg_pq(nelm)  = pq
-seg_val(nelm) = val
-
-!-------------------------------------------------------------------------------
-
-!full sort
-
-!!$do i=nelm,1,-1
-!!$   if(seg_pq(i)<=pq) then
-!!$      if(seg_pq(i)==pq) return
-!!$      exit
-!!$   endif
-!!$enddo
-!!$j = i + 1
-!!$
-!!$do i=nelm,j,-1
-!!$   seg_pq(i+1) = seg_pq(i)
-!!$enddo
-!!$seg_pq(j) = pq
-!!$do i=nelm,j,-1
-!!$   seg_val(i+1) = seg_val(i)
-!!$enddo
-!!$seg_val(j) = val
-!!$
-!!$nelm = nelm + 1
-
-!-------------------------------------------------------------------------------
-
-end subroutine insert_seg
 
 subroutine dump_AOBucket(bck,unit)
 implicit none
@@ -714,24 +685,26 @@ allocate(rdr%val(max_pq))
 
 end subroutine open_AOReader
 
-subroutine get_AOReader(rdr,rs,ints)
+subroutine getTR_AOReader(rdr,rs,ints,empty)
 implicit none
 class(AOReaderData) :: rdr
 integer,intent(in) :: rs
 double precision,intent(out) :: ints(:)
+logical,intent(out) :: empty
 integer :: nelm,i
 
 nelm = rdr%rs_nelm(rs)
 ints(1:rdr%nelm) = 0
 
-if(nelm==0) return
+empty = (nelm==0)
+if(empty) return
 
 read(rdr%unit,pos=rdr%rs_pos(rs)) rdr%pq(1:nelm),rdr%val(1:nelm)
 do i=1,nelm
    ints(rdr%pq(i)) = rdr%val(i)
 enddo
 
-end subroutine get_AOReader
+end subroutine getTR_AOReader
 
 subroutine close_AOReader(rdr)
 implicit none
