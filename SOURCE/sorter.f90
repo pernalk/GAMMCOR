@@ -535,7 +535,8 @@ total_ints = total_ints + count(abs(srt%rs_diag)>0)
 max_seg_size = max_seg_size + srt%ncol
 
 ratio = total_ints
-ratio = ratio/srt%nelm**2
+ratio = ratio/srt%nelm
+ratio = ratio/srt%nelm
 ratio = ratio*100
 
 write(LOUT,'()')
