@@ -53,6 +53,7 @@ integer,allocatable :: pq(:)
 double precision,allocatable :: val(:)
 contains
 procedure :: open => open_AOReader
+procedure :: getDiag => getDiag_AOReader
 procedure :: getTR => getTR_AOReader
 procedure :: close => close_AOReader
 end type AOReaderData
@@ -685,6 +686,15 @@ allocate(rdr%pq(max_pq))
 allocate(rdr%val(max_pq))
 
 end subroutine open_AOReader
+
+subroutine getDiag_AOReader(rdr,diag)
+implicit none
+class(AOReaderData) :: rdr
+double precision,intent(out) :: diag(:)
+
+read(rdr%unit,pos=rdr%pos_diag) diag(1:rdr%nelm)
+
+end subroutine getDiag_AOReader
 
 subroutine getTR_AOReader(rdr,rs,ints,empty)
 implicit none
