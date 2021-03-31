@@ -49,11 +49,20 @@ gammcor
 ## Testing
 
 ### Preparation
-1. Obtain test input files from repository:
+1. Define _gitos_ in your `~/.ssh/config` file:
 ```
-git clone git@172.20.50.110:qchem/TESTS
+Host gitos
+  HostName 172.20.50.110
+  User git
+  Port 22
+  IdentityFile ~/.ssh/<public_key_name>
 ```
-2. Open _gammcor_verify.bash_ in the main GAMMCOR directory and assign variable ```TEST_SCRIPT_PATH``` the path to the file ```run_test.py``` located in your TESTS directory
+* If you do not have a key, please contact the server administrator. 
+2. Obtain test input files from repository:
+```
+git clone gitos:qchem/TESTS
+```
+3. Open _gammcor_verify.bash_ in the main GAMMCOR directory and assign variable ```TEST_SCRIPT_PATH``` the path to the file ```run_test.py``` located in your TESTS directory
 
 ### Manual testing
 Run test script located in the main GAMMCOR directory:
