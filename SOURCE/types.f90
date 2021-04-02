@@ -104,12 +104,14 @@ type CalculationBlock
       integer :: SaptLevel = SAPTLEVEL2
       integer :: vdWCoef   = 0
       integer :: RedVirt   = FLAG_REDVIRT
+      integer(8) :: MemVal = 2
       logical :: Restart   = FLAG_RESTART
       logical :: PostCAS   = FLAG_POSTCAS
       integer :: IPrint    = 0 !FLAG_PRINT_LEVEL
       double precision :: RPAThresh  = 1.0D-6
       double precision :: ThreshVirt = 1.0D-6
       integer :: imon = 1
+      character(:), allocatable :: MemType
       character(:), allocatable :: JobTitle
       character(:), allocatable :: IntegralsFilePath
 end type CalculationBlock
@@ -1622,6 +1624,29 @@ function uppercase(s)
             end if
       end do
 end function uppercase
+
+subroutine read_memread(val,MemVal,MemType)
+
+     character(*), intent(in)  :: val
+     integer(8), intent(out)   :: MemVal
+     character(*), intent(out) :: MemType
+
+     character(:), allocatable :: s1,s2
+
+     call split(val,s1,s2)
+
+     read(s1,*) MemVal
+
+     if(trim(uppercase(s2))=='MB') then
+        MemVal = MemVal * 1024_8**2
+     else if(trim(uppercase(s2))=='GB') then
+        MemVal = MemVal * 1024_8**3
+     else
+        write(lout,'(1x,a)') 'Error in declaration of MemSort!'
+        stop
+     endif
+
+end subroutine read_memread
 
 subroutine read_statearray(val,inst,instates,delim)
 

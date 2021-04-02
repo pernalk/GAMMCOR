@@ -35,6 +35,8 @@ double precision :: Tcpu,Twall
  write(LOUT,'(1x,a)') 'STARTING SAPT CALCULATIONS'
  write(LOUT,'(8a10)') ('**********',i=1,8)
 
+ stop
+
  ! jump to reduceVirt framework
  if(Flags%IRedVirt==1) call sapt_driver_red(Flags,SAPT)
 
