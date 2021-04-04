@@ -2131,7 +2131,7 @@ end subroutine e2exind
 
 subroutine e2exdisp(Flags,A,B,SAPT)
 
-!use exappr
+use exappr
 !use sref_exch
 
 implicit none
@@ -2198,6 +2198,7 @@ double precision,parameter :: SmallE = 1.D-3
 
 ! set e2exd_version
  approx    = .false.
+ !approx    = .true.
  both      = SAPT%iCpld
  uncoupled = .true.
  if(Flags%ICASSCF==0)     uncoupled = .false.
@@ -2881,8 +2882,8 @@ double precision,parameter :: SmallE = 1.D-3
     !if(SAPT%IPrint>5) write(LOUT,'(/1x,a,f16.8)') 'term Z      = ',  termZ*1.0d3
     !if(SAPT%IPrint>5) write(LOUT,'(1x,a,f16.8)') 'term X      = ',  termX*1.0d3
    
-    if(SAPT%IPrint>5) call print_en('term Z',termZ*1.0d3,.true.) 
-    if(SAPT%IPrint>5) call print_en('term X',termZ*1.0d3,.false.) 
+    if(SAPT%IPrint>5) call print_en('term Z',termZ*1.0d3,.true.)
+    if(SAPT%IPrint>5) call print_en('term X',termX*1.0d3,.false.)
 
     ! termY
     ! term Y: t_ij
@@ -2910,7 +2911,7 @@ double precision,parameter :: SmallE = 1.D-3
 
     termY = -8d0*(SAPT%elst-SAPT%Vnn)*termY
     !if(SAPT%IPrint>5) write(LOUT,'(1x,a,f16.8)') 'term Y      = ',  termY*1.0d3
-    if(SAPT%IPrint>5) call print_en('term Y',termY*1.0d3,.false.) 
+    if(SAPT%IPrint>5) call print_en('term Y',termY*1.0d3,.false.)
 
     e2exd = termX + termY + termZ
 
