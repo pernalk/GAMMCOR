@@ -287,13 +287,13 @@ integer      :: iter,i,pq,ip,iq
 logical      :: conv=.FALSE.
 character(8) :: nameunc
 double precision :: error
-integer,parameter          :: MaxIt = 100 
-double precision,parameter :: ThrDIIS = 1.d-10
+integer,parameter          :: MaxIt = 50
+double precision,parameter :: ThrDIIS = 1.d-8
 
  if(M%Monomer==1) nameunc='XY0_A'
  if(M%Monomer==2) nameunc='XY0_B'
 
- call init_DIIS(DIISBlock,M%NDimX,M%NDimX,Flags%DIISN) 
+ call init_DIIS(DIISBlock,M%NDimX,M%NDimX,Flags%DIISN)
 
  allocate(WxYY(NBas,NBas))
  allocate(wVecxYY(M%NDimX))
@@ -338,7 +338,7 @@ double precision,parameter :: ThrDIIS = 1.d-10
 
  call amplitudes_T1(OmM0,vecR,delta,M%NDimX)
  amps = amps + delta
- !if(iter>Flags%DIISOn) call use_DIIS(DIISBlock,amps,vecR)
+ if(iter>Flags%DIISOn) call use_DIIS(DIISBlock,amps,vecR)
 
  enddo
 

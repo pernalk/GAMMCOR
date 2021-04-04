@@ -81,7 +81,7 @@ double precision :: Tcpu,Twall
     elseif(SAPT%SaptLevel==2) then
        call e2ind(Flags,SAPT%monA,SAPT%monB,SAPT)
       !call e2ind_resp(Flags,SAPT%monA,SAPT%monB,SAPT) ! version using alpha(0)
-      !call e2ind_hf_icphf(Flags,SAPT%monA,SAPT%monB,SAPT) ! works only with HF
+       call e2ind_hf_icphf(Flags,SAPT%monA,SAPT%monB,SAPT) ! works only with HF
        call e2disp(Flags,SAPT%monA,SAPT%monB,SAPT)
        call e2exind(Flags,SAPT%monA,SAPT%monB,SAPT)
        call e2exdisp(Flags,SAPT%monA,SAPT%monB,SAPT)
@@ -752,6 +752,8 @@ double precision :: Tcpu,Twall
  NInte2 = NInte1*(NInte1+1)/2
  SAPT%monA%NDim = NBasis*(NBasis-1)/2
  SAPT%monB%NDim = NBasis*(NBasis-1)/2
+
+ print*, 'here?'
 
 ! set RSH
  SAPT%doRSH = .false.
@@ -2566,6 +2568,9 @@ double precision,parameter :: SmallE=0d0,BigE=1.D20
    end select
    write(LOUT,'(/,1x,a,f16.8,a,1x,f16.8)') 'ABPlus',norm2(ABPlus),'ABMin',norm2(ABMin)
 
+!   allocate(Mon%PP(Mon%NDimX**2))
+!   Mon%PP = ABMin
+
    EigVecR = 0
    Eig = 0
    ! HERE WORTH CHECKING SOME MORE FOR EXCITED STATE SELECTION...
@@ -2599,6 +2604,14 @@ double precision,parameter :: SmallE=0d0,BigE=1.D20
    enddo
    !print*, 'EigVecR',norm2(EigVecR)
    !print*, 'Eig    ',norm2(Mon%Eig)
+
+   ! test for e2ind_hf
+   !allocate(Mon%PP(Mon%NDimX**2))
+   !call AB_CAS_FOFO(ABPlus,Mon%PP,ECASSCF,URe,Mon%Occ,XOne, &
+   !              Mon%IndN,Mon%IndX,Mon%IGem,Mon%NAct,Mon%INAct,Mon%NDimX,NBas,Mon%NDimX,&
+   !              NInte1,twojfile,twokfile,1d0,.true.)
+
+   !print*, 'Mon%PP',norm2(Mon%PP)
 
    !do i=1,Mon%NDimX
    !   print*, i, Eig(i)
@@ -5344,6 +5357,9 @@ endif
 if(allocated(SAPT%monB%NumOSym)) then
    deallocate(SAPT%monB%NumOSym)
 endif
+
+if(allocated(SAPT%monA%PP)) deallocate(SAPT%monA%PP)
+if(allocated(SAPT%monB%PP)) deallocate(SAPT%monB%PP)
 
 ! HERE - change to SAPTLEVEL?
 if(allocated(SAPT%monA%WPot)) then
