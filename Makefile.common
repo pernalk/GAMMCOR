@@ -19,6 +19,7 @@ OBJ = $(O)mainp.o $(O)initia.o $(O)dmscf.o $(O)misc.o $(O)optocc.o \
       $(O)timing.o \
       $(O)srlrdynamic.o $(O)erpa.o $(O)interpa.o  $(O)exact2el.o $(O)optapsg.o $(O)newton.o $(O)acfd.o $(O)accas.o \
       $(O)caspidft.o $(O)ac_exact_2el.o $(O)vv10.o \
+      $(O)ac_iter.o \
       xcfun/fortran/xcfun_module.o xcfun/fortran/xcfun_autogen.o
 
 $(PROG) :  $(OBJ) 
@@ -81,6 +82,8 @@ $(O)acfd.o : $(S)acfd.f $(O)abmats.o $(O)abfofo.o
 	$(FCC) $(FFLAGS)  -c $(S)acfd.f -o $(O)acfd.o
 $(O)accas.o : $(S)accas.f $(O)sorter.o $(O)types.o $(O)abmats.o $(O)abfofo.o
 	$(FCC) $(FFLAGS)  -c $(S)accas.f -o $(O)accas.o
+$(O)ac_iter.o : $(S)ac_iter.f  $(O)abmats.o $(O)abfofo.o
+	$(FCC) $(FFLAGS)  -c $(S)ac_iter.f -o $(O)ac_iter.o
 $(O)xcfun.o : $(S)xcfun.f90
 	$(FCC) $(FFLAGS)  -c $(S)xcfun.f90  -o $(O)xcfun.o
 $(O)gridmolpro.o : $(S)gridmolpro.f90

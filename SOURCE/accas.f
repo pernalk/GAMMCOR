@@ -191,9 +191,11 @@ C
      $ IndAux,ABPLUS,ABMIN,EigVecR,Eig,EGOne,
      $ Title,NBasis,NInte1,NInte2,NDimX,NGOcc,NGem,
      $ IndN,IndX,NDimX)
-c herer!!!
-c      Call CASPIDFT(ENuc,URe,UNOAO,Occ,XOne,TwoNO,
-c     $ NBasis,NInte1,NInte2)
+
+c      Call ACIter(ETot,ENuc,TwoNO,URe,Occ,XOne,UNOAO,
+c     $ IndAux,ABPLUS,ABMIN,EigVecR,Eig,EGOne,
+c     $ Title,NBasis,NInte1,NInte2,NDimX,NGOcc,NGem,
+c     $ IndN,IndX,NDimX)
 c 
 c exact AC
 c      NoEig=1
