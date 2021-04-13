@@ -8,3 +8,5 @@ if [ $? -ne 0 ]; then
  echo "Tests must pass before push!"
  exit 1
 fi
+
+git push --no-verify
