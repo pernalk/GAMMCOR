@@ -211,6 +211,10 @@ else
      endif
 !     if(Input%CalcParams%DFApp==2) Flags%IFunSRKer = 1
 
+  case(JOB_TYPE_ACFREQ)
+     Flags%IFlAC  = 1
+     Flags%IFlACFREQ = 1
+
   case(JOB_TYPE_AC0)
     ! HERE WILL BE CHANGED TO:
     !Flags%IFlAC = 0
@@ -241,6 +245,13 @@ else
         endif
         Flags%IFunSRKer = Input%CalcParams%Kernel
      endif
+
+  case(JOB_TYPE_AC0DP)
+     Flags%IFlAC   = 1
+     Flags%IFlSnd  = 1
+     Flags%IFlAC0D = 1
+     Flags%ISymmAC0D = 1
+     Flags%IFlAC0DP = 1
 
   case(JOB_TYPE_AC0DNOSYMM)
     ! HERE WILL BE CHANGED TO:

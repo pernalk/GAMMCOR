@@ -187,15 +187,18 @@ C     CALL AC If IFlAC=1 OR IFlSnd=1
 C
       If(IFlAC.Eq.1.Or.IFlSnd.Eq.1) Then
       NGOcc=0
-c      Call ACECORR(ETot,ENuc,TwoNO,URe,Occ,XOne,UNOAO,
-c     $ IndAux,ABPLUS,ABMIN,EigVecR,Eig,EGOne,
-c     $ Title,NBasis,NInte1,NInte2,NDimX,NGOcc,NGem,
-c     $ IndN,IndX,NDimX)
 
+      If(IFlACFREQ.Eq.0) Then
+      Call ACECORR(ETot,ENuc,TwoNO,URe,Occ,XOne,UNOAO,
+     $ IndAux,ABPLUS,ABMIN,EigVecR,Eig,EGOne,
+     $ Title,NBasis,NInte1,NInte2,NDimX,NGOcc,NGem,
+     $ IndN,IndX,NDimX)
+      ElseIf(IFlACFREQ.Eq.1) Then
       Call ACIter(ETot,ENuc,TwoNO,URe,Occ,XOne,UNOAO,
      $ IndAux,ABPLUS,ABMIN,EigVecR,Eig,EGOne,
      $ Title,NBasis,NInte1,NInte2,NDimX,NGOcc,NGem,
      $ IndN,IndX,NDimX)
+      EndIf
 c 
 c exact AC
 c      NoEig=1

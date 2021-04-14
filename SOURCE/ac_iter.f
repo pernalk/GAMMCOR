@@ -119,7 +119,7 @@ C
 C
 C     Frequency integration of CMAT 
 C
-      NGrid=20
+      NGrid=18
       Call FreqGrid(XFreq,WFreq,NGrid)
 C   
       COM=0.0 
