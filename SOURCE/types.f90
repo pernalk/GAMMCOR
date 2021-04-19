@@ -185,6 +185,7 @@ type SystemBlock
       double precision,allocatable :: OrbE(:)
       double precision,allocatable :: TwoMO(:)
       double precision,allocatable :: CMO(:,:)
+      double precision,allocatable :: OV(:,:)
       double precision,allocatable :: WPot(:,:)
       double precision,allocatable :: VCoul(:)
       double precision,allocatable :: RDM2(:),RDM2Act(:,:,:,:)
@@ -288,6 +289,7 @@ type SaptData
      double precision,allocatable :: Wind(:),Wdisp(:)
      integer :: InterfaceType = INTER_TYPE_DAL
      integer :: SaptLevel = SAPTLEVEL2
+     integer :: NCholesky
      integer :: ic6 = 0
      integer :: iPINO=-1
      integer :: IPrint = 1000

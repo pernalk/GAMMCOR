@@ -5,6 +5,7 @@ use abmat
 use abfofo
 use tran
 use sorter
+use Cholesky
 use sapt_pol
 use sapt_exch
 use exd_pino
@@ -34,8 +35,6 @@ double precision :: Tcpu,Twall
  write(LOUT,'()')
  write(LOUT,'(1x,a)') 'STARTING SAPT CALCULATIONS'
  write(LOUT,'(8a10)') ('**********',i=1,8)
-
- stop
 
  ! jump to reduceVirt framework
  if(Flags%IRedVirt==1) call sapt_driver_red(Flags,SAPT)
@@ -695,11 +694,14 @@ subroutine sapt_interface(Flags,SAPT,NBasis)
 !
 implicit none
 
-type(FlagsData)    :: Flags
-type(SaptData)     :: SAPT
-integer,intent(in) :: NBasis
+type(FlagsData)     :: Flags
+type(SaptData)      :: SAPT
+type(TCholeskyVecs) :: CholeskyVecs
+integer,intent(in)  :: NBasis
 
 integer :: NSq,NInte1,NInte2
+integer :: NCholesky
+integer :: dimOA,dimOB,dimVA,dimVB,nOVA,nOVB
 integer :: NCMOt, NOrbt, NBasist
 integer :: NSym, NBas(8)
 integer :: NOcc(8),NOrbs(8)
@@ -882,6 +884,30 @@ double precision :: Tcpu,Twall
 ! look-up tables
  call select_active(SAPT%monA,NBasis,Flags)
  call select_active(SAPT%monB,NBasis,Flags)
+
+! perform Cholesky decomposition
+ call chol_CoulombMatrix(CholeskyVecs,'AOTWOSORT',CHOL_ACCURACY_LUDICROUS)
+ !call chol_CoulombMatrix(CholeskyVecs,'AOTWOSORT',CHOL_ACCURACY_TIGHT)
+ !call chol_CoulombMatrix(CholeskyVecs,'AOTWOSORT',CHOL_ACCURACY_DEFAULT)
+
+! transform Cholesky to NO
+ NCholesky = CholeskyVecs%NCholesky
+ SAPT%NCholesky = NCholesky
+ dimOA = SAPT%monA%num0+SAPT%monA%num1
+ dimOB = SAPT%monB%num0+SAPT%monB%num1
+ dimVA = SAPT%monA%num1+SAPT%monA%num2
+ dimVB = SAPT%monB%num1+SAPT%monB%num2
+ nOVA  = dimOA*dimVA
+ nOVB  = dimOB*dimVB
+
+ allocate(SAPT%monA%OV(NCholesky,nOVA),&
+          SAPT%monB%OV(NCholesky,nOVB))
+ call chol_MOTransf(SAPT%monA%OV,CholeskyVecs,&
+                    SAPT%monA%CMO,1,dimOA,&
+                    SAPT%monA%CMO,SAPT%monA%num0+1,NBasis)
+ call chol_MOTransf(SAPT%monB%OV,CholeskyVecs,&
+                    SAPT%monB%CMO,1,dimOB,&
+                    SAPT%monB%CMO,SAPT%monB%num0+1,NBasis)
 
 ! ABABABABABABABABABABABABABABABABABABABABABABABABABABABABAB
  if(SAPT%IPrint.gt.100) call print_TwoInt(NBasis)
@@ -5352,6 +5378,14 @@ if(allocated(SAPT%monB%NumOSym)) then
    deallocate(SAPT%monB%NumOSym)
 endif
 
+! test Cholesky
+if(allocated(SAPT%monA%OV)) then
+   deallocate(SAPT%monA%OV)
+endif
+if(allocated(SAPT%monB%OV)) then
+   deallocate(SAPT%monB%OV)
+endif
+
 ! HERE - change to SAPTLEVEL?
 if(allocated(SAPT%monA%WPot)) then
    deallocate(SAPT%monA%WPot)
@@ -5460,7 +5494,7 @@ endif
 ! ....
 
 ! delete files
-!call delfile('AOTWOSORT')
+call delfile('AOTWOSORT')
 if(SAPT%monA%TwoMoInt==TWOMO_INCORE.or.&
    SAPT%monA%TwoMoInt==TWOMO_FFFF) then
    call delfile('TWOMOAA')

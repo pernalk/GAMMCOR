@@ -1634,6 +1634,7 @@ type(Y01BlockData),allocatable :: Y01BlockA(:),Y01BlockB(:)
 
 integer :: NBas, NInte1,NInte2
 integer :: dimOA,dimVA,dimOB,dimVB,nOVA,nOVB
+integer :: NCholesky
 integer :: iunit
 integer :: i,j,pq,rs
 integer :: ip,iq,ir,is
@@ -1645,6 +1646,7 @@ double precision,allocatable :: EVecA(:), EVecB(:)
 double precision,allocatable :: tmp1(:,:),tmp2(:,:),&
                                 tmp01(:,:),tmp02(:,:)
 double precision,allocatable :: work(:)
+double precision,allocatable :: tChol(:)
 double precision :: e2d,fact,tmp
 double precision :: e2du,dea,deb
 double precision :: inv_omega
@@ -1680,6 +1682,8 @@ double precision,parameter :: SmallE = 1.D-3
  nOVA = dimOA*dimVA
  nOVB = dimOB*dimVB
 
+ NCholesky = SAPT%NCholesky
+
 ! read EigValA_B
  allocate(EVecA(A%NDimX*A%NDimX),OmA(A%NDimX),  &
           EVecB(B%NDimX*B%NDimX),OmB(B%NDimX),  &
@@ -1701,6 +1705,7 @@ double precision,parameter :: SmallE = 1.D-3
 
 ! tran4_gen
 allocate(work(nOVB))
+allocate(tChol(nOVB))
 open(newunit=iunit,file='TWOMOAB',status='OLD',&
      access='DIRECT',form='UNFORMATTED',recl=8*nOVB)
 
@@ -1808,7 +1813,14 @@ if(.not.(Flags%ICASSCF==0.and.Flags%ISERPA==0)) then
     ip = A%IndN(1,pq)
     iq = A%IndN(2,pq)
     ! print*, iq,ip,iq+(ip-A%num0-1)*dimOA,nOVA
-    read(iunit,rec=iq+(ip-A%num0-1)*dimOA) work(1:nOVB)
+    ! test Cholesky
+    kc = iq+(ip-A%num0-1)*dimOA
+    call dgemv('T',NCholesky,nOVB,1d0,B%OV,NCholesky,A%OV(:,kc),1,0d0,tChol,1)
+    work = tChol
+    !read(iunit,rec=iq+(ip-A%num0-1)*dimOA) work(1:nOVB)
+    !print*, 'pq',pq,norm2(work(1:nOVB))
+    !print*, 'pq',pq,norm2(tChol(1:nOVB))
+
     do rs=1,B%NDimX
        ir = B%IndN(1,rs)
        is = B%IndN(2,rs)
@@ -1944,6 +1956,7 @@ endif
  if(SAPT%Wexcit) call e2inddisp_dexc(Flags,A,B,SAPT)
 
  deallocate(work)
+ deallocate(tChol)
 
  if(Flags%ICASSCF==1) then
     ! deallocate Y01Block
