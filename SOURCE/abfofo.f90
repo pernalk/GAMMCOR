@@ -6463,7 +6463,7 @@ subroutine Y01CASDSYM_FOFO(ICAS,NoStMx,ICORR,EExcit,IStCAS,NSym,NSymNO,MultpC,EC
      propfile0,propfile1, &
      xy0file, &
      UNOAO,IndN,IndX,IGemIN,NAct,INActive,NDimX,NBasis,NDim,NInte1, &
-     NoSt,IntFileName,IntJFile,IntKFile,ETot)
+     NoSt,IntFileName,IntJFile,IntKFile,ETot,IFlAC0DP)
 !
 !     A ROUTINE FOR COMPUTING AC0D CORRELATION ENERGIES AND
 !     TRANSITION DIPOLE MOMENTS IN THE 0- AND 1 - ORDER APPROXIMATIONS
@@ -6523,6 +6523,7 @@ double precision,parameter :: Thresh = 1.D-12
 double precision :: tmpEn
 !! test timings
 double precision :: Tcpu,Twall
+integer :: IFlAC0DP
 
 ! timing
 call clock('START',Tcpu,Twall)
@@ -7466,32 +7467,33 @@ If (IStCAS(1,ICAS).Eq.1.And.IStCAS(2,ICAS).Eq.1) Then
 EndIf
 
 NoEig11=0
-! AC0D' is turned off - no replacement of omegas, even in eig_1.1.dat file exists
-! uncomment to turn AC0D' on
-!If(IStCAS(1,ICAS).Ne.1.Or.IStCAS(2,ICAS).Ne.1) Then
-!   INQUIRE(FILE="eig_1.1.dat",EXIST=file_exists)
-!   If(file_exists) Then
-!      Write(6,'(X," *** AC0D WITH replacements of omegas [eig_1.1.dat available] *** ")')
-!      Open(10,File='eig_1.1.dat')
-!      Read(10,*) NoEig11
-!      Do NU=1,NoEig11
-!         Read(10,*) ISt11ERPA(1,NU),ISt11ERPA(2,NU),Eig11(NU)
-!         If(ISt11ERPA(1,NU).Eq.IStCAS(1,ICAS).And.ISt11ERPA(2,NU).Eq.IStCAS(2,ICAS)) Then
-!            AuxVal=Eig11(NU)
-!         EndIf
-!      EndDo
-!      Close(10)
-!
-!      Do NU=1,NoEig11
-!      Write(6,'(X,"ERPA_1.1 Excit Energy ",I2,".",I1,2F22.12)') &
-!       ISt11ERPA(1,NU),ISt11ERPA(2,NU),Eig11(NU),Eig11(NU)-AuxVal
-!      Eig11(NU)=Eig11(NU)-AuxVal
-!      EndDo
-!   Else
-!   Write(6,'(X," *** AC0D WITHOUT replacements of omegas [eig_1.1.dat not available] *** ")')
-!   NoEig11=0
-!   EndIf
-!EndIf
+If(IFlAC0DP.Eq.1) Then
+! AC0D' 
+If(IStCAS(1,ICAS).Ne.1.Or.IStCAS(2,ICAS).Ne.1) Then
+   INQUIRE(FILE="eig_1.1.dat",EXIST=file_exists)
+   If(file_exists) Then
+      Write(6,'(/,X," *** AC0DPrime : AC0D WITH replacements of omegas [eig_1.1.dat available] *** ",/)')
+      Open(10,File='eig_1.1.dat')
+      Read(10,*) NoEig11
+      Do NU=1,NoEig11
+         Read(10,*) ISt11ERPA(1,NU),ISt11ERPA(2,NU),Eig11(NU)
+         If(ISt11ERPA(1,NU).Eq.IStCAS(1,ICAS).And.ISt11ERPA(2,NU).Eq.IStCAS(2,ICAS)) Then
+            AuxVal=Eig11(NU)
+         EndIf
+      EndDo
+      Close(10)
+
+      Do NU=1,NoEig11
+      Write(6,'(X,"ERPA_1.1 Excit Energy ",I2,".",I1,2F22.12)') &
+       ISt11ERPA(1,NU),ISt11ERPA(2,NU),Eig11(NU),Eig11(NU)-AuxVal
+      Eig11(NU)=Eig11(NU)-AuxVal
+      EndDo
+   Else
+      Write(6,'(X," *** AC0DPrime requested but eig_1.1.dat not available. Stopping. *** ")')
+      Stop
+   EndIf
+EndIf
+EndIf
 
       NegSym(1:8)=0
       Do I=1,NoStMx
@@ -7740,17 +7742,12 @@ EndIf
 allocate(ABP(NDimX,NDimX))
 ABP=0
 IStateInSACAS=0
-! hererxxx replace eig's with excitation energies from SA-CAS
 Do I=1,NoStMx
     AuxVal=EExcit(I)-EExcit(ICAS)
     If (AuxVal.Gt.0) Then
         Do NU=1,NoEig
              If(IStERPA(1,NU).Eq.IStCAS(1,I).And.IStERPA(2,NU).Eq.IStCAS(2,I)) Then
                      IStateInSACAS(IStERPA(1,NU),IStERPA(2,NU))=1
-! hererxxx
-!                    Write(6,'(X,"Replacing Eig ",I1,".",I1,F22.12," with SA-CAS ",F22.12)') &
-!                    IStERPA(1,NU),IStERPA(2,NU),Eig(NU),AuxVal
-!                    Eig(NU)=AuxVal
                     Write(6,'(X,"Ratio of Eig ",I1,".",I1,F22.12," to SA-CAS ",2F22.12)') &
                     IStERPA(1,NU),IStERPA(2,NU),Eig(NU),AuxVal,Eig(NU)/AuxVal
              EndIf
@@ -7761,12 +7758,9 @@ EndDo
 If(IStCAS(1,ICAS).Ne.1.Or.IStCAS(2,ICAS).Ne.1) Then
 Do I=1,NoEig11
     AuxVal=Eig11(I)
-! hererxxx
-!    If (AuxVal.Gt.0) Then
         Do NU=1,NoEig
              If(IStERPA(1,NU).Eq.ISt11ERPA(1,I).And.IStERPA(2,NU).Eq.ISt11ERPA(2,I)) Then
 
-! hererxxx
                 If(IStateInSACAS(IStERPA(1,NU),IStERPA(2,NU)).Eq.1) Then
 
 !                    If(Eig(NU).Gt.AuxVal) Then
@@ -7780,7 +7774,6 @@ Do I=1,NoEig11
 
              EndIf
         EndDo
- !   EndIf
 EndDo
 EndIf
 

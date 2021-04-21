@@ -431,7 +431,7 @@ C
      $ 'XY0',UNOAO,
      $ IndN,IndX,IGem,NAcCAS,NInAcCAS,NDimX,
      $ NBasis,NDimX,NInte1,NoSt,'EMPTY','FFOO',
-     $ 'FOFO',ETot) 
+     $ 'FOFO',ETot,IFlAC0DP) 
 C
       EndIf
 C

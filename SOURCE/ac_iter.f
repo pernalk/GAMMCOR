@@ -134,10 +134,13 @@ C     ABPLUS*ABMIN+1 Om^2
       Call dgemm('N','N',NDimX,NDimX,NDimX,1d0,ABPLUS,NDimX,
      $           ABMIN,NDimX,OmI**2,AIN,NDimX)
 
-      Call dgetrf(NDimX, NDimX, AIN, NDimX, ipiv, inf1 )
-      Call dgetri(NDimX, AIN, NDimX, ipiv, work, NDimX, inf2 )
-      Call dgemm('N','N',NDimX,NDimX,NDimX,1d0,AIN,NDimX,
-     $           ABPLUS,NDimX,0.0,CMAT,NDimX)
+c      Call dgetrf(NDimX, NDimX, AIN, NDimX, ipiv, inf1 )
+c      Call dgetri(NDimX, AIN, NDimX, ipiv, work, NDimX, inf2 )
+c      Call dgemm('N','N',NDimX,NDimX,NDimX,1d0,AIN,NDimX,
+c     $           ABPLUS,NDimX,0.0,CMAT,NDimX)
+
+      CMAT=ABPLUS
+      Call dgesv(NDimX,NDimX,AIN,NDimX,ipiv,CMAT,NDimX,inf)
 C
       COM=COM+2.D0/PI*CMAT*WFreq(IGL)
 C
