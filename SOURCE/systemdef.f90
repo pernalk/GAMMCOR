@@ -130,6 +130,10 @@ else
   ! reduce virtuals
    Flags%IRedVirt = Input%CalcParams%RedVirt
 
+  ! memory in 2ints sorter (readtwoint) 
+   Flags%MemVal   = Input%CalcParams%MemVal
+   Flags%MemType  = Input%CalcParams%MemType
+
   ! Interface
   select case(Input%CalcParams%InterfaceType)
   case(INTER_TYPE_DAL)

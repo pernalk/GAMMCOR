@@ -428,7 +428,7 @@ subroutine read_block_calculation(CalcParams, line)
             CalcParams%JobTitle = val
 
       case("MEMSORT")
-            call read_memread(val,CalcParams%MemVal,CalcParams%MemType)
+            call read_memsrt(val,CalcParams%MemVal,CalcParams%MemType)
 
       case ("INTEGRALSFILEPATH")
             CalcParams%IntegralsFilePath = val

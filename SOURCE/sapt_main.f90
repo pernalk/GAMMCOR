@@ -82,7 +82,7 @@ double precision :: Tcpu,Twall
     elseif(SAPT%SaptLevel==2) then
        call e2ind(Flags,SAPT%monA,SAPT%monB,SAPT)
       !call e2ind_resp(Flags,SAPT%monA,SAPT%monB,SAPT) ! version using alpha(0)
-      !call e2ind_hf_icphf(Flags,SAPT%monA,SAPT%monB,SAPT) ! works only with HF
+      ! call e2ind_hf_icphf(Flags,SAPT%monA,SAPT%monB,SAPT) ! works only with HF
        call e2disp(Flags,SAPT%monA,SAPT%monB,SAPT)
        call e2exind(Flags,SAPT%monA,SAPT%monB,SAPT)
        call e2exdisp(Flags,SAPT%monA,SAPT%monB,SAPT)
@@ -699,14 +699,15 @@ type(SaptData)      :: SAPT
 type(TCholeskyVecs) :: CholeskyVecs
 integer,intent(in)  :: NBasis
 
-integer :: NSq,NInte1,NInte2
-integer :: NCholesky
-integer :: dimOA,dimOB,dimVA,dimVB,nOVA,nOVB
-integer :: NCMOt, NOrbt, NBasist
-integer :: NSym, NBas(8)
-integer :: NOcc(8),NOrbs(8)
-integer :: ione,iorb,isiri,i,j,ij
-integer :: p,q
+integer    :: NSq,NInte1,NInte2
+integer    :: NCholesky
+integer    :: dimOA,dimOB,dimVA,dimVB,nOVA,nOVB
+integer    :: NCMOt, NOrbt, NBasist
+integer    :: NSym, NBas(8)
+integer    :: NOcc(8),NOrbs(8)
+integer    :: ione,iorb,isiri,i,j,ij
+integer    :: p,q
+integer(8) :: MemSrtSize
 double precision :: tmp
 double precision :: potnucA,potnucB
 double precision :: potnuc,emy,eactiv,emcscf
@@ -717,8 +718,6 @@ double precision,allocatable :: Va(:),Vb(:),S(:)
 double precision,allocatable :: Ca(:),Cb(:)
 double precision,allocatable :: AuxA(:,:),AuxB(:,:)
 double precision,allocatable :: OneRdmA(:),OneRdmB(:)
-! test sorter
-integer(8) :: mem_size
 
 logical :: doRSH
 double precision,allocatable :: Sa(:,:),Sb(:,:)
@@ -758,6 +757,8 @@ double precision :: Tcpu,Twall
  NInte2 = NInte1*(NInte1+1)/2
  SAPT%monA%NDim = NBasis*(NBasis-1)/2
  SAPT%monB%NDim = NBasis*(NBasis-1)/2
+
+ print*, 'here?'
 
 ! set RSH
  SAPT%doRSH = .false.
@@ -839,19 +840,21 @@ double precision :: Tcpu,Twall
 
 ! read 2-el integrals
  call clock('START',Tcpu,Twall)
- !mem_size = 200*1024_8**2
- ! GB
- mem_size = 3*1024_8**3
+
+! memory allocation for sorter
+ MemSrtSize = Flags%MemVal*1024_8**Flags%MemType
+ print*, 'MemSrtSize',MemSrtSize
+
  if(SAPT%InterfaceType==1) then
-    call readtwoint(NBasis,1,'AOTWOINT_A','AOTWOSORT',mem_size)
+    call readtwoint(NBasis,1,'AOTWOINT_A','AOTWOSORT',MemSrtSize)
  elseif(SAPT%InterfaceType==2) then
-    call readtwoint(NBasis,2,'AOTWOINT.mol','AOTWOSORT',mem_size)
+    call readtwoint(NBasis,2,'AOTWOINT.mol','AOTWOSORT',MemSrtSize)
     if(doRSH) then
        if(SAPT%SameOm) then
-          call readtwoint(NBasis,2,'AOTWOINT.erf','AOERFSORT',mem_size)
+          call readtwoint(NBasis,2,'AOTWOINT.erf','AOERFSORT',MemSrtSize)
        else
-          call readtwoint(NBasis,2,'AOTWOINT.erf','AOERFSORT',mem_size)
-          call readtwoint(NBasis,2,'AOTWOINT.erfB','AOERFSORTB',mem_size)
+          call readtwoint(NBasis,2,'AOTWOINT.erf','AOERFSORT',MemSrtSize)
+          call readtwoint(NBasis,2,'AOTWOINT.erfB','AOERFSORTB',MemSrtSize)
        endif
     endif
  endif
@@ -1172,7 +1175,7 @@ character(:),allocatable :: occfile,sirifile,siriusfile,coefile
 
     if(nosiri.and.nooccu) then
        write(lout,'(1x,a)') &
-             'ERROR in readocc_dalton! No SIRI or occupations files!'
+             'ERROR in readocc_dalton! No SIRIFC or occupations files!'
        stop
     endif
 
@@ -2599,6 +2602,9 @@ double precision,parameter :: SmallE=0d0,BigE=1.D20
    end select
    write(LOUT,'(/,1x,a,f16.8,a,1x,f16.8)') 'ABPlus',norm2(ABPlus),'ABMin',norm2(ABMin)
 
+!   allocate(Mon%PP(Mon%NDimX**2))
+!   Mon%PP = ABMin
+
    EigVecR = 0
    Eig = 0
    ! HERE WORTH CHECKING SOME MORE FOR EXCITED STATE SELECTION...
@@ -2632,6 +2638,14 @@ double precision,parameter :: SmallE=0d0,BigE=1.D20
    enddo
    !print*, 'EigVecR',norm2(EigVecR)
    !print*, 'Eig    ',norm2(Mon%Eig)
+
+   ! test for e2ind_hf
+   !allocate(Mon%PP(Mon%NDimX**2))
+   !call AB_CAS_FOFO(ABPlus,Mon%PP,ECASSCF,URe,Mon%Occ,XOne, &
+   !              Mon%IndN,Mon%IndX,Mon%IGem,Mon%NAct,Mon%INAct,Mon%NDimX,NBas,Mon%NDimX,&
+   !              NInte1,twojfile,twokfile,1d0,.true.)
+
+   !print*, 'Mon%PP',norm2(Mon%PP)
 
    !do i=1,Mon%NDimX
    !   print*, i, Eig(i)
@@ -4187,7 +4201,7 @@ character(:),allocatable     :: sirfile,sirifile
     mon%INAct = nisht
     mon%NAct  = nasht
 
-    if(NSym/=mon%NSym) stop "NSym from SIRI and AOONEINT do not match!"
+    if(NSym/=mon%NSym) stop "NSym from SIRIFC and AOONEINT do not match!"
 
     mon%INActS(1:mon%NSym) = NISH(1:NSym)
     mon%NActS(1:mon%NSym)  = NASH(1:NSym)
@@ -4200,7 +4214,7 @@ character(:),allocatable     :: sirfile,sirifile
     endif
 
  else
-    write(lout,'(1x,a)') 'SIRI not available!'
+    write(lout,'(1x,a)') 'SIRIFC not available!'
     stop
  endif
 
@@ -5277,15 +5291,15 @@ write(LOUT,'(8a10)') ('**********',i=1,4)
 
 write(LOUT,'(1x,a,i3)') 'SAPT level  =', SAPT%SaptLevel
 
-write(LOUT,'(1x,a,f16.8)') 'E1elst      = ', SAPT%elst*1.d03
-write(LOUT,'(1x,a,f16.8)') 'E1exch(S2)  = ', SAPT%exchs2*1.d03
+write(LOUT,'(1x,a,t19,a,f16.8)') 'E1elst',    '=', SAPT%elst*1.d03
+write(LOUT,'(1x,a,t19,a,f16.8)') 'E1exch(S2)','=', SAPT%exchs2*1.d03
 
 if(SAPT%SaptLevel==2) then
-   write(LOUT,'(1x,a,f16.8)') 'E2ind       = ', SAPT%e2ind*1.d03
-   write(LOUT,'(1x,a,f16.8)') 'E2exch-ind  = ', SAPT%e2exind*1.0d3
-   write(LOUT,'(1x,a,f16.8)') 'E2disp      = ', SAPT%e2disp*1.d03
-   write(LOUT,'(1x,a,f16.8)') 'E2exch-disp = ', SAPT%e2exdisp*1.0d3
-   write(LOUT,'(1x,a,f16.8)') 'Eint(SAPT2) = ', SAPT%esapt2*1.0d3
+   write(LOUT,'(1x,a,t19,a,f16.8)') 'E2ind',      '=', SAPT%e2ind*1.d03
+   write(LOUT,'(1x,a,t19,a,f16.8)') 'E2exch-ind', '=', SAPT%e2exind*1.0d3
+   write(LOUT,'(1x,a,t19,a,f16.8)') 'E2disp',     '=', SAPT%e2disp*1.d03
+   write(LOUT,'(1x,a,t19,a,f16.8)') 'E2exch-disp','=', SAPT%e2exdisp*1.0d3
+   write(LOUT,'(1x,a,t19,a,f16.8)') 'Eint(SAPT2)','=', SAPT%esapt2*1.0d3
 
    if(SAPT%Wexcit) then
      write(lout,'(/1x,a)') 'Dexcitation corrections' 
@@ -5304,17 +5318,17 @@ if(SAPT%SaptLevel==2) then
    endif
 
 elseif(SAPT%SaptLevel==1) then
-   write(LOUT,'(1x,a,f16.8)') 'Eint(SAPT1) = ', SAPT%esapt2*1.0d3
+   write(LOUT,'(1x,a,t19,a,f16.8)') 'Eint(SAPT1)', '=', SAPT%esapt2*1.0d3
 
 elseif(SAPT%SaptLevel==10) then
-   write(LOUT,'(1x,a,f16.8)') 'E2disp(CAS) = ', SAPT%e2dispinCAS*1.d03
+   write(LOUT,'(1x,a,t19,a,f16.8)') 'E2disp(CAS)', '=', SAPT%e2dispinCAS*1.d03
 
 elseif(SAPT%SaptLevel==0) then
-   write(LOUT,'(1x,a,f16.8)') 'E2ind(unc)  = ', SAPT%e2ind_unc*1.d03
-   write(LOUT,'(1x,a,f16.8)') 'E2exch-ind  = ', SAPT%e2exind_unc*1.0d3
-   write(LOUT,'(1x,a,f16.8)') 'E2disp(unc) = ', SAPT%e2disp_unc*1.d03
-   write(LOUT,'(1x,a,f16.8)') 'E2exch-disp = ', SAPT%e2exdisp_unc*1.0d3
-   write(LOUT,'(1x,a,f16.8)') 'Eint(SAPT0) = ', SAPT%esapt0*1.0d3
+   write(LOUT,'(1x,a,t19,a,f16.8)') 'E2ind(unc)',  '=', SAPT%e2ind_unc*1.d03
+   write(LOUT,'(1x,a,t19,a,f16.8)') 'E2exch-ind',  '=', SAPT%e2exind_unc*1.0d3
+   write(LOUT,'(1x,a,t19,a,f16.8)') 'E2disp(unc)', '=', SAPT%e2disp_unc*1.d03
+   write(LOUT,'(1x,a,t19,a,f16.8)') 'E2exch-disp', '=', SAPT%e2exdisp_unc*1.0d3
+   write(LOUT,'(1x,a,t19,a,f16.8)') 'Eint(SAPT0)', '=', SAPT%esapt0*1.0d3
 endif
 
 end subroutine summary_sapt
@@ -5385,6 +5399,9 @@ endif
 if(allocated(SAPT%monB%OV)) then
    deallocate(SAPT%monB%OV)
 endif
+
+if(allocated(SAPT%monA%PP)) deallocate(SAPT%monA%PP)
+if(allocated(SAPT%monB%PP)) deallocate(SAPT%monB%PP)
 
 ! HERE - change to SAPTLEVEL?
 if(allocated(SAPT%monA%WPot)) then
@@ -5494,7 +5511,7 @@ endif
 ! ....
 
 ! delete files
-call delfile('AOTWOSORT')
+!call delfile('AOTWOSORT')
 if(SAPT%monA%TwoMoInt==TWOMO_INCORE.or.&
    SAPT%monA%TwoMoInt==TWOMO_FFFF) then
    call delfile('TWOMOAA')

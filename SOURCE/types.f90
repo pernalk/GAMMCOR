@@ -104,14 +104,13 @@ type CalculationBlock
       integer :: SaptLevel = SAPTLEVEL2
       integer :: vdWCoef   = 0
       integer :: RedVirt   = FLAG_REDVIRT
-      integer(8) :: MemVal = 2
+      integer :: MemVal = 2, MemType = 3
       logical :: Restart   = FLAG_RESTART
       logical :: PostCAS   = FLAG_POSTCAS
       integer :: IPrint    = 0 !FLAG_PRINT_LEVEL
       double precision :: RPAThresh  = 1.0D-6
       double precision :: ThreshVirt = 1.0D-6
       integer :: imon = 1
-      character(:), allocatable :: MemType
       character(:), allocatable :: JobTitle
       character(:), allocatable :: IntegralsFilePath
 end type CalculationBlock
@@ -240,6 +239,8 @@ type FlagsData
      integer :: ISHF      = 0
      character(:), allocatable :: JobTitle
      integer :: JobType = 0
+     integer :: MemVal  = 2
+     integer :: MemType = 3
      ! initia.f
      integer :: IA        = 1
      integer :: ICASSCF   = 0
@@ -1627,11 +1628,11 @@ function uppercase(s)
       end do
 end function uppercase
 
-subroutine read_memread(val,MemVal,MemType)
+subroutine read_memsrt(val,MemVal,MemType)
 
      character(*), intent(in)  :: val
-     integer(8), intent(out)   :: MemVal
-     character(*), intent(out) :: MemType
+     integer, intent(out)      :: MemVal
+     integer, intent(out)      :: MemType
 
      character(:), allocatable :: s1,s2
 
@@ -1640,15 +1641,17 @@ subroutine read_memread(val,MemVal,MemType)
      read(s1,*) MemVal
 
      if(trim(uppercase(s2))=='MB') then
-        MemVal = MemVal * 1024_8**2
+        !MemVal = MemVal * 1024_8**2
+        MemType = 2
      else if(trim(uppercase(s2))=='GB') then
-        MemVal = MemVal * 1024_8**3
+        !MemVal = MemVal * 1024_8**3
+        MemType = 3
      else
         write(lout,'(1x,a)') 'Error in declaration of MemSort!'
         stop
      endif
 
-end subroutine read_memread
+end subroutine read_memsrt
 
 subroutine read_statearray(val,inst,instates,delim)
 

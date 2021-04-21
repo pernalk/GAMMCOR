@@ -59,13 +59,15 @@ C
       Call free_Input(Input)
 C
 C     FILL COMMONS AND CONSTANTS
-      XELE   = System%XELE
-      NELE   = System%NELE
-      Charge = System%Charge
-      NBasis = System%NBasis
-      Title  = Flags%JobTitle
-      ITwoEl = Flags%ITwoEl
-      IWarn  = 0
+      XELE    = System%XELE
+      NELE    = System%NELE
+      Charge  = System%Charge
+      NBasis  = System%NBasis
+      Title   = Flags%JobTitle
+      ITwoEl  = Flags%ITwoEl
+      MemVal  = Flags%MemVal
+      MemType = Flags%MemType
+      IWarn   = 0
 C
 C     *************************************************************************
 C

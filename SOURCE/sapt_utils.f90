@@ -287,13 +287,13 @@ integer      :: iter,i,pq,ip,iq
 logical      :: conv=.FALSE.
 character(8) :: nameunc
 double precision :: error
-integer,parameter          :: MaxIt = 100 
-double precision,parameter :: ThrDIIS = 1.d-10
+integer,parameter          :: MaxIt = 50
+double precision,parameter :: ThrDIIS = 1.d-8
 
  if(M%Monomer==1) nameunc='XY0_A'
  if(M%Monomer==2) nameunc='XY0_B'
 
- call init_DIIS(DIISBlock,M%NDimX,M%NDimX,Flags%DIISN) 
+ call init_DIIS(DIISBlock,M%NDimX,M%NDimX,Flags%DIISN)
 
  allocate(WxYY(NBas,NBas))
  allocate(wVecxYY(M%NDimX))
@@ -338,7 +338,7 @@ double precision,parameter :: ThrDIIS = 1.d-10
 
  call amplitudes_T1(OmM0,vecR,delta,M%NDimX)
  amps = amps + delta
- !if(iter>Flags%DIISOn) call use_DIIS(DIISBlock,amps,vecR)
+ if(iter>Flags%DIISOn) call use_DIIS(DIISBlock,amps,vecR)
 
  enddo
 
@@ -815,5 +815,21 @@ deallocate(MIndEx)
 deallocate(VecEx)
 
 end subroutine calc_resp_apsg2
+
+subroutine print_en(string,val,nline)
+implicit none
+
+character(*),intent(in)     :: string
+double precision,intent(in) :: val
+logical,intent(in)          :: nline
+
+if(nline) then
+   write(LOUT,'(/1x,a,t19,a,f16.8)') string, "=", val
+else
+   write(LOUT,'(1x,a,t19,a,f16.8)')  string, "=", val
+endif
+
+end subroutine print_en
+
 
 end module sapt_utils
