@@ -527,7 +527,7 @@ contains
             integer, intent(in)                                       :: MaxNCholesky
             real(F64), intent(in)                                     :: TargetTraceError
             real(F64), intent(in)                                     :: TargetTraceErrorPrescreen
-            real(F64), intent(in)                                     :: TargetMaxError            
+            real(F64), intent(in)                                     :: TargetMaxError
             type(AOReaderData)                                        :: AOInts
             integer, dimension(:), intent(inout)                      :: NOrbPairs
             integer, intent(in)                                       :: MaxNQualified
