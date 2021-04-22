@@ -383,17 +383,6 @@ enddo
 
 end subroutine amplitudes_T1
 
-subroutine chol_rs_for_pq(A,B,C,NChol,nOV)
-implicit none
-
-integer,intent(in) :: NChol, nOV
-double precision,intent(in)  :: A(NChol),B(NChol,nOV) 
-double precision,intent(out) :: C(nOV)
-
-call dgemv('T',NChol,nOV,1d0,B,NChol,A,1,0d0,C,1)
-
-end subroutine chol_rs_for_pq
-
 subroutine readresp(EVec,EVal,NDim,fname)
 implicit none
 

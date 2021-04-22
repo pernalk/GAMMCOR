@@ -65,6 +65,7 @@ C     FILL COMMONS AND CONSTANTS
       NBasis  = System%NBasis
       Title   = Flags%JobTitle
       ITwoEl  = Flags%ITwoEl
+      ICholesky = Flags%ICholesky
       MemVal  = Flags%MemVal
       MemType = Flags%MemType
       IWarn   = 0

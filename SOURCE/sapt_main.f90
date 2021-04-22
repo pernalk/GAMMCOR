@@ -9,6 +9,7 @@ use Cholesky
 use sapt_pol
 use sapt_exch
 use exd_pino
+use sapt_CD_pol
 
 implicit none
 
@@ -53,6 +54,9 @@ double precision :: Tcpu,Twall
 
  ! SAPT components
  write(LOUT,'()')
+
+ ! switch to Cholesky SAPT
+ if(Flags%ICholesky==1) call sapt_Cholesky(Flags,SAPT,Tcpu,TWall,NBasis)
 
  ! switch to extrapolated SAPT
  if(SAPT%monA%Cubic.or.SAPT%monB%Cubic) call sapt_extrapol(Flags,SAPT,NBasis)
@@ -222,6 +226,32 @@ logical          :: onlyDisp
  stop
 
 end subroutine sapt_driver_red
+
+subroutine sapt_Cholesky(Flags,SAPT,Tcpu,Twall,NBasis)
+! sapt driver with Cholesky decompositon
+! Flags%isCholesky==1
+implicit none
+
+type(FlagsData)    :: Flags
+type(SaptData)     :: SAPT
+integer,intent(in) :: NBasis
+double precision,intent(inout) :: Tcpu,Twall
+
+ print*, 'Cholesky decomposition'
+
+ call e1elst(SAPT%monA,SAPT%monB,SAPT)
+ call e1exchs2(Flags,SAPT%monA,SAPT%monB,SAPT)
+ call e2disp_Chol(Flags,SAPT%monA,SAPT%monB,SAPT)
+
+ call summary_sapt(SAPT)
+ call print_warn(SAPT)
+ call free_sapt(SAPT)
+
+ call clock('SAPT',Tcpu,Twall)
+
+ stop
+
+end subroutine sapt_Cholesky
 
 subroutine sapt_extrapol(Flags,SAPT,NBasis)
 implicit none
@@ -706,7 +736,7 @@ integer    :: NCMOt, NOrbt, NBasist
 integer    :: NSym, NBas(8)
 integer    :: NOcc(8),NOrbs(8)
 integer    :: ione,iorb,isiri,i,j,ij
-integer    :: p,q
+integer    :: p,q,pq
 integer(8) :: MemSrtSize
 double precision :: tmp
 double precision :: potnucA,potnucB
@@ -718,34 +748,11 @@ double precision,allocatable :: Va(:),Vb(:),S(:)
 double precision,allocatable :: Ca(:),Cb(:)
 double precision,allocatable :: AuxA(:,:),AuxB(:,:)
 double precision,allocatable :: OneRdmA(:),OneRdmB(:)
+double precision,allocatable :: tmpMat(:,:)
 
 logical :: doRSH
 double precision,allocatable :: Sa(:,:),Sb(:,:)
 double precision :: Tcpu,Twall
-
-!! read basis info
-!! only DCBS
-! NBasis = 0
-! if(SAPT%InterfaceType==1) then
-!    call basinfo(NBasis,'SIRIUS_A.RST','DALTON')
-! elseif(SAPT%InterfaceType==2) then
-!    call basinfo(NBasis,'AOTWOINT.mol','MOLPRO')
-! endif
-! if(NBasis==0.and.SAPT%monA%NBasis==0) then
-!    write(LOUT,'(1x,a)') 'ERROR!!! NBasis NOWHERE TO BE FOUND!'
-!    stop
-! elseif(NBasis==0.and.SAPT%monA%NBasis/=0) then
-!    ! basis only in input
-!    NBasis = SAPT%monA%NBasis
-! elseif(NBasis/=0.and.SAPT%monA%NBasis==0) then
-!    ! basis only in SIRIFC
-!    SAPT%monA%NBasis = NBasis
-!    SAPT%monB%NBasis = NBasis
-! elseif(NBasis/=0.and.SAPT%monA%NBasis/=0) then
-!    ! choose SIRIFC values
-!    SAPT%monA%NBasis = NBasis
-!    SAPT%monB%NBasis = NBasis
-! endif
 
 ! set monomer print level
  SAPT%monA%IPrint = SAPT%IPrint
@@ -757,8 +764,6 @@ double precision :: Tcpu,Twall
  NInte2 = NInte1*(NInte1+1)/2
  SAPT%monA%NDim = NBasis*(NBasis-1)/2
  SAPT%monB%NDim = NBasis*(NBasis-1)/2
-
- print*, 'here?'
 
 ! set RSH
  SAPT%doRSH = .false.
@@ -843,7 +848,6 @@ double precision :: Tcpu,Twall
 
 ! memory allocation for sorter
  MemSrtSize = Flags%MemVal*1024_8**Flags%MemType
- print*, 'MemSrtSize',MemSrtSize
 
  if(SAPT%InterfaceType==1) then
     call readtwoint(NBasis,1,'AOTWOINT_A','AOTWOSORT',MemSrtSize)
@@ -889,28 +893,19 @@ double precision :: Tcpu,Twall
  call select_active(SAPT%monB,NBasis,Flags)
 
 ! perform Cholesky decomposition
- call chol_CoulombMatrix(CholeskyVecs,'AOTWOSORT',CHOL_ACCURACY_LUDICROUS)
- !call chol_CoulombMatrix(CholeskyVecs,'AOTWOSORT',CHOL_ACCURACY_TIGHT)
- !call chol_CoulombMatrix(CholeskyVecs,'AOTWOSORT',CHOL_ACCURACY_DEFAULT)
+ print*, 'SAPT-isCholesky',Flags%ICholesky
+ if(Flags%ICholesky==1) then
 
-! transform Cholesky to NO
- NCholesky = CholeskyVecs%NCholesky
- SAPT%NCholesky = NCholesky
- dimOA = SAPT%monA%num0+SAPT%monA%num1
- dimOB = SAPT%monB%num0+SAPT%monB%num1
- dimVA = SAPT%monA%num1+SAPT%monA%num2
- dimVB = SAPT%monB%num1+SAPT%monB%num2
- nOVA  = dimOA*dimVA
- nOVB  = dimOB*dimVB
+    call chol_CoulombMatrix(CholeskyVecs,'AOTWOSORT',CHOL_ACCURACY_LUDICROUS)
+    !call chol_CoulombMatrix(CholeskyVecs,'AOTWOSORT',CHOL_ACCURACY_TIGHT)
+    !call chol_CoulombMatrix(CholeskyVecs,'AOTWOSORT',CHOL_ACCURACY_DEFAULT)
 
- allocate(SAPT%monA%OV(NCholesky,nOVA),&
-          SAPT%monB%OV(NCholesky,nOVB))
- call chol_MOTransf(SAPT%monA%OV,CholeskyVecs,&
-                    SAPT%monA%CMO,1,dimOA,&
-                    SAPT%monA%CMO,SAPT%monA%num0+1,NBasis)
- call chol_MOTransf(SAPT%monB%OV,CholeskyVecs,&
-                    SAPT%monB%CMO,1,dimOB,&
-                    SAPT%monB%CMO,SAPT%monB%num0+1,NBasis)
+    SAPT%NCholesky = CholeskyVecs%NCholesky
+
+    ! transform Cholesky Vecs to NO
+    call sapt_chol_NOTransf(SAPT%monA,SAPT%monB,CholeskyVecs,NBasis)
+
+  endif
 
 ! ABABABABABABABABABABABABABABABABABABABABABABABABABABABABAB
  if(SAPT%IPrint.gt.100) call print_TwoInt(NBasis)
@@ -3452,6 +3447,61 @@ double precision :: Factor,PNorm
 
 end subroutine calc_fci
 
+subroutine sapt_chol_NOTransf(A,B,CholeskyVecs,NBasis)
+! transform Choleksy Vecs from AO to NO
+! for all 2-index vecs needed in SAPT
+implicit none
+
+type(SystemBlock)   :: A, B
+type(TCholeskyVecs) :: CholeskyVecs
+integer,intent(in)  :: NBasis
+
+integer :: NCholesky
+integer :: dimOA,dimOB,dimVA,dimVB, &
+           nOVA,nOVB
+integer :: i,ip,iq,ipq
+double precision,allocatable :: tmp(:,:)
+
+ NCholesky = CholeskyVecs%NCholesky
+ dimOA = A%num0+A%num1
+ dimOB = B%num0+B%num1
+ dimVA = A%num1+A%num2
+ dimVB = B%num1+B%num2
+ nOVA  = dimOA*dimVA
+ nOVB  = dimOB*dimVB
+
+ allocate(A%OV(NCholesky,A%NDimX),B%OV(NCholesky,B%NDimX))
+
+ allocate(tmp(NCholesky,nOVA))
+ ! (OV|AA)
+ call chol_MOTransf(tmp,CholeskyVecs,&
+                    A%CMO,1,dimOA,&
+                    A%CMO,A%num0+1,NBasis)
+ do i=1,A%NDimX
+    ip  = A%IndN(1,i)
+    iq  = A%IndN(2,i)
+    ipq = iq+(ip-A%num0-1)*dimOA
+    A%OV(:,i)= tmp(:,ipq)
+ enddo
+ deallocate(tmp)
+
+ allocate(tmp(NCholesky,nOVB))
+ ! (OV|BB)
+ call chol_MOTransf(tmp,CholeskyVecs,&
+                    B%CMO,1,dimOB,&
+                    B%CMO,B%num0+1,NBasis)
+ do i=1,B%NDimX
+    ip  = B%IndN(1,i)
+    iq  = B%IndN(2,i)
+    ipq = iq+(ip-B%num0-1)*dimOB
+    B%OV(:,i)= tmp(:,ipq)
+ enddo
+ print*, 'B%OV',norm2(B%OV)
+
+ deallocate(tmp)
+
+end subroutine sapt_chol_NOTransf
+
 subroutine get_1el_h_mo(XOne,MO,NBas,onefile)
 ! read 1-el Hamiltonian and transform with MO coefs
 implicit none
@@ -5511,7 +5561,7 @@ endif
 ! ....
 
 ! delete files
-!call delfile('AOTWOSORT')
+call delfile('AOTWOSORT')
 if(SAPT%monA%TwoMoInt==TWOMO_INCORE.or.&
    SAPT%monA%TwoMoInt==TWOMO_FFFF) then
    call delfile('TWOMOAA')

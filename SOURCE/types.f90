@@ -51,6 +51,8 @@ integer, parameter :: TWOMO_INCORE = 1
 integer, parameter :: TWOMO_FFFF   = 2
 integer, parameter :: TWOMO_FOFO   = 3
 
+integer, parameter :: FLAG_CHOLESKY = 0
+
 integer, parameter :: DF_NONE       = 0
 integer, parameter :: DF_SRLDA      = 1
 integer, parameter :: DF_SRPBE      = 2
@@ -63,7 +65,7 @@ integer, parameter :: RESP_ERPA = 1
 integer, parameter :: RESP_APSG = 2
 integer, parameter :: RESP_DFT  = 3
 
-logical, parameter :: FLAG_POSTCAS = .FALSE.
+logical, parameter :: FLAG_POSTCAS  = .FALSE.
 
 integer,parameter :: maxcen = 500
 
@@ -99,15 +101,16 @@ type CalculationBlock
       integer :: DFApp     = DF_NONE
       integer :: Kernel    = 1
       integer :: TwoMoInt  = TWOMO_INCORE
+      integer :: Cholesky  = FLAG_CHOLESKY 
       integer :: Core      = FLAG_CORE
       integer :: SymType   = TYPE_NO_SYM
       integer :: SaptLevel = SAPTLEVEL2
       integer :: vdWCoef   = 0
       integer :: RedVirt   = FLAG_REDVIRT
       integer :: MemVal = 2, MemType = 3
-      logical :: Restart   = FLAG_RESTART
-      logical :: PostCAS   = FLAG_POSTCAS
-      integer :: IPrint    = 0 !FLAG_PRINT_LEVEL
+      logical :: Restart    = FLAG_RESTART
+      logical :: PostCAS    = FLAG_POSTCAS
+      integer :: IPrint     = 0
       double precision :: RPAThresh  = 1.0D-6
       double precision :: ThreshVirt = 1.0D-6
       integer :: imon = 1
@@ -222,8 +225,9 @@ type FlagsData
      integer :: NoSym   = 1
      integer :: NoSt    = 1
      integer :: IGVB    = 1
-     integer :: ITwoEl  = TWOMO_INCORE 
+     integer :: ITwoEl    = TWOMO_INCORE 
      integer :: IRedVirt  = FLAG_REDVIRT
+     integer :: ICholesky = FLAG_CHOLESKY
      integer :: IFun      = 13
      integer :: IFunSR    = 0 
      integer :: IFunSRKer = 0

@@ -127,6 +127,9 @@ else
   ! set TwoEl type
    Flags%ITwoEl = Input%CalcParams%TwoMoInt
 
+  ! set Cholesky decomposition
+   Flags%ICholesky = Input%CalcParams%Cholesky
+
   ! reduce virtuals
    Flags%IRedVirt = Input%CalcParams%RedVirt
 
@@ -410,9 +413,9 @@ if(Flags%ISAPT.Eq.0) then
 elseif(Flags%ISAPT.Eq.1) then
 
  SAPT%InterfaceType = Input%CalcParams%InterfaceType
- SAPT%IPrint = Input%CalcParams%IPrint
  SAPT%SaptLevel = Input%CalcParams%SaptLevel
  SAPT%ic6 = Input%CalcParams%vdWCoef
+ SAPT%IPrint = Input%CalcParams%IPrint
  if(SAPT%InterfaceType==2) SAPT%HFCheck = .false.
  ! temporary RSH
  if(Flags%IFunSR<3) then

@@ -1,7 +1,7 @@
 C
       Common/MISCFL/ XELE,IFun,IFunSR,IFunSRKer,NELE,IRes,INO,IPrint,
      $ IInteg,IAO,IGVB,IDALTON,IFreeze,ILoc,NInActOrb,NActOrb,NVirtOrb,
-     $ ISAPT,IWarn,ITwoEl,
+     $ ISAPT,IWarn,ITwoEl,ICholesky
      $ MemVal,MemType
       Common/CAS/ ICASSCF,NAcCAS,NInAcCAS,NStates,
      $ InSt(2,100),InTrSt(2,1)

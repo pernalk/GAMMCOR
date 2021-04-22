@@ -398,6 +398,13 @@ subroutine read_block_calculation(CalcParams, line)
       case ("POSTCAS")
            read(val,*) CalcParams%PostCAS
 
+      case ("CHOLESKY")
+           if (uppercase(val) == ".TRUE.".or. &
+               uppercase(val) == "TRUE".or.   &
+               uppercase(val) == "T") then
+              CalcParams%Cholesky = 1
+           endif
+
       case ("SAPTLEVEL")
            if (uppercase(val) == "0".or.&
                uppercase(val) == "SAPT0") then
