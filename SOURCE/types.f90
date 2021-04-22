@@ -123,8 +123,9 @@ type SystemBlock
       integer :: NStates = 1
       integer :: EigFCI = 1
       integer :: Charge = 0
-      integer :: ZNucl   = 0
+      integer :: ZNucl  = 0
       integer :: NBasis = 0
+      integer :: NChol  = 0
       integer :: Monomer = MONOMER_A
       integer :: NELE
       double precision :: XELE
@@ -187,7 +188,8 @@ type SystemBlock
       double precision,allocatable :: OrbE(:)
       double precision,allocatable :: TwoMO(:)
       double precision,allocatable :: CMO(:,:)
-      double precision,allocatable :: OV(:,:)
+      double precision,allocatable :: OV(:,:),OO(:,:), &
+                                      FO(:,:),FF(:,:)
       double precision,allocatable :: WPot(:,:)
       double precision,allocatable :: VCoul(:)
       double precision,allocatable :: RDM2(:),RDM2Act(:,:,:,:)

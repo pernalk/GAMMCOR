@@ -437,7 +437,6 @@ integer :: l,k,kl
 
 end subroutine tran4_gen
 
-
 subroutine read4_gen(NBas,nA,CA,nB,CB,nC,CC,nD,CD,fname,srtfile)
 ! reads 4-index ints from sorted file 
 ! dumps all integrals on disk in the (square,square) form

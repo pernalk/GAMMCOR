@@ -1825,15 +1825,12 @@ if(.not.(Flags%ICASSCF==0.and.Flags%ISERPA==0)) then
  do pq=1,A%NDimX
     ip = A%IndN(1,pq)
     iq = A%IndN(2,pq)
-    ! print*, iq,ip,iq+(ip-A%num0-1)*dimOA,nOVA
     ! test Cholesky
     !kc = iq+(ip-A%num0-1)*dimOA
     !call dgemv('T',NCholesky,nOVB,1d0,B%OV,NCholesky,A%OV(:,kc),1,0d0,tChol,1)
-    call dgemv('T',NCholesky,B%NDimX,1d0,B%OV,NCholesky,A%OV(:,pq),1,0d0,tChol,1)
-    work(1:B%NDimX) = tChol(1:B%NDimX)
-    !read(iunit,rec=iq+(ip-A%num0-1)*dimOA) work(1:nOVB)
-    !print*, 'pq',pq,norm2(work(1:nOVB))
-    !print*, 'pq',pq,norm2(tChol(1:nOVB))
+    !call dgemv('T',NCholesky,B%NDimX,1d0,B%OV,NCholesky,A%OV(:,pq),1,0d0,tChol,1)
+    !work(1:B%NDimX) = tChol(1:B%NDimX)
+    read(iunit,rec=iq+(ip-A%num0-1)*dimOA) work(1:nOVB)
 
     do rs=1,B%NDimX
        ir = B%IndN(1,rs)
@@ -1841,8 +1838,7 @@ if(.not.(Flags%ICASSCF==0.and.Flags%ISERPA==0)) then
 
        fact = (A%CICoef(iq)+A%CICoef(ip)) * &
               (B%CICoef(is)+B%CICoef(ir)) * &
-               work(rs)
-               !work(is+(ir-B%num0-1)*dimOB)
+               work(is+(ir-B%num0-1)*dimOB)
 
        do i=1,A%NDimX
           tmp1(i,rs) = tmp1(i,rs) + & 

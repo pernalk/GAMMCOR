@@ -893,17 +893,18 @@ double precision :: Tcpu,Twall
  call select_active(SAPT%monB,NBasis,Flags)
 
 ! perform Cholesky decomposition
- print*, 'SAPT-isCholesky',Flags%ICholesky
  if(Flags%ICholesky==1) then
 
     call chol_CoulombMatrix(CholeskyVecs,'AOTWOSORT',CHOL_ACCURACY_LUDICROUS)
     !call chol_CoulombMatrix(CholeskyVecs,'AOTWOSORT',CHOL_ACCURACY_TIGHT)
     !call chol_CoulombMatrix(CholeskyVecs,'AOTWOSORT',CHOL_ACCURACY_DEFAULT)
 
-    SAPT%NCholesky = CholeskyVecs%NCholesky
+    SAPT%NCholesky  = CholeskyVecs%NCholesky
+    SAPT%monA%NChol = SAPT%NCholesky
+    SAPT%monB%NChol = SAPT%NCholesky
 
     ! transform Cholesky Vecs to NO
-    call sapt_chol_NOTransf(SAPT%monA,SAPT%monB,CholeskyVecs,NBasis)
+    call chol_sapt_NOTransf(SAPT%monA,SAPT%monB,CholeskyVecs,NBasis)
 
   endif
 
@@ -1775,25 +1776,69 @@ character(:),allocatable     :: twojfile,twokfile
    call tran4_full(NBas,MO,MO,twofile,'AOTWOSORT')
 
  case(TWOMO_FOFO)
-   ! transform J and K
-    call tran4_gen(NBas,&
-         Mon%num0+Mon%num1,MO(1:NBas*(Mon%num0+Mon%num1)),&
-         Mon%num0+Mon%num1,MO(1:NBas*(Mon%num0+Mon%num1)),&
-         NBas,MO,&
-         NBas,MO,&
-         twojfile,'AOTWOSORT')
-    call tran4_gen(NBas,&
-         NBas,MO,&
-         Mon%num0+Mon%num1,MO(1:NBas*(Mon%num0+Mon%num1)),&
-         NBas,MO,&
-         Mon%num0+Mon%num1,MO(1:NBas*(Mon%num0+Mon%num1)),&
-         twokfile,'AOTWOSORT')
+   if(Flags%ICholesky==1) then
+      call chol_ints(NBas,NBas,Mon%FF, &
+                     Mon%num0+Mon%num1,Mon%num0+Mon%num1,Mon%OO,&
+                     Mon%NChol,twojfile)
+      call chol_ints(NBas,Mon%num0+Mon%num1,Mon%FO,&
+                     NBas,Mon%num0+Mon%num1,Mon%FO,&
+                     Mon%NChol,twokfile)
+   else
+      ! transform J and K
+       call tran4_gen(NBas,&
+            Mon%num0+Mon%num1,MO(1:NBas*(Mon%num0+Mon%num1)),&
+            Mon%num0+Mon%num1,MO(1:NBas*(Mon%num0+Mon%num1)),&
+            NBas,MO,&
+            NBas,MO,&
+            twojfile,'AOTWOSORT')
+       call tran4_gen(NBas,&
+            NBas,MO,&
+            Mon%num0+Mon%num1,MO(1:NBas*(Mon%num0+Mon%num1)),&
+            NBas,MO,&
+            Mon%num0+Mon%num1,MO(1:NBas*(Mon%num0+Mon%num1)),&
+            twokfile,'AOTWOSORT')
+    endif
  end select
 
  deallocate(XOne,work2,work1)
  !if(Mon%TwoMoInt==1) deallocate(TwoMO)
 
 end subroutine sapt_mon_ints
+
+subroutine chol_ints(nA,nB,MatAB,nC,nD,MatCD,NCholesky,fname)
+implicit none
+
+integer,intent(in) :: nA,nB,nC,nD,NCholesky
+character(*),intent(in) :: fname
+double precision,intent(in) :: MatAB(NCholesky,nA*nB), &
+                               MatCD(NCholesky,nC*nD)
+
+integer :: iunit
+integer :: nAB,nCD,cd
+double precision,allocatable :: work(:)
+
+nAB = nA*nB
+nCD = nC*nD
+
+allocate(work(nAB))
+
+print*, 'Assemble ',fname,' from Cholesky Vectors'
+
+open(newunit=iunit,file=fname,status='REPLACE',&
+     access='DIRECT',form='UNFORMATTED',recl=8*nAB)
+
+! (FF|OO)
+do cd=1,nCD
+
+   call dgemv('T',NCholesky,nAB,1d0,MatAB,NCholesky,MatCD(:,cd),1,0d0,work,1)
+   write(iunit,rec=cd) work(1:nAB)
+
+enddo
+
+deallocate(work)
+close(iunit)
+
+end subroutine chol_ints
 
 subroutine calc_resp_unc(Mon,MO,Flags,NBas)
 implicit none
@@ -3447,7 +3492,7 @@ double precision :: Factor,PNorm
 
 end subroutine calc_fci
 
-subroutine sapt_chol_NOTransf(A,B,CholeskyVecs,NBasis)
+subroutine chol_sapt_NOTransf(A,B,CholeskyVecs,NBasis)
 ! transform Choleksy Vecs from AO to NO
 ! for all 2-index vecs needed in SAPT
 implicit none
@@ -3496,11 +3541,43 @@ double precision,allocatable :: tmp(:,:)
     ipq = iq+(ip-B%num0-1)*dimOB
     B%OV(:,i)= tmp(:,ipq)
  enddo
- print*, 'B%OV',norm2(B%OV)
 
  deallocate(tmp)
 
-end subroutine sapt_chol_NOTransf
+ allocate(A%OO(NCholesky,dimOA**2),&
+          B%OO(NCholesky,dimOB**2) )
+ ! (OO|AA)
+ call chol_MOTransf(A%OO,CholeskyVecs,&
+                    A%CMO,1,dimOA,&
+                    A%CMO,1,dimOA)
+ ! (OO|BB)
+ call chol_MOTransf(B%OO,CholeskyVecs,&
+                    B%CMO,1,dimOB,&
+                    B%CMO,1,dimOB)
+
+ allocate(A%FF(NCholesky,NBasis**2),&
+          B%FF(NCholesky,NBasis**2) )
+ ! (FF|AA)
+ call chol_MOTransf(A%FF,CholeskyVecs,&
+                    A%CMO,1,NBasis,&
+                    A%CMO,1,NBasis)
+ ! (FF|BB)
+ call chol_MOTransf(B%FF,CholeskyVecs,&
+                    B%CMO,1,NBasis,&
+                    B%CMO,1,NBasis)
+
+ allocate(A%FO(NCholesky,NBasis*dimOA),&
+          B%FO(NCholesky,NBasis*dimOA))
+ ! (FO|AA)
+ call chol_MOTransf(A%FO,CholeskyVecs,&
+                    A%CMO,1,NBasis,&
+                    A%CMO,1,dimOA)
+ ! (FO|BB)
+ call chol_MOTransf(B%FO,CholeskyVecs,&
+                    B%CMO,1,NBasis,&
+                    B%CMO,1,dimOB)
+
+end subroutine chol_sapt_NOTransf
 
 subroutine get_1el_h_mo(XOne,MO,NBas,onefile)
 ! read 1-el Hamiltonian and transform with MO coefs
@@ -5448,6 +5525,24 @@ if(allocated(SAPT%monA%OV)) then
 endif
 if(allocated(SAPT%monB%OV)) then
    deallocate(SAPT%monB%OV)
+endif
+if(allocated(SAPT%monA%OO)) then
+   deallocate(SAPT%monA%OO)
+endif
+if(allocated(SAPT%monB%OO)) then
+   deallocate(SAPT%monB%OO)
+endif
+if(allocated(SAPT%monA%FF)) then
+   deallocate(SAPT%monA%FF)
+endif
+if(allocated(SAPT%monB%FF)) then
+   deallocate(SAPT%monB%FF)
+endif
+if(allocated(SAPT%monA%FO)) then
+   deallocate(SAPT%monA%FO)
+endif
+if(allocated(SAPT%monB%FO)) then
+   deallocate(SAPT%monB%FO)
 endif
 
 if(allocated(SAPT%monA%PP)) deallocate(SAPT%monA%PP)
