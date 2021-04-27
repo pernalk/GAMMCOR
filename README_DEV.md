@@ -1,7 +1,10 @@
+# 🛠️ GammCor Developer Zone
+### 📚 [Documentation](#-documentation) &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 🧪 [Testing](#-testing) &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 🧰 [Toolbox](#-toolbox) &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 🔗 [Links](#-links)
+---
 
-# 🛠️ GAMMCOR Developer Zone
-### 🧪 [Testing](#-testing) &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;  🧰 [Toolbox](#-toolbox) &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 🔗 [Links](#-links)
-<br/>
+## 📚 Documentation
+* GammCor documentation is available at: https://qchem.gitlab.io/gammcor-doc
+* If you would like to contribute, please visit: https://gitlab.com/qchem/gammcor-doc
 
 ## 🧪 Testing
 ### 🔧 Preparation
@@ -18,17 +21,17 @@ Host gitos
 ```
 git clone gitos:qchem/TESTS
 ```
-3. Open _gammcor_verify.bash_ in the main GAMMCOR directory and assign variable ```TEST_SCRIPT_PATH``` the path to the file ```run_test.py``` located in your TESTS directory
+3. Open _gammcor_verify.bash_ in the main GammCor directory and assign variable ```TEST_SCRIPT_PATH``` the path to the file ```run_test.py``` located in your TESTS directory
 
 ### ✋ Manual testing
-Run test script located in the main GAMMCOR directory:
+Run test script located in the main GammCor directory:
 ```
 ./gammcor_verify.bash
 ```
 
 ### 🚦 Automatic testing
 * ##### Enabling
-1. Go to ```GAMMCOR/auto_test``` directory
+1. Go to ```gammcor/auto_test``` directory
 2. Run ```./install-hooks.bash``` to install test scripts: ```pre-commit.bash```, ```pre-push.bash``` and ```post-merge.bash```
 3. From now on, the tests will be performed before each ```commit``` and ```push``` commands as well as after the ```merge``` command
 
@@ -39,7 +42,7 @@ git commit --no-verify
 ```
 
 * ##### Disabling
-To permanently disable the automatic testing feature, go to ```GAMMCOR/auto_test``` directory and run ```./uninstall-hooks.bash```
+To permanently disable the automatic testing feature, go to ```gammcor/auto_test``` directory and run ```./uninstall-hooks.bash```
 
 * ##### Adjusting the level of testing
 To customize the list of tests performed for a given _git_ command, you can change level parameter passed to ```gammcor_verify.bash``` in ```pre-commit.bash```, ```pre-push.bash``` and ```post-merge.bash``` scripts. There are three levels: ```'short'```, ```'long'``` and ```'full'``` (default), which correspond to the levels defined for individual tests listed in ```TESTS/scripts/test_list.py```.
