@@ -3,8 +3,15 @@
 ---
 
 ## 📚 Documentation
-* GammCor documentation is available at: https://qchem.gitlab.io/gammcor-doc
-* If you would like to contribute, please visit: https://gitlab.com/qchem/gammcor-doc
+Here you can find User Manual and Developer Documentation
+
+### 📘 User Manual
+* It is available at: https://qchem.gitlab.io/gammcor-manual
+* If you would like to contribute, please visit: https://gitlab.com/qchem/gammcor-manual
+### 📕 Developer Documentation
+
+* It is available at: https://qchem.gitlab.io/gammcor-dev-doc
+* If you would like to contribute, please visit: https://gitlab.com/qchem/gammcor-dev-doc
 
 ## 🧪 Testing
 ### 🔧 Preparation
@@ -58,7 +65,6 @@ To customize the list of tests performed for a given _git_ command, you can chan
 * [OProfile](https://oprofile.sourceforge.io/docs/)
 
 ## 🔗 Links
-
 ##### Intel
 * [Intel Fortran Compiler Options](https://software.intel.com/content/www/us/en/develop/documentation/fortran-compiler-oneapi-dev-guide-and-reference/top/compiler-reference/compiler-options/alphabetical-list-of-compiler-options.html)
 * [oneAPI Math Kernel Library - Fortran](https://software.intel.com/content/www/us/en/develop/documentation/onemkl-developer-reference-fortran/top.html)
