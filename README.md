@@ -4,12 +4,12 @@ Authors: Kasia Pernal and Michal Hapka
 ## Installation
 #### 1. Clone the repository
 ```
-git clone git@gitlab.com:michal.hapka/pr-dmft.git
+git clone git@gitlab.com:qchem/gammcor.git
 ```
 
-#### 2. Change directory to GAMMCOR and create a directory OBJ:
+#### 2. Create an OBJ directory inside the repository folder:
 ```
-cd GAMMCOR
+cd <repository_name>
 mkdir OBJ
 ```
 
@@ -24,29 +24,29 @@ make
 cd xcfun
 make -f Makefile.gcc
 ```
-#### 4. Build GAMMCOR
+#### 4. Build GammCor
 * ##### Using ifort:
 
-Set the path to MKL (MKL_ROOT) in `Makefile` and build GAMMCOR using:
+Set the path to MKL (MKL_ROOT) in `Makefile` and build GammCor using:
 ```
 cd ..
 make
 ```
 * ##### Using gfortran:
 
-Set the path to MKL (MKL_ROOT) in `Makefile.gcc` and build GAMMCOR using:
+Set the path to MKL (MKL_ROOT) in `Makefile.gcc` and build GammCor using:
 ```
 cd ..
 make -f Makefile.gcc
 ```
 
-This will create GAMMCOR executable:
+This will create GammCor executable:
 ```
 gammcor
 ```
 
 ## Third party software
-Third party software used in GAMMCOR:
+Third party software used in GammCor:
 #### Intel Math Kernel Library
 Intel-optimized linear algebra library with low-level routines that operate on vectors and matrices
 * Website: [https://software.intel.com](https://software.intel.com/content/www/us/en/develop/tools/oneapi/components/onemkl.html)
