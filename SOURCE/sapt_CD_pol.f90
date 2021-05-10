@@ -6,6 +6,67 @@ implicit none
 
 contains
 
+subroutine e1elst_Chol(A,B,SAPT)
+implicit none
+
+type(SystemBlock) :: A, B
+type(SaptData)    :: SAPT
+
+integer :: i,j,ii,jj
+integer :: NBas,NCholesky
+double precision,allocatable :: Va(:,:),Vb(:,:)
+double precision,allocatable :: Vabb(:,:),Vbaa(:,:)
+double precision :: ea,eb,eab,elst
+double precision,external  :: ddot
+
+! set dimensions
+ NBas = A%NBasis 
+ NCholesky = SAPT%NCholesky
+
+ allocate(Va(NBas,NBas),Vb(NBas,NBas),&
+          Vabb(NBas,NBas),Vbaa(NBas,NBas))
+
+ call get_one_mat('V',Va,A%Monomer,NBas)
+ call get_one_mat('V',Vb,B%Monomer,NBas)
+
+ call tran2MO(Va,B%CMO,B%CMO,Vabb,NBas)
+ call tran2MO(Vb,A%CMO,A%CMO,Vbaa,NBas)
+
+! sum_p n_p v^B_pp 
+ do i=1,A%num0+A%num1
+    ea = ea + A%Occ(i)*Vbaa(i,i) 
+ enddo
+ ea = 2d0*ea
+ !print*, 'ea',ea
+
+! sum_q n_q v^A_qq 
+ do j=1,B%num0+B%num1
+    eb = eb + B%Occ(j)*Vabb(j,j) 
+ enddo
+ eb = 2d0*eb
+ !print*, 'eb',eb
+
+! sum_pq n_p n_q v_{pq}^{pq}
+ do j=1,B%num0+B%num1
+    jj = (j-1)*NBas+j
+    do i=1,A%num0+A%num1
+       ii = (i-1)*NBas+i
+       eab = eab + A%Occ(i)*B%Occ(j)*ddot(NCholesky,A%FO(:,ii),1,B%FO(:,jj),1)
+    enddo
+ enddo
+ eab = 4d0*eab
+ !print*, 'eab', eab
+
+ elst = ea + eb + eab + SAPT%Vnn 
+
+ call print_en('V_nn',SAPT%Vnn,.false.)
+ call print_en('Eelst',elst*1000,.false.)
+ SAPT%elst = elst
+
+ deallocate(Vb,Va,Vbaa,Vabb)
+
+end subroutine e1elst_Chol
+
 subroutine e2disp_Chol(Flags,A,B,SAPT)
 ! calculate 2nd order dispersion energy
 ! in coupled and uncoupled approximations

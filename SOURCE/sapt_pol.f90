@@ -47,26 +47,12 @@ double precision,external  :: trace
 ! print*, eb
  call dgemm('N','N',NBas,NBas,NBas,1d0,PB,NBas,Ja,NBas,0d0,work,NBas)
  ea = ea + trace(work,NBas)
-! print*, trace(work,NBas) 
+! print*, trace(work,NBas)
  elst = ea + eb + SAPT%Vnn 
 
- !write(LOUT,'(1x,a,f16.8)') 'V_nn        = ', SAPT%Vnn
- !write(LOUT,'(1x,a,f16.8,/)') 'Eelst       = ', elst*1000d0
  call print_en('V_nn',SAPT%Vnn,.false.)
  call print_en('Eelst',elst*1000,.false.)
  SAPT%elst = elst
-
-!! test wabb
-! work = 0
-! Ja = 0
-! call make_J1(NBas,PB,Ja)
-!
-! call dgemm('N','N',NBas,NBas,NBas,1d0,PA,NBas,Ja,NBas,0d0,work,NBas)
-! print*, 'Pa.Jb', trace(work,NBas)
-!
-! call dgemm('N','N',NBas,NBas,NBas,1d0,PA,NBas,B%WPot,NBas,0d0,work,NBas)
-! print*, 'Pa.Wb', trace(work,NBas)
-!
 
  deallocate(work)
  deallocate(Ja,Vb,Va,PB,PA) 

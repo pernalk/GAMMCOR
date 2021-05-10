@@ -239,7 +239,7 @@ double precision,intent(inout) :: Tcpu,Twall
 
  print*, 'Cholesky decomposition'
 
- call e1elst(SAPT%monA,SAPT%monB,SAPT)
+ call e1elst_Chol(SAPT%monA,SAPT%monB,SAPT)
  call e1exchs2(Flags,SAPT%monA,SAPT%monB,SAPT)
  call e2disp_Chol(Flags,SAPT%monA,SAPT%monB,SAPT)
 
