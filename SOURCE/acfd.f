@@ -121,6 +121,43 @@ c      NGrid=30
 C
       Call GauLeg(Zero,One,XGrid,WGrid,NGrid)
 C 
+c herer!!!
+c      h=5.d-4
+c      ACAlpha=0*h
+c      Call ACEInteg(ECorr0,TwoNO,URe,Occ,XOne,UNOAO,
+c     $ ABPLUS,ABMIN,EigVecR,Eig,
+c     $ EGOne,NGOcc,
+c     $ Title,NBasis,NInte1,NInte2,NDim,NGem,IndAux,ACAlpha,
+c     $ IndN,IndX,NDimX) 
+c      
+c      ACAlpha=h
+c      Call ACEInteg(ECorr1,TwoNO,URe,Occ,XOne,UNOAO,
+c     $ ABPLUS,ABMIN,EigVecR,Eig,
+c     $ EGOne,NGOcc,
+c     $ Title,NBasis,NInte1,NInte2,NDim,NGem,IndAux,ACAlpha,
+c     $ IndN,IndX,NDimX) 
+c 
+c      ACAlpha=2.*h
+c      Call ACEInteg(ECorr2,TwoNO,URe,Occ,XOne,UNOAO,
+c     $ ABPLUS,ABMIN,EigVecR,Eig,
+c     $ EGOne,NGOcc,
+c     $ Title,NBasis,NInte1,NInte2,NDim,NGem,IndAux,ACAlpha,
+c     $ IndN,IndX,NDimX)
+c
+c      ACAlpha=3.*h
+c      Call ACEInteg(ECorr3,TwoNO,URe,Occ,XOne,UNOAO,
+c     $ ABPLUS,ABMIN,EigVecR,Eig,
+c     $ EGOne,NGOcc,
+c     $ Title,NBasis,NInte1,NInte2,NDim,NGem,IndAux,ACAlpha,
+c     $ IndN,IndX,NDimX)
+c
+c      ECorr=ECorr0+0.5*(ECorr1-ECorr0)/h
+c     $ +1./6.d0*(ECorr2+ECorr0-2.*ECorr1)/h**2
+c     $ +1./24.*(-ECorr0+3.*ECorr1-3.*ECorr2+ECorr3)/h**3
+c      write(*,*)'ecorr',ECorr
+c
+c      stop
+
       ECorr=Zero
       Do I=1,NGrid
 C   
