@@ -22,7 +22,7 @@ subroutine sapt_driver(Flags,SAPT)
 implicit none
 
 type(FlagsData) :: Flags
-type(SaptData) :: SAPT
+type(SaptData)  :: SAPT
 integer :: i
 integer :: NBasis
 double precision :: Tcpu,Twall
@@ -241,7 +241,10 @@ double precision,intent(inout) :: Tcpu,Twall
 
  call e1elst_Chol(SAPT%monA,SAPT%monB,SAPT)
  call e1exchs2(Flags,SAPT%monA,SAPT%monB,SAPT)
+ call e2ind(Flags,SAPT%monA,SAPT%monB,SAPT)
+ call e2exind(Flags,SAPT%monA,SAPT%monB,SAPT)
  call e2disp_Chol(Flags,SAPT%monA,SAPT%monB,SAPT)
+ call e2exdisp(Flags,SAPT%monA,SAPT%monB,SAPT)
 
  call summary_sapt(SAPT)
  call print_warn(SAPT)
@@ -471,68 +474,114 @@ if(Flags%ISERPA==0) then
   if((Flags%SaptLevel.eq.2).or.(Flags%IRedVirt.eq.1)) then
 
      write(LOUT,'(/1x,a)') 'Transforming E2exch-ind integrals...'
-     ! term A3-ind
-     call tran4_gen(NBasis,&
-              NBasis,B%CMO,&
-              B%num0+B%num1,B%CMO(1:NBasis,1:(B%num0+B%num1)),&
-              NBasis,A%CMO,&
-              A%num0+A%num1,A%CMO(1:NBasis,1:(A%num0+A%num1)),&
-              'FOFOAABB','AOTWOSORT')
-     ! term A1-ind
-     call tran4_gen(NBasis,&
-              A%num0+A%num1,A%CMO(1:NBasis,1:(A%num0+A%num1)),&
-              B%num0+B%num1,B%CMO(1:NBasis,1:(B%num0+B%num1)),&
-              NBasis,A%CMO,&
-              NBasis,B%CMO,&
-              'FFOOABAB','AOTWOSORT')
-     ! term A2-ind
-     ! A2A(B): XX
-     call tran4_gen(NBasis,&
-              NBasis,B%CMO,&
-              A%num0+A%num1,A%CMO(1:NBasis,1:(A%num0+A%num1)),&
-              NBasis,B%CMO,&
-              B%num0+B%num1,B%CMO(1:NBasis,1:(B%num0+B%num1)),&
-              'FOFOBBBA','AOTWOSORT')
-     call tran4_gen(NBasis,&
-              NBasis,A%CMO,&
-              B%num0+B%num1,B%CMO(1:NBasis,1:(B%num0+B%num1)),&
-              NBasis,A%CMO,&
-              A%num0+A%num1,A%CMO(1:NBasis,1:(A%num0+A%num1)),&
-              'FOFOAAAB','AOTWOSORT')
-     !! A2A(B): YY
-     call tran4_gen(NBasis,&
-              NBasis,A%CMO,&
-              B%num0+B%num1,B%CMO(1:NBasis,1:(B%num0+B%num1)),&
-              NBasis,B%CMO,&
-              B%num0+B%num1,B%CMO(1:NBasis,1:(B%num0+B%num1)),&
-              'FOFOBBAB','AOTWOSORT')
-     call tran4_gen(NBasis,&
-              NBasis,B%CMO,&
-              A%num0+A%num1,A%CMO(1:NBasis,1:(A%num0+A%num1)),&
-              NBasis,A%CMO,&
-              A%num0+A%num1,A%CMO(1:NBasis,1:(A%num0+A%num1)),&
-              'FOFOAABA','AOTWOSORT')
+
+     if(Flags%ICholesky==1) then
+        print*,'test Cholesky HERE!'
+        print*, 'dimOA',A%num0+A%num1
+        print*, 'dimOB',B%num0+B%num1
+        ! term A3-ind
+        call chol_ints_fofo(NBasis,A%num0+A%num1,A%FF,&
+                            NBasis,B%num0+B%num1,B%FF,&
+                            A%NChol,NBasis,'FOFOAABB')
+
+        ! term A1-ind
+        call chol_ints_fofo(NBasis,NBasis,A%FFAB, &
+                            A%num0+A%num1,B%num0+B%num1,A%FFAB,&
+                            A%NChol,NBasis,'FFOOABAB')
+
+        ! term A2-ind
+        call chol_ints_fofo(NBasis,B%num0+B%num1,B%FF,  &
+                            NBasis,A%num0+A%num1,B%FFBA,&
+                            A%NChol,NBasis,'FOFOBBBA')
+        call chol_ints_fofo(NBasis,A%num0+A%num1,A%FF,  &
+                            NBasis,B%num0+B%num1,A%FFAB,&
+                            A%NChol,NBasis,'FOFOAAAB')
+        ! A2A(B): YY
+        call chol_ints_fofo(NBasis,B%num0+B%num1,B%FF,  &
+                            NBasis,B%num0+B%num1,A%FFAB,&
+                            A%NChol,NBasis,'FOFOBBAB')
+        call chol_ints_fofo(NBasis,A%num0+A%num1,A%FF,  &
+                            NBasis,A%num0+A%num1,B%FFBA,&
+                            A%NChol,NBasis,'FOFOAABA')
+     else
+        ! term A3-ind
+        call tran4_gen(NBasis,&
+                 NBasis,B%CMO,&
+                 B%num0+B%num1,B%CMO(1:NBasis,1:(B%num0+B%num1)),&
+                 NBasis,A%CMO,&
+                 A%num0+A%num1,A%CMO(1:NBasis,1:(A%num0+A%num1)),&
+                 'FOFOAABB','AOTWOSORT')
+        ! term A1-ind
+        call tran4_gen(NBasis,&
+                 A%num0+A%num1,A%CMO(1:NBasis,1:(A%num0+A%num1)),&
+                 B%num0+B%num1,B%CMO(1:NBasis,1:(B%num0+B%num1)),&
+                 NBasis,A%CMO,&
+                 NBasis,B%CMO,&
+                 'FFOOABAB','AOTWOSORT')
+        ! term A2-ind
+        ! A2A(B): XX
+        call tran4_gen(NBasis,&
+                 NBasis,B%CMO,&
+                 A%num0+A%num1,A%CMO(1:NBasis,1:(A%num0+A%num1)),&
+                 NBasis,B%CMO,&
+                 B%num0+B%num1,B%CMO(1:NBasis,1:(B%num0+B%num1)),&
+                 'FOFOBBBA','AOTWOSORT')
+        call tran4_gen(NBasis,&
+                 NBasis,A%CMO,&
+                 B%num0+B%num1,B%CMO(1:NBasis,1:(B%num0+B%num1)),&
+                 NBasis,A%CMO,&
+                 A%num0+A%num1,A%CMO(1:NBasis,1:(A%num0+A%num1)),&
+                 'FOFOAAAB','AOTWOSORT')
+        ! A2A(B): YY
+        call tran4_gen(NBasis,&
+                 NBasis,A%CMO,&
+                 B%num0+B%num1,B%CMO(1:NBasis,1:(B%num0+B%num1)),&
+                 NBasis,B%CMO,&
+                 B%num0+B%num1,B%CMO(1:NBasis,1:(B%num0+B%num1)),&
+                 'FOFOBBAB','AOTWOSORT')
+        call tran4_gen(NBasis,&
+                 NBasis,B%CMO,&
+                 A%num0+A%num1,A%CMO(1:NBasis,1:(A%num0+A%num1)),&
+                 NBasis,A%CMO,&
+                 A%num0+A%num1,A%CMO(1:NBasis,1:(A%num0+A%num1)),&
+                 'FOFOAABA','AOTWOSORT')
+
+     endif
 
      write(LOUT,'(/1x,a)') 'Transforming E2exch-disp integrals...'
-     call tran4_gen(NBasis,&
-              NBasis,B%CMO,&
-              A%num0+A%num1,A%CMO(1:NBasis,1:(A%num0+A%num1)),&
-              NBasis,A%CMO,&
-              B%num0+B%num1,B%CMO(1:NBasis,1:(B%num0+B%num1)),&
-              'FOFOABBA','AOTWOSORT')
-     ! XY and YX, A2
-     call tran4_gen(NBasis,&
-              B%num0+B%num1,B%CMO(1:NBasis,1:(B%num0+B%num1)),&
-              B%num0+B%num1,B%CMO(1:NBasis,1:(B%num0+B%num1)),&
-              NBasis,A%CMO,&
-              NBasis,B%CMO,&
-              'FFOOABBB','AOTWOSORT')
-     call tran4_gen(NBasis,&
-              A%num0+A%num1,A%CMO(1:NBasis,1:(A%num0+A%num1)),&
-              A%num0+A%num1,A%CMO(1:NBasis,1:(A%num0+A%num1)),&
-              NBasis,B%CMO,&
-              NBasis,A%CMO,&
-              'FFOOBAAA','AOTWOSORT')
+     if(Flags%ICholesky==1) then
+        call chol_ints_fofo(NBasis,B%num0+B%num1,A%FFAB,&
+                            NBasis,A%num0+A%num1,B%FFBA,&
+                            A%NChol,NBasis,'FOFOABBA')
+        ! XY and YX, A2
+        call chol_ints_fofo(NBasis,NBasis,A%FFAB, &
+                            B%num0+B%num1,B%num0+B%num1,B%FF,&
+                            A%NChol,NBasis,'FFOOABBB')
+        call chol_ints_fofo(NBasis,NBasis,B%FFBA, &
+                            A%num0+A%num1,A%num0+A%num1,A%FF,&
+                            A%NChol,NBasis,'FFOOBAAA')
+     else
+        call tran4_gen(NBasis,&
+                 NBasis,B%CMO,&
+                 A%num0+A%num1,A%CMO(1:NBasis,1:(A%num0+A%num1)),&
+                 NBasis,A%CMO,&
+                 B%num0+B%num1,B%CMO(1:NBasis,1:(B%num0+B%num1)),&
+                 'FOFOABBA','AOTWOSORT')
+        ! XY and YX, A2
+        call tran4_gen(NBasis,&
+                 B%num0+B%num1,B%CMO(1:NBasis,1:(B%num0+B%num1)),&
+                 B%num0+B%num1,B%CMO(1:NBasis,1:(B%num0+B%num1)),&
+                 NBasis,A%CMO,&
+                 NBasis,B%CMO,&
+                 'FFOOABBB','AOTWOSORT')
+        call tran4_gen(NBasis,&
+                 A%num0+A%num1,A%CMO(1:NBasis,1:(A%num0+A%num1)),&
+                 A%num0+A%num1,A%CMO(1:NBasis,1:(A%num0+A%num1)),&
+                 NBasis,B%CMO,&
+                 NBasis,A%CMO,&
+                 'FFOOBAAA','AOTWOSORT')
+
+     endif
 
   endif
 
@@ -1777,12 +1826,18 @@ character(:),allocatable     :: twojfile,twokfile
 
  case(TWOMO_FOFO)
    if(Flags%ICholesky==1) then
-      call chol_ints(NBas,NBas,Mon%FF, &
-                     Mon%num0+Mon%num1,Mon%num0+Mon%num1,Mon%OO,&
-                     Mon%NChol,twojfile)
-      call chol_ints(NBas,Mon%num0+Mon%num1,Mon%FO,&
-                     NBas,Mon%num0+Mon%num1,Mon%FO,&
-                     Mon%NChol,twokfile)
+      call chol_ints_fofo(NBas,NBas,Mon%FF, &
+                     Mon%num0+Mon%num1,Mon%num0+Mon%num1,Mon%FF,&
+                     Mon%NChol,NBas,twojfile)
+      call chol_ints_fofo(NBas,Mon%num0+Mon%num1,Mon%FF,&
+                     NBas,Mon%num0+Mon%num1,Mon%FF,&
+                     Mon%NChol,NBas,twokfile)
+      !call chol_ints_gen(NBas,NBas,Mon%FF, &
+      !               Mon%num0+Mon%num1,Mon%num0+Mon%num1,Mon%OO,&
+      !               Mon%NChol,twojfile)
+      !call chol_ints_gen(NBas,Mon%num0+Mon%num1,Mon%FO,&
+      !               NBas,Mon%num0+Mon%num1,Mon%FO,&
+      !               Mon%NChol,twokfile)
    else
       ! transform J and K
        call tran4_gen(NBas,&
@@ -1805,16 +1860,18 @@ character(:),allocatable     :: twojfile,twokfile
 
 end subroutine sapt_mon_ints
 
-subroutine chol_ints(nA,nB,MatAB,nC,nD,MatCD,NCholesky,fname)
+subroutine chol_ints_gen(nA,nB,MatAB,nC,nD,MatCD,NCholesky,fname)
+! MatAB and MatCD may have any NChol,XX shape
 implicit none
 
 integer,intent(in) :: nA,nB,nC,nD,NCholesky
-character(*),intent(in) :: fname
+character(*),intent(in)     :: fname
 double precision,intent(in) :: MatAB(NCholesky,nA*nB), &
                                MatCD(NCholesky,nC*nD)
 
 integer :: iunit
 integer :: nAB,nCD,cd
+integer :: i,ic, id, icd
 double precision,allocatable :: work(:)
 
 nAB = nA*nB
@@ -1829,16 +1886,57 @@ open(newunit=iunit,file=fname,status='REPLACE',&
 
 ! (FF|OO)
 do cd=1,nCD
-
    call dgemv('T',NCholesky,nAB,1d0,MatAB,NCholesky,MatCD(:,cd),1,0d0,work,1)
    write(iunit,rec=cd) work(1:nAB)
-
 enddo
 
 deallocate(work)
 close(iunit)
 
-end subroutine chol_ints
+end subroutine chol_ints_gen
+
+subroutine chol_ints_fofo(nA,nB,MatAB,nC,nD,MatCD,NCholesky,NBas,fname)
+! assumes that MatAB(CD) are NChol,FF type
+! constructs (FF|OO) or (FO|FO) integrals
+implicit none
+
+integer,intent(in) :: nA,nB,nC,nD
+integer,intent(in) :: NBas,NCholesky
+character(*),intent(in)     :: fname
+double precision,intent(in) :: MatAB(NCholesky,NBas**2), &
+                               MatCD(NCholesky,NBas**2)
+
+integer :: iunit
+integer :: nAB,nCD,cd
+integer :: ic,id,irec
+double precision,allocatable :: work(:)
+
+nAB = nA*nB
+nCD = nC*nD
+
+allocate(work(nAB))
+
+print*, 'Assemble ',fname,' from Cholesky Vectors'
+
+open(newunit=iunit,file=fname,status='REPLACE',&
+     access='DIRECT',form='UNFORMATTED',recl=8*nAB)
+
+! (FF|OO)
+irec = 0
+do id=1,nD
+   do ic=1,nC
+      irec = irec + 1
+      cd = ic+(id-1)*NBas
+      call dgemv('T',NCholesky,nAB,1d0,MatAB,NCholesky,MatCD(1:NCholesky,cd),1,0d0,work,1)
+      write(iunit,rec=irec) work(1:nAB)
+   
+   enddo
+enddo
+
+deallocate(work)
+close(iunit)
+
+end subroutine chol_ints_fofo
 
 subroutine calc_resp_unc(Mon,MO,Flags,NBas)
 implicit none
@@ -3546,14 +3644,14 @@ double precision,allocatable :: tmp(:,:)
 
  allocate(A%OO(NCholesky,dimOA**2),&
           B%OO(NCholesky,dimOB**2) )
- ! (OO|AA)
- call chol_MOTransf(A%OO,CholeskyVecs,&
-                    A%CMO,1,dimOA,&
-                    A%CMO,1,dimOA)
- ! (OO|BB)
- call chol_MOTransf(B%OO,CholeskyVecs,&
-                    B%CMO,1,dimOB,&
-                    B%CMO,1,dimOB)
+ !! (OO|AA)
+ !call chol_MOTransf(A%OO,CholeskyVecs,&
+ !                   A%CMO,1,dimOA,&
+ !                   A%CMO,1,dimOA)
+ !! (OO|BB)
+ !call chol_MOTransf(B%OO,CholeskyVecs,&
+ !                   B%CMO,1,dimOB,&
+ !                   B%CMO,1,dimOB)
 
  allocate(A%FF(NCholesky,NBasis**2),&
           B%FF(NCholesky,NBasis**2) )
@@ -3566,16 +3664,27 @@ double precision,allocatable :: tmp(:,:)
                     B%CMO,1,NBasis,&
                     B%CMO,1,NBasis)
 
- allocate(A%FO(NCholesky,NBasis*dimOA),&
-          B%FO(NCholesky,NBasis*dimOA))
- ! (FO|AA)
- call chol_MOTransf(A%FO,CholeskyVecs,&
+ allocate(A%FFAB(NCholesky,NBasis**2),&
+          B%FFBA(NCholesky,NBasis**2) )
+ ! (FF|AB)
+ call chol_MOTransf(A%FFAB,CholeskyVecs,&
                     A%CMO,1,NBasis,&
-                    A%CMO,1,dimOA)
- ! (FO|BB)
- call chol_MOTransf(B%FO,CholeskyVecs,&
+                    B%CMO,1,NBasis)
+ ! (FF|BA)
+ call chol_MOTransf(B%FFBA,CholeskyVecs,&
                     B%CMO,1,NBasis,&
-                    B%CMO,1,dimOB)
+                    A%CMO,1,NBasis)
+
+ !allocate(A%FO(NCholesky,NBasis*dimOA),&
+ !         B%FO(NCholesky,NBasis*dimOA))
+ !! (FO|AA)
+ !call chol_MOTransf(A%FO,CholeskyVecs,&
+ !                   A%CMO,1,NBasis,&
+ !                   A%CMO,1,dimOA)
+ !! (FO|BB)
+ !call chol_MOTransf(B%FO,CholeskyVecs,&
+ !                   B%CMO,1,NBasis,&
+ !                   B%CMO,1,dimOB)
 
 end subroutine chol_sapt_NOTransf
 
@@ -5543,6 +5652,12 @@ if(allocated(SAPT%monA%FO)) then
 endif
 if(allocated(SAPT%monB%FO)) then
    deallocate(SAPT%monB%FO)
+endif
+if(allocated(SAPT%monA%FFAB)) then
+   deallocate(SAPT%monA%FFAB)
+endif
+if(allocated(SAPT%monB%FFBA)) then
+   deallocate(SAPT%monB%FFBA)
 endif
 
 if(allocated(SAPT%monA%PP)) deallocate(SAPT%monA%PP)

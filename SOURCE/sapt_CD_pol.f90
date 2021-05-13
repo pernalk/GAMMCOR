@@ -51,7 +51,8 @@ double precision,external  :: ddot
     jj = (j-1)*NBas+j
     do i=1,A%num0+A%num1
        ii = (i-1)*NBas+i
-       eab = eab + A%Occ(i)*B%Occ(j)*ddot(NCholesky,A%FO(:,ii),1,B%FO(:,jj),1)
+       eab = eab + A%Occ(i)*B%Occ(j)*ddot(NCholesky,A%FF(:,ii),1,B%FF(:,jj),1)
+       !eab = eab + A%Occ(i)*B%Occ(j)*ddot(NCholesky,A%FO(:,ii),1,B%FO(:,jj),1)
     enddo
  enddo
  eab = 4d0*eab
