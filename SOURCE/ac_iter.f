@@ -31,10 +31,23 @@ C
       Dimension XGrid(100), WGrid(100)
 C
 C
+      If(ITwoEl.eq.1) Then
+C
       Call WIter(ECorr,TwoNO,XOne,URe,Occ,
      $ EGOne,NGOcc,
      $ NBasis,NInte1,NInte2,NDim,NGem,IndAux,
      $ IndN,IndX,NDimX)
+C
+      ElseIf(ITwoEl.eq.3) Then
+C
+      Call WIter_FOFO(ECorr,XOne,URe,Occ,
+     $ EGOne,NGOcc,
+     $ IGem,NAcCAS,NInAcCAS,NELE,
+     $ NBasis,NInte1,NDim,NGem,IndAux,
+     $ IndN,IndX,NDimX)
+C
+      EndIf
+C
       ETot=EGOne(1)
       Write
      $ (6,'(/,2X,''ECASSCF+ENuc, AC-Corr, AC-ERPA-CASSCF '',4X,3F15.8)')
@@ -207,20 +220,20 @@ C
       Dimension
      $ Occ(NBasis),TwoNO(NInte2),XONe(NInte1),URe(NBasis,NBasis),
      $ IndAux(NBasis),
-     $ ABPLUS0(NDim*NDim),ABMIN0(NDim*NDim),
-     $ ABPLUS1(NDim*NDim),ABMIN1(NDim*NDim),
      $ EGOne(NGem),
      $ IndX(NDim),IndN(2,NDim)
 C
 C     LOCAL ARRAYS
 C
       Dimension IPair(NBasis,NBasis)
-      Dimension AIN(NDimX*NDimX),COM(NDimX*NDimX)
+      Dimension COM(NDimX*NDimX)
       Dimension ipiv(NDimX),work(NDimX)
       Dimension XFreq(100),WFreq(100)
-      Dimension A0(NDimX*NDimX),A0PLUS(NDimX*NDimX),AMBDA(NDimX*NDimX),
-     $ A1(NDimX*NDimX),A2(NDimX*NDimX),
-     $ C0(NDimX*NDimX),C1(NDimX*NDimX),C2(NDimX*NDimX),C3(NDimX*NDimX)
+      Dimension ABPLUS0(NDim*NDim),WORK0(NDim*NDim),
+     $          ABPLUS1(NDim*NDim),WORK1(NDim*NDim)
+
+      Dimension A0(NDimX*NDimX),A1(NDimX*NDimX),A2(NDimX*NDimX),
+     $ C0(NDimX*NDimX),C1(NDimX*NDimX),C2(NDimX*NDimX)
 C
       PI = 4.0*ATAN(1.0)
 C
@@ -233,14 +246,14 @@ C
       EndDo
 C
       ACAlpha=Zero
-      Call AB_CAS(ABPLUS0,ABMIN0,ECASSCF,URe,Occ,XOne,TwoNO,IPair,
+      Call AB_CAS(ABPLUS0,WORK0,ECASSCF,URe,Occ,XOne,TwoNO,IPair,
      $ IndN,IndX,NDimX,NBasis,NDim,NInte1,NInte2,ACAlpha)
       ACAlpha=One
-      Call AB_CAS(ABPLUS1,ABMIN1,ECASSCF,URe,Occ,XOne,TwoNO,IPair,
+      Call AB_CAS(ABPLUS1,WORK1,ECASSCF,URe,Occ,XOne,TwoNO,IPair,
      $ IndN,IndX,NDimX,NBasis,NDim,NInte1,NInte2,ACAlpha)
 C
       ABPLUS1=ABPLUS1-ABPLUS0
-      ABMIN1=ABMIN1-ABMIN0 
+      WORK1=WORK1-WORK0 
 C
       EGOne(1)=ECASSCF
 C
@@ -251,24 +264,23 @@ C
       IJ=(J-1)*NDimX+I
       IJ1=(IndX(J)-1)*NDim+IndX(I)
       ABPLUS0(IJ)=ABPLUS0(IJ1)
-      ABMIN0(IJ)=ABMIN0(IJ1)
+      WORK0(IJ)=WORK0(IJ1)
       ABPLUS1(IJ)=ABPLUS1(IJ1)
-      ABMIN1(IJ)=ABMIN1(IJ1)
+      WORK1(IJ)=WORK1(IJ1)
       EndDo
       EndDo
-      write(*,*)'matrices reduced'
 C
 C     A0=ABPLUS0*ABMIN0      
       Call dgemm('N','N',NDimX,NDimX,NDimX,1d0,ABPLUS0,NDimX,
-     $           ABMIN0,NDimX,0.0,A0,NDimX)
+     $           WORK0,NDimX,0.0,A0,NDimX)
 C     A1=ABPLUS0*ABMIN1+ABPLUS1*ABMIN0
       Call dgemm('N','N',NDimX,NDimX,NDimX,1d0,ABPLUS0,NDimX,
-     $           ABMIN1,NDimX,0.0,A1,NDimX)
+     $           WORK1,NDimX,0.0,A1,NDimX)
       Call dgemm('N','N',NDimX,NDimX,NDimX,1d0,ABPLUS1,NDimX,
-     $           ABMIN0,NDimX,1d0,A1,NDimX)
+     $           WORK0,NDimX,1d0,A1,NDimX)
 C     A2=ABPLUS1*ABMIN1
       Call dgemm('N','N',NDimX,NDimX,NDimX,1d0,ABPLUS1,NDimX,
-     $           ABMIN1,NDimX,0.0,A2,NDimX)      
+     $           WORK1,NDimX,0.0,A2,NDimX)      
 C
 c      NGrid=18
       NGrid=25
@@ -279,35 +291,34 @@ C
 C
       OmI=XFreq(IGL)
 
-      AIN=Zero
+      WORK0=Zero
       Do I=1,NDimX
-      AIN((I-1)*NDimX+I)=OmI**2
+      WORK0((I-1)*NDimX+I)=OmI**2
       EndDo
 C
-      AMBDA=A0+AIN
-      Call dgetrf(NDimX, NDimX, AMBDA, NDimX, ipiv, inf1 )
-      Call dgetri(NDimX, AMBDA, NDimX, ipiv, work, NDimX, inf2 )
+      WORK1=A0+WORK0
+      Call dgetrf(NDimX, NDimX, WORK1, NDimX, ipiv, inf1 )
+      Call dgetri(NDimX, WORK1, NDimX, ipiv, work, NDimX, inf2 )
 C
-C     C0=0.5 LAMBDA*ABPLUS0
-      Call dgemm('N','N',NDimX,NDimX,NDimX,0.5d0,AMBDA,NDimX,
+C     C0=C(0)
+      Call dgemm('N','N',NDimX,NDimX,NDimX,0.5d0,WORK1,NDimX,
      $           ABPLUS0,NDimX,0.0,C0,NDimX)
-C     C1=0.5 LAMBDA*ABLUS1-LAMBDA*A1*C0
-c      Call dgemm('N','N',NDimX,NDimX,NDimX,1d0,A1,NDimX,
-c     $           C0,NDimX,0.0,AIN,NDimX)
-c      Call dgemm('N','N',NDimX,NDimX,NDimX,1d0,AMBDA,NDimX,
-c     $           AIN,NDimX,0.0,C1,NDimX)
-      Call dgemm('N','N',NDimX,NDimX,NDimX,1d0,AMBDA,NDimX,
-     $           A1,NDimX,0.0,AIN,NDimX)  
-      Call dgemm('N','N',NDimX,NDimX,NDimX,1d0,AIN,NDimX,
+C     WORK0=LAMBDA*A1
+      Call dgemm('N','N',NDimX,NDimX,NDimX,1d0,WORK1,NDimX,
+     $           A1,NDimX,0.0,WORK0,NDimX)  
+C     C1=C(1)
+      Call dgemm('N','N',NDimX,NDimX,NDimX,1d0,WORK0,NDimX,
      $           C0,NDimX,0.0,C1,NDimX) 
-      Call dgemm('N','N',NDimX,NDimX,NDimX,0.5d0,AMBDA,NDimX,
+      Call dgemm('N','N',NDimX,NDimX,NDimX,0.5d0,WORK1,NDimX,
      $           ABPLUS1,NDimX,-1.d0,C1,NDimX)
 C
-C     LAMBDA*A1 in AIN
-C     C2=-2 AIN*C1 - 2 LAMBDA*A2*C0
-      Call dgemm('N','N',NDimX,NDimX,NDimX,1.d0,AMBDA,NDimX,
-     $           A2,NDimX,0.0,ABMIN0,NDimX)
-C     FROM NOW ON: LAMBDA*A2 in ABMIN0, LAMBDA*A1 in AIN
+C     WORK1=LAMBDA*A2
+      Call dgemm('N','N',NDimX,NDimX,NDimX,1.d0,WORK1,NDimX,
+     $           A2,NDimX,0.0,C2,NDimX)
+      WORK1=C2
+C
+C     FROM NOW ON: LAMBDA*A2 in WORK1, LAMBDA*A1 in WORK0
+C
 CCCCCCCCCCCCCCCCCCCCC
 CC     C(2)
 C      Call dgemm('N','N',NDimX,NDimX,NDimX,1d0,AIN,NDimX,
@@ -334,9 +345,10 @@ C
 C     C(n)
       XN1=-N
       XN2=-N*(N-1)
-      Call dgemm('N','N',NDimX,NDimX,NDimX,1d0,AIN,NDimX,
+      Call dgemm('N','N',NDimX,NDimX,NDimX,1d0,WORK0,NDimX,
      $           C1,NDimX,0.0,C2,NDimX)
-      Call dgemm('N','N',NDimX,NDimX,NDimX,XN2,ABMIN0,NDimX,
+
+      Call dgemm('N','N',NDimX,NDimX,NDimX,XN2,WORK1,NDimX,
      $           C0,NDimX,XN1,C2,NDimX)
 C
       FF=WFact/XFactorial/(N+1)
