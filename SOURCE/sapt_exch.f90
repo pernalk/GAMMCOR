@@ -582,6 +582,69 @@ double precision,allocatable :: work1(:)
 
 end subroutine e1exchs2
 
+subroutine e1exch_NaNb(Flags,A,B,SAPT)
+implicit none
+
+type(FlagsData)   :: Flags
+type(SystemBlock) :: A, B
+type(SaptData)    :: SAPT
+integer :: i, j, k, l, ia, jb
+integer :: ij,ipr
+integer :: ip,iq,ir,is
+integer :: ipq,iu,it
+integer :: iunit
+integer :: rdm2type
+integer :: dimOA,dimOB,NBas
+double precision :: fac,val,nnS2,tmp
+double precision :: tmpELST,tmpDEL
+double precision :: tvk(3),tNa(3),tNb(3),tNaNb(3)
+double precision :: exchs2
+double precision,allocatable :: Va(:,:),Vb(:,:),S(:,:)
+double precision,allocatable :: Saa(:,:),Sbb(:,:),Sab(:,:)
+double precision,allocatable :: Vaab(:,:),Vbba(:,:),Vabb(:,:),Vbaa(:,:)
+double precision,allocatable :: AlphaA(:),AlphaB(:)
+double precision,allocatable :: work(:,:),ints(:)
+
+! set dimensions
+ NBas = A%NBasis
+ dimOA = A%num0+A%num1
+ dimOB = B%num0+B%num1
+
+allocate(S(NBas,NBas),Sab(NBas,NBas))
+ allocate(Va(NBas,NBas),Vb(NBas,NBas),&
+          Vabb(NBas,NBas),Vbaa(NBas,NBas),&
+          Vaab(NBas,NBas),Vbba(NBas,NBas))
+
+ call get_one_mat('V',Va,A%Monomer,NBas)
+ call get_one_mat('V',Vb,B%Monomer,NBas)
+
+ call tran2MO(Va,B%CMO,B%CMO,Vabb,NBas)
+ call tran2MO(Vb,A%CMO,A%CMO,Vbaa,NBas)
+ call tran2MO(Va,A%CMO,B%CMO,Vaab,NBas)
+ call tran2MO(Vb,B%CMO,A%CMO,Vbba,NBas)
+
+ call get_one_mat('S',S,A%Monomer,NBas)
+ call tran2MO(S,A%CMO,B%CMO,Sab,NBas)
+
+ deallocate(Vb,Va,S)
+
+ ! n^A n^B Sab Sab
+ nnS2 = 0
+ do j=1,dimOB
+ do i=1,dimOA
+    nnS2 = nnS2 + A%Occ(i)*B%Occ(j)*Sab(i,j)**2
+ enddo
+ enddo
+
+ ! this should = -tmpDEL 
+ tmpELST = 2d0*(SAPT%elst-SAPT%Vnn)*nnS2
+ !print*, 'tmpELST',tmpELST*1000
+
+
+ deallocate(Sab,Vbba,Vaab,Vbaa,Vabb)
+
+end subroutine e1exch_NaNb
+
 !subroutine hl_2el(Flags,A,B,SAPT)
 !! calculate Heitler-London energy
 !! for 2-electron CAS monomers
