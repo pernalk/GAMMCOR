@@ -583,6 +583,7 @@ double precision,allocatable :: work1(:)
 end subroutine e1exchs2
 
 subroutine e1exch_NaNb(Flags,A,B,SAPT)
+! E1exch(S2): Eq () in SAPT(MC) paper
 implicit none
 
 type(FlagsData)   :: Flags
@@ -596,14 +597,16 @@ integer :: iunit
 integer :: rdm2type
 integer :: dimOA,dimOB,NBas
 double precision :: fac,val,nnS2,tmp
-double precision :: tmpELST,tmpDEL
-double precision :: tvk(3),tNa(3),tNb(3),tNaNb(3)
+double precision :: tElst,tvk(3),tNa(2),tNb(2),tNaNb
 double precision :: exchs2
 double precision,allocatable :: Va(:,:),Vb(:,:),S(:,:)
-double precision,allocatable :: Saa(:,:),Sbb(:,:),Sab(:,:)
-double precision,allocatable :: Vaab(:,:),Vbba(:,:),Vabb(:,:),Vbaa(:,:)
-double precision,allocatable :: AlphaA(:),AlphaB(:)
+double precision,allocatable :: Sab(:,:),Vaab(:,:),Vbba(:,:),Vabb(:,:),Vbaa(:,:)
+double precision,allocatable :: RDM2Aval(:,:,:,:),RDM2Bval(:,:,:,:)
+double precision,allocatable :: intA(:,:,:,:),intB(:,:,:,:)
+double precision,allocatable :: tmpAB(:,:,:,:)
 double precision,allocatable :: work(:,:),ints(:)
+
+print*, 'Testing E1exch NaNb...'
 
 ! set dimensions
  NBas = A%NBasis
@@ -611,37 +614,197 @@ double precision,allocatable :: work(:,:),ints(:)
  dimOB = B%num0+B%num1
 
 allocate(S(NBas,NBas),Sab(NBas,NBas))
- allocate(Va(NBas,NBas),Vb(NBas,NBas),&
-          Vabb(NBas,NBas),Vbaa(NBas,NBas),&
-          Vaab(NBas,NBas),Vbba(NBas,NBas))
+allocate(Va(NBas,NBas),Vb(NBas,NBas),&
+         Vabb(NBas,NBas),Vbaa(NBas,NBas),&
+         Vaab(NBas,NBas),Vbba(NBas,NBas))
 
- call get_one_mat('V',Va,A%Monomer,NBas)
- call get_one_mat('V',Vb,B%Monomer,NBas)
+call get_one_mat('V',Va,A%Monomer,NBas)
+call get_one_mat('V',Vb,B%Monomer,NBas)
 
- call tran2MO(Va,B%CMO,B%CMO,Vabb,NBas)
- call tran2MO(Vb,A%CMO,A%CMO,Vbaa,NBas)
- call tran2MO(Va,A%CMO,B%CMO,Vaab,NBas)
- call tran2MO(Vb,B%CMO,A%CMO,Vbba,NBas)
+call tran2MO(Va,B%CMO,B%CMO,Vabb,NBas)
+call tran2MO(Vb,A%CMO,A%CMO,Vbaa,NBas)
+call tran2MO(Va,A%CMO,B%CMO,Vaab,NBas)
+call tran2MO(Vb,B%CMO,A%CMO,Vbba,NBas)
 
- call get_one_mat('S',S,A%Monomer,NBas)
- call tran2MO(S,A%CMO,B%CMO,Sab,NBas)
+call get_one_mat('S',S,A%Monomer,NBas)
+call tran2MO(S,A%CMO,B%CMO,Sab,NBas)
 
- deallocate(Vb,Va,S)
+allocate(RDM2Aval(dimOA,dimOA,dimOA,dimOA),&
+         RDM2Bval(dimOB,dimOB,dimOB,dimOB))
+allocate(intA(dimOA,dimOA,dimOA,dimOB),&
+         intB(dimOB,dimOB,dimOA,dimOB))
 
- ! n^A n^B Sab Sab
- nnS2 = 0
- do j=1,dimOB
- do i=1,dimOA
-    nnS2 = nnS2 + A%Occ(i)*B%Occ(j)*Sab(i,j)**2
- enddo
- enddo
+if(Flags%ICASSCF==1) then
+   ! CAS
+   RDM2Aval = A%RDM2val
+   RDM2Bval = B%RDM2val
+elseif(Flags%ICASSCF==0) then
+   ! GVB
+   RDM2Aval = A%RDM2val
+   RDM2Bval = B%RDM2val
+endif
 
- ! this should = -tmpDEL 
- tmpELST = 2d0*(SAPT%elst-SAPT%Vnn)*nnS2
- !print*, 'tmpELST',tmpELST*1000
+call dgemm('N','N',dimOA**3,dimOB,dimOA,1d0,RDM2Aval,dimOA**3,Sab,NBas,0d0,intA,dimOA**3)
+!call dgemm('N','T',dimOB**3,NBas,dimOB,1d0,RDM2Bval,dimOB**3,Sab,NBas,0d0,intB,dimOB**3)
 
+! careful! intB(B,B,A,B)
+do is=1,dimOB
+   call dgemm('N','T',dimOB**2,dimOA,dimOB,1d0,RDM2Bval(:,:,:,is),dimOB**2,Sab,NBas,0d0,intB(:,:,:,is),dimOB**2)
+enddo
 
- deallocate(Sab,Vbba,Vaab,Vbaa,Vabb)
+deallocate(RDM2Bval,RDM2Aval)
+deallocate(Vb,Va,S)
+
+! n^A n^B Sab Sab
+nnS2 = 0
+do j=1,dimOB
+do i=1,dimOA
+   nnS2 = nnS2 + A%Occ(i)*B%Occ(j)*Sab(i,j)**2
+enddo
+enddo
+
+tElst = 2d0*(SAPT%elst-SAPT%Vnn)*nnS2
+print*, 'tELST',tELST*1000
+
+allocate(ints(NBas**2),work(NBas,NBas))
+
+! tvk = n_p n_q (v^A S + v^B S + v_pq^qp)
+open(newunit=iunit,file='FFOOABAB',status='OLD',&
+    access='DIRECT',form='UNFORMATTED',recl=8*NBas**2)
+
+ipq = 0
+tvk = 0
+do iq=1,dimOB
+   do ip=1,dimOA
+      ipq = ipq + 1
+      read(iunit,rec=ipq) ints(1:NBas*NBas)
+
+      tvk(3) = tvk(3) + A%Occ(ip)*B%Occ(iq)*ints(ip+(iq-1)*NBas)
+
+   enddo
+enddo
+tvk(3) = -2d0*tvk(3)
+print*, 'tvk(3)',tvk(3)*1000
+
+close(iunit)
+
+do iq=1,dimOB
+   do ip=1,dimOA
+      tvk(1) = tvk(1) + A%Occ(ip)*B%Occ(iq)*Vaab(ip,iq)*Sab(ip,iq)
+   enddo
+enddo
+tvk(1) = -2d0*tvk(1)
+print*, 'tvk(1)',tvk(1)*1000
+
+do iq=1,dimOB
+   do ip=1,dimOA
+      tvk(2) = tvk(2) + A%Occ(ip)*B%Occ(iq)*Vbba(iq,ip)*Sab(ip,iq)
+   enddo
+enddo
+tvk(2) = -2d0*tvk(2)
+print*, 'tvk(2)',tvk(2)*1000
+
+! tNa
+tNa = 0
+do it=1,dimOB
+   do iq=1,dimOA
+      do ir=1,dimOA
+         do ip=1,dimOA
+            tNa(1) = tNa(1) + B%Occ(it)*intA(ip,ir,iq,it)*Sab(iq,it)*Vbaa(ip,ir)
+         enddo
+      enddo
+   enddo
+enddo
+tNa(1) = -2d0*tNa(1)
+
+!(FO|FO): (AA|AB)
+open(newunit=iunit,file='FOFOAAAB',status='OLD', &
+     access='DIRECT',recl=8*NBas*dimOA)
+
+! one loop over integrals
+ints = 0
+do it=1,dimOB
+   do iq=1,dimOA
+      read(iunit,rec=iq+(it-1)*NBas) ints(1:NBas*dimOA)
+
+      do ir=1,dimOA
+         do ip=1,dimOA
+            tNa(2) = tNa(2) + B%Occ(it)*intA(ip,ir,iq,it)*ints(ip+(ir-1)*NBas)
+         enddo
+      enddo
+
+   enddo
+enddo
+tNa(2) = -2d0*tNa(2)
+print*, 'tNa-1',tNa(1)*1000
+print*, 'tNa-2',tNa(2)*1000
+
+close(iunit)
+
+! tNb
+tNb = 0
+do iq=1,dimOB
+   do it=1,dimOA
+      do ir=1,dimOB
+         do ip=1,dimOB
+            tNb(1) = tNb(1) + A%Occ(it)*intB(ip,ir,it,iq)*Sab(it,iq)*Vabb(ip,ir)
+         enddo
+      enddo
+   enddo
+enddo
+tNb(1) = -2d0*tNb(1)
+
+!(FO|FO): (BB|BA)
+open(newunit=iunit,file='FOFOBBBA',status='OLD', &
+     access='DIRECT',recl=8*NBas*dimOB)
+
+! one loop over integrals
+ints = 0
+do it=1,dimOA
+   do iq=1,dimOB
+      read(iunit,rec=iq+(it-1)*NBas) ints(1:NBas*dimOB)
+
+      do ir=1,dimOB
+         do ip=1,dimOB
+            tNb(2) = tNb(2) + A%Occ(it)*intB(ip,ir,it,iq)*ints(ip+(ir-1)*NBas)
+         enddo
+      enddo
+
+   enddo
+enddo
+tNb(2) = -2d0*tNb(2)
+print*, 'tNb-1',tNb(1)*1000
+print*, 'tNb-2',tNb(2)*1000
+
+close(iunit)
+
+open(newunit=iunit,file='TMPOOAB',status='OLD',&
+    access='DIRECT',form='UNFORMATTED',recl=8*dimOB**2)
+
+allocate(tmpAB(dimOA,dimOA,dimOB,dimOB))
+
+call dgemm('N','T',dimOA**2,dimOB**2,dimOA*dimOB,1d0,intA,dimOA**2,intB,dimOB**2,0d0,tmpAB,dimOA**2)
+
+val  = 0
+work = 0
+do ir=1,dimOA
+   do ip=1,dimOA
+     read(iunit,rec=ip+(ir-1)*dimOA) work(1:dimOB,1:dimOB)
+
+     val = val + sum(work(1:dimOB,1:dimOB)*tmpAB(ip,ir,1:dimOB,1:dimOB))
+     !intA(ip,ir,iq,it)*intB(it,iu,is,iq)*ints(it,is)
+
+   enddo
+enddo
+close(iunit)
+tNaNb = -2*val
+print*, 'tNaNb',tNaNb*1000
+
+deallocate(tmpAB)
+
+deallocate(ints,work)
+deallocate(intB,intA)
+deallocate(Sab,Vbba,Vaab,Vbaa,Vabb)
 
 end subroutine e1exch_NaNb
 

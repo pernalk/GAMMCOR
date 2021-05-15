@@ -70,6 +70,7 @@ double precision :: Tcpu,Twall
 
     call e1elst(SAPT%monA,SAPT%monB,SAPT)
     call e1exchs2(Flags,SAPT%monA,SAPT%monB,SAPT)
+    call e1exch_NaNb(Flags,SAPT%monA,SAPT%monB,SAPT)
     !if(SAPT%monA%NELE==1.and.SAPT%monB%NELE==1) call hl_2el(Flags,SAPT%monA,SAPT%monB,SAPT)
 
     if(SAPT%SaptLevel==0) then
