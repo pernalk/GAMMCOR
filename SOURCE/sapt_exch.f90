@@ -664,7 +664,7 @@ enddo
 enddo
 
 tElst = 2d0*(SAPT%elst-SAPT%Vnn)*nnS2
-print*, 'tELST',tELST*1000
+!print*, 'tELST',tELST*1000
 
 allocate(ints(NBas**2),work(NBas,NBas))
 
@@ -684,7 +684,7 @@ do iq=1,dimOB
    enddo
 enddo
 tvk(3) = -2d0*tvk(3)
-print*, 'tvk(3)',tvk(3)*1000
+!print*, 'tvk(3)',tvk(3)*1000
 
 close(iunit)
 
@@ -694,7 +694,7 @@ do iq=1,dimOB
    enddo
 enddo
 tvk(1) = -2d0*tvk(1)
-print*, 'tvk(1)',tvk(1)*1000
+!print*, 'tvk(1)',tvk(1)*1000
 
 do iq=1,dimOB
    do ip=1,dimOA
@@ -702,7 +702,7 @@ do iq=1,dimOB
    enddo
 enddo
 tvk(2) = -2d0*tvk(2)
-print*, 'tvk(2)',tvk(2)*1000
+!print*, 'tvk(2)',tvk(2)*1000
 
 ! tNa
 tNa = 0
@@ -736,8 +736,8 @@ do it=1,dimOB
    enddo
 enddo
 tNa(2) = -2d0*tNa(2)
-print*, 'tNa-1',tNa(1)*1000
-print*, 'tNa-2',tNa(2)*1000
+!print*, 'tNa-1',tNa(1)*1000
+!print*, 'tNa-2',tNa(2)*1000
 
 close(iunit)
 
@@ -773,8 +773,8 @@ do it=1,dimOA
    enddo
 enddo
 tNb(2) = -2d0*tNb(2)
-print*, 'tNb-1',tNb(1)*1000
-print*, 'tNb-2',tNb(2)*1000
+!print*, 'tNb-1',tNb(1)*1000
+!print*, 'tNb-2',tNb(2)*1000
 
 close(iunit)
 
@@ -798,7 +798,12 @@ do ir=1,dimOA
 enddo
 close(iunit)
 tNaNb = -2*val
-print*, 'tNaNb',tNaNb*1000
+!print*, 'tNaNb',tNaNb*1000
+
+exchs2 = tElst + sum(tvk) + sum(tNa) + sum(tNb) + tNaNb
+SAPT%exchs2 = exchs2
+!write(LOUT,'(/1x,a,f16.8)') 'ExchS2      = ', exchs2*1000d0
+call print_en('ExchS2',exchs2*1000,.true.)
 
 deallocate(tmpAB)
 
