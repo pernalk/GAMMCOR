@@ -778,8 +778,10 @@ tNb(2) = -2d0*tNb(2)
 
 close(iunit)
 
-open(newunit=iunit,file='TMPOOAB',status='OLD',&
-    access='DIRECT',form='UNFORMATTED',recl=8*dimOB**2)
+!open(newunit=iunit,file='TMPOOAB',status='OLD',&
+!    access='DIRECT',form='UNFORMATTED',recl=8*dimOB**2)
+open(newunit=iunit,file='FOFOAABB',status='OLD',&
+    access='DIRECT',form='UNFORMATTED',recl=8*dimOA*NBas)
 
 allocate(tmpAB(dimOA,dimOA,dimOB,dimOB))
 
@@ -787,18 +789,31 @@ call dgemm('N','T',dimOA**2,dimOB**2,dimOA*dimOB,1d0,intA,dimOA**2,intB,dimOB**2
 
 val  = 0
 work = 0
-do ir=1,dimOA
-   do ip=1,dimOA
-     read(iunit,rec=ip+(ir-1)*dimOA) work(1:dimOB,1:dimOB)
-
-     val = val + sum(work(1:dimOB,1:dimOB)*tmpAB(ip,ir,1:dimOB,1:dimOB))
+!do ir=1,dimOA
+!   do ip=1,dimOA
+    ! read(iunit,rec=ip+(ir-1)*dimOA) work(1:dimOB,1:dimOB)
+     !val = val + sum(work(1:dimOB,1:dimOB)*tmpAB(ip,ir,1:dimOB,1:dimOB))
      !intA(ip,ir,iq,it)*intB(it,iu,is,iq)*ints(it,is)
+!   enddo
+!enddo
+
+ints = 0
+do ir=1,dimOB
+   do ip=1,dimOB
+     read(iunit,rec=ip+(ir-1)*NBas) ints(1:dimOA*NBas)
+
+     do j=1,dimOA
+        do i=1,dimOA
+           work(i,j) = ints(i+(j-1)*NBas)
+        enddo
+     enddo
+     val = val + sum(work(1:dimOA,1:dimOA)*tmpAB(1:dimOA,1:dimOA,ip,ir))
 
    enddo
 enddo
 close(iunit)
 tNaNb = -2*val
-!print*, 'tNaNb',tNaNb*1000
+print*, 'tNaNb',tNaNb*1000
 
 exchs2 = tElst + sum(tvk) + sum(tNa) + sum(tNb) + tNaNb
 SAPT%exchs2 = exchs2

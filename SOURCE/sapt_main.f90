@@ -242,6 +242,7 @@ double precision,intent(inout) :: Tcpu,Twall
 
  call e1elst_Chol(SAPT%monA,SAPT%monB,SAPT)
  call e1exchs2(Flags,SAPT%monA,SAPT%monB,SAPT)
+ call e1exch_NaNb(Flags,SAPT%monA,SAPT%monB,SAPT)
  call e2ind(Flags,SAPT%monA,SAPT%monB,SAPT)
  call e2exind(Flags,SAPT%monA,SAPT%monB,SAPT)
  call e2disp_Chol(Flags,SAPT%monA,SAPT%monB,SAPT)
@@ -587,12 +588,17 @@ if(Flags%ISERPA==0) then
   endif
 
   ! <oo|oo>
-  call tran4_gen(NBasis,&
-                 A%num0+A%num1,A%CMO,&
-                 A%num0+A%num1,A%CMO,&
-                 B%num0+B%num1,B%CMO,&
-                 B%num0+B%num1,B%CMO,&
-                 'TMPOOAB','AOTWOSORT')
+     if(Flags%ICholesky==1) then
+        call chol_ints_gen(B%num0+B%num1,B%num0+B%num1,B%OO,&
+                           A%num0+A%num1,A%num0+A%num1,A%OO,A%NChol,'TMPOOAB')
+     else
+        call tran4_gen(NBasis,&
+                     A%num0+A%num1,A%CMO,&
+                     A%num0+A%num1,A%CMO,&
+                     B%num0+B%num1,B%CMO,&
+                     B%num0+B%num1,B%CMO,&
+                    'TMPOOAB','AOTWOSORT')
+     endif
 
 elseif(Flags%ISERPA==2) then
 
@@ -3645,14 +3651,14 @@ double precision,allocatable :: tmp(:,:)
 
  allocate(A%OO(NCholesky,dimOA**2),&
           B%OO(NCholesky,dimOB**2) )
- !! (OO|AA)
- !call chol_MOTransf(A%OO,CholeskyVecs,&
- !                   A%CMO,1,dimOA,&
- !                   A%CMO,1,dimOA)
- !! (OO|BB)
- !call chol_MOTransf(B%OO,CholeskyVecs,&
- !                   B%CMO,1,dimOB,&
- !                   B%CMO,1,dimOB)
+ ! (OO|AA)
+ call chol_MOTransf(A%OO,CholeskyVecs,&
+                    A%CMO,1,dimOA,&
+                    A%CMO,1,dimOA)
+ ! (OO|BB)
+ call chol_MOTransf(B%OO,CholeskyVecs,&
+                    B%CMO,1,dimOB,&
+                    B%CMO,1,dimOB)
 
  allocate(A%FF(NCholesky,NBasis**2),&
           B%FF(NCholesky,NBasis**2) )
