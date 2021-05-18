@@ -3692,8 +3692,63 @@ double precision,allocatable :: tmp(:,:)
  !call chol_MOTransf(B%FO,CholeskyVecs,&
  !                   B%CMO,1,NBasis,&
  !                   B%CMO,1,dimOB)
+ ! test exchange
+ call test_Qmat(A,B,CholeskyVecs,NBasis)
 
 end subroutine chol_sapt_NOTransf
+
+subroutine test_QMat(A,B,CholeskyVecs,NBas)
+implicit none
+
+type(SystemBlock)   :: A, B
+type(TCholeskyVecs) :: CholeskyVecs
+integer,intent(in)  :: NBas
+
+integer :: NCholesky,dimOA,dimOB
+double precision,allocatable :: PA(:,:),PB(:,:), &
+                                S(:,:),USa(:,:),USb(:,:)
+double precision,allocatable :: Qab(:,:),Qba(:,:),Qmat(:,:)
+
+NCholesky = CholeskyVecs%NCholesky
+dimOA = A%num0+A%num1
+dimOB = B%num0+B%num1
+
+allocate(S(NBas,NBas), &
+         PA(NBas,NBas),PB(NBas,NBas))
+allocate(USa(NBas,NBas),USb(NBas,NBas),&
+         Qab(NBas,NBas),Qba(NBas,NBas),&
+         Qmat(NCholesky,dimOA**2))
+
+call get_den(NBas,A%CMO,A%Occ,1d0,PA)
+call get_den(NBas,B%CMO,B%Occ,1d0,PB)
+call get_one_mat('S',S,A%Monomer,NBas)
+
+! USa,USb in AOMO
+call dgemm('N','N',NBas,NBas,NBas,1d0,S,NBas,A%CMO,NBas,0d0,USa,NBas)
+call dgemm('N','N',NBas,NBas,NBas,1d0,S,NBas,B%CMO,NBas,0d0,USb,NBas)
+
+! Qab=0; Qba=0
+call dgemm('N','N',NBas,NBas,NBas,1d0,PA,NBas,USb,NBas,0d0,Qab,NBas)
+call dgemm('N','N',NBas,NBas,NBas,1d0,PB,NBas,USa,NBas,0d0,Qba,NBas)
+
+call chol_MOTransf(Qmat,CholeskyVecs,&
+                   A%CMO,1,dimOA,&
+                   Qba,1,dimOA)
+call chol_ints_gen(dimOA,dimOA,A%OO,&
+                   dimOA,dimOA,Qmat,A%NChol,'TWOA3B')
+
+deallocate(Qmat)
+allocate(Qmat(NCholesky,dimOB**2))
+
+call chol_MOTransf(Qmat,CholeskyVecs,&
+                   B%CMO,1,dimOB,&
+                   Qab,1,dimOB)
+call chol_ints_gen(dimOB,dimOB,B%OO,&
+                   dimOB,dimOB,Qmat,A%NChol,'TWOB3A')
+deallocate(Qmat,Qba,Qab)
+deallocate(PB,PA,S,USb,USa)
+
+end subroutine test_Qmat
 
 subroutine get_1el_h_mo(XOne,MO,NBas,onefile)
 ! read 1-el Hamiltonian and transform with MO coefs

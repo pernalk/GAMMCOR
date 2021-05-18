@@ -141,6 +141,7 @@ double precision,allocatable :: work1(:)
 ! call tran3MO_Q(NBas,dimOA,A%CMO,Qba,'TWOA3B')
 ! call tran3MO_Q(NBas,dimOB,B%CMO,Qab,'TWOB3A')
 
+ if(Flags%ICholesky==0) then 
  call tran4_gen(NBas,&
           dimOA,A%CMO(1:NBas,1:(A%num0+A%num1)),&
           dimOA,  Qba(1:NBas,1:(A%num0+A%num1)),&
@@ -153,6 +154,7 @@ double precision,allocatable :: work1(:)
           dimOB,B%CMO(1:NBas,1:(B%num0+B%num1)),&
           dimOB,B%CMO(1:NBas,1:(B%num0+B%num1)),&
           'TWOB3A','AOTWOSORT')
+ endif
 
  call make_K(NBas,PB,Kb)
 
@@ -664,27 +666,43 @@ enddo
 enddo
 
 tElst = 2d0*(SAPT%elst-SAPT%Vnn)*nnS2
-!print*, 'tELST',tELST*1000
+print*, 'tELST',tELST*1000
 
 allocate(ints(NBas**2),work(NBas,NBas))
 
 ! tvk = n_p n_q (v^A S + v^B S + v_pq^qp)
-open(newunit=iunit,file='FFOOABAB',status='OLD',&
-    access='DIRECT',form='UNFORMATTED',recl=8*NBas**2)
+!open(newunit=iunit,file='FFOOABAB',status='OLD',&
+!    access='DIRECT',form='UNFORMATTED',recl=8*NBas**2)
+!ipq = 0
+!tvk = 0
+!do iq=1,dimOB
+!   do ip=1,dimOA
+!      ipq = ipq + 1
+!      read(iunit,rec=ipq) ints(1:NBas*NBas)
+!
+!      tvk(3) = tvk(3) + A%Occ(ip)*B%Occ(iq)*ints(ip+(iq-1)*NBas)
+!
+!   enddo
+!enddo
+!tvk(3) = -2d0*tvk(3)
+!print*, 'tvk(3)',tvk(3)*1000
 
-ipq = 0
+open(newunit=iunit,file='FOFOABBA',status='OLD',&
+    access='DIRECT',form='UNFORMATTED',recl=8*NBas*dimOB)
 tvk = 0
-do iq=1,dimOB
-   do ip=1,dimOA
+do iq=1,dimOA
+   do ip=1,dimOB
       ipq = ipq + 1
-      read(iunit,rec=ipq) ints(1:NBas*NBas)
+      read(iunit,rec=(ip+(iq-1)*NBas)) ints(1:NBas*dimOB)
 
-      tvk(3) = tvk(3) + A%Occ(ip)*B%Occ(iq)*ints(ip+(iq-1)*NBas)
+      tvk(3) = tvk(3) + A%Occ(iq)*B%Occ(ip)*ints(iq+(ip-1)*NBas)
 
    enddo
 enddo
 tvk(3) = -2d0*tvk(3)
-!print*, 'tvk(3)',tvk(3)*1000
+print*, 'tvk(3)',tvk(3)*1000
+print*, 'HERE: sth wrong with (pq|qp)?'
+print*, 'HERE: use Kb instead??'
 
 close(iunit)
 
@@ -694,7 +712,7 @@ do iq=1,dimOB
    enddo
 enddo
 tvk(1) = -2d0*tvk(1)
-!print*, 'tvk(1)',tvk(1)*1000
+print*, 'tvk(1)',tvk(1)*1000
 
 do iq=1,dimOB
    do ip=1,dimOA
@@ -702,7 +720,7 @@ do iq=1,dimOB
    enddo
 enddo
 tvk(2) = -2d0*tvk(2)
-!print*, 'tvk(2)',tvk(2)*1000
+print*, 'tvk(2)',tvk(2)*1000
 
 ! tNa
 tNa = 0
@@ -736,8 +754,8 @@ do it=1,dimOB
    enddo
 enddo
 tNa(2) = -2d0*tNa(2)
-!print*, 'tNa-1',tNa(1)*1000
-!print*, 'tNa-2',tNa(2)*1000
+print*, 'tNa-1',tNa(1)*1000
+print*, 'tNa-2',tNa(2)*1000
 
 close(iunit)
 
@@ -773,8 +791,8 @@ do it=1,dimOA
    enddo
 enddo
 tNb(2) = -2d0*tNb(2)
-!print*, 'tNb-1',tNb(1)*1000
-!print*, 'tNb-2',tNb(2)*1000
+print*, 'tNb-1',tNb(1)*1000
+print*, 'tNb-2',tNb(2)*1000
 
 close(iunit)
 
