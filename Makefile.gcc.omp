@@ -1,0 +1,8 @@
+MKL_ROOT = /opt/intel/mkl/
+
+FCC = gfortran
+FFLAGS = -O3 -g -I xcfun/fortran -march=skylake-avx512 -funroll-loops -fopenmp
+LIBS = -L$(MKL_ROOT)lib/intel64/ -lmkl_gf_lp64 -lmkl_sequential -lmkl_core \
+-L./xcfun/lib -lxcfun -lopenblas
+
+include Makefile.common
