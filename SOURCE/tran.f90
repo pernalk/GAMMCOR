@@ -423,6 +423,138 @@ integer :: l,k,kl
 end subroutine tran4_gen
 
 
+subroutine new_tran4_gen(NBas,nA,CA,nB,CB,nC,CC,nD,CD, &
+                         fname,iunit_srt,thread_id)
+! 4-index transformation out of core
+! dumps all integrals on disk in the (square,square) form
+! CAREFUL: C have to be in AOMO form!
+!!! CAREFUL: write to simpler form
+!!! ie. (NBas,n,C)
+implicit none
+
+integer,intent(in) :: NBas
+integer,intent(in) :: nA,nB,nC,nD
+! CA(NBas*nA)
+double precision,intent(in) :: CA(*), CB(*), CC(*), CD(*)
+character(*) :: fname
+!the corresponding file is open only once, before the call
+integer, intent(in) :: iunit_srt
+integer, intent(in), optional:: thread_id
+! tmp file
+character(len=80) :: tmpfile, thread_str
+
+double precision, allocatable :: work1(:), work2(:), work3(:,:)
+integer :: iunit,iunit2,iunit3
+integer :: ntr,nAB,nCD,nloop
+integer,parameter :: cbuf=512
+integer :: i,rs,ab
+!  test
+integer :: l,k,kl
+
+! write(6,'()') 
+! write(6,'(1x,a)') 'TRAN4_SYM_OUT_OF_CORE'
+! write(6,'(1x,a)') 'Transforming integrals for AB dimer'
+ write(6,'(1x,a)') 'Transforming integrals for '//fname
+
+ ntr = NBas*(NBas+1)/2
+ nAB = nA*nB
+ nCD = nC*nD
+
+ ! set no. of triangles in buffer
+ nloop = (ntr-1)/cbuf+1
+
+ allocate(work1(NBas*NBas),work2(NBas*NBas))
+ allocate(work3(cbuf,nAB))
+
+ !!!open(newunit=iunit,file='AOTWOSORT',status='OLD',&
+ !open(newunit=iunit,file=trim(srtfile),status='OLD',&
+ !     access='DIRECT',form='UNFORMATTED',recl=8*ntr)
+ tmpfile = 'TMPMO'
+ iunit2 = 75  !no reason for this particular value
+ !print *, "DEBUG: ", thread_id 
+ !print *, "DEBUG: unit", iunit2
+ if (present(thread_id)) then
+    write(thread_str, "(I0)") thread_id
+    tmpfile = trim(tmpfile)//trim(adjustl(thread_str))
+    iunit2 = iunit2 + thread_id
+ end if
+ !print *, "DEBUG: ", thread_id
+ !print *, "DEBUG: before open ", tmpfile, "at", iunit2
+ 
+ ! half-transformed file
+ open(iunit2,file=tmpfile,status='REPLACE',&
+      access='DIRECT',form='UNFORMATTED',recl=8*cbuf)
+ !print *, "DEBUG: writing ", tmpfile, "at", iunit2
+
+! (ab|
+ do i=1,nloop
+    ! loop over cbuf
+    do rs=(i-1)*cbuf+1,min(i*cbuf,ntr)
+      !$omp critical
+       read(iunit_srt,rec=rs) work1(1:ntr)
+      !$omp end critical
+       call triang_to_sq(work1,work2,NBas)
+       ! work1=CA^T.work2
+       ! work2=work1.CB
+       call dgemm('T','N',nA,NBas,NBas,1d0,CA,NBas,work2,NBas,0d0,work1,nA) 
+       call dgemm('N','N',nA,nB,NBas,1d0,work1,nA,CB,NBas,0d0,work2,nA)
+       ! transpose
+       work3(rs-(i-1)*cbuf,1:nAB) = work2(1:nAB)
+       !work1 = 0
+       !kl = 0 
+       !do l=1,nB
+       !do k=1,nA
+       !   kl = kl + 1
+       !   work1(kl) = work2((k-1)*NBas+l)
+       !enddo
+       !enddo
+       !work3(rs-(i-1)*cbuf,1:nAB) = work1(1:nAB)
+
+    enddo
+
+    do ab=1,nAB
+       write(iunit2,rec=(i-1)*nAB+ab) work3(1:cbuf,ab)
+    enddo
+
+ enddo
+
+
+! |cd)
+ open(newunit=iunit3,file=fname,status='REPLACE',&
+     access='DIRECT',form='UNFORMATTED',recl=8*nCD)
+
+ do ab=1,nAB
+
+    do i=1,nloop
+       ! get all (ab| for given |rs)
+       read(iunit2,rec=(i-1)*nAB+ab) work1((i-1)*cbuf+1:min(i*cbuf,ntr))
+    enddo
+
+    call triang_to_sq(work1,work2,NBas)
+    ! work1=CC^T.work2
+    ! work2=work1.CD
+    call dgemm('T','N',nC,NBas,NBas,1d0,CC,NBas,work2,NBas,0d0,work1,nC)
+    call dgemm('N','N',nC,nD,NBas,1d0,work1,nC,CD,NBas,0d0,work2,nC)
+    write(iunit3,rec=ab) work2(1:nCD)
+    !work1 = 0
+    !kl = 0 
+    !do l=1,nD
+    !do k=1,nC
+    !   kl = kl + 1
+    !   work1(kl) = work2((k-1)*NBas+l)
+    !enddo
+    !enddo
+    !write(iunit3,rec=ab) work1(1:nCD)
+
+ enddo
+
+ deallocate(work1,work2,work3)
+ close(iunit3)
+ close(iunit2,status='DELETE')
+
+end subroutine new_tran4_gen
+
+
 subroutine read4_gen(NBas,nA,CA,nB,CB,nC,CC,nD,CD,fname,srtfile)
 ! reads 4-index ints from sorted file 
 ! dumps all integrals on disk in the (square,square) form

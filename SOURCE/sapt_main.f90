@@ -8,6 +8,7 @@ use sorter
 use sapt_pol
 use sapt_exch
 use exd_pino
+use omp_lib
 
 implicit none
 
@@ -403,6 +404,9 @@ implicit none
 type(FlagsData)    :: Flags
 type(SystemBlock)  :: A,B
 integer,intent(in) :: iPINO,NBasis
+! GIAN-added
+integer            :: ntr, iunit_aotwosort
+integer            :: thr_id
 
 if(Flags%ISERPA==0) then
   if(Flags%ICASSCF==1) then
@@ -438,49 +442,81 @@ if(Flags%ISERPA==0) then
   endif
 
   if((Flags%SaptLevel.eq.2).or.(Flags%IRedVirt.eq.1)) then
+   ! Adding omp tasks
+   ! Let's open the AOTWSORT only once, therefore we open it here
+     ntr = NBasis*(NBasis+1)/2
+
+     open(newunit=iunit_aotwosort,file='AOTWOSORT',status='OLD',&
+          access='DIRECT',form='UNFORMATTED',recl=8*ntr)
 
      write(LOUT,'(/1x,a)') 'Transforming E2exch-ind integrals...'
+     !TODO: 
+     ! - remove `default(shared)`
+     !$omp parallel default(shared) private(thr_id)
+     !!$print *, "DEBUG: omp num threads: ", omp_get_num_threads()
+       !$omp single
+       !$omp task
+       !$ thr_id = omp_get_thread_num()
      ! term A3-ind
-     call tran4_gen(NBasis,&
+     call new_tran4_gen(NBasis,&
               NBasis,B%CMO,&
               B%num0+B%num1,B%CMO(1:NBasis,1:(B%num0+B%num1)),&
               NBasis,A%CMO,&
               A%num0+A%num1,A%CMO(1:NBasis,1:(A%num0+A%num1)),&
-              'FOFOAABB','AOTWOSORT')
+              'FOFOAABB',iunit_aotwosort,thr_id)
+        !$omp end task
+        !$omp task
+       !$ thr_id = omp_get_thread_num()
      ! term A1-ind
-     call tran4_gen(NBasis,&
+     call new_tran4_gen(NBasis,&
               A%num0+A%num1,A%CMO(1:NBasis,1:(A%num0+A%num1)),&
               B%num0+B%num1,B%CMO(1:NBasis,1:(B%num0+B%num1)),&
               NBasis,A%CMO,&
               NBasis,B%CMO,&
-              'FFOOABAB','AOTWOSORT')
+              'FFOOABAB',iunit_aotwosort,thr_id)
+        !$omp end task
+        !$omp task
+       !$ thr_id = omp_get_thread_num()
      ! term A2-ind
      ! A2A(B): XX
-     call tran4_gen(NBasis,&
+     call new_tran4_gen(NBasis,&
               NBasis,B%CMO,&
               A%num0+A%num1,A%CMO(1:NBasis,1:(A%num0+A%num1)),&
               NBasis,B%CMO,&
               B%num0+B%num1,B%CMO(1:NBasis,1:(B%num0+B%num1)),&
-              'FOFOBBBA','AOTWOSORT')
-     call tran4_gen(NBasis,&
+              'FOFOBBBA',iunit_aotwosort,thr_id)
+        !$omp end task
+        !$omp task
+       !$ thr_id = omp_get_thread_num()
+     call new_tran4_gen(NBasis,&
               NBasis,A%CMO,&
               B%num0+B%num1,B%CMO(1:NBasis,1:(B%num0+B%num1)),&
               NBasis,A%CMO,&
               A%num0+A%num1,A%CMO(1:NBasis,1:(A%num0+A%num1)),&
-              'FOFOAAAB','AOTWOSORT')
+              'FOFOAAAB',iunit_aotwosort,thr_id)
+        !$omp end task
+        !$omp task
+       !$ thr_id = omp_get_thread_num()
      !! A2A(B): YY
-     call tran4_gen(NBasis,&
+     call new_tran4_gen(NBasis,&
               NBasis,A%CMO,&
               B%num0+B%num1,B%CMO(1:NBasis,1:(B%num0+B%num1)),&
               NBasis,B%CMO,&
               B%num0+B%num1,B%CMO(1:NBasis,1:(B%num0+B%num1)),&
-              'FOFOBBAB','AOTWOSORT')
-     call tran4_gen(NBasis,&
+              'FOFOBBAB',iunit_aotwosort,thr_id)
+        !$omp end task
+        !$omp task
+       !$ thr_id = omp_get_thread_num()
+     call new_tran4_gen(NBasis,&
               NBasis,B%CMO,&
               A%num0+A%num1,A%CMO(1:NBasis,1:(A%num0+A%num1)),&
               NBasis,A%CMO,&
               A%num0+A%num1,A%CMO(1:NBasis,1:(A%num0+A%num1)),&
-              'FOFOAABA','AOTWOSORT')
+              'FOFOAABA',iunit_aotwosort,thr_id)
+        !$omp end task
+        !$omp end single
+      !$omp end parallel
+      close(iunit_aotwosort)
 
      write(LOUT,'(/1x,a)') 'Transforming E2exch-disp integrals...'
      call tran4_gen(NBasis,&
