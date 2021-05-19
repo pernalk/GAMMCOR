@@ -30,6 +30,7 @@ C     LOCAL ARRAYS
 C
       Dimension XGrid(100), WGrid(100)
 C
+c      goto 132
 C
       If(ITwoEl.eq.1) Then
 C
@@ -54,9 +55,12 @@ C
      $ ETot+ENuc,ECorr,ETot+ENuc+ECorr
       stop
 C
+  132 continue
+C
 C     GENERATE ABSCISSAS AND WEIGHTS FOR GAUSSIAN-LEGENDRE QUADRATURE
 C
       NGrid=5
+c      NGrid=30
 C
       Call GauLeg(Zero,One,XGrid,WGrid,NGrid)
 C 
@@ -65,9 +69,21 @@ C
 C   
       ACAlpha=XGrid(I)
 C
+      If(ITwoEl.eq.1) Then
+C
       Call WInteg(ECorrA,TwoNO,XOne,URe,Occ,ABPLUS,ABMIN,
      $ EGOne,NGOcc,NBasis,NInte1,NInte2,NDim,NGem,IndAux,ACAlpha,
      $ IndN,IndX,NDimX)
+C
+      ElseIf(ITwoEl.eq.3) Then
+C
+      Call WInteg_FOFO(ECorrA,XOne,URe,Occ,
+     $ EGOne,NGOcc,
+     $ IGem,NAcCAS,NInAcCAS,NELE,
+     $ NBasis,NInte1,NDim,NGem,IndAux,ACAlpha,
+     $ IndN,IndX,NDimX)
+C
+      EndIf
 C
       Write(*,*)'ACAlpha ',ACAlpha,' W_ALPHA ',ECorrA
 C
