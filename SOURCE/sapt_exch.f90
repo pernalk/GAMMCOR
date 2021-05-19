@@ -607,6 +607,7 @@ double precision,allocatable :: RDM2Aval(:,:,:,:),RDM2Bval(:,:,:,:)
 double precision,allocatable :: intA(:,:,:,:),intB(:,:,:,:)
 double precision,allocatable :: tmpAB(:,:,:,:)
 double precision,allocatable :: work(:,:),ints(:)
+double precision,external  :: ddot
 
 print*, 'Testing E1exch NaNb...'
 
@@ -687,24 +688,36 @@ allocate(ints(NBas**2),work(NBas,NBas))
 !tvk(3) = -2d0*tvk(3)
 !print*, 'tvk(3)',tvk(3)*1000
 
-open(newunit=iunit,file='FOFOABBA',status='OLD',&
-    access='DIRECT',form='UNFORMATTED',recl=8*NBas*dimOB)
+!open(newunit=iunit,file='FOFOABBA',status='OLD',&
+!    access='DIRECT',form='UNFORMATTED',recl=8*NBas*dimOB)
+!tvk = 0
+!do iq=1,dimOA
+!   do ip=1,dimOB
+!      ipq = ipq + 1
+!      read(iunit,rec=(ip+(iq-1)*NBas)) ints(1:NBas*dimOB)
+!
+!      tvk(3) = tvk(3) + A%Occ(iq)*B%Occ(ip)*ints(iq+(ip-1)*NBas)
+!
+!   enddo
+!enddo
+!tvk(3) = -2d0*tvk(3)
+!print*, 'tvk(3)',tvk(3)*1000
+!print*, 'HERE: sth wrong with (pq|qp)?'
+!print*, 'HERE: use Kb instead??'
+
+!close(iunit)
+
+! 3rd test...!
+ipq = 0
 tvk = 0
-do iq=1,dimOA
-   do ip=1,dimOB
-      ipq = ipq + 1
-      read(iunit,rec=(ip+(iq-1)*NBas)) ints(1:NBas*dimOB)
-
-      tvk(3) = tvk(3) + A%Occ(iq)*B%Occ(ip)*ints(iq+(ip-1)*NBas)
-
+do iq=1,dimOB
+   do ip=1,dimOA
+      i=(iq-1)*NBas+ip
+     tvk(3) = tvk(3) + A%Occ(ip)*B%Occ(iq)*ddot(A%NChol,A%FFAB(:,i),1,A%FFAB(:,i),1)
    enddo
 enddo
 tvk(3) = -2d0*tvk(3)
 print*, 'tvk(3)',tvk(3)*1000
-print*, 'HERE: sth wrong with (pq|qp)?'
-print*, 'HERE: use Kb instead??'
-
-close(iunit)
 
 do iq=1,dimOB
    do ip=1,dimOA
