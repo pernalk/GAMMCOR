@@ -707,17 +707,17 @@ allocate(ints(NBas**2),work(NBas,NBas))
 
 !close(iunit)
 
-! 3rd test...!
-ipq = 0
-tvk = 0
-do iq=1,dimOB
-   do ip=1,dimOA
-      i=(iq-1)*NBas+ip
-     tvk(3) = tvk(3) + A%Occ(ip)*B%Occ(iq)*ddot(A%NChol,A%FFAB(:,i),1,A%FFAB(:,i),1)
-   enddo
-enddo
-tvk(3) = -2d0*tvk(3)
-print*, 'tvk(3)',tvk(3)*1000
+!! 3rd test...!
+!ipq = 0
+!tvk = 0
+!do iq=1,dimOB
+!   do ip=1,dimOA
+!      i=(iq-1)*NBas+ip
+!     tvk(3) = tvk(3) + A%Occ(ip)*B%Occ(iq)*ddot(A%NChol,A%FFAB(:,i),1,A%FFAB(:,i),1)
+!   enddo
+!enddo
+!tvk(3) = -2d0*tvk(3)
+!print*, 'tvk(3)',tvk(3)*1000
 
 do iq=1,dimOB
    do ip=1,dimOA
@@ -734,6 +734,16 @@ do iq=1,dimOB
 enddo
 tvk(2) = -2d0*tvk(2)
 print*, 'tvk(2)',tvk(2)*1000
+
+! work = PA
+call get_den(NBas,A%CMO,A%Occ,1d0,work)
+! tvk = n_p n_q v_pq^qp = PA.K[PB]
+do jb=1,NBas
+   do ia=1,NBas
+      tvk(3) = tvk(3) + work(ia,jb)*B%Kmat(jb,ia)
+   enddo
+enddo
+tvk(3) = -2.0d0*tvk(3)
 
 ! tNa
 tNa = 0

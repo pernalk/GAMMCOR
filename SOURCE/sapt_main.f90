@@ -799,12 +799,12 @@ double precision :: potnucA,potnucB
 double precision :: potnuc,emy,eactiv,emcscf
 
 double precision,allocatable :: work1(:),work2(:)
+double precision,allocatable :: work(:,:)
 double precision,allocatable :: Ha(:),Hb(:)
 double precision,allocatable :: Va(:),Vb(:),S(:)
 double precision,allocatable :: Ca(:),Cb(:)
 double precision,allocatable :: AuxA(:,:),AuxB(:,:)
 double precision,allocatable :: OneRdmA(:),OneRdmB(:)
-double precision,allocatable :: tmpMat(:,:)
 
 logical :: doRSH
 double precision,allocatable :: Sa(:,:),Sb(:,:)
@@ -988,6 +988,16 @@ double precision :: Tcpu,Twall
        write(LOUT,'(/,1x,a)') 'UNRECOGNIZED PINO VARIANT!'
     endif
  endif
+
+! calculate exchange K[PB] matrix
+ allocate(SAPT%monB%Kmat(NBasis,NBasis))
+ allocate(work(NBasis,NBasis))
+ ! work = PB
+ work = 0
+ call get_den(NBasis,SAPT%monB%CMO,SAPT%monB%Occ,1d0,work)
+ call make_K(NBasis,work,SAPT%monB%Kmat)
+ print*, 'A%Kmat',norm2(SAPT%monB%Kmat)
+ deallocate(work)
 
 ! calculate electrostatic potential
  call calc_elpot(SAPT%monA,SAPT%monB,NBasis)

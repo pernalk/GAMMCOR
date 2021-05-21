@@ -191,7 +191,7 @@ type SystemBlock
       double precision,allocatable :: OV(:,:),OO(:,:), &
                                       FO(:,:),FF(:,:), &
                                       FFAB(:,:),FFBA(:,:)
-      double precision,allocatable :: WPot(:,:)
+      double precision,allocatable :: WPot(:,:),Kmat(:,:)
       double precision,allocatable :: VCoul(:)
       double precision,allocatable :: RDM2(:),RDM2Act(:,:,:,:)
       double precision,allocatable :: RDM2val(:,:,:,:)
