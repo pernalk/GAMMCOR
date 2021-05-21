@@ -29,7 +29,7 @@ logical :: AuxCoeff(3,3,3,3)
 double precision,allocatable :: work(:),ints(:,:)
 
 NGrid=25
-Max_Cn=9
+Max_Cn=6
 Write (6,'(/,X,''AC Iterative Calculation with Omega Grid = '',I3,&
       '' and max order in C expansion = '',I3,/)') NGrid,Max_Cn
 
@@ -108,6 +108,7 @@ Do IGL=1,NGrid
           Call dgemm('N','N',NDimX,NDimX,NDimX,XN2,WORK1,NDimX,&
                      C0,NDimX,XN1,C2,NDimX)
           FF=WFact/XFactorial/(N+1)
+          COM=COM+FF*C2 
           C0=C1
           C1=C2
       EndDo
