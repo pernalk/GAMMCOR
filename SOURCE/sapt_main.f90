@@ -4829,8 +4829,7 @@ endif
                      (Flags%IFlCore==0.and.&
                      mon%Occ(i)/=1d0.and.mon%Occ(j)/=1d0) ) then
                      ! exclude pairs of nearly/virtual orbitals
-
-                     if(abs(mon%Occ(i)+mon%Occ(j)).lt.1.D-7) then
+                      if(abs(mon%Occ(i)+mon%Occ(j)).lt.Mon%ThrQVirt) then
                         write(LOUT,'(1x,a,2x,2i4)') 'Discarding nearly virtual-orbitals pair',i,j
                      elseif(abs(mon%Occ(i)+mon%Occ(j)-2d0).gt.1.D-10) then
 
