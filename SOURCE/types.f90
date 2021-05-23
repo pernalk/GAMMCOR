@@ -52,6 +52,9 @@ integer, parameter :: TWOMO_FFFF   = 2
 integer, parameter :: TWOMO_FOFO   = 3
 
 integer, parameter :: FLAG_CHOLESKY = 0
+integer, parameter :: CHOL_ACCU_DEFAULT   = 1
+integer, parameter :: CHOL_ACCU_TIGHT     = 2
+integer, parameter :: CHOL_ACCU_LUDICROUS = 3
 
 integer, parameter :: DF_NONE       = 0
 integer, parameter :: DF_SRLDA      = 1
@@ -102,6 +105,7 @@ type CalculationBlock
       integer :: Kernel    = 1
       integer :: TwoMoInt  = TWOMO_INCORE
       integer :: Cholesky  = FLAG_CHOLESKY 
+      integer :: CholeskyAccu = CHOL_ACCU_DEFAULT
       integer :: Core      = FLAG_CORE
       integer :: SymType   = TYPE_NO_SYM
       integer :: SaptLevel = SAPTLEVEL2
@@ -231,6 +235,7 @@ type FlagsData
      integer :: ITwoEl    = TWOMO_INCORE 
      integer :: IRedVirt  = FLAG_REDVIRT
      integer :: ICholesky = FLAG_CHOLESKY
+     integer :: CholeskyAccu = CHOL_ACCU_DEFAULT
      integer :: IFun      = 13
      integer :: IFunSR    = 0 
      integer :: IFunSRKer = 0

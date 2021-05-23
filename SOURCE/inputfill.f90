@@ -405,6 +405,15 @@ subroutine read_block_calculation(CalcParams, line)
               CalcParams%Cholesky = 1
            endif
 
+      case ("CHOL_ACCU","CHOL_ACCURACY","CHOLESKY_ACCU","CHOLESKY_ACCURACY")
+           if (uppercase(val) == "DEFAULT") then
+              CalcParams%CholeskyAccu = CHOL_ACCU_DEFAULT
+           elseif (uppercase(val) == "TIGHT") then
+              CalcParams%CholeskyAccu = CHOL_ACCU_TIGHT
+           elseif (uppercase(val) == "LUDICROUS") then
+              CalcParams%CholeskyAccu = CHOL_ACCU_LUDICROUS
+           endif
+
       case ("SAPTLEVEL")
            if (uppercase(val) == "0".or.&
                uppercase(val) == "SAPT0") then

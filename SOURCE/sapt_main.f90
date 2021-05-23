@@ -241,7 +241,7 @@ double precision,intent(inout) :: Tcpu,Twall
  print*, 'Cholesky decomposition'
 
  call e1elst_Chol(SAPT%monA,SAPT%monB,SAPT)
- call e1exchs2(Flags,SAPT%monA,SAPT%monB,SAPT)
+! call e1exchs2(Flags,SAPT%monA,SAPT%monB,SAPT)
  call e1exch_NaNb(Flags,SAPT%monA,SAPT%monB,SAPT)
  call e2ind(Flags,SAPT%monA,SAPT%monB,SAPT)
  call e2exind(Flags,SAPT%monA,SAPT%monB,SAPT)
@@ -951,7 +951,8 @@ double precision :: Tcpu,Twall
 ! perform Cholesky decomposition
  if(Flags%ICholesky==1) then
 
-    call chol_CoulombMatrix(CholeskyVecs,'AOTWOSORT',CHOL_ACCURACY_LUDICROUS)
+    call chol_CoulombMatrix(CholeskyVecs,'AOTWOSORT',Flags%CholeskyAccu)
+    !call chol_CoulombMatrix(CholeskyVecs,'AOTWOSORT',CHOL_ACCURACY_LUDICROUS)
     !call chol_CoulombMatrix(CholeskyVecs,'AOTWOSORT',CHOL_ACCURACY_TIGHT)
     !call chol_CoulombMatrix(CholeskyVecs,'AOTWOSORT',CHOL_ACCURACY_DEFAULT)
 
@@ -996,7 +997,6 @@ double precision :: Tcpu,Twall
  work = 0
  call get_den(NBasis,SAPT%monB%CMO,SAPT%monB%Occ,1d0,work)
  call make_K(NBasis,work,SAPT%monB%Kmat)
- print*, 'A%Kmat',norm2(SAPT%monB%Kmat)
  deallocate(work)
 
 ! calculate electrostatic potential
@@ -5700,6 +5700,9 @@ if(allocated(SAPT%monB%NumOSym)) then
    deallocate(SAPT%monB%NumOSym)
 endif
 
+if(allocated(SAPT%monB%Kmat)) then
+  deallocate(SAPT%monB%Kmat)
+endif
 ! test Cholesky
 if(allocated(SAPT%monA%OV)) then
    deallocate(SAPT%monA%OV)

@@ -128,7 +128,8 @@ else
    Flags%ITwoEl = Input%CalcParams%TwoMoInt
 
   ! set Cholesky decomposition
-   Flags%ICholesky = Input%CalcParams%Cholesky
+   Flags%ICholesky    = Input%CalcParams%Cholesky
+   Flags%CholeskyAccu = Input%CalcParams%CholeskyAccu
 
   ! reduce virtuals
    Flags%IRedVirt = Input%CalcParams%RedVirt
@@ -351,10 +352,10 @@ end subroutine fill_Flags
 subroutine create_System(Input,Flags,System,SAPT)
 implicit none
 
-type(InputData) :: Input
-type(FlagsData) :: Flags
+type(InputData)   :: Input
+type(FlagsData)   :: Flags
 type(SystemBlock) :: System
-type(SaptData) :: SAPT
+type(SaptData)    :: SAPT
 
 ! fill System
 if(Flags%ISAPT.Eq.0) then
@@ -365,7 +366,7 @@ if(Flags%ISAPT.Eq.0) then
      stop
    endif
 
-   System%NoSt = Input%SystemInput(1)%NoSt
+   System%NoSt    = Input%SystemInput(1)%NoSt
    System%NStates = Input%SystemInput(1)%NStates
    allocate(System%InSt(2,System%NStates))
    if(Input%SystemInput(1)%DeclareSt) then

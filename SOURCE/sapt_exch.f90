@@ -719,6 +719,7 @@ allocate(ints(NBas**2),work(NBas,NBas))
 !tvk(3) = -2d0*tvk(3)
 !print*, 'tvk(3)',tvk(3)*1000
 
+tvk = 0
 do iq=1,dimOB
    do ip=1,dimOA
       tvk(1) = tvk(1) + A%Occ(ip)*B%Occ(iq)*Vaab(ip,iq)*Sab(ip,iq)

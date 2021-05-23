@@ -33,6 +33,7 @@ double precision,external  :: ddot
  call tran2MO(Vb,A%CMO,A%CMO,Vbaa,NBas)
 
 ! sum_p n_p v^B_pp 
+ ea = 0
  do i=1,A%num0+A%num1
     ea = ea + A%Occ(i)*Vbaa(i,i) 
  enddo
@@ -40,6 +41,7 @@ double precision,external  :: ddot
  !print*, 'ea',ea
 
 ! sum_q n_q v^A_qq 
+ eb = 0
  do j=1,B%num0+B%num1
     eb = eb + B%Occ(j)*Vabb(j,j) 
  enddo
@@ -47,6 +49,7 @@ double precision,external  :: ddot
  !print*, 'eb',eb
 
 ! sum_pq n_p n_q v_{pq}^{pq}
+ eab = 0
  do j=1,B%num0+B%num1
     jj = (j-1)*NBas+j
     do i=1,A%num0+A%num1
