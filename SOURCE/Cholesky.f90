@@ -752,7 +752,8 @@ contains
 
             select case (Accuracy)
             case (CHOL_ACCURACY_DEFAULT)
-                  TargetTraceError = 1.0E-2_F64
+                  TargetTraceError = 1.0E-1_F64
+                  !TargetTraceError = 1.0E-2_F64
                   TargetTraceErrorPrescreen = 1.0E-10_F64
                   TargetMaxError = 1.0E-11_F64
                   MaxNAOMult = 8

@@ -961,7 +961,7 @@ double precision :: Tcpu,Twall
     SAPT%monB%NChol = SAPT%NCholesky
 
     ! transform Cholesky Vecs to NO
-    call chol_sapt_NOTransf(SAPT%monA,SAPT%monB,CholeskyVecs,NBasis)
+    call chol_sapt_NOTransf(SAPT,SAPT%monA,SAPT%monB,CholeskyVecs,NBasis)
 
   endif
 
@@ -1379,6 +1379,455 @@ character(:),allocatable :: rdmfile
  deallocate(EVal,work)
 
 end subroutine readocc_molpro
+
+subroutine test_pmat(CholVecs,A,B,NBas,NCholesky)
+implicit none
+
+type(SystemBlock)  :: A,B
+integer,intent(in) :: NBas,NCholesky
+double precision,intent(in) :: CholVecs(NBas**2,NCholesky)
+
+integer :: i,j,info
+double precision :: val
+
+integer,allocatable :: ipiv(:)
+double precision,allocatable :: work1(:,:),work2(:,:) 
+double precision,allocatable :: work3(:)
+
+print*, 'NCholesky',NCholesky
+Print*, 'NBas  ',   NBas
+Print*, 'NBas^2',   NBas**2
+! CholVec(NBasis**2,NChol)
+
+allocate(work1(NCholesky,NCholesky),work2(NBas**2,NCholesky))
+call dgemm('T','N',NCholesky,NCholesky,NBas**2,1d0,CholVecs,NBas**2,CholVecs,NBas**2,0d0,work1,NCholesky)
+print*, 'D^T.D',norm2(work1(1:NCholesky,1:NCholesky))
+
+! inversion (D^T.D)^-1
+allocate(ipiv(NCholesky))
+call dgetrf(NCholesky,NCholesky,work1,NCholesky,ipiv,info)
+print*, 'info-1',info
+allocate(work3(NCholesky**2))
+call dgetri(NCholesky,work1,NCholesky,ipiv,work3,NCholesky**2,info) 
+print*, 'info-2',info
+print*, '(D^T.D)-1',norm2(work1(1:NCholesky,1:NCholesky))
+deallocate(ipiv)
+deallocate(work3)
+
+call dgemm('N','N',NBas**2,NCholesky,NCholesky,1d0,CholVecs,NBas**2,work1,NCholesky,0d0,work2,NBas**2)
+print*, 'D(D^TD)-1',norm2(work2)
+
+deallocate(work1)
+allocate(work1(NBas**2,NBas**2))
+call dgemm('N','T',NBas**2,NBas**2,NCholesky,1d0,work2,NBas**2,CholVecs,NBas**2,0d0,work1,NBas**2)
+print*, 'Pmat',norm2(work1(1:NBas**2,1:NBas**2))
+
+val = 0
+do i=1,NBas**2
+      print*, i,work1(i,i)
+      val = val + abs(work1(i,i))
+      work1(i,i) = 0d0 
+enddo
+print*, 'Pmat-1',norm2(work1(1:NBas**2,1:NBas**2))
+print*, 'val, NBas**2', val, NBas**2
+
+deallocate(work2)
+deallocate(work1)
+
+end subroutine test_pmat
+
+subroutine prepare_cerpa(Mon,ABPLUS,ABMIN,NBasis)
+implicit none
+
+type(SystemBlock)  :: Mon
+integer,intent(in) :: NBasis
+double precision,intent(in)  :: ABPLUS(Mon%NDimX,Mon%NDimX),&
+                                ABMIN(Mon%NDimX,Mon%NDimX)
+
+character(:),allocatable :: infile
+integer :: NCholesky,NDimX,NOccup
+integer :: i,ipq,irs,ip,iq,lwork
+integer :: iunit,info
+integer,allocatable :: ipiv(:)
+double precision :: val
+double precision,allocatable :: Adiag(:),And(:,:)
+double precision,allocatable :: AndQ(:,:),AndD(:,:),BD(:,:)
+double precision,allocatable :: work1(:,:),work2(:,:),work3(:),work4(:)
+
+! set dimensions
+NDimX     = Mon%NDimX
+NOccup    = Mon%num0+Mon%num1 
+NCholesky = Mon%NChol
+
+Print*, 'NDimX',    NDimX
+Print*, 'FOdim',    NBasis*NOccup
+Print*, 'NBas  ',   NBasis
+Print*, 'NBas^2',   NBasis**2
+Print*, 'NCholesky',NCholesky
+
+if(Mon%Monomer==1) then
+   infile='CHOL_A'
+elseif(Mon%Monomer==2) then
+   infile='CHOL_B'
+endif
+
+allocate(work1(NDimX,NDimX),work2(NDimX,NCholesky))
+allocate(Adiag(NDimX),And(NDimX,NDimX))
+
+! create Adiag, And
+call dgemm('N','N',NDimX,NDimX,NDimX,1d0,ABPLUS,NDimX,ABMIN,NDimX,0d0,work1,NDimX)
+
+And   = work1
+Adiag = 0
+do ipq=1,NDimX
+   Adiag(ipq) = work1(ipq,ipq)
+   And(ipq,ipq) = 0d0
+enddo
+print*, 'Adiag',norm2(Adiag(1:NDimX))
+print*, 'And  ',norm2(And(1:NDimX,1:NDimX))
+
+deallocate(work1)
+allocate(work1(NDimX,NCholesky))
+
+work1 = 0
+do ipq=1,NDimX
+   ip = Mon%IndN(1,ipq)
+   iq = Mon%IndN(2,ipq)
+   work1(ipq,:) = (Mon%CICoef(ip)+Mon%CICoef(iq))*Mon%OV(:,ipq)
+enddo
+! BDtilde = 0.5*ABPLUS.Dtilde
+! BDtilde = work2
+call dgemm('N','N',NDimX,NCholesky,NDimX,0.5d0,ABPLUS,NDimX,work1,NDimX,0d0,work2,NDimX)
+
+open(newunit=iunit,file=infile,form='unformatted')
+print*, 'BD',norm2(work2(1:NDimX,1:NCholesky))
+write(iunit) 'ADIAG   ', Adiag
+write(iunit) 'BMATD   ', work2
+
+deallocate(work2)
+
+allocate(work2(NCholesky,NCholesky))
+allocate(ipiv(NCholesky))
+
+! OV
+print*, 'OV: D(NDimX,NChol)'
+call dgemm('N','T',NCholesky,NCholesky,NDimX,1.0d0,Mon%OV,NCholesky,Mon%OV,NCholesky,0d0,work2,NCholesky)
+!! FF
+!print*, 'use D(NBas**2,NChol)...'
+!call dgemm('N','T',NCholesky,NCholesky,NBasis**2,1.0d0,Mon%FF,NCholesky,Mon%FF,NCholesky,0d0,work2,NCholesky)
+
+!  !! test eigenvals
+!  !allocate(work3(NCholesky),work4(NBasis))
+!  !call Diag8(work2,NCholesky,NCholesky,work3,work4)
+!  !
+!  !print*, 'Testing eigenvalues:'
+!  !do i=1,NCholesky
+!  !   if(abs(work3(i)).lt.1d-10) then
+!  !      print*, i, work3(i)
+!  !   endif
+!  !enddo
+!  !
+!  !deallocate(work4,work3)
+!  !
+!  !return
+!  !! end test
+!  !
+call dgetrf(NCholesky,NCholesky,work2,NCholesky,ipiv,info)
+print*, 'info-1',info
+if(info<0) then
+   write(lout,*) 'prepare_cerpa: dgetrf ',info,'-th argument had illegal value!'
+   stop
+endif
+allocate(work3(2))
+lwork = -1
+call dgetri(NCholesky,work2,NCholesky,ipiv,work3,lwork,info)
+lwork = int(work3(1))
+deallocate(work3)
+print*, 'lwork',lwork
+allocate(work3(lwork))
+call dgetri(NCholesky,work2,NCholesky,ipiv,work3,lwork,info)
+print*, 'info-2',info,work3(1)
+  
+if(info<0) then
+   write(lout,*) 'prepare_cerpa: dgetri ',info,'-th argument had illegal value!'
+   stop
+endif
+Print*, '(D.DT)-1',norm2(work2(1:NCholesky,1:NCholesky))
+
+! D^T.(D.D^T)-1 = work1
+! OV
+call dgemm('T','N',NDimX,NCholesky,NCholesky,1.0d0,Mon%OV,NCholesky,work2,NCholesky,0d0,work1,NDimX)
+print*, 'DT(D.DT)-1',norm2(work1(1:NDimX,1:NCholesky))
+!! FF
+!deallocate(work1)
+!allocate(work1(NBasis**2,NCholesky))
+!call dgemm('T','N',NBasis**2,NCholesky,NCholesky,1.0d0,Mon%FF,NCholesky,work2,NCholesky,0d0,work1,NBasis**2)
+!print*, 'DT(D.DT)-1',norm2(work1(1:NBasis**2,1:NCholesky))
+
+! turn off for FF!
+deallocate(work2)
+allocate(work2(NDimX,NCholesky))
+call dgemm('N','N',NDimX,NCholesky,NDimX,1.0d0,And,NDimX,work1,NDimX,0d0,work2,NDimX)
+print*, 'AndD',norm2(work2(1:NDimX,1:NCholesky))
+
+write(iunit) 'ANDD    ', work2
+!  
+! construct P and Q
+! OV
+deallocate(work2)
+allocate(work2(NDimX,NDimX))
+call dgemm('N','N',NDimX,NDimX,NCholesky,-1.0d0,work1,NDimX,Mon%OV,NCholesky,0d0,work2,NDimX)
+print*, '-Pmat',norm2(work2(1:NDimX,1:NDimX))
+
+!test Pmat
+val = 0
+do ipq=1,NDimX
+      val = val + abs(work2(ipq,ipq))
+enddo
+print*, 'val', val,NDimX
+
+do ipq=1,NDimX
+    work2(ipq,ipq) = work2(ipq,ipq) + 1d0
+enddo
+print*, 'Qmat',norm2(work2(1:NDimX,1:NDimX))
+
+!! FF
+!deallocate(work2)
+!allocate(work2(NBasis**2,NBasis**2))
+!call dgemm('N','N',NBasis**2,NBasis**2,NCholesky,1.0d0,work1,NBasis**2,Mon%FF,NCholesky,0d0,work2,NBasis**2)
+!print*, 'Pmat',norm2(work2(1:NBasis**2,1:NBasis**2))
+!
+!val = 0
+!do ipq=1,NBasis**2
+!      val = val + abs(work2(ipq,ipq))
+!      work2(ipq,ipq) = 0d0 
+!enddo
+!print*, 'Pmat-1',norm2(work2(1:NBasis**2,1:NBasis**2))
+!print*, 'val', val,NBasis**2
+!
+!deallocate(work2)
+!stop
+
+deallocate(work1)
+allocate(work1(NDimX,NDimX))
+call dgemm('N','N',NDimX,NDimX,NDimX,1.0d0,And,NDimX,work2,NDimX,0d0,work1,NDimX)
+print*, 'AndQ',norm2(work1(1:NDimX,1:NDimX))
+
+write(iunit) 'ANDQ    ', work1
+close(iunit)
+!  
+!  !deallocate(work2)
+!  !allocate(work2(NDimX,NCholesky))
+!  
+!  !! test : tranpose D
+!  !deallocate(work3)
+!  !!! OV
+!  !!work1 = 0
+!  !!do ipq=1,NDimX
+!  !!   do irs=1,NCholesky
+!  !!      work1(ipq,irs) = Mon%OV(irs,ipq)
+!  !!   enddo
+!  !!enddo
+!  !!call dgemm('T','N',NCholesky,NCholesky,NDimX,1.0d0,work1,NDimX,work1,NDimX,0d0,work2,NCholesky)
+!  !!print*, 'work2',norm2(work2)
+!  !! FF 
+!  !deallocate(work1)
+!  !allocate(work1(NBasis**2,NCholesky))
+!  !do ipq=1,NBasis**2
+!  !   do irs=1,NCholesky
+!  !      work1(ipq,irs) = Mon%FF(irs,ipq)
+!  !   enddo
+!  !enddo
+!  !call dgemm('T','N',NCholesky,NCholesky,NBasis**2,1.0d0,work1,NBasis**2,work1,NBasis**2,0d0,work2,NCholesky)
+!  !print*, 'work2',norm2(work2)
+!  !
+!  !!deallocate(work3)
+!  !!!allocate(work3(NCholesky),work4(NBasis))
+!  !!!call Diag8(work2,NCholesky,NCholesky,work3,work4)
+!  !!!
+!  !!!do i=1,NCholesky
+!  !!!   if(abs(work3(i)).lt.1d-10) then
+!  !!!      print*, i, work3(i)
+!  !!!   endif
+!  !!!enddo
+!  !!!
+!  !!!deallocate(work4,work3)
+!  !!
+!  !call dgetrf(NCholesky,NCholesky,work2,NCholesky,ipiv,info)
+!  !print*, 'info-1',info
+!  !if(info<0) then
+!  !  write(lout,*) 'prepare_cerpa: dgetrf ',info,'-th argument had illegal value!'
+!  !  stop
+!  !endif
+!  !allocate(work3(2))
+!  !lwork = -1
+!  !call dgetri(NCholesky,work2,NCholesky,ipiv,work3,lwork,info)
+!  !lwork = work3(1)
+!  !deallocate(work3)
+!  !allocate(work3(lwork))
+!  !call dgetri(NCholesky,work2,NCholesky,ipiv,work3,lwork,info)
+!  !print*, 'info-2',info,work3(1)
+!  !
+!  !if(info<0) then
+!  !  write(lout,*) 'prepare_cerpa: dgetri ',info,'-th argument had illegal value!'
+!  !  stop
+!  !endif
+!  !
+!  !print*, '(DT.D)-1',norm2(work2(1:NCholesky,1:NCholesky))
+!  !deallocate(work1)
+!  !allocate(work1(NDimX,NCholesky))
+!  !call dgemm('T','N',NDimX,NCholesky,NCholesky,1.0d0,Mon%OV,NDimX,work2,NCholesky,0d0,work1,NDimX)
+!  !print*, 'D(DT.D)-1',norm2(work1)
+!  !! end test : tranpose D
+
+deallocate(ipiv,work3,work2)
+deallocate(Adiag,And)
+deallocate(work1)
+
+end subroutine prepare_cerpa
+
+subroutine prepare_cerpa_ff(Mon,ABPLUS,ABMIN,NBasis)
+! this is only for testing
+implicit none
+
+type(SystemBlock)  :: Mon
+integer,intent(in) :: NBasis
+double precision,intent(in)  :: ABPLUS(Mon%NDimX,Mon%NDimX),&
+                                ABMIN(Mon%NDimX,Mon%NDimX)
+
+character(:),allocatable :: infile
+integer :: NCholesky,NDimX,NOccup
+integer :: i,j,ipq,irs,ip,iq,ir,is,lwork
+integer :: iunit,info
+integer,allocatable :: ipiv(:)
+double precision :: val
+double precision,allocatable :: Adiag(:),And(:,:)
+double precision,allocatable :: work1(:,:),work2(:,:),work3(:)
+double precision,allocatable :: work4(:)
+
+! set dimensions
+NDimX     = Mon%NDimX
+NOccup    = Mon%num0+Mon%num1 
+NCholesky = Mon%NChol
+
+Print*, 'NDimX',    NDimX
+Print*, 'FOdim',    NBasis*NOccup
+Print*, 'NBas  ',   NBasis
+Print*, 'NBas^2',   NBasis**2
+Print*, 'NCholesky',NCholesky
+
+if(Mon%Monomer==1) then
+   infile='CHOL_A'
+elseif(Mon%Monomer==2) then
+   infile='CHOL_B'
+endif
+
+allocate(work1(NDimX,NDimX))
+allocate(Adiag(NDimX),And(NDimX,NDimX))
+
+! create Adiag, And
+call dgemm('N','N',NDimX,NDimX,NDimX,1d0,ABPLUS,NDimX,ABMIN,NDimX,0d0,work1,NDimX)
+
+And   = work1
+Adiag = 0
+do ipq=1,NDimX
+   Adiag(ipq) = work1(ipq,ipq)
+   And(ipq,ipq) = 0d0
+enddo
+print*, 'Adiag',norm2(Adiag(1:NDimX))
+print*, 'And  ',norm2(And(1:NDimX,1:NDimX))
+
+allocate(work2(NCholesky,NCholesky))
+allocate(ipiv(NCholesky))
+
+print*, 'FF: D(NBas**2,NChol)...'
+call dgemm('N','T',NCholesky,NCholesky,NBasis**2,1.0d0,Mon%FF,NCholesky,Mon%FF,NCholesky,0d0,work2,NCholesky)
+
+!  !! test eigenvals
+!  !allocate(work3(NCholesky),work4(NBasis))
+!  !call Diag8(work2,NCholesky,NCholesky,work3,work4)
+!  !
+!  !print*, 'Testing eigenvalues:'
+!  !do i=1,NCholesky
+!  !   if(abs(work3(i)).lt.1d-10) then
+!  !      print*, i, work3(i)
+!  !   endif
+!  !enddo
+!  !
+!  !deallocate(work4,work3)
+!  !
+!  ! end test
+!  
+call dgetrf(NCholesky,NCholesky,work2,NCholesky,ipiv,info)
+print*, 'info-1',info
+if(info<0) then
+   write(lout,*) 'prepare_cerpa: dgetrf ',info,'-th argument had illegal value!'
+   stop
+endif
+allocate(work3(2))
+lwork = -1
+call dgetri(NCholesky,work2,NCholesky,ipiv,work3,lwork,info)
+lwork = int(work3(1))
+deallocate(work3)
+print*, 'lwork',lwork
+allocate(work3(lwork))
+call dgetri(NCholesky,work2,NCholesky,ipiv,work3,lwork,info)
+print*, 'info-2',info,work3(1)
+  
+if(info<0) then
+   write(lout,*) 'prepare_cerpa: dgetri ',info,'-th argument had illegal value!'
+   stop
+endif
+Print*, '(D.DT)-1',norm2(work2(1:NCholesky,1:NCholesky))
+
+! D^T.(D.D^T)-1 = work1
+deallocate(work1)
+allocate(work1(NBasis**2,NCholesky))
+call dgemm('T','N',NBasis**2,NCholesky,NCholesky,1.0d0,Mon%FF,NCholesky,work2,NCholesky,0d0,work1,NBasis**2)
+print*, 'DT(D.DT)-1',norm2(work1(1:NBasis**2,1:NCholesky))
+
+! construct P and Q
+deallocate(work2)
+allocate(work2(NBasis**2,NBasis**2))
+call dgemm('N','N',NBasis**2,NBasis**2,NCholesky,1.0d0,work1,NBasis**2,Mon%FF,NCholesky,0d0,work2,NBasis**2)
+print*, 'Pmat',norm2(work2(1:NBasis**2,1:NBasis**2))
+
+val = 0
+do ipq=1,NBasis**2
+      val = val + abs(work2(ipq,ipq))
+enddo
+print*, 'val', val,NBasis**2
+
+deallocate(work1)
+allocate(work1(NDimX,NDimX))
+
+work1 = 0
+do j=1,NDimX
+   ir=Mon%IndN(j,1)
+   is=Mon%IndN(j,2)
+   irs = is+(ir-1)*NBasis
+   do i=1,NDimX
+      ip=Mon%IndN(i,1)
+      iq=Mon%IndN(i,2)
+      ipq = iq+(ip-1)*NBasis
+      work1(i,j) = work2(ipq,irs)
+   enddo
+enddo
+
+deallocate(work2)
+allocate(work2(NDimX,NDimX))
+
+call dgemm('N','N',NDimX,NDimX,NDimX,1.0d0,And,NDimX,work1,NDimX,0d0,work2,NDimX)
+print*, 'AndQ',norm2(work2(1:NDimX,1:NDimX))
+
+!write(iunit) 'ANDQ    ', work2
+!close(iunit)
+  
+deallocate(ipiv,work3,work2)
+deallocate(Adiag,And)
+deallocate(work1)
+
+end subroutine prepare_cerpa_ff
 
 subroutine prepare_no(OneRdm,OrbAux,OrbCAS,Mon,IFunSR,NBasis)
 implicit none
@@ -2872,6 +3321,12 @@ double precision,parameter :: SmallE=0d0,BigE=1.D20
       write(LOUT,'(1x,a,5x,f15.8)') "CASSCF Energy           ", ECASSCF+Mon%PotNuc
    endif
 
+   ! dump matrices for C-ERPA
+   if(Flags%ICholesky==1) then
+      call prepare_cerpa(Mon,ABPLUS,ABMIN,NBas)
+      call prepare_cerpa_ff(Mon,ABPLUS,ABMIN,NBas)
+   endif
+
    ! UNCOUPLED
 
    allocate(Mon%IndNT(2,Mon%NDim))
@@ -3607,11 +4062,12 @@ double precision :: Factor,PNorm
 
 end subroutine calc_fci
 
-subroutine chol_sapt_NOTransf(A,B,CholeskyVecs,NBasis)
+subroutine chol_sapt_NOTransf(SAPT,A,B,CholeskyVecs,NBasis)
 ! transform Choleksy Vecs from AO to NO
 ! for all 2-index vecs needed in SAPT
 implicit none
 
+type(SaptData)   :: SAPT
 type(SystemBlock)   :: A, B
 type(TCholeskyVecs) :: CholeskyVecs
 integer,intent(in)  :: NBasis
@@ -3637,12 +4093,14 @@ double precision,allocatable :: tmp(:,:)
  call chol_MOTransf(tmp,CholeskyVecs,&
                     A%CMO,1,dimOA,&
                     A%CMO,A%num0+1,NBasis)
+ A%OV = 0
  do i=1,A%NDimX
     ip  = A%IndN(1,i)
     iq  = A%IndN(2,i)
     ipq = iq+(ip-A%num0-1)*dimOA
     A%OV(:,i)= tmp(:,ipq)
  enddo
+ print*, 'A-OV',norm2(A%OV)
  deallocate(tmp)
 
  allocate(tmp(NCholesky,nOVB))
@@ -3650,6 +4108,8 @@ double precision,allocatable :: tmp(:,:)
  call chol_MOTransf(tmp,CholeskyVecs,&
                     B%CMO,1,dimOB,&
                     B%CMO,B%num0+1,NBasis)
+
+ B%OV = 0
  do i=1,B%NDimX
     ip  = B%IndN(1,i)
     iq  = B%IndN(2,i)
@@ -3681,6 +4141,16 @@ double precision,allocatable :: tmp(:,:)
                     B%CMO,1,NBasis,&
                     B%CMO,1,NBasis)
 
+ ! test for Pmat
+ allocate(SAPT%CholVecs(NBasis**2,NCholesky))
+ SAPT%CholVecs = 0
+ do iq=1,NCholesky
+    do ip=1,NBasis**2
+       SAPT%CholVecs(ip,iq) = CholeskyVecs%R(iq,ip) 
+    enddo
+ enddo
+ !call test_pmat(SAPT%CholVecs,A,B,NBasis,NCholesky)
+
  allocate(A%FFAB(NCholesky,NBasis**2),&
           B%FFBA(NCholesky,NBasis**2) )
  ! (FF|AB)
@@ -3702,8 +4172,8 @@ double precision,allocatable :: tmp(:,:)
  !call chol_MOTransf(B%FO,CholeskyVecs,&
  !                   B%CMO,1,NBasis,&
  !                   B%CMO,1,dimOB)
- ! test exchange
- call test_Qmat(A,B,CholeskyVecs,NBasis)
+ !! test exchange
+ !call test_Qmat(A,B,CholeskyVecs,NBasis)
 
 end subroutine chol_sapt_NOTransf
 
@@ -3744,8 +4214,8 @@ call dgemm('N','N',NBas,NBas,NBas,1d0,PB,NBas,USa,NBas,0d0,Qba,NBas)
 call chol_MOTransf(Qmat,CholeskyVecs,&
                    A%CMO,1,dimOA,&
                    Qba,1,dimOA)
-call chol_ints_gen(dimOA,dimOA,A%OO,&
-                   dimOA,dimOA,Qmat,A%NChol,'TWOA3B')
+!call chol_ints_gen(dimOA,dimOA,A%OO,&
+!                   dimOA,dimOA,Qmat,A%NChol,'TWOA3B')
 
 deallocate(Qmat)
 allocate(Qmat(NCholesky,dimOB**2))
@@ -3753,8 +4223,8 @@ allocate(Qmat(NCholesky,dimOB**2))
 call chol_MOTransf(Qmat,CholeskyVecs,&
                    B%CMO,1,dimOB,&
                    Qab,1,dimOB)
-call chol_ints_gen(dimOB,dimOB,B%OO,&
-                   dimOB,dimOB,Qmat,A%NChol,'TWOB3A')
+!call chol_ints_gen(dimOB,dimOB,B%OO,&
+!                   dimOB,dimOB,Qmat,A%NChol,'TWOB3A')
 deallocate(Qmat,Qba,Qab)
 deallocate(PB,PA,S,USb,USa)
 
@@ -5734,6 +6204,12 @@ endif
 if(allocated(SAPT%monB%FFBA)) then
    deallocate(SAPT%monB%FFBA)
 endif
+! test Pmat
+if(allocated(SAPT%CholVecs)) then
+   deallocate(SAPT%CholVecs)
+endif
+
+! end test Cholesky
 
 if(allocated(SAPT%monA%PP)) deallocate(SAPT%monA%PP)
 if(allocated(SAPT%monB%PP)) deallocate(SAPT%monB%PP)

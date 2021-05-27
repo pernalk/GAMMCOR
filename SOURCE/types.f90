@@ -300,6 +300,8 @@ type SaptData
      double precision  :: e2dispinCAS
      double precision  :: exch_part(5)
      double precision,allocatable :: Wind(:),Wdisp(:)
+     ! test Pmat
+     double precision,allocatable :: CholVecs(:,:)
      integer :: InterfaceType = INTER_TYPE_DAL
      integer :: SaptLevel = SAPTLEVEL2
      integer :: NCholesky

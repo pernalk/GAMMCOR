@@ -612,9 +612,9 @@ double precision,external  :: ddot
 print*, 'Testing E1exch NaNb...'
 
 ! set dimensions
- NBas = A%NBasis
- dimOA = A%num0+A%num1
- dimOB = B%num0+B%num1
+NBas = A%NBasis
+dimOA = A%num0+A%num1
+dimOB = B%num0+B%num1
 
 allocate(S(NBas,NBas),Sab(NBas,NBas))
 allocate(Va(NBas,NBas),Vb(NBas,NBas),&
