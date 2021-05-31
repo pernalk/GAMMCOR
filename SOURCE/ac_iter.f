@@ -41,10 +41,8 @@ C
 C   
       ACAlpha=XGrid(I)
 C
-      Call WInteg(ECorrA,TwoNO,XOne,URe,Occ,
-     $ ABPLUS,ABMIN,
-     $ EGOne,NGOcc,
-     $ NBasis,NInte1,NInte2,NDim,NGem,IndAux,ACAlpha,
+      Call WInteg(ECorrA,TwoNO,XOne,URe,Occ,ABPLUS,ABMIN,
+     $ EGOne,NGOcc,NBasis,NInte1,NInte2,NDim,NGem,IndAux,ACAlpha,
      $ IndN,IndX,NDimX)
 C
       Write(*,*)'ACAlpha ',ACAlpha,' W_ALPHA ',ECorrA
@@ -91,7 +89,7 @@ C
       Dimension IPair(NBasis,NBasis)
       Dimension CMAT(NDim*NDim),AIN(NDim*NDim),COM(NDim*NDim)
       Dimension ipiv(NDim),work(NDim)
-      Dimension XGrid(100), WGrid(100)
+      Dimension  XFreq(100),WFreq(100)
 C
       PI = 4.0*ATAN(1.0)
 C
@@ -119,19 +117,15 @@ C
       EndDo
       EndDo
 C
-c      Call ERPASYMM(EigVecR,Eig,ABPLUS,ABMIN,NBasis,NDimX)
-C
-C
 C     Frequency integration of CMAT 
 C
-      NGrid=20
-      X0=0.5D0
-      Call GauLeg(-1.D0,1.D0,XGrid,WGrid,NGrid)
+      NGrid=18
+      Call FreqGrid(XFreq,WFreq,NGrid)
 C   
       COM=0.0 
       Do IGL=1,NGrid
 C
-      OmI=X0*(One+XGrid(IGL))/(One-XGrid(IGL))
+      OmI=XFreq(IGL)
       AIN=Zero
       Do I=1,NDimX
       AIN((I-1)*NDimX+I)=One
@@ -140,12 +134,15 @@ C     ABPLUS*ABMIN+1 Om^2
       Call dgemm('N','N',NDimX,NDimX,NDimX,1d0,ABPLUS,NDimX,
      $           ABMIN,NDimX,OmI**2,AIN,NDimX)
 
-      Call dgetrf(NDimX, NDimX, AIN, NDimX, ipiv, inf1 )
-      Call dgetri(NDimX, AIN, NDimX, ipiv, work, NDimX, inf2 )
-      Call dgemm('N','N',NDimX,NDimX,NDimX,1d0,AIN,NDimX,
-     $           ABPLUS,NDimX,0.0,CMAT,NDimX)
+c      Call dgetrf(NDimX, NDimX, AIN, NDimX, ipiv, inf1 )
+c      Call dgetri(NDimX, AIN, NDimX, ipiv, work, NDimX, inf2 )
+c      Call dgemm('N','N',NDimX,NDimX,NDimX,1d0,AIN,NDimX,
+c     $           ABPLUS,NDimX,0.0,CMAT,NDimX)
+
+      CMAT=ABPLUS
+      Call dgesv(NDimX,NDimX,AIN,NDimX,ipiv,CMAT,NDimX,inf)
 C
-      COM=COM+2.D0/PI*Two*X0*WGrid(IGL)/(One-XGrid(IGL))**2*CMAT
+      COM=COM+2.D0/PI*CMAT*WFreq(IGL)
 C
       EndDo
 C
@@ -181,4 +178,20 @@ C
       Return
       End
 
-
+*Deck FreqGrid
+      Subroutine FreqGrid(XFreq,WFreq,NFreq)
+C
+      Implicit Real*8 (A-H,O-Z)
+      Dimension XFreq(NFreq),WFreq(NFreq)
+C
+      Call GauLeg(-1.D0,1.D0,XFreq,WFreq,NFreq) 
+C
+      X0=0.5D0
+C
+      Do IGL=1,NFreq
+      WFreq(IGL)=2.0d0*X0*WFreq(IGL)/(1.-XFreq(IGL))**2
+      XFreq(IGL)=X0*(1.0d0+XFreq(IGL))/(1.-XFreq(IGL))
+      EndDo
+C
+      Return
+      End

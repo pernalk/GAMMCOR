@@ -89,6 +89,7 @@ double precision :: Tcpu,Twall
       !call e2ind_resp(Flags,SAPT%monA,SAPT%monB,SAPT) ! version using alpha(0)
       ! call e2ind_hf_icphf(Flags,SAPT%monA,SAPT%monB,SAPT) ! works only with HF
        call e2disp(Flags,SAPT%monA,SAPT%monB,SAPT)
+       call e2disp_Cmat(Flags,SAPT%monA,SAPT%monB,SAPT)
        call e2exind(Flags,SAPT%monA,SAPT%monB,SAPT)
        call e2exdisp(Flags,SAPT%monA,SAPT%monB,SAPT)
     endif
@@ -246,6 +247,7 @@ double precision,intent(inout) :: Tcpu,Twall
  call e2ind(Flags,SAPT%monA,SAPT%monB,SAPT)
  call e2exind(Flags,SAPT%monA,SAPT%monB,SAPT)
  call e2disp_Chol(Flags,SAPT%monA,SAPT%monB,SAPT)
+ call e2disp_Cmat(Flags,SAPT%monA,SAPT%monB,SAPT)
  call e2exdisp(Flags,SAPT%monA,SAPT%monB,SAPT)
 
  call summary_sapt(SAPT)
@@ -1407,6 +1409,7 @@ print*, 'D^T.D',norm2(work1(1:NCholesky,1:NCholesky))
 allocate(ipiv(NCholesky))
 call dgetrf(NCholesky,NCholesky,work1,NCholesky,ipiv,info)
 print*, 'info-1',info
+
 allocate(work3(NCholesky**2))
 call dgetri(NCholesky,work1,NCholesky,ipiv,work3,NCholesky**2,info) 
 print*, 'info-2',info
@@ -2981,6 +2984,8 @@ integer :: ip,iq,pq
 integer :: iunit
 integer :: DimEx
 integer :: INegExcit
+!test
+integer :: iter
 
 double precision :: ACAlpha
 double precision :: ECASSCF,ETot,ECorr
@@ -2990,11 +2995,14 @@ character(:),allocatable :: onefile,twofile,propfile,rdmfile
 character(:),allocatable :: twojfile,twokfile
 character(:),allocatable :: propfile0,propfile1
 character(:),allocatable :: y01file,xy0file
-character(:),allocatable :: testfile
+character(:),allocatable :: abfile,testfile
 
 double precision,external  :: ddot
 double precision,parameter :: One = 1d0, Half = 0.5d0
 double precision,parameter :: SmallE=0d0,BigE=1.D20
+
+! test iterative
+ iter = 1
 
 ! set filenames
  if(Mon%Monomer==1) then
@@ -3008,6 +3016,7 @@ double precision,parameter :: SmallE=0d0,BigE=1.D20
     y01file    = 'Y01_A'
     xy0file    = 'XY0_A'
     rdmfile    = 'rdm2_A.dat'
+    abfile     = 'ABMAT_A'
     testfile   = 'TEST_A'
  elseif(Mon%Monomer==2) then
     onefile    = 'ONEEL_B'
@@ -3020,6 +3029,7 @@ double precision,parameter :: SmallE=0d0,BigE=1.D20
     y01file    = 'Y01_B'
     xy0file    = 'XY0_B'
     rdmfile    = 'rdm2_B.dat'
+    abfile     = 'ABMAT_B'
     testfile   = 'TEST_B'
  endif
 
@@ -3222,6 +3232,14 @@ double precision,parameter :: SmallE=0d0,BigE=1.D20
    !                due to poor quality of deexcitation energies from ERPA (in general)
    !if(Mon%InSt(1,1)<0.or.Mon%InSt(1,1)==1) then
 
+   if(iter==1) then
+      ! dump matrices for iterative C-ERPA
+      open(newunit=iunit,file=abfile,form='unformatted')
+      write(iunit) ABPlus
+      write(iunit) ABMin
+      close(iunit)
+   endif
+
    write(lout,'(1x,a/)') 'Solving symmetric eigenvalue equation...'
 
    allocate(Mon%EigY(Mon%NDimX**2),Mon%EigX(Mon%NDimX**2),&
@@ -3321,10 +3339,9 @@ double precision,parameter :: SmallE=0d0,BigE=1.D20
       write(LOUT,'(1x,a,5x,f15.8)') "CASSCF Energy           ", ECASSCF+Mon%PotNuc
    endif
 
-   ! dump matrices for C-ERPA
    if(Flags%ICholesky==1) then
-      call prepare_cerpa(Mon,ABPLUS,ABMIN,NBas)
-      call prepare_cerpa_ff(Mon,ABPLUS,ABMIN,NBas)
+      !call prepare_cerpa(Mon,ABPLUS,ABMIN,NBas)
+      !call prepare_cerpa_ff(Mon,ABPLUS,ABMIN,NBas)
    endif
 
    ! UNCOUPLED
@@ -4143,12 +4160,12 @@ double precision,allocatable :: tmp(:,:)
 
  ! test for Pmat
  allocate(SAPT%CholVecs(NBasis**2,NCholesky))
- SAPT%CholVecs = 0
- do iq=1,NCholesky
-    do ip=1,NBasis**2
-       SAPT%CholVecs(ip,iq) = CholeskyVecs%R(iq,ip) 
-    enddo
- enddo
+ !SAPT%CholVecs = 0
+ !do iq=1,NCholesky
+ !   do ip=1,NBasis**2
+ !      SAPT%CholVecs(ip,iq) = CholeskyVecs%R(iq,ip)
+ !   enddo
+ !enddo
  !call test_pmat(SAPT%CholVecs,A,B,NBasis,NCholesky)
 
  allocate(A%FFAB(NCholesky,NBasis**2),&

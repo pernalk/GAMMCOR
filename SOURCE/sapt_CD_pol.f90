@@ -98,7 +98,7 @@ double precision :: e2du,dea,deb
 double precision :: inv_omega
 ! for Be ERPA:
 !double precision,parameter :: SmallE = 1.D-1
-double precision,parameter :: BigE = 1.D8 
+double precision,parameter :: BigE = 1.D8
 double precision,parameter :: SmallE = 1.D-3
 
 ! Parameter(SmallE=1.D-3,BigE=1.D8)
@@ -107,11 +107,11 @@ double precision,parameter :: SmallE = 1.D-3
     write(LOUT,'(1x,a)') 'ERROR! MCBS not implemented in SAPT!'
     stop
  else
-    NBas = A%NBasis 
+    NBas = A%NBasis
  endif
 
 ! print thresholds
- if(SAPT%IPrint>1) then 
+ if(SAPT%IPrint>1) then
     write(LOUT,'(/,1x,a)') 'Thresholds in E2disp:'
     write(LOUT,'(1x,a,t18,a,e15.4)') 'SmallE','=', SmallE
     write(LOUT,'(1x,a,t18,a,e15.4)') 'BigE',  '=', BigE
@@ -138,7 +138,7 @@ double precision,parameter :: SmallE = 1.D-3
  ! uncoupled - works for CAS only
  if(Flags%ICASSCF==1) then
     allocate(Y01BlockA(A%NDimX),Y01BlockB(B%NDimX))
-    
+
     call convert_XY0_to_Y01(A,Y01BlockA,OmA0,NBas,'XY0_A')
     call convert_XY0_to_Y01(B,Y01BlockB,OmB0,NBas,'XY0_B')
  endif
@@ -174,11 +174,11 @@ if(.not.(Flags%ICASSCF==0.and.Flags%ISERPA==0)) then
                work(rs)
 
        do i=1,A%NDimX
-          tmp1(i,rs) = tmp1(i,rs) + & 
+          tmp1(i,rs) = tmp1(i,rs) + &
                        fact * &
                        EVecA(pq+(i-1)*A%NDimX)
        enddo
- 
+
        associate(Y => Y01BlockA(pq))
           tmp01(Y%l1:Y%l2,rs) = tmp01(Y%l1:Y%l2,rs) + fact * Y%vec0(1:Y%n)
        end associate
@@ -191,7 +191,7 @@ if(.not.(Flags%ICASSCF==0.and.Flags%ISERPA==0)) then
  ! uncoupled
  tmp02=0
  do rs=1,B%NDimX
-    associate(Y => Y01BlockB(rs)) 
+    associate(Y => Y01BlockB(rs))
       call dger(A%NDimX,Y%n,1d0,tmp01(:,rs),1,Y%vec0,1,tmp02(:,Y%l1:Y%l2),A%NDimX)
     end associate
  enddo
@@ -211,9 +211,9 @@ elseif(Flags%ICASSCF==0.and.Flags%ISERPA==0) then
        fact = (A%CICoef(iq)+A%CICoef(ip)) * &
               (B%CICoef(is)+B%CICoef(ir)) * &
                work(rs)
-  
+
        do i=1,A%NDimX
-          tmp1(i,rs) = tmp1(i,rs) + & 
+          tmp1(i,rs) = tmp1(i,rs) + &
                        fact * &
                        EVecA(pq+(i-1)*A%NDimX)
        enddo
@@ -230,7 +230,7 @@ elseif(Flags%ICASSCF==0.and.Flags%ISERPA==0) then
        tmp2(i,j) = tmp2(i,j) + &
                     EVecB(rs+(j-1)*B%NDimX)*tmp1(i,rs)
        enddo
-    enddo  
+    enddo
  enddo
 
 endif ! end GVB select
@@ -240,7 +240,7 @@ if(.not.(Flags%ICASSCF==0.and.Flags%ISERPA==0)) then
     e2du = 0d0
     do j=1,B%NDimX
        do i=1,A%NDimX
-   
+
           if(abs(OmA0(i)).gt.SmallE.and.abs(OmB0(j)).gt.SmallE&
              .and.abs(OmA0(i)).lt.BigE.and.abs(OmB0(j)).lt.BigE) then
 
@@ -259,7 +259,7 @@ if(.not.(Flags%ICASSCF==0.and.Flags%ISERPA==0)) then
 
 endif
 
- allocate(condOmA(A%NDimX),condOmB(B%NDimX)) 
+ allocate(condOmA(A%NDimX),condOmB(B%NDimX))
  condOmA = (abs(OmA).gt.SmallE.and.abs(OmA).lt.BigE)
  condOmB = (abs(OmB).gt.SmallE.and.abs(OmB).lt.BigE)
 
@@ -311,11 +311,252 @@ endif
     enddo
     deallocate(Y01BlockB,Y01BlockA)
  endif
- 
+
  deallocate(condOmB,condOmA)
  deallocate(tmp02,tmp01,tmp2,tmp1)
  deallocate(OmB0,OmA0,OmB,EVecB,OmA,EVecA)
 
 end subroutine e2disp_Chol
+
+subroutine e2disp_Cmat(Flags,A,B,SAPT)
+! calculate 2nd order dispersion energy
+! use C(omega)
+! in coupled and uncoupled approximations
+implicit none
+
+type(FlagsData)   :: Flags
+type(SystemBlock) :: A, B
+type(SaptData)    :: SAPT
+type(Y01BlockData),allocatable :: Y01BlockA(:),Y01BlockB(:)
+
+integer :: NBas
+integer :: dimOA,dimVA,dimOB,dimVB,nOVA,nOVB
+integer :: ifreq,NFreq,NCholesky
+integer :: i,j,ipq,irs
+integer :: ip,iq,ir,is
+integer :: iunit,info
+double precision :: fact,val
+double precision :: Omega,Pi,e2d
+double precision,allocatable :: ABPMA(:,:),ABPMB(:,:),&
+                                ABPLUSA(:,:),ABPLUSB(:,:)
+double precision,allocatable :: CA(:,:),CB(:,:)
+double precision,allocatable :: XFreq(:),WFreq(:)
+double precision,allocatable :: work(:,:),ints(:)
+
+double precision,parameter :: BigE = 1.D8
+double precision,parameter :: SmallE = 1.D-3
+
+! Parameter(SmallE=1.D-3,BigE=1.D8)
+
+! check MCBS/DCBS
+if(A%NBasis.ne.B%NBasis) then
+   write(LOUT,'(1x,a)') 'ERROR! MCBS not implemented in SAPT!'
+   stop
+else
+   NBas = A%NBasis
+endif
+
+! set dimensions
+dimOA = A%num0+A%num1
+dimOB = B%num0+B%num1
+dimVA = A%num1+A%num2
+dimVB = B%num1+B%num2
+nOVA  = dimOA*dimVA
+nOVB  = dimOB*dimVB
+
+Pi = 4.0d0*atan(1.0)
+
+! get ABPM = ABPLUS.ABMIN
+allocate(ABPMA(A%NDimX,A%NDimX),ABPMB(B%NDimX,B%NDimX),&
+         ABPLUSA(A%NDimX,A%NDimX),ABPLUSB(B%NDimX,B%NDimX))
+allocate(work(A%NDimX,A%NDimX))
+
+open(newunit=iunit,file='ABMAT_A',status='OLD',&
+     access='SEQUENTIAL',form='UNFORMATTED')
+
+read(iunit) ABPLUSA
+read(iunit) work
+
+close(iunit)
+call dgemm('N','N',A%NDimX,A%NDimX,A%NDimX,1d0,ABPLUSA,A%NDimX,work,A%NDimX,0d0,ABPMA,A%NDimX)
+
+deallocate(work)
+allocate(work(B%NDimX,B%NDimX))
+
+open(newunit=iunit,file='ABMAT_B',status='OLD',&
+     access='SEQUENTIAL',form='UNFORMATTED')
+
+read(iunit) ABPLUSB
+read(iunit) work
+
+close(iunit)
+call dgemm('N','N',B%NDimX,B%NDimX,B%NDimX,1d0,ABPLUSB,B%NDimX,work,B%NDimX,0d0,ABPMB,B%NDimX)
+
+deallocate(work)
+
+!print*, 'ABPLUS-A',norm2(ABPLUSA(1:A%NDimX,1:A%NDimX))
+!print*, 'ABPLUS-B',norm2(ABPLUSB)
+!print*, 'ABPMA   ',norm2(ABPMA)
+!print*, 'ABPMB   ',norm2(ABPMB)
+
+! frequency integration
+NFreq = 18
+allocate(XFreq(NFreq),WFreq(NFreq))
+
+call FreqGrid(XFreq,WFreq,NFreq)
+
+allocate(CB(B%NDimX,B%NDimX))
+allocate(ints(NBas**2),work(A%NDimX,B%NDimX))
+
+e2d = 0
+do ifreq=1,NFreq
+
+   Omega = XFreq(ifreq)
+
+   allocate(CA(A%NDimX,A%NDimX))
+
+   !print*, ifreq,WFreq(ifreq),Omega
+
+   if(Flags%ICholesky==1) then
+     print*, 'Cholesky Cmat not ready yet! Aborting...'
+     !call get_Cmat(CA,A%CICoef,A%IndN,ABPMA,ABPLUSA,Omega,A%NDimX,NBas)
+     return
+   else
+      call get_Cmat(CA,A%CICoef,A%IndN,ABPMA,ABPLUSA,Omega,A%NDimX,NBas)
+      call get_Cmat(CB,B%CICoef,B%IndN,ABPMB,ABPLUSB,Omega,B%NDimX,NBas)
+   endif
+
+   open(newunit=iunit,file='TWOMOAB',status='OLD',&
+        access='DIRECT',form='UNFORMATTED',recl=8*nOVB)
+
+   ints = 0
+   work = 0
+   do ipq=1,A%NDimX
+      ip = A%IndN(1,ipq)
+      iq = A%IndN(2,ipq)
+      read(iunit,rec=iq+(ip-A%num0-1)*dimOA) ints(1:nOVB)
+
+      do irs=1,B%NDimX
+         ir = B%IndN(1,irs)
+         is = B%IndN(2,irs)
+
+         fact = ints(is+(ir-B%num0-1)*dimOB)
+
+         do i=1,A%NDimX
+            work(i,irs) = work(i,irs) + fact*CA(ipq,i)
+         enddo
+
+      enddo
+   enddo
+
+   deallocate(CA)
+   allocate(CA(B%NDimX,B%NDimX))
+   CA = 0
+   ints = 0
+   do ipq=1,A%NDimX
+      ip = A%IndN(1,ipq)
+      iq = A%IndN(2,ipq)
+      read(iunit,rec=iq+(ip-A%num0-1)*dimOA) ints(1:nOVB)
+
+      do irs=1,B%NDimX
+         ir = B%IndN(1,irs)
+         is = B%IndN(2,irs)
+
+         fact = ints(is+(ir-B%num0-1)*dimOB)
+         do j=1,B%NDimX
+            CA(irs,j) = CA(irs,j) + fact*work(ipq,j)
+         enddo
+
+      enddo
+
+   enddo
+
+   val = 0
+   do j=1,B%NDimX
+      do i=1,B%NDimX
+         val = val + CA(j,i)*CB(i,j)
+      enddo
+   enddo
+   e2d = e2d + WFreq(ifreq)*val
+
+   close(iunit)
+   deallocate(CA)
+
+enddo ! NFreq
+
+SAPT%e2disp = -8d0/Pi*e2d
+e2d = -8d0/Pi*e2d*1d3
+
+call print_en('E2disp',e2d,.true.)
+
+deallocate(ints,work)
+deallocate(WFreq,XFreq)
+deallocate(CB)
+deallocate(ABPMB,ABPMA,ABPLUSB,ABPLUSA)
+
+end subroutine e2disp_Cmat
+
+subroutine get_Cmat(Cmat,CICoef,IndN,ABPM,ABPLUS,Omega,NDimX,NBas)
+implicit none
+
+integer,intent(in) :: NDimX,NBas,IndN(2,NBas)
+double precision,intent(in)  :: CICoef(NBas),Omega
+double precision,intent(in)  :: ABPM(NDimX,NDimX),ABPLUS(NDimX,NDimX)
+double precision,intent(out) :: Cmat(NDimX,NDimX)
+
+integer          :: info,lwork
+integer          :: i,ipq,irs,ip,iq,ir,is
+double precision :: fact_rs,fact_pq
+integer,allocatable :: ipiv(:)
+double precision,allocatable :: work(:,:),work1(:)
+
+allocate(work(NDimX,NDimX),ipiv(NDimX))
+work = ABPM
+do i=1,NDimX
+   work(i,i) = work(i,i) + Omega**2
+enddo
+
+! work=(ABPM+omega^2)-1.ABPLUS
+!...
+
+! this is slower
+!call dgetrf(NDimX,NDimX,work,NDimX,ipiv,info)
+!print*, 'info1',info
+!allocate(work1(1))
+!lwork = -1
+!call dgetri(NDimX,work,NDimX,ipiv,work1,lwork,info)
+!lwork = int(work1(1))
+!print*, 'lwork:',lwork
+!deallocate(work1)
+!allocate(work1(lwork))
+!call dgetri(NDimX,work,NDimX,ipiv,work1,lwork,info)
+!print*, 'info2',info
+!!
+!! Cmat=work.ABPLUS
+!call dgemm('N','N',NDimX,NDimX,NDimX,1d0,work,NDimX,ABPLUS,NDimX,0d0,Cmat,NDimX)
+!
+! deallocate(work1)
+!
+Cmat = ABPlus
+call dgesv(NDimX,NDimX,work,NDimX,ipiv,Cmat,NDimX,info)
+!print*, 'info',info
+!print*, 'Cmat',norm2(Cmat)
+
+!
+do irs=1,NDimX
+   ir = IndN(1,irs)
+   is = IndN(2,irs)
+   fact_rs = CICoef(ir)+CICoef(is)
+   do ipq=1,NDimX
+      ip = IndN(1,ipq)
+      iq = IndN(2,ipq)
+      fact_pq = CICoef(ip)+CICoef(iq)
+      Cmat(ipq,irs) = fact_rs*fact_pq*Cmat(ipq,irs)
+   enddo
+enddo
+
+deallocate(ipiv,work)
+
+end subroutine get_Cmat
 
 end module sapt_CD_pol
