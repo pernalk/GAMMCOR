@@ -1223,6 +1223,10 @@ character(:),allocatable :: rdmfile
 
  call triang_to_sq2(OneRdm,OrbAux,NBasis)
  call Diag8(OrbAux,NBasis,NBasis,Eval,work)
+! KP : it may happen that an active orbital has a negative tiny occupation. set it to a positive
+ do i=1,Nbasis
+ Eval(i)=Abs(Eval(i)) 
+ enddo
 ! call dsyev('V','U',NBasis,OrbAux,NBasis,EVal,work,3*NBasis,info)
  call SortOcc(EVal,OrbAux,NBasis)
 
