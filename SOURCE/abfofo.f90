@@ -1750,15 +1750,15 @@ end associate
 end subroutine AC0CAS_FOFO
 
 subroutine Y01CAS_FOFO(Occ,URe,XOne,ABPLUS,ABMIN,ETot, &
-     propfile0,propfile1, & 
-     y01file, xy0file, & 
+     propfile0,propfile1, &
+     y01file, xy0file, &
      IndN,IndX,IGemIN,NAct,INActive,NDimX,NBasis,NDim,NInte1, &
      NoSt,IntFileName,IntJFile,IntKFile,IFlag0)
 !
-!     A ROUTINE FOR COMPUTING Y VECTORS AND EIGENVALUES OF ERPA 
+!     A ROUTINE FOR COMPUTING Y VECTORS AND EIGENVALUES OF ERPA
 !     IN THE 1ST-ORDER APPROXIMATION (USED IN SAPT)
 !
-!     IFlag0 = 1 - compute only 0th-order Y [EigY] and 0th-order omega [Eig] 
+!     IFlag0 = 1 - compute only 0th-order Y [EigY] and 0th-order omega [Eig]
 !              0 - compute both 0th-order and 1st-order Y [EigY1] and omega [Eig1]
 use timing
 !

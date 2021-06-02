@@ -1010,10 +1010,12 @@ C
       use types
       use sorter
       use tran
+      use Cholesky
       use abmat 
 C
       Implicit Real*8 (A-H,O-Z)
-      Parameter (Zero=0.D0,Half=0.5D0,One=1.D0,Two=2.D0)
+      Parameter (Half=0.5D0)
+C      Parameter (Zero=0.D0,Half=0.5D0,One=1.D0,Two=2.D0)
 C
       Real*8 XKin(NInte1),XNuc(NInte1),TwoEl(NInte2),
      $ UAOMO(NBasis,NBasis),URe(NBasis,NBasis),Occ(NBasis),
@@ -1028,6 +1030,8 @@ C
      $ GammaF(NInte1),FockF(NInte1),GammaAB(NInte1),
      $ work1(NBasis,NBasis)
       Integer(8) :: MemSrtSize
+      Type(TCholeskyVecs) :: CholeskyVecs
+      Real*8, Allocatable :: MatFF(:,:)
 C
       Character*60 FName,Aux1,Title
 C
@@ -1119,6 +1123,8 @@ C     HAP
      $     .true.,NInte1)
 C
 C     memory allocation for sorter
+c      MemType=3
+c      MemVal=2
       MemSrtSize=MemVal*1024_8**MemType
 C     KP: If IFunSR=6 integrals are not needed and are not loaded
       If (IFunSR.Eq.0.Or.IFunSR.Eq.3.Or.IFunSR.Eq.5) Then
@@ -1127,6 +1133,14 @@ C     KP: If IFunSR=6 integrals are not needed and are not loaded
       ElseIf(IFunSR.Eq.1.Or.IFunSR.Eq.2.Or.IFunSR.Eq.4) Then
       Call readtwoint(NBasis,2,'AOTWOINT.erf','AOERFSORT',MemSrtSize)
       If(ITwoEl.Eq.1) Call LoadSaptTwoEl(4,TwoEl,NBasis,NInte2)
+      EndIf
+C
+      If(ICholesky==1) Then
+      ICholeskyAccu = 1
+      Call chol_CoulombMatrix(CholeskyVecs,'AOTWOSORT',ICholeskyAccu)
+      NCholesky=CholeskyVecs%NCholesky
+      Print*, 'ICholesky',ICholesky
+      Print*, 'NCholesky',NCholesky
       EndIf
 C
 C     LOAD AO TO CAS_MO ORBITAL TRANSFORMATION MATRIX FROM uaomo.dat
@@ -1418,6 +1432,8 @@ C     PREPARE POINTERS: NOccup=num0+num1
 C     TRANSFORM J AND K
       UAux=transpose(UAOMO)
       If (IFunSR.Eq.0.Or.IFunSR.Eq.3.Or.IFunSR.Eq.5) Then
+C     This use of Cholesky is for test only 
+      If (ICholesky==0) Then
       Call tran4_gen(NBasis,
      $        Num0+Num1,UAux(1:NBasis,1:(Num0+Num1)),
      $        Num0+Num1,UAux(1:NBasis,1:(Num0+Num1)),
@@ -1430,6 +1446,14 @@ C     TRANSFORM J AND K
      $        NBasis,UAux,
      $        Num0+Num1,UAux(1:NBasis,1:(Num0+Num1)),
      $        'FOFO','AOTWOSORT')
+      ElseIf (ICholesky==1) Then
+      Print*, 'here finished! prepare ffoo/fofo!'
+      stop
+      Allocate(MatFF(NCholesky,NBasis**2))
+      Call chol_MOTransf(MatFF,CholeskyVecs,
+     $                   UAux,1,NBasis,
+     $                   UAux,1,NBasis)
+      EndIf
 C     TEST MITHAP
 C      call tran4_full(NBasis,UAux,UAux,'TWOMO','AOTWOSORT')
 C
