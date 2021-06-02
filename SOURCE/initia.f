@@ -1136,7 +1136,7 @@ C     KP: If IFunSR=6 integrals are not needed and are not loaded
       EndIf
 C
       If(ICholesky==1) Then
-      ICholeskyAccu = 1
+      ICholeskyAccu = 3
       Call chol_CoulombMatrix(CholeskyVecs,'AOTWOSORT',ICholeskyAccu)
       NCholesky=CholeskyVecs%NCholesky
       Print*, 'ICholesky',ICholesky
@@ -1447,12 +1447,18 @@ C     This use of Cholesky is for test only
      $        Num0+Num1,UAux(1:NBasis,1:(Num0+Num1)),
      $        'FOFO','AOTWOSORT')
       ElseIf (ICholesky==1) Then
-      Print*, 'here finished! prepare ffoo/fofo!'
-      stop
       Allocate(MatFF(NCholesky,NBasis**2))
       Call chol_MOTransf(MatFF,CholeskyVecs,
      $                   UAux,1,NBasis,
      $                   UAux,1,NBasis)
+C
+      Call chol_ints_fofo(NBasis,Num0+Num1,MatFF,
+     $                    NBasis,Num0+Num1,MatFF,
+     $                    NCholesky,NBasis,'FOFO')
+      Call chol_ints_fofo(NBasis,NBasis,MatFF,
+     $                    Num0+Num1,Num0+Num1,MatFF,
+     $                    NCholesky,NBasis,'FFOO')
+C
       EndIf
 C     TEST MITHAP
 C      call tran4_full(NBasis,UAux,UAux,'TWOMO','AOTWOSORT')
