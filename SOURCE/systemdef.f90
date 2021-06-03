@@ -129,7 +129,7 @@ else
 
   ! set Cholesky decomposition
    Flags%ICholesky    = Input%CalcParams%Cholesky
-   Flags%CholeskyAccu = Input%CalcParams%CholeskyAccu
+   Flags%ICholeskyAccu = Input%CalcParams%CholeskyAccu
 
   ! reduce virtuals
    Flags%IRedVirt = Input%CalcParams%RedVirt

@@ -1136,11 +1136,8 @@ C     KP: If IFunSR=6 integrals are not needed and are not loaded
       EndIf
 C
       If(ICholesky==1) Then
-      ICholeskyAccu = 3
       Call chol_CoulombMatrix(CholeskyVecs,'AOTWOSORT',ICholeskyAccu)
       NCholesky=CholeskyVecs%NCholesky
-      Print*, 'ICholesky',ICholesky
-      Print*, 'NCholesky',NCholesky
       EndIf
 C
 C     LOAD AO TO CAS_MO ORBITAL TRANSFORMATION MATRIX FROM uaomo.dat

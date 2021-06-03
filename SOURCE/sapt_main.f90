@@ -953,7 +953,7 @@ double precision :: Tcpu,Twall
 ! perform Cholesky decomposition
  if(Flags%ICholesky==1) then
 
-    call chol_CoulombMatrix(CholeskyVecs,'AOTWOSORT',Flags%CholeskyAccu)
+    call chol_CoulombMatrix(CholeskyVecs,'AOTWOSORT',Flags%ICholeskyAccu)
     !call chol_CoulombMatrix(CholeskyVecs,'AOTWOSORT',CHOL_ACCURACY_LUDICROUS)
     !call chol_CoulombMatrix(CholeskyVecs,'AOTWOSORT',CHOL_ACCURACY_TIGHT)
     !call chol_CoulombMatrix(CholeskyVecs,'AOTWOSORT',CHOL_ACCURACY_DEFAULT)

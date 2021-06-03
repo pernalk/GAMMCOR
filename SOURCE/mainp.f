@@ -66,6 +66,7 @@ C     FILL COMMONS AND CONSTANTS
       Title   = Flags%JobTitle
       ITwoEl  = Flags%ITwoEl
       ICholesky = Flags%ICholesky
+      ICholeskyAccu = Flags%ICholeskyAccu
       MemVal  = Flags%MemVal
       MemType = Flags%MemType
       IWarn   = 0
@@ -335,6 +336,7 @@ C      Write(6,'(8a10)') ('**********',i=1,9)
       EndIf
 C
       If(ITwoEl.Eq.2)  Call delfile('TWOMO')
+      Call delfile('AOTWOSORT')
 C
       Call free_System(System)
       Call clock(PossibleJobType(Flags%JobType),Tcpu,Twall)

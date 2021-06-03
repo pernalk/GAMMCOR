@@ -235,7 +235,7 @@ type FlagsData
      integer :: ITwoEl    = TWOMO_INCORE 
      integer :: IRedVirt  = FLAG_REDVIRT
      integer :: ICholesky = FLAG_CHOLESKY
-     integer :: CholeskyAccu = CHOL_ACCU_DEFAULT
+     integer :: ICholeskyAccu = CHOL_ACCU_DEFAULT
      integer :: IFun      = 13
      integer :: IFunSR    = 0 
      integer :: IFunSRKer = 0
