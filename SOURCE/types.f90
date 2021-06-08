@@ -163,11 +163,8 @@ type SystemBlock
       logical :: reduceV = .false.
       ! for cubic SAPT
       double precision :: ACAlpha0  = 1.d-10
-! herer
       double precision :: ACAlpha1  = 0.01d0
       double precision :: ACAlpha2  = 0.45d0
-!      double precision :: ACAlpha1  = 0.005d0
-!      double precision :: ACAlpha2  = 0.01d0
       ! ThrAct for active geminals selection
       double precision :: ThrAct    = 0.992d0
       double precision :: ThrSelAct = 1.d-8

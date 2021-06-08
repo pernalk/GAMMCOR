@@ -307,7 +307,6 @@ C
 C      
       Do I=1,NBasis
 C
-C
     7 Read(10,'(A100)',End=333)Aux1
       Write(20,'(A100)') Aux1
       If(Aux1(1:6).Eq." Spin=") Then
