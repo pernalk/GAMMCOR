@@ -1259,6 +1259,10 @@ character(:),allocatable :: rdmfile
 
  call triang_to_sq2(OneRdm,OrbAux,NBasis)
  call Diag8(OrbAux,NBasis,NBasis,Eval,work)
+! KP : it may happen that an active orbital has a negative tiny occupation. set it to a positive
+ do i=1,Nbasis
+ Eval(i)=Abs(Eval(i)) 
+ enddo
 ! call dsyev('V','U',NBasis,OrbAux,NBasis,EVal,work,3*NBasis,info)
  call SortOcc(EVal,OrbAux,NBasis)
 
@@ -4865,8 +4869,7 @@ endif
                      (Flags%IFlCore==0.and.&
                      mon%Occ(i)/=1d0.and.mon%Occ(j)/=1d0) ) then
                      ! exclude pairs of nearly/virtual orbitals
-
-                     if(abs(mon%Occ(i)+mon%Occ(j)).lt.1.D-7) then
+                      if(abs(mon%Occ(i)+mon%Occ(j)).lt.Mon%ThrQVirt) then
                         write(LOUT,'(1x,a,2x,2i4)') 'Discarding nearly virtual-orbitals pair',i,j
                      elseif(abs(mon%Occ(i)+mon%Occ(j)-2d0).gt.1.D-10) then
 

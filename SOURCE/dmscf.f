@@ -241,6 +241,103 @@ C
       Return
       End
 
+
+*Deck MoldenCAS
+      Subroutine MoldenCAS(Occ,UAONO,NBasis)
+C
+C     writes NO orbitals to cas_ss.molden file, created from the 
+C     existing (!) cas.molden file with AOs and UAONO
+C     useful when sa-cas is run in molpro (molpro prints to molden 
+C     state-averaged cas orbitals 
+C
+C     WARNING! it is absolutely necessary to use "CARTESIAN" AO's in molpro
+C     (in molden cartesian gaussians are assumed)
+C
+      Implicit Real*8 (A-H,O-Z)
+C
+      Character*60 Title,FMultTab
+      Include 'commons.inc'
+C 
+      Character*60 FName,FName2
+      Character*100 Line,Aux1
+      Character*10 Str
+      Logical EX
+C
+      Parameter(Zero=0.0D0,One=1.0D0,Two=2.D0)
+C
+      Dimension Occ(NBasis),UAONO(NBasis,NBasis)
+C
+C     OPEN cas.molden file
+C
+      Title="cas"
+C
+      Do I=1,60
+      FName(I:I)=' '
+      FName2(I:I)=' '
+      EndDo
+C
+      K=0
+    5 K=K+1
+      If (Title(K:K).Ne.' ') Then
+      FName(K:K)=Title(K:K)
+      FName2(K:K)=Title(K:K)
+      GoTo 5
+      EndIf
+      FName(K:K+7)='.molden'
+      FName2(K:K+11)='_ss.molden'
+C
+      INQUIRE(file=FName,EXIST=EX)
+      If(EX) Then
+      Write(6,'(/," ** cas_ss.molden will be created with NOs **",/)')
+      Else
+      Return
+      EndIf
+C      
+      Open(10,File=FName)
+      Open(20,File=Fname2)
+C
+    2 Read(10,'(A100)')Aux1
+      Write(20,'(A100)') Aux1
+      If(Aux1(1:4).Eq."[MO]") Then
+      GoTo 20
+      EndIf
+      GoTo 2
+C
+   20 Continue
+C      
+      Do I=1,NBasis
+C
+    7 Read(10,'(A100)',End=333)Aux1
+      Write(20,'(A100)') Aux1
+      If(Aux1(1:6).Eq." Spin=") Then
+      GoTo 27
+      EndIf
+      GoTo 7
+   27 Continue
+C
+      Read(10,'(A100)')Aux1
+      Write(20,'(" Occup=",F12.6)') Two*Occ(I)
+C
+      Do J=1,NBasis
+      Read(10,'(A100)')Aux1
+      If(J.Lt.10) Write(20,'(I1,F21.14)')J,UAONO(I,J)
+      If(J.Ge.10.And.J.Lt.100) Write(20,'(I2,F21.14)')J,UAONO(I,J) 
+      If(J.Ge.100.And.J.Lt.1000) Write(20,'(I3,F21.14)')J,UAONO(I,J) 
+      EndDo
+C
+      EndDo 
+C
+    9 Read(10,'(A100)',End=333)Aux1
+      Write(20,'(A100)') Aux1
+      GoTo 9
+  333 Continue
+C
+      Close(10)
+      Close(20)
+C
+      Return
+      End
+
 *Deck MoldenPrep
       Subroutine MoldenPrep(Title,Occ,UAONO,NGem,NBasis)
 C

@@ -313,6 +313,11 @@ C
       Call LdInteg(Title,XKin,XNuc,ENuc,Occ,URe,TwoEl,UMOAO,NInte1,
      $ NBasis,NInte2,NGem)
 C
+C     create cas_ss.molden file with NOs (useful after SA-CAS calculations to inspect 
+C     the character of NOs in a state requested in input.inp)
+C
+      Call MoldenCAS(Occ,UMOAO,NBasis)
+C
 C     set back IFunSR to IFFSR
       If(IFFSR.Ne.0) IFunSR=IFFSR
 C
