@@ -4797,6 +4797,8 @@ endif
  mon%IPair(1:nbas,1:nbas) = 0
 
  if(Flags%ICASSCF==0) then
+    write(LOUT,'(1x,a,e15.5)') 'Threshold for active orbitals:     ', mon%ThrSelAct
+    write(LOUT,'(1x,a,e15.5)') 'Threshold for quasi-virtual orbital', mon%ThrQVirt
  ! allocate(mon%IndXh(mon%NDim))
 
     ij=0
@@ -4810,7 +4812,8 @@ endif
              ! do not correlate active degenerate orbitals from different geminals
              if((mon%IGem(i).ne.mon%IGem(j)).and.&
                   (mon%IndAux(i)==1).and.(mon%IndAux(j)==1).and.&
-                  (Abs(mon%Occ(i)-mon%Occ(j))/mon%Occ(i).lt.1.d-2)) then
+                  !(Abs(mon%Occ(i)-mon%Occ(j))/mon%Occ(i).lt.1.d-2)) then
+                  (Abs(mon%Occ(i)-mon%Occ(j))/mon%Occ(i).lt.mon%ThrSelAct)) then
 
                 write(LOUT,'(1x,a,2x,2i4)') 'Discarding nearly degenerate pair',i,j
              else
@@ -4819,13 +4822,18 @@ endif
                      (Flags%IFlCore==0.and.&
                      mon%Occ(i)/=1d0.and.mon%Occ(j)/=1d0) ) then
 
-                   ind = ind + 1
-                   mon%IndX(ind) = ij
-                   ! mon%IndXh(ind) = ind
-                   mon%IndN(1,ind) = i
-                   mon%IndN(2,ind) = j
-                   mon%IPair(i,j) = 1
-                   mon%IPair(j,i) = 1
+                     if(abs(mon%Occ(i)+mon%Occ(j)).lt.mon%ThrQVirt) then
+                        write(LOUT,'(1x,a,2x,2i4)') 'Discarding nearly virtual-orbitals pair',i,j
+                     elseif(abs(mon%Occ(i)+mon%Occ(j)-2d0).gt.1.D-10) then
+
+                       ind = ind + 1
+                       mon%IndX(ind) = ij
+                       ! mon%IndXh(ind) = ind
+                       mon%IndN(1,ind) = i
+                       mon%IndN(2,ind) = j
+                       mon%IPair(i,j) = 1
+                       mon%IPair(j,i) = 1
+                     endif
 
                 endif
              endif
@@ -4837,6 +4845,7 @@ endif
 
  elseif(Flags%ICASSCF==1.and.Flags%ISERPA==0) then
     write(LOUT,'(1x,a,e15.5)') 'Threshold for active orbitals: ', mon%ThrSelAct
+    write(LOUT,'(2x,a,2e15.5)') 'Threshold for quasi-virtual orbital', mon%ThrQVirt
 
     if(mon%NCen==1.and.mon%ThrSelAct<1.d-3.and.mon%NAct>1) then
        write(LOUT,'(1x,a)') 'Warning! For single atom ThrSelAct should probably have larger value!'
@@ -4866,7 +4875,7 @@ endif
                      mon%Occ(i)/=1d0.and.mon%Occ(j)/=1d0) ) then
                      ! exclude pairs of nearly/virtual orbitals
 
-                     if(abs(mon%Occ(i)+mon%Occ(j)).lt.1.D-7) then
+                     if(abs(mon%Occ(i)+mon%Occ(j)).lt.mon%ThrQVirt) then
                         write(LOUT,'(1x,a,2x,2i4)') 'Discarding nearly virtual-orbitals pair',i,j
                      elseif(abs(mon%Occ(i)+mon%Occ(j)-2d0).gt.1.D-10) then
 
