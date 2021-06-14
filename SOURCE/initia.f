@@ -1113,7 +1113,9 @@ C
 C     HAP
 C     KP: If IFunSR=6 integrals are not needed and are not loaded
       If (IFunSR.Eq.0.Or.IFunSR.Eq.3.Or.IFunSR.Eq.5) Then
+      write(6,'(/,"calling readtwoint")')
       Call readtwoint(NBasis,2,'AOTWOINT.mol','AOTWOSORT')
+      write(6,'("done with readtwoint")') 
       If(ITwoEl.Eq.1) Call LoadSaptTwoEl(3,TwoEl,NBasis,NInte2)
       ElseIf(IFunSR.Eq.1.Or.IFunSR.Eq.2.Or.IFunSR.Eq.4) Then
       Call readtwoint(NBasis,2,'AOTWOINT.erf','AOERFSORT')
