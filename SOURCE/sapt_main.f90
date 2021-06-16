@@ -10,6 +10,7 @@ use sapt_pol
 use sapt_exch
 use exd_pino
 use sapt_CD_pol
+use omp_lib
 
 implicit none
 
@@ -441,6 +442,9 @@ implicit none
 type(FlagsData)    :: Flags
 type(SystemBlock)  :: A,B
 integer,intent(in) :: iPINO,NBasis
+! GIAN-added
+integer            :: ntr, iunit_aotwosort
+integer            :: thr_id
 
 if(Flags%ISERPA==0) then
   if(Flags%ICASSCF==1) then
@@ -476,8 +480,15 @@ if(Flags%ISERPA==0) then
   endif
 
   if((Flags%SaptLevel.eq.2).or.(Flags%IRedVirt.eq.1)) then
+   ! Adding omp tasks
+   ! Let's open the AOTWSORT only once, therefore we open it here
+     ntr = NBasis*(NBasis+1)/2
+
+     open(newunit=iunit_aotwosort,file='AOTWOSORT',status='OLD',&
+          access='DIRECT',form='UNFORMATTED',recl=8*ntr)
 
      write(LOUT,'(/1x,a)') 'Transforming E2exch-ind integrals...'
+<<<<<<< HEAD
 
      if(Flags%ICholesky==1) then
         print*,'test Cholesky HERE!'
@@ -551,6 +562,75 @@ if(Flags%ISERPA==0) then
                  'FOFOAABA','AOTWOSORT')
 
      endif
+=======
+     !TODO: 
+     ! - remove `default(shared)`
+     !$omp parallel default(shared) private(thr_id)
+     !!$print *, "DEBUG: omp num threads: ", omp_get_num_threads()
+       !$omp single
+       !$omp task
+       !$ thr_id = omp_get_thread_num()
+     ! term A3-ind
+     call new_tran4_gen(NBasis,&
+              NBasis,B%CMO,&
+              B%num0+B%num1,B%CMO(1:NBasis,1:(B%num0+B%num1)),&
+              NBasis,A%CMO,&
+              A%num0+A%num1,A%CMO(1:NBasis,1:(A%num0+A%num1)),&
+              'FOFOAABB',iunit_aotwosort,thr_id)
+        !$omp end task
+        !$omp task
+       !$ thr_id = omp_get_thread_num()
+     ! term A1-ind
+     call new_tran4_gen(NBasis,&
+              A%num0+A%num1,A%CMO(1:NBasis,1:(A%num0+A%num1)),&
+              B%num0+B%num1,B%CMO(1:NBasis,1:(B%num0+B%num1)),&
+              NBasis,A%CMO,&
+              NBasis,B%CMO,&
+              'FFOOABAB',iunit_aotwosort,thr_id)
+        !$omp end task
+        !$omp task
+       !$ thr_id = omp_get_thread_num()
+     ! term A2-ind
+     ! A2A(B): XX
+     call new_tran4_gen(NBasis,&
+              NBasis,B%CMO,&
+              A%num0+A%num1,A%CMO(1:NBasis,1:(A%num0+A%num1)),&
+              NBasis,B%CMO,&
+              B%num0+B%num1,B%CMO(1:NBasis,1:(B%num0+B%num1)),&
+              'FOFOBBBA',iunit_aotwosort,thr_id)
+        !$omp end task
+        !$omp task
+       !$ thr_id = omp_get_thread_num()
+     call new_tran4_gen(NBasis,&
+              NBasis,A%CMO,&
+              B%num0+B%num1,B%CMO(1:NBasis,1:(B%num0+B%num1)),&
+              NBasis,A%CMO,&
+              A%num0+A%num1,A%CMO(1:NBasis,1:(A%num0+A%num1)),&
+              'FOFOAAAB',iunit_aotwosort,thr_id)
+        !$omp end task
+        !$omp task
+       !$ thr_id = omp_get_thread_num()
+     !! A2A(B): YY
+     call new_tran4_gen(NBasis,&
+              NBasis,A%CMO,&
+              B%num0+B%num1,B%CMO(1:NBasis,1:(B%num0+B%num1)),&
+              NBasis,B%CMO,&
+              B%num0+B%num1,B%CMO(1:NBasis,1:(B%num0+B%num1)),&
+              'FOFOBBAB',iunit_aotwosort,thr_id)
+        !$omp end task
+        !$omp task
+       !$ thr_id = omp_get_thread_num()
+     call new_tran4_gen(NBasis,&
+              NBasis,B%CMO,&
+              A%num0+A%num1,A%CMO(1:NBasis,1:(A%num0+A%num1)),&
+              NBasis,A%CMO,&
+              A%num0+A%num1,A%CMO(1:NBasis,1:(A%num0+A%num1)),&
+              'FOFOAABA',iunit_aotwosort,thr_id)
+        !$omp end task
+        !$omp end single
+      !$omp end parallel
+      close(iunit_aotwosort)
+>>>>>>> kasia
 
      write(LOUT,'(/1x,a)') 'Transforming E2exch-disp integrals...'
      if(Flags%ICholesky==1) then
@@ -1321,6 +1401,10 @@ character(:),allocatable :: rdmfile
 
  call triang_to_sq2(OneRdm,OrbAux,NBasis)
  call Diag8(OrbAux,NBasis,NBasis,Eval,work)
+! KP : it may happen that an active orbital has a negative tiny occupation. set it to a positive
+ do i=1,Nbasis
+ Eval(i)=Abs(Eval(i)) 
+ enddo
 ! call dsyev('V','U',NBasis,OrbAux,NBasis,EVal,work,3*NBasis,info)
  call SortOcc(EVal,OrbAux,NBasis)
 
@@ -5590,6 +5674,8 @@ endif
  mon%IPair(1:nbas,1:nbas) = 0
 
  if(Flags%ICASSCF==0) then
+    write(LOUT,'(1x,a,e15.5)') 'Threshold for active orbitals:     ', mon%ThrSelAct
+    write(LOUT,'(1x,a,e15.5)') 'Threshold for quasi-virtual orbital', mon%ThrQVirt
  ! allocate(mon%IndXh(mon%NDim))
 
     ij=0
@@ -5603,7 +5689,8 @@ endif
              ! do not correlate active degenerate orbitals from different geminals
              if((mon%IGem(i).ne.mon%IGem(j)).and.&
                   (mon%IndAux(i)==1).and.(mon%IndAux(j)==1).and.&
-                  (Abs(mon%Occ(i)-mon%Occ(j))/mon%Occ(i).lt.1.d-2)) then
+                  !(Abs(mon%Occ(i)-mon%Occ(j))/mon%Occ(i).lt.1.d-2)) then
+                  (Abs(mon%Occ(i)-mon%Occ(j))/mon%Occ(i).lt.mon%ThrSelAct)) then
 
                 write(LOUT,'(1x,a,2x,2i4)') 'Discarding nearly degenerate pair',i,j
              else
@@ -5612,13 +5699,18 @@ endif
                      (Flags%IFlCore==0.and.&
                      mon%Occ(i)/=1d0.and.mon%Occ(j)/=1d0) ) then
 
-                   ind = ind + 1
-                   mon%IndX(ind) = ij
-                   ! mon%IndXh(ind) = ind
-                   mon%IndN(1,ind) = i
-                   mon%IndN(2,ind) = j
-                   mon%IPair(i,j) = 1
-                   mon%IPair(j,i) = 1
+                     if(abs(mon%Occ(i)+mon%Occ(j)).lt.mon%ThrQVirt) then
+                        write(LOUT,'(1x,a,2x,2i4)') 'Discarding nearly virtual-orbitals pair',i,j
+                     elseif(abs(mon%Occ(i)+mon%Occ(j)-2d0).gt.1.D-10) then
+
+                       ind = ind + 1
+                       mon%IndX(ind) = ij
+                       ! mon%IndXh(ind) = ind
+                       mon%IndN(1,ind) = i
+                       mon%IndN(2,ind) = j
+                       mon%IPair(i,j) = 1
+                       mon%IPair(j,i) = 1
+                     endif
 
                 endif
              endif
@@ -5630,6 +5722,7 @@ endif
 
  elseif(Flags%ICASSCF==1.and.Flags%ISERPA==0) then
     write(LOUT,'(1x,a,e15.5)') 'Threshold for active orbitals: ', mon%ThrSelAct
+    write(LOUT,'(2x,a,2e15.5)') 'Threshold for quasi-virtual orbital', mon%ThrQVirt
 
     if(mon%NCen==1.and.mon%ThrSelAct<1.d-3.and.mon%NAct>1) then
        write(LOUT,'(1x,a)') 'Warning! For single atom ThrSelAct should probably have larger value!'
@@ -5658,8 +5751,7 @@ endif
                      (Flags%IFlCore==0.and.&
                      mon%Occ(i)/=1d0.and.mon%Occ(j)/=1d0) ) then
                      ! exclude pairs of nearly/virtual orbitals
-
-                     if(abs(mon%Occ(i)+mon%Occ(j)).lt.1.D-7) then
+                     if(abs(mon%Occ(i)+mon%Occ(j)).lt.mon%ThrQVirt) then
                         write(LOUT,'(1x,a,2x,2i4)') 'Discarding nearly virtual-orbitals pair',i,j
                      elseif(abs(mon%Occ(i)+mon%Occ(j)-2d0).gt.1.D-10) then
 

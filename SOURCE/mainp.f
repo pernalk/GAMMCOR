@@ -96,6 +96,10 @@ C     IFlAC   = 1 - adiabatic connection formula calculation
 C               0 - AC not used
       IFlAC=Flags%IFlAC
 C
+C     IFlACFREQ = 1 - adiabatic connection formula calculation with frequency integration
+C                 0 - AC withour frequency integration
+      IFlACFREQ=Flags%IFlACFREQ
+C
 C     IFlSnd  = 1 - run AC0 (linerized in alpha, MP2-like expression for AC is used)
 C             = 0 - do not run AC0
       IFlSnd=Flags%IFlSnd
@@ -109,6 +113,11 @@ C                 0 : AC0D corrections will be computed based on overlap with SA
 C                     states (run molpro with symmetry,nosym)
 C
       ISymmAC0D=Flags%ISymmAC0D
+C
+C     IFlAC0DP  = 1 : AC0D prime corrections will be computed based on symmetry (dafault)
+C                 0 : AC0D without prime 
+C
+      IFlAC0DP=Flags%IFlAC0DP
 C
 C     IFlCore = 1 - core (inactive) orbitals included in ERPA correlation
 C             = 0 - core (inactive) orbitals excluded from ERPA correlation
@@ -307,6 +316,11 @@ C     temporarily set IFunSR to 6 to avoid loading integrals and their transform
 C
       Call LdInteg(Title,XKin,XNuc,ENuc,Occ,URe,TwoEl,UMOAO,NInte1,
      $ NBasis,NInte2,NGem)
+C
+C     create cas_ss.molden file with NOs (useful after SA-CAS calculations to inspect 
+C     the character of NOs in a state requested in input.inp)
+C
+      Call MoldenCAS(Occ,UMOAO,NBasis)
 C
 C     set back IFunSR to IFFSR
       If(IFFSR.Ne.0) IFunSR=IFFSR
