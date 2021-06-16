@@ -659,5 +659,5 @@ C
       end if
       if (x .lt. 0) y = -y
       erf = y
-      end
+      end function
 
