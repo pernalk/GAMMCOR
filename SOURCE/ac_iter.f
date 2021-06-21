@@ -218,8 +218,6 @@ C
       Return
       End
 
-<<<<<<< HEAD
-=======
 *Deck WIter
       Subroutine WIter(ECorr,TwoNO,XOne,URe,Occ,
      $ EGOne,NGOcc,
@@ -412,7 +410,6 @@ C
       Return
       End
 
->>>>>>> kasia
 *Deck FreqGrid
       Subroutine FreqGrid(XFreq,WFreq,NFreq)
 C
@@ -424,13 +421,8 @@ C
       X0=0.5D0
 C
       Do IGL=1,NFreq
-<<<<<<< HEAD
-      WFreq(IGL)=2.0d0*X0*WFreq(IGL)/(1.-XFreq(IGL))**2
-      XFreq(IGL)=X0*(1.0d0+XFreq(IGL))/(1.-XFreq(IGL))
-=======
       WFreq(IGL)=2.*X0*WFreq(IGL)/(1.-XFreq(IGL))**2
       XFreq(IGL)=X0*(1.+XFreq(IGL))/(1.-XFreq(IGL))
->>>>>>> kasia
       EndDo
 C
       Return

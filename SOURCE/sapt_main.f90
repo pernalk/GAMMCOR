@@ -488,7 +488,6 @@ if(Flags%ISERPA==0) then
           access='DIRECT',form='UNFORMATTED',recl=8*ntr)
 
      write(LOUT,'(/1x,a)') 'Transforming E2exch-ind integrals...'
-<<<<<<< HEAD
 
      if(Flags%ICholesky==1) then
         print*,'test Cholesky HERE!'
@@ -519,118 +518,74 @@ if(Flags%ISERPA==0) then
                             NBasis,A%num0+A%num1,B%FFBA,&
                             A%NChol,NBasis,'FOFOAABA')
      else
-        ! term A3-ind
-        call tran4_gen(NBasis,&
-                 NBasis,B%CMO,&
-                 B%num0+B%num1,B%CMO(1:NBasis,1:(B%num0+B%num1)),&
-                 NBasis,A%CMO,&
-                 A%num0+A%num1,A%CMO(1:NBasis,1:(A%num0+A%num1)),&
-                 'FOFOAABB','AOTWOSORT')
-        ! term A1-ind
-        call tran4_gen(NBasis,&
-                 A%num0+A%num1,A%CMO(1:NBasis,1:(A%num0+A%num1)),&
-                 B%num0+B%num1,B%CMO(1:NBasis,1:(B%num0+B%num1)),&
-                 NBasis,A%CMO,&
-                 NBasis,B%CMO,&
-                 'FFOOABAB','AOTWOSORT')
-        ! term A2-ind
-        ! A2A(B): XX
-        call tran4_gen(NBasis,&
-                 NBasis,B%CMO,&
-                 A%num0+A%num1,A%CMO(1:NBasis,1:(A%num0+A%num1)),&
-                 NBasis,B%CMO,&
-                 B%num0+B%num1,B%CMO(1:NBasis,1:(B%num0+B%num1)),&
-                 'FOFOBBBA','AOTWOSORT')
-        call tran4_gen(NBasis,&
-                 NBasis,A%CMO,&
-                 B%num0+B%num1,B%CMO(1:NBasis,1:(B%num0+B%num1)),&
-                 NBasis,A%CMO,&
-                 A%num0+A%num1,A%CMO(1:NBasis,1:(A%num0+A%num1)),&
-                 'FOFOAAAB','AOTWOSORT')
-        ! A2A(B): YY
-        call tran4_gen(NBasis,&
-                 NBasis,A%CMO,&
-                 B%num0+B%num1,B%CMO(1:NBasis,1:(B%num0+B%num1)),&
-                 NBasis,B%CMO,&
-                 B%num0+B%num1,B%CMO(1:NBasis,1:(B%num0+B%num1)),&
-                 'FOFOBBAB','AOTWOSORT')
-        call tran4_gen(NBasis,&
-                 NBasis,B%CMO,&
-                 A%num0+A%num1,A%CMO(1:NBasis,1:(A%num0+A%num1)),&
-                 NBasis,A%CMO,&
-                 A%num0+A%num1,A%CMO(1:NBasis,1:(A%num0+A%num1)),&
-                 'FOFOAABA','AOTWOSORT')
-
+         !TODO: 
+         ! - remove `default(shared)`
+         !$omp parallel default(shared) private(thr_id)
+         !!$print *, "DEBUG: omp num threads: ", omp_get_num_threads()
+            !$omp single
+            !$omp task
+            !$ thr_id = omp_get_thread_num()
+         ! term A3-ind
+         call new_tran4_gen(NBasis,&
+                  NBasis,B%CMO,&
+                  B%num0+B%num1,B%CMO(1:NBasis,1:(B%num0+B%num1)),&
+                  NBasis,A%CMO,&
+                  A%num0+A%num1,A%CMO(1:NBasis,1:(A%num0+A%num1)),&
+                  'FOFOAABB',iunit_aotwosort,thr_id)
+            !$omp end task
+            !$omp task
+            !$ thr_id = omp_get_thread_num()
+         ! term A1-ind
+         call new_tran4_gen(NBasis,&
+                  A%num0+A%num1,A%CMO(1:NBasis,1:(A%num0+A%num1)),&
+                  B%num0+B%num1,B%CMO(1:NBasis,1:(B%num0+B%num1)),&
+                  NBasis,A%CMO,&
+                  NBasis,B%CMO,&
+                  'FFOOABAB',iunit_aotwosort,thr_id)
+            !$omp end task
+            !$omp task
+            !$ thr_id = omp_get_thread_num()
+         ! term A2-ind
+         ! A2A(B): XX
+         call new_tran4_gen(NBasis,&
+                  NBasis,B%CMO,&
+                  A%num0+A%num1,A%CMO(1:NBasis,1:(A%num0+A%num1)),&
+                  NBasis,B%CMO,&
+                  B%num0+B%num1,B%CMO(1:NBasis,1:(B%num0+B%num1)),&
+                  'FOFOBBBA',iunit_aotwosort,thr_id)
+            !$omp end task
+            !$omp task
+            !$ thr_id = omp_get_thread_num()
+         call new_tran4_gen(NBasis,&
+                  NBasis,A%CMO,&
+                  B%num0+B%num1,B%CMO(1:NBasis,1:(B%num0+B%num1)),&
+                  NBasis,A%CMO,&
+                  A%num0+A%num1,A%CMO(1:NBasis,1:(A%num0+A%num1)),&
+                  'FOFOAAAB',iunit_aotwosort,thr_id)
+            !$omp end task
+            !$omp task
+            !$ thr_id = omp_get_thread_num()
+         !! A2A(B): YY
+         call new_tran4_gen(NBasis,&
+                  NBasis,A%CMO,&
+                  B%num0+B%num1,B%CMO(1:NBasis,1:(B%num0+B%num1)),&
+                  NBasis,B%CMO,&
+                  B%num0+B%num1,B%CMO(1:NBasis,1:(B%num0+B%num1)),&
+                  'FOFOBBAB',iunit_aotwosort,thr_id)
+            !$omp end task
+            !$omp task
+            !$ thr_id = omp_get_thread_num()
+         call new_tran4_gen(NBasis,&
+                  NBasis,B%CMO,&
+                  A%num0+A%num1,A%CMO(1:NBasis,1:(A%num0+A%num1)),&
+                  NBasis,A%CMO,&
+                  A%num0+A%num1,A%CMO(1:NBasis,1:(A%num0+A%num1)),&
+                  'FOFOAABA',iunit_aotwosort,thr_id)
+            !$omp end task
+            !$omp end single
+            !$omp end parallel
      endif
-=======
-     !TODO: 
-     ! - remove `default(shared)`
-     !$omp parallel default(shared) private(thr_id)
-     !!$print *, "DEBUG: omp num threads: ", omp_get_num_threads()
-       !$omp single
-       !$omp task
-       !$ thr_id = omp_get_thread_num()
-     ! term A3-ind
-     call new_tran4_gen(NBasis,&
-              NBasis,B%CMO,&
-              B%num0+B%num1,B%CMO(1:NBasis,1:(B%num0+B%num1)),&
-              NBasis,A%CMO,&
-              A%num0+A%num1,A%CMO(1:NBasis,1:(A%num0+A%num1)),&
-              'FOFOAABB',iunit_aotwosort,thr_id)
-        !$omp end task
-        !$omp task
-       !$ thr_id = omp_get_thread_num()
-     ! term A1-ind
-     call new_tran4_gen(NBasis,&
-              A%num0+A%num1,A%CMO(1:NBasis,1:(A%num0+A%num1)),&
-              B%num0+B%num1,B%CMO(1:NBasis,1:(B%num0+B%num1)),&
-              NBasis,A%CMO,&
-              NBasis,B%CMO,&
-              'FFOOABAB',iunit_aotwosort,thr_id)
-        !$omp end task
-        !$omp task
-       !$ thr_id = omp_get_thread_num()
-     ! term A2-ind
-     ! A2A(B): XX
-     call new_tran4_gen(NBasis,&
-              NBasis,B%CMO,&
-              A%num0+A%num1,A%CMO(1:NBasis,1:(A%num0+A%num1)),&
-              NBasis,B%CMO,&
-              B%num0+B%num1,B%CMO(1:NBasis,1:(B%num0+B%num1)),&
-              'FOFOBBBA',iunit_aotwosort,thr_id)
-        !$omp end task
-        !$omp task
-       !$ thr_id = omp_get_thread_num()
-     call new_tran4_gen(NBasis,&
-              NBasis,A%CMO,&
-              B%num0+B%num1,B%CMO(1:NBasis,1:(B%num0+B%num1)),&
-              NBasis,A%CMO,&
-              A%num0+A%num1,A%CMO(1:NBasis,1:(A%num0+A%num1)),&
-              'FOFOAAAB',iunit_aotwosort,thr_id)
-        !$omp end task
-        !$omp task
-       !$ thr_id = omp_get_thread_num()
-     !! A2A(B): YY
-     call new_tran4_gen(NBasis,&
-              NBasis,A%CMO,&
-              B%num0+B%num1,B%CMO(1:NBasis,1:(B%num0+B%num1)),&
-              NBasis,B%CMO,&
-              B%num0+B%num1,B%CMO(1:NBasis,1:(B%num0+B%num1)),&
-              'FOFOBBAB',iunit_aotwosort,thr_id)
-        !$omp end task
-        !$omp task
-       !$ thr_id = omp_get_thread_num()
-     call new_tran4_gen(NBasis,&
-              NBasis,B%CMO,&
-              A%num0+A%num1,A%CMO(1:NBasis,1:(A%num0+A%num1)),&
-              NBasis,A%CMO,&
-              A%num0+A%num1,A%CMO(1:NBasis,1:(A%num0+A%num1)),&
-              'FOFOAABA',iunit_aotwosort,thr_id)
-        !$omp end task
-        !$omp end single
-      !$omp end parallel
-      close(iunit_aotwosort)
->>>>>>> kasia
+     close(iunit_aotwosort)
 
      write(LOUT,'(/1x,a)') 'Transforming E2exch-disp integrals...'
      if(Flags%ICholesky==1) then
