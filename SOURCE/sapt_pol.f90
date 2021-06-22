@@ -18,7 +18,7 @@ module sapt_pol
     double precision,allocatable :: PA(:,:),PB(:,:) 
     double precision,allocatable :: Va(:,:),Vb(:,:),Ja(:,:) 
     double precision,allocatable :: work(:,:)
-    double precision :: tmp,ea,eb,elst
+    double precision :: tmp,ea,eb,eabel,elst
     double precision,parameter :: Half=0.5d0
     double precision,external  :: trace
     
@@ -46,14 +46,14 @@ module sapt_pol
      eb = trace(work,NBas) 
     ! print*, eb
      call dgemm('N','N',NBas,NBas,NBas,1d0,PB,NBas,Ja,NBas,0d0,work,NBas)
-     ea = ea + trace(work,NBas)
-    ! print*, trace(work,NBas) 
-     elst = ea + eb + SAPT%Vnn 
-    
-     !write(LOUT,'(1x,a,f16.8)') 'V_nn        = ', SAPT%Vnn
-     !write(LOUT,'(1x,a,f16.8,/)') 'Eelst       = ', elst*1000d0
+     eabel=trace(work,NBas)
+     elst = ea + eb + eabel + SAPT%Vnn 
+   
+     call print_en('V_nucB_elA',ea,.false.)
+     call print_en('V_nucA_elB',eb,.false.)
+     call print_en('V_elA_elB',eabel,.false.)   
      call print_en('V_nn',SAPT%Vnn,.false.)
-     call print_en('Eelst',elst*1000,.false.)
+     call print_en('Eelst',elst*1000,.true.)
      SAPT%elst = elst
     
     !! test wabb
