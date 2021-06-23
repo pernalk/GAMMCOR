@@ -1848,7 +1848,7 @@ C
       If (Line(K+7:K+7).Eq.'3') IPrint=3
       If (Line(K+7:K+7).Eq.'4') IPrint=4
       If (IPrint.Eq.-1) 
-     $ Stop 'FATAL ERROR: INCORRECT ENTRY IPrint IN THE INPUT FILE!' 
+     $ Stop 'FATAL ERROR: INCORRECT ENTRY IPrint IN THE INPUT FILE!'
 C
       XELE=Half*(ZNucl-Charge)
       NELE=Int(ZNucl-Charge+Half)/2
@@ -1877,7 +1877,7 @@ C
       XNuc(I)=Zero
       EndDo
 C
-C     READ ONE-ELECTRON INTEGRALS IN THE MO REPR      
+C     READ ONE-ELECTRON INTEGRALS IN THE MO REPR
 C
       Open(10,File=FName)
 C
@@ -1896,9 +1896,9 @@ C
       Ind=(Max(I1,I2)*(Max(I1,I2)-1))/2+Min(I1,I2)
       XKin(Ind)=X
       EndIf 
-      GoTo 20   
+      GoTo 20
 C
-  30  Close(10)      
+  30  Close(10)
 C
       Return
       End
@@ -1906,7 +1906,7 @@ C
 *Deck Int2
       Subroutine Int2(TwoEl,FName,NInte2,NBasis)
 C
-C     READS TWO-ELECTRON INTEGRALS FROM THE MOLPRO FCIDUMP FILE 
+C     READS TWO-ELECTRON INTEGRALS FROM THE MOLPRO FCIDUMP FILE
 C     (CHEMICAL NOTATION IS USED!)
 C
       Implicit Real*8 (A-H,O-Z)
@@ -1925,14 +1925,14 @@ c      If(Aux1(1:5).Eq." &END") GoTo 20
       GoTo 2
 C 
    20 Continue
-      Read(10,*,End=30) X,I1,I2,I3,I4 
+      Read(10,*,End=30) X,I1,I2,I3,I4
       If(I3+I4.Ne.0) TwoEl(NAddr3(I1,I2,I3,I4))=X
       GoTo 20
 C
   30  Close(10)
-C 
+C
       Return
-      End  
+      End
 
 *Deck GetENuc_AOBin
       Subroutine GetENuc_AOBin(ENuc,infile)
@@ -1942,24 +1942,24 @@ C
       Logical ex
 
       inquire(file=trim(infile),EXIST=ex)
-     
+
       if(ex) then
-         open(newunit=iunit,file=trim(infile),status='OLD', 
+         open(newunit=iunit,file=trim(infile),status='OLD',
      $        access='SEQUENTIAL',form='UNFORMATTED')
-      
+
          read(iunit)
          read(iunit)
          read(iunit) ENuc
- 
+
          close(iunit)
 
       else
- 
+
         write(LOUT,'(1x,a)') 'WARNING: '// infile //' NOT FOUND!'
         write(LOUT,'(1x,a)') 'CANNOT READ ENuc!'
         stop
 
-      endif     
+      endif
 
       End
 
@@ -2010,14 +2010,14 @@ C
 C
       Do I=1,NInte1
       XOne(I)=Zero
-      EndDo 
+      EndDo
 C
       Open(10,File=FName)
 C
       Read(10,'(A10)')Aux1
       Read(10,'(A10)')Aux1
 C
-      Ind=0  
+      Ind=0
       Do ISym=1,MxSym
 C
       Do I=1,NumOSym(ISym)
@@ -2025,7 +2025,7 @@ C
       EndDo
 C
       Ind=Ind+NumOSym(ISym)
-C   
+C
       EndDo
       Close(10)
 C
@@ -2062,7 +2062,7 @@ C
       Do NSymP=1,MxSym
 C
       NSymQ=MultpC(NSymPQ,NSymP)
-      If(NSymQ.Gt.NSymP) Cycle 
+      If(NSymQ.Gt.NSymP) Cycle
 C
       Do IP=1,NumOSym(NSymP)
 C
@@ -2075,14 +2075,14 @@ C
       Do IQ=1,NEndQ
 C
 C     READ A RECORD
-C 
+C
       Read(10) NRecL
       Read(10) (Record(I),I=1,NRecL)
       ICounter=0
 C
 C     LOOP OVER IR, IS
 C
-      NSymRS=NSymPQ     
+      NSymRS=NSymPQ
       Do NSymR=1,MxSym
 C
       NSymS=MultpC(NSymRS,NSymR)
@@ -2104,7 +2104,7 @@ C
 C
       Else
 C
-      NBlock=NTB(NSymR)*NTB(NSymS) 
+      NBlock=NTB(NSymR)*NTB(NSymS)
       ICountRS=0
 C
       Do IS=1,NumOSym(NSymS)
@@ -2133,7 +2133,7 @@ c     enddo NSymR
 c     enddo IQ
       EndDo
 c     enddo IP
-      EndDo     
+      EndDo
 c     enddo symp
       EndDo
 c     enddo sympq
@@ -2178,7 +2178,7 @@ C
 *Deck DetSym
       Subroutine DetSym(MultpC,NSymMO,NumOSym,NBasis)
 C
-C     DETRMINE THE NUMBER OF ORBITALS IN EACH SYMMETRY 
+C     DETRMINE THE NUMBER OF ORBITALS IN EACH SYMMETRY
 C     AND READ THE MULTIPLICATION TABLE
 C
       Implicit Real*8 (A-H,O-Z)
@@ -2211,7 +2211,7 @@ C
 C
       EndDo
 C
-      Return 
+      Return
       End
 
 *Deck GetUAOMO
@@ -2263,7 +2263,7 @@ C
       Function IndOrb(I,NSymI,NumOSym)
 C
 C     RETURNS THE INDEX OF AN ORBITALS WHICH IS THE ITH ORBITALS OF THE SYMMETRY NSymI
-C 
+C
       Implicit Real*8 (A-H,O-Z)
 C
       Include 'commons.inc'
@@ -2300,7 +2300,7 @@ C
       integer nxx
 C
       XKin(1:NInte1)=         0.D0
-C      
+C
       iunit77=77
       iunit88=88
       iunit99=99
@@ -2435,7 +2435,7 @@ C
         write(*,*) 'Error finding label ', ONEHAMIL
         stop
 C      else
-C        write(*,*) 'label ', ONEHAMIL, " was founded" 
+C        write(*,*) 'label ', ONEHAMIL, " was founded"
 C        stop
       end if
       end
@@ -2465,26 +2465,26 @@ C
       ! newunit works with Fortran 2008
       open(newunit=iunit,file='AOTWOINT',status='OLD',
      $     access='SEQUENTIAL',form='UNFORMATTED')
-    
+
       ! read info
       call readlabel2(iunit,'BASINFO ')
-      read(iunit) maxrep, naos, lbuf, nibuf, nbits 
-    
+      read(iunit) maxrep, naos, lbuf, nibuf, nbits
+
       write(6,'()')
       write(6,'(1x, a)') 'Dalton two-el. file initialized'
       write(6,*) lbuf,nibuf,nbits
 C      write(6,'(1x,a,i3,a,i3,a,i3)') 'Buffer size: ', lbuf, &
 C           & ', integers per index packet: ', nibuf,       &
 C           & ', bits: ', nbits
-    
+
       allocate(val_buf(lbuf))
       allocate(idx_buf(lbuf*nibuf))
-    
+
       call readlabel2(iunit,'BASTWOEL')
-    
+
       select case(nibuf)
       case(1)
-    
+
         do
            read(iunit) val_buf, idx_buf, nints
            if(nints<0) exit
@@ -2494,19 +2494,19 @@ C           & ', bits: ', nbits
               idx_q = ibits(INDX,8,8)
               idx_r = ibits(INDX,16,8)
               idx_s = ibits(INDX,24,8)
-    
+
               ! pq: position in Batch
               ! rs: Batch number
               pq = idx_p + idx_q*(idx_q-1)/2
-              rs = idx_r + idx_s*(idx_s-1)/2 
-              !write(*,*) idx_p,idx_q,idx_r,idx_s 
+              rs = idx_r + idx_s*(idx_s-1)/2
+              !write(*,*) idx_p,idx_q,idx_r,idx_s
               swap_pqrs = (pq<rs)
            TwoEl(NAddr3(idx_p,idx_q,idx_r,idx_s))=val_buf(i)
            enddo
         enddo
-       
+
       case(2)
-    
+
         do
            read(iunit) val_buf, idx_buf, nints
            if(nints<0) exit
@@ -2517,16 +2517,16 @@ C           & ', bits: ', nbits
               INDX = idx_buf(i+lbuf)
               idx_p = ibits(INDX,0,16)
               idx_q = ibits(INDX,16,16)
-    
+
               pq = idx_p + idx_q*(idx_q-1)/2
-              rs = idx_r + idx_s*(idx_s-1)/2 
+              rs = idx_r + idx_s*(idx_s-1)/2
               swap_pqrs = (pq<rs)
            TwoEl(NAddr3(idx_p,idx_q,idx_r,idx_s))=val_buf(i)
            enddo
         enddo
-    
+
       end select
-    
+
       deallocate(val_buf,idx_buf)
       close(unit=iunit)
 
@@ -2538,7 +2538,7 @@ C
 
 ****** SUBROUTINES FROM RAFAL PODESZWA, 03/2017 ******
 *
-*Deck read2el 
+*Deck read2el
       subroutine read2el(TwoEl,UMOAO,NBasis,NInte2)
 C
 C     Reads 2-el integrals in AO and ttransform to NO
@@ -2559,23 +2559,23 @@ C
       Integer(8),external :: NAddr3
 C
       TwoEl(1:NInte2)=         0.D0
-C      
+C
       iunit77=77
       iunit88=88
       iunit99=99
-      
+
       OPEN(UNIT=iunit77,FILE='AOTWOINT',STATUS='OLD',
      &           ACCESS='SEQUENTIAL',FORM='UNFORMATTED')
-     
+
       call inittwoel(iunit77)
       if (nibuf*lbuf .gt. mxbuf) then
         write(*,*) 'Dalton buffer greater than mxbuf. Stop'
         stop
       end if
-      
+
 10    continue
       call readtwoel(iunit77, dbuf, ibuf, lbuf, nibuf, nxx)
-      
+
 c      write (*,*) nxx, ' two electron integrals read'
       do i=1,nxx
 C       call unpckdlt(ibuf(i), ibuf(i+lbuf), nibuf, nbits,ip,iq,ir,is)
@@ -2585,7 +2585,7 @@ C        if (dabs(dbuf(i)).gt.1e-8)
 c     *          write(*,'(4I4,F12.8)') ip, iq, ir, is, dbuf(i)
       TwoEl(NAddr3(ip,iq,ir,is))=dbuf(i)
       end do
-      
+
       if (nxx .ge. 0) go to 10
 
 C     TEST read2el vs. readtwoint
@@ -2606,13 +2606,13 @@ C      do ir=1,NBasis
 C      read(iunit,rec=min(ir,is)+max(ir,is)*(max(ir,is)-1)/2) mat
 C      do iq=1,NBasis
 C      do ip=1,NBasis
-CC  
-CC      write(*,*) ip,iq,ir,is,TwoEl(NAddr3(ip,iq,ir,is)) 
-C      TMP1 = TwoEl(NAddr3(ip,iq,ir,is)) 
+CC
+CC      write(*,*) ip,iq,ir,is,TwoEl(NAddr3(ip,iq,ir,is))
+C      TMP1 = TwoEl(NAddr3(ip,iq,ir,is))
 C      TMP2 = mat(min(ip,iq)+max(ip,iq)*(max(ip,iq)-1)/2)
 CC
 C      if(TMP1.ne.TMP2) write(6,*) TMP1,TMP2
-CC    
+CC
 C      enddo
 C      enddo
 C      enddo
@@ -2627,14 +2627,14 @@ C
       Write(6,'(" Transforming two-electron integrals ...",/)')
       Call TwoNO1(TwoEl,UMOAO,NBasis,NInte2)
 C
-      return  
+      return
       end
-      
-      
+
+
       subroutine unpckdlt(ibuf, ibuf2, nibuf, nbits, ip, iq, ir, is)
       integer ibuf, ibuf2, nibuf, nbits, ip, iq, ir, is
-      
-      
+
+
       IF (NIBUF .EQ. 1) THEN
       IF (NBITS .EQ. 8) THEN
             LABEL = ibuf
@@ -2662,29 +2662,29 @@ c#endif
       END IF
 
       end
-     
+
       subroutine readtwoel(iunit, dbuf, ibuf, lbuf, nibuf, nxx)
       integer iunit, ibuf, lbuf, nibuf, nxx
       double precision dbuf
       dimension dbuf(lbuf), ibuf(lbuf, nibuf)
-      
+
       read (iunit) dbuf, ibuf, nxx
-      
+
       end
-       
+
       subroutine inittwoel(iunit)
       integer iunit
       character*8 BASINFO, BASTWOEL
       data BASINFO /'BASINFO'/, BASTWOEL /'BASTWOEL'/
-      
+
       integer  maxrep, naos, lbuf, nibuf, nbits
       common /daltwoel/  maxrep, naos(8), lbuf, nibuf, nbits
-      
+
       logical findlab
-      
+
       integer i
-      
-      
+
+
       if (.not. findlab(BASINFO,iunit)) then
         write(*,*) 'Error finding label', BASINFO
         stop
@@ -2698,13 +2698,13 @@ c#endif
         stop
       end if
       end
-    
-      
-      
+
+
+
       logical function findlab(label, labelunit)
       character*8 label, stars, b(4)
       parameter (stars = '********')
-      
+
       rewind(labelunit)
 10    read (labelunit, END=100, ERR=50) b
       if (b(1).ne.stars) go to 10
@@ -2719,12 +2719,12 @@ c#endif
 
 *Deck SaptInter
       Subroutine SaptInter(NBasis,Mon,ICAS)
-C     
+C
 C     FEEDS COMMONS.INC WITH SAPT VALUES
       Use types
-C     
+C
       Implicit Real*8 (A-H,O-Z)
-C      
+C
       type(SystemBlock) :: Mon
 C
       Include 'commons.inc'
@@ -2733,7 +2733,7 @@ C
       CICoef(I) = Mon%CICoef(I)
       IGem(I) = Mon%IGem(I)
       EndDo
-     
+
       If(ICAS.Eq.1) Then
       ICASSCF = ICAS
       NELE = Mon%NELE
@@ -2744,19 +2744,24 @@ C
 C      write(*,*) 'SINTER,NDimX', Mon%NDimX
 C      write(*,*) CICoef(1:NBasis)
 C      write(*,*) IGem(1:NBasis)
-      
-      End 
+
+      End
 
 *Deck LoadSaptTwoEl
       Subroutine LoadSaptTwoEl(Mon,TwoNO,NBasis,NInte2)
 C
+      use sorter
+C
       Implicit Real*8 (A-H,O-Z)
-C   
+C
+      Type(AOReaderData) :: reader
+C
       Integer :: Mon, NInte2, NBasis
       Integer :: IRS, IS, IR, IPQ, IQ, IP
       Integer :: iunit
       Integer(8),external :: NAddr3
-      Dimension :: TwoNO(NInte2), Work1(NBasis**2)    
+      Dimension :: TwoNO(NInte2), Work1(NBasis**2)
+      Logical :: empty
       Character*9 :: fname
 
       If(Mon.Eq.1) Then
@@ -2772,27 +2777,36 @@ C
       ElseIf(Mon.Eq.6) Then
       fname='MO2ERFBB'
       EndIf
- 
+
       Work1 = 0d0
-      TwoNO = 0d0 
-C      write(*,*) trim(fname) 
-      open(newunit=iunit,file=trim(fname),status='OLD',
-     $ access='DIRECT',recl=8*NBasis*(NBasis+1)/2)
+      TwoNO = 0d0
+C      write(*,*) trim(fname)
+C      open(newunit=iunit,file=trim(fname),status='OLD',
+C     $ access='DIRECT',recl=8*NBasis*(NBasis+1)/2)
+
+      call reader%open(trim(fname))
 
       IRS=0
       Do IS=1,NBasis
       Do IR=1,IS
       IRS=IRS+1
-      read(iunit,rec=IRS) Work1(1:NBasis*(NBasis+1)/2)
-      IPQ=0
-      Do IQ=1,NBasis
-      Do IP=1,IQ
-      IPQ = IPQ + 1
-      TwoNO(NAddr3(IP,IQ,IR,IS)) = Work1(IPQ)
-C      Write(6,*) IP,IQ,IR,IS, Work1(IPQ)
-C      Write(6,*) IP,IQ,IR,IS, TwoNO(NAddr3(IP,IQ,IR,IS)) 
-      EndDo
-      EndDo
+C
+      !read(iunit,rec=IRS) Work1(1:NBasis*(NBasis+1)/2)
+      Call reader%getTR(IRS,Work1,empty)
+      If(empty) Then
+         Work1 = 0d0
+      Else
+        IPQ=0
+        Do IQ=1,NBasis
+        Do IP=1,IQ
+        IPQ = IPQ + 1
+        TwoNO(NAddr3(IP,IQ,IR,IS)) = Work1(IPQ)
+C        Write(6,*) IP,IQ,IR,IS, Work1(IPQ)
+C        Write(6,*) IP,IQ,IR,IS, TwoNO(NAddr3(IP,IQ,IR,IS))
+        EndDo
+        EndDo
+      End If
+C
       EndDo
       EndDo
 
@@ -2803,7 +2817,7 @@ C      Do IR=1,IS
 C      Do IQ=1,NBasis
 C      Do IP=1,IQ
 C
-C      Write(6,*) ip,iq,ir,is,TwoNO(NAddr3(IP,IQ,IR,IS))  
+C      Write(6,*) ip,iq,ir,is,TwoNO(NAddr3(IP,IQ,IR,IS))
 C
 C      EndDo
 C      EndDo
@@ -2811,7 +2825,64 @@ C      EndDo
 C      EndDo
 C      EndIf
 
+      Call reader%close
+
+      End
+
+*Deck LoadSaptTwoNO
+      Subroutine LoadSaptTwoNO(Mon,TwoNO,NBasis,NInte2)
+C
+      use sorter
+C
+      Implicit Real*8 (A-H,O-Z)
+C
+      Type(AOReaderData) :: reader
+C
+      Integer :: Mon, NInte2, NBasis
+      Integer :: IRS, IS, IR, IPQ, IQ, IP
+      Integer :: iunit
+      Integer(8),external :: NAddr3
+      Dimension :: TwoNO(NInte2), Work1(NBasis**2)
+      Logical :: empty
+      Character*9 :: fname
+
+      If(Mon.Eq.1) Then
+      fname='TWOMOAA '
+      ElseIf(Mon.Eq.2) Then
+      fname='TWOMOBB '
+      ElseIf(Mon.Eq.5) Then
+      fname='MO2ERFAA'
+      ElseIf(Mon.Eq.6) Then
+      fname='MO2ERFBB'
+      EndIf
+
+      Work1 = 0d0
+      TwoNO = 0d0
+C      write(*,*) trim(fname)
+      open(newunit=iunit,file=trim(fname),status='OLD',
+     $ access='DIRECT',recl=8*NBasis*(NBasis+1)/2)
+
+      IRS=0
+      Do IS=1,NBasis
+      Do IR=1,IS
+      IRS=IRS+1
+C
+      read(iunit,rec=IRS) Work1(1:NBasis*(NBasis+1)/2)
+      IPQ=0
+      Do IQ=1,NBasis
+      Do IP=1,IQ
+      IPQ = IPQ + 1
+      TwoNO(NAddr3(IP,IQ,IR,IS)) = Work1(IPQ)
+C      Write(6,*) IP,IQ,IR,IS, Work1(IPQ)
+C      Write(6,*) IP,IQ,IR,IS, TwoNO(NAddr3(IP,IQ,IR,IS))
+      EndDo
+      EndDo
+C
+      EndDo
+      EndDo
+
       close(iunit)
+
       End
 
 *Deck CheckSaptTwoEl

@@ -227,16 +227,19 @@ subroutine tran4_full(NBas,CA,CB,fname,srtfile)
 !!! ie. (NBas,n,C)
 implicit none
 
+type(AOReaderData) :: reader
+
 integer,intent(in) :: NBas
-!integer,intent(in) :: nA,nB,nC,nD
 ! CA(NBas*nA)
 double precision,intent(in) :: CA(*), CB(*)
-character(*) :: fname, srtfile
+
+character(*)      :: fname, srtfile
+logical           :: empty
 double precision, allocatable :: work1(:), work2(:), work3(:,:)
-integer :: iunit,iunit2,iunit3
-integer :: ntr,nloop
+integer           :: ntr,nloop
+integer           :: i,rs,ab
+integer           :: iunit,iunit2,iunit3
 integer,parameter :: cbuf=512
-integer :: i,rs,ab
 
  write(6,'()') 
 ! write(6,'(1x,a)') 'TRAN4_SYM_OUT_OF_CORE'
@@ -252,8 +255,9 @@ integer :: i,rs,ab
  allocate(work3(cbuf,ntr))
 
  !open(newunit=iunit,file='AOTWOSORT',status='OLD',&
- open(newunit=iunit,file=trim(srtfile),status='OLD',&
-      access='DIRECT',form='UNFORMATTED',recl=8*NBas*(NBas+1)/2)
+ !open(newunit=iunit,file=trim(srtfile),status='OLD',&
+ !     access='DIRECT',form='UNFORMATTED',recl=8*NBas*(NBas+1)/2)
+ call reader%open(trim(srtfile))
 
  ! half-transformed file
  open(newunit=iunit2,file='TMPMO',status='REPLACE',&
@@ -264,15 +268,20 @@ integer :: i,rs,ab
     ! loop over cbuf
     do rs=(i-1)*cbuf+1,min(i*cbuf,ntr)
 
-       read(iunit,rec=rs) work1(1:ntr)
-       call triang_to_sq(work1,work2,NBas)
-       ! work1=CA^T.work2
-       ! work2=work1.CB
-       call dgemm('T','N',NBas,NBas,NBas,1d0,CA,NBas,work2,NBas,0d0,work1,NBas) 
-       call dgemm('N','N',NBas,NBas,NBas,1d0,work1,NBas,CA,NBas,0d0,work2,NBas)
-       call sq_to_triang(work2,work1,NBas)
-       ! transpose
-       work3(rs-(i-1)*cbuf,1:ntr) = work1(1:ntr)
+       !read(iunit,rec=rs) work1(1:ntr)
+       call reader%getTR(rs,work1(1:ntr),empty)
+       if(empty) then
+          work3(rs-(i-1)*cbuf,1:ntr) = 0
+       else
+          call triang_to_sq(work1,work2,NBas)
+          ! work1=CA^T.work2
+          ! work2=work1.CB
+          call dgemm('T','N',NBas,NBas,NBas,1d0,CA,NBas,work2,NBas,0d0,work1,NBas)
+          call dgemm('N','N',NBas,NBas,NBas,1d0,work1,NBas,CA,NBas,0d0,work2,NBas)
+          call sq_to_triang(work2,work1,NBas)
+          ! transpose
+          work3(rs-(i-1)*cbuf,1:ntr) = work1(1:ntr)
+       endif
 
     enddo
 
@@ -282,7 +291,8 @@ integer :: i,rs,ab
 
  enddo
 
- close(iunit)
+ !close(iunit)
+ call reader%close
 
 ! |cd)
  open(newunit=iunit3,file=fname,status='REPLACE',&
@@ -353,7 +363,7 @@ integer :: l,k,kl
  !!open(newunit=iunit,file='AOTWOSORT',status='OLD',&
  !open(newunit=iunit,file=trim(srtfile),status='OLD',&
  !     access='DIRECT',form='UNFORMATTED',recl=8*ntr)
- call reader%open('AOTWOSORT')
+ call reader%open(trim(srtfile))
 
  ! half-transformed file
  open(newunit=iunit2,file='TMPMO',status='REPLACE',&
@@ -364,6 +374,7 @@ integer :: l,k,kl
     ! loop over cbuf
     do rs=(i-1)*cbuf+1,min(i*cbuf,ntr)
 
+       work1 = 0
        !read(iunit,rec=rs) work1(1:ntr)
        call reader%getTR(rs,work1,empty)
        if(empty) then
@@ -438,13 +449,15 @@ integer :: l,k,kl
 end subroutine tran4_gen
 
 subroutine new_tran4_gen(NBas,nA,CA,nB,CB,nC,CC,nD,CD, &
-                         fname,iunit_srt,thread_id)
+                         fname,reader,iunit_srt,thread_id)
 ! 4-index transformation out of core
 ! dumps all integrals on disk in the (square,square) form
 ! CAREFUL: C have to be in AOMO form!
 !!! CAREFUL: write to simpler form
 !!! ie. (NBas,n,C)
 implicit none
+
+type(AOReaderData) :: reader
 
 integer,intent(in) :: NBas
 integer,intent(in) :: nA,nB,nC,nD
@@ -456,12 +469,12 @@ integer, intent(in) :: iunit_srt
 integer, intent(in), optional:: thread_id
 ! tmp file
 character(len=80) :: tmpfile, thread_str
-
+logical           :: empty
 double precision, allocatable :: work1(:), work2(:), work3(:,:)
-integer :: iunit,iunit2,iunit3
-integer :: ntr,nAB,nCD,nloop
+integer           :: i,rs,ab
+integer           :: iunit,iunit2,iunit3
+integer           :: ntr,nAB,nCD,nloop
 integer,parameter :: cbuf=512
-integer :: i,rs,ab
 !  test
 integer :: l,k,kl
 
@@ -485,7 +498,7 @@ integer :: l,k,kl
  !     access='DIRECT',form='UNFORMATTED',recl=8*ntr)
  tmpfile = 'TMPMO'
  iunit2 = 75  !no reason for this particular value
- !print *, "DEBUG: ", thread_id 
+ !print *, "DEBUG: ", thread_id
  !print *, "DEBUG: unit", iunit2
  if (present(thread_id)) then
     write(thread_str, "(I0)") thread_id
@@ -494,7 +507,7 @@ integer :: l,k,kl
  end if
  !print *, "DEBUG: ", thread_id
  !print *, "DEBUG: before open ", tmpfile, "at", iunit2
- 
+
  ! half-transformed file
  open(iunit2,file=tmpfile,status='REPLACE',&
       access='DIRECT',form='UNFORMATTED',recl=8*cbuf)
@@ -505,24 +518,29 @@ integer :: l,k,kl
     ! loop over cbuf
     do rs=(i-1)*cbuf+1,min(i*cbuf,ntr)
       !$omp critical
-       read(iunit_srt,rec=rs) work1(1:ntr)
+       !read(iunit_srt,rec=rs) work1(1:ntr)
+       call reader%getTR(rs,work1,empty)
       !$omp end critical
-       call triang_to_sq(work1,work2,NBas)
-       ! work1=CA^T.work2
-       ! work2=work1.CB
-       call dgemm('T','N',nA,NBas,NBas,1d0,CA,NBas,work2,NBas,0d0,work1,nA) 
-       call dgemm('N','N',nA,nB,NBas,1d0,work1,nA,CB,NBas,0d0,work2,nA)
-       ! transpose
-       work3(rs-(i-1)*cbuf,1:nAB) = work2(1:nAB)
-       !work1 = 0
-       !kl = 0 
-       !do l=1,nB
-       !do k=1,nA
-       !   kl = kl + 1
-       !   work1(kl) = work2((k-1)*NBas+l)
-       !enddo
-       !enddo
-       !work3(rs-(i-1)*cbuf,1:nAB) = work1(1:nAB)
+       if(empty) then
+          work3(rs-(i-1)*cbuf,1:nAB) = 0
+       else
+          call triang_to_sq(work1,work2,NBas)
+          ! work1=CA^T.work2
+          ! work2=work1.CB
+          call dgemm('T','N',nA,NBas,NBas,1d0,CA,NBas,work2,NBas,0d0,work1,nA)
+          call dgemm('N','N',nA,nB,NBas,1d0,work1,nA,CB,NBas,0d0,work2,nA)
+          ! transpose
+          work3(rs-(i-1)*cbuf,1:nAB) = work2(1:nAB)
+          !work1 = 0
+          !kl = 0
+          !do l=1,nB
+          !do k=1,nA
+          !   kl = kl + 1
+          !   work1(kl) = work2((k-1)*NBas+l)
+          !enddo
+          !enddo
+          !work3(rs-(i-1)*cbuf,1:nAB) = work1(1:nAB)
+       endif
 
     enddo
 
@@ -551,7 +569,7 @@ integer :: l,k,kl
     call dgemm('N','N',nC,nD,NBas,1d0,work1,nC,CD,NBas,0d0,work2,nC)
     write(iunit3,rec=ab) work2(1:nCD)
     !work1 = 0
-    !kl = 0 
+    !kl = 0
     !do l=1,nD
     !do k=1,nC
     !   kl = kl + 1
@@ -568,9 +586,8 @@ integer :: l,k,kl
 
 end subroutine new_tran4_gen
 
-
 subroutine read4_gen(NBas,nA,CA,nB,CB,nC,CC,nD,CD,fname,srtfile)
-! reads 4-index ints from sorted file 
+! reads 4-index ints from sorted file
 ! dumps all integrals on disk in the (square,square) form
 ! CAREFUL: C have to be in AOMO form!
 !!! CAREFUL: write to simpler form
@@ -587,7 +604,7 @@ integer :: iunit,iunit2
 integer :: ntr,nAB,nCD
 integer :: ip,iq,ir,is,pq,rs
 
- write(6,'()') 
+ write(6,'()')
  write(6,'(1x,a)') 'Reading integrals for '//fname
 
  ntr = NBas*(NBas+1)/2
@@ -1052,7 +1069,7 @@ double precision,external :: ddot
  !open(newunit=iunit,file=trim(intfile),status='OLD',&
  !     access='DIRECT',form='UNFORMATTED',recl=8*ntr)
  !     
- call reader%open('AOTWOSORT')
+ call reader%open(trim(intfile))
 
  irs=0
  do is=1,NBas
