@@ -1418,8 +1418,25 @@ C
 C
 C     ITwoEl
       If(ITwoEl.Eq.1) Then
+      If (ICholesky==0) Then
       Write(6,'(/," Transforming two-electron integrals ...",/)')
       Call TwoNO1(TwoEl,UAOMO,NBasis,NInte2)
+      ElseIf (ICholesky==1) Then
+      UAux=transpose(UAOMO)       
+      Allocate(MatFF(NCholesky,NBasis**2))
+      Call chol_MOTransf(MatFF,CholeskyVecs,
+     $                   UAux,1,NBasis,
+     $                   UAux,1,NBasis)
+      do i=1,NCholesky
+      do j=1,nbasis
+      do k=1,j
+      if(abs(MatFF(i,(j-1)*nbasis+k)).gt.1.d-8)
+     $ write(*,*)i,j,k,MatFF(i,(j-1)*nbasis+k),MatFF(i,(k-1)*nbasis+j)
+      enddo
+      enddo
+      enddo
+      stop
+      EndIf
 C     
       ElseIf(ITwoEl.eq.3) Then
 C     PREPARE POINTERS: NOccup=num0+num1
