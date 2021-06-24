@@ -10,7 +10,9 @@ integer ::  NBasis, NGrid
 ! read(igrid)
  read(igrid) npt,ndiff,ntg
  close(igrid)
- If(NBasis.Ne.ntg) Stop 'Fatal Error in molprogrid0: NBasis Ne ntg'
+ if(NBasis.Ne.ntg) then
+  stop  'Fatal Error in molprogrid: NBasis Ne ntg'
+ endif
  NGrid=npt
 end subroutine molprogrid0
 

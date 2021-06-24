@@ -28,6 +28,9 @@ integer, parameter :: JOB_TYPE_CASPIDFTOPT = 8
 integer, parameter :: JOB_TYPE_EERPA_OLD = 9
 integer, parameter :: JOB_TYPE_AC0D = 10
 integer, parameter :: JOB_TYPE_AC0DNOSYMM = 11
+integer, parameter :: JOB_TYPE_NLOCCORR = 12
+integer, parameter :: JOB_TYPE_AC0DP = 13
+integer, parameter :: JOB_TYPE_ACFREQ = 14
 
 integer, parameter :: SAPTLEVEL0 = 0
 integer, parameter :: SAPTLEVEL1 = 1
@@ -35,6 +38,7 @@ integer, parameter :: SAPTLEVEL2 = 2
 
 integer, parameter :: FLAG_CORE = 1
 integer, parameter :: FLAG_NOBASIS = 0
+integer, parameter :: FLAG_REDVIRT = 0
 logical, parameter :: FLAG_RESTART = .FALSE.
 integer, parameter :: FLAG_PRINT_LEVEL = 0
 integer, parameter :: FLAG_DEBUG_FL12 = 1
@@ -69,9 +73,10 @@ character(*),parameter :: PossibleInterface(4) = &
 [character(8) :: &
 'DALTON', 'MOLPRO', 'OWN', 'ORCA']
 
-character(*),parameter :: PossibleJobType(11) = &
+character(*),parameter :: PossibleJobType(14) = &
 [character(9) :: &
-'AC', 'AC0', 'ERPA', 'EERPA', 'SAPT', 'PDFT', 'CASPiDFT','CASPiDFTOpt','EERPA-1','AC0D', 'AC0DNOSYMM']
+'AC', 'AC0', 'ERPA', 'EERPA', 'SAPT', 'PDFT', 'CASPiDFT','CASPiDFTOpt','EERPA-1', & 
+'AC0D', 'AC0DNOSYMM', 'NLOCCORR', 'AC0DP', 'ACFREQ']
 
 character(*),parameter :: PossibleRDMType(5) = &
 [character(8) :: &
@@ -89,22 +94,24 @@ character(:), allocatable :: InputPath
 
 type CalculationBlock
       integer :: InterfaceType = INTER_TYPE_DAL
-      integer :: NBasis = FLAG_NOBASIS
-      integer :: JobType = JOB_TYPE_AC
+      integer :: NBasis    = FLAG_NOBASIS
+      integer :: JobType   = JOB_TYPE_AC
       integer :: RDMType ! = RDM_TYPE_GVB
       integer :: RDMSource = INTER_TYPE_DAL
-      integer :: Response = RESP_ERPA
-      integer :: DFApp = DF_NONE
-      integer :: Kernel = 1
-      integer :: TwoMoInt = TWOMO_INCORE
-      integer :: Core = FLAG_CORE
-      integer :: SymType = TYPE_NO_SYM
+      integer :: Response  = RESP_ERPA
+      integer :: DFApp     = DF_NONE
+      integer :: Kernel    = 1
+      integer :: TwoMoInt  = TWOMO_INCORE
+      integer :: Core      = FLAG_CORE
+      integer :: SymType   = TYPE_NO_SYM
       integer :: SaptLevel = SAPTLEVEL2
-      integer :: vdWCoef = 0
-      logical :: Restart = FLAG_RESTART
-      logical :: PostCAS = FLAG_POSTCAS
-      integer :: IPrint  = 0 !FLAG_PRINT_LEVEL
-      double precision :: RPAThresh = 1.0D-6
+      integer :: vdWCoef   = 0
+      integer :: RedVirt   = FLAG_REDVIRT
+      logical :: Restart   = FLAG_RESTART
+      logical :: PostCAS   = FLAG_POSTCAS
+      integer :: IPrint    = 0 !FLAG_PRINT_LEVEL
+      double precision :: RPAThresh  = 1.0D-6
+      double precision :: ThreshVirt = 1.0D-6
       integer :: imon = 1
       character(:), allocatable :: JobTitle
       character(:), allocatable :: IntegralsFilePath
@@ -114,7 +121,6 @@ type SystemBlock
       integer :: NoSt = 1
       integer :: NStates = 1
       integer :: EigFCI = 1
-      integer :: Multiplicity = 1
       integer :: Charge = 0
       integer :: ZNucl   = 0
       integer :: NBasis = 0
@@ -125,12 +131,14 @@ type SystemBlock
       double precision :: SumOcc  = 0d0 
       double precision :: ACAlpha = 1d0
       double precision :: Omega   = 1d0
+      double precision :: PerVirt = 0d0
       double precision :: ECASSCF = 0d0
       integer :: NSym
       integer :: NSymBas(8),NSymOrb(8)
       integer :: NOrb, NGem
       integer :: NActOrb = 1
       integer :: NAct, INAct
+      integer :: ISwitchAct = 0
       integer :: NActS(8), INActS(8)
       integer :: NDim, NDimX
       integer :: NDimN, DimEx
@@ -141,16 +149,29 @@ type SystemBlock
       integer :: IWarn = 0
       integer :: icnt
       integer :: num0,num1,num2
+      integer :: NVZero = 0
       integer :: TwoMoInt = TWOMO_INCORE
       logical :: DeclareTwoMo = .false.
       logical :: DeclareSt = .false.
       logical :: DeclareTrSt = .false.
-      logical :: ISHF = .false.
-      logical :: doRSH = .false., SameOm = .true.
+      logical :: ISHF    = .false.
+      logical :: Cubic   = .false.
+      logical :: Wexcit  = .false.
+      logical :: doRSH   = .false., SameOm = .true.
       logical :: PostCAS = .false.
       logical :: NActFromRDM = .true.
-      double precision :: ThrAct = 0.992d0
+      logical :: reduceV = .false.
+      ! for cubic SAPT
+      double precision :: ACAlpha0  = 1.d-10
+      double precision :: ACAlpha1  = 0.01d0
+      double precision :: ACAlpha2  = 0.45d0
+      ! ThrAct for active geminals selection
+      double precision :: ThrAct    = 0.992d0
       double precision :: ThrSelAct = 1.d-8
+      ! ThrVirt for reduction of virtual orbs
+      double precision :: ThrVirt   = 1.d-6
+      ! ThrQVirt for quasi-virtual orbs
+      double precision :: ThrQVirt  = 1.d-7
       integer,allocatable :: InSt(:,:),InTrSt(:,:)
       integer,allocatable :: IGem(:), IndAux(:)
       integer,allocatable :: IndX(:), IndN(:,:), IPair(:,:)
@@ -177,6 +198,20 @@ type SystemBlock
 
 end type SystemBlock
 
+type FileNames
+
+     character(:),allocatable :: rdmfile
+     character(:),allocatable :: onefile
+     character(:),allocatable :: sirifile,siriusfile
+     character(:),allocatable :: occfile,coefile
+     character(:),allocatable :: testfile
+     character(:),allocatable :: twofile,twojfile,twokfile
+     character(:),allocatable :: y01file,xy0file
+     character(:),allocatable :: propfile
+     character(:),allocatable :: propfile0,propfile1,propfile2
+
+end type FileNames
+
 type FlagsData
 ! default setting: ERPA-GVB
      ! mainp.f
@@ -189,7 +224,8 @@ type FlagsData
      integer :: NoSt    = 1
      integer :: IGVB    = 1
      integer :: ITwoEl  = TWOMO_INCORE 
-     integer :: IFun    = 13
+     integer :: IRedVirt  = FLAG_REDVIRT
+     integer :: IFun      = 13
      integer :: IFunSR    = 0 
      integer :: IFunSRKer = 0
      double precision :: Alpha = 0
@@ -201,23 +237,28 @@ type FlagsData
      integer :: ISERPA  = 0
      integer :: ISAPT   = 0
      integer :: SaptLevel = 0
-     integer :: ISHF    = 0
+     integer :: ISHF      = 0
      character(:), allocatable :: JobTitle
      integer :: JobType = 0
      ! initia.f
-     integer :: IA = 1
-     integer :: ICASSCF = 0
-     integer :: IDMRG   = 0  
+     integer :: IA        = 1
+     integer :: ICASSCF   = 0
+     integer :: IDMRG     = 0  
      ! interpa.f  
-     integer :: IFlAC   = 0
-     integer :: IFlSnd  = 0
-     integer :: IFlAC0D = 0
+     integer :: IFlAC     = 0
+     integer :: IFlSnd    = 0
+     integer :: IFlAC0D   = 0
+     integer :: IFlAC0DP  = 0
+     integer :: IFlACFREQ = 0
      integer :: ISymmAC0D = 1
-     integer :: IFlCore = 1
-     integer :: IFlFrag1 = 0
-     integer :: IFl12 = 1
+     integer :: IFlCore   = 1
+     integer :: IFlFrag1  = 0
+     integer :: IFl12     = 1
      ! sapt_main.f90
      integer :: IFlag0 = 0
+     ! sapt_utils.f90
+     integer :: DIISN  = 6
+     integer :: DIISOn = 2
 
 end type FlagsData
 
@@ -232,20 +273,36 @@ end type InputData
 
 type SaptData
 
-     type(SystemBlock) :: monA, monB
-     double precision  :: ACAlpha = 1d0
+  type(SystemBlock) :: monA,monB
      double precision  :: Vnn,elst,exchs2,e2ind,e2disp
-     double precision  :: e2disp_sc,e2disp_sp,e2disp_unc
+     double precision  :: e2disp_sc,e2disp_sp
+     double precision  :: e2ind_unc,e2disp_unc
+     double precision  :: e2dispR_unc,e2dispR
      double precision  :: e2exdisp_unc,e2exdisp
-     double precision  :: elstinCAS,e2dispinCAS
+     double precision  :: e2exdispR_unc,e2exdispR
+     double precision  :: e2exind,e2exind_unc
+     double precision  :: e2ind_a0,e2ind_a1,e2ind_a2
+     double precision  :: e2disp_a0,e2disp_a1,e2disp_a2
+     double precision  :: e2exd_a0,e2exd_a1,e2exd_a2
+     double precision  :: e2exi_a0,e2exi_a1,e2exi_a2
+     double precision  :: esapt2,esapt0
+     double precision  :: e2dispinCAS
+     double precision  :: exch_part(5)
+     double precision,allocatable :: Wind(:),Wdisp(:)
      integer :: InterfaceType = INTER_TYPE_DAL
      integer :: SaptLevel = SAPTLEVEL2
      integer :: ic6 = 0
-     integer :: IPrint = 1000
      integer :: iPINO=-1
-     logical :: iCpld = .true.
-     logical :: EnChck = .true., HFCheck =.true.
-     logical :: doRSH = .false., SameOm = .true.
+     integer :: IPrint = 1000
+     logical :: iCpld  = .true.
+     logical :: Cubic  = .false.
+     ! MH : add keyword!
+     logical :: SemiCoupled = .true.
+     logical :: Wexcit  = .false.
+     logical :: noE2exi = .true.
+     logical :: EnChck  = .true., HFCheck=.true.
+     logical :: doRSH   = .false., SameOm = .true.
+     logical :: reduceV = .false.
 
 end type SaptData
 
@@ -1178,7 +1235,6 @@ double precision :: tmp(ntr)
 
  open(newunit=iunit,file=infile,status='OLD', &
       access='SEQUENTIAL',form='UNFORMATTED')
-
  ntdg = 0
  rewind(iunit)
  read(iunit) 
@@ -1420,12 +1476,13 @@ end subroutine get_den
 subroutine get_one_mat(var,mat,mono,nbas)
 implicit none
 
-character(1),intent(in) :: var
-integer,intent(in) :: nbas,mono
+character(1),intent(in)      :: var
+integer,intent(in)           :: nbas,mono
 double precision,intent(out) :: mat(nbas,nbas)
-integer :: ione
-logical :: valid
-character(8) :: label
+
+integer                  :: ione
+logical                  :: valid
+character(8)             :: label
 character(:),allocatable :: onefile
 
  if(mono==1) then
@@ -1476,65 +1533,31 @@ character(:),allocatable :: onefile
 
 end subroutine get_one_mat
 
-subroutine fill_Fmat(Fmat,Occ,NBas,variant)
-implicit none
-
-integer,intent(in) :: NBas,variant
-double precision,intent(in)  :: Occ(NBas)
-double precision,intent(out) :: Fmat(NBas,NBas)
-
-integer :: i,j
-
-Fmat = 0
-select case(variant)
-case(0)
-   ! HF
-   do j=1,NBas
-      do i=1,NBas
-         Fmat(i,j) = Occ(i)*Occ(j)
-      enddo
-   enddo
-case(1)
-   ! BB functional
-   do j=1,NBas
-      do i=1,NBas
-         Fmat(i,j) = sqrt(Occ(i)*Occ(j))
-      enddo
-   enddo
-case(3)
-   ! Power functional
-   write(LOUT,*) 'POWER FUNCITONAL NOT READY YET!'
-   stop
-
-end select
-
-end subroutine fill_Fmat
-
 subroutine basinfo(nbasis,basfile,intf)
 implicit none
 
 character(*),intent(in) :: basfile,intf
 integer,intent(out) :: nbasis
-integer :: iunit 
+integer :: iunit
 integer :: nsym,nbas(8),norb(8),nrhf(8),ioprhf
 logical :: ex
 
  inquire(file=basfile,EXIST=ex)
 
- if(ex) then 
+ if(ex) then
     open(newunit=iunit,file=basfile,status='OLD', &
          access='SEQUENTIAL',form='UNFORMATTED')
-   
+
     if(trim(intf)=='DALTON') then
        ! read basis info
        call readlabel(iunit,'BASINFO ')
-   
+
        read (iunit) nsym,nbas,norb,nrhf,ioprhf
        !write(LOUT,*)  nsym,nbas,norb,nrhf,ioprhf
 
     elseif(trim(intf)=='MOLPRO') then
-       read(iunit) nsym
-       read(iunit) nbas(1:nsym)
+       read(iunit)
+       read(iunit) nsym,nbas(1:nsym)
     endif
 
     close(iunit)

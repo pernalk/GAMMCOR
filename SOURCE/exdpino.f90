@@ -105,8 +105,8 @@ double precision,parameter :: BigE = 1.D8
           RDM2Bval(GdimOB,GdimOB,GdimOB,GdimOB))
  ! get RDM2 for FCI!!!
 
- print*, 'dimOA,GdimOA',dimOA,GdimOA
- print*, 'dimOB,GdimOB',dimOB,GdimOB
+ !print*, 'dimOA,GdimOA',dimOA,GdimOA
+ !print*, 'dimOB,GdimOB',dimOB,GdimOB
 
  do l=1,GdimOA
     do k=1,GdimOA 
@@ -127,8 +127,8 @@ double precision,parameter :: BigE = 1.D8
     enddo
  enddo
 
- print*, 'RDM2A',norm2(RDM2Aval)
- print*, 'RDM2B',norm2(RDM2Bval)
+ !print*, 'RDM2A',norm2(RDM2Aval)
+ !print*, 'RDM2B',norm2(RDM2Bval)
 
  allocate(posA(NBas,NBas),posB(NBas,NBas))
  ! old
@@ -174,7 +174,7 @@ double precision,parameter :: BigE = 1.D8
  enddo
 
  termZ = 2d0*SAPT%e2disp*termZ
- write(LOUT,'(1x,a,f16.8)') 'term Z      = ',  termZ*1.0d3
+! write(LOUT,'(1x,a,f16.8)') 'term Z      = ',  termZ*1.0d3
 
  deallocate(tmp2,tmp1)
  
@@ -351,8 +351,9 @@ double precision,parameter :: BigE = 1.D8
 
  endif
 
- print*, 'sij',norm2(sij)
- print*, 'tmp3',norm2(tmp3)
+ !print*, 'sij',norm2(sij)
+ !print*, 'tmp3',norm2(tmp3)
+
  ! new
  termX = 0d0
  do j=1,B%DimEx
@@ -370,7 +371,7 @@ double precision,parameter :: BigE = 1.D8
  termX = -4d0*termX
 
 ! write(LOUT,*) 'termX ', termX
- write(LOUT,'(/1x,a,f16.8)') 'term X      = ',  termX*1.0d3
+! write(LOUT,'(/1x,a,f16.8)') 'term X      = ',  termX*1.0d3
 
 ! .........
 
@@ -414,9 +415,13 @@ double precision,parameter :: BigE = 1.D8
 !print*, 'Sij-norm',norm2(sij)
 !print*, 'tij-norm',norm2(tmp3)
  termY = -8d0*(SAPT%elst-SAPT%Vnn)*termY
- write(LOUT,'(1x,a,f16.8)') 'term Y      = ',  termY*1.0d3
+
+ if(SAPT%IPrint>2) write(LOUT,'(1x,a,f16.8)') 'term Z      = ',  termZ*1.0d3
+ if(SAPT%IPrint>2) write(LOUT,'(1x,a,f16.8)') 'term Y      = ',  termY*1.0d3
+ if(SAPT%IPrint>2) write(LOUT,'(1x,a,f16.8)') 'term X      = ',  termX*1.0d3
 
  write(LOUT,'(/1x,a,f16.8)') 'E2exch-disp = ', (termX+termY+termZ)*1.0d3
+ SAPT%e2exdisp=(termX+termY+termZ)
 
  deallocate(work,ints)
  deallocate(sij)

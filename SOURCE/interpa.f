@@ -171,7 +171,7 @@ C     do not correlate active degenerate orbitals if from different geminals
      $.Or.
      $ (ICASSCF.Eq.1.
      $ .And.(IndAux(I).Eq.1).And.(IndAux(J).Eq.1) 
-     $ .And.(Abs(Occ(I)-Occ(J))/Occ(I).Lt.1.D-2)) ) Then
+     $ .And.(Abs(Occ(I)-Occ(J))/Occ(I).Lt.ThrSelAct)) ) Then
 C
       Write(6,'(2X,"Discarding nearly degenerate pair ",2I4)')I,J
 C
@@ -322,6 +322,9 @@ C
       Call FragEcorr(ETot,ENuc,ECorrTot,EGOne,EigVecR,Eig,ABPLUS,ABMIN,
      $ UNOAO,Occ,TwoNO,URe,XOne,IndAux,NBasis,NInte1,NInte2,NDim,NGem,
      $ NGOcc,IFl12,NFrag)
+C
+      If(ITwoEl.ne.1) Call DelInts(ITwoEl)
+C      
       Return
 C
       IFlFrag1=1
@@ -363,30 +366,12 @@ C     FFFF and FOFO: ABMATs ALREADY TRUNCATED
 C
       EndIf
 C
-CC     Test diagonal part:
-C!      Do I=1,NDimX
-C!      Write(6,*) ABPLUS(NDimX*(I-1)+I), ABMIN(NDimX*(I-1)+I)
-C!      EndDo
-C      Do I=1,NDim**2
-C      TMP = TMP + ABMIN(I)**2
-C      EndDo
-C      Write(6,*) TMP
-
-C
 C     FIND EIGENVECTORS (EigVecR) AND COMPUTE THE ENERGY
 C
       If(ISERPA.Eq.0) Then
 C
       Call ERPASYMM(EigVecR,Eig,ABPLUS,ABMIN,NBasis,NDimX)
-C      TMP = 0
-C      Do I=1,NDimX**2
-C      TMP = TMP + EigVecR(I)**2
-C      EndDo
-C      Write(6,*) TMP
-C
-C      Do I=1,NDimX
-C      Write(6,*) I, Eig(I), EigVecR(NDimX*(I-1)+I)
-C      EndDo
+
       Write(6,'(/," *** Computing ERPA energy *** ",/)')
 C
       If(ITwoEl.Eq.1) Then
@@ -409,6 +394,17 @@ C
       Write(LOUT,'(1x,a,3f15.8)') 'EGVB+ENuc, Corr, ERPA-GVB',
      $      ETot+ENuc,ECorr,ETot+ENuc+ECorr
 
+      EndIf
+
+C     DELETE MO INTEGRALS 
+      If(ITwoel.Eq.2) Then
+        Open(newunit=iunit,file='TWOMO',status='OLD')
+        Close(iunit,status='DELETE')
+      ElseIf(ITwoel.Eq.3) Then
+        Open(newunit=iunit,file='FFOO',status='OLD')
+        Close(iunit,status='DELETE')
+        Open(newunit=iunit,file='FOFO',status='OLD')
+        Close(iunit,status='DELETE')
       EndIf
 C
 c      Write(6,'(/," *** Computing ERPA 2-RDM *** ")')
@@ -1551,11 +1547,7 @@ C
 C 
       Do K=1,NDimX
 C
-      If(Eig(K).Ge.Zero) Then
-      SQRTEig=SQRT(Eig(K))
-      Else
       SQRTEig=SQRT(Abs(Eig(K)))
-      EndIf
 C
       APLSQRT(I,J)=APLSQRT(I,J)+HlpAB(K,I)*SQRTEig*HlpAB(K,J)
 C
@@ -1571,8 +1563,13 @@ C
       Write(6,*)"The number of negative eigenvalues of A+ is",NoNeg
       EndIf
 C
-      Call MultpM(HlpAB,ABMIN,APLSQRT,NDimX)
-      Call MultpM(EigY,APLSQRT,HlpAB,NDimX)
+C      Call MultpM(HlpAB,ABMIN,APLSQRT,NDimX)
+C      Call MultpM(EigY,APLSQRT,HlpAB,NDimX)
+C
+      Call dgemm('N','N',NDimX,NDimX,NDimX,1d0,ABMIN,NDimX,
+     $           APLSQRT,NDimX,0d0,HlpAB,NDimX)
+      Call dgemm('N','N',NDimX,NDimX,NDimX,1d0,APLSQRT,NDimX,
+     $           HlpAB,NDimX,0d0,EigY,NDimX)
 C
       Call Diag8(EigY,NDimX,NDimX,Eig,Work)
 C
@@ -1584,7 +1581,11 @@ C
       HlpAB(J,I)=EigY(NDimX*(J-1)+I)
       EndDo
       EndDo
-      Call MultpM(EigY,APLSQRT,HlpAB,NDimX)
+
+C      Call MultpM(EigY,APLSQRT,HlpAB,NDimX)
+C
+      Call dgemm('N','N',NDimX,NDimX,NDimX,1d0,APLSQRT,NDimX,
+     $           HlpAB,NDimX,0d0,EigY,NDimX)
 C
 C     IMPOSE THE NORMALIZATION 2 Y*X = 1 ON THE EIGENVECTORS CORRESPONDING TO POSITIVE
 C     OMEGA'S 
@@ -1649,6 +1650,7 @@ C
 
 *Deck ERPASYMM1
       Subroutine ERPASYMM1(EigVecR,Eig,APLSQRT,ABMIN,NBasis,NDimX)
+      use omp_lib
 C
 C     A SYMMETRIZED PROBLEM A+^(1/2) A- A+^(1/2) [A+^(-1/2)] Y = om^2 [A+^(-1/2)] Y IS SOLVED
 C
@@ -1690,6 +1692,7 @@ C
       Call CpyM(HlpAB,APLSQRT,NDimX)
       Call Diag8(HlpAB,NDimX,NDimX,Eig,Work)
 C
+!$OMP PARALLEL DO DEFAULT(PRIVATE) SHARED(APLSQRT,HlpAB,Eig,NDimX)
       Do I=1,NDimX
 C
       If(Eig(I).Lt.Zero) NoNeg=NoNeg+1
@@ -1700,11 +1703,7 @@ C
 C 
       Do K=1,NDimX
 C
-      If(Eig(K).Ge.Zero) Then
-      SQRTEig=SQRT(Eig(K))
-      Else
       SQRTEig=SQRT(Abs(Eig(K)))
-      EndIf
 C
       APLSQRT(I,J)=APLSQRT(I,J)+HlpAB(K,I)*SQRTEig*HlpAB(K,J)
 C
@@ -1714,6 +1713,7 @@ C
 C
       EndDo
       EndDo
+!$OMP END PARALLEL DO 
 C
       If(NoNeg.Ne.0) Then
       Write(6,*)"The ERPA A+ matrix is not nonnegative definite"
@@ -1745,6 +1745,7 @@ C     OMEGA'S
 C
 C     SINCE X = Om^-1 ABMIN.Y THEN THE NORMALIZATION READS 2 Om^-1 Y^T AMIN Y = 1
 C
+!$OMP PARALLEL DO DEFAULT(PRIVATE) SHARED(EigVecR,NDimX,Eig,ABMIN)
       Do NU=1,NDimX
       SumNU=Zero
 C
@@ -1772,6 +1773,7 @@ C
       EndIf
 c     enddo NU
       EndDo
+!$OMP END PARALLEL DO 
 C
       Write(6,*)"ERPA equation solved"
 C
@@ -2035,7 +2037,7 @@ C
 C     do not correlate active degenerate orbitals if from different geminals
       If((IAuxGem(I).Ne.IAuxGem(J)).And.(IndAux(I).Eq.1).And.
      $ (IndAux(J).Eq.1)
-     $ .And.(Abs(Occ(I)-Occ(J))/Occ(I).Lt.1.D-2) ) Then
+     $ .And.(Abs(Occ(I)-Occ(J))/Occ(I).Lt.ThrSelAct) ) Then
 C
       Write(*,*)"Discarding nearly degenerate pair",I,J
 C
@@ -2261,7 +2263,8 @@ C
 C
 C     do not correlate degenerate active degenerate orbitals if from different geminals
       If((IAuxGem(I).Ne.IAuxGem(J)).And.(IndAux(I).Eq.1).And.
-     $ (IndAux(J).Eq.1).And.(Abs(Occ(I)-Occ(J))/Occ(I).Lt.1.D-2) ) Then
+     $ (IndAux(J).Eq.1).And.(Abs(Occ(I)-Occ(J))/Occ(I).Lt.ThrSelAct) )
+     $ Then
 C
       Write(*,*)"Discarding nearly degenerate pair",I,J
 C
@@ -2508,7 +2511,7 @@ C
 C     do not correlate idegenerate active degenerate orbitals if from different geminals
       If((IAuxGem(I).Ne.IAuxGem(J)).And.(IndAux(I).Eq.1).And.
      $ (IndAux(J).Eq.1)
-     $ .And.(Abs(Occ(I)-Occ(J))/Occ(I).Lt.1.D-2) ) Then
+     $ .And.(Abs(Occ(I)-Occ(J))/Occ(I).Lt.ThrSelAct) ) Then
 C     
       Write(*,*)"Discarding nearly degenerate pair",I,J
 C
@@ -3731,7 +3734,7 @@ C
       Open(10,File="rdm2.dat",Status='Old')
       Write(6,'(/,1X,''Active block of 2-RDM read from rdm2.dat'')')
 C
-   10 Read(10,'(4I4,F19.12)',End=40)I,J,K,L,X
+   10 Read(10,*,End=40)I,J,K,L,X
 C
 C     X IS DEFINED AS: < E(IJ)E(KL) > - DELTA(J,K) < E(IL) > = 2 GAM2(JLIK)
 C
@@ -4176,7 +4179,7 @@ C
       Open(10,File="rdm2.dat",Status='Old')
       Write(6,'(/,1X,''Active block of 2-RDM read from rdm2.dat'')')
 C
-   10 Read(10,'(4I4,F19.12)',End=40)I,J,K,L,X
+   10 Read(10,*,End=40)I,J,K,L,X
       I=Ind1(I)
       J=Ind1(J)
       K=Ind1(K)
@@ -4613,7 +4616,7 @@ C
       Open(10,File="rdm2.dat",Status='Old')
       Write(6,'(/,1X,''Active block of 2-RDM read from rdm2.dat'')')
 C
-   10 Read(10,'(4I4,F19.12)',End=40)I,J,K,L,X
+   10 Read(10,*,End=40)I,J,K,L,X
       I=Ind1(I)
       J=Ind1(J)
       K=Ind1(K)

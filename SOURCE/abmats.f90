@@ -1390,8 +1390,10 @@ end subroutine AB_CAS_mithap
 !end subroutine AB_CAS_assemb
 
 subroutine Y01CAS_mithap(Occ,URe,XOne,ABPLUS,ABMIN, &
-     EigY,EigY1,Eig,Eig1, &
-     IndN,IndX,IGemIN,NAct,INActive,NDimX,NBasis,NDim,NInte1,IntFileName,IFlag0)
+     propfile0,propfile1, & 
+     y01file,&
+     IndN,IndX,IGemIN,NAct,INActive,NDimX,NBasis,NDim,NInte1, &
+     NoSt,IntFileName,IFlag0)
 !
 !     A ROUTINE FOR COMPUTING Y VECTORS AND EIGENVALUES OF ERPA 
 !     IN THE 1ST-ORDER APPROXIMATION
@@ -1400,11 +1402,12 @@ subroutine Y01CAS_mithap(Occ,URe,XOne,ABPLUS,ABMIN, &
 !              0 - compute both 0th-order and 1st-order Y [EigY1] and omega [Eig1]
 implicit none
 
-integer,intent(in) :: NAct,INActive,NDimX,NBasis,NDim,NInte1
+integer,intent(in) :: NAct,INActive,NDimX,NBasis,NDim,NInte1,NoSt
 character(*) :: IntFileName
+character(*) :: propfile0,propfile1,y01file
 double precision,intent(out) :: ABPLUS(NDimX,NDimX),ABMIN(NDimX,NDimX)
-double precision,intent(out) :: EigY(NDimX,NDimX),EigY1(NDimX,NDimX)
-double precision,intent(out) :: Eig(NDimX),Eig1(NDimX)
+!double precision,intent(out) :: EigY(NDimX,NDimX),EigY1(NDimX,NDimX)
+!double precision,intent(out) :: Eig(NDimX),Eig1(NDimX)
 double precision,intent(in)  :: URe(NBasis,NBasis),Occ(NBasis),XOne(NInte1)
 integer,intent(in) :: IndN(2,NDim),IndX(NDim),IGemIN(NBasis),IFlag0
 
@@ -1419,17 +1422,23 @@ double precision :: HNO(NBasis,NBasis),AuxI(NBasis,NBasis),AuxIO(NBasis,NBasis),
 double precision :: AuxCoeff(3,3,3,3),AuxVal,val
 double precision :: EnDummy
 double precision,allocatable :: RDM2val(:,:,:,:),RDM2Act(:)
-double precision,allocatable :: work1(:),work2(:)
+double precision,allocatable :: work1(:),work2(:),workA(:,:)
 double precision,allocatable :: ints(:,:)
+double precision,allocatable :: EigY(:,:),EigY1(:,:)
+double precision,allocatable :: Eig(:),Eig1(:)
 double precision,allocatable :: EigYt(:,:),EigXt(:,:),Eigt(:)
 double precision,allocatable :: ABP(:,:),ABM(:,:)
 integer,external :: NAddrRDM
 double precision,external :: FRDM2
-integer :: ii,jj,ipos
+integer :: ii,jj,ipos,jpos,iblk,jblk,nblk
 integer :: nAA,tmpAA(NAct*(NAct-1)/2),limAA(2)
 integer :: nAI(INActive),tmpAI(NAct,1:INActive),limAI(2,1:INActive)
 integer :: nAV(INActive+NAct+1:NBasis),tmpAV(NAct,INActive+NAct+1:NBasis),limAV(2,INActive+NAct+1:NBasis)
 integer :: nIV,tmpIV(INActive*(NBasis-NAct-INActive)),limIV(2)
+!
+type(EblockData) :: Eblock(1+NBasis-NAct)
+type(EblockData) :: EblockIV
+!
 double precision,parameter :: Thresh = 1.D-12
 
 ABPLUS = 0
@@ -2141,98 +2150,226 @@ do ICol=1,NDimX
 
 enddo
 
-EigY1 = 0
-EigY = 0
-
-i = limAA(1)
-j = limAA(2)
-!! write(*,*) 'AB0-my',norm2(ABPLUS(i:j,i:j)),norm2(ABMIN(i:j,i:j))
-!!$write(*,*) 'AB+',norm2(ABPLUS(i:j,i:j)-transpose(ABPLUS(i:j,i:j)))
-!!$write(*,*) 'AB-',norm2(ABMIN(i:j,i:j)-transpose(ABMIN(i:j,i:j)))
-
-if(nAA>0) then
-   allocate(ABP(nAA,nAA),ABM(nAA,nAA),EigYt(nAA,nAA),EigXt(nAA,nAA),Eigt(nAA))
-
-   ABP = ABPLUS(i:j,i:j)
-   ABM = ABMIN(i:j,i:j)
-   call ERPASYMM0(EigYt,EigXt,Eigt,ABP,ABM,nAA)
-   
-   do ii=1,nAA
-      ipos = tmpAA(ii)
-      EigY(ipos,i:j) = EigYt(ii,1:nAA)
-      if(IFlag0==0) EigY1(ipos,i:j) = EigXt(ii,1:nAA)
-   enddo
-   Eig(i:j) = Eigt(1:nAA)
-
-   deallocate(Eigt,EigXt,EigYt,ABM,ABP)
-endif
-   
-   do iq=1,INActive
-      i = limAI(1,iq)
-      j = limAI(2,iq)
-      if(nAI(iq)>0) then
-!!$   write(*,*) 'ABai-my',iq,norm2(ABPLUS(i:j,i:j)),norm2(ABMIN(i:j,i:j))
-!!$   write(*,*) 'AB+',iq,norm2(ABPLUS(i:j,i:j)-transpose(ABPLUS(i:j,i:j)))
-!!$   write(*,*) 'AB-',iq,norm2(ABMIN(i:j,i:j)-transpose(ABMIN(i:j,i:j)))
-
-      allocate(ABP(nAI(iq),nAI(iq)),ABM(nAI(iq),nAI(iq)),&
-           EigYt(nAI(iq),nAI(iq)),EigXt(nAI(iq),nAI(iq)),Eigt(nAI(iq)))
-
-      ABP = ABPLUS(i:j,i:j)
-      ABM = ABMIN(i:j,i:j)
-      call ERPASYMM0(EigYt,EigXt,Eigt,ABP,ABM,nAI(iq))
-   
-      do ii=1,nAI(iq)
-         ipos = tmpAI(ii,iq)
-         EigY(ipos,i:j) = EigYt(ii,1:nAI(iq))
-         if(IFlag0==0) EigY1(ipos,i:j) = EigXt(ii,1:nAI(iq))
-      enddo
-      Eig(i:j) = Eigt(1:nAI(iq))
-      
-      deallocate(Eigt,EigXt,EigYt,ABM,ABP)
-      endif 
-   enddo
-
-   do ip=NOccup+1,NBasis
-      i = limAV(1,ip)
-      j = limAV(2,ip)
-!!$   write(*,*) 'ABav-my',ip,norm2(ABPLUS(i:j,i:j)),norm2(ABMIN(i:j,i:j))
-!!$   write(*,*) 'AB+',ip,norm2(ABPLUS(i:j,i:j)-transpose(ABPLUS(i:j,i:j)))
-!!$   write(*,*) 'AB-',ip,norm2(ABMIN(i:j,i:j)-transpose(ABMIN(i:j,i:j)))
-      if(nAV(ip)>0) then
-      allocate(ABP(nAV(ip),nAV(ip)),ABM(nAV(ip),nAV(ip)),&
-           EigYt(nAV(ip),nAV(ip)),EigXt(nAV(ip),nAV(ip)),Eigt(nAV(ip)))
-
-      ABP = ABPLUS(i:j,i:j)
-      ABM = ABMIN(i:j,i:j)
-      call ERPASYMM0(EigYt,EigXt,Eigt,ABP,ABM,nAV(ip))
-
-      do ii=1,nAV(ip)
-         ipos = tmpAV(ii,ip)
-         EigY(ipos,i:j) = EigYt(ii,1:nAV(ip))
-         if(IFlag0==0) EigY1(ipos,i:j) = EigXt(ii,1:nAV(ip))
-      enddo
-      Eig(i:j) = Eigt(1:nAV(ip))
-   
-      deallocate(Eigt,EigXt,EigYt,ABM,ABP)
-      endif
-   enddo
+!! MH: 18.12.2019 : old code
+!EigY1 = 0
+!EigY = 0
+!
+!i = limAA(1)
+!j = limAA(2)
+!!! write(*,*) 'AB0-my',norm2(ABPLUS(i:j,i:j)),norm2(ABMIN(i:j,i:j))
+!!!$write(*,*) 'AB+',norm2(ABPLUS(i:j,i:j)-transpose(ABPLUS(i:j,i:j)))
+!!!$write(*,*) 'AB-',norm2(ABMIN(i:j,i:j)-transpose(ABMIN(i:j,i:j)))
+!
+!if(nAA>0) then
+!   allocate(ABP(nAA,nAA),ABM(nAA,nAA),EigYt(nAA,nAA),EigXt(nAA,nAA),Eigt(nAA))
+!
+!   ABP = ABPLUS(i:j,i:j)
+!   ABM = ABMIN(i:j,i:j)
+!   call ERPASYMM0(EigYt,EigXt,Eigt,ABP,ABM,nAA)
+!   
+!   do ii=1,nAA
+!      ipos = tmpAA(ii)
+!      EigY(ipos,i:j) = EigYt(ii,1:nAA)
+!      if(IFlag0==0) EigY1(ipos,i:j) = EigXt(ii,1:nAA)
+!   enddo
+!   Eig(i:j) = Eigt(1:nAA)
+!
+!   deallocate(Eigt,EigXt,EigYt,ABM,ABP)
 !endif
+!   
+!   do iq=1,INActive
+!      i = limAI(1,iq)
+!      j = limAI(2,iq)
+!      if(nAI(iq)>0) then
+!!!$   write(*,*) 'ABai-my',iq,norm2(ABPLUS(i:j,i:j)),norm2(ABMIN(i:j,i:j))
+!!!$   write(*,*) 'AB+',iq,norm2(ABPLUS(i:j,i:j)-transpose(ABPLUS(i:j,i:j)))
+!!!$   write(*,*) 'AB-',iq,norm2(ABMIN(i:j,i:j)-transpose(ABMIN(i:j,i:j)))
+!
+!      allocate(ABP(nAI(iq),nAI(iq)),ABM(nAI(iq),nAI(iq)),&
+!           EigYt(nAI(iq),nAI(iq)),EigXt(nAI(iq),nAI(iq)),Eigt(nAI(iq)))
+!
+!      ABP = ABPLUS(i:j,i:j)
+!      ABM = ABMIN(i:j,i:j)
+!      call ERPASYMM0(EigYt,EigXt,Eigt,ABP,ABM,nAI(iq))
+!   
+!      do ii=1,nAI(iq)
+!         ipos = tmpAI(ii,iq)
+!         EigY(ipos,i:j) = EigYt(ii,1:nAI(iq))
+!         if(IFlag0==0) EigY1(ipos,i:j) = EigXt(ii,1:nAI(iq))
+!      enddo
+!      Eig(i:j) = Eigt(1:nAI(iq))
+!      
+!      deallocate(Eigt,EigXt,EigYt,ABM,ABP)
+!      endif 
+!   enddo
+!
+!   do ip=NOccup+1,NBasis
+!      i = limAV(1,ip)
+!      j = limAV(2,ip)
+!!!$   write(*,*) 'ABav-my',ip,norm2(ABPLUS(i:j,i:j)),norm2(ABMIN(i:j,i:j))
+!!!$   write(*,*) 'AB+',ip,norm2(ABPLUS(i:j,i:j)-transpose(ABPLUS(i:j,i:j)))
+!!!$   write(*,*) 'AB-',ip,norm2(ABMIN(i:j,i:j)-transpose(ABMIN(i:j,i:j)))
+!      if(nAV(ip)>0) then
+!      allocate(ABP(nAV(ip),nAV(ip)),ABM(nAV(ip),nAV(ip)),&
+!           EigYt(nAV(ip),nAV(ip)),EigXt(nAV(ip),nAV(ip)),Eigt(nAV(ip)))
+!
+!      ABP = ABPLUS(i:j,i:j)
+!      ABM = ABMIN(i:j,i:j)
+!      call ERPASYMM0(EigYt,EigXt,Eigt,ABP,ABM,nAV(ip))
+!
+!      do ii=1,nAV(ip)
+!         ipos = tmpAV(ii,ip)
+!         EigY(ipos,i:j) = EigYt(ii,1:nAV(ip))
+!         if(IFlag0==0) EigY1(ipos,i:j) = EigXt(ii,1:nAV(ip))
+!      enddo
+!      Eig(i:j) = Eigt(1:nAV(ip))
+!   
+!      deallocate(Eigt,EigXt,EigYt,ABM,ABP)
+!      endif
+!   enddo
+!!endif
+!
+!do i=limIV(1),limIV(2)
+!   ii = tmpIV(i-limIV(1)+1)
+!   ip = IndN(1,ii)
+!   iq = IndN(2,ii)
+!   ! write(*,*) 'ABiv-my',ip,iq,ABPLUS(i,i)
+!   Eig(i) = ABPLUS(i,i)
+!enddo
+!do ii=1,nIV
+!   i = tmpiV(ii)
+!   EigY(i,limIV(1)+ii-1) = 1d0/sqrt(2d0)
+!   if(IFlag0==0) EigY1(i,limIV(1)+ii-1) = 1d0/sqrt(2d0)
+!enddo
+!
+!deallocate(work1)
+!
+!if(IFlag0==1) return
+!
+!! AB(1) PART
+!call AB_CAS_mithap(ABPLUS,ABMIN,EnDummy,URe,Occ,XOne,&
+!              IndN,IndX,IGem,NAct,INActive,NDimX,NBasis,NDimX,&
+!              NInte1,IntFileName,1d0,.true.)
+!
+!allocate(work1(NDimX**2))
+!! work1=ABPLUS.EigX
+!! ABPLUS=work1.EigX
+!call dgemm('N','N',NDimX,NDimX,NDimX,1d0,ABPLUS,NDimX,EigY1,NDimX,0d0,work1,NDimX) 
+!call dgemm('T','N',NDimX,NDimX,NDimX,1d0,work1,NDimX,EigY1,NDimX,0d0,ABPLUS,NDimX)
+!
+!! work1=ABMIN.EigY
+!! ABMIN=work1.EigY
+!call dgemm('N','N',NDimX,NDimX,NDimX,1d0,ABMIN,NDimX,EigY,NDimX,0d0,work1,NDimX) 
+!call dgemm('T','N',NDimX,NDimX,NDimX,1d0,work1,NDimX,EigY,NDimX,0d0,ABMIN,NDimX)
 
-do i=limIV(1),limIV(2)
-   ii = tmpIV(i-limIV(1)+1)
-   ip = IndN(1,ii)
-   iq = IndN(2,ii)
-   ! write(*,*) 'ABiv-my',ip,iq,ABPLUS(i,i)
-   Eig(i) = ABPLUS(i,i)
-enddo
-do ii=1,nIV
-   i = tmpiV(ii)
-   EigY(i,limIV(1)+ii-1) = 1d0/sqrt(2d0)
-   if(IFlag0==0) EigY1(i,limIV(1)+ii-1) = 1d0/sqrt(2d0)
+! MH: 18.12.2019, new code
+nblk = 0
+
+! put pack into separate subroutine
+!pack AA
+if(nAA>0) then
+
+   nblk = nblk + 1
+   associate(B => Eblock(nblk))
+     B%n  = nAA
+     B%l1 = limAA(1)
+     B%l2 = limAA(2)
+     allocate(B%pos(B%n))
+     B%pos(1:B%n) = tmpAA(1:B%n)
+
+     allocate(B%vec(B%n),B%matX(B%n,B%n),B%matY(B%n,B%n))
+     allocate(ABP(B%n,B%n),ABM(B%n,B%n))
+
+     ABP = ABPLUS(B%l1:B%l2,B%l1:B%l2)
+     ABM = ABMIN(B%l1:B%l2,B%l1:B%l2)
+     if(NoSt==1) then
+        call ERPASYMM0(B%matY,B%matX,B%vec,ABP,ABM,B%n)
+     elseif(NoSt>1) then
+        call ERPAVECYX(B%matY,B%matX,B%vec,ABP,ABM,B%n)
+     endif
+   
+     deallocate(ABM,ABP)
+   
+   end associate
+
+endif
+
+!pack AI
+do iq=1,INActive
+   if(nAI(iq)>0) then
+
+      nblk = nblk + 1
+      associate(B => Eblock(nblk))
+        B%n  = nAI(iq)
+        B%l1 = limAI(1,iq)
+        B%l2 = limAI(2,iq)
+        allocate(B%pos(B%n))
+        B%pos(1:B%n) = tmpAI(1:B%n,iq)
+
+        allocate(B%vec(B%n),B%matX(B%n,B%n),B%matY(B%n,B%n))
+        allocate(ABP(B%n,B%n),ABM(B%n,B%n))
+  
+        ABP = ABPLUS(B%l1:B%l2,B%l1:B%l2)
+        ABM = ABMIN(B%l1:B%l2,B%l1:B%l2)
+        if(NoSt==1) then
+           call ERPASYMM0(B%matY,B%matX,B%vec,ABP,ABM,B%n)
+        elseif(NoSt>1) then
+           call ERPAVECYX(B%matY,B%matX,B%vec,ABP,ABM,B%n)
+        endif
+      
+        deallocate(ABM,ABP)
+
+      end associate
+
+   endif
 enddo
 
-deallocate(work1)
+!pack AV
+do ip=NOccup+1,NBasis
+   if(nAV(ip)>0) then
+
+      nblk = nblk + 1
+      associate(B => Eblock(nblk))
+        B%n  = nAV(ip)
+        B%l1 = limAV(1,ip)
+        B%l2 = limAV(2,ip)
+        allocate(B%pos(B%n))
+        B%pos(1:B%n) = tmpAV(1:B%n,ip)
+
+        allocate(B%vec(B%n),B%matX(B%n,B%n),B%matY(B%n,B%n))
+        allocate(ABP(B%n,B%n),ABM(B%n,B%n))
+  
+        ABP = ABPLUS(B%l1:B%l2,B%l1:B%l2)
+        ABM = ABMIN(B%l1:B%l2,B%l1:B%l2)
+        if(NoSt==1) then
+           call ERPASYMM0(B%matY,B%matX,B%vec,ABP,ABM,B%n)
+        elseif(NoSt>1) then
+           call ERPAVECYX(B%matY,B%matX,B%vec,ABP,ABM,B%n)
+        endif
+      
+        deallocate(ABM,ABP)
+
+      end associate
+
+    endif
+enddo
+
+!pack IV
+associate(B => EblockIV)
+
+  B%l1 = limIV(1)
+  B%l2 = limIV(2)
+  B%n  = B%l2-B%l1+1
+  allocate(B%pos(B%n))
+  B%pos(1:B%n) = tmpIV(1:B%n)
+
+  allocate(B%vec(B%n))
+  do i=1,B%n
+     ii = B%l1+i-1
+     B%vec(i) = ABPLUS(ii,ii)
+  enddo
+
+end associate
 
 if(IFlag0==1) return
 
@@ -2241,37 +2378,187 @@ call AB_CAS_mithap(ABPLUS,ABMIN,EnDummy,URe,Occ,XOne,&
               IndN,IndX,IGem,NAct,INActive,NDimX,NBasis,NDimX,&
               NInte1,IntFileName,1d0,.true.)
 
-allocate(work1(NDimX**2))
-! work1=ABPLUS.EigX
-! ABPLUS=work1.EigX
-call dgemm('N','N',NDimX,NDimX,NDimX,1d0,ABPLUS,NDimX,EigY1,NDimX,0d0,work1,NDimX) 
-call dgemm('T','N',NDimX,NDimX,NDimX,1d0,work1,NDimX,EigY1,NDimX,0d0,ABPLUS,NDimX)
+! B = A.X
+! C = X^T.B
+allocate(workA(NDimX,NDimX))
 
-! work1=ABMIN.EigY
-! ABMIN=work1.EigY
-call dgemm('N','N',NDimX,NDimX,NDimX,1d0,ABMIN,NDimX,EigY,NDimX,0d0,work1,NDimX) 
-call dgemm('T','N',NDimX,NDimX,NDimX,1d0,work1,NDimX,EigY,NDimX,0d0,ABMIN,NDimX)
+call ABPM_TRAN(ABPLUS,workA,EBlock,EBlockIV,nblk,NDimX,.true.)
+ABPLUS=workA
+call ABPM_TRAN(ABMIN,workA,EBlock,EBlockIV,nblk,NDimX,.false.)
+ABMIN=workA
 
-do i=1,NDimX
-   Eig1(i)=ABPLUS(i,i)+ABMIN(i,i)
+deallocate(workA)
+
+!! EBlock --> Y01Block
+! block
+! type(Y01BlockData) :: Y01Block(NDimX)
+!
+! do iblk=1,nblk
+!   associate(B => Eblock(iblk))
+!
+!     do i=1,B%n
+!        ipos = B%pos(i)
+!        associate(Y => Y01Block(ipos))
+!
+!          Y%n = B%n
+!          Y%l1 = B%l1
+!          Y%l2 = B%l2
+!          allocate(Y%vec0(Y%n))
+!          Y%vec0(1:Y%n) = B%matY(i,1:Y%n)
+!
+!        end associate
+!     enddo
+!
+!   end associate
+! enddo
+!
+! associate(B => EblockIV)
+! 
+!   do i=1,B%n
+!      ii = B%l1+i-1
+!      ipos = B%pos(i)
+!      associate(Y => Y01Block(ipos))
+!        
+!        Y%n = 1
+!        Y%l1 = ii
+!        Y%l2 = ii
+!        allocate(Y%vec0(1))
+!        Y%vec0(1) = 1d0/sqrt(2d0)
+!      end associate
+!   enddo
+! 
+! end associate
+!
+! ! dump to a file
+! open(newunit=iunit,file=y01file,form='unformatted')
+! do i=1,NDimX
+!    associate(Y => Y01Block(i))
+!      write(iunit) i, Y%n, Y%l1, Y%l2
+!      write(iunit) Y%vec0
+!    end associate
+! enddo
+! close(iunit)
+!
+! do i=1,NDimX
+!    associate(Y => Y01Block(i))
+!      deallocate(Y%vec0)
+!    end associate
+! enddo
+!
+! end block
+
+ allocate(EigY(NDimX,NDimX),Eig(NDimX))
+ if(IFlag0==0) allocate(EigY1(NDimX,NDimX),Eig1(NDimX),workA(NDimX,NDimX))
+ 
+ EigY = 0
+ Eig  = 0
+
+! unpack Eig (1)
+do iblk=1,nblk
+   associate(B => Eblock(iblk))
+
+     do i=1,B%n
+        ipos = B%pos(i)
+        EigY(ipos,B%l1:B%l2) = B%matY(i,1:B%n)
+        if(IFlag0==0) EigY1(ipos,B%l1:B%l2) = B%matX(i,1:B%n)
+     enddo
+     Eig(B%l1:B%l2) = B%vec(1:B%n)
+
+     deallocate(B%matY,B%matX,B%vec)
+     deallocate(B%pos)
+
+   end associate
 enddo
+!unpack Eig (2, IV part)
+associate(B => EblockIV)
 
-EigY1 = 0
-do j=1,NDimX
-   if(Eig(j)/=0d0) then
-      do i=1,NDimX
-         if(Eig(i)/=0d0) then
-            val = (ABPLUS(i,j)-ABMIN(i,j))/(Eig(i)+Eig(j))
-            if(Abs(Eig(i)-Eig(j))>Thresh) then
-               val = val + (ABPLUS(i,j)+ABMIN(i,j))/(Eig(j)-Eig(i))
+  do i=1,B%n
+     ii = B%l1+i-1
+     ipos = B%pos(i)
+     EigY(ipos,ii) = 1d0/sqrt(2d0)
+     if(IFlag0==0) EigY1(ipos,ii) = 1d0/sqrt(2d0)
+     Eig(ii) = B%vec(i)
+  enddo
+
+  deallocate(B%vec)
+  deallocate(B%pos)
+
+end associate
+
+if(IFlag0==0) then
+
+   do i=1,NDimX
+      Eig1(i)=ABPLUS(i,i)+ABMIN(i,i)
+   enddo
+
+   EigY1 = 0
+   do j=1,NDimX
+      if(Eig(j)/=0d0) then
+         do i=1,NDimX
+            if(Eig(i)/=0d0) then
+               val = (ABPLUS(i,j)-ABMIN(i,j))/(Eig(i)+Eig(j))
+               if(Abs(Eig(i)-Eig(j))>Thresh) then
+                  val = val + (ABPLUS(i,j)+ABMIN(i,j))/(Eig(j)-Eig(i))
+               endif
+               do ii=1,NDimX
+                  EigY1(ii,j) = EigY1(ii,j) + val*EigY(ii,i)
+               enddo
             endif
-            do ii=1,NDimX
-               EigY1(ii,j) = EigY1(ii,j) + val*EigY(ii,i)
-            enddo
-         endif
-      enddo
-   endif
-enddo
+         enddo
+      endif
+   enddo
+   !!EigY1 = 0
+   !workA=0
+   !do j=1,NDimX
+   !   if(Eig(j)/=0d0) then
+   !      do i=1,NDimX
+   !         if(Eig(i)/=0d0) then
+   !            workA(i,j) = (ABPLUS(i,j)-ABMIN(i,j))/(Eig(i)+Eig(j))
+   !            if(Abs(Eig(i)-Eig(j))>Thresh) then
+   !               workA(i,j) = workA(i,j) + (ABPLUS(i,j)+ABMIN(i,j))/(Eig(j)-Eig(i))
+   !            endif
+   !         endif
+   !      enddo
+   !   endif
+   !enddo
+   !
+   !call dgemm('N','N',NDimX,NDimX,NDimX,1d0,EigY,NDimX,workA,NDimX,0d0,EigY1,NDimX)
+
+   deallocate(workA)
+endif
+
+! dump response to a file!
+open(newunit=iunit,file=propfile0,form='unformatted')
+write(iunit) EigY
+write(iunit) Eig
+close(iunit)
+if(IFlag0==0) then
+
+   open(newunit=iunit,file=propfile1,form='unformatted')
+   write(iunit) EigY1
+   write(iunit) Eig1
+   close(iunit)
+endif
+
+deallocate(EigY,Eig)
+if(IFlag0==0) deallocate(EigY1,Eig1)
+
+!! deallocate blocks
+!do iblk=1,nblk
+!   associate(B => Eblock(iblk))
+!
+!     deallocate(B%matY,B%matX,B%vec)
+!     deallocate(B%pos)
+!
+!   end associate
+!enddo
+!! (IV part)
+!associate(B => EblockIV)
+!
+!  deallocate(B%vec)
+!  deallocate(B%pos)
+!
+!end associate
 
 !! for AC0Corr
 !EigY1 = 0
@@ -2361,11 +2648,12 @@ enddo
 !!$write(LOUT,*) 'WMAT-my', 2d0*norm2(WMAT)
 !!$write(LOUT,*) 'WMAT-norm',norm2(WMAT(1:NOccup,1:NOccup)-transpose(WMAT(1:NOccup,1:NOccup)))
 
-
 deallocate(RDM2val)
 deallocate(ints,work2,work1)
 
 end subroutine Y01CAS_mithap
+
+
 
 subroutine ACABMAT0_mithap(AMAT,BMAT,URe,Occ,XOne,&
                IndN,IndX,IGem,C, &
@@ -2778,6 +3066,123 @@ print*, "AB-my",norm2(AMAT),norm2(BMAT)
 deallocate(ints,work2,work1)
 
 end subroutine ACABMAT0_mithap
+
+subroutine ModABMin_mithap(Occ,SRKer,Wt,OrbGrid,ABMin,IndN,IndX,NDimX,NGrid,NBasis,&
+                           twofile,twoerfile)
+! ADD CONTRIBUTIONS FROM THE srALDA KERNEL TO AB MATRICES
+implicit none
+
+integer,parameter :: maxlen = 128
+integer,intent(in) :: NBasis,NDimX,NGrid
+integer,intent(in) :: IndN(2,NDimX),IndX(NDimX)
+character(*),intent(in) :: twofile,twoerfile
+double precision,intent(in) :: Occ(NBasis),SRKer(NGrid), &
+                               Wt(NGrid),OrbGrid(NGrid,NBasis)
+double precision,intent(inout) :: ABMin(NDimX,NDimX)
+
+integer :: offset,batchlen,iunit1,iunit2
+integer :: i,j,k,l,kl,ip,iq,ir,is,irs,ipq,igrd
+integer :: IRow,ICol
+double precision :: XKer1234,TwoSR,Cpq,Crs
+integer :: pos(NBasis,NBasis)
+double precision :: CICoef(NBasis)
+double precision,allocatable :: work1(:),work2(:),WtKer(:)
+double precision,allocatable :: batch(:,:),ABKer(:,:)
+double precision,allocatable :: ints1(:,:),ints2(:,:)
+
+do i=1,NBasis
+   CICoef(i) = sign(sqrt(Occ(i)),Occ(i)-0.5d0)
+enddo
+
+allocate(work1(NBasis**2),work2(NBasis**2),&
+         ints1(NBasis,NBasis),ints2(NBasis,NBasis),&
+         WtKer(maxlen),batch(maxlen,NBasis),ABKer(NDimX,NDimX))
+
+pos = 0
+do i=1,NDimX
+   pos(IndN(1,i),IndN(2,i)) = IndX(i)
+enddo
+
+ABKer = 0
+
+!print*, 'ModABMin_mithap'
+
+do offset=0,NGrid,maxlen
+   batchlen = min(NGrid-offset,maxlen)
+   if(batchlen==0) exit
+
+   WtKer(1:batchlen) = Wt(offset+1:offset+batchlen)*SRKer(offset+1:offset+batchlen)
+   batch(1:batchlen,1:NBasis) = OrbGrid(offset+1:offset+batchlen,1:NBasis)
+
+   do IRow=1,NDimX
+      ip = IndN(1,IRow)
+      iq = IndN(2,IRow)
+      ipq = IndX(IRow)
+   
+      do ICol=1,NDimX
+         ir=IndN(1,ICol)
+         is=IndN(2,ICol)
+         irs=IndX(ICol)
+         if(irs.gt.ipq) cycle
+    
+         XKer1234 = 0
+         do i=1,batchlen
+            XKer1234 = XKer1234 + WtKer(i)* &
+            batch(i,ip)*batch(i,iq)*batch(i,ir)*batch(i,is)
+         enddo
+         
+         ABKer(ipq,irs) = ABKer(ipq,irs) + XKer1234
+         ABKer(irs,ipq) = ABKer(ipq,irs)
+      
+      enddo
+   enddo
+
+enddo
+
+open(newunit=iunit1,file=trim(twofile),status='OLD', &
+     access='DIRECT',recl=8*NBasis*(NBasis+1)/2)
+open(newunit=iunit2,file=trim(twoerfile),status='OLD', &
+     access='DIRECT',recl=8*NBasis*(NBasis+1)/2)
+
+kl = 0
+do l=1,NBasis
+   do k=1,l
+      kl = kl + 1   
+      if(pos(l,k)/=0) then
+        irs = pos(l,k)
+        read(iunit1,rec=kl) work1(1:NBasis*(NBasis+1)/2)
+        call triang_to_sq2(work1,ints1,NBasis)
+        read(iunit2,rec=kl) work2(1:NBasis*(NBasis+1)/2)
+        call triang_to_sq2(work2,ints2,NBasis)
+
+        do j=1,NBasis
+           do i=1,j
+              if(pos(j,i)/=0) then
+                ipq = pos(j,i)
+                Crs = CICoef(l)+CICoef(k)
+                Cpq = CICoef(j)+CICoef(i)
+                !if(irs.gt.ipq) cycle
+
+                TwoSR = ints1(i,j)-ints2(i,j)
+
+                ABMIN(ipq,irs) = ABMIN(ipq,irs) & 
+                               + 4.0d0*Cpq*Crs*(TwoSR+ABKer(ipq,irs))
+                !ABMIN(irs,ipq) = ABMIN(ipq,irs) 
+
+              endif  
+           enddo
+        enddo
+
+      endif 
+   enddo
+enddo 
+
+close(iunit1)
+close(iunit2)
+
+deallocate(ABKer,batch,WtKer,ints2,ints1,work2,work1)
+
+end subroutine ModABMin_mithap
 
 subroutine FockGen_mithap(Fock,OneRdm,XOne,NInte1,NBasis,IntFileName)
 !
@@ -3254,5 +3659,127 @@ deallocate(Skipped)
 deallocate(ints,work)
 
 end subroutine EneERPA_FFFF
+
+subroutine ACEneERPA_FFFF(ECorr,EVec,EVal,Occ,IGem, &
+                          IndN,IndX,NOccup,NDimX,NBasis,IntFile)
+implicit none
+
+integer,intent(in) :: NDimX,NBasis
+integer,intent(in) :: IGem(NBasis),IndN(2,NDimX),IndX(NDimX)
+integer,intent(in) :: NOccup
+character(*),intent(in) :: IntFile
+double precision,intent(out) :: ECorr
+double precision,intent(in) :: EVec(NDimX,NDimX),EVal(NDimX)
+double precision :: Occ(NBasis)
+
+integer :: i,j,k,l,kl,kk,ip,iq,ir,is,ipq,irs
+integer :: iunit,ISkippedEig
+integer :: pos(NBasis,NBasis)
+logical :: AuxCoeff(3,3,3,3)
+double precision :: CICoef(NBasis),Cpq,Crs,SumY,Aux
+double precision,allocatable :: work(:),ints(:,:),Skipped(:)
+double precision,parameter :: SmallE = 1.d-3,BigE = 1.d8
+
+do i=1,NBasis
+   CICoef(i) = sign(sqrt(Occ(i)),Occ(i)-0.5d0)
+enddo
+
+pos = 0
+do i=1,NDimX
+   pos(IndN(1,i),IndN(2,i)) = IndX(i)
+enddo
+
+AuxCoeff = .true.
+do l=1,3
+   do k=1,3
+      do j=1,3
+         do i=1,3
+            if((i==j).and.(j==k).and.(k==l)) then
+               AuxCoeff(i,j,k,l) = .false.
+            endif
+         enddo
+      enddo
+   enddo
+enddo
+
+allocate(work(NBasis**2),ints(NBasis,NBasis),Skipped(NDimX))
+
+ISkippedEig = 0
+ECorr = 0
+
+! FULL INTS
+open(newunit=iunit,file=trim(IntFile),status='OLD', &
+     access='DIRECT',recl=8*NBasis*(NBasis+1)/2)
+kl = 0
+do l=1,NBasis
+   do k=1,l
+      kl = kl + 1
+      if(pos(l,k)/=0) then
+        irs = pos(l,k)
+        ir = l
+        is = k
+        read(iunit,rec=kl) work(1:NBasis*(NBasis+1)/2)
+        call triang_to_sq2(work,ints,NBasis)
+
+        do j=1,NBasis
+           do i=1,j
+              if(pos(j,i)/=0) then
+                ipq = pos(j,i)
+                ip = j
+                iq = i
+                Crs = CICoef(l)+CICoef(k)
+                Cpq = CICoef(j)+CICoef(i)
+
+                !if(.not.(IGem(ir).eq.IGem(is).and.IGem(ip).eq.IGem(iq)&
+                !.and.IGem(ir).eq.IGem(ip)).and.ir.gt.is.and.ip.gt.iq) then
+                if(AuxCoeff(IGem(ip),IGem(iq),IGem(ir),IGem(is))) then
+
+                   ISkippedEig = 0
+                   SumY = 0 
+                   do kk=1,NDimX
+                      if(EVal(kk).gt.SmallE.and.EVal(kk).lt.BigE) then
+                         SumY = SumY + EVec(ipq,kk)*EVec(irs,kk)
+                      else
+                         ISkippedEig = ISkippedEig + 1
+                         Skipped(ISkippedEig) = EVal(kk)
+                      endif
+                   enddo
+          
+                   Aux = 2*Crs*Cpq*SumY
+          
+                   if(iq.Eq.is.and.ip.Eq.ir) then
+                      Aux = Aux - Occ(ip)*(1d0-Occ(is))-Occ(is)*(1d0-Occ(ip))
+                   endif  
+
+                   ECorr = ECorr + Aux*ints(j,i)
+          
+                ! endinf of If(IP.Gt.IR.And.IQ.Gt.IS) 
+                endif
+
+              endif
+           enddo
+        enddo
+
+      endif
+
+   enddo
+enddo
+
+close(iunit)
+
+if(ISkippedEig/=0) then
+  write(LOUT,'(/,1x,"The number of discarded eigenvalues is",i4)') &
+       ISkippedEig
+  do i=1,ISkippedEig
+     write(LOUT,'(1x,a,i4,f15.8)') 'Skipped',i,Skipped(i)
+  enddo
+endif
+
+deallocate(Skipped)
+deallocate(ints,work)
+
+end subroutine ACEneERPA_FFFF
+
+
 
 end module abmat

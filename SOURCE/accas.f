@@ -49,8 +49,12 @@ C
 C
       IPair(1:NBasis,1:NBasis)=0
 C
-      Write(LOUT,'(2x,a,2e15.5)') 'Threshold for quasi-degeneracy ',
+      Write(LOUT,'(2x,a,4x,2e15.5)') 'Threshold for quasi-degeneracy ',
      $ ThrSelAct
+
+      Write(LOUT,'(2x,a,2e15.5)') 'Threshold for quasi-virtual orbital',
+     $ ThrQVirt
+
       IJ=0
       Ind=0
       Do I=1,NBasis
@@ -72,8 +76,8 @@ C     If IFlCore=0 do not include core (inactive) orbitals
       If((IFlCore.Eq.1).Or.
      $ (IFlCore.Eq.0.And.Occ(I).Ne.One.And.Occ(J).Ne.One)) Then
 C
-      If(Abs(Occ(i)+Occ(j)-Two).Gt.1.D-10.And. 
-     $   Abs(Occ(i)+Occ(j)).Gt.1.D-7) Then
+      If(Abs(Occ(i)+Occ(j)-Two).Gt.1.D-10.And.
+     $   Abs(Occ(i)+Occ(j)).Gt.ThrQVirt) Then
       Ind=Ind+1
       IndX(Ind)=Ind
       IndN(1,Ind)=I
@@ -93,7 +97,7 @@ C
       EndDo
 C
       NDimX=Ind
-      Write(6,'(2X,"Number of pairs reduced to:",I6)')Ind
+      Write(6,'(/2X,"Number of pairs reduced to:",I6)')Ind
       Write(6,'(2X,"Accepted pairs read:")')
       Do I=1,Ind
       Ind1=IndN(1,I)
@@ -183,13 +187,18 @@ C     CALL AC If IFlAC=1 OR IFlSnd=1
 C
       If(IFlAC.Eq.1.Or.IFlSnd.Eq.1) Then
       NGOcc=0
+
+      If(IFlACFREQ.Eq.0) Then
       Call ACECORR(ETot,ENuc,TwoNO,URe,Occ,XOne,UNOAO,
      $ IndAux,ABPLUS,ABMIN,EigVecR,Eig,EGOne,
      $ Title,NBasis,NInte1,NInte2,NDimX,NGOcc,NGem,
      $ IndN,IndX,NDimX)
-c herer!!!
-c      Call CASPIDFT(ENuc,URe,UNOAO,Occ,XOne,TwoNO,
-c     $ NBasis,NInte1,NInte2)
+      ElseIf(IFlACFREQ.Eq.1) Then
+      Call ACIter(ETot,ENuc,TwoNO,URe,Occ,XOne,UNOAO,
+     $ IndAux,ABPLUS,ABMIN,EigVecR,Eig,EGOne,
+     $ Title,NBasis,NInte1,NInte2,NDimX,NGOcc,NGem,
+     $ IndN,IndX,NDimX)
+      EndIf
 c 
 c exact AC
 c      NoEig=1
@@ -422,7 +431,7 @@ C
      $ 'XY0',UNOAO,
      $ IndN,IndX,IGem,NAcCAS,NInAcCAS,NDimX,
      $ NBasis,NDimX,NInte1,NoSt,'EMPTY','FFOO',
-     $ 'FOFO',ETot) 
+     $ 'FOFO',ETot,IFlAC0DP) 
 C
       EndIf
 C
@@ -817,10 +826,10 @@ C
       Call Y01CASLR_FOFO(Occ,URe,XOne,ABPLUS,ABMIN,
      $ MultpC,NSymNO,
      $ SRKer,WGrid,OrbGrid,
-     $ 'PROP0','PROP1',
+     $ 'PROP0','PROP1','XY0',
      $ IndN,IndX,IGem,NAcCAS,NInAcCAS,
      $ NGrid,NDimX,NBasis,NDimX,NInte1,NoSt,
-     $ 'EMPTY','FFOOERF','FOFOERF',0,IFunSRKer,ECASSCF,ECorr)
+     $ 'FOFO','FFOOERF','FOFOERF',0,IFunSRKer,ECASSCF,ECorr)
 C
       ElseIf(ITWoEl.Eq.1) Then
 C 
@@ -1250,7 +1259,7 @@ C
       Open(10,File="rdm2.dat",Status='Old')
       Write(6,'(/,1X,''Active block of 2-RDM read from rdm2.dat'')')
 C
-   10 Read(10,'(4I4,F19.12)',End=40)I,J,K,L,X
+   10 Read(10,*,End=40)I,J,K,L,X
 C
 C     X IS DEFINED AS: < E(IJ)E(KL) > - DELTA(J,K) < E(IL) > = 2 GAM2(JLIK)
 C
@@ -2096,7 +2105,7 @@ C
       Open(10,File="rdm2.dat",Status='Old')
       Write(6,'(/,1X,''Active block of 2-RDM read from rdm2.dat'')')
 C
-   10 Read(10,'(4I4,F19.12)',End=40)I,J,K,L,X
+   10 Read(10,*,End=40)I,J,K,L,X
 C
 C     X IS DEFINED AS: < E(IJ)E(KL) > - DELTA(J,K) < E(IL) > = 2 GAM2(JLIK)
 C
@@ -2225,7 +2234,7 @@ C
       Open(10,File="rdm2.dat",Status='Old')
       Write(6,'(/,1X,''Active block of 2-RDM read from rdm2.dat'')')
 C
-   10 Read(10,'(4I4,F19.12)',End=40)I,J,K,L,X
+   10 Read(10,*,End=40)I,J,K,L,X
 C
 C     X IS DEFINED AS: < E(IJ)E(KL) > - DELTA(J,K) < E(IL) > = 2 GAM2(JLIK)
 C
@@ -2394,7 +2403,7 @@ C
       Open(10,File="rdm2.dat",Status='Old')
       Write(6,'(/,1X,''Active block of 2-RDM read from rdm2.dat'')')
 C
-   10 Read(10,'(4I4,F19.12)',End=40)I,J,K,L,X
+   10 Read(10,*,End=40)I,J,K,L,X
 C
 C     X IS DEFINED AS: < E(IJ)E(KL) > - DELTA(J,K) < E(IL) > = 2 GAM2(JLIK)
 C
@@ -2552,7 +2561,7 @@ C
       Open(10,File="rdm2.dat",Status='Old')
       Write(6,'(/,1X,''Active block of 2-RDM read from rdm2.dat'')')
 C
-   10 Read(10,'(4I4,F19.12)',End=40)I,J,K,L,X
+   10 Read(10,*,End=40)I,J,K,L,X
 C
 C     X IS DEFINED AS: < E(IJ)E(KL) > - DELTA(J,K) < E(IL) > = 2 GAM2(JLIK)
 C
@@ -2664,7 +2673,7 @@ C
 C
       Open(10,File="rdm2.dat",Status='Old')
 C
-   10 Read(10,'(4I4,F19.12)',End=40)I,J,K,L,X
+   10 Read(10,*,End=40)I,J,K,L,X
 C
 C     X IS DEFINED AS: < E(IJ)E(KL) > - DELTA(J,K) < E(IL) > = 2 GAM2(JLIK)
 C

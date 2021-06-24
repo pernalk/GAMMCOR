@@ -310,7 +310,7 @@ integer(8) :: i
 
    close(iunit)
 
-   !print*, 'Go Werner, go!'
+   print*, 'Go Werner, go!'
 
  elseif(aosource==3) then
  ! Eugene
@@ -368,6 +368,7 @@ elseif(aosource==4) then
  endif
 
  call dump_Sorter(srt)
+ print *,'end SORT1'
 ! end SORT1
 
 ! start SORT2

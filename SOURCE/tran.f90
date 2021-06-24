@@ -422,6 +422,139 @@ integer :: l,k,kl
 
 end subroutine tran4_gen
 
+
+subroutine new_tran4_gen(NBas,nA,CA,nB,CB,nC,CC,nD,CD, &
+                         fname,iunit_srt,thread_id)
+! 4-index transformation out of core
+! dumps all integrals on disk in the (square,square) form
+! CAREFUL: C have to be in AOMO form!
+!!! CAREFUL: write to simpler form
+!!! ie. (NBas,n,C)
+implicit none
+
+integer,intent(in) :: NBas
+integer,intent(in) :: nA,nB,nC,nD
+! CA(NBas*nA)
+double precision,intent(in) :: CA(*), CB(*), CC(*), CD(*)
+character(*) :: fname
+!the corresponding file is open only once, before the call
+integer, intent(in) :: iunit_srt
+integer, intent(in), optional:: thread_id
+! tmp file
+character(len=80) :: tmpfile, thread_str
+
+double precision, allocatable :: work1(:), work2(:), work3(:,:)
+integer :: iunit,iunit2,iunit3
+integer :: ntr,nAB,nCD,nloop
+integer,parameter :: cbuf=512
+integer :: i,rs,ab
+!  test
+integer :: l,k,kl
+
+! write(6,'()') 
+! write(6,'(1x,a)') 'TRAN4_SYM_OUT_OF_CORE'
+! write(6,'(1x,a)') 'Transforming integrals for AB dimer'
+ write(6,'(1x,a)') 'Transforming integrals for '//fname
+
+ ntr = NBas*(NBas+1)/2
+ nAB = nA*nB
+ nCD = nC*nD
+
+ ! set no. of triangles in buffer
+ nloop = (ntr-1)/cbuf+1
+
+ allocate(work1(NBas*NBas),work2(NBas*NBas))
+ allocate(work3(cbuf,nAB))
+
+ !!!open(newunit=iunit,file='AOTWOSORT',status='OLD',&
+ !open(newunit=iunit,file=trim(srtfile),status='OLD',&
+ !     access='DIRECT',form='UNFORMATTED',recl=8*ntr)
+ tmpfile = 'TMPMO'
+ iunit2 = 75  !no reason for this particular value
+ !print *, "DEBUG: ", thread_id 
+ !print *, "DEBUG: unit", iunit2
+ if (present(thread_id)) then
+    write(thread_str, "(I0)") thread_id
+    tmpfile = trim(tmpfile)//trim(adjustl(thread_str))
+    iunit2 = iunit2 + thread_id
+ end if
+ !print *, "DEBUG: ", thread_id
+ !print *, "DEBUG: before open ", tmpfile, "at", iunit2
+ 
+ ! half-transformed file
+ open(iunit2,file=tmpfile,status='REPLACE',&
+      access='DIRECT',form='UNFORMATTED',recl=8*cbuf)
+ !print *, "DEBUG: writing ", tmpfile, "at", iunit2
+
+! (ab|
+ do i=1,nloop
+    ! loop over cbuf
+    do rs=(i-1)*cbuf+1,min(i*cbuf,ntr)
+      !$omp critical
+       read(iunit_srt,rec=rs) work1(1:ntr)
+      !$omp end critical
+       call triang_to_sq(work1,work2,NBas)
+       ! work1=CA^T.work2
+       ! work2=work1.CB
+       call dgemm('T','N',nA,NBas,NBas,1d0,CA,NBas,work2,NBas,0d0,work1,nA) 
+       call dgemm('N','N',nA,nB,NBas,1d0,work1,nA,CB,NBas,0d0,work2,nA)
+       ! transpose
+       work3(rs-(i-1)*cbuf,1:nAB) = work2(1:nAB)
+       !work1 = 0
+       !kl = 0 
+       !do l=1,nB
+       !do k=1,nA
+       !   kl = kl + 1
+       !   work1(kl) = work2((k-1)*NBas+l)
+       !enddo
+       !enddo
+       !work3(rs-(i-1)*cbuf,1:nAB) = work1(1:nAB)
+
+    enddo
+
+    do ab=1,nAB
+       write(iunit2,rec=(i-1)*nAB+ab) work3(1:cbuf,ab)
+    enddo
+
+ enddo
+
+
+! |cd)
+ open(newunit=iunit3,file=fname,status='REPLACE',&
+     access='DIRECT',form='UNFORMATTED',recl=8*nCD)
+
+ do ab=1,nAB
+
+    do i=1,nloop
+       ! get all (ab| for given |rs)
+       read(iunit2,rec=(i-1)*nAB+ab) work1((i-1)*cbuf+1:min(i*cbuf,ntr))
+    enddo
+
+    call triang_to_sq(work1,work2,NBas)
+    ! work1=CC^T.work2
+    ! work2=work1.CD
+    call dgemm('T','N',nC,NBas,NBas,1d0,CC,NBas,work2,NBas,0d0,work1,nC)
+    call dgemm('N','N',nC,nD,NBas,1d0,work1,nC,CD,NBas,0d0,work2,nC)
+    write(iunit3,rec=ab) work2(1:nCD)
+    !work1 = 0
+    !kl = 0 
+    !do l=1,nD
+    !do k=1,nC
+    !   kl = kl + 1
+    !   work1(kl) = work2((k-1)*NBas+l)
+    !enddo
+    !enddo
+    !write(iunit3,rec=ab) work1(1:nCD)
+
+ enddo
+
+ deallocate(work1,work2,work3)
+ close(iunit3)
+ close(iunit2,status='DELETE')
+
+end subroutine new_tran4_gen
+
+
 subroutine read4_gen(NBas,nA,CA,nB,CB,nC,CC,nD,CD,fname,srtfile)
 ! reads 4-index ints from sorted file 
 ! dumps all integrals on disk in the (square,square) form
@@ -484,6 +617,190 @@ integer :: ip,iq,ir,is,pq,rs
 
 end subroutine read4_gen
 
+subroutine abpm_tran(AMAT,AOUT,EBlock,EBlockIV,nblk,NDimX,isPl)
+implicit none
+
+integer,intent(in) :: nblk,NDimX
+logical,intent(in) :: isPl
+double precision,intent(in) :: AMAT(NDimX,NDimX)
+double precision,intent(inout) :: AOUT(NDimX,NDimX)
+
+type(EBlockData),intent(in) :: EBlock(nblk),EBlockIV
+
+integer :: i,j,ii,jj,ipos,jpos,iblk,jblk
+double precision,allocatable :: ABP(:,:),ABM(:,:)
+double precision :: fac
+
+fac = 1.d0/sqrt(2.d0)
+
+AOUT=0
+
+do jblk=1,nblk
+   associate( jB => Eblock(jblk) )
+   do iblk=1,nblk
+      associate( iB => Eblock(iblk))
+
+        allocate(ABP(iB%n,jB%n),ABM(iB%n,jB%n))
+        do j=1,jB%n
+           jpos = jB%pos(j)
+           do i=1,iB%n
+              ipos = iB%pos(i)
+              ABP(i,j) = AMAT(ipos,jpos)
+           enddo
+        enddo
+        if(isPl) then
+           call dgemm('N','N',iB%n,jB%n,jB%n,1d0,ABP,iB%n,jB%matX,jB%n,0d0,ABM,iB%n)
+           call dgemm('T','N',iB%n,jB%n,iB%n,1d0,iB%matX,iB%n,ABM,iB%n,0d0,ABP,iB%n)
+        else
+           call dgemm('N','N',iB%n,jB%n,jB%n,1d0,ABP,iB%n,jB%matY,jB%n,0d0,ABM,iB%n)
+           call dgemm('T','N',iB%n,jB%n,iB%n,1d0,iB%matY,iB%n,ABM,iB%n,0d0,ABP,iB%n)
+        endif
+
+        AOUT(iB%l1:iB%l2,jB%l1:jB%l2) = ABP
+        deallocate(ABM,ABP)
+
+      end associate
+   enddo
+   end associate
+enddo
+
+associate(B => EblockIV)
+
+  if(B%n>0) then
+     do iblk=1,nblk
+        associate(iB => Eblock(iblk))
+
+          allocate(ABP(iB%n,B%n),ABM(iB%n,B%n))
+          do j=1,B%n
+             jpos = B%pos(j)
+             do i=1,iB%n
+                ipos = iB%pos(i)
+                ABP(i,j) = AMAT(ipos,jpos)
+             enddo
+          enddo
+          if(isPl) then
+             call dgemm('T','N',iB%n,B%n,iB%n,fac,iB%matX,iB%n,ABP,iB%n,0d0,ABM,iB%n) 
+          else
+             call dgemm('T','N',iB%n,B%n,iB%n,fac,iB%matY,iB%n,ABP,iB%n,0d0,ABM,iB%n) 
+          endif
+
+          AOUT(iB%l1:iB%l2,B%l1:B%l2) = ABM
+          deallocate(ABM,ABP)
+
+        end associate
+     enddo
+
+     do jblk=1,nblk
+        associate(jB => Eblock(jblk))
+
+          allocate(ABP(B%n,jB%n),ABM(B%n,jB%n))
+          do j=1,jB%n
+             jpos = jB%pos(j)
+             do i=1,B%n
+                ipos = B%pos(i)
+                ABP(i,j) = AMAT(ipos,jpos)
+             enddo
+          enddo
+          if(isPl) then
+             call dgemm('N','N',B%n,jB%n,jB%n,fac,ABP,B%n,jB%matX,jB%n,0d0,ABM,B%n)
+          else
+             call dgemm('N','N',B%n,jB%n,jB%n,fac,ABP,B%n,jB%matY,jB%n,0d0,ABM,B%n)
+          endif
+
+          AOUT(B%l1:B%l2,jB%l1:jB%l2) = ABM
+          deallocate(ABM,ABP)
+
+        end associate
+     enddo
+
+     do j=1,B%n
+        jj = B%l1+j-1
+        jpos = B%pos(j)
+        do i=1,B%n
+           ii = B%l1+i-1
+           ipos = B%pos(i)
+           AOUT(ii,jj) = AMAT(ipos,jpos)*0.5d0
+        enddo
+     enddo
+  endif
+
+end associate
+
+end subroutine abpm_tran
+
+subroutine abpm_dgemv_gen(AMAT,AOUT,EBlock,EBlockIV,&
+                         nblk,NDimX,xyvar)
+implicit none
+
+integer,intent(in)      :: nblk,NDimX
+character(*),intent(in) :: xyvar
+double precision,intent(in)    :: AMAT(NDimX)
+double precision,intent(inout) :: AOUT(NDimX)
+
+type(EBlockData),intent(in)    :: EBlock(nblk),EBlockIV
+
+integer :: i,j,ii,jj,ipos,jpos,iblk,jblk
+double precision :: fact
+double precision,allocatable :: ABP(:),ABM(:)
+
+fact = 1d0/sqrt(2d0)
+
+do iblk=1,nblk
+   associate( A => Eblock(iblk) )
+
+   allocate(ABP(A%n),ABM(A%n))
+   do i=1,A%n
+      ipos = A%pos(i)
+      ABP(i) = AMAT(ipos)
+   enddo
+
+   select case(xyvar)
+   case('X','x')
+      call dgemv('T',A%n,A%n,1d0,A%matX,A%n,ABP,1,0d0,ABM,1)
+   case('Y','y')
+      call dgemv('T',A%n,A%n,1d0,A%matY,A%n,ABP,1,0d0,ABM,1)
+   case('YX','yx')
+      call dgemv('T',A%n,A%n,1d0,A%matY-A%matX,A%n,ABP,1,0d0,ABM,1)
+   end select
+
+   AOUT(A%l1:A%l2) = AOUT(A%l1:A%l2) + ABM
+
+   deallocate(ABM,ABP)
+
+   end associate
+enddo
+
+associate(A => EblockIV)
+
+  if(A%n>0) then
+
+     select case(xyvar)
+     case('X','x')
+        do i=1,A%n
+           ii = A%l1+i-1
+           ipos = A%pos(i)
+           AOUT(ii) = AOUT(ii) + AMAT(ipos)*A%matX(i,1)
+        enddo
+    case('Y','y')
+        do i=1,A%n
+           ii = A%l1+i-1
+           ipos = A%pos(i)
+           AOUT(ii) = AOUT(ii) + AMAT(ipos)*A%matY(i,1)
+        enddo
+    case('YX','yx')
+        do i=1,A%n
+           ii = A%l1+i-1
+           ipos = A%pos(i)
+           AOUT(ii) = AOUT(ii) - AMAT(ipos)*fact
+        enddo
+
+    end select
+ 
+  endif
+end associate
+
+end subroutine abpm_dgemv_gen
+
 subroutine abpm_tran_gen(AMAT,AOUT,EBlockA,EBlockAIV,EBlockB,EBlockBIV,&
                          nblkA,nblkB,ANDimX,BNDimX,xyvar)
 implicit none
@@ -498,9 +815,6 @@ type(EBlockData),intent(in)    :: EBlockA(nblkA),EBlockAIV, &
 
 integer :: i,j,ii,jj,ipos,jpos,iblk,jblk
 double precision,allocatable :: ABP(:,:),ABM(:,:)
-double precision :: fac
-
-fac = 1.d0/sqrt(2.d0)
 
 do jblk=1,nblkB
    associate( B => EblockB(jblk) )
@@ -916,10 +1230,18 @@ integer :: t,p,q,pq,qp
     do p=1,q
        t = t + 1
        pq = p + (q-1)*NBas
-       qp = q + (p-1)*NBas
        matSq(pq) = matTr(t)
+    enddo
+ enddo
+
+ t = 0
+ do q=1,NBas
+    do p=1,q-1
+       t = t + 1
+       qp = q + (p-1)*NBas
        matSq(qp) = matTr(t)
     enddo
+    t = t + 1
  enddo
 
 end subroutine triang_to_sq
