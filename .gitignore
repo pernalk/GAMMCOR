@@ -13,7 +13,6 @@ SOURCE/list_changes.txt
 ./prdmft.exe
 gammcor
 test.out
-SOURCE/compare_with_prdmft.py
 
 # XCFun
 xcfun/fortran/xcfun.mod

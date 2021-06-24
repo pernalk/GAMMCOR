@@ -40,6 +40,9 @@ Calculation block
   * AC
   * AC0
   * AC1
+
+* Thresholds
+  * ThrQVirt - threshold for including the active-virtual orbital pair from ACX calculations (this is to prevent treating active orbitals of the occupance lower than ThrQVirt as ative). Default: ThrQVirt  = 1.d-7
  
 By deafault integrals are kept in memory ("in-core" version). To use disc variant use:
    ``TwoMoInt   FOFO``
