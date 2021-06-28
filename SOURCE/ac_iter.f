@@ -41,6 +41,13 @@ C
 C
       ElseIf(ITwoEl.eq.3) Then
 C
+      Call WChol_FOFO(ECorr,XOne,URe,Occ,
+     $ EGOne,NGOcc,
+     $ IGem,NAcCAS,NInAcCAS,NELE,
+     $ NBasis,NInte1,NDim,NGem,IndAux,
+     $ IndN,IndX,NDimX)
+      stop
+C
       Call WIter_FOFO(ECorr,XOne,URe,Occ,
      $ EGOne,NGOcc,
      $ IGem,NAcCAS,NInAcCAS,NELE,

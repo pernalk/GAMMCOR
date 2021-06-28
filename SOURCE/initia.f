@@ -1418,25 +1418,25 @@ C
 C
 C     ITwoEl
       If(ITwoEl.Eq.1) Then
-      If (ICholesky==0) Then
+C      If (ICholesky==0) Then
       Write(6,'(/," Transforming two-electron integrals ...",/)')
       Call TwoNO1(TwoEl,UAOMO,NBasis,NInte2)
-      ElseIf (ICholesky==1) Then
-      UAux=transpose(UAOMO)       
-      Allocate(MatFF(NCholesky,NBasis**2))
-      Call chol_MOTransf(MatFF,CholeskyVecs,
-     $                   UAux,1,NBasis,
-     $                   UAux,1,NBasis)
-      do i=1,NCholesky
-      do j=1,nbasis
-      do k=1,j
-      if(abs(MatFF(i,(j-1)*nbasis+k)).gt.1.d-8)
-     $ write(*,*)i,j,k,MatFF(i,(j-1)*nbasis+k),MatFF(i,(k-1)*nbasis+j)
-      enddo
-      enddo
-      enddo
-      stop
-      EndIf
+C      ElseIf (ICholesky==1) Then
+C      UAux=transpose(UAOMO)       
+C      Allocate(MatFF(NCholesky,NBasis**2))
+C      Call chol_MOTransf(MatFF,CholeskyVecs,
+C     $                   UAux,1,NBasis,
+C     $                   UAux,1,NBasis)
+C      do i=1,NCholesky
+C      do j=1,nbasis
+C      do k=1,j
+C      if(abs(MatFF(i,(j-1)*nbasis+k)).gt.1.d-8)
+C     $ write(*,*)i,j,k,MatFF(i,(j-1)*nbasis+k),MatFF(i,(k-1)*nbasis+j)
+C      enddo
+C      enddo
+C      enddo
+C      stop
+c      EndIf
 C     
       ElseIf(ITwoEl.eq.3) Then
 C     PREPARE POINTERS: NOccup=num0+num1
@@ -1448,6 +1448,7 @@ C     TRANSFORM J AND K
       If (IFunSR.Eq.0.Or.IFunSR.Eq.3.Or.IFunSR.Eq.5) Then
 C     This use of Cholesky is for test only 
       If (ICholesky==0) Then
+C
       Call tran4_gen(NBasis,
      $        Num0+Num1,UAux(1:NBasis,1:(Num0+Num1)),
      $        Num0+Num1,UAux(1:NBasis,1:(Num0+Num1)),
@@ -1460,7 +1461,9 @@ C     This use of Cholesky is for test only
      $        NBasis,UAux,
      $        Num0+Num1,UAux(1:NBasis,1:(Num0+Num1)),
      $        'FOFO','AOTWOSORT')
+C
       ElseIf (ICholesky==1) Then
+C
       Allocate(MatFF(NCholesky,NBasis**2))
       Call chol_MOTransf(MatFF,CholeskyVecs,
      $                   UAux,1,NBasis,
@@ -1472,6 +1475,14 @@ C
       Call chol_ints_fofo(NBasis,NBasis,MatFF,
      $                    Num0+Num1,Num0+Num1,MatFF,
      $                    NCholesky,NBasis,'FFOO')
+C
+C dump MatFF
+C
+      open(newunit=iunit,file='cholvecs',form='unformatted')
+      write(iunit) NCholesky
+      write(iunit) MatFF
+      close(iunit)
+      Deallocate(MatFF) 
 C
       EndIf
 C     TEST MITHAP

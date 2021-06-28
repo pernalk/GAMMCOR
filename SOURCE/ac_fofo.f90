@@ -1,3 +1,123 @@
+subroutine WChol_FOFO(ECorr,XOne,URe,Occ,EGOne,NGOcc,&
+      IGem,NAct,INActive,NELE,NBasis,NInte1,NDim,NGem,IndAux,&
+      IndN,IndX,NDimX)
+
+use abfofo
+
+implicit none
+
+integer,intent(in) :: NGOcc,NBasis,NInte1,NDim,NGem,NDimX
+integer,intent(in) :: NAct,INActive,NELE
+integer,intent(in) :: IndN(2,NDim),IndX(NDim),IndAux(NBasis),&
+                      IGem(NBasis)
+double precision :: ACAlpha
+double precision,intent(in) :: URe(NBasis,NBasis),Occ(NBasis),XONe(NInte1)
+double precision,intent(inout) :: ECorr,EGOne(NGem)
+
+double precision :: COM(NDimX*NDimX),XFreq(100),WFreq(100),&
+                    ABPLUS(NDim*NDim),AB(NDim*NDim),ADIAG(NDim)
+
+integer :: iunit,NOccup
+integer :: ia,ib,ic,id,ICol,IRow
+integer :: i,j,k,l,kl,ip,iq,ir,is,ipq,irs
+integer :: pos(NBasis,NBasis),NGrid,N,IGL,inf1,inf2,info,Max_Cn
+double precision :: ECASSCF,PI,WFact,XFactorial,XN1,XN2,FF,CICoef(NBasis),Cpq,Crs,SumY,Aux,OmI
+character(:),allocatable :: twojfile,twokfile,IntKFile
+logical :: AuxCoeff(3,3,3,3)
+double precision,allocatable :: work(:),ints(:,:)
+Real*8, Allocatable :: MatFF(:,:),work2(:,:),work3(:),work1(:,:)
+integer,allocatable :: ipiv(:)
+integer :: NCholesky,lwork
+
+NGrid=25
+
+NOccup = NAct + INActive
+PI = 4.0*ATAN(1.0)
+
+twojfile = 'FFOO'
+twokfile = 'FOFO'
+IntKFile = twokfile
+
+open(newunit=iunit,file='cholvecs',form='unformatted')
+read(iunit) NCholesky
+allocate(MatFF(NCholesky,NBasis**2))
+read(iunit) MatFF
+close(iunit)
+
+allocate(work2(NCholesky,NCholesky))
+allocate(ipiv(NCholesky))
+
+! D.D^T
+call dgemm('N','T',NCholesky,NCholesky,NBasis**2,1.0d0,MatFF,NCholesky,MatFF,NCholesky,0d0,work2,NCholesky)
+! (D.D^T)^-1
+call dgetrf(NCholesky,NCholesky,work2,NCholesky,ipiv,info)
+!print*, 'info-1',info
+if(info<0) then
+   write(lout,*) 'WChol_FOFO: dgetrf ',info,'-th argument had illegal value!'
+   stop
+endif
+allocate(work3(NCholesky*NCholesky))
+call dgetri(NCholesky,work2,NCholesky,ipiv,work3,NCholesky,info)
+!print*, 'info-2',info,work3(1)
+if(info<0) then
+   write(lout,*) 'WChol_FOFO: dgetri ',info,'-th argument had illegal value!'
+   stop
+endif
+deallocate(work3,ipiv)
+
+! D^T.(D.D^T)-1 = work1
+allocate(work1(NBasis**2,NCholesky))
+call dgemm('T','N',NBasis**2,NCholesky,NCholesky,1.0d0,MatFF,NCholesky,work2,NCholesky,0d0,work1,NBasis**2)
+! construct P = work1.D
+deallocate(work2)
+allocate(work2(NBasis**2,NBasis**2))
+call dgemm('N','N',NBasis**2,NBasis**2,NCholesky,1.0d0,work1,NBasis**2,MatFF,NCholesky,0d0,work2,NBasis**2)
+deallocate(work1)
+
+print*, 'Pmat',norm2(work2(1:NBasis**2,1:NBasis**2))
+
+allocate(work1(NDimX,NDimX))
+! truncate Pmat
+work1 = 0
+do j=1,NDimX
+   ir=IndN(j,1)
+   is=IndN(j,2)
+   irs = is+(ir-1)*NBasis
+   do i=1,NDimX
+      ip=IndN(i,1)
+      iq=IndN(i,2)
+      ipq = iq+(ip-1)*NBasis
+      work1(i,j) = work2(ipq,irs)
+   enddo
+enddo
+deallocate(work2)
+
+
+allocate(work3(NDimX*NDimX))
+ACAlpha=1.D0
+call AB_CAS_FOFO(ABPLUS,work3,ECASSCF,URe,Occ,XOne, &
+                 IndN,IndX,IGem,NAct,INActive,NDimX,NBasis,NDimX,&
+                 NInte1,twojfile,twokfile,ACAlpha,.false.)
+
+Call dgemm('N','N',NDimX,NDimX,NDimX,1d0,ABPLUS,NDimX,work3,NDimX,0.0,AB,NDimX)
+
+ADIAG = 0
+do ipq=1,NDimX
+   ADIAG(ipq) = AB((ipq-1)*NDimX+ipq)
+   AB((ipq-1)*NDimX+ipq) = 0d0
+enddo
+
+
+! project
+Call dgemm('N','N',NDimX,NDimX,NDimX,1d0,work1,NDimX,AB,NDimX,0.0,work3,NDimX)
+work3=AB-work3
+print*, 'before and after projection',norm2(AB(1:NDimX*NDimX)),norm2(work3(1:NDimX*NDimX))
+stop
+
+deallocate(work1)
+deallocate(MatFF)
+end subroutine WChol_FOFO
+
 subroutine WIter_FOFO(ECorr,XOne,URe,Occ,EGOne,NGOcc,&
       IGem,NAct,INActive,NELE,NBasis,NInte1,NDim,NGem,IndAux,&
       IndN,IndX,NDimX)
