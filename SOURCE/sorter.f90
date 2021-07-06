@@ -83,12 +83,15 @@ end type AOReaderData
 contains
 
 subroutine readtwoint(nbas,aosource,intfile,sortfile,maxmem,outinfo)
+! AOSorter1 : a single pass through AO integrals, creates TMPSORT
+! AOSorter2 : multiple passes through the integral file, no TMPSORT
 implicit none
 integer,intent(in) :: nbas
 integer,intent(in) :: aosource
 character(*),intent(in) :: intfile,sortfile
 integer(8),intent(in) :: maxmem
 integer(8),intent(out),optional :: outinfo
+!type(AOSorter2Data) :: srt
 type(AOSorter1Data) :: srt
 integer :: iunit
 integer :: npass,ipass
@@ -113,7 +116,7 @@ case(1) ! DALTON
 
    ! read info
    call readlabel(iunit,'BASINFO ')
-   read(iunit) maxrep, naos, lbuf, nibuf, nbits, lenint4 
+   read(iunit) maxrep, naos, lbuf, nibuf, nbits, lenint4
 
 !   write(LOUT,'()')
 !   write(LOUT,'(1x, a)') 'Dalton two-el. file initialized'
@@ -126,9 +129,9 @@ case(1) ! DALTON
    allocate(val_buf(lbuf))
    allocate(idx_buf(nibuf*lbuf))
 
-   call readlabel(iunit,'BASTWOEL')
-
    do ipass=1,npass
+
+   call readlabel(iunit,'BASTWOEL')
 
       call srt%iniPass(ipass)
 
@@ -145,10 +148,10 @@ case(1) ! DALTON
                idx_q = ibits(INDX,8,8)
                idx_r = ibits(INDX,16,8)
                idx_s = ibits(INDX,24,8)
-               !write(*,*) idx_p,idx_q,idx_r,idx_s 
+               !write(*,*) idx_p,idx_q,idx_r,idx_s
 
                pq = idx_p + idx_q*(idx_q-1)/2
-               rs = idx_r + idx_s*(idx_s-1)/2 
+               rs = idx_r + idx_s*(idx_s-1)/2
                call srt%add(pq,rs,val_buf(i))
                call srt%add(rs,pq,val_buf(i))
 
@@ -170,7 +173,7 @@ case(1) ! DALTON
                idx_q = ibits(INDX,16,16)
 
                pq = idx_p + idx_q*(idx_q-1)/2
-               rs = idx_r + idx_s*(idx_s-1)/2 
+               rs = idx_r + idx_s*(idx_s-1)/2
                call srt%add(pq,rs,val_buf(i))
                call srt%add(rs,pq,val_buf(i))
 
@@ -195,7 +198,7 @@ case(2) ! MOLPRO
 
    ! read info
    read(iunit) nsk
-   read(iunit) nt 
+   read(iunit) nt
 
    if(sum(nt(1:nsk))/=NBas) then
       write(LOUT,*) 'ERROR while checking AOTWOINT.mol!!!'
@@ -211,83 +214,36 @@ case(2) ! MOLPRO
    lbuf = 3*maxval(nt(1:nsk))**2
    allocate(val_buf(lbuf))
 
-   do sym_p=1,nsk
-      if(nt(sym_p)==0) cycle
-      read(iunit) 
+   do ipass=1,npass
 
-      do  
-         read(iunit) idx_s,idx_r
-         if(idx_s<=0.and.idx_r<=0) exit
-         nints = idx_r + idx_s*(idx_s-1)/2 
-         read(iunit) val_buf(1:nints)
+      call srt%iniPass(ipass)
 
-         idx_r = idx_r + ntoff(sym_p)
-         idx_s = idx_s + ntoff(sym_p)
-         rs = idx_r + idx_s*(idx_s-1)/2
-
-         INDX = 0 
-         do idx_q=ntoff(sym_p)+1,idx_s 
-            if(idx_q<idx_s) then 
-               idx_end = idx_q
-            else
-               idx_end = idx_r
-            endif
-            do idx_p=ntoff(sym_p)+1,idx_end
-
-               INDX = INDX + 1
-               if(val_buf(INDX)/=0) then
-                  pq = idx_p + idx_q*(idx_q-1)/2
-                  call srt%add(pq,rs,val_buf(INDX))
-                  call srt%add(rs,pq,val_buf(INDX))
-               endif
-
-            enddo
-         enddo
-
-      enddo
-
-   enddo
-
-   do sym_r=2,nsk
-      do sym_p=1,sym_r-1
+      do sym_p=1,nsk
          if(nt(sym_p)==0) cycle
-         if(nt(sym_r)==0) cycle
          read(iunit)
 
-         nints=(nt(sym_p)*(nt(sym_p)+1))/2
-         nints=3*nints
          do
             read(iunit) idx_s,idx_r
             if(idx_s<=0.and.idx_r<=0) exit
+            nints = idx_r + idx_s*(idx_s-1)/2
             read(iunit) val_buf(1:nints)
 
-            idx_r = idx_r + ntoff(sym_r)
-            idx_s = idx_s + ntoff(sym_r)
+            idx_r = idx_r + ntoff(sym_p)
+            idx_s = idx_s + ntoff(sym_p)
+            rs = idx_r + idx_s*(idx_s-1)/2
 
-            INDX=0
-            do idx_q=ntoff(sym_p)+1,ntoff(sym_p)+nt(sym_p)
-               do idx_p=ntoff(sym_p)+1,idx_q
+            INDX = 0
+            do idx_q=ntoff(sym_p)+1,idx_s
+               if(idx_q<idx_s) then
+                  idx_end = idx_q
+               else
+                  idx_end = idx_r
+               endif
+               do idx_p=ntoff(sym_p)+1,idx_end
 
-                  INDX=INDX+1
+                  INDX = INDX + 1
                   if(val_buf(INDX)/=0) then
                      pq = idx_p + idx_q*(idx_q-1)/2
-                     rs = idx_r + idx_s*(idx_s-1)/2
-                     call srt%add(pq,rs,val_buf(INDX))
-                     call srt%add(rs,pq,val_buf(INDX))
-                  endif
-
-                  INDX=INDX+1
-                  if(val_buf(INDX)/=0) then
-                     pq = idx_p + idx_r*(idx_r-1)/2
-                     rs = idx_q + idx_s*(idx_s-1)/2
-                     call srt%add(pq,rs,val_buf(INDX))
-                     call srt%add(rs,pq,val_buf(INDX))
-                  endif
-
-                  INDX=INDX+1
-                  if(val_buf(INDX)/=0) then
-                     pq = idx_q + idx_r*(idx_r-1)/2
-                     rs = idx_p + idx_s*(idx_s-1)/2
                      call srt%add(pq,rs,val_buf(INDX))
                      call srt%add(rs,pq,val_buf(INDX))
                   endif
@@ -298,21 +254,14 @@ case(2) ! MOLPRO
          enddo
 
       enddo
-   enddo
 
-   do sym_s=4,nsk
-      do sym_r=3,sym_s-1
-         sym_rs = ieor(sym_r-1,sym_s-1) + 1
-         do sym_q=2,sym_r-1
-            sym_p = ieor(sym_q-1,sym_rs-1) + 1
-            if(sym_p>=sym_q) cycle
+      do sym_r=2,nsk
+         do sym_p=1,sym_r-1
             if(nt(sym_p)==0) cycle
-            if(nt(sym_q)==0) cycle
             if(nt(sym_r)==0) cycle
-            if(nt(sym_s)==0) cycle
             read(iunit)
 
-            nints=nt(sym_p)*nt(sym_q)
+            nints=(nt(sym_p)*(nt(sym_p)+1))/2
             nints=3*nints
             do
                read(iunit) idx_s,idx_r
@@ -320,11 +269,11 @@ case(2) ! MOLPRO
                read(iunit) val_buf(1:nints)
 
                idx_r = idx_r + ntoff(sym_r)
-               idx_s = idx_s + ntoff(sym_s)
+               idx_s = idx_s + ntoff(sym_r)
 
                INDX=0
-               do idx_q=ntoff(sym_q)+1,ntoff(sym_q)+nt(sym_q)
-                  do idx_p=ntoff(sym_p)+1,ntoff(sym_p)+nt(sym_p)
+               do idx_q=ntoff(sym_p)+1,ntoff(sym_p)+nt(sym_p)
+                  do idx_p=ntoff(sym_p)+1,idx_q
 
                      INDX=INDX+1
                      if(val_buf(INDX)/=0) then
@@ -357,6 +306,72 @@ case(2) ! MOLPRO
 
          enddo
       enddo
+
+      do sym_s=4,nsk
+         do sym_r=3,sym_s-1
+            sym_rs = ieor(sym_r-1,sym_s-1) + 1
+            do sym_q=2,sym_r-1
+               sym_p = ieor(sym_q-1,sym_rs-1) + 1
+               if(sym_p>=sym_q) cycle
+               if(nt(sym_p)==0) cycle
+               if(nt(sym_q)==0) cycle
+               if(nt(sym_r)==0) cycle
+               if(nt(sym_s)==0) cycle
+               read(iunit)
+
+               nints=nt(sym_p)*nt(sym_q)
+               nints=3*nints
+               do
+                  read(iunit) idx_s,idx_r
+                  if(idx_s<=0.and.idx_r<=0) exit
+                  read(iunit) val_buf(1:nints)
+
+                  idx_r = idx_r + ntoff(sym_r)
+                  idx_s = idx_s + ntoff(sym_s)
+
+                  INDX=0
+                  do idx_q=ntoff(sym_q)+1,ntoff(sym_q)+nt(sym_q)
+                     do idx_p=ntoff(sym_p)+1,ntoff(sym_p)+nt(sym_p)
+
+                        INDX=INDX+1
+                        if(val_buf(INDX)/=0) then
+                           pq = idx_p + idx_q*(idx_q-1)/2
+                           rs = idx_r + idx_s*(idx_s-1)/2
+                           call srt%add(pq,rs,val_buf(INDX))
+                           call srt%add(rs,pq,val_buf(INDX))
+                        endif
+
+                        INDX=INDX+1
+                        if(val_buf(INDX)/=0) then
+                           pq = idx_p + idx_r*(idx_r-1)/2
+                           rs = idx_q + idx_s*(idx_s-1)/2
+                           call srt%add(pq,rs,val_buf(INDX))
+                           call srt%add(rs,pq,val_buf(INDX))
+                        endif
+
+                        INDX=INDX+1
+                        if(val_buf(INDX)/=0) then
+                           pq = idx_q + idx_r*(idx_r-1)/2
+                           rs = idx_p + idx_s*(idx_s-1)/2
+                           call srt%add(pq,rs,val_buf(INDX))
+                           call srt%add(rs,pq,val_buf(INDX))
+                        endif
+
+                     enddo
+                  enddo
+
+               enddo
+
+            enddo
+         enddo
+      enddo
+
+      call srt%endPass
+
+      rewind(iunit)
+      read(iunit)
+      read(iunit)
+
    enddo
 
    deallocate(val_buf)
@@ -743,6 +758,17 @@ write(LOUT,'(1x,a,t36,i18)') 'Number of basis functions:',        srt%nbas
 write(LOUT,'(1x,a,t36,i18)') 'Number of independent pairs:',      srt%nelm
 write(LOUT,'(1x,a,t36,i18)') 'Number of columns in segment:',     srt%ncol
 write(LOUT,'(1x,a,t36,i18)') 'Number of passes:',                 srt%npass
+
+if(srt%ncol==0) then
+  write(LOUT,*) 'ERROR!!! Increase memory using MemSort keyword!'
+  write(LOUT,*) 'in: open_AOSorter2'
+  stop
+endif
+
+if(srt%npass>100) then
+  write(LOUT,'(/1x,a,i18)') 'WARNING! npass over AO integrals: ',srt%npass
+  write(LOUT,'(1x,a)')      'Increase memory using MemSort keyword!'
+endif
 
 allocate(srt%rs_diag(srt%nelm))
 allocate(srt%rs_nelm(srt%nelm))
