@@ -6,6 +6,8 @@ private
 public readtwoint
 public AOReaderData
 
+character(*),parameter :: sort1_tmpname = 'TMPSORT'
+
 type DumpData
 integer(8) :: n,pos
 end type DumpData
@@ -25,8 +27,9 @@ contains
 procedure :: dump => dump_AOBucket
 end type AOBucketData
 
-type AOSorterData
-integer :: unit
+type AOSorter1Data
+character(:),allocatable :: srtname
+integer :: TMPunit
 integer :: nbas,nelm,ncol,nbck,maxdmp
 integer(8) :: seg_size,bck_size
 type(AOBucketData),allocatable :: bck(:)
@@ -38,10 +41,29 @@ integer,allocatable :: pqrs(:,:)            !       pass2  -> ???
 double precision,allocatable :: val(:)      !       pass2  -> ???
 integer(8),allocatable :: rs_pos(:)         !       pass2  -> avail
 contains
-procedure :: open => open_AOSorter
-procedure :: add => add_AOSorter
-procedure :: close => close_AOSorter
-end type AOSorterData
+procedure :: open => open_AOSorter1
+procedure :: iniPass => iniPass_AOSorter1
+procedure :: endPass => endPass_AOSorter1
+procedure :: add => add_AOSorter1
+procedure :: close => close_AOSorter1
+end type AOSorter1Data
+
+type AOSorter2Data
+integer :: unit
+integer :: nbas,nelm,ncol,npass,rs_off
+integer(8) :: pos_diag,pos_nelm,pos_pos
+double precision,allocatable :: rs_diag(:)
+integer,allocatable :: rs_nelm(:)
+integer(8),allocatable :: rs_pos(:)
+integer,allocatable :: seg_pq(:,:)
+double precision,allocatable :: seg_val(:,:)
+contains
+procedure :: open => open_AOSorter2
+procedure :: iniPass => iniPass_AOSorter2
+procedure :: endPass => endPass_AOSorter2
+procedure :: add => add_AOSorter2
+procedure :: close => close_AOSorter2
+end type AOSorter2Data
 
 type AOReaderData
 integer :: unit
@@ -67,8 +89,9 @@ integer,intent(in) :: aosource
 character(*),intent(in) :: intfile,sortfile
 integer(8),intent(in) :: maxmem
 integer(8),intent(out),optional :: outinfo
-type(AOSorterData) :: srt
+type(AOSorter1Data) :: srt
 integer :: iunit
+integer :: npass,ipass
 integer :: maxrep, naos(8), lbuf, nibuf, nbits, lenint4
 integer :: nsk, nt(8), ntoff(8)
 integer :: nints, INDX
@@ -79,7 +102,7 @@ integer :: idx_p, idx_q, idx_r, idx_s, pq, rs, idx_end
 integer :: sym_p, sym_q, sym_r, sym_s, sym_rs
 integer :: i
 
-call srt%open('TMPSORT',nbas,maxmem)
+call srt%open(sortfile,nbas,maxmem,npass)
 
 select case(aosource)
 
@@ -105,52 +128,60 @@ case(1) ! DALTON
 
    call readlabel(iunit,'BASTWOEL')
 
-   select case(nibuf)
-   case(1)
+   do ipass=1,npass
 
-      do
-         read(iunit) val_buf, idx_buf, nints
-         if(nints<0) exit
-         do i=1,nints
+      call srt%iniPass(ipass)
 
-            INDX = idx_buf(i)
-            idx_p = ibits(INDX,0,8)
-            idx_q = ibits(INDX,8,8)
-            idx_r = ibits(INDX,16,8)
-            idx_s = ibits(INDX,24,8)
-            !write(*,*) idx_p,idx_q,idx_r,idx_s 
+      select case(nibuf)
+      case(1)
 
-            pq = idx_p + idx_q*(idx_q-1)/2
-            rs = idx_r + idx_s*(idx_s-1)/2 
-            call srt%add(pq,rs,val_buf(i))
-            call srt%add(rs,pq,val_buf(i))
+         do
+            read(iunit) val_buf, idx_buf, nints
+            if(nints<0) exit
+            do i=1,nints
 
+               INDX = idx_buf(i)
+               idx_p = ibits(INDX,0,8)
+               idx_q = ibits(INDX,8,8)
+               idx_r = ibits(INDX,16,8)
+               idx_s = ibits(INDX,24,8)
+               !write(*,*) idx_p,idx_q,idx_r,idx_s 
+
+               pq = idx_p + idx_q*(idx_q-1)/2
+               rs = idx_r + idx_s*(idx_s-1)/2 
+               call srt%add(pq,rs,val_buf(i))
+               call srt%add(rs,pq,val_buf(i))
+
+            enddo
          enddo
-      enddo
 
-   case(2)
+      case(2)
 
-      do
-         read(iunit) val_buf, idx_buf, nints
-         if(nints<0) exit
-         do i=1,nints
+         do
+            read(iunit) val_buf, idx_buf, nints
+            if(nints<0) exit
+            do i=1,nints
 
-            INDX = idx_buf(2*i-1)
-            idx_r = ibits(INDX,0,16)
-            idx_s = ibits(INDX,16,16)
-            INDX = idx_buf(2*i)
-            idx_p = ibits(INDX,0,16)
-            idx_q = ibits(INDX,16,16)
+               INDX = idx_buf(2*i-1)
+               idx_r = ibits(INDX,0,16)
+               idx_s = ibits(INDX,16,16)
+               INDX = idx_buf(2*i)
+               idx_p = ibits(INDX,0,16)
+               idx_q = ibits(INDX,16,16)
 
-            pq = idx_p + idx_q*(idx_q-1)/2
-            rs = idx_r + idx_s*(idx_s-1)/2 
-            call srt%add(pq,rs,val_buf(i))
-            call srt%add(rs,pq,val_buf(i))
+               pq = idx_p + idx_q*(idx_q-1)/2
+               rs = idx_r + idx_s*(idx_s-1)/2 
+               call srt%add(pq,rs,val_buf(i))
+               call srt%add(rs,pq,val_buf(i))
 
+            enddo
          enddo
-      enddo
 
-   end select
+      end select
+
+      call srt%endPass
+
+   enddo
 
    deallocate(idx_buf)
    deallocate(val_buf)
@@ -401,18 +432,25 @@ case default
 
 end select
 
-call srt%close(sortfile)
+call srt%close
 
 end subroutine readtwoint
 
-subroutine open_AOSorter(srt,tmpname,nbas,maxmem)
+!-------------------------------------------------------------------------------
+!-------------------------------------------------------------------------------
+!-------------------------------------------------------------------------------
+
+subroutine open_AOSorter1(srt,srtname,nbas,maxmem,npass)
 implicit none
-class(AOSorterData) :: srt
-character(*),intent(in) :: tmpname
+class(AOSorter1Data) :: srt
+character(*),intent(in) :: srtname
 integer,intent(in) :: nbas
 integer(8),intent(in) :: maxmem
+integer,intent(out) :: npass
 integer(8) :: availmem1,availmem2,pass1_bytes,pass2_bytes,col_bytes,bck_bytes
 integer :: ibck
+
+srt%srtname = srtname
 
 srt%nbas = nbas
 srt%nelm = (srt%nbas*(srt%nbas+1))/2
@@ -462,13 +500,26 @@ do ibck=1,srt%nbck
    end associate
 enddo
 
-open(newunit=srt%unit,file=tmpname,access='stream',status='replace')
+open(newunit=srt%TMPunit,file=sort1_tmpname,access='stream',status='replace')
 
-end subroutine open_AOSorter
+npass = 1
 
-subroutine add_AOSorter(srt,pq,rs,val)
+end subroutine open_AOSorter1
+
+subroutine iniPass_AOSorter1(srt,ipass)
 implicit none
-class(AOSorterData) :: srt
+class(AOSorter1Data) :: srt
+integer :: ipass
+end subroutine iniPass_AOSorter1
+
+subroutine endPass_AOSorter1(srt)
+implicit none
+class(AOSorter1Data) :: srt
+end subroutine endPass_AOSorter1
+
+subroutine add_AOSorter1(srt,pq,rs,val)
+implicit none
+class(AOSorter1Data) :: srt
 integer,intent(in) :: pq,rs
 double precision,intent(in) :: val
 
@@ -482,7 +533,7 @@ else
 
    associate(bck => srt%bck((rs-1)/srt%ncol+1))
 
-     if(bck%n==srt%bck_size) call bck%dump(srt%unit)
+     if(bck%n==srt%bck_size) call bck%dump(srt%TMPunit)
      bck%n = bck%n + 1
      bck%pqrs(1,bck%n) = pq
      bck%pqrs(2,bck%n) = rs
@@ -492,12 +543,11 @@ else
 
 endif
 
-end subroutine add_AOSorter
+end subroutine add_AOSorter1
 
-subroutine close_AOSorter(srt,srtname)
+subroutine close_AOSorter1(srt)
 implicit none
-class(AOSorterData) :: srt
-character(*),intent(in) :: srtname
+class(AOSorter1Data) :: srt
 integer :: unit
 integer :: ibck,idmp
 integer :: rs,rs_str,rs_end
@@ -508,7 +558,7 @@ double precision :: ratio
 
 do ibck=srt%nbck,1,-1
    associate(bck => srt%bck(ibck))
-     if(bck%n>0) call bck%dump(srt%unit)
+     if(bck%n>0) call bck%dump(srt%TMPunit)
      deallocate(bck%val)
      deallocate(bck%pqrs)
    end associate
@@ -554,7 +604,7 @@ pos_diag = 0
 pos_nelm = 0
 pos_pos  = 0
 
-open(newunit=unit,file=srtname,access='stream',status='replace')
+open(newunit=unit,file=srt%srtname,access='stream',status='replace')
 write(unit,pos=1) srt%nbas,srt%nelm,pos_diag,pos_nelm,pos_pos
 inquire(unit,pos=pos_diag)
 write(unit) srt%rs_diag
@@ -577,7 +627,7 @@ do ibck=1,srt%nbck
    associate(bck => srt%bck(ibck))
      do idmp=1,bck%ndmp
         associate(dmp => bck%dmp(idmp))
-          read(srt%unit,pos=dmp%pos) srt%pqrs(:,1:dmp%n),srt%val(1:dmp%n)
+          read(srt%TMPunit,pos=dmp%pos) srt%pqrs(:,1:dmp%n),srt%val(1:dmp%n)
           do i=1,dmp%n
              rs = srt%pqrs(2,i)
              srt%rs_nelm(rs) = srt%rs_nelm(rs) + 1
@@ -631,9 +681,11 @@ deallocate(srt%bck)
 deallocate(srt%rs_nelm)
 deallocate(srt%rs_diag)
 
-close(srt%unit,status='delete')
+close(srt%TMPunit,status='delete')
 
-end subroutine close_AOSorter
+deallocate(srt%srtname)
+
+end subroutine close_AOSorter1
 
 subroutine dump_AOBucket(bck,unit)
 implicit none
@@ -661,6 +713,135 @@ bck%n = 0
 bck%ndmp = bck%ndmp + 1
 
 end subroutine dump_AOBucket
+
+!-------------------------------------------------------------------------------
+!-------------------------------------------------------------------------------
+!-------------------------------------------------------------------------------
+
+subroutine open_AOSorter2(srt,srtname,nbas,maxmem,npass)
+implicit none
+class(AOSorter2Data) :: srt
+character(*),intent(in) :: srtname
+integer,intent(in) :: nbas
+integer(8),intent(in) :: maxmem
+integer,intent(out) :: npass
+integer(8) :: availmem,pass_bytes,col_bytes
+
+srt%nbas = nbas
+srt%nelm = (srt%nbas*(srt%nbas+1))/2
+
+availmem = maxmem - (8 + 4 + 8)*srt%nelm
+
+pass_bytes = 4 + 8
+col_bytes  = pass_bytes*srt%nelm
+srt%ncol   = min( int(availmem/col_bytes) , srt%nelm )
+
+srt%npass = (srt%nelm-1)/srt%ncol + 1
+
+write(LOUT,'()')
+write(LOUT,'(1x,a,t36,i18)') 'Number of basis functions:',        srt%nbas
+write(LOUT,'(1x,a,t36,i18)') 'Number of independent pairs:',      srt%nelm
+write(LOUT,'(1x,a,t36,i18)') 'Number of columns in segment:',     srt%ncol
+write(LOUT,'(1x,a,t36,i18)') 'Number of passes:',                 srt%npass
+
+allocate(srt%rs_diag(srt%nelm))
+allocate(srt%rs_nelm(srt%nelm))
+allocate(srt%rs_pos(srt%nelm))
+srt%rs_diag = 0
+srt%rs_nelm = 0
+srt%rs_pos  = 0
+
+srt%pos_diag = 0
+srt%pos_nelm = 0
+srt%pos_pos  = 0
+
+open(newunit=srt%unit,file=srtname,access='stream',status='replace')
+write(srt%unit,pos=1) srt%nbas,srt%nelm,srt%pos_diag,srt%pos_nelm,srt%pos_pos
+inquire(srt%unit,pos=srt%pos_diag)
+write(srt%unit) srt%rs_diag
+inquire(srt%unit,pos=srt%pos_nelm)
+write(srt%unit) srt%rs_nelm
+inquire(srt%unit,pos=srt%pos_pos)
+write(srt%unit) srt%rs_pos
+
+allocate(srt%seg_pq(srt%nelm,srt%ncol))
+allocate(srt%seg_val(srt%nelm,srt%ncol))
+
+npass = srt%npass
+
+end subroutine open_AOSorter2
+
+subroutine iniPass_AOSorter2(srt,ipass)
+implicit none
+class(AOSorter2Data) :: srt
+integer :: ipass
+
+srt%rs_off = srt%ncol*(ipass-1)
+
+end subroutine iniPass_AOSorter2
+
+subroutine endPass_AOSorter2(srt)
+implicit none
+class(AOSorter2Data) :: srt
+integer :: rs
+
+do rs=srt%rs_off+1,min(srt%rs_off+srt%ncol,srt%nelm)
+
+   srt%rs_nelm(rs) = srt%rs_nelm(rs) + 1
+   srt%seg_pq(srt%rs_nelm(rs),rs-srt%rs_off) = rs
+   srt%seg_val(srt%rs_nelm(rs),rs-srt%rs_off) = srt%rs_diag(rs)
+
+   if(srt%rs_nelm(rs)>0) then
+      inquire(srt%unit,pos=srt%rs_pos(rs))
+      write(srt%unit) &
+           srt%seg_pq(1:srt%rs_nelm(rs),rs-srt%rs_off),&
+           srt%seg_val(1:srt%rs_nelm(rs),rs-srt%rs_off)
+   endif
+
+enddo
+
+end subroutine endPass_AOSorter2
+
+subroutine add_AOSorter2(srt,pq,rs,val)
+implicit none
+class(AOSorter2Data) :: srt
+integer,intent(in) :: pq,rs
+double precision,intent(in) :: val
+
+if(rs<=srt%rs_off.or.rs>srt%rs_off+srt%ncol) return
+
+if(pq==rs) then
+
+   srt%rs_diag(rs) = val
+
+else
+
+   srt%rs_nelm(rs) = srt%rs_nelm(rs) + 1
+   srt%seg_pq(srt%rs_nelm(rs),rs-srt%rs_off) = pq
+   srt%seg_val(srt%rs_nelm(rs),rs-srt%rs_off) = val
+
+endif
+
+end subroutine add_AOSorter2
+
+subroutine close_AOSorter2(srt)
+implicit none
+class(AOSorter2Data) :: srt
+
+write(srt%unit,pos=1) srt%nbas,srt%nelm,srt%pos_diag,srt%pos_nelm,srt%pos_pos
+write(srt%unit,pos=srt%pos_diag) srt%rs_diag
+write(srt%unit,pos=srt%pos_nelm) srt%rs_nelm
+write(srt%unit,pos=srt%pos_pos) srt%rs_pos
+close(srt%unit,status='keep')
+
+deallocate(srt%seg_val)
+deallocate(srt%seg_pq)
+
+deallocate(srt%rs_pos)
+deallocate(srt%rs_nelm)
+deallocate(srt%rs_diag)
+
+end subroutine close_AOSorter2
 
 !-------------------------------------------------------------------------------
 !-------------------------------------------------------------------------------
