@@ -2405,6 +2405,8 @@ C
       Call MatTr(XKin,UMOAO,NBasis)
         write(56,*) XKin
 
+      close(iunit77)
+
       return
       end
 
