@@ -91,8 +91,8 @@ integer,intent(in) :: aosource
 character(*),intent(in) :: intfile,sortfile
 integer(8),intent(in) :: maxmem
 integer(8),intent(out),optional :: outinfo
-!type(AOSorter2Data) :: srt
-type(AOSorter1Data) :: srt
+type(AOSorter2Data) :: srt
+!type(AOSorter1Data) :: srt
 integer :: iunit
 integer :: npass,ipass
 integer :: maxrep, naos(8), lbuf, nibuf, nbits, lenint4
