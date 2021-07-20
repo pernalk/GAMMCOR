@@ -24,13 +24,14 @@ C
      $ EigVecR(NDim*NDim),
      $ Eig(NDim),EGOne(NGem),
      $ UNOAO(NBasis,NBasis),
-     $ IndX(NDim),IndN(2,NDim)
+     $ IndX(NDim),IndN(2,NDim),
+     $ PMat(NDimX,NDimX)
 C
 C     LOCAL ARRAYS
 C
       Dimension XGrid(100), WGrid(100)
 C
-c      goto 132
+      goto 132
 C
       If(ITwoEl.eq.1) Then
 C
@@ -40,13 +41,6 @@ C
      $ IndN,IndX,NDimX)
 C
       ElseIf(ITwoEl.eq.3) Then
-C
-      Call WChol_FOFO(ECorr,XOne,URe,Occ,
-     $ EGOne,NGOcc,
-     $ IGem,NAcCAS,NInAcCAS,NELE,
-     $ NBasis,NInte1,NDim,NGem,IndAux,
-     $ IndN,IndX,NDimX)
-      stop
 C
       Call WIter_FOFO(ECorr,XOne,URe,Occ,
      $ EGOne,NGOcc,
@@ -63,6 +57,11 @@ C
       stop
 C
   132 continue
+      Call WChol_FOFO(PMat,XOne,URe,Occ,
+     $ EGOne,NGOcc,
+     $ IGem,NAcCAS,NInAcCAS,NELE,
+     $ NBasis,NInte1,NDim,NGem,IndAux,
+     $ IndN,IndX,NDimX)
 C
 C     GENERATE ABSCISSAS AND WEIGHTS FOR GAUSSIAN-LEGENDRE QUADRATURE
 C
@@ -84,11 +83,19 @@ C
 C
       ElseIf(ITwoEl.eq.3) Then
 C
-      Call WInteg_FOFO(ECorrA,XOne,URe,Occ,
+c      Call WInteg_FOFO(ECorrA,XOne,URe,Occ,
+c     $ EGOne,NGOcc,
+c     $ IGem,NAcCAS,NInAcCAS,NELE,
+c     $ NBasis,NInte1,NDim,NGem,IndAux,ACAlpha,
+c     $ IndN,IndX,NDimX)
+C
+c      goto 666
+      Call CIter_FOFO(PMat,ECorrA,ACAlpha,XOne,URe,Occ,
      $ EGOne,NGOcc,
      $ IGem,NAcCAS,NInAcCAS,NELE,
-     $ NBasis,NInte1,NDim,NGem,IndAux,ACAlpha,
+     $ NBasis,NInte1,NDim,NGem,IndAux,
      $ IndN,IndX,NDimX)
+  666 continue
 C
       EndIf
 C
