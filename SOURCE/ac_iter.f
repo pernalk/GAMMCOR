@@ -30,8 +30,8 @@ C
 C     LOCAL ARRAYS
 C
       Dimension XGrid(100), WGrid(100)
-C
-      goto 132
+C 
+      If (ICholesky.Eq.0) Then
 C
       If(ITwoEl.eq.1) Then
 C
@@ -41,6 +41,9 @@ C
      $ IndN,IndX,NDimX)
 C
       ElseIf(ITwoEl.eq.3) Then
+C
+C     Find AC energiy in one shot (no lambda integration) by expanding C in lambda 
+C     and integrating analytically
 C
       Call WIter_FOFO(ECorr,XOne,URe,Occ,
      $ EGOne,NGOcc,
@@ -54,9 +57,13 @@ C
       Write
      $ (6,'(/,2X,''ECASSCF+ENuc, AC-Corr, AC-ERPA-CASSCF '',4X,3F15.8)')
      $ ETot+ENuc,ECorr,ETot+ENuc+ECorr
-      stop
+C       
+      Return
 C
-  132 continue
+      EndIf
+C
+C     Find the projector PMat
+C
       Call WChol_FOFO(PMat,XOne,URe,Occ,
      $ EGOne,NGOcc,
      $ IGem,NAcCAS,NInAcCAS,NELE,
@@ -66,7 +73,6 @@ C
 C     GENERATE ABSCISSAS AND WEIGHTS FOR GAUSSIAN-LEGENDRE QUADRATURE
 C
       NGrid=5
-c      NGrid=30
 C
       Call GauLeg(Zero,One,XGrid,WGrid,NGrid)
 C 
@@ -83,6 +89,9 @@ C
 C
       ElseIf(ITwoEl.eq.3) Then
 C
+C     C(Omega) WILL BE FOUND NONITERATIVELY BY INVERTING THE NDimX X NDimX matrix 
+C
+      
 c      Call WInteg_FOFO(ECorrA,XOne,URe,Occ,
 c     $ EGOne,NGOcc,
 c     $ IGem,NAcCAS,NInAcCAS,NELE,
@@ -90,6 +99,9 @@ c     $ NBasis,NInte1,NDim,NGem,IndAux,ACAlpha,
 c     $ IndN,IndX,NDimX)
 C
 c      goto 666
+C
+C     ITERATIVE SOLUTION FOR C(Omega)
+C
       Call CIter_FOFO(PMat,ECorrA,ACAlpha,XOne,URe,Occ,
      $ EGOne,NGOcc,
      $ IGem,NAcCAS,NInAcCAS,NELE,

@@ -1418,25 +1418,8 @@ C
 C
 C     ITwoEl
       If(ITwoEl.Eq.1) Then
-C      If (ICholesky==0) Then
       Write(6,'(/," Transforming two-electron integrals ...",/)')
       Call TwoNO1(TwoEl,UAOMO,NBasis,NInte2)
-C      ElseIf (ICholesky==1) Then
-C      UAux=transpose(UAOMO)       
-C      Allocate(MatFF(NCholesky,NBasis**2))
-C      Call chol_MOTransf(MatFF,CholeskyVecs,
-C     $                   UAux,1,NBasis,
-C     $                   UAux,1,NBasis)
-C      do i=1,NCholesky
-C      do j=1,nbasis
-C      do k=1,j
-C      if(abs(MatFF(i,(j-1)*nbasis+k)).gt.1.d-8)
-C     $ write(*,*)i,j,k,MatFF(i,(j-1)*nbasis+k),MatFF(i,(k-1)*nbasis+j)
-C      enddo
-C      enddo
-C      enddo
-C      stop
-c      EndIf
 C     
       ElseIf(ITwoEl.eq.3) Then
 C     PREPARE POINTERS: NOccup=num0+num1
@@ -1476,7 +1459,7 @@ C
      $                    Num0+Num1,Num0+Num1,MatFF,
      $                    NCholesky,NBasis,'FFOO')
 C
-C dump MatFF
+C KP 07.2021: dump MatFF
 C
       open(newunit=iunit,file='cholvecs',form='unformatted')
       write(iunit) NCholesky

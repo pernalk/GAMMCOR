@@ -19,11 +19,11 @@ double precision :: PMat(NDimX,NDimX)
 double precision :: COM(NDimX*NDimX),XFreq(100),WFreq(100),&
                     ABPLUS(NDim*NDim),AB(NDim*NDim),ADIAG(NDim)
 
-integer :: iunit,NOccup
+integer :: iunit
 integer :: ia,ib,ic,id,ICol,IRow
 integer :: i,j,k,l,kl,ip,iq,ir,is,ipq,irs
-integer :: pos(NBasis,NBasis),NGrid,N,IGL,inf1,inf2,info,Max_Cn
-double precision :: ECASSCF,PI,WFact,XFactorial,XN1,XN2,FF,CICoef(NBasis),Cpq,Crs,SumY,Aux,OmI
+integer :: pos(NBasis,NBasis),N,IGL,inf1,inf2,info,Max_Cn
+double precision :: ECASSCF,WFact,XFactorial,XN1,XN2,FF,CICoef(NBasis),Cpq,Crs,SumY,Aux,OmI
 character(:),allocatable :: twojfile,twokfile,IntKFile
 logical :: AuxCoeff(3,3,3,3)
 double precision,allocatable :: work(:),ints(:,:)
@@ -31,22 +31,12 @@ Real*8, Allocatable :: MatFF(:,:),work2(:,:),work3(:),work1(:,:),work4(:),work5(
 integer,allocatable :: ipiv(:)
 integer :: NCholesky,lwork
 
-NGrid=25
-
-NOccup = NAct + INActive
-PI = 4.0*ATAN(1.0)
-
-twojfile = 'FFOO'
-twokfile = 'FOFO'
-IntKFile = twokfile
-
 open(newunit=iunit,file='cholvecs',form='unformatted')
 read(iunit) NCholesky
 allocate(MatFF(NCholesky,NBasis**2))
 read(iunit) MatFF
 close(iunit)
 
-!!!
 print*,'NCholesky',NCholesky
 
 allocate(work2(NCholesky,NCholesky))
@@ -75,7 +65,7 @@ work1=work2
 call Diag8(work2,NCholesky,NCholesky,work3,work4)
 do i=1,NCholesky
    if(abs(work3(i)).lt.1d-10) then
-      print*, i, work3(i)
+!      print*, i, work3(i)
       work3(i)=0.0
    else
       work3(i)=1./work3(i)
@@ -91,28 +81,10 @@ call dgemm('T','N',NCholesky,NCholesky,NCholesky,1.0d0,work2,NCholesky,work6,NCh
 
 ! checking the inverse
 call dgemm('N','N',NCholesky,NCholesky,NCholesky,1.0d0,work5,NCholesky,work1,NCholesky,0d0,work6,NCholesky)
-!print*,work6(1,1),work6(20,20),work6(1,20)
 print*,'norm of D.D^T.[D.D^T]^-1',norm2(work6(1:NCholesky,1:NCholesky)),'Sqrt(NCholesky)',SQRT(Float(NCholesky))
 
 work2=work5
 deallocate(work4,work3,work5,work6,work1)
-
-!! (D.D^T)^-1
-!allocate(ipiv(NCholesky))
-! allocate(work3(NCholesky*NCholesky))
-!call dgetrf(NCholesky,NCholesky,work2,NCholesky,ipiv,info)
-!!print*, 'info-1',info
-!if(info>0) then
-!   write(lout,*) 'WChol_FOFO: dgetrf ',info
-!   stop
-!endif
-!call dgetri(NCholesky,work2,NCholesky,ipiv,work3,NCholesky,info)
-!!print*, 'info-2',info,work3(1)
-!if(info>0) then
-!   write(lout,*) 'WChol_FOFO: dgetri ',info
-!   stop
-!endif
-!deallocate(work3,ipiv)
 
 ! D^T.(D.D^T)-1 = work1
 !allocate(work1(NBasis**2,NCholesky))
@@ -133,56 +105,6 @@ PMAT=work2
 deallocate(MatFF)
 
 return
-
-allocate(work1(NDimX,NDimX))
-work1=work2
-! truncate PMat
-!work1 = 0
-!do j=1,NDimX
-!   ir=IndN(1,j)
-!   is=IndN(2,j)
-!   irs = is+(ir-1)*NBasis
-!   do i=1,NDimX
-!      ip=IndN(i,1)
-!      iq=IndN(i,2)
-!      ipq = iq+(ip-1)*NBasis
-!      work1(i,j) = work2(ipq,irs)
-!   enddo
-!enddo
-!deallocate(work2)
-
-
-allocate(work3(NDimX*NDimX))
-ACAlpha=1.D0
-call AB_CAS_FOFO(ABPLUS,work3,ECASSCF,URe,Occ,XOne, &
-                 IndN,IndX,IGem,NAct,INActive,NDimX,NBasis,NDimX,&
-                 NInte1,twojfile,twokfile,ACAlpha,.false.)
-
-Call dgemm('N','N',NDimX,NDimX,NDimX,1d0,ABPLUS,NDimX,work3,NDimX,0.0,AB,NDimX)
-
-ADIAG = 0
-do ipq=1,NDimX
-   ADIAG(ipq) = AB((ipq-1)*NDimX+ipq)
-   AB((ipq-1)*NDimX+ipq) = 0d0
-enddo
-print*, 'NDIAG and DIAG norms',norm2(AB(1:NDimX*NDimX)),norm2(ADIAG(1:NDimX))
-
-! project
-Call dgemm('N','N',NDimX,NDimX,NDimX,1d0,work1,NDimX,AB,NDimX,0.0,work3,NDimX)
-
-
-do i=1,NDimX
-   do j=1,NDimX
-!      if(abs(work3(i+(j-1)*ndimx)-ab(i+(j-1)*ndimx)).gt.1.d-6) &
-!      if(abs(ab(i+(j-1)*ndimx)).gt.1.d-6) &
-!      write(*,*)i,j,work3(i+(j-1)*ndimx)-ab(i+(j-1)*ndimx),ab(i+(j-1)*ndimx)
-   enddo
-enddo
-
-
-work3=AB-work3
-print*, 'before and after projection',norm2(AB(1:NDimX*NDimX)),norm2(work3(1:NDimX*NDimX))
-stop
 
 deallocate(work1)
 end subroutine WChol_FOFO
@@ -567,6 +489,10 @@ NGrid=15
 Max_Cn=10
 XMix=0.4
 
+! safe choice
+!Max_Cn=25
+!XMix=0.6
+
 Write (6,'(/,X,''AC Iterative Calculation with Omega Grid = '',I3,&
       '' and max order in C expansion = '',I3,/)') NGrid,Max_Cn
 
@@ -577,17 +503,16 @@ twojfile = 'FFOO'
 twokfile = 'FOFO'
 IntKFile = twokfile
 
-ACAlpha0=0.D0
-call AB_CAS_FOFO(ABPLUS0,WORK0,ECASSCF,URe,Occ,XOne, &
-                 IndN,IndX,IGem,NAct,INActive,NDimX,NBasis,NDimX,&
-                 NInte1,twojfile,twokfile,ACAlpha0,.false.)
+!ACAlpha0=0.D0
+!call AB_CAS_FOFO(ABPLUS0,WORK0,ECASSCF,URe,Occ,XOne, &
+!                 IndN,IndX,IGem,NAct,INActive,NDimX,NBasis,NDimX,&
+!                 NInte1,twojfile,twokfile,ACAlpha0,.false.)
+!Call dgemm('N','N',NDimX,NDimX,NDimX,1d0,ABPLUS0,NDimX,WORK0,NDimX,0.0,A0,NDimX)
+
 call AB_CAS_FOFO(ABPLUS1,WORK1,ECASSCF,URe,Occ,XOne, &
                  IndN,IndX,IGem,NAct,INActive,NDimX,NBasis,NDimX,&
                  NInte1,twojfile,twokfile,ACAlpha,.false.)
 EGOne(1)=ECASSCF
-
-!A0=ABPLUS0*ABMIN0
-Call dgemm('N','N',NDimX,NDimX,NDimX,1d0,ABPLUS0,NDimX,WORK0,NDimX,0.0,A0,NDimX)
 !A2=ABPLUS1*ABMIN1
 Call dgemm('N','N',NDimX,NDimX,NDimX,1d0,ABPLUS1,NDimX,WORK1,NDimX,0.0,A2,NDimX)
 
@@ -595,60 +520,18 @@ A0=0.D0
 Do I=1,NDimX
     A0((I-1)*NDimX+I)=A2((I-1)*NDimX+I)
 EndDo
-! herer
-Do I=1,0
-!Do I=1,NDimX
-   IR=IndN(1,I)
-   IS=IndN(2,I)
-   Do J=1,NDimX
-      IP=IndN(1,J)
-      IQ=IndN(2,J)
-!      if(abs(PMat(I,J)).gt.1.d-1) write(*,*)ir,is,ip,iq,PMat(I,J) 
-         If(IndAux(IR).Eq.1.And.IndAux(IS).Eq.1.And.IndAux(IP).Eq.1.And.IndAux(IQ).Eq.1) Then
-!!           write(*,*)'act-act',ir,is,ip,iq
-           A0((J-1)*NDimX+I)=A2((J-1)*NDimX+I)
-         EndIf
-         If(IndAux(IR).Eq.1.And.IndAux(IS).Eq.0.And.IndAux(IP).Eq.1.And.IS.Eq.IQ) Then
-!           write(*,*)'act-inact',ir,is,ip,iq
-           A0((J-1)*NDimX+I)=A2((J-1)*NDimX+I)
-         EndIf
-!         If(IndAux(IR).Eq.2.And.IndAux(IS).Eq.1.And.IndAux(IQ).Eq.1.And.IR.Eq.IP) Then
-!           write(*,*)'virt-nact',ir,is,ip,iq
-!           A0((J-1)*NDimX+I)=A2((J-1)*NDimX+I)
- !        EndIf
-         If(IndAux(IR).Eq.2.And.IndAux(IS).Eq.1.And.IndAux(IP).Eq.2.And.IS.Eq.IQ) Then
-!!           write(*,*)'virt-act',ir,is,ip,iq
-           A0((J-1)*NDimX+I)=A2((J-1)*NDimX+I)
-         EndIf
-         IA=IndAux(IR)*IndAux(IS)*IndAux(IP)*IndAux(IQ)
-         IB=0
-         SumY=Occ(IP)+Occ(IQ)+Occ(IR)+Occ(IS)
-         If(IndAux(IR).Eq.1.And.IndAux(IS).Eq.1.And.IndAux(IP).Eq.1.And.IndAux(IQ).Eq.1) IB=1
-         If((IndAux(IR).Eq.1.Or.IndAux(IS).Eq.1.Or.IndAux(IP).Eq.1.Or.IndAux(IQ).Eq.1).And.IA.Eq.2.And.IB.Eq.0) Then
-!           write(*,*)ir,is,ip,iq
-!           A0((J-1)*NDimX+I)=A2((J-1)*NDimX+I)
-         EndIf
-         If((IndAux(IR).Eq.1.Or.IndAux(IS).Eq.1.Or.IndAux(IP).Eq.1.Or.IndAux(IQ).Eq.1).And.IA.Eq.4.And.IB.Eq.0) Then
-     !      write(*,*)ir,is,ip,iq
-!           A0((J-1)*NDimX+I)=A2((J-1)*NDimX+I)
-         EndIf
-
-   EndDo
-EndDo
 
 A2=A2-A0
 
-!
-! WORK0=P.A2
+!! PROJECT A2 WITH PMat : WORK0=PMat.A2
 Call dgemm('N','N',NDimX,NDimX,NDimX,1d0,PMat,NDimX,A2,NDimX,0.0,WORK0,NDimX)
-
 A0=A0+WORK0
 print*, 'A2 norm beofore projection',norm2(A2(1:NDimX*NDimX))
 A2=A2-WORK0
 print*, 'A2 norm after projection',norm2(A2(1:NDimX*NDimX))
 
-Call FreqGrid(XFreq,WFreq,NGrid)
 
+Call FreqGrid(XFreq,WFreq,NGrid)
 COM=0.0
 Do IGL=1,NGrid
       OmI=XFreq(IGL)
@@ -658,16 +541,8 @@ Do IGL=1,NGrid
           WORK0((I-1)*NDimX+I)=OmI**2
       EndDo
 
-!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-!      WORK0=A2+A0+WORK0
-!      CMAT=ABPLUS1
-!      Call dgesv(NDimX,NDimX,WORK0,NDimX,ipiv,CMAT,NDimX,inf1)
-!      COM=COM+2.D0/PI*CMAT*WFreq(IGL)
-!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-      
       WORK1=A0+WORK0
       
-!      WORK1=A2+A0+WORK0
 ! LAMBDA=WORK1=(A0+WORK0)^-1
       Call dgetrf(NDimX, NDimX, WORK1, NDimX, ipiv, inf1 )
       Call dgetri(NDimX, WORK1, NDimX, ipiv, work0, NDimX, inf2 )
@@ -685,14 +560,15 @@ Do IGL=1,NGrid
          Call dgemm('N','N',NDimX,NDimX,NDimX,1d0,A2,NDimX,&
                  CMAT,NDimX,0.0,WORK0,NDimX)
          WORK0=ABPLUS1-WORK0
-!         Call dgemm('N','N',NDimX,NDimX,NDimX,1.0d0,WORK1,NDimX,&
-!                 WORK0,NDimX,0.0,CMAT,NDimX)
+! damping is needed when active orbitals present: CMAT(n) = (1-XMix)*CMAT(n) + XMix*CMAT(n-1)
          Call dgemm('N','N',NDimX,NDimX,NDimX,1.0d0-XMix,WORK1,NDimX,&
                  WORK0,NDimX,XMix,CMAT,NDimX)
       EndDo
       COM=COM+2.D0/PI*CMAT*WFreq(IGL)
 EndDo
-
+!
+! end of computing the integral of C(Omega)
+!
 do i=1,NBasis
    CICoef(i) = sign(sqrt(Occ(i)),Occ(i)-0.5d0)
 enddo
