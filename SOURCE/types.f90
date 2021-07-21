@@ -1561,32 +1561,31 @@ integer :: iunit
 integer :: nsym,nbas(8),norb(8),nrhf(8),ioprhf
 logical :: ex
 
- inquire(file=basfile,EXIST=ex)
+inquire(file=basfile,EXIST=ex)
 
- if(ex) then
-    open(newunit=iunit,file=basfile,status='OLD', &
-         access='SEQUENTIAL',form='UNFORMATTED')
+if(ex) then
+   open(newunit=iunit,file=basfile,status='OLD', &
+        access='SEQUENTIAL',form='UNFORMATTED')
 
-    if(trim(intf)=='DALTON') then
-       ! read basis info
-       call readlabel(iunit,'BASINFO ')
+   if(trim(intf)=='DALTON') then
+      ! read basis info
+      call readlabel(iunit,'BASINFO ')
 
-       read (iunit) nsym,nbas,norb,nrhf,ioprhf
-       !write(LOUT,*)  nsym,nbas,norb,nrhf,ioprhf
+      read (iunit) nsym,nbas,norb,nrhf,ioprhf
+      !write(LOUT,*)  nsym,nbas,norb,nrhf,ioprhf
 
-    elseif(trim(intf)=='MOLPRO') then
-       read(iunit)
-       read(iunit) nsym,nbas(1:nsym)
-    endif
+   elseif(trim(intf)=='MOLPRO') then
+      read(iunit)
+      read(iunit) nsym,nbas(1:nsym)
+   endif
 
-    close(iunit)
-    nbasis = sum(nbas(1:nsym))
+   close(iunit)
+   nbasis = sum(nbas(1:nsym))
 
- else
-    write(LOUT,'(1x,a)') 'WARNING: '// basfile //' NOT FOUND!'
-    write(LOUT,'(1x,a)') 'TRYING TO READ NBasis FROM INPUT!'
- endif
-
+else
+   write(LOUT,'(1x,a)') 'WARNING: '// basfile //' NOT FOUND!'
+   write(LOUT,'(1x,a)') 'TRYING TO READ NBasis FROM INPUT!'
+endif
 
 end subroutine basinfo
 

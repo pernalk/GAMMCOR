@@ -6130,6 +6130,8 @@ C             0th-order correlation only if (IP,IQ) pair is allowed
          enddo
       enddo
 C
+      Close(iunit)
+C
       End Subroutine ECorrAC0GVB_FOFO
 
 *Deck MP2RDM

@@ -625,8 +625,8 @@ if(Flags%ISERPA==0) then
          !$omp end single
          !$omp end parallel
 
-     call reader%close
   endif
+  call reader%close
 
      write(LOUT,'(/1x,a)') 'Transforming E2exch-disp integrals...'
      if(Flags%ICholesky==1) then
