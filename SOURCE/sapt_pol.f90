@@ -18,7 +18,7 @@ integer :: NBas
 double precision,allocatable :: PA(:,:),PB(:,:) 
 double precision,allocatable :: Va(:,:),Vb(:,:),Ja(:,:) 
 double precision,allocatable :: work(:,:)
-double precision :: tmp,ea,eb,elst
+double precision :: tmp,ea,eb,eabel,elst
 double precision,parameter :: Half=0.5d0
 double precision,external  :: trace
 
@@ -46,12 +46,14 @@ double precision,external  :: trace
  eb = trace(work,NBas) 
 ! print*, eb
  call dgemm('N','N',NBas,NBas,NBas,1d0,PB,NBas,Ja,NBas,0d0,work,NBas)
- ea = ea + trace(work,NBas)
-! print*, trace(work,NBas)
- elst = ea + eb + SAPT%Vnn 
+ eabel = trace(work,NBas)
+ elst = ea + eb + eabel + SAPT%Vnn 
 
+ call print_en('V_nucB_elA',ea,.false.)
+ call print_en('V_nucA_elB',eb,.false.)
+ call print_en('V_elA_elB',eabel,.false.)   
  call print_en('V_nn',SAPT%Vnn,.false.)
- call print_en('Eelst',elst*1000,.false.)
+ call print_en('Eelst',elst*1000,.true.)
  SAPT%elst = elst
 
  deallocate(work)
@@ -124,63 +126,6 @@ double precision :: tmp
 
  call calc_resp(EVecA,OmA,AlphaA,0d0,A)
  call calc_resp(EVecB,OmB,AlphaB,0d0,B)
-
- !! TEST ICPKS
- !write(LOUT,*) 'A%PP?', norm2(A%PP)
- !write(LOUT,*) 'B%PP?', norm2(B%PP)
-
- !allocate(wtest(A%NDimX))
- !allocate(Work(NBas**2),ipiv(A%NDimX))
- !wtest = 0 
- !do pq=1,A%NDimX
- !   ip = A%IndN(1,pq)
- !   iq = A%IndN(2,pq)
- !   wtest(pq) = WbAA(ip,iq)
- !enddo
- !call dsysv('U',A%NDimX,1,A%PP,A%NDimX,ipiv,wtest,A%NDimX,Work,NBas,info)
- !e2ba = 0
- !do pq=1,A%NDimX
- !   ip = A%IndN(1,pq)
- !   iq = A%IndN(2,pq)
- !   e2ba = e2ba + wtest(pq)*WbAA(ip,iq)
- !enddo
- !print*, 'e2ba ',2d0*e2ba*1000
- !e2ba = 0
- !
- !do rs=1,B%NDimX
- !   ir = B%IndN(1,rs)
- !   is = B%IndN(2,rs)
- !   wtest(rs) = WaBB(ir,is)
- !enddo
- !call dsysv('U',B%NDimX,1,B%PP,B%NDimX,ipiv,wtest,B%NDimX,Work,NBas,info)
- !e2ab = 0
- !do rs=1,B%NDimX
- !   ir = B%IndN(1,rs)
- !   is = B%IndN(2,rs)
- !   e2ab = e2ab + wtest(rs)*WaBB(ir,is)
- !enddo
- !print*, 'e2ab ',2d0*e2ab*1000
- !e2ab = 0
- !
- !deallocate(wtest,Work)
- !deallocate(A%PP,B%PP)
- !!
- !! end TEST-ICPKS
-
- !tmp=0
- !do i=1,A%NDimX
- !do j=1,A%NDimX
- !   tmp = tmp + AlphaA(i,j)**2
- !enddo
- !enddo
- !print*, 'RMA: ',tmp
- !tmp=0
- !do i=1,B%NDimX
- !do j=1,B%NDimX
- !   tmp = tmp + AlphaB(i,j)**2
- !enddo
- !enddo
- !print*, 'RMB: ',tmp
 
  e2ba=0
  do pq=1,A%NDimX
@@ -1621,9 +1566,56 @@ write(LOUT,'(1x,a,f16.8)') 'E2exch-disp(cubic) = ', e2exd_cub*1.0d3
 
 end subroutine e2_cubic
 
+subroutine e2disp_intermed1(tmp1,tmp01,A,B,dimOA,dimOB,nOVA,nOVB,EvecA,fact,Y01BlockA,iunit,work)
+
+use omp_lib
+implicit none
+double precision,allocatable :: tmp1(:,:), tmp01(:,:)
+type(SystemBlock) :: A, B
+integer :: ip,iq,ir,is
+integer :: i,j,pq,rs
+integer :: dimOA,dimOB,nOVA,nOVB
+double precision,allocatable :: EVecA(:)
+double precision :: fact
+type(Y01BlockData),allocatable :: Y01BlockA(:)
+integer :: iunit
+double precision,allocatable :: work(:)
+
+do pq=1,A%NDimX
+    ip = A%IndN(1,pq)
+    iq = A%IndN(2,pq)
+    ! print*, iq,ip,iq+(ip-A%num0-1)*dimOA,nOVA
+    read(iunit,rec=iq+(ip-A%num0-1)*dimOA) work(1:nOVB)
+
+    do rs=1,B%NDimX
+        ir = B%IndN(1,rs)
+        is = B%IndN(2,rs)
+
+        fact = (A%CICoef(iq)+A%CICoef(ip)) * &
+                (B%CICoef(is)+B%CICoef(ir)) * &
+                work(is+(ir-B%num0-1)*dimOB)
+               
+        !$omp parallel do
+        do i=1,A%NDimX
+            tmp1(i,rs) = tmp1(i,rs) + & 
+                        fact * &
+                        EVecA(pq+(i-1)*A%NDimX)
+        enddo
+        !$omp end parallel do
+
+        associate(Y => Y01BlockA(pq))
+            tmp01(Y%l1:Y%l2,rs) = tmp01(Y%l1:Y%l2,rs) + fact * Y%vec0(1:Y%n)
+        end associate
+
+    enddo
+enddo
+    
+end subroutine e2disp_intermed1
+ 
 subroutine e2disp(Flags,A,B,SAPT)
 ! calculate 2nd order dispersion energy
 ! in coupled and uncoupled approximations
+use omp_lib
 implicit none
 
 type(FlagsData)   :: Flags
@@ -1633,7 +1625,6 @@ type(Y01BlockData),allocatable :: Y01BlockA(:),Y01BlockB(:)
 
 integer :: NBas, NInte1,NInte2
 integer :: dimOA,dimVA,dimOB,dimVB,nOVA,nOVB
-integer :: NCholesky
 integer :: iunit
 integer :: i,j,pq,rs
 integer :: ip,iq,ir,is
@@ -1645,7 +1636,6 @@ double precision,allocatable :: EVecA(:), EVecB(:)
 double precision,allocatable :: tmp1(:,:),tmp2(:,:),&
                                 tmp01(:,:),tmp02(:,:)
 double precision,allocatable :: work(:)
-double precision,allocatable :: tChol(:)
 double precision :: e2d,fact,tmp
 double precision :: e2du,dea,deb
 double precision :: inv_omega
@@ -1681,8 +1671,6 @@ double precision,parameter :: SmallE = 1.D-3
  nOVA = dimOA*dimVA
  nOVB = dimOB*dimVB
 
- NCholesky = SAPT%NCholesky
-
 ! read EigValA_B
  allocate(EVecA(A%NDimX*A%NDimX),OmA(A%NDimX),  &
           EVecB(B%NDimX*B%NDimX),OmB(B%NDimX),  &
@@ -1704,94 +1692,8 @@ double precision,parameter :: SmallE = 1.D-3
 
 ! tran4_gen
 allocate(work(nOVB))
-allocate(tChol(nOVB))
 open(newunit=iunit,file='TWOMOAB',status='OLD',&
      access='DIRECT',form='UNFORMATTED',recl=8*nOVB)
-
-! Hartree-Fock check
-!if(Flags%ISHF==1.and.SAPT%HFCheck) then
-!
-!   allocate(tmp01(A%NDimX,B%NDimX),tmp02(A%NDimX,B%NDimX),&
-!            tmp03(A%NDimX,B%NDimX))
-!    tmp01=0
-!    tmp03=0
-!    do pq=1,A%NDimX
-!       ip = A%IndN(1,pq)
-!       iq = A%IndN(2,pq)
-!       !print*, iq,ip,iq+(ip-A%num0-1)*dimOA,nOVA
-!      read(iunit,rec=iq+(ip-A%num0-1)*dimOA) work(1:nOVB)
-!       do rs=1,B%NDimX
-!          ir = B%IndN(1,rs)
-!          is = B%IndN(2,rs)
-!   
-!          fact = &
-!                 work(is+(ir-B%num0-1)*dimOB)
-!   
-!          do i=1,A%NDimX
-!   
-!             tmp01(i,rs) = tmp01(i,rs) + &
-!                          fact * &
-!                          EVecA1(pq+(i-1)*A%NDimX)
-!   
-!   !          tmp03(i,rs) = tmp03(i,rs) + &
-!   !                       !fact * sqrt(2d0) * &
-!   !                       fact * sqrt(2d0) * &
-!   !                       EVecA0(pq+(i-1)*A%NDimX)
-!   
-!          enddo
-!   
-!       enddo
-!    enddo
-!   
-!      e2du=0d0
-!      e2ds2=0d0
-!      e2ds1=0d0
-!      tmp=0d0
-!      do pq=1,A%NDimX
-!         ip = A%IndN(1,pq)
-!         iq = A%IndN(2,pq)
-!         dea = A%OrbE(ip)-A%OrbE(iq)
-!      !   print*, iq,ip,iq+(ip-A%num0-1)*dimOA,nOVA
-!         read(iunit,rec=iq+(ip-A%num0-1)*dimOA) work(1:nOVB)
-!         do rs=1,B%NDimX
-!            ir = B%IndN(1,rs)
-!            is = B%IndN(2,rs)
-!            deb = B%OrbE(ir)-B%OrbE(is) 
-!      !      print*, is,ir,is+(ir-B%num0-1)*dimOB,nOVB
-!   
-!          if(OmA0(pq).gt.SmallE.and.OmB0(rs).gt.SmallE&
-!           .and.OmA0(pq).lt.BigE.and.OmB0(rs).lt.BigE) then
-!   
-!            tmp=0
-!            do kc=1,B%NDimX
-!               ik = B%IndN(1,kc)
-!               ic = B%IndN(2,kc)
-!               tmp = tmp + work(ic+(ik-B%num0-1)*dimOB)*EVecB1(kc+(rs-1)*B%NDimX)
-!            enddo
-!   
-!            e2du = e2du + work(is+(ir-B%num0-1)*dimOB)**2/(dea+deb)
-!            e2ds2 = e2ds2 + work(is+(ir-B%num0-1)*dimOB)**2*(Alpha*OmA1(pq)+Beta*OmB1(rs))/(dea+deb)**2
-!           ! e2ds1 = e2ds1 + (tmp02(pq,rs)+tmp01(pq,rs))*work(is+(ir-B%num0-1)*dimOB)/(OmA0(pq)+OmB0(rs))
-!            e2ds1 = e2ds1 + (Beta*tmp+Alpha*tmp01(pq,rs))*work(is+(ir-B%num0-1)*dimOB)/(dea+deb) !(OmA0(pq)+OmB0(rs))
-!   
-!          endif
-!    
-!         enddo
-!      enddo
-!       write(LOUT,'()') 
-!       e2ds = (-4d0*e2du-16/sqrt(2d0)*e2ds1+4d0*e2ds2)*1000
-!       print*, 'DS1', -16/sqrt(2d0)*e2ds1*1000
-!       write(LOUT,'(1x,a,f16.8)')'SPOLE:      = ', -4d0*e2du*1000d0 + 4d0*e2ds2*1000d0
-!       write(LOUT,'(1x,a,f16.8)')'E2disp(sc)  = ', e2ds
-!       write(LOUT,'(1x,a,f16.8)')'E2disp(unc) = ', -4d0*e2du*1000d0
-!       write(LOUT,'()') 
-!       e2ds  = 0
-!       e2ds1 = 0
-!       e2ds2 = 0 
-!   
-!   deallocate(tmp01,tmp02,tmp03)
-!   ! end Hartree-Fock check
-!endif
 
 allocate(tmp1(A%NDimX,B%NDimX),tmp2(A%NDimX,B%NDimX),&
         tmp01(A%NDimX,B%NDimX),tmp02(A%NDimX,B%NDimX))
@@ -1808,36 +1710,35 @@ if(.not.(Flags%ICASSCF==0.and.Flags%ISERPA==0)) then
 
  tmp1=0
  tmp01=0
- do pq=1,A%NDimX
-    ip = A%IndN(1,pq)
-    iq = A%IndN(2,pq)
-    ! test Cholesky
-    !kc = iq+(ip-A%num0-1)*dimOA
-    !call dgemv('T',NCholesky,nOVB,1d0,B%OV,NCholesky,A%OV(:,kc),1,0d0,tChol,1)
-    !call dgemv('T',NCholesky,B%NDimX,1d0,B%OV,NCholesky,A%OV(:,pq),1,0d0,tChol,1)
-    !work(1:B%NDimX) = tChol(1:B%NDimX)
-    read(iunit,rec=iq+(ip-A%num0-1)*dimOA) work(1:nOVB)
+!do pq=1,A%NDimX
+!   ip = A%IndN(1,pq)
+!   iq = A%IndN(2,pq)
+!   !work(1:B%NDimX) = tChol(1:B%NDimX)
+!   read(iunit,rec=iq+(ip-A%num0-1)*dimOA) work(1:nOVB)
 
-    do rs=1,B%NDimX
-       ir = B%IndN(1,rs)
-       is = B%IndN(2,rs)
+!   do rs=1,B%NDimX
+!      ir = B%IndN(1,rs)
+!      is = B%IndN(2,rs)
 
-       fact = (A%CICoef(iq)+A%CICoef(ip)) * &
-              (B%CICoef(is)+B%CICoef(ir)) * &
-               work(is+(ir-B%num0-1)*dimOB)
+!      fact = (A%CICoef(iq)+A%CICoef(ip)) * &
+!             (B%CICoef(is)+B%CICoef(ir)) * &
+!              work(is+(ir-B%num0-1)*dimOB)
 
-       do i=1,A%NDimX
-          tmp1(i,rs) = tmp1(i,rs) + & 
-                       fact * &
-                       EVecA(pq+(i-1)*A%NDimX)
-       enddo
- 
-       associate(Y => Y01BlockA(pq))
-          tmp01(Y%l1:Y%l2,rs) = tmp01(Y%l1:Y%l2,rs) + fact * Y%vec0(1:Y%n)
-       end associate
+!      do i=1,A%NDimX
+!         tmp1(i,rs) = tmp1(i,rs) + & 
+!                      fact * &
+!                      EVecA(pq+(i-1)*A%NDimX)
+!      enddo
+!
+!      associate(Y => Y01BlockA(pq))
+!         tmp01(Y%l1:Y%l2,rs) = tmp01(Y%l1:Y%l2,rs) + fact * Y%vec0(1:Y%n)
+!      end associate
 
-    enddo
- enddo
+!   enddo
+!enddo
+
+ call e2disp_intermed1(tmp1,tmp01,A,B,dimOA,dimOB,nOVA,nOVB,EvecA,fact,Y01BlockA,iunit,work)   
+
  ! coupled
  call dgemm('N','N',A%NDimX,B%NDimX,B%NDimX,1d0,tmp1,A%NDimX,EVecB,B%NDimX,0d0,tmp2,A%NDimX)
 
@@ -1866,11 +1767,13 @@ elseif(Flags%ICASSCF==0.and.Flags%ISERPA==0) then
               (B%CICoef(is)+B%CICoef(ir)) * &
                work(is+(ir-B%num0-1)*dimOB)
   
+       !$omp parallel do
        do i=1,A%NDimX
           tmp1(i,rs) = tmp1(i,rs) + & 
                        fact * &
                        EVecA(pq+(i-1)*A%NDimX)
        enddo
+       !$omp end parallel do
 
     enddo
  enddo
@@ -1955,7 +1858,6 @@ endif
  if(SAPT%Wexcit) call e2inddisp_dexc(Flags,A,B,SAPT)
 
  deallocate(work)
- deallocate(tChol)
 
  if(Flags%ICASSCF==1) then
     ! deallocate Y01Block
@@ -2038,30 +1940,32 @@ tmp01 = 0
 tmp02 = 0
 sc10a = 0
 
-do ipq=1,A%NDimX
-   ip = A%IndN(1,ipq)
-   iq = A%IndN(2,ipq)
-   read(iunit,rec=iq+(ip-A%num0-1)*dimOA) work(1:nOVB)
-   do irs=1,B%NDimX
-      ir = B%IndN(1,irs)
-      is = B%IndN(2,irs)
+!do ipq=1,A%NDimX
+!   ip = A%IndN(1,ipq)
+!   iq = A%IndN(2,ipq)
+!   read(iunit,rec=iq+(ip-A%num0-1)*dimOA) work(1:nOVB)
+!   do irs=1,B%NDimX
+!      ir = B%IndN(1,irs)
+!      is = B%IndN(2,irs)
+!
+!      fact = (A%CICoef(iq)+A%CICoef(ip)) * &
+!             (B%CICoef(is)+B%CICoef(ir)) * &
+!              work(is+(ir-B%num0-1)*dimOB)
+!
+!      do i=1,A%NDimX
+!         sc10a(i,irs) = sc10a(i,irs) + &
+!                       fact * &
+!                       EVecA1(ipq+(i-1)*A%NDimX)
+!      enddo
+!
+!       associate(Y => Y01BlockA(ipq))
+!          tmp01(Y%l1:Y%l2,irs) = tmp01(Y%l1:Y%l2,irs) + fact * Y%vec0(1:Y%n)
+!       end associate
+!
+!   enddo
+!enddo
 
-      fact = (A%CICoef(iq)+A%CICoef(ip)) * &
-             (B%CICoef(is)+B%CICoef(ir)) * &
-              work(is+(ir-B%num0-1)*dimOB)
-
-      do i=1,A%NDimX
-         sc10a(i,irs) = sc10a(i,irs) + &
-                       fact * &
-                       EVecA1(ipq+(i-1)*A%NDimX)
-      enddo
-
-       associate(Y => Y01BlockA(ipq))
-          tmp01(Y%l1:Y%l2,irs) = tmp01(Y%l1:Y%l2,irs) + fact * Y%vec0(1:Y%n)
-       end associate
-
-   enddo
-enddo
+call e2disp_intermed1(sc10a,tmp01,A,B,dimOA,dimOB,nOVA,nOVB,EvecA1,fact,Y01BlockA,iunit,work)
 
 ! uncoupled
 ! call dgemm('N','N',A%NDimX,B%NDimX,B%NDimX,1d0,tmp01,A%NDimX,EVecB0,B%NDimX,0d0,tmp02,A%NDimX)
@@ -3678,8 +3582,6 @@ enddo
  deallocate(OmB,EVecB,OmA,EVecA)
 
 end subroutine e2disp_apsg
-
-
 
 subroutine c6_dummy(Flags,A,B,SAPT)
 implicit none

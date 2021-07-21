@@ -1123,8 +1123,6 @@ C     HAP
      $     .true.,NInte1)
 C
 C     memory allocation for sorter
-c      MemType=3
-c      MemVal=2
       MemSrtSize=MemVal*1024_8**MemType
 C     KP: If IFunSR=6 integrals are not needed and are not loaded
       If (IFunSR.Eq.0.Or.IFunSR.Eq.3.Or.IFunSR.Eq.5) Then
