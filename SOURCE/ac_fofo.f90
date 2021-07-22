@@ -429,9 +429,10 @@ do k=1,NOccup
                 if(AuxCoeff(IGem(ip),IGem(iq),IGem(ir),IGem(is))) then
 
                    Aux = Crs*Cpq*COM((irs-1)*NDimX+ipq)
-                   if(iq.eq.is.and.ip.Eq.ir) then
-                      Aux = Aux - Occ(ip)*(1d0-Occ(is))-Occ(is)*(1d0-Occ(ip))
-                   endif
+            ! this term is divergent and it has been removed by computing Int C^alpha=0 domega
+            !       if(iq.eq.is.and.ip.Eq.ir) then
+            !          Aux = Aux - Occ(ip)*(1d0-Occ(is))-Occ(is)*(1d0-Occ(ip))
+            !        endif
 
                    ECorr = ECorr + Aux*ints(j,i)
                 endif
@@ -465,7 +466,7 @@ integer,intent(in) :: IndN(2,NDim),IndX(NDim),IndAux(NBasis),&
                       IGem(NBasis)
 double precision :: ACAlpha,ACAlpha0,XMix
 double precision,intent(in) :: URe(NBasis,NBasis),Occ(NBasis),XONe(NInte1)
-double precision,intent(inout) :: ECorr,EGOne(NGem)
+double precision :: ECorr,ECorrAct,EGOne(NGem)
 
 !double precision,intent(in) :: PMat(NDimX,NDimX)
 double precision :: PMat(NDimX,NDimX)
@@ -483,11 +484,14 @@ integer :: pos(NBasis,NBasis),NGrid,N,IGL,inf1,inf2,Max_Cn
 double precision :: ECASSCF,PI,WFact,XFactorial,XN1,XN2,FF,CICoef(NBasis),Cpq,Crs,SumY,Aux,OmI
 character(:),allocatable :: twojfile,twokfile,IntKFile
 logical :: AuxCoeff(3,3,3,3)
-double precision,allocatable :: work(:),ints(:,:)
+double precision,allocatable :: work(:),ints(:,:),DChol(:,:),WorkD(:,:),DCholAct(:,:)
+integer :: NCholesky
+
 
 NGrid=15
 Max_Cn=10
 XMix=0.4
+
 
 ! safe choice
 !Max_Cn=25
@@ -503,11 +507,11 @@ twojfile = 'FFOO'
 twokfile = 'FOFO'
 IntKFile = twokfile
 
-!ACAlpha0=0.D0
-!call AB_CAS_FOFO(ABPLUS0,WORK0,ECASSCF,URe,Occ,XOne, &
-!                 IndN,IndX,IGem,NAct,INActive,NDimX,NBasis,NDimX,&
-!                 NInte1,twojfile,twokfile,ACAlpha0,.false.)
-!Call dgemm('N','N',NDimX,NDimX,NDimX,1d0,ABPLUS0,NDimX,WORK0,NDimX,0.0,A0,NDimX)
+ACAlpha0=0.D0
+call AB_CAS_FOFO(ABPLUS0,WORK0,ECASSCF,URe,Occ,XOne, &
+                 IndN,IndX,IGem,NAct,INActive,NDimX,NBasis,NDimX,&
+                 NInte1,twojfile,twokfile,ACAlpha0,.false.)
+Call dgemm('N','N',NDimX,NDimX,NDimX,1d0,ABPLUS0,NDimX,WORK0,NDimX,0.0,A0,NDimX)
 
 call AB_CAS_FOFO(ABPLUS1,WORK1,ECASSCF,URe,Occ,XOne, &
                  IndN,IndX,IGem,NAct,INActive,NDimX,NBasis,NDimX,&
@@ -523,12 +527,12 @@ EndDo
 
 A2=A2-A0
 
-!! PROJECT A2 WITH PMat : WORK0=PMat.A2
-Call dgemm('N','N',NDimX,NDimX,NDimX,1d0,PMat,NDimX,A2,NDimX,0.0,WORK0,NDimX)
-A0=A0+WORK0
-print*, 'A2 norm beofore projection',norm2(A2(1:NDimX*NDimX))
-A2=A2-WORK0
-print*, 'A2 norm after projection',norm2(A2(1:NDimX*NDimX))
+! PROJECT A2 WITH PMat : WORK0=PMat.A2
+!Call dgemm('N','N',NDimX,NDimX,NDimX,1d0,PMat,NDimX,A2,NDimX,0.0,WORK0,NDimX)
+!A0=A0+WORK0
+!print*, 'A2 norm beofore projection',norm2(A2(1:NDimX*NDimX))
+!A2=A2-WORK0
+!print*, 'A2 norm after projection',norm2(A2(1:NDimX*NDimX))
 
 
 Call FreqGrid(XFreq,WFreq,NGrid)
@@ -591,60 +595,117 @@ do l=1,3
    enddo
 enddo
 
-allocate(work(NBasis**2),ints(NBasis,NBasis))
 
-ECorr = 0
-
-open(newunit=iunit,file=trim(IntKFile),status='OLD', &
-     access='DIRECT',recl=8*NBasis*NOccup)
-
-kl   = 0
-SumY = 0
-do k=1,NOccup
-   do l=1,NBasis
-      kl = kl + 1
-      if(pos(l,k)/=0) then
-        irs = pos(l,k)
-        ir = l
-        is = k
-        read(iunit,rec=kl) work(1:NBasis*NOccup)
-        do j=1,NOccup
-           do i=1,NBasis
-              ints(i,j) = work((j-1)*NBasis+i)
-           enddo
-        enddo
-        ints(:,NOccup+1:NBasis) = 0
-
-        do j=1,NBasis
-           do i=1,j
-              if(pos(j,i)/=0) then
-                ipq = pos(j,i)
-                ip = j
-                iq = i
-                Crs = CICoef(l)+CICoef(k)
-                Cpq = CICoef(j)+CICoef(i)
-
-                if(AuxCoeff(IGem(ip),IGem(iq),IGem(ir),IGem(is))) then
-
-                   Aux = Crs*Cpq*COM((irs-1)*NDimX+ipq)
-                   if(iq.eq.is.and.ip.Eq.ir) then
-                      Aux = Aux - Occ(ip)*(1d0-Occ(is))-Occ(is)*(1d0-Occ(ip))
-                   endif
-
-                   ECorr = ECorr + Aux*ints(j,i)
-                endif
-
-              endif
-           enddo
-        enddo
-
-      endif
-
-   enddo
-enddo
-
+open(newunit=iunit,file='cholvecs',form='unformatted')
+read(iunit) NCholesky
+allocate(WorkD(NCholesky,NBasis**2))
+read(iunit) WorkD
 close(iunit)
 
-deallocate(ints,work)
+print*,'NCholesky',NCholesky
+
+allocate(DChol(NCholesky,NDimX))
+allocate(DCholAct(NCholesky,NDimX))
+
+DChol = 0
+DCholAct = 0
+do j=1,NDimX
+   ir=IndN(1,j)
+   is=IndN(2,j)
+   irs = is+(ir-1)*NBasis
+   Crs=CICoef(ir)+CICoef(is)
+   do i=1,NCholesky
+       DChol(i,j) = Crs*WorkD(i,irs)
+   enddo
+   if(IndAux(ir)*IndAux(is)==1) then
+       do i=1,NCholesky
+          DCholAct(i,j) = Crs*WorkD(i,irs)
+       enddo
+   endif
+enddo
+deallocate(WorkD)
+
+!!!!!!!!!!!!!!!
+allocate(WorkD(NDimX,NCholesky))
+WorkD=0
+! WorkD=C_tilde=C*D^T
+Call dgemm('N','T',NDimX,NCholesky,NDimX,1d0,COM,NDimX,&
+                 DChol,NCholesky,0.0,WorkD,NDimX)
+ECorr=0
+do j=1,NDimX
+   do i=1,NCholesky
+      ECorr=ECorr+DChol(i,j)*WorkD(j,i)
+   enddo
+enddo
+! active part of ecorr
+WorkD=0
+! WorkD=C_tilde_act=C*D_act^T
+Call dgemm('N','T',NDimX,NCholesky,NDimX,1d0,COM,NDimX,&
+                 DCholAct,NCholesky,0.0,WorkD,NDimX)
+ECorrAct=0
+do j=1,NDimX
+   do i=1,NCholesky
+      ECorrAct=ECorrAct+DCholAct(i,j)*WorkD(j,i)
+   enddo
+enddo
+deallocate(WorkD,DChol,DCholAct)
+ECorr=ECorr-ECorrAct
+
+return
+
+
+!allocate(work(NBasis**2),ints(NBasis,NBasis))
+!
+!ECorr = 0
+!
+!open(newunit=iunit,file=trim(IntKFile),status='OLD', &
+!     access='DIRECT',recl=8*NBasis*NOccup)
+!
+!kl   = 0
+!do k=1,NOccup
+!   do l=1,NBasis
+!      kl = kl + 1
+!      if(pos(l,k)/=0) then
+!        irs = pos(l,k)
+!        ir = l
+!        is = k
+!        read(iunit,rec=kl) work(1:NBasis*NOccup)
+!        do j=1,NOccup
+!           do i=1,NBasis
+!              ints(i,j) = work((j-1)*NBasis+i)
+!           enddo
+!        enddo
+!        ints(:,NOccup+1:NBasis) = 0
+!
+!        do j=1,NBasis
+!           do i=1,j
+!              if(pos(j,i)/=0) then
+!                ipq = pos(j,i)
+!                ip = j
+!                iq = i
+!                Crs = CICoef(l)+CICoef(k)
+!                Cpq = CICoef(j)+CICoef(i)
+!
+!                if(AuxCoeff(IGem(ip),IGem(iq),IGem(ir),IGem(is))) then
+!                   Aux = Crs*Cpq*COM((irs-1)*NDimX+ipq)
+!         ! this term is divergent and it has been removed by computing Int C^alpha=0 domega
+!         !          if(iq.eq.is.and.ip.Eq.ir) then
+!         !             Aux = Aux - Occ(ip)*(1d0-Occ(is))-Occ(is)*(1d0-Occ(ip))
+!         !          endif
+!                  ECorr = ECorr + Aux*ints(j,i)
+!                endif
+!
+!              endif
+!           enddo
+!        enddo
+!
+!      endif
+!
+!   enddo
+!enddo
+!
+!close(iunit)
+!
+!deallocate(ints,work)
 
 end subroutine CIter_FOFO

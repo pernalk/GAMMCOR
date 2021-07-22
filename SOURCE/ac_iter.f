@@ -77,6 +77,27 @@ C
       Call GauLeg(Zero,One,XGrid,WGrid,NGrid)
 C 
       ECorr=Zero
+C
+      If(ITwoEl.eq.3) Then
+      ACAlpha=Zero
+C
+C      Call WInteg_FOFO(ECorrA,XOne,URe,Occ,
+C     $ EGOne,NGOcc,
+C     $ IGem,NAcCAS,NInAcCAS,NELE,
+C     $ NBasis,NInte1,NDim,NGem,IndAux,ACAlpha,
+C     $ IndN,IndX,NDimX)
+CC
+C      goto 777
+      Call CIter_FOFO(PMat,ECorrA,ACAlpha,XOne,URe,Occ,
+     $ EGOne,NGOcc,
+     $ IGem,NAcCAS,NInAcCAS,NELE,
+     $ NBasis,NInte1,NDim,NGem,IndAux,
+     $ IndN,IndX,NDimX)
+  
+  777 ECorr=-ECorrA
+      ECorr0=ECorrA
+      EndIf
+C
       Do I=1,NGrid
 C   
       ACAlpha=XGrid(I)
@@ -91,14 +112,13 @@ C
 C
 C     C(Omega) WILL BE FOUND NONITERATIVELY BY INVERTING THE NDimX X NDimX matrix 
 C
-      
-c      Call WInteg_FOFO(ECorrA,XOne,URe,Occ,
-c     $ EGOne,NGOcc,
-c     $ IGem,NAcCAS,NInAcCAS,NELE,
-c     $ NBasis,NInte1,NDim,NGem,IndAux,ACAlpha,
-c     $ IndN,IndX,NDimX)
-C
-c      goto 666
+C      Call WInteg_FOFO(ECorrA,XOne,URe,Occ,
+C     $ EGOne,NGOcc,
+C     $ IGem,NAcCAS,NInAcCAS,NELE,
+C     $ NBasis,NInte1,NDim,NGem,IndAux,ACAlpha,
+C     $ IndN,IndX,NDimX)
+CC
+C      goto 666
 C
 C     ITERATIVE SOLUTION FOR C(Omega)
 C
@@ -111,7 +131,7 @@ C
 C
       EndIf
 C
-      Write(*,*)'ACAlpha ',ACAlpha,' W_ALPHA ',ECorrA
+      Write(*,*)'ACAlpha ',ACAlpha,' W_ALPHA ',ECorrA-ECorr0
 C
       ECorr=ECorr+WGrid(I)*ECorrA
 C
