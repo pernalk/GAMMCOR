@@ -1650,6 +1650,7 @@ C
 
 *Deck ERPASYMM1
       Subroutine ERPASYMM1(EigVecR,Eig,APLSQRT,ABMIN,NBasis,NDimX)
+      use omp_lib
 C
 C     A SYMMETRIZED PROBLEM A+^(1/2) A- A+^(1/2) [A+^(-1/2)] Y = om^2 [A+^(-1/2)] Y IS SOLVED
 C
@@ -1691,6 +1692,7 @@ C
       Call CpyM(HlpAB,APLSQRT,NDimX)
       Call Diag8(HlpAB,NDimX,NDimX,Eig,Work)
 C
+!$OMP PARALLEL DO DEFAULT(PRIVATE) SHARED(APLSQRT,HlpAB,Eig,NDimX)
       Do I=1,NDimX
 C
       If(Eig(I).Lt.Zero) NoNeg=NoNeg+1
@@ -1701,11 +1703,7 @@ C
 C 
       Do K=1,NDimX
 C
-      If(Eig(K).Ge.Zero) Then
-      SQRTEig=SQRT(Eig(K))
-      Else
       SQRTEig=SQRT(Abs(Eig(K)))
-      EndIf
 C
       APLSQRT(I,J)=APLSQRT(I,J)+HlpAB(K,I)*SQRTEig*HlpAB(K,J)
 C
@@ -1715,6 +1713,7 @@ C
 C
       EndDo
       EndDo
+!$OMP END PARALLEL DO 
 C
       If(NoNeg.Ne.0) Then
       Write(6,*)"The ERPA A+ matrix is not nonnegative definite"
@@ -1746,6 +1745,7 @@ C     OMEGA'S
 C
 C     SINCE X = Om^-1 ABMIN.Y THEN THE NORMALIZATION READS 2 Om^-1 Y^T AMIN Y = 1
 C
+!$OMP PARALLEL DO DEFAULT(PRIVATE) SHARED(EigVecR,NDimX,Eig,ABMIN)
       Do NU=1,NDimX
       SumNU=Zero
 C
@@ -1773,6 +1773,7 @@ C
       EndIf
 c     enddo NU
       EndDo
+!$OMP END PARALLEL DO 
 C
       Write(6,*)"ERPA equation solved"
 C
