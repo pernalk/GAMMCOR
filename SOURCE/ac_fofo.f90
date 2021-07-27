@@ -710,250 +710,296 @@ return
 end subroutine CIter_FOFO_old
 
 
-! ADAM
-!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !subroutine Eccor_iter()
 subroutine CIter_FOFO(PMat,ECorr,ACAlpha,XOne,URe,Occ,EGOne,NGOcc,&
-IGem,NAct,INActive,NELE,NBasis,NInte1,NDim,NGem,IndAux,&
-IndN,IndX,NDimX)
+   IGem,NAct,INActive,NELE,NBasis,NInte1,NDim,NGem,IndAux,IndN,IndX,NDimX)
 
-use abfofo
+   use abfofo
 
-implicit none
+   implicit none
 
-integer,intent(in) :: NGOcc,NBasis,NInte1,NDim,NGem,NDimX
-integer,intent(in) :: NAct,INActive,NELE
-integer,intent(in) :: IndN(2,NDim),IndX(NDim),IndAux(NBasis),IGem(NBasis)
-double precision,intent(in) :: URe(NBasis,NBasis),Occ(NBasis),XONe(NInte1)
-double precision :: ACAlpha,ACAlpha0,XMix
-double precision :: ECorr,ECorrAct,EGOne(NGem)
-!double precision,intent(in) :: PMat(NDimX,NDimX)
-double precision :: PMat(NDimX,NDimX)
-double precision :: COM(NDimX*NDimX),COM_act(NDimX*NDimX),ipiv(NDimX),XFreq(100),WFreq(100),&
-                    ABPLUS0(NDim*NDim),WORK0(NDim*NDim),ABPLUS1(NDim*NDim),ABPLUS1_act(NDim*NDim),&
-                    A0(NDimX*NDimX),A2(NDimX*NDimX),&
-                    C0(NDimX*NDimX),&
-                    WORK1(NDim*NDim)
-integer :: iunit,NOccup,N,NGrid,Max_Cn
-integer :: i,j,k,l,ir,is,irs
-integer :: pos(NBasis,NBasis),IGL,inf1,inf2
-double precision :: ECASSCF,PI,CICoef(NBasis),Crs,OmI
-character(:),allocatable :: twojfile,twokfile,IntKFile
-logical :: AuxCoeff(3,3,3,3)
-double precision,allocatable :: DChol(:,:),DCholT(:,:),DCholAct(:,:),DCholActT(:,:),WorkD(:,:)
-double precision, allocatable :: APlusTilde(:), APlusTildeAct(:), CTilde(:), CTildeAct(:), COMTilde(:),COMTildeAct(:) 
-integer :: NCholesky
-
-interface
-subroutine read_D_array(NCholesky, DChol, DCholAct, NDimX, NBasis, IndN, Occ, IndAux)
-   double precision, allocatable :: DChol(:,:), DCholAct(:,:)
+   integer,intent(in) :: NGOcc,NBasis,NInte1,NDim,NGem,NDimX
+   integer,intent(in) :: NAct,INActive,NELE
+   integer,intent(in) :: IndN(2,NDim),IndX(NDim),IndAux(NBasis),IGem(NBasis)
+   double precision,intent(in) :: URe(NBasis,NBasis),Occ(NBasis),XONe(NInte1)
+   double precision :: ACAlpha,ACAlpha0
+   double precision :: ECorr,ECorrAct,EGOne(NGem)
+   !double precision,intent(in) :: PMat(NDimX,NDimX)
+   double precision :: PMat(NDimX,NDimX)
+   double precision :: COM(NDimX*NDimX),COM_act(NDimX*NDimX),ipiv(NDimX),XFreq(100),WFreq(100),&
+                     ABPLUS0(NDim*NDim),WORK0(NDim*NDim),ABPLUS1(NDim*NDim),ABPLUS1_act(NDim*NDim),&
+                     A0(NDimX*NDimX),A2(NDimX*NDimX),C0(NDimX*NDimX),WORK1(NDim*NDim),Lambda(NDimX*NDimX)
+   integer :: iunit,NOccup,N,NGrid,Max_Cn,DIISN
+   integer :: i,j,k,l,ir,is,irs
+   integer :: pos(NBasis,NBasis),IGL,inf1,inf2
+   double precision :: ECASSCF,PI,CICoef(NBasis),Crs,OmI,XMix,Threshold
+   character(:),allocatable :: twojfile,twokfile,IntKFile
+   logical :: AuxCoeff(3,3,3,3)
+   double precision,allocatable :: DChol(:,:),DCholT(:,:),DCholAct(:,:),DCholActT(:,:),WorkD(:,:)
+   double precision, allocatable :: APlusTilde(:), APlusTildeAct(:), CTilde(:), CTildeAct(:), COMTilde(:),COMTildeAct(:) 
    integer :: NCholesky
-   integer, intent(in) :: NDimX, NBasis, IndN(2,NDimX), IndAux(NBasis)
-   double precision, intent(in) :: Occ(NBasis)
-end subroutine read_D_array
-end interface
 
-NGrid=15
-Max_Cn=15
-XMix=0.6
+   interface
+   subroutine read_D_array(NCholesky, DChol, DCholAct, NDimX, NBasis, IndN, Occ, IndAux)
+      double precision, allocatable :: DChol(:,:), DCholAct(:,:)
+      integer :: NCholesky
+      integer, intent(in) :: NDimX, NBasis, IndN(2,NDimX), IndAux(NBasis)
+      double precision, intent(in) :: Occ(NBasis)
+   end subroutine read_D_array
+   end interface
 
-Write (6,'(/,X,''AC Iterative Calculation with Omega Grid = '',I3,&
-      '' and max order in C expansion = '',I3,/)') NGrid,Max_Cn
+   ! Parameters
+   ! ==========================================================================  
+   NGrid = 15
+   ! parameters for damping algorithm
+   Max_Cn = 15
+   XMix = 0.6
+   ! parameters for DIIS algorithm
+   Threshold = 1d-5
+   DIISN = 6
+   ! ==========================================================================  
 
+   ! Write (6,'(/,X,''AC Iterative Calculation with Omega Grid = '',I3,&
+   !       '' and max order in C expansion = '',I3,/)') NGrid,Max_Cn
 
-! Get DChol & DCholAct
-! ==========================================================================      
-call read_D_array(NCholesky, DChol, DCholAct, NDimX, NBasis, IndN, Occ, IndAux)
-DCholT = transpose(DChol)
-DCholActT = transpose(DCholAct)
-! ==========================================================================  
+   ! Get DChol & DCholAct
+   ! ==========================================================================      
+   call read_D_array(NCholesky, DChol, DCholAct, NDimX, NBasis, IndN, Occ, IndAux)
+   DCholT = transpose(DChol)
+   DCholActT = transpose(DCholAct)
+   ! ==========================================================================  
 
+   NOccup = NAct + INActive
+   PI = 4.0*ATAN(1.0)
 
-NOccup = NAct + INActive
-PI = 4.0*ATAN(1.0)
+   twojfile = 'FFOO'
+   twokfile = 'FOFO'
+   IntKFile = twokfile
 
-twojfile = 'FFOO'
-twokfile = 'FOFO'
-IntKFile = twokfile
+   ! ACAlpha0=0.D0
+   ! call AB_CAS_FOFO(ABPLUS0,WORK0,ECASSCF,URe,Occ,XOne, &
+   !                  IndN,IndX,IGem,NAct,INActive,NDimX,NBasis,NDimX,&
+   !                  NInte1,twojfile,twokfile,ACAlpha0,.false.)
+   ! Call dgemm('N','N',NDimX,NDimX,NDimX,1d0,ABPLUS0,NDimX,WORK0,NDimX,0.0,A0,NDimX)
 
-! ACAlpha0=0.D0
-! call AB_CAS_FOFO(ABPLUS0,WORK0,ECASSCF,URe,Occ,XOne, &
-!                  IndN,IndX,IGem,NAct,INActive,NDimX,NBasis,NDimX,&
-!                  NInte1,twojfile,twokfile,ACAlpha0,.false.)
-! Call dgemm('N','N',NDimX,NDimX,NDimX,1d0,ABPLUS0,NDimX,WORK0,NDimX,0.0,A0,NDimX)
+   call AB_CAS_FOFO(ABPLUS1,WORK1,ECASSCF,URe,Occ,XOne, &
+                  IndN,IndX,IGem,NAct,INActive,NDimX,NBasis,NDimX,&
+                  NInte1,twojfile,twokfile,ACAlpha,.false.)
+   EGOne(1)=ECASSCF
+   !A2=ABPLUS1*ABMIN1
+   Call dgemm('N','N',NDimX,NDimX,NDimX,1d0,ABPLUS1,NDimX,WORK1,NDimX,0.0,A2,NDimX)
 
-call AB_CAS_FOFO(ABPLUS1,WORK1,ECASSCF,URe,Occ,XOne, &
-                 IndN,IndX,IGem,NAct,INActive,NDimX,NBasis,NDimX,&
-                 NInte1,twojfile,twokfile,ACAlpha,.false.)
-EGOne(1)=ECASSCF
-!A2=ABPLUS1*ABMIN1
-Call dgemm('N','N',NDimX,NDimX,NDimX,1d0,ABPLUS1,NDimX,WORK1,NDimX,0.0,A2,NDimX)
+   A0=0.D0
+   Do I=1,NDimX
+      A0((I-1)*NDimX+I)=A2((I-1)*NDimX+I)
+   EndDo
+   A2=A2-A0
 
-A0=0.D0
-Do I=1,NDimX
-    A0((I-1)*NDimX+I)=A2((I-1)*NDimX+I)
-EndDo
-A2=A2-A0
+   Call FreqGrid(XFreq,WFreq,NGrid)
+   
 
-Call FreqGrid(XFreq,WFreq,NGrid)
+   ! Calc A+Tilde & AAct+Tilde
+   ! ==========================================================================   
+   allocate(APlusTilde(NDimX*NCholesky))
+   allocate(APlusTildeAct(NDimX*NCholesky))
+   Call dgemm('N','N',NDimX,NCholesky,NDimX,1d0,ABPLUS1,NDimX,DCholT,NDimX,0.0,APlusTilde,NDimX)
+   Call dgemm('N','N',NDimX,NCholesky,NDimX,1d0,ABPLUS1,NDimX,DCholActT,NDimX,0.0,APlusTildeAct,NDimX)
+   ! ==========================================================================   
 
-! Calc A+Tilde & AAct+Tilde
-! ==========================================================================   
-allocate(APlusTilde(NDimX*NCholesky))
-allocate(APlusTildeAct(NDimX*NCholesky))
-Call dgemm('N','N',NDimX,NCholesky,NDimX,1d0,ABPLUS1,NDimX,DCholT,NDimX,0.0,APlusTilde,NDimX)
-Call dgemm('N','N',NDimX,NCholesky,NDimX,1d0,ABPLUS1,NDimX,DCholActT,NDimX,0.0,APlusTildeAct,NDimX)
-! ==========================================================================   
+   ! Calc CTilde & CTildeAct integrals
+   ! ========================================================================== 
+   allocate(CTilde(NDimX*NCholesky),CTildeAct(NDimX*NCholesky))
+   allocate(COMTilde(NDimX*NCholesky),COMTildeAct(NDimX*NCholesky))
+   COMTilde=0.0
+   COMTildeAct=0.0
+   Do IGL=1,NGrid
+      OmI=XFreq(IGL)
 
-allocate(CTilde(NDimX*NCholesky),CTildeAct(NDimX*NCholesky))
-allocate(COMTilde(NDimX*NCholesky),COMTildeAct(NDimX*NCholesky))
-COMTilde=0.0
-COMTildeAct=0.0
-Do IGL=1,NGrid
-     OmI=XFreq(IGL)
-     call calc_CTilde_iter(CTilde, A0, APlusTilde, A2, NDimX, NCholesky, OmI, 0.001d0, Max_Cn, XMix)
-     call calc_CTilde_iter(CTildeAct, A0, APlusTildeAct, A2, NDimX, NCholesky, OmI, 0.001d0, Max_Cn, XMix)
-     COMTilde=COMTilde+2.D0/PI*CTilde*WFreq(IGL)
-     COMTildeAct=COMTildeAct+2.D0/PI*CTildeAct*WFreq(IGL)
-EndDo
-!
-! end of computing the integral of C(Omega)
-!
+      Lambda=0.D0
+      Do i=1,NDimX
+         j = (i-1) * NDimX + i
+         Lambda(j) = 1 / ( A0(j) + OmI**2 )
+      EndDo
 
-pos = 0
-do i=1,NDimX
-   pos(IndN(1,i),IndN(2,i)) = IndX(i)
-enddo
+    !   call iterate_CTilde_damping(CTilde, NDimX, NCholesky, Lambda, APlusTilde, A2, XMix, Max_Cn)
+    !   call iterate_CTilde_damping(CTildeAct, NDimX, NCholesky, Lambda, APlusTildeAct, A2, XMix, Max_Cn)
 
-AuxCoeff = .true.
-do l=1,3
-   do k=1,3
-      do j=1,3
-         do i=1,3
-            if((i==j).and.(j==k).and.(k==l)) then
-               AuxCoeff(i,j,k,l) = .false.
-            endif
+      call iterate_CTilde_diis(CTilde, NDimX, NCholesky, Lambda, APlusTilde, A2, Threshold, DIISN)
+      call iterate_CTilde_diis(CTildeAct, NDimX, NCholesky, Lambda, APlusTildeAct, A2, Threshold, DIISN)
+
+      COMTilde=COMTilde+2.D0/PI*CTilde*WFreq(IGL)
+      COMTildeAct=COMTildeAct+2.D0/PI*CTildeAct*WFreq(IGL)
+   EndDo
+   ! ==========================================================================   
+
+   pos = 0
+   do i=1,NDimX
+      pos(IndN(1,i),IndN(2,i)) = IndX(i)
+   enddo
+
+   AuxCoeff = .true.
+   do l=1,3
+      do k=1,3
+         do j=1,3
+            do i=1,3
+               if((i==j).and.(j==k).and.(k==l)) then
+                  AuxCoeff(i,j,k,l) = .false.
+               endif
+            enddo
          enddo
       enddo
    enddo
-enddo
 
-!!!!!!!!!!!!!!!
-allocate(WorkD(NDimX,NCholesky))
-WorkD=0
-! WorkD=C_tilde=C*D^T
-! WorkD=COM -- in new version
-! Call dgemm('N','T',NDimX,NCholesky,NDimX,1d0,COM,NDimX,&
-!                  DChol,NCholesky,0.0,WorkD,NDimX)
-WorkD = RESHAPE(COMTilde, (/NDimX, NCholesky/))
+   !!!!!!!!!!!!!!!
+   allocate(WorkD(NDimX,NCholesky))
+   WorkD=0
+   ! WorkD=C_tilde=C*D^T
+   ! WorkD=COM -- in new version
+   ! Call dgemm('N','T',NDimX,NCholesky,NDimX,1d0,COM,NDimX,&
+   !                  DChol,NCholesky,0.0,WorkD,NDimX)
+   WorkD = RESHAPE(COMTilde, (/NDimX, NCholesky/))
 
 
-ECorr=0
-do j=1,NDimX
-   do i=1,NCholesky
-      ECorr=ECorr+DChol(i,j)*WorkD(j,i)
+   ECorr=0
+   do j=1,NDimX
+      do i=1,NCholesky
+         ECorr=ECorr+DChol(i,j)*WorkD(j,i)
+      enddo
    enddo
-enddo
-! active part of ecorr
-WorkD=0
-! WorkD=C_tilde_act=C*D_act^T
-! WorkD=COM_act -- in new version
-! Call dgemm('N','T',NDimX,NCholesky,NDimX,1d0,COM,NDimX,&
-!                  DCholAct,NCholesky,0.0,WorkD,NDimX)
-WorkD = RESHAPE(COMTildeAct, (/NDimX, NCholesky/))
+   ! active part of ecorr
+   WorkD=0
+   ! WorkD=C_tilde_act=C*D_act^T
+   ! WorkD=COM_act -- in new version
+   ! Call dgemm('N','T',NDimX,NCholesky,NDimX,1d0,COM,NDimX,&
+   !                  DCholAct,NCholesky,0.0,WorkD,NDimX)
+   WorkD = RESHAPE(COMTildeAct, (/NDimX, NCholesky/))
 
 
-ECorrAct=0
-do j=1,NDimX
-   do i=1,NCholesky
-      ECorrAct=ECorrAct+DCholAct(i,j)*WorkD(j,i)
+   ECorrAct=0
+   do j=1,NDimX
+      do i=1,NCholesky
+         ECorrAct=ECorrAct+DCholAct(i,j)*WorkD(j,i)
+      enddo
    enddo
-enddo
-deallocate(WorkD,DChol,DCholAct, APlusTilde, APlusTildeAct, CTilde, CTildeAct, COMTilde, COMTildeAct)
-ECorr=ECorr-ECorrAct
+   deallocate(WorkD,DChol,DCholAct, APlusTilde, APlusTildeAct, CTilde, CTildeAct, COMTilde, COMTildeAct)
+   ECorr=ECorr-ECorrAct
 
-return
+   return
 
 end subroutine CIter_FOFO
 
-! NDim to remove
-subroutine calc_CTilde_iter(CTilde, A0, APlusTilde, A2, NDimX, NCholesky, OmI, Threshold, Max_Cn, XMix)
 
-implicit none
-integer,intent(in) :: NDimX, NCholesky, Max_Cn
-double precision, intent(in) :: OmI, Threshold, XMix
-double precision, intent(in) :: A2(NDimX*NDimX), APlusTilde(NDimX*NCholesky)
-integer :: i, j, N, inf1, inf2
-double precision :: A0(NDimX*NDimX), A2CTilde(NDimX*NCholesky), Lambda(NDimX*NDimX), ipiv(NDimX)
-double precision :: C0(NDimX*NCholesky), CTilde(NDimX*NCholesky)
+subroutine iterate_CTilde_diis(CTilde, NDimX, NCholesky, Lambda, APlusTilde, A2, Threshold, DIISN)
 
-Lambda=0.D0
-Do i=1,NDimX
-   j = (i-1) * NDimX + i
-   Lambda(j) = 1 / ( A0(j) + OmI**2 )
-EndDo
+   use diis
+   implicit none
+   type(DIISData) :: DIISBlock
+   integer,intent(in) :: NDimX, NCholesky, DIISN
+   double precision, intent(in) :: Threshold, Lambda(NDimX*NDimX), A2(NDimX*NDimX), APlusTilde(NDimX*NCholesky)
+   double precision, intent(out) :: CTilde(NDimX*NCholesky)
+   integer :: N
+   double precision :: C0(NDimX*NCholesky), A2CTilde(NDimX*NCholesky), CTilde_prev(NDimX*NCholesky)
 
-!     C0=C(0)
-Call dgemm('N','N',NDimX,NDimX,NDimX,1.d0,Lambda,NDimX,&
-           APlusTilde,NDimX,0.0,C0,NDimX)
-!     C1=C(1)
-Call dgemm('N','N',NDimX,NDimX,NDimX,1d0,A2,NDimX,&
-           C0,NDimX,0.0,A2CTilde,NDimX)
-A2CTilde=APlusTilde-A2CTilde
-Call dgemm('N','N',NDimX,NDimX,NDimX,1.0d0,Lambda,NDimX,&
-           A2CTilde,NDimX,0.0,CTilde,NDimX)
-Do N=2,Max_Cn
-   Call dgemm('N','N',NDimX,NDimX,NDimX,1d0,A2,NDimX,&
-           CTilde,NDimX,0.0,A2CTilde,NDimX)
+   !  CTilde = C0
+   Call dgemm('N','N',NDimX,NCholesky,NDimX,1.d0,Lambda,NDimX,&
+            APlusTilde,NDimX,0.0d0,CTilde,NDimX)
+
+   call init_DIIS(DIISBlock,NDimX*NCholesky,NDimX*NCholesky,DIISN)
+   CTilde_prev = 0.0d0
+   N = 1
+   do
+      Call dgemm('N','N',NDimX,NCholesky,NDimX,1.0d0,A2,NDimX,&
+            CTilde,NDimX,0.0d0,A2CTilde,NDimX)
+      A2CTilde=APlusTilde-A2CTilde
+
+      Call dgemm('N','N',NDimX,NCholesky,NDimX,1.0d0,Lambda,NDimX,&
+            A2CTilde,NDimX,0.0d0,CTilde,NDimX)
+
+      if(N > 2) then
+         call use_DIIS(DIISBlock, CTilde, CTilde - CTilde_prev)
+      endif
+
+      if (norm2(CTilde - CTilde_prev) < Threshold) exit
+
+      CTilde_prev = CTilde
+      N = N + 1
+
+   enddo
+   call free_DIIS(DIISBlock)
+
+end subroutine iterate_CTilde_diis
+
+
+subroutine iterate_CTilde_damping(CTilde, NDimX, NCholesky, Lambda, APlusTilde, A2, XMix, Max_Cn)
+
+   implicit none
+   integer,intent(in) :: NDimX, NCholesky, Max_Cn
+   double precision, intent(in) :: XMix, Lambda(NDimX*NDimX), A2(NDimX*NDimX), APlusTilde(NDimX*NCholesky)
+   double precision, intent(out) :: CTilde(NDimX*NCholesky)
+   integer :: N
+   double precision :: C0(NDimX*NCholesky), A2CTilde(NDimX*NCholesky)
+
+   !     C0=C(0)
+   Call dgemm('N','N',NDimX,NCholesky,NDimX,1.0d0,Lambda,NDimX,&
+            APlusTilde,NDimX,0.0d0,C0,NDimX)
+   !     C1=C(1)
+   Call dgemm('N','N',NDimX,NCholesky,NDimX,1.0d0,A2,NDimX,&
+            C0,NDimX,0.0d0,A2CTilde,NDimX)
    A2CTilde=APlusTilde-A2CTilde
-! damping is needed when active orbitals present: CMAT(n) = (1-XMix)*CMAT(n) + XMix*CMAT(n-1)
-   Call dgemm('N','N',NDimX,NDimX,NDimX,1.0d0-XMix,Lambda,NDimX,&
-           A2CTilde,NDimX,XMix,CTilde,NDimX)
-EndDo
+   Call dgemm('N','N',NDimX,NCholesky,NDimX,1.0d0,Lambda,NDimX,&
+            A2CTilde,NDimX,0.0d0,CTilde,NDimX)
+   Do N=2,Max_Cn
+      Call dgemm('N','N',NDimX,NCholesky,NDimX,1.0d0,A2,NDimX,&
+            CTilde,NDimX,0.0d0,A2CTilde,NDimX)
+      A2CTilde=APlusTilde-A2CTilde
+   ! damping is needed when active orbitals present: CMAT(n) = (1-XMix)*CMAT(n) + XMix*CMAT(n-1)
+      Call dgemm('N','N',NDimX,NCholesky,NDimX,1.0d0-XMix,Lambda,NDimX,&
+            A2CTilde,NDimX,XMix,CTilde,NDimX)   
+   EndDo
 
-end subroutine calc_CTilde_iter
+end subroutine iterate_CTilde_damping
+
 
 subroutine read_D_array(NCholesky, DChol, DCholAct, NDimX, NBasis, IndN, Occ, IndAux)
 
-implicit none
-double precision, allocatable :: DChol(:,:), DCholAct(:,:)
-integer, intent(in) :: NDimX, NBasis, IndN(2,NDimX), IndAux(NBasis)
-double precision, intent(in) :: Occ(NBasis)
-integer :: NCholesky, iunit, i, j, ir, is, irs
-double precision, allocatable :: WorkD(:,:)
-double precision :: Crs, CICoef(NBasis)
+   implicit none
+   integer, intent(in) :: NDimX, NBasis, IndN(2,NDimX), IndAux(NBasis)
+   double precision, intent(in) :: Occ(NBasis)
+   double precision, allocatable, intent(out) :: DChol(:,:), DCholAct(:,:)
+   integer :: NCholesky, iunit, i, j, ir, is, irs
+   double precision, allocatable :: WorkD(:,:)
+   double precision :: Crs, CICoef(NBasis)
 
+   open(newunit=iunit,file='cholvecs',form='unformatted')
+   read(iunit) NCholesky
+   allocate(WorkD(NCholesky,NBasis**2))
+   read(iunit) WorkD
+   close(iunit)
 
-open(newunit=iunit,file='cholvecs',form='unformatted')
-read(iunit) NCholesky
-allocate(WorkD(NCholesky,NBasis**2))
-read(iunit) WorkD
-close(iunit)
+   print*,'NCholesky',NCholesky
 
-print*,'NCholesky',NCholesky
+   allocate(DChol(NCholesky,NDimX), DCholAct(NCholesky,NDimX))
 
-allocate(DChol(NCholesky,NDimX), DCholAct(NCholesky,NDimX))
-
-do i=1,NBasis
-   CICoef(i) = sign(sqrt(Occ(i)),Occ(i)-0.5d0)
-enddo
-
-DChol = 0
-DCholAct = 0
-do j=1,NDimX
-   ir=IndN(1,j)
-   is=IndN(2,j)
-   irs = is+(ir-1)*NBasis
-   Crs=CICoef(ir)+CICoef(is)
-   do i=1,NCholesky
-         DChol(i,j) = Crs*WorkD(i,irs)
+   do i=1,NBasis
+      CICoef(i) = sign(sqrt(Occ(i)),Occ(i)-0.5d0)
    enddo
-   if(IndAux(ir)*IndAux(is)==1) then
-         do i=1,NCholesky
-            DCholAct(i,j) = Crs*WorkD(i,irs)
-         enddo
-   endif
-enddo
-deallocate(WorkD)
+
+   DChol = 0
+   DCholAct = 0
+   do j=1,NDimX
+      ir=IndN(1,j)
+      is=IndN(2,j)
+      irs = is+(ir-1)*NBasis
+      Crs=CICoef(ir)+CICoef(is)
+      do i=1,NCholesky
+            DChol(i,j) = Crs*WorkD(i,irs)
+      enddo
+      if(IndAux(ir)*IndAux(is)==1) then
+            do i=1,NCholesky
+               DCholAct(i,j) = Crs*WorkD(i,irs)
+            enddo
+      endif
+   enddo
+   deallocate(WorkD)
 
 end subroutine read_D_array
