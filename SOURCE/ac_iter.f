@@ -70,6 +70,19 @@ C
      $ NBasis,NInte1,NDim,NGem,IndAux,
      $ IndN,IndX,NDimX)
 C
+c      Call AC_CIter_FOFO(PMat,ECorr,XOne,URe,Occ,
+c     $ EGOne,NGOcc,
+c     $ IGem,NAcCAS,NInAcCAS,NELE,
+c     $ NBasis,NInte1,NDim,NGem,IndAux,
+c     $ IndN,IndX,NDimX)
+cC
+c      ETot=EGOne(1)
+c      Write
+c     $ (6,'(/,2X,''ECASSCF+ENuc, AC-Corr, AC-ERPA-CASSCF '',4X,3F15.8)')
+c     $ ETot+ENuc,ECorr,ETot+ENuc+ECorr
+c
+c      stop
+C
 C     GENERATE ABSCISSAS AND WEIGHTS FOR GAUSSIAN-LEGENDRE QUADRATURE
 C
       NGrid=5
