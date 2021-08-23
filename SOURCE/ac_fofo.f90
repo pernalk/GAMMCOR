@@ -715,6 +715,7 @@ subroutine CIter_FOFO(PMat,ECorr,ACAlpha,XOne,URe,Occ,EGOne,NGOcc,&
    IGem,NAct,INActive,NELE,NBasis,NInte1,NDim,NGem,IndAux,IndN,IndX,NDimX)
 
    use abfofo
+   use class_IterStats
 
    implicit none
 
@@ -735,9 +736,12 @@ subroutine CIter_FOFO(PMat,ECorr,ACAlpha,XOne,URe,Occ,EGOne,NGOcc,&
    double precision :: ECASSCF,PI,CICoef(NBasis),Crs,OmI,XMix,Threshold
    character(:),allocatable :: twojfile,twokfile,IntKFile
    logical :: AuxCoeff(3,3,3,3)
-   double precision,allocatable :: DChol(:,:),DCholT(:,:),DCholAct(:,:),DCholActT(:,:),WorkD(:,:)
+   double precision, allocatable :: DChol(:,:),DCholT(:,:),DCholAct(:,:),DCholActT(:,:),WorkD(:,:)
    double precision, allocatable :: APlusTilde(:), APlusTildeAct(:), CTilde(:), CTildeAct(:), COMTilde(:),COMTildeAct(:) 
    integer :: NCholesky
+   type(IterStats) :: iStats
+   character(50) :: iterStatsName
+   character(10) :: iterationAlgorithm, initialC0Guess
 
    interface
    subroutine read_D_array(NCholesky, DChol, DCholAct, NDimX, NBasis, IndN, Occ, IndAux)
@@ -750,13 +754,15 @@ subroutine CIter_FOFO(PMat,ECorr,ACAlpha,XOne,URe,Occ,EGOne,NGOcc,&
 
    ! Parameters
    ! ==========================================================================  
+   iterationAlgorithm = 'diis' !damping, diis
+   initialC0Guess = 'diag' !diag, block
    NGrid = 15
    ! parameters for damping algorithm
-   Max_Cn = 15
-   XMix = 0.6
+   ! Max_Cn = 15
+   XMix = 0.2
    ! parameters for DIIS algorithm
    Threshold = 1d-5
-   DIISN = 6
+   DIISN = 2
    ! ==========================================================================  
 
    ! Write (6,'(/,X,''AC Iterative Calculation with Omega Grid = '',I3,&
@@ -789,15 +795,29 @@ subroutine CIter_FOFO(PMat,ECorr,ACAlpha,XOne,URe,Occ,EGOne,NGOcc,&
    !A2=ABPLUS1*ABMIN1
    Call dgemm('N','N',NDimX,NDimX,NDimX,1d0,ABPLUS1,NDimX,WORK1,NDimX,0.0,A2,NDimX)
 
-   A0=0.D0
-   Do I=1,NDimX
-      A0((I-1)*NDimX+I)=A2((I-1)*NDimX+I)
-   EndDo
+   ! Initial C(0)
+   ! ==========================================================================
+   select case(initialC0Guess)
+      case('diag')
+         A0=0.D0   
+         Do I=1,NDimX
+            A0((I-1)*NDimX+I)=A2((I-1)*NDimX+I)
+         EndDo
+      case('block')
+         ACAlpha0=0.D0
+         call AB_CAS_FOFO(ABPLUS0,WORK0,ECASSCF,URe,Occ,XOne, &
+                          IndN,IndX,IGem,NAct,INActive,NDimX,NBasis,NDimX,&
+                          NInte1,twojfile,twokfile,ACAlpha0,.false.)
+         Call dgemm('N','N',NDimX,NDimX,NDimX,1d0,ABPLUS0,NDimX,WORK0,NDimX,0.0,A0,NDimX)
+      case default
+         print *, "Wrong initialC0Guess value!"
+         stop
+   end select
    A2=A2-A0
+   ! ==========================================================================   
 
    Call FreqGrid(XFreq,WFreq,NGrid)
    
-
    ! Calc A+Tilde & AAct+Tilde
    ! ==========================================================================   
    allocate(APlusTilde(NDimX*NCholesky))
@@ -808,28 +828,63 @@ subroutine CIter_FOFO(PMat,ECorr,ACAlpha,XOne,URe,Occ,EGOne,NGOcc,&
 
    ! Calc CTilde & CTildeAct integrals
    ! ========================================================================== 
+   iStats = IterStats()
    allocate(CTilde(NDimX*NCholesky),CTildeAct(NDimX*NCholesky))
    allocate(COMTilde(NDimX*NCholesky),COMTildeAct(NDimX*NCholesky))
    COMTilde=0.0
    COMTildeAct=0.0
    Do IGL=1,NGrid
       OmI=XFreq(IGL)
+      ! print*,"Freq = ", OmI
 
-      Lambda=0.D0
-      Do i=1,NDimX
-         j = (i-1) * NDimX + i
-         Lambda(j) = 1 / ( A0(j) + OmI**2 )
-      EndDo
+      select case(initialC0Guess)
+         case('diag')
+            Lambda=0.D0
+            Do i=1,NDimX
+               j = (i-1) * NDimX + i
+               Lambda(j) = 1 / ( A0(j) + OmI**2 )
+            EndDo
+         case('block')
+            WORK0=0.D0
+            Do I=1,NDimX
+                WORK0((I-1)*NDimX+I)=OmI**2
+            EndDo
+            Lambda=A0+WORK0
+            Call dgetrf(NDimX, NDimX, Lambda, NDimX, ipiv, inf1 )
+            Call dgetri(NDimX, Lambda, NDimX, ipiv, work0, NDimX, inf2 )
+      end select
 
-    !   call iterate_CTilde_damping(CTilde, NDimX, NCholesky, Lambda, APlusTilde, A2, XMix, Max_Cn)
-    !   call iterate_CTilde_damping(CTildeAct, NDimX, NCholesky, Lambda, APlusTildeAct, A2, XMix, Max_Cn)
-
-      call iterate_CTilde_diis(CTilde, NDimX, NCholesky, Lambda, APlusTilde, A2, Threshold, DIISN)
-      call iterate_CTilde_diis(CTildeAct, NDimX, NCholesky, Lambda, APlusTildeAct, A2, Threshold, DIISN)
+      select case(iterationAlgorithm)
+         case('damping')
+            call iterate_CTilde_damping(CTilde, N, NDimX, NCholesky, Lambda, APlusTilde, A2, Threshold, XMix)
+            call iStats%add(OmI,N)
+            call iterate_CTilde_damping(CTildeAct, N, NDimX, NCholesky, Lambda, APlusTildeAct, A2, Threshold, XMix)
+            call iStats%add(OmI,N)
+         case('diis')
+            call iterate_CTilde_diis(CTilde, N, NDimX, NCholesky, Lambda, APlusTilde, A2, Threshold, DIISN)
+            call iStats%add(OmI,N)
+            call iterate_CTilde_diis(CTildeAct, N, NDimX, NCholesky, Lambda, APlusTildeAct, A2, Threshold, DIISN)
+            call iStats%add(OmI,N)
+         case default
+            print *, "Wrong iterationAlgorithm value!"
+            stop
+      end select
 
       COMTilde=COMTilde+2.D0/PI*CTilde*WFreq(IGL)
       COMTildeAct=COMTildeAct+2.D0/PI*CTildeAct*WFreq(IGL)
    EndDo
+
+   call iStats%print()
+   select case(iterationAlgorithm)
+      case('damping')
+         write(iterStatsName, "(3a, i0, a, f4.2, a, e6.1e1)") &
+            'is_damping_', trim(initialC0Guess), '_g', NGrid, '_x', XMix, '_t', Threshold
+         call iStats%dump(iterStatsName,ACAlpha)
+      case('diis')
+         write(iterStatsName, "(3a, i0, a, i0, a, e6.1e1)") &
+            'is_DIIS_', trim(initialC0Guess), '_g', NGrid, '_n', DIISN, '_t', Threshold
+         call iStats%dump(iterStatsName,ACAlpha)
+   end select
    ! ==========================================================================   
 
    pos = 0
@@ -889,7 +944,7 @@ subroutine CIter_FOFO(PMat,ECorr,ACAlpha,XOne,URe,Occ,EGOne,NGOcc,&
 end subroutine CIter_FOFO
 
 
-subroutine iterate_CTilde_diis(CTilde, NDimX, NCholesky, Lambda, APlusTilde, A2, Threshold, DIISN)
+subroutine iterate_CTilde_diis(CTilde, N, NDimX, NCholesky, Lambda, APlusTilde, A2, Threshold, DIISN)
 
    use diis
    implicit none
@@ -899,6 +954,7 @@ subroutine iterate_CTilde_diis(CTilde, NDimX, NCholesky, Lambda, APlusTilde, A2,
    double precision, intent(out) :: CTilde(NDimX*NCholesky)
    integer :: N
    double precision :: C0(NDimX*NCholesky), A2CTilde(NDimX*NCholesky), CTilde_prev(NDimX*NCholesky)
+   double precision :: norm
 
    !  CTilde = C0
    Call dgemm('N','N',NDimX,NCholesky,NDimX,1.d0,Lambda,NDimX,&
@@ -919,7 +975,9 @@ subroutine iterate_CTilde_diis(CTilde, NDimX, NCholesky, Lambda, APlusTilde, A2,
          call use_DIIS(DIISBlock, CTilde, CTilde - CTilde_prev)
       endif
 
-      if (norm2(CTilde - CTilde_prev) < Threshold) exit
+      norm = norm2(CTilde - CTilde_prev)
+      ! print '(a, i3, a, e)', "norm (", N, ") = ", norm
+      if (norm < Threshold) exit
 
       CTilde_prev = CTilde
       N = N + 1
@@ -930,14 +988,16 @@ subroutine iterate_CTilde_diis(CTilde, NDimX, NCholesky, Lambda, APlusTilde, A2,
 end subroutine iterate_CTilde_diis
 
 
-subroutine iterate_CTilde_damping(CTilde, NDimX, NCholesky, Lambda, APlusTilde, A2, XMix, Max_Cn)
+subroutine iterate_CTilde_damping(CTilde, N, NDimX, NCholesky, Lambda, APlusTilde, A2, Threshold, XMix)
 
    implicit none
-   integer,intent(in) :: NDimX, NCholesky, Max_Cn
-   double precision, intent(in) :: XMix, Lambda(NDimX*NDimX), A2(NDimX*NDimX), APlusTilde(NDimX*NCholesky)
+   integer,intent(in) :: NDimX, NCholesky
+   double precision, intent(in) :: XMix, Lambda(NDimX*NDimX), A2(NDimX*NDimX), APlusTilde(NDimX*NCholesky), Threshold
    double precision, intent(out) :: CTilde(NDimX*NCholesky)
+   double precision :: CTilde_prev(NDimX*NCholesky)
    integer :: N
    double precision :: C0(NDimX*NCholesky), A2CTilde(NDimX*NCholesky)
+   double precision :: norm
 
    !     C0=C(0)
    Call dgemm('N','N',NDimX,NCholesky,NDimX,1.0d0,Lambda,NDimX,&
@@ -948,13 +1008,21 @@ subroutine iterate_CTilde_damping(CTilde, NDimX, NCholesky, Lambda, APlusTilde, 
    A2CTilde=APlusTilde-A2CTilde
    Call dgemm('N','N',NDimX,NCholesky,NDimX,1.0d0,Lambda,NDimX,&
             A2CTilde,NDimX,0.0d0,CTilde,NDimX)
-   Do N=2,Max_Cn
+   N = 1
+   Do
       Call dgemm('N','N',NDimX,NCholesky,NDimX,1.0d0,A2,NDimX,&
             CTilde,NDimX,0.0d0,A2CTilde,NDimX)
       A2CTilde=APlusTilde-A2CTilde
    ! damping is needed when active orbitals present: CMAT(n) = (1-XMix)*CMAT(n) + XMix*CMAT(n-1)
       Call dgemm('N','N',NDimX,NCholesky,NDimX,1.0d0-XMix,Lambda,NDimX,&
             A2CTilde,NDimX,XMix,CTilde,NDimX)   
+
+      norm = norm2(CTilde - CTilde_prev)
+      ! print '(a, i3, a, e)', "norm (", N, ") = ", norm
+      if (norm < Threshold) exit
+
+      CTilde_prev = CTilde
+      N = N + 1
    EndDo
 
 end subroutine iterate_CTilde_damping
