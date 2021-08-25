@@ -21,8 +21,9 @@ OBJ = $(O)mainp.o $(O)initia.o $(O)dmscf.o $(O)misc.o $(O)optocc.o \
       $(O)srlrdynamic.o $(O)erpa.o $(O)interpa.o  $(O)exact2el.o $(O)optapsg.o $(O)newton.o $(O)acfd.o $(O)accas.o \
       $(O)caspidft.o $(O)ac_exact_2el.o $(O)vv10.o \
       $(O)arithmetic.o $(O)io.o $(O)clock.o $(O)string.o $(O)sort.o $(O)display.o $(O)Cholesky.o \
+	  $(O)iter_stats.o $(O)C_integrator.o $(O)iter_algorithm.o $(O)iter_diis.o $(O)iter_damping.o \
+      $(O)lambda_calc.o $(O)lambda_calc_diag.o $(O)lambda_calc_block.o \
       $(O)ac_iter.o $(O)ac_fofo.o \
-	  $(O)iter_stats.o \
       xcfun/fortran/xcfun_module.o xcfun/fortran/xcfun_autogen.o
 
 $(PROG) :  $(OBJ) 
@@ -87,7 +88,9 @@ $(O)accas.o : $(S)accas.f $(O)types.o $(O)sorter.o $(O)abmats.o $(O)abfofo.o
 	$(FCC) $(FFLAGS)  -c $(S)accas.f -o $(O)accas.o
 $(O)ac_iter.o : $(S)ac_iter.f  $(O)abmats.o $(O)abfofo.o
 	$(FCC) $(FFLAGS)  -c $(S)ac_iter.f -o $(O)ac_iter.o
-$(O)ac_fofo.o : $(S)ac_fofo.f90  $(O)abmats.o $(O)abfofo.o $(O)iter_stats.o
+$(O)ac_fofo.o : $(S)ac_fofo.f90 $(O)abmats.o $(O)abfofo.o \
+                $(O)C_integrator.o $(O)iter_algorithm.o $(O)iter_diis.o $(O)iter_damping.o \
+                $(O)lambda_calc.o $(O)lambda_calc_diag.o $(O)lambda_calc_block.o
 	$(FCC) $(FFLAGS)  -c $(S)ac_fofo.f90 -o $(O)ac_fofo.o
 $(O)xcfun.o : $(S)xcfun.f90
 	$(FCC) $(FFLAGS)  -c $(S)xcfun.f90  -o $(O)xcfun.o
@@ -154,6 +157,20 @@ $(O)ac_exact_2el.o : $(S)ac_exact_2el.f
 	$(FCC) $(FFLAGS)  -c $(S)ac_exact_2el.f -o $(O)ac_exact_2el.o
 $(O)iter_stats.o : $(S)iter_stats.f90
 	$(FCC) $(FFLAGS)  -c $(S)iter_stats.f90 -o $(O)iter_stats.o
+$(O)C_integrator.o : $(S)C_integrator.f90 $(O)iter_stats.o $(O)iter_algorithm.o $(O)lambda_calc.o
+	$(FCC) $(FFLAGS)  -c $(S)C_integrator.f90 -o $(O)C_integrator.o
+$(O)iter_algorithm.o : $(S)iter_algorithm.f90
+	$(FCC) $(FFLAGS)  -c $(S)iter_algorithm.f90 -o $(O)iter_algorithm.o
+$(O)iter_diis.o : $(S)iter_diis.f90 $(O)iter_algorithm.o 
+	$(FCC) $(FFLAGS)  -c $(S)iter_diis.f90 -o $(O)iter_diis.o
+$(O)iter_damping.o : $(S)iter_damping.f90 $(O)iter_algorithm.o 
+	$(FCC) $(FFLAGS)  -c $(S)iter_damping.f90 -o $(O)iter_damping.o
+$(O)lambda_calc.o : $(S)lambda_calc.f90
+	$(FCC) $(FFLAGS)  -c $(S)lambda_calc.f90 -o $(O)lambda_calc.o
+$(O)lambda_calc_diag.o : $(S)lambda_calc_diag.f90 $(O)lambda_calc.o
+	$(FCC) $(FFLAGS)  -c $(S)lambda_calc_diag.f90 -o $(O)lambda_calc_diag.o
+$(O)lambda_calc_block.o : $(S)lambda_calc_block.f90 $(O)lambda_calc.o
+	$(FCC) $(FFLAGS)  -c $(S)lambda_calc_block.f90 -o $(O)lambda_calc_block.o
 
 
 .PHONY : clean
