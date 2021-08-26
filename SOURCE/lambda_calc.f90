@@ -1,5 +1,5 @@
 module class_LambdaCalc
-  
+
     implicit none
   
     type, public, abstract :: LambdaCalc

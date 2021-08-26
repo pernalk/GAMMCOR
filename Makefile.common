@@ -161,7 +161,7 @@ $(O)C_integrator.o : $(S)C_integrator.f90 $(O)iter_stats.o $(O)iter_algorithm.o 
 	$(FCC) $(FFLAGS)  -c $(S)C_integrator.f90 -o $(O)C_integrator.o
 $(O)iter_algorithm.o : $(S)iter_algorithm.f90
 	$(FCC) $(FFLAGS)  -c $(S)iter_algorithm.f90 -o $(O)iter_algorithm.o
-$(O)iter_diis.o : $(S)iter_diis.f90 $(O)iter_algorithm.o 
+$(O)iter_diis.o : $(S)iter_diis.f90 $(O)iter_algorithm.o  $(O)diis.o
 	$(FCC) $(FFLAGS)  -c $(S)iter_diis.f90 -o $(O)iter_diis.o
 $(O)iter_damping.o : $(S)iter_damping.f90 $(O)iter_algorithm.o 
 	$(FCC) $(FFLAGS)  -c $(S)iter_damping.f90 -o $(O)iter_damping.o
@@ -169,7 +169,7 @@ $(O)lambda_calc.o : $(S)lambda_calc.f90
 	$(FCC) $(FFLAGS)  -c $(S)lambda_calc.f90 -o $(O)lambda_calc.o
 $(O)lambda_calc_diag.o : $(S)lambda_calc_diag.f90 $(O)lambda_calc.o
 	$(FCC) $(FFLAGS)  -c $(S)lambda_calc_diag.f90 -o $(O)lambda_calc_diag.o
-$(O)lambda_calc_block.o : $(S)lambda_calc_block.f90 $(O)lambda_calc.o
+$(O)lambda_calc_block.o : $(S)lambda_calc_block.f90 $(O)lambda_calc.o $(O)abfofo.o
 	$(FCC) $(FFLAGS)  -c $(S)lambda_calc_block.f90 -o $(O)lambda_calc_block.o
 
 

@@ -745,14 +745,14 @@ subroutine CIter_FOFO(PMat,ECorr,ACAlpha,XOne,URe,Occ,EGOne,NGOcc,&
    double precision, allocatable :: APlusTilde(:), APlusTildeAct(:), COMTilde(:),COMTildeAct(:) 
    integer :: NCholesky
    type(CIntegrator) :: CIntegr
-   type(IterDIIS), target :: iterDIISAlgorithm
-   type(IterDamping), target :: iterDampingAlgorithm
-   type(LambdaCalcDiag), target :: LambdaCalculatorDiag
-   type(LambdaCalcBlock), target :: LambdaCalculatorBlock
+   class(IterDIIS), allocatable, target :: iterDIISAlgorithm
+   class(IterDamping), allocatable, target :: iterDampingAlgorithm
+   class(LambdaCalcDiag), allocatable, target :: LambdaCalculatorDiag
+   class(LambdaCalcBlock), allocatable, target :: LambdaCalculatorBlock
 
    interface
    subroutine read_D_array(NCholesky, DChol, DCholAct, NDimX, NBasis, IndN, Occ, IndAux)
-      double precision, allocatable :: DChol(:,:), DCholAct(:,:)
+      double precision, allocatable, intent(out) :: DChol(:,:), DCholAct(:,:)
       integer :: NCholesky
       integer, intent(in) :: NDimX, NBasis, IndN(2,NDimX), IndAux(NBasis)
       double precision, intent(in) :: Occ(NBasis)
@@ -816,7 +816,7 @@ subroutine CIter_FOFO(PMat,ECorr,ACAlpha,XOne,URe,Occ,EGOne,NGOcc,&
    COMTilde=0.0
    COMTildeAct=0.0
 
-   iterDIISAlgorithm = IterDIIS(NGrid=35, Threshold=1d-3, DIISN=16, maxIterations=0)
+   iterDIISAlgorithm = IterDIIS(NGrid=35, Threshold=1d-3, DIISN=16, maxIterations=10)
    iterDampingAlgorithm = IterDamping(NGrid=20, Threshold=1d-3, XMix=0.2, maxIterations=0)
 
    LambdaCalculatorDiag = LambdaCalcDiag()
@@ -824,8 +824,8 @@ subroutine CIter_FOFO(PMat,ECorr,ACAlpha,XOne,URe,Occ,EGOne,NGOcc,&
 
    CIntegr = CIntegrator(iterAlgo=iterDIISAlgorithm, LambdaCalc=LambdaCalculatorDiag)
    call CIntegr%setup(NDimX, NCholesky, A0, A2, APlusTilde, APlusTildeAct, XFreq, WFreq, NGrid, ACAlpha)
-!    call CIntegr%integrate(COMTilde, COMTildeAct)
-   call CIntegr%integrateReverse(COMTilde, COMTildeAct)
+   call CIntegr%integrate(COMTilde, COMTildeAct)
+   ! call CIntegr%integrateReverse(COMTilde, COMTildeAct)
    ! ==========================================================================   
 
    pos = 0

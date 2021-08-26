@@ -1,4 +1,4 @@
-    module class_IterStats
+module class_IterStats
 
     implicit none
 

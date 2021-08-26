@@ -1,5 +1,5 @@
 module class_IterAlgorithm
-  
+
     implicit none
   
     type, public, abstract :: IterAlgorithm
