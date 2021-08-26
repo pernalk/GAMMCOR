@@ -1,4 +1,4 @@
-    module class_IterDIIS
+module class_IterDIIS
 
     use class_IterAlgorithm
     implicit none
@@ -52,7 +52,7 @@
 
             norm = norm2(CTilde - CTilde_prev)
             ! print '(a, i3, a, e)', "norm (", N, ") = ", norm
-            if (norm < this%Threshold) exit
+            if (norm < this%Threshold .or. N .ge. this%maxIterations) exit
 
             CTilde_prev = CTilde
             N = N + 1
