@@ -1,28 +1,31 @@
-    module class_Iterdamping
+    module class_IterAlgorithmDamping
 
     use class_IterAlgorithm
     implicit none
 
-    type, public, extends(IterAlgorithm) :: Iterdamping
-        integer :: NGrid = 35, maxIterations = 0
-        double precision :: Threshold = 1d-5, Xmix = 0.2
+    type, public, extends(IterAlgorithm) :: IterAlgorithmDamping
+        double precision :: Xmix = 0.2
         contains
             procedure :: iterate => iterate
-            procedure :: createFileName => createFileName
-    end type Iterdamping
+            procedure :: getName => getName
+            procedure :: getParamsString => getParamsString
+            procedure :: toString => toString
+    end type IterAlgorithmDamping
 
 
     contains
 
 
-    subroutine iterate(this, CTilde, N, NDimX, NCholesky, Lambda, APlusTilde, A2)
+    subroutine iterate(this, CTilde, NDimX, NCholesky, Lambda, APlusTilde, A2, iStats)
 
+        use class_IterStats
         implicit none
-        class(IterDamping) :: this
+        class(IterAlgorithmDamping) :: this
 
         double precision, intent(out) :: CTilde(NDimX*NCholesky)
         integer,intent(in) :: NDimX, NCholesky
         double precision, intent(in) :: Lambda(NDimX*NDimX), A2(NDimX*NDimX), APlusTilde(NDimX*NCholesky)
+        class(IterStats), intent(inout) :: iStats
         
         double precision :: CTilde_prev(NDimX*NCholesky)
         integer :: N
@@ -49,24 +52,51 @@
 
             norm = norm2(CTilde - CTilde_prev)
             ! print '(a, i3, a, e)', "norm (", N, ") = ", norm
-            if (norm < this%Threshold .or. N .ge. this%maxIterations) exit
+            if ((norm < this%Threshold) .or. (N .ge. this%maxIterations .and. this%maxIterations .ge. 0)) then
+                call iStats%addN(N)
+                exit
+            endif
 
             CTilde_prev = CTilde
             N = N + 1
         EndDo
 
+        call iStats%addN(N)
+
     end subroutine iterate
 
 
-    subroutine createFileName(this, fileName)
+    function getName(this) result(res)
 
         implicit none
-        class(IterDamping) :: this
+        class(IterAlgorithmDamping) :: this
+        character(:), allocatable :: res
+        res = "Damping"
+
+    end function getName
+
+
+    function getParamsString(this) result(res)
+
+        implicit none
+        class(IterAlgorithmDamping) :: this
+        character(:), allocatable :: res
+        character(200) :: buffer
+        write(buffer, "(a, f4.2, a, e6.1e1, a, i0, a)") &
+            "{XMix: ", this%XMix, ", Threshold: ", this%Threshold, ", maxIterations: ", this%maxIterations, "}"
+        res = trim(buffer)
+
+    end function getParamsString
+
+
+    subroutine toString(this, fileName)
+
+        implicit none
+        class(IterAlgorithmDamping) :: this
         character(50), intent(out) :: fileName
-        write(fileName, "(3a, i0, a, f4.2, a, e6.1e1)") &
-            'is_damping_', 'diag', '_g', this%NGrid, '_x', this%XMix, '_t', this%Threshold
+        write(fileName, "(a, f4.2, a, e6.1e1)") 'damping_x', this%XMix, '_t', this%Threshold
 
-    end subroutine createFileName
+    end subroutine toString
 
 
-end module class_Iterdamping
+end module class_IterAlgorithmDamping

@@ -3,12 +3,14 @@ module class_IterStats
     implicit none
 
     type, public :: IterStats
-        integer :: count = 0
-        integer :: iterNoTotal = 0, iterMax = 0
-        double precision :: freqMax = 0, iterAvg = 0
+        integer :: count = 0, freqsHittingMaxIterationsLimit = 0
+        integer :: iterNoTotal = 0, iterMax = 0, maxIterationsLimit = 0
+        double precision :: freq = 0, freqMax = 0, iterAvg = 0
         character(13) :: buffer = ''
         contains
-            procedure :: add => add
+            procedure :: reset => reset
+            procedure :: setFreq => setFreq
+            procedure :: addN => addN
             procedure :: print => print
             procedure :: dump => dump
     end type IterStats
@@ -17,23 +19,52 @@ module class_IterStats
     contains
 
 
-    subroutine add(this, freq, iterNo)
+    subroutine reset(this)
+
+        implicit none
+        class(IterStats) :: this
+        this%count = 0
+        this%iterNoTotal = 0
+        this%iterMax = 0
+        this%freqMax = 0
+        this%iterAvg = 0
+        this%buffer = ''
+        this%freqsHittingMaxIterationsLimit = 0
+        this%maxIterationsLimit = 0
+
+    end subroutine reset
+
+
+    subroutine setFreq(this, freq)
+
+        implicit none
+        class(IterStats) :: this
+        double precision :: freq
+        this%freq = freq
+
+    end subroutine setFreq
+
+
+    subroutine addN(this, iterNo)
 
         implicit none
         class(IterStats) :: this
         integer :: iterNo
-        double precision :: freq
 
         if(iterNo > this%iterMax) then
             this%iterMax = iterNo
-            this%freqMax = freq
+            this%freqMax = this%freq
         end if
+
+        if(iterNo .ge. this%maxIterationsLimit .and. this%maxIterationsLimit .ge. 0) then
+            this%freqsHittingMaxIterationsLimit = this%freqsHittingMaxIterationsLimit + 1
+        endif
 
         this%count = this%count + 1
         this%iterNoTotal = this%iterNoTotal + iterNo
         this%iterAvg = float(this%iterNoTotal) / this%count
 
-    end subroutine add
+    end subroutine addN
 
 
     subroutine print(this, unitOp)
@@ -45,16 +76,19 @@ module class_IterStats
 
         unit = merge(unitOp, 6, present(unitOp))
 
-        write (unit, *) "------------------------------------------------"
+        write (unit, *) "--------------------------------------------------------------------"
+        write (unit, *) "[IterStats] Iteration statistics"
         write (this%buffer, '(i13)') this%iterNoTotal
-        write (unit, '(a37, a13)') "total number of iterations:         ", adjustl(this%buffer)
+        write (unit, '(a46, a13)') " total number of iterations:                  ", adjustl(this%buffer)
         write (this%buffer, '(f4.1)') this%iterAvg
-        write (unit, '(a37, a13)') "average number of iterations:       ", adjustl(this%buffer)
+        write (unit, '(a46, a13)') " average number of iterations:                ", adjustl(this%buffer)
         write (this%buffer, '(i13)') this%iterMax
-        write (unit, '(a37, a13)') "max number of iterations:           ", adjustl(this%buffer)
+        write (unit, '(a46, a13)') " max number of iterations:                    ", adjustl(this%buffer)
         write (this%buffer, '(e13.6)') this%freqMax
-        write (unit, '(a37, a13)') "freq with max number of iterations: ", adjustl(this%buffer)
-        write (unit, *) "------------------------------------------------"
+        write (unit, '(a46, a13)') " freq with max number of iterations:          ", adjustl(this%buffer)
+        write (this%buffer, '(i13)') this%freqsHittingMaxIterationsLimit
+        write (unit, '(a46, a13)') " no of freqs hitting the max iteration limit: ", adjustl(this%buffer)
+        write (unit, *) "--------------------------------------------------------------------"
 
     end subroutine print
 

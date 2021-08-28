@@ -718,11 +718,12 @@ subroutine CIter_FOFO(PMat,ECorr,ACAlpha,XOne,URe,Occ,EGOne,NGOcc,&
    use class_IterStats
    use class_CIntegrator
    use class_IterAlgorithm
-   use class_IterDIIS
-   use class_IterDamping
-   use class_LambdaCalc
-   use class_LambdaCalcDiag
-   use class_LambdaCalcBlock
+   use class_IterAlgorithmDIIS
+   use class_IterAlgorithmDamping
+   use class_LambdaCalculator
+   use class_LambdaCalculatorDiag
+   use class_LambdaCalculatorBlock
+   use class_LambdaCalculatorProjector
 
    implicit none
 
@@ -732,23 +733,18 @@ subroutine CIter_FOFO(PMat,ECorr,ACAlpha,XOne,URe,Occ,EGOne,NGOcc,&
    double precision,intent(in) :: URe(NBasis,NBasis),Occ(NBasis),XONe(NInte1)
    double precision :: ACAlpha
    double precision :: ECorr,ECorrAct,EGOne(NGem)
-   !double precision,intent(in) :: PMat(NDimX,NDimX)
-   double precision :: PMat(NDimX,NDimX)
-   double precision :: XFreq(100),WFreq(100),ABPLUS1(NDim*NDim),A0(NDimX*NDimX),A2(NDimX*NDimX),WORK1(NDim*NDim)
-   integer :: NOccup,NGrid,DIISN
-   integer :: i,j,k,l
-   integer :: pos(NBasis,NBasis)
-   double precision :: ECASSCF,PI,XMix,Threshold
+   double precision,intent(in) :: PMat(NDimX,NDimX)
+   double precision :: ABPLUS1(NDim*NDim),A0(NDimX*NDimX),A2(NDimX*NDimX),WORK1(NDim*NDim)
+   integer :: NOccup,NGrid
+   integer :: i,j
+   double precision :: ECASSCF,PI
    character(:),allocatable :: twojfile,twokfile,IntKFile
-   logical :: AuxCoeff(3,3,3,3)
    double precision, allocatable :: DChol(:,:),DCholT(:,:),DCholAct(:,:),DCholActT(:,:),WorkD(:,:)
    double precision, allocatable :: APlusTilde(:), APlusTildeAct(:), COMTilde(:),COMTildeAct(:) 
    integer :: NCholesky
    type(CIntegrator) :: CIntegr
-   class(IterDIIS), allocatable, target :: iterDIISAlgorithm
-   class(IterDamping), allocatable, target :: iterDampingAlgorithm
-   class(LambdaCalcDiag), allocatable, target :: LambdaCalculatorDiag
-   class(LambdaCalcBlock), allocatable, target :: LambdaCalculatorBlock
+   class(IterAlgorithm), allocatable, target :: iterAlgo
+   class(LambdaCalculator), allocatable, target :: lambdaCalc
 
    interface
    subroutine read_D_array(NCholesky, DChol, DCholAct, NDimX, NBasis, IndN, Occ, IndAux)
@@ -758,20 +754,6 @@ subroutine CIter_FOFO(PMat,ECorr,ACAlpha,XOne,URe,Occ,EGOne,NGOcc,&
       double precision, intent(in) :: Occ(NBasis)
    end subroutine read_D_array
    end interface
-
-   ! Parameters
-   ! ==========================================================================  
-   NGrid = 35
-   ! parameters for damping algorithm
-   ! Max_Cn = 15
-   XMix = 0.2
-   ! parameters for DIIS algorithm
-   Threshold = 1d-3
-   DIISN = 16
-   ! ==========================================================================  
-
-   ! Write (6,'(/,X,''AC Iterative Calculation with Omega Grid = '',I3,&
-   !       '' and max order in C expansion = '',I3,/)') NGrid,Max_Cn
 
    ! Get DChol & DCholAct
    ! ==========================================================================      
@@ -787,74 +769,45 @@ subroutine CIter_FOFO(PMat,ECorr,ACAlpha,XOne,URe,Occ,EGOne,NGOcc,&
    twokfile = 'FOFO'
    IntKFile = twokfile
 
-   ! ACAlpha0=0.D0
-   ! call AB_CAS_FOFO(ABPLUS0,WORK0,ECASSCF,URe,Occ,XOne, &
-   !                  IndN,IndX,IGem,NAct,INActive,NDimX,NBasis,NDimX,&
-   !                  NInte1,twojfile,twokfile,ACAlpha0,.false.)
-   ! Call dgemm('N','N',NDimX,NDimX,NDimX,1d0,ABPLUS0,NDimX,WORK0,NDimX,0.0,A0,NDimX)
-
    call AB_CAS_FOFO(ABPLUS1,WORK1,ECASSCF,URe,Occ,XOne, &
                   IndN,IndX,IGem,NAct,INActive,NDimX,NBasis,NDimX,&
                   NInte1,twojfile,twokfile,ACAlpha,.false.)
    EGOne(1)=ECASSCF
-   !A2=ABPLUS1*ABMIN1
+   ! Calc A2=ABPLUS1*ABMIN1
    Call dgemm('N','N',NDimX,NDimX,NDimX,1d0,ABPLUS1,NDimX,WORK1,NDimX,0.0,A2,NDimX)
-
-   Call FreqGrid(XFreq,WFreq,NGrid)
    
    ! Calc A+Tilde & AAct+Tilde
-   ! ==========================================================================   
+   ! ==========================================================================================================================   
    allocate(APlusTilde(NDimX*NCholesky), APlusTildeAct(NDimX*NCholesky))
    Call dgemm('N','N',NDimX,NCholesky,NDimX,1d0,ABPLUS1,NDimX,DCholT,NDimX,0.0,APlusTilde,NDimX)
    Call dgemm('N','N',NDimX,NCholesky,NDimX,1d0,ABPLUS1,NDimX,DCholActT,NDimX,0.0,APlusTildeAct,NDimX)
-   ! ==========================================================================   
+   ! ==========================================================================================================================  
 
    ! Calc CTilde & CTildeAct integrals
-   ! ========================================================================== 
-!    allocate(CTilde(NDimX*NCholesky),CTildeAct(NDimX*NCholesky))
+  ! ==========================================================================================================================  
    allocate(COMTilde(NDimX*NCholesky),COMTildeAct(NDimX*NCholesky))
    COMTilde=0.0
    COMTildeAct=0.0
 
-   iterDIISAlgorithm = IterDIIS(NGrid=35, Threshold=1d-3, DIISN=16, maxIterations=10)
-   iterDampingAlgorithm = IterDamping(NGrid=20, Threshold=1d-3, XMix=0.2, maxIterations=0)
+   ! Create iteration algorithm object
+   iterAlgo = IterAlgorithmDIIS(Threshold=1d-3, DIISN=16, maxIterations=30)
+!    iterAlgo = IterAlgorithmDamping(Threshold=1d-3, XMix=0.2, maxIterations=-1)
 
-   LambdaCalculatorDiag = LambdaCalcDiag()
-   LambdaCalculatorBlock = LambdaCalcBlock(URe,Occ,XOne,IndN,IndX,IGem,NBasis,NAct,INActive,NInte1,twojfile,twokfile)
+   ! Create A0 calculator object
+   lambdaCalc = LambdaCalculatorDiag()
+!    LambdaCalc = LambdaCalculatorBlock(URe,Occ,XOne,IndN,IndX,IGem,NBasis,NAct,INActive,NInte1,twojfile,twokfile)
+!    LambdaCalc = LambdaCalculatorProjector(PMat)
 
-   CIntegr = CIntegrator(iterAlgo=iterDIISAlgorithm, LambdaCalc=LambdaCalculatorDiag)
-   call CIntegr%setup(NDimX, NCholesky, A0, A2, APlusTilde, APlusTildeAct, XFreq, WFreq, NGrid, ACAlpha)
-   call CIntegr%integrate(COMTilde, COMTildeAct)
-   ! call CIntegr%integrateReverse(COMTilde, COMTildeAct)
-   ! ==========================================================================   
+   NGrid = 35
+   CIntegr = CIntegrator(iterAlgo=iterAlgo, lambdaCalc=lambdaCalc)
+   call CIntegr%setup(NGrid, NDimX, NCholesky, A0, A2, APlusTilde, APlusTildeAct, ACAlpha)
+!    call CIntegr%integrate(COMTilde, COMTildeAct)
+   call CIntegr%integrateReverse(COMTilde, COMTildeAct)
+   ! ==========================================================================================================================  
 
-   pos = 0
-   do i=1,NDimX
-      pos(IndN(1,i),IndN(2,i)) = IndX(i)
-   enddo
-
-   AuxCoeff = .true.
-   do l=1,3
-      do k=1,3
-         do j=1,3
-            do i=1,3
-               if((i==j).and.(j==k).and.(k==l)) then
-                  AuxCoeff(i,j,k,l) = .false.
-               endif
-            enddo
-         enddo
-      enddo
-   enddo
-
-   !!!!!!!!!!!!!!!
    allocate(WorkD(NDimX,NCholesky))
    WorkD=0
-   ! WorkD=C_tilde=C*D^T
-   ! WorkD=COM -- in new version
-   ! Call dgemm('N','T',NDimX,NCholesky,NDimX,1d0,COM,NDimX,&
-   !                  DChol,NCholesky,0.0,WorkD,NDimX)
    WorkD = RESHAPE(COMTilde, (/NDimX, NCholesky/))
-
 
    ECorr=0
    do j=1,NDimX
@@ -864,12 +817,7 @@ subroutine CIter_FOFO(PMat,ECorr,ACAlpha,XOne,URe,Occ,EGOne,NGOcc,&
    enddo
    ! active part of ecorr
    WorkD=0
-   ! WorkD=C_tilde_act=C*D_act^T
-   ! WorkD=COM_act -- in new version
-   ! Call dgemm('N','T',NDimX,NCholesky,NDimX,1d0,COM,NDimX,&
-   !                  DCholAct,NCholesky,0.0,WorkD,NDimX)
    WorkD = RESHAPE(COMTildeAct, (/NDimX, NCholesky/))
-
 
    ECorrAct=0
    do j=1,NDimX

@@ -1,9 +1,9 @@
-module class_LambdaCalcBlock
+module class_LambdaCalculatorBlock
   
-    use class_LambdaCalc
+    use class_LambdaCalculator
     implicit none
   
-    type, public, extends(LambdaCalc):: LambdaCalcBlock
+    type, public, extends(LambdaCalculator):: LambdaCalculatorBlock
         double precision, allocatable :: URe(:,:), Occ(:), XONe(:)
         integer, allocatable :: IndN(:,:), IndX(:), IGem(:)
         integer :: NBasis, NAct, INActive, NInte1
@@ -11,17 +11,19 @@ module class_LambdaCalcBlock
         contains
             procedure :: calculateInitialA => calculateInitialA
             procedure :: calculateLambda => calculateLambda
-    end type LambdaCalcBlock
+            procedure :: getName => getName
+            procedure :: toString => toString
+    end type LambdaCalculatorBlock
 
 
     contains
 
 
-    subroutine calculateLambda(this, InitialC, OmI, NDimX, A0)
+    subroutine calculateLambda(this, Lambda, OmI, NDimX, A0)
 
         implicit none
-        class(LambdaCalcBlock) :: this
-        double precision, intent(out) :: InitialC(NDimX*NDimX)
+        class(LambdaCalculatorBlock) :: this
+        double precision, intent(out) :: Lambda(NDimX*NDimX)
         integer, intent(in) :: NDimX
         double precision, intent(in) :: OmI, A0(NDimX*NDimX)
         integer :: i, inf1, inf2
@@ -32,9 +34,9 @@ module class_LambdaCalcBlock
         Do i=1,NDimX
             WORK0((i-1)*NDimX+i)=OmI**2
         EndDo
-        InitialC=A0+WORK0
-        Call dgetrf(NDimX,NDimX, InitialC, NDimX, ipiv, inf1)
-        Call dgetri(NDimX, InitialC, NDimX, ipiv, work0, NDimX, inf2)
+        Lambda=A0+WORK0
+        Call dgetrf(NDimX,NDimX, Lambda, NDimX, ipiv, inf1)
+        Call dgetri(NDimX, Lambda, NDimX, ipiv, work0, NDimX, inf2)
 
     end subroutine calculateLambda
 
@@ -43,7 +45,7 @@ module class_LambdaCalcBlock
 
         use abfofo
         implicit none
-        class(LambdaCalcBlock) :: this
+        class(LambdaCalculatorBlock) :: this
         double precision, intent(out) :: A0(NDimX*NDimX)
         double precision, intent(inout) :: A2(NDimX*NDimX)
         integer, intent(in) :: NDimX
@@ -51,7 +53,6 @@ module class_LambdaCalcBlock
         double precision :: ABPLUS0(NDimX*NDimX),WORK0(NDimX*NDimX)
         double precision :: ECASSCF, ACAlpha0
     
-
         ACAlpha0=0.D0
         call AB_CAS_FOFO(ABPLUS0,WORK0,ECASSCF,this%URe,this%Occ,this%XOne, &
                         this%IndN,this%IndX,this%IGem,this%NAct,this%INActive,NDimX,this%NBasis,NDimX,&
@@ -62,4 +63,24 @@ module class_LambdaCalcBlock
     end subroutine calculateInitialA
 
 
-end module class_LambdaCalcBlock
+    function getName(this) result(res)
+
+        implicit none
+        class(LambdaCalculatorBlock) :: this
+        character(:), allocatable :: res
+        res = "Block"
+
+    end function getName
+
+
+    subroutine toString(this, string)
+
+        implicit none
+        class(LambdaCalculatorBlock) :: this
+        character(50), intent(out) :: string
+        string = "block"
+
+    end subroutine toString
+
+
+end module class_LambdaCalculatorBlock
