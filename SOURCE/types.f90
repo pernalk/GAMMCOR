@@ -31,6 +31,7 @@ integer, parameter :: JOB_TYPE_AC0DNOSYMM = 11
 integer, parameter :: JOB_TYPE_NLOCCORR = 12
 integer, parameter :: JOB_TYPE_AC0DP = 13
 integer, parameter :: JOB_TYPE_ACFREQ = 14
+integer, parameter :: JOB_TYPE_ACFREQNTH = 15
 
 integer, parameter :: SAPTLEVEL0 = 0
 integer, parameter :: SAPTLEVEL1 = 1
@@ -78,10 +79,10 @@ character(*),parameter :: PossibleInterface(4) = &
 [character(8) :: &
 'DALTON', 'MOLPRO', 'OWN', 'ORCA']
 
-character(*),parameter :: PossibleJobType(14) = &
+character(*),parameter :: PossibleJobType(15) = &
 [character(9) :: &
 'AC', 'AC0', 'ERPA', 'EERPA', 'SAPT', 'PDFT', 'CASPiDFT','CASPiDFTOpt','EERPA-1', & 
-'AC0D', 'AC0DNOSYMM', 'NLOCCORR', 'AC0DP', 'ACFREQ']
+'AC0D', 'AC0DNOSYMM', 'NLOCCORR', 'AC0DP', 'ACFREQ','ACFREQNTH']
 
 character(*),parameter :: PossibleRDMType(5) = &
 [character(8) :: &
@@ -266,6 +267,7 @@ type FlagsData
      integer :: IFlAC0D   = 0
      integer :: IFlAC0DP  = 0
      integer :: IFlACFREQ = 0
+     integer :: IFlACFREQNTH = 0
      integer :: ISymmAC0D = 1
      integer :: IFlCore   = 1
      integer :: IFlFrag1  = 0

@@ -97,8 +97,13 @@ C               0 - AC not used
       IFlAC=Flags%IFlAC
 C
 C     IFlACFREQ = 1 - adiabatic connection formula calculation with frequency integration
-C                 0 - AC withour frequency integration
+C                 0 - AC without frequency integration
       IFlACFREQ=Flags%IFlACFREQ
+C
+C     IFlACFREQNTH = 1 - AC integrand expanded wrt alpha, frequency integration
+C                    0 - AC without frequency integration
+      IFlACFREQNTH=Flags%IFlACFREQNTH
+C
 C
 C     IFlSnd  = 1 - run AC0 (linerized in alpha, MP2-like expression for AC is used)
 C             = 0 - do not run AC0

@@ -31,6 +31,8 @@ C     LOCAL ARRAYS
 C
       Dimension XGrid(100), WGrid(100)
 C 
+      If (IFlACFREQNTH.Eq.1) Then
+C
       If (ICholesky.Eq.0) Then
 C
       If(ITwoEl.eq.1) Then
@@ -42,7 +44,7 @@ C
 C
       ElseIf(ITwoEl.eq.3) Then
 C
-C     Find AC energiy in one shot (no lambda integration) by expanding C in lambda 
+C     Find AC energy in one shot (no lambda integration) by expanding C in lambda 
 C     and integrating analytically
 C
       Call WIter_FOFO(ECorr,XOne,URe,Occ,
@@ -60,6 +62,24 @@ C
 C       
       Return
 C
+C     If (ICholesky.Eq.0) Then
+      Else
+C
+      Write(*,*)'ACFREQNTH with Cholesky not available yet'
+      Stop
+C
+      EndIf
+C
+C     If (IFlACFREQNTH.Eq.1) Then
+      EndIf
+C
+C     *************************************************************************************
+C     what follows is AC calculation with omega frequency integration by iteration C(omega)
+C     available only together with cholesky decomposition
+C     *************************************************************************************
+      If (ICholesky.Eq.0) Then
+      Write(6,'(" ACFREQ is only available with Cholesky .true.")')
+      Stop
       EndIf
 C
 C     Find the projector PMat
@@ -69,19 +89,6 @@ C
      $ IGem,NAcCAS,NInAcCAS,NELE,
      $ NBasis,NInte1,NDim,NGem,IndAux,
      $ IndN,IndX,NDimX)
-C
-c      Call AC_CIter_FOFO(PMat,ECorr,XOne,URe,Occ,
-c     $ EGOne,NGOcc,
-c     $ IGem,NAcCAS,NInAcCAS,NELE,
-c     $ NBasis,NInte1,NDim,NGem,IndAux,
-c     $ IndN,IndX,NDimX)
-cC
-c      ETot=EGOne(1)
-c      Write
-c     $ (6,'(/,2X,''ECASSCF+ENuc, AC-Corr, AC-ERPA-CASSCF '',4X,3F15.8)')
-c     $ ETot+ENuc,ECorr,ETot+ENuc+ECorr
-c
-c      stop
 C
 C     GENERATE ABSCISSAS AND WEIGHTS FOR GAUSSIAN-LEGENDRE QUADRATURE
 C
