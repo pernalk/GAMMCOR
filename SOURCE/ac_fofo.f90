@@ -113,6 +113,7 @@ subroutine WIter_FOFO(ECorr,XOne,URe,Occ,EGOne,NGOcc,&
    IGem,NAct,INActive,NELE,NBasis,NInte1,NDim,NGem,IndAux,&
    IndN,IndX,NDimX)
 
+use abmat
 use abfofo
 
 implicit none
@@ -139,8 +140,8 @@ character(:),allocatable :: twojfile,twokfile,IntKFile
 logical :: AuxCoeff(3,3,3,3)
 double precision,allocatable :: work(:),ints(:,:)
 
-NGrid=25
-Max_Cn=3
+NGrid=20
+Max_Cn=5
 Write (6,'(/,X,''AC Iterative Calculation with Omega Grid = '',I3,&
    '' and max order in C expansion = '',I3,/)') NGrid,Max_Cn
 
@@ -173,6 +174,11 @@ Call dgemm('N','N',NDimX,NDimX,NDimX,1d0,ABPLUS1,NDimX,WORK1,NDimX,0.0,A2,NDimX)
 
 Call FreqGrid(XFreq,WFreq,NGrid)
 
+!
+Call AC0BLOCK(Occ,URe,XOne, &
+      IndN,IndX,IGem,NAct,INActive,NDimX,NBasis,NDimX,NInte1,'FFOO','FOFO')
+!
+
 COM=0.0
 Do IGL=1,NGrid
    OmI=XFreq(IGL)
@@ -184,8 +190,11 @@ Do IGL=1,NGrid
 
    WORK1=A0+WORK0
 
-   Call dgetrf(NDimX, NDimX, WORK1, NDimX, ipiv, inf1 )
-   Call dgetri(NDimX, WORK1, NDimX, ipiv, work0, NDimX, inf2 )
+!   Call dgetrf(NDimX, NDimX, WORK1, NDimX, ipiv, inf1 )
+!   Call dgetri(NDimX, WORK1, NDimX, ipiv, work0, NDimX, inf2 )
+!
+   Call READ_AC0BLK(OmI**2,WORK1,'A0BLK',NDimX)
+!
 
 !     C0=C(0)
    Call dgemm('N','N',NDimX,NDimX,NDimX,0.5d0,WORK1,NDimX,&
@@ -205,8 +214,9 @@ Do IGL=1,NGrid
 
 !     FROM NOW ON: Initial*A2 in WORK1, Initial*A1 in WORK0
    WFact=4.D0/PI*WFreq(IGL)
-
-   COM=COM+WFact*(C0+0.5D0*C1)
+   ! exclude C0 - its role is to cancel the divergent terms in AC, see below
+   !COM=COM+WFact*(C0+0.5D0*C1)
+   COM=COM+WFact*(0.5D0*C1)
 
    XFactorial=1
    Do N=2,Max_Cn
@@ -284,9 +294,10 @@ do l=1,NBasis
              if(AuxCoeff(IGem(ip),IGem(iq),IGem(ir),IGem(is))) then
 
                 Aux = Crs*Cpq*COM((irs-1)*NDimX+ipq)
-                if(iq.eq.is.and.ip.Eq.ir) then
-                   Aux = Aux - Occ(ip)*(1d0-Occ(is))-Occ(is)*(1d0-Occ(ip))
-                endif
+                ! the divergent term below cancels with Int_0^inf C0(omega) 
+                !if(iq.eq.is.and.ip.Eq.ir) then
+                !   Aux = Aux - Occ(ip)*(1d0-Occ(is))-Occ(is)*(1d0-Occ(ip))
+                !endif
 
                 ECorr = ECorr + Aux*ints(j,i)
              endif
@@ -1070,3 +1081,304 @@ subroutine read_D_array(NCholesky, DChol, DCholAct, NDimX, NBasis, IndN, Occ, In
    deallocate(WorkD)
 
 end subroutine read_D_array
+
+subroutine AC0BLOCK(Occ,URe,XOne, &
+                    IndN,IndX,IGemIN,NAct,INActive,NDimX,NBasis,NDim,NInte1, &
+                    IntJFile,IntKFile)
+!
+!     A ROUTINE FOR COMPUTING A0=ABPLUS^{(0)}.ABMIN^{(0)}
+!                 (FOFO VERSION)
+!
+use abfofo
+use types,only : LOUT,EblockData
+!
+implicit none
+
+integer,intent(in)           :: NAct,INActive,NDimX,NBasis,NDim,NInte1
+integer,intent(in)           :: IndN(2,NDim),IndX(NDim),IGemIN(NBasis)
+double precision,intent(in)  :: URe(NBasis,NBasis),Occ(NBasis),XOne(NInte1)
+character(*)                 :: IntJFile,IntKFile
+
+integer          :: iunit
+integer          :: NOccup
+integer          :: i,j,k,l,kl,ii,ip,iq,ir,is,ipq,irs
+integer          :: ipos,jpos,iblk,jblk,nblk
+integer          :: IGem(NBasis),Ind(NBasis),pos(NBasis,NBasis)
+integer          :: nAA,nAI(INActive),nAV(INActive+NAct+1:NBasis),nIV
+integer          :: tmpAA(NAct*(NAct-1)/2),tmpAI(NAct,1:INActive),&
+                    tmpAV(NAct,INActive+NAct+1:NBasis),&
+                    tmpIV(INActive*(NBasis-NAct-INActive))
+integer          :: limAA(2),limAI(2,1:INActive),&
+                    limAV(2,INActive+NAct+1:NBasis),limIV(2)
+double precision :: AuxCoeff(3,3,3,3),Aux,val,ETot
+double precision :: ABPLUS(NDimX,NDimX),ABMIN(NDimX,NDimX)
+double precision :: C(NBasis)
+double precision,allocatable :: work(:,:)
+
+type(EblockData),allocatable :: A0block(:)
+type(EblockData) :: A0blockIV
+
+! set dimensions
+NOccup = NAct + INActive
+
+Ind = 0
+do i=1,NAct
+   Ind(INActive+i) = i
+enddo
+
+! fix IGem
+do i=1,INActive
+   IGem(i) = 1
+enddo
+do i=INActive+1,NOccup
+   IGem(i) = 2
+enddo
+do i=NOccup+1,NBasis
+   IGem(i) = 3
+enddo
+
+do l=1,3
+   do k=1,3
+      do j=1,3
+         do i=1,3
+            if((i==j).and.(j==k).and.(k==l)) then
+               AuxCoeff(i,j,k,l) = 1
+            else
+               AuxCoeff(i,j,k,l) = 0
+            endif
+         enddo
+      enddo
+   enddo
+enddo
+
+call ABPM0_FOFO(Occ,URe,XOne,ABPLUS,ABMIN, &
+                IndN,IndX,IGemIN,NAct,INActive,NDimX,NBasis,NDim,NInte1, &
+                IntJFile,IntKFile,ETot)
+
+call create_blocks_ABPL0(nAA,nAI,nAV,nIV,tmpAA,tmpAI,tmpAV,tmpIV,&
+                         limAA,limAI,limAV,limIV,pos,&
+                         IGem,IndN,INActive,NAct,NBasis,NDimX)
+
+do i=1,NBasis
+   C(i) = sign(sqrt(Occ(i)),Occ(i)-0.5d0)
+enddo
+
+allocate(A0block(1+NBasis-NAct))
+
+nblk = 0
+
+!pack AA
+if(nAA>0) then
+   nblk = nblk + 1
+   call pack_A0block(ABPLUS,ABMIN,nAA,limAA(1),limAA(2),tmpAA,A0block(nblk),NDimX)
+endif
+!pack AI
+do iq=1,INActive
+   if(nAI(iq)>0) then
+      nblk = nblk + 1
+      call pack_A0block(ABPLUS,ABMIN,nAI(iq),limAI(1,iq),limAI(2,iq),tmpAI(1:nAI(iq),iq),&
+                        A0block(nblk),NDimX)
+   endif
+enddo
+!pack AV
+do ip=NOccup+1,NBasis
+   if(nAV(ip)>0) then
+      nblk = nblk + 1
+      call pack_A0block(ABPLUS,ABMIN,nAV(ip),limAV(1,ip),limAV(2,ip),tmpAV(1:nAV(ip),ip),&
+                        A0block(nblk),NDimX)
+    endif
+enddo
+!pack IV
+associate(B => A0blockIV)
+
+  B%l1 = limIV(1)
+  B%l2 = limIV(2)
+  B%n  = B%l2-B%l1+1
+  allocate(B%pos(B%n))
+  B%pos(1:B%n) = tmpIV(1:B%n)
+
+  allocate(B%vec(B%n))
+  do i=1,B%n
+     ii = B%l1+i-1
+     B%vec(i) = ABPLUS(ii,ii)*ABMIN(ii,ii)
+  enddo
+
+end associate
+
+allocate(work(NDimX,NDimX))
+
+!call dgemm('N','N',NDimX,NDimX,NDimX,1d0,ABPLUS,NDimX,ABMIN,NDimX,0d0,work,NDimX)
+!print*, 'A0=A+A-',norm2(work)
+
+!print*, 'TEST UNPACKING A0 BLOCKS'
+work = 0
+do iblk=1,nblk
+associate(B => A0block(iblk))
+   do j=1,B%n
+      jpos=B%pos(j)
+      do i=1,B%n
+         ipos=B%pos(i)
+         work(ipos,jpos) = B%matX(i,j)
+      enddo
+   enddo   
+end associate
+enddo
+associate(B => A0blockIV)
+do i=1,B%n
+   ii = B%pos(i)
+   work(ii,ii) = B%vec(i) 
+   !print*, ii,work(ii,ii)
+enddo
+end associate
+!print*, 'assemble:',norm2(work)
+
+deallocate(work)
+
+! dump to file
+open(newunit=iunit,file='A0BLK',form='unformatted')
+write(iunit) nblk
+do iblk=1,nblk
+   associate(B => A0Block(iblk))
+     write(iunit) iblk, B%n, B%l1, B%l2
+     write(iunit) B%pos,B%matX
+   end associate
+enddo
+associate(B => A0BlockIV)
+  write(iunit) B%n,B%l1,B%l2
+  write(iunit) B%pos,B%vec
+end associate
+close(iunit)
+
+! deallocate blocks
+do iblk=1,nblk
+   associate(B => A0block(iblk))
+     deallocate(B%matX,B%pos)
+   end associate
+enddo
+! (IV part)
+associate(B => A0blockIV)
+  deallocate(B%pos,B%vec)
+end associate
+
+end subroutine AC0BLOCK
+
+subroutine READ_AC0BLK(omega,A0Inv,a0blkfile,NDimX)
+!subroutine READ_AC0BLK(A0Block,A0BlockIV,a0blkfile,NDimX)
+! an example of reading-in a0blocks from file
+use types,only : LOUT,EblockData
+
+implicit none
+
+double precision    :: omega
+integer,intent(in)      :: NDimX
+double precision :: A0Inv(NDimX,NDimX)
+character(*),intent(in) :: a0blkfile
+
+integer :: i,iblk,iunit
+integer :: nblk
+type(EBlockData)             :: A0BlockIV
+type(EBlockData),allocatable :: A0Block(:)
+! for testing:
+integer             :: ii,j,ipos,jpos,info
+double precision    :: diff
+integer,allocatable :: ipiv(:)
+double precision,allocatable :: work1(:),work(:,:)
+
+! read from file
+open(newunit=iunit,file=a0blkfile,status='OLD',&
+     form='UNFORMATTED')
+read(iunit) nblk
+allocate(A0Block(nblk))
+do iblk=1,nblk
+   associate(A => A0Block(iblk))
+     read(iunit) i, A%n, A%l1, A%l2
+     allocate(A%pos(A%n),A%matX(A%n,A%n))
+     read(iunit) A%pos,A%matX
+   end associate
+enddo
+associate(A => A0BlockIV)
+  read(iunit) A%n,A%l1,A%l2
+  allocate(A%pos(A%n),A%vec(A%n))
+  read(iunit) A%pos,A%vec
+end associate
+close(iunit)
+
+! example: diagonalize small blocks
+allocate(work(NDimX,NDimX))
+
+work = 0
+do iblk=1,nblk
+   associate(B => A0block(iblk))
+
+     allocate(ipiv(B%n),work1(B%n))
+
+     do i=1,B%n
+         B%matX(i,i) = B%matX(i,i) + omega
+     enddo
+
+     call dgetrf(B%n,B%n,B%matX,B%n,ipiv,info)
+     call dgetri(B%n,B%matX,B%n,ipiv,work1,B%n,info)
+     ! assign places in work(NDimX,NDimX) matrix
+     do j=1,B%n
+        jpos=B%pos(j)
+        do i=1,B%n
+           ipos=B%pos(i)
+           work(ipos,jpos) = B%matX(i,j)
+        enddo
+     enddo
+
+     deallocate(work1,ipiv)
+
+   end associate
+enddo
+
+! IV block
+associate(B => A0blockIV)
+do i=1,B%n
+   ii = B%pos(i)
+   work(ii,ii) = 1d0 / (B%vec(i) + omega)
+enddo
+end associate
+!print*, 'test2-2:',norm2(work)
+
+A0Inv=work
+
+deallocate(work)
+
+end subroutine READ_AC0BLK
+
+subroutine pack_A0block(ABPLUS,ABMIN,nVal,lim1,lim2,tmpMat,Eblock,NDimX)
+
+use types,only : LOUT,EblockData
+
+implicit none
+
+integer,intent(in) :: NDimX
+integer,intent(in) :: nVal,lim1,lim2,tmpMat(nVal)
+double precision :: ABPLUS(NDimX,NDimX),ABMIN(NDimX,NDimX)
+type(EblockData) :: Eblock(1)
+double precision,allocatable :: ABP(:,:),ABM(:,:)
+
+associate(B => Eblock(1))
+  B%n  = nVal
+  B%l1 = lim1
+  B%l2 = lim2
+  allocate(B%pos(B%n))
+  B%pos(1:B%n) = tmpMat(1:B%n)
+
+  !allocate(B%vec(B%n),B%matX(B%n,B%n),B%matY(B%n,B%n))
+  allocate(B%matX(B%n,B%n))
+  allocate(ABP(B%n,B%n),ABM(B%n,B%n))
+
+  ABP = ABPLUS(B%l1:B%l2,B%l1:B%l2)
+  ABM = ABMIN(B%l1:B%l2,B%l1:B%l2)
+
+  call dgemm('N','N',B%n,B%n,B%n,1d0,ABP,B%n,ABM,B%n,0d0,B%matX,B%n)
+
+  deallocate(ABM,ABP)
+
+end associate
+
+end subroutine pack_A0block
+
+
