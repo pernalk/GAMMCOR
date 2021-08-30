@@ -248,7 +248,8 @@ double precision,intent(inout) :: Tcpu,Twall
  call e2ind(Flags,SAPT%monA,SAPT%monB,SAPT)
  call e2exind(Flags,SAPT%monA,SAPT%monB,SAPT)
  call e2disp_Chol(Flags,SAPT%monA,SAPT%monB,SAPT)
- call e2disp_Cmat(Flags,SAPT%monA,SAPT%monB,SAPT)
+ !call e2disp_Cmat(Flags,SAPT%monA,SAPT%monB,SAPT)
+ call e2disp_Cmat_Chol(Flags,SAPT%monA,SAPT%monB,SAPT)
  call e2exdisp(Flags,SAPT%monA,SAPT%monB,SAPT)
 
  call summary_sapt(SAPT)
@@ -3081,6 +3082,9 @@ character(:),allocatable :: abfile,testfile
 double precision,external  :: ddot
 double precision,parameter :: One = 1d0, Half = 0.5d0
 double precision,parameter :: SmallE=0d0,BigE=1.D20
+!! test Cmat
+!double precision :: EGOne,NGOcc
+!double precision,allocatable :: Pmat(:,:)
 
 ! test iterative
  iter = 1
@@ -3424,6 +3428,24 @@ double precision,parameter :: SmallE=0d0,BigE=1.D20
       !call prepare_cerpa(Mon,ABPLUS,ABMIN,NBas)
       !call prepare_cerpa_ff(Mon,ABPLUS,ABMIN,NBas)
    endif
+
+   !! snippet for testing Cmat
+   !EGOne = 0
+   !NGOcc = 0
+   !ECorr = 0
+   !allocate(Pmat(Mon%NDimX,Mon%NDimX))
+
+   !if(allocated(Mon%FF)) print*, 'jest MatFF!'
+   !open(newunit=iunit,file='cholvecs',form='unformatted')
+   !write(iunit) Mon%NChol
+   !write(iunit) Mon%FF
+   !close(iunit)
+
+   !call CIter_FOFO(PMat,ECorr,ACAlpha,XOne,URe,Mon%Occ,EGOne,NGOcc,&
+   !                Mon%IGem,Mon%NAct,Mon%INAct,Mon%NELE,NBas,NInte1, &
+   !                Mon%NDim,Mon%NGem,Mon%IndAux,Mon%IndN,Mon%IndX,Mon%NDimX,&
+   !                twojfile,twokfile)
+   !deallocate(Pmat)
 
    ! UNCOUPLED
 
