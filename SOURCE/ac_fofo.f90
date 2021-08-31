@@ -1,4 +1,4 @@
-subroutine WChol_FOFO(PMat,XOne,URe,Occ,EGOne,NGOcc,&
+subroutine Project_DChol(PMat,XOne,URe,Occ,EGOne,NGOcc,&
    IGem,NAct,INActive,NELE,NBasis,NInte1,NDim,NGem,IndAux,&
    IndN,IndX,NDimX)
 !
@@ -30,7 +30,6 @@ character(:),allocatable :: twojfile,twokfile,IntKFile
 logical :: AuxCoeff(3,3,3,3)
 double precision,allocatable :: work(:),ints(:,:)
 Real*8, Allocatable :: MatFF(:,:),work2(:,:),work3(:),work1(:,:),work4(:),work5(:,:),work6(:,:)
-integer,allocatable :: ipiv(:)
 integer :: NCholesky,lwork
 
 open(newunit=iunit,file='cholvecs',form='unformatted')
@@ -109,7 +108,172 @@ deallocate(MatFF)
 return
 
 deallocate(work1)
-end subroutine WChol_FOFO
+end subroutine Project_DChol
+
+subroutine WIter_DChol(ECorr,XOne,URe,Occ,EGOne,NGOcc,&
+   IGem,NAct,INActive,NELE,NBasis,NInte1,NDim,NGem,IndAux,&
+   IndN,IndX,NDimX)
+!
+!  AC energy cacluation using CHOLESKY VECTORS:
+!  (1) expanding AC integrand in alpha around alpha=0, up to Max_Cn order
+!  (2) finding C^(n)[omega] and (3) omega integration 
+!
+use abfofo
+
+implicit none
+
+integer,intent(in) :: NGOcc,NBasis,NInte1,NDim,NGem,NDimX
+integer,intent(in) :: NAct,INActive,NELE
+integer,intent(in) :: IndN(2,NDim),IndX(NDim),IndAux(NBasis),&
+                   IGem(NBasis)
+double precision :: ACAlpha
+double precision,intent(in) :: URe(NBasis,NBasis),Occ(NBasis),XONe(NInte1)
+double precision :: ECorr,ECorrAct,EGOne(NGem)
+
+double precision :: COM(NDimX*NDimX),XFreq(100),WFreq(100),&
+                 ABPLUS0(NDim*NDim),WORK0(NDim*NDim),ABPLUS1(NDim*NDim),WORK1(NDim*NDim),&
+                 A1(NDimX*NDimX),A2(NDimX*NDimX),&
+                 C0(NDimX*NDimX),C1(NDimX*NDimX),C2(NDimX*NDimX)
+
+integer :: iunit,NOccup
+integer :: ia,ib,ic,id,ICol,IRow
+integer :: i,j,k,l,kl,ip,iq,ir,is,ipq,irs
+integer :: pos(NBasis,NBasis),NGrid,N,IGL,inf1,inf2,Max_Cn
+double precision :: ECASSCF,PI,WFact,XFactorial,XN1,XN2,FF,CICoef(NBasis),Cpq,Crs,SumY,Aux,OmI
+character(:),allocatable :: twojfile,twokfile,IntKFile
+logical :: AuxCoeff(3,3,3,3)
+double precision,allocatable :: work(:),ints(:,:)
+
+double precision, allocatable :: DChol(:,:),DCholT(:,:),DCholAct(:,:),DCholActT(:,:),WorkD(:,:)
+double precision, allocatable :: APlusTilde(:), APlusTildeAct(:), COMTilde(:),COMTildeAct(:)
+integer :: NCholesky
+
+interface
+subroutine read_D_array(NCholesky, DChol, DCholAct, NDimX, NBasis, IndN, Occ, IndAux)
+   double precision, allocatable, intent(out) :: DChol(:,:), DCholAct(:,:)
+   integer :: NCholesky
+   integer, intent(in) :: NDimX, NBasis, IndN(2,NDimX), IndAux(NBasis)
+   double precision, intent(in) :: Occ(NBasis)
+end subroutine read_D_array
+end interface
+
+! Get DChol & DCholAct
+call read_D_array(NCholesky, DChol, DCholAct, NDimX, NBasis, IndN, Occ, IndAux)
+DCholT = transpose(DChol)
+DCholActT = transpose(DCholAct)
+! ==========================================================================  
+
+NGrid=20
+Max_Cn=5
+Write (6,'(/,X,''AC calculation through W_AC expansion around Alpha=0, Omega Grid = '',I3,&
+   '' and max order in C expansion = '',I3,/)') NGrid,Max_Cn
+
+NOccup = NAct + INActive
+PI = 4.0*ATAN(1.0)
+
+twojfile = 'FFOO'
+twokfile = 'FOFO'
+IntKFile = twokfile
+
+ACAlpha=0.D0
+call AB_CAS_FOFO(ABPLUS0,WORK0,ECASSCF,URe,Occ,XOne, &
+              IndN,IndX,IGem,NAct,INActive,NDimX,NBasis,NDimX,&
+              NInte1,twojfile,twokfile,ACAlpha,.false.)
+ACAlpha=1.D0
+call AB_CAS_FOFO(ABPLUS1,WORK1,ECASSCF,URe,Occ,XOne, &
+              IndN,IndX,IGem,NAct,INActive,NDimX,NBasis,NDimX,&
+              NInte1,twojfile,twokfile,ACAlpha,.false.)
+ABPLUS1=ABPLUS1-ABPLUS0
+WORK1=WORK1-WORK0
+EGOne(1)=ECASSCF
+
+!Calc: A1=ABPLUS0*ABMIN1+ABPLUS1*ABMIN0
+Call dgemm('N','N',NDimX,NDimX,NDimX,1d0,ABPLUS0,NDimX,WORK1,NDimX,0.0,A1,NDimX)
+Call dgemm('N','N',NDimX,NDimX,NDimX,1d0,ABPLUS1,NDimX,WORK0,NDimX,1d0,A1,NDimX)
+!Calc: A2=ABPLUS1*ABMIN1
+Call dgemm('N','N',NDimX,NDimX,NDimX,1d0,ABPLUS1,NDimX,WORK1,NDimX,0.0,A2,NDimX)
+
+Call FreqGrid(XFreq,WFreq,NGrid)
+
+! Calc: A0 and dump it
+Call AC0BLOCK(Occ,URe,XOne, &
+      IndN,IndX,IGem,NAct,INActive,NDimX,NBasis,NDimX,NInte1,'FFOO','FOFO')
+!
+COM=0.0
+Do IGL=1,NGrid
+   OmI=XFreq(IGL)
+
+!  Calc: WORK1=(A0+Om^2)^-1
+   Call READ_AC0BLK(OmI**2,WORK1,'A0BLK',NDimX)
+
+!  Calc: C0=1/2 Lambda.ABPLUS0
+   Call dgemm('N','N',NDimX,NDimX,NDimX,0.5d0,WORK1,NDimX,&
+              ABPLUS0,NDimX,0.0,C0,NDimX)
+!  Calc: WORK0=Lambda.A1
+   Call dgemm('N','N',NDimX,NDimX,NDimX,1d0,WORK1,NDimX,&
+              A1,NDimX,0.0,WORK0,NDimX)
+!  Calc: C1=1/2 Lambda.ABPLUS1-WORK0.C0
+   Call dgemm('N','N',NDimX,NDimX,NDimX,1d0,WORK0,NDimX,&
+              C0,NDimX,0.0,C1,NDimX)
+   Call dgemm('N','N',NDimX,NDimX,NDimX,0.5d0,WORK1,NDimX,&
+              ABPLUS1,NDimX,-1.d0,C1,NDimX)
+!  Calc: WORK1=LAMBDA*A2
+   Call dgemm('N','N',NDimX,NDimX,NDimX,1.d0,WORK1,NDimX,&
+              A2,NDimX,0.0,C2,NDimX)
+   WORK1=C2
+
+!  FROM NOW ON: Lambda.A2 in WORK1, Lambda.A1 in WORK0
+   WFact=4.D0/PI*WFreq(IGL)
+   COM=COM+WFact*0.5D0*C1
+
+   XFactorial=1
+   Do N=2,Max_Cn
+       XFactorial=XFactorial*N
+!  Calc: Cn
+       XN1=-N
+       XN2=-N*(N-1)
+       Call dgemm('N','N',NDimX,NDimX,NDimX,1d0,WORK0,NDimX,&
+                  C1,NDimX,0.0,C2,NDimX)
+       Call dgemm('N','N',NDimX,NDimX,NDimX,XN2,WORK1,NDimX,&
+                  C0,NDimX,XN1,C2,NDimX)
+       FF=WFact/XFactorial/(N+1)
+
+       COM=COM+FF*C2
+       C0=C1
+       C1=C2
+   EndDo
+EndDo
+
+! compute the AC energy from C(omega) and CActive(omega)
+allocate(COMTilde(NDimX*NCholesky),COMTildeAct(NDimX*NCholesky))
+COMTilde=0.0
+COMTildeAct=0.0
+Call dgemm('N','N',NDimX,NCholesky,NDimX,1d0,COM,NDimX,DCholT,NDimX,0.0,COMTilde,NDimX)
+Call dgemm('N','N',NDimX,NCholesky,NDimX,1d0,COM,NDimX,DCholActT,NDimX,0.0,COMTildeAct,NDimX)
+
+allocate(WorkD(NDimX,NCholesky))
+WorkD=0
+WorkD = RESHAPE(COMTilde, (/NDimX, NCholesky/))
+ECorr=0
+do j=1,NDimX
+   do i=1,NCholesky
+      ECorr=ECorr+DChol(i,j)*WorkD(j,i)
+   enddo
+enddo
+! active part of ecorr
+WorkD=0
+WorkD = RESHAPE(COMTildeAct, (/NDimX, NCholesky/))
+ECorrAct=0
+do j=1,NDimX
+   do i=1,NCholesky
+      ECorrAct=ECorrAct+DCholAct(i,j)*WorkD(j,i)
+   enddo
+enddo
+ECorr=ECorr-ECorrAct
+
+deallocate(WorkD,COMTilde,COMTildeAct)
+
+end subroutine WIter_DChol
 
 subroutine WIter_FOFO(ECorr,XOne,URe,Occ,EGOne,NGOcc,&
    IGem,NAct,INActive,NELE,NBasis,NInte1,NDim,NGem,IndAux,&
@@ -131,7 +295,7 @@ double precision :: ACAlpha
 double precision,intent(in) :: URe(NBasis,NBasis),Occ(NBasis),XONe(NInte1)
 double precision,intent(inout) :: ECorr,EGOne(NGem)
 
-double precision :: COM(NDimX*NDimX),ipiv(NDimX),XFreq(100),WFreq(100),&
+double precision :: COM(NDimX*NDimX),XFreq(100),WFreq(100),&
                  ABPLUS0(NDim*NDim),WORK0(NDim*NDim),ABPLUS1(NDim*NDim),WORK1(NDim*NDim),&
                  A1(NDimX*NDimX),A2(NDimX*NDimX),&
                  C0(NDimX*NDimX),C1(NDimX*NDimX),C2(NDimX*NDimX)
@@ -711,7 +875,12 @@ end subroutine CIter_FOFO_old
 !subroutine Eccor_iter()
 subroutine CIter_FOFO(PMat,ECorr,ACAlpha,XOne,URe,Occ,EGOne,NGOcc,&
    IGem,NAct,INActive,NELE,NBasis,NInte1,NDim,NGem,IndAux,IndN,IndX,NDimX)
-
+!
+!  to do: get rid of multiplication of NDimX.NDimX matrices
+!  reduce the number of matrices: do not keep A0, only diagonals of Lambda
+!  use an efficient algorithm (lower dimensional) to invert the matrix with PMat
+!  turn on projection if the reduction of the norm of A2 after projection is low enough
+!
    use abfofo
    use class_IterStats
    use class_CIntegrator
@@ -788,12 +957,12 @@ subroutine CIter_FOFO(PMat,ECorr,ACAlpha,XOne,URe,Occ,EGOne,NGOcc,&
    COMTildeAct=0.0
 
    ! Create iteration algorithm object
-   iterAlgo = IterAlgorithmDIIS(Threshold=1d-3, DIISN=16, maxIterations=30)
+   iterAlgo = IterAlgorithmDIIS(Threshold=1d-4, DIISN=6, maxIterations=30)
 !    iterAlgo = IterAlgorithmDamping(Threshold=1d-3, XMix=0.2, maxIterations=-1)
 
    ! Create A0 calculator object
-   lambdaCalc = LambdaCalculatorDiag()
-!    LambdaCalc = LambdaCalculatorBlock(URe,Occ,XOne,IndN,IndX,IGem,NBasis,NAct,INActive,NInte1,twojfile,twokfile)
+!   lambdaCalc = LambdaCalculatorDiag()
+    LambdaCalc = LambdaCalculatorBlock(URe,Occ,XOne,IndN,IndX,IGem,NBasis,NAct,INActive,NInte1,twojfile,twokfile)
 !    LambdaCalc = LambdaCalculatorProjector(PMat)
 
    NGrid = 35
