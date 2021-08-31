@@ -538,6 +538,7 @@ type(IterStats) :: iStatsA = IterStats()
 type(IterStats) :: iStatsB = IterStats()
 class(IterAlgorithmDIIS), allocatable, target    :: iterAlgo
 class(LambdaCalculatorDiag), allocatable, target :: LambdaCalc
+!class(LambdaCalculatorProjector), allocatable, target :: LambdaCalc
 
 ACAlpha = 1.0d0
 Pi = 4.0d0*atan(1.0)
