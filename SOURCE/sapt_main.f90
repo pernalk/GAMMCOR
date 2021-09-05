@@ -249,7 +249,8 @@ double precision,intent(inout) :: Tcpu,Twall
  call e2exind(Flags,SAPT%monA,SAPT%monB,SAPT)
  call e2disp_Chol(Flags,SAPT%monA,SAPT%monB,SAPT)
  !call e2disp_Cmat(Flags,SAPT%monA,SAPT%monB,SAPT)
- call e2disp_Cmat_Chol(Flags,SAPT%monA,SAPT%monB,SAPT)
+ !call e2disp_Cmat_Chol(Flags,SAPT%monA,SAPT%monB,SAPT)
+ call e2disp_Cmat_Chol_manual(Flags,SAPT%monA,SAPT%monB,SAPT)
  call e2exdisp(Flags,SAPT%monA,SAPT%monB,SAPT)
 
  call summary_sapt(SAPT)
@@ -3077,6 +3078,7 @@ character(:),allocatable :: onefile,twofile,propfile,rdmfile
 character(:),allocatable :: twojfile,twokfile
 character(:),allocatable :: propfile0,propfile1
 character(:),allocatable :: y01file,xy0file
+character(:),allocatable :: abpm0file
 character(:),allocatable :: abfile,testfile
 
 double precision,external  :: ddot
@@ -3085,6 +3087,9 @@ double precision,parameter :: SmallE=0d0,BigE=1.D20
 !! test Cmat
 !double precision :: EGOne,NGOcc
 !double precision,allocatable :: Pmat(:,:)
+integer :: nblk
+type(EblockData) :: A0blockIV
+type(EblockData),allocatable :: A0block(:)
 
 ! test iterative
  iter = 1
@@ -3100,6 +3105,7 @@ double precision,parameter :: SmallE=0d0,BigE=1.D20
     propfile1  = 'PROP_A1'
     y01file    = 'Y01_A'
     xy0file    = 'XY0_A'
+    abpm0file  = 'A0BLK_A'
     rdmfile    = 'rdm2_A.dat'
     abfile     = 'ABMAT_A'
     testfile   = 'TEST_A'
@@ -3113,6 +3119,7 @@ double precision,parameter :: SmallE=0d0,BigE=1.D20
     propfile1  = 'PROP_B1'
     y01file    = 'Y01_B'
     xy0file    = 'XY0_B'
+    abpm0file  = 'A0BLK_B'
     rdmfile    = 'rdm2_B.dat'
     abfile     = 'ABMAT_B'
     testfile   = 'TEST_B'
@@ -3435,7 +3442,6 @@ double precision,parameter :: SmallE=0d0,BigE=1.D20
    !ECorr = 0
    !allocate(Pmat(Mon%NDimX,Mon%NDimX))
 
-   !if(allocated(Mon%FF)) print*, 'jest MatFF!'
    !open(newunit=iunit,file='cholvecs',form='unformatted')
    !write(iunit) Mon%NChol
    !write(iunit) Mon%FF
@@ -3463,6 +3469,16 @@ double precision,parameter :: SmallE=0d0,BigE=1.D20
              y01file,xy0file,     &
              Mon%IndN,Mon%IndX,Mon%IGem,Mon%NAct,Mon%INAct,Mon%NDimX, &
              NBas,Mon%NDimX,NInte1,Mon%NoSt,twofile,twojfile,twokfile,Flags%IFlag0)
+
+   if(Flags%ICholesky==1) then
+      nblk = 1 + NBas - Mon%NAct
+      allocate(A0Block(nblk))
+      ! maybe just include blocks in Mon%...?
+      call AC0BLOCK(Mon%Occ,URe,XOne, &
+           Mon%IndN,Mon%IndX,Mon%IGem,Mon%NAct,Mon%INAct,Mon%NDimX, &
+           NBas,Mon%NDimX,NInte1,twojfile,twokfile, &
+           A0BlockIV,A0Block,nblk,abpm0file,1)
+   endif
    case(TWOMO_FFFF)
       call Y01CAS_mithap(Mon%Occ,URe,XOne,ABPlus,ABMin, &
              propfile0,propfile1, &

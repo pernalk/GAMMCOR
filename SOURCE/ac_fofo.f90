@@ -224,7 +224,7 @@ nblk = 1 + NBasis - NAct
 allocate(A0block(nblk))
 Call AC0BLOCK(Occ,URe,XOne, &
      IndN,IndX,IGem,NAct,INActive,NDimX,NBasis,NDimX,NInte1,'FFOO','FOFO', &
-     A0BlockIV,A0Block,nblk,0)
+     A0BlockIV,A0Block,nblk,'A0BLK',0)
 
 allocate(COMTilde(NDimX*NCholesky),COMTildeAct(NDimX*NCholesky))
 COMTilde=0.0
@@ -959,6 +959,8 @@ subroutine CIter_FOFO(PMat,ECorr,ACAlpha,XOne,URe,Occ,EGOne,NGOcc,&
    class(IterAlgorithm), allocatable, target :: iterAlgo
    class(LambdaCalculator), allocatable, target :: lambdaCalc
 
+   integer :: nblk
+
    interface
    subroutine read_D_array(NCholesky, DChol, DCholAct, NDimX, NBasis, IndN, Occ, IndAux)
       double precision, allocatable, intent(out) :: DChol(:,:), DCholAct(:,:)
@@ -1092,7 +1094,7 @@ end subroutine read_D_array
 
 subroutine AC0BLOCK(Occ,URe,XOne, &
                     IndN,IndX,IGemIN,NAct,INActive,NDimX,NBasis,NDim,NInte1, &
-                    IntJFile,IntKFile,A0BlockIV,A0block,nblk,dump)
+                    IntJFile,IntKFile,A0BlockIV,A0block,nblk,dumpfile,dump)
 !
 !     A ROUTINE FOR COMPUTING A0=ABPLUS^{(0)}.ABMIN^{(0)}
 !                 (FOFO VERSION)
@@ -1107,6 +1109,7 @@ integer,intent(in)           :: IndN(2,NDim),IndX(NDim),IGemIN(NBasis)
 integer                      :: nblk
 double precision,intent(in)  :: URe(NBasis,NBasis),Occ(NBasis),XOne(NInte1)
 character(*)                 :: IntJFile,IntKFile
+character(*)                 :: dumpfile
 integer,intent(in)           :: dump
 
 integer          :: iunit
@@ -1214,7 +1217,7 @@ end associate
 
 if(dump==1) then
   ! dump to file
-  open(newunit=iunit,file='A0BLK',form='unformatted')
+  open(newunit=iunit,file=dumpfile,form='unformatted')
   write(iunit) nblk
   do iblk=1,nblk
      associate(B => A0Block(iblk))

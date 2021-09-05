@@ -511,7 +511,6 @@ type(SystemBlock) :: A, B
 type(SaptData)    :: SAPT
 
 integer :: NBas
-integer :: dimOA,dimVA,dimOB,dimVB,nOVA,nOVB
 integer :: ifreq,NFreq,NCholesky
 integer :: i,j,ipq,irs
 integer :: ip,iq,ir,is
@@ -545,12 +544,6 @@ Pi = 4.0d0*atan(1.0)
 
 ! set dimensions
 NCholesky = SAPT%NCholesky
-dimOA = A%num0+A%num1
-dimOB = B%num0+B%num1
-dimVA = A%num1+A%num2
-dimVB = B%num1+B%num2
-nOVA  = dimOA*dimVA
-nOVB  = dimOB*dimVB
 
 ! check MCBS/DCBS
 if(A%NBasis.ne.B%NBasis) then
@@ -690,6 +683,183 @@ deallocate(CB,CA,A0B,A0A)
 deallocate(CTildeB,CTildeA)
 
 end subroutine e2disp_Cmat_Chol
+
+subroutine e2disp_Cmat_Chol_manual(Flags,A,B,SAPT)
+
+use class_IterStats
+
+implicit none
+
+type(FlagsData)   :: Flags
+type(SystemBlock) :: A, B
+type(SaptData)    :: SAPT
+
+integer :: NBas
+integer :: ifreq,NFreq,NCholesky
+integer :: i,j,ipq,irs
+integer :: ip,iq,ir,is
+integer :: iunit,info
+integer :: n,nblkA,nblkB
+integer :: maxIter
+double precision :: fact,val
+double precision :: Cpq,Crs
+double precision :: ACAlpha,OmI,Pi,e2d
+
+double precision,allocatable :: XFreq(:),WFreq(:)
+double precision,allocatable :: ABPMA(:,:),ABPMB(:,:),&
+                                ABPLUSA(:,:),ABPLUSB(:,:),&
+                                ABPTildeA(:,:),ABPTildeB(:,:)
+double precision,allocatable :: DCholA(:,:),DCholB(:,:)
+double precision,allocatable :: CA(:,:),CB(:,:)
+double precision,allocatable :: CTildeA(:,:),CTildeB(:,:)
+double precision,allocatable :: work(:,:)
+double precision,allocatable :: WorkA(:,:)
+
+type(EBlockData)             :: A0BlkIVA,A0BlkIVB
+type(EBlockData),allocatable :: A0BlkA(:),A0BlkB(:)
+type(EBlockData)             :: LambdaIVA,LambdaIVB
+type(EBlockData),allocatable :: LambdaA(:),LambdaB(:)
+
+type(IterStats) :: iStatsA = IterStats()
+type(IterStats) :: iStatsB = IterStats()
+
+ACAlpha = 1.0d0
+Pi = 4.0d0*atan(1.0)
+
+! set dimensions
+NCholesky = SAPT%NCholesky
+
+! check MCBS/DCBS
+if(A%NBasis.ne.B%NBasis) then
+   write(LOUT,'(1x,a)') 'ERROR! MCBS not implemented in SAPT!'
+   stop
+else
+   NBas = A%NBasis
+endif
+
+! get Dmat
+allocate(DCholA(NCholesky,A%NDimX),DCholB(NCholesky,B%NDimX))
+
+DCholA = 0
+do j=1,A%NDimX
+   ip = A%IndN(1,j)
+   iq = A%IndN(2,j)
+   ipq = iq + (ip-1)*NBas
+   Cpq = A%CICoef(ip) + A%CICoef(iq)
+   do i=1,NCholesky
+      DCholA(i,j) = Cpq*A%FF(i,ipq)
+   enddo
+enddo
+DCholB = 0
+do j=1,B%NDimX
+   ir = B%IndN(1,j)
+   is = B%IndN(2,j)
+   irs = is + (ir-1)*NBas
+   Crs = B%CICoef(ir) + B%CICoef(is)
+   do i=1,NCholesky
+      DCholB(i,j) = Crs*B%FF(i,irs)
+   enddo
+enddo
+
+! monomer A
+allocate(ABPMA(A%NDimX,A%NDimX),ABPTildeA(A%NDimX,NCholesky))
+allocate(ABPLUSA(A%NDimX,A%NDimX),work(A%NDimX,A%NDimX))
+
+open(newunit=iunit,file='ABMAT_A',status='OLD',&
+     access='SEQUENTIAL',form='UNFORMATTED')
+
+read(iunit) ABPLUSA
+read(iunit) work
+
+close(iunit)
+call dgemm('N','N',A%NDimX,A%NDimX,A%NDimX,1d0,ABPLUSA,A%NDimX,work,A%NDimX,0d0,ABPMA,A%NDimX)
+call dgemm('N','T',A%NDimX,NCholesky,A%NDimX,1d0,ABPLUSA,A%NDimX,DCholA,NCholesky,0.0,ABPTildeA,A%NDimX)
+
+deallocate(ABPLUSA,work)
+
+! monomer B
+allocate(ABPMB(B%NDimX,B%NDimX),ABPTildeB(B%NDimX,NCholesky))
+allocate(ABPLUSB(B%NDimX,B%NDimX),work(B%NDimX,B%NDimX))
+
+open(newunit=iunit,file='ABMAT_B',status='OLD',&
+     access='SEQUENTIAL',form='UNFORMATTED')
+
+read(iunit) ABPLUSB
+read(iunit) work
+
+close(iunit)
+call dgemm('N','N',B%NDimX,B%NDimX,B%NDimX,1d0,ABPLUSB,B%NDimX,work,B%NDimX,0d0,ABPMB,B%NDimX)
+call dgemm('N','T',B%NDimX,NCholesky,B%NDimX,1d0,ABPLUSB,B%NDimX,DCholB,NCholesky,0.0,ABPTildeB,B%NDimX)
+
+deallocate(ABPLUSB,work)
+
+! get CTilde in an iterative manner
+NFreq = 18
+allocate(XFreq(NFreq),WFreq(NFreq))
+allocate(CTildeA(A%NDimX,NCholesky),CTildeB(B%NDimX,NCholesky))
+allocate(CA(NCholesky,NCholesky),CB(NCholesky,NCholesky))
+
+call FreqGrid(XFreq,WFreq,NFreq)
+
+! get A2 = ABPM - ABPM0
+call calculateInitialA(ABPMA,A0BlkA,A0BlkIVA,nblkA,A%NDimX,'A0BLK_A')
+call calculateInitialA(ABPMB,A0BlkB,A0BlkIVB,nblkB,B%NDimX,'A0BLK_B')
+
+maxIter = 20
+iStatsA%maxIterationsLimit = maxIter
+iStatsB%maxIterationsLimit = maxIter
+
+e2d = 0
+do ifreq=NFreq,1,-1
+
+   OmI = XFreq(ifreq)
+
+   call calculateLambda(LambdaA,LambdaIVA,OmI**2,A%NDimX,nblkA,A0BlkA,A0BlkIVA)
+   call calculateLambda(LambdaB,LambdaIVB,OmI**2,B%NDimX,nblkA,A0BlkB,A0BlkIVB)
+
+   !if(ifreq==NFreq) call dgemm('N','N',A%NDimX,NCholesky,A%NDimX,1.d0,WorkA,A%NDimX,ABPTildeA,A%NDimX,0.0d0,CTildeA,A%NDimX)
+   if(ifreq==NFreq) call ABPM_HALFTRAN_LR(ABPTildeA,CTildeA,LambdaA,LambdaIVA,nblkA,A%NDimX,NCholesky,0)
+   call Cmat_iterDIIS(CTildeA,A%NDimX,NCholesky,nblkA,LambdaA,LambdaIVA,ABPTildeA,ABPMA,iStatsA)
+   call iStatsA%setFreq(OmI)
+
+   if(ifreq==NFreq) call ABPM_HALFTRAN_LR(ABPTildeB,CTildeB,LambdaB,LambdaIVB,nblkB,B%NDimX,NCholesky,0)
+   call Cmat_iterDIIS(CTildeB,B%NDimX,NCholesky,nblkB,LambdaB,LambdaIVB,ABPTildeB,ABPMB,iStatsB)
+   call iStatsB%setFreq(OmI)
+
+   call dgemm('N','N',NCholesky,NCholesky,A%NDimX,1d0,DCholA,NCholesky,CTildeA,A%NDimX,0d0,CA,NCholesky)
+   call dgemm('N','N',NCholesky,NCholesky,B%NDimX,1d0,DCholB,NCholesky,CTildeB,B%NDimX,0d0,CB,NCholesky)
+
+   val = 0
+   do j=1,NCholesky
+      do i=1,NCholesky
+         val = val + CA(j,i)*CB(i,j)
+      enddo
+   enddo
+
+   e2d = e2d + WFreq(ifreq)*val
+
+   call release_ac0block(LambdaA,LambdaIVA,nblkA)
+   call release_ac0block(LambdaB,LambdaIVB,nblkB)
+
+enddo
+
+write(lout,'(/1x,a)') 'C(omega): Monomer A'
+call iStatsA%print()
+write(lout,'(1x,a)') 'C(omega): Monomer B'
+call iStatsB%print()
+
+e2d = -8d0/Pi*e2d*1d3
+!print*, 'E2disp(Cmat)',e2d
+call print_en('E2disp(Cmat)',e2d,.false.)
+
+deallocate(CB,CA)
+deallocate(CTildeB,CTildeA)
+deallocate(WFreq,XFreq)
+deallocate(DCholB,DCholA)
+deallocate(ABPMB,ABPMA)
+deallocate(ABPTildeB,ABPTildeA)
+
+end subroutine e2disp_Cmat_Chol_manual
 
 subroutine get_Cmat(Cmat,CICoef,IndN,ABPM,ABPLUS,Omega,NDimX,NBas)
 implicit none

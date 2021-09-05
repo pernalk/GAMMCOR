@@ -39,6 +39,37 @@ close(iunit)
 
 end subroutine read_SBlock
 
+subroutine read_ABPM0Block(A0Block,A0BlockIV,nblk,abpm0file)
+implicit none
+
+type(EBlockData)             :: A0BlockIV
+type(EBlockData),allocatable :: A0Block(:)
+integer,intent(out)          :: nblk
+character(*),intent(in)      :: abpm0file
+
+integer                      :: iunit,i,ival,iblk
+
+! read ABPM0 = ABPLUS0.ABMIN0
+open(newunit=iunit,file=abpm0file,status='OLD',&
+     form='UNFORMATTED')
+read(iunit) nblk
+allocate(A0Block(nblk))
+do iblk=1,nblk
+   associate(A => A0Block(iblk))
+     read(iunit) i, A%n, A%l1, A%l2
+     allocate(A%pos(A%n),A%matX(A%n,A%n))
+     read(iunit) A%pos,A%matX
+   end associate
+enddo
+associate(A => A0BlockIV)
+  read(iunit) A%n,A%l1,A%l2
+  allocate(A%pos(A%n),A%vec(A%n))
+  read(iunit) A%pos,A%vec
+end associate
+close(iunit)
+
+end subroutine read_ABPM0Block
+
 subroutine create_Y0tilde(Y01Block,SBlock,SBlockIV,Eig,CICoef,IndN,nblk,NBasis,NDimX)
 implicit none
 
@@ -149,7 +180,7 @@ integer                      :: i,ii,ip,iq,iblk,nblk,ipos
 double precision             :: valX,valY
 type(EblockData),allocatable :: SBlock(:)
 type(EblockData)             :: SBlockIV
-double precision,parameter   :: fac = 1d0/sqrt(2d0) 
+double precision,parameter   :: fac = 1d0/sqrt(2d0)
 
 ! read SBLOCK
 open(newunit=iunit,file=xy0file,status='OLD',&
@@ -215,7 +246,7 @@ do iblk=1,nblk
      deallocate(B%pos)
    end associate
 enddo
-! deallocate IV blocks 
+! deallocate IV blocks
 associate(B => SblockIV)
   deallocate(B%vec)
   deallocate(B%pos)
@@ -297,8 +328,8 @@ double precision,parameter :: ThrDIIS = 1.d-8
 
  allocate(WxYY(NBas,NBas))
  allocate(wVecxYY(M%NDimX))
- call tran2MO(WPot,M%CMO,M%CMO,WxYY,NBas) 
- wVecxYY = 0 
+ call tran2MO(WPot,M%CMO,M%CMO,WxYY,NBas)
+ wVecxYY = 0
  do pq=1,M%NDimX
     ip = M%IndN(1,pq)
     iq = M%IndN(2,pq)
@@ -561,7 +592,7 @@ double precision,intent(out) :: Alpha(Mon%NDimX,Mon%NDimX)
 double precision :: frac
 integer :: pq,rs,t,ip,iq,ir,is
 double precision,parameter :: SmallE = 1.D-3
-double precision,parameter :: BigE = 1.D8 
+double precision,parameter :: BigE = 1.D8
 
  Alpha = 0
  do t=1,Mon%NDimX
@@ -584,9 +615,9 @@ double precision,parameter :: BigE = 1.D8
 
           Alpha(pq,rs) = Alpha(pq,rs) + &
                        (Mon%CICoef(iq)+Mon%CICoef(ip)) * &
-                       (Mon%CICoef(is)+Mon%CICoef(ir)) * & 
+                       (Mon%CICoef(is)+Mon%CICoef(ir)) * &
                        EVec(pq,t)*EVec(rs,t)*frac
-          Alpha(rs,pq) = Alpha(pq,rs)                
+          Alpha(rs,pq) = Alpha(pq,rs)
 
        enddo
     enddo
@@ -635,9 +666,9 @@ double precision,parameter :: SmallE = 1.d-6
 
              Alpha(pq,rs) = Alpha(pq,rs) + &
                           (Mon%CICoef(iq)+Mon%CICoef(ip)) * &
-                          (Mon%CICoef(is)+Mon%CICoef(ir)) * & 
+                          (Mon%CICoef(is)+Mon%CICoef(ir)) * &
                           EVec(pq,t)*EVec(rs,t)*frac
-             Alpha(rs,pq) = Alpha(pq,rs)                
+             Alpha(rs,pq) = Alpha(pq,rs)
 
           enddo
        enddo
@@ -645,72 +676,72 @@ double precision,parameter :: SmallE = 1.d-6
  enddo
 
 ! p>q,r=s
-! 
+!
   do t=1,NDimEx
  !   if(imag) then
  !      v=4d0*omega(p)/(freq**2+omega(p)**2)
  !   else
 !      v=4d0*omega(p)/(-freq**2+omega(p)**2)
  !   end if
- 
+
      if(EVal(t).gt.SmallE.and.EVal(t).lt.1d20) then
         frac = 8d0*EVal(t)/(EVal(t)**2+freq)
- 
+
         do pq=1,Mon%NDimX
            ip = Mon%IndN(1,pq)
            iq = Mon%IndN(2,pq)
            do ir=1,Mon%NDimN
- 
+
 !              Alpha(pq,ir) = Alpha(pq,ir) + &
 !                           (Mon%CICoef(iq)+Mon%CICoef(ip)) * &
-!                          Mon%CICoef(ir) * & 
+!                          Mon%CICoef(ir) * &
 !                           EVec(pq,t)*EVec(2*Mon%NDimX+ir,t)*frac
-!              Alpha(ir,pq) = Alpha(pq,ir)                
+!              Alpha(ir,pq) = Alpha(pq,ir)
 
               Alpha(pq,Mon%NDimX+ir) = Alpha(pq,Mon%NDimX+ir) + &
                            (Mon%CICoef(iq)+Mon%CICoef(ip)) * &
-                           Mon%CICoef(ir) * & 
+                           Mon%CICoef(ir) * &
                            !EVec(pq,t)*EVec(2*Mon%NDimX+ir,t)*frac
                            EVec(pq,t)*EVec(Mon%NDimX+ir,t)*frac
-              Alpha(Mon%NDimX+ir,pq) = Alpha(pq,Mon%NDimX+ir)                
- 
+              Alpha(Mon%NDimX+ir,pq) = Alpha(pq,Mon%NDimX+ir)
+
            enddo
         enddo
- 
+
      endif
   enddo
- 
+
  print*, 'aaa?',2*Mon%NDimX+Mon%NDimN,NDimEx
 
  ! p=q,r=s
   do t=1,NDimEx
- 
+
  !   if(imag) then
  !      v=4d0*omega(p)/(freq**2+omega(p)**2)
  !   else
  !      v=4d0*omega(p)/(-freq**2+omega(p)**2)
  !   end if
- 
+
      if(EVal(t).gt.SmallE.and.EVal(t).lt.1d20) then
         frac = 8d0*EVal(t)/(EVal(t)**2+freq)
- 
+
         do ip=1,Mon%NDimN
            do ir=1,ip !Mon%NDimN
- 
+
 !              Alpha(ip,ir) = Alpha(ip,ir) + &
 !                           Mon%CICoef(ip) * &
-!                           Mon%CICoef(ir) * & 
+!                           Mon%CICoef(ir) * &
 !                           EVec(2*Mon%NDimX+ip,t)*EVec(2*Mon%NDimX+ir,t)*frac
 !              Alpha(ir,ip) = Alpha(ip,ir)
 
               Alpha(Mon%NDimX+ip,Mon%NDimX+ir) = Alpha(Mon%NDimX+ip,Mon%NDimX+ir) + &
                            Mon%CICoef(ip) * &
-                           Mon%CICoef(ir) * & 
+                           Mon%CICoef(ir) * &
                            !EVec(2*Mon%NDimX+ip,t)*EVec(2*Mon%NDimX+ir,t)*frac
                            EVec(Mon%NDimX+ip,t)*EVec(Mon%NDimX+ir,t)*frac
               Alpha(Mon%NDimX+ir,Mon%NDimX+ip) = Alpha(Mon%NDimX+ip,Mon%NDimX+ir)
 
- 
+
            enddo
         enddo
      endif
@@ -743,7 +774,7 @@ double precision,parameter :: SmallE = 1.d-6, BigE = 1.d20
  !coef = 2
 
  allocate(VecEx(NDimEx**2),MIndEx(2,NDimEx))
- 
+
  MIndEx = Mon%IndNx
 
  VecEx = 0
@@ -759,7 +790,7 @@ double precision,parameter :: SmallE = 1.d-6, BigE = 1.d20
            VecEx((i-1)*coef*NDimEx+pq) = fact * &
                                           EVec((i-1)*coef*NDimEx+pq)
         enddo
- 
+
     elseif(pq>Mon%NDimX) then
 
         ir = pq - Mon%NDimX
@@ -791,7 +822,7 @@ double precision,parameter :: SmallE = 1.d-6, BigE = 1.d20
                           !EVec(pq,t)*EVec(rs,t)*frac
                           !VecEx((pq-1)*coef*NDimEx+t)*VecEx((rs-1)*coef*NDimEx+t)*frac
                           frac*VecEx((t-1)*coef*NDimEx+pq)*VecEx((t-1)*coef*NDimEx+rs)
-             !Alpha(rs,pq) = Alpha(pq,rs) 
+             !Alpha(rs,pq) = Alpha(pq,rs)
 
           enddo
        enddo
@@ -804,6 +835,239 @@ deallocate(MIndEx)
 deallocate(VecEx)
 
 end subroutine calc_resp_apsg2
+
+subroutine calculateInitialA(A2,A0Blk,A0BlkIV,nblk,NDimX,abpm0file)
+! a) read ABPM0 blocks from file
+! b) calculate A2 = ABPM - ABPM0
+implicit none
+
+integer,intent(in)  :: NDimX
+integer,intent(out) :: nblk
+character(*)        :: abpm0file
+double precision    :: A2(NDimX,NDimX)
+type(EblockData)    :: A0BlkIV
+type(EblockData),allocatable :: A0Blk(:)
+
+integer :: i,j,ipos,jpos,iblk,ii
+! test
+double precision,allocatable :: A0(:,:)
+
+call read_ABPM0Block(A0Blk,A0BlkIV,nblk,abpm0file)
+
+!allocate(A0(NDimX,NDimX))
+!A0 = 0
+do iblk=1,nblk
+   associate(B => A0Blk(iblk))
+
+     ! A2 = ABPM - A0PM
+     do j=1,B%n
+        jpos=B%pos(j)
+        do i=1,B%n
+           ipos=B%pos(i)
+           A2(ipos,jpos) = A2(ipos,jpos) - B%matX(i,j)
+           !A0(ipos,jpos) = B%matX(i,j)
+        enddo
+     enddo
+
+   end associate
+enddo
+!IV block
+associate(B => A0BlkIV)
+  do i=1,B%n
+     ii = B%pos(i)
+     A2(ii,ii) = A2(ii,ii) - B%vec(i)
+     !A0(ii,ii) = B%vec(i)
+  enddo
+end associate
+
+!print*, 'test: A0',norm2(A0)
+!deallocate(A0)
+
+end subroutine calculateInitialA
+
+subroutine calculateLambda(Lambda,LambdaIV,omega,NDimX,nblk,A0Blk,A0BlkIV)
+! calculate Lambda by inversion of blocks ABPM0 blocks
+! Lambda = (A0+omega^2)-1
+implicit none
+
+integer,intent(in)  :: NDimX,nblk
+double precision,intent(in) :: omega
+type(EblockData)    :: A0Blk(nblk),A0BlkIV
+type(EblockData),allocatable :: Lambda(:)
+type(EblockData)             :: LambdaIV
+
+integer :: i,ii,j,ipos,jpos,iblk
+integer :: info
+integer,allocatable :: ipiv(:)
+double precision,allocatable :: work(:)
+! for testing full Lambda
+double precision,allocatable :: A0Inv(:,:)
+
+!allocate(A0Inv(NDimX,NDimX))
+!A0Inv=0
+
+Lambda = A0Blk
+do iblk=1,nblk
+   associate(B => Lambda(iblk), A => A0Blk(iblk))
+
+     allocate(ipiv(B%n),work(B%n))
+
+     do i=1,B%n
+        B%matX(i,i) = B%matX(i,i) + omega
+     enddo
+
+     call dgetrf(B%n,B%n,B%matX,B%n,ipiv,info)
+     call dgetri(B%n,B%matX,B%n,ipiv,work,B%n,info)
+
+     !! test Lambda
+     !do j=1,B%n
+     !   jpos=B%pos(j)
+     !   do i=1,B%n
+     !      ipos=B%pos(i)
+     !      A0Inv(ipos,jpos) = B%matX(i,j)
+     !   enddo
+     !enddo
+
+     deallocate(work,ipiv)
+
+   end associate
+enddo
+
+! IV block
+associate(B => A0blkIV, A => LambdaIV)
+  A%n = B%n
+  A%l1 = B%l1
+  A%l2 = B%l2
+  allocate(A%pos(A%n),A%vec(A%n))
+  A%pos = B%pos
+  do i=1,B%n
+     ii = B%pos(i)
+     A%vec(i) = 1d0 / (B%vec(i) + omega)
+     !A0Inv(ii,ii) = 1d0 / (B%vec(i) + omega)
+  enddo
+end associate
+
+!print*, 'test2-2:',norm2(A0Inv)
+!deallocate(A0Inv)
+
+end subroutine calculateLambda
+
+subroutine Cmat_iterDIIS(CTilde,NDimX,NCholesky,nblk,Lambda,LambdaIV,ABPTilde,A2,iStats)
+use diis
+use class_IterStats
+implicit none
+
+type(SaptDIIS) :: SAPT_DIIS
+type(DIISData) :: DIISBlock
+
+type(EblockData)                :: Lambda(nblk),LambdaIV
+class(IterStats), intent(inout) :: iStats
+integer,intent(in) :: nblk,NDimX,NCholesky
+double precision, intent(in)  :: A2(NDimX,NDimX), ABPTilde(NDimX,NCholesky)
+double precision, intent(out) :: CTilde(NDimX,NCholesky)
+! for testing full Lambda (passed a work)
+!double precision, intent(in)  :: work(NDimX,NDimX)
+
+integer :: N
+double precision :: A2CTilde(NDimX,NCholesky), CTilde_prev(NDimX,NCholesky)
+double precision :: norm
+double precision :: Thresh
+
+!print*, 'SAPTDiis: test'
+!print*, 'DIISN',SAPT_DIIS%DIISN
+!print*, 'DIISON',SAPT_DIIS%DIISOn
+!print*, 'maxIter',SAPT_DIIS%maxIter
+!print*, 'Thresh',SAPT_DIIS%Threshold
+
+call init_DIIS(DIISBlock,NDimX*NCholesky,NDimX*NCholesky,SAPT_DIIS%DIISN)
+
+CTilde_prev = 0.0d0
+N = 1
+
+do
+   call dgemm('N','N',NDimX,NCholesky,NDimX,1.0d0,A2,NDimX,CTilde,NDimX,0.0d0,A2CTilde,NDimX)
+   A2CTilde = ABPTilde - A2CTilde
+
+   ! with full Lambda(=work)
+   !call dgemm('N','N',NDimX,NCholesky,NDimX,1.0d0,work,NDimX,A2CTilde,NDimX,0.0d0,CTilde,NDimX)
+   call ABPM_HALFTRAN_LR(A2CTilde,CTilde,Lambda,LambdaIV,nblk,NDimX,NCholesky,0)
+
+   if(N > SAPT_DIIS%DIISOn ) then
+       call use_DIIS(DIISBlock, CTilde, CTilde - CTilde_prev)
+   endif
+
+   norm = norm2(CTilde - CTilde_prev)
+   !print '(a, i3, a, e)', "norm (", N, ") = ", norm
+
+   if ((norm < SAPT_DIIS%Thresh) .or. (N .ge. SAPT_DIIS%maxIter .and. SAPT_DIIS%maxIter .ge. 0)) then
+       call iStats%addN(N)
+       exit
+   endif
+
+   CTilde_prev = CTilde
+   N = N + 1
+
+enddo
+
+call free_DIIS(DIISBlock)
+
+end subroutine Cmat_iterDIIS
+
+subroutine ABPM_HALFTRAN_LR(AMAT,AOUT,EBlock,EBlockIV,nblk,DimL,DimR,isMatY)
+implicit none
+
+integer,intent(in) :: nblk,DimL,DimR
+integer,intent(in) :: isMatY
+double precision,intent(in)    :: AMAT(DimL,DimR)
+double precision,intent(inout) :: AOUT(DimL,DimR)
+
+type(EBlockData),intent(in) :: EBlock(nblk),EBlockIV
+
+integer :: i,ii,ipos,iblk
+double precision,allocatable :: ABP(:,:),ABM(:,:)
+
+AOUT=0
+
+do iblk=1,nblk
+   associate(iB => Eblock(iblk))
+
+     allocate(ABP(iB%n,DimR),ABM(iB%n,DimR))
+
+     do i=1,iB%n
+        ipos = iB%pos(i)
+        ABP(i,:) = AMAT(ipos,:)
+     enddo
+
+     if(isMatY==1) then
+       call dgemm('N','N',iB%n,DimR,iB%n,1d0,iB%matY,iB%n,ABP,iB%n,0d0,ABM,iB%n)
+     elseif(isMatY==0) then
+       call dgemm('N','N',iB%n,DimR,iB%n,1d0,iB%matX,iB%n,ABP,iB%n,0d0,ABM,iB%n)
+     else
+       write(lout,'(a)') 'Error in ABPM_HALFTRAN_LR!'
+       stop
+     endif
+
+     do i=1,iB%n
+        ipos = iB%pos(i)
+        AOUT(ipos,:) = ABM(i,:)
+     enddo
+
+     deallocate(ABM,ABP)
+
+   end associate
+enddo
+
+associate(B => EblockIV)
+
+  do i=1,B%n
+     ii = B%l1+i-1
+     ipos = B%pos(i)
+     AOUT(ipos,:) = B%vec(i)*AMAT(ipos,:)
+  enddo
+
+end associate
+
+end subroutine ABPM_HALFTRAN_LR
 
 subroutine print_en(string,val,nline)
 implicit none
