@@ -1013,62 +1013,6 @@ call free_DIIS(DIISBlock)
 
 end subroutine Cmat_iterDIIS
 
-subroutine ABPM_HALFTRAN_LR(AMAT,AOUT,EBlock,EBlockIV,nblk,DimL,DimR,isMatY)
-implicit none
-
-integer,intent(in) :: nblk,DimL,DimR
-integer,intent(in) :: isMatY
-double precision,intent(in)    :: AMAT(DimL,DimR)
-double precision,intent(inout) :: AOUT(DimL,DimR)
-
-type(EBlockData),intent(in) :: EBlock(nblk),EBlockIV
-
-integer :: i,ii,ipos,iblk
-double precision,allocatable :: ABP(:,:),ABM(:,:)
-
-AOUT=0
-
-do iblk=1,nblk
-   associate(iB => Eblock(iblk))
-
-     allocate(ABP(iB%n,DimR),ABM(iB%n,DimR))
-
-     do i=1,iB%n
-        ipos = iB%pos(i)
-        ABP(i,:) = AMAT(ipos,:)
-     enddo
-
-     if(isMatY==1) then
-       call dgemm('N','N',iB%n,DimR,iB%n,1d0,iB%matY,iB%n,ABP,iB%n,0d0,ABM,iB%n)
-     elseif(isMatY==0) then
-       call dgemm('N','N',iB%n,DimR,iB%n,1d0,iB%matX,iB%n,ABP,iB%n,0d0,ABM,iB%n)
-     else
-       write(lout,'(a)') 'Error in ABPM_HALFTRAN_LR!'
-       stop
-     endif
-
-     do i=1,iB%n
-        ipos = iB%pos(i)
-        AOUT(ipos,:) = ABM(i,:)
-     enddo
-
-     deallocate(ABM,ABP)
-
-   end associate
-enddo
-
-associate(B => EblockIV)
-
-  do i=1,B%n
-     ii = B%l1+i-1
-     ipos = B%pos(i)
-     AOUT(ipos,:) = B%vec(i)*AMAT(ipos,:)
-  enddo
-
-end associate
-
-end subroutine ABPM_HALFTRAN_LR
-
 subroutine print_en(string,val,nline)
 implicit none
 
@@ -1083,6 +1027,5 @@ else
 endif
 
 end subroutine print_en
-
 
 end module sapt_utils

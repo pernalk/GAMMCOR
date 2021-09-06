@@ -648,7 +648,7 @@ integer :: ip,iq,ir,is,pq,rs
 
 end subroutine read4_gen
 
-subroutine abpm_tran(AMAT,AOUT,EBlock,EBlockIV,nblk,NDimX,isPl)
+subroutine ABPM_TRAN(AMAT,AOUT,EBlock,EBlockIV,nblk,NDimX,isPl)
 implicit none
 
 integer,intent(in) :: nblk,NDimX
@@ -757,9 +757,9 @@ associate(B => EblockIV)
 
 end associate
 
-end subroutine abpm_tran
+end subroutine ABPM_TRAN
 
-subroutine abpm_dgemv_gen(AMAT,AOUT,EBlock,EBlockIV,&
+subroutine ABPM_DGEMV_GEN(AMAT,AOUT,EBlock,EBlockIV,&
                          nblk,NDimX,xyvar)
 implicit none
 
@@ -830,9 +830,9 @@ associate(A => EblockIV)
   endif
 end associate
 
-end subroutine abpm_dgemv_gen
+end subroutine ABPM_DGEMV_GEN
 
-subroutine abpm_tran_gen(AMAT,AOUT,EBlockA,EBlockAIV,EBlockB,EBlockBIV,&
+subroutine ABPM_TRAN_GEN(AMAT,AOUT,EBlockA,EBlockAIV,EBlockB,EBlockBIV,&
                          nblkA,nblkB,ANDimX,BNDimX,xyvar)
 implicit none
 
@@ -1043,7 +1043,65 @@ associate(A => EblockAIV,&
 
 end associate
 
-end subroutine abpm_tran_gen
+end subroutine ABPM_TRAN_GEN
+
+subroutine ABPM_HALFTRAN_LR(AMAT,AOUT,EBlock,EBlockIV,nblk,DimL,DimR,isMatY)
+implicit none
+
+integer,intent(in) :: nblk,DimL,DimR
+integer,intent(in) :: isMatY
+double precision,intent(in)    :: AMAT(DimL,DimR)
+double precision,intent(inout) :: AOUT(DimL,DimR)
+
+type(EBlockData),intent(in) :: EBlock(nblk),EBlockIV
+
+integer :: i,ii,ipos,iblk
+double precision,allocatable :: ABP(:,:),ABM(:,:)
+
+AOUT=0
+
+do iblk=1,nblk
+   associate(iB => Eblock(iblk))
+
+     allocate(ABP(iB%n,DimR),ABM(iB%n,DimR))
+
+     do i=1,iB%n
+        ipos = iB%pos(i)
+        ABP(i,:) = AMAT(ipos,:)
+     enddo
+
+     if(isMatY==1) then
+       call dgemm('N','N',iB%n,DimR,iB%n,1d0,iB%matY,iB%n,ABP,iB%n,0d0,ABM,iB%n)
+     elseif(isMatY==0) then
+       call dgemm('N','N',iB%n,DimR,iB%n,1d0,iB%matX,iB%n,ABP,iB%n,0d0,ABM,iB%n)
+     else
+       write(lout,'(a)') 'Error in ABPM_HALFTRAN_LR!'
+       stop
+     endif
+
+     do i=1,iB%n
+        ipos = iB%pos(i)
+        AOUT(ipos,:) = ABM(i,:)
+     enddo
+
+     deallocate(ABM,ABP)
+
+   end associate
+enddo
+
+associate(B => EblockIV)
+
+  do i=1,B%n
+     ii = B%l1+i-1
+     ipos = B%pos(i)
+     AOUT(ipos,:) = B%vec(i)*AMAT(ipos,:)
+  enddo
+
+end associate
+
+end subroutine ABPM_HALFTRAN_LR
+
+
 
 subroutine make_J1(NBas,X,J,intfile)
 implicit none

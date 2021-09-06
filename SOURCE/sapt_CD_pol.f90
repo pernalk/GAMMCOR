@@ -1,5 +1,6 @@
 module sapt_CD_pol
 use types
+use tran, only : ABPM_HALFTRAN_LR
 use sapt_utils
 
 implicit none

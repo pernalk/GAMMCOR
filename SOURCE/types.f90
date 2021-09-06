@@ -330,8 +330,8 @@ end type SaptData
 type SaptDIIS
      integer :: DIISN  = 6
      integer :: DIISOn = 2
-     integer :: maxIter = 20
-     double precision :: Thresh=1d-4
+     integer :: maxIter = 25
+     double precision :: Thresh=1d-3
 end type
 
 type Y01BlockData
