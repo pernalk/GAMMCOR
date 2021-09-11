@@ -795,7 +795,7 @@ read(iunit) work
 
 close(iunit)
 call dgemm('N','N',A%NDimX,A%NDimX,A%NDimX,1d0,ABPLUSA,A%NDimX,work,A%NDimX,0d0,ABPMA,A%NDimX)
-call dgemm('N','T',A%NDimX,NCholesky,A%NDimX,1d0,ABPLUSA,A%NDimX,DCholA,NCholesky,0.0,ABPTildeA,A%NDimX)
+call dgemm('N','T',A%NDimX,NCholesky,A%NDimX,1d0,ABPLUSA,A%NDimX,DCholA,NCholesky,0d0,ABPTildeA,A%NDimX)
 
 deallocate(ABPLUSA,work)
 
@@ -811,7 +811,7 @@ read(iunit) work
 
 close(iunit)
 call dgemm('N','N',B%NDimX,B%NDimX,B%NDimX,1d0,ABPLUSB,B%NDimX,work,B%NDimX,0d0,ABPMB,B%NDimX)
-call dgemm('N','T',B%NDimX,NCholesky,B%NDimX,1d0,ABPLUSB,B%NDimX,DCholB,NCholesky,0.0,ABPTildeB,B%NDimX)
+call dgemm('N','T',B%NDimX,NCholesky,B%NDimX,1d0,ABPLUSB,B%NDimX,DCholB,NCholesky,0d0,ABPTildeB,B%NDimX)
 
 deallocate(ABPLUSB,work)
 
@@ -837,9 +837,8 @@ do ifreq=NFreq,1,-1
    OmI = XFreq(ifreq)
 
    call calculateLambda(LambdaA,LambdaIVA,OmI**2,A%NDimX,nblkA,A0BlkA,A0BlkIVA)
-   call calculateLambda(LambdaB,LambdaIVB,OmI**2,B%NDimX,nblkA,A0BlkB,A0BlkIVB)
+   call calculateLambda(LambdaB,LambdaIVB,OmI**2,B%NDimX,nblkB,A0BlkB,A0BlkIVB)
 
-   !if(ifreq==NFreq) call dgemm('N','N',A%NDimX,NCholesky,A%NDimX,1.d0,WorkA,A%NDimX,ABPTildeA,A%NDimX,0.0d0,CTildeA,A%NDimX)
    if(ifreq==NFreq) call ABPM_HALFTRAN_LR(ABPTildeA,CTildeA,LambdaA,LambdaIVA,nblkA,A%NDimX,NCholesky,0)
    call Cmat_iterDIIS(CTildeA,A%NDimX,NCholesky,nblkA,LambdaA,LambdaIVA,ABPTildeA,ABPMA,iStatsA)
    call iStatsA%setFreq(OmI)
@@ -870,8 +869,9 @@ call iStatsA%print()
 write(lout,'(1x,a)') 'C(omega): Monomer B'
 call iStatsB%print()
 
+SAPT%e2disp  = -8d0/Pi*e2d
+
 e2d = -8d0/Pi*e2d*1d3
-!print*, 'E2disp(Cmat)',e2d
 call print_en('E2disp(Cmat)',e2d,.false.)
 
 deallocate(CB,CA)

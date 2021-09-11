@@ -3041,10 +3041,11 @@ double precision,parameter :: SmallE = 1.D-3
     else
 
        ! make s_ij uncoupled
-       !call make_sij_Yunc(sij,tmp1,A%Occ,B%Occ,A%EigY,A%EigX,B%EigY,B%EigX,&
+       !call make_sij_Y_unc(sij,tmp1,A%Occ,B%Occ,A%EigY,A%EigX,B%EigY,B%EigX,&
        !                A%num0,B%num0,dimOA,dimOB,nOVB,A%IndN,B%IndN,A%NDimX,B%NDimX,NBas)
-       write(LOUT,'(1x,a)') 'ERROR! Zrob make_sij(unc)!!!'
-       stop
+       write(LOUT,'(/1x,a)') 'ERROR! make_sij_Yunc not ready yet!'
+       write(LOUT,'(1x,a)')  'E2exch-disp(unc) = 0!'
+       !stop
 
     endif
 
