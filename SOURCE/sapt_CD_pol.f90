@@ -21,7 +21,7 @@ double precision :: ea,eb,eab,elst
 double precision,external  :: ddot
 
 ! set dimensions
- NBas = A%NBasis 
+ NBas = A%NBasis
  NCholesky = SAPT%NCholesky
 
  allocate(Va(NBas,NBas),Vb(NBas,NBas),&
@@ -33,18 +33,18 @@ double precision,external  :: ddot
  call tran2MO(Va,B%CMO,B%CMO,Vabb,NBas)
  call tran2MO(Vb,A%CMO,A%CMO,Vbaa,NBas)
 
-! sum_p n_p v^B_pp 
+! sum_p n_p v^B_pp
  ea = 0
  do i=1,A%num0+A%num1
-    ea = ea + A%Occ(i)*Vbaa(i,i) 
+    ea = ea + A%Occ(i)*Vbaa(i,i)
  enddo
  ea = 2d0*ea
  !print*, 'ea',ea
 
-! sum_q n_q v^A_qq 
+! sum_q n_q v^A_qq
  eb = 0
  do j=1,B%num0+B%num1
-    eb = eb + B%Occ(j)*Vabb(j,j) 
+    eb = eb + B%Occ(j)*Vabb(j,j)
  enddo
  eb = 2d0*eb
  !print*, 'eb',eb
@@ -62,7 +62,7 @@ double precision,external  :: ddot
  eab = 4d0*eab
  !print*, 'eab', eab
 
- elst = ea + eb + eab + SAPT%Vnn 
+ elst = ea + eb + eab + SAPT%Vnn
 
  call print_en('V_nn',SAPT%Vnn,.false.)
  call print_en('Eelst',elst*1000,.false.)
@@ -320,8 +320,11 @@ endif
 end subroutine e2disp_Chol
 
 subroutine e2disp_Cmat(Flags,A,B,SAPT)
+!
+! THIS IS FOR TESTING ONLY:
 ! calculate 2nd order dispersion energy
-! use C(omega)
+! use C(omega) obained brute-force (i.e.,
+! by inversion: C(om)=(APLUS.AMIN + om^2)^-1.APLUS
 ! in coupled and uncoupled approximations
 implicit none
 
@@ -355,6 +358,12 @@ if(A%NBasis.ne.B%NBasis) then
    stop
 else
    NBas = A%NBasis
+endif
+
+! check Cholesky
+if(Flags%ICholesky==1) then
+   write(LOUT,'(1x,a)') 'Cholesky Cmat not ready yet! Aborting...'
+   return
 endif
 
 ! set dimensions
@@ -395,11 +404,6 @@ call dgemm('N','N',B%NDimX,B%NDimX,B%NDimX,1d0,ABPLUSB,B%NDimX,work,B%NDimX,0d0,
 
 deallocate(work)
 
-!print*, 'ABPLUS-A',norm2(ABPLUSA(1:A%NDimX,1:A%NDimX))
-!print*, 'ABPLUS-B',norm2(ABPLUSB)
-!print*, 'ABPMA   ',norm2(ABPMA)
-!print*, 'ABPMB   ',norm2(ABPMB)
-
 ! frequency integration
 NFreq = 18
 allocate(XFreq(NFreq),WFreq(NFreq))
@@ -416,16 +420,8 @@ do ifreq=1,NFreq
 
    allocate(CA(A%NDimX,A%NDimX))
 
-   !print*, ifreq,WFreq(ifreq),Omega
-
-   if(Flags%ICholesky==1) then
-     print*, 'Cholesky Cmat not ready yet! Aborting...'
-     !call get_Cmat(CA,A%CICoef,A%IndN,ABPMA,ABPLUSA,Omega,A%NDimX,NBas)
-     return
-   else
-      call get_Cmat(CA,A%CICoef,A%IndN,ABPMA,ABPLUSA,Omega,A%NDimX,NBas)
-      call get_Cmat(CB,B%CICoef,B%IndN,ABPMB,ABPLUSB,Omega,B%NDimX,NBas)
-   endif
+   call get_Cmat(CA,A%CICoef,A%IndN,ABPMA,ABPLUSA,Omega,A%NDimX,NBas)
+   call get_Cmat(CB,B%CICoef,B%IndN,ABPMB,ABPLUSB,Omega,B%NDimX,NBas)
 
    open(newunit=iunit,file='TWOMOAB',status='OLD',&
         access='DIRECT',form='UNFORMATTED',recl=8*nOVB)
@@ -498,6 +494,18 @@ deallocate(ABPMB,ABPMA,ABPLUSB,ABPLUSA)
 end subroutine e2disp_Cmat
 
 subroutine e2disp_Cmat_Chol(Flags,A,B,SAPT)
+!
+! THIS PROCEDURE SHOULD BE IMPROVED:
+! IT IS BASED ON ADAM'S IMPLEMENTATION
+! OF \LAMBDA AND ITERATIVE ALGORITHMS
+! WHICH ASSUME FULL A0(NDIMX,NDIMX) MATRICES
+! SO THAT NEITHER DIAGONAL NOR BLOCK MULTIPLICATION
+! ARE USED
+!
+! calculate 2nd order dispersion energy
+! in coupled approximation using
+! C(omega) obained in an iterative fashion
+! with Cholesky vectors
 
 use class_IterStats
 use class_IterAlgorithm
@@ -592,9 +600,6 @@ close(iunit)
 call dgemm('N','N',A%NDimX,A%NDimX,A%NDimX,1d0,ABPLUSA,A%NDimX,work,A%NDimX,0d0,ABPMA,A%NDimX)
 call dgemm('N','T',A%NDimX,NCholesky,A%NDimX,1d0,ABPLUSA,A%NDimX,DCholA,NCholesky,0.0,ABPTildeA,A%NDimX)
 
-!print*, 'ABPMA',norm2(ABPMA)
-!print*, 'ABPTildeA',norm2(ABPTildeA)
-
 deallocate(ABPLUSA,work)
 
 ! monomer B
@@ -685,7 +690,23 @@ deallocate(CTildeB,CTildeA)
 
 end subroutine e2disp_Cmat_Chol
 
-subroutine e2disp_Cmat_Chol_manual(Flags,A,B,SAPT)
+subroutine e2disp_Cmat_Chol_block(Flags,A,B,SAPT)
+!
+! THIS PROCEDURE SHOULD BE IMPROVED:
+! A0 MATRICES ARE KEPT IN DIAGONAL BLOCKS
+! AND BLOCK MULTIPLICATION IS USED
+! (THE ABPM_HALFTRAN_LR PROCEDURE
+! IN sapt_utils.f90);
+! IDEALLY, THE BLOCK/DIAGONAL MULTIPLICATIONS
+! COMMON FOR THE ENTIRE GAMMCOR SHOULD BE USED
+! AND DIAG/BLOCK VERSION OF THE ALGORITHM SHOULD
+! BE CHOSEN AUTOMATICALLY, E.G., BASED ON NACT
+!
+! calculate 2nd order dispersion energy
+! in coupled approximation using
+! C(omega) obained in an iterative fashion
+! using A0 blocks (not diagonal)
+! with Cholesky vectors
 
 use class_IterStats
 
@@ -860,7 +881,7 @@ deallocate(DCholB,DCholA)
 deallocate(ABPMB,ABPMA)
 deallocate(ABPTildeB,ABPTildeA)
 
-end subroutine e2disp_Cmat_Chol_manual
+end subroutine e2disp_Cmat_Chol_block
 
 subroutine get_Cmat(Cmat,CICoef,IndN,ABPM,ABPLUS,Omega,NDimX,NBas)
 implicit none

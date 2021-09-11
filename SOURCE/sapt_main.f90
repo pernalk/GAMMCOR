@@ -250,7 +250,7 @@ double precision,intent(inout) :: Tcpu,Twall
  call e2disp_Chol(Flags,SAPT%monA,SAPT%monB,SAPT)
  !call e2disp_Cmat(Flags,SAPT%monA,SAPT%monB,SAPT)
  !call e2disp_Cmat_Chol(Flags,SAPT%monA,SAPT%monB,SAPT)
- call e2disp_Cmat_Chol_manual(Flags,SAPT%monA,SAPT%monB,SAPT)
+ call e2disp_Cmat_Chol_block(Flags,SAPT%monA,SAPT%monB,SAPT)
  call e2exdisp(Flags,SAPT%monA,SAPT%monB,SAPT)
 
  call summary_sapt(SAPT)
@@ -1475,7 +1475,7 @@ integer :: i,j,info
 double precision :: val
 
 integer,allocatable :: ipiv(:)
-double precision,allocatable :: work1(:,:),work2(:,:) 
+double precision,allocatable :: work1(:,:),work2(:,:)
 double precision,allocatable :: work3(:)
 
 print*, 'NCholesky',NCholesky
@@ -1493,7 +1493,7 @@ call dgetrf(NCholesky,NCholesky,work1,NCholesky,ipiv,info)
 print*, 'info-1',info
 
 allocate(work3(NCholesky**2))
-call dgetri(NCholesky,work1,NCholesky,ipiv,work3,NCholesky**2,info) 
+call dgetri(NCholesky,work1,NCholesky,ipiv,work3,NCholesky**2,info)
 print*, 'info-2',info
 print*, '(D^T.D)-1',norm2(work1(1:NCholesky,1:NCholesky))
 deallocate(ipiv)
@@ -1511,7 +1511,7 @@ val = 0
 do i=1,NBas**2
       print*, i,work1(i,i)
       val = val + abs(work1(i,i))
-      work1(i,i) = 0d0 
+      work1(i,i) = 0d0
 enddo
 print*, 'Pmat-1',norm2(work1(1:NBas**2,1:NBas**2))
 print*, 'val, NBas**2', val, NBas**2
@@ -1541,7 +1541,7 @@ double precision,allocatable :: work1(:,:),work2(:,:),work3(:),work4(:)
 
 ! set dimensions
 NDimX     = Mon%NDimX
-NOccup    = Mon%num0+Mon%num1 
+NOccup    = Mon%num0+Mon%num1
 NCholesky = Mon%NChol
 
 Print*, 'NDimX',    NDimX
@@ -1632,7 +1632,7 @@ print*, 'lwork',lwork
 allocate(work3(lwork))
 call dgetri(NCholesky,work2,NCholesky,ipiv,work3,lwork,info)
 print*, 'info-2',info,work3(1)
-  
+
 if(info<0) then
    write(lout,*) 'prepare_cerpa: dgetri ',info,'-th argument had illegal value!'
    stop
@@ -1656,7 +1656,7 @@ call dgemm('N','N',NDimX,NCholesky,NDimX,1.0d0,And,NDimX,work1,NDimX,0d0,work2,N
 print*, 'AndD',norm2(work2(1:NDimX,1:NCholesky))
 
 write(iunit) 'ANDD    ', work2
-!  
+!
 ! construct P and Q
 ! OV
 deallocate(work2)
@@ -1685,7 +1685,7 @@ print*, 'Qmat',norm2(work2(1:NDimX,1:NDimX))
 !val = 0
 !do ipq=1,NBasis**2
 !      val = val + abs(work2(ipq,ipq))
-!      work2(ipq,ipq) = 0d0 
+!      work2(ipq,ipq) = 0d0
 !enddo
 !print*, 'Pmat-1',norm2(work2(1:NBasis**2,1:NBasis**2))
 !print*, 'val', val,NBasis**2
@@ -1700,10 +1700,10 @@ print*, 'AndQ',norm2(work1(1:NDimX,1:NDimX))
 
 write(iunit) 'ANDQ    ', work1
 close(iunit)
-!  
+!
 !  !deallocate(work2)
 !  !allocate(work2(NDimX,NCholesky))
-!  
+!
 !  !! test : tranpose D
 !  !deallocate(work3)
 !  !!! OV
@@ -1715,7 +1715,7 @@ close(iunit)
 !  !!enddo
 !  !!call dgemm('T','N',NCholesky,NCholesky,NDimX,1.0d0,work1,NDimX,work1,NDimX,0d0,work2,NCholesky)
 !  !!print*, 'work2',norm2(work2)
-!  !! FF 
+!  !! FF
 !  !deallocate(work1)
 !  !allocate(work1(NBasis**2,NCholesky))
 !  !do ipq=1,NBasis**2
@@ -1792,7 +1792,7 @@ double precision,allocatable :: work4(:)
 
 ! set dimensions
 NDimX     = Mon%NDimX
-NOccup    = Mon%num0+Mon%num1 
+NOccup    = Mon%num0+Mon%num1
 NCholesky = Mon%NChol
 
 Print*, 'NDimX',    NDimX
@@ -1842,7 +1842,7 @@ call dgemm('N','T',NCholesky,NCholesky,NBasis**2,1.0d0,Mon%FF,NCholesky,Mon%FF,N
 !  !deallocate(work4,work3)
 !  !
 !  ! end test
-!  
+!
 call dgetrf(NCholesky,NCholesky,work2,NCholesky,ipiv,info)
 print*, 'info-1',info
 if(info<0) then
@@ -1858,7 +1858,7 @@ print*, 'lwork',lwork
 allocate(work3(lwork))
 call dgetri(NCholesky,work2,NCholesky,ipiv,work3,lwork,info)
 print*, 'info-2',info,work3(1)
-  
+
 if(info<0) then
    write(lout,*) 'prepare_cerpa: dgetri ',info,'-th argument had illegal value!'
    stop
@@ -1907,7 +1907,7 @@ print*, 'AndQ',norm2(work2(1:NDimX,1:NDimX))
 
 !write(iunit) 'ANDQ    ', work2
 !close(iunit)
-  
+
 deallocate(ipiv,work3,work2)
 deallocate(Adiag,And)
 deallocate(work1)
@@ -2481,7 +2481,7 @@ end subroutine chol_ints_gen
 !      cd = ic+(id-1)*NBas
 !      call dgemv('T',NCholesky,nAB,1d0,MatAB,NCholesky,MatCD(1:NCholesky,cd),1,0d0,work,1)
 !      write(iunit,rec=irec) work(1:nAB)
-!   
+!
 !   enddo
 !enddo
 !
@@ -3020,7 +3020,7 @@ logical :: doRSH
                   NGrid,Mon%NDimX,NBas,Mon%NDimX,NInte1,Mon%NoSt,&
                   twokfile,Twojerf,twokerf,1,1)
 
- end select 
+ end select
 
  ! dump uncoupled response
  !call writeresp(EigY0,Eig0,propfile0)
@@ -6225,16 +6225,16 @@ if(SAPT%SaptLevel==2) then
    write(LOUT,'(1x,a,t19,a,f16.8)') 'Eint(SAPT2)','=', SAPT%esapt2*1.0d3
 
    if(SAPT%Wexcit) then
-     write(lout,'(/1x,a)') 'Dexcitation corrections' 
+     write(lout,'(/1x,a)') 'Dexcitation corrections'
      j = SAPT%monA%InSt(1,1)
      do i=1,size(SAPT%Wind)
-        write(lout,'(1x,a,2i1,a,f12.6)') & 
+        write(lout,'(1x,a,2i1,a,f12.6)') &
              'Wind_',SAPT%monA%InSt(1,1)-1,j,'     =', SAPT%Wind(i)*1000d0
         j = j + 1
      enddo
      j = SAPT%monA%InSt(1,1)
      do i=1,size(SAPT%Wdisp)
-        write(lout,'(1x,a,2i1,a,f12.6)') & 
+        write(lout,'(1x,a,2i1,a,f12.6)') &
              'Wdisp_',SAPT%monA%InSt(1,1)-1,j,'    =', SAPT%Wdisp(i)*1000d0
         j = j + 1
      enddo
