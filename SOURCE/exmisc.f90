@@ -183,6 +183,7 @@ do ipq=1,ANDimX
 
    enddo
 enddo
+close(iunit)
 
 sij=0
 do j=1,BNDimX
