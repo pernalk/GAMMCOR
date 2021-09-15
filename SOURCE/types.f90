@@ -92,6 +92,10 @@ character(*),parameter :: PossibleDFAType(3) = &
 [character(8) :: &
 'srLDA', 'srPBE', 'PBE']
 
+character(*),parameter :: PossibleCholAccu(3) = &
+[character(8) :: &
+'DEFAULT', 'TIGHT', 'LUDICROUS']
+
 character(*),parameter :: PossibleMonomers(2) = &
 [character(8) :: 'A', 'B']
 
@@ -399,9 +403,12 @@ associate( CalcParams => Input%CalcParams)
  endif
  write(LOUT,' (1x,a,3x,a)') "RDM SOURCE: ",  &
               PossibleInterface(CalcParams%RDMSource)
-! write(LOUT,' (1x,a,6x,i3)') "NBASIS: ",  &
-!              CalcParams%NBasis
-! write(LOUT, *) "RPA thresh: ", CalcParams%RPAThresh
+ if(CalcParams%Cholesky>0) then
+    write(LOUT,' (1x,a,5x,a)') "CHOLESKY: ",  &
+                       ".TRUE."
+    write(LOUT,' (1x,a,a)') "CHOLESKY ACCU: ", &
+               PossibleCholAccu(CalcParams%CholeskyAccu)
+ endif
  if (allocated(CalcParams%IntegralsFilePath)) then
        write(*, *) "Ints file: ", CalcParams%IntegralsFilePath
  end if
