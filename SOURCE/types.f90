@@ -344,6 +344,7 @@ type EblockData
 integer :: n
 integer :: l1,l2
 integer,allocatable :: pos(:)
+integer,allocatable :: ipiv(:)
 double precision,allocatable :: vec(:), matX(:,:),matY(:,:)
 end type
 

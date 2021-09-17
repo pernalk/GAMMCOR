@@ -297,32 +297,153 @@ integer :: iunit
 
 end subroutine writeampl
 
+!subroutine solve_cphf(M,WPot,e2indxy,Flags,NBas)
+!implicit none
+!
+!type(FlagsData) :: Flags
+!type(SystemBlock) :: M
+!type(DIISData) :: DIISBlock
+!type(Y01BlockData),allocatable :: Y01BlockM(:)
+!
+!integer,intent(in) :: NBas
+!double precision,intent(in)  :: WPot(NBas,NBas)
+!double precision,intent(out) :: e2indxy
+!
+!double precision,allocatable :: WxYY(:,:)
+!double precision,allocatable :: wVecxYY(:)
+!double precision,allocatable :: amps(:),vecR(:),delta(:)
+!double precision,allocatable :: OmM0(:)
+!
+!integer      :: iter,i,pq,ip,iq
+!logical      :: conv=.FALSE.
+!character(8) :: nameunc
+!double precision :: error
+!integer,parameter          :: MaxIt = 50
+!double precision,parameter :: ThrDIIS = 1.d-8
+!
+! if(M%Monomer==1) nameunc='XY0_A'
+! if(M%Monomer==2) nameunc='XY0_B'
+!
+! call init_DIIS(DIISBlock,M%NDimX,M%NDimX,Flags%DIISN)
+!
+! allocate(WxYY(NBas,NBas))
+! allocate(wVecxYY(M%NDimX))
+! call tran2MO(WPot,M%CMO,M%CMO,WxYY,NBas)
+! wVecxYY = 0
+! do pq=1,M%NDimX
+!    ip = M%IndN(1,pq)
+!    iq = M%IndN(2,pq)
+!    wVecxYY(pq) = WxYY(ip,iq)
+! enddo
+!
+! ! read EigVals
+! allocate(OmM0(M%NDimX))
+! allocate(Y01BlockM(M%NDimX))
+! call convert_XY0_to_Y01(M,Y01BlockM,OmM0,NBas,trim(nameunc))
+!
+! allocate(vecR(M%NDimX),amps(M%NDimX),delta(M%NDimX))
+!
+! ! zero iter
+! call amplitudes_T1(OmM0,wVecxYY,amps,M%NDimX)
+!
+! write(LOUT,'(1x,a,5x,a)') 'ITER', 'ERROR'
+! iter = 0
+! do
+!
+! vecR = wVecxYY
+! call dgemv('N',M%NDimX,M%NDimX,1.d0,M%PP,M%NDimX,amps,1,1d0,vecR,1)
+!
+! error = norm2(vecR)
+! conv=error.le.ThrDIIS
+!
+! write(LOUT,'(1x,i3,f11.6)') iter,error
+!
+! if(conv) then
+!    exit
+! elseif(.not.conv.and.iter.le.MaxIt) then
+!    iter = iter + 1
+! elseif(.not.conv.and.iter.gt.MaxIt) then
+!   write(*,*) 'Error!!! E2ind DIIS not converged!'
+!   exit
+! endif
+!
+! call amplitudes_T1(OmM0,vecR,delta,M%NDimX)
+! amps = amps + delta
+! if(iter>Flags%DIISOn) call use_DIIS(DIISBlock,amps,vecR)
+!
+! enddo
+!
+! !E2ind(X--Y)
+! e2indxy = 0
+! do pq=1,M%NDimX
+!    ip = M%IndN(1,pq)
+!    iq = M%IndN(2,pq)
+!    e2indxy = e2indxy + amps(pq)*WxYY(ip,iq)
+! enddo
+! e2indxy = 2d0*e2indxy
+!
+! call free_DIIS(DIISBlock)
+!
+! ! deallocate Y01Block
+! do i=1,M%NDimX
+!    associate(Y => Y01BlockM(i))
+!      deallocate(Y%vec0)
+!    end associate
+! enddo
+!
+! deallocate(delta,amps,vecR)
+! deallocate(Y01BlockM)
+! deallocate(OmM0)
+! deallocate(wVecxYY,WxYY)
+!
+!end subroutine solve_cphf
+
 subroutine solve_cphf(M,WPot,e2indxy,Flags,NBas)
 implicit none
 
-type(FlagsData) :: Flags
 type(SystemBlock) :: M
-type(DIISData) :: DIISBlock
-type(Y01BlockData),allocatable :: Y01BlockM(:)
+type(FlagsData)   :: Flags
 
-integer,intent(in) :: NBas
+integer,intent(in)           :: NBas
 double precision,intent(in)  :: WPot(NBas,NBas)
 double precision,intent(out) :: e2indxy
+
+type(DIISData)                 :: DIISBlock
+type(EblockData)               :: ABlockIV
+type(EblockData),allocatable   :: ABlock(:)
 
 double precision,allocatable :: WxYY(:,:)
 double precision,allocatable :: wVecxYY(:)
 double precision,allocatable :: amps(:),vecR(:),delta(:)
 double precision,allocatable :: OmM0(:)
 
+integer      :: iunit
 integer      :: iter,i,pq,ip,iq
+integer      :: iblk,nblk,nmax
 logical      :: conv=.FALSE.
-character(8) :: nameunc
-double precision :: error
-integer,parameter          :: MaxIt = 50
+character(8) :: nameunc,abfile
+
+double precision :: fact, error
+integer,parameter          :: MaxIt = 20
 double precision,parameter :: ThrDIIS = 1.d-8
+
+double precision,allocatable :: ABMin(:,:),Work(:)
 
  if(M%Monomer==1) nameunc='XY0_A'
  if(M%Monomer==2) nameunc='XY0_B'
+
+ if(M%Monomer==1) abfile='ABMAT_A'
+ if(M%Monomer==2) abfile='ABMAT_B'
+
+ allocate(ABMin(M%NDimX,M%NDimX))
+
+ open(newunit=iunit,file=abfile,status='OLD',&
+      access='SEQUENTIAL',form='UNFORMATTED')
+
+ read(iunit)
+ read(iunit) ABMin
+
+ close(iunit)
 
  call init_DIIS(DIISBlock,M%NDimX,M%NDimX,Flags%DIISN)
 
@@ -333,25 +454,35 @@ double precision,parameter :: ThrDIIS = 1.d-8
  do pq=1,M%NDimX
     ip = M%IndN(1,pq)
     iq = M%IndN(2,pq)
-    wVecxYY(pq) = WxYY(ip,iq)
+    fact = M%CICoef(ip)+M%CICoef(iq)
+    wVecxYY(pq) = fact*WxYY(ip,iq)
  enddo
 
- ! read EigVals
- allocate(OmM0(M%NDimX))
- allocate(Y01BlockM(M%NDimX))
- call convert_XY0_to_Y01(M,Y01BlockM,OmM0,NBas,trim(nameunc))
+ call convert_to_ABMIN(ABlock,ABlockIV,M%IndN,M%CICoef,nblk,NBas,M%NDimX,trim(nameunc))
 
  allocate(vecR(M%NDimX),amps(M%NDimX),delta(M%NDimX))
 
  ! zero iter
- call amplitudes_T1(OmM0,wVecxYY,amps,M%NDimX)
+ !call amplitudes_T1_cphf(OmM0,wVecxYY,amps,M%NDimX)
+ call amplitudes_T1_cerpa(ABlock,ABlockIV,nblk,wVecxYY,amps,M%NDimX)
+ print*, 'amp-1',norm2(amps)
+ e2indxy = 0
+ do pq=1,M%NDimX
+    ip = M%IndN(1,pq)
+    iq = M%IndN(2,pq)
+    fact = M%CICoef(ip)+M%CICoef(iq)
+    e2indxy = e2indxy + fact*amps(pq)*WxYY(ip,iq)
+ enddo
+ e2indxy = 1d0*e2indxy
+ print*, 'e2ind(unc)',e2indxy
 
  write(LOUT,'(1x,a,5x,a)') 'ITER', 'ERROR'
  iter = 0
  do
 
  vecR = wVecxYY
- call dgemv('N',M%NDimX,M%NDimX,1.d0,M%PP,M%NDimX,amps,1,1d0,vecR,1)
+ !call dgemv('N',M%NDimX,M%NDimX,1.d0,M%PP,M%NDimX,amps,1,1d0,vecR,1)
+ call dgemv('N',M%NDimX,M%NDimX,1.d0,ABMin,M%NDimX,amps,1,1d0,vecR,1)
 
  error = norm2(vecR)
  conv=error.le.ThrDIIS
@@ -367,7 +498,9 @@ double precision,parameter :: ThrDIIS = 1.d-8
    exit
  endif
 
- call amplitudes_T1(OmM0,vecR,delta,M%NDimX)
+ ! HF test
+ !call amplitudes_T1_cphf(OmM0,vecR,delta,M%NDimX)
+ call amplitudes_T1_cerpa(ABlock,ABlockIV,nblk,vecR,delta,M%NDimX)
  amps = amps + delta
  if(iter>Flags%DIISOn) call use_DIIS(DIISBlock,amps,vecR)
 
@@ -378,27 +511,39 @@ double precision,parameter :: ThrDIIS = 1.d-8
  do pq=1,M%NDimX
     ip = M%IndN(1,pq)
     iq = M%IndN(2,pq)
-    e2indxy = e2indxy + amps(pq)*WxYY(ip,iq)
+    fact = M%CICoef(ip)+M%CICoef(iq)
+    e2indxy = e2indxy + fact*amps(pq)*WxYY(ip,iq)
  enddo
  e2indxy = 2d0*e2indxy
+ print*, 'e2indxy',e2indxy
 
  call free_DIIS(DIISBlock)
 
- ! deallocate Y01Block
- do i=1,M%NDimX
-    associate(Y => Y01BlockM(i))
-      deallocate(Y%vec0)
+ ! deallocate ABLOCK
+ do iblk=1,nblk
+    associate(A => ABlock(iblk))
+      deallocate(A%matY,A%matX,A%vec)
+      deallocate(A%pos)
     end associate
  enddo
+ ! deallocate IV part
+ associate(A => AblockIV)
+   if(A%n>0) then
+      deallocate(A%vec)
+      deallocate(A%pos)
+   endif
+ end associate
 
+ deallocate(ABmin)
  deallocate(delta,amps,vecR)
- deallocate(Y01BlockM)
- deallocate(OmM0)
+ deallocate(ABlock)
  deallocate(wVecxYY,WxYY)
 
 end subroutine solve_cphf
 
-subroutine amplitudes_T1(deps,ints,res,NDimX)
+
+
+subroutine amplitudes_T1_cphf(deps,ints,res,NDimX)
 implicit none
 
 integer,intent(in) :: NDimX
@@ -412,7 +557,151 @@ do pq=1,NDimX
    res(pq) = res(pq) - ints(pq) / deps(pq)
 enddo
 
-end subroutine amplitudes_T1
+end subroutine amplitudes_T1_cphf
+
+subroutine amplitudes_T1_cerpa(ABlock,ABlockIV,nblk,ints,res,NDimX)
+implicit none
+
+type(EBlockData)   :: ABlock(nblk),AblockIV
+
+integer,intent(in) :: nblk,NDimX
+double precision,intent(in)  :: ints(NDimX)
+double precision,intent(out) :: res(NDimX)
+
+integer :: iblk,ipos,pq,ip,iq
+integer :: i,nmax,info
+double precision,allocatable :: tmp(:)
+
+! set nmax
+nmax = ABlockIV%n
+do iblk=1,nblk
+   nmax = max(nmax,ABlock(iblk)%n)
+enddo
+
+allocate(tmp(nmax))
+
+res = 0
+tmp = 0
+do iblk=1,nblk
+   associate(A => ABlock(iblk))
+
+     do i=1,A%n
+        ipos = A%pos(i)
+        tmp(i) = ints(ipos)
+     enddo
+
+     call dsytrs('U',A%n,1,A%matY,A%n,A%ipiv,tmp,A%n,info)
+
+     do i=1,A%n
+        ipos = A%pos(i)
+        res(ipos) = -tmp(i)
+     enddo
+
+   end associate
+enddo
+
+! block IV
+associate(A => ABlockIV)
+
+   do i=1,A%n
+     ipos = A%pos(i)
+     res(ipos) = -2d0*ints(ipos) / A%vec(i)
+  enddo
+
+end associate
+
+deallocate(tmp)
+
+end subroutine amplitudes_T1_cerpa
+
+subroutine convert_to_ABMIN(ABlock,ABlockIV,IndN,CICoef,nblk,NBas,NDimX,xy0file)
+implicit none
+
+type(EBlockData)             :: ABlockIV
+type(EBlockData),allocatable :: Ablock(:)
+
+integer,intent(in)  :: NBas,NDimX
+integer,intent(in)  :: IndN(2,NBas)
+integer,intent(out) :: nblk
+double precision,intent(in) :: CICoef(NBas)
+character(*),intent(in) :: xy0file
+
+type(EBlockData)             :: SblockIV
+type(EBlockData),allocatable :: Sblock(:)
+
+integer :: i,iblk,ipos,ip,iq
+integer :: j,info
+double precision  :: valX,valY
+double precision,allocatable :: tmp(:,:),work(:)
+
+call read_SBlock(SBlock,SBlockIV,nblk,xy0file)
+
+allocate(ABlock(nblk))
+
+do iblk=1,nblk
+   associate(A => SBlock(iblk),&
+             C => ABlock(iblk))
+
+     C%n = A%n
+     allocate(C%pos(C%n),C%ipiv(C%n),C%vec(C%n))
+     allocate(C%matX(C%n,C%n),C%matY(C%n,C%n))
+
+     C%l1  = A%l1
+     C%l2  = A%l2
+     C%pos = A%pos
+     C%vec = A%vec
+
+     allocate(tmp(A%n,A%n),work(A%n))
+
+     do i=1,A%n
+        ipos = A%pos(i)
+        ip   = IndN(1,ipos)
+        iq   = IndN(2,ipos)
+        valX = (CICoef(ip)+CICoef(iq))
+        C%matX(i,1:C%n) = valX*(A%matX(i,1:A%n) + A%matY(i,1:A%n))
+     enddo
+
+     do i=1,A%n
+        tmp(:,i) = C%matX(:,i) * C%vec(i)
+     enddo
+     call dgemm('N','T',A%n,A%n,A%n,1d0,tmp,A%n,C%matX,A%n,0d0,C%matY,A%n)
+
+     ! CmatY: inverse ABMIN
+     !call dgetrf(A%n,A%n,C%matY,A%n,Ipiv,Info)
+     !call dgetri(A%n,C%matY,A%n,Ipiv,Work,A%n,Info)
+
+     !! try diagonalization
+     !C%matX = C%matY
+     !call Diag8(C%matX,A%n,A%n,A%vec,work)
+
+     ! CmatY: factorized ABMIN
+     call dsytrf('U',C%n,C%matY,C%n,C%ipiv,Work,C%n,Info)
+
+     deallocate(work,tmp)
+
+   end associate
+enddo
+
+ABlockIV = SBlockIV
+
+! deallocate SBLOCK
+do iblk=1,nblk
+   associate(A => SBlock(iblk))
+     deallocate(A%matY,A%matX,A%vec)
+     deallocate(A%pos)
+   end associate
+enddo
+! deallocate IV part
+associate(A => SblockIV)
+  if(A%n>0) then
+     deallocate(A%vec)
+     deallocate(A%pos)
+  endif
+end associate
+
+end subroutine convert_to_ABMIN
+
+
 
 subroutine readresp(EVec,EVal,NDim,fname)
 implicit none

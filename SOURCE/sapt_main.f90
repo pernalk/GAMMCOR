@@ -88,7 +88,7 @@ double precision :: Tcpu,Twall
     elseif(SAPT%SaptLevel==2) then
        call e2ind(Flags,SAPT%monA,SAPT%monB,SAPT)
       !call e2ind_resp(Flags,SAPT%monA,SAPT%monB,SAPT) ! version using alpha(0)
-      ! call e2ind_hf_icphf(Flags,SAPT%monA,SAPT%monB,SAPT) ! works only with HF
+       call e2ind_hf_icphf(Flags,SAPT%monA,SAPT%monB,SAPT)
        call e2disp(Flags,SAPT%monA,SAPT%monB,SAPT)
       ! call e2disp_Cmat(Flags,SAPT%monA,SAPT%monB,SAPT)
        call e2exind(Flags,SAPT%monA,SAPT%monB,SAPT)
@@ -246,6 +246,7 @@ double precision,intent(inout) :: Tcpu,Twall
 ! call e1exchs2(Flags,SAPT%monA,SAPT%monB,SAPT)
  call e1exch_NaNb(Flags,SAPT%monA,SAPT%monB,SAPT)
  call e2ind(Flags,SAPT%monA,SAPT%monB,SAPT)
+ !call e2ind_hf_icphf(Flags,SAPT%monA,SAPT%monB,SAPT)
  call e2exind(Flags,SAPT%monA,SAPT%monB,SAPT)
  !call e2disp_Chol(Flags,SAPT%monA,SAPT%monB,SAPT)
  !call e2disp_Cmat(Flags,SAPT%monA,SAPT%monB,SAPT)

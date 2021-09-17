@@ -625,7 +625,9 @@ allocate(CTildeA(A%NDimX*NCholesky),CTildeB(B%NDimX*NCholesky))
 allocate(A0A(A%NDimX,A%NDimX),A0B(B%NDimX,B%NDimX))
 allocate(CA(NCholesky,NCholesky),CB(NCholesky,NCholesky))
 
-NFreq = 18
+NFreq = 12
+print*, 'SAPT%NFreq =', NFreq
+
 allocate(XFreq(NFreq),WFreq(NFreq))
 allocate(LambdaA(A%NDimX,A%NDimX),LambdaB(B%NDimX,B%NDimX))
 
@@ -816,7 +818,9 @@ call dgemm('N','T',B%NDimX,NCholesky,B%NDimX,1d0,ABPLUSB,B%NDimX,DCholB,NCholesk
 deallocate(ABPLUSB,work)
 
 ! get CTilde in an iterative manner
-NFreq = 18
+NFreq = 12
+print*, 'SAPT%NFreq =', NFreq
+
 allocate(XFreq(NFreq),WFreq(NFreq))
 allocate(CTildeA(A%NDimX,NCholesky),CTildeB(B%NDimX,NCholesky))
 allocate(CA(NCholesky,NCholesky),CB(NCholesky,NCholesky))
