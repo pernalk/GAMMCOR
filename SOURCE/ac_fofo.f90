@@ -388,7 +388,7 @@ nblk = 1 + NBasis - NAct
 allocate(A0block(nblk))
 Call AC0BLOCK(Occ,URe,XOne, &
       IndN,IndX,IGem,NAct,INActive,NDimX,NBasis,NDimX,NInte1,'FFOO','FOFO', &
-      A0BlockIV,A0Block,nblk,0)
+      A0BlockIV,A0Block,nblk,'A0BLK',0)
       !A0BlockIV,A0Block,nblk,1)
 !
 COM=0.0
