@@ -165,9 +165,11 @@ type SystemBlock
       integer :: num0,num1,num2
       integer :: NVZero = 0
       integer :: TwoMoInt = TWOMO_INCORE
-      logical :: DeclareTwoMo = .false.
-      logical :: DeclareSt = .false.
-      logical :: DeclareTrSt = .false.
+      logical :: DeclareTwoMo     = .false.
+      logical :: DeclareSt        = .false.
+      logical :: DeclareTrSt      = .false.
+      logical :: DeclareThrSelAct = .false.
+      logical :: DeclareThrQVirt  = .false.
       logical :: ISHF    = .false.
       logical :: Cubic   = .false.
       logical :: Wexcit  = .false.
@@ -429,6 +431,12 @@ associate( CalcParams => Input%CalcParams)
       endif
       if(System%UCen.gt.0) then
          write(LOUT, '(1x,a,i2)') "NO. OF SYM. EQUIV. ATOMS: ", System%UCen 
+      endif
+      if(System%DeclareThrSelAct) then
+         write(LOUT, '(1x,a,e13.6)') "THRESHOLD SELECT ACTIVE : ", System%ThrSelAct
+      endif
+      if(System%DeclareThrQVirt) then
+         write(LOUT, '(1x,a,e13.6)') "THRESHOLD QUASI-VIRTUAL : ", System%ThrQVirt
       endif
       if(System%ISHF) then
          write(LOUT, '(1x,a,l2)') "HARTREE-FOCK: ", System%ISHF 

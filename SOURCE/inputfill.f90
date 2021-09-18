@@ -514,9 +514,11 @@ character(:), allocatable :: first, last
        read(val,*) SystemParams%ThrAct
 
  case ("THRSELACT")
+       SystemParams%DeclareThrSelAct = .true.
        read(val,*) SystemParams%ThrSelAct
 
  case ("THRQVIRT")
+       SystemParams%DeclareThrQVirt = .true.
        read(val,*) SystemParams%ThrQVirt
 
  case ("THRVIRT")
