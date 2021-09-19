@@ -297,107 +297,6 @@ integer :: iunit
 
 end subroutine writeampl
 
-!subroutine solve_cphf(M,WPot,e2indxy,Flags,NBas)
-!implicit none
-!
-!type(FlagsData) :: Flags
-!type(SystemBlock) :: M
-!type(DIISData) :: DIISBlock
-!type(Y01BlockData),allocatable :: Y01BlockM(:)
-!
-!integer,intent(in) :: NBas
-!double precision,intent(in)  :: WPot(NBas,NBas)
-!double precision,intent(out) :: e2indxy
-!
-!double precision,allocatable :: WxYY(:,:)
-!double precision,allocatable :: wVecxYY(:)
-!double precision,allocatable :: amps(:),vecR(:),delta(:)
-!double precision,allocatable :: OmM0(:)
-!
-!integer      :: iter,i,pq,ip,iq
-!logical      :: conv=.FALSE.
-!character(8) :: nameunc
-!double precision :: error
-!integer,parameter          :: MaxIt = 50
-!double precision,parameter :: ThrDIIS = 1.d-8
-!
-! if(M%Monomer==1) nameunc='XY0_A'
-! if(M%Monomer==2) nameunc='XY0_B'
-!
-! call init_DIIS(DIISBlock,M%NDimX,M%NDimX,Flags%DIISN)
-!
-! allocate(WxYY(NBas,NBas))
-! allocate(wVecxYY(M%NDimX))
-! call tran2MO(WPot,M%CMO,M%CMO,WxYY,NBas)
-! wVecxYY = 0
-! do pq=1,M%NDimX
-!    ip = M%IndN(1,pq)
-!    iq = M%IndN(2,pq)
-!    wVecxYY(pq) = WxYY(ip,iq)
-! enddo
-!
-! ! read EigVals
-! allocate(OmM0(M%NDimX))
-! allocate(Y01BlockM(M%NDimX))
-! call convert_XY0_to_Y01(M,Y01BlockM,OmM0,NBas,trim(nameunc))
-!
-! allocate(vecR(M%NDimX),amps(M%NDimX),delta(M%NDimX))
-!
-! ! zero iter
-! call amplitudes_T1(OmM0,wVecxYY,amps,M%NDimX)
-!
-! write(LOUT,'(1x,a,5x,a)') 'ITER', 'ERROR'
-! iter = 0
-! do
-!
-! vecR = wVecxYY
-! call dgemv('N',M%NDimX,M%NDimX,1.d0,M%PP,M%NDimX,amps,1,1d0,vecR,1)
-!
-! error = norm2(vecR)
-! conv=error.le.ThrDIIS
-!
-! write(LOUT,'(1x,i3,f11.6)') iter,error
-!
-! if(conv) then
-!    exit
-! elseif(.not.conv.and.iter.le.MaxIt) then
-!    iter = iter + 1
-! elseif(.not.conv.and.iter.gt.MaxIt) then
-!   write(*,*) 'Error!!! E2ind DIIS not converged!'
-!   exit
-! endif
-!
-! call amplitudes_T1(OmM0,vecR,delta,M%NDimX)
-! amps = amps + delta
-! if(iter>Flags%DIISOn) call use_DIIS(DIISBlock,amps,vecR)
-!
-! enddo
-!
-! !E2ind(X--Y)
-! e2indxy = 0
-! do pq=1,M%NDimX
-!    ip = M%IndN(1,pq)
-!    iq = M%IndN(2,pq)
-!    e2indxy = e2indxy + amps(pq)*WxYY(ip,iq)
-! enddo
-! e2indxy = 2d0*e2indxy
-!
-! call free_DIIS(DIISBlock)
-!
-! ! deallocate Y01Block
-! do i=1,M%NDimX
-!    associate(Y => Y01BlockM(i))
-!      deallocate(Y%vec0)
-!    end associate
-! enddo
-!
-! deallocate(delta,amps,vecR)
-! deallocate(Y01BlockM)
-! deallocate(OmM0)
-! deallocate(wVecxYY,WxYY)
-!
-!end subroutine solve_cphf
-
 subroutine solve_cphf(M,WPot,e2indxy,Flags,NBas)
 implicit none
 
@@ -540,8 +439,6 @@ double precision,allocatable :: ABMin(:,:),Work(:)
  deallocate(wVecxYY,WxYY)
 
 end subroutine solve_cphf
-
-
 
 subroutine amplitudes_T1_cphf(deps,ints,res,NDimX)
 implicit none
@@ -700,8 +597,6 @@ associate(A => SblockIV)
 end associate
 
 end subroutine convert_to_ABMIN
-
-
 
 subroutine readresp(EVec,EVal,NDim,fname)
 implicit none
@@ -1301,6 +1196,93 @@ enddo
 call free_DIIS(DIISBlock)
 
 end subroutine Cmat_iterDIIS
+
+subroutine ModABMin(Occ,SRKer,Wt,OrbGrid,TwoNO,TwoElErf,ABMin,IndN,IndX,NDimX,NGrid,NInte2,NBasis)
+!     ADD CONTRIBUTIONS FROM THE srALDA KERNEL TO AB MATRICES
+implicit none
+
+integer,parameter :: maxlen = 128
+integer,intent(in) :: NBasis,NDimX,NGrid,NInte2
+integer,intent(in) :: IndN(2,NDimX),IndX(NDimX)
+double precision,intent(in) :: Occ(NBasis),SRKer(NGrid), &
+                               Wt(NGrid),OrbGrid(NGrid,NBasis)
+double precision,intent(in) :: TwoNO(NInte2),TwoElErf(NInte2)
+double precision,intent(inout) :: ABMin(NDimX,NDimX)
+
+double precision :: CICoef(NBasis)
+double precision,allocatable :: work(:),batch(:,:),ABKer(:,:)
+integer :: i,j,IRow,ICol,ia,ib,iab,ic,id,icd
+integer :: offset,batchlen
+double precision :: XKer1234,TwoSR,CA,CB,CC,CD
+integer,external :: NAddr3,NAddrrK
+
+allocate(work(maxlen),batch(maxlen,NBasis),ABKer(NDimX,NDimX))
+
+do i=1,NBasis
+   CICoef(i) = sign(sqrt(Occ(i)),Occ(i)-0.5d0)
+enddo
+
+ABKer = 0
+
+do offset=0,NGrid,maxlen
+   batchlen = min(NGrid-offset,maxlen)
+   if(batchlen==0) exit
+
+   work(1:batchlen) = Wt(offset+1:offset+batchlen)*SRKer(offset+1:offset+batchlen)
+   batch(1:batchlen,1:NBasis) = OrbGrid(offset+1:offset+batchlen,1:NBasis)
+
+   do IRow=1,NDimX
+      ia = IndN(1,IRow)
+      ib = IndN(2,IRow)
+      iab = IndX(IRow)
+
+      do ICol=1,NDimX
+         ic=IndN(1,ICol)
+         id=IndN(2,ICol)
+         icd=IndX(ICol)
+         if(icd.gt.iab) cycle
+
+         XKer1234 = 0
+         do i=1,batchlen
+            XKer1234 = XKer1234 + work(i)* &
+            batch(i,ia)*batch(i,ib)*batch(i,ic)*batch(i,id)
+         enddo
+
+         ABKer(iab,icd) = ABKer(iab,icd) + XKer1234
+         ABKer(icd,iab) = ABKer(iab,icd)
+
+      enddo
+   enddo
+
+enddo
+
+do IRow=1,NDimX
+   ia = IndN(1,IRow)
+   ib = IndN(2,IRow)
+   iab = IndX(IRow)
+   CA = CICoef(ia)
+   CB = CICoef(ib)
+
+   do ICol=1,NDimX
+      ic=IndN(1,ICol)
+      id=IndN(2,ICol)
+      icd=IndX(ICol)
+      CC=CICoef(ic)
+      CD=CICoef(id)
+      !if(icd.gt.iab) cycle
+
+      TwoSR=TwoNO(NAddr3(ia,ib,ic,id))-TwoElErf(NAddr3(ia,ib,ic,id))
+
+      ABMin(iab,icd) = ABMin(iab,icd) &
+                       +4.0d0*(CA+CB)*(CD+CC)*(ABKer(iab,icd)+TwoSR)
+      !ABMin(icd,iab) = ABMin(iab,icd)
+
+   enddo
+enddo
+
+deallocate(ABKer,batch,work)
+
+end subroutine ModABMin
 
 subroutine print_en(string,val,nline)
 implicit none

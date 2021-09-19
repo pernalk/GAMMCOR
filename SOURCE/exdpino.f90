@@ -8,7 +8,7 @@ implicit none
 
 contains
 
-subroutine e2exdisp_apsg(Flags,A,B,SAPT)
+subroutine e2exdisp_pino(Flags,A,B,SAPT)
 
 implicit none
 
@@ -429,7 +429,7 @@ double precision,parameter :: BigE = 1.D8
  deallocate(posB,posA)
  deallocate(Vbab,Vaba,Vaab,Vbaa,Vabb,Vb,Va,PB,PA,Sab,S)
 
-end subroutine e2exdisp_apsg
+end subroutine e2exdisp_pino
 
 subroutine make_tij_Y_PINO(tmp3,tmp2,tmp1,posA,posB,Sab,Sba,A,B,NBas)
 implicit none

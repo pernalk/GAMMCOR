@@ -226,6 +226,7 @@ type FileNames
      character(:),allocatable :: testfile
      character(:),allocatable :: twofile,twojfile,twokfile
      character(:),allocatable :: y01file,xy0file
+     character(:),allocatable :: abfile
      character(:),allocatable :: propfile
      character(:),allocatable :: propfile0,propfile1,propfile2
 

@@ -3058,6 +3058,7 @@ double precision,parameter :: SmallE = 1.d-6
 
  print*, A%num0,A%num1,A%num2
  print*, B%num0,B%num1,B%num2
+ print*, 'sth wrong here with num1 and num2!'
 
 ! read EigValA_B
  allocate(EVecA(coef2*ADimEx**2),OmA(coef*ADimEx),&
