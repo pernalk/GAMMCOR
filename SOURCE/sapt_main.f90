@@ -2451,49 +2451,6 @@ close(iunit)
 
 end subroutine chol_ints_gen
 
-!subroutine chol_ints_fofo(nA,nB,MatAB,nC,nD,MatCD,NCholesky,NBas,fname)
-!! assumes that MatAB(CD) are NChol,FF type
-!! constructs (FF|OO) or (FO|FO) integrals
-!implicit none
-!
-!integer,intent(in) :: nA,nB,nC,nD
-!integer,intent(in) :: NBas,NCholesky
-!character(*),intent(in)     :: fname
-!double precision,intent(in) :: MatAB(NCholesky,NBas**2), &
-!                               MatCD(NCholesky,NBas**2)
-!
-!integer :: iunit
-!integer :: nAB,nCD,cd
-!integer :: ic,id,irec
-!double precision,allocatable :: work(:)
-!
-!nAB = nA*nB
-!nCD = nC*nD
-!
-!allocate(work(nAB))
-!
-!print*, 'Assemble ',fname,' from Cholesky Vectors'
-!
-!open(newunit=iunit,file=fname,status='REPLACE',&
-!     access='DIRECT',form='UNFORMATTED',recl=8*nAB)
-!
-!! (FF|OO)
-!irec = 0
-!do id=1,nD
-!   do ic=1,nC
-!      irec = irec + 1
-!      cd = ic+(id-1)*NBas
-!      call dgemv('T',NCholesky,nAB,1d0,MatAB,NCholesky,MatCD(1:NCholesky,cd),1,0d0,work,1)
-!      write(iunit,rec=irec) work(1:nAB)
-!
-!   enddo
-!enddo
-!
-!deallocate(work)
-!close(iunit)
-!
-!end subroutine chol_ints_fofo
-
 subroutine chol_sapt_NOTransf(SAPT,A,B,CholeskyVecs,NBasis)
 ! transform Choleksy Vecs from AO to NO
 ! for all 2-index vecs needed in SAPT
