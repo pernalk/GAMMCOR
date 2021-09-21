@@ -16,6 +16,8 @@ module class_CIntegrator
         procedure :: setup => setup
         procedure :: integrate => integrate
         procedure :: integrateReverse => integrateReverse
+        procedure :: clean => clean
+        procedure :: showInfo => showInfo
     end type CIntegrator
 
 
@@ -149,6 +151,14 @@ module class_CIntegrator
         end associate
 
     end subroutine integrateReverse
+
+
+    subroutine clean(this)
+
+        class(CIntegrator) :: this
+        deallocate(this%A0, this%A2, this%APlusTilde, this%APlusTildeAct)
+
+    endsubroutine clean
 
 
     subroutine showInfo(this, integrationModeName)
