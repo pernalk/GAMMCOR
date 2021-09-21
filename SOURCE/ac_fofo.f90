@@ -1,6 +1,4 @@
-subroutine Project_DChol(PMat,XOne,URe,Occ,EGOne,NGOcc,&
-   IGem,NAct,INActive,NELE,NBasis,NInte1,NDim,NGem,IndAux,&
-   IndN,IndX,NDimX)
+subroutine Project_DChol(PMat,IndN,NBasis,NDimX)
 !
 ! compute the projector matrix PMat, used optionally in ACFREQ
 !
@@ -8,26 +6,13 @@ use abfofo
 
 implicit none
 
-integer,intent(in) :: NGOcc,NBasis,NInte1,NDim,NGem,NDimX
-integer,intent(in) :: NAct,INActive,NELE
-integer,intent(in) :: IndN(2,NDim),IndX(NDim),IndAux(NBasis),&
-                   IGem(NBasis)
-double precision :: ACAlpha
-double precision,intent(in) :: URe(NBasis,NBasis),Occ(NBasis),XONe(NInte1)
-double precision,intent(inout) :: EGOne(NGem)
-
+integer,intent(in) :: NBasis,NDimX,IndN(2,NDimX)
 double precision :: PMat(NDimX,NDimX)
-
-double precision :: COM(NDimX*NDimX),XFreq(100),WFreq(100),&
-                 ABPLUS(NDim*NDim),AB(NDim*NDim),ADIAG(NDim)
 
 integer :: iunit
 integer :: ia,ib,ic,id,ICol,IRow
 integer :: i,j,k,l,kl,ip,iq,ir,is,ipq,irs
-integer :: pos(NBasis,NBasis),N,IGL,inf1,inf2,info,Max_Cn
-double precision :: ECASSCF,WFact,XFactorial,XN1,XN2,FF,CICoef(NBasis),Cpq,Crs,SumY,Aux,OmI
-character(:),allocatable :: twojfile,twokfile,IntKFile
-logical :: AuxCoeff(3,3,3,3)
+integer :: pos(NBasis,NBasis),N,IGL,inf1,inf2,info
 double precision,allocatable :: work(:),ints(:,:)
 Real*8, Allocatable :: MatFF(:,:),work2(:,:),work3(:),work1(:,:),work4(:),work5(:,:),work6(:,:)
 integer :: NCholesky,lwork
@@ -1010,8 +995,8 @@ subroutine CIter_FOFO(PMat,ECorr,ACAlpha,XOne,URe,Occ,EGOne,NGOcc,&
 
    ! Create A0 calculator object
 !   lambdaCalc = LambdaCalculatorDiag()
-    LambdaCalc = LambdaCalculatorBlock(URe,Occ,XOne,IndN,IndX,IGem,NBasis,NAct,INActive,NInte1,twojfile,twokfile)
-!    LambdaCalc = LambdaCalculatorProjector(PMat)
+!    LambdaCalc = LambdaCalculatorBlock(URe,Occ,XOne,IndN,IndX,IGem,NBasis,NAct,INActive,NInte1,twojfile,twokfile)
+    LambdaCalc = LambdaCalculatorProjector(PMat)
 
    NGrid = 35
    CIntegr = CIntegrator(iterAlgo=iterAlgo, lambdaCalc=lambdaCalc)
