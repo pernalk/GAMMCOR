@@ -994,9 +994,9 @@ subroutine CIter_FOFO(PMat,ECorr,ACAlpha,XOne,URe,Occ,EGOne,NGOcc,&
 !    iterAlgo = IterAlgorithmDamping(Threshold=1d-3, XMix=0.2, maxIterations=-1)
 
    ! Create A0 calculator object
-!   lambdaCalc = LambdaCalculatorDiag()
+   lambdaCalc = LambdaCalculatorDiag()
 !    LambdaCalc = LambdaCalculatorBlock(URe,Occ,XOne,IndN,IndX,IGem,NBasis,NAct,INActive,NInte1,twojfile,twokfile)
-    LambdaCalc = LambdaCalculatorProjector(PMat)
+!    LambdaCalc = LambdaCalculatorProjector(PMat)
 
    NGrid = 35
    CIntegr = CIntegrator(iterAlgo=iterAlgo, lambdaCalc=lambdaCalc)
@@ -1345,7 +1345,7 @@ associate(A => A0BlockIV)
 end associate
 close(iunit)
 
-! example: diagonalize small blocks
+! invert small blocks
 allocate(work(NDimX,NDimX))
 
 work = 0
