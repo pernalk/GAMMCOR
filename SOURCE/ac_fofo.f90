@@ -994,8 +994,8 @@ subroutine CIter_FOFO(PMat,ECorr,ACAlpha,XOne,URe,Occ,EGOne,NGOcc,&
 !    iterAlgo = IterAlgorithmDamping(Threshold=1d-3, XMix=0.2, maxIterations=-1)
 
    ! Create A0 calculator object
-   lambdaCalc = LambdaCalculatorDiag()
-!    LambdaCalc = LambdaCalculatorBlock(URe,Occ,XOne,IndN,IndX,IGem,NBasis,NAct,INActive,NInte1,twojfile,twokfile)
+!   lambdaCalc = LambdaCalculatorDiag()
+    LambdaCalc = LambdaCalculatorBlock(URe,Occ,XOne,IndN,IndX,IGem,NBasis,NAct,INActive,NInte1,twojfile,twokfile)
 !    LambdaCalc = LambdaCalculatorProjector(PMat)
 
    NGrid = 35

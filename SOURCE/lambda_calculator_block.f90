@@ -65,6 +65,7 @@ module class_LambdaCalculatorBlock
                       A0BlockIV,A0Block,nblk,'A0BLK',0)
         Call INV_AC0BLK(OmI**2,Lambda,A0Block,A0BlockIV,nblk,NDimX)
 
+        Call RELEASE_AC0BLOCK(A0Block,A0blockIV,nblk)
 
     end subroutine calculateLambda
 
