@@ -1045,11 +1045,13 @@ end associate
 
 end subroutine ABPM_TRAN_GEN
 
-subroutine ABPM_HALFTRAN_LR(AMAT,AOUT,EBlock,EBlockIV,nblk,DimL,DimR,isMatY)
+subroutine ABPM_HALFTRAN_GEN_L(AMAT,AOUT,fact,EBlock,EBlockIV,nblk,DimL,DimR,xyvar)
+! AOUT = EBlock.AMAT
 implicit none
 
 integer,intent(in) :: nblk,DimL,DimR
-integer,intent(in) :: isMatY
+double precision,intent(in) :: fact
+character(*),intent(in) :: xyvar
 double precision,intent(in)    :: AMAT(DimL,DimR)
 double precision,intent(inout) :: AOUT(DimL,DimR)
 
@@ -1058,7 +1060,7 @@ type(EBlockData),intent(in) :: EBlock(nblk),EBlockIV
 integer :: i,ii,ipos,iblk
 double precision,allocatable :: ABP(:,:),ABM(:,:)
 
-AOUT=0
+AOUT = fact*AOUT
 
 do iblk=1,nblk
    associate(iB => Eblock(iblk))
@@ -1070,14 +1072,15 @@ do iblk=1,nblk
         ABP(i,:) = AMAT(ipos,:)
      enddo
 
-     if(isMatY==1) then
+     select case(xyvar)
+     case('Y','y')
        call dgemm('N','N',iB%n,DimR,iB%n,1d0,iB%matY,iB%n,ABP,iB%n,0d0,ABM,iB%n)
-     elseif(isMatY==0) then
+     case('X','x')
        call dgemm('N','N',iB%n,DimR,iB%n,1d0,iB%matX,iB%n,ABP,iB%n,0d0,ABM,iB%n)
-     else
+     case default
        write(lout,'(a)') 'Error in ABPM_HALFTRAN_LR!'
        stop
-     endif
+     end select
 
      do i=1,iB%n
         ipos = iB%pos(i)
@@ -1099,9 +1102,66 @@ associate(B => EblockIV)
 
 end associate
 
-end subroutine ABPM_HALFTRAN_LR
+end subroutine ABPM_HALFTRAN_GEN_L
 
+subroutine ABPM_HALFTRAN_GEN_R(AMAT,AOUT,fact,EBlock,EBlockIV,nblk,DimL,DimR,xyvar)
+implicit none
 
+integer,intent(in) :: nblk,DimL,DimR
+double precision,intent(in) :: fact
+character(*),intent(in)     :: xyvar
+double precision,intent(in)    :: AMAT(DimL,DimR)
+double precision,intent(inout) :: AOUT(DimL,DimR)
+
+type(EBlockData),intent(in) :: EBlock(nblk),EBlockIV
+
+integer :: i,ii,ipos,iblk
+double precision,allocatable :: ABP(:,:),ABM(:,:)
+
+AOUT = fact*AOUT
+
+do iblk=1,nblk
+   associate(iB => Eblock(iblk))
+
+     !allocate(ABP(iB%n,DimR),ABM(iB%n,DimR))
+     allocate(ABP(DimL,iB%n),ABM(DimL,iB%n))
+
+     do i=1,iB%n
+        ipos = iB%pos(i)
+        ABP(:,i) = AMAT(:,ipos)
+     enddo
+
+     select case(xyvar)
+     case('Y','y')
+       call dgemm('N','N',DimL,iB%n,iB%n,1d0,ABP,DimL,iB%matY,iB%n,0d0,ABM,DimL)
+     case('X','x')
+       call dgemm('N','N',DimL,iB%n,iB%n,1d0,ABP,DimL,iB%matX,iB%n,0d0,ABM,DimL)
+     case default
+       write(lout,'(a)') 'Error in ABPM_HALFTRAN_LR!'
+       stop
+     end select
+
+     do i=1,iB%n
+        ipos = iB%pos(i)
+        AOUT(:,ipos) = AOUT(:,ipos) + ABM(:,i)
+     enddo
+
+     deallocate(ABM,ABP)
+
+   end associate
+enddo
+
+associate(B => EblockIV)
+
+  do i=1,B%n
+     ii = B%l1+i-1
+     ipos = B%pos(i)
+     AOUT(:,ipos) = AOUT(:,ipos) + B%vec(i)*AMAT(:,ipos)
+  enddo
+
+end associate
+
+end subroutine ABPM_HALFTRAN_GEN_R
 
 subroutine make_J1(NBas,X,J,intfile)
 implicit none

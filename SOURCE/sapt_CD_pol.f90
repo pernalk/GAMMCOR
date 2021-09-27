@@ -1,6 +1,6 @@
 module sapt_CD_pol
 use types
-use tran, only : ABPM_HALFTRAN_LR
+use tran, only : ABPM_HALFTRAN_GEN_L
 use sapt_utils
 
 implicit none
@@ -843,11 +843,11 @@ do ifreq=NFreq,1,-1
    call calculateLambda(LambdaA,LambdaIVA,OmI**2,A%NDimX,nblkA,A0BlkA,A0BlkIVA)
    call calculateLambda(LambdaB,LambdaIVB,OmI**2,B%NDimX,nblkB,A0BlkB,A0BlkIVB)
 
-   if(ifreq==NFreq) call ABPM_HALFTRAN_LR(ABPTildeA,CTildeA,LambdaA,LambdaIVA,nblkA,A%NDimX,NCholesky,0)
+   if(ifreq==NFreq) call ABPM_HALFTRAN_GEN_L(ABPTildeA,CTildeA,0d0,LambdaA,LambdaIVA,nblkA,A%NDimX,NCholesky,'X')
    call Cmat_iterDIIS(CTildeA,A%NDimX,NCholesky,nblkA,LambdaA,LambdaIVA,ABPTildeA,ABPMA,iStatsA)
    call iStatsA%setFreq(OmI)
 
-   if(ifreq==NFreq) call ABPM_HALFTRAN_LR(ABPTildeB,CTildeB,LambdaB,LambdaIVB,nblkB,B%NDimX,NCholesky,0)
+   if(ifreq==NFreq) call ABPM_HALFTRAN_GEN_L(ABPTildeB,CTildeB,0d0,LambdaB,LambdaIVB,nblkB,B%NDimX,NCholesky,'X')
    call Cmat_iterDIIS(CTildeB,B%NDimX,NCholesky,nblkB,LambdaB,LambdaIVB,ABPTildeB,ABPMB,iStatsB)
    call iStatsB%setFreq(OmI)
 
@@ -886,6 +886,319 @@ deallocate(ABPMB,ABPMA)
 deallocate(ABPTildeB,ABPTildeA)
 
 end subroutine e2disp_Cmat_Chol_block
+
+subroutine e2disp_CAlphaTilde_block(Flags,A,B,SAPT)
+!
+! calculate 2nd order dispersion energy
+! in coupled approximation using
+! C(omega) obained in an iterative fashion
+! using A0 blocks (not diagonal)
+! with Cholesky vectors
+!
+implicit none
+
+type(FlagsData)   :: Flags
+type(SystemBlock) :: A, B
+type(SaptData)    :: SAPT
+
+integer :: NBas
+integer :: ifreq,NFreq,NCholesky
+integer :: i,j,ipq,irs
+integer :: ip,iq,ir,is
+integer :: iunit,info
+integer :: nblkA,nblkB
+integer :: N,Max_Cn
+double precision :: fact,val
+double precision :: Cpq,Crs
+double precision :: XFactorial,XN1,XN2
+double precision :: ACAlpha,OmI,Pi,e2d
+
+double precision,allocatable :: XFreq(:),WFreq(:)
+double precision,allocatable :: ABPMA(:,:),ABPMB(:,:),&
+                                ABPLUS1A(:,:),ABPLUS1B(:,:),&
+                                ABMIN1A(:,:),ABMIN1B(:,:),  &
+                                A1A(:,:),A1B(:,:),&
+                                A2A(:,:),A2B(:,:),&
+                                ABP0TildeA(:,:),ABP0TildeB(:,:),&
+                                ABP1TildeA(:,:),ABP1TildeB(:,:)
+double precision,allocatable :: DCholA(:,:),DCholB(:,:)
+double precision,allocatable :: CA(:,:),CB(:,:)
+double precision,allocatable :: C0TildeA(:,:),C0TildeB(:,:), &
+                                C1TildeA(:,:),C1TildeB(:,:), &
+                                C2TildeA(:,:),C2TildeB(:,:), &
+                                CTildeA(:,:), CTildeB(:,:)
+double precision,allocatable :: WorkA(:,:),WorkB(:,:)
+
+type(EBlockData)             :: A0BlkIVA,A0BlkIVB
+type(EBlockData),allocatable :: A0BlkA(:),A0BlkB(:)
+
+type(EBlockData)             :: LambdaIVA,LambdaIVB
+type(EBlockData),allocatable :: LambdaA(:),LambdaB(:)
+
+ACAlpha = 1.0d0
+Pi = 4.0d0*atan(1.0)
+
+! set dimensions
+NCholesky = SAPT%NCholesky
+
+! check MCBS/DCBS
+if(A%NBasis.ne.B%NBasis) then
+   write(LOUT,'(1x,a)') 'ERROR! MCBS not implemented in SAPT!'
+   stop
+else
+   NBas = A%NBasis
+endif
+
+! get Dmat
+allocate(DCholA(NCholesky,A%NDimX),DCholB(NCholesky,B%NDimX))
+
+DCholA = 0
+do j=1,A%NDimX
+   ip = A%IndN(1,j)
+   iq = A%IndN(2,j)
+   ipq = iq + (ip-1)*NBas
+   Cpq = A%CICoef(ip) + A%CICoef(iq)
+   do i=1,NCholesky
+      DCholA(i,j) = Cpq*A%FF(i,ipq)
+   enddo
+enddo
+DCholB = 0
+do j=1,B%NDimX
+   ir = B%IndN(1,j)
+   is = B%IndN(2,j)
+   irs = is + (ir-1)*NBas
+   Crs = B%CICoef(ir) + B%CICoef(is)
+   do i=1,NCholesky
+      DCholB(i,j) = Crs*B%FF(i,irs)
+   enddo
+enddo
+
+! monomer A
+allocate(ABPLUS1A(A%NDimX,A%NDimX),ABMIN1A(A%NDimX,A%NDimX))
+allocate(A1A(A%NDimX,A%NDimX),A2A(A%NDimX,A%NDimX))
+
+open(newunit=iunit,file='ABMAT_A',status='OLD',&
+     access='SEQUENTIAL',form='UNFORMATTED')
+
+read(iunit) ABPLUS1A
+read(iunit) ABMIN1A
+
+close(iunit)
+
+! also: we may use a ridiculous alternative and generate full matrices...
+
+! get A0PLUS, A0MIN in blocks matY and matX
+call Sblock_to_ABMAT(A0BlkA,A0BlkIVA,A%IndN,A%CICoef,nblkA,NBas,A%NDimX,'XY0_A')
+
+! AB1 = AB1 - A0
+call subtr_blk_right(ABPLUS1A,A0BlkA,A0BlkIVA,.false.,nblkA,A%NDimX)
+call subtr_blk_right(ABMIN1A, A0BlkA,A0BlkIVA,.true., nblkA,A%NDimX)
+
+print*, 'ABPLUS1A',norm2(ABPLUS1A)
+print*, 'ABMIN1A ',norm2(ABMIN1A)
+
+!Calc: A1 = ABP0*ABM1+ABP1*ABM0
+call ABPM_HALFTRAN_GEN_L(ABMIN1A, A1A,0.0d0,A0BlkA,A0BlkIVA,nblkA,A%NDimX,A%NDimX,'Y')
+call ABPM_HALFTRAN_GEN_R(ABPLUS1A,A1A,1.0d0,A0BlkA,A0BlkIVA,nblkA,A%NDimX,A%NDimX,'X')
+print*, 'A1A',norm2(A1A)
+
+!Calc: A2 = ABP1*ABM1
+Call dgemm('N','N',A%NDimX,A%NDimX,A%NDimX,1d0,ABPLUS1A,A%NDimX,ABMIN1A,A%NDimX,0.0d0,A2A,A%NDimX)
+deallocate(ABMIN1A)
+print*, 'A2A',norm2(A2A)
+
+!Calc: APLUS0Tilde=ABPLUS0.DChol
+allocate(ABP0TildeA(A%NDimX,NCholesky))
+call ABPM_HALFTRAN_GEN_L(transpose(DCholA),ABP0TildeA,0.0d0,A0BlkA,A0BlkIVA,nblkA,A%NDimX,NCholesky,'Y')
+print*, 'APLUS0Tilde',norm2(ABP0TildeA)
+
+!Calc: APLUS1Tilde=ABPLUS1.DChol
+allocate(ABP1TildeA(A%NDimX,NCholesky))
+Call dgemm('N','T',A%NDimX,NCholesky,A%NDimX,1d0,ABPLUS1A,A%NDimX,DCholA,NCholesky,0.0d0,ABP1TildeA,A%NDimX)
+print*, 'APLUS1Tilde',norm2(ABP1TildeA)
+
+deallocate(ABPLUS1A)
+call release_ac0block(A0BlkA,A0BlkIVA,nblkA)
+deallocate(A0BlkA)
+
+! monomer B
+allocate(ABPLUS1B(B%NDimX,B%NDimX),ABMIN1B(B%NDimX,B%NDimX))
+allocate(A1B(B%NDimX,B%NDimX),A2B(B%NDimX,B%NDimX))
+
+!allocate(ABPMB(B%NDimX,B%NDimX),ABPTildeB(B%NDimX,NCholesky))
+
+open(newunit=iunit,file='ABMAT_B',status='OLD',&
+     access='SEQUENTIAL',form='UNFORMATTED')
+
+read(iunit) ABPLUS1B
+read(iunit) ABMIN1B
+
+close(iunit)
+
+! get A0PLUS, A0MIN in blocks matY and matX
+call Sblock_to_ABMAT(A0BlkB,A0BlkIVB,B%IndN,B%CICoef,nblkB,NBas,B%NDimX,'XY0_B')
+
+! AB1 = AB1 - A0
+call subtr_blk_right(ABPLUS1B,A0BlkB,A0BlkIVB,.false.,nblkB,B%NDimX)
+call subtr_blk_right(ABMIN1B, A0BlkB,A0BlkIVB,.true., nblkB,B%NDimX)
+
+print*, 'ABPLUS1B',norm2(ABPLUS1B)
+print*, 'ABMIN1B ',norm2(ABMIN1B)
+
+!Calc: A1 = ABP0*ABM1+ABP1*ABM0
+call ABPM_HALFTRAN_GEN_L(ABMIN1B, A1B,0.0d0,A0BlkB,A0BlkIVB,nblkB,B%NDimX,B%NDimX,'Y')
+call ABPM_HALFTRAN_GEN_R(ABPLUS1B,A1B,1.0d0,A0BlkB,A0BlkIVB,nblkB,B%NDimX,B%NDimX,'X')
+print*, 'A1B',norm2(A1B)
+
+!Calc: A2 = ABP1*ABM1
+Call dgemm('N','N',B%NDimX,B%NDimX,B%NDimX,1d0,ABPLUS1B,B%NDimX,ABMIN1B,B%NDimX,0.0d0,A2B,B%NDimX)
+deallocate(ABMIN1B)
+print*, 'A2B',norm2(A2B)
+
+!Calc: APLUS0Tilde=ABPLUS0.DChol
+allocate(ABP0TildeB(B%NDimX,NCholesky))
+call ABPM_HALFTRAN_GEN_L(transpose(DCholB),ABP0TildeB,0.0d0,A0BlkB,A0BlkIVB,nblkB,B%NDimX,NCholesky,'Y')
+print*, 'APLUS0Tilde-b',norm2(ABP0TildeB)
+
+!Calc: APLUS1Tilde=ABPLUS1.DChol
+allocate(ABP1TildeB(B%NDimX,NCholesky))
+Call dgemm('N','T',B%NDimX,NCholesky,B%NDimX,1d0,ABPLUS1B,B%NDimX,DCholB,NCholesky,0.0d0,ABP1TildeB,B%NDimX)
+print*, 'APLUS1Tilde-b',norm2(ABP1TildeB)
+
+deallocate(ABPLUS1B)
+call release_ac0block(A0BlkB,A0BlkIVB,nblkB)
+deallocate(A0BlkB)
+
+! get CAlphaTilde in an iterative manner
+
+NFreq = 12
+Max_Cn = 5
+print*, 'SAPT%NFreq =', NFreq
+print*, 'SAPT%MaxCn =', Max_Cn
+
+allocate(XFreq(NFreq),WFreq(NFreq))
+
+allocate(C0TildeA(A%NDimX,NCholesky),C0TildeB(B%NDimX,NCholesky))
+allocate(C1TildeA(A%NDimX,NCholesky),C1TildeB(B%NDimX,NCholesky))
+allocate(C2TildeA(A%NDimX,NCholesky),C2TildeB(B%NDimX,NCholesky))
+allocate(CTildeA(A%NDimX,NCholesky),CTildeB(B%NDimX,NCholesky))
+allocate(WorkA(A%NDimX,NCholesky),WorkB(B%NDimX,NCholesky))
+allocate(CA(NCholesky,NCholesky),CB(NCholesky,NCholesky))
+
+call FreqGrid(XFreq,WFreq,NFreq)
+
+! read ABPLUS0.ABMIN0 blocks
+call read_ABPM0Block(A0BlkA,A0BlkIVA,nblkA,'A0BLK_A')
+call read_ABPM0Block(A0BlkB,A0BlkIVB,nblkB,'A0BLK_B')
+
+e2d = 0
+do ifreq=NFreq,1,-1
+
+   OmI = XFreq(ifreq)
+   !OmI = 1.08185673347417
+
+!  Calc: LAMBDA=(A0+Om^2)^-1
+   call calculateLambda(LambdaA,LambdaIVA,OmI**2,A%NDimX,nblkA,A0BlkA,A0BlkIVA)
+   call calculateLambda(LambdaB,LambdaIVB,OmI**2,B%NDimX,nblkB,A0BlkB,A0BlkIVB)
+
+!  Calc: C0Tilde=1/2 LAMBDA.APLUS0Tilde
+   call ABPM_HALFTRAN_GEN_L(ABP0TildeA,C0TildeA,0.0d0,LambdaA,LambdaIVA,nblkA,A%NDimX,NCholesky,'X')
+   call ABPM_HALFTRAN_GEN_L(ABP0TildeB,C0TildeB,0.0d0,LambdaB,LambdaIVB,nblkB,B%NDimX,NCholesky,'X')
+   C0TildeA = 0.5d0*C0TildeA
+   C0TildeB = 0.5d0*C0TildeB
+
+   print*, 'C0Tilde-A',OmI,norm2(C0TildeA)
+   print*, 'C0Tilde-B',OmI,norm2(C0TildeB)
+
+!  Calc: C1Tilde=LAMBDA.(1/2 APLUS1Tilde - A1.C0Tilde)
+   call dgemm('N','N',A%NDimX,NCholesky,A%NDimX,1.d0,A1A,A%NDimX,C0TildeA,A%NDimX,0.0d0,CTildeA,A%NDimX)
+   CTildeA = 0.5d0*ABP1TildeA - CTildeA
+   call ABPM_HALFTRAN_GEN_L(CTildeA,C1TildeA,0.0d0,LambdaA,LambdaIVA,nblkA,A%NDimX,NCholesky,'X')
+
+   call dgemm('N','N',B%NDimX,NCholesky,B%NDimX,1.d0,A1B,B%NDimX,C0TildeB,B%NDimX,0.0d0,CTildeB,B%NDimX)
+   CTildeB = 0.5d0*ABP1TildeB - CTildeB
+   call ABPM_HALFTRAN_GEN_L(CTildeB,C1TildeB,0.0d0,LambdaB,LambdaIVB,nblkB,B%NDimX,NCholesky,'X')
+
+   print*, 'C1Tilde-A',OmI,norm2(C1TildeA)
+   print*, 'C1Tilde-B',OmI,norm2(C1TildeB)
+
+   ! test uncoupled
+   CTildeA = 0
+   CTildeB = 0
+
+   CTildeA = C0TildeA
+   CTildeB = C0TildeB
+
+   !! test semicoupled
+   CTildeA = CTildeA + C1TildeA
+   CTildeB = CTildeB + C1TildeB
+
+   XFactorial = 1
+   do N=2,Max_Cn
+
+       XFactorial = XFactorial*N
+       XN1 = -N
+       XN2 = -N*(N-1)
+
+       call dgemm('N','N',A%NDimX,NCholesky,A%NDimX,XN2,A2A,A%NDimX,C0TildeA,A%NDimX,0.0d0,WorkA,A%NDimX)
+       call dgemm('N','N',A%NDimX,NCholesky,A%NDimX,XN1,A1A,A%NDimX,C1TildeA,A%NDimX,1.0d0,WorkA,A%NDimX)
+       call ABPM_HALFTRAN_GEN_L(WorkA,C2TildeA,0.0d0,LambdaA,LambdaIVA,nblkA,A%NDimX,NCholesky,'X')
+       !call dgemm('N','N',A%NDimX,NCholesky,A%NDimX,1.0d0,LAMBDA,NDimX,WORK0,NDimX,0.0d0,C2TildeA,NDimX)
+
+       CTildeA  = CTildeA + C2TildeA / XFactorial
+       C0TildeA = C1TildeA
+       C1TildeA = C2TildeA
+
+       print*, 'N,COMTildeA',N,norm2(CTildeA)
+
+       call dgemm('N','N',B%NDimX,NCholesky,B%NDimX,XN2,A2B,B%NDimX,C0TildeB,B%NDimX,0.0d0,WorkB,B%NDimX)
+       call dgemm('N','N',B%NDimX,NCholesky,B%NDimX,XN1,A1B,B%NDimX,C1TildeB,B%NDimX,1.0d0,WorkB,B%NDimX)
+       call ABPM_HALFTRAN_GEN_L(WorkB,C2TildeB,0.0d0,LambdaB,LambdaIVB,nblkB,B%NDimX,NCholesky,'X')
+       !call dgemm('N','N',B%NDimX,NCholesky,B%NDimX,1.0d0,LAMBDA,NDimX,WORK0,NDimX,0.0d0,C2Tilde,NDimX)
+
+       CTildeB = CTildeB + C2TildeB / XFactorial
+       C0TildeB = C1TildeB
+       C1TildeB = C2TildeB
+       
+       print*, 'N,COMTildeB',N,norm2(CTildeB)
+
+   enddo
+
+   call dgemm('N','N',NCholesky,NCholesky,A%NDimX,1d0,DCholA,NCholesky,CTildeA,A%NDimX,0d0,CA,NCholesky)
+   call dgemm('N','N',NCholesky,NCholesky,B%NDimX,1d0,DCholB,NCholesky,CTildeB,B%NDimX,0d0,CB,NCholesky)
+!
+   val = 0
+   do j=1,NCholesky
+      do i=1,NCholesky
+         val = val + CA(j,i)*CB(i,j)
+      enddo
+   enddo
+
+   e2d = e2d + WFreq(ifreq)*val
+
+   call release_ac0block(LambdaA,LambdaIVA,nblkA)
+   call release_ac0block(LambdaB,LambdaIVB,nblkB)
+
+enddo
+
+!SAPT%e2disp  = -8d0/Pi*e2d
+
+e2d = -32d0/Pi*e2d*1d3
+print*, 'e2d = ',e2d
+!call print_en('E2disp(Cmat)',e2d,.false.)
+
+deallocate(WFreq,XFreq)
+deallocate(A2A,A1A)
+deallocate(ABP1TildeA,ABP0TildeA)
+deallocate(CTildeB,CTildeA)
+deallocate(C2TildeB,C2TildeA)
+deallocate(C1TildeB,C1TildeA)
+deallocate(C0TildeB,C0TildeA)
+deallocate(WorkB,WorkA)
+deallocate(CB,CA)
+deallocate(DCholB,DCholA)
+
+end subroutine e2disp_CAlphaTilde_block
 
 subroutine get_Cmat(Cmat,CICoef,IndN,ABPM,ABPLUS,Omega,NDimX,NBas)
 implicit none
