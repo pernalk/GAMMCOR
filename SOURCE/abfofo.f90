@@ -1160,7 +1160,7 @@ allocate(RDM2Act(NRDM2Act))
 
 RDM2Act = 0
 open(newunit=iunit,file='rdm2.dat',status='old')
-write(LOUT,'(/,1x,''Active block of 2-RDM read from rdm2.dat'')')
+!write(LOUT,'(/,1x,''Active block of 2-RDM read from rdm2.dat'')')
 do
    read(iunit,*,iostat=ios) i,j,k,l,val
    if(ios/=0) exit
@@ -1199,7 +1199,7 @@ EnOne = EnOne + 2*val
 !print*, 'Occ:', norm2(Occ)
 !print*, 'HNO:', norm2(HNO)
 
-write(LOUT,*) 'ONE ELECTRON ENERGY:', EnOne
+!write(LOUT,*) 'ONE ELECTRON ENERGY:', EnOne
 if(present(ETot)) ETot = ETot + 2*val
 
 do j=1,NBasis

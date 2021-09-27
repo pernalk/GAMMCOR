@@ -19,7 +19,7 @@ module class_LambdaCalculatorBlock
     contains
 
 
-    subroutine calculateLambda(this, Lambda, OmI, NDimX, A0)
+    subroutine calculateLambda_old(this, Lambda, OmI, NDimX, A0)
 
         implicit none
         class(LambdaCalculatorBlock) :: this
@@ -38,8 +38,36 @@ module class_LambdaCalculatorBlock
         Call dgetrf(NDimX,NDimX, Lambda, NDimX, ipiv, inf1)
         Call dgetri(NDimX, Lambda, NDimX, ipiv, work0, NDimX, inf2)
 
-    end subroutine calculateLambda
+    end subroutine calculateLambda_old
 
+    subroutine calculateLambda(this, Lambda, OmI, NDimX, A0)
+! to do: A0 is not needed, it is now computed in AC0BLOCK; 
+!        compute A2 here, do not use calculateInitialA
+        use abfofo
+        implicit none
+        class(LambdaCalculatorBlock) :: this
+        double precision, intent(out) :: Lambda(NDimX*NDimX)
+        integer, intent(in) :: NDimX
+        double precision, intent(in) :: OmI, A0(NDimX*NDimX)
+        integer :: i, inf1, inf2
+        double precision :: WORK0(NDimX*NDimX)
+        double precision :: ipiv(NDimX)
+
+        integer :: nblk
+        type(EblockData) :: A0blockIV
+        type(EblockData),allocatable :: A0block(:)
+
+        nblk = 1 + this%NBasis - this%NAct
+        allocate(A0block(nblk))
+        Call AC0BLOCK(this%Occ,this%URe,this%XOne, &
+                      this%IndN,this%IndX,this%IGem,this%NAct,this%INActive,NDimX,this%NBasis,NDimX,&
+                      this%NInte1,'FFOO','FOFO', &
+                      A0BlockIV,A0Block,nblk,'A0BLK',0)
+        Call INV_AC0BLK(OmI**2,Lambda,A0Block,A0BlockIV,nblk,NDimX)
+
+        Call RELEASE_AC0BLOCK(A0Block,A0blockIV,nblk)
+
+    end subroutine calculateLambda
 
     subroutine calculateInitialA(this, A0, A2, NDimX)
 

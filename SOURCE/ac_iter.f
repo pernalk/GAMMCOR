@@ -94,11 +94,8 @@ C     **************************************************************************
 C
 C     Find the projector PMat
 C
-      Call Project_DChol(PMat,XOne,URe,Occ,
-     $ EGOne,NGOcc,
-     $ IGem,NAcCAS,NInAcCAS,NELE,
-     $ NBasis,NInte1,NDim,NGem,IndAux,
-     $ IndN,IndX,NDimX)
+      write(*,*)ndim,ndimx
+      Call Project_DChol(PMat,IndN,NBasis,NDimX)
 C
 C     GENERATE ABSCISSAS AND WEIGHTS FOR GAUSSIAN-LEGENDRE QUADRATURE
 C
