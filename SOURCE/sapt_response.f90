@@ -58,6 +58,10 @@ double precision,parameter :: SmallE=0d0,BigE=1.D20
 integer :: nblk
 type(EblockData) :: A0blockIV
 type(EblockData),allocatable :: A0block(:)
+! test Calpha
+integer :: NGOcc
+double precision :: OmI
+double precision,allocatable :: COMTilde(:)
 
 ! test iterative
 iter = 1
@@ -268,7 +272,9 @@ if(Flags%ICASSCF==0.and.Flags%ISERPA==0) then
      call EKT(URe,Mon%Occ,XOne,TwoMO,NBas,NInte1,NInte2)
 
   end select
-  write(LOUT,'(/,1x,a,f16.8,a,1x,f16.8)') 'ABPlus',norm2(ABPlus),'ABMin',norm2(ABMin)
+  !write(LOUT,'(/,1x,a,f16.8,a,1x,f16.8)') 'ABPlus',norm2(ABPlus),'ABMin',norm2(ABMin)
+  print*, 'ABPlus',norm2(ABPlus)
+  print*, 'ABMin',norm2(ABMin)
 
   EigVecR = 0
   Eig = 0
@@ -503,6 +509,17 @@ if(Flags%ICASSCF==0.and.Flags%ISERPA==0) then
       deallocate(Eig1,Eig0,EigY1,EigY0)
 
   end select
+
+  !! test CAlpha
+  NGOcc = 0
+  OmI = 1.08185673347417
+  call C_AlphaExpand(COMTilde,OmI,XOne,URe,Mon%Occ,NGOcc,&
+                    Mon%IGem,Mon%NAct,Mon%INAct,NBas,NInte1,&
+                    Mon%NDim,Mon%NGem,&
+                    Mon%IndAux,Mon%IndN,Mon%IndX,Mon%NDimX,&
+                    twojfile,twokfile,xy0file,abpm0file)
+  print*, 'COMTilde',norm2(COMTilde)
+  deallocate(COMTilde)
 
    ! WARNING: MH, September 2021
    ! in previous versions of the code all PINO cases (ISERPA==2)

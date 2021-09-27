@@ -255,6 +255,7 @@ double precision,intent(inout) :: Tcpu,Twall
  !call e2disp_Cmat(Flags,SAPT%monA,SAPT%monB,SAPT)
  !call e2disp_Cmat_Chol(Flags,SAPT%monA,SAPT%monB,SAPT)
  call e2disp_Cmat_Chol_block(Flags,SAPT%monA,SAPT%monB,SAPT)
+ call e2disp_CAlphaTilde_block(Flags,SAPT%monA,SAPT%monB,SAPT)
  call e2exdisp(Flags,SAPT%monA,SAPT%monB,SAPT)
 
  call summary_sapt(SAPT)

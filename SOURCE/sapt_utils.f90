@@ -511,6 +511,208 @@ deallocate(tmp)
 
 end subroutine amplitudes_T1_cerpa
 
+subroutine Sblock_to_ABMAT(ABlock,ABlockIV,IndN,CICoef,nblk,NBas,NDimX,xy0file)
+implicit none
+
+type(EBlockData)             :: ABlockIV
+type(EBlockData),allocatable :: Ablock(:)
+
+integer,intent(in)  :: NBas,NDimX
+integer,intent(in)  :: IndN(2,NBas)
+integer,intent(out) :: nblk
+double precision,intent(in) :: CICoef(NBas)
+character(*),intent(in)     :: xy0file
+
+type(EBlockData)             :: SblockIV
+type(EBlockData),allocatable :: Sblock(:)
+
+integer :: i,iblk,ipos,ip,iq
+integer :: j,info
+double precision  :: fact,valX,valY
+double precision,allocatable :: tmpX(:,:),tmpY(:,:),work(:)
+! test
+double precision :: tstX,tstY
+
+! why factor sqrt(2)?
+fact = sqrt(2d0) 
+
+call read_SBlock(SBlock,SBlockIV,nblk,xy0file)
+
+allocate(ABlock(nblk))
+
+tstX = 0
+tstY = 0
+do iblk=1,nblk
+   associate(A => SBlock(iblk),&
+             C => ABlock(iblk))
+
+     C%n = A%n
+     allocate(C%pos(C%n),C%ipiv(C%n),C%vec(C%n))
+     allocate(C%matX(C%n,C%n),C%matY(C%n,C%n))
+
+     C%l1  = A%l1
+     C%l2  = A%l2
+     C%pos = A%pos
+     C%vec = A%vec
+
+     allocate(tmpX(A%n,A%n),tmpY(A%n,A%n),work(A%n))
+
+     do i=1,A%n
+        ipos = A%pos(i)
+        ip   = IndN(1,ipos)
+        iq   = IndN(2,ipos)
+        valX = fact*(CICoef(ip)+CICoef(iq))
+        valY = fact*(CICoef(ip)-CICoef(iq))
+        C%matX(i,1:C%n) = valX*(A%matX(i,1:A%n) + A%matY(i,1:A%n))
+        C%matY(i,1:C%n) = valY*(A%matY(i,1:A%n) - A%matX(i,1:A%n))
+     enddo
+
+     do i=1,A%n
+        tmpX(:,i) = C%matX(:,i) * C%vec(i)
+     enddo
+     tmpY(1:A%n,1:A%n) = C%matX(1:A%n,1:A%n)
+
+     ! ABMIN in matX
+     call dgemm('N','T',A%n,A%n,A%n,1d0,tmpX,A%n,tmpY,A%n,0d0,C%matX,A%n)
+
+     tmpX = 0
+     tmpY = 0
+     do i=1,A%n
+        tmpY(:,i) = C%matY(:,i) * C%vec(i)
+     enddo
+     tmpX(1:A%n,1:A%n) = C%matY(1:A%n,1:A%n)
+
+     ! ABPLUS in matY
+     call dgemm('N','T',A%n,A%n,A%n,1d0,tmpY,A%n,tmpX,A%n,0d0,C%matY,A%n)
+
+     do j=1,A%n
+     do i=1,A%n
+     tstX = tstX + C%matX(i,j)**2
+     tstY = tstY + C%matY(i,j)**2
+     enddo
+     enddo
+
+     deallocate(work,tmpX,tmpY)
+
+   end associate
+enddo
+
+ABlockIV = SBlockIV
+
+! deallocate SBLOCK
+do iblk=1,nblk
+   associate(A => SBlock(iblk))
+     deallocate(A%matY,A%matX,A%vec)
+     deallocate(A%pos)
+   end associate
+enddo
+! deallocate IV part
+associate(A => SblockIV)
+  if(A%n>0) then
+
+    ! test IV
+    do i=1,A%n
+       tstX = tstX + (1d0*A%vec(i))**2
+       tstY = tstY + (1d0*A%vec(i))**2
+    enddo
+
+    deallocate(A%vec)
+    deallocate(A%pos)
+
+  endif
+end associate
+
+print*, 'something is wrong with this spectral subroutine'
+print*, 'tst-Y(ABPLS)',sqrt(tstY)
+print*, 'tst-X(ABMIN)',sqrt(tstX)
+
+end subroutine SBlock_to_ABMAT
+
+subroutine subtr_blk_right(AMAT,A0Blk,A0BlkIV,isX,nblk,NDimX)
+!
+! subtract AMAT = AMAT - ABLOCK
+!
+implicit none
+
+integer,intent(in) :: nblk,NDimX
+logical,intent(in) :: isX
+double precision,intent(inout) :: AMAT(NDimX,NDimX)
+
+type(EblockData)    :: A0Blk(nblk), A0BlkIV
+
+integer :: i,j
+integer :: iblk,ipos,jpos
+
+do iblk=1,nblk
+   associate(B => A0Blk(iblk))
+
+     do j=1,B%n
+        jpos=B%pos(j)
+        do i=1,B%n
+           ipos=B%pos(i)
+           if(isX) AMAT(ipos,jpos) = AMAT(ipos,jpos) - B%matX(i,j)
+           if(.not.isX) AMAT(ipos,jpos) = AMAT(ipos,jpos) - B%matY(i,j)
+        enddo
+     enddo
+
+   end associate
+enddo
+!IV block
+associate(B => A0BlkIV)
+  do i=1,B%n
+     j = B%pos(i)
+     AMAT(j,j) = AMAT(j,j) - B%vec(i)
+  enddo
+end associate
+
+end subroutine subtr_blk_right
+
+subroutine test_ABMAT(ABP,ABM,A0Blk,A0BlkIV,nblk,NBasis,NDimX)
+! for testing
+! fill ABPLUS, ABMIN from blocks
+
+integer,intent(in) :: nblk,NBasis,NDimX
+
+type(EBlockData)             :: A0BlkIV,A0Blk(nblk)
+
+double precision,intent(out) :: ABP(NDimX,NDimX),ABM(NDimX,NDimX)
+
+integer :: i,j,iblk
+
+ABP = 0
+ABM = 0
+do iblk=1,nblk
+   associate(B => A0Blk(iblk))
+
+     ! ABPLUS in matY
+     ! ABMIN  in matX
+     do j=1,B%n
+        jpos=B%pos(j)
+        do i=1,B%n
+           ipos=B%pos(i)
+           ABP(ipos,jpos) = B%matY(i,j)
+           ABM(ipos,jpos) = B%matX(i,j)
+        enddo
+     enddo
+
+   end associate
+enddo
+!IV block
+associate(B => A0BlkIV)
+  if(B%n>0) then
+     do i=1,B%n
+       ii = B%pos(i)
+       ABP(ii,ii) = 1.0d0* B%vec(i)
+       ABM(ii,ii) = 1.0d0* B%vec(i)
+     enddo
+  endif
+end associate
+
+print*, 'ABP',norm2(ABP)
+print*, 'ABM',norm2(ABM)
+
+end subroutine test_ABMAT
+
 subroutine convert_to_ABMIN(ABlock,ABlockIV,IndN,CICoef,nblk,NBas,NDimX,xy0file)
 implicit none
 
@@ -1038,6 +1240,8 @@ double precision,allocatable :: A0(:,:)
 
 call read_ABPM0Block(A0Blk,A0BlkIV,nblk,abpm0file)
 
+! HERE: replace with call subtr_blk_right(..,true,...)!
+
 !allocate(A0(NDimX,NDimX))
 !A0 = 0
 do iblk=1,nblk
@@ -1174,7 +1378,7 @@ do
 
    ! with full Lambda(=work)
    !call dgemm('N','N',NDimX,NCholesky,NDimX,1.0d0,work,NDimX,A2CTilde,NDimX,0.0d0,CTilde,NDimX)
-   call ABPM_HALFTRAN_LR(A2CTilde,CTilde,Lambda,LambdaIV,nblk,NDimX,NCholesky,0)
+   call ABPM_HALFTRAN_GEN_L(A2CTilde,CTilde,0d0,Lambda,LambdaIV,nblk,NDimX,NCholesky,'X')
 
    if(N > SAPT_DIIS%DIISOn ) then
        call use_DIIS(DIISBlock, CTilde, CTilde - CTilde_prev)
@@ -1301,7 +1505,7 @@ end subroutine print_en
 
 subroutine C_AlphaExpand(COMTilde,OmI,XOne,URe,Occ,NGOcc,&
    IGem,NAct,INActive,NBasis,NInte1,NDim,NGem,IndAux,&
-   IndN,IndX,NDimX)
+   IndN,IndX,NDimX,twojfile,twokfile,xy0file,a0blkfile)
 !
 !  For a given frequency OmI, CTilde(Alpha=1) is computed by expanding 
 !  around alpha=0 up to the order Max_cn
@@ -1310,29 +1514,33 @@ use abfofo
 
 implicit none
 
-integer,intent(in) :: OmI,NGOcc,NBasis,NInte1,NDim,NGem,NDimX
+integer,intent(in) :: NGOcc,NBasis,NInte1,NDim,NGem,NDimX
 integer,intent(in) :: NAct,INActive
-integer,intent(in) :: IndN(2,NDim),IndX(NDim),IndAux(NBasis),&
-                   IGem(NBasis)
+integer,intent(in) :: IndN(2,NDim),IndX(NDim),&
+                      IndAux(NBasis),IGem(NBasis)
 double precision :: ACAlpha
-double precision,intent(in) :: URe(NBasis,NBasis),Occ(NBasis),XONe(NInte1)
+double precision,intent(in)  :: OmI
+double precision,intent(in)  :: URe(NBasis,NBasis),Occ(NBasis),XONe(NInte1)
 
 integer :: iunit,NOccup
 integer :: i,j,k,l
 integer :: N,inf1,inf2,Max_Cn
 double precision :: XFactorial,XN1,XN2,ECASSCF
-character(:),allocatable :: twojfile,twokfile,IntKFile
+character(:),allocatable :: twojfile,twokfile
+character(:),allocatable :: xy0file,a0blkfile
 
 double precision, allocatable :: DChol(:,:),DCholT(:,:),DCholAct(:,:)
 double precision, allocatable :: APLUS0Tilde(:), APLUS1Tilde(:),  &
                                  A1(:),A2(:), &
-                                 COMTilde(:),ABPLUS0(:),ABMIN0(:),ABPLUS1(:),ABMIN1(:), &
+                                 ABPLUS0(:),ABMIN0(:),ABPLUS1(:),ABMIN1(:), &
                                  LAMBDA(:), &
+                                 COMTilde(:),&
                                  C0Tilde(:),C1Tilde(:),C2Tilde(:), &
                                  WORK0(:)
 integer :: NCholesky
 
 integer :: nblk
+double precision :: CICoef(NBasis)
 type(EblockData) :: A0blockIV
 type(EblockData),allocatable :: A0block(:)
 
@@ -1357,10 +1565,30 @@ NOccup = NAct + INActive
 
 allocate(ABPLUS0(NDimX*NDimX),ABMIN0(NDimX*NDimX),ABPLUS1(NDimX*NDimX),ABMIN1(NDimX*NDimX))
 
-ACAlpha=0.D0
+do i=1,NBasis
+   CICoef(i) = sign(sqrt(Occ(i)),Occ(i)-0.5d0)
+enddo
+
+! test blocks
+!call Sblock_to_ABMAT(A0block,A0blockIV,IndN,CICoef,nblk,NBasis,NDimX,xy0file)
+! the S-->ABMAT does not seem to work...
+!call test_ABMAT(ABPLUS0,ABMIN0,A0block,A0blockIV,nblk,NBasis,NDimX)
+!print*, 'ABPLUS0-1',norm2(ABPLUS0)
+!print*, ABPLUS0(1:10)
+!print*, 'ABMIN0 -1',norm2(ABMIN0)
+!print*, ABMIN0(1:10)
+!ABPLUS0=0
+!ABMIN0=0
+
+ACAlpha=1.D-10
 call AB_CAS_FOFO(ABPLUS0,ABMIN0,ECASSCF,URe,Occ,XOne, &
               IndN,IndX,IGem,NAct,INActive,NDimX,NBasis,NDimX,&
               NInte1,twojfile,twokfile,ACAlpha,.false.)
+print*, 'ABPLUS0-',norm2(ABPLUS0)
+!print*, ABPLUS0(1:10)
+print*, 'ABMIN0 -',norm2(ABMIN0)
+!print*, ABMIN0(1:10)
+
 ACAlpha=1.D0
 call AB_CAS_FOFO(ABPLUS1,ABMIN1,ECASSCF,URe,Occ,XOne, &
               IndN,IndX,IGem,NAct,INActive,NDimX,NBasis,NDimX,&
@@ -1368,35 +1596,49 @@ call AB_CAS_FOFO(ABPLUS1,ABMIN1,ECASSCF,URe,Occ,XOne, &
 ABPLUS1=ABPLUS1-ABPLUS0
 ABMIN1 =ABMIN1 -ABMIN0
 
+print*, 'ABPLUS1',norm2(ABPLUS1)
+print*, 'ABMIN1 ',norm2(ABMIN1)
+
 !Calc: A1=ABPLUS0*ABMIN1+ABPLUS1*ABMIN0
 allocate(A1(NDimX*NDimX))
 Call dgemm('N','N',NDimX,NDimX,NDimX,1d0,ABPLUS0,NDimX,ABMIN1,NDimX,0.0d0,A1,NDimX)
 Call dgemm('N','N',NDimX,NDimX,NDimX,1d0,ABPLUS1,NDimX,ABMIN0,NDimX,1d0,A1,NDimX)
+print*, 'A1',norm2(A1)
 deallocate(ABMIN0)
 
 !Calc: A2=ABPLUS1*ABMIN1
 allocate(A2(NDimX*NDimX))
 Call dgemm('N','N',NDimX,NDimX,NDimX,1d0,ABPLUS1,NDimX,ABMIN1,NDimX,0.0d0,A2,NDimX)
+print*, 'A2-',norm2(A2)
 deallocate(ABMIN1)
 
 !Calc: APLUS0Tilde=ABPLUS0.DChol
 allocate(APLUS0Tilde(NDimX*NCholesky))
 Call dgemm('N','N',NDimX,NCholesky,NDimX,1d0,ABPLUS0,NDimX,DCholT,NDimX,0.0d0,APLUS0Tilde,NDimX)
+print*, 'APLUS0Tilde',norm2(APLUS0Tilde)
 deallocate(ABPLUS0)
 
 !Calc: APLUS1Tilde=ABPLUS1.DChol
 allocate(APLUS1Tilde(NDimX*NCholesky))
 Call dgemm('N','N',NDimX,NCholesky,NDimX,1d0,ABPLUS1,NDimX,DCholT,NDimX,0.0d0,APLUS1Tilde,NDimX)
+print*, 'APLUS1Tilde',norm2(APLUS1Tilde)
 deallocate(ABPLUS1)
 
 
 ! Calc: A0
 nblk = 1 + NBasis - NAct
+
+! test blocks
+!deallocate(A0Block)
+!deallocate(A0BlockIV%pos)
+!deallocate(A0BlockIV%vec)
+
 allocate(A0block(nblk))
 Call AC0BLOCK(Occ,URe,XOne, &
-     IndN,IndX,IGem,NAct,INActive,NDimX,NBasis,NDimX,NInte1,'FFOO','FOFO', &
-     A0BlockIV,A0Block,nblk,'A0BLK',0)
+     IndN,IndX,IGem,NAct,INActive,NDimX,NBasis,NDimX,NInte1,twojfile,twokfile, &
+     A0BlockIV,A0Block,nblk,a0blkfile,0)
 
+print*, 'nblk',nblk
 allocate(COMTilde(NDimX*NCholesky))
 COMTilde=0.0
 
@@ -1408,13 +1650,16 @@ allocate(LAMBDA(NDimX*NDimX))
 
 !  Calc: C0Tilde=1/2 LAMBDA.APLUS0Tilde
    Call dgemm('N','N',NDimX,NCholesky,NDimX,0.5d0,LAMBDA,NDimX,APLUS0Tilde,NDimX,0.0d0,C0Tilde,NDimX)
+   print*, 'C0Tilde',norm2(C0Tilde)
 
 !  Calc: C1Tilde=LAMBDA.(1/2 APLUS1Tilde - A1.C0Tilde)
    Call dgemm('N','N',NDimX,NCholesky,NDimX,1.d0,A1,NDimX,C0Tilde,NDimX,0.0d0,WORK0,NDimX)
    WORK0=0.5d0*APLUS1Tilde-WORK0
    Call dgemm('N','N',NDimX,NCholesky,NDimX,1.d0,LAMBDA,NDimX,WORK0,NDimX,0.0d0,C1Tilde,NDimX)
+   print*, 'C1Tilde',norm2(C1Tilde)
 
    COMTilde=COMTilde+C0Tilde+C1Tilde
+   print*, 'COMTilde',norm2(COMTilde)
   
    XFactorial=1
    Do N=2,Max_Cn
@@ -1427,6 +1672,8 @@ allocate(LAMBDA(NDimX*NDimX))
        COMTilde=COMTilde+C2Tilde/XFactorial
        C0Tilde=C1Tilde
        C1Tilde=C2Tilde
+
+       print*, 'N,COMTilde',N,norm2(COMTilde)
    EndDo
 
 close(iunit)
