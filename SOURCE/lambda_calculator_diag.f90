@@ -4,71 +4,98 @@ module class_LambdaCalculatorDiag
     implicit none
   
     type, public, extends(LambdaCalculator):: LambdaCalculatorDiag
+        private
+        double precision, allocatable :: A0(:)
         contains
             procedure :: calculateInitialA => calculateInitialA
             procedure :: calculateLambda => calculateLambda
             procedure :: getName => getName
             procedure :: toString => toString
+            procedure :: clean => clean
     end type LambdaCalculatorDiag
+
+    interface LambdaCalculatorDiag
+        module procedure constructor
+    end interface
+    private :: constructor
 
 
     contains
 
+    
+        function constructor(NDimX, A2) result(new)
 
-    subroutine calculateLambda(this, Lambda, OmI, NDimX, A0)
+            implicit none
+            type(LambdaCalculatorDiag) :: new
+            integer, intent(in) :: NDimX
+            double precision :: A2(NDimx*NDimX)
 
-        implicit none
-        class(LambdaCalculatorDiag) :: this
-        double precision, intent(out) :: Lambda(NDimX*NDimX)
-        integer, intent(in) :: NDimX
-        double precision, intent(in) :: OmI, A0(NDimX*NDimX)
-        integer :: i, j
+            new%NDimX = NDimX
+            new%A2 = A2
+            
+            allocate(new%A0(new%NDimX*new%NDimX))
 
-        Lambda=0.D0
-        Do i=1,NDimX
-            j = (i-1) * NDimX + i
-            Lambda(j) = 1 / ( A0(j) + OmI**2 )
-        EndDo
-
-    end subroutine calculateLambda
+        end function
 
 
-    subroutine calculateInitialA(this, A0, A2, NDimX)
+        subroutine calculateLambda(this, Lambda, OmI)
 
-        implicit none
-        class(LambdaCalculatorDiag) :: this
-        double precision, intent(out) :: A0(NDimX*NDimX)
-        double precision, intent(inout) :: A2(NDimX*NDimX)
-        integer, intent(in) :: NDimX
-        integer :: i
+            implicit none
+            class(LambdaCalculatorDiag) :: this
+            double precision, intent(out) :: Lambda(this%NDimX*this%NDimX)
+            double precision, intent(in) :: OmI
+            integer :: i, j
 
-        A0=0.D0   
-        Do i=1,NDimX
-           A0((i-1)*NDimX+i)=A2((i-1)*NDimX+i)
-        EndDo
-        A2=A2-A0
+            Lambda=0.D0
+            Do i=1,this%NDimX
+                j = (i-1) * this%NDimX + i
+                Lambda(j) = 1 / ( this%A0(j) + OmI**2 )
+            EndDo
 
-    end subroutine calculateInitialA
-
-
-    function getName(this) result(res)
-
-        implicit none
-        class(LambdaCalculatorDiag) :: this
-        character(:), allocatable :: res
-        res = "Diag"
-
-    end function getName
+        end subroutine calculateLambda
 
 
-    subroutine toString(this, string)
+        subroutine calculateInitialA(this)
 
-        implicit none
-        class(LambdaCalculatorDiag) :: this
-        character(50), intent(out) :: string
-        string = "diag"
+            implicit none
+            class(LambdaCalculatorDiag) :: this
+            integer :: i
 
-    end subroutine toString
+            this%A0 = 0.D0   
+            Do i = 1, this%NDimX
+                this%A0((i-1)*this%NDimX+i) = this%A2((i-1)*this%NDimX+i)
+            EndDo
+            this%A2 = this%A2 - this%A0
+
+        end subroutine calculateInitialA
+
+
+        function getName(this) result(res)
+
+            implicit none
+            class(LambdaCalculatorDiag) :: this
+            character(:), allocatable :: res
+            res = "Diag"
+
+        end function getName
+
+
+        subroutine toString(this, string)
+
+            implicit none
+            class(LambdaCalculatorDiag) :: this
+            character(50), intent(out) :: string
+            string = "diag"
+
+        end subroutine toString
+
+
+        subroutine clean(this)
+
+            class(LambdaCalculatorDiag) :: this
+            deallocate(this%A0, this%A2)
+
+        end subroutine clean
 
 
 end module class_LambdaCalculatorDiag
