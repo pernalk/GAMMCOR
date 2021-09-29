@@ -511,15 +511,15 @@ if(Flags%ICASSCF==0.and.Flags%ISERPA==0) then
   end select
 
   !! test CAlpha
-  NGOcc = 0
-  OmI = 1.08185673347417
-  call C_AlphaExpand(COMTilde,OmI,XOne,URe,Mon%Occ,NGOcc,&
-                    Mon%IGem,Mon%NAct,Mon%INAct,NBas,NInte1,&
-                    Mon%NDim,Mon%NGem,&
-                    Mon%IndAux,Mon%IndN,Mon%IndX,Mon%NDimX,&
-                    twojfile,twokfile,xy0file,abpm0file)
-  print*, 'COMTilde',norm2(COMTilde)
-  deallocate(COMTilde)
+!   NGOcc = 0
+!   OmI = 1.08185673347417
+!   call C_AlphaExpand(COMTilde,OmI,XOne,URe,Mon%Occ,NGOcc,&
+!                     Mon%IGem,Mon%NAct,Mon%INAct,NBas,NInte1,&
+!                     Mon%NDim,Mon%NGem,&
+!                     Mon%IndAux,Mon%IndN,Mon%IndX,Mon%NDimX,&
+!                     twojfile,twokfile,xy0file,abpm0file)
+!   print*, 'COMTilde',norm2(COMTilde)
+!   deallocate(COMTilde)
 
    ! WARNING: MH, September 2021
    ! in previous versions of the code all PINO cases (ISERPA==2)
