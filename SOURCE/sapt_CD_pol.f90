@@ -633,47 +633,47 @@ allocate(LambdaA(A%NDimX,A%NDimX),LambdaB(B%NDimX,B%NDimX))
 
 call FreqGrid(XFreq,WFreq,NFreq)
 
-A0A = 0
-A0B = 0
+! A0A = 0
+! A0B = 0
 
-iterAlgo = IterAlgorithmDIIS(Threshold=1d-3, DIISN=6, maxIterations=20)
-LambdaCalc = LambdaCalculatorDiag()
+! iterAlgo = IterAlgorithmDIIS(Threshold=1d-3, DIISN=6, maxIterations=20)
+! LambdaCalc = LambdaCalculatorDiag()
 
-iStatsA%maxIterationsLimit = iterAlgo%maxIterations
-iStatsB%maxIterationsLimit = iterAlgo%maxIterations
+! iStatsA%maxIterationsLimit = iterAlgo%maxIterations
+! iStatsB%maxIterationsLimit = iterAlgo%maxIterations
 
-call LambdaCalc%calculateInitialA(A0A, ABPMA, A%NDimX)
-call LambdaCalc%calculateInitialA(A0B, ABPMB, B%NDimX)
+! call LambdaCalc%calculateInitialA(A0A, ABPMA, A%NDimX)
+! call LambdaCalc%calculateInitialA(A0B, ABPMB, B%NDimX)
 
-e2d = 0
-do ifreq=NFreq,1,-1
+! e2d = 0
+! do ifreq=NFreq,1,-1
 
-   OmI = XFreq(ifreq)
+!    OmI = XFreq(ifreq)
 
-   call LambdaCalc%calculateLambda(LambdaA, OmI, A%NDimX, A0A)
-   call LambdaCalc%calculateLambda(LambdaB, OmI, B%NDimX, A0B)
+!    call LambdaCalc%calculateLambda(LambdaA, OmI, A%NDimX, A0A)
+!    call LambdaCalc%calculateLambda(LambdaB, OmI, B%NDimX, A0B)
 
-   if(ifreq==NFreq) call dgemm('N','N',A%NDimX,NCholesky,A%NDimX,1.d0,LambdaA,A%NDimX,ABPTildeA,A%NDimX,0.0d0,CTildeA,A%NDimX)
-   call iterAlgo%iterate(CTildeA, A%NDimX, NCholesky, LambdaA, ABPTildeA, ABPMA, iStatsA)
-   call iStatsA%setFreq(OmI)
+!    if(ifreq==NFreq) call dgemm('N','N',A%NDimX,NCholesky,A%NDimX,1.d0,LambdaA,A%NDimX,ABPTildeA,A%NDimX,0.0d0,CTildeA,A%NDimX)
+!    call iterAlgo%iterate(CTildeA, A%NDimX, NCholesky, LambdaA, ABPTildeA, ABPMA, iStatsA)
+!    call iStatsA%setFreq(OmI)
 
-   if(ifreq==NFreq) call dgemm('N','N',B%NDimX,NCholesky,B%NDimX,1.d0,LambdaB,B%NDimX,ABPTildeB,B%NDimX,0.0d0,CTildeB,B%NDimX)
-   call iterAlgo%iterate(CTildeB, B%NDimX, NCholesky, LambdaB, ABPTildeB, ABPMB, iStatsB)
-   call iStatsB%setFreq(OmI)
+!    if(ifreq==NFreq) call dgemm('N','N',B%NDimX,NCholesky,B%NDimX,1.d0,LambdaB,B%NDimX,ABPTildeB,B%NDimX,0.0d0,CTildeB,B%NDimX)
+!    call iterAlgo%iterate(CTildeB, B%NDimX, NCholesky, LambdaB, ABPTildeB, ABPMB, iStatsB)
+!    call iStatsB%setFreq(OmI)
 
-   call dgemm('N','N',NCholesky,NCholesky,A%NDimX,1d0,DCholA,NCholesky,CTildeA,A%NDimX,0d0,CA,NCholesky)
-   call dgemm('N','N',NCholesky,NCholesky,B%NDimX,1d0,DCholB,NCholesky,CTildeB,B%NDimX,0d0,CB,NCholesky)
+!    call dgemm('N','N',NCholesky,NCholesky,A%NDimX,1d0,DCholA,NCholesky,CTildeA,A%NDimX,0d0,CA,NCholesky)
+!    call dgemm('N','N',NCholesky,NCholesky,B%NDimX,1d0,DCholB,NCholesky,CTildeB,B%NDimX,0d0,CB,NCholesky)
 
-   val = 0
-   do j=1,NCholesky
-      do i=1,NCholesky
-         val = val + CA(j,i)*CB(i,j)
-      enddo
-   enddo
+!    val = 0
+!    do j=1,NCholesky
+!       do i=1,NCholesky
+!          val = val + CA(j,i)*CB(i,j)
+!       enddo
+!    enddo
 
-   e2d = e2d + WFreq(ifreq)*val
+!    e2d = e2d + WFreq(ifreq)*val
 
-enddo
+! enddo
 
 write(lout,'(/1x,a)') 'C(omega): Monomer A'
 call iStatsA%print()
