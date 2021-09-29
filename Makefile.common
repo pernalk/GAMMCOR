@@ -182,4 +182,4 @@ $(O)lambda_calculator_projector.o : $(S)lambda_calculator_projector.f90 $(O)lamb
 
 .PHONY : clean
 clean :
-	rm $(O)*.o *.mod $(PROG)
+	rm -f $(O)*.o *.mod $(PROG)
