@@ -3,8 +3,13 @@ Authors: Kasia Pernal and Michal Hapka
 
 ## Installation
 #### 1. Clone the repository
+* Using ssh:
 ```
 git clone git@gitlab.com:qchem/gammcor.git
+```
+* Using https:
+```
+git clone https://gitlab.com/qchem/gammcor.git
 ```
 
 #### 2. Create an OBJ directory inside the repository folder:
