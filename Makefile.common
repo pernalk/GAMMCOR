@@ -148,7 +148,7 @@ $(O)sapt_CD_pol.o : $(S)sapt_CD_pol.f90 $(O)types.o $(O)tran.o $(O)sapt_utils.o 
                     $(O)iter_stats.o $(O)iter_algorithm.o $(O)iter_algorithm_diis.o \
                     $(O)lambda_calculator.o $(O)lambda_calculator_diag.o
 	$(FCC) $(FFLAGS)  -c $(S)sapt_CD_pol.f90 -o $(O)sapt_CD_pol.o
-$(O)sapt_utils.o : $(S)sapt_utils.f90 $(O)types.o $(O)tran.o $(O)diis.o $(O)iter_stats.o
+$(O)sapt_utils.o : $(S)sapt_utils.f90 $(O)types.o $(O)tran.o $(O)diis.o $(O)iter_stats.o $(O)abfofo.o
 	$(FCC) $(FFLAGS)  -c $(S)sapt_utils.f90 -o $(O)sapt_utils.o
 $(O)sapt_pol.o : $(S)sapt_pol.f90 $(O)types.o $(O)tran.o $(O)sapt_utils.o
 	$(FCC) $(FFLAGS)  -c $(S)sapt_pol.f90 -o $(O)sapt_pol.o
@@ -182,4 +182,4 @@ $(O)lambda_calculator_projector.o : $(S)lambda_calculator_projector.f90 $(O)lamb
 
 .PHONY : clean
 clean :
-	rm $(O)*.o *.mod $(PROG)
+	rm -f $(O)*.o *.mod $(PROG)

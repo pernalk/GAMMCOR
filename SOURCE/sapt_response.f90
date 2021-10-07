@@ -58,6 +58,11 @@ double precision,parameter :: SmallE=0d0,BigE=1.D20
 integer :: nblk
 type(EblockData) :: A0blockIV
 type(EblockData),allocatable :: A0block(:)
+! test Calpha
+integer :: NGOcc
+double precision :: OmI
+double precision,allocatable :: COMTilde(:)
+double precision,allocatable :: ABPlus0(:,:),ABMin0(:,:)
 
 ! test iterative
 iter = 1
@@ -76,7 +81,7 @@ if(Mon%Monomer==1) then
    abpm0file  = 'A0BLK_A'
    rdmfile    = 'rdm2_A.dat'
    abfile     = 'ABMAT_A'
-   testfile   = 'TEST_A'
+   testfile   = 'A0MAT_A'
 elseif(Mon%Monomer==2) then
    onefile    = 'ONEEL_B'
    twofile    = 'TWOMOBB'
@@ -90,7 +95,7 @@ elseif(Mon%Monomer==2) then
    abpm0file  = 'A0BLK_B'
    rdmfile    = 'rdm2_B.dat'
    abfile     = 'ABMAT_B'
-   testfile   = 'TEST_B'
+   testfile   = 'A0MAT_B'
 endif
 
 ! set dimensions
@@ -268,7 +273,9 @@ if(Flags%ICASSCF==0.and.Flags%ISERPA==0) then
      call EKT(URe,Mon%Occ,XOne,TwoMO,NBas,NInte1,NInte2)
 
   end select
-  write(LOUT,'(/,1x,a,f16.8,a,1x,f16.8)') 'ABPlus',norm2(ABPlus),'ABMin',norm2(ABMin)
+  !write(LOUT,'(/,1x,a,f16.8,a,1x,f16.8)') 'ABPlus',norm2(ABPlus),'ABMin',norm2(ABMin)
+  print*, 'ABPlus',norm2(ABPlus)
+  print*, 'ABMin',norm2(ABMin)
 
   EigVecR = 0
   Eig = 0
@@ -290,6 +297,22 @@ if(Flags%ICASSCF==0.and.Flags%ISERPA==0) then
      write(iunit) ABMin
      close(iunit)
   endif
+
+  if(TWOMO_FOFO) then
+     if(iter==1) then
+        allocate(ABPlus0(Mon%NDimX,Mon%NDImX),&
+                 ABMin0(Mon%NDimX,Mon%NDimX))
+        call AB_CAS_FOFO(ABPlus0,ABMin0,ECASSCF,URe,Mon%Occ,XOne, &
+                    Mon%IndN,Mon%IndX,Mon%IGem,Mon%NAct,Mon%INAct,Mon%NDimX,NBas,Mon%NDimX,&
+                    NInte1,twojfile,twokfile,1d-9,.false.)
+        ! dump matrices for iterative C-ERPA
+        open(newunit=iunit,file=testfile,form='unformatted')
+        write(iunit) ABPlus0
+        write(iunit) ABMin0
+        close(iunit)
+        deallocate(ABMin0,ABPlus0)
+     endif
+ endif
 
   write(lout,'(1x,a/)') 'Solving symmetric eigenvalue equation...'
 
@@ -503,6 +526,17 @@ if(Flags%ICASSCF==0.and.Flags%ISERPA==0) then
       deallocate(Eig1,Eig0,EigY1,EigY0)
 
   end select
+
+  !! test CAlpha
+!   NGOcc = 0
+!   OmI = 1.08185673347417
+!   call C_AlphaExpand(COMTilde,OmI,XOne,URe,Mon%Occ,NGOcc,&
+!                     Mon%IGem,Mon%NAct,Mon%INAct,NBas,NInte1,&
+!                     Mon%NDim,Mon%NGem,&
+!                     Mon%IndAux,Mon%IndN,Mon%IndX,Mon%NDimX,&
+!                     twojfile,twokfile,xy0file,abpm0file)
+!   print*, 'COMTilde',norm2(COMTilde)
+!   deallocate(COMTilde)
 
    ! WARNING: MH, September 2021
    ! in previous versions of the code all PINO cases (ISERPA==2)
@@ -1638,7 +1672,7 @@ type(FileNames)   :: FNam
     FNam%y01file    = 'Y01_A'
     FNam%xy0file    = 'XY0_A'
     FNam%rdmfile    = 'rdm2_A.dat'
-    FNam%testfile   = 'TEST_A'
+    FNam%testfile   = 'A0MAT_A'
  elseif(Mon%Monomer==2) then
     FNam%sirifile   = 'SIRIFC_B'
     FNam%siriusfile = 'SIRIUS_B.RST'
@@ -1656,7 +1690,7 @@ type(FileNames)   :: FNam
     FNam%y01file    = 'Y01_B'
     FNam%xy0file    = 'XY0_B'
     FNam%rdmfile    = 'rdm2_B.dat'
-    FNam%testfile   = 'TEST_B'
+    FNam%testfile   = 'A0MAT_B'
  endif
 
 end subroutine set_filenames

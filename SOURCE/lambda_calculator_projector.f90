@@ -5,83 +5,110 @@ module class_LambdaCalculatorProjector
   
     type, public, extends(LambdaCalculator):: LambdaCalculatorProjector
         double precision, allocatable :: PMat(:,:)
+        double precision, allocatable :: A0(:)
         contains
             procedure :: calculateInitialA => calculateInitialA
             procedure :: calculateLambda => calculateLambda
             procedure :: getName => getName
             procedure :: toString => toString
+            procedure :: clean => clean
     end type LambdaCalculatorProjector
+
+    interface LambdaCalculatorProjector
+        module procedure constructor
+    end interface
+    private :: constructor
 
 
     contains
 
 
-    subroutine calculateLambda(this, Lambda, OmI, NDimX, A0)
+        function constructor(NDimX, A2, PMat) result(new)
 
-        implicit none
-        class(LambdaCalculatorProjector) :: this
-        double precision, intent(out) :: Lambda(NDimX*NDimX)
-        integer, intent(in) :: NDimX
-        double precision, intent(in) :: OmI, A0(NDimX*NDimX)
-        integer :: i, inf1, inf2
-        double precision :: WORK0(NDimX*NDimX)
-        double precision :: ipiv(NDimX)
+            implicit none
+            type(LambdaCalculatorProjector) :: new
+            integer, intent(in) :: NDimX
+            double precision, intent(in) :: A2(NDimx*NDimX), PMat(NDimX,NDimX)
 
-        WORK0=0.D0
-        Do i=1,NDimX
-            WORK0((i-1)*NDimX+i)=OmI**2
-        EndDo
-        Lambda=A0+WORK0
-        Call dgetrf(NDimX,NDimX, Lambda, NDimX, ipiv, inf1)
-        Call dgetri(NDimX, Lambda, NDimX, ipiv, work0, NDimX, inf2)
+            new%NDimX = NDimX
+            new%A2 = A2
+            new%PMat = PMat
+            
+            allocate(new%A0(new%NDimX*new%NDimX))
 
-    end subroutine calculateLambda
+        end function
 
 
-    subroutine calculateInitialA(this, A0, A2, NDimX)
+        subroutine calculateLambda(this, Lambda, OmI)
 
-        implicit none
-        class(LambdaCalculatorProjector) :: this
-        double precision, intent(out) :: A0(NDimX*NDimX)
-        double precision, intent(inout) :: A2(NDimX*NDimX)
-        integer, intent(in) :: NDimX
-        double precision :: WORK0(NDimX*NDimX)
-        integer :: i
+            implicit none
+            class(LambdaCalculatorProjector) :: this
+            double precision, intent(out) :: Lambda(this%NDimX*this%NDimX)
+            double precision, intent(in) :: OmI
+            integer :: i, inf1, inf2
+            double precision :: WORK0(this%NDimX*this%NDimX)
+            double precision :: ipiv(this%NDimX)
 
-        A0=0.D0   
-        Do i=1,NDimX
-           A0((i-1)*NDimX+i)=A2((i-1)*NDimX+i)
-        EndDo
-        A2=A2-A0
+            WORK0=0.D0
+            Do i=1,this%NDimX
+                WORK0((i-1)*this%NDimX+i)=OmI**2
+            EndDo
+            Lambda=this%A0+WORK0
+            Call dgetrf(this%NDimX,this%NDimX, Lambda, this%NDimX, ipiv, inf1)
+            Call dgetri(this%NDimX, Lambda, this%NDimX, ipiv, work0, this%NDimX, inf2)
 
-        ! PROJECT A2 WITH PMat : WORK0=PMat.A2
-        Call dgemm('N','N',NDimX,NDimX,NDimX,1d0,this%PMat,NDimX,A2,NDimX,0.0,WORK0,NDimX)
-        A0=A0+WORK0
-        print*, 'A2 norm before projection',norm2(A2(1:NDimX*NDimX))
-        A2=A2-WORK0
-        print*, 'A2 norm after projection',norm2(A2(1:NDimX*NDimX))
-
-    end subroutine calculateInitialA
+        end subroutine calculateLambda
 
 
-    function getName(this) result(res)
+        subroutine calculateInitialA(this)
 
-        implicit none
-        class(LambdaCalculatorProjector) :: this
-        character(:), allocatable :: res
-        res = "Projector"
+            implicit none
+            class(LambdaCalculatorProjector) :: this
+            double precision :: WORK0(this%NDimX*this%NDimX)
+            integer :: i
 
-    end function getName
+            this%A0=0.D0   
+            Do i=1,this%NDimX
+                this%A0((i-1)*this%NDimX+i) = this%A2((i-1)*this%NDimX+i)
+            EndDo
+            this%A2 = this%A2 - this%A0
+
+            ! PROJECT A2 WITH PMat : WORK0=PMat.A2
+            Call dgemm('N','N',this%NDimX,this%NDimX,this%NDimX,1d0,this%PMat,this%NDimX,this%A2,this%NDimX,0.0,WORK0,this%NDimX)
+            this%A0 = this%A0 + WORK0
+            print*, 'A2 norm before projection',norm2(this%A2(1:this%NDimX*this%NDimX))
+            this%A2 = this%A2 - WORK0
+            print*, 'A2 norm after projection',norm2(this%A2(1:this%NDimX*this%NDimX))
+
+        end subroutine calculateInitialA
 
 
-    subroutine toString(this, string)
+        function getName(this) result(res)
 
-        implicit none
-        class(LambdaCalculatorProjector) :: this
-        character(50), intent(out) :: string
-        string = "projector"
+            implicit none
+            class(LambdaCalculatorProjector) :: this
+            character(:), allocatable :: res
+            res = "Projector"
 
-    end subroutine toString
+        end function getName
+
+
+        subroutine toString(this, string)
+
+            implicit none
+            class(LambdaCalculatorProjector) :: this
+            character(50), intent(out) :: string
+            string = "projector"
+
+        end subroutine toString
+
+
+        subroutine clean(this)
+
+            class(LambdaCalculatorProjector) :: this
+            deallocate(this%A0, this%A2, this%PMat)
+
+        end subroutine clean
 
 
 end module class_LambdaCalculatorProjector

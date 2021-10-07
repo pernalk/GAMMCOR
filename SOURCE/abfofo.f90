@@ -1831,8 +1831,10 @@ call ABPM0_FOFO(Occ,URe,XOne,ABPLUS,ABMIN, &
                 IndN,IndX,IGemIN,NAct,INActive,NDimX,NBasis,NDim,NInte1, &
                 IntJFile,IntKFile,ETot)
 
-!print*, 'ABPLUS-new',norm2(ABPLUS)
+print*, 'ABPLUS-new',norm2(ABPLUS)
+!print*, ABPLUS(1,1:10)
 !print*, 'ABMIN -new',norm2(ABMIN)
+!print*, ABMIN(1,1:10)
 
 call clock('ABPM(0)',Tcpu,Twall)
 
@@ -1875,6 +1877,8 @@ associate(B => EblockIV)
   do i=1,B%n
      ii = B%l1+i-1
      B%vec(i) = ABPLUS(ii,ii)
+     !print*, 'ABPLUS-IV',ii,ABPLUS(ii,ii)
+     !if(abs(ABPLUS(ii,ii))-abs(ABMIN(ii,ii)).gt.1d-6) print*, 'oh!',ii,ABMIN(ii,ii)
   enddo
 
 end associate
