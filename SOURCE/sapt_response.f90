@@ -62,6 +62,7 @@ type(EblockData),allocatable :: A0block(:)
 integer :: NGOcc
 double precision :: OmI
 double precision,allocatable :: COMTilde(:)
+double precision,allocatable :: ABPlus0(:,:),ABMin0(:,:)
 
 ! test iterative
 iter = 1
@@ -80,7 +81,7 @@ if(Mon%Monomer==1) then
    abpm0file  = 'A0BLK_A'
    rdmfile    = 'rdm2_A.dat'
    abfile     = 'ABMAT_A'
-   testfile   = 'TEST_A'
+   testfile   = 'A0MAT_A'
 elseif(Mon%Monomer==2) then
    onefile    = 'ONEEL_B'
    twofile    = 'TWOMOBB'
@@ -94,7 +95,7 @@ elseif(Mon%Monomer==2) then
    abpm0file  = 'A0BLK_B'
    rdmfile    = 'rdm2_B.dat'
    abfile     = 'ABMAT_B'
-   testfile   = 'TEST_B'
+   testfile   = 'A0MAT_B'
 endif
 
 ! set dimensions
@@ -296,6 +297,22 @@ if(Flags%ICASSCF==0.and.Flags%ISERPA==0) then
      write(iunit) ABMin
      close(iunit)
   endif
+
+  if(TWOMO_FOFO) then
+     if(iter==1) then
+        allocate(ABPlus0(Mon%NDimX,Mon%NDImX),&
+                 ABMin0(Mon%NDimX,Mon%NDimX))
+        call AB_CAS_FOFO(ABPlus0,ABMin0,ECASSCF,URe,Mon%Occ,XOne, &
+                    Mon%IndN,Mon%IndX,Mon%IGem,Mon%NAct,Mon%INAct,Mon%NDimX,NBas,Mon%NDimX,&
+                    NInte1,twojfile,twokfile,1d-9,.false.)
+        ! dump matrices for iterative C-ERPA
+        open(newunit=iunit,file=testfile,form='unformatted')
+        write(iunit) ABPlus0
+        write(iunit) ABMin0
+        close(iunit)
+        deallocate(ABMin0,ABPlus0)
+     endif
+ endif
 
   write(lout,'(1x,a/)') 'Solving symmetric eigenvalue equation...'
 
@@ -1655,7 +1672,7 @@ type(FileNames)   :: FNam
     FNam%y01file    = 'Y01_A'
     FNam%xy0file    = 'XY0_A'
     FNam%rdmfile    = 'rdm2_A.dat'
-    FNam%testfile   = 'TEST_A'
+    FNam%testfile   = 'A0MAT_A'
  elseif(Mon%Monomer==2) then
     FNam%sirifile   = 'SIRIFC_B'
     FNam%siriusfile = 'SIRIUS_B.RST'
@@ -1673,7 +1690,7 @@ type(FileNames)   :: FNam
     FNam%y01file    = 'Y01_B'
     FNam%xy0file    = 'XY0_B'
     FNam%rdmfile    = 'rdm2_B.dat'
-    FNam%testfile   = 'TEST_B'
+    FNam%testfile   = 'A0MAT_B'
  endif
 
 end subroutine set_filenames

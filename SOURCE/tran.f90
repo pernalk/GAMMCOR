@@ -1163,6 +1163,26 @@ end associate
 
 end subroutine ABPM_HALFTRAN_GEN_R
 
+subroutine MultpDiagMat(Diag,matA,fact,matC,dimA,dimB)
+! multiply matC = diagonal*matrix
+implicit none
+
+integer,intent(in) :: dimA,dimB
+double precision,intent(in)    :: fact
+double precision,intent(in)    :: Diag(dimA),matA(dimA,dimB)
+double precision,intent(inout) :: matC(dimA,dimB)
+
+integer :: i,j
+
+matC = fact * matC
+do j=1,dimB
+   do i=1,dimA
+      matC(i,j) = matC(i,j) + Diag(i)*matA(i,j)
+   enddo
+enddo
+
+end subroutine MultpDiagMat
+
 subroutine make_J1(NBas,X,J,intfile)
 implicit none
 
