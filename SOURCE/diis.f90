@@ -56,6 +56,14 @@ allocate(DIIS%vec_solve(DIIS%LDN+1))
 allocate(DIIS%work(DIIS%lwork))
 allocate(DIIS%ipiv(DIIS%LDN+1))
 
+DIIS%A = 0.d0
+DIIS%E = 0.d0
+DIIS%vec_solve = 0.d0
+DIIS%mat_solve = 0.d0
+DIIS%mat = 0.d0
+DIIS%work = 0.d0
+DIIS%ipiv = 0.d0
+
 end subroutine init_DIIS
 
 subroutine restart_DIIS(DIIS,nA,nE,max_n)
