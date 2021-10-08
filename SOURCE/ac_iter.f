@@ -47,7 +47,7 @@ C
 C     Find AC energy in one shot (no lambda integration) by expanding C in lambda 
 C     and integrating analytically
 C
-      Call WIter_FOFO(ECorr,XOne,URe,Occ,
+      Call WIter_FOFO(ECorr,Max_Cn,XOne,URe,Occ,
      $ EGOne,NGOcc,
      $ IGem,NAcCAS,NInAcCAS,NELE,
      $ NBasis,NInte1,NDim,NGem,IndAux,
@@ -55,17 +55,14 @@ C
 C
       EndIf
 C
-c      ETot=EGOne(1)
-c      Write
-c     $ (6,'(/,2X,''ECASSCF+ENuc, AC-Corr, AC-ERPA-CASSCF '',4X,3F15.8)')
-c     $ ETot+ENuc,ECorr,ETot+ENuc+ECorr
-cC       
-c      Return
-C
 C     If (ICholesky.Eq.0) Then
       Else
 C
-      Call WIter_DChol(ECorr,XOne,URe,Occ,
+C     Find AC energy in one shot (no lambda integration) by expanding C in lambda
+C     and integrating analytically, Cholesky decomposition is employed
+C     to lower dimensionality of the C(omega)-problem 
+C
+      Call WIter_DChol(ECorr,Max_Cn,XOne,URe,Occ,
      $ EGOne,NGOcc,IGem,NAcCAS,NInAcCAS,NELE,
      $ NBasis,NInte1,NDim,NGem,IndAux,
      $ IndN,IndX,NDimX)
@@ -491,7 +488,7 @@ C
 C
       Call GauLeg(-1.D0,1.D0,XFreq,WFreq,NFreq) 
 C
-      X0=0.5D0
+      X0=1.0D0
 C
       Do IGL=1,NFreq
       WFreq(IGL)=2.*X0*WFreq(IGL)/(1.-XFreq(IGL))**2
