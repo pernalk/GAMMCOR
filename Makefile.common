@@ -145,8 +145,8 @@ $(O)sapt_main.o : $(S)sapt_main.f90 $(O)types.o $(O)systemdef.o $(O)tran.o $(O)s
 $(O)sapt_response.o : $(S)sapt_response.f90 $(O)types.o $(O)tran.o $(O)abmats.o $(O)abfofo.o $(O)sapt_utils.o $(O)timing.o
 	$(FCC) $(FFLAGS)  -c $(S)sapt_response.f90 -o $(O)sapt_response.o
 $(O)sapt_CD_pol.o : $(S)sapt_CD_pol.f90 $(O)types.o $(O)tran.o $(O)sapt_utils.o \
-                    $(O)iter_stats.o $(O)iter_algorithm.o $(O)iter_algorithm_diis.o \
-                    $(O)lambda_calculator.o $(O)lambda_calculator_diag.o
+                    $(O)iter_stats.o $(O)iter_algorithm.o $(O)iter_algorithm_diis.o $(O)timing.o \
+                    $(O)lambda_calculator.o $(O)lambda_calculator_diag.o $(O)lambda_calculator_projector.o
 	$(FCC) $(FFLAGS)  -c $(S)sapt_CD_pol.f90 -o $(O)sapt_CD_pol.o
 $(O)sapt_utils.o : $(S)sapt_utils.f90 $(O)types.o $(O)tran.o $(O)diis.o $(O)iter_stats.o $(O)abfofo.o
 	$(FCC) $(FFLAGS)  -c $(S)sapt_utils.f90 -o $(O)sapt_utils.o

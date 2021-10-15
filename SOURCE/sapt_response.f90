@@ -254,6 +254,8 @@ if(Flags%ICASSCF==0.and.Flags%ISERPA==0) then
   !ACAlpha=1d-12
   !Print*, 'UNCOUPLED,ACAlpha',ACAlpha
 
+  !ACAlpha=0.953089922969332
+  !print*, 'ACAlpha',ACAlpha
   select case(Mon%TwoMoInt)
   case(TWOMO_FOFO)
 
@@ -298,21 +300,22 @@ if(Flags%ICASSCF==0.and.Flags%ISERPA==0) then
      close(iunit)
   endif
 
-  if(TWOMO_FOFO) then
-     if(iter==1) then
-        allocate(ABPlus0(Mon%NDimX,Mon%NDImX),&
-                 ABMin0(Mon%NDimX,Mon%NDimX))
-        call AB_CAS_FOFO(ABPlus0,ABMin0,ECASSCF,URe,Mon%Occ,XOne, &
-                    Mon%IndN,Mon%IndX,Mon%IGem,Mon%NAct,Mon%INAct,Mon%NDimX,NBas,Mon%NDimX,&
-                    NInte1,twojfile,twokfile,1d-9,.false.)
-        ! dump matrices for iterative C-ERPA
-        open(newunit=iunit,file=testfile,form='unformatted')
-        write(iunit) ABPlus0
-        write(iunit) ABMin0
-        close(iunit)
-        deallocate(ABMin0,ABPlus0)
-     endif
- endif
+!! this is only for testing e2disp_CAlphaTilde_full
+!if(TWOMO_FOFO) then
+!   if(iter==1) then
+!      allocate(ABPlus0(Mon%NDimX,Mon%NDImX),&
+!               ABMin0(Mon%NDimX,Mon%NDimX))
+!      call AB_CAS_FOFO(ABPlus0,ABMin0,ECASSCF,URe,Mon%Occ,XOne, &
+!                  Mon%IndN,Mon%IndX,Mon%IGem,Mon%NAct,Mon%INAct,Mon%NDimX,NBas,Mon%NDimX,&
+!                  NInte1,twojfile,twokfile,1d-9,.false.)
+!      ! dump matrices for iterative C-ERPA
+!      open(newunit=iunit,file=testfile,form='unformatted')
+!      write(iunit) ABPlus0
+!      write(iunit) ABMin0
+!      close(iunit)
+!      deallocate(ABMin0,ABPlus0)
+!   endif
+!endif
 
   write(lout,'(1x,a/)') 'Solving symmetric eigenvalue equation...'
 
@@ -422,12 +425,15 @@ if(Flags%ICASSCF==0.and.Flags%ISERPA==0) then
   !EGOne = 0
   !NGOcc = 0
   !ECorr = 0
-  !allocate(Pmat(Mon%NDimX,Mon%NDimX))
 
-  !open(newunit=iunit,file='cholvecs',form='unformatted')
-  !write(iunit) Mon%NChol
-  !write(iunit) Mon%FF
-  !close(iunit)
+  ! sub-snippet for testing Pmat
+  allocate(Mon%Pmat(Mon%NDimX,Mon%NDimX))
+  open(newunit=iunit,file='cholvecs',form='unformatted')
+  write(iunit) Mon%NChol
+  write(iunit) Mon%FF
+  close(iunit)
+
+  call Project_DChol(Mon%PMat,Mon%IndN,NBas,Mon%NDimX)
 
   !call CIter_FOFO(PMat,ECorr,ACAlpha,XOne,URe,Mon%Occ,EGOne,NGOcc,&
   !                Mon%IGem,Mon%NAct,Mon%INAct,Mon%NELE,NBas,NInte1, &

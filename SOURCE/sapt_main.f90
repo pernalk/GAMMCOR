@@ -234,8 +234,10 @@ logical          :: onlyDisp
 end subroutine sapt_driver_red
 
 subroutine sapt_Cholesky(Flags,SAPT,Tcpu,Twall,NBasis)
+!
 ! sapt driver with Cholesky decompositon
 ! Flags%isCholesky==1
+!
 implicit none
 
 type(FlagsData)    :: Flags
@@ -253,9 +255,13 @@ double precision,intent(inout) :: Tcpu,Twall
  call e2exind(Flags,SAPT%monA,SAPT%monB,SAPT)
  !call e2disp_Chol(Flags,SAPT%monA,SAPT%monB,SAPT)
  !call e2disp_Cmat(Flags,SAPT%monA,SAPT%monB,SAPT)
- call e2disp_Cmat_Chol_diag(Flags,SAPT%monA,SAPT%monB,SAPT)
- call e2disp_Cmat_Chol_block(Flags,SAPT%monA,SAPT%monB,SAPT)
- !call e2disp_CAlphaTilde_block(Flags,SAPT%monA,SAPT%monB,SAPT)
+ ! Adam's test
+ !call e2disp_Cmat_Chol(Flags,SAPT%monA,SAPT%monB,SAPT)
+ !call e2disp_Cmat_Chol_diag(Flags,SAPT%monA,SAPT%monB,SAPT)
+ !call e2disp_Cmat_Chol_block(Flags,SAPT%monA,SAPT%monB,SAPT)
+ !call e2disp_Cmat_Chol_proj(Flags,SAPT%monA,SAPT%monB,SAPT)
+ ! C(mat)-alpha
+ call e2disp_CAlphaTilde_block(Flags,SAPT%monA,SAPT%monB,SAPT)
  !call e2disp_CAlphaTilde_full(Flags,SAPT%monA,SAPT%monB,SAPT)
  call e2exdisp(Flags,SAPT%monA,SAPT%monB,SAPT)
 

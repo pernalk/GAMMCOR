@@ -622,19 +622,20 @@ associate(A => SblockIV)
   endif
 end associate
 
-print*, 'something is wrong with this spectral subroutine'
-print*, 'tst-Y(ABPLS)',sqrt(tstY)
-print*, 'tst-X(ABMIN)',sqrt(tstX)
+!print*, 'something is wrong with this spectral subroutine'
+!print*, 'tst-Y(ABPLS)',sqrt(tstY)
+!print*, 'tst-X(ABMIN)',sqrt(tstX)
 
 end subroutine SBlock_to_ABMAT
 
-subroutine subtr_blk_right(AMAT,A0Blk,A0BlkIV,isX,nblk,NDimX)
+subroutine add_blk_right(AMAT,A0Blk,A0BlkIV,fact,isX,nblk,NDimX)
 !
 ! subtract AMAT = AMAT - ABLOCK
 !
 implicit none
 
 integer,intent(in) :: nblk,NDimX
+double precision,intent(in) :: fact
 logical,intent(in) :: isX
 double precision,intent(inout) :: AMAT(NDimX,NDimX)
 
@@ -650,8 +651,8 @@ do iblk=1,nblk
         jpos=B%pos(j)
         do i=1,B%n
            ipos=B%pos(i)
-           if(isX) AMAT(ipos,jpos) = AMAT(ipos,jpos) - B%matX(i,j)
-           if(.not.isX) AMAT(ipos,jpos) = AMAT(ipos,jpos) - B%matY(i,j)
+           if(isX) AMAT(ipos,jpos) = AMAT(ipos,jpos) + fact * B%matX(i,j)
+           if(.not.isX) AMAT(ipos,jpos) = AMAT(ipos,jpos) + fact * B%matY(i,j)
         enddo
      enddo
 
@@ -661,11 +662,11 @@ enddo
 associate(B => A0BlkIV)
   do i=1,B%n
      j = B%pos(i)
-     AMAT(j,j) = AMAT(j,j) - B%vec(i)
+     AMAT(j,j) = AMAT(j,j) + fact * B%vec(i)
   enddo
 end associate
 
-end subroutine subtr_blk_right
+end subroutine add_blk_right
 
 subroutine test_ABMAT(ABP,ABM,A0Blk,A0BlkIV,nblk,NBasis,NDimX)
 ! for testing
@@ -1233,13 +1234,42 @@ integer :: i
 
 Diag = 0d0
 do i=1,NDimX
-   !Diag(i) = ABPMA((i-1)*A%NDimX+i)
-   !ABPM((i-1)*A%NDimX+i) = ABPMA((i-1)*A%NDimX+i) - DiagA(i)
    Diag(i) = ABPM(i,i)
    ABPM(i,i) = ABPM(i,i) - Diag(i)
 enddo
 
 end subroutine calculateInitialA_diag
+
+subroutine calculateInitialA_diagP(AB0,ABPM,Pmat,NDimX)
+! calculate A2 = ABPM - ABPM0
+implicit none
+
+integer,intent(in) :: NDimX
+double precision,intent(in)    :: Pmat(NDimX,NDimX)
+double precision,intent(inout) :: AB0(NDimX,NDimX), ABPM(NDimX,NDimX)
+
+integer :: i
+double precision,allocatable :: work(:,:)
+
+AB0 = 0d0
+do i=1,NDimX
+   AB0(i,i)  = ABPM(i,i)
+   ABPM(i,i) = ABPM(i,i) - AB0(i,i)
+enddo
+
+! PROJECT A2 WITH PMat : work = PMat.A2
+allocate(work(NDimX,NDimX))
+
+Call dgemm('N','N',NDimX,NDimX,NDimX,1d0,PMat,NDimX,ABPM,NDimX,0d0,work,NDimX)
+AB0 = AB0 + work
+
+print*, 'A2 norm before projection-moje',norm2(ABPM)
+ABPM = ABPM - work
+print*, 'A2 norm after projection-moje',norm2(ABPM)
+
+deallocate(work)
+
+end subroutine calculateInitialA_diagP
 
 subroutine calculateInitialA_blk(A2,A0Blk,A0BlkIV,nblk,NDimX,abpm0file)
 ! a) read ABPM0 blocks from file
@@ -1291,6 +1321,69 @@ end associate
 !deallocate(A0)
 
 end subroutine calculateInitialA_blk
+
+subroutine calculateInitialA_blkP(A2,A0,Pmat,NDimX,abpm0file)
+! a) read ABPM0 blocks from file
+! b) calculate A2 = ABPM - ABPM0
+implicit none
+
+integer,intent(in)  :: NDimX
+character(*)        :: abpm0file
+double precision    :: Pmat(NDimX,NDimX)
+double precision    :: A2(NDimX,NDimX),A0(NDimX,NDimX)
+
+type(EblockData)    :: A0BlkIV
+type(EblockData),allocatable :: A0Blk(:)
+
+integer :: i,j,ii,ipos,jpos
+integer :: iblk,nblk
+double precision,allocatable :: work(:,:)
+
+! A2 = A2 - A0(blk)
+call read_ABPM0Block(A0Blk,A0BlkIV,nblk,abpm0file)
+call add_blk_right(A2,A0Blk,A0BlkIV,-1d0,.true.,nblk,NDimX)
+
+! PROJECT A2 WITH PMat : A0 = PMat.A2
+Call dgemm('N','N',NDimX,NDimX,NDimX,1d0,PMat,NDimX,A2,NDimX,0d0,A0,NDimX)
+
+print*, 'A2 norm before projection',norm2(A2)
+A2 = A2 - A0
+print*, 'A2 norm after projection',norm2(A2)
+
+!A0 = A0 + Pmat.A2
+call add_blk_right(A0,A0Blk,A0BlkIV,1d0,.true.,nblk,NDimX)
+
+end subroutine calculateInitialA_blkP
+
+subroutine calculateLambda_Pmat(Lambda,A0,omega,NDimX)
+! THIS IS FOR TESTING ONLY!
+! calculate Lambda with Pmat
+! Lambda = (A0 + omega^2 + A2.Q )-1
+!
+implicit none
+
+integer,intent(in)  :: NDimX
+double precision,intent(in)    :: omega
+double precision,intent(in)    :: A0(NDimX,NDimX)
+double precision,intent(out)   :: Lambda(NDimX,NDimX)
+
+integer :: i,inf1,inf2
+integer,allocatable            :: ipiv(:)
+double precision,allocatable   :: work(:)
+
+Lambda = A0
+do i=1,NDimX
+   Lambda(i,i) = Lambda(i,i) + omega**2
+enddo
+
+allocate(ipiv(NDimX),work(NDimX))
+
+call dgetrf(NDimX,NDimX,Lambda,NDimX,ipiv,inf1)
+call dgetri(NDimX,Lambda,NDimX,ipiv,work,NDimX,inf2)
+
+deallocate(work,ipiv)
+
+end subroutine calculateLambda_Pmat
 
 subroutine calculateLambda_diag(Lambda,Diag,omega,NDimX)
 ! calculate Lambda in diagonal form

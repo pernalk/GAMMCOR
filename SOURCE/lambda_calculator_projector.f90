@@ -74,7 +74,7 @@ module class_LambdaCalculatorProjector
             this%A2 = this%A2 - this%A0
 
             ! PROJECT A2 WITH PMat : WORK0=PMat.A2
-            Call dgemm('N','N',this%NDimX,this%NDimX,this%NDimX,1d0,this%PMat,this%NDimX,this%A2,this%NDimX,0.0,WORK0,this%NDimX)
+            Call dgemm('N','N',this%NDimX,this%NDimX,this%NDimX,1d0,this%PMat,this%NDimX,this%A2,this%NDimX,0d0,WORK0,this%NDimX)
             this%A0 = this%A0 + WORK0
             print*, 'A2 norm before projection',norm2(this%A2(1:this%NDimX*this%NDimX))
             this%A2 = this%A2 - WORK0
