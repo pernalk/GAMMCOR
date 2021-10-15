@@ -128,6 +128,7 @@ type CalculationBlock
       integer :: imon = 1
       character(:), allocatable :: JobTitle
       character(:), allocatable :: IntegralsFilePath
+      integer :: Max_Cn = 3
 end type CalculationBlock
 
 type SystemBlock
@@ -215,6 +216,8 @@ type SystemBlock
       double precision,allocatable :: Eig(:),EigX(:),EigY(:) 
       double precision,allocatable :: AP(:,:),PP(:)
       double precision  :: charg(maxcen),xyz(maxcen,3)
+
+      integer :: Max_Cn = 3
 
 end type SystemBlock
 

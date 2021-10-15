@@ -411,6 +411,9 @@ subroutine read_block_calculation(CalcParams, line)
               CalcParams%Cholesky = 1
            endif
 
+      case("MAX_CN")
+             read(val,*) CalcParams%Max_Cn
+
       case ("CHOL_ACCU","CHOL_ACCURACY","CHOLESKY_ACCU","CHOLESKY_ACCURACY")
            if (uppercase(val) == "DEFAULT") then
               CalcParams%CholeskyAccu = CHOL_ACCU_DEFAULT

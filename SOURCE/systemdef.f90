@@ -412,6 +412,9 @@ if(Flags%ISAPT.Eq.0) then
    System%ThrQVirt  = Input%SystemInput(1)%ThrQVirt
    System%TwoMoInt = Input%SystemInput(1)%TwoMoInt
    System%IPrint = Input%CalcParams%IPrint
+  
+   System%Max_Cn = Input%CalcParams%Max_Cn
+   write(*,*)'maxcn',System%Max_Cn 
 
    System%XELE = (System%ZNucl - System%Charge)/2.0d0
    System%NELE = (System%ZNucl - System%Charge)/2

@@ -33,11 +33,6 @@ module class_IterAlgorithmDIIS
             double precision :: A2CTilde(NDimX*NCholesky), CTilde_prev(NDimX*NCholesky)
             double precision :: norm
 
-            !  CTilde = C0
-            ! Call dgemm('N','N',NDimX,NCholesky,NDimX,1.d0,Lambda,NDimX,&
-            !             APlusTilde,NDimX,0.0d0,CTilde,NDimX)
-
-            call init_DIIS(DIISBlock,NDimX*NCholesky,NDimX*NCholesky,this%DIISN)
             CTilde_prev = 0.0d0
             N = 1
             do
@@ -49,12 +44,14 @@ module class_IterAlgorithmDIIS
                 Call dgemm('N','N',NDimX,NCholesky,NDimX,1.0d0,Lambda,NDimX,&
                         A2CTilde,NDimX,0.0d0,CTilde,NDimX)
 
+                if(N == 3) then
+                    call init_DIIS(DIISBlock,NDimX*NCholesky,NDimX*NCholesky,this%DIISN)
+                endif
                 if(N > 2) then
                     call use_DIIS(DIISBlock, CTilde, CTilde - CTilde_prev)
                 endif
 
                 norm = norm2(CTilde - CTilde_prev)
-                ! print '(a, i3, a, e)', "norm (", N, ") = ", norm
 
                 if ((norm < this%Threshold) .or. (N .ge. this%maxIterations .and. this%maxIterations .ge. 0)) then
                     call iStats%addN(N)
@@ -65,7 +62,10 @@ module class_IterAlgorithmDIIS
                 N = N + 1
 
             enddo
-            call free_DIIS(DIISBlock)
+
+            if(N > 2) then
+                call free_DIIS(DIISBlock)
+            endif
             
 
         end subroutine iterate

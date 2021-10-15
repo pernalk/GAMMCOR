@@ -95,18 +95,19 @@ return
 deallocate(work1)
 end subroutine Project_DChol
 
-subroutine WIter_DChol(ECorr,XOne,URe,Occ,EGOne,NGOcc,&
+subroutine WIter_DChol(ECorr,Max_Cn,XOne,URe,Occ,EGOne,NGOcc,&
    IGem,NAct,INActive,NELE,NBasis,NInte1,NDim,NGem,IndAux,&
    IndN,IndX,NDimX)
 !
 !  AC energy cacluation using CHOLESKY VECTORS:
 !  (1) expanding AC integrand in alpha around alpha=0, up to Max_Cn order
 !  (2) finding C^(n)[omega] and (3) omega integration 
+!  Max_Cn is passed in input.inp (if missed, the dafault value 3 is used)
 !
 use abfofo
+use systemdef
 
 implicit none
-
 integer,intent(in) :: NGOcc,NBasis,NInte1,NDim,NGem,NDimX
 integer,intent(in) :: NAct,INActive,NELE
 integer,intent(in) :: IndN(2,NDim),IndX(NDim),IndAux(NBasis),&
@@ -151,8 +152,8 @@ DCholT = transpose(DChol)
 DCholActT = transpose(DCholAct)
 ! ==========================================================================  
 
-NGrid=20
-Max_Cn=5
+NGrid=18
+
 Write (6,'(/,X,''AC calculation through W_AC expansion around Alpha=0, Omega Grid = '',I3,&
    '' and max order in C expansion = '',I3,/)') NGrid,Max_Cn
 
@@ -268,6 +269,8 @@ Do IGL=1,NGrid
 
    EndDo
 
+   Write(6,'(X,"Omega, |C|, |C_Act|",I3,3F10.4)')IGL,OmI,Norm2(COMTilde),Norm2(COMTildeAct)
+
 EndDo
 
 allocate(WorkD(NDimX,NCholesky))
@@ -297,7 +300,7 @@ Call RELEASE_AC0BLOCK(A0Block,A0blockIV,nblk)
 
 end subroutine WIter_DChol
 
-subroutine WIter_FOFO(ECorr,XOne,URe,Occ,EGOne,NGOcc,&
+subroutine WIter_FOFO(ECorr,Max_Cn,XOne,URe,Occ,EGOne,NGOcc,&
    IGem,NAct,INActive,NELE,NBasis,NInte1,NDim,NGem,IndAux,&
    IndN,IndX,NDimX)
 !
