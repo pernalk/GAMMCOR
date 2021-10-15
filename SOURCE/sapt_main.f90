@@ -3696,8 +3696,8 @@ endif
  mon%IPair(1:nbas,1:nbas) = 0
 
  if(Flags%ICASSCF==0) then
-    write(LOUT,'(1x,a,e15.5)') 'Threshold for active orbitals:     ', mon%ThrSelAct
-    write(LOUT,'(1x,a,e15.5)') 'Threshold for quasi-virtual orbital', mon%ThrQVirt
+    write(LOUT,'(1x,a,e15.5)') 'Threshold for active orbitals:       ', mon%ThrSelAct
+    write(LOUT,'(1x,a,e15.5)') 'Threshold for quasi-virtual orbitals:', mon%ThrQVirt
  ! allocate(mon%IndXh(mon%NDim))
 
     ij=0
@@ -3743,8 +3743,8 @@ endif
     enddo
 
  elseif(Flags%ICASSCF==1.and.Flags%ISERPA==0) then
-    write(LOUT,'(1x,a,e15.5)') 'Threshold for active orbitals: ', mon%ThrSelAct
-    write(LOUT,'(2x,a,2e15.5)') 'Threshold for quasi-virtual orbital', mon%ThrQVirt
+    write(LOUT,'(1x,a,e15.5)')  'Threshold for active orbitals:       ', mon%ThrSelAct
+    write(LOUT,'(1x,a,2e15.5)') 'Threshold for quasi-virtual orbitals:', mon%ThrQVirt
 
     if(mon%NCen==1.and.mon%ThrSelAct<1.d-3.and.mon%NAct>1) then
        write(LOUT,'(1x,a)') 'Warning! For single atom ThrSelAct should probably have larger value!'

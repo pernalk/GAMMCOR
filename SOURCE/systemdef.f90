@@ -414,7 +414,6 @@ if(Flags%ISAPT.Eq.0) then
    System%IPrint = Input%CalcParams%IPrint
   
    System%Max_Cn = Input%CalcParams%Max_Cn
-   write(*,*)'maxcn',System%Max_Cn 
 
    System%XELE = (System%ZNucl - System%Charge)/2.0d0
    System%NELE = (System%ZNucl - System%Charge)/2
@@ -434,6 +433,7 @@ elseif(Flags%ISAPT.Eq.1) then
  SAPT%InterfaceType = Input%CalcParams%InterfaceType
  SAPT%SaptLevel = Input%CalcParams%SaptLevel
  SAPT%ic6 = Input%CalcParams%vdWCoef
+ SAPT%Max_Cn = Input%CalcParams%Max_Cn
  SAPT%IPrint = Input%CalcParams%IPrint
  if(SAPT%InterfaceType==2) SAPT%HFCheck = .false.
  ! temporary RSH
@@ -464,10 +464,10 @@ elseif(Flags%ISAPT.Eq.1) then
       monA%PerVirt = Input%SystemInput(1)%PerVirt
       monA%EigFCI  = Input%SystemInput(1)%EigFCI
       monA%NBasis  = Input%CalcParams%NBasis
-      monA%ThrAct       = Input%SystemInput(1)%ThrAct
-      monA%ThrSelAct    = Input%SystemInput(1)%ThrSelAct
+      monA%ThrAct      = Input%SystemInput(1)%ThrAct
+      monA%ThrSelAct   = Input%SystemInput(1)%ThrSelAct
       monA%ThrVirt     = Input%SystemInput(1)%ThrVirt
-      monA%ThrQVirt     = Input%SystemInput(1)%ThrQVirt
+      monA%ThrQVirt    = Input%SystemInput(1)%ThrQVirt
       monA%DeclareTwoMo = Input%SystemInput(1)%DeclareTwoMo
       monA%TwoMoInt = Input%SystemInput(1)%TwoMoInt
       monA%PostCAS  = Input%SystemInput(1)%PostCAS
@@ -514,6 +514,7 @@ elseif(Flags%ISAPT.Eq.1) then
       monB%ISHF      = Input%SystemInput(2)%ISHF
       monB%Cubic     = Input%SystemInput(2)%Cubic
       monB%Wexcit    = Input%SystemInput(2)%Wexcit
+
       monB%NCen = Input%SystemInput(2)%NCen
       monB%UCen = Input%SystemInput(2)%UCen
       monB%Monomer = Input%SystemInput(2)%Monomer

@@ -1504,7 +1504,7 @@ deallocate(A0BlkB)
 ! get CAlphaTilde in an iterative manner
 
 NFreq = 12
-Max_Cn = 6
+Max_Cn = SAPT%Max_Cn
 print*, ''
 print*, 'CAlphaTilde: '
 print*, 'SAPT%NFreq =', NFreq
@@ -1757,7 +1757,7 @@ deallocate(ABPLUS1B)
 ! get CAlphaTilde in an iterative manner
 
 NFreq = 12
-Max_Cn = 6
+Max_Cn = SAPT%Max_Cn
 print*, 'SAPT%NFreq =', NFreq
 print*, 'SAPT%MaxCn =', Max_Cn
 

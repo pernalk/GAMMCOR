@@ -258,7 +258,6 @@ if(Flags%ICASSCF==0.and.Flags%ISERPA==0) then
   !print*, 'ACAlpha',ACAlpha
   select case(Mon%TwoMoInt)
   case(TWOMO_FOFO)
-
      call AB_CAS_FOFO(ABPlus,ABMin,ECASSCF,URe,Mon%Occ,XOne, &
                  Mon%IndN,Mon%IndX,Mon%IGem,Mon%NAct,Mon%INAct,Mon%NDimX,NBas,Mon%NDimX,&
                  NInte1,twojfile,twokfile,ACAlpha,.false.)
@@ -416,30 +415,27 @@ if(Flags%ICASSCF==0.and.Flags%ISERPA==0) then
      write(LOUT,'(1x,a,5x,f15.8)') "CASSCF Energy           ", ECASSCF+Mon%PotNuc
   endif
 
-  if(Flags%ICholesky==1) then
-     !call prepare_cerpa(Mon,ABPLUS,ABMIN,NBas)
-     !call prepare_cerpa_ff(Mon,ABPLUS,ABMIN,NBas)
-  endif
-
   !! snippet for testing Cmat
   !EGOne = 0
   !NGOcc = 0
   !ECorr = 0
 
-  ! sub-snippet for testing Pmat
-  allocate(Mon%Pmat(Mon%NDimX,Mon%NDimX))
-  open(newunit=iunit,file='cholvecs',form='unformatted')
-  write(iunit) Mon%NChol
-  write(iunit) Mon%FF
-  close(iunit)
+  if(Flags%ICholesky==1) then
+     ! sub-snippet for testing Pmat
+     allocate(Mon%Pmat(Mon%NDimX,Mon%NDimX))
+     open(newunit=iunit,file='cholvecs',form='unformatted')
+     write(iunit) Mon%NChol
+     write(iunit) Mon%FF
+     close(iunit)
 
-  call Project_DChol(Mon%PMat,Mon%IndN,NBas,Mon%NDimX)
+     call Project_DChol(Mon%PMat,Mon%IndN,NBas,Mon%NDimX)
 
-  !call CIter_FOFO(PMat,ECorr,ACAlpha,XOne,URe,Mon%Occ,EGOne,NGOcc,&
-  !                Mon%IGem,Mon%NAct,Mon%INAct,Mon%NELE,NBas,NInte1, &
-  !                Mon%NDim,Mon%NGem,Mon%IndAux,Mon%IndN,Mon%IndX,Mon%NDimX,&
-  !                twojfile,twokfile)
-  !deallocate(Pmat)
+     !call CIter_FOFO(PMat,ECorr,ACAlpha,XOne,URe,Mon%Occ,EGOne,NGOcc,&
+     !                Mon%IGem,Mon%NAct,Mon%INAct,Mon%NELE,NBas,NInte1, &
+     !                Mon%NDim,Mon%NGem,Mon%IndAux,Mon%IndN,Mon%IndX,Mon%NDimX,&
+     !                twojfile,twokfile)
+     !deallocate(Pmat)
+  endif
 
   ! UNCOUPLED
 

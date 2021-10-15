@@ -323,6 +323,7 @@ type SaptData
      integer :: InterfaceType = INTER_TYPE_DAL
      integer :: SaptLevel = SAPTLEVEL2
      integer :: NCholesky
+     integer :: Max_Cn = 4
      integer :: ic6 = 0
      integer :: iPINO=-1
      integer :: IPrint = 1000

@@ -70,7 +70,7 @@ C     FILL COMMONS AND CONSTANTS
       MemVal  = Flags%MemVal
       MemType = Flags%MemType
       IWarn   = 0
-      Max_Cn=System%Max_Cn
+      Max_Cn  = System%Max_Cn
 C
 C     *************************************************************************
 C
