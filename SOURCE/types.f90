@@ -129,6 +129,7 @@ type CalculationBlock
       character(:), allocatable :: JobTitle
       character(:), allocatable :: IntegralsFilePath
       integer :: Max_Cn = 3
+      logical :: CAlpha = .false.
 end type CalculationBlock
 
 type SystemBlock
@@ -329,6 +330,7 @@ type SaptData
      integer :: IPrint = 1000
      logical :: iCpld  = .true.
      logical :: Cubic  = .false.
+     logical :: CAlpha = .false.
      ! MH : add keyword!
      logical :: SemiCoupled = .true.
      logical :: Wexcit  = .false.

@@ -1877,7 +1877,6 @@ deallocate(DCholB,DCholA)
 
 end subroutine e2disp_CAlphaTilde_full
 
-
 subroutine get_Cmat(Cmat,CICoef,IndN,ABPM,ABPLUS,Omega,NDimX,NBas)
 implicit none
 

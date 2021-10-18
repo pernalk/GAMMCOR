@@ -434,6 +434,7 @@ elseif(Flags%ISAPT.Eq.1) then
  SAPT%SaptLevel = Input%CalcParams%SaptLevel
  SAPT%ic6 = Input%CalcParams%vdWCoef
  SAPT%Max_Cn = Input%CalcParams%Max_Cn
+ SAPT%CAlpha = Input%CalcParams%CAlpha
  SAPT%IPrint = Input%CalcParams%IPrint
  if(SAPT%InterfaceType==2) SAPT%HFCheck = .false.
  ! temporary RSH
