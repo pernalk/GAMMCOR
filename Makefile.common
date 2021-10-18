@@ -14,7 +14,7 @@ OBJ = $(O)mainp.o $(O)initia.o $(O)dmscf.o $(O)misc.o $(O)optocc.o \
       $(O)sorter.o $(O)tran.o $(O)systemdef.o \
       $(O)types.o $(O)inputfill.o $(O)abmats.o $(O)abfofo.o \
       $(O)sapt_main.o $(O)sapt_exch.o $(O)sapt_pol.o $(O)sapt_utils.o \
-      $(O)sapt_CD_pol.o $(O)sapt_response.o \
+      $(O)sapt_CD_pol.o $(O)sapt_response.o $(O)sapt_interface.o \
       $(O)exmisc.o $(O)exdpino.o $(O)exi.o $(O)exappr.o \
       $(O)srefex.o $(O)diis.o \
       $(O)timing.o \
@@ -138,10 +138,13 @@ $(O)exappr.o : $(S)exappr.f90 $(O)exmisc.o
 	$(FCC) $(FFLAGS)  -c $(S)exappr.f90 -o $(O)exappr.o
 $(O)exdpino.o : $(S)exdpino.f90 $(O)types.o $(O)tran.o $(O)timing.o $(O)exmisc.o
 	$(FCC) $(FFLAGS)  -c $(S)exdpino.f90 -o $(O)exdpino.o
-$(O)sapt_main.o : $(S)sapt_main.f90 $(O)types.o $(O)systemdef.o $(O)tran.o $(O)sorter.o \
+$(O)sapt_main.o : $(S)sapt_main.f90 $(O)types.o \
                   $(O)sapt_exch.o $(O)sapt_pol.o $(O)sapt_CD_pol.o $(O)sapt_utils.o $(O)exdpino.o \
-                  $(O)Cholesky.o $(O)sapt_response.o
+                  $(O)sapt_response.o $(O)sapt_interface.o
 	$(FCC) $(FFLAGS)  -c $(S)sapt_main.f90 -o $(O)sapt_main.o
+$(O)sapt_interface.o : $(S)sapt_interface.f90 $(O)types.o $(O)timing.o \
+                  $(O)sorter.o $(O)tran.o $(O)Cholesky.o $(O)abmats.o
+	$(FCC) $(FFLAGS)  -c $(S)sapt_interface.f90 -o $(O)sapt_interface.o
 $(O)sapt_response.o : $(S)sapt_response.f90 $(O)types.o $(O)tran.o $(O)abmats.o $(O)abfofo.o $(O)sapt_utils.o $(O)timing.o
 	$(FCC) $(FFLAGS)  -c $(S)sapt_response.f90 -o $(O)sapt_response.o
 $(O)sapt_CD_pol.o : $(S)sapt_CD_pol.f90 $(O)types.o $(O)tran.o $(O)sapt_utils.o \
