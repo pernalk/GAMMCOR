@@ -1337,10 +1337,11 @@ integer :: ip,iq,ir,is
 integer :: iunit,info
 integer :: nblkA,nblkB
 integer :: N,Max_Cn
-double precision :: fact,val
+double precision :: fact,val,val2
 double precision :: Cpq,Crs
 double precision :: XFactorial,XN1,XN2
-double precision :: ACAlpha,OmI,Pi,e2d
+double precision :: ACAlpha,OmI,Pi,e2du,e2d
+logical :: both
 
 double precision,allocatable :: XFreq(:),WFreq(:)
 double precision,allocatable :: ABPMA(:,:),ABPMB(:,:),&
@@ -1365,6 +1366,9 @@ type(EBlockData)             :: LambdaIVA,LambdaIVB
 type(EBlockData),allocatable :: LambdaA(:),LambdaB(:)
 ! test
 double precision :: Tcpu,Twall
+
+! both = coupled + uncoupled
+both = SAPT%iCpld
 
 ! timing
 call clock('START',Tcpu,Twall)
@@ -1525,34 +1529,62 @@ call FreqGrid(XFreq,WFreq,NFreq)
 call read_ABPM0Block(A0BlkA,A0BlkIVA,nblkA,'A0BLK_A')
 call read_ABPM0Block(A0BlkB,A0BlkIVB,nblkB,'A0BLK_B')
 
-e2d = 0
+e2d  = 0
+e2du = 0
 do ifreq=NFreq,1,-1
 
    OmI = XFreq(ifreq)
 
-   call C_AlphaExpand(CTildeA,C0TildeA,OmI,Max_Cn,A1A,A2A,ABP0TildeA,ABP1TildeA, &
-                      A0BlkA,A0BlkIVA,nblkA,NCholesky,A%NDimX)
-   call C_AlphaExpand(CTildeB,C0TildeB,OmI,Max_Cn,A1B,A2B,ABP0TildeB,ABP1TildeB, &
-                      A0BlkB,A0BlkIVB,nblkB,NCholesky,B%NDimX)
+   !if(both) then
 
-   call dgemm('N','N',NCholesky,NCholesky,A%NDimX,1d0,DCholA,NCholesky,CTildeA,A%NDimX,0d0,CA,NCholesky)
-   call dgemm('N','N',NCholesky,NCholesky,B%NDimX,1d0,DCholB,NCholesky,CTildeB,B%NDimX,0d0,CB,NCholesky)
+      ! coupled
+      call C_AlphaExpand(CTildeA,C0TildeA,OmI,Max_Cn,A1A,A2A,ABP0TildeA,ABP1TildeA, &
+                         A0BlkA,A0BlkIVA,nblkA,NCholesky,A%NDimX)
+      call C_AlphaExpand(CTildeB,C0TildeB,OmI,Max_Cn,A1B,A2B,ABP0TildeB,ABP1TildeB, &
+                         A0BlkB,A0BlkIVB,nblkB,NCholesky,B%NDimX)
 
-   val = 0
-   do j=1,NCholesky
-      do i=1,NCholesky
-         val = val + CA(j,i)*CB(i,j)
+      call dgemm('N','N',NCholesky,NCholesky,A%NDimX,1d0,DCholA,NCholesky,CTildeA,A%NDimX,0d0,CA,NCholesky)
+      call dgemm('N','N',NCholesky,NCholesky,B%NDimX,1d0,DCholB,NCholesky,CTildeB,B%NDimX,0d0,CB,NCholesky)
+
+      val = 0
+      do j=1,NCholesky
+         do i=1,NCholesky
+            val = val + CA(j,i)*CB(i,j)
+         enddo
       enddo
-   enddo
 
-   e2d = e2d + WFreq(ifreq)*val
+      e2d = e2d + WFreq(ifreq)*val
+   !endif
+
+   !! uncoupled
+
+   !call C_AlphaExpand_unc(C0TildeA,OmI,A1A,A2A,ABP0TildeA,ABP1TildeA, &
+   !                   A0BlkA,A0BlkIVA,nblkA,NCholesky,A%NDimX)
+   !call C_AlphaExpand_unc(C0TildeB,OmI,A1B,A2B,ABP0TildeB,ABP1TildeB, &
+   !                   A0BlkB,A0BlkIVB,nblkB,NCholesky,B%NDimX)
+
+   !call dgemm('N','N',NCholesky,NCholesky,A%NDimX,1d0,DCholA,NCholesky,C0TildeA,A%NDimX,0d0,CA,NCholesky)
+   !call dgemm('N','N',NCholesky,NCholesky,B%NDimX,1d0,DCholB,NCholesky,C0TildeB,B%NDimX,0d0,CB,NCholesky)
+
+   !val2 = 0
+   !do j=1,NCholesky
+   !   do i=1,NCholesky
+   !      val2 = val2+ CA(j,i)*CB(i,j)
+   !   enddo
+   !enddo
+   !e2du = e2du + WFreq(ifreq)*val2
 
 enddo
 
-SAPT%e2disp  = -32d0/Pi*e2d
-e2d = -32d0/Pi*e2d*1d3
-!print*, 'e2d = ',e2d
-call print_en('E2disp(CAlpha)',e2d,.false.)
+!SAPT%e2disp_unc = -32d0/Pi*e2du
+!e2du = -32d0/Pi*e2du*1d3
+!call print_en('E2disp(Alph,unc)',e2du,.false.)
+!if(both) then
+   SAPT%e2disp  = -32d0/Pi*e2d
+   e2d = -32d0/Pi*e2d*1d3
+   !print*, 'e2d = ',e2d
+   call print_en('E2disp(CAlpha)',e2d,.false.)
+!endif
 
 call clock('E2disp(CAlpha)',Tcpu,Twall)
 

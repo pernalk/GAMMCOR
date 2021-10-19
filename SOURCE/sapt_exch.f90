@@ -2489,7 +2489,7 @@ double precision,parameter :: SmallE = 1.D-3
  !approx    = .true.
  both      = SAPT%iCpld
  uncoupled = .true.
- if(Flags%ICASSCF==0)     uncoupled = .false.
+ if(Flags%ICASSCF==0)   uncoupled = .false.
  if(A%Cubic.or.B%Cubic) uncoupled = .false.
 
  ! SAPT cubic

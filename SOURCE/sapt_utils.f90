@@ -1601,7 +1601,7 @@ double precision,intent(inout) :: CTilde(NDimX,NCholesky),C0Tilde(NDimX,NCholesk
 
 integer :: N
 double precision :: XFactorial, XN1, XN2
-logical :: uncoupled
+! testing only
 
 type(EBlockData)             :: A0Blk(nblk),A0BlkIV
 
@@ -1610,10 +1610,6 @@ type(EBlockData)             :: LambdaIV
 
 double precision, allocatable :: C1Tilde(:,:),C2Tilde(:,:)
 double precision, allocatable :: Work(:,:)
-
-! for tests
-uncoupled = .false.
-!uncoupled = .true.
 
 allocate(C1Tilde(NDimX,NCholesky),C2Tilde(NDimX,NCholesky),Work(NDimX,NCholesky))
 
@@ -1635,8 +1631,6 @@ call ABPM_HALFTRAN_GEN_L(CTilde,C1Tilde,0.0d0,Lambda,LambdaIV,nblk,NDimX,NCholes
 CTilde = C0Tilde
 ! test semicoupled
 CTilde = CTilde + C1Tilde
-
-if(uncoupled) return
 
 XFactorial = 1d0
 do N=2,Max_Cn
@@ -1662,6 +1656,40 @@ call release_ac0block(Lambda,LambdaIV,nblk)
 deallocate(Work,C2Tilde,C1Tilde)
 
 end subroutine C_AlphaExpand
+
+subroutine C_AlphaExpand_unc(C0Tilde,OmI,A1,A2,ABP0Tilde,ABP1Tilde,&
+                         A0Blk,A0BlkIV,nblk,NCholesky,NDimX)
+!
+!  For a given frequency OmI, CTilde(Alpha=1) is computed by expanding
+!  around alpha=0, here only in 0-th term, i.e., uncoupled
+!
+implicit none
+
+integer,intent(in)           :: nblk,NCholesky,NDimX
+double precision,intent(in)  :: OmI
+
+double precision,intent(in)    :: A1(NDimX,NDimX),A2(NDimX,NDimX)
+double precision,intent(in)    :: ABP0Tilde(NDimX,NCholesky),ABP1TIlde(NDimX,NCholesky)
+double precision,intent(inout) :: C0Tilde(NDimX,NCholesky)
+
+integer :: N
+double precision :: XFactorial, XN1, XN2
+
+type(EBlockData)             :: A0Blk(nblk),A0BlkIV
+
+type(EBlockData),allocatable :: Lambda(:)
+type(EBlockData)             :: LambdaIV
+
+! Calc: LAMBDA=(A0+Om^2)^-1
+call calculateLambda_blk(Lambda,LambdaIV,OmI**2,NDimX,nblk,A0Blk,A0BlkIV)
+
+! Calc: C0Tilde=1/2 LAMBDA.APLUS0Tilde
+call ABPM_HALFTRAN_GEN_L(ABP0Tilde,C0Tilde,0.0d0,Lambda,LambdaIV,nblk,NDimX,NCholesky,'X')
+C0Tilde = 0.5d0*C0Tilde
+
+call release_ac0block(Lambda,LambdaIV,nblk)
+
+end subroutine C_AlphaExpand_unc
 
 subroutine ModABMin(Occ,SRKer,Wt,OrbGrid,TwoNO,TwoElErf,ABMin,IndN,IndX,NDimX,NGrid,NInte2,NBasis)
 !     ADD CONTRIBUTIONS FROM THE srALDA KERNEL TO AB MATRICES
