@@ -53,12 +53,12 @@ WORK1=WORK1-WORK0
 EGOne(1)=ECASSCF
 
 !A0=ABPLUS0*ABMIN0
-Call dgemm('N','N',NDimX,NDimX,NDimX,1d0,ABPLUS0,NDimX,WORK0,NDimX,0.0,A0,NDimX)
+Call dgemm('N','N',NDimX,NDimX,NDimX,1d0,ABPLUS0,NDimX,WORK0,NDimX,0d0,A0,NDimX)
 !A1=ABPLUS0*ABMIN1+ABPLUS1*ABMIN0
-Call dgemm('N','N',NDimX,NDimX,NDimX,1d0,ABPLUS0,NDimX,WORK1,NDimX,0.0,A1,NDimX)
+Call dgemm('N','N',NDimX,NDimX,NDimX,1d0,ABPLUS0,NDimX,WORK1,NDimX,0d0,A1,NDimX)
 Call dgemm('N','N',NDimX,NDimX,NDimX,1d0,ABPLUS1,NDimX,WORK0,NDimX,1d0,A1,NDimX)
 !A2=ABPLUS1*ABMIN1
-Call dgemm('N','N',NDimX,NDimX,NDimX,1d0,ABPLUS1,NDimX,WORK1,NDimX,0.0,A2,NDimX)
+Call dgemm('N','N',NDimX,NDimX,NDimX,1d0,ABPLUS1,NDimX,WORK1,NDimX,0d0,A2,NDimX)
 
 Call FreqGrid(XFreq,WFreq,NGrid)
 
@@ -78,18 +78,18 @@ Do IGL=1,NGrid
 
 !     C0=C(0)
       Call dgemm('N','N',NDimX,NDimX,NDimX,0.5d0,WORK1,NDimX,&
-                 ABPLUS0,NDimX,0.0,C0,NDimX)
+                 ABPLUS0,NDimX,0d0,C0,NDimX)
 !     WORK0=LAMBDA*A1
       Call dgemm('N','N',NDimX,NDimX,NDimX,1d0,WORK1,NDimX,&
-                 A1,NDimX,0.0,WORK0,NDimX)
+                 A1,NDimX,0d0,WORK0,NDimX)
 !     C1=C(1)
       Call dgemm('N','N',NDimX,NDimX,NDimX,1d0,WORK0,NDimX,&
-                 C0,NDimX,0.0,C1,NDimX)
+                 C0,NDimX,0d0,C1,NDimX)
       Call dgemm('N','N',NDimX,NDimX,NDimX,0.5d0,WORK1,NDimX,&
                  ABPLUS1,NDimX,-1.d0,C1,NDimX)
 !     WORK1=LAMBDA*A2
       Call dgemm('N','N',NDimX,NDimX,NDimX,1.d0,WORK1,NDimX,&
-                 A2,NDimX,0.0,C2,NDimX)
+                 A2,NDimX,0d0,C2,NDimX)
       WORK1=C2
 
 !     FROM NOW ON: LAMBDA*A2 in WORK1, LAMBDA*A1 in WORK0
@@ -104,12 +104,12 @@ Do IGL=1,NGrid
           XN1=-N
           XN2=-N*(N-1)
           Call dgemm('N','N',NDimX,NDimX,NDimX,1d0,WORK0,NDimX,&
-                     C1,NDimX,0.0,C2,NDimX)
+                     C1,NDimX,0d0,C2,NDimX)
           Call dgemm('N','N',NDimX,NDimX,NDimX,XN2,WORK1,NDimX,&
                      C0,NDimX,XN1,C2,NDimX)
           FF=WFact/XFactorial/(N+1)
 
-          COM=COM+FF*C2 
+          COM=COM+FF*C2
           C0=C1
           C1=C2
       EndDo
@@ -118,7 +118,7 @@ EndDo
 do i=1,NBasis
    CICoef(i) = sign(sqrt(Occ(i)),Occ(i)-0.5d0)
 enddo
- 
+
 pos = 0
 do i=1,NDimX
    pos(IndN(1,i),IndN(2,i)) = IndX(i)
@@ -237,11 +237,11 @@ call AB_CAS_FOFO(ABPLUS,ABMIN,ECASSCF,URe,Occ,XOne, &
                  NInte1,twojfile,twokfile,ACAlpha,.false.)
 EGOne(1)=ECASSCF
 
-!     Frequency integration of CMAT 
+!     Frequency integration of CMAT
 
 NGrid=18
 Call FreqGrid(XFreq,WFreq,NGrid)
-   
+
 COM=0.0
 Do IGL=1,NGrid
       OmI=XFreq(IGL)
