@@ -12,7 +12,7 @@ OBJ = $(O)mainp.o $(O)initia.o $(O)dmscf.o $(O)misc.o $(O)optocc.o \
       $(O)xcfun.o \
       $(O)gridmolpro.o \
       $(O)sorter.o $(O)tran.o $(O)systemdef.o \
-      $(O)types.o $(O)inputfill.o $(O)abmats.o $(O)abfofo.o \
+      $(O)types.o $(O)inputfill.o $(O)abmats.o $(O)abfofo.o $(O)ab0fofo.o \
       $(O)sapt_main.o $(O)sapt_exch.o $(O)sapt_pol.o $(O)sapt_utils.o \
       $(O)sapt_CD_pol.o $(O)sapt_response.o $(O)sapt_interface.o \
       $(O)exmisc.o $(O)exdpino.o $(O)exi.o $(O)exappr.o \
@@ -74,7 +74,7 @@ $(O)srlrdynamic.o : $(S)srlrdynamic.f
 	$(FCC) $(FFLAGS)  -c $(S)srlrdynamic.f -o $(O)srlrdynamic.o
 $(O)erpa.o : $(S)erpa.f
 	$(FCC) $(FFLAGS)  -c $(S)erpa.f -o $(O)erpa.o
-$(O)interpa.o : $(S)interpa.f $(O)abmats.o $(O)abfofo.o
+$(O)interpa.o : $(S)interpa.f $(O)abmats.o $(O)abfofo.o $(O)ab0fofo.o
 	$(FCC) $(FFLAGS)  -c $(S)interpa.f -o $(O)interpa.o
 $(O)exact2el.o : $(S)exact2el.f
 	$(FCC) $(FFLAGS)  -c $(S)exact2el.f -o $(O)exact2el.o
@@ -82,9 +82,9 @@ $(O)optapsg.o : $(S)optapsg.f
 	$(FCC) $(FFLAGS)  -c $(S)optapsg.f -o $(O)optapsg.o
 $(O)newton.o : $(S)newton.f
 	$(FCC) $(FFLAGS)  -c $(S)newton.f -o $(O)newton.o
-$(O)acfd.o : $(S)acfd.f $(O)abmats.o $(O)abfofo.o
+$(O)acfd.o : $(S)acfd.f $(O)abmats.o $(O)abfofo.o $(O)ab0fofo.o
 	$(FCC) $(FFLAGS)  -c $(S)acfd.f -o $(O)acfd.o
-$(O)accas.o : $(S)accas.f $(O)types.o $(O)sorter.o $(O)abmats.o $(O)abfofo.o
+$(O)accas.o : $(S)accas.f $(O)types.o $(O)sorter.o $(O)abmats.o $(O)abfofo.o $(O)ab0fofo.o
 	$(FCC) $(FFLAGS)  -c $(S)accas.f -o $(O)accas.o
 $(O)ac_iter.o : $(S)ac_iter.f  $(O)abmats.o $(O)abfofo.o
 	$(FCC) $(FFLAGS)  -c $(S)ac_iter.f -o $(O)ac_iter.o
@@ -128,6 +128,8 @@ $(O)abmats.o : $(S)abmats.f90 $(O)types.o $(O)tran.o
 	$(FCC) $(FFLAGS)  -c $(S)abmats.f90 -o $(O)abmats.o
 $(O)abfofo.o : $(S)abfofo.f90 $(O)types.o $(O)tran.o
 	$(FCC) $(FFLAGS)  -c $(S)abfofo.f90 -o $(O)abfofo.o
+$(O)ab0fofo.o : $(S)ab0fofo.f90 $(O)types.o $(O)tran.o $(O)abfofo.o
+	$(FCC) $(FFLAGS)  -c $(S)ab0fofo.f90 -o $(O)ab0fofo.o
 $(O)srefex.o : $(S)srefex.f90 $(O)types.o $(O)exmisc.o
 	$(FCC) $(FFLAGS)  -c $(S)srefex.f90 -o $(O)srefex.o
 $(O)exi.o : $(S)exi.f90
@@ -145,7 +147,8 @@ $(O)sapt_main.o : $(S)sapt_main.f90 $(O)types.o \
 $(O)sapt_interface.o : $(S)sapt_interface.f90 $(O)types.o $(O)timing.o \
                   $(O)sorter.o $(O)tran.o $(O)Cholesky.o $(O)abmats.o
 	$(FCC) $(FFLAGS)  -c $(S)sapt_interface.f90 -o $(O)sapt_interface.o
-$(O)sapt_response.o : $(S)sapt_response.f90 $(O)types.o $(O)tran.o $(O)abmats.o $(O)abfofo.o $(O)sapt_utils.o $(O)timing.o
+$(O)sapt_response.o : $(S)sapt_response.f90 $(O)types.o $(O)tran.o $(O)abmats.o $(O)abfofo.o $(O)ab0fofo.o \
+                  $(O)sapt_utils.o $(O)timing.o
 	$(FCC) $(FFLAGS)  -c $(S)sapt_response.f90 -o $(O)sapt_response.o
 $(O)sapt_CD_pol.o : $(S)sapt_CD_pol.f90 $(O)types.o $(O)tran.o $(O)sapt_utils.o \
                     $(O)iter_stats.o $(O)iter_algorithm.o $(O)iter_algorithm_diis.o $(O)timing.o \

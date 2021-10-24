@@ -141,6 +141,7 @@ C
      $  IndAux,IPair,IndN,IndX,NDimX,Title,NBasis,NInte1,NInte2,NGem)
 C
       use abfofo
+      use ab0fofo
 C
       Implicit Real*8 (A-H,O-Z)
 C
@@ -293,6 +294,7 @@ C
 c      use abmat
       use types
       use abfofo
+      use ab0fofo
 C
       Implicit Real*8 (A-H,O-Z)
 C
@@ -555,6 +557,7 @@ C
       use sorter
       use abmat
       use abfofo
+      use ab0fofo
       use timing
 C
       Implicit Real*8 (A-H,O-Z)

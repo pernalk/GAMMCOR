@@ -2,8 +2,6 @@ subroutine Project_DChol(PMat,IndN,NBasis,NDimX)
 !
 ! compute the projector matrix PMat, used optionally in ACFREQ
 !
-use abfofo
-
 implicit none
 
 integer,intent(in) :: NBasis,NDimX,IndN(2,NDimX)
@@ -52,7 +50,7 @@ call Diag8(work2,NCholesky,NCholesky,work3,work4)
 do i=1,NCholesky
 if(abs(work3(i)).lt.1d-10) then
 !      print*, i, work3(i)
-   work3(i)=0.0
+   work3(i) = 0
 else
    work3(i)=1./work3(i)
 endif
@@ -364,10 +362,10 @@ WORK1=WORK1-WORK0
 EGOne(1)=ECASSCF
 
 !Calc: A1=ABPLUS0*ABMIN1+ABPLUS1*ABMIN0
-Call dgemm('N','N',NDimX,NDimX,NDimX,1d0,ABPLUS0,NDimX,WORK1,NDimX,0.0,A1,NDimX)
+Call dgemm('N','N',NDimX,NDimX,NDimX,1d0,ABPLUS0,NDimX,WORK1,NDimX,0d0,A1,NDimX)
 Call dgemm('N','N',NDimX,NDimX,NDimX,1d0,ABPLUS1,NDimX,WORK0,NDimX,1d0,A1,NDimX)
 !Calc: A2=ABPLUS1*ABMIN1
-Call dgemm('N','N',NDimX,NDimX,NDimX,1d0,ABPLUS1,NDimX,WORK1,NDimX,0.0,A2,NDimX)
+Call dgemm('N','N',NDimX,NDimX,NDimX,1d0,ABPLUS1,NDimX,WORK1,NDimX,0d0,A2,NDimX)
 
 Call FreqGrid(XFreq,WFreq,NGrid)
 
@@ -379,7 +377,7 @@ Call AC0BLOCK(Occ,URe,XOne, &
       A0BlockIV,A0Block,nblk,'A0BLK',0)
       !A0BlockIV,A0Block,nblk,1)
 !
-COM=0.0
+COM=0d0
 Do IGL=1,NGrid
    OmI=XFreq(IGL)
 
@@ -389,18 +387,18 @@ Do IGL=1,NGrid
 
 !  Calc: C0=1/2 Lambda.ABPLUS0
    Call dgemm('N','N',NDimX,NDimX,NDimX,0.5d0,WORK1,NDimX,&
-              ABPLUS0,NDimX,0.0,C0,NDimX)
+              ABPLUS0,NDimX,0d0,C0,NDimX)
 !  Calc: WORK0=Lambda.A1
    Call dgemm('N','N',NDimX,NDimX,NDimX,1d0,WORK1,NDimX,&
-              A1,NDimX,0.0,WORK0,NDimX)
+              A1,NDimX,0d0,WORK0,NDimX)
 !  Calc: C1=1/2 Lambda.ABPLUS1-WORK0.C0
    Call dgemm('N','N',NDimX,NDimX,NDimX,1d0,WORK0,NDimX,&
-              C0,NDimX,0.0,C1,NDimX)
+              C0,NDimX,0d0,C1,NDimX)
    Call dgemm('N','N',NDimX,NDimX,NDimX,0.5d0,WORK1,NDimX,&
               ABPLUS1,NDimX,-1.d0,C1,NDimX)
 !  Calc: WORK1=LAMBDA*A2
    Call dgemm('N','N',NDimX,NDimX,NDimX,1.d0,WORK1,NDimX,&
-              A2,NDimX,0.0,C2,NDimX)
+              A2,NDimX,0d0,C2,NDimX)
    WORK1=C2
 
 !  FROM NOW ON: Lambda.A2 in WORK1, Lambda.A1 in WORK0
@@ -414,7 +412,7 @@ Do IGL=1,NGrid
        XN1=-N
        XN2=-N*(N-1)
        Call dgemm('N','N',NDimX,NDimX,NDimX,1d0,WORK0,NDimX,&
-                  C1,NDimX,0.0,C2,NDimX)
+                  C1,NDimX,0d0,C2,NDimX)
        Call dgemm('N','N',NDimX,NDimX,NDimX,XN2,WORK1,NDimX,&
                   C0,NDimX,XN1,C2,NDimX)
        FF=WFact/XFactorial/(N+1)
@@ -551,10 +549,10 @@ NGrid=15
 Write (6,'(/,X,''AC Calculation with Omega Grid = '',I3,/)') NGrid
 Call FreqGrid(XFreq,WFreq,NGrid)
 
-COM=0.0
+COM=0d0
 Do IGL=1,NGrid
    OmI=XFreq(IGL)
-   AIN=0.0
+   AIN=0d0
    Do I=1,NDimX
        AIN((I-1)*NDimX+I)=1.0
    EndDo
@@ -706,14 +704,14 @@ ACAlpha0=0.D0
 call AB_CAS_FOFO(ABPLUS0,WORK0,ECASSCF,URe,Occ,XOne, &
               IndN,IndX,IGem,NAct,INActive,NDimX,NBasis,NDimX,&
               NInte1,twojfile,twokfile,ACAlpha0,.false.)
-Call dgemm('N','N',NDimX,NDimX,NDimX,1d0,ABPLUS0,NDimX,WORK0,NDimX,0.0,A0,NDimX)
+Call dgemm('N','N',NDimX,NDimX,NDimX,1d0,ABPLUS0,NDimX,WORK0,NDimX,0d0,A0,NDimX)
 
 call AB_CAS_FOFO(ABPLUS1,WORK1,ECASSCF,URe,Occ,XOne, &
               IndN,IndX,IGem,NAct,INActive,NDimX,NBasis,NDimX,&
               NInte1,twojfile,twokfile,ACAlpha,.false.)
 EGOne(1)=ECASSCF
 !A2=ABPLUS1*ABMIN1
-Call dgemm('N','N',NDimX,NDimX,NDimX,1d0,ABPLUS1,NDimX,WORK1,NDimX,0.0,A2,NDimX)
+Call dgemm('N','N',NDimX,NDimX,NDimX,1d0,ABPLUS1,NDimX,WORK1,NDimX,0d0,A2,NDimX)
 
 A0=0.D0
 Do I=1,NDimX
@@ -731,7 +729,7 @@ A2=A2-A0
 
 
 Call FreqGrid(XFreq,WFreq,NGrid)
-COM=0.0
+COM=0d0
 Do IGL=1,NGrid
    OmI=XFreq(IGL)
 
@@ -748,16 +746,16 @@ Do IGL=1,NGrid
 
 !     C0=C(0)
    Call dgemm('N','N',NDimX,NDimX,NDimX,1.d0,WORK1,NDimX,&
-              ABPLUS1,NDimX,0.0,C0,NDimX)
+              ABPLUS1,NDimX,0d0,C0,NDimX)
 !     C1=C(1)
    Call dgemm('N','N',NDimX,NDimX,NDimX,1d0,A2,NDimX,&
-              C0,NDimX,0.0,WORK0,NDimX)
+              C0,NDimX,0d0,WORK0,NDimX)
    WORK0=ABPLUS1-WORK0
    Call dgemm('N','N',NDimX,NDimX,NDimX,1.0d0,WORK1,NDimX,&
-              WORK0,NDimX,0.0,CMAT,NDimX)
+              WORK0,NDimX,0d0,CMAT,NDimX)
    Do N=2,Max_Cn
       Call dgemm('N','N',NDimX,NDimX,NDimX,1d0,A2,NDimX,&
-              CMAT,NDimX,0.0,WORK0,NDimX)
+              CMAT,NDimX,0d0,WORK0,NDimX)
       WORK0=ABPLUS1-WORK0
 ! damping is needed when active orbitals present: CMAT(n) = (1-XMix)*CMAT(n) + XMix*CMAT(n-1)
       Call dgemm('N','N',NDimX,NDimX,NDimX,1.0d0-XMix,WORK1,NDimX,&
@@ -825,7 +823,7 @@ allocate(WorkD(NDimX,NCholesky))
 WorkD=0
 ! WorkD=C_tilde=C*D^T
 Call dgemm('N','T',NDimX,NCholesky,NDimX,1d0,COM,NDimX,&
-              DChol,NCholesky,0.0,WorkD,NDimX)
+              DChol,NCholesky,0d0,WorkD,NDimX)
 ECorr=0
 do j=1,NDimX
 do i=1,NCholesky
@@ -836,7 +834,7 @@ enddo
 WorkD=0
 ! WorkD=C_tilde_act=C*D_act^T
 Call dgemm('N','T',NDimX,NCholesky,NDimX,1d0,COM,NDimX,&
-              DCholAct,NCholesky,0.0,WorkD,NDimX)
+              DCholAct,NCholesky,0d0,WorkD,NDimX)
 ECorrAct=0
 do j=1,NDimX
 do i=1,NCholesky
@@ -904,7 +902,6 @@ return
 !deallocate(ints,work)
 
 end subroutine CIter_FOFO_old
-
 
 !subroutine Eccor_iter()
 subroutine CIter_FOFO(PMat,ECorr,ACAlpha,XOne,URe,Occ,EGOne,NGOcc,&
@@ -977,20 +974,20 @@ subroutine CIter_FOFO(PMat,ECorr,ACAlpha,XOne,URe,Occ,EGOne,NGOcc,&
                   NInte1,twojfile,twokfile,ACAlpha,.false.)
    EGOne(1)=ECASSCF
    ! Calc A2=ABPLUS1*ABMIN1
-   Call dgemm('N','N',NDimX,NDimX,NDimX,1d0,ABPLUS1,NDimX,WORK1,NDimX,0.0,A2,NDimX)
+   Call dgemm('N','N',NDimX,NDimX,NDimX,1d0,ABPLUS1,NDimX,WORK1,NDimX,0d0,A2,NDimX)
    
    ! Calc A+Tilde & AAct+Tilde
    ! ==========================================================================================================================   
    allocate(APlusTilde(NDimX*NCholesky), APlusTildeAct(NDimX*NCholesky))
-   Call dgemm('N','N',NDimX,NCholesky,NDimX,1d0,ABPLUS1,NDimX,DCholT,NDimX,0.0,APlusTilde,NDimX)
-   Call dgemm('N','N',NDimX,NCholesky,NDimX,1d0,ABPLUS1,NDimX,DCholActT,NDimX,0.0,APlusTildeAct,NDimX)
+   Call dgemm('N','N',NDimX,NCholesky,NDimX,1d0,ABPLUS1,NDimX,DCholT,NDimX,0d0,APlusTilde,NDimX)
+   Call dgemm('N','N',NDimX,NCholesky,NDimX,1d0,ABPLUS1,NDimX,DCholActT,NDimX,0d0,APlusTildeAct,NDimX)
    ! ==========================================================================================================================  
 
    ! Calc CTilde & CTildeAct integrals
   ! ==========================================================================================================================  
    allocate(COMTilde(NDimX*NCholesky),COMTildeAct(NDimX*NCholesky))
-   COMTilde=0.0
-   COMTildeAct=0.0
+   COMTilde=0d0
+   COMTildeAct=0d0
 
    ! Create iteration algorithm object
    iterAlgo = IterAlgorithmDIIS(Threshold=1d-4, DIISN=6, maxIterations=30)

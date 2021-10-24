@@ -1319,9 +1319,8 @@ end subroutine e2disp_Cmat_Chol_proj
 subroutine e2disp_CAlphaTilde_block(Flags,A,B,SAPT)
 !
 ! calculate 2nd order dispersion energy
-! in coupled approximation using
-! C(omega) obained in an iterative fashion
-! using A0 blocks (not diagonal)
+! using expansion of C(w) in alpha around alpha=0, up to Max_Cn order
+! use A0 blocks (not diagonal)
 ! with Cholesky vectors
 !
 implicit none

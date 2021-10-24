@@ -5,6 +5,7 @@
 C
       use abmat
       use abfofo
+      use ab0fofo
 C
 C      Subroutine INTERPA(ETot,ENuc,TwoNO,URe,UNOAO,Occ,XOne,
 C     $  Title,OrbGrid,WGrid,NSymMO,NBasis,NInte1,NInte2,NGrid,NDim,

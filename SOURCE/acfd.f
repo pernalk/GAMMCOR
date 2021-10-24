@@ -6,6 +6,7 @@
 C
       use abmat
       use abfofo
+      use ab0fofo
 C 
 C     A ROUTINE FOR COMPUTING ELECTRONIC ENERGY USING AC CORRELATION ENERGY FORMULA
 C
@@ -1005,7 +1006,7 @@ C
       Subroutine ConvertXYtilde(EigY,EigX,Eig,C,IEigAddY,IEigAddInd,
      $ IndN,IndBlock,NFree2,NBasis,NDimX,NDim,filename,ifdump)
 C
-      use abfofo,only : reduce_to_XY0CAS
+      use ab0fofo,only : reduce_to_XY0CAS
 C
       Implicit Real*8 (A-H,O-Z)
 C
@@ -4565,6 +4566,7 @@ C     A ROUTINE FOR COMPUTING AC INTEGRAND
 C
       use abmat
       use abfofo
+      use ab0fofo
 C
       Implicit Real*8 (A-H,O-Z)
 C
