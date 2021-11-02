@@ -594,6 +594,8 @@ subroutine read4_gen(NBas,nA,CA,nB,CB,nC,CC,nD,CD,fname,srtfile)
 !!! ie. (NBas,n,C)
 implicit none
 
+type(AOReaderData) :: reader
+
 integer,intent(in) :: NBas
 integer,intent(in) :: nA,nB,nC,nD
 ! CA(NBas*nA)
@@ -603,6 +605,7 @@ double precision, allocatable :: work1(:), work2(:)
 integer :: iunit,iunit2
 integer :: ntr,nAB,nCD
 integer :: ip,iq,ir,is,pq,rs
+logical :: empty
 
  write(6,'()')
  write(6,'(1x,a)') 'Reading integrals for '//fname
@@ -613,8 +616,9 @@ integer :: ip,iq,ir,is,pq,rs
 
  allocate(work1(NBas*NBas),work2(NBas*NBas))
 
- open(newunit=iunit,file=trim(srtfile),status='OLD',&
-      access='DIRECT',form='UNFORMATTED',recl=8*ntr)
+ !open(newunit=iunit,file=trim(srtfile),status='OLD',&
+ !     access='DIRECT',form='UNFORMATTED',recl=8*ntr)
+ call reader%open(trim(srtfile))
 
  open(newunit=iunit2,file=fname,status='REPLACE',&
      access='DIRECT',form='UNFORMATTED',recl=8*nCD)
@@ -624,16 +628,21 @@ integer :: ip,iq,ir,is,pq,rs
        pq=max(ip,iq)
        pq=min(ip,iq)+pq*(pq-1)/2
 
-       read(iunit,rec=pq) work1(1:ntr)
-       call triang_to_sq(work1,work2,NBas)
+       !read(iunit,rec=pq) work1(1:ntr)
+       call reader%getTR(pq,work1,empty)
+       if(empty) then
+          work1(1:nCD) = 0
+       else
+          call triang_to_sq(work1,work2,NBas)
 
-       rs = 0
-       do is=1,nD
-          do ir=1,nC
-             rs = rs + 1
-             work1(rs) = work2(ir+(is-1)*NBas)
+          rs = 0
+          do is=1,nD
+             do ir=1,nC
+                rs = rs + 1
+                work1(rs) = work2(ir+(is-1)*NBas)
+             enddo
           enddo
-       enddo
+       endif
 
        pq=ip+(iq-1)*nA
        write(iunit2,rec=pq) work1(1:nCD)
@@ -642,7 +651,8 @@ integer :: ip,iq,ir,is,pq,rs
  enddo
  
  close(iunit2)
- close(iunit)
+ !close(iunit)
+ call reader%close
 
  deallocate(work1,work2)
 

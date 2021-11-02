@@ -408,35 +408,46 @@ case(4) ! Libor
         access='STREAM',form='UNFORMATTED')
    read(iunit)idx_p, idx_q, idx_r
 
-   pq=0
-   do idx_p=1,nbas
-      do idx_q=1,idx_p
-         pq=pq+1
+   do ipass=1,npass
 
-         rs=0
-         do idx_r=1,nbas
-            do idx_s=1,idx_r
-               rs=rs+1
+      call srt%iniPass(ipass)
 
-               if(pq.Ge.rs) then
-                  read(iunit) val
-                  if(val/=0) then
-                     call srt%add(pq,rs,val)
-                     call srt%add(rs,pq,val)
+      pq=0
+      do idx_p=1,nbas
+         do idx_q=1,idx_p
+            pq=pq+1
+
+            rs=0
+            do idx_r=1,nbas
+               do idx_s=1,idx_r
+                  rs=rs+1
+
+                  if(pq.Ge.rs) then
+                     read(iunit) val
+                     if(val/=0) then
+                        call srt%add(pq,rs,val)
+                        call srt%add(rs,pq,val)
+                     endif
                   endif
-               endif
 
+               enddo
             enddo
+
          enddo
-
       enddo
-   enddo
 
-   ! find position in file
-   if(present(outinfo)) then
-      inquire(unit=iunit,pos=outinfo)
-      outinfo = outinfo-24
-   endif
+      ! find position in file
+      ! I am not sure we need it for Libor?
+      if(present(outinfo)) then
+         inquire(unit=iunit,pos=outinfo)
+         outinfo = outinfo-24
+      endif
+
+      call srt%endPass
+      rewind(iunit)
+      read(iunit)
+
+   enddo
 
    close(iunit)
 
