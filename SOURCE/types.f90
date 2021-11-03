@@ -1,5 +1,6 @@
 module types
 ! written by M. Hapka, M. Modrzejewski
+!            K. Pernal
 use iso_fortran_env
 
 implicit none

@@ -797,8 +797,10 @@ contains
       end subroutine chol_CoulombMatrix
 
 subroutine chol_ints_fofo(nA,nB,MatAB,nC,nD,MatCD,NCholesky,NBas,fname)
+!
 ! assumes that MatAB(CD) are NChol,FF type
 ! constructs (FF|OO) or (FO|FO) integrals
+!
 implicit none
 
 integer,intent(in) :: nA,nB,nC,nD
@@ -828,7 +830,7 @@ do id=1,nD
    do ic=1,nC
       irec = irec + 1
       cd = ic+(id-1)*NBas
-      call dgemv('T',NCholesky,nAB,1d0,MatAB,NCholesky,MatCD(1:NCholesky,cd),1,0d0,work,1)
+      call dgemv('T',NCholesky,nAB,1d0,MatAB(1:NCholesky,:),NCholesky,MatCD(1:NCholesky,cd),1,0d0,work,1)
       write(iunit,rec=irec) work(1:nAB)
    
    enddo
@@ -838,5 +840,62 @@ deallocate(work)
 close(iunit)
 
 end subroutine chol_ints_fofo
+
+subroutine chol_triang_fofo(nA,nB,MatAB,nC,nD,MatCD,NCholesky,NInte1,NBas,fname)
+!
+! MatAB and MatCD are (NChol,FFtriang) type
+! constructs (FF|OO) or (FO|FO) integrals
+! it is the Cholesky counterpart of read4_gen in tran
+! this was added to handle ints from Libor
+!
+implicit none
+
+integer,intent(in) :: nA,nB,nC,nD
+integer,intent(in) :: NInte1,NBas,NCholesky
+character(*),intent(in)     :: fname
+double precision,intent(in) :: MatAB(1:NCholesky,1:NInte1), &
+                               MatCD(1:NCholesky,1:NInte1)
+
+integer :: iunit
+integer :: nAB,nCD,cd
+integer :: ic,id,irec
+integer :: ia,ib,iab,tab
+double precision,allocatable :: work(:),workT(:)
+double precision,allocatable :: ints(:,:)
+
+nAB = nA*nB
+nCD = nC*nD
+
+allocate(workT(NInte1),work(nAB),ints(NBas,NBas))
+
+print*, 'Assemble ',fname,' from Cholesky Vectors'
+
+open(newunit=iunit,file=fname,status='REPLACE',&
+     access='DIRECT',form='UNFORMATTED',recl=8*nAB)
+
+! (FF|OO)
+irec = 0
+do id=1,nD
+   do ic=1,nC
+      irec = irec + 1
+      cd = max(ic,id)*(max(ic,id)-1)/2 + min(ic,id)
+      call dgemv('T',NCholesky,NInte1,1d0,MatAB(1:NCholesky,:),NCholesky,MatCD(1:NCholesky,cd),1,0d0,workT,1)
+
+      ! unpack triangle to square
+      iab  = 0
+      do ib=1,nB
+         do ia=1,nA
+            iab = iab + 1
+            tab = max(ia,ib)*(max(ia,ib)-1)/2 + min(ia,ib)
+            work(iab) = workT(tab)
+         enddo
+      enddo
+
+      write(iunit,rec=irec) work(1:nAB)
+
+   enddo
+enddo
+
+end subroutine chol_triang_fofo
 
 end module Cholesky

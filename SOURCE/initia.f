@@ -245,18 +245,20 @@ C
 C
       use types
       use sorter
+      use Cholesky
       use tran
-      use abmat 
+      use abmat
 C
 C     READ Integrals and 1-RDM - needed for AC-DMRG CALCULATION
 C
       Implicit Real*8 (A-H,O-Z)
 C
-      Parameter (Zero=0.D0,One=1.D0,Two=2.D0)
+!      Parameter (Zero=0.D0,One=1.D0,Two=2.D0)
 C
       Real*8 XKin(NInte1),XNuc(NInte1),Occ(NBasis),URe(NBasis,NBasis),
      $ TwoEl(NInte2),UMOAO(NBasis*NBasis)
-C 
+      Type(TCholeskyVecs) :: CholeskyVecs
+C
       Character*60 FName,Aux1
 C
       Include 'commons.inc'
@@ -473,6 +475,11 @@ C
       MemSrtSize=MemVal*1024_8**MemType
       Call readtwoint(NBasis,4,'DPQRS.bin','AOTWOSORT',
      $                MemSrtSize,IOutInfo)
+C
+      If(ICholesky==1) Then
+         Call chol_CoulombMatrix(CholeskyVecs,'AOTWOSORT',ICholeskyAccu)
+         NCholesky=CholeskyVecs%NCholesky
+      EndIf
 C
       EndIf
 C
@@ -733,18 +740,27 @@ C     READ J AND K AND DUMP TO DISC
       Do I=1,NBasis
       UAux(I,I) = 1d0
       EndDo
-      Call read4_gen(NBasis,
-     $        Num0+Num1,UAux(1:NBasis,1:(Num0+Num1)),
-     $        Num0+Num1,UAux(1:NBasis,1:(Num0+Num1)),
-     $        NBasis,UAux,
-     $        NBasis,UAux,
-     $        'FFOO','AOTWOSORT')
-      Call read4_gen(NBasis,
-     $        NBasis,UAux,
-     $        Num0+Num1,UAux(1:NBasis,1:(Num0+Num1)),
-     $        NBasis,UAux,
-     $        Num0+Num1,UAux(1:NBasis,1:(Num0+Num1)),
-     $        'FOFO','AOTWOSORT')
+!
+      If(ICholesky==1) then
+         call chol_triang_fofo(NBasis,NBasis,
+     $                  CholeskyVecs%R(1:NCholesky,1:NInte1),
+     $                  Num0+Num1,Num0+Num1,
+     $                  CholeskyVecs%R(1:NCholesky,1:NInte1),
+     $                  NCholesky,NInte1,NBasis,'FFOO')
+         call chol_triang_fofo(NBasis,Num0+Num1,
+     $                  CholeskyVecs%R(1:NCholesky,1:NInte1),
+     $                  NBasis,Num0+Num1,
+     $                  CholeskyVecs%R(1:NCholesky,1:NInte1),
+     $                  NCholesky,NInte1,NBasis,'FOFO')
+      Else
+         Call read4_gen(NBasis,
+     $           Num0+Num1,Num0+Num1,NBasis,NBasis,
+     $           'FFOO','AOTWOSORT')
+         Call read4_gen(NBasis,
+     $           NBasis,Num0+Num1,NBasis,Num0+Num1,
+     $           'FOFO','AOTWOSORT')
+C
+      EndIf ! ICholesky
 C
       EndIf
 C

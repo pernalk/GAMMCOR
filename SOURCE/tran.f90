@@ -586,20 +586,18 @@ integer :: l,k,kl
 
 end subroutine new_tran4_gen
 
-subroutine read4_gen(NBas,nA,CA,nB,CB,nC,CC,nD,CD,fname,srtfile)
+subroutine read4_gen(NBas,nA,nB,nC,nD,fname,srtfile)
+!
 ! reads 4-index ints from sorted file
 ! dumps all integrals on disk in the (square,square) form
 ! CAREFUL: C have to be in AOMO form!
-!!! CAREFUL: write to simpler form
-!!! ie. (NBas,n,C)
+!
 implicit none
 
 type(AOReaderData) :: reader
 
 integer,intent(in) :: NBas
 integer,intent(in) :: nA,nB,nC,nD
-! CA(NBas*nA)
-double precision,intent(in) :: CA(*), CB(*), CC(*), CD(*)
 character(*) :: fname,srtfile
 double precision, allocatable :: work1(:), work2(:)
 integer :: iunit,iunit2
