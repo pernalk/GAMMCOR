@@ -338,7 +338,6 @@ type(EblockData) :: A0blockIV
 type(EblockData),allocatable :: A0block(:)
 
 NGrid=20
-Max_Cn=5
 Write (6,'(/,X,''AC calculation through W_AC expansion around Alpha=0, Omega Grid = '',I3,&
    '' and max order in C expansion = '',I3,/)') NGrid,Max_Cn
 
