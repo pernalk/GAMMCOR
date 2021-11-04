@@ -245,7 +245,7 @@ C
 C
       use types
       use sorter
-      use Cholesky
+      use Cholesky_old
       use tran
       use abmat
 C
@@ -1026,7 +1026,7 @@ C
       use types
       use sorter
       use tran
-      use Cholesky
+      use Cholesky_old
       use abmat 
 C
       Implicit Real*8 (A-H,O-Z)

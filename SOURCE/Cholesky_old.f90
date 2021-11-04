@@ -34,14 +34,14 @@
 ! 2. Harbrecht, H., Peters, M., and Schneider R. Appl. Num. Math. 62, 428 (2012);
 !    doi: 10.1016/j.apnum.2011.10.001
 !
-module Cholesky
+module Cholesky_old
       use arithmetic
       use io
       use clockMM
       use string
-      use sorter_Cholesky
-      use display
       use sort
+      use sorter
+      use display
       
       implicit none
 
@@ -224,8 +224,8 @@ contains
                                     !
                                     ! S(1:NCholesky, 1:Na*Nb) <- S(1:NCholesky, 1:Na*Nb) + R(1:NCholesky, pq0:pq1)W(1:NA*NB, 1:NVecs)**T
                                     !
-                                    call chol_abT_x(S, ldS, R(:, pq0:pq1), ldR, W, NA*NB, NCholesky, NA*NB, NVecs, &
-                                                    alpha=ONE, beta=ONE)
+                                    call chol_abT_x(S, ldS, R(:, pq0:pq1), ldR, W, NA*NB, & 
+                                                    NCholesky, NA*NB, NVecs, alpha=ONE, beta=ONE)
                                     NVecs = 0
                               end if
                         end do
@@ -452,33 +452,27 @@ contains
                   D(p) = D(p) - R(p)**2
             end do
       end subroutine chol_Update_D
+      
 
+      subroutine chol_M(M, Qualified, QualifiedDim, NQualified, BufferLoc, AOInts)
+            real(F64), dimension(:, :), intent(out) :: M
+            integer, dimension(:, :), intent(in)    :: Qualified
+            integer, dimension(:), intent(in)       :: QualifiedDim
+            integer, intent(in)                     :: NQualified
+            integer, dimension(:, :), intent(in)    :: BufferLoc
+            type(AOReaderData)                      :: AOInts
 
-      subroutine chol_KetStorageLoc(KetStorageLoc, BufferLoc, Qualified, QualifiedDim, NQualified)
-            integer, dimension(:), intent(out)   :: KetStorageLoc
-            integer, dimension(:, :), intent(in) :: BufferLoc
-            integer, dimension(:, :), intent(in) :: Qualified
-            integer, dimension(:), intent(in)    :: QualifiedDim
-            integer, intent(in)                  :: NQualified
-            
-            integer :: k, l, rs
-            
-            KetStorageLoc = 0
+            integer :: k, l, rs, z
+            logical :: IsEmpty
+
+            M = ZERO
             do k = 1, NQualified
                   do l = 1, QualifiedDim(k)
                         rs = Qualified(l, k)
-                        KetStorageLoc(rs) = BufferLoc(l, k)
+                        z = BufferLoc(l, k)
+                        call AOInts%getTR(rs, M(:, z), IsEmpty)
                   end do
             end do
-      end subroutine chol_KetStorageLoc
-
-      
-      subroutine chol_M(M, KetStorageLoc, AOInts)
-            real(F64), dimension(:, :), intent(out) :: M
-            integer, dimension(:), intent(in)       :: KetStorageLoc
-            type(AOReaderChol)                      :: AOInts
-
-            call AOInts%get_TR(KetStorageLoc, M)
       end subroutine chol_M
 
 
@@ -533,8 +527,8 @@ contains
             integer, intent(in)                                       :: MaxNCholesky
             real(F64), intent(in)                                     :: TargetTraceError
             real(F64), intent(in)                                     :: TargetTraceErrorPrescreen
-            real(F64), intent(in)                                     :: TargetMaxError            
-            type(AOReaderChol)                                        :: AOInts
+            real(F64), intent(in)                                     :: TargetMaxError
+            type(AOReaderData)                                        :: AOInts
             integer, dimension(:), intent(inout)                      :: NOrbPairs
             integer, intent(in)                                       :: MaxNQualified
             integer, intent(in)                                       :: MaxBatchDim
@@ -546,7 +540,6 @@ contains
             real(F64), dimension(:, :), allocatable :: M
             integer, dimension(:, :), allocatable :: Qualified
             integer, dimension(:), allocatable :: QualifiedDim
-            integer, dimension(:), allocatable :: KetStorageLoc
             integer :: NQualified
             real(F64) :: Dmax, Dmin
             integer :: i, j0, j1, j
@@ -583,7 +576,6 @@ contains
             allocate(M(NOrbPairs(BASE_PAIRS), MaxNQualified*MaxBatchDim))
             allocate(Rk(NOrbPairs(BASE_PAIRS)))
             allocate(Tk(NOrbPairs(BASE_PAIRS)))
-            allocate(KetStorageLoc(NOrbPairs(BASE_PAIRS)))
             allocate(RQk(MaxNQualified*MaxBatchDim))
             memory_R = io_size_byte(R) / real(1024**3, F64)
             memory_M = io_size_byte(M) / real(1024**3, F64)
@@ -623,9 +615,8 @@ contains
                   end if
                   call chol_Qualified(Qualified, QualifiedDim, NQualified, BufferLoc, NOrbPairs, Significant, &
                         SignificantDim, NSignificant, D, Dmin, MaxNQualified, MaxBatchDim)
-                  call clock_start(DeltaT)                  
-                  call chol_KetStorageLoc(KetStorageLoc, BufferLoc, Qualified, QualifiedDim, NQualified)
-                  call chol_M(M, KetStorageLoc, AOInts)
+                  call clock_start(DeltaT)
+                  call chol_M(M, Qualified, QualifiedDim, NQualified, BufferLoc, AOInts)
                   time_2e = time_2e + clock_readwall(DeltaT)
                   if (NCholesky > 0) then
                         call clock_start(DeltaT)
@@ -708,7 +699,7 @@ contains
       end subroutine chol_MainLoop
       
 
-      subroutine chol_CoulombMatrix(Vecs, NAO, IntegralsPath, AOSource, Accuracy)
+      subroutine chol_CoulombMatrix(Vecs, SortedIntegralsPath, Accuracy)
             !
             ! Compute the matrix of Cholesky vectors, R, defined as
             !
@@ -743,9 +734,7 @@ contains
             ! 2. Harbrecht, H., Peters, M., and Schneider R. Appl. Num. Math. 62, 428 (2012); doi: 10.1016/j.apnum.2011.10.001
             !
             type(TCholeskyVecs), intent(out)  :: Vecs
-            integer, intent(in)               :: NAO
-            character(*), intent(in)          :: IntegralsPath
-            integer, intent(in)               :: AOSource
+            character(*), intent(in)          :: SortedIntegralsPath
             integer, intent(in)               :: Accuracy
             
             real(F64) :: PrescreenError
@@ -754,7 +743,8 @@ contains
             integer, dimension(:, :), allocatable :: Significant
             integer, dimension(:), allocatable :: SignificantDim
             integer :: NSignificant
-            type(AOReaderChol) :: AOInts
+            integer :: NAO
+            type(AOReaderData) :: AOInts
             integer, parameter :: MaxBatchDim = 10
             integer, parameter :: MaxNQualified = 100
             real(F64) :: TargetTraceError, TargetTraceErrorPrescreen, TargetMaxError
@@ -762,6 +752,7 @@ contains
 
             select case (Accuracy)
             case (CHOL_ACCURACY_DEFAULT)
+                  !TargetTraceError = 1.0E-1_F64
                   TargetTraceError = 1.0E-2_F64
                   TargetTraceErrorPrescreen = 1.0E-10_F64
                   TargetMaxError = 1.0E-11_F64
@@ -777,20 +768,22 @@ contains
                   TargetMaxError = 1.0E-11_F64
                   MaxNAOMult = 10
             end select
+            call AOInts%open(SortedIntegralsPath)
             associate ( &
                   NOrbPairs => Vecs%NOrbPairs, &
+                  NAO => Vecs%NAO, &
                   MaxNCholesky => Vecs%MaxNCholesky, &
                   NCholesky => Vecs%NCholesky)
-                  Vecs%NAO = NAO
+                  
+                  NOrbPairs(BASE_PAIRS) = AOInts%nelm
+                  NAO = AOInts%nbas
+                  MaxNCholesky = min(MaxNAOMult * NAO, NOrbPairs(BASE_PAIRS))
                   !
                   ! Read diagonal integrals (pq|pq) for all unique pq
                   !
-                  allocate(Vdiag(NAO*(NAO+1)/2))
-                  call AOInts%open(NAO, AOSource, IntegralsPath, Vdiag)
-                  
-                  NOrbPairs(BASE_PAIRS) = AOInts%nelm
-                  MaxNCholesky = min(MaxNAOMult * NAO, NOrbPairs(BASE_PAIRS))
+                  allocate(Vdiag(NOrbPairs(BASE_PAIRS)))
                   allocate(D(NOrbPairs(BASE_PAIRS)))
+                  call AOInts%getDiag(Vdiag)
                   !
                   ! Prescreen small matrix elements on the diagonal
                   !
@@ -803,4 +796,49 @@ contains
             end associate
       end subroutine chol_CoulombMatrix
 
-end module Cholesky
+!subroutine chol_ints_fofo(nA,nB,MatAB,nC,nD,MatCD,NCholesky,NBas,fname)
+!!
+!! assumes that MatAB(CD) are NChol,FF type
+!! constructs (FF|OO) or (FO|FO) integrals
+!!
+!implicit none
+!
+!integer,intent(in) :: nA,nB,nC,nD
+!integer,intent(in) :: NBas,NCholesky
+!character(*),intent(in)     :: fname
+!double precision,intent(in) :: MatAB(NCholesky,NBas**2), &
+!                               MatCD(NCholesky,NBas**2)
+!
+!integer :: iunit
+!integer :: nAB,nCD,cd
+!integer :: ic,id,irec
+!double precision,allocatable :: work(:)
+!
+!nAB = nA*nB
+!nCD = nC*nD
+!
+!allocate(work(nAB))
+!
+!print*, 'Assemble ',fname,' from Cholesky Vectors'
+!
+!open(newunit=iunit,file=fname,status='REPLACE',&
+!     access='DIRECT',form='UNFORMATTED',recl=8*nAB)
+!
+!! (FF|OO)
+!irec = 0
+!do id=1,nD
+!   do ic=1,nC
+!      irec = irec + 1
+!      cd = ic+(id-1)*NBas
+!      call dgemv('T',NCholesky,nAB,1d0,MatAB(1:NCholesky,:),NCholesky,MatCD(1:NCholesky,cd),1,0d0,work,1)
+!      write(iunit,rec=irec) work(1:nAB)
+!   
+!   enddo
+!enddo
+!
+!deallocate(work)
+!close(iunit)
+!
+!end subroutine chol_ints_fofo
+
+end module Cholesky_old

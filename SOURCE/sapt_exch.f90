@@ -3144,8 +3144,16 @@ double precision,parameter :: SmallE = 1.D-3
     else
 
        ! make s_ij
-       call make_sij_Y(sij,tmp1,A%Occ,B%Occ,A%EigY,A%EigX,B%EigY,B%EigX,&
-                       A%num0,B%num0,dimOA,dimOB,nOVB,A%IndN,B%IndN,A%NDimX,B%NDimX,NBas)
+       if(Flags%ICholesky==0) then
+          call make_sij_Y(sij,tmp1,A%Occ,B%Occ,A%EigY,A%EigX,B%EigY,B%EigX,&
+                          A%num0,B%num0,dimOA,dimOB,nOVB,A%IndN,B%IndN, &
+                          A%NDimX,B%NDimX,NBas)
+       else if(Flags%ICholesky==1) then
+          call make_sij_Y_Chol(sij,tmp1,A%Occ,B%Occ,A%EigY,A%EigX,B%EigY,B%EigX,&
+                          A%OV,B%OV, &
+                          A%num0,B%num0,dimOA,dimOB,nOVB,A%IndN,B%IndN, &
+                          A%NDimX,B%NDimX,A%NChol,NBas)
+       endif
 
     endif
 

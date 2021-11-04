@@ -484,7 +484,7 @@ if(Flags%ISERPA==0) then
      endif
   endif
 
-  if(Flags%SaptLevel/=1) then
+  if(Flags%SaptLevel/=1.and.Flags%ICholesky==0) then
      ! integrals stored as (ov|ov)
      call tran4_gen(NBasis,&
                     A%num0+A%num1,A%CMO,&
@@ -499,7 +499,6 @@ if(Flags%ISERPA==0) then
 
   ! omp tasks
   ! Let's open the AOTWSORT only once, therefore we open it here
-  call reader%open('AOTWOSORT')
 
   if(Flags%ICholesky==1) then
      !print*,'test Cholesky HERE!'
@@ -572,6 +571,9 @@ if(Flags%ISERPA==0) then
    !           NBasis,A%CMO,&
    !           A%num0+A%num1,A%CMO(1:NBasis,1:(A%num0+A%num1)),&
    !           'FOFOAABA','AOTWOSORT')
+
+      call reader%open('AOTWOSORT')
+
    ! Gianfranco's OMP modification
       write(LOUT,'(/1x,a)') 'Transforming E2exch-ind integrals...'
       write(LOUT,'(1x,a)')  '    (the OMP version is active)     '
@@ -641,8 +643,8 @@ if(Flags%ISERPA==0) then
          !$omp end single
          !$omp end parallel
 
+      call reader%close
   endif
-  call reader%close
 
      write(LOUT,'(/1x,a)') 'Transforming E2exch-disp integrals...'
      if(Flags%ICholesky==1) then
