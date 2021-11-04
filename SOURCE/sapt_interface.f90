@@ -161,8 +161,8 @@ double precision :: Tcpu,Twall
  call clock('2ints',Tcpu,Twall)
 
  if(SAPT%InterfaceType==2) then
-    call prepare_no(OneRdmA,AuxA,Ca,SAPT%monA,Flags%IFunSR,NBasis)
-    call prepare_no(OneRdmB,AuxB,Cb,SAPT%monB,Flags%IFunSR,NBasis)
+    call prepare_no(OneRdmA,AuxA,Ca,SAPT%monA,CholeskyVecs,Flags%IFunSR,Flags%ICholesky,NBasis)
+    call prepare_no(OneRdmB,AuxB,Cb,SAPT%monB,CholeskyVecs,Flags%IFunSR,Flags%ICholesky,NBasis)
     call prepare_rdm2_file(SAPT%monA,AuxA,NBasis)
     call prepare_rdm2_file(SAPT%monB,AuxB,NBasis)
  endif
@@ -1510,21 +1510,25 @@ double precision :: OccOrd(nbas)
 
 end subroutine sort_sym_occ
 
-subroutine prepare_no(OneRdm,OrbAux,OrbCAS,Mon,IFunSR,NBasis)
+subroutine prepare_no(OneRdm,OrbAux,OrbCAS,Mon,CholeskyVecs,IFunSR,ICholesky,NBasis)
 implicit none
+!
 ! OrbCAS[inout] :: on input AOtoCAS
 !                  on output AOtoNO
 ! OrbAux        :: on input CAStoNO
+!
+type(SystemBlock)   :: Mon
+type(TCholeskyVecs) :: CholeskyVecs
 
-type(SystemBlock) :: Mon
+integer,intent(in) :: IFunSR,ICholesky,NBasis
+double precision   :: OneRdm(NBasis*(NBasis+1)/2)
+double precision   :: OrbAux(NBasis,NBasis),OrbCAS(NBasis,NBasis)
 
-integer :: IFunSR,NBasis
-double precision :: OneRdm(NBasis*(NBasis+1)/2)
-double precision :: OrbAux(NBasis,NBasis),OrbCAS(NBasis,NBasis)
+integer :: NOccup,NVirt,NSym
+integer :: NCholesky
+integer :: i,j,ia,ib,iab,ioff,idx,NInte1
 double precision,allocatable :: URe(:,:),OrbSym(:,:),Fock(:)
 double precision,allocatable :: work1(:),work2(:),work3(:)
-integer :: NOccup,NVirt,NSym
-integer :: i,j,ia,ib,iab,ioff,idx,NInte1
 character(:),allocatable :: onefile,rdmfile,aoerfile
 ! testy
 integer :: info
@@ -1620,7 +1624,13 @@ integer :: info
  if(IFunSR==0) then
  ! CASSCF,Hartree-Fock
 
-   call FockGen_mithap(work2,OneRdm,work1,NInte1,NBasis,'AOTWOSORT')
+   if(ICholesky==0) then
+     call FockGen_mithap(work2,OneRdm,work1,NInte1,NBasis,'AOTWOSORT')
+   elseif(ICholesky==1) then
+     NCholesky = CholeskyVecs%NCholesky
+     call FockGen_CholR(work2,CholeskyVecs%R(1:NCholesky,1:NInte1),OneRdm,work1, &
+                        NInte1,NCholesky,NBasis)
+   endif
 
  elseif(IFunSR>0) then
  ! Kohn-Sham
