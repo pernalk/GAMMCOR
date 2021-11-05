@@ -252,8 +252,7 @@ integer :: i
     write(LOUT,'(1x,a,/)') 'RS calculation requested'
 
     call e1elst_Chol(SAPT%monA,SAPT%monB,SAPT)
-    !call e2ind(Flags,SAPT%monA,SAPT%monB,SAPT)
-    !call e2ind_resp(Flags,SAPT%monA,SAPT%monB,SAPT)
+    call e2ind_icerpa(Flags,SAPT%monA,SAPT%monB,SAPT)
     if(.not.SAPT%CAlpha) then
       call e2disp_Cmat_Chol_block(Flags,SAPT%monA,SAPT%monB,SAPT)
     else if(SAPT%CAlpha) then
@@ -1128,6 +1127,10 @@ double precision,allocatable :: work1(:),work2(:),XOne(:)
 character(8)                 :: label
 character(:),allocatable     :: onefile,twofile
 character(:),allocatable     :: twojfile,twokfile
+!test
+double precision :: Tcpu,Twall
+
+call clock('START',Tcpu,Twall)
 
 ! set dimensions
  NSq = NBas**2
@@ -1197,12 +1200,14 @@ character(:),allocatable     :: twojfile,twokfile
             NBas,MO,&
             NBas,MO,&
             twojfile,'AOTWOSORT')
+call clock('FFOO',Tcpu,Twall)
        call tran4_gen(NBas,&
             NBas,MO,&
             Mon%num0+Mon%num1,MO(1:NBas*(Mon%num0+Mon%num1)),&
             NBas,MO,&
             Mon%num0+Mon%num1,MO(1:NBas*(Mon%num0+Mon%num1)),&
             twokfile,'AOTWOSORT')
+call clock('FOFO',Tcpu,Twall)
     endif
  end select
 

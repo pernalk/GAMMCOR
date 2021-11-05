@@ -2200,6 +2200,10 @@ integer :: dimOA,dimOB,dimVA,dimVB, &
            nOVA,nOVB
 integer :: i,ip,iq,ipq
 double precision,allocatable :: tmp(:,:)
+! test
+double precision :: Tcpu,Twall
+
+call clock('START',Tcpu,Twall)
 
  NCholesky = CholeskyVecs%NCholesky
  dimOA = A%num0+A%num1
@@ -2209,7 +2213,7 @@ double precision,allocatable :: tmp(:,:)
  nOVA  = dimOA*dimVA
  nOVB  = dimOB*dimVB
 
- allocate(A%OV(NCholesky,A%NDimX),B%OV(NCholesky,B%NDimX))
+ !allocate(A%OV(NCholesky,A%NDimX),B%OV(NCholesky,B%NDimX))
 
  !allocate(tmp(NCholesky,nOVA))
  !! (OV|AA)
@@ -2248,10 +2252,12 @@ double precision,allocatable :: tmp(:,:)
  call chol_MOTransf(A%OO,CholeskyVecs,&
                     A%CMO,1,dimOA,&
                     A%CMO,1,dimOA)
+call clock('AOO',Tcpu,Twall)
  ! (OO|BB)
  call chol_MOTransf(B%OO,CholeskyVecs,&
                     B%CMO,1,dimOB,&
                     B%CMO,1,dimOB)
+call clock('BOO',Tcpu,Twall)
 
  allocate(A%FF(NCholesky,NBasis**2),&
           B%FF(NCholesky,NBasis**2) )
@@ -2259,10 +2265,12 @@ double precision,allocatable :: tmp(:,:)
  call chol_MOTransf(A%FF,CholeskyVecs,&
                     A%CMO,1,NBasis,&
                     A%CMO,1,NBasis)
+call clock('AFF',Tcpu,Twall)
  ! (FF|BB)
  call chol_MOTransf(B%FF,CholeskyVecs,&
                     B%CMO,1,NBasis,&
                     B%CMO,1,NBasis)
+call clock('BFF',Tcpu,Twall)
 
  if(SAPT%SaptLevel==999) return
 

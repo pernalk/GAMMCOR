@@ -1330,7 +1330,7 @@ type(SystemBlock) :: A, B
 type(SaptData)    :: SAPT
 
 integer :: NCholesky,NBas
-integer :: i,j,ip,iq,ipq
+integer :: i,j,ip,iq,ipq,ir,is,irs
 integer :: nblkA,nblkB
 double precision :: e2ba, e2ab
 double precision,allocatable :: WaBB(:,:),WbAA(:,:),   &
@@ -1347,24 +1347,22 @@ double precision,allocatable :: C0TildeA(:,:),C0TildeB(:,:), &
 type(EBlockData)             :: A0BlkIVA,A0BlkIVB
 type(EBlockData),allocatable :: A0BlkA(:),A0BlkB(:)
 
-print*, 'E2ind(CAlpha) jedziemy...'
-
-! set dimensions
-NCholesky = SAPT%NCholesky
-
-! check MCBS/DCBS
-if(A%NBasis.ne.B%NBasis) then
-   write(LOUT,'(1x,a)') 'ERROR! MCBS not implemented in SAPT!'
-   stop
-else
-   NBas = A%NBasis
-endif
-
-allocate(WaBB(NBas,NBas),WbAA(NBas,NBas))
-
-call tran2MO(A%WPot,B%CMO,B%CMO,WaBB,NBas)
-call tran2MO(B%WPot,A%CMO,A%CMO,WbAA,NBas)
-
+!! set dimensions
+!NCholesky = SAPT%NCholesky
+!
+!! check MCBS/DCBS
+!if(A%NBasis.ne.B%NBasis) then
+!   write(LOUT,'(1x,a)') 'ERROR! MCBS not implemented in SAPT!'
+!   stop
+!else
+!   NBas = A%NBasis
+!endif
+!
+!allocate(WaBB(NBas,NBas),WbAA(NBas,NBas))
+!
+!call tran2MO(A%WPot,B%CMO,B%CMO,WaBB,NBas)
+!call tran2MO(B%WPot,A%CMO,A%CMO,WbAA,NBas)
+!
 !allocate(A1A(A%NDimX,A%NDimX),A2A(A%NDimX,A%NDimX))
 !allocate(ABP0TildeA(A%NDimX,NCholesky), &
 !         ABP1TildeA(A%NDimX,NCholesky), &
@@ -1391,7 +1389,7 @@ call tran2MO(B%WPot,A%CMO,A%CMO,WbAA,NBas)
 !call prepare_resp_Cmat(B,A1B,A2B,ABP0TildeB,ABP1TIldeB,DCholB,B%NDimX,NCholesky,NBas)
 !
 !allocate(CTildeA(A%NDimX,NCholesky),C0TildeA(A%NDimX,NCholesky))
-!allocate(CA(NCholesky,NCholesky))
+!allocate(CA(A%NDimX,A%NDimX))
 !call read_ABPM0Block(A0BlkA,A0BlkIVA,nblkA,'A0BLK_A')
 !
 !call C_AlphaExpand(CTildeA,C0TildeA,0d0,SAPT%Max_Cn, &
@@ -1400,22 +1398,17 @@ call tran2MO(B%WPot,A%CMO,A%CMO,WbAA,NBas)
 !
 !print*, 'CTildeA',norm2(CTildeA)
 !!call dgemm('N','N',NCholesky,NCholesky,A%NDimX,1d0,DCholA,NCholesky,CTildeA,A%NDimX,0d0,CA,NCholesky)
+!call dgemm('N','N',A%NDimX,A%NDimX,NCholesky,1d0,CTildeA,A%NDimX,DCholA,NCholesky,0d0,CA,A%NDimX)
 !
-!!e2ba = 0
-!!do j=1,NCholesky
-!!   do i=1,NCholesky
-!!      e2ba = e2ba + &
-!!           WbChAA(i)*CA(i,j)*WbChAA(j)
-!!   enddo
-!!enddo
-! print*, 'WbAA',norm2(WbAA)
-!
-! do ipq=1,A%NDimX
-!    ip = A%IndN(1,ipq)
-!    iq = A%IndN(2,ipq)
-!    do i=1,NCholesky
-!       e2ba = e2ba + CTildeA(i,ipq)*WbAA(ip,iq)
-!    enddo
+!e2ba = 0
+!do ipq=1,A%NDimX
+!   ip = A%IndN(1,ipq)
+!   iq = A%IndN(2,ipq)
+!   do irs=1,A%NDimX
+!      ir = A%IndN(1,irs)
+!      is = A%IndN(2,irs)
+!      e2ba = e2ba + WbAA(ip,iq)*CA(ipq,irs)*WbAA(ir,is)
+!   enddo
 !enddo
 !e2ba = -0.5d0*e2ba
 !print*, 'e2ba',e2ba*1000
@@ -1425,7 +1418,7 @@ call tran2MO(B%WPot,A%CMO,A%CMO,WbAA,NBas)
 !!                   A0BlkB,A0BlkIVB,nblkB,NCholesky,B%NDimX)
 !
 !deallocate(DCholB,DCholA)
-deallocate(WbAA,WaBB)
+!deallocate(WbAA,WaBB)
 !deallocate(CA)
 !deallocate(C0TildeA,CTildeA)
 !deallocate(A2B,A2A,A1B,A1A)
