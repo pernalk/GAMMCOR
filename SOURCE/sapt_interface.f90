@@ -2211,36 +2211,36 @@ double precision,allocatable :: tmp(:,:)
 
  allocate(A%OV(NCholesky,A%NDimX),B%OV(NCholesky,B%NDimX))
 
- allocate(tmp(NCholesky,nOVA))
- ! (OV|AA)
- call chol_MOTransf(tmp,CholeskyVecs,&
-                    A%CMO,1,dimOA,&
-                    A%CMO,A%num0+1,NBasis)
- A%OV = 0
- do i=1,A%NDimX
-    ip  = A%IndN(1,i)
-    iq  = A%IndN(2,i)
-    ipq = iq+(ip-A%num0-1)*dimOA
-    A%OV(:,i)= tmp(:,ipq)
- enddo
- print*, 'A-OV',norm2(A%OV)
- deallocate(tmp)
+ !allocate(tmp(NCholesky,nOVA))
+ !! (OV|AA)
+ !call chol_MOTransf(tmp,CholeskyVecs,&
+ !                   A%CMO,1,dimOA,&
+ !                   A%CMO,A%num0+1,NBasis)
+ !A%OV = 0
+ !do i=1,A%NDimX
+ !   ip  = A%IndN(1,i)
+ !   iq  = A%IndN(2,i)
+ !   ipq = iq+(ip-A%num0-1)*dimOA
+ !   A%OV(:,i)= tmp(:,ipq)
+ !enddo
+ !print*, 'A-OV',norm2(A%OV)
+ !deallocate(tmp)
 
- allocate(tmp(NCholesky,nOVB))
- ! (OV|BB)
- call chol_MOTransf(tmp,CholeskyVecs,&
-                    B%CMO,1,dimOB,&
-                    B%CMO,B%num0+1,NBasis)
+ !allocate(tmp(NCholesky,nOVB))
+ !! (OV|BB)
+ !call chol_MOTransf(tmp,CholeskyVecs,&
+ !                   B%CMO,1,dimOB,&
+ !                   B%CMO,B%num0+1,NBasis)
 
- B%OV = 0
- do i=1,B%NDimX
-    ip  = B%IndN(1,i)
-    iq  = B%IndN(2,i)
-    ipq = iq+(ip-B%num0-1)*dimOB
-    B%OV(:,i)= tmp(:,ipq)
- enddo
+ !B%OV = 0
+ !do i=1,B%NDimX
+ !   ip  = B%IndN(1,i)
+ !   iq  = B%IndN(2,i)
+ !   ipq = iq+(ip-B%num0-1)*dimOB
+ !   B%OV(:,i)= tmp(:,ipq)
+ !enddo
 
- deallocate(tmp)
+ !deallocate(tmp)
 
  allocate(A%OO(NCholesky,dimOA**2),&
           B%OO(NCholesky,dimOB**2) )
@@ -2264,8 +2264,10 @@ double precision,allocatable :: tmp(:,:)
                     B%CMO,1,NBasis,&
                     B%CMO,1,NBasis)
 
+ if(SAPT%SaptLevel==999) return
+
  ! test for Pmat
- allocate(SAPT%CholVecs(NBasis**2,NCholesky))
+ !allocate(SAPT%CholVecs(NBasis**2,NCholesky))
  !SAPT%CholVecs = 0
  !do iq=1,NCholesky
  !   do ip=1,NBasis**2

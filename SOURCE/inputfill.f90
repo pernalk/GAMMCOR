@@ -441,7 +441,7 @@ subroutine read_block_calculation(CalcParams, line)
            elseif (uppercase(val) == "DISP-CAS") then
               CalcParams%SaptLevel = 10
            elseif (uppercase(val) == "RS".or. &
-                   uppercase(val) == "RSPT") then
+                   uppercase(val) == "RSPT2") then
               CalcParams%SaptLevel = 999
            endif
 

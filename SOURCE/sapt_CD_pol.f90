@@ -1316,6 +1316,123 @@ deallocate(CTildeB,CTildeA)
 
 end subroutine e2disp_Cmat_Chol_proj
 
+subroutine e2ind_CAlphaTilde_block(Flags,A,B,SAPT)
+!
+! calculate 2nd order induction energy
+! using expansion of C(0) in alpha around alpha=0, up to Max_Cn order
+! use A0 blocks (not diagonal)
+! with Cholesky vectors
+!
+implicit none
+
+type(FlagsData)   :: Flags
+type(SystemBlock) :: A, B
+type(SaptData)    :: SAPT
+
+integer :: NCholesky,NBas
+integer :: i,j,ip,iq,ipq
+integer :: nblkA,nblkB
+double precision :: e2ba, e2ab
+double precision,allocatable :: WaBB(:,:),WbAA(:,:),   &
+                                WaChBB(:),WbChAA(:)
+double precision,allocatable :: A1A(:,:),A1B(:,:),&
+                                A2A(:,:),A2B(:,:),&
+                                ABP0TildeA(:,:),ABP0TildeB(:,:), &
+                                ABP1TildeA(:,:),ABP1TildeB(:,:)
+double precision,allocatable :: DCholA(:,:),DCholB(:,:)
+double precision,allocatable :: C0TildeA(:,:),C0TildeB(:,:), &
+                                CTildeA(:,:),CTildeB(:,:),   &
+                                CA(:,:),CB(:,:)
+
+type(EBlockData)             :: A0BlkIVA,A0BlkIVB
+type(EBlockData),allocatable :: A0BlkA(:),A0BlkB(:)
+
+print*, 'E2ind(CAlpha) jedziemy...'
+
+! set dimensions
+NCholesky = SAPT%NCholesky
+
+! check MCBS/DCBS
+if(A%NBasis.ne.B%NBasis) then
+   write(LOUT,'(1x,a)') 'ERROR! MCBS not implemented in SAPT!'
+   stop
+else
+   NBas = A%NBasis
+endif
+
+allocate(WaBB(NBas,NBas),WbAA(NBas,NBas))
+
+call tran2MO(A%WPot,B%CMO,B%CMO,WaBB,NBas)
+call tran2MO(B%WPot,A%CMO,A%CMO,WbAA,NBas)
+
+!allocate(A1A(A%NDimX,A%NDimX),A2A(A%NDimX,A%NDimX))
+!allocate(ABP0TildeA(A%NDimX,NCholesky), &
+!         ABP1TildeA(A%NDimX,NCholesky), &
+!         DCholA(A%NDimX,NCholesky))
+!
+!call prepare_resp_Cmat(A,A1A,A2A,ABP0TildeA,ABP1TIldeA,DCholA,A%NDimX,NCholesky,NBas)
+!
+!allocate(WbChAA(NCholesky))
+!do i=1,NCholesky
+!   do ipq=1,A%NDimX
+!      ip = A%IndN(1,ipq)
+!      iq = A%IndN(2,ipq)
+!   
+!      WbChAA(i) = WbChAA(i) + WbAA(ip,iq)*DCholA(i,ipq)
+!
+!   enddo
+!enddo
+!
+!allocate(A1B(B%NDimX,B%NDimX),A2B(B%NDimX,B%NDimX))
+!allocate(ABP0TildeB(B%NDimX,NCholesky), &
+!         ABP1TildeB(B%NDimX,NCholesky), &
+!         DCholB(B%NDimX,NCholesky))
+!
+!call prepare_resp_Cmat(B,A1B,A2B,ABP0TildeB,ABP1TIldeB,DCholB,B%NDimX,NCholesky,NBas)
+!
+!allocate(CTildeA(A%NDimX,NCholesky),C0TildeA(A%NDimX,NCholesky))
+!allocate(CA(NCholesky,NCholesky))
+!call read_ABPM0Block(A0BlkA,A0BlkIVA,nblkA,'A0BLK_A')
+!
+!call C_AlphaExpand(CTildeA,C0TildeA,0d0,SAPT%Max_Cn, &
+!                   A1A,A2A,ABP0TildeA,ABP1TildeA,    &
+!                   A0BlkA,A0BlkIVA,nblkA,NCholesky,A%NDimX)
+!
+!print*, 'CTildeA',norm2(CTildeA)
+!!call dgemm('N','N',NCholesky,NCholesky,A%NDimX,1d0,DCholA,NCholesky,CTildeA,A%NDimX,0d0,CA,NCholesky)
+!
+!!e2ba = 0
+!!do j=1,NCholesky
+!!   do i=1,NCholesky
+!!      e2ba = e2ba + &
+!!           WbChAA(i)*CA(i,j)*WbChAA(j)
+!!   enddo
+!!enddo
+! print*, 'WbAA',norm2(WbAA)
+!
+! do ipq=1,A%NDimX
+!    ip = A%IndN(1,ipq)
+!    iq = A%IndN(2,ipq)
+!    do i=1,NCholesky
+!       e2ba = e2ba + CTildeA(i,ipq)*WbAA(ip,iq)
+!    enddo
+!enddo
+!e2ba = -0.5d0*e2ba
+!print*, 'e2ba',e2ba*1000
+!
+!!call read_ABPM0Block(A0BlkB,A0BlkIVB,nblkB,'A0BLK_B')
+!!call C_AlphaExpand(CTildeB,C0TildeB,OmI,SAPT%Max_Cn,A1B,A2B,ABP0TildeB,ABP1TildeB, &
+!!                   A0BlkB,A0BlkIVB,nblkB,NCholesky,B%NDimX)
+!
+!deallocate(DCholB,DCholA)
+deallocate(WbAA,WaBB)
+!deallocate(CA)
+!deallocate(C0TildeA,CTildeA)
+!deallocate(A2B,A2A,A1B,A1A)
+!deallocate(ABP0TildeB,ABP0TildeA,ABP1TildeB,ABP1TIldeA)
+
+end subroutine e2ind_CAlphaTilde_block
+
 subroutine e2disp_CAlphaTilde_block(Flags,A,B,SAPT)
 !
 ! calculate 2nd order dispersion energy
