@@ -440,6 +440,9 @@ subroutine read_block_calculation(CalcParams, line)
               CalcParams%vdWCoef = 1
            elseif (uppercase(val) == "DISP-CAS") then
               CalcParams%SaptLevel = 10
+           elseif (uppercase(val) == "RS".or. &
+                   uppercase(val) == "RSPT") then
+              CalcParams%SaptLevel = 999
            endif
 
       case("RESTART")

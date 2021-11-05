@@ -585,7 +585,10 @@ double precision,allocatable :: work1(:)
 end subroutine e1exchs2
 
 subroutine e1exch_NaNb(Flags,A,B,SAPT)
-! E1exch(S2): Eq () in SAPT(MC) paper
+!
+! E1exch(S2): Eq (9) in SAPT(MC) paper
+! doi: 10.1021/acs.jctc.1c00344
+!
 implicit none
 
 type(FlagsData)   :: Flags

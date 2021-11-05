@@ -242,32 +242,53 @@ type(FlagsData)    :: Flags
 type(SaptData)     :: SAPT
 integer,intent(in) :: NBasis
 double precision,intent(inout) :: Tcpu,Twall
+integer :: i
 
- print*, 'Cholesky decomposition'
+ write(LOUT,'(1x,a)') 'SAPT(MC) with Cholesky decomposition'
+ write(LOUT,'(8a10)') ('----------',i=1,8)
+ if(SAPT%CAlpha) print*, 'SAPT%CAlpha',SAPT%CAlpha
 
- call e1elst_Chol(SAPT%monA,SAPT%monB,SAPT)
-! call e1exchs2(Flags,SAPT%monA,SAPT%monB,SAPT)
- call e1exch_NaNb(Flags,SAPT%monA,SAPT%monB,SAPT)
- call e2ind(Flags,SAPT%monA,SAPT%monB,SAPT)
- !call e2ind_hf_icphf(Flags,SAPT%monA,SAPT%monB,SAPT)
- call e2exind(Flags,SAPT%monA,SAPT%monB,SAPT)
- !call e2disp_Chol(Flags,SAPT%monA,SAPT%monB,SAPT)
- !call e2disp_Cmat(Flags,SAPT%monA,SAPT%monB,SAPT)
- Print*, 'SAPT%CAlpha',SAPT%CAlpha
- if(.not.SAPT%CAlpha) then
-   ! Adam's test
-   !call e2disp_Cmat_Chol(Flags,SAPT%monA,SAPT%monB,SAPT)
-   call e2disp_Cmat_Chol_diag(Flags,SAPT%monA,SAPT%monB,SAPT)
-   !call e2disp_Cmat_Chol_block(Flags,SAPT%monA,SAPT%monB,SAPT)
-   call e2disp_Cmat_Chol_proj(Flags,SAPT%monA,SAPT%monB,SAPT)
-   ! C(mat)-alpha
- else if(SAPT%CAlpha) then
-   call e2disp_CAlphaTilde_block(Flags,SAPT%monA,SAPT%monB,SAPT)
-   !call e2disp_CAlphaTilde_full(Flags,SAPT%monA,SAPT%monB,SAPT)
+ if(SAPT%SaptLevel==999) then
+    write(LOUT,'(1x,a,/)') 'RS calculation requested'
+
+    call e1elst_Chol(SAPT%monA,SAPT%monB,SAPT)
+    !call e2ind(Flags,SAPT%monA,SAPT%monB,SAPT)
+    !call e2ind_resp(Flags,SAPT%monA,SAPT%monB,SAPT)
+    if(.not.SAPT%CAlpha) then
+      call e2disp_Cmat_Chol_block(Flags,SAPT%monA,SAPT%monB,SAPT)
+    else if(SAPT%CAlpha) then
+      call e2disp_CAlphaTilde_block(Flags,SAPT%monA,SAPT%monB,SAPT)
+    endif
+
+    call summary_rspt(SAPT)
+
+ else
+
+    call e1elst_Chol(SAPT%monA,SAPT%monB,SAPT)
+    !call e1exchs2(Flags,SAPT%monA,SAPT%monB,SAPT)
+    call e1exch_NaNb(Flags,SAPT%monA,SAPT%monB,SAPT)
+    call e2ind(Flags,SAPT%monA,SAPT%monB,SAPT)
+    call e2exind(Flags,SAPT%monA,SAPT%monB,SAPT)
+   
+    ! test subroutines for E2disp
+    !call e2disp_Chol(Flags,SAPT%monA,SAPT%monB,SAPT)
+    !call e2disp_Cmat(Flags,SAPT%monA,SAPT%monB,SAPT)
+
+    if(.not.SAPT%CAlpha) then
+      ! Adam's test
+      !call e2disp_Cmat_Chol(Flags,SAPT%monA,SAPT%monB,SAPT)
+      call e2disp_Cmat_Chol_diag(Flags,SAPT%monA,SAPT%monB,SAPT)
+      !call e2disp_Cmat_Chol_block(Flags,SAPT%monA,SAPT%monB,SAPT)
+      call e2disp_Cmat_Chol_proj(Flags,SAPT%monA,SAPT%monB,SAPT)
+    else if(SAPT%CAlpha) then
+      call e2disp_CAlphaTilde_block(Flags,SAPT%monA,SAPT%monB,SAPT)
+      !call e2disp_CAlphaTilde_full(Flags,SAPT%monA,SAPT%monB,SAPT)
+    endif
+    call e2exdisp(Flags,SAPT%monA,SAPT%monB,SAPT)
+    call summary_sapt(SAPT)
+
  endif
- call e2exdisp(Flags,SAPT%monA,SAPT%monB,SAPT)
 
- call summary_sapt(SAPT)
  call print_warn(SAPT)
  call free_sapt(Flags,SAPT)
 
@@ -422,6 +443,12 @@ double precision :: MO(NBasis*NBasis)
 
  if(SaptLevel.eq.1) return
 
+ if(SaptLevel.eq.999) then
+    ! for RSPT2 only AB matrices are needed
+    call calc_ab_cas(Mon,MO,Flags,NBasis)
+    return
+ endif
+
  if(Flags%ISERPA==0) then
     if(SaptLevel.eq.0.or.SaptLevel.eq.10) then
 
@@ -461,6 +488,11 @@ type(AOReaderData) :: reader
 integer,intent(in) :: iPINO,NBasis
 integer            :: thr_id
 integer            :: ntr,iunit_aotwosort
+
+if(Flags%SaptLevel==999) then
+  print*, 'In RSPT2 intermoner ints not calculated for now'
+  return
+endif
 
 if(Flags%ISERPA==0) then
   if(Flags%ICASSCF==1) then
@@ -1618,6 +1650,30 @@ elseif(SAPT%SaptLevel==1) then
 endif
 
 end subroutine summary_sapt_verbose
+
+subroutine summary_rspt(SAPT)
+implicit none
+
+type(SaptData) :: SAPT
+
+integer :: i
+double precision :: erspt2
+
+erspt2 = SAPT%elst +  SAPT%e2ind + SAPT%e2disp
+
+write(LOUT,'(/,8a10)') ('**********',i=1,4)
+write(LOUT,'(1x,a)') 'SAPT SUMMARY / milliHartree'
+write(LOUT,'(8a10)') ('**********',i=1,4)
+
+write(LOUT,'(1x,a)') 'SAPT level  = RSPT2'
+
+write(LOUT,'(1x,a,t19,a,f16.8)') 'E1elst',    '=', SAPT%elst*1.d03
+write(LOUT,'(1x,a,t19,a,f16.8)') 'E2ind',      '=', SAPT%e2ind*1.d03
+write(LOUT,'(1x,a,t19,a,f16.8)') 'E2disp',     '=', SAPT%e2disp*1.d03
+write(LOUT,'(1x,a,t19,a,f16.8)') 'Eint(RSPT2)','=', erspt2*1.0d3
+write(LOUT,'()')
+
+end subroutine summary_rspt
 
 subroutine free_sapt(Flags,SAPT)
 implicit none

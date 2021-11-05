@@ -1366,6 +1366,9 @@ type(EBlockData),allocatable :: LambdaA(:),LambdaB(:)
 ! test
 double precision :: Tcpu,Twall
 
+print*, ''
+print*, 'Experimental E2disp(CAlpha) procedure...'
+
 ! both = coupled + uncoupled
 both = SAPT%iCpld
 
