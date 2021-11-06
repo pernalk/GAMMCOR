@@ -2186,7 +2186,12 @@ end function calc_vnn
 subroutine chol_sapt_NOTransf(SAPT,A,B,CholeskyVecs,NBasis)
 !
 ! transform Choleksy Vecs from AO to NO
-! for all 2-index vecs needed in SAPT
+! for all 2-index vecs needed in SAPT:
+!   FFXX(NCholesky,NBas**2) -- for polarization
+!   FFXY(NCholesky,NBas**2) -- for exchange
+!   FFYX(NCholesky,NBas**2) -- for exchange
+!   OOXX(NCholesky,dimO**2) -- for polarization
+!   DCholX(NCholesky,NDimX) -- for polarization
 !
 implicit none
 
@@ -2198,7 +2203,8 @@ integer,intent(in)  :: NBasis
 integer :: NCholesky
 integer :: dimOA,dimOB,dimVA,dimVB, &
            nOVA,nOVB
-integer :: i,ip,iq,ipq
+integer          :: i,j,ip,iq,ipq
+double precision :: Cpq
 double precision,allocatable :: tmp(:,:)
 ! test
 double precision :: Tcpu,Twall
@@ -2212,6 +2218,9 @@ call clock('START',Tcpu,Twall)
  dimVB = B%num1+B%num2
  nOVA  = dimOA*dimVA
  nOVB  = dimOB*dimVB
+
+ print*, 'dimOA',dimOA
+ print*, 'dimOB',dimOB
 
  !allocate(A%OV(NCholesky,A%NDimX),B%OV(NCholesky,B%NDimX))
 
@@ -2265,12 +2274,32 @@ call clock('BOO',Tcpu,Twall)
  call chol_MOTransf(A%FF,CholeskyVecs,&
                     A%CMO,1,NBasis,&
                     A%CMO,1,NBasis)
-call clock('AFF',Tcpu,Twall)
+ call clock('AFF',Tcpu,Twall)
  ! (FF|BB)
  call chol_MOTransf(B%FF,CholeskyVecs,&
                     B%CMO,1,NBasis,&
                     B%CMO,1,NBasis)
-call clock('BFF',Tcpu,Twall)
+ call clock('BFF',Tcpu,Twall)
+
+ ! DChol(NCholeksy,NDimX)
+ allocate(A%DChol(NCholesky,A%NDimX), &
+          B%DChol(NCholesky,B%NDimX))
+
+ do j=1,A%NDimX
+    ip = A%IndN(1,j)
+    iq = A%IndN(2,j)
+    ipq = iq + (ip-1)*NBasis
+    Cpq = A%CICoef(ip) + A%CICoef(iq)
+    A%DChol(:,j) = Cpq*A%FF(:,ipq)
+ enddo
+
+ do j=1,B%NDimX
+    ip = B%IndN(1,j)
+    iq = B%IndN(2,j)
+    ipq = iq + (ip-1)*NBasis
+    Cpq = B%CICoef(ip) + B%CICoef(iq)
+    B%DChol(:,j) = Cpq*B%FF(:,ipq)
+ enddo
 
  if(SAPT%SaptLevel==999) return
 

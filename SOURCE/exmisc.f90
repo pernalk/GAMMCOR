@@ -205,6 +205,9 @@ subroutine make_sij_Y_Chol(sij,tmp1,AOcc,BOcc,AEigY,AEigX,BEigY,BEigX,&
                       OVA,OVB, &
                       Anum0,Bnum0,dimOA,dimOB,nOVB,AIndN,BIndN,ANDimX,BNDimX,&
                       NCholesky,NBas)
+!
+! warning! OVA and OVB are overwritten!
+!
 implicit none
 
 integer,intent(in) :: Anum0,Bnum0,dimOA,dimOB,nOVB,ANDimX,BNDimX
@@ -213,7 +216,8 @@ integer,intent(in) :: AIndN(2,ANDimX),BIndN(2,BNDimX)
 double precision,intent(in) :: AOcc(NBas),BOcc(NBas),&
                                AEigY(ANDimX*ANDimX),AEigX(ANDimX*ANDimX),&
                                BEigY(BNDimX*BNDimX),BEigX(BNDimX*BNDimX)
-double precision,intent(in) :: OVA(NCholesky,ANDimX),OVB(NCholesky,BNDimX)
+!double precision,intent(in) :: OVA(NCholesky,ANDimX),OVB(NCholesky,BNDimX)
+double precision               :: OVA(NCholesky,ANDimX),OVB(NCholesky,BNDimX)
 double precision,intent(inout) :: tmp1(ANDimX,BNDimX),&
                                   sij(ANDimX,BNDimX)
 
@@ -221,8 +225,27 @@ integer :: i,j,ir,is,irs,ip,iq,ipq
 double precision :: fact
 double precision,allocatable :: work(:)
 
-allocate(work(BNDimX))
+! we do not need the Cpq prefacor...
+allocate(work(NBas))
+do i=1,NBas
+   work(i) = sign(sqrt(AOcc(i)),AOcc(i)-0.5d0)
+enddo
+do ipq=1,ANDimX
+   ip = AIndN(1,ipq)
+   iq = AIndN(2,ipq)
+   OVA(:,ipq) = 1d0/(work(ip)+work(iq))*OVA(:,ipq)
+enddo
+do i=1,NBas
+   work(i) = sign(sqrt(BOcc(i)),BOcc(i)-0.5d0)
+enddo
+do ipq=1,BNDimX
+   ip = BIndN(1,ipq)
+   iq = BIndN(2,ipq)
+   OVB(:,ipq) = 1d0/(work(ip)+work(iq))*OVB(:,ipq)
+enddo
+deallocate(work)
 
+allocate(work(BNDimX))
 tmp1=0
 do ipq=1,ANDimX
    ip = AIndN(1,ipq)

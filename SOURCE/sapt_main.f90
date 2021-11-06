@@ -490,6 +490,9 @@ integer            :: ntr,iunit_aotwosort
 
 if(Flags%SaptLevel==999) then
   print*, 'In RSPT2 intermoner ints not calculated for now'
+  ! deallocate (FF|NCholesky) integrals
+  deallocate(A%FF)
+  deallocate(B%FF)
   return
 endif
 
@@ -532,9 +535,8 @@ if(Flags%ISERPA==0) then
   ! Let's open the AOTWSORT only once, therefore we open it here
 
   if(Flags%ICholesky==1) then
-     !print*,'test Cholesky HERE!'
      !print*, 'dimOA',A%num0+A%num1
-     print*, 'dimOB',B%num0+B%num1
+     !print*, 'dimOB',B%num0+B%num1
      ! term A3-ind
      call chol_ints_fofo(NBasis,A%num0+A%num1,A%FF,&
                          NBasis,B%num0+B%num1,B%FF,&
@@ -689,6 +691,9 @@ if(Flags%ISERPA==0) then
         call chol_ints_fofo(NBasis,NBasis,B%FFBA, &
                             A%num0+A%num1,A%num0+A%num1,A%FF,&
                             A%NChol,NBasis,'FFOOBAAA')
+        ! deallocate (FF|NCholesky) integrals
+        deallocate(A%FF)
+        deallocate(B%FF)
      else
         call tran4_gen(NBasis,&
                  NBasis,B%CMO,&
@@ -1200,14 +1205,14 @@ call clock('START',Tcpu,Twall)
             NBas,MO,&
             NBas,MO,&
             twojfile,'AOTWOSORT')
-call clock('FFOO',Tcpu,Twall)
+       call clock('FFOO',Tcpu,Twall)
        call tran4_gen(NBas,&
             NBas,MO,&
             Mon%num0+Mon%num1,MO(1:NBas*(Mon%num0+Mon%num1)),&
             NBas,MO,&
             Mon%num0+Mon%num1,MO(1:NBas*(Mon%num0+Mon%num1)),&
             twokfile,'AOTWOSORT')
-call clock('FOFO',Tcpu,Twall)
+       call clock('FOFO',Tcpu,Twall)
     endif
  end select
 
@@ -1712,6 +1717,12 @@ if(allocated(SAPT%monB%Kmat)) then
   deallocate(SAPT%monB%Kmat)
 endif
 ! test Cholesky
+if(allocated(SAPT%monA%DChol)) then
+   deallocate(SAPT%monA%Dchol)
+endif
+if(allocated(SAPT%monB%DChol)) then
+   deallocate(SAPT%monB%Dchol)
+endif
 if(allocated(SAPT%monA%OV)) then
    deallocate(SAPT%monA%OV)
 endif

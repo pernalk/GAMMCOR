@@ -208,6 +208,7 @@ type SystemBlock
       double precision,allocatable :: OV(:,:),OO(:,:), &
                                       FO(:,:),FF(:,:), &
                                       FFAB(:,:),FFBA(:,:)
+      double precision,allocatable :: DChol(:,:)
       double precision,allocatable :: Pmat(:,:)
       double precision,allocatable :: WPot(:,:),Kmat(:,:)
       double precision,allocatable :: VCoul(:)
