@@ -18,6 +18,13 @@ cd <repository_name>
 mkdir OBJ
 ```
 
+#### CMake build: switch to 'cmake' branch!
+#### 3a. Build with CMake (IFort example)
+env FC=ifort CC=gcc CXX=icc cmake -S. -Bbuild
+
+#### 3b. Build with CMake (GNU example)
+env FC=gfortran CC=gcc CXX=gcc cmake -S. -Bbuild
+
 #### 3. Build XCFun
 * ##### Using Intel compilers (icc/ipcp & ifort):
 ```
