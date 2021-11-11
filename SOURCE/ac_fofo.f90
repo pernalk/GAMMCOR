@@ -257,6 +257,8 @@ Do IGL=1,NGrid
 
 EndDo
 
+deallocate(A1,A2,WORK0,C0Tilde,C1Tilde,C2Tilde,Lambda,APLUS0Tilde,APLUS1Tilde)
+
 allocate(WorkD(NDimX,NCholesky))
 WorkD=0
 WorkD = RESHAPE(COMTilde, (/NDimX, NCholesky/))
