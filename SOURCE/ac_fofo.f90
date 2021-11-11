@@ -93,6 +93,187 @@ return
 deallocate(work1)
 end subroutine Project_DChol
 
+subroutine WIter_D12Chol(ECorr,Max_Cn,XOne,URe,Occ,EGOne,NGOcc,&
+   IGem,NAct,INActive,NELE,NBasis,NInte1,NDim,NGem,IndAux,&
+   IndN,IndX,NDimX)
+!
+!  AC energy cacluation using CHOLESKY VECTORS:
+!  (1) expanding AC integrand in alpha around alpha=0, up to Max_Cn order
+!  (2) finding C^(n)[omega] and (3) omega integration
+!  Max_Cn is passed in input.inp (if missed, the dafault value 3 is used)
+!
+!  A difference with WIter_DChol: no need to compute COMTildeAct
+!
+use abfofo
+use systemdef
+
+implicit none
+integer,intent(in) :: NGOcc,NBasis,NInte1,NDim,NGem,NDimX
+integer,intent(in) :: NAct,INActive,NELE
+integer,intent(in) :: IndN(2,NDim),IndX(NDim),IndAux(NBasis),&
+                   IGem(NBasis)
+double precision :: ACAlpha
+double precision,intent(in) :: URe(NBasis,NBasis),Occ(NBasis),XONe(NInte1)
+double precision :: ECorr,ECorrAct,EGOne(NGem)
+double precision :: XFreq(100),WFreq(100)
+
+integer :: iunit,NOccup
+integer :: ia,ib,ic,id,ICol,IRow
+integer :: i,j,k,l,kl,ip,iq,ir,is,ipq,irs
+integer :: NGrid,N,IGL,inf1,inf2,Max_Cn
+double precision :: ECASSCF,PI,WFact,XFactorial,XN1,XN2,FF,OmI
+character(:),allocatable :: twojfile,twokfile,IntKFile
+
+double precision, allocatable :: DChol(:,:),DCholT(:,:),DCholAct(:,:),DCholActT(:,:),WorkD(:,:)
+double precision, allocatable :: APLUS0Tilde(:), APLUS1Tilde(:),  &
+                                 A1(:),A2(:), &
+                                 COMTilde(:),ABPLUS0(:),ABMIN0(:),ABPLUS1(:),ABMIN1(:), &
+                                 LAMBDA(:), &
+                                 C0Tilde(:),C1Tilde(:),C2Tilde(:), &
+                                 WORK0(:)
+integer :: NCholesky
+
+integer :: nblk
+type(EblockData) :: A0blockIV
+type(EblockData),allocatable :: A0block(:)
+
+interface
+subroutine read_D12_array(NCholesky, DChol, DCholAct, NDimX, NBasis, IndN, Occ, IndAux)
+   double precision, allocatable, intent(out) :: DChol(:,:), DCholAct(:,:)
+   integer :: NCholesky
+   integer, intent(in) :: NDimX, NBasis, IndN(2,NDimX), IndAux(NBasis)
+   double precision, intent(in) :: Occ(NBasis)
+end subroutine read_D12_array
+end interface
+
+! Get DChol & DCholAct
+call read_D12_array(NCholesky, DChol, DCholAct, NDimX, NBasis, IndN, Occ, IndAux)
+DCholT = transpose(DChol)
+DCholActT = transpose(DCholAct)
+! ==========================================================================
+
+NGrid=18
+
+Write (6,'(/,X,''AC calculation through W_AC expansion around Alpha=0, Omega Grid = '',I3,&
+   '' and max order in C expansion = '',I3,/)') NGrid,Max_Cn
+
+NOccup = NAct + INActive
+PI = 4.0*ATAN(1.0)
+
+twojfile = 'FFOO'
+twokfile = 'FOFO'
+IntKFile = twokfile
+
+allocate(ABPLUS0(NDimX*NDimX),ABMIN0(NDimX*NDimX),ABPLUS1(NDimX*NDimX),ABMIN1(NDimX*NDimX))
+
+ACAlpha=0.D0
+call AB_CAS_FOFO(ABPLUS0,ABMIN0,ECASSCF,URe,Occ,XOne, &
+              IndN,IndX,IGem,NAct,INActive,NDimX,NBasis,NDimX,&
+              NInte1,twojfile,twokfile,ACAlpha,.false.)
+
+Call sq_symmetrize(ABPLUS0,NDimX)
+Call sq_symmetrize(ABMIN0,NDimX)
+
+ACAlpha=1.D0
+call AB_CAS_FOFO(ABPLUS1,ABMIN1,ECASSCF,URe,Occ,XOne, &
+              IndN,IndX,IGem,NAct,INActive,NDimX,NBasis,NDimX,&
+              NInte1,twojfile,twokfile,ACAlpha,.false.)
+
+Call sq_symmetrize(ABPLUS1,NDimX)
+Call sq_symmetrize(ABMIN1,NDimX)
+
+ABPLUS1=ABPLUS1-ABPLUS0
+ABMIN1 =ABMIN1 -ABMIN0
+EGOne(1)=ECASSCF
+
+!Calc: A1=ABPLUS0*ABMIN1+ABPLUS1*ABMIN0
+allocate(A1(NDimX*NDimX))
+Call dgemm('N','N',NDimX,NDimX,NDimX,1d0,ABPLUS0,NDimX,ABMIN1,NDimX,0.0d0,A1,NDimX)
+Call dgemm('N','N',NDimX,NDimX,NDimX,1d0,ABPLUS1,NDimX,ABMIN0,NDimX,1d0,A1,NDimX)
+deallocate(ABMIN0)
+
+!Calc: A2=ABPLUS1*ABMIN1
+allocate(A2(NDimX*NDimX))
+Call dgemm('N','N',NDimX,NDimX,NDimX,1d0,ABPLUS1,NDimX,ABMIN1,NDimX,0.0d0,A2,NDimX)
+deallocate(ABMIN1)
+
+!Calc: APLUS0Tilde=ABPLUS0.DChol
+allocate(APLUS0Tilde(NDimX*NCholesky))
+Call dgemm('N','N',NDimX,NCholesky,NDimX,1d0,ABPLUS0,NDimX,DCholT,NDimX,0.0d0,APLUS0Tilde,NDimX)
+deallocate(ABPLUS0)
+
+!Calc: APLUS1Tilde=ABPLUS1.DChol
+allocate(APLUS1Tilde(NDimX*NCholesky))
+Call dgemm('N','N',NDimX,NCholesky,NDimX,1d0,ABPLUS1,NDimX,DCholT,NDimX,0.0d0,APLUS1Tilde,NDimX)
+deallocate(ABPLUS1)
+
+Call FreqGrid(XFreq,WFreq,NGrid)
+
+! Calc: A0
+nblk = 1 + NBasis - NAct
+allocate(A0block(nblk))
+Call AC0BLOCK(Occ,URe,XOne, &
+     IndN,IndX,IGem,NAct,INActive,NDimX,NBasis,NDimX,NInte1,'FFOO','FOFO', &
+     A0BlockIV,A0Block,nblk,'A0BLK',0)
+
+allocate(COMTilde(NDimX*NCholesky))
+COMTilde=0.0
+
+allocate(C0Tilde(NDimX*NCholesky),C1Tilde(NDimX*NCholesky),C2Tilde(NDimX*NCholesky),WORK0(NDimX*NCholesky))
+allocate(LAMBDA(NDimX*NDimX))
+
+Do IGL=1,NGrid
+   OmI=XFreq(IGL)
+   WFact=4.D0/PI*WFreq(IGL)
+
+!  Calc: LAMBDA=(A0+Om^2)^-1
+   Call INV_AC0BLK(OmI**2,LAMBDA,A0Block,A0BlockIV,nblk,NDimX)
+
+!  Calc: C0Tilde=1/2 LAMBDA.APLUS0Tilde
+   Call dgemm('N','N',NDimX,NCholesky,NDimX,0.5d0,LAMBDA,NDimX,APLUS0Tilde,NDimX,0.0d0,C0Tilde,NDimX)
+
+!  Calc: C1Tilde=LAMBDA.(1/2 APLUS1Tilde - A1.C0Tilde)
+   Call dgemm('N','N',NDimX,NCholesky,NDimX,1.d0,A1,NDimX,C0Tilde,NDimX,0.0d0,WORK0,NDimX)
+   WORK0=0.5d0*APLUS1Tilde-WORK0
+   Call dgemm('N','N',NDimX,NCholesky,NDimX,1.d0,LAMBDA,NDimX,WORK0,NDimX,0.0d0,C1Tilde,NDimX)
+
+   COMTilde=COMTilde+WFact*0.5d0*C1Tilde
+
+   XFactorial=1
+   Do N=2,Max_Cn
+       XFactorial=XFactorial*N
+       XN1=-N
+       XN2=-N*(N-1)
+       Call dgemm('N','N',NDimX,NCholesky,NDimX,XN2,A2,NDimX,C0Tilde,NDimX,0.0d0,WORK0,NDimX)
+       Call dgemm('N','N',NDimX,NCholesky,NDimX,XN1,A1,NDimX,C1Tilde,NDimX,1.0d0,WORK0,NDimX)
+       Call dgemm('N','N',NDimX,NCholesky,NDimX,1.0d0,LAMBDA,NDimX,WORK0,NDimX,0.0d0,C2Tilde,NDimX)
+       FF=WFact/XFactorial/(N+1)
+       COMTilde=COMTilde+FF*C2Tilde
+       C0Tilde=C1Tilde
+       C1Tilde=C2Tilde
+   EndDo
+
+   Write(6,'(X,"Omega, |C|",I3,2F10.4)')IGL,OmI,Norm2(COMTilde)
+
+EndDo
+
+allocate(WorkD(NDimX,NCholesky))
+WorkD=0
+WorkD = RESHAPE(COMTilde, (/NDimX, NCholesky/))
+ECorr=0
+do j=1,NDimX
+   do i=1,NCholesky
+      ECorr=ECorr+DCholAct(i,j)*WorkD(j,i)
+   enddo
+enddo
+
+deallocate(WorkD,COMTilde)
+
+close(iunit)
+Call RELEASE_AC0BLOCK(A0Block,A0blockIV,nblk)
+
+end subroutine WIter_D12Chol
+
 subroutine WIter_DChol(ECorr,Max_Cn,XOne,URe,Occ,EGOne,NGOcc,&
    IGem,NAct,INActive,NELE,NBasis,NInte1,NDim,NGem,IndAux,&
    IndN,IndX,NDimX)
@@ -151,6 +332,7 @@ DCholActT = transpose(DCholAct)
 ! ==========================================================================  
 
 NGrid=18
+!NGrid=30
 
 Write (6,'(/,X,''AC calculation through W_AC expansion around Alpha=0, Omega Grid = '',I3,&
    '' and max order in C expansion = '',I3,/)') NGrid,Max_Cn
@@ -168,10 +350,12 @@ ACAlpha=0.D0
 call AB_CAS_FOFO(ABPLUS0,ABMIN0,ECASSCF,URe,Occ,XOne, &
               IndN,IndX,IGem,NAct,INActive,NDimX,NBasis,NDimX,&
               NInte1,twojfile,twokfile,ACAlpha,.false.)
+
 ACAlpha=1.D0
 call AB_CAS_FOFO(ABPLUS1,ABMIN1,ECASSCF,URe,Occ,XOne, &
               IndN,IndX,IGem,NAct,INActive,NDimX,NBasis,NDimX,&
               NInte1,twojfile,twokfile,ACAlpha,.false.)
+
 ABPLUS1=ABPLUS1-ABPLUS0
 ABMIN1 =ABMIN1 -ABMIN0
 EGOne(1)=ECASSCF
@@ -326,7 +510,7 @@ double precision :: COM(NDimX*NDimX),XFreq(100),WFreq(100),&
 
 integer :: iunit,NOccup
 integer :: ia,ib,ic,id,ICol,IRow
-integer :: i,j,k,l,kl,ip,iq,ir,is,ipq,irs
+integer :: i,j,k,l,kl,ip,iq,ir,is,ipq,irs,iipq,iirs
 integer :: pos(NBasis,NBasis),NGrid,N,IGL,inf1,inf2,Max_Cn
 double precision :: ECASSCF,PI,WFact,XFactorial,XN1,XN2,FF,CICoef(NBasis),Cpq,Crs,SumY,Aux,OmI
 character(:),allocatable :: twojfile,twokfile,IntKFile
@@ -337,7 +521,7 @@ integer :: nblk
 type(EblockData) :: A0blockIV
 type(EblockData),allocatable :: A0block(:)
 
-NGrid=20
+NGrid=18
 Write (6,'(/,X,''AC calculation through W_AC expansion around Alpha=0, Omega Grid = '',I3,&
    '' and max order in C expansion = '',I3,/)') NGrid,Max_Cn
 
@@ -352,10 +536,12 @@ ACAlpha=0.D0
 call AB_CAS_FOFO(ABPLUS0,WORK0,ECASSCF,URe,Occ,XOne, &
               IndN,IndX,IGem,NAct,INActive,NDimX,NBasis,NDimX,&
               NInte1,twojfile,twokfile,ACAlpha,.false.)
+
 ACAlpha=1.D0
 call AB_CAS_FOFO(ABPLUS1,WORK1,ECASSCF,URe,Occ,XOne, &
               IndN,IndX,IGem,NAct,INActive,NDimX,NBasis,NDimX,&
               NInte1,twojfile,twokfile,ACAlpha,.false.)
+
 ABPLUS1=ABPLUS1-ABPLUS0
 WORK1=WORK1-WORK0
 EGOne(1)=ECASSCF
@@ -382,8 +568,6 @@ Do IGL=1,NGrid
 
 !  Calc: WORK1=(A0+Om^2)^-1
    Call INV_AC0BLK(OmI**2,WORK1,A0Block,A0BlockIV,nblk,NDimX)
-   !Call READ_AC0BLK(OmI**2,WORK1,'A0BLK',NDimX)
-
 !  Calc: C0=1/2 Lambda.ABPLUS0
    Call dgemm('N','N',NDimX,NDimX,NDimX,0.5d0,WORK1,NDimX,&
               ABPLUS0,NDimX,0d0,C0,NDimX)
@@ -1036,6 +1220,54 @@ subroutine CIter_FOFO(PMat,ECorr,ACAlpha,XOne,URe,Occ,EGOne,NGOcc,&
 
 end subroutine CIter_FOFO
 
+
+subroutine read_D12_array(NCholesky, DChol, DCholAct, NDimX, NBasis, IndN, Occ, IndAux)
+
+   implicit none
+   integer, intent(in) :: NDimX, NBasis, IndN(2,NDimX), IndAux(NBasis)
+   double precision, intent(in) :: Occ(NBasis)
+   double precision, allocatable, intent(out) :: DChol(:,:), DCholAct(:,:)
+   integer :: NCholesky, iunit, i, j, ir, is, irs
+   double precision, allocatable :: WorkD(:,:)
+   double precision :: Crs, CICoef(NBasis)
+
+   open(newunit=iunit,file='cholvecs',form='unformatted')
+   read(iunit) NCholesky
+   allocate(WorkD(NCholesky,NBasis**2))
+   read(iunit) WorkD
+   close(iunit)
+
+   print*,'NCholesky',NCholesky
+
+   allocate(DChol(NCholesky,NDimX), DCholAct(NCholesky,NDimX))
+
+   do i=1,NBasis
+      CICoef(i) = sign(sqrt(Occ(i)),Occ(i)-0.5d0)
+   enddo
+
+   DChol = 0
+   DCholAct = 0
+   do j=1,NDimX
+      ir=IndN(1,j)
+      is=IndN(2,j)
+      irs = is+(ir-1)*NBasis
+      Crs=CICoef(ir)+CICoef(is)
+      do i=1,NCholesky
+!           DChol(i,j) = Crs*WorkD(i,irs)
+            DCholAct(i,j) = Crs*WorkD(i,irs) 
+!           if(IndAux(ir)*IndAux(is)==1) DChol(i,j) = 2.D0*DChol(i,j)
+            if(IndAux(ir)*IndAux(is)==1) DCholAct(i,j) = 2.D0*DCholAct(i,j)
+      enddo
+      if(IndAux(ir)*IndAux(is).ne.1) then  
+            do i=1,NCholesky
+!               DCholAct(i,j) = Crs*WorkD(i,irs)
+                DChol(i,j) = Crs*WorkD(i,irs) 
+            enddo
+      endif
+   enddo
+   deallocate(WorkD)
+
+end subroutine read_D12_array
 
 subroutine read_D_array(NCholesky, DChol, DCholAct, NDimX, NBasis, IndN, Occ, IndAux)
 

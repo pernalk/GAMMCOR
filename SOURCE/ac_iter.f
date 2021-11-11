@@ -62,7 +62,7 @@ C     Find AC energy in one shot (no lambda integration) by expanding C in lambd
 C     and integrating analytically, Cholesky decomposition is employed
 C     to lower dimensionality of the C(omega)-problem 
 C
-      Call WIter_DChol(ECorr,Max_Cn,XOne,URe,Occ,
+      Call WIter_D12Chol(ECorr,Max_Cn,XOne,URe,Occ,
      $ EGOne,NGOcc,IGem,NAcCAS,NInAcCAS,NELE,
      $ NBasis,NInte1,NDim,NGem,IndAux,
      $ IndN,IndX,NDimX)
