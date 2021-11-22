@@ -203,8 +203,13 @@ c
 c exact AC
 c      NoEig=1
 c      NDimFull=NBasis*(NBasis-1)/2
+
 c      Call ACPINO(ENuc,TwoNO,Occ,XOne,
 c     $ NBasis,NInte1,NInte2,NDimFull,NGem,NoEig) 
+
+c AC with varying Alpha-dependent RDMs
+c      Call ACRDM(ETot,ENuc,TwoNO,Occ,XOne,
+c     $ UNOAO,IndN,IndX,IndAux,NDimX,NBasis,NInte1,NInte2,NDimFull,NGem) 
       
       Return
       EndIf

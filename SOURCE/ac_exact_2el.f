@@ -199,6 +199,8 @@ C
 C
       NDimX=Ind
       NDimN=NBasis
+c herer!!!
+c      NDimN=0
 C
 C     GENERATE ABSCISSAS AND WEIGHTS FOR GAUSSIAN-LEGENDRE QUADRATURE
 C
@@ -276,6 +278,7 @@ C
      $ H1Alph,UReAlph,OccAlph,
      $ NBasis,NInte1,NInte2,NoEig,ACAlpha)
 C
+c herer!!! (uncomment the line below after tests)
       Return
 C
   444 Continue
@@ -346,7 +349,7 @@ C
 C
       Call ACEnePINO(ECorrA,DeltaA,
      $ EigVecR,Eig,TwoEl,Occ,XOne,
-     $ CIAlph,UReAlph,IndN,NBasis,NInte1,NInte2,NDimX,NDimN)
+     $ CIAlph,UReAlph,IndN,NBasis,NInte1,NInte2,NDimX,NDimN,1)
 C
       Write(6,'(/,X,''ACAlpha:'',F11.8,3X,"W_ALPHA:",F12.8,
      $ 3X,"Delta_ALPHA:",F12.8)')ACAlpha,ECorrA,DeltaA
@@ -386,6 +389,496 @@ C
       Return 
       End
 
+*Deck ACRDM
+      Subroutine ACRDM(ETot,ENuc,TwoEl,Occ,XOne,
+     $ UNOAO,IndN,IndX,IndAux,NDimX,NBasis,NInte1,NInte2,NDim,NGem)
+C
+C     AC ENERGY USING ERPA TRANSITION DENSITY MATRIX ELEMENTS
+C     AND ALPHA-DEPENDENT 1,2-RDMs
+C
+      Implicit Real*8 (A-H,O-Z)
+C
+      Include 'commons.inc'
+c
+      Parameter(Zero=0.D0,Half=0.5D0,One=1.D0,Two=2.D0,Three=3.D0,
+     $ Four=4.D0)
+C
+      Dimension
+     $ Occ(NBasis),TwoEl(NInte2),XOne(NInte1)
+C
+C     LOCAL ARRAYS
+C
+      Dimension
+     $ UReAlph(NBasis,NBasis),OccAlph(NBasis),CIAlph(NBasis),
+     $ TwoAlph(NInte2),H1Alph(NInte1),
+     $ ABPLUS(NDim*NDim),ABMIN(NDim*NDim),
+     $ CMAT(NDim*NDim),EMAT(NBasis*NBasis),DMAT(NDim*NBasis),
+     $ EMATM(NBasis*NBasis),DMATK(NDim*NBasis),
+     $ IndX(NDim),IndN(2,NDim),
+     $ EigVecR(2*(NDim+NBasis)*2*(NDim+NBasis)),
+     $ Eig(2*(NDim+NBasis)),IndAux(NBasis),
+     $ XGrid(100), WGrid(100),CISave(NBasis),IGemCAS(NBasis),
+     $ TrGamm(NInte1,NInte1),EExcit(NInte1),GammAl(NInte1),
+     $ IPair(NBasis,NBasis)
+C
+      Character*10     :: IntFile 
+C
+c      Call MP2RDM(TwoEl,EMAT,Occ,URe,UNOAO,XOne,
+c     $           IndN,IndX,IndAux,NDimX,
+c     $           NBasis,NDim,NInte1,NInte2,NVirt,
+c     $           IntFile,ThrVirt,.true.)
+c      stop
+C
+      Do I=1,NBasis
+      CISave(I)=CICoef(I)
+      IGemCAS(I)=IGem(I)
+      EndDo
+      NGemCAS=NGem
+C
+      NDimN=0
+C
+C      NGrid=30
+C      Call GauLeg(Zero,One,XGrid,WGrid,NGrid)
+      Open(10,File="alpha.txt",Status='Old')
+      IX=0
+   10 Read(10,*,End=40)XGrid(IX+1)
+      IX=IX+1
+      GoTo 10
+   40 Continue
+      Close(10)      
+      Open(10,File="weights.txt",Status='Old')
+      IW=0
+   12 Read(10,*,End=42)WGrid(IW+1)
+      IW=IW+1
+      GoTo 12
+   42 Continue
+      Close(10) 
+      If(IX.Eq.IW) Then
+      NGrid=IX
+      Else
+      Stop 'Fatal Error: Inconsistent NGrid for XGrid and WGrid'
+      EndIf
+C
+      ECorr=Zero
+      Delta=Zero
+C
+      Do N=1,NGrid
+C
+      ACAlpha=XGrid(N)
+C
+      Do I=1,NInte2
+      TwoAlph(I)=TwoEl(I)
+      EndDo
+      Call RDMAlpha(IndX,IndN,IndAux,NDimX,NDim,Occ,XOne,TwoAlph,
+     $ H1Alph,UReAlph,OccAlph,CIAlph,
+     $ IPair,IGemCAS,
+     $ NBasis,NInte1,NInte2,ACAlpha,N)
+C
+      Call AB_CAS(ABPLUS,ABMIN,ECASSCF,UReAlph,OccAlph,H1Alph,TwoAlph,
+     $ IPair,IndN,IndX,NDimX,NBasis,NDim,NInte1,NInte2,1.D0)
+C
+C     REDUCE THE MATRICES
+C
+      Do J=1,NDimX
+      Do I=1,NDimX
+      IJ=(J-1)*NDimX+I
+      IJ1=(IndX(J)-1)*NDim+IndX(I)
+      ABPLUS(IJ)=ABPLUS(IJ1)
+      ABMIN(IJ)=ABMIN(IJ1)
+      EndDo
+      EndDo
+C
+c herer!!!
+c      Call ERPAVEC(EigVecR,Eig,ABPLUS,ABMIN,NBasis,NDimX)
+      Call ERPASYMM1(EigVecR,Eig,ABPLUS,ABMIN,NBasis,NDimX)
+C
+      Do I=1,NBasis
+      CICoef(I)=CISave(I)
+      IGem(I)=IGemCAS(I)
+      EndDo
+      NGem=NGemCAS
+C
+      Call ACEnePINO(ECorrA,DeltaA,
+     $ EigVecR,Eig,TwoEl,Occ,XOne,
+     $ CIAlph,UReAlph,IndN,NBasis,NInte1,NInte2,NDimX,NDimN,2)
+C
+      Write(6,'(/,X,''ACAlpha:'',F11.8,3X,"W_ALPHA:",F12.8,
+     $ 3X,"Delta_ALPHA:",F12.8)')ACAlpha,ECorrA,DeltaA
+C
+      ECorr=ECorr+WGrid(N)*ECorrA
+      Delta=Delta+WGrid(N)*DeltaA
+C
+      EndDo
+C
+      Write
+     $ (6,'(/,X,''ERef+ENuc, W, Delta, Total'',4F15.8)')
+     $ ETot+ENuc,ECorr,Delta,ETot+ENuc+ECorr+Delta
+C
+      Return
+      End
+
+*Deck RDMAlpha
+      Subroutine RDMAlpha(IndX,IndN,IndAux,NDimX,NDim,Occ,XOne,TwoEl,
+     $ H1Alph,UReAlph,OccAlph,CIAlph,
+     $ IPair,IGemCAS,
+     $ NBasis,NInte1,NInte2,ACAlpha,IGrid)
+C
+C     For a given alpha: construct/read 1,2-RDM(Alpha)
+C     find a transformation matix from CAS MO to NO(Alpha)
+C     construct Alpha-dependent Hamiltonian elements and transform 
+C     to NO(Alpha)
+C
+      use types
+C
+      Implicit Real*8 (A-H,O-Z)
+C
+      Parameter(Zero=0.0D0,Half=0.50D0,One=1.0D0,Two=2.0D0,Four=4.0D0)
+C
+      Character*60 FMultTab
+      Include 'commons.inc'
+C
+      Dimension UReAlph(Nbasis,NBasis),Occ(NBasis),
+     $ OccAlph(NBasis),CIAlph(NBasis),XOne(NInte1),TwoEl(NInte2),
+     $ H1Alph(NInte1),
+     $ IndX(NDim),IndN(2,NDim),IndAux(NBasis),IGemCAS(NBasis),
+     $ IPair(NBasis,NBasis)
+C
+C     read 1-,2-RDMs in CAS orbital representation
+C
+      Call ReadRDMs(OccAlph,UReAlph,NBasis,NGem,NInte1,IGrid) 
+      Do I=1,NBasis
+      CIAlph(I)=SQRT(OccAlph(I))
+      If(OccAlph(I).Lt.Half) CIAlph(I)=-CIAlph(I)
+      EndDo
+C
+C     CONSTRUCT A LOOK-UP TABLE
+C
+      Do I=1,NELE
+      IndAux(I)=0
+      EndDo
+      Do I=1+NELE,NBasis
+      IndAux(I)=2
+      EndDo
+C
+      ICount=0
+      Do I=1,NBasis
+      If(OccAlph(I).Lt.One.And.OccAlph(I).Ne.Zero) Then
+      IndAux(I)=1
+c      Write(6,'(X," Active Orbital: ",I4,E14.4)') I, OccAlph(I)
+      ICount=ICount+1
+      EndIf
+      EndDo
+C
+      IPair(1:NBasis,1:NBasis)=0
+C 
+      IJ=0
+      Ind=0
+      Do I=1,NBasis
+      Do J=1,I-1
+C
+      IJ=IJ+1
+C
+      If(IndAux(I)+IndAux(J).Ne.0.And.IndAux(I)+IndAux(J).Ne.4) Then
+C
+      If((IndAux(I).Eq.1).And.(IndAux(J).Eq.1)
+     $ .And.(Abs(OccAlph(I)-OccAlph(J))/OccAlph(I).Lt.ThrSelAct)
+     $ ) Then
+C
+      Write(6,'(2X,"Discarding nearly degenerate pair ",2I4)')I,J
+C
+      Else
+C
+C     If IFlCore=0 do not include core (inactive) orbitals
+      If((IFlCore.Eq.1).Or.
+     $ (IFlCore.Eq.0.And.OccAlph(I).Ne.One.And.OccAlph(J).Ne.One)) Then
+C
+      If(Abs(OccAlph(i)+OccAlph(j)-Two).Gt.1.D-10.And.
+     $   Abs(OccAlph(i)+OccAlph(j)).Gt.ThrQVirt) Then
+      Ind=Ind+1
+      IndX(Ind)=Ind
+      IndN(1,Ind)=I
+      IndN(2,Ind)=J
+      IPair(I,J)=1
+      IPair(J,I)=1
+      EndIf
+C
+      EndIf
+C
+      EndIf
+C
+c     If(IndAux(I)+IndAux(J).Ne.0 ...
+      EndIf
+C
+      EndDo
+      EndDo
+C
+      NDimX=Ind 
+C
+C     CONSTRUCT ONE-ELECTRON PART OF THE AC ALPHA-HAMILTONIAN
+C
+      Do I=1,NInte1
+      H1Alph(I)=XOne(I)
+      EndDo
+C
+      IJ=0
+      Do I=1,NBasis
+      Do J=1,I
+      IJ=IJ+1
+C
+      If(IGemCAS(I).Ne.IGemCAS(J)) Then
+C
+      H1Alph(IJ)=ACAlpha*H1Alph(IJ)
+C
+      Else
+C
+      Aux=Zero
+C
+      Do IT=1,NBasis
+      If(IGemCAS(IT).Ne.IGemCAS(I))
+     $ Aux=Aux+Occ(IT)*
+     $ (Two*TwoEl(NAddr3(IT,IT,I,J))-TwoEl(NAddr3(IT,I,IT,J)))
+      EndDo
+C
+      Aux=(One-ACAlpha)*Aux
+      H1Alph(IJ)=H1Alph(IJ)+Aux
+C
+      EndIf
+C
+      EndDo
+      EndDo
+C
+C     CONSTRUCT TWO-ELECTRON PART OF THE AC ALPHA-HAMILTONIAN
+C     AND TRANSFORM TO NO(Alpha) REPRESENTATION
+C
+      NAdd=Zero
+      IJ=0
+      Do I=1,NBasis
+      Do J=1,I
+      IJ=IJ+1
+      KL=0
+      Do K=1,NBasis
+      Do L=1,K
+      KL=KL+1
+C
+      If(IJ.Ge.KL) Then
+      NAdd=NAdd+1
+C
+      If(.Not.(
+     $IGemCAS(I).Eq.IGemCAS(J).And.IGemCAS(J).Eq.IGemCAS(K).And.
+     $ IGemCAS(K).Eq.IGemCAS(L)))
+     $ TwoEl(NAdd)=ACAlpha*TwoEl(NAdd)
+C
+      EndIf
+C
+      EndDo
+      EndDo
+      EndDo
+      EndDo
+C
+      Call TwoNO1(TwoEl,UReAlph,NBasis,NInte2) 
+C
+      Return
+      End 
+
+*Deck ReadRDMs
+      Subroutine ReadRDMs(Occ,URe,NBasis,NGem,NInte1,IGrid)
+C
+      Implicit Real*8 (A-H,O-Z)
+C
+      Parameter(Zero=0.0D0,Half=0.50D0,One=1.0D0,Two=2.0D0,Four=4.0D0)
+C
+      Include 'commons.inc'
+C
+      Dimension URe(Nbasis,NBasis),Occ(NBasis),UAux(NBasis*NBasis),
+     $ UCASNO(Nbasis,NBasis)
+C
+C     LOCAL ARRAYS
+C
+      Real*8, Allocatable :: RDM2(:)
+      Dimension Gamma(NInte1),Work(NBasis),PC(NBasis),
+     $ AUXM(NBasis,NBasis),AUXM1(NBasis,NBasis)
+      Character*15 FName,StrNum
+C
+      UAux(1:NBasis*NBasis)=Zero
+      URe(1:NBasis,1:NBasis)=Zero
+      UCASNO(1:NBasis,1:NBasis)=Zero
+      Occ(1:NBasis)=Zero
+      PC(1:NBasis)=Zero
+      Gamma(1:NInte1)=Zero
+C
+C     FOR A GIVEN ALPHA READ IN 1-RDM AND DIAGONALIZE IT
+C
+      If(IGrid-1.Lt.10) L=1
+      If(IGrid-1.Ge.10) L=2
+      Write(StrNum,*)IGrid-1
+C
+      FName(1:7+L)="G1_"//StrNum(13-L:12)//".bin"
+      write(*,*)'G1 file name ',FName(1:7+L)
+      Open(10,File=FName(1:7+L),form='unformatted', access='stream',
+c       Open(10,File='G1_0.bin',form='unformatted', access='stream',  
+     $ Status='Old')
+      Read(10)i,j,k
+      ICount=0
+      IJ=0
+      Do I=1,NBasis
+      Do J=1,I
+      IJ=IJ+1
+      Read(10,End=61) X
+      Ind=I*(I-1)/2+J
+      Gamma(Ind)=X/Two 
+      ICount=ICount+1
+      EndDo
+      EndDo
+   61 Close(10)
+      Call CpySym(AUXM,Gamma,NBasis)
+      Call Diag8(AUXM,NBasis,NBasis,PC,Work)
+      Call SortOcc(PC,AUXM,NBasis)
+C
+      Sum=Zero
+      NAc=0
+      Do I=1,NBasis
+      Sum=Sum+PC(I)
+      If(PC(I).Gt.Zero) NAc=NAc+1
+      EndDo
+C
+      NInAc=NELE-Sum+1.D-1
+      Do I=1,NInAc+NAc
+      If(I.Le.NInAc) Then
+      Occ(I)=One
+      Else
+      Occ(I)=PC(I-NInAc)
+      EndIf
+      EndDo
+C
+      If(NInAc.Eq.0) Then
+      NGem=2
+      IGem(1:NInAc+NAc)=1
+      IGem(NInAc+NAc+1:NBasis)=2
+      Else
+      NGem=3
+      IGem(1:NInAc)=1
+      IGem(NInAc+1:NInAc+NAc)=2
+      IGem(NInAc+NAc+1:NBasis)=3
+      EndIf
+C
+      NAcCAS=NAc
+      NInAcCAS=NInAc
+C
+      Write(6,'(2X,"No of DMRG inactive and active orbitals: ",2I4)')
+     $ NInAcCAS,NAcCAS
+C
+      Write(6,'(2X,"DMRG",3X,"Occupancy",4X,"Gem")')
+      Sum=Zero
+      Do I=1,NBasis
+      Write(6,'(X,I3,E16.6,I6)') I,Occ(I),IGem(I)
+      Sum=Sum+Occ(I)
+      EndDo
+      Write(6,'(2X,"Sum of Occupancies: ",F5.2)') Sum
+C
+      NAct=NAcCAS
+      INActive=NInAcCAS
+      NOccup=INActive+NAct
+C
+C     COPY AUXM TO URe AND OFF SET BY NInAc
+      Do I=1,NBasis
+      IIAct=I-NInAc
+      Do J=1,NBasis
+      If(I.Eq.J) URe(I,J)=One
+      JJAct=J-NInAc
+      If(IIAct.Gt.0.And.IIAct.Le.NAc.And.JJAct.Gt.0.And.JJAct.Le.NAc)
+     $ Then
+      URe(I,J)=AUXM(IIAct,JJAct)
+      EndIf
+      EndDo
+      EndDo
+C
+      NRDM2 = NBasis**2*(NBasis**2+1)/2
+      Allocate (RDM2(NRDM2))
+      RDM2(1:NRDM2)=Zero
+C
+      FName(1:7+L)="G2_"//StrNum(13-L:12)//".bin"
+      write(*,*)'G2 file name ',FName(1:7+L)
+      Open(10,File=FName,form='unformatted',access='stream',
+c      Open(10,File='G2_0.bin',form='unformatted',access='stream',
+     $ Status='Old')
+      Read(10)I,J,K
+C
+      Do K1=1,NBasis
+      Do J1=1,NBasis
+      Do L1=1,NBasis
+      Do I1=1,NBasis
+C
+      Read(10) X
+C
+      I=I1+NInAc
+      J=J1+NInAc
+      K=K1+NInAc
+      L=L1+NInAc
+      RDM2(NAddrRDM(L,K,I,J,NBasis))=X
+      RDM2(NAddrRDM(K,L,J,I,NBasis))=X
+C
+      EndDo
+      EndDo
+      EndDo
+      EndDo
+C
+      Close(10)
+C
+      Do I=1,NBasis
+      Do J=1,NBasis
+      UAux((J-1)*NBasis+I)=AUXM(I,J)
+      EndDo
+      EndDo
+C
+      Call TrRDM2(RDM2,UAux,NBasis,NRDM2)
+C     SAVE THE ACTIVE PART IN rdm2.dat
+      Open(10,File='rdm2.dat')
+      Do I=NInAc+1,NInAc+NAc
+      IIAct=I-NInAc
+      Do J=NInAc+1,NInAc+NAc
+      JJAct=J-NInAc
+      IJ=(I-1)*NBasis+J
+      Do K=NInAc+1,NInAc+NAc
+      KKAct=K-NInAc
+      Do L=NInAc+1,NInAc+NAc
+      LLAct=L-NInAc
+      KL=(K-1)*NBasis+L
+      If(IJ.Ge.KL) Write(10,'(4I4,F19.12)')
+     $ KKAct,IIAct,LLAct,JJAct,Two*RDM2(NAddrRDM(I,J,K,L,NBasis))
+      EndDo
+      EndDo
+      EndDo
+      EndDo
+      Close(10)
+      Deallocate(RDM2)
+C
+C
+C     CONSTRUCT A TRANSFORMATION MATRIX FROM NO-CAS to THE NEW ALPHA-ORBITALS
+C
+C     TRANSFORMATION MATRIX FROM CAS TO NO_CAS
+C
+      open(10,file='ure_casno.dat')
+      read(10,*)UCASNO
+      close(10)
+C
+      Do I=1,NBasis
+      Do J=1,NBasis
+      UAux((J-1)*NBasis+I)=URe(I,J)
+      EndDo
+      EndDo 
+C
+      Do I=1,NBasis
+      Do J=1,NBasis
+      URe(I,J)=Zero
+      Do K=1,NBasis
+      URe(I,J)=URe(I,J)+UAux((K-1)*NBasis+I)*UCASNO(J,K)
+      EndDo
+      EndDo
+      EndDo
+C
+      Return
+      End
+
 *Deck OptTwoAlpha
       Subroutine OptTwoAlpha(ETotAlph,ENuc,Occ,XOne,TwoEl,
      $ H1Alph,UReAlph,OccAlph,CIAlph,
@@ -395,7 +888,7 @@ C     OPTIMIZATION ALGORITHM FOR TWO-ELECTRON SYSTEMS
 C     THE WHOLE DENISTY MATRIX IS FOUND IN ONE STEP
 C
 C     ON EXIT TwoEl INCLUDES TWO-ELECTRON INTEGRALS WITH ALPHA 
-C     TRANSFORMED BY UReAlp
+C     TRANSFORMED BY UReAlph
 C
       Implicit Real*8 (A-H,O-Z)
 C
@@ -952,7 +1445,7 @@ C
       Subroutine ACEnePINO(ECorr,Delta,
      $ EigVecR,Eig,TwoNO,Occ,
      $ HNO,CIAlph,UReAlph,
-     $ IndN,NBasis,NInte1,NInte2,NDimX,NDimN)
+     $ IndN,NBasis,NInte1,NInte2,NDimX,NDimN,IF12)
 C
       Implicit Real*8 (A-H,O-Z)
 C    
@@ -975,7 +1468,8 @@ C
       Dimension OccAlph(NBasis),GammaAlph(NInte1),
      $ EigVecTr(2*(NDimX+NDimN)*2*(NDimX+NDimN))
 C
-      NI=2*(NDimX+NDimN)
+      If(IF12.Eq.1) NI=2*(NDimX+NDimN)
+      If(IF12.Eq.2) NI=NDimX+NDimN
       EigVecTr(1:NI*NI)=Zero 
 C
       Do I=1,NBasis
@@ -1263,7 +1757,6 @@ c      If(EExcit(K).Lt.Zero) Then
       EndDo
 C
       Aux=Two*SumY
-c herer!!!
       If(IR.Eq.IS.And.IP.Eq.IQ) Aux=Aux+
      $ (-Occ(IP)*(One-Occ(IS))-Occ(IS)*(One-Occ(IP)) )
       ECorr=ECorr+Aux*TwoNO(NAddr3(IP,IR,IQ,IS))

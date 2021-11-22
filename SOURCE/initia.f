@@ -695,6 +695,12 @@ C
       If(IUNIT.Eq.1) Then
       Write(6,'(/,X,"URe is a unit matrix up to ",E16.6)') ERR
       Write(6,'(X,"do not transform integrals")') 
+      Do I=1,NBasis
+      Do J=1,NBasis
+      If(I.Eq.J) URe(I,J)=One
+      If(I.Ne.J) URe(I,J)=Zero
+      EndDo
+      EndDo
       EndIf
 C
       If(IUNIT.Eq.0) Then
@@ -1002,6 +1008,12 @@ c     $Two*RDM2(NAddrRDM(I,J,K,L,NBasis))
 
 c herer!!! 
   888 Continue
+C
+C     dump URe, it may be usefull
+C
+      open(10,file='ure_casno.dat')
+      write(10,*)URe
+      close(10)  
 C
 C     INTEGRALS ARE TRANSFORMED SO URe IS SET AS A UNIT MATRIX 
 C

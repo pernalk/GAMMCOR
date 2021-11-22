@@ -84,15 +84,15 @@ C     **************************************************************************
 C     what follows is AC calculation with omega frequency integration by iteration C(omega)
 C     available only together with cholesky decomposition
 C     *************************************************************************************
-      If (ICholesky.Eq.0) Then
-      Write(6,'(" ACFREQ is only available with Cholesky .true.")')
-      Stop
-      EndIf
+c      If (ICholesky.Eq.0) Then
+c      Write(6,'(" ACFREQ is only available with Cholesky .true.")')
+c      Stop
+c      EndIf
 C
 C     Find the projector PMat
 C
-      write(*,*)ndim,ndimx
-      Call Project_DChol(PMat,IndN,NBasis,NDimX)
+      If(ICholesky.Eq.1.And.ITwoEl.eq.3) 
+     $ Call Project_DChol(PMat,IndN,NBasis,NDimX)
 C
 C     GENERATE ABSCISSAS AND WEIGHTS FOR GAUSSIAN-LEGENDRE QUADRATURE
 C
@@ -103,6 +103,13 @@ C
       ECorr=Zero
 C
       If(ITwoEl.eq.3) Then
+C
+      If (ICholesky.Eq.0) Then
+      Write(6,
+     $ '(" ACFREQ with FOFO is only available with Cholesky .true.")')
+      Stop
+      EndIf
+C
       ACAlpha=Zero
 C
 C      Call WInteg_FOFO(ECorrA,XOne,URe,Occ,
