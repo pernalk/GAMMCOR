@@ -798,7 +798,7 @@ C
 C
       FName(1:7+L)="G2_"//StrNum(13-L:12)//".bin"
       write(*,*)'G2 file name ',FName(1:7+L)
-      Open(10,File=FName,form='unformatted',access='stream',
+      Open(10,File=FName(1:7+L),form='unformatted',access='stream',
 c      Open(10,File='G2_0.bin',form='unformatted',access='stream',
      $ Status='Old')
       Read(10)I,J,K
