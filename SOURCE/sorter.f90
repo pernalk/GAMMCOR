@@ -404,11 +404,11 @@ case(3) ! Eugene
 
 case(4) ! Libor
 
-   open(newunit=iunit,file=intfile,status='OLD',&
-        access='STREAM',form='UNFORMATTED')
-   read(iunit)idx_p, idx_q, idx_r
-
    do ipass=1,npass
+
+      open(newunit=iunit,file=intfile,status='OLD',&
+           access='STREAM',form='UNFORMATTED')
+      read(iunit)idx_p, idx_q, idx_r
 
       call srt%iniPass(ipass)
 
@@ -444,12 +444,10 @@ case(4) ! Libor
       endif
 
       call srt%endPass
-      rewind(iunit)
-      read(iunit)
+
+      close(iunit)
 
    enddo
-
-   close(iunit)
 
 case default
 
