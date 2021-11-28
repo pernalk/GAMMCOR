@@ -901,6 +901,7 @@ call iStatsA%print()
 write(lout,'(1x,a)') 'C(omega): Monomer B'
 call iStatsB%print()
 
+SAPT%e2disp = -8d0/Pi*e2d
 e2d = -8d0/Pi*e2d*1d3
 call print_en('E2disp(Cmat)',e2d,.false.)
 

@@ -120,7 +120,7 @@ type CalculationBlock
       integer :: SaptLevel = SAPTLEVEL2
       integer :: vdWCoef   = 0
       integer :: RedVirt   = FLAG_REDVIRT
-      integer :: MemVal = 2, MemType = 3
+      integer :: MemVal = 2, MemType = 3 ! default: use 2 GB for 3-ind_tran (Cholesky)
       logical :: Restart    = FLAG_RESTART
       logical :: PostCAS    = FLAG_POSTCAS
       integer :: IPrint     = 0

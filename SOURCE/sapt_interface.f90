@@ -214,7 +214,7 @@ double precision :: Tcpu,Twall
 
  if(Flags%ICholesky==1) then
     ! transform Cholesky Vecs to NO
-    call chol_sapt_NOTransf(SAPT,SAPT%monA,SAPT%monB,CholeskyVecs,NBasis)
+    call chol_sapt_NOTransf(SAPT,SAPT%monA,SAPT%monB,CholeskyVecs,NBasis,Flags%MemVal,Flags%MemType)
     call clock('chol_NOTransf',Tcpu,Twall)
  endif
 
@@ -2183,7 +2183,7 @@ double precision :: Vnn
 
 end function calc_vnn
 
-subroutine chol_sapt_NOTransf(SAPT,A,B,CholeskyVecs,NBasis)
+subroutine chol_sapt_NOTransf(SAPT,A,B,CholeskyVecs,NBasis,MemVal,MemType)
 !
 ! transform Choleksy Vecs from AO to NO
 ! for all 2-index vecs needed in SAPT:
@@ -2199,8 +2199,10 @@ type(SaptData)   :: SAPT
 type(SystemBlock)   :: A, B
 type(TCholeskyVecs) :: CholeskyVecs
 integer,intent(in)  :: NBasis
+integer,intent(in)  :: MemVal,MemType
 
 integer :: NCholesky
+integer :: MaxBufferDimMB
 integer :: dimOA,dimOB,dimVA,dimVB, &
            nOVA,nOVB
 integer          :: i,j,ip,iq,ipq
@@ -2210,6 +2212,14 @@ double precision,allocatable :: tmp(:,:)
 double precision :: Tcpu,Twall
 
 call clock('START',Tcpu,Twall)
+
+ ! set buffer size
+ if(MemType == 2) then       !MB
+    MaxBufferDimMB = MemVal
+ elseif(MemType == 3) then   !GB
+    MaxBufferDimMB = MemVal * 1024_8
+ endif
+ write(lout,'(1x,a,i5,a)') 'Using ',MaxBufferDimMB,' MB for 3-indx Cholesky transformation'
 
  NCholesky = CholeskyVecs%NCholesky
  dimOA = A%num0+A%num1
@@ -2258,27 +2268,50 @@ call clock('START',Tcpu,Twall)
  allocate(A%OO(NCholesky,dimOA**2),&
           B%OO(NCholesky,dimOB**2) )
  ! (OO|AA)
- call chol_MOTransf(A%OO,CholeskyVecs,&
+ !call chol_MOTransf(A%OO,CholeskyVecs,&
+ !                  A%CMO,1,dimOA,&
+ !                  A%CMO,1,dimOA)
+ !                  B%CMO,1,NBasis)
+ !
+ call chol_MOTransf_TwoStep(A%OO,CholeskyVecs,&
                     A%CMO,1,dimOA,&
-                    A%CMO,1,dimOA)
+                    A%CMO,1,dimOA,&
+                    MaxBufferDimMB)
 call clock('AOO',Tcpu,Twall)
  ! (OO|BB)
- call chol_MOTransf(B%OO,CholeskyVecs,&
+ !call chol_MOTransf(B%OO,CholeskyVecs,&
+ !                   B%CMO,1,dimOB,&
+ !                   B%CMO,1,dimOB)
+ !                   B%CMO,1,NBasis)
+ !
+ call chol_MOTransf_TwoStep(B%OO,CholeskyVecs,&
                     B%CMO,1,dimOB,&
-                    B%CMO,1,dimOB)
+                    B%CMO,1,dimOB,&
+                    MaxBufferDimMB)
 call clock('BOO',Tcpu,Twall)
 
  allocate(A%FF(NCholesky,NBasis**2),&
           B%FF(NCholesky,NBasis**2) )
  ! (FF|AA)
- call chol_MOTransf(A%FF,CholeskyVecs,&
+ !call chol_MOTransf(A%FF,CholeskyVecs,&
+ !                   A%CMO,1,NBasis,&
+ !                   A%CMO,1,NBasis)
+ !                   B%CMO,1,NBasis)
+ !
+ call chol_MOTransf_TwoStep(A%FF,CholeskyVecs,&
                     A%CMO,1,NBasis,&
-                    A%CMO,1,NBasis)
+                    A%CMO,1,NBasis,&
+                    MaxBufferDimMB)
  call clock('AFF',Tcpu,Twall)
  ! (FF|BB)
- call chol_MOTransf(B%FF,CholeskyVecs,&
+ !call chol_MOTransf(B%FF,CholeskyVecs,&
+ !                   B%CMO,1,NBasis,&
+ !                   B%CMO,1,NBasis)
+ !
+ call chol_MOTransf_TwoStep(B%FF,CholeskyVecs,&
                     B%CMO,1,NBasis,&
-                    B%CMO,1,NBasis)
+                    B%CMO,1,NBasis,&
+                    MaxBufferDimMB)
  call clock('BFF',Tcpu,Twall)
 
  ! DChol(NCholeksy,NDimX)
@@ -2316,13 +2349,25 @@ call clock('BOO',Tcpu,Twall)
  allocate(A%FFAB(NCholesky,NBasis**2),&
           B%FFBA(NCholesky,NBasis**2) )
  ! (FF|AB)
- call chol_MOTransf(A%FFAB,CholeskyVecs,&
+ !call chol_MOTransf(A%FFAB,CholeskyVecs,&
+ !                   A%CMO,1,NBasis,&
+ !                   B%CMO,1,NBasis)
+ !                   B%CMO,1,NBasis)
+ !
+ call chol_MOTransf_TwoStep(A%FFAB,CholeskyVecs,&
                     A%CMO,1,NBasis,&
-                    B%CMO,1,NBasis)
- ! (FF|BA)
- call chol_MOTransf(B%FFBA,CholeskyVecs,&
                     B%CMO,1,NBasis,&
-                    A%CMO,1,NBasis)
+                    MaxBufferDimMB)
+ ! (FF|BA)
+ !call chol_MOTransf(B%FFBA,CholeskyVecs,&
+ !                   B%CMO,1,NBasis,&
+ !                   A%CMO,1,NBasis)
+ !                   B%CMO,1,NBasis)
+ !
+ call chol_MOTransf_TwoStep(B%FFBA,CholeskyVecs,&
+                    B%CMO,1,NBasis,&
+                    A%CMO,1,NBasis,&
+                    MaxBufferDimMB)
 
  !allocate(A%FO(NCholesky,NBasis*dimOA),&
  !         B%FO(NCholesky,NBasis*dimOA))

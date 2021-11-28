@@ -65,6 +65,25 @@ module Cholesky
 
 contains
 
+      subroutine chol_av_x(w, a, lda, v, m, n, alpha, beta)
+            !
+            ! Perform matrix-vector multiplication w = alpha * Av + beta * w
+            !
+            real(F64), dimension(*), intent(inout)   :: w
+            real(F64), dimension(lda, *), intent(in) :: a
+            integer, intent(in)                      :: lda
+            real(F64), dimension(*), intent(in)      :: v
+            integer, intent(in)                      :: m
+            integer, intent(in)                      :: n
+            real(F64), intent(in)                    :: alpha
+            real(F64), intent(in)                    :: beta
+
+            external :: dgemv
+            
+            call dgemv("N", m, n, alpha, a, lda, v, 1, beta, w, 1)
+      end subroutine chol_av_x
+      
+
       subroutine chol_vwT_x(a, lda, v, w, m, n, alpha)
             !
             ! A <- alpha * v*w**T + A
@@ -232,6 +251,165 @@ contains
                   end do
             end associate
       end subroutine chol_MOTransf
+
+
+      subroutine chol_MOTransf_TwoStep(S, Vecs, CA, a0, a1, CB, b0, b1, MaxBufferDimMB)
+            !
+            ! R(k, pq) -> R(k, ab) for a=a0...a1, b=b0...b1, k=1...NCholesky
+            !
+            ! MaxBufferDimMB Maximum buffer size in megabytes
+            !
+            real(F64), dimension(:, :), intent(out) :: S
+            type(TCholeskyVecs), intent(in)         :: Vecs
+            real(F64), dimension(:, :), intent(in)  :: CA
+            integer, intent(in)                     :: a0, a1
+            real(F64), dimension(:, :), intent(in)  :: CB
+            integer, intent(in)                     :: b0, b1
+            integer, intent(in)                     :: MaxBufferDimMB
+
+            integer(I64) :: MaxBufferDim
+            
+            associate ( &
+                  NAO => Vecs%NAO, &
+                  NCholesky => Vecs%NCholesky, &
+                  R => Vecs%R)
+
+                  MaxBufferDim = (MaxBufferDimMB*1024*1024)/(storage_size(S)/8)
+                  call chol_MOTransf_TwoStep_x(S, R, CA, CB, a0, a1, b0, b1, &
+                        NAO, NCholesky, MaxBufferDim)
+            end associate
+      end subroutine chol_MOTransf_TwoStep
+
+      
+      subroutine chol_MOTransf_TwoStep_x(Rab, Rpq, CA, CB, a0, a1, b0, b1, NAO, NCholesky, MaxBufferDim)
+            real(F64), dimension(:, :), intent(out)                    :: Rab
+            real(F64), dimension(:, :), intent(in)                     :: Rpq
+            real(F64), dimension(:, :), intent(in)                     :: CA
+            real(F64), dimension(:, :), intent(in)                     :: CB
+            integer, intent(in)                                        :: a0, a1
+            integer, intent(in)                                        :: b0, b1
+            integer, intent(in)                                        :: NAO
+            integer, intent(in)                                        :: NCholesky
+            integer(I64), intent(in)                                   :: MaxBufferDim
+
+            integer :: p, q, pq, pq0, pq1
+            integer :: NA, NB
+            integer :: MaxNk, NPasses, Nk
+            integer :: k, a0k, a1k
+            integer(I64) :: NW
+            real(F64), dimension(:, :), allocatable :: CAT
+            real(F64), dimension(:), allocatable :: W
+            type(TClock) :: timer, timer_total
+
+            NA = a1 - a0 + 1
+            NB = b1 - b0 + 1
+            allocate(CAT(NA, NAO))
+            CAT = transpose(CA(:, a0:a1))
+            MaxNk = min(NA, int(MaxBufferDim/(NCholesky*NAO)))
+            if (.not. MaxNk > 0) then
+                  call msg("Buffer size too small for Rpq->Rab")
+                  error stop
+            end if
+            NPasses = NA / MaxNk
+            if (modulo(NA, MaxNk) > 0) then
+                  NPasses = NPasses + 1
+            end if
+            allocate(W(NCholesky*MaxNk*NAO))
+
+            call msg("Two step transformation of Cholesky vectors: R(k,pq)->R(k,ab)")
+            call msg("Will perform " // str(NPasses) // " passes over R(k,pq)")
+            call clock_start(timer_total)
+            Rab = ZERO
+            do k = 1, NPasses
+                  call clock_start(timer)
+                  ! ------------------------------------------------
+                  ! First index transformation Rpq -> Raq
+                  ! ------------------------------------------------
+                  a0k = (k - 1) * MaxNk + a0
+                  a1k = min(k * MaxNk, a1)
+                  Nk = a1k - a0k + 1
+                  call chol_MOTransf_Step1(W, Nk, NAO, CAT, a0k, a1k, a0, a1, Rpq, NCholesky)
+                  ! ------------------------------------------------
+                  ! Second index transformation Raq -> Rab
+                  ! ------------------------------------------------
+                  call chol_MOTransf_Step2(Rab, W, CB, a0k, a1k, Nk, a0, a1, b0, b1, NCholesky, NAO)
+                  call msg("Completed pass " // str(k) // " in " // str(clock_readwall(timer),d=1) // " seconds")
+            end do
+            call msg("Completed transformation in " // str(clock_readwall(timer_total),d=1) // " seconds")
+      end subroutine chol_MOTransf_TwoStep_x
+
+
+      subroutine chol_MOTransf_Step1(W, Nk, NAO, CAT, a0k, a1k, a0, a1, Rpq, NCholesky)
+            real(F64), dimension(NCholesky, Nk, NAO), intent(out) :: W
+            integer, intent(in)                                   :: Nk
+            integer, intent(in)                                   :: NAO
+            integer, intent(in)                                   :: a0, a1
+            real(F64), dimension(a0:a1, 1:NAO), intent(in)        :: CAT
+            integer, intent(in)                                   :: a0k, a1k
+            real(F64), dimension(:, :), intent(in)                :: Rpq
+            integer, intent(in)                                   :: NCholesky
+
+            integer :: pq
+            integer :: p, q
+            
+            W = ZERO
+            pq = 0
+            do q = 1, NAO
+                  do p = 1, q
+                        pq = pq + 1
+                        !
+                        ! W(:, :, p) <- W(:, :, p) + R(1:NVecs, pq) * CA(q, b0k:b1k)**T
+                        ! W(:, :, q) <- W(:, :, q) + R(1:NVecs, pq) * CA(p, b0k:b1k)**T
+                        !
+                        if (p /= q) then
+                              call chol_vwT_x(W(:, :, p), NCholesky, Rpq(:, pq), CAT(a0k:a1k, q), NCholesky, Nk, ONE)
+                              call chol_vwT_x(W(:, :, q), NCholesky, Rpq(:, pq), CAT(a0k:a1k, p), NCholesky, Nk, ONE)
+                        else
+                              call chol_vwT_x(W(:, :, p), NCholesky, Rpq(:, pq), CAT(a0k:a1k, q), NCholesky, Nk, ONE)
+                        end if
+                  end do
+            end do
+      end subroutine chol_MOTransf_Step1
+
+
+      subroutine chol_MOTransf_Step2(Rab, W, CB, a0k, a1k, Nk, a0, a1, b0, b1, NCholesky, NAO)
+            integer, intent(in)                                           :: a0, a1
+            integer, intent(in)                                           :: b0, b1
+            real(F64), dimension(NCholesky, a0:a1, b0:b1), intent(inout)  :: Rab
+            real(F64), dimension(NCholesky, Nk, NAO), intent(in)          :: W
+            real(F64), dimension(:, :), intent(in)                        :: CB
+            integer, intent(in)                                           :: a0k, a1k
+            integer, intent(in)                                           :: Nk
+            integer, intent(in)                                           :: NCholesky
+            integer, intent(in)                                           :: NAO
+
+            integer :: m, n, ldW, b
+            !
+            ! Transform the second AO index by a series of vector-matrix multiplications
+            ! --------------------------------------------------------------------------
+            !
+            ! Explicit loop:
+            ! do b = b0, b1
+            !       do p = 1, NAO
+            !             Rab(:, a0k:a1k, b) = Rab(:, a0k:a1k, b) + W(:, :, p) * CB(p, b)
+            !       end do
+            ! end do
+            !
+            ! Call a linear algebra subroutine for each of individual
+            ! vector-matrix multiplications
+            !
+            ! Rab(:, a0k:a1k, b) <- Rab(:, a0k:a1k, b) + Sum(p=1...NAO) W(:, :, p) CB(p, b)
+            !
+            ! Note that the above cannot be done as a single matrix multiplication due to
+            ! the non-contiguous memory layout of Rab.
+            !
+            m = NCholesky * Nk
+            n = NAO
+            ldW = NCholesky * Nk
+            do b = b0, b1
+                  call chol_av_x(Rab(:, a0k:a1k, b), W, ldW, CB(:, b), m, n, ONE, ONE)
+            end do
+      end subroutine chol_MOTransf_Step2
       
 
       subroutine chol_Significant_Sorted(Significant, SignificantDim, NSignificant, D, TraceError, &
@@ -802,5 +980,4 @@ contains
                   call AOInts%close()
             end associate
       end subroutine chol_CoulombMatrix
-
 end module Cholesky

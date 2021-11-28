@@ -276,9 +276,9 @@ integer :: i
     if(.not.SAPT%CAlpha) then
       ! Adam's test
       !call e2disp_Cmat_Chol(Flags,SAPT%monA,SAPT%monB,SAPT)
-      call e2disp_Cmat_Chol_diag(Flags,SAPT%monA,SAPT%monB,SAPT)
-      !call e2disp_Cmat_Chol_block(Flags,SAPT%monA,SAPT%monB,SAPT)
-      call e2disp_Cmat_Chol_proj(Flags,SAPT%monA,SAPT%monB,SAPT)
+      !call e2disp_Cmat_Chol_diag(Flags,SAPT%monA,SAPT%monB,SAPT)
+      call e2disp_Cmat_Chol_block(Flags,SAPT%monA,SAPT%monB,SAPT)
+      !call e2disp_Cmat_Chol_proj(Flags,SAPT%monA,SAPT%monB,SAPT)
     else if(SAPT%CAlpha) then
       call e2disp_CAlphaTilde_block(Flags,SAPT%monA,SAPT%monB,SAPT)
       !call e2disp_CAlphaTilde_full(Flags,SAPT%monA,SAPT%monB,SAPT)
