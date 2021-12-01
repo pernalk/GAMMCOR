@@ -585,7 +585,10 @@ double precision,allocatable :: work1(:)
 end subroutine e1exchs2
 
 subroutine e1exch_NaNb(Flags,A,B,SAPT)
-! E1exch(S2): Eq () in SAPT(MC) paper
+!
+! E1exch(S2): Eq (9) in SAPT(MC) paper
+! doi: 10.1021/acs.jctc.1c00344
+!
 implicit none
 
 type(FlagsData)   :: Flags
@@ -3144,8 +3147,16 @@ double precision,parameter :: SmallE = 1.D-3
     else
 
        ! make s_ij
-       call make_sij_Y(sij,tmp1,A%Occ,B%Occ,A%EigY,A%EigX,B%EigY,B%EigX,&
-                       A%num0,B%num0,dimOA,dimOB,nOVB,A%IndN,B%IndN,A%NDimX,B%NDimX,NBas)
+       if(Flags%ICholesky==0) then
+          call make_sij_Y(sij,tmp1,A%Occ,B%Occ,A%EigY,A%EigX,B%EigY,B%EigX,&
+                          A%num0,B%num0,dimOA,dimOB,nOVB,A%IndN,B%IndN, &
+                          A%NDimX,B%NDimX,NBas)
+       else if(Flags%ICholesky==1) then
+          call make_sij_Y_Chol(sij,tmp1,A%Occ,B%Occ,A%EigY,A%EigX,B%EigY,B%EigX,&
+                          A%DChol,B%DChol, &
+                          A%num0,B%num0,dimOA,dimOB,nOVB,A%IndN,B%IndN, &
+                          A%NDimX,B%NDimX,A%NChol,NBas)
+       endif
 
     endif
 

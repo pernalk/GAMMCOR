@@ -61,7 +61,7 @@ double precision,external  :: trace
 
 end subroutine e1elst
 
-subroutine e2ind_hf_icphf(Flags,A,B,SAPT)
+subroutine e2ind_icerpa(Flags,A,B,SAPT)
 implicit none
 
 type(FlagsData) :: Flags
@@ -82,7 +82,7 @@ double precision :: e2ba,e2ab,e2ic
  write(LOUT,'(1x,a,f16.8)') 'E2ind       = ', e2ic*1000d0 
  SAPT%e2ind = e2ic
 
-end subroutine e2ind_hf_icphf
+end subroutine e2ind_icerpa
 
 subroutine e2ind_resp(Flags,A,B,SAPT)
 implicit none

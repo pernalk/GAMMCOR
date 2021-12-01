@@ -12,6 +12,7 @@ OBJ = $(O)mainp.o $(O)initia.o $(O)dmscf.o $(O)misc.o $(O)optocc.o \
       $(O)xcfun.o \
       $(O)gridmolpro.o \
       $(O)sorter.o $(O)tran.o $(O)systemdef.o \
+      $(O)sorter_Cholesky.o \
       $(O)types.o $(O)inputfill.o $(O)abmats.o $(O)abfofo.o $(O)ab0fofo.o \
       $(O)sapt_main.o $(O)sapt_exch.o $(O)sapt_pol.o $(O)sapt_utils.o \
       $(O)sapt_CD_pol.o $(O)sapt_response.o $(O)sapt_interface.o \
@@ -20,7 +21,7 @@ OBJ = $(O)mainp.o $(O)initia.o $(O)dmscf.o $(O)misc.o $(O)optocc.o \
       $(O)timing.o \
       $(O)srlrdynamic.o $(O)erpa.o $(O)interpa.o  $(O)exact2el.o $(O)optapsg.o $(O)newton.o $(O)acfd.o $(O)accas.o \
       $(O)caspidft.o $(O)ac_exact_2el.o $(O)vv10.o \
-      $(O)arithmetic.o $(O)io.o $(O)clock.o $(O)string.o $(O)sort.o $(O)display.o $(O)Cholesky.o \
+      $(O)arithmetic.o $(O)io.o $(O)clock.o $(O)string.o $(O)sort.o $(O)display.o $(O)Cholesky.o $(O)Cholesky_old.o $(O)tran_Chol.o \
 	   $(O)iter_stats.o $(O)C_integrator.o $(O)iter_algorithm.o $(O)iter_algorithm_diis.o $(O)iter_algorithm_damping.o \
       $(O)lambda_calculator.o $(O)lambda_calculator_diag.o $(O)lambda_calculator_block.o $(O)lambda_calculator_projector.o \
       $(O)ac_iter.o $(O)ac_fofo.o \
@@ -106,6 +107,8 @@ $(O)systemdef.o : $(S)systemdef.f90 $(O)types.o
 	$(FCC) $(FFLAGS)  -c $(S)systemdef.f90 -o $(O)systemdef.o
 $(O)sorter.o : $(S)sorter.f90 $(O)types.o
 	$(FCC) $(FFLAGS)  -c $(S)sorter.f90 -o $(O)sorter.o
+$(O)sorter_Cholesky.o : $(S)sorter_Cholesky.f90 $(O)types.o
+	$(FCC) $(FFLAGS)  -c $(S)sorter_Cholesky.f90 -o $(O)sorter_Cholesky.o
 $(O)tran.o : $(S)tran.f90 $(O)types.o $(O)sorter.o
 	$(FCC) $(FFLAGS)  -c $(S)tran.f90 -o $(O)tran.o
 $(O)display.o : $(S)display.f90
@@ -120,8 +123,13 @@ $(O)string.o : $(S)string.f90 $(O)arithmetic.o
 	$(FCC) $(FFLAGS)  -c $(S)string.f90 -o $(O)string.o
 $(O)io.o : $(S)io.f90 $(O)arithmetic.o
 	$(FCC) $(FFLAGS)  -c $(S)io.f90 -o $(O)io.o
-$(O)Cholesky.o : $(S)Cholesky.f90 $(O)arithmetic.o $(O)io.o $(O)clock.o $(O)string.o $(O)sort.o $(O)sorter.o $(O)display.o
+$(O)Cholesky_old.o : $(S)Cholesky_old.f90 $(O)arithmetic.o $(O)io.o $(O)clock.o $(O)string.o $(O)sort.o $(O)sorter.o $(O)display.o
+	$(FCC) $(FFLAGS)  -c $(S)Cholesky_old.f90 -o $(O)Cholesky_old.o
+$(O)Cholesky.o : $(S)Cholesky.f90 $(O)arithmetic.o $(O)io.o $(O)clock.o $(O)string.o $(O)sort.o \
+                 $(O)display.o $(O)sorter_Cholesky.o
 	$(FCC) $(FFLAGS)  -c $(S)Cholesky.f90 -o $(O)Cholesky.o
+$(O)tran_Chol.o : $(S)tran_Chol.f90 $(O)types.o $(O)tran.o
+	$(FCC) $(FFLAGS)  -c $(S)tran_Chol.f90 -o $(O)tran_Chol.o
 $(O)diis.o : $(S)diis.f90 $(O)types.o
 	$(FCC) $(FFLAGS)  -c $(S)diis.f90 -o $(O)diis.o
 $(O)abmats.o : $(S)abmats.f90 $(O)types.o $(O)tran.o
@@ -145,7 +153,7 @@ $(O)sapt_main.o : $(S)sapt_main.f90 $(O)types.o \
                   $(O)sapt_response.o $(O)sapt_interface.o
 	$(FCC) $(FFLAGS)  -c $(S)sapt_main.f90 -o $(O)sapt_main.o
 $(O)sapt_interface.o : $(S)sapt_interface.f90 $(O)types.o $(O)timing.o \
-                  $(O)sorter.o $(O)tran.o $(O)Cholesky.o $(O)abmats.o
+                  $(O)sorter.o $(O)tran.o $(O)Cholesky.o $(O)Cholesky_old.o $(O)abmats.o
 	$(FCC) $(FFLAGS)  -c $(S)sapt_interface.f90 -o $(O)sapt_interface.o
 $(O)sapt_response.o : $(S)sapt_response.f90 $(O)types.o $(O)tran.o $(O)abmats.o $(O)abfofo.o $(O)ab0fofo.o \
                   $(O)sapt_utils.o $(O)timing.o

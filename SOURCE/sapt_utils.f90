@@ -1691,6 +1691,96 @@ call release_ac0block(Lambda,LambdaIV,nblk)
 
 end subroutine C_AlphaExpand_unc
 
+subroutine prepare_resp_Cmat(Mon,A1,A2,ABP0Tilde,ABP1TIlde,DChol,NDimX,NCholesky,NBasis)
+!
+! prepare matrices for construction of CAlpha(omega)
+!
+implicit none
+
+type(SystemBlock) :: Mon
+integer,intent(in) :: NDimX,NCholesky,NBasis
+
+integer :: iunit
+integer :: nblk
+integer :: i,j,ip,iq,ipq
+
+double precision,intent(out) :: DChol(NCholesky,NDimX)
+double precision,intent(out) :: A1(NDimX,NDimX), &
+                                A2(NDimX,NDimX), &
+                                ABP0Tilde(NDimX,NCholesky), &
+                                ABP1Tilde(NDimX,NCholesky)
+
+double precision :: Cpq
+character(:),allocatable     :: abfile,xy0file
+double precision,allocatable :: ABPLUS1(:,:),ABMIN1(:,:)
+
+type(EBlockData)             :: A0BlkIV
+type(EBlockData),allocatable :: A0Blk(:)
+
+! set filenames
+if(Mon%Monomer==1) then
+   abfile='ABMAT_A'
+   xy0file='XY0_A'
+elseif(Mon%Monomer==2) then
+   abfile='ABMAT_B'
+   xy0file='XY0_B'
+endif
+
+DChol = 0
+do j=1,NDimX
+   ip = Mon%IndN(1,j)
+   iq = Mon%IndN(2,j)
+   ipq = iq + (ip-1)*NBasis
+   Cpq = Mon%CICoef(ip) + Mon%CICoef(iq)
+   do i=1,NCholesky
+      DChol(i,j) = Cpq*Mon%FF(i,ipq)
+   enddo
+enddo
+
+allocate(ABPLUS1(NDimX,NDimX),ABMIN1(NDimX,NDimX))
+
+open(newunit=iunit,file=abfile,status='OLD',&
+     access='SEQUENTIAL',form='UNFORMATTED')
+
+read(iunit) ABPLUS1
+read(iunit) ABMIN1
+
+close(iunit)
+
+! get A0PLUS, A0MIN in blocks matY and matX
+call Sblock_to_ABMAT(A0Blk,A0BlkIV,Mon%IndN,Mon%CICoef,nblk,NBasis,NDimX,xy0file)
+
+! AB1 = AB1 - A0
+call add_blk_right(ABPLUS1,A0Blk,A0BlkIV,-1d0,.false.,nblk,NDimX)
+call add_blk_right(ABMIN1, A0Blk,A0BlkIV,-1d0,.true., nblk,NDimX)
+
+print*, 'ABPLUS1',norm2(ABPLUS1)
+print*, 'ABMIN1 ',norm2(ABMIN1)
+
+!Calc: A1 = ABP0*ABM1+ABP1*ABM0
+call ABPM_HALFTRAN_GEN_L(ABMIN1, A1,0.0d0,A0Blk,A0BlkIV,nblk,NDimX,NDimX,'Y')
+call ABPM_HALFTRAN_GEN_R(ABPLUS1,A1,1.0d0,A0Blk,A0BlkIV,nblk,NDimX,NDimX,'X')
+print*, 'A1',norm2(A1)
+
+!Calc: A2 = ABP1*ABM1
+Call dgemm('N','N',NDimX,NDimX,NDimX,1d0,ABPLUS1,NDimX,ABMIN1,NDimX,0.0d0,A2,NDimX)
+print*, 'A2',norm2(A2)
+
+!Calc: APLUS0Tilde=ABPLUS0.DChol
+call ABPM_HALFTRAN_GEN_L(transpose(DChol),ABP0Tilde,0.0d0,A0Blk,A0BlkIV,nblk,NDimX,NCholesky,'Y')
+print*, 'APLUS0Tilde',norm2(ABP0Tilde)
+
+!Calc: APLUS1Tilde=ABPLUS1.DChol
+Call dgemm('N','T',NDimX,NCholesky,NDimX,1d0,ABPLUS1,NDimX,DChol,NCholesky,0.0d0,ABP1Tilde,NDimX)
+print*, 'APLUS1Tilde',norm2(ABP1Tilde)
+
+call release_ac0block(A0Blk,A0BlkIV,nblk)
+
+deallocate(A0Blk)
+deallocate(ABPLUS1,ABMIN1)
+
+end subroutine prepare_resp_Cmat
+
 subroutine ModABMin(Occ,SRKer,Wt,OrbGrid,TwoNO,TwoElErf,ABMin,IndN,IndX,NDimX,NGrid,NInte2,NBasis)
 !     ADD CONTRIBUTIONS FROM THE srALDA KERNEL TO AB MATRICES
 implicit none
