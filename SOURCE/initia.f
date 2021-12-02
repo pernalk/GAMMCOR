@@ -246,6 +246,7 @@ C
       use types
       use sorter
       use Cholesky_old
+c     use Cholesky  ! not ready yet!
       use tran
       use abmat
 C
@@ -266,6 +267,7 @@ C
 C     LOCAL ARRAYS
 C
       Real*8, Allocatable :: RDM2(:),RDMAB2(:)
+      Real*8, Allocatable :: MatFF(:,:)
       Dimension Gamma(NInte1),Work(NBasis),PC(NBasis),
      $ AUXM(NBasis,NBasis),AUXM1(NBasis,NBasis),
      $ Fock(NBasis*NBasis),
@@ -472,12 +474,16 @@ C
 C
       ElseIf(ITwoEl.Gt.1) Then
 C
+c      If(ICholesky==0) Then
       MemSrtSize=MemVal*1024_8**MemType
       Call readtwoint(NBasis,4,'DPQRS.bin','AOTWOSORT',
      $                MemSrtSize,IOutInfo)
 C
+C      Else If(ICholesky==1) Then
       If(ICholesky==1) Then
-         Call chol_CoulombMatrix(CholeskyVecs,'AOTWOSORT',ICholeskyAccu)
+       Call chol_CoulombMatrix(CholeskyVecs,'AOTWOSORT',ICholeskyAccu)
+C       Call chol_CoulombMatrix(CholeskyVecs,NBasis,'DPQRS.bin',4,
+C     &                         ICholeskyAccu)
          NCholesky=CholeskyVecs%NCholesky
       EndIf
 C
@@ -538,7 +544,13 @@ C
       EndDo
       Call sq_to_triang2(UAux,GammaAB,NBasis)
 C
-      Call FockGen_mithap(FockF,GammaAB,XKin,NInte1,NBasis,'AOTWOSORT')
+      If(ICholesky==0) Then
+          Call FockGen_mithap(FockF,GammaAB,XKin,NInte1,NBasis,
+     &                        'AOTWOSORT')
+      ElseIf(ICholesky==1) Then
+          Call FockGen_CholR(FockF,CholeskyVecs%R(1:NCholesky,1:NInte1),
+     &                       GammaAB,XKin,NInte1,NCholesky,NBasis)
+      EndIf
 C
 C     INACTIVE
       If(NInAc.Ne.Zero) Then
@@ -713,13 +725,13 @@ C
 C
       ElseIf(ITwoEl.Eq.3) Then
 C
-C     CREATE FOFO and FFOO ?
 C     PREPARE POINTERS: NOccup=num0+num1
       Call prepare_nums(Occ,Num0,Num1,NBasis)
       If(ISwitch.Eq.1) Num0=NInAC
       If(ISwitch.Eq.1) Num1=NAc
 C     TRANSFORM J AND K
       UAux=transpose(URe)
+      If(ICholesky==0) Then
       Call tran4_gen(NBasis,
      $        Num0+Num1,UAux(1:NBasis,1:(Num0+Num1)),
      $        Num0+Num1,UAux(1:NBasis,1:(Num0+Num1)),
@@ -732,6 +744,21 @@ C     TRANSFORM J AND K
      $        NBasis,UAux,
      $        Num0+Num1,UAux(1:NBasis,1:(Num0+Num1)),
      $        'FOFO','AOTWOSORT')
+      ElseIf(ICholesky==1) Then
+      Allocate(MatFF(NCholesky,NBasis**2))
+       Call chol_MOTransf(MatFF,CholeskyVecs,
+     $              UAux,1,NBasis,
+     $              UAux,1,NBasis)
+C
+      Call chol_ints_fofo(NBasis,Num0+Num1,MatFF,
+     $                    NBasis,Num0+Num1,MatFF,
+     $                    NCholesky,NBasis,'FOFO')
+      Call chol_ints_fofo(NBasis,NBasis,MatFF,
+     $                    Num0+Num1,Num0+Num1,MatFF,
+     $                    NCholesky,NBasis,'FFOO')
+
+      Deallocate(MatFF)
+      EndIf
 CC
       EndIf
 C
@@ -1038,7 +1065,8 @@ C
       use types
       use sorter
       use tran
-      use Cholesky_old
+c     use Cholesky_old  ! requires AOTWOSORT
+      use Cholesky
       use abmat 
 C
       Implicit Real*8 (A-H,O-Z)
@@ -1150,6 +1178,7 @@ C     HAP
       Call readoneint_molpro(XKin,'AOONEINT.mol','ONEHAMIL',
      $     .true.,NInte1)
 C
+      If(ICholesky==0) Then
 C     memory allocation for sorter
       MemSrtSize=MemVal*1024_8**MemType
 C     KP: If IFunSR=6 integrals are not needed and are not loaded
@@ -1161,10 +1190,13 @@ C     KP: If IFunSR=6 integrals are not needed and are not loaded
       If(ITwoEl.Eq.1) Call LoadSaptTwoEl(4,TwoEl,NBasis,NInte2)
       EndIf
 C
-      If(ICholesky==1) Then
-      Call chol_CoulombMatrix(CholeskyVecs,'AOTWOSORT',ICholeskyAccu)
+      Else If(ICholesky==1) Then
+c     If(ICholesky==1) Then
+c     Call chol_CoulombMatrix(CholeskyVecs,'AOTWOSORT',ICholeskyAccu)
+       Call chol_CoulombMatrix(CholeskyVecs,NBasis,'AOTWOINT.mol',2,
+     &                         ICholeskyAccu)
       NCholesky=CholeskyVecs%NCholesky
-      EndIf
+      EndIf ! ICholesky
 C
 C     LOAD AO TO CAS_MO ORBITAL TRANSFORMATION MATRIX FROM uaomo.dat
 C      
@@ -1309,7 +1341,7 @@ C
       EndDo
 C
 C     FIND CANONICAL INACTIVE AND VIRTUAL ORBITALS 
-C      
+C
       If(IAO.Eq.0) Then
 C
       Call FockGen(FockF,GammaF,XKin,TwoEl,NInte1,NBasis,NInte2)
@@ -1337,9 +1369,21 @@ C
       EndDo
 C
       If (IFunSR.Eq.0.Or.IFunSR.Eq.3.Or.IFunSR.Eq.5.Or.IFunSR.Eq.6) Then
-      Call FockGen_mithap(FockF,GammaAB,XKin,NInte1,NBasis,'AOTWOSORT')
+          If(ICholesky==0) Then
+          Call FockGen_mithap(FockF,GammaAB,XKin,NInte1,NBasis,
+     &                        'AOTWOSORT')
+          ElseIf(ICholesky==1) Then
+          Call FockGen_CholR(FockF,CholeskyVecs%R(1:NCholesky,1:NInte1),
+     &                       GammaAB,XKin,NInte1,NCholesky,NBasis)
+          EndIf
       ElseIf (IFunSR.Eq.1.Or.IFunSR.Eq.2.Or.IFunSR.Eq.4) Then
-      Call FockGen_mithap(FockF,GammaAB,XKin,NInte1,NBasis,'AOERFSORT')
+          If(ICholesky==0) Then
+             Call FockGen_mithap(FockF,GammaAB,XKin,NInte1,NBasis,
+     &                           'AOERFSORT')
+          ElseIf(ICholesky==1) Then
+             Write(6,'(1x,a)') 'Cholesky not ready for LR-ERF!'
+             Stop
+          EndIf
       EndIf
 C
 C     TESTY:
@@ -1455,7 +1499,7 @@ C     PREPARE POINTERS: NOccup=num0+num1
 C     TRANSFORM J AND K
       UAux=transpose(UAOMO)
       If (IFunSR.Eq.0.Or.IFunSR.Eq.3.Or.IFunSR.Eq.5) Then
-C     This use of Cholesky is for test only 
+C     This use of Cholesky is for test only
       If (ICholesky==0) Then
 C
       Call tran4_gen(NBasis,
@@ -1474,9 +1518,15 @@ C
       ElseIf (ICholesky==1) Then
 C
       Allocate(MatFF(NCholesky,NBasis**2))
-      Call chol_MOTransf(MatFF,CholeskyVecs,
-     $                   UAux,1,NBasis,
-     $                   UAux,1,NBasis)
+C     Old 1-step transformation (much slower)
+c     Call chol_MOTransf(MatFF,CholeskyVecs,
+c    $                   UAux,1,NBasis,
+c    $                   UAux,1,NBasis)
+C
+      Call chol_MOTransf_TwoStep(MatFF,CholeskyVecs,
+     $              UAux,1,NBasis,
+     $              UAux,1,NBasis,
+     $              1500)
 C
       Call chol_ints_fofo(NBasis,Num0+Num1,MatFF,
      $                    NBasis,Num0+Num1,MatFF,

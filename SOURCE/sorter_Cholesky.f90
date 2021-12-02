@@ -12,6 +12,7 @@ integer :: aosource
 integer :: nbas,nelm,nibuf
 integer,allocatable :: idx_buf(:)
 double precision,allocatable :: val_buf(:)
+character(:),allocatable :: file_path
 contains
 procedure :: open => open_AOReaderChol
 procedure :: get_TR => get_TR_AOReaderChol
@@ -216,6 +217,37 @@ case(2) ! MOLPRO
 
          enddo
       enddo
+
+case(4) ! Libor
+
+      !rdr%file_path = file_path
+      !open(newunit=rdr%unit,file=file_path,status='OLD',&
+      !     access='STREAM',form='UNFORMATTED')
+      !read(rdr%unit)idx_p, idx_q, idx_r
+
+      !pq=0
+      !do idx_p=1,nbas
+      !   do idx_q=1,idx_p
+      !      pq=pq+1
+
+      !      rs=0
+      !      do idx_r=1,nbas
+      !         do idx_s=1,idx_r
+      !            rs=rs+1
+
+      !            if (pq == rs) then
+      !               read(rdr%unit) val
+      !               if(val/=0) rs_diag(rs) = val
+      !            endif
+
+      !         enddo
+      !      enddo
+
+      !   enddo
+      !enddo
+
+      !print*, 'rs_diag',norm2(rs_diag(1:nbas))
+      !close(rdr%unit) ! figure out how to rewind it
 
 case default
 
@@ -449,6 +481,35 @@ case(2) ! MOLPRO
          enddo
       enddo
 
+case(4) ! Libor
+
+      print*, 'Case=4 (Libor) not reay in sorter_Cholesky!'
+      stop
+      !open(newunit=rdr%unit,file=rdr%file_path,status='OLD',&
+      !     access='STREAM',form='UNFORMATTED')
+      !read(rdr%unit)idx_p, idx_q, idx_r
+
+      !pq=0
+      !do idx_p=1,rdr%nbas
+      !   do idx_q=1,idx_p
+      !      pq=pq+1
+
+      !      rs=0
+      !      do idx_r=1,rdr%nbas
+      !         do idx_s=1,idx_r
+      !            rs=rs+1
+
+      !            if (pq .ge. rs) then
+      !               read(rdr%unit) val
+      !               call add_TR(pq,rs,val,y,M)
+      !            endif
+
+      !         enddo
+      !      enddo
+
+      !   enddo
+      !enddo
+
 case default
 
    write(LOUT,'(a)') 'Unknown AOSOURCE in get_TR_AOReaderChol'
@@ -457,8 +518,6 @@ case default
 end select
 
 end subroutine get_TR_AOReaderChol
-
-
 
 subroutine close_AOReaderChol(rdr)
 implicit none
