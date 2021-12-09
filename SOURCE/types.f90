@@ -24,15 +24,15 @@ integer, parameter :: JOB_TYPE_ERPA  = 3
 integer, parameter :: JOB_TYPE_EERPA = 4
 integer, parameter :: JOB_TYPE_SAPT  = 5
 integer, parameter :: JOB_TYPE_PDFT  = 6
-integer, parameter :: JOB_TYPE_CASPIDFT = 7
+integer, parameter :: JOB_TYPE_CASPIDFT    = 7
 integer, parameter :: JOB_TYPE_CASPIDFTOPT = 8
-integer, parameter :: JOB_TYPE_EERPA_OLD = 9
-integer, parameter :: JOB_TYPE_AC0D = 10
-integer, parameter :: JOB_TYPE_AC0DNOSYMM = 11
-integer, parameter :: JOB_TYPE_NLOCCORR = 12
-integer, parameter :: JOB_TYPE_AC0DP = 13
-integer, parameter :: JOB_TYPE_ACFREQ = 14
-integer, parameter :: JOB_TYPE_ACFREQNTH = 15
+integer, parameter :: JOB_TYPE_EERPA_OLD   = 9
+integer, parameter :: JOB_TYPE_AC0D        = 10
+integer, parameter :: JOB_TYPE_AC0DNOSYMM  = 11
+integer, parameter :: JOB_TYPE_NLOCCORR    = 12
+integer, parameter :: JOB_TYPE_AC0DP       = 13
+integer, parameter :: JOB_TYPE_ACFREQ      = 14
+integer, parameter :: JOB_TYPE_ACFREQNTH   = 15
 
 integer, parameter :: SAPTLEVEL0 = 0
 integer, parameter :: SAPTLEVEL1 = 1
@@ -43,7 +43,7 @@ integer, parameter :: FLAG_NOBASIS = 0
 integer, parameter :: FLAG_REDVIRT = 0
 logical, parameter :: FLAG_RESTART = .FALSE.
 integer, parameter :: FLAG_PRINT_LEVEL = 0
-integer, parameter :: FLAG_DEBUG_FL12 = 1
+integer, parameter :: FLAG_DEBUG_FL12  = 1
 
 integer, parameter :: RDM_TYPE_GVB  = 1
 integer, parameter :: RDM_TYPE_APSG = 2
@@ -207,7 +207,8 @@ type SystemBlock
       double precision,allocatable :: CMO(:,:)
       double precision,allocatable :: OV(:,:),OO(:,:), &
                                       FO(:,:),FF(:,:), &
-                                      FFAB(:,:),FFBA(:,:)
+                                      FFAB(:,:),FFBA(:,:), &
+                                      OOAB(:,:),OOBA(:,:)
       double precision,allocatable :: DChol(:,:)
       double precision,allocatable :: Pmat(:,:)
       double precision,allocatable :: WPot(:,:),Kmat(:,:)

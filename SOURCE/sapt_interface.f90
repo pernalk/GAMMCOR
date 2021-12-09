@@ -2290,6 +2290,21 @@ call clock('AOO',Tcpu,Twall)
                     MaxBufferDimMB)
 call clock('BOO',Tcpu,Twall)
 
+ if(SAPT%SaptLevel==666) then ! RS2PT2+
+    allocate(A%OOAB(NCholesky,dimOA*dimOB), &
+             B%OOBA(NCholesky,dimOB*dimOA))
+
+    call chol_MOTransf_TwoStep(A%OOAB,CholeskyVecs,&
+                       A%CMO,1,dimOA,&
+                       B%CMO,1,dimOB,&
+                       MaxBufferDimMB)
+
+    call chol_MOTransf_TwoStep(B%OOBA,CholeskyVecs,&
+                       B%CMO,1,dimOB,&
+                       A%CMO,1,dimOA,&
+                       MaxBufferDimMB)
+ endif
+
  allocate(A%FF(NCholesky,NBasis**2),&
           B%FF(NCholesky,NBasis**2) )
  ! (FF|AA)

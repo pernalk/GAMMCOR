@@ -248,10 +248,12 @@ integer :: i
  write(LOUT,'(8a10)') ('----------',i=1,8)
  if(SAPT%CAlpha) print*, 'SAPT%CAlpha',SAPT%CAlpha
 
- if(SAPT%SaptLevel==999) then
-    write(LOUT,'(1x,a,/)') 'RS calculation requested'
+ if(SAPT%SaptLevel==999 .or. SAPT%SaptLevel==666) then
+    write(LOUT,'(1x,a,/)') 'RSPT2 calculation requested'
+    write(LOUT,'(1x,a,/)') 'RSPT2+ calculation requested'
 
     call e1elst_Chol(SAPT%monA,SAPT%monB,SAPT)
+    if(SAPT%SaptLevel==666) call e1exch_Chol(Flags,SAPT%monA,SAPT%monB,SAPT)
     call e2ind_icerpa(Flags,SAPT%monA,SAPT%monB,SAPT)
     if(.not.SAPT%CAlpha) then
       call e2disp_Cmat_Chol_block(Flags,SAPT%monA,SAPT%monB,SAPT)
@@ -490,6 +492,30 @@ integer            :: ntr,iunit_aotwosort
 
 if(Flags%SaptLevel==999) then
   print*, 'In RSPT2 intermoner ints not calculated for now'
+  ! deallocate (FF|NCholesky) integrals
+  deallocate(A%FF)
+  deallocate(B%FF)
+  return
+endif
+
+if(Flags%SaptLevel==666) then
+  print*, 'Get 1-st order exchange ints (RSPT2+)'
+  if (Flags%ICholesky==1) then
+     call chol_ints_oooo(A%num0+A%num1,A%num0+A%num1,A%OO,&
+                         B%num0+B%num1,B%num0+B%num1,B%OO,&
+                         A%NChol,'OOOOAABB')
+     !call chol_ints_fofo(NBasis,A%num0+A%num1,A%FF,&
+     !                    NBasis,B%num0+B%num1,B%FF,&
+     !                    A%NChol,NBasis,'FOFOAABB')
+
+     call chol_ints_oooo(B%num0+B%num1,B%num0+B%num1,B%OO,  &
+                         B%num0+B%num1,A%num0+A%num1,B%OOBA,&
+                         A%NChol,'OOOOBBBA')
+
+     call chol_ints_oooo(A%num0+A%num1,A%num0+A%num1,A%OO,  &
+                         A%num0+A%num1,B%num0+B%num1,A%OOAB,&
+                         A%NChol,'OOOOAAAB')
+  endif
   ! deallocate (FF|NCholesky) integrals
   deallocate(A%FF)
   deallocate(B%FF)
