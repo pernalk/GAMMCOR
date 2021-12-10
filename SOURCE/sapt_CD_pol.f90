@@ -205,15 +205,16 @@ enddo
 tNa(1) = -2d0*tNa(1)
 
 !(OO|OO): (AA|AB)
-!open(newunit=iunit,file='FOFOAAAB',status='OLD', &
 open(newunit=iunit,file='OOOOAAAB',status='OLD', &
      access='DIRECT',recl=8*dimOA*dimOA)
 
 ! one loop over integrals
 ints = 0
+ij = 0
 do it=1,dimOB
    do iq=1,dimOA
-      read(iunit,rec=iq+(it-1)*dimOB) ints(1:dimOA*dimOA)
+      ij = ij + 1
+      read(iunit,rec=iq+(it-1)*dimOA) ints(1:dimOA*dimOA)
 
       do ir=1,dimOA
          do ip=1,dimOA
@@ -241,9 +242,8 @@ do iq=1,dimOB
    enddo
 enddo
 tNb(1) = -2d0*tNb(1)
-
+!
 !(OO|OO): (BB|BA)
-!open(newunit=iunit,file='FOFOBBBA',status='OLD', &
 open(newunit=iunit,file='OOOOBBBA',status='OLD', &
      access='DIRECT',recl=8*dimOB*dimOB)
 
@@ -251,7 +251,7 @@ open(newunit=iunit,file='OOOOBBBA',status='OLD', &
 ints = 0
 do it=1,dimOA
    do iq=1,dimOB
-      read(iunit,rec=iq+(it-1)*dimOA) ints(1:dimOB*dimOB)
+      read(iunit,rec=iq+(it-1)*dimOB) ints(1:dimOB*dimOB)
 
       do ir=1,dimOB
          do ip=1,dimOB
@@ -269,8 +269,6 @@ close(iunit)
 
 open(newunit=iunit,file='OOOOAABB',status='OLD',&
     access='DIRECT',form='UNFORMATTED',recl=8*dimOA*dimOA)
-!open(newunit=iunit,file='FOFOAABB',status='OLD',&
-!    access='DIRECT',form='UNFORMATTED',recl=8*dimOA*NBas)
 
 allocate(tmpAB(dimOA,dimOA,dimOB,dimOB))
 
@@ -284,15 +282,12 @@ do ir=1,dimOB
    do ip=1,dimOB
      ipr = ipr + 1
      read(iunit,rec=ip+(ir-1)*dimOB) ints(1:dimOA*dimOA)
-     !read(iunit,rec=ip+(ir-1)*NBas) ints(1:dimOA*NBas)
 
      do j=1,dimOA
         do i=1,dimOA
            work(i,j) = ints(i+(j-1)*dimOA)
-           !work(i,j) = ints(i+(j-1)*NBas)
         enddo
      enddo
-     !print*, 'ip,ir,work',ip,ir,norm2(work)
      val = val + sum(work(1:dimOA,1:dimOA)*tmpAB(1:dimOA,1:dimOA,ip,ir))
 
    enddo

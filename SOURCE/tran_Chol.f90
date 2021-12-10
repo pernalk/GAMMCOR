@@ -127,13 +127,12 @@ print*, 'Assemble ',fname,' from Cholesky Vectors'
 
 open(newunit=iunit,file=fname,status='REPLACE',&
      access='DIRECT',form='UNFORMATTED',recl=8*nAB)
-
 ! (OO|OO)
 irec = 0
 do id=1,nD
    do ic=1,nC
       irec = irec + 1
-      cd = ic+(id-1)*nD
+      cd = ic+(id-1)*nC
       call dgemv('T',NCholesky,nAB,1d0,MatAB,NCholesky,MatCD(1:NCholesky,cd),1,0d0,work,1)
       write(iunit,rec=irec) work(1:nAB)
    enddo

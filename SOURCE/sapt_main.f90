@@ -249,8 +249,8 @@ integer :: i
  if(SAPT%CAlpha) print*, 'SAPT%CAlpha',SAPT%CAlpha
 
  if(SAPT%SaptLevel==999 .or. SAPT%SaptLevel==666) then
-    write(LOUT,'(1x,a,/)') 'RSPT2 calculation requested'
-    write(LOUT,'(1x,a,/)') 'RSPT2+ calculation requested'
+    if(SAPT%SaptLevel==999)  write(LOUT,'(1x,a,/)') 'RSPT2 calculation requested'
+    if(SAPT%SaptLevel==666)  write(LOUT,'(1x,a,/)') 'RSPT2+ calculation requested'
 
     call e1elst_Chol(SAPT%monA,SAPT%monB,SAPT)
     if(SAPT%SaptLevel==666) call e1exch_Chol(Flags,SAPT%monA,SAPT%monB,SAPT)
@@ -444,7 +444,7 @@ double precision :: MO(NBasis*NBasis)
 
  if(SaptLevel.eq.1) return
 
- if(SaptLevel.eq.999) then
+ if(SaptLevel.eq.999 .or. SaptLevel.eq.666) then
     ! for RSPT2 only AB matrices are needed
     call calc_ab_cas(Mon,MO,Flags,NBasis)
     return
@@ -1696,6 +1696,9 @@ integer :: i
 double precision :: erspt2
 
 erspt2 = SAPT%elst +  SAPT%e2ind + SAPT%e2disp
+if(SAPT%SaptLevel==666) then ! RSPT2+
+  erspt2 = erspt2 + SAPT%exchs2
+endif
 
 write(LOUT,'(/,8a10)') ('**********',i=1,4)
 write(LOUT,'(1x,a)') 'SAPT SUMMARY / milliHartree'
@@ -1703,8 +1706,11 @@ write(LOUT,'(8a10)') ('**********',i=1,4)
 
 write(LOUT,'(1x,a)') 'SAPT level  = RSPT2'
 
-write(LOUT,'(1x,a,t19,a,f16.8)') 'E1elst',    '=', SAPT%elst*1.d03
-write(LOUT,'(1x,a,t19,a,f16.8)') 'E2ind',      '=', SAPT%e2ind*1.d03
+write(LOUT,'(1x,a,t19,a,f16.8)') 'E1elst',     '=', SAPT%elst  *1.d03
+if(SAPT%SaptLevel==666) then ! RSPT2+
+   write(LOUT,'(1x,a,t19,a,f16.8)') 'E1exch',     '=', SAPT%exchs2*1.d03
+endif
+write(LOUT,'(1x,a,t19,a,f16.8)') 'E2ind',      '=', SAPT%e2ind *1.d03
 write(LOUT,'(1x,a,t19,a,f16.8)') 'E2disp',     '=', SAPT%e2disp*1.d03
 write(LOUT,'(1x,a,t19,a,f16.8)') 'Eint(RSPT2)','=', erspt2*1.0d3
 write(LOUT,'()')
