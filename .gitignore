@@ -22,5 +22,6 @@ xcfun/fortran/xcfun_autogen.f90
 xcfun/lib/libxcfun.*
 xcfun/**/*.o
 
-
 xcfun/geninterface
+build/
+SOURCE/git_info.f90
