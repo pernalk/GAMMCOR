@@ -136,4 +136,4 @@ $(O)ac_exact_2el.o : $(S)ac_exact_2el.f
 
 .PHONY : clean
 clean :
-	rm $(O)*.o *.mod $(PROG)
+	rm -f $(O)*.o *.mod $(PROG)
