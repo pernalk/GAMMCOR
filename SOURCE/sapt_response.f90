@@ -351,9 +351,9 @@ if(Flags%ICASSCF==0.and.Flags%ISERPA==0) then
   !enddo
 
   !! TEST COUPLED ANDREAS
-   ! print*, 'CPLD-ANDREAS:'
-   ! Mon%EigX = EigVecR
-   ! Mon%EigY = 0
+  ! print*, 'CPLD-ANDREAS:'
+  ! Mon%EigX = EigVecR
+  ! Mon%EigY = 0
 
 
 !!    else  ! MH 1 Dec 2020: disable ERPAVECTRANS

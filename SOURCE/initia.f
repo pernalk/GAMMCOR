@@ -126,6 +126,7 @@ C
       Close(10)
 C
       ElseIf(ICASSCF.Eq.1) Then
+      print*, 'here? Dalton-CAS'
 C
 c      Occ(1:NBasis)=0.D0
 cC
@@ -143,6 +144,7 @@ c      EndDo
       Do I=1,NInAc+NAc
       Sum=Sum+Occ(I)
       EndDo
+      print*, '???',sum
 C
       If(NInAc.Eq.0) Then
       NGem=2
@@ -274,7 +276,7 @@ C
      $ UAux(NBasis,NBasis),
      $ FockF(NInte1),GammaAB(NInte1),Eps(NBasis,NBasis)
       Integer(8) MemSrtSize,IOutInfo
-      Dimension FockF2(NInte1)
+      Dimension FockF2(NInte1),WorkSq(NBasis,NBasis)
 
       If(iORCA==1) then
       LiborNew=1
@@ -551,9 +553,27 @@ C
          Call FockGen_mithap(FockF,GammaAB,XKin,NInte1,NBasis,
      &                       'AOTWOSORT')
       ElseIf(ICholesky==1) Then
-        Call FockGen_CholR(FockF,CholeskyVecs%R(1:NCholesky,1:NInte1),
+         Call FockGen_CholR(FockF,CholeskyVecs%R(1:NCholesky,1:NInte1),
      &                      GammaAB,XKin,NInte1,NCholesky,NBasis)
       EndIf
+C
+C     STH must be wrong in FockGen_CholR...!?
+C     check if off-diagonal elements of FockF \approx 0?
+      WorkSq = 0
+      call triang_to_sq2(FockF,WorkSq,NBasis)
+      Err = 0
+      do J=1,NInAc
+      do I=1,j
+      if(i.ne.j) Err = Err + WorkSq(i,j)**2
+      enddo
+      enddo
+      do J=NInAc+NAc+1,NBasis
+      do I=NInAc+NAc+1,J
+      if(i.ne.j) Err = Err + WorkSq(i,j)**2
+      enddo
+      enddo
+      Print*, 'Err-2',Sqrt(Err)
+C
 C      do j=1,NInte1
 C         if(abs(FockF(j)-FockF2(j)).gt.1d-8) then
 C          write(*,'(i3,3f16.6)') j,FockF(j)-FockF2(j),FockF(j),FockF2(j)
@@ -577,7 +597,7 @@ C
       Do J=1,NInAc
       URe(I,J)=Fock((J-1)*NInAc+I)
       EndDo
-      EndDo 
+      EndDo
 C
 C      Print*, 'INAct-MY', norm2(URe)
 C
@@ -1252,14 +1272,14 @@ C
 C     READ RDMs: OLD
       Write(6,'(/," Reading in 1-RDM ...")')
 C
-C      Call read_1rdm_molpro(Gamma,InSt(1,1),InSt(2,1),
+C      Call read_1rdm_molpro(Gamma,InSt(1,1),InSt(2,1),ISpinMs2,
 C     $ '2RDM',IWarn,NBasis)
 C
 C     READ RDMs: NEW
       Wght=One/Float(NStates)
       Do I=1,NStates
       GammaAB(1:NInte1)=Zero
-      Call read_1rdm_molpro(GammaAB,InSt(1,I),InSt(2,I),
+      Call read_1rdm_molpro(GammaAB,InSt(1,I),InSt(2,I),ISpinMs2,
      $ '2RDM',IWarn,NBasis)
       Do K=1,NInte1
       Gamma(K)=Gamma(K)+Wght*GammaAB(K)
@@ -1624,13 +1644,13 @@ C
 C
 C     READ RDMs: OLD
 C      Call read_2rdm_molpro(RDM2Act,InSt(1,1),InSt(2,1),
-C     $ '2RDM',IWarn,NAct)
+C     $ ISpinMs2,'2RDM',IWarn,NAct)
 C
 C     READ RDMs: NEW
       Wght=One/Float(NStates)
       Do I=1,NStates
       GammaAB(1:NInte1)=Zero
-      Call read_2rdm_molpro(HlpRDM2,InSt(1,I),InSt(2,I),
+      Call read_2rdm_molpro(HlpRDM2,InSt(1,I),InSt(2,I),ISpinMs2,
      $ '2RDM',IWarn,NAct)
       Do K=1,NRDM2Act
       RDM2Act(K)=RDM2Act(K)+Wght*HlpRDM2(K)
@@ -3513,7 +3533,7 @@ C
       Open(10,File="occupations.dat",Form='Formatted',Status='Old')
       Read(10,*)NNIn,NNAct
       NNIn=NNIn/2
-      Read(10,*)(Occ1(I),I=1,NNAct+NNIn)
+      Read(10,*) (Occ1(I),I=1,NNAct+NNIn)
       Read(10,*) (IActOrb(I),I=1,NSym)
       Read(10,*) (InActOrb(I),I=1,NSym)
       Close(10)

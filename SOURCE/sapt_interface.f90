@@ -578,7 +578,7 @@ character(:),allocatable :: rdmfile
  OneRdm = 0
  ! HERE! FIRST STATE FOR NOW
  call read_1rdm_molpro(OneRdm,Mon%InSt(1,1),Mon%InSt(2,1),&
-                       rdmfile,Mon%IWarn,NBasis)
+                       Mon%ISpinMs2,rdmfile,Mon%IWarn,NBasis)
 
  call triang_to_sq2(OneRdm,OrbAux,NBasis)
  call Diag8(OrbAux,NBasis,NBasis,Eval,work)
@@ -1756,7 +1756,7 @@ integer,external :: NAddrRDM
  allocate(RDM2Act(NRDM2Act),work1(Mon%NAct**2))
  RDM2Act = 0
  call read_2rdm_molpro(RDM2Act,Mon%InSt(1,1),Mon%InSt(2,1),&
-                       rdmfile,Mon%IWarn,Mon%NAct)
+                       Mon%ISpinMs2,rdmfile,Mon%IWarn,Mon%NAct)
 
  do i=1,Mon%NAct
     do j=1,Mon%NAct

@@ -1104,7 +1104,7 @@ C
 C
 C     Prepare MO->NO
 C
-      Call read_1rdm_molpro(GammaAB,InSt(1,1),InSt(2,1),
+      Call read_1rdm_molpro(GammaAB,InSt(1,1),InSt(2,1),ISpinMs2,
      $ '2RDM',IWarn,NBasis)
 C
       Call CpySym(AUXM,GammaAB,NBasis)

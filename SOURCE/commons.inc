@@ -4,7 +4,7 @@ C
      $ ISAPT,IWarn,ITwoEl,
      $ ICholesky,ICholeskyAccu,MemVal,MemType
       Common/CAS/ ICASSCF,NAcCAS,NInAcCAS,NStates,
-     $ InSt(2,100),InTrSt(2,1)
+     $ InSt(2,100),InTrSt(2,1),ISpinMs2
       Common/BBC3/ IType(1000)
       Common/DFTSR/ Alpha,Cmix
       Common/Sym/ FMultTab,NoSym,MxSym

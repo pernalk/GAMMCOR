@@ -487,6 +487,32 @@ character(:), allocatable :: first, last
        SystemParams%DeclareSt = .true.
        call read_statearray(val,SystemParams%InSt,SystemParams%NStates,',')
 
+ case("SPIN")
+      SystemParams%DeclareSpin = .true.
+      ! spin is kept in Molpro convention: 2*ms
+      if(uppercase(val) == "SINGLET" .or. &
+         uppercase(val)=="0") then
+         SystemParams%ISpinMs2 = 0
+      elseif(uppercase(val) == "DOUBLET" .or. &
+             uppercase(val) == "1") then
+         SystemParams%ISpinMs2 = 1
+      elseif(uppercase(val) == "TRIPLET" .or. &
+             uppercase(val) == "2") then
+         SystemParams%ISpinMs2 = 2
+      elseif(uppercase(val) == "QUARTET" .or. &
+             uppercase(val) == "3") then
+         SystemParams%ISpinMs2 = 3
+      elseif(uppercase(val) == "QUINTET" .or. &
+             uppercase(val) == "4") then
+         SystemParams%ISpinMs2 = 4
+      elseif(uppercase(val) == "SEXTET" .or. &
+             uppercase(val) == "5") then
+         SystemParams%ISpinMs2 = 5
+      elseif(uppercase(val) == "SEPTET" .or. &
+             uppercase(val) == "6") then
+         SystemParams%ISpinMs2 = 6
+      endif
+
  case("TRDM")
        SystemParams%DeclareTrSt = .true.
        call read_trstatearray(val,SystemParams%InTrSt,',')

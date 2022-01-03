@@ -381,8 +381,12 @@ if(Flags%ISAPT.Eq.0) then
      stop
    endif
 
-   System%NoSt    = Input%SystemInput(1)%NoSt
-   System%NStates = Input%SystemInput(1)%NStates
+   System%NoSt     = Input%SystemInput(1)%NoSt
+   System%NStates  = Input%SystemInput(1)%NStates
+   System%ISpinMs2 = -255
+   if(Input%SystemInput(1)%DeclareSpin) then
+      System%ISpinMs2 = Input%SystemInput(1)%ISpinMs2
+   endif
    allocate(System%InSt(2,System%NStates))
    if(Input%SystemInput(1)%DeclareSt) then
       System%InSt = Input%SystemInput(1)%InSt
@@ -449,8 +453,12 @@ elseif(Flags%ISAPT.Eq.1) then
    select case(Input%SystemInput(1)%Monomer)
    case(1)
 
-      monA%NoSt    = Input%SystemInput(1)%NoSt
-      monA%NStates = Input%SystemInput(1)%NStates
+      monA%NoSt     = Input%SystemInput(1)%NoSt
+      monA%NStates  = Input%SystemInput(1)%NStates
+      monA%ISpinMs2 = -255
+      if(Input%SystemInput(1)%DeclareSpin) then
+         monA%ISpinMs2 = Input%SystemInput(1)%ISpinMs2
+      endif
       allocate(monA%InSt(2,System%NStates))
       if(Input%SystemInput(1)%DeclareSt) then
          monA%InSt = Input%SystemInput(1)%InSt
@@ -489,8 +497,12 @@ elseif(Flags%ISAPT.Eq.1) then
          monA%NActFromRDM = Input%SystemInput(1)%NActFromRDM
       endif
 
-      monB%NoSt    = Input%SystemInput(2)%NoSt
-      monB%NStates = Input%SystemInput(2)%NStates
+      monB%NoSt     = Input%SystemInput(2)%NoSt
+      monB%NStates  = Input%SystemInput(2)%NStates
+      monB%ISpinMs2 = -255
+      if(Input%SystemInput(2)%DeclareSpin) then
+         monB%ISpinMs2 = Input%SystemInput(2)%ISpinMs2
+      endif
       allocate(monB%InSt(2,System%NStates))
       if(Input%SystemInput(2)%DeclareSt) then
          monB%InSt = Input%SystemInput(2)%InSt
