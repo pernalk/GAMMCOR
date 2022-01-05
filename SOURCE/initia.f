@@ -484,11 +484,11 @@ C
 C
       Else If(ICholesky==1) Then
 c     If(ICholesky==1) Then
-!     print*, 'use Cholesky-old'
+c     print*, 'use Cholesky-old'
 !     Call chol_CoulombMatrix(CholeskyVecs,'AOTWOSORT',ICholeskyAccu)
-C     print*, 'use Cholesky-new'
+c     print*, 'use Cholesky-new'
       Call chol_CoulombMatrix(CholeskyVecs,NBasis,'DPQRS.bin',4,
-     &                         ICholeskyAccu)
+     &                        ICholeskyAccu)
       NCholesky=CholeskyVecs%NCholesky
       EndIf
 C
@@ -557,30 +557,20 @@ C
      &                      GammaAB,XKin,NInte1,NCholesky,NBasis)
       EndIf
 C
-C     STH must be wrong in FockGen_CholR...!?
-C     check if off-diagonal elements of FockF \approx 0?
-      WorkSq = 0
-      call triang_to_sq2(FockF,WorkSq,NBasis)
-      Err = 0
-      do J=1,NInAc
-      do I=1,j
-      if(i.ne.j) Err = Err + WorkSq(i,j)**2
-      enddo
-      enddo
-      do J=NInAc+NAc+1,NBasis
-      do I=NInAc+NAc+1,J
-      if(i.ne.j) Err = Err + WorkSq(i,j)**2
-      enddo
-      enddo
-      Print*, 'Err-2',Sqrt(Err)
-C
-C      do j=1,NInte1
-C         if(abs(FockF(j)-FockF2(j)).gt.1d-8) then
-C          write(*,'(i3,3f16.6)') j,FockF(j)-FockF2(j),FockF(j),FockF2(j)
-C         endif
-C      end do
-C      print*, 'FockF1',norm2(FockF)
-C      print*, 'FockF2',norm2(FockF2)
+C      WorkSq = 0
+C      call triang_to_sq2(FockF,WorkSq,NBasis)
+C      Err = 0
+C      do J=1,NInAc
+C      do I=1,j
+C      if(i.ne.j) Err = Err + WorkSq(i,j)**2
+C      enddo
+C      enddo
+C      do J=NInAc+NAc+1,NBasis
+C      do I=NInAc+NAc+1,J
+C      if(i.ne.j) Err = Err + WorkSq(i,j)**2
+C      enddo
+C      enddo
+C      Print*, 'Err-2',Sqrt(Err)
 C
 C     INACTIVE
       If(NInAc.Ne.Zero) Then
@@ -734,6 +724,7 @@ C
       EndDo
 C     Print*, 'Err',Err
       If(Err.Gt.1.D-5) IUNIT=0
+C     If(Err.Gt.1.D-4) IUNIT=0 ! this should work with Cholesky/Ludicrous
 C
       If(IUNIT.Eq.1) Then
       Write(6,'(/,X,"URe is a unit matrix up to ",E16.6)') ERR
