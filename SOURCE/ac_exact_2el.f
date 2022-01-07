@@ -423,7 +423,11 @@ C
 C
       Character*10     :: IntFile 
 C
-c      Call MP2RDM(TwoEl,EMAT,Occ,URe,UNOAO,XOne,
+c      UReAlph(1:NBasis,1:NBasis)=Zero
+c      Do I=1,NBasis
+c      UReAlph(I,I)=One
+c      EndDo
+c      Call MP2RDM(TwoEl,EMAT,Occ,UReAlph,UNOAO,XOne,
 c     $           IndN,IndX,IndAux,NDimX,
 c     $           NBasis,NDim,NInte1,NInte2,NVirt,
 c     $           IntFile,ThrVirt,.true.)
@@ -551,6 +555,9 @@ C
       If(OccAlph(I).Lt.Half) CIAlph(I)=-CIAlph(I)
       EndDo
 C
+c herer!!! 
+      GoTo 222
+C
 C     CONSTRUCT A LOOK-UP TABLE
 C
       Do I=1,NELE
@@ -612,7 +619,16 @@ C
       EndDo
       EndDo
 C
-      NDimX=Ind 
+      NDimX=Ind
+c herer!!!
+  222 Continue
+      Do Ind=1,NDimX
+      I=IndN(1,Ind)
+      J=IndN(2,Ind)
+      IPair(I,J)=1
+      IPair(J,I)=1
+      EndDo
+      Write(6,'(/,X,"NDimX = ",I4)')NDimX
 C
 C     CONSTRUCT ONE-ELECTRON PART OF THE AC ALPHA-HAMILTONIAN
 C
@@ -715,7 +731,7 @@ C
       FName(1:7+L)="G1_"//StrNum(13-L:12)//".bin"
       write(*,*)'G1 file name ',FName(1:7+L)
       Open(10,File=FName(1:7+L),form='unformatted', access='stream',
-c       Open(10,File='G1_0.bin',form='unformatted', access='stream',  
+c       Open(10,File='G1_0.bin',form='unformatted', access='stream',
      $ Status='Old')
       Read(10)i,j,k
       ICount=0
@@ -738,6 +754,7 @@ C
       NAc=0
       Do I=1,NBasis
       Sum=Sum+PC(I)
+      PC(I)=Abs(PC(I))
       If(PC(I).Gt.Zero) NAc=NAc+1
       EndDo
 C

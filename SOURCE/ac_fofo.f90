@@ -122,6 +122,8 @@ integer :: ia,ib,ic,id,ICol,IRow
 integer :: i,j,k,l,kl,ip,iq,ir,is,ipq,irs
 integer :: NGrid,N,IGL,inf1,inf2,Max_Cn
 double precision :: ECASSCF,PI,WFact,XFactorial,XN1,XN2,FF,OmI
+! hererXXX
+!double precision :: C(NBasis)
 character(:),allocatable :: twojfile,twokfile,IntKFile
 
 double precision, allocatable :: DChol(:,:),DCholT(:,:),DCholAct(:,:),DCholActT(:,:),WorkD(:,:)
@@ -181,7 +183,28 @@ call AB_CAS_FOFO(ABPLUS1,ABMIN1,ECASSCF,URe,Occ,XOne, &
 
 Call sq_symmetrize(ABPLUS1,NDimX)
 Call sq_symmetrize(ABMIN1,NDimX)
-
+! hererXXX
+!do i=1,NBasis
+!   C(i) = sign(sqrt(Occ(i)),Occ(i)-0.5d0)
+!enddo
+!xn1=0.25
+!do ICol=1,NDimX
+!   ir = IndN(1,ICol)
+!   is = IndN(2,ICol)
+!   irs = IndX(ICol)
+!   do IRow=1,NDimX
+!         ip = IndN(1,IRow)
+!         iq = IndN(2,IRow)
+!         ipq = IndX(IRow)
+!         if(ICol.Eq.IRow) then
+!            xn2=(Occ(IP)-Occ(IQ))*(Occ(IP)+1.D0-Occ(IQ))*xn1
+!            ABPLUS0((ICol-1)*NDimX+IRow)=ABPLUS0((ICol-1)*NDimX+IRow)+xn2/(C(IP)+C(IQ))**2
+!            ABMIN0((ICol-1)*NDimX+IRow)=ABMIN0((ICol-1)*NDimX+IRow)+xn2/(C(IP)-C(IQ))**2
+!            ABPLUS1((ICol-1)*NDimX+IRow)=ABPLUS1((ICol-1)*NDimX+IRow)+xn2/(C(IP)+C(IQ))**2  
+!            ABMIN1((ICol-1)*NDimX+IRow)=ABMIN1((ICol-1)*NDimX+IRow)+xn2/(C(IP)-C(IQ))**2
+!         endif
+!   enddo
+!enddo
 ABPLUS1=ABPLUS1-ABPLUS0
 ABMIN1 =ABMIN1 -ABMIN0
 EGOne(1)=ECASSCF
@@ -1349,6 +1372,9 @@ integer          :: limAA(2),limAI(2,1:INActive),&
 double precision :: AuxCoeff(3,3,3,3),Aux,val,ETot
 double precision :: ABPLUS(NDimX,NDimX),ABMIN(NDimX,NDimX)
 double precision :: C(NBasis)
+! hererXXX
+!integer :: ICol,IRow
+!double precision :: xn1,xn2
 
 type(EblockData) :: A0block(nblk), A0blockIV
 
@@ -1388,6 +1414,27 @@ enddo
 call ABPM0_FOFO(Occ,URe,XOne,ABPLUS,ABMIN, &
                 IndN,IndX,IGemIN,NAct,INActive,NDimX,NBasis,NDim,NInte1, &
                 IntJFile,IntKFile,ETot)
+! hererXXX
+!do i=1,NBasis
+!   C(i) = sign(sqrt(Occ(i)),Occ(i)-0.5d0)
+!enddo
+!xn1=0.25
+!call create_pos_ABPL0(pos,IGem,IndN,INActive,NAct,NBasis,NDimX)
+!do ICol=1,NDimX
+!   ir = IndN(1,ICol)
+!   is = IndN(2,ICol)
+!   irs = pos(ir,is)
+!   do IRow=1,NDimX
+!         ip = IndN(1,IRow)
+!         iq = IndN(2,IRow)
+!         ipq = pos(ip,iq)
+!         if(ipq.Eq.irs) then
+!            xn2=(Occ(IP)-Occ(IQ))*(Occ(IP)+1.D0-Occ(IQ))*xn1
+!            ABPLUS(ipq,irs)=ABPLUS(ipq,irs)+xn2/(C(IP)+C(IQ))**2
+!            ABMIN(ipq,irs)=ABMIN(ipq,irs)+xn2/(C(IP)-C(IQ))**2
+!         endif
+!   enddo
+!enddo
 
 call create_blocks_ABPL0(nAA,nAI,nAV,nIV,tmpAA,tmpAI,tmpAV,tmpIV,&
                          limAA,limAI,limAV,limIV,pos,&

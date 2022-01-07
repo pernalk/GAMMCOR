@@ -246,6 +246,11 @@ do ICol=1,NDimX
 
          ABPLUS(ipq,irs) = ABPLUS(ipq,irs) + val
          ABMIN(ipq,irs) = ABMIN(ipq,irs) - val
+! hererXXX
+!         if(ipq.eq.irs) then
+!           ABPLUS(ipq,irs) = ABPLUS(ipq,irs)+(Occ(IP)-Occ(IQ))*(Occ(IP)+1.D0-Occ(IQ))*0.25
+!           ABMIN(ipq,irs)  = ABMIN(ipq,irs)+(Occ(IP)-Occ(IQ))*(Occ(IP)+1.D0-Occ(IQ))*0.25
+!         endif
 
          val = (C(ip) + C(iq))*(C(ir) + C(is))
          if(val/=0d0) ABPLUS(ipq,irs) = ABPLUS(ipq,irs)/val
@@ -880,6 +885,13 @@ do ICol=1,NDimX
 
          ABPLUS(ipq,irs) = ABPLUS(ipq,irs) + val
          ABMIN(ipq,irs) = ABMIN(ipq,irs) - val
+
+! hererXXX
+!         if(ipq.eq.irs) then
+!           ABPLUS(ipq,irs) = ABPLUS(ipq,irs)+(Occ(IP)-Occ(IQ))*(Occ(IP)+1.D0-Occ(IQ))*0.25
+!           ABMIN(ipq,irs)  = ABMIN(ipq,irs)+(Occ(IP)-Occ(IQ))*(Occ(IP)+1.D0-Occ(IQ))*0.25
+!           endif
+!         endif
 
          val = (C(ip) + C(iq))*(C(ir) + C(is))
          if(val/=0d0) ABPLUS(ipq,irs) = ABPLUS(ipq,irs)/val
