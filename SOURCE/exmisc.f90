@@ -201,6 +201,90 @@ deallocate(work)
 
 end subroutine make_sij_Y
 
+subroutine make_sij_Y_Chol(sij,tmp1,AOcc,BOcc,AEigY,AEigX,BEigY,BEigX,&
+                      OVA,OVB, &
+                      Anum0,Bnum0,dimOA,dimOB,nOVB,AIndN,BIndN,ANDimX,BNDimX,&
+                      NCholesky,NBas)
+!
+! warning! OVA and OVB are overwritten!
+!
+implicit none
+
+integer,intent(in) :: Anum0,Bnum0,dimOA,dimOB,nOVB,ANDimX,BNDimX
+integer,intent(in) :: NCholesky,NBas
+integer,intent(in) :: AIndN(2,ANDimX),BIndN(2,BNDimX)
+double precision,intent(in) :: AOcc(NBas),BOcc(NBas),&
+                               AEigY(ANDimX*ANDimX),AEigX(ANDimX*ANDimX),&
+                               BEigY(BNDimX*BNDimX),BEigX(BNDimX*BNDimX)
+!double precision,intent(in) :: OVA(NCholesky,ANDimX),OVB(NCholesky,BNDimX)
+double precision               :: OVA(NCholesky,ANDimX),OVB(NCholesky,BNDimX)
+double precision,intent(inout) :: tmp1(ANDimX,BNDimX),&
+                                  sij(ANDimX,BNDimX)
+
+integer :: i,j,ir,is,irs,ip,iq,ipq
+double precision :: fact
+double precision,allocatable :: work(:)
+
+! we do not need the Cpq prefacor...
+allocate(work(NBas))
+do i=1,NBas
+   work(i) = sign(sqrt(AOcc(i)),AOcc(i)-0.5d0)
+enddo
+do ipq=1,ANDimX
+   ip = AIndN(1,ipq)
+   iq = AIndN(2,ipq)
+   OVA(:,ipq) = 1d0/(work(ip)+work(iq))*OVA(:,ipq)
+enddo
+do i=1,NBas
+   work(i) = sign(sqrt(BOcc(i)),BOcc(i)-0.5d0)
+enddo
+do ipq=1,BNDimX
+   ip = BIndN(1,ipq)
+   iq = BIndN(2,ipq)
+   OVB(:,ipq) = 1d0/(work(ip)+work(iq))*OVB(:,ipq)
+enddo
+deallocate(work)
+
+allocate(work(BNDimX))
+tmp1=0
+do ipq=1,ANDimX
+   ip = AIndN(1,ipq)
+   iq = AIndN(2,ipq)
+   call dgemv('T',NCholesky,BNDimX,1d0,OVB,NCholesky,OVA(:,ipq),1,0d0,work,1)
+
+   do irs=1,BNDimX
+      ir = BIndN(1,irs)
+      is = BIndN(2,irs)
+
+      fact = (AOcc(ip)-AOcc(iq)) * &
+             (BOcc(ir)-BOcc(is)) * &
+              work(irs)
+
+      do i=1,ANDimX
+         tmp1(i,irs) = tmp1(i,irs) + &
+                      fact * &
+                      (AEigY(ipq+(i-1)*ANDimX)-AEigX(ipq+(i-1)*ANDimX))
+      enddo
+
+   enddo
+enddo
+
+sij=0
+do j=1,BNDimX
+   do i=1,ANDimX
+      do irs=1,BNDimX
+         ir = BIndN(1,irs)
+         is = BIndN(2,irs)
+         sij(i,j) = sij(i,j) + &
+                    (BEigY(irs+(j-1)*BNDimX)-BEigX(irs+(j-1)*BNDimX))*tmp1(i,irs)
+      enddo
+   enddo
+ enddo
+
+deallocate(work)
+
+end subroutine make_sij_Y_Chol
+
 !subroutine make_tij_Y(tmp3,tmp2,tmp1,posA,posB,Sab,Sba,A,B,NBas)
 subroutine make_tij_Y(tmp3,tmp2,tmp1,AOcc,BOcc,AEigY,AEigX,BEigY,BEigX,&
                       AIndN,BIndN,posA,posB,Sab,Sba,ANDimX,BNDimX,NBas)

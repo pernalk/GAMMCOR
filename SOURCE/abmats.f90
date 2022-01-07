@@ -3206,8 +3206,6 @@ allocate(OneRdmSq(NBasis,NBasis),FockSq(NBasis,NBasis),ints(NBasis,NBasis),work1
 call triang_to_sq2(OneRdm,OneRdmSq,NBasis)
 call triang_to_sq2(XOne,FockSq,NBasis)
 
-!open(newunit=iunit,file=trim(IntFileName),status='OLD',&
-!     access='DIRECT',form='UNFORMATTED',recl=8*NInte1)
 call reader%open(trim(IntFileName))
 
 kl = 0

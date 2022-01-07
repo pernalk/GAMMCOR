@@ -242,32 +242,54 @@ type(FlagsData)    :: Flags
 type(SaptData)     :: SAPT
 integer,intent(in) :: NBasis
 double precision,intent(inout) :: Tcpu,Twall
+integer :: i
 
- print*, 'Cholesky decomposition'
+ write(LOUT,'(1x,a)') 'SAPT(MC) with Cholesky decomposition'
+ write(LOUT,'(8a10)') ('----------',i=1,8)
+ if(SAPT%CAlpha) print*, 'SAPT%CAlpha',SAPT%CAlpha
 
- call e1elst_Chol(SAPT%monA,SAPT%monB,SAPT)
-! call e1exchs2(Flags,SAPT%monA,SAPT%monB,SAPT)
- call e1exch_NaNb(Flags,SAPT%monA,SAPT%monB,SAPT)
- call e2ind(Flags,SAPT%monA,SAPT%monB,SAPT)
- !call e2ind_hf_icphf(Flags,SAPT%monA,SAPT%monB,SAPT)
- call e2exind(Flags,SAPT%monA,SAPT%monB,SAPT)
- !call e2disp_Chol(Flags,SAPT%monA,SAPT%monB,SAPT)
- !call e2disp_Cmat(Flags,SAPT%monA,SAPT%monB,SAPT)
- Print*, 'SAPT%CAlpha',SAPT%CAlpha
- if(.not.SAPT%CAlpha) then
-   ! Adam's test
-   !call e2disp_Cmat_Chol(Flags,SAPT%monA,SAPT%monB,SAPT)
-   call e2disp_Cmat_Chol_diag(Flags,SAPT%monA,SAPT%monB,SAPT)
-   !call e2disp_Cmat_Chol_block(Flags,SAPT%monA,SAPT%monB,SAPT)
-   call e2disp_Cmat_Chol_proj(Flags,SAPT%monA,SAPT%monB,SAPT)
-   ! C(mat)-alpha
- else if(SAPT%CAlpha) then
-   call e2disp_CAlphaTilde_block(Flags,SAPT%monA,SAPT%monB,SAPT)
-   !call e2disp_CAlphaTilde_full(Flags,SAPT%monA,SAPT%monB,SAPT)
+ if(SAPT%SaptLevel==999 .or. SAPT%SaptLevel==666) then
+    if(SAPT%SaptLevel==999)  write(LOUT,'(1x,a,/)') 'RSPT2 calculation requested'
+    if(SAPT%SaptLevel==666)  write(LOUT,'(1x,a,/)') 'RSPT2+ calculation requested'
+
+    call e1elst_Chol(SAPT%monA,SAPT%monB,SAPT)
+    if(SAPT%SaptLevel==666) call e1exch_Chol(Flags,SAPT%monA,SAPT%monB,SAPT)
+    call e2ind_icerpa(Flags,SAPT%monA,SAPT%monB,SAPT)
+    if(.not.SAPT%CAlpha) then
+      call e2disp_Cmat_Chol_block(Flags,SAPT%monA,SAPT%monB,SAPT)
+    else if(SAPT%CAlpha) then
+      call e2disp_CAlphaTilde_block(Flags,SAPT%monA,SAPT%monB,SAPT)
+    endif
+
+    call summary_rspt(SAPT)
+
+ else
+
+    call e1elst_Chol(SAPT%monA,SAPT%monB,SAPT)
+    !call e1exchs2(Flags,SAPT%monA,SAPT%monB,SAPT)
+    call e1exch_NaNb(Flags,SAPT%monA,SAPT%monB,SAPT)
+    call e2ind(Flags,SAPT%monA,SAPT%monB,SAPT)
+    call e2exind(Flags,SAPT%monA,SAPT%monB,SAPT)
+   
+    ! test subroutines for E2disp
+    !call e2disp_Chol(Flags,SAPT%monA,SAPT%monB,SAPT)
+    !call e2disp_Cmat(Flags,SAPT%monA,SAPT%monB,SAPT)
+
+    if(.not.SAPT%CAlpha) then
+      ! Adam's test
+      !call e2disp_Cmat_Chol(Flags,SAPT%monA,SAPT%monB,SAPT)
+      !call e2disp_Cmat_Chol_diag(Flags,SAPT%monA,SAPT%monB,SAPT)
+      call e2disp_Cmat_Chol_block(Flags,SAPT%monA,SAPT%monB,SAPT)
+      !call e2disp_Cmat_Chol_proj(Flags,SAPT%monA,SAPT%monB,SAPT)
+    else if(SAPT%CAlpha) then
+      call e2disp_CAlphaTilde_block(Flags,SAPT%monA,SAPT%monB,SAPT)
+      !call e2disp_CAlphaTilde_full(Flags,SAPT%monA,SAPT%monB,SAPT)
+    endif
+    call e2exdisp(Flags,SAPT%monA,SAPT%monB,SAPT)
+    call summary_sapt(SAPT)
+
  endif
- call e2exdisp(Flags,SAPT%monA,SAPT%monB,SAPT)
 
- call summary_sapt(SAPT)
  call print_warn(SAPT)
  call free_sapt(Flags,SAPT)
 
@@ -422,6 +444,12 @@ double precision :: MO(NBasis*NBasis)
 
  if(SaptLevel.eq.1) return
 
+ if(SaptLevel.eq.999 .or. SaptLevel.eq.666) then
+    ! for RSPT2 only AB matrices are needed
+    call calc_ab_cas(Mon,MO,Flags,NBasis)
+    return
+ endif
+
  if(Flags%ISERPA==0) then
     if(SaptLevel.eq.0.or.SaptLevel.eq.10) then
 
@@ -462,6 +490,38 @@ integer,intent(in) :: iPINO,NBasis
 integer            :: thr_id
 integer            :: ntr,iunit_aotwosort
 
+if(Flags%SaptLevel==999) then
+  print*, 'In RSPT2 intermoner ints not calculated for now'
+  ! deallocate (FF|NCholesky) integrals
+  deallocate(A%FF)
+  deallocate(B%FF)
+  return
+endif
+
+if(Flags%SaptLevel==666) then
+  print*, 'Get 1-st order exchange ints (RSPT2+)'
+  if (Flags%ICholesky==1) then
+     call chol_ints_oooo(A%num0+A%num1,A%num0+A%num1,A%OO,&
+                         B%num0+B%num1,B%num0+B%num1,B%OO,&
+                         A%NChol,'OOOOAABB')
+     !call chol_ints_fofo(NBasis,A%num0+A%num1,A%FF,&
+     !                    NBasis,B%num0+B%num1,B%FF,&
+     !                    A%NChol,NBasis,'FOFOAABB')
+
+     call chol_ints_oooo(B%num0+B%num1,B%num0+B%num1,B%OO,  &
+                         B%num0+B%num1,A%num0+A%num1,B%OOBA,&
+                         A%NChol,'OOOOBBBA')
+
+     call chol_ints_oooo(A%num0+A%num1,A%num0+A%num1,A%OO,  &
+                         A%num0+A%num1,B%num0+B%num1,A%OOAB,&
+                         A%NChol,'OOOOAAAB')
+  endif
+  ! deallocate (FF|NCholesky) integrals
+  deallocate(A%FF)
+  deallocate(B%FF)
+  return
+endif
+
 if(Flags%ISERPA==0) then
   if(Flags%ICASSCF==1) then
      if(A%num1/=A%NAct) then
@@ -484,7 +544,7 @@ if(Flags%ISERPA==0) then
      endif
   endif
 
-  if(Flags%SaptLevel/=1) then
+  if(Flags%SaptLevel/=1.and.Flags%ICholesky==0) then
      ! integrals stored as (ov|ov)
      call tran4_gen(NBasis,&
                     A%num0+A%num1,A%CMO,&
@@ -499,12 +559,10 @@ if(Flags%ISERPA==0) then
 
   ! omp tasks
   ! Let's open the AOTWSORT only once, therefore we open it here
-  call reader%open('AOTWOSORT')
 
   if(Flags%ICholesky==1) then
-     !print*,'test Cholesky HERE!'
      !print*, 'dimOA',A%num0+A%num1
-     print*, 'dimOB',B%num0+B%num1
+     !print*, 'dimOB',B%num0+B%num1
      ! term A3-ind
      call chol_ints_fofo(NBasis,A%num0+A%num1,A%FF,&
                          NBasis,B%num0+B%num1,B%FF,&
@@ -572,6 +630,9 @@ if(Flags%ISERPA==0) then
    !           NBasis,A%CMO,&
    !           A%num0+A%num1,A%CMO(1:NBasis,1:(A%num0+A%num1)),&
    !           'FOFOAABA','AOTWOSORT')
+
+      call reader%open('AOTWOSORT')
+
    ! Gianfranco's OMP modification
       write(LOUT,'(/1x,a)') 'Transforming E2exch-ind integrals...'
       write(LOUT,'(1x,a)')  '    (the OMP version is active)     '
@@ -641,8 +702,8 @@ if(Flags%ISERPA==0) then
          !$omp end single
          !$omp end parallel
 
+      call reader%close
   endif
-  call reader%close
 
      write(LOUT,'(/1x,a)') 'Transforming E2exch-disp integrals...'
      if(Flags%ICholesky==1) then
@@ -656,6 +717,9 @@ if(Flags%ISERPA==0) then
         call chol_ints_fofo(NBasis,NBasis,B%FFBA, &
                             A%num0+A%num1,A%num0+A%num1,A%FF,&
                             A%NChol,NBasis,'FFOOBAAA')
+        ! deallocate (FF|NCholesky) integrals
+        deallocate(A%FF)
+        deallocate(B%FF)
      else
         call tran4_gen(NBasis,&
                  NBasis,B%CMO,&
@@ -1094,6 +1158,10 @@ double precision,allocatable :: work1(:),work2(:),XOne(:)
 character(8)                 :: label
 character(:),allocatable     :: onefile,twofile
 character(:),allocatable     :: twojfile,twokfile
+!test
+double precision :: Tcpu,Twall
+
+call clock('START',Tcpu,Twall)
 
 ! set dimensions
  NSq = NBas**2
@@ -1163,12 +1231,14 @@ character(:),allocatable     :: twojfile,twokfile
             NBas,MO,&
             NBas,MO,&
             twojfile,'AOTWOSORT')
+       call clock('FFOO',Tcpu,Twall)
        call tran4_gen(NBas,&
             NBas,MO,&
             Mon%num0+Mon%num1,MO(1:NBas*(Mon%num0+Mon%num1)),&
             NBas,MO,&
             Mon%num0+Mon%num1,MO(1:NBas*(Mon%num0+Mon%num1)),&
             twokfile,'AOTWOSORT')
+       call clock('FOFO',Tcpu,Twall)
     endif
  end select
 
@@ -1617,6 +1687,36 @@ endif
 
 end subroutine summary_sapt_verbose
 
+subroutine summary_rspt(SAPT)
+implicit none
+
+type(SaptData) :: SAPT
+
+integer :: i
+double precision :: erspt2
+
+erspt2 = SAPT%elst +  SAPT%e2ind + SAPT%e2disp
+if(SAPT%SaptLevel==666) then ! RSPT2+
+  erspt2 = erspt2 + SAPT%exchs2
+endif
+
+write(LOUT,'(/,8a10)') ('**********',i=1,4)
+write(LOUT,'(1x,a)') 'SAPT SUMMARY / milliHartree'
+write(LOUT,'(8a10)') ('**********',i=1,4)
+
+write(LOUT,'(1x,a)') 'SAPT level  = RSPT2'
+
+write(LOUT,'(1x,a,t19,a,f16.8)') 'E1elst',     '=', SAPT%elst  *1.d03
+if(SAPT%SaptLevel==666) then ! RSPT2+
+   write(LOUT,'(1x,a,t19,a,f16.8)') 'E1exch',     '=', SAPT%exchs2*1.d03
+endif
+write(LOUT,'(1x,a,t19,a,f16.8)') 'E2ind',      '=', SAPT%e2ind *1.d03
+write(LOUT,'(1x,a,t19,a,f16.8)') 'E2disp',     '=', SAPT%e2disp*1.d03
+write(LOUT,'(1x,a,t19,a,f16.8)') 'Eint(RSPT2)','=', erspt2*1.0d3
+write(LOUT,'()')
+
+end subroutine summary_rspt
+
 subroutine free_sapt(Flags,SAPT)
 implicit none
 
@@ -1649,6 +1749,12 @@ if(allocated(SAPT%monB%Kmat)) then
   deallocate(SAPT%monB%Kmat)
 endif
 ! test Cholesky
+if(allocated(SAPT%monA%DChol)) then
+   deallocate(SAPT%monA%Dchol)
+endif
+if(allocated(SAPT%monB%DChol)) then
+   deallocate(SAPT%monB%Dchol)
+endif
 if(allocated(SAPT%monA%OV)) then
    deallocate(SAPT%monA%OV)
 endif

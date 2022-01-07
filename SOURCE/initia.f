@@ -126,6 +126,7 @@ C
       Close(10)
 C
       ElseIf(ICASSCF.Eq.1) Then
+      print*, 'here? Dalton-CAS'
 C
 c      Occ(1:NBasis)=0.D0
 cC
@@ -143,6 +144,7 @@ c      EndDo
       Do I=1,NInAc+NAc
       Sum=Sum+Occ(I)
       EndDo
+      print*, '???',sum
 C
       If(NInAc.Eq.0) Then
       NGem=2
@@ -245,6 +247,7 @@ C
 C
       use types
       use sorter
+c     use Cholesky_old  ! create AOTWOSORT file
       use Cholesky
       use tran
       use abmat
@@ -266,12 +269,14 @@ C
 C     LOCAL ARRAYS
 C
       Real*8, Allocatable :: RDM2(:),RDMAB2(:)
+      Real*8, Allocatable :: MatFF(:,:)
       Dimension Gamma(NInte1),Work(NBasis),PC(NBasis),
      $ AUXM(NBasis,NBasis),AUXM1(NBasis,NBasis),
      $ Fock(NBasis*NBasis),
      $ UAux(NBasis,NBasis),
      $ FockF(NInte1),GammaAB(NInte1),Eps(NBasis,NBasis)
       Integer(8) MemSrtSize,IOutInfo
+      Dimension FockF2(NInte1),WorkSq(NBasis,NBasis)
 
       If(iORCA==1) then
       LiborNew=1
@@ -472,13 +477,19 @@ C
 C
       ElseIf(ITwoEl.Gt.1) Then
 C
+      If(ICholesky==0) Then
       MemSrtSize=MemVal*1024_8**MemType
       Call readtwoint(NBasis,4,'DPQRS.bin','AOTWOSORT',
      $                MemSrtSize,IOutInfo)
 C
-      If(ICholesky==1) Then
-         Call chol_CoulombMatrix(CholeskyVecs,'AOTWOSORT',ICholeskyAccu)
-         NCholesky=CholeskyVecs%NCholesky
+      Else If(ICholesky==1) Then
+c     If(ICholesky==1) Then
+c     print*, 'use Cholesky-old'
+!     Call chol_CoulombMatrix(CholeskyVecs,'AOTWOSORT',ICholeskyAccu)
+c     print*, 'use Cholesky-new'
+      Call chol_CoulombMatrix(CholeskyVecs,NBasis,'DPQRS.bin',4,
+     &                        ICholeskyAccu)
+      NCholesky=CholeskyVecs%NCholesky
       EndIf
 C
       EndIf
@@ -538,7 +549,28 @@ C
       EndDo
       Call sq_to_triang2(UAux,GammaAB,NBasis)
 C
-      Call FockGen_mithap(FockF,GammaAB,XKin,NInte1,NBasis,'AOTWOSORT')
+      If(ICholesky==0) Then
+         Call FockGen_mithap(FockF,GammaAB,XKin,NInte1,NBasis,
+     &                       'AOTWOSORT')
+      ElseIf(ICholesky==1) Then
+         Call FockGen_CholR(FockF,CholeskyVecs%R(1:NCholesky,1:NInte1),
+     &                      GammaAB,XKin,NInte1,NCholesky,NBasis)
+      EndIf
+C
+C      WorkSq = 0
+C      call triang_to_sq2(FockF,WorkSq,NBasis)
+C      Err = 0
+C      do J=1,NInAc
+C      do I=1,j
+C      if(i.ne.j) Err = Err + WorkSq(i,j)**2
+C      enddo
+C      enddo
+C      do J=NInAc+NAc+1,NBasis
+C      do I=NInAc+NAc+1,J
+C      if(i.ne.j) Err = Err + WorkSq(i,j)**2
+C      enddo
+C      enddo
+C      Print*, 'Err-2',Sqrt(Err)
 C
 C     INACTIVE
       If(NInAc.Ne.Zero) Then
@@ -555,7 +587,7 @@ C
       Do J=1,NInAc
       URe(I,J)=Fock((J-1)*NInAc+I)
       EndDo
-      EndDo 
+      EndDo
 C
 C      Print*, 'INAct-MY', norm2(URe)
 C
@@ -690,7 +722,9 @@ C
       If(I.Ne.J) Err=Err+Abs(URe(I,J))
       EndDo
       EndDo
+C     Print*, 'Err',Err
       If(Err.Gt.1.D-5) IUNIT=0
+C     If(Err.Gt.1.D-4) IUNIT=0 ! this should work with Cholesky/Ludicrous
 C
       If(IUNIT.Eq.1) Then
       Write(6,'(/,X,"URe is a unit matrix up to ",E16.6)') ERR
@@ -705,21 +739,22 @@ C
 C
       If(IUNIT.Eq.0) Then
 C
+      Write(6,'(" Transforming two-electron integrals ...",/)')
+C
       Call MatTr(XKin,URe,NBasis)
 C
       If(ITwoEl.Eq.1) Then
-      Write(6,'(" Transforming two-electron integrals ...",/)')
       Call TwoNO1(TwoEl,URe,NBasis,NInte2)
 C
       ElseIf(ITwoEl.Eq.3) Then
 C
-C     CREATE FOFO and FFOO ?
 C     PREPARE POINTERS: NOccup=num0+num1
       Call prepare_nums(Occ,Num0,Num1,NBasis)
       If(ISwitch.Eq.1) Num0=NInAC
       If(ISwitch.Eq.1) Num1=NAc
 C     TRANSFORM J AND K
       UAux=transpose(URe)
+      If(ICholesky==0) Then
       Call tran4_gen(NBasis,
      $        Num0+Num1,UAux(1:NBasis,1:(Num0+Num1)),
      $        Num0+Num1,UAux(1:NBasis,1:(Num0+Num1)),
@@ -732,6 +767,34 @@ C     TRANSFORM J AND K
      $        NBasis,UAux,
      $        Num0+Num1,UAux(1:NBasis,1:(Num0+Num1)),
      $        'FOFO','AOTWOSORT')
+      ElseIf(ICholesky==1) Then
+      Allocate(MatFF(NCholesky,NBasis**2))
+C       print*, 'use chol_MOTransf-old,IUNIT',IUNIT
+C       Call chol_MOTransf(MatFF,CholeskyVecs,
+C     $              UAux,1,NBasis,
+C     $              UAux,1,NBasis)
+C
+      MemMOTransf = 1200 ! this is fixed for now in MB
+                         ! will be changed in next revision
+      Call chol_MOTransf_TwoStep(MatFF,CholeskyVecs,
+     $              UAux,1,NBasis,
+     $              UAux,1,NBasis,
+     $              MemMOTransf)
+C
+      Call chol_ints_fofo(NBasis,Num0+Num1,MatFF,
+     $                    NBasis,Num0+Num1,MatFF,
+     $                    NCholesky,NBasis,'FOFO')
+      Call chol_ints_fofo(NBasis,NBasis,MatFF,
+     $                    Num0+Num1,Num0+Num1,MatFF,
+     $                    NCholesky,NBasis,'FFOO')
+
+      open(newunit=iunt,file='cholvecs',form='unformatted')
+      write(iunt) NCholesky
+      write(iunt) MatFF(1:NCholesky,1:NBasis**2)
+      close(iunt)
+
+      Deallocate(MatFF)
+      EndIf
 CC
       EndIf
 C
@@ -748,6 +811,7 @@ C     READ J AND K AND DUMP TO DISC
       EndDo
 !
       If(ICholesky==1) then
+c      print*, 'use chol_triang_fofo,IUNIT',IUNIT
          call chol_triang_fofo(NBasis,NBasis,
      $                  CholeskyVecs%R(1:NCholesky,1:NInte1),
      $                  Num0+Num1,Num0+Num1,
@@ -758,6 +822,17 @@ C     READ J AND K AND DUMP TO DISC
      $                  NBasis,Num0+Num1,
      $                  CholeskyVecs%R(1:NCholesky,1:NInte1),
      $                  NCholesky,NInte1,NBasis,'FOFO')
+
+      Allocate(MatFF(NCholesky,NBasis**2))
+      do i=1,NCholesky
+         call triang_to_sq(CholeskyVecs%R(i,1:NInte1),MatFF(i,:),NBasis)
+      enddo
+      open(newunit=iunt,file='cholvecs',form='unformatted')
+      write(iunt) NCholesky
+      write(iunt) MatFF(1:NCholesky,1:NBasis**2)
+      close(iunt)
+      Deallocate(MatFF)
+
       Else
          Call read4_gen(NBasis,
      $           Num0+Num1,Num0+Num1,NBasis,NBasis,
@@ -773,7 +848,7 @@ C
 C     CHECK IF INACT AND VIRT ORBITALS ARE CANONICAL
 C
       If(IBin.Ge.0) Then
-      NBSave=NBasis        
+      NBSave=NBasis
       NBasis=NAc
       NInAc=0
       EndIf
@@ -899,7 +974,7 @@ C
       If(IUNIT.Eq.0) Call TrRDM2(RDM2,UMOAO,NBasis,NRDM2)
       GoTo 777
 C
-      EndIf      
+      EndIf
 C 
       Call TrRDM2(RDM2,URe,NBasis,NRDM2)
 C
@@ -1038,8 +1113,10 @@ C
       use types
       use sorter
       use tran
+c     use Cholesky_old  ! requires AOTWOSORT
       use Cholesky
-      use abmat 
+      use abmat
+      use timing
 C
       Implicit Real*8 (A-H,O-Z)
       Parameter (Half=0.5D0)
@@ -1060,6 +1137,7 @@ C
       Integer(8) :: MemSrtSize
       Type(TCholeskyVecs) :: CholeskyVecs
       Real*8, Allocatable :: MatFF(:,:)
+      Real*8 Tcpu,Twall
 C
       Character*60 FName,Aux1,Title
 C
@@ -1146,10 +1224,13 @@ C     LOAD ONE-ELE INTEGS IN AO
       FName(K:K+8)='xone.dat'
 C      Call Int1_AO(XKin,NInte1,FName,NumOSym,Nbasis)
 C
-C     HAP
       Call readoneint_molpro(XKin,'AOONEINT.mol','ONEHAMIL',
      $     .true.,NInte1)
 C
+C     SET TIMING FOR 2-el integrals
+      Call clock('START',Tcpu,Twall)
+C
+      If(ICholesky==0) Then
 C     memory allocation for sorter
       MemSrtSize=MemVal*1024_8**MemType
 C     KP: If IFunSR=6 integrals are not needed and are not loaded
@@ -1161,10 +1242,14 @@ C     KP: If IFunSR=6 integrals are not needed and are not loaded
       If(ITwoEl.Eq.1) Call LoadSaptTwoEl(4,TwoEl,NBasis,NInte2)
       EndIf
 C
-      If(ICholesky==1) Then
-      Call chol_CoulombMatrix(CholeskyVecs,'AOTWOSORT',ICholeskyAccu)
+      Else If(ICholesky==1) Then
+c     If(ICholesky==1) Then
+c     Call chol_CoulombMatrix(CholeskyVecs,'AOTWOSORT',ICholeskyAccu)
+       Call chol_CoulombMatrix(CholeskyVecs,NBasis,'AOTWOINT.mol',2,
+     &                         ICholeskyAccu)
       NCholesky=CholeskyVecs%NCholesky
-      EndIf
+      EndIf ! ICholesky
+      Call clock('2-electron ints',Tcpu,Twall)
 C
 C     LOAD AO TO CAS_MO ORBITAL TRANSFORMATION MATRIX FROM uaomo.dat
 C      
@@ -1183,14 +1268,14 @@ C
 C     READ RDMs: OLD
       Write(6,'(/," Reading in 1-RDM ...")')
 C
-C      Call read_1rdm_molpro(Gamma,InSt(1,1),InSt(2,1),
+C      Call read_1rdm_molpro(Gamma,InSt(1,1),InSt(2,1),ISpinMs2,
 C     $ '2RDM',IWarn,NBasis)
 C
 C     READ RDMs: NEW
       Wght=One/Float(NStates)
       Do I=1,NStates
       GammaAB(1:NInte1)=Zero
-      Call read_1rdm_molpro(GammaAB,InSt(1,I),InSt(2,I),
+      Call read_1rdm_molpro(GammaAB,InSt(1,I),InSt(2,I),ISpinMs2,
      $ '2RDM',IWarn,NBasis)
       Do K=1,NInte1
       Gamma(K)=Gamma(K)+Wght*GammaAB(K)
@@ -1309,7 +1394,7 @@ C
       EndDo
 C
 C     FIND CANONICAL INACTIVE AND VIRTUAL ORBITALS 
-C      
+C
       If(IAO.Eq.0) Then
 C
       Call FockGen(FockF,GammaF,XKin,TwoEl,NInte1,NBasis,NInte2)
@@ -1337,9 +1422,21 @@ C
       EndDo
 C
       If (IFunSR.Eq.0.Or.IFunSR.Eq.3.Or.IFunSR.Eq.5.Or.IFunSR.Eq.6) Then
-      Call FockGen_mithap(FockF,GammaAB,XKin,NInte1,NBasis,'AOTWOSORT')
+          If(ICholesky==0) Then
+          Call FockGen_mithap(FockF,GammaAB,XKin,NInte1,NBasis,
+     &                        'AOTWOSORT')
+          ElseIf(ICholesky==1) Then
+          Call FockGen_CholR(FockF,CholeskyVecs%R(1:NCholesky,1:NInte1),
+     &                       GammaAB,XKin,NInte1,NCholesky,NBasis)
+          EndIf
       ElseIf (IFunSR.Eq.1.Or.IFunSR.Eq.2.Or.IFunSR.Eq.4) Then
-      Call FockGen_mithap(FockF,GammaAB,XKin,NInte1,NBasis,'AOERFSORT')
+          If(ICholesky==0) Then
+             Call FockGen_mithap(FockF,GammaAB,XKin,NInte1,NBasis,
+     &                           'AOERFSORT')
+          ElseIf(ICholesky==1) Then
+             Write(6,'(1x,a)') 'Cholesky not ready for LR-ERF!'
+             Stop
+          EndIf
       EndIf
 C
 C     TESTY:
@@ -1455,7 +1552,6 @@ C     PREPARE POINTERS: NOccup=num0+num1
 C     TRANSFORM J AND K
       UAux=transpose(UAOMO)
       If (IFunSR.Eq.0.Or.IFunSR.Eq.3.Or.IFunSR.Eq.5) Then
-C     This use of Cholesky is for test only 
       If (ICholesky==0) Then
 C
       Call tran4_gen(NBasis,
@@ -1471,12 +1567,22 @@ C
      $        Num0+Num1,UAux(1:NBasis,1:(Num0+Num1)),
      $        'FOFO','AOTWOSORT')
 C
+      Call clock('tran4_FOFO',Tcpu,Twall)
+C
       ElseIf (ICholesky==1) Then
 C
       Allocate(MatFF(NCholesky,NBasis**2))
-      Call chol_MOTransf(MatFF,CholeskyVecs,
-     $                   UAux,1,NBasis,
-     $                   UAux,1,NBasis)
+C     Old 1-step transformation (much slower)
+c     Call chol_MOTransf(MatFF,CholeskyVecs,
+c    $                   UAux,1,NBasis,
+c    $                   UAux,1,NBasis)
+C
+      Call chol_MOTransf_TwoStep(MatFF,CholeskyVecs,
+     $              UAux,1,NBasis,
+     $              UAux,1,NBasis,
+     $              1500)
+C
+      Call clock('chol_NOTransf',Tcpu,Twall)
 C
       Call chol_ints_fofo(NBasis,Num0+Num1,MatFF,
      $                    NBasis,Num0+Num1,MatFF,
@@ -1484,6 +1590,8 @@ C
       Call chol_ints_fofo(NBasis,NBasis,MatFF,
      $                    Num0+Num1,Num0+Num1,MatFF,
      $                    NCholesky,NBasis,'FFOO')
+C
+      Call clock('chol_FFOOFOFO',Tcpu,Twall)
 C
 C KP 07.2021: dump MatFF
 C
@@ -1537,13 +1645,13 @@ C
 C
 C     READ RDMs: OLD
 C      Call read_2rdm_molpro(RDM2Act,InSt(1,1),InSt(2,1),
-C     $ '2RDM',IWarn,NAct)
+C     $ ISpinMs2,'2RDM',IWarn,NAct)
 C
 C     READ RDMs: NEW
       Wght=One/Float(NStates)
       Do I=1,NStates
       GammaAB(1:NInte1)=Zero
-      Call read_2rdm_molpro(HlpRDM2,InSt(1,I),InSt(2,I),
+      Call read_2rdm_molpro(HlpRDM2,InSt(1,I),InSt(2,I),ISpinMs2,
      $ '2RDM',IWarn,NAct)
       Do K=1,NRDM2Act
       RDM2Act(K)=RDM2Act(K)+Wght*HlpRDM2(K)
@@ -3426,7 +3534,7 @@ C
       Open(10,File="occupations.dat",Form='Formatted',Status='Old')
       Read(10,*)NNIn,NNAct
       NNIn=NNIn/2
-      Read(10,*)(Occ1(I),I=1,NNAct+NNIn)
+      Read(10,*) (Occ1(I),I=1,NNAct+NNIn)
       Read(10,*) (IActOrb(I),I=1,NSym)
       Read(10,*) (InActOrb(I),I=1,NSym)
       Close(10)

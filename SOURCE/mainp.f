@@ -222,6 +222,7 @@ C
 C     SELECT ELECTRONIC STATE
 C
       NStates = System%NStates
+      ISpinMs2= System%ISpinMs2
       InSt(1:2,1:NStates) = System%InSt
       InTrSt(1:2,1:1) = System%InTrSt
 C

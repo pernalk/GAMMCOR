@@ -351,9 +351,9 @@ if(Flags%ICASSCF==0.and.Flags%ISERPA==0) then
   !enddo
 
   !! TEST COUPLED ANDREAS
-   ! print*, 'CPLD-ANDREAS:'
-   ! Mon%EigX = EigVecR
-   ! Mon%EigY = 0
+  ! print*, 'CPLD-ANDREAS:'
+  ! Mon%EigX = EigVecR
+  ! Mon%EigY = 0
 
 
 !!    else  ! MH 1 Dec 2020: disable ERPAVECTRANS
@@ -429,7 +429,7 @@ if(Flags%ICASSCF==0.and.Flags%ISERPA==0) then
      write(iunit) Mon%FF
      close(iunit)
 
-     call Project_DChol(Mon%PMat,Mon%IndN,NBas,Mon%NDimX)
+     !call Project_DChol(Mon%PMat,Mon%IndN,NBas,Mon%NDimX)
 
      !call CIter_FOFO(PMat,ECorr,ACAlpha,XOne,URe,Mon%Occ,EGOne,NGOcc,&
      !                Mon%IGem,Mon%NAct,Mon%INAct,Mon%NELE,NBas,NInte1, &
@@ -560,6 +560,135 @@ endif
  !call delfile(twofile)
 
 end subroutine calc_resp_casgvb
+
+subroutine calc_ab_cas(Mon,MO,Flags,NBas)
+!
+!for Cholesky !
+! should work with e2disp_CAlpha
+!
+implicit none
+
+type(SystemBlock) :: Mon
+type(FlagsData) :: Flags
+double precision :: MO(:)
+integer :: NBas
+integer :: NSq,NInte1,NInte2
+double precision, allocatable :: XOne(:),TwoMO(:)
+double precision, allocatable :: ABPlus(:), ABMin(:), URe(:,:)
+double precision, allocatable :: work1(:),work2(:)
+
+integer :: dimOcc
+integer :: i,j,k,l,ii,jj,ij,ij1,ione,itwo
+integer :: ip,iq,pq
+integer :: iunit
+
+double precision :: ACAlpha
+double precision :: ECASSCF
+
+character(8) :: label
+character(:),allocatable :: onefile,twofile
+character(:),allocatable :: twojfile,twokfile
+character(:),allocatable :: abfile
+character(:),allocatable :: abpm0file,xy0file
+
+double precision,parameter :: One = 1d0, Half = 0.5d0
+
+integer :: nblk
+type(EblockData)             :: A0blockIV
+type(EblockData),allocatable :: A0block(:)
+
+! set filenames
+if(Mon%Monomer==1) then
+   onefile    = 'ONEEL_A'
+   twofile    = 'TWOMOAA'
+   twojfile   = 'FFOOAA'
+   twokfile   = 'FOFOAA'
+   abfile     = 'ABMAT_A'
+   abpm0file  = 'A0BLK_A'
+   xy0file    = 'XY0_A'
+elseif(Mon%Monomer==2) then
+   onefile    = 'ONEEL_B'
+   twofile    = 'TWOMOBB'
+   twojfile   = 'FFOOBB'
+   twokfile   = 'FOFOBB'
+   abfile     = 'ABMAT_B'
+   abpm0file  = 'A0BLK_B'
+   xy0file    = 'XY0_B'
+endif
+
+! set dimensions
+NInte1 = NBas*(NBas+1)/2
+NInte2 = 1
+if(Mon%TwoMoInt==TWOMO_INCORE) NInte2 = NInte1*(NInte1+1)/2
+
+allocate(work1(NBas**2),work2(NBas**2),XOne(NInte1),URe(NBas,NBas))
+allocate(TwoMO(NInte2))
+
+URe = 0d0
+do i=1,NBas
+   URe(i,i) = 1d0
+enddo
+
+! read 1-el
+call get_1el_h_mo(XOne,MO,NBas,onefile)
+
+! INCORE: load 2-el integrals
+if(Mon%TwoMoInt==TWOMO_INCORE) call LoadSaptTwoNO(Mon%Monomer,TwoMO,NBas,NInte2)
+
+! get AB matrices for CAS function
+
+ACAlpha=One
+allocate(ABPlus(Mon%NDimX**2),ABMin(Mon%NDimX**2))
+
+ECASSCF = 0
+
+select case(Mon%TwoMoInt)
+case(TWOMO_FOFO)
+   call AB_CAS_FOFO(ABPlus,ABMin,ECASSCF,URe,Mon%Occ,XOne, &
+               Mon%IndN,Mon%IndX,Mon%IGem,Mon%NAct,Mon%INAct,Mon%NDimX,NBas,Mon%NDimX,&
+               NInte1,twojfile,twokfile,ACAlpha,.false.)
+case(TWOMO_FFFF)
+
+   call AB_CAS_mithap(ABPlus,ABMin,ECASSCF,URe,Mon%Occ,XOne, &
+               Mon%IndN,Mon%IndX,Mon%IGem,Mon%NAct,Mon%INAct,Mon%NDimX,NBas,Mon%NDimX,&
+                NInte1,twofile,ACAlpha,.false.)
+case(TWOMO_INCORE)
+
+   call AB_CAS(ABPlus,ABMin,ECASSCF,URe,Mon%Occ,XOne,TwoMO,Mon%IPair,&
+               Mon%IndN,Mon%IndX,Mon%NDimX,NBas,Mon%NDimX,NInte1,NInte2,ACAlpha)
+end select
+
+print*, 'ABPlus',norm2(ABPlus)
+print*, 'ABMin',norm2(ABMin)
+
+! dump matrices for iterative C-ERPA
+open(newunit=iunit,file=abfile,form='unformatted')
+write(iunit) ABPlus
+write(iunit) ABMin
+close(iunit)
+
+! UNCOUPLED
+select case(Mon%TwoMoInt)
+case(TWOMO_FOFO)
+   ! are prop-files necessary?
+   call Y01CAS_FOFO(Mon%Occ,URe,XOne,ABPlus,ABMin,ECASSCF, &
+          'DUMMY','DUMMY',     &
+          'DUMMY',xy0file,     &
+          Mon%IndN,Mon%IndX,Mon%IGem,Mon%NAct,Mon%INAct,Mon%NDimX, &
+          NBas,Mon%NDimX,NInte1,Mon%NoSt,twofile,twojfile,twokfile,Flags%IFlag0)
+
+   nblk = 1 + NBas - Mon%NAct
+   allocate(A0Block(nblk))
+   call AC0BLOCK(Mon%Occ,URe,XOne, &
+        Mon%IndN,Mon%IndX,Mon%IGem,Mon%NAct,Mon%INAct,Mon%NDimX, &
+        NBas,Mon%NDimX,NInte1,twojfile,twokfile, &
+        A0BlockIV,A0Block,nblk,abpm0file,1)
+end select
+
+deallocate(TwoMO)
+deallocate(ABMin,ABPlus)
+
+end subroutine calc_ab_cas
 
 subroutine calc_resp_extrapolate(Mon,Flags,NBasis)
 ! calculate response for extrapolated SAPT formulas

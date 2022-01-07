@@ -37,7 +37,7 @@ if(adjustl(trim(mode))/='START') then
 
    write(6,'(/,1x,3a)',advance='no') 'CPU  time in ',string_out,' is '
    call print_watch(Tcpu_inter-Tcpu)
-   write(6,'(1x,3a)',advance='no') 'Wall time in ',string_out,' is '
+   write(6,'(1x,3a)',advance='no')   'Wall time in ',string_out,' is '
    call print_watch(Twall_inter-Twall)
 
 endif

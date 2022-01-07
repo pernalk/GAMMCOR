@@ -24,15 +24,15 @@ integer, parameter :: JOB_TYPE_ERPA  = 3
 integer, parameter :: JOB_TYPE_EERPA = 4
 integer, parameter :: JOB_TYPE_SAPT  = 5
 integer, parameter :: JOB_TYPE_PDFT  = 6
-integer, parameter :: JOB_TYPE_CASPIDFT = 7
+integer, parameter :: JOB_TYPE_CASPIDFT    = 7
 integer, parameter :: JOB_TYPE_CASPIDFTOPT = 8
-integer, parameter :: JOB_TYPE_EERPA_OLD = 9
-integer, parameter :: JOB_TYPE_AC0D = 10
-integer, parameter :: JOB_TYPE_AC0DNOSYMM = 11
-integer, parameter :: JOB_TYPE_NLOCCORR = 12
-integer, parameter :: JOB_TYPE_AC0DP = 13
-integer, parameter :: JOB_TYPE_ACFREQ = 14
-integer, parameter :: JOB_TYPE_ACFREQNTH = 15
+integer, parameter :: JOB_TYPE_EERPA_OLD   = 9
+integer, parameter :: JOB_TYPE_AC0D        = 10
+integer, parameter :: JOB_TYPE_AC0DNOSYMM  = 11
+integer, parameter :: JOB_TYPE_NLOCCORR    = 12
+integer, parameter :: JOB_TYPE_AC0DP       = 13
+integer, parameter :: JOB_TYPE_ACFREQ      = 14
+integer, parameter :: JOB_TYPE_ACFREQNTH   = 15
 
 integer, parameter :: SAPTLEVEL0 = 0
 integer, parameter :: SAPTLEVEL1 = 1
@@ -43,7 +43,7 @@ integer, parameter :: FLAG_NOBASIS = 0
 integer, parameter :: FLAG_REDVIRT = 0
 logical, parameter :: FLAG_RESTART = .FALSE.
 integer, parameter :: FLAG_PRINT_LEVEL = 0
-integer, parameter :: FLAG_DEBUG_FL12 = 1
+integer, parameter :: FLAG_DEBUG_FL12  = 1
 
 integer, parameter :: RDM_TYPE_GVB  = 1
 integer, parameter :: RDM_TYPE_APSG = 2
@@ -120,7 +120,7 @@ type CalculationBlock
       integer :: SaptLevel = SAPTLEVEL2
       integer :: vdWCoef   = 0
       integer :: RedVirt   = FLAG_REDVIRT
-      integer :: MemVal = 2, MemType = 3
+      integer :: MemVal = 2, MemType = 3 ! default: use 2 GB for 3-ind_tran (Cholesky)
       logical :: Restart    = FLAG_RESTART
       logical :: PostCAS    = FLAG_POSTCAS
       integer :: IPrint     = 0
@@ -134,8 +134,9 @@ type CalculationBlock
 end type CalculationBlock
 
 type SystemBlock
-      integer :: NoSt = 1
-      integer :: NStates = 1
+      integer :: NoSt     = 1
+      integer :: NStates  = 1
+      integer :: ISpinMs2 = 0
       integer :: EigFCI = 1
       integer :: Charge = 0
       integer :: ZNucl  = 0
@@ -171,6 +172,7 @@ type SystemBlock
       logical :: DeclareTwoMo     = .false.
       logical :: DeclareSt        = .false.
       logical :: DeclareTrSt      = .false.
+      logical :: DeclareSpin      = .false.
       logical :: DeclareThrSelAct = .false.
       logical :: DeclareThrQVirt  = .false.
       logical :: ISHF    = .false.
@@ -207,7 +209,9 @@ type SystemBlock
       double precision,allocatable :: CMO(:,:)
       double precision,allocatable :: OV(:,:),OO(:,:), &
                                       FO(:,:),FF(:,:), &
-                                      FFAB(:,:),FFBA(:,:)
+                                      FFAB(:,:),FFBA(:,:), &
+                                      OOAB(:,:),OOBA(:,:)
+      double precision,allocatable :: DChol(:,:)
       double precision,allocatable :: Pmat(:,:)
       double precision,allocatable :: WPot(:,:),Kmat(:,:)
       double precision,allocatable :: VCoul(:)
@@ -672,25 +676,27 @@ enddo
 
 end subroutine readorbsmolpro
 
-subroutine read_2rdm_molpro(twordm,nost,nosym,infile,iwarn,nact)
+subroutine read_2rdm_molpro(twordm,nost,nosym,noms2,infile,iwarn,nact)
 implicit none
 ! only active part of 2RDM is kept
 
-integer,intent(in) :: nact,nost,nosym
+integer,intent(in) :: nact,nost,nosym,noms2
 integer,intent(inout) :: iwarn
 character(*),intent(in) :: infile
 double precision,intent(out) :: twordm(nact**2*(nact**2+1)/2)
 
 integer :: iunit,ios,ist,ic1d,TrSq
-integer :: istsym,isym,nstate,nstsym
+integer :: istsym,isym,nstate,ims2,nstsym
 integer :: i,j,k,l,ij,kl,ik,jl,ijkl,ikjl,lend
 double precision,allocatable :: work(:)
-logical :: scanfile
+logical :: scanfile,scanms2
 character(8) :: label
 
  !check if any states declared in input
  scanfile = .false.
- if(nosym>0) scanfile = .true.
+ scanms2  = .false.
+ if(nosym>0)  scanfile = .true.
+ if(noms2>=0) scanms2  = .true.
 
  TrSq = nact**2*(nact**2+1)/2
 
@@ -709,15 +715,25 @@ character(8) :: label
               read(iunit) ic1d,nstsym
               if(scanfile) then 
                  do istsym=1,nstsym
-                    read(iunit) isym,nstate
+                    read(iunit) isym,nstate,ims2
+                    !print*, 'isym,nstate,ims2',isym,nstate,ims2
                     do i=1,nstate
-                       read(iunit) ist 
+                       read(iunit) ist
                        read(iunit) work(1:TrSq)
-                       if(ist==nost.and.isym==nosym) exit fileloop
+                       if(scanms2) then
+                          if(ist==nost.and.isym==nosym.and.ims2==noms2) exit fileloop
+                       else
+                          if(ist==nost.and.isym==nosym) exit fileloop
+                       endif
                     enddo
                  enddo
-                 write(LOUT,'(1x,a,i2,a,i1,a)') 'ERROR!!! 2RDM FOR STATE',&
-                             & nost,'.',nosym,' NOT PRESENT IN 2RDM FILE!'
+                 if(scanms2) then
+                    write(LOUT,'(1x,a,i2,a,i1,a,i1,a)') 'ERROR!!! 2RDM FOR STATE',&
+                                & nost,'.',nosym,' AND MS2 = ',noms2,' NOT PRESENT IN 2RDM FILE!'
+                 else
+                    write(LOUT,'(1x,a,i2,a,i1,a)') 'ERROR!!! 2RDM FOR STATE',&
+                                & nost,'.',nosym,' NOT PRESENT IN 2RDM FILE!'
+                 endif
                  stop
               else
                  read(iunit) isym,nstate 
@@ -843,23 +859,25 @@ character(8) :: label
 
 end subroutine read_nact_molpro
 
-subroutine read_1rdm_molpro(onerdm,nost,nosym,infile,iwarn,nbasis)
+subroutine read_1rdm_molpro(onerdm,nost,nosym,noms2,infile,iwarn,nbasis)
 implicit none
 
-integer,intent(in) :: nbasis,nost,nosym
+integer,intent(in) :: nbasis,nost,nosym,noms2
 integer,intent(inout) :: iwarn 
 character(*),intent(in) :: infile
 double precision,intent(out) :: onerdm(nbasis*(nbasis+1)/2)
 
-integer :: iunit,ios,ist,isym,nact,nact2,nstate,nstsym
+integer :: iunit,ios,ist,isym,nact,nact2,nstate,ims2,nstsym
 integer :: i,j,ij,idx,istsym
 double precision,allocatable :: work(:)
-logical :: scanfile
+logical :: scanfile,scanms2
 character(8) :: label
 
  !check if any states declared in input
  scanfile = .false.
- if(nosym>0) scanfile = .true.
+ scanms2  = .false.
+ if(nosym>0)  scanfile = .true.
+ if(noms2>=0) scanms2  = .true.
 
  allocate(work(NBasis**2))
  open(newunit=iunit,file=infile,status='OLD', &
@@ -876,15 +894,25 @@ character(8) :: label
               !print*, nact2,nstate
               if(scanfile) then
                  do istsym=1,nstsym
-                    read(iunit) isym,nstate 
+                    read(iunit) isym,nstate,ims2
                     do i=1,nstate
                        read(iunit) ist 
                        read(iunit) work(1:nact2)
-                       if(ist==nost.and.isym==nosym) exit fileloop
+                       if(scanms2) then
+                          !print*, 'ist,isym,ims2',ist,isym,ims2
+                          if(ist==nost.and.isym==nosym.and.ims2==noms2) exit fileloop
+                       else
+                          if(ist==nost.and.isym==nosym) exit fileloop
+                       endif
                     enddo
                  enddo
-                 write(LOUT,'(1x,a,i2,a,i1,a)') 'ERROR!!! 1RDM FOR STATE',&
-                             & nost,'.',nosym,' NOT PRESENT IN 1RDM FILE!'
+                 if(scanms2) then
+                    write(LOUT,'(1x,a,i2,a,i1,a,i1,a)') 'ERROR!!! 1RDM FOR STATE',&
+                                & nost,'.',nosym,' AND MS2 = ',noms2,' NOT PRESENT IN 1RDM FILE!'
+                 else
+                    write(LOUT,'(1x,a,i2,a,i1,a)') 'ERROR!!! 1RDM FOR STATE',&
+                                & nost,'.',nosym,' NOT PRESENT IN 1RDM FILE!'
+                 endif
                  stop
               else
                  read(iunit) isym,nstate 

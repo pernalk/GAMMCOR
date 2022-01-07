@@ -3,6 +3,7 @@
      $  Title,NBasis,NInte1,NInte2,NGem,System)
 C
       use types
+      use timing
 C     A ROUTINE FOR COMPUTING ELECTRONIC ENERGY USING ERPA TRANSITION
 C     DENSITY MATRIX ELEMENTS
 C
@@ -24,6 +25,12 @@ C
      $ IndAux(NBasis),IPair(NBasis,NBasis)
 C
       type(SystemBlock) :: System
+C
+      Double Precision  :: Tcpu,Twall
+C
+C     START TIMING FOR AC PROCEDURES
+C
+      call clock('START',Tcpu,Twall)
 C
 C     CONSTRUCT LOOK-UP TABLES
 C
@@ -114,10 +121,14 @@ C
       Call RunACDEXIT(ETot,ENuc,TwoNO,URe,UNOAO,Occ,XOne,
      $  IndAux,IPair,IndN,IndX,NDimX,Title,NBasis,NInte1,NInte2,NGem)
 C
+      call clock('ACD model',Tcpu,Twall)
+
       Else
 C
       Call RunACCAS(ETot,ENuc,TwoNO,URe,UNOAO,Occ,XOne,
      $  IndAux,IPair,IndN,IndX,NDimX,Title,NBasis,NInte1,NInte2,NGem)
+
+      call clock('AC  model',Tcpu,Twall)
 C
       EndIf
 C
@@ -131,6 +142,8 @@ C
       Call RunACCASLR(ETot,ENuc,TwoNO,URe,UNOAO,Occ,XOne,
      $  IndAux,IPair,IndN,IndX,NDimX,Title,NBasis,NInte1,NInte2,NGem)
 C
+      call clock('ACLR model',Tcpu,Twall)
+
       EndIf
 C
       Return

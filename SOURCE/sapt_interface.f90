@@ -4,6 +4,7 @@ use types
 use timing
 use tran
 use sorter
+!use Cholesky_old
 use Cholesky
 use abmat
 
@@ -32,6 +33,7 @@ integer    :: NOcc(8),NOrbs(8)
 integer    :: ione,iorb,isiri,i,j,ij
 integer    :: p,q,pq
 integer(8) :: MemSrtSize
+integer    :: ICholOLD
 double precision :: tmp
 double precision :: potnucA,potnucB
 double precision :: potnuc,emy,eactiv,emcscf
@@ -51,8 +53,6 @@ double precision :: Tcpu,Twall
 ! set monomer print level
  SAPT%monA%IPrint = SAPT%IPrint
  SAPT%monB%IPrint = SAPT%IPrint
-
- print*, 'Using new sapt_interface...! '
 
 ! set dimensions
  NSq = NBasis**2
@@ -145,31 +145,53 @@ double precision :: Tcpu,Twall
 ! memory allocation for sorter
  MemSrtSize = Flags%MemVal*1024_8**Flags%MemType
 
- if(SAPT%InterfaceType==1) then
-    call readtwoint(NBasis,1,'AOTWOINT_A','AOTWOSORT',MemSrtSize)
- elseif(SAPT%InterfaceType==2) then
-    call readtwoint(NBasis,2,'AOTWOINT.mol','AOTWOSORT',MemSrtSize)
-    if(doRSH) then
-       if(SAPT%SameOm) then
-          call readtwoint(NBasis,2,'AOTWOINT.erf','AOERFSORT',MemSrtSize)
-       else
-          call readtwoint(NBasis,2,'AOTWOINT.erf','AOERFSORT',MemSrtSize)
-          call readtwoint(NBasis,2,'AOTWOINT.erfB','AOERFSORTB',MemSrtSize)
+! for testing old Cholesky
+ ICholOld = 0
+
+ if(Flags%ICholesky==0.or.ICholOld==1) then
+    if(SAPT%InterfaceType==1) then
+       call readtwoint(NBasis,1,'AOTWOINT_A','AOTWOSORT',MemSrtSize)
+    elseif(SAPT%InterfaceType==2) then
+       call readtwoint(NBasis,2,'AOTWOINT.mol','AOTWOSORT',MemSrtSize)
+       if(doRSH) then
+          if(SAPT%SameOm) then
+             call readtwoint(NBasis,2,'AOTWOINT.erf','AOERFSORT',MemSrtSize)
+          else
+             call readtwoint(NBasis,2,'AOTWOINT.erf','AOERFSORT',MemSrtSize)
+             call readtwoint(NBasis,2,'AOTWOINT.erfB','AOERFSORTB',MemSrtSize)
+          endif
        endif
     endif
+ endif
+
+! Cholesky decomposition
+ if(Flags%ICholesky==1) then
+
+    !! old Cholesky
+    !if(ICholOLD==1) print*, 'old Cholesky transformation...'
+    !if(ICholOLD==1) call chol_CoulombMatrix(CholeskyVecs,'AOTWOSORT',Flags%ICholeskyAccu)
+
+    ! new Cholesky
+    if(ICholOLD==0) print*, 'new Cholesky transformation...'
+    if(SAPT%InterfaceType==1) then
+       call chol_CoulombMatrix(CholeskyVecs,NBasis,'AOTWOINT_A',1,Flags%ICholeskyAccu)
+    elseif(SAPT%InterfaceType==2) then
+       call chol_CoulombMatrix(CholeskyVecs,NBasis,'AOTWOINT.mol',2,Flags%ICholeskyAccu)
+    endif
+
+    SAPT%NCholesky  = CholeskyVecs%NCholesky
+    SAPT%monA%NChol = SAPT%NCholesky
+    SAPT%monB%NChol = SAPT%NCholesky
+
  endif
  call clock('2ints',Tcpu,Twall)
 
  if(SAPT%InterfaceType==2) then
-    call prepare_no(OneRdmA,AuxA,Ca,SAPT%monA,Flags%IFunSR,NBasis)
-    call prepare_no(OneRdmB,AuxB,Cb,SAPT%monB,Flags%IFunSR,NBasis)
+    call prepare_no(OneRdmA,AuxA,Ca,SAPT%monA,CholeskyVecs,Flags%IFunSR,Flags%ICholesky,NBasis)
+    call prepare_no(OneRdmB,AuxB,Cb,SAPT%monB,CholeskyVecs,Flags%IFunSR,Flags%ICholesky,NBasis)
     call prepare_rdm2_file(SAPT%monA,AuxA,NBasis)
     call prepare_rdm2_file(SAPT%monB,AuxB,NBasis)
  endif
-
-! MAYBE: one should print with NOrbt?
- !if(SAPT%IPrint.ne.0) call print_mo(Ca,NBasis,'MONOMER A')
- !if(SAPT%IPrint.ne.0) call print_mo(Cb,NBasis,'MONOMER B')
 
 ! maybe better: add writing Ca, Cb to file?!
  allocate(SAPT%monA%CMO(NBasis,NBasis),SAPT%monB%CMO(NBasis,NBasis))
@@ -188,22 +210,15 @@ double precision :: Tcpu,Twall
  call select_active(SAPT%monA,NBasis,Flags)
  call select_active(SAPT%monB,NBasis,Flags)
 
-! perform Cholesky decomposition
  if(Flags%ICholesky==1) then
-
-    call chol_CoulombMatrix(CholeskyVecs,'AOTWOSORT',Flags%ICholeskyAccu)
-    !call chol_CoulombMatrix(CholeskyVecs,'AOTWOSORT',CHOL_ACCURACY_LUDICROUS)
-    !call chol_CoulombMatrix(CholeskyVecs,'AOTWOSORT',CHOL_ACCURACY_TIGHT)
-    !call chol_CoulombMatrix(CholeskyVecs,'AOTWOSORT',CHOL_ACCURACY_DEFAULT)
-
-    SAPT%NCholesky  = CholeskyVecs%NCholesky
-    SAPT%monA%NChol = SAPT%NCholesky
-    SAPT%monB%NChol = SAPT%NCholesky
-
     ! transform Cholesky Vecs to NO
-    call chol_sapt_NOTransf(SAPT,SAPT%monA,SAPT%monB,CholeskyVecs,NBasis)
+    call chol_sapt_NOTransf(SAPT,SAPT%monA,SAPT%monB,CholeskyVecs,NBasis,Flags%MemVal,Flags%MemType)
+    call clock('chol_NOTransf',Tcpu,Twall)
+ endif
 
-  endif
+! MAYBE: one should print with NOrbt?
+ !if(SAPT%IPrint.ne.0) call print_mo(Ca,NBasis,'MONOMER A')
+ !if(SAPT%IPrint.ne.0) call print_mo(Cb,NBasis,'MONOMER B')
 
 ! ABABABABABABABABABABABABABABABABABABABABABABABABABABABABAB
  if(SAPT%IPrint.gt.100) call print_TwoInt(NBasis)
@@ -236,11 +251,17 @@ double precision :: Tcpu,Twall
  ! work = PB
  work = 0
  call get_den(NBasis,SAPT%monB%CMO,SAPT%monB%Occ,1d0,work)
- call make_K(NBasis,work,SAPT%monB%Kmat)
+ if(Flags%ICholesky==0) then
+    call make_K(NBasis,work,SAPT%monB%Kmat)
+ elseif(Flags%ICholesky==1) then
+    NCholesky = CholeskyVecs%NCholesky
+    call make_K_CholR(CholeskyVecs%R(1:NCholesky,1:NInte1), &
+                      NCholesky,NBasis,work,SAPT%monB%Kmat)
+ endif
  deallocate(work)
 
 ! calculate electrostatic potential
- call calc_elpot(SAPT%monA,SAPT%monB,NBasis)
+ call calc_elpot(SAPT%monA,SAPT%monB,CholeskyVecs,Flags%ICholesky,NBasis)
 
 ! calc intermolecular repulsion
  SAPT%Vnn = calc_vnn(SAPT%monA,SAPT%monB)
@@ -555,7 +576,7 @@ character(:),allocatable :: rdmfile
  OneRdm = 0
  ! HERE! FIRST STATE FOR NOW
  call read_1rdm_molpro(OneRdm,Mon%InSt(1,1),Mon%InSt(2,1),&
-                       rdmfile,Mon%IWarn,NBasis)
+                       Mon%ISpinMs2,rdmfile,Mon%IWarn,NBasis)
 
  call triang_to_sq2(OneRdm,OrbAux,NBasis)
  call Diag8(OrbAux,NBasis,NBasis,Eval,work)
@@ -1510,21 +1531,25 @@ double precision :: OccOrd(nbas)
 
 end subroutine sort_sym_occ
 
-subroutine prepare_no(OneRdm,OrbAux,OrbCAS,Mon,IFunSR,NBasis)
+subroutine prepare_no(OneRdm,OrbAux,OrbCAS,Mon,CholeskyVecs,IFunSR,ICholesky,NBasis)
 implicit none
+!
 ! OrbCAS[inout] :: on input AOtoCAS
 !                  on output AOtoNO
 ! OrbAux        :: on input CAStoNO
+!
+type(SystemBlock)   :: Mon
+type(TCholeskyVecs) :: CholeskyVecs
 
-type(SystemBlock) :: Mon
+integer,intent(in) :: IFunSR,ICholesky,NBasis
+double precision   :: OneRdm(NBasis*(NBasis+1)/2)
+double precision   :: OrbAux(NBasis,NBasis),OrbCAS(NBasis,NBasis)
 
-integer :: IFunSR,NBasis
-double precision :: OneRdm(NBasis*(NBasis+1)/2)
-double precision :: OrbAux(NBasis,NBasis),OrbCAS(NBasis,NBasis)
+integer :: NOccup,NVirt,NSym
+integer :: NCholesky
+integer :: i,j,ia,ib,iab,ioff,idx,NInte1
 double precision,allocatable :: URe(:,:),OrbSym(:,:),Fock(:)
 double precision,allocatable :: work1(:),work2(:),work3(:)
-integer :: NOccup,NVirt,NSym
-integer :: i,j,ia,ib,iab,ioff,idx,NInte1
 character(:),allocatable :: onefile,rdmfile,aoerfile
 ! testy
 integer :: info
@@ -1620,7 +1645,13 @@ integer :: info
  if(IFunSR==0) then
  ! CASSCF,Hartree-Fock
 
-   call FockGen_mithap(work2,OneRdm,work1,NInte1,NBasis,'AOTWOSORT')
+   if(ICholesky==0) then
+     call FockGen_mithap(work2,OneRdm,work1,NInte1,NBasis,'AOTWOSORT')
+   elseif(ICholesky==1) then
+     NCholesky = CholeskyVecs%NCholesky
+     call FockGen_CholR(work2,CholeskyVecs%R(1:NCholesky,1:NInte1),OneRdm,work1, &
+                        NInte1,NCholesky,NBasis)
+   endif
 
  elseif(IFunSR>0) then
  ! Kohn-Sham
@@ -1723,7 +1754,7 @@ integer,external :: NAddrRDM
  allocate(RDM2Act(NRDM2Act),work1(Mon%NAct**2))
  RDM2Act = 0
  call read_2rdm_molpro(RDM2Act,Mon%InSt(1,1),Mon%InSt(2,1),&
-                       rdmfile,Mon%IWarn,Mon%NAct)
+                       Mon%ISpinMs2,rdmfile,Mon%IWarn,Mon%NAct)
 
  do i=1,Mon%NAct
     do j=1,Mon%NAct
@@ -2087,14 +2118,20 @@ end function FindGem
 
 end subroutine select_active
 
-subroutine calc_elpot(A,B,NBas)
+subroutine calc_elpot(A,B,CholeskyVecs,ICholesky,NBas)
 implicit none
 
-integer :: NBas
-type(SystemBlock) :: A, B
+type(SystemBlock)   :: A, B
+type(TCholeskyVecs) :: CholeskyVecs
+
+integer,intent(in) :: ICholesky,NBas
+
+integer :: NInte1,NCholesky
 double precision,allocatable :: Pa(:,:),Pb(:,:)
 double precision,allocatable :: Va(:,:),Vb(:,:)
 double precision,allocatable :: Ja(:,:),Jb(:,:)
+
+ NInte1 = NBas*(NBas+1)/2
 
  allocate(Pa(NBas,NBas),Pb(NBas,NBas),&
           Va(NBas,NBas),Vb(NBas,NBas),&
@@ -2106,7 +2143,13 @@ double precision,allocatable :: Ja(:,:),Jb(:,:)
  call get_one_mat('V',Va,A%Monomer,NBas)
  call get_one_mat('V',Vb,B%Monomer,NBas)
 
- call make_J2(NBas,Pa,Pb,Ja,Jb)
+ if(ICholesky==0) then
+    call make_J2(NBas,Pa,Pb,Ja,Jb)
+ elseif(ICholesky==1) then
+    NCholesky = CholeskyVecs%NCholesky
+    call make_J2_CholR(CholeskyVecs%R(1:NCholesky,1:NInte1), &
+                       Pa,Pb,Ja,Jb,NCholesky,NBas)
+ endif
 
  allocate(A%WPot(NBas,NBas),B%WPot(NBas,NBas))
 
@@ -2138,21 +2181,43 @@ double precision :: Vnn
 
 end function calc_vnn
 
-subroutine chol_sapt_NOTransf(SAPT,A,B,CholeskyVecs,NBasis)
+subroutine chol_sapt_NOTransf(SAPT,A,B,CholeskyVecs,NBasis,MemVal,MemType)
+!
 ! transform Choleksy Vecs from AO to NO
-! for all 2-index vecs needed in SAPT
+! for all 2-index vecs needed in SAPT:
+!   FFXX(NCholesky,NBas**2) -- for polarization
+!   FFXY(NCholesky,NBas**2) -- for exchange
+!   FFYX(NCholesky,NBas**2) -- for exchange
+!   OOXX(NCholesky,dimO**2) -- for polarization
+!   DCholX(NCholesky,NDimX) -- for polarization
+!
 implicit none
 
 type(SaptData)   :: SAPT
 type(SystemBlock)   :: A, B
 type(TCholeskyVecs) :: CholeskyVecs
 integer,intent(in)  :: NBasis
+integer,intent(in)  :: MemVal,MemType
 
 integer :: NCholesky
+integer :: MaxBufferDimMB
 integer :: dimOA,dimOB,dimVA,dimVB, &
            nOVA,nOVB
-integer :: i,ip,iq,ipq
+integer          :: i,j,ip,iq,ipq
+double precision :: Cpq
 double precision,allocatable :: tmp(:,:)
+! test
+double precision :: Tcpu,Twall
+
+call clock('START',Tcpu,Twall)
+
+ ! set buffer size
+ if(MemType == 2) then       !MB
+    MaxBufferDimMB = MemVal
+ elseif(MemType == 3) then   !GB
+    MaxBufferDimMB = MemVal * 1024_8
+ endif
+ write(lout,'(1x,a,i5,a)') 'Using ',MaxBufferDimMB,' MB for 3-indx Cholesky transformation'
 
  NCholesky = CholeskyVecs%NCholesky
  dimOA = A%num0+A%num1
@@ -2162,63 +2227,130 @@ double precision,allocatable :: tmp(:,:)
  nOVA  = dimOA*dimVA
  nOVB  = dimOB*dimVB
 
- allocate(A%OV(NCholesky,A%NDimX),B%OV(NCholesky,B%NDimX))
+ print*, 'dimOA',dimOA
+ print*, 'dimOB',dimOB
 
- allocate(tmp(NCholesky,nOVA))
- ! (OV|AA)
- call chol_MOTransf(tmp,CholeskyVecs,&
-                    A%CMO,1,dimOA,&
-                    A%CMO,A%num0+1,NBasis)
- A%OV = 0
- do i=1,A%NDimX
-    ip  = A%IndN(1,i)
-    iq  = A%IndN(2,i)
-    ipq = iq+(ip-A%num0-1)*dimOA
-    A%OV(:,i)= tmp(:,ipq)
- enddo
- print*, 'A-OV',norm2(A%OV)
- deallocate(tmp)
+ !allocate(A%OV(NCholesky,A%NDimX),B%OV(NCholesky,B%NDimX))
 
- allocate(tmp(NCholesky,nOVB))
- ! (OV|BB)
- call chol_MOTransf(tmp,CholeskyVecs,&
-                    B%CMO,1,dimOB,&
-                    B%CMO,B%num0+1,NBasis)
+ !allocate(tmp(NCholesky,nOVA))
+ !! (OV|AA)
+ !call chol_MOTransf(tmp,CholeskyVecs,&
+ !                   A%CMO,1,dimOA,&
+ !                   A%CMO,A%num0+1,NBasis)
+ !A%OV = 0
+ !do i=1,A%NDimX
+ !   ip  = A%IndN(1,i)
+ !   iq  = A%IndN(2,i)
+ !   ipq = iq+(ip-A%num0-1)*dimOA
+ !   A%OV(:,i)= tmp(:,ipq)
+ !enddo
+ !print*, 'A-OV',norm2(A%OV)
+ !deallocate(tmp)
 
- B%OV = 0
- do i=1,B%NDimX
-    ip  = B%IndN(1,i)
-    iq  = B%IndN(2,i)
-    ipq = iq+(ip-B%num0-1)*dimOB
-    B%OV(:,i)= tmp(:,ipq)
- enddo
+ !allocate(tmp(NCholesky,nOVB))
+ !! (OV|BB)
+ !call chol_MOTransf(tmp,CholeskyVecs,&
+ !                   B%CMO,1,dimOB,&
+ !                   B%CMO,B%num0+1,NBasis)
 
- deallocate(tmp)
+ !B%OV = 0
+ !do i=1,B%NDimX
+ !   ip  = B%IndN(1,i)
+ !   iq  = B%IndN(2,i)
+ !   ipq = iq+(ip-B%num0-1)*dimOB
+ !   B%OV(:,i)= tmp(:,ipq)
+ !enddo
+
+ !deallocate(tmp)
 
  allocate(A%OO(NCholesky,dimOA**2),&
           B%OO(NCholesky,dimOB**2) )
  ! (OO|AA)
- call chol_MOTransf(A%OO,CholeskyVecs,&
+ !call chol_MOTransf(A%OO,CholeskyVecs,&
+ !                  A%CMO,1,dimOA,&
+ !                  A%CMO,1,dimOA)
+ !                  B%CMO,1,NBasis)
+ !
+ call chol_MOTransf_TwoStep(A%OO,CholeskyVecs,&
                     A%CMO,1,dimOA,&
-                    A%CMO,1,dimOA)
+                    A%CMO,1,dimOA,&
+                    MaxBufferDimMB)
+call clock('AOO',Tcpu,Twall)
  ! (OO|BB)
- call chol_MOTransf(B%OO,CholeskyVecs,&
+ !call chol_MOTransf(B%OO,CholeskyVecs,&
+ !                   B%CMO,1,dimOB,&
+ !                   B%CMO,1,dimOB)
+ !                   B%CMO,1,NBasis)
+ !
+ call chol_MOTransf_TwoStep(B%OO,CholeskyVecs,&
                     B%CMO,1,dimOB,&
-                    B%CMO,1,dimOB)
+                    B%CMO,1,dimOB,&
+                    MaxBufferDimMB)
+call clock('BOO',Tcpu,Twall)
+
+ if(SAPT%SaptLevel==666) then ! RS2PT2+
+    allocate(A%OOAB(NCholesky,dimOA*dimOB), &
+             B%OOBA(NCholesky,dimOB*dimOA))
+
+    call chol_MOTransf_TwoStep(A%OOAB,CholeskyVecs,&
+                       A%CMO,1,dimOA,&
+                       B%CMO,1,dimOB,&
+                       MaxBufferDimMB)
+
+    call chol_MOTransf_TwoStep(B%OOBA,CholeskyVecs,&
+                       B%CMO,1,dimOB,&
+                       A%CMO,1,dimOA,&
+                       MaxBufferDimMB)
+ endif
 
  allocate(A%FF(NCholesky,NBasis**2),&
           B%FF(NCholesky,NBasis**2) )
  ! (FF|AA)
- call chol_MOTransf(A%FF,CholeskyVecs,&
+ !call chol_MOTransf(A%FF,CholeskyVecs,&
+ !                   A%CMO,1,NBasis,&
+ !                   A%CMO,1,NBasis)
+ !                   B%CMO,1,NBasis)
+ !
+ call chol_MOTransf_TwoStep(A%FF,CholeskyVecs,&
                     A%CMO,1,NBasis,&
-                    A%CMO,1,NBasis)
+                    A%CMO,1,NBasis,&
+                    MaxBufferDimMB)
+ call clock('AFF',Tcpu,Twall)
  ! (FF|BB)
- call chol_MOTransf(B%FF,CholeskyVecs,&
+ !call chol_MOTransf(B%FF,CholeskyVecs,&
+ !                   B%CMO,1,NBasis,&
+ !                   B%CMO,1,NBasis)
+ !
+ call chol_MOTransf_TwoStep(B%FF,CholeskyVecs,&
                     B%CMO,1,NBasis,&
-                    B%CMO,1,NBasis)
+                    B%CMO,1,NBasis,&
+                    MaxBufferDimMB)
+ call clock('BFF',Tcpu,Twall)
+
+ ! DChol(NCholeksy,NDimX)
+ allocate(A%DChol(NCholesky,A%NDimX), &
+          B%DChol(NCholesky,B%NDimX))
+
+ do j=1,A%NDimX
+    ip = A%IndN(1,j)
+    iq = A%IndN(2,j)
+    ipq = iq + (ip-1)*NBasis
+    Cpq = A%CICoef(ip) + A%CICoef(iq)
+    A%DChol(:,j) = Cpq*A%FF(:,ipq)
+ enddo
+
+ do j=1,B%NDimX
+    ip = B%IndN(1,j)
+    iq = B%IndN(2,j)
+    ipq = iq + (ip-1)*NBasis
+    Cpq = B%CICoef(ip) + B%CICoef(iq)
+    B%DChol(:,j) = Cpq*B%FF(:,ipq)
+ enddo
+
+ if(SAPT%SaptLevel==999) return
 
  ! test for Pmat
- allocate(SAPT%CholVecs(NBasis**2,NCholesky))
+ !allocate(SAPT%CholVecs(NBasis**2,NCholesky))
  !SAPT%CholVecs = 0
  !do iq=1,NCholesky
  !   do ip=1,NBasis**2
@@ -2230,13 +2362,25 @@ double precision,allocatable :: tmp(:,:)
  allocate(A%FFAB(NCholesky,NBasis**2),&
           B%FFBA(NCholesky,NBasis**2) )
  ! (FF|AB)
- call chol_MOTransf(A%FFAB,CholeskyVecs,&
+ !call chol_MOTransf(A%FFAB,CholeskyVecs,&
+ !                   A%CMO,1,NBasis,&
+ !                   B%CMO,1,NBasis)
+ !                   B%CMO,1,NBasis)
+ !
+ call chol_MOTransf_TwoStep(A%FFAB,CholeskyVecs,&
                     A%CMO,1,NBasis,&
-                    B%CMO,1,NBasis)
- ! (FF|BA)
- call chol_MOTransf(B%FFBA,CholeskyVecs,&
                     B%CMO,1,NBasis,&
-                    A%CMO,1,NBasis)
+                    MaxBufferDimMB)
+ ! (FF|BA)
+ !call chol_MOTransf(B%FFBA,CholeskyVecs,&
+ !                   B%CMO,1,NBasis,&
+ !                   A%CMO,1,NBasis)
+ !                   B%CMO,1,NBasis)
+ !
+ call chol_MOTransf_TwoStep(B%FFBA,CholeskyVecs,&
+                    B%CMO,1,NBasis,&
+                    A%CMO,1,NBasis,&
+                    MaxBufferDimMB)
 
  !allocate(A%FO(NCholesky,NBasis*dimOA),&
  !         B%FO(NCholesky,NBasis*dimOA))

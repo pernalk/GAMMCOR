@@ -6824,7 +6824,7 @@ C
 C
 C     Prepare MO->NO_NoState
 C
-      Call read_1rdm_molpro(GammaAB,NoState,InSt(2,1),
+      Call read_1rdm_molpro(GammaAB,NoState,InSt(2,1),ISpinMs2,
      $ '2RDM',IWarn,NBasis)
 C
       Call CpySym(AUXM,GammaAB,NBasis)
@@ -6855,7 +6855,8 @@ C     1-RDMs FROM ALL STATES IN THE REPRESENTATION OF NOs OF THE NoState's STATE
 C
       Do IS=1,NoStMx
 C
-      call read_1rdm_molpro(GammaAB,IS,InSt(2,1),'2RDM',IWarn,NBasis)
+      call read_1rdm_molpro(GammaAB,IS,InSt(2,1),ISpinMs2,
+     $                      '2RDM',IWarn,NBasis)
       Call CpySym(AUXM,GammaAB,NBasis)
 C
       rdm=0
@@ -7081,7 +7082,7 @@ C
 C
 C     Prepare MO->NO
 C
-      Call read_1rdm_molpro(GammaAB,InSt(1,1),InSt(2,1),
+      Call read_1rdm_molpro(GammaAB,InSt(1,1),InSt(2,1),ISpinMs2,
      $ '2RDM',IWarn,NBasis)
 C
       Call CpySym(AUXM,GammaAB,NBasis)
@@ -7119,8 +7120,7 @@ C     Stop if IBra is greater than NBasis (dimension of XCAS, YCAS would be exce
 C
       Do IKet=1,IBra-1
 C
-      Call read_1trdm_molpro(AUXM,IBra,IKet,
-     $ '2RDM',NBasis)
+      Call read_1trdm_molpro(AUXM,IBra,IKet,'2RDM',NBasis)
 C
       trdm=0
 C
@@ -7236,7 +7236,7 @@ c      Return
 C
 C     Prepare MO->NO
 C
-      Call read_1rdm_molpro(GammaAB,InSt(1,1),InSt(2,1),
+      Call read_1rdm_molpro(GammaAB,InSt(1,1),InSt(2,1),ISpinMs2,
      $ '2RDM',IWarn,NBasis)
 C
       Call CpySym(AUXM,GammaAB,NBasis)
@@ -7271,8 +7271,7 @@ C
       Do IKet=1,IBra-1
       write(*,*)'KET',iket
 C
-      Call read_1trdm_molpro(AUXM,IBra,IKet,
-     $ '2RDM',NBasis)
+      Call read_1trdm_molpro(AUXM,IBra,IKet,'2RDM',NBasis)
 C
       trdm=0
 C

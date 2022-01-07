@@ -22,60 +22,302 @@ double precision :: ea,eb,eab,elst
 double precision,external  :: ddot
 
 ! set dimensions
- NBas = A%NBasis
- NCholesky = SAPT%NCholesky
+NBas = A%NBasis
+NCholesky = SAPT%NCholesky
 
- allocate(Va(NBas,NBas),Vb(NBas,NBas),&
-          Vabb(NBas,NBas),Vbaa(NBas,NBas))
+allocate(Va(NBas,NBas),Vb(NBas,NBas),&
+         Vabb(NBas,NBas),Vbaa(NBas,NBas))
 
- call get_one_mat('V',Va,A%Monomer,NBas)
- call get_one_mat('V',Vb,B%Monomer,NBas)
+call get_one_mat('V',Va,A%Monomer,NBas)
+call get_one_mat('V',Vb,B%Monomer,NBas)
 
- call tran2MO(Va,B%CMO,B%CMO,Vabb,NBas)
- call tran2MO(Vb,A%CMO,A%CMO,Vbaa,NBas)
+call tran2MO(Va,B%CMO,B%CMO,Vabb,NBas)
+call tran2MO(Vb,A%CMO,A%CMO,Vbaa,NBas)
 
 ! sum_p n_p v^B_pp
- ea = 0
- do i=1,A%num0+A%num1
-    ea = ea + A%Occ(i)*Vbaa(i,i)
- enddo
- ea = 2d0*ea
- !print*, 'ea',ea
+ea = 0
+do i=1,A%num0+A%num1
+   ea = ea + A%Occ(i)*Vbaa(i,i)
+enddo
+ea = 2d0*ea
+!print*, 'ea',ea
 
 ! sum_q n_q v^A_qq
- eb = 0
- do j=1,B%num0+B%num1
-    eb = eb + B%Occ(j)*Vabb(j,j)
- enddo
- eb = 2d0*eb
- !print*, 'eb',eb
+eb = 0
+do j=1,B%num0+B%num1
+   eb = eb + B%Occ(j)*Vabb(j,j)
+enddo
+eb = 2d0*eb
+!print*, 'eb',eb
 
 ! sum_pq n_p n_q v_{pq}^{pq}
- eab = 0
- do j=1,B%num0+B%num1
-    jj = (j-1)*NBas+j
-    do i=1,A%num0+A%num1
-       ii = (i-1)*NBas+i
-       eab = eab + A%Occ(i)*B%Occ(j)*ddot(NCholesky,A%FF(:,ii),1,B%FF(:,jj),1)
-       !eab = eab + A%Occ(i)*B%Occ(j)*ddot(NCholesky,A%FO(:,ii),1,B%FO(:,jj),1)
-    enddo
- enddo
- eab = 4d0*eab
- !print*, 'eab', eab
+eab = 0
+do j=1,B%num0+B%num1
+   jj = (j-1)*(B%num0+B%num1)+j
+   do i=1,A%num0+A%num1
+      ii = (i-1)*(A%num0+A%num1)+i
+      eab = eab + A%Occ(i)*B%Occ(j)*ddot(NCholesky,A%OO(:,ii),1,B%OO(:,jj),1)
+   enddo
+enddo
 
- elst = ea + eb + eab + SAPT%Vnn
+eab = 4d0*eab
+!print*, 'eab', eab
 
- call print_en('V_nn',SAPT%Vnn,.false.)
- call print_en('Eelst',elst*1000,.false.)
- SAPT%elst = elst
+elst = ea + eb + eab + SAPT%Vnn
 
- deallocate(Vb,Va,Vbaa,Vabb)
+call print_en('V_nn',SAPT%Vnn,.false.)
+call print_en('Eelst',elst*1000,.false.)
+SAPT%elst = elst
+
+deallocate(Vb,Va,Vbaa,Vabb)
 
 end subroutine e1elst_Chol
 
+subroutine e1exch_Chol(Flags,A,B,SAPT)
+!
+! this is experimental and should be moved to a new file!
+!
+! E1exch(S2): Eq (9) in SAPT(MC) paper
+! doi: 10.1021/acs.jctc.1c00344
+! adapted e1exch_NaNb from sapt_pol.f90
+!
+implicit none
+
+type(FlagsData)   :: Flags
+type(SystemBlock) :: A, B
+type(SaptData)    :: SAPT
+integer :: i, j, k, l, ia, jb
+integer :: ij,ipr
+integer :: ip,iq,ir,is
+integer :: ipq,iu,it
+integer :: iunit
+integer :: rdm2type
+integer :: dimOA,dimOB,NBas
+double precision :: fac,val,nnS2,tmp
+double precision :: tElst,tvk(3),tNa(2),tNb(2),tNaNb
+double precision :: exchs2
+double precision,allocatable :: Va(:,:),Vb(:,:),S(:,:)
+double precision,allocatable :: Sab(:,:),Vaab(:,:),Vbba(:,:),Vabb(:,:),Vbaa(:,:)
+double precision,allocatable :: RDM2Aval(:,:,:,:),RDM2Bval(:,:,:,:)
+double precision,allocatable :: intA(:,:,:,:),intB(:,:,:,:)
+double precision,allocatable :: tmpAB(:,:,:,:)
+double precision,allocatable :: work(:,:),ints(:)
+double precision,external  :: ddot
+
+print*, 'Testing E1exch Chol...'
+
+! set dimensions
+NBas = A%NBasis
+dimOA = A%num0+A%num1
+dimOB = B%num0+B%num1
+
+allocate(S(NBas,NBas),Sab(NBas,NBas))
+allocate(Va(NBas,NBas),Vb(NBas,NBas),&
+         Vabb(NBas,NBas),Vbaa(NBas,NBas),&
+         Vaab(NBas,NBas),Vbba(NBas,NBas))
+
+call get_one_mat('V',Va,A%Monomer,NBas)
+call get_one_mat('V',Vb,B%Monomer,NBas)
+
+call tran2MO(Va,B%CMO,B%CMO,Vabb,NBas)
+call tran2MO(Vb,A%CMO,A%CMO,Vbaa,NBas)
+call tran2MO(Va,A%CMO,B%CMO,Vaab,NBas)
+call tran2MO(Vb,B%CMO,A%CMO,Vbba,NBas)
+
+call get_one_mat('S',S,A%Monomer,NBas)
+call tran2MO(S,A%CMO,B%CMO,Sab,NBas)
+
+allocate(RDM2Aval(dimOA,dimOA,dimOA,dimOA),&
+         RDM2Bval(dimOB,dimOB,dimOB,dimOB))
+allocate(intA(dimOA,dimOA,dimOA,dimOB),&
+         intB(dimOB,dimOB,dimOA,dimOB))
+
+if(Flags%ICASSCF==1) then
+   ! CAS
+   RDM2Aval = A%RDM2val
+   RDM2Bval = B%RDM2val
+elseif(Flags%ICASSCF==0) then
+   ! GVB
+   RDM2Aval = A%RDM2val
+   RDM2Bval = B%RDM2val
+endif
+
+call dgemm('N','N',dimOA**3,dimOB,dimOA,1d0,RDM2Aval,dimOA**3,Sab,NBas,0d0,intA,dimOA**3)
+! careful! intB(B,B,A,B)
+do is=1,dimOB
+   call dgemm('N','T',dimOB**2,dimOA,dimOB,1d0,RDM2Bval(:,:,:,is),dimOB**2,Sab,NBas,0d0,intB(:,:,:,is),dimOB**2)
+enddo
+
+deallocate(RDM2Bval,RDM2Aval)
+deallocate(Vb,Va,S)
+
+! n^A n^B Sab Sab
+nnS2 = 0
+do j=1,dimOB
+do i=1,dimOA
+   nnS2 = nnS2 + A%Occ(i)*B%Occ(j)*Sab(i,j)**2
+enddo
+enddo
+
+tElst = 2d0*(SAPT%elst-SAPT%Vnn)*nnS2
+print*, 'tELST',tELST*1000
+
+allocate(ints(NBas**2),work(NBas,NBas))
+
+tvk = 0
+do iq=1,dimOB
+   do ip=1,dimOA
+      tvk(1) = tvk(1) + A%Occ(ip)*B%Occ(iq)*Vaab(ip,iq)*Sab(ip,iq)
+   enddo
+enddo
+tvk(1) = -2d0*tvk(1)
+print*, 'tvk(1)',tvk(1)*1000
+
+do iq=1,dimOB
+   do ip=1,dimOA
+      tvk(2) = tvk(2) + A%Occ(ip)*B%Occ(iq)*Vbba(iq,ip)*Sab(ip,iq)
+   enddo
+enddo
+tvk(2) = -2d0*tvk(2)
+print*, 'tvk(2)',tvk(2)*1000
+
+! work = PA
+call get_den(NBas,A%CMO,A%Occ,1d0,work)
+! tvk = n_p n_q v_pq^qp = PA.K[PB]
+do jb=1,NBas
+   do ia=1,NBas
+      tvk(3) = tvk(3) + work(ia,jb)*B%Kmat(jb,ia)
+   enddo
+enddo
+tvk(3) = -2.0d0*tvk(3)
+
+! tNa
+tNa = 0
+do it=1,dimOB
+   do iq=1,dimOA
+      do ir=1,dimOA
+         do ip=1,dimOA
+            tNa(1) = tNa(1) + B%Occ(it)*intA(ip,ir,iq,it)*Sab(iq,it)*Vbaa(ip,ir)
+         enddo
+      enddo
+   enddo
+enddo
+tNa(1) = -2d0*tNa(1)
+
+!(OO|OO): (AA|AB)
+open(newunit=iunit,file='OOOOAAAB',status='OLD', &
+     access='DIRECT',recl=8*dimOA*dimOA)
+
+! one loop over integrals
+ints = 0
+ij = 0
+do it=1,dimOB
+   do iq=1,dimOA
+      ij = ij + 1
+      read(iunit,rec=iq+(it-1)*dimOA) ints(1:dimOA*dimOA)
+
+      do ir=1,dimOA
+         do ip=1,dimOA
+            tNa(2) = tNa(2) + B%Occ(it)*intA(ip,ir,iq,it)*ints(ip+(ir-1)*dimOA)
+         enddo
+      enddo
+
+   enddo
+enddo
+tNa(2) = -2d0*tNa(2)
+print*, 'tNa-1',tNa(1)*1000
+print*, 'tNa-2',tNa(2)*1000
+
+close(iunit)
+
+! tNb
+tNb = 0
+do iq=1,dimOB
+   do it=1,dimOA
+      do ir=1,dimOB
+         do ip=1,dimOB
+            tNb(1) = tNb(1) + A%Occ(it)*intB(ip,ir,it,iq)*Sab(it,iq)*Vabb(ip,ir)
+         enddo
+      enddo
+   enddo
+enddo
+tNb(1) = -2d0*tNb(1)
+!
+!(OO|OO): (BB|BA)
+open(newunit=iunit,file='OOOOBBBA',status='OLD', &
+     access='DIRECT',recl=8*dimOB*dimOB)
+
+! one loop over integrals
+ints = 0
+do it=1,dimOA
+   do iq=1,dimOB
+      read(iunit,rec=iq+(it-1)*dimOB) ints(1:dimOB*dimOB)
+
+      do ir=1,dimOB
+         do ip=1,dimOB
+            tNb(2) = tNb(2) + A%Occ(it)*intB(ip,ir,it,iq)*ints(ip+(ir-1)*dimOB)
+         enddo
+      enddo
+
+   enddo
+enddo
+tNb(2) = -2d0*tNb(2)
+print*, 'tNb-1',tNb(1)*1000
+print*, 'tNb-2',tNb(2)*1000
+
+close(iunit)
+
+open(newunit=iunit,file='OOOOAABB',status='OLD',&
+    access='DIRECT',form='UNFORMATTED',recl=8*dimOA*dimOA)
+
+allocate(tmpAB(dimOA,dimOA,dimOB,dimOB))
+
+call dgemm('N','T',dimOA**2,dimOB**2,dimOA*dimOB,1d0,intA,dimOA**2,intB,dimOB**2,0d0,tmpAB,dimOA**2)
+
+val  = 0
+work = 0
+
+ints = 0
+do ir=1,dimOB
+   do ip=1,dimOB
+     ipr = ipr + 1
+     read(iunit,rec=ip+(ir-1)*dimOB) ints(1:dimOA*dimOA)
+
+     do j=1,dimOA
+        do i=1,dimOA
+           work(i,j) = ints(i+(j-1)*dimOA)
+        enddo
+     enddo
+     val = val + sum(work(1:dimOA,1:dimOA)*tmpAB(1:dimOA,1:dimOA,ip,ir))
+
+   enddo
+enddo
+close(iunit)
+tNaNb = -2*val
+print*, 'tNaNb',tNaNb*1000
+
+exchs2 = tElst + sum(tvk) + sum(tNa) + sum(tNb) + tNaNb
+SAPT%exchs2 = exchs2
+!write(LOUT,'(/1x,a,f16.8)') 'ExchS2      = ', exchs2*1000d0
+call print_en('ExchS2',exchs2*1000,.true.)
+
+deallocate(tmpAB)
+
+deallocate(ints,work)
+deallocate(intB,intA)
+deallocate(Sab,Vbba,Vaab,Vbaa,Vabb)
+
+call delfile('OOOOAABB')
+call delfile('OOOOBBBA')
+call delfile('OOOOAAAB')
+
+end subroutine e1exch_Chol
+
 subroutine e2disp_Chol(Flags,A,B,SAPT)
+!
 ! calculate 2nd order dispersion energy
 ! in coupled and uncoupled approximations
+!
 implicit none
 
 type(FlagsData)   :: Flags
@@ -534,7 +776,7 @@ double precision,allocatable :: AB0A(:,:),AB0B(:,:)
 double precision,allocatable :: ABPMA(:),ABPMB(:),&
                                 ABPLUSA(:,:),ABPLUSB(:,:),&
                                 ABPTildeA(:,:),ABPTildeB(:,:)
-double precision,allocatable :: DCholA(:,:),DCholB(:,:)
+!double precision,allocatable :: DCholA(:,:),DCholB(:,:)
 double precision,allocatable :: CA(:,:),CB(:,:)
 double precision,allocatable :: CTildeA(:,:),CTildeB(:,:)
 double precision,allocatable :: LambdaA(:,:),LambdaB(:,:)
@@ -564,29 +806,29 @@ else
    NBas = A%NBasis
 endif
 
-! get Dmat
-allocate(DCholA(NCholesky,A%NDimX),DCholB(NCholesky,B%NDimX))
-
-DCholA = 0
-do j=1,A%NDimX
-   ip = A%IndN(1,j)
-   iq = A%IndN(2,j)
-   ipq = iq + (ip-1)*NBas
-   Cpq = A%CICoef(ip) + A%CICoef(iq)
-   do i=1,NCholesky
-      DCholA(i,j) = Cpq*A%FF(i,ipq)
-   enddo
-enddo
-DCholB = 0
-do j=1,B%NDimX
-   ir = B%IndN(1,j)
-   is = B%IndN(2,j)
-   irs = is + (ir-1)*NBas
-   Crs = B%CICoef(ir) + B%CICoef(is)
-   do i=1,NCholesky
-      DCholB(i,j) = Crs*B%FF(i,irs)
-   enddo
-enddo
+!! get Dmat
+!allocate(DCholA(NCholesky,A%NDimX),DCholB(NCholesky,B%NDimX))
+!
+!DCholA = 0
+!do j=1,A%NDimX
+!   ip = A%IndN(1,j)
+!   iq = A%IndN(2,j)
+!   ipq = iq + (ip-1)*NBas
+!   Cpq = A%CICoef(ip) + A%CICoef(iq)
+!   do i=1,NCholesky
+!      DCholA(i,j) = Cpq*A%FF(i,ipq)
+!   enddo
+!enddo
+!DCholB = 0
+!do j=1,B%NDimX
+!   ir = B%IndN(1,j)
+!   is = B%IndN(2,j)
+!   irs = is + (ir-1)*NBas
+!   Crs = B%CICoef(ir) + B%CICoef(is)
+!   do i=1,NCholesky
+!      DCholB(i,j) = Crs*B%FF(i,irs)
+!   enddo
+!enddo
 
 ! get Pmat
 print*, 'to-do: adapt Pmat procedure for SAPT...'
@@ -603,7 +845,7 @@ read(iunit) work
 
 close(iunit)
 call dgemm('N','N',A%NDimX,A%NDimX,A%NDimX,1d0,ABPLUSA,A%NDimX,work,A%NDimX,0d0,ABPMA,A%NDimX)
-call dgemm('N','T',A%NDimX,NCholesky,A%NDimX,1d0,ABPLUSA,A%NDimX,DCholA,NCholesky,0d0,ABPTildeA,A%NDimX)
+call dgemm('N','T',A%NDimX,NCholesky,A%NDimX,1d0,ABPLUSA,A%NDimX,A%DChol,NCholesky,0d0,ABPTildeA,A%NDimX)
 !print*, 'ABPTildeA',norm2(ABPTildeA)
 
 deallocate(ABPLUSA,work)
@@ -620,7 +862,7 @@ read(iunit) work
 
 close(iunit)
 call dgemm('N','N',B%NDimX,B%NDimX,B%NDimX,1d0,ABPLUSB,B%NDimX,work,B%NDimX,0d0,ABPMB,B%NDimX)
-call dgemm('N','T',B%NDimX,NCholesky,B%NDimX,1d0,ABPLUSB,B%NDimX,DCholB,NCholesky,0d0,ABPTildeB,B%NDimX)
+call dgemm('N','T',B%NDimX,NCholesky,B%NDimX,1d0,ABPLUSB,B%NDimX,B%DChol,NCholesky,0d0,ABPTildeB,B%NDimX)
 !print*, 'ABPTildeB',norm2(ABPTildeB)
 
 deallocate(ABPLUSB,work)
@@ -693,8 +935,8 @@ do ifreq=NFreq,1,-1
    call iterAlgo%iterate(CTildeB, B%NDimX, NCholesky, LambdaB, ABPTildeB, ABPMB, iStatsB)
    call iStatsB%setFreq(OmI)
 
-   call dgemm('N','N',NCholesky,NCholesky,A%NDimX,1d0,DCholA,NCholesky,CTildeA,A%NDimX,0d0,CA,NCholesky)
-   call dgemm('N','N',NCholesky,NCholesky,B%NDimX,1d0,DCholB,NCholesky,CTildeB,B%NDimX,0d0,CB,NCholesky)
+   call dgemm('N','N',NCholesky,NCholesky,A%NDimX,1d0,A%DChol,NCholesky,CTildeA,A%NDimX,0d0,CA,NCholesky)
+   call dgemm('N','N',NCholesky,NCholesky,B%NDimX,1d0,B%DChol,NCholesky,CTildeB,B%NDimX,0d0,CB,NCholesky)
 
    val = 0
    do j=1,NCholesky
@@ -760,7 +1002,7 @@ double precision,allocatable :: PMatA(:,:),PmatB(:,:)
 double precision,allocatable :: ABPMA(:),ABPMB(:),&
                                 ABPLUSA(:,:),ABPLUSB(:,:),&
                                 ABPTildeA(:,:),ABPTildeB(:,:)
-double precision,allocatable :: DCholA(:,:),DCholB(:,:)
+!double precision,allocatable :: DCholA(:,:),DCholB(:,:)
 double precision,allocatable :: CA(:,:),CB(:,:)
 double precision,allocatable :: CTildeA(:,:),CTildeB(:,:)
 double precision,allocatable :: LambdaA(:,:),LambdaB(:,:)
@@ -785,29 +1027,29 @@ else
    NBas = A%NBasis
 endif
 
-! get Dmat
-allocate(DCholA(NCholesky,A%NDimX),DCholB(NCholesky,B%NDimX))
-
-DCholA = 0
-do j=1,A%NDimX
-   ip = A%IndN(1,j)
-   iq = A%IndN(2,j)
-   ipq = iq + (ip-1)*NBas
-   Cpq = A%CICoef(ip) + A%CICoef(iq)
-   do i=1,NCholesky
-      DCholA(i,j) = Cpq*A%FF(i,ipq)
-   enddo
-enddo
-DCholB = 0
-do j=1,B%NDimX
-   ir = B%IndN(1,j)
-   is = B%IndN(2,j)
-   irs = is + (ir-1)*NBas
-   Crs = B%CICoef(ir) + B%CICoef(is)
-   do i=1,NCholesky
-      DCholB(i,j) = Crs*B%FF(i,irs)
-   enddo
-enddo
+!! get Dmat
+!allocate(DCholA(NCholesky,A%NDimX),DCholB(NCholesky,B%NDimX))
+!
+!DCholA = 0
+!do j=1,A%NDimX
+!   ip = A%IndN(1,j)
+!   iq = A%IndN(2,j)
+!   ipq = iq + (ip-1)*NBas
+!   Cpq = A%CICoef(ip) + A%CICoef(iq)
+!   do i=1,NCholesky
+!      DCholA(i,j) = Cpq*A%FF(i,ipq)
+!   enddo
+!enddo
+!DCholB = 0
+!do j=1,B%NDimX
+!   ir = B%IndN(1,j)
+!   is = B%IndN(2,j)
+!   irs = is + (ir-1)*NBas
+!   Crs = B%CICoef(ir) + B%CICoef(is)
+!   do i=1,NCholesky
+!      DCholB(i,j) = Crs*B%FF(i,irs)
+!   enddo
+!enddo
 
 ! monomer A
 allocate(ABPMA(A%NDimX*A%NDimX),ABPTildeA(A%NDimX,NCholesky))
@@ -821,7 +1063,7 @@ read(iunit) work
 
 close(iunit)
 call dgemm('N','N',A%NDimX,A%NDimX,A%NDimX,1d0,ABPLUSA,A%NDimX,work,A%NDimX,0d0,ABPMA,A%NDimX)
-call dgemm('N','T',A%NDimX,NCholesky,A%NDimX,1d0,ABPLUSA,A%NDimX,DCholA,NCholesky,0d0,ABPTildeA,A%NDimX)
+call dgemm('N','T',A%NDimX,NCholesky,A%NDimX,1d0,ABPLUSA,A%NDimX,A%DChol,NCholesky,0d0,ABPTildeA,A%NDimX)
 print*, 'ABPTildeA',norm2(ABPTildeA)
 
 deallocate(ABPLUSA,work)
@@ -838,7 +1080,7 @@ read(iunit) work
 
 close(iunit)
 call dgemm('N','N',B%NDimX,B%NDimX,B%NDimX,1d0,ABPLUSB,B%NDimX,work,B%NDimX,0d0,ABPMB,B%NDimX)
-call dgemm('N','T',B%NDimX,NCholesky,B%NDimX,1d0,ABPLUSB,B%NDimX,DCholB,NCholesky,0d0,ABPTildeB,B%NDimX)
+call dgemm('N','T',B%NDimX,NCholesky,B%NDimX,1d0,ABPLUSB,B%NDimX,B%DChol,NCholesky,0d0,ABPTildeB,B%NDimX)
 print*, 'ABPTildeB',norm2(ABPTildeB)
 
 deallocate(ABPLUSB,work)
@@ -880,8 +1122,8 @@ do ifreq=NFreq,1,-1
    call Cmat_diag_iterDIIS(CTildeB,B%NDimX,NCholesky,LamDiaB,ABPTildeB,ABPMB,iStatsB)
    call iStatsB%setFreq(OmI)
 
-   call dgemm('N','N',NCholesky,NCholesky,A%NDimX,1d0,DCholA,NCholesky,CTildeA,A%NDimX,0d0,CA,NCholesky)
-   call dgemm('N','N',NCholesky,NCholesky,B%NDimX,1d0,DCholB,NCholesky,CTildeB,B%NDimX,0d0,CB,NCholesky)
+   call dgemm('N','N',NCholesky,NCholesky,A%NDimX,1d0,A%DChol,NCholesky,CTildeA,A%NDimX,0d0,CA,NCholesky)
+   call dgemm('N','N',NCholesky,NCholesky,B%NDimX,1d0,B%DChol,NCholesky,CTildeB,B%NDimX,0d0,CB,NCholesky)
 
    val = 0
    do j=1,NCholesky
@@ -899,6 +1141,7 @@ call iStatsA%print()
 write(lout,'(1x,a)') 'C(omega): Monomer B'
 call iStatsB%print()
 
+SAPT%e2disp = -8d0/Pi*e2d
 e2d = -8d0/Pi*e2d*1d3
 call print_en('E2disp(Cmat)',e2d,.false.)
 
@@ -953,7 +1196,7 @@ double precision,allocatable :: XFreq(:),WFreq(:)
 double precision,allocatable :: ABPMA(:,:),ABPMB(:,:),&
                                 ABPLUSA(:,:),ABPLUSB(:,:),&
                                 ABPTildeA(:,:),ABPTildeB(:,:)
-double precision,allocatable :: DCholA(:,:),DCholB(:,:)
+!double precision,allocatable :: DCholA(:,:),DCholB(:,:)
 double precision,allocatable :: CA(:,:),CB(:,:)
 double precision,allocatable :: CTildeA(:,:),CTildeB(:,:)
 double precision,allocatable :: work(:,:)
@@ -981,29 +1224,29 @@ else
    NBas = A%NBasis
 endif
 
-! get Dmat
-allocate(DCholA(NCholesky,A%NDimX),DCholB(NCholesky,B%NDimX))
-
-DCholA = 0
-do j=1,A%NDimX
-   ip = A%IndN(1,j)
-   iq = A%IndN(2,j)
-   ipq = iq + (ip-1)*NBas
-   Cpq = A%CICoef(ip) + A%CICoef(iq)
-   do i=1,NCholesky
-      DCholA(i,j) = Cpq*A%FF(i,ipq)
-   enddo
-enddo
-DCholB = 0
-do j=1,B%NDimX
-   ir = B%IndN(1,j)
-   is = B%IndN(2,j)
-   irs = is + (ir-1)*NBas
-   Crs = B%CICoef(ir) + B%CICoef(is)
-   do i=1,NCholesky
-      DCholB(i,j) = Crs*B%FF(i,irs)
-   enddo
-enddo
+!! get Dmat
+!allocate(DCholA(NCholesky,A%NDimX),DCholB(NCholesky,B%NDimX))
+!
+!DCholA = 0
+!do j=1,A%NDimX
+!   ip = A%IndN(1,j)
+!   iq = A%IndN(2,j)
+!   ipq = iq + (ip-1)*NBas
+!   Cpq = A%CICoef(ip) + A%CICoef(iq)
+!   do i=1,NCholesky
+!      DCholA(i,j) = Cpq*A%FF(i,ipq)
+!   enddo
+!enddo
+!DCholB = 0
+!do j=1,B%NDimX
+!   ir = B%IndN(1,j)
+!   is = B%IndN(2,j)
+!   irs = is + (ir-1)*NBas
+!   Crs = B%CICoef(ir) + B%CICoef(is)
+!   do i=1,NCholesky
+!      DCholB(i,j) = Crs*B%FF(i,irs)
+!   enddo
+!enddo
 
 ! monomer A
 allocate(ABPMA(A%NDimX,A%NDimX),ABPTildeA(A%NDimX,NCholesky))
@@ -1017,7 +1260,7 @@ read(iunit) work
 
 close(iunit)
 call dgemm('N','N',A%NDimX,A%NDimX,A%NDimX,1d0,ABPLUSA,A%NDimX,work,A%NDimX,0d0,ABPMA,A%NDimX)
-call dgemm('N','T',A%NDimX,NCholesky,A%NDimX,1d0,ABPLUSA,A%NDimX,DCholA,NCholesky,0d0,ABPTildeA,A%NDimX)
+call dgemm('N','T',A%NDimX,NCholesky,A%NDimX,1d0,ABPLUSA,A%NDimX,A%DChol,NCholesky,0d0,ABPTildeA,A%NDimX)
 
 deallocate(ABPLUSA,work)
 
@@ -1033,7 +1276,7 @@ read(iunit) work
 
 close(iunit)
 call dgemm('N','N',B%NDimX,B%NDimX,B%NDimX,1d0,ABPLUSB,B%NDimX,work,B%NDimX,0d0,ABPMB,B%NDimX)
-call dgemm('N','T',B%NDimX,NCholesky,B%NDimX,1d0,ABPLUSB,B%NDimX,DCholB,NCholesky,0d0,ABPTildeB,B%NDimX)
+call dgemm('N','T',B%NDimX,NCholesky,B%NDimX,1d0,ABPLUSB,B%NDimX,B%DChol,NCholesky,0d0,ABPTildeB,B%NDimX)
 
 deallocate(ABPLUSB,work)
 
@@ -1071,8 +1314,8 @@ do ifreq=NFreq,1,-1
    call Cmat_blk_iterDIIS(CTildeB,B%NDimX,NCholesky,nblkB,LambdaB,LambdaIVB,ABPTildeB,ABPMB,iStatsB)
    call iStatsB%setFreq(OmI)
 
-   call dgemm('N','N',NCholesky,NCholesky,A%NDimX,1d0,DCholA,NCholesky,CTildeA,A%NDimX,0d0,CA,NCholesky)
-   call dgemm('N','N',NCholesky,NCholesky,B%NDimX,1d0,DCholB,NCholesky,CTildeB,B%NDimX,0d0,CB,NCholesky)
+   call dgemm('N','N',NCholesky,NCholesky,A%NDimX,1d0,A%DChol,NCholesky,CTildeA,A%NDimX,0d0,CA,NCholesky)
+   call dgemm('N','N',NCholesky,NCholesky,B%NDimX,1d0,B%DChol,NCholesky,CTildeB,B%NDimX,0d0,CB,NCholesky)
 
    val = 0
    do j=1,NCholesky
@@ -1101,7 +1344,7 @@ call print_en('E2disp(Cmat)',e2d,.false.)
 deallocate(CB,CA)
 deallocate(CTildeB,CTildeA)
 deallocate(WFreq,XFreq)
-deallocate(DCholB,DCholA)
+!deallocate(DCholB,DCholA)
 deallocate(ABPMB,ABPMA)
 deallocate(ABPTildeB,ABPTildeA)
 
@@ -1145,7 +1388,7 @@ double precision,allocatable :: ABPMA(:),ABPMB(:),&
                                 AB0A(:,:),AB0B(:,:),&
                                 ABPLUSA(:,:),ABPLUSB(:,:),&
                                 ABPTildeA(:,:),ABPTildeB(:,:)
-double precision,allocatable :: DCholA(:,:),DCholB(:,:)
+!double precision,allocatable :: DCholA(:,:),DCholB(:,:)
 double precision,allocatable :: CA(:,:),CB(:,:)
 double precision,allocatable :: CTildeA(:,:),CTildeB(:,:)
 double precision,allocatable :: LambdaA(:,:),LambdaB(:,:)
@@ -1178,29 +1421,29 @@ else
    NBas = A%NBasis
 endif
 
-! get Dmat
-allocate(DCholA(NCholesky,A%NDimX),DCholB(NCholesky,B%NDimX))
-
-DCholA = 0
-do j=1,A%NDimX
-   ip = A%IndN(1,j)
-   iq = A%IndN(2,j)
-   ipq = iq + (ip-1)*NBas
-   Cpq = A%CICoef(ip) + A%CICoef(iq)
-   do i=1,NCholesky
-      DCholA(i,j) = Cpq*A%FF(i,ipq)
-   enddo
-enddo
-DCholB = 0
-do j=1,B%NDimX
-   ir = B%IndN(1,j)
-   is = B%IndN(2,j)
-   irs = is + (ir-1)*NBas
-   Crs = B%CICoef(ir) + B%CICoef(is)
-   do i=1,NCholesky
-      DCholB(i,j) = Crs*B%FF(i,irs)
-   enddo
-enddo
+!! get Dmat
+!allocate(DCholA(NCholesky,A%NDimX),DCholB(NCholesky,B%NDimX))
+!
+!DCholA = 0
+!do j=1,A%NDimX
+!   ip = A%IndN(1,j)
+!   iq = A%IndN(2,j)
+!   ipq = iq + (ip-1)*NBas
+!   Cpq = A%CICoef(ip) + A%CICoef(iq)
+!   do i=1,NCholesky
+!      DCholA(i,j) = Cpq*A%FF(i,ipq)
+!   enddo
+!enddo
+!DCholB = 0
+!do j=1,B%NDimX
+!   ir = B%IndN(1,j)
+!   is = B%IndN(2,j)
+!   irs = is + (ir-1)*NBas
+!   Crs = B%CICoef(ir) + B%CICoef(is)
+!   do i=1,NCholesky
+!      DCholB(i,j) = Crs*B%FF(i,irs)
+!   enddo
+!enddo
 
 ! monomer A
 allocate(ABPMA(A%NDimX*A%NDimX),ABPTildeA(A%NDimX,NCholesky))
@@ -1214,7 +1457,7 @@ read(iunit) work
 
 close(iunit)
 call dgemm('N','N',A%NDimX,A%NDimX,A%NDimX,1d0,ABPLUSA,A%NDimX,work,A%NDimX,0d0,ABPMA,A%NDimX)
-call dgemm('N','T',A%NDimX,NCholesky,A%NDimX,1d0,ABPLUSA,A%NDimX,DCholA,NCholesky,0d0,ABPTildeA,A%NDimX)
+call dgemm('N','T',A%NDimX,NCholesky,A%NDimX,1d0,ABPLUSA,A%NDimX,A%DChol,NCholesky,0d0,ABPTildeA,A%NDimX)
 print*, 'ABPTildeA',norm2(ABPTildeA)
 
 deallocate(ABPLUSA,work)
@@ -1231,7 +1474,7 @@ read(iunit) work
 
 close(iunit)
 call dgemm('N','N',B%NDimX,B%NDimX,B%NDimX,1d0,ABPLUSB,B%NDimX,work,B%NDimX,0d0,ABPMB,B%NDimX)
-call dgemm('N','T',B%NDimX,NCholesky,B%NDimX,1d0,ABPLUSB,B%NDimX,DCholB,NCholesky,0d0,ABPTildeB,B%NDimX)
+call dgemm('N','T',B%NDimX,NCholesky,B%NDimX,1d0,ABPLUSB,B%NDimX,B%DChol,NCholesky,0d0,ABPTildeB,B%NDimX)
 print*, 'ABPTildeB',norm2(ABPTildeB)
 
 deallocate(ABPLUSB,work)
@@ -1284,8 +1527,8 @@ do ifreq=NFreq,1,-1
    call iterAlgo%iterate(CTildeB, B%NDimX, NCholesky, LambdaB, ABPTildeB, ABPMB, iStatsB)
    call iStatsB%setFreq(OmI)
 
-   call dgemm('N','N',NCholesky,NCholesky,A%NDimX,1d0,DCholA,NCholesky,CTildeA,A%NDimX,0d0,CA,NCholesky)
-   call dgemm('N','N',NCholesky,NCholesky,B%NDimX,1d0,DCholB,NCholesky,CTildeB,B%NDimX,0d0,CB,NCholesky)
+   call dgemm('N','N',NCholesky,NCholesky,A%NDimX,1d0,A%DChol,NCholesky,CTildeA,A%NDimX,0d0,CA,NCholesky)
+   call dgemm('N','N',NCholesky,NCholesky,B%NDimX,1d0,B%DChol,NCholesky,CTildeB,B%NDimX,0d0,CB,NCholesky)
 
    val = 0
    do j=1,NCholesky
@@ -1315,6 +1558,116 @@ deallocate(CB,CA)
 deallocate(CTildeB,CTildeA)
 
 end subroutine e2disp_Cmat_Chol_proj
+
+subroutine e2ind_CAlphaTilde_block(Flags,A,B,SAPT)
+!
+! calculate 2nd order induction energy
+! using expansion of C(0) in alpha around alpha=0, up to Max_Cn order
+! use A0 blocks (not diagonal)
+! with Cholesky vectors
+!
+implicit none
+
+type(FlagsData)   :: Flags
+type(SystemBlock) :: A, B
+type(SaptData)    :: SAPT
+
+integer :: NCholesky,NBas
+integer :: i,j,ip,iq,ipq,ir,is,irs
+integer :: nblkA,nblkB
+double precision :: e2ba, e2ab
+double precision,allocatable :: WaBB(:,:),WbAA(:,:),   &
+                                WaChBB(:),WbChAA(:)
+double precision,allocatable :: A1A(:,:),A1B(:,:),&
+                                A2A(:,:),A2B(:,:),&
+                                ABP0TildeA(:,:),ABP0TildeB(:,:), &
+                                ABP1TildeA(:,:),ABP1TildeB(:,:)
+!double precision,allocatable :: DCholA(:,:),DCholB(:,:)
+double precision,allocatable :: C0TildeA(:,:),C0TildeB(:,:), &
+                                CTildeA(:,:),CTildeB(:,:),   &
+                                CA(:,:),CB(:,:)
+
+type(EBlockData)             :: A0BlkIVA,A0BlkIVB
+type(EBlockData),allocatable :: A0BlkA(:),A0BlkB(:)
+
+!! set dimensions
+!NCholesky = SAPT%NCholesky
+!
+!! check MCBS/DCBS
+!if(A%NBasis.ne.B%NBasis) then
+!   write(LOUT,'(1x,a)') 'ERROR! MCBS not implemented in SAPT!'
+!   stop
+!else
+!   NBas = A%NBasis
+!endif
+!
+!allocate(WaBB(NBas,NBas),WbAA(NBas,NBas))
+!
+!call tran2MO(A%WPot,B%CMO,B%CMO,WaBB,NBas)
+!call tran2MO(B%WPot,A%CMO,A%CMO,WbAA,NBas)
+!
+!allocate(A1A(A%NDimX,A%NDimX),A2A(A%NDimX,A%NDimX))
+!allocate(ABP0TildeA(A%NDimX,NCholesky), &
+!         ABP1TildeA(A%NDimX,NCholesky), &
+!         DCholA(A%NDimX,NCholesky))
+!
+!call prepare_resp_Cmat(A,A1A,A2A,ABP0TildeA,ABP1TIldeA,DCholA,A%NDimX,NCholesky,NBas)
+!
+!allocate(WbChAA(NCholesky))
+!do i=1,NCholesky
+!   do ipq=1,A%NDimX
+!      ip = A%IndN(1,ipq)
+!      iq = A%IndN(2,ipq)
+!   
+!      WbChAA(i) = WbChAA(i) + WbAA(ip,iq)*DCholA(i,ipq)
+!
+!   enddo
+!enddo
+!
+!allocate(A1B(B%NDimX,B%NDimX),A2B(B%NDimX,B%NDimX))
+!allocate(ABP0TildeB(B%NDimX,NCholesky), &
+!         ABP1TildeB(B%NDimX,NCholesky), &
+!         DCholB(B%NDimX,NCholesky))
+!
+!call prepare_resp_Cmat(B,A1B,A2B,ABP0TildeB,ABP1TIldeB,DCholB,B%NDimX,NCholesky,NBas)
+!
+!allocate(CTildeA(A%NDimX,NCholesky),C0TildeA(A%NDimX,NCholesky))
+!allocate(CA(A%NDimX,A%NDimX))
+!call read_ABPM0Block(A0BlkA,A0BlkIVA,nblkA,'A0BLK_A')
+!
+!call C_AlphaExpand(CTildeA,C0TildeA,0d0,SAPT%Max_Cn, &
+!                   A1A,A2A,ABP0TildeA,ABP1TildeA,    &
+!                   A0BlkA,A0BlkIVA,nblkA,NCholesky,A%NDimX)
+!
+!print*, 'CTildeA',norm2(CTildeA)
+!!call dgemm('N','N',NCholesky,NCholesky,A%NDimX,1d0,DCholA,NCholesky,CTildeA,A%NDimX,0d0,CA,NCholesky)
+!call dgemm('N','N',A%NDimX,A%NDimX,NCholesky,1d0,CTildeA,A%NDimX,DCholA,NCholesky,0d0,CA,A%NDimX)
+!
+!e2ba = 0
+!do ipq=1,A%NDimX
+!   ip = A%IndN(1,ipq)
+!   iq = A%IndN(2,ipq)
+!   do irs=1,A%NDimX
+!      ir = A%IndN(1,irs)
+!      is = A%IndN(2,irs)
+!      e2ba = e2ba + WbAA(ip,iq)*CA(ipq,irs)*WbAA(ir,is)
+!   enddo
+!enddo
+!e2ba = -0.5d0*e2ba
+!print*, 'e2ba',e2ba*1000
+!
+!!call read_ABPM0Block(A0BlkB,A0BlkIVB,nblkB,'A0BLK_B')
+!!call C_AlphaExpand(CTildeB,C0TildeB,OmI,SAPT%Max_Cn,A1B,A2B,ABP0TildeB,ABP1TildeB, &
+!!                   A0BlkB,A0BlkIVB,nblkB,NCholesky,B%NDimX)
+!
+!deallocate(DCholB,DCholA)
+!deallocate(WbAA,WaBB)
+!deallocate(CA)
+!deallocate(C0TildeA,CTildeA)
+!deallocate(A2B,A2A,A1B,A1A)
+!deallocate(ABP0TildeB,ABP0TildeA,ABP1TildeB,ABP1TIldeA)
+
+end subroutine e2ind_CAlphaTilde_block
 
 subroutine e2disp_CAlphaTilde_block(Flags,A,B,SAPT)
 !
@@ -1350,7 +1703,7 @@ double precision,allocatable :: ABPMA(:,:),ABPMB(:,:),&
                                 A2A(:,:),A2B(:,:),&
                                 ABP0TildeA(:,:),ABP0TildeB(:,:),&
                                 ABP1TildeA(:,:),ABP1TildeB(:,:)
-double precision,allocatable :: DCholA(:,:),DCholB(:,:)
+!double precision,allocatable :: DCholA(:,:),DCholB(:,:)
 double precision,allocatable :: CA(:,:),CB(:,:)
 double precision,allocatable :: C0TildeA(:,:),C0TildeB(:,:), &
                                 C1TildeA(:,:),C1TildeB(:,:), &
@@ -1365,6 +1718,9 @@ type(EBlockData)             :: LambdaIVA,LambdaIVB
 type(EBlockData),allocatable :: LambdaA(:),LambdaB(:)
 ! test
 double precision :: Tcpu,Twall
+
+print*, ''
+print*, 'Experimental E2disp(CAlpha) procedure...'
 
 ! both = coupled + uncoupled
 both = SAPT%iCpld
@@ -1386,29 +1742,29 @@ else
    NBas = A%NBasis
 endif
 
-! get Dmat
-allocate(DCholA(NCholesky,A%NDimX),DCholB(NCholesky,B%NDimX))
-
-DCholA = 0
-do j=1,A%NDimX
-   ip = A%IndN(1,j)
-   iq = A%IndN(2,j)
-   ipq = iq + (ip-1)*NBas
-   Cpq = A%CICoef(ip) + A%CICoef(iq)
-   do i=1,NCholesky
-      DCholA(i,j) = Cpq*A%FF(i,ipq)
-   enddo
-enddo
-DCholB = 0
-do j=1,B%NDimX
-   ir = B%IndN(1,j)
-   is = B%IndN(2,j)
-   irs = is + (ir-1)*NBas
-   Crs = B%CICoef(ir) + B%CICoef(is)
-   do i=1,NCholesky
-      DCholB(i,j) = Crs*B%FF(i,irs)
-   enddo
-enddo
+!! get Dmat
+!allocate(DCholA(NCholesky,A%NDimX),DCholB(NCholesky,B%NDimX))
+!
+!DCholA = 0
+!do j=1,A%NDimX
+!   ip = A%IndN(1,j)
+!   iq = A%IndN(2,j)
+!   ipq = iq + (ip-1)*NBas
+!   Cpq = A%CICoef(ip) + A%CICoef(iq)
+!   do i=1,NCholesky
+!      DCholA(i,j) = Cpq*A%FF(i,ipq)
+!   enddo
+!enddo
+!DCholB = 0
+!do j=1,B%NDimX
+!   ir = B%IndN(1,j)
+!   is = B%IndN(2,j)
+!   irs = is + (ir-1)*NBas
+!   Crs = B%CICoef(ir) + B%CICoef(is)
+!   do i=1,NCholesky
+!      DCholB(i,j) = Crs*B%FF(i,irs)
+!   enddo
+!enddo
 
 ! monomer A
 allocate(ABPLUS1A(A%NDimX,A%NDimX),ABMIN1A(A%NDimX,A%NDimX))
@@ -1444,12 +1800,12 @@ print*, 'A2A',norm2(A2A)
 
 !Calc: APLUS0Tilde=ABPLUS0.DChol
 allocate(ABP0TildeA(A%NDimX,NCholesky))
-call ABPM_HALFTRAN_GEN_L(transpose(DCholA),ABP0TildeA,0.0d0,A0BlkA,A0BlkIVA,nblkA,A%NDimX,NCholesky,'Y')
+call ABPM_HALFTRAN_GEN_L(transpose(A%DChol),ABP0TildeA,0.0d0,A0BlkA,A0BlkIVA,nblkA,A%NDimX,NCholesky,'Y')
 print*, 'APLUS0Tilde',norm2(ABP0TildeA)
 
 !Calc: APLUS1Tilde=ABPLUS1.DChol
 allocate(ABP1TildeA(A%NDimX,NCholesky))
-Call dgemm('N','T',A%NDimX,NCholesky,A%NDimX,1d0,ABPLUS1A,A%NDimX,DCholA,NCholesky,0.0d0,ABP1TildeA,A%NDimX)
+Call dgemm('N','T',A%NDimX,NCholesky,A%NDimX,1d0,ABPLUS1A,A%NDimX,A%DChol,NCholesky,0.0d0,ABP1TildeA,A%NDimX)
 print*, 'APLUS1Tilde',norm2(ABP1TildeA)
 
 deallocate(ABPLUS1A)
@@ -1492,12 +1848,12 @@ print*, 'A2B',norm2(A2B)
 
 !Calc: APLUS0Tilde=ABPLUS0.DChol
 allocate(ABP0TildeB(B%NDimX,NCholesky))
-call ABPM_HALFTRAN_GEN_L(transpose(DCholB),ABP0TildeB,0.0d0,A0BlkB,A0BlkIVB,nblkB,B%NDimX,NCholesky,'Y')
+call ABPM_HALFTRAN_GEN_L(transpose(B%DChol),ABP0TildeB,0.0d0,A0BlkB,A0BlkIVB,nblkB,B%NDimX,NCholesky,'Y')
 print*, 'APLUS0Tilde-b',norm2(ABP0TildeB)
 
 !Calc: APLUS1Tilde=ABPLUS1.DChol
 allocate(ABP1TildeB(B%NDimX,NCholesky))
-Call dgemm('N','T',B%NDimX,NCholesky,B%NDimX,1d0,ABPLUS1B,B%NDimX,DCholB,NCholesky,0.0d0,ABP1TildeB,B%NDimX)
+Call dgemm('N','T',B%NDimX,NCholesky,B%NDimX,1d0,ABPLUS1B,B%NDimX,B%DChol,NCholesky,0.0d0,ABP1TildeB,B%NDimX)
 print*, 'APLUS1Tilde-b',norm2(ABP1TildeB)
 
 deallocate(ABPLUS1B)
@@ -1542,8 +1898,8 @@ do ifreq=NFreq,1,-1
       call C_AlphaExpand(CTildeB,C0TildeB,OmI,Max_Cn,A1B,A2B,ABP0TildeB,ABP1TildeB, &
                          A0BlkB,A0BlkIVB,nblkB,NCholesky,B%NDimX)
 
-      call dgemm('N','N',NCholesky,NCholesky,A%NDimX,1d0,DCholA,NCholesky,CTildeA,A%NDimX,0d0,CA,NCholesky)
-      call dgemm('N','N',NCholesky,NCholesky,B%NDimX,1d0,DCholB,NCholesky,CTildeB,B%NDimX,0d0,CB,NCholesky)
+      call dgemm('N','N',NCholesky,NCholesky,A%NDimX,1d0,A%DChol,NCholesky,CTildeA,A%NDimX,0d0,CA,NCholesky)
+      call dgemm('N','N',NCholesky,NCholesky,B%NDimX,1d0,B%DChol,NCholesky,CTildeB,B%NDimX,0d0,CB,NCholesky)
 
       val = 0
       do j=1,NCholesky
@@ -1596,7 +1952,7 @@ deallocate(C1TildeB,C1TildeA)
 deallocate(C0TildeB,C0TildeA)
 deallocate(WorkB,WorkA)
 deallocate(CB,CA)
-deallocate(DCholB,DCholA)
+!deallocate(B%DCholB,A%DCholA)
 
 end subroutine e2disp_CAlphaTilde_block
 
@@ -1634,7 +1990,7 @@ double precision,allocatable :: ABPMA(:,:),ABPMB(:,:),&
                                 A2A(:,:),A2B(:,:),&
                                 ABP0TildeA(:,:),ABP0TildeB(:,:),&
                                 ABP1TildeA(:,:),ABP1TildeB(:,:)
-double precision,allocatable :: DCholA(:,:),DCholB(:,:)
+!double precision,allocatable :: DCholA(:,:),DCholB(:,:)
 double precision,allocatable :: CA(:,:),CB(:,:)
 double precision,allocatable :: C0TildeA(:,:),C0TildeB(:,:), &
                                 C1TildeA(:,:),C1TildeB(:,:), &
@@ -1664,29 +2020,29 @@ else
    NBas = A%NBasis
 endif
 
-! get Dmat
-allocate(DCholA(NCholesky,A%NDimX),DCholB(NCholesky,B%NDimX))
-
-DCholA = 0
-do j=1,A%NDimX
-   ip = A%IndN(1,j)
-   iq = A%IndN(2,j)
-   ipq = iq + (ip-1)*NBas
-   Cpq = A%CICoef(ip) + A%CICoef(iq)
-   do i=1,NCholesky
-      DCholA(i,j) = Cpq*A%FF(i,ipq)
-   enddo
-enddo
-DCholB = 0
-do j=1,B%NDimX
-   ir = B%IndN(1,j)
-   is = B%IndN(2,j)
-   irs = is + (ir-1)*NBas
-   Crs = B%CICoef(ir) + B%CICoef(is)
-   do i=1,NCholesky
-      DCholB(i,j) = Crs*B%FF(i,irs)
-   enddo
-enddo
+!! get Dmat
+!allocate(DCholA(NCholesky,A%NDimX),DCholB(NCholesky,B%NDimX))
+!
+!DCholA = 0
+!do j=1,A%NDimX
+!   ip = A%IndN(1,j)
+!   iq = A%IndN(2,j)
+!   ipq = iq + (ip-1)*NBas
+!   Cpq = A%CICoef(ip) + A%CICoef(iq)
+!   do i=1,NCholesky
+!      DCholA(i,j) = Cpq*A%FF(i,ipq)
+!   enddo
+!enddo
+!DCholB = 0
+!do j=1,B%NDimX
+!   ir = B%IndN(1,j)
+!   is = B%IndN(2,j)
+!   irs = is + (ir-1)*NBas
+!   Crs = B%CICoef(ir) + B%CICoef(is)
+!   do i=1,NCholesky
+!      DCholB(i,j) = Crs*B%FF(i,irs)
+!   enddo
+!enddo
 
 ! monomer A
 allocate(ABPLUS0A(A%NDimX,A%NDimX),ABMIN0A(A%NDimX,A%NDimX))
@@ -1725,12 +2081,12 @@ print*, 'A2A',norm2(A2A)
 
 !Calc: APLUS0Tilde=ABPLUS0.DChol
 allocate(ABP0TildeA(A%NDimX,NCholesky))
-call dgemm('N','T',A%NDimX,NCholesky,A%NDimX,1d0,ABPLUS0A,A%NDimX,DCholA,NCholesky,0.0d0,ABP0TildeA,A%NDimX)
+call dgemm('N','T',A%NDimX,NCholesky,A%NDimX,1d0,ABPLUS0A,A%NDimX,A%DChol,NCholesky,0.0d0,ABP0TildeA,A%NDimX)
 print*, 'APLUS0Tilde',norm2(ABP0TildeA)
 
 !Calc: APLUS1Tilde=ABPLUS1.DChol
 allocate(ABP1TildeA(A%NDimX,NCholesky))
-call dgemm('N','T',A%NDimX,NCholesky,A%NDimX,1d0,ABPLUS1A,A%NDimX,DCholA,NCholesky,0.0d0,ABP1TildeA,A%NDimX)
+call dgemm('N','T',A%NDimX,NCholesky,A%NDimX,1d0,ABPLUS1A,A%NDimX,A%DChol,NCholesky,0.0d0,ABP1TildeA,A%NDimX)
 print*, 'APLUS1Tilde',norm2(ABP1TildeA)
 
 deallocate(ABPLUS1A)
@@ -1775,12 +2131,12 @@ print*, 'A2B',norm2(A2B)
 
 !Calc: APLUS0Tilde=ABPLUS0.DChol
 allocate(ABP0TildeB(B%NDimX,NCholesky))
-call dgemm('N','T',B%NDimX,NCholesky,B%NDimX,1d0,ABPLUS0B,B%NDimX,DCholB,NCholesky,0.0d0,ABP0TildeB,B%NDimX)
+call dgemm('N','T',B%NDimX,NCholesky,B%NDimX,1d0,ABPLUS0B,B%NDimX,B%DChol,NCholesky,0.0d0,ABP0TildeB,B%NDimX)
 print*, 'APLUS0Tilde-b',norm2(ABP0TildeB)
 
 !Calc: APLUS1Tilde=ABPLUS1.DChol
 allocate(ABP1TildeB(B%NDimX,NCholesky))
-Call dgemm('N','T',B%NDimX,NCholesky,B%NDimX,1d0,ABPLUS1B,B%NDimX,DCholB,NCholesky,0.0d0,ABP1TildeB,B%NDimX)
+Call dgemm('N','T',B%NDimX,NCholesky,B%NDimX,1d0,ABPLUS1B,B%NDimX,B%DChol,NCholesky,0.0d0,ABP1TildeB,B%NDimX)
 print*, 'APLUS1Tilde-b',norm2(ABP1TildeB)
 
 deallocate(ABPLUS1B)
@@ -1876,8 +2232,8 @@ do ifreq=NFreq,1,-1
 
    enddo
 
-   call dgemm('N','N',NCholesky,NCholesky,A%NDimX,1d0,DCholA,NCholesky,CTildeA,A%NDimX,0d0,CA,NCholesky)
-   call dgemm('N','N',NCholesky,NCholesky,B%NDimX,1d0,DCholB,NCholesky,CTildeB,B%NDimX,0d0,CB,NCholesky)
+   call dgemm('N','N',NCholesky,NCholesky,A%NDimX,1d0,A%DChol,NCholesky,CTildeA,A%NDimX,0d0,CA,NCholesky)
+   call dgemm('N','N',NCholesky,NCholesky,B%NDimX,1d0,B%DChol,NCholesky,CTildeB,B%NDimX,0d0,CB,NCholesky)
 
    val = 0
    do j=1,NCholesky
@@ -1904,7 +2260,7 @@ deallocate(C1TildeB,C1TildeA)
 deallocate(C0TildeB,C0TildeA)
 deallocate(WorkB,WorkA)
 deallocate(CB,CA)
-deallocate(DCholB,DCholA)
+!deallocate(DCholB,DCholA)
 
 end subroutine e2disp_CAlphaTilde_full
 
