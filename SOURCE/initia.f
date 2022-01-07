@@ -1115,7 +1115,8 @@ C
       use tran
 c     use Cholesky_old  ! requires AOTWOSORT
       use Cholesky
-      use abmat 
+      use abmat
+      use timing
 C
       Implicit Real*8 (A-H,O-Z)
       Parameter (Half=0.5D0)
@@ -1136,6 +1137,7 @@ C
       Integer(8) :: MemSrtSize
       Type(TCholeskyVecs) :: CholeskyVecs
       Real*8, Allocatable :: MatFF(:,:)
+      Real*8 Tcpu,Twall
 C
       Character*60 FName,Aux1,Title
 C
@@ -1222,9 +1224,11 @@ C     LOAD ONE-ELE INTEGS IN AO
       FName(K:K+8)='xone.dat'
 C      Call Int1_AO(XKin,NInte1,FName,NumOSym,Nbasis)
 C
-C     HAP
       Call readoneint_molpro(XKin,'AOONEINT.mol','ONEHAMIL',
      $     .true.,NInte1)
+C
+C     SET TIMING FOR 2-el integrals
+      Call clock('START',Tcpu,Twall)
 C
       If(ICholesky==0) Then
 C     memory allocation for sorter
@@ -1245,6 +1249,7 @@ c     Call chol_CoulombMatrix(CholeskyVecs,'AOTWOSORT',ICholeskyAccu)
      &                         ICholeskyAccu)
       NCholesky=CholeskyVecs%NCholesky
       EndIf ! ICholesky
+      Call clock('2-electron ints',Tcpu,Twall)
 C
 C     LOAD AO TO CAS_MO ORBITAL TRANSFORMATION MATRIX FROM uaomo.dat
 C      
@@ -1547,7 +1552,6 @@ C     PREPARE POINTERS: NOccup=num0+num1
 C     TRANSFORM J AND K
       UAux=transpose(UAOMO)
       If (IFunSR.Eq.0.Or.IFunSR.Eq.3.Or.IFunSR.Eq.5) Then
-C     This use of Cholesky is for test only
       If (ICholesky==0) Then
 C
       Call tran4_gen(NBasis,
@@ -1563,6 +1567,8 @@ C
      $        Num0+Num1,UAux(1:NBasis,1:(Num0+Num1)),
      $        'FOFO','AOTWOSORT')
 C
+      Call clock('tran4_FOFO',Tcpu,Twall)
+C
       ElseIf (ICholesky==1) Then
 C
       Allocate(MatFF(NCholesky,NBasis**2))
@@ -1576,12 +1582,16 @@ C
      $              UAux,1,NBasis,
      $              1500)
 C
+      Call clock('chol_NOTransf',Tcpu,Twall)
+C
       Call chol_ints_fofo(NBasis,Num0+Num1,MatFF,
      $                    NBasis,Num0+Num1,MatFF,
      $                    NCholesky,NBasis,'FOFO')
       Call chol_ints_fofo(NBasis,NBasis,MatFF,
      $                    Num0+Num1,Num0+Num1,MatFF,
      $                    NCholesky,NBasis,'FFOO')
+C
+      Call clock('chol_FFOOFOFO',Tcpu,Twall)
 C
 C KP 07.2021: dump MatFF
 C

@@ -54,8 +54,6 @@ double precision :: Tcpu,Twall
  SAPT%monA%IPrint = SAPT%IPrint
  SAPT%monB%IPrint = SAPT%IPrint
 
- print*, 'Using new sapt_interface...! '
-
 ! set dimensions
  NSq = NBasis**2
  NInte1 = NBasis*(NBasis+1)/2
