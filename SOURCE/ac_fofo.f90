@@ -121,7 +121,7 @@ integer :: iunit,NOccup
 integer :: ia,ib,ic,id,ICol,IRow
 integer :: i,j,k,l,kl,ip,iq,ir,is,ipq,irs
 integer :: NGrid,N,IGL,inf1,inf2,Max_Cn
-double precision :: ECASSCF,PI,WFact,XFactorial,XN1,XN2,FF,OmI
+double precision :: ECASSCF,PI,WFact,XFactorial,XN1,XN2,FF,OmI,XNorm0,XNorm1
 ! hererXXX
 !double precision :: C(NBasis)
 character(:),allocatable :: twojfile,twokfile,IntKFile
@@ -262,6 +262,7 @@ Do IGL=1,NGrid
 
    COMTilde=COMTilde+WFact*0.5d0*C1Tilde
 
+   XNorm0=0.0
    XFactorial=1
    Do N=2,Max_Cn
        XFactorial=XFactorial*N
@@ -271,6 +272,15 @@ Do IGL=1,NGrid
        Call dgemm('N','N',NDimX,NCholesky,NDimX,XN1,A1,NDimX,C1Tilde,NDimX,1.0d0,WORK0,NDimX)
        Call dgemm('N','N',NDimX,NCholesky,NDimX,1.0d0,LAMBDA,NDimX,WORK0,NDimX,0.0d0,C2Tilde,NDimX)
        FF=WFact/XFactorial/(N+1)
+       If(MOD(N,2).Eq.0) Then
+           XNorm1=Norm2(FF*C2Tilde)    
+           Write(6,'(X,"Order (n), |Delta_C|",I3,E14.4)')N,XNorm1
+           If(N.Gt.3.And.XNorm1.Gt.XNorm0) Then
+                 Write(6,'(X,"Divergence detected. Expansion of C terminated at order ",I3,3F10.4)')N-1
+                 Exit
+           EndIf
+           XNorm0=XNorm1
+       EndIf
        COMTilde=COMTilde+FF*C2Tilde
        C0Tilde=C1Tilde
        C1Tilde=C2Tilde
