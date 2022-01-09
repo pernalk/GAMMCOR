@@ -1,6 +1,6 @@
 module dumpintao
 
-private 
+private
 public dump_aoints,dump_molpro_sapt,dump_intsonly,dump_dens
 
 double precision :: ChiSave
@@ -17,12 +17,13 @@ subroutine dump_molpro_sapt(mon,IsRSH,Omega)
       double precision :: Omega
       logical :: doRSH,DiffOm
       character(32) :: onefile,rdmfile,recname,orbname,str
+      character(32) :: dipfile
       character(8) :: unit
 
       ! manage range-seprated hybrids
       doRSH=.false.
       if(isRSH==1) doRSH=.true.
-       
+
       if(doRSH) then
         DiffOm = .false.
         if(mon==1) then
@@ -36,7 +37,7 @@ subroutine dump_molpro_sapt(mon,IsRSH,Omega)
       write(6,*) 'mon,DiffOm',mon,DiffOm
       write(6,*) 'ChiSave,Omega',ChiSave,Omega
 
-      ! two-electron integrals 
+      ! two-electron integrals
       ibase=icorr(0)
 
       ! choose monomer
@@ -45,12 +46,14 @@ subroutine dump_molpro_sapt(mon,IsRSH,Omega)
         rdmfile='2RDMA'
         recname='CASORBA'
         orbname='MOLPRO_A.MOPUN'
+        dipfile='DIP_A'
       elseif(mon==2) then
         onefile='AOONEINT_B'
         rdmfile='2RDMB'
         recname='CASORBB'
         orbname='MOLPRO_B.MOPUN'
-      endif     
+        dipfile='DIP_B'
+      endif
 
       iS = icorr(ntdg)
       iT = icorr(ntdg)
@@ -68,15 +71,17 @@ subroutine dump_molpro_sapt(mon,IsRSH,Omega)
       call dump_gamma(trim(rdmfile),2,7200,2,7100)
       ! orbitals
       call dump_orbs(q(iOrbCas),trim(recname),trim(orbname))
+      ! dipole moment integrals
+      call dump_dip(trim(dipfile))
 
       ! 2-el integrals
       iex=iexcom_status()
       if(iex.eq.1) call excom(2)
-      if(mon==1.and.doRSH) then 
+      if(mon==1.and.doRSH) then
         call dump_twoints('AOTWOINT.erf')
-      elseif(mon==2.and.doRSH.and.DiffOm) then 
+      elseif(mon==2.and.doRSH.and.DiffOm) then
         call dump_twoints('AOTWOINT.erfB')
-      elseif(mon==2.and.(.not.doRSH)) then 
+      elseif(mon==2.and.(.not.doRSH)) then
         call dump_twoints('AOTWOINT.mol')
       endif
       if (iex.eq.1) call excom(1)
@@ -116,7 +121,7 @@ subroutine dump_intsonly(intfilename)
       include "common/cbas"
       include "common/tapes"
       include "common/big"
-      character(*) :: intfilename 
+      character(*) :: intfilename
       character(32) :: str,namx
       character(8) :: unit
 
@@ -152,7 +157,7 @@ subroutine dump_aoints
       !
       ! 1- and 2-RDM
        call dump_gamma('2RDM',2,7200,2,7100)
- 
+
       ! one electron integrals
       iS = icorr(ntdg)
       iT = icorr(ntdg)
@@ -172,9 +177,12 @@ subroutine dump_aoints
       call corlsr(iS)
 
       ! orbitals
-      ! 
+      !
       iOrbCas = icorr(ntqg)
       call dump_orbs(q(iOrbCas),'CASORB','MOLPRO.MOPUN')
+
+      ! dipole moment integrals
+      call dump_dip(trim('DIP'))
 
       call corlsr(ibase)
 
@@ -183,6 +191,7 @@ end subroutine dump_aoints
 subroutine dump_basinfo(iunit,nstats,istsy,nstsym,mxstsy)
       implicit double precision (a-h,o-z)
       include "common/corb"
+      !include "common/cstate"
       include "common/cbas"
       include "common/tapes"
       include "common/big"
@@ -204,11 +213,11 @@ subroutine dump_basinfo(iunit,nstats,istsy,nstsym,mxstsy)
       write(iunit) int(istsy(1:nstsym),kind=4)
       write(iunit) int(iclos(1:nsk),kind=4)
       write(iunit) int(iact(1:nsk),kind=4)
-      write(iunit) int(nt(1:nsk),kind=4) 
+      write(iunit) int(nt(1:nsk),kind=4)
 
-end subroutine dump_basinfo 
+end subroutine dump_basinfo
 
-subroutine dump_dens(i1fil,i1recnum,ensmble)
+subroutine dump_dens(i1fil,i1recnum,ensmble,smoothSCF,iststr)
 
       implicit double precision (a-h,o-z)
       include "common/big"
@@ -220,39 +229,90 @@ subroutine dump_dens(i1fil,i1recnum,ensmble)
       include "common/corbdim"
       include "common/casscf"
       include "common/syminf"
-      integer :: i1fil,i1recnum,ensmble
+      integer :: i1fil,i1recnum,ensmble,smoothSCF
+      character(*),optional :: iststr
       integer :: i1off,itr
       integer :: icasrec,icasfil
       integer :: IndInt(ntg)
-      double precision :: wght
+      integer :: is1,is2,istChck
+      double precision :: wght,w1,w2
       double precision :: d1mat(nact*nact),onerdm(ntdgx)
+      double precision :: onerdmPrev(ntdgx),onerdmTmp(ntdgx)
       double precision,allocatable :: GammaEns(:)
       double precision :: GammaI(ntg*(ntg+1)/2),GammaF(ntg*(ntg+1)/2)
       double precision :: OrbCas(ntqg),OrbAux(ntg,ntg),OrbSym(ntg,ntg)
+      character(:),allocatable :: s1,s2
 
       ! set dimensions
-      nact2 = nact*nact       
+      nact2 = nact*nact
       ntr = ntg*(ntg+1)/2
+
+      ! density matrix averaging
+      ! to improve SCF convergence
+      w1 = 0.5d0
+      w2 = 0.5d0
+
+      ! load s1.s2 state from input
+      if(present(iststr)) then
+         if(iststr == '') then
+            write(6,*) 'NO STATE GIVEN AFTER DENSAVE,STATE!'
+            call fehler("error")
+         else
+            !write(6,*) 'SAVING STATE:',iststr
+            call split(iststr,s1,s2,'.')
+            read(s1,*) is1
+            read(s2,*) is2
+            if(is1*is2.le.0) then
+               write(6,*) 'WRONG STATE ON DENSAVE CARD:'
+               write(6,'(1x,a,i1,a,i1)') 'STATE ', is1,'.',is2
+               call fehler('error')
+            endif
+         endif
+      endif
+
+      if(ensmble==1.and.smoothSCF==1) then
+         call read_prev_1rdm(onerdmPrev,smoothSCF)
+      endif
 
       i1off = 0
       isymoff = 0
       if(ensmble==0) then
 
-         do istsym=1,nstsym
-            nstate = nstats(istsym)
-            isym   = istsy(istsym)
-            do i=1,nstate
-               itr = i*(i-1)/2 + i
-               i1off = isymoff + (itr-1)*nact2
-               !print*, 'isym,i1off',isym,i1off
-               call lesw(d1mat,nact*nact,i1fil,i1recnum,i1off)
+         if(present(iststr)) then
+            do istsym=1,nstsym
+               nstate = nstats(istsym)
+               isym   = istsy(istsym)
+               do i=1,nstate
+                  itr = i*(i-1)/2 + i
+                  i1off = isymoff + (itr-1)*nact2
+                  if(i==is1.and.isym==is2) then
+                      istChck = 1
+                      call lesw(d1mat,nact*nact,i1fil,i1recnum,i1off)
+                  endif
+               enddo
+               isymoff = isymoff + nstate*(nstate+1)/2*nact2
             enddo
-            isymoff = isymoff + nstate*(nstate+1)/2*nact2
-         enddo
+            if(istChck==0) then
+               write(iout,'(1x,a,i1,a,i1,a)') 'STATE ',is1,'.',is2,' NOT AVAILABLE!'
+               call fehler('error')
+            endif
+         else
+            do istsym=1,nstsym
+               nstate = nstats(istsym)
+               isym   = istsy(istsym)
+               do i=1,nstate
+                  itr = i*(i-1)/2 + i
+                  i1off = isymoff + (itr-1)*nact2
+                  !print*, 'isym,i1off',isym,i1off
+                  call lesw(d1mat,nact*nact,i1fil,i1recnum,i1off)
+               enddo
+               isymoff = isymoff + nstate*(nstate+1)/2*nact2
+            enddo
+         endif
 
-         GammaI = 0 
-         idx = 0  
-         do j=1,nact 
+         GammaI = 0
+         idx = 0
+         do j=1,nact
             do i=1,j
                idx = idx + 1
                ij = i + (j-1)*nact
@@ -261,7 +321,7 @@ subroutine dump_dens(i1fil,i1recnum,ensmble)
          enddo
 
       elseif(ensmble==1) then
-           
+
           GammaI=0
           wght=1d0/nstsym
           !print*, 'nstsym,wght',nstsym,wght
@@ -272,9 +332,9 @@ subroutine dump_dens(i1fil,i1recnum,ensmble)
              isym   = istsy(istsym)
 
              if(nstate>1) then
-                write(iout,'(1x,a)') 'CANNOT MAKE ENSAMBLE FOR MORE & 
-                                      THAN 1 STATE IN GIVEN SYM!'
-                call fehler 
+                write(iout,'(1x,a)') 'CANNOT MAKE ENSAMBLE FOR MORE &
+                                     &THAN 1 STATE IN GIVEN SYM!'
+                call fehler
              endif
 
              do i=1,nstate
@@ -285,9 +345,9 @@ subroutine dump_dens(i1fil,i1recnum,ensmble)
              enddo
              isymoff = isymoff + nstate*(nstate+1)/2*nact2
 
-             GammaEns = 0 
-             idx = 0  
-             do j=1,nact 
+             GammaEns = 0
+             idx = 0
+             do j=1,nact
                 do i=1,j
                    idx = idx + 1
                    ij = i + (j-1)*nact
@@ -299,7 +359,7 @@ subroutine dump_dens(i1fil,i1recnum,ensmble)
              do i=1,ntr
                 GammaI(i) = GammaI(i) + wght*GammaEns(i)
              enddo
-            
+
            enddo
 
            deallocate(GammaEns)
@@ -357,7 +417,7 @@ subroutine dump_dens(i1fil,i1recnum,ensmble)
 
       ! adapt to symmetry
       do i=1,ntg
-         do j=1,ntg   
+         do j=1,ntg
             OrbSym(IndInt(i),j)=OrbAux(j,i)
          enddo
       enddo
@@ -395,8 +455,14 @@ subroutine dump_dens(i1fil,i1recnum,ensmble)
          enddo
        enddo
       !print*, 'idx',idx,ntdg
- 
-      ! dump to record 
+
+      ! DM average with w1 and w2 weights
+      if(ensmble==1.and.smoothSCF==1) then
+         onerdmTmp = onerdm
+         onerdm = w1*onerdmTmp + w2*onerdmPrev
+      endif
+
+      ! dump to record
       call dump_1rdm_st1sym1(onerdm,ensmble)
 
 end subroutine dump_dens
@@ -416,7 +482,7 @@ subroutine create_ind(IndInt,NBasis)
       !print*,'iact',iact(1:NSym)
       !print*,'ivirt',ivirt(1:NSym)
       if(NSym>1) then
-        ! symmetry 
+        ! symmetry
         IOld = 0
         INew = 0
         do isym=1,NSym
@@ -460,16 +526,55 @@ subroutine create_ind(IndInt,NBasis)
               IndInt(IOld) = INew
            enddo
         enddo
-     
+
       else
         ! nosym
         do i=1,NBasis
            IndInt(i) = i
         enddo
-     
+
       endif
 
 end subroutine create_ind
+
+subroutine read_prev_1rdm(onerdm,smoothSCF)
+      implicit double precision (a-h,o-z)
+      include "common/tapes"
+      include "common/cbas"
+      include "common/code"
+      include "common/corb"
+      include "common/cref"
+      include "common/clseg"
+      include "common/cgeom"
+      include "common/czmat"
+      include "common/cstat"
+      include "common/cfreeze"
+      include "common/dumpinfow"
+
+      integer :: smoothSCF
+      double precision :: onerdm(ntdgx)
+      integer :: ensmble
+      integer :: idenrec,idenfil
+
+      isyref_save = isyref
+      istate_save = istate
+      isyref = 1
+      istate = 1
+
+      call find_rec('CASDEN',idenrec,idenfil)
+      if(idenrec.ne.0) then 
+         call read_info(idenrec, idenfil, 0, idiffCAS, method)
+         call read_den(onerdm(1:ntdgx),1)
+         call flush_dump
+      else
+         smoothSCF = 0
+         write(iout,'(1x,a)') 'WARNING! CASDEN RECORD EMPTY! ABORT DM AVERAGE!'
+      endif
+ 
+      isyref = isyref_save
+      istate = istate_save
+
+end subroutine read_prev_1rdm
 
 subroutine dump_1rdm_st1sym1(onerdm,ensmble)
       implicit double precision (a-h,o-z)
@@ -487,7 +592,7 @@ subroutine dump_1rdm_st1sym1(onerdm,ensmble)
 
       double precision :: onerdm(ntdgx)
       integer :: ensmble
-      integer :: idenrec,idenfil     
+      integer :: idenrec,idenfil
 
       isyref_save = isyref
       istate_save = istate
@@ -502,7 +607,7 @@ subroutine dump_1rdm_st1sym1(onerdm,ensmble)
                idenrec,'.',idenfil, ': NOW RECOGNIZED AS THE 1.1 STATE'
       elseif(ensmble==1) then
          write(iout,'(1x,a,i4,a,i1,a)') 'CHARGE DENSITY FOR ENSEMBLE &
-               DUMPED TO RECORD ',&
+                                        &DUMPED TO RECORD ',&
                idenrec,'.',idenfil, ': NOW RECOGNIZED AS THE 1.1 STATE'
       endif
       call reserve_dump(idenrec, idenfil, 'PRDMFT', ntdgx)
@@ -536,9 +641,11 @@ subroutine dump_gamma(outfile,i2fil,i2recnum,i1fil,i1recnum)
       integer :: i1off,i2off,itr
       double precision :: d2mat(ic1d),d1mat(nact*nact)
 
-      nact2 = nact*nact       
+      nact2 = nact*nact
 
-      print*,'istsy',istsy(1:nstsym) 
+!      print*,'istsy',istsy(1:nstsym)
+!      print*, 'ISTMS2',istms2(1:nstsym)
+      write(6,'(1x,a,/)') '*** PRDMFT: Dump RDM matrices'
 
       call find_free_unit(ifil)
       open(unit=ifil,file=trim(outfile),form='unformatted')
@@ -554,14 +661,16 @@ subroutine dump_gamma(outfile,i2fil,i2recnum,i1fil,i1recnum)
       do istsym=1,nstsym
          nstate = nstats(istsym)
          isym   = istsy(istsym)
-         write(ifil) int(isym,kind=4),int(nstate,kind=4)
+         ims2   = istms2(istsym)
+         write(ifil) int(isym,kind=4),int(nstate,kind=4),int(ims2,kind=4)
+         write(6,'(1x,a,3i3)') 'isym,ms2,nstate',isym,ims2,nstate
          do i=1,nstate
             itr = i*(i-1)/2 + i
             i2off = isymoff + (itr-1)*ic1d
             call lesw(d2mat,ic1d,i2fil,i2recnum,i2off)
             !write(6,*) i,itr,i2off
             !write(6,*) d2mat(1:ic1d)
-            write(ifil) int(i,kind=4) 
+            write(ifil) int(i,kind=4)
             write(ifil) d2mat(1:ic1d)
          enddo
          isymoff = isymoff + nstate*(nstate+1)/2*ic1d
@@ -574,19 +683,44 @@ subroutine dump_gamma(outfile,i2fil,i2recnum,i1fil,i1recnum)
       do istsym=1,nstsym
          nstate = nstats(istsym)
          isym   = istsy(istsym)
-         write(ifil) int(isym,kind=4),int(nstate,kind=4)
+         ims2   = istms2(istsym)
+         write(ifil) int(isym,kind=4),int(nstate,kind=4),int(ims2,kind=4)
          do i=1,nstate
             itr = i*(i-1)/2 + i
             i1off = isymoff + (itr-1)*nact2
-            print*, 'isym,i1off',isym,i1off
+            !print*, 'isym,i1off',isym,i1off
             call lesw(d1mat,nact*nact,i1fil,i1recnum,i1off)
             !write(6,*) i,itr,i1off
             !write(6,*) d1mat(1:nact2)*0.5d0
-            write(ifil) int(i,kind=4) 
+            write(ifil) int(i,kind=4)
             write(ifil) d1mat(1:nact2)
          enddo
          isymoff = isymoff + nstate*(nstate+1)/2*nact2
       enddo
+
+      !write(*,*) 'Writing TRDMs!' 
+      i1off = 0
+      isymoff = 0
+      write(ifil) '1TRDM   '
+      write(ifil) int(nact,kind=4),int(nact2,kind=4),int(nstsym,kind=4)
+      do istsym=1,nstsym
+         nstate = nstats(istsym)
+         isym   = istsy(istsym)
+         write(ifil) int(isym,kind=4),int(nstate,kind=4)
+         do j=1,nstate
+            do i=1,j-1   
+               itr = j*(j-1)/2 + i
+               i1off = isymoff + (itr-1)*nact2
+               !print*, 'isym,i1off',isym,i1off
+               call lesw(d1mat,nact*nact,i1fil,i1recnum,i1off)
+               write(ifil) int(i,kind=4),int(j,kind=4)
+               write(ifil) d1mat(1:nact2)
+               !write(*,*) 'i,j',i,j
+            enddo
+         enddo
+         isymoff = isymoff + nstate*(nstate+1)/2*nact2
+      enddo
+
 
       close(ifil)
 
@@ -615,30 +749,30 @@ subroutine dump_twoints(intfilename)
       write(ifil) int(nt,kind=4)
 
       do iska=1,nsk
-        if(nt(iska).eq.0) cycle 
+        if(nt(iska).eq.0) cycle
         call dumpints1(ifil,q(ibuf),length,iska)
         !call printints1(q(ibuf),length,iska)
-      enddo   
+      enddo
 
       intyp=nsk
       do iska=2,nsk
         do iskb=1,iska-1
           intyp=intyp+1
-          if(nt(iska).eq.0) cycle 
-          if(nt(iskb).eq.0) cycle 
+          if(nt(iska).eq.0) cycle
+          if(nt(iskb).eq.0) cycle
           call dumpints2(ifil,q(ibuf),length,iska,iskb)
           !call printints2(q(ibuf),length,intyp,iska,iskb)
-        enddo         
-      enddo         
+        enddo
+      enddo
 
       do iska=4,nsk
         do iskb=3,iska-1
         iskab=mult(iska,iskb)
         do iskc=2,iskb-1
           iskd=mult(iskab,iskc)
-          if(iskd.ge.iskc) cycle 
-          intyp=intyp+1 
-          if(nt(iska).eq.0) cycle  
+          if(iskd.ge.iskc) cycle
+          intyp=intyp+1
+          if(nt(iska).eq.0) cycle
           if(nt(iskb).eq.0) cycle
           if(nt(iskc).eq.0) cycle
           if(nt(iskd).eq.0) cycle
@@ -663,11 +797,11 @@ subroutine dump_oneints(infil,Smat,Tmat,Vmat,Hmat)
       integer :: natm
       double precision :: enuc
       double precision :: Smat(*),Tmat(*),Vmat(*),Hmat(*)
-      double precision,allocatable :: chrg(:),xyz(:,:) 
+      double precision,allocatable :: chrg(:),xyz(:,:)
 
       enuc=calc_enuc()
       natm=calc_natom()
-      allocate(chrg(natm),xyz(natm,3)) 
+      allocate(chrg(natm),xyz(natm,3))
       ii=1
       do i=1,ncen
         if(charg(i).ne.0d0) then
@@ -693,12 +827,12 @@ subroutine dump_oneints(infil,Smat,Tmat,Vmat,Hmat)
       write(ifil) 'ISORDK  '
       write(ifil) int(natm,kind=4)
       write(ifil) chrg(1:natm),xyz(1:natm,1:3)
-     
+
       close(ifil)
-     
+
       deallocate(chrg,xyz)
 
-contains 
+contains
       function calc_enuc() result(enuc)
 
       double precision :: dist
@@ -713,19 +847,81 @@ contains
       enddo
 
       end function calc_enuc
-      
+
       function calc_natom() result(natm)
- 
-      integer :: i,natm 
-     
-      natm = 0 
-      do i=1,ncen 
+
+      integer :: i,natm
+
+      natm = 0
+      do i=1,ncen
          if(charg(i)/=0d0) natm = natm + 1
       enddo
 
       end function calc_natom
 
 end subroutine dump_oneints
+
+subroutine dump_dip(infil)
+      implicit double precision (a-h,o-z)
+      include "common/corb"
+      include "common/cbas"
+      include "common/tapes"
+      
+      character(*)     :: infil
+
+      integer :: i,isym
+      integer :: isyop,isymx,isymy,isymz
+      double precision :: origin(3),opnuc(3)
+      double precision,allocatable :: tmp(:) 
+      double precision,allocatable :: dipx(:),dipy(:),dipz(:)
+
+      origin = 0d0
+
+      allocate(tmp(ntqg),dipx(ntqg),dipy(ntqg),dipz(ntqg))
+      dipx=0
+      dipy=0
+      dipz=0
+      do isym=1,nsk 
+         call read_op(tmp,opnuc(1),'DMX',0,isym,0,origin,isyop)
+         if(isyop.ne.0) then
+            dipx  = tmp
+            isymx = isym
+            tmp = 0
+         endif
+         call read_op(tmp,opnuc(2),'DMY',0,isym,0,origin,isyop)
+         if(isyop.ne.0) then
+            dipy = tmp
+            isymy = isym
+            tmp = 0
+         endif
+         call read_op(tmp,opnuc(3),'DMZ',0,isym,0,origin,isyop)
+         if(isyop.ne.0) then
+            dipz = tmp
+            isymz = isym
+            tmp = 0
+         endif
+        
+      enddo
+
+      call find_free_unit(ifil)
+      open(unit=ifil,file=infil,form='unformatted')
+      write(ifil)
+      write(ifil) int(nsk,kind=4),int(nt(1:nsk),kind=4),int(nts(1:nsk),kind=4)
+      write(ifil) 'DIPMOMX '
+      write(ifil) int(isymx,kind=4) 
+      write(ifil) dipx(1:ntqg)
+      write(ifil) 'DIPMOMY '
+      write(ifil) int(isymy,kind=4) 
+      write(ifil) dipy(1:ntqg)
+      write(ifil) 'DIPMOMZ '
+      write(ifil) int(isymz,kind=4) 
+      write(ifil) dipz(1:ntqg)
+
+      close(ifil)
+
+      deallocate(dipz,dipy,dipx,tmp)
+
+end subroutine dump_dip
 
 subroutine dump_orbs(OrbCas,recname,outfile)
       implicit double precision (a-h,o-z)
@@ -746,7 +942,7 @@ subroutine dump_orbs(OrbCas,recname,outfile)
       !write(6,*) idiffCAS,method
       call read_orb(OrbCas, 1)
       call flush_dump
-       
+
 !      call find_rec('NATORB',inatrec,inatfil)
 !      call read_info(inatrec, inatfil, 0, idiffNAT, method)
 !      call read_orb(OrbNat, 1)
@@ -765,7 +961,7 @@ subroutine dump_orbs(OrbCas,recname,outfile)
       !write(ifil) OccNat(1:ntg)
       close(ifil)
 
-end subroutine dump_orbs 
+end subroutine dump_orbs
 
 subroutine find_rec(str,irec,ifil)
       implicit double precision (a-h,o-z)
@@ -773,9 +969,9 @@ subroutine find_rec(str,irec,ifil)
       character(*) :: str
       integer :: irec,ifil
       character(8) :: unit
-    
+
       ii1=1
-      ityp=1  
+      ityp=1
       irec=0
       ifil=0
       xtmp=0
@@ -800,6 +996,44 @@ subroutine find_rec(str,irec,ifil)
 end subroutine find_rec
 
 !-----------------------------------------------------------------------
+subroutine split(s, s1, s2, delimiter)
+!-----------------------------------------------------------------------
+      implicit double precision (a-h,o-z)
+      ! Split a list of words into two pieces:
+      ! "keyword    value1 value2" -> "keyword" + "value1 value2".
+      !
+      character(*), intent(in)               :: s
+      character(:), allocatable, intent(out) :: s1
+      character(:), allocatable, intent(out) :: s2
+      character(1), intent(in), optional :: delimiter
+
+      integer :: k
+      character(:), allocatable :: w
+      character(1) :: delim
+
+      if (present(delimiter)) then
+            delim = delimiter
+      else
+            delim = " "
+      end if
+
+      w = trim(adjustl(s))
+      if (len(w) == 0) then
+            s1 = ""
+            s2 = ""
+      else
+            k = index(w, delim)
+            if (k == 0) then
+                  s1 = w
+                  s2 = ""
+            else
+                  s1 = w(1:k-1)
+                  s2 = trim(adjustl(w(k+1:)))
+            end if
+      end if
+end subroutine split
+
+!-----------------------------------------------------------------------
       subroutine dumpints1(iunit,t,length,iska)
 !-----------------------------------------------------------------------
       implicit double precision (a-h,o-z)
@@ -819,7 +1053,7 @@ end subroutine find_rec
            jj=ii-1
            do k=1,i-1
              jj=jj+k
-             t(jj)=2*t(jj) 
+             t(jj)=2*t(jj)
            enddo
            if(i==j) then
              t(ii+lcd-1)=2*t(ii+lcd-1)
@@ -869,7 +1103,7 @@ end subroutine find_rec
         end do
       end do
       return
-      end
+      end subroutine
 
 !-----------------------------------------------------------------------
       subroutine dumpints2(iunit,t,length,iska,iskb)
@@ -901,13 +1135,13 @@ end subroutine find_rec
               m=ii-3
               do k=1,nt(iskb)
                 do l=1,k-1
-                  m=m+3 
+                  m=m+3
                   t2=(t(m+1)+t(m+2))
                   t3=(t(m+1)-t(m+2))
                   t(m+1)=t2*0.5d0     !(ik|jl)
                   t(m+2)=t3*0.5d0     !(il|jk)
                 enddo
-                m=m+3 
+                m=m+3
                 t2=(t(m+1)+t(m+2))
                 t3=(t(m+1)-t(m+2))
                 t(m+1)=t2             !(ik|jl)
@@ -916,15 +1150,15 @@ end subroutine find_rec
             endif
 
             jj=ii-3
-            do k=1,nt(iskb) 
-              jj=jj+3*k  
+            do k=1,nt(iskb)
+              jj=jj+3*k
               t(jj)=2*t(jj)
             enddo
             if(i==j) then
               t(ii:ii+3*lcd-1:3)=2*t(ii:ii+3*lcd-1:3)
-              jj=ii-3  
+              jj=ii-3
               do k=1,nt(iskb)
-                jj=jj+3*k  
+                jj=jj+3*k
                 t(jj+1)=2*t(jj+1)
                 t(jj+2)=2*t(jj+2)
               enddo
@@ -980,7 +1214,7 @@ end subroutine find_rec
         end do
       end do
       return
-      end
+      end subroutine
 
 !-----------------------------------------------------------------------
       subroutine dumpints3(iunit,t,length,iska,iskb,iskc,iskd)
@@ -1058,7 +1292,6 @@ end subroutine find_rec
         end do
       end do
       return
-      end
+      end subroutine
 
 end module dumpintao
-
