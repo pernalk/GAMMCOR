@@ -56,4 +56,5 @@ set(GAMMCOR_SOURCE
     SOURCE/xcfun.f90
     SOURCE/git_info.f90
     SOURCE/build_info.f90
+    SOURCE/trexio_f.f90
 )

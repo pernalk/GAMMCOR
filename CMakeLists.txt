@@ -26,6 +26,7 @@ include(CommonFortranConfig)
 
 # Libraries configuration
 include(XCFunConfig)
+include(TREXIOConfig)
 
 # Source files list
 include(SourceFilesList)
@@ -46,4 +47,4 @@ add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
 )
 
 # Link libraries
-target_link_libraries(${PROJECT_NAME} PRIVATE OpenMP::OpenMP_Fortran)
+target_link_libraries(${PROJECT_NAME} PRIVATE OpenMP::OpenMP_Fortran ${BLAS_LIBRARIES} ${TREXIO_LIBRARY})

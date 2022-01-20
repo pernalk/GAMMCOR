@@ -22,6 +22,11 @@ xcfun/fortran/xcfun_autogen.f90
 xcfun/lib/libxcfun.*
 xcfun/**/*.o
 
-xcfun/geninterface
 build/
+xcfun/geninterface
 SOURCE/git_info.f90
+SOURCE/build_info.f90
+SOURCE/trexio_f.f90
+trexio/*.so*
+*.out
+clean-build-test.sh
