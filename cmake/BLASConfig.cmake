@@ -15,7 +15,6 @@ else()
     endforeach()
 endif()
 
-link_libraries(${BLAS_LIBRARIES})
 string (REPLACE ";" " " BLAS_LIBRARIES_STRING "${BLAS_LIBRARIES}")
 
 message(NOTICE "")
