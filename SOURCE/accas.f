@@ -216,7 +216,6 @@ c
 c exact AC
 c      NoEig=1
 c      NDimFull=NBasis*(NBasis-1)/2
-
 c      Call ACPINO(ENuc,TwoNO,Occ,XOne,
 c     $ NBasis,NInte1,NInte2,NDimFull,NGem,NoEig) 
 

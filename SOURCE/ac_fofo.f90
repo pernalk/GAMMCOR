@@ -276,8 +276,11 @@ Do IGL=1,NGrid
            XNorm1=Norm2(FF*C2Tilde)    
            Write(6,'(X,"Order (n), |Delta_C|",I3,E14.4)')N,XNorm1
            If(N.Gt.3.And.XNorm1.Gt.XNorm0) Then
-                 Write(6,'(X,"Divergence detected. Expansion of C terminated at order ",I3,3F10.4)')N-1
-                 Exit
+! herer
+!                 Write(6,'(X,"Divergence detected. Expansion of C terminated at order ",I3,3F10.4)')N-1
+                 Write(6,'(X,"Divergence detected at order. Continue up to order Max_Cn",I3,3F10.4)')N
+! herer!
+!                 Exit
            EndIf
            XNorm0=XNorm1
        EndIf
