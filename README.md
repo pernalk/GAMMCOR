@@ -1,49 +1,11 @@
 # GAMMCOR
-Authors: Kasia Pernal and Michal Hapka
+Authors: Kasia Pernal and Michal Hapka<br>
+User Manual: [link](https://qchem.gitlab.io/gammcor-manual/)
 
 ## Installation
-#### 1. Clone the repository
-```
-git clone git@gitlab.com:qchem/gammcor.git
-```
 
-#### 2. Create an OBJ directory inside the repository folder:
-```
-cd <repository_name>
-mkdir OBJ
-```
-
-#### 3. Build XCFun
-* ##### Using Intel compilers (icc/ipcp & ifort):
-```
-cd xcfun
-make
-```
-* ##### Using GCC (gcc/g++ & gfortran):
-```
-cd xcfun
-make -f Makefile.gcc
-```
-#### 4. Build GammCor
-* ##### Using ifort:
-
-Set the path to MKL (MKL_ROOT) in `Makefile` and build GammCor using:
-```
-cd ..
-make
-```
-* ##### Using gfortran:
-
-Set the path to MKL (MKL_ROOT) in `Makefile.gcc` and build GammCor using:
-```
-cd ..
-make -f Makefile.gcc
-```
-
-This will create GammCor executable:
-```
-gammcor
-```
+* Using CMake: [link](https://qchem.gitlab.io/gammcor-manual/pages/introduction/cmake.html)
+* Using ready-made Makefiles: [link](https://qchem.gitlab.io/gammcor-manual/pages/introduction/makefiles.html)
 
 ## Third party software
 Third party software used in GammCor:
@@ -58,3 +20,5 @@ XCFun is a library of exchange-correlation functionals with arbitrary-order deri
 _Ulf Ekström, Lucas Visscher, Radovan Bast, Andreas J. Thorvaldsen and Kenneth Ruud, 
 Arbitrary-Order Density Functional Response Theory from Automatic Differentiation, 
 Journal of Chemical Theory and Computation 6, 1971 (2010), DOI: 10.1021/ct100117s_.
+#### TREXIO
+* Website: [TREXIO repository](https://github.com/TREX-CoE/trexio)
