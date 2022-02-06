@@ -38,7 +38,7 @@ example_fortran: fortran/xcfun_autogen.o fortran/xcfun_module.o fortran/example.
 
 fortran/xcfun_autogen.o : fortran/xcfun_autogen.f90
 	cd fortran; $(FC) -c xcfun_autogen.f90 -o xcfun_autogen.o
-fortran/xcfun_module.o : fortran/xcfun_module.f90
+fortran/xcfun_module.o : fortran/xcfun_module.f90 fortran/xcfun_autogen.o
 	cd fortran; $(FC) -c xcfun_module.f90 -o xcfun_module.o
 
 clean:

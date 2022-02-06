@@ -15,6 +15,8 @@ C
       use systemdef
       use sapt_main
       use timing
+      use git_info
+      use build_info
 C
       Implicit Real*8 (A-H,O-Z)
 C
@@ -51,6 +53,9 @@ C
 C
 C     *************************************************************************
 C
+      Call git_print_info()
+      Call build_print_info()
+
       Call read_Input(Input)
       Call check_Calc(Input%CalcParams)
       Call fill_Flags(Input,Flags)

@@ -1705,6 +1705,8 @@ C
 C
       Implicit Real*8 (A-H,O-Z)
 C
+      Dimension Dir(NBasis),Occ(NBasis)
+C
       PARAMETER (GOLD=1.618034D0, GLIMIT=100.D0, TINY=1.d-20)
       PARAMETER (ZERO=0.0D0, TEN5=0.05D0, MXIT=20)
 C
