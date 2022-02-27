@@ -7,6 +7,7 @@ C
       use abmat
       use abfofo
       use ab0fofo
+      use omp_lib
 C 
 C     A ROUTINE FOR COMPUTING ELECTRONIC ENERGY USING AC CORRELATION ENERGY FORMULA
 C
@@ -33,6 +34,10 @@ C
       Integer Points
 C     HAP
       Double precision,Allocatable :: WorkVec(:),WorkEig(:),MYAP(:) 
+C
+      real*8, dimension(:), allocatable :: ABPLUS_tmp, ABMIN_tmp
+      real*8, dimension(:), allocatable :: EigVecR_tmp, Eig_tmp
+
 C
       If(IFlSnd.Eq.1) Then
 C
@@ -123,6 +128,17 @@ C
       Call GauLeg(Zero,One,XGrid,WGrid,NGrid)
 C 
       ECorr=Zero
+C
+!$OMP PARALLEL PRIVATE(ABPLUS_tmp, ABMIN_tmp, I, ACAlpha, ECorrA,
+!$OMP$ EigVecR_tmp, Eig_tmp)
+      allocate(ABPLUS_tmp(NDim*NDim), ABMIN_tmp(NDim*NDim))
+      ABPLUS_tmp = ABPLUS
+      ABMIN_tmp = ABMIN
+      EigVecR_tmp = EigVecR
+      Eig_tmp = Eig
+      ECorrA = Zero
+!$OMP DO schedule(static,1)
+!$OMP$ REDUCTION(+:ECorr)
       Do I=1,NGrid
 C   
       ACAlpha=XGrid(I)
@@ -130,17 +146,18 @@ C
       If(ITwoEl.eq.1) Then
 
       Call ACEInteg(ECorrA,TwoNO,URe,Occ,XOne,UNOAO,
-     $ ABPLUS,ABMIN,EigVecR,Eig,
+     $ ABPLUS_tmp,ABMIN_tmp,EigVecR_tmp,Eig_tmp,
      $ EGOne,NGOcc,
      $ Title,NBasis,NInte1,NInte2,NDim,NGem,IndAux,ACAlpha,
      $ IndN,IndX,NDimX)
+
 C
       ElseIf(ITwoEl.eq.3) Then
 
       If(ICASSCF.Eq.1) Then
 
       Call ACEInteg_FOFO(ECorrA,URe,Occ,XOne,UNOAO,
-     $ ABPLUS,ABMIN,EigVecR,Eig,
+     $ ABPLUS_tmp,ABMIN_tmp,EigVecR_tmp,Eig_tmp,
      $ EGOne,NGOcc,CICoef,
      $ NBasis,NInte1,NDimX,NGem,IndAux,ACAlpha,
      $ IGem,NAcCAS,NInAcCAS,NELE,IndN,IndX,NDimX,
@@ -149,7 +166,7 @@ C
       ElseIf(ICASSCF.Ne.1) Then
 
       Call ACEInteg_FOFO(ECorrA,URe,Occ,XOne,UNOAO,
-     $ ABPLUS,ABMIN,EigVecR,Eig,
+     $ ABPLUS_tmp,ABMIN_tmp,EigVecR_tmp,Eig_tmp,
      $ EGOne,NGOcc,CICoef,
      $ NBasis,NInte1,NDim,NGem,IndAux,ACAlpha,
      $ IGem,NActive,NInAcCAS,NELE,IndN,IndX,NDimX,
@@ -163,6 +180,9 @@ C
       ECorr=ECorr+WGrid(I)*ECorrA
 C
       EndDo
+!$OMP END DO
+      deallocate(ABPLUS_tmp, ABMIN_tmp)
+!$OMP END PARALLEL
 C
       If(ICASSCF.Eq.1) Then
 C
@@ -4830,6 +4850,7 @@ C
       IPair(I,J)=1
       IPair(J,I)=1
       EndDo
+
 C
 C     CALCULATE THE A+B AND A-B MATRICES
 C   

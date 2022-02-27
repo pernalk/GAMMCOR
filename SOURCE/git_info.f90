@@ -1,11 +1,11 @@
 module git_info
 
     implicit none
-    character(len=*), parameter :: GIT_HEAD_BRANCH = "cmake-int-chol"
-    character(len=*), parameter :: GIT_REVISION_HASH = "7175d38b90442a488dd29bea3f3b7127273ce6ec"
-    character(len=*), parameter :: GIT_REVISION = "7175d38"
-    character(len=*), parameter :: GIT_COMMITTER_DATE = "Sun Feb 6 02:17:08 2022 +0100"
-    character(len=*), parameter :: GIT_LATEST_TAG_LONG = "v-4-🐀"
+    character(len=*), parameter :: GIT_HEAD_BRANCH = "aks-openmp"
+    character(len=*), parameter :: GIT_REVISION_HASH = "acaa15ddf88ea9b906eefd818402c853d58e50d4"
+    character(len=*), parameter :: GIT_REVISION = "acaa15d"
+    character(len=*), parameter :: GIT_COMMITTER_DATE = "Sun Feb 27 18:08:42 2022 +0100"
+    character(len=*), parameter :: GIT_LATEST_TAG_LONG = "v-4.1"
 
     contains
 

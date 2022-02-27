@@ -1689,9 +1689,10 @@ C
 C
 C     FIND A+^(1/2)
 C
+
       NoNeg=0
       Call CpyM(HlpAB,APLSQRT,NDimX)
-      Call Diag8(HlpAB,NDimX,NDimX,Eig,Work)
+      Call Diag8(HlpAB,NDimX,NDimX,Eig,Work)    
 C
 !$OMP PARALLEL DO DEFAULT(PRIVATE) SHARED(APLSQRT,HlpAB,Eig,NDimX)
       Do I=1,NDimX
@@ -1722,7 +1723,7 @@ C
       Else
       Write(6,*)"ERPA A+ matrix is positive definite"
       EndIf
-C
+C 
       Call MultpM(HlpAB,ABMIN,APLSQRT,NDimX)
       Call MultpM(EigVecR,APLSQRT,HlpAB,NDimX)
 C
@@ -3732,6 +3733,7 @@ C
       Allocate (RDM2Act(NRDM2Act))
       RDM2Act(1:NRDM2Act)=Zero
 C
+!$OMP CRITICAL(crit_AB_CAS_1)
       Open(10,File="rdm2.dat",Status='Old')
       Write(6,'(/,1X,''Active block of 2-RDM read from rdm2.dat'')')
 C
@@ -3749,6 +3751,7 @@ C
       GoTo 10
    40 Continue
       Close(10)
+!$OMP END CRITICAL(crit_AB_CAS_1)
 C
 C      Write(*,*) 'RDM2Act',norm2(RDM2Act)
 C     COMPUTE THE ENERGY FOR CHECKING
