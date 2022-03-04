@@ -6,7 +6,7 @@
 C
       use abmat
       use abfofo
-C 
+C
 C     AC Iteratively
 C
       Implicit Real*8 (A-H,O-Z)
@@ -99,7 +99,7 @@ C
       NGrid=5
 C
       Call GauLeg(Zero,One,XGrid,WGrid,NGrid)
-C 
+C
       ECorr=Zero
 C
       If(ITwoEl.eq.3) Then
@@ -130,7 +130,7 @@ C      goto 777
       EndIf
 C
       Do I=1,NGrid
-C   
+C
       ACAlpha=XGrid(I)
 C
       If(ITwoEl.eq.1) Then
@@ -234,12 +234,12 @@ C
       EndDo
       EndDo
 C
-C     Frequency integration of CMAT 
+C     Frequency integration of CMAT
 C
       NGrid=18
       Call FreqGrid(XFreq,WFreq,NGrid)
-C   
-      COM=0.0 
+C
+      COM=0d0
       Do IGL=1,NGrid
 C
       OmI=XFreq(IGL)
@@ -346,7 +346,7 @@ C
      $ IndN,IndX,NDimX,NBasis,NDim,NInte1,NInte2,ACAlpha)
 C
       ABPLUS1=ABPLUS1-ABPLUS0
-      WORK1=WORK1-WORK0 
+      WORK1=WORK1-WORK0
 C
       EGOne(1)=ECASSCF
 C
@@ -363,23 +363,23 @@ C
       EndDo
       EndDo
 C
-C     A0=ABPLUS0*ABMIN0      
+C     A0=ABPLUS0*ABMIN0
       Call dgemm('N','N',NDimX,NDimX,NDimX,1d0,ABPLUS0,NDimX,
-     $           WORK0,NDimX,0.0,A0,NDimX)
+     $           WORK0,NDimX,0d0,A0,NDimX)
 C     A1=ABPLUS0*ABMIN1+ABPLUS1*ABMIN0
       Call dgemm('N','N',NDimX,NDimX,NDimX,1d0,ABPLUS0,NDimX,
-     $           WORK1,NDimX,0.0,A1,NDimX)
+     $           WORK1,NDimX,0d0,A1,NDimX)
       Call dgemm('N','N',NDimX,NDimX,NDimX,1d0,ABPLUS1,NDimX,
      $           WORK0,NDimX,1d0,A1,NDimX)
 C     A2=ABPLUS1*ABMIN1
       Call dgemm('N','N',NDimX,NDimX,NDimX,1d0,ABPLUS1,NDimX,
-     $           WORK1,NDimX,0.0,A2,NDimX)      
+     $           WORK1,NDimX,0d0,A2,NDimX)
 C
 c      NGrid=18
       NGrid=25
       Call FreqGrid(XFreq,WFreq,NGrid)
-C   
-      COM=0.0 
+C
+      COM=0d0
       Do IGL=1,NGrid
 C
       OmI=XFreq(IGL)
@@ -395,19 +395,19 @@ C
 C
 C     C0=C(0)
       Call dgemm('N','N',NDimX,NDimX,NDimX,0.5d0,WORK1,NDimX,
-     $           ABPLUS0,NDimX,0.0,C0,NDimX)
+     $           ABPLUS0,NDimX,0d0,C0,NDimX)
 C     WORK0=LAMBDA*A1
       Call dgemm('N','N',NDimX,NDimX,NDimX,1d0,WORK1,NDimX,
-     $           A1,NDimX,0.0,WORK0,NDimX)  
+     $           A1,NDimX,0d0,WORK0,NDimX)
 C     C1=C(1)
       Call dgemm('N','N',NDimX,NDimX,NDimX,1d0,WORK0,NDimX,
-     $           C0,NDimX,0.0,C1,NDimX) 
+     $           C0,NDimX,0d0,C1,NDimX)
       Call dgemm('N','N',NDimX,NDimX,NDimX,0.5d0,WORK1,NDimX,
      $           ABPLUS1,NDimX,-1.d0,C1,NDimX)
 C
 C     WORK1=LAMBDA*A2
       Call dgemm('N','N',NDimX,NDimX,NDimX,1.d0,WORK1,NDimX,
-     $           A2,NDimX,0.0,C2,NDimX)
+     $           A2,NDimX,0d0,C2,NDimX)
       WORK1=C2
 C
 C     FROM NOW ON: LAMBDA*A2 in WORK1, LAMBDA*A1 in WORK0
@@ -417,7 +417,7 @@ CC     C(2)
 C      Call dgemm('N','N',NDimX,NDimX,NDimX,1d0,AIN,NDimX,
 C     $           C1,NDimX,0.0,C2,NDimX)
 C      Call dgemm('N','N',NDimX,NDimX,NDimX,-2.d0,ABMIN0,NDimX,
-C     $           C0,NDimX,-2.d0,C2,NDimX)      
+C     $           C0,NDimX,-2.d0,C2,NDimX)
 C
 CC     C(3)
 C      Call dgemm('N','N',NDimX,NDimX,NDimX,1d0,AIN,NDimX,
@@ -439,7 +439,7 @@ C     C(n)
       XN1=-N
       XN2=-N*(N-1)
       Call dgemm('N','N',NDimX,NDimX,NDimX,1d0,WORK0,NDimX,
-     $           C1,NDimX,0.0,C2,NDimX)
+     $           C1,NDimX,0d0,C2,NDimX)
 
       Call dgemm('N','N',NDimX,NDimX,NDimX,XN2,WORK1,NDimX,
      $           C0,NDimX,XN1,C2,NDimX)
@@ -455,7 +455,7 @@ C
 C     IGL
       EndDo
 C
-C     W Integrand 
+C     W Integrand
 C
       ECorr=Zero
 C
@@ -493,7 +493,7 @@ C
       Implicit Real*8 (A-H,O-Z)
       Dimension XFreq(NFreq),WFreq(NFreq)
 C
-      Call GauLeg(-1.D0,1.D0,XFreq,WFreq,NFreq) 
+      Call GauLeg(-1.D0,1.D0,XFreq,WFreq,NFreq)
 C
       X0=1.0D0
 C

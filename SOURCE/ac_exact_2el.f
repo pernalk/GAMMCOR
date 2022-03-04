@@ -1121,7 +1121,8 @@ C
 C
 C change to ISpin=0 for singlets or ISpin=1 for triplets
 c herer!!!
-      ISpin=0
+c      ISpin=0
+      ISpin=1
 C
       SpinFac=One
       If(ISpin.Eq.1) SpinFac=-One
@@ -1262,11 +1263,12 @@ C
       Do I=1,NInte1
       EExcit(I)=PP(I)-PP(NoEig)
 C
-C     becaouse the core-core block (if any) is set to 0, 
+C     because the core-core block (if any) is set to 0, 
 C     almost-exact-zero-eigenvalues appear, set them exactly to 0
 C     to exclude the pertinent eigenvectors from the correlation energy
 C
-      If(Abs(PP(I)).Lt.1.D-10) EExcit(I)=Zero
+c herer!!!
+c      If(Abs(PP(I)).Lt.1.D-10) EExcit(I)=Zero
 C     do not account for zero excitation corresponding to noeig
 c      If(Abs(PP(I)-PP(NoEig)).Lt.1.D-10) EExcit(I)=Zero
       If(I.Eq.NoEig) EExcit(I)=Zero 
@@ -1274,21 +1276,9 @@ c herer!!! this is for test only
 c      if(EExcit(I).lt.zero)EExcit(I)=0
       EndDo 
 
-c      write(*,*)'alpha',ACAlpha
-cc      Do I=1,NInte1
       Do I=1,12
       write(*,*)i,'ene',pp(i),pp(i)+ecore+enuc
-c      write(*,*)i,'excit ene',EExcit(I)
-c      IAB=0
-c      Do IA=1,NBasis
-c      Do IB=1,IA
-c      IAB=IAB+1
-c      write(*,*)i,ia,ib,ap(i,iab)
-c      enddo
-c      enddo
       enddo
-c      return
-c      stop  
 C
       Write(6,'(/,X,
      $ ''RESULTS FROM THE TWO-ELECTRON FUNCTIONAL OPTIMIZATION'')')
@@ -1311,7 +1301,10 @@ C
       PFull(IA,IB,I)=FAB*AP(I,IAB)
       If(IA.Ne.IB) PFull(IB,IA,I)=FAB*SpinFac*AP(I,IAB)
 C
-      If(IA.Eq.IB.And.ISpin.Eq.1.And.Abs(PFull(IB,IA,I)).Gt.1D-12) Then
+C in addition to proper triplet state, some other eigenvectors (junk) are found 
+C this must be removed by checking if the diag element (remember that for triplet P_pq=-P_qp => P_pp=0)
+C is not zero (in practice if gt 1.-5)
+      If(IA.Eq.IB.And.ISpin.Eq.1.And.Abs(PFull(IB,IA,I)).Gt.1D-5) Then 
       ISkip(I)=1
       EndIf
       EndDo

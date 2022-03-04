@@ -22,17 +22,22 @@ OBJ = $(O)mainp.o $(O)initia.o $(O)dmscf.o $(O)misc.o $(O)optocc.o \
       $(O)srlrdynamic.o $(O)erpa.o $(O)interpa.o  $(O)exact2el.o $(O)optapsg.o $(O)newton.o $(O)acfd.o $(O)accas.o \
       $(O)caspidft.o $(O)ac_exact_2el.o $(O)vv10.o \
       $(O)arithmetic.o $(O)io.o $(O)clock.o $(O)string.o $(O)sort.o $(O)display.o $(O)Cholesky.o $(O)Cholesky_old.o $(O)tran_Chol.o \
-	   $(O)iter_stats.o $(O)C_integrator.o $(O)iter_algorithm.o $(O)iter_algorithm_diis.o $(O)iter_algorithm_damping.o \
+	  $(O)iter_stats.o $(O)C_integrator.o $(O)iter_algorithm.o $(O)iter_algorithm_diis.o $(O)iter_algorithm_damping.o \
       $(O)lambda_calculator.o $(O)lambda_calculator_diag.o $(O)lambda_calculator_block.o $(O)lambda_calculator_projector.o \
       $(O)ac_iter.o $(O)ac_fofo.o \
+      $(O)git_info.o $(O)build_info.o\
       xcfun/fortran/xcfun_module.o xcfun/fortran/xcfun_autogen.o
 
 $(PROG) :  $(OBJ) 
 	$(FCC) $(FFLAGS) -o $(PROG) $(OBJ) $(LIBS)
-$(O)mainp.o : $(S)mainp.f $(S)commons.inc $(O)types.o $(O)inputfill.o $(O)systemdef.o $(O)sapt_main.o
+$(O)mainp.o : $(S)mainp.f $(S)commons.inc $(O)types.o $(O)inputfill.o $(O)systemdef.o $(O)sapt_main.o $(O)git_info.o $(O)build_info.o
 	$(FCC) $(FFLAGS)  -c $(S)mainp.f -o $(O)mainp.o
 $(O)initia.o : $(S)initia.f $(S)commons.inc $(O)types.o $(O)sorter.o $(O)tran.o $(O)abmats.o $(O)sapt_main.o $(O)timing.o
 	$(FCC) $(FFLAGS)  -c $(S)initia.f -o $(O)initia.o 
+$(O)git_info.o : $(S)git_info.f90
+	$(FCC) $(FFLAGS)  -c $(S)git_info.f90 -o $(O)git_info.o
+$(O)build_info.o : $(S)build_info.f90
+	$(FCC) $(FFLAGS)  -c $(S)build_info.f90 -o $(O)build_info.o
 $(O)misc.o : $(S)misc.f $(S)commons.inc
 	$(FCC) $(FFLAGS)  -c $(S)misc.f -o $(O)misc.o
 $(O)dmscf.o : $(S)dmscf.f $(S)commons.inc $(O)types.o

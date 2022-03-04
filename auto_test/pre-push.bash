@@ -4,7 +4,7 @@
 set -e
 
 echo "Running pre-push hook"
-gammcor_verify.bash 'full'
+./gammcor_verify.bash 'full'
 
 # $? stores exit value of the last command
 if [ $? -ne 0 ]; then
