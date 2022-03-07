@@ -5,6 +5,7 @@ C
 C     READ HAO, 2-EL INTEGRALS IN NO, C_COEFFICIENTS, IGEM FROM A DALTON_GENERATED FILE
 C     READ UMOAO FROM DALTON.MOPUN
 C
+      use print_units
       use types
       use sorter
       use tran
@@ -1201,7 +1202,7 @@ C      Call GetENuc_AO(ENuc,Title)
       Call GetEnuc_AOBin(ENuc,'AOONEINT.mol')
 C
 C     HAP
-      Call create_ind('2RDM',NumOSym,IndInt,MxSym,NBasis)
+      Call create_ind_molpro('2RDM',NumOSym,IndInt,MxSym,NBasis)
 C
 C     LOAD ONE-ELE INTEGS IN AO
       FName(K:K+8)='xone.dat'
@@ -2064,6 +2065,8 @@ C
 
 *Deck GetENuc_AOBin
       Subroutine GetENuc_AOBin(ENuc,infile)
+C
+      use print_units
 C
       Implicit Real*8 (A-H,O-Z)
       Character(*) infile
@@ -3497,6 +3500,50 @@ C
       Close(iunit)
 C
       end subroutine TwoEHartree
+
+*Deck BasInfo
+      Subroutine basinfo(nbasis,basfile,intf)
+C
+C     Purpose: read NBasis from Dalton/Molpro
+C
+      use print_units
+      use types
+C
+      implicit none
+      
+      character(*),intent(in) :: basfile,intf
+      integer,intent(out) :: nbasis
+      integer :: iunit
+      integer :: nsym,nbas(8),norb(8),nrhf(8),ioprhf
+      logical :: ex
+      
+      inquire(file=basfile,EXIST=ex)
+      
+      if(ex) then
+         open(newunit=iunit,file=basfile,status='OLD',
+     $        access='SEQUENTIAL',form='UNFORMATTED')
+      
+         if(trim(intf)=='DALTON') then
+            ! read basis info
+            call readlabel(iunit,'BASINFO ')
+      
+            read (iunit) nsym,nbas,norb,nrhf,ioprhf
+            !write(LOUT,*)  nsym,nbas,norb,nrhf,ioprhf
+      
+         elseif(trim(intf)=='MOLPRO') then
+            read(iunit)
+            read(iunit) nsym,nbas(1:nsym)
+         endif
+      
+         close(iunit)
+         nbasis = sum(nbas(1:nsym))
+      
+      else
+         write(LOUT,'(1x,a)') 'WARNING: '// basfile //' NOT FOUND!'
+         write(LOUT,'(1x,a)') 'TRYING TO READ NBasis FROM INPUT!'
+      endif
+      
+      End Subroutine BasInfo
 
 *Deck SortOrbDal
       Subroutine SortOrbDal(URe1,Occ2,NNIn,NNAct,NSym,IOrbSym,NBasis)

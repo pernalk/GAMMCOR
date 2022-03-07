@@ -793,4 +793,289 @@ integer :: imon
 
 end subroutine check_Input
 
+subroutine read_memsrt(val,MemVal,MemType)
+
+     character(*), intent(in)  :: val
+     integer, intent(out)      :: MemVal
+     integer, intent(out)      :: MemType
+
+     character(:), allocatable :: s1,s2
+
+     call split(val,s1,s2)
+
+     read(s1,*) MemVal
+
+     if(trim(uppercase(s2))=='MB') then
+        !MemVal = MemVal * 1024_8**2
+        MemType = 2
+     else if(trim(uppercase(s2))=='GB') then
+        !MemVal = MemVal * 1024_8**3
+        MemType = 3
+     else
+        write(lout,'(1x,a)') 'Error in declaration of MemSort!'
+        stop
+     endif
+
+end subroutine read_memsrt
+
+subroutine read_statearray(val,inst,instates,delim)
+
+     character(*), intent(in) :: val
+     character(1), intent(in) :: delim
+     integer,intent(inout) :: instates
+
+     integer :: ii,k
+     logical :: dot
+     integer,allocatable :: inst(:,:)
+     character(:), allocatable :: w,v,s1,s2
+
+     w = trim(adjustl(val))
+     v = trim(adjustl(val))
+      
+     if (len(w) == 0) then
+           write(LOUT,'(1x,a)') 'ERROR!!! NO STATES GIVEN FOR Ensamble!'
+           stop
+     else
+           ! check for dots
+           k = index(v,'.')
+           if(k /= 0) then 
+              dot=.true.
+           else
+              dot=.false.
+           endif
+         
+           ! get number of states 
+           instates = 0
+           dimloop: do 
+                     k = index(v, delim)
+                     instates = instates + 1
+                     v = trim(adjustl(v(k+1:)))
+                     if (k == 0) exit dimloop
+                    enddo dimloop
+
+           ! assign states
+           allocate(inst(2,instates))
+           instates = 0
+           arrloop: do 
+                     k = index(w, delim)
+                     instates = instates + 1
+                     if(k /= 0) then
+                         if(dot) then
+                            call split(w(1:k-1),s1,s2,'.')
+                            read(s1, *) inst(1,instates) 
+                            read(s2, *) inst(2,instates) 
+                         else
+                            s1 = w(1:k-1)
+                            read(s1, *) inst(1,instates) 
+                            inst(2,instates) = 1  
+                         endif
+                         w = trim(adjustl(w(k+1:)))
+                         !print*, '1 2',inst(1,instates),inst(2,instates)
+                     elseif (k == 0) then 
+                         !print*, 'last ', w
+                         if(dot) then
+                            call split(w,s1,s2,'.')
+                            read(s1, *) inst(1,instates)
+                            read(s2, *) inst(2,instates)
+                         else
+                            s1 = w
+                            read(s1, *) inst(1,instates) 
+                            inst(2,instates) = 1  
+                         endif
+                         !print*, '1 2',inst(1,instates),inst(2,instates)
+                         exit arrloop
+                     endif 
+                  enddo arrloop
+
+     end if
+
+end subroutine read_statearray
+
+subroutine read_trstatearray(val,intrst,delim)
+
+     character(*), intent(in) :: val
+     character(1), intent(in) :: delim
+
+     integer :: ii,k
+     logical :: dot
+     integer,allocatable :: intrst(:,:)
+     integer :: instates
+     character(:), allocatable :: w,v,s1,s2
+
+     w = trim(adjustl(val))
+     v = trim(adjustl(val))
+      
+     if (len(w) == 0) then
+           write(LOUT,'(1x,a)') 'ERROR!!! NO STATES GIVEN FOR Ensamble!'
+           stop
+     else
+           ! check for dots
+           k = index(v,'.')
+           if(k /= 0) then 
+              dot=.true.
+           else
+              dot=.false.
+           endif
+         
+           ! get number of states 
+           instates = 0
+           dimloop: do 
+                     k = index(v, delim)
+                     instates = instates + 1
+                     v = trim(adjustl(v(k+1:)))
+                     if (k == 0) exit dimloop
+                    enddo dimloop
+
+           if(instates.gt.1) then
+              write(lout,*) 'ONLY SINGLE TRDM POSSIBLE!'
+              stop
+           endif
+
+           ! assign states
+           allocate(intrst(2,instates))
+           instates = 0
+           arrloop: do 
+                     k = index(w, delim)
+                     instates = instates + 1
+                     if(k == 0) then
+                         !print*, 'last ', w
+                         if(dot) then
+                            call split(w,s1,s2,'.')
+                            read(s1, *) intrst(1,instates)
+                            read(s2, *) intrst(2,instates)
+                         else
+                            s1 = w
+                            read(s1, *) intrst(1,instates) 
+                            intrst(2,instates) = 1  
+                         endif
+                         !print*, '1 2',inst(1,instates),inst(2,instates)
+                         exit arrloop
+                     endif 
+                  enddo arrloop
+
+     end if
+
+end subroutine read_trstatearray
+
+subroutine split(s, s1, s2, delimiter)
+      !
+      ! Split a list of words into two pieces:
+      ! "keyword    value1 value2" -> "keyword" + "value1 value2".
+      !
+      character(*), intent(in)               :: s
+      character(:), allocatable, intent(out) :: s1
+      character(:), allocatable, intent(out) :: s2
+      character(1), intent(in), optional :: delimiter
+
+      integer :: k
+      character(:), allocatable :: w
+      character(1) :: delim
+
+      if (present(delimiter)) then
+            delim = delimiter
+      else
+            delim = " "
+      end if
+      
+      w = trim(adjustl(s))
+      if (len(w) == 0) then
+            s1 = ""
+            s2 = ""
+      else
+            k = index(w, delim)
+            if (k == 0) then
+                  s1 = w
+                  s2 = ""
+            else
+                  s1 = w(1:k-1)
+                  s2 = trim(adjustl(w(k+1:)))
+            end if
+      end if
+end subroutine split
+
+subroutine io_text_readline(line, u, eof)
+      !
+      ! Read a line from a text file. The limit for the line
+      ! size is MAXCHUNKS * DEFLEN characters (see the code).
+      !
+      character(:), allocatable, intent(out) :: line
+      integer, intent(in)                    :: u
+      logical, optional, intent(out)         :: eof
+
+      character(len=80) :: chunk
+      character(len=256) :: errmsg
+      integer :: s, ios
+      integer :: n
+      integer, parameter :: maxchunks = 2**10
+
+      line = ""
+      if (present(eof)) eof = .false.
+      
+      lineloop: do n = 1, maxchunks
+            read(u, "(A)", advance="NO", size=s, &
+                  iostat=ios, iomsg=errmsg) chunk
+
+            if (s > 0) then
+                  line = line // chunk(1:s)
+            end if
+
+            if (ios == iostat_end) then
+                  if (present(eof)) eof = .true.
+                  exit lineloop
+            else if (ios == iostat_eor) then
+                  exit lineloop
+            else if (ios .ne. 0) then
+                  write(*, *) "COULD NOT READ LINE"
+                  write(*, *) trim(errmsg)
+                  stop
+            end if
+      end do lineloop
+end subroutine io_text_readline
+
+function uppercase(s)
+      !
+      ! Convert characters to uppercase.
+      ! Numbers and special characters are ignored.
+      !
+      character(:), allocatable :: uppercase
+      character(*), intent(in)  :: s
+      integer :: idx, k
+      character(len=*), parameter :: STR_LETTER_UPPER = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+      character(len=*), parameter :: STR_LETTER_LOWER = "abcdefghijklmnopqrstuvwxyz"
+
+      uppercase = s
+      do k = 1, len_trim(s)
+            idx = index(STR_LETTER_LOWER, s(k:k))
+            if (idx > 0) then
+                  uppercase(k:k) = STR_LETTER_UPPER(idx:idx)
+            end if
+      end do
+end function uppercase
+
+function isblank(l)
+      logical                      :: isblank
+      character(len=*), intent(in) :: l
+
+      if (len_trim(l) .eq. 0) then
+            isblank = .true.
+      else
+            isblank = .false.
+      end if
+end function isblank
+
+function iscomment(s)
+      logical                  :: iscomment
+      character(*), intent(in) :: s
+      
+      character(:), allocatable :: sl
+
+      iscomment = .false.
+      if (.not. isblank(s)) then
+            sl = adjustl(s)
+            if (sl(1:1) == "!") then
+                  iscomment = .true.
+            end if
+      end if            
+end function iscomment
+
 end module inputfill

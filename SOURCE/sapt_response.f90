@@ -838,7 +838,6 @@ character(:),allocatable      :: onefile,twofile,rdmfile,propfile
 double precision, allocatable :: work1(:),work2(:),XOne(:),TwoMO(:)
 double precision, allocatable :: ABPlus(:),ABMin(:),DMAT(:),DMATK(:),&
                                  CMAT(:),EMAT(:),EMATM(:),EigVecR(:),Eig(:)
-
 ! checks
  if(M%TwoMoInt/=TWOMO_INCORE) then
    write(LOUT,'(/,1x,a)') 'ERROR! PINO possible only with TwoMoInt==INCORE!'
@@ -894,14 +893,16 @@ double precision, allocatable :: ABPlus(:),ABMin(:),DMAT(:),DMATK(:),&
  if(iPINO==0.or.iPINO==1) then
     ! FCI
     call calc_fci(NBas,NInte1,NInte2,XOne,URe,TwoMO,M,iPINO)
-    call read2rdm(M,NBas)
+!   loading 2RDM-incore is not necessary
+!   call read2rdm(M,NBas)
 
     if(iPINO==0) call init_pino(NBas,M,Flags%ICASSCF)
 
  elseif(iPINO==2) then
 
     ! CAS
-    call read2rdm(M,NBas)
+    ! loading 2RDM-incore is not necessary
+    !call read2rdm(M,NBas)
     call system('cp '//rdmfile// ' rdm2.dat')
 
  endif
@@ -1432,7 +1433,6 @@ allocate(ABPlus(Mon%NDimX**2),ABMin(Mon%NDimX**2),&
 
 ! read 2-RDMs
 ! HERE-2?
-!call read2rdm(Mon,NBas)
  call system('cp '//rdmfile// ' rdm2.dat')
 
 ECASSCF = 0
@@ -1700,6 +1700,9 @@ integer :: i,j,ij,ind
 end subroutine init_pino
 
 subroutine calc_fci(NBas,NInte1,NInte2,XOne,URe,TwoMO,Mon,iPINO)
+!
+! Purpose: obtain exact 2RDM for 2-electron systems
+!
 implicit none
 
 integer,intent(in) :: NBas, NInte1, NInte2, iPINO
@@ -1827,8 +1830,6 @@ type(FileNames)   :: FNam
 
 end subroutine set_filenames
 
-
-
 subroutine get_1el_h_mo(XOne,MO,NBas,onefile)
 ! read 1-el Hamiltonian and transform with MO coefs
 implicit none
@@ -1861,6 +1862,59 @@ character(8) :: label
  deallocate(work2,work1)
 
 end subroutine get_1el_h_mo
+
+subroutine create_symmats(Mon,MO,NBasis)
+implicit none
+! create MultpC and NSymNO 
+! WARNING!!! THIS PROCEDURE STILL REQUIRES VERIFICATION
+! WITH A SAPT LR-PBE JOB!!!
+
+integer,intent(in) :: NBasis
+double precision,intent(in) :: MO(NBasis,NBasis)
+type(SystemBlock) :: Mon
+
+integer :: i,j,iorb,istart
+
+allocate(Mon%NSymNO(NBasis),Mon%MultpC(15,15))
+
+!print*, 'NSym',Mon%NSym
+Mon%MultpC = 0
+if(Mon%NSym==1) then
+   Mon%MultpC(1,1)=1
+else
+   do i=1,Mon%NSym
+      do j=1,i
+         Mon%MultpC(i,j) = ieor(i-1,j-1)+1
+         Mon%MultpC(j,i) = Mon%MultpC(i,j)
+      enddo
+   enddo
+endif
+
+
+Mon%NSymNO(1:NBasis) = 0
+istart = 0
+do i=1,Mon%NSym
+   do j=istart+1,istart+Mon%NumOSym(i)
+      do iorb=1,NBasis
+         if(abs(MO(j,iorb)).gt.1.d-1) Mon%NSymNO(iorb) = i
+      enddo
+   enddo
+   istart=istart+Mon%NumOSym(i)
+enddo
+
+! check
+do i=1,Mon%NSym
+   j = 0
+   do iorb=1,NBasis
+      if(Mon%NSymNO(iorb)==i) j = j + 1
+   enddo
+   if(j/=Mon%NumOSym(i)) then
+      write(LOUT,'(1x,a)') 'ERROR IN create_symmats! SYMMETRY OF NO CANNOT BE ESTABLISHED!'
+      stop
+   endif
+enddo
+!
+end subroutine create_symmats
 
 subroutine reduce_dim(var,matP,matM,Mon)
 implicit none

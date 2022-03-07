@@ -13,6 +13,7 @@ OBJ = $(O)mainp.o $(O)initia.o $(O)dmscf.o $(O)misc.o $(O)optocc.o \
       $(O)gridmolpro.o \
       $(O)sorter.o $(O)tran.o $(O)systemdef.o \
       $(O)sorter_Cholesky.o \
+      $(O)priunit.o \
       $(O)types.o $(O)inputfill.o $(O)abmats.o $(O)abfofo.o $(O)ab0fofo.o \
       $(O)sapt_main.o $(O)sapt_exch.o $(O)sapt_pol.o $(O)sapt_utils.o \
       $(O)sapt_CD_pol.o $(O)sapt_response.o $(O)sapt_interface.o \
@@ -32,7 +33,7 @@ $(PROG) :  $(OBJ)
 	$(FCC) $(FFLAGS) -o $(PROG) $(OBJ) $(LIBS)
 $(O)mainp.o : $(S)mainp.f $(S)commons.inc $(O)types.o $(O)inputfill.o $(O)systemdef.o $(O)sapt_main.o $(O)git_info.o $(O)build_info.o
 	$(FCC) $(FFLAGS)  -c $(S)mainp.f -o $(O)mainp.o
-$(O)initia.o : $(S)initia.f $(S)commons.inc $(O)types.o $(O)sorter.o $(O)tran.o $(O)abmats.o $(O)sapt_main.o $(O)timing.o
+$(O)initia.o : $(S)initia.f $(S)commons.inc $(O)priunit.o $(O)types.o $(O)sorter.o $(O)tran.o $(O)abmats.o $(O)sapt_main.o $(O)timing.o
 	$(FCC) $(FFLAGS)  -c $(S)initia.f -o $(O)initia.o 
 $(O)git_info.o : $(S)git_info.f90
 	$(FCC) $(FFLAGS)  -c $(S)git_info.f90 -o $(O)git_info.o
@@ -105,9 +106,11 @@ $(O)gridmolpro.o : $(S)gridmolpro.f90
 	$(FCC) $(FFLAGS)  -c $(S)gridmolpro.f90 -o $(O)gridmolpro.o
 $(O)timing.o : $(S)timing.f90
 	$(FCC) $(FFLAGS)  -c $(S)timing.f90 -o $(O)timing.o
-$(O)types.o : $(S)types.f90
+$(O)priunit.o : $(S)priunit.f90
+	$(FCC) $(FFLAGS)  -c $(S)priunit.f90 -o $(O)priunit.o
+$(O)types.o : $(S)types.f90 $(O)priunit.o
 	$(FCC) $(FFLAGS)  -c $(S)types.f90 -o $(O)types.o
-$(O)inputfill.o : $(S)inputfill.f90 $(O)types.o  
+$(O)inputfill.o : $(S)inputfill.f90 $(O)types.o
 	$(FCC) $(FFLAGS)  -c $(S)inputfill.f90 -o $(O)inputfill.o
 $(O)systemdef.o : $(S)systemdef.f90 $(O)types.o
 	$(FCC) $(FFLAGS)  -c $(S)systemdef.f90 -o $(O)systemdef.o
@@ -152,7 +155,7 @@ $(O)exmisc.o : $(S)exmisc.f90 $(O)types.o
 	$(FCC) $(FFLAGS)  -c $(S)exmisc.f90 -o $(O)exmisc.o
 $(O)exappr.o : $(S)exappr.f90 $(O)exmisc.o
 	$(FCC) $(FFLAGS)  -c $(S)exappr.f90 -o $(O)exappr.o
-$(O)exdpino.o : $(S)exdpino.f90 $(O)types.o $(O)tran.o $(O)timing.o $(O)exmisc.o
+$(O)exdpino.o : $(S)exdpino.f90 $(O)types.o $(O)tran.o $(O)timing.o $(O)exmisc.o $(O)sapt_utils.o
 	$(FCC) $(FFLAGS)  -c $(S)exdpino.f90 -o $(O)exdpino.o
 $(O)sapt_main.o : $(S)sapt_main.f90 $(O)types.o \
                   $(O)sapt_exch.o $(O)sapt_pol.o $(O)sapt_CD_pol.o $(O)sapt_utils.o $(O)exdpino.o \

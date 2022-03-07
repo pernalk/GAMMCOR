@@ -1,13 +1,8 @@
 module types
 ! written by M. Hapka, M. Modrzejewski
 !            K. Pernal
-use iso_fortran_env
 
-implicit none
-
-
-integer :: LOUT = output_unit
-integer,parameter :: LERR = error_unit
+use print_units
 
 integer, parameter :: INTER_TYPE_DAL  = 1
 integer, parameter :: INTER_TYPE_MOL  = 2
@@ -215,7 +210,7 @@ type SystemBlock
       double precision,allocatable :: Pmat(:,:)
       double precision,allocatable :: WPot(:,:),Kmat(:,:)
       double precision,allocatable :: VCoul(:)
-      double precision,allocatable :: RDM2(:),RDM2Act(:,:,:,:)
+      double precision,allocatable :: RDM2(:)
       double precision,allocatable :: RDM2val(:,:,:,:)
       double precision,allocatable :: Fmat(:,:) 
       double precision,allocatable :: dipm(:,:,:)
@@ -1425,247 +1420,6 @@ logical :: iexist
 
 end subroutine delfile
 
-subroutine read2rdm(Mon,NBas)
-
-implicit none 
-
-type(SystemBlock) :: Mon
-integer, intent(in) :: NBas
-character(:),allocatable :: rdmfile
-integer :: iunit,ios
-integer :: NRDM2Act
-integer :: Ind1(NBas),Ind2(NBas)
-integer :: i,j,k,l
-double precision :: val
-double precision,parameter :: Half=0.5d0
-integer,external :: NAddrRDM
-
- if(Mon%Monomer==1) then
-    rdmfile='rdm2_A.dat'
- elseif(Mon%Monomer==2) then
-    rdmfile='rdm2_B.dat'
- endif 
-
- Ind1=0
- Ind2=0
- do i=1,Mon%NAct
-    Ind1(i) = Mon%INAct + i
-    Ind2(Mon%INAct+i) = i 
- enddo
-
-  NRDM2Act = Mon%NAct**2*(Mon%NAct**2+1)/2
-  !print*, Mon%NAct,NRDM2Act
-
- if(allocated(Mon%RDM2))    deallocate(Mon%RDM2)
- if(allocated(Mon%RDM2Act)) deallocate(Mon%RDM2Act)
-  allocate(Mon%RDM2(NRDM2Act), &
-           Mon%RDM2Act(Mon%NAct,Mon%NAct,Mon%NAct,Mon%NAct))
-  Mon%RDM2(1:NRDM2Act)=0
-  Mon%RDM2Act=0
-
-  open(newunit=iunit,file=rdmfile,status='OLD',&
-       form='FORMATTED')
-  do
-
-     read(iunit,'(4i4,f19.12)',iostat=ios) i,j,k,l,val
-
-!    val IS DEFINED AS: < E(IJ)E(KL) > - DELTA(J,K) < E(IL) > = 2 GAM2(JLIK)
-
-     if(ios==0) then
-        Mon%RDM2(NAddrRDM(j,l,i,k,Mon%NAct))=Half*val
-        !print*, 'old',Mon%RDM2(NAddrRDM(j,l,i,k,Mon%NAct))
-
-!       not all elements would be included ?
-!        Mon%RDM2Act(j,l,i,k) = Half*val        
-        !print*, 'new',Mon%RDM2Act(j,l,i,k)
-
-        i=Ind1(i)
-        j=Ind1(j)
-        k=Ind1(k)
-        l=Ind1(l)
-
-      elseif(ios/=0) then 
-        exit
-
-     endif
-
-  enddo
-  close(iunit)
-
-  do i=1,Mon%NAct
-     do j=1,Mon%NAct
-        do k=1,Mon%NAct
-           do l=1,Mon%NAct
-              Mon%RDM2Act(i,j,k,l) = Mon%RDM2(NAddrRDM(i,j,k,l,Mon%NAct))
-           enddo
-        enddo
-     enddo
-  enddo
-
-  if(allocated(Mon%Ind2)) deallocate(Mon%Ind2)
-  allocate(Mon%Ind2(NBas))
-
-  Mon%Ind2 = Ind2
-
-end subroutine read2rdm
-
-subroutine  square_oneint(tr,sq,nbas,nsym,norb)
-
-implicit none
-integer,intent(in) :: nbas,nsym,norb(8)
-double precision,intent(in) :: tr(:)
-double precision,intent(out) :: sq(nbas,nbas)
-integer :: irep,i,j
-integer :: offset,idx 
-
-sq=0
-
-offset=0
-idx=0
-do irep=1,nsym
-   do j=offset+1,offset+norb(irep)
-      do i=offset+1,j
-
-         idx=idx+1
-         sq(i,j)=tr(idx)
-         sq(j,i)=tr(idx)
-
-      enddo
-   enddo
-   offset=offset+norb(irep)
-enddo
-
-end subroutine square_oneint
-
-subroutine get_den(nbas,MO,Occ,Fac,Den)
-implicit none
-
-integer,intent(in) :: nbas
-double precision, intent(in) :: MO(nbas,nbas)
-double precision, intent(in) :: Occ(nbas)
-double precision, intent(in) :: Fac
-double precision, intent(out) :: Den(nbas,nbas)
-integer :: i
-
-Den = 0
-do i=1,nbas
-   call dger(nbas, nbas, Fac*Occ(i), MO(:, i), 1, MO(:, i), 1, Den, nbas)
-enddo
-
-end subroutine get_den
-
-subroutine get_one_mat(var,mat,mono,nbas)
-implicit none
-
-character(1),intent(in)      :: var
-integer,intent(in)           :: nbas,mono
-double precision,intent(out) :: mat(nbas,nbas)
-
-integer                  :: ione
-logical                  :: valid
-character(8)             :: label
-character(:),allocatable :: onefile
-
- if(mono==1) then
-    onefile = 'ONEEL_A'
- elseif(mono==2) then
-    onefile = 'ONEEL_B'
- else
-    write(LOUT,'(1x,a)') 'ERROR!!! ONLY 2 MONOMERS ACCEPTED!'
-    stop
- endif
-
- open(newunit=ione,file=onefile,access='sequential',&
-      form='unformatted',status='old')
-
- valid=.false.
- mat=0
- select case(var)
- case('V','v')
-
-    read(ione)
-    read(ione) label,mat 
-    if(label=='POTENTAL') valid=.true. 
- 
- case('S','s')
-
-    read(ione) label,mat 
-    if(label=='OVERLAP ') valid=.true. 
-
- case('H','h')
-
-    read(ione) 
-    read(ione)
-    read(ione) label,mat 
-    if(label=='ONEHAMIL') valid=.true. 
-
- case default
-    write(LOUT,'()')
-    write(LOUT,'(1x,a)') 'ERROR IN get_one_max! TYPE '//var//' NOT AVAILABLE!'
-    stop
- end select
-
- if(.not.valid) then
-    write(LOUT,'(1x,a)') 'ERROR!!! LABEL MISMATCH IN get_one_mat!' 
-    stop
- endif
-
- close(ione)
-
-end subroutine get_one_mat
-
-subroutine basinfo(nbasis,basfile,intf)
-implicit none
-
-character(*),intent(in) :: basfile,intf
-integer,intent(out) :: nbasis
-integer :: iunit
-integer :: nsym,nbas(8),norb(8),nrhf(8),ioprhf
-logical :: ex
-
-inquire(file=basfile,EXIST=ex)
-
-if(ex) then
-   open(newunit=iunit,file=basfile,status='OLD', &
-        access='SEQUENTIAL',form='UNFORMATTED')
-
-   if(trim(intf)=='DALTON') then
-      ! read basis info
-      call readlabel(iunit,'BASINFO ')
-
-      read (iunit) nsym,nbas,norb,nrhf,ioprhf
-      !write(LOUT,*)  nsym,nbas,norb,nrhf,ioprhf
-
-   elseif(trim(intf)=='MOLPRO') then
-      read(iunit)
-      read(iunit) nsym,nbas(1:nsym)
-   endif
-
-   close(iunit)
-   nbasis = sum(nbas(1:nsym))
-
-else
-   write(LOUT,'(1x,a)') 'WARNING: '// basfile //' NOT FOUND!'
-   write(LOUT,'(1x,a)') 'TRYING TO READ NBasis FROM INPUT!'
-endif
-
-end subroutine basinfo
-
-!function trace(m,n) result(tr)
-!implicit none
-!
-!integer,intent(in) :: n
-!double precision,intent(in) :: m(n,n)
-!integer :: i
-!double precision :: tr
-!
-! tr = 0
-! do i=1,n
-!    tr = tr + m(i,i)
-! enddo
-! 
-!end function trace 
-
 function iaddr(IAddr1,IAddr2,IAddr3,IAddr4) result(NAddr3)
 ! POINTER FOR TWO-ELECTRON INTEGRALS
  implicit none
@@ -1687,291 +1441,6 @@ function iaddr(IAddr1,IAddr2,IAddr3,IAddr4) result(NAddr3)
           Min(IAddr12,IAddr34)
 
 end function iaddr
-
-function uppercase(s)
-      !
-      ! Convert characters to uppercase.
-      ! Numbers and special characters are ignored.
-      !
-      character(:), allocatable :: uppercase
-      character(*), intent(in)  :: s
-      integer :: idx, k
-      character(len=*), parameter :: STR_LETTER_UPPER = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
-      character(len=*), parameter :: STR_LETTER_LOWER = "abcdefghijklmnopqrstuvwxyz"
-
-      uppercase = s
-      do k = 1, len_trim(s)
-            idx = index(STR_LETTER_LOWER, s(k:k))
-            if (idx > 0) then
-                  uppercase(k:k) = STR_LETTER_UPPER(idx:idx)
-            end if
-      end do
-end function uppercase
-
-subroutine read_memsrt(val,MemVal,MemType)
-
-     character(*), intent(in)  :: val
-     integer, intent(out)      :: MemVal
-     integer, intent(out)      :: MemType
-
-     character(:), allocatable :: s1,s2
-
-     call split(val,s1,s2)
-
-     read(s1,*) MemVal
-
-     if(trim(uppercase(s2))=='MB') then
-        !MemVal = MemVal * 1024_8**2
-        MemType = 2
-     else if(trim(uppercase(s2))=='GB') then
-        !MemVal = MemVal * 1024_8**3
-        MemType = 3
-     else
-        write(lout,'(1x,a)') 'Error in declaration of MemSort!'
-        stop
-     endif
-
-end subroutine read_memsrt
-
-subroutine read_statearray(val,inst,instates,delim)
-
-     character(*), intent(in) :: val
-     character(1), intent(in) :: delim
-     integer,intent(inout) :: instates
-
-     integer :: ii,k
-     logical :: dot
-     integer,allocatable :: inst(:,:)
-     character(:), allocatable :: w,v,s1,s2
-
-     w = trim(adjustl(val))
-     v = trim(adjustl(val))
-      
-     if (len(w) == 0) then
-           write(LOUT,'(1x,a)') 'ERROR!!! NO STATES GIVEN FOR Ensamble!'
-           stop
-     else
-           ! check for dots
-           k = index(v,'.')
-           if(k /= 0) then 
-              dot=.true.
-           else
-              dot=.false.
-           endif
-         
-           ! get number of states 
-           instates = 0
-           dimloop: do 
-                     k = index(v, delim)
-                     instates = instates + 1
-                     v = trim(adjustl(v(k+1:)))
-                     if (k == 0) exit dimloop
-                    enddo dimloop
-
-           ! assign states
-           allocate(inst(2,instates))
-           instates = 0
-           arrloop: do 
-                     k = index(w, delim)
-                     instates = instates + 1
-                     if(k /= 0) then
-                         if(dot) then
-                            call split(w(1:k-1),s1,s2,'.')
-                            read(s1, *) inst(1,instates) 
-                            read(s2, *) inst(2,instates) 
-                         else
-                            s1 = w(1:k-1)
-                            read(s1, *) inst(1,instates) 
-                            inst(2,instates) = 1  
-                         endif
-                         w = trim(adjustl(w(k+1:)))
-                         !print*, '1 2',inst(1,instates),inst(2,instates)
-                     elseif (k == 0) then 
-                         !print*, 'last ', w
-                         if(dot) then
-                            call split(w,s1,s2,'.')
-                            read(s1, *) inst(1,instates)
-                            read(s2, *) inst(2,instates)
-                         else
-                            s1 = w
-                            read(s1, *) inst(1,instates) 
-                            inst(2,instates) = 1  
-                         endif
-                         !print*, '1 2',inst(1,instates),inst(2,instates)
-                         exit arrloop
-                     endif 
-                  enddo arrloop
-
-     end if
-
-end subroutine read_statearray
-
-subroutine read_trstatearray(val,intrst,delim)
-
-     character(*), intent(in) :: val
-     character(1), intent(in) :: delim
-
-     integer :: ii,k
-     logical :: dot
-     integer,allocatable :: intrst(:,:)
-     integer :: instates
-     character(:), allocatable :: w,v,s1,s2
-
-     w = trim(adjustl(val))
-     v = trim(adjustl(val))
-      
-     if (len(w) == 0) then
-           write(LOUT,'(1x,a)') 'ERROR!!! NO STATES GIVEN FOR Ensamble!'
-           stop
-     else
-           ! check for dots
-           k = index(v,'.')
-           if(k /= 0) then 
-              dot=.true.
-           else
-              dot=.false.
-           endif
-         
-           ! get number of states 
-           instates = 0
-           dimloop: do 
-                     k = index(v, delim)
-                     instates = instates + 1
-                     v = trim(adjustl(v(k+1:)))
-                     if (k == 0) exit dimloop
-                    enddo dimloop
-
-           if(instates.gt.1) then
-              write(lout,*) 'ONLY SINGLE TRDM POSSIBLE!'
-              stop
-           endif
-
-           ! assign states
-           allocate(intrst(2,instates))
-           instates = 0
-           arrloop: do 
-                     k = index(w, delim)
-                     instates = instates + 1
-                     if(k == 0) then
-                         !print*, 'last ', w
-                         if(dot) then
-                            call split(w,s1,s2,'.')
-                            read(s1, *) intrst(1,instates)
-                            read(s2, *) intrst(2,instates)
-                         else
-                            s1 = w
-                            read(s1, *) intrst(1,instates) 
-                            intrst(2,instates) = 1  
-                         endif
-                         !print*, '1 2',inst(1,instates),inst(2,instates)
-                         exit arrloop
-                     endif 
-                  enddo arrloop
-
-     end if
-
-end subroutine read_trstatearray
-
-subroutine split(s, s1, s2, delimiter)
-      !
-      ! Split a list of words into two pieces:
-      ! "keyword    value1 value2" -> "keyword" + "value1 value2".
-      !
-      character(*), intent(in)               :: s
-      character(:), allocatable, intent(out) :: s1
-      character(:), allocatable, intent(out) :: s2
-      character(1), intent(in), optional :: delimiter
-
-      integer :: k
-      character(:), allocatable :: w
-      character(1) :: delim
-
-      if (present(delimiter)) then
-            delim = delimiter
-      else
-            delim = " "
-      end if
-      
-      w = trim(adjustl(s))
-      if (len(w) == 0) then
-            s1 = ""
-            s2 = ""
-      else
-            k = index(w, delim)
-            if (k == 0) then
-                  s1 = w
-                  s2 = ""
-            else
-                  s1 = w(1:k-1)
-                  s2 = trim(adjustl(w(k+1:)))
-            end if
-      end if
-end subroutine split
-
-subroutine io_text_readline(line, u, eof)
-      !
-      ! Read a line from a text file. The limit for the line
-      ! size is MAXCHUNKS * DEFLEN characters (see the code).
-      !
-      character(:), allocatable, intent(out) :: line
-      integer, intent(in)                    :: u
-      logical, optional, intent(out)         :: eof
-
-      character(len=80) :: chunk
-      character(len=256) :: errmsg
-      integer :: s, ios
-      integer :: n
-      integer, parameter :: maxchunks = 2**10
-
-      line = ""
-      if (present(eof)) eof = .false.
-      
-      lineloop: do n = 1, maxchunks
-            read(u, "(A)", advance="NO", size=s, &
-                  iostat=ios, iomsg=errmsg) chunk
-
-            if (s > 0) then
-                  line = line // chunk(1:s)
-            end if
-
-            if (ios == iostat_end) then
-                  if (present(eof)) eof = .true.
-                  exit lineloop
-            else if (ios == iostat_eor) then
-                  exit lineloop
-            else if (ios .ne. 0) then
-                  write(*, *) "COULD NOT READ LINE"
-                  write(*, *) trim(errmsg)
-                  stop
-            end if
-      end do lineloop
-end subroutine io_text_readline
-
-function isblank(l)
-      logical                      :: isblank
-      character(len=*), intent(in) :: l
-
-      if (len_trim(l) .eq. 0) then
-            isblank = .true.
-      else
-            isblank = .false.
-      end if
-end function isblank
-
-function iscomment(s)
-      logical                  :: iscomment
-      character(*), intent(in) :: s
-      
-      character(:), allocatable :: sl
-
-      iscomment = .false.
-      if (.not. isblank(s)) then
-            sl = adjustl(s)
-            if (sl(1:1) == "!") then
-                  iscomment = .true.
-            end if
-      end if            
-end function iscomment
 
 !subroutine molpro_routines
 !implicit none
@@ -2012,60 +1481,14 @@ end function iscomment
 !!
 !end subroutine molpro_routines
 
-subroutine create_symmats(Mon,MO,NBasis)
-implicit none
-! create MultpC and NSymNO 
-! WARNING!!!! THIS PROCEDURE STILL REQUIRES VERIFICATION
-! WITH A SAPT LR-PBE JOB!!!
-
-integer,intent(in) :: NBasis
-double precision,intent(in) :: MO(NBasis,NBasis)
-type(SystemBlock) :: Mon
-
-integer :: i,j,iorb,istart
-
-allocate(Mon%NSymNO(NBasis),Mon%MultpC(15,15))
-
-print*, 'NSym',Mon%NSym
-Mon%MultpC=0
-if(Mon%NSym==1) then
-   Mon%MultpC(1,1)=1
-else
-   do i=1,Mon%NSym
-      do j=1,i
-         Mon%MultpC(i,j) = ieor(i-1,j-1)+1
-         Mon%MultpC(j,i) = Mon%MultpC(i,j)
-      enddo
-   enddo
-endif
-
-
-Mon%NSymNO(1:NBasis) = 0
-istart = 0
-do i=1,Mon%NSym
-   do j=istart+1,istart+Mon%NumOSym(i)
-      do iorb=1,NBasis
-         if(abs(MO(j,iorb)).gt.1.d-1) Mon%NSymNO(iorb) = i
-      enddo
-   enddo
-   istart=istart+Mon%NumOSym(i)
-enddo
-
-! check
-do i=1,Mon%NSym
-   j = 0
-   do iorb=1,NBasis
-      if(Mon%NSymNO(iorb)==i) j = j + 1
-   enddo
-   if(j/=Mon%NumOSym(i)) then
-      write(LOUT,'(1x,a)') 'ERROR IN create_symmats! SYMMETRY OF NO CANNOT BE ESTABLISHED!'
-      stop
-   endif
-enddo
+subroutine sym_inf_molpro(infile,NumOSym,NSym,nstats,istsy,NStSym,NSymAO,NBasis)
 !
-end subroutine create_symmats
-
-subroutine sym_inf(infile,NumOSym,NSym,nstats,istsy,NStSym,NSymAO,NBasis)
+! Purpose: reads number of irreps (NSym)
+!          number of atomic orbitals in each irrep (NumOSym) 
+!          number of irreps in SA-CAS (NStSym)
+!          number of states in SA-CAS in each irrep (NumStSym)
+!          which irrep (a label) in SA-CAS (IStSy)
+! 
 implicit none
 
 character(*) :: infile
@@ -2110,9 +1533,14 @@ do i=1,Nsym
     enddo
  enddo
 
-end subroutine sym_inf
+end subroutine sym_inf_molpro
 
-subroutine create_ind(infile,NumOSym,IndInt,NSym,NBasis)
+subroutine create_ind_molpro(infile,NumOSym,IndInt,NSym,NBasis)
+!
+! Purpose: reads number of atomic orbitals in each irrep (NumOSym)
+!          creates index array IndInt(NBasis)
+!          used to reorder orbitals (all closed first, then active, then virt)
+!
 implicit none
 
 character(*) :: infile
@@ -2211,7 +1639,7 @@ character(8) :: label
 
  endif
 
-end subroutine create_ind 
+end subroutine create_ind_molpro
 
 !subroutine molprogrid(NGrid,NBasis)
 !Implicit Real*8 (A-H,O-Z)

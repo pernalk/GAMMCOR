@@ -438,8 +438,6 @@ double precision :: MO(NBasis*NBasis)
     if(Mon%Monomer==1) call system('cp rdm2_A.dat rdm2.dat')
     if(Mon%Monomer==2) call system('cp rdm2_B.dat rdm2.dat')
  endif
- !if(Flags%ICASSCF==1) call system('cp rdm2_A.dat rdm2.dat')
-
  call prepare_RDM2val(Mon,Flags%ICASSCF,NBasis)
 
  if(SaptLevel.eq.1) return
@@ -989,7 +987,10 @@ deallocate(work1)
 end subroutine test_pmat
 
 subroutine prepare_RDM2val(Mon,ICASSCF,NBasis)
-! prepare RDM2val(dimOcc,dimOcc,dimOcc,dimOcc) for SAPT
+!
+! prepare RDM2val(NOccup,NOccup,NOccup,NOccup) 
+! from packeg RDM2(NAddr)
+!
 implicit none
 
 type(SystemBlock) :: Mon
@@ -997,27 +998,19 @@ integer,intent(in) :: ICASSCF
 integer,intent(in) :: NBasis
 
 integer :: i,j,k,l
-integer :: dimOcc
+integer :: NOccup
 double precision, external :: FRDM2,FRDM2GVB
 
-dimOcc = Mon%num0+Mon%num1
+NOccup = Mon%num0+Mon%num1
 if(allocated(Mon%RDM2val)) deallocate(Mon%RDM2val)
-allocate(Mon%RDM2val(dimOcc,dimOcc,dimOcc,dimOcc))
-
-!print*, Mon%Occ
-!print*, ''
-!print*, 'NACT',Mon%NAct
-!print*, ''
-!print*, 'Ind2',Mon%Ind2
-!print*, ''
-!print*, 'RDM2',Mon%RDM2
+allocate(Mon%RDM2val(NOccup,NOccup,NOccup,NOccup))
 
 if(ICASSCF==1) then
 ! CAS
-   do l=1,dimOcc
-      do k=1,dimOcc
-         do j=1,dimOcc
-            do i=1,dimOcc
+   do l=1,NOccup
+      do k=1,NOccup
+         do j=1,NOccup
+            do i=1,NOccup
                Mon%RDM2val(i,j,k,l) = &
                FRDM2(i,k,j,l,Mon%RDM2,Mon%Occ,Mon%Ind2,Mon%NAct,NBasis)
             enddo
@@ -1026,16 +1019,18 @@ if(ICASSCF==1) then
    enddo
 elseif(ICASSCF==0) then
 ! GVB
-   do l=1,dimOcc
-     do k=1,dimOcc
-        do j=1,dimOcc
-           do i=1,dimOcc
+   do l=1,NOccup
+     do k=1,NOccup
+        do j=1,NOccup
+           Do i=1,NOccup
               Mon%RDM2val(i,j,k,l) = FRDM2GVB(i,k,j,l,Mon%Occ,NBasis)
            enddo
         enddo
      enddo
    enddo
 endif
+
+if(allocated(Mon%RDM2)) deallocate(Mon%RDM2)
 
 end subroutine prepare_RDM2val
 
@@ -1281,59 +1276,6 @@ deallocate(work)
 close(iunit)
 
 end subroutine chol_ints_gen
-
-subroutine test_QMat(A,B,CholeskyVecs,NBas)
-implicit none
-
-type(SystemBlock)   :: A, B
-type(TCholeskyVecs) :: CholeskyVecs
-integer,intent(in)  :: NBas
-
-integer :: NCholesky,dimOA,dimOB
-double precision,allocatable :: PA(:,:),PB(:,:), &
-                                S(:,:),USa(:,:),USb(:,:)
-double precision,allocatable :: Qab(:,:),Qba(:,:),Qmat(:,:)
-
-NCholesky = CholeskyVecs%NCholesky
-dimOA = A%num0+A%num1
-dimOB = B%num0+B%num1
-
-allocate(S(NBas,NBas), &
-         PA(NBas,NBas),PB(NBas,NBas))
-allocate(USa(NBas,NBas),USb(NBas,NBas),&
-         Qab(NBas,NBas),Qba(NBas,NBas),&
-         Qmat(NCholesky,dimOA**2))
-
-call get_den(NBas,A%CMO,A%Occ,1d0,PA)
-call get_den(NBas,B%CMO,B%Occ,1d0,PB)
-call get_one_mat('S',S,A%Monomer,NBas)
-
-! USa,USb in AOMO
-call dgemm('N','N',NBas,NBas,NBas,1d0,S,NBas,A%CMO,NBas,0d0,USa,NBas)
-call dgemm('N','N',NBas,NBas,NBas,1d0,S,NBas,B%CMO,NBas,0d0,USb,NBas)
-
-! Qab=0; Qba=0
-call dgemm('N','N',NBas,NBas,NBas,1d0,PA,NBas,USb,NBas,0d0,Qab,NBas)
-call dgemm('N','N',NBas,NBas,NBas,1d0,PB,NBas,USa,NBas,0d0,Qba,NBas)
-
-call chol_MOTransf(Qmat,CholeskyVecs,&
-                   A%CMO,1,dimOA,&
-                   Qba,1,dimOA)
-!call chol_ints_gen(dimOA,dimOA,A%OO,&
-!                   dimOA,dimOA,Qmat,A%NChol,'TWOA3B')
-
-deallocate(Qmat)
-allocate(Qmat(NCholesky,dimOB**2))
-
-call chol_MOTransf(Qmat,CholeskyVecs,&
-                   B%CMO,1,dimOB,&
-                   Qab,1,dimOB)
-!call chol_ints_gen(dimOB,dimOB,B%OO,&
-!                   dimOB,dimOB,Qmat,A%NChol,'TWOB3A')
-deallocate(Qmat,Qba,Qab)
-deallocate(PB,PA,S,USb,USa)
-
-end subroutine test_Qmat
 
 subroutine readmulti(nbas,mon,ihf,exsiri,isiri,occfile,occsir)
 !
@@ -1811,11 +1753,11 @@ if(allocated(SAPT%monB%OrbE)) then
 endif
 
 if(allocated(SAPT%monA%RDM2)) then
-   deallocate(SAPT%monA%RDM2,SAPT%monA%RDM2Act)
+   deallocate(SAPT%monA%RDM2)
    deallocate(SAPT%monA%Ind2)
 endif
 if(allocated(SAPT%monB%RDM2)) then
-   deallocate(SAPT%monB%RDM2,SAPT%monB%RDM2Act)
+   deallocate(SAPT%monB%RDM2)
    deallocate(SAPT%monB%Ind2)
 endif
 

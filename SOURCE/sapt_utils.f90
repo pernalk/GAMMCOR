@@ -5,6 +5,87 @@ use diis
 
 contains
 
+subroutine get_den(nbas,MO,Occ,Fac,Den)
+implicit none
+
+integer,intent(in) :: nbas
+double precision, intent(in) :: MO(nbas,nbas)
+double precision, intent(in) :: Occ(nbas)
+double precision, intent(in) :: Fac
+double precision, intent(out) :: Den(nbas,nbas)
+integer :: i
+
+Den = 0
+do i=1,nbas
+   call dger(nbas, nbas, Fac*Occ(i), MO(:, i), 1, MO(:, i), 1, Den, nbas)
+enddo
+
+end subroutine get_den
+
+subroutine get_one_mat(var,mat,mono,nbas)
+!
+! Purpose: get 1-el V, S or H matrix from ONEEL files
+!
+implicit none
+
+character(1),intent(in)      :: var
+integer,intent(in)           :: nbas,mono
+double precision,intent(out) :: mat(nbas,nbas)
+
+integer                  :: ione
+logical                  :: valid
+character(8)             :: label
+character(:),allocatable :: onefile
+
+ if(mono==1) then
+    onefile = 'ONEEL_A'
+ elseif(mono==2) then
+    onefile = 'ONEEL_B'
+ else
+    write(LOUT,'(1x,a)') 'ERROR!!! ONLY 2 MONOMERS ACCEPTED!'
+    stop
+ endif
+
+ open(newunit=ione,file=onefile,access='sequential',&
+      form='unformatted',status='old')
+
+ valid=.false.
+ mat=0
+ select case(var)
+ case('V','v')
+
+    read(ione)
+    read(ione) label,mat 
+    if(label=='POTENTAL') valid=.true. 
+ 
+ case('S','s')
+
+    read(ione) label,mat 
+    if(label=='OVERLAP ') valid=.true. 
+
+ case('H','h')
+
+    read(ione) 
+    read(ione)
+    read(ione) label,mat 
+    if(label=='ONEHAMIL') valid=.true. 
+
+ case default
+    write(LOUT,'()')
+    write(LOUT,'(1x,a)') 'ERROR IN get_one_max! TYPE '//var//' NOT AVAILABLE!'
+    stop
+ end select
+
+ if(.not.valid) then
+    write(LOUT,'(1x,a)') 'ERROR!!! LABEL MISMATCH IN get_one_mat!' 
+    stop
+ endif
+
+ close(ione)
+
+end subroutine get_one_mat
+
+
 subroutine read_SBlock(SBlock,SBlockIV,nblk,xy0file)
 implicit none
 

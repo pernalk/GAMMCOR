@@ -2088,7 +2088,7 @@ endif
 ! establish the type of correction: W_0j, W_1j, ...
 ! get info about monomer A
 allocate(NSymAO(NBas))
-call sym_inf('2RDMA',NumOSym,NSym,NumStSym,IStSy,NStSym,NSymAO,NBas)
+call sym_inf_molpro('2RDMA',NumOSym,NSym,NumStSym,IStSy,NStSym,NSymAO,NBas)
 deallocate(NSymAO)
 
 ! number of states summed over irreps
@@ -2216,7 +2216,7 @@ nOVB  = dimOB*dimVB
 ! establish the type of correction: W_ij , i<j
 ! get info about monomer A
 allocate(NSymAO(NBas))
-call sym_inf('2RDMA',NumOSym,NSym,NumStSym,IStSy,NStSym,NSymAO,NBas)
+call sym_inf_molpro('2RDMA',NumOSym,NSym,NumStSym,IStSy,NStSym,NSymAO,NBas)
 deallocate(NSymAO)
 
 ! number of states summed over irreps
@@ -2432,7 +2432,7 @@ nOVB  = dimOB*dimVB
 ! establish the type of correction: W_0j, W_1j, ...
 ! get info about monomer A
 allocate(NSymAO(NBas))
-call sym_inf('2RDMA',NumOSym,NSym,NumStSym,IStSy,NStSym,NSymAO,NBas)
+call sym_inf_molpro('2RDMA',NumOSym,NSym,NumStSym,IStSy,NStSym,NSymAO,NBas)
 deallocate(NSymAO)
 
 ! number of states summed over irreps

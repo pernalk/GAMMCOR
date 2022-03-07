@@ -345,7 +345,7 @@ C
       Call read_sym_molpro(NSymAO,MxSym,NumOSym,
      $ 'MOLPRO.MOPUN','CASORB  ',NBasis)
 C 
-      Call sym_inf('2RDM',NumOSym,NSym,NumStSym,IStSy,
+      Call sym_inf_molpro('2RDM',NumOSym,NSym,NumStSym,IStSy,
      $ NStSym,NSymAO,NBasis) 
 C     number of irreps
       write(*,*)'NSym',NSym
@@ -666,7 +666,7 @@ C      NumOSym(I)=X
 C      EndDo
 C      Close(10)
 C     HAP
-      Call create_ind('2RDM',NumOSym,IndInt,NSym,NBasis)
+      Call create_ind_molpro('2RDM',NumOSym,IndInt,NSym,NBasis)
       MxSym=NSym
 C
       NSymNO(1:NBasis)=0

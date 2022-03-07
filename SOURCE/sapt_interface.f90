@@ -189,8 +189,8 @@ double precision :: Tcpu,Twall
  if(SAPT%InterfaceType==2) then
     call prepare_no(OneRdmA,AuxA,Ca,SAPT%monA,CholeskyVecs,Flags%IFunSR,Flags%ICholesky,NBasis)
     call prepare_no(OneRdmB,AuxB,Cb,SAPT%monB,CholeskyVecs,Flags%IFunSR,Flags%ICholesky,NBasis)
-    call prepare_rdm2_file(SAPT%monA,AuxA,NBasis)
-    call prepare_rdm2_file(SAPT%monB,AuxB,NBasis)
+    call prepare_rdm2_molpro(SAPT%monA,AuxA,NBasis)
+    call prepare_rdm2_molpro(SAPT%monB,AuxB,NBasis)
  endif
 
 ! maybe better: add writing Ca, Cb to file?!
@@ -245,12 +245,15 @@ double precision :: Tcpu,Twall
     endif
  endif
 
-! calculate exchange K[PB] matrix
+! calculate exchange K[PB] matrix in AO
  allocate(SAPT%monB%Kmat(NBasis,NBasis))
  allocate(work(NBasis,NBasis))
- ! work = PB
+ !get PB density in AO
  work = 0
- call get_den(NBasis,SAPT%monB%CMO,SAPT%monB%Occ,1d0,work)
+ do i=1,NBasis
+ call dger(NBasis,NBasis,SAPT%monB%Occ(i),SAPT%monB%CMO(:,i),1,SAPT%monB%CMO(:,i),1,work,NBasis)
+ enddo
+
  if(Flags%ICholesky==0) then
     call make_K(NBasis,work,SAPT%monB%Kmat)
  elseif(Flags%ICholesky==1) then
@@ -1261,7 +1264,71 @@ end subroutine readocc_hf_siri
 !!  write(LOUT,*) mon%Occ
 !
 !end subroutine readmulti
-!
+
+subroutine read2rdm(Mon,NBas)
+! 
+! Purpose: load rdm2.dat file to memory
+!          as Mon%RDM2(NRDM2Act) matrix
+! 
+implicit none
+
+type(SystemBlock) :: Mon
+integer, intent(in) :: NBas
+character(:),allocatable :: rdmfile
+integer :: iunit,ios
+integer :: NRDM2Act
+integer :: Ind1(NBas),Ind2(NBas)
+integer :: i,j,k,l
+double precision :: val
+double precision,parameter :: Half=0.5d0
+integer,external :: NAddrRDM
+
+ if(Mon%Monomer==1) then
+    rdmfile='rdm2_A.dat'
+ elseif(Mon%Monomer==2) then
+    rdmfile='rdm2_B.dat'
+ endif 
+
+ Ind1=0
+ Ind2=0
+ do i=1,Mon%NAct
+    Ind1(i) = Mon%INAct + i
+    Ind2(Mon%INAct+i) = i 
+ enddo
+
+ NRDM2Act = Mon%NAct**2*(Mon%NAct**2+1)/2
+
+ if(allocated(Mon%RDM2))    deallocate(Mon%RDM2)
+
+ allocate(Mon%RDM2(NRDM2Act))
+ Mon%RDM2(1:NRDM2Act)=0
+
+ open(newunit=iunit,file=rdmfile,status='OLD',&
+      form='FORMATTED')
+ do
+
+   read(iunit,'(4i4,f19.12)',iostat=ios) i,j,k,l,val
+
+!  val IS DEFINED AS: < E(IJ)E(KL) > - DELTA(J,K) < E(IL) > = 2 GAM2(JLIK)
+
+   if(ios==0) then
+      Mon%RDM2(NAddrRDM(j,l,i,k,Mon%NAct))=Half*val
+
+    elseif(ios/=0) then 
+       exit
+
+    endif
+
+ enddo
+ close(iunit)
+
+ if(allocated(Mon%Ind2)) deallocate(Mon%Ind2)
+ allocate(Mon%Ind2(NBas))
+
+ Mon%Ind2 = Ind2
+
+end subroutine read2rdm
+
 subroutine arrange_mo(mat,nbas,SAPT)
 implicit none
 
@@ -1576,7 +1643,7 @@ integer :: info
  allocate(work1(NInte1),work2(NInte1),work3(NBasis),&
           Fock(NBasis**2),OrbSym(NBasis,NBasis),URe(NBasis,NBasis))
 
- call create_ind(rdmfile,Mon%NumOSym,Mon%IndInt,NSym,NBasis)
+ call create_ind_molpro(rdmfile,Mon%NumOSym,Mon%IndInt,NSym,NBasis)
 
 ! COPY AUXM TO URe AND OFF SET BY NInAc
  URe = 0
@@ -1730,7 +1797,7 @@ integer :: info
 
 end subroutine prepare_no
 
-subroutine prepare_rdm2_file(Mon,OrbAux,NBasis)
+subroutine prepare_rdm2_molpro(Mon,OrbAux,NBasis)
 implicit none
 
 type(SystemBlock) :: Mon
@@ -1784,7 +1851,7 @@ integer,external :: NAddrRDM
 
  deallocate(work1,RDM2Act)
 
-end subroutine prepare_rdm2_file
+end subroutine prepare_rdm2_molpro
 
 subroutine select_active(mon,nbas,Flags)
 ! set dimensions: NDimX,num0,num1,num2
@@ -2126,10 +2193,13 @@ type(TCholeskyVecs) :: CholeskyVecs
 
 integer,intent(in) :: ICholesky,NBas
 
+integer :: ione,i
 integer :: NInte1,NCholesky
 double precision,allocatable :: Pa(:,:),Pb(:,:)
 double precision,allocatable :: Va(:,:),Vb(:,:)
 double precision,allocatable :: Ja(:,:),Jb(:,:)
+logical                      :: valid
+character(8)                 :: label
 
  NInte1 = NBas*(NBas+1)/2
 
@@ -2137,11 +2207,41 @@ double precision,allocatable :: Ja(:,:),Jb(:,:)
           Va(NBas,NBas),Vb(NBas,NBas),&
           Ja(NBas,NBas),Jb(NBas,NBas))
 
- call get_den(NBas,A%CMO,A%Occ,2d0,Pa)
- call get_den(NBas,B%CMO,B%Occ,2d0,Pb)
+ !call get_den(NBas,A%CMO,A%Occ,2d0,Pa)
+ !call get_den(NBas,B%CMO,B%Occ,2d0,Pb)
+ Pa = 0d0
+ do i=1,NBas
+    call dger(NBas,NBas,2d0*A%Occ(i),A%CMO(:,i),1,A%CMO(:,i),1,Pa,NBas)
+ enddo
+ Pb = 0d0
+ do i=1,NBas
+    call dger(NBas,NBas,2d0*B%Occ(i),B%CMO(:,i),1,B%CMO(:,i),1,Pb,NBas)
+ enddo
 
- call get_one_mat('V',Va,A%Monomer,NBas)
- call get_one_mat('V',Vb,B%Monomer,NBas)
+ !call get_one_mat('V',Va,A%Monomer,NBas)
+ !call get_one_mat('V',Vb,B%Monomer,NBas)
+ valid=.false.
+ Va = 0d0
+ open(newunit=ione,file='ONEEL_A',access='sequential',&
+      form='unformatted',status='old')
+    read(ione)
+    read(ione) label,Va
+    if(label=='POTENTAL') valid=.true.
+ close(ione)
+ if(.not.valid) then
+    write(LOUT,'(1x,a)') 'Va not found in calc_elpot!'
+ endif
+ valid=.false.
+ Vb = 0d0
+ open(newunit=ione,file='ONEEL_B',access='sequential',&
+      form='unformatted',status='old')
+    read(ione)
+    read(ione) label,Vb
+    if(label=='POTENTAL') valid=.true.
+ close(ione)
+ if(.not.valid) then
+    write(LOUT,'(1x,a)') 'Vb not found in calc_elpot!'
+ endif
 
  if(ICholesky==0) then
     call make_J2(NBas,Pa,Pb,Ja,Jb)
@@ -2392,8 +2492,6 @@ call clock('BOO',Tcpu,Twall)
  !call chol_MOTransf(B%FO,CholeskyVecs,&
  !                   B%CMO,1,NBasis,&
  !                   B%CMO,1,dimOB)
- !! test exchange
- !call test_Qmat(A,B,CholeskyVecs,NBasis)
 
 end subroutine chol_sapt_NOTransf
 
@@ -2531,9 +2629,35 @@ enddo
 close(iunit)
 
 end subroutine readgvb
-!
-!
-!
+
+subroutine  square_oneint(tr,sq,nbas,nsym,norb)
+
+implicit none
+integer,intent(in) :: nbas,nsym,norb(8)
+double precision,intent(in) :: tr(:)
+double precision,intent(out) :: sq(nbas,nbas)
+integer :: irep,i,j
+integer :: offset,idx 
+
+sq=0
+
+offset=0
+idx=0
+do irep=1,nsym
+   do j=offset+1,offset+norb(irep)
+      do i=offset+1,j
+
+         idx=idx+1
+         sq(i,j)=tr(idx)
+         sq(j,i)=tr(idx)
+
+      enddo
+   enddo
+   offset=offset+norb(irep)
+enddo
+
+end subroutine square_oneint
+
 subroutine writeoneint(mon,ndim,S,V,H)
 implicit none
 
