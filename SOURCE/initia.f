@@ -105,15 +105,13 @@ C
 C
       If(ICASSCF.Eq.0) Then
 C
-      CICoef(1:NBasis)=0.D0
-      Open(10,File='coeff.dat',Form='Formatted',Status='Old')
-      Read(10,*) NActive
-      INActive=NELE-NActive
+C     read geminal coefficients
+      Call ReadCGemDal(CICoef,NELE,INActive,NActive,NBasis)
+C
+C     set IGem and Occ
       Do I=1,INActive
-      CICoef(I)=1.D0
       IGem(I)=I
       EndDo
-      Read(10,*) (CICoef(I+INActive),I=1,2*NActive)
       Do I=INActive+1,NELE
       IGem(I)=I
       IGem(NELE+I-INActive)=I
@@ -123,28 +121,13 @@ C
       If(CICoef(I).Eq.0.D0) IGem(I)=NGem
       Occ(I)=CICoef(I)**2
       EndDo
-      Close(10)
 C
       ElseIf(ICASSCF.Eq.1) Then
-      print*, 'here? Dalton-CAS'
 C
-c      Occ(1:NBasis)=0.D0
-cC
-c      Open(10,File='occupations.dat',Form='Formatted',Status='Old')
-cC
-c      Read(10,*) NInAc,NAc
-c      NInAc=NInAc/2
-c      Read(10,*) (Occ(I),I=1,NInAc+NAc)
-c      Sum=0.D0
-c      Do I=1,NInAc+NAc
-c      Occ(I)=Occ(I)/2.D0
-c      Sum=Sum+Occ(I)
-c      EndDo
       Sum=0.D0
       Do I=1,NInAc+NAc
       Sum=Sum+Occ(I)
       EndDo
-      print*, '???',sum
 C
       If(NInAc.Eq.0) Then
       NGem=2
@@ -194,7 +177,7 @@ C
       ElseIf(ITwoEl.Eq.3) Then
 C     TRANSFORM J AND K
       UAux=transpose(UMOAO)
-      print*, 'Num0-1',Num0,Num1
+c     print*, 'Num0-1',Num0,Num1
       Call tran4_gen(NBasis,
      $        Num0+Num1,UAux(1:NBasis,1:(Num0+Num1)),
      $        Num0+Num1,UAux(1:NBasis,1:(Num0+Num1)),
@@ -3653,7 +3636,6 @@ C     NISHT  -- no of inactive orbitals
 C     NNASHX -- triang of active orbitals
 C     DV(1:NNASHX) - triangular 1RDM
 C
-      use types
       use tran
       implicit none
 
@@ -3687,7 +3669,6 @@ C
       read(isirifc) DV(1:NNASHX) ! how to correctly read DS?
 
 C      print*, 'DV',DV(1:NNASHX)
-
       close(isirifc)
 
       allocate(EigAct(NASHT))
@@ -3720,6 +3701,85 @@ C     transfer to GammCor variables
       Occ = 0d0
       Occ(1:NISHT) = 2d0
       Occ(NISHT+1:NISHT+NASHT) = EigAct(1:NASHT)
+
+      End
+
+      Subroutine ReadCGemDal(CICoef,NELE,INActive,NActive,NBasis)
+C
+C     Purpose: read geminal coefficients either from Dalton output (coeff.dat)
+C              or SIRIFC file
+C
+      implicit none
+C
+      integer,intent(in)  :: NELE,NBasis
+      integer,intent(out) :: INActive,NActive
+      double precision,intent(out) :: CICoef(NBasis)
+C
+      integer :: i
+      logical :: FileCoeff, FileSIRIFC
+
+      Inquire(file="coeff.dat", EXIST=FileCoeff)
+      Inquire(file="SIRIFC",EXIST=FileSIRIFC)
+C
+      If (FileCoeff) Then
+C        read coefficients from Dalton output...
+         CICoef(1:NBasis)=0.D0
+         Open(10,File='coeff.dat',Form='Formatted',Status='Old')
+         Read(10,*) NActive
+         INActive=NELE-NActive
+         Do I=1,INActive
+         CICoef(I)=1.D0
+         EndDo
+         Read(10,*) (CICoef(I+INActive),I=1,2*NActive)
+         Close(10)
+      ElseIf(FileSIRIFC) Then
+C        read coefficients from Dalton SIRIFC file...
+         call read_CGEM_dalton(CICoef,INActive,NActive,NBasis)
+      Else
+         Write(6,'(1x,a)') 'Geminal coefficients from Dalton not found!'
+         Stop
+      EndIf
+C
+      End
+
+      Subroutine read_CGEM_dalton(CICoef,INActive,NActive,NBasis)
+C
+C     Purpose: read geminal coefficients from Dalton SIRIFC file
+C              set the number of (in)active geminals
+C
+      use types
+      implicit none
+
+      integer,intent(in)  :: NBasis
+      integer,intent(out) :: INActive,NActive
+      double precision,intent(out) :: CICoef(NBasis)
+C
+      integer :: isirifc
+      integer :: NGEM,NISHT_G,NASHT_G
+      double precision :: CGEM(NBasis)
+
+      CGEM(1:NBasis) = 0.D0
+      CICoef(1:NBasis)=0.D0
+
+      open(newunit=isirifc,file='SIRIFC',status='OLD',
+     &     access='SEQUENTIAL',form='UNFORMATTED')
+
+      call readlabel(isirifc,'CI+APSG ')
+      read(isirifc) NGEM,NISHT_G,NASHT_G
+      read(isirifc) CGEM(1:NASHT_G)
+
+C     print*, 'NGEM',   NGEM
+C     print*, 'NISHT_G',NISHT_G
+C     print*, 'NASHT_G',NASHT_G
+      close(isirifc)
+
+      ! set no of (in)active geminals
+      INActive = NISHT_G
+      NActive  = NASHT_G / 2
+
+      CICoef(1:INActive) = 1.d0
+      CICoef(INActive+1:INActive+NASHT_G) = CGEM(1:NASHT_G)
+      ! print*,'CICoef-1',CICOef(1:NBasis)
 
       End
 
