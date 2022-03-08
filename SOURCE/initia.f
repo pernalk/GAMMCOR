@@ -235,6 +235,7 @@ c     use Cholesky_old  ! create AOTWOSORT file
       use Cholesky
       use tran
       use abmat
+      use read_external
 C
 C     READ Integrals and 1-RDM - needed for AC-DMRG CALCULATION
 C
@@ -1100,6 +1101,7 @@ C
 c     use Cholesky_old  ! requires AOTWOSORT
       use Cholesky
       use abmat
+      use read_external
       use timing
 C
       Implicit Real*8 (A-H,O-Z)
@@ -2579,6 +2581,8 @@ C
 C     Reads 2-el integrals in AO and ttransform to NO
 C     Returns TwoEl in NO
 C
+      use read_external    
+C
       Implicit Real*8 (A-H,O-Z)
 C
       Dimension TwoEl(NInte2),UMOAO(NBasis,NBasis)
@@ -2600,7 +2604,7 @@ C
      $     access='SEQUENTIAL',form='UNFORMATTED')
 
       ! read info
-      call readlabel2(iunit,'BASINFO ')
+      call readlabel(iunit,'BASINFO ')
       read(iunit) maxrep, naos, lbuf, nibuf, nbits
 
       write(6,'()')
@@ -2613,7 +2617,7 @@ C           & ', bits: ', nbits
       allocate(val_buf(lbuf))
       allocate(idx_buf(lbuf*nibuf))
 
-      call readlabel2(iunit,'BASTWOEL')
+      call readlabel(iunit,'BASTWOEL')
 
       select case(nibuf)
       case(1)
@@ -3205,32 +3209,6 @@ C
       Return
       End
 
-      subroutine readlabel2(iunit,text)
-      ! sets file pointer
-      ! to first data after text
-      implicit none
-
-      integer :: iunit
-      integer :: ios
-      character(8) :: text, label(4)
-
-      rewind(iunit)
-      do
-
-        read(iunit,iostat=ios) label
-        if(ios<0) then
-           write(6,*) 'ERROR!!! Empty section in AOTWOINT!'
-           stop
-        endif
-        if(label(1)=='********') then
-           if(label(4)==text) exit
-        endif
-
-      enddo
-
-      end subroutine readlabel2
-
-
       subroutine prepare_nums(Occ,Num0,Num1,NBasis)
       Implicit Real*8 (A-H,O-Z)
 C
@@ -3507,7 +3485,7 @@ C
 C     Purpose: read NBasis from Dalton/Molpro
 C
       use print_units
-      use types
+      use read_external
 C
       implicit none
       
@@ -3794,7 +3772,7 @@ C
 C     Purpose: read geminal coefficients from Dalton SIRIFC file
 C              set the number of (in)active geminals
 C
-      use types
+      use read_external
       implicit none
 
       integer,intent(in)  :: NBasis

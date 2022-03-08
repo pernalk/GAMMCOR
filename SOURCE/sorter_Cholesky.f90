@@ -3,7 +3,8 @@ module sorter_Cholesky
 ! this module is used by Cholesky
 ! which avoids creation of AOTWOSORT
 !
-use types
+use print_units 
+use read_external
 implicit none
 
 type AOReaderChol

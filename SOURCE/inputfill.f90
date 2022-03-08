@@ -1,6 +1,8 @@
 module inputfill
 
 use types
+use print_units
+
 implicit none
 
 contains
@@ -793,6 +795,151 @@ integer :: imon
 
 end subroutine check_Input
 
+subroutine free_Input(Input)
+implicit none
+type(InputData) :: Input
+
+deallocate(Input%SystemInput(1)%InSt)
+deallocate(Input%SystemInput)
+
+end subroutine free_Input
+
+subroutine print_Input(Input)
+!
+! A highly imperfect subroutine for Input print
+! should be replaced with sth smarter
+!
+implicit none
+
+type(InputData) :: Input
+integer :: switch
+integer :: i,imon
+
+write(LOUT,'()')
+write(LOUT,'(1x,a)') 'INPUT '
+write(LOUT,'(8a10)') ('**********',i=1,8)
+
+associate( CalcParams => Input%CalcParams)
+ ! CALCULATION BLOCK
+ if(allocated(CalcParams%JobTitle)) then
+    write(LOUT,' (1x,a,4x,a)') "JOB TITLE: ", &
+                 CalcParams%JobTitle
+ else
+    write(LOUT,'(1x,a,4x,a)') "JOB TITLE: ", & 
+                 "EMPTY"
+ endif
+ write(LOUT,' (1x,a,4x,a)') "INTERFACE: ", &
+              PossibleInterface(CalcParams%InterfaceType)
+ write(LOUT,' (1x,a,5x,a)') "JOB TYPE: ",  &
+                      PossibleJobType(CalcParams%JOBtype)
+ write(LOUT,' (1x,a,5x,a)') "RDM TYPE: ",  &
+              PossibleRDMType(CalcParams%RDMType)
+ if(CalcParams%DFApp>0) then
+    write(LOUT,' (1x,a,5x,a)') "DFA TYPE: ",  &
+                       PossibleDFAType(CalcParams%DFApp)
+ endif
+ write(LOUT,' (1x,a,3x,a)') "RDM SOURCE: ",  &
+              PossibleInterface(CalcParams%RDMSource)
+ if(CalcParams%Cholesky>0) then
+    write(LOUT,' (1x,a,5x,a)') "CHOLESKY: ",  &
+                       ".TRUE."
+    write(LOUT,' (1x,a,a)') "CHOLESKY ACCU: ", &
+               PossibleCholAccu(CalcParams%CholeskyAccu)
+ endif
+ if (allocated(CalcParams%IntegralsFilePath)) then
+       write(*, *) "Ints file: ", CalcParams%IntegralsFilePath
+ end if
+  switch = 0
+  if(Input%SystemInput(1)%Monomer==2) switch = 3
+
+ ! SYSTEM BLOCK(S)
+ do imon=1,CalcParams%imon
+    associate(System => Input%SystemInput(abs(imon-switch)) )
+      write(LOUT, '()')
+      write(LOUT, '(1x,a,6x,a)') "MONOMER: ", &
+                    PossibleMonomers(System%Monomer)
+      write(LOUT, '(1x,a,6x,i3)') "ZNUCL: ", System%ZNucl
+      write(LOUT, '(1x,a,5x,i3)') "CHARGE: ", System%Charge
+      if(System%NCen.gt.0) then
+         write(LOUT, '(1x,a,i2)') "NO. OF ATOMS: ", System%NCen 
+      endif
+      if(System%UCen.gt.0) then
+         write(LOUT, '(1x,a,i2)') "NO. OF SYM. EQUIV. ATOMS: ", System%UCen 
+      endif
+      if(System%DeclareThrSelAct) then
+         write(LOUT, '(1x,a,e13.6)') "THRESHOLD SELECT ACTIVE : ", System%ThrSelAct
+      endif
+      if(System%DeclareThrQVirt) then
+         write(LOUT, '(1x,a,e13.6)') "THRESHOLD QUASI-VIRTUAL : ", System%ThrQVirt
+      endif
+      if(System%ISHF) then
+         write(LOUT, '(1x,a,l2)') "HARTREE-FOCK: ", System%ISHF 
+      endif
+
+    end associate
+ enddo
+
+end associate
+
+! FLAGS BLOCK
+ if(Input%iflag==1) then
+    write(LOUT, '()')
+    write(LOUT, '(1x,a,6x,i3)') "IDALTON ", &
+                 (Input%Flags%IDALTON)
+     write(LOUT, '(1x,a,6x,i3)') "IRes    ", &
+                 (Input%Flags%IRes)
+     write(LOUT, '(1x,a,6x,i3)') "IAO     ", &
+                 (Input%Flags%IAO)
+     write(LOUT, '(1x,a,6x,i3)') "INO     ", &
+                 (Input%Flags%INO)
+     write(LOUT, '(1x,a,6x,i3)') "NoSym   ", &
+                 (Input%Flags%NoSym)
+     write(LOUT, '(1x,a,6x,i3)') "IGVB    ", &
+                 (Input%Flags%IGVB)
+     write(LOUT, '(1x,a,6x,i3)') "IFun    ", &
+                 (Input%Flags%IFun)
+     write(LOUT, '(1x,a,6x,i3)') "IFunSR  ", &
+                 (Input%Flags%IFunSR)
+     write(LOUT, '(1x,a,5x,i3)') "IFunSRKer", &
+                 (Input%Flags%IFunSRKer)
+     write(LOUT, '(1x,a,6x,i3)') "IModG   ", &
+                 (Input%Flags%IModG)
+     write(LOUT, '(1x,a,6x,i3)') "NGOcc   ", &
+                 (Input%Flags%NGOcc)
+     write(LOUT, '(1x,a,6x,i3)') "ILoc    ", &
+                 (Input%Flags%ILoc)
+     write(LOUT, '(1x,a,6x,i3)') "IFreeze ", &
+                 (Input%Flags%IFreeze)
+     write(LOUT, '(1x,a,6x,i3)') "IAPSG   ", &
+                 (Input%Flags%IAPSG)
+     write(LOUT, '(1x,a,6x,i3)') "ISERPA  ", &
+                 (Input%Flags%ISERPA)
+     write(LOUT, '(1x,a,6x,i3)') "IA      ", &
+                 (Input%Flags%IA)
+     write(LOUT, '(1x,a,6x,i3)') "ICASSCF ", &
+                 (Input%Flags%ICASSCF)
+     write(LOUT, '(1x,a,6x,i3)') "IDMRG   ", &
+                 (Input%Flags%IDMRG)
+     write(LOUT, '(1x,a,6x,i3)') "IFlAC   ", &
+                 (Input%Flags%IFlAC)
+     write(LOUT, '(1x,a,6x,i3)') "IFLSnd  ", &
+                 (Input%Flags%IFlSnd)
+     write(LOUT, '(1x,a,6x,i3)') "IFlCore ", &
+                 (Input%Flags%IFlCore)
+     write(LOUT, '(1x,a,6x,i3)') "IFlFrag1 ", &
+                 (Input%Flags%IFlFrag1)
+     write(LOUT, '(1x,a,6x,i3)') "IFl12   ", &
+                 (Input%Flags%IFl12)
+     write(LOUT, '(1x,a,6x,i3)') "ISAPT   ", &
+                 (Input%Flags%ISAPT)
+ endif
+
+write(LOUT,'()') 
+
+end subroutine print_Input
+
+
+
 subroutine read_memsrt(val,MemVal,MemType)
 
      character(*), intent(in)  :: val
@@ -1077,5 +1224,7 @@ function iscomment(s)
             end if
       end if            
 end function iscomment
+
+
 
 end module inputfill

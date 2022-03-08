@@ -1082,7 +1082,7 @@ C
 *Deck TEST_TRDMS
       Subroutine TEST_TRDMS(Occ,UNOAO,NInte1,NBasis) 
 C
-      use types
+      use read_external
 C
       Implicit Real*8 (A-H,O-Z)
 C

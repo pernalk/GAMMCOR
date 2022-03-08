@@ -765,4 +765,12 @@ write(LOUT, '(1x,a,6x,i3)') "ISAPT   ", &
 
 end subroutine print_Flags
 
+subroutine free_System(System)
+implicit none
+type(SystemBlock) :: System 
+
+deallocate(System%InSt)
+
+end subroutine free_System
+
 end module systemdef

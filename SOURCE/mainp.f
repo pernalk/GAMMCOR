@@ -15,6 +15,7 @@ C
       use systemdef
       use sapt_main
       use timing
+      use read_external
       use git_info
       use build_info
 C
@@ -225,6 +226,7 @@ CC
 C     *************************************************************************
 C
 C     SELECT ELECTRONIC STATE
+C     (maybe move selection to LdInteg and ReadDAL?)
 C
       NStates = System%NStates
       ISpinMs2= System%ISpinMs2

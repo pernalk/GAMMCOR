@@ -532,7 +532,7 @@ C     find a transformation matix from CAS MO to NO(Alpha)
 C     construct Alpha-dependent Hamiltonian elements and transform 
 C     to NO(Alpha)
 C
-      use types
+c     use types
 C
       Implicit Real*8 (A-H,O-Z)
 C

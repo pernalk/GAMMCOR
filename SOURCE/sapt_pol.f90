@@ -2,6 +2,7 @@ module sapt_pol
 use types
 use tran
 use sapt_utils
+use read_external
 
 implicit none
 
@@ -3644,9 +3645,6 @@ double precision,parameter :: BigE = 1.D8
 
  allocate(intA(3,A%NDimX),intB(3,B%NDimX))
 
- !call print_sqmat(A%dipm(1,:,:),NBas) 
- !call print_sqmat(A%dipm(2,:,:),NBas) 
- !call print_sqmat(A%dipm(3,:,:),NBas) 
  print*, norm2(A%dipm)
  print*, norm2(B%dipm)
 

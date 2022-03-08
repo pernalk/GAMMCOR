@@ -6772,7 +6772,7 @@ C
 C     READS 1RDMs FOR STATES FROM 1 TO NoStMx AND TRANSFROM THEM 
 C     TO THE REPRESENTATION OF NO's OF THE NoState's STATE
 C
-      use types
+      use read_external
 C
       Implicit Real*8 (A-H,O-Z)
 C
@@ -7040,7 +7040,7 @@ C
 C     READS TRDM FOR DEEXCITATION FROM molpro SA-CAS (nosymmetry) 
 C     AND TRANSFORMS THEM TO X,Y TILDED VECTORS NORMALIZED TO 1/2
 C
-      use types
+      use read_external
 C
       Implicit Real*8 (A-H,O-Z)
 C
@@ -7186,7 +7186,7 @@ C
 C
 C     THIS PROCEDURE HAS BEEN USED MAINLY FOR DIFFERENT TESTS
 C
-      use types
+      use read_external
 C
       Implicit Real*8 (A-H,O-Z)
 C
@@ -7426,7 +7426,7 @@ C
 C
 C     Read dipole moment matrices and transform them to NO
 C
-      use types
+      use read_external
 C
       Implicit Real*8 (A-H,O-Z)
 C

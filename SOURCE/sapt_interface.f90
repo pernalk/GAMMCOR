@@ -7,6 +7,7 @@ use sorter
 !use Cholesky_old
 use Cholesky
 use abmat
+use read_external
 
 implicit none
 
@@ -386,16 +387,16 @@ subroutine onel_dalton(mon,NBasis,NSq,NInte1,MonBlock,SAPT)
  MonBlock%NSymOrb(1:NSym) = NBas(1:NSym)
 
  call readlabel(ione,'ONEHAMIL')
- call readoneint(ione,work1)
+ call readoneint_dalton(ione,work1)
  call square_oneint(work1,Hmat,NBasis,NSym,NBas)
 
  call readlabel(ione,'KINETINT')
- call readoneint(ione,work1)
+ call readoneint_dalton(ione,work1)
  call square_oneint(work1,work2,NBasis,NSym,NBas)
  Vmat(:) = Hmat - work2
 
  call readlabel(ione,'OVERLAP ')
- call readoneint(ione,work1)
+ call readoneint_dalton(ione,work1)
  call square_oneint(work1,Smat,NBasis,NSym,NBas)
 
  call readlabel(ione,'ISORDK  ')
@@ -2793,5 +2794,100 @@ integer        :: i,ip,NDimX
  endif
 
 end subroutine print_active
+
+subroutine print_mo(cmo,n,mon)
+implicit none
+
+integer,intent(in) :: n
+double precision,intent(in) :: cmo(n,n) 
+character(*) :: mon
+integer :: i,j,ll,nn
+integer :: nline
+
+ write(LOUT,'()')
+ write(LOUT,'(1x,a)') 'NATURAL ORBITALS '//mon
+ do i=1,n
+    write(LOUT,'(1x,i3)') i
+    write(LOUT,'(10f10.6)') cmo(:,i)
+    write(LOUT,'()')
+ enddo
+
+end subroutine print_mo
+
+subroutine print_TwoInt(NBasis)
+! Purpose: for debugging,
+!          print trasformed integrals
+!
+implicit none
+
+integer :: NBasis
+integer :: ip,iq,ir,is,irs,ipq
+integer :: iunit,i
+double precision :: work1(NBasis*NBasis)
+double precision :: work2(NBasis*NBasis)
+
+
+ open(newunit=iunit,file='TWOMOAB',status='OLD', &
+      access='DIRECT',recl=8*NBasis*(NBasis+1)/2)
+
+ write(LOUT,'()')
+ write(LOUT,'(1x,a)') 'Two-electron integrals in the NO representation:' 
+ write(LOUT,'(4x,a,12x,a)') 'p   q   r   s', 'Val'
+ write(LOUT,'(1x,8a6)') ('------',i=1,8)
+ irs=0
+ do is=1,NBasis
+    do ir=1,is
+       irs=irs+1
+       read(iunit,rec=irs) work1(1:NBasis*(NBasis+1)/2)
+       ipq=0
+       do iq=1,NBasis
+          do ip=1,iq
+             ipq = ipq+1
+             write(LOUT,'(1x,4i4,3x,f20.16)') ip,iq,ir,is,work1(ipq)
+          enddo
+       enddo
+    enddo
+ enddo
+
+ close(iunit)
+
+end subroutine print_TwoInt
+
+subroutine print_sqmat(mat,ndim)
+!
+! Print square matrix
+!
+implicit none
+
+integer,intent(in) :: ndim
+double precision,intent(in) :: mat(ndim,ndim)
+integer :: i,j
+
+ do i=1,ndim
+    write(LOUT,*) i
+    write(LOUT,'(10f13.8)') (mat(i,j),j=1,ndim)
+ enddo
+ write(LOUT,'()') 
+ 
+ return
+end subroutine print_sqmat
+
+subroutine print_diag(mat,ndim)
+!
+! Print diagonal of a square matrix
+!
+implicit none
+
+integer,intent(in) :: ndim
+double precision,intent(in) :: mat(ndim,ndim)
+integer :: i
+
+ do i=1,ndim
+    write(LOUT,'(10f11.6)') mat(i,i)
+ enddo
+ write(LOUT,'()') 
+ 
+ return
+end subroutine print_diag 
 
 end module sapt_inter

@@ -1,5 +1,9 @@
 module sorter
-use types
+
+!use types
+use print_units 
+use read_external
+
 implicit none
 
 private
