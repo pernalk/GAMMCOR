@@ -227,6 +227,10 @@ else
      Flags%IFlAC  = 1
      Flags%IFlACFREQNTH = 1
 
+  case(JOB_TYPE_AC1FREQNTH)
+     Flags%IFlAC  = 1
+     Flags%IFlAC1FREQNTH = 1
+
   case(JOB_TYPE_AC0)
     ! HERE WILL BE CHANGED TO:
     !Flags%IFlAC = 0

@@ -304,6 +304,8 @@ subroutine read_block_calculation(CalcParams, line)
                CalcParams%JobType = JOB_TYPE_ACFREQ 
            elseif (uppercase(val) == "ACFREQNTH" ) then
                CalcParams%JobType = JOB_TYPE_ACFREQNTH
+           elseif (uppercase(val) == "AC1FREQNTH" ) then
+               CalcParams%JobType = JOB_TYPE_AC1FREQNTH
            elseif (uppercase(val) == "NLOCCORR" ) then
                CalcParams%JobType = JOB_TYPE_NLOCCORR
            endif

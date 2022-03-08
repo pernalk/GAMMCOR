@@ -201,7 +201,8 @@ C     CALL AC If IFlAC=1 OR IFlSnd=1
 C  
       If(IFlAC.Eq.1.Or.IFlSnd.Eq.1) Then
       NGOcc=0
-      If(IFlACFREQ.Eq.0.And.IFlACFREQNTH.Eq.0) Then
+      If(IFlACFREQ.Eq.0.And.IFlACFREQNTH.Eq.0.
+     $ And.IFlAC1FREQNTH.Eq.0) Then
       Call ACECORR(ETot,ENuc,TwoNO,URe,Occ,XOne,UNOAO,
      $ IndAux,ABPLUS,ABMIN,EigVecR,Eig,EGOne,
      $ Title,NBasis,NInte1,NInte2,NDimX,NGOcc,NGem,

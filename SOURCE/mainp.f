@@ -105,6 +105,9 @@ C     IFlACFREQNTH = 1 - AC integrand expanded wrt alpha, frequency integration
 C                    0 - AC without frequency integration
       IFlACFREQNTH=Flags%IFlACFREQNTH
 C
+C     IFlAC1FREQNTH = 1 - AC1 via expansion wrt alpha, frequency integration
+      IFlAC1FREQNTH=Flags%IFlAC1FREQNTH
+C
 C
 C     IFlSnd  = 1 - run AC0 (linerized in alpha, MP2-like expression for AC is used)
 C             = 0 - do not run AC0

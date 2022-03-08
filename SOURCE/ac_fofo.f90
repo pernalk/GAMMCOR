@@ -93,7 +93,7 @@ return
 deallocate(work1)
 end subroutine Project_DChol
 
-subroutine WIter_D12Chol(ECorr,Max_Cn,XOne,URe,Occ,EGOne,NGOcc,&
+subroutine WIter_D12Chol(ECorr,AC1,Max_Cn,XOne,URe,Occ,EGOne,NGOcc,&
    IGem,NAct,INActive,NELE,NBasis,NInte1,NDim,NGem,IndAux,&
    IndN,IndX,NDimX)
 !
@@ -108,7 +108,7 @@ use abfofo
 use systemdef
 
 implicit none
-integer,intent(in) :: NGOcc,NBasis,NInte1,NDim,NGem,NDimX
+integer,intent(in) :: AC1,NGOcc,NBasis,NInte1,NDim,NGem,NDimX
 integer,intent(in) :: NAct,INActive,NELE
 integer,intent(in) :: IndN(2,NDim),IndX(NDim),IndAux(NBasis),&
                    IGem(NBasis)
@@ -156,8 +156,13 @@ DCholActT = transpose(DCholAct)
 
 NGrid=18
 
+If(AC1.Eq.0) Then
 Write (6,'(/,X,''AC calculation through W_AC expansion around Alpha=0, Omega Grid = '',I3,&
    '' and max order in C expansion = '',I3,/)') NGrid,Max_Cn
+Else
+Write (6,'(/,X,''AC1 calculation through W_AC expansion around Alpha=0, Omega Grid = '',I3,&
+   '' and max order in C expansion = '',I3,/)') NGrid,Max_Cn
+EndIf
 
 NOccup = NAct + INActive
 PI = 4.0*ATAN(1.0)
@@ -183,28 +188,6 @@ call AB_CAS_FOFO(ABPLUS1,ABMIN1,ECASSCF,URe,Occ,XOne, &
 
 Call sq_symmetrize(ABPLUS1,NDimX)
 Call sq_symmetrize(ABMIN1,NDimX)
-! hererXXX
-!do i=1,NBasis
-!   C(i) = sign(sqrt(Occ(i)),Occ(i)-0.5d0)
-!enddo
-!xn1=0.25
-!do ICol=1,NDimX
-!   ir = IndN(1,ICol)
-!   is = IndN(2,ICol)
-!   irs = IndX(ICol)
-!   do IRow=1,NDimX
-!         ip = IndN(1,IRow)
-!         iq = IndN(2,IRow)
-!         ipq = IndX(IRow)
-!         if(ICol.Eq.IRow) then
-!            xn2=(Occ(IP)-Occ(IQ))*(Occ(IP)+1.D0-Occ(IQ))*xn1
-!            ABPLUS0((ICol-1)*NDimX+IRow)=ABPLUS0((ICol-1)*NDimX+IRow)+xn2/(C(IP)+C(IQ))**2
-!            ABMIN0((ICol-1)*NDimX+IRow)=ABMIN0((ICol-1)*NDimX+IRow)+xn2/(C(IP)-C(IQ))**2
-!            ABPLUS1((ICol-1)*NDimX+IRow)=ABPLUS1((ICol-1)*NDimX+IRow)+xn2/(C(IP)+C(IQ))**2  
-!            ABMIN1((ICol-1)*NDimX+IRow)=ABMIN1((ICol-1)*NDimX+IRow)+xn2/(C(IP)-C(IQ))**2
-!         endif
-!   enddo
-!enddo
 ABPLUS1=ABPLUS1-ABPLUS0
 ABMIN1 =ABMIN1 -ABMIN0
 EGOne(1)=ECASSCF
@@ -272,14 +255,13 @@ Do IGL=1,NGrid
        Call dgemm('N','N',NDimX,NCholesky,NDimX,XN1,A1,NDimX,C1Tilde,NDimX,1.0d0,WORK0,NDimX)
        Call dgemm('N','N',NDimX,NCholesky,NDimX,1.0d0,LAMBDA,NDimX,WORK0,NDimX,0.0d0,C2Tilde,NDimX)
        FF=WFact/XFactorial/(N+1)
+       If(AC1.Eq.1) FF=WFact/XFactorial/2.D0
        If(MOD(N,2).Eq.0) Then
            XNorm1=Norm2(FF*C2Tilde)    
            Write(6,'(X,"Order (n), |Delta_C|",I3,E14.4)')N,XNorm1
            If(N.Gt.3.And.XNorm1.Gt.XNorm0) Then
-! herer
 !                 Write(6,'(X,"Divergence detected. Expansion of C terminated at order ",I3,3F10.4)')N-1
-                 Write(6,'(X,"Divergence detected at order. Continue up to order Max_Cn",I3,3F10.4)')N
-! herer!
+                 Write(6,'(X,"Divergence detected. Continue up to order Max_Cn",I3,3F10.4)')N
 !                 Exit
            EndIf
            XNorm0=XNorm1

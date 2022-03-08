@@ -129,6 +129,8 @@ C
 C
       If(ITwoEl.eq.1) Then
 
+c hererXXX
+c      ACAlpha=1.D0
       Call ACEInteg(ECorrA,TwoNO,URe,Occ,XOne,UNOAO,
      $ ABPLUS,ABMIN,EigVecR,Eig,
      $ EGOne,NGOcc,
@@ -4835,8 +4837,11 @@ C     CALCULATE THE A+B AND A-B MATRICES
 C   
       If(ICASSCF.Eq.0) Then
 C
+c hererXXX
       Call ACABMAT0(ABPLUS,ABMIN,URe,Occ,XOne,TwoNO,
      $ NBasis,NDim,NInte1,NInte2,NGem,ACAlpha,1)
+c      Call AB_T_CAS(ABPLUS,ABMIN,ECASSCF,URe,Occ,XOne,TwoNO,IPair,
+c     $ IndN,IndX,NDimX,NBasis,NDim,NInte1,NInte2,ACAlpha)
 C
       ElseIf(ICASSCF.Eq.1) Then
 C
@@ -4846,8 +4851,12 @@ C
 c      Call Gamma2_AB(ABPLUS,ABMIN,ECASSCF,URe,Occ,XOne,TwoNO,IPair,
 c     $ NBasis,NDim,NInte1,NInte2,ACAlpha)
 C
+
+c hererXXX
       Call AB_CAS(ABPLUS,ABMIN,ECASSCF,URe,Occ,XOne,TwoNO,IPair,
      $ IndN,IndX,NDimX,NBasis,NDim,NInte1,NInte2,ACAlpha)
+c      Call AB_T_CAS(ABPLUS,ABMIN,ECASSCF,URe,Occ,XOne,TwoNO,IPair,
+c     $ IndN,IndX,NDimX,NBasis,NDim,NInte1,NInte2,ACAlpha)
 C
       EGOne(1)=ECASSCF
 C
@@ -4920,6 +4929,12 @@ C     FIND EIGENVECTORS (EigVecR) AND COMPUTE THE ENERGY
 C
       If(NoSt.Eq.1) Then
       Call ERPASYMM1(EigVecR,Eig,ABPLUS,ABMIN,NBasis,NDimX)
+c hererXXX
+c      do i=1,10
+c      write(*,*)eig(i)
+c      enddo
+c      stop      
+
       Else
       Call ERPAVEC(EigVecR,Eig,ABPLUS,ABMIN,NBasis,NDimX)
       EndIf
