@@ -746,7 +746,7 @@ call AB_CAS_FOFO(ABPLUS,ABMIN,ECASSCF,URe,Occ,XOne, &
               NInte1,twojfile,twokfile,ACAlpha,.false.)
 EGOne(1)=ECASSCF
 
-!     Frequency integration of CMAT 
+!     Frequency integration of CMAT
 
 NGrid=15
 Write (6,'(/,X,''AC Calculation with Omega Grid = '',I3,/)') NGrid

@@ -1579,13 +1579,21 @@ double precision,allocatable :: EVecA(:)
 double precision :: fact
 type(Y01BlockData),allocatable :: Y01BlockA(:)
 integer :: iunit
-double precision,allocatable :: work(:)
+double precision,allocatable :: work(:), tmpA(:)
+
+allocate(tmpA(A%NDimX))
 
 do pq=1,A%NDimX
     ip = A%IndN(1,pq)
     iq = A%IndN(2,pq)
     ! print*, iq,ip,iq+(ip-A%num0-1)*dimOA,nOVA
     read(iunit,rec=iq+(ip-A%num0-1)*dimOA) work(1:nOVB)
+
+    tmpA = 0
+    do i=1,A%NDimX
+       tmpA(i) = tmpA(i) + &
+                 EVecA(pq+(i-1)*A%NDimX)
+    enddo
 
     do rs=1,B%NDimX
         ir = B%IndN(1,rs)
@@ -1594,14 +1602,10 @@ do pq=1,A%NDimX
         fact = (A%CICoef(iq)+A%CICoef(ip)) * &
                 (B%CICoef(is)+B%CICoef(ir)) * &
                 work(is+(ir-B%num0-1)*dimOB)
-               
-        !$omp parallel do
+
         do i=1,A%NDimX
-            tmp1(i,rs) = tmp1(i,rs) + & 
-                        fact * &
-                        EVecA(pq+(i-1)*A%NDimX)
+           tmp1(i,rs) = tmp1(i,rs) + fact*tmpA(i)
         enddo
-        !$omp end parallel do
 
         associate(Y => Y01BlockA(pq))
             tmp01(Y%l1:Y%l2,rs) = tmp01(Y%l1:Y%l2,rs) + fact * Y%vec0(1:Y%n)
@@ -1609,7 +1613,9 @@ do pq=1,A%NDimX
 
     enddo
 enddo
-    
+
+deallocate(tmpA)
+
 end subroutine e2disp_intermed1
  
 subroutine e2disp(Flags,A,B,SAPT)
@@ -1635,7 +1641,7 @@ double precision,allocatable :: OmA(:), OmB(:), &
 double precision,allocatable :: EVecA(:), EVecB(:)
 double precision,allocatable :: tmp1(:,:),tmp2(:,:),&
                                 tmp01(:,:),tmp02(:,:)
-double precision,allocatable :: work(:)
+double precision,allocatable :: tmpA(:), work(:)
 double precision :: e2d,fact,tmp
 double precision :: e2du,dea,deb
 double precision :: inv_omega
@@ -1710,32 +1716,6 @@ if(.not.(Flags%ICASSCF==0.and.Flags%ISERPA==0)) then
 
  tmp1=0
  tmp01=0
-!do pq=1,A%NDimX
-!   ip = A%IndN(1,pq)
-!   iq = A%IndN(2,pq)
-!   !work(1:B%NDimX) = tChol(1:B%NDimX)
-!   read(iunit,rec=iq+(ip-A%num0-1)*dimOA) work(1:nOVB)
-
-!   do rs=1,B%NDimX
-!      ir = B%IndN(1,rs)
-!      is = B%IndN(2,rs)
-
-!      fact = (A%CICoef(iq)+A%CICoef(ip)) * &
-!             (B%CICoef(is)+B%CICoef(ir)) * &
-!              work(is+(ir-B%num0-1)*dimOB)
-
-!      do i=1,A%NDimX
-!         tmp1(i,rs) = tmp1(i,rs) + & 
-!                      fact * &
-!                      EVecA(pq+(i-1)*A%NDimX)
-!      enddo
-!
-!      associate(Y => Y01BlockA(pq))
-!         tmp01(Y%l1:Y%l2,rs) = tmp01(Y%l1:Y%l2,rs) + fact * Y%vec0(1:Y%n)
-!      end associate
-
-!   enddo
-!enddo
 
  call e2disp_intermed1(tmp1,tmp01,A,B,dimOA,dimOB,nOVA,nOVB,EvecA,fact,Y01BlockA,iunit,work)   
 
@@ -1753,12 +1733,21 @@ if(.not.(Flags%ICASSCF==0.and.Flags%ISERPA==0)) then
 
 elseif(Flags%ICASSCF==0.and.Flags%ISERPA==0) then
 
+ allocate(tmpA(A%NDimX))
+
  tmp1 = 0
  do pq=1,A%NDimX
     ip = A%IndN(1,pq)
     iq = A%IndN(2,pq)
     ! print*, iq,ip,iq+(ip-A%num0-1)*dimOA,nOVA
     read(iunit,rec=iq+(ip-A%num0-1)*dimOA) work(1:nOVB)
+
+    tmpA = 0
+    do i=1,A%NDimX
+       tmpA(i) = tmpA(i) + &
+                 EVecA(pq+(i-1)*A%NDimX)
+    enddo
+
     do rs=1,B%NDimX
        ir = B%IndN(1,rs)
        is = B%IndN(2,rs)
@@ -1766,17 +1755,23 @@ elseif(Flags%ICASSCF==0.and.Flags%ISERPA==0) then
        fact = (A%CICoef(iq)+A%CICoef(ip)) * &
               (B%CICoef(is)+B%CICoef(ir)) * &
                work(is+(ir-B%num0-1)*dimOB)
-  
-       !$omp parallel do
+
        do i=1,A%NDimX
-          tmp1(i,rs) = tmp1(i,rs) + & 
-                       fact * &
-                       EVecA(pq+(i-1)*A%NDimX)
+          tmp1(i,rs) = tmp1(i,rs) + fact*tmpA(i)
        enddo
-       !$omp end parallel do
+
+       !!$omp parallel do
+       !do i=1,A%NDimX
+       !   tmp1(i,rs) = tmp1(i,rs) + & 
+       !                fact * &
+       !                EVecA(pq+(i-1)*A%NDimX)
+       !enddo
+       !!$omp end parallel do
 
     enddo
  enddo
+
+ deallocate(tmpA)
 
  tmp2=0
  do j=1,B%NDimX

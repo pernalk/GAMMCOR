@@ -292,7 +292,9 @@ case(1) ! DALTON
 
                pq = idx_p + idx_q*(idx_q-1)/2
                rs = idx_r + idx_s*(idx_s-1)/2
-               call add_TR(pq,rs,rdr%val_buf(i),y,M)
+               !call add_TR(pq,rs,rdr%val_buf(i),y,M)
+               if(y(rs) > 0) M(pq, y(rs)) = rdr%val_buf(i)
+               if(y(pq) > 0) M(rs, y(pq)) = rdr%val_buf(i)
 
             enddo
          enddo
@@ -313,7 +315,9 @@ case(1) ! DALTON
 
                pq = idx_p + idx_q*(idx_q-1)/2
                rs = idx_r + idx_s*(idx_s-1)/2
-               call add_TR(pq,rs,rdr%val_buf(i),y,M)
+               !call add_TR(pq,rs,rdr%val_buf(i),y,M)
+               if(y(rs) > 0) M(pq, y(rs)) = rdr%val_buf(i)
+               if(y(pq) > 0) M(rs, y(pq)) = rdr%val_buf(i)
 
             enddo
          enddo
@@ -361,7 +365,10 @@ case(2) ! MOLPRO
                   INDX = INDX + 1
                   if(rdr%val_buf(INDX)/=0) then
                      pq = idx_p + idx_q*(idx_q-1)/2
-                     call add_TR(pq,rs,rdr%val_buf(INDX),y,M)
+                     !call add_TR(pq,rs,rdr%val_buf(INDX),y,M)
+                     if(y(rs) > 0) M(pq, y(rs)) = rdr%val_buf(INDX)
+                     if(y(pq) > 0) M(rs, y(pq)) = rdr%val_buf(INDX)
+
                   endif
 
                enddo
@@ -395,21 +402,27 @@ case(2) ! MOLPRO
                      if(rdr%val_buf(INDX)/=0) then
                         pq = idx_p + idx_q*(idx_q-1)/2
                         rs = idx_r + idx_s*(idx_s-1)/2
-                        call add_TR(pq,rs,rdr%val_buf(INDX),y,M)
+                        !call add_TR(pq,rs,rdr%val_buf(INDX),y,M)
+                        if(y(rs) > 0) M(pq, y(rs)) = rdr%val_buf(INDX)
+                        if(y(pq) > 0) M(rs, y(pq)) = rdr%val_buf(INDX)
                      endif
 
                      INDX=INDX+1
                      if(rdr%val_buf(INDX)/=0) then
                         pq = idx_p + idx_r*(idx_r-1)/2
                         rs = idx_q + idx_s*(idx_s-1)/2
-                        call add_TR(pq,rs,rdr%val_buf(INDX),y,M)
+                        !call add_TR(pq,rs,rdr%val_buf(INDX),y,M)
+                        if(y(rs) > 0) M(pq, y(rs)) = rdr%val_buf(INDX)
+                        if(y(pq) > 0) M(rs, y(pq)) = rdr%val_buf(INDX)
                      endif
 
                      INDX=INDX+1
                      if(rdr%val_buf(INDX)/=0) then
                         pq = idx_q + idx_r*(idx_r-1)/2
                         rs = idx_p + idx_s*(idx_s-1)/2
-                        call add_TR(pq,rs,rdr%val_buf(INDX),y,M)
+                        !call add_TR(pq,rs,rdr%val_buf(INDX),y,M)
+                        if(y(rs) > 0) M(pq, y(rs)) = rdr%val_buf(INDX)
+                        if(y(pq) > 0) M(rs, y(pq)) = rdr%val_buf(INDX)
                      endif
 
                   enddo
@@ -450,21 +463,27 @@ case(2) ! MOLPRO
                         if(rdr%val_buf(INDX)/=0) then
                            pq = idx_p + idx_q*(idx_q-1)/2
                            rs = idx_r + idx_s*(idx_s-1)/2
-                           call add_TR(pq,rs,rdr%val_buf(INDX),y,M)
+                           !call add_TR(pq,rs,rdr%val_buf(INDX),y,M)
+                           if(y(rs) > 0) M(pq, y(rs)) = rdr%val_buf(INDX)
+                           if(y(pq) > 0) M(rs, y(pq)) = rdr%val_buf(INDX)
                         endif
 
                         INDX=INDX+1
                         if(rdr%val_buf(INDX)/=0) then
                            pq = idx_p + idx_r*(idx_r-1)/2
                            rs = idx_q + idx_s*(idx_s-1)/2
-                           call add_TR(pq,rs,rdr%val_buf(INDX),y,M)
+                           !call add_TR(pq,rs,rdr%val_buf(INDX),y,M)
+                           if(y(rs) > 0) M(pq, y(rs)) = rdr%val_buf(INDX)
+                           if(y(pq) > 0) M(rs, y(pq)) = rdr%val_buf(INDX)
                         endif
 
                         INDX=INDX+1
                         if(rdr%val_buf(INDX)/=0) then
                            pq = idx_q + idx_r*(idx_r-1)/2
                            rs = idx_p + idx_s*(idx_s-1)/2
-                           call add_TR(pq,rs,rdr%val_buf(INDX),y,M)
+                           !call add_TR(pq,rs,rdr%val_buf(INDX),y,M)
+                           if(y(rs) > 0) M(pq, y(rs)) = rdr%val_buf(INDX)
+                           if(y(pq) > 0) M(rs, y(pq)) = rdr%val_buf(INDX)
                         endif
 
                      enddo
@@ -492,7 +511,9 @@ case(4) ! Libor
 
                   if (pq .ge. rs) then
                      read(rdr%unit) val
-                     call add_TR(pq,rs,val,y,M)
+                     !call add_TR(pq,rs,val,y,M)
+                     if(y(rs) > 0) M(pq, y(rs)) = val
+                     if(y(pq) > 0) M(rs, y(pq)) = val
                   endif
 
                enddo
@@ -500,6 +521,11 @@ case(4) ! Libor
 
          enddo
       enddo
+
+case(5) ! TREXIO
+
+   write(LOUT,'(a)') 'AOSOURCE=5 not ready in get_TR_AOReaderChol'
+   stop
 
 case default
 

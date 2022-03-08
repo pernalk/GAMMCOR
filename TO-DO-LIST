@@ -1,0 +1,36 @@
+
++ sapt_pol.f90 -- e2disp_intermed, 
+  EVecA(pq+(i-1)*NDimX)
+
++ add_TR <-- change inline
+
+- IndSym <-- not parallel, kind of bad because called a lot of times
+           maybe ca be improved 
+
+compilation times...
+
+use HDF5 parallel read in TREXIO and GammCor?
+https://docs.h5py.org/en/stable/mpi.html
+
+SAPT: get rid of FOFO/FFOO files:
+      -- rewrite AB_CAS_FOFO,
+      -- rewrite E1exch
+      -- rewrite E2disp, E2ind
+      -- (?) is E2exch possible?
+
+add Cholesky in Molpro... (but not helpful in short term)
+
+Large 2RDMs -- decompose them with Cholesky?
+
+replace dgers?
+
+Cholesky:
+dgemv --> dgemm
+
+chol_ints_fofo    <-- get rid of that..., new Hessian
+get rid of dgmev  <-- Cholesky (?)
+
+HPM (high performance memory systems)
+for large RDMs    <-- MPI, chop into pieces, distribute over nodes
+                      or try Cholesky decomposition
+

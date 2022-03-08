@@ -1,0 +1,28 @@
+include(cmake/InitialCacheParser.cmake)
+
+# Custom compile options in form of:
+# -flag1 -flag2 -option1 value1 -flag3 ...
+# Note: this overwrites default compile flags and options
+init(CUSTOM_COMPILE_OPTIONS STRING          
+)
+
+# Choose SIMD instruction set (e.g. xCOMMON-AVX512, xHost)
+# If not specified, CMake tries to determines it automatically
+init(SIMD_SET STRING                        march=skylake-avx512
+)
+
+# Select BLAS vendor (e.g. Intel10_64lp or OpenBLAS).
+# If not specified, CMake tries to find it automatically
+init(BLAS_VENDOR STRING                     Intel10_64lp
+)
+
+# Should Fortran compiler produce additional debug info? (ON/OFF)
+# set(FORTRAN_DEBUG_FLAG              ON
+# CACHE STRING BOOL)
+init(FORTRAN_DEBUG_FLAG BOOL                ON
+)
+
+# Additional compile options in form of:
+# -flag1 -flag2 -option1 value1 -flag3 ...
+init(ADDITIONAL_COMPILE_OPTIONS STRING          
+)

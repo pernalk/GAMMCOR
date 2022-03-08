@@ -4,7 +4,7 @@
 set -e
 
 echo "Running pre-commit hook"
-gammcor_verify.bash 'short'
+./gammcor_verify.bash 'short'
 
 # $? stores exit value of the last command
 if [ $? -ne 0 ]; then

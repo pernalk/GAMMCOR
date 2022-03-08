@@ -1982,9 +1982,7 @@ end function iscomment
 !
 !  call basinfo(NBasis,'SIRIUS_A.RST','DALTON')
 !  call molprogrid(NGrid,NBasis)
-!  print*, 'here-1?'
 !  call molprogrid(NGrid,NBasis)
-!  print*, 'here-2?'
 ! stop
 !
 !! !... idftgra: functional contains grad rho terms (1) , del.2 rho (2)
