@@ -1,6 +1,7 @@
 module ab0fofo
 
-use types,only : EblockData
+!use types,only : EblockData
+use blocktypes
 use tran
 use abfofo
 use print_units

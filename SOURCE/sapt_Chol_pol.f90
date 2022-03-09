@@ -1,6 +1,5 @@
 module sapt_Chol_pol
 
-use types
 use tran, only : ABPM_HALFTRAN_GEN_L
 use sapt_utils
 use timing

@@ -348,20 +348,6 @@ type SaptDIIS
      double precision :: Thresh=1d-3
 end type
 
-type Y01BlockData
-     integer :: n
-     integer :: l1, l2
-     double precision,allocatable :: vec0(:)
-end type Y01BlockData
-
-type EblockData
-integer :: n
-integer :: l1,l2
-integer,allocatable :: pos(:)
-integer,allocatable :: ipiv(:)
-double precision,allocatable :: vec(:), matX(:,:),matY(:,:)
-end type
-
 contains 
 
 function iaddr(IAddr1,IAddr2,IAddr3,IAddr4) result(NAddr3)
