@@ -1,9 +1,8 @@
 *Deck DMSCF 
       Subroutine DMSCF 
      $ (Title,URe,Occ,XKin,XNuc,ENuc,UMOAO,TwoEl,NBasis,NInte1,NInte2,
-     $ NGem,System)
+     $ NGem)
 C
-      use types
 C     !!! XKin CONTAINS BOTH KINETIC AND EL-N CONTRIBUTIONS !!!
 C     !!! XNuc IS EMPTY 
 C
@@ -17,8 +16,6 @@ C
 C
       Dimension URe(Nbasis,NBasis),Occ(NBasis),XKin(NInte1),
      $ XNuc(NInte1),TwoEl(NInte2),UMOAO(NBasis,NBasis)
-C
-      type(SystemBlock) :: System
 C
 C     LOCAL ARRAYS
 C
@@ -66,7 +63,7 @@ C
       If(ICASSCF.Eq.1) Then
 C
       Call ACCAS(ETot,ENuc,TwoEl,URe,UReSav,Occ,XOne,
-     $  Title,NBasis,NInte1,NInte2,NGem,System)
+     $  Title,NBasis,NInte1,NInte2,NGem)
 C
       Else
 C

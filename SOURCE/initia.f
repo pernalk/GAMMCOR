@@ -9,7 +9,7 @@ C
       use types
       use sorter
       use tran
-      use sapt_main
+      use read_external
 C
       Implicit Real*8 (A-H,O-Z)
 C

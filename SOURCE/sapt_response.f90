@@ -556,9 +556,6 @@ endif
  deallocate(TwoMO)
  deallocate(ABPlus,ABMin,EigVecR,Eig)
 
- ! delete TWOMO file
- !call delfile(twofile)
-
 end subroutine calc_resp_casgvb
 
 subroutine calc_ab_cas(Mon,MO,Flags,NBas)

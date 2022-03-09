@@ -529,7 +529,8 @@ subroutine WIter_FOFO(ECorr,Max_Cn,XOne,URe,Occ,EGOne,NGOcc,&
 !
 use abmat
 use abfofo
-use types,only : LOUT,EblockData
+use types,only : EblockData
+use print_units
 
 implicit none
 
@@ -1359,7 +1360,7 @@ subroutine AC0BLOCK(Occ,URe,XOne, &
 !                 (FOFO VERSION)
 !
 use abfofo
-use types,only : LOUT,EblockData
+use types,only : EblockData
 !
 implicit none
 
@@ -1582,7 +1583,9 @@ end associate
 end subroutine INV_AC0BLK
 
 subroutine RELEASE_AC0BLOCK(A0block,A0blockIV,nblk)
+
 use types,only : EblockData
+
 implicit none
 
 integer,intent(in) :: nblk
@@ -1605,7 +1608,7 @@ end subroutine RELEASE_AC0BLOCK
 subroutine READ_AC0BLK(omega,A0Inv,a0blkfile,NDimX)
 ! an example of reading-in a0blocks from file
 ! and calculating (A0+omega)^-1
-use types,only : LOUT,EblockData
+use types,only : EblockData
 
 implicit none
 
@@ -1689,7 +1692,7 @@ end subroutine READ_AC0BLK
 
 subroutine pack_A0block(ABPLUS,ABMIN,nVal,lim1,lim2,tmpMat,Eblock,NDimX)
 
-use types,only : LOUT,EblockData
+use types,only : EblockData
 
 implicit none
 
@@ -1720,5 +1723,4 @@ associate(B => Eblock(1))
 end associate
 
 end subroutine pack_A0block
-
 

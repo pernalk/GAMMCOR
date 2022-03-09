@@ -1,5 +1,7 @@
 module diis
-use types, only : LOUT
+
+use print_units
+
 implicit none
 
 private

@@ -1,9 +1,11 @@
 *Deck ACCAS
       Subroutine ACCAS(ETot,ENuc,TwoNO,URe,UNOAO,Occ,XOne,
-     $  Title,NBasis,NInte1,NInte2,NGem,System)
+     $  Title,NBasis,NInte1,NInte2,NGem)
 C
-      use types
+c     use types
+      use print_units
       use timing
+C
 C     A ROUTINE FOR COMPUTING ELECTRONIC ENERGY USING ERPA TRANSITION
 C     DENSITY MATRIX ELEMENTS
 C
@@ -23,8 +25,6 @@ C
       Dimension
      $ IndX(NBasis*(NBasis-1)/2),IndN(2,NBasis*(NBasis-1)/2),
      $ IndAux(NBasis),IPair(NBasis,NBasis)
-C
-      type(SystemBlock) :: System
 C
       Double Precision  :: Tcpu,Twall
 C
@@ -310,7 +310,6 @@ C
      $  IndAux,IPair,IndN,IndX,NDimX,Title,NBasis,NInte1,NInte2,NGem)
 C
 c      use abmat
-      use types
       use abfofo
       use ab0fofo
       use read_external
@@ -572,7 +571,6 @@ C
       Subroutine RunACCASLR(ETot,ENuc,TwoNO,URe,UNOAO,Occ,XOne,
      $  IndAux,IPair,IndN,IndX,NDimX,Title,NBasis,NInte1,NInte2,NGem)
 C
-      use types
       use sorter
       use abmat
       use abfofo

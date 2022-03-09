@@ -1,6 +1,8 @@
 module abmat
-use types,only : LOUT
+
+use print_units
 use tran
+
 implicit none
 
 contains 

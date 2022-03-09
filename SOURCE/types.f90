@@ -364,23 +364,6 @@ end type
 
 contains 
 
-subroutine delfile(filename)
-implicit none
-
-character(*) :: filename
-integer :: iunit
-logical :: iexist
-
- inquire(file=trim(filename),EXIST=iexist)
- if(iexist) then
-   open(newunit=iunit,file=trim(filename),status='OLD')
-   close(iunit,status='DELETE')
- else
-   write(LOUT,'(1x,a)') 'WARNING! NOT POSSIBLE TO DELETE '// filename //' FILE'
- endif
-
-end subroutine delfile
-
 function iaddr(IAddr1,IAddr2,IAddr3,IAddr4) result(NAddr3)
 ! POINTER FOR TWO-ELECTRON INTEGRALS
  implicit none

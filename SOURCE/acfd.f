@@ -6565,7 +6565,7 @@ C
       Subroutine AcceptPair(IndN,IndX,NDimX,IndAux,Occ,
      $ NOccup,NVirt,NBasis)
 C
-      use types 
+      use print_units
 C
       Implicit Real*8 (A-H,O-Z)
 C
@@ -6574,11 +6574,8 @@ C
       Dimension IndX(NBasis*(NBasis-1)/2),IndN(2,NBasis*(NBasis-1)/2),
      $ IndAux(NBasis),Occ(NBasis)
 C
-      type(SystemBlock) :: System
-C
       NOK=NOccup+NVirt
 C
-C      ThrSelAct=System%ThrSelAct
       Write(LOUT,'(1x,a,2e15.5)') 'Threshold for quasi-degeneracy ',
      $ ThrSelAct
 C

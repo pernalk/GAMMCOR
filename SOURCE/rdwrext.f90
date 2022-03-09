@@ -944,6 +944,99 @@ enddo
 
 end subroutine readoneint_dalton
 
+subroutine read_mo_dalton(cmo,nbasis,nsym,nbas,norb,nsiri,nmopun)
+!
+! reads MOs either from SIRIUS.RST or DALTON.MOPUN
+! unpacks symmetry blocks to (NBasis,NOrb) form
+! in SAPT orbitals kept in AOMO order!
+!
+implicit none
+
+integer,intent(in) :: nbasis,nsym,nbas(8),norb(8)
+character(*)       :: nsiri,nmopun
+double precision   :: cmo(nbasis,nbasis)
+
+integer          :: i,j,idx
+integer          :: iunit,irep
+integer          :: ncmot
+integer          :: off_i,off_j
+logical          :: isiri
+character(60)    :: line
+double precision :: natocc(10)
+double precision :: tmp(nbasis**2)
+
+tmp =    0
+ncmot    = sum(nbas(1:nsym)*norb(1:nsym))
+
+inquire(file=nsiri,EXIST=isiri)
+if(isiri) then
+
+   open(newunit=iunit,file=nsiri,status='OLD', &
+         access='SEQUENTIAL',form='UNFORMATTED')
+
+   call readlabel(iunit,'NEWORB  ')
+   read(iunit) tmp(1:ncmot)
+
+!   cmo = 0
+!   off_i = 0
+!   off_j = 0
+!   idx = 0
+!
+!   do irep=1,nsym
+!      do j=off_j+1,off_j+norb(irep)
+!
+!         do i=off_i+1,off_i+nbas(irep)
+!            idx = idx + 1
+!            cmo(i,j) = tmp(idx)
+!         enddo
+!
+!      enddo
+!      off_i = off_i + nbas(irep)
+!      off_j = off_j + norb(irep)
+!   enddo
+   write(LOUT,'(1x,a)') 'Orbitals read from '//nsiri
+
+else
+
+   open(newunit=iunit,file=nmopun,form='FORMATTED',status='OLD')
+   read(iunit,'(a60)') line
+   off_i = 0
+   idx   = 0
+   do irep=1,nsym
+      do j=1,norb(irep)
+         read(iunit,'(4f18.14)') (tmp(off_i+i),i=1,nbas(irep))
+         off_i = off_i + nbas(irep)
+      enddo
+   enddo
+
+   write(LOUT,'(1x,a)') 'Orbitals read from '//nmopun
+endif
+
+close(iunit)
+
+! unpack orbitals
+cmo   = 0
+off_i = 0
+off_j = 0
+idx   = 0
+
+do irep=1,nsym
+   do j=off_j+1,off_j+norb(irep)
+
+      do i=off_i+1,off_i+nbas(irep)
+         idx = idx + 1
+         cmo(i,j) = tmp(idx)
+      enddo
+
+   enddo
+   off_i = off_i + nbas(irep)
+   off_j = off_j + norb(irep)
+enddo
+
+! call print_sqmat(cmo,nbasis)
+
+end subroutine read_mo_dalton
+
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 ! Eugene subroutines
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -979,5 +1072,26 @@ double precision :: val
  close(iunit)
 
 end subroutine readoneint_eugene
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!! General file handling
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+subroutine delfile(filename)
+implicit none
+
+character(*) :: filename
+integer :: iunit
+logical :: iexist
+
+ inquire(file=trim(filename),EXIST=iexist)
+ if(iexist) then
+   open(newunit=iunit,file=trim(filename),status='OLD')
+   close(iunit,status='DELETE')
+ else
+   write(LOUT,'(1x,a)') 'WARNING! NOT POSSIBLE TO DELETE '// filename //' FILE'
+ endif
+
+end subroutine delfile
 
 end module read_external
