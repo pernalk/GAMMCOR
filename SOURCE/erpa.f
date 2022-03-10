@@ -184,7 +184,7 @@ C
       EndDo
       EndDo
 C
-      NDimX=Ind       
+      NDimX=Ind
 C
       Write(6,'(2/,X,"Small parameter set to:",E14.4)')Small
       Write(6,'(X,"Big   parameter set to:",E14.4)')Big

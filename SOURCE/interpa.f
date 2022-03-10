@@ -237,9 +237,16 @@ C
 C
       If(ITwoEl.Eq.1) Then
 
-      Call ACABMAT0(ABPLUS,ABMIN,URe,Occ,XOne,TwoNO,
-     $ NBasis,NDim,NInte1,NInte2,NGem,ACAlpha,1)
-
+      If (ITrpl .Eq. 0) Then
+         ! Singlet GVB response
+          Call ACABMAT0(ABPLUS,ABMIN,URe,Occ,XOne,TwoNO,
+     $                  NBasis,NDim,NInte1,NInte2,NGem,ACAlpha,1)
+      ElseIf(ITrpl .Eq. 1) Then
+         ! Triplet GVB response
+          Call AB_T_CAS(ABPLUS,ABMIN,ECASSCF,URe,Occ,XOne,TwoNO,IPair,
+     $                IndN,IndX,NDimX,NBasis,NDim,NInte1,NInte2,ACAlpha)
+      End If
+C
 C      print*, 'ABPLUS-Ka',norm2(ABPLUS(1:NDim**2))
 C      print*, 'ABMIN -Ka',norm2(ABMIN(1:NDim**2))
 
@@ -407,6 +414,18 @@ C     DELETE MO INTEGRALS
         Open(newunit=iunit,file='FOFO',status='OLD')
         Close(iunit,status='DELETE')
       EndIf
+
+      If (ITrpl .Eq. 0) Then
+      Write(6,'(/,
+     $ " *** ERPA-GVB Singlet Excitation Energies (a.u., eV) *** ")')
+      ElseIf (ITrpl .Eq. 1) Then
+      Write(6,'(/,
+     $ " *** ERPA-GVB Triplet Excitation Energies (a.u., eV) *** ")')
+      End If
+C     the purpose of sorting is only to print a few highest (sorted) eigenvectors
+      Do I=1,20
+      Write(6,'(I4,4X,2F16.8)') I,Eig(I),27.211*Eig(I)
+      EndDo
 C
 c      Write(6,'(/," *** Computing ERPA 2-RDM *** ")')
 cC

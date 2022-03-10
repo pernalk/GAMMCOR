@@ -43,6 +43,7 @@ integer, parameter :: FLAG_CORE = 1
 integer, parameter :: FLAG_NOBASIS = 0
 integer, parameter :: FLAG_REDVIRT = 0
 logical, parameter :: FLAG_RESTART = .FALSE.
+logical, parameter :: FLAG_TRIPLET = .FALSE.
 integer, parameter :: FLAG_PRINT_LEVEL = 0
 integer, parameter :: FLAG_DEBUG_FL12  = 1
 
@@ -123,6 +124,7 @@ type CalculationBlock
       integer :: RedVirt   = FLAG_REDVIRT
       integer :: MemVal = 2, MemType = 3 ! default: use 2 GB for 3-ind_tran (Cholesky)
       logical :: Restart    = FLAG_RESTART
+      logical :: Triplet    = FLAG_TRIPLET
       logical :: PostCAS    = FLAG_POSTCAS
       integer :: IPrint     = 0
       double precision :: RPAThresh  = 1.0D-6
@@ -268,6 +270,7 @@ type FlagsData
      integer :: IFreeze = 0
      integer :: IAPSG   = 1
      integer :: ISERPA  = 0
+     integer :: ITrpl   = 0
      integer :: ISAPT   = 0
      integer :: SaptLevel = 0
      integer :: ISHF      = 0
@@ -421,9 +424,11 @@ associate( CalcParams => Input%CalcParams)
  endif
  write(LOUT,' (1x,a,3x,a)') "RDM SOURCE: ",  &
               PossibleInterface(CalcParams%RDMSource)
+ if(CalcParams%Triplet) then
+    write(LOUT,'(1x,a,5x,a)') "TRIPLET: ",".TRUE."
+ endif
  if(CalcParams%Cholesky>0) then
-    write(LOUT,' (1x,a,5x,a)') "CHOLESKY: ",  &
-                       ".TRUE."
+    write(LOUT,' (1x,a,5x,a)') "CHOLESKY: ",".TRUE."
     write(LOUT,' (1x,a,a)') "CHOLESKY ACCU: ", &
                PossibleCholAccu(CalcParams%CholeskyAccu)
  endif

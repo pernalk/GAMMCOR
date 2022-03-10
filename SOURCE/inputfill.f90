@@ -375,6 +375,13 @@ subroutine read_block_calculation(CalcParams, line)
                CalcParams%Response = RESP_DFT
            endif
 
+       case ("TRIPLET")
+            if (uppercase(val) == "TRUE".or.  &
+                uppercase(val) == ".TRUE.".or.&
+                uppercase(val) == "T") then
+               CalcParams%Triplet = .TRUE.
+            endif
+
       case ("DFUNC")
            if (uppercase(val) == "SRLDA".or.&
                uppercase(val) == "SR-LDA") then

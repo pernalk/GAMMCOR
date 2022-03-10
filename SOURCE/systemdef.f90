@@ -345,6 +345,9 @@ else
 
   end select
 
+ ! Triplet response
+  if(Input%CalcParams%Triplet) Flags%ITrpl = 1
+
  ! Inactive
   Flags%IFlCore = Input%CalcParams%Core
 
