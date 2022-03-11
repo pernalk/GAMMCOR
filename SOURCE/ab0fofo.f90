@@ -1,7 +1,11 @@
 module ab0fofo
-use types,only : LOUT,EblockData
+
+!use types,only : EblockData
+use blocktypes
 use tran
 use abfofo
+use print_units
+
 implicit none
 
 contains

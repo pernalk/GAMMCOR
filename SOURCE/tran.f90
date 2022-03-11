@@ -1,7 +1,11 @@
 module tran
 !!! CAREFUL :: unsym procedures yet to be tested!!!
-use types,only: LOUT,EblockData
+
+!use types,only: EblockData
+use blocktypes
+use print_units
 use sorter
+
 implicit none
 
 contains

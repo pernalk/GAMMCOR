@@ -2,6 +2,7 @@ module sapt_pol
 use types
 use tran
 use sapt_utils
+use read_external
 
 implicit none
 
@@ -2088,7 +2089,7 @@ endif
 ! establish the type of correction: W_0j, W_1j, ...
 ! get info about monomer A
 allocate(NSymAO(NBas))
-call sym_inf('2RDMA',NumOSym,NSym,NumStSym,IStSy,NStSym,NSymAO,NBas)
+call sym_inf_molpro('2RDMA',NumOSym,NSym,NumStSym,IStSy,NStSym,NSymAO,NBas)
 deallocate(NSymAO)
 
 ! number of states summed over irreps
@@ -2216,7 +2217,7 @@ nOVB  = dimOB*dimVB
 ! establish the type of correction: W_ij , i<j
 ! get info about monomer A
 allocate(NSymAO(NBas))
-call sym_inf('2RDMA',NumOSym,NSym,NumStSym,IStSy,NStSym,NSymAO,NBas)
+call sym_inf_molpro('2RDMA',NumOSym,NSym,NumStSym,IStSy,NStSym,NSymAO,NBas)
 deallocate(NSymAO)
 
 ! number of states summed over irreps
@@ -2432,7 +2433,7 @@ nOVB  = dimOB*dimVB
 ! establish the type of correction: W_0j, W_1j, ...
 ! get info about monomer A
 allocate(NSymAO(NBas))
-call sym_inf('2RDMA',NumOSym,NSym,NumStSym,IStSy,NStSym,NSymAO,NBas)
+call sym_inf_molpro('2RDMA',NumOSym,NSym,NumStSym,IStSy,NStSym,NSymAO,NBas)
 deallocate(NSymAO)
 
 ! number of states summed over irreps
@@ -3644,9 +3645,6 @@ double precision,parameter :: BigE = 1.D8
 
  allocate(intA(3,A%NDimX),intB(3,B%NDimX))
 
- !call print_sqmat(A%dipm(1,:,:),NBas) 
- !call print_sqmat(A%dipm(2,:,:),NBas) 
- !call print_sqmat(A%dipm(3,:,:),NBas) 
  print*, norm2(A%dipm)
  print*, norm2(B%dipm)
 

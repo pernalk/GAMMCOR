@@ -6580,7 +6580,7 @@ C
       Subroutine AcceptPair(IndN,IndX,NDimX,IndAux,Occ,
      $ NOccup,NVirt,NBasis)
 C
-      use types 
+      use print_units
 C
       Implicit Real*8 (A-H,O-Z)
 C
@@ -6589,11 +6589,8 @@ C
       Dimension IndX(NBasis*(NBasis-1)/2),IndN(2,NBasis*(NBasis-1)/2),
      $ IndAux(NBasis),Occ(NBasis)
 C
-      type(SystemBlock) :: System
-C
       NOK=NOccup+NVirt
 C
-C      ThrSelAct=System%ThrSelAct
       Write(LOUT,'(1x,a,2e15.5)') 'Threshold for quasi-degeneracy ',
      $ ThrSelAct
 C
@@ -6787,7 +6784,7 @@ C
 C     READS 1RDMs FOR STATES FROM 1 TO NoStMx AND TRANSFROM THEM 
 C     TO THE REPRESENTATION OF NO's OF THE NoState's STATE
 C
-      use types
+      use read_external
 C
       Implicit Real*8 (A-H,O-Z)
 C
@@ -7055,7 +7052,7 @@ C
 C     READS TRDM FOR DEEXCITATION FROM molpro SA-CAS (nosymmetry) 
 C     AND TRANSFORMS THEM TO X,Y TILDED VECTORS NORMALIZED TO 1/2
 C
-      use types
+      use read_external
 C
       Implicit Real*8 (A-H,O-Z)
 C
@@ -7201,7 +7198,7 @@ C
 C
 C     THIS PROCEDURE HAS BEEN USED MAINLY FOR DIFFERENT TESTS
 C
-      use types
+      use read_external
 C
       Implicit Real*8 (A-H,O-Z)
 C
@@ -7441,7 +7438,7 @@ C
 C
 C     Read dipole moment matrices and transform them to NO
 C
-      use types
+      use read_external
 C
       Implicit Real*8 (A-H,O-Z)
 C

@@ -15,6 +15,7 @@ C
       use systemdef
       use sapt_main
       use timing
+      use read_external
       use git_info
       use build_info
 C
@@ -228,6 +229,7 @@ CC
 C     *************************************************************************
 C
 C     SELECT ELECTRONIC STATE
+C     (maybe move selection to LdInteg and ReadDAL?)
 C
       NStates = System%NStates
       ISpinMs2= System%ISpinMs2
@@ -356,7 +358,7 @@ C
       Call VV10(URe,UMOAO,Occ,NBasis)
       Else
       Call DMSCF(Title,URe,Occ,XKin,XNuc,ENuc,UMOAO,
-     $ TwoEl,NBasis,NInte1,NInte2,NGem,System)
+     $ TwoEl,NBasis,NInte1,NInte2,NGem)
       EndIf
 C
       If(IWarn.Gt.0) Then

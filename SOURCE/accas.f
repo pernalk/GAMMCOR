@@ -1,9 +1,11 @@
 *Deck ACCAS
       Subroutine ACCAS(ETot,ENuc,TwoNO,URe,UNOAO,Occ,XOne,
-     $  Title,NBasis,NInte1,NInte2,NGem,System)
+     $  Title,NBasis,NInte1,NInte2,NGem)
 C
-      use types
+c     use types
+      use print_units
       use timing
+C
 C     A ROUTINE FOR COMPUTING ELECTRONIC ENERGY USING ERPA TRANSITION
 C     DENSITY MATRIX ELEMENTS
 C
@@ -23,8 +25,6 @@ C
       Dimension
      $ IndX(NBasis*(NBasis-1)/2),IndN(2,NBasis*(NBasis-1)/2),
      $ IndAux(NBasis),IPair(NBasis,NBasis)
-C
-      type(SystemBlock) :: System
 C
       Double Precision  :: Tcpu,Twall
 C
@@ -311,9 +311,9 @@ C
      $  IndAux,IPair,IndN,IndX,NDimX,Title,NBasis,NInte1,NInte2,NGem)
 C
 c      use abmat
-      use types
       use abfofo
       use ab0fofo
+      use read_external
 C
       Implicit Real*8 (A-H,O-Z)
 C
@@ -344,10 +344,10 @@ C
 C     Symmetry of NO's
 C
       Call read_sym_molpro(NSymAO,MxSym,NumOSym,
-     $ 'MOLPRO.MOPUN','CASORB  ',NBasis)
+     $                    'MOLPRO.MOPUN','CASORB  ',NBasis)
 C 
-      Call sym_inf('2RDM',NumOSym,NSym,NumStSym,IStSy,
-     $ NStSym,NSymAO,NBasis) 
+      Call sym_inf_molpro('2RDM',NumOSym,NSym,NumStSym,IStSy,
+     $                    NStSym,NSymAO,NBasis)
 C     number of irreps
       write(*,*)'NSym',NSym
 C     number of atomic orbitals in each irrep 
@@ -572,11 +572,11 @@ C
       Subroutine RunACCASLR(ETot,ENuc,TwoNO,URe,UNOAO,Occ,XOne,
      $  IndAux,IPair,IndN,IndX,NDimX,Title,NBasis,NInte1,NInte2,NGem)
 C
-      use types
       use sorter
       use abmat
       use abfofo
       use ab0fofo
+      use read_external
       use timing
 C
       Implicit Real*8 (A-H,O-Z)
@@ -667,7 +667,7 @@ C      NumOSym(I)=X
 C      EndDo
 C      Close(10)
 C     HAP
-      Call create_ind('2RDM',NumOSym,IndInt,NSym,NBasis)
+      Call create_ind_molpro('2RDM',NumOSym,IndInt,NSym,NBasis)
       MxSym=NSym
 C
       NSymNO(1:NBasis)=0

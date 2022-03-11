@@ -266,8 +266,6 @@ C
 C     WARNING! The P(X) function is discontinuous at X=1. As a result numerical instability 
 C     (related to the X>1.D0 condition) may occur. The final PiDFT energy value is reliable ONLY up to the 4th decimal place. 
 C
-      use types
-C
       Implicit Real*8 (A-H,O-Z)
 C
       Parameter(Zero=0.D0, Half=0.5D0, One=1.D0, Two=2.D0, Four=4.D0)
@@ -1082,7 +1080,7 @@ C
 *Deck TEST_TRDMS
       Subroutine TEST_TRDMS(Occ,UNOAO,NInte1,NBasis) 
 C
-      use types
+      use read_external
 C
       Implicit Real*8 (A-H,O-Z)
 C
@@ -1443,7 +1441,7 @@ C
 C
 C     DELTA-CORRELONS
 C
-      use types
+c     use types
 C
       Implicit Real*8 (A-H,O-Z)
 C

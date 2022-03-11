@@ -1,10 +1,12 @@
 module sapt_main
+
 use types
 use timing
 use sapt_inter
 use sapt_resp
 use sapt_pol
-use sapt_CD_pol
+use sapt_Chol_pol
+use sapt_Chol_exch
 use sapt_exch
 use exd_pino
 use omp_lib
@@ -438,8 +440,6 @@ double precision :: MO(NBasis*NBasis)
     if(Mon%Monomer==1) call system('cp rdm2_A.dat rdm2.dat')
     if(Mon%Monomer==2) call system('cp rdm2_B.dat rdm2.dat')
  endif
- !if(Flags%ICASSCF==1) call system('cp rdm2_A.dat rdm2.dat')
-
  call prepare_RDM2val(Mon,Flags%ICASSCF,NBasis)
 
  if(SaptLevel.eq.1) return
@@ -933,7 +933,8 @@ end subroutine sapt_ab_ints_red
 
 subroutine prepare_RDM2val(Mon,ICASSCF,NBasis)
 !
-! prepare RDM2val(NOccup,NOccup,NOccup,NOccup) for SAPT
+! prepare RDM2val(NOccup,NOccup,NOccup,NOccup) 
+! from packed RDM2(NAddr)
 !
 implicit none
 
@@ -948,14 +949,6 @@ double precision, external :: FRDM2,FRDM2GVB
 NOccup = Mon%num0+Mon%num1
 if(allocated(Mon%RDM2val)) deallocate(Mon%RDM2val)
 allocate(Mon%RDM2val(NOccup,NOccup,NOccup,NOccup))
-
-!print*, Mon%Occ
-!print*, ''
-!print*, 'NACT',Mon%NAct
-!print*, ''
-!print*, 'Ind2',Mon%Ind2
-!print*, ''
-!print*, 'RDM2',Mon%RDM2
 
 if(ICASSCF==1) then
 ! CAS
@@ -981,6 +974,8 @@ elseif(ICASSCF==0) then
      enddo
    enddo
 endif
+
+if(allocated(Mon%RDM2)) deallocate(Mon%RDM2)
 
 end subroutine prepare_RDM2val
 
@@ -1461,11 +1456,11 @@ if(allocated(SAPT%monB%OrbE)) then
 endif
 
 if(allocated(SAPT%monA%RDM2)) then
-   deallocate(SAPT%monA%RDM2,SAPT%monA%RDM2Act)
+   deallocate(SAPT%monA%RDM2)
    deallocate(SAPT%monA%Ind2)
 endif
 if(allocated(SAPT%monB%RDM2)) then
-   deallocate(SAPT%monB%RDM2,SAPT%monB%RDM2Act)
+   deallocate(SAPT%monB%RDM2)
    deallocate(SAPT%monB%Ind2)
 endif
 

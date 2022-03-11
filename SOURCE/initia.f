@@ -5,10 +5,11 @@ C
 C     READ HAO, 2-EL INTEGRALS IN NO, C_COEFFICIENTS, IGEM FROM A DALTON_GENERATED FILE
 C     READ UMOAO FROM DALTON.MOPUN
 C
+      use print_units
       use types
       use sorter
       use tran
-      use sapt_main
+      use read_external
 C
       Implicit Real*8 (A-H,O-Z)
 C
@@ -234,6 +235,7 @@ c     use Cholesky_old  ! create AOTWOSORT file
       use Cholesky
       use tran
       use abmat
+      use read_external
 C
 C     READ Integrals and 1-RDM - needed for AC-DMRG CALCULATION
 C
@@ -1099,6 +1101,7 @@ C
 c     use Cholesky_old  ! requires AOTWOSORT
       use Cholesky
       use abmat
+      use read_external
       use timing
 C
       Implicit Real*8 (A-H,O-Z)
@@ -1201,7 +1204,7 @@ C      Call GetENuc_AO(ENuc,Title)
       Call GetEnuc_AOBin(ENuc,'AOONEINT.mol')
 C
 C     HAP
-      Call create_ind('2RDM',NumOSym,IndInt,MxSym,NBasis)
+      Call create_ind_molpro('2RDM',NumOSym,IndInt,MxSym,NBasis)
 C
 C     LOAD ONE-ELE INTEGS IN AO
       FName(K:K+8)='xone.dat'
@@ -2065,6 +2068,8 @@ C
 *Deck GetENuc_AOBin
       Subroutine GetENuc_AOBin(ENuc,infile)
 C
+      use print_units
+C
       Implicit Real*8 (A-H,O-Z)
       Character(*) infile
       Logical ex
@@ -2576,6 +2581,8 @@ C
 C     Reads 2-el integrals in AO and ttransform to NO
 C     Returns TwoEl in NO
 C
+      use read_external
+C
       Implicit Real*8 (A-H,O-Z)
 C
       Dimension TwoEl(NInte2),UMOAO(NBasis,NBasis)
@@ -2597,7 +2604,7 @@ C
      $     access='SEQUENTIAL',form='UNFORMATTED')
 
       ! read info
-      call readlabel2(iunit,'BASINFO ')
+      call readlabel(iunit,'BASINFO ')
       read(iunit) maxrep, naos, lbuf, nibuf, nbits
 
       write(6,'()')
@@ -2610,7 +2617,7 @@ C           & ', bits: ', nbits
       allocate(val_buf(lbuf))
       allocate(idx_buf(lbuf*nibuf))
 
-      call readlabel2(iunit,'BASTWOEL')
+      call readlabel(iunit,'BASTWOEL')
 
       select case(nibuf)
       case(1)
@@ -3202,32 +3209,6 @@ C
       Return
       End
 
-      subroutine readlabel2(iunit,text)
-      ! sets file pointer
-      ! to first data after text
-      implicit none
-
-      integer :: iunit
-      integer :: ios
-      character(8) :: text, label(4)
-
-      rewind(iunit)
-      do
-
-        read(iunit,iostat=ios) label
-        if(ios<0) then
-           write(6,*) 'ERROR!!! Empty section in AOTWOINT!'
-           stop
-        endif
-        if(label(1)=='********') then
-           if(label(4)==text) exit
-        endif
-
-      enddo
-
-      end subroutine readlabel2
-
-
       subroutine prepare_nums(Occ,Num0,Num1,NBasis)
       Implicit Real*8 (A-H,O-Z)
 C
@@ -3498,6 +3479,50 @@ C
 C
       end subroutine TwoEHartree
 
+*Deck BasInfo
+      Subroutine basinfo(nbasis,basfile,intf)
+C
+C     Purpose: read NBasis from Dalton/Molpro
+C
+      use print_units
+      use read_external
+C
+      implicit none
+
+      character(*),intent(in) :: basfile,intf
+      integer,intent(out) :: nbasis
+      integer :: iunit
+      integer :: nsym,nbas(8),norb(8),nrhf(8),ioprhf
+      logical :: ex
+
+      inquire(file=basfile,EXIST=ex)
+
+      if(ex) then
+         open(newunit=iunit,file=basfile,status='OLD',
+     $        access='SEQUENTIAL',form='UNFORMATTED')
+
+         if(trim(intf)=='DALTON') then
+            ! read basis info
+            call readlabel(iunit,'BASINFO ')
+
+            read (iunit) nsym,nbas,norb,nrhf,ioprhf
+            !write(LOUT,*)  nsym,nbas,norb,nrhf,ioprhf
+
+         elseif(trim(intf)=='MOLPRO') then
+            read(iunit)
+            read(iunit) nsym,nbas(1:nsym)
+         endif
+
+         close(iunit)
+         nbasis = sum(nbas(1:nsym))
+
+      else
+         write(LOUT,'(1x,a)') 'WARNING: '// basfile //' NOT FOUND!'
+         write(LOUT,'(1x,a)') 'TRYING TO READ NBasis FROM INPUT!'
+      endif
+
+      End Subroutine BasInfo
+
 *Deck SortOrbDal
       Subroutine SortOrbDal(URe1,Occ2,NNIn,NNAct,NSym,IOrbSym,NBasis)
 C     sorts the orbitals in URe1 so that the
@@ -3747,7 +3772,7 @@ C
 C     Purpose: read geminal coefficients from Dalton SIRIFC file
 C              set the number of (in)active geminals
 C
-      use types
+      use read_external
       implicit none
 
       integer,intent(in)  :: NBasis
