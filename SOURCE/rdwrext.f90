@@ -9,8 +9,8 @@ contains
 
 subroutine read_2rdm_molpro(twordm,nost,nosym,noms2,infile,iwarn,nact)
 !
-! Purpose: read active part of spin-summed 2RDM from Molpro 
-!          in MO representation 
+! Purpose: read active part of spin-summed 2RDM from Molpro
+!          in MO representation
 !
 implicit none
 
@@ -41,13 +41,13 @@ character(8) :: label
  fileloop: do
            read(iunit,iostat=ios) label
            if(ios<0) then
-              write(LOUT,*) 'ERROR!!! LABEL 2RDM     not found!'  
+              write(LOUT,*) 'ERROR!!! LABEL 2RDM     not found!'
               stop
            endif
            if(label=='2RDM    ') then
               !read(iunit) ic1d,nstate
               read(iunit) ic1d,nstsym
-              if(scanfile) then 
+              if(scanfile) then
                  do istsym=1,nstsym
                     read(iunit) isym,nstate,ims2
                     !print*, 'isym,nstate,ims2',isym,nstate,ims2
@@ -70,7 +70,7 @@ character(8) :: label
                  endif
                  stop
               else
-                 read(iunit) isym,nstate 
+                 read(iunit) isym,nstate
                  read(iunit) ist
                  read(iunit) work(1:TrSq)
                  if(isym/=1.or.ist/=1) then
@@ -80,7 +80,7 @@ character(8) :: label
                  endif
                  exit fileloop
               endif
-           endif 
+           endif
          enddo fileloop
 
  close(iunit)
@@ -114,17 +114,17 @@ character(8) :: label
 !!! HERE : in SAPT writing to rdm2.dat will be necessary
 !!!! better loop!!!
 ! ijkl = 0
-! open(newunit=iunit,file=outfile,form='unformatted')  
+! open(newunit=iunit,file=outfile,form='unformatted')
 ! do i=1,nact
 !    do j=1,nact
-!       ij = (i-1)*nact+j 
+!       ij = (i-1)*nact+j
 !       do k=1,nact
 !          do l=1,nact
 !             kl = (k-1)*nact+l
 !             if(ij>=kl) then
-!               ijkl = ijkl + 1  
+!               ijkl = ijkl + 1
 !               write(iunit,'(4I4,F19.12)') k,i,l,j,twordm(ijkl)
-!             endif        
+!             endif
 !          enddo
 !       enddo
 !    enddo
@@ -140,7 +140,7 @@ subroutine read_1rdm_molpro(onerdm,nost,nosym,noms2,infile,iwarn,nbasis)
 implicit none
 
 integer,intent(in) :: nbasis,nost,nosym,noms2
-integer,intent(inout) :: iwarn 
+integer,intent(inout) :: iwarn
 character(*),intent(in) :: infile
 double precision,intent(out) :: onerdm(nbasis*(nbasis+1)/2)
 
@@ -163,7 +163,7 @@ character(8) :: label
  fileloop: do
            read(iunit,iostat=ios) label
            if(ios<0) then
-              write(LOUT,*) 'ERROR!!! LABEL 1RDM     not found!'  
+              write(LOUT,*) 'ERROR!!! LABEL 1RDM     not found!'
               stop
            endif
            if(label=='1RDM    ') then
@@ -173,7 +173,7 @@ character(8) :: label
                  do istsym=1,nstsym
                     read(iunit) isym,nstate,ims2
                     do i=1,nstate
-                       read(iunit) ist 
+                       read(iunit) ist
                        read(iunit) work(1:nact2)
                        if(scanms2) then
                           !print*, 'ist,isym,ims2',ist,isym,ims2
@@ -192,7 +192,7 @@ character(8) :: label
                  endif
                  stop
               else
-                 read(iunit) isym,nstate 
+                 read(iunit) isym,nstate
                  read(iunit) ist
                  read(iunit) work(1:nact2)
                  if(isym/=1.or.ist/=1) then
@@ -200,21 +200,21 @@ character(8) :: label
                                 & ist,'.',isym,' WILL BE USED IN CALCULATIONS!'
                     write(LOUT,'()')
                     iwarn = iwarn + 1
-                 endif 
+                 endif
                  exit fileloop
               endif
-           endif 
+           endif
          enddo fileloop
 
  close(iunit)
 
  !call sq_to_triang(work,onerdm,nact)
  onerdm = 0
- idx = 0 
+ idx = 0
  do j=1,nact
     do i=1,j
        idx = idx + 1
-       ij = i + (j-1)*nact 
+       ij = i + (j-1)*nact
        onerdm(idx) = work(ij)*0.5d0
     enddo
  enddo
@@ -240,7 +240,7 @@ character(8) :: label
 
  !order states
  if(stbrIn.gt.stketIn) then
-    stbr  = stketIn 
+    stbr  = stketIn
     stket = stbrIn
  else
     stbr =  stbrIn
@@ -262,7 +262,7 @@ character(8) :: label
  fileloop: do
            read(iunit,iostat=ios) label
            if(ios<0) then
-              write(LOUT,*) 'ERROR!!! LABEL 1TRMD    not found!'  
+              write(LOUT,*) 'ERROR!!! LABEL 1TRMD    not found!'
               stop
            endif
            if(label=='1TRDM    ') then
@@ -270,10 +270,10 @@ character(8) :: label
               !print*, nact2,nstate
               if(scanfile) then
                  do istsym=1,nstsym
-                    read(iunit) isym,nstate 
+                    read(iunit) isym,nstate
                     do j=1,nstate
                        do i=1,j-1
-                          read(iunit) istbr,istket 
+                          read(iunit) istbr,istket
                           read(iunit) work(1:nact2)
                           if(istbr==stbr.and.istket==stket) exit fileloop
                        enddo
@@ -283,17 +283,17 @@ character(8) :: label
                              & stbr,'.',stket,' NOT PRESENT IN 1RDM FILE!'
                  stop
               else
-                 read(iunit) isym,nstate 
+                 read(iunit) isym,nstate
                  read(iunit) istbr,istket
                  read(iunit) work(1:nact2)
                  if(isym/=1.or.ist/=1) then
                     write(LOUT,'(1x,a,i2,a,i1,a)') 'WARNING! 1TRDM FOR STATE',&
                                 & istbr,'.',istket,' WILL BE USED IN CALCULATIONS!'
                     write(LOUT,'()')
-                 endif 
+                 endif
                  exit fileloop
               endif
-           endif 
+           endif
          enddo fileloop
 
  close(iunit)
@@ -302,7 +302,7 @@ character(8) :: label
  onerdm = 0
  do j=1,nact
     do i=1,nact
-       ij = i + (j-1)*nact 
+       ij = i + (j-1)*nact
        onerdm(i,j) = work(ij)*0.5d0
     enddo
  enddo
@@ -324,7 +324,7 @@ character(*),intent(in) :: infile,text
 character(8) :: label
 integer :: iunit,ios
 integer :: nsym,nbas(8),offs(8),ntdg
-integer :: i,j,idx,irep,ioff,ii 
+integer :: i,j,idx,irep,ioff,ii
 double precision,intent(out) :: mone(ntr)
 double precision :: tmp(ntr)
 
@@ -332,7 +332,7 @@ double precision :: tmp(ntr)
       access='SEQUENTIAL',form='UNFORMATTED')
  ntdg = 0
  rewind(iunit)
- read(iunit) 
+ read(iunit)
  read(iunit) nsym,nbas(1:nsym),offs(1:nsym)
  read(iunit)
  do irep=1,nsym
@@ -342,13 +342,13 @@ double precision :: tmp(ntr)
  do
    read(iunit,iostat=ios) label
    if(ios<0) then
-      write(6,*) 'ERROR!!! LABEL '//text//' not found!'  
+      write(6,*) 'ERROR!!! LABEL '//text//' not found!'
       stop
    endif
    if(label==text) then
       read(iunit) tmp(1:ntdg)
       exit
-   endif 
+   endif
  enddo
 
  close(iunit)
@@ -358,7 +358,7 @@ double precision :: tmp(ntr)
     mone = 0
     ii   = 0
     idx  = 0
-    ioff = 0   
+    ioff = 0
     do irep=1,nsym
       ioff = offs(irep)
       do j=1,nbas(irep)
@@ -367,7 +367,7 @@ double precision :: tmp(ntr)
            ii = (ioff+j)*(ioff+j-1)/2 + ioff+i
            mone(ii) = tmp(idx)
         enddo
-      enddo 
+      enddo
     enddo
  else
  ! return ntdg
@@ -386,7 +386,7 @@ double precision,intent(out) :: cmo(nbasis,nbasis)
 character(8) :: label
 integer :: iunit,ios
 integer :: nsym,nbas(8),offs(8),ncmot
-integer :: i,j,idx,irep,ioff 
+integer :: i,j,idx,irep,ioff
 double precision ::tmp(nbasis**2)
 
  open(newunit=iunit,file=infile,status='OLD', &
@@ -396,7 +396,7 @@ double precision ::tmp(nbasis**2)
  do
    read(iunit,iostat=ios) label
    if(ios<0) then
-      write(6,*) 'ERROR!!! LABEL '//text//' not found!'  
+      write(6,*) 'ERROR!!! LABEL '//text//' not found!'
       stop
    endif
    if(label==text) then
@@ -406,9 +406,9 @@ double precision ::tmp(nbasis**2)
       !print*, ncmot
       read(iunit) tmp(1:ncmot)
       exit
-   endif 
+   endif
  enddo
- 
+
 !! HERE: should there be a norb-offset?
  cmo = 0
  idx = 0
@@ -416,10 +416,10 @@ double precision ::tmp(nbasis**2)
     ioff = offs(irep)
     do j=1,nbas(irep)
        do i=1,nbas(irep)
-          idx = idx + 1 
+          idx = idx + 1
           cmo(ioff+i,ioff+j) = tmp(idx)
        enddo
-    enddo       
+    enddo
  enddo
 
   !write(LOUT,*) 'test print'
@@ -429,7 +429,7 @@ double precision ::tmp(nbasis**2)
 
  close(iunit)
 
-end subroutine read_mo_molpro 
+end subroutine read_mo_molpro
 
 subroutine readgridmolpro(iunit,text,npt,r,wt)
 !
@@ -447,16 +447,16 @@ rewind(iunit)
 do
   read(iunit,iostat=ios) label
   if(ios<0) then
-     write(6,*) 'ERROR!!! LABEL '//text//' not found!'  
+     write(6,*) 'ERROR!!! LABEL '//text//' not found!'
      stop
   endif
   if(label==text) then
 
      read(iunit) npt
-     read(iunit) r(1:3,1:npt) 
+     read(iunit) r(1:3,1:npt)
      read(iunit) wt(1:npt)
      exit
-  endif 
+  endif
 enddo
 
 end subroutine readgridmolpro
@@ -477,7 +477,7 @@ rewind(iunit)
 do
   read(iunit,iostat=ios) label
   if(ios<0) then
-     write(6,*) 'ERROR!!! LABEL '//text//' not found!'  
+     write(6,*) 'ERROR!!! LABEL '//text//' not found!'
      stop
   endif
   if(label==text) then
@@ -486,7 +486,7 @@ do
      read(iunit) orbval(1:npt,1:ndiff,1:ntg)
      read(iunit) mapinv(1:ntg)
      exit
-  endif 
+  endif
 enddo
 
 end subroutine readorbsmolpro
@@ -544,15 +544,15 @@ character(8) :: label
  fileloop: do
            read(iunit,iostat=ios) label
            if(ios<0) then
-              write(LOUT,*) 'ERROR!!! LABEL 1RDM     not found!'  
+              write(LOUT,*) 'ERROR!!! LABEL 1RDM     not found!'
               stop
            endif
            if(label=='1RDM    ') then
               read(iunit)
-              read(iunit) isym,nstate 
+              read(iunit) isym,nstate
               read(iunit) NoSt
               exit fileloop
-           endif 
+           endif
          enddo fileloop
 
  close(iunit)
@@ -570,7 +570,7 @@ implicit none
 integer,intent(in) :: nbasis
 character(*),intent(in) :: infile
 double precision :: matdx(nbasis,nbasis),matdy(nbasis,nbasis),matdz(nbasis,nbasis)
-double precision,allocatable :: dipx(:),dipy(:),dipz(:) 
+double precision,allocatable :: dipx(:),dipy(:),dipz(:)
 
 integer :: iunit,ios,ictrl
 integer :: nsym,nbas(8),offs(8),ntqg
@@ -584,7 +584,7 @@ character(8) :: label
 
  ntqg = 0
  rewind(iunit)
- read(iunit) 
+ read(iunit)
  read(iunit) nsym,nbas(1:nsym),offs(1:nsym)
  do irep=1,nsym
     ntqg = ntqg + nbas(irep)**2
@@ -596,7 +596,7 @@ character(8) :: label
  do
    read(iunit,iostat=ios) label
    if(ios<0) then
-      write(6,*) 'ERROR!!! LABEL DIPMOMX not found!'  
+      write(6,*) 'ERROR!!! LABEL DIPMOMX not found!'
       stop
    endif
    if(label=='DIPMOMX ') then
@@ -611,18 +611,18 @@ character(8) :: label
       ictrl = ictrl + 1
       read(iunit) isz
       read(iunit) dipz(1:ntqg)
-   endif 
+   endif
    if(ictrl==3) exit
  enddo
 
  close(iunit)
 
  !print*, 'dmx',dipx(1:ntqg)
- !print*,'' 
+ !print*,''
  !print*, 'dmy',dipy(1:ntqg)
- !print*,'' 
+ !print*,''
  !print*, 'dmz',dipz(1:ntqg)
- 
+
  !allocate(mon%dipm(3,nbasis,nbasis))
  !mon%dipm=0d0
  matdx=0
@@ -631,7 +631,7 @@ character(8) :: label
 
  ij = 0
  do isym_p=1,nsym
-    isym_q = ieor(isx-1,isym_p-1)+1 
+    isym_q = ieor(isx-1,isym_p-1)+1
     if(nbas(isym_p)>0.and.nbas(isym_q)>0) then
        !print*, isym_p,isym_q
        !print*, 'offs_p(q)',offs(isym_p),offs(isym_q)
@@ -649,7 +649,7 @@ character(8) :: label
 
  ij = 0
  do isym_p=1,nsym
-    isym_q = ieor(isy-1,isym_p-1)+1 
+    isym_q = ieor(isy-1,isym_p-1)+1
     if(nbas(isym_p)>0.and.nbas(isym_q)>0) then
        !print*, isym_p,isym_q
        do j=1,nbas(isym_q)
@@ -664,7 +664,7 @@ character(8) :: label
 
  ij = 0
  do isym_p=1,nsym
-    isym_q = ieor(isz-1,isym_p-1)+1 
+    isym_q = ieor(isz-1,isym_p-1)+1
     if(nbas(isym_p)>0.and.nbas(isym_q)>0) then
        do j=1,nbas(isym_q)
           do i=1,nbas(isym_p)
@@ -682,7 +682,7 @@ end subroutine read_dip_molpro
 
 subroutine read_sym_molpro(NSymMO,nsym,nbas,infile,text,nbasis)
 !
-! Purpose: read irreps of orbitals (NSymMO) 
+! Purpose: read irreps of orbitals (NSymMO)
 !          and how many orbitals in each irrep (nbas)
 !
 implicit none
@@ -727,11 +727,11 @@ end subroutine read_sym_molpro
 subroutine sym_inf_molpro(infile,NumOSym,NSym,nstats,istsy,NStSym,NSymAO,NBasis)
 !
 ! Purpose: reads number of irreps (NSym)
-!          number of atomic orbitals in each irrep (NumOSym) 
+!          number of atomic orbitals in each irrep (NumOSym)
 !          number of irreps in SA-CAS (NStSym)
 !          number of states in SA-CAS in each irrep (NumStSym)
 !          which irrep (a label) in SA-CAS (IStSy)
-! 
+!
 implicit none
 
 character(*) :: infile
@@ -802,10 +802,10 @@ character(8) :: label
  open(newunit=ifile,file=infile,access='sequential',&
       form='unformatted',status='old')
 
- do 
+ do
    read(ifile,iostat=ios) label
     if(ios<0) then
-      write(6,*) 'ERROR!!! LABEL ISORDK   not found!'  
+      write(6,*) 'ERROR!!! LABEL ISORDK   not found!'
       stop
    endif
    if(label=='BASINFO ') then
@@ -813,20 +813,20 @@ character(8) :: label
       read(ifile) NStSym
       read(ifile) nstats(1:NStSym)
       read(ifile) istsy(1:NStSym)
-      read(ifile) iclos(1:NSym) 
-      read(ifile) iact(1:NSym) 
-      read(ifile) NumOSym(1:NSym) 
+      read(ifile) iclos(1:NSym)
+      read(ifile) iact(1:NSym)
+      read(ifile) NumOSym(1:NSym)
       exit
-   endif 
- enddo 
- 
+   endif
+ enddo
+
  close(ifile)
  ivirt(1:NSym) = NumOSym(1:NSym)-iclos(1:NSym)-iact(1:NSym)
 
 ! print*, 'nact',iact(1:NSym)
 
  if(NSym>1) then
-   ! symmetry 
+   ! symmetry
    IOld = 0
    INew = 0
    do isym=1,NSym
@@ -876,7 +876,7 @@ character(8) :: label
 
  else
    ! nosym
-   do i=1,NBasis  
+   do i=1,NBasis
       IndInt(i) = i
    enddo
 
@@ -891,7 +891,7 @@ end subroutine create_ind_molpro
 
 subroutine readlabel(iunit,text)
 !
-! Purpose: sets file pointer 
+! Purpose: sets file pointer
 !          to first data after text
 !          (works with Dalton files)
 !
@@ -902,7 +902,7 @@ integer :: ios
 character(8) :: text, label(4)
 
 rewind(iunit)
-do 
+do
 
   read(iunit,iostat=ios) label
   if(ios<0) then
@@ -920,7 +920,7 @@ end subroutine readlabel
 subroutine readoneint_dalton(iunit,ints)
 !
 ! Purpose: read 1-el ints from Dalton
-! information are kept in one record in the 
+! information are kept in one record in the
 ! order: buf, ibuf, length
 ! buf: integrals, ibuf: int number
 
@@ -934,7 +934,7 @@ integer :: ibuf(lbuf)
 integer :: length,i
 
 ints=0
-do 
+do
    read(iunit) buf,ibuf,length
    if(length.lt.0) exit
    do i=1,length
@@ -1060,7 +1060,7 @@ double precision :: val
  read(iunit,pos=ipos)
  do
     read(iunit) val,i,j,k,l
-    if(i+j==0) then 
+    if(i+j==0) then
        enuc = val
        exit
     else

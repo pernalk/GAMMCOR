@@ -920,10 +920,10 @@ logical                      :: exsiri
 end subroutine readocc_hf_siri
 
 subroutine read2rdm(Mon,NBas)
-! 
+!
 ! Purpose: load rdm2.dat file to memory
 !          as Mon%RDM2(NRDM2Act) matrix
-! 
+!
 implicit none
 
 type(SystemBlock) :: Mon
@@ -941,13 +941,13 @@ integer,external :: NAddrRDM
     rdmfile='rdm2_A.dat'
  elseif(Mon%Monomer==2) then
     rdmfile='rdm2_B.dat'
- endif 
+ endif
 
  Ind1=0
  Ind2=0
  do i=1,Mon%NAct
     Ind1(i) = Mon%INAct + i
-    Ind2(Mon%INAct+i) = i 
+    Ind2(Mon%INAct+i) = i
  enddo
 
  NRDM2Act = Mon%NAct**2*(Mon%NAct**2+1)/2
@@ -968,7 +968,7 @@ integer,external :: NAddrRDM
    if(ios==0) then
       Mon%RDM2(NAddrRDM(j,l,i,k,Mon%NAct))=Half*val
 
-    elseif(ios/=0) then 
+    elseif(ios/=0) then
        exit
 
     endif
@@ -2281,7 +2281,7 @@ integer,intent(in) :: nbas,nsym,norb(8)
 double precision,intent(in) :: tr(:)
 double precision,intent(out) :: sq(nbas,nbas)
 integer :: irep,i,j
-integer :: offset,idx 
+integer :: offset,idx
 
 sq=0
 
@@ -2442,7 +2442,7 @@ subroutine print_mo(cmo,n,mon)
 implicit none
 
 integer,intent(in) :: n
-double precision,intent(in) :: cmo(n,n) 
+double precision,intent(in) :: cmo(n,n)
 character(*) :: mon
 integer :: i,j,ll,nn
 integer :: nline
@@ -2474,7 +2474,7 @@ double precision :: work2(NBasis*NBasis)
       access='DIRECT',recl=8*NBasis*(NBasis+1)/2)
 
  write(LOUT,'()')
- write(LOUT,'(1x,a)') 'Two-electron integrals in the NO representation:' 
+ write(LOUT,'(1x,a)') 'Two-electron integrals in the NO representation:'
  write(LOUT,'(4x,a,12x,a)') 'p   q   r   s', 'Val'
  write(LOUT,'(1x,8a6)') ('------',i=1,8)
  irs=0
@@ -2510,8 +2510,8 @@ integer :: i,j
     write(LOUT,*) i
     write(LOUT,'(10f13.8)') (mat(i,j),j=1,ndim)
  enddo
- write(LOUT,'()') 
- 
+ write(LOUT,'()')
+
  return
 end subroutine print_sqmat
 
@@ -2528,9 +2528,9 @@ integer :: i
  do i=1,ndim
     write(LOUT,'(10f11.6)') mat(i,i)
  enddo
- write(LOUT,'()') 
- 
+ write(LOUT,'()')
+
  return
-end subroutine print_diag 
+end subroutine print_diag
 
 end module sapt_inter

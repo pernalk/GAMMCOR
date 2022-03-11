@@ -303,7 +303,7 @@ subroutine read_block_calculation(CalcParams, line)
            elseif (uppercase(val) == "AC0DP" ) then
                CalcParams%JobType = JOB_TYPE_AC0DP
            elseif (uppercase(val) == "ACFREQ" ) then
-               CalcParams%JobType = JOB_TYPE_ACFREQ 
+               CalcParams%JobType = JOB_TYPE_ACFREQ
            elseif (uppercase(val) == "ACFREQNTH" ) then
                CalcParams%JobType = JOB_TYPE_ACFREQNTH
            elseif (uppercase(val) == "NLOCCORR" ) then
@@ -697,7 +697,7 @@ character(:), allocatable :: key, val
       endif
  end select
 
-end subroutine read_sapt_val 
+end subroutine read_sapt_val
 
 subroutine read_sapt_mon(Input, line, isys)
 implicit none
@@ -777,7 +777,7 @@ integer :: imon
          write(LOUT, '(1x,a,3x,i3)') 'NCen', System%NCen
          stop
       endif
-    
+
       if(System%UCen==0) then
         System%UCen = System%NCen
       elseif(System%UCen.lt.0) then
@@ -825,7 +825,7 @@ associate( CalcParams => Input%CalcParams)
     write(LOUT,' (1x,a,4x,a)') "JOB TITLE: ", &
                  CalcParams%JobTitle
  else
-    write(LOUT,'(1x,a,4x,a)') "JOB TITLE: ", & 
+    write(LOUT,'(1x,a,4x,a)') "JOB TITLE: ", &
                  "EMPTY"
  endif
  write(LOUT,' (1x,a,4x,a)') "INTERFACE: ", &
@@ -861,10 +861,10 @@ associate( CalcParams => Input%CalcParams)
       write(LOUT, '(1x,a,6x,i3)') "ZNUCL: ", System%ZNucl
       write(LOUT, '(1x,a,5x,i3)') "CHARGE: ", System%Charge
       if(System%NCen.gt.0) then
-         write(LOUT, '(1x,a,i2)') "NO. OF ATOMS: ", System%NCen 
+         write(LOUT, '(1x,a,i2)') "NO. OF ATOMS: ", System%NCen
       endif
       if(System%UCen.gt.0) then
-         write(LOUT, '(1x,a,i2)') "NO. OF SYM. EQUIV. ATOMS: ", System%UCen 
+         write(LOUT, '(1x,a,i2)') "NO. OF SYM. EQUIV. ATOMS: ", System%UCen
       endif
       if(System%DeclareThrSelAct) then
          write(LOUT, '(1x,a,e13.6)') "THRESHOLD SELECT ACTIVE : ", System%ThrSelAct
@@ -873,7 +873,7 @@ associate( CalcParams => Input%CalcParams)
          write(LOUT, '(1x,a,e13.6)') "THRESHOLD QUASI-VIRTUAL : ", System%ThrQVirt
       endif
       if(System%ISHF) then
-         write(LOUT, '(1x,a,l2)') "HARTREE-FOCK: ", System%ISHF 
+         write(LOUT, '(1x,a,l2)') "HARTREE-FOCK: ", System%ISHF
       endif
 
     end associate
@@ -934,7 +934,7 @@ end associate
                  (Input%Flags%ISAPT)
  endif
 
-write(LOUT,'()') 
+write(LOUT,'()')
 
 end subroutine print_Input
 
@@ -978,22 +978,22 @@ subroutine read_statearray(val,inst,instates,delim)
 
      w = trim(adjustl(val))
      v = trim(adjustl(val))
-      
+
      if (len(w) == 0) then
            write(LOUT,'(1x,a)') 'ERROR!!! NO STATES GIVEN FOR Ensamble!'
            stop
      else
            ! check for dots
            k = index(v,'.')
-           if(k /= 0) then 
+           if(k /= 0) then
               dot=.true.
            else
               dot=.false.
            endif
-         
-           ! get number of states 
+
+           ! get number of states
            instates = 0
-           dimloop: do 
+           dimloop: do
                      k = index(v, delim)
                      instates = instates + 1
                      v = trim(adjustl(v(k+1:)))
@@ -1003,22 +1003,22 @@ subroutine read_statearray(val,inst,instates,delim)
            ! assign states
            allocate(inst(2,instates))
            instates = 0
-           arrloop: do 
+           arrloop: do
                      k = index(w, delim)
                      instates = instates + 1
                      if(k /= 0) then
                          if(dot) then
                             call split(w(1:k-1),s1,s2,'.')
-                            read(s1, *) inst(1,instates) 
-                            read(s2, *) inst(2,instates) 
+                            read(s1, *) inst(1,instates)
+                            read(s2, *) inst(2,instates)
                          else
                             s1 = w(1:k-1)
-                            read(s1, *) inst(1,instates) 
-                            inst(2,instates) = 1  
+                            read(s1, *) inst(1,instates)
+                            inst(2,instates) = 1
                          endif
                          w = trim(adjustl(w(k+1:)))
                          !print*, '1 2',inst(1,instates),inst(2,instates)
-                     elseif (k == 0) then 
+                     elseif (k == 0) then
                          !print*, 'last ', w
                          if(dot) then
                             call split(w,s1,s2,'.')
@@ -1026,12 +1026,12 @@ subroutine read_statearray(val,inst,instates,delim)
                             read(s2, *) inst(2,instates)
                          else
                             s1 = w
-                            read(s1, *) inst(1,instates) 
-                            inst(2,instates) = 1  
+                            read(s1, *) inst(1,instates)
+                            inst(2,instates) = 1
                          endif
                          !print*, '1 2',inst(1,instates),inst(2,instates)
                          exit arrloop
-                     endif 
+                     endif
                   enddo arrloop
 
      end if
@@ -1051,22 +1051,22 @@ subroutine read_trstatearray(val,intrst,delim)
 
      w = trim(adjustl(val))
      v = trim(adjustl(val))
-      
+
      if (len(w) == 0) then
            write(LOUT,'(1x,a)') 'ERROR!!! NO STATES GIVEN FOR Ensamble!'
            stop
      else
            ! check for dots
            k = index(v,'.')
-           if(k /= 0) then 
+           if(k /= 0) then
               dot=.true.
            else
               dot=.false.
            endif
-         
-           ! get number of states 
+
+           ! get number of states
            instates = 0
-           dimloop: do 
+           dimloop: do
                      k = index(v, delim)
                      instates = instates + 1
                      v = trim(adjustl(v(k+1:)))
@@ -1081,7 +1081,7 @@ subroutine read_trstatearray(val,intrst,delim)
            ! assign states
            allocate(intrst(2,instates))
            instates = 0
-           arrloop: do 
+           arrloop: do
                      k = index(w, delim)
                      instates = instates + 1
                      if(k == 0) then
@@ -1092,12 +1092,12 @@ subroutine read_trstatearray(val,intrst,delim)
                             read(s2, *) intrst(2,instates)
                          else
                             s1 = w
-                            read(s1, *) intrst(1,instates) 
-                            intrst(2,instates) = 1  
+                            read(s1, *) intrst(1,instates)
+                            intrst(2,instates) = 1
                          endif
                          !print*, '1 2',inst(1,instates),inst(2,instates)
                          exit arrloop
-                     endif 
+                     endif
                   enddo arrloop
 
      end if
@@ -1123,7 +1123,7 @@ subroutine split(s, s1, s2, delimiter)
       else
             delim = " "
       end if
-      
+
       w = trim(adjustl(s))
       if (len(w) == 0) then
             s1 = ""
@@ -1157,7 +1157,7 @@ subroutine io_text_readline(line, u, eof)
 
       line = ""
       if (present(eof)) eof = .false.
-      
+
       lineloop: do n = 1, maxchunks
             read(u, "(A)", advance="NO", size=s, &
                   iostat=ios, iomsg=errmsg) chunk
@@ -1213,7 +1213,7 @@ end function isblank
 function iscomment(s)
       logical                  :: iscomment
       character(*), intent(in) :: s
-      
+
       character(:), allocatable :: sl
 
       iscomment = .false.
@@ -1222,7 +1222,7 @@ function iscomment(s)
             if (sl(1:1) == "!") then
                   iscomment = .true.
             end if
-      end if            
+      end if
 end function iscomment
 
 

@@ -2581,7 +2581,7 @@ C
 C     Reads 2-el integrals in AO and ttransform to NO
 C     Returns TwoEl in NO
 C
-      use read_external    
+      use read_external
 C
       Implicit Real*8 (A-H,O-Z)
 C
@@ -3488,39 +3488,39 @@ C
       use read_external
 C
       implicit none
-      
+
       character(*),intent(in) :: basfile,intf
       integer,intent(out) :: nbasis
       integer :: iunit
       integer :: nsym,nbas(8),norb(8),nrhf(8),ioprhf
       logical :: ex
-      
+
       inquire(file=basfile,EXIST=ex)
-      
+
       if(ex) then
          open(newunit=iunit,file=basfile,status='OLD',
      $        access='SEQUENTIAL',form='UNFORMATTED')
-      
+
          if(trim(intf)=='DALTON') then
             ! read basis info
             call readlabel(iunit,'BASINFO ')
-      
+
             read (iunit) nsym,nbas,norb,nrhf,ioprhf
             !write(LOUT,*)  nsym,nbas,norb,nrhf,ioprhf
-      
+
          elseif(trim(intf)=='MOLPRO') then
             read(iunit)
             read(iunit) nsym,nbas(1:nsym)
          endif
-      
+
          close(iunit)
          nbasis = sum(nbas(1:nsym))
-      
+
       else
          write(LOUT,'(1x,a)') 'WARNING: '// basfile //' NOT FOUND!'
          write(LOUT,'(1x,a)') 'TRYING TO READ NBasis FROM INPUT!'
       endif
-      
+
       End Subroutine BasInfo
 
 *Deck SortOrbDal

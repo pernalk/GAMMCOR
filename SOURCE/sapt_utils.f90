@@ -55,20 +55,20 @@ character(:),allocatable :: onefile
  case('V','v')
 
     read(ione)
-    read(ione) label,mat 
-    if(label=='POTENTAL') valid=.true. 
- 
+    read(ione) label,mat
+    if(label=='POTENTAL') valid=.true.
+
  case('S','s')
 
-    read(ione) label,mat 
-    if(label=='OVERLAP ') valid=.true. 
+    read(ione) label,mat
+    if(label=='OVERLAP ') valid=.true.
 
  case('H','h')
 
-    read(ione) 
     read(ione)
-    read(ione) label,mat 
-    if(label=='ONEHAMIL') valid=.true. 
+    read(ione)
+    read(ione) label,mat
+    if(label=='ONEHAMIL') valid=.true.
 
  case default
     write(LOUT,'()')
@@ -77,7 +77,7 @@ character(:),allocatable :: onefile
  end select
 
  if(.not.valid) then
-    write(LOUT,'(1x,a)') 'ERROR!!! LABEL MISMATCH IN get_one_mat!' 
+    write(LOUT,'(1x,a)') 'ERROR!!! LABEL MISMATCH IN get_one_mat!'
     stop
  endif
 
@@ -615,7 +615,7 @@ double precision,allocatable :: tmpX(:,:),tmpY(:,:),work(:)
 double precision :: tstX,tstY
 
 ! why factor sqrt(2)?
-fact = sqrt(2d0) 
+fact = sqrt(2d0)
 
 call read_SBlock(SBlock,SBlockIV,nblk,xy0file)
 

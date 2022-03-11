@@ -3,7 +3,7 @@ module sorter_Cholesky
 ! this module is used by Cholesky
 ! which avoids creation of AOTWOSORT
 !
-use print_units 
+use print_units
 use read_external
 implicit none
 
@@ -259,7 +259,7 @@ subroutine get_TR_AOReaderChol(rdr,y,M)
 implicit none
 class(AOReaderChol) :: rdr
 integer,intent(in)  :: y(:)
-double precision,intent(out) :: M(:,:) 
+double precision,intent(out) :: M(:,:)
 
 double precision :: val
 integer :: lbuf
