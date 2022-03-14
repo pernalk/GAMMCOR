@@ -18,6 +18,7 @@ C
       use read_external
       use git_info
       use build_info
+      use omp_lib
 C
       Implicit Real*8 (A-H,O-Z)
 C
@@ -56,6 +57,8 @@ C     *************************************************************************
 C
       Call git_print_info()
       Call build_print_info()
+
+      Call omp_set_max_active_levels(2)
 
       Call read_Input(Input)
       Call check_Calc(Input%CalcParams)

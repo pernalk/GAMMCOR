@@ -3811,6 +3811,7 @@ subroutine ACEInteg_FOFO(ECorr,URe,Occ,XOne,UNOAO,&
       NBasis,NInte1,NDim,NGem,IndAux,ACAlpha,&
       IGemIN,NAct,INActive,NELE,IndN,IndX,NDimX,&
       NoSt,ICASSCF,IFlFrag1,IFunSR,IFunSRKer)
+use omp_lib
 !
 !  A ROUTINE FOR COMPUTING AC INTEGRAND
 !
@@ -3833,6 +3834,7 @@ integer :: i,j,k,l,kl,ip,iq,ir,is,ipq,irs
 integer :: pos(NBasis,NBasis)
 double precision :: ECASSCF,XKer
 character(:),allocatable :: twojfile,twokfile
+
 
  NOccup = NAct + INActive
 
@@ -3864,7 +3866,7 @@ character(:),allocatable :: twojfile,twokfile
                   IndN,IndX,IGemIN,CICoef, &
                   NAct,NELE,NBasis,NDim,NDimX,NInte1,NGem, &
                  'TWOMO','FFOO','FOFO',0,ACAlpha,1)
-
+  
  endif
 
  if(IFlFrag1.Eq.1) then
@@ -3873,6 +3875,7 @@ character(:),allocatable :: twojfile,twokfile
  endif
 
 ! ADD A SR KERNEL
+!$OMP CRITICAL(crit_ACEInteg_FOFO_1)
  if(IFunSR.Ne.0.And.IFunSRKer.Eq.1) then
 
     open(newunit=iunit,file="srdump",form='UNFORMATTED')
@@ -3912,12 +3915,12 @@ character(:),allocatable :: twojfile,twokfile
     close(iunit)
 
  endif
+!$OMP END CRITICAL(crit_ACEInteg_FOFO_1)
 !
 ! FIND EIGENVECTORS (EigVecR) AND COMPUTE THE ENERGY
-
  if(NoSt==1) then
     call ERPASYMM1(EigVecR,Eig,ABPLUS,ABMIN,NBasis,NDimX)
-   else
+   else 
     call ERPAVEC(EigVecR,Eig,ABPLUS,ABMIN,NBasis,NDimX)
  endif
 
@@ -3927,8 +3930,9 @@ character(:),allocatable :: twojfile,twokfile
                         NDimX,NBasis,twokfile)
  else
     call EneERPA_FOFO(ECorr,EigVecR,Eig,Occ,CICoef, &
-                      IGemIN,IndN,NDimX,NELE+NAct,NBasis,'FOFO')
+                      IGemIN,IndN,NDimX,NELE+NAct,NBasis,'FOFO')         
  endif
+
 
 end subroutine ACEInteg_FOFO
 
@@ -3999,6 +4003,7 @@ do kk=1,NDimX
    if(condition(kk)) tVec(kk,:) = EVec(:,kk)
 enddo
 
+!$OMP CRITICAL(crit_ACEneERPA_FOFO_1)
 open(newunit=iunit,file=trim(IntKFile),status='OLD', &
      access='DIRECT',recl=8*NBasis*NOccup)
 
@@ -4055,6 +4060,7 @@ do k=1,NOccup
 enddo
 
 close(iunit)
+!$OMP END CRITICAL(crit_ACEneERPA_FOFO_1)
 
 if(ISkippedEig/=0) then
   write(LOUT,'(/,1x,"The number of discarded eigenvalues is",i4)') &
@@ -4102,6 +4108,7 @@ ISkippedEig = 0
 EIntra = 0
 ECorr  = 0
 
+!$OMP CRITICAL(crit_EneERPA_FOFO_1)
 open(newunit=iunit,file=trim(IntKFile),status='OLD', &
      access='DIRECT',recl=8*NBasis*NOccup)
 
@@ -4163,6 +4170,7 @@ do k=1,NOccup
 enddo
 
 close(iunit)
+!$OMP END CRITICAL(crit_EneERPA_FOFO_1)
 
 if(ISkippedEig/=0) then
   write(LOUT,'(/,1x,"The number of discarded eigenvalues is",i4)') &

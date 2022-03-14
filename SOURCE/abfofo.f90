@@ -96,12 +96,10 @@ enddo
 
 deallocate(RDM2Act)
 
-
 call triang_to_sq(XOne,work1,NBasis)
 call dgemm('N','N',NBasis,NBasis,NBasis,1d0,URe,NBasis,work1,NBasis,0d0,work2,NBasis)
 call dgemm('N','T',NBasis,NBasis,NBasis,1d0,work2,NBasis,URe,NBasis,0d0,HNO,NBasis)
 call sq_symmetrize(HNO,NBasis)
-
 
 val = 0
 do i=1,NOccup
@@ -294,7 +292,6 @@ endif
 !write(LOUT,*) 'AuxIO-tr', norm2(work1(1:NBasis*(NBasis+1)/2))
 !!
 !write(LOUT,*) 'WMAT-my', 2d0*norm2(WMAT)
-
 deallocate(RDM2val)
 deallocate(ints,work2,work1)
 
