@@ -1,10 +1,10 @@
 module git_info
 
     implicit none
-    character(len=*), parameter :: GIT_HEAD_BRANCH = "aks-openmp"
-    character(len=*), parameter :: GIT_REVISION_HASH = "acaa15ddf88ea9b906eefd818402c853d58e50d4"
-    character(len=*), parameter :: GIT_REVISION = "acaa15d"
-    character(len=*), parameter :: GIT_COMMITTER_DATE = "Sun Feb 27 18:08:42 2022 +0100"
+    character(len=*), parameter :: GIT_HEAD_BRANCH = "IntCholesky"
+    character(len=*), parameter :: GIT_REVISION_HASH = "c570ad13247ae4b701a0b06de97603eab0ebec05"
+    character(len=*), parameter :: GIT_REVISION = "c570ad1"
+    character(len=*), parameter :: GIT_COMMITTER_DATE = "Mon Mar 14 23:25:23 2022 +0100"
     character(len=*), parameter :: GIT_LATEST_TAG_LONG = "v-4.1"
 
     contains

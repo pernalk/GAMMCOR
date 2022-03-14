@@ -54,7 +54,6 @@ set(GAMMCOR_SOURCE
     SOURCE/types.f90
     SOURCE/vv10.f
     SOURCE/xcfun.f90
-    
     SOURCE/arithmetic.f90
     SOURCE/io.f90
     SOURCE/clock.f90
@@ -76,10 +75,14 @@ set(GAMMCOR_SOURCE
     SOURCE/ac_iter.f
     SOURCE/ac_fofo.f90
     SOURCE/sorter_Cholesky.f90
-    SOURCE/sapt_CD_pol.f90
+    SOURCE/sapt_Chol_pol.f90
+    SOURCE/sapt_Chol_exch.f90
     SOURCE/ab0fofo.f90
     SOURCE/sapt_response.f90
     SOURCE/sapt_interface.f90
+    SOURCE/priunit.f90
+    SOURCE/rdwrext.f90
+    SOURCE/blocktypes.f90
 
     SOURCE/git_info.f90
     SOURCE/build_info.f90
