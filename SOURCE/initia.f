@@ -759,12 +759,18 @@ C       Call chol_MOTransf(MatFF,CholeskyVecs,
 C     $              UAux,1,NBasis,
 C     $              UAux,1,NBasis)
 C
-      MemMOTransf = 1200 ! this is fixed for now in MB
-                         ! will be changed in next revision
+C    set buffer size for Cholesky AO2NO transformation
+      if(MemType == 2) then       !MB
+         MemMOTransfMB = MemVal
+      elseif(MemType == 3) then   !GB
+         MemMOTransfMB = MemVal * 1024_8
+      endif
+      Write(LOUT,'(1x,a,i5,a)') 'Using ',MemMOTransfMB,
+     $                          ' MB for 3-indx Cholesky transformation'
       Call chol_MOTransf_TwoStep(MatFF,CholeskyVecs,
      $              UAux,1,NBasis,
      $              UAux,1,NBasis,
-     $              MemMOTransf)
+     $              MemMOTransfMB)
 C
       Call chol_ints_fofo(NBasis,Num0+Num1,MatFF,
      $                    NBasis,Num0+Num1,MatFF,
@@ -1563,10 +1569,18 @@ c     Call chol_MOTransf(MatFF,CholeskyVecs,
 c    $                   UAux,1,NBasis,
 c    $                   UAux,1,NBasis)
 C
+C    set buffer size for Cholesky AO2NO transformation
+      if(MemType == 2) then       !MB
+         MemMOTransfMB = MemVal
+      elseif(MemType == 3) then   !GB
+         MemMOTransfMB = MemVal * 1024_8
+      endif
+      Write(LOUT,'(1x,a,i5,a)') 'Using ',MemMOTransfMB,
+     $                          ' MB for 3-indx Cholesky transformation'
       Call chol_MOTransf_TwoStep(MatFF,CholeskyVecs,
      $              UAux,1,NBasis,
      $              UAux,1,NBasis,
-     $              1500)
+     $              MemMOTransfMB)
 C
       Call clock('chol_NOTransf',Tcpu,Twall)
 C

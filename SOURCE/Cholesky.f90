@@ -274,9 +274,7 @@ contains
                   NCholesky => Vecs%NCholesky, &
                   R => Vecs%R)
 
-                  MaxBufferDim = MaxBufferDimMB*1024
-                  MaxBufferDim = (MaxBufferDimMB*1024)/(storage_size(S)/8)
-                  !MaxBufferDim = (MaxBufferDimMB*1024*1024)/(storage_size(S)/8)
+                  MaxBufferDim = (int(MaxBufferDimMB,I64)*1024*1024)/(storage_size(S)/8)
                   call chol_MOTransf_TwoStep_x(S, R, CA, CB, a0, a1, b0, b1, &
                         NAO, NCholesky, MaxBufferDim)
             end associate
