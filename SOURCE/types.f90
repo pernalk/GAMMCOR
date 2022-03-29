@@ -173,6 +173,7 @@ type SystemBlock
       logical :: DeclareSpin      = .false.
       logical :: DeclareThrSelAct = .false.
       logical :: DeclareThrQVirt  = .false.
+      logical :: DeclareThrQInact = .false.
       logical :: ISHF    = .false.
       logical :: Cubic   = .false.
       logical :: Wexcit  = .false.
@@ -184,6 +185,7 @@ type SystemBlock
       double precision :: ACAlpha0  = 1.d-10
       double precision :: ACAlpha1  = 0.01d0
       double precision :: ACAlpha2  = 0.45d0
+
       ! ThrAct for active geminals selection
       double precision :: ThrAct    = 0.992d0
       double precision :: ThrSelAct = 1.d-8
@@ -191,6 +193,9 @@ type SystemBlock
       double precision :: ThrVirt   = 1.d-6
       ! ThrQVirt for quasi-virtual orbs
       double precision :: ThrQVirt  = 1.d-7
+      ! ThrQInact for quasi-inactive orbs (0.9998...)
+      double precision :: ThrQInact = 1.d-4
+
       integer,allocatable :: InSt(:,:),InTrSt(:,:)
       integer,allocatable :: IGem(:), IndAux(:)
       integer,allocatable :: IndX(:), IndN(:,:), IPair(:,:)

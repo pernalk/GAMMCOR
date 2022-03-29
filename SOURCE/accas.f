@@ -62,6 +62,9 @@ C
       Write(LOUT,'(2x,a,2e15.5)') 'Threshold for quasi-virtual orbital',
      $ ThrQVirt
 
+      Write(LOUT,'(2x,a,2e14.5)')'Threshold for quasi-inactive orbital',
+     $ ThrQInact
+
       IJ=0
       Ind=0
       Do I=1,NBasis
@@ -83,7 +86,7 @@ C     If IFlCore=0 do not include core (inactive) orbitals
       If((IFlCore.Eq.1).Or.
      $ (IFlCore.Eq.0.And.Occ(I).Ne.One.And.Occ(J).Ne.One)) Then
 C
-      If(Abs(Occ(i)+Occ(j)-Two).Gt.1.D-10.And.
+      If(Abs(Occ(i)+Occ(j)-Two).Gt.ThrQInact.And.
      $   Abs(Occ(i)+Occ(j)).Gt.ThrQVirt) Then
       Ind=Ind+1
       IndX(Ind)=Ind

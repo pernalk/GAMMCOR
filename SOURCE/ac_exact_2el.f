@@ -597,7 +597,7 @@ C     If IFlCore=0 do not include core (inactive) orbitals
       If((IFlCore.Eq.1).Or.
      $ (IFlCore.Eq.0.And.OccAlph(I).Ne.One.And.OccAlph(J).Ne.One)) Then
 C
-      If(Abs(OccAlph(i)+OccAlph(j)-Two).Gt.1.D-10.And.
+      If(Abs(OccAlph(i)+OccAlph(j)-Two).Gt.ThrQInact.And.
      $   Abs(OccAlph(i)+OccAlph(j)).Gt.ThrQVirt) Then
       Ind=Ind+1
       IndX(Ind)=Ind

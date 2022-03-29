@@ -570,6 +570,10 @@ character(:), allocatable :: first, last
        SystemParams%DeclareThrQVirt = .true.
        read(val,*) SystemParams%ThrQVirt
 
+ case ("THRQINACT")
+       SystemParams%DeclareThrQInact = .true.
+       read(val,*) SystemParams%ThrQInact
+
  case ("THRVIRT")
        read(val,*) SystemParams%ThrVirt
 
@@ -880,6 +884,9 @@ associate( CalcParams => Input%CalcParams)
       endif
       if(System%DeclareThrQVirt) then
          write(LOUT, '(1x,a,e13.6)') "THRESHOLD QUASI-VIRTUAL : ", System%ThrQVirt
+      endif
+      if(System%DeclareThrQInact) then
+         write(LOUT, '(1x,a,e13.6)') "THRESHOLD QUASI-INACTIVE : ", System%ThrQInact
       endif
       if(System%ISHF) then
          write(LOUT, '(1x,a,l2)') "HARTREE-FOCK: ", System%ISHF

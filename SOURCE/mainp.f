@@ -258,10 +258,11 @@ C
 C     SET THRESHOLD FOR ACTIVE ORBITALS IN CAS
       ThrSelAct = System%ThrSelAct
 C     SET THRESHOLD FOR ACTIVE ORBITALS IN GVB
-      ThrAct = System%ThrAct
+      ThrAct    = System%ThrAct
 C     SET THRESHOLD FOR QUASI-VIRTUAL ORBITALS IN CAS
-      write(lout,*) System%ThrQVirt
-      ThrQVirt = System%ThrQVirt
+      ThrQVirt  = System%ThrQVirt
+C     SET THRESHOLD FOR QUASI-INACTIVE ORBITALS IN CAS
+      ThrQInact = System%ThrQInact
 C
 C*************************************************************************
 C     READ THE INPUT AND PRINT THE INPUT DATA

@@ -421,6 +421,7 @@ if(Flags%ISAPT.Eq.0) then
    System%ThrSelAct = Input%SystemInput(1)%ThrSelAct
    System%ThrVirt = Input%SystemInput(1)%ThrVirt
    System%ThrQVirt  = Input%SystemInput(1)%ThrQVirt
+   System%ThrQInact = Input%SystemInput(1)%ThrQInact
    System%TwoMoInt = Input%SystemInput(1)%TwoMoInt
    System%IPrint = Input%CalcParams%IPrint
   
@@ -484,6 +485,7 @@ elseif(Flags%ISAPT.Eq.1) then
       monA%ThrSelAct   = Input%SystemInput(1)%ThrSelAct
       monA%ThrVirt     = Input%SystemInput(1)%ThrVirt
       monA%ThrQVirt    = Input%SystemInput(1)%ThrQVirt
+      monA%ThrQInact   = Input%SystemInput(1)%ThrQInact
       monA%DeclareTwoMo = Input%SystemInput(1)%DeclareTwoMo
       monA%TwoMoInt = Input%SystemInput(1)%TwoMoInt
       monA%PostCAS  = Input%SystemInput(1)%PostCAS
@@ -528,6 +530,7 @@ elseif(Flags%ISAPT.Eq.1) then
       monB%ThrSelAct = Input%SystemInput(2)%ThrSelAct
       monB%ThrVirt   = Input%SystemInput(2)%ThrVirt
       monB%ThrQVirt  = Input%SystemInput(2)%ThrQVirt
+      monB%ThrQInact   = Input%SystemInput(2)%ThrQInact
       monB%DeclareTwoMo = Input%SystemInput(2)%DeclareTwoMo
       monB%TwoMoInt  = Input%SystemInput(2)%TwoMoInt
       monB%PostCAS   = Input%SystemInput(2)%PostCAS
@@ -573,6 +576,7 @@ elseif(Flags%ISAPT.Eq.1) then
       monA%ThrSelAct = Input%SystemInput(2)%ThrSelAct
       monA%ThrVirt   = Input%SystemInput(2)%ThrVirt
       monA%ThrQVirt  = Input%SystemInput(2)%ThrQVirt
+      monA%ThrQInact = Input%SystemInput(2)%ThrQInact
       monA%DeclareTwoMo = Input%SystemInput(2)%DeclareTwoMo
       monA%TwoMoInt = Input%SystemInput(2)%TwoMoInt
       monA%PostCAS = Input%SystemInput(2)%PostCAS
@@ -611,6 +615,7 @@ elseif(Flags%ISAPT.Eq.1) then
       monB%ThrSelAct = Input%SystemInput(1)%ThrSelAct
       monB%ThrVirt   = Input%SystemInput(1)%ThrVirt
       monB%ThrQVirt  = Input%SystemInput(1)%ThrQVirt
+      monB%ThrQInact = Input%SystemInput(1)%ThrQInact
       monB%DeclareTwoMo = Input%SystemInput(1)%DeclareTwoMo
       monB%TwoMoInt = Input%SystemInput(1)%TwoMoInt
       monB%PostCAS  = Input%SystemInput(1)%PostCAS
