@@ -1130,6 +1130,9 @@ C
       Type(TCholeskyVecs) :: CholeskyVecs
       Real*8, Allocatable :: MatFF(:,:)
       Real*8 Tcpu,Twall
+C     test AO-->NO
+      Integer :: itsoao(NBasis),jtsoao(NBasis)
+      Real*8  :: CAONO(NBasis,NBasis)
 C
       Character*60 FName,Aux1,Title
 C
@@ -1393,6 +1396,7 @@ C
 C
       Else
 C
+C     REORDER MOs TO NO SYMMETRY
       Do I=1,NBasis
       Do J=1,NBasis
       UAux(IndInt(I),J)=UAOMO(J,I)
@@ -1528,8 +1532,31 @@ C
 C     If(IAO.Eq.0)
       Else
 C
+C     PREPARE AO--> NO TRANSFORMATION:
+C     UAOMO(NO,AO) = C(NO,MO).C(MO,AO)
+C     IF SYMMETRY IS USED IN MOLPRO CALCULATIONS,
+C     UAux IS ACTUALLY (MO,SAO), WHERE
+C     SAO ARE SYMMETRIZED AOs
+C
       Call MultpM(UAOMO,URe,UAux,NBasis)
       Call MatTr(XKin,UAOMO,NBasis)
+C
+C     TEST GETTING AO --> NO
+C     work1 = C(AO,MO) ; UAux = C(NO,MO)
+      Call read_caomo_molpro(work1,itsoao,jtsoao,
+     &                      'MATSAO.mol','CASORBAO',NBasis)
+      Call dgemm('N','T',NBasis,NBasis,NBasis,1d0,work1,NBasis,
+     &           URe,NBasis,0d0,CAONO,NBasis)
+      Call dump_CAONO(CAONO,'CAONO.mol',NBasis)
+C      PRINT*, 'CAO-NO '
+C      DO I=1,NBASIS
+C         WRITE(*,'(14f11.6)') (CAONO(I,J),J=1,NBasis)
+C      ENDDO
+C      PRINT*, 'CSAO->NO'
+C      DO I=1,NBASIS
+C         WRITE(*,'(14f11.6)') (UAOMO(J,I),J=1,NBasis)
+C      ENDDO
+C
 C
 C     ITwoEl
       If(ITwoEl.Eq.1) Then

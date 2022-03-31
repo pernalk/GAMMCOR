@@ -378,6 +378,9 @@ double precision :: tmp(ntr)
 end subroutine readoneint_molpro
 
 subroutine read_mo_molpro(cmo,infile,text,nbasis)
+!
+! this subroutine reads C(SAO,MO) coefficients
+!
 implicit none
 
 integer,intent(in) :: nbasis
@@ -430,6 +433,88 @@ double precision ::tmp(nbasis**2)
  close(iunit)
 
 end subroutine read_mo_molpro
+
+subroutine read_caomo_molpro(caomo,itsoao,jtsoao,infile,text,nbasis)
+!
+! this subroutine reads C(AO,MO) coefficients
+! transition from SAO-->AO is done in Molpro
+!
+implicit none
+
+integer,intent(in)           :: nbasis
+integer,intent(out)          :: itsoao(nbasis),jtsoao(nbasis)
+character(*),intent(in)      :: infile,text
+double precision,intent(out) :: caomo(nbasis,nbasis)
+
+integer      :: iunit,ios
+integer      :: i,j,ntg
+character(8) :: label
+
+ open(newunit=iunit,file=infile,status='OLD', &
+      access='SEQUENTIAL',form='UNFORMATTED')
+
+ do
+   read(iunit,iostat=ios) label
+   if(ios<0) then
+      write(6,*) 'ERROR!!! LABEL '//text//' not found!'
+      stop
+   endif
+   if(label==text) then
+      read(iunit) ntg
+      read(iunit) itsoao(1:ntg),jtsoao(1:ntg)
+      read(iunit) caomo(1:ntg,1:ntg)
+      exit
+   endif
+ enddo
+
+ if(NBasis /= ntg) then
+   write(lout,'(1x,a)') 'ERROR! NBasis .ne. ntg in read_caomo_molpro!'
+   write(lout,'(1x,a,i4,a,i4)') 'NBasis = ', NBasis, 'ntg = ', ntg
+   stop
+ endif
+
+ ! write(LOUT,*) 'test print'
+ ! do i=1,NBasis
+ !    write(*,'(14f11.6)') (caomo(i,j),j=1,NBasis)
+ ! end do
+
+ close(iunit)
+
+end subroutine read_caomo_molpro
+
+subroutine dump_CAONO(CAONO,infile,NBasis)
+!
+! THIS IS FOR TEST ONLY & SHOULD BE REMOVED
+!
+implicit none
+
+integer,intent(in)          :: NBasis
+character(*),intent(in)     :: infile
+double precision,intent(in) ::CAONO(NBasis,NBasis)
+
+integer :: iunit
+! test
+integer :: ntg 
+double precision :: work(NBasis,NBasis)
+
+open(newunit=iunit,file=infile, &
+     access='SEQUENTIAL',form='UNFORMATTED')
+
+write(iunit) NBasis
+write(iunit) CAONO(1:NBasis,1:NBasis)
+close(iunit)
+
+!! test read
+!open(newunit=iunit,file=infile,form='UNFORMATTED')
+!read(iunit) ntg
+!read(iunit) work(1:NBasis,1:NBasis)
+!close(iunit)
+!
+!print*, 'ntg, NBasis: ',ntg, NBasis
+!print*, 'norms =', norm2(CAONO),norm2(work)
+!print*, 'diff norms = ',norm2(CAONO-work)
+!
+end subroutine dump_CAONO
 
 subroutine readgridmolpro(iunit,text,npt,r,wt)
 !
@@ -781,8 +866,10 @@ end subroutine sym_inf_molpro
 subroutine create_ind_molpro(infile,NumOSym,IndInt,NSym,NBasis)
 !
 ! Purpose: reads number of atomic orbitals in each irrep (NumOSym)
-!          creates index array IndInt(NBasis)
-!          used to reorder orbitals (all closed first, then active, then virt)
+!          creates index array IndInt(NBasis):
+!          in Molpro, orbitals are arranged into core-closed-active-virtual in each irrep
+!          here we create a no-symmetry mapping, i.e. orbs are arranged within a single irrep
+!          (all closed first, then active, then virt)
 !
 implicit none
 
