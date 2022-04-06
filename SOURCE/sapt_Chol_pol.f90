@@ -73,6 +73,67 @@ deallocate(Vb,Va,Vbaa,Vabb)
 
 end subroutine e1elst_Chol
 
+subroutine test_Chol_ints(Flags,A,B,SAPT)
+implicit none
+
+type(FlagsData)   :: Flags
+type(SystemBlock) :: A, B
+type(SaptData)    :: SAPT
+
+integer :: iunit
+integer :: i,j,ij,ic,id,cd,irec
+integer :: nA,nB,nC,nD,nAB,nCD
+integer :: NCholesky,NBasis
+double precision :: diff,diffOne,tot
+double precision,allocatable :: work(:),workAO(:)
+
+NBasis    = A%NBasis
+NCholesky = SAPT%NCholesky
+
+nA = NBasis
+nB = NBasis
+nC = NBasis
+nD = NBasis
+
+nAB = nA*nB
+nCD = nC*nD
+
+allocate(work(nAB),workAO(nAB))
+
+open(newunit=iunit,file='FFFFAABB',status='OLD',&
+    access='DIRECT',form='UNFORMATTED',recl=8*NBasis**2)
+
+tot = 0d0
+irec = 0
+do id=1,nD
+   do ic=1,nC
+      cd = ic+(id-1)*NBasis
+      irec = irec + 1
+      !call dgemv('T',NCholesky,nAB,1d0,B%FF,NCholesky,A%FF(1:NCholesky,cd),1,0d0,work,1)
+      call dgemv('T',NCholesky,nCD,1d0,A%FF,NCholesky,B%FF(1:NCholesky,cd),1,0d0,work,1)
+      read(iunit,rec=irec) workAO(1:nAB)
+
+      ij = 0
+      do j=1,nB
+      do i=1,nA
+         ij = ij + 1
+         diffOne = abs(work(ij)) - abs(workAO(ij))
+         if(abs(diffOne).gt.1d-7) print*, 'i,j',i,j,diffOne
+      enddo
+      enddo
+
+      diff = norm2(work) - norm2(workAO)
+      tot  = tot + abs(diff)
+      write(lout,*) 'cd = ',cd,abs(diff)
+
+   enddo
+enddo
+print*, 'Total : ', tot
+deallocate(work,workAO)
+close(iunit)
+
+end subroutine test_Chol_ints
+
 subroutine e2disp_Chol(Flags,A,B,SAPT)
 !
 ! calculate 2nd order dispersion energy

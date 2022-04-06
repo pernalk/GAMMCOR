@@ -1132,7 +1132,7 @@ C
       Real*8 Tcpu,Twall
 C     test AO-->NO
       Integer :: itsoao(NBasis),jtsoao(NBasis)
-      Real*8  :: CAONO(NBasis,NBasis)
+      Real*8  :: CAONO(NBasis,NBasis),SAO(NBasis,NBasis)
 C
       Character*60 FName,Aux1,Title
 C
@@ -1543,20 +1543,13 @@ C
 C
 C     TEST GETTING AO --> NO
 C     work1 = C(AO,MO) ; UAux = C(NO,MO)
-      Call read_caomo_molpro(work1,itsoao,jtsoao,
+      Call read_caomo_molpro(work1,SAO,itsoao,jtsoao,
      &                      'MATSAO.mol','CASORBAO',NBasis)
       Call dgemm('N','T',NBasis,NBasis,NBasis,1d0,work1,NBasis,
      &           URe,NBasis,0d0,CAONO,NBasis)
-      Call dump_CAONO(CAONO,'CAONO.mol',NBasis)
-C      PRINT*, 'CAO-NO '
-C      DO I=1,NBASIS
-C         WRITE(*,'(14f11.6)') (CAONO(I,J),J=1,NBasis)
-C      ENDDO
-C      PRINT*, 'CSAO->NO'
-C      DO I=1,NBASIS
-C         WRITE(*,'(14f11.6)') (UAOMO(J,I),J=1,NBasis)
-C      ENDDO
-C
+      Call dump_CAONO_SAO(CAONO,transpose(UAOMO),SAO,
+     &               'CAONO.mol',NBasis)
+      Call test_Smat(SAO,CAONO,transpose(UAOMO),NBasis)
 C
 C     ITwoEl
       If(ITwoEl.Eq.1) Then

@@ -434,7 +434,7 @@ double precision ::tmp(nbasis**2)
 
 end subroutine read_mo_molpro
 
-subroutine read_caomo_molpro(caomo,itsoao,jtsoao,infile,text,nbasis)
+subroutine read_caomo_molpro(caomo,sao,itsoao,jtsoao,infile,text,nbasis)
 !
 ! this subroutine reads C(AO,MO) coefficients
 ! transition from SAO-->AO is done in Molpro
@@ -445,6 +445,7 @@ integer,intent(in)           :: nbasis
 integer,intent(out)          :: itsoao(nbasis),jtsoao(nbasis)
 character(*),intent(in)      :: infile,text
 double precision,intent(out) :: caomo(nbasis,nbasis)
+double precision,intent(out) :: sao(nbasis,nbasis)
 
 integer      :: iunit,ios
 integer      :: i,j,ntg
@@ -463,6 +464,7 @@ character(8) :: label
       read(iunit) ntg
       read(iunit) itsoao(1:ntg),jtsoao(1:ntg)
       read(iunit) caomo(1:ntg,1:ntg)
+      read(iunit) sao(1:ntg,1:ntg)
       exit
    endif
  enddo
@@ -477,32 +479,72 @@ character(8) :: label
  ! do i=1,NBasis
  !    write(*,'(14f11.6)') (caomo(i,j),j=1,NBasis)
  ! end do
+ ! do i=1,NBasis
+ !    write(*,'(14f11.6)') (sao(i,j),j=1,NBasis)
+ ! end do
 
  close(iunit)
 
 end subroutine read_caomo_molpro
 
-subroutine dump_CAONO(CAONO,infile,NBasis)
+subroutine dump_CAONO_SAO(CAONO,CSAONO,SAO,infile,NBasis)
 !
 ! THIS IS FOR TEST ONLY & SHOULD BE REMOVED
+! SSAO (symmetrized S matrix) is read from AOONEINT.mol file
 !
 implicit none
 
 integer,intent(in)          :: NBasis
 character(*),intent(in)     :: infile
-double precision,intent(in) ::CAONO(NBasis,NBasis)
+double precision,intent(in) :: CAONO(NBasis,NBasis),CSAONO(NBasis,NBasis)
+double precision,intent(in) :: SAO(NBasis,NBasis)
 
-integer :: iunit
+integer :: iunit,ntr
 ! test
-integer :: ntg 
-double precision :: work(NBasis,NBasis)
+integer :: i,j,k,ntg
+double precision :: work(NBasis,NBasis),wrktr(NBasis*(NBasis+1)/2)
+double precision :: SSAO(NBasis,NBasis)
+
+print*, 'DUMP CAONO and CSAONO integrals to file...'
+
+ntr = NBasis*(NBasis+1)/2
+call readoneint_molpro(wrktr,'AOONEINT.mol','OVERLAP ',.true.,ntr)
+k = 0
+do j=1,NBasis
+   do i=1,j
+      k = k + 1
+      SSAO(i,j) = wrktr(k)
+      SSAO(j,i) = wrktr(k)
+   enddo
+enddo
 
 open(newunit=iunit,file=infile, &
      access='SEQUENTIAL',form='UNFORMATTED')
 
 write(iunit) NBasis
 write(iunit) CAONO(1:NBasis,1:NBasis)
+write(iunit) CSAONO(1:NBasis,1:NBasis)
+write(iunit) SAO(1:NBasis,1:NBasis)
+write(iunit) SSAO(1:NBasis,1:NBasis)
 close(iunit)
+
+  print*, 'cao-no '
+  do i=1,nbasis
+     write(*,'(14f11.6)') (CAONO(i,j),j=1,nbasis)
+  enddo
+  print*, 'csao->no'
+  do i=1,nbasis
+     write(*,'(14f11.6)') (CSAONO(i,j),j=1,nbasis)
+  enddo
+  print*, 'sao '
+  do i=1,nbasis
+     write(*,'(14f11.6)') (SAO(i,j),j=1,nbasis)
+  enddo
+  print*, 'ssao'
+  do i=1,nbasis
+     write(*,'(14f11.6)') (SSAO(i,j),j=1,nbasis)
+  enddo
+  write(*,*) ''
 
 !! test read
 !open(newunit=iunit,file=infile,form='UNFORMATTED')
@@ -514,7 +556,52 @@ close(iunit)
 !print*, 'norms =', norm2(CAONO),norm2(work)
 !print*, 'diff norms = ',norm2(CAONO-work)
 !
-end subroutine dump_CAONO
+end subroutine dump_CAONO_SAO
+
+subroutine test_Smat(SAO,CAONO,CSAONO,NBasis)
+!
+! THIS IS FOR TEST ONLY & SHOULD BE REMOVED
+!
+implicit none
+
+integer,intent(in)          :: NBasis
+double precision,intent(in) :: CAONO(NBasis,NBasis),CSAONO(NBasis,NBasis)
+double precision,intent(in) :: SAO(NBasis,NBasis)
+
+integer :: i,j,k,ntr
+double precision :: SSAO(NBasis,NBasis)
+double precision :: work(NBasis,NBasis),wrktr(NBasis*(NBasis+1)/2)
+
+call dgemm('T','N',NBasis,NBasis,NBasis,1d0,CAONO,NBasis,SAO,NBasis,0d0,work,NBasis)
+call dgemm('N','N',NBasis,NBasis,NBasis,1d0,work,NBasis,CAONO,NBasis,0d0,SAO,NBasis)
+
+print*, 'sao2no'
+do i=1,nbasis
+   write(*,'(14f11.6)') (SAO(i,j),j=1,nbasis)
+enddo
+
+ntr = NBasis*(NBasis+1)/2
+call readoneint_molpro(wrktr,'AOONEINT.mol','OVERLAP ',.true.,ntr)
+k = 0
+do j=1,NBasis
+   do i=1,j
+      k = k + 1
+      SSAO(i,j) = wrktr(k)
+      SSAO(j,i) = wrktr(k)
+   enddo
+enddo
+
+call dgemm('T','N',NBasis,NBasis,NBasis,1d0,CSAONO,NBasis,SSAO,NBasis,0d0,work,NBasis)
+call dgemm('N','N',NBasis,NBasis,NBasis,1d0,work,NBasis,CSAONO,NBasis,0d0,SSAO,NBasis)
+
+print*, 'ssao2no'
+do i=1,nbasis
+   write(*,'(14f11.6)') (SSAO(i,j),j=1,nbasis)
+enddo
+
+write(*,*) ''
+
+end subroutine test_Smat
 
 subroutine readgridmolpro(iunit,text,npt,r,wt)
 !
