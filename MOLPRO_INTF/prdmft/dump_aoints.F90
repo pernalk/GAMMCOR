@@ -396,8 +396,10 @@ subroutine dump_dens(i1fil,i1recnum,ensmble,smoothSCF,iststr)
 
       ! get orbs
       call find_rec('CASORB',icasrec,icasfil)
-      call read_info(icasrec, icasfil, 0, idiffCAS, method)
-      call read_orb(OrbCas, 1)
+      call get_orb(OrbCas,icasrec,icasfil,1,2)
+      ! MH, 22.04.22: this stopped working for some reason
+      !call read_info(icasrec, icasfil, 0, idiffCAS, method)
+      !call read_orb(OrbCas, 1)
       call flush_dump
 
       ! expand Orbs
