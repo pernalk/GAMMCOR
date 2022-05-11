@@ -337,7 +337,7 @@ C
       If(PC(I).Gt.Zero) NAc=NAc+1
       EndDo
 C
-      NInAc=NELE-Sum+1.D-1
+      NInAc=XELE-Sum+1.D-1
       Do I=1,NInAc+NAc
       If(I.Le.NInAc) Then
       Occ(I)=One
