@@ -1105,14 +1105,16 @@ C
       use sorter
       use tran
 c     use Cholesky_old  ! requires AOTWOSORT
-      use Cholesky
+      use Cholesky, only : chol_CoulombMatrix, TCholeskyVecs,
+     $                     chol_MOTransf_TwoStep
+      use Cholesky_driver, only: chol_MOVecs
       use abmat
       use read_external
       use timing
 C
       Implicit Real*8 (A-H,O-Z)
-      Parameter (Half=0.5D0)
-C      Parameter (Zero=0.D0,Half=0.5D0,One=1.D0,Two=2.D0)
+c     Parameter (Half=0.5D0)
+      Parameter (Zero=0.D0,Half=0.5D0,One=1.D0,Two=2.D0)
 C
       Real*8 XKin(NInte1),XNuc(NInte1),TwoEl(NInte2),
      $ UAOMO(NBasis,NBasis),URe(NBasis,NBasis),Occ(NBasis),
@@ -1225,25 +1227,27 @@ C
 C     SET TIMING FOR 2-el integrals
       Call clock('START',Tcpu,Twall)
 C
-      If(ICholesky==0) Then
+C     test 1
+C     If(ICholesky==0) Then
 C     memory allocation for sorter
       MemSrtSize=MemVal*1024_8**MemType
 C     KP: If IFunSR=6 integrals are not needed and are not loaded
       If (IFunSR.Eq.0.Or.IFunSR.Eq.3.Or.IFunSR.Eq.5) Then
-      Call readtwoint(NBasis,2,'AOTWOINT.mol','AOTWOSORT',MemSrtSize)
-      If(ITwoEl.Eq.1) Call LoadSaptTwoEl(3,TwoEl,NBasis,NInte2)
+         Call readtwoint(NBasis,2,'AOTWOINT.mol','AOTWOSORT',MemSrtSize)
+         If(ITwoEl.Eq.1) Call LoadSaptTwoEl(3,TwoEl,NBasis,NInte2)
       ElseIf(IFunSR.Eq.1.Or.IFunSR.Eq.2.Or.IFunSR.Eq.4) Then
-      Call readtwoint(NBasis,2,'AOTWOINT.erf','AOERFSORT',MemSrtSize)
-      If(ITwoEl.Eq.1) Call LoadSaptTwoEl(4,TwoEl,NBasis,NInte2)
+         Call readtwoint(NBasis,2,'AOTWOINT.erf','AOERFSORT',MemSrtSize)
+         If(ITwoEl.Eq.1) Call LoadSaptTwoEl(4,TwoEl,NBasis,NInte2)
       EndIf
 C
-      Else If(ICholesky==1) Then
-c     If(ICholesky==1) Then
-c     Call chol_CoulombMatrix(CholeskyVecs,'AOTWOSORT',ICholeskyAccu)
-       Call chol_CoulombMatrix(CholeskyVecs,NBasis,'AOTWOINT.mol',2,
-     &                         ICholeskyAccu)
-      NCholesky=CholeskyVecs%NCholesky
-      EndIf ! ICholesky
+C      Else If(ICholesky==1) Then
+Cc     If(ICholesky==1) Then
+Cc     Call chol_CoulombMatrix(CholeskyVecs,'AOTWOSORT',ICholeskyAccu)
+C      Call chol_CoulombMatrix(CholeskyVecs,NBasis,'AOTWOINT.mol',2,
+C    &                         ICholeskyAccu)
+C      NCholesky=CholeskyVecs%NCholesky
+C      EndIf ! ICholesky
+C end test 1
       Call clock('2-electron ints',Tcpu,Twall)
 C
 C     LOAD AO TO CAS_MO ORBITAL TRANSFORMATION MATRIX FROM uaomo.dat
@@ -1417,14 +1421,15 @@ C
       EndDo
       EndDo
 C
+C     test 1
       If (IFunSR.Eq.0.Or.IFunSR.Eq.3.Or.IFunSR.Eq.5.Or.IFunSR.Eq.6) Then
-          If(ICholesky==0) Then
+C          If(ICholesky==0) Then
           Call FockGen_mithap(FockF,GammaAB,XKin,NInte1,NBasis,
      &                        'AOTWOSORT')
-          ElseIf(ICholesky==1) Then
-          Call FockGen_CholR(FockF,CholeskyVecs%R(1:NCholesky,1:NInte1),
-     &                       GammaAB,XKin,NInte1,NCholesky,NBasis)
-          EndIf
+C          ElseIf(ICholesky==1) Then
+C         Call FockGen_CholR(FockF,CholeskyVecs%R(1:NCholesky,1:NInte1),
+C    &                       GammaAB,XKin,NInte1,NCholesky,NBasis)
+C          EndIf
       ElseIf (IFunSR.Eq.1.Or.IFunSR.Eq.2.Or.IFunSR.Eq.4) Then
           If(ICholesky==0) Then
              Call FockGen_mithap(FockF,GammaAB,XKin,NInte1,NBasis,
@@ -1541,16 +1546,16 @@ C
       Call MultpM(UAOMO,URe,UAux,NBasis)
       Call MatTr(XKin,UAOMO,NBasis)
 C
-C     TEST GETTING AO --> NO
-C     work1 = C(AO,MO) ; UAux = C(NO,MO)
-      Call read_caomo_molpro(work1,SAO,itsoao,jtsoao,
-     &                      'MATSAO.mol','CASORBAO',NBasis)
-      Call dgemm('N','T',NBasis,NBasis,NBasis,1d0,work1,NBasis,
-     &           URe,NBasis,0d0,CAONO,NBasis)
-      Call dump_CAONO_SAO(CAONO,transpose(UAOMO),SAO,
-     &               'CAONO.mol',NBasis)
-      Call test_Smat(SAO,CAONO,transpose(UAOMO),NBasis)
-C
+CC     TEST GETTING AO --> NO
+CC     work1 = C(AO,MO) ; UAux = C(NO,MO)
+C      Call read_caomo_molpro(work1,SAO,itsoao,jtsoao,
+C     &                      'MATSAO.mol','CASORBAO',NBasis)
+C      Call dgemm('N','T',NBasis,NBasis,NBasis,1d0,work1,NBasis,
+C     &           URe,NBasis,0d0,CAONO,NBasis)
+C      Call dump_CAONO_SAO(CAONO,transpose(UAOMO),SAO,
+C     &               'CAONO.mol',NBasis)
+C      Call test_Smat(SAO,CAONO,transpose(UAOMO),NBasis)
+CC
 C     ITwoEl
       If(ITwoEl.Eq.1) Then
       Write(6,'(/," Transforming two-electron integrals ...",/)')
@@ -1583,7 +1588,7 @@ C
 C
       ElseIf (ICholesky==1) Then
 C
-      Allocate(MatFF(NCholesky,NBasis**2))
+C     Allocate(MatFF(NCholesky,NBasis**2))
 C     Old 1-step transformation (much slower)
 c     Call chol_MOTransf(MatFF,CholeskyVecs,
 c    $                   UAux,1,NBasis,
@@ -1595,14 +1600,32 @@ C    set buffer size for Cholesky AO2NO transformation
       elseif(MemType == 3) then   !GB
          MemMOTransfMB = MemVal * 1024_8
       endif
-      Write(LOUT,'(1x,a,i5,a)') 'Using ',MemMOTransfMB,
-     $                          ' MB for 3-indx Cholesky transformation'
-      Call chol_MOTransf_TwoStep(MatFF,CholeskyVecs,
-     $              UAux,1,NBasis,
-     $              UAux,1,NBasis,
-     $              MemMOTransfMB)
-C
+CC     test 1
+C      Write(LOUT,'(1x,a,i5,a)') 'Using ',MemMOTransfMB,
+C    $                          ' MB for 3-indx Cholesky transformation'
+C      Call chol_MOTransf_TwoStep(MatFF,CholeskyVecs,
+C    $              UAux,1,NBasis,
+C    $              UAux,1,NBasis,
+C    $              MemMOTransfMB)
+
+C cholesky OTF
+       Write(LOUT,'(/,1x,a)') 'Cholesky OTF...'
+       Call chol_MOVecs(MatFF,   ! matrix(:,:), allocatable
+     $         UAux,1,NBasis,   ! Ca, a0, a1
+     $         UAux,1,NBasis,   ! Cb  b0, b1
+     $         MemMOTransfMB,   ! MaxBufferDIM => buffer for integral transformation 
+     $         .true.,          ! on-the-fly
+     $         'AOTWOINT.mol',  ! RawIntegralsPath
+     $         2,               ! AOSource = Molpro
+     $         '/home/michalhapka/pr-dmft/cholesky_test/cc-pVDZ',   ! basis set path
+     $         '/home/michalhapka/pr-dmft/cholesky_test/water.xyz', ! xyz path
+     $         ICholeskyAccu,   ! Accuracy = DEBUG (4), LUDICROUS (3)
+     $         .true.)          ! SpherAO : true  => spherical basis
+                                !           false => cartesian basis
+C 
+CC
       Call clock('chol_NOTransf',Tcpu,Twall)
+      NCholesky = size(MatFF,dim=1)
 C
       Call chol_ints_fofo(NBasis,Num0+Num1,MatFF,
      $                    NBasis,Num0+Num1,MatFF,
