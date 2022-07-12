@@ -74,7 +74,9 @@ C     FILL COMMONS AND CONSTANTS
       NBasis  = System%NBasis
       Title   = Flags%JobTitle
       ITwoEl  = Flags%ITwoEl
-      ICholesky = Flags%ICholesky
+      ICholesky     = Flags%ICholesky
+      ICholeskyBIN  = Flags%ICholeskyBIN
+      ICholeskyOTF  = Flags%ICholeskyOTF
       ICholeskyAccu = Flags%ICholeskyAccu
       MemVal  = Flags%MemVal
       MemType = Flags%MemType

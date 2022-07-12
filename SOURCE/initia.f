@@ -1255,8 +1255,6 @@ C     KP: If IFunSR=6 integrals are not needed and are not loaded
       EndIf
 C
 C      Else If(ICholesky==1) Then
-      ICholeskyBIN = 0
-      ICholeskyOTF = 1
 C     compute Cholesky vectors from binary file
       If(ICholeskyBIN==1) Then
 

@@ -128,8 +128,10 @@ else
    Flags%ITwoEl = Input%CalcParams%TwoMoInt
 
   ! set Cholesky decomposition
-   Flags%ICholesky    = Input%CalcParams%Cholesky
-   Flags%ICholeskyAccu = Input%CalcParams%CholeskyAccu
+   Flags%ICholesky     = Input%CholeskyParams%Cholesky
+   Flags%ICholeskyBIN  = Input%CholeskyParams%CholeskyBIN
+   Flags%ICholeskyOTF  = Input%CholeskyParams%CholeskyOTF
+   Flags%ICholeskyAccu = Input%CholeskyParams%CholeskyAccu
 
   ! reduce virtuals
    Flags%IRedVirt = Input%CalcParams%RedVirt

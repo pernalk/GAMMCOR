@@ -140,6 +140,7 @@ integer, parameter        :: block_none        = 0
 integer, parameter        :: block_calculation = 1
 integer, parameter        :: block_system      = 2
 integer, parameter        :: block_flags       = 3
+integer, parameter        :: block_cholesky    = 4
 character(:), allocatable :: line
 
  open(newunit=u, file=filename, status="old", &
@@ -174,6 +175,10 @@ character(:), allocatable :: line
              current_block = block_calculation
              cycle lines
 
+       case ("CHOLESKY")
+             current_block = block_cholesky
+             cycle lines
+
        case ("FLAGS")
              Input%iflag = Input%iflag + 1
              current_block = block_flags
@@ -189,6 +194,8 @@ character(:), allocatable :: line
              call read_block_system(Input%SystemInput(isys), line)
        else if (current_block == block_calculation) then
              call read_block_calculation(Input%CalcParams, line)
+       else if (current_block == block_cholesky) then
+             call read_block_cholesky(Input%CholeskyParams, line)
        else if (current_block == block_flags) then
              call read_block_flags(Input%Flags, line)
        end if
@@ -248,6 +255,45 @@ open(newunit=u, file=filename, status="old", &
 close(u)
 
 end subroutine sapt_scan_inputfile
+
+subroutine read_block_cholesky(CholeskyParams, line)
+      type(CholeskyBlock), intent(inout) :: CholeskyParams
+      character(*), intent(in) :: line
+
+      character(:), allocatable :: key, val
+
+      call split(line, key, val)
+      select case (uppercase(key))
+
+      case ("CHOLESKY")
+           if (uppercase(val) == "BINARY".or. &
+               uppercase(val) == "BIN"   .or. &
+               uppercase(val) == "B") then
+              CholeskyParams%Cholesky    = 1
+              CholeskyParams%CholeskyBIN = 1
+              CholeskyParams%CholeskyOTF = 0
+           elseif (uppercase(val) == "ON-THE-FLY".or. &
+                   uppercase(val) == "OTF"   .or. &
+                   uppercase(val) == "O") then
+              CholeskyParams%Cholesky    = 1
+              CholeskyParams%CholeskyBIN = 0
+              CholeskyParams%CholeskyOTF = 1
+           else
+              stop "Unknown keyword for Cholesky!"
+           endif
+
+      case ("CHOL_ACCU","CHOL_ACCURACY","CHOLESKY_ACCU","CHOLESKY_ACCURACY")
+           if (uppercase(val) == "DEFAULT") then
+              CholeskyParams%CholeskyAccu = CHOL_ACCU_DEFAULT
+           elseif (uppercase(val) == "TIGHT") then
+              CholeskyParams%CholeskyAccu = CHOL_ACCU_TIGHT
+           elseif (uppercase(val) == "LUDICROUS") then
+              CholeskyParams%CholeskyAccu = CHOL_ACCU_LUDICROUS
+           endif
+
+      end select
+
+end subroutine read_block_cholesky
 
 subroutine read_block_calculation(CalcParams, line)
       type(CalculationBlock), intent(inout) :: CalcParams
@@ -415,27 +461,11 @@ subroutine read_block_calculation(CalcParams, line)
       case ("POSTCAS")
            read(val,*) CalcParams%PostCAS
 
-      case ("CHOLESKY")
-           if (uppercase(val) == ".TRUE.".or. &
-               uppercase(val) == "TRUE".or.   &
-               uppercase(val) == "T") then
-              CalcParams%Cholesky = 1
-           endif
-
       case("MAX_CN")
              read(val,*) CalcParams%Max_Cn
 
       case ("CALPHA")
              read(val,*) CalcParams%CAlpha
-
-      case ("CHOL_ACCU","CHOL_ACCURACY","CHOLESKY_ACCU","CHOLESKY_ACCURACY")
-           if (uppercase(val) == "DEFAULT") then
-              CalcParams%CholeskyAccu = CHOL_ACCU_DEFAULT
-           elseif (uppercase(val) == "TIGHT") then
-              CalcParams%CholeskyAccu = CHOL_ACCU_TIGHT
-           elseif (uppercase(val) == "LUDICROUS") then
-              CalcParams%CholeskyAccu = CHOL_ACCU_LUDICROUS
-           endif
 
       case ("SAPTLEVEL")
            if (uppercase(val) == "0".or.&
@@ -853,17 +883,30 @@ associate( CalcParams => Input%CalcParams)
  endif
  write(LOUT,' (1x,a,3x,a)') "RDM SOURCE: ",  &
               PossibleInterface(CalcParams%RDMSource)
- if(CalcParams%Cholesky>0) then
-    write(LOUT,' (1x,a,5x,a)') "CHOLESKY: ",  &
-                       ".TRUE."
-    write(LOUT,' (1x,a,a)') "CHOLESKY ACCU: ", &
-               PossibleCholAccu(CalcParams%CholeskyAccu)
- endif
  if (allocated(CalcParams%IntegralsFilePath)) then
        write(*, *) "Ints file: ", CalcParams%IntegralsFilePath
  end if
   switch = 0
   if(Input%SystemInput(1)%Monomer==2) switch = 3
+
+associate( CholeskyParams => Input%CholeskyParams)
+ ! CHOLESKY BLOCK
+ if(CholeskyParams%Cholesky>0) then
+    write(LOUT, '()')
+    write(LOUT,' (1x,a,5x,a)') "CHOLESKY: ",  &
+                       ".TRUE."
+    if(CholeskyParams%CholeskyBIN>0) then
+       write(LOUT,'(1x,a,5x,a)') "ALGORITHM:", &
+                       "BINARY"
+    endif
+    if(CholeskyParams%CholeskyOTF>0) then
+       write(LOUT,'(1x,a,5x,a)') "ALGORITHM:", &
+                       "ON-THE-FLY"
+    endif
+    write(LOUT,' (1x,a,a)') "CHOLESKY ACCU: ", &
+               PossibleCholAccu(CholeskyParams%CholeskyAccu)
+ endif
+end associate
 
  ! SYSTEM BLOCK(S)
  do imon=1,CalcParams%imon

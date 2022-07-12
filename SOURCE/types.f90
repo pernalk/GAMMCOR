@@ -53,6 +53,8 @@ integer, parameter :: TWOMO_FFFF   = 2
 integer, parameter :: TWOMO_FOFO   = 3
 
 integer, parameter :: FLAG_CHOLESKY = 0
+integer, parameter :: FLAG_CHOLESKY_BIN   = 1
+integer, parameter :: FLAG_CHOLESKY_OTF   = 0
 integer, parameter :: CHOL_ACCU_DEFAULT   = 1
 integer, parameter :: CHOL_ACCU_TIGHT     = 2
 integer, parameter :: CHOL_ACCU_LUDICROUS = 3
@@ -110,8 +112,6 @@ type CalculationBlock
       integer :: DFApp     = DF_NONE
       integer :: Kernel    = 1
       integer :: TwoMoInt  = TWOMO_INCORE
-      integer :: Cholesky  = FLAG_CHOLESKY 
-      integer :: CholeskyAccu = CHOL_ACCU_DEFAULT
       integer :: Core      = FLAG_CORE
       integer :: SymType   = TYPE_NO_SYM
       integer :: SaptLevel = SAPTLEVEL2
@@ -230,6 +230,15 @@ type SystemBlock
 
 end type SystemBlock
 
+type CholeskyBlock
+
+      integer :: Cholesky     = FLAG_CHOLESKY
+      integer :: CholeskyBIN  = FLAG_CHOLESKY_BIN
+      integer :: CholeskyOTF  = FLAG_CHOLESKY_OTF
+      integer :: CholeskyAccu = CHOL_ACCU_DEFAULT
+
+end type CholeskyBlock
+
 type FileNames
 
      character(:),allocatable :: rdmfile
@@ -258,7 +267,9 @@ type FlagsData
      integer :: IGVB    = 1
      integer :: ITwoEl    = TWOMO_INCORE 
      integer :: IRedVirt  = FLAG_REDVIRT
-     integer :: ICholesky = FLAG_CHOLESKY
+     integer :: ICholesky     = FLAG_CHOLESKY
+     integer :: ICholeskyBIN  = FLAG_CHOLESKY_BIN
+     integer :: ICholeskyOTF  = FLAG_CHOLESKY_OTF
      integer :: ICholeskyAccu = CHOL_ACCU_DEFAULT
      integer :: IFun      = 13
      integer :: IFunSR    = 0 
@@ -305,6 +316,7 @@ end type FlagsData
 type InputData
 
      type(CalculationBlock) :: CalcParams
+     type(CholeskyBlock)    :: CholeskyParams
      type(SystemBlock),allocatable :: SystemInput(:)
      integer :: iflag = 0
      type(FlagsData) :: Flags 
