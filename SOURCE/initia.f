@@ -1277,15 +1277,10 @@ C     compute Cholesky vectors OTF
       block
        character(:),allocatable :: XYZPath
        character(:),allocatable :: BasisSetPath
-       character(:),allocatable :: BasisSetPath0
 
-       XYZPath = 
-     $ '/home/michalhapka/pr-dmft/cholesky_test/water.xyz'
-c      BasisSetPath =
-c    $ '/home/michalhapka/pr-dmft/cholesky_test/cc-pVDZ'
-c    $ '/home/michalhapka/pr-dmft/cholesky_test/aug-cc-pVQZ'
-
+      XYZPath = "./input.inp"
       BasisSetPath = BasisSet
+
       Call cholesky_ao_vectors(CholeskyVecsOTF, AOBasis, XYZPath,
      $                         BasisSetPath, ICholeskyAccu)
 

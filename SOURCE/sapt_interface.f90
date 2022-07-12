@@ -5,7 +5,13 @@ use timing
 use tran
 use sorter
 !use Cholesky_old
-use Cholesky
+use Cholesky, only : chol_CoulombMatrix, TCholeskyVecs, &
+                     chol_Rkab_ExternalBinary, chol_MOTransf_TwoStep
+use basis_sets
+use sys_definitions
+use CholeskyOTF, only : TCholeskyVecsOTF
+use Cholesky_driver, only : chol_Rkab_OTF
+
 use abmat
 use read_external
 
@@ -20,10 +26,12 @@ subroutine sapt_interface(Flags,SAPT,NBasis)
 !
 implicit none
 
-type(FlagsData)     :: Flags
-type(SaptData)      :: SAPT
-type(TCholeskyVecs) :: CholeskyVecs
-integer,intent(in)  :: NBasis
+type(FlagsData)        :: Flags
+type(SaptData)         :: SAPT
+type(TCholeskyVecs)    :: CholeskyVecs
+type(TCholeskyVecsOTF) :: CholeskyVecsOTF
+type(TAOBasis)         :: AOBasis
+integer,intent(in)     :: NBasis
 
 integer    :: NSq,NInte1,NInte2
 integer    :: NCholesky

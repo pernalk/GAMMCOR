@@ -184,6 +184,10 @@ character(:), allocatable :: line
              current_block = block_flags
              cycle lines
 
+       case("XYZ")
+             current_block = block_none
+             cycle lines
+
        case ("END")
              current_block = block_none
              cycle lines
