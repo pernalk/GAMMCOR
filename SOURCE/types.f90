@@ -126,6 +126,7 @@ type CalculationBlock
       double precision :: ThreshVirt = 1.0D-6
       integer :: imon = 1
       character(:), allocatable :: JobTitle
+      character(:), allocatable :: BasisSet,BasisSetPath
       character(:), allocatable :: IntegralsFilePath
       integer :: Max_Cn = 3
       logical :: CAlpha = .false.
@@ -286,6 +287,7 @@ type FlagsData
      integer :: SaptLevel = 0
      integer :: ISHF      = 0
      character(:), allocatable :: JobTitle
+     character(:), allocatable :: BasisSet,BasisSetPath
      integer :: JobType = 0
      integer :: MemVal  = 2
      integer :: MemType = 3

@@ -124,6 +124,10 @@ else
   ! set JobType
    Flags%JobType = Input%CalcParams%JobType
 
+  ! set BasisSet
+   Flags%BasisSet = Input%CalcParams%BasisSet
+   Flags%BasisSetPath = Input%CalcParams%BasisSetPath
+
   ! set TwoEl type
    Flags%ITwoEl = Input%CalcParams%TwoMoInt
 

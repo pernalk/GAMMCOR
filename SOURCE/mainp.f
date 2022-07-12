@@ -22,7 +22,8 @@ C
 C
       Implicit Real*8 (A-H,O-Z)
 C
-      Character*60 Title,FMultTab
+      Character*60 FMultTab
+      Character(:),allocatable :: Title,BasisSet
 C
       Real*8, Dimension(:), Allocatable :: Occ
       Real*8, Dimension(:), Allocatable :: URe
@@ -42,10 +43,10 @@ C
       Real*8, Dimension(:), Allocatable :: UMOAO
       Integer, Dimension(:), Allocatable :: NSymMO
 C
-      type(InputData) :: Input
-      type(FlagsData) :: Flags
+      type(InputData)   :: Input
+      type(FlagsData)   :: Flags
       type(SystemBlock) :: System
-      type(SaptData) :: Sapt
+      type(SaptData)    :: Sapt
 C
       Include 'commons.inc'
 C
@@ -72,6 +73,7 @@ C     FILL COMMONS AND CONSTANTS
       NELE    = System%NELE
       Charge  = System%Charge
       NBasis  = System%NBasis
+      BasisSet= Flags%BasisSetPath // Flags%BasisSet
       Title   = Flags%JobTitle
       ITwoEl  = Flags%ITwoEl
       ICholesky     = Flags%ICholesky
@@ -337,8 +339,8 @@ C     temporarily set IFunSR to 6 to avoid loading integrals and their transform
       IFFSR=7
       EndIf
 C
-      Call LdInteg(Title,XKin,XNuc,ENuc,Occ,URe,TwoEl,UMOAO,NInte1,
-     $ NBasis,NInte2,NGem)
+      Call LdInteg(Title,BasisSet,XKin,XNuc,ENuc,Occ,URe,
+     $             TwoEl,UMOAO,NInte1,NBasis,NInte2,NGem)
 C
 C     create cas_ss.molden file with NOs (useful after SA-CAS calculations to inspect 
 C     the character of NOs in a state requested in input.inp)

@@ -1094,9 +1094,8 @@ C
       End
 
 *Deck LdInteg
-      Subroutine LdInteg(Title,XKin,XNuc,ENuc,Occ,URe,
+      Subroutine LdInteg(Title,BasisSet,XKin,XNuc,ENuc,Occ,URe,
      $ TwoEl,UAOMO,NInte1,NBasis,NInte2,NGem)
-C     $ TwoEl,UAOMO,NInte1,NBasis,NInte2,NGem,NoSt)
 C
 C     READ/WRITE THE ONE- AND TWO-ELECTRON INTEGRALS
 C     INTERFACED WITH MOLPRO (INTEGRALS ARE READ FROM FCIDUMP FILES)
@@ -1105,7 +1104,6 @@ C
       use sorter
       use tran
 c     use Cholesky_old  ! requires AOTWOSORT
-
 C     binary
       use Cholesky, only : chol_CoulombMatrix, TCholeskyVecs,
      $              chol_Rkab_ExternalBinary, chol_MOTransf_TwoStep
@@ -1150,7 +1148,8 @@ C
       type(TAOBasis) :: AOBasis
 
 C
-      Character*60 FName,Aux1,Title
+      Character*60 FName,Aux1
+      Character(*) :: Title,BasisSet
 C
       Include 'commons.inc'
 C
@@ -1278,13 +1277,15 @@ C     compute Cholesky vectors OTF
       block
        character(:),allocatable :: XYZPath
        character(:),allocatable :: BasisSetPath
+       character(:),allocatable :: BasisSetPath0
 
        XYZPath = 
      $ '/home/michalhapka/pr-dmft/cholesky_test/water.xyz'
-       BasisSetPath =
+c      BasisSetPath =
 c    $ '/home/michalhapka/pr-dmft/cholesky_test/cc-pVDZ'
-     $ '/home/michalhapka/pr-dmft/cholesky_test/aug-cc-pVQZ'
+c    $ '/home/michalhapka/pr-dmft/cholesky_test/aug-cc-pVQZ'
 
+      BasisSetPath = BasisSet
       Call cholesky_ao_vectors(CholeskyVecsOTF, AOBasis, XYZPath,
      $                         BasisSetPath, ICholeskyAccu)
 

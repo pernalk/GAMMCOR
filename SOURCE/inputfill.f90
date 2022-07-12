@@ -502,6 +502,12 @@ subroutine read_block_calculation(CalcParams, line)
       case ("JOBTITLE")
             CalcParams%JobTitle = val
 
+      case ("BASIS")
+            CalcParams%BasisSet = val
+
+      case ("BASISPATH")
+            CalcParams%BasisSetPath = val
+
       case("MEMSORT")
             call read_memsrt(val,CalcParams%MemVal,CalcParams%MemType)
 
@@ -871,6 +877,13 @@ associate( CalcParams => Input%CalcParams)
     write(LOUT,'(1x,a,4x,a)') "JOB TITLE: ", &
                  "EMPTY"
  endif
+
+ if(allocated(CalcParams%BasisSet)) &
+    write(LOUT,'(1x,a,4x,a)') "BASIS SET: ", &
+                 CalcParams%BasisSet
+ if(allocated(CalcParams%BasisSet)) &
+    write(LOUT,'(1x,a,4x,a)') "BASIS PATH:", &
+                 CalcParams%BasisSetPath
  write(LOUT,' (1x,a,4x,a)') "INTERFACE: ", &
               PossibleInterface(CalcParams%InterfaceType)
  write(LOUT,' (1x,a,5x,a)') "JOB TYPE: ",  &
@@ -893,7 +906,7 @@ associate( CholeskyParams => Input%CholeskyParams)
  ! CHOLESKY BLOCK
  if(CholeskyParams%Cholesky>0) then
     write(LOUT, '()')
-    write(LOUT,' (1x,a,5x,a)') "CHOLESKY: ",  &
+    write(LOUT,' (1x,a,5x,a)') "CHOLESKY :",  &
                        ".TRUE."
     if(CholeskyParams%CholeskyBIN>0) then
        write(LOUT,'(1x,a,5x,a)') "ALGORITHM:", &
