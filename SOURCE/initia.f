@@ -1,5 +1,5 @@
 *Deck ReadDAL
-      Subroutine ReadDAL(XKin,XNuc,ENuc,Occ,URe,
+      Subroutine ReadDAL(BasisSet,XKin,XNuc,ENuc,Occ,URe,
      $ TwoEl,UMOAO,NInte1,NBasis,NInte2,NGem,Flags)
 C
 C     READ HAO, 2-EL INTEGRALS IN NO, C_COEFFICIENTS, IGEM FROM A DALTON_GENERATED FILE
@@ -23,6 +23,7 @@ C
 C
       Character*60 Line
       Character*30 Line1
+      Character(*) :: BasisSet
 C
       type(FlagsData) :: Flags
 C
@@ -37,7 +38,7 @@ C     IDMRG - integrals and RDM's read from external dmrg files
       If(IDMRG.Eq.1.And.ICASSCF.Eq.0) Stop 'Set ICASSCF TO 1'
 C
       If(IDMRG.Eq.1) Then
-      Call ReadDMRG(XKin,XNuc,ENuc,Occ,URe,
+      Call ReadDMRG(BasisSet,XKin,XNuc,ENuc,Occ,URe,
      $ TwoEl,UMOAO,NInte1,NBasis,NInte2,NGem,iORCA)
       Return
       EndIf
@@ -226,13 +227,23 @@ C     ReadDMRG: VERSION THAT WORKS WITH EUGENE'S INTS (IEugene=1)
 C               IT WORKS WITH ORCA OUTPUTS (IEugene=0)
 C
 *Deck ReadDMRG
-      Subroutine ReadDMRG(XKin,XNuc,ENuc,Occ,URe,
+      Subroutine ReadDMRG(BasisSet,XKin,XNuc,ENuc,Occ,URe,
      $ TwoEl,UMOAO,NInte1,NBasis,NInte2,NGem,iORCA)
 C
       use types
       use sorter
+C     Cholesky modules
 c     use Cholesky_old  ! create AOTWOSORT file
-      use Cholesky
+C     binary
+      use Auto2eInterface
+      use Cholesky, only : chol_CoulombMatrix, TCholeskyVecs,
+     $              chol_Rkab_ExternalBinary, chol_MOTransf_TwoStep
+C     on-the-fly
+      use basis_sets
+      use sys_definitions
+      use CholeskyOTF, only : TCholeskyVecsOTF
+      use Cholesky_driver, only : chol_Rkab_OTF
+
       use tran
       use abmat
       use read_external
@@ -245,16 +256,24 @@ C
 C
       Real*8 XKin(NInte1),XNuc(NInte1),Occ(NBasis),URe(NBasis,NBasis),
      $ TwoEl(NInte2),UMOAO(NBasis*NBasis)
-      Type(TCholeskyVecs) :: CholeskyVecs
 C
       Character*60 FName,Aux1
+      Character(*) :: BasisSet
 C
       Include 'commons.inc'
 C
 C     LOCAL ARRAYS
 C
       Real*8, Allocatable :: RDM2(:),RDMAB2(:)
+C     binary
+      Type(TCholeskyVecs) :: CholeskyVecs
       Real*8, Allocatable :: MatFF(:,:)
+C     on-the-fly
+      type(TCholeskyVecsOTF) :: CholeskyVecsOTF
+      type(TAOBasis)         :: AOBasis
+      integer :: NA, NB, a0, a1, b0, b1
+      logical :: SortAngularMomenta
+
       Dimension Gamma(NInte1),Work(NBasis),PC(NBasis),
      $ AUXM(NBasis,NBasis),AUXM1(NBasis,NBasis),
      $ Fock(NBasis*NBasis),
@@ -262,6 +281,10 @@ C
      $ FockF(NInte1),GammaAB(NInte1),Eps(NBasis,NBasis)
       Integer(8) MemSrtSize,IOutInfo
       Dimension FockF2(NInte1),WorkSq(NBasis,NBasis)
+C     for OTF Cholesky
+      double precision :: UAONO(NBasis,NBasis)
+      double precision,allocatable :: CMOAO(:,:)
+
 
       If(iORCA==1) then
       LiborNew=1
@@ -462,19 +485,47 @@ C
 C
       ElseIf(ITwoEl.Gt.1) Then
 C
-      If(ICholesky==0) Then
+c     If(ICholesky==0) Then
+C OTF Cholesky test 1: we always need AOTWOSORT
+C                      to generate Fock matrix
       MemSrtSize=MemVal*1024_8**MemType
       Call readtwoint(NBasis,4,'DPQRS.bin','AOTWOSORT',
      $                MemSrtSize,IOutInfo)
 C
-      Else If(ICholesky==1) Then
+      If(ICholeskyBIN==1) Then
+c     Else If(ICholeskyBIN==1) Then
 c     If(ICholesky==1) Then
 c     print*, 'use Cholesky-old'
 !     Call chol_CoulombMatrix(CholeskyVecs,'AOTWOSORT',ICholeskyAccu)
 c     print*, 'use Cholesky-new'
+      Write(LOUT,'(/1x,3a6)') ('******',i=1,3)
+      Write(LOUT,'(1x,a)') 'Cholesky Binary'
+      Write(LOUT,'(1x,3a6)') ('******',i=1,3)
       Call chol_CoulombMatrix(CholeskyVecs,NBasis,'DPQRS.bin',4,
      &                        ICholeskyAccu)
       NCholesky=CholeskyVecs%NCholesky
+C      
+      Else If(ICholeskyOTF==1) Then
+C
+      Write(LOUT,'(/1x,3a6)') ('******',i=1,3)
+      Write(LOUT,'(1x,a)') 'Cholesky On-The-Fly'
+      Write(LOUT,'(1x,3a6)') ('******',i=1,3)
+
+      Call auto2e_init()
+
+      block
+       character(:),allocatable :: XYZPath
+       character(:),allocatable :: BasisSetPath
+
+      XYZPath = "./input.inp"
+
+      BasisSetPath = BasisSet
+      SortAngularMomenta = .false.
+
+      Call cholesky_ao_vectors(CholeskyVecsOTF, AOBasis, XYZPath,
+     $                 BasisSetPath, SortAngularMomenta, ICholeskyAccu)
+      end block
+
       EndIf
 C
       EndIf
@@ -534,13 +585,16 @@ C
       EndDo
       Call sq_to_triang2(UAux,GammaAB,NBasis)
 C
-      If(ICholesky==0) Then
+C OTF Cholesky test 2:
+!      If(ICholesky==0) Then
          Call FockGen_mithap(FockF,GammaAB,XKin,NInte1,NBasis,
      &                       'AOTWOSORT')
-      ElseIf(ICholesky==1) Then
-         Call FockGen_CholR(FockF,CholeskyVecs%R(1:NCholesky,1:NInte1),
-     &                      GammaAB,XKin,NInte1,NCholesky,NBasis)
-      EndIf
+C OTF Cholesky test 3: switch off FockGen_CholR
+C                    until there is a dedicated procedure from Marcin
+C      ElseIf(ICholesky==1) Then
+c        Call FockGen_CholR(FockF,CholeskyVecs%R(1:NCholesky,1:NInte1),
+c    &                      GammaAB,XKin,NInte1,NCholesky,NBasis)
+C      EndIf
 C
 C      WorkSq = 0
 C      call triang_to_sq2(FockF,WorkSq,NBasis)
@@ -753,12 +807,7 @@ C     TRANSFORM J AND K
      $        Num0+Num1,UAux(1:NBasis,1:(Num0+Num1)),
      $        'FOFO','AOTWOSORT')
       ElseIf(ICholesky==1) Then
-      Allocate(MatFF(NCholesky,NBasis**2))
-C       print*, 'use chol_MOTransf-old,IUNIT',IUNIT
-C       Call chol_MOTransf(MatFF,CholeskyVecs,
-C     $              UAux,1,NBasis,
-C     $              UAux,1,NBasis)
-C
+C      
 C    set buffer size for Cholesky AO2NO transformation
       if(MemType == 2) then       !MB
          MemMOTransfMB = MemVal
@@ -767,10 +816,64 @@ C    set buffer size for Cholesky AO2NO transformation
       endif
       Write(LOUT,'(1x,a,i5,a)') 'Using ',MemMOTransfMB,
      $                          ' MB for 3-indx Cholesky transformation'
+C
+      If(ICholeskyBIN==1) Then
+      Allocate(MatFF(NCholesky,NBasis**2))
+C       print*, 'use chol_MOTransf-old,IUNIT',IUNIT
+C       Call chol_MOTransf(MatFF,CholeskyVecs,
+C     $              UAux,1,NBasis,
+C     $              UAux,1,NBasis)
+C
       Call chol_MOTransf_TwoStep(MatFF,CholeskyVecs,
      $              UAux,1,NBasis,
      $              UAux,1,NBasis,
      $              MemMOTransfMB)
+
+      ElseIf(ICholeskyOTF==1) Then
+      NA = NBasis
+      NB = NBasis
+      a0 = 1
+      a1 = NBasis
+      b0 = 1
+      b1 = NBasis
+      NCholesky = CholeskyVecsOTF%NVecs
+      Print*, 'NCholesky',NCholesky
+      allocate(MatFF(NCholesky,NA*NB))
+C
+      ! read in C(AO,MO) matrix
+      open(newunit=iunt,File='C0.bin',form='unformatted',
+     $     access='stream',status='OLD')
+      read(iunt) IROW,ICOL,ITYP
+      Print*, 'IROW,ICOL',IROW,ICOL
+      Print*, 'ITYP',ITYP
+      if(IROW.ne.ICOL) then
+        Print*, 'IROW != ICOL in ReadDMRG!'
+        stop "Linear dependcies in basis!"
+      endif
+      allocate(CMOAO(IROW,ICOL))
+      read(iunt) CMOAO
+      close(iunt)
+C     test print MO orbitals (this is transposed):
+      do i=1,NBasis
+         write(LOUT,*) i
+         write(LOUT,'(10f13.8)') (CMOAO(i,j),j=1,nbasis)
+      enddo
+      write(LOUT,'()')
+
+      !UAux = U(MO,NO)
+      !UAONO = (CMOAO)^T.UMONO
+      call dgemm('T','N',NBasis,NBasis,NBasis,1d0,CMOAO,NBasis,
+     $           UAux,NBasis,0d0,UAONO,NBasis)
+
+      call chol_Rkab_OTF(MatFF, UAONO, a0, a1, UAONO, b0, b1,
+     $                   MemMOTransfMB, CholeskyVecsOTF,
+     $                   AOBasis, ORBITAL_ORDERING_ORCA)
+
+      deallocate(CMOAO)
+C
+      EndIf ! Cholesky BIN/OTF
+C
+c     Call clock('chol_NOTransf',Tcpu,Twall)
 C
       Call chol_ints_fofo(NBasis,Num0+Num1,MatFF,
      $                    NBasis,Num0+Num1,MatFF,
@@ -1105,6 +1208,7 @@ C
       use tran
 c     use Cholesky_old  ! requires AOTWOSORT
 C     binary
+      use Auto2eInterface
       use Cholesky, only : chol_CoulombMatrix, TCholeskyVecs,
      $              chol_Rkab_ExternalBinary, chol_MOTransf_TwoStep
 C     on-the-fly
@@ -1138,6 +1242,7 @@ C     binary
       Type(TCholeskyVecs) :: CholeskyVecs
       Real*8, Allocatable :: MatFF(:,:)
       Real*8 Tcpu,Twall
+      logical :: SortAngularMomenta
 C     test AO-->NO
       Integer :: itsoao(NBasis),jtsoao(NBasis)
       Real*8  :: CAONO(NBasis,NBasis),SAO(NBasis,NBasis)
@@ -1280,9 +1385,10 @@ C     compute Cholesky vectors OTF
 
       XYZPath = "./input.inp"
       BasisSetPath = BasisSet
+      SortAngularMomenta = .true.
 
       Call cholesky_ao_vectors(CholeskyVecsOTF, AOBasis, XYZPath,
-     $                         BasisSetPath, ICholeskyAccu)
+     $                 BasisSetPath, SortAngularMomenta, ICholeskyAccu)
 
       end block
 C
@@ -1660,7 +1766,8 @@ C     cholesky OTF
       NCholesky = CholeskyVecsOTF%NVecs
       allocate(MatFF(NCholesky,NA*NB))
       call chol_Rkab_OTF(MatFF, UAux, a0, a1, UAux, b0, b1,
-     $     MemMOTransfMB, CholeskyVecsOTF, AOBasis)
+     $                   MemMOTransfMB, CholeskyVecsOTF,
+     $                   AOBasis, ORBITAL_ORDERING_MOLPRO)
       EndIf ! Cholesky BIN / OTF
 C 
       Call clock('chol_NOTransf',Tcpu,Twall)
@@ -1839,7 +1946,7 @@ C
       End
 
       Subroutine cholesky_ao_vectors(CholeskyVecsOTF, AOBasis, XYZPath,
-     $                           BasisSetPath, Accuracy)
+     $                       BasisSetPath, SortAngularMomenta, Accuracy)
             use arithmetic
             use auto2e
             use Cholesky, only: chol_CoulombMatrix, TCholeskyVecs,
@@ -1857,6 +1964,7 @@ C
             type(TAOBasis), intent(out)         :: AOBasis
             character(*), intent(in)            :: XYZPath
             character(*), intent(in)            :: BasisSetPath
+            logical, intent(in)                 :: SortAngularMomenta
             integer, intent(in)                 :: Accuracy
 
             type(TSystem) :: System
@@ -1874,7 +1982,7 @@ C
             ! (GAMESS-US format, no need for any edits, just download it straight from the website)
             !
             call basis_NewAOBasis(AOBasis, System,
-     $                       BasisSetPath, SpherAO)
+     $                       BasisSetPath, SpherAO, SortAngularMomenta)
             !
             ! Compute Cholesky vectors in AO basis
             !

@@ -352,7 +352,7 @@ C     set back IFunSR to IFFSR
 C
       Else
 C
-      Call ReadDAL(XKin,XNuc,ENuc,Occ,URe,TwoEl,UMOAO,
+      Call ReadDAL(BasisSet,XKin,XNuc,ENuc,Occ,URe,TwoEl,UMOAO,
      $ NInte1,NBasis,NInte2,NGem,Flags)
 C
       EndIf
