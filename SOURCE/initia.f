@@ -350,6 +350,11 @@ C
       EndIf
 C
       Call CpySym(AUXM,Gamma,NBasis)
+C      Print*, '1-RDM -- is it in AO/NO/MO...?'
+C      do i=1,Nbasis
+C         write(LOUT,*) i
+C         write(LOUT,'(10f13.8)') (AUXM(i,j),j=1,nbasis)
+C      enddo
       Call Diag8(AUXM,NBasis,NBasis,PC,Work)
       Call SortOcc(PC,AUXM,NBasis)
 C
@@ -763,7 +768,11 @@ C
       EndDo
 C     Print*, 'Err',Err
       If(Err.Gt.1.D-5) IUNIT=0
-C     If(Err.Gt.1.D-4) IUNIT=0 ! this should work with Cholesky/Ludicrous
+      If(IUNIT==1.and.ICholeskyOTF==1) Then
+        Write(6,'(1x,a)') 'Assembling FOFO and FFOO from Cholesky 
+     $                    not ready for Cholesky = OTF!'
+        Stop
+      EndIf
 C
       If(IUNIT.Eq.1) Then
       Write(6,'(/,X,"URe is a unit matrix up to ",E16.6)') ERR
@@ -837,7 +846,6 @@ C
       b0 = 1
       b1 = NBasis
       NCholesky = CholeskyVecsOTF%NVecs
-      Print*, 'NCholesky',NCholesky
       allocate(MatFF(NCholesky,NA*NB))
 C
       ! read in C(AO,MO) matrix
@@ -853,18 +861,26 @@ C
       allocate(CMOAO(IROW,ICOL))
       read(iunt) CMOAO
       close(iunt)
-C     test print MO orbitals (this is transposed):
-      do i=1,NBasis
-         write(LOUT,*) i
-         write(LOUT,'(10f13.8)') (CMOAO(i,j),j=1,nbasis)
-      enddo
-      write(LOUT,'()')
+CC     test print MO orbitals (this is transposed):
+C      Print*, 'Orbitals from Pavel:'
+C      do i=1,NBasis
+C         write(LOUT,*) i
+C         write(LOUT,'(10f13.8)') (CMOAO(i,j),j=1,nbasis)
+C      enddo
+C      write(LOUT,'()')
+C      Print*, 'Gamma diag orbs AOMO :'
+C      do j=1,NBasis
+C         write(LOUT,*) j
+C         write(LOUT,'(10f13.8)') (UAux(i,j),i=1,nbasis)
+C      enddo
+C      write(LOUT,'()')
 
       !UAux = U(MO,NO)
       !UAONO = (CMOAO)^T.UMONO
       call dgemm('T','N',NBasis,NBasis,NBasis,1d0,CMOAO,NBasis,
      $           UAux,NBasis,0d0,UAONO,NBasis)
 
+c     CMOAO=transpose(CMOAO)
       call chol_Rkab_OTF(MatFF, UAONO, a0, a1, UAONO, b0, b1,
      $                   MemMOTransfMB, CholeskyVecsOTF,
      $                   AOBasis, ORBITAL_ORDERING_ORCA)
