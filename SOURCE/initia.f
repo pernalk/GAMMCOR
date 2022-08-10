@@ -270,6 +270,7 @@ C     binary
       Real*8, Allocatable :: MatFF(:,:)
 C     on-the-fly
       type(TCholeskyVecsOTF) :: CholeskyVecsOTF
+      type(TSystem)          :: System
       type(TAOBasis)         :: AOBasis
       integer :: NA, NB, a0, a1, b0, b1
       logical :: SortAngularMomenta
@@ -350,11 +351,6 @@ C
       EndIf
 C
       Call CpySym(AUXM,Gamma,NBasis)
-C      Print*, '1-RDM -- is it in AO/NO/MO...?'
-C      do i=1,Nbasis
-C         write(LOUT,*) i
-C         write(LOUT,'(10f13.8)') (AUXM(i,j),j=1,nbasis)
-C      enddo
       Call Diag8(AUXM,NBasis,NBasis,PC,Work)
       Call SortOcc(PC,AUXM,NBasis)
 C
@@ -527,7 +523,7 @@ C
       BasisSetPath = BasisSet
       SortAngularMomenta = .false.
 
-      Call cholesky_ao_vectors(CholeskyVecsOTF, AOBasis, XYZPath,
+      Call cholesky_ao_vectors(CholeskyVecsOTF,AOBasis,System,XYZPath,
      $                 BasisSetPath, SortAngularMomenta, ICholeskyAccu)
       end block
 
@@ -1231,7 +1227,7 @@ C     on-the-fly
       use basis_sets
       use sys_definitions
       use CholeskyOTF, only : TCholeskyVecsOTF
-      use Cholesky_driver, only : chol_Rkab_OTF
+      use Cholesky_driver, only : chol_Rkab_OTF, chol_F
 
       use abmat
       use read_external
@@ -1266,6 +1262,7 @@ C
 C
       integer :: NA, NB, a0, a1, b0, b1
       type(TCholeskyVecsOTF) :: CholeskyVecsOTF
+      type(TSystem)  :: System
       type(TAOBasis) :: AOBasis
 
 C
@@ -1403,7 +1400,7 @@ C     compute Cholesky vectors OTF
       BasisSetPath = BasisSet
       SortAngularMomenta = .true.
 
-      Call cholesky_ao_vectors(CholeskyVecsOTF, AOBasis, XYZPath,
+      Call cholesky_ao_vectors(CholeskyVecsOTF,AOBasis,System,XYZPath,
      $                 BasisSetPath, SortAngularMomenta, ICholeskyAccu)
 
       end block
@@ -1588,6 +1585,79 @@ C     test 1
 C          If(ICholesky==0) Then
           Call FockGen_mithap(FockF,GammaAB,XKin,NInte1,NBasis,
      &                        'AOTWOSORT')
+
+      block
+C     start testing Fock matrix
+      double precision :: F_mo(NBasis,NBasis),H0_mo(NBasis,NBasis)
+      double precision :: Cmat(NBasis,NBasis),D_mo(NBasis,NBasis)
+      double precision :: H0tr(NInte1)
+
+!      call triang_to_Sq2(FockF,Fmat,NBasis)
+!      write(6,*) 'Fock AO'
+!      do j=1,NBasis
+!         write(LOUT,'(*(f13.8))') (Fmat(i,j),i=1,NBasis)
+!      enddo
+!      write(LOUT,'()')
+!      Fmat = 0
+
+      H0tr = XKin
+      call tran_matTr(H0tr,UAux,UAux,NBasis,.false.)
+      call triang_to_Sq2(H0tr,H0_mo,NBasis)
+
+c     write(6,*) 'H0   AO'
+      write(6,*) 'H0   MO'
+      do j=1,NBasis
+         write(LOUT,'(*(f13.8))') (H0_mo(i,j),i=1,NBasis)
+      enddo
+      H0_mo = 0
+      write(LOUT,'()')
+
+C      call triang_to_Sq2(GammaAB,Dmat,NBasis)
+      D_mo = 0d0
+      Do J=1,NBasis
+      Do I=1,NBasis
+         D_mo(I,J) = GammaF(IndSym(I,J))
+      EndDo
+      EndDo
+      write(6,*) 'DMAT MO'
+      do j=1,NBasis
+         write(LOUT,'(*(f13.8))') (D_mo(i,j),i=1,NBasis)
+      enddo
+      write(LOUT,'()')
+
+      write(6,*) 'CAOMO  '
+      do j=1,NBasis
+         write(LOUT,'(*(f13.8))') (UAux(i,j),i=1,NBasis)
+      enddo
+      write(LOUT,'()')
+      print*, 'Testing new Fock Matrix...'
+C    set buffer size for Fock matrix with Cholesky
+      if(MemType == 2) then       !MB
+         MemMOTransfMB = MemVal
+      elseif(MemType == 3) then   !GB
+         MemMOTransfMB = MemVal * 1024_8
+      endif
+C      Write(LOUT,'(1x,a,i5,a)') 'Using ',MemMOTransfMB,
+C     $                          ' MB for Fock Matrix from CholeskyOTF'
+C
+       Cmat  = transpose(UAux)
+       D_mo = 2d0*D_mo
+       call chol_F(F_mo,H0_mo,D_mo,Cmat,0.5d0,CholeskyVecsOTF,
+     $             AOBasis,System,ORBITAL_ORDERING_MOLPRO,MemMOTransfMB)
+
+      write(6,*) 'H0   MO -- new'
+      do j=1,NBasis
+         write(LOUT,'(*(f13.8))') (H0_mo(i,j),i=1,NBasis)
+      enddo
+
+      print*, 'FockF w bazie MO -- new'
+c     print*, 'FockF w bazie MO -- only J'
+      do j=1,NBasis
+         write(LOUT,'(*(f13.8))') (F_mo(i,j),i=1,NBasis)
+      enddo
+
+      end block
+
 C          ElseIf(ICholesky==1) Then
 C         Call FockGen_CholR(FockF,CholeskyVecs%R(1:NCholesky,1:NInte1),
 C    &                       GammaAB,XKin,NInte1,NCholesky,NBasis)
@@ -1610,6 +1680,17 @@ C      print*,'Fock:', norm2(FockF)
 C
 C      Call FockGen(FockF,GammaAB,XKin,TwoEl,NInte1,NBasis,NInte2)
       Call MatTr(FockF,UAux,NBasis)
+
+C     test Fock 2
+      block
+      double precision :: Fmat(NBasis,NBasis)
+      print*, 'FockF w bazie MO -- old'
+      call triang_to_Sq2(FockF,Fmat,NBasis)
+      do j=1,NBasis
+         write(LOUT,'(*(f13.8))') (Fmat(i,j),i=1,NBasis)
+      enddo
+
+      end block
 C
       EndIf
 C
@@ -1961,8 +2042,9 @@ C
       Return
       End
 
-      Subroutine cholesky_ao_vectors(CholeskyVecsOTF, AOBasis, XYZPath,
-     $                       BasisSetPath, SortAngularMomenta, Accuracy)
+      Subroutine cholesky_ao_vectors(CholeskyVecsOTF, AOBasis, System, 
+     $                       XYZPath, BasisSetPath, 
+     $                       SortAngularMomenta, Accuracy)
             use arithmetic
             use auto2e
             use Cholesky, only: chol_CoulombMatrix, TCholeskyVecs,
@@ -1978,12 +2060,12 @@ C
 
             type(TCholeskyVecsOTF), intent(out) :: CholeskyVecsOTF
             type(TAOBasis), intent(out)         :: AOBasis
+            type(TSystem), intent(out)          :: System
             character(*), intent(in)            :: XYZPath
             character(*), intent(in)            :: BasisSetPath
             logical, intent(in)                 :: SortAngularMomenta
             integer, intent(in)                 :: Accuracy
 
-            type(TSystem) :: System
             logical, parameter :: SpherAO = .true.
 
             ! Initialize the two-electron intergrals library
