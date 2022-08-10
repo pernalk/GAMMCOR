@@ -1651,6 +1651,7 @@ C
       enddo
 
       print*, 'FockF w bazie MO -- new'
+      print*, 'Fock = ',norm2(F_mo)
 c     print*, 'FockF w bazie MO -- only J'
       do j=1,NBasis
          write(LOUT,'(*(f13.8))') (F_mo(i,j),i=1,NBasis)
@@ -1686,6 +1687,7 @@ C     test Fock 2
       double precision :: Fmat(NBasis,NBasis)
       print*, 'FockF w bazie MO -- old'
       call triang_to_Sq2(FockF,Fmat,NBasis)
+      print*, 'Fock = ',norm2(Fmat)
       do j=1,NBasis
          write(LOUT,'(*(f13.8))') (Fmat(i,j),i=1,NBasis)
       enddo
