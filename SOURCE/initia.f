@@ -523,7 +523,7 @@ C
       BasisSetPath = BasisSet
       SortAngularMomenta = .false.
 
-      Call cholesky_ao_vectors(CholeskyVecsOTF,AOBasis,System,XYZPath,
+      Call CholeskyOTF_ao_vecs(CholeskyVecsOTF,AOBasis,System,XYZPath,
      $                 BasisSetPath, SortAngularMomenta, ICholeskyAccu)
       end block
 
@@ -1219,11 +1219,11 @@ C
       use sorter
       use tran
 c     use Cholesky_old  ! requires AOTWOSORT
-C     binary
+C     Cholesky binary
       use Auto2eInterface
       use Cholesky, only : chol_CoulombMatrix, TCholeskyVecs,
      $              chol_Rkab_ExternalBinary, chol_MOTransf_TwoStep
-C     on-the-fly
+C     Cholesky on-the-fly (OTF)
       use basis_sets
       use sys_definitions
       use CholeskyOTF, only : TCholeskyVecsOTF
@@ -1359,7 +1359,7 @@ C     SET TIMING FOR 2-el integrals
       Call clock('START',Tcpu,Twall)
 C
 C     test 1
-C     If(ICholesky==0) Then
+c     If(ICholesky==0) Then
 C     memory allocation for sorter
       MemSrtSize=MemVal*1024_8**MemType
 C     KP: If IFunSR=6 integrals are not needed and are not loaded
@@ -1371,7 +1371,7 @@ C     KP: If IFunSR=6 integrals are not needed and are not loaded
          If(ITwoEl.Eq.1) Call LoadSaptTwoEl(4,TwoEl,NBasis,NInte2)
       EndIf
 C
-C      Else If(ICholesky==1) Then
+c     Else If(ICholesky==1) Then
 C     compute Cholesky vectors from binary file
       If(ICholeskyBIN==1) Then
 
@@ -1400,7 +1400,7 @@ C     compute Cholesky vectors OTF
       BasisSetPath = BasisSet
       SortAngularMomenta = .true.
 
-      Call cholesky_ao_vectors(CholeskyVecsOTF,AOBasis,System,XYZPath,
+      Call CholeskyOTF_ao_vecs(CholeskyVecsOTF,AOBasis,System,XYZPath,
      $                 BasisSetPath, SortAngularMomenta, ICholeskyAccu)
 
       end block
@@ -1580,89 +1580,27 @@ C
       EndDo
       EndDo
 C
-C     test 1
       If (IFunSR.Eq.0.Or.IFunSR.Eq.3.Or.IFunSR.Eq.5.Or.IFunSR.Eq.6) Then
-C          If(ICholesky==0) Then
+C
+          If(ICholesky==0) Then
           Call FockGen_mithap(FockF,GammaAB,XKin,NInte1,NBasis,
      &                        'AOTWOSORT')
 
-      block
-C     start testing Fock matrix
-      double precision :: F_mo(NBasis,NBasis),H0_mo(NBasis,NBasis)
-      double precision :: Cmat(NBasis,NBasis),D_mo(NBasis,NBasis)
-      double precision :: H0tr(NInte1)
-
-!      call triang_to_Sq2(FockF,Fmat,NBasis)
-!      write(6,*) 'Fock AO'
-!      do j=1,NBasis
-!         write(LOUT,'(*(f13.8))') (Fmat(i,j),i=1,NBasis)
-!      enddo
-!      write(LOUT,'()')
-!      Fmat = 0
-
-      H0tr = XKin
-      call tran_matTr(H0tr,UAux,UAux,NBasis,.false.)
-      call triang_to_Sq2(H0tr,H0_mo,NBasis)
-
-c     write(6,*) 'H0   AO'
-      write(6,*) 'H0   MO'
-      do j=1,NBasis
-         write(LOUT,'(*(f13.8))') (H0_mo(i,j),i=1,NBasis)
-      enddo
-      H0_mo = 0
-      write(LOUT,'()')
-
-C      call triang_to_Sq2(GammaAB,Dmat,NBasis)
-      D_mo = 0d0
-      Do J=1,NBasis
-      Do I=1,NBasis
-         D_mo(I,J) = GammaF(IndSym(I,J))
-      EndDo
-      EndDo
-      write(6,*) 'DMAT MO'
-      do j=1,NBasis
-         write(LOUT,'(*(f13.8))') (D_mo(i,j),i=1,NBasis)
-      enddo
-      write(LOUT,'()')
-
-      write(6,*) 'CAOMO  '
-      do j=1,NBasis
-         write(LOUT,'(*(f13.8))') (UAux(i,j),i=1,NBasis)
-      enddo
-      write(LOUT,'()')
-      print*, 'Testing new Fock Matrix...'
-C    set buffer size for Fock matrix with Cholesky
-      if(MemType == 2) then       !MB
-         MemMOTransfMB = MemVal
-      elseif(MemType == 3) then   !GB
-         MemMOTransfMB = MemVal * 1024_8
-      endif
-C      Write(LOUT,'(1x,a,i5,a)') 'Using ',MemMOTransfMB,
-C     $                          ' MB for Fock Matrix from CholeskyOTF'
-C
-       Cmat  = transpose(UAux)
-       D_mo = 2d0*D_mo
-       call chol_F(F_mo,H0_mo,D_mo,Cmat,0.5d0,CholeskyVecsOTF,
-     $             AOBasis,System,ORBITAL_ORDERING_MOLPRO,MemMOTransfMB)
-
-      write(6,*) 'H0   MO -- new'
-      do j=1,NBasis
-         write(LOUT,'(*(f13.8))') (H0_mo(i,j),i=1,NBasis)
-      enddo
-
-      print*, 'FockF w bazie MO -- new'
-      print*, 'Fock = ',norm2(F_mo)
-c     print*, 'FockF w bazie MO -- only J'
-      do j=1,NBasis
-         write(LOUT,'(*(f13.8))') (F_mo(i,j),i=1,NBasis)
-      enddo
-
-      end block
-
-C          ElseIf(ICholesky==1) Then
+          ElseIf(ICholesky==1) Then
 C         Call FockGen_CholR(FockF,CholeskyVecs%R(1:NCholesky,1:NInte1),
 C    &                       GammaAB,XKin,NInte1,NCholesky,NBasis)
-C          EndIf
+C         test Cholesky
+          block
+          double precision :: F_mo(NBasis,NBasis)
+
+          Call CholeskyOTF_Fock(F_mo,CholeskyVecsOTF,AOBasis,System,
+     $                          transpose(UAux),XKin,GammaF,
+     $                          MemType,MemVal,NInte1,NBasis)
+          Call sq_to_triang2(F_mo,FockF,NBasis)
+          end block
+C
+          EndIf
+C
       ElseIf (IFunSR.Eq.1.Or.IFunSR.Eq.2.Or.IFunSR.Eq.4) Then
           If(ICholesky==0) Then
              Call FockGen_mithap(FockF,GammaAB,XKin,NInte1,NBasis,
@@ -1680,7 +1618,8 @@ C      print*,'GammaF:', norm2(GammaF)
 C      print*,'Fock:', norm2(FockF)
 C
 C      Call FockGen(FockF,GammaAB,XKin,TwoEl,NInte1,NBasis,NInte2)
-      Call MatTr(FockF,UAux,NBasis)
+C     transform Fock to MO if not CholeskyOTF
+      If(ICholesky==0) Call MatTr(FockF,UAux,NBasis)
 
 C     test Fock 2
       block
@@ -2044,7 +1983,7 @@ C
       Return
       End
 
-      Subroutine cholesky_ao_vectors(CholeskyVecsOTF, AOBasis, System, 
+      Subroutine CholeskyOTF_ao_vecs(CholeskyVecsOTF, AOBasis, System, 
      $                       XYZPath, BasisSetPath, 
      $                       SortAngularMomenta, Accuracy)
             use arithmetic
@@ -2088,7 +2027,106 @@ C
             !
             call chol_Rkpq_OTF(CholeskyVecsOTF, AOBasis, Accuracy)
 
-      end subroutine cholesky_ao_vectors
+      end subroutine CholeskyOTF_ao_vecs
+
+*Deck CholeskyOTF_Fock
+      Subroutine CholeskyOTF_Fock(F_mo,CholeskyVecsOTF,AOBasis,System,
+     $                            Cmat,H0in,GammaF,
+     $                            MemType,MemVal,NInte1,NBasis)
+
+      use print_units
+      use tran
+      use basis_sets
+      use sys_definitions
+      use Auto2eInterface
+      use CholeskyOTF, only: TCholeskyVecsOTF
+      use Cholesky_driver, only : chol_F
+
+      implicit none
+
+      type(TCholeskyVecsOTF), intent(in) :: CholeskyVecsOTF
+      type(TAOBasis), intent(in)         :: AOBasis
+      type(TSystem), intent(in)          :: System
+
+      integer,intent(in)          :: NInte1,NBasis
+      integer,intent(in)          :: MemType,MemVal
+      double precision,intent(in) :: H0in(NInte1)
+      double precision,intent(in) :: Cmat(NBasis,NBasis),
+     $                               GammaF(NInte1)
+      double precision,intent(out) :: F_mo(NBasis,NBasis)
+
+      integer          :: i, j
+      integer          :: MemMOTransfMB
+      double precision :: val, h0norm
+      double precision :: H0tr(NInte1)
+      double precision :: D_mo(NBasis,NBasis), H0_mo(NBasis,NBasis)
+      double precision, parameter :: ThreshH0 = 1d-6
+      integer,external :: IndSym
+C     
+C     transform H0 to MO
+      H0tr = H0in
+      call tran_matTr(H0tr,Cmat,Cmat,NBasis,.true.)
+      call triang_to_sq2(H0tr,H0_mo,NBasis)
+
+      write(6,*) 'H0   MO'
+      do j=1,NBasis
+         write(LOUT,'(*(f13.8))') (H0_mo(i,j),i=1,NBasis)
+      enddo
+      h0norm = norm2(H0_mo)
+      write(LOUT,'()')
+
+C     prepare density matrix
+      H0_mo = 0d0
+      D_mo  = 0d0
+      Do J=1,NBasis
+      Do I=1,NBasis
+         D_mo(I,J) = 2d0 * GammaF(IndSym(I,J))
+      EndDo
+      EndDo
+      write(6,*) 'DMAT MO'
+      do j=1,NBasis
+         write(LOUT,'(*(f13.8))') (D_mo(i,j),i=1,NBasis)
+      enddo
+      write(LOUT,'()')
+
+C      write(6,*) 'CAOMO  '
+C      do j=1,NBasis
+C         write(LOUT,'(*(f13.8))') (UAux(i,j),i=1,NBasis)
+C      enddo
+C      write(LOUT,'()')
+
+C     set memory for Fock transformation
+      if(MemType == 2) then       !MB
+         MemMOTransfMB = MemVal
+      elseif(MemType == 3) then   !GB
+         MemMOTransfMB = MemVal * 1024_8
+      endif
+C
+       call chol_F(F_mo,H0_mo,D_mo,Cmat,0.5d0,CholeskyVecsOTF,
+     $             AOBasis,System,ORBITAL_ORDERING_MOLPRO,MemMOTransfMB)
+
+      write(6,*) 'H0   MO -- new'
+      do j=1,NBasis
+         write(LOUT,'(*(f13.8))') (H0_mo(i,j),i=1,NBasis)
+      enddo
+      val = norm2(H0_mo)
+C
+      print*, 'H0 test = ',abs(val)-abs(h0norm)
+      if(abs(val)-abs(h0norm).gt.ThreshH0) then
+        print*, 'Difference in H0 norms = '
+        print*, abs(val)-abs(h0norm)
+        print*, 'Threshold = ',ThreshH0
+        print*, 'Maybe error in geometry / basis set?'
+        stop
+      endif
+
+      print*, 'FockF w bazie MO -- new'
+      print*, 'Fock = ',norm2(F_mo)
+      do j=1,NBasis
+         write(LOUT,'(*(f13.8))') (F_mo(i,j),i=1,NBasis)
+      enddo
+
+      End Subroutine CholeskyOTF_Fock
 
 *Deck DimSym
       Subroutine DimSym(NBasis,NInte1,NInte2,MxHVec,MaxXV)
