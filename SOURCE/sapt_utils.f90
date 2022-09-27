@@ -1663,7 +1663,7 @@ call free_DIIS(DIISBlock)
 end subroutine Cmat_diag_iterDIIS
 
 subroutine C_AlphaExpand(CTilde,C0Tilde,OmI,Max_Cn,A1,A2,ABP0Tilde,ABP1Tilde,&
-                         A0Blk,A0BlkIV,nblk,NCholesky,NDimX)
+                         A0Blk,A0BlkIV,nblk,NCholesky,NDimX,ErrMax,ifreq)
 !
 !  For a given frequency OmI, CTilde(Alpha=1) is computed by expanding
 !  around alpha=0 up to the order Max_Cn
@@ -1691,6 +1691,12 @@ type(EBlockData)             :: LambdaIV
 
 double precision, allocatable :: C1Tilde(:,:),C2Tilde(:,:)
 double precision, allocatable :: Work(:,:)
+! testing ErrMax
+integer :: ifreq
+double precision :: WFact,XNorm0,XNorm1,PI,FF
+double precision :: ErrMax
+
+PI = 4.0*ATAN(1.0)
 
 allocate(C1Tilde(NDimX,NCholesky),C2Tilde(NDimX,NCholesky),Work(NDimX,NCholesky))
 
@@ -1713,6 +1719,7 @@ CTilde = C0Tilde
 ! test semicoupled
 CTilde = CTilde + C1Tilde
 
+WFact = 4.D0/PI*OmI
 XFactorial = 1d0
 do N=2,Max_Cn
 
@@ -1724,6 +1731,11 @@ do N=2,Max_Cn
    call dgemm('N','N',NDimX,NCholesky,NDimX,XN1,A1,NDimX,C1Tilde,NDimX,1.0d0,Work,NDimX)
    call ABPM_HALFTRAN_GEN_L(Work,C2Tilde,0.0d0,Lambda,LambdaIV,nblk,NDimX,NCholesky,'X')
 
+   FF = WFact / XFactorial / (N+1)
+   XNorm1 = norm2(FF*C2Tilde)
+   write(6,'(X,"Order (n), |Delta_C|",I3,E14.4)') N, XNorm1
+   if(XNorm1.Lt.ErrMax) exit
+
    CTilde  = CTilde + C2Tilde / XFactorial
    C0Tilde = C1Tilde
    C1Tilde = C2Tilde
@@ -1733,6 +1745,8 @@ do N=2,Max_Cn
 enddo
 
 call release_ac0block(Lambda,LambdaIV,nblk)
+
+if(ifreq==1) ErrMax = norm2(FF*C2Tilde)
 
 deallocate(Work,C2Tilde,C1Tilde)
 
