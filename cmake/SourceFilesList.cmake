@@ -54,14 +54,6 @@ set(GAMMCOR_SOURCE
     SOURCE/types.f90
     SOURCE/vv10.f
     SOURCE/xcfun.f90
-    SOURCE/arithmetic.f90
-    SOURCE/io.f90
-    SOURCE/clock.f90
-    SOURCE/string.f90
-    SOURCE/sort.f90
-    SOURCE/display.f90
-    SOURCE/Cholesky.f90
-    SOURCE/Cholesky_old.f90
     SOURCE/tran_Chol.f90
 	SOURCE/iter_stats.f90
     SOURCE/C_integrator.f90
@@ -74,7 +66,6 @@ set(GAMMCOR_SOURCE
     SOURCE/lambda_calculator_projector.f90
     SOURCE/ac_iter.f
     SOURCE/ac_fofo.f90
-    SOURCE/sorter_Cholesky.f90
     SOURCE/sapt_Chol_pol.f90
     SOURCE/sapt_Chol_exch.f90
     SOURCE/ab0fofo.f90
