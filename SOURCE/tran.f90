@@ -1070,44 +1070,83 @@ double precision,intent(inout) :: AOUT(DimL,DimR)
 type(EBlockData),intent(in) :: EBlock(nblk),EBlockIV
 
 integer :: i,ii,ipos,iblk
+integer :: maxEBlockN
 double precision,allocatable :: ABP(:,:),ABM(:,:)
 
 AOUT = fact*AOUT
 
+maxEBlockN = maxval(EBlock%n)
+if(maxEBlockN > 1) allocate(ABP(maxEBlockN,DimR),ABM(maxEBlockN,DimR))
+
+select case(xyvar)
+case('Y','y')
+
 do iblk=1,nblk
    associate(iB => Eblock(iblk))
 
-     allocate(ABP(iB%n,DimR),ABM(iB%n,DimR))
+     if(iB%n==1) then
 
-     do i=1,iB%n
-        ipos = iB%pos(i)
-        ABP(i,:) = AMAT(ipos,:)
-     enddo
+        ipos = iB%pos(1)
+        AOUT(ipos,:) = iB%matY(1,1)*AMAT(ipos,:)
 
-     select case(xyvar)
-     case('Y','y')
-       call dgemm('N','N',iB%n,DimR,iB%n,1d0,iB%matY,iB%n,ABP,iB%n,0d0,ABM,iB%n)
-     case('X','x')
-       call dgemm('N','N',iB%n,DimR,iB%n,1d0,iB%matX,iB%n,ABP,iB%n,0d0,ABM,iB%n)
-     case default
-       write(lout,'(a)') 'Error in ABPM_HALFTRAN_LR!'
-       stop
-     end select
+     else
 
-     do i=1,iB%n
-        ipos = iB%pos(i)
-        AOUT(ipos,:) = ABM(i,:)
-     enddo
+        do i=1,iB%n
+           ipos = iB%pos(i)
+           ABP(i,:) = AMAT(ipos,:)
+        enddo
 
-     deallocate(ABM,ABP)
+        call dgemm('N','N',iB%n,DimR,iB%n,1d0,iB%matY,iB%n,ABP,maxEBlockN,0d0,ABM,maxEBlockN)
+
+        do i=1,iB%n
+           ipos = iB%pos(i)
+           AOUT(ipos,:) = ABM(i,:)
+        enddo
+
+     endif
 
    end associate
 enddo
 
+case('X','x')
+
+do iblk=1,nblk
+   associate(iB => Eblock(iblk))
+
+     if(iB%n==1) then
+
+        ipos = iB%pos(1)
+        AOUT(ipos,:) = iB%matX(1,1)*AMAT(ipos,:)
+
+     else
+
+        do i=1,iB%n
+           ipos = iB%pos(i)
+           ABP(i,:) = AMAT(ipos,:)
+        enddo
+
+        call dgemm('N','N',iB%n,DimR,iB%n,1d0,iB%matX,iB%n,ABP,maxEBlockN,0d0,ABM,maxEBlockN)
+
+        do i=1,iB%n
+           ipos = iB%pos(i)
+           AOUT(ipos,:) = ABM(i,:)
+        enddo
+
+     endif
+
+   end associate
+enddo
+
+case default
+  write(lout,'(a)') 'Error in ABPM_HALFTRAN_LR!'
+  stop
+end select
+
+if(maxEBlockN > 1) deallocate(ABM,ABP)
+
 associate(B => EblockIV)
 
   do i=1,B%n
-     ii = B%l1+i-1
      ipos = B%pos(i)
      AOUT(ipos,:) = B%vec(i)*AMAT(ipos,:)
   enddo
@@ -1128,45 +1167,83 @@ double precision,intent(inout) :: AOUT(DimL,DimR)
 type(EBlockData),intent(in) :: EBlock(nblk),EBlockIV
 
 integer :: i,ii,ipos,iblk
+integer :: maxEBlockN
 double precision,allocatable :: ABP(:,:),ABM(:,:)
 
 AOUT = fact*AOUT
 
-do iblk=1,nblk
-   associate(iB => Eblock(iblk))
+maxEBlockN = maxval(EBlock%n)
+if(maxEBlockN > 1) allocate(ABP(DimL,maxEBlockN),ABM(DimL,maxEBlockN))
 
-     !allocate(ABP(iB%n,DimR),ABM(iB%n,DimR))
-     allocate(ABP(DimL,iB%n),ABM(DimL,iB%n))
+select case(xyvar)
+case('Y','y')
 
-     do i=1,iB%n
-        ipos = iB%pos(i)
-        ABP(:,i) = AMAT(:,ipos)
-     enddo
+   do iblk=1,nblk
+      associate(iB => Eblock(iblk))
 
-     select case(xyvar)
-     case('Y','y')
-       call dgemm('N','N',DimL,iB%n,iB%n,1d0,ABP,DimL,iB%matY,iB%n,0d0,ABM,DimL)
-     case('X','x')
-       call dgemm('N','N',DimL,iB%n,iB%n,1d0,ABP,DimL,iB%matX,iB%n,0d0,ABM,DimL)
-     case default
-       write(lout,'(a)') 'Error in ABPM_HALFTRAN_LR!'
-       stop
-     end select
+        if(iB%n==1) then
 
-     do i=1,iB%n
-        ipos = iB%pos(i)
-        AOUT(:,ipos) = AOUT(:,ipos) + ABM(:,i)
-     enddo
+           ipos = iB%pos(1)
+           AOUT(:,ipos) = AOUT(:,ipos) + iB%matY(1,1)*AMAT(:,ipos)
 
-     deallocate(ABM,ABP)
+        else
+   
+           do i=1,iB%n
+              ipos = iB%pos(i)
+              ABP(:,i) = AMAT(:,ipos)
+           enddo
+   
+           call dgemm('N','N',DimL,iB%n,iB%n,1d0,ABP,DimL,iB%matY,iB%n,0d0,ABM,DimL)
 
-   end associate
-enddo
+           do i=1,iB%n
+              ipos = iB%pos(i)
+              AOUT(:,ipos) = AOUT(:,ipos) + ABM(:,i)
+           enddo
+
+        endif
+
+      end associate
+   enddo
+
+case('X','x')
+
+   do iblk=1,nblk
+      associate(iB => Eblock(iblk))
+
+        if(iB%n==1) then
+
+           ipos = iB%pos(1)
+           AOUT(:,ipos) = AOUT(:,ipos) + iB%matX(1,1)*AMAT(:,ipos)
+
+        else
+
+           do i=1,iB%n
+              ipos = iB%pos(i)
+              ABP(:,i) = AMAT(:,ipos)
+           enddo
+   
+           call dgemm('N','N',DimL,iB%n,iB%n,1d0,ABP,DimL,iB%matX,iB%n,0d0,ABM,DimL)
+
+           do i=1,iB%n
+              ipos = iB%pos(i)
+              AOUT(:,ipos) = AOUT(:,ipos) + ABM(:,i)
+           enddo
+
+        endif
+
+      end associate
+   enddo
+
+case default
+  write(lout,'(a)') 'Error in ABPM_HALFTRAN_LR!'
+  stop
+end select
+
+if(maxEBlockN > 1) deallocate(ABM,ABP)
 
 associate(B => EblockIV)
 
   do i=1,B%n
-     ii = B%l1+i-1
      ipos = B%pos(i)
      AOUT(:,ipos) = AOUT(:,ipos) + B%vec(i)*AMAT(:,ipos)
   enddo

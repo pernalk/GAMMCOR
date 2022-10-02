@@ -1638,6 +1638,11 @@ endif
     mon%num1 = mon%NAct
  endif
 
+! some prints
+ print*, 'num0',mon%num0
+ print*, 'num1',mon%num1
+ print*, 'num2',mon%num2
+
 ! active pairs
  allocate(mon%IPair(nbas,nbas),mon%IndX(mon%NDim),mon%IndN(2,mon%NDim))
 
