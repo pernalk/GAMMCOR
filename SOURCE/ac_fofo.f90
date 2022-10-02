@@ -1195,13 +1195,15 @@ subroutine CIter_FOFO(PMat,ECorr,ACAlpha,XOne,URe,Occ,EGOne,NGOcc,&
    COMTildeAct=0d0
 
    ! Create iteration algorithm object
-   iterAlgo = IterAlgorithmDIIS(Threshold=1d-4, DIISN=6, maxIterations=30)
-!    iterAlgo = IterAlgorithmDamping(Threshold=1d-4, XMix=0.2, maxIterations=-1)
+   !iterAlgo = IterAlgorithmDIIS(Threshold=1d-4, DIISN=6, maxIterations=30)
+   !!iterAlgo = IterAlgorithmDamping(Threshold=1d-4, XMix=0.2, maxIterations=-1)
+   allocate(iterAlgo,SOURCE=IterAlgorithmDIIS(Threshold=1d-4, DIISN=6, maxIterations=30))
 
    ! Create A0 calculator object
-!    lambdaCalc = LambdaCalculatorDiag(NDimX, A2)
-   LambdaCalc = LambdaCalculatorBlock(NDimX, A2, URe, Occ, XOne, IndN, IndX, IGem, NBasis, NAct, INActive, NInte1)
-!    LambdaCalc = LambdaCalculatorProjector(NDimX, A2, PMat)
+!!    lambdaCalc = LambdaCalculatorDiag(NDimX, A2)
+   !LambdaCalc = LambdaCalculatorBlock(NDimX, A2, URe, Occ, XOne, IndN, IndX, IGem, NBasis, NAct, INActive, NInte1)
+   allocate(LambdaCalc,SOURCE=LambdaCalculatorBlock(NDimX, A2, URe, Occ, XOne, IndN, IndX, IGem, NBasis, NAct, INActive, NInte1))
+!!    LambdaCalc = LambdaCalculatorProjector(NDimX, A2, PMat)
 
    NGrid = 35
    CIntegr = CIntegrator(iterAlgo=iterAlgo, lambdaCalc=lambdaCalc)
@@ -1212,8 +1214,8 @@ subroutine CIter_FOFO(PMat,ECorr,ACAlpha,XOne,URe,Occ,EGOne,NGOcc,&
    ! Free memory
    call lambdaCalc%clean()
    call CIntegr%clean()
-   deallocate(iterAlgo,lambdaCalc)
-   ! ==========================================================================================================================  
+   deallocate(iterAlgo,LambdaCalc)
+   ! ==========================================================================================================================
 
    allocate(WorkD(NDimX,NCholesky))
    WorkD=0

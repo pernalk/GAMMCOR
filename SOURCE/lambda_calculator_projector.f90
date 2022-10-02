@@ -31,6 +31,9 @@ module class_LambdaCalculatorProjector
             double precision, intent(in) :: A2(NDimx*NDimX), PMat(NDimX,NDimX)
 
             new%NDimX = NDimX
+            allocate(new%A2(new%NDimX*new%NDimX))
+            allocate(new%Pmat(new%NDimX,new%NDimX))
+
             new%A2 = A2
             new%PMat = PMat
             

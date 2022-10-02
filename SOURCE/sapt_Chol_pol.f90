@@ -643,11 +643,14 @@ allocate(AB0A(A%NDimX,A%NDimX),AB0B(B%NDimX,B%NDimX))
 
 call FreqGrid(XFreq,WFreq,NFreq)
 
-iterAlgo = IterAlgorithmDIIS(Threshold=1d-3, DIISN=6, maxIterations=20)
+!iterAlgo = IterAlgorithmDIIS(Threshold=1d-3, DIISN=6, maxIterations=20)
+allocate(iterAlgo,SOURCE = IterAlgorithmDIIS(Threshold=1d-3, DIISN=6, maxIterations=20))
 
 if(project) then
-   LambdaCalcA = LambdaCalculatorProjector(A%NDimX,ABPMA,A%Pmat)
-   LambdaCalcB = LambdaCalculatorProjector(B%NDimX,ABPMB,B%Pmat)
+   !LambdaCalcA = LambdaCalculatorProjector(A%NDimX,ABPMA,A%Pmat)
+   !LambdaCalcB = LambdaCalculatorProjector(B%NDimX,ABPMB,B%Pmat)
+   allocate(LambdaCalcA, SOURCE = LambdaCalculatorProjector(A%NDimX,ABPMA,A%Pmat))
+   allocate(LambdaCalcB, SOURCE = LambdaCalculatorProjector(B%NDimX,ABPMB,B%Pmat))
 else
  !  LambdaCalcA = LambdaCalculatorDiag(A%NDimX,ABPMA)
  !  LambdaCalcB = LambdaCalculatorDiag(B%NDimX,ABPMB)
@@ -1058,6 +1061,8 @@ maxIter = 20
 iStatsA%maxIterationsLimit = maxIter
 iStatsB%maxIterationsLimit = maxIter
 
+allocate(LambdaA(nblkA),LambdaB(nblkB))
+
 e2d = 0
 do ifreq=NFreq,1,-1
 
@@ -1258,7 +1263,8 @@ allocate(LambdaA(A%NDimX,A%NDimX),LambdaB(B%NDimX,B%NDimX))
 
 call FreqGrid(XFreq,WFreq,NFreq)
 
-iterAlgo = IterAlgorithmDIIS(Threshold=1d-3, DIISN=6, maxIterations=20)
+!iterAlgo = IterAlgorithmDIIS(Threshold=1d-3, DIISN=6, maxIterations=20)
+allocate(iterAlgo, SOURCE = IterAlgorithmDIIS(Threshold=1d-3, DIISN=6, maxIterations=20))
 
 iStatsA%maxIterationsLimit = iterAlgo%maxIterations
 iStatsB%maxIterationsLimit = iterAlgo%maxIterations

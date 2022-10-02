@@ -422,13 +422,14 @@ if(Flags%ICASSCF==0.and.Flags%ISERPA==0) then
   !ECorr = 0
 
   if(Flags%ICholesky==1) then
-     ! sub-snippet for testing Pmat
-     allocate(Mon%Pmat(Mon%NDimX,Mon%NDimX))
      open(newunit=iunit,file='cholvecs',form='unformatted')
      write(iunit) Mon%NChol
      write(iunit) Mon%FF
      close(iunit)
 
+     ! sub-snippet for testing Pmat
+     ! uncomment this for e2disp_Cmat_Chol / e2disp_Cmat_Chol_proj
+     !allocate(Mon%Pmat(Mon%NDimX,Mon%NDimX))
      !call Project_DChol(Mon%PMat,Mon%IndN,NBas,Mon%NDimX)
 
      !call CIter_FOFO(PMat,ECorr,ACAlpha,XOne,URe,Mon%Occ,EGOne,NGOcc,&
