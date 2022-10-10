@@ -107,7 +107,7 @@ subroutine WIter_D12Chol(ECorr,AC1,Max_Cn,XOne,URe,Occ,EGOne,NGOcc,&
 use abfofo
 use systemdef
 ! only to use Y01CAS_FOFO
-use ab0fofo
+!use ab0fofo
 use sapt_utils
 
 implicit none
@@ -119,9 +119,6 @@ double precision :: ACAlpha
 double precision,intent(in) :: URe(NBasis,NBasis),Occ(NBasis),XONe(NInte1)
 double precision :: ECorr,ECorrAct,EGOne(NGem)
 double precision :: XFreq(100),WFreq(100)
-! test using Y01CAS_FOFO
-double precision :: ETot
-double precision :: CICoef(NBasis)
 
 integer :: iunit,NOccup
 integer :: ia,ib,ic,id,ICol,IRow
@@ -136,14 +133,13 @@ double precision, allocatable :: DChol(:,:),DCholT(:,:),DCholAct(:,:),DCholActT(
 double precision, allocatable :: APLUS0Tilde(:), APLUS1Tilde(:),  &
                                  A1(:),A2(:), &
                                  COMTilde(:),ABPLUS0(:),ABMIN0(:),ABPLUS1(:),ABMIN1(:), &
-                                 LAMBDA(:), &
                                  C0Tilde(:),C1Tilde(:),C2Tilde(:), &
                                  WORK0(:)
 integer :: NCholesky
 
 integer :: nblk
-type(EblockData) :: A0blockIV
-type(EblockData),allocatable :: A0block(:)
+type(EblockData) :: A0blockIV,LambdaIV
+type(EblockData),allocatable :: A0block(:),Lambda(:)
 
 interface
 subroutine read_D12_array(NCholesky, DChol, DCholAct, NDimX, NBasis, IndN, Occ, IndAux)
@@ -179,26 +175,13 @@ IntKFile = twokfile
 
 allocate(ABPLUS1(NDimX*NDimX),ABMIN1(NDimX*NDimX))
 
-! test 1
-! plan: get to halftransformations: if they work,
-!       go back and replace Y01CAS_FOFO with AC0BLOCK
-!       extended to saving A+(0) and A-(0)
-!
-! Y01CAS_FOFO dumps zero-order response X,Y vectors
-print*, 'test y01cas_fofo...'
-call Y01CAS_FOFO(Occ,URe,XOne,ABPlus1,ABMin1,ETot, &
-       'DUMMY0','DUMMY1', &
-       'DUMY01','XY0',    &
-       IndN,IndX,IGem,NAct,INActive,NDimX, &
-       NBasis,NDimX,NInte1,1,'DUMMY','FFOO','FOFO',1)
-
-! get A0PLUS, A0MIN in blocks matY and matX
+! AC0BLOCK with ver=0 stores A-(0) and A+(0) matrices
+!                            in X and Y, respectively
 nblk = 1 + NBasis - NAct
-do i=1,NBasis
-   CICoef(i) = sign(sqrt(Occ(i)),Occ(i)-0.5d0)
-enddo
-call Sblock_to_ABMAT(A0Block,A0BlockIV,IndN,CICoef,nblk,NBasis,NDimX,'XY0')
-! A0Block stores A+(0) and A-(0) in blocks
+allocate(A0block(nblk))
+Call AC0BLOCK(Occ,URe,XOne, &
+     IndN,IndX,IGem,NAct,INActive,NDimX,NBasis,NDimX,NInte1,'FFOO','FOFO', &
+     A0BlockIV,A0Block,nblk,0,'DUMMY',0)
 
 ! get AB1PLUS and AB1MIN
 ACAlpha=1.D0
@@ -212,46 +195,33 @@ Call sq_symmetrize(ABMIN1,NDimX)
 ! AB1 = AB1 - A0
 call add_blk_right(ABPLUS1,A0Block,A0BlockIV,-1d0,.false.,nblk,NDimX)
 call add_blk_right(ABMIN1, A0Block,A0BlockIV,-1d0,.true., nblk,NDimX)
-print*, 'add_blk_right: ABPLUS1',norm2(ABPLUS1)
-print*, 'add_blk_right: ABMIN1 ',norm2(ABMIN1)
+!print*, 'add_blk_right: ABPLUS1',norm2(ABPLUS1)
+!print*, 'add_blk_right: ABMIN1 ',norm2(ABMIN1)
 
-!Calc: A1 = ABP0*ABM1+ABP1*ABM0
+!Calc: A1=ABPLUS0*ABMIN1+ABPLUS1*ABMIN0
 allocate(A1(NDimX*NDimX))
 call ABPM_HALFTRAN_GEN_L(ABMIN1, A1,0.0d0,A0Block,A0BlockIV,nblk,NDimX,NDimX,'Y')
 call ABPM_HALFTRAN_GEN_R(ABPLUS1,A1,1.0d0,A0Block,A0BlockIV,nblk,NDimX,NDimX,'X')
-print*, 'A1',norm2(A1)
-
-!stop "look at your files"
+!print*, 'A1',norm2(A1)
 
 EGOne(1)=ECASSCF
-
-!!Calc: A1=ABPLUS0*ABMIN1+ABPLUS1*ABMIN0 ! old
-!allocate(A1(NDimX*NDimX))
-!Call dgemm('N','N',NDimX,NDimX,NDimX,1d0,ABPLUS0,NDimX,ABMIN1,NDimX,0.0d0,A1,NDimX)
-!Call dgemm('N','N',NDimX,NDimX,NDimX,1d0,ABPLUS1,NDimX,ABMIN0,NDimX,1d0,A1,NDimX)
-!deallocate(ABMIN0)
 
 ! this should be fixed (N^6 step!)
 !Calc: A2=ABPLUS1*ABMIN1
 allocate(A2(NDimX*NDimX))
 Call dgemm('N','N',NDimX,NDimX,NDimX,1d0,ABPLUS1,NDimX,ABMIN1,NDimX,0.0d0,A2,NDimX)
-print*, 'A2:',norm2(A2)
+!print*, 'A2:',norm2(A2)
 deallocate(ABMIN1)
 
 !Calc: APLUS0Tilde=ABPLUS0.DChol
 allocate(APLUS0Tilde(NDimX*NCholesky))
 call ABPM_HALFTRAN_GEN_L(DCholT,APLUS0Tilde,0.0d0,A0Block,A0BlockIV,nblk,NDimX,NCholesky,'Y')
-print*, 'A0PT  ',norm2(APLUS0Tilde)
-
-!!Calc: APLUS0Tilde=ABPLUS0.DChol ! old
-!allocate(APLUS0Tilde(NDimX*NCholesky))
-!Call dgemm('N','N',NDimX,NCholesky,NDimX,1d0,ABPLUS0,NDimX,DCholT,NDimX,0.0d0,APLUS0Tilde,NDimX)
-!deallocate(ABPLUS0)
+!print*, 'A0PT  ',norm2(APLUS0Tilde)
 
 !Calc: APLUS1Tilde=ABPLUS1.DChol
 allocate(APLUS1Tilde(NDimX*NCholesky))
 Call dgemm('N','N',NDimX,NCholesky,NDimX,1d0,ABPLUS1,NDimX,DCholT,NDimX,0.0d0,APLUS1Tilde,NDimX)
-print*, 'A1PT  ',norm2(APLUS1Tilde)
+!print*, 'A1PT  ',norm2(APLUS1Tilde)
 deallocate(ABPLUS1)
 
 deallocate(A0block)
@@ -264,28 +234,29 @@ nblk = 1 + NBasis - NAct
 allocate(A0block(nblk))
 Call AC0BLOCK(Occ,URe,XOne, &
      IndN,IndX,IGem,NAct,INActive,NDimX,NBasis,NDimX,NInte1,'FFOO','FOFO', &
-     A0BlockIV,A0Block,nblk,'A0BLK',0)
+     A0BlockIV,A0Block,nblk,1,'A0BLK',0)
 
 allocate(COMTilde(NDimX*NCholesky))
 COMTilde=0.0
 
 allocate(C0Tilde(NDimX*NCholesky),C1Tilde(NDimX*NCholesky),C2Tilde(NDimX*NCholesky),WORK0(NDimX*NCholesky))
-allocate(LAMBDA(NDimX*NDimX))
+allocate(Lambda(nblk))
 
 Do IGL=1,NGrid
    OmI=XFreq(IGL)
    WFact=4.D0/PI*WFreq(IGL)
 
 !  Calc: LAMBDA=(A0+Om^2)^-1
-   Call INV_AC0BLK(OmI**2,LAMBDA,A0Block,A0BlockIV,nblk,NDimX)
+   Call INV_AC0BLK(OmI**2,Lambda,LambdaIV,A0Block,A0BlockIV,nblk,NDimX)
 
 !  Calc: C0Tilde=1/2 LAMBDA.APLUS0Tilde
-   Call dgemm('N','N',NDimX,NCholesky,NDimX,0.5d0,LAMBDA,NDimX,APLUS0Tilde,NDimX,0.0d0,C0Tilde,NDimX)
+   Call ABPM_HALFTRAN_GEN_L(APLUS0Tilde,C0Tilde,0.0d0,Lambda,LambdaIV,nblk,NDimX,NCholesky,'X')
+   C0Tilde = 0.5d0*C0Tilde
 
 !  Calc: C1Tilde=LAMBDA.(1/2 APLUS1Tilde - A1.C0Tilde)
    Call dgemm('N','N',NDimX,NCholesky,NDimX,1.d0,A1,NDimX,C0Tilde,NDimX,0.0d0,WORK0,NDimX)
-   WORK0=0.5d0*APLUS1Tilde-WORK0
-   Call dgemm('N','N',NDimX,NCholesky,NDimX,1.d0,LAMBDA,NDimX,WORK0,NDimX,0.0d0,C1Tilde,NDimX)
+   WORK0 = 0.5d0*APLUS1Tilde - WORK0
+   Call ABPM_HALFTRAN_GEN_L(WORK0,C1Tilde,0.0d0,Lambda,LambdaIV,nblk,NDimX,NCholesky,'X')
 
    COMTilde=COMTilde+WFact*0.5d0*C1Tilde
 
@@ -297,7 +268,8 @@ Do IGL=1,NGrid
        XN2=-N*(N-1)
        Call dgemm('N','N',NDimX,NCholesky,NDimX,XN2,A2,NDimX,C0Tilde,NDimX,0.0d0,WORK0,NDimX)
        Call dgemm('N','N',NDimX,NCholesky,NDimX,XN1,A1,NDimX,C1Tilde,NDimX,1.0d0,WORK0,NDimX)
-       Call dgemm('N','N',NDimX,NCholesky,NDimX,1.0d0,LAMBDA,NDimX,WORK0,NDimX,0.0d0,C2Tilde,NDimX)
+       Call ABPM_HALFTRAN_GEN_L(Work0,C2Tilde,0.0d0,Lambda,LambdaIV,nblk,NDimX,NCholesky,'X')
+       !Call dgemm('N','N',NDimX,NCholesky,NDimX,1.0d0,LAMBDA,NDimX,WORK0,NDimX,0.0d0,C2Tilde,NDimX)
        FF=WFact/XFactorial/(N+1)
        If(AC1.Eq.1) FF=WFact/XFactorial/2.D0
        If(MOD(N,2).Eq.0) Then
@@ -469,7 +441,7 @@ Do IGL=1,NGrid
    WFact=4.D0/PI*WFreq(IGL)
 
 !  Calc: LAMBDA=(A0+Om^2)^-1
-   Call INV_AC0BLK(OmI**2,LAMBDA,A0Block,A0BlockIV,nblk,NDimX)
+   Call INV_AC0BLK_OLD(OmI**2,LAMBDA,A0Block,A0BlockIV,nblk,NDimX)
 
    Do K=1,2
 
@@ -1383,9 +1355,11 @@ end subroutine read_D_array
 
 subroutine AC0BLOCK(Occ,URe,XOne, &
                     IndN,IndX,IGemIN,NAct,INActive,NDimX,NBasis,NDim,NInte1, &
-                    IntJFile,IntKFile,A0BlockIV,A0block,nblk,dumpfile,dump)
+                    IntJFile,IntKFile,A0BlockIV,A0block,nblk,ver,dumpfile,dump)
 !
-!     A ROUTINE FOR COMPUTING A0=ABPLUS^{(0)}.ABMIN^{(0)}
+!     A ROUTINE FOR COMPUTING : a) ver=0  ABPLUS^{(0)} and ABMIN^{(0)}
+!                                         (stored in matY and matX, respectively)
+!                               b) ver=1  A0=ABPLUS^{(0)}.ABMIN^{(0)}
 !                 (FOFO VERSION)
 !
 use abfofo
@@ -1400,7 +1374,7 @@ integer                      :: nblk
 double precision,intent(in)  :: URe(NBasis,NBasis),Occ(NBasis),XOne(NInte1)
 character(*)                 :: IntJFile,IntKFile
 character(*)                 :: dumpfile
-integer,intent(in)           :: dump
+integer,intent(in)           :: ver,dump
 
 integer          :: iunit
 integer          :: NOccup
@@ -1494,14 +1468,14 @@ nblk = 0
 !pack AA
 if(nAA>0) then
    nblk = nblk + 1
-   call pack_A0block(ABPLUS,ABMIN,nAA,limAA(1),limAA(2),tmpAA,A0block(nblk),NDimX)
+   call pack_A0block(ABPLUS,ABMIN,nAA,limAA(1),limAA(2),tmpAA,A0block(nblk),NDimX,ver)
 endif
 !pack AI
 do iq=1,INActive
    if(nAI(iq)>0) then
       nblk = nblk + 1
       call pack_A0block(ABPLUS,ABMIN,nAI(iq),limAI(1,iq),limAI(2,iq),tmpAI(1:nAI(iq),iq),&
-                        A0block(nblk),NDimX)
+                        A0block(nblk),NDimX,ver)
    endif
 enddo
 !pack AV
@@ -1509,7 +1483,7 @@ do ip=NOccup+1,NBasis
    if(nAV(ip)>0) then
       nblk = nblk + 1
       call pack_A0block(ABPLUS,ABMIN,nAV(ip),limAV(1,ip),limAV(2,ip),tmpAV(1:nAV(ip),ip),&
-                        A0block(nblk),NDimX)
+                        A0block(nblk),NDimX,ver)
     endif
 enddo
 !pack IV
@@ -1522,10 +1496,18 @@ associate(B => A0blockIV)
   B%pos(1:B%n) = tmpIV(1:B%n)
 
   allocate(B%vec(B%n))
-  do i=1,B%n
-     ii = B%l1+i-1
-     B%vec(i) = ABPLUS(ii,ii)*ABMIN(ii,ii)
-  enddo
+
+  if(ver==0) then
+     do i=1,B%n
+        ii = B%l1+i-1
+        B%vec(i) = ABPLUS(ii,ii)
+     enddo
+  elseif(ver==1) then
+     do i=1,B%n
+        ii = B%l1+i-1
+        B%vec(i) = ABPLUS(ii,ii)*ABMIN(ii,ii)
+     enddo
+  endif
 
 end associate
 
@@ -1559,9 +1541,67 @@ endif
 
 end subroutine AC0BLOCK
 
-subroutine INV_AC0BLK(omega,A0Inv,A0Block,A0BlockIV,nblk,NDimX)
+subroutine INV_AC0BLK(omega,Lambda,LambdaIV,A0Block,A0BlockIV,nblk,NDimX)
+!
 ! Calculate A0Inv=(A0+Om^2)^-1
-!use types,only : EblockData
+! (note: this is the same as calculateLambda_blk in SAPT)
+!
+use blocktypes
+
+integer,intent(in)           :: nblk,NDimX
+double precision,intent(in)  :: omega
+type(EblockData),intent(in)  :: A0block(nblk), A0blockIV
+
+type(EblockData),intent(out) :: Lambda(nblk), LambdaIV
+
+integer             :: i,j,ipos,jpos,info
+integer,allocatable :: ipiv(:)
+double precision,allocatable :: work(:)
+
+Lambda = A0block
+
+do iblk=1,nblk
+   associate(B => Lambda(iblk))
+
+     if(B%n == 1) then
+        ! hartree-fock case
+        B%matX(1,1) = 1d0 / (B%matX(1,1) + omega)
+     else
+        ! more than 1 active orbital
+        allocate(ipiv(B%n),work(B%n))
+
+        do i=1,B%n
+            B%matX(i,i) = B%matX(i,i) + omega
+        enddo
+
+        call dgetrf(B%n,B%n,B%matX,B%n,ipiv,info)
+        call dgetri(B%n,B%matX,B%n,ipiv,work,B%n,info)
+
+        deallocate(work,ipiv)
+     endif
+
+   end associate
+enddo
+
+! IV block
+associate(B => A0blockIV, A => LambdaIV)
+  A%n = B%n
+  A%l1 = B%l1
+  A%l2 = B%l2
+  allocate(A%pos(A%n),A%vec(A%n))
+  A%pos = B%pos
+  do i=1,B%n
+     ii = B%pos(i)
+     A%vec(i) = 1d0 / (B%vec(i) + omega)
+  enddo
+end associate
+
+end subroutine INV_AC0BLK
+
+subroutine INV_AC0BLK_OLD(omega,A0Inv,A0Block,A0BlockIV,nblk,NDimX)
+!
+! Calculate A0Inv=(A0+Om^2)^-1 and return full A0inv matrix!
+!
 use blocktypes
 
 type(EblockData)   :: A0block(nblk), A0blockIV
@@ -1588,6 +1628,7 @@ do iblk=1,nblk
 
      call dgetrf(B%n,B%n,B%matX,B%n,ipiv,info)
      call dgetri(B%n,B%matX,B%n,ipiv,work,B%n,info)
+
      ! assign places in work(NDimX,NDimX) matrix
      do j=1,B%n
         jpos=B%pos(j)
@@ -1609,9 +1650,8 @@ do i=1,B%n
    A0Inv(ii,ii) = 1d0 / (B%vec(i) + omega)
 enddo
 end associate
-!print*, 'test2-2:',norm2(A0Inv)
 
-end subroutine INV_AC0BLK
+end subroutine INV_AC0BLK_OLD
 
 subroutine RELEASE_AC0BLOCK(A0block,A0blockIV,nblk)
 
@@ -1723,15 +1763,18 @@ deallocate(work)
 
 end subroutine READ_AC0BLK
 
-subroutine pack_A0block(ABPLUS,ABMIN,nVal,lim1,lim2,tmpMat,Eblock,NDimX)
-
-!use types,only : EblockData
+subroutine pack_A0block(ABPLUS,ABMIN,nVal,lim1,lim2,tmpMat,Eblock,NDimX,ver)
+!
+! packs either :  ver = 0 , ABP, ABM (stored in matY and matX, respectively)
+!                 ver = 1 ABP.ABM    (stored in matX)
+!
 use blocktypes
 
 implicit none
 
 integer,intent(in) :: NDimX
 integer,intent(in) :: nVal,lim1,lim2,tmpMat(nVal)
+integer,intent(in) :: ver
 double precision :: ABPLUS(NDimX,NDimX),ABMIN(NDimX,NDimX)
 type(EblockData) :: Eblock(1)
 double precision,allocatable :: ABP(:,:),ABM(:,:)
@@ -1744,14 +1787,20 @@ associate(B => Eblock(1))
   B%pos(1:B%n) = tmpMat(1:B%n)
 
   !allocate(B%vec(B%n),B%matX(B%n,B%n),B%matY(B%n,B%n))
-  allocate(B%matX(B%n,B%n))
   allocate(ABP(B%n,B%n),ABM(B%n,B%n))
-
   ABP = ABPLUS(B%l1:B%l2,B%l1:B%l2)
   ABM = ABMIN(B%l1:B%l2,B%l1:B%l2)
-
-  call dgemm('N','N',B%n,B%n,B%n,1d0,ABP,B%n,ABM,B%n,0d0,B%matX,B%n)
-
+  if(ver == 0) then
+     allocate(B%matX(B%n,B%n),B%matY(B%n,B%n))
+     B%matX = ABM
+     B%matY = ABP
+  elseif(ver == 1) then
+     allocate(B%matX(B%n,B%n))
+     call dgemm('N','N',B%n,B%n,B%n,1d0,ABP,B%n,ABM,B%n,0d0,B%matX,B%n)
+  else
+     write(*,*) 'Wrong call for pack_A0block',ver
+     stop
+  endif
   deallocate(ABM,ABP)
 
 end associate
