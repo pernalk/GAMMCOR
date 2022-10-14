@@ -580,7 +580,7 @@ end associate
 ! AB(1) PART
 call AB_CAS_FOFO(ABPLUS,ABMIN,val,URe,Occ,XOne,&
               IndN,IndX,IGem,NAct,INActive,NDimX,NBasis,NDimX,&
-              NInte1,IntJFile,IntKFile,1d0,.true.)
+              NInte1,IntJFile,IntKFile,ICholesky,1d0,.true.)
 
 !call clock('AB(1)',Tcpu,Twall)
 
@@ -896,7 +896,7 @@ if(IFlag0==0) then
    ! AB(1) PART
    call AB_CAS_FOFO(ABPLUS,ABMIN,EnDummy,URe,Occ,XOne,&
                     IndN,IndX,IGem,NAct,INActive,NDimX,NBasis,NDimX,&
-                    NInte1,IntJFile,IntKFile,1d0,.true.)
+                    NInte1,IntJFile,IntKFile,ICholesky,1d0,.true.)
 
    !call clock('ABPM(1)',Tcpu,Twall)
 
@@ -1003,7 +1003,7 @@ subroutine Y01CASLR_FOFO(Occ,URe,XOne,ABPLUS,ABMIN, &
      SRKer,Wt,OrbGrid, &
      propfile0,propfile1,xy0file, &
      IndN,IndX,IGemIN,NAct,INActive,NGrid,NDimX,NBasis,NDim,NInte1, &
-     NoSt,IntFileName,IntJFile,IntKFile,IFlag0,IFunSRKer,ETot,ECorr)
+     NoSt,IntFileName,IntJFile,IntKFile,ICholesky,IFlag0,IFunSRKer,ETot,ECorr)
 !
 !     CAREFUL! IFlag=0 not ready yet!
 !
@@ -1019,6 +1019,7 @@ use timing
 
 implicit none
 integer,intent(in) :: NAct,INActive,NGrid,NDimX,NBasis,NDim,NInte1,NoSt
+integer,intent(in) :: ICholesky
 character(*)       :: IntFileName,IntJFile,IntKFile
 character(*)       :: propfile0,propfile1,xy0filE
 double precision,intent(out) :: ABPLUS(NDimX,NDimX),ABMIN(NDimX,NDimX)
@@ -1464,7 +1465,7 @@ if(IFlag0==1) return
 ! AB(1) PART
 call AB_CAS_FOFO(ABPLUS,ABMIN,EnDummy,URe,Occ,XOne,&
               IndN,IndX,IGem,NAct,INActive,NDimX,NBasis,NDimX,&
-              NInte1,IntJFile,IntKFile,1d0,.true.)
+              NInte1,IntJFile,IntKFile,ICholesky,1d0,.true.)
 !print*, 'AB1-MY',norm2(ABPLUS),norm2(ABMIN)
 
 call clock('AB_CAS_FOFO',Tcpu,Twall)
@@ -1733,7 +1734,7 @@ subroutine Y01CASD_FOFO(IH0St,Occ,URe,XOne, &
      propfile0,propfile1, &
      xy0file, &
      UNOAO,IndN,IndX,IGemIN,NAct,INActive,NDimX,NBasis,NDim,NInte1, &
-     NoSt,IntFileName,IntJFile,IntKFile,ETot,ECorr)
+     NoSt,IntFileName,IntJFile,IntKFile,ICholesky,ETot,ECorr)
 !
 !     A ROUTINE FOR COMPUTING AC0D CORRELATION ENERGIES AND
 !     TRANSITION DIPOLE MOMENTS IN THE 0- AND 1 - ORDER APPROXIMATIONS
@@ -1743,6 +1744,7 @@ use timing
 implicit none
 double precision :: UNOAO(NBasis,NBasis),DipX(NBasis,NBasis),DipY(NBasis,NBasis),DipZ(NBasis,NBasis)
 integer,intent(in) :: NAct,INActive,NDimX,NBasis,NDim,NInte1,NoSt
+integer,intent(in) :: ICholesky
 character(*) :: IntFileName,IntJFile,IntKFile
 character(*) :: propfile0,propfile1,xy0file
 double precision,intent(in)  :: URe(NBasis,NBasis),Occ(NBasis),XOne(NInte1)
@@ -2912,7 +2914,7 @@ call dump_Eblock(Eblock,EblockIV,Occ,IndN,nblk,NBasis,NDimX,xy0file)
    ! AB(1) PART
    call AB_CAS_FOFO(ABPLUS,ABMIN,EnDummy,URe,Occ,XOne,&
                  IndN,IndX,IGem,NAct,INActive,NDimX,NBasis,NDimX,&
-                 NInte1,IntJFile,IntKFile,1d0,.true.)
+                 NInte1,IntJFile,IntKFile,ICholesky,1d0,.true.)
 
   call clock('AB(1)',Tcpu,Twall)
 !  ! B = A.X
@@ -3153,7 +3155,7 @@ subroutine Y01CASDSYM_FOFO(ICAS,NoStMx,ICORR,EExcit,IStCAS,NSym,NSymNO,MultpC,EC
      propfile0,propfile1, &
      xy0file, &
      UNOAO,IndN,IndX,IGemIN,NAct,INActive,NDimX,NBasis,NDim,NInte1, &
-     NoSt,IntFileName,IntJFile,IntKFile,ETot,IFlAC0DP)
+     NoSt,IntFileName,IntJFile,IntKFile,ICholesky,ETot,IFlAC0DP)
 !
 !     A ROUTINE FOR COMPUTING AC0D CORRELATION ENERGIES AND
 !     TRANSITION DIPOLE MOMENTS IN THE 0- AND 1 - ORDER APPROXIMATIONS
@@ -3161,8 +3163,9 @@ subroutine Y01CASDSYM_FOFO(ICAS,NoStMx,ICORR,EExcit,IStCAS,NSym,NSymNO,MultpC,EC
 use timing
 !
 implicit none
-double precision :: UNOAO(NBasis,NBasis),DipX(NBasis,NBasis),DipY(NBasis,NBasis),DipZ(NBasis,NBasis)
+double precision   :: UNOAO(NBasis,NBasis),DipX(NBasis,NBasis),DipY(NBasis,NBasis),DipZ(NBasis,NBasis)
 integer,intent(in) :: NAct,INActive,NDimX,NBasis,NDim,NInte1,NoSt
+integer,intent(in) :: ICholesky
 character(*) :: IntFileName,IntJFile,IntKFile
 character(*) :: propfile0,propfile1,xy0file
 double precision,intent(in)  :: URe(NBasis,NBasis),Occ(NBasis),XOne(NInte1)
@@ -3471,7 +3474,7 @@ call dump_Eblock(Eblock,EblockIV,Occ,IndN,nblk,NBasis,NDimX,xy0file)
 ! AB(1) PART
 call AB_CAS_FOFO(ABPLUS,ABMIN,EnDummy,URe,Occ,XOne,&
               IndN,IndX,IGem,NAct,INActive,NDimX,NBasis,NDimX,&
-              NInte1,IntJFile,IntKFile,1d0,.true.)
+              NInte1,IntJFile,IntKFile,ICholesky,1d0,.true.)
 
 call clock('AB(1)',Tcpu,Twall)
 !  ! B = A.X
@@ -3812,7 +3815,7 @@ subroutine ACEInteg_FOFO(ECorr,URe,Occ,XOne,UNOAO,&
       EGOne,NGOcc,CICoef,&
       NBasis,NInte1,NDim,NGem,IndAux,ACAlpha,&
       IGemIN,NAct,INActive,NELE,IndN,IndX,NDimX,&
-      NoSt,ICASSCF,IFlFrag1,IFunSR,IFunSRKer)
+      NoSt,ICASSCF,IFlFrag1,IFunSR,IFunSRKer,ICholesky)
 use omp_lib
 !
 !  A ROUTINE FOR COMPUTING AC INTEGRAND
@@ -3820,6 +3823,7 @@ use omp_lib
 implicit none
 integer,intent(in) :: NGOcc,NBasis,NInte1,NDim,NGem,NDimX
 integer,intent(in) :: NAct,INActive,NELE,NoSt,ICASSCF,IFlFrag1,IFunSR,IFunSRKer
+integer,intent(in) :: ICholesky
 integer,intent(in) :: IndN(2,NDim),IndX(NDim),IndAux(NBasis),&
                       IGemIN(NBasis)
 double precision,intent(in) :: ACAlpha
@@ -3859,7 +3863,7 @@ character(:),allocatable :: twojfile,twokfile
 
     call AB_CAS_FOFO(ABPLUS,ABMIN,ECASSCF,URe,Occ,XOne, &
                    IndN,IndX,IGemIN,NAct,INActive,NDimX,NBasis,NDimX,&
-                   NInte1,twojfile,twokfile,ACAlpha,.false.)
+                   NInte1,twojfile,twokfile,ICholesky,ACAlpha,.false.)
     EGOne(1)=ECASSCF
 
  elseif(ICASSCF==0) then

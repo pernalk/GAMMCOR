@@ -112,7 +112,7 @@ module class_LambdaCalculatorBlock
             ACAlpha0=0.D0
             call AB_CAS_FOFO(ABPLUS0,WORK0,ECASSCF,this%URe,this%Occ,this%XOne, &
                             this%IndN,this%IndX,this%IGem,this%NAct,this%INActive,this%NDimX,this%NBasis,this%NDimX,&
-                            this%NInte1,this%twojfile,this%twokfile,ACAlpha0,.false.)
+                            this%NInte1,this%twojfile,this%twokfile,1,ACAlpha0,.false.)
             Call dgemm('N','N',this%NDimX,this%NDimX,this%NDimX,1d0,ABPLUS0,this%NDimX,WORK0,this%NDimX,0.0,this%A0,this%NDimX)
             this%A2 = this%A2 - this%A0
 

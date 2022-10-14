@@ -163,7 +163,8 @@ C
      $ EGOne,NGOcc,CICoef,
      $ NBasis,NInte1,NDimX,NGem,IndAux,ACAlpha,
      $ IGem,NAcCAS,NInAcCAS,NELE,IndN,IndX,NDimX,
-     $ NoSt,ICASSCF,IFlFrag1,IFunSR,IFunSRKer)
+     $ NoSt,ICASSCF,IFlFrag1,IFunSR,IFunSRKer,
+     $ ICholesky)
 
       ElseIf(ICASSCF.Ne.1) Then
 
@@ -172,7 +173,8 @@ C
      $ EGOne,NGOcc,CICoef,
      $ NBasis,NInte1,NDim,NGem,IndAux,ACAlpha,
      $ IGem,NActive,NInAcCAS,NELE,IndN,IndX,NDimX,
-     $ NoSt,ICASSCF,IFlFrag1,IFunSR,IFunSRKer)
+     $ NoSt,ICASSCF,IFlFrag1,IFunSR,IFunSRKer,
+     $ ICholesky)
 
       EndIf
       EndIf

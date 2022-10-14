@@ -25,7 +25,7 @@ integer :: iunit
 integer :: iloop,nloop,off,dimFO,dimOO,dimFF
 integer :: mloop
 integer :: iBatch
-integer :: BatchSize,MaxBatchSize = 100
+integer :: BatchSize,MaxBatchSize = 33
 integer :: NCholesky
 double precision :: val
 double precision :: AuxVal,HNOCoef
@@ -46,13 +46,13 @@ endif
 
 HNO_save = HNO
 
-print*, 'NDimX = ', NDimX
-print*, 'Occ =',norm2(Occ)
-print*, 'HNO =',norm2(HNO)
-print*, 'WMAT=',norm2(WMAT)
-print*, 'AuxI=',norm2(AuxI)
-print*, 'AuxIO',norm2(AuxIO)
-print*, 'RDM2val',norm2(RDM2val)
+!print*, 'NDimX = ', NDimX
+!print*, 'Occ =',norm2(Occ)
+!print*, 'HNO =',norm2(HNO)
+!print*, 'WMAT=',norm2(WMAT)
+!print*, 'AuxI=',norm2(AuxI)
+!print*, 'AuxIO',norm2(AuxIO)
+!print*, 'RDM2val',norm2(RDM2val)
 
 ! read cholesky (FF|K) vectors
 open(newunit=iunit,file='cholvecs',form='unformatted')
@@ -65,8 +65,8 @@ close(iunit)
 dimFO = NOccup*NBasis
 nloop = (dimFO - 1) / MaxBatchSize + 1
 
-print*, 'nloop  ',nloop
-print*, 'dimFO',dimFO
+!print*, 'nloop  ',nloop
+!print*, 'dimFO',dimFO
 
 allocate(work1(dimFO,MaxBatchSize),ints(NBasis,NBasis))
 
@@ -394,14 +394,11 @@ Print*, 'ABMIN -after K',norm2(ABMIN)
 !AuxI = 0
 !AuxIO = 0
 
-MaxBatchSize = NOccup
 dimOO = NOccup*NOccup
 nloop = (dimOO - 1) / MaxBatchSize + 1
 
-print*, 'nloop',nloop
-
 allocate(work1(NBasis**2,MaxBatchSize))
-allocate(work2(NBasis**2,NOccup))
+allocate(work2(NCholesky,MaxBatchSize))
 
 off = 0
 k   = 0
@@ -410,12 +407,22 @@ l   = 1
 do iloop=1,nloop
 
    ! batch size
-   !BatchSize = min(MaxBatchSize,dimOO-off)
-   BatchSize = MaxBatchSize
+   BatchSize = min(MaxBatchSize,dimOO-off)
 
-! works for BatchSize = NOccup
+   kk = k
+   ll = l
+   do iBatch=1,BatchSize
+      kk = kk + 1
+      if(kk>NOccup) then
+         kk = 1
+         ll = ll + 1
+      endif
+      kl = (ll - 1)*NBasis + kk
+      work2(:,iBatch) = MatFF(:,kl)
+   enddo
+
    call dgemm('T','N',NBasis**2,BatchSize,NCholesky,1d0,MatFF,NCholesky, &
-              MatFF(1:NCholesky,off+1:BatchSize),NCholesky,0d0,work1,NBasis**2)
+              work2,NCholesky,0d0,work1,NBasis**2)
 
    ! loop over integrals
    do iBatch=1,BatchSize
@@ -434,8 +441,8 @@ do iloop=1,nloop
 
       if(k>NOccup.or.l>NOccup) cycle
       kl = (l - 1)*NOccup + k
-      print*, 'k,l,kl',k,l,kl
-      print*, norm2(ints)
+      !print*, 'k,l,kl',k,l,kl
+      !print*, norm2(ints)
 
       ! COMPUTE THE ENERGY FOR CHECKING
       if(present(ETot)) then
@@ -665,19 +672,21 @@ do iloop=1,nloop
 
    enddo
 
-   off = iloop*NBasis
+   off = off + MaxBatchSize
 
 enddo
 
 Print*, 'ABPLUS-after J',norm2(ABPLUS)
 Print*, 'ABMIN -after J',norm2(ABMIN)
 
-ABPLUS = 0
-ABMIN  = 0
-HNO = HNO_save
-WMAT = 0
-AuxI = 0
-AuxIO = 0
+!ABPLUS = 0
+!ABMIN  = 0
+!HNO = HNO_save
+!WMAT = 0
+!AuxI = 0
+!AuxIO = 0
+
+deallocate(work2,work1,ints)
 
 end subroutine JK_Chol_loop
 

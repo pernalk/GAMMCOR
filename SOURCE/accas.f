@@ -245,7 +245,7 @@ C
       If(ITwoEl.Eq.3) Then
       Call AB_CAS_FOFO(ABPLUS,ABMIN,ECASSCF,URe,Occ,XOne,
      $ IndN,IndX,IGem,NAcCAS,NInAcCAS,NDimX,NBasis,NDimX,
-     $ NInte1,'FFOO','FOFO',ACAlpha,.false.)
+     $ NInte1,'FFOO','FOFO',ICholesky,ACAlpha,.false.)
 C
       ElseIf(ITwoEl.Eq.1) Then
       Call AB_CAS(ABPLUS,ABMIN,ECASSCF,URe,Occ,XOne,TwoNO,IPair,
@@ -454,7 +454,7 @@ C
      $ 'XY0',UNOAO,
      $ IndN,IndX,IGem,NAcCAS,NInAcCAS,NDimX,
      $ NBasis,NDimX,NInte1,NoSt,'EMPTY','FFOO',
-     $ 'FOFO',ETot,IFlAC0DP) 
+     $ 'FOFO',ICholesky,ETot,IFlAC0DP) 
 C
       EndIf
 C
@@ -538,7 +538,7 @@ C
      $ 'XY0',UNOAO,
      $ IndN,IndX,IGem,NAcCAS,NInAcCAS,NDimX,
      $ NBasis,NDimX,NInte1,NoSt,'EMPTY','FFOO',
-     $ 'FOFO',ETot,ECorr)
+     $ 'FOFO',ICholesky,ETot,ECorr)
 C
 C     ITwoEl
       EndIf
@@ -853,7 +853,7 @@ C
      $ 'PROP0','PROP1','XY0',
      $ IndN,IndX,IGem,NAcCAS,NInAcCAS,
      $ NGrid,NDimX,NBasis,NDimX,NInte1,NoSt,
-     $ 'FOFO','FFOOERF','FOFOERF',0,IFunSRKer,ECASSCF,ECorr)
+     $ 'FOFO','FFOOERF','FOFOERF',ICholesky,0,IFunSRKer,ECASSCF,ECorr)
 C
       ElseIf(ITWoEl.Eq.1) Then
 C 
@@ -991,7 +991,7 @@ C
       If(ITwoEl.Eq.3) Then
       Call AB_CAS_FOFO(ABPLUS,ABMIN,ECASSCF,URe,Occ,XOne,
      $ IndN,IndX,IGem,NAcCAS,NInAcCAS,NDimX,NBasis,NDimX,
-     $ NInte1,'FFOOERF','FOFOERF',ACAlpha,.false.)
+     $ NInte1,'FFOOERF','FOFOERF',ICholesky,ACAlpha,.false.)
 C
       ElseIf(ITwoEl.Eq.1) Then
       Call AB_CAS(ABPLUS,ABMIN,ECASSCF,URe,Occ,XOne,TwoNO,IPair,
