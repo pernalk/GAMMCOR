@@ -438,7 +438,7 @@ end subroutine ACABMAT0_FOFO
 
 subroutine AC0CAS_FOFO(ECorr,ETot,Occ,URe,XOne,ABPLUS,ABMIN, &
                        IndN,IndX,IGemIN,NAct,INActive,NDimX,NBasis,NDim,NInte1, &
-                       NoSt,IntJFile,IntKFile)
+                       NoSt,IntJFile,IntKFile,ICholesky)
 !
 !     A ROUTINE FOR COMPUTING AC0 INTEGRAND
 !     (FOFO VERSION, USED IN AC0-CAS)
@@ -453,6 +453,7 @@ implicit none
 
 integer,intent(in)           :: NAct,INActive,NDimX,NBasis,NDim,NInte1,NoSt
 integer,intent(in)           :: IndN(2,NDim),IndX(NDim),IGemIN(NBasis)
+integer,intent(in)           :: ICholesky
 double precision,intent(in)  :: URe(NBasis,NBasis),Occ(NBasis),XOne(NInte1)
 character(*)                 :: IntJFile,IntKFile
 double precision,intent(out) :: ETot,ECorr
@@ -517,7 +518,7 @@ enddo
 
 call ABPM0_FOFO(Occ,URe,XOne,ABPLUS,ABMIN, &
                 IndN,IndX,IGemIN,NAct,INActive,NDimX,NBasis,NDim,NInte1, &
-                IntJFile,IntKFile,ETot)
+                IntJFile,IntKFile,ICholesky,ETot)
 
 !print*, 'ABPLUS-new',norm2(ABPLUS)
 !print*, 'ABMIN -new',norm2(ABMIN)
@@ -711,7 +712,7 @@ subroutine Y01CAS_FOFO(Occ,URe,XOne,ABPLUS,ABMIN,ETot, &
      propfile0,propfile1, &
      y01file, xy0file, &
      IndN,IndX,IGemIN,NAct,INActive,NDimX,NBasis,NDim,NInte1, &
-     NoSt,IntFileName,IntJFile,IntKFile,IFlag0)
+     NoSt,IntFileName,IntJFile,IntKFile,IFlag0,ICholesky)
 !
 !     A ROUTINE FOR COMPUTING Y VECTORS AND EIGENVALUES OF ERPA
 !     IN THE 0TH- AND 1ST-ORDER APPROXIMATIONS (USED IN SAPT)
@@ -725,7 +726,8 @@ subroutine Y01CAS_FOFO(Occ,URe,XOne,ABPLUS,ABMIN,ETot, &
 implicit none
 
 integer,intent(in)           :: NAct,INActive,NDimX,NBasis,NDim,NInte1,NoSt
-integer,intent(in)           :: IndN(2,NDim),IndX(NDim),IGemIN(NBasis),IFlag0
+integer,intent(in)           :: IndN(2,NDim),IndX(NDim),IGemIN(NBasis)
+integer,intent(in)           :: IFlag0,ICholesky
 double precision,intent(in)  :: URe(NBasis,NBasis),Occ(NBasis),XOne(NInte1)
 double precision,intent(out) :: ABPLUS(NDimX,NDimX),ABMIN(NDimX,NDimX)
 double precision,intent(out) :: ETot
@@ -789,7 +791,7 @@ call create_blocks_ABPL0(nAA,nAI,nAV,nIV,tmpAA,tmpAI,tmpAV,tmpIV,&
 
 call ABPM0_FOFO(Occ,URe,XOne,ABPLUS,ABMIN, &
                 IndN,IndX,IGemIN,NAct,INActive,NDimX,NBasis,NDim,NInte1, &
-                IntJFile,IntKFile,ETot)
+                IntJFile,IntKFile,ICholesky,ETot)
 
 !print*, 'ABPLUS-new',norm2(ABPLUS)
 !print*, 'ABMIN -new',norm2(ABMIN)
@@ -1868,7 +1870,7 @@ call create_blocks_ABPL0(nAA,nAI,nAV,nIV,tmpAA,tmpAI,tmpAV,tmpIV,&
 
 call ABPM0_FOFO(Occ,URe,XOne,ABPLUS,ABMIN, &
                 IndN,IndX,IGemIN,NAct,INActive,NDimX,NBasis,NDim,NInte1, &
-                IntJFile,IntKFile,ETot)
+                IntJFile,IntKFile,0,ETot)
 
 
 !allocate(work1(NBasis**2),work2(NBasis**2),ints(NBasis,NBasis))
@@ -3263,7 +3265,7 @@ call create_blocks_ABPL0(nAA,nAI,nAV,nIV,tmpAA,tmpAI,tmpAV,tmpIV,&
 
 call ABPM0_FOFO(Occ,URe,XOne,ABPLUS,ABMIN, &
                 IndN,IndX,IGemIN,NAct,INActive,NDimX,NBasis,NDim,NInte1, &
-                IntJFile,IntKFile,ETot)
+                IntJFile,IntKFile,0,ETot)
 
 print*, 'after ABPM0_FOFO...'
 call clock('AB0MAT',Tcpu,Twall)

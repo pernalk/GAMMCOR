@@ -1413,7 +1413,7 @@ enddo
 
 call ABPM0_FOFO(Occ,URe,XOne,ABPLUS,ABMIN, &
                 IndN,IndX,IGemIN,NAct,INActive,NDimX,NBasis,NDim,NInte1, &
-                IntJFile,IntKFile,ETot)
+                IntJFile,IntKFile,1,ETot)
 ! hererXXX
 !do i=1,NBasis
 !   C(i) = sign(sqrt(Occ(i)),Occ(i)-0.5d0)

@@ -454,7 +454,8 @@ if(Flags%ICASSCF==0.and.Flags%ISERPA==0) then
             propfile0,propfile1, &
             y01file,xy0file,     &
             Mon%IndN,Mon%IndX,Mon%IGem,Mon%NAct,Mon%INAct,Mon%NDimX, &
-            NBas,Mon%NDimX,NInte1,Mon%NoSt,twofile,twojfile,twokfile,Flags%IFlag0)
+            NBas,Mon%NDimX,NInte1,Mon%NoSt,twofile,twojfile,twokfile,&
+            Flags%IFlag0,Flags%ICholesky)
 
   if(Flags%ICholesky==1) then
      nblk = 1 + NBas - Mon%NAct
@@ -673,7 +674,8 @@ case(TWOMO_FOFO)
           'DUMMY','DUMMY',     &
           'DUMMY',xy0file,     &
           Mon%IndN,Mon%IndX,Mon%IGem,Mon%NAct,Mon%INAct,Mon%NDimX, &
-          NBas,Mon%NDimX,NInte1,Mon%NoSt,twofile,twojfile,twokfile,Flags%IFlag0)
+          NBas,Mon%NDimX,NInte1,Mon%NoSt,twofile,twojfile,twokfile,&
+          Flags%IFlag0,Flags%ICholesky)
 
    nblk = 1 + NBas - Mon%NAct
    allocate(A0Block(nblk))
@@ -1188,7 +1190,8 @@ elseif(Flags%ICASSCF==1.and.Flags%ISERPA==0) then
             propfile0,propfile1, &
             y01file,xy0file,     &
             Mon%IndN,Mon%IndX,Mon%IGem,Mon%NAct,Mon%INAct,Mon%NDimX, &
-            NBas,Mon%NDim,NInte1,Mon%NoSt,twofile,twojfile,twokfile,Flags%IFlag0)
+            NBas,Mon%NDim,NInte1,Mon%NoSt,twofile,twojfile,twokfile, &
+            Flags%IFlag0,Flags%ICholesky)
   case(TWOMO_FFFF)
      call Y01CAS_mithap(Mon%Occ,URe,XOne,ABPlus,ABMin, &
             propfile0,propfile1, &

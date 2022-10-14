@@ -2,6 +2,7 @@ module abfofo
 !use types,only : EblockData
 use blocktypes
 use tran
+use abchol
 use print_units
 
 implicit none
@@ -383,7 +384,7 @@ call create_blocks_ABPL0(nAA,nAI,nAV,nIV,tmpAA,tmpAI,tmpAV,tmpIV,&
 
 call ABPM0_FOFO(Occ,URe,XOne,ABPLUS,ABMIN, &
                 IndN,IndX,IGemIN,NAct,INActive,NDimX,NBasis,NDim,NInte1, &
-                IntJFile,IntKFile,ETot)
+                IntJFile,IntKFile,0,ETot)
 
 Eps = 0
 !get AV
@@ -684,11 +685,12 @@ end subroutine MP2RDM_FOFO
 
 subroutine ABPM0_FOFO(Occ,URe,XOne,ABPLUS,ABMIN, &
                       IndN,IndX,IGemIN,NAct,INActive,NDimX,NBasis,NDim,NInte1, &
-                      IntJFile,IntKFile,ETot)
+                      IntJFile,IntKFile,ICholesky,ETot)
 implicit none
 
 integer,intent(in)           :: NAct,INActive,NDimX,NBasis,NDim,NInte1
 integer,intent(in)           :: IndN(2,NDim),IndX(NDim),IGemIN(NBasis)
+integer,intent(in)           :: ICholesky
 double precision,intent(in)  :: URe(NBasis,NBasis),Occ(NBasis),XOne(NInte1)
 character(*)                 :: IntJFile,IntKFile
 double precision,intent(out) :: ABPLUS(NDimX,NDimX),ABMIN(NDimX,NDimX)
@@ -811,6 +813,14 @@ call create_pos_ABPL0(pos,IGem,IndN,INActive,NAct,NBasis,NDimX)
 AuxI  = 0
 AuxIO = 0
 WMAT  = 0
+
+if(ICholesky) then
+   if(present(ETot)) then
+   call JK_Chol_loop(ABPLUS,ABMIN,HNO,AuxI,AuxIO,WMAT,&
+                     RDM2val,Occ,AuxCoeff,IGem,AuxInd,pos,&
+                     INActive,NOccup,NDimX,NDimX,NBasis,NInte1,IntJFile,IntKFile,0d0,2,ETot)
+   endif
+endif
 
 if(present(ETot)) then
    call JK_loop(ABPLUS,ABMIN,HNO,AuxI,AuxIO,WMAT,&
@@ -1990,6 +2000,15 @@ elseif(AB==2) then
    HNOCoef = 1
 endif
 
+print*, 'from full JK_loop'
+print*, 'NDimX = ', NDimX
+print*, 'Occ =',norm2(Occ)
+print*, 'HNO =',norm2(HNO)
+print*, 'WMAT=',norm2(WMAT)
+print*, 'AuxI=',norm2(AuxI)
+print*, 'AuxIO',norm2(AuxIO)
+print*, 'RDM2val',norm2(RDM2val)
+
 allocate(work1(NBasis**2),ints(NBasis,NBasis))
 
 open(newunit=iunit1,file=trim(IntKFile),status='OLD', &
@@ -2012,6 +2031,9 @@ do ll=1,NOccup
 
       if(l>NOccup) cycle
       ints(:,NOccup+1:NBasis) = 0
+      !! test Cholesky
+      !print*, 'k, l, kl', k, l, kl
+      !print*, norm2(ints)
 
       ! CONSTRUCT ONE-ELECTRON PART OF THE AC ALPHA-HAMILTONIAN
 
@@ -2287,6 +2309,10 @@ enddo
 
 close(iunit1)
 
+print*, 'from JK_Loop'
+print*, 'ABPLUS-after K',norm2(ABPLUS)
+print*, 'ABMIN -after K',norm2(ABMIN)
+
 open(newunit=iunit2,file=trim(IntJFile),status='OLD', &
      access='DIRECT',recl=8*NBasis**2)
 
@@ -2306,6 +2332,9 @@ do ll=1,NOccup
       l = ll
 
       if(k>NOccup.or.l>NOccup) cycle
+
+      print*, 'k,l,kl',k,l,kl
+      print*, norm2(ints)
 
       ! COMPUTE THE ENERGY FOR CHECKING
       if(present(ETot)) then
@@ -2535,6 +2564,9 @@ do ll=1,NOccup
 
    enddo
 enddo
+
+print*, 'ABPLUS-after J',norm2(ABPLUS)
+print*, 'ABMIN -after J',norm2(ABMIN)
 
 close(iunit2)
 
