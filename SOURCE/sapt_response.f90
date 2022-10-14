@@ -428,11 +428,12 @@ if(Flags%ICASSCF==0.and.Flags%ISERPA==0) then
      close(iunit)
 
      ! sub-snippet for testing Pmat
+     ! this will not work now, shit -- Pmat!
      ! uncomment this for e2disp_Cmat_Chol / e2disp_Cmat_Chol_proj
      !allocate(Mon%Pmat(Mon%NDimX,Mon%NDimX))
      !call Project_DChol(Mon%PMat,Mon%IndN,NBas,Mon%NDimX)
 
-     !call CIter_FOFO(PMat,ECorr,ACAlpha,XOne,URe,Mon%Occ,EGOne,NGOcc,&
+     !call CIter_FOFO(ECorr,ACAlpha,XOne,URe,Mon%Occ,EGOne,NGOcc,&
      !                Mon%IGem,Mon%NAct,Mon%INAct,Mon%NELE,NBas,NInte1, &
      !                Mon%NDim,Mon%NGem,Mon%IndAux,Mon%IndN,Mon%IndX,Mon%NDimX,&
      !                twojfile,twokfile)

@@ -14,4 +14,13 @@ integer,allocatable :: ipiv(:)
 double precision,allocatable :: vec(:), matX(:,:),matY(:,:)
 end type
 
+type ABblockData
+integer :: n
+integer :: l1,l2
+integer,allocatable :: pos(:)
+integer,allocatable :: ipiv(:)
+double precision,allocatable :: vec(:),vecAB(:)
+double precision,allocatable :: matAM(:,:), matAP(:,:), matAB(:,:)
+end type
+
 end module blocktypes

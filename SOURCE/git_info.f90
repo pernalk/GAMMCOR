@@ -1,10 +1,10 @@
 module git_info
 
     implicit none
-    character(len=*), parameter :: GIT_HEAD_BRANCH = "IntCholesky"
-    character(len=*), parameter :: GIT_REVISION_HASH = "c570ad13247ae4b701a0b06de97603eab0ebec05"
-    character(len=*), parameter :: GIT_REVISION = "c570ad1"
-    character(len=*), parameter :: GIT_COMMITTER_DATE = "Mon Mar 14 23:25:23 2022 +0100"
+    character(len=*), parameter :: GIT_HEAD_BRANCH = "IntCholesky_AC0block"
+    character(len=*), parameter :: GIT_REVISION_HASH = "f722ed4a64d45d4d2fc82697e3eb8c504ea34a28"
+    character(len=*), parameter :: GIT_REVISION = "f722ed4"
+    character(len=*), parameter :: GIT_COMMITTER_DATE = "Mon Oct 10 19:27:48 2022 +0200"
     character(len=*), parameter :: GIT_LATEST_TAG_LONG = "v-4.1"
 
     contains

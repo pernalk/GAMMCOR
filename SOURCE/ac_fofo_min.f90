@@ -106,9 +106,6 @@ subroutine WIter_D12Chol(ECorr,AC1,Max_Cn,XOne,URe,Occ,EGOne,NGOcc,&
 !
 use abfofo
 use systemdef
-! only to use Y01CAS_FOFO
-!use ab0fofo
-use sapt_utils
 
 implicit none
 integer,intent(in) :: AC1,NGOcc,NBasis,NInte1,NDim,NGem,NDimX
@@ -133,13 +130,15 @@ double precision, allocatable :: DChol(:,:),DCholT(:,:),DCholAct(:,:),DCholActT(
 double precision, allocatable :: APLUS0Tilde(:), APLUS1Tilde(:),  &
                                  A1(:),A2(:), &
                                  COMTilde(:),ABPLUS0(:),ABMIN0(:),ABPLUS1(:),ABMIN1(:), &
+                                 LAMBDA(:), &
                                  C0Tilde(:),C1Tilde(:),C2Tilde(:), &
                                  WORK0(:)
 integer :: NCholesky
 
 integer :: nblk
-type(EblockData) :: A0blockIV,LambdaIV
-type(EblockData),allocatable :: A0block(:),Lambda(:)
+type(EblockData) :: A0blockIV
+type(EblockData) :: LambdaIV
+type(EblockData),allocatable :: A0block(:)
 
 interface
 subroutine read_D12_array(NCholesky, DChol, DCholAct, NDimX, NBasis, IndN, Occ, IndAux)
@@ -173,152 +172,156 @@ twojfile = 'FFOO'
 twokfile = 'FOFO'
 IntKFile = twokfile
 
-allocate(ABPLUS1(NDimX*NDimX),ABMIN1(NDimX*NDimX))
+!allocate(ABPLUS0(NDimX*NDimX),ABMIN0(NDimX*NDimX),ABPLUS1(NDimX*NDimX),ABMIN1(NDimX*NDimX))
 
-! AC0BLOCK with ver=0 stores A-(0) and A+(0) matrices
-!                            in X and Y, respectively
-if(NAct==1) then
-  ! active-virtual block
-  nblk = NBasis - NAct - INActive
-else
-  nblk = 1 + NBasis - NAct
-endif
-print*, 'outer nblk',nblk
+ACAlpha=0.D0
+!call AB_CAS_FOFO(ABPLUS0,ABMIN0,ECASSCF,URe,Occ,XOne, &
+!              IndN,IndX,IGem,NAct,INActive,NDimX,NBasis,NDimX,&
+!              NInte1,twojfile,twokfile,ACAlpha,.false.)
+ABPLUS0 = 0
+ABMIN0  = 0
 
-allocate(A0block(nblk))
-Call AC0BLOCK(Occ,URe,XOne, &
-     IndN,IndX,IGem,NAct,INActive,NDimX,NBasis,NDimX,NInte1,'FFOO','FOFO', &
-     A0BlockIV,A0Block,nblk,0,'DUMMY',0)
+!Call sq_symmetrize(ABPLUS0,NDimX)
+!Call sq_symmetrize(ABMIN0,NDimX)
 
-! get AB1PLUS and AB1MIN
 ACAlpha=1.D0
-call AB_CAS_FOFO(ABPLUS1,ABMIN1,ECASSCF,URe,Occ,XOne, &
-              IndN,IndX,IGem,NAct,INActive,NDimX,NBasis,NDimX,&
-              NInte1,twojfile,twokfile,ACAlpha,.false.)
+!call AB_CAS_FOFO(ABPLUS1,ABMIN1,ECASSCF,URe,Occ,XOne, &
+!              IndN,IndX,IGem,NAct,INActive,NDimX,NBasis,NDimX,&
+!              NInte1,twojfile,twokfile,ACAlpha,.false.)
+!ABPLUS1 = 0
+!ABMIN1  = 0
+!ECASSCF = 0
 
-Call sq_symmetrize(ABPLUS1,NDimX)
-Call sq_symmetrize(ABMIN1,NDimX)
+!Call sq_symmetrize(ABPLUS1,NDimX)
+!Call sq_symmetrize(ABMIN1,NDimX)
+!ABPLUS1=ABPLUS1-ABPLUS0
+!ABMIN1 =ABMIN1 -ABMIN0
 
-! AB1 = AB1 - A0
-call add_blk_right(ABPLUS1,A0Block,A0BlockIV,-1d0,.false.,nblk,NDimX)
-call add_blk_right(ABMIN1, A0Block,A0BlockIV,-1d0,.true., nblk,NDimX)
-print*, 'add_blk_right: ABPLUS1',norm2(ABPLUS1)
-print*, 'add_blk_right: ABMIN1 ',norm2(ABMIN1)
-
-!Calc: A1=ABPLUS0*ABMIN1+ABPLUS1*ABMIN0
-allocate(A1(NDimX*NDimX))
-call ABPM_HALFTRAN_GEN_L(ABMIN1, A1,0.0d0,A0Block,A0BlockIV,nblk,NDimX,NDimX,'Y')
-call ABPM_HALFTRAN_GEN_R(ABPLUS1,A1,1.0d0,A0Block,A0BlockIV,nblk,NDimX,NDimX,'X')
-!print*, 'A1',norm2(A1)
+!print*, 'ABPLUS1-K',norm2(ABPLUS1)
+!print*, 'ABMIN1 -K',norm2(ABMIN1)
 
 EGOne(1)=ECASSCF
 
-! this should be fixed (N^6 step!)
+!!Calc: A1=ABPLUS0*ABMIN1+ABPLUS1*ABMIN0
+!allocate(A1(NDimX*NDimX))
+!Call dgemm('N','N',NDimX,NDimX,NDimX,1d0,ABPLUS0,NDimX,ABMIN1,NDimX,0.0d0,A1,NDimX)
+!Call dgemm('N','N',NDimX,NDimX,NDimX,1d0,ABPLUS1,NDimX,ABMIN0,NDimX,1d0,A1,NDimX)
+!A1 = 0
+!print*, 'A1-K',norm2(A1)
+!deallocate(ABMIN0)
+
 !Calc: A2=ABPLUS1*ABMIN1
-allocate(A2(NDimX*NDimX))
-Call dgemm('N','N',NDimX,NDimX,NDimX,1d0,ABPLUS1,NDimX,ABMIN1,NDimX,0.0d0,A2,NDimX)
-print*, 'A2:',norm2(A2)
-deallocate(ABMIN1)
+!allocate(A2(NDimX*NDimX))
+!!Call dgemm('N','N',NDimX,NDimX,NDimX,1d0,ABPLUS1,NDimX,ABMIN1,NDimX,0.0d0,A2,NDimX)
+!A2 = 0
+!print*, 'A2-K:',norm2(A2)
+!deallocate(ABMIN1)
 
 !Calc: APLUS0Tilde=ABPLUS0.DChol
-allocate(APLUS0Tilde(NDimX*NCholesky))
-call ABPM_HALFTRAN_GEN_L(DCholT,APLUS0Tilde,0.0d0,A0Block,A0BlockIV,nblk,NDimX,NCholesky,'Y')
-print*, 'A0PT  ',norm2(APLUS0Tilde)
+!allocate(APLUS0Tilde(NDimX*NCholesky))
+!!Call dgemm('N','N',NDimX,NCholesky,NDimX,1d0,ABPLUS0,NDimX,DCholT,NDimX,0.0d0,APLUS0Tilde,NDimX)
+!APlus0Tilde = 0
 
-!Calc: APLUS1Tilde=ABPLUS1.DChol
-allocate(APLUS1Tilde(NDimX*NCholesky))
-Call dgemm('N','N',NDimX,NCholesky,NDimX,1d0,ABPLUS1,NDimX,DCholT,NDimX,0.0d0,APLUS1Tilde,NDimX)
-print*, 'A1PT  ',norm2(APLUS1Tilde)
-deallocate(ABPLUS1)
+!print*, 'A0PT-K',norm2(APLUS0Tilde)
+!deallocate(ABPLUS0)
 
-deallocate(A0block)
-deallocate(A0BlockIV%vec,A0BlockIV%pos)
+!!Calc: APLUS1Tilde=ABPLUS1.DChol
+!allocate(APLUS1Tilde(NDimX*NCholesky))
+!Call dgemm('N','N',NDimX,NCholesky,NDimX,1d0,ABPLUS1,NDimX,DCholT,NDimX,0.0d0,APLUS1Tilde,NDimX)
+!APLUS1Tilde = 0
+!print*, 'A1PT-K',norm2(APLUS1Tilde)
+!deallocate(ABPLUS1)
 
-Call FreqGrid(XFreq,WFreq,NGrid)
+!Call FreqGrid(XFreq,WFreq,NGrid)
 
 ! Calc: A0
-nblk = 1 + NBasis - NAct
+if(NAct == 1) then
+   nblk = NBasis - NAct - INActive
+else
+   nblk = 1 + NBasis - NAct
+endif
+
+print*, 'nblk',nblk
+
 allocate(A0block(nblk))
 Call AC0BLOCK(Occ,URe,XOne, &
      IndN,IndX,IGem,NAct,INActive,NDimX,NBasis,NDimX,NInte1,'FFOO','FOFO', &
-     A0BlockIV,A0Block,nblk,1,'A0BLK',0)
+     A0BlockIV,A0Block,nblk,'A0BLK',0)
 
-allocate(COMTilde(NDimX*NCholesky))
-COMTilde=0.0
+call makieta_1_petli_po_IV(LambdaIV,A0BlockIV,nblk,NDimX)
+print*, 'po makieta_1_petli'
 
-allocate(C0Tilde(NDimX*NCholesky),C1Tilde(NDimX*NCholesky),C2Tilde(NDimX*NCholesky),WORK0(NDimX*NCholesky))
-allocate(Lambda(nblk))
-associate(A => A0BlockIV, L => LambdaIV)
-  L%n = A%n
-  L%l1 = A%l1
-  L%l2 = A%l2
-  allocate(L%pos(L%n),L%vec(L%n))
-end associate
+!allocate(COMTilde(NDimX*NCholesky))
+!COMTilde=0.0
+
+!allocate(C0Tilde(NDimX*NCholesky),C1Tilde(NDimX*NCholesky),C2Tilde(NDimX*NCholesky),WORK0(NDimX*NCholesky))
+allocate(LAMBDA(NDimX*NDimX))
 
 Do IGL=1,NGrid
    OmI=XFreq(IGL)
    WFact=4.D0/PI*WFreq(IGL)
 
 !  Calc: LAMBDA=(A0+Om^2)^-1
-   Call INV_AC0BLK(OmI**2,Lambda,LambdaIV,A0Block,A0BlockIV,nblk,NDimX)
+   Call INV_AC0BLK(OmI**2,LAMBDA,A0Block,A0BlockIV,nblk,NDimX)
 
-!  Calc: C0Tilde=1/2 LAMBDA.APLUS0Tilde
-   Call ABPM_HALFTRAN_GEN_L(APLUS0Tilde,C0Tilde,0.0d0,Lambda,LambdaIV,nblk,NDimX,NCholesky,'X')
-   C0Tilde = 0.5d0*C0Tilde
+   print*, 'po INV_AC0BLOCK'
+   ECorr = 0d0
+   return
 
-!  Calc: C1Tilde=LAMBDA.(1/2 APLUS1Tilde - A1.C0Tilde)
-   Call dgemm('N','N',NDimX,NCholesky,NDimX,1.d0,A1,NDimX,C0Tilde,NDimX,0.0d0,WORK0,NDimX)
-   WORK0 = 0.5d0*APLUS1Tilde - WORK0
-   Call ABPM_HALFTRAN_GEN_L(WORK0,C1Tilde,0.0d0,Lambda,LambdaIV,nblk,NDimX,NCholesky,'X')
-
-   COMTilde=COMTilde+WFact*0.5d0*C1Tilde
-
-   XNorm0=0.0
-   XFactorial=1
-   Do N=2,Max_Cn
-       XFactorial=XFactorial*N
-       XN1=-N
-       XN2=-N*(N-1)
-       Call dgemm('N','N',NDimX,NCholesky,NDimX,XN2,A2,NDimX,C0Tilde,NDimX,0.0d0,WORK0,NDimX)
-       Call dgemm('N','N',NDimX,NCholesky,NDimX,XN1,A1,NDimX,C1Tilde,NDimX,1.0d0,WORK0,NDimX)
-       Call ABPM_HALFTRAN_GEN_L(Work0,C2Tilde,0.0d0,Lambda,LambdaIV,nblk,NDimX,NCholesky,'X')
-       !Call dgemm('N','N',NDimX,NCholesky,NDimX,1.0d0,LAMBDA,NDimX,WORK0,NDimX,0.0d0,C2Tilde,NDimX)
-       FF=WFact/XFactorial/(N+1)
-       If(AC1.Eq.1) FF=WFact/XFactorial/2.D0
-       If(MOD(N,2).Eq.0) Then
-           XNorm1=Norm2(FF*C2Tilde)
-           Write(6,'(X,"Order (n), |Delta_C|",I3,E14.4)')N,XNorm1
-           If(N.Gt.3.And.XNorm1.Gt.XNorm0) Then
-!                 Write(6,'(X,"Divergence detected. Expansion of C terminated at order ",I3,3F10.4)')N-1
-                 Write(6,'(X,"Divergence detected. Continue up to order Max_Cn",I3,3F10.4)')N
-!                 Exit
-           EndIf
-           XNorm0=XNorm1
-       EndIf
-       COMTilde=COMTilde+FF*C2Tilde
-       C0Tilde=C1Tilde
-       C1Tilde=C2Tilde
-   EndDo
-
-   Write(6,'(X,"Omega, |C|",I3,2F10.4)')IGL,OmI,Norm2(COMTilde)
+!!  Calc: C0Tilde=1/2 LAMBDA.APLUS0Tilde
+!   Call dgemm('N','N',NDimX,NCholesky,NDimX,0.5d0,LAMBDA,NDimX,APLUS0Tilde,NDimX,0.0d0,C0Tilde,NDimX)
+!
+!!  Calc: C1Tilde=LAMBDA.(1/2 APLUS1Tilde - A1.C0Tilde)
+!   Call dgemm('N','N',NDimX,NCholesky,NDimX,1.d0,A1,NDimX,C0Tilde,NDimX,0.0d0,WORK0,NDimX)
+!   WORK0=0.5d0*APLUS1Tilde-WORK0
+!   Call dgemm('N','N',NDimX,NCholesky,NDimX,1.d0,LAMBDA,NDimX,WORK0,NDimX,0.0d0,C1Tilde,NDimX)
+!
+!   COMTilde=COMTilde+WFact*0.5d0*C1Tilde
+!
+!   XNorm0=0.0
+!   XFactorial=1
+!   Do N=2,Max_Cn
+!       XFactorial=XFactorial*N
+!       XN1=-N
+!       XN2=-N*(N-1)
+!       Call dgemm('N','N',NDimX,NCholesky,NDimX,XN2,A2,NDimX,C0Tilde,NDimX,0.0d0,WORK0,NDimX)
+!       Call dgemm('N','N',NDimX,NCholesky,NDimX,XN1,A1,NDimX,C1Tilde,NDimX,1.0d0,WORK0,NDimX)
+!       Call dgemm('N','N',NDimX,NCholesky,NDimX,1.0d0,LAMBDA,NDimX,WORK0,NDimX,0.0d0,C2Tilde,NDimX)
+!       FF=WFact/XFactorial/(N+1)
+!       If(AC1.Eq.1) FF=WFact/XFactorial/2.D0
+!       If(MOD(N,2).Eq.0) Then
+!           XNorm1=Norm2(FF*C2Tilde)    
+!           Write(6,'(X,"Order (n), |Delta_C|",I3,E14.4)')N,XNorm1
+!           If(N.Gt.3.And.XNorm1.Gt.XNorm0) Then
+!!                 Write(6,'(X,"Divergence detected. Expansion of C terminated at order ",I3,3F10.4)')N-1
+!                 Write(6,'(X,"Divergence detected. Continue up to order Max_Cn",I3,3F10.4)')N
+!!                 Exit
+!           EndIf
+!           XNorm0=XNorm1
+!       EndIf
+!       COMTilde=COMTilde+FF*C2Tilde
+!       C0Tilde=C1Tilde
+!       C1Tilde=C2Tilde
+!   EndDo
+!
+!   Write(6,'(X,"Omega, |C|",I3,2F10.4)')IGL,OmI,Norm2(COMTilde)
 
 EndDo
 
-deallocate(A1,A2,WORK0,C0Tilde,C1Tilde,C2Tilde,Lambda,APLUS0Tilde,APLUS1Tilde)
+!deallocate(A1,A2,WORK0,C0Tilde,C1Tilde,C2Tilde,Lambda,APLUS0Tilde,APLUS1Tilde)
 
-allocate(WorkD(NDimX,NCholesky))
-WorkD=0
-WorkD = RESHAPE(COMTilde, (/NDimX, NCholesky/))
-ECorr=0
-do j=1,NDimX
-   do i=1,NCholesky
-      ECorr=ECorr+DCholAct(i,j)*WorkD(j,i)
-   enddo
-enddo
+!allocate(WorkD(NDimX,NCholesky))
+!WorkD=0
+!WorkD = RESHAPE(COMTilde, (/NDimX, NCholesky/))
+!ECorr=0
+!do j=1,NDimX
+!   do i=1,NCholesky
+!      ECorr=ECorr+DCholAct(i,j)*WorkD(j,i)
+!   enddo
+!enddo
+!
+!deallocate(WorkD,COMTilde)
 
-deallocate(WorkD,COMTilde)
-
-close(iunit)
 Call RELEASE_AC0BLOCK(A0Block,A0blockIV,nblk)
 
 end subroutine WIter_D12Chol
@@ -329,7 +332,7 @@ subroutine WIter_DChol(ECorr,Max_Cn,XOne,URe,Occ,EGOne,NGOcc,&
 !
 !  AC energy cacluation using CHOLESKY VECTORS:
 !  (1) expanding AC integrand in alpha around alpha=0, up to Max_Cn order
-!  (2) finding C^(n)[omega] and (3) omega integration
+!  (2) finding C^(n)[omega] and (3) omega integration 
 !  Max_Cn is passed in input.inp (if missed, the dafault value 3 is used)
 !
 use abfofo
@@ -358,7 +361,7 @@ double precision, allocatable :: APLUS0Tilde(:), APLUS1Tilde(:),APLUS0TildeAct(:
                                  COMTilde(:),COMTildeAct(:),ABPLUS0(:),ABMIN0(:),ABPLUS1(:),ABMIN1(:), &
                                  LAMBDA(:), &
                                  C0Tilde(:),C1Tilde(:),C2Tilde(:), &
-                                 WORK0(:)
+                                 WORK0(:)          
 integer :: NCholesky
 
 integer :: nblk
@@ -378,7 +381,7 @@ end interface
 call read_D_array(NCholesky, DChol, DCholAct, NDimX, NBasis, IndN, Occ, IndAux)
 DCholT = transpose(DChol)
 DCholActT = transpose(DCholAct)
-! ==========================================================================
+! ==========================================================================  
 
 NGrid=18
 !NGrid=30
@@ -436,7 +439,7 @@ deallocate(ABPLUS1)
 
 Call FreqGrid(XFreq,WFreq,NGrid)
 
-! Calc: A0
+! Calc: A0 
 nblk = 1 + NBasis - NAct
 allocate(A0block(nblk))
 Call AC0BLOCK(Occ,URe,XOne, &
@@ -454,7 +457,7 @@ Do IGL=1,NGrid
    WFact=4.D0/PI*WFreq(IGL)
 
 !  Calc: LAMBDA=(A0+Om^2)^-1
-   Call INV_AC0BLK_OLD(OmI**2,LAMBDA,A0Block,A0BlockIV,nblk,NDimX)
+   Call INV_AC0BLK(OmI**2,LAMBDA,A0Block,A0BlockIV,nblk,NDimX)
 
    Do K=1,2
 
@@ -472,8 +475,8 @@ Do IGL=1,NGrid
    Else
       WORK0=0.5d0*APLUS1TildeAct-WORK0
    EndIf
-   Call dgemm('N','N',NDimX,NCholesky,NDimX,1.d0,LAMBDA,NDimX,WORK0,NDimX,0.0d0,C1Tilde,NDimX)
-
+   Call dgemm('N','N',NDimX,NCholesky,NDimX,1.d0,LAMBDA,NDimX,WORK0,NDimX,0.0d0,C1Tilde,NDimX)   
+   
    If(K==1) Then
       COMTilde=COMTilde+WFact*0.5d0*C1Tilde
    Else
@@ -536,7 +539,7 @@ subroutine WIter_FOFO(ECorr,Max_Cn,XOne,URe,Occ,EGOne,NGOcc,&
    IndN,IndX,NDimX)
 !
 !  AC energy cacluation by: (1) expanding AC integrand in alpha around alpha=0, up to Max_Cn order
-!  (2) finding C^(n)[omega] and (3) omega integration
+!  (2) finding C^(n)[omega] and (3) omega integration 
 !
 use abmat
 use abfofo
@@ -605,7 +608,7 @@ Call dgemm('N','N',NDimX,NDimX,NDimX,1d0,ABPLUS1,NDimX,WORK1,NDimX,0d0,A2,NDimX)
 
 Call FreqGrid(XFreq,WFreq,NGrid)
 
-! Calc: A0
+! Calc: A0 
 nblk = 1 + NBasis - NAct
 allocate(A0block(nblk))
 Call AC0BLOCK(Occ,URe,XOne, &
@@ -651,7 +654,7 @@ Do IGL=1,NGrid
                   C0,NDimX,XN1,C2,NDimX)
        FF=WFact/XFactorial/(N+1)
 
-       COM=COM+FF*C2
+       COM=COM+FF*C2 
        C0=C1
        C1=C2
    EndDo
@@ -973,7 +976,7 @@ Do IGL=1,NGrid
    EndDo
 
    WORK1=A0+WORK0
-
+   
 ! Initial=WORK1=(A0+WORK0)^-1
    Call dgetrf(NDimX, NDimX, WORK1, NDimX, ipiv, inf1 )
    Call dgetri(NDimX, WORK1, NDimX, ipiv, work0, NDimX, inf2 )
@@ -1172,7 +1175,7 @@ subroutine CIter_FOFO(PMat,ECorr,ACAlpha,XOne,URe,Occ,EGOne,NGOcc,&
    double precision :: ECASSCF,PI
    character(:),allocatable :: twojfile,twokfile,IntKFile
    double precision, allocatable :: DChol(:,:),DCholT(:,:),DCholAct(:,:),DCholActT(:,:),WorkD(:,:)
-   double precision, allocatable :: APlusTilde(:), APlusTildeAct(:), COMTilde(:),COMTildeAct(:)
+   double precision, allocatable :: APlusTilde(:), APlusTildeAct(:), COMTilde(:),COMTildeAct(:) 
    integer :: NCholesky
    type(CIntegrator) :: CIntegr
    class(IterAlgorithm), allocatable, target :: iterAlgo
@@ -1190,11 +1193,11 @@ subroutine CIter_FOFO(PMat,ECorr,ACAlpha,XOne,URe,Occ,EGOne,NGOcc,&
    end interface
 
    ! Get DChol & DCholAct
-   ! ==========================================================================
+   ! ==========================================================================      
    call read_D_array(NCholesky, DChol, DCholAct, NDimX, NBasis, IndN, Occ, IndAux)
    DCholT = transpose(DChol)
    DCholActT = transpose(DCholAct)
-   ! ==========================================================================
+   ! ==========================================================================  
 
    NOccup = NAct + INActive
    PI = 4.0*ATAN(1.0)
@@ -1209,16 +1212,16 @@ subroutine CIter_FOFO(PMat,ECorr,ACAlpha,XOne,URe,Occ,EGOne,NGOcc,&
    EGOne(1)=ECASSCF
    ! Calc A2=ABPLUS1*ABMIN1
    Call dgemm('N','N',NDimX,NDimX,NDimX,1d0,ABPLUS1,NDimX,WORK1,NDimX,0d0,A2,NDimX)
-
+   
    ! Calc A+Tilde & AAct+Tilde
-   ! ==========================================================================================================================
+   ! ==========================================================================================================================   
    allocate(APlusTilde(NDimX*NCholesky), APlusTildeAct(NDimX*NCholesky))
    Call dgemm('N','N',NDimX,NCholesky,NDimX,1d0,ABPLUS1,NDimX,DCholT,NDimX,0d0,APlusTilde,NDimX)
    Call dgemm('N','N',NDimX,NCholesky,NDimX,1d0,ABPLUS1,NDimX,DCholActT,NDimX,0d0,APlusTildeAct,NDimX)
-   ! ==========================================================================================================================
+   ! ==========================================================================================================================  
 
    ! Calc CTilde & CTildeAct integrals
-  ! ==========================================================================================================================
+  ! ==========================================================================================================================  
    allocate(COMTilde(NDimX*NCholesky),COMTildeAct(NDimX*NCholesky))
    COMTilde=0d0
    COMTildeAct=0d0
@@ -1307,14 +1310,14 @@ subroutine read_D12_array(NCholesky, DChol, DCholAct, NDimX, NBasis, IndN, Occ, 
       Crs=CICoef(ir)+CICoef(is)
       do i=1,NCholesky
 !           DChol(i,j) = Crs*WorkD(i,irs)
-            DCholAct(i,j) = Crs*WorkD(i,irs)
+            DCholAct(i,j) = Crs*WorkD(i,irs) 
 !           if(IndAux(ir)*IndAux(is)==1) DChol(i,j) = 2.D0*DChol(i,j)
             if(IndAux(ir)*IndAux(is)==1) DCholAct(i,j) = 2.D0*DCholAct(i,j)
       enddo
-      if(IndAux(ir)*IndAux(is).ne.1) then
+      if(IndAux(ir)*IndAux(is).ne.1) then  
             do i=1,NCholesky
 !               DCholAct(i,j) = Crs*WorkD(i,irs)
-                DChol(i,j) = Crs*WorkD(i,irs)
+                DChol(i,j) = Crs*WorkD(i,irs) 
             enddo
       endif
    enddo
@@ -1368,11 +1371,9 @@ end subroutine read_D_array
 
 subroutine AC0BLOCK(Occ,URe,XOne, &
                     IndN,IndX,IGemIN,NAct,INActive,NDimX,NBasis,NDim,NInte1, &
-                    IntJFile,IntKFile,A0BlockIV,A0block,nblk,ver,dumpfile,dump)
+                    IntJFile,IntKFile,A0BlockIV,A0block,nblk,dumpfile,dump)
 !
-!     A ROUTINE FOR COMPUTING : a) ver=0  ABPLUS^{(0)} and ABMIN^{(0)}
-!                                         (stored in matY and matX, respectively)
-!                               b) ver=1  A0=ABPLUS^{(0)}.ABMIN^{(0)}
+!     A ROUTINE FOR COMPUTING A0=ABPLUS^{(0)}.ABMIN^{(0)}
 !                 (FOFO VERSION)
 !
 use abfofo
@@ -1387,7 +1388,7 @@ integer                      :: nblk
 double precision,intent(in)  :: URe(NBasis,NBasis),Occ(NBasis),XOne(NInte1)
 character(*)                 :: IntJFile,IntKFile
 character(*)                 :: dumpfile
-integer,intent(in)           :: ver,dump
+integer,intent(in)           :: dump
 
 integer          :: iunit
 integer          :: NOccup
@@ -1442,9 +1443,12 @@ do l=1,3
    enddo
 enddo
 
-call ABPM0_FOFO(Occ,URe,XOne,ABPLUS,ABMIN, &
-                IndN,IndX,IGemIN,NAct,INActive,NDimX,NBasis,NDim,NInte1, &
-                IntJFile,IntKFile,ETot)
+!call ABPM0_FOFO(Occ,URe,XOne,ABPLUS,ABMIN, &
+!                IndN,IndX,IGemIN,NAct,INActive,NDimX,NBasis,NDim,NInte1, &
+!                IntJFile,IntKFile,ETot)
+ABPLUS = 0
+ABMIN  = 0
+
 ! hererXXX
 !do i=1,NBasis
 !   C(i) = sign(sqrt(Occ(i)),Occ(i)-0.5d0)
@@ -1481,14 +1485,14 @@ nblk = 0
 !pack AA
 if(nAA>0) then
    nblk = nblk + 1
-   call pack_A0block(ABPLUS,ABMIN,nAA,limAA(1),limAA(2),tmpAA,A0block(nblk),NDimX,ver)
+   call pack_A0block(ABPLUS,ABMIN,nAA,limAA(1),limAA(2),tmpAA,A0block(nblk),NDimX)
 endif
 !pack AI
 do iq=1,INActive
    if(nAI(iq)>0) then
       nblk = nblk + 1
       call pack_A0block(ABPLUS,ABMIN,nAI(iq),limAI(1,iq),limAI(2,iq),tmpAI(1:nAI(iq),iq),&
-                        A0block(nblk),NDimX,ver)
+                        A0block(nblk),NDimX)
    endif
 enddo
 !pack AV
@@ -1496,7 +1500,7 @@ do ip=NOccup+1,NBasis
    if(nAV(ip)>0) then
       nblk = nblk + 1
       call pack_A0block(ABPLUS,ABMIN,nAV(ip),limAV(1,ip),limAV(2,ip),tmpAV(1:nAV(ip),ip),&
-                        A0block(nblk),NDimX,ver)
+                        A0block(nblk),NDimX)
     endif
 enddo
 !pack IV
@@ -1509,18 +1513,10 @@ associate(B => A0blockIV)
   B%pos(1:B%n) = tmpIV(1:B%n)
 
   allocate(B%vec(B%n))
-
-  if(ver==0) then
-     do i=1,B%n
-        ii = B%l1+i-1
-        B%vec(i) = ABPLUS(ii,ii)
-     enddo
-  elseif(ver==1) then
-     do i=1,B%n
-        ii = B%l1+i-1
-        B%vec(i) = ABPLUS(ii,ii)*ABMIN(ii,ii)
-     enddo
-  endif
+  do i=1,B%n
+     ii = B%l1+i-1
+     B%vec(i) = ABPLUS(ii,ii)*ABMIN(ii,ii)
+  enddo
 
 end associate
 
@@ -1550,82 +1546,29 @@ if(dump==1) then
   !associate(B => A0blockIV)
   !  deallocate(B%pos,B%vec)
   !end associate
-endif
+endif 
 
 end subroutine AC0BLOCK
 
-subroutine INV_AC0BLK(omega,Lambda,LambdaIV,A0Block,A0BlockIV,nblk,NDimX)
+subroutine INV_AC0BLK(omega,A0Inv,A0Block,A0BlockIV,nblk,NDimX)
 !
 ! Calculate A0Inv=(A0+Om^2)^-1
-! (note: this is the same as calculateLambda_blk in SAPT)
-!
-use blocktypes
-
-integer,intent(in)           :: nblk,NDimX
-double precision,intent(in)  :: omega
-type(EblockData)             :: A0block(nblk), A0blockIV
-
-type(EblockData)             :: Lambda(nblk), LambdaIV
-
-integer             :: i,j,ipos,jpos,info
-integer,allocatable :: ipiv(:)
-double precision,allocatable :: work(:)
-
-Lambda = A0block
-
-do iblk=1,nblk
-   associate(B => Lambda(iblk))
-
-     if(B%n == 1) then
-        ! hartree-fock case
-        B%matX(1,1) = 1d0 / (B%matX(1,1) + omega)
-     else
-        ! more than 1 active orbital
-        allocate(ipiv(B%n),work(B%n))
-
-        do i=1,B%n
-            B%matX(i,i) = B%matX(i,i) + omega
-        enddo
-
-        call dgetrf(B%n,B%n,B%matX,B%n,ipiv,info)
-        call dgetri(B%n,B%matX,B%n,ipiv,work,B%n,info)
-
-        deallocate(work,ipiv)
-     endif
-
-   end associate
-enddo
-
-! IV block
-associate(B => A0blockIV, A => LambdaIV)
-  !A%n = B%n
-  !A%l1 = B%l1
-  !A%l2 = B%l2
-  !allocate(A%pos(A%n),A%vec(A%n))
-  A%pos = B%pos
-  do i=1,B%n
-     A%vec(i) = 1d0 / (B%vec(i) + omega)
-  enddo
-end associate
-
-end subroutine INV_AC0BLK
-
-subroutine INV_AC0BLK_OLD(omega,A0Inv,A0Block,A0BlockIV,nblk,NDimX)
-!
-! Calculate A0Inv=(A0+Om^2)^-1 and return full A0inv matrix!
+!use types,only : EblockData
 !
 use blocktypes
 
 type(EblockData)   :: A0block(nblk), A0blockIV
-type(EblockData)   :: W0block(nblk)
 integer,intent(in) :: nblk,NDimX
-double precision,intent(in)  :: omega
-double precision,intent(out) :: A0Inv(NDimX,NDimX)
+double precision   :: omega
+double precision   :: A0Inv(NDimX,NDimX)
 
-integer             :: i,j,ipos,jpos,info
+integer             :: iblk,i,j,ipos,jpos,info
 integer,allocatable :: ipiv(:)
+double precision    :: val
 double precision,allocatable :: work(:)
+type(EblockData),allocatable   :: W0block(:)
 
+allocate(W0Block(nblk))
 W0block = A0block
 
 A0Inv = 0
@@ -1640,7 +1583,6 @@ do iblk=1,nblk
 
      call dgetrf(B%n,B%n,B%matX,B%n,ipiv,info)
      call dgetri(B%n,B%matX,B%n,ipiv,work,B%n,info)
-
      ! assign places in work(NDimX,NDimX) matrix
      do j=1,B%n
         jpos=B%pos(j)
@@ -1658,12 +1600,12 @@ enddo
 ! IV block
 associate(B => A0blockIV)
 do i=1,B%n
-   ii = B%pos(i)
-   A0Inv(ii,ii) = 1d0 / (B%vec(i) + omega)
+   A0Inv(B%pos(i),B%pos(i)) = A0Inv(B%pos(i),B%pos(i)) + 1d0 / (B%vec(i) + omega)
 enddo
 end associate
+!print*, 'test2-2:',norm2(A0Inv)
 
-end subroutine INV_AC0BLK_OLD
+end subroutine INV_AC0BLK
 
 subroutine RELEASE_AC0BLOCK(A0block,A0blockIV,nblk)
 
@@ -1775,18 +1717,15 @@ deallocate(work)
 
 end subroutine READ_AC0BLK
 
-subroutine pack_A0block(ABPLUS,ABMIN,nVal,lim1,lim2,tmpMat,Eblock,NDimX,ver)
-!
-! packs either :  ver = 0 , ABP, ABM (stored in matY and matX, respectively)
-!                 ver = 1 ABP.ABM    (stored in matX)
-!
+subroutine pack_A0block(ABPLUS,ABMIN,nVal,lim1,lim2,tmpMat,Eblock,NDimX)
+
+!use types,only : EblockData
 use blocktypes
 
 implicit none
 
 integer,intent(in) :: NDimX
 integer,intent(in) :: nVal,lim1,lim2,tmpMat(nVal)
-integer,intent(in) :: ver
 double precision :: ABPLUS(NDimX,NDimX),ABMIN(NDimX,NDimX)
 type(EblockData) :: Eblock(1)
 double precision,allocatable :: ABP(:,:),ABM(:,:)
@@ -1799,23 +1738,60 @@ associate(B => Eblock(1))
   B%pos(1:B%n) = tmpMat(1:B%n)
 
   !allocate(B%vec(B%n),B%matX(B%n,B%n),B%matY(B%n,B%n))
+  allocate(B%matX(B%n,B%n))
   allocate(ABP(B%n,B%n),ABM(B%n,B%n))
+
   ABP = ABPLUS(B%l1:B%l2,B%l1:B%l2)
   ABM = ABMIN(B%l1:B%l2,B%l1:B%l2)
-  if(ver == 0) then
-     allocate(B%matX(B%n,B%n),B%matY(B%n,B%n))
-     B%matX = ABM
-     B%matY = ABP
-  elseif(ver == 1) then
-     allocate(B%matX(B%n,B%n))
-     call dgemm('N','N',B%n,B%n,B%n,1d0,ABP,B%n,ABM,B%n,0d0,B%matX,B%n)
-  else
-     write(*,*) 'Wrong call for pack_A0block',ver
-     stop
-  endif
+
+  call dgemm('N','N',B%n,B%n,B%n,1d0,ABP,B%n,ABM,B%n,0d0,B%matX,B%n)
+
   deallocate(ABM,ABP)
 
 end associate
 
 end subroutine pack_A0block
+
+subroutine makieta_1_petli_po_IV(LambdaIV,A0BlkIV,nblk,NdimX)
+use blocktypes
+implicit none
+
+integer,intent(in) :: nblk
+integer,intent(in) :: NdimX
+type(EblockData)   :: A0BlkIV
+type(EblockData)   :: LambdaIV
+
+integer :: i,j
+double precision :: Amat(NDimX,NDimX)
+
+Amat = 0
+
+print*, 'makieta 1a'
+print*, 'B%n',A0BlkIV%n
+
+associate(B => A0BlkIV, L => LambdaIV)
+  L%n = B%n
+  allocate(L%pos(B%n),L%vec(B%n))
+  L%pos = B%pos
+  do i=1,B%n
+      !Amat(L%pos(i),L%pos(i)) = B%vec(i) * 1.2d0
+      L%vec(i) = L%vec(i) + 1.0d0  / (B%vec(i) + 2.d0)
+  enddo
+end associate
+
+print*, 'makieta 1b-R'
+associate(B => A0BlkIV)
+  do i=1,B%n
+     Amat(:,B%pos(i)) = Amat(:,B%pos(i)) + B%vec(i)*Amat(:,B%pos(i))
+  enddo
+end associate
+
+print*, 'makieta 1b-L'
+associate(B => A0BlkIV)
+  do i=1,B%n
+     Amat(B%pos(i),:) = B%vec(i)*AMAT(B%pos(i),:)
+  enddo
+end associate
+
+end subroutine makieta_1_petli_po_IV
 
