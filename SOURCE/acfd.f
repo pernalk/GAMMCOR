@@ -8520,15 +8520,22 @@ C
 C     DELETE MO INTEGRALS 
 C
       Implicit Real*8 (A-H,O-Z)
+      Logical yes
 
       If(ITwoel.Eq.2) Then
-        Open(newunit=iunit,file='TWOMO',status='OLD')
-        Close(iunit,status='DELETE')
+        inquire(file='TWOMO',exist=yes)
+        If(yes) then
+           Open(newunit=iunit,file='TWOMO',status='OLD')
+           Close(iunit,status='DELETE')
+        Endif
       ElseIf(ITwoel.Eq.3) Then
-        Open(newunit=iunit,file='FFOO',status='OLD')
-        Close(iunit,status='DELETE')
-        Open(newunit=iunit,file='FOFO',status='OLD')
-        Close(iunit,status='DELETE')
+        inquire(file='TWOMO',exist=yes)
+        If(yes) then
+           Open(newunit=iunit,file='FFOO',status='OLD')
+           Close(iunit,status='DELETE')
+           Open(newunit=iunit,file='FOFO',status='OLD')
+           Close(iunit,status='DELETE')
+        Endif
       EndIf
 
       Return

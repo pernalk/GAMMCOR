@@ -772,13 +772,14 @@ C    set buffer size for Cholesky AO2NO transformation
      $              UAux,1,NBasis,
      $              MemMOTransfMB)
 C
+C
       Call chol_ints_fofo(NBasis,Num0+Num1,MatFF,
      $                    NBasis,Num0+Num1,MatFF,
      $                    NCholesky,NBasis,'FOFO')
       Call chol_ints_fofo(NBasis,NBasis,MatFF,
      $                    Num0+Num1,Num0+Num1,MatFF,
      $                    NCholesky,NBasis,'FFOO')
-
+C
       open(newunit=iunt,file='cholvecs',form='unformatted')
       write(iunt) NCholesky
       write(iunt) MatFF(1:NCholesky,1:NBasis**2)
@@ -1584,12 +1585,13 @@ C    set buffer size for Cholesky AO2NO transformation
 C
       Call clock('chol_NOTransf',Tcpu,Twall)
 C
-      Call chol_ints_fofo(NBasis,Num0+Num1,MatFF,
-     $                    NBasis,Num0+Num1,MatFF,
-     $                    NCholesky,NBasis,'FOFO')
-      Call chol_ints_fofo(NBasis,NBasis,MatFF,
-     $                    Num0+Num1,Num0+Num1,MatFF,
-     $                    NCholesky,NBasis,'FFOO')
+      Write(6,'(/," Skipping FOFO/FFOO assembling")')
+C      Call chol_ints_fofo(NBasis,Num0+Num1,MatFF,
+C     $                    NBasis,Num0+Num1,MatFF,
+C     $                    NCholesky,NBasis,'FOFO')
+C      Call chol_ints_fofo(NBasis,NBasis,MatFF,
+C     $                    Num0+Num1,Num0+Num1,MatFF,
+C     $                    NCholesky,NBasis,'FFOO')
 C
       Call clock('chol_FFOOFOFO',Tcpu,Twall)
 C
@@ -1718,7 +1720,11 @@ C      ETot=ETot+Hlp
       EndDo
 C
       ElseIf(ITwoEl.eq.3) Then
-      Call TwoEneChck(ETwo,RDM2Act,Occ,INActive,NAct,NBasis)
+      If(ICholesky.eq.0) Then
+         Call TwoEneChck(ETwo,RDM2Act,Occ,INActive,NAct,NBasis)
+      ElseIf(ICholesky.eq.1) Then
+         Call TwoEneChckChol(ETwo,RDM2Act,Occ,INActive,NAct,NBasis)
+      EndIf
       EndIf
 C
       Write(6,'(/,1X,''Two-electron Energy'',5X,F15.8)')ETwo
@@ -3341,6 +3347,108 @@ C
       Deallocate(RDM2val)
 C
       end subroutine TwoEneChck
+
+      subroutine TwoEneChckChol(ETwo,RDM2Act,Occ,INActive,NAct,NBasis)
+C
+C     calculate 2-electron energy using Cholesky vectors
+C     maybe better to have MatOO and save on the transformation?
+C
+      Implicit Real*8 (A-H,O-Z)
+C
+      Include 'commons.inc'
+C
+      Parameter(Zero=0.D0,Half=0.5D0,One=1.D0,Two=2.D0)
+C
+      Integer INActive,NAct,NBasis
+      Double Precision ETwo
+      Dimension Occ(NBasis),RDM2Act(NAct**2*(NAct**2+1)/2)
+C
+C     LOCAL ARRAYS
+C
+      Integer iloop,nloop,off
+      Integer dimFO,iBatch,BatchSize
+      Integer Ind(NBasis)
+      Double Precision, Allocatable :: RDM2val(:,:,:,:),
+     $                                 work1(:,:),work2(:,:),
+     $                                 ints(:,:),MatFF(:,:)
+      Parameter(MaxBatchSize = 100)
+C
+c     SET FILES
+      Open(newunit=iunit,file='cholvecs',form='unformatted')
+      Read(iunit) NCholesky
+      Allocate(MatFF(NCholesky,NBasis**2))
+      Read(iunit) MatFF
+      Close(iunit)
+C
+C     SET DIMENSIONS
+      NOccup=NAct+INActive
+      Ind=0
+      Do I=1,NAct
+      Ind(INActive+I)=I
+      EndDo
+C
+      Allocate(ints(NBasis,NBasis))
+      Allocate(RDM2val(NOccup,NOccup,NOccup,NOccup))
+C
+      Do L=1,NOccup
+      Do K=1,NOccup
+      Do J=1,NOccup
+      Do I=1,NOccup
+      RDM2val(I,J,K,L) = FRDM2(I,K,J,L,RDM2Act,Occ,Ind,NAct,NBasis)
+      EndDo
+      EndDo
+      EndDo
+      EndDo
+C
+      dimFO = NBasis*NOccup
+      nloop = (dimFO - 1) / MaxBatchSize + 1
+C
+      Allocate(work1(dimFO,MaxBatchSize))
+C
+      ETwo=0
+C     EXCHANGE LOOP (FO|FO), use only (OO|OO)
+      off = 0
+      k   = 0
+      l   = 1
+      Do iloop=1,nloop
+
+      ! batch size for each iloop; last one is smaller
+      BatchSize = min(MaxBatchSize,dimFO-off)
+C
+      ! assemble (FO|BatchSize) batch from CholVecs
+      Call dgemm('T','N',dimFO,BatchSize,NCholesky,1d0,
+     $           MatFF,NCholesky,MatFF(:,off+1:BatchSize),NCholesky,
+     $           0d0,work1,dimFO)
+C
+      Do iBatch=1,BatchSize
+
+      k = k + 1
+      if(k>NBasis) then
+         k = 1
+         l = l + 1
+      endif
+
+      do j=1,NOccup
+         do i=1,NBasis
+            ints(i,j) = work1((j-1)*NBasis+i,iBatch)
+         enddo
+      enddo
+C
+      if(k>NOccup) cycle
+C
+       ETwo = ETwo + sum(RDM2val(:,:,k,l)*ints(1:NOccup,1:NOccup))
+C
+      EndDo
+C
+      off = off + MaxBatchSize
+C
+      EndDo
+C
+      Deallocate(ints,MatFF)
+      Deallocate(work1)
+      Deallocate(RDM2val)
+C
+      end subroutine TwoEneChckChol
 
       subroutine TwoEneGVBChck(ETwo,Occ,NOccup,NBasis)
       Implicit Real*8 (A-H,O-Z)

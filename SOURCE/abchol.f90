@@ -25,14 +25,12 @@ integer :: iunit
 integer :: iloop,nloop,off,dimFO,dimOO,dimFF
 integer :: mloop
 integer :: iBatch
-integer :: BatchSize,MaxBatchSize = 33
+integer :: BatchSize,MaxBatchSize = 120
 integer :: NCholesky
 double precision :: val
 double precision :: AuxVal,HNOCoef
 double precision,allocatable :: work1(:,:),work2(:,:)
 double precision,allocatable :: ints(:,:),MatFF(:,:)
-! testing
-double precision :: HNO_save(NBasis,NBasis)
 
 print*, 'start JK Chol:'
 
@@ -43,8 +41,6 @@ elseif(AB==0) then
 elseif(AB==2) then
    HNOCoef = 1
 endif
-
-HNO_save = HNO
 
 !print*, 'NDimX = ', NDimX
 !print*, 'Occ =',norm2(Occ)
@@ -81,10 +77,7 @@ do iloop=1,nloop
 
    ! assemble (FO|BatchSize) batch from CholVecs 
    call dgemm('T','N',dimFO,BatchSize,NCholesky,1d0,MatFF,NCholesky, &
-              MatFF(1:NCholesky,off+1:BatchSize),NCholesky,0d0,work1,dimFO)
-   !print*, 'iloop,BatchSize',iloop,BatchSize
-   !print*, 'work1',norm2(work1)
-   ! work1 should contain a batch of (FO|FO) ints
+              MatFF(:,off+1:BatchSize),NCholesky,0d0,work1,dimFO)
 
    ! loop over integrals
    do iBatch=1,BatchSize
