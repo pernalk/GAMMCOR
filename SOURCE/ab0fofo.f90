@@ -4010,29 +4010,30 @@ character(:),allocatable :: twojfile,twokfile
 ! FIND EIGENVECTORS (EigVecR) AND COMPUTE THE ENERGY
  if(NoSt==1) then
     call ERPASYMM1(EigVecR,Eig,ABPLUS,ABMIN,NBasis,NDimX)
-   else 
+   else
     call ERPAVEC(EigVecR,Eig,ABPLUS,ABMIN,NBasis,NDimX)
  endif
 
  if(ICASSCF==1) then
     call ACEneERPA_FOFO(ECorr,EigVecR,Eig,Occ, &
                         IGemIN,IndN,IndX,INActive+NAct, &
-                        NDimX,NBasis,twokfile)
+                        NDimX,NBasis,twokfile,ICholesky)
  else
     call EneERPA_FOFO(ECorr,EigVecR,Eig,Occ,CICoef, &
-                      IGemIN,IndN,NDimX,NELE+NAct,NBasis,'FOFO')         
+                      IGemIN,IndN,NDimX,NELE+NAct,NBasis,'FOFO')
  endif
 
 
 end subroutine ACEInteg_FOFO
 
 subroutine ACEneERPA_FOFO(ECorr,EVec,EVal,Occ,IGem, &
-                          IndN,IndX,NOccup,NDimX,NBasis,IntKFile)
+                          IndN,IndX,NOccup,NDimX,NBasis,IntKFile,ICholesky)
 implicit none
 
 integer,intent(in) :: NDimX,NBasis
 integer,intent(in) :: IGem(NBasis),IndN(2,NDimX),IndX(NDimX)
 integer,intent(in) :: NOccup
+integer,intent(in) :: ICholesky
 character(*),intent(in) :: IntKFile
 double precision,intent(out) :: ECorr
 double precision,intent(in) :: EVec(NDimX,NDimX),EVal(NDimX)
@@ -4041,10 +4042,16 @@ double precision :: Occ(NBasis)
 integer :: i,j,k,l,kl,kk,ip,iq,ir,is,ipq,irs
 integer :: iunit,ISkippedEig
 integer :: pos(NBasis,NBasis)
+integer :: NCholesky
+integer :: iloop,nloop,off
+integer :: dimFO,iBatch,BatchSize
+integer :: MaxBatchSize = 33
+logical :: yes
 logical :: AuxCoeff(3,3,3,3)
 logical,allocatable          :: condition(:)
 double precision             :: CICoef(NBasis),Cpq,Crs,SumY,Aux
 double precision,allocatable :: work(:),ints(:,:),Skipped(:)
+double precision,allocatable :: work1(:,:),MatFF(:,:)
 double precision,allocatable :: tVec(:,:)
 double precision,parameter   :: SmallE = 1.d-3,BigE = 1.d8
 double precision,external    :: ddot
@@ -4093,64 +4100,162 @@ do kk=1,NDimX
    if(condition(kk)) tVec(kk,:) = EVec(:,kk)
 enddo
 
-!$OMP CRITICAL(crit_ACEneERPA_FOFO_1)
-open(newunit=iunit,file=trim(IntKFile),status='OLD', &
-     access='DIRECT',recl=8*NBasis*NOccup)
+if(ICholesky==0) then
 
-kl   = 0
-SumY = 0
-do k=1,NOccup
-   do l=1,NBasis
-      kl = kl + 1
-      if(pos(l,k)/=0) then
-        irs = pos(l,k)
-        ir = l
-        is = k
-        read(iunit,rec=kl) work(1:NBasis*NOccup)
-        do j=1,NOccup
-           do i=1,NBasis
-              ints(i,j) = work((j-1)*NBasis+i)
+   !$OMP CRITICAL(crit_ACEneERPA_FOFO_1)
+   open(newunit=iunit,file=trim(IntKFile),status='OLD', &
+        access='DIRECT',recl=8*NBasis*NOccup)
+
+   kl   = 0
+   SumY = 0
+   do k=1,NOccup
+      do l=1,NBasis
+         kl = kl + 1
+         if(pos(l,k)/=0) then
+           irs = pos(l,k)
+           ir = l
+           is = k
+           read(iunit,rec=kl) work(1:NBasis*NOccup)
+           do j=1,NOccup
+              do i=1,NBasis
+                 ints(i,j) = work((j-1)*NBasis+i)
+              enddo
            enddo
-        enddo
-        ints(:,NOccup+1:NBasis) = 0
+           ints(:,NOccup+1:NBasis) = 0
 
-        do j=1,NBasis
-           do i=1,j
-              if(pos(j,i)/=0) then
-                ipq = pos(j,i)
-                ip = j
-                iq = i
-                Crs = CICoef(l)+CICoef(k)
-                Cpq = CICoef(j)+CICoef(i)
+           do j=1,NBasis
+              do i=1,j
+                 if(pos(j,i)/=0) then
+                   ipq = pos(j,i)
+                   ip = j
+                   iq = i
+                   Crs = CICoef(l)+CICoef(k)
+                   Cpq = CICoef(j)+CICoef(i)
 
-                !if(.not.(IGem(ir).eq.IGem(is).and.IGem(ip).eq.IGem(iq)&
-                !.and.IGem(ir).eq.IGem(ip)).and.ir.gt.is.and.ip.gt.iq) then
-                if(AuxCoeff(IGem(ip),IGem(iq),IGem(ir),IGem(is))) then
+                   !if(.not.(IGem(ir).eq.IGem(is).and.IGem(ip).eq.IGem(iq)&
+                   !.and.IGem(ir).eq.IGem(ip)).and.ir.gt.is.and.ip.gt.iq) then
+                   if(AuxCoeff(IGem(ip),IGem(iq),IGem(ir),IGem(is))) then
 
-                   SumY = ddot(NDimX,tVec(:,ipq),1,tVec(:,irs),1)
+                      SumY = ddot(NDimX,tVec(:,ipq),1,tVec(:,irs),1)
 
-                   Aux = 2*Crs*Cpq*SumY
+                      Aux = 2*Crs*Cpq*SumY
 
-                   if(iq.Eq.is.and.ip.Eq.ir) then
-                      Aux = Aux - Occ(ip)*(1d0-Occ(is))-Occ(is)*(1d0-Occ(ip))
+                      if(iq.Eq.is.and.ip.Eq.ir) then
+                         Aux = Aux - Occ(ip)*(1d0-Occ(is))-Occ(is)*(1d0-Occ(ip))
+                      endif
+
+                      ECorr = ECorr + Aux*ints(j,i)
+
+                   ! endinf of If(IP.Gt.IR.And.IQ.Gt.IS)
                    endif
 
-                   ECorr = ECorr + Aux*ints(j,i)
-
-                ! endinf of If(IP.Gt.IR.And.IQ.Gt.IS)
-                endif
-
-              endif
+                 endif
+              enddo
            enddo
-        enddo
 
-      endif
+         endif
 
+      enddo
    enddo
-enddo
+   print*, 'ECorr FOFO ',ECorr
 
-close(iunit)
-!$OMP END CRITICAL(crit_ACEneERPA_FOFO_1)
+   close(iunit)
+   !$OMP END CRITICAL(crit_ACEneERPA_FOFO_1)
+
+elseif(ICholesky==1) then
+
+  inquire(file='cholvecs',EXIST=yes)
+  if(.not.yes) stop "cholvecs not found in ACEneERPA_FOFO"
+
+   ! read cholesky (FF|K) vectors
+   open(newunit=iunit,file='cholvecs',form='unformatted')
+   read(iunit) NCholesky
+   allocate(MatFF(NCholesky,NBasis**2))
+   read(iunit) MatFF
+   close(iunit)
+
+   ! set number of loops over integrals
+   dimFO = NOccup*NBasis
+   nloop = (dimFO - 1) / MaxBatchSize + 1
+
+   allocate(work1(dimFO,MaxBatchSize))
+
+   off = 0
+   k   = 0
+   l   = 1
+   SumY = 0
+   ! exchange loop (FO|FO)
+   do iloop=1,nloop
+
+      ! batch size for each iloop; last one is smaller
+      BatchSize = min(MaxBatchSize,dimFO-off)
+
+      ! assemble (FO|BatchSize) batch from CholVecs
+      call dgemm('T','N',dimFO,BatchSize,NCholesky,1d0,MatFF,NCholesky, &
+                 MatFF(:,off+1:BatchSize),NCholesky,0d0,work1,dimFO)
+
+      ! loop over integrals
+      do iBatch=1,BatchSize
+
+         k = k + 1
+         if(k>NBasis) then
+            k = 1
+            l = l + 1
+         endif
+
+         if(pos(k,l)==0) cycle
+         ir = k
+         is = l
+         irs = pos(k,l)
+
+         do j=1,NOccup
+            do i=1,NBasis
+               ints(i,j) = work1((j-1)*NBasis+i,iBatch)
+            enddo
+         enddo
+
+         if(l>NOccup) cycle
+         ints(:,NOccup+1:NBasis) = 0
+
+         do j=1,NBasis
+            do i=1,j
+               if(pos(j,i)/=0) then
+                 ipq = pos(j,i)
+                 ip = j
+                 iq = i
+                 Crs = CICoef(l)+CICoef(k)
+                 Cpq = CICoef(j)+CICoef(i)
+
+                 !if(.not.(IGem(ir).eq.IGem(is).and.IGem(ip).eq.IGem(iq)&
+                 !.and.IGem(ir).eq.IGem(ip)).and.ir.gt.is.and.ip.gt.iq) then
+                 if(AuxCoeff(IGem(ip),IGem(iq),IGem(ir),IGem(is))) then
+
+                    SumY = ddot(NDimX,tVec(:,ipq),1,tVec(:,irs),1)
+
+                    Aux = 2*Crs*Cpq*SumY
+
+                    if(iq.Eq.is.and.ip.Eq.ir) then
+                       Aux = Aux - Occ(ip)*(1d0-Occ(is))-Occ(is)*(1d0-Occ(ip))
+                    endif
+
+                    ECorr = ECorr + Aux*ints(j,i)
+
+                 ! endinf of If(IP.Gt.IR.And.IQ.Gt.IS)
+                 endif
+
+               endif
+            enddo
+         enddo
+
+      enddo ! iBatch
+
+      off = off + MaxBatchSize
+   enddo
+   print*, 'ECorr Chol ',ECorr
+
+   deallocate(work1,MatFF)
+
+endif
 
 if(ISkippedEig/=0) then
   write(LOUT,'(/,1x,"The number of discarded eigenvalues is",i4)') &

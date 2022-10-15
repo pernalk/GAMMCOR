@@ -294,7 +294,7 @@ C
       If(ITwoEl.Eq.3) Then
       Call ACEneERPA_FOFO(ECorr,EigVecR,Eig,Occ,
      $ IGem,IndN,IndX,NAcCAS+NInAcCAS,
-     $ NDimX,NBasis,'FOFO')
+     $ NDimX,NBasis,'FOFO',ICholesky)
 C
       ElseIf(ITwoEl.Eq.1) Then
       Call ACEneERPA(ECorr,EigVecR,Eig,TwoNO,URe,Occ,XOne,
@@ -1125,7 +1125,7 @@ C
       If(ITwoEl.Eq.3) Then
       Call ACEneERPA_FOFO(ECorr,EigVecR,Eig,Occ,
      $ IGem,IndN,IndX,NAcCAS+NInAcCAS,
-     $ NDimX,NBasis,'FOFOERF')
+     $ NDimX,NBasis,'FOFOERF',ICholesky)
 C
       ElseIf(ITwoEl.Eq.1) Then
       Call ACEneERPA(ECorr,EigVecR,Eig,TwoNO,URe,Occ,XOne,

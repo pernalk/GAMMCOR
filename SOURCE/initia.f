@@ -1593,7 +1593,7 @@ C      Call chol_ints_fofo(NBasis,NBasis,MatFF,
 C     $                    Num0+Num1,Num0+Num1,MatFF,
 C     $                    NCholesky,NBasis,'FFOO')
 C
-      Call clock('chol_FFOOFOFO',Tcpu,Twall)
+C     Call clock('chol_FFOOFOFO',Tcpu,Twall)
 C
 C KP 07.2021: dump MatFF
 C

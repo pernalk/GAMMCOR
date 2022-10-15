@@ -398,7 +398,7 @@ if(Flags%ICASSCF==0.and.Flags%ISERPA==0) then
      case(TWOMO_FOFO)
         call ACEneERPA_FOFO(ECorr,EigVecR,Eig,Mon%Occ, &
                              Mon%IGem,Mon%IndN,Mon%IndX,Mon%num0+Mon%num1, &
-                             Mon%NDimX,NBas,twokfile)
+                             Mon%NDimX,NBas,twokfile,Flags%ICholesky)
      case(TWOMO_FFFF)
         call ACEneERPA_FFFF(ECorr,EigVecR,Eig,Mon%Occ, &
                              Mon%IGem,Mon%IndN,Mon%IndX,Mon%num0+Mon%num1, &
@@ -1531,7 +1531,7 @@ enddo
  !!     Mon%IndN,NBas,NInte1,NInte2,Mon%NDimX,Mon%NGem)
  !  call ACEneERPA_FOFO(ECorr,EigVecR,Eig,Mon%Occ, &
  !                      Mon%IGem,Mon%IndN,Mon%IndX,Mon%num0+Mon%num1, &
- !                      Mon%NDimX,NBas,twokfile)
+ !                      Mon%NDimX,NBas,twokfile,Flags%ICholesky)
  !ECorr=Ecorr*0.5d0
  !write(LOUT,'(/,1x,''ECASSCF+ENuc, Corr, ERPA-CASSCF'',6x,3f15.8)') &
  !     ECASSCF+Mon%PotNuc,ECorr,ECASSCF+Mon%PotNuc+ECorr
