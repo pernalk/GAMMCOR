@@ -9,6 +9,7 @@ C
       use types
       use sorter
       use tran
+      use Cholesky
       use read_external
 C
       Implicit Real*8 (A-H,O-Z)
@@ -25,6 +26,9 @@ C
       Character*30 Line1
 C
       type(FlagsData) :: Flags
+C
+      Type(TCholeskyVecs) :: CholeskyVecs
+      Real*8, Allocatable :: MatFF(:,:)
 C
       Include 'commons.inc'
 C
@@ -100,8 +104,14 @@ C
       Call read2el(TwoEl,UMOAO,NBasis,NInte2)
       Else
 
+      If(ICholesky==0) Then
       MemSrtSize=MemVal*1024_8**MemType
       Call readtwoint(NBasis,1,'AOTWOINT','AOTWOSORT',MemSrtSize)
+      ElseIf(ICholesky==1) Then
+       Call chol_CoulombMatrix(CholeskyVecs,NBasis,'AOTWOINT',1,
+     &                         ICholeskyAccu)
+      NCholesky=CholeskyVecs%NCholesky
+      EndIf
       EndIf
 C
       If(ICASSCF.Eq.0) Then
@@ -178,7 +188,9 @@ C
       ElseIf(ITwoEl.Eq.3) Then
 C     TRANSFORM J AND K
       UAux=transpose(UMOAO)
-c     print*, 'Num0-1',Num0,Num1
+C
+      If (ICholesky==0) Then
+C
       Call tran4_gen(NBasis,
      $        Num0+Num1,UAux(1:NBasis,1:(Num0+Num1)),
      $        Num0+Num1,UAux(1:NBasis,1:(Num0+Num1)),
@@ -192,7 +204,30 @@ c     print*, 'Num0-1',Num0,Num1
      $        Num0+Num1,UAux(1:NBasis,1:(Num0+Num1)),
      $        'FOFO','AOTWOSORT')
 C
-      EndIf
+      ElseIf (ICholesky==1) Then
+C
+      Allocate(MatFF(NCholesky,NBasis**2))
+C
+      If(MemType == 2) then       !MB
+         MemMOTransfMB = MemVal
+      ElseIf(MemType == 3) then   !GB
+         MemMOTransfMB = MemVal * 1024_8
+      Endif
+      Write(LOUT,'(1x,a,i5,a)') 'Using ',MemMOTransfMB,
+     $                          ' MB for 3-indx Cholesky transformation'
+      Call chol_MOTransf_TwoStep(MatFF,CholeskyVecs,
+     $              UAux,1,NBasis,
+     $              UAux,1,NBasis,
+     $              MemMOTransfMB)
+C
+      Open(newunit=iunit,file='cholvecs',form='unformatted')
+      Write(iunit) NCholesky
+      Write(iunit) MatFF
+      Close(iunit)
+      Deallocate(MatFF)
+C
+      EndIf ! ICholesky
+      EndIf ! ITwoEl
 C
       If(ITwoEl.Gt.1) Then
 C     DELETE SORTED AOTWOINTS FOFO
