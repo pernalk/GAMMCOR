@@ -470,9 +470,11 @@ integer          :: tmpAA(NAct*(NAct-1)/2),tmpAI(NAct,1:INActive),&
                     tmpIV(INActive*(NBasis-NAct-INActive))
 integer          :: limAA(2),limAI(2,1:INActive),&
                     limAV(2,INActive+NAct+1:NBasis),limIV(2)
+! Cholesky
 integer          :: iloop,nloop,off
 integer          :: dimFO,iBatch,BatchSize
 integer          :: MaxBatchSize = 100
+! end Cholesky
 double precision :: Cpq,Crs,EAll,EIntra
 double precision :: AuxCoeff(3,3,3,3),Aux,val
 double precision :: Tcpu,Twall
@@ -764,6 +766,7 @@ elseif(ICholesky==1) then
       enddo
 
       off = off + MaxBatchSize
+
    enddo
 
    deallocate(work,MatFF)
@@ -3271,7 +3274,7 @@ double precision,allocatable :: EigY(:,:),EigY1(:,:),EigX(:,:)
 integer,allocatable :: iaddr(:)
 double precision,allocatable :: Eig(:),Eig1(:)
 double precision,allocatable :: RDM2val(:,:,:,:),RDM2Act(:)
-double precision,allocatable :: work1(:),work2(:)
+double precision,allocatable :: work1(:)
 double precision,allocatable :: ints(:,:)
 !double precision,allocatable :: EigYt(:,:),EigXt(:,:),Eigt(:)
 double precision,allocatable :: ABP(:,:),ABM(:,:),workA(:,:)
@@ -3283,8 +3286,14 @@ integer :: nAI(INActive),tmpAI(NAct,1:INActive),limAI(2,1:INActive)
 integer :: nAV(INActive+NAct+1:NBasis),tmpAV(NAct,INActive+NAct+1:NBasis),limAV(2,INActive+NAct+1:NBasis)
 integer :: nIV,tmpIV(INActive*(NBasis-NAct-INActive)),limIV(2)
 integer :: IERPA,NoStMx,IPr,IPair(NBasis,NBasis),NU,IAB,NUMx
-!double precision :: GammaS(100,NInte1),XCAS(NBasis,NInte1),YCAS(NBasis,NInte1)
-!double precision :: OvMax,OvXMax,OvYMax,SumERY,SumCAY,SumERX,SumCAX,YER,XER,YCA,XCA,SOvY,SOvX,TDIP2,EigOv
+! Cholesky
+integer          :: iloop,nloop,off
+integer          :: NCholesky
+integer          :: dimFO,iBatch,BatchSize
+integer          :: MaxBatchSize = 100
+logical          :: yes
+double precision,allocatable :: MatFF(:,:),work2(:,:)
+! end Cholesky
 double precision,allocatable :: ABPLUS(:,:),ABMIN(:,:)
 double precision :: ECorrSym(100),EExcit(100),ECorr,EigMin,Hlp,TDIP2,Eig11(100)
 integer :: NSym,NSymNO(NBasis),MultpC(8,8),IStCAS(2,100),ICORR(100),IStERPA(2,100),ISym,IStart,ICount, &
@@ -3352,7 +3361,7 @@ call create_blocks_ABPL0(nAA,nAI,nAV,nIV,tmpAA,tmpAI,tmpAV,tmpIV,&
 
 call ABPM0_FOFO(Occ,URe,XOne,ABPLUS,ABMIN, &
                 IndN,IndX,IGemIN,NAct,INActive,NDimX,NBasis,NDim,NInte1, &
-                IntJFile,IntKFile,0,ETot)
+                IntJFile,IntKFile,ICholesky,ETot)
 
 print*, 'after ABPM0_FOFO...'
 call clock('AB0MAT',Tcpu,Twall)
@@ -3812,59 +3821,149 @@ do i=1,NDimX
 enddo
 !
 ! energy loop
-allocate(work1(NBasis*NBasis),ints(NBasis,NBasis))
+allocate(ints(NBasis,NBasis))
+
 EAll = 0
 EIntra = 0
-open(newunit=iunit,file='FOFO',status='OLD', &
-     access='DIRECT',recl=8*NBasis*NOccup)
 
-ints = 0
-kl   = 0
-do k=1,NOccup
-   do l=1,NBasis
-      kl = kl + 1
-      if(pos(l,k)/=0) then
-        irs = pos(l,k)
-        ir = l
-        is = k
-        read(iunit,rec=kl) work1(1:NBasis*NOccup)
-        do j=1,NOccup
-           do i=1,NBasis
-              ints(i,j) = work1((j-1)*NBasis+i)
+if(ICholesky==0) then
+
+   allocate(work1(NBasis*NBasis))
+
+   open(newunit=iunit,file='FOFO',status='OLD', &
+        access='DIRECT',recl=8*NBasis*NOccup)
+
+   ints = 0
+   kl   = 0
+   do k=1,NOccup
+      do l=1,NBasis
+         kl = kl + 1
+         if(pos(l,k)/=0) then
+           irs = pos(l,k)
+           ir = l
+           is = k
+           read(iunit,rec=kl) work1(1:NBasis*NOccup)
+           do j=1,NOccup
+              do i=1,NBasis
+                 ints(i,j) = work1((j-1)*NBasis+i)
+              enddo
            enddo
-        enddo
-        ints(:,NOccup+1:NBasis) = 0
+           ints(:,NOccup+1:NBasis) = 0
 
-        do j=1,NBasis
-           do i=1,j
-              if(pos(j,i)/=0) then
-                ipq = pos(j,i)
-                ip = j
-                iq = i
-                Crs = C(ir)+C(is)
-                Cpq = C(ip)+C(iq)
+           do j=1,NBasis
+              do i=1,j
+                 if(pos(j,i)/=0) then
+                   ipq = pos(j,i)
+                   ip = j
+                   iq = i
+                   Crs = C(ir)+C(is)
+                   Cpq = C(ip)+C(iq)
 
-                Aux = Crs*Cpq*ABP(ipq,irs)
-                EAll = EAll + Aux*ints(j,i)
+                   Aux = Crs*Cpq*ABP(ipq,irs)
+                   EAll = EAll + Aux*ints(j,i)
 
-                if(AuxCoeff(IGem(ip),IGem(iq),IGem(ir),IGem(is))==1) EIntra = EIntra + Aux*ints(j,i)
+                   if(AuxCoeff(IGem(ip),IGem(iq),IGem(ir),IGem(is))==1) EIntra = EIntra + Aux*ints(j,i)
 
-              endif
+                 endif
+              enddo
            enddo
-        enddo
 
-      endif
+         endif
+      enddo
    enddo
-enddo
 
-close(iunit)
+   deallocate(work1)
 
-call clock('ENE-loop',Tcpu,Twall)
+   close(iunit)
+
+elseif(ICholesky==1) then
+
+   ! read cholesky (FF|K) vectors
+   inquire(file='cholvecs',exist=yes)
+   if(.not.yes) stop "cholvecs absent in Y01CASDSYM_FOFO!"
+   open(newunit=iunit,file='cholvecs',form='unformatted')
+   read(iunit) NCholesky
+   allocate(MatFF(NCholesky,NBasis**2))
+   read(iunit) MatFF
+   close(iunit)
+
+   ! set number of loops over integrals
+   dimFO = NOccup*NBasis
+   nloop = (dimFO - 1) / MaxBatchSize + 1
+
+   allocate(work2(dimFO,MaxBatchSize))
+
+   ints = 0
+   off = 0
+   k   = 0
+   l   = 1
+   ! exchange loop (FO|FO)
+   do iloop=1,nloop
+
+      ! batch size for each iloop; last one is smaller
+      BatchSize = min(MaxBatchSize,dimFO-off)
+
+      ! assemble (FO|BatchSize) batch from CholVecs
+      call dgemm('T','N',dimFO,BatchSize,NCholesky,1d0,MatFF,NCholesky, &
+                 MatFF(1:NCholesky,off+1:BatchSize),NCholesky,0d0,work2,dimFO)
+
+      ! loop over integrals
+      do iBatch=1,BatchSize
+
+         k = k + 1
+         if(k>NBasis) then
+            k = 1
+            l = l + 1
+         endif
+
+         if(pos(k,l)==0) cycle
+         ir = k
+         is = l
+         irs = pos(k,l)
+
+         do j=1,NOccup
+            do i=1,NBasis
+               ints(i,j) = work2((j-1)*NBasis+i,iBatch)
+            enddo
+         enddo
+
+         if(l>NOccup) cycle
+         ints(:,NOccup+1:NBasis) = 0
+
+         do j=1,NBasis
+            do i=1,j
+               if(pos(j,i)/=0) then
+                 ipq = pos(j,i)
+                 ip = j
+                 iq = i
+                 Crs = C(ir)+C(is)
+                 Cpq = C(ip)+C(iq)
+
+                 Aux = Crs*Cpq*ABP(ipq,irs)
+                 EAll = EAll + Aux*ints(j,i)
+
+                 if(AuxCoeff(IGem(ip),IGem(iq),IGem(ir),IGem(is))==1) EIntra = EIntra + Aux*ints(j,i)
+
+               endif
+            enddo
+         enddo
+
+      enddo
+
+      off = off + MaxBatchSize
+
+   enddo
+
+   deallocate(work2,MatFF)
+
+endif ! ICholesky
+
+call clock('ENE-loop Y01CASDSYM_FOFO',Tcpu,Twall)
 
 ECorr = EAll-EIntra
 ECorrSym(IDCORR)=ECorr
 
-deallocate(ints,work1)
+deallocate(ints)
 !
 !
 EndIf
