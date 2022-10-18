@@ -720,7 +720,7 @@ elseif(ICholesky==1) then
 
       ! assemble (FO|BatchSize) batch from CholVecs
       call dgemm('T','N',dimFO,BatchSize,NCholesky,1d0,MatFF,NCholesky, &
-                 MatFF(1:NCholesky,off+1:BatchSize),NCholesky,0d0,work,dimFO)
+                 MatFF(:,off+1:BatchSize),NCholesky,0d0,work,dimFO)
 
       ! loop over integrals
       do iBatch=1,BatchSize
@@ -3905,7 +3905,7 @@ elseif(ICholesky==1) then
 
       ! assemble (FO|BatchSize) batch from CholVecs
       call dgemm('T','N',dimFO,BatchSize,NCholesky,1d0,MatFF,NCholesky, &
-                 MatFF(1:NCholesky,off+1:BatchSize),NCholesky,0d0,work2,dimFO)
+                 MatFF(:,off+1:BatchSize),NCholesky,0d0,work2,dimFO)
 
       ! loop over integrals
       do iBatch=1,BatchSize
