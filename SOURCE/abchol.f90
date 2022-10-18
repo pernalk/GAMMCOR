@@ -75,7 +75,7 @@ do iloop=1,nloop
    ! batch size for each iloop; last one is smaller
    BatchSize = min(MaxBatchSize,dimFO-off)
 
-   ! assemble (FO|BatchSize) batch from CholVecs 
+   ! assemble (FO|BatchSize) batch from CholVecs
    call dgemm('T','N',dimFO,BatchSize,NCholesky,1d0,MatFF,NCholesky, &
               MatFF(:,off+1:BatchSize),NCholesky,0d0,work1,dimFO)
 

@@ -4144,7 +4144,7 @@ integer :: pos(NBasis,NBasis)
 integer :: NCholesky
 integer :: iloop,nloop,off
 integer :: dimFO,iBatch,BatchSize
-integer :: MaxBatchSize = 33
+integer :: MaxBatchSize = 123
 logical :: yes
 logical :: AuxCoeff(3,3,3,3)
 logical,allocatable          :: condition(:)
@@ -4256,7 +4256,7 @@ if(ICholesky==0) then
 
       enddo
    enddo
-   print*, 'ECorr FOFO ',ECorr
+   !print*, 'ECorr FOFO ',ECorr
 
    close(iunit)
    !$OMP END CRITICAL(crit_ACEneERPA_FOFO_1)
@@ -4350,7 +4350,7 @@ elseif(ICholesky==1) then
 
       off = off + MaxBatchSize
    enddo
-   print*, 'ECorr Chol ',ECorr
+   !print*, 'ECorr Chol ',ECorr
 
    deallocate(work1,MatFF)
 

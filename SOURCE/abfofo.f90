@@ -2011,15 +2011,6 @@ elseif(AB==2) then
    HNOCoef = 1
 endif
 
-print*, 'from full JK_loop'
-print*, 'NDimX = ', NDimX
-print*, 'Occ =',norm2(Occ)
-print*, 'HNO =',norm2(HNO)
-print*, 'WMAT=',norm2(WMAT)
-print*, 'AuxI=',norm2(AuxI)
-print*, 'AuxIO',norm2(AuxIO)
-print*, 'RDM2val',norm2(RDM2val)
-
 allocate(work1(NBasis**2),ints(NBasis,NBasis))
 
 open(newunit=iunit1,file=trim(IntKFile),status='OLD', &

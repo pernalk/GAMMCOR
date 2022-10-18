@@ -454,7 +454,7 @@ C
      $ 'XY0',UNOAO,
      $ IndN,IndX,IGem,NAcCAS,NInAcCAS,NDimX,
      $ NBasis,NDimX,NInte1,NoSt,'EMPTY','FFOO',
-     $ 'FOFO',ICholesky,ETot,IFlAC0DP) 
+     $ 'FOFO',ICholesky,ETot,IFlAC0DP)
 C
       EndIf
 C
