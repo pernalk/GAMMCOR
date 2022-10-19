@@ -237,12 +237,6 @@ deallocate(A0BlockIV%vec,A0BlockIV%pos)
 Call FreqGrid(XFreq,WFreq,NGrid)
 
 ! Calc: A0
-if(NAct==1) then
-  ! active-virtual block
-  nblk = NBasis - NAct - INActive
-else
-  nblk = 1 + NBasis - NAct
-endif
 allocate(A0block(nblk))
 ! ver=1: store A+(0).A-(0) in blocks 
 Call AC0BLOCK(Occ,URe,XOne, &

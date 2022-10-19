@@ -736,7 +736,7 @@ deallocate(TwoNO,XOne)
 
 end subroutine calc_resp_extrapolate
 
-subroutine calc_cas_resp(ACAlpha,XOne,TwoMO,Mon,propfile,NInte1,NInte2,ICholesky,NBas)
+subroutine calc_cas_resp(ACAlpha,XOne,TwoMO,Mon,propfile,NInte1,NInte2,NBas,ICholesky)
 !
 ! Two steps: 1) calculate A+B, A-B for alpha=ACAlpha
 !            2) solve symmetric ERPA eigenproblem

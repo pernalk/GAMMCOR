@@ -463,6 +463,7 @@ double precision :: MO(NBasis*NBasis)
           if(Flags%IFunSR/=0) then
              call calc_resp_dft(Mon,MO,Flags,NBasis)
           else
+             print*, 'here?'
              call calc_resp_casgvb(Mon,MO,Flags,NBasis,EnChck)
           endif
 
