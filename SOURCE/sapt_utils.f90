@@ -725,6 +725,7 @@ type(EblockData)    :: A0Blk(nblk), A0BlkIV
 integer :: i,j
 integer :: iblk,ipos,jpos
 
+!print*, 'add: before blocks'
 do iblk=1,nblk
    associate(B => A0Blk(iblk))
 
@@ -739,11 +740,15 @@ do iblk=1,nblk
 
    end associate
 enddo
+
 !IV block
+! MH 19.10.2022 change below is a bypass of some weird bug
+!               which is to be fixed!  
 associate(B => A0BlkIV)
   do i=1,B%n
-     j = B%pos(i)
-     AMAT(j,j) = AMAT(j,j) + fact * B%vec(i)
+     !j = B%pos(i)
+     !AMAT(j,j) = AMAT(j,j) + fact * B%vec(i)
+     AMAT(B%pos(i),B%pos(i)) = AMAT(B%pos(i),B%pos(i)) + fact * B%vec(i)
   enddo
 end associate
 
@@ -759,7 +764,7 @@ type(EBlockData)             :: A0BlkIV,A0Blk(nblk)
 
 double precision,intent(out) :: ABP(NDimX,NDimX),ABM(NDimX,NDimX)
 
-integer :: i,j,iblk
+integer :: i,j,ii,iblk,jpos,ipos
 
 ABP = 0
 ABM = 0

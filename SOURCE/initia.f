@@ -1258,6 +1258,14 @@ C
 C     SET TIMING FOR 2-el integrals
       Call clock('START',Tcpu,Twall)
 C
+CCC     bug!!!
+C       If(IRes==1) then
+C          print*, 'RESTART : read NCholesky from file!'
+C          open(newunit=iunit,file='cholvecs',form='unformatted')
+C          read(iunit) NCholesky
+C          close(iunit)
+C       Else
+C
       If(ICholesky==0) Then
 C     memory allocation for sorter
       MemSrtSize=MemVal*1024_8**MemType
@@ -1277,6 +1285,7 @@ c     Call chol_CoulombMatrix(CholeskyVecs,'AOTWOSORT',ICholeskyAccu)
      &                         ICholeskyAccu)
       NCholesky=CholeskyVecs%NCholesky
       EndIf ! ICholesky
+C      EndIf ! IRes
       Call clock('2-electron ints',Tcpu,Twall)
 C
 C     LOAD AO TO CAS_MO ORBITAL TRANSFORMATION MATRIX FROM uaomo.dat
@@ -1347,6 +1356,7 @@ C     it may happen that an active orbital has a negative but very small occupat
 C
 C KP 30.07.2020, no need to call read_nact_molpro again
 c      Call read_nact_molpro(nact,'2RDM')
+      ISwitch=0
       If(NAc.Ne.nact) Then
       Write(6,'(1x,"WARNING! The number of partially occ orbitals
      $ different from nact read from molpro. Some active orbitals
@@ -1388,7 +1398,7 @@ C
       Write(6,'(X,I3,E16.6,I6)') I,Occ(I),IGem(I)
       Sum=Sum+Occ(I)
       EndDo
-      Write(6,'(2X,"Sum of Occupancies: ",F5.2)') Sum
+      Write(6,'(2X,"Sum of Occupancies: ",F7.2)') Sum
 C
       NAct=NAcCAS
       INActive=NInAcCAS
@@ -1420,6 +1430,11 @@ C
      $ GammaF(IJ)=Gamma(IndSym(I-NInAc,J-NInAc))
       EndDo
       EndDo
+C
+CCc     bug!
+C       if(IRes==1) then
+C          print*, 'Restart: Skip canonicalization...'
+C       else
 C
 C     FIND CANONICAL INACTIVE AND VIRTUAL ORBITALS
 C
@@ -1538,6 +1553,9 @@ C
 C
 C     END OF CANONICALIZING
 C
+c     endif ! IRes
+C
+C
   543 Continue
 C
 C     If CASPiDFT then skip integral transformation
@@ -1566,6 +1584,11 @@ C     If(IAO.Eq.0)
 C
       Call MultpM(UAOMO,URe,UAux,NBasis)
       Call MatTr(XKin,UAOMO,NBasis)
+C
+      If(IRes.Eq.1) Then
+      Write(6,'(/," Skipping AO-NO transformation...",/)')
+C      
+      Else ! IRes=0, perform 2-ints transformation
 C
 C     ITwoEl
       If(ITwoEl.Eq.1) Then
@@ -1663,6 +1686,8 @@ C
       EndIf
 C
       EndIf
+C
+      EndIf ! IRes
 C
 c     If(IFunSR.Eq.5) Then
       EndIf
