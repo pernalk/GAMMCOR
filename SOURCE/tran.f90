@@ -1149,6 +1149,8 @@ associate(B => EblockIV)
   do i=1,B%n
      !ipos = B%pos(i)
      !AOUT(ipos,:) = B%vec(i)*AMAT(ipos,:)
+     ! MH 19.10.2022 change below is a bypass of some weird bug
+     !               which is to be fixed!
      AOUT(B%pos(i),:) = B%vec(i)*AMAT(B%pos(i),:)
   enddo
 
@@ -1247,6 +1249,8 @@ associate(B => EblockIV)
   do i=1,B%n
      !ipos = B%pos(i)
      !AOUT(:,ipos) = AOUT(:,ipos) + B%vec(i)*AMAT(:,ipos)
+     ! MH 19.10.2022 change below is a bypass of some weird bug
+     !               which is to be fixed!  
      AOUT(:,B%pos(i)) = AOUT(:,B%pos(i)) + B%vec(i)*AMAT(:,B%pos(i))
   enddo
 

@@ -725,7 +725,7 @@ type(EblockData)    :: A0Blk(nblk), A0BlkIV
 integer :: i,j
 integer :: iblk,ipos,jpos
 
-print*, 'add: before blocks'
+!print*, 'add: before blocks'
 do iblk=1,nblk
    associate(B => A0Blk(iblk))
 
@@ -741,7 +741,8 @@ do iblk=1,nblk
    end associate
 enddo
 !IV block
-print*, 'add: zero in IV block'
+! MH 19.10.2022 change below is a bypass of some weird bug
+!               which is to be fixed!  
 associate(B => A0BlkIV)
   do i=1,B%n
      !j = B%pos(i)
