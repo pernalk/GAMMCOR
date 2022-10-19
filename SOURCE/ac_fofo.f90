@@ -183,9 +183,10 @@ if(NAct==1) then
 else
   nblk = 1 + NBasis - NAct
 endif
-print*, 'outer nblk',nblk
+!print*, 'outer nblk',nblk
 
 allocate(A0block(nblk))
+! ver=0: store A+(0) and A-(0) in blocks
 Call AC0BLOCK(Occ,URe,XOne, &
      IndN,IndX,IGem,NAct,INActive,NDimX,NBasis,NDimX,NInte1,'FFOO','FOFO', &
      A0BlockIV,A0Block,nblk,0,'DUMMY',0)
@@ -202,8 +203,8 @@ Call sq_symmetrize(ABMIN1,NDimX)
 ! AB1 = AB1 - A0
 call add_blk_right(ABPLUS1,A0Block,A0BlockIV,-1d0,.false.,nblk,NDimX)
 call add_blk_right(ABMIN1, A0Block,A0BlockIV,-1d0,.true., nblk,NDimX)
-print*, 'add_blk_right: ABPLUS1',norm2(ABPLUS1)
-print*, 'add_blk_right: ABMIN1 ',norm2(ABMIN1)
+!print*, 'add_blk_right: ABPLUS1',norm2(ABPLUS1)
+!print*, 'add_blk_right: ABMIN1 ',norm2(ABMIN1)
 
 !Calc: A1=ABPLUS0*ABMIN1+ABPLUS1*ABMIN0
 allocate(A1(NDimX*NDimX))
@@ -217,18 +218,18 @@ EGOne(1)=ECASSCF
 !Calc: A2=ABPLUS1*ABMIN1
 allocate(A2(NDimX*NDimX))
 Call dgemm('N','N',NDimX,NDimX,NDimX,1d0,ABPLUS1,NDimX,ABMIN1,NDimX,0.0d0,A2,NDimX)
-print*, 'A2:',norm2(A2)
+!print*, 'A2:',norm2(A2)
 deallocate(ABMIN1)
 
 !Calc: APLUS0Tilde=ABPLUS0.DChol
 allocate(APLUS0Tilde(NDimX*NCholesky))
 call ABPM_HALFTRAN_GEN_L(DCholT,APLUS0Tilde,0.0d0,A0Block,A0BlockIV,nblk,NDimX,NCholesky,'Y')
-print*, 'A0PT  ',norm2(APLUS0Tilde)
+!print*, 'A0PT  ',norm2(APLUS0Tilde)
 
 !Calc: APLUS1Tilde=ABPLUS1.DChol
 allocate(APLUS1Tilde(NDimX*NCholesky))
 Call dgemm('N','N',NDimX,NCholesky,NDimX,1d0,ABPLUS1,NDimX,DCholT,NDimX,0.0d0,APLUS1Tilde,NDimX)
-print*, 'A1PT  ',norm2(APLUS1Tilde)
+!print*, 'A1PT  ',norm2(APLUS1Tilde)
 deallocate(ABPLUS1)
 
 deallocate(A0block)
@@ -237,8 +238,14 @@ deallocate(A0BlockIV%vec,A0BlockIV%pos)
 Call FreqGrid(XFreq,WFreq,NGrid)
 
 ! Calc: A0
-nblk = 1 + NBasis - NAct
+if(NAct==1) then
+  ! active-virtual block
+  nblk = NBasis - NAct - INActive
+else
+  nblk = 1 + NBasis - NAct
+endif
 allocate(A0block(nblk))
+! ver=1: store A+(0).A-(0) in blocks 
 Call AC0BLOCK(Occ,URe,XOne, &
      IndN,IndX,IGem,NAct,INActive,NDimX,NBasis,NDimX,NInte1,'FFOO','FOFO', &
      A0BlockIV,A0Block,nblk,1,'A0BLK',0)
@@ -281,7 +288,7 @@ Do IGL=1,NGrid
        XN2=-N*(N-1)
        Call dgemm('N','N',NDimX,NCholesky,NDimX,XN2,A2,NDimX,C0Tilde,NDimX,0.0d0,WORK0,NDimX)
        Call dgemm('N','N',NDimX,NCholesky,NDimX,XN1,A1,NDimX,C1Tilde,NDimX,1.0d0,WORK0,NDimX)
-       Call ABPM_HALFTRAN_GEN_L(Work0,C2Tilde,0.0d0,Lambda,LambdaIV,nblk,NDimX,NCholesky,'X')
+       Call ABPM_HALFTRAN_GEN_L(WORK0,C2Tilde,0.0d0,Lambda,LambdaIV,nblk,NDimX,NCholesky,'X')
        !Call dgemm('N','N',NDimX,NCholesky,NDimX,1.0d0,LAMBDA,NDimX,WORK0,NDimX,0.0d0,C2Tilde,NDimX)
        FF=WFact/XFactorial/(N+1)
        If(AC1.Eq.1) FF=WFact/XFactorial/2.D0
@@ -318,7 +325,6 @@ enddo
 
 deallocate(WorkD,COMTilde)
 
-close(iunit)
 Call RELEASE_AC0BLOCK(A0Block,A0blockIV,nblk)
 
 end subroutine WIter_D12Chol
