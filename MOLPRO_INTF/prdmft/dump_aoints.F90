@@ -7,7 +7,7 @@ double precision :: ChiSave
 
 contains
 
-subroutine dump_molpro_sapt(mon,IsRSH,Omega)
+subroutine dump_molpro_sapt(mon,IsRSH,Omega,diab)
       implicit double precision (a-h,o-z)
       include "common/corb"
       include "common/cbas"
@@ -18,7 +18,8 @@ subroutine dump_molpro_sapt(mon,IsRSH,Omega)
       logical :: doRSH,DiffOm
       character(32) :: onefile,rdmfile,recname,orbname,str
       character(32) :: dipfile
-      character(8) :: unit
+      character(8)  :: unit
+      integer,optional :: diab
 
       ! manage range-seprated hybrids
       doRSH=.false.
@@ -55,11 +56,20 @@ subroutine dump_molpro_sapt(mon,IsRSH,Omega)
         dipfile='DIP_B'
       endif
 
+      if(present(diab)) write(6,'(1x,a)') 'SAPT with diabatization'
+
+!         if(diab.eq.1) then
+!            write(6,'(1x,a)') 'Save RDMs and AOMO orbs only'
+!         elseif(diab.eq.2) then
+!            write(6,'(1x,a)') 'dump 1-electron ints...'
+!         endif
+
+      if( .not.present(diab).or.diab.eq.2 ) then
+
       iS = icorr(ntdg)
       iT = icorr(ntdg)
       iV = icorr(ntdg)
       iH = icorr(ntdg)
-      iOrbCas = icorr(ntqg)
       call readm(q(iS), ntdg, 1, 1100, 0, str)
       call readm(q(iT), ntdg, 1, 1400, 0, str)
       call readm(q(iV), ntdg, 1, 1410, 0, str)
@@ -67,9 +77,15 @@ subroutine dump_molpro_sapt(mon,IsRSH,Omega)
 !      call readm(q(iH), ntdg, 1, 1200, 0, str)
       ! 1-el integrals
       call dump_oneints(trim(onefile),q(iS),q(iT),q(iV),q(iH))
+
+      endif
+      ! if diab2 exit after dumping 1el ints
+      if(present(diab).and.diab.eq.2) return
+
       ! 1- and 2-RDM
       call dump_gamma(trim(rdmfile),2,7200,2,7100)
       ! orbitals
+      iOrbCas = icorr(ntqg)
       call dump_orbs(q(iOrbCas),trim(recname),trim(orbname))
       ! dipole moment integrals
       call dump_dip(trim(dipfile))
@@ -171,11 +187,6 @@ subroutine dump_aoints
       ! add symmetries
       call dump_oneints('AOONEINT.mol',q(iS),q(iT),q(iV),q(iH))
 
-      call corlsr(iH)
-      call corlsr(iV)
-      call corlsr(iT)
-      call corlsr(iS)
-
       ! orbitals
       !
       iOrbCas = icorr(ntqg)
@@ -184,9 +195,95 @@ subroutine dump_aoints
       ! dipole moment integrals
       call dump_dip(trim('DIP'))
 
+      !! AO integrals and orbitals
+      !call dump_AOs('AOMATS',q(iOrbCas),q(iS))
+
+      call corlsr(iH)
+      call corlsr(iV)
+      call corlsr(iT)
+      call corlsr(iS)
+
       call corlsr(ibase)
 
 end subroutine dump_aoints
+
+subroutine dump_AOs(aofile,orb,Smat)
+!
+! dump integrals and orbitals in AO not SAO representation
+! on entry, orb is in (SAO,MO) representation
+!
+      implicit double precision (a-h,o-z)
+      include "common/corb"
+      include "common/cbas"
+      include "common/tapes"
+      include "common/big"
+      include "common/cgeom"
+      character(*)     :: aofile
+      double precision :: orb(ntqg)
+      double precision :: Smat(ntdg)
+      double precision :: orbAO(ntg,ntg),SmatAO(ntg,ntg)
+      integer :: iorder(ntg)
+
+      isq = icorr(ntg)
+      iit = icori(ntg)
+      ijt = icori(ntg*8)
+
+!     Construct SO-AO transformation:
+      call mksoaotra(iq(iit),iq(ijt),q(isq))
+
+      call symtrans_oper(Smat,SmatAO,iq(ijt),iq(iit),q(isq))
+      call symtrans_orbitals(orb,orbAO,iorder,iq(ijt),iq(iit),q(isq))
+      !call test_oper(SmatAO,orbAO,orb,iorder)
+      call test_Ssao_to_Smo(Smat,orb)
+
+end subroutine dump_AOs
+
+
+subroutine test_Ssao_to_Smo(S,C)
+      implicit double precision (a-h,o-z)
+
+      include "common/corb"
+      !include "common/cstate"
+      include "common/cbas"
+      include "common/tapes"
+      include "common/big"
+      double precision :: C(ntqg), S(ntdg)
+      double precision :: Smat(ntg,ntg),Cmat(ntg,ntg)
+      double precision :: work(ntqg)
+
+      ! unpack C(SAO,MO) coeffs
+      cmat = 0
+      idx  = 0
+      do irep=1,nsk
+         ioff = nts(irep)
+         do j=1,nt(irep)
+            do i=1,nt(irep)
+               idx = idx + 1
+               cmat(ioff+i,ioff+j) = c(idx)
+            enddo
+         enddo
+      enddo
+      call print_sqmat(Cmat,ntg,'Cmat')
+
+      ! unpack S(SAO,SAO) coeffs
+      work = 0
+      call expan(S,work,1,1,0)
+      Smat = 0
+      idx  = 0
+      do irep=1,nsk
+         ioff = nts(irep)
+         do j=1,nt(irep)
+            do i=1,nt(irep)
+               idx = idx + 1
+               Smat(ioff+i,ioff+j) = S(idx)
+            enddo
+         enddo
+      enddo
+      call print_sqmat(Smat,ntg,'Smat')
+
+
+
+end subroutine test_Ssao_to_Smo
 
 subroutine dump_basinfo(iunit,nstats,istsy,nstsym,mxstsy)
       implicit double precision (a-h,o-z)
@@ -396,8 +493,10 @@ subroutine dump_dens(i1fil,i1recnum,ensmble,smoothSCF,iststr)
 
       ! get orbs
       call find_rec('CASORB',icasrec,icasfil)
-      call read_info(icasrec, icasfil, 0, idiffCAS, method)
-      call read_orb(OrbCas, 1)
+      call get_orb(OrbCas,icasrec,icasfil,1,2)
+      ! MH, 22.04.22: this stopped working for some reason
+      !call read_info(icasrec, icasfil, 0, idiffCAS, method)
+      !call read_orb(OrbCas, 1)
       call flush_dump
 
       ! expand Orbs
@@ -562,7 +661,7 @@ subroutine read_prev_1rdm(onerdm,smoothSCF)
       istate = 1
 
       call find_rec('CASDEN',idenrec,idenfil)
-      if(idenrec.ne.0) then 
+      if(idenrec.ne.0) then
          call read_info(idenrec, idenfil, 0, idiffCAS, method)
          call read_den(onerdm(1:ntdgx),1)
          call flush_dump
@@ -570,7 +669,7 @@ subroutine read_prev_1rdm(onerdm,smoothSCF)
          smoothSCF = 0
          write(iout,'(1x,a)') 'WARNING! CASDEN RECORD EMPTY! ABORT DM AVERAGE!'
       endif
- 
+
       isyref = isyref_save
       istate = istate_save
 
@@ -698,7 +797,7 @@ subroutine dump_gamma(outfile,i2fil,i2recnum,i1fil,i1recnum)
          isymoff = isymoff + nstate*(nstate+1)/2*nact2
       enddo
 
-      !write(*,*) 'Writing TRDMs!' 
+      !write(*,*) 'Writing TRDMs!'
       i1off = 0
       isymoff = 0
       write(ifil) '1TRDM   '
@@ -708,7 +807,7 @@ subroutine dump_gamma(outfile,i2fil,i2recnum,i1fil,i1recnum)
          isym   = istsy(istsym)
          write(ifil) int(isym,kind=4),int(nstate,kind=4)
          do j=1,nstate
-            do i=1,j-1   
+            do i=1,j-1
                itr = j*(j-1)/2 + i
                i1off = isymoff + (itr-1)*nact2
                !print*, 'isym,i1off',isym,i1off
@@ -866,13 +965,13 @@ subroutine dump_dip(infil)
       include "common/corb"
       include "common/cbas"
       include "common/tapes"
-      
+
       character(*)     :: infil
 
       integer :: i,isym
       integer :: isyop,isymx,isymy,isymz
       double precision :: origin(3),opnuc(3)
-      double precision,allocatable :: tmp(:) 
+      double precision,allocatable :: tmp(:)
       double precision,allocatable :: dipx(:),dipy(:),dipz(:)
 
       origin = 0d0
@@ -881,7 +980,7 @@ subroutine dump_dip(infil)
       dipx=0
       dipy=0
       dipz=0
-      do isym=1,nsk 
+      do isym=1,nsk
          call read_op(tmp,opnuc(1),'DMX',0,isym,0,origin,isyop)
          if(isyop.ne.0) then
             dipx  = tmp
@@ -900,7 +999,7 @@ subroutine dump_dip(infil)
             isymz = isym
             tmp = 0
          endif
-        
+
       enddo
 
       call find_free_unit(ifil)
@@ -908,13 +1007,13 @@ subroutine dump_dip(infil)
       write(ifil)
       write(ifil) int(nsk,kind=4),int(nt(1:nsk),kind=4),int(nts(1:nsk),kind=4)
       write(ifil) 'DIPMOMX '
-      write(ifil) int(isymx,kind=4) 
+      write(ifil) int(isymx,kind=4)
       write(ifil) dipx(1:ntqg)
       write(ifil) 'DIPMOMY '
-      write(ifil) int(isymy,kind=4) 
+      write(ifil) int(isymy,kind=4)
       write(ifil) dipy(1:ntqg)
       write(ifil) 'DIPMOMZ '
-      write(ifil) int(isymz,kind=4) 
+      write(ifil) int(isymz,kind=4)
       write(ifil) dipz(1:ntqg)
 
       close(ifil)
@@ -924,6 +1023,7 @@ subroutine dump_dip(infil)
 end subroutine dump_dip
 
 subroutine dump_orbs(OrbCas,recname,outfile)
+
       implicit double precision (a-h,o-z)
       include "common/corb"
       include "common/cbas"
@@ -962,6 +1062,269 @@ subroutine dump_orbs(OrbCas,recname,outfile)
       close(ifil)
 
 end subroutine dump_orbs
+
+subroutine print_SAOs(orb)
+
+   implicit double precision (a-h,o-z)
+   include "common/corb"
+   include "common/cbas"
+   include "common/tapes"
+   double precision orb(*)
+
+   ij = 0
+   do isk=1,nsk
+      do i=1,nt(isk)
+         do j=1,nt(isk)
+            ij = ij + 1
+            write(iout,*) i,j,orb(ij)
+         enddo
+      enddo
+   enddo
+
+end subroutine print_SAOs
+
+subroutine print_AOs(orb)
+
+   implicit double precision (a-h,o-z)
+   include "common/corb"
+   include "common/cbas"
+   include "common/tapes"
+   double precision orb(*)
+
+   ij = 0
+   do i=1,ntg
+       do j=1,ntg
+          ij = ij + 1
+          write(iout,*) i,j,orb(ij)
+       enddo
+   enddo
+
+end subroutine print_AOs
+
+subroutine test_oper(SAO,CAO,CSAO,iorder)
+   implicit double precision (a-h,o-z)
+   include "common/tapes"
+   include "common/cbas"
+   include "common/corb"
+   include "common/big"
+
+   integer :: iorder(ntg)
+   double precision :: CSAO(ntqg)
+   double precision :: SAO(ntg,ntg),CAO(ntg,ntg)
+   double precision :: CSAOb(ntg,ntg),CAOb(ntg,ntg)
+   double precision :: CAOSAO(ntg,ntg),SSAO(ntg,ntg)
+   double precision :: work(ntg,ntg)
+
+   ! unpack CSAO to square
+   CSAOb = 0
+   idx = 0
+   do irep=1,nsk
+      ioff = nts(irep)
+      do j=1,nt(irep)
+         do i=1,nt(irep)
+            idx = idx + 1
+            CSAOb(ioff+i,ioff+j) = CSAO(idx)
+         enddo
+      enddo
+   enddo
+
+   ! reorder MOs to match symmetry
+   CAOb = 0
+   do j=1,ntg
+      do i=1,ntg
+         CAOb(i,iorder(j)) = CAO(i,j)
+      enddo
+   enddo
+   ! create AO->SAO matrix
+   call dgemm('N','T',ntg,ntg,ntg,1d0,CAOb,ntg,CSAOb,ntg,0d0,CAOSAO,ntg)
+   call print_sqmat(CAOSAO,ntg,'cSAOAO')
+   ! transform SAO to SSAO
+   call dgemm('N','N',ntg,ntg,ntg,1d0,SAO,ntg,CAOSAO,ntg,0d0,work,ntg)
+   call dgemm('T','N',ntg,ntg,ntg,1d0,CAOSAO,ntg,work,ntg,0d0,SSAO,ntg)
+   !call print_sqmat(SSAO,ntg,'SSAO')
+
+end subroutine test_oper
+
+subroutine symtrans_orbitals(orb,orbOut,iorder,ijt,iit,tra)
+
+   implicit double precision (a-h,o-z)
+   include "common/tapes"
+   include "common/cbas"
+   include "common/corb"
+   include "common/big"
+   integer          :: iit(ntg),ijt(ntg,nsk)
+   integer          :: iorder(ntg)
+   double precision :: tra(ntg)
+   double precision,intent(in)  :: orb(ntqg)
+   double precision,intent(out) :: orbOut(ntg*ntg)
+   integer          :: iit_sav(ntg),ijt_sav(ntg,nsk)
+   double precision :: tra_sav(ntg)
+
+!   if(nsk.eq.1) return
+   orbOut = 0d0
+
+   iit_sav(1:ntg)       = iit(1:ntg)
+   ijt_sav(1:ntg,1:nsk) = ijt(1:ntg,1:nsk)
+   tra_sav(1:ntg)       = tra(1:ntg)
+
+   !write(iout,*) 'iit,tra: symtrans_orbs'
+   !do i=1,ntg
+   !   write(iout,*) i,iit(i),tra(i)
+   !enddo
+   !write(iout,*) 'jtsoao_orbs'
+   !do i=1,ntg
+   !   write(iout,*) i,(ijt(i,isk),isk=1,iit(i))
+   !enddo
+
+   ! orbitals
+   iq1  = icorr(ntg*ntg)
+   iord = icori(ntg)
+   !call print_sao(orb)
+   call symtrans_orb(orb,q(iq1),ntg,iq(iord),ijt,iit,tra)
+   call fmove(q(iord),iorder,ntg)
+   call fmove(q(iq1),orbOut,ntg*ntg)
+
+   iit(1:ntg)       = iit_sav(1:ntg)
+   ijt(1:ntg,1:nsk) = ijt_sav(1:ntg,1:nsk)
+   tra(1:ntg)       = tra_sav(1:ntg)
+
+   !call reconstruct_sao(orbOut,iq(iord),ijt,iit,tra)
+
+   call corlsr(iq1)
+
+end subroutine symtrans_orbitals
+
+subroutine symtrans_oper(op,opOut,ijt,iit,tra)
+
+   implicit double precision (a-h,o-z)
+   include "common/tapes"
+   include "common/cbas"
+   include "common/corb"
+   include "common/big"
+
+   double precision,intent(in)  :: op(ntdg)
+   double precision,intent(out) :: opOut(ntg,ntg)
+   integer          :: iit(ntg),ijt(ntg,nsk)
+   double precision :: tra(ntg)
+   integer          :: iit_sav(ntg),ijt_sav(ntg,nsk)
+   double precision :: tra_sav(ntg)
+
+   iit_sav(1:ntg) = iit(1:ntg)
+   ijt_sav = ijt
+   tra_sav(1:ntg) = tra(1:ntg)
+
+   !write(iout,*) 'iit,tra: symtrans_oper'
+   !do i=1,ntg
+   !   write(iout,*) i,iit(i),tra(i)
+   !enddo
+   !write(iout,*) 'jtsoao_oper'
+   !do i=1,ntg
+   !   write(iout,*) i,(ijt(i,isk),isk=1,iit(i))
+   !enddo
+
+   !if(nsk.eq.1) return
+   iq1 = icorr(ntqg)
+   iq2 = icorr(ntg*ntg)
+   call expan(op,q(iq1),1,1,0)
+   call symtrans_op(q(iq2),ntg,q(iq1),1,ijt,iit,tra,1)
+   !call triang(q(iq2),op,ntg)
+   call fmove(q(iq2),opOut,ntg*ntg)
+   !call print_sqmat(q(iq2),ntg,'SAO')
+   call print_sqmat(opOut,ntg,'SAO')
+   call corlsr(iq1)
+
+   iit = iit_sav
+   ijt = ijt_sav
+   tra = tra_sav
+
+end subroutine symtrans_oper
+
+subroutine print_sao(CSAO)
+!
+! print unpacked SAO(ntg,ntg) instead of SAO(ntqg)
+!
+      implicit real*8 (a-h,o-z)
+      include "common/tapes"
+      include "common/zahl"
+      include "common/cbas"
+      include "common/corb"
+
+      double precision CSAO(*)
+      double precision CUN(ntg,ntg)
+
+      CUN = 0
+      idx = 0
+      do irep=1,nsk
+         ioff = nts(irep)
+         do j=1,nt(irep)
+            do i=1,nt(irep)
+               idx = idx + 1
+               CUN(ioff+i,ioff+j) = CSAO(idx)
+            enddo
+         enddo
+      enddo
+      write(iout,*) 'idx = ',idx,ntqg
+      call print_sqmat(CUN,ntg,'CSAOun')
+
+end subroutine print_sao
+
+subroutine reconstruct_sao(CAO,iord,ijt,iit,tra)
+
+      implicit real*8 (a-h,o-z)
+      include "common/tapes"
+      include "common/zahl"
+      include "common/cbas"
+      include "common/corb"
+      include "common/big"
+
+      dimension CAO(ntg,ntg),CSAO(ntg,ntg)
+      dimension iord(ntg),ijt(ntg,nsk),iit(ntg)
+      dimension tra(ntg)
+
+      !call print_sqmat(CAO,ntg,'CAO')
+      CSAO = 0d0
+      do j=1,ntg
+         do i=1,ntg
+            do k=1,iit(i)
+               iao = abs(ijt(i,k))
+               if (ijt(i,k).lt.0) fac = -tra(iao)
+               if (ijt(i,k).gt.0) fac = tra(iao)
+               !write(iout,*) 'iao',iao,iord(j)
+               !write(iout,*) 'fac',fac
+               CSAO(i,j) = CSAO(i,j) + fac*CAO(iao,iord(j))
+            enddo
+         enddo
+      enddo
+      call print_sqmat(CSAO,ntg,'CSAO')
+
+end subroutine reconstruct_sao
+
+subroutine print_test(iit,ijt,tra)
+      implicit real*8 (a-h,o-z)
+      include "common/tapes"
+      include "common/zahl"
+      include "common/cbas"
+      include "common/corb"
+      include "common/big"
+      dimension ijt(ntg,nsk),iit(ntg)
+      dimension tra(ntg)
+
+      write(iout,*) 'itsoao'
+      do i=1,ntg
+         write(iout,*) i,iit(i)
+      enddo
+
+      write(iout,*) 'jtsoao'
+      do i=1,ntg
+         write(iout,*) i,(ijt(i,isk),isk=1,iit(i))
+      enddo
+
+      write(iout,*) 'tra'
+      do i=1,ntg
+         write(iout,*) i,tra(i)
+      enddo
+
+end subroutine print_test
 
 subroutine find_rec(str,irec,ifil)
       implicit double precision (a-h,o-z)
