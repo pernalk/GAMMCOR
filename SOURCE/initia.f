@@ -1359,7 +1359,7 @@ C     SET TIMING FOR 2-el integrals
       Call clock('START',Tcpu,Twall)
 C
 C     test 1
-c     If(ICholesky==0) Then
+      If(ICholesky==0) Then
 C     memory allocation for sorter
       MemSrtSize=MemVal*1024_8**MemType
 C     KP: If IFunSR=6 integrals are not needed and are not loaded
@@ -1373,7 +1373,7 @@ C     KP: If IFunSR=6 integrals are not needed and are not loaded
 C
 c     Else If(ICholesky==1) Then
 C     compute Cholesky vectors from binary file
-      If(ICholeskyBIN==1) Then
+      ElseIf(ICholeskyBIN==1) Then
 
       Write(LOUT,'(/1x,3a6)') ('******',i=1,3)
       Write(LOUT,'(1x,a)') 'Cholesky Binary'
@@ -1585,19 +1585,18 @@ C
           If(ICholesky==0) Then
           Call FockGen_mithap(FockF,GammaAB,XKin,NInte1,NBasis,
      &                        'AOTWOSORT')
-
-          ElseIf(ICholesky==1) Then
-C         Call FockGen_CholR(FockF,CholeskyVecs%R(1:NCholesky,1:NInte1),
-C    &                       GammaAB,XKin,NInte1,NCholesky,NBasis)
-C         test Cholesky
-          block
-          double precision :: F_mo(NBasis,NBasis)
-
-          Call CholeskyOTF_Fock(F_mo,CholeskyVecsOTF,AOBasis,System,
+C
+          ElseIf(ICholeskyBIN==1) Then
+          Call FockGen_CholR(FockF,CholeskyVecs%R(1:NCholesky,1:NInte1),
+     &                       GammaAB,XKin,NInte1,NCholesky,NBasis)
+C
+          ElseIf(ICholeskyOTF==1) Then
+C
+          Call CholeskyOTF_Fock(work1,CholeskyVecsOTF,AOBasis,System,
      $                          transpose(UAux),XKin,GammaF,
      $                          MemType,MemVal,NInte1,NBasis)
-          Call sq_to_triang2(F_mo,FockF,NBasis)
-          end block
+C         on output work1 contains Fock in MO
+          Call sq_to_triang2(work1,FockF,NBasis)
 C
           EndIf
 C
@@ -1619,12 +1618,12 @@ C      print*,'Fock:', norm2(FockF)
 C
 C      Call FockGen(FockF,GammaAB,XKin,TwoEl,NInte1,NBasis,NInte2)
 C     transform Fock to MO if not CholeskyOTF
-      If(ICholesky==0) Call MatTr(FockF,UAux,NBasis)
+      If(ICholeskyOTF==0) Call MatTr(FockF,UAux,NBasis)
 
 C     test Fock 2
       block
       double precision :: Fmat(NBasis,NBasis)
-      print*, 'FockF w bazie MO -- old'
+      print*, 'FockF w bazie MO -- new'
       call triang_to_Sq2(FockF,Fmat,NBasis)
       print*, 'Fock = ',norm2(Fmat)
       do j=1,NBasis
@@ -1652,6 +1651,7 @@ C
       EndDo
 C
 C KP 15.05.2019
+      work1 = 0
       Do I=1,NInAc
       Do J=1,NBasis
       work1(J,I)=PC(I)
@@ -2039,7 +2039,7 @@ C
       use basis_sets
       use sys_definitions
       use Auto2eInterface
-      use CholeskyOTF, only: TCholeskyVecsOTF
+      use CholeskyOTF, only : TCholeskyVecsOTF
       use Cholesky_driver, only : chol_F
 
       implicit none
