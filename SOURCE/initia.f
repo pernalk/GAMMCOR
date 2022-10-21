@@ -1768,22 +1768,16 @@ C
       If(ICholeskyOTF==1) Then
 C
 C     TEST GETTING AO --> NO
-C     work1 = C(AO,MO) ; UAux = C(NO,MO)
-      work1 = 0
-      Call read_caomo_molpro(work1,SAO,itsoao,jtsoao,
-     &                      'MATSAO.mol','CASORBAO',NBasis)
-      Call dgemm('N','T',NBasis,NBasis,NBasis,1d0,work1,NBasis,
+C     CAOMO = C(AO,MO) ; UAux = C(NO,MO)
+      Call dgemm('N','T',NBasis,NBasis,NBasis,1d0,CAOMO,NBasis,
      &           URe,NBasis,0d0,CAONO,NBasis)
-C
-C     FOR CHOLESKY WITH SYMMETRY REPLACE (NO,SAO)
-C     WITH (NO,AO)
 C
 C     for external test
 C      Call dump_CAONO_SAO(CAONO,transpose(UAOMO),SAO,
 C     &               'CAONO.mol',NBasis)
 C      Call test_Smat(SAO,CAONO,transpose(UAOMO),NBasis)
       EndIf
-CC
+C
 C     ITwoEl
       If(ITwoEl.Eq.1) Then
       Write(6,'(/," Transforming two-electron integrals ...",/)')
