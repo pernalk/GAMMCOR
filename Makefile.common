@@ -150,7 +150,7 @@ $(O)diis.o : $(S)diis.f90 $(O)priunit.o
 	$(FCC) $(FFLAGS)  -c $(S)diis.f90 -o $(O)diis.o
 $(O)abmats.o : $(S)abmats.f90 $(O)priunit.o $(O)tran.o
 	$(FCC) $(FFLAGS)  -c $(S)abmats.f90 -o $(O)abmats.o
-$(O)abfofo.o : $(S)abfofo.f90 $(O)blocktypes.o $(O)priunit.o $(O)tran.o
+$(O)abfofo.o : $(S)abfofo.f90 $(O)abchol.o $(O)blocktypes.o $(O)priunit.o $(O)tran.o
 	$(FCC) $(FFLAGS)  -c $(S)abfofo.f90 -o $(O)abfofo.o
 $(O)ab0fofo.o : $(S)ab0fofo.f90 $(O)priunit.o $(O)blocktypes.o $(O)tran.o $(O)abfofo.o
 	$(FCC) $(FFLAGS)  -c $(S)ab0fofo.f90 -o $(O)ab0fofo.o

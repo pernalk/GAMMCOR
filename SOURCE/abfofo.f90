@@ -821,7 +821,7 @@ AuxI  = 0
 AuxIO = 0
 WMAT  = 0
 
-if(ICholesky) then
+if(ICholesky==1) then
    if(present(ETot)) then
       call JK_Chol_loop(ABPLUS,ABMIN,HNO,AuxI,AuxIO,WMAT,&
                         RDM2val,Occ,AuxCoeff,IGem,AuxInd,pos,&
