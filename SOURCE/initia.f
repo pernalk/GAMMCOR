@@ -1692,6 +1692,9 @@ C
 c     If(IFunSR.Eq.5) Then
       EndIf
 C
+C     test dipole moments
+      Call ComputeDipoleMom(UAOMO,Occ,NOccup,NBasis)
+C
 C     READ ACTIVE 2-RDM AND TRANSFORM TO NO'S
 C
       Write(6,'(" Reading in 2-RDM ...")')

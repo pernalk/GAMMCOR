@@ -7490,6 +7490,78 @@ C
       Return
       End
 
+*Deck ComputeDipoleMom
+      Subroutine ComputeDipoleMom(UNOAO,Occ,NOccup,NBasis)
+C
+C     compute electronic part of the DM
+C     using occupation numbers
+C
+      Implicit Real*8 (A-H,O-Z)
+C
+      Include 'commons.inc'
+C
+      Dimension Occ(NBasis),UNOAO(NBasis,NBasis)
+      Parameter(Zero=0.D0,Half=0.5D0,One=1.D0,Two=2.D0,Three=3.D0)
+C
+C     LOCAL ARRAYS
+C
+      Dimension DipX(NBasis,NBasis),DipY(NBasis,NBasis),
+     $          DipZ(NBasis,NBasis)
+      Real*8,Allocatable :: XYZ(:,:),Charg(:)
+      Real*8 DM_X,DM_Y,DM_Z
+      Real*8 NUC_DMX,NUC_DMY,NUC_DMZ
+      Character(8) label
+
+      Call ReadDip(DipX,DipY,DipZ,UNOAO,NBasis)
+
+C     Nuclear
+C
+      Open(newunit=ione,file='AOONEINT.mol',access='sequential',
+     $     form='unformatted',status='old')
+C
+      Do
+        Read(ione,iostat=ios) label
+        If(ios<0) then
+           Write(6,*) 'ERROR!!! LABEL ISORDK   not found!'
+           stop
+        EndIf
+        If(label=='ISORDK  ') then
+           Read(ione) NCen
+           Allocate(Charg(ncen),XYZ(ncen,3))
+           Read(ione) Charg(1:ncen),XYZ(1:ncen,1:3)
+           Exit
+        EndIf
+      EndDo
+      Close(ione)
+C
+      NUC_DMX=0; NUC_DMY=0; NUC_DMZ=0
+      Do I=1,NCen
+         NUC_DMX = NUC_DMX + Charg(i)*XYZ(i,1)
+         NUC_DMY = NUC_DMY + Charg(i)*XYZ(i,2)
+         NUC_DMZ = NUC_DMZ + Charg(i)*XYZ(i,3)
+      Enddo
+C
+      Write(6,'(/,1X,A,3f12.8)') 'Nuclear DM   ',
+     $                            NUC_DMX,NUC_DMY,NUC_DMZ
+C
+C     Electronic
+C
+      DM_X = 0; DM_Y = 0; DM_Z = 0
+      Do I=1,NOccup
+         DM_X = DM_X + 2d0*Occ(i)*DipX(i,i)
+         DM_Y = DM_Y + 2d0*Occ(i)*DipY(i,i)
+         DM_Z = DM_Z + 2d0*Occ(i)*DipZ(i,i)
+      Enddo
+      Write(6,'(1X,A,3f12.8)')   'Electronic DM',
+     $                           DM_X,DM_Y,DM_Z
+C
+      Write(6,'(1X,A,3f12.8,/)') 'Total DM     ',
+     $                            NUC_DMX+DM_X,NUC_DMY+DM_Y,NUC_DMZ+DM_Z
+
+      Deallocate(XYZ,Charg)
+      Return
+      End
+
 *Deck AC0DSYMM
       Subroutine AC0DSYMM(ICAS,NoStMx,ICORR,EExcit,IStCAS,NSym,NSymNO,
      $ MultpC,ECorrSym,
