@@ -174,23 +174,36 @@ double precision :: Tcpu,Twall
  endif
 
 ! Cholesky decomposition
- if(Flags%ICholesky==1) then
+ if(Flags%ICholeskyBIN==1.or.Flags%ICholeskyOTF==1) then
 
     !! old Cholesky
     !if(ICholOLD==1) print*, 'old Cholesky transformation...'
     !if(ICholOLD==1) call chol_CoulombMatrix(CholeskyVecs,'AOTWOSORT',Flags%ICholeskyAccu)
 
-    ! new Cholesky
+    ! Cholesky binary
     if(ICholOLD==0) print*, 'new Cholesky transformation...'
-    if(SAPT%InterfaceType==1) then
-       call chol_CoulombMatrix(CholeskyVecs,NBasis,'AOTWOINT_A',1,Flags%ICholeskyAccu)
-    elseif(SAPT%InterfaceType==2) then
-       call chol_CoulombMatrix(CholeskyVecs,NBasis,'AOTWOINT.mol',2,Flags%ICholeskyAccu)
-    endif
 
-    SAPT%NCholesky  = CholeskyVecs%NCholesky
-    SAPT%monA%NChol = SAPT%NCholesky
-    SAPT%monB%NChol = SAPT%NCholesky
+    if(Flags%ICholeskyBIN==1) then
+
+       if(SAPT%InterfaceType==1) then
+          call chol_CoulombMatrix(CholeskyVecs,NBasis,'AOTWOINT_A',1,Flags%ICholeskyAccu)
+       elseif(SAPT%InterfaceType==2) then
+          call chol_CoulombMatrix(CholeskyVecs,NBasis,'AOTWOINT.mol',2,Flags%ICholeskyAccu)
+       endif
+
+       SAPT%NCholesky  = CholeskyVecs%NCholesky
+       SAPT%monA%NChol = SAPT%NCholesky
+       SAPT%monB%NChol = SAPT%NCholesky
+
+    ! Cholesky on-the-fly
+    elseif(Flags%ICholeskyOTF==1) then
+
+       write(lout,'(/1x,3a6)') ('******',i=1,3)
+       write(lout,'(1x,a)') 'Cholesky On-The-Fly'
+       write(lout,'(1x,3a6)') ('******',i=1,3)
+       write(lout,*) 'OTF not ready in SAPT...'
+
+    endif
 
  endif
  call clock('2ints',Tcpu,Twall)

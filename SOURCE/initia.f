@@ -1655,17 +1655,17 @@ C      Call FockGen(FockF,GammaAB,XKin,TwoEl,NInte1,NBasis,NInte2)
 C     transform Fock to MO if not CholeskyOTF
       If(ICholeskyOTF==0) Call MatTr(FockF,UAux,NBasis)
 
-C     test Fock 2
-      block
-      double precision :: Fmat(NBasis,NBasis)
-      print*, 'FockF w bazie MO -- old'
-      call triang_to_Sq2(FockF,Fmat,NBasis)
-      print*, 'Fock = ',norm2(Fmat)
-      do j=1,NBasis
-         write(LOUT,'(*(f13.8))') (Fmat(i,j),i=1,NBasis)
-      enddo
-
-      end block
+CC     test Fock 2
+C      block
+C      double precision :: Fmat(NBasis,NBasis)
+C      print*, 'FockF w bazie MO -- old'
+C      call triang_to_Sq2(FockF,Fmat,NBasis)
+C      print*, 'Fock = ',norm2(Fmat)
+C      do j=1,NBasis
+C         write(LOUT,'(*(f13.8))') (Fmat(i,j),i=1,NBasis)
+C      enddo
+C
+C      end block
 C
       EndIf
 C
