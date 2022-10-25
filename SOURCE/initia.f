@@ -1623,14 +1623,16 @@ C
 C
 C          load C(AO,MO) - already w/o symmety in MOs
 C
-           Inquire(file='MATSAO.mol',exist=isymfile)
-           If (.not.isymfile) then
-              Write(6,*) 'MATSAO.mol file not found!'
-              stop
-           EndIf
+C          use MOLPRO.MOPUN instead of a separate file!
+C          Inquire(file='MATSAO.mol',exist=isymfile)
+C          If (.not.isymfile) then
+C             Write(6,*) 'MATSAO.mol file not found!'
+C              stop
+C          EndIf
 C
            Call read_caomo_molpro(CAOMO,SAO,itsoao,jtsoao,
-     &                           'MATSAO.mol','CASORBAO',NBasis)
+c    &                           'MATSAO.mol','CASORBAO',NBasis)
+     &                           'MOLPRO.MOPUN','CASORBAO',NBasis)
 C
            Call CholeskyOTF_Fock(work1,CholeskyVecsOTF,AOBasis,System,
      $                          CAOMO,CSAOMO,XKin,GammaF,
@@ -2123,12 +2125,12 @@ C     prepare density matrix
          D_mo(I,J) = 2d0 * GammaF(IndSym(I,J))
       EndDo
       EndDo
-      write(6,*) 'DMAT MO'
-      do j=1,NBasis
-         write(LOUT,'(*(f13.8))') (D_mo(i,j),i=1,NBasis)
-      enddo
-      write(LOUT,'()')
-
+C      write(6,*) 'DMAT MO'
+C      do j=1,NBasis
+C         write(LOUT,'(*(f13.8))') (D_mo(i,j),i=1,NBasis)
+C      enddo
+C      write(LOUT,'()')
+C
 C       write(6,*) 'CAOMO  '
 C       do j=1,NBasis
 C          write(LOUT,'(*(f13.8))') (Cmat(i,j),i=1,NBasis)

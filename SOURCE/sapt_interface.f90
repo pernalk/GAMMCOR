@@ -5,6 +5,7 @@ use timing
 use tran
 use sorter
 !use Cholesky_old
+use Auto2eInterface
 use Cholesky, only : chol_CoulombMatrix, TCholeskyVecs, &
                      chol_Rkab_ExternalBinary, chol_MOTransf_TwoStep
 use basis_sets
@@ -31,6 +32,7 @@ type(SaptData)         :: SAPT
 type(TCholeskyVecs)    :: CholeskyVecs
 type(TCholeskyVecsOTF) :: CholeskyVecsOTF
 type(TAOBasis)         :: AOBasis
+type(TSystem)          :: System
 integer,intent(in)     :: NBasis
 
 integer    :: NSq,NInte1,NInte2
@@ -55,20 +57,28 @@ double precision,allocatable :: Ca(:),Cb(:)
 double precision,allocatable :: AuxA(:,:),AuxB(:,:)
 double precision,allocatable :: OneRdmA(:),OneRdmB(:)
 
+logical :: SortAngularMomenta
+character(:),allocatable :: BasisSet
+
 logical :: doRSH
 double precision,allocatable :: Sa(:,:),Sb(:,:)
 double precision :: Tcpu,Twall
 
 ! set monomer print level
- SAPT%monA%IPrint = SAPT%IPrint
- SAPT%monB%IPrint = SAPT%IPrint
+SAPT%monA%IPrint = SAPT%IPrint
+SAPT%monB%IPrint = SAPT%IPrint
+
+! set basis set
+print*, 'Flags:BasisSetPath',Flags%BasisSetPath
+print*, 'Flags:BasisSet    ',Flags%BasisSet
+BasisSet = Flags%BasisSetPath // Flags%BasisSet
 
 ! set dimensions
- NSq = NBasis**2
- NInte1 = NBasis*(NBasis+1)/2
- NInte2 = NInte1*(NInte1+1)/2
- SAPT%monA%NDim = NBasis*(NBasis-1)/2
- SAPT%monB%NDim = NBasis*(NBasis-1)/2
+NSq = NBasis**2
+NInte1 = NBasis*(NBasis+1)/2
+NInte2 = NInte1*(NInte1+1)/2
+SAPT%monA%NDim = NBasis*(NBasis-1)/2
+SAPT%monB%NDim = NBasis*(NBasis-1)/2
 
 ! set RSH
  SAPT%doRSH = .false.
@@ -185,6 +195,10 @@ double precision :: Tcpu,Twall
 
     if(Flags%ICholeskyBIN==1) then
 
+       write(lout,'(/1x,3a6)') ('******',i=1,3)
+       write(lout,'(1x,a)') 'Cholesky Binary'
+       write(lout,'(1x,3a6)') ('******',i=1,3)
+
        if(SAPT%InterfaceType==1) then
           call chol_CoulombMatrix(CholeskyVecs,NBasis,'AOTWOINT_A',1,Flags%ICholeskyAccu)
        elseif(SAPT%InterfaceType==2) then
@@ -203,14 +217,34 @@ double precision :: Tcpu,Twall
        write(lout,'(1x,3a6)') ('******',i=1,3)
        write(lout,*) 'OTF not ready in SAPT...'
 
+       call auto2e_init()
+
+       block
+        character(:),allocatable :: XYZPath
+        character(:),allocatable :: BasisSetPath
+
+        XYZPath = "./input.inp"
+        BasisSetPath = BasisSet
+        SortAngularMomenta = .true.
+
+        print*, 'WARNING: move CholeskyOTF_ao_vecs to new module!'
+        call CholeskyOTF_ao_vecs(CholeskyVecsOTF,AOBasis,System, &
+                                 XYZPath,BasisSetPath, &
+                                 SortAngularMomenta,Flags%ICholeskyAccu)
+       end block
+
     endif
 
  endif
  call clock('2ints',Tcpu,Twall)
 
  if(SAPT%InterfaceType==2) then
-    call prepare_no(OneRdmA,AuxA,Ca,SAPT%monA,CholeskyVecs,Flags%IFunSR,Flags%ICholesky,NBasis)
-    call prepare_no(OneRdmB,AuxB,Cb,SAPT%monB,CholeskyVecs,Flags%IFunSR,Flags%ICholesky,NBasis)
+    call prepare_no(OneRdmA,AuxA,Ca,SAPT%monA,AOBasis,System, &
+                    CholeskyVecs,CholeskyVecsOTF, &
+                    Flags,NBasis)
+    call prepare_no(OneRdmB,AuxB,Cb,SAPT%monB,AOBasis,System, &
+                    CholeskyVecs,CholeskyVecsOTF, &
+                    Flags,NBasis)
     call prepare_rdm2_molpro(SAPT%monA,AuxA,NBasis)
     call prepare_rdm2_molpro(SAPT%monB,AuxB,NBasis)
  endif
@@ -1273,26 +1307,40 @@ double precision :: OccOrd(nbas)
 
 end subroutine sort_sym_occ
 
-subroutine prepare_no(OneRdm,OrbAux,OrbCAS,Mon,CholeskyVecs,IFunSR,ICholesky,NBasis)
+subroutine prepare_no(OneRdm,OrbAux,OrbCAS,Mon,AOBasis,System, &
+                      CholeskyVecs,CholeskyVecsOTF, &
+                      Flags,NBasis)
 implicit none
 !
 ! OrbCAS[inout] :: on input AOtoCAS
 !                  on output AOtoNO
 ! OrbAux        :: on input CAStoNO
 !
-type(SystemBlock)   :: Mon
-type(TCholeskyVecs) :: CholeskyVecs
+type(FlagsData)        :: Flags
+type(SystemBlock)      :: Mon
+type(TCholeskyVecs)    :: CholeskyVecs
+type(TCholeskyVecsOTF) :: CholeskyVecsOTF
+type(TAOBasis)         :: AOBasis
+type(TSystem)          :: System
 
-integer,intent(in) :: IFunSR,ICholesky,NBasis
+integer,intent(in) :: NBasis
 double precision   :: OneRdm(NBasis*(NBasis+1)/2)
 double precision   :: OrbAux(NBasis,NBasis),OrbCAS(NBasis,NBasis)
 
 integer :: NOccup,NVirt,NSym
 integer :: NCholesky
 integer :: i,j,ia,ib,iab,ioff,idx,NInte1
-double precision,allocatable :: URe(:,:),OrbSym(:,:),Fock(:)
+integer :: itsoao(NBasis),jtsoao(NBasis)
+
+double precision :: CAOMO(NBasis,NBasis),CSAOMO(NBasis,NBasis), &
+                    SAO(NBasis,NBasis)
+double precision :: FockSq(NBasis,NBasis)
+double precision,allocatable :: URe(:,:),OrbSym(:,:)
+double precision,allocatable :: H0(:), GammaF(:),Fock(:)
 double precision,allocatable :: work1(:),work2(:),work3(:)
+
 character(:),allocatable :: onefile,rdmfile,aoerfile
+character(:),allocatable :: orbaofile
 ! testy
 integer :: info
 
@@ -1301,12 +1349,14 @@ integer :: info
  NVirt = NBasis - Mon%INAct - Mon%NAct
 
  if(Mon%Monomer==1) then
-   onefile = 'AOONEINT_A'
-   rdmfile = '2RDMA'
-   aoerfile = 'AOERFSORT'
+   onefile   = 'AOONEINT_A'
+   rdmfile   = '2RDMA'
+   aoerfile  = 'AOERFSORT'
+   orbaofile = 'MOLPRO_A.MOPUN'
  elseif(Mon%Monomer==2) then
-   onefile = 'AOONEINT_B'
-   rdmfile = '2RDMB'
+   onefile   = 'AOONEINT_B'
+   rdmfile   = '2RDMB'
+   orbaofile = 'MOLPRO_B.MOPUN'
    if(Mon%SameOm) then
       aoerfile = 'AOERFSORT'
    else
@@ -1316,6 +1366,7 @@ integer :: info
 
  allocate(Mon%NumOSym(15),Mon%IndInt(NBasis))
  allocate(work1(NInte1),work2(NInte1),work3(NBasis),&
+          H0(NInte1),GammaF(NInte1), &
           Fock(NBasis**2),OrbSym(NBasis,NBasis),URe(NBasis,NBasis))
 
  call create_ind_molpro(rdmfile,Mon%NumOSym,Mon%IndInt,NSym,NBasis)
@@ -1339,12 +1390,13 @@ integer :: info
 ! call print_sqmat(URe,NBasis)
 
 ! FIND CANONICAL INACTIVE AND VIRTUAL ORBITALS
- work1 = 0
+
+ GammaF = 0
  idx = 0
  do j=1,Mon%INAct
     do i=1,j
        idx = idx + 1
-       if(i==j) work1(idx) = 1.0d0
+       if(i==j) GammaF(idx) = 1.0d0
     enddo
  enddo
  idx = 0
@@ -1352,13 +1404,11 @@ integer :: info
     do i=1,j
        idx = idx + 1
        ioff = (Mon%INAct+j)*(Mon%INAct+j-1)/2 + Mon%INAct
-       work1(ioff+i) = OneRdm(idx)
+       GammaF(ioff+i) = OneRdm(idx)
     enddo
  enddo
-! do i=1,NInte1
-!    print*, i,work1(i)
-! enddo
 
+ ! reorder MOs to no symmetry
  do i=1,NBasis
     do j=1,NBasis
        OrbSym(Mon%IndInt(i),j) = OrbCAS(j,i)
@@ -1373,29 +1423,46 @@ integer :: info
        do i=1,NBasis
           do j=1,NBasis
              idx = max(i,j)*(max(i,j)-1)/2+min(i,j)
-             OneRdm(iab) = OneRdm(iab) &
-           + OrbSym(i,ia)*OrbSym(j,ib)*work1(idx)
+             OneRdm(iab) = OneRdm(iab) + OrbSym(i,ia)*OrbSym(j,ib)*GammaF(idx)
           enddo
        enddo
     enddo
  enddo
 
  ! create Fock matrix
- ! work1 = XOne
- call readoneint_molpro(work1,onefile,'ONEHAMIL',.true.,NInte1)
+ ! H0 = XOne
+ call readoneint_molpro(H0,onefile,'ONEHAMIL',.true.,NInte1)
  ! work2 = Fock
- if(IFunSR==0) then
+ if(Flags%IFunSR==0) then
  ! CASSCF,Hartree-Fock
 
-   if(ICholesky==0) then
-     call FockGen_mithap(work2,OneRdm,work1,NInte1,NBasis,'AOTWOSORT')
-   elseif(ICholesky==1) then
+   if(Flags%ICholeskyBIN==0.and.Flags%ICholeskyOTF==0) then
+
+     call FockGen_mithap(work2,OneRdm,H0,NInte1,NBasis,'AOTWOSORT')
+
+   elseif(Flags%ICholeskyBIN==1) then
+
      NCholesky = CholeskyVecs%NCholesky
-     call FockGen_CholR(work2,CholeskyVecs%R(1:NCholesky,1:NInte1),OneRdm,work1, &
+     call FockGen_CholR(work2,CholeskyVecs%R(1:NCholesky,1:NInte1),OneRdm,H0, &
                         NInte1,NCholesky,NBasis)
+
+   elseif(Flags%ICholeskyOTF==1) then
+
+     CSAOMO = transpose(OrbSym)
+
+     call read_caomo_molpro(CAOMO,SAO,itsoao,jtsoao,orbaofile,'CASORBAO',NBasis)
+     print*, 'CAOMO',norm2(CAOMO)
+
+     call CholeskyOTF_Fock(FockSq,CholeskyVecsOTF,AOBasis,System, &
+                           CAOMO,CSAOMO,H0,GammaF, &
+                           Flags%MemType,Flags%MemVal,NInte1,NBasis)
+     print*, 'FockSq',norm2(FOckSq)
+     call sq_to_triang2(FockSq,work2,NBasis)
+     stop
+
    endif
 
- elseif(IFunSR>0) then
+ elseif(Flags%IFunSR>0) then
  ! Kohn-Sham
 
    ! add and store Coulomb
@@ -1405,13 +1472,12 @@ integer :: info
    ! RSH
    if(Mon%doRSH) then
      ! generate long-range Fock
-     print*, 'Check: prepare_no:',aoerfile
-     call FockGen_mithap(work2,OneRdm,work1,NInte1,NBasis,aoerfile)
+     call FockGen_mithap(work2,OneRdm,H0,NInte1,NBasis,aoerfile)
      work2 = work2 + Mon%VCoul
    else
    ! non-hybrid DFAs
-   !  work2 = work1
-     work2 = work1 + Mon%VCoul
+   !  work2 = H0
+     work2 = H0 + Mon%VCoul
    endif
 
  endif
@@ -1468,6 +1534,7 @@ integer :: info
  OrbCAS = transpose(OrbCAS)
 
  deallocate(work3,work2,work1,Fock,OrbSym,URe)
+ deallocate(H0)
  deallocate(Mon%IndInt)
 
 end subroutine prepare_no

@@ -175,7 +175,7 @@ character(:), allocatable :: line
              current_block = block_calculation
              cycle lines
 
-       case ("CHOLESKY")
+       case ("CHOLESKYBLOCK")
              current_block = block_cholesky
              cycle lines
 
