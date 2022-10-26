@@ -66,6 +66,7 @@ integer, parameter :: DF_PBE        = 3
 
 integer, parameter :: MONOMER_A = 1
 integer, parameter :: MONOMER_B = 2
+integer, parameter :: DIMER_AB  = 3
 
 integer, parameter :: RESP_ERPA = 1
 integer, parameter :: RESP_APSG = 2
@@ -96,8 +97,8 @@ character(*),parameter :: PossibleCholAccu(3) = &
 [character(8) :: &
 'DEFAULT', 'TIGHT', 'LUDICROUS']
 
-character(*),parameter :: PossibleMonomers(2) = &
-[character(8) :: 'A', 'B']
+character(*),parameter :: PossibleMonomers(3) = &
+[character(8) :: 'A', 'B', 'AB']
 
 character(:), allocatable :: InputPath
 !InputPath = "./input.inp"
@@ -141,7 +142,7 @@ type SystemBlock
       integer :: ZNucl  = 0
       integer :: NBasis = 0
       integer :: NChol  = 0
-      integer :: Monomer = MONOMER_A
+      integer :: Monomer = DIMER_AB
       integer :: NELE
       double precision :: XELE
       double precision :: PotNuc
@@ -210,7 +211,9 @@ type SystemBlock
       double precision,allocatable :: Occ(:), CICoef(:)
       double precision,allocatable :: OrbE(:)
       double precision,allocatable :: TwoMO(:)
-      double precision,allocatable :: CMO(:,:)
+      ! SAO = symmetrized atomic orbitals
+      ! CMO = C(SAO,NO); CAONO = C(AO,NO)
+      double precision,allocatable :: CMO(:,:),CAONO(:,:)
       double precision,allocatable :: OV(:,:),OO(:,:), &
                                       FO(:,:),FF(:,:), &
                                       FFAB(:,:),FFBA(:,:), &

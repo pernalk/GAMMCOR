@@ -523,8 +523,8 @@ C
       BasisSetPath = BasisSet
       SortAngularMomenta = .false.
 
-      Call CholeskyOTF_ao_vecs(CholeskyVecsOTF,AOBasis,System,XYZPath,
-     $                 BasisSetPath, SortAngularMomenta, ICholeskyAccu)
+      Call CholeskyOTF_ao_vecs(CholeskyVecsOTF,AOBasis,System,
+     $            XYZPath,BasisSetPath,SortAngularMomenta,ICholeskyAccu)
       end block
 
       EndIf
@@ -1400,8 +1400,8 @@ C     compute Cholesky vectors OTF
       BasisSetPath = BasisSet
       SortAngularMomenta = .true.
 
-      Call CholeskyOTF_ao_vecs(CholeskyVecsOTF,AOBasis,System,XYZPath,
-     $                 BasisSetPath, SortAngularMomenta, ICholeskyAccu)
+      Call CholeskyOTF_ao_vecs(CholeskyVecsOTF,AOBasis,System,
+     $            XYZPath,BasisSetPath,SortAngularMomenta,ICholeskyAccu)
 
       end block
 C
@@ -1635,6 +1635,7 @@ c    &                           'MATSAO.mol','CASORBAO',NBasis)
      &                           'MOLPRO.MOPUN','CASORBAO',NBasis)
 C
            Call CholeskyOTF_Fock(work1,CholeskyVecsOTF,AOBasis,System,
+     $                          Monomer,
      $                          CAOMO,CSAOMO,XKin,GammaF,
      $                          MemType,MemVal,NInte1,NBasis)
 C
@@ -1770,7 +1771,7 @@ C
       If(ICholeskyOTF==1) Then
 C
 C     TEST GETTING AO --> NO
-C     CAOMO = C(AO,MO) ; UAux = C(NO,MO)
+C     CAOMO = C(AO,MO) ; URe = C(NO,MO)
       Call dgemm('N','T',NBasis,NBasis,NBasis,1d0,CAOMO,NBasis,
      &           URe,NBasis,0d0,CAONO,NBasis)
 C
@@ -2024,9 +2025,13 @@ C
       Return
       End
 
-      Subroutine CholeskyOTF_ao_vecs(CholeskyVecsOTF, AOBasis, System,
-     $                       XYZPath, BasisSetPath,
-     $                       SortAngularMomenta, Accuracy)
+*Deck CholeskyOTF_ao_vecs
+      Subroutine CholeskyOTF_ao_vecs(CholeskyVecsOTF,
+     $                     AOBasis,System,XYZPath,BasisSetPath,
+     $                     SortAngularMomenta, Accuracy)
+C
+C           Generate Cholesky vectors in AO basis on-the-fly
+C
             use arithmetic
             use auto2e
             use Cholesky, only: chol_CoulombMatrix, TCholeskyVecs,
@@ -2058,6 +2063,8 @@ C
             !
             call sys_Read_XYZ(System, XYZPath)
             !
+            call sys_Init(System,SYS_TOTAL)
+            !
             ! Read the basis set parameters from an EMSL text file
             ! (GAMESS-US format, no need for any edits, just download it straight from the website)
             !
@@ -2071,10 +2078,14 @@ C
       end subroutine CholeskyOTF_ao_vecs
 
 *Deck CholeskyOTF_Fock
-      Subroutine CholeskyOTF_Fock(F_mo,CholeskyVecsOTF,AOBasis,System,
+      Subroutine CholeskyOTF_Fock(F_mo,CholeskyVecsOTF,
+     $                            AOBasis,System,Monomer,
      $                            Cmat,CSAO,H0in,GammaF,
      $                            MemType,MemVal,NInte1,NBasis)
-
+C
+C     Generate Fock matrix (NBasis,NBasis) in AO basis
+C     from Cholesky OTF vectors
+C
       use print_units
       use tran
       use basis_sets
@@ -2087,8 +2098,9 @@ C
 
       type(TCholeskyVecsOTF), intent(in) :: CholeskyVecsOTF
       type(TAOBasis), intent(in)         :: AOBasis
-      type(TSystem), intent(in)          :: System
+      type(TSystem), intent(inout)       :: System
 
+      integer,intent(in)          :: Monomer
       integer,intent(in)          :: NInte1,NBasis
       integer,intent(in)          :: MemType,MemVal
       double precision,intent(in) :: H0in(NInte1)
@@ -2104,6 +2116,16 @@ C
       double precision :: D_mo(NBasis,NBasis), H0_mo(NBasis,NBasis)
       double precision, parameter :: ThreshH0 = 1d-6
       integer,external :: IndSym
+C
+      ! Read whether to put ghost functions
+      print*, 'Monomer',Monomer
+      if(Monomer==1) then
+         call sys_Init(System,SYS_MONO_A)
+      elseif(Monomer==2) then
+         call sys_Init(System,SYS_MONO_B)
+      else
+         call sys_Init(System,SYS_TOTAL)
+      endif
 C
 C     transform H0 (in SAO) to MO
       H0tr = H0in

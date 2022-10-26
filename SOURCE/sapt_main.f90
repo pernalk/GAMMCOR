@@ -560,7 +560,8 @@ if(Flags%ISERPA==0) then
   ! omp tasks
   ! Let's open the AOTWSORT only once, therefore we open it here
 
-  if(Flags%ICholesky==1) then
+  if(Flags%ICholeskyBIN==1) then
+
      !print*, 'dimOA',A%num0+A%num1
      !print*, 'dimOB',B%num0+B%num1
      ! term A3-ind
@@ -587,6 +588,10 @@ if(Flags%ISERPA==0) then
      call chol_ints_fofo(NBasis,A%num0+A%num1,A%FF,  &
                          NBasis,A%num0+A%num1,B%FFBA,&
                          A%NChol,NBasis,'FOFOAABA')
+
+  elseif(Flags%ICholeskyOTF) then
+     print*,'not ready with OTF yet!'
+    stop
   else
    ! working stuff...
    !  ! term A3-ind

@@ -69,6 +69,7 @@ C
       Call free_Input(Input)
 C
 C     FILL COMMONS AND CONSTANTS
+      Monomer = System%Monomer
       XELE    = System%XELE
       NELE    = System%NELE
       Charge  = System%Charge

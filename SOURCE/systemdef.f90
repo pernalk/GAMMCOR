@@ -394,6 +394,7 @@ if(Flags%ISAPT.Eq.0) then
      stop
    endif
 
+   System%Monomer  = Input%SystemInput(1)%Monomer
    System%NoSt     = Input%SystemInput(1)%NoSt
    System%NStates  = Input%SystemInput(1)%NStates
    System%ISpinMs2 = -255

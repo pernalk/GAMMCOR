@@ -570,6 +570,16 @@ character(:), allocatable :: first, last
 ! case ("STATE")
 !      read(val, *) SystemParams%NoSt
 
+ case ("MONOMER")
+     if(uppercase(val)=="A") then
+         SystemParams%Monomer = MONOMER_A
+     elseif(uppercase(val)=="B") then
+         SystemParams%Monomer = MONOMER_B
+     elseif(uppercase(val)=="AB" .or. &
+            uppercase(val)=="DIMER") then
+         SystemParams%Monomer = DIMER_AB
+     endif
+
  case ("NACTIVE")
        read(val, *) SystemParams%NAct
        SystemParams%NActFromRDM = .false.
@@ -865,7 +875,6 @@ subroutine print_Input(Input)
 implicit none
 
 type(InputData) :: Input
-integer :: switch
 integer :: i,imon
 
 write(LOUT,'()')
@@ -903,8 +912,6 @@ associate( CalcParams => Input%CalcParams)
  if (allocated(CalcParams%IntegralsFilePath)) then
        write(*, *) "Ints file: ", CalcParams%IntegralsFilePath
  end if
-  switch = 0
-  if(Input%SystemInput(1)%Monomer==2) switch = 3
 
 associate( CholeskyParams => Input%CholeskyParams)
  ! CHOLESKY BLOCK
@@ -927,7 +934,7 @@ end associate
 
  ! SYSTEM BLOCK(S)
  do imon=1,CalcParams%imon
-    associate(System => Input%SystemInput(abs(imon-switch)) )
+    associate(System => Input%SystemInput(imon))
       write(LOUT, '()')
       write(LOUT, '(1x,a,6x,a)') "MONOMER: ", &
                     PossibleMonomers(System%Monomer)

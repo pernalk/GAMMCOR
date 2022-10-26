@@ -266,9 +266,11 @@ SAPT%monB%NDim = NBasis*(NBasis-1)/2
  call select_active(SAPT%monA,NBasis,Flags)
  call select_active(SAPT%monB,NBasis,Flags)
 
- if(Flags%ICholesky==1) then
-    ! transform Cholesky Vecs to NO
-    call chol_sapt_NOTransf(SAPT,SAPT%monA,SAPT%monB,CholeskyVecs,NBasis,Flags%MemVal,Flags%MemType)
+ ! transform Cholesky Vecs to NO
+ if(Flags%ICholeskyBIN==1) then
+    call chol_sapt_AO2NO_BIN(SAPT,SAPT%monA,SAPT%monB,CholeskyVecs,NBasis,Flags%MemVal,Flags%MemType)
+ elseif(Flags%ICholeskyOTF==1) then
+    call chol_sapt_AO2NO_OTF(SAPT,SAPT%monA,SAPT%monB,CholeskyVecsOTF,AOBasis,Flags)
     call clock('chol_NOTransf',Tcpu,Twall)
  endif
 
@@ -1333,7 +1335,7 @@ integer :: i,j,ia,ib,iab,ioff,idx,NInte1
 integer :: itsoao(NBasis),jtsoao(NBasis)
 
 double precision :: CAOMO(NBasis,NBasis),CSAOMO(NBasis,NBasis), &
-                    SAO(NBasis,NBasis)
+                    CAONO(NBasis,NBasis),SAO(NBasis,NBasis)
 double precision :: FockSq(NBasis,NBasis)
 double precision,allocatable :: URe(:,:),OrbSym(:,:)
 double precision,allocatable :: H0(:), GammaF(:),Fock(:)
@@ -1451,14 +1453,13 @@ integer :: info
      CSAOMO = transpose(OrbSym)
 
      call read_caomo_molpro(CAOMO,SAO,itsoao,jtsoao,orbaofile,'CASORBAO',NBasis)
-     print*, 'CAOMO',norm2(CAOMO)
+     !print*, 'CAOMO',norm2(CAOMO)
 
-     call CholeskyOTF_Fock(FockSq,CholeskyVecsOTF,AOBasis,System, &
+     call CholeskyOTF_Fock(FockSq,CholeskyVecsOTF,AOBasis,System,mon%Monomer, &
                            CAOMO,CSAOMO,H0,GammaF, &
                            Flags%MemType,Flags%MemVal,NInte1,NBasis)
      print*, 'FockSq',norm2(FOckSq)
      call sq_to_triang2(FockSq,work2,NBasis)
-     stop
 
    endif
 
@@ -1530,12 +1531,21 @@ integer :: info
 
 ! END OF CANONICALIZING
 
- call dgemm('N','N',NBasis,NBasis,NBasis,1d0,URe,NBasis,OrbSym,NBasis,0d0,OrbCAS,NBasis)
- OrbCAS = transpose(OrbCAS)
+! transform orbitals to (SAO,NO)
+! URe = C(NO,MO); OrbSym = C(MO,SAO)
+call dgemm('N','N',NBasis,NBasis,NBasis,1d0,URe,NBasis,OrbSym,NBasis,0d0,OrbCAS,NBasis)
+OrbCAS = transpose(OrbCAS)
 
- deallocate(work3,work2,work1,Fock,OrbSym,URe)
- deallocate(H0)
- deallocate(Mon%IndInt)
+if(Flags%ICholeskyOTF) then
+   allocate(Mon%CAONO(NBasis,NBasis))
+   ! CAOMO = C(AO,MO) ; URe = C(NO,MO) 
+   call dgemm('N','T',NBasis,NBasis,NBasis,1d0,CAOMO,NBasis,URe,NBasis,0d0,CAONO,NBasis)
+   Mon%CAONO = CAONO
+endif
+
+deallocate(work3,work2,work1,Fock,OrbSym,URe)
+deallocate(H0)
+deallocate(Mon%IndInt)
 
 end subroutine prepare_no
 
@@ -2025,7 +2035,7 @@ double precision :: Vnn
 
 end function calc_vnn
 
-subroutine chol_sapt_NOTransf(SAPT,A,B,CholeskyVecs,NBasis,MemVal,MemType)
+subroutine chol_sapt_AO2NO_BIN(SAPT,A,B,CholeskyVecs,NBasis,MemVal,MemType)
 !
 ! transform Choleksy Vecs from AO to NO
 ! for all 2-index vecs needed in SAPT:
@@ -2037,16 +2047,15 @@ subroutine chol_sapt_NOTransf(SAPT,A,B,CholeskyVecs,NBasis,MemVal,MemType)
 !
 implicit none
 
-type(SaptData)   :: SAPT
+type(SaptData)      :: SAPT
 type(SystemBlock)   :: A, B
 type(TCholeskyVecs) :: CholeskyVecs
 integer,intent(in)  :: NBasis
 integer,intent(in)  :: MemVal,MemType
 
-integer :: NCholesky
-integer :: MaxBufferDimMB
-integer :: dimOA,dimOB,dimVA,dimVB, &
-           nOVA,nOVB
+integer          :: NCholesky
+integer          :: MaxBufferDimMB
+integer          :: dimOA,dimOB,dimVA,dimVB,nOVA,nOVB
 integer          :: i,j,ip,iq,ipq
 double precision :: Cpq
 double precision,allocatable :: tmp(:,:)
@@ -2055,24 +2064,24 @@ double precision :: Tcpu,Twall
 
 call clock('START',Tcpu,Twall)
 
- ! set buffer size
- if(MemType == 2) then       !MB
-    MaxBufferDimMB = MemVal
- elseif(MemType == 3) then   !GB
-    MaxBufferDimMB = MemVal * 1024_8
- endif
- write(lout,'(1x,a,i5,a)') 'Using ',MaxBufferDimMB,' MB for 3-indx Cholesky transformation'
+! set buffer size
+if(MemType == 2) then       !MB
+   MaxBufferDimMB = MemVal
+elseif(MemType == 3) then   !GB
+   MaxBufferDimMB = MemVal * 1024_8
+endif
+write(lout,'(1x,a,i5,a)') 'Using ',MaxBufferDimMB,' MB for 3-indx Cholesky transformation'
 
- NCholesky = CholeskyVecs%NCholesky
- dimOA = A%num0+A%num1
- dimOB = B%num0+B%num1
- dimVA = A%num1+A%num2
- dimVB = B%num1+B%num2
- nOVA  = dimOA*dimVA
- nOVB  = dimOB*dimVB
+NCholesky = CholeskyVecs%NCholesky
+dimOA = A%num0+A%num1
+dimOB = B%num0+B%num1
+dimVA = A%num1+A%num2
+dimVB = B%num1+B%num2
+nOVA  = dimOA*dimVA
+nOVB  = dimOB*dimVB
 
- print*, 'dimOA',dimOA
- print*, 'dimOB',dimOB
+print*, 'dimOA',dimOA
+print*, 'dimOB',dimOB
 
  !allocate(A%OV(NCholesky,A%NDimX),B%OV(NCholesky,B%NDimX))
 
@@ -2227,7 +2236,66 @@ call clock('BOO',Tcpu,Twall)
  !                   B%CMO,1,NBasis,&
  !                   B%CMO,1,dimOB)
 
-end subroutine chol_sapt_NOTransf
+end subroutine chol_sapt_AO2NO_BIN
+
+subroutine chol_sapt_AO2NO_OTF(SAPT,A,B,CholeskyVecsOTF,AOBasis,Flags)
+implicit none
+
+type(SaptData)         :: SAPT
+type(SystemBlock)      :: A, B
+type(TAOBasis)         :: AOBasis
+type(TCholeskyVecsOTF) :: CholeskyVecsOTF
+type(FlagsData)        :: Flags
+
+integer :: NCholesky
+integer :: MaxBufferDimMB
+integer :: dimOA,dimOB
+
+double precision :: Tcpu,Twall
+
+if(SAPT%InterfaceType==1) then
+  write(lout,*) 'Cholesky 3-index AO2NO transformation does not work with DALTON yet!'
+  stop
+endif
+
+call clock('START',Tcpu,Twall)
+
+! set dimensions
+NCholesky = CholeskyVecsOTF%NVecs
+dimOA = A%num0+A%num1
+dimOB = B%num0+B%num1
+
+! set buffer size
+if(Flags%MemType == 2) then       !MB
+   MaxBufferDimMB = Flags%MemVal
+elseif(Flags%MemType == 3) then   !GB
+   MaxBufferDimMB = Flags%MemVal * 1024_8
+endif
+write(lout,'(1x,a,i5,a)') 'Using ',MaxBufferDimMB,' MB for 3-indx AO2NO transformation'
+
+allocate(A%OO(NCholesky,dimOA**2),B%OO(NCholesky,dimOB**2))
+
+call chol_Rkab_OTF(A%OO,A%CAONO,1,dimOA,A%CAONO,1,dimOA, &
+                   MaxBufferDimMB,CholeskyVecsOTF,       &
+                   AOBasis,ORBITAL_ORDERING_MOLPRO)
+
+call clock('AOO',Tcpu,Twall)
+
+call chol_Rkab_OTF(B%OO,B%CAONO,1,dimOB,B%CAONO,1,dimOB, &
+                   MaxBufferDimMB,CholeskyVecsOTF,       &
+                   AOBasis,ORBITAL_ORDERING_MOLPRO)
+
+call clock('BOO',Tcpu,Twall)
+
+
+!call chol_Rkab_OTF(MatFF, UAux, a0, a1, UAux, b0, b1,
+!                   MaxBufferDimMB, CholeskyVecsOTF,
+!                   AOBasis, ORBITAL_ORDERING_MOLPRO)
+
+print*, 'not ready yet: chol_sapt_AO2NO_OTF!'
+stop "do some good testing here"
+
+end subroutine chol_sapt_AO2NO_OTF
 
 subroutine gen_swap_rows(mat,nbas,nsym,nA,nB)
 implicit none
