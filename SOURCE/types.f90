@@ -53,7 +53,7 @@ integer, parameter :: TWOMO_FFFF   = 2
 integer, parameter :: TWOMO_FOFO   = 3
 
 integer, parameter :: FLAG_CHOLESKY = 0
-integer, parameter :: FLAG_CHOLESKY_BIN   = 1
+integer, parameter :: FLAG_CHOLESKY_BIN   = 0
 integer, parameter :: FLAG_CHOLESKY_OTF   = 0
 integer, parameter :: CHOL_ACCU_DEFAULT   = 1
 integer, parameter :: CHOL_ACCU_TIGHT     = 2

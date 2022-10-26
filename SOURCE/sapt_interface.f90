@@ -166,7 +166,7 @@ SAPT%monB%NDim = NBasis*(NBasis-1)/2
 
 ! for testing old Cholesky
  ICholOld = 0
-
+ 
  if(Flags%ICholesky==0.or.ICholOld==1) then
     if(SAPT%InterfaceType==1) then
        call readtwoint(NBasis,1,'AOTWOINT_A','AOTWOSORT',MemSrtSize)
@@ -239,10 +239,10 @@ SAPT%monB%NDim = NBasis*(NBasis-1)/2
  call clock('2ints',Tcpu,Twall)
 
  if(SAPT%InterfaceType==2) then
-    call prepare_no(OneRdmA,AuxA,Ca,SAPT%monA,AOBasis,System, &
+    call prepare_no_molpro(Ca,OneRdmA,AuxA,SAPT%monA,AOBasis,System, &
                     CholeskyVecs,CholeskyVecsOTF, &
                     Flags,NBasis)
-    call prepare_no(OneRdmB,AuxB,Cb,SAPT%monB,AOBasis,System, &
+    call prepare_no_molpro(Cb,OneRdmB,AuxB,SAPT%monB,AOBasis,System, &
                     CholeskyVecs,CholeskyVecsOTF, &
                     Flags,NBasis)
     call prepare_rdm2_molpro(SAPT%monA,AuxA,NBasis)
@@ -594,7 +594,10 @@ end subroutine readocc_dalton
 
 subroutine readocc_molpro(NBasis,Mon,OrbAux,OneRdm,Flags)
 implicit none
-
+!
+! OrbAux  :: on output C(MO,NO)
+! OneRdm  :: on output 1-RDM in AO
+!
 type(SystemBlock) :: Mon
 type(FlagsData) :: Flags
 
@@ -1309,14 +1312,17 @@ double precision :: OccOrd(nbas)
 
 end subroutine sort_sym_occ
 
-subroutine prepare_no(OneRdm,OrbAux,OrbCAS,Mon,AOBasis,System, &
+subroutine prepare_no_molpro(OrbCAS,OneRdm,CMONO,Mon,AOBasis,System, &
                       CholeskyVecs,CholeskyVecsOTF, &
                       Flags,NBasis)
 implicit none
 !
-! OrbCAS[inout] :: on input AOtoCAS
-!                  on output AOtoNO
-! OrbAux        :: on input CAStoNO
+! Prepare C(AO,NO) orbitals by diagonalization of inactive and virtual 
+! blocks of the Fock matrix
+!
+! CMONO[in]     :: on input  C(MO,NO)  from diagonalization of 1-RDM in MO
+! OrbCAS[inout] :: on input  C(SAO,MO) from Molpro files
+!                  on output C(SAO,NO)
 !
 type(FlagsData)        :: Flags
 type(SystemBlock)      :: Mon
@@ -1327,7 +1333,8 @@ type(TSystem)          :: System
 
 integer,intent(in) :: NBasis
 double precision   :: OneRdm(NBasis*(NBasis+1)/2)
-double precision   :: OrbAux(NBasis,NBasis),OrbCAS(NBasis,NBasis)
+double precision,intent(in)    :: CMONO(NBasis,NBasis)
+double precision,intent(inout) :: OrbCAS(NBasis,NBasis)
 
 integer :: NOccup,NVirt,NSym
 integer :: NCholesky
@@ -1337,7 +1344,7 @@ integer :: itsoao(NBasis),jtsoao(NBasis)
 double precision :: CAOMO(NBasis,NBasis),CSAOMO(NBasis,NBasis), &
                     CAONO(NBasis,NBasis),SAO(NBasis,NBasis)
 double precision :: FockSq(NBasis,NBasis)
-double precision,allocatable :: URe(:,:),OrbSym(:,:)
+double precision,allocatable :: URe(:,:)
 double precision,allocatable :: H0(:), GammaF(:),Fock(:)
 double precision,allocatable :: work1(:),work2(:),work3(:)
 
@@ -1368,18 +1375,18 @@ integer :: info
 
  allocate(Mon%NumOSym(15),Mon%IndInt(NBasis))
  allocate(work1(NInte1),work2(NInte1),work3(NBasis),&
-          H0(NInte1),GammaF(NInte1), &
-          Fock(NBasis**2),OrbSym(NBasis,NBasis),URe(NBasis,NBasis))
+          H0(NInte1),GammaF(NInte1),&
+          Fock(NBasis**2),URe(NBasis,NBasis))
 
  call create_ind_molpro(rdmfile,Mon%NumOSym,Mon%IndInt,NSym,NBasis)
 
-! COPY AUXM TO URe AND OFF SET BY NInAc
+! COPY C(MO,NO) TO URe AND OFF SET BY NInAc
  URe = 0
  forall(i=1:NBasis) URe(i,i)=1d0
  ! with Diag8:
  do i=1,Mon%NAct
     do j=1,Mon%NAct
-       URe(Mon%INAct+i,Mon%INAct+j) = OrbAux(i,j)
+       URe(Mon%INAct+i,Mon%INAct+j) = CMONO(i,j)
     enddo
  enddo
  ! with dsyev
@@ -1410,10 +1417,11 @@ integer :: info
     enddo
  enddo
 
- ! reorder MOs to no symmetry
+ ! reorder MOs to no symmetry 
+ ! (in Molpro they are arrange by irreps)
  do i=1,NBasis
     do j=1,NBasis
-       OrbSym(Mon%IndInt(i),j) = OrbCAS(j,i)
+       CSAOMO(Mon%IndInt(i),j) = OrbCAS(j,i)
     enddo
  enddo
 
@@ -1425,7 +1433,7 @@ integer :: info
        do i=1,NBasis
           do j=1,NBasis
              idx = max(i,j)*(max(i,j)-1)/2+min(i,j)
-             OneRdm(iab) = OneRdm(iab) + OrbSym(i,ia)*OrbSym(j,ib)*GammaF(idx)
+             OneRdm(iab) = OneRdm(iab) + CSAOMO(i,ia)*CSAOMO(j,ib)*GammaF(idx)
           enddo
        enddo
     enddo
@@ -1450,7 +1458,7 @@ integer :: info
 
    elseif(Flags%ICholeskyOTF==1) then
 
-     CSAOMO = transpose(OrbSym)
+     CSAOMO = transpose(CSAOMO)
 
      call read_caomo_molpro(CAOMO,SAO,itsoao,jtsoao,orbaofile,'CASORBAO',NBasis)
      !print*, 'CAOMO',norm2(CAOMO)
@@ -1482,7 +1490,7 @@ integer :: info
    endif
 
  endif
- call tran_matTr(work2,OrbSym,OrbSym,NBasis,.false.)
+ call tran_matTr(work2,CSAOMO,CSAOMO,NBasis,.false.)
 
  Fock = 0
  work3 = 0
@@ -1532,8 +1540,8 @@ integer :: info
 ! END OF CANONICALIZING
 
 ! transform orbitals to (SAO,NO)
-! URe = C(NO,MO); OrbSym = C(MO,SAO)
-call dgemm('N','N',NBasis,NBasis,NBasis,1d0,URe,NBasis,OrbSym,NBasis,0d0,OrbCAS,NBasis)
+! URe = C(NO,MO); CSAOMO = C(MO,SAO)
+call dgemm('N','N',NBasis,NBasis,NBasis,1d0,URe,NBasis,CSAOMO,NBasis,0d0,OrbCAS,NBasis)
 OrbCAS = transpose(OrbCAS)
 
 if(Flags%ICholeskyOTF) then
@@ -1543,11 +1551,11 @@ if(Flags%ICholeskyOTF) then
    Mon%CAONO = CAONO
 endif
 
-deallocate(work3,work2,work1,Fock,OrbSym,URe)
+deallocate(work3,work2,work1,Fock,URe)
 deallocate(H0)
 deallocate(Mon%IndInt)
 
-end subroutine prepare_no
+end subroutine prepare_no_molpro
 
 subroutine prepare_rdm2_molpro(Mon,OrbAux,NBasis)
 implicit none
