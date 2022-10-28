@@ -125,17 +125,14 @@ integer :: iunit,NOccup
 integer :: ia,ib,ic,id,ICol,IRow
 integer :: i,j,k,l,kl,ip,iq,ir,is,ipq,irs
 integer :: NGrid,N,IGL,inf1,inf2,Max_Cn
-double precision :: ECASSCF,PI,WFact,XFactorial,XN1,XN2,FF,OmI,XNorm0,XNorm1
-! hererXXX
-!double precision :: C(NBasis)
+double precision :: ECASSCF,PI,WFact,XFactorial,XN1,XN2,FF,OmI,XNorm0,XNorm1,ErrMax
 character(:),allocatable :: twojfile,twokfile,IntKFile
 
 double precision, allocatable :: DChol(:,:),DCholT(:,:),DCholAct(:,:),DCholActT(:,:),WorkD(:,:)
-double precision, allocatable :: APLUS0Tilde(:), APLUS1Tilde(:),  &
-                                 A1(:),A2(:), &
+double precision, allocatable :: APLUS0Tilde(:), APLUS1Tilde(:), A1(:), &
                                  COMTilde(:),ABPLUS0(:),ABMIN0(:),ABPLUS1(:),ABMIN1(:), &
                                  C0Tilde(:),C1Tilde(:),C2Tilde(:), &
-                                 WORK0(:)
+                                 WORK0(:),WORK1(:)
 integer :: NCholesky
 
 integer :: nblk
@@ -216,12 +213,6 @@ call ABPM_HALFTRAN_GEN_R(ABPLUS1,A1,1.0d0,A0Block,A0BlockIV,nblk,NDimX,NDimX,'X'
 
 EGOne(1)=ECASSCF
 
-!Calc: A2=ABPLUS1*ABMIN1
-! this should be fixed (N^6 step!)
-allocate(A2(NDimX*NDimX))
-Call dgemm('N','N',NDimX,NDimX,NDimX,1d0,ABPLUS1,NDimX,ABMIN1,NDimX,0.0d0,A2,NDimX)
-deallocate(ABMIN1)
-
 !Calc: APLUS0Tilde=ABPLUS0.DChol
 allocate(APLUS0Tilde(NDimX*NCholesky))
 call ABPM_HALFTRAN_GEN_L(DCholT,APLUS0Tilde,0.0d0,A0Block,A0BlockIV,nblk,NDimX,NCholesky,'Y')
@@ -229,7 +220,6 @@ call ABPM_HALFTRAN_GEN_L(DCholT,APLUS0Tilde,0.0d0,A0Block,A0BlockIV,nblk,NDimX,N
 !Calc: APLUS1Tilde=ABPLUS1.DChol
 allocate(APLUS1Tilde(NDimX*NCholesky))
 Call dgemm('N','N',NDimX,NCholesky,NDimX,1d0,ABPLUS1,NDimX,DCholT,NDimX,0.0d0,APLUS1Tilde,NDimX)
-deallocate(ABPLUS1)
 
 deallocate(A0block)
 deallocate(A0BlockIV%vec,A0BlockIV%pos)
@@ -247,6 +237,7 @@ allocate(COMTilde(NDimX*NCholesky))
 COMTilde=0.0
 
 allocate(C0Tilde(NDimX*NCholesky),C1Tilde(NDimX*NCholesky),C2Tilde(NDimX*NCholesky),WORK0(NDimX*NCholesky))
+allocate(WORK1(NDimX*NCholesky))
 allocate(Lambda(nblk))
 associate(A => A0BlockIV, L => LambdaIV)
   L%n = A%n
@@ -273,39 +264,38 @@ Do IGL=1,NGrid
 
    COMTilde=COMTilde+WFact*0.5d0*C1Tilde
 
-   XNorm0=0.0
+   XNorm0=1.0d5
    XFactorial=1
    Do N=2,Max_Cn
        XFactorial=XFactorial*N
        XN1=-N
        XN2=-N*(N-1)
-       Call dgemm('N','N',NDimX,NCholesky,NDimX,XN2,A2,NDimX,C0Tilde,NDimX,0.0d0,WORK0,NDimX)
+       Call dgemm('N','N',NDimX,NCholesky,NDimX,XN2,ABMIN1,NDimX,C0Tilde,NDimX,0.0d0,WORK1,NDimX)
+       Call dgemm('N','N',NDimX,NCholesky,NDimX,1.d0,ABPLUS1,NDimX,WORK1,NDimX,0.0d0,WORK0,NDimX)
        Call dgemm('N','N',NDimX,NCholesky,NDimX,XN1,A1,NDimX,C1Tilde,NDimX,1.0d0,WORK0,NDimX)
        Call ABPM_HALFTRAN_GEN_L(WORK0,C2Tilde,0.0d0,Lambda,LambdaIV,nblk,NDimX,NCholesky,'X')
-       !Call dgemm('N','N',NDimX,NCholesky,NDimX,1.0d0,LAMBDA,NDimX,WORK0,NDimX,0.0d0,C2Tilde,NDimX)
        FF=WFact/XFactorial/(N+1)
        If(AC1.Eq.1) FF=WFact/XFactorial/2.D0
-       If(MOD(N,2).Eq.0) Then
-           XNorm1=Norm2(FF*C2Tilde)
-           Write(6,'(X,"Order (n), |Delta_C|",I3,E14.4)')N,XNorm1
-           If(N.Gt.3.And.XNorm1.Gt.XNorm0) Then
-!                 Write(6,'(X,"Divergence detected. Expansion of C terminated at order ",I3,3F10.4)')N-1
-                 Write(6,'(X,"Divergence detected. Continue up to order Max_Cn",I3,3F10.4)')N
-!                 Exit
-           EndIf
-           XNorm0=XNorm1
+       XNorm1=Norm2(FF*C2Tilde)
+       Write(6,'(X,"Order (n), |Delta_C|",I3,E14.4)')N,XNorm1
+       If(XNorm1.Lt.ErrMax) Exit
+       If(N.Gt.3.And.XNorm1.Gt.XNorm0) Then
+           Write(6,'(X,"Divergence detected. Expansion of C terminated at order ",I3,3F10.4)')N-1
+!          Write(6,'(X,"Divergence detected. Continue up to order Max_Cn",I3,3F10.4)')N
+           Exit
        EndIf
+       XNorm0=XNorm1
        COMTilde=COMTilde+FF*C2Tilde
        C0Tilde=C1Tilde
        C1Tilde=C2Tilde
    EndDo
 
    Write(6,'(X,"Omega, |C|",I3,2F10.4)')IGL,OmI,Norm2(COMTilde)
-
+   If(IGL.Eq.1) ErrMax=XNorm1
 EndDo
 
-deallocate(A1,A2,WORK0,C0Tilde,C1Tilde,C2Tilde,Lambda,APLUS0Tilde,APLUS1Tilde)
-
+deallocate(A1,WORK0,C0Tilde,C1Tilde,C2Tilde,Lambda,APLUS0Tilde,APLUS1Tilde)
+deallocate(ABMIN1,ABPLUS1,WORK1)
 allocate(WorkD(NDimX,NCholesky))
 WorkD=0
 WorkD = RESHAPE(COMTilde, (/NDimX, NCholesky/))
