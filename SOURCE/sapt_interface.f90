@@ -231,6 +231,11 @@ SAPT%monB%NDim = NBasis*(NBasis-1)/2
         call CholeskyOTF_ao_vecs(CholeskyVecsOTF,AOBasis,System, &
                                  XYZPath,BasisSetPath, &
                                  SortAngularMomenta,Flags%ICholeskyAccu)
+
+       SAPT%NCholesky  = CholeskyVecsOTF%NVecs
+       SAPT%monA%NChol = SAPT%NCholesky
+       SAPT%monB%NChol = SAPT%NCholesky
+
        end block
 
     endif
@@ -269,9 +274,10 @@ SAPT%monB%NDim = NBasis*(NBasis-1)/2
  ! transform Cholesky Vecs to NO
  if(Flags%ICholeskyBIN==1) then
     call chol_sapt_AO2NO_BIN(SAPT,SAPT%monA,SAPT%monB,CholeskyVecs,NBasis,Flags%MemVal,Flags%MemType)
+    call clock('chol_AO2NO_BIN',Tcpu,Twall)
  elseif(Flags%ICholeskyOTF==1) then
-    call chol_sapt_AO2NO_OTF(SAPT,SAPT%monA,SAPT%monB,CholeskyVecsOTF,AOBasis,Flags)
-    call clock('chol_NOTransf',Tcpu,Twall)
+    call chol_sapt_AO2NO_OTF(SAPT,SAPT%monA,SAPT%monB,CholeskyVecsOTF,AOBasis,Flags,NBasis)
+    call clock('chol_AO2NO_OTF',Tcpu,Twall)
  endif
 
 ! MAYBE: one should print with NOrbt?
@@ -314,15 +320,18 @@ SAPT%monB%NDim = NBasis*(NBasis-1)/2
 
  if(Flags%ICholesky==0) then
     call make_K(NBasis,work,SAPT%monB%Kmat)
- elseif(Flags%ICholesky==1) then
+ elseif(Flags%ICholeskyBIN==1) then
     NCholesky = CholeskyVecs%NCholesky
     call make_K_CholR(CholeskyVecs%R(1:NCholesky,1:NInte1), &
                       NCholesky,NBasis,work,SAPT%monB%Kmat)
+ elseif(Flags%ICholeskyOTF==1) then
+    print*, 'K matrix is missing...'
  endif
  deallocate(work)
 
 ! calculate electrostatic potential
- call calc_elpot(SAPT%monA,SAPT%monB,CholeskyVecs,Flags%ICholesky,NBasis)
+ call calc_elpot(SAPT%monA,SAPT%monB,CholeskyVecs,&
+                 Flags%ICholesky,Flags%ICholeskyBIN,Flags%ICholeskyOTF,NBasis)
 
 ! calc intermolecular repulsion
  SAPT%Vnn = calc_vnn(SAPT%monA,SAPT%monB)
@@ -1312,7 +1321,7 @@ double precision :: OccOrd(nbas)
 
 end subroutine sort_sym_occ
 
-subroutine prepare_no_molpro(OrbCAS,OneRdm,CMONO,Mon,AOBasis,System, &
+subroutine prepare_no_molpro(OrbCAS,OneRdm,CMONOAct,Mon,AOBasis,System, &
                       CholeskyVecs,CholeskyVecsOTF, &
                       Flags,NBasis)
 implicit none
@@ -1320,7 +1329,10 @@ implicit none
 ! Prepare C(AO,NO) orbitals by diagonalization of inactive and virtual 
 ! blocks of the Fock matrix
 !
-! CMONO[in]     :: on input  C(MO,NO)  from diagonalization of 1-RDM in MO
+! CMONOAct[in]  :: on input  C(MO,NO) in active MOs
+!                  (from diagonalization of 1-RDM in MOs)
+! OneRDM[inout] :: on input  1-RDM in AO
+!                  on output 1-RDM in MO
 ! OrbCAS[inout] :: on input  C(SAO,MO) from Molpro files
 !                  on output C(SAO,NO)
 !
@@ -1332,9 +1344,9 @@ type(TAOBasis)         :: AOBasis
 type(TSystem)          :: System
 
 integer,intent(in) :: NBasis
-double precision   :: OneRdm(NBasis*(NBasis+1)/2)
-double precision,intent(in)    :: CMONO(NBasis,NBasis)
+double precision,intent(in)    :: CMONOAct(NBasis,NBasis)
 double precision,intent(inout) :: OrbCAS(NBasis,NBasis)
+double precision,intent(inout) :: OneRdm(NBasis*(NBasis+1)/2)
 
 integer :: NOccup,NVirt,NSym
 integer :: NCholesky
@@ -1342,9 +1354,9 @@ integer :: i,j,ia,ib,iab,ioff,idx,NInte1
 integer :: itsoao(NBasis),jtsoao(NBasis)
 
 double precision :: CAOMO(NBasis,NBasis),CSAOMO(NBasis,NBasis), &
-                    CAONO(NBasis,NBasis),SAO(NBasis,NBasis)
-double precision :: FockSq(NBasis,NBasis)
-double precision,allocatable :: URe(:,:)
+                    CAONO(NBasis,NBasis),CMONO(NBasis,NBasis)
+double precision :: FockSq(NBasis,NBasis),SAO(NBasis,NBasis)
+
 double precision,allocatable :: H0(:), GammaF(:),Fock(:)
 double precision,allocatable :: work1(:),work2(:),work3(:)
 
@@ -1374,19 +1386,18 @@ integer :: info
  endif
 
  allocate(Mon%NumOSym(15),Mon%IndInt(NBasis))
- allocate(work1(NInte1),work2(NInte1),work3(NBasis),&
-          H0(NInte1),GammaF(NInte1),&
-          Fock(NBasis**2),URe(NBasis,NBasis))
+ allocate(work1(NInte1),work2(NInte1),work3(NBasis))
+ allocate(H0(NInte1),GammaF(NInte1),Fock(NBasis**2))
 
  call create_ind_molpro(rdmfile,Mon%NumOSym,Mon%IndInt,NSym,NBasis)
 
-! COPY C(MO,NO) TO URe AND OFF SET BY NInAc
- URe = 0
- forall(i=1:NBasis) URe(i,i)=1d0
+! COPY C(MO,NO)Act TO CMONO AND OFF SET BY NInAc
+ CMONO = 0
+ forall(i=1:NBasis) CMONO(i,i)=1d0
  ! with Diag8:
  do i=1,Mon%NAct
     do j=1,Mon%NAct
-       URe(Mon%INAct+i,Mon%INAct+j) = CMONO(i,j)
+       CMONO(Mon%INAct+i,Mon%INAct+j) = CMONOAct(i,j)
     enddo
  enddo
  ! with dsyev
@@ -1466,8 +1477,10 @@ integer :: info
      call CholeskyOTF_Fock(FockSq,CholeskyVecsOTF,AOBasis,System,mon%Monomer, &
                            CAOMO,CSAOMO,H0,GammaF, &
                            Flags%MemType,Flags%MemVal,NInte1,NBasis)
-     print*, 'FockSq',norm2(FOckSq)
+     print*, 'FockSq',norm2(FockSq)
      call sq_to_triang2(FockSq,work2,NBasis)
+
+     CSAOMO = transpose(CSAOMO)
 
    endif
 
@@ -1490,7 +1503,7 @@ integer :: info
    endif
 
  endif
- call tran_matTr(work2,CSAOMO,CSAOMO,NBasis,.false.)
+ if(Flags%ICholeskyOTF==0) call tran_matTr(work2,CSAOMO,CSAOMO,NBasis,.false.)
 
  Fock = 0
  work3 = 0
@@ -1511,7 +1524,7 @@ integer :: info
 
     do i=1,Mon%INAct
       do j=1,Mon%INAct
-         URe(i,j) = Fock((j-1)*Mon%INAct+i)
+         CMONO(i,j) = Fock((j-1)*Mon%INAct+i)
       enddo
     enddo
  endif
@@ -1520,7 +1533,7 @@ integer :: info
  if(NVirt/=0) then
     do i=1,NVirt
        do j=1,NVirt
-          idx = max(i+NOccup,j+NOccup)*(max(i+NOccup,j+NOccup)-1)/2&
+          idx = (max(i+NOccup,j+NOccup)*(max(i+NOccup,j+NOccup)-1))/2 &
               + min(i+NOccup,j+NOccup)
           Fock((j-1)*NVirt+i) = work2(idx)
        enddo
@@ -1529,7 +1542,7 @@ integer :: info
     !call dsyev('V','U',NVirt,Fock,NVirt,work3,work1,3*NVirt,info)
     do i=1,NVirt
        do j=1,NVirt
-          URe(i+NOccup,j+NOccup) = Fock((j-1)*NVirt+i)
+          CMONO(i+NOccup,j+NOccup) = Fock((j-1)*NVirt+i)
        enddo
     enddo
  endif
@@ -1540,19 +1553,20 @@ integer :: info
 ! END OF CANONICALIZING
 
 ! transform orbitals to (SAO,NO)
-! URe = C(NO,MO); CSAOMO = C(MO,SAO)
-call dgemm('N','N',NBasis,NBasis,NBasis,1d0,URe,NBasis,CSAOMO,NBasis,0d0,OrbCAS,NBasis)
+! CMONO = C(NO,MO); CSAOMO = C(MO,SAO)
+call dgemm('N','N',NBasis,NBasis,NBasis,1d0,CMONO,NBasis,CSAOMO,NBasis,0d0,OrbCAS,NBasis)
 OrbCAS = transpose(OrbCAS)
 
 if(Flags%ICholeskyOTF) then
    allocate(Mon%CAONO(NBasis,NBasis))
-   ! CAOMO = C(AO,MO) ; URe = C(NO,MO) 
-   call dgemm('N','T',NBasis,NBasis,NBasis,1d0,CAOMO,NBasis,URe,NBasis,0d0,CAONO,NBasis)
+   ! CAOMO = C(AO,MO) ; CMONO = C(NO,MO)
+   call dgemm('N','T',NBasis,NBasis,NBasis,1d0,CAOMO,NBasis,CMONO,NBasis,0d0,CAONO,NBasis)
    Mon%CAONO = CAONO
+
 endif
 
-deallocate(work3,work2,work1,Fock,URe)
-deallocate(H0)
+deallocate(work3,work2,work1)
+deallocate(H0,Fock)
 deallocate(Mon%IndInt)
 
 end subroutine prepare_no_molpro
@@ -1947,13 +1961,14 @@ end function FindGem
 
 end subroutine select_active
 
-subroutine calc_elpot(A,B,CholeskyVecs,ICholesky,NBas)
+subroutine calc_elpot(A,B,CholeskyVecs,ICholesky,ICholeskyBIN,ICholeskyOTF,NBas)
 implicit none
 
 type(SystemBlock)   :: A, B
 type(TCholeskyVecs) :: CholeskyVecs
 
 integer,intent(in) :: ICholesky,NBas
+integer,intent(in) :: ICholeskyBIN,ICholeskyOTF
 
 integer :: ione,i
 integer :: NInte1,NCholesky
@@ -2007,10 +2022,15 @@ character(8)                 :: label
 
  if(ICholesky==0) then
     call make_J2(NBas,Pa,Pb,Ja,Jb)
- elseif(ICholesky==1) then
+ elseif(ICholeskyBIN==1) then
     NCholesky = CholeskyVecs%NCholesky
     call make_J2_CholR(CholeskyVecs%R(1:NCholesky,1:NInte1), &
                        Pa,Pb,Ja,Jb,NCholesky,NBas)
+ elseif(ICholeskyOTF==1) then
+    print*, 'skipping Ja and Jb matrices'
+    !call make_J2(NBas,Pa,Pb,Ja,Jb)
+    Ja = 0
+    Jb = 0
  endif
 
  allocate(A%WPot(NBas,NBas),B%WPot(NBas,NBas))
@@ -2149,6 +2169,9 @@ call clock('AOO',Tcpu,Twall)
                     MaxBufferDimMB)
 call clock('BOO',Tcpu,Twall)
 
+print*, 'A%OO',norm2(A%OO)
+print*, 'B%OO',norm2(B%OO)
+
  if(SAPT%SaptLevel==666) then ! RS2PT2+
     allocate(A%OOAB(NCholesky,dimOA*dimOB), &
              B%OOBA(NCholesky,dimOB*dimOA))
@@ -2187,6 +2210,10 @@ call clock('BOO',Tcpu,Twall)
                     B%CMO,1,NBasis,&
                     MaxBufferDimMB)
  call clock('BFF',Tcpu,Twall)
+
+!print*, 'A%FF',norm2(A%FF)
+!print*, A%FF(3,:)
+!print*, 'B%FF',norm2(B%FF)
 
  ! DChol(NCholeksy,NDimX)
  allocate(A%DChol(NCholesky,A%NDimX), &
@@ -2233,6 +2260,9 @@ call clock('BOO',Tcpu,Twall)
                     A%CMO,1,NBasis,&
                     MaxBufferDimMB)
 
+ print*, 'A%FFAB',norm2(A%FFAB)
+ print*, 'B%FFBA',norm2(B%FFBA)
+
  !allocate(A%FO(NCholesky,NBasis*dimOA),&
  !         B%FO(NCholesky,NBasis*dimOA))
  !! (FO|AA)
@@ -2246,7 +2276,7 @@ call clock('BOO',Tcpu,Twall)
 
 end subroutine chol_sapt_AO2NO_BIN
 
-subroutine chol_sapt_AO2NO_OTF(SAPT,A,B,CholeskyVecsOTF,AOBasis,Flags)
+subroutine chol_sapt_AO2NO_OTF(SAPT,A,B,CholeskyVecsOTF,AOBasis,Flags,NBasis)
 implicit none
 
 type(SaptData)         :: SAPT
@@ -2254,10 +2284,13 @@ type(SystemBlock)      :: A, B
 type(TAOBasis)         :: AOBasis
 type(TCholeskyVecsOTF) :: CholeskyVecsOTF
 type(FlagsData)        :: Flags
+integer,intent(in)     :: NBasis
 
 integer :: NCholesky
 integer :: MaxBufferDimMB
 integer :: dimOA,dimOB
+integer :: i,j,ip,iq,ipq
+double precision :: Cpq
 
 double precision :: Tcpu,Twall
 
@@ -2295,13 +2328,81 @@ call chol_Rkab_OTF(B%OO,B%CAONO,1,dimOB,B%CAONO,1,dimOB, &
 
 call clock('BOO',Tcpu,Twall)
 
+print*, 'A%OO',norm2(A%OO)
+print*, 'B%OO',norm2(B%OO)
+
+if(SAPT%SaptLevel==666) then ! RS2PT2+
+
+   allocate(A%OOAB(NCholesky,dimOA*dimOB), &
+            B%OOBA(NCholesky,dimOB*dimOA))
+
+   call chol_Rkab_OTF(A%OOAB,A%CAONO,1,dimOA,B%CAONO,1,dimOB, &
+                      MaxBufferDimMB,CholeskyVecsOTF, &
+                      AOBasis,ORBITAL_ORDERING_MOLPRO)
+
+   call chol_Rkab_OTF(A%OOBA,B%CAONO,1,dimOB,A%CAONO,1,dimOA, &
+                      MaxBufferDimMB,CholeskyVecsOTF, &
+                      AOBasis,ORBITAL_ORDERING_MOLPRO)
+
+endif
+
+allocate(A%FF(NCholesky,NBasis**2),&
+         B%FF(NCholesky,NBasis**2) )
+
+call chol_Rkab_OTF(A%FF,A%CAONO,1,NBasis,A%CAONO,1,NBasis,&
+                   MaxBufferDimMB,CholeskyVecsOTF, &
+                   AOBasis,ORBITAL_ORDERING_MOLPRO)
+
+call clock('AFF',Tcpu,Twall)
+
+call chol_Rkab_OTF(B%FF,B%CAONO,1,NBasis,B%CAONO,1,NBasis,&
+                   MaxBufferDimMB,CholeskyVecsOTF, &
+                   AOBasis,ORBITAL_ORDERING_MOLPRO)
+
+call clock('BFF',Tcpu,Twall)
+
+print*, 'A%FF',norm2(A%FF)
+print*, 'B%FF',norm2(B%FF)
+
+! DChol(NCholeksy,NDimX)
+allocate(A%DChol(NCholesky,A%NDimX), &
+         B%DChol(NCholesky,B%NDimX))
+
+do j=1,A%NDimX
+   ip = A%IndN(1,j)
+   iq = A%IndN(2,j)
+   ipq = iq + (ip-1)*NBasis
+   Cpq = A%CICoef(ip) + A%CICoef(iq)
+   A%DChol(:,j) = Cpq*A%FF(:,ipq)
+enddo
+
+do j=1,B%NDimX
+   ip = B%IndN(1,j)
+   iq = B%IndN(2,j)
+   ipq = iq + (ip-1)*NBasis
+   Cpq = B%CICoef(ip) + B%CICoef(iq)
+   B%DChol(:,j) = Cpq*B%FF(:,ipq)
+enddo
+
+if(SAPT%SaptLevel==999) return
 
 !call chol_Rkab_OTF(MatFF, UAux, a0, a1, UAux, b0, b1,
 !                   MaxBufferDimMB, CholeskyVecsOTF,
 !                   AOBasis, ORBITAL_ORDERING_MOLPRO)
 
-print*, 'not ready yet: chol_sapt_AO2NO_OTF!'
-stop "do some good testing here"
+allocate(A%FFAB(NCholesky,NBasis**2),&
+         B%FFBA(NCholesky,NBasis**2) )
+
+call chol_Rkab_OTF(A%FFAB,A%CAONO,1,NBasis,B%CAONO,1,NBasis,&
+                   MaxBufferDimMB,CholeskyVecsOTF, &
+                   AOBasis,ORBITAL_ORDERING_MOLPRO)
+
+call chol_Rkab_OTF(B%FFBA,B%CAONO,1,NBasis,A%CAONO,1,NBasis,&
+                   MaxBufferDimMB,CholeskyVecsOTF, &
+                   AOBasis,ORBITAL_ORDERING_MOLPRO)
+
+print*, 'A%FFAB',norm2(A%FFAB)
+print*, 'B%FFBA',norm2(B%FFBA)
 
 end subroutine chol_sapt_AO2NO_OTF
 

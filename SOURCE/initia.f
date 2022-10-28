@@ -1845,12 +1845,14 @@ C     cholesky OTF
       NCholesky = CholeskyVecsOTF%NVecs
       allocate(MatFF(NCholesky,NA*NB))
       UAux = CAONO
+C
       call chol_Rkab_OTF(MatFF, UAux, a0, a1, UAux, b0, b1,
      $                   MemMOTransfMB, CholeskyVecsOTF,
      $                   AOBasis, ORBITAL_ORDERING_MOLPRO)
       EndIf ! Cholesky BIN / OTF
 C
       Call clock('chol_NOTransf',Tcpu,Twall)
+
 C
       Call chol_ints_fofo(NBasis,Num0+Num1,MatFF,
      $                    NBasis,Num0+Num1,MatFF,
@@ -2117,8 +2119,9 @@ C
       double precision, parameter :: ThreshH0 = 1d-6
       integer,external :: IndSym
 C
+      write(6,'(/,1x,a,i2)') "Construct Fock matrix, monomer", Monomer
+C
       ! Read whether to put ghost functions
-      print*, 'Monomer',Monomer
       if(Monomer==1) then
          call sys_Init(System,SYS_MONO_A)
       elseif(Monomer==2) then
@@ -2131,14 +2134,8 @@ C     transform H0 (in SAO) to MO
       H0tr = H0in
       call tran_matTr(H0tr,CSAO,CSAO,NBasis,.true.)
       call triang_to_sq2(H0tr,H0_mo,NBasis)
-
-      write(6,*) 'H0   MO'
-      do j=1,NBasis
-         write(LOUT,'(*(f13.8))') (H0_mo(i,j),i=1,NBasis)
-      enddo
       h0norm = norm2(H0_mo)
-      write(LOUT,'()')
-
+C
 C     prepare density matrix
       H0_mo = 0d0
       D_mo  = 0d0
@@ -2166,29 +2163,37 @@ C     set memory for Fock transformation
          MemMOTransfMB = MemVal * 1024_8
       endif
 C
-       call chol_F(F_mo,H0_mo,D_mo,Cmat,0.5d0,CholeskyVecsOTF,
-     $             AOBasis,System,ORBITAL_ORDERING_MOLPRO,MemMOTransfMB)
+      call chol_F(F_mo,H0_mo,D_mo,Cmat,0.5d0,CholeskyVecsOTF,
+     $            AOBasis,System,ORBITAL_ORDERING_MOLPRO,MemMOTransfMB)
 
-      write(6,*) 'H0   MO -- new'
-      do j=1,NBasis
-         write(LOUT,'(*(f13.8))') (H0_mo(i,j),i=1,NBasis)
-      enddo
-      val = norm2(H0_mo)
 C
-      print*, 'H0 test = ',abs(val)-abs(h0norm)
+       val = norm2(H0_mo)
+       write(6,'(1x,a,f12.6)') "Test H0 norms= ",abs(val)-abs(h0norm)
+C
       if(abs(val)-abs(h0norm).gt.ThreshH0) then
         print*, 'Difference in H0 norms = '
         print*, abs(val)-abs(h0norm)
         print*, 'Threshold = ',ThreshH0
         print*, 'Maybe error in geometry / basis set?'
+
+        write(6,*) 'H0   MO (external)'
+        do j=1,NBasis
+           write(LOUT,'(*(f13.8))') (H0_mo(i,j),i=1,NBasis)
+        enddo
+        write(LOUT,'()')
+        write(6,*) 'H0   MO (internal)'
+        do j=1,NBasis
+           write(LOUT,'(*(f13.8))') (H0_mo(i,j),i=1,NBasis)
+        enddo
+
+        print*, 'FockF w bazie MO -- new'
+        print*, 'Fock = ',norm2(F_mo)
+        do j=1,NBasis
+           write(LOUT,'(*(f13.8))') (F_mo(i,j),i=1,NBasis)
+        enddo
+
         stop
       endif
-
-      print*, 'FockF w bazie MO -- new'
-      print*, 'Fock = ',norm2(F_mo)
-      do j=1,NBasis
-         write(LOUT,'(*(f13.8))') (F_mo(i,j),i=1,NBasis)
-      enddo
 
       End Subroutine CholeskyOTF_Fock
 
