@@ -310,7 +310,7 @@ SAPT%monB%NDim = NBasis*(NBasis-1)/2
  endif
 
 ! calculate exchange K[PB] matrix in AO
- allocate(SAPT%monB%Kmat(NBasis,NBasis))
+ if(.not.allocated(SAPT%monB%Kmat)) allocate(SAPT%monB%Kmat(NBasis,NBasis))
  allocate(work(NBasis,NBasis))
  !get PB density in AO
  work = 0
@@ -324,8 +324,6 @@ SAPT%monB%NDim = NBasis*(NBasis-1)/2
     NCholesky = CholeskyVecs%NCholesky
     call make_K_CholR(CholeskyVecs%R(1:NCholesky,1:NInte1), &
                       NCholesky,NBasis,work,SAPT%monB%Kmat)
- elseif(Flags%ICholeskyOTF==1) then
-    print*, 'K matrix is missing...'
  endif
  deallocate(work)
 
@@ -1336,6 +1334,8 @@ implicit none
 ! OrbCAS[inout] :: on input  C(SAO,MO) from Molpro files
 !                  on output C(SAO,NO)
 !
+! For CholeskyOTF: compute J and K matrices
+!
 type(FlagsData)        :: Flags
 type(SystemBlock)      :: Mon
 type(TCholeskyVecs)    :: CholeskyVecs
@@ -1356,6 +1356,7 @@ integer :: itsoao(NBasis),jtsoao(NBasis)
 double precision :: CAOMO(NBasis,NBasis),CSAOMO(NBasis,NBasis), &
                     CAONO(NBasis,NBasis),CMONO(NBasis,NBasis)
 double precision :: FockSq(NBasis,NBasis),SAO(NBasis,NBasis)
+double precision :: work(NBasis,NBasis),SC(NBasis,NBasis)
 
 double precision,allocatable :: H0(:), GammaF(:),Fock(:)
 double precision,allocatable :: work1(:),work2(:),work3(:)
@@ -1469,6 +1470,11 @@ integer :: info
 
    elseif(Flags%ICholeskyOTF==1) then
 
+     ! for SAPT with Cholesky OTF compute J and K matrices here
+     ! used later in eletrostatic potential (V+J in calc_elpot)
+     ! and in E1exch (K for monomer B)
+     allocate(Mon%Jmat(NBasis,NBasis),Mon%Kmat(NBasis,NBasis))
+
      CSAOMO = transpose(CSAOMO)
 
      call read_caomo_molpro(CAOMO,SAO,itsoao,jtsoao,orbaofile,'CASORBAO',NBasis)
@@ -1476,7 +1482,8 @@ integer :: info
 
      call CholeskyOTF_Fock(FockSq,CholeskyVecsOTF,AOBasis,System,mon%Monomer, &
                            CAOMO,CSAOMO,H0,GammaF, &
-                           Flags%MemType,Flags%MemVal,NInte1,NBasis)
+                           Flags%MemType,Flags%MemVal,NInte1,NBasis, &
+                           Mon%Jmat,Mon%Kmat)
      print*, 'FockSq',norm2(FockSq)
      call sq_to_triang2(FockSq,work2,NBasis)
 
@@ -1558,10 +1565,34 @@ call dgemm('N','N',NBasis,NBasis,NBasis,1d0,CMONO,NBasis,CSAOMO,NBasis,0d0,OrbCA
 OrbCAS = transpose(OrbCAS)
 
 if(Flags%ICholeskyOTF) then
+
    allocate(Mon%CAONO(NBasis,NBasis))
    ! CAOMO = C(AO,MO) ; CMONO = C(NO,MO)
    call dgemm('N','T',NBasis,NBasis,NBasis,1d0,CAOMO,NBasis,CMONO,NBasis,0d0,CAONO,NBasis)
    Mon%CAONO = CAONO
+
+   ! transform J/K from MO to AO with SAO
+   ! remember: C^T(AO,MO).S(AO).C(AO,MO) = 1
+   !   so that C^-1(AO,MO) = C^T.S(AO)
+   !           J_MO = C^T . J_AO . C
+   !           J_AO = SC . J_MO . (SC)^T
+   call dgemm('N','N',NBasis,NBasis,NBasis,1d0,SAO,NBasis,CAOMO,NBasis,0d0,SC,NBasis)
+   call dgemm('N','N',NBasis,NBasis,NBasis,1d0,SC,NBasis,mon%Jmat,NBasis,0d0,work,NBasis)
+   call dgemm('N','T',NBasis,NBasis,NBasis,1d0,work,NBasis,SC,NBasis,0d0,mon%Jmat,NBasis)
+
+   call dgemm('N','N',NBasis,NBasis,NBasis,1d0,SC,NBasis,mon%Kmat,NBasis,0d0,work,NBasis)
+   call dgemm('N','T',NBasis,NBasis,NBasis,-1d0,work,NBasis,SC,NBasis,0d0,mon%Kmat,NBasis)
+
+   !write(6,*) 'Kmat-AO OTF',mon%Monomer,norm2(mon%Kmat)
+   !do j=1,NBasis
+   !   write(LOUT,'(*(f13.8))') (Mon%Kmat(i,j),i=1,NBasis)
+   !enddo
+   !write(LOUT,'()')
+   !write(6,*) 'Jmat-AO OTF',mon%Monomer,norm2(mon%Jmat)
+   !do j=1,NBasis
+   !   write(LOUT,'(*(f13.8))') (Mon%Jmat(i,j),i=1,NBasis)
+   !enddo
+   !write(LOUT,'()')
 
 endif
 
@@ -1970,7 +2001,7 @@ type(TCholeskyVecs) :: CholeskyVecs
 integer,intent(in) :: ICholesky,NBas
 integer,intent(in) :: ICholeskyBIN,ICholeskyOTF
 
-integer :: ione,i
+integer :: ione,i,j
 integer :: NInte1,NCholesky
 double precision,allocatable :: Pa(:,:),Pb(:,:)
 double precision,allocatable :: Va(:,:),Vb(:,:)
@@ -1990,6 +2021,7 @@ character(8)                 :: label
  do i=1,NBas
     call dger(NBas,NBas,2d0*A%Occ(i),A%CMO(:,i),1,A%CMO(:,i),1,Pa,NBas)
  enddo
+
  Pb = 0d0
  do i=1,NBas
     call dger(NBas,NBas,2d0*B%Occ(i),B%CMO(:,i),1,B%CMO(:,i),1,Pb,NBas)
@@ -2027,10 +2059,9 @@ character(8)                 :: label
     call make_J2_CholR(CholeskyVecs%R(1:NCholesky,1:NInte1), &
                        Pa,Pb,Ja,Jb,NCholesky,NBas)
  elseif(ICholeskyOTF==1) then
-    print*, 'skipping Ja and Jb matrices'
-    !call make_J2(NBas,Pa,Pb,Ja,Jb)
-    Ja = 0
-    Jb = 0
+   Ja = A%Jmat
+   Jb = B%Jmat
+   deallocate(A%Jmat,B%Jmat)
  endif
 
  allocate(A%WPot(NBas,NBas),B%WPot(NBas,NBas))

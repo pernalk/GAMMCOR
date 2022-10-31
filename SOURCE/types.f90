@@ -212,7 +212,7 @@ type SystemBlock
       double precision,allocatable :: OrbE(:)
       double precision,allocatable :: TwoMO(:)
       ! SAO = symmetrized atomic orbitals
-      ! CMO = C(SAO,NO); CAONO = C(AO,NO)
+      ! CMO = C(SAO,NO); CAONO = C(AO,NO); CMONO = C(MO,NO)
       double precision,allocatable :: CMO(:,:),CAONO(:,:)
       double precision,allocatable :: OV(:,:),OO(:,:), &
                                       FO(:,:),FF(:,:), &
@@ -220,11 +220,12 @@ type SystemBlock
                                       OOAB(:,:),OOBA(:,:)
       double precision,allocatable :: DChol(:,:)
       double precision,allocatable :: Pmat(:,:)
-      double precision,allocatable :: WPot(:,:),Kmat(:,:)
+      double precision,allocatable :: Jmat(:,:),Kmat(:,:)
+      double precision,allocatable :: Fmat(:,:)
+      double precision,allocatable :: Wpot(:,:)
       double precision,allocatable :: VCoul(:)
       double precision,allocatable :: RDM2(:)
       double precision,allocatable :: RDM2val(:,:,:,:)
-      double precision,allocatable :: Fmat(:,:) 
       double precision,allocatable :: dipm(:,:,:)
       double precision,allocatable :: Eig(:),EigX(:),EigY(:)
       double precision,allocatable :: AP(:,:),PP(:)

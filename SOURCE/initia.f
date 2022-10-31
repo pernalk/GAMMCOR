@@ -1854,9 +1854,11 @@ C
       Call clock('chol_NOTransf',Tcpu,Twall)
 
 C
-      Call chol_ints_fofo(NBasis,Num0+Num1,MatFF,
-     $                    NBasis,Num0+Num1,MatFF,
-     $                    NCholesky,NBasis,'FOFO')
+C      Call chol_ints_fofo(NBasis,Num0+Num1,MatFF,
+C     $                    NBasis,Num0+Num1,MatFF,
+C     $                    NCholesky,NBasis,'FOFO')
+      Call chol_fofo_batch(Num0+Num1,MatFF,Num0+Num1,MatFF,
+     $                     NCholesky,NBasis,'FOFO')
       Call chol_ints_fofo(NBasis,NBasis,MatFF,
      $                    Num0+Num1,Num0+Num1,MatFF,
      $                    NCholesky,NBasis,'FFOO')
@@ -2083,10 +2085,12 @@ C
       Subroutine CholeskyOTF_Fock(F_mo,CholeskyVecsOTF,
      $                            AOBasis,System,Monomer,
      $                            Cmat,CSAO,H0in,GammaF,
-     $                            MemType,MemVal,NInte1,NBasis)
+     $                            MemType,MemVal,NInte1,NBasis,
+     $                            J_mo,K_mo)
 C
-C     Generate Fock matrix (NBasis,NBasis) in AO basis
+C     Generate Fock matrix (NBasis,NBasis) in MO basis
 C     from Cholesky OTF vectors
+C     optional :: compute J and K matrices in MO basis
 C
       use print_units
       use tran
@@ -2110,12 +2114,15 @@ C
      $                               CSAO(NBasis,NBasis),
      $                               GammaF(NInte1)
       double precision,intent(out) :: F_mo(NBasis,NBasis)
+      double precision,optional,intent(out) :: J_mo(NBasis,NBasis)
+      double precision,optional,intent(out) :: K_mo(NBasis,NBasis)
 
       integer          :: i, j
       integer          :: MemMOTransfMB
       double precision :: val, h0norm
       double precision :: H0tr(NInte1)
       double precision :: D_mo(NBasis,NBasis), H0_mo(NBasis,NBasis)
+      double precision :: work(NBasis,NBasis)
       double precision, parameter :: ThreshH0 = 1d-6
       integer,external :: IndSym
 C
@@ -2144,17 +2151,17 @@ C     prepare density matrix
          D_mo(I,J) = 2d0 * GammaF(IndSym(I,J))
       EndDo
       EndDo
-C      write(6,*) 'DMAT MO'
+C      write(6,*) 'DMAT MO',norm2(D_mo)
 C      do j=1,NBasis
 C         write(LOUT,'(*(f13.8))') (D_mo(i,j),i=1,NBasis)
 C      enddo
 C      write(LOUT,'()')
-C
-C       write(6,*) 'CAOMO  '
-C       do j=1,NBasis
-C          write(LOUT,'(*(f13.8))') (Cmat(i,j),i=1,NBasis)
-C       enddo
-C       write(LOUT,'()')
+CC
+C        write(6,*) 'CAOMO  '
+C        do j=1,NBasis
+C           write(LOUT,'(*(f13.8))') (Cmat(i,j),i=1,NBasis)
+C        enddo
+C        write(LOUT,'()')
 
 C     set memory for Fock transformation
       if(MemType == 2) then       !MB
@@ -2163,9 +2170,15 @@ C     set memory for Fock transformation
          MemMOTransfMB = MemVal * 1024_8
       endif
 C
-      call chol_F(F_mo,H0_mo,D_mo,Cmat,0.5d0,CholeskyVecsOTF,
+      if(present(J_mo) .and. present(K_mo)) then
+c        generate also J_mo and K_mo
+         call chol_F(F_mo,H0_mo,D_mo,Cmat,0.5d0,CholeskyVecsOTF,
+     $            AOBasis,System,ORBITAL_ORDERING_MOLPRO,MemMOTransfMB,
+     $            J_mo,K_mo)
+      else
+         call chol_F(F_mo,H0_mo,D_mo,Cmat,0.5d0,CholeskyVecsOTF,
      $            AOBasis,System,ORBITAL_ORDERING_MOLPRO,MemMOTransfMB)
-
+      endif
 C
        val = norm2(H0_mo)
        write(6,'(1x,a,f12.6)') "Test H0 norms= ",abs(val)-abs(h0norm)
