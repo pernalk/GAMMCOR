@@ -97,17 +97,17 @@ do iloop=1,nloop
          l = l + 1
       endif
 
-      do j=1,nOB
+      do j=1,nOA
          do i=1,NBasis
             ints(i,j) = work((j-1)*NBasis+i,iBatch)
          enddo
       enddo
 
       if(l>nOB) cycle
-      ints(:,nOB+1:NBasis) = 0
+      ints(:,nOA+1:NBasis) = 0
 
       irec = (l-1)*NBasis + k
-      write(iunit,rec=irec) ints(1:NBasis,1:nOB)
+      write(iunit,rec=irec) ints(1:NBasis,1:nOA)
    enddo
 
    off = off + MaxBatchSize

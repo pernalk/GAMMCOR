@@ -562,11 +562,13 @@ if(Flags%ISERPA==0) then
 
   if(Flags%ICholeskyBIN==1.or.Flags%ICholeskyOTF==1) then
 
-     !print*, 'dimOA',A%num0+A%num1
-     !print*, 'dimOB',B%num0+B%num1
+     print*, 'dimOA',A%num0+A%num1
+     print*, 'dimOB',B%num0+B%num1
      ! term A3-ind
-     call chol_ints_fofo(NBasis,A%num0+A%num1,A%FF,&
-                         NBasis,B%num0+B%num1,B%FF,&
+     !call chol_ints_fofo(NBasis,A%num0+A%num1,A%FF,&
+     !                    NBasis,B%num0+B%num1,B%FF,&
+     !                    A%NChol,NBasis,'FOFOAABB')
+     call chol_fofo_batch(A%num0+A%num1,A%FF,B%num0+B%num1,B%FF, &
                          A%NChol,NBasis,'FOFOAABB')
 
      ! term A1-ind
@@ -575,19 +577,28 @@ if(Flags%ISERPA==0) then
                          A%NChol,NBasis,'FFOOABAB')
 
      ! term A2-ind
-     call chol_ints_fofo(NBasis,B%num0+B%num1,B%FF,  &
-                         NBasis,A%num0+A%num1,B%FFBA,&
+     !call chol_ints_fofo(NBasis,B%num0+B%num1,B%FF,  &
+     !                    NBasis,A%num0+A%num1,B%FFBA,&
+     !                    A%NChol,NBasis,'FOFOBBBA')
+     call chol_fofo_batch(B%num0+B%num1,B%FF,A%num0+A%num1,B%FFBA, &
                          A%NChol,NBasis,'FOFOBBBA')
-     call chol_ints_fofo(NBasis,A%num0+A%num1,A%FF,  &
-                         NBasis,B%num0+B%num1,A%FFAB,&
+
+     !call chol_ints_fofo(NBasis,A%num0+A%num1,A%FF,  &
+     !                    NBasis,B%num0+B%num1,A%FFAB,&
+     !                    A%NChol,NBasis,'FOFOAAAB')
+     call chol_fofo_batch(A%num0+A%num1,A%FF,B%num0+B%num1,A%FFAB, &
                          A%NChol,NBasis,'FOFOAAAB')
      ! A2A(B): YY
-     call chol_ints_fofo(NBasis,B%num0+B%num1,B%FF,  &
-                         NBasis,B%num0+B%num1,A%FFAB,&
-                         A%NChol,NBasis,'FOFOBBAB')
-     call chol_ints_fofo(NBasis,A%num0+A%num1,A%FF,  &
-                         NBasis,A%num0+A%num1,B%FFBA,&
-                         A%NChol,NBasis,'FOFOAABA')
+     !call chol_ints_fofo(NBasis,B%num0+B%num1,B%FF,  &
+     !                    NBasis,B%num0+B%num1,A%FFAB,&
+     !                    A%NChol,NBasis,'FOFOBBAB')
+     call chol_fofo_batch(B%num0+B%num1,B%FF,B%num0+B%num1,A%FFAB, &
+                          A%NChol,NBasis,'FOFOBBAB')
+     !call chol_ints_fofo(NBasis,A%num0+A%num1,A%FF,  &
+     !                    NBasis,A%num0+A%num1,B%FFBA,&
+     !                    A%NChol,NBasis,'FOFOAABA')
+     call chol_fofo_batch(A%num0+A%num1,A%FF,A%num0+A%num1,B%FFBA, &
+                          A%NChol,NBasis,'FOFOAABA')
 
   else
    ! working stuff...
