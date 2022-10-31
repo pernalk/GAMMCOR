@@ -1854,14 +1854,16 @@ C
       Call clock('chol_NOTransf',Tcpu,Twall)
 
 C
-C      Call chol_ints_fofo(NBasis,Num0+Num1,MatFF,
-C     $                    NBasis,Num0+Num1,MatFF,
-C     $                    NCholesky,NBasis,'FOFO')
+c     Call chol_ints_fofo(NBasis,Num0+Num1,MatFF,
+c    $                    NBasis,Num0+Num1,MatFF,
+c    $                    NCholesky,NBasis,'FOFO')
+c     Call chol_ints_fofo(NBasis,NBasis,MatFF,
+c    $                    Num0+Num1,Num0+Num1,MatFF,
+c    $                    NCholesky,NBasis,'FFOO')
       Call chol_fofo_batch(Num0+Num1,MatFF,Num0+Num1,MatFF,
      $                     NCholesky,NBasis,'FOFO')
-      Call chol_ints_fofo(NBasis,NBasis,MatFF,
-     $                    Num0+Num1,Num0+Num1,MatFF,
-     $                    NCholesky,NBasis,'FFOO')
+      Call chol_ffoo_batch(Num0+Num1,MatFF,Num0+Num1,MatFF,
+     $                     NCholesky,NBasis,'FFOO')
 C
       Call clock('chol_FFOOFOFO',Tcpu,Twall)
 C
