@@ -112,7 +112,7 @@ C
       Do I=1,Ind
       Ind1=IndN(1,I)
       Ind2=IndN(2,I)
-      Write(6,'(2X,3I5,2E14.4)')I,Ind1,Ind2,Occ(Ind1),Occ(Ind2)
+      Write(6,'(2X,I8,2I5,2E14.4)')I,Ind1,Ind2,Occ(Ind1),Occ(Ind2)
       EndDo
 C
       If(IFunSR.Eq.0) Then 
