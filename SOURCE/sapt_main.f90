@@ -569,12 +569,14 @@ if(Flags%ISERPA==0) then
      !                    NBasis,B%num0+B%num1,B%FF,&
      !                    A%NChol,NBasis,'FOFOAABB')
      call chol_fofo_batch(A%num0+A%num1,A%FF,B%num0+B%num1,B%FF, &
-                         A%NChol,NBasis,'FOFOAABB')
+                          A%NChol,NBasis,'FOFOAABB')
 
      ! term A1-ind
-     call chol_ints_fofo(NBasis,NBasis,A%FFAB, &
-                         A%num0+A%num1,B%num0+B%num1,A%FFAB,&
-                         A%NChol,NBasis,'FFOOABAB')
+     !call chol_ints_fofo(NBasis,NBasis,A%FFAB, &
+     !                    A%num0+A%num1,B%num0+B%num1,A%FFAB,&
+     !                    A%NChol,NBasis,'FFOOABAB')
+     call chol_ffoo_batch(A%FFAB,A%num0+A%num1,B%num0+B%num1,A%FFAB, &
+                          A%NChol,NBasis,'FFOOABAB')
 
      ! term A2-ind
      !call chol_ints_fofo(NBasis,B%num0+B%num1,B%FF,  &
@@ -720,16 +722,22 @@ if(Flags%ISERPA==0) then
 
      write(LOUT,'(/1x,a)') 'Transforming E2exch-disp integrals...'
      if(Flags%ICholesky==1) then
-        call chol_ints_fofo(NBasis,B%num0+B%num1,A%FFAB,&
-                            NBasis,A%num0+A%num1,B%FFBA,&
-                            A%NChol,NBasis,'FOFOABBA')
+        !call chol_ints_fofo(NBasis,B%num0+B%num1,A%FFAB,&
+        !                    NBasis,A%num0+A%num1,B%FFBA,&
+        !                    A%NChol,NBasis,'FOFOABBA')
+        call chol_fofo_batch(B%num0+B%num1,A%FFAB,A%num0+A%num1,B%FFBA, &
+                             A%NChol,NBasis,'FOFOABBA')
         ! XY and YX, A2
-        call chol_ints_fofo(NBasis,NBasis,A%FFAB, &
-                            B%num0+B%num1,B%num0+B%num1,B%FF,&
-                            A%NChol,NBasis,'FFOOABBB')
-        call chol_ints_fofo(NBasis,NBasis,B%FFBA, &
-                            A%num0+A%num1,A%num0+A%num1,A%FF,&
-                            A%NChol,NBasis,'FFOOBAAA')
+        !call chol_ints_fofo(NBasis,NBasis,A%FFAB, &
+        !                    B%num0+B%num1,B%num0+B%num1,B%FF,&
+        !                    A%NChol,NBasis,'FFOOABBB')
+        call chol_ffoo_batch(A%FFAB,B%num0+B%num1,B%num0+B%num1,B%FF, &
+                             A%NChol,NBasis,'FFOOABBB')
+        !call chol_ints_fofo(NBasis,NBasis,B%FFBA, &
+        !                    A%num0+A%num1,A%num0+A%num1,A%FF,&
+        !                    A%NChol,NBasis,'FFOOBAAA')
+        call chol_ffoo_batch(B%FFBA,A%num0+A%num1,A%num0+A%num1,A%FF, &
+                             A%NChol,NBasis,'FFOOBAAA')
         ! deallocate (FF|NCholesky) integrals
         deallocate(A%FF)
         deallocate(B%FF)

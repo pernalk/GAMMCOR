@@ -1862,7 +1862,7 @@ c    $                    Num0+Num1,Num0+Num1,MatFF,
 c    $                    NCholesky,NBasis,'FFOO')
       Call chol_fofo_batch(Num0+Num1,MatFF,Num0+Num1,MatFF,
      $                     NCholesky,NBasis,'FOFO')
-      Call chol_ffoo_batch(Num0+Num1,MatFF,Num0+Num1,MatFF,
+      Call chol_ffoo_batch(MatFF,Num0+Num1,Num0+Num1,MatFF,
      $                     NCholesky,NBasis,'FFOO')
 C
       Call clock('chol_FFOOFOFO',Tcpu,Twall)

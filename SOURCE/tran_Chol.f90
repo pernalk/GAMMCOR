@@ -120,7 +120,7 @@ deallocate(work,ints)
 
 end subroutine chol_fofo_batch
 
-subroutine chol_ffoo_batch(nOA,MatFA,nOB,MatFB,NCholesky,NBasis,fname)
+subroutine chol_ffoo_batch(MatFF,nOA,nOB,MatFAB,NCholesky,NBasis,fname)
 !
 ! (FF|OO) | (FF|AB)
 !
@@ -129,8 +129,8 @@ implicit none
 integer,intent(in) :: nOA,nOB
 integer,intent(in) :: NBasis,NCholesky
 character(*),intent(in)     :: fname
-double precision,intent(in) :: MatFA(NCholesky,NBasis**2), &
-                               MatFB(NCholesky,NBasis**2)
+double precision,intent(in) :: MatFF(NCholesky,NBasis**2), &
+                               MatFAB(NCholesky,NBasis**2)
 
 integer :: iunit
 integer :: nAB,nFF,cd
@@ -165,22 +165,22 @@ do iloop=1,nloop
    ll = l
    do iBatch=1,BatchSize
       kk = kk + 1
-      if(kk>nOB) then
+      if(kk>nOA) then
          kk = 1
          ll = ll + 1
       endif
       kl = (ll - 1)*NBasis + kk
-      work2(:,iBatch) = MatFB(:,kl)
+      work2(:,iBatch) = MatFAB(:,kl)
    enddo
 
-   call dgemm('T','N',NBasis**2,BatchSize,NCholesky,1d0,MatFA,NCholesky, &
+   call dgemm('T','N',NBasis**2,BatchSize,NCholesky,1d0,MatFF,NCholesky, &
               work2,NCholesky,0d0,work1,NBasis**2)
 
    ! loop over integrals
    do iBatch=1,BatchSize
 
       k = k + 1
-      if(k>nOB) then
+      if(k>nOA) then
          k = 1
          l = l + 1
       endif
@@ -191,8 +191,9 @@ do iloop=1,nloop
          enddo
       enddo
 
-      if(k>nOB.or.l>nOB) cycle
-      irec = (l - 1)*nOB + k
+      if(k>nOA.or.l>nOB) cycle
+      irec = (l - 1)*nOA + k
+      print*, noa,nob,irec
       write(iunit,rec=irec) ints(1:NBasis,1:NBasis)
 
    enddo
