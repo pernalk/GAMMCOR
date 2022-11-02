@@ -1,7 +1,6 @@
 *Deck ACIter
       Subroutine ACIter(ETot,ENuc,TwoNO,URe,Occ,XOne,UNOAO,
-     $ IndAux,ABPLUS,ABMIN,EigVecR,Eig,EGOne,
-     $ Title,NBasis,NInte1,NInte2,NDim,NGOcc,NGem,
+     $ IndAux,NBasis,NInte1,NInte2,NDim,NGem,
      $ IndN,IndX,NDimX)
 C
       use abmat
@@ -11,21 +10,16 @@ C     AC Iteratively
 C
       Implicit Real*8 (A-H,O-Z)
 C
-      Character*60 FMultTab,Title
       Include 'commons.inc'
 c
       Parameter(Zero=0.D0,Half=0.5D0,One=1.D0,Two=2.D0,Three=3.D0,
      $ Four=4.D0)
 C
       Dimension URe(NBasis,NBasis),Occ(NBasis),
-     $ TwoNO(NInte2),
-     $ XOne(NInte1),IndAux(NBasis),
-     $ ABPLUS(NDim*NDim),ABMIN(NDim*NDim),
-     $ EigVecR(NDim*NDim),
-     $ Eig(NDim),EGOne(NGem),
-     $ UNOAO(NBasis,NBasis),
-     $ IndX(NDim),IndN(2,NDim),
-     $ PMat(NDimX,NDimX)
+     $ TwoNO(NInte2),XOne(NInte1),IndAux(NBasis),
+     $ EGOne(NGem),UNOAO(NBasis,NBasis),
+     $ IndX(NDim),IndN(2,NDim)
+      Real*8, Dimension(:,:), Allocatable :: PMat
 C
 C     LOCAL ARRAYS
 C
@@ -110,6 +104,7 @@ c      EndIf
 C
 C     Find the projector PMat
 C
+      Allocate(PMat(NDimX,NDimX))
       If(ICholesky.Eq.1.And.ITwoEl.eq.3) 
      $ Call Project_DChol(PMat,IndN,NBasis,NDimX)
 C
@@ -192,6 +187,7 @@ C
      $ (6,'(/,2X,''ECASSCF+ENuc, AC-Corr, AC-ERPA-CASSCF '',4X,3F15.8)')
      $ ETot+ENuc,ECorr,ETot+ENuc+ECorr
 C
+      Deallocate(PMat)
       Call DelInts(ITwoEl)
 C
       Return

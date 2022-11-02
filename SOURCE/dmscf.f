@@ -111,7 +111,7 @@ C     IOrbA(I) = 1 - ITH ORBITAL IS ACTIVE
 C     IOrbA(I) = 0 - ITH ORBTIAL IS INACTIVE 
 C     NoAt - THE NUMBER OF ATOMS IN A MOLECULE
 C
-      Dimension NAt(NBasis),NBasisAt(1000),NPair(1000,2)
+      Dimension NAt(NBasis),NBasisAt(5000),NPair(5000,2)
 C    
 C     BEGINNING OF THE INPUT
 C c herer!!! - change NBasisAt if basis set changes

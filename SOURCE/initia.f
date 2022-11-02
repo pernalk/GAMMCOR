@@ -1881,7 +1881,7 @@ C
       Write(6,'('' *'',61X,''*'')')
 C
       Write(6,
-     $ '('' * NUCLEAR CHARGE = '',F9.6,''   CHARGE = '',F9.6,13X,
+     $ '('' * NUCLEAR CHARGE = '',F13.9,''   CHARGE = '',F9.6,13X,
      $ ''*'')') ZNucl,Charge
 C
       Write(6,'('' *'',61X,''*'')')

@@ -128,8 +128,16 @@ C
 
       Else
 C
+      If(IFlACFREQ.Eq.1.Or.IFlACFREQNTH.Eq.1.
+     $ Or.IFlAC1FREQNTH.Eq.1) Then
+      Call ACIter(ETot,ENuc,TwoNO,URe,Occ,XOne,UNOAO,
+     $ IndAux,NBasis,NInte1,NInte2,NDimX,NGem,
+     $ IndN,IndX,NDimX)
+      Return
+      Else
       Call RunACCAS(ETot,ENuc,TwoNO,URe,UNOAO,Occ,XOne,
      $  IndAux,IPair,IndN,IndX,NDimX,Title,NBasis,NInte1,NInte2,NGem)
+      EndIf
 
       call clock('AC  model',Tcpu,Twall)
 C
@@ -177,8 +185,6 @@ C
      $ ABPLUS(NDimX*NDimX),ABMIN(NDimX*NDimX),
      $ EigVecR(NDimX*NDimX),Eig(NDimX),
      $ ECorrG(NGem), EGOne(NGem)
-c herer!!! delete after tests
-c     $ ,EigX(NDimX*NDimX)
 C
 C     IFlAC   = 1 - adiabatic connection formula calculation
 C               0 - AC not used
@@ -204,18 +210,10 @@ C     CALL AC If IFlAC=1 OR IFlSnd=1
 C  
       If(IFlAC.Eq.1.Or.IFlSnd.Eq.1) Then
       NGOcc=0
-      If(IFlACFREQ.Eq.0.And.IFlACFREQNTH.Eq.0.
-     $ And.IFlAC1FREQNTH.Eq.0) Then
       Call ACECORR(ETot,ENuc,TwoNO,URe,Occ,XOne,UNOAO,
      $ IndAux,ABPLUS,ABMIN,EigVecR,Eig,EGOne,
      $ Title,NBasis,NInte1,NInte2,NDimX,NGOcc,NGem,
      $ IndN,IndX,NDimX)
-      Else 
-      Call ACIter(ETot,ENuc,TwoNO,URe,Occ,XOne,UNOAO,
-     $ IndAux,ABPLUS,ABMIN,EigVecR,Eig,EGOne,
-     $ Title,NBasis,NInte1,NInte2,NDimX,NGOcc,NGem,
-     $ IndN,IndX,NDimX)
-      EndIf
 c 
 c exact AC
 c      NoEig=1
@@ -2401,10 +2399,7 @@ C
 C
 C     LOCAL ARRAYS
 C
-      Dimension
-     $ ABPLUS(NDimX*NDimX),ABMIN(NDimX*NDimX),
-     $ EigVecR(NDimX*NDimX),Eig(NDimX),
-     $ ECorrG(NGem), EGOne(NGem)
+      Dimension ECorrG(NGem), EGOne(NGem)
 C
 C     READ 2RDM, COMPUTE THE ENERGY
 C

@@ -255,8 +255,8 @@ C
 C
 C     LOCAL ARRAYS
 C
-      Dimension EOcc(NBasis),UReOld(NBasis,NBasis),Ind(1000),
-     $ IndOcc(1000)
+      Dimension EOcc(NBasis),UReOld(NBasis,NBasis),Ind(5000),
+     $ IndOcc(5000)
 C
 C     COPY NEGATIVE EPSILONS TO EOcc
 C
