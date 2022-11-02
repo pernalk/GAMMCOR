@@ -43,6 +43,167 @@ close(iunit)
 
 end subroutine chol_ints_fofo
 
+subroutine chol_fofo_batch(nOA,MatFA,nOB,MatFB,NCholesky,NBasis,fname)
+!
+! (FO|FO) | (FA|FB)
+!
+implicit none
+
+integer,intent(in) :: nOA,nOB
+integer,intent(in) :: NBasis,NCholesky
+character(*),intent(in)     :: fname
+double precision,intent(in) :: MatFA(NCholesky,NBasis**2), &
+                               MatFB(NCholesky,NBasis**2)
+
+integer :: iunit
+integer :: nAB,nCD,cd
+integer :: i,j,k,l,ic,id,irec
+integer :: iloop,nloop,off
+integer :: iBatch
+integer :: BatchSize,MaxBatchSize = 33
+double precision,allocatable :: work(:,:),ints(:,:)
+
+nAB = NBasis*nOA
+nCD = NBasis*nOB
+
+print*, 'Assemble ',fname,' from Cholesky Vectors in Batches'
+
+allocate(work(nAB,MaxBatchSize),ints(NBasis,NBasis))
+
+open(newunit=iunit,file=fname,status='REPLACE',&
+     access='DIRECT',form='UNFORMATTED',recl=8*nAB)
+
+nloop = (nCD - 1) / MaxBatchSize + 1
+
+off = 0
+k   = 0
+l   = 1
+do iloop=1,nloop
+
+   ! batch size for each iloop; last one is smaller
+   BatchSize = min(MaxBatchSize,nCD-off)
+
+   ! assemble (FO|BatchSize) batch from CholVecs
+   call dgemm('T','N',nAB,BatchSize,NCholesky,1d0,MatFA,NCholesky, &
+              MatFB(:,off+1:BatchSize),NCholesky,0d0,work,nAB)
+
+   ! loop over integrals
+   do iBatch=1,BatchSize
+
+      k = k + 1
+      if(k>NBasis) then
+         k = 1
+         l = l + 1
+      endif
+
+      do j=1,nOB
+         do i=1,NBasis
+            ints(i,j) = work((j-1)*NBasis+i,iBatch)
+         enddo
+      enddo
+
+      if(l>nOB) cycle
+      ints(:,nOB+1:NBasis) = 0
+
+      irec = (l-1)*NBasis + k
+      write(iunit,rec=irec) ints(1:NBasis,1:nOB)
+   enddo
+
+   off = off + MaxBatchSize
+
+enddo
+
+close(iunit)
+
+deallocate(work,ints)
+
+end subroutine chol_fofo_batch
+
+subroutine chol_ffoo_batch(nOA,MatFA,nOB,MatFB,NCholesky,NBasis,fname)
+!
+! (FF|OO) | (FF|AB)
+!
+implicit none
+
+integer,intent(in) :: nOA,nOB
+integer,intent(in) :: NBasis,NCholesky
+character(*),intent(in)     :: fname
+double precision,intent(in) :: MatFA(NCholesky,NBasis**2), &
+                               MatFB(NCholesky,NBasis**2)
+
+integer :: iunit
+integer :: nAB,nFF,cd
+integer :: i,j,k,l,kk,ll,kl,irec
+integer :: iloop,nloop,off
+integer :: iBatch
+integer :: BatchSize,MaxBatchSize = 33
+double precision,allocatable :: work1(:,:),work2(:,:),ints(:,:)
+
+nFF = NBasis*NBasis
+nAB = nOA*nOB
+
+nloop = (nAB - 1) / MaxBatchSize + 1
+
+print*, 'Assemble ',fname,' from Cholesky Vectors in Batches'
+
+allocate(work1(NBasis**2,MaxBatchSize),work2(NCholesky,MaxBatchSize))
+allocate(ints(NBasis,NBasis))
+
+open(newunit=iunit,file=fname,status='REPLACE',&
+     access='DIRECT',form='UNFORMATTED',recl=8*nFF)
+
+off = 0
+k   = 0
+l   = 1
+do iloop=1,nloop
+   ! batch size
+   BatchSize = min(MaxBatchSize,nAB-off)
+
+   kk = k
+   ll = l
+   do iBatch=1,BatchSize
+      kk = kk + 1
+      if(kk>nOB) then
+         kk = 1
+         ll = ll + 1
+      endif
+      kl = (ll - 1)*NBasis + kk
+      work2(:,iBatch) = MatFB(:,kl)
+   enddo
+
+   call dgemm('T','N',NBasis**2,BatchSize,NCholesky,1d0,MatFA,NCholesky, &
+              work2,NCholesky,0d0,work1,NBasis**2)
+
+   ! loop over integrals
+   do iBatch=1,BatchSize
+
+      k = k + 1
+      if(k>nOB) then
+         k = 1
+         l = l + 1
+      endif
+
+      do j=1,NBasis
+         do i=1,NBasis
+            ints(i,j) = work1((j-1)*NBasis+i,iBatch)
+         enddo
+      enddo
+
+      if(k>nOB.or.l>nOB) cycle
+      irec = (l - 1)*nOB + k
+      write(iunit,rec=irec) ints(1:NBasis,1:NBasis)
+
+   enddo
+
+   off = off + MaxBatchSize
+
+enddo
+
+close(iunit)
+deallocate(work2,work1,ints)
+
+end subroutine chol_ffoo_batch
+
 subroutine chol_triang_fofo(nA,nB,MatAB,nC,nD,MatCD,NCholesky,NInte1,NBas,fname)
 !
 ! MatAB and MatCD are (NChol,FFtriang) type
