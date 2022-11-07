@@ -120,6 +120,117 @@ deallocate(work,ints)
 
 end subroutine chol_fofo_batch
 
+subroutine chol_gen_ket_batch(tran,nA,nB,MatAB,nC,nD,MatCD,NCholesky,NBasis,fname)
+!
+! (AB|CD)
+!
+implicit none
+
+integer,intent(in) :: nA,nB,nC,nD
+integer,intent(in) :: NBasis,NCholesky
+character(*),intent(in)     :: tran,fname
+double precision,intent(in) :: MatAB(NCholesky,NBasis**2), &
+                               MatCD(NCholesky,NBasis**2)
+
+integer :: iunit
+integer :: nAB,nCD,cd
+integer :: i,j,k,l,kk,ll,kl,irec
+integer :: iloop,nloop,off
+integer :: iBatch
+integer :: BatchSize,MaxBatchSize = 33
+logical :: tranket
+double precision,allocatable :: work1(:,:),work2(:,:),ints(:,:)
+
+if(tran=='T'.or.tran=='t') then
+   tranket = .true.
+elseif(tran=='N'.or.tran=='n') then
+   tranket = .false.
+else
+   write(6,'(1x,a)') 'Wrong 1st arg in chol_gen_ket_batch!'
+   stop
+endif
+
+nAB = nA*nB
+nCD = nC*nD
+
+nloop = (nCD - 1) / MaxBatchSize + 1
+
+print*, 'Assemble ',fname,' from Cholesky Vectors in Batches'
+
+allocate(work1(nAB,MaxBatchSize),work2(NCholesky,MaxBatchSize))
+allocate(ints(NBasis,NBasis))
+
+open(newunit=iunit,file=fname,status='REPLACE',&
+     access='DIRECT',form='UNFORMATTED',recl=8*nAB)
+
+off = 0
+k   = 0
+l   = 1
+do iloop=1,nloop
+
+   ! batch size
+   BatchSize = min(MaxBatchSize,nCD-off)
+
+   kk = k
+   ll = l
+   !if (.not.tranket) then
+   do iBatch=1,BatchSize
+      kk = kk + 1
+      if(kk>nC) then
+         kk = 1
+         ll = ll + 1
+      endif
+      kl = (ll - 1)*nC + kk
+      work2(:,iBatch) = MatCD(:,kl)
+   enddo
+   !elseif(tranket) then
+   !  print*,'here?',tranket
+   !  do iBatch=1,BatchSize
+   !     ll = ll + 1
+   !     if(ll>nD) then
+   !        ll = 1
+   !        kk = kk + 1
+   !     endif
+   !     kl = (ll - 1)*nC + kk
+   !     work2(:,iBatch) = MatCD(:,kl)
+   !  enddo
+
+   !endif
+
+   call dgemm('T','N',nAB,BatchSize,NCholesky,1d0,MatAB,NCholesky, &
+              work2,NCholesky,0d0,work1,nAB)
+
+   ! loop over integrals
+   do iBatch=1,BatchSize
+
+      k = k + 1
+      if(k>nC) then
+         k = 1
+         l = l + 1
+      endif
+
+     do j=1,nB
+        do i=1,nA
+           ints(i,j) = work1((j-1)*nA+i,iBatch)
+        enddo
+     enddo
+
+      if(k>nC.or.l>nD) cycle
+      irec = (l - 1)*nC + k
+      !print*, k,l,irec,norm2(ints(1:nA,1:nB))
+      write(iunit,rec=irec) ints(1:nA,1:nB)
+
+   enddo
+
+   off = off + MaxBatchSize
+
+enddo
+
+close(iunit)
+deallocate(work2,work1,ints)
+
+end subroutine chol_gen_ket_batch
+
 subroutine chol_ffoo_batch(MatFF,nOA,nOB,MatFAB,NCholesky,NBasis,fname)
 !
 ! (FF|OO) | (FF|AB)
@@ -193,7 +304,6 @@ do iloop=1,nloop
 
       if(k>nOA.or.l>nOB) cycle
       irec = (l - 1)*nOA + k
-      print*, noa,nob,irec
       write(iunit,rec=irec) ints(1:NBasis,1:NBasis)
 
    enddo

@@ -135,8 +135,6 @@ else
    Flags%ICholesky     = Input%CholeskyParams%Cholesky
    Flags%ICholeskyBIN  = Input%CholeskyParams%CholeskyBIN
    Flags%ICholeskyOTF  = Input%CholeskyParams%CholeskyOTF
-   print*,'Flags-Cholesky-BIN',Flags%ICholeskyBIN
-   print*,'Flags-Cholesky-OTF',Flags%ICholeskyOTF
    Flags%ICholeskyAccu = Input%CholeskyParams%CholeskyAccu
 
   ! reduce virtuals

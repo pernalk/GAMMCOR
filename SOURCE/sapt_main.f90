@@ -584,6 +584,13 @@ if(Flags%ISERPA==0) then
      !                    A%NChol,NBasis,'FOFOBBBA')
      call chol_fofo_batch(B%num0+B%num1,B%FF,A%num0+A%num1,B%FFBA, &
                          A%NChol,NBasis,'FOFOBBBA')
+     ! test -- chol_gen_ket_batch worsk here
+     !call chol_gen_ket_batch('N',NBasis,B%num0+B%num1,B%FF,  &
+     !                            NBasis,A%num0+A%num1,B%FFBA,&
+     !                            A%NChol,NBasis,'FOFOBBBA')
+     !call chol_gen_ket_batch('T',NBasis,B%num0+B%num1,B%FF,  &
+     !                            A%num0+A%num1,NBasis,A%FFAB,&
+     !                            A%NChol,NBasis,'FOFOBBBA')
 
      !call chol_ints_fofo(NBasis,A%num0+A%num1,A%FF,  &
      !                    NBasis,B%num0+B%num1,A%FFAB,&

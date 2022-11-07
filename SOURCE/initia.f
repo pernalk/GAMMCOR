@@ -1617,29 +1617,100 @@ C
           Call FockGen_CholR(FockF,CholeskyVecs%R(1:NCholesky,1:NInte1),
      &                       GammaAB,XKin,NInte1,NCholesky,NBasis)
 
+C          block
+CC         try to construct Fock in MO in CholeskyBIN
+C          double precision :: MatFMO(NCholesky,NBasis**2)
+C          double precision :: FockSq(NBasis,NBasis)
+C          double precision :: D_mo(NBasis,NBasis)
+C          double precision :: H0tr(NInte1),ints(NBasis**2)
+C          double precision :: wrkSq(NBasis,NBasis)
+C          double precision :: J_mo(NBasis,Nbasis),K_mo(NBasis,NBasis)
+C          double precision :: val
+C
+C          if(MemType == 2) then       !MB
+C             MemMOTransfMB = MemVal
+C          elseif(MemType == 3) then   !GB
+C             MemMOTransfMB = MemVal * 1024_8
+C          endif
+CC
+C          CSAOMO = transpose(UAux)
+CC
+C          Call chol_MOTransf_TwoStep(MatFMO,CholeskyVecs,
+C     $                 CSAOMO,1,NBasis,
+C     $                 CSAOMO,1,NBasis,
+C     $                 MemMOTransfMB)
+CC
+CC         get H0 in MOs
+C          H0tr = XKin
+C          Call tran_matTr(H0tr,CSAOMO,CSAOMO,NBasis,.true.)
+C          Call triang_to_sq2(H0tr,FockSq,NBasis)
+CC
+CC         get D in MOs
+C          D_mo = 0d0
+C          Do J=1,NBasis
+C          Do I=1,NBasis
+C             D_mo(I,J) = 2d0 * GammaF(IndSym(I,J))
+C          EndDo
+C          EndDo
+CC
+C          ints = 0
+C          J_mo = 0
+C          K_mo = 0
+C          Do I=1,NCholesky
+C          ints(:) = MatFMO(I,:)
+C          val = ddot(NBasis**2,ints,1,D_mo,1)
+C          print*, I,val,norm2(ints)
+C          Call daxpy(NBasis**2,val,ints,1,J_mo,1)
+C          Call dgemm('N','N',NBasis,NBasis,NBasis,1d0,ints,NBasis,
+C     $               D_mo,NBasis,0d0,wrkSq,NBasis)
+C          Call dgemm('N','N',NBasis,NBasis,NBasis,-0.5d0,wrkSq,NBasis,
+C     $               ints,NBasis,1d0,K_mo,NBasis)
+C          EndDo
+CC
+C          FockSq = FockSq + J_mo + K_mo
+CC
+C          print*, 'J mat w bazie MO -- new'
+C          print*, 'J mat= ', norm2(J_mo)
+C          do j=1,NBasis
+C             write(LOUT,'(*(f13.8))') (J_mo(i,j),i=1,NBasis)
+C          enddo
+CC
+C          print*, 'K mat w bazie MO -- new'
+C          print*, 'K mat= ', norm2(K_mo)
+C          do j=1,NBasis
+C             write(LOUT,'(*(f13.8))') (K_mo(i,j),i=1,NBasis)
+C          enddo
+CC
+C          print*, 'F mat w bazie MO -- new'
+C          print*, 'F mat= ', norm2(FockSq)
+C          do j=1,NBasis
+C             write(LOUT,'(*(f13.8))') (FockSq(i,j),i=1,NBasis)
+C          enddo
+CC
+C          end block
+
            ElseIf(ICholeskyOTF==1) Then
 C
            CSAOMO = transpose(UAux)
 C
 C          load C(AO,MO) - already w/o symmety in MOs
-C
-C          use MOLPRO.MOPUN instead of a separate file!
-C          Inquire(file='MATSAO.mol',exist=isymfile)
-C          If (.not.isymfile) then
-C             Write(6,*) 'MATSAO.mol file not found!'
-C              stop
-C          EndIf
-C
            Call read_caomo_molpro(CAOMO,SAO,itsoao,jtsoao,
-c    &                           'MATSAO.mol','CASORBAO',NBasis)
      &                           'MOLPRO.MOPUN','CASORBAO',NBasis)
 C
-           Call CholeskyOTF_Fock(work1,CholeskyVecsOTF,AOBasis,System,
-     $                          Monomer,
+C     V1 uses Fock subroutine in OTF module -- has to be improved
+C
+C           Call CholeskyOTF_Fock_MO_v1(work1,CholeskyVecsOTF,
+C     $                          AOBasis,System,Monomer,
+C     $                          CAOMO,CSAOMO,XKin,GammaF,
+C     $                          MemType,MemVal,NInte1,NBasis,
+C     $                          JMO,KMO)
+C
+           Call CholeskyOTF_Fock_MO_v2(work1,CholeskyVecsOTF,
+     $                          AOBasis,System,Monomer,
      $                          CAOMO,CSAOMO,XKin,GammaF,
      $                          MemType,MemVal,NInte1,NBasis)
 C
-C         on output work1 contains Fock in MO
+C         unpack Fock in MO (work1) to triangle
           Call sq_to_triang2(work1,FockF,NBasis)
 C
           EndIf
@@ -1658,6 +1729,7 @@ C      Call FockGen(FockF,GammaAB,XKin,TwoEl,NInte1,NBasis,NInte2)
 C     transform Fock to MO if not CholeskyOTF
       If(ICholeskyOTF==0) Call MatTr(FockF,UAux,NBasis)
 
+      Call clock('generate Fock',Tcpu,Twall)
 CC     test Fock 2
 C      block
 C      double precision :: Fmat(NBasis,NBasis)
@@ -2083,8 +2155,8 @@ C
 
       end subroutine CholeskyOTF_ao_vecs
 
-*Deck CholeskyOTF_Fock
-      Subroutine CholeskyOTF_Fock(F_mo,CholeskyVecsOTF,
+*Deck CholeskyOTF_Fock_MO_v1
+      Subroutine CholeskyOTF_Fock_MO_v1(F_mo,CholeskyVecsOTF,
      $                            AOBasis,System,Monomer,
      $                            Cmat,CSAO,H0in,GammaF,
      $                            MemType,MemVal,NInte1,NBasis,
@@ -2145,6 +2217,12 @@ C     transform H0 (in SAO) to MO
       call triang_to_sq2(H0tr,H0_mo,NBasis)
       h0norm = norm2(H0_mo)
 C
+        write(6,*) 'H0   MO (external)'
+        do j=1,NBasis
+           write(LOUT,'(*(f13.8))') (H0_mo(i,j),i=1,NBasis)
+        enddo
+        write(LOUT,'()')
+C
 C     prepare density matrix
       H0_mo = 0d0
       D_mo  = 0d0
@@ -2182,6 +2260,24 @@ c        generate also J_mo and K_mo
      $            AOBasis,System,ORBITAL_ORDERING_MOLPRO,MemMOTransfMB)
       endif
 C
+        print*, 'FockF w bazie MO -- new'
+        print*, 'Fock = ',norm2(F_mo)
+        do j=1,NBasis
+           write(LOUT,'(*(f13.8))') (F_mo(i,j),i=1,NBasis)
+        enddo
+C
+        print*, 'J mat w bazie MO -- new'
+        print*, 'J mat= ',norm2(J_mo)
+        do j=1,NBasis
+           write(LOUT,'(*(f13.8))') (J_mo(i,j),i=1,NBasis)
+        enddo
+C
+        print*, 'K mat w bazie MO -- new'
+        print*, 'K mat= ',norm2(K_mo)
+        do j=1,NBasis
+           write(LOUT,'(*(f13.8))') (K_mo(i,j),i=1,NBasis)
+        enddo
+C
        val = norm2(H0_mo)
        write(6,'(1x,a,f12.6)') "Test H0 norms= ",abs(val)-abs(h0norm)
 C
@@ -2191,11 +2287,6 @@ C
         print*, 'Threshold = ',ThreshH0
         print*, 'Maybe error in geometry / basis set?'
 
-        write(6,*) 'H0   MO (external)'
-        do j=1,NBasis
-           write(LOUT,'(*(f13.8))') (H0_mo(i,j),i=1,NBasis)
-        enddo
-        write(LOUT,'()')
         write(6,*) 'H0   MO (internal)'
         do j=1,NBasis
            write(LOUT,'(*(f13.8))') (H0_mo(i,j),i=1,NBasis)
@@ -2210,7 +2301,141 @@ C
         stop
       endif
 
-      End Subroutine CholeskyOTF_Fock
+      End Subroutine CholeskyOTF_Fock_MO_v1
+
+*Deck CholeskyOTF_Fock_MO_v2
+      Subroutine CholeskyOTF_Fock_MO_v2(F_mo,CholeskyVecsOTF,
+     $                            AOBasis,System,Monomer,
+     $                            Cmat,CSAO,H0in,GammaF,
+     $                            MemType,MemVal,NInte1,NBasis,
+     $                            J_mo,K_mo)
+C
+C     Generate Fock matrix (NBasis,NBasis) in MO basis
+C     from Cholesky OTF vectors
+C     optional :: compute J and K matrices in MO basis
+C
+      use print_units
+      use tran
+      use basis_sets
+      use sys_definitions
+      use Auto2eInterface
+      use CholeskyOTF, only : TCholeskyVecsOTF
+      use Cholesky_driver, only : chol_Rkab_OTF, chol_F
+
+      implicit none
+
+      type(TCholeskyVecsOTF), intent(in) :: CholeskyVecsOTF
+      type(TAOBasis), intent(in)         :: AOBasis
+      type(TSystem), intent(inout)       :: System
+
+      integer,intent(in)          :: Monomer
+      integer,intent(in)          :: NInte1,NBasis
+      integer,intent(in)          :: MemType,MemVal
+      double precision,intent(in) :: H0in(NInte1)
+      double precision,intent(in) :: Cmat(NBasis,NBasis),
+     $                               CSAO(NBasis,NBasis),
+     $                               GammaF(NInte1)
+      double precision,intent(out)          :: F_mo(NBasis,NBasis)
+      double precision,optional,intent(out) :: J_mo(NBasis,NBasis)
+      double precision,optional,intent(out) :: K_mo(NBasis,NBasis)
+
+      integer          :: i, j
+      integer          :: NCholesky
+      integer          :: MemMOTransfMB
+      double precision :: val
+      double precision :: H0tr(NInte1)
+      double precision :: D_mo(NBasis,NBasis), H0_mo(NBasis,NBasis)
+      double precision :: Jtmp(NBasis,NBasis), Ktmp(NBasis,NBasis)
+      double precision :: work(NBasis,NBasis)
+      double precision, allocatable :: ints(:), matFFMO(:,:)
+      double precision, parameter :: ThreshH0 = 1d-6
+C
+      integer,external :: IndSym
+      double precision,external :: ddot
+C
+      write(6,'(/,1x,a,i2)') "Construct Fock ver 2, monomer", Monomer
+
+      ! set dimensions
+      NCholesky = CholeskyVecsOTF%NVecs
+
+      ! Read whether to put ghost functions
+      if(Monomer==1) then
+         call sys_Init(System,SYS_MONO_A)
+      elseif(Monomer==2) then
+         call sys_Init(System,SYS_MONO_B)
+      else
+         call sys_Init(System,SYS_TOTAL)
+      endif
+
+C     transform H0 (in SAO) to MO
+      H0tr = H0in
+      call tran_matTr(H0tr,CSAO,CSAO,NBasis,.true.)
+      call triang_to_sq2(H0tr,H0_mo,NBasis)
+C
+C     prepare density matrix
+      D_mo  = 0d0
+      Do J=1,NBasis
+      Do I=1,NBasis
+         D_mo(I,J) = 2d0 * GammaF(IndSym(I,J))
+      EndDo
+      EndDo
+C
+C     set memory for Fock transformation
+      if(MemType == 2) then       !MB
+         MemMOTransfMB = MemVal
+      elseif(MemType == 3) then   !GB
+         MemMOTransfMB = MemVal * 1024_8
+      endif
+C
+C     transform Cholesky vecs to MO
+      Allocate(MatFFMO(NCholesky,NBasis**2),ints(NBasis**2))
+C
+      Call chol_Rkab_OTF(MatFFMO,Cmat,1,NBasis,Cmat,1,NBasis,
+     $                   MemMOTransfMB,CholeskyVecsOTF,
+     $                   AOBasis,ORBITAL_ORDERING_MOLPRO)
+C
+C     construct J and K in MO
+      ints = 0d0
+      Jtmp = 0d0
+      Ktmp = 0d0
+      Do i=1,NCholesky
+         ints(:) = MatFFMO(i,:)
+         val = ddot(NBasis**2,ints,1,D_mo,1)
+         Call daxpy(NBasis**2,2d0*val,ints,1,Jtmp,1)
+         Call dgemm('N','N',NBasis,NBasis,NBasis,1d0,ints,NBasis,
+     $              D_mo,NBasis,0d0,work,NBasis)
+         Call dgemm('N','N',NBasis,NBasis,NBasis,-1d0,work,NBasis,
+     $              ints,NBasis,1d0,Ktmp,NBasis)
+      EndDo
+C
+      F_mo = Jtmp + Ktmp
+      F_mo = H0_mo + 0.5d0*F_mo
+C
+C     return J and K in MO upon request
+      If(present(J_mo).and.present(K_mo)) then
+         J_mo = 0.5d0*Jtmp
+         K_mo = 0.5d0*Ktmp
+      EndIf
+C
+C        print*, 'Fock in MO basis'
+C        print*, 'Fock = ',norm2(F_mo)
+C        do j=1,NBasis
+C           write(LOUT,'(*(f13.8))') (F_mo(i,j),i=1,NBasis)
+C        enddo
+CC
+C        print*, 'J_mo = ',norm2(Jtmp)
+C        do j=1,NBasis
+C           write(LOUT,'(*(f13.8))') (Jtmp(i,j),i=1,NBasis)
+C        enddo
+CC
+C        print*, 'K_mo = ',norm2(Ktmp)
+C        do j=1,NBasis
+C           write(LOUT,'(*(f13.8))') (Ktmp(i,j),i=1,NBasis)
+C        enddo
+C
+      Deallocate(MatFFMO,ints)
+C
+      End Subroutine CholeskyOTF_Fock_MO_v2
 
 *Deck DimSym
       Subroutine DimSym(NBasis,NInte1,NInte2,MxHVec,MaxXV)

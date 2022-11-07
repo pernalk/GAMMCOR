@@ -94,7 +94,7 @@ character(*),parameter :: PossibleDFAType(3) = &
 'srLDA', 'srPBE', 'PBE']
 
 character(*),parameter :: PossibleCholAccu(3) = &
-[character(8) :: &
+[character(9) :: &
 'DEFAULT', 'TIGHT', 'LUDICROUS']
 
 character(*),parameter :: PossibleMonomers(3) = &

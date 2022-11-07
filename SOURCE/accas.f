@@ -158,6 +158,7 @@ C
 C
       use abfofo
       use ab0fofo
+      use read_external
 C
       Implicit Real*8 (A-H,O-Z)
 C
@@ -227,7 +228,16 @@ c AC with varying Alpha-dependent RDMs
 c      NDimFull=NBasis*(NBasis-1)/2
 c      Call ACRDM(ETot,ENuc,TwoNO,Occ,XOne,
 c     $ UNOAO,IndN,IndX,IndAux,NDimX,NBasis,NInte1,NInte2,NDimFull,NGem) 
-      
+C
+      If(ITwoEl.Eq.3) Then
+      If (ICholesky .Eq. 0) Then
+      Call delfile('FFOO')
+      Call delfile('FOFO')
+      ElseIf (ICholesky .Eq. 1) Then
+      Call delfile('cholvecs')
+      EndIf
+      EndIf
+C
       Return
       EndIf
 C

@@ -1478,13 +1478,18 @@ integer :: info
      CSAOMO = transpose(CSAOMO)
 
      call read_caomo_molpro(CAOMO,SAO,itsoao,jtsoao,orbaofile,'CASORBAO',NBasis)
-     !print*, 'CAOMO',norm2(CAOMO)
 
-     call CholeskyOTF_Fock(FockSq,CholeskyVecsOTF,AOBasis,System,mon%Monomer, &
+     !call CholeskyOTF_Fock_MO_v1(FockSq,CholeskyVecsOTF,&
+     !                      AOBasis,System,mon%Monomer, &
+     !                      CAOMO,CSAOMO,H0,GammaF, &
+     !                      Flags%MemType,Flags%MemVal,NInte1,NBasis, &
+     !                      Mon%Jmat,Mon%Kmat)
+     call CholeskyOTF_Fock_MO_v2(FockSq,CholeskyVecsOTF,&
+                           AOBasis,System,mon%Monomer, &
                            CAOMO,CSAOMO,H0,GammaF, &
                            Flags%MemType,Flags%MemVal,NInte1,NBasis, &
                            Mon%Jmat,Mon%Kmat)
-     print*, 'FockSq',norm2(FockSq)
+
      call sq_to_triang2(FockSq,work2,NBasis)
 
      CSAOMO = transpose(CSAOMO)
