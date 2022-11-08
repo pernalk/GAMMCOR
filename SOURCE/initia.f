@@ -594,11 +594,6 @@ C
 C
 C     TEST
       call triang_to_sq2(FockF,WorkSq,NBasis)
-      print*, 'Fock in MO basis : BIN'
-      print*, 'Fock = ',norm2(WorkSq)
-      do j=1,NBasis
-         write(LOUT,'(*(f13.8))') (WorkSq(i,j),i=1,NBasis)
-      enddo
 C
       ElseIf(ICholeskyOTF==1) Then
 
