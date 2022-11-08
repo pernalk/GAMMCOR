@@ -284,7 +284,7 @@ C     on-the-fly
       Dimension FockF2(NInte1),WorkSq(NBasis,NBasis)
 C     for OTF Cholesky
       double precision :: UAONO(NBasis,NBasis)
-      double precision,allocatable :: CMOAO(:,:)
+      double precision,allocatable :: CMOAO(:,:),CAOMO(:,:)
 
 
       If(iORCA==1) then
@@ -486,14 +486,13 @@ C
 C
       ElseIf(ITwoEl.Gt.1) Then
 C
-c     If(ICholesky==0) Then
-C OTF Cholesky test 1: we always need AOTWOSORT
-C                      to generate Fock matrix
+      If(ICholesky==0) Then
+C
       MemSrtSize=MemVal*1024_8**MemType
       Call readtwoint(NBasis,4,'DPQRS.bin','AOTWOSORT',
      $                MemSrtSize,IOutInfo)
 C
-      If(ICholeskyBIN==1) Then
+      ElseIf(ICholeskyBIN==1) Then
 c     Else If(ICholeskyBIN==1) Then
 c     If(ICholesky==1) Then
 c     print*, 'use Cholesky-old'
@@ -586,16 +585,45 @@ C
       EndDo
       Call sq_to_triang2(UAux,GammaAB,NBasis)
 C
-C OTF Cholesky test 2:
-!      If(ICholesky==0) Then
+      If(ICholesky==0) Then
          Call FockGen_mithap(FockF,GammaAB,XKin,NInte1,NBasis,
      &                       'AOTWOSORT')
-C OTF Cholesky test 3: switch off FockGen_CholR
-C                    until there is a dedicated procedure from Marcin
-C      ElseIf(ICholesky==1) Then
-c        Call FockGen_CholR(FockF,CholeskyVecs%R(1:NCholesky,1:NInte1),
-c    &                      GammaAB,XKin,NInte1,NCholesky,NBasis)
-C      EndIf
+      ElseIf(ICholeskyBIN==1) Then
+         Call FockGen_CholR(FockF,CholeskyVecs%R(1:NCholesky,1:NInte1),
+     &                      GammaAB,XKin,NInte1,NCholesky,NBasis)
+C
+C     TEST
+      call triang_to_sq2(FockF,WorkSq,NBasis)
+      print*, 'Fock in MO basis : BIN'
+      print*, 'Fock = ',norm2(WorkSq)
+      do j=1,NBasis
+         write(LOUT,'(*(f13.8))') (WorkSq(i,j),i=1,NBasis)
+      enddo
+C
+      ElseIf(ICholeskyOTF==1) Then
+
+      ! read in C(AO,MO) matrix
+         open(newunit=iunt,File='C0.bin',form='unformatted',
+     $        access='stream',status='OLD')
+         read(iunt) IROW,ICOL,ITYP
+         if(IROW.ne.ICOL) then
+           Print*, 'IROW != ICOL in ReadDMRG!'
+           stop "Linear dependcies in basis!"
+         endif
+         allocate(CMOAO(IROW,ICOL),CAOMO(ICOL,IROW))
+         read(iunt) CMOAO
+         close(iunt)
+C
+        CAOMO = transpose(CMOAO) 
+C
+         Call CholeskyOTF_Fock_MO_v2(WorkSq,CholeskyVecsOTF,
+     $                         AOBasis,System,Monomer,'ORCA  ',
+     $                         CAOMO,CAOMO,XKin,GammaAB,
+     $                         MemType,MemVal,NInte1,NBasis)
+C        unpack Fock in MO (WorkSq) to triangle
+         Call sq_to_triang2(WorkSq,FockF,NBasis)
+C
+      EndIf
 C
 C      WorkSq = 0
 C      call triang_to_sq2(FockF,WorkSq,NBasis)
@@ -844,19 +872,6 @@ C
       NCholesky = CholeskyVecsOTF%NVecs
       allocate(MatFF(NCholesky,NA*NB))
 C
-      ! read in C(AO,MO) matrix
-      open(newunit=iunt,File='C0.bin',form='unformatted',
-     $     access='stream',status='OLD')
-      read(iunt) IROW,ICOL,ITYP
-      Print*, 'IROW,ICOL',IROW,ICOL
-      Print*, 'ITYP',ITYP
-      if(IROW.ne.ICOL) then
-        Print*, 'IROW != ICOL in ReadDMRG!'
-        stop "Linear dependcies in basis!"
-      endif
-      allocate(CMOAO(IROW,ICOL))
-      read(iunt) CMOAO
-      close(iunt)
 CC     test print MO orbitals (this is transposed):
 C      Print*, 'Orbitals from Pavel:'
 C      do i=1,NBasis
@@ -1706,7 +1721,7 @@ C     $                          MemType,MemVal,NInte1,NBasis,
 C     $                          JMO,KMO)
 C
            Call CholeskyOTF_Fock_MO_v2(work1,CholeskyVecsOTF,
-     $                          AOBasis,System,Monomer,
+     $                          AOBasis,System,Monomer,'MOLRPO',
      $                          CAOMO,CSAOMO,XKin,GammaF,
      $                          MemType,MemVal,NInte1,NBasis)
 C
@@ -2305,7 +2320,7 @@ C
 
 *Deck CholeskyOTF_Fock_MO_v2
       Subroutine CholeskyOTF_Fock_MO_v2(F_mo,CholeskyVecsOTF,
-     $                            AOBasis,System,Monomer,
+     $                            AOBasis,System,Monomer,Source,
      $                            Cmat,CSAO,H0in,GammaF,
      $                            MemType,MemVal,NInte1,NBasis,
      $                            J_mo,K_mo)
@@ -2329,6 +2344,7 @@ C
       type(TSystem), intent(inout)       :: System
 
       integer,intent(in)          :: Monomer
+      character(6),intent(in)     :: Source
       integer,intent(in)          :: NInte1,NBasis
       integer,intent(in)          :: MemType,MemVal
       double precision,intent(in) :: H0in(NInte1)
@@ -2341,6 +2357,7 @@ C
 
       integer          :: i, j
       integer          :: NCholesky
+      integer          :: ORBITAL_ORDERING
       integer          :: MemMOTransfMB
       double precision :: val
       double precision :: H0tr(NInte1)
@@ -2348,7 +2365,7 @@ C
       double precision :: Jtmp(NBasis,NBasis), Ktmp(NBasis,NBasis)
       double precision :: work(NBasis,NBasis)
       double precision, allocatable :: ints(:), matFFMO(:,:)
-      double precision, parameter :: ThreshH0 = 1d-6
+      double precision, parameter :: ThreshH0 = 1.0d-6
 C
       integer,external :: IndSym
       double precision,external :: ddot
@@ -2357,6 +2374,16 @@ C
 
       ! set dimensions
       NCholesky = CholeskyVecsOTF%NVecs
+
+C     Set orbital ordering
+      print*, 'Source ', trim(Source)
+      if(trim(Source)=='MOLPRO') then
+         ORBITAL_ORDERING = ORBITAL_ORDERING_MOLPRO
+         print*, 'Fock = MOLPRO'
+      elseif(trim(Source)=='ORCA  ') then
+         print*, 'Fock = ORCA'
+         ORBITAL_ORDERING = ORBITAL_ORDERING_ORCA
+      endif
 
       ! Read whether to put ghost functions
       if(Monomer==1) then
@@ -2369,8 +2396,12 @@ C
 
 C     transform H0 (in SAO) to MO
       H0tr = H0in
-      call tran_matTr(H0tr,CSAO,CSAO,NBasis,.true.)
-      call triang_to_sq2(H0tr,H0_mo,NBasis)
+      if(trim(Source)=='MOLPRO') then
+         call tran_matTr(H0tr,CSAO,CSAO,NBasis,.true.)
+         call triang_to_sq2(H0tr,H0_mo,NBasis)
+      elseif(trim(Source)=='ORCA  ') then
+         call triang_to_sq2(H0in,H0_mo,NBasis)
+      endif
 C
 C     prepare density matrix
       D_mo  = 0d0
@@ -2392,7 +2423,7 @@ C     transform Cholesky vecs to MO
 C
       Call chol_Rkab_OTF(MatFFMO,Cmat,1,NBasis,Cmat,1,NBasis,
      $                   MemMOTransfMB,CholeskyVecsOTF,
-     $                   AOBasis,ORBITAL_ORDERING_MOLPRO)
+     $                   AOBasis,ORBITAL_ORDERING)
 C
 C     construct J and K in MO
       ints = 0d0
@@ -2412,10 +2443,10 @@ C
       F_mo = H0_mo + 0.5d0*F_mo
 C
 C     return J and K in MO upon request
-      If(present(J_mo).and.present(K_mo)) then
-         J_mo = 0.5d0*Jtmp
-         K_mo = 0.5d0*Ktmp
-      EndIf
+C      If(present(J_mo).and.present(K_mo)) then
+C         J_mo = 0.5d0*Jtmp
+C         K_mo = 0.5d0*Ktmp
+C      EndIf
 C
 C        print*, 'Fock in MO basis'
 C        print*, 'Fock = ',norm2(F_mo)
