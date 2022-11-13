@@ -13,6 +13,7 @@ C
      $ IGemSave(5000), IOrbA(5000),NGemB, NActive,
      $ IConnect(5000,5000)
       Common/AC/ IFlAC,IFlSnd,IFlAC0D,IFlAC0DP,IFlCore,IFlFrag1,IFl12,
-     $ NoSt,ISymmAC0D,IFlACFREQ,IFlACFREQNTH,IFlAC1FREQNTH,Max_Cn
+     $ NoSt,ISymmAC0D,IFlACFREQ,IFlACFREQNTH,IFlAC1FREQNTH,Max_Cn,
+     $ IFlRESPONSE,FreqOm
       Common/THR/ ThrSelAct,ThrAct,ThrQVirt,ThrQInact
 C

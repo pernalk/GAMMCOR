@@ -231,6 +231,9 @@ else
      Flags%IFlAC  = 1
      Flags%IFlAC1FREQNTH = 1
 
+  case(JOB_TYPE_RESPONSE)
+     Flags%IFlRESPONSE = 1
+
   case(JOB_TYPE_AC0)
     ! HERE WILL BE CHANGED TO:
     !Flags%IFlAC = 0
@@ -426,6 +429,7 @@ if(Flags%ISAPT.Eq.0) then
    System%IPrint = Input%CalcParams%IPrint
   
    System%Max_Cn = Input%CalcParams%Max_Cn
+   System%FreqOm = Input%CalcParams%FreqOm
 
    System%XELE = (System%ZNucl - System%Charge)/2.0d0
    System%NELE = (System%ZNucl - System%Charge)/2

@@ -28,7 +28,8 @@ integer, parameter :: JOB_TYPE_NLOCCORR    = 12
 integer, parameter :: JOB_TYPE_AC0DP       = 13
 integer, parameter :: JOB_TYPE_ACFREQ      = 14
 integer, parameter :: JOB_TYPE_ACFREQNTH   = 15
-integer, parameter :: JOB_TYPE_AC1FREQNTH   = 16
+integer, parameter :: JOB_TYPE_AC1FREQNTH  = 16
+integer, parameter :: JOB_TYPE_RESPONSE    = 17
 
 integer, parameter :: SAPTLEVEL0 = 0
 integer, parameter :: SAPTLEVEL1 = 1
@@ -77,10 +78,10 @@ character(*),parameter :: PossibleInterface(4) = &
 [character(8) :: &
 'DALTON', 'MOLPRO', 'OWN', 'ORCA']
 
-character(*),parameter :: PossibleJobType(16) = &
+character(*),parameter :: PossibleJobType(17) = &
 [character(9) :: &
 'AC', 'AC0', 'ERPA', 'EERPA', 'SAPT', 'PDFT', 'CASPiDFT','CASPiDFTOpt','EERPA-1', & 
-'AC0D', 'AC0DNOSYMM', 'NLOCCORR', 'AC0DP', 'ACFREQ','ACFREQNTH','AC1FREQNTH']
+'AC0D', 'AC0DNOSYMM', 'NLOCCORR', 'AC0DP', 'ACFREQ','ACFREQNTH','AC1FREQNTH','RESPONSE']
 
 character(*),parameter :: PossibleRDMType(5) = &
 [character(8) :: &
@@ -128,6 +129,7 @@ type CalculationBlock
       character(:), allocatable :: JobTitle
       character(:), allocatable :: IntegralsFilePath
       integer :: Max_Cn = 3
+      double precision :: FreqOm = 0.d0
       logical :: CAlpha = .false.
 end type CalculationBlock
 
@@ -227,6 +229,7 @@ type SystemBlock
       double precision  :: charg(maxcen),xyz(maxcen,3)
 
       integer :: Max_Cn = 3
+      double precision :: FreqOm = 0.d0
 
 end type SystemBlock
 
@@ -290,6 +293,7 @@ type FlagsData
      integer :: IFlACFREQ = 0
      integer :: IFlACFREQNTH = 0
      integer :: IFlAC1FREQNTH = 0
+     integer :: IFlRESPONSE = 0
      integer :: ISymmAC0D = 1
      integer :: IFlCore   = 1
      integer :: IFlFrag1  = 0

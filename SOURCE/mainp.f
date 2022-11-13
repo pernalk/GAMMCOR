@@ -81,6 +81,7 @@ C     FILL COMMONS AND CONSTANTS
       IWarn   = 0
       Max_Cn  = System%Max_Cn
       ITrpl   = Flags%ITrpl
+      FreqOm  = System%FreqOm
 C
 C     *************************************************************************
 C
@@ -96,7 +97,6 @@ C
 C
 C     IF IRes=1 - RESTART THE CALCULATIONS FROM A RESTART FILE
 C
-c herer!!!
       IRes=Flags%IRes
 C
 C     SET IAO TO ONE IF INTEGRALS IN AO ARE OBTAINED FROM MOLPRO
@@ -150,6 +150,10 @@ C           = 0 - IMPOSE SYMMETRY (RUN molpro WITHOUT 'nosym')
 C
       NoSym=Flags%NoSym
 C
+C     IFlRESPONSE = 1 : compute polarizability tensor for a given frequency FreqOm
+C
+      IFlRESPONSE=Flags%IFlRESPONSE
+C
 C     *************************************************************************
 C
 C     SELECT A LONG-RANGE DMFT FUNCTIONAL
@@ -191,7 +195,7 @@ C
 C     IFun   = 13 - APSG
 C
 C     IGVB   = 1  - APSG WITH ONLY TWO ORBITALS PER GEMINAL
-c herer!!!
+C
       IGVB=Flags%IGVB
 C
       IFun=Flags%IFun

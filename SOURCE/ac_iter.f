@@ -24,7 +24,7 @@ C
 C     LOCAL ARRAYS
 C
       Dimension XGrid(100), WGrid(100)
-C 
+C
       If (IFlACFREQNTH.Eq.1) Then
 C
       If (ICholesky.Eq.0) Then
@@ -41,6 +41,7 @@ C
 C     Find AC energy in one shot (no lambda integration) by expanding C in lambda 
 C     and integrating analytically
 C
+      Stop 'Set Cholesky .true. in input.inp'
       Call WIter_FOFO(ECorr,Max_Cn,XOne,URe,Occ,
      $ EGOne,NGOcc,
      $ IGem,NAcCAS,NInAcCAS,NELE,

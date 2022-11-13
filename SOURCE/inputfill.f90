@@ -308,6 +308,8 @@ subroutine read_block_calculation(CalcParams, line)
                CalcParams%JobType = JOB_TYPE_ACFREQNTH
            elseif (uppercase(val) == "AC1FREQNTH" ) then
                CalcParams%JobType = JOB_TYPE_AC1FREQNTH
+           elseif (uppercase(val) == "RESPONSE" ) then
+               CalcParams%JobType = JOB_TYPE_RESPONSE
            elseif (uppercase(val) == "NLOCCORR" ) then
                CalcParams%JobType = JOB_TYPE_NLOCCORR
            endif
@@ -424,6 +426,9 @@ subroutine read_block_calculation(CalcParams, line)
 
       case("MAX_CN")
              read(val,*) CalcParams%Max_Cn
+
+      case("FREQOM")
+             read(val,*) CalcParams%FreqOm
 
       case ("CALPHA")
              read(val,*) CalcParams%CAlpha

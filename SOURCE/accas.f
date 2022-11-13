@@ -115,6 +115,25 @@ C
       Write(6,'(2X,I8,2I5,2E14.4)')I,Ind1,Ind2,Occ(Ind1),Occ(Ind2)
       EndDo
 C
+      If(IFlRESPONSE.Eq.1) Then
+C
+      Write(6,'(/,X,''Polarizability tensor calculation for Om ''
+     $ ,F8.4)') Om
+C
+      If(Max_Cn.Eq.-1) Then
+      Call Polariz(FreqOm,UNOAO,XOne,URe,Occ,
+     $   IGem,NAcCAS,NInAcCAS,NELE,NBasis,NInte1,NGem,IndAux,
+     $   IndN,IndX,NDimX,ICholesky)
+      Else
+      Write(6,'(/,X,''Expand C(Om) maximally up to order '',I4)') Max_Cn
+      Call PolarizAl(FreqOm,UNOAO,XOne,URe,Occ,
+     $   IGem,NAcCAS,NInAcCAS,NELE,NBasis,NInte1,NGem,IndAux,
+     $   IndN,IndX,NDimX,ICholesky,Max_Cn)
+      EndIf
+C
+      Return
+      EndIf
+C
       If(IFunSR.Eq.0) Then 
 C
       If(IFlAC0D.Eq.1) Then

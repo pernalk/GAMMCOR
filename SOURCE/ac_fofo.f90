@@ -424,7 +424,6 @@ Call dgemm('N','N',NDimX,NCholesky,NDimX,1d0,ABPLUS1,NDimX,DCholActT,NDimX,0.0d0
 deallocate(ABPLUS1)
 
 Call FreqGrid(XFreq,WFreq,NGrid)
-
 ! Calc: A0
 nblk = 1 + NBasis - NAct
 allocate(A0block(nblk))
@@ -601,7 +600,7 @@ Call AC0BLOCK(Occ,URe,XOne, &
       IndN,IndX,IGem,NAct,INActive,NDimX,NBasis,NDimX,NInte1,'FFOO','FOFO', &
       A0BlockIV,A0Block,nblk,'A0BLK',0)
       !A0BlockIV,A0Block,nblk,1)
-!
+
 COM=0d0
 Do IGL=1,NGrid
    OmI=XFreq(IGL)
@@ -1806,3 +1805,315 @@ end associate
 
 end subroutine pack_A0block
 
+subroutine Polariz(FreqOm,UNOAO,XOne,URe,Occ,&
+   IGem,NAct,INActive,NELE,NBasis,NInte1,NGem,IndAux,&
+   IndN,IndX,NDimX,ICholesky)
+!
+! Returns dynamic polarizability tensor for a given frequency
+! find C(omega) by inversion
+!
+use abfofo
+
+implicit none
+integer,intent(in) :: NBasis,NInte1,NGem,NDimX
+integer,intent(in) :: NAct,INActive,NELE
+integer,intent(in) :: IndN(2,NDimX),IndX(NDimX),IndAux(NBasis),IGem(NBasis)
+double precision,intent(in) :: FreqOm,UNOAO(NBasis,NBasis),URe(NBasis,NBasis),Occ(NBasis),XONe(NInte1)
+double precision :: DipX(NBasis,NBasis),DipY(NBasis,NBasis),DipZ(NBasis,NBasis),CICoef(NBasis)
+double precision :: DipCX(NDimX),DipCY(NDimX),DipCZ(NDimX)
+double precision :: ipiv(NDimX),ABPLUS(NDimX*NDimX),ABMIN(NDimX*NDimX),AIN(NDimX*NDimX),CMAT(NDimX*NDimX)
+double precision :: ECASSCF,AXX,AYX,AXY,AZX,AXZ,AYY,AZY,AYZ,AZZ,Om,ddot,Alpha
+character(:),allocatable :: twojfile,twokfile
+integer :: I,J,IJ,inf,ICholesky,NOccup
+
+Om=FreqOm
+
+NOccup=NAct+INActive
+Call ComputeDipoleMom(UNOAO,Occ,NOccup,NBasis)
+
+Call ReadDip(DipX,DipY,DipZ,UNOAO,NBasis)
+
+do i=1,NBasis
+CICoef(i) = sign(sqrt(Occ(i)),Occ(i)-0.5d0)
+enddo
+
+Do IJ=1,NDimX
+  I=IndN(1,IJ)
+  J=IndN(2,IJ)
+  DipCX(IndX(IJ))=(CICoef(I)+CICoef(J))*DipX(I,J)
+  DipCY(IndX(IJ))=(CICoef(I)+CICoef(J))*DipY(I,J)
+  DipCZ(IndX(IJ))=(CICoef(I)+CICoef(J))*DipZ(I,J)
+Enddo
+
+twojfile = 'FFOO'
+twokfile = 'FOFO'
+
+Alpha=1.0
+Call AB_CAS_FOFO(ABPLUS,ABMIN,ECASSCF,URe,Occ,XOne, &
+              IndN,IndX,IGem,NAct,INActive,NDimX,NBasis,NDimX,&
+              NInte1,twojfile,twokfile,ICholesky,Alpha,.false.)
+AIN=0d0
+Do I=1,NDimX
+    AIN((I-1)*NDimX+I)=1.0
+EndDo
+!  ABPLUS*ABMIN - 1 Om^2
+Call dgemm('N','N',NDimX,NDimX,NDimX,1d0,ABPLUS,NDimX,&
+           ABMIN,NDimX,-Om**2,AIN,NDimX)
+CMAT=0.5d0*ABPLUS
+Call dgesv(NDimX,NDimX,AIN,NDimX,ipiv,CMAT,NDimX,inf)
+
+! contract CMAT with dipole moment vectors
+Call dgemv('N',NDimX,NDimX,1.d0,CMAT,NDimx,DipCX,1,0.d0,ipiv,1)
+
+AYX=8.d0*ddot(NDimx,DipCY,1,ipiv,1)
+AZX=8.d0*ddot(NDimx,DipCZ,1,ipiv,1)
+AXX=8.d0*ddot(NDimx,DipCX,1,ipiv,1)
+
+Call dgemv('N',NDimX,NDimX,1.d0,CMAT,NDimx,DipCY,1,0.d0,ipiv,1)
+AXY=8.d0*ddot(NDimx,DipCX,1,ipiv,1)
+AZY=8.d0*ddot(NDimx,DipCZ,1,ipiv,1)
+AYY=8.d0*ddot(NDimx,DipCY,1,ipiv,1)
+
+Call dgemv('N',NDimX,NDimX,1.d0,CMAT,NDimx,DipCZ,1,0.d0,ipiv,1)
+AXZ=8.d0*ddot(NDimx,DipCX,1,ipiv,1)
+AYZ=8.d0*ddot(NDimx,DipCY,1,ipiv,1)
+AZZ=8.d0*ddot(NDimx,DipCZ,1,ipiv,1)
+
+Write(6,'(/,X,''Polarizability tensor for frequency '',F8.4)') Om
+Write(6,'(/,X,''XX   XY   XZ  '',3F15.8)') AXX, AXY, AXZ
+Write(6,'(X,''YX   YY   YZ  '',3F15.8)') AYX, AYY, AYZ
+Write(6,'(X,''ZX   ZY   ZZ  '',3F15.8,2/)') AZX, AZY, AZZ
+
+end subroutine Polariz
+
+subroutine PolarizAl(FreqOm,UNOAO,XOne,URe,Occ,&
+   IGem,NAct,INActive,NELE,NBasis,NInte1,NGem,IndAux,&
+   IndN,IndX,NDimX,ICholesky,Max_Cn)
+!
+! Returns dynamic polarizability tensor for a given frequency FreqOm
+! find C(omega) by expanding around Alpha=0 with a tolerance Eps or
+! up to maximal order Max_Cn
+!
+use abfofo
+
+implicit none
+integer,intent(in) :: NBasis,NInte1,NGem,NDimX,Max_cn
+integer,intent(in) :: NAct,INActive,NELE
+integer,intent(in) :: IndN(2,NDimX),IndX(NDimX),IndAux(NBasis),IGem(NBasis)
+double precision,intent(in) :: FreqOm,UNOAO(NBasis,NBasis),URe(NBasis,NBasis),Occ(NBasis),XOne(NInte1)
+double precision :: DipX(NBasis,NBasis),DipY(NBasis,NBasis),DipZ(NBasis,NBasis),CICoef(NBasis)
+double precision :: DipCX(NDimX),DipCY(NDimX),DipCZ(NDimX)
+double precision :: ipiv(NDimX)
+double precision :: ECASSCF,AXX,AYX,AXY,AZX,AXZ,AYY,AZY,AYZ,AZZ,Om,ddot,Alpha
+character(:),allocatable :: twojfile,twokfile
+integer :: I,J,IJ,inf,ICholesky,NOccup
+
+Om=FreqOm
+
+NOccup=NAct+INActive
+Call ComputeDipoleMom(UNOAO,Occ,NOccup,NBasis)
+
+Call ReadDip(DipX,DipY,DipZ,UNOAO,NBasis)
+
+do i=1,NBasis
+CICoef(i) = sign(sqrt(Occ(i)),Occ(i)-0.5d0)
+enddo
+
+Do IJ=1,NDimX
+  I=IndN(1,IJ)
+  J=IndN(2,IJ)
+  DipCX(IndX(IJ))=(CICoef(I)+CICoef(J))*DipX(I,J)
+  DipCY(IndX(IJ))=(CICoef(I)+CICoef(J))*DipY(I,J)
+  DipCZ(IndX(IJ))=(CICoef(I)+CICoef(J))*DipZ(I,J)
+Enddo
+
+Call CFREQPROJ(ipiv,Om,DipCX,1, &
+   Max_Cn,XOne,URe,Occ,&
+   IGem,NAct,INActive,NELE,NBasis,NInte1,NGem,IndAux,&
+   ICholesky,IndN,IndX,NDimX)
+
+AYX=8.d0*ddot(NDimx,DipCY,1,ipiv,1)
+AZX=8.d0*ddot(NDimx,DipCZ,1,ipiv,1)
+AXX=8.d0*ddot(NDimx,DipCX,1,ipiv,1)
+
+Call CFREQPROJ(ipiv,Om,DipCY,1, &
+   Max_Cn,XOne,URe,Occ,&
+   IGem,NAct,INActive,NELE,NBasis,NInte1,NGem,IndAux,&
+   ICholesky,IndN,IndX,NDimX)
+
+AXY=8.d0*ddot(NDimx,DipCX,1,ipiv,1)
+AZY=8.d0*ddot(NDimx,DipCZ,1,ipiv,1)
+AYY=8.d0*ddot(NDimx,DipCY,1,ipiv,1)
+
+Call CFREQPROJ(ipiv,Om,DipCZ,1, &
+   Max_Cn,XOne,URe,Occ,&
+   IGem,NAct,INActive,NELE,NBasis,NInte1,NGem,IndAux,&
+   ICholesky,IndN,IndX,NDimX)
+AXZ=8.d0*ddot(NDimx,DipCX,1,ipiv,1)
+AYZ=8.d0*ddot(NDimx,DipCY,1,ipiv,1)
+AZZ=8.d0*ddot(NDimx,DipCZ,1,ipiv,1)
+
+Write(6,'(/,X,''Polarizability tensor for frequency '',F8.4)') Om
+Write(6,'(/,X,''XX   XY   XZ  '',3F15.8)') AXX, AXY, AXZ
+Write(6,'(X,''YX   YY   YZ  '',3F15.8)') AYX, AYY, AYZ
+Write(6,'(X,''ZX   ZY   ZZ  '',3F15.8,2/)') AZX, AZY, AZZ
+
+end subroutine PolarizAl
+
+subroutine CFREQPROJ(COMTilde,OmI,DProj,NProj, &
+   Max_Cn,XOne,URe,Occ,&
+   IGem,NAct,INActive,NELE,NBasis,NInte1,NGem,IndAux,&
+   ICholesky,IndN,IndX,NDimX)
+!
+!  For a given frequency OmI, return a product of the matrices C(Alpha=1,OmI) and DProj
+!  where DProj is of the NProj x NDimX size
+!  C is found by expanding in alpha around alpha=0
+!  with a tolerance Eps or truncating at Max_Cn order
+!  
+use abfofo
+use systemdef
+use sapt_utils
+
+implicit none
+integer,intent(in) :: NBasis,NInte1,NGem,NDimX,NProj
+integer,intent(in) :: NAct,INActive,NELE,ICholesky
+integer,intent(in) :: IndN(2,NDimX),IndX(NDimX),IndAux(NBasis),&
+                      IGem(NBasis)
+double precision :: ACAlpha,Eps
+double precision,intent(in) :: DProj(NProj,NDimX),URe(NBasis,NBasis),Occ(NBasis),XOne(NInte1)
+
+double precision,intent(out) :: COMTilde(NDimX*NProj)
+
+integer :: iunit
+integer :: ia,ib,ic,id
+integer :: i,j,k,l,kl,ip,iq,ir,is,ipq,irs
+integer :: inf1,inf2,Max_Cn
+double precision :: XFactorial,XN1,XN2,OmI,XNorm0,XNorm1,ECASSCF,DProjT(NDimX,NProj)
+character(:),allocatable :: twojfile,twokfile,IntKFile
+
+double precision, allocatable :: APLUS0Tilde(:), APLUS1Tilde(:),  &
+                                 A1(:),&
+                                 ABPLUS0(:),ABMIN0(:),ABPLUS1(:),ABMIN1(:), &
+                                 C0Tilde(:),C1Tilde(:),C2Tilde(:), &
+                                 WORK0(:),WORK1(:)
+integer :: nblk,N
+type(EblockData) :: A0blockIV,LambdaIV
+type(EblockData),allocatable :: A0block(:),Lambda(:)
+
+! tolerance
+Eps=1.d-2
+
+DProjT = transpose(DProj)
+
+twojfile = 'FFOO'
+twokfile = 'FOFO'
+IntKFile = twokfile
+
+allocate(ABPLUS1(NDimX*NDimX),ABMIN1(NDimX*NDimX))
+
+if(NAct==1) then
+  ! active-virtual block
+  nblk = NBasis - NAct - INActive
+else
+  nblk = 1 + NBasis - NAct
+endif
+
+allocate(A0block(nblk))
+! AC0BLOCK with ver=0 stores A-(0) and A+(0) matrices
+!                            in X and Y, respectively
+Call AC0BLOCK(Occ,URe,XOne, &
+     IndN,IndX,IGem,NAct,INActive,NDimX,NBasis,NDimX,NInte1,'FFOO','FOFO', &
+     ICholesky,A0BlockIV,A0Block,nblk,0,'DUMMY',0)
+
+! get AB1PLUS and AB1MIN
+ACAlpha=1.D0
+call AB_CAS_FOFO(ABPLUS1,ABMIN1,ECASSCF,URe,Occ,XOne, &
+              IndN,IndX,IGem,NAct,INActive,NDimX,NBasis,NDimX,&
+              NInte1,twojfile,twokfile,ICholesky,ACAlpha,.false.)
+
+Call sq_symmetrize(ABPLUS1,NDimX)
+Call sq_symmetrize(ABMIN1,NDimX)
+
+! AB1 = AB1 - A0
+call add_blk_right(ABPLUS1,A0Block,A0BlockIV,-1d0,.false.,nblk,NDimX)
+call add_blk_right(ABMIN1, A0Block,A0BlockIV,-1d0,.true., nblk,NDimX)
+
+!Calc: A1=ABPLUS0*ABMIN1+ABPLUS1*ABMIN0
+allocate(A1(NDimX*NDimX))
+call ABPM_HALFTRAN_GEN_L(ABMIN1, A1,0.0d0,A0Block,A0BlockIV,nblk,NDimX,NDimX,'Y')
+call ABPM_HALFTRAN_GEN_R(ABPLUS1,A1,1.0d0,A0Block,A0BlockIV,nblk,NDimX,NDimX,'X')
+
+!Calc: APLUS0Tilde=ABPLUS0.DProj
+allocate(APLUS0Tilde(NDimX*NProj))
+call ABPM_HALFTRAN_GEN_L(DProjT,APLUS0Tilde,0.0d0,A0Block,A0BlockIV,nblk,NDimX,NProj,'Y')
+
+!Calc: APLUS1Tilde=ABPLUS1.DProj
+allocate(APLUS1Tilde(NDimX*NProj))
+Call dgemm('N','N',NDimX,NProj,NDimX,1d0,ABPLUS1,NDimX,DProjT,NDimX,0.0d0,APLUS1Tilde,NDimX)
+
+deallocate(A0block)
+deallocate(A0BlockIV%vec,A0BlockIV%pos)
+
+! Calc: A0
+allocate(A0block(nblk))
+! ver=1: store A+(0).A-(0) in blocks
+Call AC0BLOCK(Occ,URe,XOne, &
+     IndN,IndX,IGem,NAct,INActive,NDimX,NBasis,NDimX,NInte1,'FFOO','FOFO', &
+     ICholesky,A0BlockIV,A0Block,nblk,1,'A0BLK',0)
+
+COMTilde=0.0
+
+allocate(C0Tilde(NDimX*NProj),C1Tilde(NDimX*NProj),C2Tilde(NDimX*NProj),WORK0(NDimX*NProj))
+allocate(WORK1(NDimX*NProj))
+allocate(Lambda(nblk))
+associate(A => A0BlockIV, L => LambdaIV)
+  L%n = A%n
+  L%l1 = A%l1
+  L%l2 = A%l2
+  allocate(L%pos(L%n),L%vec(L%n))
+end associate
+
+!  Calc: LAMBDA=(A0-Om^2)^-1
+Call INV_AC0BLK(-OmI**2,Lambda,LambdaIV,A0Block,A0BlockIV,nblk,NDimX)
+
+!  Calc: C0Tilde=1/2 LAMBDA.APLUS0Tilde
+Call ABPM_HALFTRAN_GEN_L(APLUS0Tilde,C0Tilde,0.0d0,Lambda,LambdaIV,nblk,NDimX,NProj,'X')
+C0Tilde = 0.5d0*C0Tilde
+
+!  Calc: C1Tilde=LAMBDA.(1/2 APLUS1Tilde - A1.C0Tilde)
+Call dgemm('N','N',NDimX,NProj,NDimX,1.d0,A1,NDimX,C0Tilde,NDimX,0.0d0,WORK0,NDimX)
+WORK0 = 0.5d0*APLUS1Tilde - WORK0
+Call ABPM_HALFTRAN_GEN_L(WORK0,C1Tilde,0.0d0,Lambda,LambdaIV,nblk,NDimX,NProj,'X')
+
+COMTilde=C0Tilde
+COMTilde=COMTilde+C1Tilde
+
+XNorm0=1.0d5
+XFactorial=1
+Do N=2,Max_Cn
+    XFactorial=XFactorial*N
+    XN1=-N
+    XN2=-N*(N-1)
+    Call dgemm('N','N',NDimX,NProj,NDimX,XN2,ABMIN1,NDimX,C0Tilde,NDimX,0.0d0,WORK1,NDimX)
+    Call dgemm('N','N',NDimX,NProj,NDimX,1.d0,ABPLUS1,NDimX,WORK1,NDimX,0.0d0,WORK0,NDimX)
+    Call dgemm('N','N',NDimX,NProj,NDimX,XN1,A1,NDimX,C1Tilde,NDimX,1.0d0,WORK0,NDimX)
+    Call ABPM_HALFTRAN_GEN_L(WORK0,C2Tilde,0.0d0,Lambda,LambdaIV,nblk,NDimX,NProj,'X')
+    XNorm1=Norm2(C2Tilde/XFactorial)
+    Write(6,'(X,"Order (n), |C^(n)/n!|",I3,E14.4)')N,XNorm1
+    If(XNorm1.Le.Eps) Exit
+    If(N.Gt.3.And.XNorm1.Gt.XNorm0) Then
+       Write(6,'(X,"Divergence detected. Expansion of C terminated at order ",I3,3F10.4)')N-1
+       Exit
+    EndIf
+    XNorm0=XNorm1
+    COMTilde=COMTilde+C2Tilde/XFactorial
+    C0Tilde=C1Tilde
+    C1Tilde=C2Tilde
+EndDo
+
+deallocate(A1,WORK0,C0Tilde,C1Tilde,C2Tilde,Lambda,APLUS0Tilde,APLUS1Tilde)
+deallocate(ABMIN1,ABPLUS1,WORK1)
+
+Call RELEASE_AC0BLOCK(A0Block,A0blockIV,nblk)
+
+end subroutine CFREQPROJ 
