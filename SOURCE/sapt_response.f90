@@ -232,6 +232,18 @@ if(Flags%ICASSCF==0.and.Flags%ISERPA==0) then
   allocate(ABPlus(Mon%NDimX**2),ABMin(Mon%NDimX**2),&
             EigVecR(Mon%NDimX**2),Eig(Mon%NDimX))
 
+
+  if(Flags%ICholeskyOTF==1) then
+     if(Mon%Monomer==2) then
+        open(newunit=iunit,file='cholvecs',status='old')
+        close(iunit,status='delete')
+     endif
+     open(newunit=iunit,file='cholvecs',form='unformatted')
+     write(iunit) Mon%NChol
+     write(iunit) Mon%FF
+     close(iunit)
+  endif
+
   ECASSCF = 0
 !
 ! test semicoupled
@@ -261,7 +273,7 @@ if(Flags%ICASSCF==0.and.Flags%ISERPA==0) then
   case(TWOMO_FOFO)
      call AB_CAS_FOFO(ABPlus,ABMin,ECASSCF,URe,Mon%Occ,XOne, &
                  Mon%IndN,Mon%IndX,Mon%IGem,Mon%NAct,Mon%INAct,Mon%NDimX,NBas,Mon%NDimX,&
-                 NInte1,twojfile,twokfile,ACAlpha,.false.)
+                 NInte1,twojfile,twokfile,Flags%ICholesky,ACAlpha,.false.)
   case(TWOMO_FFFF)
 
      call AB_CAS_mithap(ABPlus,ABMin,ECASSCF,URe,Mon%Occ,XOne, &
@@ -307,7 +319,7 @@ if(Flags%ICASSCF==0.and.Flags%ISERPA==0) then
 !               ABMin0(Mon%NDimX,Mon%NDimX))
 !      call AB_CAS_FOFO(ABPlus0,ABMin0,ECASSCF,URe,Mon%Occ,XOne, &
 !                  Mon%IndN,Mon%IndX,Mon%IGem,Mon%NAct,Mon%INAct,Mon%NDimX,NBas,Mon%NDimX,&
-!                  NInte1,twojfile,twokfile,1d-9,.false.)
+!                  NInte1,twojfile,twokfile,Flags%ICholesky,1d-9,.false.)
 !      ! dump matrices for iterative C-ERPA
 !      open(newunit=iunit,file=testfile,form='unformatted')
 !      write(iunit) ABPlus0
@@ -342,7 +354,7 @@ if(Flags%ICASSCF==0.and.Flags%ISERPA==0) then
   !allocate(Mon%PP(Mon%NDimX**2))
   !call AB_CAS_FOFO(ABPlus,Mon%PP,ECASSCF,URe,Mon%Occ,XOne, &
   !              Mon%IndN,Mon%IndX,Mon%IGem,Mon%NAct,Mon%INAct,Mon%NDimX,NBas,Mon%NDimX,&
-  !              NInte1,twojfile,twokfile,1d0,.true.)
+  !              NInte1,twojfile,twokfile,Flags%ICholesky,1d0,.true.)
 
   !print*, 'Mon%PP',norm2(Mon%PP)
 
@@ -398,7 +410,7 @@ if(Flags%ICASSCF==0.and.Flags%ISERPA==0) then
      case(TWOMO_FOFO)
         call ACEneERPA_FOFO(ECorr,EigVecR,Eig,Mon%Occ, &
                              Mon%IGem,Mon%IndN,Mon%IndX,Mon%num0+Mon%num1, &
-                             Mon%NDimX,NBas,twokfile)
+                             Mon%NDimX,NBas,twokfile,Flags%ICholesky)
      case(TWOMO_FFFF)
         call ACEneERPA_FFFF(ECorr,EigVecR,Eig,Mon%Occ, &
                              Mon%IGem,Mon%IndN,Mon%IndX,Mon%num0+Mon%num1, &
@@ -423,15 +435,12 @@ if(Flags%ICASSCF==0.and.Flags%ISERPA==0) then
 
   if(Flags%ICholesky==1) then
      ! sub-snippet for testing Pmat
-     allocate(Mon%Pmat(Mon%NDimX,Mon%NDimX))
-     open(newunit=iunit,file='cholvecs',form='unformatted')
-     write(iunit) Mon%NChol
-     write(iunit) Mon%FF
-     close(iunit)
-
+     ! this will not work now, shit -- Pmat!
+     ! uncomment this for e2disp_Cmat_Chol / e2disp_Cmat_Chol_proj
+     !allocate(Mon%Pmat(Mon%NDimX,Mon%NDimX))
      !call Project_DChol(Mon%PMat,Mon%IndN,NBas,Mon%NDimX)
 
-     !call CIter_FOFO(PMat,ECorr,ACAlpha,XOne,URe,Mon%Occ,EGOne,NGOcc,&
+     !call CIter_FOFO(ECorr,ACAlpha,XOne,URe,Mon%Occ,EGOne,NGOcc,&
      !                Mon%IGem,Mon%NAct,Mon%INAct,Mon%NELE,NBas,NInte1, &
      !                Mon%NDim,Mon%NGem,Mon%IndAux,Mon%IndN,Mon%IndX,Mon%NDimX,&
      !                twojfile,twokfile)
@@ -448,12 +457,14 @@ if(Flags%ICASSCF==0.and.Flags%ISERPA==0) then
   enddo
 
   select case(Mon%TwoMoInt)
+
   case(TWOMO_FOFO)
      call Y01CAS_FOFO(Mon%Occ,URe,XOne,ABPlus,ABMin,ECASSCF, &
             propfile0,propfile1, &
             y01file,xy0file,     &
             Mon%IndN,Mon%IndX,Mon%IGem,Mon%NAct,Mon%INAct,Mon%NDimX, &
-            NBas,Mon%NDimX,NInte1,Mon%NoSt,twofile,twojfile,twokfile,Flags%IFlag0)
+            NBas,Mon%NDimX,NInte1,Mon%NoSt,twofile,twojfile,twokfile,&
+            Flags%IFlag0,Flags%ICholesky)
 
   if(Flags%ICholesky==1) then
      nblk = 1 + NBas - Mon%NAct
@@ -461,8 +472,8 @@ if(Flags%ICASSCF==0.and.Flags%ISERPA==0) then
      ! maybe just include blocks in Mon%...?
      call AC0BLOCK(Mon%Occ,URe,XOne, &
           Mon%IndN,Mon%IndX,Mon%IGem,Mon%NAct,Mon%INAct,Mon%NDimX, &
-          NBas,Mon%NDimX,NInte1,twojfile,twokfile, &
-          A0BlockIV,A0Block,nblk,abpm0file,1)
+          NBas,Mon%NDimX,NInte1,twojfile,twokfile,Flags%ICholesky, &
+          A0BlockIV,A0Block,nblk,1,abpm0file,1)
   endif
   case(TWOMO_FFFF)
      call Y01CAS_mithap(Mon%Occ,URe,XOne,ABPlus,ABMin, &
@@ -643,7 +654,7 @@ select case(Mon%TwoMoInt)
 case(TWOMO_FOFO)
    call AB_CAS_FOFO(ABPlus,ABMin,ECASSCF,URe,Mon%Occ,XOne, &
                Mon%IndN,Mon%IndX,Mon%IGem,Mon%NAct,Mon%INAct,Mon%NDimX,NBas,Mon%NDimX,&
-               NInte1,twojfile,twokfile,ACAlpha,.false.)
+               NInte1,twojfile,twokfile,Flags%ICholesky,ACAlpha,.false.)
 case(TWOMO_FFFF)
 
    call AB_CAS_mithap(ABPlus,ABMin,ECASSCF,URe,Mon%Occ,XOne, &
@@ -672,14 +683,15 @@ case(TWOMO_FOFO)
           'DUMMY','DUMMY',     &
           'DUMMY',xy0file,     &
           Mon%IndN,Mon%IndX,Mon%IGem,Mon%NAct,Mon%INAct,Mon%NDimX, &
-          NBas,Mon%NDimX,NInte1,Mon%NoSt,twofile,twojfile,twokfile,Flags%IFlag0)
+          NBas,Mon%NDimX,NInte1,Mon%NoSt,twofile,twojfile,twokfile,&
+          Flags%IFlag0,Flags%ICholesky)
 
    nblk = 1 + NBas - Mon%NAct
    allocate(A0Block(nblk))
    call AC0BLOCK(Mon%Occ,URe,XOne, &
         Mon%IndN,Mon%IndX,Mon%IGem,Mon%NAct,Mon%INAct,Mon%NDimX, &
-        NBas,Mon%NDimX,NInte1,twojfile,twokfile, &
-        A0BlockIV,A0Block,nblk,abpm0file,1)
+        NBas,Mon%NDimX,NInte1,twojfile,twokfile,Flags%ICholesky, &
+        A0BlockIV,A0Block,nblk,1,abpm0file,1)
 end select
 
 deallocate(TwoMO)
@@ -723,23 +735,26 @@ call tran_matTr(XOne,Mon%CMO,Mon%CMO,NBasis,.true.)
 if(Mon%TwoMoInt==TWOMO_INCORE) call LoadSaptTwoNO(Mon%Monomer,TwoNO,NBasis,NInte2)
 
 print*, 'Monomer',Mon%Monomer
-call calc_cas_resp(Mon%ACAlpha0,XOne,TwoNO,Mon,FNam%propfile0,NInte1,NInte2,NBasis)
-call calc_cas_resp(Mon%ACAlpha1,XOne,TwoNO,Mon,FNam%propfile1,NInte1,NInte2,NBasis)
-call calc_cas_resp(Mon%ACAlpha2,XOne,TwoNO,Mon,FNam%propfile2,NInte1,NInte2,NBasis)
+call calc_cas_resp(Mon%ACAlpha0,XOne,TwoNO,Mon,FNam%propfile0,NInte1,NInte2,NBasis,Flags%ICholesky)
+call calc_cas_resp(Mon%ACAlpha1,XOne,TwoNO,Mon,FNam%propfile1,NInte1,NInte2,NBasis,Flags%ICholesky)
+call calc_cas_resp(Mon%ACAlpha2,XOne,TwoNO,Mon,FNam%propfile2,NInte1,NInte2,NBasis,Flags%ICholesky)
 
 deallocate(work)
 deallocate(TwoNO,XOne)
 
 end subroutine calc_resp_extrapolate
 
-subroutine calc_cas_resp(ACAlpha,XOne,TwoMO,Mon,propfile,NInte1,NInte2,NBas)
+subroutine calc_cas_resp(ACAlpha,XOne,TwoMO,Mon,propfile,NInte1,NInte2,NBas,ICholesky)
+!
 ! Two steps: 1) calculate A+B, A-B for alpha=ACAlpha
 !            2) solve symmetric ERPA eigenproblem
+!
 implicit none
 
 type(SystemBlock)            :: Mon
 type(FileNames)              :: FNam
 integer, intent(in)          :: NInte1,NInte2,NBas
+integer, intent(in)          :: ICholesky
 double precision, intent(in) :: ACAlpha
 double precision, intent(in) :: XOne(NInte1),TwoMO(NInte2)
 character(*)                 :: propfile
@@ -771,7 +786,7 @@ case(TWOMO_FOFO)
 
    call AB_CAS_FOFO(ABPlus,ABMin,ECASSCF,URe,Mon%Occ,XOne, &
                Mon%IndN,Mon%IndX,Mon%IGem,Mon%NAct,Mon%INAct,Mon%NDimX,NBas,Mon%NDimX,&
-               NInte1,FNam%twojfile,FNam%twokfile,ACAlpha,.false.)
+               NInte1,FNam%twojfile,FNam%twokfile,ICholesky,ACAlpha,.false.)
 case(TWOMO_FFFF)
 
    call AB_CAS_mithap(ABPlus,ABMin,ECASSCF,URe,Mon%Occ,XOne, &
@@ -1187,7 +1202,8 @@ elseif(Flags%ICASSCF==1.and.Flags%ISERPA==0) then
             propfile0,propfile1, &
             y01file,xy0file,     &
             Mon%IndN,Mon%IndX,Mon%IGem,Mon%NAct,Mon%INAct,Mon%NDimX, &
-            NBas,Mon%NDim,NInte1,Mon%NoSt,twofile,twojfile,twokfile,Flags%IFlag0)
+            NBas,Mon%NDim,NInte1,Mon%NoSt,twofile,twojfile,twokfile, &
+            Flags%IFlag0,Flags%ICholesky)
   case(TWOMO_FFFF)
      call Y01CAS_mithap(Mon%Occ,URe,XOne,ABPlus,ABMin, &
             propfile0,propfile1, &
@@ -1447,7 +1463,7 @@ case(TWOMO_FFFF)
 case(TWOMO_FOFO)
    call AB_CAS_FOFO(ABPlus,ABMin,ECASSCF,URe,Mon%Occ,XOne, &
                Mon%IndN,Mon%IndX,Mon%IGem,Mon%NAct,Mon%INAct,Mon%NDimX,NBas,Mon%NDimX,&
-               NInte1,twojerf,twokerf,ACAlpha,.false.)
+               NInte1,twojerf,twokerf,Flags%ICholesky,ACAlpha,.false.)
 !else
 ! HERE:: ADD SEPARATE PROCEDURE FOR Kohn-Sham!
 !endif
@@ -1524,7 +1540,7 @@ enddo
  !!     Mon%IndN,NBas,NInte1,NInte2,Mon%NDimX,Mon%NGem)
  !  call ACEneERPA_FOFO(ECorr,EigVecR,Eig,Mon%Occ, &
  !                      Mon%IGem,Mon%IndN,Mon%IndX,Mon%num0+Mon%num1, &
- !                      Mon%NDimX,NBas,twokfile)
+ !                      Mon%NDimX,NBas,twokfile,Flags%ICholesky)
  !ECorr=Ecorr*0.5d0
  !write(LOUT,'(/,1x,''ECASSCF+ENuc, Corr, ERPA-CASSCF'',6x,3f15.8)') &
  !     ECASSCF+Mon%PotNuc,ECorr,ECASSCF+Mon%PotNuc+ECorr
@@ -1568,7 +1584,7 @@ case(TWOMO_FOFO)
                  propfile0,propfile1,xy0file,&
                  Mon%IndN,Mon%IndX,Mon%IGem,Mon%NAct,Mon%INAct,&
                  NGrid,Mon%NDimX,NBas,Mon%NDimX,NInte1,Mon%NoSt,&
-                 twokfile,Twojerf,twokerf,1,1)
+                 twokfile,Twojerf,twokerf,Flags%ICholesky,1,1)
 
 end select
 

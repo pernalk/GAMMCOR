@@ -2,6 +2,7 @@ module abfofo
 !use types,only : EblockData
 use blocktypes
 use tran
+use abchol
 use print_units
 
 implicit none
@@ -10,7 +11,7 @@ contains
 
 subroutine AB_CAS_FOFO(ABPLUS,ABMIN,ETot,URe,Occ,XOne, &
      IndN,IndX,IGemIN,NAct,INActive,NDimX,NBasis,NDim,NInte1, &
-     IntJFile,IntKFile,ACAlpha,AB1)
+     IntJFile,IntKFile,ICholesky,ACAlpha,AB1)
 !
 ! COMPUTE THE A+B AND A-B MATRICES FOR 2-RDM READ FROM A rdm2.dat FILE
 !
@@ -23,6 +24,7 @@ subroutine AB_CAS_FOFO(ABPLUS,ABMIN,ETot,URe,Occ,XOne, &
  implicit none
 
 integer,intent(in) :: NAct,INActive,NDimX,NBasis,NDim,NInte1
+integer,intent(in) :: ICholesky
 character(*) :: IntJFile,IntKFile
 double precision,intent(out) :: ABPLUS(NDim,NDim),ABMIN(NDim,NDim)
 double precision,intent(out) :: ETot
@@ -177,9 +179,15 @@ else
    switch=0
 endif
 
-call JK_loop(ABPLUS,ABMIN,HNO,AuxI,AuxIO,WMAT,&
-             RDM2val,Occ,AuxCoeff,IGem,AuxInd,pos,&
-             INActive,NOccup,NDim,NDimX,NBasis,NInte1,IntJFile,IntKFile,ACAlpha,switch,ETot)
+if(ICholesky==1) then
+   call JK_Chol_loop(ABPLUS,ABMIN,HNO,AuxI,AuxIO,WMAT,&
+                     RDM2val,Occ,AuxCoeff,IGem,AuxInd,pos,&
+                     INActive,NOccup,NDimX,NDimX,NBasis,NInte1,IntJFile,IntKFile,ACAlpha,switch,ETot)
+else
+   call JK_loop(ABPLUS,ABMIN,HNO,AuxI,AuxIO,WMAT,&
+                RDM2val,Occ,AuxCoeff,IGem,AuxInd,pos,&
+                INActive,NOccup,NDim,NDimX,NBasis,NInte1,IntJFile,IntKFile,ACAlpha,switch,ETot)
+endif
 
 write(LOUT,'(1x,a,5x,f15.8)') "CASSCF Energy (w/o ENuc)", ETot
 
@@ -383,7 +391,7 @@ call create_blocks_ABPL0(nAA,nAI,nAV,nIV,tmpAA,tmpAI,tmpAV,tmpIV,&
 
 call ABPM0_FOFO(Occ,URe,XOne,ABPLUS,ABMIN, &
                 IndN,IndX,IGemIN,NAct,INActive,NDimX,NBasis,NDim,NInte1, &
-                IntJFile,IntKFile,ETot)
+                IntJFile,IntKFile,0,ETot)
 
 Eps = 0
 !get AV
@@ -684,11 +692,12 @@ end subroutine MP2RDM_FOFO
 
 subroutine ABPM0_FOFO(Occ,URe,XOne,ABPLUS,ABMIN, &
                       IndN,IndX,IGemIN,NAct,INActive,NDimX,NBasis,NDim,NInte1, &
-                      IntJFile,IntKFile,ETot)
+                      IntJFile,IntKFile,ICholesky,ETot)
 implicit none
 
 integer,intent(in)           :: NAct,INActive,NDimX,NBasis,NDim,NInte1
 integer,intent(in)           :: IndN(2,NDim),IndX(NDim),IGemIN(NBasis)
+integer,intent(in)           :: ICholesky
 double precision,intent(in)  :: URe(NBasis,NBasis),Occ(NBasis),XOne(NInte1)
 character(*)                 :: IntJFile,IntKFile
 double precision,intent(out) :: ABPLUS(NDimX,NDimX),ABMIN(NDimX,NDimX)
@@ -812,14 +821,26 @@ AuxI  = 0
 AuxIO = 0
 WMAT  = 0
 
-if(present(ETot)) then
-   call JK_loop(ABPLUS,ABMIN,HNO,AuxI,AuxIO,WMAT,&
-                RDM2val,Occ,AuxCoeff,IGem,AuxInd,pos,&
-                INActive,NOccup,NDimX,NDimX,NBasis,NInte1,IntJFile,IntKFile,0d0,2,ETot)
+if(ICholesky==1) then
+   if(present(ETot)) then
+      call JK_Chol_loop(ABPLUS,ABMIN,HNO,AuxI,AuxIO,WMAT,&
+                        RDM2val,Occ,AuxCoeff,IGem,AuxInd,pos,&
+                        INActive,NOccup,NDimX,NDimX,NBasis,NInte1,IntJFile,IntKFile,0d0,2,ETot)
+   else
+      call JK_Chol_loop(ABPLUS,ABMIN,HNO,AuxI,AuxIO,WMAT,&
+                        RDM2val,Occ,AuxCoeff,IGem,AuxInd,pos,&
+                        INActive,NOccup,NDimX,NDimX,NBasis,NInte1,IntJFile,IntKFile,0d0,2)
+   endif
 else
-   call JK_loop(ABPLUS,ABMIN,HNO,AuxI,AuxIO,WMAT,&
-                RDM2val,Occ,AuxCoeff,IGem,AuxInd,pos,&
-                INActive,NOccup,NDimX,NDimX,NBasis,NInte1,IntJFile,IntKFile,0d0,2)
+   if(present(ETot)) then
+      call JK_loop(ABPLUS,ABMIN,HNO,AuxI,AuxIO,WMAT,&
+                   RDM2val,Occ,AuxCoeff,IGem,AuxInd,pos,&
+                   INActive,NOccup,NDimX,NDimX,NBasis,NInte1,IntJFile,IntKFile,0d0,2,ETot)
+   else
+      call JK_loop(ABPLUS,ABMIN,HNO,AuxI,AuxIO,WMAT,&
+                   RDM2val,Occ,AuxCoeff,IGem,AuxInd,pos,&
+                   INActive,NOccup,NDimX,NDimX,NBasis,NInte1,IntJFile,IntKFile,0d0,2)
+   endif
 endif
 
 do i=1,NBasis
@@ -2012,6 +2033,9 @@ do ll=1,NOccup
 
       if(l>NOccup) cycle
       ints(:,NOccup+1:NBasis) = 0
+      !! test Cholesky
+      !print*, 'k, l, kl', k, l, kl
+      !print*, norm2(ints)
 
       ! CONSTRUCT ONE-ELECTRON PART OF THE AC ALPHA-HAMILTONIAN
 
@@ -2287,6 +2311,10 @@ enddo
 
 close(iunit1)
 
+print*, 'from JK_Loop'
+print*, 'ABPLUS-after K',norm2(ABPLUS)
+print*, 'ABMIN -after K',norm2(ABMIN)
+
 open(newunit=iunit2,file=trim(IntJFile),status='OLD', &
      access='DIRECT',recl=8*NBasis**2)
 
@@ -2306,6 +2334,10 @@ do ll=1,NOccup
       l = ll
 
       if(k>NOccup.or.l>NOccup) cycle
+
+      ! test Cholesky
+      !print*, 'k,l,kl',k,l,kl
+      !print*, norm2(ints)
 
       ! COMPUTE THE ENERGY FOR CHECKING
       if(present(ETot)) then
@@ -2535,6 +2567,9 @@ do ll=1,NOccup
 
    enddo
 enddo
+
+print*, 'ABPLUS-after J',norm2(ABPLUS)
+print*, 'ABMIN -after J',norm2(ABMIN)
 
 close(iunit2)
 

@@ -63,6 +63,7 @@ double precision,external  :: trace
 end subroutine e1elst
 
 subroutine e2ind_icerpa(Flags,A,B,SAPT)
+use timing
 implicit none
 
 type(FlagsData) :: Flags
@@ -70,6 +71,9 @@ type(SystemBlock) :: A, B
 type(SaptData) :: SAPT
 integer :: NBas
 double precision :: e2ba,e2ab,e2ic
+double precision :: Tcpu,Twall
+
+ call clock('START',Tcpu,Twall)
 
  NBas = A%NBasis 
 
@@ -82,6 +86,8 @@ double precision :: e2ba,e2ab,e2ic
  write(LOUT,'(1x,a,f16.8)') 'Ind(B--A)   = ', e2ba*1000d0 
  write(LOUT,'(1x,a,f16.8)') 'E2ind       = ', e2ic*1000d0 
  SAPT%e2ind = e2ic
+
+ call clock('E2ind',Tcpu,Twall)
 
 end subroutine e2ind_icerpa
 
@@ -439,6 +445,8 @@ double precision,parameter :: SmallE = 1.D-6
 end subroutine e2ind_unc
 
 subroutine e2ind(Flags,A,B,SAPT)
+
+use timing
 implicit none
 
 type(FlagsData) :: Flags
@@ -457,6 +465,7 @@ integer :: i,j,pq,ip,iq,rs,ir,is
 double precision :: fact
 double precision :: e2ba,e2ab,e2iu,e2ic
 double precision :: e2ab_unc,e2ba_unc,e2ic_unc
+double precision :: Tcpu,Twall
 double precision,parameter :: BigE   = 1.D10
 double precision,parameter :: SmallE = 1.D-6
 
@@ -466,6 +475,8 @@ double precision,parameter :: SmallE = 1.D-6
  else
     NBas = A%NBasis
  endif
+
+ call clock('START',Tcpu,Twall)
 
  ! E2IND(B<--A)
 
@@ -636,6 +647,8 @@ double precision,parameter :: SmallE = 1.D-6
  deallocate(tmpA)
  deallocate(WaBB,WbAA)
  deallocate(EVecA,OmA)
+
+ call clock('E2ind ',Tcpu,Twall)
 
 end subroutine e2ind
 
@@ -1567,6 +1580,27 @@ write(LOUT,'(1x,a,f16.8)') 'E2exch-disp(cubic) = ', e2exd_cub*1.0d3
 
 end subroutine e2_cubic
 
+subroutine e2disp_test(tmp1,tmp01,A,B,EVecA,dimOA,dimOb,nOVA,nOVB)
+implicit none
+
+double precision,allocatable :: tmp1(:,:), tmp01(:,:)
+type(SystemBlock) :: A, B
+double precision,allocatable :: EVecA(:)
+integer :: ip,iq,ir,is
+integer :: i,j,pq,rs
+integer :: dimOA,dimOB,nOVA,nOVB
+integer :: iunit
+double precision,allocatable :: work(:,:)
+
+allocate(work(B%NDimX,A%NDimX))
+
+work = 0d0
+call dgemm('N','N',A%NDimX,B%NDimX,B%NDimX,1d0,EVecA,A%NDimX,work,B%NDimX,0d0,tmp1,A%NDimX)
+
+deallocate(work)
+
+end subroutine e2disp_test
+
 subroutine e2disp_intermed1(tmp1,tmp01,A,B,dimOA,dimOB,nOVA,nOVB,EvecA,fact,Y01BlockA,iunit,work)
 
 use omp_lib
@@ -1604,9 +1638,10 @@ do pq=1,A%NDimX
                 (B%CICoef(is)+B%CICoef(ir)) * &
                 work(is+(ir-B%num0-1)*dimOB)
 
-        do i=1,A%NDimX
-           tmp1(i,rs) = tmp1(i,rs) + fact*tmpA(i)
-        enddo
+        !do i=1,A%NDimX
+        !   tmp1(i,rs) = tmp1(i,rs) + fact*tmpA(i)
+        !enddo
+        tmp1(1:A%NDimX,rs) = tmp1(1:A%NDimX,rs) + fact*tmpA
 
         associate(Y => Y01BlockA(pq))
             tmp01(Y%l1:Y%l2,rs) = tmp01(Y%l1:Y%l2,rs) + fact * Y%vec0(1:Y%n)
@@ -1623,6 +1658,7 @@ subroutine e2disp(Flags,A,B,SAPT)
 ! calculate 2nd order dispersion energy
 ! in coupled and uncoupled approximations
 use omp_lib
+use timing
 implicit none
 
 type(FlagsData)   :: Flags
@@ -1647,6 +1683,7 @@ double precision :: e2d,fact,tmp
 double precision :: e2du,dea,deb
 double precision :: inv_omega
 double precision :: Alpha, Beta
+double precision :: Tcpu,Twall
 ! for Be ERPA:
 !double precision,parameter :: SmallE = 1.D-1
 double precision,parameter :: BigE = 1.D8 
@@ -1660,6 +1697,8 @@ double precision,parameter :: SmallE = 1.D-3
  else
     NBas = A%NBasis 
  endif
+
+ call clock('START',Tcpu,Twall)
 
 ! print thresholds
  if(SAPT%IPrint>1) then 
@@ -1718,7 +1757,9 @@ if(.not.(Flags%ICASSCF==0.and.Flags%ISERPA==0)) then
  tmp1=0
  tmp01=0
 
- call e2disp_intermed1(tmp1,tmp01,A,B,dimOA,dimOB,nOVA,nOVB,EvecA,fact,Y01BlockA,iunit,work)   
+ call e2disp_intermed1(tmp1,tmp01,A,B,dimOA,dimOB,nOVA,nOVB,EvecA,fact,Y01BlockA,iunit,work)
+ !call e2disp_test(tmp1,tmp01,A,B,EVecA,dimOA,dimOB,nOVA,nOVB)
+ !call clock('E2disp: intermed1',Tcpu,Twall)
 
  ! coupled
  call dgemm('N','N',A%NDimX,B%NDimX,B%NDimX,1d0,tmp1,A%NDimX,EVecB,B%NDimX,0d0,tmp2,A%NDimX)
@@ -1873,6 +1914,8 @@ endif
  deallocate(condOmB,condOmA)
  deallocate(tmp02,tmp01,tmp2,tmp1)
  deallocate(OmB0,OmA0,OmB,EVecB,OmA,EVecA)
+
+ call clock('E2disp ',Tcpu,Twall)
 
 end subroutine e2disp
 

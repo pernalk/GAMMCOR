@@ -438,7 +438,7 @@ end subroutine ACABMAT0_FOFO
 
 subroutine AC0CAS_FOFO(ECorr,ETot,Occ,URe,XOne,ABPLUS,ABMIN, &
                        IndN,IndX,IGemIN,NAct,INActive,NDimX,NBasis,NDim,NInte1, &
-                       NoSt,IntJFile,IntKFile)
+                       NoSt,IntJFile,IntKFile,ICholesky)
 !
 !     A ROUTINE FOR COMPUTING AC0 INTEGRAND
 !     (FOFO VERSION, USED IN AC0-CAS)
@@ -453,13 +453,14 @@ implicit none
 
 integer,intent(in)           :: NAct,INActive,NDimX,NBasis,NDim,NInte1,NoSt
 integer,intent(in)           :: IndN(2,NDim),IndX(NDim),IGemIN(NBasis)
+integer,intent(in)           :: ICholesky
 double precision,intent(in)  :: URe(NBasis,NBasis),Occ(NBasis),XOne(NInte1)
 character(*)                 :: IntJFile,IntKFile
 double precision,intent(out) :: ETot,ECorr
 double precision,intent(out) :: ABPLUS(NDimX,NDimX),ABMIN(NDimX,NDimX)
 
 integer          :: iunit
-integer          :: NOccup
+integer          :: NOccup,NCholesky
 integer          :: i,j,k,l,kl,ii,ip,iq,ir,is,ipq,irs
 integer          :: ipos,jpos,iblk,jblk,nblk
 integer          :: IGem(NBasis),Ind(NBasis),pos(NBasis,NBasis)
@@ -469,12 +470,18 @@ integer          :: tmpAA(NAct*(NAct-1)/2),tmpAI(NAct,1:INActive),&
                     tmpIV(INActive*(NBasis-NAct-INActive))
 integer          :: limAA(2),limAI(2,1:INActive),&
                     limAV(2,INActive+NAct+1:NBasis),limIV(2)
+! Cholesky
+integer          :: iloop,nloop,off
+integer          :: dimFO,iBatch,BatchSize
+integer          :: MaxBatchSize = 100
+! end Cholesky
 double precision :: Cpq,Crs,EAll,EIntra
 double precision :: AuxCoeff(3,3,3,3),Aux,val
 double precision :: Tcpu,Twall
 double precision :: C(NBasis)
 double precision,allocatable :: work1(:),ints(:,:)
 double precision,allocatable :: work(:,:),Eig(:)
+double precision,allocatable :: MatFF(:,:)
 
 type(EblockData),allocatable :: Eblock(:)
 type(EblockData) :: EblockIV
@@ -517,7 +524,7 @@ enddo
 
 call ABPM0_FOFO(Occ,URe,XOne,ABPLUS,ABMIN, &
                 IndN,IndX,IGemIN,NAct,INActive,NDimX,NBasis,NDim,NInte1, &
-                IntJFile,IntKFile,ETot)
+                IntJFile,IntKFile,ICholesky,ETot)
 
 !print*, 'ABPLUS-new',norm2(ABPLUS)
 !print*, 'ABMIN -new',norm2(ABMIN)
@@ -579,7 +586,7 @@ end associate
 ! AB(1) PART
 call AB_CAS_FOFO(ABPLUS,ABMIN,val,URe,Occ,XOne,&
               IndN,IndX,IGem,NAct,INActive,NDimX,NBasis,NDimX,&
-              NInte1,IntJFile,IntKFile,1d0,.true.)
+              NInte1,IntJFile,IntKFile,ICholesky,1d0,.true.)
 
 !call clock('AB(1)',Tcpu,Twall)
 
@@ -634,59 +641,140 @@ do i=1,NDimX
 enddo
 
 ! energy loop
-allocate(work1(NBasis*NBasis),ints(NBasis,NBasis))
+allocate(ints(NBasis,NBasis))
 
-EAll = 0
+EAll   = 0
 EIntra = 0
 
-open(newunit=iunit,file='FOFO',status='OLD', &
-     access='DIRECT',recl=8*NBasis*NOccup)
+if(ICholesky==0) then
 
-kl = 0
-do k=1,NOccup
-   do l=1,NBasis
-      kl = kl + 1
-      if(pos(l,k)/=0) then
-        irs = pos(l,k)
-        ir = l
-        is = k
-        read(iunit,rec=kl) work1(1:NBasis*NOccup)
-        do j=1,NOccup
-           do i=1,NBasis
-              ints(i,j) = work1((j-1)*NBasis+i)
+   allocate(work1(NBasis*NBasis))
+
+   open(newunit=iunit,file='FOFO',status='OLD', &
+        access='DIRECT',recl=8*NBasis*NOccup)
+
+   kl = 0
+   do k=1,NOccup
+      do l=1,NBasis
+         kl = kl + 1
+         if(pos(l,k)/=0) then
+           irs = pos(l,k)
+           ir = l
+           is = k
+           read(iunit,rec=kl) work1(1:NBasis*NOccup)
+           do j=1,NOccup
+              do i=1,NBasis
+                 ints(i,j) = work1((j-1)*NBasis+i)
+              enddo
            enddo
-        enddo
-        ints(:,NOccup+1:NBasis) = 0
+           ints(:,NOccup+1:NBasis) = 0
 
-        do j=1,NBasis
-           do i=1,j
-              if(pos(j,i)/=0) then
-                ipq = pos(j,i)
-                ip = j
-                iq = i
-                Crs = C(ir)+C(is)
-                Cpq = C(ip)+C(iq)
+           do j=1,NBasis
+              do i=1,j
+                 if(pos(j,i)/=0) then
+                   ipq = pos(j,i)
+                   ip = j
+                   iq = i
+                   Crs = C(ir)+C(is)
+                   Cpq = C(ip)+C(iq)
 
-                Aux = Crs*Cpq*ABPLUS(ipq,irs)
-                EAll = EAll + Aux*ints(j,i)
+                   Aux = Crs*Cpq*ABPLUS(ipq,irs)
+                   EAll = EAll + Aux*ints(j,i)
 
-                if(AuxCoeff(IGem(ip),IGem(iq),IGem(ir),IGem(is))==1) EIntra = EIntra + Aux*ints(j,i)
+                   if(AuxCoeff(IGem(ip),IGem(iq),IGem(ir),IGem(is))==1) EIntra = EIntra + Aux*ints(j,i)
 
-              endif
+                 endif
+              enddo
            enddo
-        enddo
 
-      endif
+         endif
+      enddo
    enddo
-enddo
+
+   close(iunit)
+   deallocate(work1)
+
+elseif(ICholesky==1) then
+
+   ! read cholesky (FF|K) vectors
+   open(newunit=iunit,file='cholvecs',form='unformatted')
+   read(iunit) NCholesky
+   allocate(MatFF(NCholesky,NBasis**2))
+   read(iunit) MatFF
+   close(iunit)
+
+   ! set number of loops over integrals
+   dimFO = NOccup*NBasis
+   nloop = (dimFO - 1) / MaxBatchSize + 1
+
+   allocate(work(dimFO,MaxBatchSize))
+
+   off = 0
+   k   = 0
+   l   = 1
+   ! exchange loop (FO|FO)
+   do iloop=1,nloop
+
+      ! batch size for each iloop; last one is smaller
+      BatchSize = min(MaxBatchSize,dimFO-off)
+
+      ! assemble (FO|BatchSize) batch from CholVecs
+      call dgemm('T','N',dimFO,BatchSize,NCholesky,1d0,MatFF,NCholesky, &
+                 MatFF(:,off+1:BatchSize),NCholesky,0d0,work,dimFO)
+
+      ! loop over integrals
+      do iBatch=1,BatchSize
+
+         k = k + 1
+         if(k>NBasis) then
+            k = 1
+            l = l + 1
+         endif
+
+         if(pos(k,l)==0) cycle
+         ir = k
+         is = l
+         irs = pos(k,l)
+
+         do j=1,NOccup
+            do i=1,NBasis
+               ints(i,j) = work((j-1)*NBasis+i,iBatch)
+            enddo
+         enddo
+
+         if(l>NOccup) cycle
+         ints(:,NOccup+1:NBasis) = 0
+
+         do j=1,NBasis
+            do i=1,j
+               if(pos(j,i)/=0) then
+                 ipq = pos(j,i)
+                 ip = j
+                 iq = i
+                 Crs = C(ir)+C(is)
+                 Cpq = C(ip)+C(iq)
+
+                 Aux = Crs*Cpq*ABPLUS(ipq,irs)
+                 EAll = EAll + Aux*ints(j,i)
+
+                 if(AuxCoeff(IGem(ip),IGem(iq),IGem(ir),IGem(is))==1) EIntra = EIntra + Aux*ints(j,i)
+
+               endif
+            enddo
+         enddo
+
+      enddo
+
+      off = off + MaxBatchSize
+
+   enddo
+
+   deallocate(work,MatFF)
+endif
 
 ECorr = EAll - EIntra
 
-close(iunit)
-
-!call clock('ENERGY ',Tcpu,Twall)
-
-deallocate(ints,work1)
+deallocate(ints)
 
 ! deallocate blocks
 do iblk=1,nblk
@@ -711,7 +799,7 @@ subroutine Y01CAS_FOFO(Occ,URe,XOne,ABPLUS,ABMIN,ETot, &
      propfile0,propfile1, &
      y01file, xy0file, &
      IndN,IndX,IGemIN,NAct,INActive,NDimX,NBasis,NDim,NInte1, &
-     NoSt,IntFileName,IntJFile,IntKFile,IFlag0)
+     NoSt,IntFileName,IntJFile,IntKFile,IFlag0,ICholesky)
 !
 !     A ROUTINE FOR COMPUTING Y VECTORS AND EIGENVALUES OF ERPA
 !     IN THE 0TH- AND 1ST-ORDER APPROXIMATIONS (USED IN SAPT)
@@ -725,7 +813,8 @@ subroutine Y01CAS_FOFO(Occ,URe,XOne,ABPLUS,ABMIN,ETot, &
 implicit none
 
 integer,intent(in)           :: NAct,INActive,NDimX,NBasis,NDim,NInte1,NoSt
-integer,intent(in)           :: IndN(2,NDim),IndX(NDim),IGemIN(NBasis),IFlag0
+integer,intent(in)           :: IndN(2,NDim),IndX(NDim),IGemIN(NBasis)
+integer,intent(in)           :: IFlag0,ICholesky
 double precision,intent(in)  :: URe(NBasis,NBasis),Occ(NBasis),XOne(NInte1)
 double precision,intent(out) :: ABPLUS(NDimX,NDimX),ABMIN(NDimX,NDimX)
 double precision,intent(out) :: ETot
@@ -789,7 +878,7 @@ call create_blocks_ABPL0(nAA,nAI,nAV,nIV,tmpAA,tmpAI,tmpAV,tmpIV,&
 
 call ABPM0_FOFO(Occ,URe,XOne,ABPLUS,ABMIN, &
                 IndN,IndX,IGemIN,NAct,INActive,NDimX,NBasis,NDim,NInte1, &
-                IntJFile,IntKFile,ETot)
+                IntJFile,IntKFile,ICholesky,ETot)
 
 !print*, 'ABPLUS-new',norm2(ABPLUS)
 !print*, 'ABMIN -new',norm2(ABMIN)
@@ -894,7 +983,7 @@ if(IFlag0==0) then
    ! AB(1) PART
    call AB_CAS_FOFO(ABPLUS,ABMIN,EnDummy,URe,Occ,XOne,&
                     IndN,IndX,IGem,NAct,INActive,NDimX,NBasis,NDimX,&
-                    NInte1,IntJFile,IntKFile,1d0,.true.)
+                    NInte1,IntJFile,IntKFile,ICholesky,1d0,.true.)
 
    !call clock('ABPM(1)',Tcpu,Twall)
 
@@ -1001,7 +1090,7 @@ subroutine Y01CASLR_FOFO(Occ,URe,XOne,ABPLUS,ABMIN, &
      SRKer,Wt,OrbGrid, &
      propfile0,propfile1,xy0file, &
      IndN,IndX,IGemIN,NAct,INActive,NGrid,NDimX,NBasis,NDim,NInte1, &
-     NoSt,IntFileName,IntJFile,IntKFile,IFlag0,IFunSRKer,ETot,ECorr)
+     NoSt,IntFileName,IntJFile,IntKFile,ICholesky,IFlag0,IFunSRKer,ETot,ECorr)
 !
 !     CAREFUL! IFlag=0 not ready yet!
 !
@@ -1017,6 +1106,7 @@ use timing
 
 implicit none
 integer,intent(in) :: NAct,INActive,NGrid,NDimX,NBasis,NDim,NInte1,NoSt
+integer,intent(in) :: ICholesky
 character(*)       :: IntFileName,IntJFile,IntKFile
 character(*)       :: propfile0,propfile1,xy0filE
 double precision,intent(out) :: ABPLUS(NDimX,NDimX),ABMIN(NDimX,NDimX)
@@ -1462,7 +1552,7 @@ if(IFlag0==1) return
 ! AB(1) PART
 call AB_CAS_FOFO(ABPLUS,ABMIN,EnDummy,URe,Occ,XOne,&
               IndN,IndX,IGem,NAct,INActive,NDimX,NBasis,NDimX,&
-              NInte1,IntJFile,IntKFile,1d0,.true.)
+              NInte1,IntJFile,IntKFile,ICholesky,1d0,.true.)
 !print*, 'AB1-MY',norm2(ABPLUS),norm2(ABMIN)
 
 call clock('AB_CAS_FOFO',Tcpu,Twall)
@@ -1731,7 +1821,7 @@ subroutine Y01CASD_FOFO(IH0St,Occ,URe,XOne, &
      propfile0,propfile1, &
      xy0file, &
      UNOAO,IndN,IndX,IGemIN,NAct,INActive,NDimX,NBasis,NDim,NInte1, &
-     NoSt,IntFileName,IntJFile,IntKFile,ETot,ECorr)
+     NoSt,IntFileName,IntJFile,IntKFile,ICholesky,ETot,ECorr)
 !
 !     A ROUTINE FOR COMPUTING AC0D CORRELATION ENERGIES AND
 !     TRANSITION DIPOLE MOMENTS IN THE 0- AND 1 - ORDER APPROXIMATIONS
@@ -1741,6 +1831,7 @@ use timing
 implicit none
 double precision :: UNOAO(NBasis,NBasis),DipX(NBasis,NBasis),DipY(NBasis,NBasis),DipZ(NBasis,NBasis)
 integer,intent(in) :: NAct,INActive,NDimX,NBasis,NDim,NInte1,NoSt
+integer,intent(in) :: ICholesky
 character(*) :: IntFileName,IntJFile,IntKFile
 character(*) :: propfile0,propfile1,xy0file
 double precision,intent(in)  :: URe(NBasis,NBasis),Occ(NBasis),XOne(NInte1)
@@ -1868,7 +1959,7 @@ call create_blocks_ABPL0(nAA,nAI,nAV,nIV,tmpAA,tmpAI,tmpAV,tmpIV,&
 
 call ABPM0_FOFO(Occ,URe,XOne,ABPLUS,ABMIN, &
                 IndN,IndX,IGemIN,NAct,INActive,NDimX,NBasis,NDim,NInte1, &
-                IntJFile,IntKFile,ETot)
+                IntJFile,IntKFile,0,ETot)
 
 
 !allocate(work1(NBasis**2),work2(NBasis**2),ints(NBasis,NBasis))
@@ -2910,7 +3001,7 @@ call dump_Eblock(Eblock,EblockIV,Occ,IndN,nblk,NBasis,NDimX,xy0file)
    ! AB(1) PART
    call AB_CAS_FOFO(ABPLUS,ABMIN,EnDummy,URe,Occ,XOne,&
                  IndN,IndX,IGem,NAct,INActive,NDimX,NBasis,NDimX,&
-                 NInte1,IntJFile,IntKFile,1d0,.true.)
+                 NInte1,IntJFile,IntKFile,ICholesky,1d0,.true.)
 
   call clock('AB(1)',Tcpu,Twall)
 !  ! B = A.X
@@ -3151,7 +3242,7 @@ subroutine Y01CASDSYM_FOFO(ICAS,NoStMx,ICORR,EExcit,IStCAS,NSym,NSymNO,MultpC,EC
      propfile0,propfile1, &
      xy0file, &
      UNOAO,IndN,IndX,IGemIN,NAct,INActive,NDimX,NBasis,NDim,NInte1, &
-     NoSt,IntFileName,IntJFile,IntKFile,ETot,IFlAC0DP)
+     NoSt,IntFileName,IntJFile,IntKFile,ICholesky,ETot,IFlAC0DP)
 !
 !     A ROUTINE FOR COMPUTING AC0D CORRELATION ENERGIES AND
 !     TRANSITION DIPOLE MOMENTS IN THE 0- AND 1 - ORDER APPROXIMATIONS
@@ -3159,8 +3250,9 @@ subroutine Y01CASDSYM_FOFO(ICAS,NoStMx,ICORR,EExcit,IStCAS,NSym,NSymNO,MultpC,EC
 use timing
 !
 implicit none
-double precision :: UNOAO(NBasis,NBasis),DipX(NBasis,NBasis),DipY(NBasis,NBasis),DipZ(NBasis,NBasis)
+double precision   :: UNOAO(NBasis,NBasis),DipX(NBasis,NBasis),DipY(NBasis,NBasis),DipZ(NBasis,NBasis)
 integer,intent(in) :: NAct,INActive,NDimX,NBasis,NDim,NInte1,NoSt
+integer,intent(in) :: ICholesky
 character(*) :: IntFileName,IntJFile,IntKFile
 character(*) :: propfile0,propfile1,xy0file
 double precision,intent(in)  :: URe(NBasis,NBasis),Occ(NBasis),XOne(NInte1)
@@ -3182,7 +3274,7 @@ double precision,allocatable :: EigY(:,:),EigY1(:,:),EigX(:,:)
 integer,allocatable :: iaddr(:)
 double precision,allocatable :: Eig(:),Eig1(:)
 double precision,allocatable :: RDM2val(:,:,:,:),RDM2Act(:)
-double precision,allocatable :: work1(:),work2(:)
+double precision,allocatable :: work1(:)
 double precision,allocatable :: ints(:,:)
 !double precision,allocatable :: EigYt(:,:),EigXt(:,:),Eigt(:)
 double precision,allocatable :: ABP(:,:),ABM(:,:),workA(:,:)
@@ -3194,8 +3286,14 @@ integer :: nAI(INActive),tmpAI(NAct,1:INActive),limAI(2,1:INActive)
 integer :: nAV(INActive+NAct+1:NBasis),tmpAV(NAct,INActive+NAct+1:NBasis),limAV(2,INActive+NAct+1:NBasis)
 integer :: nIV,tmpIV(INActive*(NBasis-NAct-INActive)),limIV(2)
 integer :: IERPA,NoStMx,IPr,IPair(NBasis,NBasis),NU,IAB,NUMx
-!double precision :: GammaS(100,NInte1),XCAS(NBasis,NInte1),YCAS(NBasis,NInte1)
-!double precision :: OvMax,OvXMax,OvYMax,SumERY,SumCAY,SumERX,SumCAX,YER,XER,YCA,XCA,SOvY,SOvX,TDIP2,EigOv
+! Cholesky
+integer          :: iloop,nloop,off
+integer          :: NCholesky
+integer          :: dimFO,iBatch,BatchSize
+integer          :: MaxBatchSize = 100
+logical          :: yes
+double precision,allocatable :: MatFF(:,:),work2(:,:)
+! end Cholesky
 double precision,allocatable :: ABPLUS(:,:),ABMIN(:,:)
 double precision :: ECorrSym(100),EExcit(100),ECorr,EigMin,Hlp,TDIP2,Eig11(100)
 integer :: NSym,NSymNO(NBasis),MultpC(8,8),IStCAS(2,100),ICORR(100),IStERPA(2,100),ISym,IStart,ICount, &
@@ -3263,7 +3361,7 @@ call create_blocks_ABPL0(nAA,nAI,nAV,nIV,tmpAA,tmpAI,tmpAV,tmpIV,&
 
 call ABPM0_FOFO(Occ,URe,XOne,ABPLUS,ABMIN, &
                 IndN,IndX,IGemIN,NAct,INActive,NDimX,NBasis,NDim,NInte1, &
-                IntJFile,IntKFile,ETot)
+                IntJFile,IntKFile,ICholesky,ETot)
 
 print*, 'after ABPM0_FOFO...'
 call clock('AB0MAT',Tcpu,Twall)
@@ -3469,7 +3567,7 @@ call dump_Eblock(Eblock,EblockIV,Occ,IndN,nblk,NBasis,NDimX,xy0file)
 ! AB(1) PART
 call AB_CAS_FOFO(ABPLUS,ABMIN,EnDummy,URe,Occ,XOne,&
               IndN,IndX,IGem,NAct,INActive,NDimX,NBasis,NDimX,&
-              NInte1,IntJFile,IntKFile,1d0,.true.)
+              NInte1,IntJFile,IntKFile,ICholesky,1d0,.true.)
 
 call clock('AB(1)',Tcpu,Twall)
 !  ! B = A.X
@@ -3723,59 +3821,149 @@ do i=1,NDimX
 enddo
 !
 ! energy loop
-allocate(work1(NBasis*NBasis),ints(NBasis,NBasis))
+allocate(ints(NBasis,NBasis))
+
 EAll = 0
 EIntra = 0
-open(newunit=iunit,file='FOFO',status='OLD', &
-     access='DIRECT',recl=8*NBasis*NOccup)
 
-ints = 0
-kl   = 0
-do k=1,NOccup
-   do l=1,NBasis
-      kl = kl + 1
-      if(pos(l,k)/=0) then
-        irs = pos(l,k)
-        ir = l
-        is = k
-        read(iunit,rec=kl) work1(1:NBasis*NOccup)
-        do j=1,NOccup
-           do i=1,NBasis
-              ints(i,j) = work1((j-1)*NBasis+i)
+if(ICholesky==0) then
+
+   allocate(work1(NBasis*NBasis))
+
+   open(newunit=iunit,file='FOFO',status='OLD', &
+        access='DIRECT',recl=8*NBasis*NOccup)
+
+   ints = 0
+   kl   = 0
+   do k=1,NOccup
+      do l=1,NBasis
+         kl = kl + 1
+         if(pos(l,k)/=0) then
+           irs = pos(l,k)
+           ir = l
+           is = k
+           read(iunit,rec=kl) work1(1:NBasis*NOccup)
+           do j=1,NOccup
+              do i=1,NBasis
+                 ints(i,j) = work1((j-1)*NBasis+i)
+              enddo
            enddo
-        enddo
-        ints(:,NOccup+1:NBasis) = 0
+           ints(:,NOccup+1:NBasis) = 0
 
-        do j=1,NBasis
-           do i=1,j
-              if(pos(j,i)/=0) then
-                ipq = pos(j,i)
-                ip = j
-                iq = i
-                Crs = C(ir)+C(is)
-                Cpq = C(ip)+C(iq)
+           do j=1,NBasis
+              do i=1,j
+                 if(pos(j,i)/=0) then
+                   ipq = pos(j,i)
+                   ip = j
+                   iq = i
+                   Crs = C(ir)+C(is)
+                   Cpq = C(ip)+C(iq)
 
-                Aux = Crs*Cpq*ABP(ipq,irs)
-                EAll = EAll + Aux*ints(j,i)
+                   Aux = Crs*Cpq*ABP(ipq,irs)
+                   EAll = EAll + Aux*ints(j,i)
 
-                if(AuxCoeff(IGem(ip),IGem(iq),IGem(ir),IGem(is))==1) EIntra = EIntra + Aux*ints(j,i)
+                   if(AuxCoeff(IGem(ip),IGem(iq),IGem(ir),IGem(is))==1) EIntra = EIntra + Aux*ints(j,i)
 
-              endif
+                 endif
+              enddo
            enddo
-        enddo
 
-      endif
+         endif
+      enddo
    enddo
-enddo
 
-close(iunit)
+   deallocate(work1)
 
-call clock('ENE-loop',Tcpu,Twall)
+   close(iunit)
+
+elseif(ICholesky==1) then
+
+   ! read cholesky (FF|K) vectors
+   inquire(file='cholvecs',exist=yes)
+   if(.not.yes) stop "cholvecs absent in Y01CASDSYM_FOFO!"
+   open(newunit=iunit,file='cholvecs',form='unformatted')
+   read(iunit) NCholesky
+   allocate(MatFF(NCholesky,NBasis**2))
+   read(iunit) MatFF
+   close(iunit)
+
+   ! set number of loops over integrals
+   dimFO = NOccup*NBasis
+   nloop = (dimFO - 1) / MaxBatchSize + 1
+
+   allocate(work2(dimFO,MaxBatchSize))
+
+   ints = 0
+   off = 0
+   k   = 0
+   l   = 1
+   ! exchange loop (FO|FO)
+   do iloop=1,nloop
+
+      ! batch size for each iloop; last one is smaller
+      BatchSize = min(MaxBatchSize,dimFO-off)
+
+      ! assemble (FO|BatchSize) batch from CholVecs
+      call dgemm('T','N',dimFO,BatchSize,NCholesky,1d0,MatFF,NCholesky, &
+                 MatFF(:,off+1:BatchSize),NCholesky,0d0,work2,dimFO)
+
+      ! loop over integrals
+      do iBatch=1,BatchSize
+
+         k = k + 1
+         if(k>NBasis) then
+            k = 1
+            l = l + 1
+         endif
+
+         if(pos(k,l)==0) cycle
+         ir = k
+         is = l
+         irs = pos(k,l)
+
+         do j=1,NOccup
+            do i=1,NBasis
+               ints(i,j) = work2((j-1)*NBasis+i,iBatch)
+            enddo
+         enddo
+
+         if(l>NOccup) cycle
+         ints(:,NOccup+1:NBasis) = 0
+
+         do j=1,NBasis
+            do i=1,j
+               if(pos(j,i)/=0) then
+                 ipq = pos(j,i)
+                 ip = j
+                 iq = i
+                 Crs = C(ir)+C(is)
+                 Cpq = C(ip)+C(iq)
+
+                 Aux = Crs*Cpq*ABP(ipq,irs)
+                 EAll = EAll + Aux*ints(j,i)
+
+                 if(AuxCoeff(IGem(ip),IGem(iq),IGem(ir),IGem(is))==1) EIntra = EIntra + Aux*ints(j,i)
+
+               endif
+            enddo
+         enddo
+
+      enddo
+
+      off = off + MaxBatchSize
+
+   enddo
+
+   deallocate(work2,MatFF)
+
+endif ! ICholesky
+
+call clock('ENE-loop Y01CASDSYM_FOFO',Tcpu,Twall)
 
 ECorr = EAll-EIntra
 ECorrSym(IDCORR)=ECorr
 
-deallocate(ints,work1)
+deallocate(ints)
 !
 !
 EndIf
@@ -3810,7 +3998,7 @@ subroutine ACEInteg_FOFO(ECorr,URe,Occ,XOne,UNOAO,&
       EGOne,NGOcc,CICoef,&
       NBasis,NInte1,NDim,NGem,IndAux,ACAlpha,&
       IGemIN,NAct,INActive,NELE,IndN,IndX,NDimX,&
-      NoSt,ICASSCF,IFlFrag1,IFunSR,IFunSRKer)
+      NoSt,ICASSCF,IFlFrag1,IFunSR,IFunSRKer,ICholesky)
 use omp_lib
 !
 !  A ROUTINE FOR COMPUTING AC INTEGRAND
@@ -3818,6 +4006,7 @@ use omp_lib
 implicit none
 integer,intent(in) :: NGOcc,NBasis,NInte1,NDim,NGem,NDimX
 integer,intent(in) :: NAct,INActive,NELE,NoSt,ICASSCF,IFlFrag1,IFunSR,IFunSRKer
+integer,intent(in) :: ICholesky
 integer,intent(in) :: IndN(2,NDim),IndX(NDim),IndAux(NBasis),&
                       IGemIN(NBasis)
 double precision,intent(in) :: ACAlpha
@@ -3857,7 +4046,7 @@ character(:),allocatable :: twojfile,twokfile
 
     call AB_CAS_FOFO(ABPLUS,ABMIN,ECASSCF,URe,Occ,XOne, &
                    IndN,IndX,IGemIN,NAct,INActive,NDimX,NBasis,NDimX,&
-                   NInte1,twojfile,twokfile,ACAlpha,.false.)
+                   NInte1,twojfile,twokfile,ICholesky,ACAlpha,.false.)
     EGOne(1)=ECASSCF
 
  elseif(ICASSCF==0) then
@@ -3866,7 +4055,7 @@ character(:),allocatable :: twojfile,twokfile
                   IndN,IndX,IGemIN,CICoef, &
                   NAct,NELE,NBasis,NDim,NDimX,NInte1,NGem, &
                  'TWOMO','FFOO','FOFO',0,ACAlpha,1)
-  
+
  endif
 
  if(IFlFrag1.Eq.1) then
@@ -3920,29 +4109,30 @@ character(:),allocatable :: twojfile,twokfile
 ! FIND EIGENVECTORS (EigVecR) AND COMPUTE THE ENERGY
  if(NoSt==1) then
     call ERPASYMM1(EigVecR,Eig,ABPLUS,ABMIN,NBasis,NDimX)
-   else 
+   else
     call ERPAVEC(EigVecR,Eig,ABPLUS,ABMIN,NBasis,NDimX)
  endif
 
  if(ICASSCF==1) then
     call ACEneERPA_FOFO(ECorr,EigVecR,Eig,Occ, &
                         IGemIN,IndN,IndX,INActive+NAct, &
-                        NDimX,NBasis,twokfile)
+                        NDimX,NBasis,twokfile,ICholesky)
  else
     call EneERPA_FOFO(ECorr,EigVecR,Eig,Occ,CICoef, &
-                      IGemIN,IndN,NDimX,NELE+NAct,NBasis,'FOFO')         
+                      IGemIN,IndN,NDimX,NELE+NAct,NBasis,'FOFO')
  endif
 
 
 end subroutine ACEInteg_FOFO
 
 subroutine ACEneERPA_FOFO(ECorr,EVec,EVal,Occ,IGem, &
-                          IndN,IndX,NOccup,NDimX,NBasis,IntKFile)
+                          IndN,IndX,NOccup,NDimX,NBasis,IntKFile,ICholesky)
 implicit none
 
 integer,intent(in) :: NDimX,NBasis
 integer,intent(in) :: IGem(NBasis),IndN(2,NDimX),IndX(NDimX)
 integer,intent(in) :: NOccup
+integer,intent(in) :: ICholesky
 character(*),intent(in) :: IntKFile
 double precision,intent(out) :: ECorr
 double precision,intent(in) :: EVec(NDimX,NDimX),EVal(NDimX)
@@ -3951,10 +4141,16 @@ double precision :: Occ(NBasis)
 integer :: i,j,k,l,kl,kk,ip,iq,ir,is,ipq,irs
 integer :: iunit,ISkippedEig
 integer :: pos(NBasis,NBasis)
+integer :: NCholesky
+integer :: iloop,nloop,off
+integer :: dimFO,iBatch,BatchSize
+integer :: MaxBatchSize = 123
+logical :: yes
 logical :: AuxCoeff(3,3,3,3)
 logical,allocatable          :: condition(:)
 double precision             :: CICoef(NBasis),Cpq,Crs,SumY,Aux
 double precision,allocatable :: work(:),ints(:,:),Skipped(:)
+double precision,allocatable :: work1(:,:),MatFF(:,:)
 double precision,allocatable :: tVec(:,:)
 double precision,parameter   :: SmallE = 1.d-3,BigE = 1.d8
 double precision,external    :: ddot
@@ -4003,64 +4199,162 @@ do kk=1,NDimX
    if(condition(kk)) tVec(kk,:) = EVec(:,kk)
 enddo
 
-!$OMP CRITICAL(crit_ACEneERPA_FOFO_1)
-open(newunit=iunit,file=trim(IntKFile),status='OLD', &
-     access='DIRECT',recl=8*NBasis*NOccup)
+if(ICholesky==0) then
 
-kl   = 0
-SumY = 0
-do k=1,NOccup
-   do l=1,NBasis
-      kl = kl + 1
-      if(pos(l,k)/=0) then
-        irs = pos(l,k)
-        ir = l
-        is = k
-        read(iunit,rec=kl) work(1:NBasis*NOccup)
-        do j=1,NOccup
-           do i=1,NBasis
-              ints(i,j) = work((j-1)*NBasis+i)
+   !$OMP CRITICAL(crit_ACEneERPA_FOFO_1)
+   open(newunit=iunit,file=trim(IntKFile),status='OLD', &
+        access='DIRECT',recl=8*NBasis*NOccup)
+
+   kl   = 0
+   SumY = 0
+   do k=1,NOccup
+      do l=1,NBasis
+         kl = kl + 1
+         if(pos(l,k)/=0) then
+           irs = pos(l,k)
+           ir = l
+           is = k
+           read(iunit,rec=kl) work(1:NBasis*NOccup)
+           do j=1,NOccup
+              do i=1,NBasis
+                 ints(i,j) = work((j-1)*NBasis+i)
+              enddo
            enddo
-        enddo
-        ints(:,NOccup+1:NBasis) = 0
+           ints(:,NOccup+1:NBasis) = 0
 
-        do j=1,NBasis
-           do i=1,j
-              if(pos(j,i)/=0) then
-                ipq = pos(j,i)
-                ip = j
-                iq = i
-                Crs = CICoef(l)+CICoef(k)
-                Cpq = CICoef(j)+CICoef(i)
+           do j=1,NBasis
+              do i=1,j
+                 if(pos(j,i)/=0) then
+                   ipq = pos(j,i)
+                   ip = j
+                   iq = i
+                   Crs = CICoef(l)+CICoef(k)
+                   Cpq = CICoef(j)+CICoef(i)
 
-                !if(.not.(IGem(ir).eq.IGem(is).and.IGem(ip).eq.IGem(iq)&
-                !.and.IGem(ir).eq.IGem(ip)).and.ir.gt.is.and.ip.gt.iq) then
-                if(AuxCoeff(IGem(ip),IGem(iq),IGem(ir),IGem(is))) then
+                   !if(.not.(IGem(ir).eq.IGem(is).and.IGem(ip).eq.IGem(iq)&
+                   !.and.IGem(ir).eq.IGem(ip)).and.ir.gt.is.and.ip.gt.iq) then
+                   if(AuxCoeff(IGem(ip),IGem(iq),IGem(ir),IGem(is))) then
 
-                   SumY = ddot(NDimX,tVec(:,ipq),1,tVec(:,irs),1)
+                      SumY = ddot(NDimX,tVec(:,ipq),1,tVec(:,irs),1)
 
-                   Aux = 2*Crs*Cpq*SumY
+                      Aux = 2*Crs*Cpq*SumY
 
-                   if(iq.Eq.is.and.ip.Eq.ir) then
-                      Aux = Aux - Occ(ip)*(1d0-Occ(is))-Occ(is)*(1d0-Occ(ip))
+                      if(iq.Eq.is.and.ip.Eq.ir) then
+                         Aux = Aux - Occ(ip)*(1d0-Occ(is))-Occ(is)*(1d0-Occ(ip))
+                      endif
+
+                      ECorr = ECorr + Aux*ints(j,i)
+
+                   ! endinf of If(IP.Gt.IR.And.IQ.Gt.IS)
                    endif
 
-                   ECorr = ECorr + Aux*ints(j,i)
-
-                ! endinf of If(IP.Gt.IR.And.IQ.Gt.IS)
-                endif
-
-              endif
+                 endif
+              enddo
            enddo
-        enddo
 
-      endif
+         endif
 
+      enddo
    enddo
-enddo
+   !print*, 'ECorr FOFO ',ECorr
 
-close(iunit)
-!$OMP END CRITICAL(crit_ACEneERPA_FOFO_1)
+   close(iunit)
+   !$OMP END CRITICAL(crit_ACEneERPA_FOFO_1)
+
+elseif(ICholesky==1) then
+
+  inquire(file='cholvecs',EXIST=yes)
+  if(.not.yes) stop "cholvecs not found in ACEneERPA_FOFO"
+
+   ! read cholesky (FF|K) vectors
+   open(newunit=iunit,file='cholvecs',form='unformatted')
+   read(iunit) NCholesky
+   allocate(MatFF(NCholesky,NBasis**2))
+   read(iunit) MatFF
+   close(iunit)
+
+   ! set number of loops over integrals
+   dimFO = NOccup*NBasis
+   nloop = (dimFO - 1) / MaxBatchSize + 1
+
+   allocate(work1(dimFO,MaxBatchSize))
+
+   off = 0
+   k   = 0
+   l   = 1
+   SumY = 0
+   ! exchange loop (FO|FO)
+   do iloop=1,nloop
+
+      ! batch size for each iloop; last one is smaller
+      BatchSize = min(MaxBatchSize,dimFO-off)
+
+      ! assemble (FO|BatchSize) batch from CholVecs
+      call dgemm('T','N',dimFO,BatchSize,NCholesky,1d0,MatFF,NCholesky, &
+                 MatFF(:,off+1:BatchSize),NCholesky,0d0,work1,dimFO)
+
+      ! loop over integrals
+      do iBatch=1,BatchSize
+
+         k = k + 1
+         if(k>NBasis) then
+            k = 1
+            l = l + 1
+         endif
+
+         if(pos(k,l)==0) cycle
+         ir = k
+         is = l
+         irs = pos(k,l)
+
+         do j=1,NOccup
+            do i=1,NBasis
+               ints(i,j) = work1((j-1)*NBasis+i,iBatch)
+            enddo
+         enddo
+
+         if(l>NOccup) cycle
+         ints(:,NOccup+1:NBasis) = 0
+
+         do j=1,NBasis
+            do i=1,j
+               if(pos(j,i)/=0) then
+                 ipq = pos(j,i)
+                 ip = j
+                 iq = i
+                 Crs = CICoef(l)+CICoef(k)
+                 Cpq = CICoef(j)+CICoef(i)
+
+                 !if(.not.(IGem(ir).eq.IGem(is).and.IGem(ip).eq.IGem(iq)&
+                 !.and.IGem(ir).eq.IGem(ip)).and.ir.gt.is.and.ip.gt.iq) then
+                 if(AuxCoeff(IGem(ip),IGem(iq),IGem(ir),IGem(is))) then
+
+                    SumY = ddot(NDimX,tVec(:,ipq),1,tVec(:,irs),1)
+
+                    Aux = 2*Crs*Cpq*SumY
+
+                    if(iq.Eq.is.and.ip.Eq.ir) then
+                       Aux = Aux - Occ(ip)*(1d0-Occ(is))-Occ(is)*(1d0-Occ(ip))
+                    endif
+
+                    ECorr = ECorr + Aux*ints(j,i)
+
+                 ! endinf of If(IP.Gt.IR.And.IQ.Gt.IS)
+                 endif
+
+               endif
+            enddo
+         enddo
+
+      enddo ! iBatch
+
+      off = off + MaxBatchSize
+   enddo
+   !print*, 'ECorr Chol ',ECorr
+
+   deallocate(work1,MatFF)
+
+endif
 
 if(ISkippedEig/=0) then
   write(LOUT,'(/,1x,"The number of discarded eigenvalues is",i4)') &

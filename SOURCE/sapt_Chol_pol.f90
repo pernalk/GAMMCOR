@@ -704,11 +704,14 @@ allocate(AB0A(A%NDimX,A%NDimX),AB0B(B%NDimX,B%NDimX))
 
 call FreqGrid(XFreq,WFreq,NFreq)
 
-iterAlgo = IterAlgorithmDIIS(Threshold=1d-3, DIISN=6, maxIterations=20)
+!iterAlgo = IterAlgorithmDIIS(Threshold=1d-3, DIISN=6, maxIterations=20)
+allocate(iterAlgo,SOURCE = IterAlgorithmDIIS(Threshold=1d-3, DIISN=6, maxIterations=20))
 
 if(project) then
-   LambdaCalcA = LambdaCalculatorProjector(A%NDimX,ABPMA,A%Pmat)
-   LambdaCalcB = LambdaCalculatorProjector(B%NDimX,ABPMB,B%Pmat)
+   !LambdaCalcA = LambdaCalculatorProjector(A%NDimX,ABPMA,A%Pmat)
+   !LambdaCalcB = LambdaCalculatorProjector(B%NDimX,ABPMB,B%Pmat)
+   allocate(LambdaCalcA, SOURCE = LambdaCalculatorProjector(A%NDimX,ABPMA,A%Pmat))
+   allocate(LambdaCalcB, SOURCE = LambdaCalculatorProjector(B%NDimX,ABPMB,B%Pmat))
 else
  !  LambdaCalcA = LambdaCalculatorDiag(A%NDimX,ABPMA)
  !  LambdaCalcB = LambdaCalculatorDiag(B%NDimX,ABPMB)
@@ -1119,6 +1122,8 @@ maxIter = 20
 iStatsA%maxIterationsLimit = maxIter
 iStatsB%maxIterationsLimit = maxIter
 
+allocate(LambdaA(nblkA),LambdaB(nblkB))
+
 e2d = 0
 do ifreq=NFreq,1,-1
 
@@ -1319,7 +1324,8 @@ allocate(LambdaA(A%NDimX,A%NDimX),LambdaB(B%NDimX,B%NDimX))
 
 call FreqGrid(XFreq,WFreq,NFreq)
 
-iterAlgo = IterAlgorithmDIIS(Threshold=1d-3, DIISN=6, maxIterations=20)
+!iterAlgo = IterAlgorithmDIIS(Threshold=1d-3, DIISN=6, maxIterations=20)
+allocate(iterAlgo, SOURCE = IterAlgorithmDIIS(Threshold=1d-3, DIISN=6, maxIterations=20))
 
 iStatsA%maxIterationsLimit = iterAlgo%maxIterations
 iStatsB%maxIterationsLimit = iterAlgo%maxIterations
@@ -1538,6 +1544,7 @@ type(EBlockData),allocatable :: A0BlkA(:),A0BlkB(:)
 type(EBlockData)             :: LambdaIVA,LambdaIVB
 type(EBlockData),allocatable :: LambdaA(:),LambdaB(:)
 ! test
+double precision :: ErrMax
 double precision :: Tcpu,Twall
 
 print*, ''
@@ -1707,25 +1714,28 @@ call read_ABPM0Block(A0BlkB,A0BlkIVB,nblkB,'A0BLK_B')
 
 e2d  = 0
 e2du = 0
-do ifreq=NFreq,1,-1
+ErrMax = 0d0
+do ifreq=1,NFreq
 
    OmI = XFreq(ifreq)
+   print*,'OmI', OmI
 
    !if(both) then
 
       ! coupled
+      print*, 'ErrMax', ErrMax
       call C_AlphaExpand(CTildeA,C0TildeA,OmI,Max_Cn,A1A,A2A,ABP0TildeA,ABP1TildeA, &
-                         A0BlkA,A0BlkIVA,nblkA,NCholesky,A%NDimX)
+                         A0BlkA,A0BlkIVA,nblkA,NCholesky,A%NDimX,ErrMax,ifreq)
       call C_AlphaExpand(CTildeB,C0TildeB,OmI,Max_Cn,A1B,A2B,ABP0TildeB,ABP1TildeB, &
-                         A0BlkB,A0BlkIVB,nblkB,NCholesky,B%NDimX)
+                         A0BlkB,A0BlkIVB,nblkB,NCholesky,B%NDimX,ErrMax,ifreq)
 
-      call dgemm('N','N',NCholesky,NCholesky,A%NDimX,1d0,A%DChol,NCholesky,CTildeA,A%NDimX,0d0,CA,NCholesky)
+      call dgemm('T','T',NCholesky,NCholesky,A%NDimX,1d0,CTildeA,A%NDimX,A%DChol,NCholesky,0d0,CA,NCholesky)
       call dgemm('N','N',NCholesky,NCholesky,B%NDimX,1d0,B%DChol,NCholesky,CTildeB,B%NDimX,0d0,CB,NCholesky)
 
       val = 0
       do j=1,NCholesky
          do i=1,NCholesky
-            val = val + CA(j,i)*CB(i,j)
+            val = val + CA(i,j)*CB(i,j)
          enddo
       enddo
 

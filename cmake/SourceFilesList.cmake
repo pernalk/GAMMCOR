@@ -1,12 +1,14 @@
 set(GAMMCOR_SOURCE
     SOURCE/abfofo.f90
     SOURCE/abmats.f90
+    SOURCE/abchol.f90
     SOURCE/accas.f
     SOURCE/ac_exact_2el.f
     SOURCE/acfd.f
     SOURCE/ac_fofo.f90
     SOURCE/ac_iter.f
     SOURCE/caspidft.f
+    SOURCE/CholeskyOTF.f90
     SOURCE/constants.h
     SOURCE/cpdmft.f
     SOURCE/dftacg_pw92c.f

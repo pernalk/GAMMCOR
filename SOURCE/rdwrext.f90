@@ -755,12 +755,18 @@ character(8) :: label
       access='SEQUENTIAL',form='UNFORMATTED')
 
  ntqg = 0
+ nbas = 0
+ offs = 0
  rewind(iunit)
  read(iunit)
  read(iunit) nsym,nbas(1:nsym),offs(1:nsym)
  do irep=1,nsym
     ntqg = ntqg + nbas(irep)**2
  enddo
+
+ !print*, 'ntqg',ntqg,nsym
+ !print*, 'nsym,nbas',nsym,nbas
+ !print*, 'offs     ',offs
 
  allocate(dipx(ntqg),dipy(ntqg),dipz(ntqg))
 
@@ -775,20 +781,26 @@ character(8) :: label
       ictrl = ictrl + 1
       read(iunit) isx
       read(iunit) dipx(1:ntqg)
+!      print*, 'read-dipx',ictrl
    elseif(label=='DIPMOMY ') then
       ictrl = ictrl + 1
       read(iunit) isy
       read(iunit) dipy(1:ntqg)
+!      print*, 'read-dipy',ictrl
    elseif(label=='DIPMOMZ ') then
       ictrl = ictrl + 1
       read(iunit) isz
       read(iunit) dipz(1:ntqg)
+!      print*, 'read-dipz',ictrl
    endif
    if(ictrl==3) exit
  enddo
 
  close(iunit)
 
+ !print*, 'isx',isx
+ !print*, 'isy',isy
+ !print*, 'isz',isz
  !print*, 'dmx',dipx(1:ntqg)
  !print*,''
  !print*, 'dmy',dipy(1:ntqg)
@@ -813,6 +825,7 @@ character(8) :: label
              ij = ij + 1
              !print*, i,j,dipx(ij)
              !mon%dipm(1,offs(isym_p)+i,offs(isym_q)+j) = -1d0*dipx(ij)
+             !print*,isym_p,isym_q,offs(isym_p)+i,offs(isym_q)+j
              matdx(offs(isym_p)+i,offs(isym_q)+j) = -1d0*dipx(ij)
           enddo
        enddo

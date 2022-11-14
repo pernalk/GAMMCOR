@@ -10,6 +10,7 @@ use Cholesky, only : chol_CoulombMatrix, TCholeskyVecs, &
                      chol_Rkab_ExternalBinary, chol_MOTransf_TwoStep
 use basis_sets
 use sys_definitions
+use CholeskyOTF_interface
 use CholeskyOTF, only : TCholeskyVecsOTF
 use Cholesky_driver, only : chol_Rkab_OTF
 
@@ -783,13 +784,22 @@ character(:),allocatable     :: sirfile,sirifile
     allocate(mon%Occ(nbas))
     allocate(OccX(1:norbt))
 
-    open(newunit=iunit,file=sirfile,status='OLD', &
-         access='SEQUENTIAL',form='UNFORMATTED')
+    if (mon%Nact.ge.2) then
 
-    call readlabel(iunit,'NATOCC  ')
-    read(iunit) OccX(1:NORBT)
+      open(newunit=iunit,file=sirfile,status='OLD', &
+           access='SEQUENTIAL',form='UNFORMATTED')
+      call readlabel(iunit,'NATOCC  ')
+      read(iunit) OccX(1:NORBT)
+      close(iunit)
 
-    close(iunit)
+    elseif(mon%NAct.le.1) then
+
+      write(lout,'(/1x,a,i3)') 'Warning! Number of active orbitals = ',mon%NAct
+      write(lout,'(1x,a)') 'Assuming a Hartree-Fock calculation...'
+      OccX(1:mon%INAct) = 2d0
+      OccX(mon%INAct+1:mon%INAct+mon%NAct) = 1d0
+
+    endif
 
     ! save occupations in mon%Occ
     ! order from sym ordering to inact-act (ISW/ISX in Dalton)
@@ -1485,7 +1495,7 @@ integer :: info
      !                      Flags%MemType,Flags%MemVal,NInte1,NBasis, &
      !                      Mon%Jmat,Mon%Kmat)
      call CholeskyOTF_Fock_MO_v2(FockSq,CholeskyVecsOTF,&
-                           AOBasis,System,mon%Monomer, &
+                           AOBasis,System,mon%Monomer,'MOLPRO', &
                            CAOMO,CSAOMO,H0,GammaF, &
                            Flags%MemType,Flags%MemVal,NInte1,NBasis, &
                            Mon%Jmat,Mon%Kmat)
@@ -1784,6 +1794,11 @@ endif
     mon%num0 = mon%InAct
     mon%num1 = mon%NAct
  endif
+
+! some prints
+ print*, 'num0',mon%num0
+ print*, 'num1',mon%num1
+ print*, 'num2',mon%num2
 
 ! active pairs
  allocate(mon%IPair(nbas,nbas),mon%IndX(mon%NDim),mon%IndN(2,mon%NDim))

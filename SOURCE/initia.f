@@ -9,6 +9,7 @@ C
       use types
       use sorter
       use tran
+      use Cholesky
       use read_external
 C
       Implicit Real*8 (A-H,O-Z)
@@ -26,6 +27,9 @@ C
       Character(*) :: BasisSet
 C
       type(FlagsData) :: Flags
+C
+      Type(TCholeskyVecs) :: CholeskyVecs
+      Real*8, Allocatable :: MatFF(:,:)
 C
       Include 'commons.inc'
 C
@@ -101,8 +105,14 @@ C
       Call read2el(TwoEl,UMOAO,NBasis,NInte2)
       Else
 
+      If(ICholesky==0) Then
       MemSrtSize=MemVal*1024_8**MemType
       Call readtwoint(NBasis,1,'AOTWOINT','AOTWOSORT',MemSrtSize)
+      ElseIf(ICholesky==1) Then
+       Call chol_CoulombMatrix(CholeskyVecs,NBasis,'AOTWOINT',1,
+     &                         ICholeskyAccu)
+      NCholesky=CholeskyVecs%NCholesky
+      EndIf
       EndIf
 C
       If(ICASSCF.Eq.0) Then
@@ -179,7 +189,9 @@ C
       ElseIf(ITwoEl.Eq.3) Then
 C     TRANSFORM J AND K
       UAux=transpose(UMOAO)
-c     print*, 'Num0-1',Num0,Num1
+C
+      If (ICholesky==0) Then
+C
       Call tran4_gen(NBasis,
      $        Num0+Num1,UAux(1:NBasis,1:(Num0+Num1)),
      $        Num0+Num1,UAux(1:NBasis,1:(Num0+Num1)),
@@ -193,7 +205,30 @@ c     print*, 'Num0-1',Num0,Num1
      $        Num0+Num1,UAux(1:NBasis,1:(Num0+Num1)),
      $        'FOFO','AOTWOSORT')
 C
-      EndIf
+      ElseIf (ICholesky==1) Then
+C
+      Allocate(MatFF(NCholesky,NBasis**2))
+C
+      If(MemType == 2) then       !MB
+         MemMOTransfMB = MemVal
+      ElseIf(MemType == 3) then   !GB
+         MemMOTransfMB = MemVal * 1024_8
+      Endif
+      Write(LOUT,'(1x,a,i5,a)') 'Using ',MemMOTransfMB,
+     $                          ' MB for 3-indx Cholesky transformation'
+      Call chol_MOTransf_TwoStep(MatFF,CholeskyVecs,
+     $              UAux,1,NBasis,
+     $              UAux,1,NBasis,
+     $              MemMOTransfMB)
+C
+      Open(newunit=iunit,file='cholvecs',form='unformatted')
+      Write(iunit) NCholesky
+      Write(iunit) MatFF
+      Close(iunit)
+      Deallocate(MatFF)
+C
+      EndIf ! ICholesky
+      EndIf ! ITwoEl
 C
       If(ITwoEl.Gt.1) Then
 C     DELETE SORTED AOTWOINTS FOFO
@@ -221,14 +256,13 @@ C
 C
       Return
       End
-
 C
 C     ReadDMRG: VERSION THAT WORKS WITH EUGENE'S INTS (IEugene=1)
 C               IT WORKS WITH ORCA OUTPUTS (IEugene=0)
 C
 *Deck ReadDMRG
       Subroutine ReadDMRG(BasisSet,XKin,XNuc,ENuc,Occ,URe,
-     $ TwoEl,UMOAO,NInte1,NBasis,NInte2,NGem,iORCA)
+     $                    TwoEl,UMOAO,NInte1,NBasis,NInte2,NGem,iORCA)
 C
       use types
       use sorter
@@ -241,6 +275,7 @@ C     binary
 C     on-the-fly
       use basis_sets
       use sys_definitions
+      use CholeskyOTF_interface
       use CholeskyOTF, only : TCholeskyVecsOTF
       use Cholesky_driver, only : chol_Rkab_OTF
 
@@ -361,7 +396,7 @@ C
       If(PC(I).Gt.Zero) NAc=NAc+1
       EndDo
 C
-      NInAc=NELE-Sum+1.D-1
+      NInAc=XELE-Sum+1.D-1
       Do I=1,NInAc+NAc
       If(I.Le.NInAc) Then
       Occ(I)=One
@@ -591,9 +626,6 @@ C
       ElseIf(ICholeskyBIN==1) Then
          Call FockGen_CholR(FockF,CholeskyVecs%R(1:NCholesky,1:NInte1),
      &                      GammaAB,XKin,NInte1,NCholesky,NBasis)
-C
-C     TEST
-      call triang_to_sq2(FockF,WorkSq,NBasis)
 C
       ElseIf(ICholeskyOTF==1) Then
 
@@ -897,13 +929,16 @@ C
 C
 c     Call clock('chol_NOTransf',Tcpu,Twall)
 C
-      Call chol_ints_fofo(NBasis,Num0+Num1,MatFF,
-     $                    NBasis,Num0+Num1,MatFF,
-     $                    NCholesky,NBasis,'FOFO')
-      Call chol_ints_fofo(NBasis,NBasis,MatFF,
-     $                    Num0+Num1,Num0+Num1,MatFF,
-     $                    NCholesky,NBasis,'FFOO')
-
+C
+C      Call chol_ints_fofo(NBasis,Num0+Num1,MatFF,
+C     $                    NBasis,Num0+Num1,MatFF,
+C     $                    NCholesky,NBasis,'FOFO')
+C      Call chol_ints_fofo(NBasis,NBasis,MatFF,
+C     $                    Num0+Num1,Num0+Num1,MatFF,
+C     $                    NCholesky,NBasis,'FFOO')
+C
+      Write(6,'(/," Skipping FOFO/FFOO assembling")')
+C
       open(newunit=iunt,file='cholvecs',form='unformatted')
       write(iunt) NCholesky
       write(iunt) MatFF(1:NCholesky,1:NBasis**2)
@@ -927,7 +962,7 @@ C     READ J AND K AND DUMP TO DISC
       EndDo
 !
       If(ICholesky==1) then
-c      print*, 'use chol_triang_fofo,IUNIT',IUNIT
+      print*, 'use chol_triang_fofo,IUNIT',IUNIT
          call chol_triang_fofo(NBasis,NBasis,
      $                  CholeskyVecs%R(1:NCholesky,1:NInte1),
      $                  Num0+Num1,Num0+Num1,
@@ -1236,6 +1271,7 @@ C     Cholesky binary
 C     Cholesky on-the-fly (OTF)
       use basis_sets
       use sys_definitions
+      use CholeskyOTF_interface
       use CholeskyOTF, only : TCholeskyVecsOTF
       use Cholesky_driver, only : chol_Rkab_OTF, chol_F
 
@@ -1369,6 +1405,14 @@ C
 C     SET TIMING FOR 2-el integrals
       Call clock('START',Tcpu,Twall)
 C
+CCC     bug!!!
+C       If(IRes==1) then
+C          print*, 'RESTART : read NCholesky from file!'
+C          open(newunit=iunit,file='cholvecs',form='unformatted')
+C          read(iunit) NCholesky
+C          close(iunit)
+C       Else
+C
       If(ICholesky==0) Then
 C     memory allocation for sorter
       MemSrtSize=MemVal*1024_8**MemType
@@ -1416,7 +1460,7 @@ C     compute Cholesky vectors OTF
       end block
 C
       EndIf ! CholeskyBIN .OR. CholeskyOTF
-
+C      EndIf ! IRes
       Call clock('2-electron ints',Tcpu,Twall)
 C
 C     LOAD AO TO CAS_MO ORBITAL TRANSFORMATION MATRIX FROM uaomo.dat
@@ -1487,6 +1531,7 @@ C     it may happen that an active orbital has a negative but very small occupat
 C
 C KP 30.07.2020, no need to call read_nact_molpro again
 c      Call read_nact_molpro(nact,'2RDM')
+      ISwitch=0
       If(NAc.Ne.nact) Then
       Write(6,'(1x,"WARNING! The number of partially occ orbitals
      $ different from nact read from molpro. Some active orbitals
@@ -1528,7 +1573,7 @@ C
       Write(6,'(X,I3,E16.6,I6)') I,Occ(I),IGem(I)
       Sum=Sum+Occ(I)
       EndDo
-      Write(6,'(2X,"Sum of Occupancies: ",F5.2)') Sum
+      Write(6,'(2X,"Sum of Occupancies: ",F7.2)') Sum
 C
       NAct=NAcCAS
       INActive=NInAcCAS
@@ -1560,6 +1605,11 @@ C
      $ GammaF(IJ)=Gamma(IndSym(I-NInAc,J-NInAc))
       EndDo
       EndDo
+C
+CCc     bug!
+C       if(IRes==1) then
+C          print*, 'Restart: Skip canonicalization...'
+C       else
 C
 C     FIND CANONICAL INACTIVE AND VIRTUAL ORBITALS
 C
@@ -1815,6 +1865,9 @@ C
 C
 C     END OF CANONICALIZING
 C
+c     endif ! IRes
+C
+C
   543 Continue
 C
 C     If CASPiDFT then skip integral transformation
@@ -1862,6 +1915,12 @@ C      Call dump_CAONO_SAO(CAONO,transpose(UAOMO),SAO,
 C     &               'CAONO.mol',NBasis)
 C      Call test_Smat(SAO,CAONO,transpose(UAOMO),NBasis)
       EndIf
+C      
+      If(IRes.Eq.1) Then
+C      
+      Write(6,'(/," Skipping AO-NO transformation...",/)')
+C      
+      Else ! IRes=0, perform 2-ints transformation
 C
 C     ITwoEl
       If(ITwoEl.Eq.1) Then
@@ -1934,20 +1993,16 @@ C
       EndIf ! Cholesky BIN / OTF
 C
       Call clock('chol_NOTransf',Tcpu,Twall)
-
 C
-c     Call chol_ints_fofo(NBasis,Num0+Num1,MatFF,
-c    $                    NBasis,Num0+Num1,MatFF,
-c    $                    NCholesky,NBasis,'FOFO')
-c     Call chol_ints_fofo(NBasis,NBasis,MatFF,
-c    $                    Num0+Num1,Num0+Num1,MatFF,
-c    $                    NCholesky,NBasis,'FFOO')
-      Call chol_fofo_batch(Num0+Num1,MatFF,Num0+Num1,MatFF,
-     $                     NCholesky,NBasis,'FOFO')
-      Call chol_ffoo_batch(MatFF,Num0+Num1,Num0+Num1,MatFF,
-     $                     NCholesky,NBasis,'FFOO')
+c     Write(6,'(/," Assemble FOFO/FFOO integrals")'
+c     Call chol_fofo_batch(Num0+Num1,MatFF,Num0+Num1,MatFF,
+c    $                     NCholesky,NBasis,'FOFO')
+c     Call chol_ffoo_batch(MatFF,Num0+Num1,Num0+Num1,MatFF,
+c    $                     NCholesky,NBasis,'FFOO')
 C
-      Call clock('chol_FFOOFOFO',Tcpu,Twall)
+      Write(6,'(/," Skipping FOFO/FFOO assembling")')
+C
+C     Call clock('chol_FFOOFOFO',Tcpu,Twall)
 C
 C KP 07.2021: dump MatFF
 C
@@ -1957,7 +2012,7 @@ C
       close(iunit)
       Deallocate(MatFF)
 C
-      EndIf
+      EndIf ! ICholesky
 C     TEST MITHAP
 C      call tran4_full(NBasis,UAux,UAux,'TWOMO','AOTWOSORT')
 C
@@ -1983,8 +2038,13 @@ C
 C
       EndIf
 C
+      EndIf ! IRes
+C
 c     If(IFunSR.Eq.5) Then
       EndIf
+C
+C     test dipole moments
+      Call ComputeDipoleMom(UAOMO,Occ,NOccup,NBasis)
 C
 C     READ ACTIVE 2-RDM AND TRANSFORM TO NO'S
 C
@@ -2074,7 +2134,11 @@ C      ETot=ETot+Hlp
       EndDo
 C
       ElseIf(ITwoEl.eq.3) Then
-      Call TwoEneChck(ETwo,RDM2Act,Occ,INActive,NAct,NBasis)
+      If(ICholesky.eq.0) Then
+         Call TwoEneChck(ETwo,RDM2Act,Occ,INActive,NAct,NBasis)
+      ElseIf(ICholesky.eq.1) Then
+         Call TwoEneChckChol(ETwo,RDM2Act,Occ,INActive,NAct,NBasis)
+      EndIf
       EndIf
 C
       Write(6,'(/,1X,''Two-electron Energy'',5X,F15.8)')ETwo
@@ -2164,304 +2228,6 @@ C
             call chol_Rkpq_OTF(CholeskyVecsOTF, AOBasis, Accuracy)
 
       end subroutine CholeskyOTF_ao_vecs
-
-*Deck CholeskyOTF_Fock_MO_v1
-      Subroutine CholeskyOTF_Fock_MO_v1(F_mo,CholeskyVecsOTF,
-     $                            AOBasis,System,Monomer,
-     $                            Cmat,CSAO,H0in,GammaF,
-     $                            MemType,MemVal,NInte1,NBasis,
-     $                            J_mo,K_mo)
-C
-C     Generate Fock matrix (NBasis,NBasis) in MO basis
-C     from Cholesky OTF vectors
-C     optional :: compute J and K matrices in MO basis
-C
-      use print_units
-      use tran
-      use basis_sets
-      use sys_definitions
-      use Auto2eInterface
-      use CholeskyOTF, only : TCholeskyVecsOTF
-      use Cholesky_driver, only : chol_F
-
-      implicit none
-
-      type(TCholeskyVecsOTF), intent(in) :: CholeskyVecsOTF
-      type(TAOBasis), intent(in)         :: AOBasis
-      type(TSystem), intent(inout)       :: System
-
-      integer,intent(in)          :: Monomer
-      integer,intent(in)          :: NInte1,NBasis
-      integer,intent(in)          :: MemType,MemVal
-      double precision,intent(in) :: H0in(NInte1)
-      double precision,intent(in) :: Cmat(NBasis,NBasis),
-     $                               CSAO(NBasis,NBasis),
-     $                               GammaF(NInte1)
-      double precision,intent(out) :: F_mo(NBasis,NBasis)
-      double precision,optional,intent(out) :: J_mo(NBasis,NBasis)
-      double precision,optional,intent(out) :: K_mo(NBasis,NBasis)
-
-      integer          :: i, j
-      integer          :: MemMOTransfMB
-      double precision :: val, h0norm
-      double precision :: H0tr(NInte1)
-      double precision :: D_mo(NBasis,NBasis), H0_mo(NBasis,NBasis)
-      double precision :: work(NBasis,NBasis)
-      double precision, parameter :: ThreshH0 = 1d-6
-      integer,external :: IndSym
-C
-      write(6,'(/,1x,a,i2)') "Construct Fock matrix, monomer", Monomer
-C
-      ! Read whether to put ghost functions
-      if(Monomer==1) then
-         call sys_Init(System,SYS_MONO_A)
-      elseif(Monomer==2) then
-         call sys_Init(System,SYS_MONO_B)
-      else
-         call sys_Init(System,SYS_TOTAL)
-      endif
-C
-C     transform H0 (in SAO) to MO
-      H0tr = H0in
-      call tran_matTr(H0tr,CSAO,CSAO,NBasis,.true.)
-      call triang_to_sq2(H0tr,H0_mo,NBasis)
-      h0norm = norm2(H0_mo)
-C
-        write(6,*) 'H0   MO (external)'
-        do j=1,NBasis
-           write(LOUT,'(*(f13.8))') (H0_mo(i,j),i=1,NBasis)
-        enddo
-        write(LOUT,'()')
-C
-C     prepare density matrix
-      H0_mo = 0d0
-      D_mo  = 0d0
-      Do J=1,NBasis
-      Do I=1,NBasis
-         D_mo(I,J) = 2d0 * GammaF(IndSym(I,J))
-      EndDo
-      EndDo
-C      write(6,*) 'DMAT MO',norm2(D_mo)
-C      do j=1,NBasis
-C         write(LOUT,'(*(f13.8))') (D_mo(i,j),i=1,NBasis)
-C      enddo
-C      write(LOUT,'()')
-CC
-C        write(6,*) 'CAOMO  '
-C        do j=1,NBasis
-C           write(LOUT,'(*(f13.8))') (Cmat(i,j),i=1,NBasis)
-C        enddo
-C        write(LOUT,'()')
-
-C     set memory for Fock transformation
-      if(MemType == 2) then       !MB
-         MemMOTransfMB = MemVal
-      elseif(MemType == 3) then   !GB
-         MemMOTransfMB = MemVal * 1024_8
-      endif
-C
-      if(present(J_mo) .and. present(K_mo)) then
-c        generate also J_mo and K_mo
-         call chol_F(F_mo,H0_mo,D_mo,Cmat,0.5d0,CholeskyVecsOTF,
-     $            AOBasis,System,ORBITAL_ORDERING_MOLPRO,MemMOTransfMB,
-     $            J_mo,K_mo)
-      else
-         call chol_F(F_mo,H0_mo,D_mo,Cmat,0.5d0,CholeskyVecsOTF,
-     $            AOBasis,System,ORBITAL_ORDERING_MOLPRO,MemMOTransfMB)
-      endif
-C
-        print*, 'FockF w bazie MO -- new'
-        print*, 'Fock = ',norm2(F_mo)
-        do j=1,NBasis
-           write(LOUT,'(*(f13.8))') (F_mo(i,j),i=1,NBasis)
-        enddo
-C
-        print*, 'J mat w bazie MO -- new'
-        print*, 'J mat= ',norm2(J_mo)
-        do j=1,NBasis
-           write(LOUT,'(*(f13.8))') (J_mo(i,j),i=1,NBasis)
-        enddo
-C
-        print*, 'K mat w bazie MO -- new'
-        print*, 'K mat= ',norm2(K_mo)
-        do j=1,NBasis
-           write(LOUT,'(*(f13.8))') (K_mo(i,j),i=1,NBasis)
-        enddo
-C
-       val = norm2(H0_mo)
-       write(6,'(1x,a,f12.6)') "Test H0 norms= ",abs(val)-abs(h0norm)
-C
-      if(abs(val)-abs(h0norm).gt.ThreshH0) then
-        print*, 'Difference in H0 norms = '
-        print*, abs(val)-abs(h0norm)
-        print*, 'Threshold = ',ThreshH0
-        print*, 'Maybe error in geometry / basis set?'
-
-        write(6,*) 'H0   MO (internal)'
-        do j=1,NBasis
-           write(LOUT,'(*(f13.8))') (H0_mo(i,j),i=1,NBasis)
-        enddo
-
-        print*, 'FockF w bazie MO -- new'
-        print*, 'Fock = ',norm2(F_mo)
-        do j=1,NBasis
-           write(LOUT,'(*(f13.8))') (F_mo(i,j),i=1,NBasis)
-        enddo
-
-        stop
-      endif
-
-      End Subroutine CholeskyOTF_Fock_MO_v1
-
-*Deck CholeskyOTF_Fock_MO_v2
-      Subroutine CholeskyOTF_Fock_MO_v2(F_mo,CholeskyVecsOTF,
-     $                            AOBasis,System,Monomer,Source,
-     $                            Cmat,CSAO,H0in,GammaF,
-     $                            MemType,MemVal,NInte1,NBasis,
-     $                            J_mo,K_mo)
-C
-C     Generate Fock matrix (NBasis,NBasis) in MO basis
-C     from Cholesky OTF vectors
-C     optional :: compute J and K matrices in MO basis
-C
-      use print_units
-      use tran
-      use basis_sets
-      use sys_definitions
-      use Auto2eInterface
-      use CholeskyOTF, only : TCholeskyVecsOTF
-      use Cholesky_driver, only : chol_Rkab_OTF, chol_F
-
-      implicit none
-
-      type(TCholeskyVecsOTF), intent(in) :: CholeskyVecsOTF
-      type(TAOBasis), intent(in)         :: AOBasis
-      type(TSystem), intent(inout)       :: System
-
-      integer,intent(in)          :: Monomer
-      character(6),intent(in)     :: Source
-      integer,intent(in)          :: NInte1,NBasis
-      integer,intent(in)          :: MemType,MemVal
-      double precision,intent(in) :: H0in(NInte1)
-      double precision,intent(in) :: Cmat(NBasis,NBasis),
-     $                               CSAO(NBasis,NBasis),
-     $                               GammaF(NInte1)
-      double precision,intent(out)          :: F_mo(NBasis,NBasis)
-      double precision,optional,intent(out) :: J_mo(NBasis,NBasis)
-      double precision,optional,intent(out) :: K_mo(NBasis,NBasis)
-
-      integer          :: i, j
-      integer          :: NCholesky
-      integer          :: ORBITAL_ORDERING
-      integer          :: MemMOTransfMB
-      double precision :: val
-      double precision :: H0tr(NInte1)
-      double precision :: D_mo(NBasis,NBasis), H0_mo(NBasis,NBasis)
-      double precision :: Jtmp(NBasis,NBasis), Ktmp(NBasis,NBasis)
-      double precision :: work(NBasis,NBasis)
-      double precision, allocatable :: ints(:), matFFMO(:,:)
-      double precision, parameter :: ThreshH0 = 1.0d-6
-C
-      integer,external :: IndSym
-      double precision,external :: ddot
-C
-      write(6,'(/,1x,a,i2)') "Construct Fock ver 2, monomer", Monomer
-
-      ! set dimensions
-      NCholesky = CholeskyVecsOTF%NVecs
-
-C     Set orbital ordering
-      print*, 'Source ', trim(Source)
-      if(trim(Source)=='MOLPRO') then
-         ORBITAL_ORDERING = ORBITAL_ORDERING_MOLPRO
-         print*, 'Fock = MOLPRO'
-      elseif(trim(Source)=='ORCA  ') then
-         print*, 'Fock = ORCA'
-         ORBITAL_ORDERING = ORBITAL_ORDERING_ORCA
-      endif
-
-      ! Read whether to put ghost functions
-      if(Monomer==1) then
-         call sys_Init(System,SYS_MONO_A)
-      elseif(Monomer==2) then
-         call sys_Init(System,SYS_MONO_B)
-      else
-         call sys_Init(System,SYS_TOTAL)
-      endif
-
-C     transform H0 (in SAO) to MO
-      H0tr = H0in
-      if(trim(Source)=='MOLPRO') then
-         call tran_matTr(H0tr,CSAO,CSAO,NBasis,.true.)
-         call triang_to_sq2(H0tr,H0_mo,NBasis)
-      elseif(trim(Source)=='ORCA  ') then
-         call triang_to_sq2(H0in,H0_mo,NBasis)
-      endif
-C
-C     prepare density matrix
-      D_mo  = 0d0
-      Do J=1,NBasis
-      Do I=1,NBasis
-         D_mo(I,J) = 2d0 * GammaF(IndSym(I,J))
-      EndDo
-      EndDo
-C
-C     set memory for Fock transformation
-      if(MemType == 2) then       !MB
-         MemMOTransfMB = MemVal
-      elseif(MemType == 3) then   !GB
-         MemMOTransfMB = MemVal * 1024_8
-      endif
-C
-C     transform Cholesky vecs to MO
-      Allocate(MatFFMO(NCholesky,NBasis**2),ints(NBasis**2))
-C
-      Call chol_Rkab_OTF(MatFFMO,Cmat,1,NBasis,Cmat,1,NBasis,
-     $                   MemMOTransfMB,CholeskyVecsOTF,
-     $                   AOBasis,ORBITAL_ORDERING)
-C
-C     construct J and K in MO
-      ints = 0d0
-      Jtmp = 0d0
-      Ktmp = 0d0
-      Do i=1,NCholesky
-         ints(:) = MatFFMO(i,:)
-         val = ddot(NBasis**2,ints,1,D_mo,1)
-         Call daxpy(NBasis**2,2d0*val,ints,1,Jtmp,1)
-         Call dgemm('N','N',NBasis,NBasis,NBasis,1d0,ints,NBasis,
-     $              D_mo,NBasis,0d0,work,NBasis)
-         Call dgemm('N','N',NBasis,NBasis,NBasis,-1d0,work,NBasis,
-     $              ints,NBasis,1d0,Ktmp,NBasis)
-      EndDo
-C
-      F_mo = Jtmp + Ktmp
-      F_mo = H0_mo + 0.5d0*F_mo
-C
-C     return J and K in MO upon request
-C      If(present(J_mo).and.present(K_mo)) then
-C         J_mo = 0.5d0*Jtmp
-C         K_mo = 0.5d0*Ktmp
-C      EndIf
-C
-C        print*, 'Fock in MO basis'
-C        print*, 'Fock = ',norm2(F_mo)
-C        do j=1,NBasis
-C           write(LOUT,'(*(f13.8))') (F_mo(i,j),i=1,NBasis)
-C        enddo
-CC
-C        print*, 'J_mo = ',norm2(Jtmp)
-C        do j=1,NBasis
-C           write(LOUT,'(*(f13.8))') (Jtmp(i,j),i=1,NBasis)
-C        enddo
-CC
-C        print*, 'K_mo = ',norm2(Ktmp)
-C        do j=1,NBasis
-C           write(LOUT,'(*(f13.8))') (Ktmp(i,j),i=1,NBasis)
-C        enddo
-C
-      Deallocate(MatFFMO,ints)
-C
-      End Subroutine CholeskyOTF_Fock_MO_v2
 
 *Deck DimSym
       Subroutine DimSym(NBasis,NInte1,NInte2,MxHVec,MaxXV)
@@ -4047,6 +3813,108 @@ C
       Deallocate(RDM2val)
 C
       end subroutine TwoEneChck
+
+      subroutine TwoEneChckChol(ETwo,RDM2Act,Occ,INActive,NAct,NBasis)
+C
+C     calculate 2-electron energy using Cholesky vectors
+C     maybe better to have MatOO and save on the transformation?
+C
+      Implicit Real*8 (A-H,O-Z)
+C
+      Include 'commons.inc'
+C
+      Parameter(Zero=0.D0,Half=0.5D0,One=1.D0,Two=2.D0)
+C
+      Integer INActive,NAct,NBasis
+      Double Precision ETwo
+      Dimension Occ(NBasis),RDM2Act(NAct**2*(NAct**2+1)/2)
+C
+C     LOCAL ARRAYS
+C
+      Integer iloop,nloop,off
+      Integer dimFO,iBatch,BatchSize
+      Integer Ind(NBasis)
+      Double Precision, Allocatable :: RDM2val(:,:,:,:),
+     $                                 work1(:,:),work2(:,:),
+     $                                 ints(:,:),MatFF(:,:)
+      Parameter(MaxBatchSize = 100)
+C
+c     SET FILES
+      Open(newunit=iunit,file='cholvecs',form='unformatted')
+      Read(iunit) NCholesky
+      Allocate(MatFF(NCholesky,NBasis**2))
+      Read(iunit) MatFF
+      Close(iunit)
+C
+C     SET DIMENSIONS
+      NOccup=NAct+INActive
+      Ind=0
+      Do I=1,NAct
+      Ind(INActive+I)=I
+      EndDo
+C
+      Allocate(ints(NBasis,NBasis))
+      Allocate(RDM2val(NOccup,NOccup,NOccup,NOccup))
+C
+      Do L=1,NOccup
+      Do K=1,NOccup
+      Do J=1,NOccup
+      Do I=1,NOccup
+      RDM2val(I,J,K,L) = FRDM2(I,K,J,L,RDM2Act,Occ,Ind,NAct,NBasis)
+      EndDo
+      EndDo
+      EndDo
+      EndDo
+C
+      dimFO = NBasis*NOccup
+      nloop = (dimFO - 1) / MaxBatchSize + 1
+C
+      Allocate(work1(dimFO,MaxBatchSize))
+C
+      ETwo=0
+C     EXCHANGE LOOP (FO|FO), use only (OO|OO)
+      off = 0
+      k   = 0
+      l   = 1
+      Do iloop=1,nloop
+
+      ! batch size for each iloop; last one is smaller
+      BatchSize = min(MaxBatchSize,dimFO-off)
+C
+      ! assemble (FO|BatchSize) batch from CholVecs
+      Call dgemm('T','N',dimFO,BatchSize,NCholesky,1d0,
+     $           MatFF,NCholesky,MatFF(:,off+1:BatchSize),NCholesky,
+     $           0d0,work1,dimFO)
+C
+      Do iBatch=1,BatchSize
+
+      k = k + 1
+      if(k>NBasis) then
+         k = 1
+         l = l + 1
+      endif
+
+      do j=1,NOccup
+         do i=1,NBasis
+            ints(i,j) = work1((j-1)*NBasis+i,iBatch)
+         enddo
+      enddo
+C
+      if(k>NOccup) cycle
+C
+       ETwo = ETwo + sum(RDM2val(:,:,k,l)*ints(1:NOccup,1:NOccup))
+C
+      EndDo
+C
+      off = off + MaxBatchSize
+C
+      EndDo
+C
+      Deallocate(ints,MatFF)
+      Deallocate(work1)
+      Deallocate(RDM2val)
+C
+      end subroutine TwoEneChckChol
 
       subroutine TwoEneGVBChck(ETwo,Occ,NOccup,NBasis)
       Implicit Real*8 (A-H,O-Z)

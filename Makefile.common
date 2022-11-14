@@ -15,6 +15,7 @@ OBJ = $(O)mainp.o $(O)initia.o $(O)dmscf.o $(O)misc.o $(O)optocc.o \
       $(O)priunit.o $(O)rdwrext.o \
       $(O)types.o $(O)blocktypes.o \
       $(O)inputfill.o $(O)abmats.o $(O)abfofo.o $(O)ab0fofo.o \
+      $(O)abchol.o \
       $(O)sapt_main.o $(O)sapt_exch.o $(O)sapt_pol.o $(O)sapt_utils.o \
       $(O)sapt_response.o $(O)sapt_interface.o \
       $(O)sapt_Chol_pol.o $(O)sapt_Chol_exch.o \
@@ -23,7 +24,7 @@ OBJ = $(O)mainp.o $(O)initia.o $(O)dmscf.o $(O)misc.o $(O)optocc.o \
       $(O)timing.o \
       $(O)srlrdynamic.o $(O)erpa.o $(O)interpa.o  $(O)exact2el.o $(O)optapsg.o $(O)newton.o $(O)acfd.o $(O)accas.o \
       $(O)caspidft.o $(O)ac_exact_2el.o $(O)vv10.o \
-      $(O)tran_Chol.o \
+      $(O)tran_Chol.o $(O)CholeskyOTF.o \
 	   $(O)iter_stats.o $(O)C_integrator.o $(O)iter_algorithm.o $(O)iter_algorithm_diis.o $(O)iter_algorithm_damping.o \
       $(O)lambda_calculator.o $(O)lambda_calculator_diag.o $(O)lambda_calculator_block.o $(O)lambda_calculator_projector.o \
       $(O)ac_iter.o $(O)ac_fofo.o \
@@ -34,7 +35,8 @@ $(PROG) :  $(OBJ)
 	$(FCC) $(FFLAGS) -o $(PROG) $(OBJ) $(LIBS)
 $(O)mainp.o : $(S)mainp.f $(S)commons.inc $(O)types.o $(O)inputfill.o $(O)systemdef.o $(O)sapt_main.o $(O)git_info.o $(O)build_info.o
 	$(FCC) $(FFLAGS)  -c $(S)mainp.f -o $(O)mainp.o
-$(O)initia.o : $(S)initia.f $(S)commons.inc $(O)priunit.o $(O)types.o $(O)sorter.o $(O)tran.o $(O)abmats.o $(O)rdwrext.o $(O)timing.o
+$(O)initia.o : $(S)initia.f $(S)commons.inc $(O)priunit.o $(O)types.o $(O)sorter.o \
+               $(O)tran.o $(O)abmats.o $(O)rdwrext.o $(O)timing.o $(O)CholeskyOTF.o
 	$(FCC) $(FFLAGS)  -c $(S)initia.f -o $(O)initia.o 
 $(O)git_info.o : $(S)git_info.f90
 	$(FCC) $(FFLAGS)  -c $(S)git_info.f90 -o $(O)git_info.o
@@ -125,14 +127,18 @@ $(O)tran.o : $(S)tran.f90 $(O)blocktypes.o $(O)sorter.o
 	$(FCC) $(FFLAGS)  -c $(S)tran.f90 -o $(O)tran.o
 $(O)tran_Chol.o : $(S)tran_Chol.f90 $(O)tran.o
 	$(FCC) $(FFLAGS)  -c $(S)tran_Chol.f90 -o $(O)tran_Chol.o
+$(O)CholeskyOTF.o : $(S)CholeskyOTF.f90 $(O)tran.o $(O)priunit.o
+	$(FCC) $(FFLAGS)  -c $(S)CholeskyOTF.f90 -o $(O)CholeskyOTF.o
 $(O)diis.o : $(S)diis.f90 $(O)priunit.o
 	$(FCC) $(FFLAGS)  -c $(S)diis.f90 -o $(O)diis.o
 $(O)abmats.o : $(S)abmats.f90 $(O)priunit.o $(O)tran.o
 	$(FCC) $(FFLAGS)  -c $(S)abmats.f90 -o $(O)abmats.o
-$(O)abfofo.o : $(S)abfofo.f90 $(O)blocktypes.o $(O)priunit.o $(O)tran.o
+$(O)abfofo.o : $(S)abfofo.f90 $(O)abchol.o $(O)blocktypes.o $(O)priunit.o $(O)tran.o
 	$(FCC) $(FFLAGS)  -c $(S)abfofo.f90 -o $(O)abfofo.o
 $(O)ab0fofo.o : $(S)ab0fofo.f90 $(O)priunit.o $(O)blocktypes.o $(O)tran.o $(O)abfofo.o
 	$(FCC) $(FFLAGS)  -c $(S)ab0fofo.f90 -o $(O)ab0fofo.o
+$(O)abchol.o : $(S)abchol.f90
+	$(FCC) $(FFLAGS)  -c $(S)abchol.f90 -o $(O)abchol.o
 $(O)srefex.o : $(S)srefex.f90 $(O)types.o $(O)exmisc.o
 	$(FCC) $(FFLAGS)  -c $(S)srefex.f90 -o $(O)srefex.o
 $(O)exi.o : $(S)exi.f90
@@ -149,7 +155,8 @@ $(O)sapt_main.o : $(S)sapt_main.f90 $(O)types.o \
                   $(O)sapt_response.o $(O)sapt_interface.o
 	$(FCC) $(FFLAGS)  -c $(S)sapt_main.f90 -o $(O)sapt_main.o
 $(O)sapt_interface.o : $(S)sapt_interface.f90 $(O)types.o $(O)timing.o \
-                  $(O)sorter.o $(O)tran.o $(O)abmats.o $(O)rdwrext.o
+                  $(O)sorter.o $(O)tran.o $(O)abmats.o $(O)rdwrext.o \
+                  $(O)CholeskyOTF.o
 	$(FCC) $(FFLAGS)  -c $(S)sapt_interface.f90 -o $(O)sapt_interface.o
 $(O)sapt_response.o : $(S)sapt_response.f90 $(O)types.o $(O)tran.o $(O)abmats.o $(O)abfofo.o $(O)ab0fofo.o \
                   $(O)sapt_utils.o $(O)timing.o
