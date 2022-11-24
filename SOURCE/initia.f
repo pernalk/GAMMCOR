@@ -1766,7 +1766,7 @@ C     $                          MemType,MemVal,NInte1,NBasis,
 C     $                          JMO,KMO)
 C
            Call CholeskyOTF_Fock_MO_v2(work1,CholeskyVecsOTF,
-     $                          AOBasis,System,Monomer,'MOLRPO',
+     $                          AOBasis,System,Monomer,'MOLPRO',
      $                          CAOMO,CSAOMO,XKin,GammaF,
      $                          MemType,MemVal,NInte1,NBasis)
 C
