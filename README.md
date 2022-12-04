@@ -1,5 +1,5 @@
 # GAMMCOR
-Authors: Kasia Pernal and Michal Hapka
+Authors: Kasia Pernal, Michal Hapka, Marcin Modrzejewski, Adam Sokół, Aleksandra Tucholska
 
 ## Installation
 #### 1. Clone the repository
