@@ -34,6 +34,7 @@ integer, parameter :: JOB_TYPE_RESPONSE    = 17
 integer, parameter :: SAPTLEVEL0 = 0
 integer, parameter :: SAPTLEVEL1 = 1
 integer, parameter :: SAPTLEVEL2 = 2
+integer, parameter :: FLAG_dSRS  = 0
 
 integer, parameter :: FLAG_CORE = 1
 integer, parameter :: FLAG_NOBASIS = 0
@@ -116,6 +117,7 @@ type CalculationBlock
       integer :: Core      = FLAG_CORE
       integer :: SymType   = TYPE_NO_SYM
       integer :: SaptLevel = SAPTLEVEL2
+      integer :: dSRS      = FLAG_dSRS
       integer :: vdWCoef   = 0
       integer :: RedVirt   = FLAG_REDVIRT
       integer :: MemVal = 2, MemType = 3 ! default: use 2 GB for 3-ind_tran (Cholesky)
@@ -275,6 +277,7 @@ type FlagsData
      integer :: ISERPA  = 0
      integer :: ITrpl   = 0
      integer :: ISAPT   = 0
+     integer :: IdSRS   = 0
      integer :: SaptLevel = 0
      integer :: ISHF      = 0
      character(:), allocatable :: JobTitle

@@ -55,6 +55,9 @@ double precision :: Tcpu,Twall
  ! SAPT components
  write(LOUT,'()')
 
+ ! switch to dSRS
+ if(Flags%IdSRS==1) call sapt_dSRS(Flags,SAPT,Tcpu,TWall,NBasis)
+
  ! switch to Cholesky SAPT
  if(Flags%ICholesky==1) call sapt_Cholesky(Flags,SAPT,Tcpu,TWall,NBasis)
 
@@ -232,6 +235,28 @@ logical          :: onlyDisp
  stop
 
 end subroutine sapt_driver_red
+
+subroutine sapt_dSRS(Flags,SAPT,Tcpu,Twall,NBasis)
+!
+! sapt driver for degenerate SRS
+! Flags%IdSRS==1
+!
+implicit none
+
+type(FlagsData)    :: Flags
+type(SaptData)     :: SAPT
+integer,intent(in) :: NBasis
+double precision,intent(inout) :: Tcpu,Twall
+
+ write(LOUT,'(1x,a)') 'Degenerate SAPT(MC)'
+
+ print*, 'nothing here yet -- quitting...'
+
+ call clock('SAPT',Tcpu,Twall)
+
+ stop
+
+end subroutine sapt_dSRS
 
 subroutine sapt_Cholesky(Flags,SAPT,Tcpu,Twall,NBasis)
 !

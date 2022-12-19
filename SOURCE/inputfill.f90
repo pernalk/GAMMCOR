@@ -458,10 +458,17 @@ subroutine read_block_calculation(CalcParams, line)
               CalcParams%SaptLevel = 10
            elseif (uppercase(val) == "RS".or. &
                    uppercase(val) == "RSPT2") then
+              ! for SAPT with Cholesky: only 2nd order RS
               CalcParams%SaptLevel = 999
            elseif (uppercase(val) == "RS+".or. &
                    uppercase(val) == "RSPT2+") then
+              ! for SAPT with Cholesky: 2nd order RS
+              !                         + 1st order exch
               CalcParams%SaptLevel = 666
+           elseif (uppercase(val) == "DSRS" ) then
+              ! set degenerate SAPT calculation
+              CalcParams%SaptLevel = SAPTLEVEL0
+              CalcParams%dSRS     = 1
            endif
 
       case("RESTART")

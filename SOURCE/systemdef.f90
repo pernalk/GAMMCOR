@@ -318,6 +318,9 @@ else
      Flags%IFlAC  = 0
      Flags%IFlSnd = 0
 
+     ! set a degenerate SAPT job
+     Flags%IdSRS = Input%CalcParams%dSRS
+
      ! Response for SAPT
      select case(Input%CalcParams%Response)
      case(RESP_ERPA)
