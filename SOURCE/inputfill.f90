@@ -47,7 +47,7 @@ integer :: imon
  ! check monomers
  select case(Input%CalcParams%JobType)
  ! SAPT case
- case(5)
+ case(5,18)
 
     current_block = block_none
     isys = 0
@@ -290,6 +290,9 @@ subroutine read_block_calculation(CalcParams, line)
                CalcParams%JobType = JOB_TYPE_EERPA_OLD
            elseif (uppercase(val) == "SAPT" ) then
                CalcParams%JobType = JOB_TYPE_SAPT
+           elseif (uppercase(val) == "dSRS") then
+               CalcParams%JobType = JOB_TYPE_DSRS
+               print*, 'here?'
            elseif (uppercase(val) == "PDFT" ) then
                CalcParams%JobType = JOB_TYPE_PDFT
            elseif (uppercase(val) == "CASPIDFT" ) then
@@ -465,10 +468,6 @@ subroutine read_block_calculation(CalcParams, line)
               ! for SAPT with Cholesky: 2nd order RS
               !                         + 1st order exch
               CalcParams%SaptLevel = 666
-           elseif (uppercase(val) == "DSRS" ) then
-              ! set degenerate SAPT calculation
-              CalcParams%SaptLevel = SAPTLEVEL0
-              CalcParams%dSRS     = 1
            endif
 
       case("RESTART")
@@ -716,8 +715,11 @@ character(:), allocatable :: key, val
  call split(line, key, val)
  select case (uppercase(key))
   case ("JOBTYPE")
-      if (uppercase(val) == "SAPT" ) then
+      if (uppercase(val) == "SAPT") then
           CalcParams%JobType = JOB_TYPE_SAPT
+          CalcParams%imon = 2
+      elseif (uppercase(val) == "DSAPT" .or. uppercase(val) == "DSRS") then
+          CalcParams%JobType = JOB_TYPE_DSRS
           CalcParams%imon = 2
       endif
  end select
@@ -960,13 +962,13 @@ end associate
                  (Input%Flags%IFl12)
      write(LOUT, '(1x,a,6x,i3)') "ISAPT   ", &
                  (Input%Flags%ISAPT)
+     write(LOUT, '(1x,a,6x,i3)') "IdSRS   ", &
+                 (Input%Flags%IdSRS)
  endif
 
 write(LOUT,'()')
 
 end subroutine print_Input
-
-
 
 subroutine read_memsrt(val,MemVal,MemType)
 

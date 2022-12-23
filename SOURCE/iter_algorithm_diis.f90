@@ -87,7 +87,7 @@ module class_IterAlgorithmDIIS
             class(IterAlgorithmDIIS) :: this
             character(:), allocatable :: res
             character(200) :: buffer
-            write(buffer, "(a, i0, a, e6.1e1, a, i0, a)") &
+            write(buffer, "(a, i0, a, e7.1e1, a, i0, a)") &
                 "{DIISN: ", this%DIISN, ", Threshold: ", this%Threshold, ", maxIterations: ", this%maxIterations, "}"
             res = trim(buffer)
 
@@ -99,7 +99,7 @@ module class_IterAlgorithmDIIS
             implicit none
             class(IterAlgorithmDIIS) :: this
             character(50), intent(out) :: fileName
-            write(fileName, "(a, i0, a, e6.1e1)") 'diis_n', this%DIISN, '_t', this%Threshold
+            write(fileName, "(a, i0, a, e7.1e1)") 'diis_n', this%DIISN, '_t', this%Threshold
 
         end subroutine toString
 

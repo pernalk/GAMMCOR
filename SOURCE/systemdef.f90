@@ -318,8 +318,11 @@ else
      Flags%IFlAC  = 0
      Flags%IFlSnd = 0
 
-     ! set a degenerate SAPT job
-     Flags%IdSRS = Input%CalcParams%dSRS
+  case(JOB_TYPE_DSRS)
+     Flags%ISAPT  = 1
+     Flags%IdSRS  = 1
+     Flags%IFlAC  = 0
+     Flags%IFlSnd = 0
 
      ! Response for SAPT
      select case(Input%CalcParams%Response)
@@ -781,6 +784,8 @@ write(LOUT, '(1x,a,6x,i3)') "IFl12   ", &
               (Flags%IFl12)
 write(LOUT, '(1x,a,6x,i3)') "ISAPT   ", &
               (Flags%ISAPT)
+write(LOUT, '(1x,a,6x,i3)') "IdSRS   ", &
+              (Flags%IdSRS)
 
 end subroutine print_Flags
 
