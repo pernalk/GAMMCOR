@@ -5,6 +5,7 @@ use timing
 use sapt_inter
 use sapt_resp
 use sapt_pol
+use sapt_dRS
 use sapt_Chol_pol
 use sapt_Chol_exch
 use sapt_exch
@@ -251,6 +252,8 @@ double precision,intent(inout) :: Tcpu,Twall
  write(LOUT,'(1x,a)') 'Degenerate SAPT(MC)'
 
  print*, 'nothing here yet -- quitting...'
+
+ call elst_dRS(SAPT%monA,SAPT%monB,SAPT)
 
  call clock('SAPT',Tcpu,Twall)
 

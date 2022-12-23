@@ -224,6 +224,9 @@ type SystemBlock
       double precision,allocatable :: VCoul(:)
       double precision,allocatable :: RDM2(:)
       double precision,allocatable :: RDM2val(:,:,:,:)
+      ! rdm1 and trdm1 in NOs: rdm1(nstates,NBasis),
+      !                        trdm1(nstates,NBasis,NBasis)
+      double precision,allocatable :: rdm1(:,:),trdm1(:,:,:)
       double precision,allocatable :: Fmat(:,:) 
       double precision,allocatable :: dipm(:,:,:)
       double precision,allocatable :: Eig(:),EigX(:),EigY(:)

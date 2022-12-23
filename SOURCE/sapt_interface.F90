@@ -1,3 +1,5 @@
+#define SAPT_INTERFACE_DEBUG -1
+
 module sapt_inter
 
 use types
@@ -103,6 +105,12 @@ double precision :: Tcpu,Twall
     call readocc_molpro(NBasis,SAPT%monB,AuxB,OneRdmB,Flags)
  endif
  call print_occ(NBasis,SAPT,Flags%ICASSCF)
+
+ ! dSRS: read 1rdms, 1trdms
+ if(Flags%IdSRS==1) then
+    call read_1rdm_1trdm_molpro(NBasis,SAPT%monA)
+    !call read_1rdm_1trdm_molpro(NBasis,SAPT%monB)
+ endif
 
 ! read orbitals
 ! norb.leq.nbas, orbitals mays be deleted due to linear
@@ -274,6 +282,8 @@ double precision :: Tcpu,Twall
  if(SAPT%InterfaceType==2) then
     deallocate(OneRdmB,OneRdmA,AuxB,AuxA)
  endif
+
+stop "testing dSRS!"
 
 end subroutine sapt_interface
 
@@ -574,7 +584,7 @@ character(:),allocatable :: rdmfile
  call Diag8(OrbAux,NBasis,NBasis,Eval,work)
 ! KP : it may happen that an active orbital has a negative tiny occupation. set it to a positive
  do i=1,Nbasis
- Eval(i)=Abs(Eval(i))
+    Eval(i)=Abs(Eval(i))
  enddo
 ! call dsyev('V','U',NBasis,OrbAux,NBasis,EVal,work,3*NBasis,info)
  call SortOcc(EVal,OrbAux,NBasis)
@@ -637,6 +647,179 @@ character(:),allocatable :: rdmfile
  deallocate(EVal,work)
 
 end subroutine readocc_molpro
+
+subroutine read_1rdm_1trdm_molpro(NBasis,mon)
+!
+! a) read all 1-rdms,  transform to NO of RefState, and store in mon%rdm1(nstates)
+! b) read all 1-trdms, transform to NO of RefState, and store in mon%Trdm1(nstates*(nstates-1)/2)
+!
+implicit none
+
+integer,intent(in) :: NBasis
+type(SystemBlock)  :: mon
+
+integer                  :: i,j,ist,irr,ibra,iket,itr,nnstates,nstates
+integer                  :: ntIrrep,nIrrep,NumStSym(16)
+integer                  :: RefState
+integer                  :: NOccup,HlpDim
+double precision         :: AuxSq(NBasis,NBasis),AuxTr(NBasis*(NBasis+1)/2)
+double precision         :: EVal(NBasis)
+double precision,allocatable :: AuxRDM(:,:,:),CMONO(:,:,:)
+double precision,allocatable :: work(:)
+character(:),allocatable :: mname
+character(:),allocatable :: rdmfile
+
+if(Mon%Monomer==1) then
+  rdmfile = '2RDMA'
+  mname   = 'A'
+elseif(Mon%Monomer==2) then
+  rdmfile = '2RDMB'
+  mname   = 'B'
+endif
+
+if(mon%Monomer==1) then
+  write(lout,'(1x,a)') "Monomer A:"
+elseif(mon%Monomer==2) then
+  write(lout,'(1x,a)') "Monomer B:"
+endif
+
+! set reference state
+if (Mon%InSt(1,1) > 0) then
+   RefState = Mon%InSt(1,1)
+else
+   RefState = 1
+endif
+
+HlpDim = max(NBasis**2,3*NBasis)
+NOccup = Mon%INAct + Mon%NAct
+
+! get the number of states
+call read_nstates_molpro(rdmfile,nTIrrep,nIrrep,NumStSym)
+
+nstates  = sum(NumStSym(1:nIrrep))
+nnstates = nstates*(nstates-1)/2
+
+write(lout,'(1x,a,i3)') 'The number of states from SA-CAS:',nstates
+write(lout,'(1x,a,i3,/)') 'Reference state for dSRS        :',RefState
+
+! in Molpro 1-TRDMs are only available for states of the same symmetry
+if(nTIrrep>1) stop "dSRS does not work with symmetry (Molpro)!"
+
+! read all all 1-RDMs in MO and transform to NOs
+allocate(AuxRDM(nstates,NBasis,NBasis),CMONO(nstates,NBasis,NBasis))
+allocate(Mon%rdm1(nstates,NBasis))
+allocate(work(HlpDim))
+
+AuxRDM = 0d0
+CMONO  = 0d0
+irr = 1 ! always assume C1 point group
+do ist=1,nstates
+
+   call read_1rdm_molpro(AuxTr,ist,irr,Mon%ISpinMs2,rdmfile,Mon%IWarn,NBasis)
+   call triang_to_sq2(AuxTr,AuxRDM(ist,:,:),NBasis)
+   call Diag8(AuxRDM(ist,1:Mon%NAct,1:Mon%NAct),Mon%NAct,Mon%NAct,EVal,work)
+   EVal(1:NBasis)=Abs(EVal(1:NBasis))
+
+   !print*,'before Sort'
+   !do j=1,Mon%NAct
+   !   write(lout,'(*(f12.6))') (AuxRDM(ist,i,j),i=1,Mon%NAct)
+   !enddo
+
+   call SortOcc(EVal,AuxRDM(ist,1:Mon%NAct,1:Mon%NAct),Mon%NAct)
+
+   !print*,'after Sort'
+   !do j=1,Mon%NAct
+   !   write(lout,'(*(f12.6))') (AuxRDM(ist,i,j),i=1,Mon%NAct)
+   !enddo
+
+   CMONO(ist,:,:) = transpose(AuxRDM(ist,:,:))
+
+   ! save occupation numbers == 1-RDMs
+   Mon%rdm1(ist,:) = 0d0
+   do i=1,NOccup
+      if(i<=Mon%INAct) then
+         Mon%rdm1(ist,i) = 1.d0
+      else
+         Mon%rdm1(ist,i) = EVal(i-Mon%INAct)
+      endif
+   enddo
+
+   ! expand MO --> NO from NAct to NOccup
+   AuxSq = CMONO(ist,:,:)
+   CMONO(ist,:,:) = 0d0
+   do i=1,Mon%INAct
+      CMONO(ist,i,i) = 1d0
+   enddo
+   do j=1,Mon%NAct
+      do i=1,Mon%NAct
+         CMONO(ist,Mon%INAct+i,Mon%INAct+j) = AuxSq(i,j)
+      enddo
+   enddo
+
+#if SAPT_INTERFACE_DEBUG > 3
+   print*, 'Occupation numbers, istate',ist
+   do i=1,NOccup
+      write(lout,'(1x,f12.6)') Mon%rdm1(ist,i)
+   enddo
+   print*, 'CMONO, istate=',ist
+   do j=1,NOccup
+      write(lout,'(*(f12.6))') (CMONO(ist,i,j),i=1,NOccup)
+   enddo
+#endif
+
+enddo
+deallocate(AuxRDM)
+
+! read all 1-TRDMs and transform to NOs
+! of the reference state
+allocate(Mon%trdm1(nnstates,NBasis,NBasis))
+allocate(AuxRDM(nnstates,NBasis,NBasis))
+
+AuxRDM    = 0d0
+Mon%trdm1 = 0d0
+itr = 0
+do iket=1,nstates
+   do ibra=1,iket-1
+
+      itr = itr + 1
+
+      call read_1trdm_molpro(AuxSq,ibra,iket,rdmfile,NBasis)
+
+      ! expand to NOccup
+      do j=1,Mon%NAct
+         do i=1,Mon%NAct
+            AuxRDM(itr,Mon%INAct+i,Mon%INAct+j) = AuxSq(i,j)
+         enddo
+      enddo
+
+#if SAPT_INTERFACE_DEBUG > 3
+      print*, '1-TRDM MO ='
+      do j=1,NOccup
+         write(lout,'(*(f12.6))') (AuxRDM(itr,i,j),i=1,NOccup)
+      enddo
+
+      print*, 'CMONO, RefState=',RefState
+      do j=1,NOccup
+         write(lout,'(*(f12.6))') (CMONO(RefState,j,i),i=1,NOccup)
+      enddo
+
+      call tran2MO(AuxRDM(itr,:,:),CMONO(RefState,:,:),CMONO(RefState,:,:), &
+                   Mon%trdm1(itr,:,:),NBasis)
+
+      print*, '1-TRDM NO, RefState = ',RefState
+      do j=1,NOccup
+         write(lout,'(*(f12.6))') (Mon%trdm1(itr,i,j),i=1,NOccup)
+      enddo
+#endif
+
+   enddo
+enddo
+
+deallocate(AuxRDM)
+deallocate(CMONO)
+deallocate(work)
+
+end subroutine read_1rdm_1trdm_molpro
 
 subroutine readocc_cas_siri(mon,nbas,noSiri)
 !

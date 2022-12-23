@@ -737,6 +737,46 @@ double precision ::tmp(nbasis**2)
 
 end subroutine read_sym_molpro
 
+subroutine read_nstates_molpro(rdmfile,ntirrep,nirrep,nstats)
+!
+! Purpose: reads number of states in each irrep
+!          ntirrep : total number of irreps in a given group
+!          nirrep  : number of nonzero irreps
+!          nstats  : how many states in those irreps
+!
+implicit none
+
+character(*)        :: rdmfile
+integer,intent(out) :: ntirrep,nirrep,nstats(16)
+
+integer      :: ifile,ios
+integer      :: NStSym
+integer :: istsy(16)
+character(8) :: label
+
+open(newunit=ifile,file=rdmfile,access='sequential',&
+     form='unformatted',status='old')
+
+nstats = 0
+do
+  read(ifile,iostat=ios) label
+   if(ios<0) then
+     write(6,*) 'ERROR!!! LABEL BASINFO not found!'
+     stop
+  endif
+  if(label=='BASINFO ') then
+     read(ifile) ntirrep
+     read(ifile) nirrep
+     read(ifile) nstats(1:nirrep)
+!     read(ifile) istsy(1:NStSym)
+     exit
+  endif
+enddo
+
+close(ifile)
+
+end subroutine read_nstates_molpro
+
 subroutine sym_inf_molpro(infile,NumOSym,NSym,nstats,istsy,NStSym,NSymAO,NBasis)
 !
 ! Purpose: reads number of irreps (NSym)
@@ -788,6 +828,8 @@ do i=1,Nsym
       NSymAO(ioff)=i
     enddo
  enddo
+
+ close(ifile)
 
 end subroutine sym_inf_molpro
 
