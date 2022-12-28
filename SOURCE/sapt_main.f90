@@ -249,15 +249,20 @@ type(SaptData)     :: SAPT
 integer,intent(in) :: NBasis
 double precision,intent(inout) :: Tcpu,Twall
 
- write(LOUT,'(1x,a)') 'Degenerate SAPT(MC)'
+integer :: i
 
- print*, 'nothing here yet -- quitting...'
+write(LOUT,'(8a10)') ('----------',i=1,8)
+write(LOUT,'(1x,a)') 'Degenerate SAPT(MC)'
+write(LOUT,'(8a10)') ('----------',i=1,8)
 
- call elst_dRS(SAPT%monA,SAPT%monB,SAPT)
+call elst_dRS(SAPT%monA,SAPT%monB,SAPT)
 
- call clock('SAPT',Tcpu,Twall)
+call clock('SAPT',Tcpu,Twall)
 
- stop
+call print_warn(SAPT)
+call free_sapt(Flags,SAPT)
+
+stop
 
 end subroutine sapt_dSRS
 

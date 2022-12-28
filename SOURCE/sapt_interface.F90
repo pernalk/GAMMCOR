@@ -283,8 +283,6 @@ double precision :: Tcpu,Twall
     deallocate(OneRdmB,OneRdmA,AuxB,AuxA)
  endif
 
-stop "testing dSRS!"
-
 end subroutine sapt_interface
 
 subroutine onel_molpro(mon,NBasis,NSq,NInte1,MonBlock,SAPT)
