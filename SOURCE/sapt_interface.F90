@@ -109,7 +109,7 @@ double precision :: Tcpu,Twall
  ! dSRS: read 1rdms, 1trdms
  if(Flags%IdSRS==1) then
     call read_1rdm_1trdm_molpro(NBasis,SAPT%monA)
-    !call read_1rdm_1trdm_molpro(NBasis,SAPT%monB)
+    call read_1rdm_1trdm_molpro(NBasis,SAPT%monB)
  endif
 
 ! read orbitals
@@ -676,9 +676,9 @@ elseif(Mon%Monomer==2) then
 endif
 
 if(mon%Monomer==1) then
-  write(lout,'(1x,a)') "Monomer A:"
+  write(lout,'(/1x,a)') "Monomer A:"
 elseif(mon%Monomer==2) then
-  write(lout,'(1x,a)') "Monomer B:"
+  write(lout,'(/1x,a)') "Monomer B:"
 endif
 
 ! set reference state
