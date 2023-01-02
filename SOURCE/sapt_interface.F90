@@ -106,12 +106,6 @@ double precision :: Tcpu,Twall
  endif
  call print_occ(NBasis,SAPT,Flags%ICASSCF)
 
- ! dSRS: read 1rdms, 1trdms
- if(Flags%IdSRS==1) then
-    call read_1rdm_1trdm_molpro(NBasis,SAPT%monA)
-    call read_1rdm_1trdm_molpro(NBasis,SAPT%monB)
- endif
-
 ! read orbitals
 ! norb.leq.nbas, orbitals mays be deleted due to linear
 ! dependecies in large basis sets; ncmot = norb*nbas
@@ -196,10 +190,16 @@ double precision :: Tcpu,Twall
  call clock('2ints',Tcpu,Twall)
 
  if(SAPT%InterfaceType==2) then
-    call prepare_no(OneRdmA,AuxA,Ca,SAPT%monA,CholeskyVecs,Flags%IFunSR,Flags%ICholesky,NBasis)
-    call prepare_no(OneRdmB,AuxB,Cb,SAPT%monB,CholeskyVecs,Flags%IFunSR,Flags%ICholesky,NBasis)
+    call prepare_no_molpro(OneRdmA,AuxA,Ca,SAPT%monA,CholeskyVecs,Flags%IFunSR,Flags%ICholesky,NBasis)
+    call prepare_no_molpro(OneRdmB,AuxB,Cb,SAPT%monB,CholeskyVecs,Flags%IFunSR,Flags%ICholesky,NBasis)
     call prepare_rdm2_molpro(SAPT%monA,AuxA,NBasis)
     call prepare_rdm2_molpro(SAPT%monB,AuxB,NBasis)
+ endif
+
+ ! dSRS: read 1rdms, 1trdms
+ if(Flags%IdSRS==1) then
+    call read_1rdm_1trdm_molpro(NBasis,SAPT%monA)
+    call read_1rdm_1trdm_molpro(NBasis,SAPT%monB)
  endif
 
 ! maybe better: add writing Ca, Cb to file?!
@@ -214,6 +214,17 @@ double precision :: Tcpu,Twall
        SAPT%monB%CMO(j,i) = Cb(ij)
     enddo
  enddo
+
+#if SAPT_INTERFACE_DEBUG > 5
+ write(lout,'(/,1x,a,f14.8)') 'Monomer A : CAONO',norm2(SAPT%monA%CMO)
+ do j=1,NBasis
+    write(6,'(*(f12.6))') (SAPT%monA%CMO(i,j),i=1,NBasis)
+ enddo
+ write(lout,'(/,1x,a,f14.8)') 'Monomer B : CAONO',norm2(SAPT%monB%CMO)
+ do j=1,NBasis
+    write(6,'(*(f12.6))') (SAPT%monB%CMO(i,j),i=1,NBasis)
+ enddo
+#endif
 
 ! look-up tables
  call select_active(SAPT%monA,NBasis,Flags)
@@ -544,6 +555,10 @@ character(:),allocatable :: occfile,sirifile,siriusfile,coefile
 end subroutine readocc_dalton
 
 subroutine readocc_molpro(NBasis,Mon,OrbAux,OneRdm,Flags)
+!
+! OneRdm -- 1-RDM in MO (triang)
+! OrbAux -- CMONO transformation matrix (square)
+!
 implicit none
 
 type(SystemBlock) :: Mon
@@ -640,7 +655,10 @@ character(:),allocatable :: rdmfile
     if(Mon%Occ(i).lt.0.5d0) Mon%CICoef(i)=-Mon%CICoef(i)
  enddo
 
-! call print_sqmat(OrbAux,NBasis)
+ !print*, 'readocc_molpro: OrbAux',norm2(OrbAux)
+ !do j=1,NBasis
+ !   write(lout,'(*(f12.6))') (OrbAux(i,j),i=1,NBasis)
+ !enddo
 
  deallocate(EVal,work)
 
@@ -650,11 +668,14 @@ subroutine read_1rdm_1trdm_molpro(NBasis,mon)
 !
 ! a) read all 1-rdms,  transform to NO of RefState, and store in mon%rdm1(nstates)
 ! b) read all 1-trdms, transform to NO of RefState, and store in mon%Trdm1(nstates*(nstates-1)/2)
+! c) save all CAONO transformation matrices and store in mon%CAONO(nstates,NBasis,NBasis)
 !
 implicit none
 
 integer,intent(in) :: NBasis
 type(SystemBlock)  :: mon
+
+type(TCholeskyVecs) :: CholeskyVecs
 
 integer                  :: i,j,ist,irr,ibra,iket,itr,nnstates,nstates
 integer                  :: ntIrrep,nIrrep,NumStSym(16)
@@ -662,16 +683,18 @@ integer                  :: RefState
 integer                  :: NOccup,HlpDim
 double precision         :: AuxSq(NBasis,NBasis),AuxTr(NBasis*(NBasis+1)/2)
 double precision         :: EVal(NBasis)
-double precision,allocatable :: AuxRDM(:,:,:),CMONO(:,:,:)
+double precision,allocatable :: AuxRDM(:,:,:),CAOMO(:,:),CMONO(:,:,:)
 double precision,allocatable :: work(:)
 character(:),allocatable :: mname
-character(:),allocatable :: rdmfile
+character(:),allocatable :: rdmfile,mofile
 
 if(Mon%Monomer==1) then
   rdmfile = '2RDMA'
+  mofile  = 'MOLPRO_A.MOPUN'
   mname   = 'A'
 elseif(Mon%Monomer==2) then
   rdmfile = '2RDMB'
+  mofile  = 'MOLPRO_B.MOPUN'
   mname   = 'B'
 endif
 
@@ -691,6 +714,10 @@ endif
 HlpDim = max(NBasis**2,3*NBasis)
 NOccup = Mon%INAct + Mon%NAct
 
+! get state-averaged AO-->MO transformation matrix
+allocate(CAOMO(NBasis,NBasis))
+call read_mo_molpro(CAOMO,mofile,'CASORB  ',NBasis)
+
 ! get the number of states
 call read_nstates_molpro(rdmfile,nTIrrep,nIrrep,NumStSym)
 
@@ -705,6 +732,7 @@ if(nTIrrep>1) stop "dSRS does not work with symmetry (Molpro)!"
 
 ! read all all 1-RDMs in MO and transform to NOs
 allocate(AuxRDM(nstates,NBasis,NBasis),CMONO(nstates,NBasis,NBasis))
+allocate(Mon%CAONO(nstates,NBasis,NBasis))
 allocate(Mon%rdm1(nstates,NBasis))
 allocate(work(HlpDim))
 
@@ -732,6 +760,11 @@ do ist=1,nstates
 
    CMONO(ist,:,:) = transpose(AuxRDM(ist,:,:))
 
+   ! obtain AO-->NO transformation matrix
+   Mon%CAONO(ist,:,:) = CAOMO
+   call prepare_no_molpro(AuxTr,AuxRDM(ist,:,:),Mon%CAONO(ist,:,:), &
+                          Mon,CholeskyVecs,0,0,NBasis)
+
    ! save occupation numbers == 1-RDMs
    Mon%rdm1(ist,:) = 0d0
    do i=1,NOccup
@@ -754,7 +787,7 @@ do ist=1,nstates
       enddo
    enddo
 
-#if SAPT_INTERFACE_DEBUG > 3
+#if SAPT_INTERFACE_DEBUG > 10
    print*, 'Occupation numbers, istate',ist
    do i=1,NOccup
       write(lout,'(1x,f12.6)') Mon%rdm1(ist,i)
@@ -762,6 +795,10 @@ do ist=1,nstates
    print*, 'CMONO, istate=',ist
    do j=1,NOccup
       write(lout,'(*(f12.6))') (CMONO(ist,i,j),i=1,NOccup)
+   enddo
+   print*, 'CAONO, istate=',ist, 'norm',norm2(Mon%CAONO)
+   do j=1,NBasis
+      write(lout,'(*(f12.6))') (Mon%CAONO(ist,i,j),i=1,NBasis)
    enddo
 #endif
 
@@ -790,6 +827,9 @@ do iket=1,nstates
          enddo
       enddo
 
+      call tran2MO(AuxRDM(itr,:,:),CMONO(RefState,:,:),CMONO(RefState,:,:), &
+                   Mon%trdm1(itr,:,:),NBasis)
+
 #if SAPT_INTERFACE_DEBUG > 3
       print*, '1-TRDM MO ='
       do j=1,NOccup
@@ -801,9 +841,6 @@ do iket=1,nstates
          write(lout,'(*(f12.6))') (CMONO(RefState,j,i),i=1,NOccup)
       enddo
 
-      call tran2MO(AuxRDM(itr,:,:),CMONO(RefState,:,:),CMONO(RefState,:,:), &
-                   Mon%trdm1(itr,:,:),NBasis)
-
       print*, '1-TRDM NO, RefState = ',RefState
       do j=1,NOccup
          write(lout,'(*(f12.6))') (Mon%trdm1(itr,i,j),i=1,NOccup)
@@ -814,7 +851,7 @@ do iket=1,nstates
 enddo
 
 deallocate(AuxRDM)
-deallocate(CMONO)
+deallocate(CMONO,CAOMO)
 deallocate(work)
 
 end subroutine read_1rdm_1trdm_molpro
@@ -1442,19 +1479,21 @@ double precision :: OccOrd(nbas)
 
 end subroutine sort_sym_occ
 
-subroutine prepare_no(OneRdm,OrbAux,OrbCAS,Mon,CholeskyVecs,IFunSR,ICholesky,NBasis)
+subroutine prepare_no_molpro(OneRdm,OrbAux,OrbCAS,Mon,CholeskyVecs,IFunSR,ICholesky,NBasis)
 implicit none
 !
-! OrbCAS[inout] :: on input AOtoCAS
+! OneRDM[in]    :: 1-RDM in MO (triang)
+! OrbAux[in]    :: on input  CAStoNO
+! OrbCAS[inout] :: on input  AOtoCAS
 !                  on output AOtoNO
-! OrbAux        :: on input CAStoNO
 !
 type(SystemBlock)   :: Mon
 type(TCholeskyVecs) :: CholeskyVecs
 
 integer,intent(in) :: IFunSR,ICholesky,NBasis
 double precision   :: OneRdm(NBasis*(NBasis+1)/2)
-double precision   :: OrbAux(NBasis,NBasis),OrbCAS(NBasis,NBasis)
+double precision,intent(in)    :: OrbAux(NBasis,NBasis)
+double precision,intent(inout) :: OrbCAS(NBasis,NBasis)
 
 integer :: NOccup,NVirt,NSym
 integer :: NCholesky
@@ -1483,11 +1522,17 @@ integer :: info
    endif
  endif
 
- allocate(Mon%NumOSym(15),Mon%IndInt(NBasis))
+ !print*, 'OneRDM',norm2(OneRdm)
+ !print*, 'OrbAux',norm2(OrbAux)
+ !print*, 'OrbCAS',norm2(OrbCAS)
+ 
+ if(.not.allocated(Mon%NumOSym)) then
+    allocate(Mon%NumOSym(15),Mon%IndInt(NBasis))
+    call create_ind_molpro(rdmfile,Mon%NumOSym,Mon%IndInt,NSym,NBasis)
+ endif
+
  allocate(work1(NInte1),work2(NInte1),work3(NBasis),&
           Fock(NBasis**2),OrbSym(NBasis,NBasis),URe(NBasis,NBasis))
-
- call create_ind_molpro(rdmfile,Mon%NumOSym,Mon%IndInt,NSym,NBasis)
 
 ! COPY AUXM TO URe AND OFF SET BY NInAc
  URe = 0
@@ -1534,6 +1579,7 @@ integer :: info
     enddo
  enddo
 
+ ! transform OneRDM to AO
  iab = 0
  do ia=1,NBasis
     do ib=1,ia
@@ -1558,6 +1604,7 @@ integer :: info
 
    if(ICholesky==0) then
      call FockGen_mithap(work2,OneRdm,work1,NInte1,NBasis,'AOTWOSORT')
+     print*, 'FockGen_mithap',norm2(work2)
    elseif(ICholesky==1) then
      NCholesky = CholeskyVecs%NCholesky
      call FockGen_CholR(work2,CholeskyVecs%R(1:NCholesky,1:NInte1),OneRdm,work1, &
@@ -1588,7 +1635,7 @@ integer :: info
 
  Fock = 0
  work3 = 0
- allocate(Mon%OrbE(NBasis))
+ if(.not.allocated(Mon%OrbE)) allocate(Mon%OrbE(NBasis))
 !INACTIVE
  if(Mon%INAct/=0) then
     do i=1,Mon%INAct
@@ -1637,9 +1684,8 @@ integer :: info
  OrbCAS = transpose(OrbCAS)
 
  deallocate(work3,work2,work1,Fock,OrbSym,URe)
- deallocate(Mon%IndInt)
 
-end subroutine prepare_no
+end subroutine prepare_no_molpro
 
 subroutine prepare_rdm2_molpro(Mon,OrbAux,NBasis)
 implicit none

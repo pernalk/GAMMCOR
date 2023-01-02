@@ -1474,6 +1474,10 @@ endif
 if(allocated(SAPT%monA%PP)) deallocate(SAPT%monA%PP)
 if(allocated(SAPT%monB%PP)) deallocate(SAPT%monB%PP)
 
+! dSRS
+if(allocated(SAPT%monA%CAONO)) deallocate(SAPT%monA%CAONO)
+if(allocated(SAPT%monB%CAONO)) deallocate(SAPT%monB%CAONO)
+
 ! HERE - change to SAPTLEVEL?
 if(allocated(SAPT%monA%WPot)) then
    deallocate(SAPT%monA%WPot)
