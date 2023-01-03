@@ -77,10 +77,11 @@ set(GAMMCOR_SOURCE
     SOURCE/ac_fofo.f90
     SOURCE/sorter_Cholesky.f90
     SOURCE/sapt_Chol_pol.f90
+    SOURCE/sapt_dRS.f90
     SOURCE/sapt_Chol_exch.f90
     SOURCE/ab0fofo.f90
     SOURCE/sapt_response.f90
-    SOURCE/sapt_interface.f90
+    SOURCE/sapt_interface.F90
     SOURCE/priunit.f90
     SOURCE/rdwrext.f90
     SOURCE/blocktypes.f90

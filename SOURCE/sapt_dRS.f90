@@ -21,12 +21,14 @@ type(SaptData)    :: SAPT
 integer :: NBasis,dimOA,dimOB
 integer :: iunit
 integer :: iref
+integer :: iexcited
 integer :: ip,ir,iq,is
-double precision :: elab
+double precision :: elab, elab2,elab3
 double precision,allocatable :: work(:,:)
 
 ! set dimensions
-iref   = 1
+iref   =  1
+iexcited = 1
 NBasis = A%NBasis
 dimOA  = A%num0+A%num1
 dimOB  = B%num0+B%num1
@@ -66,6 +68,35 @@ close(iunit)
 
 ! test
 print*, 'elab = ',4d0*elab
+
+print*, 'dziwne'
+open(newunit=iunit,file='OOOOAABB',status='old',access='direct',&
+     form='unformatted',recl=8*dimOA**2)
+elab2 = 0
+elab3 = 0
+print*, 'Atrdm1' , A%trdm1(1,1,1)
+do ip = 1,dimOB
+   do ir = 1,dimOB
+      ! get all (AA| integrals for a given |BB) record
+      read(iunit,rec=ir+(ip-1)*dimOB) work(1:dimOA,1:dimOA)
+      do iq = 1,dimOA
+         do is = 1,dimOA
+            elab3= elab3 + A%trdm1(iexcited,iq,is)*B%trdm1(iexcited,ip,ir)*work(iq,is)
+            if (ip == ir .and. iq == is) then
+               elab2 = elab2 + A%rdm1(iref,iq)*B%rdm1(iref,ip)*work(iq,iq)
+            endif
+         enddo
+      enddo
+   enddo
+enddo
+close(iunit)
+
+! test2
+
+print*, 'elab2 = ',4d0*elab2
+print *, 'elab3 =',4d0*elab3
+
+
 
 deallocate(work)
 print*, 'nothing yet in elst_dRS; quitting...'
