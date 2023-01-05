@@ -669,7 +669,8 @@ subroutine read_1rdm_1trdm_molpro(NBasis,mon)
 ! a) read all 1-rdms,  transform to NO of RefState, and store in mon%rdm1(nstates)
 ! b) read all 1-trdms, transform to NO of RefState, and store in mon%Trdm1(nstates*(nstates-1)/2)
 ! c) save all CAONO transformation matrices and store in mon%CAONO(nstates,NBasis,NBasis)
-!
+! d) save all CMONO transformation matrices and store in mon%CMONO(nstates,NBasis,NBasis)
+!  
 implicit none
 
 integer,intent(in) :: NBasis
@@ -734,6 +735,7 @@ if(nTIrrep>1) stop "dSRS does not work with symmetry (Molpro)!"
 allocate(AuxRDM(nstates,NBasis,NBasis),CMONO(nstates,NBasis,NBasis))
 allocate(Mon%CAONO(nstates,NBasis,NBasis))
 allocate(Mon%rdm1(nstates,NBasis))
+allocate(Mon%CMONO(nstates,NBasis,NBasis))
 allocate(work(HlpDim))
 
 AuxRDM = 0d0
@@ -787,6 +789,8 @@ do ist=1,nstates
       enddo
    enddo
 
+   Mon%CMONO(ist,:,:)=CMONO(ist,:,:)
+   
 #if SAPT_INTERFACE_DEBUG > 10
    print*, 'Occupation numbers, istate',ist
    do i=1,NOccup
@@ -826,9 +830,9 @@ do iket=1,nstates
             AuxRDM(itr,Mon%INAct+i,Mon%INAct+j) = AuxSq(i,j)
          enddo
       enddo
-
-      call tran2MO(AuxRDM(itr,:,:),CMONO(RefState,:,:),CMONO(RefState,:,:), &
-                   Mon%trdm1(itr,:,:),NBasis)
+      Mon%trdm1(itr,:,:)=AuxRDM(itr,:,:)
+!      call tran2MO(AuxRDM(itr,:,:),CMONO(RefState,:,:),CMONO(RefState,:,:), &
+!                   Mon%trdm1(itr,:,:),NBasis)
 
 #if SAPT_INTERFACE_DEBUG > 3
       print*, '1-TRDM MO ='

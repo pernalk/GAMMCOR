@@ -215,6 +215,7 @@ type SystemBlock
       double precision,allocatable :: TwoMO(:)
       double precision,allocatable :: CMO(:,:)     ! SAPT : CAONO
       double precision,allocatable :: CAONO(:,:,:) ! dSRS : CAONO
+      double precision,allocatable :: CMONO(:,:,:) 
       double precision,allocatable :: OV(:,:),OO(:,:), &
                                       FO(:,:),FF(:,:), &
                                       FFAB(:,:),FFBA(:,:), &

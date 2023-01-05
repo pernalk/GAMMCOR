@@ -1,7 +1,7 @@
 module sapt_dRS
 use types
 use tran
-!use sapt_utils
+use sapt_utils
 !use read_external
 
 implicit none
@@ -20,14 +20,24 @@ type(SaptData)    :: SAPT
 
 integer :: NBasis,dimOA,dimOB
 integer :: iunit
-integer :: iref
+integer :: iref,iref2
 integer :: iexcited
 integer :: ip,ir,iq,is
 double precision :: elab, elab2,elab3
 double precision,allocatable :: work(:,:)
+double precision,allocatable :: Btrdm(:,:)
+double precision,allocatable :: Atrdm(:,:)
+
+integer :: i
+double precision,allocatable :: Vb(:,:)
+double precision,allocatable :: Vbaa(:,:)
+double precision,allocatable :: Vbaa2(:,:)
+double precision :: ea1,ea2
+
 
 ! set dimensions
 iref   =  1
+iref2  =  2
 iexcited = 1
 NBasis = A%NBasis
 dimOA  = A%num0+A%num1
@@ -45,12 +55,49 @@ dimOB  = B%num0+B%num1
 ! first, try to recover regular Elst for A-B (ground-state)
 !
 ! get v_pr^qs
+
+
+allocate(Vb(NBasis,NBasis),Vbaa(NBasis,NBasis))
+allocate(Vbaa2(NBasis,NBasis))
+call get_one_mat('V',Vb,B%Monomer,NBasis)
+
+call tran2MO(Vb,A%CAONO(iref,:,:),A%CAONO(iref,:,:),Vbaa,NBasis)
+call tran2MO(Vb,A%CAONO(iref2,:,:),A%CAONO(iref2,:,:),Vbaa2,NBasis)
+! sum_p n_p v^B_pp
+ea1 = 0
+ea2 = 0
+do i=1,A%num0+A%num1
+   ea1 = ea1 + A%rdm1(iref,i)*Vbaa(i,i)
+   ea2 = ea2 + A%rdm1(iref2,i)*Vbaa2(i,i)
+enddo
+ea1 = 2d0*ea1
+ea2 = 2d0*ea2
+print*, 'ea1',ea1
+print*, 'ea2',ea2
+
+
+
+
+
+!call tran4_gen(NBasis,&
+!               B%num0+B%num1,B%CMO,&
+!               B%num0+B%num1,B%CMO,&
+!               A%num0+A%num1,A%CMO,&
+!               A%num0+A%num1,A%CMO,&
+!               'OOOOAABB','AOTWOSORT')
+
+
+
+
 call tran4_gen(NBasis,&
-               B%num0+B%num1,B%CMO,&
-               B%num0+B%num1,B%CMO,&
-               A%num0+A%num1,A%CMO,&
-               A%num0+A%num1,A%CMO,&
-               'OOOOAABB','AOTWOSORT')
+     B%num0+B%num1,B%CAONO(iref2,:,:),&
+     B%num0+B%num1,B%CAONO(iref2,:,:),&
+     A%num0+A%num1,A%CAONO(iref,:,:),&
+     A%num0+A%num1,A%CAONO(iref,:,:),&
+     'OOOOAABB','AOTWOSORT')
+
+
+
 
 allocate(work(dimOA,dimOA))
 ! n_p * n_q * v_pq^pq
@@ -61,7 +108,7 @@ do ip=1,dimOB
    ! get all (AA| integrals for a given |BB) record
    read(iunit,rec=ip+(ip-1)*dimOB) work(1:dimOA,1:dimOA)
    do iq=1,dimOA
-      elab = elab + A%rdm1(iref,iq)*B%rdm1(iref,ip)*work(iq,iq)
+      elab = elab + A%rdm1(iref,iq)*B%rdm1(iref2,ip)*work(iq,iq)
    enddo
 enddo
 close(iunit)
@@ -69,21 +116,29 @@ close(iunit)
 ! test
 print*, 'elab = ',4d0*elab
 
-print*, 'dziwne'
+allocate(Atrdm(NBasis,NBasis))
+allocate(Btrdm(NBasis,NBasis))
+!call tran2MO(A%trdm(iref,:,:),CMONO(RefState,:,:),CMONO(RefState,:,:), &
+!                        Atrdm(iref,:,:),NBasis)
+call tran2MO(A%trdm1(iexcited,:,:),A%CMONO(iref,:,:),A%CMONO(iref,:,:), &
+                        Atrdm(:,:),NBasis)
+call tran2MO(B%trdm1(iexcited,:,:),B%CMONO(iref2,:,:),B%CMONO(iref2,:,:), &
+                             Btrdm(:,:),NBasis)
+
 open(newunit=iunit,file='OOOOAABB',status='old',access='direct',&
      form='unformatted',recl=8*dimOA**2)
 elab2 = 0
 elab3 = 0
-print*, 'Atrdm1' , A%trdm1(1,1,1)
+
 do ip = 1,dimOB
    do ir = 1,dimOB
       ! get all (AA| integrals for a given |BB) record
       read(iunit,rec=ir+(ip-1)*dimOB) work(1:dimOA,1:dimOA)
       do iq = 1,dimOA
          do is = 1,dimOA
-            elab3= elab3 + A%trdm1(iexcited,iq,is)*B%trdm1(iexcited,ip,ir)*work(iq,is)
+            elab3= elab3 + Atrdm(iq,is)*Btrdm(ir,ip)*work(iq,is)
             if (ip == ir .and. iq == is) then
-               elab2 = elab2 + A%rdm1(iref,iq)*B%rdm1(iref,ip)*work(iq,iq)
+               elab2 = elab2 + A%rdm1(iref,iq)*B%rdm1(iref2,ip)*work(iq,iq)
             endif
          enddo
       enddo
@@ -92,10 +147,10 @@ enddo
 close(iunit)
 
 ! test2
-
-print*, 'elab2 = ',4d0*elab2
-print *, 'elab3 =',4d0*elab3
-
+elab2 = 4d0*elab2
+print*, 'elab2 = ',elab2
+print *, 'elab3 =',elab3
+print *, 'EdRS(1) = ' ,ea1+ea2+elab2+elab3
 
 
 deallocate(work)
