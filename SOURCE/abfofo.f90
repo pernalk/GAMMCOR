@@ -273,8 +273,13 @@ enddo
 
 if(AB1) then
    ! symmetrize AB1
+   write(lout,'(/1x,a)') 'Warning: Hessian AB(1) matrices are symmetrized!'
+   write(lout,'(10x,a)') '(AB_CAS_FOFO : AB1)'
    call sq_symmetrize(ABPLUS,NDimX)
    call sq_symmetrize(ABMIN,NDimX)
+else
+   write(lout,'(/1x,a)')  'Warning: Hessian AB matrices are NOT symmetrized!'
+   write(lout,'(10x,a)') '(AB_CAS_FOFO)'
 endif
 
 !print*, "AB-my",norm2(ABPLUS),norm2(ABMIN)
@@ -709,6 +714,7 @@ integer          :: iunit,ios
 integer          :: NOccup,NRDM2Act
 integer          :: IGem(NBasis),Ind(NBasis),AuxInd(3,3),pos(NBasis,NBasis)
 double precision :: val,AuxVal,EnOne
+double precision :: AsymABP,AsymABM
 double precision :: AuxCoeff(3,3,3,3),C(NBasis)
 double precision :: HNO(NBasis,NBasis),AuxI(NBasis,NBasis),&
                     AuxIO(NBasis,NBasis),WMAT(NBasis,NBasis)
@@ -924,6 +930,34 @@ enddo
 
 deallocate(work2)
 deallocate(RDM2val)
+
+write(lout,'(/,1x,a)') 'Warning: Hessian AB(0) matrices are NOT symmetrized!'
+val     = 0
+AsymABP = 0
+do j=1,NDimX
+   do i=1,j
+      val = abs(ABPLUS(j,i))-abs(ABPLUS(i,j))
+      if(val.ge.1.d-6) then
+        if(AsymABP.lt.val) AsymABP = val
+      endif
+   enddo
+enddo
+val     = 0
+AsymABM = 0
+do j=1,NDimX
+   do i=1,j
+      val = abs(ABMIN(j,i))-abs(ABMIN(i,j))
+      if(val.ge.1.d-6) then
+        if(AsymABM.lt.val) AsymABM = val
+      endif
+   enddo
+enddo
+if ((AsymABP .ne. 0d0) .or. (AsymABM .ne. 0d0)) then
+   write(lout,'(10x,a,f12.6)') 'Max Difference in AB0PLUS:',AsymABP
+   write(lout,'(10x,a,f12.6)') 'Max Difference in AB0MIN :',AsymABM
+else
+   write(lout,'(10x,a)')       'Max Difference is below 1d-6 (ABPM0_FOFO)'
+endif
 
 end subroutine ABPM0_FOFO
 
@@ -2311,9 +2345,9 @@ enddo
 
 close(iunit1)
 
-print*, 'from JK_Loop'
-print*, 'ABPLUS-after K',norm2(ABPLUS)
-print*, 'ABMIN -after K',norm2(ABMIN)
+!print*, 'from JK_Loop'
+!print*, 'ABPLUS-after K',norm2(ABPLUS)
+!print*, 'ABMIN -after K',norm2(ABMIN)
 
 open(newunit=iunit2,file=trim(IntJFile),status='OLD', &
      access='DIRECT',recl=8*NBasis**2)
@@ -2568,8 +2602,8 @@ do ll=1,NOccup
    enddo
 enddo
 
-print*, 'ABPLUS-after J',norm2(ABPLUS)
-print*, 'ABMIN -after J',norm2(ABMIN)
+!print*, 'ABPLUS-after J',norm2(ABPLUS)
+!print*, 'ABMIN -after J',norm2(ABMIN)
 
 close(iunit2)
 

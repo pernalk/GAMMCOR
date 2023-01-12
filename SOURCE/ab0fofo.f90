@@ -589,6 +589,8 @@ call AB_CAS_FOFO(ABPLUS,ABMIN,val,URe,Occ,XOne,&
               NInte1,IntJFile,IntKFile,ICholesky,1d0,.true.)
 
 !call clock('AB(1)',Tcpu,Twall)
+!print*, 'AB1PLUS-new',norm2(ABPLUS)
+!print*, 'AB1MIN -new',norm2(ABMIN)
 
 allocate(work(NDimX,NDimX),Eig(NDimX))
 
