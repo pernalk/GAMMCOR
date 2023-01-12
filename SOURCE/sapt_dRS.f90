@@ -34,7 +34,6 @@ double precision,allocatable :: Vbaa(:,:)
 double precision,allocatable :: Vbaa2(:,:)
 double precision :: ea1,ea2
 
-
 ! set dimensions
 iref   =  1
 iref2  =  2
@@ -56,7 +55,6 @@ dimOB  = B%num0+B%num1
 !
 ! get v_pr^qs
 
-
 allocate(Vb(NBasis,NBasis),Vbaa(NBasis,NBasis))
 allocate(Vbaa2(NBasis,NBasis))
 call get_one_mat('V',Vb,B%Monomer,NBasis)
@@ -75,10 +73,6 @@ ea2 = 2d0*ea2
 print*, 'ea1',ea1
 print*, 'ea2',ea2
 
-
-
-
-
 !call tran4_gen(NBasis,&
 !               B%num0+B%num1,B%CMO,&
 !               B%num0+B%num1,B%CMO,&
@@ -86,18 +80,12 @@ print*, 'ea2',ea2
 !               A%num0+A%num1,A%CMO,&
 !               'OOOOAABB','AOTWOSORT')
 
-
-
-
 call tran4_gen(NBasis,&
      B%num0+B%num1,B%CAONO(iref2,:,:),&
      B%num0+B%num1,B%CAONO(iref2,:,:),&
      A%num0+A%num1,A%CAONO(iref,:,:),&
      A%num0+A%num1,A%CAONO(iref,:,:),&
      'OOOOAABB','AOTWOSORT')
-
-
-
 
 allocate(work(dimOA,dimOA))
 ! n_p * n_q * v_pq^pq
@@ -136,7 +124,7 @@ do ip = 1,dimOB
       read(iunit,rec=ir+(ip-1)*dimOB) work(1:dimOA,1:dimOA)
       do iq = 1,dimOA
          do is = 1,dimOA
-            elab3= elab3 + Atrdm(iq,is)*Btrdm(ir,ip)*work(iq,is)
+            elab3 = elab3 + Atrdm(iq,is)*Btrdm(ir,ip)*work(iq,is)
             if (ip == ir .and. iq == is) then
                elab2 = elab2 + A%rdm1(iref,iq)*B%rdm1(iref2,ip)*work(iq,iq)
             endif
@@ -150,11 +138,10 @@ close(iunit)
 elab2 = 4d0*elab2
 print*, 'elab2 = ',elab2
 print *, 'elab3 =',elab3
-print *, 'EdRS(1) = ' ,ea1+ea2+elab2+elab3
-
+print *, 'EdRS(1)+= ' , (ea1+ea2+elab2+elab3+SAPT%Vnn)*1d3
+print *, 'EdRS(1)-= ' , (ea1+ea2+elab2-elab3+SAPT%Vnn)*1d3
 
 deallocate(work)
-print*, 'nothing yet in elst_dRS; quitting...'
 
 end subroutine elst_dRS
 
