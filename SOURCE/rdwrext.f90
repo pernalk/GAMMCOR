@@ -559,6 +559,69 @@ character(8) :: label
 
 end subroutine read_NoSt_molpro
 
+subroutine read_dip_sym_molpro(matdx,matdy,matdz,infile,nbasis)
+!
+! Purpose: read dipole integrals with symmetry
+!
+implicit none
+
+!type(SystemBlock) :: mon
+
+integer,intent(in)      :: nbasis
+character(*),intent(in) :: infile
+double precision :: matdx(nbasis*nbasis),matdy(nbasis*nbasis),matdz(nbasis*nbasis)
+
+integer :: iunit,ios,ictrl
+integer :: nsym,nbas(8),offs(8)
+integer :: ntqg
+integer :: irep,isx,isy,isz
+character(8) :: label
+
+open(newunit=iunit,file=infile,status='OLD', &
+      access='SEQUENTIAL',form='UNFORMATTED')
+
+ntqg = 0
+nbas = 0
+offs = 0
+rewind(iunit)
+read(iunit)
+read(iunit) nsym,nbas(1:nsym),offs(1:nsym)
+do irep=1,nsym
+   ntqg = ntqg + nbas(irep)**2
+enddo
+
+matdx = 0
+matdy = 0
+matdz = 0
+ictrl = 0
+do
+  read(iunit,iostat=ios) label
+  if(ios<0) then
+     write(6,*) 'ERROR!!! LABEL DIPMOMX not found!'
+     stop
+  endif
+  if(label=='DIPMOMX ') then
+     ictrl = ictrl + 1
+     read(iunit) isx
+     read(iunit) matdx(1:ntqg)
+  elseif(label=='DIPMOMY ') then
+     ictrl = ictrl + 1
+     read(iunit) isy
+     read(iunit) matdy(1:ntqg)
+!      print*, 'read-dipy',ictrl
+  elseif(label=='DIPMOMZ ') then
+     ictrl = ictrl + 1
+     read(iunit) isz
+     read(iunit) matdz(1:ntqg)
+!      print*, 'read-dipz',ictrl
+  endif
+ if(ictrl==3) exit
+enddo
+
+close(iunit)
+
+end subroutine read_dip_sym_molpro
+
 subroutine read_dip_molpro(matdx,matdy,matdz,infile,nbasis)
 !
 ! Purpose: read dipole integrals and unpack withour symmetry

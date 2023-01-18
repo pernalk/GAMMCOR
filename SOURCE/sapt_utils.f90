@@ -85,7 +85,6 @@ character(:),allocatable :: onefile
 
 end subroutine get_one_mat
 
-
 subroutine read_SBlock(SBlock,SBlockIV,nblk,xy0file)
 implicit none
 

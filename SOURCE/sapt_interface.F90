@@ -200,6 +200,9 @@ double precision :: Tcpu,Twall
  if(Flags%IdSRS==1) then
     call read_1rdm_1trdm_molpro(NBasis,SAPT%monA)
     call read_1rdm_1trdm_molpro(NBasis,SAPT%monB)
+
+    call calc_trdip(NBasis,SAPT%monA)
+    call calc_trdip(NBasis,SAPT%monB)
  endif
 
 ! maybe better: add writing Ca, Cb to file?!
@@ -690,19 +693,19 @@ character(:),allocatable :: mname
 character(:),allocatable :: rdmfile,mofile
 
 if(Mon%Monomer==1) then
-  rdmfile = '2RDMA'
-  mofile  = 'MOLPRO_A.MOPUN'
-  mname   = 'A'
+   rdmfile = '2RDMA'
+   mofile  = 'MOLPRO_A.MOPUN'
+   mname   = 'A'
 elseif(Mon%Monomer==2) then
-  rdmfile = '2RDMB'
-  mofile  = 'MOLPRO_B.MOPUN'
-  mname   = 'B'
+   rdmfile = '2RDMB'
+   mofile  = 'MOLPRO_B.MOPUN'
+   mname   = 'B'
 endif
 
 if(mon%Monomer==1) then
-  write(lout,'(/1x,a)') "Monomer A:"
+   write(lout,'(/1x,a)') "Monomer A:"
 elseif(mon%Monomer==2) then
-  write(lout,'(/1x,a)') "Monomer B:"
+   write(lout,'(/1x,a)') "Monomer B:"
 endif
 
 ! set reference state
@@ -724,6 +727,7 @@ call read_nstates_molpro(rdmfile,nTIrrep,nIrrep,NumStSym)
 
 nstates  = sum(NumStSym(1:nIrrep))
 nnstates = nstates*(nstates-1)/2
+Mon%NStates = nstates
 
 write(lout,'(1x,a,i3)') 'The number of states from SA-CAS:',nstates
 write(lout,'(1x,a,i3,/)') 'Reference state for dSRS        :',RefState
@@ -859,6 +863,116 @@ deallocate(CMONO,CAOMO)
 deallocate(work)
 
 end subroutine read_1rdm_1trdm_molpro
+
+subroutine calc_trdip(NBasis,mon)
+!
+! calculate and print transition dipole moments
+! (use SA-MO representation)
+!
+implicit none
+
+integer,intent(in) :: NBasis
+type(SystemBlock)  :: mon
+
+integer :: i,j,ij,ist,itr,nnstates
+double precision :: CAOMO(NBasis,NBasis)
+double precision :: work(NBasis,NBasis)
+double precision :: DipXao(NBasis**2),DipYao(NBasis**2),DipZao(NBasis**2)
+double precision :: DipX(NBasis,NBasis),DipY(NBasis,NBasis),DipZ(NBasis,NBasis)
+double precision,allocatable :: TSDipX(:),TSDipY(:),TSDipZ(:)
+character(:),allocatable     :: mname,dipfile,mofile
+
+if(mon%Monomer==1) then
+   mname  = 'A'
+   dipfile= "DIP_A"
+   mofile = 'MOLPRO_A.MOPUN'
+elseif(mon%Monomer==2) then
+   mname  = 'B'
+   dipfile= "DIP_B"
+   mofile = 'MOLPRO_B.MOPUN'
+endif 
+
+call read_dip_sym_molpro(DipXao,DipYao,DipZao,dipfile,NBasis)
+
+!print*, 'DipX-AO:',norm2(DipXao)
+!print*, 'DipY-AO:',norm2(DipYao)
+!print*, 'DipZ-AO:',norm2(DipZao)
+
+call unpack_sym_molpro(DipXao,dipfile,NBasis)
+call unpack_sym_molpro(DipYao,dipfile,NBasis)
+call unpack_sym_molpro(DipZao,dipfile,NBasis)
+
+call read_mo_molpro(CAOMO,mofile,'CASORB  ',NBasis)
+call tran2MO(DipXao,CAOMO,CAOMO,DipX,NBasis)
+call tran2MO(DipYao,CAOMO,CAOMO,DipY,NBasis)
+call tran2MO(DipZao,CAOMO,CAOMO,DipZ,NBasis)
+
+nnstates = mon%nstates*(mon%nstates-1)/2
+
+allocate(TSDipX(nnstates),TSDipY(nnstates),TSDipZ(nnstates))
+TSDipX = 0d0
+TSDipY = 0d0
+TSDipZ = 0d0
+do itr=1,nnstates
+   do j=1,NBasis
+      do i=1,NBasis
+         TSDipX(itr) = TSDipX(itr) - 2d0*Mon%trdm1(itr,j,i)*DipX(i,j)
+         TSDipY(itr) = TSDipY(itr) - 2d0*Mon%trdm1(itr,j,i)*DipY(i,j)
+         TSDipZ(itr) = TSDipZ(itr) - 2d0*Mon%trdm1(itr,j,i)*DipZ(i,j)
+      enddo
+   enddo
+enddo
+
+! print results:
+write(lout,'(/1x,3a)') 'Monomer ',mname, ': Transition dipole moments'
+write(lout,'(11x,a,9x,a,9x,a)') 'DMX','DMY','DMZ'
+! ist = Ket state (=column from TSDips triangle)
+!        e.g., <2|d|1>, <3|d|1>, ...
+ist = 1
+! ij = first element in the trdm triangle
+ij = ist*(ist+1)/2
+do i=ist+1,mon%nstates
+   write(lout,'(1x,a,i1,a,3f12.8)') '<',i,'|1>',TSDipX(ij),TSDipY(ij),TSDipZ(ij)
+   ij = ij + i - 1 ! next element
+enddo
+
+deallocate(TSDipZ,TSDipY,TSDipX)
+
+end subroutine calc_trdip
+
+subroutine unpack_sym_molpro(mat,infile,NBasis)
+
+integer,intent(in) :: NBasis
+double precision,intent(inout) :: Mat(NBasis**2)
+character(*) :: infile
+
+integer   :: nsym,nbas(8),offs(8)
+integer   :: iunit
+integer   :: irep,ntqg
+
+open(newunit=iunit,file=infile,status='OLD', &
+      access='SEQUENTIAL',form='UNFORMATTED')
+
+ntqg = 0
+nbas = 0
+offs = 0
+rewind(iunit)
+read(iunit)
+read(iunit) nsym,nbas(1:nsym),offs(1:nsym)
+do irep=1,nsym
+   ntqg = ntqg + nbas(irep)**2
+enddo
+
+if(nsym==1) then
+   return
+else
+   print*, 'unpack_sym_molpro not finished with sym!'
+   stop
+endif
+
+close(iunit)
+
+end subroutine unpack_sym_molpro
 
 subroutine readocc_cas_siri(mon,nbas,noSiri)
 !
