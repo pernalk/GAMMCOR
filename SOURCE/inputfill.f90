@@ -554,6 +554,12 @@ character(:), allocatable :: first, last
  case ("NATOMS")
        read(val, *) SystemParams%NCen
 
+ case ("IREF1")
+       read(val, *) SystemParams%IREF1
+       
+ case ("IREF2")
+       read(val, *) SystemParams%IREF2
+      
  case ("ACALPHA")
        read(val, *) SystemParams%ACAlpha
 

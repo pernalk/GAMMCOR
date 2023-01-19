@@ -20,8 +20,8 @@ type(SaptData)    :: SAPT
 
 integer :: NBasis,dimOA,dimOB
 integer :: iunit
-integer :: iref,iref2
-integer :: iexcited
+integer :: iref,iref2,irefB,iref2B
+integer :: iexcited,iexcited2
 integer :: ip,ir,iq,is
 double precision :: elab, elab2,elab3
 double precision,allocatable :: work(:,:)
@@ -35,9 +35,18 @@ double precision,allocatable :: Vbaa2(:,:)
 double precision :: ea1,ea2
 
 ! set dimensions
-iref   =  1
-iref2  =  2
-iexcited = 1
+print*, 'A%IREF1',A%IREF1
+print*, 'A%IREF2',A%IREF2
+print*, 'B%IREF1',B%IREF1
+print*, 'B%IREF2',B%IREF2
+
+iref   =  A%IREF1 !1
+iref2  =  A%IREF2 !4
+irefB  =  B%IREF1
+iref2B  = B%IREF2
+iexcited = ((iref2-2)*(iref2-1))/2+iref
+iexcited2 = ((iref2B-2)*(iref2B-1))/2+irefB
+
 NBasis = A%NBasis
 dimOA  = A%num0+A%num1
 dimOB  = B%num0+B%num1
@@ -81,8 +90,8 @@ print*, 'ea2',ea2
 !               'OOOOAABB','AOTWOSORT')
 
 call tran4_gen(NBasis,&
-     B%num0+B%num1,B%CAONO(iref2,:,:),&
-     B%num0+B%num1,B%CAONO(iref2,:,:),&
+     B%num0+B%num1,B%CAONO(iref2B,:,:),&
+     B%num0+B%num1,B%CAONO(iref2B,:,:),&
      A%num0+A%num1,A%CAONO(iref,:,:),&
      A%num0+A%num1,A%CAONO(iref,:,:),&
      'OOOOAABB','AOTWOSORT')
@@ -96,7 +105,7 @@ do ip=1,dimOB
    ! get all (AA| integrals for a given |BB) record
    read(iunit,rec=ip+(ip-1)*dimOB) work(1:dimOA,1:dimOA)
    do iq=1,dimOA
-      elab = elab + A%rdm1(iref,iq)*B%rdm1(iref2,ip)*work(iq,iq)
+      elab = elab + A%rdm1(iref,iq)*B%rdm1(iref2B,ip)*work(iq,iq)
    enddo
 enddo
 close(iunit)
@@ -110,7 +119,7 @@ allocate(Btrdm(NBasis,NBasis))
 !                        Atrdm(iref,:,:),NBasis)
 call tran2MO(A%trdm1(iexcited,:,:),A%CMONO(iref,:,:),A%CMONO(iref,:,:), &
                         Atrdm(:,:),NBasis)
-call tran2MO(B%trdm1(iexcited,:,:),B%CMONO(iref2,:,:),B%CMONO(iref2,:,:), &
+call tran2MO(B%trdm1(iexcited2,:,:),B%CMONO(iref2B,:,:),B%CMONO(iref2B,:,:), &
                              Btrdm(:,:),NBasis)
 
 open(newunit=iunit,file='OOOOAABB',status='old',access='direct',&
@@ -126,7 +135,7 @@ do ip = 1,dimOB
          do is = 1,dimOA
             elab3 = elab3 + Atrdm(iq,is)*Btrdm(ir,ip)*work(iq,is)
             if (ip == ir .and. iq == is) then
-               elab2 = elab2 + A%rdm1(iref,iq)*B%rdm1(iref2,ip)*work(iq,iq)
+               elab2 = elab2 + A%rdm1(iref,iq)*B%rdm1(iref2B,ip)*work(iq,iq)
             endif
          enddo
       enddo
@@ -136,10 +145,11 @@ close(iunit)
 
 ! test2
 elab2 = 4d0*elab2
+elab3 = 4d0*elab3
 print*, 'elab2 = ',elab2
 print *, 'elab3 =',elab3
-print *, 'EdRS(1)+= ' , (ea1+ea2+elab2+elab3+SAPT%Vnn)*1d3
-print *, 'EdRS(1)-= ' , (ea1+ea2+elab2-elab3+SAPT%Vnn)*1d3
+print *, 'EdRS(1)+= ' , (ea1+ea2+elab2+ABS(elab3)+SAPT%Vnn)*1d3
+print *, 'EdRS(1)-= ' , (ea1+ea2+elab2-ABS(elab3)+SAPT%Vnn)*1d3
 
 deallocate(work)
 

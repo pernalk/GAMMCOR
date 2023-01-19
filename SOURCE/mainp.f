@@ -226,7 +226,6 @@ C
 C     *************************************************************************
 C
 C     CHECK IF SAPT RUN
-      print*, 'Flags%ISAPT',Flags%ISAPT
       ISAPT=Flags%ISAPT
 C
       If(ISAPT.Eq.1) Call sapt_driver(Flags,Sapt)

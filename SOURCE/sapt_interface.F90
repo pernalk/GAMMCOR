@@ -203,6 +203,7 @@ double precision :: Tcpu,Twall
 
     call calc_trdip(NBasis,SAPT%monA)
     call calc_trdip(NBasis,SAPT%monB)
+    call set_iref(SAPT%monA,SAPT%monB)
  endif
 
 ! maybe better: add writing Ca, Cb to file?!
@@ -879,7 +880,7 @@ double precision :: CAOMO(NBasis,NBasis)
 double precision :: work(NBasis,NBasis)
 double precision :: DipXao(NBasis**2),DipYao(NBasis**2),DipZao(NBasis**2)
 double precision :: DipX(NBasis,NBasis),DipY(NBasis,NBasis),DipZ(NBasis,NBasis)
-double precision,allocatable :: TSDipX(:),TSDipY(:),TSDipZ(:)
+double precision,allocatable :: TSDipXYZ(:,:)
 character(:),allocatable     :: mname,dipfile,mofile
 
 if(mon%Monomer==1) then
@@ -909,16 +910,14 @@ call tran2MO(DipZao,CAOMO,CAOMO,DipZ,NBasis)
 
 nnstates = mon%nstates*(mon%nstates-1)/2
 
-allocate(TSDipX(nnstates),TSDipY(nnstates),TSDipZ(nnstates))
-TSDipX = 0d0
-TSDipY = 0d0
-TSDipZ = 0d0
+allocate(TSDipXYZ(3,nnstates))
+TSDipXYZ = 0d0
 do itr=1,nnstates
    do j=1,NBasis
       do i=1,NBasis
-         TSDipX(itr) = TSDipX(itr) - 2d0*Mon%trdm1(itr,j,i)*DipX(i,j)
-         TSDipY(itr) = TSDipY(itr) - 2d0*Mon%trdm1(itr,j,i)*DipY(i,j)
-         TSDipZ(itr) = TSDipZ(itr) - 2d0*Mon%trdm1(itr,j,i)*DipZ(i,j)
+         TSDipXYZ(1,itr) = TSDipXYZ(1,itr) - 2d0*Mon%trdm1(itr,j,i)*DipX(i,j)
+         TSDipXYZ(2,itr) = TSDipXYZ(2,itr) - 2d0*Mon%trdm1(itr,j,i)*DipY(i,j)
+         TSDipXYZ(3,itr) = TSDipXYZ(3,itr) - 2d0*Mon%trdm1(itr,j,i)*DipZ(i,j)
       enddo
    enddo
 enddo
@@ -932,13 +931,44 @@ ist = 1
 ! ij = first element in the trdm triangle
 ij = ist*(ist+1)/2
 do i=ist+1,mon%nstates
-   write(lout,'(1x,a,i1,a,3f12.8)') '<',i,'|1>',TSDipX(ij),TSDipY(ij),TSDipZ(ij)
+   write(lout,'(1x,a,i1,a,3f12.8)') '<',i,'|1>',TSDipXYZ(1,ij),TSDipXYZ(2,ij),TSDipXYZ(3,ij)
    ij = ij + i - 1 ! next element
 enddo
 
-deallocate(TSDipZ,TSDipY,TSDipX)
+! save transition dipole moments
+allocate(mon%TSDipXYZ(3,nnstates))
+mon%TSDipXYZ = TSDipXYZ
+
+deallocate(TSDipXYZ)
 
 end subroutine calc_trdip
+
+subroutine set_iref(monA,monB)
+  type(SystemBlock) :: monA
+  type(SystemBlock) :: monB
+  integer :: ist, i, ij, ijA, ITrdipA
+  integer, allocatable ::ITrdipBmat(:)
+ 
+  ist = monB%IREF1
+  allocate(ITrdipBmat(monB%nstates-ist))
+  ! ij = first element in the trdm triangle
+  ij = ist*(ist+1)/2
+  do i=1,monB%nstates-ist
+         ITrdipBmat(i) = maxloc(abs(monB%TSDipXYZ(1:3,ij)),1)
+  !   print *,'maxloc', maxloc(abs(monB%TSDipXYZ(1:3,ij)),1)
+     ij = ij + i + ist - 1 ! next element
+  enddo
+  ijA = (monA%IREF2-2)*(monA%IREF2-1)/2+monA%IREF1  
+  ITrdipA = maxloc(abs(monA%TSDipXYZ(1:3,ijA)),1)
+  
+  if (ITrdipA /= ITrdipBmat(monB%IREF2-ist) ) then
+     monB%IREF2 = findloc(ITrdipBmat,ITrdipA,1) + ist
+     print *,'B%REF changed to', monB%IREF2 
+
+  endif
+
+end subroutine set_iref
+
 
 subroutine unpack_sym_molpro(mat,infile,NBasis)
 

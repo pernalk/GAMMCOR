@@ -33,7 +33,6 @@ double precision :: Tcpu,Twall
 ! ERPA
  Flags%IFlAC  = 0
  Flags%IFlSnd = 0
-
  write(LOUT,'()')
  write(LOUT,'(1x,a)') 'STARTING SAPT CALCULATIONS'
  write(LOUT,'(8a10)') ('**********',i=1,8)

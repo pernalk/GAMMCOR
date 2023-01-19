@@ -146,6 +146,8 @@ type SystemBlock
       integer :: NChol  = 0
       integer :: Monomer = MONOMER_A
       integer :: NELE
+      integer :: IREF1 = 1
+      integer :: IREF2 = 2
       double precision :: XELE
       double precision :: PotNuc
       double precision :: SumOcc  = 0d0 
@@ -231,6 +233,7 @@ type SystemBlock
       double precision,allocatable :: rdm1(:,:),trdm1(:,:,:)
       double precision,allocatable :: Fmat(:,:) 
       double precision,allocatable :: dipm(:,:,:)
+      double precision,allocatable :: TSdipXYZ(:,:)
       double precision,allocatable :: Eig(:),EigX(:),EigY(:)
       double precision,allocatable :: AP(:,:),PP(:)
       double precision  :: charg(maxcen),xyz(maxcen,3)

@@ -433,7 +433,10 @@ if(Flags%ISAPT.Eq.0) then
    System%ThrQInact = Input%SystemInput(1)%ThrQInact
    System%TwoMoInt = Input%SystemInput(1)%TwoMoInt
    System%IPrint = Input%CalcParams%IPrint
-  
+ 
+   System%IREF1 = Input%SystemInput(1)%IREF1
+   System%IREF2 = Input%SystemInput(1)%IREF2
+   
    System%Max_Cn = Input%CalcParams%Max_Cn
    System%FreqOm = Input%CalcParams%FreqOm
 
@@ -503,6 +506,9 @@ elseif(Flags%ISAPT.Eq.1) then
       monA%Cubic    = Input%SystemInput(1)%Cubic
       monA%Wexcit   = Input%SystemInput(1)%Wexcit
 
+      monA%IREF1    = Input%SystemInput(1)%IREF1
+      monA%IREF2    = Input%SystemInput(1)%IREF2
+
       monA%NCen    = Input%SystemInput(1)%NCen
       monA%UCen    = Input%SystemInput(1)%UCen
       monA%Monomer = Input%SystemInput(1)%Monomer
@@ -548,6 +554,9 @@ elseif(Flags%ISAPT.Eq.1) then
       monB%Cubic     = Input%SystemInput(2)%Cubic
       monB%Wexcit    = Input%SystemInput(2)%Wexcit
 
+      monB%IREF1    = Input%SystemInput(2)%IREF1
+      monB%IREF2    = Input%SystemInput(2)%IREF2
+      
       monB%NCen = Input%SystemInput(2)%NCen
       monB%UCen = Input%SystemInput(2)%UCen
       monB%Monomer = Input%SystemInput(2)%Monomer
@@ -598,6 +607,9 @@ elseif(Flags%ISAPT.Eq.1) then
       monA%Monomer = Input%SystemInput(2)%Monomer
       monA%IPrint  = Input%CalcParams%IPrint
 
+      monA%IREF1    = Input%SystemInput(2)%IREF1
+      monA%IREF2    = Input%SystemInput(2)%IREF2
+
       monA%XELE = (monA%ZNucl - monA%Charge)/2.0d0
       monA%NELE = (monA%ZNucl - monA%Charge)/2
 
@@ -637,6 +649,9 @@ elseif(Flags%ISAPT.Eq.1) then
       monB%Monomer  = Input%SystemInput(1)%Monomer
       monB%IPrint   = Input%CalcParams%IPrint
 
+      monB%IREF1    = Input%SystemInput(1)%IREF1
+      monB%IREF2    = Input%SystemInput(1)%IREF2
+      
       monB%XELE = (monB%ZNucl - monB%Charge)/2.0d0
       monB%NELE = (monB%ZNucl - monB%Charge)/2
 
