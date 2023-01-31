@@ -217,7 +217,7 @@ type SystemBlock
       double precision,allocatable :: TwoMO(:)
       double precision,allocatable :: CMO(:,:)     ! SAPT : CAONO
       double precision,allocatable :: CAONO(:,:,:) ! dSRS : CAONO
-      double precision,allocatable :: CMONO(:,:,:) 
+      double precision,allocatable :: CMONO(:,:,:)
       double precision,allocatable :: OV(:,:),OO(:,:), &
                                       FO(:,:),FF(:,:), &
                                       FFAB(:,:),FFBA(:,:), &
@@ -230,7 +230,9 @@ type SystemBlock
       double precision,allocatable :: RDM2val(:,:,:,:)
       ! rdm1 and trdm1 in NOs: rdm1(nstates,NBasis),
       !                        trdm1(nstates,NBasis,NBasis)
+      ! rdm2 in NOs: rdm2(nstates,NBasis**4)
       double precision,allocatable :: rdm1(:,:),trdm1(:,:,:)
+      double precision,allocatable :: rdm24(:,:,:,:,:)
       double precision,allocatable :: Fmat(:,:) 
       double precision,allocatable :: dipm(:,:,:)
       double precision,allocatable :: TSdipXYZ(:,:)
@@ -341,6 +343,9 @@ type SaptData
      double precision  :: e2exd_a0,e2exd_a1,e2exd_a2
      double precision  :: e2exi_a0,e2exi_a1,e2exi_a2
      double precision  :: esapt2,esapt0
+     ! dSRS
+     double precision  :: elst1,elst2
+     !
      double precision  :: e2dispinCAS
      double precision  :: exch_part(5)
      double precision,allocatable :: Wind(:),Wdisp(:)

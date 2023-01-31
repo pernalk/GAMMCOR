@@ -255,6 +255,9 @@ write(LOUT,'(1x,a)') 'Degenerate SAPT(MC)'
 write(LOUT,'(8a10)') ('----------',i=1,8)
 
 call elst_dRS(SAPT%monA,SAPT%monB,SAPT)
+! modify e1exch_NaNb to arbitrary IREFA / IREFB
+! call e1exch_NaNb(Flags,SAPT%monA,SAPT%monB,S APT)
+! call e1exch_dSRS(...) 
 
 call clock('SAPT',Tcpu,Twall)
 
@@ -1476,6 +1479,8 @@ if(allocated(SAPT%monB%PP)) deallocate(SAPT%monB%PP)
 ! dSRS
 if(allocated(SAPT%monA%CAONO)) deallocate(SAPT%monA%CAONO)
 if(allocated(SAPT%monB%CAONO)) deallocate(SAPT%monB%CAONO)
+if(allocated(SAPT%monA%rdm24)) deallocate(SAPT%monA%rdm24)
+if(allocated(SAPT%monB%rdm24)) deallocate(SAPT%monB%rdm24)
 
 ! HERE - change to SAPTLEVEL?
 if(allocated(SAPT%monA%WPot)) then

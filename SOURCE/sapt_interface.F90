@@ -196,7 +196,7 @@ double precision :: Tcpu,Twall
     call prepare_rdm2_molpro(SAPT%monB,AuxB,NBasis)
  endif
 
- ! dSRS: read 1rdms, 1trdms
+ ! dSRS: read 1rdms, 1trdms, 2rdms
  if(Flags%IdSRS==1) then
     call read_1rdm_1trdm_molpro(NBasis,SAPT%monA)
     call read_1rdm_1trdm_molpro(NBasis,SAPT%monB)
@@ -204,6 +204,9 @@ double precision :: Tcpu,Twall
     call calc_trdip(NBasis,SAPT%monA)
     call calc_trdip(NBasis,SAPT%monB)
     call set_iref(SAPT%monA,SAPT%monB)
+
+    call read_2rdm_2trdm_molpro(NBasis,SAPT%monA)
+    call read_2rdm_2trdm_molpro(NBasis,SAPT%monB)
  endif
 
 ! maybe better: add writing Ca, Cb to file?!
@@ -864,6 +867,87 @@ deallocate(CMONO,CAOMO)
 deallocate(work)
 
 end subroutine read_1rdm_1trdm_molpro
+
+subroutine read_2rdm_2trdm_molpro(NBasis,mon)
+!
+! a) read 2-RDMs for all states, transform them from MO-->NO
+!    using Mon%CMONO
+! b-1) construct 2-TRDMs in noncumulant approx.
+!      TGamma = ... tgamma +/-
+! b-2) read 2-TRDMs from Molpro (future)
+!
+implicit none
+
+integer,intent(in) :: NBasis
+type(SystemBlock)  :: mon
+
+integer                      :: irr,ist,nstates
+integer                      :: i,j,k,l
+integer                      :: NOccup
+integer                      :: iunit,NRDM2Act
+integer                      :: Ind2(NBasis)
+double precision,allocatable :: RDM2Act(:),work(:,:)
+character(:),allocatable     :: rdmfile
+double precision,external :: FRDM2
+
+if(mon%Monomer==1) then
+  rdmfile='2RDMA'
+elseif(mon%Monomer==2) then
+  rdmfile='2RDMB'
+endif
+
+nstates = Mon%NStates
+NRDM2Act = Mon%NAct**2*(Mon%NAct**2+1)/2
+NOccup = Mon%INAct + Mon%NAct
+
+Ind2 = 0
+do i=1,Mon%NAct
+   Ind2(Mon%INAct+i) = i
+enddo
+
+allocate(RDM2Act(NRDM2Act),work(Mon%NAct,Mon%NAct))
+allocate(Mon%rdm24(nstates,NOccup,NOccup,NOccup,NOccup))
+
+RDM2Act   = 0d0
+Mon%rdm24 = 0d0
+
+irr = 1 ! assume C1 point group
+do ist=1,nstates
+
+   call read_2rdm_molpro(RDM2Act,ist,irr, &
+                      Mon%ISpinMs2,rdmfile,Mon%IWarn,Mon%NAct)
+   ! CMONO --> CMONOAct
+   work = 0d0
+   do j=1,Mon%NAct
+      do i=1,Mon%NAct
+         work(j,i) = Mon%CMONO(ist,Mon%INAct+i,Mon%INAct+j)
+      enddo
+   enddo
+   call TrRDM2(RDM2Act,work,Mon%NAct,NRDM2Act)
+
+   do i=1,NRDM2Act
+      if(abs(RDM2Act(i)).lt.1d-10) RDM2Act(i) = 0d0
+   enddo
+
+   do l=1,NOccup
+      do k=1,NOccup
+         do j=1,NOccup
+            do i=1,NOccup
+               mon%rdm24(ist,i,j,k,l) = FRDM2(i,k,j,l,RDM2Act, &
+                                        mon%rdm1(ist,:),Ind2,Mon%NAct,NBasis)
+            enddo
+         enddo
+      enddo
+   enddo
+   !print*, 'RDM2val, state', ist, norm2(mon%rdm24(ist,:,:,:,:))
+
+enddo
+
+! create approximate 2-TRDMs here...
+
+deallocate(work,RDM2Act)
+
+end subroutine read_2rdm_2trdm_molpro
 
 subroutine calc_trdip(NBasis,mon)
 !
@@ -1879,6 +1963,7 @@ integer,external :: NAddrRDM
     enddo
  enddo
  call TrRDM2(RDM2Act,work1,Mon%NAct,NRDM2Act)
+ !print*, 'RDM2Act-transformed', norm2(RDM2Act)
 
  open(newunit=iunit,file=outfile,status='replace',&
       form='formatted')
@@ -1902,6 +1987,25 @@ integer,external :: NAddrRDM
  deallocate(work1,RDM2Act)
 
 end subroutine prepare_rdm2_molpro
+
+subroutine TrRDM24_dgemm(RDM2,URe,NBasis)
+!
+!     TRANSFORM RDM2(NBasis,NBasis,NBasis,NBasis)
+!     WITH URe(NBasis,NBasis) using dgemm
+!
+implicit none
+
+integer          :: NBasis
+double precision :: URe(NBasis,NBasis),RDM2(NBasis,NBasis,NBasis,NBasis)
+
+double precision :: Aux(NBasis,NBasis,NBasis,NBasis)
+
+call dgemm('T','N', NBasis**3, NBasis, NBasis, 1.d0, RDM2, NBasis, URe, NBasis, 0.d0, Aux, NBasis**3)
+call dgemm('T','N', NBasis**3, NBasis, NBasis, 1.d0, Aux,  NBasis, URe, NBasis, 0.d0, RDM2,NBasis**3)
+call dgemm('T','N', NBasis**3, NBasis, NBasis, 1.d0, RDM2, NBasis, URe, NBasis, 0.d0, Aux, NBasis**3)
+call dgemm('T','N', NBasis**3, NBasis, NBasis, 1.d0, Aux,  NBasis, URe, NBasis, 0.d0, RDM2,NBasis**3)
+
+end subroutine TrRDM24_dgemm
 
 subroutine select_active(mon,nbas,Flags)
 ! set dimensions: NDimX,num0,num1,num2

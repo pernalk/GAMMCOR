@@ -33,6 +33,7 @@ double precision,allocatable :: Vb(:,:)
 double precision,allocatable :: Vbaa(:,:)
 double precision,allocatable :: Vbaa2(:,:)
 double precision :: ea1,ea2
+double precision :: elst1,elst2
 
 ! set dimensions
 print*, 'A%IREF1',A%IREF1
@@ -148,8 +149,17 @@ elab2 = 4d0*elab2
 elab3 = 4d0*elab3
 print*, 'elab2 = ',elab2
 print *, 'elab3 =',elab3
-print *, 'EdRS(1)+= ' , (ea1+ea2+elab2+ABS(elab3)+SAPT%Vnn)*1d3
-print *, 'EdRS(1)-= ' , (ea1+ea2+elab2-ABS(elab3)+SAPT%Vnn)*1d3
+!print *, 'EdRS(1)= ' , (ea1+ea2+elab2+ABS(elab3)+SAPT%Vnn)*1d3
+!print *, 'EdRS(2)= ' , (ea1+ea2+elab2-ABS(elab3)+SAPT%Vnn)*1d3
+
+elst1 = ea1+ea2+elab2+elab3+SAPT%Vnn
+elst2 = ea1+ea2+elab2-elab3+SAPT%Vnn
+
+print *, 'EdRS(1)= ' , elst1*1d3
+print *, 'EdRS(2)= ' , elst2*1d3
+
+SAPT%elst1 = elst1
+SAPT%elst2 = elst2
 
 deallocate(work)
 
