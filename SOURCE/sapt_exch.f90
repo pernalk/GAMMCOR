@@ -606,6 +606,7 @@ double precision :: tElst,tvk(3),tNa(2),tNb(2),tNaNb
 double precision :: exchs2
 double precision,allocatable :: Va(:,:),Vb(:,:),S(:,:)
 double precision,allocatable :: Sab(:,:),Vaab(:,:),Vbba(:,:),Vabb(:,:),Vbaa(:,:)
+double precision,allocatable :: AOcc(:),BOcc(:)
 double precision,allocatable :: RDM2Aval(:,:,:,:),RDM2Bval(:,:,:,:)
 double precision,allocatable :: intA(:,:,:,:),intB(:,:,:,:)
 double precision,allocatable :: tmpAB(:,:,:,:)
@@ -619,36 +620,42 @@ NBas = A%NBasis
 dimOA = A%num0+A%num1
 dimOB = B%num0+B%num1
 
+! set irefs
+! ...
+
 allocate(S(NBas,NBas),Sab(NBas,NBas))
 allocate(Va(NBas,NBas),Vb(NBas,NBas),&
          Vabb(NBas,NBas),Vbaa(NBas,NBas),&
          Vaab(NBas,NBas),Vbba(NBas,NBas))
 
+! get V_ne in atomic orbs
 call get_one_mat('V',Va,A%Monomer,NBas)
 call get_one_mat('V',Vb,B%Monomer,NBas)
 
+! transform to NOs (MON%CMO contains AONO transformation)
 call tran2MO(Va,B%CMO,B%CMO,Vabb,NBas)
 call tran2MO(Vb,A%CMO,A%CMO,Vbaa,NBas)
 call tran2MO(Va,A%CMO,B%CMO,Vaab,NBas)
 call tran2MO(Vb,B%CMO,A%CMO,Vbba,NBas)
 
+! get overlap S matrix in AO and transform to NOs
 call get_one_mat('S',S,A%Monomer,NBas)
 call tran2MO(S,A%CMO,B%CMO,Sab,NBas)
+
+allocate(AOcc(NBas),BOcc(NBas))
+
+! load reference occupation numbers
+!AOcc = A%rdm1(irefA,:)
+!BOcc = B%rdm1(irefB,:)
 
 allocate(RDM2Aval(dimOA,dimOA,dimOA,dimOA),&
          RDM2Bval(dimOB,dimOB,dimOB,dimOB))
 allocate(intA(dimOA,dimOA,dimOA,dimOB),&
          intB(dimOB,dimOB,dimOA,dimOB))
 
-if(Flags%ICASSCF==1) then
-   ! CAS
-   RDM2Aval = A%RDM2val
-   RDM2Bval = B%RDM2val
-elseif(Flags%ICASSCF==0) then
-   ! GVB
-   RDM2Aval = A%RDM2val
-   RDM2Bval = B%RDM2val
-endif
+! load reference 2-RDMs
+RDM2Aval = A%RDM2val
+RDM2Bval = B%RDM2val
 
 call dgemm('N','N',dimOA**3,dimOB,dimOA,1d0,RDM2Aval,dimOA**3,Sab,NBas,0d0,intA,dimOA**3)
 !call dgemm('N','T',dimOB**3,NBas,dimOB,1d0,RDM2Bval,dimOB**3,Sab,NBas,0d0,intB,dimOB**3)
@@ -669,6 +676,7 @@ do i=1,dimOA
 enddo
 enddo
 
+! remember to adapt somehow to dSRS!
 tElst = 2d0*(SAPT%elst-SAPT%Vnn)*nnS2
 print*, 'tELST',tELST*1000
 

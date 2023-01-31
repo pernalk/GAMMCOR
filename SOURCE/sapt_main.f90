@@ -50,7 +50,7 @@ double precision :: Tcpu,Twall
  call sapt_response(Flags,SAPT%monA,SAPT%EnChck,NBasis)
  call sapt_response(Flags,SAPT%monB,SAPT%EnChck,NBasis)
 
- call sapt_ab_ints(Flags,SAPT%monA,SAPT%monB,SAPT%iPINO,NBasis)
+ if(Flags%IdSRS/=1) call sapt_ab_ints(Flags,SAPT%monA,SAPT%monB,SAPT%iPINO,NBasis)
 
  ! SAPT components
  write(LOUT,'()')
@@ -249,6 +249,8 @@ integer,intent(in) :: NBasis
 double precision,intent(inout) :: Tcpu,Twall
 
 integer :: i
+
+call sapt_ab_ints_dSRS(Flags,SAPT%monA,SAPT%monB,NBasis)
 
 write(LOUT,'(8a10)') ('----------',i=1,8)
 write(LOUT,'(1x,a)') 'Degenerate SAPT(MC)'
@@ -828,6 +830,22 @@ elseif(Flags%ISERPA==2) then
 endif
 
 end subroutine sapt_ab_ints
+
+subroutine sapt_ab_ints_dSRS(Flags,A,B,NBasis)
+!
+! transform integrals of the AB type for dSRS:
+! OOOOAABB, OOOOAAAB, ...
+!
+implicit none
+
+type(FlagsData)    :: Flags
+type(SystemBlock)  :: A,B
+integer,intent(in) :: NBasis
+
+! choose iref
+! use tran4_gen(...)
+
+end subroutine sapt_ab_ints_dSRS
 
 subroutine sapt_ab_ints_red(Flags,A,B,iPINO,NBasis,NBasisRed)
 implicit none
