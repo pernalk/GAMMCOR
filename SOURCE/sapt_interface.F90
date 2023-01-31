@@ -944,31 +944,43 @@ deallocate(TSDipXYZ)
 end subroutine calc_trdip
 
 subroutine set_iref(monA,monB)
-  type(SystemBlock) :: monA
-  type(SystemBlock) :: monB
-  integer :: ist, i, ij, ijA, ITrdipA
-  integer, allocatable ::ITrdipBmat(:)
- 
-  ist = monB%IREF1
-  allocate(ITrdipBmat(monB%nstates-ist))
-  ! ij = first element in the trdm triangle
-  ij = ist*(ist+1)/2
-  do i=1,monB%nstates-ist
-         ITrdipBmat(i) = maxloc(abs(monB%TSDipXYZ(1:3,ij)),1)
-  !   print *,'maxloc', maxloc(abs(monB%TSDipXYZ(1:3,ij)),1)
-     ij = ij + i + ist - 1 ! next element
-  enddo
-  ijA = (monA%IREF2-2)*(monA%IREF2-1)/2+monA%IREF1  
-  ITrdipA = maxloc(abs(monA%TSDipXYZ(1:3,ijA)),1)
-  
-  if (ITrdipA /= ITrdipBmat(monB%IREF2-ist) ) then
-     monB%IREF2 = findloc(ITrdipBmat,ITrdipA,1) + ist
-     print *,'B%REF changed to', monB%IREF2 
+!
+! 1-TRDMs selected via <IREF2|IREF1> in input  should target
+! the same states for monomers A and B
+!
+! Purpose: check if 1-TRDMs match by comparing transition dipole moments
+!      monomer B        monomer A
+! <IREF2|\mu|IREF1> == <IREF2|\mu|IREF1>
+! 
+!
+implicit none
 
-  endif
+type(SystemBlock) :: monA
+type(SystemBlock) :: monB
+integer :: ist, i, ij, ijA, ITrdipA
+integer, allocatable ::ITrdipBmat(:)
+
+ist = monB%IREF1
+
+allocate(ITrdipBmat(monB%nstates-ist))
+
+ij = ist*(ist+1)/2
+do i=1,monB%nstates-ist
+   ITrdipBmat(i) = maxloc(abs(monB%TSDipXYZ(1:3,ij)),1)
+   ij = ij + i + ist - 1 ! next element
+enddo
+
+! A: check location of the IREF1-IREF2 1-TRDM in triangle
+!    and its transition dipole moment
+ijA = (monA%IREF2-2)*(monA%IREF2-1)/2+monA%IREF1
+ITrdipA = maxloc(abs(monA%TSDipXYZ(1:3,ijA)),1)
+
+if (ITrdipA /= ITrdipBmat(monB%IREF2-ist) ) then
+   monB%IREF2 = findloc(ITrdipBmat,ITrdipA,1) + ist
+   write(lout,'(1x,a,i2)') 'WARNING! B%REF2 changed to:', monB%IREF2
+endif
 
 end subroutine set_iref
-
 
 subroutine unpack_sym_molpro(mat,infile,NBasis)
 
