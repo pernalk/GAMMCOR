@@ -229,6 +229,25 @@ if(Flags%ICASSCF==0.and.Flags%ISERPA==0) then
   ! CAS-SCF
   elseif(Flags%ICASSCF==1.and.Flags%ISERPA==0) then
 
+  if(Flags%ICholesky==1) then
+     open(newunit=iunit,file='cholvecs',form='unformatted')
+     write(iunit) Mon%NChol
+     write(iunit) Mon%FF
+     close(iunit)
+
+     ! sub-snippet for testing Pmat
+     ! this will not work now, shit -- Pmat!
+     ! uncomment this for e2disp_Cmat_Chol / e2disp_Cmat_Chol_proj
+     !allocate(Mon%Pmat(Mon%NDimX,Mon%NDimX))
+     !call Project_DChol(Mon%PMat,Mon%IndN,NBas,Mon%NDimX)
+
+     !call CIter_FOFO(ECorr,ACAlpha,XOne,URe,Mon%Occ,EGOne,NGOcc,&
+     !                Mon%IGem,Mon%NAct,Mon%INAct,Mon%NELE,NBas,NInte1, &
+     !                Mon%NDim,Mon%NGem,Mon%IndAux,Mon%IndN,Mon%IndX,Mon%NDimX,&
+     !                twojfile,twokfile)
+     !deallocate(Pmat)
+  endif
+
   allocate(ABPlus(Mon%NDimX**2),ABMin(Mon%NDimX**2),&
             EigVecR(Mon%NDimX**2),Eig(Mon%NDimX))
 
@@ -421,25 +440,6 @@ if(Flags%ICASSCF==0.and.Flags%ISERPA==0) then
   !NGOcc = 0
   !ECorr = 0
 
-  if(Flags%ICholesky==1) then
-     open(newunit=iunit,file='cholvecs',form='unformatted')
-     write(iunit) Mon%NChol
-     write(iunit) Mon%FF
-     close(iunit)
-
-     ! sub-snippet for testing Pmat
-     ! this will not work now, shit -- Pmat!
-     ! uncomment this for e2disp_Cmat_Chol / e2disp_Cmat_Chol_proj
-     !allocate(Mon%Pmat(Mon%NDimX,Mon%NDimX))
-     !call Project_DChol(Mon%PMat,Mon%IndN,NBas,Mon%NDimX)
-
-     !call CIter_FOFO(ECorr,ACAlpha,XOne,URe,Mon%Occ,EGOne,NGOcc,&
-     !                Mon%IGem,Mon%NAct,Mon%INAct,Mon%NELE,NBas,NInte1, &
-     !                Mon%NDim,Mon%NGem,Mon%IndAux,Mon%IndN,Mon%IndX,Mon%NDimX,&
-     !                twojfile,twokfile)
-     !deallocate(Pmat)
-  endif
-
   ! UNCOUPLED
 
   allocate(Mon%IndNT(2,Mon%NDim))
@@ -464,8 +464,8 @@ if(Flags%ICASSCF==0.and.Flags%ISERPA==0) then
      ! maybe just include blocks in Mon%...?
      call AC0BLOCK(Mon%Occ,URe,XOne, &
           Mon%IndN,Mon%IndX,Mon%IGem,Mon%NAct,Mon%INAct,Mon%NDimX, &
-          NBas,Mon%NDimX,NInte1,twojfile,twokfile, &
-          A0BlockIV,A0Block,nblk,abpm0file,1)
+          NBas,Mon%NDimX,NInte1,twojfile,twokfile,Flags%ICholesky, &
+          A0BlockIV,A0Block,nblk,1,abpm0file,1)
   endif
   case(TWOMO_FFFF)
      call Y01CAS_mithap(Mon%Occ,URe,XOne,ABPlus,ABMin, &
