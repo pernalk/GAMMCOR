@@ -1436,6 +1436,8 @@ if(allocated(SAPT%CholVecs)) then
    deallocate(SAPT%CholVecs)
 endif
 
+if(Flags%ICholesky==1) call delfile('cholvecs')
+
 ! end test Cholesky
 
 if(allocated(SAPT%monA%PP)) deallocate(SAPT%monA%PP)

@@ -79,7 +79,7 @@ C
 C
       If(IPrint.Ge.0)
      $ Write(6,'(/,X,''QSCF ITER'',I3,2X,''ENERGY'',F16.8,2X,
-     $ ''ENE DIFF '',E10.3,2X,''GRAD NORM '',E9.3)')
+     $ ''ENE DIFF '',E10.3,2X,''GRAD NORM '',E10.3)')
      $ Iter,ETot,ETot-EOld,GradNo
       If(IPrint.Ge.1) Then
       Write(6,'(/,X,''  ORBITAL OCCUPANCIES '')')

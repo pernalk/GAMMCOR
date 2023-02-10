@@ -268,7 +268,7 @@ C
 C
       If(IPrint.Ge.0)
      $ Write(6,'(/,X,''ITER'',I3,2X,''ENERGY'',F16.8,2X,
-     $ ''ENE DIFF '',E10.3,2X,''GRAD NORM '',E9.3)')
+     $ ''ENE DIFF '',E10.3,2X,''GRAD NORM '',E10.3)')
      $ Iter,ETot,ETot-ETotO,GradNo
       Write(6,'(/,X,''  ORBITAL OCCUPANCIES '')')
       Write(6,'(2X,"Orb",3X,"Occupancy",7X,"Gem",3X,"Sym")')
