@@ -637,6 +637,13 @@ if(Mon%TwoMoInt==TWOMO_INCORE) call LoadSaptTwoNO(Mon%Monomer,TwoMO,NBas,NInte2)
 
 ! get AB matrices for CAS function
 
+if(Flags%ICholesky==1) then
+   open(newunit=iunit,file='cholvecs',form='unformatted')
+   write(iunit) Mon%NChol
+   write(iunit) Mon%FF
+   close(iunit)
+endif
+
 ACAlpha=One
 allocate(ABPlus(Mon%NDimX**2),ABMin(Mon%NDimX**2))
 
@@ -682,8 +689,8 @@ case(TWOMO_FOFO)
    allocate(A0Block(nblk))
    call AC0BLOCK(Mon%Occ,URe,XOne, &
         Mon%IndN,Mon%IndX,Mon%IGem,Mon%NAct,Mon%INAct,Mon%NDimX, &
-        NBas,Mon%NDimX,NInte1,twojfile,twokfile, &
-        A0BlockIV,A0Block,nblk,abpm0file,1)
+        NBas,Mon%NDimX,NInte1,twojfile,twokfile,Flags%ICholesky, &
+        A0BlockIV,A0Block,nblk,1,abpm0file,1)
 end select
 
 deallocate(TwoMO)
