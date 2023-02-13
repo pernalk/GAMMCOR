@@ -1,12 +1,12 @@
 message(NOTICE "")
 message(NOTICE "🗃️  Cholesky info")
 
-include_directories(/home/michalhapka/CholeskyOnTheFly/include)
+include_directories(./gammcor-cholesky/include)
 
 find_library(
     CHOLESKY_LIBRARY 
     NAMES cholesky.a
-    PATHS /home/michalhapka/CholeskyOnTheFly/lib/
+    PATHS ../gammcor-cholesky/lib/
     NO_DEFAULT_PATH
 )
 

@@ -216,7 +216,6 @@ SAPT%monB%NDim = NBasis*(NBasis-1)/2
        write(lout,'(/1x,3a6)') ('******',i=1,3)
        write(lout,'(1x,a)') 'Cholesky On-The-Fly'
        write(lout,'(1x,3a6)') ('******',i=1,3)
-       write(lout,*) 'OTF not ready in SAPT...'
 
        call auto2e_init()
 

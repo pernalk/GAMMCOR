@@ -233,7 +233,7 @@ if(Flags%ICASSCF==0.and.Flags%ISERPA==0) then
             EigVecR(Mon%NDimX**2),Eig(Mon%NDimX))
 
 
-  if(Flags%ICholeskyOTF==1) then
+  if(Flags%ICholeskyOTF==1.or.Flags%ICholeskyBIN==1) then
      if(Mon%Monomer==2) then
         open(newunit=iunit,file='cholvecs',status='old')
         close(iunit,status='delete')
