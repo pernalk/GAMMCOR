@@ -4,6 +4,7 @@ module read_external
 ! files (RDMs, MOs, ...) from Dalton, Molpro, ...
 
 use print_units
+use trexio
 
 contains
 
@@ -1049,6 +1050,36 @@ enddo
 ! call print_sqmat(cmo,nbasis)
 
 end subroutine read_mo_dalton
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+! TREXIO subroutines
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+subroutine read_mo_trexio(C,trexfile,nao,nmo)
+use trexio
+implicit none
+
+integer,intent(in)           :: nao,nmo
+character(*),intent(in)      :: trexfile
+double precision,intent(out) :: C(nao*nmo)
+
+integer(8) :: f
+integer    :: rc
+
+f = trexio_open (TrexFile, 'r', TREXIO_HDF5, rc)
+
+rc = trexio_has_mo_coefficient(f)
+if (rc /= TREXIO_SUCCESS) then
+  stop 'No AOMO coefficients in file'
+end if
+
+rc = trexio_read_mo_coefficient(f, C)
+
+!call print_sqmat(C,NBas,'C')
+
+rc = trexio_close(f)
+
+end subroutine read_mo_trexio
 
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 ! Eugene subroutines

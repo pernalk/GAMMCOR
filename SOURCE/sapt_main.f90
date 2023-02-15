@@ -40,6 +40,9 @@ double precision :: Tcpu,Twall
  ! jump to reduceVirt framework
  if(Flags%IRedVirt==1) call sapt_driver_red(Flags,SAPT)
 
+ ! jump to TREXIO framework
+ if(SAPT%InterfaceType==5) call sapt_driver_trexio(Flags,SAPT)
+
  call clock('START',Tcpu,Twall)
  call sapt_basinfo(SAPT,NBasis)
  call sapt_interface(Flags,SAPT,NBasis)
@@ -233,6 +236,35 @@ logical          :: onlyDisp
 
 end subroutine sapt_driver_red
 
+subroutine sapt_driver_trexio(Flags,SAPT)
+implicit none
+
+type(FlagsData) :: Flags
+type(SaptData)  :: SAPT
+integer :: i
+
+integer :: NBasis
+integer :: Anum0_save, Bnum0_save
+double precision :: Tcpu,Twall
+
+ Flags%SaptLevel = SAPT%SaptLevel
+
+! ERPA
+ Flags%IFlAC  = 0
+ Flags%IFlSnd = 0
+
+ write(LOUT,'(1x,a,/)') 'TREXIO INTERFACE'
+
+ call clock('START',Tcpu,Twall)
+ call sapt_basinfo(SAPT,NBasis)
+ call sapt_interface(Flags,SAPT,NBasis)
+
+ call clock('SAPT',Tcpu,Twall)
+
+ stop
+
+end subroutine sapt_driver_trexio
+
 subroutine sapt_Cholesky(Flags,SAPT,Tcpu,Twall,NBasis)
 !
 ! sapt driver with Cholesky decompositon
@@ -382,6 +414,8 @@ integer,intent(out) :: NBasis
     call basinfo(NBasis,'SIRIUS_A.RST','DALTON')
  elseif(SAPT%InterfaceType==2) then
     call basinfo(NBasis,'AOONEINT_A','MOLPRO')
+ elseif(SAPT%InterfaceType==5) then
+    call basinfo(NBasis,SAPT%monA%trexfile,'TREXIO')
  endif
  if(NBasis==0.and.SAPT%monA%NBasis==0) then
     write(LOUT,'(1x,a)') 'ERROR! NBasis NOWHERE TO BE FOUND!'

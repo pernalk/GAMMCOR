@@ -16,12 +16,14 @@ implicit none
 type(FlagsData) :: Flags
 type(SystemBlock) :: A, B
 type(SaptData) :: SAPT
+
 integer :: i, j, k, l, ia, jb
 integer :: ij,ipr
 integer :: ip, iq, ir, is
 integer :: iv, iz, iu, it
 integer :: iunit
-integer :: dimOA,dimOB,NBas
+integer :: dimOA,dimOB
+integer :: NAO,NBas
 integer :: GdimOA,GdimOB
 double precision,allocatable :: S(:,:),Sab(:,:)
 double precision,allocatable :: USa(:,:),USb(:,:)
@@ -46,6 +48,7 @@ double precision,external    :: trace,FRDM2,FRDM2GVB
 double precision,allocatable :: work1(:)
 
 ! set dimensions
+ NAO  = SAPT%NAO
  NBas = A%NBasis
  dimOA = A%num0+A%num1
  dimOB = B%num0+B%num1
@@ -71,8 +74,8 @@ double precision,allocatable :: work1(:)
           Kb(NBas,NBas))
  allocate(work(NBas,NBas),tmp1(NBas,NBas),tmp2(NBas,NBas))
 
- call get_den(NBas,A%CMO,A%Occ,1d0,PA)
- call get_den(NBas,B%CMO,B%Occ,1d0,PB)
+ call get_den(NAO,NBas,A%CMO,A%Occ,1d0,PA)
+ call get_den(NAO,NBas,B%CMO,B%Occ,1d0,PB)
 
  call get_one_mat('S',S,A%Monomer,NBas)
  call tran2MO(S,A%CMO,B%CMO,Sab,NBas)
@@ -594,13 +597,15 @@ implicit none
 type(FlagsData)   :: Flags
 type(SystemBlock) :: A, B
 type(SaptData)    :: SAPT
+
 integer :: i, j, k, l, ia, jb
 integer :: ij,ipr
 integer :: ip,iq,ir,is
 integer :: ipq,iu,it
 integer :: iunit
 integer :: rdm2type
-integer :: dimOA,dimOB,NBas
+integer :: dimOA,dimOB
+integer :: NAO,NBas
 double precision :: fac,val,nnS2,tmp
 double precision :: tElst,tvk(3),tNa(2),tNb(2),tNaNb
 double precision :: exchs2
@@ -615,6 +620,7 @@ double precision,external  :: ddot
 print*, 'Testing E1exch NaNb...'
 
 ! set dimensions
+NAO  = SAPT%NAO
 NBas = A%NBasis
 dimOA = A%num0+A%num1
 dimOB = B%num0+B%num1
@@ -740,7 +746,7 @@ tvk(2) = -2d0*tvk(2)
 print*, 'tvk(2)',tvk(2)*1000
 
 ! work = PA
-call get_den(NBas,A%CMO,A%Occ,1d0,work)
+call get_den(NAO,NBas,A%CMO,A%Occ,1d0,work)
 ! tvk = n_p n_q v_pq^qp = PA.K[PB]
 do jb=1,NBas
    do ia=1,NBas
@@ -1820,7 +1826,8 @@ type(FlagsData)   :: Flags
 type(SystemBlock) :: A, B
 type(SaptData)    :: SAPT
 
-integer             :: NBas,dimOA,dimOB,dimVA,dimVB,nOVA,nOVB
+integer             :: NAO,NBas
+integer             :: dimOA,dimOB,dimVA,dimVB,nOVA,nOVB
 double precision    :: nelA,nelB
 integer,allocatable :: posA(:,:),posB(:,:)
 double precision,allocatable :: S(:,:),Sab(:,:),Sba(:,:)
@@ -1871,6 +1878,7 @@ double precision,parameter :: BigE = 1.D8
  if(A%Cubic.or.B%Cubic) uncoupled = .false.
 
 ! set dimensions
+ NAO  = SAPT%NAO
  NBas = A%NBasis
  dimOA = A%num0+A%num1
  dimVA = A%num1+A%num2
@@ -1958,8 +1966,8 @@ double precision,parameter :: BigE = 1.D8
  call tran2MO(S,A%CMO,B%CMO,Sab,NBas)
  call tran2MO(S,B%CMO,A%CMO,Sba,NBas)
 
- call get_den(NBas,A%CMO,A%Occ,1d0,PA)
- call get_den(NBas,B%CMO,B%Occ,1d0,PB)
+ call get_den(NAO,NBas,A%CMO,A%Occ,1d0,PA)
+ call get_den(NAO,NBas,B%CMO,B%Occ,1d0,PB)
 
  allocate(tmp1(NBas,NBas),tmp2(NBas,NBas))
 
@@ -2431,7 +2439,7 @@ type(FlagsData) :: Flags
 type(SystemBlock) :: A, B
 type(SaptData) :: SAPT
 
-integer          :: NBas,NInte1
+integer          :: NAO,NBas,NInte1
 integer          :: dimOA,dimVA,dimOB,dimVB,nOVA,nOVB
 integer          :: GdimOA,GdimOB
 integer          :: iunit
@@ -2472,6 +2480,7 @@ double precision,parameter :: BigE   = 1.D8
 double precision,parameter :: SmallE = 1.D-3
 
 ! set dimensions
+ NAO  = SAPT%NAO
  NBas = A%NBasis
  !dimOA = A%INAct+A%NAct
  dimOA = A%num0+A%num1
@@ -2567,8 +2576,8 @@ double precision,parameter :: SmallE = 1.D-3
           Vaba(NBas,NBas),Vaab(NBas,NBas),Vbab(NBas,NBas))
  allocate(tmp1(NBas,NBas),tmp2(NBas,NBas))
 
- call get_den(NBas,A%CMO,A%Occ,1d0,PA)
- call get_den(NBas,B%CMO,B%Occ,1d0,PB)
+ call get_den(NAO,NBas,A%CMO,A%Occ,1d0,PA)
+ call get_den(NAO,NBas,B%CMO,B%Occ,1d0,PB)
 
  call get_one_mat('S',S,A%Monomer,NBas)
  call tran2MO(S,A%CMO,B%CMO,Sab,NBas)

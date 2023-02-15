@@ -15,7 +15,7 @@ type(SystemBlock) :: A, B
 type(SaptData)    :: SAPT
 
 integer :: i, j
-integer :: NBas
+integer :: NAO,NBas
 double precision,allocatable :: PA(:,:),PB(:,:) 
 double precision,allocatable :: Va(:,:),Vb(:,:),Ja(:,:) 
 double precision,allocatable :: work(:,:)
@@ -24,14 +24,15 @@ double precision,parameter :: Half=0.5d0
 double precision,external  :: trace
 
 ! set dimensions
+ NAO  = SAPT%NAO
  NBas = A%NBasis 
 
  allocate(PA(NBas,NBas),PB(NBas,NBas),&
           Va(NBas,NBas),Vb(NBas,NBas),Ja(NBas,NBas))
  allocate(work(NBas,NBas))
 
- call get_den(NBas,A%CMO,A%Occ,2d0,PA)
- call get_den(NBas,B%CMO,B%Occ,2d0,PB)
+ call get_den(NAO,NBas,A%CMO,A%Occ,2d0,PA)
+ call get_den(NAO,NBas,B%CMO,B%Occ,2d0,PB)
 
  call get_one_mat('V',Va,A%Monomer,NBas)
  call get_one_mat('V',Vb,B%Monomer,NBas)
