@@ -271,6 +271,8 @@ subroutine read_block_calculation(CalcParams, line)
                CalcParams%InterfaceType = INTER_TYPE_ORCA
                CalcParams%RDMSource = INTER_TYPE_ORCA
                CalcParams%RDMType   = RDM_TYPE_DMRG
+           elseif (uppercase(val) == "TREXIO") then
+               CalcParams%InterfaceType = INTER_TYPE_TREX
            endif
 
       case ("JOBTYPE")
@@ -567,6 +569,9 @@ character(:), allocatable :: first, last
  case ("THRACT")
        read(val,*) SystemParams%ThrAct
 
+ case ("THRGEMACT")
+       read(val,*) SystemParams%ThrGemAct
+
  case ("THRSELACT")
        SystemParams%DeclareThrSelAct = .true.
        read(val,*) SystemParams%ThrSelAct
@@ -612,6 +617,16 @@ character(:), allocatable :: first, last
 
  case ("WEXCIT")
        read(val,*) SystemParams%Wexcit
+
+ case ("TREXFILE")
+       SystemParams%TrexFile = val
+
+ case ("CHOLESKY2RDM")
+       if (uppercase(val) == "TRUE".or.  &
+           uppercase(val) == ".TRUE.".or.&
+           uppercase(val) == "T") then
+          SystemParams%Cholesky2rdm = .true.
+       endif
 
  end select
 end subroutine read_block_system

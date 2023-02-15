@@ -8,6 +8,7 @@ integer, parameter :: INTER_TYPE_DAL  = 1
 integer, parameter :: INTER_TYPE_MOL  = 2
 integer, parameter :: INTER_TYPE_OWN  = 3
 integer, parameter :: INTER_TYPE_ORCA = 4
+integer, parameter :: INTER_TYPE_TREX = 5
 
 integer, parameter :: TYPE_NO_SYM = 1
 integer, parameter :: TYPE_SYM = 0
@@ -74,9 +75,9 @@ logical, parameter :: FLAG_POSTCAS  = .FALSE.
 
 integer,parameter :: maxcen = 500
 
-character(*),parameter :: PossibleInterface(4) = &
+character(*),parameter :: PossibleInterface(5) = &
 [character(8) :: &
-'DALTON', 'MOLPRO', 'OWN', 'ORCA']
+'DALTON', 'MOLPRO', 'OWN', 'ORCA','TREXIO']
 
 character(*),parameter :: PossibleJobType(17) = &
 [character(9) :: &
@@ -181,15 +182,19 @@ type SystemBlock
       logical :: Wexcit  = .false.
       logical :: doRSH   = .false., SameOm = .true.
       logical :: PostCAS = .false.
-      logical :: NActFromRDM = .true.
-      logical :: reduceV = .false.
+      logical :: NActFromRDM  = .true.
+      logical :: reduceV      = .false.
+      logical :: Cholesky2RDM = .false.
       ! for cubic SAPT
       double precision :: ACAlpha0  = 1.d-10
       double precision :: ACAlpha1  = 0.01d0
       double precision :: ACAlpha2  = 0.45d0
 
-      ! ThrAct for active geminals selection
-      double precision :: ThrAct    = 0.992d0
+      ! ThrGemAct for active geminals selection
+      double precision :: ThrGemAct    = 0.992d0
+      ! ThrAct for active orbitals selection (CIPSI)
+      double precision :: ThrAct = 1.d-9
+      ! ThrSelAct selects active orbital pairs
       double precision :: ThrSelAct = 1.d-8
       ! ThrVirt for reduction of virtual orbs
       double precision :: ThrVirt   = 1.d-6
@@ -231,6 +236,8 @@ type SystemBlock
       integer :: Max_Cn = 3
       double precision :: FreqOm = 0.d0
 
+      character(:), allocatable :: TrexFile
+
 end type SystemBlock
 
 type FileNames
@@ -253,6 +260,7 @@ type FlagsData
      ! mainp.f
      integer :: IDALTON = 1
      integer :: iORCA   = 0
+     integer :: iTREXIO = 0
      integer :: IRes    = 0
      integer :: IAO     = 0
      integer :: INO     = 0
@@ -337,6 +345,7 @@ type SaptData
      double precision,allocatable :: CholVecs(:,:)
      integer :: InterfaceType = INTER_TYPE_DAL
      integer :: SaptLevel = SAPTLEVEL2
+     integer :: NAO
      integer :: NCholesky
      integer :: Max_Cn = 4
      integer :: ic6 = 0
@@ -352,6 +361,7 @@ type SaptData
      logical :: EnChck  = .true., HFCheck=.true.
      logical :: doRSH   = .false., SameOm = .true.
      logical :: reduceV = .false.
+     character(:),allocatable :: TrexFile
 
 end type SaptData
 

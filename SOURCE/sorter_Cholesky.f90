@@ -5,6 +5,7 @@ module sorter_Cholesky
 !
 use print_units
 use read_external
+use trexio
 implicit none
 
 type AOReaderChol
@@ -12,6 +13,8 @@ integer :: unit
 integer :: aosource
 integer :: nbas,nelm,nibuf
 integer,allocatable :: idx_buf(:)
+integer(8) :: f,BUFSIZE
+integer,allocatable :: buf_idx(:,:)
 double precision,allocatable :: val_buf(:)
 contains
 procedure :: open => open_AOReaderChol
@@ -37,8 +40,11 @@ end subroutine add_TR
 !-------------------------------------------------------------------------------
 !-------------------------------------------------------------------------------
 subroutine open_AOReaderChol(rdr,nbas,aosource,file_path,rs_diag)
+!
 ! reads the diagonal
+!
 implicit none
+!
 class(AOReaderChol) :: rdr
 integer,intent(in)  :: aosource,nbas
 character(*), intent(in) :: file_path
@@ -51,6 +57,8 @@ integer :: nints, INDX
 integer :: idx_p, idx_q, idx_r, idx_s, pq, rs, idx_end
 integer :: sym_p, sym_q, sym_r, sym_s, sym_rs
 integer :: i
+integer :: rc
+integer(8) :: offset,icount
 
 rdr%aosource = aosource
 rdr%nbas = nbas
@@ -245,6 +253,41 @@ case(4) ! Libor
          enddo
       enddo
 
+case(5) ! TreX-io
+
+   rdr%f = trexio_open (file_path, 'r', TREXIO_HDF5, rc)
+
+   rdr%BUFSIZE = nbas**2
+   allocate(rdr%buf_idx(4,rdr%BUFSIZE))
+   allocate(rdr%val_buf(rdr%BUFSIZE))
+
+   offset = 0
+   icount = rdr%BUFSIZE
+   rdr%val_buf = 0
+   rdr%buf_idx = 0
+   do while(icount == rdr%BUFSIZE)
+
+      rc = trexio_read_ao_2e_int_eri(rdr%f,offset,icount,rdr%buf_idx,rdr%val_buf)
+
+      do i=1,icount
+
+         idx_p = rdr%buf_idx(1,i)
+         idx_q = rdr%buf_idx(3,i)
+         idx_r = rdr%buf_idx(2,i)
+         idx_s = rdr%buf_idx(4,i)
+
+         if (idx_q<=idx_p.and.idx_s<=idx_r) then
+            pq = idx_q + idx_p*(idx_p-1)/2
+            rs = idx_s + idx_r*(idx_r-1)/2
+            if (pq == rs) rs_diag(rs) = rdr%val_buf(i)
+         endif
+
+      enddo
+
+      offset = offset + icount
+
+   enddo
+
 case default
 
    write(LOUT,'(a)') 'Unknown AOSOURCE in open_AOReaderChol'
@@ -255,8 +298,11 @@ end select
 end subroutine open_AOReaderChol
 
 subroutine get_TR_AOReaderChol(rdr,y,M)
+!
 ! reader with adder_TR
+!
 implicit none
+!
 class(AOReaderChol) :: rdr
 integer,intent(in)  :: y(:)
 double precision,intent(out) :: M(:,:)
@@ -268,6 +314,8 @@ integer :: nints, INDX
 integer :: idx_p, idx_q, idx_r, idx_s, pq, rs, idx_end
 integer :: sym_p, sym_q, sym_r, sym_s, sym_rs
 integer :: i
+integer :: rc
+integer(8) :: offset,icount
 
 M = 0
 
@@ -525,8 +573,34 @@ case(4) ! Libor
 
 case(5) ! TREXIO
 
-   write(LOUT,'(a)') 'AOSOURCE=5 not ready in get_TR_AOReaderChol'
-   stop
+   offset = 0
+   icount = rdr%BUFSIZE
+   rdr%val_buf = 0
+   rdr%buf_idx = 0
+   do while(icount == rdr%BUFSIZE)
+
+      rc = trexio_read_ao_2e_int_eri(rdr%f,offset,icount,rdr%buf_idx,rdr%val_buf)
+
+      do i=1,icount
+
+         idx_p = rdr%buf_idx(1,i)
+         idx_q = rdr%buf_idx(3,i)
+         idx_r = rdr%buf_idx(2,i)
+         idx_s = rdr%buf_idx(4,i)
+
+         if (idx_q<=idx_p.and.idx_s<=idx_r) then
+            pq = idx_q + idx_p*(idx_p-1)/2
+            rs = idx_s + idx_r*(idx_r-1)/2
+            if(rs <= pq) then
+               call add_TR(pq,rs,rdr%val_buf(i),y,M)
+            endif
+         endif
+
+      enddo
+
+      offset = offset + icount
+
+   enddo
 
 case default
 
@@ -540,6 +614,7 @@ end subroutine get_TR_AOReaderChol
 subroutine close_AOReaderChol(rdr)
 implicit none
 class(AOReaderChol) :: rdr
+integer :: rc
 
 select case(rdr%aosource)
 case(1) ! DALTON
@@ -550,6 +625,13 @@ case(1) ! DALTON
 case(2) ! MOLPRO
 
    deallocate(rdr%val_buf)
+
+case(5) ! TREXIO
+
+   deallocate(rdr%val_buf)
+   deallocate(rdr%buf_idx)
+
+   rc = trexio_close(rdr%f)
 
 end select
 

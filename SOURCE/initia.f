@@ -3671,12 +3671,16 @@ C     Purpose: read NBasis from Dalton/Molpro
 C
       use print_units
       use read_external
+      use trexio
 C
       implicit none
 
       character(*),intent(in) :: basfile,intf
       integer,intent(out) :: nbasis
-      integer :: iunit
+
+      integer    :: iunit
+      integer(8) :: f
+      integer :: rc
       integer :: nsym,nbas(8),norb(8),nrhf(8),ioprhf
       logical :: ex
 
@@ -3687,23 +3691,40 @@ C
      $        access='SEQUENTIAL',form='UNFORMATTED')
 
          if(trim(intf)=='DALTON') then
-            ! read basis info
-            call readlabel(iunit,'BASINFO ')
 
+            call readlabel(iunit,'BASINFO ')
             read (iunit) nsym,nbas,norb,nrhf,ioprhf
-            !write(LOUT,*)  nsym,nbas,norb,nrhf,ioprhf
+            nbasis = sum(nbas(1:nsym))
+
+            close(iunit)
 
          elseif(trim(intf)=='MOLPRO') then
+
             read(iunit)
             read(iunit) nsym,nbas(1:nsym)
+            nbasis = sum(nbas(1:nsym))
+
+            close(iunit)
+
+         elseif(trim(intf)=='TREXIO') then
+
+            f = trexio_open (basfile, 'r', TREXIO_HDF5, rc)
+            rc = trexio_read_mo_num(f, nbasis)
+
+            if (rc /= TREXIO_SUCCESS) then
+              write(lout,'(1x,a)') 'NBasis empty in TREXIO!'
+              stop 'Error reading MO num'
+            end if
+
+            rc = trexio_close(f)
+
          endif
 
-         close(iunit)
-         nbasis = sum(nbas(1:nsym))
-
       else
+
          write(LOUT,'(1x,a)') 'WARNING: '// basfile //' NOT FOUND!'
          write(LOUT,'(1x,a)') 'TRYING TO READ NBasis FROM INPUT!'
+
       endif
 
       End Subroutine BasInfo
