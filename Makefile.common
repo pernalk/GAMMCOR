@@ -29,6 +29,7 @@ OBJ = $(O)mainp.o $(O)initia.o $(O)dmscf.o $(O)misc.o $(O)optocc.o \
 	  $(O)iter_stats.o $(O)C_integrator.o $(O)iter_algorithm.o $(O)iter_algorithm_diis.o $(O)iter_algorithm_damping.o \
       $(O)lambda_calculator.o $(O)lambda_calculator_diag.o $(O)lambda_calculator_block.o $(O)lambda_calculator_projector.o \
       $(O)ac_iter.o $(O)ac_fofo.o \
+      $(O)trexio_module.o $(O)write_trexio.o\
       $(O)git_info.o $(O)build_info.o\
       xcfun/fortran/xcfun_module.o xcfun/fortran/xcfun_autogen.o
 
@@ -36,7 +37,7 @@ $(PROG) :  $(OBJ)
 	$(FCC) $(FFLAGS) -o $(PROG) $(OBJ) $(LIBS)
 $(O)mainp.o : $(S)mainp.f $(S)commons.inc $(O)types.o $(O)inputfill.o $(O)systemdef.o $(O)sapt_main.o $(O)git_info.o $(O)build_info.o
 	$(FCC) $(FFLAGS)  -c $(S)mainp.f -o $(O)mainp.o
-$(O)initia.o : $(S)initia.f $(S)commons.inc $(O)priunit.o $(O)types.o $(O)sorter.o $(O)tran.o $(O)abmats.o $(O)rdwrext.o $(O)timing.o
+$(O)initia.o : $(S)initia.f $(S)commons.inc $(O)priunit.o $(O)types.o $(O)sorter.o $(O)tran.o $(O)abmats.o $(O)rdwrext.o $(O)timing.o $(O)trexio_module.o
 	$(FCC) $(FFLAGS)  -c $(S)initia.f -o $(O)initia.o 
 $(O)git_info.o : $(S)git_info.f90
 	$(FCC) $(FFLAGS)  -c $(S)git_info.f90 -o $(O)git_info.o
@@ -115,15 +116,15 @@ $(O)types.o : $(S)types.f90 $(O)priunit.o
 	$(FCC) $(FFLAGS)  -c $(S)types.f90 -o $(O)types.o
 $(O)blocktypes.o : $(S)blocktypes.f90
 	$(FCC) $(FFLAGS)  -c $(S)blocktypes.f90 -o $(O)blocktypes.o
-$(O)rdwrext.o : $(S)rdwrext.f90 $(O)priunit.o
+$(O)rdwrext.o : $(S)rdwrext.f90 $(O)priunit.o $(O)trexio_module.o
 	$(FCC) $(FFLAGS)  -c $(S)rdwrext.f90 -o $(O)rdwrext.o
 $(O)inputfill.o : $(S)inputfill.f90 $(O)types.o $(O)priunit.o
 	$(FCC) $(FFLAGS)  -c $(S)inputfill.f90 -o $(O)inputfill.o
 $(O)systemdef.o : $(S)systemdef.f90 $(O)types.o
 	$(FCC) $(FFLAGS)  -c $(S)systemdef.f90 -o $(O)systemdef.o
-$(O)sorter.o : $(S)sorter.f90 $(O)priunit.o $(O)rdwrext.o
+$(O)sorter.o : $(S)sorter.f90 $(O)priunit.o $(O)rdwrext.o $(O)trexio_module.o
 	$(FCC) $(FFLAGS)  -c $(S)sorter.f90 -o $(O)sorter.o
-$(O)sorter_Cholesky.o : $(S)sorter_Cholesky.f90 $(O)priunit.o $(O)rdwrext.o
+$(O)sorter_Cholesky.o : $(S)sorter_Cholesky.f90 $(O)priunit.o $(O)rdwrext.o $(O)trexio_module.o
 	$(FCC) $(FFLAGS)  -c $(S)sorter_Cholesky.f90 -o $(O)sorter_Cholesky.o
 $(O)tran.o : $(S)tran.f90 $(O)blocktypes.o $(O)sorter.o
 	$(FCC) $(FFLAGS)  -c $(S)tran.f90 -o $(O)tran.o
@@ -172,7 +173,7 @@ $(O)sapt_main.o : $(S)sapt_main.f90 $(O)types.o \
                   $(O)sapt_response.o $(O)sapt_interface.o
 	$(FCC) $(FFLAGS)  -c $(S)sapt_main.f90 -o $(O)sapt_main.o
 $(O)sapt_interface.o : $(S)sapt_interface.f90 $(O)types.o $(O)timing.o \
-                  $(O)sorter.o $(O)tran.o $(O)Cholesky.o $(O)Cholesky_old.o $(O)abmats.o $(O)rdwrext.o
+                  $(O)sorter.o $(O)tran.o $(O)Cholesky.o $(O)Cholesky_old.o $(O)abmats.o $(O)rdwrext.o $(O)trexio_module.o
 	$(FCC) $(FFLAGS)  -c $(S)sapt_interface.f90 -o $(O)sapt_interface.o
 $(O)sapt_response.o : $(S)sapt_response.f90 $(O)types.o $(O)tran.o $(O)abmats.o $(O)abfofo.o $(O)ab0fofo.o \
                   $(O)sapt_utils.o $(O)timing.o
@@ -213,6 +214,10 @@ $(O)lambda_calculator_block.o : $(S)lambda_calculator_block.f90 $(O)lambda_calcu
 	$(FCC) $(FFLAGS)  -c $(S)lambda_calculator_block.f90 -o $(O)lambda_calculator_block.o
 $(O)lambda_calculator_projector.o : $(S)lambda_calculator_projector.f90 $(O)lambda_calculator.o
 	$(FCC) $(FFLAGS)  -c $(S)lambda_calculator_projector.f90 -o $(O)lambda_calculator_projector.o
+$(O)trexio_module.o : $(S)trexio_module.F90
+	$(FCC) $(FFLAGS)  -c $(S)trexio_module.F90 -o $(O)trexio_module.o
+$(O)write_trexio.o : $(S)write_trexio.f90 $(O)trexio_module.o $(O)blocktypes.o $(O)priunit.o $(O)rdwrext.o $(O)tran.o
+	$(FCC) $(FFLAGS)  -c $(S)write_trexio.f90 -o $(O)write_trexio.o
 
 
 .PHONY : clean
