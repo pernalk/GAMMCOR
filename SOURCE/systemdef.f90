@@ -196,6 +196,12 @@ else
      FLags%IGVB = 0
      Flags%ICASSCF = 1
      Flags%ISHF = 1
+
+  case(RDM_TYPE_CI)
+     FLags%ICI     = 1
+     FLags%IGVB    = 0
+     Flags%ICASSCF = 0
+
   case default
      write(LOUT,'(1x,a)') 'RDMType not declared! Assuming ICASSCF=1!'
      FLags%IGVB    = 0
@@ -469,7 +475,6 @@ elseif(Flags%ISAPT.Eq.1) then
    case(1)
 
       if(SAPT%InterfaceType==5) monA%TrexFile = Input%SystemInput(1)%TrexFile
-      print*,'case 1',monA%TrexFile
 
       monA%NoSt     = Input%SystemInput(1)%NoSt
       monA%NStates  = Input%SystemInput(1)%NStates
@@ -519,7 +524,6 @@ elseif(Flags%ISAPT.Eq.1) then
       endif
 
       if(SAPT%InterfaceType==5) monB%TrexFile = Input%SystemInput(2)%TrexFile
-      print*,'case 1',monA%TrexFile
 
       monB%NoSt     = Input%SystemInput(2)%NoSt
       monB%NStates  = Input%SystemInput(2)%NStates
@@ -666,11 +670,9 @@ elseif(Flags%ISAPT.Eq.1) then
  end associate
 
  ! set in/out-of-core
- ! SAPT-CAS: unless defined in input, set FOFO as default!
- if(Flags%ICASSCF==1.and.Flags%ISERPA==0) then
-    if(.not.SAPT%monA%DeclareTwoMo) SAPT%monA%TwoMoInt = TWOMO_FOFO
-    if(.not.SAPT%monB%DeclareTwoMo) SAPT%monB%TwoMoInt = TWOMO_FOFO
- endif
+ ! SAPT: unless defined in input, set FOFO as default!
+ if(.not.SAPT%monA%DeclareTwoMo) SAPT%monA%TwoMoInt = TWOMO_FOFO
+ if(.not.SAPT%monB%DeclareTwoMo) SAPT%monB%TwoMoInt = TWOMO_FOFO
 
  ! set SameOm for SAPT-RSH
  if(SAPT%doRSH) then

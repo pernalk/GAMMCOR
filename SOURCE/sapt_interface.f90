@@ -229,7 +229,7 @@ double precision :: Tcpu,Twall
     call prepare_no_trexio(AuxB,Cb,NAO,NBasis)
  endif
 
- allocate(SAPT%monA%CMO(NBasis,NBasis),SAPT%monB%CMO(NBasis,NBasis))
+ allocate(SAPT%monA%CMO(NAO,NBasis),SAPT%monB%CMO(NAO,NBasis))
 
  call save_CAONO(Ca,SAPT%monA%CMO,NAO,NBasis)
  call save_CAONO(Cb,SAPT%monB%CMO,NAO,NBasis)
@@ -254,8 +254,8 @@ double precision :: Tcpu,Twall
    !call truncate_rdm2(SAPT%monA,NAO,NBasis)
    !call truncate_rdm2(SAPT%monB,NAO,NBasis)
 
-   call rw_trexio_rdm2_file(SAPT%monA,AuxA,NBasis)
-   call rw_trexio_rdm2_file(SAPT%monB,AuxB,NBasis)
+   call rw_trexio_rdm2(SAPT%monA,AuxA,NBasis)
+   call rw_trexio_rdm2(SAPT%monB,AuxB,NBasis)
  endif
 
  if(Flags%ICholesky==1) then
@@ -1779,10 +1779,14 @@ integer :: info
 
 end subroutine prepare_no
 
-subroutine rw_trexio_rdm2_file(Mon,CMONO,NBasis)
+subroutine rw_trexio_rdm2(Mon,CMONO,NBasis)
 !
 ! Purpose:
 ! read RDM2 in MO and transform MO2NO (full transformation needed)
+! stored in Mon%RDM2val
+!
+! CAREFUL!!! CURRENTLY NBasis^4 has to fit into memory!
+!
 !
 use trexio
 implicit none
@@ -1833,10 +1837,14 @@ endif
 BUFSIZE = NBasis**2
 
 if(Mon%Cholesky2rdm) then
-
+  
+   write(lout,'(/,1x,a)') 'WIP1: use 3-ind transformation for 2-RDMs!'
+   write(lout,'(1x,a)')   'WIP2: can the matrix be read-in and 3-indx transformed in batches? (rw_trexio_rdm2)'
    allocate(val_buf(BUFSIZE),idx_buf(3,BUFSIZE))
-   write(lout,'(/,1x,a)') 'WIP: use 3-ind transformation for 2-RDMs!'
    rc = trexio_read_rdm_2e_cholesky_num(f, NCholesky2rdm)
+   write(lout,'(1x,a,i5)') 'Number of Cholesky 2-RDM vectors ', NCholesky2rdm
+   print*, '(compared to ',NBasis**2,")"
+
    allocate(RDM2Chol(NOccup,NOccup,NCholesky2rdm))
    RDM2Chol = 0
 
@@ -1945,7 +1953,9 @@ rc = trexio_close(f)
 ! truncate 2-RDM from NBasis^4 to NOccup^4
 call truncate_2rdm_trexio(Mon,mon%num0+mon%num1,NBasis)
 
-end subroutine rw_trexio_rdm2_file
+!print*, 'Gamma-test-NOccup',norm2(Mon%RDM2val)
+
+end subroutine rw_trexio_rdm2
 
 subroutine truncate_2rdm_trexio(Mon,NOccup,NBasis)
 !

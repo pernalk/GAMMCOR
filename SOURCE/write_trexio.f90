@@ -473,7 +473,8 @@ double precision,intent(out) :: ETot
 double precision,intent(in)  :: URe(NBasis,NBasis),Occ(NBasis),XOne(NInte1)
 integer,intent(in) :: IndN(2,NDim),IndX(NDim)
 double precision,intent(in)  :: ACAlpha
-double precision,intent(in)  :: RDM2val(NBasis,NBasis,NBasis,NBasis)
+!double precision,intent(in)  :: RDM2val(NBasis,NBasis,NBasis,NBasis)
+double precision,intent(in)  :: RDM2val(INActive+NAct,INActive+NAct,INActive+NAct,INActive+NAct)
 logical,intent(in) :: AB1
 
 integer :: i,j,k,l,ij,kl,kk,ll

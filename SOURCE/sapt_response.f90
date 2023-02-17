@@ -698,6 +698,182 @@ deallocate(ABMin,ABPlus)
 
 end subroutine calc_ab_cas
 
+subroutine calc_resp_cipsi(Mon,Flags,NAO,NBasis)
+implicit none
+
+type(SystemBlock)  :: Mon
+type(FlagsData)    :: Flags
+integer,intent(in) :: NAO, NBasis
+
+integer          :: i,j,ip,iq
+integer          :: iunit
+integer          :: NInte1,NOccup,NDimX
+double precision :: val
+double precision :: ACAlpha, ECIPSI
+
+integer :: nblk
+type(EblockData) :: A0blockIV
+type(EblockData),allocatable :: A0block(:)
+
+double precision, allocatable :: XOne(:), URe(:,:)
+double precision, allocatable :: ABPlus(:,:), ABMin(:,:)
+double precision, allocatable :: ABPlus0(:,:), ABMin0(:,:)
+double precision, allocatable :: Eig(:), EigVecR(:)
+character(:),     allocatable :: onefile,twojfile,twokfile, &
+                                 propfile,abfile,abpm0file, &
+                                 testfile
+
+print*, 'calc_resp_cispi --> calc_resp_casgvb?'
+
+! set filenames
+if(Mon%Monomer==1) then
+   onefile    = 'ONEEL_A'
+   twojfile   = 'FFOOAA'
+   twokfile   = 'FOFOAA'
+   propfile   = 'PROP_A'
+   abfile     = 'ABMAT_A'
+   abpm0file  = 'A0BLK_A'
+   testfile   = 'A0MAT_A'
+!   propfile0  = 'PROP_A0'
+!   propfile1  = 'PROP_A1'
+!   rdmfile    = 'rdm2_A.dat'
+elseif(Mon%Monomer==2) then
+   onefile    = 'ONEEL_B'
+   twojfile   = 'FFOOBB'
+   twokfile   = 'FOFOBB'
+   propfile   = 'PROP_B'
+   abfile     = 'ABMAT_B'
+   abpm0file  = 'A0BLK_B'
+   testfile   = 'A0MAT_B'
+!   propfile0  = 'PROP_B0'
+!   propfile1  = 'PROP_B1'
+!   rdmfile    = 'rdm2_B.dat'
+endif
+
+! set dimensions
+NInte1 = NBasis*(NBasis+1)/2
+NDimX  = Mon%NDimX
+Mon%INAct = Mon%num0
+Mon%NAct  = Mon%num1
+
+allocate(XOne(NInte1),URe(NBasis,NBasis))
+
+! read 1-el Hamiltonian
+call get_h0_no(Mon%CMO,XOne,onefile,NAO,NBasis)
+
+! get unit matrix
+URe = 0d0
+do i=1,NBasis
+   URe(i,i) = 1d0
+enddo
+
+ACAlpha = 1.0d0
+ECIPSI  = 0.0d0
+
+print*, 'Mon%NAct',Mon%Nact
+print*, 'Mon%INAct',Mon%INact
+print*, 'Mon%mon0',Mon%num0,Mon%num1
+!Mon%NAct = Mon%num0 + Mon%num1
+Mon%INAct = Mon%num0
+Mon%NAct = Mon%num1
+NOccup   = Mon%num0 + Mon%num1
+
+select case(Mon%TwoMoInt)
+
+ case(TWOMO_FFFF,TWOMO_INCORE)
+     write(LOUT,'(1x,a)') "TREXIO does not work with INCORE/FFFF"
+     stop
+
+  case(TWOMO_FOFO)
+
+     allocate(ABPlus(NDimX,NDimX),ABMin(NDimX,NDimX),&
+              EigVecR(NDimX*NDimX),Eig(NDimX))
+
+     !ACAlpha = 1.d-9
+     !print*, 'Testing UNCOUPLED:', ACAlpha
+     call AB_CIPSI_FOFO(ABPlus,ABMin,Mon%RDM2val,ECIPSI,URe,Mon%Occ,XOne, &
+                 Mon%IndN,Mon%IndX, &
+                 Mon%NAct,Mon%INAct,NDimX,NBasis,NDimX,&
+                 NInte1,twojfile,twokfile,ACAlpha,.false.)
+
+     print*, 'ABPLUS',norm2(ABPlus)
+     print*, 'ABMIN ',norm2(ABMin)
+
+! for e2disp Cmat
+! dump matrices for iterative C-ERPA
+open(newunit=iunit,file=abfile,form='unformatted')
+write(iunit) ABPlus
+write(iunit) ABMin
+close(iunit)
+
+if(Flags%ICholesky==1) then
+   ! this is only for testing e2disp_CAlphaTilde_full
+   allocate(ABPlus0(NDimX,NDImX),&
+            ABMin0(NDimX,NDimX))
+   call AB_CIPSI_FOFO(ABPlus0,ABMin0,Mon%RDM2val,ECIPSI,URe,Mon%Occ,XOne, &
+               Mon%IndN,Mon%IndX, &
+               Mon%NAct,Mon%INAct,NDimX,NBasis,NDimX,&
+               NInte1,twojfile,twokfile,0d0 ,.false.)
+    ! dump matrices for iterative C-ERPA
+    open(newunit=iunit,file=testfile,form='unformatted')
+    write(iunit) ABPlus0
+    write(iunit) ABMin0
+    close(iunit)
+    deallocate(ABMin0,ABPlus0)
+
+   if (Mon%NAct ==0) then
+      nblk = 1
+   else
+      nblk = 1 + NBasis - Mon%NAct
+   endif
+   allocate(A0Block(nblk))
+   call AC0BLOCK_CIPSI(Mon%RDM2val,Mon%Occ,URe,XOne, &
+        Mon%IndN,Mon%IndX,Mon%IGem,Mon%NAct,Mon%INAct,NOccup,&
+        Mon%NDimX,NBasis,Mon%NDimX,NInte1,twojfile,twokfile, &
+        A0BlockIV,A0Block,nblk,abpm0file,1)
+
+endif
+
+end select
+
+if(Flags%ICholesky==1) return ! only AB matrices needed with Cholesky
+
+write(lout,'(1x,a/)') 'Solving symmetric eigenvalue equation...'
+
+allocate(Mon%EigY(Mon%NDimX**2),Mon%EigX(Mon%NDimX**2),&
+         Mon%Eig(Mon%NDimX))
+
+call ERPASYMMXY_CIPSI(Mon%EigY,Mon%EigX,Mon%Eig,ABPlus,ABMin,&
+                Mon%CICoef,Mon%IndN,NDimX,NBasis)
+
+Eig = Mon%Eig
+do j=1,NDimX
+   do i=1,NDimX
+      ip = Mon%IndN(1,i)
+      iq = Mon%IndN(2,i)
+      val = Mon%CICoef(ip)-Mon%CICoef(iq)
+      EigVecR((j-1)*NDimX+i) = val * &
+                               (Mon%EigY((j-1)*NDimX+i) - Mon%EigX((j-1)*NDimX+i))
+   enddo
+enddo
+
+if(Mon%IPrint.gt.10) then
+   write(lout,'(1x,a,f12.8)') 'ERPA EigVec norm', norm2(EigVecR)
+   write(lout,'(1x,a,f14.8)') 'ERPA EigVal norm', norm2(Eig)
+   write(lout,'(1x,a,i5,a)') 'ERPA Eigenvalues (NDimX =',NDimX,'):'
+   do i=1,NDimX
+      write(lout,'(1x,i4,f12.6)') i,Eig(i)
+   enddo
+endif
+
+! dump response
+call writeresp(EigVecR,Eig,propfile)
+
+deallocate(XOne)
+deallocate(Eig,EigVecR,ABPlus,ABMin)
+
+end subroutine calc_resp_cipsi
+
 subroutine calc_resp_extrapolate(Mon,Flags,NBasis)
 ! calculate response for extrapolated SAPT formulas
 ! i.e., Cubic=.true.

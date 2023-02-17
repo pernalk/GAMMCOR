@@ -49,6 +49,7 @@ integer, parameter :: RDM_TYPE_APSG = 2
 integer, parameter :: RDM_TYPE_CAS  = 3
 integer, parameter :: RDM_TYPE_DMRG = 4
 integer, parameter :: RDM_TYPE_HF   = 5
+integer, parameter :: RDM_TYPE_CI   = 6
 
 integer, parameter :: TWOMO_INCORE = 1
 integer, parameter :: TWOMO_FFFF   = 2
@@ -84,9 +85,9 @@ character(*),parameter :: PossibleJobType(17) = &
 'AC', 'AC0', 'ERPA', 'EERPA', 'SAPT', 'PDFT', 'CASPiDFT','CASPiDFTOpt','EERPA-1', & 
 'AC0D', 'AC0DNOSYMM', 'NLOCCORR', 'AC0DP', 'ACFREQ','ACFREQNTH','AC1FREQNTH','RESPONSE']
 
-character(*),parameter :: PossibleRDMType(5) = &
+character(*),parameter :: PossibleRDMType(6) = &
 [character(8) :: &
-'GVB', 'APSG', 'CASSCF', 'DMRG', 'HF']
+'GVB', 'APSG', 'CASSCF', 'DMRG', 'HF', 'CI']
 
 character(*),parameter :: PossibleDFAType(3) = &
 [character(8) :: &
@@ -292,7 +293,8 @@ type FlagsData
      ! initia.f
      integer :: IA        = 1
      integer :: ICASSCF   = 0
-     integer :: IDMRG     = 0  
+     integer :: IDMRG     = 0
+     integer :: ICI       = 0
      ! interpa.f  
      integer :: IFlAC     = 0
      integer :: IFlSnd    = 0

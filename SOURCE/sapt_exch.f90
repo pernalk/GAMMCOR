@@ -16,7 +16,6 @@ implicit none
 type(FlagsData) :: Flags
 type(SystemBlock) :: A, B
 type(SaptData) :: SAPT
-
 integer :: i, j, k, l, ia, jb
 integer :: ij,ipr
 integer :: ip, iq, ir, is
@@ -24,12 +23,10 @@ integer :: iv, iz, iu, it
 integer :: iunit
 integer :: dimOA,dimOB
 integer :: NAO,NBas
-integer :: GdimOA,GdimOB
 double precision,allocatable :: S(:,:),Sab(:,:)
 double precision,allocatable :: USa(:,:),USb(:,:)
 double precision,allocatable :: PA(:,:),PB(:,:), &
                                 PAbb(:,:),PBaa(:,:)
-double precision,allocatable :: Kb(:,:)
 double precision,allocatable :: JJb(:,:)
 double precision,allocatable :: Qab(:,:),Qba(:,:)
 double precision,allocatable :: Va(:,:),Vb(:,:), &
@@ -37,105 +34,79 @@ double precision,allocatable :: Va(:,:),Vb(:,:), &
 double precision,allocatable :: tmp1(:,:),tmp2(:,:)
 double precision,allocatable :: tmpA(:,:,:,:),tmpB(:,:,:,:), &
                                 tmpAB(:,:,:,:)
-double precision,allocatable :: work(:,:),RDM2Aval(:,:,:,:), &
-                                RDM2Bval(:,:,:,:)
+double precision,allocatable :: work(:,:)
 double precision :: tmp,ea,eb,exchs2
 double precision :: t1(2),t2a(4),t2b(2),t2c(2),t2d
 double precision :: t1f,t2f
 !double precision :: Tcpu,Twall
 double precision,parameter   :: Half=0.5d0
-double precision,external    :: trace,FRDM2,FRDM2GVB
+double precision,external    :: trace
 double precision,allocatable :: work1(:)
 
 ! set dimensions
  NAO  = SAPT%NAO
  NBas = A%NBasis
+
  dimOA = A%num0+A%num1
  dimOB = B%num0+B%num1
  !
- !dimOA = A%INAct+A%NAct
- !dimOB = B%INAct+B%NAct
- GdimOA = A%num0+A%num1
- GdimOB = B%num0+B%num1
 
- !print*, 'A-MON'
- !print*, A%num0,A%num1
- !print*, A%INAct,A%NAct
 
 ! call clock('START',Tcpu,Twall)
 
- allocate(S(NBas,NBas),Sab(NBas,NBas),&
-          PA(NBas,NBas),PB(NBas,NBas),&
-          Va(NBas,NBas),Vb(NBas,NBas),&
+ allocate(S(NAO,NAO), Sab(NBas,NBas),&
+          PA(NAO,NAO),PB(NAO,NAO), &
+          Va(NAO,NAO),Vb(NAO,NAO), &
           PAbb(NBas,NBas),PBaa(NBas,NBas),&
           Vabb(NBas,NBas),Vbaa(NBas,NBas))
- allocate(USa(NBas,NBas),USb(NBas,NBas),&
-          Qab(NBas,NBas),Qba(NBas,NBas),&
-          Kb(NBas,NBas))
- allocate(work(NBas,NBas),tmp1(NBas,NBas),tmp2(NBas,NBas))
+ allocate(USa(NAO,NBas),USb(NAO,NBas), &
+          Qab(NAO,NBas),Qba(NAO,NBas))
+ allocate(work(NBas,NBas),tmp1(NAO,NAO),tmp2(NAO,NAO))
 
  call get_den(NAO,NBas,A%CMO,A%Occ,1d0,PA)
  call get_den(NAO,NBas,B%CMO,B%Occ,1d0,PB)
 
- call get_one_mat('S',S,A%Monomer,NBas)
- call tran2MO(S,A%CMO,B%CMO,Sab,NBas)
+ call get_one_mat('S',S,A%Monomer,NAO)
+ ! OLD
+ !call tran2MO(S,A%CMO,B%CMO,Sab,NBas)
+ call tran_AO2MO2(S,A%CMO,B%CMO,Sab,NAO,NBas)
 
- call get_one_mat('V',Va,A%Monomer,NBas)
- call get_one_mat('V',Vb,B%Monomer,NBas)
+ call get_one_mat('V',Va,A%Monomer,NAO)
+ call get_one_mat('V',Vb,B%Monomer,NAO)
 
- call tran2MO(Va,B%CMO,B%CMO,Vabb,NBas)
- call tran2MO(Vb,A%CMO,A%CMO,Vbaa,NBas)
+ call tran_AO2MO2(Va,B%CMO,B%CMO,Vabb,NAO,NBas)
+ call tran_AO2MO2(Vb,A%CMO,A%CMO,Vbaa,NAO,NBas)
+ ! OLD
+ !call tran2MO(Va,B%CMO,B%CMO,Vabb,NBas)
+ !call tran2MO(Vb,A%CMO,A%CMO,Vbaa,NBas)
 
- allocate(RDM2Aval(dimOA,dimOA,dimOA,dimOA),&
-          RDM2Bval(dimOB,dimOB,dimOB,dimOB))
+ !allocate(RDM2Aval(dimOA,dimOA,dimOA,dimOA),&
+ !         RDM2Bval(dimOB,dimOB,dimOB,dimOB))
 
- if(Flags%ICASSCF==1) then
-    ! CAS
-    RDM2Aval = A%RDM2val
-    RDM2Bval = B%RDM2val
-    ! old:
-    !do l=1,dimOA
-    !   do k=1,dimOA
-    !      do j=1,dimOA
-    !         do i=1,dimOA
-    !            RDM2Aval(i,j,k,l) = FRDM2(i,k,j,l,A%RDM2,A%Occ,A%Ind2,A%NAct,NBas)
-    !         enddo
-    !      enddo
-    !   enddo
-    !enddo
-    !do l=1,dimOB
-    !   do k=1,dimOB
-    !      do j=1,dimOB
-    !         do i=1,dimOB
-    !            RDM2Bval(i,j,k,l) = FRDM2(i,k,j,l,B%RDM2,B%Occ,B%Ind2,B%NAct,NBas)
-    !         enddo
-    !      enddo
-    !   enddo
-    !enddo
+ !! 2-RDMs
+ !RDM2Aval = A%RDM2val
+ !RDM2Bval = B%RDM2val
 
- elseif(Flags%ICASSCF==0) then
-
-    ! GVB
-    RDM2Aval = A%RDM2val
-    RDM2Bval = B%RDM2val
-
- endif
-
-! USa=0; USb=0
-! USa,USb in MOAO
-! call dgemm('T','N',NBas,NBas,NBas,1d0,A%CMO,NBas,S,NBas,0d0,USa,NBas)
-! call dgemm('T','N',NBas,NBas,NBas,1d0,B%CMO,NBas,S,NBas,0d0,USb,NBas)
 ! USa,USb in AOMO
- call dgemm('N','N',NBas,NBas,NBas,1d0,S,NBas,A%CMO,NBas,0d0,USa,NBas)
- call dgemm('N','N',NBas,NBas,NBas,1d0,S,NBas,B%CMO,NBas,0d0,USb,NBas)
+! old
+ !call dgemm('N','N',NBas,NBas,NBas,1d0,S,NBas,A%CMO,NBas,0d0,USa,NBas)
+ !call dgemm('N','N',NBas,NBas,NBas,1d0,S,NBas,B%CMO,NBas,0d0,USb,NBas)
+ call dgemm('N','N',NAO,NBas,NAO,1d0,S,NAO,A%CMO,NAO,0d0,USa,NAO)
+ call dgemm('N','N',NAO,NBas,NAO,1d0,S,NAO,B%CMO,NAO,0d0,USb,NAO)
 
 ! PA(B), PB(A)
- call tran2MO(PA,USb,USb,PAbb,NBas)
- call tran2MO(PB,USa,USa,PBaa,NBas)
+ !call tran2MO(PA,USb,USb,PAbb,NBas)
+ !call tran2MO(PB,USa,USa,PBaa,NBas)
+ call tran_AO2MO2(PA,USb,USb,PAbb,NAO,NBas)
+ call tran_AO2MO2(PB,USa,USa,PBaa,NAO,NBas)
 
 ! Qab=0; Qba=0
- call dgemm('N','N',NBas,NBas,NBas,1d0,PA,NBas,USb,NBas,0d0,Qab,NBas)
- call dgemm('N','N',NBas,NBas,NBas,1d0,PB,NBas,USa,NBas,0d0,Qba,NBas)
+ ! old
+ !call dgemm('N','N',NBas,NBas,NBas,1d0,PA,NBas,USb,NBas,0d0,Qab,NBas)
+ !call dgemm('N','N',NBas,NBas,NBas,1d0,PB,NBas,USa,NBas,0d0,Qba,NBas)
+ !
+ call dgemm('N','N',NAO,NBas,NAO,1d0,PA,NAO,USb,NAO,0d0,Qab,NAO)
+ call dgemm('N','N',NAO,NBas,NAO,1d0,PB,NAO,USa,NAO,0d0,Qba,NAO)
 
 ! old (too large)
  !print*, 'A: num0, num1',A%num0,A%num1
@@ -145,21 +116,35 @@ double precision,allocatable :: work1(:)
 ! call tran3MO_Q(NBas,dimOB,B%CMO,Qab,'TWOB3A')
 
  if(Flags%ICholesky==0) then 
- call tran4_gen(NBas,&
-          dimOA,A%CMO(1:NBas,1:(A%num0+A%num1)),&
-          dimOA,  Qba(1:NBas,1:(A%num0+A%num1)),&
-          dimOA,A%CMO(1:NBas,1:(A%num0+A%num1)),&
-          dimOA,A%CMO(1:NBas,1:(A%num0+A%num1)),&
+ ! old
+ !call tran4_gen(NBas,&
+ !         dimOA,A%CMO(1:NBas,1:(A%num0+A%num1)),&
+ !         dimOA,  Qba(1:NBas,1:(A%num0+A%num1)),&
+ !         dimOA,A%CMO(1:NBas,1:(A%num0+A%num1)),&
+ !         dimOA,A%CMO(1:NBas,1:(A%num0+A%num1)),&
+ !         'TWOA3B','AOTWOSORT')
+ !call tran4_gen(NBas,&
+ !         dimOB,B%CMO(1:NBas,1:(B%num0+B%num1)),&
+ !         dimOB,  Qab(1:NBas,1:(B%num0+B%num1)),&
+ !         dimOB,B%CMO(1:NBas,1:(B%num0+B%num1)),&
+ !         dimOB,B%CMO(1:NBas,1:(B%num0+B%num1)),&
+ !         'TWOB3A','AOTWOSORT')
+ !
+ call tran4_gen(NAO,&
+          dimOA,A%CMO(1:NAO,1:dimOA),&
+          dimOA,  Qba(1:NAO,1:dimOA),&
+          dimOA,A%CMO(1:NAO,1:dimOA),&
+          dimOA,A%CMO(1:NAO,1:dimOA),&
           'TWOA3B','AOTWOSORT')
- call tran4_gen(NBas,&
-          dimOB,B%CMO(1:NBas,1:(B%num0+B%num1)),&
-          dimOB,  Qab(1:NBas,1:(B%num0+B%num1)),&
-          dimOB,B%CMO(1:NBas,1:(B%num0+B%num1)),&
-          dimOB,B%CMO(1:NBas,1:(B%num0+B%num1)),&
+ call tran4_gen(NAO,&
+          dimOB,B%CMO(1:NAO,1:dimOB),&
+          dimOB,  Qab(1:NAO,1:dimOB),&
+          dimOB,B%CMO(1:NAO,1:dimOB),&
+          dimOB,B%CMO(1:NAO,1:dimOB),&
           'TWOB3A','AOTWOSORT')
  endif
 
- call make_K(NBas,PB,Kb)
+ !call make_K(NAO,PB,Kb)
 
 ! block
 ! integer :: ip,iq,ir,is
@@ -201,10 +186,14 @@ double precision,allocatable :: work1(:)
  ! S(ad).PB(dc)
  tmp1=0
  tmp2=0
- call dgemm('N','N',NBas,NBas,NBas,1d0,PA,NBas,S,NBas,0d0,tmp1,NBas)
- call dgemm('N','N',NBas,NBas,NBas,1d0,S,NBas,PB,NBas,0d0,tmp2,NBas)
- do j=1,NBas
-    do i=1,NBas
+ !
+ !call dgemm('N','N',NBas,NBas,NBas,1d0,PA,NBas,S,NBas,0d0,tmp1,NBas)
+ !call dgemm('N','N',NBas,NBas,NBas,1d0,S,NBas,PB,NBas,0d0,tmp2,NBas)
+
+ call dgemm('N','N',NAO,NAO,NAO,1d0,PA,NAO,S,NAO,0d0,tmp1,NAO)
+ call dgemm('N','N',NAO,NAO,NAO,1d0,S,NAO,PB,NAO,0d0,tmp2,NAO)
+ do j=1,NAO
+    do i=1,NAO
        t1(2) = t1(2) + tmp1(i,j)*tmp2(i,j)
     enddo
  enddo
@@ -222,10 +211,10 @@ double precision,allocatable :: work1(:)
  t2c =0
  tmp1=0
  tmp2=0
- call dgemm('N','N',NBas,NBas,NBas,1d0,Va,NBas,PB,NBas,0d0,tmp1,NBas)
- call dgemm('N','N',NBas,NBas,NBas,1d0,PA,NBas,S,NBas,0d0,tmp2,NBas)
-  do j=1,NBas
-    do i=1,NBas
+ call dgemm('N','N',NAO,NAO,NAO,1d0,Va,NAO,PB,NAO,0d0,tmp1,NAO)
+ call dgemm('N','N',NAO,NAO,NAO,1d0,PA,NAO,S,NAO,0d0,tmp2,NAO)
+  do j=1,NAO
+    do i=1,NAO
        t2c(1) = t2c(1) + tmp1(i,j)*tmp2(i,j)
     enddo
  enddo
@@ -238,7 +227,7 @@ double precision,allocatable :: work1(:)
  do is=1,dimOB
     do iq=1,dimOB
        !t2c(2) = t2c(2) + sum(RDM2Bval(:,:,iq,is)*Vabb(:,:)*PAbb(is,iq))
-       tmp = tmp + sum(RDM2Bval(1:dimOB,1:dimOB,iq,is)*Vabb(1:dimOB,1:dimoB)*PAbb(is,iq))
+       tmp = tmp + sum(B%RDM2val(1:dimOB,1:dimOB,iq,is)*Vabb(1:dimOB,1:dimoB)*PAbb(is,iq))
     enddo
  enddo
  t2c(2) = -2d0*tmp
@@ -249,10 +238,10 @@ double precision,allocatable :: work1(:)
  t2b=0
  tmp1=0
  tmp2=0
- call dgemm('N','N',NBas,NBas,NBas,1d0,Vb,NBas,PA,NBas,0d0,tmp1,NBas)
- call dgemm('N','N',NBas,NBas,NBas,1d0,PB,NBas,S,NBas,0d0,tmp2,NBas)
-  do j=1,NBas
-    do i=1,NBas
+ call dgemm('N','N',NAO,NAO,NAO,1d0,Vb,NAO,PA,NAO,0d0,tmp1,NAO)
+ call dgemm('N','N',NAO,NAO,NAO,1d0,PB,NAO,S,NAO,0d0,tmp2,NAO)
+  do j=1,NAO
+    do i=1,NAO
        t2b(1) = t2b(1) + tmp1(i,j)*tmp2(i,j)
     enddo
   enddo
@@ -265,7 +254,8 @@ double precision,allocatable :: work1(:)
  do is=1,dimOA
     do iq=1,dimOA
        !t2b(2) = t2b(2) + sum(RDM2Aval(:,:,iq,is)*Vbaa(:,:)*PBaa(is,iq))
-       t2b(2) = t2b(2) + sum(RDM2Aval(1:dimOA,1:dimOA,iq,is)*Vbaa(1:dimOA,1:dimOA)*PBaa(is,iq))
+       !t2b(2) = t2b(2) + sum(RDM2Aval(1:dimOA,1:dimOA,iq,is)*Vbaa(1:dimOA,1:dimOA)*PBaa(is,iq))
+       t2b(2) = t2b(2) + sum(A%RDM2val(1:dimOA,1:dimOA,iq,is)*Vbaa(1:dimOA,1:dimOA)*PBaa(is,iq))
     enddo
  enddo
  t2b(2) = -2d0*t2b(2)
@@ -274,9 +264,10 @@ double precision,allocatable :: work1(:)
 
 ! T2a
  t2a = 0
- do jb=1,NBas
-    do ia=1,NBas
-       t2a(1) = t2a(1) + PA(ia,jb)*Kb(jb,ia)
+ do jb=1,NAO
+    do ia=1,NAO
+       !t2a(1) = t2a(1) + PA(ia,jb)*Kb(jb,ia)
+       t2a(1) = t2a(1) + PA(ia,jb)*B%Kmat(jb,ia)
     enddo
  enddo
  t2a(1) = -2.0d0*t2a(1)
@@ -295,7 +286,8 @@ double precision,allocatable :: work1(:)
            do is=1,dimOA
               do iq=1,dimOA
                      t2a(2) = t2a(2) + work(iq,is)* &
-                              RDM2Aval(ip,ir,iq,is)
+                              !RDM2Aval(ip,ir,iq,is)
+                              A%RDM2val(ip,ir,iq,is)
               enddo
            enddo
     enddo
@@ -356,7 +348,7 @@ double precision,allocatable :: work1(:)
            do is=1,dimOB
               do iq=1,dimOB
                      tmp = tmp + work(iq,is)* &
-                           RDM2Bval(ip,ir,iq,is)
+                           B%RDM2val(ip,ir,iq,is)
               enddo
            enddo
     enddo
@@ -406,6 +398,12 @@ double precision,allocatable :: work1(:)
  close(iunit,status='DELETE')
 
 ! T2a(4)
+
+ ! test
+ !dimOA = NBas
+ !dimOB = NBas
+ ! test
+
  allocate(tmpA(dimOA,dimOA,dimOA,dimOB),tmpB(dimOB,dimOB,dimOA,dimOB),&
           tmpAB(dimOA,dimOA,dimOB,dimOB))
 !
@@ -497,7 +495,8 @@ double precision,allocatable :: work1(:)
  !   enddo
  !enddo
  ! new
- call dgemm('N','N',dimOA**3,dimOB,dimOA,1d0,RDM2Aval,dimOA**3,Sab,NBas,0d0,tmpA,dimOA**3)
+ call dgemm('N','N',dimOA**3,dimOB,dimOA,1d0,A%RDM2val,dimOA**3,Sab,NBas,0d0,tmpA,dimOA**3)
+ !print*, 'tmpA',norm2(tmpA)
 
 ! old:
 ! N^5
@@ -518,8 +517,9 @@ double precision,allocatable :: work1(:)
 ! enddo
 ! new
  do is=1,dimOB
-    call dgemm('N','T',dimOB**2,dimOA,dimOB,1d0,RDM2Bval(:,:,:,is),dimOB**2,Sab,NBas,0d0,tmpB(:,:,:,is),dimOB**2)
+    call dgemm('N','T',dimOB**2,dimOA,dimOB,1d0,B%RDM2val(:,:,:,is),dimOB**2,Sab,NBas,0d0,tmpB(:,:,:,is),dimOB**2)
  enddo
+ !print*, 'tmpB',norm2(tmpB)
 
 ! old:
 ! N^6
@@ -552,14 +552,19 @@ double precision,allocatable :: work1(:)
  !enddo
  !print*, 'tmpAB-exch',norm2(tmpAB)
 
+ ! test
+ !dimOA = A%num0+A%num1
+ !dimOB = B%num0+B%num1
+ ! test
+
  work=0
  open(newunit=iunit,file='TMPOOAB',status='OLD',&
-     access='DIRECT',form='UNFORMATTED',recl=8*GdimOB**2)
+     access='DIRECT',form='UNFORMATTED',recl=8*dimOB**2)
 
  tmp = 0
  do ir=1,dimOA
     do ip=1,dimOA
-      read(iunit,rec=ip+(ir-1)*GdimOA) work(1:GdimOB,1:GdimOB)
+      read(iunit,rec=ip+(ir-1)*dimOA) work(1:dimOB,1:dimOB)
 
       tmp = tmp + sum(work(1:dimOB,1:dimOB)*tmpAB(ip,ir,1:dimOB,1:dimOB))
 
@@ -578,10 +583,8 @@ double precision,allocatable :: work1(:)
  call print_en('ExchS2',exchs2*1000,.true.)
 
  deallocate(Vbaa,Vabb,PBaa,PAbb,Vb,Va,PB,PA,Sab,S)
- deallocate(Kb,Qba,Qab,USb,USa)
+ deallocate(Qba,Qab,USb,USa)
  deallocate(tmp2,tmp1,work)
- !deallocate(JJb)
- deallocate(RDM2Bval,RDM2Aval)
 
 ! call clock('E1exch(S2)',Tcpu,Twall)
 
@@ -597,21 +600,19 @@ implicit none
 type(FlagsData)   :: Flags
 type(SystemBlock) :: A, B
 type(SaptData)    :: SAPT
-
 integer :: i, j, k, l, ia, jb
 integer :: ij,ipr
 integer :: ip,iq,ir,is
 integer :: ipq,iu,it
 integer :: iunit
 integer :: rdm2type
-integer :: dimOA,dimOB
 integer :: NAO,NBas
+integer :: dimOA,dimOB
 double precision :: fac,val,nnS2,tmp
 double precision :: tElst,tvk(3),tNa(2),tNb(2),tNaNb
 double precision :: exchs2
 double precision,allocatable :: Va(:,:),Vb(:,:),S(:,:)
 double precision,allocatable :: Sab(:,:),Vaab(:,:),Vbba(:,:),Vabb(:,:),Vbaa(:,:)
-double precision,allocatable :: RDM2Aval(:,:,:,:),RDM2Bval(:,:,:,:)
 double precision,allocatable :: intA(:,:,:,:),intB(:,:,:,:)
 double precision,allocatable :: tmpAB(:,:,:,:)
 double precision,allocatable :: work(:,:),ints(:)
@@ -622,49 +623,48 @@ print*, 'Testing E1exch NaNb...'
 ! set dimensions
 NAO  = SAPT%NAO
 NBas = A%NBasis
+
+!  for TREXIO!
+!dimOA = NBas
+!dimOB = NBas
 dimOA = A%num0+A%num1
 dimOB = B%num0+B%num1
 
-allocate(S(NBas,NBas),Sab(NBas,NBas))
-allocate(Va(NBas,NBas),Vb(NBas,NBas),&
+allocate(S(NAO,NAO),Sab(NBas,NBas))
+allocate(Va(NAO,NAO),Vb(NAO,NAO), &
          Vabb(NBas,NBas),Vbaa(NBas,NBas),&
          Vaab(NBas,NBas),Vbba(NBas,NBas))
 
-call get_one_mat('V',Va,A%Monomer,NBas)
-call get_one_mat('V',Vb,B%Monomer,NBas)
+call get_one_mat('V',Va,A%Monomer,NAO)
+call get_one_mat('V',Vb,B%Monomer,NAO)
 
-call tran2MO(Va,B%CMO,B%CMO,Vabb,NBas)
-call tran2MO(Vb,A%CMO,A%CMO,Vbaa,NBas)
-call tran2MO(Va,A%CMO,B%CMO,Vaab,NBas)
-call tran2MO(Vb,B%CMO,A%CMO,Vbba,NBas)
+!call tran2MO(Va,B%CMO,B%CMO,Vabb,NBas)
+!call tran2MO(Vb,A%CMO,A%CMO,Vbaa,NBas)
+!call tran2MO(Va,A%CMO,B%CMO,Vaab,NBas)
+!call tran2MO(Vb,B%CMO,A%CMO,Vbba,NBas)
 
-call get_one_mat('S',S,A%Monomer,NBas)
-call tran2MO(S,A%CMO,B%CMO,Sab,NBas)
+call tran_AO2MO2(Va,B%CMO,B%CMO,Vabb,NAO,NBas)
+call tran_AO2MO2(Vb,A%CMO,A%CMO,Vbaa,NAO,NBas)
+call tran_AO2MO2(Va,A%CMO,B%CMO,Vaab,NAO,NBas)
+call tran_AO2MO2(Vb,B%CMO,A%CMO,Vbba,NAO,NBas)
 
-allocate(RDM2Aval(dimOA,dimOA,dimOA,dimOA),&
-         RDM2Bval(dimOB,dimOB,dimOB,dimOB))
+call get_one_mat('S',S,A%Monomer,NAO)
+!call tran2MO(S,A%CMO,B%CMO,Sab,NBas)
+call tran_AO2MO2(S,A%CMO,B%CMO,Sab,NAO,NBas)
+
 allocate(intA(dimOA,dimOA,dimOA,dimOB),&
          intB(dimOB,dimOB,dimOA,dimOB))
 
-if(Flags%ICASSCF==1) then
-   ! CAS
-   RDM2Aval = A%RDM2val
-   RDM2Bval = B%RDM2val
-elseif(Flags%ICASSCF==0) then
-   ! GVB
-   RDM2Aval = A%RDM2val
-   RDM2Bval = B%RDM2val
-endif
 
-call dgemm('N','N',dimOA**3,dimOB,dimOA,1d0,RDM2Aval,dimOA**3,Sab,NBas,0d0,intA,dimOA**3)
+call dgemm('N','N',dimOA**3,dimOB,dimOA,1d0,A%RDM2val,dimOA**3,Sab,NBas,0d0,intA,dimOA**3)
 !call dgemm('N','T',dimOB**3,NBas,dimOB,1d0,RDM2Bval,dimOB**3,Sab,NBas,0d0,intB,dimOB**3)
 
 ! careful! intB(B,B,A,B)
 do is=1,dimOB
-   call dgemm('N','T',dimOB**2,dimOA,dimOB,1d0,RDM2Bval(:,:,:,is),dimOB**2,Sab,NBas,0d0,intB(:,:,:,is),dimOB**2)
+   call dgemm('N','T',dimOB**2,dimOA,dimOB,1d0,B%RDM2val(:,:,:,is),dimOB**2,Sab,NBas,0d0,intB(:,:,:,is),dimOB**2)
 enddo
 
-deallocate(RDM2Bval,RDM2Aval)
+!deallocate(RDM2Bval,RDM2Aval)
 deallocate(Vb,Va,S)
 
 ! n^A n^B Sab Sab
@@ -675,10 +675,15 @@ do i=1,dimOA
 enddo
 enddo
 
+!print*, 'Sab',norm2(Sab)
+!do i=1,NBas
+!   write(lout,'(i3,2f12.6)') i,A%Occ(i),B%Occ(i)
+!enddo
+
 tElst = 2d0*(SAPT%elst-SAPT%Vnn)*nnS2
 print*, 'tELST',tELST*1000
 
-allocate(ints(NBas**2),work(NBas,NBas))
+allocate(ints(NBas**2),work(NAO,NAO))
 
 ! tvk = n_p n_q (v^A S + v^B S + v_pq^qp)
 !open(newunit=iunit,file='FFOOABAB',status='OLD',&
@@ -748,12 +753,18 @@ print*, 'tvk(2)',tvk(2)*1000
 ! work = PA
 call get_den(NAO,NBas,A%CMO,A%Occ,1d0,work)
 ! tvk = n_p n_q v_pq^qp = PA.K[PB]
-do jb=1,NBas
-   do ia=1,NBas
+do jb=1,NAO 
+   do ia=1,NAO
       tvk(3) = tvk(3) + work(ia,jb)*B%Kmat(jb,ia)
    enddo
 enddo
 tvk(3) = -2.0d0*tvk(3)
+print*, 'tvk(3)',tvk(3)*1000
+
+!print*, 'B%Kmat',norm2(B%Kmat)
+
+deallocate(work)
+allocate(work(NBas,NBas))
 
 ! tNa
 tNa = 0
@@ -1840,8 +1851,6 @@ double precision,allocatable :: uA(:),uB(:)
 double precision,allocatable :: tindA(:),tindB(:),&
                                 tindX(:),VindX(:)
 double precision,allocatable :: WaBB(:,:),WbAA(:,:)
-double precision,allocatable :: RDM2Aval(:,:,:,:), &
-                                RDM2Bval(:,:,:,:)
 ! unc
 type(EBlockData)             :: SBlockAIV,SBlockBIV
 type(EBlockData),allocatable :: SBlockA(:),SBlockB(:)
@@ -1875,6 +1884,7 @@ double precision,parameter :: BigE = 1.D8
 
  uncoupled = .true.
  if(Flags%ICASSCF==0)   uncoupled = .false.
+ if(Flags%ITREXIO==1)   uncoupled = .false.
  if(A%Cubic.or.B%Cubic) uncoupled = .false.
 
 ! set dimensions
@@ -1953,55 +1963,57 @@ double precision,parameter :: BigE = 1.D8
 ! read EigValA_B
 ! allocate(EVecA(A%NDimX,A%NDimX),OmA(A%NDimX), &
 !          EVecB(B%NDimX,B%NDimX),OmB(B%NDimX))
- allocate(S(NBas,NBas),Sab(NBas,NBas),&
-          Sba(NBas,NBas),&
-          PA(NBas,NBas),PB(NBas,NBas),&
+ allocate(S(NAO,NAO),&
+          PA(NAO,NAO),PB(NAO,NAO),&
+          Va(NAO,NAO),Vb(NAO,NAO),&
+          Sab(NBas,NBas),Sba(NBas,NBas),&
           PAaa(NBas,NBas),PBbb(NBas,NBas),&
-          Va(NBas,NBas),Vb(NBas,NBas),  &
           Vabb(NBas,NBas),Vbaa(NBas,NBas),&
           Vaba(NBas,NBas),Vaab(NBas,NBas),Vbab(NBas,NBas),&
           WaBB(NBas,NBas),WbAA(NBas,NBas))
 
- call get_one_mat('S',S,A%Monomer,NBas)
- call tran2MO(S,A%CMO,B%CMO,Sab,NBas)
- call tran2MO(S,B%CMO,A%CMO,Sba,NBas)
+ call get_one_mat('S',S,A%Monomer,NAO)
+ !call tran2MO(S,A%CMO,B%CMO,Sab,NBas)
+ !call tran2MO(S,B%CMO,A%CMO,Sba,NBas)
+ call tran_AO2MO2(S,A%CMO,B%CMO,Sab,NAO,NBas)
+ call tran_AO2MO2(S,B%CMO,A%CMO,Sba,NAO,NBas)
 
  call get_den(NAO,NBas,A%CMO,A%Occ,1d0,PA)
  call get_den(NAO,NBas,B%CMO,B%Occ,1d0,PB)
 
- allocate(tmp1(NBas,NBas),tmp2(NBas,NBas))
+ allocate(tmp1(NAO,NBas),tmp2(NAO,NBas))
 
- call dgemm('N','N',NBas,NBas,NBas,1d0,S,NBas,A%CMO,NBas,0d0,tmp1,NBas)
- call dgemm('N','N',NBas,NBas,NBas,1d0,S,NBas,B%CMO,NBas,0d0,tmp2,NBas)
+ call dgemm('N','N',NAO,NBas,NAO,1d0,S,NAO,A%CMO,NAO,0d0,tmp1,NAO)
+ call dgemm('N','N',NAO,NBas,NAO,1d0,S,NAO,B%CMO,NAO,0d0,tmp2,NAO)
  ! PA(B), PB(A)
- call tran2MO(PA,tmp1,tmp1,PAaa,NBas)
- call tran2MO(PB,tmp2,tmp2,PBbb,NBas)
+ !call tran2MO(PA,tmp1,tmp1,PAaa,NBas)
+ !call tran2MO(PB,tmp2,tmp2,PBbb,NBas)
+ call tran_AO2MO2(PA,tmp1,tmp1,PAaa,NAO,NBas)
+ call tran_AO2MO2(PB,tmp2,tmp2,PBbb,NAO,NBas)
 
- call get_one_mat('V',Va,A%Monomer,NBas)
- call get_one_mat('V',Vb,B%Monomer,NBas)
+ call get_one_mat('V',Va,A%Monomer,NAO)
+ call get_one_mat('V',Vb,B%Monomer,NAO)
 
- call tran2MO(Va,B%CMO,B%CMO,Vabb,NBas)
- call tran2MO(Vb,A%CMO,A%CMO,Vbaa,NBas)
+ !call tran2MO(Va,B%CMO,B%CMO,Vabb,NBas)
+ !call tran2MO(Vb,A%CMO,A%CMO,Vbaa,NBas)
+ call tran_AO2MO2(Va,B%CMO,B%CMO,Vabb,NAO,NBas)
+ call tran_AO2MO2(Vb,A%CMO,A%CMO,Vbaa,NAO,NBas)
 
- call tran2MO(Va,B%CMO,A%CMO,Vaba,NBas)
- call tran2MO(Va,A%CMO,B%CMO,Vaab,NBas)
- call tran2MO(Vb,A%CMO,B%CMO,Vbab,NBas)
+ !call tran2MO(Va,B%CMO,A%CMO,Vaba,NBas)
+ !call tran2MO(Va,A%CMO,B%CMO,Vaab,NBas)
+ !call tran2MO(Vb,A%CMO,B%CMO,Vbab,NBas)
+ call tran_AO2MO2(Va,B%CMO,A%CMO,Vaba,NAO,NBas)
+ call tran_AO2MO2(Va,A%CMO,B%CMO,Vaab,NAO,NBas)
+ call tran_AO2MO2(Vb,A%CMO,B%CMO,Vbab,NAO,NBas)
 
- call tran2MO(A%WPot,B%CMO,B%CMO,WaBB,NBas)
- call tran2MO(B%WPot,A%CMO,A%CMO,WbAA,NBas)
+ !call tran2MO(A%WPot,B%CMO,B%CMO,WaBB,NBas)
+ !call tran2MO(B%WPot,A%CMO,A%CMO,WbAA,NBas)
+ call tran_AO2MO2(A%WPot,B%CMO,B%CMO,WaBB,NAO,NBas)
+ call tran_AO2MO2(B%WPot,A%CMO,A%CMO,WbAA,NAO,NBas)
 
- allocate(RDM2Aval(dimOA,dimOA,dimOA,dimOA),&
-          RDM2Bval(dimOB,dimOB,dimOB,dimOB))
+ !allocate(RDM2Aval(dimOA,dimOA,dimOA,dimOA),&
+ !         RDM2Bval(dimOB,dimOB,dimOB,dimOB))
 
- if(Flags%ICASSCF==1) then
-    ! CAS
-    RDM2Aval = A%RDM2val
-    RDM2Bval = B%RDM2val
- elseif(Flags%ICASSCF==0) then
-    ! GVB
-    RDM2Aval = A%RDM2val
-    RDM2Bval = B%RDM2val
- endif
 
  allocate(posA(NBas,NBas),posB(NBas,NBas))
 
@@ -2025,16 +2037,18 @@ double precision,parameter :: BigE = 1.D8
     enddo
  endif
 
+ deallocate(tmp2,tmp1)
  ! termZ
  ! PA(ab).S(bc)
  ! S(ad).PB(dc)
+ allocate(tmp1(NAO,NAO),tmp2(NAO,NAO))
  tmp1 = 0
  tmp2 = 0
  termZ = 0
- call dgemm('N','N',NBas,NBas,NBas,1d0,PA,NBas,S,NBas,0d0,tmp1,NBas)
- call dgemm('N','N',NBas,NBas,NBas,1d0,S,NBas,PB,NBas,0d0,tmp2,NBas)
- do j=1,NBas
-    do i=1,NBas
+ call dgemm('N','N',NAO,NAO,NAO,1d0,PA,NAO,S,NAO,0d0,tmp1,NAO)
+ call dgemm('N','N',NAO,NAO,NAO,1d0,S,NAO,PB,NAO,0d0,tmp2,NAO)
+ do j=1,NAO
+    do i=1,NAO
        termZ = termZ + tmp1(i,j)*tmp2(i,j)
     enddo
  enddo
@@ -2223,7 +2237,7 @@ double precision,parameter :: BigE = 1.D8
  !                 A%IndN,B%IndN,posA,posB,dimOA,dimOB,A%NDimX,B%NDimX,NBas)
 
  ! A3 here!!
- call exind_A3_XY_full(A%NDimX,B%NDimX,tmpXA,tmpXB,RDM2Aval,RDM2Bval,Sab, &
+ call exind_A3_XY_full(A%NDimX,B%NDimX,tmpXA,tmpXB,A%RDM2val,B%RDM2val,Sab, &
                     nelA,Vabb,nelB,Vbaa,'FOFOAABB',&
                     B%IndN,A%IndN,posB,posA,dimOB,dimOA,B%NDimX,A%NDimX,NBas)
 
@@ -2234,11 +2248,11 @@ double precision,parameter :: BigE = 1.D8
  call exind_A1_AB(A%NDimX,B%NDimX,tmpXA,tmpXB,tmpYA,tmpYB,nelA,nelB,dimOA,dimOB, &
                   A%Occ,B%Occ,PAaa,PBbb,Vaab,Vbab,Sab,A%IndN,B%IndN,posA,posB,NBas)
 ! A2
- call exind_A2_XX(A%NDimX,B%NDimX,tmpXA,tmpXB,RDM2Bval, &
+ call exind_A2_XX(A%NDimX,B%NDimX,tmpXA,tmpXB,B%RDM2val, &
                   Sab,nelA,Vabb,nelB,Vbab,PAaa,'FOFOBBBA', &
                   B%Occ,A%Occ,B%IndN,A%IndN,posB,posA,  &
                   dimOB,dimOA,B%NDimX,A%NDimX,NBas,.false.)
- call exind_A2_XX(B%NDimX,A%NDimX,tmpXB,tmpXA,RDM2Aval, &
+ call exind_A2_XX(B%NDimX,A%NDimX,tmpXB,tmpXA,A%RDM2val, &
                  Sba,nelB,Vbaa,nelA,Vaba,PBbb,'FOFOAAAB', &
                   A%Occ,B%Occ,A%IndN,B%IndN,posA,posB,  &
                   dimOA,dimOB,A%NDimX,B%NDimX,NBas,.false.)
@@ -2246,7 +2260,7 @@ double precision,parameter :: BigE = 1.D8
  !print*, 'XA-tot',norm2(tmpXA)
  !print*, 'XB-tot',norm2(tmpXB)
 
- call exind_A2_YY(A%NDimX,B%NDimX,tmpYA,tmpYB,RDM2Bval, &
+ call exind_A2_YY(A%NDimX,B%NDimX,tmpYA,tmpYB,B%RDM2val, &
                   Sab,nelA,Vabb,nelB,Vbab,PAaa,'FOFOBBAB', &
                   B%Occ,A%Occ,B%IndN,A%IndN,posB,posA,  &
                   dimOB,dimOA,B%NDimX,A%NDimX,NBas,.false.)
@@ -2254,7 +2268,7 @@ double precision,parameter :: BigE = 1.D8
  !print*, 'YA-tot-1',norm2(tmpYA)
  !print*, 'YB-tot-1',norm2(tmpYB)
 
- call exind_A2_YY(B%NDimX,A%NDimX,tmpYB,tmpYA,RDM2Aval, &
+ call exind_A2_YY(B%NDimX,A%NDimX,tmpYB,tmpYA,A%RDM2val, &
                   Sba,nelB,Vbaa,nelA,Vaba,PBbb,'FOFOAABA', &
                   A%Occ,B%Occ,A%IndN,B%IndN,posA,posB,  &
                   dimOA,dimOB,A%NDimX,B%NDimX,NBas,.false.)
@@ -2421,7 +2435,6 @@ double precision,parameter :: BigE = 1.D8
  deallocate(tmpYA,tmpXA)
 
  deallocate(posB,posA)
- deallocate(RDM2Bval,RDM2Aval)
  deallocate(PBbb,PAaa)
  deallocate(Vbab,Vaba,Vaab,Vbaa,Vb,Va)
  deallocate(WbAA,WaBB,PB,PA,Sba,Sab,S)
@@ -2464,8 +2477,6 @@ double precision,allocatable :: PA(:,:),PB(:,:), &
 double precision,allocatable :: Va(:,:),Vb(:,:), &
                                 Vabb(:,:),Vbaa(:,:),&
                                 Vaba(:,:),Vaab(:,:),Vbab(:,:)
-double precision,allocatable :: RDM2Aval(:,:,:,:), &
-                                RDM2Bval(:,:,:,:)
 type(EBlockData)             :: SBlockAIV,SBlockBIV
 type(EBlockData),allocatable :: SBlockA(:),SBlockB(:)
 character(:),allocatable     :: propA,propB
@@ -2502,6 +2513,7 @@ double precision,parameter :: SmallE = 1.D-3
  both      = SAPT%iCpld
  uncoupled = .true.
  if(Flags%ICASSCF==0)   uncoupled = .false.
+ if(Flags%ITREXIO==1)   uncoupled = .false.
  if(A%Cubic.or.B%Cubic) uncoupled = .false.
 
  ! SAPT cubic
@@ -2568,43 +2580,32 @@ double precision,parameter :: SmallE = 1.D-3
  !call unpack_XY0_full(AVecX0,AVecY0,OmA0,A%CICoef,A%IndN,A%NDimX,NBas,'XY0_A')
  !call unpack_XY0_full(BVecX0,BVecY0,OmB0,B%CICoef,B%IndN,B%NDimX,NBas,'XY0_B')
 
- allocate(S(NBas,NBas),&
+ allocate(S(NAO,NAO),&
+          PA(NAO,NAO),PB(NAO,NAO),&
+          Va(NAO,NAO),Vb(NAO,NAO),&
           Sab(NBas,NBas),Sba(NBas,NBas),&
-          PA(NBas,NBas),PB(NBas,NBas),  &
-          Va(NBas,NBas),Vb(NBas,NBas),  &
           Vabb(NBas,NBas),Vbaa(NBas,NBas),&
           Vaba(NBas,NBas),Vaab(NBas,NBas),Vbab(NBas,NBas))
- allocate(tmp1(NBas,NBas),tmp2(NBas,NBas))
+ allocate(tmp1(NAO,NAO),tmp2(NAO,NAO))
 
  call get_den(NAO,NBas,A%CMO,A%Occ,1d0,PA)
  call get_den(NAO,NBas,B%CMO,B%Occ,1d0,PB)
 
- call get_one_mat('S',S,A%Monomer,NBas)
- call tran2MO(S,A%CMO,B%CMO,Sab,NBas)
- call tran2MO(S,B%CMO,A%CMO,Sba,NBas)
+ call get_one_mat('S',S,A%Monomer,NAO)
 
- call get_one_mat('V',Va,A%Monomer,NBas)
- call get_one_mat('V',Vb,B%Monomer,NBas)
+ call tran_AO2MO2(S,A%CMO,B%CMO,Sab,NAO,NBas)
+ call tran_AO2MO2(S,B%CMO,A%CMO,Sba,NAO,NBas)
 
- call tran2MO(Va,B%CMO,B%CMO,Vabb,NBas)
- call tran2MO(Vb,A%CMO,A%CMO,Vbaa,NBas)
+ call get_one_mat('V',Va,A%Monomer,NAO)
+ call get_one_mat('V',Vb,B%Monomer,NAO)
 
- call tran2MO(Va,B%CMO,A%CMO,Vaba,NBas)
- call tran2MO(Va,A%CMO,B%CMO,Vaab,NBas)
- call tran2MO(Vb,A%CMO,B%CMO,Vbab,NBas)
+ call tran_AO2MO2(Va,B%CMO,B%CMO,Vabb,NAO,NBas)
+ call tran_AO2MO2(Vb,A%CMO,A%CMO,Vbaa,NAO,NBas)
 
- allocate(RDM2Aval(dimOA,dimOA,dimOA,dimOA),&
-          RDM2Bval(dimOB,dimOB,dimOB,dimOB))
+ call tran_AO2MO2(Va,B%CMO,A%CMO,Vaba,NAO,NBas)
+ call tran_AO2MO2(Va,A%CMO,B%CMO,Vaab,NAO,NBas)
+ call tran_AO2MO2(Vb,A%CMO,B%CMO,Vbab,NAO,NBas)
 
- if(Flags%ICASSCF==1) then
-    ! CAS
-    RDM2Aval = A%RDM2val
-    RDM2Bval = B%RDM2val
- elseif(Flags%ICASSCF==0) then
-    ! GVB
-    RDM2Aval = A%RDM2val
-    RDM2Bval = B%RDM2val
- endif
 
  allocate(posA(NBas,NBas),posB(NBas,NBas))
  if(Flags%ICASSCF==1) then
@@ -2633,10 +2634,10 @@ double precision,parameter :: SmallE = 1.D-3
  tmp1 = 0
  tmp2 = 0
  termZ = 0
- call dgemm('N','N',NBas,NBas,NBas,1d0,PA,NBas,S,NBas,0d0,tmp1,NBas)
- call dgemm('N','N',NBas,NBas,NBas,1d0,S,NBas,PB,NBas,0d0,tmp2,NBas)
- do j=1,NBas
-    do i=1,NBas
+ call dgemm('N','N',NAO,NAO,NAO,1d0,PA,NAO,S,NAO,0d0,tmp1,NAO)
+ call dgemm('N','N',NAO,NAO,NAO,1d0,S,NAO,PB,NAO,0d0,tmp2,NAO)
+ do j=1,NAO
+    do i=1,NAO
        termZ = termZ + tmp1(i,j)*tmp2(i,j)
     enddo
  enddo
@@ -2743,7 +2744,7 @@ double precision,parameter :: SmallE = 1.D-3
 
  else
 
-    call inter_A3_XX(A%NDimX,B%NDimX,tmp1,A%Occ,B%Occ,RDM2Aval,RDM2Bval,Sab,nelA,Vabb,nelB,Vbaa,'FOFOAABB',&
+    call inter_A3_XX(A%NDimX,B%NDimX,tmp1,A%Occ,B%Occ,A%RDM2val,B%RDM2val,Sab,nelA,Vabb,nelB,Vbaa,'FOFOAABB',&
                      B%IndN,A%IndN,posB,posA,dimOB,dimOA,B%NDimX,A%NDimX,NBas)
 
  endif
@@ -2812,11 +2813,11 @@ double precision,parameter :: SmallE = 1.D-3
 
  else
 
-    call inter_A2_XX(A%NDimX,B%NDimX,tmp1,RDM2Bval,     &
+    call inter_A2_XX(A%NDimX,B%NDimX,tmp1,B%RDM2val,    &
                      Sab,nelA,Vabb,nelB,Vbab,'FOFOBBBA',&
                      A%Occ,B%IndN,A%IndN,posB,posA,     &
                      dimOB,dimOA,B%NDimX,A%NDimX,NBas,.false.)
-    call inter_A2_XX(A%NDimX,B%NDimX,tmp1,RDM2Aval,     &
+    call inter_A2_XX(A%NDimX,B%NDimX,tmp1,A%RDM2val,    &
                      Sba,nelB,Vbaa,nelA,Vaba,'FOFOAAAB',&
                      B%Occ,A%IndN,B%IndN,posA,posB,     &
                      dimOA,dimOB,A%NDimX,B%NDimX,NBas,.true.)
@@ -2858,9 +2859,9 @@ double precision,parameter :: SmallE = 1.D-3
 
  else
 
-    call inter_A2_YY(A%NDimX,B%NDimX,tmp1,RDM2Bval,Sab,nelA,Vabb,nelB,Vbab,'FOFOBBAB',&
+    call inter_A2_YY(A%NDimX,B%NDimX,tmp1,B%RDM2val,Sab,nelA,Vabb,nelB,Vbab,'FOFOBBAB',&
              A%Occ,B%IndN,A%IndN,posB,posA,dimOB,dimOA,B%NDimX,A%NDimX,NBas,.false.)
-    call inter_A2_YY(A%NDimX,B%NDimX,tmp1,RDM2Aval,Sba,nelB,Vbaa,nelA,Vaba,'FOFOAABA',&
+    call inter_A2_YY(A%NDimX,B%NDimX,tmp1,A%RDM2val,Sba,nelB,Vbaa,nelA,Vaba,'FOFOAABA',&
               B%Occ,A%IndN,B%IndN,posA,posB,dimOA,dimOB,A%NDimX,B%NDimX,NBas,.true.)
 
  endif
@@ -2893,7 +2894,7 @@ double precision,parameter :: SmallE = 1.D-3
 
  else
 
-   call inter_A3_XY(A%NDimX,B%NDimX,tmp1,A%Occ,B%Occ,RDM2Aval,RDM2Bval,Sab,nelA,Vabb,nelB,Vbaa,'FOFOAABB',&
+   call inter_A3_XY(A%NDimX,B%NDimX,tmp1,A%Occ,B%Occ,A%RDM2val,B%RDM2val,Sab,nelA,Vabb,nelB,Vbaa,'FOFOAABB',&
                   B%IndN,A%IndN,posB,posA,dimOB,dimOA,B%NDimX,A%NDimX,NBas)
 
  endif
@@ -2958,9 +2959,9 @@ double precision,parameter :: SmallE = 1.D-3
 
  else
 
-    call inter_A2_XY(A%NDimX,B%NDimX,tmp1,RDM2Bval,Sab,nelA,Vabb,nelB,Vbab,'FOFOBBAB',&
+    call inter_A2_XY(A%NDimX,B%NDimX,tmp1,B%RDM2val,Sab,nelA,Vabb,nelB,Vbab,'FOFOBBAB',&
               A%Occ,B%IndN,A%IndN,posB,posA,dimOB,dimOA,B%NDimX,A%NDimX,NBas,.false.)
-    call inter_A2_YX(A%NDimX,B%NDimX,tmp1,RDM2Aval,Sba,nelB,Vbaa,nelA,Vaba,'FOFOAABA','FFOOBAAA',&
+    call inter_A2_YX(A%NDimX,B%NDimX,tmp1,A%RDM2val,Sba,nelB,Vbaa,nelA,Vaba,'FOFOAABA','FFOOBAAA',&
               B%Occ,A%IndN,B%IndN,posA,posB,dimOA,dimOB,A%NDimX,B%NDimX,NBas,.true.)
 !              B%Occ,A%IndN,B%IndN,posA,posB,dimOA,dimOB,A%NDimX,B%NDimX,NBas,.true.,B)
 
@@ -3000,10 +3001,10 @@ double precision,parameter :: SmallE = 1.D-3
 
  else
 
-    call inter_A2_YX(A%NDimX,B%NDimX,tmp1,RDM2Bval,Sab,nelA,Vabb,nelB,Vbab,'FOFOBBAB','FFOOABBB',&
+    call inter_A2_YX(A%NDimX,B%NDimX,tmp1,B%RDM2val,Sab,nelA,Vabb,nelB,Vbab,'FOFOBBAB','FFOOABBB',&
               A%Occ,B%IndN,A%IndN,posB,posA,dimOB,dimOA,B%NDimX,A%NDimX,NBas,.false.)
 !              A%Occ,B%IndN,A%IndN,posB,posA,dimOB,dimOA,B%NDimX,A%NDimX,NBas,.false.,B)
-    call inter_A2_XY(A%NDimX,B%NDimX,tmp1,RDM2Aval,Sba,nelB,Vbaa,nelA,Vaba,'FOFOAABA',&
+    call inter_A2_XY(A%NDimX,B%NDimX,tmp1,A%RDM2val,Sba,nelB,Vbaa,nelA,Vaba,'FOFOAABA',&
               B%Occ,A%IndN,B%IndN,posA,posB,dimOA,dimOB,A%NDimX,B%NDimX,NBas,.true.)
 
  endif

@@ -9,6 +9,9 @@ implicit none
 contains
 
 subroutine e1elst(A,B,SAPT)
+! calculates 1st order electrostatic energy
+! in the AO basis
+!
 implicit none
 
 type(SystemBlock) :: A, B
@@ -27,28 +30,28 @@ double precision,external  :: trace
  NAO  = SAPT%NAO
  NBas = A%NBasis 
 
- allocate(PA(NBas,NBas),PB(NBas,NBas),&
-          Va(NBas,NBas),Vb(NBas,NBas),Ja(NBas,NBas))
- allocate(work(NBas,NBas))
+ allocate(PA(NAO,NAO),PB(NAO,NAO),&
+          Va(NAO,NAO),Vb(NAO,NAO),Ja(NAO,NAO))
+ allocate(work(NAO,NAO))
 
  call get_den(NAO,NBas,A%CMO,A%Occ,2d0,PA)
  call get_den(NAO,NBas,B%CMO,B%Occ,2d0,PB)
 
- call get_one_mat('V',Va,A%Monomer,NBas)
- call get_one_mat('V',Vb,B%Monomer,NBas)
+ call get_one_mat('V',Va,A%Monomer,NAO)
+ call get_one_mat('V',Vb,B%Monomer,NAO)
 
- call make_J1(NBas,PA,Ja,'AOTWOSORT')
+ call make_J1(NAO,PA,Ja,'AOTWOSORT')
 
 ! Tr[Pa.Va + Pb.Vb + Pb.Ja]
  work=0
- call dgemm('N','N',NBas,NBas,NBas,1d0,PA,NBas,Vb,NBas,0d0,work,NBas)
- ea = trace(work,NBas)
+ call dgemm('N','N',NAO,NAO,NAO,1d0,PA,NAO,Vb,NAO,0d0,work,NAO)
+ ea = trace(work,NAO)
 ! print*, ea
- call dgemm('N','N',NBas,NBas,NBas,1d0,PB,NBas,Va,NBas,0d0,work,NBas)
- eb = trace(work,NBas) 
+ call dgemm('N','N',NAO,NAO,NAO,1d0,PB,NAO,Va,NAO,0d0,work,NAO)
+ eb = trace(work,NAO)
 ! print*, eb
- call dgemm('N','N',NBas,NBas,NBas,1d0,PB,NBas,Ja,NBas,0d0,work,NBas)
- eabel = trace(work,NBas)
+ call dgemm('N','N',NAO,NAO,NAO,1d0,PB,NAO,Ja,NAO,0d0,work,NAO)
+ eabel = trace(work,NAO)
  elst = ea + eb + eabel + SAPT%Vnn 
 
  call print_en('V_nucB_elA',ea,.false.)
@@ -195,7 +198,7 @@ double precision,allocatable :: EVecA(:,:),EVecB(:,:)
 double precision,allocatable :: WaBB(:,:),WbAA(:,:)
 double precision,allocatable :: tmpA(:),tmpB(:)
 
-integer          :: NBas,info
+integer          :: NAO,NBas,info
 integer          :: i,j,pq,ip,iq,rs,ir,is
 double precision :: fact
 double precision :: e2ba,e2ab,e2iu,e2ic
@@ -210,6 +213,7 @@ double precision,parameter :: SmallE = 1.D-6
  else
     NBas = A%NBasis
  endif
+ NAO = SAPT%NAO
 
  ! E2IND(B<--A)
 
@@ -232,7 +236,7 @@ double precision,parameter :: SmallE = 1.D-6
    call readEvalZ(OmB,B%NDimX,'PROP_B')
  endif
 
- call tran2MO(A%WPot,B%CMO,B%CMO,WaBB,NBas)
+ call tran_AO2MO2(A%WPot,B%CMO,B%CMO,WaBB,NAO,NBas)
 
  tmpB = 0d0
  do rs=1,B%NDimX
@@ -281,7 +285,7 @@ double precision,parameter :: SmallE = 1.D-6
    call readEvalZ(OmA,A%NDimX,'PROP_A')
  endif
 
- call tran2MO(B%WPot,A%CMO,A%CMO,WbAA,NBas)
+ call tran_AO2MO2(B%WPot,A%CMO,A%CMO,WbAA,NAO,NBas)
 
  tmpA = 0d0
  do pq=1,A%NDimX
@@ -1325,9 +1329,11 @@ deallocate(OmB,OmA)
 end subroutine e2dispCAS
 
 subroutine e2disp_cpld(Flags,A,B,SAPT)
+!
 ! calculate only coupled E2disp
-! used also for  cubic E2disp
+! used also for cubic E2disp
 ! does not work for GVB yet
+!
 implicit none
 
 type(FlagsData)   :: Flags
@@ -1350,9 +1356,9 @@ character(:),allocatable     :: propA,propB
 
 !double precision,parameter :: SmallE = 1.D-1
 double precision,parameter :: BigE   = 1.D8 
-double precision,parameter :: SmallE = 1.D-3
+double precision,parameter :: SmallE = 1.D-4
+!double precision,parameter :: SmallE = 1.D-3
 
- ! NOWE
  if(A%NBasis.ne.B%NBasis) then
     write(LOUT,'(1x,a)') 'ERROR! MCBS not implemented in SAPT!'
     stop
@@ -1361,8 +1367,8 @@ double precision,parameter :: SmallE = 1.D-3
  endif
 
 !check
- if(Flags%ICASSCF==0) then
-   write(LOUT,*) 'ERROR! E2DISP_CPLD WORKS WITH CAS!'
+ if(Flags%IGVB==1) then
+   write(LOUT,*) 'ERROR! E2DISP_CPLD DOES NOT WORK WITH GVB!'
    stop
  endif
 
@@ -1639,9 +1645,6 @@ do pq=1,A%NDimX
                 (B%CICoef(is)+B%CICoef(ir)) * &
                 work(is+(ir-B%num0-1)*dimOB)
 
-        !do i=1,A%NDimX
-        !   tmp1(i,rs) = tmp1(i,rs) + fact*tmpA(i)
-        !enddo
         tmp1(1:A%NDimX,rs) = tmp1(1:A%NDimX,rs) + fact*tmpA
 
         associate(Y => Y01BlockA(pq))
@@ -1759,8 +1762,6 @@ if(.not.(Flags%ICASSCF==0.and.Flags%ISERPA==0)) then
  tmp01=0
 
  call e2disp_intermed1(tmp1,tmp01,A,B,dimOA,dimOB,nOVA,nOVB,EvecA,fact,Y01BlockA,iunit,work)
- !call e2disp_test(tmp1,tmp01,A,B,EVecA,dimOA,dimOB,nOVA,nOVB)
- !call clock('E2disp: intermed1',Tcpu,Twall)
 
  ! coupled
  call dgemm('N','N',A%NDimX,B%NDimX,B%NDimX,1d0,tmp1,A%NDimX,EVecB,B%NDimX,0d0,tmp2,A%NDimX)
@@ -1802,14 +1803,6 @@ elseif(Flags%ICASSCF==0.and.Flags%ISERPA==0) then
        do i=1,A%NDimX
           tmp1(i,rs) = tmp1(i,rs) + fact*tmpA(i)
        enddo
-
-       !!$omp parallel do
-       !do i=1,A%NDimX
-       !   tmp1(i,rs) = tmp1(i,rs) + & 
-       !                fact * &
-       !                EVecA(pq+(i-1)*A%NDimX)
-       !enddo
-       !!$omp end parallel do
 
     enddo
  enddo
@@ -3689,6 +3682,9 @@ double precision,parameter :: BigE = 1.D8
 
  allocate(intA(3,A%NDimX),intB(3,B%NDimX))
 
+ !call print_sqmat(A%dipm(1,:,:),NBas) 
+ !call print_sqmat(A%dipm(2,:,:),NBas) 
+ !call print_sqmat(A%dipm(3,:,:),NBas) 
  print*, norm2(A%dipm)
  print*, norm2(B%dipm)
 

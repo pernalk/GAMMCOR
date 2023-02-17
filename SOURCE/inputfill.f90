@@ -343,6 +343,9 @@ subroutine read_block_calculation(CalcParams, line)
               CalcParams%RDMType = RDM_TYPE_HF
            elseif (uppercase(val) == "DMRG" ) then
               CalcParams%RDMType = RDM_TYPE_DMRG
+           elseif (uppercase(val) == "CIPSI".or.&
+                 & uppercase(val) == "CI") then
+              CalcParams%RDMType = RDM_TYPE_CI
            endif
 
       case ("TWOMOINT")
