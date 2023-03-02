@@ -371,6 +371,13 @@ subroutine read_block_calculation(CalcParams, line)
                CalcParams%RedVirt = 1
            endif
 
+      case ("RDMCORR")
+           if (uppercase(val) == ".TRUE.".or. &
+               uppercase(val) == "TRUE".or.   &
+               uppercase(val) == "T") then
+               CalcParams%RdmCorr = 1
+           endif
+
       ! here not sure
       case ("RESPONSE")
            if (uppercase(val) == "ERPA-APSG".or.&

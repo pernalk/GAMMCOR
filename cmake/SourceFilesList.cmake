@@ -84,6 +84,7 @@ set(GAMMCOR_SOURCE
     SOURCE/priunit.f90
     SOURCE/rdwrext.f90
     SOURCE/blocktypes.f90
+    SOURCE/rdmcorr.f90
 
     SOURCE/git_info.f90
     SOURCE/build_info.f90

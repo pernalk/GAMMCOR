@@ -39,6 +39,7 @@ double precision :: Tcpu,Twall
 
  ! jump to reduceVirt framework
  if(Flags%IRedVirt==1) call sapt_driver_red(Flags,SAPT)
+ if(Flags%IRDMCorr==1) call sapt_driver_rdmcorr(Flags,SAPT)
 
  call clock('START',Tcpu,Twall)
  call sapt_basinfo(SAPT,NBasis)
@@ -128,9 +129,52 @@ double precision :: Tcpu,Twall
 
 end subroutine sapt_driver
 
-subroutine sapt_driver_red(Flags,SAPT)
+subroutine sapt_driver_rdmcorr(Flags,SAPT)
+!
 ! sapt driver with reduced virt space
 ! Flags%IRedVirt==1
+!
+use rdmcorr
+!
+implicit none
+
+type(FlagsData)  :: Flags
+type(SaptData)   :: SAPT
+integer          :: i
+integer          :: NBasis
+
+double precision :: Tcpu,Twall
+
+Flags%SaptLevel = 0
+
+print*, 'sapt_driver_rdmcorr...'
+
+call clock('START',Tcpu,Twall)
+call sapt_basinfo(SAPT,NBasis)
+call sapt_interface(Flags,SAPT,NBasis)
+
+call sapt_mon_ints(SAPT%monA,Flags,SAPT%NAO,NBasis)
+call sapt_mon_ints(SAPT%monB,Flags,SAPT%NAO,NBasis)
+
+call sapt_rdm_corr(SAPT%monA,Flags,SAPT%NAO,NBasis)
+call sapt_rdm_corr(SAPT%monB,Flags,SAPT%NAO,NBasis)
+
+!call select_active ! set num0-2, NDimX
+
+!call sapt_mon_ints(SAPT%monA,Flags,SAPT%NAO,NBasis)
+!call sapt_mon_ints(SAPT%monB,Flags,SAPT%NAO,NBasis)
+
+call clock('SAPT',Tcpu,Twall)
+
+stop
+
+end subroutine sapt_driver_rdmcorr
+
+subroutine sapt_driver_red(Flags,SAPT)
+!
+! sapt driver with reduced virt space
+! Flags%IRedVirt==1
+!
 implicit none
 
 type(FlagsData)  :: Flags
@@ -799,19 +843,19 @@ if(Flags%ISERPA==0) then
 
   !endif
 
-  ! <oo|oo> for e1exchs2
-     if(Flags%ICholesky==1) then
-        call chol_ints_gen(B%num0+B%num1,B%num0+B%num1,B%OO,&
-                           A%num0+A%num1,A%num0+A%num1,A%OO,A%NChol,'TMPOOAB')
-     else
-        call tran4_gen(NAO, &
-                dimOA,A%CMO(1:NAO,1:dimOA), &
-                dimOA,A%CMO(1:NAO,1:dimOA), &
-                dimOB,B%CMO(1:NAO,1:dimOB), &
-                dimOB,B%CMO(1:NAO,1:dimOB), &
-               'TMPOOAB','AOTWOSORT')
+  !! <oo|oo> for e1exchs2
+  !   if(Flags%ICholesky==1) then
+  !      call chol_ints_gen(B%num0+B%num1,B%num0+B%num1,B%OO,&
+  !                         A%num0+A%num1,A%num0+A%num1,A%OO,A%NChol,'TMPOOAB')
+  !   else
+  !      call tran4_gen(NAO, &
+  !              dimOA,A%CMO(1:NAO,1:dimOA), &
+  !              dimOA,A%CMO(1:NAO,1:dimOA), &
+  !              dimOB,B%CMO(1:NAO,1:dimOB), &
+  !              dimOB,B%CMO(1:NAO,1:dimOB), &
+  !             'TMPOOAB','AOTWOSORT')
 
-     endif
+  !   endif
 
 elseif(Flags%ISERPA==2) then
 
@@ -834,13 +878,13 @@ elseif(Flags%ISERPA==2) then
                      NBasis,B%CMO,&
                      'TWOMOAB','AOTWOSORT')
 
-      ! <oo|oo>
-      call tran4_gen(NBasis,&
-                     A%num0+A%num1,A%CMO,&
-                     A%num0+A%num1,A%CMO,&
-                     B%num0+B%num1,B%CMO,&
-                    B%num0+B%num1,B%CMO,&
-                     'TMPOOAB','AOTWOSORT')
+     ! ! <oo|oo>
+     ! call tran4_gen(NBasis,&
+     !                A%num0+A%num1,A%CMO,&
+     !                A%num0+A%num1,A%CMO,&
+     !                B%num0+B%num1,B%CMO,&
+     !               B%num0+B%num1,B%CMO,&
+     !                'TMPOOAB','AOTWOSORT')
 
    endif
 
@@ -951,13 +995,13 @@ if(Flags%ISERPA==0) then
                  B%num1+B%num2,B%CMO(1:NBasis,B%num0+1:NBasisRed),&
                  'TWOMOAB','AOTWOSORT')
 
-  ! <oo|oo>
-  call tran4_gen(NBasis,&
-                 A%num0+A%num1,A%CMO,&
-                 A%num0+A%num1,A%CMO,&
-                 B%num0+B%num1,B%CMO,&
-                 B%num0+B%num1,B%CMO,&
-                 'TMPOOAB','AOTWOSORT')
+  !! <oo|oo>
+  !call tran4_gen(NBasis,&
+  !               A%num0+A%num1,A%CMO,&
+  !               A%num0+A%num1,A%CMO,&
+  !               B%num0+B%num1,B%CMO,&
+  !               B%num0+B%num1,B%CMO,&
+  !               'TMPOOAB','AOTWOSORT')
 !
 ! have not thought that thru
 !elseif(Flags%ISERPA==2) then

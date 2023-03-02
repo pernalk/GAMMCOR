@@ -134,6 +134,9 @@ else
   ! reduce virtuals
    Flags%IRedVirt = Input%CalcParams%RedVirt
 
+  ! calculate correlated RDMs
+   Flags%IRdmCorr = Input%CalcParams%RdmCorr
+
   ! memory in 2ints sorter (readtwoint) 
    Flags%MemVal   = Input%CalcParams%MemVal
    Flags%MemType  = Input%CalcParams%MemType

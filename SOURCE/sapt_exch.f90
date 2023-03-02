@@ -142,6 +142,13 @@ double precision,allocatable :: work1(:)
           dimOB,B%CMO(1:NAO,1:dimOB),&
           dimOB,B%CMO(1:NAO,1:dimOB),&
           'TWOB3A','AOTWOSORT')
+
+ call tran4_gen(NAO, &
+        dimOA,A%CMO(1:NAO,1:dimOA), &
+        dimOA,A%CMO(1:NAO,1:dimOA), &
+        dimOB,B%CMO(1:NAO,1:dimOB), &
+        dimOB,B%CMO(1:NAO,1:dimOB), &
+       'TMPOOAB','AOTWOSORT')
  endif
 
  !call make_K(NAO,PB,Kb)
