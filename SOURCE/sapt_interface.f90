@@ -236,8 +236,8 @@ double precision :: Tcpu,Twall
 
 ! look-up tables
  if(SAPT%InterfaceType==5) then
-    call select_active_trexio(SAPT%monA,NBasis,Flags)
-    call select_active_trexio(SAPT%monB,NBasis,Flags)
+    call select_active_thresh(SAPT%monA,NBasis,Flags)
+    call select_active_thresh(SAPT%monB,NBasis,Flags)
  else
     call select_active(SAPT%monA,NBasis,Flags)
     call select_active(SAPT%monB,NBasis,Flags)
@@ -2115,6 +2115,7 @@ integer,external :: NAddrRDM
 end subroutine prepare_rdm2_molpro
 
 subroutine select_active(mon,nbas,Flags)
+!
 ! set dimensions: NDimX,num0,num1,num2
 ! set matrices  : IndN,IndX,IPair,IndAux
 !
@@ -2134,7 +2135,7 @@ character(1) :: mname
  if(mon%Monomer==2) mname='B'
 
  IAuxGem = mon%IGem
- allocate(mon%IndAux(nbas))
+ if(.not.allocated(mon%IndAux)) allocate(mon%IndAux(nbas))
 
  do i=1,mon%NELE
     mon%IndAux(i)=0
@@ -2242,7 +2243,9 @@ endif
  print*, 'num2',mon%num2
 
 ! active pairs
- allocate(mon%IPair(nbas,nbas),mon%IndX(mon%NDim),mon%IndN(2,mon%NDim))
+ if(.not.allocated(mon%IndN)) then
+   allocate(mon%IPair(nbas,nbas),mon%IndX(mon%NDim),mon%IndN(2,mon%NDim))
+ endif
 
  mon%IPair(1:nbas,1:nbas) = 0
 
@@ -2453,7 +2456,7 @@ end function FindGem
 
 end subroutine select_active
 
-subroutine select_active_trexio(mon,nbas,Flags)
+subroutine select_active_thresh(mon,nbas,Flags)
 !
 ! do we really need a separate procedure for TREXIO?
 ! it would maybe make more sense to set RDMType CI?
@@ -2468,13 +2471,10 @@ type(SystemBlock)  :: mon
 type(FlagsData)    :: Flags
 integer,intent(in) :: nbas
 
+integer :: idisPair
 integer :: i,j,ij,ind,ind_ij
 
-print*, 'WIP: do we really need a separate procedure for TREXIO?'
-print*, '     it would maybe make more sense to set RDMType CI?'
-print*, '     or split: select_active_gvb/cas/ci? '
-
-allocate(mon%IndAux(nbas))
+if(.not.allocated(mon%IndAux)) allocate(mon%IndAux(nbas))
 
 ! IndAux = 0 (inactive)
 !        = 1 (active)
@@ -2521,20 +2521,22 @@ enddo
 mon%num1 = nbas - mon%num0 - mon%num2
 
 if(Mon%IPrint.gt.10) then
-  write(lout,'(/1x,a)')     'TREXIO-num:'
+  write(lout,'(/1x,a)')     'select_active_thresh:'
   write(lout,'(1x,a,i4)')   'num0 (inactive)',mon%num0
   write(lout,'(1x,a,i4)')   'num1   (active)',mon%num1
   write(lout,'(1x,a,i4,/)') 'num2  (virtual)',mon%num2
 endif
 
 ! active pairs
-allocate(mon%IPair(nbas,nbas),mon%IndX(mon%NDim),mon%IndN(2,mon%NDim))
+if(.not.allocated(mon%IndN)) then
+  allocate(mon%IPair(nbas,nbas),mon%IndX(mon%NDim),mon%IndN(2,mon%NDim))
+endif
 
 mon%IPair(1:nbas,1:nbas) = 0
 
-print*, 'maybe better call ThrSelAct : Threshold for nearly degenerate pairs?'
+!print*, 'maybe better call ThrSelAct : Threshold for nearly degenerate pairs?'
 
-write(LOUT,'(1x,a,e15.5)')  'Threshold for active orbital pairs:       ', mon%ThrSelAct
+write(LOUT,'(/1x,a,e15.5)') 'Threshold for active orbital pairs:       ', mon%ThrSelAct
 write(LOUT,'(1x,a,2e15.5)') 'Threshold for quasi-virtual orbital pairs:', mon%ThrQVirt
 block
 double precision :: ThrInact
@@ -2551,6 +2553,7 @@ endif
 
 ij  = 0
 ind = 0
+idisPair = 0
 do i=1,nbas
    do j=1,i-1
 
@@ -2568,9 +2571,9 @@ do i=1,nbas
                  mon%Occ(i)/=1d0.and.mon%Occ(j)/=1d0) ) then
                  ! exclude pairs of nearly/virtual orbitals
                  if(abs(mon%Occ(i)+mon%Occ(j)).lt.mon%ThrQVirt) then
-                    write(LOUT,'(1x,a,2x,2i4)') 'Discarding nearly virtual-orbitals pair',i,j
+                    idisPair = idisPair + 1
+                    if(mon%IPrint>10) write(LOUT,'(1x,a,2x,2i4)') 'Discarding nearly virtual-orbitals pair',i,j
                  elseif(abs(mon%Occ(i)+mon%Occ(j)-2d0).gt.1.D-10) then
-
                     ind = ind + 1
                     mon%IndX(ind) = ind
                     mon%IndN(1,ind) = i
@@ -2585,10 +2588,11 @@ do i=1,nbas
 
    enddo
 enddo
+write(LOUT,*) 'Number of discarded nearly degenerate virtual-orbital pairs ', idisPair
 
 mon%NDimX = ind
 
-end subroutine select_active_trexio
+end subroutine select_active_thresh
 
 subroutine save_CAONO(Cin,Cout,NAO,NBasis)
 !
@@ -3170,8 +3174,11 @@ integer        :: i,ip,NDimX
     !NDim = nbas*(nbas-1)/2
     write(LOUT,'()')
     write(LOUT,'(26x,a,5x,a)') 'Monomer A', 'Monomer B'
-    write(LOUT,'(1x,a,2x,i6,8x,i6)') 'Total number of pairs: ', SAPT%monA%NDim,SAPT%monB%NDim
+    write(LOUT,'(1x,a,1x,i6,8x,i6)') 'Total number of pairs: ', SAPT%monA%NDim,SAPT%monB%NDim
     write(LOUT,'(1x,a,12x,i6,8x,i6)') 'Reduced to: ', SAPT%monA%NDimX, SAPT%monB%NDimX
+    if (SAPT%monA%NDimX0/=0 .or. SAPT%monB%NDimX0/=0) then
+       write(LOUT,'(1x,a,6x,i6,8x,i6,a)') '(without RDM corr:', SAPT%monA%NDimX0, SAPT%monB%NDimX0, ')'
+    endif
     write(LOUT,'()')
 
     if(SAPT%IPrint.ge.10) then

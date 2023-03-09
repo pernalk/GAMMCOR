@@ -312,7 +312,7 @@ end subroutine AB_CAS_FOFO
 
 subroutine MP2RDM_FOFO(PerVirt,Eps,Occ,URe,UNOAO,XOne,IndN,IndX,IndAux,IGemIN, &
                        NAct,INActive,NDimX,NDim,NBasis,NInte1,     &
-                       IntJFile,IntKFile,ThrVirt,NVZero,IPrint)
+                       IntJFile,IntKFile,ThrVirt,NVZero,IPrint,RDM1)
 implicit none
 
 integer,intent(in)           :: NAct,INActive,NDimX,NDim,NBasis,NInte1
@@ -322,6 +322,8 @@ integer,intent(out)          :: NVZero
 double precision,intent(in)  :: PerVirt,ThrVirt
 double precision,intent(in)  :: Occ(NBasis),XOne(NInte1),UNOAO(NBasis,NBasis)
 double precision,intent(out) :: Eps(NBasis,NBasis)
+double precision,intent(out),optional :: RDM1(NBasis,NBasis)
+
 character(*)                 :: IntJFile,IntKFile
 
 integer                      :: iunit1,iunit2
@@ -489,6 +491,14 @@ deallocate(ints_bi,ints_bk)
 !enddo
 
 call triang_to_sq2(Gamma,AuxMat,NBasis)
+
+if (present(RDM1)) then
+   print*, 'zrzucanie nowej 1-rdm...'
+   RDM1 = 0d0
+   RDM1 = AuxMat
+   return
+endif
+
 call Diag8(AuxMat,NBasis,NBasis,PC,work(1:NBasis))
 
 val = 0d0

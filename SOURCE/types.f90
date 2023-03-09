@@ -164,6 +164,7 @@ type SystemBlock
       integer :: NActS(8), INActS(8)
       integer :: NDim, NDimX
       integer :: NDimN, DimEx
+      integer :: NDimX0 = 0
       integer :: NCen = 0
       integer :: UCen = 0
       integer :: NMonBas(8) = 0

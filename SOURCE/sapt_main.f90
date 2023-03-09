@@ -156,13 +156,39 @@ call sapt_interface(Flags,SAPT,NBasis)
 call sapt_mon_ints(SAPT%monA,Flags,SAPT%NAO,NBasis)
 call sapt_mon_ints(SAPT%monB,Flags,SAPT%NAO,NBasis)
 
+call read2rdm(SAPT%monA,NBasis)
+call prepare_RDM2val(SAPT%monA,Flags%ICASSCF,NBasis)
+call read2rdm(SAPT%monB,NBasis)
+call prepare_RDM2val(SAPT%monB,Flags%ICASSCF,NBasis)
+
 call sapt_rdm_corr(SAPT%monA,Flags,SAPT%NAO,NBasis)
 call sapt_rdm_corr(SAPT%monB,Flags,SAPT%NAO,NBasis)
 
-!call select_active ! set num0-2, NDimX
+!call select_active(SAPT%monA,NBasis,Flags) ! set num0-2, NDimX
+!call select_active(SAPT%monB,NBasis,Flags) ! set num0-2, NDimX
+call select_active_thresh(SAPT%monA,NBasis,Flags)
+call select_active_thresh(SAPT%monB,NBasis,Flags)
+call print_active(SAPT,NBasis)
 
+associate(A => SAPT%monA, B => SAPT%monB)
+  A%Occ(A%num0+A%num1+1:NBasis) = 0d0
+  B%Occ(B%num0+B%num1+1:NBasis) = 0d0
+end associate
+
+
+! integrals
 !call sapt_mon_ints(SAPT%monA,Flags,SAPT%NAO,NBasis)
 !call sapt_mon_ints(SAPT%monB,Flags,SAPT%NAO,NBasis)
+
+!call sapt_ab_ints(Flags,SAPT%monA,SAPT%monB,SAPT%iPINO,SAPT%NAO,NBasis)
+
+!call prepare_RDM2val(SAPT%monA,Flags%ICASSCF,NBasis)
+!call prepare_RDM2val(SAPT%monB,Flags%ICASSCF,NBasis)
+
+! SAPT component
+call e1elst(SAPT%monA,SAPT%monB,SAPT)
+!call e1elst_NaNb(SAPT%monA,SAPT%monB,SAPT)
+!call e1exchs2(Flags,SAPT%monA,SAPT%monB,SAPT)
 
 call clock('SAPT',Tcpu,Twall)
 
@@ -1046,6 +1072,7 @@ integer :: NOccup
 double precision, external :: FRDM2,FRDM2GVB
 
 NOccup = Mon%num0+Mon%num1
+
 if(allocated(Mon%RDM2val)) deallocate(Mon%RDM2val)
 allocate(Mon%RDM2val(NOccup,NOccup,NOccup,NOccup))
 

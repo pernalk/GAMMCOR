@@ -9,6 +9,7 @@ implicit none
 contains
 
 subroutine e1elst(A,B,SAPT)
+!
 ! calculates 1st order electrostatic energy
 ! in the AO basis
 !
@@ -34,8 +35,14 @@ double precision,external  :: trace
           Va(NAO,NAO),Vb(NAO,NAO),Ja(NAO,NAO))
  allocate(work(NAO,NAO))
 
+ print*, 'e1elst/OccA',norm2(A%Occ)
+ print*, 'e1elst/OccB',norm2(B%Occ)
+
  call get_den(NAO,NBas,A%CMO,A%Occ,2d0,PA)
  call get_den(NAO,NBas,B%CMO,B%Occ,2d0,PB)
+
+ print*, 'e1elst/PA',norm2(PA)
+ print*, 'e1elst/PB',norm2(PB)
 
  call get_one_mat('V',Va,A%Monomer,NAO)
  call get_one_mat('V',Vb,B%Monomer,NAO)
@@ -56,15 +63,105 @@ double precision,external  :: trace
 
  call print_en('V_nucB_elA',ea,.false.)
  call print_en('V_nucA_elB',eb,.false.)
- call print_en('V_elA_elB',eabel,.false.)   
+ call print_en('V_elA_elB',eabel,.false.)
  call print_en('V_nn',SAPT%Vnn,.false.)
  call print_en('Eelst',elst*1000,.true.)
  SAPT%elst = elst
 
  deallocate(work)
- deallocate(Ja,Vb,Va,PB,PA) 
+ deallocate(Ja,Vb,Va,PB,PA)
 
 end subroutine e1elst
+
+subroutine e1elst_NaNb(A,B,SAPT)
+!
+! calculates 1st order electrostatic energy
+! in the NO basis
+!
+implicit none
+
+type(SystemBlock) :: A, B
+type(SaptData)    :: SAPT
+
+integer :: iunit
+integer :: i,j,ip,iq
+integer :: NAO,NBasis
+integer :: dimOA,dimOB
+double precision,allocatable :: Va(:,:),Vb(:,:)
+double precision,allocatable :: Vabb(:,:),Vbaa(:,:)
+double precision,allocatable :: work(:,:)
+double precision :: ea,eb,eab,elst
+double precision,external  :: trace
+
+! set dimensions
+NAO    = SAPT%NAO
+NBasis = A%NBasis
+dimOA  = A%num0+A%num1
+dimOB  = B%num0+B%num1
+
+allocate(Va(NAO,NAO),Vb(NAO,NAO), &
+         Vabb(NBasis,NBasis),Vbaa(NBasis,NBasis))
+
+call get_one_mat('V',Va,A%Monomer,NAO)
+call get_one_mat('V',Vb,B%Monomer,NAO)
+
+call tran2MO(Va,B%CMO,B%CMO,Vabb,NBasis)
+call tran2MO(Vb,A%CMO,A%CMO,Vbaa,NBasis)
+
+! sum_p n_p v^B_pp
+ea = 0
+do i=1,A%num0+A%num1
+   ea = ea + A%Occ(i)*Vbaa(i,i)
+enddo
+ea = 2d0*ea
+!print*, 'ea',ea
+
+! sum_q n_q v^A_qq
+eb = 0
+do j=1,B%num0+B%num1
+   eb = eb + B%Occ(j)*Vabb(j,j)
+enddo
+eb = 2d0*eb
+!print*, 'eb',eb
+
+! sum_pq n_p n_q v_{pq}^{pq}
+! (OOOO|AABB)
+
+call tran4_gen(NBasis,&
+               A%num0+A%num1,A%CMO,&
+               A%num0+A%num1,A%CMO,&
+               B%num0+B%num1,B%CMO,&
+               B%num0+B%num1,B%CMO,&
+              'TMPOOAB','AOTWOSORT')
+
+open(newunit=iunit,file='TMPOOAB',status='OLD',&
+    access='DIRECT',form='UNFORMATTED',recl=8*dimOB**2)
+
+allocate(work(NBasis,NBasis))
+work = 0d0
+eab  = 0d0
+do ip=1,dimOA
+   read(iunit,rec=ip+(ip-1)*dimOA) work(1:dimOB,1:dimOB)
+   do iq=1,dimOB
+      eab = eab + A%Occ(ip)*B%Occ(iq)*work(iq,iq)
+   enddo
+enddo
+eab = 4d0*eab
+close(iunit)
+
+!print*, 'eab', eab
+
+elst = ea + eb + eab + SAPT%Vnn
+
+call print_en('V_nucB_elA',ea,.false.)
+call print_en('V_nucA_elB',eb,.false.)
+call print_en('V_elA_elB',eab,.false.)
+call print_en('V_nn',SAPT%Vnn,.false.)
+call print_en('Eelst',elst*1000,.true.)
+
+deallocate(Vbaa,Vabb,Vb,Va)
+
+end subroutine e1elst_NaNb
 
 subroutine e2ind_icerpa(Flags,A,B,SAPT)
 use timing

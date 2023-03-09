@@ -158,8 +158,8 @@ $(O)ab0fofo.o : $(S)ab0fofo.f90 $(O)priunit.o $(O)blocktypes.o $(O)tran.o $(O)ab
 	$(FCC) $(FFLAGS)  -c $(S)ab0fofo.f90 -o $(O)ab0fofo.o
 $(O)abchol.o : $(S)abchol.f90
 	$(FCC) $(FFLAGS)  -c $(S)abchol.f90 -o $(O)abchol.o
-$(O)rdmcorr.o : $(S)rdmcorr.f90 $(O)abchol.o $(O)types.o $(O)priunit.o
-	$(FCC) $(FFLAGS)  -c $(S)rdmcorr.f90 -o $(O)rdmcorr.o
+$(O)rdmcorr.o : $(S)rdmcorr.F90 $(O)abfofo.o $(O)types.o $(O)priunit.o
+	$(FCC) $(FFLAGS)  -c $(S)rdmcorr.F90 -o $(O)rdmcorr.o
 $(O)srefex.o : $(S)srefex.f90 $(O)types.o $(O)exmisc.o
 	$(FCC) $(FFLAGS)  -c $(S)srefex.f90 -o $(O)srefex.o
 $(O)exi.o : $(S)exi.f90

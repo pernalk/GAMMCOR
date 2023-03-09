@@ -49,8 +49,6 @@ double precision,allocatable :: work1(:)
 
  dimOA = A%num0+A%num1
  dimOB = B%num0+B%num1
- !
-
 
 ! call clock('START',Tcpu,Twall)
 
@@ -571,7 +569,7 @@ double precision,allocatable :: work1(:)
  tmp = 0
  do ir=1,dimOA
     do ip=1,dimOA
-      read(iunit,rec=ip+(ir-1)*dimOA) work(1:dimOB,1:dimOB)
+       read(iunit,rec=ip+(ir-1)*dimOA) work(1:dimOB,1:dimOB)
 
       tmp = tmp + sum(work(1:dimOB,1:dimOB)*tmpAB(ip,ir,1:dimOB,1:dimOB))
 
