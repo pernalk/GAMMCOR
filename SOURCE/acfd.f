@@ -2663,7 +2663,7 @@ C
       CICoef(I)=C(I)
       EndDo
 C
-      Call ReadDip(DipX,DipY,DipZ,UNOAO,NBasis)
+      Call ReadDip(DipX,DipY,DipZ,UNOAO,'DIP',NBasis)
 C
       NoStMx=0
       Write(6,'(X,"**** SA-CAS FROM MOLPRO ****",/)')
@@ -7457,7 +7457,7 @@ C
       End
 
 *Deck ReadDip
-      Subroutine ReadDip(DipX,DipY,DipZ,UNOAO,NBasis)
+      Subroutine ReadDip(DipX,DipY,DipZ,UNOAO,DipFile,NBasis)
 C
 C     Read dipole moment matrices and transform them to NO
 C
@@ -7471,8 +7471,9 @@ C
 C
       Dimension DipX(NBasis,NBasis),DipY(NBasis,NBasis),
      $ DipZ(NBasis,NBasis),UNOAO(NBasis,NBasis),AUXM(NBasis,NBasis)
+      Character(*) DipFile
 C
-      Call read_dip_molpro(DipX,DipY,DipZ,'DIP',NBasis)
+      Call read_dip_molpro(DipX,DipY,DipZ,trim(DipFile),NBasis)
 C
       Call dgemm('N','N',NBasis,NBasis,NBasis,1d0,UNOAO,NBasis,
      $           dipz,NBasis,0d0,AUXM,NBasis)
@@ -7491,7 +7492,8 @@ C
       End
 
 *Deck ComputeDipoleMom
-      Subroutine ComputeDipoleMom(UNOAO,Occ,NOccup,NBasis)
+      Subroutine ComputeDipoleMom(UNOAO,Occ,NOccup,AOFile,DipAOFile,
+     $                            NBasis)
 C
 C     compute electronic part of the DM
 C     using occupation numbers
@@ -7502,6 +7504,7 @@ C
 C
       Dimension Occ(NBasis),UNOAO(NBasis,NBasis)
       Parameter(Zero=0.D0,Half=0.5D0,One=1.D0,Two=2.D0,Three=3.D0)
+      Character(*) AOFile,DipAOFile
 C
 C     LOCAL ARRAYS
 C
@@ -7512,11 +7515,11 @@ C
       Real*8 NUC_DMX,NUC_DMY,NUC_DMZ
       Character(8) label
 
-      Call ReadDip(DipX,DipY,DipZ,UNOAO,NBasis)
+      Call ReadDip(DipX,DipY,DipZ,UNOAO,trim(DipAOFile),NBasis)
 
 C     Nuclear
 C
-      Open(newunit=ione,file='AOONEINT.mol',access='sequential',
+      Open(newunit=ione,file=trim(AOFile),access='sequential',
      $     form='unformatted',status='old')
 C
       Do
@@ -7536,6 +7539,7 @@ C
 C
       NUC_DMX=0; NUC_DMY=0; NUC_DMZ=0
       Do I=1,NCen
+         print*, 'Charge = ',i,Charg(i)
          NUC_DMX = NUC_DMX + Charg(i)*XYZ(i,1)
          NUC_DMY = NUC_DMY + Charg(i)*XYZ(i,2)
          NUC_DMZ = NUC_DMZ + Charg(i)*XYZ(i,3)
@@ -7615,7 +7619,7 @@ C
       EndDo
 C
       If(IStCAS(1,ICAS).Eq.1.And.IStCAS(2,ICAS).Eq.1) 
-     $ Call ReadDip(DipX,DipY,DipZ,UNOAO,NBasis)
+     $ Call ReadDip(DipX,DipY,DipZ,UNOAO,'DIP',NBasis)
 C
 C     AUXILIARY STUFF LATER NEEDED TO GET A+ AND A- MATRICES FOR ALPHA=0
 C

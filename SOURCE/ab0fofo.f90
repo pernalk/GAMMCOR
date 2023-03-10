@@ -1904,7 +1904,7 @@ If(IH0St.Lt.NoSt) Then
   Stop 'Stop in AC0CDEXCIT: IH0St is smaller than NoSt. AC0 correction would not be reliable '
 EndIf
 
-Call ReadDip(DipX,DipY,DipZ,UNOAO,NBasis)
+Call ReadDip(DipX,DipY,DipZ,UNOAO,'DIP',NBasis)
 
 NoStMx=0
 Write(6,'(X,"**** SA-CAS FROM MOLPRO ****",/)')
@@ -3320,7 +3320,7 @@ Do I=1,NBasis
    If(Occ(I).Lt.0.5) C(I)=-C(I)
 EndDo
 
-If(IStCAS(1,ICAS).Eq.1.And.IStCAS(2,ICAS).Eq.1) Call ReadDip(DipX,DipY,DipZ,UNOAO,NBasis)
+If(IStCAS(1,ICAS).Eq.1.And.IStCAS(2,ICAS).Eq.1) Call ReadDip(DipX,DipY,DipZ,UNOAO,'DIP',NBasis)
 
 allocate(ABPLUS(NDimX,NDimX),ABMIN(NDimX,NDimX))
 ABPLUS = 0
