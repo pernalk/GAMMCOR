@@ -710,6 +710,12 @@ character(:),allocatable :: occfile,sirifile,siriusfile,coefile
 end subroutine readocc_dalton
 
 subroutine readocc_molpro(NBasis,Mon,OrbAux,OneRdm,Flags)
+!
+! output: INActive, NAct
+!         NGem, IGem
+!
+! output: Occ, CICoef
+!
 implicit none
 
 type(SystemBlock) :: Mon
@@ -936,6 +942,52 @@ deallocate(Eval,work)
 deallocate(work1d)
 
 end subroutine readocc_trexio
+
+subroutine readocc_rdm_corr(Mon,NBasis)
+!
+! set: INActive, NAct
+!      NGem, IGem
+
+implicit none
+
+type(SystemBlock)  :: Mon
+integer,intent(in) :: NBasis
+
+integer :: i
+integer :: NOccup
+
+Mon%INAct = Mon%num0
+Mon%NAct  = Mon%num1
+NOccup = Mon%INAct + Mon%NAct
+
+Print*, 'INAct = ',Mon%INAct
+Print*, 'NAct = ',Mon%NAct
+
+!do i=1,Mon%NAct
+!   print*, 'i,occ,1-occ = ',i,Mon%Occ(i),1d0-Mon%Occ(i)
+!enddo
+
+allocate(Mon%IGem0(NBasis))
+Mon%IGem0 = Mon%IGem
+
+! this may not work with GVB?
+do i=1,Mon%INAct
+   Mon%IGem(i) = 1
+enddo
+do i=Mon%INAct+1,NOccup
+   Mon%IGem(i) = 2
+enddo
+do i=NOccup+1,NBasis
+   Mon%IGem(i) = 3
+enddo
+
+! construct CICoef
+do i=1,NBasis
+   Mon%CICoef(i)=sqrt(Mon%Occ(i))
+   if(Mon%Occ(i).lt.0.5d0) Mon%CICoef(i)=-Mon%CICoef(i)
+enddo
+
+end subroutine readocc_rdm_corr
 
 subroutine readocc_cas_siri(mon,nbas,noSiri)
 !
@@ -2520,7 +2572,7 @@ do i=nbas,1,-1
 enddo
 mon%num1 = nbas - mon%num0 - mon%num2
 
-if(Mon%IPrint.gt.10) then
+if(Mon%IPrint.ge.10) then
   write(lout,'(/1x,a)')     'select_active_thresh:'
   write(lout,'(1x,a,i4)')   'num0 (inactive)',mon%num0
   write(lout,'(1x,a,i4)')   'num1   (active)',mon%num1
@@ -3181,7 +3233,7 @@ integer        :: i,ip,NDimX
     endif
     write(LOUT,'()')
 
-    if(SAPT%IPrint.ge.10) then
+    if(SAPT%IPrint.gt.10) then
        NDimX = max(SAPT%monA%NDimX,SAPT%monB%NDimX)
        write(LOUT,'()')
        write(LOUT,'(2x,"Accepted pairs:")')
@@ -3215,6 +3267,27 @@ integer        :: i,ip,NDimX
  endif
 
 end subroutine print_active
+
+
+subroutine compare_active(Mon, NBas)
+!
+! compare the current set of occupation numbers (Occ)
+! with the initial one (written for RDMCORR = .TRUE. option)
+!
+implicit none
+type(SystemBlock)  :: Mon
+integer,intent(in) :: NBas
+
+integer :: i
+
+write(LOUT,'(1x,a)') 'ORBITAL OCCUPANCIES'
+write(LOUT,'(1x,a,3x,a,4x,a,10x,a,6x,a)') 'CASSCF', 'Occ-Initial', 'Gem-I', 'Occ-Final  ','Gem-F'
+do i=1,nbas
+   write(LOUT,'(1x,i3,1x,e16.6,1x,i6,7x,e16.6,3x,i6)') i, Mon%Occ0(i),Mon%IGem0(i),Mon%Occ(i),Mon%IGem(i)
+enddo
+write(LOUT, '()')
+
+end subroutine compare_active
 
 subroutine print_mo(cmo,n,mon)
 implicit none

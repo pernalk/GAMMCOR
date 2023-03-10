@@ -168,13 +168,28 @@ call sapt_rdm_corr(SAPT%monB,Flags,SAPT%NAO,NBasis)
 !call select_active(SAPT%monB,NBasis,Flags) ! set num0-2, NDimX
 call select_active_thresh(SAPT%monA,NBasis,Flags)
 call select_active_thresh(SAPT%monB,NBasis,Flags)
-call print_active(SAPT,NBasis)
 
+! set Virtual occupation to zero
+write(lout,'(1x,a)') 'Setting virtual occupations to 0d0!'
 associate(A => SAPT%monA, B => SAPT%monB)
   A%Occ(A%num0+A%num1+1:NBasis) = 0d0
   B%Occ(B%num0+B%num1+1:NBasis) = 0d0
 end associate
 
+call readocc_rdm_corr(SAPT%monA,NBasis)
+call readocc_rdm_corr(SAPT%monB,NBasis)
+
+call print_active(SAPT,NBasis)
+call compare_active(SAPT%monA,NBasis)
+
+block
+   ! TEST
+   !print*, 'restore old Occ numbers (Occ0)'
+   !associate(A => SAPT%monA, B => SAPT%monB)
+   !A%Occ = A%Occ0
+   !B%Occ = B%Occ0
+   !end associate
+end block
 
 ! integrals
 !call sapt_mon_ints(SAPT%monA,Flags,SAPT%NAO,NBasis)
@@ -182,13 +197,22 @@ end associate
 
 !call sapt_ab_ints(Flags,SAPT%monA,SAPT%monB,SAPT%iPINO,SAPT%NAO,NBasis)
 
-!call prepare_RDM2val(SAPT%monA,Flags%ICASSCF,NBasis)
-!call prepare_RDM2val(SAPT%monB,Flags%ICASSCF,NBasis)
+call prepare_RDM2corr(SAPT%monA,NBasis,Flags%IRDM2Typ)
+call prepare_RDM2corr(SAPT%monB,NBasis,Flags%IRDM2Typ)
 
 ! SAPT component
 call e1elst(SAPT%monA,SAPT%monB,SAPT)
 !call e1elst_NaNb(SAPT%monA,SAPT%monB,SAPT)
-!call e1exchs2(Flags,SAPT%monA,SAPT%monB,SAPT)
+call e1exchs2(Flags,SAPT%monA,SAPT%monB,SAPT)
+
+call summary_sapt_rdm(SAPT,Flags,NBasis)
+
+call delfile('AOTWOSORT')
+call delfile('TMPOOAB')
+call delfile('FFOOAA')
+call delfile('FFOOBB')
+call delfile('FOFOAA')
+call delfile('FOFOBB')
 
 call clock('SAPT',Tcpu,Twall)
 
@@ -1473,6 +1497,35 @@ write(LOUT,'(1x,a,t19,a,f16.8)') 'Eint(RSPT2)','=', erspt2*1.0d3
 write(LOUT,'()')
 
 end subroutine summary_rspt
+
+subroutine summary_sapt_rdm(SAPT,Flags,NBasis)
+!
+implicit none
+!
+type(SAPTData)     :: SAPT
+type(FlagsData)    :: Flags
+integer,intent(in) :: NBasis
+
+integer :: i
+character(*),parameter :: PossibleRDM2corr(3) = &
+[character(8) :: 'CAS', 'HF', 'DMFT(BB)']
+
+write(LOUT,'(/,8a10)') ('**********',i=1,4)
+write(LOUT,'(1x,a)') 'SAPT SUMMARY / milliHartree'
+write(LOUT,'(8a10)') ('**********',i=1,4)
+
+write(LOUT,'(1x,a)')   'First-order SAPT with correlated RDMs'
+write(LOUT,'(1x,2a)') '2-RDM corr type : ', PossibleRDM2corr(Flags%IRDM2Typ+1)
+write(LOUT,'(/1x,a,e10.3)') 'Thresh Active A : ', SAPT%monA%ThrAct
+write(LOUT,'(1x,a,e10.3)') 'Thresh Active B : ', SAPT%monB%ThrAct
+write(LOUT,'(1x,a,i3,a,i3)') 'Occ space A increased from ', SAPT%monA%NOccup0, ' to ', SAPT%monA%num0+SAPT%monA%num1
+write(LOUT,'(1x,a,i3,a,i3)') 'Occ space B increased from ', SAPT%monA%NOccup0, ' to ', SAPT%monA%num0+SAPT%monA%num1
+
+write(LOUT,'(/1x,a,t19,a,f16.8)') 'E1elst',  '=', SAPT%elst  *1.d03
+write(LOUT,'(1x,a,t19,a,f16.8)') 'E1exch',   '=', SAPT%exchs2*1.d03
+write(LOUT,'(1x,a,t19,a,f16.8)') 'E1    ',   '=', (SAPT%elst+SAPT%exchs2)*1.d03
+
+end subroutine summary_sapt_rdm
 
 subroutine free_sapt(Flags,SAPT)
 implicit none
