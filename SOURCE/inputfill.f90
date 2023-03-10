@@ -378,6 +378,18 @@ subroutine read_block_calculation(CalcParams, line)
                CalcParams%RdmCorr = 1
            endif
 
+      case ("RDM2APP")
+           if (uppercase(val) == "HF".or. &
+               uppercase(val) == "HARTREE-FOCK") then
+               CalcParams%Rdm2Type = 1
+           elseif (uppercase(val) == "BB".or. &
+               uppercase(val) == "DMFT") then
+               CalcParams%Rdm2Type = 2
+           elseif (uppercase(val) == "CAS".or. &
+               uppercase(val) == "CASSCF") then
+               CalcParams%Rdm2Type = 0
+           endif
+
       ! here not sure
       case ("RESPONSE")
            if (uppercase(val) == "ERPA-APSG".or.&

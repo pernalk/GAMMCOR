@@ -136,6 +136,7 @@ else
 
   ! calculate correlated RDMs
    Flags%IRdmCorr = Input%CalcParams%RdmCorr
+   Flags%IRdm2Typ = Input%CalcParams%Rdm2Type
 
   ! memory in 2ints sorter (readtwoint) 
    Flags%MemVal   = Input%CalcParams%MemVal

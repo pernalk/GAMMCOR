@@ -40,6 +40,7 @@ integer, parameter :: FLAG_CORE = 1
 integer, parameter :: FLAG_NOBASIS = 0
 integer, parameter :: FLAG_REDVIRT = 0
 integer, parameter :: FLAG_RDMCORR = 0
+integer, parameter :: FLAG_RDM2TYP = 0
 logical, parameter :: FLAG_RESTART = .FALSE.
 logical, parameter :: FLAG_TRIPLET = .FALSE.
 integer, parameter :: FLAG_PRINT_LEVEL = 0
@@ -122,6 +123,7 @@ type CalculationBlock
       integer :: vdWCoef   = 0
       integer :: RedVirt   = FLAG_REDVIRT
       integer :: RdmCorr   = FLAG_RDMCORR
+      integer :: Rdm2Type  = FLAG_RDM2TYP
       integer :: MemVal = 2, MemType = 3 ! default: use 2 GB for 3-ind_tran (Cholesky)
       logical :: Restart    = FLAG_RESTART
       logical :: Triplet    = FLAG_TRIPLET
@@ -164,7 +166,8 @@ type SystemBlock
       integer :: NActS(8), INActS(8)
       integer :: NDim, NDimX
       integer :: NDimN, DimEx
-      integer :: NDimX0 = 0
+      integer :: NDimX0  = 0
+      integer :: NOccup0 = 0
       integer :: NCen = 0
       integer :: UCen = 0
       integer :: NMonBas(8) = 0
@@ -215,12 +218,16 @@ type SystemBlock
       integer,allocatable :: NumOSym(:),IndInt(:)
       integer,allocatable :: IndNx(:,:)
       ! TEST ONLY
+      integer,allocatable :: IGem0(:)
+      double precision,allocatable :: Occ0(:)
+
       integer,allocatable :: IndNT(:,:)
       integer,allocatable :: Ind2(:)
       double precision,allocatable :: Occ(:), CICoef(:)
       double precision,allocatable :: OrbE(:)
       double precision,allocatable :: TwoMO(:)
       double precision,allocatable :: CMO(:,:)
+      double precision,allocatable :: CNONO(:,:)
       double precision,allocatable :: OV(:,:),OO(:,:), &
                                       FO(:,:),FF(:,:), &
                                       FFAB(:,:),FFBA(:,:), &
@@ -275,6 +282,7 @@ type FlagsData
      integer :: ITwoEl    = TWOMO_INCORE 
      integer :: IRedVirt  = FLAG_REDVIRT
      integer :: IRDMCorr  = FLAG_RDMCORR
+     integer :: IRDM2Typ  = FLAG_RDM2TYP
      integer :: ICholesky = FLAG_CHOLESKY
      integer :: ICholeskyAccu = CHOL_ACCU_DEFAULT
      integer :: IFun      = 13
