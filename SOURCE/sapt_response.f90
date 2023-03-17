@@ -7,10 +7,282 @@ use abmat
 use abfofo
 use ab0fofo
 use sapt_utils
+use sapt_inter
 
 implicit none
 
 contains
+
+subroutine sapt_2trdm(Flags,A,B,NBasis)
+implicit none
+
+type(FlagsData)    :: Flags
+type(SystemBlock)  :: A,B
+integer,intent(in) :: NBasis
+integer :: pq,ip,iq,ir,is,it,exc,i,j
+integer :: dimOA,dimOB
+integer :: nstatesA,nstatesB
+double precision,allocatable :: RDM2A(:,:,:,:),RDM2B(:,:,:,:),TRDM1(:,:),TRDM1TEST(:,:),RDM1TEST(:,:)
+
+write(lout,'(/1x,a)') 'entering 2trdm...'
+dimOA  = A%num0+A%num1
+dimOB  = B%num0+B%num1
+nstatesA = A%NStates
+nstatesB = B%NStates
+allocate(RDM2A(dimOA,dimOA,dimOA,dimOA),&
+         RDM2B(dimOB,dimOB,dimOB,dimOB))
+
+RDM2A(:,:,:,:) = A%rdm24(A%iref1,:,:,:,:)
+RDM2B(:,:,:,:) = B%rdm24(B%iref1,:,:,:,:)
+!print*,"RDM2A"
+!print*,RDM2A
+
+
+!allocate(A%trdm24(nstatesA,NBasis,NBasis,NBasis,NBasis))
+!allocate(B%trdm24(nstatesB,NBasis,NBasis,NBasis,NBasis))
+
+allocate(A%trdm24(4,NBasis,NBasis,NBasis,NBasis))
+allocate(B%trdm24(4,NBasis,NBasis,NBasis,NBasis))
+
+allocate(TRDM1(A%NDimX,A%NDimX))
+allocate(TRDM1TEST(A%NDimX,A%NDIMX))
+TRDM1=0d0
+
+
+do exc=1,4 
+   A%trdm24(exc,:,:,:,:)=0d0
+enddo
+
+
+print*, 'A EigX',norm2(A%EigX)
+print*, 'A EigY',norm2(A%EigY)
+print*, 'B EigX',norm2(B%EigX)
+print*, 'B EigY',norm2(B%EigY)
+print*,'NDimX',A%NDimX
+!print*,'A%EigX'
+do pq=1,A%NDimX
+   if (A%EigX(2*A%NDimX+pq)/= 0d0) then
+!   print *,A%EigX(2*A%NDimX+pq)
+   endif
+enddo
+! 1 OK OK 
+do exc=1,4
+   do pq=1,A%NDimX
+      ip = A%IndN(1,pq)
+      iq = A%IndN(2,pq)
+      do ir = 1,dimOA
+         do is = 1,dimOA
+            do it =1,dimOA
+            A%trdm24(exc,ip,is,ir,it) =  A%trdm24(exc,ip,is,ir,it)+A%EigX((exc-1)*A%NDimX+pq)*RDM2A(iq,is,ir,it)
+!            print*, A%EigX((exc-1)*A%NDimX+pq)
+            enddo
+         enddo
+      enddo
+   enddo
+ ! 2  OK 
+   do pq=1,A%NDimX
+      ip = A%IndN(1,pq)
+      iq = A%IndN(2,pq)
+      do ir = 1,dimOA
+         do is = 1,dimOA
+            do it =1,dimOA
+            A%trdm24(exc,ir,is,ip,it) =  A%trdm24(exc,ir,is,ip,it)+A%EigX((exc-1)*A%NDimX+pq)*RDM2A(ir,is,iq,it)
+            enddo
+         enddo
+      enddo
+   enddo
+!3   OK
+   do pq=1,A%NDimX
+      ip = A%IndN(1,pq)
+      iq = A%IndN(2,pq)
+      do ir = 1,dimOA
+         do is = 1,dimOA
+            do it =1,dimOA
+               if (ip <= dimOA) then
+                  A%trdm24(exc,ir,iq,is,it) =  A%trdm24(exc,ir,iq,is,it)-A%EigX((exc-1)*A%NDimX+pq)*RDM2A(ir,ip,is,it)
+            endif
+            enddo
+         enddo
+      enddo
+   enddo
+!4   OK
+   do pq=1,A%NDimX
+      ip = A%IndN(1,pq)
+      iq = A%IndN(2,pq)
+      do ir = 1,dimOA
+         do is = 1,dimOA
+            do it =1,dimOA
+               if(ip<=dimOA) then
+                  A%trdm24(exc,ir,it,is,iq) =  A%trdm24(exc,ir,it,is,iq)-A%EigX((exc-1)*A%NDimX+pq)*RDM2A(ir,it,is,ip)
+               endif   
+            enddo
+         enddo
+      enddo
+   enddo
+
+
+
+!5 OK
+      do pq=1,A%NDimX
+         ip = A%IndN(1,pq)
+         iq = A%IndN(2,pq)
+         do ir = 1,dimOA
+            do is = 1,dimOA
+               do it =1,dimOA
+                  if(ip <= dimOA) then
+                     A%trdm24(exc,iq,is,ir,it) =  A%trdm24(exc,iq,is,ir,it)+A%EigY((exc-1)*A%NDimX+pq)*RDM2A(ip,is,ir,it)
+                  endif   
+               enddo
+            enddo
+         enddo
+      enddo
+
+
+!6  OK    
+      do pq=1,A%NDimX
+         ip = A%IndN(1,pq)
+         iq = A%IndN(2,pq)
+         do ir = 1,dimOA
+            do is = 1,dimOA
+               do it =1,dimOA
+                     if(ip<= dimOA) then
+                        A%trdm24(exc,ir,is,iq,it) =  A%trdm24(exc,ir,is,iq,it)+A%EigY((exc-1)*A%NDimX+pq)*RDM2A(ir,is,ip,it)
+                     endif     
+               enddo
+            enddo
+         enddo
+      enddo
+ !7   OK  
+      do pq=1,A%NDimX
+         ip = A%IndN(1,pq)
+         iq = A%IndN(2,pq)
+         do ir = 1,dimOA
+            do is = 1,dimOA
+               do it =1,dimOA
+               A%trdm24(exc,ir,ip,is,it) =  A%trdm24(exc,ir,ip,is,it)-A%EigY((exc-1)*A%NDimX+pq)*RDM2A(ir,iq,is,it)
+               enddo
+            enddo
+         enddo
+      enddo
+!8      OK
+      do pq=1,A%NDimX
+         ip = A%IndN(1,pq)
+         iq = A%IndN(2,pq)
+         do ir = 1,dimOA
+            do is = 1,dimOA
+               do it =1,dimOA
+               A%trdm24(exc,ir,it,is,ip) =  A%trdm24(exc,ir,it,is,ip)-A%EigY((exc-1)*A%NDimX+pq)*RDM2A(ir,it,is,iq)
+               enddo
+            enddo
+         enddo
+      enddo
+
+enddo
+print*,"2TRDM"
+do ip=1,10
+   do iq = 1,10
+      do ir = 1,10
+         do is =1,10
+            if(abs(A%trdm24(1,ip,iq,ir,is))>1d-2) then
+               print*,ip,iq,ir,is,A%trdm24(1,ip,iq,ir,is)
+            endif
+         enddo
+      enddo
+   enddo
+enddo
+print*,'Firs few eigenvalues',A%Eig(1),A%Eig(2),A%Eig(3)
+print*,'Dla pewności',A%rdm1(1,:)
+
+do pq=1,A%NDimX
+   ip = A%IndN(1,pq)
+   iq = A%IndN(2,pq)
+   print*,"ip,iq",ip,",",iq
+         TRDM1(ip,iq)=TRDM1(ip,iq)-(A%rdm1(1,ip)-A%rdm1(1,iq))*A%EigX(0*A%NDimX+pq)
+         TRDM1(iq,ip)=TRDM1(iq,ip)-(A%rdm1(1,iq)-A%rdm1(1,ip))*A%EigY(0*A%NDimX+pq)
+enddo
+print*,"1TRDM z X i Y"
+do j=1,10
+   write(lout,'(*(f12.6))') (TRDM1(i,j),i=1,10)
+enddo
+print*, "1TRDM z X i Y norma : ", norm2(TRDM1)
+do i=1,A%NDimX
+   do j=1,A%NDimX
+   if(abs(TRDM1(i,j))>1d-2) then
+      print *,"TRDM1 duze dla :",i, j, "wynosi", TRDM1(i,j)
+   endif
+   enddo
+enddo   
+TRDM1TEST=0d0
+do ip=1,NBasis
+   do ir=1,NBAsis
+      do iq=1,NBasis
+         TRDM1TEST(ip,ir)= TRDM1TEST(ip,ir)+A%trdm24(1,ip,ir,iq,iq)
+      enddo
+   enddo
+enddo
+
+print*,"1TRDM odtworzny z TRDM"
+do j=1,10
+   write(lout,'(*(f12.6))') (TRDM1TEST(i,j),i=1,10)
+enddo
+
+print*,"Norma 2TRDM"
+print*,norm2(A%trdm24(1,:,:,:,:))
+print*,"A czy działa dla zwykłego 2RDM?"
+RDM1TEST=0d0
+allocate(RDM1TEST(dimOA,dimOA))
+do ip=1,dimOA
+   do ir=1,dimOA
+      do iq=1,dimOA
+         RDM1TEST(ip,ir)= RDM1TEST(ip,ir)+A%rdm24(1,ip,ir,iq,iq)
+      enddo
+   enddo
+enddo
+print*,"1RDM odtworzny z 2RDM"
+do j=1,10
+   write(lout,'(*(f12.6))') (RDM1TEST(i,j),i=1,10)
+enddo
+print*,"AOCC",A%Occ
+
+
+
+block
+   double precision :: DipXao(NBasis**2),DipYao(NBasis**2),DipZao(NBasis**2)
+   double precision :: DipX(NBasis,NBasis),DipY(NBasis,NBasis),DipZ(NBasis,NBasis)
+   double precision:: TSDipXYZ(3)
+   character(:),allocatable     :: mname,dipfile,mofile
+   mname  = 'A'
+   dipfile= "DIP_A"
+   mofile = 'MOLPRO_A.MOPUN'
+
+
+   call read_dip_sym_molpro(DipXao,DipYao,DipZao,dipfile,NBasis)
+
+!print*, 'DipX-AO:',norm2(DipXao)
+!print*, 'DipY-AO:',norm2(DipYao)
+!print*, 'DipZ-AO:',norm2(DipZao)
+
+   call unpack_sym_molpro(DipXao,dipfile,NBasis)
+   call unpack_sym_molpro(DipYao,dipfile,NBasis)
+   call unpack_sym_molpro(DipZao,dipfile,NBasis)
+
+   call tran2MO(DipXao,A%CAONO(A%iref1,:,:),A%CAONO(A%iref1,:,:),DipX,NBasis)
+   call tran2MO(DipYao,A%CAONO(A%iref1,:,:),A%CAONO(A%iref1,:,:),DipY,NBasis)
+   call tran2MO(DipZao,A%CAONO(A%iref1,:,:),A%CAONO(A%iref1,:,:),DipZ,NBasis)
+   TSDipXYZ = 0d0
+   do j=1,NBasis
+      do i=1,NBasis
+         TSDipXYZ(1) = TSDipXYZ(1) - 2d0*TRDM1(j,i)*DipX(i,j)
+         TSDipXYZ(2) = TSDipXYZ(2) - 2d0*TRDM1(j,i)*DipY(i,j)
+         TSDipXYZ(3) = TSDipXYZ(3) - 2d0*TRDM1(j,i)*DipZ(i,j)
+      enddo
+   enddo
+   print *,'X,Y,Z moments from X and Y matrix'
+   print *,TSDipXYZ
+end block
+
+deallocate(TRDM1TEST)
+end subroutine sapt_2trdm
 
 subroutine calc_resp_casgvb(Mon,MO,Flags,NBas,EChck)
 implicit none
@@ -252,8 +524,8 @@ if(Flags%ICASSCF==0.and.Flags%ISERPA==0) then
 !   endif
 
   !ACAlpha=sqrt(2d0)/2d0
-  !ACAlpha=1d-12
-  !Print*, 'UNCOUPLED,ACAlpha',ACAlpha
+  ACAlpha=1d-12
+  Print*, 'UNCOUPLED,ACAlpha',ACAlpha
 
   !ACAlpha=0.953089922969332
   !print*, 'ACAlpha',ACAlpha
@@ -1600,6 +1872,459 @@ endif
 deallocate(VSR,URe,XOne,work1,work2)
 
 end subroutine calc_resp_dft
+
+subroutine sapt_ERPA_TRDMs(Flags,Mon,NBasis)
+implicit none
+
+type(SystemBlock) :: Mon
+type(FlagsData) :: Flags
+integer,intent(in) :: NBasis
+
+type(EBlockData)             :: SBlockIV
+type(EBlockData),allocatable :: SBlock(:)
+character(:),allocatable :: xy0file
+integer :: iblk, nblk,nAA,NU
+integer :: i,j, ii ,ipos, ip, iq,ir,is,it, pq
+integer :: dimO,exc
+double precision, allocatable :: EigX0(:,:),EigY0(:,:)
+double precision :: TRDM1(NBasis,NBasis),TRDM1CAS(NBasis,NBasis),XCAS(NBAsis,NBasis),YCAS(NBasis,NBASIs)
+double precision,allocatable :: RDM2(:,:,:,:),montrdm24(:,:,:,:,:),TRDM1TEST(:,:)
+integer :: iref,iref2,iexcited,NumX, IStERPA
+double precision :: SSgn,SumNU
+double precision, allocatable :: Eig(:),EigY(:,:),EigX(:,:),iaddr(:)
+double precision:: OvMax, OvXMax, OvYMax, SumERY, SumERX, SumCAY, SumCAX,SOvY,SOvX, EigOv
+double precision:: YER,YCA,XER,XCA
+! CHANGE IN FUTURE
+allocate(mon%trdm24(4,NBasis,NBasis,NBasis,NBasis))
+
+
+if(Mon%Monomer == 1) then
+   xy0file = "XY0_A"
+elseif(Mon%Monomer == 2) then
+   xy0file = "XY0_B"
+endif
+
+dimO  = mon%num0+mon%num1
+call read_SBlock(SBlock,SBlockIV,nblk,xy0file)
+
+!
+! Firstly we want to make XCas a YCas vectors
+!
+! We transform TRDMs to NO basis of IREF1 state
+
+
+! nAA   = 0
+
+! do i=1,NDimX
+!    ip = IndN(1,i)
+!    iq = IndN(2,i)
+!    if(IGem(ip)==2.and.IGem(iq)==2) then
+!       nAA = nAA + 1
+!    endif
+! enddo
+
+
+
+
+iref   =  mon%IREF1 !1
+iref2  =  mon%IREF2 !4
+iexcited = ((iref2-2)*(iref2-1))/2+iref
+call tran2MO(mon%trdm1(iexcited,:,:),mon%CMONO(iref,:,:),mon%CMONO(iref,:,:), &
+TRDM1CAS(:,:),NBasis)
+!
+! now we make X_Cas and Y_Cas from TRDM1CAS
+!
+SumNU=0d0
+XCAS=0d0
+YCAS=0d0
+do ip=1,NBasis
+   do iq=1,ip-1
+      if(mon%Occ(ip)-mon%OCC(iq).ne.0d0) then
+         YCAS(ip,iq)=TRDM1CAS(iq,ip)/(mon%Occ(ip)-mon%OCC(iq))
+         XCAS(ip,iq)=-TRDM1CAS(ip,iq)/(mon%Occ(ip)-mon%OCC(iq))
+      endif
+   enddo
+enddo
+do ip=1,NBasis
+   do iq=1,ip-1
+      SumNU=SumNU+YCAS(ip,iq)*XCAS(ip,iq)
+   enddo
+enddo
+
+SSgn=1d0
+write(6,'(X,"SumNu Y*X before normalization",E15.6)') SumNU
+If(SumNU.Lt.0d0) SSgn=-1d0
+If(Abs(SumNu).Gt.1.D-8) Then
+SumNU=1d0/Sqrt(Two*Abs(SumNU))
+Else
+SumNU=0d0
+EndIf
+do ip=1,NBasis
+   do iq=1,ip-1
+      YCAS(ip,iq)=YCAS(ip,iq)*SumNU
+      XCAS(ip,iq)=SSgn*XCAS(ip,iq)*SumNU
+      If(Abs(YCAS(ip,iq))+Abs(XCAS(ip,iq)).Gt.1.d-6) Then 
+         Write(6,'(X,"NORMALIZED Y_SA-CAS X_SA-CAS",2I3,2E15.6)') ip,iq,YCAS(ip,iq),XCAS(ip,iq)
+      EndIf
+   EndDo
+EndDo
+!
+!
+!
+!tu skończyliśmy
+!
+!
+!
+nAA=SBlock(1)%n
+allocate(Eig(nAA),EigY(nAA,nAA),EigX(nAA,nAA),iaddr(nAA))
+allocate(TRDM1TEST(NBasis,NBasis))
+Eig = 0
+EigY = 0
+! nAA to liczba aktywnych
+   associate(B => Sblock(1))
+      do i=1,B%n
+           If(B%vec(i).lt.0) Then
+               Write(6,'(X,"Setting to Zero Negative Eigs",E15.6)') B%vec(i)
+               B%vec(i)=0
+               B%matY(1:B%n,i)=0
+               B%matX(1:B%n,i)=0
+           EndIf
+
+           iaddr(i)=B%pos(i)
+           EigY(i,B%l1:B%l2) = B%matY(i,1:B%n)
+           EigX(i,B%l1:B%l2) = B%matX(i,1:B%n)
+
+     enddo
+     Eig(B%l1:B%l2) = B%vec(1:B%n)
+   end associate
+
+!   if(NoSt>1) then
+!     Call SortEigXY(1,Eig,EigY,EigX,nAA)
+!   endif
+
+   Write(6,'(X,"Active ERPA Eigenvalues and Eigenvecs")')
+   do i=1,nAA
+      Write(6,'(X,I4,E15.6)') i,eig(i)
+      do iq=1,nAA
+         if(abs(eigy(iq,i))+abs(eigx(iq,i)).gt.1.d-7) Write(6,'(X,"Y_ERPA, X_ERPA",2I3,2E15.6)') &
+         mon%IndN(1,iaddr(iq)),mon%IndN(2,iaddr(iq)),eigy(iq,i),eigx(iq,i)
+      enddo
+   enddo
+      Write(6,*)
+      OvMax=0
+      OvXMax=0
+      OvYMax=0
+
+      Do NU=1,nAA
+
+      SumERY=0
+      SumERX=0
+      SumCAY=0
+      SumCAX=0
+
+      Do I=1,nAA
+      ip=mon%IndN(1,iaddr(i))
+      iq=mon%IndN(2,iaddr(i))
+      YER=eigy(i,NU)
+      YCA=YCAS(ip,iq)
+      XER=eigx(i,NU)
+      XCA=XCAS(ip,iq)
+
+      SumERX=SumERX+XER*XER
+      SumCAX=SumCAX+XCA*XCA
+      SumERY=SumERY+YER*YER
+      SumCAY=SumCAY+YCA*YCA
+      EndDo
+
+      If(Abs(SumERX).Gt.1.D-12) SumERX=1.D0/Sqrt(Abs(SumERX))
+      If(Abs(SumCAX).Gt.1.D-12) SumCAX=1.D0/Sqrt(Abs(SumCAX))
+      If(Abs(SumERY).Gt.1.D-12) SumERY=1.D0/Sqrt(Abs(SumERY))
+      If(Abs(SumCAY).Gt.1.D-12) SumCAY=1.D0/Sqrt(Abs(SumCAY))
+
+      SOvY=0d0
+      SOvX=0d0
+
+      Do I=1,nAA
+      ip=mon%IndN(1,iaddr(i))
+      iq=mon%IndN(2,iaddr(i))
+      YER=eigy(i,NU)
+      YCA=YCAS(ip,iq)
+      XER=eigx(i,NU)
+      XCA=XCAS(ip,iq)
+      SOvY=SOvY+YER*YCA*SumERY*SumCAY
+      SOvX=SOvX+XER*XCA*SumERX*SumCAX
+      EndDo
+
+      SOvY=Abs(SOvY)
+      SOvX=Abs(SOvX)
+      Write(6,'(X,"SA-CAS-Overlap for ERPA vector",I2,3F15.8)') NU,SOvY,SOvX,(SOvY+SovX)/2.D0
+
+      If((SOvY+SovX)/2.D0.Gt.OvMax) Then
+      OvMax=(SOvY+SovX)/2.D0
+      OvXMax=SOvX
+      OvYMax=SOvY
+      NUMx=NU
+      EndIf
+
+      EndDo
+
+      If((OvMax.Ge.0.5).Or. &
+       ( (OvMax.Lt.0.5).And.(OvXMax.Gt.0.5.Or.OvYMax.Gt.0.5) )) Then
+
+         IStERPA=NUMx
+         EigOv=Eig(IStERPA)
+
+         Write(6,'(/,X,"ERPA vector best overlapping with SA-CAS is vector no", &
+         I2," of excit energy:",F15.8)') IStERPA,Eig(IStERPA)
+         NU=IStERPA
+
+         Do I=1,nAA
+         ip=mon%IndN(1,iaddr(i))
+         iq=mon%IndN(2,iaddr(i))
+         If(Abs(eigy(i,NU))+Abs(eigx(i,NU)).Gt.1.d-7) &
+         Write(6,'(X,"Y_ERPA, X_ERPA        ",2I3,2E15.6)')ip,iq,eigy(i,NU),eigx(i,NU)
+         EndDo
+
+         ! Write(6,'(X,"best-matching SA-CAS Excitation from ", &
+         !       I4," to ",I4,23X,F15.8)') NoSt,IH0St,EExcit(IH0St)
+
+         Do I=1,nAA
+         ip=mon%IndN(1,iaddr(i))
+         iq=mon%IndN(2,iaddr(i))
+         If(Abs(YCAS(ip,iq))+Abs(XCAS(ip,iq)).Gt.1.d-7) &
+         Write(6,'(X,"Y_SA-CAS, X_SA-CAS    ",2I3,2E15.6)')ip,iq, &
+         YCAS(ip,iq),XCAS(ip,iq)
+         EndDo
+
+      Else
+
+         IStERPA=0
+         Write(6,'(/,X, "No ERPA vector overlaps with SA-CAS State No",I2)')mon%Iref2
+
+      EndIf
+deallocate(Eig,EigY,EigX,iaddr)
+
+
+
+
+
+
+
+
+
+! If(IA.Ne.IB.And.IPair(IA,IB).Eq.1) Then
+! c      If(IA.Ne.IB) Then
+! If(C(IA)+C(IB).Ne.Zero) YCAS(IKet,IAB)=
+! $ (trdm(IA,IB)+trdm(IB,IA))/(C(IA)+C(IB))
+! If(C(IA)-C(IB).Ne.Zero) XCAS(IKet,IAB)=
+! $ (trdm(IB,IA)-trdm(IA,IB))/(C(IA)-C(IB))
+! EndIf
+! C
+! If(IPr.Eq.1.And.Abs(trdm(IA,IB))+Abs(trdm(IB,IA)).gt.1.d-6) Then
+! Write(6,'(X,"TRDM_ab 1-TRDM_ba",2I3,2E15.6)')IA,IB,
+! $ trdm(IA,IB),trdm(IB,IA)
+! c      Write(6,'(X,"YCAS, XCAS    ",6X,2E15.6)')
+! c     $ YCAS(IKet,IAB),XCAS(IKet,IAB)
+! EndIf
+! C
+! SumNU=SumNU+YCAS(IKet,IAB)*XCAS(IKet,IAB)
+! C
+! EndDo
+! EndDo
+! C
+! SSgn=One
+! If(IPr.Eq.1) 
+! $ Write(6,'(X,"SumNu Y*X before normalization",E15.6)')SumNU
+! If(SumNU.Lt.Zero) SSgn=-One
+! If(Abs(SumNu).Gt.1.D-8) Then
+! SumNU=One/Sqrt(Two*Abs(SumNU))
+! Else
+! SumNU=Zero
+! EndIf
+! C
+! IAB=0
+! Do IA=1,NBasis
+! Do IB=1,IA
+! IAB=IAB+1
+! YCAS(IKet,IAB)=YCAS(IKet,IAB)
+! $ *SumNU
+! XCAS(IKet,IAB)=SSgn*XCAS(IKet,IAB)
+! $ *SumNU
+! If(IPr.Eq.1.And.Abs(YCAS(IKet,IAB))+Abs(XCAS(IKet,IAB)).Gt.1.d-6)
+! $  Then 
+!  Write(6,'(X,"NORMALIZED Y_SA-CAS X_SA-CAS",2I3,2E15.6)')
+! $ IA,IB,YCAS(IKet,IAB),XCAS(IKet,IAB)
+! EndIf
+! EndDo
+! EndDo
+
+
+
+
+
+
+
+allocate(RDM2(dimO,dimO,dimO,dimO))
+RDM2(:,:,:,:) = mon%rdm24(mon%iref1,:,:,:,:)
+allocate(montrdm24(4,NBasis,NBasis,NBasis,NBasis))
+!allocate(mon%trdm24(4,NBasis,NBasis,NBasis,NBasis))
+do exc=1,4 
+   montrdm24(exc,:,:,:,:)=0d0
+enddo
+exc = NU
+print *,"NOWA PROCEDURA"
+allocate(EigY0(mon%NDimX,mon%NDimX),EigX0(mon%NDimX,mon%NDimX))
+TRDM1 = 0d0
+
+
+EigY0 = 0d0
+EigX0 = 0d0
+! unpack (1)
+do iblk=1,nblk
+   associate(B => Sblock(iblk))
+      if(B%l1 /= 1) cycle 
+      do i=1,B%n
+        ipos = B%pos(i)
+!        EigY0(ipos,B%l1:B%l2) = B%matY(i,1:B%n)
+!        EigX0(ipos,B%l1:B%l2) = B%matX(i,1:B%n)
+        ip = mon%IndN(1,ipos)
+        iq = mon%IndN(2,ipos)
+         TRDM1(ip,iq)=TRDM1(ip,iq)-(mon%rdm1(1,ip)-mon%rdm1(1,iq))*B%matX(i,exc)!EigX0(pq,1)
+         TRDM1(iq,ip)=TRDM1(iq,ip)-(mon%rdm1(1,iq)-mon%rdm1(1,ip))*B%matY(i,exc)
+         do ir = 1,dimO
+            do is = 1,dimO
+               do it =1,dimO
+               montrdm24(exc,ip,is,ir,it) =  montrdm24(exc,ip,is,ir,it)+B%matX(i,exc)*RDM2(iq,is,ir,it)
+               montrdm24(exc,ir,is,ip,it) =  montrdm24(exc,ir,is,ip,it)+B%matX(i,exc)*RDM2(ir,is,iq,it)
+               montrdm24(exc,ir,ip,is,it) =  montrdm24(exc,ir,ip,is,it)-B%matY(i,exc)*RDM2(ir,iq,is,it)
+               montrdm24(exc,ir,it,is,ip) =  montrdm24(exc,ir,it,is,ip)-B%matY(i,exc)*RDM2(ir,it,is,iq)
+               if (ip <= dimO) then
+                  montrdm24(exc,ir,iq,is,it) =  montrdm24(exc,ir,iq,is,it)-B%matX(i,exc)*RDM2(ir,ip,is,it)
+                  montrdm24(exc,ir,it,is,iq) =  montrdm24(exc,ir,it,is,iq)-B%matX(i,exc)*RDM2(ir,it,is,ip)
+                  montrdm24(exc,iq,is,ir,it) =  montrdm24(exc,iq,is,ir,it)+B%matY(i,exc)*RDM2(ip,is,ir,it)
+                  montrdm24(exc,ir,is,iq,it) =  montrdm24(exc,ir,is,iq,it)+B%matY(i,exc)*RDM2(ir,is,ip,it)
+               endif
+
+               enddo
+            enddo
+         enddo
+      enddo
+   end associate
+enddo
+
+!unpack (2, IV part)
+! associate(B => SblockIV)
+!   do i=1,B%n
+!      ii = B%l1+i-1
+!      ipos = B%pos(i)
+!      EigY0(ipos,ii) = 1d0/sqrt(2d0)
+!      EigX0(ipos,ii) = 1d0/sqrt(2d0)
+!   enddo
+!end associate
+
+! do pq=1,mon%NDimX
+!    ip = mon%IndN(1,pq)
+!    iq = mon%IndN(2,pq)
+!          TRDM1(ip,iq)=TRDM1(ip,iq)-(mon%rdm1(1,ip)-mon%rdm1(1,iq))*EigX0(pq,1)
+!          TRDM1(iq,ip)=TRDM1(iq,ip)-(mon%rdm1(1,iq)-mon%rdm1(1,ip))*EigY0(pq,1)
+! enddo
+print*,"1TRDM z X i Y", norm2(TRDM1)
+do i=1,10
+   write(lout,'(*(f12.6))') (TRDM1(i,j),j=1,10)
+enddo
+print *,"TRDM(1,2) wynosi",TRDM1(1,2)
+print* , "TRDM(1,3) wynosi", TRDM1(1,3)
+do i=1,NBasis
+   do j=1,NBasis
+   if(abs(TRDM1(i,j))>1d-2) then
+      print *,"TRDM1 duze dla :",i, j, "wynosi", TRDM1(i,j)
+   endif
+   enddo
+enddo   
+
+
+print*,"2TRDM"
+do ip=1,10
+   do iq = 1,10
+      do ir = 1,10
+         do is =1,10
+            if(abs(montrdm24(exc,ip,iq,ir,is))>1d-2) then
+               print*,ip,iq,ir,is,montrdm24(exc,ip,iq,ir,is)
+            endif
+         enddo
+      enddo
+   enddo
+enddo
+print*,"2TRDM norm", norm2(montrdm24(exc,:,:,:,:))
+do exc=1,4
+   mon%trdm24(exc,:,:,:,:)=montrdm24(exc,:,:,:,:)
+enddo
+
+
+TRDM1TEST=0d0
+do ip=1,NBasis
+   do ir=1,NBasis
+      do iq=1,NBasis
+         TRDM1TEST(ip,ir)= TRDM1TEST(ip,ir)+mon%trdm24(NU,ip,ir,iq,iq)
+      enddo
+   enddo
+enddo
+
+print*,"1TRDM odtworzny z TRDM"
+do i=1,10
+   write(lout,'(*(f12.6))') (TRDM1TEST(i,j),j=1,10)
+enddo
+
+print*,"Norma 2TRDM"
+print*,norm2(montrdm24(1,:,:,:,:))
+
+
+block
+   double precision :: DipXao(NBasis**2),DipYao(NBasis**2),DipZao(NBasis**2)
+   double precision :: DipX(NBasis,NBasis),DipY(NBasis,NBasis),DipZ(NBasis,NBasis)
+   double precision:: TSDipXYZ(3)
+   character(:),allocatable     :: mname,dipfile,mofile
+   mname  = 'A'
+   dipfile= "DIP_A"
+   mofile = 'MOLPRO_A.MOPUN'
+
+
+   call read_dip_sym_molpro(DipXao,DipYao,DipZao,dipfile,NBasis)
+
+!print*, 'DipX-AO:',norm2(DipXao)
+!print*, 'DipY-AO:',norm2(DipYao)
+!print*, 'DipZ-AO:',norm2(DipZao)
+
+   call unpack_sym_molpro(DipXao,dipfile,NBasis)
+   call unpack_sym_molpro(DipYao,dipfile,NBasis)
+   call unpack_sym_molpro(DipZao,dipfile,NBasis)
+
+   call tran2MO(DipXao,mon%CAONO(mon%iref1,:,:),mon%CAONO(mon%iref1,:,:),DipX,NBasis)
+   call tran2MO(DipYao,mon%CAONO(mon%iref1,:,:),mon%CAONO(mon%iref1,:,:),DipY,NBasis)
+   call tran2MO(DipZao,mon%CAONO(mon%iref1,:,:),mon%CAONO(mon%iref1,:,:),DipZ,NBasis)
+   TSDipXYZ = 0d0
+   do j=1,NBasis
+      do i=1,NBasis
+         TSDipXYZ(1) = TSDipXYZ(1) - 2d0*TRDM1(j,i)*DipX(i,j)
+         TSDipXYZ(2) = TSDipXYZ(2) - 2d0*TRDM1(j,i)*DipY(i,j)
+         TSDipXYZ(3) = TSDipXYZ(3) - 2d0*TRDM1(j,i)*DipZ(i,j)
+      enddo
+   enddo
+   print *,'X,Y,Z moments from X and Y matrix (A only)'
+   print *,TSDipXYZ
+end block
+
+
+
+
+
+
+
+end subroutine sapt_ERPA_TRDMs
+
+
+
+
 
 subroutine init_pino(NBas,Mon,ICASSCF)
 implicit none

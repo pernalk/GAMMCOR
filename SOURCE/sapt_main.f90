@@ -250,7 +250,12 @@ double precision,intent(inout) :: Tcpu,Twall
 
 integer :: i
 
+call sapt_ERPA_TRDMs(Flags,SAPT%monA,NBasis)
+call sapt_ERPA_TRDMs(Flags,SAPT%monB,NBasis)
+
 call sapt_ab_ints_dSRS(Flags,SAPT%monA,SAPT%monB,NBasis)
+
+!call sapt_2trdm(Flags,SAPT%monA,SAPT%monB,NBasis)
 
 write(LOUT,'(8a10)') ('----------',i=1,8)
 write(LOUT,'(1x,a)') 'Degenerate SAPT(MC)'
@@ -258,8 +263,8 @@ write(LOUT,'(8a10)') ('----------',i=1,8)
 
 call elst_dRS(SAPT%monA,SAPT%monB,SAPT)
 ! modify e1exch_NaNb to arbitrary IREFA / IREFB
-! call e1exch_NaNb(Flags,SAPT%monA,SAPT%monB,S APT)
-! call e1exch_dSRS(...) 
+call e1exch_NaNb(Flags,SAPT%monA,SAPT%monB,SAPT)
+call e1exch_dSRS(SAPT%monA,SAPT%monB,SAPT) 
 
 call clock('SAPT',Tcpu,Twall)
 
@@ -303,9 +308,8 @@ integer :: i
     call summary_rspt(SAPT)
 
  else
-
     call e1elst_Chol(SAPT%monA,SAPT%monB,SAPT)
-    !call e1exchs2(Flags,SAPT%monA,SAPT%monB,SAPT)
+    ! call e1exchs2(Flags,SAPT%monA,SAPT%monB,SAPT)
     call e1exch_NaNb(Flags,SAPT%monA,SAPT%monB,SAPT)
     call e2ind(Flags,SAPT%monA,SAPT%monB,SAPT)
     call e2exind(Flags,SAPT%monA,SAPT%monB,SAPT)
@@ -500,7 +504,6 @@ double precision :: MO(NBasis*NBasis)
           if(Flags%IFunSR/=0) then
              call calc_resp_dft(Mon,MO,Flags,NBasis)
           else
-             print*, 'here?'
              call calc_resp_casgvb(Mon,MO,Flags,NBasis,EnChck)
           endif
 
@@ -841,10 +844,58 @@ implicit none
 type(FlagsData)    :: Flags
 type(SystemBlock)  :: A,B
 integer,intent(in) :: NBasis
-
+integer            :: iref, iref2, irefB, iref2B
+integer            :: iexcited, iexcited2 
+integer            :: dimOA, dimOB
 ! choose iref
 ! use tran4_gen(...)
+iref   =  A%IREF1 !1
+iref2  =  A%IREF2 !4
+irefB  =  B%IREF1
+iref2B  = B%IREF2
+iexcited = ((iref2-2)*(iref2-1))/2+iref
+iexcited2 = ((iref2B-2)*(iref2B-1))/2+irefB
+dimOA  = A%num0+A%num1
+dimOB  = B%num0+B%num1
 
+
+call tran4_gen(NBasis,&
+     B%num0+B%num1,B%CAONO(iref2B,:,:),&
+     B%num0+B%num1,B%CAONO(iref2B,:,:),&
+     A%num0+A%num1,A%CAONO(iref,:,:),&
+     A%num0+A%num1,A%CAONO(iref,:,:),&
+     'OOOOAABB','AOTWOSORT')
+
+
+ call tran4_gen(NBasis,&
+               NBasis,A%CAONO(iref,:,:),&
+               B%num0+B%num1,B%CAONO(iref2B,1:NBasis,1:(B%num0+B%num1)),&
+               NBasis,A%CAONO(iref,:,:),&
+               A%num0+A%num1,A%CAONO(iref,1:NBasis,1:(A%num0+A%num1)),&
+               'FOFOAAAB','AOTWOSORT')
+ 
+  call tran4_gen(NBasis,&
+               NBasis,B%CAONO(iref2B,:,:),&
+               A%num0+A%num1,A%CAONO(iref,1:NBasis,1:(A%num0+A%num1)),&
+               NBasis,B%CAONO(iref2B,:,:),&
+               B%num0+B%num1,B%CAONO(iref2B,1:NBasis,1:(B%num0+B%num1)),&
+               'FOFOBBBA','AOTWOSORT')
+
+   call tran4_gen(NBasis,&
+               NBasis,B%CAONO(iref2B,:,:),&
+               B%num0+B%num1,B%CAONO(iref2B,1:NBasis,1:(B%num0+B%num1)),&
+               NBasis,A%CAONO(iref,:,:),&
+               A%num0+A%num1,A%CAONO(iref,1:NBasis,1:(A%num0+A%num1)),&
+               'FOFOAABB','AOTWOSORT')
+
+   call tran4_gen(NBasis,&
+                 B%num0+B%num1,B%CAONO(iref2B,:,:),&
+                 A%num0+A%num1,A%CAONO(iref,:,:),&
+                 A%num0+A%num1,A%CAONO(iref,:,:),&
+                 B%num0+B%num1,B%CAONO(iref2B,:,:),&
+                 'OOOOABBA','AOTWOSORT')
+     
+  
 end subroutine sapt_ab_ints_dSRS
 
 subroutine sapt_ab_ints_red(Flags,A,B,iPINO,NBasis,NBasisRed)

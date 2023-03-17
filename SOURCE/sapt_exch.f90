@@ -603,25 +603,37 @@ integer :: rdm2type
 integer :: dimOA,dimOB,NBas
 double precision :: fac,val,nnS2,tmp
 double precision :: tElst,tvk(3),tNa(2),tNb(2),tNaNb
+double precision :: tElst1, tElst2
 double precision :: exchs2
+double precision :: exchs21,exchs22
 double precision,allocatable :: Va(:,:),Vb(:,:),S(:,:)
 double precision,allocatable :: Sab(:,:),Vaab(:,:),Vbba(:,:),Vabb(:,:),Vbaa(:,:)
 double precision,allocatable :: AOcc(:),BOcc(:)
 double precision,allocatable :: RDM2Aval(:,:,:,:),RDM2Bval(:,:,:,:)
 double precision,allocatable :: intA(:,:,:,:),intB(:,:,:,:)
 double precision,allocatable :: tmpAB(:,:,:,:)
-double precision,allocatable :: work(:,:),ints(:)
+double precision,allocatable :: work(:,:),ints(:),work2(:,:)
 double precision,external  :: ddot
-
+integer :: iref, iref2, irefB, iref2B
+integer :: iexcited, iexcited2
 print*, 'Testing E1exch NaNb...'
 
 ! set dimensions
 NBas = A%NBasis
 dimOA = A%num0+A%num1
 dimOB = B%num0+B%num1
-
+!
 ! set irefs
-! ...
+!
+iref   =  A%IREF1 !1
+iref2  =  A%IREF2 !4
+irefB  =  B%IREF1
+iref2B  = B%IREF2
+iexcited = ((iref2-2)*(iref2-1))/2+iref
+iexcited2 = ((iref2B-2)*(iref2B-1))/2+irefB
+
+
+
 
 allocate(S(NBas,NBas),Sab(NBas,NBas))
 allocate(Va(NBas,NBas),Vb(NBas,NBas),&
@@ -633,20 +645,32 @@ call get_one_mat('V',Va,A%Monomer,NBas)
 call get_one_mat('V',Vb,B%Monomer,NBas)
 
 ! transform to NOs (MON%CMO contains AONO transformation)
-call tran2MO(Va,B%CMO,B%CMO,Vabb,NBas)
-call tran2MO(Vb,A%CMO,A%CMO,Vbaa,NBas)
-call tran2MO(Va,A%CMO,B%CMO,Vaab,NBas)
-call tran2MO(Vb,B%CMO,A%CMO,Vbba,NBas)
+!call tran2MO(Va,B%CMO,B%CMO,Vabb,NBas)
+!call tran2MO(Vb,A%CMO,A%CMO,Vbaa,NBas)
+!call tran2MO(Va,A%CMO,B%CMO,Vaab,NBas)
+!call tran2MO(Vb,B%CMO,A%CMO,Vbba,NBas)
+
+!call tran2MO(Vb,A%CAONO(iref,:,:),A%CAONO(iref,:,:),Vbaa,NBasis)
+
+call tran2MO(Va,B%CAONO(iref2B,:,:),B%CAONO(iref2B,:,:),Vabb,NBas)
+call tran2MO(Vb,A%CAONO(iref,:,:),A%CAONO(iref,:,:),Vbaa,NBas)
+call tran2MO(Va,A%CAONO(iref,:,:),B%CAONO(iref2B,:,:),Vaab,NBas)
+call tran2MO(Vb,B%CAONO(iref2B,:,:),A%CAONO(iref,:,:),Vbba,NBas)
+
+
 
 ! get overlap S matrix in AO and transform to NOs
 call get_one_mat('S',S,A%Monomer,NBas)
-call tran2MO(S,A%CMO,B%CMO,Sab,NBas)
+
+!call tran2MO(S,A%CMO,B%CMO,Sab,NBas)
+
+call tran2MO(S,A%CAONO(iref,:,:),B%CAONO(iref2B,:,:),Sab,NBas)
 
 allocate(AOcc(NBas),BOcc(NBas))
 
-! load reference occupation numbers
-!AOcc = A%rdm1(irefA,:)
-!BOcc = B%rdm1(irefB,:)
+! load reference occupation numbers dSRS
+AOcc = A%rdm1(iref,:)
+BOcc = B%rdm1(iref2B,:)
 
 allocate(RDM2Aval(dimOA,dimOA,dimOA,dimOA),&
          RDM2Bval(dimOB,dimOB,dimOB,dimOB))
@@ -654,8 +678,11 @@ allocate(intA(dimOA,dimOA,dimOA,dimOB),&
          intB(dimOB,dimOB,dimOA,dimOB))
 
 ! load reference 2-RDMs
-RDM2Aval = A%RDM2val
-RDM2Bval = B%RDM2val
+! RDM2Aval = A%RDM2val
+! RDM2Bval = B%RDM2val
+! load reference 2-RDMs dSRS
+RDM2Aval(:,:,:,:) = A%rdm24(iref,:,:,:,:)
+RDM2Bval(:,:,:,:) = B%rdm24(iref2B,:,:,:,:)
 
 call dgemm('N','N',dimOA**3,dimOB,dimOA,1d0,RDM2Aval,dimOA**3,Sab,NBas,0d0,intA,dimOA**3)
 !call dgemm('N','T',dimOB**3,NBas,dimOB,1d0,RDM2Bval,dimOB**3,Sab,NBas,0d0,intB,dimOB**3)
@@ -672,14 +699,20 @@ deallocate(Vb,Va,S)
 nnS2 = 0
 do j=1,dimOB
 do i=1,dimOA
-   nnS2 = nnS2 + A%Occ(i)*B%Occ(j)*Sab(i,j)**2
+   !   nnS2 = nnS2 + A%Occ(i)*B%Occ(j)*Sab(i,j)**2
+   nnS2 = nnS2 + AOcc(i)*BOcc(j)*Sab(i,j)**2
 enddo
 enddo
 
-! remember to adapt somehow to dSRS!
+
+! it can be checked if iref2B=1?
+print*,'good SAPT%elst = ', SAPT%elst
 tElst = 2d0*(SAPT%elst-SAPT%Vnn)*nnS2
 print*, 'tELST',tELST*1000
-
+tElst1 = 2d0*(SAPT%elst1 - SAPT%Vnn)*nnS2
+tElst2 = 2d0*(SAPT%elst2 - SAPT%Vnn)*nnS2
+print*, 'tELST1(dSRS)',tELST1*1000
+print*, 'tELST2(dSRS)',tELST2*1000
 allocate(ints(NBas**2),work(NBas,NBas))
 
 ! tvk = n_p n_q (v^A S + v^B S + v_pq^qp)
@@ -733,29 +766,52 @@ allocate(ints(NBas**2),work(NBas,NBas))
 tvk = 0
 do iq=1,dimOB
    do ip=1,dimOA
-      tvk(1) = tvk(1) + A%Occ(ip)*B%Occ(iq)*Vaab(ip,iq)*Sab(ip,iq)
-   enddo
+      !     tvk(1) = tvk(1) + A%Occ(ip)*B%Occ(iq)*Vaab(ip,iq)*Sab(ip,iq)
+       tvk(1) = tvk(1) + AOcc(ip)*BOcc(iq)*Vaab(ip,iq)*Sab(ip,iq)
+   Enddo
 enddo
 tvk(1) = -2d0*tvk(1)
-print*, 'tvk(1)',tvk(1)*1000
+print*, 'tvk(1)-rhoArhoBVaSab',tvk(1)*1000
 
 do iq=1,dimOB
    do ip=1,dimOA
-      tvk(2) = tvk(2) + A%Occ(ip)*B%Occ(iq)*Vbba(iq,ip)*Sab(ip,iq)
+      !  tvk(2) = tvk(2) + A%Occ(ip)*B%Occ(iq)*Vbba(iq,ip)*Sab(ip,iq)
+      tvk(2) = tvk(2) + AOcc(ip)*BOcc(iq)*Vbba(iq,ip)*Sab(ip,iq)
    enddo
 enddo
 tvk(2) = -2d0*tvk(2)
-print*, 'tvk(2)',tvk(2)*1000
+print*, 'tvk(2)-rhoArhoBSabVb',tvk(2)*1000
 
-! work = PA
-call get_den(NBas,A%CMO,A%Occ,1d0,work)
-! tvk = n_p n_q v_pq^qp = PA.K[PB]
-do jb=1,NBas
-   do ia=1,NBas
-      tvk(3) = tvk(3) + work(ia,jb)*B%Kmat(jb,ia)
+!! work = PA
+!call get_den(NBas,A%CMO,A%Occ,1d0,work)
+!! tvk = n_p n_q v_pq^qp = PA.K[PB]
+!do jb=1,NBas
+!   do ia=1,NBas
+!      tvk(3) = tvk(3) + work(ia,jb)*B%Kmat(jb,ia)
+!   enddo
+!enddo
+!tvk(3) = -2.0d0*tvk(3)
+!
+!  Changed to dSRS
+!
+!
+allocate(work2(dimOA,dimOB))
+! n_p * n_q * v_pq^qp
+open(newunit=iunit,file='OOOOABBA',status='old',access='direct',&
+     form='unformatted',recl=8*dimOA*dimOB)
+do ip=1,dimOB
+   do iq=1,dimOA
+       ! get all (AB| integrals for a given |BA) record
+      read(iunit,rec=ip+(iq-1)*dimOB) work2(1:dimOA,1:dimOB)
+     ! tvk(3) = tvk(3) + A%rdm1(iref,iq)*B%rdm1(iref2B,ip)*work2(iq,ip)
+      tvk(3) = tvk(3) + Aocc(iq)*Bocc(ip)*work2(iq,ip)
    enddo
 enddo
+close(iunit)
+
 tvk(3) = -2.0d0*tvk(3)
+print*,"opdowiada tvk(2) z dSRS"
+print*,'tvk(3)= ', tvk(3)*1000
 
 ! tNa
 tNa = 0
@@ -763,7 +819,8 @@ do it=1,dimOB
    do iq=1,dimOA
       do ir=1,dimOA
          do ip=1,dimOA
-            tNa(1) = tNa(1) + B%Occ(it)*intA(ip,ir,iq,it)*Sab(iq,it)*Vbaa(ip,ir)
+            !   tNa(1) = tNa(1) + B%Occ(it)*intA(ip,ir,iq,it)*Sab(iq,it)*Vbaa(ip,ir)
+            tNa(1) = tNa(1) + BOcc(it)*intA(ip,ir,iq,it)*Sab(iq,it)*Vbaa(ip,ir)
          enddo
       enddo
    enddo
@@ -771,6 +828,7 @@ enddo
 tNa(1) = -2d0*tNa(1)
 
 !(FO|FO): (AA|AB)
+!New from dSRS  
 open(newunit=iunit,file='FOFOAAAB',status='OLD', &
      access='DIRECT',recl=8*NBas*dimOA)
 
@@ -782,7 +840,8 @@ do it=1,dimOB
 
       do ir=1,dimOA
          do ip=1,dimOA
-            tNa(2) = tNa(2) + B%Occ(it)*intA(ip,ir,iq,it)*ints(ip+(ir-1)*NBas)
+            !tNa(2) = tNa(2) + B%Occ(it)*intA(ip,ir,iq,it)*ints(ip+(ir-1)*NBas)
+            tNa(2) = tNa(2) + BOcc(it)*intA(ip,ir,iq,it)*ints(ip+(ir-1)*NBas)
          enddo
       enddo
 
@@ -800,7 +859,8 @@ do iq=1,dimOB
    do it=1,dimOA
       do ir=1,dimOB
          do ip=1,dimOB
-            tNb(1) = tNb(1) + A%Occ(it)*intB(ip,ir,it,iq)*Sab(it,iq)*Vabb(ip,ir)
+            !tNb(1) = tNb(1) + A%Occ(it)*intB(ip,ir,it,iq)*Sab(it,iq)*Vabb(ip,ir)
+            tNb(1) = tNb(1) + AOcc(it)*intB(ip,ir,it,iq)*Sab(it,iq)*Vabb(ip,ir)
          enddo
       enddo
    enddo
@@ -808,6 +868,7 @@ enddo
 tNb(1) = -2d0*tNb(1)
 
 !(FO|FO): (BB|BA)
+! aded to dSRS
 open(newunit=iunit,file='FOFOBBBA',status='OLD', &
      access='DIRECT',recl=8*NBas*dimOB)
 
@@ -819,7 +880,8 @@ do it=1,dimOA
 
       do ir=1,dimOB
          do ip=1,dimOB
-            tNb(2) = tNb(2) + A%Occ(it)*intB(ip,ir,it,iq)*ints(ip+(ir-1)*NBas)
+            !   tNb(2) = tNb(2) + A%Occ(it)*intB(ip,ir,it,iq)*ints(ip+(ir-1)*NBas)
+            tNb(2) = tNb(2) + AOcc(it)*intB(ip,ir,it,iq)*ints(ip+(ir-1)*NBas)
          enddo
       enddo
 
@@ -833,6 +895,9 @@ close(iunit)
 
 !open(newunit=iunit,file='TMPOOAB',status='OLD',&
 !    access='DIRECT',form='UNFORMATTED',recl=8*dimOB**2)
+!
+!aded to DSRS
+!
 open(newunit=iunit,file='FOFOAABB',status='OLD',&
     access='DIRECT',form='UNFORMATTED',recl=8*dimOA*NBas)
 
@@ -869,10 +934,15 @@ tNaNb = -2*val
 print*, 'tNaNb',tNaNb*1000
 
 exchs2 = tElst + sum(tvk) + sum(tNa) + sum(tNb) + tNaNb
+exchs21 = tElst1 + sum(tvk) + sum(tNa) + sum(tNb) + tNaNb
+exchs22 = tElst2 + sum(tvk) + sum(tNa) + sum(tNb) + tNaNb
 SAPT%exchs2 = exchs2
+SAPT%exchs21 = exchs21
+SAPT%exchs22 = exchs22
 !write(LOUT,'(/1x,a,f16.8)') 'ExchS2      = ', exchs2*1000d0
 call print_en('ExchS2',exchs2*1000,.true.)
-
+call print_en('ExchS21+',exchs21*1000,.true.)
+call print_en('ExchS22+',exchs22*1000,.true.)
 deallocate(tmpAB)
 
 deallocate(ints,work)

@@ -233,6 +233,11 @@ type SystemBlock
       ! rdm2 in NOs: rdm2(nstates,NBasis**4)
       double precision,allocatable :: rdm1(:,:),trdm1(:,:,:)
       double precision,allocatable :: rdm24(:,:,:,:,:)
+      ! trdm2 from ground state to iref2 in NOs
+      ! basic approximation
+      ! trdm2(nstates,NBasis**4)
+      double precision,allocatable :: trdm24(:,:,:,:,:)
+      
       double precision,allocatable :: Fmat(:,:) 
       double precision,allocatable :: dipm(:,:,:)
       double precision,allocatable :: TSdipXYZ(:,:)
@@ -345,6 +350,7 @@ type SaptData
      double precision  :: esapt2,esapt0
      ! dSRS
      double precision  :: elst1,elst2
+     double precision  :: exchs21,exchs22
      !
      double precision  :: e2dispinCAS
      double precision  :: exch_part(5)

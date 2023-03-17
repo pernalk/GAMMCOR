@@ -1,4 +1,4 @@
-#define SAPT_INTERFACE_DEBUG -1
+#define SAPT_INTERFACE_DEBUG 5
 
 module sapt_inter
 
@@ -203,8 +203,9 @@ double precision :: Tcpu,Twall
 
     call calc_trdip(NBasis,SAPT%monA)
     call calc_trdip(NBasis,SAPT%monB)
-    call set_iref(SAPT%monA,SAPT%monB)
-
+    if(SAPT%monA%IRef2 /= 1 .OR. SAPT%monB%IRef2 /= 1) then
+      ! call set_iref(SAPT%monA,SAPT%monB)
+    endif
     call read_2rdm_2trdm_molpro(NBasis,SAPT%monA)
     call read_2rdm_2trdm_molpro(NBasis,SAPT%monB)
  endif
@@ -312,7 +313,6 @@ subroutine onel_molpro(mon,NBasis,NSq,NInte1,MonBlock,SAPT)
 
  integer                       :: ione,ios,NSym,NBas(8),ncen
  double precision, allocatable :: Hmat(:),Vmat(:),Smat(:)
- double precision, allocatable :: Kmat(:)
  double precision, allocatable :: work1(:),work2(:)
  character(8)                  :: label
  character(:),allocatable      :: infile,outfile
@@ -327,8 +327,6 @@ subroutine onel_molpro(mon,NBasis,NSq,NInte1,MonBlock,SAPT)
 
  allocate(work1(NInte1),work2(NSq))
  allocate(Hmat(NSq),Vmat(NSq),Smat(NSq))
- ! test HLONDON
- allocate(Kmat(NSq))
 ! read and dump 1-electron integrals
  open(newunit=ione,file=infile,access='sequential',&
       form='unformatted',status='old')
@@ -365,10 +363,6 @@ subroutine onel_molpro(mon,NBasis,NSq,NInte1,MonBlock,SAPT)
  call square_oneint(work1,Smat,NBasis,NSym,NBas)
  !call print_sqmat(Smat,NBasis)
 
- !! test for Heitler-London
- !call readoneint_molpro(work1,infile,'KINETINT',.false.,NInte1)
- !call square_oneint(work1,Kmat,NBasis,NSym,NBas)
-
  MonBlock%NSym = NSym
  MonBlock%NSymBas(1:NSym) = NBas(1:NSym)
 
@@ -377,7 +371,6 @@ subroutine onel_molpro(mon,NBasis,NSq,NInte1,MonBlock,SAPT)
 
  deallocate(work2,work1)
  deallocate(Smat,Vmat,Hmat)
- deallocate(Kmat)
 
 end subroutine onel_molpro
 
@@ -819,6 +812,8 @@ deallocate(AuxRDM)
 
 ! read all 1-TRDMs and transform to NOs
 ! of the reference state
+! that's not true now?
+! now reads in MO?
 allocate(Mon%trdm1(nnstates,NBasis,NBasis))
 allocate(AuxRDM(nnstates,NBasis,NBasis))
 
@@ -846,6 +841,11 @@ do iket=1,nstates
       print*, '1-TRDM MO ='
       do j=1,NOccup
          write(lout,'(*(f12.6))') (AuxRDM(itr,i,j),i=1,NOccup)
+      enddo
+
+      print*, 'CAOMO, RefState=',RefState
+      do j=1,NBasis
+         write(lout,'(*(f12.6))') (CAOMO(i,j),i=1,NBasis)
       enddo
 
       print*, 'CMONO, RefState=',RefState
@@ -889,6 +889,8 @@ integer                      :: Ind2(NBasis)
 double precision,allocatable :: RDM2Act(:),work(:,:)
 character(:),allocatable     :: rdmfile
 double precision,external :: FRDM2
+integer :: iref,iexcited
+double precision,allocatable :: Montrdm(:,:)
 
 if(mon%Monomer==1) then
   rdmfile='2RDMA'
@@ -939,11 +941,52 @@ do ist=1,nstates
          enddo
       enddo
    enddo
-   !print*, 'RDM2val, state', ist, norm2(mon%rdm24(ist,:,:,:,:))
+   print*, 'RDM2val, state', ist, norm2(mon%rdm24(ist,:,:,:,:))
 
 enddo
+!Make 2 trdm in noncumulant approximation
+allocate(Montrdm(NBasis,NBasis))
+iref=Mon%IREF1
+!Mon%trdm24 = 0d0
+do ist=1,nstates
+   iexcited = ((ist-2)*(ist-1))/2+iref
+call tran2MO(Mon%trdm1(iexcited,:,:),Mon%CMONO(iref,:,:),Mon%CMONO(iref,:,:), &
+                        Montrdm(:,:),NBasis)
+enddo 
+!do l=1,NOccup
+!   do k=1,NOccup
+!       do j=1,NOccup
+!          do i=1,NOccup
+!             if (k==l) then
+!                Mon%trdm24(ist,i,j,k,l) = Mon%trdm24(ist,i,j,k,l) + Montrdm(i,j)*Mon%rdm1(iref,k)
+!             endif
+!             if (i==k) then
+!                Mon%trdm24(ist,i,j,k,l) = Mon%trdm24(ist,i,j,k,l) + Montrdm(j,l)*Mon%rdm1(iref,i)
+!             endif
+!              if (j==k) then
+!                Mon%trdm24(ist,i,j,k,l) = Mon%trdm24(ist,i,j,k,l) -0.5d0*Montrdm(i,l)*Mon%rdm1(iref,j)
+!             endif
+!             if (i==l) then
+!                Mon%trdm24(ist,i,j,k,l) = Mon%trdm24(ist,i,j,k,l) -0.5d0*Montrdm(j,k)*Mon%rdm1(iref,l)
+!             endif
+!          enddo
+!        enddo
+!     enddo
+!  enddo
+!returns TRDM in iref NO basis
+
+
+
 
 ! create approximate 2-TRDMs here...
+
+
+
+
+
+
+
+
 
 deallocate(work,RDM2Act)
 

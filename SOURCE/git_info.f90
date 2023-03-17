@@ -2,9 +2,9 @@ module git_info
 
     implicit none
     character(len=*), parameter :: GIT_HEAD_BRANCH = "dSRS"
-    character(len=*), parameter :: GIT_REVISION_HASH = "863a922a7ec04a5daff86beee26e93a6a493d716"
-    character(len=*), parameter :: GIT_REVISION = "863a922"
-    character(len=*), parameter :: GIT_COMMITTER_DATE = "Wed Dec 28 16:44:47 2022 +0100"
+    character(len=*), parameter :: GIT_REVISION_HASH = "1ce36295ad7df64b2d5bf5c8bae07dc5ee1b83b3"
+    character(len=*), parameter :: GIT_REVISION = "1ce3629"
+    character(len=*), parameter :: GIT_COMMITTER_DATE = "Tue Jan 31 18:32:03 2023 +0100"
     character(len=*), parameter :: GIT_LATEST_TAG_LONG = "v-4.1"
 
     contains
