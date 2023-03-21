@@ -200,10 +200,13 @@ end block
 call prepare_RDM2corr(SAPT%monA,NBasis,Flags%IRDM2Typ)
 call prepare_RDM2corr(SAPT%monB,NBasis,Flags%IRDM2Typ)
 
+!call sapt_ab_ints_rdmcorr(SAPT%monA,SAPT%monB,Flags,SAPT%NAO,NBasis)
+
 ! SAPT component
 call e1elst(SAPT%monA,SAPT%monB,SAPT)
 !call e1elst_NaNb(SAPT%monA,SAPT%monB,SAPT)
 call e1exchs2(Flags,SAPT%monA,SAPT%monB,SAPT)
+!call e1exch_NaNb(Flags,SAPT%monA,SAPT%monB,SAPT)
 
 call summary_sapt_rdm(SAPT,Flags,NBasis)
 
@@ -941,6 +944,47 @@ elseif(Flags%ISERPA==2) then
 endif
 
 end subroutine sapt_ab_ints
+
+
+subroutine sapt_ab_ints_rdmcorr(A,B,Flags,NAO,NBasis)
+implicit none
+
+type(FlagsData)    :: Flags
+type(SystemBlock)  :: A,B
+integer,intent(in) :: NAO,NBasis
+
+integer :: dimOA, dimOB
+
+dimOA = A%num0 + A%num1
+dimOB = B%num0 + B%num1
+
+print*, 'sapt_ab_ints_rdmcorr...'
+print*, 'dimOA',dimOA
+print*, 'dimOB',dimOB
+
+call tran4_gen(NAO,&
+        NBasis,B%CMO(1:NAO,1:NBasis),&
+        dimOB, B%CMO(1:NAO,1:dimOB), &
+        NBasis,A%CMO(1:NAO,1:NBasis),&
+        dimOA ,A%CMO(1:NAO,1:dimOA), &
+       'FOFOAABB','AOTWOSORT')
+
+call tran4_gen(NAO,&
+      NBasis,B%CMO(1:NAO,1:NBasis),&
+      dimOA ,A%CMO(1:NAO,1:dimOA), &
+      NBasis,B%CMO(1:NAO,1:NBasis),&
+      dimOB ,B%CMO(1:NAO,1:dimOB), &
+     'FOFOBBBA','AOTWOSORT')
+
+call tran4_gen(NAO,&
+      NBasis,A%CMO(1:NAO,1:NBasis),&
+      dimOB, B%CMO(1:NAO,1:dimOB), &
+      NBasis,A%CMO(1:NAO,1:NBasis),&
+      dimOA ,A%CMO(1:NAO,1:dimOA), &
+     'FOFOAAAB','AOTWOSORT')
+
+
+end subroutine sapt_ab_ints_rdmcorr
 
 subroutine sapt_ab_ints_red(Flags,A,B,iPINO,NBasis,NBasisRed)
 implicit none

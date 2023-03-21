@@ -6140,7 +6140,7 @@ C
 *Deck MP2RDM
       Subroutine MP2RDM(TwoNO,Eps,Occ,URe,UNOAO,XOne,
      $ IndN,IndX,IndAux,NDimX,NBasis,NDim,NInte1,NInte2,
-     $ NVirt,IntFile,ThrVirtIN,iTwoNOout)
+     $ NVirt,IntFile,ThrVirtIN,iTwoNOout,RDM1)
 C
       use tran,only : tran4_full
 C
@@ -6163,6 +6163,7 @@ C
       Double Precision,intent(in) :: ThrVirtIN
       Logical          :: iTwoNOout
       Character(*)     :: IntFile
+      Double Precision,intent(out),optional :: RDM1(NInte1)
 C
 C     LOCAL ARRAYS
 C
@@ -6229,6 +6230,7 @@ C
       EndDo
 C
       NRDM2Act = NAct**2*(NAct**2+1)/2
+
       Allocate (RDM2Act(NRDM2Act))
       RDM2Act(1:NRDM2Act)=Zero
 C
@@ -6443,6 +6445,11 @@ C
 C
       EndDo
       EndDo
+C
+      If(present(RDM1)) then
+      RDM1 = Gamma
+      return
+      EndIf
 C
       Call CpySym(AUXM,Gamma,NBasis)
       Call Diag8(AUXM,NBasis,NBasis,PC,Work)
@@ -7539,7 +7546,6 @@ C
 C
       NUC_DMX=0; NUC_DMY=0; NUC_DMZ=0
       Do I=1,NCen
-         print*, 'Charge = ',i,Charg(i)
          NUC_DMX = NUC_DMX + Charg(i)*XYZ(i,1)
          NUC_DMY = NUC_DMY + Charg(i)*XYZ(i,2)
          NUC_DMZ = NUC_DMZ + Charg(i)*XYZ(i,3)

@@ -1655,6 +1655,15 @@ character(:),allocatable :: onefile,rdmfile,aoerfile
 ! testy
 integer :: info
 
+ !block
+ !print*, 'CAOMO: prepare_no',norm2(OrbCAS)
+ !do i=1,NBasis
+ !   write(lout,'(*(f12.8))') (OrbCAS(i,j),j=1,NBasis)
+ !enddo
+ !print*,'skip canonicalization...'
+ !return
+ !end block
+
  NInte1 = NBasis*(NBasis+1)/2
  NOccup = Mon%INAct + Mon%NAct
  NVirt = NBasis - Mon%INAct - Mon%NAct

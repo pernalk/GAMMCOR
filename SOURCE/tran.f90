@@ -1527,6 +1527,38 @@ integer :: i,j
 
 end subroutine tran2MO
 
+subroutine tran_den(back,C,S,DAO,DMO,nao,nmo)
+!
+! performs transformation of the density matrix:
+! a) back=.false.  DMO = C^T S D (SC)
+! b) back=.true.   D   = (SC) DMO (SC)^T
+!
+implicit none
+
+logical,intent(in) :: back
+integer,intent(in) :: nao,nmo
+double precision,intent(in)    :: C(nao,nao),S(nao,nao)
+double precision,intent(inout) :: DAO(nao,nao),DMO(nmo,nmo)
+
+double precision :: work1(nao,nmo),work2(nao,nmo)
+integer :: i,j
+
+if(back) then
+ ! work1 = S.C; work2 = work1.DMO
+ call dgemm('N','N',nao,nmo,nao,1d0,S,nao,C,nao,0d0,work1,nao)
+ !call dgemm('T','N',nao,nmo,nao,1d0,C,nao,work1,nao,0d0,work2,nao)
+ !print*, 'test!'
+ !do i=1,nmo
+ !   write(6,'(*(f12.8))') (work2(i,j),j=1,nmo)
+ !enddo
+ call dgemm('N','N',nao,nmo,nmo,1d0,work1,nao,DMO,nmo,0d0,work2,nao)
+ call dgemm('N','T',nao,nao,nmo,1d0,work2,nao,work1,nao,0d0,DAO,nao)
+else
+   stop "tran_den not ready!"
+endif
+
+end subroutine tran_den
+
 subroutine transp_mat1dim(matIn,matOut,NBas)
 implicit none
 

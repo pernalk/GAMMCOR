@@ -5,6 +5,7 @@ module rdmcorr
 use print_units
 use types
 use abfofo
+use sapt_utils
 
 contains
 
@@ -95,13 +96,73 @@ enddo
 AuxMat = transpose(Mon%CMO)
 
 ! return MP2-like rdm1c = CAS + corr
-call MP2RDM_FOFO(0d0,Eps,Mon%Occ,URe,AuxMat,XOne,&
+select case(Mon%TwoMoInt)
+case(TWOMO_INCORE)
+   block
+   integer :: NInte2,NVirt
+   double precision,allocatable :: TwoMO(:),workTr(:)
+   character(:),allocatable :: twofile
+
+   NInte2 = NInte1*(NInte1+1)/2
+
+   if(Mon%monomer==1) then
+      twofile  = 'TWOMOAA'
+   elseif(Mon%monomer==2) then
+      twofile  = 'TWOMOBB'
+   endif
+
+   allocate(TwoMO(NInte2),workTr(NInte1))
+
+   call SaptInter(NBasis,Mon,1)
+
+   if(Mon%Monomer==1) call system('cp rdm2_A.dat rdm2.dat')
+   if(Mon%Monomer==2) call system('cp rdm2_B.dat rdm2.dat')
+
+   call LoadSaptTwoNO(Mon%Monomer,TwoMO,NBasis,NInte2)
+   print*, 'TWOMO',norm2(TWOMO)
+
+   call MP2RDM(TwoMO,Eps,Mon%Occ,URe,AuxMat,XOne,  &
+                Mon%IndN,Mon%IndX,Mon%IndAux,Mon%NDimX, &
+                NBasis,Mon%NDimX,NInte1,NInte2,NVirt, &
+                twofile,Mon%ThrVirt,.false., &
+                workTr)
+
+   call triang_to_sq2(workTr,Mon%rdm1c,NBasis)
+
+   end block
+case(TWOMO_FOFO)
+   call MP2RDM_FOFO(0d0,Eps,Mon%Occ,URe,AuxMat,XOne,&
                  Mon%IndN,Mon%IndX,Mon%IndAux,Mon%IGem,  &
                  Mon%NAct,Mon%INAct,Mon%NDimX,Mon%NDimX,NBasis,NInte1, &
                  twojfile,twokfile,Mon%ThrVirt,Mon%NVZero,Mon%IPrint,  &
                  Mon%rdm1c)
+end select
 
-print*, 'RDMcorr ',norm2(Mon%rdm1c)
+!#if RDMCORR_DEBUG > 5
+
+   !print*, 'CAONO',norm2(Mon%CMO)
+   !do i=1,NBasis
+   !   write(lout,'(*(f12.8))') (AuxMat(i,j),j=1,NBasis)
+   !enddo
+   !print*,''
+   print*, '1-RDM MP2 unrelaxed (MO)',norm2(Mon%rdm1c)
+   do i=1,NBasis
+      write(lout,'(*(f12.8))') (2d0*Mon%rdm1c(i,j),j=1,NBasis)
+   enddo
+   !block
+   !double precision :: DAO(NBasis,NBasis),S(NBasis,NBasis)
+
+   !! try backtransformation
+   !call get_one_mat('S',S,MON%Monomer,NBasis)
+   !call tran_den(.true.,Mon%CMO,S,DAO,Mon%rdm1c,NBasis,NBasis)
+
+   !print*, 'DAO',norm2(DAO)
+   !do i=1,NBasis
+   !   write(lout,'(*(f12.8))') (2d0*DAO(i,j),j=1,NBasis)
+   !enddo
+   !print*,''
+   !end block
+!#endif
 
 ! test
 !Mon%rdm1c = 0d0
