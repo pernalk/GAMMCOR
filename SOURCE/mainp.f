@@ -82,6 +82,8 @@ C     FILL COMMONS AND CONSTANTS
       Max_Cn  = System%Max_Cn
       ITrpl   = Flags%ITrpl
       FreqOm  = System%FreqOm
+      IRedVirt=Flags%IRedVirt
+c      ThrVirt=System%ThrVirt
 C
 C     *************************************************************************
 C
