@@ -263,6 +263,7 @@ integer,intent(in) :: NBasis
 integer :: i,j,k,l
 integer :: ip,iq,ir,is
 integer :: NOccup,NOccup0
+double precision :: xnorm,refnorm
 double precision,allocatable :: work(:,:,:,:)
 
 NOccup0 = Mon%NOccup0
@@ -374,6 +375,20 @@ elseif(ver==1) then
          Mon%RDM2val(ip,iq,iq,ip) = Mon%RDM2val(ip,iq,iq,ip) - Mon%Occ(ip)*Mon%Occ(iq)
       enddo
    enddo
+   !do is=1,NOccup
+   !do iq=1,NOccup
+   !do ir=1,NOccup
+   !do ip=1,NOccup
+   !   if ((ip==ir).and.(iq==is)) then
+   !      Mon%RDM2val(ip,ir,iq,is) = Mon%RDM2val(ip,ir,iq,is) + 2d0*Mon%Occ(ip)*Mon%Occ(iq)
+   !   endif
+   !   if ((ip==is).and.(iq==ir)) then
+   !      Mon%RDM2val(ip,ir,iq,is) = Mon%RDM2val(ip,ir,iq,is) - Mon%Occ(ip)*Mon%Occ(iq)
+   !   endif
+   !enddo
+   !enddo
+   !enddo
+   !enddo
 
    print*, '2RDM non-cumulant: 2 n_p n_q - n_p n_q'
    print*, '2-RDM',norm2(Mon%RDM2val)
@@ -400,6 +415,54 @@ elseif(ver==2) then
    print*, '2-RDM',norm2(Mon%RDM2val)
 
 endif
+
+! check norm
+refnorm = Mon%XELE*(2d0*Mon%XELE-1)
+
+xnorm = 0d0
+do i=1,NOccup
+   do j=1,NOccup
+      xnorm = xnorm + Mon%RDM2val(i,i,j,j)
+   enddo
+enddo
+
+if(mon%monomer==1) write(lout,'(/1x,a,i3)') 'Monomer A',NOccup
+if(mon%monomer==2) write(lout,'(/1x,a,i3)') 'Monomer B',NOccup
+write(lout,'(1x,a,f12.6)',advance="no") '2-RDM2 norm = ', xnorm
+write(lout,'(1x,a,f8.3,a)') '(reference =', refnorm, ')'
+
+!if(abs(refnorm-xnorm).gt.1d-5) then
+!   Mon%RDM2val = Mon%RDM2val * refnorm / xnorm
+!   xnorm = 0d0
+!   do i=1,NOccup
+!      do j=1,NOccup
+!         xnorm = xnorm + Mon%RDM2val(i,i,j,j)
+!      enddo
+!   enddo
+!   write(lout,'(1x,a,f12.6)') 'RDM2 renormalized!' 
+!endif
+
+block
+integer :: ip,iq,ir,is
+double precision :: tst(NBasis,NBasis)
+! test RDM2val
+  tst = 0d0
+  do ip=1,NOccup 
+  do is=1,NOccup
+  do iq=1,NOccup
+     tst(iq,is) = tst(iq,is) + Mon%RDM2val(ip,ip,iq,is)
+  enddo
+  enddo
+  enddo
+  ! renormalize
+  tst = tst / (2d0*Mon%XELE-1)
+  print*, 'test sum rule'
+  do is=1,NBasis
+     write(lout,'(*(f13.8))') (tst(iq,is),iq=1,NBasis)
+  enddo
+
+end block
+
 
 end subroutine prepare_RDM2corr
 

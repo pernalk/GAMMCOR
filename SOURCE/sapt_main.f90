@@ -161,6 +161,29 @@ call prepare_RDM2val(SAPT%monA,Flags%ICASSCF,NBasis)
 call read2rdm(SAPT%monB,NBasis)
 call prepare_RDM2val(SAPT%monB,Flags%ICASSCF,NBasis)
 
+block
+integer :: ip,iq,ir,is
+double precision :: tst(NBasis,NBasis)
+! test RDM2val
+associate(A => SAPT%monA)
+  tst = 0d0
+  do ip=1,A%num0+A%num1
+  do is=1,A%num0+A%num1
+  do iq=1,A%num0+A%num1
+     tst(iq,is) = tst(iq,is) + A%RDM2val(ip,ip,iq,is)
+  enddo
+  enddo
+  enddo
+  ! renormalize
+  tst = tst / (2d0*A%XELE-1)
+  print*, 'test.........',A%XELE,A%NELE
+  do is=1,NBasis
+     write(lout,'(*(f13.8))') (tst(iq,is),iq=1,NBasis)
+  enddo
+
+end associate
+end block
+
 call sapt_rdm_corr(SAPT%monA,Flags,SAPT%NAO,NBasis)
 call sapt_rdm_corr(SAPT%monB,Flags,SAPT%NAO,NBasis)
 
