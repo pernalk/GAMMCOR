@@ -4,7 +4,7 @@ FCC = ifort
 WARNINGS 		=	-warn nounused
 OPTIMIZATION 	=	-xCOMMON-AVX512 -O3
 #OPTIMIZATION 	=	-xHost -O3
-PARALLELIZATION	=	-mkl=parallel -qopenmp
+PARALLELIZATION	=	-qmkl=parallel -qopenmp
 XCFUN 			=	-I xcfun/fortran
 TREXIO         = $(shell pkg-config --cflags trexio)
 FFLAGS = $(WARNINGS) $(OPTIMIZATION) $(PARALLELIZATION) $(XCFUN) $(TREXIO) -assume byterecl -heap-arrays -g

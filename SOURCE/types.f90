@@ -342,6 +342,7 @@ type SaptData
 
   type(SystemBlock) :: monA,monB
      double precision  :: Vnn,elst,exchs2,e2ind,e2disp
+     double precision  :: elALL(3)
      double precision  :: e2disp_sc,e2disp_sp
      double precision  :: e2ind_unc,e2disp_unc
      double precision  :: e2dispR_unc,e2dispR

@@ -158,7 +158,7 @@ $(O)ab0fofo.o : $(S)ab0fofo.f90 $(O)priunit.o $(O)blocktypes.o $(O)tran.o $(O)ab
 	$(FCC) $(FFLAGS)  -c $(S)ab0fofo.f90 -o $(O)ab0fofo.o
 $(O)abchol.o : $(S)abchol.f90
 	$(FCC) $(FFLAGS)  -c $(S)abchol.f90 -o $(O)abchol.o
-$(O)rdmcorr.o : $(S)rdmcorr.F90 $(O)abfofo.o $(O)types.o $(O)priunit.o
+$(O)rdmcorr.o : $(S)rdmcorr.F90 $(O)abfofo.o $(O)types.o $(O)priunit.o $(O)sapt_utils.o
 	$(FCC) $(FFLAGS)  -c $(S)rdmcorr.F90 -o $(O)rdmcorr.o
 $(O)srefex.o : $(S)srefex.f90 $(O)types.o $(O)exmisc.o
 	$(FCC) $(FFLAGS)  -c $(S)srefex.f90 -o $(O)srefex.o
@@ -173,7 +173,8 @@ $(O)exdpino.o : $(S)exdpino.f90 $(O)types.o $(O)tran.o $(O)timing.o $(O)exmisc.o
 $(O)sapt_main.o : $(S)sapt_main.f90 $(O)types.o \
                   $(O)sapt_exch.o $(O)sapt_pol.o $(O)sapt_Chol_pol.o $(O)sapt_Chol_exch.o \
                   $(O)sapt_utils.o $(O)exdpino.o \
-                  $(O)sapt_response.o $(O)sapt_interface.o
+                  $(O)sapt_response.o $(O)sapt_interface.o \
+                  $(O)rdmcorr.o
 	$(FCC) $(FFLAGS)  -c $(S)sapt_main.f90 -o $(O)sapt_main.o
 $(O)sapt_interface.o : $(S)sapt_interface.f90 $(O)types.o $(O)timing.o \
                   $(O)sorter.o $(O)tran.o $(O)Cholesky.o $(O)Cholesky_old.o $(O)abmats.o $(O)rdwrext.o $(O)trexio_module.o

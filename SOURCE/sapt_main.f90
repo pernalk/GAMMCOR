@@ -163,6 +163,7 @@ call prepare_RDM2val(SAPT%monB,Flags%ICASSCF,NBasis)
 
 block
 integer :: ip,iq,ir,is
+double precision :: norm,tmp
 double precision :: tst(NBasis,NBasis)
 ! test RDM2val
 associate(A => SAPT%monA)
@@ -177,9 +178,18 @@ associate(A => SAPT%monA)
   ! renormalize
   tst = tst / (2d0*A%XELE-1)
   print*, 'test.........',A%XELE,A%NELE
+  norm=norm2(tst)
+  tmp=0d0
   do is=1,NBasis
-     write(lout,'(*(f13.8))') (tst(iq,is),iq=1,NBasis)
+     tmp = tmp + tst(is,is)**2
   enddo
+  tmp = sqrt(tmp)
+  if(abs(norm-tmp).gt.1d-8) then
+    print*, 'Error! off diagonal elements!'
+  endif
+  !do is=1,NBasis
+  !   write(lout,'(*(f13.8))') (tst(iq,is),iq=1,NBasis)
+  !enddo
 
 end associate
 end block
@@ -222,6 +232,8 @@ end block
 
 call prepare_RDM2corr(SAPT%monA,NBasis,Flags%IRDM2Typ)
 call prepare_RDM2corr(SAPT%monB,NBasis,Flags%IRDM2Typ)
+
+call sapt_Kmat_AO(SAPT%monB%Kmat,SAPT%monB%CMO,SAPT%monB%Occ,SAPT%NAO,NBasis)
 
 !call sapt_ab_ints_rdmcorr(SAPT%monA,SAPT%monB,Flags,SAPT%NAO,NBasis)
 

@@ -296,20 +296,21 @@ double precision :: Tcpu,Twall
 ! calculate exchange K[PB] matrix in AO
  allocate(SAPT%monB%Kmat(NAO,NAO))
  allocate(work(NAO,NAO))
- !get PB density in AO
- !call get_den(NAO,NBasis,SAPT%monB%CMO,SAPT%monB%Occ,1d0,work)
- work = 0
- do i=1,NBasis
-    call dger(NAO,NAO,SAPT%monB%Occ(i),SAPT%monB%CMO(:,i),1,SAPT%monB%CMO(:,i),1,work,NAO)
- enddo
-
+!get PB density in AO
+! work = 0
+! do i=1,NBasis
+!    call dger(NAO,NAO,SAPT%monB%Occ(i),SAPT%monB%CMO(:,i),1,SAPT%monB%CMO(:,i),1,work,NAO)
+! enddo
+!
  if(Flags%ICholesky==0) then
-    call make_K(NAO,work,SAPT%monB%Kmat)
+!    call make_K(NAO,work,SAPT%monB%Kmat)
+   call sapt_Kmat_AO(SAPT%monB%Kmat,SAPT%monB%CMO,SAPT%monB%Occ,NAO,NBasis)
  elseif(Flags%ICholesky==1) then
     NCholesky = CholeskyVecs%NCholesky
     call make_K_CholR(CholeskyVecs%R(1:NCholesky,1:NInte1), &
                       NCholesky,NAO,work,SAPT%monB%Kmat)
  endif
+! print*, 'from sapt_interface',norm2(SAPT%monB%Kmat)
  deallocate(work)
 
 ! calculate electrostatic potential
@@ -2174,6 +2175,28 @@ integer,external :: NAddrRDM
  deallocate(work1,RDM2Act)
 
 end subroutine prepare_rdm2_molpro
+
+subroutine sapt_Kmat_AO(Kmat,CMO,Occ,NAO,NBasis)
+implicit none
+
+integer,intent(in) :: NAO, NBasis
+double precision,intent(in)    :: Occ(NBasis)
+double precision,intent(in)    :: CMO(NBasis,NBasis)
+double precision,intent(inout) :: Kmat(NBasis,NBasis)
+
+integer :: i
+double precision :: work(NAO,NAO)
+
+work = 0d0
+do i=1,NBasis
+   call dger(NAO,NAO,Occ(i),CMO(:,i),1,CMO(:,i),1,work,NAO)
+enddo
+
+call make_K(NAO,work,Kmat)
+
+print*, 'from sapt_interface',norm2(Kmat)
+
+end subroutine sapt_Kmat_AO
 
 subroutine select_active(mon,nbas,Flags)
 !

@@ -68,6 +68,10 @@ double precision,external  :: trace
  call print_en('Eelst',elst*1000,.true.)
  SAPT%elst = elst
 
+ SAPT%elALL(1) = ea
+ SAPT%elALL(2) = eb
+ SAPT%elALL(3) = eabel
+
  deallocate(work)
  deallocate(Ja,Vb,Va,PB,PA)
 

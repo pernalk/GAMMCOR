@@ -189,6 +189,7 @@ double precision,allocatable :: work1(:)
  t1(1) = SAPT%elst
  ! PA(ab).S(bc)
  ! S(ad).PB(dc)
+ print*, '???',SAPT%elst
  tmp1=0
  tmp2=0
  !
