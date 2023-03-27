@@ -631,6 +631,9 @@ character(:), allocatable :: first, last
          SystemParams%TwoMoInt = TWOMO_INCORE
       endif
 
+ case ("RDMODEL", "RDMMODEL")
+       read(val,*) SystemParams%RDModel
+
  case ("ISHF")
        read(val,*) SystemParams%ISHF
 
@@ -649,6 +652,12 @@ character(:), allocatable :: first, last
            uppercase(val) == "T") then
           SystemParams%Cholesky2rdm = .true.
        endif
+
+ case ("MONOMER")
+     ! monomer is read for SAPT
+ case default
+     write(lout,*) 'Unrecognized keyword in System block!'
+     stop
 
  end select
 end subroutine read_block_system

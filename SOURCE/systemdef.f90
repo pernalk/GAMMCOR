@@ -511,6 +511,7 @@ elseif(Flags%ISAPT.Eq.1) then
       monA%PostCAS  = Input%SystemInput(1)%PostCAS
       monA%ISHF     = Input%SystemInput(1)%ISHF
       monA%Cubic    = Input%SystemInput(1)%Cubic
+      monA%RDModel  = Input%SystemInput(1)%RDModel
       monA%Wexcit   = Input%SystemInput(1)%Wexcit
       monA%Cholesky2RDM = Input%SystemInput(1)%Cholesky2RDM
 
@@ -560,6 +561,7 @@ elseif(Flags%ISAPT.Eq.1) then
       monB%PostCAS   = Input%SystemInput(2)%PostCAS
       monB%ISHF      = Input%SystemInput(2)%ISHF
       monB%Cubic     = Input%SystemInput(2)%Cubic
+      monB%RDModel   = Input%SystemInput(2)%RDModel
       monB%Wexcit    = Input%SystemInput(2)%Wexcit
       monB%Cholesky2RDM = Input%SystemInput(2)%Cholesky2RDM
 
@@ -610,6 +612,7 @@ elseif(Flags%ISAPT.Eq.1) then
       monA%PostCAS = Input%SystemInput(2)%PostCAS
       monA%ISHF    = Input%SystemInput(2)%ISHF
       monA%Cubic   = Input%SystemInput(2)%Cubic
+      monA%RDModel = Input%SystemInput(2)%RDModel
       monA%Wexcit  = Input%SystemInput(2)%Wexcit
       monA%Cholesky2RDM = Input%SystemInput(2)%Cholesky2RDM
 
@@ -654,6 +657,7 @@ elseif(Flags%ISAPT.Eq.1) then
       monB%PostCAS  = Input%SystemInput(1)%PostCAS
       monB%ISHF     = Input%SystemInput(1)%ISHF
       monB%Cubic    = Input%SystemInput(1)%Cubic
+      monB%RDModel  = Input%SystemInput(1)%RDModel
       monB%Wexcit   = Input%SystemInput(1)%Wexcit
       monB%Cholesky2RDM = Input%SystemInput(1)%Cholesky2RDM
 

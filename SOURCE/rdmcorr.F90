@@ -131,11 +131,32 @@ case(TWOMO_INCORE)
 
    end block
 case(TWOMO_FOFO)
-   call MP2RDM_FOFO(0d0,Eps,Mon%Occ,URe,AuxMat,XOne,&
-                 Mon%IndN,Mon%IndX,Mon%IndAux,Mon%IGem,  &
-                 Mon%NAct,Mon%INAct,Mon%NDimX,Mon%NDimX,NBasis,NInte1, &
-                 twojfile,twokfile,Mon%ThrVirt,Mon%NVZero,Mon%IPrint,  &
-                 Mon%rdm1c)
+
+    if(Mon%RDModel.lt.0) then
+       Mon%RDModel = 1
+       !write(lout,'(1x,a)') "Warning! Setting RDModel to 0!"
+    endif
+
+    if(Mon%RDModel==0) then
+
+      print*, 'MP2RDM_FOFO...'
+      call MP2RDM_FOFO(0d0,Eps,Mon%Occ,URe,AuxMat,XOne,&
+                    Mon%IndN,Mon%IndX,Mon%IndAux,Mon%IGem,  &
+                    Mon%NAct,Mon%INAct,Mon%NDimX,Mon%NDimX,NBasis,NInte1, &
+                    twojfile,twokfile,Mon%ThrVirt,Mon%NVZero,Mon%IPrint,  &
+                    Mon%rdm1c)
+
+    elseif(Mon%RDModel==1) then
+
+      print*, 'RDMResp_FOFO...'
+      call RDMResp_FOFO(Mon%Occ,URe,AuxMat,XOne,&
+                        Mon%IndN,Mon%IndX,Mon%IndAux,&
+                        Mon%IGem,Mon%NAct,Mon%INAct, &
+                        Mon%NDimX,Mon%NDimX,NBasis,NInte1, &
+                        twojfile,twokfile,Mon%rdm1c)
+
+   endif
+
 end select
 
 !#if RDMCORR_DEBUG > 5

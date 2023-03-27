@@ -705,6 +705,202 @@ deallocate(ints_J,ints_K,work)
 
 end subroutine MP2RDM_FOFO
 
+subroutine RDMResp_FOFO(Occ,URe,UNOAO,XOne,IndN,IndX,IndAux,IGemIN, &
+                       NAct,INActive,NDimX,NDim,NBasis,NInte1,     &
+                       IntJFile,IntKFile,RDM1)
+implicit none
+
+integer,intent(in)           :: NAct,INActive,NDimX,NDim,NBasis,NInte1
+integer,intent(in)           :: IndN(2,NDim),IndX(NDim),IndAux(NBasis),IGemIN(NBasis)
+double precision,intent(in)  :: Occ(NBasis),XOne(NInte1),UNOAO(NBasis,NBasis)
+double precision             :: Eps(NBasis,NBasis),CI(NBasis)
+character(*)                 :: IntJFile,IntKFile
+integer                      :: iunit1,iunit2
+integer                      :: i,j,k,l,a,b,c,ij,ac,ii,jj,ip,iq,ir,is,ipos,ipos1,ipos2
+integer                      :: NOccup,NVirt,NVirtOld,iOccup,iVirt
+integer                      :: IGem(NBasis),pos(NBasis,NBasis),IPair(NBasis,NBasis)
+integer                      :: nAA,nAI(INActive),nAV(INActive+NAct+1:NBasis),nIV
+integer                      :: tmpAA(NAct*(NAct-1)/2),tmpAI(NAct,1:INActive),&
+                                tmpAV(NAct,INActive+NAct+1:NBasis),&
+                                tmpIV(INActive*(NBasis-NAct-INActive))
+integer                      :: limAA(2),limAI(2,1:INActive),&
+                                limAV(2,INActive+NAct+1:NBasis),limIV(2)
+double precision             :: val,ETot
+double precision             :: URe(NBasis,NBasis)
+double precision             :: AuxMat(NBasis,NBasis),&
+                                Gamma(NBasis,NBasis),PC(NBasis),Fock(NBasis*NBasis)
+integer                      :: XInd(NBasis,NBasis)
+double precision,allocatable :: ABPLUS(:,:),ABMIN(:,:)
+double precision,allocatable :: AuxI(:,:),Aux2(:,:)
+double precision,allocatable :: ints_J(:,:),ints_K(:,:),   &
+                                ints_bi(:,:),ints_bk(:,:), &
+                                work(:),workTr(:),workSq(:,:)
+double precision,intent(out),optional :: RDM1(NBasis,NBasis)
+
+integer          :: EndVirt,NBasisNew
+character(100)   :: num1char
+
+! set dimensions
+NOccup   = INActive + NAct
+
+! fix IGem
+do i=1,INActive
+   IGem(i) = 1
+enddo
+do i=INActive+1,NOccup
+   IGem(i) = 2
+enddo
+do i=NOccup+1,NBasis
+   IGem(i) = 3
+enddo
+
+IPair = 0
+do ii=1,NDimX
+   i = IndN(1,ii)
+   j = IndN(2,ii)
+   IPair(i,j) = 1
+   IPair(j,i) = 1
+   XInd(i,j) = IndX(ii)
+   XInd(j,i) = IndX(ii)
+enddo
+
+do i=1,NBasis
+  CI(i)=SQRT(Occ(i))
+  if(Occ(i).Lt.0.5d0) CI(i)=-CI(i)
+enddo
+
+! construct ABPLUS(0)
+allocate(ABPLUS(NDimX,NDimX),ABMIN(NDimX,NDimX))
+
+call create_blocks_ABPL0(nAA,nAI,nAV,nIV,tmpAA,tmpAI,tmpAV,tmpIV,&
+                         limAA,limAI,limAV,limIV,pos,&
+                         IGem,IndN,INActive,NAct,NBasis,NDimX)
+
+call ABPM0_FOFO(Occ,URe,XOne,ABPLUS,ABMIN, &
+                IndN,IndX,IGemIN,NAct,INActive,NDimX,NBasis,NDim,NInte1, &
+                IntJFile,IntKFile,0,ETot)
+
+Eps = 0
+!get AV
+do i=1,NDimX
+   ip = IndN(1,i)
+   iq = IndN(2,i)
+   ipos = pos(ip,iq)
+   Eps(ip,iq) = SQRT(ABPLUS(ipos,ipos)*ABMIN(ipos,ipos))
+enddo
+
+! AB(1) PART
+call AB_CAS_FOFO(ABPLUS,ABMIN,val,URe,Occ,XOne,&
+              IndN,IndX,IGem,NAct,INActive,NDimX,NBasis,NDimX,&
+              NInte1,IntJFile,IntKFile,0,1d0,.true.)
+
+allocate(work(NBasis**2),ints_bi(NBasis,NBasis),ints_bk(NBasis,NBasis))
+open(newunit=iunit1,file=trim(IntKFile),status='OLD', &
+     access='DIRECT',recl=8*NBasis*NOccup)
+
+Gamma = 0
+ij = 0
+do i=1,NOccup
+   Gamma(i,i) = Occ(i)
+enddo
+
+! NOccup-NOccup block of 1-RDM
+do k=1,NOccup
+   do b=NOccup+1,NBasis
+
+   if(IPair(b,k).eq.1) then
+
+      read(iunit1,rec=(b+(k-1)*NBasis)) work(1:NBasis*NOccup)
+      ! ints_bk
+      do l=1,NOccup
+         do j=1,NBasis
+            ints_bk(j,l) = work((l-1)*NBasis+j)
+         enddo
+      enddo
+      ints_bk(:,NOccup+1:NBasis) = 0
+
+      do i=1,NOccup
+         do a=i+1,NBasis
+
+              if(IPair(a,i).eq.1) then
+              do j=1,NOccup
+                if(IPair(a,j).eq.1) then
+                  ipos1 = XInd(a,i)
+                  ipos2 = XInd(b,k)
+                  Gamma(i,j) = Gamma(i,j) + ints_bk(a,j)* &
+                           0.5d0* &
+                           ( (CI(I)+CI(A))*(CI(K)+CI(B))*ABPLUS(ipos1,ipos2) &
+                            -(CI(I)-CI(A))*(CI(K)-CI(B))* ABMIN(ipos1,ipos2) ) &
+                           /(Eps(a,i)+Eps(b,k)) / (Eps(a,j)+Eps(b,k))
+                 endif
+              enddo
+              endif
+         enddo
+      enddo
+
+   endif
+
+   enddo
+enddo
+
+! Virt-Virt block of 1-RDM
+do b=1,NBasis
+  do k=1,b-1
+
+  if(IPair(b,k).eq.1) then
+
+      read(iunit1,rec=(b+(k-1)*NBasis)) work(1:NBasis*NOccup)
+      ! ints_bk
+      do l=1,NOccup
+         do j=1,NBasis
+            ints_bk(j,l) = work((l-1)*NBasis+j)
+         enddo
+      enddo
+      ints_bk(:,NOccup+1:NBasis) = 0
+
+      do i=1,NOccup
+         do c=NOccup+1,NBasis
+            if(IPair(c,i).eq.1) then
+            do a=NOccup+1,NBasis
+                 if(IPair(a,i).eq.1) then
+                 ipos1 = XInd(a,i)
+                 ipos2 = XInd(b,k)
+                 Gamma(a,c) = Gamma(a,c) - ints_bk(c,i)* &
+                 0.5d0* &
+                 ( (CI(I)+CI(A))*(CI(K)+CI(B))*ABPLUS(ipos1,ipos2) &
+                  -(CI(I)-CI(A))*(CI(K)-CI(B))* ABMIN(ipos1,ipos2) ) &
+                             /(Eps(a,i)+Eps(b,k)) / (Eps(c,i)+Eps(b,k))
+                 endif
+            enddo
+            endif
+         enddo
+      enddo
+
+   endif
+
+   enddo
+enddo
+
+Gamma=0.5d0*(Gamma+transpose(Gamma))
+
+close(iunit1)
+deallocate(ints_bk)
+deallocate(ABMIN,ABPLUS)
+
+AuxMat = Gamma
+call Diag8(AuxMat,NBasis,NBasis,PC,work(1:NBasis))
+val = 0d0
+write(LOUT,'(/,2x,"AC0-correlated ",3x,"occupation numbers")')
+do i=NBasis,1,-1
+   write(LOUT,'(X,I3,E16.6,I6)') i,PC(i)*2d0
+   val = val + PC(i)
+enddo
+write(LOUT,'(/,1x,"Sum of AC0 Occupancies: ",F5.2,/)') val
+
+if(present(RDM1)) RDM1 = Gamma
+
+end subroutine RDMResp_FOFO
+
 subroutine ABPM0_FOFO(Occ,URe,XOne,ABPLUS,ABMIN, &
                       IndN,IndX,IGemIN,NAct,INActive,NDimX,NBasis,NDim,NInte1, &
                       IntJFile,IntKFile,ICholesky,ETot)
