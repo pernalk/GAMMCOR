@@ -161,38 +161,38 @@ call prepare_RDM2val(SAPT%monA,Flags%ICASSCF,NBasis)
 call read2rdm(SAPT%monB,NBasis)
 call prepare_RDM2val(SAPT%monB,Flags%ICASSCF,NBasis)
 
-block
-integer :: ip,iq,ir,is
-double precision :: norm,tmp
-double precision :: tst(NBasis,NBasis)
-! test RDM2val
-associate(A => SAPT%monA)
-  tst = 0d0
-  do ip=1,A%num0+A%num1
-  do is=1,A%num0+A%num1
-  do iq=1,A%num0+A%num1
-     tst(iq,is) = tst(iq,is) + A%RDM2val(ip,ip,iq,is)
-  enddo
-  enddo
-  enddo
-  ! renormalize
-  tst = tst / (2d0*A%XELE-1)
-  print*, 'test.........',A%XELE,A%NELE
-  norm=norm2(tst)
-  tmp=0d0
-  do is=1,NBasis
-     tmp = tmp + tst(is,is)**2
-  enddo
-  tmp = sqrt(tmp)
-  if(abs(norm-tmp).gt.1d-8) then
-    print*, 'Error! off diagonal elements!'
-  endif
-  !do is=1,NBasis
-  !   write(lout,'(*(f13.8))') (tst(iq,is),iq=1,NBasis)
-  !enddo
-
-end associate
-end block
+!block
+!integer :: ip,iq,ir,is
+!double precision :: norm,tmp
+!double precision :: tst(NBasis,NBasis)
+!! test RDM2val
+!associate(A => SAPT%monA)
+!  tst = 0d0
+!  do ip=1,A%num0+A%num1
+!  do is=1,A%num0+A%num1
+!  do iq=1,A%num0+A%num1
+!     tst(iq,is) = tst(iq,is) + A%RDM2val(ip,ip,iq,is)
+!  enddo
+!  enddo
+!  enddo
+!  ! renormalize
+!  tst = tst / (2d0*A%XELE-1)
+!  print*, 'test.........',A%XELE,A%NELE
+!  norm=norm2(tst)
+!  tmp=0d0
+!  do is=1,NBasis
+!     tmp = tmp + tst(is,is)**2
+!  enddo
+!  tmp = sqrt(tmp)
+!  if(abs(norm-tmp).gt.1d-8) then
+!    print*, 'Error! off diagonal elements!'
+!  endif
+!  !do is=1,NBasis
+!  !   write(lout,'(*(f13.8))') (tst(iq,is),iq=1,NBasis)
+!  !enddo
+!
+!end associate
+!end block
 
 call sapt_rdm_corr(SAPT%monA,Flags,SAPT%NAO,NBasis)
 call sapt_rdm_corr(SAPT%monB,Flags,SAPT%NAO,NBasis)
@@ -235,13 +235,13 @@ call prepare_RDM2corr(SAPT%monB,NBasis,Flags%IRDM2Typ)
 
 call sapt_Kmat_AO(SAPT%monB%Kmat,SAPT%monB%CMO,SAPT%monB%Occ,SAPT%NAO,NBasis)
 
-!call sapt_ab_ints_rdmcorr(SAPT%monA,SAPT%monB,Flags,SAPT%NAO,NBasis)
+call sapt_ab_ints_rdmcorr(SAPT%monA,SAPT%monB,Flags,SAPT%NAO,NBasis)
 
 ! SAPT component
 call e1elst(SAPT%monA,SAPT%monB,SAPT)
 !call e1elst_NaNb(SAPT%monA,SAPT%monB,SAPT)
 call e1exchs2(Flags,SAPT%monA,SAPT%monB,SAPT)
-!call e1exch_NaNb(Flags,SAPT%monA,SAPT%monB,SAPT)
+call e1exch_NaNb(Flags,SAPT%monA,SAPT%monB,SAPT)
 
 call summary_sapt_rdm(SAPT,Flags,NBasis)
 

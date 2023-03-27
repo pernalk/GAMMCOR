@@ -363,32 +363,34 @@ elseif(ver==1) then
    ! Hartree-Fock
    ! Gamma(prqs) = 2*np*nq \delta_pr \delta_qs - n_p*nq \delta_ps \delta_qr
    Mon%RDM2val = 0d0
-   !! Coulomb
-   !do ip=1,NOccup
-   !   do iq=1,NOccup
-   !      Mon%RDM2val(ip,ip,iq,iq) = Mon%RDM2val(ip,ip,iq,iq) + 2d0*Mon%Occ(ip)*Mon%Occ(iq)
-   !   enddo
-   !enddo
-   !! exchange
-   !do ip=1,NOccup
-   !   do iq=1,NOccup
-   !      Mon%RDM2val(ip,iq,iq,ip) = Mon%RDM2val(ip,iq,iq,ip) - Mon%Occ(ip)*Mon%Occ(iq)
-   !   enddo
-   !enddo
-   do is=1,NOccup
+   ! Coulomb
    do iq=1,NOccup
-   do ir=1,NOccup
-   do ip=1,NOccup
-      if ((ip==ir).and.(iq==is)) then
-         Mon%RDM2val(ip,ir,iq,is) = Mon%RDM2val(ip,ir,iq,is) + 2d0*Mon%Occ(ip)*Mon%Occ(iq)
-      endif
-      if ((ip==is).and.(iq==ir)) then
-         Mon%RDM2val(ip,ir,iq,is) = Mon%RDM2val(ip,ir,iq,is) - Mon%Occ(ip)*Mon%Occ(iq)
-      endif
+      do ip=1,NOccup
+         Mon%RDM2val(ip,ip,iq,iq) = Mon%RDM2val(ip,ip,iq,iq) + 2d0*Mon%Occ(ip)*Mon%Occ(iq)
+      enddo
    enddo
+   ! exchange
+   do iq=1,NOccup
+      do ip=1,NOccup
+         Mon%RDM2val(ip,iq,iq,ip) = Mon%RDM2val(ip,iq,iq,ip) - Mon%Occ(ip)*Mon%Occ(iq)
+      enddo
    enddo
-   enddo
-   enddo
+   ! test
+   !do is=1,NOccup
+   !do iq=1,NOccup
+   !do ir=1,NOccup
+   !do ip=1,NOccup
+   !   if ((ip==ir).and.(iq==is)) then
+   !      Mon%RDM2val(ip,ir,iq,is) = Mon%RDM2val(ip,ir,iq,is) + 2d0*Mon%Occ(ip)*Mon%Occ(iq)
+   !   endif
+   !   if ((ip==is).and.(iq==ir)) then
+   !      !Mon%RDM2val(ip,ir,iq,is) = Mon%RDM2val(ip,ir,iq,is) - Mon%Occ(iq)
+   !      mon%RDM2val(ip,ir,iq,is) = Mon%RDM2val(ip,ir,iq,is) - Mon%Occ(ip)*Mon%Occ(iq)
+   !   endif
+   !enddo
+   !enddo
+   !enddo
+   !enddo
 
    print*, '2RDM non-cumulant: 2 n_p n_q - n_p n_q'
    print*, '2-RDM',norm2(Mon%RDM2val)
@@ -431,47 +433,50 @@ if(mon%monomer==2) write(lout,'(/1x,a,i3)') 'Monomer B',NOccup
 write(lout,'(1x,a,f12.6)',advance="no") '2-RDM2 norm = ', xnorm
 write(lout,'(1x,a,f8.3,a)') '(reference =', refnorm, ')'
 
-if(abs(refnorm-xnorm).gt.1d-5) then
-   Mon%RDM2val = Mon%RDM2val * refnorm / xnorm
-   xnorm = 0d0
-   do i=1,NOccup
-      do j=1,NOccup
-         xnorm = xnorm + Mon%RDM2val(i,i,j,j)
-      enddo
-   enddo
-   write(lout,'(1x,a,f12.6)') 'RDM2 renormalized!',xnorm
-endif
+!if(abs(refnorm-xnorm).gt.1d-5) then
+!   Mon%RDM2val = Mon%RDM2val * refnorm / xnorm
+!   xnorm = 0d0
+!   do i=1,NOccup
+!      do j=1,NOccup
+!         xnorm = xnorm + Mon%RDM2val(i,i,j,j)
+!      enddo
+!   enddo
+!   write(lout,'(1x,a,f12.6)') 'RDM2 renormalized!',xnorm
+!endif
 
-block
-integer :: ip,iq,ir,is
-double precision :: tmp,sumOcc
-double precision :: tst(NBasis,NBasis)
-! test RDM2val
-  tst = 0d0
-  do ip=1,NOccup 
-  do is=1,NOccup
-  do iq=1,NOccup
-     tst(iq,is) = tst(iq,is) + Mon%RDM2val(iq,is,ip,ip)
-     !tst(iq,is) = tst(iq,is) + Mon%RDM2val(ip,ip,iq,is)
-  enddo
-  enddo
-  enddo
-  tst = tst / (2d0*Mon%XELE-1)
-  tmp = norm2(tst)
-  print*, 'test sum rule',tmp
-  xnorm = 0d0
-  sumOcc = 0d0
-  do ip=1,NBasis
-  !   write(lout,'(*(f13.8))') (tst(iq,is),iq=1,NBasis)
-     xnorm = xnorm + tst(ip,ip)**2  
-     sumOcc = sumOcc + tst(ip,ip)
-     write(lout,'(i3,2f12.6)') ip, tst(ip,ip),Mon%Occ(ip)
-  enddo
-  xnorm = sqrt(xnorm)
-  print*, 'NORM TEST', abs(tmp-xnorm)
-  print*, 'Summ Occ ', sumOcc
-
-end block
+!block
+!integer :: ip,iq,ir,is
+!double precision :: tmp,ntmp,sumOcc
+!double precision :: tst(NBasis,NBasis)
+!! test RDM2val
+!  tst = 0d0
+!  do ip=1,NOccup 
+!  do is=1,NOccup
+!  do iq=1,NOccup
+!     !tst(iq,is) = tst(iq,is) + Mon%RDM2val(iq,is,ip,ip)
+!     tst(iq,is) = tst(iq,is) + Mon%RDM2val(ip,ip,iq,is)
+!  enddo
+!  enddo
+!  enddo
+!  !tst = tst / (2d0*Mon%XELE-1)
+!  tmp = norm2(tst)
+!  print*, 'test sum rule',tmp
+!  xnorm = 0d0
+!  sumOcc = 0d0
+!  ntmp=0d0
+!  do ip=1,NBasis
+!  !   write(lout,'(*(f13.8))') (tst(iq,is),iq=1,NBasis)
+!     xnorm = xnorm + tst(ip,ip)**2  
+!     sumOcc = sumOcc + tst(ip,ip)
+!     ntmp = 2d0*Mon%XELE*Mon%Occ(ip)-Mon%Occ(ip)**2
+!     write(lout,'(i3,2f12.6)') ip, tst(ip,ip),ntmp
+!     !write(lout,'(i3,2f12.6)') ip, tst(ip,ip),Mon%Occ(ip)
+!  enddo
+!  xnorm = sqrt(xnorm)
+!  print*, 'NORM TEST', abs(tmp-xnorm)
+!  print*, 'Summ Occ ', sumOcc
+!
+!end block
 
 end subroutine prepare_RDM2corr
 
