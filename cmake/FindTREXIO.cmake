@@ -62,8 +62,6 @@ find_library(TREXIO_LIBRARY
 	     PATHS ${TREXIO_SEARCH_PATHS}
 	     )
 
-message("<FindTREXIO.cmake>")
-
 # Handle the QUIETLY and REQUIRED arguments and set TREXIO_FOUND to TRUE if
 # all listed variables are TRUE.
 INCLUDE(FindPackageHandleStandardArgs)
@@ -76,4 +74,5 @@ set(TREXIO_LIBRARIES ${TREXIO_LIBRARY})
 set(TREXIO_INCLUDE_DIRS ${TREXIO_INCLUDE_DIR})
 
 message("TREXIO location: .............. ${TREXIO_LIBRARY}")
+message("TREXIO include dir: ........... ${TREXIO_INCLUDE_DIR}")
 message(NOTICE "")
