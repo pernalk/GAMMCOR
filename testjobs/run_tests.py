@@ -19,15 +19,13 @@ if len(sys.argv) < 2:
 
 local_path_gammcor = sys.argv[1]
 
-if "gammcor" in local_path_gammcor:
-    local_path_gammcor = local_path_gammcor.split("gammcor")[0]
-
-if local_path_gammcor.endswith("/"):
-    local_path_gammcor += 'gammcor/build/'
+if local_path_gammcor.endswith("/gammcor"):
+    RUN_GAMMCOR = local_path_gammcor 
 else:
-    local_path_gammcor += '/gammcor/build/'
-
-RUN_GAMMCOR = local_path_gammcor + 'gammcor'
+    if local_path_gammcor.endswith("/"):
+        RUN_GAMMCOR = local_path_gammcor + 'gammcor'
+    else:
+        RUN_GAMMCOR = local_path_gammcor + '/gammcor'
 
 if not Path(RUN_GAMMCOR).is_file():
     raise Exception(f"{RUN_GAMMCOR} not found!")

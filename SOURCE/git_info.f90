@@ -2,9 +2,9 @@ module git_info
 
     implicit none
     character(len=*), parameter :: GIT_HEAD_BRANCH = "IntCholesky"
-    character(len=*), parameter :: GIT_REVISION_HASH = "fa5fc92caaa98e37e21e0454b4a69fa8bae80db4"
-    character(len=*), parameter :: GIT_REVISION = "fa5fc92"
-    character(len=*), parameter :: GIT_COMMITTER_DATE = "Fri Feb 17 14:29:13 2023 +0100"
+    character(len=*), parameter :: GIT_REVISION_HASH = "3873c1f17f00ed54ec5a879f598782f8aef42919"
+    character(len=*), parameter :: GIT_REVISION = "3873c1f"
+    character(len=*), parameter :: GIT_COMMITTER_DATE = "Wed Mar 29 18:57:54 2023 +0200"
     character(len=*), parameter :: GIT_LATEST_TAG_LONG = "v-4.1"
 
     contains
