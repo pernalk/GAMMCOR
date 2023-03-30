@@ -26,5 +26,4 @@ build/
 xcfun/geninterface
 SOURCE/trexio_f.f90
 trexio/*.so*
-*.out
 clean-build-test.sh

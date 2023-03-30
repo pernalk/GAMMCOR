@@ -1,0 +1,732 @@
+ 
+ GIT INFO
+********************************************************************************
+ Branch:             IntCholesky
+ Revision (short):   3fe3f6a
+ Revision (full):    3fe3f6ade070f215fe3b1c4ce9d1b13312c64148
+ Latest commit date: Tue Oct 18 17:46:32 2022 +0200
+ Latest tag:         v-4.1
+ 
+ 
+ BUILD INFO
+********************************************************************************
+ Fortran compiler:   Intel 
+ /opt/intel/oneapi/compiler/2021.1.2/linux/bin/intel64/ifort
+ C++ compiler:       Intel 
+ /opt/intel/oneapi/compiler/2021.1.2/linux/bin/intel64/icpc
+ C compiler:         Intel 
+ /opt/intel/oneapi/compiler/2021.1.2/linux/bin/intel64/icc
+ Compile options:    -assume byterecl -heap-arrays -O3 -g -xCOMMON-AVX512
+ BLAS libraries:     
+ /opt/intel/oneapi/mkl/latest/lib/intel64/libmkl_intel_lp64.so /opt/intel/oneapi
+ /mkl/latest/lib/intel64/libmkl_intel_thread.so /opt/intel/oneapi/mkl/latest/lib
+ /intel64/libmkl_core.so /usr/lib/x86_64-linux-gnu/libiomp5.so -lpthread -lm -ld
+ l
+ 
+ NBasis WILL BE READ FROM MOLPRO
+
+ INPUT 
+********************************************************************************
+ JOB TITLE:     H2-H2 (TREXIO)
+ INTERFACE:     TREXIO  
+ JOB TYPE:      SAPT     
+ RDM TYPE:      CI      
+ RDM SOURCE:    DALTON  
+
+ MONOMER:       A       
+ ZNUCL:         2
+ CHARGE:        0
+ NO. OF ATOMS:  2
+ NO. OF SYM. EQUIV. ATOMS:  2
+ THRESHOLD SELECT ACTIVE :  0.100000E-02
+
+ MONOMER:       B       
+ ZNUCL:         2
+ CHARGE:        0
+ NO. OF ATOMS:  2
+ NO. OF SYM. EQUIV. ATOMS:  2
+ THRESHOLD SELECT ACTIVE :  0.100000E-02
+
+
+ INPUT CHECK PASSED
+********************************************************************************
+
+ IDALTON         0
+ IRes            0
+ IAO             0
+ INO             0
+ NoSym           1
+ IGVB            0
+ IFun           13
+ IFunSR          0
+ IFunSRKer       0
+ IModG           1
+ NGOcc           0
+ ILoc            1
+ IFreeze         0
+ IAPSG           0
+ ISERPA          0
+ IA              1
+ ICASSCF         0
+ IDMRG           0
+ IFlAC           0
+ IFLSnd          0
+ IFlCore         1
+ IFlFrag         0
+ IFl12           1
+ ISAPT           1
+
+ SYSTEM 
+********************************************************************************
+ MONOMER A
+ NUCLEAR CHARGE:   2
+ CHARGE:           0
+ NO.OF ATOMS:      2
+ THRESH ACTIVE:    0.100000E-05
+
+ MONOMER B
+ NUCLEAR CHARGE:   2
+ CHARGE:           0
+ NO.OF ATOMS:      2
+ THRESH ACTIVE:    0.100000E-05
+ PRINT LEVEL:     11
+
+
+ IFunSR=0
+
+ IFunSRKer=0
+
+
+ STARTING SAPT CALCULATIONS
+********************************************************************************
+ One-electron integrals written to file: ONEEL_A
+ Total number of nuclei :           4
+ Charges on centers
+  1    1.000000
+  2    1.000000
+  3    0.000000
+  4    0.000000
+ Cartesian coordinates (Angstrom)
+  1    0.000000    0.000000    8.979863
+  2    0.000000    0.000000   -1.360718
+  3    0.000000    0.000000    0.000000
+  4    0.000000    0.000000    0.000000
+ 
+ One-electron integrals written to file: ONEEL_B
+ Total number of nuclei :           4
+ Charges on centers
+  1    1.000000
+  2    1.000000
+  3    0.000000
+  4    0.000000
+ Cartesian coordinates (Angstrom)
+  1    0.000000    1.360718  -13.095802
+  2    0.000000   -1.360718  -13.095802
+  3    0.000000    0.000000    0.000000
+  4    0.000000    0.000000    0.000000
+ 
+
+ Warning! Small occupation:  3    0.9140E-07
+ Warning! Small occupation:  4    0.7082E-07
+ Warning! Small occupation:  5    0.2549E-07
+ Warning! Small occupation:  6    0.2549E-07
+ Warning! Small occupation:  7    0.1550E-07
+ Warning! Small occupation:  8    0.1550E-07
+ Warning! Small occupation:  9    0.1711E-10
+ Warning! Small occupation: 10    0.1509E-10
+ Warning! Small occupation: 11    0.5924E-15
+ Warning! Small occupation: 12    0.4381E-19
+ Warning! Small occupation: 13    0.3970E-20
+ Warning! Small occupation: 14    0.3198E-20
+ Warning! Small occupation: 15    0.0000E+00
+ Warning! Small occupation: 16    0.0000E+00
+ Warning! Small occupation: 17    0.0000E+00
+ Warning! Small occupation: 18    0.0000E+00
+ Warning! Small occupation: 19    0.0000E+00
+ Warning! Small occupation: 20    0.0000E+00
+ Monomoner A:           18 orbitals will be treated as virtual
+ Warning! Small occupation: 11    0.6443E-14
+ Warning! Small occupation: 12    0.2159E-16
+ Warning! Small occupation: 13    0.3441E-17
+ Warning! Small occupation: 14    0.1450E-20
+ Warning! Small occupation: 15    0.0000E+00
+ Warning! Small occupation: 16    0.0000E+00
+ Warning! Small occupation: 17    0.0000E+00
+ Warning! Small occupation: 18    0.0000E+00
+ Warning! Small occupation: 19    0.0000E+00
+ Warning! Small occupation: 20    0.0000E+00
+ Monomoner B:           10 orbitals will be treated as virtual
+ ORBITAL OCCUPANCIES
+  Orb   Occupancy-A      Gem-A          Occupancy-B      Gem-B
+   1    0.501141E+00     1              0.923091E+00     1
+   2    0.498859E+00     1              0.743312E-01     1
+   3    0.457001E-07     1              0.143499E-02     1
+   4    0.354075E-07     1              0.383000E-03     1
+   5    0.127456E-07     1              0.383000E-03     1
+   6    0.127456E-07     1              0.137819E-03     1
+   7    0.774764E-08     1              0.104725E-03     1
+   8    0.774764E-08     1              0.606148E-04     1
+   9    0.855362E-11     1              0.606148E-04     1
+  10    0.754478E-11     1              0.128752E-04     1
+  11    0.296201E-15     1              0.322148E-14     1
+  12    0.219050E-19     1              0.107944E-16     1
+  13    0.198516E-20     1              0.172055E-17     1
+  14    0.159902E-20     1              0.725098E-21     1
+  15    0.000000E+00     1              0.000000E+00     1
+  16    0.000000E+00     1              0.000000E+00     1
+  17    0.000000E+00     1              0.000000E+00     1
+  18    0.000000E+00     1              0.000000E+00     1
+  19    0.000000E+00     1              0.000000E+00     1
+  20    0.000000E+00     1              0.000000E+00     1
+
+
+ Number of basis functions:                        20
+ Number of independent pairs:                     210
+ Number of columns in segment:                    210
+ Number of passes:                                  1
+ Use TREXIO INTS SORTER
+
+ CPU  time in 2ints                is                0.011 s
+ Wall time in 2ints                is                0.010 s
+ WIP: do we really need a separate procedure for TREXIO?
+      it would maybe make more sense to set RDMType CI?
+      or split: select_active_gvb/cas/ci? 
+
+ Monomer A
+ Active Orbital:    1    0.5011E+00
+ Active Orbital:    2    0.4989E+00
+
+ TREXIO-num:
+ num0 (inactive)   0
+ num1   (active)   2
+ num2  (virtual)  18
+
+ maybe better call ThrSelAct : Threshold for nearly degenerate pairs?
+ Threshold for active orbital pairs:           0.10000E-02
+ Threshold for quasi-virtual orbital pairs:    0.10000E-06
+ Threshold for selecting active orbitals:      0.10000E-05 < Active <  0.10000E+01
+ WIP: do we really need a separate procedure for TREXIO?
+      it would maybe make more sense to set RDMType CI?
+      or split: select_active_gvb/cas/ci? 
+
+ Monomer B
+ Active Orbital:    1    0.9231E+00
+ Active Orbital:    2    0.7433E-01
+ Active Orbital:    3    0.1435E-02
+ Active Orbital:    4    0.3830E-03
+ Active Orbital:    5    0.3830E-03
+ Active Orbital:    6    0.1378E-03
+ Active Orbital:    7    0.1047E-03
+ Active Orbital:    8    0.6061E-04
+ Active Orbital:    9    0.6061E-04
+ Active Orbital:   10    0.1288E-04
+
+ TREXIO-num:
+ num0 (inactive)   0
+ num1   (active)  10
+ num2  (virtual)  10
+
+ maybe better call ThrSelAct : Threshold for nearly degenerate pairs?
+ Threshold for active orbital pairs:           0.10000E-02
+ Threshold for quasi-virtual orbital pairs:    0.10000E-06
+ Threshold for selecting active orbitals:      0.10000E-05 < Active <  0.10000E+01
+ Discarding nearly degenerate pair     5   4
+ Discarding nearly degenerate pair     9   8
+
+ WIP1: use 3-ind transformation for 2-RDMs!
+ WIP2: can the matrix be read-in and 3-indx transformed in batches? (rw_trexio_rdm2)
+ Number of Cholesky 2-RDM vectors     1
+ (compared to          400 )
+
+ Monomer A
+ 2-RDM2 norm =     1.000000 (reference =   1.000)
+ FCI RDM2 TRANSFORMATION TO NO IN PROCESS...
+ 2-RDM dim for monomer 1 truncated from NBasis =  20 to NOccup =   2
+ according to the 0.100000E-05 threshold (ThrAct)
+
+ WIP1: use 3-ind transformation for 2-RDMs!
+ WIP2: can the matrix be read-in and 3-indx transformed in batches? (rw_trexio_rdm2)
+ Number of Cholesky 2-RDM vectors     1
+ (compared to          400 )
+
+ Monomer B
+ 2-RDM2 norm =     1.000000 (reference =   1.000)
+ FCI RDM2 TRANSFORMATION TO NO IN PROCESS...
+ 2-RDM dim for monomer 2 truncated from NBasis =  20 to NOccup =  10
+ according to the 0.100000E-05 threshold (ThrAct)
+
+                           Monomer A    Monomer B
+ Active orbital:    1    0.5011E+00    0.9231E+00
+ Active orbital:    2    0.4989E+00    0.7433E-01
+ Active orbital:    3                  0.1435E-02
+ Active orbital:    4                  0.3830E-03
+ Active orbital:    5                  0.3830E-03
+ Active orbital:    6                  0.1378E-03
+ Active orbital:    7                  0.1047E-03
+ Active orbital:    8                  0.6061E-04
+ Active orbital:    9                  0.6061E-04
+ Active orbital:   10                  0.1288E-04
+ ------------------------------------------------
+ Total Active:                 2          10
+
+                          Monomer A     Monomer B
+ Total number of pairs:      190           190
+ Reduced to:                 37           143
+
+
+  Accepted pairs:
+  p  q           Monomer A                            MonomerB
+  --------------------------------     --------------------------------
+  2  1    0.4989E+00    0.5011E+00     2  1    0.7433E-01    0.9231E+00
+  3  1    0.4570E-07    0.5011E+00     3  1    0.1435E-02    0.9231E+00
+  3  2    0.4570E-07    0.4989E+00     3  2    0.1435E-02    0.7433E-01
+  4  1    0.3541E-07    0.5011E+00     4  1    0.3830E-03    0.9231E+00
+  4  2    0.3541E-07    0.4989E+00     4  2    0.3830E-03    0.7433E-01
+  5  1    0.1275E-07    0.5011E+00     4  3    0.3830E-03    0.1435E-02
+  5  2    0.1275E-07    0.4989E+00     5  1    0.3830E-03    0.9231E+00
+  6  1    0.1275E-07    0.5011E+00     5  2    0.3830E-03    0.7433E-01
+  6  2    0.1275E-07    0.4989E+00     5  3    0.3830E-03    0.1435E-02
+  7  1    0.7748E-08    0.5011E+00     6  1    0.1378E-03    0.9231E+00
+  7  2    0.7748E-08    0.4989E+00     6  2    0.1378E-03    0.7433E-01
+  8  1    0.7748E-08    0.5011E+00     6  3    0.1378E-03    0.1435E-02
+  8  2    0.7748E-08    0.4989E+00     6  4    0.1378E-03    0.3830E-03
+  9  1    0.8554E-11    0.5011E+00     6  5    0.1378E-03    0.3830E-03
+  9  2    0.8554E-11    0.4989E+00     7  1    0.1047E-03    0.9231E+00
+ 10  1    0.7545E-11    0.5011E+00     7  2    0.1047E-03    0.7433E-01
+ 10  2    0.7545E-11    0.4989E+00     7  3    0.1047E-03    0.1435E-02
+ 11  1    0.2962E-15    0.5011E+00     7  4    0.1047E-03    0.3830E-03
+ 11  2    0.2962E-15    0.4989E+00     7  5    0.1047E-03    0.3830E-03
+ 12  1    0.2190E-19    0.5011E+00     7  6    0.1047E-03    0.1378E-03
+ 12  2    0.2190E-19    0.4989E+00     8  1    0.6061E-04    0.9231E+00
+ 13  1    0.1985E-20    0.5011E+00     8  2    0.6061E-04    0.7433E-01
+ 13  2    0.1985E-20    0.4989E+00     8  3    0.6061E-04    0.1435E-02
+ 14  1    0.1599E-20    0.5011E+00     8  4    0.6061E-04    0.3830E-03
+ 14  2    0.1599E-20    0.4989E+00     8  5    0.6061E-04    0.3830E-03
+ 15  1    0.0000E+00    0.5011E+00     8  6    0.6061E-04    0.1378E-03
+ 15  2    0.0000E+00    0.4989E+00     8  7    0.6061E-04    0.1047E-03
+ 16  1    0.0000E+00    0.5011E+00     9  1    0.6061E-04    0.9231E+00
+ 16  2    0.0000E+00    0.4989E+00     9  2    0.6061E-04    0.7433E-01
+ 17  1    0.0000E+00    0.5011E+00     9  3    0.6061E-04    0.1435E-02
+ 17  2    0.0000E+00    0.4989E+00     9  4    0.6061E-04    0.3830E-03
+ 18  1    0.0000E+00    0.5011E+00     9  5    0.6061E-04    0.3830E-03
+ 18  2    0.0000E+00    0.4989E+00     9  6    0.6061E-04    0.1378E-03
+ 19  1    0.0000E+00    0.5011E+00     9  7    0.6061E-04    0.1047E-03
+ 19  2    0.0000E+00    0.4989E+00    10  1    0.1288E-04    0.9231E+00
+ 20  1    0.0000E+00    0.5011E+00    10  2    0.1288E-04    0.7433E-01
+ 20  2    0.0000E+00    0.4989E+00    10  3    0.1288E-04    0.1435E-02
+                                      10  4    0.1288E-04    0.3830E-03
+                                      10  5    0.1288E-04    0.3830E-03
+                                      10  6    0.1288E-04    0.1378E-03
+                                      10  7    0.1288E-04    0.1047E-03
+                                      10  8    0.1288E-04    0.6061E-04
+                                      10  9    0.1288E-04    0.6061E-04
+                                      11  1    0.3221E-14    0.9231E+00
+                                      11  2    0.3221E-14    0.7433E-01
+                                      11  3    0.3221E-14    0.1435E-02
+                                      11  4    0.3221E-14    0.3830E-03
+                                      11  5    0.3221E-14    0.3830E-03
+                                      11  6    0.3221E-14    0.1378E-03
+                                      11  7    0.3221E-14    0.1047E-03
+                                      11  8    0.3221E-14    0.6061E-04
+                                      11  9    0.3221E-14    0.6061E-04
+                                      11 10    0.3221E-14    0.1288E-04
+                                      12  1    0.1079E-16    0.9231E+00
+                                      12  2    0.1079E-16    0.7433E-01
+                                      12  3    0.1079E-16    0.1435E-02
+                                      12  4    0.1079E-16    0.3830E-03
+                                      12  5    0.1079E-16    0.3830E-03
+                                      12  6    0.1079E-16    0.1378E-03
+                                      12  7    0.1079E-16    0.1047E-03
+                                      12  8    0.1079E-16    0.6061E-04
+                                      12  9    0.1079E-16    0.6061E-04
+                                      12 10    0.1079E-16    0.1288E-04
+                                      13  1    0.1721E-17    0.9231E+00
+                                      13  2    0.1721E-17    0.7433E-01
+                                      13  3    0.1721E-17    0.1435E-02
+                                      13  4    0.1721E-17    0.3830E-03
+                                      13  5    0.1721E-17    0.3830E-03
+                                      13  6    0.1721E-17    0.1378E-03
+                                      13  7    0.1721E-17    0.1047E-03
+                                      13  8    0.1721E-17    0.6061E-04
+                                      13  9    0.1721E-17    0.6061E-04
+                                      13 10    0.1721E-17    0.1288E-04
+                                      14  1    0.7251E-21    0.9231E+00
+                                      14  2    0.7251E-21    0.7433E-01
+                                      14  3    0.7251E-21    0.1435E-02
+                                      14  4    0.7251E-21    0.3830E-03
+                                      14  5    0.7251E-21    0.3830E-03
+                                      14  6    0.7251E-21    0.1378E-03
+                                      14  7    0.7251E-21    0.1047E-03
+                                      14  8    0.7251E-21    0.6061E-04
+                                      14  9    0.7251E-21    0.6061E-04
+                                      14 10    0.7251E-21    0.1288E-04
+                                      15  1    0.0000E+00    0.9231E+00
+                                      15  2    0.0000E+00    0.7433E-01
+                                      15  3    0.0000E+00    0.1435E-02
+                                      15  4    0.0000E+00    0.3830E-03
+                                      15  5    0.0000E+00    0.3830E-03
+                                      15  6    0.0000E+00    0.1378E-03
+                                      15  7    0.0000E+00    0.1047E-03
+                                      15  8    0.0000E+00    0.6061E-04
+                                      15  9    0.0000E+00    0.6061E-04
+                                      15 10    0.0000E+00    0.1288E-04
+                                      16  1    0.0000E+00    0.9231E+00
+                                      16  2    0.0000E+00    0.7433E-01
+                                      16  3    0.0000E+00    0.1435E-02
+                                      16  4    0.0000E+00    0.3830E-03
+                                      16  5    0.0000E+00    0.3830E-03
+                                      16  6    0.0000E+00    0.1378E-03
+                                      16  7    0.0000E+00    0.1047E-03
+                                      16  8    0.0000E+00    0.6061E-04
+                                      16  9    0.0000E+00    0.6061E-04
+                                      16 10    0.0000E+00    0.1288E-04
+                                      17  1    0.0000E+00    0.9231E+00
+                                      17  2    0.0000E+00    0.7433E-01
+                                      17  3    0.0000E+00    0.1435E-02
+                                      17  4    0.0000E+00    0.3830E-03
+                                      17  5    0.0000E+00    0.3830E-03
+                                      17  6    0.0000E+00    0.1378E-03
+                                      17  7    0.0000E+00    0.1047E-03
+                                      17  8    0.0000E+00    0.6061E-04
+                                      17  9    0.0000E+00    0.6061E-04
+                                      17 10    0.0000E+00    0.1288E-04
+                                      18  1    0.0000E+00    0.9231E+00
+                                      18  2    0.0000E+00    0.7433E-01
+                                      18  3    0.0000E+00    0.1435E-02
+                                      18  4    0.0000E+00    0.3830E-03
+                                      18  5    0.0000E+00    0.3830E-03
+                                      18  6    0.0000E+00    0.1378E-03
+                                      18  7    0.0000E+00    0.1047E-03
+                                      18  8    0.0000E+00    0.6061E-04
+                                      18  9    0.0000E+00    0.6061E-04
+                                      18 10    0.0000E+00    0.1288E-04
+                                      19  1    0.0000E+00    0.9231E+00
+                                      19  2    0.0000E+00    0.7433E-01
+                                      19  3    0.0000E+00    0.1435E-02
+                                      19  4    0.0000E+00    0.3830E-03
+                                      19  5    0.0000E+00    0.3830E-03
+                                      19  6    0.0000E+00    0.1378E-03
+                                      19  7    0.0000E+00    0.1047E-03
+                                      19  8    0.0000E+00    0.6061E-04
+                                      19  9    0.0000E+00    0.6061E-04
+                                      19 10    0.0000E+00    0.1288E-04
+                                      20  1    0.0000E+00    0.9231E+00
+                                      20  2    0.0000E+00    0.7433E-01
+                                      20  3    0.0000E+00    0.1435E-02
+                                      20  4    0.0000E+00    0.3830E-03
+                                      20  5    0.0000E+00    0.3830E-03
+                                      20  6    0.0000E+00    0.1378E-03
+                                      20  7    0.0000E+00    0.1047E-03
+                                      20  8    0.0000E+00    0.6061E-04
+                                      20  9    0.0000E+00    0.6061E-04
+                                      20 10    0.0000E+00    0.1288E-04
+ Transforming integrals for FFOOAA
+
+ CPU  time in FFOO                 is                0.006 s
+ Wall time in FFOO                 is                0.002 s
+ Transforming integrals for FOFOAA
+
+ CPU  time in FOFO                 is                0.021 s
+ Wall time in FOFO                 is                0.005 s
+ Transforming integrals for FFOOBB
+
+ CPU  time in FFOO                 is                0.040 s
+ Wall time in FFOO                 is                0.010 s
+ Transforming integrals for FOFOBB
+
+ CPU  time in FOFO                 is                0.070 s
+ Wall time in FOFO                 is                0.018 s
+ calc_resp_cispi --> calc_resp_casgvb?
+ Mon%NAct           2
+ Mon%INAct           0
+ Mon%mon0           0           2
+ CIPSI One-electron Energy             -1.19197042
+ CIPSI Total Energy (w/o ENuc)         -1.09526354
+ ABPLUS   11.2745182409366     
+ ABMIN    11.2748173385297     
+ Solving symmetric eigenvalue equation...
+
+ ERPA EigVec norm  4.30083344
+ ERPA EigVal norm   11.27466631
+ ERPA Eigenvalues (NDimX =   37):
+    1    0.442217
+    2    0.568312
+    3    0.607949
+    4    0.681207
+    5    0.681224
+    6    0.682963
+    7    0.721487
+    8    1.231458
+    9    1.314896
+   10    1.408897
+   11    1.409297
+   12    1.409297
+   13    1.410098
+   14    1.410098
+   15    1.410499
+   16    1.749705
+   17    1.789398
+   18    1.960114
+   19    1.999217
+   20    2.106196
+   21    2.106246
+   22    2.107129
+   23    2.107129
+   24    2.107129
+   25    2.107129
+   26    2.107515
+   27    2.108143
+   28    2.139906
+   29    2.147337
+   30    2.147433
+   31    2.179028
+   32    2.373990
+   33    2.374582
+   34    2.413714
+   35    2.413807
+   36    2.984337
+   37    3.023629
+ calc_resp_cispi --> calc_resp_casgvb?
+ Mon%NAct          10
+ Mon%INAct           0
+ Mon%mon0           0          10
+ CIPSI One-electron Energy             -1.83368400
+ CIPSI Total Energy (w/o ENuc)         -1.43702063
+ ABPLUS   35.3141350267776     
+ ABMIN    35.3141646668436     
+ Solving symmetric eigenvalue equation...
+
+ ERPA EigVec norm  8.45576440
+ ERPA EigVal norm   35.31414985
+ ERPA Eigenvalues (NDimX =  143):
+    1    0.354804
+    2    0.577395
+    3    0.616774
+    4    0.774968
+    5    0.778104
+    6    0.830607
+    7    0.870431
+    8    1.166857
+    9    1.200779
+   10    1.411166
+   11    1.418812
+   12    1.435819
+   13    1.435819
+   14    1.450501
+   15    1.468541
+   16    1.495628
+   17    1.495628
+   18    1.508944
+   19    1.598333
+   20    1.736116
+   21    1.877424
+   22    1.879472
+   23    1.910515
+   24    1.910515
+   25    1.917169
+   26    1.918991
+   27    1.965845
+   28    1.966483
+   29    2.005523
+   30    2.005621
+   31    2.019203
+   32    2.019203
+   33    2.108180
+   34    2.113041
+   35    2.132683
+   36    2.142716
+   37    2.142716
+   38    2.172648
+   39    2.185696
+   40    2.185696
+   41    2.219960
+   42    2.220531
+   43    2.220542
+   44    2.225229
+   45    2.225860
+   46    2.259556
+   47    2.259648
+   48    2.259648
+   49    2.264970
+   50    2.265067
+   51    2.381726
+   52    2.473156
+   53    2.473753
+   54    2.473757
+   55    2.513213
+   56    2.513306
+   57    2.513306
+   58    2.535756
+   59    2.535756
+   60    2.572963
+   61    2.572963
+   62    2.598336
+   63    2.713243
+   64    2.752181
+   65    2.752719
+   66    2.770619
+   67    2.791098
+   68    2.791098
+   69    2.791967
+   70    2.811160
+   71    2.906626
+   72    2.999759
+   73    2.999759
+   74    3.024105
+   75    3.053731
+   76    3.054301
+   77    3.054312
+   78    3.077611
+   79    3.093283
+   80    3.093375
+   81    3.093376
+   82    3.111072
+   83    3.111696
+   84    3.111704
+   85    3.151726
+   86    3.151820
+   87    3.151820
+   88    3.179501
+   89    3.219386
+   90    3.267924
+   91    3.268561
+   92    3.307741
+   93    3.307839
+   94    3.312263
+   95    3.312263
+   96    3.416703
+   97    3.519976
+   98    3.520569
+   99    3.520573
+  100    3.527305
+  101    3.527934
+  102    3.559951
+  103    3.560044
+  104    3.560044
+  105    3.567187
+  106    3.567285
+  107    3.608401
+  108    3.608988
+  109    3.608998
+  110    3.609057
+  111    3.609619
+  112    3.609626
+  113    3.648306
+  114    3.648398
+  115    3.648399
+  116    3.648403
+  117    3.648494
+  118    3.648495
+  119    3.701708
+  120    3.701708
+  121    3.803642
+  122    3.867780
+  123    3.868370
+  124    3.868380
+  125    3.868428
+  126    3.868993
+  127    3.869000
+  128    3.907752
+  129    3.907845
+  130    3.907845
+  131    3.907849
+  132    3.907941
+  133    3.907941
+  134    3.937944
+  135    3.937944
+  136    4.054259
+  137    4.094184
+  138    4.394732
+  139    4.395327
+  140    4.395331
+  141    4.434749
+  142    4.434842
+  143    4.434842
+
+ Transforming E2disp integrals...
+ Transforming integrals for TWOMOAB
+
+ Transforming E2exch-ind integrals...
+ Transforming integrals for FOFOAABB
+ Transforming integrals for FOFOBBBA
+ Transforming integrals for FOFOAAAB
+ Transforming integrals for FFOOABAB
+ Transforming integrals for FOFOBBAB
+ Transforming integrals for FOFOAABA
+
+ Transforming E2exch-disp integrals...
+ Transforming integrals for FOFOABBA
+ Transforming integrals for FFOOABBB
+ Transforming integrals for FFOOBAAA
+ Transforming integrals for TMPOOAB
+
+ V_nucB_elA       =     -0.25972069
+ V_nucA_elB       =     -0.25999955
+ V_elA_elB        =      0.25999953
+ V_nn             =      0.25972071
+
+ Eelst            =     -0.00000139
+ Transforming integrals for TWOA3B
+ Transforming integrals for TWOB3A
+
+ ExchS2(T1   ) =      -0.00000000
+ ExchS2(T2d  ) =      -0.00001277
+ ExchS2(T2c-1) =       0.00001558
+ ExchS2(T2c-2) =       0.00000640
+ ExchS2(T2b-1) =       0.00002218
+ ExchS2(T2b-2) =       0.00000445
+ ExchS2(T2a-1) =      -0.00001070
+ ExchS2(T2a-2) =      -0.00000337
+ ExchS2(T2a-3) =      -0.00001050
+ ExchS2(T2a-4) =      -0.00000222
+
+ ExchS2           =      0.00000903
+
+ Ind(B<--A)     =      -0.00000003
+ Ind(A<--B)     =      -0.00000121
+ E2ind          =      -0.00000125
+
+ Thresholds in E2exch-ind:
+ SmallE          =     0.1000E-02
+ BigE            =     0.1000E+09
+
+ term Z           =     -0.00000000
+ term Y           =     -0.00000040
+ term X           =      0.00000045
+
+ E2exch-ind       =      0.00000005
+
+ Thresholds in E2disp:
+ SmallE      =       0.1000E-03
+ BigE        =       0.1000E+09
+
+ E2disp       =      -0.00051441
+
+ Thresholds in E2exch-disp:
+ SmallE          =     0.1000E-02
+ BigE            =     0.1000E+09
+
+ term Z           =     -0.00000000
+ term X           =      0.00000259
+ term Y           =     -0.00000243
+
+ E2exch-disp      =      0.00000015
+
+****************************************
+ SAPT SUMMARY / milliHartree
+****************************************
+ Interface   = TREXIO  
+ SAPT level  =  2
+ E1elst           =     -0.00000139
+ E1exch(S2)       =      0.00000903
+ E2ind            =     -0.00000125
+ E2exch-ind       =      0.00000005
+ E2disp           =     -0.00051441
+ E2exch-disp      =      0.00000015
+ Eint(SAPT2)      =     -0.00050781
+ WARNING! NOT POSSIBLE TO DELETE XY0_A FILE
+ WARNING! NOT POSSIBLE TO DELETE XY0_B FILE
+ WARNING! NOT POSSIBLE TO DELETE PROP_AB0 FILE
+
+ CPU  time in SAPT                 is                0.924 s
+ Wall time in SAPT                 is                0.281 s
