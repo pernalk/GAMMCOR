@@ -70,7 +70,11 @@ C
       Write
      $ (6,'(/,2X,''ECASSCF+ENuc, ACn-Corr, ACn-CASSCF '',4X,3F15.8)')
      $ ETot+ENuc,ECorr,ETot+ENuc+ECorr
-C       
+C
+C     delete cholesky vecs
+      Open(newunit=iunit,file='cholvecs',status='OLD')
+      Close(iunit,status='DELETE')
+C
       Return
 C
       EndIf
