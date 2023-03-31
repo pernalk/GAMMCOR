@@ -629,6 +629,10 @@ character(:), allocatable :: first, last
            uppercase(val) == ".TRUE.".or.&
            uppercase(val) == "T") then
           SystemParams%Cholesky2rdm = .true.
+       elseif (uppercase(val) == "FALSE".or.  &
+           uppercase(val) == ".FALSE.".or.&
+           uppercase(val) == "F") then
+          SystemParams%Cholesky2rdm = .false.
        endif
 
  end select
