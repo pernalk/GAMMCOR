@@ -561,11 +561,12 @@ subroutine readocc_molpro(NBasis,Mon,OrbAux,OneRdm,Flags)
 !
 implicit none
 
-type(SystemBlock) :: Mon
-type(FlagsData) :: Flags
+type(SystemBlock)   :: Mon
+type(FlagsData)     :: Flags
+integer,intent(in)  :: NBasis
 
-integer :: NBasis
-integer :: NInte1,HlpDim,NOccup,nact
+integer :: NAct,NOccup
+integer :: NInte1,HlpDim
 integer :: i,info
 double precision :: Tmp
 double precision :: OrbAux(NBasis,NBasis), &
@@ -575,53 +576,55 @@ double precision,allocatable :: work(:)
 character(:),allocatable :: mname
 character(:),allocatable :: rdmfile
 
- NInte1 = NBasis*(NBasis+1)/2
- HlpDim = max(NBasis**2,3*NBasis)
+NInte1 = NBasis*(NBasis+1)/2
+HlpDim = max(NBasis**2,3*NBasis)
 
- if(Mon%Monomer==1) then
-   rdmfile = '2RDMA'
-   mname   = 'A'
- elseif(Mon%Monomer==2) then
-   rdmfile = '2RDMB'
-   mname   = 'B'
- endif
+if(Mon%Monomer==1) then
+  rdmfile = '2RDMA'
+  mname   = 'A'
+elseif(Mon%Monomer==2) then
+  rdmfile = '2RDMB'
+  mname   = 'B'
+endif
 
- allocate(Mon%CICoef(NBasis),Mon%IGem(NBasis),Mon%Occ(NBasis))
- allocate(work(HlpDim),EVal(NBasis))
- OneRdm = 0
- ! HERE! FIRST STATE FOR NOW
- call read_1rdm_molpro(OneRdm,Mon%InSt(1,1),Mon%InSt(2,1),&
-                       Mon%ISpinMs2,rdmfile,Mon%IWarn,NBasis)
+call read_nact_molpro(NAct,rdmfile)
 
- call triang_to_sq2(OneRdm,OrbAux,NBasis)
- call Diag8(OrbAux,NBasis,NBasis,Eval,work)
+allocate(Mon%CICoef(NBasis),Mon%IGem(NBasis),Mon%Occ(NBasis))
+allocate(work(HlpDim),EVal(NBasis))
+OneRdm = 0
+! HERE! FIRST STATE FOR NOW
+call read_1rdm_molpro(OneRdm,Mon%InSt(1,1),Mon%InSt(2,1),&
+                      Mon%ISpinMs2,rdmfile,Mon%IWarn,NBasis)
+
+call triang_to_sq2(OneRdm,OrbAux,NBasis)
+call Diag8(OrbAux(1:NAct,1:NAct),NAct,NAct,Eval,work)
+
 ! KP : it may happen that an active orbital has a negative tiny occupation. set it to a positive
- do i=1,Nbasis
-    Eval(i)=Abs(Eval(i))
- enddo
+do i=1,NBasis
+   Eval(i)=Abs(Eval(i))
+enddo
 ! call dsyev('V','U',NBasis,OrbAux,NBasis,EVal,work,3*NBasis,info)
- call SortOcc(EVal,OrbAux,NBasis)
+call SortOcc(EVal,OrbAux(1:NAct,1:NAct),NAct)
 
 ! read NAct from 1RDM
- if(Mon%NActFromRDM) Mon%NAct = 0
- Tmp = 0
- do i=1,NBasis
-    Tmp = Tmp + EVal(i)
-    !if(Mon%NActFromRDM.and.EVal(i)>0.d0) Mon%NAct = Mon%NAct + 1
-    if(Mon%NActFromRDM.and.EVal(i)>1d-10) Mon%NAct = Mon%NAct + 1
- enddo
+if(Mon%NActFromRDM) Mon%NAct = 0
+Tmp = 0
+do i=1,NBasis
+   Tmp = Tmp + EVal(i)
+   !if(Mon%NActFromRDM.and.EVal(i)>0.d0) Mon%NAct = Mon%NAct + 1
+   if(Mon%NActFromRDM.and.EVal(i)>1d-10) Mon%NAct = Mon%NAct + 1
+enddo
 
 ! test NAct from 1RDM
- call read_nact_molpro(nact,rdmfile)
- if(Mon%NAct/=nact) then
-    write(lout,'(1x,2a)') 'Warning! In monomer ', mname
-    write(lout,'(1x,"The number of partially occ orbitals '// &
-          'different from nact read from molpro. '// &
-          'Some active orbitals must be unoccupied.",/)')
-    Mon%NAct = nact
-    Mon%ISwitchAct = 1  ! change Mon%num0 and Mon%num1 in select_active
-    Mon%IWarn = Mon%IWarn + 1
- endif
+if(Mon%NAct/=nact) then
+   write(lout,'(1x,2a)') 'Warning! In monomer ', mname
+   write(lout,'(1x,"The number of partially occ orbitals '// &
+         'different from nact read from molpro. '// &
+         'Some active orbitals must be unoccupied.",/)')
+   Mon%NAct = nact
+   Mon%ISwitchAct = 1  ! change Mon%num0 and Mon%num1 in select_active
+   Mon%IWarn = Mon%IWarn + 1
+endif
 
 ! Set INAct (also works for open-shells)
  Mon%INAct = Mon%XELE-Tmp+1.d-1
@@ -655,10 +658,13 @@ character(:),allocatable :: rdmfile
     if(Mon%Occ(i).lt.0.5d0) Mon%CICoef(i)=-Mon%CICoef(i)
  enddo
 
- !print*, 'readocc_molpro: OrbAux',norm2(OrbAux)
+ !block
+ !integer :: j
+ !print*, 'readocc_molpro: CMONO',norm2(OrbAux)
  !do j=1,NBasis
  !   write(lout,'(*(f12.6))') (OrbAux(i,j),i=1,NBasis)
  !enddo
+ !end block
 
  deallocate(EVal,work)
 
@@ -1770,9 +1776,9 @@ subroutine prepare_no_molpro(OneRdm,OrbAux,OrbCAS,Mon,CholeskyVecs,IFunSR,IChole
 implicit none
 !
 ! OneRDM[in]    :: 1-RDM in MO (triang)
-! OrbAux[in]    :: on input  CAStoNO
-! OrbCAS[inout] :: on input  AOtoCAS
-!                  on output AOtoNO
+! OrbAux[in]    :: on input  CMONO
+! OrbCAS[inout] :: on input  AOMO
+!                  on output AONO
 !
 type(SystemBlock)   :: Mon
 type(TCholeskyVecs) :: CholeskyVecs
@@ -1809,10 +1815,6 @@ integer :: info
    endif
  endif
 
- !print*, 'OneRDM',norm2(OneRdm)
- !print*, 'OrbAux',norm2(OrbAux)
- !print*, 'OrbCAS',norm2(OrbCAS)
- 
  if(.not.allocated(Mon%NumOSym)) then
     allocate(Mon%NumOSym(15),Mon%IndInt(NBasis))
     call create_ind_molpro(rdmfile,Mon%NumOSym,Mon%IndInt,NSym,NBasis)

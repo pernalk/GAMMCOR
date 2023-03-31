@@ -1906,15 +1906,12 @@ endif
 
 dimO  = mon%num0+mon%num1
 call read_SBlock(SBlock,SBlockIV,nblk,xy0file)
-
 !
-! Firstly we want to make XCas a YCas vectors
+! First, we want to make XCas a YCas vectors
 !
 ! We transform TRDMs to NO basis of IREF1 state
 
-
 ! nAA   = 0
-
 ! do i=1,NDimX
 !    ip = IndN(1,i)
 !    iq = IndN(2,i)
@@ -1923,12 +1920,10 @@ call read_SBlock(SBlock,SBlockIV,nblk,xy0file)
 !    endif
 ! enddo
 
-
-
-
 iref   =  mon%IREF1 !1
 iref2  =  mon%IREF2 !4
 iexcited = ((iref2-2)*(iref2-1))/2+iref
+
 call tran2MO(mon%trdm1(iexcited,:,:),mon%CMONO(iref,:,:),mon%CMONO(iref,:,:), &
 TRDM1CAS(:,:),NBasis)
 !
@@ -1939,12 +1934,29 @@ XCAS=0d0
 YCAS=0d0
 do ip=1,NBasis
    do iq=1,ip-1
-      if(mon%Occ(ip)-mon%OCC(iq).ne.0d0) then
-         YCAS(ip,iq)=TRDM1CAS(iq,ip)/(mon%Occ(ip)-mon%OCC(iq))
-         XCAS(ip,iq)=-TRDM1CAS(ip,iq)/(mon%Occ(ip)-mon%OCC(iq))
+      if(mon%Occ(ip)-mon%Occ(iq).ne.0d0) then
+         YCAS(ip,iq)=TRDM1CAS(iq,ip)/(mon%Occ(ip)-mon%Occ(iq))
+         XCAS(ip,iq)=-TRDM1CAS(ip,iq)/(mon%Occ(ip)-mon%Occ(iq))
       endif
    enddo
 enddo
+!block
+!! assemble X_SA-CAS / Y_SA-CAS like in Kasia's code
+!! works with skipped XTilde-->X transformation in dump_EBlock
+!double precision :: CICoef(NBasis)
+!CICoef = mon%CICoef
+!do ip=1,NBasis
+!   do iq=1,ip-1
+!      If(CICoef(ip)+CICoef(iq).Ne.0d0) then
+!        YCAS(ip,iq) = (trdm1cas(ip,iq)+trdm1cas(iq,ip))/(CICoef(ip)+CICoef(iq))
+!      endif
+!      If(CICoef(ip)+CICoef(iq).Ne.0d0) then
+!        XCAS(ip,iq) = (trdm1cas(iq,ip)-trdm1cas(ip,iq))/(CICoef(ip)-CICoef(iq))
+!      endif
+!   enddo
+!enddo
+!end block
+
 do ip=1,NBasis
    do iq=1,ip-1
       SumNU=SumNU+YCAS(ip,iq)*XCAS(ip,iq)
@@ -1952,6 +1964,7 @@ do ip=1,NBasis
 enddo
 
 SSgn=1d0
+write(6,'(1x,a,i2)') 'Monomer',mon%monomer
 write(6,'(X,"SumNu Y*X before normalization",E15.6)') SumNU
 If(SumNU.Lt.0d0) SSgn=-1d0
 If(Abs(SumNu).Gt.1.D-8) Then
@@ -2002,8 +2015,9 @@ EigY = 0
 !     Call SortEigXY(1,Eig,EigY,EigX,nAA)
 !   endif
 
-   Write(6,'(X,"Active ERPA Eigenvalues and Eigenvecs")')
-   do i=1,nAA
+   Write(6,'(X,"First 4 Active ERPA Eigenvalues and Eigenvecs")')
+   do i=1,4
+   !do i=1,nAA
       Write(6,'(X,I4,E15.6)') i,eig(i)
       do iq=1,nAA
          if(abs(eigy(iq,i))+abs(eigx(iq,i)).gt.1.d-7) Write(6,'(X,"Y_ERPA, X_ERPA",2I3,2E15.6)') &

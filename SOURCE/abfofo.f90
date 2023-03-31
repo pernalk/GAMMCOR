@@ -1182,13 +1182,6 @@ do iblk=1,nblk
       !   A%matY(i,1:B%n) = 0.5d0*(B%matX(i,1:B%n)*valX + B%matY(i,1:B%n)*valY)
         A%matX(i,1:B%n) = B%matX(i,1:B%n)
         A%matY(i,1:B%n) = B%matY(i,1:B%n)
-        block
-        print*, 'z abfofo...'
-        do j=1,B%n
-           print*, 'X0_ERPA, Y0_ERPA', ip, iq, B%matX(i,j),B%matY(i,j)
-        enddo
-        end block 
-
      enddo
 
    end associate
