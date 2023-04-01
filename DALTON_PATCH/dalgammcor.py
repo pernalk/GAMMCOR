@@ -7,6 +7,12 @@ from copy import deepcopy
 import numpy
 
 
+# ------------------------------- HOW TO USE THIS SCRIPT ------------------------------------------------------------------
+#
+# python3 dalgammcor.py <local-path-to-dalton>
+#
+# --------------------------------------------------------------------------------------------------------------------
+
 # ------------------------------- PARAMS FOR SIROPT ------------------------------------------------------------------
 GAMMCOR_TAG = "!$GAMMCOR --- GammCor interface, Pernal et al. 2023 ---\n"
 
@@ -156,9 +162,9 @@ with open(gnrinf, "r") as f:
 for i, line in enumerate(lines):
     if 'DKHINT' in line:
         if "!$GAMMCOR" not in lines[i+1]:
-            lines.insert(i+1, f"//{GAMMCOR_TAG}")
+            lines.insert(i+1, f"!{GAMMCOR_TAG}")
             lines.insert(i+2, f"     &        GAMMCOR,                                                  &\n")
-            lines.insert(i+3, f"//{GAMMCOR_TAG}")
+            lines.insert(i+3, f"!{GAMMCOR_TAG}")
             break
         else:
             break
@@ -433,5 +439,7 @@ f.close()
 
 print('')
 print('#################################### SUCCESS #####################################')
+print('')
+print('####################### Please, recompile Dalton sources #########################')
 print('')
 
