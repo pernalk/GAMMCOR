@@ -195,7 +195,7 @@ for i, line in enumerate(lines):
             if '/' in lines[j]:
                 if "!$GAMMCOR" not in lines[j]:
                     lines[j] = lines[j].replace('/', ',')
-                    lines.insert(j+1, f"     &            '.GAMMCO/', {GAMMCOR_TAG}")
+                    lines.insert(j+1, f"     &            '.GAMMCO'/ {GAMMCOR_TAG}")
                     break_out_flag = True
                     break
                 else:
@@ -263,11 +263,11 @@ for i, line in enumerate(lines):
         for j in range(i+1, len(lines)):
             if "GOTO 100" in lines[j]:
                 if "!$GAMMCOR" not in lines[j+1]:
-                    lines.insert(j+1, f"      {GAMMCOR_TAG}")
+                    lines.insert(j+1, f"{GAMMCOR_TAG}")
                     lines.insert(j+2,  f" {new_label}     CONTINUE  \n")
                     lines.insert(j+3, f"            GAMMCOR = .TRUE. \n")
                     lines.insert(j+4, f"         GOTO 100 ")
-                    lines.insert(j+5, f"\n      {GAMMCOR_TAG}")
+                    lines.insert(j+5, f"\n{GAMMCOR_TAG}")
                     brake_out_flag = True
                     break
                 else:
@@ -279,10 +279,10 @@ for i, line in enumerate(lines):
 for i, line in enumerate(lines):
     if "Information for WESTA" in line:
         if "!$GAMMCOR" not in lines[i+1]:
-            lines.insert(i+1, f"     {GAMMCOR_TAG}")
+            lines.insert(i+1, f"{GAMMCOR_TAG}")
             lines.insert(i+2, f"      IF (GAMMCOR) WRITE (LUPRI,\'(4X,A)\') 'Information '//\n")
             lines.insert(i+3, f"     &  'for GammCor will be calculated and written to files.'")
-            lines.insert(i+4, f"\n     {GAMMCOR_TAG}")
+            lines.insert(i+4, f"\n{GAMMCOR_TAG}")
             break
         else:
             break
