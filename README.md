@@ -1,5 +1,5 @@
 # GAMMCOR
-Authors: Kasia Pernal and Michal Hapka<br>
+Authors: Kasia Pernal, Michal Hapka, Marcin Modrzejewski, Adam Sokół, Aleksandra Tucholska <br>
 User Manual: [link](https://qchem.gitlab.io/gammcor-manual/)
 
 
