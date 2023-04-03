@@ -15,6 +15,16 @@ def get():
         }
     })
 
+    ### AC0 ###
+    tests_list.append({
+        'name': '* testing AC0-CAS[Dalton] energy',
+        'fun': ac0_en,
+        'runner': run_test,
+        'units': {
+            "AC0/ethene":   {'atol': 1.e-5, 'level': 'short'},
+        }
+    })
+
     ### ACn ###
     tests_list.append({
         'name': '* testing ACn-CAS[molpro] energy',
