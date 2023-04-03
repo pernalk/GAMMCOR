@@ -7,6 +7,8 @@ User Manual: [link](https://qchem.gitlab.io/gammcor-manual/)
 * Using CMake: [link](https://qchem.gitlab.io/gammcor-manual/pages/introduction/cmake.html)
 * Using ready-made Makefiles: [link](https://qchem.gitlab.io/gammcor-manual/pages/introduction/makefiles.html)
 
+## Testing
+* coming soon
 
 ## Third party software
 Third party software used in GammCor:
