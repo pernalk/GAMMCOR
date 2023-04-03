@@ -1,0 +1,4 @@
+!comdeck big $Revision: 2002.10 $
+      common /big/ q(2)
+      integer iq(2)
+      equivalence (q(1),iq(1))

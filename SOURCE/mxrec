@@ -1,0 +1,2 @@
+! src/common/mxrec $Revision: 2006.4 $
+      parameter (mxrec=200)

@@ -1,0 +1,28 @@
+!comdeck tapes $Revision: 2006.4 $
+!.....inp:  molpro input file number
+!.....iout: output file number
+!.....ipun: punch file number
+!.....inpc: standart input file number
+!.....iprio: io print paramter
+!.....ltap:  max number of records per file (set in blk1)
+!.....logout: unit number of log file
+!.....logfile: name of log file
+!.....logopen: flag indicating whether log file is open
+!.....lastout: output unit before last call to openlog
+!.....npl(ifile):  logical file number for molpro file ifile
+!.....nre(ifile):  number of calculation
+!.....iwrite(ifile): if nonzero, file has been written since last tapsav
+!.....int2ad(irec): address offsets for two electron integral symmetry blocks
+!ftc if Molpro
+      include "mxrec"
+      integer, parameter :: mxfil=9
+      logical :: ga_debug
+      common/tapes/inp,iout,ipun,inpc,iprio,ltap,logout,logopen,lastout,&
+     &             npl(mxfil),nre(mxfil),iwrite(mxfil),int2ad(51)
+      common/ltapes/ga_debug
+      equivalence (nein,inp),(naus,iout)
+      character(255) :: logfile
+      common/clogf/logfile
+!ftc else
+!ftc ;      common/tapes/iout
+!ftc end

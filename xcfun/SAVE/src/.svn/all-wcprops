@@ -1,0 +1,77 @@
+K 25
+svn:wc:ra_dav:version-url
+V 32
+/svn/xcfun/!svn/ver/58/trunk/src
+END
+functional.cpp
+K 25
+svn:wc:ra_dav:version-url
+V 46
+/svn/xcfun/!svn/ver/2/trunk/src/functional.cpp
+END
+array.h
+K 25
+svn:wc:ra_dav:version-url
+V 39
+/svn/xcfun/!svn/ver/2/trunk/src/array.h
+END
+parameters.cpp
+K 25
+svn:wc:ra_dav:version-url
+V 46
+/svn/xcfun/!svn/ver/2/trunk/src/parameters.cpp
+END
+xcfun.cpp
+K 25
+svn:wc:ra_dav:version-url
+V 42
+/svn/xcfun/!svn/ver/58/trunk/src/xcfun.cpp
+END
+xcfun_internal.h
+K 25
+svn:wc:ra_dav:version-url
+V 48
+/svn/xcfun/!svn/ver/2/trunk/src/xcfun_internal.h
+END
+evaluators.cpp
+K 25
+svn:wc:ra_dav:version-url
+V 47
+/svn/xcfun/!svn/ver/58/trunk/src/evaluators.cpp
+END
+functional.h
+K 25
+svn:wc:ra_dav:version-url
+V 45
+/svn/xcfun/!svn/ver/58/trunk/src/functional.h
+END
+parameters.h
+K 25
+svn:wc:ra_dav:version-url
+V 45
+/svn/xcfun/!svn/ver/27/trunk/src/parameters.h
+END
+specmath.h
+K 25
+svn:wc:ra_dav:version-url
+V 43
+/svn/xcfun/!svn/ver/58/trunk/src/specmath.h
+END
+config.h
+K 25
+svn:wc:ra_dav:version-url
+V 41
+/svn/xcfun/!svn/ver/58/trunk/src/config.h
+END
+geninterface.cpp
+K 25
+svn:wc:ra_dav:version-url
+V 49
+/svn/xcfun/!svn/ver/52/trunk/src/geninterface.cpp
+END
+fortran.c
+K 25
+svn:wc:ra_dav:version-url
+V 42
+/svn/xcfun/!svn/ver/40/trunk/src/fortran.c
+END

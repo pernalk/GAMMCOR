@@ -1,8 +1,12 @@
 *Deck ACCAS
       Subroutine ACCAS(ETot,ENuc,TwoNO,URe,UNOAO,Occ,XOne,
-     $  Title,NBasis,NInte1,NInte2,NGem,System)
+     $  Title,NBasis,NInte1,NInte2,NGem)
 C
-      use types
+c     use types
+      use print_units
+      use timing
+      use abfofo
+C
 C     A ROUTINE FOR COMPUTING ELECTRONIC ENERGY USING ERPA TRANSITION
 C     DENSITY MATRIX ELEMENTS
 C
@@ -23,7 +27,11 @@ C
      $ IndX(NBasis*(NBasis-1)/2),IndN(2,NBasis*(NBasis-1)/2),
      $ IndAux(NBasis),IPair(NBasis,NBasis)
 C
-      type(SystemBlock) :: System
+      Double Precision  :: Tcpu,Twall
+C
+C     START TIMING FOR AC PROCEDURES
+C
+      call clock('START',Tcpu,Twall)
 C
 C     CONSTRUCT LOOK-UP TABLES
 C
@@ -49,8 +57,15 @@ C
 C
       IPair(1:NBasis,1:NBasis)=0
 C
-      Write(LOUT,'(2x,a,2e15.5)') 'Threshold for quasi-degeneracy ',
+      Write(LOUT,'(2x,a,4x,2e15.5)') 'Threshold for quasi-degeneracy ',
      $ ThrSelAct
+
+      Write(LOUT,'(2x,a,2e15.5)') 'Threshold for quasi-virtual orbital',
+     $ ThrQVirt
+
+      Write(LOUT,'(2x,a,2e14.5)')'Threshold for quasi-inactive orbital',
+     $ ThrQInact
+
       IJ=0
       Ind=0
       Do I=1,NBasis
@@ -72,7 +87,8 @@ C     If IFlCore=0 do not include core (inactive) orbitals
       If((IFlCore.Eq.1).Or.
      $ (IFlCore.Eq.0.And.Occ(I).Ne.One.And.Occ(J).Ne.One)) Then
 C
-      If(Abs(Occ(i)+Occ(j)-Two).Gt.1.D-10) Then
+      If(Abs(Occ(i)+Occ(j)-Two).Gt.ThrQInact.And.
+     $   Abs(Occ(i)+Occ(j)).Gt.ThrQVirt) Then
       Ind=Ind+1
       IndX(Ind)=Ind
       IndN(1,Ind)=I
@@ -92,24 +108,80 @@ C
       EndDo
 C
       NDimX=Ind
-      Write(6,'(2X,"Number of pairs reduced to:",I6)')Ind
+      Write(6,'(/2X,"Number of pairs reduced to:",I6)')Ind
       Write(6,'(2X,"Accepted pairs read:")')
       Do I=1,Ind
       Ind1=IndN(1,I)
       Ind2=IndN(2,I)
-      Write(6,'(2X,3I5,2E14.4)')I,Ind1,Ind2,Occ(Ind1),Occ(Ind2)
+      Write(6,'(2X,I8,2I5,2E14.4)')I,Ind1,Ind2,Occ(Ind1),Occ(Ind2)
       EndDo
+C
+      If(IFlRESPONSE.Eq.1) Then
+C
+      Write(6,'(/,X,''Polarizability tensor calculation for Om ''
+     $ ,F8.4)') Om
+C
+      If(Max_Cn.Eq.-1) Then
+      Call Polariz(FreqOm,UNOAO,XOne,URe,Occ,
+     $   IGem,NAcCAS,NInAcCAS,NELE,NBasis,NInte1,NGem,IndAux,
+     $   IndN,IndX,NDimX,ICholesky)
+      Else
+      Write(6,'(/,X,''Expand C(Om) maximally up to order '',I4)') Max_Cn
+      Call PolarizAl(FreqOm,UNOAO,XOne,URe,Occ,
+     $   IGem,NAcCAS,NInAcCAS,NELE,NBasis,NInte1,NGem,IndAux,
+     $   IndN,IndX,NDimX,ICholesky,Max_Cn)
+      EndIf
+C
+      Return
+      EndIf
+C
+C     COMPUTE RESPONSE RDMs FROM AC0-CAS DERIVATIVE-LIKE EXPRESSION 
+C
+      If (IRedVirt.Eq.1) Then
+C
+      If(ITwoEl.eq.3) Then
+C
+      Call RDMResp_FOFO(Occ,URe,UNOAO,XOne,IndN,IndX,IndAux,IGem,
+     $                  NAcCAS,NInAcCAS,NDimX,NDim,NBasis,NInte1,
+     $                  'FFOO','FOFO')
+C
+      Else
+C
+      Write(6,'(/,X,
+     $ ''Response RDM is available only with FOFO integrals '')') 
+      Stop  
+C
+      EndIf
+C
+      EndIf
 C
       If(IFunSR.Eq.0) Then 
 C
-c      Call RunACCAS(ETot,ENuc,TwoNO,URe,UNOAO,Occ,XOne,
-c     $  IndAux,IPair,IndN,IndX,NDimX,Title,NBasis,NInte1,NInte2,NGem)
-c      stop
+      If(IFlAC0D.Eq.1) Then
 C
 C this is a version of AC0 which takes special care of deexcitations (SA-CAS is required)
 C
       Call RunACDEXIT(ETot,ENuc,TwoNO,URe,UNOAO,Occ,XOne,
      $  IndAux,IPair,IndN,IndX,NDimX,Title,NBasis,NInte1,NInte2,NGem)
+C
+      call clock('ACD model',Tcpu,Twall)
+
+      Else
+C
+      If(IFlACFREQ.Eq.1.Or.IFlACFREQNTH.Eq.1.
+     $ Or.IFlAC1FREQNTH.Eq.1) Then
+      Call ACIter(ETot,ENuc,TwoNO,URe,Occ,XOne,UNOAO,
+     $ IndAux,NBasis,NInte1,NInte2,NDimX,NGem,
+     $ IndN,IndX,NDimX)
+      Return
+      Else
+      Call RunACCAS(ETot,ENuc,TwoNO,URe,UNOAO,Occ,XOne,
+     $  IndAux,IPair,IndN,IndX,NDimX,Title,NBasis,NInte1,NInte2,NGem)
+      EndIf
+
+      call clock('AC  model',Tcpu,Twall)
+C
+      EndIf
 C
       ElseIf(IFunSR.Eq.3) Then
 C
@@ -121,6 +193,8 @@ C
       Call RunACCASLR(ETot,ENuc,TwoNO,URe,UNOAO,Occ,XOne,
      $  IndAux,IPair,IndN,IndX,NDimX,Title,NBasis,NInte1,NInte2,NGem)
 C
+      call clock('ACLR model',Tcpu,Twall)
+
       EndIf
 C
       Return
@@ -131,6 +205,7 @@ C
      $  IndAux,IPair,IndN,IndX,NDimX,Title,NBasis,NInte1,NInte2,NGem)
 C
       use abfofo
+      use ab0fofo
 C
       Implicit Real*8 (A-H,O-Z)
 C
@@ -150,8 +225,6 @@ C
      $ ABPLUS(NDimX*NDimX),ABMIN(NDimX*NDimX),
      $ EigVecR(NDimX*NDimX),Eig(NDimX),
      $ ECorrG(NGem), EGOne(NGem)
-c herer!!! delete after tests
-c     $ ,EigX(NDimX*NDimX)
 C
 C     IFlAC   = 1 - adiabatic connection formula calculation
 C               0 - AC not used
@@ -174,22 +247,24 @@ C
       EndIf
 C
 C     CALL AC If IFlAC=1 OR IFlSnd=1
-C
+C  
       If(IFlAC.Eq.1.Or.IFlSnd.Eq.1) Then
       NGOcc=0
       Call ACECORR(ETot,ENuc,TwoNO,URe,Occ,XOne,UNOAO,
      $ IndAux,ABPLUS,ABMIN,EigVecR,Eig,EGOne,
      $ Title,NBasis,NInte1,NInte2,NDimX,NGOcc,NGem,
      $ IndN,IndX,NDimX)
-c herer!!!
-c      Call CASPIDFT(ENuc,URe,UNOAO,Occ,XOne,TwoNO,
-c     $ NBasis,NInte1,NInte2)
 c 
 c exact AC
 c      NoEig=1
 c      NDimFull=NBasis*(NBasis-1)/2
 c      Call ACPINO(ENuc,TwoNO,Occ,XOne,
 c     $ NBasis,NInte1,NInte2,NDimFull,NGem,NoEig) 
+
+c AC with varying Alpha-dependent RDMs
+c      NDimFull=NBasis*(NBasis-1)/2
+c      Call ACRDM(ETot,ENuc,TwoNO,Occ,XOne,
+c     $ UNOAO,IndN,IndX,IndAux,NDimX,NBasis,NInte1,NInte2,NDimFull,NGem) 
       
       Return
       EndIf
@@ -208,7 +283,7 @@ C
       If(ITwoEl.Eq.3) Then
       Call AB_CAS_FOFO(ABPLUS,ABMIN,ECASSCF,URe,Occ,XOne,
      $ IndN,IndX,IGem,NAcCAS,NInAcCAS,NDimX,NBasis,NDimX,
-     $ NInte1,'FFOO','FOFO',ACAlpha,.false.)
+     $ NInte1,'FFOO','FOFO',ICholesky,ACAlpha,.false.)
 C
       ElseIf(ITwoEl.Eq.1) Then
       Call AB_CAS(ABPLUS,ABMIN,ECASSCF,URe,Occ,XOne,TwoNO,IPair,
@@ -257,7 +332,7 @@ C
       If(ITwoEl.Eq.3) Then
       Call ACEneERPA_FOFO(ECorr,EigVecR,Eig,Occ,
      $ IGem,IndN,IndX,NAcCAS+NInAcCAS,
-     $ NDimX,NBasis,'FOFO')
+     $ NDimX,NBasis,'FOFO',ICholesky)
 C
       ElseIf(ITwoEl.Eq.1) Then
       Call ACEneERPA(ECorr,EigVecR,Eig,TwoNO,URe,Occ,XOne,
@@ -276,13 +351,16 @@ C
       Subroutine RunACDEXIT(ETot,ENuc,TwoNO,URe,UNOAO,Occ,XOne,
      $  IndAux,IPair,IndN,IndX,NDimX,Title,NBasis,NInte1,NInte2,NGem)
 C
+c      use abmat
       use abfofo
-      use abmat
+      use ab0fofo
+      use read_external
 C
       Implicit Real*8 (A-H,O-Z)
 C
       Character*60 FMultTab,Title
       CHARACTER(100) :: num1char
+      Character*32 Str 
 C
       Include 'commons.inc'
 C
@@ -291,7 +369,153 @@ C
       Dimension
      $ URe(NBasis,NBasis),UNOAO(NBasis,NBasis),Occ(NBasis),
      $ TwoNO(NInte2),XOne(NInte1),IndX(NDimX),IndN(2,NDimX),
-     $ IndAux(NBasis),IPair(NBasis,NBasis)
+     $ IndAux(NBasis),IPair(NBasis,NBasis),NSymAO(NBasis),
+     $ NSymNO(NBasis),MultpC(8,8),NumOSym(8),NumStSym(16),IStSy(16),
+     $ IStCAS(2,100),EExcit(100),ICORR(100),ECorrSym(100)
+C
+C
+C     ***************************************
+      If(ISymmAC0D.Eq.1) Then
+C     ***************************************
+C
+C     AC0D corrections are computed for states of the same symmetries as 
+C     the symmetries of SA-CAS states 
+C
+C
+C     Symmetry of NO's
+C
+      Call read_sym_molpro(NSymAO,MxSym,NumOSym,
+     $                    'MOLPRO.MOPUN','CASORB  ',NBasis)
+C 
+      Call sym_inf_molpro('2RDM',NumOSym,NSym,NumStSym,IStSy,
+     $                    NStSym,NSymAO,NBasis)
+C     number of irreps
+      write(*,*)'NSym',NSym
+C     number of atomic orbitals in each irrep 
+      write(*,*)'NumOSym',NumOSym(1:NSym)
+C     number of irreps in SA-CAS
+      write(*,*)'NStSym',NStSym
+C     number of states in SA-CAS in each irrep
+      write(*,*)'NumStSym',NumStSym(1:NStSym)
+C     which irrep (a label) in SA-CAS
+      write(*,*)'IStSy',IStSy(1:NStSym)
+C
+      Write(6,'(2/,X,"SYMMETRY OF NATURAL ORBITALS")')
+      Write(6,'(X,"Orbital",3X,"Symmetry",3X,"Occupancy")')
+C
+      Do I=1,NBasis
+      NSymNO(I)=0
+C
+      Do J=1,NBasis
+C
+      If(Abs(UNOAO(I,J)).Gt.0.1) Then
+C
+      ISym=NSymAO(J)
+      If(NSymNO(I).Eq.0) Then
+      NSymNO(I)=ISym
+      Else
+      If(NSymNO(I).Ne.ISym)
+     $ Write(6,'("In RunACDEXIT. Symm of NO cannot be established",
+     $ I3)')I
+      EndIf
+C
+      EndIf
+      EndDo
+      Write(6,'(I4,7X,I4,2X,E16.6)')I,NSymNO(I),Occ(I)
+      EndDo
+C
+C     checking
+      Do I=1,MxSym
+      II=0
+      Do IOrb=1,NBasis
+      If(NSymNO(IOrb).Eq.I) II=II+1
+      EndDo
+      If(II.Ne.NumOSym(I))
+     $ Write(*,*) 'In RunACDEXIT. Symmetry of NO cannot be established!'
+      EndDo
+C
+      If(MxSym.Eq.1) Then
+      MultpC(1,1)=1
+      Else
+      Do I=1,MxSym
+      Do J=1,I
+      MultpC(I,J)=IEOR(I-1,J-1)+1
+      MultpC(J,I)=MultpC(I,J)
+      EndDo
+      EndDo
+      EndIf
+C
+c      write(*,*) 'st, sym',inst(1,1),inst(2,1)
+C
+C     determine a number of states in the SA-CAS calculation
+C
+C     grep ' !MCSCF STATE' filename.out > sacas_ene.dat
+      Open(10,File="sacas_ene.dat",Status='Old')
+      NoStMx=0
+      I=0
+   20 I=I+1
+      Read(10,'(A14,I1,A1,I1,A15,F22.12)',End=40) 
+     $Str,IStCAS(1,I),Str,IStCAS(2,I),Str,EExcit(I)
+      Write(6,'(X,"SA-CAS Energy  ",I1,".",I1,F22.12)') 
+     $ IStCAS(1,I),IStCAS(2,I),EExcit(I)
+      Read(10,*)
+      NoStMx=NoStMx+1
+      GoTo 20
+   40 Continue
+      Close(10)
+      Write(6,'(/,X,"The number of states in SA-CAS: ",I4,/)')NoStMx
+C
+      Do I=1,NoStMx
+      If(IStCAS(1,I).Eq.inst(1,1).And.IStCAS(2,I).Eq.inst(2,1)) ICAS=I
+      EndDo
+      Write(6,'(X,"Energy of the NoSt ",I1,".",I1,F22.12)')
+     $ IStCAS(1,ICAS),IStCAS(2,ICAS),EExcit(ICAS)
+C
+      Do I=1,NoStMx
+      ICORR(I)=0
+      If(EExcit(I).Ge.EExcit(ICAS)) ICORR(I)=1
+      EndDo
+C
+      If(ITwoEl.eq.1) Then
+C
+      Call AC0DSYMM(ICAS,NoStMx,ICORR,EExcit,IStCAS,NSym,NSymNO,MultpC,
+     $ ECorrSym,
+     $ ETot,TwoNO,Occ,URe,XOne,
+     $ UNOAO,IndN,IndX,NBasis,NDimX,NInte1,NInte2)
+C
+      ElseIf(ITwoEl.eq.3) Then
+C
+      Call Y01CASDSYM_FOFO(ICAS,NoStMx,ICORR,EExcit,IStCAS,NSym,NSymNO,
+     $ MultpC,
+     $ ECorrSym,Occ,URe,XOne,
+     $ 'PROP0','PROP1',
+     $ 'XY0',UNOAO,
+     $ IndN,IndX,IGem,NAcCAS,NInAcCAS,NDimX,
+     $ NBasis,NDimX,NInte1,NoSt,'EMPTY','FFOO',
+     $ 'FOFO',ICholesky,ETot,IFlAC0DP)
+C
+      EndIf
+C
+      Write(6,*)
+      Write
+     $ (6,'(X,''ECASSCF+ENuc, AC0DE-Corr, AC0DE-CASSCF '',4X,3F15.8)')
+     $ ETot+ENuc,ECorrSym(ICAS),ETot+ENuc+ECorrSym(ICAS)
+      Write(6,*)
+
+      Do I=1,NoStMx
+      If(ICORR(I).Eq.1.And.I.Ne.ICAS) 
+     $  Write
+     $ (6,'(X,''Dexcitation correction for AC0 for '',
+     $ I1,".",I1,"->",I1,".",I1," transition ",F15.8)')
+     $ IStCAS(1,I),IStCAS(2,I),IStCAS(1,ICAS),IStCAS(2,ICAS),ECorrSym(I)
+      EndDo
+C
+C     ***************************************
+      ElseIf(ISymmAC0D.Eq.0) Then
+C     ***************************************
+C
+C     AC0D corrections will be computed for states which have best overlap 
+C     with SA-CAS states
 C
       NDimD=0
       IJ=0
@@ -315,18 +539,47 @@ C
 C
       NDimD=Ind
 C
-      IF(COMMAND_ARGUMENT_COUNT().Eq.0)THEN
-      WRITE(*,*)'ERROR, COMMAND-LINE ARGUMENTS REQUIRED, STOPPING'
-      STOP
-      ENDIF
-      CALL GET_COMMAND_ARGUMENT(1,num1char)
-      READ(num1char,*)xnum1
-      IH0St=xnum1
-      Write(6,'(/,X,"H0 in AC0 will be constructed for state number",
-     $ I2)') IH0St
-C      IH0St=1
+C     determine a number of states in the SA-CAS calculation
+C
+C     grep ' !MCSCF STATE' filename.out > sacas_ene.dat
+      Open(10,File="sacas_ene.dat",Status='Old')
+      NoStMx=0
+      I=0
+   22 Read(10,'(A32,F22.12)',End=42) Str,EE
+      Write(6,'(X,"SA-CAS Energy  ",I2,F22.12)')
+     $ NoStMx+1,EE
+      Read(10,*)
+      NoStMx=NoStMx+1
+      GoTo 22
+   42 Continue
+      Close(10)
+      Write(6,'(/,X,"The number of states in SA-CAS: ",I4,/)')NoStMx
+C
+      Do IH0St=NoSt,NoStMx 
+C
+      Write(6,'(/,X,86("*"))')
+      Write(6,'(X,"**** AC0D calculation for SA-CAS state no",
+     $ I3," with H0 constructed for state no",I4,
+     $ " ****")')
+     $ NoSt,IH0St
+      Write(6,'(X,86("*"),/)')
+C
+      If(ITwoEl.eq.1) Then
+C
       Call AC0CDEXCIT(IH0St,ECorr,ETot,TwoNO,Occ,URe,XOne,
      $ UNOAO,IndN,IndX,NBasis,NDimX,NDimD,NInte1,NInte2)
+C
+      ElseIf(ITwoEl.eq.3) Then
+C
+      Call Y01CASD_FOFO(IH0St,Occ,URe,XOne,
+     $ 'PROP0','PROP1',
+     $ 'XY0',UNOAO,
+     $ IndN,IndX,IGem,NAcCAS,NInAcCAS,NDimX,
+     $ NBasis,NDimX,NInte1,NoSt,'EMPTY','FFOO',
+     $ 'FOFO',ICholesky,ETot,ECorr)
+C
+C     ITwoEl
+      EndIf
 C
       If(IH0St.Eq.NoSt) Then
 C
@@ -340,11 +593,18 @@ C
       Else
 C
       Write
-     $ (6,'(/,X,''Dexcitation correction for AC0 for '',I2," <-",I2,
+     $ (6,'(/,X,''Dexcitation correction for AC0 for '',I2," ->",I2,
      $ " transition ",F15.8)')
-     $ NoSt,IH0St,ECorr
+     $ IH0St,NoSt,ECorr
 C
       EndIf
+C
+C     Do IH0St=NoSt,NoStMx
+      EndDo
+C
+C     ***************************************
+      EndIf
+C     ***************************************
 C
       Return
       End
@@ -353,10 +613,11 @@ C
       Subroutine RunACCASLR(ETot,ENuc,TwoNO,URe,UNOAO,Occ,XOne,
      $  IndAux,IPair,IndN,IndX,NDimX,Title,NBasis,NInte1,NInte2,NGem)
 C
-      use types
       use sorter
       use abmat
       use abfofo
+      use ab0fofo
+      use read_external
       use timing
 C
       Implicit Real*8 (A-H,O-Z)
@@ -447,7 +708,8 @@ C      NumOSym(I)=X
 C      EndDo
 C      Close(10)
 C     HAP
-      Call create_ind('2RDM',NumOSym,IndInt,NSym,NBasis)
+      Call create_ind_molpro('2RDM',NumOSym,IndInt,NSym,NBasis)
+      MxSym=NSym
 C
       NSymNO(1:NBasis)=0
       IStart=0
@@ -497,7 +759,7 @@ C
       EndIf
       FName(K:K+10)='.reg.integ'
 C      Call Int2_AO(TwoEl2,NumOSym,MultpC,FName,NInte1,NInte2,NBasis)
-      Call readtwoint(NBasis,2,'AOTWOINT.mol','AOTWOSORT')
+      Call readtwoint(NBasis,2,'AOTWOINT.mol','AOTWOSORT',134*1024_8**2)
       If(ITwoEl.Eq.1) Call LoadSaptTwoEl(3,TwoEl2,NBasis,NInte2)
 C
       If(ITwoEl.Eq.1) Then
@@ -626,10 +888,10 @@ C
       Call Y01CASLR_FOFO(Occ,URe,XOne,ABPLUS,ABMIN,
      $ MultpC,NSymNO,
      $ SRKer,WGrid,OrbGrid,
-     $ 'PROP0','PROP1',
+     $ 'PROP0','PROP1','XY0',
      $ IndN,IndX,IGem,NAcCAS,NInAcCAS,
      $ NGrid,NDimX,NBasis,NDimX,NInte1,NoSt,
-     $ 'EMPTY','FFOOERF','FOFOERF',0,IFunSRKer,ECASSCF,ECorr)
+     $ 'FOFO','FFOOERF','FOFOERF',ICholesky,0,IFunSRKer,ECASSCF,ECorr)
 C
       ElseIf(ITWoEl.Eq.1) Then
 C 
@@ -767,7 +1029,7 @@ C
       If(ITwoEl.Eq.3) Then
       Call AB_CAS_FOFO(ABPLUS,ABMIN,ECASSCF,URe,Occ,XOne,
      $ IndN,IndX,IGem,NAcCAS,NInAcCAS,NDimX,NBasis,NDimX,
-     $ NInte1,'FFOOERF','FOFOERF',ACAlpha,.false.)
+     $ NInte1,'FFOOERF','FOFOERF',ICholesky,ACAlpha,.false.)
 C
       ElseIf(ITwoEl.Eq.1) Then
       Call AB_CAS(ABPLUS,ABMIN,ECASSCF,URe,Occ,XOne,TwoNO,IPair,
@@ -901,7 +1163,7 @@ C
       If(ITwoEl.Eq.3) Then
       Call ACEneERPA_FOFO(ECorr,EigVecR,Eig,Occ,
      $ IGem,IndN,IndX,NAcCAS+NInAcCAS,
-     $ NDimX,NBasis,'FOFOERF')
+     $ NDimX,NBasis,'FOFOERF',ICholesky)
 C
       ElseIf(ITwoEl.Eq.1) Then
       Call ACEneERPA(ECorr,EigVecR,Eig,TwoNO,URe,Occ,XOne,
@@ -928,6 +1190,16 @@ C
       DeAllocate  (OrbZGrid)
       DeAllocate  (Work)
       DeAllocate (SRKer)
+C     
+      Call delfile('AOTWOSORT')
+      Call delfile('AOERFSORT')
+C
+      If(ITwoEl.Eq.3) Then
+      Call delfile('FFOO')
+      Call delfile('FOFO')
+      Call delfile('FOFOERF')
+      Call delfile('FFOOERF')
+      EndIf
 C
       Return
       End
@@ -1049,7 +1321,7 @@ C
       Open(10,File="rdm2.dat",Status='Old')
       Write(6,'(/,1X,''Active block of 2-RDM read from rdm2.dat'')')
 C
-   10 Read(10,'(4I4,F19.12)',End=40)I,J,K,L,X
+   10 Read(10,*,End=40)I,J,K,L,X
 C
 C     X IS DEFINED AS: < E(IJ)E(KL) > - DELTA(J,K) < E(IL) > = 2 GAM2(JLIK)
 C
@@ -1895,7 +2167,7 @@ C
       Open(10,File="rdm2.dat",Status='Old')
       Write(6,'(/,1X,''Active block of 2-RDM read from rdm2.dat'')')
 C
-   10 Read(10,'(4I4,F19.12)',End=40)I,J,K,L,X
+   10 Read(10,*,End=40)I,J,K,L,X
 C
 C     X IS DEFINED AS: < E(IJ)E(KL) > - DELTA(J,K) < E(IL) > = 2 GAM2(JLIK)
 C
@@ -2024,7 +2296,7 @@ C
       Open(10,File="rdm2.dat",Status='Old')
       Write(6,'(/,1X,''Active block of 2-RDM read from rdm2.dat'')')
 C
-   10 Read(10,'(4I4,F19.12)',End=40)I,J,K,L,X
+   10 Read(10,*,End=40)I,J,K,L,X
 C
 C     X IS DEFINED AS: < E(IJ)E(KL) > - DELTA(J,K) < E(IL) > = 2 GAM2(JLIK)
 C
@@ -2167,10 +2439,7 @@ C
 C
 C     LOCAL ARRAYS
 C
-      Dimension
-     $ ABPLUS(NDimX*NDimX),ABMIN(NDimX*NDimX),
-     $ EigVecR(NDimX*NDimX),Eig(NDimX),
-     $ ECorrG(NGem), EGOne(NGem)
+      Dimension ECorrG(NGem), EGOne(NGem)
 C
 C     READ 2RDM, COMPUTE THE ENERGY
 C
@@ -2193,7 +2462,7 @@ C
       Open(10,File="rdm2.dat",Status='Old')
       Write(6,'(/,1X,''Active block of 2-RDM read from rdm2.dat'')')
 C
-   10 Read(10,'(4I4,F19.12)',End=40)I,J,K,L,X
+   10 Read(10,*,End=40)I,J,K,L,X
 C
 C     X IS DEFINED AS: < E(IJ)E(KL) > - DELTA(J,K) < E(IL) > = 2 GAM2(JLIK)
 C
@@ -2351,7 +2620,7 @@ C
       Open(10,File="rdm2.dat",Status='Old')
       Write(6,'(/,1X,''Active block of 2-RDM read from rdm2.dat'')')
 C
-   10 Read(10,'(4I4,F19.12)',End=40)I,J,K,L,X
+   10 Read(10,*,End=40)I,J,K,L,X
 C
 C     X IS DEFINED AS: < E(IJ)E(KL) > - DELTA(J,K) < E(IL) > = 2 GAM2(JLIK)
 C
@@ -2463,7 +2732,7 @@ C
 C
       Open(10,File="rdm2.dat",Status='Old')
 C
-   10 Read(10,'(4I4,F19.12)',End=40)I,J,K,L,X
+   10 Read(10,*,End=40)I,J,K,L,X
 C
 C     X IS DEFINED AS: < E(IJ)E(KL) > - DELTA(J,K) < E(IL) > = 2 GAM2(JLIK)
 C

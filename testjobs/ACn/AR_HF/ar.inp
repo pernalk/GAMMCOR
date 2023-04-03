@@ -1,0 +1,28 @@
+! Threshold settings
+gthresh,energy=1E-10,orbital=1E-10,grid=1.d-10
+symmetry,nosym
+geometry={ar}
+
+CASORB = 2144.2
+
+!basis=6-31G
+!basis=sto-3G
+basis=cc-pVDZ
+
+{rhf;print,orbprint=14}
+
+!{mp2;natorb,3200.2}
+
+{multi
+closed,8
+occ,9
+wf,18,1,0;state,1
+!start,3200.2
+orbital,$CASORB
+natorb,2140.2
+print,orbitals
+}
+
+
+user,prdmft,cas
+
