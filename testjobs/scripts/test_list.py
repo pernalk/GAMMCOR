@@ -10,8 +10,9 @@ def get():
         'fun': 'sapt2',
         'runner': run_test_sapt,
         'units': {
+            "SAPT/Dalton/TEST6":   {'atol': 1.e-5, 'level': 'short'},
             "SAPT/Dalton/TEST7":   {'atol': 1.e-5, 'level': 'short'},
-            "SAPT/QPackage/TEST1":   {'atol': 1.e-5, 'level': 'short'},
+            "SAPT/QPackage/TEST1": {'atol': 1.e-5, 'level': 'short'},
         }
     })
 

@@ -186,6 +186,8 @@ type SystemBlock
       logical :: NActFromRDM  = .true.
       logical :: reduceV      = .false.
       logical :: Cholesky2RDM = .true.
+      logical :: switchAB= .false.
+
       ! for cubic SAPT
       double precision :: ACAlpha0  = 1.d-10
       double precision :: ACAlpha1  = 0.01d0
