@@ -10,8 +10,19 @@ def get():
         'fun': 'sapt2',
         'runner': run_test_sapt,
         'units': {
+            "SAPT/Dalton/TEST6":   {'atol': 1.e-5, 'level': 'short'},
             "SAPT/Dalton/TEST7":   {'atol': 1.e-5, 'level': 'short'},
-            "SAPT/QPackage/TEST1":   {'atol': 1.e-5, 'level': 'short'},
+            "SAPT/QPackage/TEST1": {'atol': 1.e-5, 'level': 'short'},
+        }
+    })
+
+    ### AC0 ###
+    tests_list.append({
+        'name': '* testing AC0-CAS[Dalton] energy',
+        'fun': ac0_en,
+        'runner': run_test,
+        'units': {
+            "AC0/ethene":   {'atol': 1.e-5, 'level': 'short'},
         }
     })
 

@@ -144,7 +144,7 @@ c     CALL DISK_RHOS12(WORK(KRHO1),WORK(KRHO2),NASHT)
       IF(ISPIN1.EQ.0 .AND. ISPIN2.EQ.1) RDMFILE = 'rdms201.dat'
       IF(ISPIN1.EQ.1 .AND. ISPIN2.EQ.0) RDMFILE = 'rdms210.dat'
 
-      write(lupri,*) 'rdmfile',RDMFILE
+      write(lupri,*) 'GammCor rdmfile: ',RDMFILE
 C
 C KP 23/02/18
 C
@@ -168,9 +168,6 @@ C
       CHARACTER*9 RDMFILE
 
       RDMFILE = 'rdms1.dat'
-
-      write(lupri,*) 'nasht',NASHT
-      write(lupri,*) 'rho1',RHO1
 
       OPEN(938,FILE=RDMFILE)
       DO J=1,NASHT

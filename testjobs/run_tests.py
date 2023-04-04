@@ -17,7 +17,7 @@ os.chdir(SCRIPT_PATH)
 if len(sys.argv) < 2:
     raise Exception("Executable path not specified!")
 
-local_path_gammcor = sys.argv[1]
+local_path_gammcor = os.path.abspath(sys.argv[1])
 
 if local_path_gammcor.endswith("/gammcor"):
     RUN_GAMMCOR = local_path_gammcor 
@@ -26,7 +26,7 @@ else:
         RUN_GAMMCOR = local_path_gammcor + 'gammcor'
     else:
         RUN_GAMMCOR = local_path_gammcor + '/gammcor'
-
+print(RUN_GAMMCOR)
 if not Path(RUN_GAMMCOR).is_file():
     raise Exception(f"{RUN_GAMMCOR} not found!")
 ### Set test level
