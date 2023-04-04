@@ -894,7 +894,27 @@ call tran4_gen(NBasis,&
                  A%num0+A%num1,A%CAONO(iref,:,:),&
                  B%num0+B%num1,B%CAONO(iref2B,:,:),&
                  'OOOOABBA','AOTWOSORT')
-     
+   
+!  call tran4_gen(NBasis,&
+!                B%num0+B%num1,B%CAONO(irefB,1:NBasis,1:(B%num0+B%num1)),&
+!                A%num0+A%num1,A%CAONO(iref,1:NBasis,1:(A%num0+A%num1)),&
+!                B%num0+B%num1,B%CAONO(irefB,1:NBasis,1:(B%num0+B%num1)),&
+!                B%num0+B%num1,B%CAONO(irefB,1:NBasis,1:(B%num0+B%num1)),&
+!                'OOOOBBBA','AOTWOSORT')
+                 
+call tran4_gen(NBasis,&
+               B%num0+B%num1,B%CMO(1:NBasis,1:(B%num0+B%num1)),&
+               A%num0+A%num1,A%CMO(1:NBasis,1:(A%num0+A%num1)),&
+               B%num0+B%num1,B%CMO(1:NBasis,1:(B%num0+B%num1)),&
+               B%num0+B%num1,B%CMO(1:NBasis,1:(B%num0+B%num1)),&
+               'OOOOBBBA','AOTWOSORT')
+
+call tran4_gen(NBasis,&
+                 A%num0+A%num1,A%CAONO(iref,1:NBasis,1:(A%num0+A%num1)),&
+                 B%num0+B%num1,B%CAONO(irefB,1:NBasis,1:(B%num0+B%num1)),&
+                 A%num0+A%num1,A%CAONO(iref,1:NBasis,1:(A%num0+A%num1)),&
+                 A%num0+A%num1,A%CAONO(iref,1:NBasis,1:(A%num0+A%num1)),&
+                 'OOOOAAAB','AOTWOSORT')
   
 end subroutine sapt_ab_ints_dSRS
 

@@ -837,7 +837,7 @@ ints = 0
 do it=1,dimOB
    do iq=1,dimOA
       read(iunit,rec=iq+(it-1)*NBas) ints(1:NBas*dimOA)
-
+      ! get all (AA| integrals for a given |AB) record
       do ir=1,dimOA
          do ip=1,dimOA
             !tNa(2) = tNa(2) + B%Occ(it)*intA(ip,ir,iq,it)*ints(ip+(ir-1)*NBas)

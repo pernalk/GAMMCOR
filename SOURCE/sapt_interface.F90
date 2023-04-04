@@ -591,13 +591,14 @@ call read_nact_molpro(NAct,rdmfile)
 
 allocate(Mon%CICoef(NBasis),Mon%IGem(NBasis),Mon%Occ(NBasis))
 allocate(work(HlpDim),EVal(NBasis))
-OneRdm = 0
+OneRdm = 0d0
+EVal   = 0d0
 ! HERE! FIRST STATE FOR NOW
 call read_1rdm_molpro(OneRdm,Mon%InSt(1,1),Mon%InSt(2,1),&
                       Mon%ISpinMs2,rdmfile,Mon%IWarn,NBasis)
 
 call triang_to_sq2(OneRdm,OrbAux,NBasis)
-call Diag8(OrbAux(1:NAct,1:NAct),NAct,NAct,Eval,work)
+call Diag8(OrbAux(1:NAct,1:NAct),NAct,NAct,Eval(1:NAct),work)
 
 ! KP : it may happen that an active orbital has a negative tiny occupation. set it to a positive
 do i=1,NBasis
@@ -608,7 +609,7 @@ call SortOcc(EVal,OrbAux(1:NAct,1:NAct),NAct)
 
 ! read NAct from 1RDM
 if(Mon%NActFromRDM) Mon%NAct = 0
-Tmp = 0
+Tmp = 0d0
 do i=1,NBasis
    Tmp = Tmp + EVal(i)
    !if(Mon%NActFromRDM.and.EVal(i)>0.d0) Mon%NAct = Mon%NAct + 1

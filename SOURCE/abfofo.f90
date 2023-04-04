@@ -1130,9 +1130,9 @@ end subroutine pack_Eblock
 subroutine dump_Eblock(Eblock,EblockIV,Occ,IndN,nblk,NBasis,NDimX,xy0file)
 !
 ! save blocks to XY0FILE
-! XTilde (matX) and YTilde (matY) are saved:
-! XTilde = X / 2 / ( c_p + c_q ) - Y / 2 / ( c_p - c_q)
-! YTilde = X / 2 / ( c_p + c_q ) + Y / 2 / ( c_p - c_q)
+! X (matX) and Y (matY) are saved:
+! X = XTilde / 2 / ( c_p + c_q ) - YTilde / 2 / ( c_p - c_q)
+! Y = XTilde / 2 / ( c_p + c_q ) + YTilde / 2 / ( c_p - c_q)
 !
 implicit none
 
@@ -1178,10 +1178,10 @@ do iblk=1,nblk
 
         valX = 1d0/(C(ip)+C(iq))
         valY = 1d0/(C(ip)-C(iq))
-      !   A%matX(i,1:B%n) = 0.5d0*(B%matX(i,1:B%n)*valX - B%matY(i,1:B%n)*valY)
-      !   A%matY(i,1:B%n) = 0.5d0*(B%matX(i,1:B%n)*valX + B%matY(i,1:B%n)*valY)
-        A%matX(i,1:B%n) = B%matX(i,1:B%n)
-        A%matY(i,1:B%n) = B%matY(i,1:B%n)
+        A%matX(i,1:B%n) = 0.5d0*(B%matX(i,1:B%n)*valX - B%matY(i,1:B%n)*valY)
+        A%matY(i,1:B%n) = 0.5d0*(B%matX(i,1:B%n)*valX + B%matY(i,1:B%n)*valY)
+      !   A%matX(i,1:B%n) = B%matX(i,1:B%n)
+      !   A%matY(i,1:B%n) = B%matY(i,1:B%n)
      enddo
 
    end associate
