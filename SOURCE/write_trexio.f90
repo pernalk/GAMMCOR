@@ -248,7 +248,7 @@ if (rc /= TREXIO_SUCCESS) then
 end if
 rc = trexio_read_mo_coefficient(f, Coeff)
 
-call print_sqmat_cols(Coeff,NAO,NMO)
+!call print_sqmat_cols(Coeff,NAO)
 
 allocate(work(NAO*NMO),Vao2mo(NBasis**2))
 

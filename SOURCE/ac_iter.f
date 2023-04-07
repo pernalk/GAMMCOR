@@ -24,6 +24,7 @@ C
 C     LOCAL ARRAYS
 C
       Dimension XGrid(100), WGrid(100)
+      Logical   IFOFO, IURE
 C
       If (IFlACFREQNTH.Eq.1) Then
 C
@@ -74,6 +75,20 @@ C
 C     delete cholesky vecs
       Open(newunit=iunit,file='cholvecs',status='OLD')
       Close(iunit,status='DELETE')
+C     delete FOFO/FFOO ints
+      Inquire(file='FOFO',exist=IFOFO)
+      If (IFOFO) Then
+         Open(newunit=iunit,file='FOFO',status='OLD')
+         Close(iunit,status='DELETE')
+         Open(newunit=iunit,file='FFOO',status='OLD')
+         Close(iunit,status='DELETE')
+      EndIf
+C     delete CMONO matrixormation
+      Inquire(file='ure_casno.dat',exist=IURE)
+      If (IURE) Then
+         Open(newunit=iunit,file='ure_casno.dat',status='OLD')
+         Close(iunit,status='DELETE')
+      EndIf
 C
       Return
 C

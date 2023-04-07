@@ -421,6 +421,7 @@ subroutine onel_dalton(mon,NBasis,NAO,NInte1,MonBlock,SAPT)
 
  integer :: NSq
  integer :: ione,NSym,NBas(8),ncen
+ integer :: i,ncenA,ncenB
  double precision, allocatable :: Hmat(:),Vmat(:),Smat(:)
  double precision, allocatable :: work1(:),work2(:)
  character(:),allocatable :: infile,outfile
@@ -467,6 +468,32 @@ subroutine onel_dalton(mon,NBasis,NAO,NInte1,MonBlock,SAPT)
  read(ione)
  read(ione) MonBlock%charg,ncen,MonBlock%xyz
 
+ if(mon==2) then
+
+    ! check is B and A monomers were switched
+    if(MonBlock%charg(1)/=0d0) MonBlock%switchAB = .true.
+
+    !print*, 'charge before switch'
+    !write(LOUT,*) MonBlock%charg(1:ncen)
+    ! if Gh(A)-B :
+    !  a) adapt xyz coords of B
+    !  b) adapt chrge of B
+    if(MonBlock%charg(1)==0d0) then
+       ncenA = 0
+       do i=1,ncen
+          if(MonBlock%charg(i)==0d0) ncenA = ncenA + 1
+       enddo
+       ncenB=ncen-ncenA
+       !print*, 'ncenA,ncenB',ncenA,ncenB,ncen
+       do i=1,ncenB
+          MonBlock%xyz(i,:) = MonBlock%xyz(i+ncenA,:)
+          MonBlock%charg(i) = MonBlock%charg(i+ncenA)
+       enddo
+       MonBlock%charg(ncenB+1:ncen) = 0d0
+    endif
+
+ endif
+
 ! print*, 'MONO-A',ncen
 ! write(LOUT,*) SAPT%monA%charg(1:ncen)
 ! do i=1,ncen
@@ -484,7 +511,10 @@ subroutine onel_dalton(mon,NBasis,NAO,NInte1,MonBlock,SAPT)
 
  if(mon==2) then
  ! rearrange in V: (B,A) -> (A,B)
-    call read_syminf(SAPT%monA,SAPT%monB,NBasis)
+    !call read_syminf(SAPT%monA,SAPT%monB,NBasis)
+    call read_syminf_dalton(SAPT%monA%NSym,SAPT%monB%NSym,SAPT%monB%UCen, &
+                            SAPT%monA%NSymOrb,SAPT%monB%NSymOrb,&
+                            SAPT%monA%NMonBas,SAPT%monB%NMonBas)
 
     call arrange_oneint(Smat,NBasis,SAPT)
     call arrange_oneint(Vmat,NBasis,SAPT)
@@ -1299,8 +1329,10 @@ type(SaptData) :: SAPT
 integer :: nbas
 double precision :: mat(nbas,nbas)
 
-call gen_swap_rows(mat,nbas,SAPT%monA%NSym,&
+if(SAPT%monB%switchAB) then
+   call gen_swap_rows(mat,nbas,SAPT%monA%NSym,&
                    SAPT%monA%NMonBas,SAPT%monB%NMonBas)
+endif
 
 !call swap_rows(NOrbA,NOrbB,mat)
 
@@ -1402,13 +1434,12 @@ double precision :: mat(nbas,nbas)
 
 !call read_syminf(SAPT%monA,SAPT%monB,nbas)
 
-call gen_swap_rows(mat,nbas,SAPT%monA%NSym,&
-                   SAPT%monA%NMonBas,SAPT%monB%NMonBas)
-call gen_swap_cols(mat,nbas,SAPT%monA%NSym,&
-                   SAPT%monA%NMonBas,SAPT%monB%NMonBas)
-
-!call swap_rows(SAPT%monA%NMonOrb,SAPT%monB%NMonOrb,mat)
-!call swap_cols(SAPT%monA%NMonOrb,SAPT%monB%NMonOrb,mat)
+if(SAPT%monB%switchAB) then
+   call gen_swap_rows(mat,nbas,SAPT%monA%NSym,&
+                      SAPT%monA%NMonBas,SAPT%monB%NMonBas)
+   call gen_swap_cols(mat,nbas,SAPT%monA%NSym,&
+                      SAPT%monA%NMonBas,SAPT%monB%NMonBas)
+endif
 
 end subroutine arrange_oneint
 

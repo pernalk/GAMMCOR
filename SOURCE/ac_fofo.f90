@@ -115,25 +115,27 @@ integer,intent(in) :: AC1,NGOcc,NBasis,NInte1,NDim,NGem,NDimX
 integer,intent(in) :: NAct,INActive,NELE
 integer,intent(in) :: IndN(2,NDim),IndX(NDim),IndAux(NBasis),&
                       IGem(NBasis)
-double precision :: ACAlpha
 double precision,intent(in) :: URe(NBasis,NBasis),Occ(NBasis),XONe(NInte1)
+
+double precision :: ACAlpha
 double precision :: ECorr,ECorrAct,EGOne(NGem)
 double precision :: XFreq(100),WFreq(100)
 
 integer :: ICholesky
+integer :: NCholesky
 integer :: iunit,NOccup
 integer :: ia,ib,ic,id,ICol,IRow
 integer :: i,j,k,l,kl,ip,iq,ir,is,ipq,irs
 integer :: NGrid,N,IGL,inf1,inf2,Max_Cn
 double precision :: ECASSCF,PI,WFact,XFactorial,XN1,XN2,FF,OmI,XNorm0,XNorm1,ErrMax
 character(:),allocatable :: twojfile,twokfile,IntKFile
+logical :: irdm2
 
 double precision, allocatable :: DChol(:,:),DCholT(:,:),DCholAct(:,:),DCholActT(:,:),WorkD(:,:)
 double precision, allocatable :: APLUS0Tilde(:), APLUS1Tilde(:), A1(:), &
                                  COMTilde(:),ABPLUS0(:),ABMIN0(:),ABPLUS1(:),ABMIN1(:), &
                                  C0Tilde(:),C1Tilde(:),C2Tilde(:), &
                                  WORK0(:),WORK1(:)
-integer :: NCholesky
 
 integer :: nblk
 type(EblockData) :: A0blockIV,LambdaIV
@@ -309,6 +311,12 @@ enddo
 deallocate(WorkD,COMTilde)
 
 Call RELEASE_AC0BLOCK(A0Block,A0blockIV,nblk)
+
+inquire(file='rdm2.dat',exist=irdm2)
+if(irdm2) then
+   open(newunit=iunit,file='rdm2.dat',status='old')
+   close(iunit,status='delete')
+endif
 
 end subroutine WIter_D12Chol
 

@@ -609,8 +609,6 @@ C
       EndDo
       EndDo
 C
-C      Print*, 'INAct-MY', norm2(URe)
-C
       EndIf
 C
 C     VIRTUAL
@@ -627,8 +625,6 @@ C
       EndDo
       Call Diag8(Fock,NVirt,NVirt,PC,Work)
 C
-C      Print*, PC(1:5)
-C      Print*, 'VIRT-MY',norm2(Fock)
       Do I=1,NVirt
       Do J=1,NVirt
       II=I+NInAc+NAc

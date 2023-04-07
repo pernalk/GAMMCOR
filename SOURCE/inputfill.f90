@@ -267,7 +267,8 @@ subroutine read_block_calculation(CalcParams, line)
            elseif (uppercase(val) == "OWN".or.&
                    uppercase(val) == "NONE") then
                CalcParams%InterfaceType = INTER_TYPE_OWN
-           elseif (uppercase(val) == "ORCA") then
+           elseif (uppercase(val) == "ORCA" .or. &
+                   uppercase(val) == "MOLMPS") then
                CalcParams%InterfaceType = INTER_TYPE_ORCA
                CalcParams%RDMSource = INTER_TYPE_ORCA
                CalcParams%RDMType   = RDM_TYPE_DMRG
@@ -629,6 +630,10 @@ character(:), allocatable :: first, last
            uppercase(val) == ".TRUE.".or.&
            uppercase(val) == "T") then
           SystemParams%Cholesky2rdm = .true.
+       elseif (uppercase(val) == "FALSE".or.  &
+           uppercase(val) == ".FALSE.".or.&
+           uppercase(val) == "F") then
+          SystemParams%Cholesky2rdm = .false.
        endif
 
  end select

@@ -1051,6 +1051,111 @@ enddo
 
 end subroutine read_mo_dalton
 
+subroutine read_orbinf_dalton(sirifc,NSym,NOrb,NSymOrb)
+!
+! read the number of irreps (NSym)
+! the number of basis functions in irreps (NSymOrb)
+! from Dalton interface file (SIRIFC)
+!
+implicit none
+
+character(*),intent(in) :: sirifc
+integer,intent(out) :: NSym,NOrb,NSymOrb(8)
+
+integer :: iunit
+integer :: NBasist,NCMOt,NOcc(8)
+logical :: ex
+
+!print*, 'read_orbinf_dalton...'
+
+inquire(file=sirifc,EXIST=ex)
+if(ex) then
+    open(newunit=iunit,file=sirifc,status='OLD',access='SEQUENTIAL',form='UNFORMATTED')
+    call readlabel(iunit,'TRCCINT ')
+    read(iunit) NSym,NOrb,NBasist,NCMOt,NOcc(1:NSym),NSymOrb(1:NSym)
+else
+  write(lout,*) 'Error! No ',sirifc, ' file in read_orbinf_dalton!'
+  stop
+endif
+
+end subroutine read_orbinf_dalton
+
+subroutine read_syminf_dalton(ANSym,BNSym,BUcen,ANSymOrb,BNSymOrb,ANMonBas,BNMonBas)
+!
+! reads number of basis functions on each monomer
+! from SYMINFO(B) file!
+!
+! input: NSym -- no of irreps
+!        BUCen -- no of symmetry-independent centers on B (from input)
+!
+! output: NSymBas -- number of basis functions on each monomer (in different irreps)
+!
+implicit none
+
+integer,intent(in)  :: ANSym,BNSym
+integer,intent(in)  :: BUcen
+integer,intent(in)  :: ANSymOrb(8),BNSymOrb(8)
+integer,intent(out) :: ANMonBas(8),BNMonBas(8)
+
+integer :: iunit,ios
+integer :: ibas,icen,last_ibas,last_icen
+integer :: irep,ifun,offset
+logical :: ex,dump
+integer :: tmp
+integer :: ACenTst, ACenBeg, ACenEnd
+
+!print*, 'read_syminf_dalton...'
+
+! sanity checks
+if(ANSym/=BNSym) then
+  write(lout,*) 'ERROR in read_syminf_dalton: NSym different for A and B!'
+endif
+
+ANMonBas = 0
+ANMonBas = 0
+
+inquire(file='SYMINFO_B',EXIST=ex)
+
+if(ex) then
+   open(newunit=iunit,file='SYMINFO_B',status='OLD',&
+        form='FORMATTED')
+   read(iunit,*)
+   read(iunit,*)
+
+   ! new version : ok with sym
+   do irep=1,BNSym
+      do ifun=1,BNSymOrb(irep)
+         read(iunit,'(i5,i6)',iostat=ios) ibas,icen
+         if(icen.le.BUCen) then
+            BNMonBas(irep) = BNMonBas(irep) + 1
+         else
+            ANMonBas(irep) = ANMonBas(irep) + 1
+         endif
+      enddo
+   enddo
+
+   close(iunit)
+else
+   write(LOUT,'(1x,a)') 'ERROR! MISSING SYMINFO_B FILE!'
+   stop
+endif
+
+! sanity checks : out
+do irep=1,BNSym
+   ibas = ANMonBas(irep)+BNmonBas(irep)
+   if(ibas/=ANSymOrb(irep)) then
+      write(lout,'(1x,a)') 'ERROR in read_syminf!'
+      write(lout,'(1x,a,i3,a)') 'For irep =',irep, ':'
+      write(lout,*) 'A-NMonBas',ANMonBas(1:ANSym)
+      write(lout,*) 'B-NMonBas',BNMonBas(1:BNSym)
+      write(lout,*) 'Sum:     ',ANMonBas(1:ANSym)+BNMonBas(1:BNSym)
+      write(lout,*) 'Should be',ANSymOrb(1:ANSym)
+      stop
+   endif
+enddo
+
+end subroutine read_syminf_dalton
+
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 ! TREXIO subroutines
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
