@@ -1411,6 +1411,7 @@ type(SaptData)  :: SAPT
 
 integer         :: ISERPA
 
+! deallocate occupation numbers, CI coefficients...
 deallocate(SAPT%monA%CICoef,SAPT%monA%IGem,SAPT%monA%Occ, &
            SAPT%monA%IndAux,SAPT%monA%IndX,SAPT%monA%IndN,&
            SAPT%monA%CMO,&
@@ -1419,6 +1420,11 @@ deallocate(SAPT%monB%CICoef,SAPT%monB%IGem,SAPT%monB%Occ, &
            SAPT%monB%IndAux,SAPT%monB%IndX,SAPT%monB%IndN,&
            SAPT%monB%CMO,&
            SAPT%monB%IPair)
+
+! remove RDM files
+call delfile('rdm2.dat')
+if(SAPT%InterfaceType==INTER_TYPE_MOL) call delfile('rdm2_A.dat')
+if(SAPT%InterfaceType==INTER_TYPE_MOL) call delfile('rdm2_B.dat')
 
 ! for PINO
 ISERPA = 0

@@ -7,8 +7,16 @@ User Manual: [link](https://qchem.gitlab.io/gammcor-manual/)
 * Using CMake: [link](https://qchem.gitlab.io/gammcor-manual/pages/introduction/cmake.html)
 * Using ready-made Makefiles: [link](https://qchem.gitlab.io/gammcor-manual/pages/introduction/makefiles.html)
 
-## Testing
-* coming soon
+## Run test jobs (optional)
+* In your GammCor ``build`` directory run ::
+
+        cd build
+        ctest -V
+
+* As an alternative to ``ctest``, you can run the ``run_test.py`` script manually which is located in the ``gammcor/testjobs`` directory (requires `Python 3 <https://www.python.org/downloads/>`_) ::
+
+python3 run_test.py <local_path_to_gammcor_executable>
+
 
 ## Third party software
 Third party software used in GammCor:

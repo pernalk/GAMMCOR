@@ -24,7 +24,6 @@ C
 C     LOCAL ARRAYS
 C
       Dimension XGrid(100), WGrid(100)
-      Logical   IFOFO, IURE
 C
       If (IFlACFREQNTH.Eq.1) Then
 C
