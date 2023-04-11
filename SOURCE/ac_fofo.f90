@@ -1937,7 +1937,7 @@ Enddo
 
 Call CFREQPROJ(ipiv,Om,DipCX,1, &
    Max_Cn,XOne,URe,Occ,&
-   IGem,NAct,INActive,NELE,NBasis,NInte1,NGem,IndAux,&
+   IGem,NAct,INActive,NBasis,NInte1,IndAux,&
    ICholesky,IndN,IndX,NDimX)
 
 AYX=8.d0*ddot(NDimx,DipCY,1,ipiv,1)
@@ -1946,7 +1946,7 @@ AXX=8.d0*ddot(NDimx,DipCX,1,ipiv,1)
 
 Call CFREQPROJ(ipiv,Om,DipCY,1, &
    Max_Cn,XOne,URe,Occ,&
-   IGem,NAct,INActive,NELE,NBasis,NInte1,NGem,IndAux,&
+   IGem,NAct,INActive,NBasis,NInte1,IndAux,&
    ICholesky,IndN,IndX,NDimX)
 
 AXY=8.d0*ddot(NDimx,DipCX,1,ipiv,1)
@@ -1955,7 +1955,7 @@ AYY=8.d0*ddot(NDimx,DipCY,1,ipiv,1)
 
 Call CFREQPROJ(ipiv,Om,DipCZ,1, &
    Max_Cn,XOne,URe,Occ,&
-   IGem,NAct,INActive,NELE,NBasis,NInte1,NGem,IndAux,&
+   IGem,NAct,INActive,NBasis,NInte1,IndAux,&
    ICholesky,IndN,IndX,NDimX)
 AXZ=8.d0*ddot(NDimx,DipCX,1,ipiv,1)
 AYZ=8.d0*ddot(NDimx,DipCY,1,ipiv,1)
@@ -1970,7 +1970,7 @@ end subroutine PolarizAl
 
 subroutine CFREQPROJ(COMTilde,OmI,DProj,NProj, &
    Max_Cn,XOne,URe,Occ,&
-   IGem,NAct,INActive,NELE,NBasis,NInte1,NGem,IndAux,&
+   IGem,NAct,INActive,NBasis,NInte1,IndAux,&
    ICholesky,IndN,IndX,NDimX)
 !
 !  For a given frequency OmI, return a product of the matrices C(Alpha=1,OmI) and DProj
@@ -1983,8 +1983,8 @@ use systemdef
 use sapt_utils
 
 implicit none
-integer,intent(in) :: NBasis,NInte1,NGem,NDimX,NProj
-integer,intent(in) :: NAct,INActive,NELE,ICholesky
+integer,intent(in) :: NBasis,NInte1,NDimX,NProj
+integer,intent(in) :: NAct,INActive,ICholesky
 integer,intent(in) :: IndN(2,NDimX),IndX(NDimX),IndAux(NBasis),&
                       IGem(NBasis)
 double precision :: ACAlpha,Eps
@@ -2009,7 +2009,7 @@ type(EblockData) :: A0blockIV,LambdaIV
 type(EblockData),allocatable :: A0block(:),Lambda(:)
 
 ! tolerance
-Eps=1.d-2
+Eps=1.d-5
 
 DProjT = transpose(DProj)
 
@@ -2108,7 +2108,8 @@ Do N=2,Max_Cn
     Call ABPM_HALFTRAN_GEN_L(WORK0,C2Tilde,0.0d0,Lambda,LambdaIV,nblk,NDimX,NProj,'X')
     XNorm1=Norm2(C2Tilde/XFactorial)
     Write(6,'(X,"Order (n), |C^(n)/n!|",I3,E14.4)')N,XNorm1
-    If(XNorm1.Le.Eps) Exit
+! herer
+!    If(XNorm1.Le.Eps) Exit
     If(N.Gt.3.And.XNorm1.Gt.XNorm0) Then
        Write(6,'(X,"Divergence detected. Expansion of C terminated at order ",I3,3F10.4)')N-1
        Exit

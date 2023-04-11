@@ -144,6 +144,7 @@ C
       Call RDMResp_FOFO(Occ,URe,UNOAO,XOne,IndN,IndX,IndAux,IGem,
      $                  NAcCAS,NInAcCAS,NDimX,NDim,NBasis,NInte1,
      $                  'FFOO','FOFO')
+      stop
 C
       Else
 C
