@@ -371,6 +371,13 @@ subroutine read_block_calculation(CalcParams, line)
                uppercase(val) == "T") then
                CalcParams%RedVirt = 1
            endif
+      
+      case ("ORBRELAX")
+           if (uppercase(val) == ".FALSE.".or. &
+               uppercase(val) == "FALSE".or.   &
+               uppercase(val) == "F") then
+               CalcParams%OrbRelax = 0
+           endif 
 
       ! here not sure
       case ("RESPONSE")

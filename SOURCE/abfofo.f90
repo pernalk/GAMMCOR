@@ -697,8 +697,9 @@ end subroutine MP2RDM_FOFO
 
 subroutine RDMResp_FOFO(Occ,URe,UNOAO,XOne,IndN,IndX,IndAux,IGemIN, &
                        NAct,INActive,NDimX,NDim,NBasis,NInte1,     &
-                       IntJFile,IntKFile)
+                       IntJFile,IntKFile,IOrbRelax)
 implicit none
+integer,intent(in)           :: IOrbRelax
 integer,intent(in)           :: NAct,INActive,NDimX,NDim,NBasis,NInte1
 integer,intent(in)           :: IndN(2,NDim),IndX(NDim),IndAux(NBasis),IGemIN(NBasis)
 double precision,intent(in)  :: Occ(NBasis),XOne(NInte1),UNOAO(NBasis,NBasis)
@@ -985,6 +986,9 @@ enddo
 !
 ! occ-virt block - relaxation of orbitals
 !
+
+if(IOrbRelax) then
+
 AUX2=0.d0
 NDimRed=0
 do d=NOccup+1,NBasis
@@ -1091,16 +1095,27 @@ do i=1,NOccup
    enddo
 enddo
 
+close(iunit1)
+deallocate(AUX1,ints_dl)
+
+! end of orbital relaxation 
+endif
+
 Gamma=0.5d0*(Gamma+transpose(Gamma))
 
-close(iunit1)
-deallocate(AUX1,ints_bk,ints_bi,ints_dl)
+deallocate(ints_bk,ints_bi)
 
 AuxMat=Gamma
 call Diag8(AuxMat,NBasis,NBasis,PC,work(1:NBasis))
 
 Write(6,'(/,X,"NOccup set to: ",I5)') NOccup
 val = 0d0
+if(IOrbRelax) then
+write(LOUT,'(/,2x,"Orbitals Relaxed")')
+else
+write(LOUT,'(/,2x,"Orbitals UnRelaxed")')
+endif
+
 write(LOUT,'(/,2x,"AC0-correlated ",3x,"occupation numbers")')
 do i=NBasis,1,-1
    write(LOUT,'(X,I3,E16.6,I6)') i,PC(i)*2.0

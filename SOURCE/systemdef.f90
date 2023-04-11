@@ -134,6 +134,8 @@ else
   ! reduce virtuals
    Flags%IRedVirt = Input%CalcParams%RedVirt
 
+   Flags%IOrbRelax = Input%CalcParams%OrbRelax 
+
   ! memory in 2ints sorter (readtwoint) 
    Flags%MemVal   = Input%CalcParams%MemVal
    Flags%MemType  = Input%CalcParams%MemType

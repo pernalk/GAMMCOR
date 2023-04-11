@@ -39,6 +39,7 @@ integer, parameter :: SAPTLEVEL2 = 2
 integer, parameter :: FLAG_CORE = 1
 integer, parameter :: FLAG_NOBASIS = 0
 integer, parameter :: FLAG_REDVIRT = 0
+integer, parameter :: FLAG_ORBRELAX = 1
 logical, parameter :: FLAG_RESTART = .FALSE.
 logical, parameter :: FLAG_TRIPLET = .FALSE.
 integer, parameter :: FLAG_PRINT_LEVEL = 0
@@ -120,6 +121,7 @@ type CalculationBlock
       integer :: SaptLevel = SAPTLEVEL2
       integer :: vdWCoef   = 0
       integer :: RedVirt   = FLAG_REDVIRT
+      integer :: OrbRelax   = FLAG_ORBRELAX
       integer :: MemVal = 2, MemType = 3 ! default: use 2 GB for 3-ind_tran (Cholesky)
       logical :: Restart    = FLAG_RESTART
       logical :: Triplet    = FLAG_TRIPLET
@@ -272,6 +274,7 @@ type FlagsData
      integer :: IGVB    = 1
      integer :: ITwoEl    = TWOMO_INCORE 
      integer :: IRedVirt  = FLAG_REDVIRT
+     integer :: IOrbRelax  = FLAG_ORBRELAX 
      integer :: ICholesky = FLAG_CHOLESKY
      integer :: ICholeskyAccu = CHOL_ACCU_DEFAULT
      integer :: IFun      = 13
