@@ -716,7 +716,7 @@ integer                      :: tmpAA(NAct*(NAct-1)/2),tmpAI(NAct,1:INActive),&
 integer                      :: limAA(2),limAI(2,1:INActive),&
                                 limAV(2,INActive+NAct+1:NBasis),limIV(2)
 double precision             :: val,ETot
-double precision             :: URe(NBasis,NBasis)
+double precision             :: URe(NBasis,NBasis),UCorr(NBasis,NBasis)
 double precision             :: AuxMat(NBasis,NBasis),&
                                 Gamma(NBasis,NBasis),PC(NBasis),Fock(NBasis*NBasis),AUXM0(NBasis,NBasis),AUX2(NBasis*NBasis)
 integer                      :: XInd(NBasis,NBasis),XInd1(NBasis,NBasis),IRow,ICol,inf,NDimRed,Max_Cn
@@ -1116,12 +1116,17 @@ else
 write(LOUT,'(/,2x,"Orbitals UnRelaxed")')
 endif
 
-write(LOUT,'(/,2x,"AC0-correlated ",3x,"occupation numbers")')
+write(LOUT,'(/,2x,"AC0-correlated natural occupation numbers")')
 do i=NBasis,1,-1
-   write(LOUT,'(X,I3,E16.6,I6)') i,PC(i)*2.0
+   write(LOUT,'(X,I3,E16.6,I6)') Nbasis-i+1,PC(i)*2.0
    val = val + PC(i)
 enddo
 write(LOUT,'(/,1x,"Sum of AC0-correlated Occupancies: ",F5.2,/)') val
+
+! compute transformation matrix to correlated NO's and dipole moments
+Call MultpM(UCorr,AuxMat,UNOAO,NBasis)
+write(LOUT,'(/,x,"Dipole moment with correlated 1-RDM")')
+Call ComputeDipoleMom(UCorr,PC,NBasis,NBasis)
 
 end subroutine RDMResp_FOFO
 
