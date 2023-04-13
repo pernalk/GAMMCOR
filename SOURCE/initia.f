@@ -3880,6 +3880,7 @@ C
       double precision,allocatable :: OneAct(:,:),EigAct(:)
       double precision,allocatable :: work(:)
 
+      DV = 0d0
 
       ! read 1RDM in active orbs from SIRIFC file
       open(newunit=isirifc,file='SIRIFC',status='OLD',
