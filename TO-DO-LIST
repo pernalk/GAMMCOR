@@ -1,3 +1,9 @@
+**** 2023  ****
+*** April  ****
+DALTON SAPT interface :
+ -- remove AMFI_SYMINFO file dependence
+ -- 
+
 
 + sapt_pol.f90 -- e2disp_intermed, 
   EVecA(pq+(i-1)*NDimX)
