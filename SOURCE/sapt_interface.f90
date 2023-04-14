@@ -2500,6 +2500,8 @@ type(FlagsData)    :: Flags
 integer,intent(in) :: nbas
 
 integer :: i,j,ij,ind,ind_ij
+double precision :: ThrInact
+ThrInact = 1d0-1d-8
 
 print*, 'WIP: do we really need a separate procedure for TREXIO?'
 print*, '     it would maybe make more sense to set RDMType CI?'
@@ -2567,13 +2569,11 @@ print*, 'maybe better call ThrSelAct : Threshold for nearly degenerate pairs?'
 
 write(LOUT,'(1x,a,e15.5)')  'Threshold for active orbital pairs:       ', mon%ThrSelAct
 write(LOUT,'(1x,a,2e15.5)') 'Threshold for quasi-virtual orbital pairs:', mon%ThrQVirt
-block
-double precision :: ThrInact
-ThrInact = 1d0-1d-8
+!block
 !mon%ThrAct = 1d-10
 write(lout,'(1x,a)',advance="no") 'Threshold for selecting active orbitals: '
 write(lout,'(1x,e15.5,a,e12.5)') mon%ThrAct, ' < Active < ', ThrInact
-end block
+!end block
 
 if(mon%NCen==1.and.mon%ThrSelAct<1.d-3.and.mon%NAct>1) then
    write(LOUT,'(1x,a)') 'Warning! For single atom ThrSelAct should probably have larger value!'

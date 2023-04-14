@@ -1,9 +1,9 @@
-MKL_ROOT = /opt/intel/mkl/
+MKL_ROOT = /opt/intel/composer_xe_2013.2.146/mkl/
 
 FCC = ifort 
 WARNINGS 		=	-warn nounused
-OPTIMIZATION 	=	-xCOMMON-AVX512 -O3
-PARALLELIZATION	=	-mkl=parallel -qopenmp
+OPTIMIZATION 	=	-xHost -O3
+PARALLELIZATION	=	-mkl=parallel
 XCFUN 			=	-I xcfun/fortran
 TREXIO         = $(shell pkg-config --cflags trexio)
 FFLAGS = $(WARNINGS) $(OPTIMIZATION) $(PARALLELIZATION) $(XCFUN) $(TREXIO) -assume byterecl -heap-arrays -g
