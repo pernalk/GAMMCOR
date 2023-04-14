@@ -819,7 +819,8 @@ do k=1,NOccup
       do j=1,NOccup
       do i=1,NOccup
          do a=max(i,j)+1,NBasis
-              if(IPair(a,i).and.IPair(a,j)) then
+!             if(IPair(a,i).and.IPair(a,j)) then
+              if(IPair(a,i)==IPair(a,j)) then
                   ipos1 = XInd(a,i)
                   ipos2 = XInd(b,k)
                   Gamma(i,j) = Gamma(i,j) + ints_bk(a,j)* &
@@ -965,7 +966,8 @@ do b=NOccup+1,NBasis
       do c=NOccup+1,NBasis
          do a=NOccup+1,NBasis
             do i=NOccup+1,min(a,c)-1
-               if(IPair(c,i).and.IPair(a,i)) then
+!              if(IPair(c,i).and.IPair(a,i)) then
+               if(IPair(c,i) == IPair(a,i)) then
                   ipos1 = XInd(a,i)
                   ipos2 = XInd(b,k)
                   Gamma(a,c) = Gamma(a,c) - ints_bk(c,i)* &
@@ -987,7 +989,7 @@ enddo
 ! occ-virt block - relaxation of orbitals
 !
 
-if(IOrbRelax) then
+if(IOrbRelax==1) then
 
 AUX2=0.d0
 NDimRed=0
@@ -1033,7 +1035,8 @@ do d=NOccup+1,NBasis
       do a=NOccup+1,NBasis
       do b=NOccup+1,NBasis
 
-      if(IPair(a,j).and.IPair(d,l)) then
+!     if(IPair(a,j).and.IPair(d,l)) then
+      if(IPair(a,j) == IPair(d,l)) then
       ipos1=XInd(a,j)
       ipos2=XInd(d,l)
       AUX2(XInd1(b,j))=AUX2(XInd1(b,j)) &
@@ -1059,7 +1062,8 @@ do d=NOccup+1,NBasis
       do i=1,NOccup
       do j=1,NOccup
 
-      if(IPair(b,i).and.IPair(d,l)) then
+!     if(IPair(b,i).and.IPair(d,l)) then
+      if(IPair(b,i) == IPair(d,l)) then
       ipos1=XInd(b,i)
       ipos2=XInd(d,l)
       AUX2(XInd1(b,j))=AUX2(XInd1(b,j)) &
@@ -1110,7 +1114,7 @@ call Diag8(AuxMat,NBasis,NBasis,PC,work(1:NBasis))
 
 Write(6,'(/,X,"NOccup set to: ",I5)') NOccup
 val = 0d0
-if(IOrbRelax) then
+if(IOrbRelax==1) then
 write(LOUT,'(/,2x,"Orbitals Relaxed")')
 else
 write(LOUT,'(/,2x,"Orbitals UnRelaxed")')
