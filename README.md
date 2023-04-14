@@ -2,6 +2,10 @@
 Authors: Kasia Pernal, Michal Hapka, Marcin Modrzejewski, Adam Sokół, Aleksandra Tucholska <br>
 User Manual: [link](https://qchem.gitlab.io/gammcor-manual/)
 
+## Clone the repository
+```
+git clone https://github.com/pernalk/GAMMCOR.git
+```
 
 ## Installation
 * Using CMake: [link](https://qchem.gitlab.io/gammcor-manual/pages/introduction/cmake.html)
