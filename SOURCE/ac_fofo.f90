@@ -312,11 +312,11 @@ deallocate(WorkD,COMTilde)
 
 Call RELEASE_AC0BLOCK(A0Block,A0blockIV,nblk)
 
-inquire(file='rdm2.dat',exist=irdm2)
-if(irdm2) then
-   open(newunit=iunit,file='rdm2.dat',status='old')
-   close(iunit,status='delete')
-endif
+!inquire(file='rdm2.dat',exist=irdm2)
+!if(irdm2) then
+!   open(newunit=iunit,file='rdm2.dat',status='old')
+!   close(iunit,status='delete')
+!endif
 
 end subroutine WIter_D12Chol
 
