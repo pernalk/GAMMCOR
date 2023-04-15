@@ -15,7 +15,7 @@ C     DENSITY MATRIX ELEMENTS
 C
       Implicit Real*8 (A-H,O-Z)
 C
-      Character*60 FMultTab,Title
+      Character*60 Title
       Include 'commons.inc'
 c
       Parameter(Zero=0.D0,Half=0.5D0,One=1.D0,Two=2.D0,Three=3.D0,
@@ -1958,7 +1958,7 @@ C                        A GIVEN ONE- TWO- THREE- OR FOUR-BODY INTERACTION
 C
       Implicit Real*8 (A-H,O-Z)
 C
-      Character*60 FMultTab,Title
+      Character*60 Title
       Include 'commons.inc'
 c
       Parameter(Zero=0.D0,Half=0.5D0,One=1.D0,Two=2.D0,Three=3.D0,
@@ -3026,7 +3026,7 @@ C           = 2  : OLD VERSION OF EERPA
 C
       Implicit Real*8 (A-H,O-Z)
 C
-      Character*60 FMultTab,Title
+      Character*60 Title
       Include 'commons.inc'
 c
       Parameter(Zero=0.D0,Half=0.5D0,One=1.D0,Two=2.D0,Three=3.D0,

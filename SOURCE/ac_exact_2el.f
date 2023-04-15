@@ -536,7 +536,6 @@ C
 C
       Parameter(Zero=0.0D0,Half=0.50D0,One=1.0D0,Two=2.0D0,Four=4.0D0)
 C
-      Character*60 FMultTab
       Include 'commons.inc'
 C
       Dimension UReAlph(Nbasis,NBasis),Occ(NBasis),
@@ -909,7 +908,6 @@ C
 C
       Parameter(Zero=0.0D0,Half=0.50D0,One=1.0D0,Two=2.0D0,Four=4.0D0)
 C
-      Character*60 FMultTab
       Include 'commons.inc'
 C
       Dimension UReAlph(Nbasis,NBasis),Occ(NBasis),
@@ -1104,7 +1102,6 @@ C
 C
       Parameter(Zero=0.0D0,Half=0.50D0,One=1.0D0,Two=2.0D0,Four=4.0D0)
 C
-      Character*60 FMultTab
       Include 'commons.inc'
 C
       Dimension UReAlph(Nbasis,NBasis),Occ(NBasis),

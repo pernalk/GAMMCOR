@@ -10,7 +10,6 @@ C
       Dimension Occ(NBasis),HNO(NBasis*(NBasis+1)/2),
      $ CoulNO(NBasis*(NBasis+1)/2),ExchNO(NBasis*(NBasis+1)/2)
 C
-      Character*60 FMultTab
       Include 'commons.inc'
 C
       XKu=Zero
@@ -45,7 +44,6 @@ C     IMPOSING OF THE CORRECT NORMALIZATION (DECREASE X IF NECESSARY)
 C
       Implicit Real*8 (A-H,O-Z)
 C
-      Character*60 FMultTab
       Include 'commons.inc'
 C
       Parameter(Zero=0.D0, Half=0.5D0,MxIt=25)
@@ -123,7 +121,6 @@ C
      $ Grad(NBasis),HNO(NInte1),Occ(NBasis),CoulNO(NInte1),
      $ ExchNO(NInte1)
 C
-      Character*60 FMultTab
       Include 'commons.inc'
 C
       XKu=Zero
@@ -171,7 +168,6 @@ C
       Dimension
      $ Hess(NBasis,NBasis),Occ(NBasis),CoulNO(NInte1),ExchNO(NInte1)
 C
-      Character*60 FMultTab
       Include 'commons.inc'
 C
       XKu=Zero
@@ -223,7 +219,6 @@ C
       Parameter(Zero=0.0D0,Half=0.5D0,One=1.0D0,Two=2.0D0,Three=3.D0,
      $  Four=4.D0)
 C
-      Character*60 FMultTab
       Include 'commons.inc'
 C
 C     IFlag =   0 - calculate F(x,y)
@@ -847,7 +842,6 @@ C
       Parameter(Zero=0.0D0,Half=0.5D0,One=1.0D0,Two=2.0D0,Three=3.D0,
      $  Four=4.D0)
 C
-      Character*60 FMultTab
       Include 'commons.inc'
 C
 C     IFlag1 =  0 - calculate F(x,y)
@@ -948,7 +942,6 @@ C     FIND OPTIMAL OCCUPATION NUMBERS
 C
       Implicit Real*8 (A-H,O-Z)
 C
-      Character*60 FMultTab
       Include 'commons.inc'
       Common/CPMFT/ MFrac,MOcc,NFrac
 C
@@ -1100,7 +1093,6 @@ C
 C
       Parameter(Zero=0.0D0,Half=0.50D0,One=1.0D0,Two=2.0D0,Four=4.0D0)
 C
-      Character*60 FMultTab
       Include 'commons.inc'
 C
       Dimension URe(Nbasis,NBasis),Occ(NBasis),XOne(NInte1),
@@ -1402,7 +1394,6 @@ c herer!!!
 c     $ MxIt=10,ETol=1.D-5)
      $ MxIt=10,ETol=1.D-9)
 C
-      Character*60 FMultTab
       Include 'commons.inc'
 C
       Dimension URe(Nbasis,NBasis),Occ(NBasis),XKin(NInte1),
@@ -1547,7 +1538,6 @@ C     GENERATE A GUESS FOR THE OCCUPATION NUMBERS USING HF ORBITAL ENERGIES
 C
       Implicit Real*8 (A-H,O-Z)
 C
-      Character*60 FMultTab
       Include 'commons.inc'
       Common/PEN/ Pen
 C
@@ -1642,7 +1632,6 @@ C     ON FRACTIONALLY OCCUPIED ORBITALS (USED IN CPMFT METHOD)
 C
       Implicit Real*8 (A-H,O-Z)
 C
-      Character*60 FMultTab
       Include 'commons.inc'
       Common/CPMFT/ MFrac,MOcc,NFrac
 C
@@ -1840,7 +1829,6 @@ C
 C
       Implicit Real*8 (A-H,O-Z)
 C
-      Character*60 FMultTab
       Include 'commons.inc'
       Common/CPMFT/ MFrac,MOcc,NFrac
 C
@@ -2035,7 +2023,6 @@ C
 C
       Parameter(Zero=0.0D0,Half=0.50D0,One=1.0D0,Two=2.0D0,Four=4.0D0)
 C
-      Character*60 FMultTab
       Include 'commons.inc'
 C
       Dimension URe(Nbasis,NBasis),Occ(NBasis),XOne(NInte1),
@@ -2334,7 +2321,6 @@ C
 C
       Parameter(Zero=0.0D0,Half=0.50D0,One=1.0D0,Two=2.0D0,Four=4.0D0)
 C
-      Character*60 FMultTab
       Include 'commons.inc'
 C
       Dimension URe(Nbasis,NBasis),Occ(NBasis),XOne(NInte1),
@@ -2633,7 +2619,6 @@ C
 C
       Parameter(Zero=0.0D0,Half=0.50D0,One=1.0D0,Two=2.0D0,Four=4.0D0)
 C
-      Character*60 FMultTab
       Include 'commons.inc'
 C
       Dimension URe(Nbasis,NBasis),Occ(NBasis),XOne(NInte1),
@@ -2796,7 +2781,6 @@ C
 C
       Parameter(Zero=0.0D0,Half=0.50D0,One=1.0D0,Two=2.0D0,Four=4.0D0)
 C
-      Character*60 FMultTab
       Include 'commons.inc'
 C
       Dimension URe(Nbasis,NBasis),Occ(NBasis),XOne(NInte1),

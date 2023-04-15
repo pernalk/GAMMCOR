@@ -239,8 +239,8 @@ if (rc /= TREXIO_SUCCESS) then
 end if
 rc = trexio_read_ao_1e_int_potential_n_e(f, Vao)
 
-print*, 'Vmat-AO'
-call print_sqmat_cols(Vao,NAO)
+!print*, 'Vmat-AO'
+!call print_sqmat_cols(Vao,NAO)
 
 rc = trexio_has_mo_coefficient(f)
 if (rc /= TREXIO_SUCCESS) then
@@ -248,7 +248,7 @@ if (rc /= TREXIO_SUCCESS) then
 end if
 rc = trexio_read_mo_coefficient(f, Coeff)
 
-call print_sqmat_cols(Coeff,NAO,NMO)
+!call print_sqmat_cols(Coeff,NAO,NMO)
 
 allocate(work(NAO*NMO),Vao2mo(NBasis**2))
 

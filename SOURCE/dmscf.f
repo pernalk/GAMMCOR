@@ -8,7 +8,7 @@ C     !!! XNuc IS EMPTY
 C
       Implicit Real*8 (A-H,O-Z)
 C
-      Character*60 Title,FMultTab
+      Character*60 Title
 C
       Include 'commons.inc'
 C
@@ -252,7 +252,7 @@ C     (in molden cartesian gaussians are assumed)
 C
       Implicit Real*8 (A-H,O-Z)
 C
-      Character*60 Title,FMultTab
+      Character*60 Title
       Include 'commons.inc'
 C 
       Character*60 FName,FName2
@@ -340,7 +340,7 @@ C
 C
       Implicit Real*8 (A-H,O-Z)
 C
-      Character*60 Title,FMultTab
+      Character*60 Title
       Include 'commons.inc'
 C 
       Character*60 FName,FName2
@@ -459,7 +459,7 @@ C
 C
       Implicit Real*8 (A-H,O-Z)
 C
-      Character*60 Title,FName,FMultTab,Aux1
+      Character*60 Title,FName,Aux1
       Include 'commons.inc'
 C 
       Parameter(Zero=0.0D0,One=1.0D0,Two=2.D0)

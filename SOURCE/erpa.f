@@ -13,8 +13,6 @@ c     $ Four=4.D0, Big=1.5D0)
 C
       Include 'commons.inc'
 C
-      Character*60 FMultTab
-C
       Dimension
      $ URe(NBasis,NBasis),Occ(NBasis),TwoMO(NInte2),TwoMOLR(NInte2),
      $ XOne(NInte1),OrbGrid(NBasis,NGrid),WGrid(NGrid)

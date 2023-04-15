@@ -5,7 +5,6 @@
 C
       Implicit Real*8 (A-H,O-Z)
 C
-      Character*60 FMultTab
       Include 'commons.inc'
 C
       Parameter(Zero=0.0D0,One=1.0D0,Two=2.D0)
@@ -245,7 +244,6 @@ C
      $ T(NBasis,NBasis),FunIJ(NBasis,NBasis),TNO(NInte2),Occ(NBasis),
      $ B(NBasis,NBasis)
 C
-      Character*60 FMultTab
       Include 'commons.inc'
 C 
       If(IFlag.Eq.1) Then
@@ -506,7 +504,6 @@ C     LOCAL ARRAY
 C
       Dimension SB(NBasis,NBasis)
 C
-      Character*60 FMultTab
       Include 'commons.inc'
 C
 C     !!! B IS TRANSPOSED!!!
@@ -863,7 +860,6 @@ C
      $ GN(NGem*NBasis*(NBasis+1)/2),
      $ GC(NGem*NBasis*(NBasis+1)/2)
 C
-      Character*60 FMultTab
       Include 'commons.inc'
 C
       NInte1=NBasis*(NBasis+1)/2 
@@ -1055,7 +1051,6 @@ C     LOCAL ARRAY
 C
       Dimension Gamma(NInte1),FF(NInte1)
 C
-      Character*60 FMultTab
       Include 'commons.inc'
 C
 C     CONSTRUCT NEW DENSITY MATRIX
@@ -1170,7 +1165,6 @@ C     OPTIMIZATION OF THE ARAI SUBSPACES FOR APSG
 C
       Parameter(Zero=0.0D0,Half=0.50D0,One=1.0D0,Two=2.0D0,Four=4.0D0)
 C     
-      Character*60 FMultTab
       Include 'commons.inc'
 C
       Dimension URe(Nbasis,NBasis),Occ(NBasis),XKin(NInte1),
@@ -1277,7 +1271,6 @@ C     MODIFY ORBITAL SPACES OF APSG GEMINALS
 C       
       Implicit Real*8 (A-H,O-Z)
 C
-      Character*60 FMultTab
       Include 'commons.inc'
 C
       Parameter(Zero=0.D0,One=1.D0,Two=2.D0,Small=1.D-7)       
@@ -1326,7 +1319,6 @@ C
 C
       Implicit Real*8 (A-H,O-Z)  
 C
-      Character*60 FMultTab
       Include 'commons.inc'
 C
       Dimension T(NB*NB)
@@ -1547,7 +1539,6 @@ C
 C
       Implicit Real*8 (A-H,O-Z)      
 C
-      Character*60 FMultTab
       Include 'commons.inc'
 C
       Dimension TOld(NB*NB),T(NB*NB),

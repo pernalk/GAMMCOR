@@ -23,7 +23,6 @@ C
       Dimension
      $ Hess(NN,NN),G(NN),St(NN),EigVal(NN),Work(NN)
 C
-      Character*60 FMultTab
       Include 'commons.inc'
 C
 C     Maximal step for X (should be less than Pi/2, otherwise Exp(X) does not converge)
@@ -399,7 +398,6 @@ C
 C
       Dimension XProj(MxHVec*(MxHVec+1)/2)
 C
-      Character*60 FMultTab
       Include 'commons.inc'
 C
       IJ=0
@@ -445,7 +443,6 @@ C
       Dimension Aux1(NBasis,NBasis),Aux2(NBasis,NBasis),
      $ Aux3(NBasis,NBasis)
 C
-      Character*60 FMultTab
       Include 'commons.inc'
 C
 C     COPY xx BLOCKS OF HESSIAN AND XProj TO AUXILIARY SQUARE ARRAYS

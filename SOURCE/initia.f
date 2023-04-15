@@ -1852,7 +1852,7 @@ C
 C
       Implicit Real*8 (A-H,O-Z)
 C
-      Character*60 Title,FMultTab
+      Character*60 Title
 C
       Include 'commons.inc'
 C
@@ -2395,7 +2395,6 @@ C     AND READ THE MULTIPLICATION TABLE
 C
       Implicit Real*8 (A-H,O-Z)
 C
-      Character*60 FMultTab
       Include 'commons.inc'
 C
       Parameter (Zero=0.D0)

@@ -12,7 +12,7 @@ C     DENSITY MATRIX ELEMENTS
 C
       Implicit Real*8 (A-H,O-Z)
 C
-      Character*60 FMultTab,Title
+      Character*60 Title
       Include 'commons.inc'
 c
       Parameter(Zero=0.D0,Half=0.5D0,One=1.D0,Two=2.D0)
@@ -209,7 +209,7 @@ C
 C
       Implicit Real*8 (A-H,O-Z)
 C
-      Character*60 FMultTab,Title
+      Character*60 Title
       Include 'commons.inc'
 C
       Parameter(Zero=0.D0,Half=0.5D0,One=1.D0,Two=2.D0)
@@ -358,7 +358,7 @@ c      use abmat
 C
       Implicit Real*8 (A-H,O-Z)
 C
-      Character*60 FMultTab,Title
+      Character*60 Title
       CHARACTER(100) :: num1char
       Character*32 Str 
 C
@@ -622,7 +622,7 @@ C
 C
       Implicit Real*8 (A-H,O-Z)
 C
-      Character*60 FMultTab,Title
+      Character*60 Title
       Include 'commons.inc'
 C
       Character*60 FName
@@ -2418,7 +2418,7 @@ C     doi: 10.1021/ct500483t
 C
       Implicit Real*8 (A-H,O-Z)
 C
-      Character*60 FMultTab,Title
+      Character*60 Title
       Include 'commons.inc'
 C
       Character*60 FName
