@@ -512,14 +512,15 @@ subroutine onel_dalton(mon,NBasis,NAO,NInte1,MonBlock,SAPT)
  if(mon==2) then
  ! rearrange in V: (B,A) -> (A,B)
     !call read_syminf(SAPT%monA,SAPT%monB,NBasis)
-    call read_syminf_dalton(SAPT%monA%NSym,SAPT%monB%NSym,SAPT%monB%UCen, &
-                            SAPT%monA%NSymOrb,SAPT%monB%NSymOrb,&
-                            SAPT%monA%NMonBas,SAPT%monB%NMonBas)
+    if(MonBlock%switchAB) then
+       call read_syminf_dalton(SAPT%monA%NSym,SAPT%monB%NSym,SAPT%monB%UCen, &
+                               SAPT%monA%NSymOrb,SAPT%monB%NSymOrb,&
+                               SAPT%monA%NMonBas,SAPT%monB%NMonBas)
 
-    call arrange_oneint(Smat,NBasis,SAPT)
-    call arrange_oneint(Vmat,NBasis,SAPT)
-    call arrange_oneint(Hmat,NBasis,SAPT)
-
+       call arrange_oneint(Smat,NBasis,SAPT)
+       call arrange_oneint(Vmat,NBasis,SAPT)
+       call arrange_oneint(Hmat,NBasis,SAPT)
+    endif
  endif
 
  ! square form
@@ -1337,93 +1338,6 @@ endif
 !call swap_rows(NOrbA,NOrbB,mat)
 
 end subroutine arrange_mo
-
-subroutine read_syminf(A,B,nbas)
-! reads number of basis functions on each monomer
-! from SYMINFO(B) file!
-implicit none
-
-type(SystemBlock) :: A, B
-integer :: nbas
-integer :: iunit,ios
-integer :: ibas,icen,last_ibas,last_icen
-integer :: irep,ifun,offset
-logical :: ex,dump
-integer :: tmp
-integer :: ACenTst, ACenBeg, ACenEnd
-
-! sanity checks : in
-!print*, A%NCen, B%NCen
-!print*, A%UCen, B%UCen
-if(A%NSym/=B%NSym) then
-  write(lout,*) 'ERROR in read_syminf: NSym different for A and B!'
-endif
-
-inquire(file='SYMINFO_B',EXIST=ex)
-
-if(ex) then
-   open(newunit=iunit,file='SYMINFO_B',status='OLD',&
-        form='FORMATTED')
-   read(iunit,*)
-   read(iunit,*)
-
-   ! old version: does not work with sym
-   ! print*, 'old version'
-   ! offset = 0
-   ! irep   = 1
-   ! read(iunit,'(i5,i6)',iostat=ios) last_ibas,last_icen
-   ! do
-   !   read(iunit,'(i5,i6)',iostat=ios) ibas,icen
-   !   if(ios/=0) then
-   !      A%NMonBas(irep)=last_ibas-offset
-   !      exit
-   !   elseif(icen/=last_icen) then
-   !        if(last_icen==B%UCen) then
-   !           B%NMonBas(irep) = last_ibas-offset
-   !           offset = last_ibas
-   !        elseif(icen==1) then
-   !           A%NMonBas(irep) = last_ibas-offset
-   !           offset = last_ibas
-   !           irep   = irep + 1
-   !        endif
-   !   endif
-   !   last_ibas=ibas
-   !   last_icen=icen
-   !enddo
-
-   ! new version : ok with sym
-   do irep=1,B%NSym
-      do ifun=1,B%NSymOrb(irep)
-         read(iunit,'(i5,i6)',iostat=ios) ibas,icen
-         if(icen.le.B%UCen) then
-            B%NMonBas(irep) = B%NMonBas(irep) + 1
-         else
-            A%NMonBas(irep) = A%NMonBas(irep) + 1
-         endif
-      enddo
-   enddo
-
-   close(iunit)
-else
-   write(LOUT,'(1x,a)') 'ERROR! MISSING SYMINFO_B FILE!'
-   stop
-endif
-
-! sanity checks : out
-do irep=1,B%NSym
-   ibas = A%NMonBas(irep)+B%NmonBas(irep)
-   if(ibas/=A%NSymOrb(irep)) then
-      write(lout,'(1x,a)') 'ERROR in read_syminf!'
-      write(lout,'(1x,a,i3,a)') 'For irep =',irep, ':'
-      write(lout,*) 'A-NMonBas',A%NMonBas(1:A%NSym)
-      write(lout,*) 'B-NMonBas',B%NMonBas(1:B%NSym)
-      write(lout,*) 'Sum:     ',A%NMonBas(1:A%NSym)+B%NMonBas(1:B%NSym)
-      write(lout,*) 'Should be',A%NSymOrb(1:A%NSym)
-      stop
-   endif
-enddo
-
-end subroutine read_syminf
 
 subroutine arrange_oneint(mat,nbas,SAPT)
 implicit none

@@ -134,7 +134,8 @@ else
   ! reduce virtuals
    Flags%IRedVirt = Input%CalcParams%RedVirt
 
-   Flags%IOrbRelax = Input%CalcParams%OrbRelax 
+  ! compute orbital relaxation
+   Flags%IOrbRelax = Input%CalcParams%OrbRelax
 
   ! memory in 2ints sorter (readtwoint) 
    Flags%MemVal   = Input%CalcParams%MemVal
