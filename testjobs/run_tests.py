@@ -1,5 +1,5 @@
 #! /usr/bin/env python
-import os,sys,string,math
+import os,sys,glob, string,math
 from pathlib import Path
 import numpy as np
 from scripts import test_list, test_utils
@@ -75,6 +75,15 @@ print(f"\n{no_passed} / {no_failed} / {no_total} (passed / failed / total)\n")
 if no_failed == 0:
     print(f"*** SUCCESS ***")
     print(f"\n===============================================")
+    # DELETE UNNECESSARY FILES
+    patterns = ["FOFO", "FFOO", "fock.dat", "fort*"]    
+    for test in test_list.get():
+        for path in test['units'] :
+            for pattern in patterns:
+                files = glob.glob(os.path.join(path, pattern))
+                for file in files:
+                    os.remove(file)
+
     exit(0)
 else:
     print(f"*** FAILURE ***")
