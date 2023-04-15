@@ -5687,16 +5687,16 @@ C
 C
       TwoEl=TwoMO(NAddr3(IS,IR,IP,IQ))
       BRSPQ=(Occ(IR)-Occ(IS))*(Occ(IQ)-Occ(IP))*Two*TwoEl*AuxTwo
-      BRSPQ=BRSPQ
-     $ +(-GOCC(Occ(IR),Occ(IP),0,IR,IP)
+      BRSPQ=BRSPQ +
+     $  (-GOCC(Occ(IR),Occ(IP),0,IR,IP)
      $   +GOCC(Occ(IR),Occ(IQ),0,IR,IQ)
      $   +GOCC(Occ(IS),Occ(IP),0,IS,IP)
      $   -GOCC(Occ(IS),Occ(IQ),0,IS,IQ))
      $ *TwoMO(NAddr3(IS,IP,IQ,IR))*AuxTwo
 C
       ARSPQ=(Occ(IR)-Occ(IS))*(Occ(IP)-Occ(IQ))*Two*TwoEl*AuxTwo
-      ARSPQ=ARSPQ+
-     $ +(-GOCC(Occ(IR),Occ(IQ),0,IR,IQ)
+      ARSPQ=ARSPQ +
+     $  (-GOCC(Occ(IR),Occ(IQ),0,IR,IQ)
      $   +GOCC(Occ(IR),Occ(IP),0,IR,IP)
      $   +GOCC(Occ(IS),Occ(IQ),0,IS,IQ)
      $   -GOCC(Occ(IS),Occ(IP),0,IS,IP))

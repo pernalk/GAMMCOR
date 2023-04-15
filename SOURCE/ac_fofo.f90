@@ -437,7 +437,7 @@ nblk = 1 + NBasis - NAct
 allocate(A0block(nblk))
 Call AC0BLOCK(Occ,URe,XOne, &
      IndN,IndX,IGem,NAct,INActive,NDimX,NBasis,NDimX,NInte1,'FFOO','FOFO', &
-     A0BlockIV,A0Block,nblk,'A0BLK',0)
+     1,A0BlockIV,A0Block,nblk,1,'A0BLK',0)
 
 allocate(COMTilde(NDimX*NCholesky),COMTildeAct(NDimX*NCholesky))
 COMTilde=0.0
@@ -606,15 +606,14 @@ nblk = 1 + NBasis - NAct
 allocate(A0block(nblk))
 Call AC0BLOCK(Occ,URe,XOne, &
       IndN,IndX,IGem,NAct,INActive,NDimX,NBasis,NDimX,NInte1,'FFOO','FOFO', &
-      A0BlockIV,A0Block,nblk,'A0BLK',0)
-      !A0BlockIV,A0Block,nblk,1)
+      0,A0BlockIV,A0Block,nblk,0,'A0BLK',0)
 
 COM=0d0
 Do IGL=1,NGrid
    OmI=XFreq(IGL)
 
 !  Calc: WORK1=(A0+Om^2)^-1
-   Call INV_AC0BLK(OmI**2,WORK1,A0Block,A0BlockIV,nblk,NDimX)
+   Call INV_AC0BLK_OLD(OmI**2,WORK1,A0Block,A0BlockIV,nblk,NDimX)
 !  Calc: C0=1/2 Lambda.ABPLUS0
    Call dgemm('N','N',NDimX,NDimX,NDimX,0.5d0,WORK1,NDimX,&
               ABPLUS0,NDimX,0d0,C0,NDimX)

@@ -11,7 +11,7 @@ XCFUN_LIB = -L./xcfun/lib/ -lxcfun
 TREXIO         = $(shell pkg-config --cflags trexio)
 TREXIO_LIB = $(shell pkg-config --libs trexio) -Wl,-rpath=$(shell pkg-config --variable=libdir trexio)
 
-FFLAGS = $(XCFUN) $(TREXIO) -O3 -fopenmp -funroll-loops -ffree-line-length-none
+FFLAGS = $(XCFUN) $(TREXIO) -O3 -fopenmp -funroll-loops -ffree-line-length-none -std=legacy
 LIBS = $(BLAS) $(XCFUN_LIB) $(TREXIO_LIB)
 #LIBS = $(MKL_LIB) $(XCFUN_LIB) $(TREXIO_LIB)
 

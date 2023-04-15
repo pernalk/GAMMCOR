@@ -23,6 +23,7 @@ C
 C
 C     LOCAL ARRAYS
 C
+      Dimension ABPLUS(NDim*NDim),ABMIN(NDim*NDim)
       Dimension XGrid(100), WGrid(100)
       Logical IURE, IFOFO
 C

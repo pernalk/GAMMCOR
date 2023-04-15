@@ -48,6 +48,7 @@ C
 C
       Parameter(Zero=0.D0, Half=0.5D0,MxIt=25)
       Dimension Dir(NBasis),Occ(NBasis)
+      Dimension HNO(*),CoulNO(*),ExchNO(*)
 C
 C     LOCAL ARRAY
 C
@@ -1695,6 +1696,7 @@ C
       Implicit Real*8 (A-H,O-Z)
 C
       Dimension Dir(NBasis),Occ(NBasis)
+      Dimension HNO(*),CoulNO(*),ExchNO(*)
 C
       PARAMETER (GOLD=1.618034D0, GLIMIT=100.D0, TINY=1.d-20)
       PARAMETER (ZERO=0.0D0, TEN5=0.05D0, MXIT=20)
@@ -1794,6 +1796,7 @@ C
       Common/CPMFT/ MFrac,MOcc,NFrac
 C
       Dimension DirN(NSym),Occ(NBasis),Ind(NSym)
+      Dimension HNO(*),CoulNO(*),ExchNO(*)
 C
 C     LOCAL ARRAY
 C
@@ -1833,6 +1836,7 @@ C
       Common/CPMFT/ MFrac,MOcc,NFrac
 C
       Dimension Occ(NBasis),Ind(MFrac)
+      Dimension HNO(*),CoulNO(*),ExchNO(*)
 C
 C     LOCAL ARRAYS 
 C
@@ -1929,6 +1933,9 @@ C
      $ Dir,Occ,HNO,CoulNO,ExchNO,NBasis)
 C
       Implicit Real*8 (A-H,O-Z)
+C
+      Dimension Dir(NBasis),Occ(NBasis)
+      Dimension HNO(*),CoulNO(*),ExchNO(*)
 C
       PARAMETER (ITMAX=100,CGOLD=.3819660D0,ZEPS=1.0D-10)
 C

@@ -1322,6 +1322,8 @@ C
       Include 'commons.inc'
 C
       Dimension T(NB*NB)
+      Dimension FIJ(*),A(*),GIJ(*),FunIJ(*),Occ(*)
+      Dimension XKin(*),XNuc(*),TNO(*)
 C
 C     LOCAL ARRAYS
 C
@@ -1369,7 +1371,7 @@ C
         iter=its
 
         Call LNSRCHX(IDFP,n,p,T,fp,g,xi,pnew,TNew,fret,check,
-     $  FIJ,GIJ,FunIJ,BIJ,A,XKin,XNuc,Occ,TNO,NB,N2,NGem)
+     $               FIJ,GIJ,FunIJ,BIJ,A,XKin,XNuc,Occ,TNO,NB,N2,NGem)
 
         if(check.eqv..false.) then
         Deallocate (hessin)
@@ -1526,7 +1528,7 @@ c
 
 27    continue
 
-      If(IPrint.Ge.1)Write(6,'(/,X,''Too many iterations in DFPMIN!'')') 
+      If(IPrint.Ge.1)Write(6,'(/,X,''Too many iterations in DFPMIN!'')')
 C
       Deallocate (hessin)
 C
@@ -1542,7 +1544,9 @@ C
       Include 'commons.inc'
 C
       Dimension TOld(NB*NB),T(NB*NB),
-     $ g(n),p(n),x(n),xold(n)
+     $          g(n),p(n),x(n),xold(n)
+      Dimension FIJ(*),GIJ(*),FunIJ(*),BIJ(*),A(*),XKin(*),XNuc(*)
+      Dimension Occ(*),TNO(*)
 C
 C     LOCAL ARRAY
 C
@@ -1643,19 +1647,19 @@ C
           else
             rhs1=f-fold-alam*slope
             rhs2=f2-fold-alam2*slope
-            a=(rhs1/alam**2-rhs2/alam2**2)/(alam-alam2)
-            b=(-alam2*rhs1/alam**2+alam*rhs2/alam2**2)/(alam-alam2)
+            aT=(rhs1/alam**2-rhs2/alam2**2)/(alam-alam2)
+            bT=(-alam2*rhs1/alam**2+alam*rhs2/alam2**2)/(alam-alam2)
 
-            if(a.eq.0.)then
-              tmplam=-slope/(2.*b)
+            if(aT.eq.0.)then
+              tmplam=-slope/(2.*bT)
             else
-              disc=b*b-3.*a*slope
+              disc=bT*bT-3.*aT*slope
               if(disc.le.0.) then
                  tmplam=.5*alam
-              elseif(b.le.0.) then
-                 tmplam=(-b+sqrt(disc))/(3.*a)
+              elseif(bT.le.0.) then
+                 tmplam=(-bT+sqrt(disc))/(3.*aT)
               else
-                 tmplam=-slope/(b+sqrt(disc)) 
+                 tmplam=-slope/(bT+sqrt(disc)) 
               endif
             endif
             if(tmplam.gt..5*alam)tmplam=.5*alam

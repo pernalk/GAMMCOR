@@ -527,7 +527,7 @@ C
 *Deck Diag8
       Subroutine Diag8_old(C,NDim,NVar,AII,AJJ)
 
-      Real*8 C,AII,AJJ
+      Real*8 C(*),AII(*),AJJ(*)
 !
 !     GENERAL PURPOSE DIAGONALIZATION ROUTINE
 !

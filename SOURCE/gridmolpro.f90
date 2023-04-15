@@ -166,7 +166,8 @@ implicit none
 integer :: iunit
 integer :: ios
 integer :: npt, ndiff, ntg
-double precision :: mapinv(ntg),orbval(npt,ndiff,ntg)
+integer :: mapinv(ntg)
+double precision :: orbval(npt,ndiff,ntg)
 character(8) :: text, label
 
 rewind(iunit)
