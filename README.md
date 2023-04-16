@@ -4,7 +4,7 @@ Authors: Kasia Pernal, Michal Hapka, Marcin Modrzejewski, Adam Sokół, Aleksand
 ## Installation
 #### 1. Clone the repository
 ```
-git clone git@gitlab.com:qchem/gammcor.git
+git clone https://git@github.com/pernalk/GAMMCOR.git
 ```
 
 #### 2. Create an OBJ directory inside the repository folder:
