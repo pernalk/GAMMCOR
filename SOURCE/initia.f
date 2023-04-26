@@ -609,8 +609,6 @@ C
       EndDo
       EndDo
 C
-C      Print*, 'INAct-MY', norm2(URe)
-C
       EndIf
 C
 C     VIRTUAL
@@ -627,8 +625,6 @@ C
       EndDo
       Call Diag8(Fock,NVirt,NVirt,PC,Work)
 C
-C      Print*, PC(1:5)
-C      Print*, 'VIRT-MY',norm2(Fock)
       Do I=1,NVirt
       Do J=1,NVirt
       II=I+NInAc+NAc
@@ -1617,6 +1613,14 @@ C
      $        NBasis,UAux,
      $        Num0+Num1,UAux(1:NBasis,1:(Num0+Num1)),
      $        'FOFO','AOTWOSORT')
+      If (IRedVirt == 1) then
+         Call tran4_gen(NBasis,
+     $        NBasis,UAux,
+     $        Num0+Num1,UAux(1:NBasis,1:(Num0+Num1)),
+     $        NBasis,UAux,
+     $        NBasis,UAux,
+     $        'FFFO','AOTWOSORT')
+      EndIf
 C
       Call clock('tran4_FOFO',Tcpu,Twall)
 C
@@ -3885,6 +3889,7 @@ C
       double precision,allocatable :: OneAct(:,:),EigAct(:)
       double precision,allocatable :: work(:)
 
+      DV = 0d0
 
       ! read 1RDM in active orbs from SIRIFC file
       open(newunit=isirifc,file='SIRIFC',status='OLD',

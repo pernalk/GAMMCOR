@@ -36,6 +36,12 @@ include(SourceFilesList)
 include(GitInfoService)
 include(BuildInfoService)
 
+# enable testing
+enable_testing()
+
+#define tests
+add_test(NAME gammcortest COMMAND python3 ${PROJECT_SOURCE_DIR}/testjobs/run_tests.py ${PROJECT_BINARY_DIR})
+
 # Create executable
 add_executable(${PROJECT_NAME}
     ${XCFUN_SOURCE}

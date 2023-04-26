@@ -6,6 +6,7 @@ use tran
 use abmat
 use abfofo
 use ab0fofo
+use abcipsi
 use sapt_utils
 
 implicit none
@@ -860,8 +861,8 @@ enddo
 if(Mon%IPrint.gt.10) then
    write(lout,'(1x,a,f12.8)') 'ERPA EigVec norm', norm2(EigVecR)
    write(lout,'(1x,a,f14.8)') 'ERPA EigVal norm', norm2(Eig)
-   write(lout,'(1x,a,i5,a)') 'ERPA Eigenvalues (NDimX =',NDimX,'):'
-   do i=1,NDimX
+   write(lout,'(1x,a,i5,a)') 'ERPA first 6 Eigenvalues (NDimX =',NDimX,'):'
+   do i=1,6 !NDimX
       write(lout,'(1x,i4,f12.6)') i,Eig(i)
    enddo
 endif

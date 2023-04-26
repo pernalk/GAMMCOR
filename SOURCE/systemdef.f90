@@ -138,6 +138,9 @@ else
    Flags%IRdmCorr = Input%CalcParams%RdmCorr
    Flags%IRdm2Typ = Input%CalcParams%Rdm2Type
 
+  ! compute orbital relaxation
+   Flags%IOrbRelax = Input%CalcParams%OrbRelax
+
   ! memory in 2ints sorter (readtwoint) 
    Flags%MemVal   = Input%CalcParams%MemVal
    Flags%MemType  = Input%CalcParams%MemType

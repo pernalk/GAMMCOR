@@ -8,7 +8,7 @@ init(CUSTOM_COMPILE_OPTIONS STRING
 
 # Choose SIMD instruction set (e.g. xCOMMON-AVX512, xHost)
 # If not specified, CMake tries to determines it automatically
-init(SIMD_SET STRING                        xCOMMON-AVX512
+init(SIMD_SET STRING                        xHost
 )
 
 # Select BLAS vendor (e.g. Intel10_64lp or OpenBLAS).

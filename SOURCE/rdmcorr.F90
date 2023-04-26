@@ -28,7 +28,9 @@ double precision,allocatable :: XOne(:),work(:)
 
 character(8) :: label
 character(:),allocatable     :: aofile,dipfile
-character(:),allocatable     :: onefile,twojfile,twokfile
+character(:),allocatable     :: onefile,twojfile,twokfile,two3file
+! test
+integer :: IOrbRelax
 
 HlpDim = max(NBasis**2,3*NBasis)
 NInte1 = NBasis*(NBasis+1)/2
@@ -42,12 +44,14 @@ if(Mon%Monomer==1) then
    onefile  = 'ONEEL_A'
    twojfile = 'FFOOAA'
    twokfile = 'FOFOAA'
+   two3file = 'FFFOAA'
    dipfile  = 'DIP_A'
 elseif(Mon%Monomer==2) then
    aofile   = 'AOONEINT_B'
    onefile  = 'ONEEL_B'
    twojfile = 'FFOOBB'
    twokfile = 'FOFOBB'
+   two3file = 'FFFOBB'
    dipfile  = 'DIP_B'
 endif
 
@@ -149,11 +153,14 @@ case(TWOMO_FOFO)
     elseif(Mon%RDModel==1) then
 
       print*, 'RDMResp_FOFO...'
+      IOrbRelax = 1
       call RDMResp_FOFO(Mon%Occ,URe,AuxMat,XOne,&
                         Mon%IndN,Mon%IndX,Mon%IndAux,&
                         Mon%IGem,Mon%NAct,Mon%INAct, &
                         Mon%NDimX,Mon%NDimX,NBasis,NInte1, &
-                        twojfile,twokfile,Mon%rdm1c)
+                        aofile,dipfile, &
+                        twojfile,twokfile,two3file, &
+                        IOrbRelax,Mon%rdm1c)
 
    endif
 

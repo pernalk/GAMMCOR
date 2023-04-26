@@ -142,8 +142,10 @@ C
       If(ITwoEl.eq.3) Then
 C
       Call RDMResp_FOFO(Occ,URe,UNOAO,XOne,IndN,IndX,IndAux,IGem,
-     $                  NAcCAS,NInAcCAS,NDimX,NDim,NBasis,NInte1,
-     $                  'FFOO','FOFO')
+     $                  NAcCAS,NInAcCAS,NDimX,NDimX,NBasis,NInte1,
+     $                  'AOONEINT.mol','DIP',
+     $                  'FFOO','FOFO','FFFO',IOrbRelax)
+      stop
 C
       Else
 C
@@ -897,7 +899,7 @@ C
 C 
       Call AC0CASLR(ECorr,ECASSCF,TwoNO,Occ,URe,XOne,
      $ ABPLUS,ABMIN,EigVecR,Eig,
-     $ IndN,IndX,NDimX,NBasis,NDim,NInte1,NInte2,
+     $ IndN,IndX,NDimX,NBasis,NDimX,NInte1,NInte2,
      $ TwoEl2,OrbGrid,Work,NSymNO,MultpC,NGrid)
 
 c      Call AC0CASLR(ECorr,ECASSCF,TwoEl2,Occ,URe,XOne,

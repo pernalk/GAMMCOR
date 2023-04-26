@@ -1,0 +1,33 @@
+! test for input
+  
+Calculation
+ JobTitle   H2-H2 (QPACKAGE)
+ Interface  TREXIO
+ JobType    SAPT
+ RDMType    CI
+ TwoMoInt   FOFO
+ IPrint     11
+end
+
+System
+ Monomer       A
+ NAtoms        2
+ ZNucl         2
+ Charge        0
+ ThrAct        1.d-6
+ ThrSelAct     1.d-3
+ TrexFile      A.h5
+ Cholesky2RDM  true
+End
+
+System
+ Monomer       B
+ NAtoms        2
+ ZNucl         2
+ Charge        0
+ ThrAct        1.d-6
+ ThrSelAct     1.d-3
+ TrexFile      B.h5
+ Cholesky2RDM  true
+End
+

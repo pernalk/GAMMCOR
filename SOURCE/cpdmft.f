@@ -19,7 +19,7 @@ C
 C
       Om1=.28D0
       Call POLARIZ2
-     $ (IExact,Om1,ALPHYY1,ALPHZZ1,URe,TwoMO,Occ,XKin,XNuc,
+     $ (IExact,Om1,ALPHXX1,ALPHYY1,ALPHZZ1,URe,TwoMO,Occ,XKin,XNuc,
      $ DipX,DipY,DipZ,NBasis,NInte1,NInte2,NDim)
       F=One/ALPHYY1/ALPHZZ1
 C    
@@ -27,7 +27,7 @@ C
       Do I=1,150
       Om2=Om2+1.D-3
       Call POLARIZ2
-     $ (IExact,Om2,ALPHYY2,ALPHZZ2,URe,TwoMO,Occ,XKin,XNuc,
+     $ (IExact,Om2,ALPHXX1,ALPHYY2,ALPHZZ2,URe,TwoMO,Occ,XKin,XNuc,
      $ DipX,DipY,DipZ,NBasis,NInte1,NInte2,NDim)
 C   
       FMid=One/ALPHYY2/ALPHZZ2
@@ -54,7 +54,7 @@ C
       XMid=RtBis+DX
 C
       Call POLARIZ2
-     $ (IExact,XMid,ALPHYY,ALPHZZ,URe,TwoMO,Occ,XKin,XNuc,
+     $ (IExact,XMid,ALPHXX,ALPHYY,ALPHZZ,URe,TwoMO,Occ,XKin,XNuc,
      $ DipX,DipY,DipZ,NBasis,NInte1,NInte2,NDim)
 C
       FMid=One/ALPHYY/ALPHZZ 

@@ -41,6 +41,7 @@ integer, parameter :: FLAG_NOBASIS = 0
 integer, parameter :: FLAG_REDVIRT = 0
 integer, parameter :: FLAG_RDMCORR = 0
 integer, parameter :: FLAG_RDM2TYP = 0
+integer, parameter :: FLAG_ORBRELAX = 1
 logical, parameter :: FLAG_RESTART = .FALSE.
 logical, parameter :: FLAG_TRIPLET = .FALSE.
 integer, parameter :: FLAG_PRINT_LEVEL = 0
@@ -124,6 +125,7 @@ type CalculationBlock
       integer :: RedVirt   = FLAG_REDVIRT
       integer :: RdmCorr   = FLAG_RDMCORR
       integer :: Rdm2Type  = FLAG_RDM2TYP
+      integer :: OrbRelax  = FLAG_ORBRELAX
       integer :: MemVal = 2, MemType = 3 ! default: use 2 GB for 3-ind_tran (Cholesky)
       logical :: Restart    = FLAG_RESTART
       logical :: Triplet    = FLAG_TRIPLET
@@ -191,9 +193,10 @@ type SystemBlock
       logical :: PostCAS = .false.
       logical :: NActFromRDM  = .true.
       logical :: reduceV      = .false.
-      logical :: Cholesky2RDM = .false.
       ! for RDMCORR SAPT
       integer :: RDModel = -1
+      logical :: Cholesky2RDM = .true.
+      logical :: switchAB = .false.
       ! for cubic SAPT
       double precision :: ACAlpha0  = 1.d-10
       double precision :: ACAlpha1  = 0.01d0
@@ -285,6 +288,7 @@ type FlagsData
      integer :: IRedVirt  = FLAG_REDVIRT
      integer :: IRDMCorr  = FLAG_RDMCORR
      integer :: IRDM2Typ  = FLAG_RDM2TYP
+     integer :: IOrbRelax = FLAG_ORBRELAX
      integer :: ICholesky = FLAG_CHOLESKY
      integer :: ICholeskyAccu = CHOL_ACCU_DEFAULT
      integer :: IFun      = 13

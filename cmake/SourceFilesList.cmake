@@ -2,6 +2,7 @@ set(GAMMCOR_SOURCE
     SOURCE/abfofo.f90
     SOURCE/abmats.f90
     SOURCE/abchol.f90
+    SOURCE/abcipsi.f90
     SOURCE/accas.f
     SOURCE/ac_exact_2el.f
     SOURCE/acfd.f
