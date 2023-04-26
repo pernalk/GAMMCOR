@@ -1938,7 +1938,8 @@ Enddo
 Call CFREQPROJ(ipiv,Om,DipCX,1, &
    Max_Cn,XOne,URe,Occ,&
    IGem,NAct,INActive,NBasis,NInte1,IndAux,&
-   ICholesky,IndN,IndX,NDimX)
+   ICholesky,IndN,IndX,NDimX,&
+   'FFOO','FOFO')
 
 AYX=8.d0*ddot(NDimx,DipCY,1,ipiv,1)
 AZX=8.d0*ddot(NDimx,DipCZ,1,ipiv,1)
@@ -1947,7 +1948,8 @@ AXX=8.d0*ddot(NDimx,DipCX,1,ipiv,1)
 Call CFREQPROJ(ipiv,Om,DipCY,1, &
    Max_Cn,XOne,URe,Occ,&
    IGem,NAct,INActive,NBasis,NInte1,IndAux,&
-   ICholesky,IndN,IndX,NDimX)
+   ICholesky,IndN,IndX,NDimX,&
+   'FFOO','FOFO')
 
 AXY=8.d0*ddot(NDimx,DipCX,1,ipiv,1)
 AZY=8.d0*ddot(NDimx,DipCZ,1,ipiv,1)
@@ -1956,7 +1958,8 @@ AYY=8.d0*ddot(NDimx,DipCY,1,ipiv,1)
 Call CFREQPROJ(ipiv,Om,DipCZ,1, &
    Max_Cn,XOne,URe,Occ,&
    IGem,NAct,INActive,NBasis,NInte1,IndAux,&
-   ICholesky,IndN,IndX,NDimX)
+   ICholesky,IndN,IndX,NDimX,&
+   'FFOO','FOFO')
 AXZ=8.d0*ddot(NDimx,DipCX,1,ipiv,1)
 AYZ=8.d0*ddot(NDimx,DipCY,1,ipiv,1)
 AZZ=8.d0*ddot(NDimx,DipCZ,1,ipiv,1)
@@ -1971,7 +1974,8 @@ end subroutine PolarizAl
 subroutine CFREQPROJ(COMTilde,OmI,DProj,NProj, &
    Max_Cn,XOne,URe,Occ,&
    IGem,NAct,INActive,NBasis,NInte1,IndAux,&
-   ICholesky,IndN,IndX,NDimX)
+   ICholesky,IndN,IndX,NDimX,&
+   IntJFile,IntKFile)
 !
 !  For a given frequency OmI, return a product of the matrices C(Alpha=1,OmI) and DProj
 !  where DProj is of the NProj x NDimX size
@@ -1989,6 +1993,7 @@ integer,intent(in) :: IndN(2,NDimX),IndX(NDimX),IndAux(NBasis),&
                       IGem(NBasis)
 double precision :: ACAlpha,Eps
 double precision,intent(in) :: DProj(NProj,NDimX),URe(NBasis,NBasis),Occ(NBasis),XOne(NInte1)
+character(*),intent(in) :: IntJfile,IntKFile
 
 double precision,intent(out) :: COMTilde(NDimX*NProj)
 
@@ -1997,7 +2002,6 @@ integer :: ia,ib,ic,id
 integer :: i,j,k,l,kl,ip,iq,ir,is,ipq,irs
 integer :: inf1,inf2,Max_Cn
 double precision :: XFactorial,XN1,XN2,OmI,XNorm0,XNorm1,ECASSCF,DProjT(NDimX,NProj)
-character(:),allocatable :: twojfile,twokfile,IntKFile
 
 double precision, allocatable :: APLUS0Tilde(:), APLUS1Tilde(:),  &
                                  A1(:),&
@@ -2013,10 +2017,6 @@ Eps=1.d-5
 
 DProjT = transpose(DProj)
 
-twojfile = 'FFOO'
-twokfile = 'FOFO'
-IntKFile = twokfile
-
 allocate(ABPLUS1(NDimX*NDimX),ABMIN1(NDimX*NDimX))
 
 if(NAct==1) then
@@ -2030,14 +2030,15 @@ allocate(A0block(nblk))
 ! AC0BLOCK with ver=0 stores A-(0) and A+(0) matrices
 !                            in X and Y, respectively
 Call AC0BLOCK(Occ,URe,XOne, &
-     IndN,IndX,IGem,NAct,INActive,NDimX,NBasis,NDimX,NInte1,'FFOO','FOFO', &
+     IndN,IndX,IGem,NAct,INActive,NDimX,NBasis,NDimX,NInte1, &
+     IntJFile,IntKFile, &
      ICholesky,A0BlockIV,A0Block,nblk,0,'DUMMY',0)
 
 ! get AB1PLUS and AB1MIN
 ACAlpha=1.D0
 call AB_CAS_FOFO(ABPLUS1,ABMIN1,ECASSCF,URe,Occ,XOne, &
               IndN,IndX,IGem,NAct,INActive,NDimX,NBasis,NDimX,&
-              NInte1,twojfile,twokfile,ICholesky,ACAlpha,.false.)
+              NInte1,IntJFile,IntKFile,ICholesky,ACAlpha,.false.)
 
 Call sq_symmetrize(ABPLUS1,NDimX)
 Call sq_symmetrize(ABMIN1,NDimX)
@@ -2066,7 +2067,8 @@ deallocate(A0BlockIV%vec,A0BlockIV%pos)
 allocate(A0block(nblk))
 ! ver=1: store A+(0).A-(0) in blocks
 Call AC0BLOCK(Occ,URe,XOne, &
-     IndN,IndX,IGem,NAct,INActive,NDimX,NBasis,NDimX,NInte1,'FFOO','FOFO', &
+     IndN,IndX,IGem,NAct,INActive,NDimX,NBasis,NDimX,NInte1, &
+     IntJFile,IntKFile, &
      ICholesky,A0BlockIV,A0Block,nblk,1,'A0BLK',0)
 
 COMTilde=0.0

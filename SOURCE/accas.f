@@ -6,6 +6,7 @@ c     use types
       use print_units
       use timing
       use abfofo
+      use rdmcorr
 C
 C     A ROUTINE FOR COMPUTING ELECTRONIC ENERGY USING ERPA TRANSITION
 C     DENSITY MATRIX ELEMENTS

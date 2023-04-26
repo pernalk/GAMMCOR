@@ -9,6 +9,459 @@ use sapt_utils
 
 contains
 
+subroutine RDMResp_FOFO(Occ,URe,UNOAO,XOne,IndN,IndX,IndAux,IGemIN, &
+                        NAct,INActive,NDimX,NDim,NBasis,NInte1,     &
+                        AOFile,DipFile,                             &
+                        IntJFile,IntKFile,Int3File,IOrbRelax,RDM1)
+implicit none
+integer,intent(in)           :: IOrbRelax
+integer,intent(in)           :: NAct,INActive,NDimX,NDim,NBasis,NInte1
+integer,intent(in)           :: IndN(2,NDim),IndX(NDim),IndAux(NBasis),IGemIN(NBasis)
+character(*)                 :: AOFile,DipFile
+character(*)                 :: IntJFile,IntKFile,Int3File
+double precision,intent(in)  :: Occ(NBasis),XOne(NInte1)
+double precision,intent(in)  :: UNOAO(NBasis,NBasis),URe(NBasis,NBasis)
+
+double precision,intent(out),optional :: RDM1(NBasis,NBasis)
+
+integer                      :: iunit1,iunit2
+integer                      :: i,j,k,l,ij,ii,jj,ip,iq,ir,is
+integer                      :: ipos,ipos1,ipos2
+integer                      :: a,b,c,d,m,ac
+integer                      :: NOccup0,NOccup,NVirt,NVirtOld,iOccup,iVirt
+integer                      :: IGem(NBasis),pos(NBasis,NBasis),IPair(NBasis,NBasis)
+integer                      :: nAA,nAI(INActive),nAV(INActive+NAct+1:NBasis),nIV
+integer                      :: tmpAA(NAct*(NAct-1)/2),tmpAI(NAct,1:INActive),&
+                                tmpAV(NAct,INActive+NAct+1:NBasis),&
+                                tmpIV(INActive*(NBasis-NAct-INActive))
+integer                      :: limAA(2),limAI(2,1:INActive),&
+                                limAV(2,INActive+NAct+1:NBasis),limIV(2)
+integer                      :: IRow,ICol,NDimRed,Max_Cn
+double precision             :: val,ETot
+double precision             :: UCorr(NBasis,NBasis)
+double precision             :: Eps(NBasis,NBasis),CI(NBasis)
+double precision             :: AuxMat(NBasis,NBasis),Gamma(NBasis,NBasis),PC(NBasis)
+double precision             :: AUXM0(NBasis,NBasis),AUX2(NBasis*NBasis)
+
+integer                      :: XInd(NBasis,NBasis),XInd1(NBasis,NBasis)
+integer, allocatable         :: IndBlock(:,:)
+
+double precision,allocatable :: ABPLUS(:,:),ABMIN(:,:)
+double precision,allocatable :: AUX1(:),AuxI(:,:)
+double precision,allocatable :: ints_J(:,:),ints_K(:,:)
+double precision,allocatable :: ints_bi(:,:),ints_bk(:,:),ints_dl(:,:)
+double precision,allocatable :: work(:),workSq(:,:)
+
+! set dimensions
+NOccup = INActive + NAct
+
+! fix IGem
+do i=1,INActive
+   IGem(i) = 1
+enddo
+do i=INActive+1,NOccup
+   IGem(i) = 2
+enddo
+do i=NOccup+1,NBasis
+   IGem(i) = 3
+enddo
+
+IPair = 0
+do ii=1,NDimX
+   i = IndN(1,ii)
+   j = IndN(2,ii)
+   IPair(i,j) = 1
+   IPair(j,i) = 1
+   XInd(i,j) = IndX(ii)
+   XInd(j,i) = IndX(ii)
+enddo
+
+do i=1,NBasis
+  CI(i)=SQRT(Occ(i))
+  if(Occ(i).Lt.0.5d0) CI(i)=-CI(i)
+enddo
+
+! construct ABPLUS(0)
+allocate(ABPLUS(NDimX,NDimX),ABMIN(NDimX,NDimX))
+
+call create_blocks_ABPL0(nAA,nAI,nAV,nIV,tmpAA,tmpAI,tmpAV,tmpIV,&
+                         limAA,limAI,limAV,limIV,pos,&
+                         IGem,IndN,INActive,NAct,NBasis,NDimX)
+
+call ABPM0_FOFO(Occ,URe,XOne,ABPLUS,ABMIN, &
+                IndN,IndX,IGemIN,NAct,INActive,NDimX,NBasis,NDim,NInte1, &
+                IntJFile,IntKFile,0,ETot)
+
+Eps = 0
+!get AV
+do i=1,NDimX
+   ip = IndN(1,i)
+   iq = IndN(2,i)
+   ipos = pos(ip,iq)
+   Eps(ip,iq) = SQRT(ABPLUS(ipos,ipos)*ABMIN(ipos,ipos))
+enddo
+
+! AB(1) PART
+call AB_CAS_FOFO(ABPLUS,ABMIN,val,URe,Occ,XOne,&
+              IndN,IndX,IGem,NAct,INActive,NDimX,NBasis,NDimX,&
+              NInte1,IntJFile,IntKFile,0,1d0,.true.)
+
+allocate(work(NBasis**2),ints_bi(NBasis,NBasis),ints_bk(NBasis,NBasis))
+open(newunit=iunit1,file=trim(IntKFile),status='OLD', &
+     access='DIRECT',recl=8*NBasis*NOccup)
+
+Gamma = 0d0
+ij = 0
+do i=1,NOccup
+   Gamma(i,i) = Occ(i)
+enddo
+
+AUXM0 = 0
+NOccup0=NOccup
+
+NOccup=0
+Do I=1,NBasis
+   AUXM0(I,I)=Occ(I)
+   If(Occ(I).Gt.0.49) NOccup=NOccup+1
+EndDo
+
+! NOccup-NOccup block of 1-RDM
+do k=1,NOccup
+   do b=NOccup+1,NBasis
+
+   if(IPair(b,k)==1) then
+
+      read(iunit1,rec=(b+(k-1)*NBasis)) work(1:NBasis*NOccup)
+      ! ints_bk
+      do l=1,NOccup
+         do j=1,NBasis
+            ints_bk(j,l) = work((l-1)*NBasis+j)
+         enddo
+      enddo
+
+      do j=1,NOccup
+      do i=1,NOccup
+         do a=max(i,j)+1,NBasis
+              if(IPair(a,i)==1 .and. IPair(a,j)==1) then
+                  ipos1 = XInd(a,i)
+                  ipos2 = XInd(b,k)
+                  Gamma(i,j) = Gamma(i,j) + ints_bk(a,j)* &
+                           0.5d0* &
+                           ( (CI(I)+CI(A))*(CI(K)+CI(B))*ABPLUS(ipos1,ipos2) &
+                            -(CI(I)-CI(A))*(CI(K)-CI(B))* ABMIN(ipos1,ipos2) ) &
+                           /(Eps(a,i)+Eps(b,k)) / (Eps(a,j)+Eps(b,k))
+                 endif
+           enddo
+      enddo
+      enddo
+
+   endif
+
+   enddo
+enddo
+! second part
+do b=NOccup+1,NBasis
+   do k=NOccup+1,b-1
+
+   if(IPair(b,k).eq.1) then
+      ipos2 = XInd(b,k)
+
+      read(iunit1,rec=(b+(k-1)*NBasis)) work(1:NBasis*NOccup)
+      ! ints_bk
+      do l=1,NOccup
+         do j=1,NBasis
+            ints_bk(j,l) = work((l-1)*NBasis+j)
+         enddo
+      enddo
+
+      do i=1,NOccup
+         do a=NOccup+1,NBasis
+
+              if(IPair(a,i).eq.1) then
+                 ipos1 = XInd(a,i)
+                 do j=1,NOccup
+                   if(IPair(a,j).eq.1) then
+                     Gamma(i,j) = Gamma(i,j) + ints_bk(a,j)* &
+                              0.5d0* &
+                              ( (CI(I)+CI(A))*(CI(K)+CI(B))*ABPLUS(ipos1,ipos2) &
+                               -(CI(I)-CI(A))*(CI(K)-CI(B))* ABMIN(ipos1,ipos2) ) &
+                              /(Eps(a,i)+Eps(b,k)) / (Eps(a,j)+Eps(b,k))
+                    endif
+                 enddo
+              endif
+         enddo
+      enddo
+
+   endif
+
+   enddo
+enddo
+
+! Virt-Virt block of 1-RDM
+
+do b=NOccup+1,NBasis
+  do k=1,NOccup
+
+  if(IPair(b,k).eq.1) then
+
+      read(iunit1,rec=(b+(k-1)*NBasis)) work(1:NBasis*NOccup)
+      ! ints_bk
+      do l=1,NOccup
+         do j=1,NBasis
+            ints_bk(j,l) = work((l-1)*NBasis+j)
+         enddo
+      enddo
+
+      do i=1,NOccup
+         do c=NOccup+1,NBasis
+            if(IPair(c,i).eq.1) then
+             do a=NOccup+1,NBasis
+                 if(IPair(a,i).eq.1) then
+                 ipos1 = XInd(a,i)
+                 ipos2 = XInd(b,k)
+                 Gamma(a,c) = Gamma(a,c) - ints_bk(c,i)* &
+                 0.5d0* &
+                 ( (CI(I)+CI(A))*(CI(K)+CI(B))*ABPLUS(ipos1,ipos2) &
+                  -(CI(I)-CI(A))*(CI(K)-CI(B))* ABMIN(ipos1,ipos2) ) &
+                             /(Eps(a,i)+Eps(b,k)) / (Eps(c,i)+Eps(b,k))
+                 endif
+             enddo
+            endif
+         enddo
+      enddo
+
+   endif
+
+   enddo
+enddo
+! second part
+do b=1,NOccup
+  do k=1,b-1
+
+  if(IPair(b,k).eq.1) then
+
+      read(iunit1,rec=(b+(k-1)*NBasis)) work(1:NBasis*NOccup)
+      ! ints_bk
+      do l=1,NOccup
+         do j=1,NBasis
+            ints_bk(j,l) = work((l-1)*NBasis+j)
+         enddo
+      enddo
+
+      do i=1,NOccup
+         do c=NOccup+1,NBasis
+            if(IPair(c,i).eq.1) then
+            do a=NOccup+1,NBasis
+                 if(IPair(a,i).eq.1) then
+                 ipos1 = XInd(a,i)
+                 ipos2 = XInd(b,k)
+                 Gamma(a,c) = Gamma(a,c) - ints_bk(c,i)* &
+                 0.5d0* &
+                 ( (CI(I)+CI(A))*(CI(K)+CI(B))*ABPLUS(ipos1,ipos2) &
+                  -(CI(I)-CI(A))*(CI(K)-CI(B))* ABMIN(ipos1,ipos2) ) &
+                             /(Eps(a,i)+Eps(b,k)) / (Eps(c,i)+Eps(b,k))
+                 endif
+            enddo
+            endif
+         enddo
+      enddo
+
+   endif
+
+   enddo
+enddo
+! third part
+do b=NOccup+1,NBasis
+  do k=1,NOccup
+
+  if(IPair(b,k).eq.1) then
+
+      read(iunit1,rec=(b+(k-1)*NBasis)) work(1:NBasis*NOccup0)
+      ! ints_bk
+      do l=1,NOccup0
+!      do j=1,NOccup0
+       do j=1,NBasis
+            ints_bk(j,l) = work((l-1)*NBasis+j)
+         enddo
+      enddo
+
+      do c=NOccup+1,NBasis
+         do a=NOccup+1,NBasis
+            do i=NOccup+1,min(a,c)-1
+               if(IPair(c,i)==1 .and. IPair(a,i)==1) then
+                  ipos1 = XInd(a,i)
+                  ipos2 = XInd(b,k)
+                  Gamma(a,c) = Gamma(a,c) - ints_bk(c,i)* &
+                  0.5d0* &
+                  ( (CI(I)+CI(A))*(CI(K)+CI(B))*ABPLUS(ipos1,ipos2) &
+                  -(CI(I)-CI(A))*(CI(K)-CI(B))* ABMIN(ipos1,ipos2) ) &
+                  /(Eps(a,i)+Eps(b,k)) / (Eps(c,i)+Eps(b,k))
+               endif
+            enddo
+         enddo
+      enddo
+
+   endif
+
+   enddo
+enddo
+
+!
+! occ-virt block - relaxation of orbitals
+!
+
+if(IOrbRelax==1) then
+
+AUX2=0.d0
+NDimRed=0
+do d=NOccup+1,NBasis
+   do l=1,NOccup
+      NDimRed=NDimRed+1
+      XInd1(d,l)=NDimRed
+   enddo
+enddo
+allocate(IndBlock(2,NDimRed))
+NDimRed=0
+do d=NOccup+1,NBasis
+   do l=1,NOccup
+      NDimRed=NDimRed+1
+      IndBlock(1,NDimRed)=d
+      IndBlock(2,NDimRed)=l
+   enddo
+enddo
+
+allocate(ints_dl(NBasis,NBasis))
+! (FF|FO) terms
+open(newunit=iunit2,file=trim(Int3File),status='OLD', &
+     access='DIRECT',recl=8*NBasis*NBasis)
+
+do d=NOccup+1,NBasis
+   do l=1,NOccup
+
+      read(iunit2,rec=(d+(l-1)*NBasis)) work(1:NBasis*NBasis)
+      do a=1,NBasis
+         do b=1,NBasis
+            ints_dl(a,b) = work((a-1)*NBasis+b)
+         enddo
+      enddo
+
+      do a=NOccup+1,NBasis
+      do b=NOccup+1,NBasis
+      AUX2(XInd1(d,l))=AUX2(XInd1(d,l))-Occ(l)*(gamma(a,b)-AUXM0(a,b))*2.d0*ints_dl(a,b)
+      AUX2(XInd1(a,l))=AUX2(XInd1(a,l))+Occ(l)*(gamma(d,b)-AUXM0(d,b))*ints_dl(a,b)
+      enddo
+      enddo
+
+      do j=1,NOccup
+      do a=NOccup+1,NBasis
+      do b=NOccup+1,NBasis
+
+      if(IPair(a,j)==1 .and. IPair(d,l)==1) then
+      ipos1=XInd(a,j)
+      ipos2=XInd(d,l)
+      AUX2(XInd1(b,j))=AUX2(XInd1(b,j)) &
+      -0.5d0* ( (CI(j)+CI(a))*(CI(l)+CI(d))*ABPLUS(ipos1,ipos2) &
+              - (CI(j)-CI(a))*(CI(l)-CI(d))*ABMIN(ipos1,ipos2) ) &
+              *ints_dl(a,b)/(Eps(a,j)+Eps(d,l))
+      endif
+
+      enddo
+      enddo
+      enddo
+
+! (FO|FO) terms
+
+      do i=1,NOccup
+      do m=1,NOccup
+      AUX2(XInd1(d,l))=AUX2(XInd1(d,l))-Occ(l)*(gamma(i,m)-AUXM0(i,m))*2.d0*ints_dl(i,m)
+      AUX2(XInd1(d,m))=AUX2(XInd1(d,m))+Occ(m)*(gamma(i,l)-AUXM0(i,l))*ints_dl(i,m)
+      enddo
+      enddo
+
+      do b=NOccup+1,NBasis
+      do i=1,NOccup
+      do j=1,NOccup
+
+      if(IPair(b,i)==1 .and. IPair(d,l)==1) then
+      ipos1=XInd(b,i)
+      ipos2=XInd(d,l)
+      AUX2(XInd1(b,j))=AUX2(XInd1(b,j)) &
+      +0.5d0* ( (CI(i)+CI(b))*(CI(l)+CI(d))*ABPLUS(ipos1,ipos2) &
+              - (CI(i)-CI(b))*(CI(l)-CI(d))*ABMIN(ipos1,ipos2) ) &
+              *ints_dl(i,j)/(Eps(b,i)+Eps(d,l))
+      endif
+
+      enddo
+      enddo
+      enddo
+
+    enddo
+enddo
+close(iunit2)
+
+deallocate(ABPLUS,ABMIN)
+
+allocate(AUX1(NDimRed*NDimRed))
+Max_Cn=10
+AUX1=0.d0
+Write(6,'(/,X,"**** Expansion of the C response matrix up to n = ",I5," ****")') Max_Cn
+Call CFREQPROJ(AUX1,0.d0,AUX2,1, &
+   Max_Cn,XOne,URe,Occ,&
+   IGem,NAct,INActive,NBasis,NInte1,IndAux,&
+   0,IndBlock,IndX,NDimRed,&
+   IntJFile,IntKFile)
+
+do i=1,NOccup
+   do a=NOccup+1,NBasis
+     ! C(omega) is multiplied by 2, see the note 
+     Gamma(i,a)=AUX1(XInd(a,i))*2.0
+     Gamma(a,i)=Gamma(i,a)
+   enddo
+enddo
+
+close(iunit1)
+deallocate(AUX1,ints_dl)
+
+! end of orbital relaxation 
+endif
+
+Gamma=0.5d0*(Gamma+transpose(Gamma))
+
+deallocate(ints_bk,ints_bi)
+
+AuxMat = Gamma
+
+if (present(RDM1)) RDM1 = AuxMat
+
+call Diag8(AuxMat,NBasis,NBasis,PC,work(1:NBasis))
+
+Write(6,'(/,X,"NOccup set to: ",I5)') NOccup
+val = 0d0
+if(IOrbRelax==1) then
+   write(LOUT,'(/,2x,"Orbitals Relaxed")')
+else
+   write(LOUT,'(/,2x,"Orbitals UnRelaxed")')
+endif
+
+write(LOUT,'(/,2x,"AC0-correlated natural occupation numbers")')
+do i=NBasis,1,-1
+   write(LOUT,'(X,I3,E16.6,I6)') Nbasis-i+1,PC(i)*2.0
+   val = val + PC(i)
+enddo
+write(LOUT,'(/,1x,"Sum of AC0-correlated Occupancies: ",F5.2,/)') val
+
+! compute transformation matrix to correlated NO's and dipole moments
+Call MultpM(UCorr,AuxMat,UNOAO,NBasis)
+write(LOUT,'(/,x,"Dipole moment with correlated 1-RDM")',advance="no")
+if(IOrbRelax==1) then
+   write(LOUT,'(1x, " (relaxed)")')
+else
+   write(LOUT,'(1x, " (unrelaxed)")')
+endif
+Call ComputeDipoleMom(UCorr,PC,NBasis,AOFile,DipFile,NBasis)
+
+end subroutine RDMResp_FOFO
+
 subroutine sapt_rdm_corr(Mon,Flags,NAO,NBasis)
 implicit none
 
@@ -29,8 +482,6 @@ double precision,allocatable :: XOne(:),work(:)
 character(8) :: label
 character(:),allocatable     :: aofile,dipfile
 character(:),allocatable     :: onefile,twojfile,twokfile,two3file
-! test
-integer :: IOrbRelax
 
 HlpDim = max(NBasis**2,3*NBasis)
 NInte1 = NBasis*(NBasis+1)/2
@@ -59,6 +510,16 @@ endif
 if(Flags%ICASSCF==1) then
    if(Mon%Monomer==1) call system('cp rdm2_A.dat rdm2.dat')
    if(Mon%Monomer==2) call system('cp rdm2_B.dat rdm2.dat')
+endif
+
+! response requires FFFO integrals
+if(Flags%IOrbRelax==1) then
+   call tran4_gen(NAO, &
+                  NBasis,Mon%CMO, &
+                  Mon%NOccup0,Mon%CMO(1:NAO,1:Mon%NOccup0),&
+                  NBasis,Mon%CMO, &
+                  NBasis,Mon%CMO, &
+                  two3file,'AOTWOSORT')
 endif
 
 ! get H0 matrix
@@ -153,26 +614,25 @@ case(TWOMO_FOFO)
     elseif(Mon%RDModel==1) then
 
       print*, 'RDMResp_FOFO...'
-      IOrbRelax = 1
+
       call RDMResp_FOFO(Mon%Occ,URe,AuxMat,XOne,&
                         Mon%IndN,Mon%IndX,Mon%IndAux,&
                         Mon%IGem,Mon%NAct,Mon%INAct, &
                         Mon%NDimX,Mon%NDimX,NBasis,NInte1, &
                         aofile,dipfile, &
                         twojfile,twokfile,two3file, &
-                        IOrbRelax,Mon%rdm1c)
+                        Flags%IOrbRelax,Mon%rdm1c)
 
    endif
 
 end select
 
-!#if RDMCORR_DEBUG > 5
+#if RDMCORR_DEBUG > 5
 
    !print*, 'CAONO',norm2(Mon%CMO)
    !do i=1,NBasis
    !   write(lout,'(*(f12.8))') (AuxMat(i,j),j=1,NBasis)
    !enddo
-   !print*,''
    print*, '1-RDM MP2 unrelaxed (MO)',norm2(Mon%rdm1c)
    do i=1,NBasis
       write(lout,'(*(f12.8))') (2d0*Mon%rdm1c(i,j),j=1,NBasis)
@@ -190,7 +650,7 @@ end select
    !enddo
    !print*,''
    !end block
-!#endif
+#endif
 
 ! test
 !Mon%rdm1c = 0d0
@@ -270,8 +730,8 @@ Mon%Occ  = EVal
 !print*, 'test-2: save old orbitals!'
 Mon%CMO = AuxMat
 
-write(lout,'(1x,a)') "DIPOLE MOMENT WITH MP2-LIKE 1RDM:"
-call ComputeDipoleMom(transpose(Mon%CMO),Mon%Occ,NBasis,aofile,dipfile,NBasis)
+!write(lout,'(1x,a)') "DIPOLE MOMENT WITH MP2-LIKE 1RDM:"
+!call ComputeDipoleMom(transpose(Mon%CMO),Mon%Occ,NBasis,aofile,dipfile,NBasis)
 
 deallocate(XOne)
 
@@ -296,6 +756,10 @@ double precision,allocatable :: work(:,:,:,:)
 
 NOccup0 = Mon%NOccup0
 NOccup = Mon%num0+Mon%num1
+
+print*, 'NOccup0 = ',NOccup0
+print*, 'NOccup  = ',NOccup
+print*, 'ver = ', ver
 
 if(ver==0) then
    if(allocated(Mon%RDM2val)) then
@@ -388,6 +852,7 @@ if(ver==0) then
    deallocate(work)
 
 elseif(ver==1) then
+
    ! Hartree-Fock
    ! Gamma(prqs) = 2*np*nq \delta_pr \delta_qs - n_p*nq \delta_ps \delta_qr
    Mon%RDM2val = 0d0
@@ -456,21 +921,21 @@ do i=1,NOccup
    enddo
 enddo
 
-if(mon%monomer==1) write(lout,'(/1x,a,i3)') 'Monomer A',NOccup
-if(mon%monomer==2) write(lout,'(/1x,a,i3)') 'Monomer B',NOccup
+if(mon%monomer==1) write(lout,'(/1x,a,i3)') 'Monomer A / NOccup =',NOccup
+if(mon%monomer==2) write(lout,'(/1x,a,i3)') 'Monomer B / NOccup =',NOccup
 write(lout,'(1x,a,f12.6)',advance="no") '2-RDM2 norm = ', xnorm
 write(lout,'(1x,a,f8.3,a)') '(reference =', refnorm, ')'
 
-!if(abs(refnorm-xnorm).gt.1d-5) then
-!   Mon%RDM2val = Mon%RDM2val * refnorm / xnorm
-!   xnorm = 0d0
-!   do i=1,NOccup
-!      do j=1,NOccup
-!         xnorm = xnorm + Mon%RDM2val(i,i,j,j)
-!      enddo
-!   enddo
-!   write(lout,'(1x,a,f12.6)') 'RDM2 renormalized!',xnorm
-!endif
+if(abs(refnorm-xnorm).gt.1d-5) then
+   Mon%RDM2val = Mon%RDM2val * refnorm / xnorm
+   xnorm = 0d0
+   do i=1,NOccup
+      do j=1,NOccup
+         xnorm = xnorm + Mon%RDM2val(i,i,j,j)
+      enddo
+   enddo
+   write(lout,'(1x,a,f12.6)') 'RDM2 renormalized!',xnorm
+endif
 
 !block
 !integer :: ip,iq,ir,is

@@ -215,14 +215,14 @@ call readocc_rdm_corr(SAPT%monB,NBasis)
 call print_active(SAPT,NBasis)
 call compare_active(SAPT%monA,NBasis)
 
-block
+!block
    ! TEST
    !print*, 'restore old Occ numbers (Occ0)'
    !associate(A => SAPT%monA, B => SAPT%monB)
    !A%Occ = A%Occ0
    !B%Occ = B%Occ0
    !end associate
-end block
+!end block
 
 ! integrals
 !call sapt_mon_ints(SAPT%monA,Flags,SAPT%NAO,NBasis)
@@ -235,13 +235,14 @@ call prepare_RDM2corr(SAPT%monB,NBasis,Flags%IRDM2Typ)
 
 call sapt_Kmat_AO(SAPT%monB%Kmat,SAPT%monB%CMO,SAPT%monB%Occ,SAPT%NAO,NBasis)
 
-call sapt_ab_ints_rdmcorr(SAPT%monA,SAPT%monB,Flags,SAPT%NAO,NBasis)
-
 ! SAPT component
 call e1elst(SAPT%monA,SAPT%monB,SAPT)
 !call e1elst_NaNb(SAPT%monA,SAPT%monB,SAPT)
 call e1exchs2(Flags,SAPT%monA,SAPT%monB,SAPT)
-call e1exch_NaNb(Flags,SAPT%monA,SAPT%monB,SAPT)
+
+! additional test
+!call sapt_ab_ints_rdmcorr(SAPT%monA,SAPT%monB,Flags,SAPT%NAO,NBasis)
+!call e1exch_NaNb(Flags,SAPT%monA,SAPT%monB,SAPT)
 
 call summary_sapt_rdm(SAPT,Flags,NBasis)
 
