@@ -3078,34 +3078,6 @@ close(iunit)
 
 end subroutine readgvb
 
-subroutine  square_oneint(tr,sq,nbas,nsym,norb)
-
-implicit none
-integer,intent(in) :: nbas,nsym,norb(8)
-double precision,intent(in) :: tr(:)
-double precision,intent(out) :: sq(nbas,nbas)
-integer :: irep,i,j
-integer :: offset,idx
-
-sq=0
-
-offset=0
-idx=0
-do irep=1,nsym
-   do j=offset+1,offset+norb(irep)
-      do i=offset+1,j
-
-         idx=idx+1
-         sq(i,j)=tr(idx)
-         sq(j,i)=tr(idx)
-
-      enddo
-   enddo
-   offset=offset+norb(irep)
-enddo
-
-end subroutine square_oneint
-
 subroutine writeoneint(mon,ndim,S,V,H)
 implicit none
 

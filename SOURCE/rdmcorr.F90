@@ -496,14 +496,16 @@ if(Mon%Monomer==1) then
    twojfile = 'FFOOAA'
    twokfile = 'FOFOAA'
    two3file = 'FFFOAA'
-   dipfile  = 'DIP_A'
+   if(Flags%IMOLPRO==1) dipfile  = 'DIP_A'
+   if(Flags%IDALTON==1) dipfile  = 'AOPROPER_A'
 elseif(Mon%Monomer==2) then
    aofile   = 'AOONEINT_B'
    onefile  = 'ONEEL_B'
    twojfile = 'FFOOBB'
    twokfile = 'FOFOBB'
    two3file = 'FFFOBB'
-   dipfile  = 'DIP_B'
+   if(Flags%IMOLPRO==1) dipfile  = 'DIP_B'
+   if(Flags%IDALTON==1) dipfile  = 'AOPROPER_B'
 endif
 
 ! prepare RDM2

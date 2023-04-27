@@ -7480,7 +7480,26 @@ C
      $ DipZ(NBasis,NBasis),UNOAO(NBasis,NBasis),AUXM(NBasis,NBasis)
       Character(*) DipFile
 C
+      If (IMOLPRO == 1) Then
       Call read_dip_molpro(DipX,DipY,DipZ,trim(DipFile),NBasis)
+      ElseIf (IDALTON == 1) Then
+      Call read_dip_dalton(DipX,DipY,DipZ,trim(DipFile),NBasis)
+      Else
+      Stop "Unknown Interface in ReadDip!"
+      EndIf
+C
+C      Print*,'DipX = ',norm2(DipX)
+C      Do I=1,NBasis
+C      Write(6,'(*(f12.6))') (DipX(I,J),J=1,NBasis)
+C      EndDo
+C      Print*,'DipY = ',norm2(DipY)
+C      Do I=1,NBasis
+C      Write(6,'(*(f12.6))') (DipY(I,J),J=1,NBasis)
+C      EndDo
+C      Print*,'DipZ = ',norm2(DipZ)
+C      Do I=1,NBasis
+C      Write(6,'(*(f12.6))') (DipZ(I,J),J=1,NBasis)
+C      EndDo
 C
       Call dgemm('N','N',NBasis,NBasis,NBasis,1d0,UNOAO,NBasis,
      $           dipz,NBasis,0d0,AUXM,NBasis)
@@ -7504,6 +7523,8 @@ C
 C
 C     compute electronic part of the DM
 C     using occupation numbers
+C
+      use read_external
 C
       Implicit Real*8 (A-H,O-Z)
 C
@@ -7529,6 +7550,8 @@ C
       Open(newunit=ione,file=trim(AOFile),access='sequential',
      $     form='unformatted',status='old')
 C
+      If (IMOLPRO == 1) Then
+C
       Do
         Read(ione,iostat=ios) label
         If(ios<0) then
@@ -7542,6 +7565,22 @@ C
            Exit
         EndIf
       EndDo
+C
+      ElseIf (IDALTON == 1) Then
+C
+      Call readlabel(ione,'ISORDK  ')
+      MaxCen = 500
+      Allocate(Charg(MaxCen),XYZ(MaxCen,3))
+      Read(ione)
+      Read(ione) Charg,NCen,XYZ(1:MaxCen,1:3)
+      EndIf
+C
+      Print*, 'NCen  =',NCen
+      Print*, 'Charg =',Charg(1:NCen)
+      Do I=1,NCen
+      Print*, 'I,X,Y,Z',I,XYZ(I,1:3)
+      EndDo
+C
       Close(ione)
 C
       NUC_DMX=0; NUC_DMY=0; NUC_DMZ=0

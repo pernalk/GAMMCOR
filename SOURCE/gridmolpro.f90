@@ -39,7 +39,8 @@ implicit real*8 (A-H,O-Z)
 double precision OrbGrid(NGrid,NBasis),WGrid(NGrid),UMOAO(NBasis,NBasis)
 double precision OrbXGrid(NGrid,NBasis),OrbYGrid(NGrid,NBasis),OrbZGrid(NGrid,NBasis),Aux(NGrid,NBasis)
 integer ::  NBasis, NGrid
-double precision, allocatable :: r(:,:),wt(:),mapinv(:),orbval(:,:,:)
+integer, allocatable :: mapinv(:)
+double precision, allocatable :: r(:,:),wt(:),orbval(:,:,:)
 integer :: i,j,k,igrid
 integer :: npt, ndiff, ntg
 
@@ -165,7 +166,8 @@ implicit none
 integer :: iunit
 integer :: ios
 integer :: npt, ndiff, ntg
-double precision :: mapinv(ntg),orbval(npt,ndiff,ntg)
+integer :: mapinv(ntg)
+double precision :: orbval(npt,ndiff,ntg)
 character(8) :: text, label
 
 rewind(iunit)

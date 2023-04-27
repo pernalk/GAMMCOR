@@ -203,6 +203,14 @@ C
      $        NBasis,UAux,
      $        Num0+Num1,UAux(1:NBasis,1:(Num0+Num1)),
      $        'FOFO','AOTWOSORT')
+      If (IRedVirt == 1) then
+         Call tran4_gen(NBasis,
+     $        NBasis,UAux,
+     $        Num0+Num1,UAux(1:NBasis,1:(Num0+Num1)),
+     $        NBasis,UAux,
+     $        NBasis,UAux,
+     $        'FFFO','AOTWOSORT')
+      EndIf
 C
       ElseIf (ICholesky==1) Then
 C

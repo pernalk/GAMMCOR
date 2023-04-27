@@ -562,7 +562,7 @@ end subroutine read_NoSt_molpro
 
 subroutine read_dip_molpro(matdx,matdy,matdz,infile,nbasis)
 !
-! Purpose: read dipole integrals and unpack withour symmetry
+! Purpose: read dipole integrals and unpack without symmetry
 !
 implicit none
 
@@ -1155,6 +1155,94 @@ do irep=1,BNSym
 enddo
 
 end subroutine read_syminf_dalton
+
+subroutine read_dip_dalton(xdip,ydip,zdip,dipfile,nao)
+!
+! read dipole moments in AO
+!
+implicit none
+
+integer,intent(in)      :: nao
+character(*),intent(in) :: dipfile
+!character(*),intent(in) :: aofile
+
+double precision,intent(out) :: xdip(nao,nao), &
+                                ydip(nao,nao), &
+                                zdip(nao,nao)
+
+integer :: ione
+integer :: nsym,nbas(8)
+double precision,allocatable :: work(:)
+
+allocate(work(nao*(nao+1)/2))
+
+!open(newunit=ione,file=aofile,access='sequential',&
+!     form='unformatted',status='old')
+!read(ione)
+!read(ione) nsym,nbas(1:nsym)
+!close(ione)
+! test
+nsym = 1
+nbas = 0
+nbas(1) = nao
+
+open(newunit=ione,file=dipfile,access='sequential',&
+     form='unformatted',status='old')
+
+! Dipole moment ints are stored in AOPROPER files
+call readlabel(ione,'XDIPLEN ')
+read(ione) work
+call square_oneint(work,xdip,nao,nsym,nbas)
+
+call readlabel(ione,'YDIPLEN ')
+read(ione) work
+call square_oneint(work,ydip,nao,nsym,nbas)
+
+call readlabel(ione,'ZDIPLEN ')
+read(ione) work
+call square_oneint(work,zdip,nao,nsym,nbas)
+
+! why ?
+xdip = -xdip
+ydip = -ydip
+zdip = -zdip
+
+close(ione)
+deallocate(work)
+
+end subroutine read_dip_dalton
+
+subroutine square_oneint(tr,sq,nbas,nsym,norb)
+!
+! tr(:) to sq(nbas,nbas) with sym
+!
+implicit none
+
+integer,intent(in) :: nbas,nsym,norb(8)
+double precision,intent(in) :: tr(:)
+double precision,intent(out) :: sq(nbas,nbas)
+
+integer :: irep,i,j
+integer :: offset,idx
+
+sq=0
+
+offset=0
+idx=0
+do irep=1,nsym
+   do j=offset+1,offset+norb(irep)
+      do i=offset+1,j
+
+         idx=idx+1
+         sq(i,j)=tr(idx)
+         sq(j,i)=tr(idx)
+
+      enddo
+   enddo
+   offset=offset+norb(irep)
+enddo
+
+end subroutine square_oneint
 
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 ! TREXIO subroutines

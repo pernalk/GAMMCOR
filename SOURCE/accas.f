@@ -28,11 +28,23 @@ C
      $ IndX(NBasis*(NBasis-1)/2),IndN(2,NBasis*(NBasis-1)/2),
      $ IndAux(NBasis),IPair(NBasis,NBasis)
 C
+      Character(:),Allocatable :: AOFile,DipAOFile
+C
       Double Precision  :: Tcpu,Twall
 C
 C     START TIMING FOR AC PROCEDURES
 C
       call clock('START',Tcpu,Twall)
+C
+C     SET FILENAMES
+C
+      If (IMOLPRO == 1 ) Then
+      AOFile = 'AOONEINT.mol'
+      DipAOFile = 'DIP'
+      ElseIf (IDALTON == 1 ) Then
+      AOFile = 'AOONEINT'
+      DipAOFile = 'AOPROPER'
+      EndIf
 C
 C     CONSTRUCT LOOK-UP TABLES
 C
@@ -144,7 +156,7 @@ C
 C
       Call RDMResp_FOFO(Occ,URe,UNOAO,XOne,IndN,IndX,IndAux,IGem,
      $                  NAcCAS,NInAcCAS,NDimX,NDimX,NBasis,NInte1,
-     $                  'AOONEINT.mol','DIP',
+     $                  AOFile,DipAOFile,
      $                  'FFOO','FOFO','FFFO',IOrbRelax)
       stop
 C

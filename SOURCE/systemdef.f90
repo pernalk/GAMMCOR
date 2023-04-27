@@ -155,7 +155,7 @@ else
      Flags%IA = 1
 
   case(INTER_TYPE_MOL)
-     Flags%IDALTON = 0
+     Flags%IMOLPRO = 1
      Flags%IAO     = 1
      Flags%INO     = 1
      !Flags%NoSym   = Input%CalcParams%SymType
@@ -175,7 +175,6 @@ else
      Flags%NoSym   = 1
      Flags%IA = 1
   case(INTER_TYPE_TREX)
-     Flags%IDALTON = 0
      Flags%ITREXIO = 1
   end select
 
@@ -207,7 +206,7 @@ else
   case(RDM_TYPE_CI)
      FLags%ICI     = 1
      FLags%IGVB    = 0
-     Flags%ICASSCF = 0
+     Flags%ICASSCF = 1
 
   case default
      write(LOUT,'(1x,a)') 'RDMType not declared! Assuming ICASSCF=1!'

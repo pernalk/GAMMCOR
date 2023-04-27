@@ -246,12 +246,17 @@ call e1exchs2(Flags,SAPT%monA,SAPT%monB,SAPT)
 
 call summary_sapt_rdm(SAPT,Flags,NBasis)
 
+! delete unnecessary files
 call delfile('AOTWOSORT')
+call delfile('ONEEL_A')
+call delfile('ONEEL_B')
 call delfile('TMPOOAB')
 call delfile('FFOOAA')
 call delfile('FFOOBB')
 call delfile('FOFOAA')
 call delfile('FOFOBB')
+if (Flags%IOrbRelax==1) call delfile('FFFOAA')
+if (Flags%IOrbRelax==1) call delfile('FFFOBB')
 
 call clock('SAPT',Tcpu,Twall)
 
