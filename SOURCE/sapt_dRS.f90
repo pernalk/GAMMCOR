@@ -40,7 +40,8 @@ double precision,allocatable :: Vabb2(:,:)
 double precision,allocatable :: workB(:,:)
 double precision :: ea1,ea2,eb1,eb2,elstb1,elstb2
 double precision :: sumA,sumB
-double precision :: elst1,elst2,elstSAPT,elst1exp,elst2exp,elstEXPsym1,elstEXPsym2,ElstEXPsymTrAng1,ELstEXPsymTrAng2
+double precision :: elst1,elst2,elstSAPT
+double precision :: elst1exp,elst2exp,elstEXPsym1,elstEXPsym2,ElstEXPsymTrAng1,ELstEXPsymTrAng2
 double precision :: A1B2A1B2,A2B1A2B1,A1B2A2B1
 double precision :: gamma
 
@@ -60,31 +61,6 @@ iexcited2 = ((iref2B-2)*(iref2B-1))/2+irefB
 NBasis = A%NBasis
 dimOA  = A%num0+A%num1
 dimOB  = B%num0+B%num1
-! print*, '1-TRDM MO ='
-!       do i=1,10
-!          write(lout,'(*(f12.6))') (A%trdm1(1,i,j),j=1,10)
-!       enddo
-! print*,'Atrdm1(1,2)',A%trdm1(1,1,2)
-! print*,'Atrdm1(1,3)',A%trdm1(1,1,3)
-
-! print*,'trace'
-! tr=0d0
-! do i=1,NBasis
-!    tr=tr+A%trdm1(iexcited,i,i)
-! enddo
-! print*,tr
-! we will need :
-!       a) A%rdm1(istate,NBasis)
-!       b) A%trdm1(nnstate,NBasis,NBasis)
-!       c) v_{pr}^{qs} integrals, pq \in A, rs \in B
-!       d) SAPT%Vnn
-!
-! let us get the integral files here,
-!  we will move them outside to sapt_ab_ints later
-
-! first, try to recover regular Elst for A-B (ground-state)
-!
-! get v_pr^qs
 
 allocate(Vb(NBasis,NBasis),Vbaa(NBasis,NBasis))
 allocate(Vbaa2(NBasis,NBasis))
@@ -104,12 +80,9 @@ call tran2MO(Vb,A%CAONO(iref2,:,:),A%CAONO(iref2,:,:),Vbaa2,NBasis)
 call tran2MO(Va,B%CAONO(iref,:,:),B%CAONO(iref,:,:),Vabb,NBasis)
 call tran2MO(Va,B%CAONO(iref2,:,:),B%CAONO(iref2,:,:),Vabb2,NBasis)
 
-
 ! sum_p n_p v^B_pp
 ea1 = 0d0
 ea2 = 0d0
-eb1 = 0d0
-eb2 = 0d0
 do i=1,A%num0+A%num1
    ea1 = ea1 + A%rdm1(iref,i)*Vbaa(i,i)
    ea2 = ea2 + A%rdm1(iref2,i)*Vbaa2(i,i)
@@ -119,6 +92,8 @@ ea2 = 2d0*ea2
 print*, 'ea1',ea1
 print*, 'ea2',ea2
 
+eb1 = 0d0
+eb2 = 0d0
 do i=1,B%num0+B%num1
    eb1 = eb1 + B%rdm1(iref,i)*Vabb(i,i)
    eb2 = eb2 + B%rdm1(iref2,i)*Vabb2(i,i)
@@ -127,20 +102,6 @@ eb1 = 2d0*eb1
 eb2 = 2d0*eb2
 print*, 'eb1',eb1
 print*, 'eb2',eb2
-
-!call tran4_gen(NBasis,&
-!               B%num0+B%num1,B%CMO,&
-!               B%num0+B%num1,B%CMO,&
-!               A%num0+A%num1,A%CMO,&
-!               A%num0+A%num1,A%CMO,&
-!               'OOOOAABB','AOTWOSORT')
-
-!call tran4_gen(NBasis,&
-!     B%num0+B%num1,B%CAONO(iref2B,:,:),&
-!     B%num0+B%num1,B%CAONO(iref2B,:,:),&
-!     A%num0+A%num1,A%CAONO(iref,:,:),&
-!     A%num0+A%num1,A%CAONO(iref,:,:),&
-!     'OOOOAABB','AOTWOSORT')
 
 allocate(work(dimOA,dimOA))
 ! n_p * n_q * v_pq^pq
@@ -170,12 +131,10 @@ do ip=1,dimOB
 enddo
 close(iunit)
 
-
-
-
 ! test
 print*, 'elab = ',4d0*elab
 print*, 'elabB = ',4d0*elabB
+
 allocate(Atrdm(NBasis,NBasis))
 allocate(Btrdm(NBasis,NBasis))
 !call tran2MO(A%trdm(iref,:,:),CMONO(RefState,:,:),CMONO(RefState,:,:), &
@@ -184,7 +143,6 @@ call tran2MO(A%trdm1(iexcited,:,:),A%CMONO(iref,:,:),A%CMONO(iref,:,:), &
                         Atrdm(:,:),NBasis)
 call tran2MO(B%trdm1(iexcited2,:,:),B%CMONO(iref2B,:,:),B%CMONO(iref2B,:,:), &
                              Btrdm(:,:),NBasis)
-
 
 open(newunit=iunit,file='OOOOAABB',status='old',access='direct',&
      form='unformatted',recl=8*dimOA**2)
@@ -212,9 +170,6 @@ elab2 = 4d0*elab2
 elab3 = 4d0*elab3
 print*, 'elab2 = ',elab2
 print *, 'elab3 = ',elab3
-
-
-
 
 open(newunit=iunit,file='OOOOAABB2',status='old',access='direct',&
      form='unformatted',recl=8*dimOA**2)
@@ -246,10 +201,12 @@ A1B2A2B1=elab3
 write(LOUT,'(/1x,a,f16.8)') '<AB*|V|AB*>      = ', A1B2A1B2*1000d0
 write(LOUT,'(/1x,a,f16.8)') '<A*B|V|A*B>      = ', A2B1A2B1*1000d0
 write(LOUT,'(/1x,a,f16.8)') '<AB*|V|A*B>      = ', A1B2A2B1*1000d0
+
 gamma=0.5d0*atan2(2*A1B2A2B1,A1B2A1B2-A2B1A2B1)
 write(LOUT,'(/1x,a,f16.8)') 'gamma      = ', gamma
  print*,'4*gamma = ',4*gamma
  print*,'COS(gamma)^2',COS(gamma)**2
+
 !TRACK MINUS/PLUS SIGN  (NOT SURE ABOUT IT)
 elst1exp=COS(gamma)**2*A1B2A1B2+SIN(gamma)**2*A2B1A2B1+2d0*SIN(gamma)*COS(gamma)*A1B2A2B1
 elst2exp=COS(gamma)**2*A1B2A1B2+SIN(gamma)**2*A2B1A2B1-2d0*SIN(gamma)*COS(gamma)*A1B2A2B1
@@ -291,8 +248,8 @@ SAPT%A1B2VA1B2 = A1B2A1B2
 SAPT%A2B1VA2B1 = A2B1A2B1
 SAPT%A1B2VA2B1 = A1B2A2B1
 
-
 deallocate(work)
+deallocate(Btrdm,Atrdm)
 
 end subroutine elst_dRS
 
@@ -317,7 +274,9 @@ double precision, allocatable :: Atrdm(:,:)
 double precision, allocatable :: Btrdm(:,:),Btrdm2(:,:)
 double precision, allocatable :: Atrdmtest(:,:),Btrdmtest(:,:)
 double precision,allocatable :: Va(:,:),Vb(:,:),S(:,:)
-double precision,allocatable :: Sab(:,:),Sab2(:,:),Sab3(:,:),Vaab(:,:),Vbba(:,:),Vabb(:,:),Vbaa(:,:),Vbab(:,:),Vabb2(:,:),Vbab2(:,:),Vaab2(:,:)
+double precision,allocatable :: Sab(:,:),Sab2(:,:),Sab3(:,:)
+double precision,allocatable :: Vaab(:,:),Vbba(:,:),Vabb(:,:),Vbaa(:,:),Vbab(:,:)
+double precision,allocatable :: Vabb2(:,:),Vbab2(:,:),Vaab2(:,:)
 double precision, allocatable :: work(:,:)
 double precision, allocatable :: work2A(:,:,:,:), work2B(:,:,:,:)
 ! double precision, allocatable :: intA(:,:,:,:), intB(:,:,:,:)
@@ -331,6 +290,7 @@ double precision :: A1B2VA1B2,A2B1VA2B1,A1B2VA2B1
 double precision :: A1B2VPA1B2,A2B1VPA2B1,A1B2VPA2B1,A2B1VPA1B2
 double precision :: P(2,2),V(2,2),VPnb(2,2)
 double precision :: gamma
+
 print *, "running exch dSRS"
 print *,"exch w DRS ",SAPT%exchs21
 print *,"SAPT%gamma",SAPT%gamma
@@ -393,17 +353,15 @@ dimOB  = B%num0+B%num1
 allocate(Atrdm(NBasis,NBasis))
 allocate(Btrdm(NBasis,NBasis),Btrdm2(NBasis,NBasis))
 
-allocate(S(NBasis,NBasis),Sab(NBasis,NBasis),Sab2(NBasis,NBasis),Sab3(NBasis,NBasis))
-allocate(Va(NBasis,NBasis),Vb(NBasis,NBasis),&
-         Vabb(NBasis,NBasis),Vbaa(NBasis,NBasis),&
-         Vaab(NBasis,NBasis),Vbba(NBasis,NBasis),Vbab(NBasis,NBasis),Vbab2(NBasis,NBasis),Vabb2(NBasis,NBasis),Vaab2(NBasis,NBasis))
-
+allocate(S(NBasis,NBasis),Va(NBasis,NBasis),Vb(NBasis,NBasis))
+allocate(Sab(NBasis,NBasis),Sab2(NBasis,NBasis),Sab3(NBasis,NBasis))
+allocate(Vabb(NBasis,NBasis),Vbaa(NBasis,NBasis),&
+         Vaab(NBasis,NBasis),Vbba(NBasis,NBasis),&
+         Vbab(NBasis,NBasis),Vbab2(NBasis,NBasis),Vabb2(NBasis,NBasis),Vaab2(NBasis,NBasis))
 
 ! get V_ne in atomic orbs
 call get_one_mat('V',Va,A%Monomer,NBasis)
 call get_one_mat('V',Vb,B%Monomer,NBasis)
-
-
 
 !call tran2MO(Vb,A%CAONO(iref,:,:),A%CAONO(iref,:,:),Vbaa,NBasis)
 ! not sure all are needed
@@ -415,8 +373,6 @@ call tran2MO(Va,A%CAONO(iref,:,:),B%CAONO(irefB,:,:),Vaab2,NBasis)
 call tran2MO(Vb,B%CAONO(iref2B,:,:),A%CAONO(iref,:,:),Vbba,NBasis)
 call tran2MO(Vb,A%CAONO(iref,:,:),B%CAONO(iref2B,:,:),Vbab,NBasis)
 call tran2MO(Vb,A%CAONO(iref,:,:),B%CAONO(irefB,:,:),Vbab2,NBasis)
-print*,"norm Va before and after transformation",norm2(Va), norm2(Vabb)
-
 
 ! get overlap S matrix in AO and transform to NOs
 call get_one_mat('S',S,A%Monomer,NBasis)
@@ -425,14 +381,12 @@ call get_one_mat('S',S,A%Monomer,NBasis)
 call tran2MO(S,A%CAONO(iref,:,:),B%CAONO(iref2B,:,:),Sab,NBasis)
 call tran2MO(S,A%CAONO(iref2,:,:),B%CAONO(irefB,:,:),Sab3,NBasis)
 
+deallocate(Vb,Va,S)
 
 call tran2MO(A%trdm1(iexcited,:,:),A%CMONO(iref,:,:),A%CMONO(iref,:,:), &
-                        Atrdm(:,:),NBasis)
+             Atrdm(:,:),NBasis)
 call tran2MO(B%trdm1(iexcited2,:,:),B%CMONO(iref2B,:,:),B%CMONO(iref2B,:,:), &
-                             Btrdm(:,:),NBasis)
-print*,"norm S before and after transformation",norm2(S), norm2(Sab)
-print*,"norm Atrdm before and after transformation",norm2(A%trdm1(iexcited,:,:)), norm2(Atrdm)
-!print*, "Sab",Sab
+             Btrdm(:,:),NBasis)
 
 allocate(trdm2A(NBasis,NBasis,NBasis,NBasis))
 allocate(trdm2B(NBasis,NBasis,NBasis,NBasis))
@@ -441,35 +395,30 @@ allocate(trdm2B(NBasis,NBasis,NBasis,NBasis))
 
 trdm2A(:,:,:,:)=A%trdm24(:,:,:,:)
 trdm2B(:,:,:,:)=B%trdm24(:,:,:,:)
- 
+
+! "2" denotes basis of B ground-state NOs
 call tran2MO(S,A%CAONO(iref,:,:),B%CAONO(irefB,:,:),Sab2,NBasis)
 
 call tran2MO(B%trdm1(iexcited2,:,:),B%CMONO(irefB,:,:),B%CMONO(irefB,:,:), &
-                             Btrdm2(:,:),NBasis)
+             Btrdm2(:,:),NBasis)
 
-
-A1B2PA1B2=0d0
-
+A1B2PA1B2 = 0d0
 do j=1,dimOB
    do i=1,dimOA
       !   nnS2 = nnS2 + A%Occ(i)*B%Occ(j)*Sab(i,j)**2
       A1B2PA1B2 = A1B2PA1B2 + A%rdm1(iref,i)*B%rdm1(iref2B,j)*Sab(i,j)**2
    enddo
 enddo
+
 A1B2PA1B2=-2d0*A1B2PA1B2
 
-
-
 A2B1PA2B1 = 0d0
-
-
 do j=1,dimOB
    do i=1,dimOA
          !   nnS2 = nnS2 + A%Occ(i)*B%Occ(j)*Sab(i,j)**2
          A2B1PA2B1 = A2B1PA2B1 + A%rdm1(iref2,i)*B%rdm1(irefB,j)*Sab3(i,j)**2
    enddo
 enddo
-
 
 A2B1PA2B1=-2d0*A2B1PA2B1
    
@@ -506,7 +455,7 @@ do iq=1,dimOA
       do ir=1,dimOB
          do is=1,dimOB
             !     tvk(1) = tvk(1) + A%Occ(ip)*B%Occ(iq)*Vaab(ip,iq)*Sab(ip,iq)
-            P1 = P1 +Atrdm(ip,iq)*Btrdm(ir,is)*Sab(ip,ir)*Sab(iq,is) !poprawione
+            P1 = P1 + Atrdm(ip,iq)*Btrdm(ir,is)*Sab(ip,ir)*Sab(iq,is) !poprawione
             tvk(2) = tvk(2) + Atrdm(ip,iq)*Btrdm(ir,is)*Vbab(ip,ir)*Sab(iq,is) !poprawione
             tvk(1) = tvk(1) + Atrdm(ip,iq)*Btrdm(ir,is)*Vaab(iq,is)*Sab(ip,ir)
             tvk2(2) = tvk2(2) + Atrdm(iq,ip)*Btrdm(is,ir)*Vbab(ip,ir)*Sab(iq,is) 
@@ -688,17 +637,6 @@ tvk2(3)= tvk(3)
 ! end block
 
 
-
-
-
-
-
-
-
-
-
-
-
 print *,"dimOA",dimOA
 allocate(ints(dimOA,dimOA))
 allocate(Atrdmtest(NBasis,NBasis),Btrdmtest(NBasis,NBasis))
@@ -707,7 +645,7 @@ Btrdmtest = 0d0
 do ip=1,NBasis
    do ir=1,NBAsis
       do iq=1,NBasis
-         Atrdmtest(ip,ir)=  Atrdmtest(ip,ir)+trdm2A(ip,ir,iq,iq)
+         Atrdmtest(ip,ir)=  Atrdmtest(ip,ir)+Trdm2A(ip,ir,iq,iq)
       enddo
    enddo
 enddo
@@ -715,7 +653,7 @@ enddo
 do ip=1,NBasis
    do ir=1,NBAsis
       do iq=1,NBasis
-         Btrdmtest(ip,ir)=Btrdmtest(ip,ir)+trdm2B(ip,ir,iq,iq)
+         Btrdmtest(ip,ir)=Btrdmtest(ip,ir)+Trdm2B(ip,ir,iq,iq)
       enddo
    enddo
 enddo
@@ -780,13 +718,6 @@ call tran4_gen(NBasis,&
      'OOOOAABB','AOTWOSORT')
 
 
-
-
-
-
-
-
-
 test = 0d0
 TNa = 0d0
 TNa2= 0d0
@@ -848,7 +779,6 @@ print*, 'tNa(2)',tNa(2)*1000
 close(iunit)
 
 
-! NOWA CZĘŚĆ DO NAPISANIA !!!!!
 open(newunit=iunit,file='OOOOAAAB',status='OLD', access='DIRECT', &
   form='unformatted' ,recl=8*dimOA*dimOA)
 ! one loop over integrals
@@ -904,6 +834,7 @@ do ip=1,dimOA
 enddo
 tNb(1) = -2d0*tNb(1)
 tNb2(1) = tNB(1)
+
 ! aded to dSRS
 open(newunit=iunit,file='OOOOBBBA',status='OLD', &
      access='DIRECT',form='unformatted',recl=8*dimOB*dimOB)
@@ -1054,7 +985,7 @@ TNaNb2=TNaNb
 !!! TO jeszcze nie gotowe
 
 
-VP = sum(tvk)+sum(TNa)+sum(TNb)+TNaNb+P1*SAPT%Vnn
+VP  = sum(tvk)+sum(TNa)+sum(TNb)+TNaNb+P1*SAPT%Vnn
 VP2 = sum(tvk2) + sum(TNa2) +sum(TNb2)+TNaNb2+P1*SAPT%Vnn
 exch1tot1 = SAPT%exchs21 - VP + P1*SAPT%elst1
 exch1tot2 = SAPT%exchs22 + VP - P1*SAPT%elst2
@@ -1094,46 +1025,58 @@ print*, 'tNb(1)',tNb(1)
 print*, 'tNb(2)',tNb(2)
 print*, 'tNb2(1)',TNb2(1)
 print*, 'tNb2(2)',TNb2(2)
-print*, 'TNaNb',TNaNb
+print*, 'TNaNb ',TNaNb
 print*, 'TNaNb2',TNaNb2
 print*, 'exchange elst dSRS 1', exch1tot1*1000
 print*, 'exchange elst dSRS 2', exch1tot2*1000
 print*, 'elst dSRS 1', SAPT%elst1*1000
 print*, 'elst dSRS 2', SAPT%elst2*1000
+
 print*, 'Now we calculate matrix elements of V in Psi basis:'
 gamma = SAPT%gamma
 V(1,1)=COS(gamma)**2*SAPT%A1B2VA1B2+SIN(gamma)**2*SAPT%A2B1VA2B1+2*SIN(gamma)*COS(gamma)*SAPT%A1B2VA2B1
 V(2,2)=SIN(gamma)**2*SAPT%A1B2VA1B2+COS(gamma)**2*SAPT%A2B1VA2B1-2*SIN(gamma)*COS(gamma)*SAPT%A1B2VA2B1
 V(1,2)=-SIN(gamma)*COS(gamma)*SAPT%A1B2VA1B2+COS(gamma)*SIN(gamma)*SAPT%A2B1VA2B1+(COS(gamma)**2-SIN(gamma)**2)*SAPT%A1B2VA2B1
 V(2,1)=-SIN(gamma)*COS(gamma)*SAPT%A1B2VA1B2+COS(gamma)*SIN(gamma)*SAPT%A2B1VA2B1+(COS(gamma)**2-SIN(gamma)**2)*SAPT%A1B2VA2B1
- do i=1,2
-       write(lout,'(*(f12.6))') (V(i,j),j=1,2)
- enddo
- print*, 'Calculate matrix elements of P in Psi basis:'
- P(1,1)=COS(gamma)**2*A1B2PA1B2+SIN(gamma)**2*A2B1PA2B1+2*SIN(gamma)*COS(gamma)*A1B2PA2B1
- P(2,2)=SIN(gamma)**2*A1B2PA1B2+COS(gamma)**2*A2B1PA2B1-2*SIN(gamma)*COS(gamma)*A1B2PA2B1
- P(1,2)=-SIN(gamma)*COS(gamma)*A1B2PA1B2+COS(gamma)*SIN(gamma)*A2B1PA2B1+(COS(gamma)**2-SIN(gamma)**2)*A1B2PA2B1
- P(2,1)=-SIN(gamma)*COS(gamma)*A1B2PA1B2+COS(gamma)*SIN(gamma)*A2B1PA2B1+(COS(gamma)**2-SIN(gamma)**2)*A1B2PA2B1
-  do i=1,2
-        write(lout,'(*(f12.6))') (P(i,j),j=1,2)
-  enddo
-  print*, 'And Calculate matrix elements of VP in Psi basis:'
-  VPnb(1,1)=COS(gamma)**2*SAPT%A1B2VPA1B2+SIN(gamma)**2*SAPT%A2B1VPA2B1+SIN(gamma)*COS(gamma)*(VP+VP2)
-  VPnb(2,2)=SIN(gamma)**2*SAPT%A1B2VPA1B2+COS(gamma)**2*SAPT%A2B1VPA2B1-SIN(gamma)*COS(gamma)*(VP+VP2)
-  VPnb(1,2)=-SIN(gamma)*COS(gamma)*SAPT%A1B2VPA1B2+COS(gamma)*SIN(gamma)*SAPT%A2B1VPA2B1+COS(gamma)**2*VP-SIN(gamma)**2*VP2
-  VPnb(2,1)=-SIN(gamma)*COS(gamma)*SAPT%A1B2VPA1B2+COS(gamma)*SIN(gamma)*SAPT%A2B1VPA2B1+COS(gamma)**2*VP-SIN(gamma)**2*VP2
-   do i=1,2
-         write(lout,'(*(f12.6))') (VPnb(i,j),j=1,2)
-   enddo
+do i=1,2
+   write(lout,'(*(f12.6))') (V(i,j),j=1,2)
+enddo
+
+print*, 'Calculate matrix elements of P in Psi basis:'
+P(1,1)=COS(gamma)**2*A1B2PA1B2+SIN(gamma)**2*A2B1PA2B1+2*SIN(gamma)*COS(gamma)*A1B2PA2B1
+P(2,2)=SIN(gamma)**2*A1B2PA1B2+COS(gamma)**2*A2B1PA2B1-2*SIN(gamma)*COS(gamma)*A1B2PA2B1
+P(1,2)=-SIN(gamma)*COS(gamma)*A1B2PA1B2+COS(gamma)*SIN(gamma)*A2B1PA2B1+(COS(gamma)**2-SIN(gamma)**2)*A1B2PA2B1
+P(2,1)=-SIN(gamma)*COS(gamma)*A1B2PA1B2+COS(gamma)*SIN(gamma)*A2B1PA2B1+(COS(gamma)**2-SIN(gamma)**2)*A1B2PA2B1
+do i=1,2
+   write(lout,'(*(f12.6))') (P(i,j),j=1,2)
+enddo
+
+print*, 'And Calculate matrix elements of VP in Psi basis:'
+VPnb(1,1)=COS(gamma)**2*SAPT%A1B2VPA1B2+SIN(gamma)**2*SAPT%A2B1VPA2B1+SIN(gamma)*COS(gamma)*(VP+VP2)
+VPnb(2,2)=SIN(gamma)**2*SAPT%A1B2VPA1B2+COS(gamma)**2*SAPT%A2B1VPA2B1-SIN(gamma)*COS(gamma)*(VP+VP2)
+VPnb(1,2)=-SIN(gamma)*COS(gamma)*SAPT%A1B2VPA1B2+COS(gamma)*SIN(gamma)*SAPT%A2B1VPA2B1+COS(gamma)**2*VP-SIN(gamma)**2*VP2
+VPnb(2,1)=-SIN(gamma)*COS(gamma)*SAPT%A1B2VPA1B2+COS(gamma)*SIN(gamma)*SAPT%A2B1VPA2B1+COS(gamma)**2*VP-SIN(gamma)**2*VP2
+do i=1,2
+   write(lout,'(*(f12.6))') (VPnb(i,j),j=1,2)
+enddo
+
 print *,"Electrostatic energy from matrix element(in miliihartree)"
-print *,"First",V(1,1)*1000d0
-print *,"Second",V(2,2)*1000d0
+print *,"First ", V(1,1)*1000d0
+print *,"Second", V(2,2)*1000d0
 
 print *,"Exch energy from matrix element(in miliihartree)"
-print *,"First",(VPnb(1,1)-P(1,1)*V(1,1))*1000d0
-print *,"Second",(VPnb(2,2)-P(2,2)*V(2,2))*1000d0
+print *,"First ", (VPnb(1,1)-P(1,1)*V(1,1))*1000d0
+print *,"Second", (VPnb(2,2)-P(2,2)*V(2,2))*1000d0
+
+deallocate(Sab,Sab2,Sab3)
+deallocate(Vabb,Vbaa,Vaab,Vbba,Vbab)
+deallocate(Vbab2,Vabb2,Vaab2)
+
+deallocate(work)
+deallocate(ints)
+deallocate(Trdm2B,Trdm2A)
+deallocate(Btrdmtest,Atrdmtest)
+
 end subroutine e1exch_dSRS
-
-
 
 end module sapt_dRS
