@@ -7575,11 +7575,11 @@ C
       Read(ione) Charg,NCen,XYZ(1:MaxCen,1:3)
       EndIf
 C
-      Print*, 'NCen  =',NCen
-      Print*, 'Charg =',Charg(1:NCen)
-      Do I=1,NCen
-      Print*, 'I,X,Y,Z',I,XYZ(I,1:3)
-      EndDo
+C      Print*, 'NCen  =',NCen
+C      Print*, 'Charg =',Charg(1:NCen)
+C      Do I=1,NCen
+C      Print*, 'I,X,Y,Z',I,XYZ(I,1:3)
+C      EndDo
 C
       Close(ione)
 C
