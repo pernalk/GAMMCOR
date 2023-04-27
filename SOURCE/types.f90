@@ -236,7 +236,7 @@ type SystemBlock
       ! trdm2 from ground state to iref2 in NOs
       ! basic approximation
       ! trdm2(nstates,NBasis**4)
-      double precision,allocatable :: trdm24(:,:,:,:,:)
+      double precision,allocatable :: trdm24(:,:,:,:)
       
       double precision,allocatable :: Fmat(:,:) 
       double precision,allocatable :: dipm(:,:,:)
@@ -351,6 +351,10 @@ type SaptData
      ! dSRS
      double precision  :: elst1,elst2
      double precision  :: exchs21,exchs22
+     double precision  :: gamma
+     double precision :: A1B2PA1B2,A2B1PA2B1,A1B2PA2B1
+     double precision :: A1B2VA1B2,A2B1VA2B1,A1B2VA2B1
+     double precision :: A1B2VPA1B2,A2B1VPA2B1,A1B2VPA2B1,A2B1VPA1B2
      !
      double precision  :: e2dispinCAS
      double precision  :: exch_part(5)

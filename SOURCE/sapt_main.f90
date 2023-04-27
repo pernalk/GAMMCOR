@@ -264,6 +264,7 @@ write(LOUT,'(8a10)') ('----------',i=1,8)
 call elst_dRS(SAPT%monA,SAPT%monB,SAPT)
 ! modify e1exch_NaNb to arbitrary IREFA / IREFB
 call e1exch_NaNb(Flags,SAPT%monA,SAPT%monB,SAPT)
+call e1exch_NaNb_AexcB(Flags,SAPT%monA,SAPT%monB,SAPT)
 call e1exch_dSRS(SAPT%monA,SAPT%monB,SAPT) 
 
 call clock('SAPT',Tcpu,Twall)
@@ -860,11 +861,18 @@ dimOB  = B%num0+B%num1
 
 
 call tran4_gen(NBasis,&
-     B%num0+B%num1,B%CAONO(iref2B,:,:),&
-     B%num0+B%num1,B%CAONO(iref2B,:,:),&
-     A%num0+A%num1,A%CAONO(iref,:,:),&
-     A%num0+A%num1,A%CAONO(iref,:,:),&
+     B%num0+B%num1,B%CAONO(iref2B,1:NBasis,1:(B%num0+B%num1)),&
+     B%num0+B%num1,B%CAONO(iref2B,1:NBasis,1:(B%num0+B%num1)),&
+     A%num0+A%num1,A%CAONO(iref,1:NBasis,1:(A%num0+A%num1)),&
+     A%num0+A%num1,A%CAONO(iref,1:NBasis,1:(A%num0+A%num1)),&
      'OOOOAABB','AOTWOSORT')
+
+call tran4_gen(NBasis,&
+     B%num0+B%num1,B%CAONO(irefB,1:NBasis,1:(B%num0+B%num1)),&
+     B%num0+B%num1,B%CAONO(irefB,1:NBasis,1:(B%num0+B%num1)),&
+     A%num0+A%num1,A%CAONO(iref2,1:NBasis,1:(A%num0+A%num1)),&
+     A%num0+A%num1,A%CAONO(iref2,1:NBasis,1:(A%num0+A%num1)),&
+     'OOOOAABB2','AOTWOSORT')
 
 
  call tran4_gen(NBasis,&
@@ -873,6 +881,14 @@ call tran4_gen(NBasis,&
                NBasis,A%CAONO(iref,:,:),&
                A%num0+A%num1,A%CAONO(iref,1:NBasis,1:(A%num0+A%num1)),&
                'FOFOAAAB','AOTWOSORT')
+
+
+ call tran4_gen(NBasis,&
+               NBasis,A%CAONO(iref2,:,:),&
+               B%num0+B%num1,B%CAONO(irefB,1:NBasis,1:(B%num0+B%num1)),&
+               NBasis,A%CAONO(iref2,:,:),&
+               A%num0+A%num1,A%CAONO(iref2,1:NBasis,1:(A%num0+A%num1)),&
+               'FOFOAAAB2','AOTWOSORT')
  
   call tran4_gen(NBasis,&
                NBasis,B%CAONO(iref2B,:,:),&
@@ -882,6 +898,13 @@ call tran4_gen(NBasis,&
                'FOFOBBBA','AOTWOSORT')
 
    call tran4_gen(NBasis,&
+               NBasis,B%CAONO(irefB,:,:),&
+               A%num0+A%num1,A%CAONO(iref2,1:NBasis,1:(A%num0+A%num1)),&
+               NBasis,B%CAONO(irefB,:,:),&
+               B%num0+B%num1,B%CAONO(irefB,1:NBasis,1:(B%num0+B%num1)),&
+               'FOFOBBBA2','AOTWOSORT')
+
+   call tran4_gen(NBasis,&
                NBasis,B%CAONO(iref2B,:,:),&
                B%num0+B%num1,B%CAONO(iref2B,1:NBasis,1:(B%num0+B%num1)),&
                NBasis,A%CAONO(iref,:,:),&
@@ -889,25 +912,39 @@ call tran4_gen(NBasis,&
                'FOFOAABB','AOTWOSORT')
 
    call tran4_gen(NBasis,&
-                 B%num0+B%num1,B%CAONO(iref2B,:,:),&
-                 A%num0+A%num1,A%CAONO(iref,:,:),&
-                 A%num0+A%num1,A%CAONO(iref,:,:),&
-                 B%num0+B%num1,B%CAONO(iref2B,:,:),&
+               NBasis,B%CAONO(irefB,:,:),&
+               B%num0+B%num1,B%CAONO(irefB,1:NBasis,1:(B%num0+B%num1)),&
+               NBasis,A%CAONO(iref2,:,:),&
+               A%num0+A%num1,A%CAONO(iref2,1:NBasis,1:(A%num0+A%num1)),&
+               'FOFOAABB2','AOTWOSORT')
+
+   call tran4_gen(NBasis,&
+                 B%num0+B%num1,B%CAONO(iref2B,1:NBasis,1:(B%num0+B%num1)),&
+                 A%num0+A%num1,A%CAONO(iref,1:NBasis,1:(A%num0+A%num1)),&
+                 A%num0+A%num1,A%CAONO(iref,1:NBasis,1:(A%num0+A%num1)),&
+                 B%num0+B%num1,B%CAONO(iref2B,1:NBasis,1:(B%num0+B%num1)),&
                  'OOOOABBA','AOTWOSORT')
+
+   call tran4_gen(NBasis,&
+                 B%num0+B%num1,B%CAONO(irefB,1:NBasis,1:(B%num0+B%num1)),&
+                 A%num0+A%num1,A%CAONO(iref2,1:NBasis,1:(A%num0+A%num1)),&
+                 A%num0+A%num1,A%CAONO(iref2,1:NBasis,1:(A%num0+A%num1)),&
+                 B%num0+B%num1,B%CAONO(irefB,1:NBasis,1:(B%num0+B%num1)),&
+                 'OOOOABBA2','AOTWOSORT')
    
-!  call tran4_gen(NBasis,&
-!                B%num0+B%num1,B%CAONO(irefB,1:NBasis,1:(B%num0+B%num1)),&
-!                A%num0+A%num1,A%CAONO(iref,1:NBasis,1:(A%num0+A%num1)),&
-!                B%num0+B%num1,B%CAONO(irefB,1:NBasis,1:(B%num0+B%num1)),&
-!                B%num0+B%num1,B%CAONO(irefB,1:NBasis,1:(B%num0+B%num1)),&
-!                'OOOOBBBA','AOTWOSORT')
-                 
-call tran4_gen(NBasis,&
-               B%num0+B%num1,B%CMO(1:NBasis,1:(B%num0+B%num1)),&
-               A%num0+A%num1,A%CMO(1:NBasis,1:(A%num0+A%num1)),&
-               B%num0+B%num1,B%CMO(1:NBasis,1:(B%num0+B%num1)),&
-               B%num0+B%num1,B%CMO(1:NBasis,1:(B%num0+B%num1)),&
+ call tran4_gen(NBasis,&
+               B%num0+B%num1,B%CAONO(irefB,1:NBasis,1:(B%num0+B%num1)),&
+               A%num0+A%num1,A%CAONO(iref,1:NBasis,1:(A%num0+A%num1)),&
+               B%num0+B%num1,B%CAONO(irefB,1:NBasis,1:(B%num0+B%num1)),&
+               B%num0+B%num1,B%CAONO(irefB,1:NBasis,1:(B%num0+B%num1)),&
                'OOOOBBBA','AOTWOSORT')
+                 
+! call tran4_gen(NBasis,&
+!                B%num0+B%num1,B%CMO(1:NBasis,1:(B%num0+B%num1)),&
+!                A%num0+A%num1,A%CMO(1:NBasis,1:(A%num0+A%num1)),&
+!                B%num0+B%num1,B%CMO(1:NBasis,1:(B%num0+B%num1)),&
+!                B%num0+B%num1,B%CMO(1:NBasis,1:(B%num0+B%num1)),&
+!                'OOOOBBBA','AOTWOSORT')
 
 call tran4_gen(NBasis,&
                  A%num0+A%num1,A%CAONO(iref,1:NBasis,1:(A%num0+A%num1)),&
