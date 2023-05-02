@@ -296,11 +296,11 @@ double precision :: Tcpu,Twall
 ! calculate exchange K[PB] matrix in AO
  allocate(SAPT%monB%Kmat(NAO,NAO))
  allocate(work(NAO,NAO))
-!get PB density in AO
-! work = 0
-! do i=1,NBasis
-!    call dger(NAO,NAO,SAPT%monB%Occ(i),SAPT%monB%CMO(:,i),1,SAPT%monB%CMO(:,i),1,work,NAO)
-! enddo
+! get PB density in AO
+ work = 0
+ do i=1,NBasis
+    call dger(NAO,NAO,SAPT%monB%Occ(i),SAPT%monB%CMO(:,i),1,SAPT%monB%CMO(:,i),1,work,NAO)
+ enddo
 !
  if(Flags%ICholesky==0) then
 !    call make_K(NAO,work,SAPT%monB%Kmat)

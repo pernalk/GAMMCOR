@@ -2,8 +2,8 @@ MKL_ROOT = /opt/intel/mkl/
 
 FCC = ifort 
 WARNINGS 		=	-warn nounused
-OPTIMIZATION 	=	-xCOMMON-AVX512 -O3
-#OPTIMIZATION 	=	-xHost -O3
+#OPTIMIZATION 	=	-xCOMMON-AVX512 -O3
+OPTIMIZATION 	=	-xHost -O3
 PARALLELIZATION	=	-qmkl=parallel -qopenmp
 XCFUN 			=	-I xcfun/fortran
 TREXIO         = $(shell pkg-config --cflags trexio)
