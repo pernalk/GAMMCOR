@@ -66,6 +66,7 @@ do i=NOccup+1,NBasis
    IGem(i) = 3
 enddo
 
+XInd  = 0
 IPair = 0
 do ii=1,NDimX
    i = IndN(1,ii)
