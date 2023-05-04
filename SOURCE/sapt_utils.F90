@@ -1,4 +1,7 @@
+#define SAPT_UTILS_DEBUG -1
+
 module sapt_utils
+
 use types
 use tran
 use diis
@@ -1967,6 +1970,330 @@ enddo
 deallocate(ABKer,batch,work)
 
 end subroutine ModABMin
+
+subroutine sapt_Ki_AO(Ki,X,Vnn,NA,NB,NAO)
+!
+! prepare Ki matrix
+! Eq. (A3) in T. Korona, JCP 128, 224104 (2008)
+!
+implicit none
+
+integer,intent(in) :: NAO
+double precision,intent(in)    :: Vnn
+double precision,intent(in)    :: NA,NB
+double precision,intent(in)    :: X(NAO,NAO)
+double precision,intent(inout) :: Ki(NAO,NAO)
+
+integer :: i,j
+double precision :: NA2,NB2,NAinv,NBinv,Vinv
+double precision,allocatable :: Va(:,:),Vb(:,:),S(:,:)
+double precision,allocatable :: SX(:,:),XS(:,:),work(:,:)
+
+! get prefactors
+NA2 = 2d0 * NA
+NB2 = 2d0 * NB
+NAinv = 1d0 / NA2
+NBinv = 1d0 / NB2
+Vinv = Vnn / NA2 / NB2
+
+!print*, 'NA',NA
+!print*, 'NB',NB
+!print*, 'NAinv',NAinv
+!print*, 'NBinv',NBinv
+!print*, 'Vinv ',Vinv
+
+#if SAPT_UTILS_DEBUG > 5
+! print X in AO
+print*, 'Xmat',norm2(X)
+do j=1,NAO
+   write(lout,'(*(f12.8))') (X(i,j),i=1,NAO)
+enddo
+#endif
+
+! get K(X)
+call make_K(NAO,X,Ki)
+
+#if SAPT_UTILS_DEBUG > 5
+   print*, 'Ki = K',norm2(Ki)
+#endif
+
+allocate(Va(NAO,NAO),Vb(NAO,NAO),S(NAO,NAO))
+allocate(SX(NAO,NAO),XS(NAO,NAO),work(NAO,NAO))
+
+call get_one_mat('S',S,1,NAO)
+call get_one_mat('V',Va,1,NAO)
+call get_one_mat('V',Vb,2,NAO)
+
+call dgemm('N','N',NAO,NAO,NAO,1d0,S,NAO,X,NAO,0d0,SX,NAO)
+
+! Ki = Ki + 1/NB * S.X.Vb
+call dgemm('N','N',NAO,NAO,NAO,NBinv,SX,NAO,Vb,NAO,1d0,Ki,NAO)
+
+#if SAPT_UTILS_DEBUG > 5
+   print*, 'Ki = K+NB',norm2(Ki)
+#endif
+
+! Ki = Ki + 1/NA * Va.X.S
+call dgemm('N','N',NAO,NAO,NAO,1d0,X,NAO,S,NAO,0d0,XS,NAO)
+call dgemm('N','N',NAO,NAO,NAO,NAinv,Va,NAO,XS,NAO,1d0,Ki,NAO)
+
+#if SAPT_UTILS_DEBUG > 5
+   print*, 'Ki = K+NB+NA',norm2(Ki)
+#endif
+
+! Ki = Ki + V/(NA*NB) * S.X.S
+call dgemm('N','N',NAO,NAO,NAO,Vinv,SX,NAO,S,NAO,1d0,Ki,NAO)
+
+#if SAPT_UTILS_DEBUG > 5
+   print*, 'Ki = K+NB+NA+V',norm2(Ki)
+#endif
+
+deallocate(SX,XS,work)
+deallocate(S,Vb,Va)
+
+end subroutine sapt_Ki_AO
+
+subroutine sapt_Ko_AO(Ko,X,Vnn,NA,NB,NAO)
+!
+! prepare Ki matrix
+! Eq. (A4) in T. Korona, JCP 128, 224104 (2008)
+!
+implicit none
+
+integer,intent(in) :: NAO
+double precision,intent(in)    :: Vnn
+double precision,intent(in)    :: NA,NB
+double precision,intent(in)    :: X(NAO,NAO)
+double precision,intent(inout) :: Ko(NAO,NAO)
+
+integer :: i,j
+double precision :: NA2,NB2,NAinv,NBinv,Vinv
+double precision,allocatable :: Va(:,:),Vb(:,:),S(:,:)
+double precision,allocatable :: SX(:,:),XS(:,:),work(:,:)
+
+! get prefactors
+NA2 = 2d0 * NA
+NB2 = 2d0 * NB
+NAinv = 1d0 / NA2
+NBinv = 1d0 / NB2
+Vinv = Vnn / NA2 / NB2
+
+#if SAPT_UTILS_DEBUG > 5
+   ! print X in AO
+   print*, 'Xmat',norm2(X)
+   do j=1,NAO
+      write(lout,'(*(f12.8))') (X(i,j),i=1,NAO)
+   enddo
+#endif
+
+! get K(X)
+call make_K(NAO,X,Ko)
+#if SAPT_UTILS_DEBUG > 5
+   print*, 'Ko = K        ',norm2(Ko)
+#endif
+
+allocate(Va(NAO,NAO),Vb(NAO,NAO),S(NAO,NAO))
+allocate(SX(NAO,NAO),XS(NAO,NAO),work(NAO,NAO))
+
+call get_one_mat('S',S,1,NAO)
+call get_one_mat('V',Va,1,NAO)
+call get_one_mat('V',Vb,2,NAO)
+
+call dgemm('N','N',NAO,NAO,NAO,1d0,S,NAO,X,NAO,0d0,SX,NAO)
+call dgemm('N','N',NAO,NAO,NAO,1d0,X,NAO,S,NAO,0d0,XS,NAO)
+
+! Ko = Ko + 1/NA S.X.Va
+call dgemm('N','N',NAO,NAO,NAO,NAinv,SX,NAO,Va,NAO,1d0,Ko,NAO)
+
+#if SAPT_UTILS_DEBUG > 5
+   print*, 'Ki = K+NA     ',norm2(Ko)
+#endif
+
+! Ko = Ko + 1/NB Vb.X.S
+!call dgemm('N','T',NAO,NAO,NAO,NBinv,Vb,NAO,SX,NAO,1d0,Ko,NAO)
+call dgemm('N','N',NAO,NAO,NAO,NBinv,Vb,NAO,XS,NAO,1d0,Ko,NAO)
+
+#if SAPT_UTILS_DEBUG > 5
+   print*, 'Ki = K+NA+NB  ',norm2(Ko)
+#endif
+
+! Ko = Ko + V/NANB S.X.S
+call dgemm('N','N',NAO,NAO,NAO,Vinv,SX,NAO,S,NAO,1d0,Ko,NAO)
+
+#if SAPT_UTILS_DEBUG > 5
+   print*, 'Ki = K+NA+NB+V',norm2(Ko)
+#endif
+
+deallocate(SX,XS,work)
+deallocate(S,Vb,Va)
+
+end subroutine sapt_Ko_AO
+
+subroutine sapt_Jl_AO(Jl,X,Vnn,NA,NB,NAO)
+!
+! prepare Jl matrix
+! Eq. (A1) in T. Korona, JCP 128, 224104 (2008)
+!
+implicit none
+
+integer,intent(in) :: NAO
+double precision,intent(in)    :: Vnn
+double precision,intent(in)    :: NA,NB
+double precision,intent(in)    :: X(NAO,NAO)
+double precision,intent(inout) :: Jl(NAO,NAO)
+
+integer :: i,j
+double precision :: NA2,NB2,NAinv,NBinv,Vinv
+double precision :: trXS,trXV
+double precision,allocatable :: Va(:,:),Vb(:,:),S(:,:)
+double precision,allocatable :: work(:,:)
+
+! get prefactors
+NA2 = 2d0 * NA
+NB2 = 2d0 * NB
+NAinv = 1d0 / NA2
+NBinv = 1d0 / NB2
+Vinv = Vnn / NA2 / NB2
+
+#if SAPT_UTILS_DEBUG > 5
+   ! print X in AO
+   print*, 'Xmat',norm2(X)
+   do j=1,NAO
+      write(lout,'(*(f12.8))') (X(i,j),i=1,NAO)
+   enddo
+#endif
+
+! get J(X)
+call make_J1(NAO,X,Jl,'AOTWOSORT')
+
+#if SAPT_UTILS_DEBUG > 5
+   print*, 'Jl = J        ',norm2(Jl)
+#endif
+
+allocate(Va(NAO,NAO),Vb(NAO,NAO),S(NAO,NAO))
+allocate(work(NAO,NAO))
+
+call get_one_mat('S',S,1,NAO)
+call get_one_mat('V',Va,1,NAO)
+call get_one_mat('V',Vb,2,NAO)
+
+call dgemm('N','N',NAO,NAO,NAO,1d0,X,NAO,S,NAO,0d0,work,NAO)
+trXS = 0d0
+do i=1,NAO
+   trXS = trXS + work(i,i)
+enddo
+! Jl = Jl + 1/NA * tr(XS) * Va
+Jl = Jl + NAinv * trXS * Va
+
+#if SAPT_UTILS_DEBUG > 5
+   print*, 'Jl = J+NA     ',norm2(Jl)
+#endif
+
+call dgemm('N','N',NAO,NAO,NAO,1d0,X,NAO,Vb,NAO,0d0,work,NAO)
+trXV = 0d0
+do i=1,NAO
+   trXV = trXV + work(i,i)
+enddo
+! Jl = Jl + 1/NB * tr(XVb) * S
+Jl = Jl + NBinv * trXV * S
+
+#if SAPT_UTILS_DEBUG > 5
+   print*, 'Jl = J+NB+NA  ',norm2(Jl)
+#endif
+
+! Jl = Jl + V/NA/NB * tr(XS) * S
+Jl = Jl + Vinv * trXS * S
+#if SAPT_UTILS_DEBUG > 5
+   print*, 'Jl = J+NB+NA+V',norm2(Jl)
+#endif
+
+deallocate(work)
+deallocate(S,Vb,Va)
+
+end subroutine sapt_Jl_AO
+
+subroutine sapt_Jr_AO(Jr,X,Vnn,NA,NB,NAO)
+!
+! prepare Ki matrix
+! Eq. (A2) in T. Korona, JCP 128, 224104 (2008)
+!
+implicit none
+
+integer,intent(in) :: NAO
+double precision,intent(in)    :: Vnn
+double precision,intent(in)    :: NA,NB
+double precision,intent(in)    :: X(NAO,NAO)
+double precision,intent(inout) :: Jr(NAO,NAO)
+
+integer :: i,j
+double precision :: NA2,NB2,NAinv,NBinv,Vinv
+double precision :: trXS,trXV
+double precision,allocatable :: Va(:,:),Vb(:,:),S(:,:)
+double precision,allocatable :: work(:,:)
+
+! get prefactors
+NA2 = 2d0 * NA
+NB2 = 2d0 * NB
+NAinv = 1d0 / NA2
+NBinv = 1d0 / NB2
+Vinv = Vnn / NA2 / NB2
+
+#if SAPT_UTILS_DEBUG > 5
+   ! print X in AO
+   print*, 'Xmat',norm2(X)
+   do j=1,NAO
+      write(lout,'(*(f12.8))') (X(i,j),i=1,NAO)
+   enddo
+#endif
+
+! get J(X)
+call make_J1(NAO,X,Jr,'AOTWOSORT')
+
+#if SAPT_UTILS_DEBUG > 5
+   print*, 'Jr = J',norm2(Jr)
+#endif
+
+allocate(Va(NAO,NAO),Vb(NAO,NAO),S(NAO,NAO))
+allocate(work(NAO,NAO))
+
+call get_one_mat('S',S,1,NAO)
+call get_one_mat('V',Va,1,NAO)
+call get_one_mat('V',Vb,2,NAO)
+
+call dgemm('N','N',NAO,NAO,NAO,1d0,X,NAO,S,NAO,0d0,work,NAO)
+trXS = 0d0
+do i=1,NAO
+   trXS = trXS + work(i,i)
+enddo
+! Jr = Jr + 1/NB * tr(XS) * Vb
+Jr = Jr + NBinv * trXS * Vb
+
+#if SAPT_UTILS_DEBUG > 5
+   print*, 'Jr = J+NB',norm2(Jr)
+#endif
+
+call dgemm('N','N',NAO,NAO,NAO,1d0,X,NAO,Va,NAO,0d0,work,NAO)
+trXV = 0d0
+do i=1,NAO
+   trXV = trXV + work(i,i)
+enddo
+! Jr = Jr + 1/NA * tr(XVa) * S
+Jr = Jr + NAinv * trXV * S
+#if SAPT_UTILS_DEBUG > 5
+   print*, 'Jr = J+NB+NA',norm2(Jr)
+#endif
+
+! Jr = Jr + V/NA/NB * tr(XS) * S
+Jr = Jr + Vinv * trXS * S
+
+#if SAPT_UTILS_DEBUG > 5
+   print*, 'Jr = J+NB+NA+V',norm2(Jr)
+#endif
+
+deallocate(work)
+deallocate(S,Vb,Va)
+
+end subroutine sapt_Jr_AO
 
 subroutine print_en(string,val,nline)
 implicit none

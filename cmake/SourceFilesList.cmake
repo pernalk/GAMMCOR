@@ -46,7 +46,7 @@ set(GAMMCOR_SOURCE
     SOURCE/sapt_exch.f90
     SOURCE/sapt_main.f90
     SOURCE/sapt_pol.f90
-    SOURCE/sapt_utils.f90
+    SOURCE/sapt_utils.F90
     SOURCE/sorter.f90
     SOURCE/srefex.f90
     SOURCE/srlrdynamic.f

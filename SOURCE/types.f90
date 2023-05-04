@@ -240,6 +240,8 @@ type SystemBlock
       double precision,allocatable :: DChol(:,:)
       double precision,allocatable :: Pmat(:,:)
       double precision,allocatable :: WPot(:,:),Kmat(:,:)
+      double precision,allocatable :: Jl(:,:),Jr(:,:)
+      double precision,allocatable :: Ki(:,:),Ko(:,:)
       double precision,allocatable :: VCoul(:)
       double precision,allocatable :: RDM1c(:,:)
       double precision,allocatable :: RDM2(:)
@@ -350,6 +352,7 @@ type SaptData
   type(SystemBlock) :: monA,monB
      double precision  :: Vnn,elst,exchs2,e2ind,e2disp
      double precision  :: elALL(3)
+     double precision  :: exchNNs2
      double precision  :: e2disp_sc,e2disp_sp
      double precision  :: e2ind_unc,e2disp_unc
      double precision  :: e2dispR_unc,e2dispR

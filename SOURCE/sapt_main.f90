@@ -74,6 +74,7 @@ double precision :: Tcpu,Twall
 
     call e1elst(SAPT%monA,SAPT%monB,SAPT)
     call e1exchs2(Flags,SAPT%monA,SAPT%monB,SAPT)
+    call e1exchNN_AO(Flags,SAPT%monA,SAPT%monB,SAPT)
     !call e1exch_NaNb(Flags,SAPT%monA,SAPT%monB,SAPT)
     !if(SAPT%monA%NELE==1.and.SAPT%monB%NELE==1) call hl_2el(Flags,SAPT%monA,SAPT%monB,SAPT)
 
@@ -240,9 +241,12 @@ call e1elst(SAPT%monA,SAPT%monB,SAPT)
 !call e1elst_NaNb(SAPT%monA,SAPT%monB,SAPT)
 call e1exchs2(Flags,SAPT%monA,SAPT%monB,SAPT)
 
-! additional test
+! additional test 1
 !call sapt_ab_ints_rdmcorr(SAPT%monA,SAPT%monB,Flags,SAPT%NAO,NBasis)
 !call e1exch_NaNb(Flags,SAPT%monA,SAPT%monB,SAPT)
+
+! additional test in AO
+call e1exchNN_AO(Flags,SAPT%monA,SAPT%monB,SAPT)
 
 call summary_sapt_rdm(SAPT,Flags,NBasis)
 

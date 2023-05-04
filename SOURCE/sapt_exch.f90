@@ -596,6 +596,134 @@ double precision,allocatable :: work1(:)
 
 end subroutine e1exchs2
 
+subroutine e1exchNN_AO(Flags,A,B,SAPT)
+!
+! noncumulant part of E1exch(S2)
+! Eq (21) in T. Korona, JCP 128, 224104 (2008)
+! doi: 10.1063/1.2933312
+!
+implicit none
+
+type(FlagsData)   :: Flags
+type(SystemBlock) :: A, B
+type(SaptData)    :: SAPT
+
+integer :: NAO, NBasis
+integer :: i,j
+double precision :: tvk(6), exchNNs2
+double precision,allocatable :: XA(:,:),XB(:,:)
+double precision,allocatable :: S(:,:),ASB(:,:),BSA(:,:)
+double precision,allocatable :: Aux(:,:),work(:,:)
+
+NAO = SAPT%NAO
+NBasis = A%NBasis
+
+write(lout,'(/,1x,a)') 'Noncumulant part of E1exch...'
+
+! get S matrix
+allocate(S(NAO,NAO))
+call get_one_mat('S',S,A%Monomer,NAO)
+
+! get B matrices: X, Ki, Jr
+allocate(XB(NAO,NAO),B%Ki(NAO,NAO),B%Jr(NAO,NAO))
+XB = 0d0
+do i=1,NBasis
+   call dger(NAO,NAO,B%Occ(i),B%CMO(:,i),1,B%CMO(:,i),1,XB,NAO)
+enddo
+XB = 2d0 * XB
+
+call sapt_Ki_AO(B%Ki,XB,SAPT%Vnn,A%XELE,B%XELE,NAO)
+call sapt_Jr_AO(B%Jr,XB,SAPT%Vnn,A%XELE,B%XELE,NAO)
+
+! get A matrices: X, Ko, Jl
+allocate(XA(NAO,NAO),A%Ko(NAO,NAO),A%Jl(NAO,NAO))
+XA = 0d0
+do i=1,NBasis
+   call dger(NAO,NAO,A%Occ(i),A%CMO(:,i),1,A%CMO(:,i),1,XA,NAO)
+enddo
+XA = 2d0 * XA
+
+call sapt_Ko_AO(A%Ko,XA,SAPT%Vnn,A%XELE,B%XELE,NAO)
+call sapt_Jl_AO(A%Jl,XA,SAPT%Vnn,A%XELE,B%XELE,NAO)
+
+allocate(work(NAO,NAO),Aux(NAO,NAO))
+
+! T1 = -1/2 A^T.K(B)
+call dgemm('T','N',NAO,NAO,NAO,0.5d0,XA,NAO,B%Ki,NAO,0d0,work,NAO)
+tvk = 0d0
+do i=1,NAO
+   tvk(1) = tvk(1) + work(i,i)
+enddo
+tvk(1) = -tvk(1)
+if(SAPT%IPrint>=10) print*, 'Term-1 = ',tvk(1)*1000
+
+allocate(ASB(NAO,NAO),BSA(NAO,NAO))
+call dgemm('N','N',NAO,NAO,NAO,1d0,XA,NAO,S,NAO,0d0,work,NAO)
+call dgemm('N','N',NAO,NAO,NAO,1d0,work,NAO,XB,NAO,0d0,ASB,NAO)
+
+call dgemm('N','N',NAO,NAO,NAO,1d0,XB,NAO,S,NAO,0d0,work,NAO)
+call dgemm('N','N',NAO,NAO,NAO,1d0,work,NAO,XA,NAO,0d0,BSA,NAO)
+
+! T2 = (ASB)^T.[Jr(B)-1/2 Ki(B)]
+Aux = B%Jr - 0.5d0*B%Ki
+call dgemm('N','N',NAO,NAO,NAO,0.5d0,ASB,NAO,Aux,NAO,0d0,work,NAO)
+!print*, 'Jr(B)-1/2Ki(B)',norm2(work)
+do i=1,NAO
+   tvk(2) = tvk(2) + work(i,i)
+enddo
+tvk(2) = -tvk(2)
+if(SAPT%IPrint>=10) print*, 'Term-2 = ',tvk(2)*1000
+
+! T3 = (BSA).[Jl(A)-1/2 Ko(A)]
+Aux = 0d0
+Aux = A%Jl - 0.5d0*A%Ko
+call dgemm('N','N',NAO,NAO,NAO,0.5d0,BSA,NAO,Aux,NAO,0d0,work,NAO)
+!print*, 'Jl(A)-1/2Ko(A)',norm2(work)
+do i=1,NAO
+   tvk(3) = tvk(3) + work(i,i)
+enddo
+tvk(3) = -tvk(3)
+if(SAPT%IPrint>=10) print*, 'Term-3 = ',tvk(3)*1000
+
+! T4 = (ASBSA).Jr(B)
+call dgemm('N','N',NAO,NAO,NAO,1d0,XA,NAO,S,NAO,0d0,work,NAO)
+call dgemm('N','N',NAO,NAO,NAO,1d0,work,NAO,BSA,NAO,0d0,Aux,NAO)
+call dgemm('N','N',NAO,NAO,NAO,0.25d0,Aux,NAO,B%Jr,NAO,0d0,work,NAO)
+do i=1,NAO
+   tvk(4) = tvk(4) + work(i,i)
+enddo
+if(SAPT%IPrint>=10) print*, 'Term-4 = ',tvk(4)*1000
+
+! T5 = (BSASB).Jl(A)
+call dgemm('N','N',NAO,NAO,NAO,1d0,S,NAO,XB,NAO,0d0,work,NAO)
+call dgemm('N','N',NAO,NAO,NAO,1d0,BSA,NAO,work,NAO,0d0,Aux,NAO)
+call dgemm('N','N',NAO,NAO,NAO,0.25d0,Aux,NAO,A%Jl,NAO,0d0,work,NAO)
+do i=1,NAO
+   tvk(5) = tvk(5) + work(i,i)
+enddo
+if(SAPT%IPrint>=10) print*, 'Term-5 = ',tvk(5)*1000
+
+Aux = 0d0
+call sapt_Ko_AO(Aux,ASB,SAPT%Vnn,A%XELE,B%XELE,NAO)
+call dgemm('N','N',NAO,NAO,NAO,0.125d0,BSA,NAO,Aux,NAO,0d0,work,NAO)
+do i=1,NAO
+   tvk(6) = tvk(6) + work(i,i)
+enddo
+tvk(6) = -tvk(6)
+if(SAPT%IPrint>=10) print*, 'Term-6 = ',tvk(6)*1000
+
+exchNNs2 = sum(tvk)
+call print_en('ExchNNS2',exchNNs2*1000,.true.)
+!print*, 'E1exch(S2)-AO',exchNNs2*1000
+
+deallocate(ASB,BSA)
+deallocate(work,Aux)
+deallocate(A%Ko,A%Jl)
+deallocate(B%Ki,B%Jr)
+deallocate(XB,XA,S)
+
+end subroutine e1exchNN_AO
+
 subroutine e1exch_NaNb(Flags,A,B,SAPT)
 !
 ! E1exch(S2): Eq (9) in SAPT(MC) paper

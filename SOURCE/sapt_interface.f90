@@ -2127,7 +2127,7 @@ implicit none
 integer,intent(in) :: NAO, NBasis
 double precision,intent(in)    :: Occ(NBasis)
 double precision,intent(in)    :: CMO(NBasis,NBasis)
-double precision,intent(inout) :: Kmat(NBasis,NBasis)
+double precision,intent(inout) :: Kmat(NAO,NAO)
 
 integer :: i
 double precision :: work(NAO,NAO)
