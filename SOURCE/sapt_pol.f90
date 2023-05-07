@@ -114,11 +114,12 @@ call tran2MO(Vb,A%CMO,A%CMO,Vbaa,NBasis)
 
 ! sum_p n_p v^B_pp
 ea = 0
+print*, 'dimOA elst = ',A%num0+A%num1
 do i=1,A%num0+A%num1
    ea = ea + A%Occ(i)*Vbaa(i,i)
 enddo
 ea = 2d0*ea
-!print*, 'ea',ea
+print*, 'ea',ea
 
 ! sum_q n_q v^A_qq
 eb = 0
@@ -126,7 +127,7 @@ do j=1,B%num0+B%num1
    eb = eb + B%Occ(j)*Vabb(j,j)
 enddo
 eb = 2d0*eb
-!print*, 'eb',eb
+print*, 'eb',eb
 
 ! sum_pq n_p n_q v_{pq}^{pq}
 ! (OOOO|AABB)

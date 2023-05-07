@@ -72,10 +72,14 @@ double precision :: Tcpu,Twall
 
  elseif(Flags%ISERPA==0.and.SAPT%ic6==0) then
 
+    !print*, 'Set Vnn=0!'
+    !SAPT%Vnn = 0d0
+
     call e1elst(SAPT%monA,SAPT%monB,SAPT)
     call e1exchs2(Flags,SAPT%monA,SAPT%monB,SAPT)
     call e1exchNN_AO(Flags,SAPT%monA,SAPT%monB,SAPT)
-    !call e1exch_NaNb(Flags,SAPT%monA,SAPT%monB,SAPT)
+    call e1exchNN_AO_noVnn(Flags,SAPT%monA,SAPT%monB,SAPT)
+    call e1exch_NaNb(Flags,SAPT%monA,SAPT%monB,SAPT)
     !if(SAPT%monA%NELE==1.and.SAPT%monB%NELE==1) call hl_2el(Flags,SAPT%monA,SAPT%monB,SAPT)
 
     if(SAPT%SaptLevel==0) then
@@ -237,6 +241,11 @@ call prepare_RDM2corr(SAPT%monB,NBasis,Flags%IRDM2Typ)
 call sapt_Kmat_AO(SAPT%monB%Kmat,SAPT%monB%CMO,SAPT%monB%Occ,SAPT%NAO,NBasis)
 
 ! SAPT component
+
+!print*, 'setting Vnn = 0! (sapt_main)'
+!SAPT%Vnn = 0d0
+!print*, 'Vnn =',SAPT%Vnn
+
 call e1elst(SAPT%monA,SAPT%monB,SAPT)
 !call e1elst_NaNb(SAPT%monA,SAPT%monB,SAPT)
 call e1exchs2(Flags,SAPT%monA,SAPT%monB,SAPT)
@@ -247,6 +256,7 @@ call e1exchs2(Flags,SAPT%monA,SAPT%monB,SAPT)
 
 ! additional test in AO
 call e1exchNN_AO(Flags,SAPT%monA,SAPT%monB,SAPT)
+call e1exchNN_AO_noVnn(Flags,SAPT%monA,SAPT%monB,SAPT)
 
 call summary_sapt_rdm(SAPT,Flags,NBasis)
 

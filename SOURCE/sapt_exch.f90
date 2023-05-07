@@ -268,6 +268,30 @@ double precision,allocatable :: work1(:)
  !write(LOUT,*) 'T2b(2) ',t2b(2)
  if(SAPT%IPrint>=10) write(LOUT,'(1x,a,f16.8)') 'ExchS2(T2b-2) = ', t2b(2)*1000d0
 
+ !block
+ !double precision :: t2b2a,t2b2b
+ !print*, 'Test kasowania 1'
+ !t2b2a = 0d0
+ !do iq=1,dimOA
+ !do ip=1,dimOA
+ !   t2b2a = t2b2a + A%Occ(ip)*Vbaa(ip,ip)*A%Occ(iq)*PBaa(iq,iq)
+ !enddo
+ !enddo
+ !t2b2a = -4d0*t2b2a
+ !print*, 'T2b-2 a',t2b2a
+ !print*, 'Elst*SS',2d0*SAPT%elALL(1)*t1(2)
+ !!
+ !t2b2b = 0d0
+ !do iq=1,dimOA
+ !do ip=1,dimOA
+ !  t2b2b = t2b2b + A%Occ(ip)*A%Occ(iq)*PBaa(ip,iq)*Vbaa(ip,iq)
+ !enddo
+ !enddo
+ !t2b2b = 2d0*t2b2b
+ !print*, 'T2b-2 b',t2b2b*1000
+ !print*, 'T2b-2 a+b',(t2b2a+t2b2b)*1000
+ !end block
+
 ! T2a
  t2a = 0
  do jb=1,NAO
@@ -341,6 +365,33 @@ double precision,allocatable :: work1(:)
  ! write(LOUT,*) 'T2a(2) ',t2a(2)
  if(SAPT%IPrint>=10) write(LOUT,'(1x,a,f16.8)') 'ExchS2(T2a-2) = ', t2a(2)*1000d0
  close(iunit,status='DELETE')
+ 
+ !block
+ !double precision :: t2a2a,t2a2b
+ !print*, 'Test kasowania 2'
+ !t2a2a = 0d0
+ !do iq=1,dimOB
+ !do ip=1,dimOB
+ !   t2a2a = t2a2a + B%Occ(ip)*Vabb(ip,ip)*B%Occ(iq)*PAbb(iq,iq)
+ !enddo
+ !enddo
+ !t2a2a = -4d0*t2a2a
+ !print*, 'T2a-2 a',t2a2a
+ !print*, 'Elst*SS',2d0*SAPT%elALL(2)*t1(2)
+ !!
+ !t2a2b = 0d0
+ !do iq=1,dimOB
+ !do ip=1,dimOB
+ !  t2a2b = t2a2b + B%Occ(ip)*B%Occ(iq)*PAbb(ip,iq)*Vabb(ip,iq)
+ !enddo
+ !enddo
+ !t2a2b = 2d0*t2a2b
+ !print*, 'T2a-2 b',t2a2b*1000
+ !print*, 'T2a-2 a+b',(t2a2a+t2a2b)*1000
+
+ !print*, 'Test kasowania 3'
+ !print*, 'T2c a', 2d0*SAPT%elALL(3)*t1(2)*1000
+ !end block
 
  open(newunit=iunit,file='TWOB3A',status='OLD',&
      access='DIRECT',form='UNFORMATTED',recl=8*dimOB**2)
@@ -632,6 +683,10 @@ do i=1,NBasis
 enddo
 XB = 2d0 * XB
 
+! test 1
+!SAPT%Vnn = 0d0
+!print*, 'setting Vnn = 0!',SAPT%Vnn
+
 call sapt_Ki_AO(B%Ki,XB,SAPT%Vnn,A%XELE,B%XELE,NAO)
 call sapt_Jr_AO(B%Jr,XB,SAPT%Vnn,A%XELE,B%XELE,NAO)
 
@@ -642,6 +697,37 @@ do i=1,NBasis
    call dger(NAO,NAO,A%Occ(i),A%CMO(:,i),1,A%CMO(:,i),1,XA,NAO)
 enddo
 XA = 2d0 * XA
+
+!block
+!double precision :: AS(NAO,NAO),AS2(NAO,NAO)
+!double precision :: BS(NAO,NAO),BS2(NAO,NAO)
+!double precision :: val
+!
+!call dgemm('N','N',NAO,NAO,NAO,1d0,XA,NAO,S,NAO,0d0,AS,NAO)
+!call dgemm('N','N',NAO,NAO,NAO,1d0,AS,NAO,AS,NAO,0d0,AS2,NAO)
+!AS2 = 0.5d0*AS2
+!print*, 'test AS=(AS)^2'
+!val = 0d0
+!do j=1,NAO
+!do i=1,NAO
+!   val = abs(AS2(i,j))-abs(AS(i,j))
+!   if(val .gt. 1d-6 ) write(6,'(1x,3f12.6)') AS(i,j),AS2(i,j),val
+!enddo
+!enddo
+!
+!call dgemm('N','N',NAO,NAO,NAO,1d0,XB,NAO,S,NAO,0d0,BS,NAO)
+!call dgemm('N','N',NAO,NAO,NAO,1d0,BS,NAO,BS,NAO,0d0,BS2,NAO)
+!BS2 = 0.5d0*BS2
+!print*, 'test BS=(BS)^2'
+!val = 0d0
+!do j=1,NAO
+!do i=1,NAO
+!   val = abs(BS2(i,j))-abs(BS(i,j))
+!   if(val .gt. 1d-6 ) write(6,'(1x,3f12.6)') BS(i,j),BS2(i,j),val
+!enddo
+!enddo
+!
+!end block
 
 call sapt_Ko_AO(A%Ko,XA,SAPT%Vnn,A%XELE,B%XELE,NAO)
 call sapt_Jl_AO(A%Jl,XA,SAPT%Vnn,A%XELE,B%XELE,NAO)
@@ -666,6 +752,8 @@ call dgemm('N','N',NAO,NAO,NAO,1d0,work,NAO,XA,NAO,0d0,BSA,NAO)
 
 ! T2 = (ASB)^T.[Jr(B)-1/2 Ki(B)]
 Aux = B%Jr - 0.5d0*B%Ki
+print*, 'B%Ki=',norm2(B%Ki)
+print*, 'Aux =',norm2(Aux)
 call dgemm('N','N',NAO,NAO,NAO,0.5d0,ASB,NAO,Aux,NAO,0d0,work,NAO)
 !print*, 'Jr(B)-1/2Ki(B)',norm2(work)
 do i=1,NAO
@@ -723,6 +811,194 @@ deallocate(B%Ki,B%Jr)
 deallocate(XB,XA,S)
 
 end subroutine e1exchNN_AO
+
+subroutine e1exchNN_AO_noVnn(Flags,A,B,SAPT)
+!
+! noncumulant part of E1exch(S2)
+! version in which we do not calculate Coulomb parts of 2-RDM
+! that should cancel with the first term of Eq (9)
+! in doi.org/10.1021/acs.jctc.1c00344, i.e.
+! 2*E1elst*\sum_pq np nq Spq^2
+!
+implicit none
+
+type(FlagsData)   :: Flags
+type(SystemBlock) :: A, B
+type(SaptData)    :: SAPT
+
+integer :: NAO, NBasis
+integer :: i,j
+double precision :: term2(3),term3(2),term4(2),term5(3)
+double precision :: tvk(6), exchNNs2
+double precision,allocatable :: XA(:,:),XB(:,:)
+double precision,allocatable :: JA(:,:),KA(:,:),JB(:,:)
+double precision,allocatable :: Va(:,:),Vb(:,:)
+double precision,allocatable :: S(:,:),ASB(:,:),BSA(:,:)
+double precision,allocatable :: Aux(:,:),work(:,:)
+
+NAO = SAPT%NAO
+NBasis = A%NBasis
+
+write(lout,'(/,1x,a)') 'Try noncumulant part of E1exch...'
+
+! get S matrix
+allocate(S(NAO,NAO),Va(NAO,NAO),Vb(NAO,NAO))
+call get_one_mat('S',S,A%Monomer,NAO)
+call get_one_mat('V',Va,A%Monomer,NAO)
+call get_one_mat('V',Vb,B%Monomer,NAO)
+
+! get B matrices: X
+allocate(XB(NAO,NAO),XA(NAO,NAO))
+allocate(Aux(NAO,NAO),work(NAO,NAO))
+XB = 0d0
+do i=1,NBasis
+   call dger(NAO,NAO,B%Occ(i),B%CMO(:,i),1,B%CMO(:,i),1,XB,NAO)
+enddo
+XB = 2d0 * XB
+
+! get A matrices: X, Ko, Jl
+XA = 0d0
+do i=1,NBasis
+   call dger(NAO,NAO,A%Occ(i),A%CMO(:,i),1,A%CMO(:,i),1,XA,NAO)
+enddo
+XA = 2d0 * XA
+
+allocate(ASB(NAO,NAO),BSA(NAO,NAO))
+call dgemm('N','N',NAO,NAO,NAO,1d0,XA,NAO,S,NAO,0d0,work,NAO)
+call dgemm('N','N',NAO,NAO,NAO,1d0,work,NAO,XB,NAO,0d0,ASB,NAO)
+
+call dgemm('N','N',NAO,NAO,NAO,1d0,XB,NAO,S,NAO,0d0,work,NAO)
+call dgemm('N','N',NAO,NAO,NAO,1d0,work,NAO,XA,NAO,0d0,BSA,NAO)
+
+! start with the terms!
+tvk = 0d0
+
+! Coulomb part, gets cancelled by Elst_Vb*SS
+!call dgemm('N','N',NAO,NAO,NAO,1d0,XA,NAO,Vb,NAO,0d0,work,NAO)
+!trXV = 0d0
+!do i=1,NAO
+!   trXV = trXV + work(i,i)
+!enddo
+!Aux = trXV * S
+!call dgemm('N','N',NAO,NAO,NAO,0.5d0,ASB,NAO,Aux,NAO,0d0,work,NAO)
+!do i=1,NAO
+!   tvk(2) = tvk(2) + work(i,i)
+!enddo
+!tvk(2) = -tvk(2)
+!print*, 'Term-2 = ',tvk(2)*1000
+
+term2 = 0d0
+term3 = 0d0
+term4 = 0d0
+term5 = 0d0
+
+! T1 = -1/2 ASB.va 
+do j=1,NAO
+   do i=1,NAO
+      term2(1) = term2(1) + ASB(i,j)*Va(i,j)
+   enddo
+enddo
+term2(1) = -0.5d0*term2(1)
+print*, 'Term-2a = ',term2(1)*1d3
+
+do j=1,NAO
+   do i=1,NAO
+      term2(2) = term2(2) + BSA(i,j)*Vb(i,j)
+   enddo
+enddo
+term2(2) = -0.5d0*term2(2)
+print*, 'Term-2b = ',term2(2)*1d3
+
+! T1 = -1/2 A^T.K(B)
+call dgemm('T','N',NAO,NAO,NAO,1d0,XA,NAO,B%Kmat,NAO,0d0,work,NAO)
+do i=1,NAO
+   term2(3) = term2(3) + work(i,i)
+enddo
+term2(3) = -term2(3)
+print*, 'Term-2c = ',term2(3)*1d3
+
+! Term3, exchange part : n^B . Gamma^A . v^B . S
+call dgemm('N','N',NAO,NAO,NAO,1d0,XA,NAO,S,NAO,0d0,Aux,NAO)
+call dgemm('N','T',NAO,NAO,NAO,1d0,ASB,NAO,Aux,NAO,0d0,work,NAO)
+do j=1,NAO
+   do i=1,NAO
+      term3(1) = term3(1) + work(i,j)*Vb(i,j)
+   enddo
+enddo
+term3(1) = 0.25d0*term3(1)
+print*, 'Term-3a = ',term3(1)*1000
+
+! Term4, exchange part : n^A . Gamma^B . v^A . S
+call dgemm('N','N',NAO,NAO,NAO,1d0,XB,NAO,S,NAO,0d0,Aux,NAO)
+call dgemm('N','T',NAO,NAO,NAO,1d0,BSA,NAO,Aux,NAO,0d0,work,NAO)
+do j=1,NAO
+do i=1,NAO
+   term4(1) = term4(1) + work(i,j)*Va(i,j)
+enddo
+enddo
+term4(1) = 0.25d0*term4(1)
+print*, 'Term-4a = ',term4(1)*1000
+
+allocate(JA(NAO,NAO),JB(NAO,NAO),KA(NAO,NAO))
+call make_J1(NAO,XB,JB,'AOTWOSORT')
+call make_J1(NAO,XA,JA,'AOTWOSORT')
+call make_K(NAO,XA,KA)
+
+! B%Kmat contains 1/2!
+Aux = JB - B%Kmat
+call dgemm('N','N',NAO,NAO,NAO,1d0,ASB,NAO,Aux,NAO,0d0,work,NAO)
+do i=1,NAO
+   term3(2) = term3(2) + work(i,i)
+enddo
+term3(2) = -0.5d0*term3(2)
+print*, 'Term-3b = ',term3(2)*1000
+
+Aux = JA - 0.5d0*KA
+call dgemm('N','N',NAO,NAO,NAO,1d0,BSA,NAO,Aux,NAO,0d0,work,NAO)
+do i=1,NAO
+   term4(2) = term4(2) + work(i,i)
+enddo
+term4(2) = -0.5d0*term4(2)
+print*, 'Term-4b = ',term4(2)*1000
+
+! T4 = (ASBSA).J(B)
+call dgemm('N','N',NAO,NAO,NAO,1d0,XA,NAO,S,NAO,0d0,work,NAO)
+call dgemm('N','N',NAO,NAO,NAO,1d0,work,NAO,BSA,NAO,0d0,Aux,NAO)
+call dgemm('N','N',NAO,NAO,NAO,0.25d0,Aux,NAO,JB,NAO,0d0,work,NAO)
+do i=1,NAO
+   term5(1) = term5(1) + work(i,i)
+enddo
+print*, 'Term-5a = ',term5(1)*1d3
+
+! T5 = (BSASB).J(A)
+call dgemm('N','N',NAO,NAO,NAO,1d0,S,NAO,XB,NAO,0d0,work,NAO)
+call dgemm('N','N',NAO,NAO,NAO,1d0,BSA,NAO,work,NAO,0d0,Aux,NAO)
+call dgemm('N','N',NAO,NAO,NAO,0.25d0,Aux,NAO,JA,NAO,0d0,work,NAO)
+do i=1,NAO
+   term5(2) = term5(2) + work(i,i)
+enddo
+print*, 'Term-5b = ',term5(2)*1d3
+
+call make_K(NAO,ASB,Aux)
+call dgemm('N','N',NAO,NAO,NAO,0.125d0,BSA,NAO,Aux,NAO,0d0,work,NAO)
+do i=1,NAO
+   term5(3) = term5(3) + work(i,i)
+enddo
+term5(3) = -term5(3)
+print*, 'Term-5c = ',term5(3)*1d3
+
+exchNNs2 = sum(term2)+sum(term3)+sum(term4)+sum(term5)
+
+call print_en('ExchNNS2',exchNNs2*1000,.true.)
+print*, ''
+!print*, 'E1exch-nn =',exchNNs2*1d3
+
+deallocate(JB)
+deallocate(work,Aux)
+deallocate(BSA,ASB)
+deallocate(XB,XA)
+
+end subroutine e1exchNN_AO_noVnn
 
 subroutine e1exch_NaNb(Flags,A,B,SAPT)
 !

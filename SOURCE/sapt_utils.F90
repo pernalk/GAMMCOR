@@ -2012,6 +2012,8 @@ enddo
 
 ! get K(X)
 call make_K(NAO,X,Ki)
+!print*, 'pure Ki'
+!return
 
 #if SAPT_UTILS_DEBUG > 5
    print*, 'Ki = K',norm2(Ki)
@@ -2088,6 +2090,8 @@ Vinv = Vnn / NA2 / NB2
 
 ! get K(X)
 call make_K(NAO,X,Ko)
+!print*, 'pure Ko'
+!return
 #if SAPT_UTILS_DEBUG > 5
    print*, 'Ko = K        ',norm2(Ko)
 #endif
@@ -2165,6 +2169,8 @@ Vinv = Vnn / NA2 / NB2
 
 ! get J(X)
 call make_J1(NAO,X,Jl,'AOTWOSORT')
+!print*, 'pure J!',norm2(Jl)
+!return
 
 #if SAPT_UTILS_DEBUG > 5
    print*, 'Jl = J        ',norm2(Jl)
@@ -2248,6 +2254,8 @@ Vinv = Vnn / NA2 / NB2
 
 ! get J(X)
 call make_J1(NAO,X,Jr,'AOTWOSORT')
+!print*, 'pure Jr!',norm2(Jr)
+!return
 
 #if SAPT_UTILS_DEBUG > 5
    print*, 'Jr = J',norm2(Jr)
