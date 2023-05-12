@@ -1,0 +1,22 @@
+Calculation
+ JobTitle   ACn
+ Interface  MOLPRO
+ JobType    ACFREQNTH
+ ! JobType AC
+ Max_Cn     10
+ RDMType    CAS
+
+ TwoMoInt   FOFO
+end
+
+CholeskyBlock
+ Cholesky   BIN
+ Cholesky_Accuracy DEFAULT
+End
+
+System
+ ZNucl   18
+ Charge  0
+ ThrSelAct    1.d-4
+ ThrQVirt     1.d-1
+end

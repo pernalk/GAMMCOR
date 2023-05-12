@@ -3,7 +3,7 @@ MKL_ROOT = /opt/intel/mkl/
 FCC = ifort 
 WARNINGS 		=	-warn nounused
 OPTIMIZATION 	=	-xCOMMON-AVX512 -O3
-PARALLELIZATION	=	-mkl=parallel -qopenmp
+PARALLELIZATION	=	-qmkl=parallel -qopenmp
 XCFUN 			=	-I xcfun/fortran
 CHOLESKY       =  -I ./gammcor-cholesky/include
 FFLAGS = $(WARNINGS) $(OPTIMIZATION) $(PARALLELIZATION) $(XCFUN) $(CHOLESKY) -assume byterecl -heap-arrays -g

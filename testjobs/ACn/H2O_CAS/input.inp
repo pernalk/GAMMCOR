@@ -1,0 +1,25 @@
+
+Calculation
+ JobTitle   ACn with MOLMPS
+ Interface  ORCA
+ JobType    ACFREQNTH
+ Max_Cn     6 
+
+! the number of basis set functions (remember to subtract the number of core orbitals, if any)
+ NBasis        23
+ TwoMoInt      FOFO
+end
+
+CholeskyBlock
+ Cholesky      BIN
+ Cholesky_Accu LUDICROUS
+end
+
+System
+! the number of electrons (rememeber to subtract the number of core electrons, if any)
+! for water 10-2 (core electrons) = 8
+ ZNucl   8
+ Charge  0
+ ThrSelAct    1.d-4
+end
+
