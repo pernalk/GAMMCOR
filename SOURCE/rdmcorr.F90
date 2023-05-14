@@ -28,16 +28,17 @@ integer                      :: iunit1,iunit2
 integer                      :: i,j,k,l,ij,ii,jj,ip,iq,ir,is
 integer                      :: ipos,ipos1,ipos2
 integer                      :: a,b,c,d,m,ac
-integer                      :: NOccup0,NOccup,NVirt,NVirtOld,iOccup,iVirt
-integer                      :: IGem(NBasis),pos(NBasis,NBasis),IPair(NBasis,NBasis)
+integer                      :: NOccup0,NOccup,NVirt,NVirtOld,NOccupResp,NVirtResp
+integer                      :: iOccup,iVirt
+integer                      :: IGem(NBasis),pos(NBasis,NBasis),IPair(NBasis,NBasis),IPair1(NBasis,NBasis)
 integer                      :: nAA,nAI(INActive),nAV(INActive+NAct+1:NBasis),nIV
 integer                      :: tmpAA(NAct*(NAct-1)/2),tmpAI(NAct,1:INActive),&
                                 tmpAV(NAct,INActive+NAct+1:NBasis),&
                                 tmpIV(INActive*(NBasis-NAct-INActive))
 integer                      :: limAA(2),limAI(2,1:INActive),&
                                 limAV(2,INActive+NAct+1:NBasis),limIV(2)
-integer                      :: IRow,ICol,NDimRed,Max_Cn
-double precision             :: val,ETot
+integer                      :: IRow,ICol,NDimRed,Max_Cn,NS1
+double precision             :: val,xmiu,ETot
 double precision             :: UCorr(NBasis,NBasis)
 double precision             :: Eps(NBasis,NBasis),CI(NBasis)
 double precision             :: AuxMat(NBasis,NBasis),Gamma(NBasis,NBasis),PC(NBasis)
@@ -93,7 +94,7 @@ call ABPM0_FOFO(Occ,URe,XOne,ABPLUS,ABMIN, &
                 IndN,IndX,IGemIN,NAct,INActive,NDimX,NBasis,NDim,NInte1, &
                 IntJFile,IntKFile,0,ETot)
 
-Eps = 0
+Eps = 0d0
 !get AV
 do i=1,NDimX
    ip = IndN(1,i)
@@ -118,31 +119,38 @@ do i=1,NOccup
 enddo
 
 AUXM0 = 0
-NOccup0=NOccup
+NOccup0 = NOccup
 
-NOccup=0
+NOccupResp = 0
+NVirtResp  = 0
 Do I=1,NBasis
    AUXM0(I,I)=Occ(I)
-   If(Occ(I).Gt.0.49) NOccup=NOccup+1
+!  include active orbitals 
+   If(Occ(I).Gt.0.5) NOccupResp=NOccupResp+1  
+   If(Occ(I).Gt.0.5) NVirtResp=NVirtResp+1
+!  exclude active orbitals
+!   If(Occ(I).Gt.0.999) NOccupResp=NOccupResp+1
+!   If(Occ(I).Gt.1.D-4) NVirtResp=NVirtResp+1
 EndDo
+NVirtResp=NVirtResp+1
+Write(6,'(/,X,"NOccupResp NVirtResp in unrelaxed part: ",2I5)') NOccupResp,NVirtResp
 
 ! NOccup-NOccup block of 1-RDM
-do k=1,NOccup
-   do b=NOccup+1,NBasis
+do k=1,NOccupResp
+   do b=NVirtResp,NBasis
 
    if(IPair(b,k)==1) then
 
-      read(iunit1,rec=(b+(k-1)*NBasis)) work(1:NBasis*NOccup)
-      ! ints_bk
-      do l=1,NOccup
+      read(iunit1,rec=(b+(k-1)*NBasis)) work(1:NBasis*NOccup0)
+      do l=1,NOccupResp
          do j=1,NBasis
             ints_bk(j,l) = work((l-1)*NBasis+j)
          enddo
       enddo
 
-      do j=1,NOccup
-      do i=1,NOccup
-         do a=max(i,j)+1,NBasis
+      do j=1,NOccupResp
+      do i=1,NOccupResp
+         do a=NVirtResp,NBasis
               if(IPair(a,i)==1 .and. IPair(a,j)==1) then
                   ipos1 = XInd(a,i)
                   ipos2 = XInd(b,k)
@@ -160,63 +168,62 @@ do k=1,NOccup
 
    enddo
 enddo
-! second part
-do b=NOccup+1,NBasis
-   do k=NOccup+1,b-1
-
-   if(IPair(b,k).eq.1) then
-      ipos2 = XInd(b,k)
-
-      read(iunit1,rec=(b+(k-1)*NBasis)) work(1:NBasis*NOccup)
-      ! ints_bk
-      do l=1,NOccup
-         do j=1,NBasis
-            ints_bk(j,l) = work((l-1)*NBasis+j)
-         enddo
-      enddo
-
-      do i=1,NOccup
-         do a=NOccup+1,NBasis
-
-              if(IPair(a,i).eq.1) then
-                 ipos1 = XInd(a,i)
-                 do j=1,NOccup
-                   if(IPair(a,j).eq.1) then
-                     Gamma(i,j) = Gamma(i,j) + ints_bk(a,j)* &
-                              0.5d0* &
-                              ( (CI(I)+CI(A))*(CI(K)+CI(B))*ABPLUS(ipos1,ipos2) &
-                               -(CI(I)-CI(A))*(CI(K)-CI(B))* ABMIN(ipos1,ipos2) ) &
-                              /(Eps(a,i)+Eps(b,k)) / (Eps(a,j)+Eps(b,k))
-                    endif
-                 enddo
-              endif
-         enddo
-      enddo
-
-   endif
-
-   enddo
-enddo
+!! second part
+!do b=NOccup+1,NBasis
+!   do k=NOccup+1,b-1
+!
+!   if(IPair(b,k).eq.1) then
+!      ipos2 = XInd(b,k)
+!
+!      read(iunit1,rec=(b+(k-1)*NBasis)) work(1:NBasis*NOccup)
+!      ! ints_bk
+!      do l=1,NOccup
+!         do j=1,NBasis
+!            ints_bk(j,l) = work((l-1)*NBasis+j)
+!         enddo
+!      enddo
+!
+!      do i=1,NOccup
+!         do a=NOccup+1,NBasis
+!
+!              if(IPair(a,i).eq.1) then
+!                 ipos1 = XInd(a,i)
+!                 do j=1,NOccup
+!                   if(IPair(a,j).eq.1) then
+!                     Gamma(i,j) = Gamma(i,j) + ints_bk(a,j)* &
+!                              0.5d0* &
+!                              ( (CI(I)+CI(A))*(CI(K)+CI(B))*ABPLUS(ipos1,ipos2) &
+!                               -(CI(I)-CI(A))*(CI(K)-CI(B))* ABMIN(ipos1,ipos2) ) &
+!                              /(Eps(a,i)+Eps(b,k)) / (Eps(a,j)+Eps(b,k))
+!                    endif
+!                 enddo
+!              endif
+!         enddo
+!      enddo
+!
+!   endif
+!
+!   enddo
+!enddo
 
 ! Virt-Virt block of 1-RDM
 
-do b=NOccup+1,NBasis
-  do k=1,NOccup
+do b=NVirtResp,NBasis
+  do k=1,NOccupResp
 
   if(IPair(b,k).eq.1) then
 
-      read(iunit1,rec=(b+(k-1)*NBasis)) work(1:NBasis*NOccup)
-      ! ints_bk
-      do l=1,NOccup
+      read(iunit1,rec=(b+(k-1)*NBasis)) work(1:NBasis*NOccup0)
+      do l=1,NOccupResp
          do j=1,NBasis
             ints_bk(j,l) = work((l-1)*NBasis+j)
          enddo
       enddo
 
-      do i=1,NOccup
-         do c=NOccup+1,NBasis
+      do i=1,NOccupResp
+         do c=NVirtResp,NBasis
             if(IPair(c,i).eq.1) then
-             do a=NOccup+1,NBasis
+             do a=NVirtResp,NBasis
                  if(IPair(a,i).eq.1) then
                  ipos1 = XInd(a,i)
                  ipos2 = XInd(b,k)
@@ -235,77 +242,79 @@ do b=NOccup+1,NBasis
 
    enddo
 enddo
-! second part
-do b=1,NOccup
-  do k=1,b-1
-
-  if(IPair(b,k).eq.1) then
-
-      read(iunit1,rec=(b+(k-1)*NBasis)) work(1:NBasis*NOccup)
-      ! ints_bk
-      do l=1,NOccup
-         do j=1,NBasis
-            ints_bk(j,l) = work((l-1)*NBasis+j)
-         enddo
-      enddo
-
-      do i=1,NOccup
-         do c=NOccup+1,NBasis
-            if(IPair(c,i).eq.1) then
-            do a=NOccup+1,NBasis
-                 if(IPair(a,i).eq.1) then
-                 ipos1 = XInd(a,i)
-                 ipos2 = XInd(b,k)
-                 Gamma(a,c) = Gamma(a,c) - ints_bk(c,i)* &
-                 0.5d0* &
-                 ( (CI(I)+CI(A))*(CI(K)+CI(B))*ABPLUS(ipos1,ipos2) &
-                  -(CI(I)-CI(A))*(CI(K)-CI(B))* ABMIN(ipos1,ipos2) ) &
-                             /(Eps(a,i)+Eps(b,k)) / (Eps(c,i)+Eps(b,k))
-                 endif
-            enddo
-            endif
-         enddo
-      enddo
-
-   endif
-
-   enddo
-enddo
-! third part
-do b=NOccup+1,NBasis
-  do k=1,NOccup
-
-  if(IPair(b,k).eq.1) then
-
-      read(iunit1,rec=(b+(k-1)*NBasis)) work(1:NBasis*NOccup0)
-      ! ints_bk
-      do l=1,NOccup0
-!      do j=1,NOccup0
-       do j=1,NBasis
-            ints_bk(j,l) = work((l-1)*NBasis+j)
-         enddo
-      enddo
-
-      do c=NOccup+1,NBasis
-         do a=NOccup+1,NBasis
-            do i=NOccup+1,min(a,c)-1
-               if(IPair(c,i)==1 .and. IPair(a,i)==1) then
-                  ipos1 = XInd(a,i)
-                  ipos2 = XInd(b,k)
-                  Gamma(a,c) = Gamma(a,c) - ints_bk(c,i)* &
-                  0.5d0* &
-                  ( (CI(I)+CI(A))*(CI(K)+CI(B))*ABPLUS(ipos1,ipos2) &
-                  -(CI(I)-CI(A))*(CI(K)-CI(B))* ABMIN(ipos1,ipos2) ) &
-                  /(Eps(a,i)+Eps(b,k)) / (Eps(c,i)+Eps(b,k))
-               endif
-            enddo
-         enddo
-      enddo
-
-   endif
-
-   enddo
-enddo
+!
+!! second part
+!do b=1,NOccup
+!  do k=1,b-1
+!
+!  if(IPair(b,k).eq.1) then
+!
+!      read(iunit1,rec=(b+(k-1)*NBasis)) work(1:NBasis*NOccup)
+!      ! ints_bk
+!      do l=1,NOccup
+!         do j=1,NBasis
+!            ints_bk(j,l) = work((l-1)*NBasis+j)
+!         enddo
+!      enddo
+!
+!      do i=1,NOccup
+!         do c=NOccup+1,NBasis
+!            if(IPair(c,i).eq.1) then
+!            do a=NOccup+1,NBasis
+!                 if(IPair(a,i).eq.1) then
+!                 ipos1 = XInd(a,i)
+!                 ipos2 = XInd(b,k)
+!                 Gamma(a,c) = Gamma(a,c) - ints_bk(c,i)* &
+!                 0.5d0* &
+!                 ( (CI(I)+CI(A))*(CI(K)+CI(B))*ABPLUS(ipos1,ipos2) &
+!                  -(CI(I)-CI(A))*(CI(K)-CI(B))* ABMIN(ipos1,ipos2) ) &
+!                             /(Eps(a,i)+Eps(b,k)) / (Eps(c,i)+Eps(b,k))
+!                 endif
+!            enddo
+!            endif
+!         enddo
+!      enddo
+!
+!   endif
+!
+!   enddo
+!enddo
+!
+!! third part
+!do b=NOccup+1,NBasis
+!  do k=1,NOccup
+!
+!  if(IPair(b,k).eq.1) then
+!
+!      read(iunit1,rec=(b+(k-1)*NBasis)) work(1:NBasis*NOccup0)
+!      ! ints_bk
+!      do l=1,NOccup0
+!!      do j=1,NOccup0
+!       do j=1,NBasis
+!            ints_bk(j,l) = work((l-1)*NBasis+j)
+!         enddo
+!      enddo
+!
+!      do c=NOccup+1,NBasis
+!         do a=NOccup+1,NBasis
+!            do i=NOccup+1,min(a,c)-1
+!               if(IPair(c,i)==1 .and. IPair(a,i)==1) then
+!                  ipos1 = XInd(a,i)
+!                  ipos2 = XInd(b,k)
+!                  Gamma(a,c) = Gamma(a,c) - ints_bk(c,i)* &
+!                  0.5d0* &
+!                  ( (CI(I)+CI(A))*(CI(K)+CI(B))*ABPLUS(ipos1,ipos2) &
+!                  -(CI(I)-CI(A))*(CI(K)-CI(B))* ABMIN(ipos1,ipos2) ) &
+!                  /(Eps(a,i)+Eps(b,k)) / (Eps(c,i)+Eps(b,k))
+!               endif
+!            enddo
+!         enddo
+!      enddo
+!
+!   endif
+!
+!   enddo
+!enddo
 
 !
 ! occ-virt block - relaxation of orbitals
@@ -313,21 +322,31 @@ enddo
 
 if(IOrbRelax==1) then
 
+NOccup=NOccupResp
+NS1=NVirtResp-1
+
 AUX2=0.d0
 NDimRed=0
-do d=NOccup+1,NBasis
-   do l=1,NOccup
-      NDimRed=NDimRed+1
-      XInd1(d,l)=NDimRed
+XInd1=0
+IPair1=0
+do d=NS1+1,NBasis
+   do l=1,min(NOccup,d-1) 
+      if(IPair(d,l)==1) then
+          NDimRed=NDimRed+1
+          XInd1(d,l)=NDimRed
+          IPair1(d,l)=1
+       endif
    enddo
 enddo
 allocate(IndBlock(2,NDimRed))
 NDimRed=0
-do d=NOccup+1,NBasis
-   do l=1,NOccup
-      NDimRed=NDimRed+1
-      IndBlock(1,NDimRed)=d
-      IndBlock(2,NDimRed)=l
+do d=NS1+1,NBasis
+   do l=1,min(NOccup,d-1) 
+      if(IPair(d,l)==1) then
+        NDimRed=NDimRed+1
+        IndBlock(1,NDimRed)=d
+        IndBlock(2,NDimRed)=l
+      endif
    enddo
 enddo
 
@@ -336,8 +355,8 @@ allocate(ints_dl(NBasis,NBasis))
 open(newunit=iunit2,file=trim(Int3File),status='OLD', &
      access='DIRECT',recl=8*NBasis*NBasis)
 
-do d=NOccup+1,NBasis
-   do l=1,NOccup
+do d=NS1+1,NBasis
+   do l=1,min(d-1,NOccup)
 
       read(iunit2,rec=(d+(l-1)*NBasis)) work(1:NBasis*NBasis)
       do a=1,NBasis
@@ -348,22 +367,26 @@ do d=NOccup+1,NBasis
 
       do a=NOccup+1,NBasis
       do b=NOccup+1,NBasis
-      AUX2(XInd1(d,l))=AUX2(XInd1(d,l))-Occ(l)*(gamma(a,b)-AUXM0(a,b))*2.d0*ints_dl(a,b)
-      AUX2(XInd1(a,l))=AUX2(XInd1(a,l))+Occ(l)*(gamma(d,b)-AUXM0(d,b))*ints_dl(a,b)
+         if(IPair1(d,l)==1) AUX2(XInd1(d,l))=AUX2(XInd1(d,l))-Occ(l)*(gamma(a,b)-AUXM0(a,b))*2.d0*ints_dl(a,b)
+         if(IPair1(a,l)==1) AUX2(XInd1(a,l))=AUX2(XInd1(a,l))+Occ(l)*(gamma(d,b)-AUXM0(d,b))*ints_dl(a,b)
       enddo
       enddo
 
       do j=1,NOccup
-      do a=NOccup+1,NBasis
-      do b=NOccup+1,NBasis
+      do a=NS1+1,NBasis
+      do b=NS1+1,NBasis
+
+      if(a>j.and.b>j) then
 
       if(IPair(a,j)==1 .and. IPair(d,l)==1) then
       ipos1=XInd(a,j)
       ipos2=XInd(d,l)
-      AUX2(XInd1(b,j))=AUX2(XInd1(b,j)) &
+      if(IPair1(b,j)==1) AUX2(XInd1(b,j))=AUX2(XInd1(b,j)) &
       -0.5d0* ( (CI(j)+CI(a))*(CI(l)+CI(d))*ABPLUS(ipos1,ipos2) &
               - (CI(j)-CI(a))*(CI(l)-CI(d))*ABMIN(ipos1,ipos2) ) &
               *ints_dl(a,b)/(Eps(a,j)+Eps(d,l))
+      endif
+
       endif
 
       enddo
@@ -374,22 +397,26 @@ do d=NOccup+1,NBasis
 
       do i=1,NOccup
       do m=1,NOccup
-      AUX2(XInd1(d,l))=AUX2(XInd1(d,l))-Occ(l)*(gamma(i,m)-AUXM0(i,m))*2.d0*ints_dl(i,m)
-      AUX2(XInd1(d,m))=AUX2(XInd1(d,m))+Occ(m)*(gamma(i,l)-AUXM0(i,l))*ints_dl(i,m)
+         if(IPair1(d,l)==1) AUX2(XInd1(d,l))=AUX2(XInd1(d,l))-Occ(l)*(gamma(i,m)-AUXM0(i,m))*2.d0*ints_dl(i,m)
+         if(IPair1(d,m)==1) AUX2(XInd1(d,m))=AUX2(XInd1(d,m))+Occ(m)*(gamma(i,l)-AUXM0(i,l))*ints_dl(i,m)
       enddo
       enddo
 
-      do b=NOccup+1,NBasis
+      do b=NS1+1,NBasis
       do i=1,NOccup
       do j=1,NOccup
+
+      if(b>i.and.b>j) then
 
       if(IPair(b,i)==1 .and. IPair(d,l)==1) then
       ipos1=XInd(b,i)
       ipos2=XInd(d,l)
-      AUX2(XInd1(b,j))=AUX2(XInd1(b,j)) &
+      if(IPair1(b,j)==1) AUX2(XInd1(b,j))=AUX2(XInd1(b,j)) &
       +0.5d0* ( (CI(i)+CI(b))*(CI(l)+CI(d))*ABPLUS(ipos1,ipos2) &
               - (CI(i)-CI(b))*(CI(l)-CI(d))*ABMIN(ipos1,ipos2) ) &
               *ints_dl(i,j)/(Eps(b,i)+Eps(d,l))
+      endif
+
       endif
 
       enddo
@@ -412,16 +439,21 @@ Call CFREQPROJ(AUX1,0.d0,AUX2,1, &
    0,IndBlock,IndX,NDimRed,&
    IntJFile,IntKFile)
 
-do i=1,NOccup
-   do a=NOccup+1,NBasis
-     ! C(omega) is multiplied by 2, see the note 
-     Gamma(i,a)=AUX1(XInd(a,i))*2.0
-     Gamma(a,i)=Gamma(i,a)
+do a=NS1+1,NBasis
+   do i=1,min(NOccup,a-1)
+     if(IPair(a,i)==1) then
+       ! C(omega) is multiplied by 2, see the note
+       val=AUX1(XInd1(a,i))*2d0
+       Gamma(i,a)=Gamma(i,a)+val
+       Gamma(a,i)=Gamma(a,i)+val
+     endif
    enddo
 enddo
 
 close(iunit1)
 deallocate(AUX1,ints_dl)
+
+Write(6,'(/,X,"NOccupResp NVirtResp in relaxed part: ",2I5)') NOccup,NS1+1
 
 ! end of orbital relaxation 
 endif
@@ -431,12 +463,9 @@ Gamma=0.5d0*(Gamma+transpose(Gamma))
 deallocate(ints_bk,ints_bi)
 
 AuxMat = Gamma
-
 if (present(RDM1)) RDM1 = AuxMat
-
 call Diag8(AuxMat,NBasis,NBasis,PC,work(1:NBasis))
 
-Write(6,'(/,X,"NOccup set to: ",I5)') NOccup
 val = 0d0
 if(IOrbRelax==1) then
    write(LOUT,'(/,2x,"Orbitals Relaxed")')
@@ -446,7 +475,7 @@ endif
 
 write(LOUT,'(/,2x,"AC0-correlated natural occupation numbers")')
 do i=NBasis,1,-1
-   write(LOUT,'(X,I3,E16.6,I6)') Nbasis-i+1,PC(i)*2.0
+   write(LOUT,'(X,I3,E16.6,I6)') Nbasis-i+1,PC(i)
    val = val + PC(i)
 enddo
 write(LOUT,'(/,1x,"Sum of AC0-correlated Occupancies: ",F5.2,/)') val
@@ -460,6 +489,14 @@ else
    write(LOUT,'(1x, " (unrelaxed)")')
 endif
 Call ComputeDipoleMom(UCorr,PC,NBasis,AOFile,DipFile,NBasis)
+
+!Call PrOcc1(xmiu,val,PC,NBasis)
+!Write(6,'(/,2X,"Projected Occupancies")')
+!do i=NBasis,1,-1
+!   write(LOUT,'(X,I3,E16.6,I6)') Nbasis-i+1,PC(i)
+!enddo
+!write(LOUT,'(/,x,"Dipole moment with projected 1-RDM")')
+!Call ComputeDipoleMom(UCorr,PC,NBasis,NBasis)
 
 end subroutine RDMResp_FOFO
 
@@ -929,16 +966,16 @@ if(mon%monomer==2) write(lout,'(/1x,a,i3)') 'Monomer B / NOccup =',NOccup
 write(lout,'(1x,a,f12.6)',advance="no") '2-RDM2 norm = ', xnorm
 write(lout,'(1x,a,f8.3,a)') '(reference =', refnorm, ')'
 
-if(abs(refnorm-xnorm).gt.1d-5) then
-   Mon%RDM2val = Mon%RDM2val * refnorm / xnorm
-   xnorm = 0d0
-   do i=1,NOccup
-      do j=1,NOccup
-         xnorm = xnorm + Mon%RDM2val(i,i,j,j)
-      enddo
-   enddo
-   write(lout,'(1x,a,f12.6)') 'RDM2 renormalized!',xnorm
-endif
+!if(abs(refnorm-xnorm).gt.1d-5) then
+!   Mon%RDM2val = Mon%RDM2val * refnorm / xnorm
+!   xnorm = 0d0
+!   do i=1,NOccup
+!      do j=1,NOccup
+!         xnorm = xnorm + Mon%RDM2val(i,i,j,j)
+!      enddo
+!   enddo
+!   write(lout,'(1x,a,f12.6)') 'RDM2 renormalized!',xnorm
+!endif
 
 !block
 !integer :: ip,iq,ir,is
