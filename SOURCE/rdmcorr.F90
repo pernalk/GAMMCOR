@@ -123,6 +123,8 @@ NOccup0 = NOccup
 
 NOccupResp = 0
 NVirtResp  = 0
+  print*, 'RDMResp: include active orbs'
+ ! print*, ' RDMResp: exclude active orbs!'
 Do I=1,NBasis
    AUXM0(I,I)=Occ(I)
 !  include active orbitals 

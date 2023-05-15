@@ -801,7 +801,7 @@ tvk(6) = -tvk(6)
 if(SAPT%IPrint>=10) print*, 'Term-6 = ',tvk(6)*1000
 
 exchNNs2 = sum(tvk)
-call print_en('ExchNNS2',exchNNs2*1000,.true.)
+call print_en('ExchNNS2(Tania)',exchNNs2*1000,.true.)
 !print*, 'E1exch(S2)-AO',exchNNs2*1000
 
 deallocate(ASB,BSA)
