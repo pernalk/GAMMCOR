@@ -256,7 +256,7 @@ call e1exchs2(Flags,SAPT%monA,SAPT%monB,SAPT)
 
 ! additional test in AO
 call e1exchNN_AO(Flags,SAPT%monA,SAPT%monB,SAPT)
-call e1exchNN_AO_noVnn(Flags,SAPT%monA,SAPT%monB,SAPT)
+!call e1exchNN_AO_noVnn(Flags,SAPT%monA,SAPT%monB,SAPT)
 
 call summary_sapt_rdm(SAPT,Flags,NBasis)
 
@@ -1622,6 +1622,7 @@ write(LOUT,'(1x,a,i3,a,i3)') 'Occ space B increased from ', SAPT%monA%NOccup0, '
 
 write(LOUT,'(/1x,a,t19,a,f16.8)') 'E1elst',  '=', SAPT%elst  *1.d03
 write(LOUT,'(1x,a,t19,a,f16.8)') 'E1exch',   '=', SAPT%exchs2*1.d03
+write(LOUT,'(1x,a,t19,a,f16.8)') 'E1exchNN', '=', SAPT%exchNNs2*1.d03
 write(LOUT,'(1x,a,t19,a,f16.8)') 'E1    ',   '=', (SAPT%elst+SAPT%exchs2)*1.d03
 
 end subroutine summary_sapt_rdm
