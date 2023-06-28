@@ -2000,7 +2000,19 @@ c    $                     NCholesky,NBasis,'FOFO')
 c     Call chol_ffoo_batch(MatFF,Num0+Num1,Num0+Num1,MatFF,
 c    $                     NCholesky,NBasis,'FFOO')
 C
-      Write(6,'(/," Skipping FOFO/FFOO assembling")')
+      If(IRedVirt==0) Then
+        Write(6,'(/," Skipping FOFO/FFOO assembling")')
+      ElseIf(IRedVirt==1) Then
+        Write(6,'(/," Assemble FOFO/FFOO integrals")')
+        Call chol_fofo_batch(Num0+Num1,MatFF,Num0+Num1,MatFF,
+     $                       NCholesky,NBasis,'FOFO')
+        Call chol_ffoo_batch(MatFF,Num0+Num1,Num0+Num1,MatFF,
+     $                       NCholesky,NBasis,'FFOO')
+         If(IOrbRelax==1) Then
+           Call chol_ffoo_batch(MatFF,NBasis,Num0+Num1,MatFF,
+     $                          NCholesky,NBasis,'FFFO')
+         EndIf
+      EndIf
 C
 C     Call clock('chol_FFOOFOFO',Tcpu,Twall)
 C

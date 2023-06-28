@@ -5,6 +5,8 @@ C
 c     use types
       use print_units
       use timing
+      use read_external
+      use abfofo
 C
 C     A ROUTINE FOR COMPUTING ELECTRONIC ENERGY USING ERPA TRANSITION
 C     DENSITY MATRIX ELEMENTS
@@ -114,6 +116,32 @@ C
       Ind2=IndN(2,I)
       Write(6,'(2X,3I5,2E14.4)')I,Ind1,Ind2,Occ(Ind1),Occ(Ind2)
       EndDo
+C
+C     COMPUTE RESPONSE RDMs FROM AC0-CAS DERIVATIVE-LIKE EXPRESSION
+C
+      If (IRedVirt.Eq.1) Then
+C
+      If(ITwoEl.eq.3) Then
+C
+      Call RDMResp_FOFO(Occ,URe,UNOAO,XOne,IndN,IndX,IndAux,IGem,
+     $                  NAcCAS,NInAcCAS,NDimX,NDim,NBasis,NInte1,
+     $                  'FFOO','FOFO',ICholesky,IOrbRelax,IOrbIncl)
+C
+      If (IOrbRelax==1) Call delfile('FFFO')
+      Call delfile('FFOO')
+      Call delfile('FOFO')
+C
+      stop
+C
+      Else
+C
+      Write(6,'(/,X,
+     $ ''Response RDM is available only with FOFO integrals '')')
+      Stop
+C
+      EndIf
+C
+      EndIf
 C
       If(IFunSR.Eq.0) Then 
 C

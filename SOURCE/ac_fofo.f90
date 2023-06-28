@@ -317,8 +317,6 @@ Call RELEASE_AC0BLOCK(A0Block,A0blockIV,nblk)
 !   close(iunit,status='delete')
 !endif
 
-
-
 end subroutine WIter_D12Chol
 
 subroutine WIter_DChol(ECorr,Max_Cn,XOne,URe,Occ,EGOne,NGOcc,&
@@ -439,7 +437,7 @@ nblk = 1 + NBasis - NAct
 allocate(A0block(nblk))
 Call AC0BLOCK(Occ,URe,XOne, &
      IndN,IndX,IGem,NAct,INActive,NDimX,NBasis,NDimX,NInte1,'FFOO','FOFO', &
-     A0BlockIV,A0Block,nblk,'A0BLK',0)
+     1,A0BlockIV,A0Block,nblk,1,'A0BLK',0)
 
 allocate(COMTilde(NDimX*NCholesky),COMTildeAct(NDimX*NCholesky))
 COMTilde=0.0
@@ -608,15 +606,15 @@ nblk = 1 + NBasis - NAct
 allocate(A0block(nblk))
 Call AC0BLOCK(Occ,URe,XOne, &
       IndN,IndX,IGem,NAct,INActive,NDimX,NBasis,NDimX,NInte1,'FFOO','FOFO', &
-      A0BlockIV,A0Block,nblk,'A0BLK',0)
+      0,A0BlockIV,A0Block,nblk,0,'A0BLK',0)
       !A0BlockIV,A0Block,nblk,1)
-!
+
 COM=0d0
 Do IGL=1,NGrid
    OmI=XFreq(IGL)
 
 !  Calc: WORK1=(A0+Om^2)^-1
-   Call INV_AC0BLK(OmI**2,WORK1,A0Block,A0BlockIV,nblk,NDimX)
+   Call INV_AC0BLK_OLD(OmI**2,WORK1,A0Block,A0BlockIV,nblk,NDimX)
 !  Calc: C0=1/2 Lambda.ABPLUS0
    Call dgemm('N','N',NDimX,NDimX,NDimX,0.5d0,WORK1,NDimX,&
               ABPLUS0,NDimX,0d0,C0,NDimX)
@@ -1818,3 +1816,160 @@ end associate
 
 end subroutine pack_A0block
 
+subroutine CFREQPROJ(COMTilde,OmI,DProj,NProj, &
+   Max_Cn,XOne,URe,Occ,&
+   IGem,NAct,INActive,NBasis,NInte1,IndAux,&
+   ICholesky,IndN,IndX,NDimX)
+!
+!  For a given frequency OmI, return a product of the matrices C(Alpha=1,OmI) and DProj
+!  where DProj is of the NProj x NDimX size
+!  C is found by expanding in alpha around alpha=0
+!  with a tolerance Eps or truncating at Max_Cn order
+!  
+use abfofo
+use systemdef
+use sapt_utils
+
+implicit none
+integer,intent(in) :: NBasis,NInte1,NDimX,NProj
+integer,intent(in) :: NAct,INActive,ICholesky
+integer,intent(in) :: IndN(2,NDimX),IndX(NDimX),IndAux(NBasis),&
+                      IGem(NBasis)
+double precision :: ACAlpha,Eps
+double precision,intent(in) :: DProj(NProj,NDimX),URe(NBasis,NBasis),Occ(NBasis),XOne(NInte1)
+
+double precision,intent(out) :: COMTilde(NDimX*NProj)
+
+integer :: iunit
+integer :: ia,ib,ic,id
+integer :: i,j,k,l,kl,ip,iq,ir,is,ipq,irs
+integer :: inf1,inf2,Max_Cn
+double precision :: XFactorial,XN1,XN2,OmI,XNorm0,XNorm1,ECASSCF,DProjT(NDimX,NProj)
+character(:),allocatable :: twojfile,twokfile,IntKFile
+
+double precision, allocatable :: APLUS0Tilde(:), APLUS1Tilde(:),  &
+                                 A1(:),&
+                                 ABPLUS0(:),ABMIN0(:),ABPLUS1(:),ABMIN1(:), &
+                                 C0Tilde(:),C1Tilde(:),C2Tilde(:), &
+                                 WORK0(:),WORK1(:)
+integer :: nblk,N
+type(EblockData) :: A0blockIV,LambdaIV
+type(EblockData),allocatable :: A0block(:),Lambda(:)
+
+! tolerance
+Eps=1.d-5
+
+DProjT = transpose(DProj)
+
+twojfile = 'FFOO'
+twokfile = 'FOFO'
+IntKFile = twokfile
+
+allocate(ABPLUS1(NDimX*NDimX),ABMIN1(NDimX*NDimX))
+
+if(NAct==1) then
+  ! active-virtual block
+  nblk = NBasis - NAct - INActive
+else
+  nblk = 1 + NBasis - NAct
+endif
+
+allocate(A0block(nblk))
+! AC0BLOCK with ver=0 stores A-(0) and A+(0) matrices
+!                            in X and Y, respectively
+Call AC0BLOCK(Occ,URe,XOne, &
+     IndN,IndX,IGem,NAct,INActive,NDimX,NBasis,NDimX,NInte1,'FFOO','FOFO', &
+     ICholesky,A0BlockIV,A0Block,nblk,0,'DUMMY',0)
+
+! get AB1PLUS and AB1MIN
+ACAlpha=1.D0
+call AB_CAS_FOFO(ABPLUS1,ABMIN1,ECASSCF,URe,Occ,XOne, &
+              IndN,IndX,IGem,NAct,INActive,NDimX,NBasis,NDimX,&
+              NInte1,twojfile,twokfile,ICholesky,ACAlpha,.false.)
+
+Call sq_symmetrize(ABPLUS1,NDimX)
+Call sq_symmetrize(ABMIN1,NDimX)
+
+! AB1 = AB1 - A0
+call add_blk_right(ABPLUS1,A0Block,A0BlockIV,-1d0,.false.,nblk,NDimX)
+call add_blk_right(ABMIN1, A0Block,A0BlockIV,-1d0,.true., nblk,NDimX)
+
+!Calc: A1=ABPLUS0*ABMIN1+ABPLUS1*ABMIN0
+allocate(A1(NDimX*NDimX))
+call ABPM_HALFTRAN_GEN_L(ABMIN1, A1,0.0d0,A0Block,A0BlockIV,nblk,NDimX,NDimX,'Y')
+call ABPM_HALFTRAN_GEN_R(ABPLUS1,A1,1.0d0,A0Block,A0BlockIV,nblk,NDimX,NDimX,'X')
+
+!Calc: APLUS0Tilde=ABPLUS0.DProj
+allocate(APLUS0Tilde(NDimX*NProj))
+call ABPM_HALFTRAN_GEN_L(DProjT,APLUS0Tilde,0.0d0,A0Block,A0BlockIV,nblk,NDimX,NProj,'Y')
+
+!Calc: APLUS1Tilde=ABPLUS1.DProj
+allocate(APLUS1Tilde(NDimX*NProj))
+Call dgemm('N','N',NDimX,NProj,NDimX,1d0,ABPLUS1,NDimX,DProjT,NDimX,0.0d0,APLUS1Tilde,NDimX)
+
+deallocate(A0block)
+deallocate(A0BlockIV%vec,A0BlockIV%pos)
+
+! Calc: A0
+allocate(A0block(nblk))
+! ver=1: store A+(0).A-(0) in blocks
+Call AC0BLOCK(Occ,URe,XOne, &
+     IndN,IndX,IGem,NAct,INActive,NDimX,NBasis,NDimX,NInte1,'FFOO','FOFO', &
+     ICholesky,A0BlockIV,A0Block,nblk,1,'A0BLK',0)
+
+COMTilde=0.0
+
+allocate(C0Tilde(NDimX*NProj),C1Tilde(NDimX*NProj),C2Tilde(NDimX*NProj),WORK0(NDimX*NProj))
+allocate(WORK1(NDimX*NProj))
+allocate(Lambda(nblk))
+associate(A => A0BlockIV, L => LambdaIV)
+  L%n = A%n
+  L%l1 = A%l1
+  L%l2 = A%l2
+  allocate(L%pos(L%n),L%vec(L%n))
+end associate
+
+!  Calc: LAMBDA=(A0-Om^2)^-1
+Call INV_AC0BLK(-OmI**2,Lambda,LambdaIV,A0Block,A0BlockIV,nblk,NDimX)
+
+!  Calc: C0Tilde=1/2 LAMBDA.APLUS0Tilde
+Call ABPM_HALFTRAN_GEN_L(APLUS0Tilde,C0Tilde,0.0d0,Lambda,LambdaIV,nblk,NDimX,NProj,'X')
+C0Tilde = 0.5d0*C0Tilde
+
+!  Calc: C1Tilde=LAMBDA.(1/2 APLUS1Tilde - A1.C0Tilde)
+Call dgemm('N','N',NDimX,NProj,NDimX,1.d0,A1,NDimX,C0Tilde,NDimX,0.0d0,WORK0,NDimX)
+WORK0 = 0.5d0*APLUS1Tilde - WORK0
+Call ABPM_HALFTRAN_GEN_L(WORK0,C1Tilde,0.0d0,Lambda,LambdaIV,nblk,NDimX,NProj,'X')
+
+COMTilde=C0Tilde
+COMTilde=COMTilde+C1Tilde
+
+XNorm0=1.0d5
+XFactorial=1
+Do N=2,Max_Cn
+    XFactorial=XFactorial*N
+    XN1=-N
+    XN2=-N*(N-1)
+    Call dgemm('N','N',NDimX,NProj,NDimX,XN2,ABMIN1,NDimX,C0Tilde,NDimX,0.0d0,WORK1,NDimX)
+    Call dgemm('N','N',NDimX,NProj,NDimX,1.d0,ABPLUS1,NDimX,WORK1,NDimX,0.0d0,WORK0,NDimX)
+    Call dgemm('N','N',NDimX,NProj,NDimX,XN1,A1,NDimX,C1Tilde,NDimX,1.0d0,WORK0,NDimX)
+    Call ABPM_HALFTRAN_GEN_L(WORK0,C2Tilde,0.0d0,Lambda,LambdaIV,nblk,NDimX,NProj,'X')
+    XNorm1=Norm2(C2Tilde/XFactorial)
+    Write(6,'(X,"Order (n), |C^(n)/n!|",I3,E14.4)')N,XNorm1
+    If(XNorm1.Le.Eps) Exit
+    If(N.Gt.3.And.XNorm1.Gt.XNorm0) Then
+       Write(6,'(X,"Divergence detected. Expansion of C terminated at order ",I3,3F10.4)')N-1
+       Exit
+    EndIf
+    XNorm0=XNorm1
+    COMTilde=COMTilde+C2Tilde/XFactorial
+    C0Tilde=C1Tilde
+    C1Tilde=C2Tilde
+EndDo
+
+deallocate(A1,WORK0,C0Tilde,C1Tilde,C2Tilde,Lambda,APLUS0Tilde,APLUS1Tilde)
+deallocate(ABMIN1,ABPLUS1,WORK1)
+
+Call RELEASE_AC0BLOCK(A0Block,A0blockIV,nblk)
+
+end subroutine CFREQPROJ 

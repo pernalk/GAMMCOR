@@ -35,8 +35,10 @@ integer, parameter :: SAPTLEVEL1 = 1
 integer, parameter :: SAPTLEVEL2 = 2
 
 integer, parameter :: FLAG_CORE = 1
-integer, parameter :: FLAG_NOBASIS = 0
-integer, parameter :: FLAG_REDVIRT = 0
+integer, parameter :: FLAG_NOBASIS  = 0
+integer, parameter :: FLAG_REDVIRT  = 0
+integer, parameter :: FLAG_ORBRELAX = 1
+integer, parameter :: FLAG_ORBINCL  = 0
 logical, parameter :: FLAG_RESTART = .FALSE.
 logical, parameter :: FLAG_TRIPLET = .FALSE.
 integer, parameter :: FLAG_PRINT_LEVEL = 0
@@ -118,6 +120,8 @@ type CalculationBlock
       integer :: SaptLevel = SAPTLEVEL2
       integer :: vdWCoef   = 0
       integer :: RedVirt   = FLAG_REDVIRT
+      integer :: OrbRelax  = FLAG_ORBRELAX
+      integer :: OrbIncl   = FLAG_ORBINCL
       integer :: MemVal = 2, MemType = 3 ! default: use 2 GB for 3-ind_tran (Cholesky)
       logical :: Restart    = FLAG_RESTART
       logical :: Triplet    = FLAG_TRIPLET
@@ -130,6 +134,7 @@ type CalculationBlock
       character(:), allocatable :: BasisSet,BasisSetPath
       character(:), allocatable :: IntegralsFilePath
       integer :: Max_Cn = 3
+      double precision :: FreqOm = 0.d0
       logical :: CAlpha = .false.
 end type CalculationBlock
 
@@ -231,7 +236,8 @@ type SystemBlock
       double precision,allocatable :: AP(:,:),PP(:)
       double precision  :: charg(maxcen),xyz(maxcen,3)
 
-      integer :: Max_Cn = 3
+      integer :: Max_Cn = 10
+      double precision :: FreqOm = 0.d0
 
 end type SystemBlock
 
@@ -272,6 +278,8 @@ type FlagsData
      integer :: IGVB    = 1
      integer :: ITwoEl    = TWOMO_INCORE 
      integer :: IRedVirt  = FLAG_REDVIRT
+     integer :: IOrbRelax = FLAG_ORBRELAX
+     integer :: IOrbIncl  = FLAG_ORBINCL
      integer :: ICholesky     = FLAG_CHOLESKY
      integer :: ICholeskyBIN  = FLAG_CHOLESKY_BIN
      integer :: ICholeskyOTF  = FLAG_CHOLESKY_OTF

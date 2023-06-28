@@ -377,9 +377,9 @@ enddo
 
 deallocate(work1)
 
-Print*, 'from JK_Chol_loop'
-Print*, 'ABPLUS-after K',norm2(ABPLUS)
-Print*, 'ABMIN -after K',norm2(ABMIN)
+!Print*, 'from JK_Chol_loop'
+!Print*, 'ABPLUS-after K',norm2(ABPLUS)
+!Print*, 'ABMIN -after K',norm2(ABMIN)
 !ABPLUS = 0
 !ABMIN  = 0
 !HNO = HNO_save
@@ -669,8 +669,8 @@ do iloop=1,nloop
 
 enddo
 
-Print*, 'ABPLUS-after J',norm2(ABPLUS)
-Print*, 'ABMIN -after J',norm2(ABMIN)
+!Print*, 'ABPLUS-after J',norm2(ABPLUS)
+!Print*, 'ABMIN -after J',norm2(ABMIN)
 
 !ABPLUS = 0
 !ABMIN  = 0

@@ -414,6 +414,21 @@ subroutine read_block_calculation(CalcParams, line)
                CalcParams%RedVirt = 1
            endif
 
+      case ("ORBRELAX")
+           if (uppercase(val) == ".FALSE.".or. &
+               uppercase(val) == "FALSE".or.   &
+               uppercase(val) == "F") then
+               CalcParams%OrbRelax = 0
+           endif
+
+      case ("ORBINCL", "ORBINCLUDE")
+           if (uppercase(val) == ".TRUE.".or. &
+               uppercase(val) == "TRUE".or.   &
+               uppercase(val) == "T") then
+               CalcParams%OrbIncl = 1
+           endif
+
+
       ! here not sure
       case ("RESPONSE")
            if (uppercase(val) == "ERPA-APSG".or.&

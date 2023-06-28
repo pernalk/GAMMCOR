@@ -75,17 +75,26 @@ C     FILL COMMONS AND CONSTANTS
       Charge  = System%Charge
       NBasis  = System%NBasis
       BasisSet= Flags%BasisSetPath // Flags%BasisSet
+C
       Title   = Flags%JobTitle
+C
       ITwoEl  = Flags%ITwoEl
       ICholesky     = Flags%ICholesky
       ICholeskyBIN  = Flags%ICholeskyBIN
       ICholeskyOTF  = Flags%ICholeskyOTF
       ICholeskyAccu = Flags%ICholeskyAccu
+C
       MemVal  = Flags%MemVal
       MemType = Flags%MemType
+C
       IWarn   = 0
       Max_Cn  = System%Max_Cn
       ITrpl   = Flags%ITrpl
+      FreqOm  = System%FreqOm
+      IRedVirt  = Flags%IRedVirt
+      IOrbRelax = Flags%IOrbRelax
+      IOrbIncl  = Flags%IOrbIncl
+C
 C
 C     *************************************************************************
 C
