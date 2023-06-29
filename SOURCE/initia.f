@@ -1976,6 +1976,14 @@ C
      $        NBasis,UAux,
      $        Num0+Num1,UAux(1:NBasis,1:(Num0+Num1)),
      $        'FOFO','AOTWOSORT')
+      If(IRedVirt==1.and.IOrbRelax==1) Then ! orbital relaxation
+      Call tran4_gen(NBasis,
+     $        NBasis,UAux,
+     $        Num0+Num1,UAux(1:NBasis,1:(Num0+Num1)),
+     $        NBasis,UAux,
+     $        Num0+Num1,UAux(1:NBasis,1:(Num0+Num1)),
+     $        'FFFO','AOTWOSORT')
+      EndIf
 C
       Call clock('tran4_FOFO',Tcpu,Twall)
 C

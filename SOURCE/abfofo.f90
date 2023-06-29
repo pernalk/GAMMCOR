@@ -805,7 +805,7 @@ Do I=1,NBasis
    If ( IOrbIncl==1 ) Then
      If(Occ(I).Gt.0.5) NOccupResp=NOccupResp+1  
      If(Occ(I).Gt.0.5) NVirtResp=NVirtResp+1
-   ElseIf (IOrbIncl == 0) Then
+   ElseIf ( IOrbIncl == 0 ) Then
    !  exclude active orbitals
      If(Occ(I).Gt.0.999) NOccupResp=NOccupResp+1
      If(Occ(I).Gt.1.D-4) NVirtResp=NVirtResp+1
