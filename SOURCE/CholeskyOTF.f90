@@ -132,7 +132,7 @@ subroutine CholeskyOTF_Fock_MO_v2(F_mo,CholeskyVecsOTF, &
                              AOBasis,System,Monomer,Source,&
                              Cmat,CSAO,H0in,GammaF,&
                              MemType,MemVal,NInte1,NBasis,&
-                             J_mo,K_mo)
+                             IH0Test,J_mo,K_mo)
 !
 !     Generate Fock matrix (NBasis,NBasis) in MO basis
 !     from Cholesky OTF vectors
@@ -149,6 +149,7 @@ integer,intent(in)          :: Monomer
 character(6),intent(in)     :: Source
 integer,intent(in)          :: NInte1,NBasis
 integer,intent(in)          :: MemType,MemVal
+integer,intent(in)          :: IH0Test
 double precision,intent(in) :: H0in(NInte1),GammaF(NInte1)
 double precision,intent(in) :: Cmat(NBasis,NBasis),CSAO(NBasis,NBasis)
 
@@ -221,7 +222,11 @@ endif
 ! obtain H0 and check if they match
 call chol_H0_mo(H0_int,Cmat,AOBasis,System,ORBITAL_ORDERING)
 
-call CholeskyOTF_H0_test(H0_int,H0_mo,NBasis)
+if(IH0Test==1) then
+   call CholeskyOTF_H0_test(H0_int,H0_mo,NBasis)
+elseif(IH0Test==0) then
+   write(6,'(/,1x,"Skipping H0 Test...")')
+endif
 
 !transform Cholesky vecs to MO
 allocate(MatFFMO(NCholesky,NBasis**2),ints(NBasis**2))

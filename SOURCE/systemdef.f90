@@ -136,6 +136,7 @@ else
    Flags%ICholeskyBIN  = Input%CholeskyParams%CholeskyBIN
    Flags%ICholeskyOTF  = Input%CholeskyParams%CholeskyOTF
    Flags%ICholeskyAccu = Input%CholeskyParams%CholeskyAccu
+   Flags%IH0Test       = Input%CholeskyParams%H0Test
 
   ! reduce virtuals
    Flags%IRedVirt = Input%CalcParams%RedVirt

@@ -723,6 +723,7 @@ double precision,allocatable :: ints_J(:,:),ints_K(:,:),   &
                                 ints_bi(:,:),ints_bk(:,:),ints_dl(:,:), &
                                 work(:),workTr(:),workSq(:,:)
 integer          :: EndVirt,NBasisNew
+logical          :: DipCheck
 character(100)   :: num1char
 
 ! set dimensions
@@ -1152,8 +1153,14 @@ write(LOUT,'(/,1x,"Sum of AC0-correlated Occupancies: ",F5.2,/)') val
 
 ! compute transformation matrix to correlated NO's and dipole moments
 Call MultpM(UCorr,AuxMat,UNOAO,NBasis)
-write(LOUT,'(/,x,"Dipole moment with correlated 1-RDM")')
-Call ComputeDipoleMom(UCorr,PC,NBasis,NBasis)
+
+Inquire(file='DIP',exist=DipCheck)
+If(DipCheck) Then
+  write(LOUT,'(/,x,"Dipole moment with correlated 1-RDM")')
+  Call ComputeDipoleMom(UCorr,PC,NBasis,NBasis)
+Else
+  write(LOUT,'(/,x,"Dipole moment ints not available")')
+EndIf
 
 !Call PrOcc1(xmiu,val,PC,NBasis)
 !Write(6,'(/,2X,"Projected Occupancies")')

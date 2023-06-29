@@ -1497,6 +1497,7 @@ integer :: info
                            AOBasis,System,mon%Monomer,'MOLPRO', &
                            CAOMO,CSAOMO,H0,GammaF, &
                            Flags%MemType,Flags%MemVal,NInte1,NBasis, &
+                           Flags%IH0test, &
                            Mon%Jmat,Mon%Kmat)
 
      call sq_to_triang2(FockSq,work2,NBasis)

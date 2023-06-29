@@ -295,6 +295,13 @@ subroutine read_block_cholesky(CholeskyParams, line)
               CholeskyParams%CholeskyAccu = CHOL_ACCU_LUDICROUS
            endif
 
+      case ("H0TEST")
+           if (uppercase(val) == ".FALSE.".or. &
+               uppercase(val) == "FALSE".or.   &
+               uppercase(val) == "F") then
+               CholeskyParams%H0test = 0
+           endif
+
       end select
 
 end subroutine read_block_cholesky
@@ -427,7 +434,6 @@ subroutine read_block_calculation(CalcParams, line)
                uppercase(val) == "T") then
                CalcParams%OrbIncl = 1
            endif
-
 
       ! here not sure
       case ("RESPONSE")

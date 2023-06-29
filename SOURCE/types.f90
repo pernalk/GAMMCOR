@@ -57,6 +57,7 @@ integer, parameter :: TWOMO_FOFO   = 3
 integer, parameter :: FLAG_CHOLESKY = 0
 integer, parameter :: FLAG_CHOLESKY_BIN   = 0
 integer, parameter :: FLAG_CHOLESKY_OTF   = 0
+integer, parameter :: FLAG_H0TEST         = 1
 integer, parameter :: CHOL_ACCU_DEFAULT   = 1
 integer, parameter :: CHOL_ACCU_TIGHT     = 2
 integer, parameter :: CHOL_ACCU_LUDICROUS = 3
@@ -247,6 +248,7 @@ type CholeskyBlock
       integer :: CholeskyBIN  = FLAG_CHOLESKY_BIN
       integer :: CholeskyOTF  = FLAG_CHOLESKY_OTF
       integer :: CholeskyAccu = CHOL_ACCU_DEFAULT
+      integer :: H0test       = FLAG_H0TEST ! check 1el ints with CholeskyOTF
 
 end type CholeskyBlock
 
@@ -284,6 +286,7 @@ type FlagsData
      integer :: ICholeskyBIN  = FLAG_CHOLESKY_BIN
      integer :: ICholeskyOTF  = FLAG_CHOLESKY_OTF
      integer :: ICholeskyAccu = CHOL_ACCU_DEFAULT
+     integer :: IH0Test   = FLAG_H0TEST
      integer :: IFun      = 13
      integer :: IFunSR    = 0 
      integer :: IFunSRKer = 0

@@ -1,7 +1,8 @@
       Common/MISCFL/ XELE,IFun,IFunSR,IFunSRKer,NELE,IRes,INO,IPrint,
      $ IInteg,IAO,IGVB,IFreeze,ILoc,NInActOrb,NActOrb,NVirtOrb,
      $ ISAPT,IWarn,ITwoEl,ITrpl,
-     $ ICholesky,ICholeskyBIN,ICholeskyOTF,ICholeskyAccu,MemVal,MemType
+     $ ICholesky,ICholeskyBIN,ICholeskyOTF,ICholeskyAccu,MemVal,MemType,
+     $ IH0test
       Common/INTF/ IDALTON,IMOLPRO,ITREXIO
       Common/CAS/ ICASSCF,NAcCAS,NInAcCAS,NStates,
      $ InSt(2,100),InTrSt(2,1),ISpinMs2

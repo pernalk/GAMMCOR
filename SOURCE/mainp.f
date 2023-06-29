@@ -83,6 +83,7 @@ C
       ICholeskyBIN  = Flags%ICholeskyBIN
       ICholeskyOTF  = Flags%ICholeskyOTF
       ICholeskyAccu = Flags%ICholeskyAccu
+      IH0test       = Flags%IH0test
 C
       MemVal  = Flags%MemVal
       MemType = Flags%MemType

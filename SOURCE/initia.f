@@ -646,7 +646,8 @@ C
          Call CholeskyOTF_Fock_MO_v2(WorkSq,CholeskyVecsOTF,
      $                         AOBasis,System,Monomer,'ORCA  ',
      $                         CAOMO,CAOMO,XKin,GammaAB,
-     $                         MemType,MemVal,NInte1,NBasis)
+     $                         MemType,MemVal,NInte1,NBasis,
+     $                         IH0Test)
 C        unpack Fock in MO (WorkSq) to triangle
          Call sq_to_triang2(WorkSq,FockF,NBasis)
 C
@@ -866,6 +867,16 @@ C     TRANSFORM J AND K
      $        NBasis,UAux,
      $        Num0+Num1,UAux(1:NBasis,1:(Num0+Num1)),
      $        'FOFO','AOTWOSORT')
+C
+      If(IOrbRelax==1) Then
+      Call tran4_gen(NBasis,
+     $        NBasis,UAux,
+     $        Num0+Num1,UAux(1:NBasis,1:(Num0+Num1)),
+     $        NBasis,UAux,
+     $        NBasis,UAux,
+     $        'FFFO','AOTWOSORT')
+      EndIf
+C      
       ElseIf(ICholesky==1) Then
 C
 C    set buffer size for Cholesky AO2NO transformation
@@ -937,7 +948,22 @@ C      Call chol_ints_fofo(NBasis,NBasis,MatFF,
 C     $                    Num0+Num1,Num0+Num1,MatFF,
 C     $                    NCholesky,NBasis,'FFOO')
 C
+      If(IRedVirt==0) Then
       Write(6,'(/," Skipping FOFO/FFOO assembling")')
+      ElseIf(IRedVirt==1) Then
+        Write(6,'(/," Assemble FOFO/FFOO integrals")')
+      Call chol_ints_fofo(NBasis,Num0+Num1,MatFF,
+     $                    NBasis,Num0+Num1,MatFF,
+     $                    NCholesky,NBasis,'FOFO')
+      Call chol_ints_fofo(NBasis,NBasis,MatFF,
+     $                    Num0+Num1,Num0+Num1,MatFF,
+     $                    NCholesky,NBasis,'FFOO')
+C
+      If(IOrbRelax==1) Then
+        Call chol_ffoo_batch(MatFF,NBasis,Num0+Num1,MatFF,
+     $                      NCholesky,NBasis,'FFFO')
+      EndIf
+      EndIf
 C
       open(newunit=iunt,file='cholvecs',form='unformatted')
       write(iunt) NCholesky
@@ -1768,7 +1794,8 @@ C
            Call CholeskyOTF_Fock_MO_v2(work1,CholeskyVecsOTF,
      $                          AOBasis,System,Monomer,'MOLPRO',
      $                          CAOMO,CSAOMO,XKin,GammaF,
-     $                          MemType,MemVal,NInte1,NBasis)
+     $                          MemType,MemVal,NInte1,NBasis,
+     $                          IH0Test)
 C
 C         unpack Fock in MO (work1) to triangle
           Call sq_to_triang2(work1,FockF,NBasis)
@@ -1993,12 +2020,6 @@ C
       EndIf ! Cholesky BIN / OTF
 C
       Call clock('chol_NOTransf',Tcpu,Twall)
-C
-c     Write(6,'(/," Assemble FOFO/FFOO integrals")'
-c     Call chol_fofo_batch(Num0+Num1,MatFF,Num0+Num1,MatFF,
-c    $                     NCholesky,NBasis,'FOFO')
-c     Call chol_ffoo_batch(MatFF,Num0+Num1,Num0+Num1,MatFF,
-c    $                     NCholesky,NBasis,'FFOO')
 C
       If(IRedVirt==0) Then
         Write(6,'(/," Skipping FOFO/FFOO assembling")')
