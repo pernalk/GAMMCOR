@@ -1029,7 +1029,7 @@ double precision,intent(out) :: Fmat(NBas,NBas)
 
 integer :: i,j
 
-Fmat = 0
+Fmat = 0d0
 select case(variant)
 case(0)
    ! HF

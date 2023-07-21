@@ -58,6 +58,9 @@ double precision :: Tcpu,Twall
  ! switch to Cholesky SAPT
  if(Flags%ICholesky==1) call sapt_Cholesky(Flags,SAPT,Tcpu,TWall,NBasis)
 
+ ! switch to SAPT(DMFT)
+ if(SAPT%SaptExch==1) call sapt_dmft(Flags,SAPT,Tcpu,TWall,NBasis)
+
  ! switch to extrapolated SAPT
  if(SAPT%monA%Cubic.or.SAPT%monB%Cubic) call sapt_extrapol(Flags,SAPT,NBasis)
 
@@ -232,6 +235,43 @@ logical          :: onlyDisp
  stop
 
 end subroutine sapt_driver_red
+
+subroutine sapt_dmft(Flags,SAPT,Tcpu,Twall,NBasis)
+!
+! sapt driver with Cholesky decompositon
+! Flags%isCholesky==1
+!
+implicit none
+
+type(FlagsData)    :: Flags
+type(SaptData)     :: SAPT
+integer,intent(in) :: NBasis
+double precision,intent(inout) :: Tcpu,Twall
+integer :: i
+
+write(LOUT,'(1x,a)') 'SAPT(MC) with DMFT exchange'
+
+call e1elst(SAPT%monA,SAPT%monB,SAPT)
+call e1exch_dmft(Flags,SAPT%monA,SAPT%monB,SAPT)
+call e1exch_dmft_2(Flags,SAPT%monA,SAPT%monB,SAPT)
+
+call e2ind(Flags,SAPT%monA,SAPT%monB,SAPT)
+call e2disp(Flags,SAPT%monA,SAPT%monB,SAPT)
+
+call e2exind(Flags,SAPT%monA,SAPT%monB,SAPT)
+call e2exdisp(Flags,SAPT%monA,SAPT%monB,SAPT)
+
+call summary_sapt(SAPT)
+!call summary_sapt_verbose(SAPT)
+
+call print_warn(SAPT)
+call free_sapt(Flags,SAPT)
+
+call clock('SAPT',Tcpu,Twall)
+
+stop
+
+end subroutine sapt_dmft
 
 subroutine sapt_Cholesky(Flags,SAPT,Tcpu,Twall,NBasis)
 !

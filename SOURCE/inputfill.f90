@@ -287,11 +287,14 @@ subroutine read_block_cholesky(CholeskyParams, line)
            endif
 
       case ("CHOL_ACCU","CHOL_ACCURACY","CHOLESKY_ACCU","CHOLESKY_ACCURACY")
-           if (uppercase(val) == "DEFAULT") then
+           if (uppercase(val) == "DEFAULT" .or. &
+               uppercase(val) == "D" ) then
               CholeskyParams%CholeskyAccu = CHOL_ACCU_DEFAULT
-           elseif (uppercase(val) == "TIGHT") then
+           elseif (uppercase(val) == "TIGHT" .or. &
+                   uppercase(val) == "T" ) then
               CholeskyParams%CholeskyAccu = CHOL_ACCU_TIGHT
-           elseif (uppercase(val) == "LUDICROUS") then
+           elseif (uppercase(val) == "LUDICROUS" .or. &
+                   uppercase(val) == "L" ) then
               CholeskyParams%CholeskyAccu = CHOL_ACCU_LUDICROUS
            endif
 
@@ -435,6 +438,15 @@ subroutine read_block_calculation(CalcParams, line)
                CalcParams%OrbIncl = 1
            endif
 
+      case ("RDM2APP")
+           if (uppercase(val) == "HF".or. &
+               uppercase(val) == "HARTREE-FOCK") then
+               CalcParams%Rdm2Type = 0
+           elseif (uppercase(val) == "BB".or. &
+               uppercase(val) == "DMFT") then
+               CalcParams%Rdm2Type = 1
+           endif
+
       ! here not sure
       case ("RESPONSE")
            if (uppercase(val) == "ERPA-APSG".or.&
@@ -512,6 +524,11 @@ subroutine read_block_calculation(CalcParams, line)
            elseif (uppercase(val) == "RS+".or. &
                    uppercase(val) == "RSPT2+") then
               CalcParams%SaptLevel = 666
+           endif
+
+      case("SAPTEXCH")
+           if (uppercase(val) == "DMFT") then
+               CalcParams%SaptExch = 1
            endif
 
       case("RESTART")

@@ -366,15 +366,411 @@ enddo
 intA = -2d0*intA
 intB = -2d0*intB
 
-!print*, ''
-!print*, 'intA',norm2(intA)
-!print*, 'intB',norm2(intB)
+print*, ''
+print*, 'exind_A3_XY_full:'
+print*, 'intA',norm2(intA)
+print*, 'intB',norm2(intB)
 
 deallocate(intsr,ints,work,tmp)
 deallocate(calkA)
 deallocate(intV,intAB)
 
 end subroutine exind_A3_XY_full
+
+subroutine app_exi_A3_XY_full(dim1,dim2,intA,intB,occA,occB,IRDM2Type,Sab, &
+                    AXELE,Vabb,BXELE,Vbaa,IntKFile,&
+                    BIndN,AIndN,posB,posA,dimOB,dimOA,BDimX,ADimX,NBas)
+implicit none
+
+integer,intent(in) :: dim1,dim2,dimOA,dimOB,ADimX,BDimX,NBas
+integer,intent(in) :: IRDM2Type
+integer,intent(in) :: AIndN(2,ADimX),BIndN(2,BDimX)
+integer,intent(in) :: posA(NBas,NBas),posB(NBas,NBas) 
+character(*) :: IntKFile
+double precision,intent(inout) :: intA(dim1),intB(dim2)
+double precision,intent(in) :: AXELE,BXELE
+double precision,intent(in) :: occA(NBas),occB(NBas)
+double precision,intent(in) :: Sab(NBas,NBas),Vabb(NBas,NBas),Vbaa(NBas,NBas)
+
+integer :: iunit
+integer :: i,j,k,l,kl,ip,iq,ir,ia,ib,ic,iac,ipr
+integer :: it,is,id,ie
+double precision :: AlphaA(NBas),AlphaB(NBas) 
+double precision :: vAA,vBA,vAB,vBB
+double precision :: fact,val
+double precision :: Sxx(NBas,NBas),S10(NBas,NBas)
+double precision :: TA(dimOA,dimOA),TB(dimOB,dimOB),U(dimOA,dimOB)
+double precision :: intOAl(NBas,NBas),intOAr(NBas,NBas)
+double precision :: intOBl(NBas,NBas),intOBr(NBas,NBas)
+double precision,allocatable :: work(:),ints(:,:),tmp(:,:)
+double precision,allocatable :: intOA(:,:),intOB(:,:),  &
+                                intVaa(:,:),intVbb(:,:),&
+                                intVi(:,:),intVo(:,:)
+double precision,external :: ddot
+
+Sxx = 0d0
+do i=1,NBas
+   Sxx(i,i) = 1d0
+enddo
+
+AlphaA = 0d0
+AlphaB = 0d0
+if(IRDM2Type==0) then
+   do i=1,dimOA
+      AlphaA(i) = occA(i)
+   enddo
+   do i=1,dimOB
+      AlphaB(i) = occB(i)
+   enddo
+elseif(IRDM2Type==1) then
+   do i=1,dimOA
+      AlphaA(i) = sqrt(occA(i))
+   enddo
+   do i=1,dimOB
+      AlphaB(i) = sqrt(occB(i))
+   enddo
+endif
+
+allocate(intOA(NBas,NBas),intOB(NBas,NBas))
+allocate(intVaa(NBas,NBas),intVbb(NBas,NBas))
+allocate(intVi(NBas,NBas),intVo(NBas,NBas))
+
+S10 = 0d0
+do ia=1,NBas
+   do ip=1,dimOA
+      S10(ip,ia) = AlphaA(ip)*Sab(ip,ia)
+   enddo
+enddo
+
+! intermediate from overlap integrals
+! intOA(a,a') = sum_b S^01(a,b).S^01(a',b)
+intOA = 0d0
+do ir=1,NBas
+   do ip=1,NBas
+      do ib=1,dimOB
+         intOA(ip,ir) = intOA(ip,ir) + occB(ib)*Sab(ip,ib)*Sab(ir,ib)
+      enddo
+   enddo
+enddo
+! intOB(b,b') = sum_a S^10(a,b).S^10(a,b')
+intOB = 0d0
+do ib=1,NBas
+   do ia=1,NBas
+      do iq=1,dimOA
+         intOB(ia,ib) = intOB(ia,ib) + occA(iq)*Sab(iq,ia)*Sab(iq,ib)
+      enddo
+   enddo
+enddo
+
+TB = 0d0
+do ib=1,dimOB
+   do ia=1,dimOB
+      fact = AlphaB(ia)*AlphaB(ib)
+      do iq=1,dimOA
+         TB(ia,ib) = TB(ia,ib) + occA(iq)*fact*Sab(iq,ia)*Sab(iq,ib)
+      enddo
+   enddo
+enddo
+TA = 0d0
+do iq=1,dimOA
+   do ip=1,dimOA
+      fact = AlphaA(ip)*AlphaA(iq)
+      do ib=1,dimOB
+         TA(ip,iq) = TA(ip,iq) + occB(ib)*fact*Sab(ip,ib)*Sab(iq,ib)
+      enddo
+   enddo
+enddo
+
+allocate(work(NBas*NBas),ints(NBas,NBas))
+allocate(tmp(NBas,NBas))
+
+!(FO|FO): (AA|BB)
+open(newunit=iunit,file=trim(IntKFile),status='OLD', &
+     access='DIRECT',recl=8*NBas*dimOA)
+
+! one loop over integrals
+ints   = 0d0
+intVi  = 0d0
+intVo  = 0d0
+intVaa = 0d0
+intVbb = 0d0
+U      = 0d0
+kl = 0
+do l=1,dimOB
+   do k=1,NBas
+      kl = kl + 1
+      read(iunit,rec=kl) work(1:NBas*dimOA)
+
+      call ints_modify(NBas,dimOA,ints,NBas,work,&
+                       Vabb(k,l)/AXELE,Sxx,Sxx(k,l)/BXELE,Vbaa)
+
+      ib = l
+      ia = k
+
+      fact = 0.5d0*AlphaB(ia)*AlphaB(ib)
+
+      ! A part
+      if (k <= dimOB) then
+
+         if (ia == ib) then
+
+            do ir=1,dimOA
+               do ip=1,NBas
+                  intVaa(ip,ir) = intVaa(ip,ir) + occB(ib)*ints(ip,ir)
+               enddo
+            enddo
+
+         endif
+
+         ! 1-1b
+         do i=1,ADimX
+
+            ip = AIndN(1,i)
+            ir = AIndN(2,i)
+            ipr = posA(ip,ir)
+
+            val = 0.5d0*(occA(ir)-occA(ip))
+
+            intA(ipr) = intA(ipr) - val*ints(ip,ir)*TB(ia,ib)
+
+         enddo
+
+         do iq=1,dimOA
+
+            ! for 2-1b
+            U(ia,ib) = U(ia,ib) + fact*occA(iq)*ints(iq,iq)
+
+            ! outer: Sum_{a'b'} (aa'|b'b) sqrt(n_a') sqrt(n_b') S(a',b')
+            ! used in A part
+            do ip=1,NBas
+               intVo(ip,ib) = intVo(ip,ib) + AlphaA(iq)*AlphaB(ia)*ints(ip,iq)*Sab(iq,ia)
+            enddo
+
+         enddo
+
+      endif ! k <=dimOB
+
+      ! B part
+      do ip=1,dimOA
+         intVbb(ia,ib) = intVbb(ia,ib) + occA(ip)*ints(ip,ip)
+      enddo
+
+      ! inner: Sum_{a'b'} (a'a|bb') sqrt(n_a') sqrt(n_b') S(a',b')
+      ! used in B part
+      do iq=1,dimOA
+         do ip=1,dimOA
+            intVi(iq,ia) = intVi(iq,ia) + AlphaA(ip)*AlphaB(ib)*ints(ip,iq)*Sab(ip,ib)
+         enddo
+      enddo
+
+      ic = l
+      ia = k
+
+      iac = posB(ia,ic)
+
+      ! (B) 1-1b
+      if(iac/=0) then
+
+         val = 0.5d0*(occB(ic)-occB(ia))
+
+         do iq=1,dimOA
+            do ip=1,dimOA
+               intB(iac) = intB(iac) - val*ints(ip,iq)*TA(ip,iq)
+            enddo
+         enddo
+
+      endif
+
+   enddo
+enddo
+
+!print*, 'A:11b',norm2(intA)
+!print*, 'B:11b',norm2(intB)
+
+close(iunit)
+
+! A
+vAA = 0d0
+vBA = 0d0
+do iq=1,dimOA
+   vAA = vAA + occA(iq)*intOA(iq,iq)
+   vBA = vBA + occA(iq)*intVaa(iq,iq)
+enddo
+! B
+vAB = 0d0
+vBB = 0d0
+do ib=1,dimOB
+   vAB = vAB + occB(ib)*intOB(ib,ib)
+   vBB = vBB + occB(ib)*intVbb(ib,ib)
+enddo
+! A
+intOAl = 0d0
+intOAr = 0d0
+do ir=1,NBas
+   do iq=1,dimOA
+      intOAl(iq,ir) = AlphaA(iq)*intOA(iq,ir)
+      intOAr(ir,iq) = AlphaA(iq)*intOA(ir,iq)
+   enddo
+enddo
+! B
+intOBl = 0d0
+intOBr = 0d0
+do ic=1,NBas
+   do ib=1,dimOB
+      intOBl(ib,ic) = AlphaB(ib)*intOB(ib,ic)
+      intOBr(ic,ib) = AlphaB(ib)*intOB(ic,ib)
+   enddo
+enddo
+
+! A part
+do i=1,ADimX
+
+   ip = AIndN(1,i)
+   ir = AIndN(2,i)
+   ipr = posA(ip,ir)
+
+   fact = occA(ir) - occA(ip)
+
+   ! 1-1a
+   intA(ipr) = intA(ipr) + fact*intVaa(ip,ir)*vAA
+
+   ! 2-1a
+   intA(ipr) = intA(ipr) + fact*intOA(ip,ir)*vBA
+
+   ! 1-1b is done in ints loop
+
+   ! 2-1b
+   val = 0d0
+   do ib=1,dimOB
+      do ia=1,dimOB
+         val = val - U(ia,ib)*Sab(ip,ia)*Sab(ir,ib)
+      enddo
+   enddo
+   intA(ipr) = intA(ipr) + fact*val
+
+enddo
+!print*, 'A:11a:21a:21b',norm2(intA)
+
+! B part
+call dgemm('N','N',NBas,NBas,NBas,1d0,intVaa,NBas,S10,NBas,0d0,tmp,NBas)
+do i=1,BDimX
+
+   ia = BIndN(1,i)
+   ic = BIndN(2,i)
+   iac = posB(ia,ic)
+
+   fact = occB(ic) - occB(ia)
+
+   ! (B) 1-1a
+   intB(iac) = intB(iac) + fact*intVbb(ia,ic)*vAB
+
+   ! (B) 2-1a
+   intB(iac) = intB(iac) + fact*intOB(ia,ic)*vBB
+
+   ! (B) 1-1b is done in ints loop
+
+   ! (B) 2-1b
+   !call dgemm('N','N',NBas,NBas,NBas,fact,intVaa,NBas,S10,NBas,0d0,tmp,NBas)
+   !call dgemm('T','N',NBas,NBas,NBas,-0.5d0,S10,NBas,tmp,NBas,1d0,intB,NBas)
+   val = 0d0
+   do ip=1,dimOA
+      val = val + S10(ip,ia)*tmp(ip,ic)
+   enddo
+   intB(iac) = intB(iac) -0.5d0*fact*val
+
+enddo
+!print*, 'B:11a:21a:21b',norm2(intB)
+
+! A part : sqrt(n_r) - sqrt(n_p)
+do i=1,ADimX
+
+   ip = AIndN(1,i)
+   ir = AIndN(2,i)
+   ipr = posA(ip,ir)
+
+   fact = AlphaA(ip) - AlphaA(ir)
+
+   ! 3-1a
+   intA(ipr) = intA(ipr) + 0.5d0*fact*dot_product(intVaa(ip,:),intOAl(:,ir))
+   !intA(ipr) = intA(ipr) + 0.5d0*fact*ddot(NBas,intVaa(ip,1),NBas,intOAl(:,ir),1)
+
+   ! 4-1a
+   intA(ipr) = intA(ipr) + 0.5d0*fact*dot_product(intOAr(ip,:),intVaa(:,ir))
+   !intA(ipr) = intA(ipr) + 0.5d0*fact*ddot(NBas,intOAr(ip,1),NBas,intVaa(:,ir),1)
+
+   ! 3-1b
+   val = 0d0
+   do ib=1,dimOB
+       val = val + AlphaB(ib)*intVo(ip,ib)*Sab(ir,ib)
+   enddo
+   intA(ipr) = intA(ipr) - 0.25d0*fact*val
+
+   ! 4-1b
+   val = 0d0
+   do ib=1,dimOB
+       val = val + AlphaB(ib)*intVo(ir,ib)*Sab(ip,ib)
+   enddo
+   intA(ipr) = intA(ipr) - 0.25d0*fact*val
+
+enddo
+!print*, 'A:31a:41a:31b:41b',norm2(intA)
+!print*, 'A:31b:41b',norm2(intA)
+!print*, 'A:31a:41a',norm2(intA)
+
+! B part : sqrt(n_a) - sqrt(n_c)
+do i=1,BDimX
+
+   ia = BIndN(1,i)
+   ic = BIndN(2,i)
+   iac = posB(ia,ic)
+
+   fact = AlphaB(ia) - AlphaB(ic)
+
+   ! (B) 3-1a
+   intB(iac) = intB(iac) + 0.5d0*fact*dot_product(intVbb(ip,:),intOBl(:,ir))
+   !intB(iac) = intB(iac) + 0.5d0*fact*ddot(NBas,intVbb(ia,1),NBas,intOBl(:,ic),1)
+
+   ! (B) 4-1a
+   intB(iac) = intB(iac) + 0.5d0*fact*dot_product(intObr(ia,:),intVbb(:,ic))
+   !intB(iac) = intB(iac) + 0.5d0*fact*ddot(NBas,intObr(ia,1),NBas,intVbb(:,ic),1)
+
+   ! (B) 3-1b
+   val = 0d0
+   do iq=1,dimOA
+      val = val + AlphaA(iq)*intVi(iq,ia)*Sab(iq,ic)
+   enddo
+   intB(iac) = intB(iac) - 0.25d0*fact*val
+
+   ! (B) 4-1b
+   val = 0d0
+   do iq=1,dimOA
+      val = val + AlphaA(iq)*intVi(iq,ic)*Sab(iq,ia)
+   enddo
+   intB(iac) = intB(iac) - 0.25d0*fact*val
+
+enddo
+!print*, 'B:31a:41a:31b:41b',norm2(intB)
+!print*, 'B:31b:41b',norm2(intB)
+!print*, 'B:31a:41a',norm2(intB)
+
+!intA = -2d0*intA
+!intB = -2d0*intB
+intA = -8d0*intA
+intB = -8d0*intB
+
+print*, ''
+print*, 'app_exi_A3_XY_full:'
+print*, 'intA',norm2(intA)
+print*, 'intB',norm2(intB)
+
+!intA = 0d0
+!intB = 0d0
+
+deallocate(intOB,intOA)
+deallocate(intVo,intVi,intVbb,intVaa)
+deallocate(tmp,ints,work)
+
+end subroutine app_exi_A3_XY_full
 
 subroutine exind_A3_XY(dim1,dim2,intX,intY,RDM2Aval,RDM2Bval,Sab, &
                     AXELE,Vabb,BXELE,Vbaa,IntKFile,&
@@ -558,8 +954,8 @@ enddo
 intX = -2d0*intX
 intY = -2d0*intY
 
-!print*, 'intX',norm2(intX)
-!print*, 'intY',norm2(intY)
+print*, 'intX',norm2(intX)
+print*, 'intY',norm2(intY)
 
 deallocate(intsr,tints,ints,work,tmp)
 deallocate(calkA)
@@ -764,12 +1160,214 @@ do j=1,BDimX
 enddo
 
 !!print*, 'workSq,Amat',norm2(workSq),norm2(Amat)
-!print*, 'A2 intXA',norm2(intXA)
-!print*, 'A2 intXB',norm2(intXB)
+print*, ''
+print*, 'A2 intXA',norm2(intXA)
+print*, 'A2 intXB',norm2(intXB)
 
 deallocate(ints,work,workSq,tmp2,tmp1)
 
 end subroutine exind_A2_XX
+
+subroutine app_exi_A2_XX(dim1,dim2,intXA,intXB,IRDM2Type,Smat, &
+                    AXELE,Vabb,BXELE,Vbab,IntKFile,&
+                    occB,occA,BIndN,AIndN,posB,posA,&
+                    dimOB,dimOA,BDimX,ADimX,NBas)
+!
+! compute A2A and A2B contributions to the X part
+!
+implicit none
+
+integer,intent(in) :: dim1,dim2,dimOA,dimOB,ADimX,BDimX,NBas
+integer,intent(in) :: AIndN(2,ADimX),BIndN(2,BDimX),posA(NBas,NBas),posB(NBas,NBas) 
+integer,intent(in) :: IRDM2Type
+character(*) :: IntKFile
+double precision,intent(inout) :: intXA(dim1),intXB(dim2)
+double precision,intent(in) :: AXELE,BXELE,occA(NBas),occB(NBas),&
+                               Smat(NBas,NBas),Vabb(NBas,NBas),Vbab(NBas,NBas)
+
+integer :: iunit
+integer :: i,j,k,l,kl,ip,ir,ipr,ia,ib,ic,iac
+double precision :: AlphaA(NBas),AlphaB(NBas)
+double precision :: fact,val
+double precision :: Sxx(NBas,NBas)
+double precision :: S20(NBas,NBas),S21(NBas,NBas),S22(NBas,NBas)
+double precision :: intR(NBas,NBas),intO(NBas,NBas)
+double precision,allocatable :: work(:),ints(:,:)
+
+Sxx = 0
+do i=1,NBas
+   Sxx(i,i) = 1d0
+enddo
+
+AlphaA = 0d0
+AlphaB = 0d0
+if(IRDM2Type==0) then
+   do i=1,dimOA
+      AlphaA(i) = occA(i)
+   enddo
+   do i=1,dimOB
+      AlphaB(i) = occB(i)
+   enddo
+elseif(IRDM2Type==1) then
+   do i=1,dimOA
+      AlphaA(i) = sqrt(occA(i))
+   enddo
+   do i=1,dimOB
+      AlphaB(i) = sqrt(occB(i))
+   enddo
+endif
+
+S20 = 0d0
+S21 = 0d0
+S22 = 0d0
+do ib=1,dimOB
+   do ia=1,dimOA
+      S20(ia,ib) = occA(ia)*Smat(ia,ib)
+      S21(ia,ib) = occA(ia)*AlphaB(ib)*Smat(ia,ib)
+      S22(ia,ib) = occA(ia)*occB(ib)*Smat(ia,ib)
+   enddo
+enddo
+
+allocate(work(NBas*NBas),ints(NBas,NBas))
+
+!(FO|FO):(BB|BA) or (AA|AB)
+open(newunit=iunit,file=trim(IntKFile),status='OLD', &
+     access='DIRECT',recl=8*NBas*dimOB)
+
+! one loop over integrals
+intR = 0d0
+intO = 0d0
+ints = 0d0
+kl = 0
+do l=1,dimOA
+   do k=1,NBas
+      kl = kl + 1
+      read(iunit,rec=kl) work(1:NBas*dimOB)
+
+      call ints_modify(NBas,dimOB,ints,NBas,work,&
+                       Smat(l,k)/AXELE,Vabb,Vbab(l,k)/BXELE,Sxx)
+
+      ia = l ! A
+      ib = k ! B
+
+      !if(ib<=dimOB) then
+      do ic=1,dimOB
+         intR(ib,ia) = intR(ib,ia) + occB(ic)*ints(ic,ic)
+      enddo
+
+      if(ib<=dimOB) then
+      do ic=1,NBas
+         intO(ic,ia) = intO(ic,ia) + AlphaB(ib)*ints(ic,ib)
+      enddo
+      endif
+
+      ip = l ! A
+      ib = k ! B
+
+      ! 3b
+      do i=1,BDimX
+
+         ia = BIndN(1,i)
+         ic = BIndN(2,i)
+         iac = posB(ia,ic)
+
+         fact = occB(ic) - occB(ia)
+
+         intXB(iac) = intXB(iac) - 4d0*fact*ints(ia,ic)*S22(ip,ib)
+
+      enddo
+
+      ip = l ! A
+      ia = k ! B
+
+      ! 6b
+      do ic=1,dimOB
+
+         iac = posB(ia,ic)
+
+         if(iac/=0) then
+
+            fact = AlphaB(ic) - AlphaB(ia)
+            
+            val = 0d0
+            do ib=1,dimOB
+               val = val + ints(ib,ic)*S21(ip,ib)
+            enddo
+
+            intXB(iac) = intXB(iac) + 2.0d0*fact*val
+
+         endif
+
+      enddo
+
+
+   enddo
+enddo
+close(iunit)
+
+! intXA part
+do i=1,ADimX
+
+   ip  = AIndN(1,i)
+   ir  = AIndN(2,i)
+   ipr = posA(ip,ir)
+
+   fact = occA(ir)-occA(ip)
+
+   ! 1a
+   val = 0d0
+   do ib=1,dimOB
+      val = val + intR(ib,ir)*occB(ib)*Smat(ip,ib) 
+   enddo
+   intXA(ipr) = intXA(ipr) - 4d0*fact*val
+
+   ! 2a
+   val = 0d0
+   do ia=1,dimOB
+      val = val + intO(ia,ir)*AlphaB(ia)*Smat(ip,ia)
+   enddo
+   intXA(ipr) = intXA(ipr) + 2.0d0*fact*val
+
+enddo
+
+! intXB part
+do i=1,BDimX
+
+   ia = BIndN(1,i)
+   ic = BIndN(2,i)
+   iac = posB(ia,ic)
+
+   fact = occB(ic)-occB(ia)
+
+   ! 4b
+   val = 0d0
+   do ip=1,dimOA 
+      val = val + intR(ia,ip)*S20(ip,ic)
+   enddo
+   intXB(iac) = intXB(iac) - 4d0*fact*val
+
+   fact = AlphaB(ic)-AlphaB(ia)
+
+   ! 5b
+   val = 0d0
+   do ip=1,dimOA 
+      val = val + intO(ia,ip)*S20(ip,ic)
+   enddo
+   intXB(iac) = intXB(iac) + 2.0d0*fact*val
+
+enddo
+
+!print*, ''
+!print*, 'app_exi_A2_XX '
+!print*, 'intXA',norm2(intXA)
+!print*, 'intXB',norm2(intXB)
+
+!intXA = 0d0
+!intXB = 0d0
+
+deallocate(work,ints)
+
+end subroutine app_exi_A2_XX
 
 subroutine exind_A2_YY(dim1,dim2,intYA,intYB,RDM2val,Smat,  &
                     AXELE,Vabb,BXELE,Vbab,PAaa,IntKFile,&
@@ -931,12 +1529,211 @@ do j=1,BDimX
 
 enddo
 
-!print*,  'intYA',norm2(intYA)
-!print*,  'intYB',norm2(intYB)
+print*,  'intYA',norm2(intYA)
+print*,  'intYB',norm2(intYB)
 
 deallocate(ints,workSq,work,tmp2,tmp1)
 
 end subroutine exind_A2_YY
+
+subroutine app_exi_A2_YY(dim1,dim2,intYA,intYB,IRDM2Type,Smat, &
+                         AXELE,Vabb,BXELE,Vbab,IntKFile, &
+                         occB,occA,BIndN,AIndN,posB,posA,&
+                         dimOB,dimOA,BDimX,ADimX,NBas)
+implicit none
+
+integer,intent(in) :: dim1,dim2,dimOA,dimOB,ADimX,BDimX,NBas
+integer,intent(in) :: AIndN(2,ADimX),BIndN(2,BDimX),posA(NBas,NBas),posB(NBas,NBas) 
+integer,intent(in) :: IRDM2Type
+character(*) :: IntKFile
+double precision,intent(inout) :: intYA(dim1),intYB(dim2)
+double precision,intent(in) :: AXELE,BXELE,occA(NBas),occB(NBas),&
+                               Smat(NBas,NBas),Vabb(NBas,NBas),Vbab(NBas,NBas)
+
+integer :: iunit
+integer :: i,j,k,l,kl,ip,ir,ipr,ia,ib,ic,iac
+double precision :: AlphaA(NBas),AlphaB(NBas)
+double precision :: fact,val
+double precision :: Sxx(NBas,NBas)
+double precision :: S20(NBas,NBas),S21(NBas,NBas),S22(NBas,NBas)
+double precision :: intR(NBas,NBas),intI(NBas,NBas)
+double precision,allocatable :: work(:),ints(:,:)
+
+Sxx = 0
+do i=1,NBas
+   Sxx(i,i) = 1d0
+enddo
+
+AlphaA = 0d0
+AlphaB = 0d0
+if(IRDM2Type==0) then
+   do i=1,dimOA
+      AlphaA(i) = occA(i)
+   enddo
+   do i=1,dimOB
+      AlphaB(i) = occB(i)
+   enddo
+elseif(IRDM2Type==1) then
+   do i=1,dimOA
+      AlphaA(i) = sqrt(occA(i))
+   enddo
+   do i=1,dimOB
+      AlphaB(i) = sqrt(occB(i))
+   enddo
+endif
+
+S20 = 0d0
+S21 = 0d0
+S22 = 0d0
+do ib=1,NBas
+   do ia=1,dimOA
+      S20(ia,ib) = occA(ia)*Smat(ia,ib)
+   enddo
+enddo
+do ib=1,dimOB
+   do ia=1,dimOA
+      S21(ia,ib) = occA(ia)*AlphaB(ib)*Smat(ia,ib)
+      S22(ia,ib) = occA(ia)*occB(ib)*Smat(ia,ib)
+   enddo
+enddo
+
+allocate(work(NBas*NBas),ints(NBas,NBas))
+
+!(FO|FO):(BB|AB) or (AA|BA)
+open(newunit=iunit,file=trim(IntKFile),status='OLD', &
+     access='DIRECT',recl=8*NBas*dimOB)
+
+! one loop over integrals
+intI = 0d0
+intR = 0d0
+ints = 0d0
+kl = 0
+do l=1,dimOB
+   do k=1,NBas
+      kl = kl + 1
+      read(iunit,rec=kl) work(1:NBas*dimOB)
+
+      call ints_modify(NBas,dimOB,ints,NBas,work,&
+                       Smat(k,l)/AXELE,Vabb,Vbab(k,l)/BXELE,Sxx)
+
+      ib = l
+      ia = k
+
+      do ic=1,dimOB 
+         intR(ia,ib) = intR(ia,ib) + occB(ic)*ints(ic,ic)
+      enddo
+
+      do ic=1,dimOB
+         intI(ic,ia) = intI(ic,ia) + AlphaB(ib)*ints(ib,ic)
+      enddo
+
+      ib = l ! B
+      ip = k ! A
+
+      ! 3b
+      do i=1,BDimX
+
+         ia = BIndN(1,i)
+         ic = BIndN(2,i)
+         iac = posB(ia,ic)
+
+         fact = occB(ia) - occB(ic)
+
+         intYB(iac) = intYB(iac) - 4d0*fact*ints(ia,ic)*S22(ip,ib)
+
+      enddo
+
+      ic = l ! B
+      ip = k ! A
+
+      ! 6b
+      do ia=1,NBas
+
+         iac = posB(ia,ic)
+
+         if(iac/=0) then
+
+            fact = AlphaB(ia) - AlphaB(ic)
+
+            val = 0d0 
+            do ib=1,dimOB
+               val = val + ints(ia,ib)*S21(ip,ib)
+            enddo
+
+            intYB(iac) = intYB(iac) + 2.0d0*fact*val
+
+         endif
+
+      enddo
+
+   enddo
+enddo
+
+close(iunit)
+
+! intYA part
+do i=1,ADimX
+
+   ip  = AIndN(1,i)
+   ir  = AIndN(2,i)
+   ipr = posA(ip,ir)
+
+   fact = occA(ip)-occA(ir)
+
+   ! 1a 
+   val = 0d0
+   do ib=1,dimOB
+      val = val + intR(ip,ib)*occB(ib)*Smat(ir,ib)
+   enddo
+   intYA(ipr) = intYA(ipr) - 4d0*fact*val
+
+   ! 2a
+   val = 0d0
+   do ia=1,dimOB
+      val = val + intI(ia,ip)*AlphaB(ia)*Smat(ir,ia)
+   enddo
+   intYA(ipr) = intYA(ipr) + 2.0d0*fact*val
+
+enddo
+
+! intYB part
+do i=1,BDimX
+
+   ia = BIndN(1,i)
+   ic = BIndN(2,i)
+   iac = posB(ia,ic)
+
+   fact = occB(ia)-occB(ic)
+
+   ! 4b
+   val = 0d0
+   do ip=1,dimOA
+      val = val + intR(ip,ic)*S20(ip,ia)
+   enddo
+   intYB(iac) = intYB(iac) - 4d0*fact*val
+
+   fact = AlphaB(ia)-AlphaB(ic)
+
+   ! 5b
+   val = 0d0
+   do ip=1,dimOA
+      val = val + intI(ic,ip)*S20(ip,ia)
+   enddo
+   intYB(iac) = intYB(iac) + 2.0d0*fact*val
+
+enddo
+
+!intYA = -4d0*intYA
+!intYB = -4d0*intYB
+
+!print*, ''
+!print*, 'app_exi_A2_YY'
+!print*, 'intYA',norm2(intYA)
+!print*, 'intYB',norm2(intYB)
+
+deallocate(ints,work)
+
+end subroutine app_exi_A2_YY
 
 subroutine exind_A1_AB(ANDimX,BNDimX,intXA,intXB,intYA,intYB,AXELE,BXELE,dimOA,dimOB, &
                        AOcc,BOcc,PAaa,PBbb,Vaab,Vbab,Sab,AIndN,BIndN,posA,posB,NBas)

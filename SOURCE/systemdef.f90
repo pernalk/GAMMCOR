@@ -141,6 +141,9 @@ else
   ! reduce virtuals
    Flags%IRedVirt = Input%CalcParams%RedVirt
 
+  ! RDM2 settings
+   Flags%IRdm2Typ = Input%CalcParams%Rdm2Type
+
   ! compute orbital relaxation
    Flags%IOrbRelax = Input%CalcParams%OrbRelax
 
@@ -458,6 +461,7 @@ elseif(Flags%ISAPT.Eq.1) then
 
  SAPT%InterfaceType = Input%CalcParams%InterfaceType
  SAPT%SaptLevel = Input%CalcParams%SaptLevel
+ SAPT%SaptExch  = Input%CalcParams%SaptExch
  SAPT%ic6 = Input%CalcParams%vdWCoef
  SAPT%Max_Cn = Input%CalcParams%Max_Cn
  SAPT%CAlpha = Input%CalcParams%CAlpha

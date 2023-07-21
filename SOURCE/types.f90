@@ -37,6 +37,7 @@ integer, parameter :: SAPTLEVEL2 = 2
 integer, parameter :: FLAG_CORE = 1
 integer, parameter :: FLAG_NOBASIS  = 0
 integer, parameter :: FLAG_REDVIRT  = 0
+integer, parameter :: FLAG_RDM2TYP  = 0
 integer, parameter :: FLAG_ORBRELAX = 1
 integer, parameter :: FLAG_ORBINCL  = 0
 logical, parameter :: FLAG_RESTART = .FALSE.
@@ -119,8 +120,10 @@ type CalculationBlock
       integer :: Core      = FLAG_CORE
       integer :: SymType   = TYPE_NO_SYM
       integer :: SaptLevel = SAPTLEVEL2
+      integer :: SaptExch  = 0
       integer :: vdWCoef   = 0
       integer :: RedVirt   = FLAG_REDVIRT
+      integer :: Rdm2Type  = FLAG_RDM2TYP
       integer :: OrbRelax  = FLAG_ORBRELAX
       integer :: OrbIncl   = FLAG_ORBINCL
       integer :: MemVal = 2, MemType = 3 ! default: use 2 GB for 3-ind_tran (Cholesky)
@@ -280,6 +283,7 @@ type FlagsData
      integer :: IGVB    = 1
      integer :: ITwoEl    = TWOMO_INCORE 
      integer :: IRedVirt  = FLAG_REDVIRT
+     integer :: IRdm2Typ  = FLAG_RDM2TYP
      integer :: IOrbRelax = FLAG_ORBRELAX
      integer :: IOrbIncl  = FLAG_ORBINCL
      integer :: ICholesky     = FLAG_CHOLESKY
@@ -362,6 +366,8 @@ type SaptData
      double precision,allocatable :: CholVecs(:,:)
      integer :: InterfaceType = INTER_TYPE_DAL
      integer :: SaptLevel = SAPTLEVEL2
+     integer :: SaptExch  = 0
+     integer :: NAO
      integer :: NCholesky
      integer :: Max_Cn = 4
      integer :: ic6 = 0
