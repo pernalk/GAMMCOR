@@ -2289,55 +2289,56 @@ double precision,parameter :: BigE = 1.D8
  nelA = 2d0*A%XELE
  nelB = 2d0*B%XELE
 
- if (approx) then
-   ! Gamma(prqs) = 2*np*nq \delta_pr \delta_qs - F_pq \delta_ps \delta_qr
-   !       1122
-   A%RDM2val = 0d0
-   ! Coulomb (nc part)
-   do ip=1,dimOA
-      do iq=1,dimOA
-         A%RDM2val(ip,ip,iq,iq) = A%RDM2val(ip,ip,iq,iq) + 2d0*A%Occ(ip)*A%Occ(iq)
-      enddo
-   enddo
-   if(Flags%IRdm2Typ==0) then
-      ! exchange
-      do ip=1,dimOA
-         do iq=1,dimOA
-            A%RDM2val(ip,iq,iq,ip) = A%RDM2val(ip,iq,iq,ip) - A%Occ(ip)*A%Occ(iq)
-         enddo
-      enddo
-   elseif(Flags%IRdm2Typ==1) then
-      ! exchange-corr
-      do ip=1,dimOA
-         do iq=1,dimOA
-            A%RDM2val(ip,iq,iq,ip) = A%RDM2val(ip,iq,iq,ip) - sqrt(A%Occ(ip)*A%Occ(iq))
-         enddo
-      enddo
-   endif
+ ! for testing!
+ !if (approx) then
+ !  ! Gamma(prqs) = 2*np*nq \delta_pr \delta_qs - F_pq \delta_ps \delta_qr
+ !  !       1122
+ !  A%RDM2val = 0d0
+ !  ! Coulomb (nc part)
+ !  do ip=1,dimOA
+ !     do iq=1,dimOA
+ !        A%RDM2val(ip,ip,iq,iq) = A%RDM2val(ip,ip,iq,iq) + 2d0*A%Occ(ip)*A%Occ(iq)
+ !     enddo
+ !  enddo
+ !  if(Flags%IRdm2Typ==0) then
+ !     ! exchange
+ !     do ip=1,dimOA
+ !        do iq=1,dimOA
+ !           A%RDM2val(ip,iq,iq,ip) = A%RDM2val(ip,iq,iq,ip) - A%Occ(ip)*A%Occ(iq)
+ !        enddo
+ !     enddo
+ !  elseif(Flags%IRdm2Typ==1) then
+ !     ! exchange-corr
+ !     do ip=1,dimOA
+ !        do iq=1,dimOA
+ !           A%RDM2val(ip,iq,iq,ip) = A%RDM2val(ip,iq,iq,ip) - sqrt(A%Occ(ip)*A%Occ(iq))
+ !        enddo
+ !     enddo
+ !  endif
 
-   B%RDM2val = 0d0
-   do ip=1,dimOB
-      do iq=1,dimOB
-         B%RDM2val(ip,ip,iq,iq) = B%RDM2val(ip,ip,iq,iq) + 2d0*B%Occ(ip)*B%Occ(iq)
-      enddo
-   enddo
-   if(Flags%IRdm2Typ==0) then
-      ! exchange
-      do ip=1,dimOB
-         do iq=1,dimOB
-            B%RDM2val(ip,iq,iq,ip) = B%RDM2val(ip,iq,iq,ip) - B%Occ(ip)*B%Occ(iq)
-         enddo
-      enddo
-   elseif(Flags%IRdm2Typ==1) then
-      ! exchange-corr
-      do ip=1,dimOB
-         do iq=1,dimOB
-            B%RDM2val(ip,iq,iq,ip) = B%RDM2val(ip,iq,iq,ip) - sqrt(B%Occ(ip)*B%Occ(iq))
-         enddo
-      enddo
-   endif
+ !  B%RDM2val = 0d0
+ !  do ip=1,dimOB
+ !     do iq=1,dimOB
+ !        B%RDM2val(ip,ip,iq,iq) = B%RDM2val(ip,ip,iq,iq) + 2d0*B%Occ(ip)*B%Occ(iq)
+ !     enddo
+ !  enddo
+ !  if(Flags%IRdm2Typ==0) then
+ !     ! exchange
+ !     do ip=1,dimOB
+ !        do iq=1,dimOB
+ !           B%RDM2val(ip,iq,iq,ip) = B%RDM2val(ip,iq,iq,ip) - B%Occ(ip)*B%Occ(iq)
+ !        enddo
+ !     enddo
+ !  elseif(Flags%IRdm2Typ==1) then
+ !     ! exchange-corr
+ !     do ip=1,dimOB
+ !        do iq=1,dimOB
+ !           B%RDM2val(ip,iq,iq,ip) = B%RDM2val(ip,iq,iq,ip) - sqrt(B%Occ(ip)*B%Occ(iq))
+ !        enddo
+ !     enddo
+ !  endif
 
- endif
+ !endif
 
  ! SAPT cubic
  ! A: get response properites
@@ -2439,11 +2440,13 @@ double precision,parameter :: BigE = 1.D8
  call tran2MO(A%WPot,B%CMO,B%CMO,WaBB,NBas)
  call tran2MO(B%WPot,A%CMO,A%CMO,WbAA,NBas)
 
+ if (.not. approx) then
  allocate(RDM2Aval(dimOA,dimOA,dimOA,dimOA),&
           RDM2Bval(dimOB,dimOB,dimOB,dimOB))
 
  RDM2Aval = A%RDM2val
  RDM2Bval = B%RDM2val
+ endif
 
  allocate(posA(NBas,NBas),posB(NBas,NBas))
 
@@ -2664,23 +2667,16 @@ double precision,parameter :: BigE = 1.D8
  !call exind_A3_XY(B%NDimX,B%NDimX,tmpXB,tmpYB,RDM2Bval,RDM2Aval,Sba,nelB,Vbaa,nelA,Vabb,'FOFOBBAA',&
  !                 A%IndN,B%IndN,posA,posB,dimOA,dimOB,A%NDimX,B%NDimX,NBas)
 
- ! A3 here!!
-
- !if (approx) then
- block
- double precision :: aaaXA(A%NDimX),aaaXB(B%NDimX)
-
- print*, 'test: app_exi_A3_XY...'
- call app_exi_A3_XY_full(A%NDimX,B%NDimX,aaaXA,aaaXB,A%Occ,B%Occ,Flags%IRdm2Typ,Sab, &
- !call app_exi_A3_XY_full(A%NDimX,B%NDimX,tmpXA,tmpXB,A%Occ,B%Occ,Flags%IRdm2Typ,Sab, &
-                    nelA,Vabb,nelB,Vbaa,'FOFOAABB',&
-                    B%IndN,A%IndN,posB,posA,dimOB,dimOA,B%NDimX,A%NDimX,NBas)
- end block                    
- !else
- call exind_A3_XY_full(A%NDimX,B%NDimX,tmpXA,tmpXB,RDM2Aval,RDM2Bval,Sab, &
-                    nelA,Vabb,nelB,Vbaa,'FOFOAABB',&
-                    B%IndN,A%IndN,posB,posA,dimOB,dimOA,B%NDimX,A%NDimX,NBas)
- !endif
+! A3
+ if (approx) then
+    call app_exi_A3_XY_full(A%NDimX,B%NDimX,tmpXA,tmpXB,A%Occ,B%Occ,Flags%IRdm2Typ,Sab, &
+                       nelA,Vabb,nelB,Vbaa,'FOFOAABB',&
+                       B%IndN,A%IndN,posB,posA,dimOB,dimOA,B%NDimX,A%NDimX,NBas)
+ else
+    call exind_A3_XY_full(A%NDimX,B%NDimX,tmpXA,tmpXB,RDM2Aval,RDM2Bval,Sab, &
+                       nelA,Vabb,nelB,Vbaa,'FOFOAABB',&
+                       B%IndN,A%IndN,posB,posA,dimOB,dimOA,B%NDimX,A%NDimX,NBas)
+ endif
 
  tmpYA = -tmpXA
  tmpYB = -tmpXB
@@ -2908,7 +2904,7 @@ double precision,parameter :: BigE = 1.D8
  deallocate(tmpYA,tmpXA)
 
  deallocate(posB,posA)
- deallocate(RDM2Bval,RDM2Aval)
+ if(.not.approx) deallocate(RDM2Bval,RDM2Aval)
  deallocate(PBbb,PAaa)
  deallocate(Vbab,Vaba,Vaab,Vbaa,Vb,Va)
  deallocate(WbAA,WaBB,PB,PA,Sba,Sab,S)

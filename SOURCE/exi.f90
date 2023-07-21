@@ -692,11 +692,11 @@ do i=1,ADimX
 
    ! 3-1a
    intA(ipr) = intA(ipr) + 0.5d0*fact*dot_product(intVaa(ip,:),intOAl(:,ir))
-   !intA(ipr) = intA(ipr) + 0.5d0*fact*ddot(NBas,intVaa(ip,1),NBas,intOAl(:,ir),1)
+   !!intA(ipr) = intA(ipr) + 0.5d0*fact*ddot(NBas,intVaa(ip,1),NBas,intOAl(:,ir),1)
 
    ! 4-1a
    intA(ipr) = intA(ipr) + 0.5d0*fact*dot_product(intOAr(ip,:),intVaa(:,ir))
-   !intA(ipr) = intA(ipr) + 0.5d0*fact*ddot(NBas,intOAr(ip,1),NBas,intVaa(:,ir),1)
+   !!intA(ipr) = intA(ipr) + 0.5d0*fact*ddot(NBas,intOAr(ip,1),NBas,intVaa(:,ir),1)
 
    ! 3-1b
    val = 0d0
@@ -727,7 +727,7 @@ do i=1,BDimX
    fact = AlphaB(ia) - AlphaB(ic)
 
    ! (B) 3-1a
-   intB(iac) = intB(iac) + 0.5d0*fact*dot_product(intVbb(ip,:),intOBl(:,ir))
+   intB(iac) = intB(iac) + 0.5d0*fact*dot_product(intVbb(ia,:),intOBl(:,ic))
    !intB(iac) = intB(iac) + 0.5d0*fact*ddot(NBas,intVbb(ia,1),NBas,intOBl(:,ic),1)
 
    ! (B) 4-1a
@@ -753,18 +753,13 @@ enddo
 !print*, 'B:31b:41b',norm2(intB)
 !print*, 'B:31a:41a',norm2(intB)
 
-!intA = -2d0*intA
-!intB = -2d0*intB
 intA = -8d0*intA
 intB = -8d0*intB
 
-print*, ''
-print*, 'app_exi_A3_XY_full:'
-print*, 'intA',norm2(intA)
-print*, 'intB',norm2(intB)
-
-!intA = 0d0
-!intB = 0d0
+!print*, ''
+!print*, 'app_exi_A3_XY_full:'
+!print*, 'intA',norm2(intA)
+!print*, 'intB',norm2(intB)
 
 deallocate(intOB,intOA)
 deallocate(intVo,intVi,intVbb,intVaa)
