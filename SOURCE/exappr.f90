@@ -8,6 +8,10 @@ contains
 subroutine app_A3_XY(dim1,dim2,intXY,AOcc,BOcc,AFmat,BFmat,Sab, &
                     AXELE,Vabb,BXELE,Vbaa,IntKFile,&
                     BIndN,AIndN,posB,posA,dimOB,dimOA,BDimX,ADimX,NBas)
+!
+! terms 1A-1B cancel with E2disp*( n_p*n_q*(S_p^q)^2 )
+! terms 2A-2B cancel with (Elst-VAB)*( n_q*n_b*<qb|qb>*S_p^c*S_r^a )
+!
 implicit none
 
 integer,intent(in) :: dim1,dim2,dimOA,dimOB,ADimX,BDimX,NBas
@@ -88,7 +92,7 @@ do l=1,dimOB
             factB = 4d0*(BOcc(ia)-BOcc(ic))
 
             ! 1A-1B
-            intXY(ipr,iac) = intXY(ipr,iac) - fact*valTr*ints(ip,ir)
+            !intXY(ipr,iac) = intXY(ipr,iac) - fact*valTr*ints(ip,ir)
 
             val = 0
             do iq=1,dimOA
@@ -266,8 +270,8 @@ do l=1,BDimX
       !enddo
 
       !2A-2B
-      !intXY(ipr,iac) = intXY(ipr,iac) - fact*val*Sab(ip,ia)*Sab(ir,ic)
-      intXY(ipr,iac) = intXY(ipr,iac) - factC*Sab(ip,ia)*Sab(ir,ic)
+      !!intXY(ipr,iac) = intXY(ipr,iac) - fact*val*Sab(ip,ia)*Sab(ir,ic)
+      !intXY(ipr,iac) = intXY(ipr,iac) - factC*Sab(ip,ia)*Sab(ir,ic)
 
       val = 0
       do iq=1,dimOA
@@ -634,6 +638,10 @@ end subroutine app_nn_A3_XX
 subroutine app_A3_XX(dim1,dim2,intXX,AOcc,BOcc,AFmat,BFmat,Sab, &
                     AXELE,Vabb,BXELE,Vbaa,IntKFile,&
                     BIndN,AIndN,posB,posA,dimOB,dimOA,BDimX,ADimX,NBas)
+!
+! terms 1A-1B cancel with E2disp*( n_p*n_q*(S_p^q)^2 )
+! terms 2A-2B cancel with (Elst-VAB)*( n_q*n_b*<qb|qb>*S_p^c*S_r^a )
+!
 implicit none
 
 integer,intent(in) :: dim1,dim2,dimOA,dimOB,ADimX,BDimX,NBas
@@ -715,7 +723,7 @@ do l=1,dimOB
             fact  = 2d0*(AOcc(ir)-AOcc(ip))*factB
 
             ! 1A-1B
-            intXX(ipr,iac) = intXX(ipr,iac) - fact*valTr*ints(ip,ir)
+            !intXX(ipr,iac) = intXX(ipr,iac) - fact*valTr*ints(ip,ir)
 
             val = 0
             do iq=1,dimOA
@@ -894,8 +902,8 @@ do l=1,BDimX
       !enddo
 
       !2A-2B
-      !intXX(ipr,iac) = intXX(ipr,iac) - fact*val*Sab(ip,ic)*Sab(ir,ia)
-      intXX(ipr,iac) = intXX(ipr,iac) - factC*Sab(ip,ic)*Sab(ir,ia)
+      !!intXX(ipr,iac) = intXX(ipr,iac) - fact*val*Sab(ip,ic)*Sab(ir,ia)
+      !intXX(ipr,iac) = intXX(ipr,iac) - factC*Sab(ip,ic)*Sab(ir,ia)
 
       val = 0
       do iq=1,dimOA

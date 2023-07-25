@@ -380,6 +380,10 @@ end subroutine exind_A3_XY_full
 subroutine app_exi_A3_XY_full(dim1,dim2,intA,intB,occA,occB,IRDM2Type,Sab, &
                     AXELE,Vabb,BXELE,Vbaa,IntKFile,&
                     BIndN,AIndN,posB,posA,dimOB,dimOA,BDimX,ADimX,NBas)
+!
+! careful: terms 1-1a cancel with E2ind*eta
+!          terms 1-1b cancel with termY = (elst-V)*nu
+!
 implicit none
 
 integer,intent(in) :: dim1,dim2,dimOA,dimOB,ADimX,BDimX,NBas
@@ -623,6 +627,8 @@ do ic=1,NBas
 enddo
 
 ! A part
+!print*, 'TEST-eta: settting eta*U=0'
+!print*, 'TEST-nu : settting nu*T =0'
 do i=1,ADimX
 
    ip = AIndN(1,i)
@@ -632,10 +638,10 @@ do i=1,ADimX
    fact = occA(ir) - occA(ip)
 
    ! 1-1a
-   intA(ipr) = intA(ipr) + fact*intVaa(ip,ir)*vAA
+   !intA(ipr) = intA(ipr) + fact*intVaa(ip,ir)*vAA
 
    ! 2-1a
-   intA(ipr) = intA(ipr) + fact*intOA(ip,ir)*vBA
+   !intA(ipr) = intA(ipr) + fact*intOA(ip,ir)*vBA
 
    ! 1-1b is done in ints loop
 
@@ -662,10 +668,10 @@ do i=1,BDimX
    fact = occB(ic) - occB(ia)
 
    ! (B) 1-1a
-   intB(iac) = intB(iac) + fact*intVbb(ia,ic)*vAB
+   !intB(iac) = intB(iac) + fact*intVbb(ia,ic)*vAB
 
    ! (B) 2-1a
-   intB(iac) = intB(iac) + fact*intOB(ia,ic)*vBB
+   !intB(iac) = intB(iac) + fact*intOB(ia,ic)*vBB
 
    ! (B) 1-1b is done in ints loop
 

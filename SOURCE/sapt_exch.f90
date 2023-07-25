@@ -2471,33 +2471,40 @@ double precision,parameter :: BigE = 1.D8
  endif
 
  ! termZ
- ! PA(ab).S(bc)
- ! S(ad).PB(dc)
- tmp1 = 0
- tmp2 = 0
- termZ = 0
- call dgemm('N','N',NBas,NBas,NBas,1d0,PA,NBas,S,NBas,0d0,tmp1,NBas)
- call dgemm('N','N',NBas,NBas,NBas,1d0,S,NBas,PB,NBas,0d0,tmp2,NBas)
- do j=1,NBas
-    do i=1,NBas
-       termZ = termZ + tmp1(i,j)*tmp2(i,j)
-    enddo
- enddo
+ if (approx) then
 
- if(uncoupled) termZ_u = 2d0*SAPT%e2ind_unc*termZ
+    termZ = 0d0
 
- if(A%Cubic.or.B%Cubic) then
-   if(A%ACAlpha==A%ACAlpha0.or.B%ACAlpha==B%ACAlpha0) termZ = 2d0*SAPT%e2ind_a0*termZ
-   if(A%ACAlpha==A%ACAlpha1.or.B%ACAlpha==B%ACAlpha1) termZ = 2d0*SAPT%e2ind_a1*termZ
-   if(A%ACAlpha==A%ACAlpha2.or.B%ACAlpha==B%ACAlpha2) termZ = 2d0*SAPT%e2ind_a2*termZ
  else
-   termZ = 2d0*SAPT%e2ind*termZ
- endif
+
+    ! PA(ab).S(bc)
+    ! S(ad).PB(dc)
+    tmp1 = 0d0
+    tmp2 = 0d0
+    termZ = 0d0
+    call dgemm('N','N',NBas,NBas,NBas,1d0,PA,NBas,S,NBas,0d0,tmp1,NBas)
+    call dgemm('N','N',NBas,NBas,NBas,1d0,S,NBas,PB,NBas,0d0,tmp2,NBas)
+    do j=1,NBas
+       do i=1,NBas
+          termZ = termZ + tmp1(i,j)*tmp2(i,j)
+       enddo
+    enddo
+
+    if(uncoupled) termZ_u = 2d0*SAPT%e2ind_unc*termZ
+
+    if(A%Cubic.or.B%Cubic) then
+      if(A%ACAlpha==A%ACAlpha0.or.B%ACAlpha==B%ACAlpha0) termZ = 2d0*SAPT%e2ind_a0*termZ
+      if(A%ACAlpha==A%ACAlpha1.or.B%ACAlpha==B%ACAlpha1) termZ = 2d0*SAPT%e2ind_a1*termZ
+      if(A%ACAlpha==A%ACAlpha2.or.B%ACAlpha==B%ACAlpha2) termZ = 2d0*SAPT%e2ind_a2*termZ
+    else
+      termZ = 2d0*SAPT%e2ind*termZ
+    endif
+
+ endif ! approx => skip termZ
 
  deallocate(tmp2,tmp1)
 
 !! Y term
-
  allocate(tindA(A%NDimX),tindB(B%NDimX))
 
  ! unc
@@ -2534,28 +2541,32 @@ double precision,parameter :: BigE = 1.D8
     ! full unc
     !call dgemv('T',B%NDimX,B%NDimX,1d0,BVecY0-BVecX0,B%NDimX,tindB,1,0d0,uB0,1)
 
-    call make_tind_unc(tindA,SBlockA,SblockAIV,Sab,A%Occ,B%Occ,A%IndN,posA,nblkA,A%NDimX,NBas)
-    call make_tind_unc(tindB,SblockB,SblockBIV,Sba,B%Occ,A%Occ,B%IndN,posB,nblkB,B%NDimX,NBas)
+    if (approx) then
+       termY_u = 0d0
+    else
+       call make_tind_unc(tindA,SBlockA,SblockAIV,Sab,A%Occ,B%Occ,A%IndN,posA,nblkA,A%NDimX,NBas)
+       call make_tind_unc(tindB,SblockB,SblockBIV,Sba,B%Occ,A%Occ,B%IndN,posB,nblkB,B%NDimX,NBas)
 
-    ! full unc
-    !call make_tind(tindA,AVecX0,AVecY0,Sab,A%Occ,B%Occ,A%IndN,posA,A%NDimX,NBas)
-    !call make_tind(tindB,BVecX0,BVecY0,Sba,B%Occ,A%Occ,B%IndN,posB,B%NDimX,NBas)
+       ! full unc
+       !call make_tind(tindA,AVecX0,AVecY0,Sab,A%Occ,B%Occ,A%IndN,posA,A%NDimX,NBas)
+       !call make_tind(tindB,BVecX0,BVecY0,Sba,B%Occ,A%Occ,B%IndN,posB,B%NDimX,NBas)
 
-    termY_u = 0d0
-    do i=1,A%NDimX
-       if(abs(OmA0(i)).gt.SmallE.and.abs(OmA0(i)).lt.BigE) then
-          termY_u = termY_u + (tindA(i)*uA0(i))/OmA0(i)
-       endif
-    enddo
-    do i=1,B%NDimX
-       if(abs(OmB0(i)).gt.SmallE.and.abs(OmB0(i)).lt.BigE) then
-          termY_u = termY_u + (tindB(i)*uB0(i))/OmB0(i)
-       endif
-    enddo
+       termY_u = 0d0
+       do i=1,A%NDimX
+          if(abs(OmA0(i)).gt.SmallE.and.abs(OmA0(i)).lt.BigE) then
+             termY_u = termY_u + (tindA(i)*uA0(i))/OmA0(i)
+          endif
+       enddo
+       do i=1,B%NDimX
+          if(abs(OmB0(i)).gt.SmallE.and.abs(OmB0(i)).lt.BigE) then
+             termY_u = termY_u + (tindB(i)*uB0(i))/OmB0(i)
+          endif
+       enddo
 
-    termY_u=-4d0*(SAPT%elst-SAPT%Vnn)*termY_u
+       termY_u=-4d0*(SAPT%elst-SAPT%Vnn)*termY_u
+    endif ! approx => termY = 0
 
- endif
+ endif ! end uncoupled
 
  ! cpld
  if(both) then
@@ -2588,25 +2599,29 @@ double precision,parameter :: BigE = 1.D8
     call dgemv('T',B%NDimX,B%NDimX,1d0,B%EigY-B%EigX,B%NDimX,tindB,1,0d0,uB,1)
     !print*, 'uB',norm2(uB)
 
-     call make_tind(tindA,A%EigX,A%EigY,Sab,A%Occ,B%Occ,A%IndN,posA,A%NDimX,NBas)
-     call make_tind(tindB,B%EigX,B%EigY,Sba,B%Occ,A%Occ,B%IndN,posB,B%NDimX,NBas)
+    if (approx) then
+       termY = 0d0
+    else
+       call make_tind(tindA,A%EigX,A%EigY,Sab,A%Occ,B%Occ,A%IndN,posA,A%NDimX,NBas)
+       call make_tind(tindB,B%EigX,B%EigY,Sba,B%Occ,A%Occ,B%IndN,posB,B%NDimX,NBas)
 
-    termY=0d0
-    do i=1,A%NDimX
-       if(abs(A%Eig(i)).gt.SmallE.and.abs(A%Eig(i)).lt.BigE) then
-          termY = termY + (tindA(i)*uA(i))/A%Eig(i)
-       endif
-    enddo
-    do i=1,B%NDimX
-       if(abs(B%Eig(i)).gt.SmallE.and.abs(B%Eig(i)).lt.BigE) then
-          termY = termY + (tindB(i)*uB(i))/B%Eig(i)
-       endif
-    enddo
+       termY=0d0
+       do i=1,A%NDimX
+          if(abs(A%Eig(i)).gt.SmallE.and.abs(A%Eig(i)).lt.BigE) then
+             termY = termY + (tindA(i)*uA(i))/A%Eig(i)
+          endif
+       enddo
+       do i=1,B%NDimX
+          if(abs(B%Eig(i)).gt.SmallE.and.abs(B%Eig(i)).lt.BigE) then
+             termY = termY + (tindB(i)*uB(i))/B%Eig(i)
+          endif
+       enddo
 
-    termY=-4d0*(SAPT%elst-SAPT%Vnn)*termY
-    !write(*,*) 'termY',termY
+       termY=-4d0*(SAPT%elst-SAPT%Vnn)*termY
+       !write(*,*) 'termY',termY
+    endif ! approx => termY = 0
 
- endif
+ endif ! both cpld & uncpld
  deallocate(tindB,tindA)
 
  ! term A3
@@ -3118,29 +3133,35 @@ double precision,parameter :: SmallE = 1.D-3
  endif
 
  ! termZ
- ! PA(ab).S(bc)
- ! S(ad).PB(dc)
- tmp1 = 0
- tmp2 = 0
- termZ = 0
- call dgemm('N','N',NBas,NBas,NBas,1d0,PA,NBas,S,NBas,0d0,tmp1,NBas)
- call dgemm('N','N',NBas,NBas,NBas,1d0,S,NBas,PB,NBas,0d0,tmp2,NBas)
- do j=1,NBas
-    do i=1,NBas
-       termZ = termZ + tmp1(i,j)*tmp2(i,j)
-    enddo
- enddo
-
- termZ_u = termZ
- termZ_u = 2d0*SAPT%e2disp_unc*termZ_u
-
- if(A%Cubic.or.B%Cubic) then
-    if(A%ACAlpha==A%ACAlpha0.or.B%ACAlpha==B%ACAlpha0) termZ = 2d0*SAPT%e2disp_a0*termZ
-    if(A%ACAlpha==A%ACAlpha1.or.B%ACAlpha==B%ACAlpha1) termZ = 2d0*SAPT%e2disp_a1*termZ
-    if(A%ACAlpha==A%ACAlpha2.or.B%ACAlpha==B%ACAlpha2) termZ = 2d0*SAPT%e2disp_a2*termZ
+ if (approx) then
+    termZ   = 0d0
+    termZ_u = 0d0
  else
-    termZ   = 2d0*SAPT%e2disp*termZ
- endif
+    ! PA(ab).S(bc)
+    ! S(ad).PB(dc)
+    tmp1 = 0
+    tmp2 = 0
+    termZ = 0
+    call dgemm('N','N',NBas,NBas,NBas,1d0,PA,NBas,S,NBas,0d0,tmp1,NBas)
+    call dgemm('N','N',NBas,NBas,NBas,1d0,S,NBas,PB,NBas,0d0,tmp2,NBas)
+    do j=1,NBas
+       do i=1,NBas
+          termZ = termZ + tmp1(i,j)*tmp2(i,j)
+       enddo
+    enddo
+
+    termZ_u = termZ
+    termZ_u = 2d0*SAPT%e2disp_unc*termZ_u
+
+    if(A%Cubic.or.B%Cubic) then
+       if(A%ACAlpha==A%ACAlpha0.or.B%ACAlpha==B%ACAlpha0) termZ = 2d0*SAPT%e2disp_a0*termZ
+       if(A%ACAlpha==A%ACAlpha1.or.B%ACAlpha==B%ACAlpha1) termZ = 2d0*SAPT%e2disp_a1*termZ
+       if(A%ACAlpha==A%ACAlpha2.or.B%ACAlpha==B%ACAlpha2) termZ = 2d0*SAPT%e2disp_a2*termZ
+    else
+       termZ   = 2d0*SAPT%e2disp*termZ
+    endif
+
+ endif ! approx => termZ = 0
 
  !write(LOUT,*) 'termZ ',termZ
  !write(LOUT,'(1x,a,f16.8)') 'term Z      = ',  termZ*1.0d3
@@ -3566,24 +3587,32 @@ double precision,parameter :: SmallE = 1.D-3
     enddo
     termX_u = -4d0*termX_u
 
-    call make_tij_Y_unc(tmp_u,tmp1,A%Occ,B%Occ,SBlockA,SBlockAIV,SBlockB,SBlockBIV, &
-                        A%IndN,B%IndN,posA,posB,Sab,Sba,nblkA,nblkB,A%NDimX,B%NDimX,NBas)
+    if (approx) then
 
-    ! term Y(unc)
-    termY_u = 0d0
-    do j=1,B%NDimX
-       do i=1,A%NDimX
+       termY_u = 0d0
 
-          if(abs(OmA0(i)).gt.SmallE.and.abs(OmB0(j)).gt.SmallE&
-             .and.abs(OmA0(i)).lt.BigE.and.abs(OmB0(j)).lt.BigE) then
+    else
 
-             termY_u = termY_u + sij(i,j)*tmp_u(i,j)/(OmA0(i)+OmB0(j))
+       call make_tij_Y_unc(tmp_u,tmp1,A%Occ,B%Occ,SBlockA,SBlockAIV,SBlockB,SBlockBIV, &
+                           A%IndN,B%IndN,posA,posB,Sab,Sba,nblkA,nblkB,A%NDimX,B%NDimX,NBas)
 
-          endif
+       ! term Y(unc)
+       termY_u = 0d0
+       do j=1,B%NDimX
+          do i=1,A%NDimX
+
+             if(abs(OmA0(i)).gt.SmallE.and.abs(OmB0(j)).gt.SmallE&
+                .and.abs(OmA0(i)).lt.BigE.and.abs(OmB0(j)).lt.BigE) then
+
+                termY_u = termY_u + sij(i,j)*tmp_u(i,j)/(OmA0(i)+OmB0(j))
+
+             endif
+          enddo
        enddo
-    enddo
 
-    termY_u = -8d0*(SAPT%elst-SAPT%Vnn)*termY_u
+       termY_u = -8d0*(SAPT%elst-SAPT%Vnn)*termY_u
+
+    endif ! approx => termYu = 0
 
     !if(SAPT%IPrint>2) write(LOUT,'(/1x,a,f16.8)') 'term Z(unc) = ',  termZ_u*1.0d3
     !if(SAPT%IPrint>2) write(LOUT,'(1x,a,f16.8)')  'term X(unc) = ',  termX_u*1.0d3
@@ -3685,30 +3714,39 @@ double precision,parameter :: SmallE = 1.D-3
     if(SAPT%IPrint>5) call print_en('term X',termX*1.0d3,.false.)
 
     ! termY
-    ! term Y: t_ij
-    !call make_tij_Y(tmp3,tmp2,tmp1,posA,posB,Sab,Sba,A,B,NBas)
-    call make_tij_Y(tmp3,tmp2,tmp1,A%Occ,B%Occ,A%EigY,A%EigX,B%EigY,B%EigX,&
-                    A%IndN,B%IndN,posA,posB,Sab,Sba,A%NDimX,B%NDimX,NBas)
+    if (approx) then
 
-    ! term Y
-    termY = 0d0
-    do j=1,B%NDimX
-       do i=1,A%NDimX
+       termY = 0d0
 
-         ! if(A%Eig(i).gt.SmallE.and.B%Eig(j).gt.SmallE&
-         !    .and.A%Eig(i).lt.BigE.and.B%Eig(j).lt.BigE) then
+    else
 
-          if(abs(A%Eig(i)).gt.SmallE.and.abs(B%Eig(j)).gt.SmallE&
-             .and.abs(A%Eig(i)).lt.BigE.and.abs(B%Eig(j)).lt.BigE) then
+       ! term Y: t_ij
+       !call make_tij_Y(tmp3,tmp2,tmp1,posA,posB,Sab,Sba,A,B,NBas)
+       call make_tij_Y(tmp3,tmp2,tmp1,A%Occ,B%Occ,A%EigY,A%EigX,B%EigY,B%EigX,&
+                       A%IndN,B%IndN,posA,posB,Sab,Sba,A%NDimX,B%NDimX,NBas)
 
-             !termY = termY + 1d0/(A%Eig(i)+B%Eig(j))
-             termY = termY + sij(i,j)*tmp3(i,j)/(A%Eig(i)+B%Eig(j))
+       ! term Y
+       termY = 0d0
+       do j=1,B%NDimX
+          do i=1,A%NDimX
 
-          endif
+            ! if(A%Eig(i).gt.SmallE.and.B%Eig(j).gt.SmallE&
+            !    .and.A%Eig(i).lt.BigE.and.B%Eig(j).lt.BigE) then
+
+             if(abs(A%Eig(i)).gt.SmallE.and.abs(B%Eig(j)).gt.SmallE&
+                .and.abs(A%Eig(i)).lt.BigE.and.abs(B%Eig(j)).lt.BigE) then
+
+                !termY = termY + 1d0/(A%Eig(i)+B%Eig(j))
+                termY = termY + sij(i,j)*tmp3(i,j)/(A%Eig(i)+B%Eig(j))
+
+             endif
+          enddo
        enddo
-    enddo
 
-    termY = -8d0*(SAPT%elst-SAPT%Vnn)*termY
+       termY = -8d0*(SAPT%elst-SAPT%Vnn)*termY
+
+    endif ! approx => termY = 0
+
     !if(SAPT%IPrint>5) write(LOUT,'(1x,a,f16.8)') 'term Y      = ',  termY*1.0d3
     if(SAPT%IPrint>5) call print_en('term Y',termY*1.0d3,.false.)
 
