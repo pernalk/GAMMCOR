@@ -6,7 +6,7 @@ include_directories(./gammcor-cholesky/include)
 find_library(
     CHOLESKY_LIBRARY 
     NAMES cholesky.a
-    PATHS ../gammcor-cholesky/lib/
+    PATHS ./gammcor-cholesky/lib/
     NO_DEFAULT_PATH
 )
 
