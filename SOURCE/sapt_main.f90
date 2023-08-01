@@ -503,7 +503,6 @@ double precision :: MO(NBasis*NBasis)
           if(Flags%IFunSR/=0) then
              call calc_resp_dft(Mon,MO,Flags,NBasis)
           else
-             print*, 'here?'
              call calc_resp_casgvb(Mon,MO,Flags,NBasis,EnChck)
           endif
 
@@ -1220,12 +1219,16 @@ call clock('START',Tcpu,Twall)
 
  case(TWOMO_FOFO)
    if(Flags%ICholesky==1) then
-      call chol_ints_fofo(NBas,NBas,Mon%FF, &
-                     Mon%num0+Mon%num1,Mon%num0+Mon%num1,Mon%FF,&
-                     Mon%NChol,NBas,twojfile)
-      call chol_ints_fofo(NBas,Mon%num0+Mon%num1,Mon%FF,&
-                     NBas,Mon%num0+Mon%num1,Mon%FF,&
-                     Mon%NChol,NBas,twokfile)
+      if (Flags%ICholeskyBIN==1) then
+         call chol_ints_fofo(NBas,NBas,Mon%FF, &
+                        Mon%num0+Mon%num1,Mon%num0+Mon%num1,Mon%FF,&
+                        Mon%NChol,NBas,twojfile)
+         call chol_ints_fofo(NBas,Mon%num0+Mon%num1,Mon%FF,&
+                        NBas,Mon%num0+Mon%num1,Mon%FF,&
+                        Mon%NChol,NBas,twokfile)
+      elseif (Flags%ICholeskyOTF==1) then
+          write(LOUT,'(1x,a,i2)') 'Skipping FFOO/FOFO for monomer ',Mon%Monomer
+      endif
       !call chol_ints_gen(NBas,NBas,Mon%FF, &
       !               Mon%num0+Mon%num1,Mon%num0+Mon%num1,Mon%OO,&
       !               Mon%NChol,twojfile)
