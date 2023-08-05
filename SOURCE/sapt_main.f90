@@ -55,11 +55,11 @@ double precision :: Tcpu,Twall
  ! SAPT components
  write(LOUT,'()')
 
- ! switch to Cholesky SAPT
- if(Flags%ICholesky==1) call sapt_Cholesky(Flags,SAPT,Tcpu,TWall,NBasis)
-
  ! switch to SAPT(DMFT)
  if(SAPT%SaptExch==1) call sapt_dmft(Flags,SAPT,Tcpu,TWall,NBasis)
+
+ ! switch to Cholesky SAPT
+ if(Flags%ICholesky==1) call sapt_Cholesky(Flags,SAPT,Tcpu,TWall,NBasis)
 
  ! switch to extrapolated SAPT
  if(SAPT%monA%Cubic.or.SAPT%monB%Cubic) call sapt_extrapol(Flags,SAPT,NBasis)
@@ -238,8 +238,7 @@ end subroutine sapt_driver_red
 
 subroutine sapt_dmft(Flags,SAPT,Tcpu,Twall,NBasis)
 !
-! sapt driver with Cholesky decompositon
-! Flags%isCholesky==1
+! sapt driver with DMFT
 !
 implicit none
 
@@ -251,19 +250,39 @@ integer :: i
 
 write(LOUT,'(1x,a)') 'SAPT(MC) with DMFT exchange'
 
-call e1elst(SAPT%monA,SAPT%monB,SAPT)
-call e1exch_dmft(Flags,SAPT%monA,SAPT%monB,SAPT)
-call e1exch_dmft_2(Flags,SAPT%monA,SAPT%monB,SAPT)
+if(Flags%ICholesky==0) then
+   call e1elst(SAPT%monA,SAPT%monB,SAPT)
+   call e1exch_dmft(Flags,SAPT%monA,SAPT%monB,SAPT)
+   !call e1exch_dmft_2(Flags,SAPT%monA,SAPT%monB,SAPT)
 
-call e2ind(Flags,SAPT%monA,SAPT%monB,SAPT)
-call e2disp(Flags,SAPT%monA,SAPT%monB,SAPT)
+   call e2ind(Flags,SAPT%monA,SAPT%monB,SAPT)
+   call e2disp(Flags,SAPT%monA,SAPT%monB,SAPT)
 
-call e2exind(Flags,SAPT%monA,SAPT%monB,SAPT)
-call e2exdisp(Flags,SAPT%monA,SAPT%monB,SAPT)
+   call e2exind(Flags,SAPT%monA,SAPT%monB,SAPT)
+   call e2exdisp(Flags,SAPT%monA,SAPT%monB,SAPT)
+
+   !call summary_sapt_verbose(SAPT)
+
+elseif(Flags%ICholesky==1) then
+
+   print*,'CHECKING CHOLESKY...',Flags%ICholeskyOTF
+   call e1elst_Chol(SAPT%monA,SAPT%monB,SAPT)
+   call e1exch_dmft(Flags,SAPT%monA,SAPT%monB,SAPT)
+
+   call e2ind(Flags,SAPT%monA,SAPT%monB,SAPT)
+
+   if(.not.SAPT%CAlpha) then
+      call e2disp_Cmat_Chol_block(Flags,SAPT%monA,SAPT%monB,SAPT)
+   else if(SAPT%CAlpha) then
+      call e2disp_CAlphaTilde_block(Flags,SAPT%monA,SAPT%monB,SAPT)
+   endif
+
+   call e2exind(Flags,SAPT%monA,SAPT%monB,SAPT)
+   call e2exdisp(Flags,SAPT%monA,SAPT%monB,SAPT)
+
+endif
 
 call summary_sapt(SAPT)
-!call summary_sapt_verbose(SAPT)
-
 call print_warn(SAPT)
 call free_sapt(Flags,SAPT)
 
@@ -276,7 +295,7 @@ end subroutine sapt_dmft
 subroutine sapt_Cholesky(Flags,SAPT,Tcpu,Twall,NBasis)
 !
 ! sapt driver with Cholesky decompositon
-! Flags%isCholesky==1
+! Flags%ICholesky==1
 !
 implicit none
 
@@ -529,6 +548,9 @@ type(AOReaderData) :: reader
 integer,intent(in) :: iPINO,NBasis
 integer            :: thr_id
 integer            :: ntr,iunit_aotwosort
+double precision :: Tcpu,TWall
+
+call clock('START',Tcpu,Twall)
 
 if(Flags%SaptLevel==999) then
   print*, 'In RSPT2 intermoner ints not calculated for now'
@@ -648,6 +670,8 @@ if(Flags%ISERPA==0) then
      !                    A%NChol,NBasis,'FOFOAABA')
      call chol_fofo_batch(A%num0+A%num1,A%FF,A%num0+A%num1,B%FFBA, &
                           A%NChol,NBasis,'FOFOAABA')
+
+     call clock('Time in Assemble:',Tcpu,Twall)
 
   else
    ! working stuff...
@@ -788,6 +812,8 @@ if(Flags%ISERPA==0) then
         ! deallocate (FF|NCholesky) integrals
         deallocate(A%FF)
         deallocate(B%FF)
+        deallocate(A%FFAB)
+        deallocate(B%FFBA)
      else
         call tran4_gen(NBasis,&
                  NBasis,B%CMO,&

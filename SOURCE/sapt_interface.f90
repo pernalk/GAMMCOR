@@ -70,8 +70,9 @@ SAPT%monA%IPrint = SAPT%IPrint
 SAPT%monB%IPrint = SAPT%IPrint
 
 ! set basis set
-print*, 'Flags:BasisSetPath',Flags%BasisSetPath
-print*, 'Flags:BasisSet    ',Flags%BasisSet
+
+write(LOUT,'(/1x,"Flags:BasisSetPath ",a)') Flags%BasisSetPath
+write(LOUT,'(1x, "Flags:BasisSet ",a)')     Flags%BasisSet
 BasisSet = Flags%BasisSetPath // Flags%BasisSet
 
 ! set dimensions
