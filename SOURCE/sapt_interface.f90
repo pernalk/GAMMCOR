@@ -18,10 +18,13 @@ use abmat
 use read_external
 
 implicit none
+!private
+
+!public TCholeskyVecs,TCholeskyVecsOTF
 
 contains
 
-subroutine sapt_interface(Flags,SAPT,NBasis)
+subroutine sapt_interface(Flags,SAPT,NBasis,AOBasis,CholeskyVecsOTF)
 !
 ! SAPT-DALTON requires SIRIFC and SIRIUS.RST
 !                   or SIRIFC and occupations.dat
@@ -277,7 +280,9 @@ SAPT%monB%NDim = NBasis*(NBasis-1)/2
     call chol_sapt_AO2NO_BIN(SAPT,SAPT%monA,SAPT%monB,CholeskyVecs,NBasis,Flags%MemVal,Flags%MemType)
     call clock('chol_AO2NO_BIN',Tcpu,Twall)
  elseif(Flags%ICholeskyOTF==1) then
-    call chol_sapt_AO2NO_OTF(SAPT,SAPT%monA,SAPT%monB,CholeskyVecsOTF,AOBasis,Flags,NBasis)
+    !call chol_sapt_AO2NO_OTF(SAPT,SAPT%monA,SAPT%monB,CholeskyVecsOTF,AOBasis,Flags,NBasis)
+    call chol_OO_sapt_AO2NO_OTF(SAPT,SAPT%monA,SAPT%monB,CholeskyVecsOTF,AOBasis,Flags,NBasis)
+    call chol_FO_sapt_AO2NO_OTF(SAPT,SAPT%monA,SAPT%monB,CholeskyVecsOTF,AOBasis,Flags,NBasis)
     call clock('chol_AO2NO_OTF',Tcpu,Twall)
  endif
 
@@ -2117,7 +2122,7 @@ end function calc_vnn
 
 subroutine chol_sapt_AO2NO_BIN(SAPT,A,B,CholeskyVecs,NBasis,MemVal,MemType)
 !
-! transform Choleksy Vecs from AO to NO
+! transform Cholesky Vecs from AO to NO
 ! for all 2-index vecs needed in SAPT:
 !   FFXX(NCholesky,NBas**2) -- for polarization
 !   FFXY(NCholesky,NBas**2) -- for exchange
@@ -2224,7 +2229,7 @@ call clock('BOO',Tcpu,Twall)
 print*, 'A%OO',norm2(A%OO)
 print*, 'B%OO',norm2(B%OO)
 
- if(SAPT%SaptLevel==666) then ! RS2PT2+
+! if(SAPT%SaptLevel==666) then ! RS2PT2+
     allocate(A%OOAB(NCholesky,dimOA*dimOB), &
              B%OOBA(NCholesky,dimOB*dimOA))
 
@@ -2237,7 +2242,9 @@ print*, 'B%OO',norm2(B%OO)
                        B%CMO,1,dimOB,&
                        A%CMO,1,dimOA,&
                        MaxBufferDimMB)
- endif
+! endif
+print*, 'A%OOAB',norm2(A%OOAB)
+print*, 'B%OOBA',norm2(B%OOBA)
 
  allocate(A%FF(NCholesky,NBasis**2),&
           B%FF(NCholesky,NBasis**2) )
@@ -2383,7 +2390,7 @@ call clock('BOO',Tcpu,Twall)
 print*, 'A%OO',norm2(A%OO)
 print*, 'B%OO',norm2(B%OO)
 
-if(SAPT%SaptLevel==666) then ! RS2PT2+
+!if(SAPT%SaptLevel==666) then ! RS2PT2+
 
    allocate(A%OOAB(NCholesky,dimOA*dimOB), &
             B%OOBA(NCholesky,dimOB*dimOA))
@@ -2396,7 +2403,9 @@ if(SAPT%SaptLevel==666) then ! RS2PT2+
                       MaxBufferDimMB,CholeskyVecsOTF, &
                       AOBasis,ORBITAL_ORDERING_MOLPRO)
 
-endif
+print*, 'A%OOAB',norm2(A%OOAB)
+print*, 'B%OOBA',norm2(B%OOBA)
+!endif
 
 allocate(A%FF(NCholesky,NBasis**2),&
          B%FF(NCholesky,NBasis**2) )
@@ -2457,6 +2466,235 @@ print*, 'A%FFAB',norm2(A%FFAB)
 print*, 'B%FFBA',norm2(B%FFBA)
 
 end subroutine chol_sapt_AO2NO_OTF
+
+subroutine chol_OO_sapt_AO2NO_OTF(SAPT,A,B,CholeskyVecsOTF,AOBasis,Flags,NBasis)
+implicit none
+
+type(SaptData)         :: SAPT
+type(SystemBlock)      :: A, B
+type(TAOBasis)         :: AOBasis
+type(TCholeskyVecsOTF) :: CholeskyVecsOTF
+type(FlagsData)        :: Flags
+integer,intent(in)     :: NBasis
+
+integer :: NCholesky
+integer :: MaxBufferDimMB
+integer :: dimOA,dimOB
+integer :: i,j,ip,iq,ipq
+double precision :: Cpq
+
+double precision :: Tcpu,Twall
+
+call clock('START',Tcpu,Twall)
+
+! set dimensions
+NCholesky = CholeskyVecsOTF%NVecs
+dimOA = A%num0+A%num1
+dimOB = B%num0+B%num1
+
+! set buffer size
+if(Flags%MemType == 2) then       !MB
+   MaxBufferDimMB = Flags%MemVal
+elseif(Flags%MemType == 3) then   !GB
+   MaxBufferDimMB = Flags%MemVal * 1024_8
+endif
+write(lout,'(1x,a,i5,a)') 'Using ',MaxBufferDimMB,' MB for 3-indx AO2NO transformation'
+
+allocate(A%OO(NCholesky,dimOA**2),B%OO(NCholesky,dimOB**2))
+
+call chol_Rkab_OTF(A%OO,A%CAONO,1,dimOA,A%CAONO,1,dimOA, &
+                   MaxBufferDimMB,CholeskyVecsOTF,       &
+                   AOBasis,ORBITAL_ORDERING_MOLPRO)
+
+call clock('AOO',Tcpu,Twall)
+
+call chol_Rkab_OTF(B%OO,B%CAONO,1,dimOB,B%CAONO,1,dimOB, &
+                   MaxBufferDimMB,CholeskyVecsOTF,       &
+                   AOBasis,ORBITAL_ORDERING_MOLPRO)
+
+call clock('BOO',Tcpu,Twall)
+
+allocate(A%OOAB(NCholesky,dimOA*dimOB), &
+            B%OOBA(NCholesky,dimOB*dimOA))
+
+call chol_Rkab_OTF(A%OOAB,A%CAONO,1,dimOA,B%CAONO,1,dimOB, &
+                   MaxBufferDimMB,CholeskyVecsOTF, &
+                   AOBasis,ORBITAL_ORDERING_MOLPRO)
+
+call clock('AOOAB',Tcpu,Twall)
+
+call chol_Rkab_OTF(B%OOBA,B%CAONO,1,dimOB,A%CAONO,1,dimOA, &
+                   MaxBufferDimMB,CholeskyVecsOTF, &
+                   AOBasis,ORBITAL_ORDERING_MOLPRO)
+
+print*, 'A%OOAB',norm2(A%OOAB)
+print*, 'A%OOBA',norm2(B%OOBA)
+
+end subroutine chol_OO_sapt_AO2NO_OTF
+
+subroutine chol_FO_sapt_AO2NO_OTF(SAPT,A,B,CholeskyVecsOTF,AOBasis,Flags,NBasis)
+!
+! prepare (NChol,NBasis*dimO) matrices for FOFO integrals
+! (FO|AA), (FO|BB), (FO|AB), (FO|BA)
+!
+implicit none
+
+type(SaptData)         :: SAPT
+type(SystemBlock)      :: A, B
+type(TAOBasis)         :: AOBasis
+type(TCholeskyVecsOTF) :: CholeskyVecsOTF
+type(FlagsData)        :: Flags
+integer,intent(in)     :: NBasis
+
+integer :: NCholesky
+integer :: MaxBufferDimMB
+integer :: dimOA,dimOB
+integer :: i,j,ip,iq,ipq
+double precision :: Cpq
+
+double precision :: Tcpu,Twall
+
+call clock('START',Tcpu,Twall)
+
+! set dimensions
+NCholesky = CholeskyVecsOTF%NVecs
+dimOA = A%num0+A%num1
+dimOB = B%num0+B%num1
+
+! set buffer size
+if(Flags%MemType == 2) then       !MB
+   MaxBufferDimMB = Flags%MemVal
+elseif(Flags%MemType == 3) then   !GB
+   MaxBufferDimMB = Flags%MemVal * 1024_8
+endif
+
+allocate(A%FO(NCholesky,NBasis*dimOA),B%FO(NCholesky,NBasis*dimOB))
+
+call chol_Rkab_OTF(A%FO,A%CAONO,1,NBasis,A%CAONO,1,dimOA, &
+                   MaxBufferDimMB,CholeskyVecsOTF,        &
+                   AOBasis,ORBITAL_ORDERING_MOLPRO)
+
+call chol_Rkab_OTF(B%FO,B%CAONO,1,NBasis,B%CAONO,1,dimOB, &
+                   MaxBufferDimMB,CholeskyVecsOTF,        &
+                   AOBasis,ORBITAL_ORDERING_MOLPRO)
+
+allocate(A%FOAB(NCholesky,NBasis*dimOB),B%FOBA(NCholesky,NBasis*dimOA))
+
+call chol_Rkab_OTF(A%FOAB,A%CAONO,1,NBasis,B%CAONO,1,dimOB, &
+                   MaxBufferDimMB,CholeskyVecsOTF,          &
+                   AOBasis,ORBITAL_ORDERING_MOLPRO)
+
+call chol_Rkab_OTF(B%FOBA,B%CAONO,1,NBasis,A%CAONO,1,dimOA, &
+                   MaxBufferDimMB,CholeskyVecsOTF,          &
+                   AOBasis,ORBITAL_ORDERING_MOLPRO)
+
+end subroutine chol_FO_sapt_AO2NO_OTF
+
+subroutine chol_FFXX_mon_AO2NO_OTF(Flags,M,CholeskyVecsOTF,AOBasis,NBasis)
+!
+! performs AO2NO transformation
+! to generate 1) FFXX(NCholesky,NBasis**2) vectors
+!             2) (c_p+c_q)*FFXX => DChol vectors
+!
+implicit none
+
+type(FlagsData)        :: Flags
+type(SystemBlock)      :: M
+type(TAOBasis)         :: AOBasis
+type(TCholeskyVecsOTF) :: CholeskyVecsOTF
+integer,intent(in)     :: NBasis
+
+integer :: NCholesky
+integer :: MaxBufferDimMB
+integer :: i,j,ip,iq,ipq
+double precision :: Cpq
+
+double precision :: Tcpu,Twall
+
+call clock('START',Tcpu,Twall)
+
+! set dimensions
+NCholesky = CholeskyVecsOTF%NVecs
+
+! set buffer size
+if(Flags%MemType == 2) then       !MB
+   MaxBufferDimMB = Flags%MemVal
+elseif(Flags%MemType == 3) then   !GB
+   MaxBufferDimMB = Flags%MemVal * 1024_8
+endif
+!write(lout,'(1x,a,i5,a)') 'Using ',MaxBufferDimMB,' MB for 3-indx AO2NO transformation'
+
+allocate(M%FF(NCholesky,NBasis**2))
+
+call chol_Rkab_OTF(M%FF,M%CAONO,1,NBasis,M%CAONO,1,NBasis,&
+                   MaxBufferDimMB,CholeskyVecsOTF, &
+                   AOBasis,ORBITAL_ORDERING_MOLPRO)
+
+call clock('AFF',Tcpu,Twall)
+
+allocate(M%DChol(NCholesky,M%NDimX))
+
+do j=1,M%NDimX
+   ip = M%IndN(1,j)
+   iq = M%IndN(2,j)
+   ipq = iq + (ip-1)*NBasis
+   Cpq = M%CICoef(ip) + M%CICoef(iq)
+   M%DChol(:,j) = Cpq*M%FF(:,ipq)
+enddo
+
+end subroutine chol_FFXX_mon_AO2NO_OTF
+
+subroutine chol_FFXY_AB_AO2NO_OTF(Flags,A,B,CholeskyVecsOTF,AOBasis,NBasis,abtype)
+!
+! performs AO2NO transformation
+! to generate 1) FFXY(NCholesky,NBasis**2) vectors
+!
+implicit none
+
+type(FlagsData)        :: Flags
+type(SystemBlock)      :: A,B
+type(TAOBasis)         :: AOBasis
+type(TCholeskyVecsOTF) :: CholeskyVecsOTF
+integer,intent(in)     :: NBasis
+character(2),intent(in)   :: abtype
+
+integer :: NCholesky
+integer :: MaxBufferDimMB
+integer :: i,j,ip,iq,ipq
+double precision :: Cpq
+
+double precision :: Tcpu,Twall
+
+call clock('START',Tcpu,Twall)
+
+! set dimensions
+NCholesky = CholeskyVecsOTF%NVecs
+
+! set buffer size
+if(Flags%MemType == 2) then       !MB
+   MaxBufferDimMB = Flags%MemVal
+elseif(Flags%MemType == 3) then   !GB
+   MaxBufferDimMB = Flags%MemVal * 1024_8
+endif
+!write(lout,'(1x,a,i5,a)') 'Using ',MaxBufferDimMB,' MB for 3-indx AO2NO transformation'
+
+if (abtype == "AB") then
+
+   allocate(A%FFAB(NCholesky,NBasis**2))
+   call chol_Rkab_OTF(A%FFAB,A%CAONO,1,NBasis,B%CAONO,1,NBasis,&
+                      MaxBufferDimMB,CholeskyVecsOTF, &
+                      AOBasis,ORBITAL_ORDERING_MOLPRO)
+
+elseif (abtype == "BA") then
+
+   allocate(B%FFBA(NCholesky,NBasis**2))
+   call chol_Rkab_OTF(B%FFBA,B%CAONO,1,NBasis,A%CAONO,1,NBasis,&
+                      MaxBufferDimMB,CholeskyVecsOTF, &
+                      AOBasis,ORBITAL_ORDERING_MOLPRO)
+
+endif
+
+end subroutine chol_FFXY_AB_AO2NO_OTF
 
 subroutine gen_swap_rows(mat,nbas,nsym,nA,nB)
 implicit none

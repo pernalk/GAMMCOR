@@ -23,6 +23,9 @@ implicit none
 
 type(FlagsData) :: Flags
 type(SaptData)  :: SAPT
+type(TAOBasis)  :: AOBasis
+type(TCholeskyVecsOTF) :: CholeskyVecsOTF
+
 integer :: i
 integer :: NBasis
 double precision :: Tcpu,Twall
@@ -42,15 +45,15 @@ double precision :: Tcpu,Twall
 
  call clock('START',Tcpu,Twall)
  call sapt_basinfo(SAPT,NBasis)
- call sapt_interface(Flags,SAPT,NBasis)
+ call sapt_interface(Flags,SAPT,NBasis,AOBasis,CholeskyVecsOTF)
 
- call sapt_mon_ints(SAPT%monA,Flags,NBasis)
- call sapt_mon_ints(SAPT%monB,Flags,NBasis)
-
+ call sapt_mon_ints(SAPT%monA,Flags,NBasis,AOBasis,CholeskyVecsOTF)
  call sapt_response(Flags,SAPT%monA,SAPT%EnChck,NBasis)
+
+ call sapt_mon_ints(SAPT%monB,Flags,NBasis,AOBasis,CholeskyVecsOTF)
  call sapt_response(Flags,SAPT%monB,SAPT%EnChck,NBasis)
 
- call sapt_ab_ints(Flags,SAPT%monA,SAPT%monB,SAPT%iPINO,NBasis)
+ call sapt_ab_ints(Flags,SAPT%monA,SAPT%monB,SAPT%iPINO,NBasis,AOBasis,CholeskyVecsOTF)
 
  ! SAPT components
  write(LOUT,'()')
@@ -135,6 +138,9 @@ implicit none
 
 type(FlagsData)  :: Flags
 type(SaptData)   :: SAPT
+type(TAOBasis)   :: AOBasis
+type(TCholeskyVecsOTF) :: CholeskyVecsOTF
+
 integer          :: i
 integer          :: NBasis,NBasisRed
 integer          :: SAPT_LEVEL_SAVE
@@ -159,15 +165,15 @@ logical          :: onlyDisp
 
  call clock('START',Tcpu,Twall)
  call sapt_basinfo(SAPT,NBasis)
- call sapt_interface(Flags,SAPT,NBasis)
+ call sapt_interface(Flags,SAPT,NBasis,AOBasis,CholeskyVecsOTF)
 
- call sapt_mon_ints(SAPT%monA,Flags,NBasis)
- call sapt_mon_ints(SAPT%monB,Flags,NBasis)
-
- call sapt_response(Flags,SAPT%monA,SAPT%EnChck,NBasis)
+ call sapt_mon_ints(SAPT%monA,Flags,NBasis,AOBasis,CholeskyVecsOTF)
  call sapt_response(Flags,SAPT%monB,SAPT%EnChck,NBasis)
 
- call sapt_ab_ints(Flags,SAPT%monA,SAPT%monB,SAPT%iPINO,NBasis)
+ call sapt_mon_ints(SAPT%monB,Flags,NBasis,AOBasis,CholeskyVecsOTF)
+ call sapt_response(Flags,SAPT%monA,SAPT%EnChck,NBasis)
+
+ call sapt_ab_ints(Flags,SAPT%monA,SAPT%monB,SAPT%iPINO,NBasis,AOBasis,CholeskyVecsOTF)
 
  write(LOUT,'(/,1x,a)') 'SAPT COMPONENTS'
  write(LOUT,'(8a10)') ('**********',i=1,6)
@@ -539,12 +545,14 @@ double precision :: MO(NBasis*NBasis)
 
 end subroutine sapt_response
 
-subroutine sapt_ab_ints(Flags,A,B,iPINO,NBasis)
+subroutine sapt_ab_ints(Flags,A,B,iPINO,NBasis,AOBasis,CholeskyVecsOTF)
 implicit none
 
 type(FlagsData)    :: Flags
 type(SystemBlock)  :: A,B
 type(AOReaderData) :: reader
+type(TAOBasis)     :: AOBasis
+type(TCholeskyVecsOTF) :: CholeskyVecsOTF
 integer,intent(in) :: iPINO,NBasis
 integer            :: thr_id
 integer            :: ntr,iunit_aotwosort
@@ -626,26 +634,47 @@ if(Flags%ISERPA==0) then
 
      print*, 'dimOA',A%num0+A%num1
      print*, 'dimOB',B%num0+B%num1
+
+     if(Flags%ICholeskyOTF==1) then
+        call chol_FFXY_AB_AO2NO_OTF(Flags,A,B,CholeskyVecsOTF,AOBasis,NBasis,'AB')
+        ! deallocate AO cholesky vectors
+        deallocate(CholeskyVecsOTF%R)
+        !call chol_FFXY_AB_AO2NO_OTF(Flags,A,B,CholeskyVecsOTF,AOBasis,NBasis,'BA')
+        ! test prints 
+        if(allocated(A%FF))   print*, 'A%FF   is here!'
+        if(allocated(B%FF))   print*, 'B%FF   is here!'
+        if(allocated(A%FFAB)) print*, 'A%FFAB is here!'
+        if(allocated(B%FFBA)) print*, 'B%FFBA is here!'
+     endif
+     
+
      ! term A3-ind
+     call chol_fofo_batch(A%num0+A%num1,A%FO,B%num0+B%num1,B%FO, &
+                          A%NChol,NBasis,'FOFOAABB')
+     !call chol_fofo_full_batch(A%num0+A%num1,A%FF,B%num0+B%num1,B%FF, &
+     !                     A%NChol,NBasis,'FOFOAABB')
      !call chol_ints_fofo(NBasis,A%num0+A%num1,A%FF,&
      !                    NBasis,B%num0+B%num1,B%FF,&
      !                    A%NChol,NBasis,'FOFOAABB')
-     call chol_fofo_batch(A%num0+A%num1,A%FF,B%num0+B%num1,B%FF, &
-                          A%NChol,NBasis,'FOFOAABB')
 
      ! term A1-ind
+     call chol_ffoo_batch(.false.,A%FFAB,A%num0+A%num1,B%num0+B%num1,A%OOAB, &
+                          A%NChol,NBasis,'FFOOABAB')
+     !call chol_ffoo_full_batch(.false.,A%FFAB,A%num0+A%num1,B%num0+B%num1,A%FFAB, &
+     !                        A%NChol,NBasis,'FFOOABAB')
      !call chol_ints_fofo(NBasis,NBasis,A%FFAB, &
      !                    A%num0+A%num1,B%num0+B%num1,A%FFAB,&
      !                    A%NChol,NBasis,'FFOOABAB')
-     call chol_ffoo_batch(A%FFAB,A%num0+A%num1,B%num0+B%num1,A%FFAB, &
-                          A%NChol,NBasis,'FFOOABAB')
 
      ! term A2-ind
+     call chol_fofo_batch(B%num0+B%num1,B%FO,A%num0+A%num1,B%FOBA, &
+                         A%NChol,NBasis,'FOFOBBBA')
+     !call chol_fofo_full_batch(B%num0+B%num1,B%FF,A%num0+A%num1,B%FFBA, &
+     !                    A%NChol,NBasis,'FOFOBBBA')
      !call chol_ints_fofo(NBasis,B%num0+B%num1,B%FF,  &
      !                    NBasis,A%num0+A%num1,B%FFBA,&
      !                    A%NChol,NBasis,'FOFOBBBA')
-     call chol_fofo_batch(B%num0+B%num1,B%FF,A%num0+A%num1,B%FFBA, &
-                         A%NChol,NBasis,'FOFOBBBA')
+
      ! test -- chol_gen_ket_batch worsk here
      !call chol_gen_ket_batch('N',NBasis,B%num0+B%num1,B%FF,  &
      !                            NBasis,A%num0+A%num1,B%FFBA,&
@@ -654,22 +683,34 @@ if(Flags%ISERPA==0) then
      !                            A%num0+A%num1,NBasis,A%FFAB,&
      !                            A%NChol,NBasis,'FOFOBBBA')
 
+     call chol_fofo_batch(A%num0+A%num1,A%FO,B%num0+B%num1,A%FOAB, &
+                         A%NChol,NBasis,'FOFOAAAB')
+     !call chol_fofo_full_batch(A%num0+A%num1,A%FF,B%num0+B%num1,A%FFAB, &
+     !                    A%NChol,NBasis,'FOFOAAAB')
      !call chol_ints_fofo(NBasis,A%num0+A%num1,A%FF,  &
      !                    NBasis,B%num0+B%num1,A%FFAB,&
      !                    A%NChol,NBasis,'FOFOAAAB')
-     call chol_fofo_batch(A%num0+A%num1,A%FF,B%num0+B%num1,A%FFAB, &
-                         A%NChol,NBasis,'FOFOAAAB')
+
      ! A2A(B): YY
+     call chol_fofo_batch(B%num0+B%num1,B%FO,B%num0+B%num1,A%FOAB, &
+                          A%NChol,NBasis,'FOFOBBAB')
+     !call chol_fofo_full_batch(B%num0+B%num1,B%FF,B%num0+B%num1,A%FFAB, &
+     !                     A%NChol,NBasis,'FOFOBBAB')
      !call chol_ints_fofo(NBasis,B%num0+B%num1,B%FF,  &
      !                    NBasis,B%num0+B%num1,A%FFAB,&
      !                    A%NChol,NBasis,'FOFOBBAB')
-     call chol_fofo_batch(B%num0+B%num1,B%FF,B%num0+B%num1,A%FFAB, &
-                          A%NChol,NBasis,'FOFOBBAB')
+
+     call chol_fofo_batch(A%num0+A%num1,A%FO,A%num0+A%num1,B%FOBA, &
+                          A%NChol,NBasis,'FOFOAABA')
+     !call chol_fofo_full_batch(A%num0+A%num1,A%FF,A%num0+A%num1,B%FFBA, &
+     !                     A%NChol,NBasis,'FOFOAABA')
      !call chol_ints_fofo(NBasis,A%num0+A%num1,A%FF,  &
      !                    NBasis,A%num0+A%num1,B%FFBA,&
      !                    A%NChol,NBasis,'FOFOAABA')
-     call chol_fofo_batch(A%num0+A%num1,A%FF,A%num0+A%num1,B%FFBA, &
-                          A%NChol,NBasis,'FOFOAABA')
+
+     deallocate(A%FO)
+     deallocate(B%FO)
+     deallocate(A%OOAB)
 
      call clock('Time in Assemble:',Tcpu,Twall)
 
@@ -793,27 +834,37 @@ if(Flags%ISERPA==0) then
 
      write(LOUT,'(/1x,a)') 'Transforming E2exch-disp integrals...'
      if(Flags%ICholesky==1) then
+
+        call chol_fofo_batch(B%num0+B%num1,A%FOAB,A%num0+A%num1,B%FOBA, &
+                             A%NChol,NBasis,'FOFOABBA')
+        !call chol_fofo_full_batch(B%num0+B%num1,A%FFAB,A%num0+A%num1,B%FFBA, &
+        !                     A%NChol,NBasis,'FOFOABBA')
         !call chol_ints_fofo(NBasis,B%num0+B%num1,A%FFAB,&
         !                    NBasis,A%num0+A%num1,B%FFBA,&
         !                    A%NChol,NBasis,'FOFOABBA')
-        call chol_fofo_batch(B%num0+B%num1,A%FFAB,A%num0+A%num1,B%FFBA, &
-                             A%NChol,NBasis,'FOFOABBA')
+
         ! XY and YX, A2
+        call chol_ffoo_batch(.false.,A%FFAB,B%num0+B%num1,B%num0+B%num1,B%OO, &
+                             A%NChol,NBasis,'FFOOABBB')
+        !call chol_ffoo_full_batch(.false.,A%FFAB,B%num0+B%num1,B%num0+B%num1,B%FF, &
+        !                     A%NChol,NBasis,'FFOOABBB')
         !call chol_ints_fofo(NBasis,NBasis,A%FFAB, &
         !                    B%num0+B%num1,B%num0+B%num1,B%FF,&
         !                    A%NChol,NBasis,'FFOOABBB')
-        call chol_ffoo_batch(A%FFAB,B%num0+B%num1,B%num0+B%num1,B%FF, &
-                             A%NChol,NBasis,'FFOOABBB')
+        call chol_ffoo_batch(.true.,A%FFAB,A%num0+A%num1,A%num0+A%num1,A%OO, &
+                             A%NChol,NBasis,'FFOOBAAA')
+        !call chol_ffoo_full_batch(.true.,A%FFAB,A%num0+A%num1,A%num0+A%num1,A%FF, &
+        !                     A%NChol,NBasis,'FFOOBAAA')
         !call chol_ints_fofo(NBasis,NBasis,B%FFBA, &
         !                    A%num0+A%num1,A%num0+A%num1,A%FF,&
         !                    A%NChol,NBasis,'FFOOBAAA')
-        call chol_ffoo_batch(B%FFBA,A%num0+A%num1,A%num0+A%num1,A%FF, &
-                             A%NChol,NBasis,'FFOOBAAA')
         ! deallocate (FF|NCholesky) integrals
-        deallocate(A%FF)
-        deallocate(B%FF)
+        deallocate(B%FOBA)
+        deallocate(A%FOAB)
+        !deallocate(A%FF)
+        !deallocate(B%FF)
         deallocate(A%FFAB)
-        deallocate(B%FFBA)
+        !deallocate(B%FFBA)
      else
         call tran4_gen(NBasis,&
                  NBasis,B%CMO,&
@@ -1176,11 +1227,16 @@ subroutine reduce_virt(Flags,Mon,NBas)
 
 end subroutine reduce_virt
 
-subroutine sapt_mon_ints(Mon,Flags,NBas)
+subroutine sapt_mon_ints(Mon,Flags,NBas,AOBasis,CholeskyVecsOTF)
+!
+! Cholesky: generate FFXX(NCholesky,NBas**2)
+!
 implicit none
 
 type(SystemBlock) :: Mon
-type(FlagsData) :: Flags
+type(FlagsData)   :: Flags
+type(TAOBasis)    :: AOBasis
+type(TCholeskyVecsOTF) :: CholeskyVecsOTF
 
 integer :: NBas
 integer :: i,j,ij,ione
@@ -1254,6 +1310,7 @@ call clock('START',Tcpu,Twall)
                         Mon%NChol,NBas,twokfile)
       elseif (Flags%ICholeskyOTF==1) then
           write(LOUT,'(1x,a,i2)') 'Skipping FFOO/FOFO for monomer ',Mon%Monomer
+          call chol_FFXX_mon_AO2NO_OTF(Flags,Mon,CholeskyVecsOTF,AOBasis,NBas)
       endif
       !call chol_ints_gen(NBas,NBas,Mon%FF, &
       !               Mon%num0+Mon%num1,Mon%num0+Mon%num1,Mon%OO,&

@@ -64,6 +64,9 @@ integer :: NGOcc
 double precision :: OmI
 double precision,allocatable :: COMTilde(:)
 double precision,allocatable :: ABPlus0(:,:),ABMin0(:,:)
+double precision :: Tcpu,Twall
+
+call clock('START',Tcpu,Twall)
 
 ! test iterative
 iter = 1
@@ -234,6 +237,7 @@ if(Flags%ICASSCF==0.and.Flags%ISERPA==0) then
 
 
   if(Flags%ICholeskyOTF==1.or.Flags%ICholeskyBIN==1) then
+  ! write cholesky vecs on disk!
      if(Mon%Monomer==2) then
         open(newunit=iunit,file='cholvecs',status='old')
         close(iunit,status='delete')
@@ -242,9 +246,11 @@ if(Flags%ICASSCF==0.and.Flags%ISERPA==0) then
      write(iunit) Mon%NChol
      write(iunit) Mon%FF
      close(iunit)
+     ! they are needed in JK_Chol_loop 
+     deallocate(Mon%FF)
   endif
 
-  ECASSCF = 0
+  ECASSCF = 0d0
 !
 ! test semicoupled
 !  ACAlpha = 0.000000001
@@ -347,6 +353,9 @@ if(Flags%ICASSCF==0.and.Flags%ISERPA==0) then
                                   *(Mon%EigY((j-1)*Mon%NDimX+i)-Mon%EigX((j-1)*Mon%NDimX+i))
      enddo
   enddo
+
+  call clock('ERPA response',Tcpu,Twall)
+
   !print*, 'EigVecR',norm2(EigVecR)
   !print*, 'Eig    ',norm2(Mon%Eig)
 
@@ -540,6 +549,8 @@ if(Flags%ICASSCF==0.and.Flags%ISERPA==0) then
       deallocate(Eig1,Eig0,EigY1,EigY0)
 
   end select
+
+  call clock('ERPA unc response',Tcpu,Twall)
 
   !! test CAlpha
 !   NGOcc = 0

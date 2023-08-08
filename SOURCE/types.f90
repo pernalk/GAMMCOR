@@ -225,6 +225,7 @@ type SystemBlock
       double precision,allocatable :: CMO(:,:),CAONO(:,:)
       double precision,allocatable :: OV(:,:),OO(:,:), &
                                       FO(:,:),FF(:,:), &
+                                      FOAB(:,:),FOBA(:,:), &
                                       FFAB(:,:),FFBA(:,:), &
                                       OOAB(:,:),OOBA(:,:)
       double precision,allocatable :: DChol(:,:)
