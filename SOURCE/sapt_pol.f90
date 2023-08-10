@@ -31,6 +31,17 @@ double precision,external  :: trace
  allocate(work(NBas,NBas))
 
  call get_den(NBas,A%CMO,A%Occ,2d0,PA)
+
+ !block
+ !print*, 'PA in AOs'
+ !do i=1,nbas
+ !!   write(LOUT,*) i
+ !write(LOUT,'(*(f13.8))') (PA(i,j),j=1,nbas)
+ !enddo
+ !!write(LOUT,'()')
+ !print*, 'PA norm',norm2(PA)
+ !end block
+
  call get_den(NBas,B%CMO,B%Occ,2d0,PB)
 
  call get_one_mat('V',Va,A%Monomer,NBas)
@@ -42,6 +53,19 @@ double precision,external  :: trace
  work=0
  call dgemm('N','N',NBas,NBas,NBas,1d0,PA,NBas,Vb,NBas,0d0,work,NBas)
  ea = trace(work,NBas)
+
+ !block
+ !print*, 'Vb in AOs'
+ !do i=1,nbas
+ !!   write(LOUT,*) i
+ !!   write(LOUT,'(10f13.8)') (Vb(i,j),j=1,nbas)
+ !write(LOUT,'(*(f13.8))') (Vb(i,j),j=1,nbas)
+ !enddo
+ !write(LOUT,'()')
+ !print*, 'Vb norm',norm2(Vb)
+ !end block
+
+
 ! print*, ea
  call dgemm('N','N',NBas,NBas,NBas,1d0,PB,NBas,Va,NBas,0d0,work,NBas)
  eb = trace(work,NBas) 

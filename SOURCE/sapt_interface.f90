@@ -2578,6 +2578,8 @@ call chol_Rkab_OTF(B%FO,B%CAONO,1,NBasis,B%CAONO,1,dimOB, &
                    MaxBufferDimMB,CholeskyVecsOTF,        &
                    AOBasis,ORBITAL_ORDERING_MOLPRO)
 
+call clock('AFO+BFO',Tcpu,Twall)
+
 allocate(A%FOAB(NCholesky,NBasis*dimOB),B%FOBA(NCholesky,NBasis*dimOA))
 
 call chol_Rkab_OTF(A%FOAB,A%CAONO,1,NBasis,B%CAONO,1,dimOB, &
@@ -2587,6 +2589,8 @@ call chol_Rkab_OTF(A%FOAB,A%CAONO,1,NBasis,B%CAONO,1,dimOB, &
 call chol_Rkab_OTF(B%FOBA,B%CAONO,1,NBasis,A%CAONO,1,dimOA, &
                    MaxBufferDimMB,CholeskyVecsOTF,          &
                    AOBasis,ORBITAL_ORDERING_MOLPRO)
+
+call clock('AFOAB+BFOBA',Tcpu,Twall)
 
 end subroutine chol_FO_sapt_AO2NO_OTF
 
@@ -2630,7 +2634,8 @@ call chol_Rkab_OTF(M%FF,M%CAONO,1,NBasis,M%CAONO,1,NBasis,&
                    MaxBufferDimMB,CholeskyVecsOTF, &
                    AOBasis,ORBITAL_ORDERING_MOLPRO)
 
-call clock('AFF',Tcpu,Twall)
+if (M%Monomer==1) call clock('AFF',Tcpu,Twall)
+if (M%Monomer==2) call clock('BFF',Tcpu,Twall)
 
 allocate(M%DChol(NCholesky,M%NDimX))
 

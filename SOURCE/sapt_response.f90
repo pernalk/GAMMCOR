@@ -246,7 +246,7 @@ if(Flags%ICASSCF==0.and.Flags%ISERPA==0) then
      write(iunit) Mon%NChol
      write(iunit) Mon%FF
      close(iunit)
-     ! they are needed in JK_Chol_loop 
+     ! they are needed in JK_Chol_loop
      deallocate(Mon%FF)
   endif
 
@@ -658,6 +658,20 @@ if(Mon%TwoMoInt==TWOMO_INCORE) call LoadSaptTwoNO(Mon%Monomer,TwoMO,NBas,NInte2)
 
 ACAlpha=One
 allocate(ABPlus(Mon%NDimX**2),ABMin(Mon%NDimX**2))
+
+if(Flags%ICholeskyOTF==1.or.Flags%ICholeskyBIN==1) then
+! write cholesky vecs on disk!
+   if(Mon%Monomer==2) then
+      open(newunit=iunit,file='cholvecs',status='old')
+      close(iunit,status='delete')
+   endif
+   open(newunit=iunit,file='cholvecs',form='unformatted')
+   write(iunit) Mon%NChol
+   write(iunit) Mon%FF
+   close(iunit)
+   ! they are needed in JK_Chol_loop
+   deallocate(Mon%FF)
+endif
 
 ECASSCF = 0
 

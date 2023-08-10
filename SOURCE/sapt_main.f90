@@ -268,14 +268,21 @@ if(Flags%ICholesky==0) then
    call e2exdisp(Flags,SAPT%monA,SAPT%monB,SAPT)
 
    !call summary_sapt_verbose(SAPT)
+   call summary_sapt(SAPT)
 
 elseif(Flags%ICholesky==1) then
 
    print*,'CHECKING CHOLESKY...',Flags%ICholeskyOTF
    call e1elst_Chol(SAPT%monA,SAPT%monB,SAPT)
-   call e1exch_dmft(Flags,SAPT%monA,SAPT%monB,SAPT)
 
-   call e2ind(Flags,SAPT%monA,SAPT%monB,SAPT)
+   if(SAPT%SaptLevel==666.or.SAPT%SaptLevel==999) then
+      print*, 'TESTING E1EXCH CHOL-DMFT'
+      call e1exch_Chol_dmft(Flags,SAPT%monA,SAPT%monB,SAPT)
+   else
+      call e1exch_dmft(Flags,SAPT%monA,SAPT%monB,SAPT)
+   endif
+
+   call e2ind_icerpa(Flags,SAPT%monA,SAPT%monB,SAPT)
 
    if(.not.SAPT%CAlpha) then
       call e2disp_Cmat_Chol_block(Flags,SAPT%monA,SAPT%monB,SAPT)
@@ -283,12 +290,18 @@ elseif(Flags%ICholesky==1) then
       call e2disp_CAlphaTilde_block(Flags,SAPT%monA,SAPT%monB,SAPT)
    endif
 
-   call e2exind(Flags,SAPT%monA,SAPT%monB,SAPT)
-   call e2exdisp(Flags,SAPT%monA,SAPT%monB,SAPT)
+   if(SAPT%SaptLevel/=666.and.SAPT%SaptLevel/=999) then
+      call e2exind(Flags,SAPT%monA,SAPT%monB,SAPT)
+      call e2exdisp(Flags,SAPT%monA,SAPT%monB,SAPT)
+
+      call summary_sapt(SAPT)
+   else
+      call summary_rspt(SAPT)
+   endif
+
 
 endif
 
-call summary_sapt(SAPT)
 call print_warn(SAPT)
 call free_sapt(Flags,SAPT)
 
@@ -585,10 +598,14 @@ if(Flags%SaptLevel==666) then
      call chol_ints_oooo(A%num0+A%num1,A%num0+A%num1,A%OO,  &
                          A%num0+A%num1,B%num0+B%num1,A%OOAB,&
                          A%NChol,'OOOOAAAB')
+
+     call chol_ints_oooo(A%num0+A%num1,B%num0+B%num1,A%OOAB,  &
+                         A%num0+A%num1,B%num0+B%num1,A%OOAB,&
+                         A%NChol,'OOOOABAB')
   endif
   ! deallocate (FF|NCholesky) integrals
-  deallocate(A%FF)
-  deallocate(B%FF)
+  !deallocate(A%FF)
+  !deallocate(B%FF)
   return
 endif
 
@@ -1725,6 +1742,13 @@ endif
 if(.not.SAPT%doRSH) then
    call delfile('ABMAT_A')
    call delfile('ABMAT_B')
+endif
+
+if(SAPT%SaptLevel==999.or.SAPT%SaptLevel==666) then
+   call delfile('OOOOAABB')
+   call delfile('OOOOAAAB')
+   call delfile('OOOOBBBA')
+   call delfile('OOOOABAB')
 endif
 
 if(Flags%ISERPA==0) then

@@ -402,8 +402,8 @@ integer :: it,is,id,ie
 double precision :: AlphaA(NBas),AlphaB(NBas) 
 double precision :: vAA,vBA,vAB,vBB
 double precision :: fact,val
-double precision :: Sxx(NBas,NBas),S10(NBas,NBas)
-double precision :: TA(dimOA,dimOA),TB(dimOB,dimOB),U(dimOA,dimOB)
+double precision :: Sxx(NBas,NBas),S10(NBas,NBas),S01(NBas,NBas)
+double precision :: TA(dimOA,dimOA),TB(dimOB,dimOB) !,U(dimOA,dimOB)
 double precision :: intOAl(NBas,NBas),intOAr(NBas,NBas)
 double precision :: intOBl(NBas,NBas),intOBr(NBas,NBas)
 double precision,allocatable :: work(:),ints(:,:),tmp(:,:)
@@ -443,6 +443,13 @@ S10 = 0d0
 do ia=1,NBas
    do ip=1,dimOA
       S10(ip,ia) = AlphaA(ip)*Sab(ip,ia)
+   enddo
+enddo
+
+S01 = 0d0
+do ia=1,dimOB
+   do ip=1,NBas
+      S01(ip,ia) = Sab(ip,ia)*AlphaB(ia)
    enddo
 enddo
 
@@ -498,7 +505,7 @@ intVi  = 0d0
 intVo  = 0d0
 intVaa = 0d0
 intVbb = 0d0
-U      = 0d0
+!U      = 0d0
 kl = 0
 do l=1,dimOB
    do k=1,NBas
@@ -541,8 +548,8 @@ do l=1,dimOB
 
          do iq=1,dimOA
 
-            ! for 2-1b
-            U(ia,ib) = U(ia,ib) + fact*occA(iq)*ints(iq,iq)
+            !! for 2-1b
+            !U(ia,ib) = U(ia,ib) + fact*occA(iq)*ints(iq,iq)
 
             ! outer: Sum_{a'b'} (aa'|b'b) sqrt(n_a') sqrt(n_b') S(a',b')
             ! used in A part
@@ -629,6 +636,7 @@ enddo
 ! A part
 !print*, 'TEST-eta: settting eta*U=0'
 !print*, 'TEST-nu : settting nu*T =0'
+call dgemm('N','N',NBas,NBas,NBas,1d0,S01,NBas,intVbb,NBas,0d0,tmp,NBas)
 do i=1,ADimX
 
    ip = AIndN(1,i)
@@ -648,11 +656,9 @@ do i=1,ADimX
    ! 2-1b
    val = 0d0
    do ib=1,dimOB
-      do ia=1,dimOB
-         val = val - U(ia,ib)*Sab(ip,ia)*Sab(ir,ib)
-      enddo
+      val = val + tmp(ip,ib)*S01(ir,ib)
    enddo
-   intA(ipr) = intA(ipr) + fact*val
+   intA(ipr) = intA(ipr) -0.5d0*fact*val
 
 enddo
 !print*, 'A:11a:21a:21b',norm2(intA)
