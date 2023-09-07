@@ -246,7 +246,7 @@ call delfile('OOOOAAAB')
 
 end subroutine e1exch_Chol
 
-subroutine e1exch_Chol_dmft(Flags,A,B,SAPT)
+subroutine e1exch_Chol_dmft(Flags,A,B,SAPT,rdm2type)
 implicit none
 
 type(FlagsData) :: Flags
@@ -257,7 +257,7 @@ integer :: ij,ipr
 integer :: ip,iq,ir,is
 integer :: ipq,iu,it
 integer :: iunit
-integer :: rdm2type
+integer,intent(in) :: rdm2type
 integer :: dimOA,dimOB,NBas
 double precision :: fac,val,nnS2,tmp
 double precision :: tmpELST,tmpDEL
@@ -276,7 +276,7 @@ double precision,allocatable :: work(:,:),ints(:)
 
  allocate(AlphaA(dimOA),AlphaB(dimOB))
 
- rdm2type = Flags%IRdm2Typ
+ !rdm2type = Flags%IRdm2Typ
  print*, 'First-order exchange with RDM2 type =',rdm2Type
  select case(rdm2type)
  case(0)
@@ -547,7 +547,11 @@ close(iunit)
  e1ex_dmft = sum(tvk)+sum(tNa)+sum(tNb)+sum(tNaNb)
  SAPT%exchs2 = e1ex_dmft
 
- call print_en('E1exch-DMFT(S2)',e1ex_dmft*1000,.true.)
+ if (rdm2type==0) then
+    call print_en('E1exch-DMFT(nn)',e1ex_dmft*1000,.true.)
+ elseif (rdm2type==1) then
+    call print_en('E1exch-DMFT(BB)',e1ex_dmft*1000,.true.)
+ endif
 
  deallocate(Vbaa,Vabb,Vbba,Vaab)
  deallocate(AlphaB,AlphaA)

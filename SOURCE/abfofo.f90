@@ -108,6 +108,7 @@ do i=1,NOccup
    val = val + Occ(i)*HNO(i,i)
 enddo
 ETot = ETot + 2*val
+write(LOUT,*) 'ONE ELECTRON ENERGY:', ETot
 
 if(AB1) then
    do j=1,NBasis
@@ -1252,6 +1253,7 @@ enddo
 deallocate(RDM2Act)
 
 call triang_to_sq(XOne,work1,NBasis)
+print*, 'XOne',norm2(XOne)
 call dgemm('N','N',NBasis,NBasis,NBasis,1d0,URe,NBasis,work1,NBasis,0d0,work2,NBasis)
 call dgemm('N','T',NBasis,NBasis,NBasis,1d0,work2,NBasis,URe,NBasis,0d0,HNO,NBasis)
 call sq_symmetrize(HNO,NBasis)

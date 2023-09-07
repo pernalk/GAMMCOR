@@ -696,6 +696,14 @@ character(:), allocatable :: first, last
  case ("WEXCIT")
        read(val,*) SystemParams%Wexcit
 
+ case ("NATORB")
+       SystemParams%DeclareNatOrb = .true.
+      if(uppercase(val) == "MOLPRO") then
+         SystemParams%NatOrb = 1
+      else
+         stop "Unknown Natural Orbitals Source!" 
+      endif
+
  end select
 end subroutine read_block_system
 

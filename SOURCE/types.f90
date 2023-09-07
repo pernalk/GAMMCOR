@@ -178,8 +178,10 @@ type SystemBlock
       integer :: num0,num1,num2
       integer :: NVZero = 0
       integer :: TwoMoInt = TWOMO_INCORE
+      integer :: NatOrb = 0 ! if 1, natural orbs from Molpro
       logical :: DeclareTwoMo     = .false.
       logical :: DeclareSt        = .false.
+      logical :: DeclareNatOrb    = .false.
       logical :: DeclareTrSt      = .false.
       logical :: DeclareSpin      = .false.
       logical :: DeclareThrSelAct = .false.

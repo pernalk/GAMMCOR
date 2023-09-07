@@ -33,13 +33,23 @@ double precision,external  :: trace
  call get_den(NBas,A%CMO,A%Occ,2d0,PA)
 
  !block
- !print*, 'PA in AOs'
- !do i=1,nbas
- !!   write(LOUT,*) i
- !write(LOUT,'(*(f13.8))') (PA(i,j),j=1,nbas)
+ !!print*, 'PA in AOs'
+ !print*, 'A%CMO in AOs'
+ !do j=1,nbas
+ !   write(LOUT,*) j
+ !   write(LOUT,'(10f13.8)') (A%CMO(i,j),i=1,nbas)
+ !!write(LOUT,'(*(f13.8))') (PA(i,j),j=1,nbas)
  !enddo
- !!write(LOUT,'()')
- !print*, 'PA norm',norm2(PA)
+ !write(LOUT,'()')
+ !!print*, 'PA norm',norm2(PA)
+ !print*, 'CNOA norm',norm2(A%CMO)
+ !print*, 'B%CMO in AOs'
+ !do j=1,nbas
+ !   write(LOUT,*) j
+ !   write(LOUT,'(10f13.8)') (B%CMO(i,j),i=1,nbas)
+ !!write(LOUT,'(*(f13.8))') (PA(i,j),j=1,nbas)
+ !enddo
+ !print*, 'CNOB norm',norm2(B%CMO)
  !end block
 
  call get_den(NBas,B%CMO,B%Occ,2d0,PB)

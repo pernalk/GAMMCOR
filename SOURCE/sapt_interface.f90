@@ -65,6 +65,7 @@ logical :: SortAngularMomenta
 character(:),allocatable :: BasisSet
 
 logical :: doRSH
+logical :: canoni
 double precision,allocatable :: Sa(:,:),Sb(:,:)
 double precision :: Tcpu,Twall
 
@@ -143,6 +144,7 @@ SAPT%monB%NDim = NBasis*(NBasis-1)/2
  elseif(SAPT%InterfaceType==2) then
     call read_mo_molpro(Ca,'MOLPRO_A.MOPUN','CASORB  ',NBasis)
     call read_mo_molpro(Cb,'MOLPRO_B.MOPUN','CASORB  ',NBasis)
+
  endif
 
 ! symmetry sorting
@@ -248,17 +250,83 @@ SAPT%monB%NDim = NBasis*(NBasis-1)/2
  call clock('2ints',Tcpu,Twall)
 
  if(SAPT%InterfaceType==2) then
-    call prepare_no_molpro(Ca,OneRdmA,AuxA,SAPT%monA,AOBasis,System, &
-                    CholeskyVecs,CholeskyVecsOTF, &
-                    Flags,NBasis)
-    call prepare_no_molpro(Cb,OneRdmB,AuxB,SAPT%monB,AOBasis,System, &
-                    CholeskyVecs,CholeskyVecsOTF, &
-                    Flags,NBasis)
+
+    if(SAPT%monA%NatOrb==0) then
+       ! create NOs inside GammCor (use canonical CAS orbs)
+       call prepare_no_molpro(Ca,OneRdmA,AuxA,SAPT%monA,AOBasis,System, &
+                       CholeskyVecs,CholeskyVecsOTF, &
+                       Flags,NBasis)
+    elseif(SAPT%monA%NatOrb==1) then
+       print*, 'MONOMER A: use Natural Orbitals from Molpro'
+       block
+       integer :: ione
+       character(8) :: label
+       double precision :: CSAOMO(NBasis,NBasis)
+       double precision :: SAO(NBasis,NBasis),ttt(NBasis,NBasis)
+       CSAOMO = 0d0
+       ij = 0
+       do j=1,NBasis
+          do i=1,NBasis
+             ij = ij + 1
+             CSAOMO(i,j) = Ca(ij)
+          enddo
+       enddo
+       ! get S in AO
+       open(newunit=ione,file='ONEEL_A',access='sequential',&
+            form='unformatted',status='old')
+       read(ione) label, SAO
+       close(ione)
+
+
+       call read_no_molpro(Ca,SAPT%monA%InSt(1,1),'MOLPRO_A.MOPUN','NATORB  ',NBasis)
+
+       call dgemm('T','N',NBasis,NBasis,NBasis,1d0,CSAOMO,NBasis,SAO,NBasis,0d0,ttt,NBasis)
+       call dgemm('N','N',NBasis,NBasis,NBasis,1d0,ttt,NBasis,Ca,NBasis,0d0,AuxA,NBasis)
+       end block
+    else
+       stop "Wrong NatOrb Value!"
+    endif
+
+    if(SAPT%monB%NatOrb==0) then
+       call prepare_no_molpro(Cb,OneRdmB,AuxB,SAPT%monB,AOBasis,System, &
+                       CholeskyVecs,CholeskyVecsOTF, &
+                       Flags,NBasis)
+    elseif(SAPT%monB%NatOrb==1) then
+
+       print*, 'MONOMER B: use Natural Orbitals from Molpro'
+       block
+       double precision :: CSAOMO(NBasis,NBasis)
+       double precision :: SAO(NBasis,NBasis)
+       ij = 0
+       do j=1,NBasis
+          do i=1,NBasis
+             ij = ij + 1
+             CSAOMO(i,j) = Cb(ij)
+          enddo
+       enddo
+
+       call read_no_molpro(Cb,SAPT%monB%InSt(1,1),'MOLPRO_B.MOPUN','NATORB  ',NBasis)
+       call dgemm('T','N',NBasis,NBasis,NBasis,1d0,CSAOMO,NBasis,SAO,NBasis,0d0,work,NBasis)
+       call dgemm('N','N',NBasis,NBasis,NBasis,1d0,work,NBasis,Cb,NBasis,0d0,AuxB,NBasis)
+       end block
+
+    else
+       stop "Wrong NatOrb Value!"
+    endif
+!
+!       print*, 'Skipping canonicalization...'
+!       call prepare_no_molpro_skip(AuxA,Ca,SAPT%monA%INAct,SAPT%monA%NAct,NBasis,NBasis)
+!       call prepare_no_molpro_skip(AuxB,Cb,SAPT%monB%INAct,SAPT%monB%NAct,NBasis,NBasis)
+
+       !print*, 'aaaa: AuxA'
+       !do j=1,NBasis
+       !   write(6,'(*(f12.6))') (AuxA(i,j),i=1,NBasis)
+       !enddo
+
     call prepare_rdm2_molpro(SAPT%monA,AuxA,NBasis)
     call prepare_rdm2_molpro(SAPT%monB,AuxB,NBasis)
  endif
 
-! maybe better: add writing Ca, Cb to file?!
  allocate(SAPT%monA%CMO(NBasis,NBasis),SAPT%monB%CMO(NBasis,NBasis))
  ij=0
  SAPT%monA%CMO = 0
@@ -270,6 +338,16 @@ SAPT%monB%NDim = NBasis*(NBasis-1)/2
        SAPT%monB%CMO(j,i) = Cb(ij)
     enddo
  enddo
+
+ ! test
+ write(LOUT,*) 'sapt_interface: CNO'
+ print*, norm2(SAPT%monA%CMO)
+ do j=1,NBasis
+    print*, j
+    write(*,'(14f11.6)') (SAPT%monA%CMO(i,j),i=1,nbasis)
+ end do
+
+
 
 ! look-up tables
  call select_active(SAPT%monA,NBasis,Flags)
@@ -611,11 +689,12 @@ implicit none
 ! OrbAux  :: on output C(MO,NO)
 ! OneRdm  :: on output 1-RDM in AO
 !
-type(SystemBlock) :: Mon
-type(FlagsData) :: Flags
+type(SystemBlock)  :: Mon
+type(FlagsData)    :: Flags
+integer,intent(in) :: NBasis
 
-integer :: NBasis
-integer :: NInte1,HlpDim,NOccup,nact
+integer :: NAct,NOccup
+integer :: NInte1,HlpDim
 integer :: i,info
 double precision :: Tmp
 double precision :: OrbAux(NBasis,NBasis), &
@@ -636,21 +715,26 @@ character(:),allocatable :: rdmfile
    mname   = 'B'
  endif
 
+ call read_nact_molpro(NAct,rdmfile)
+
  allocate(Mon%CICoef(NBasis),Mon%IGem(NBasis),Mon%Occ(NBasis))
  allocate(work(HlpDim),EVal(NBasis))
- OneRdm = 0
- ! HERE! FIRST STATE FOR NOW
+ OneRdm = 0d0
+ EVal   = 0d0
  call read_1rdm_molpro(OneRdm,Mon%InSt(1,1),Mon%InSt(2,1),&
                        Mon%ISpinMs2,rdmfile,Mon%IWarn,NBasis)
 
  call triang_to_sq2(OneRdm,OrbAux,NBasis)
- call Diag8(OrbAux,NBasis,NBasis,Eval,work)
+ call Diag8(OrbAux(1:NAct,1:NAct),NAct,NAct,Eval(1:NAct),work)
+ !call Diag8(OrbAux,NBasis,NBasis,Eval,work)
+
 ! KP : it may happen that an active orbital has a negative tiny occupation. set it to a positive
- do i=1,Nbasis
+ do i=1,NBasis
  Eval(i)=Abs(Eval(i))
  enddo
 ! call dsyev('V','U',NBasis,OrbAux,NBasis,EVal,work,3*NBasis,info)
- call SortOcc(EVal,OrbAux,NBasis)
+ call SortOcc(EVal,OrbAux(1:NAct,1:NAct),NAct)
+ !call SortOcc(EVal,OrbAux,NBasis)
 
 ! read NAct from 1RDM
  if(Mon%NActFromRDM) Mon%NAct = 0
@@ -662,7 +746,7 @@ character(:),allocatable :: rdmfile
  enddo
 
 ! test NAct from 1RDM
- call read_nact_molpro(nact,rdmfile)
+ !call read_nact_molpro(nact,rdmfile)
  if(Mon%NAct/=nact) then
     write(lout,'(1x,2a)') 'Warning! In monomer ', mname
     write(lout,'(1x,"The number of partially occ orbitals '// &
@@ -1334,6 +1418,38 @@ double precision :: OccOrd(nbas)
 
 end subroutine sort_sym_occ
 
+subroutine prepare_no_molpro_skip(CMONOAct,CAOMO,INAct,NAct,NAO,NBasis)
+implicit none
+!
+! Purpose: get AO-->NO transformation
+!
+! CMONO[in] :: on input MOtoNO
+! CAOMO[in] :: on input AOtoMO
+!     [out] :: on output AOtoNO
+!
+integer,intent(in) :: NAO,NBasis
+integer,intent(in) :: INAct,NAct
+double precision   :: CMONOAct(NBasis,NBasis),CAOMO(NAO,NBasis)
+
+integer :: i,j
+double precision   :: CMONO(NBasis,NBasis)
+double precision   :: work(NAO,NBasis)
+
+! skip canonicalization
+
+ CMONO = 0d0
+ forall(i=1:NBasis) CMONO(i,i)=1d0
+ do i=1,NAct
+    do j=1,NAct
+       CMONO(INAct+i,INAct+j) = CMONOAct(i,j)
+    enddo
+ enddo
+
+ call dgemm('N','N',NAO,NBasis,NBasis,1d0,CAOMO,NAO,CMONO,NBasis,0d0,work,NAO)
+ CAOMO = work
+
+end subroutine prepare_no_molpro_skip
+
 subroutine prepare_no_molpro(OrbCAS,OneRdm,CMONOAct,Mon,AOBasis,System, &
                       CholeskyVecs,CholeskyVecsOTF, &
                       Flags,NBasis)
@@ -1416,6 +1532,10 @@ integer :: info
        CMONO(Mon%INAct+i,Mon%INAct+j) = CMONOAct(i,j)
     enddo
  enddo
+ !print*, 'prepare_no: CMONO'
+ !do j=1,NBasis
+ !   write(6,'(*(f12.6))') (CMONO(i,j),i=1,NBasis)
+ !enddo
  ! with dsyev
  !do i=1,Mon%NAct
  !   do j=1,Mon%NAct
@@ -1445,7 +1565,7 @@ integer :: info
  enddo
 
  ! reorder MOs to no symmetry 
- ! (in Molpro they are arrange by irreps)
+ ! (in Molpro they are arranged by irreps)
  do i=1,NBasis
     do j=1,NBasis
        CSAOMO(Mon%IndInt(i),j) = OrbCAS(j,i)
@@ -1585,7 +1705,7 @@ integer :: info
 call dgemm('N','N',NBasis,NBasis,NBasis,1d0,CMONO,NBasis,CSAOMO,NBasis,0d0,OrbCAS,NBasis)
 OrbCAS = transpose(OrbCAS)
 
-if(Flags%ICholeskyOTF) then
+if(Flags%ICholeskyOTF==1) then
 
    allocate(Mon%CAONO(NBasis,NBasis))
    ! CAOMO = C(AO,MO) ; CMONO = C(NO,MO)
@@ -1649,11 +1769,19 @@ integer,external :: NAddrRDM
  call read_2rdm_molpro(RDM2Act,Mon%InSt(1,1),Mon%InSt(2,1),&
                        Mon%ISpinMs2,rdmfile,Mon%IWarn,Mon%NAct)
 
- do i=1,Mon%NAct
-    do j=1,Mon%NAct
-       work1((j-1)*Mon%NAct+i) = OrbAux(i,j)
+ if (Mon%NatOrb==1) then
+    do i=1,Mon%NAct
+       do j=1,Mon%NAct
+          work1((j-1)*Mon%NAct+i) = OrbAux(Mon%INAct+j,Mon%INAct+i)
+       enddo
     enddo
- enddo
+ else
+    do i=1,Mon%NAct
+       do j=1,Mon%NAct
+          work1((j-1)*Mon%NAct+i) = OrbAux(i,j)
+       enddo
+    enddo
+ endif
  call TrRDM2(RDM2Act,work1,Mon%NAct,NRDM2Act)
 
  open(newunit=iunit,file=outfile,status='replace',&

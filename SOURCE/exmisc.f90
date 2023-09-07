@@ -201,7 +201,7 @@ deallocate(work)
 
 end subroutine make_sij_Y
 
-subroutine make_sij_Y_Chol(sij,tmp1,AOcc,BOcc,AEigY,AEigX,BEigY,BEigX,&
+subroutine make_sij_Y_Chol_old(sij,tmp1,AOcc,BOcc,AEigY,AEigX,BEigY,BEigX,&
                       OVA,OVB, &
                       Anum0,Bnum0,dimOA,dimOB,nOVB,AIndN,BIndN,ANDimX,BNDimX,&
                       NCholesky,NBas)
@@ -282,6 +282,61 @@ do j=1,BNDimX
  enddo
 
 deallocate(work)
+
+end subroutine make_sij_Y_Chol_old
+
+subroutine make_sij_Y_Chol(sij,AOcc,BOcc,AEigY,AEigX,BEigY,BEigX,&
+                      OVA,OVB, &
+                      Anum0,Bnum0,dimOA,dimOB,nOVB,AIndN,BIndN,ANDimX,BNDimX,&
+                      NCholesky,NBas)
+!
+! warning! OVA and OVB are overwritten!
+!
+implicit none
+
+integer,intent(in) :: Anum0,Bnum0,dimOA,dimOB,nOVB,ANDimX,BNDimX
+integer,intent(in) :: NCholesky,NBas
+integer,intent(in) :: AIndN(2,ANDimX),BIndN(2,BNDimX)
+double precision,intent(in) :: AOcc(NBas),BOcc(NBas),&
+                               AEigY(ANDimX*ANDimX),AEigX(ANDimX*ANDimX),&
+                               BEigY(BNDimX*BNDimX),BEigX(BNDimX*BNDimX)
+double precision               :: OVA(NCholesky,ANDimX),OVB(NCholesky,BNDimX)
+double precision,intent(inout) :: sij(ANDimX,BNDimX)
+
+integer :: i,j,ir,is,irs,ip,iq,ipq
+double precision :: fact
+double precision :: work(NBas)
+double precision,allocatable :: tmpA(:,:),tmpB(:,:)
+
+! we do not need the Cpq prefacor...
+do i=1,NBas
+   work(i) = sign(sqrt(AOcc(i)),AOcc(i)-0.5d0)
+enddo
+do ipq=1,ANDimX
+   ip = AIndN(1,ipq)
+   iq = AIndN(2,ipq)
+   OVA(:,ipq) = (work(ip)-work(iq))*OVA(:,ipq)
+enddo
+do i=1,NBas
+   work(i) = sign(sqrt(BOcc(i)),BOcc(i)-0.5d0)
+enddo
+do irs=1,BNDimX
+   ir = BIndN(1,irs)
+   is = BIndN(2,irs)
+   OVB(:,irs) = (work(ir)-work(is))*OVB(:,irs)
+enddo
+
+allocate(tmpA(NCholesky,ANDimX),tmpB(NCholesky,BNDimX))
+
+call dgemm('N','N',NCholesky,ANDimX,ANDimX, 1d0,OVA,NCholesky,AEigY,ANDimX,0d0,tmpA,NCholesky)
+call dgemm('N','N',NCholesky,ANDimX,ANDimX,-1d0,OVA,NCholesky,AEigX,ANDimX,1d0,tmpA,NCholesky)
+
+call dgemm('N','N',NCholesky,BNDimX,BNDimX, 1d0,OVB,NCholesky,BEigY,BNDimX,0d0,tmpB,NCholesky)
+call dgemm('N','N',NCholesky,BNDimX,BNDimX,-1d0,OVB,NCholesky,BEigX,BNDimX,1d0,tmpB,NCholesky)
+
+call dgemm('T','N',ANDimX,BNDimX,NCholesky,1d0,tmpA,NCholesky,tmpB,NCholesky,0d0,sij,ANDimX)
+
+deallocate(tmpB,tmpA)
 
 end subroutine make_sij_Y_Chol
 

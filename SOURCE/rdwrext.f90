@@ -377,6 +377,75 @@ double precision :: tmp(ntr)
 
 end subroutine readoneint_molpro
 
+subroutine read_no_molpro(cno,istate,infile,text,nbasis)
+!
+! this subroutine reads C(SAO,NO) coefficients
+! these are dumped in Molpro through NATORBA and NATORBB
+! labels 
+!
+implicit none
+
+integer,intent(in) :: nbasis,istate
+character(*),intent(in) :: infile,text
+double precision,intent(out) :: cno(nbasis,nbasis)
+
+character(8) :: label
+integer :: iunit,ios
+integer :: nsym,nbas(8),offs(8),ncmot
+integer :: iset
+integer :: i,j,idx,irep,ioff
+double precision ::tmp(nbasis**2)
+
+ open(newunit=iunit,file=infile,status='OLD', &
+      access='SEQUENTIAL',form='UNFORMATTED')
+
+ !rewind(iunit)
+ do
+   read(iunit,iostat=ios) label
+   if(ios<0) then
+      write(6,*) 'ERROR!!! LABEL '//text//' not found!'
+      stop
+   endif
+   if(label==text) then
+      read(iunit) nsym,nbas(1:nsym),offs(1:nsym),iset
+      ncmot = sum(nbas(1:nsym)**2)
+      print*, 'iset?',iset
+      !print*, nsym,nbas(1:nsym),offs(1:nsym)
+      print*, ncmot,istate
+      if(istate==1.or.istate.lt.0) then
+         read(iunit) tmp(1:ncmot)
+      elseif(istate==2.and.(iset.lt.0)) then
+         read(iunit)
+         read(iunit) tmp(1:ncmot)
+      elseif(istate==2.and.(iset.ge.0)) then
+         stop "read_no_molpro: NOs for state 2 are missing!"
+      endif
+      exit
+   endif
+ enddo
+
+ cno = 0
+ idx = 0
+ do irep=1,nsym
+    ioff = offs(irep)
+    do j=1,nbas(irep)
+       do i=1,nbas(irep)
+          idx = idx + 1
+          cno(ioff+i,ioff+j) = tmp(idx)
+       enddo
+    enddo
+ enddo
+
+ write(LOUT,*) 'readm_no_molpro: CNO'
+ do j=1,NBasis
+    print*, j
+    write(*,'(14f11.6)') (cno(i,j),i=1,nbasis)
+ end do
+
+ close(iunit)
+
+end subroutine read_no_molpro
+
 subroutine read_mo_molpro(cmo,infile,text,nbasis)
 !
 ! this subroutine reads C(SAO,MO) coefficients
@@ -425,10 +494,11 @@ double precision ::tmp(nbasis**2)
     enddo
  enddo
 
-  !write(LOUT,*) 'test print'
-  !do i=1,NBasis
-  !   write(*,'(14f11.6)') (cmo(i,j),j=1,nbasis)
-  !end do
+ !write(LOUT,*) 'readm_mo_molpro: CMO'
+ !do j=1,NBasis
+ !   print*, j
+ !   write(*,'(14f11.6)') (cmo(i,j),i=1,nbasis)
+ !end do
 
  close(iunit)
 
