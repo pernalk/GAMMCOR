@@ -3712,6 +3712,7 @@ call clock('START',Tcpu,Twall)
                           A%NDimX,B%NDimX,A%NChol,NBas)
           !call clock('make_sij_Y_Chol2',TCpu,TWall)
        endif
+       call writeampl(sij,'PROP_AB')
 
     endif
 

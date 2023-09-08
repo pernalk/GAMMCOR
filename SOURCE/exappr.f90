@@ -294,7 +294,7 @@ enddo
 
 deallocate(ints,work)
 
-print*, 'appA3_XY', norm2(intXY)
+!print*, 'app_A3_XY', norm2(intXY)
 
 end subroutine app_A3_XY
 
@@ -629,7 +629,7 @@ deallocate(intU)
 deallocate(intV,intE)
 deallocate(BOccN,AOccN)
 
-print*, 'appA3_nn_XX',norm2(intXX(1:dim1,1:dim2))
+!print*, 'appA3_nn_XX',norm2(intXX(1:dim1,1:dim2))
 
 end subroutine app_nn_A3_XX
 
@@ -926,7 +926,7 @@ enddo
 
 deallocate(ints,work)
 
-print*, 'appA3_XX',norm2(intXX(1:dim1,1:dim2))
+!print*, 'app_A3_XX',norm2(intXX(1:dim1,1:dim2))
 
 end subroutine app_A3_XX
 
@@ -1136,7 +1136,7 @@ close(iunit)
 
 deallocate(ints,work,tmp)
 
-print*,'appYX', norm2(intYX)
+!print*,'app_A2_YX', norm2(intYX)
 
 end subroutine app_A2_YX 
 
@@ -1310,7 +1310,7 @@ endif
 
 deallocate(ints,work,tmp)
 
-print*, 'appXY',norm2(intXY)
+!print*, 'app_A2_XY',norm2(intXY)
 
 end subroutine app_A2_XY
 
@@ -1485,7 +1485,7 @@ endif
 
 deallocate(ints,work,tmp)
 
-print*, 'appYY',norm2(intYY)
+!print*, 'app_A2_YY',norm2(intYY)
 
 end subroutine app_A2_YY
 
@@ -1660,7 +1660,7 @@ else
    enddo
 endif
 
-print*,'appXX:', norm2(intXX)
+!print*,'app_A2_XX:', norm2(intXX)
 
 deallocate(ints,work,tmp)
 

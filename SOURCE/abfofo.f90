@@ -802,9 +802,9 @@ NOccupResp=0
 NVirtResp=0
 Do I=1,NBasis
    AUXM0(I,I)=Occ(I)
-   !  include active orbitals 
+   !  include active orbitals
    If ( IOrbIncl==1 ) Then
-     If(Occ(I).Gt.0.5) NOccupResp=NOccupResp+1  
+     If(Occ(I).Gt.0.5) NOccupResp=NOccupResp+1
      If(Occ(I).Gt.0.5) NVirtResp=NVirtResp+1
    ElseIf ( IOrbIncl == 0 ) Then
    !  exclude active orbitals
