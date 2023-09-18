@@ -426,7 +426,7 @@ if(IRDM2Type==0) then
    do i=1,dimOB
       AlphaB(i) = occB(i)
    enddo
-elseif(IRDM2Type==1) then
+elseif(IRDM2Type==1.or.IRDM2Type==11) then
    do i=1,dimOA
       AlphaA(i) = sqrt(occA(i))
    enddo
@@ -1215,7 +1215,7 @@ if(IRDM2Type==0) then
    do i=1,dimOB
       AlphaB(i) = occB(i)
    enddo
-elseif(IRDM2Type==1) then
+elseif(IRDM2Type==1.or.IRDM2Type==11) then
    do i=1,dimOA
       AlphaA(i) = sqrt(occA(i))
    enddo
@@ -1580,7 +1580,7 @@ if(IRDM2Type==0) then
    do i=1,dimOB
       AlphaB(i) = occB(i)
    enddo
-elseif(IRDM2Type==1) then
+elseif(IRDM2Type==1.or.IRDM2Type==11) then
    do i=1,dimOA
       AlphaA(i) = sqrt(occA(i))
    enddo

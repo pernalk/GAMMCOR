@@ -1707,6 +1707,7 @@ integer :: i,j,pq,rs
 integer :: ip,iq,ir,is
 integer :: kc,ik,ic
 logical,allocatable          :: condOmA(:),condOmB(:)
+logical,allocatable          :: condOmA0(:),condOmB0(:)
 double precision,allocatable :: OmA(:), OmB(:), &
                                 OmA0(:),OmB0(:)
 double precision,allocatable :: EVecA(:), EVecB(:)
@@ -1780,10 +1781,10 @@ allocate(tmp1(A%NDimX,B%NDimX),tmp2(A%NDimX,B%NDimX),&
 
 ! coupled
 do i=1,A%NDimX
-   if(OmA(i)<0d0) write(LOUT,*) 'Negative omega A!',i,OmA(i)
+   if(OmA(i)<0d0) write(LOUT,*) 'Discarding negative omega A!',i,OmA(i)
 enddo
 do i=1,B%NDimX
-   if(OmB(i)<0d0) write(LOUT,*) 'Negative omega B!',i,OmB(i)
+   if(OmB(i)<0d0) write(LOUT,*) 'Discarding negative omega B!',i,OmB(i)
 enddo
 
 if(.not.(Flags%ICASSCF==0.and.Flags%ISERPA==0)) then
@@ -1867,19 +1868,26 @@ close(iunit)
 
 if(.not.(Flags%ICASSCF==0.and.Flags%ISERPA==0)) then
    ! uncoupled
+    allocate(condOmA0(A%NDimX),condOmB0(B%NDimX)) 
+
+    condOmA0 = (OmA0.gt.SmallE.and.OmA0.lt.BigE)
+    condOmB0 = (OmB0.gt.SmallE.and.OmB0.lt.BigE)
+
     e2du = 0d0
     do j=1,B%NDimX
-       do i=1,A%NDimX
+       if(condOmB0(j)) then
+          do i=1,A%NDimX
+             if(condOmA0(i)) then
    
-          if(abs(OmA0(i)).gt.SmallE.and.abs(OmB0(j)).gt.SmallE&
-             .and.abs(OmA0(i)).lt.BigE.and.abs(OmB0(j)).lt.BigE) then
+             !if(abs(OmA0(i)).gt.SmallE.and.abs(OmB0(j)).gt.SmallE&
+             !   .and.abs(OmA0(i)).lt.BigE.and.abs(OmB0(j)).lt.BigE) then
 
+             inv_omega = 1d0/(OmA0(i)+OmB0(j))
+             e2du = e2du + tmp02(i,j)**2*inv_omega
 
-          inv_omega = 1d0/(OmA0(i)+OmB0(j))
-          e2du = e2du + tmp02(i,j)**2*inv_omega
-
-          endif
-       enddo
+             endif
+          enddo
+       endif
     enddo
     SAPT%e2disp_unc = -16d0*e2du
 
@@ -1887,11 +1895,14 @@ if(.not.(Flags%ICASSCF==0.and.Flags%ISERPA==0)) then
 
     call writeampl(tmp02,'PROP_AB0')
 
+    deallocate(condOmB0,condOmA0)
 endif
 
  allocate(condOmA(A%NDimX),condOmB(B%NDimX)) 
- condOmA = (abs(OmA).gt.SmallE.and.abs(OmA).lt.BigE)
- condOmB = (abs(OmB).gt.SmallE.and.abs(OmB).lt.BigE)
+ !condOmA = (abs(OmA).gt.SmallE.and.abs(OmA).lt.BigE)
+ !condOmB = (abs(OmB).gt.SmallE.and.abs(OmB).lt.BigE)
+ condOmA = (OmA.gt.SmallE.and.OmA.lt.BigE)
+ condOmB = (OmB.gt.SmallE.and.OmB.lt.BigE)
 
  e2d = 0d0
  do j=1,B%NDimX

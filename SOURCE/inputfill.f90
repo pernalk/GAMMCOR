@@ -445,6 +445,9 @@ subroutine read_block_calculation(CalcParams, line)
            elseif (uppercase(val) == "BB".or. &
                uppercase(val) == "DMFT") then
                CalcParams%Rdm2Type = 1
+           elseif (uppercase(val) == "BBFULL".or. &
+               uppercase(val) == "DMFTFULL") then
+               CalcParams%Rdm2Type = 11
            endif
 
       ! here not sure

@@ -283,7 +283,7 @@ double precision,allocatable :: work(:,:),ints(:)
  ! HF
     AlphaA(1:dimOA) = A%Occ(1:dimOA)
     AlphaB(1:dimOB) = B%Occ(1:dimOB)
- case(1)
+ case(1,11)
     ! BB functional
     do i=1,dimOA
        AlphaA(i) = sqrt(A%Occ(i))

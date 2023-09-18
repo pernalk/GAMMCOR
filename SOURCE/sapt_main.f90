@@ -276,13 +276,14 @@ elseif(Flags%ICholesky==1) then
    call e1elst_Chol(SAPT%monA,SAPT%monB,SAPT)
 
    if(SAPT%SaptLevel==666.or.SAPT%SaptLevel==999) then
-      print*, 'TESTING E1EXCH CHOL-DMFT'
-      call e1exch_Chol_dmft(Flags,SAPT%monA,SAPT%monB,SAPT,0)
-      call e1exch_Chol_dmft(Flags,SAPT%monA,SAPT%monB,SAPT,1)
+      !print*, 'TESTING E1EXCH CHOL-DMFT'
+      !call e1exch_Chol_dmft(Flags,SAPT%monA,SAPT%monB,SAPT,0)
+      !call e1exch_Chol_dmft(Flags,SAPT%monA,SAPT%monB,SAPT,1)
+      call e1exch_Chol_dmft(Flags,SAPT%monA,SAPT%monB,SAPT,Flags%IRDM2Typ)
    else
-      Flags%IRdm2Typ=0 ! noncumulant
-      call e1exch_dmft(Flags,SAPT%monA,SAPT%monB,SAPT)
-      Flags%IRdm2Typ=1 ! DMFT
+      !Flags%IRdm2Typ=0 ! noncumulant
+      !call e1exch_dmft(Flags,SAPT%monA,SAPT%monB,SAPT)
+      !Flags%IRdm2Typ=1 ! DMFT
       call e1exch_dmft(Flags,SAPT%monA,SAPT%monB,SAPT)
    endif
 
@@ -295,11 +296,11 @@ elseif(Flags%ICholesky==1) then
    endif
 
    if(SAPT%SaptLevel/=666.and.SAPT%SaptLevel/=999) then
-      Flags%IRdm2Typ=0 ! noncumulant
-      call e2exind(Flags,SAPT%monA,SAPT%monB,SAPT)
-      call e2exdisp(Flags,SAPT%monA,SAPT%monB,SAPT)
+      !Flags%IRdm2Typ=0 ! noncumulant
+      !call e2exind(Flags,SAPT%monA,SAPT%monB,SAPT)
+      !call e2exdisp(Flags,SAPT%monA,SAPT%monB,SAPT)
 
-      Flags%IRdm2Typ=1 ! DMFT
+      !Flags%IRdm2Typ=1 ! DMFT
       call e2exind(Flags,SAPT%monA,SAPT%monB,SAPT)
       call e2exdisp(Flags,SAPT%monA,SAPT%monB,SAPT)
 

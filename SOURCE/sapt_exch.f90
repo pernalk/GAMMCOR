@@ -910,7 +910,7 @@ double precision,allocatable :: work(:,:),ints(:)
  ! HF
     AlphaA(1:dimOA) = A%Occ(1:dimOA)
     AlphaB(1:dimOB) = B%Occ(1:dimOB)
- case(1)
+ case(1,11)
     ! BB functional
     do i=1,dimOA
        AlphaA(i) = sqrt(A%Occ(i))
@@ -1161,7 +1161,7 @@ close(iunit)
  elseif(SAPT%SaptExch==1) then
     if(Flags%IRdm2Typ==0) then
        call print_en('E1exch-DMFT(nn)',e1ex_dmft*1000,.true.)
-    elseif(Flags%IRdm2Typ==1) then
+    elseif(Flags%IRDM2typ==1.or.Flags%IRDM2Typ==11) then
        call print_en('E1exch-DMFT(BB)',e1ex_dmft*1000,.true.)
     endif
  endif
@@ -1213,7 +1213,7 @@ case(0)
 ! HF
    AlphaA(1:dimOA) = A%Occ(1:dimOA)
    AlphaB(1:dimOB) = B%Occ(1:dimOB)
-case(1)
+case(1,11)
    ! BB functional
    do i=1,dimOA
       AlphaA(i) = sqrt(A%Occ(i))
@@ -1221,7 +1221,7 @@ case(1)
    do j=1,dimOB
       AlphaB(j) = sqrt(B%Occ(j))
    enddo
-case(2)
+case(3)
   write(LOUT,*) 'POWER FUNCITONAL NOT READY YET!'
   stop
 end select
@@ -2280,7 +2280,7 @@ double precision,parameter :: BigE = 1.D8
  if (approx) then
     if(Flags%IRdm2Typ==0) then
        write(6,*) 'Exch-ind based on HF functional'
-    elseif(Flags%IRdm2Typ==1) then
+    elseif(Flags%IRdm2Typ==1.or.Flags%IRDM2Typ==11) then
        write(6,*) 'Exch-ind based on BB functional'
     endif
  endif
@@ -2315,7 +2315,7 @@ double precision,parameter :: BigE = 1.D8
  !           A%RDM2val(ip,iq,iq,ip) = A%RDM2val(ip,iq,iq,ip) - A%Occ(ip)*A%Occ(iq)
  !        enddo
  !     enddo
- !  elseif(Flags%IRdm2Typ==1) then
+ !  elseif(Flags%IRdm2Typ==1.or.Flags%IRdm2Typ==11) then
  !     ! exchange-corr
  !     do ip=1,dimOA
  !        do iq=1,dimOA
@@ -2337,7 +2337,7 @@ double precision,parameter :: BigE = 1.D8
  !           B%RDM2val(ip,iq,iq,ip) = B%RDM2val(ip,iq,iq,ip) - B%Occ(ip)*B%Occ(iq)
  !        enddo
  !     enddo
- !  elseif(Flags%IRdm2Typ==1) then
+ !  elseif(Flags%IRdm2Typ==1.or.Flags%IRDM2Typ==11) then
  !     ! exchange-corr
  !     do ip=1,dimOB
  !        do iq=1,dimOB
@@ -2878,7 +2878,7 @@ double precision,parameter :: BigE = 1.D8
       elseif(SAPT%SaptExch==1) then
          if(Flags%IRDM2typ==0) then
             call print_en('E2exch-ind(nn)',e2exi*1.0d3,.true.)
-         elseif(Flags%IRDM2typ==1) then
+         elseif(Flags%IRDM2typ==1.or.Flags%IRDM2Typ==11) then
             call print_en('E2exch-ind(BB)',e2exi*1.0d3,.true.)
          endif
       endif
@@ -3025,7 +3025,7 @@ call clock('START',Tcpu,Twall)
  if (approx) then
     if(Flags%IRdm2Typ==0) then
        write(6,*) 'Exch-disp based on HF functional'
-    elseif(Flags%IRdm2Typ==1) then
+    elseif(Flags%IRdm2Typ==1.or.Flags%IRDM2Typ==11) then
        write(6,*) 'Exch-disp based on BB functional'
     endif
  endif
@@ -3808,7 +3808,7 @@ call clock('START',Tcpu,Twall)
     elseif(SAPT%SaptExch==1) then
        if(Flags%IRDM2typ==0) then
           call print_en('E2exch-disp(nn)',e2exd*1.0d3,.true.)
-       elseif(Flags%IRDM2typ==1) then
+       elseif(Flags%IRDM2typ==1.or.Flags%IRDM2Typ==11) then
           call print_en('E2exch-disp(BB)',e2exd*1.0d3,.true.)
        endif
     endif

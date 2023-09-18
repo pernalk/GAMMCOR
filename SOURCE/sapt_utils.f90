@@ -572,6 +572,7 @@ do iblk=1,nblk
 
      do i=1,A%n
         ipos = A%pos(i)
+        print*, 'loop',iblk,norm2(tmp)
         res(ipos) = -tmp(i)
      enddo
 
@@ -1038,7 +1039,7 @@ case(0)
          Fmat(i,j) = Occ(i)*Occ(j)
       enddo
    enddo
-case(1)
+case(1,11)
    ! BB functional
    do j=1,NBas
       do i=1,NBas

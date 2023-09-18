@@ -327,6 +327,10 @@ SAPT%monB%NDim = NBasis*(NBasis-1)/2
     call prepare_rdm2_molpro(SAPT%monB,AuxB,NBasis)
  endif
 
+ ! create approximate 2-rdm for SAPT(DMFT)
+ if(SAPT%SaptExch==1.and.Flags%IRDM2Typ==11) call prepare_rdm2_approx(SAPT%monA,Flags%IRDM2Typ,NBasis)
+ if(SAPT%SaptExch==1.and.Flags%IRDM2Typ==11) call prepare_rdm2_approx(SAPT%monB,Flags%IRDM2Typ,NBasis)
+
  allocate(SAPT%monA%CMO(NBasis,NBasis),SAPT%monB%CMO(NBasis,NBasis))
  ij=0
  SAPT%monA%CMO = 0
@@ -339,15 +343,13 @@ SAPT%monB%NDim = NBasis*(NBasis-1)/2
     enddo
  enddo
 
- ! test
- write(LOUT,*) 'sapt_interface: CNO'
- print*, norm2(SAPT%monA%CMO)
- do j=1,NBasis
-    print*, j
-    write(*,'(14f11.6)') (SAPT%monA%CMO(i,j),i=1,nbasis)
- end do
-
-
+ !! test
+ !write(LOUT,*) 'sapt_interface: CNO'
+ !print*, norm2(SAPT%monA%CMO)
+ !do j=1,NBasis
+ !   print*, j
+ !   write(*,'(14f11.6)') (SAPT%monA%CMO(i,j),i=1,nbasis)
+ !end do
 
 ! look-up tables
  call select_active(SAPT%monA,NBasis,Flags)
@@ -510,7 +512,9 @@ subroutine onel_dalton(mon,NBasis,NSq,NInte1,MonBlock,SAPT)
  type(SystemBlock) :: MonBlock
 
  integer,intent(in) :: mon,NBasis,NSq,NInte1
+
  integer :: ione,NSym,NBas(8),ncen
+ integer :: i,ncenA,ncenB
  double precision, allocatable :: Hmat(:),Vmat(:),Smat(:)
  double precision, allocatable :: work1(:),work2(:)
  character(:),allocatable :: infile,outfile
@@ -551,6 +555,32 @@ subroutine onel_dalton(mon,NBasis,NSq,NInte1,MonBlock,SAPT)
  read(ione)
  read(ione) MonBlock%charg,ncen,MonBlock%xyz
 
+ if(mon==2) then
+
+    ! check is B and A monomers were switched
+    if(MonBlock%charg(1)/=0d0) MonBlock%switchAB = .true.
+
+    !print*, 'charge before switch'
+    !write(LOUT,*) MonBlock%charg(1:ncen)
+    ! if Gh(A)-B :
+    !  a) adapt xyz coords of B
+    !  b) adapt chrge of B
+    if(MonBlock%charg(1)==0d0) then
+       ncenA = 0
+       do i=1,ncen
+          if(MonBlock%charg(i)==0d0) ncenA = ncenA + 1
+       enddo
+       ncenB=ncen-ncenA
+       !print*, 'ncenA,ncenB',ncenA,ncenB,ncen
+       do i=1,ncenB
+          MonBlock%xyz(i,:) = MonBlock%xyz(i+ncenA,:)
+          MonBlock%charg(i) = MonBlock%charg(i+ncenA)
+       enddo
+       MonBlock%charg(ncenB+1:ncen) = 0d0
+    endif
+
+ endif
+
 ! print*, 'MONO-A',ncen
 ! write(LOUT,*) SAPT%monA%charg(1:ncen)
 ! do i=1,ncen
@@ -568,12 +598,16 @@ subroutine onel_dalton(mon,NBasis,NSq,NInte1,MonBlock,SAPT)
 
  if(mon==2) then
  ! rearrange in V: (B,A) -> (A,B)
-    call read_syminf(SAPT%monA,SAPT%monB,NBasis)
+    !call read_syminf(SAPT%monA,SAPT%monB,NBasis)
+    if(MonBlock%switchAB) then
+       call read_syminf_dalton(SAPT%monA%NSym,SAPT%monB%NSym,SAPT%monB%UCen, &
+                               SAPT%monA%NSymOrb,SAPT%monB%NSymOrb,&
+                               SAPT%monA%NMonBas,SAPT%monB%NMonBas)
 
-    call arrange_oneint(Smat,NBasis,SAPT)
-    call arrange_oneint(Vmat,NBasis,SAPT)
-    call arrange_oneint(Hmat,NBasis,SAPT)
-
+       call arrange_oneint(Smat,NBasis,SAPT)
+       call arrange_oneint(Vmat,NBasis,SAPT)
+       call arrange_oneint(Hmat,NBasis,SAPT)
+    endif
  endif
 
  ! square form
@@ -1142,6 +1176,8 @@ integer,external :: NAddrRDM
  enddo
  close(iunit)
 
+ print*, 'read2rdm: MON%RDM2',norm2(Mon%RDM2)
+
  if(allocated(Mon%Ind2)) deallocate(Mon%Ind2)
  allocate(Mon%Ind2(NBas))
 
@@ -1157,99 +1193,101 @@ type(SaptData) :: SAPT
 integer :: nbas
 double precision :: mat(nbas,nbas)
 
-call gen_swap_rows(mat,nbas,SAPT%monA%NSym,&
-                   SAPT%monA%NMonBas,SAPT%monB%NMonBas)
+if(SAPT%monB%switchAB) then
+   call gen_swap_rows(mat,nbas,SAPT%monA%NSym,&
+                      SAPT%monA%NMonBas,SAPT%monB%NMonBas)
+endif
 
 !call swap_rows(NOrbA,NOrbB,mat)
 
 end subroutine arrange_mo
 
-subroutine read_syminf(A,B,nbas)
-! reads number of basis functions on each monomer
-! from SYMINFO(B) file!
-implicit none
-
-type(SystemBlock) :: A, B
-integer :: nbas
-integer :: iunit,ios
-integer :: ibas,icen,last_ibas,last_icen
-integer :: irep,ifun,offset
-logical :: ex,dump
-integer :: tmp
-integer :: ACenTst, ACenBeg, ACenEnd
-
-! sanity checks : in
-!print*, A%NCen, B%NCen
-!print*, A%UCen, B%UCen
-if(A%NSym/=B%NSym) then
-  write(lout,*) 'ERROR in read_syminf: NSym different for A and B!'
-endif
-
-inquire(file='SYMINFO_B',EXIST=ex)
-
-if(ex) then
-   open(newunit=iunit,file='SYMINFO_B',status='OLD',&
-        form='FORMATTED')
-   read(iunit,*)
-   read(iunit,*)
-
-   ! old version: does not work with sym
-   ! print*, 'old version'
-   ! offset = 0
-   ! irep   = 1
-   ! read(iunit,'(i5,i6)',iostat=ios) last_ibas,last_icen
-   ! do
-   !   read(iunit,'(i5,i6)',iostat=ios) ibas,icen
-   !   if(ios/=0) then
-   !      A%NMonBas(irep)=last_ibas-offset
-   !      exit
-   !   elseif(icen/=last_icen) then
-   !        if(last_icen==B%UCen) then
-   !           B%NMonBas(irep) = last_ibas-offset
-   !           offset = last_ibas
-   !        elseif(icen==1) then
-   !           A%NMonBas(irep) = last_ibas-offset
-   !           offset = last_ibas
-   !           irep   = irep + 1
-   !        endif
-   !   endif
-   !   last_ibas=ibas
-   !   last_icen=icen
-   !enddo
-
-   ! new version : ok with sym
-   do irep=1,B%NSym
-      do ifun=1,B%NSymOrb(irep)
-         read(iunit,'(i5,i6)',iostat=ios) ibas,icen
-         if(icen.le.B%UCen) then
-            B%NMonBas(irep) = B%NMonBas(irep) + 1
-         else
-            A%NMonBas(irep) = A%NMonBas(irep) + 1
-         endif
-      enddo
-   enddo
-
-   close(iunit)
-else
-   write(LOUT,'(1x,a)') 'ERROR! MISSING SYMINFO_B FILE!'
-   stop
-endif
-
-! sanity checks : out
-do irep=1,B%NSym
-   ibas = A%NMonBas(irep)+B%NmonBas(irep)
-   if(ibas/=A%NSymOrb(irep)) then
-      write(lout,'(1x,a)') 'ERROR in read_syminf!'
-      write(lout,'(1x,a,i3,a)') 'For irep =',irep, ':'
-      write(lout,*) 'A-NMonBas',A%NMonBas(1:A%NSym)
-      write(lout,*) 'B-NMonBas',B%NMonBas(1:B%NSym)
-      write(lout,*) 'Sum:     ',A%NMonBas(1:A%NSym)+B%NMonBas(1:B%NSym)
-      write(lout,*) 'Should be',A%NSymOrb(1:A%NSym)
-      stop
-   endif
-enddo
-
-end subroutine read_syminf
+!subroutine read_syminf(A,B,nbas)
+!! reads number of basis functions on each monomer
+!! from SYMINFO(B) file!
+!implicit none
+!
+!type(SystemBlock) :: A, B
+!integer :: nbas
+!integer :: iunit,ios
+!integer :: ibas,icen,last_ibas,last_icen
+!integer :: irep,ifun,offset
+!logical :: ex,dump
+!integer :: tmp
+!integer :: ACenTst, ACenBeg, ACenEnd
+!
+!! sanity checks : in
+!!print*, A%NCen, B%NCen
+!!print*, A%UCen, B%UCen
+!if(A%NSym/=B%NSym) then
+!  write(lout,*) 'ERROR in read_syminf: NSym different for A and B!'
+!endif
+!
+!inquire(file='SYMINFO_B',EXIST=ex)
+!
+!if(ex) then
+!   open(newunit=iunit,file='SYMINFO_B',status='OLD',&
+!        form='FORMATTED')
+!   read(iunit,*)
+!   read(iunit,*)
+!
+!   ! old version: does not work with sym
+!   ! print*, 'old version'
+!   ! offset = 0
+!   ! irep   = 1
+!   ! read(iunit,'(i5,i6)',iostat=ios) last_ibas,last_icen
+!   ! do
+!   !   read(iunit,'(i5,i6)',iostat=ios) ibas,icen
+!   !   if(ios/=0) then
+!   !      A%NMonBas(irep)=last_ibas-offset
+!   !      exit
+!   !   elseif(icen/=last_icen) then
+!   !        if(last_icen==B%UCen) then
+!   !           B%NMonBas(irep) = last_ibas-offset
+!   !           offset = last_ibas
+!   !        elseif(icen==1) then
+!   !           A%NMonBas(irep) = last_ibas-offset
+!   !           offset = last_ibas
+!   !           irep   = irep + 1
+!   !        endif
+!   !   endif
+!   !   last_ibas=ibas
+!   !   last_icen=icen
+!   !enddo
+!
+!   ! new version : ok with sym
+!   do irep=1,B%NSym
+!      do ifun=1,B%NSymOrb(irep)
+!         read(iunit,'(i5,i6)',iostat=ios) ibas,icen
+!         if(icen.le.B%UCen) then
+!            B%NMonBas(irep) = B%NMonBas(irep) + 1
+!         else
+!            A%NMonBas(irep) = A%NMonBas(irep) + 1
+!         endif
+!      enddo
+!   enddo
+!
+!   close(iunit)
+!else
+!   write(LOUT,'(1x,a)') 'ERROR! MISSING SYMINFO_B FILE!'
+!   stop
+!endif
+!
+!! sanity checks : out
+!do irep=1,B%NSym
+!   ibas = A%NMonBas(irep)+B%NmonBas(irep)
+!   if(ibas/=A%NSymOrb(irep)) then
+!      write(lout,'(1x,a)') 'ERROR in read_syminf!'
+!      write(lout,'(1x,a,i3,a)') 'For irep =',irep, ':'
+!      write(lout,*) 'A-NMonBas',A%NMonBas(1:A%NSym)
+!      write(lout,*) 'B-NMonBas',B%NMonBas(1:B%NSym)
+!      write(lout,*) 'Sum:     ',A%NMonBas(1:A%NSym)+B%NMonBas(1:B%NSym)
+!      write(lout,*) 'Should be',A%NSymOrb(1:A%NSym)
+!      stop
+!   endif
+!enddo
+!
+!end subroutine read_syminf
 
 subroutine arrange_oneint(mat,nbas,SAPT)
 implicit none
@@ -1260,10 +1298,12 @@ double precision :: mat(nbas,nbas)
 
 !call read_syminf(SAPT%monA,SAPT%monB,nbas)
 
-call gen_swap_rows(mat,nbas,SAPT%monA%NSym,&
-                   SAPT%monA%NMonBas,SAPT%monB%NMonBas)
-call gen_swap_cols(mat,nbas,SAPT%monA%NSym,&
-                   SAPT%monA%NMonBas,SAPT%monB%NMonBas)
+if(SAPT%monB%switchAB) then
+   call gen_swap_rows(mat,nbas,SAPT%monA%NSym,&
+                      SAPT%monA%NMonBas,SAPT%monB%NMonBas)
+   call gen_swap_cols(mat,nbas,SAPT%monA%NSym,&
+                      SAPT%monA%NMonBas,SAPT%monB%NMonBas)
+endif
 
 !call swap_rows(SAPT%monA%NMonOrb,SAPT%monB%NMonOrb,mat)
 !call swap_cols(SAPT%monA%NMonOrb,SAPT%monB%NMonOrb,mat)
@@ -1806,6 +1846,87 @@ integer,external :: NAddrRDM
  deallocate(work1,RDM2Act)
 
 end subroutine prepare_rdm2_molpro
+
+subroutine prepare_rdm2_approx(Mon,IRDM2Typ,NBasis)
+!
+! replace rdm2_A.dat and rdm2_B.dat files
+! with approximate density matrices: DMFT or noncumulant
+!
+implicit none
+
+type(SystemBlock)  :: Mon
+integer,intent(in) :: IRDM2Typ,NBasis
+
+integer :: i,j,k,l,ij,kl
+integer :: NOccup
+integer :: iunit,NRDM2Act
+double precision,allocatable :: RDM2val(:,:,:,:)
+character(:),allocatable :: rdmfile
+integer,external :: NAddrRDM
+
+if(Mon%Monomer==1) then
+  rdmfile='rdm2_A.dat'
+elseif(Mon%Monomer==2) then
+  rdmfile='rdm2_B.dat'
+endif
+
+print*, 'REPLACE 2-RDM with APPROXIMATE FORM in ERPA!'
+
+NOccup = Mon%INAct+Mon%NAct
+print*, 'NOccup',NOccup
+print*, 'FLAG',IRDM2TYP
+
+allocate(RDM2val(NOccup,NOccup,NOccup,NOccup))
+
+! Gamma(prqs) = 2*np*nq \delta_pr \delta_qs - F_pq \delta_ps \delta_qr
+!       1122
+RDM2val = 0d0
+! Coulomb (nc part)
+do i=1,NOccup
+   do j=1,NOccup
+      RDM2val(i,i,j,j) = RDM2val(i,i,j,j) + 2d0*Mon%Occ(i)*Mon%Occ(j)
+   enddo
+enddo
+if(IRdm2Typ==0) then
+   ! exchange
+   do i=1,NOccup
+      do j=1,NOccup
+         RDM2val(i,j,j,i) = RDM2val(i,j,j,i) - Mon%Occ(i)*Mon%Occ(j)
+      enddo
+   enddo
+elseif(IRdm2Typ==1.or.IRDM2Typ==11) then
+   ! exchange-corr
+   do i=1,NOccup
+      do j=1,NOccup
+         RDM2val(i,j,j,i) = RDM2val(i,j,j,i) - sqrt(Mon%Occ(i)*Mon%Occ(j))
+      enddo
+   enddo
+endif
+print*, 'RDM2val =',norm2(RDM2val)
+
+open(newunit=iunit,file=rdmfile,status='replace',&
+     form='formatted')
+do i=1,Mon%NAct
+  do j=1,Mon%NAct
+     ij = (i-1)*Mon%NAct+j
+     do k=1,Mon%NAct
+        do l=1,Mon%NAct
+           kl = (k-1)*Mon%NAct+l
+           if(ij>=kl) then
+             write(iunit,'(4i4,f19.12)') &
+               !k,i,l,j,RDM2val(Mon%INAct+i,Mon%INAct+j,Mon%INAct+k,Mon%INAct+l)
+               k,i,l,j,2d0*RDM2val(Mon%INAct+k,Mon%INAct+i,Mon%INAct+j,Mon%INAct+l)
+           endif
+        enddo
+     enddo
+  enddo
+enddo
+
+deallocate(RDM2val)
+
+close(iunit)
+
+end subroutine prepare_rdm2_approx
 
 subroutine select_active(mon,nbas,Flags)
 ! set dimensions: NDimX,num0,num1,num2
