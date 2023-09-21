@@ -138,6 +138,9 @@ subroutine CholeskyOTF_Fock_MO_v2(F_mo,CholeskyVecsOTF, &
 !     from Cholesky OTF vectors
 !     optional :: compute J and K matrices in MO basis
 !
+!     CAREFUL! Involves one 3-ind AO --> MO transformation
+!              with FF indices
+!
 
 implicit none
 
@@ -184,6 +187,8 @@ if(trim(Source)=='MOLPRO') then
    ORBITAL_ORDERING = ORBITAL_ORDERING_MOLPRO
 elseif(trim(Source)=='ORCA  ') then
    ORBITAL_ORDERING = ORBITAL_ORDERING_ORCA
+elseif(trim(Source)=='DALTON') then
+   ORBITAL_ORDERING = ORBITAL_ORDERING_DALTON
 endif
 
 ! Read whether to put ghost functions

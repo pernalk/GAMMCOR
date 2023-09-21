@@ -277,6 +277,8 @@ end type FileNames
 
 type FlagsData
 ! default setting: ERPA-GVB
+     ! sapt_main.f90
+     integer :: InterfaceType = INTER_TYPE_DAL
      ! mainp.f
      integer :: IDALTON = 1
      integer :: iORCA   = 0

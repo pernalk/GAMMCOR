@@ -185,6 +185,7 @@ else
      Flags%IA = 1
   ! ????
   end select
+  Flags%InterFaceType = Input%CalcParams%InterfaceType
 
   if(Input%CalcParams%Restart) Flags%IRes = 1
 

@@ -592,31 +592,29 @@ if(Flags%SaptLevel==999) then
 endif
 
 if(Flags%SaptLevel==666) then
-  print*, 'Get 1-st order exchange ints (RSPT2+)'
-  if (Flags%ICholesky==1) then
-     call chol_ints_oooo(A%num0+A%num1,A%num0+A%num1,A%OO,&
-                         B%num0+B%num1,B%num0+B%num1,B%OO,&
-                         A%NChol,'OOOOAABB')
-     !call chol_ints_fofo(NBasis,A%num0+A%num1,A%FF,&
-     !                    NBasis,B%num0+B%num1,B%FF,&
-     !                    A%NChol,NBasis,'FOFOAABB')
+   if (Flags%ICholesky==1) then
+      call chol_ints_oooo(A%num0+A%num1,A%num0+A%num1,A%OO,&
+                          B%num0+B%num1,B%num0+B%num1,B%OO,&
+                          A%NChol,'OOOOAABB')
+      !call chol_ints_fofo(NBasis,A%num0+A%num1,A%FF,&
+      !                    NBasis,B%num0+B%num1,B%FF,&
+      !                    A%NChol,NBasis,'FOFOAABB')
 
-     call chol_ints_oooo(B%num0+B%num1,B%num0+B%num1,B%OO,  &
-                         B%num0+B%num1,A%num0+A%num1,B%OOBA,&
-                         A%NChol,'OOOOBBBA')
+      call chol_ints_oooo(B%num0+B%num1,B%num0+B%num1,B%OO,  &
+                          B%num0+B%num1,A%num0+A%num1,B%OOBA,&
+                          A%NChol,'OOOOBBBA')
 
-     call chol_ints_oooo(A%num0+A%num1,A%num0+A%num1,A%OO,  &
-                         A%num0+A%num1,B%num0+B%num1,A%OOAB,&
-                         A%NChol,'OOOOAAAB')
+      call chol_ints_oooo(A%num0+A%num1,A%num0+A%num1,A%OO,  &
+                          A%num0+A%num1,B%num0+B%num1,A%OOAB,&
+                          A%NChol,'OOOOAAAB')
 
-     call chol_ints_oooo(A%num0+A%num1,B%num0+B%num1,A%OOAB,  &
-                         A%num0+A%num1,B%num0+B%num1,A%OOAB,&
-                         A%NChol,'OOOOABAB')
-  endif
-  ! deallocate (FF|NCholesky) integrals
-  !deallocate(A%FF)
-  !deallocate(B%FF)
-  return
+      call chol_ints_oooo(A%num0+A%num1,B%num0+B%num1,A%OOAB,  &
+                          A%num0+A%num1,B%num0+B%num1,A%OOAB,&
+                          A%NChol,'OOOOABAB')
+   endif
+
+   print*, 'Only 1-st order exchange ints in RSPT2+'
+   return
 endif
 
 if(Flags%ISERPA==0) then
@@ -668,10 +666,10 @@ if(Flags%ISERPA==0) then
         deallocate(CholeskyVecsOTF%R)
         !call chol_FFXY_AB_AO2NO_OTF(Flags,A,B,CholeskyVecsOTF,AOBasis,NBasis,'BA')
         ! test prints 
-        if(allocated(A%FF))   print*, 'A%FF   is here!'
-        if(allocated(B%FF))   print*, 'B%FF   is here!'
-        if(allocated(A%FFAB)) print*, 'A%FFAB is here!'
-        if(allocated(B%FFBA)) print*, 'B%FFBA is here!'
+        !if(allocated(A%FF))   print*, 'A%FF   is here!'
+        !if(allocated(B%FF))   print*, 'B%FF   is here!'
+        !if(allocated(A%FFAB)) print*, 'A%FFAB is here!'
+        !if(allocated(B%FFBA)) print*, 'B%FFBA is here!'
      endif
      
 
@@ -1338,6 +1336,11 @@ call clock('START',Tcpu,Twall)
       elseif (Flags%ICholeskyOTF==1) then
           write(LOUT,'(1x,a,i2)') 'Skipping FFOO/FOFO for monomer ',Mon%Monomer
           call chol_FFXX_mon_AO2NO_OTF(Flags,Mon,CholeskyVecsOTF,AOBasis,NBas)
+          ! SAPT+DALTON avoids Fock matrix in sapt_interface (no need
+          ! for canonicalization). The J, K and W (=V+J) matrices
+          ! are calculate now from Cholesky FFXX vectors.
+          if (Flags%InterfaceType==1) call chol_JKmat_AO_OTF(Mon,NBas)
+          if (Flags%InterfaceType==1) call CholeskyOTF_elpot_AO(Mon,NBas)
       endif
       !call chol_ints_gen(NBas,NBas,Mon%FF, &
       !               Mon%num0+Mon%num1,Mon%num0+Mon%num1,Mon%OO,&

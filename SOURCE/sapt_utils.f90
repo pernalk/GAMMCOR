@@ -572,7 +572,7 @@ do iblk=1,nblk
 
      do i=1,A%n
         ipos = A%pos(i)
-        print*, 'loop',iblk,norm2(tmp)
+       ! print*, 'loop',iblk,norm2(tmp)
         res(ipos) = -tmp(i)
      enddo
 

@@ -351,6 +351,12 @@ SAPT%monB%NDim = NBasis*(NBasis-1)/2
  !   write(*,'(14f11.6)') (SAPT%monA%CMO(i,j),i=1,nbasis)
  !end do
 
+ if(SAPT%InterfaceType==1.and.Flags%ICholeskyOTF==1) then
+    allocate(SAPT%monA%CAONO(NBasis,NBasis),SAPT%monB%CAONO(NBasis,NBasis))
+    SAPT%monA%CAONO = SAPT%monA%CMO
+    SAPT%monB%CAONO = SAPT%monB%CMO
+ endif
+
 ! look-up tables
  call select_active(SAPT%monA,NBasis,Flags)
  call select_active(SAPT%monB,NBasis,Flags)
@@ -413,9 +419,14 @@ SAPT%monB%NDim = NBasis*(NBasis-1)/2
  endif
  deallocate(work)
 
-! calculate electrostatic potential
- call calc_elpot(SAPT%monA,SAPT%monB,CholeskyVecs,&
-                 Flags%ICholesky,Flags%ICholeskyBIN,Flags%ICholeskyOTF,NBasis)
+! calculate electrostatic potential: W = V + J (in AO)
+ if(SAPT%InterfaceType==1.and.Flags%ICholeskyOTF==1) then
+    ! Dalton/CholeskyOTF: J,K,W in sapt_mon_ints
+ else
+    print*, 'calc_elpot'
+    call calc_elpot(SAPT%monA,SAPT%monB,CholeskyVecs,&
+                    Flags%ICholesky,Flags%ICholeskyBIN,Flags%ICholeskyOTF,NBasis)
+ endif
 
 ! calc intermolecular repulsion
  SAPT%Vnn = calc_vnn(SAPT%monA,SAPT%monB)
@@ -1757,6 +1768,7 @@ if(Flags%ICholeskyOTF==1) then
    !   so that C^-1(AO,MO) = C^T.S(AO)
    !           J_MO = C^T . J_AO . C
    !           J_AO = SC . J_MO . (SC)^T
+   print*, 'Jmat-MO',norm2(mon%Jmat)
    call dgemm('N','N',NBasis,NBasis,NBasis,1d0,SAO,NBasis,CAOMO,NBasis,0d0,SC,NBasis)
    call dgemm('N','N',NBasis,NBasis,NBasis,1d0,SC,NBasis,mon%Jmat,NBasis,0d0,work,NBasis)
    call dgemm('N','T',NBasis,NBasis,NBasis,1d0,work,NBasis,SC,NBasis,0d0,mon%Jmat,NBasis)
@@ -2348,6 +2360,47 @@ character(8)                 :: label
 
 end subroutine calc_elpot
 
+subroutine CholeskyOTF_elpot_AO(Mon,NBasis)
+!
+! obtain electrostatic potential in AO
+! W = V + J
+!
+implicit none
+
+type(SystemBlock)  :: Mon
+integer,intent(in) :: NBasis
+
+integer      :: ione
+logical      :: valid
+character(8) :: label
+character(:),allocatable :: onefile
+
+double precision :: V(NBasis,NBasis)
+
+if(Mon%Monomer==1) then
+  onefile="ONEEL_A"
+elseif(Mon%Monomer==2) then
+  onefile="ONEEL_B"
+endif
+
+V = 0d0
+open(newunit=ione,file=onefile,access='sequential',&
+     form='unformatted',status='old')
+read(ione)
+read(ione) label,V
+if(label=='POTENTAL') valid=.true.
+close(ione)
+
+if(.not.valid) then
+   write(LOUT,'(1x,a)') 'V not found in calc_elpot_CholOTF!'
+endif
+
+allocate(Mon%WPot(NBasis,NBasis))
+
+ Mon%WPot = V + Mon%Jmat
+
+end subroutine CholeskyOTF_elpot_AO
+
 function calc_vnn(A,B) result(Vnn)
 implicit none
 
@@ -2728,6 +2781,7 @@ integer,intent(in)     :: NBasis
 
 integer :: NCholesky
 integer :: MaxBufferDimMB
+integer :: ORBITAL_ORDERING
 integer :: dimOA,dimOB
 integer :: i,j,ip,iq,ipq
 double precision :: Cpq
@@ -2741,6 +2795,16 @@ NCholesky = CholeskyVecsOTF%NVecs
 dimOA = A%num0+A%num1
 dimOB = B%num0+B%num1
 
+! set orbital ordering
+if(SAPT%InterfaceType==1) then
+   ORBITAL_ORDERING = ORBITAL_ORDERING_DALTON
+elseif(SAPT%InterFaceType==2) then
+   ORBITAL_ORDERING = ORBITAL_ORDERING_MOLPRO
+else
+   print*, 'SAPT with Cholesky OTF does not work with this Interface!'
+   stop
+endif
+
 ! set buffer size
 if(Flags%MemType == 2) then       !MB
    MaxBufferDimMB = Flags%MemVal
@@ -2753,13 +2817,13 @@ allocate(A%OO(NCholesky,dimOA**2),B%OO(NCholesky,dimOB**2))
 
 call chol_Rkab_OTF(A%OO,A%CAONO,1,dimOA,A%CAONO,1,dimOA, &
                    MaxBufferDimMB,CholeskyVecsOTF,       &
-                   AOBasis,ORBITAL_ORDERING_MOLPRO)
+                   AOBasis,ORBITAL_ORDERING)
 
 call clock('AOO',Tcpu,Twall)
 
 call chol_Rkab_OTF(B%OO,B%CAONO,1,dimOB,B%CAONO,1,dimOB, &
                    MaxBufferDimMB,CholeskyVecsOTF,       &
-                   AOBasis,ORBITAL_ORDERING_MOLPRO)
+                   AOBasis,ORBITAL_ORDERING)
 
 call clock('BOO',Tcpu,Twall)
 
@@ -2768,13 +2832,13 @@ allocate(A%OOAB(NCholesky,dimOA*dimOB), &
 
 call chol_Rkab_OTF(A%OOAB,A%CAONO,1,dimOA,B%CAONO,1,dimOB, &
                    MaxBufferDimMB,CholeskyVecsOTF, &
-                   AOBasis,ORBITAL_ORDERING_MOLPRO)
+                   AOBasis,ORBITAL_ORDERING)
 
 call clock('AOOAB',Tcpu,Twall)
 
 call chol_Rkab_OTF(B%OOBA,B%CAONO,1,dimOB,A%CAONO,1,dimOA, &
                    MaxBufferDimMB,CholeskyVecsOTF, &
-                   AOBasis,ORBITAL_ORDERING_MOLPRO)
+                   AOBasis,ORBITAL_ORDERING)
 
 print*, 'A%OOAB',norm2(A%OOAB)
 print*, 'A%OOBA',norm2(B%OOBA)
@@ -2797,6 +2861,7 @@ integer,intent(in)     :: NBasis
 
 integer :: NCholesky
 integer :: MaxBufferDimMB
+integer :: ORBITAL_ORDERING
 integer :: dimOA,dimOB
 integer :: i,j,ip,iq,ipq
 double precision :: Cpq
@@ -2810,6 +2875,16 @@ NCholesky = CholeskyVecsOTF%NVecs
 dimOA = A%num0+A%num1
 dimOB = B%num0+B%num1
 
+! set orbital ordering
+if(SAPT%InterfaceType==1) then
+   ORBITAL_ORDERING = ORBITAL_ORDERING_DALTON
+elseif(SAPT%InterFaceType==2) then
+   ORBITAL_ORDERING = ORBITAL_ORDERING_MOLPRO
+else
+   print*, 'SAPT with Cholesky OTF does not work with this Interface!'
+   stop
+endif
+
 ! set buffer size
 if(Flags%MemType == 2) then       !MB
    MaxBufferDimMB = Flags%MemVal
@@ -2821,11 +2896,11 @@ allocate(A%FO(NCholesky,NBasis*dimOA),B%FO(NCholesky,NBasis*dimOB))
 
 call chol_Rkab_OTF(A%FO,A%CAONO,1,NBasis,A%CAONO,1,dimOA, &
                    MaxBufferDimMB,CholeskyVecsOTF,        &
-                   AOBasis,ORBITAL_ORDERING_MOLPRO)
+                   AOBasis,ORBITAL_ORDERING)
 
 call chol_Rkab_OTF(B%FO,B%CAONO,1,NBasis,B%CAONO,1,dimOB, &
                    MaxBufferDimMB,CholeskyVecsOTF,        &
-                   AOBasis,ORBITAL_ORDERING_MOLPRO)
+                   AOBasis,ORBITAL_ORDERING)
 
 call clock('AFO+BFO',Tcpu,Twall)
 
@@ -2833,11 +2908,11 @@ allocate(A%FOAB(NCholesky,NBasis*dimOB),B%FOBA(NCholesky,NBasis*dimOA))
 
 call chol_Rkab_OTF(A%FOAB,A%CAONO,1,NBasis,B%CAONO,1,dimOB, &
                    MaxBufferDimMB,CholeskyVecsOTF,          &
-                   AOBasis,ORBITAL_ORDERING_MOLPRO)
+                   AOBasis,ORBITAL_ORDERING)
 
 call chol_Rkab_OTF(B%FOBA,B%CAONO,1,NBasis,A%CAONO,1,dimOA, &
                    MaxBufferDimMB,CholeskyVecsOTF,          &
-                   AOBasis,ORBITAL_ORDERING_MOLPRO)
+                   AOBasis,ORBITAL_ORDERING)
 
 call clock('AFOAB+BFOBA',Tcpu,Twall)
 
@@ -2859,6 +2934,7 @@ integer,intent(in)     :: NBasis
 
 integer :: NCholesky
 integer :: MaxBufferDimMB
+integer :: ORBITAL_ORDERING
 integer :: i,j,ip,iq,ipq
 double precision :: Cpq
 
@@ -2877,11 +2953,21 @@ elseif(Flags%MemType == 3) then   !GB
 endif
 !write(lout,'(1x,a,i5,a)') 'Using ',MaxBufferDimMB,' MB for 3-indx AO2NO transformation'
 
+! set orbital ordering
+if(Flags%InterfaceType==1) then
+   ORBITAL_ORDERING = ORBITAL_ORDERING_DALTON
+elseif(Flags%InterFaceType==2) then
+   ORBITAL_ORDERING = ORBITAL_ORDERING_MOLPRO
+else
+   print*, 'SAPT with Cholesky OTF does not work with this Interface!'
+   stop
+endif
+
 allocate(M%FF(NCholesky,NBasis**2))
 
 call chol_Rkab_OTF(M%FF,M%CAONO,1,NBasis,M%CAONO,1,NBasis,&
                    MaxBufferDimMB,CholeskyVecsOTF, &
-                   AOBasis,ORBITAL_ORDERING_MOLPRO)
+                   AOBasis,ORBITAL_ORDERING)
 
 if (M%Monomer==1) call clock('AFF',Tcpu,Twall)
 if (M%Monomer==2) call clock('BFF',Tcpu,Twall)
@@ -2914,6 +3000,8 @@ character(2),intent(in)   :: abtype
 
 integer :: NCholesky
 integer :: MaxBufferDimMB
+integer :: ORBITAL_ORDERING
+
 integer :: i,j,ip,iq,ipq
 double precision :: Cpq
 
@@ -2932,23 +3020,107 @@ elseif(Flags%MemType == 3) then   !GB
 endif
 !write(lout,'(1x,a,i5,a)') 'Using ',MaxBufferDimMB,' MB for 3-indx AO2NO transformation'
 
+! set orbital ordering
+if(Flags%InterfaceType==1) then
+   ORBITAL_ORDERING = ORBITAL_ORDERING_DALTON
+elseif(Flags%InterFaceType==2) then
+   ORBITAL_ORDERING = ORBITAL_ORDERING_MOLPRO
+else
+   print*, 'SAPT with Cholesky OTF does not work with this Interface!'
+   stop
+endif
+
 if (abtype == "AB") then
 
    allocate(A%FFAB(NCholesky,NBasis**2))
    call chol_Rkab_OTF(A%FFAB,A%CAONO,1,NBasis,B%CAONO,1,NBasis,&
                       MaxBufferDimMB,CholeskyVecsOTF, &
-                      AOBasis,ORBITAL_ORDERING_MOLPRO)
+                      AOBasis,ORBITAL_ORDERING)
 
 elseif (abtype == "BA") then
 
    allocate(B%FFBA(NCholesky,NBasis**2))
    call chol_Rkab_OTF(B%FFBA,B%CAONO,1,NBasis,A%CAONO,1,NBasis,&
                       MaxBufferDimMB,CholeskyVecsOTF, &
-                      AOBasis,ORBITAL_ORDERING_MOLPRO)
+                      AOBasis,ORBITAL_ORDERING)
 
 endif
 
 end subroutine chol_FFXY_AB_AO2NO_OTF
+
+subroutine chol_JKmat_AO_OTF(Mon,NBasis)
+!
+! generates J and K matrices in MO
+! and backtransforms them to AO
+!
+implicit none
+
+type(SystemBlock)  :: Mon
+integer,intent(in) :: NBasis
+
+integer :: i,j
+integer :: ione
+integer :: NOccup,NCholesky
+double precision :: val
+double precision :: D_no(NBasis,NBasis)
+double precision :: SC(NBasis,NBasis),SAO(NBasis,NBasis)
+double precision,allocatable :: ints(:),work(:,:)
+double precision,allocatable :: Jtmp(:,:),Ktmp(:,:)
+character(8) :: label
+double precision,external :: ddot
+
+NOccup = Mon%num0+Mon%num1
+NCholesky = Mon%NChol
+
+! prepare NO 1-density
+D_no = 0d0
+do i=1,NOccup
+   D_no(i,i) = Mon%Occ(i)
+enddo
+
+! prepare Jmat in AO
+allocate(Mon%Jmat(NBasis,NBasis))
+if(.not.allocated(Mon%Kmat)) allocate(Mon%Kmat(NBasis,NBasis))
+
+allocate(Jtmp(NBasis,NBasis),Ktmp(NBasis,NBasis))
+allocate(ints(NBasis**2),work(NBasis,NBasis))
+
+ints = 0d0
+Jtmp = 0d0
+Ktmp = 0d0
+do i=1,NCholesky
+   ints(:) = Mon%FF(i,:)
+   val = ddot(NBasis**2,ints,1,D_no,1)
+   call daxpy(NBasis**2,2d0*val,ints,1,Jtmp,1)
+   call dgemm('N','N',NBasis,NBasis,NBasis,1d0,ints,NBasis, &
+              D_no,NBasis,0d0,work,NBasis)
+   call dgemm('N','N',NBasis,NBasis,NBasis,-1d0,work,NBasis, &
+              ints,NBasis,1d0,Ktmp,NBasis)
+enddo
+
+!print*, 'Jtmp', norm2(Jtmp)
+
+! backtransform J to AO
+! get S in AO
+open(newunit=ione,file='ONEEL_A',access='sequential',&
+     form='unformatted',status='old')
+read(ione) label, SAO
+close(ione)
+
+! J_AO = SC . J_NO . (SC)^T
+call dgemm('N','N',NBasis,NBasis,NBasis,1d0,SAO,NBasis,Mon%CAONO,NBasis,0d0,SC,NBasis)
+call dgemm('N','N',NBasis,NBasis,NBasis,1d0,SC,NBasis,Jtmp,NBasis,0d0,work,NBasis)
+call dgemm('N','T',NBasis,NBasis,NBasis,1d0,work,NBasis,SC,NBasis,0d0,mon%Jmat,NBasis)
+!print*, 'Jmat-AO', norm2(Mon%Jmat)
+
+! K_AO = SC . K_NO . (SC)^T
+call dgemm('N','N',NBasis,NBasis,NBasis,1d0,SC,NBasis,Ktmp,NBasis,0d0,work,NBasis)
+call dgemm('N','T',NBasis,NBasis,NBasis,-1d0,work,NBasis,SC,NBasis,0d0,mon%Kmat,NBasis)
+
+deallocate(Ktmp,Jtmp)
+deallocate(work,ints)
+
+end subroutine chol_JKmat_AO_OTF 
 
 subroutine gen_swap_rows(mat,nbas,nsym,nA,nB)
 implicit none

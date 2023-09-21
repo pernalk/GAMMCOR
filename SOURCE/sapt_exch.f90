@@ -748,6 +748,7 @@ do jb=1,NBas
    enddo
 enddo
 tvk(3) = -2.0d0*tvk(3)
+print*, 'tvk(3)',tvk(3)*1000
 
 ! tNa
 tNa = 0
