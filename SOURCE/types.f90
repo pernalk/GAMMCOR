@@ -28,7 +28,8 @@ integer, parameter :: JOB_TYPE_NLOCCORR    = 12
 integer, parameter :: JOB_TYPE_AC0DP       = 13
 integer, parameter :: JOB_TYPE_ACFREQ      = 14
 integer, parameter :: JOB_TYPE_ACFREQNTH   = 15
-integer, parameter :: JOB_TYPE_AC1FREQNTH   = 16
+integer, parameter :: JOB_TYPE_AC1FREQNTH  = 16
+integer, parameter :: JOB_TYPE_RESPONSE    = 17
 
 integer, parameter :: SAPTLEVEL0 = 0
 integer, parameter :: SAPTLEVEL1 = 1
@@ -84,10 +85,10 @@ character(*),parameter :: PossibleInterface(4) = &
 [character(8) :: &
 'DALTON', 'MOLPRO', 'OWN', 'ORCA']
 
-character(*),parameter :: PossibleJobType(16) = &
+character(*),parameter :: PossibleJobType(17) = &
 [character(9) :: &
 'AC', 'AC0', 'ERPA', 'EERPA', 'SAPT', 'PDFT', 'CASPiDFT','CASPiDFTOpt','EERPA-1', & 
-'AC0D', 'AC0DNOSYMM', 'NLOCCORR', 'AC0DP', 'ACFREQ','ACFREQNTH','AC1FREQNTH']
+'AC0D', 'AC0DNOSYMM', 'NLOCCORR', 'AC0DP', 'ACFREQ','ACFREQNTH','AC1FREQNTH','RESPONSE']
 
 character(*),parameter :: PossibleRDMType(5) = &
 [character(8) :: &
@@ -211,6 +212,8 @@ type SystemBlock
       ! ThrQInact for quasi-inactive orbs (0.9998...)
       double precision :: ThrQInact = 1.d-4
 
+      double precision :: esrDFT(3) ! srDFT xc energy
+
       integer,allocatable :: InSt(:,:),InTrSt(:,:)
       integer,allocatable :: IGem(:), IndAux(:)
       integer,allocatable :: IndX(:), IndN(:,:), IPair(:,:)
@@ -237,7 +240,8 @@ type SystemBlock
       double precision,allocatable :: Jmat(:,:),Kmat(:,:)
       double precision,allocatable :: Fmat(:,:)
       double precision,allocatable :: Wpot(:,:)
-      double precision,allocatable :: VCoul(:)
+      double precision,allocatable :: VCoul(:) ! Coulomb (SR) potential
+      double precision,allocatable :: VsrKS(:,:),Jsr(:,:)
       double precision,allocatable :: RDM2(:)
       double precision,allocatable :: RDM2val(:,:,:,:)
       double precision,allocatable :: dipm(:,:,:)
@@ -329,6 +333,7 @@ type FlagsData
      integer :: IFlACFREQ = 0
      integer :: IFlACFREQNTH = 0
      integer :: IFlAC1FREQNTH = 0
+     integer :: IFlRESPONSE = 0
      integer :: ISymmAC0D = 1
      integer :: IFlCore   = 1
      integer :: IFlFrag1  = 0

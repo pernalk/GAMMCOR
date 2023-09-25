@@ -67,6 +67,9 @@ double precision :: Tcpu,Twall
  ! switch to extrapolated SAPT
  if(SAPT%monA%Cubic.or.SAPT%monB%Cubic) call sapt_extrapol(Flags,SAPT,NBasis)
 
+ ! MC-srDFT SAPT
+ SAPT%SemiCoupled = .false.
+
  if(Flags%ISERPA==0.and.SAPT%ic6==1) then
 
     ! calculate only C6
@@ -500,7 +503,7 @@ logical,intent(in) :: EnChck
 integer          :: i,j,ij
 integer          :: SaptLevel
 logical          :: regular,extrapolate
-double precision :: MO(NBasis*NBasis)
+double precision :: NO(NBasis*NBasis)
 
  SaptLevel = Flags%SaptLevel
  if(Mon%Cubic) then
@@ -515,7 +518,7 @@ double precision :: MO(NBasis*NBasis)
  do j=1,NBasis
     do i=1,NBasis
        ij = ij + 1
-       MO(ij) = Mon%CMO(i,j)
+       NO(ij) = Mon%CMO(i,j)
     enddo
  enddo
 
@@ -534,7 +537,7 @@ double precision :: MO(NBasis*NBasis)
 
  if(SaptLevel.eq.999 .or. SaptLevel.eq.666) then
     ! for RSPT2 only AB matrices are needed
-    call calc_ab_cas(Mon,MO,Flags,NBasis)
+    call calc_ab_cas(Mon,NO,Flags,NBasis)
     return
  endif
 
@@ -542,16 +545,20 @@ double precision :: MO(NBasis*NBasis)
     if(SaptLevel.eq.0.or.SaptLevel.eq.10) then
 
         if(SaptLevel.eq.10) Flags%IFlag0 = 1
-        call calc_resp_unc(Mon,MO,Flags,NBasis)
+        call calc_resp_unc(Mon,NO,Flags,NBasis)
 
     elseif(SaptLevel.gt.0) then
 
        if(regular) then
 
           if(Flags%IFunSR/=0) then
-             call calc_resp_dft(Mon,MO,Flags,NBasis)
+             if (Flags%IDALTON == 1) then
+                call calc_resp_dft_dalton(Mon,Flags,NBasis)
+             elseif (Flags%IDALTON == 0) then
+                call calc_resp_dft_molpro(Mon,NO,Flags,NBasis)
+             endif
           else
-             call calc_resp_casgvb(Mon,MO,Flags,NBasis,EnChck)
+             call calc_resp_casgvb(Mon,NO,Flags,NBasis,EnChck)
           endif
 
        elseif(extrapolate) then
@@ -562,8 +569,8 @@ double precision :: MO(NBasis*NBasis)
 
     endif
  elseif(Flags%ISERPA==2) then
-    call calc_resp_pino(Mon,MO,Flags,NBasis)
-   ! call calc_resp_casgvb(Mon,MO,Flags,NBasis,EnChck)
+    call calc_resp_pino(Mon,NO,Flags,NBasis)
+   ! call calc_resp_casgvb(Mon,NO,Flags,NBasis,EnChck)
  endif
 
 end subroutine sapt_response
@@ -1269,7 +1276,7 @@ integer :: NSq,NInte1,NInte2
 
 double precision             :: URe(NBas,NBas),MO(NBas*NBas)
 double precision,allocatable :: TwoMO(:)
-double precision,allocatable :: work1(:),work2(:),XOne(:)
+double precision,allocatable :: work1(:),work2(:)
 character(8)                 :: label
 character(:),allocatable     :: onefile,twofile
 character(:),allocatable     :: twojfile,twokfile
@@ -1285,18 +1292,16 @@ call clock('START',Tcpu,Twall)
 
 ! set file names
  if(Mon%Monomer==1) then
-    onefile  = 'ONEEL_A'
     twofile  = 'TWOMOAA'
     twojfile = 'FFOOAA'
     twokfile = 'FOFOAA'
  elseif(Mon%Monomer==2) then
-    onefile  = 'ONEEL_B'
     twofile  = 'TWOMOBB'
     twojfile = 'FFOOBB'
     twokfile = 'FOFOBB'
  endif
 
- allocate(work1(NSq),work2(NSq),XOne(NInte1))
+ allocate(work1(NSq),work2(NSq))
 
  URe = 0d0
  do i=1,NBas
@@ -1313,7 +1318,7 @@ call clock('START',Tcpu,Twall)
  enddo
 
  ! read 1-el
- call get_1el_h_mo(XOne,MO,NBas,onefile)
+ !call get_1el_h_mo(XOne,MO,NBas,onefile)
 
  if(Flags%SaptLevel==1) return
 
@@ -1367,7 +1372,7 @@ call clock('START',Tcpu,Twall)
     endif
  end select
 
- deallocate(XOne,work2,work1)
+ deallocate(work2,work1)
  !if(Mon%TwoMoInt==1) deallocate(TwoMO)
 
 end subroutine sapt_mon_ints
@@ -1709,6 +1714,14 @@ if(SAPT%doRSH) then
    call delfile('FOFOERFAA')
    call delfile('FOFOERFBB')
    if(.not.SAPT%SameOm) call delfile('AOERFSORTB')
+endif
+
+if(SAPT%doRSH) then
+  if(allocated(SAPT%monA%VsrKS)) deallocate(SAPT%monA%VsrKS)
+  if(allocated(SAPT%monB%VsrKS)) deallocate(SAPT%monB%VsrKS)
+
+  if(allocated(SAPT%monA%Jsr)) deallocate(SAPT%monA%Jsr)
+  if(allocated(SAPT%monB%Jsr)) deallocate(SAPT%monB%Jsr)
 endif
 
 ! Wind,Wdisp terms

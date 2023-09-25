@@ -900,7 +900,7 @@ do b=NVirtResp,NBasis
       enddo
 
       do i=1,NOccupResp
-         do c=NVirtResp,NBasis 
+         do c=NVirtResp,NBasis
             if(IPair(c,i).eq.1) then
              do a=NVirtResp,NBasis
                  if(IPair(a,i).eq.1) then
@@ -1006,7 +1006,7 @@ NDimRed=0
 XInd1=0
 IPair1=0
 do d=NS1+1,NBasis
-   do l=1,min(NOccup,d-1) 
+   do l=1,min(NOccup,d-1)
       if(IPair(d,l)==1) then
           NDimRed=NDimRed+1
           XInd1(d,l)=NDimRed
@@ -1017,7 +1017,7 @@ enddo
 allocate(IndBlock(2,NDimRed))
 NDimRed=0
 do d=NS1+1,NBasis
-   do l=1,min(NOccup,d-1) 
+   do l=1,min(NOccup,d-1)
       if(IPair(d,l)==1) then
         NDimRed=NDimRed+1
         IndBlock(1,NDimRed)=d
@@ -1113,9 +1113,9 @@ Call CFREQPROJ(AUX1,0.d0,AUX2,1, &
    0,IndBlock,IndX,NDimRed)
 
 do a=NS1+1,NBasis
-   do i=1,min(NOccup,a-1) 
+   do i=1,min(NOccup,a-1)
      if(IPair(a,i)==1) then
-       ! C(omega) is multiplied by 2, see the note 
+       ! C(omega) is multiplied by 2, see the note
        val=AUX1(XInd1(a,i))*2.0
        Gamma(i,a)=Gamma(i,a)+val
        Gamma(a,i)=Gamma(a,i)+val
@@ -1128,7 +1128,7 @@ deallocate(AUX1,ints_dl)
 
 Write(6,'(/,X,"NOccupResp NVirtResp in relaxed part: ",2I5)') NOccup,NS1+1
 
-! end of orbital relaxation 
+! end of orbital relaxation
 endif
 
 Gamma=0.5d0*(Gamma+transpose(Gamma))

@@ -84,7 +84,7 @@ C
 C
       Else
 C
-C     If IFlCore=0 do not include core (inactive) orbitals  
+C     If IFlCore=0 do not include core (inactive) orbitals
       If((IFlCore.Eq.1).Or.
      $ (IFlCore.Eq.0.And.Occ(I).Ne.One.And.Occ(J).Ne.One)) Then
 C

@@ -105,6 +105,41 @@ SAPT%monB%NDim = NBasis*(NBasis-1)/2
     call onel_molpro(SAPT%monB%Monomer,NBasis,NSq,NInte1,SAPT%monB,SAPT)
  endif
 
+ if(SAPT%InterfaceType==1) then
+ ! (Dalton) read SR Coulomb and V_KS potential (in AO)
+    if(doRSH) then
+       ! maybe it would be better to calculate Jsr in our code?
+       allocate(SAPT%monA%VsrKS(NBasis,NBasis),SAPT%monA%Jsr(NBasis,NBasis))
+       call read_vKS_dalton(SAPT%monA%VsrKS,'dftSRfile_A.dat',NBasis)
+       call read_Jsr_dalton(SAPT%monA%Jsr  ,'dftSRfile_A.dat',NBasis)
+       call read_esrDFT_dalton(SAPT%monA%esrDFT,'dftSRfile_A.dat')
+
+       write(LOUT,'(/1x,a)') 'SR Kohn-Sham potential read from dftSRfile_A.dat'
+       write(LOUT,'(1x,a)')  'SR Coulomb integrals   read from dftSRfile_A.dat'
+
+       allocate(SAPT%monB%VsrKS(NBasis,NBasis),SAPT%monB%Jsr(NBasis,NBasis))
+       call read_vKS_dalton(SAPT%monB%VsrKS,'dftSRfile_B.dat',NBasis)
+       call read_Jsr_dalton(SAPT%monB%Jsr  ,'dftSRfile_B.dat',NBasis)
+
+       call read_esrDFT_dalton(SAPT%monB%esrDFT,'dftSRfile_B.dat')
+
+       call arrange_oneint(SAPT%monB%VsrKS,NBasis,SAPT)
+       call arrange_oneint(SAPT%monB%Jsr,NBasis,SAPT)
+
+       write(LOUT,'(/1x,a)') 'SR Kohn-Sham potential read from dftSRfile_B.dat'
+       write(LOUT,'(1x,a)')  'SR Coulomb integrals   read from dftSRfile_B.dat'
+
+       !print*, 'JSR from Dalton'
+       !do j=1,NBasis
+       !   write(6,'(*(f13.8))') (Jsr(i,j),i=1,NBasis)
+       !enddo
+       !print*, 'VsrKS from Dalton'
+       !do j=1,NBasis
+       !   write(6,'(*(f13.8))') (VsrKS(i,j),i=1,NBasis)
+       !enddo
+    endif
+ endif
+
 ! add empty line
  write(lout,'()')
 
@@ -144,7 +179,6 @@ SAPT%monB%NDim = NBasis*(NBasis-1)/2
  elseif(SAPT%InterfaceType==2) then
     call read_mo_molpro(Ca,'MOLPRO_A.MOPUN','CASORB  ',NBasis)
     call read_mo_molpro(Cb,'MOLPRO_B.MOPUN','CASORB  ',NBasis)
-
  endif
 
 ! symmetry sorting
@@ -173,11 +207,32 @@ SAPT%monB%NDim = NBasis*(NBasis-1)/2
 
 ! for testing old Cholesky
  ICholOld = 0
- 
+
  if(Flags%ICholesky==0.or.ICholOld==1) then
-    if(SAPT%InterfaceType==1) then
+
+    if(SAPT%InterfaceType==1) then ! Dalton
+
        call readtwoint(NBasis,1,'AOTWOINT_A','AOTWOSORT',MemSrtSize)
-    elseif(SAPT%InterfaceType==2) then
+       if(doRSH) then
+
+         if (SAPT%SameOm) then
+            call readtwoint(NBasis,1,'AOERFINT_A','AOERFSORT',MemSrtSize)
+         else
+            call readtwoint(NBasis,1,'AOERFINT_A','AOERFSORT',MemSrtSize)
+            call readtwoint(NBasis,1,'AOERFINT_B','AOERFSORTB',MemSrtSize)
+         endif
+         !call readtwoint(NBasis,1,'AOSR2INT','AOSR2SORT',MemSrtSize)  ! skip that for now
+
+         if(SAPT%IPrint.gt.1) then
+            write(lout,'(/1x,a)') "Sorting AO integrals DALTON interface:"
+            write(lout,'(1x,a)') "AOTWOSORT should contain full-range integrals"
+            write(lout,'(1x,a)') "AOERFSORT should contain LR integrals"
+            !write(lout,'(1x,a)') "AOSR2SORT should contain SR integrals"
+         endif
+       endif
+
+    elseif(SAPT%InterfaceType==2) then ! Molpro
+
        call readtwoint(NBasis,2,'AOTWOINT.mol','AOTWOSORT',MemSrtSize)
        if(doRSH) then
           if(SAPT%SameOm) then
@@ -185,6 +240,12 @@ SAPT%monB%NDim = NBasis*(NBasis-1)/2
           else
              call readtwoint(NBasis,2,'AOTWOINT.erf','AOERFSORT',MemSrtSize)
              call readtwoint(NBasis,2,'AOTWOINT.erfB','AOERFSORTB',MemSrtSize)
+          endif
+
+          if(SAPT%IPrint.gt.1) then
+             write(lout,'(1x,a)') "Sorting AO integrals Molpro interface:"
+             write(lout,'(1x,a)') "AOTWOSORT should contain full-range integrals"
+             write(lout,'(1x,a)') "AOERFSORT should contain LR integrals"
           endif
        endif
     endif
@@ -439,50 +500,48 @@ SAPT%monB%NDim = NBasis*(NBasis-1)/2
 end subroutine sapt_interface
 
 subroutine onel_molpro(mon,NBasis,NSq,NInte1,MonBlock,SAPT)
- implicit none
+implicit none
 
- type(SaptData)     :: SAPT
- type(SystemBlock)  :: MonBlock
- integer,intent(in) :: mon,NBasis,NSq,NInte1
+type(SaptData)     :: SAPT
+type(SystemBlock)  :: MonBlock
+integer,intent(in) :: mon,NBasis,NSq,NInte1
 
- integer                       :: ione,ios,NSym,NBas(8),ncen
- double precision, allocatable :: Hmat(:),Vmat(:),Smat(:)
- double precision, allocatable :: Kmat(:)
- double precision, allocatable :: work1(:),work2(:)
- character(8)                  :: label
- character(:),allocatable      :: infile,outfile
+integer                       :: ione,ios,NSym,NBas(8),ncen
+double precision, allocatable :: Hmat(:),Vmat(:),Smat(:)
+double precision, allocatable :: Kmat(:)
+double precision, allocatable :: work1(:),work2(:)
+character(8)                  :: label
+character(:),allocatable      :: infile,outfile
 
- if(mon==1) then
-   infile  = 'AOONEINT_A'
-   outfile = 'ONEEL_A'
- elseif(mon==2) then
-   infile  = 'AOONEINT_B'
-   outfile = 'ONEEL_B'
- endif
+if(mon==1) then
+  infile  = 'AOONEINT_A'
+  outfile = 'ONEEL_A'
+elseif(mon==2) then
+  infile  = 'AOONEINT_B'
+  outfile = 'ONEEL_B'
+endif
 
- allocate(work1(NInte1),work2(NSq))
- allocate(Hmat(NSq),Vmat(NSq),Smat(NSq))
- ! test HLONDON
- allocate(Kmat(NSq))
+allocate(work1(NInte1),work2(NSq))
+allocate(Hmat(NSq),Vmat(NSq),Smat(NSq))
 ! read and dump 1-electron integrals
- open(newunit=ione,file=infile,access='sequential',&
-      form='unformatted',status='old')
- read(ione)
- read(ione) NSym,NBas(1:NSym)
- read(ione) MonBlock%PotNuc
+open(newunit=ione,file=infile,access='sequential',&
+     form='unformatted',status='old')
+read(ione)
+read(ione) NSym,NBas(1:NSym)
+read(ione) MonBlock%PotNuc
 
- do
-   read(ione,iostat=ios) label
-   if(ios<0) then
-      write(6,*) 'ERROR!!! LABEL ISORDK   not found!'
-      stop
-   endif
-   if(label=='ISORDK  ') then
-      read(ione) ncen
-      read(ione) MonBlock%charg(1:ncen),MonBlock%xyz(1:ncen,1:3)
-      exit
-   endif
- enddo
+do
+  read(ione,iostat=ios) label
+  if(ios<0) then
+     write(6,*) 'ERROR!!! LABEL ISORDK   not found!'
+     stop
+  endif
+  if(label=='ISORDK  ') then
+     read(ione) ncen
+     read(ione) MonBlock%charg(1:ncen),MonBlock%xyz(1:ncen,1:3)
+     exit
+  endif
+enddo
  !print*, 'ncen',MonBlock%charg(1:ncen)
  !print*, 'ncen',MonBlock%xyz(1:ncen,1:3)
 
@@ -500,10 +559,6 @@ subroutine onel_molpro(mon,NBasis,NSq,NInte1,MonBlock,SAPT)
  call square_oneint(work1,Smat,NBasis,NSym,NBas)
  !call print_sqmat(Smat,NBasis)
 
- !! test for Heitler-London
- !call readoneint_molpro(work1,infile,'KINETINT',.false.,NInte1)
- !call square_oneint(work1,Kmat,NBasis,NSym,NBas)
-
  MonBlock%NSym = NSym
  MonBlock%NSymBas(1:NSym) = NBas(1:NSym)
 
@@ -512,7 +567,6 @@ subroutine onel_molpro(mon,NBasis,NSq,NInte1,MonBlock,SAPT)
 
  deallocate(work2,work1)
  deallocate(Smat,Vmat,Hmat)
- deallocate(Kmat)
 
 end subroutine onel_molpro
 
@@ -657,17 +711,7 @@ character(:),allocatable :: occfile,sirifile,siriusfile,coefile
 
  inquire(file=sirifile,EXIST=exsiri)
  if(exsiri) then
-    open(newunit=isiri,file=sirifile,status='OLD', &
-         access='SEQUENTIAL',form='UNFORMATTED')
-    call readlabel(isiri,'TRCCINT ')
-    read(isiri) NSym,NOrbt,NBasist,NCMOt,NOcc(1:NSym),NOrbs(1:NSym)
-
-    Mon%NOrb = NOrbt
-    Mon%NSymOrb(1:NSym) = NOrbs(1:NSym)
-
-    rewind(isiri)
-    read (isiri)
-    read (isiri) potnuc,emy,eactiv,emcscf
+    call read_orbinf_dalton(sirifile,NSym,Mon%NOrb,Mon%NSymOrb)
  else
     NBasist = NBasis
  endif
@@ -1303,9 +1347,9 @@ end subroutine arrange_mo
 subroutine arrange_oneint(mat,nbas,SAPT)
 implicit none
 
-type(SaptData) :: SAPT
-integer :: nbas
-double precision :: mat(nbas,nbas)
+type(SaptData)     :: SAPT
+integer,intent(in) :: nbas
+double precision,intent(inout) :: mat(nbas,nbas)
 
 !call read_syminf(SAPT%monA,SAPT%monB,nbas)
 
