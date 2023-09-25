@@ -1205,7 +1205,7 @@ integer :: nbas
 double precision :: mat(nbas,nbas)
 
 if(SAPT%monB%switchAB) then
-   call gen_swap_rows(mat,nbas,SAPT%monA%NSym,&
+   call gen_swap_rows(mat,nbas,nbas,SAPT%monA%NSym,&
                       SAPT%monA%NMonBas,SAPT%monB%NMonBas)
 endif
 
@@ -1310,9 +1310,9 @@ double precision :: mat(nbas,nbas)
 !call read_syminf(SAPT%monA,SAPT%monB,nbas)
 
 if(SAPT%monB%switchAB) then
-   call gen_swap_rows(mat,nbas,SAPT%monA%NSym,&
+   call gen_swap_rows(mat,nbas,nbas,SAPT%monA%NSym,&
                       SAPT%monA%NMonBas,SAPT%monB%NMonBas)
-   call gen_swap_cols(mat,nbas,SAPT%monA%NSym,&
+   call gen_swap_cols(mat,nbas,nbas,SAPT%monA%NSym,&
                       SAPT%monA%NMonBas,SAPT%monB%NMonBas)
 endif
 
@@ -3122,34 +3122,6 @@ deallocate(work,ints)
 
 end subroutine chol_JKmat_AO_OTF 
 
-subroutine gen_swap_rows(mat,nbas,nsym,nA,nB)
-implicit none
-
-integer,intent(in) :: nbas,nsym,nA(8),nB(8)
-double precision   :: mat(nbas,nbas)
-double precision   :: work(nbas,nbas)
-
-integer :: irep,iA,iB,iAB,offset
-
-offset = 0
-
-do irep=1,nsym
-
-   iA = nA(irep)
-   iB = nB(irep)
-   iAB = iA + iB
-
-   work(1:iA,:) = mat(offset+iB+1:offset+iAB,:)
-   work(iA+1:iAB,:) = mat(offset+1:offset+iB,:)
-
-   mat(offset+1:offset+iAB,:) = work(1:iAB,:)
-
-   offset = offset + iAB
-
-enddo
-
-end subroutine gen_swap_rows
-
 subroutine swap_rows(nA,nB,mat)
 implicit none
 
@@ -3165,34 +3137,6 @@ work(nA+1:nA+nB,:) = mat(1:nB,:)
 mat = work
 
 end subroutine swap_rows
-
-subroutine gen_swap_cols(mat,nbas,nsym,nA,nB)
-implicit none
-
-integer,intent(in) :: nbas,nsym,nA(8),nB(8)
-double precision   :: mat(nbas,nbas)
-double precision   :: work(nbas,nbas)
-
-integer :: irep,iA,iB,iAB,offset
-
-offset = 0
-
-do irep=1,nsym
-
-   iA = nA(irep)
-   iB = nB(irep)
-   iAB = iA + iB
-
-   work(:,1:iA) = mat(:,offset+iB+1:offset+iAB)
-   work(:,iA+1:iAB) = mat(:,offset+1:offset+iB)
-
-   mat(:,offset+1:offset+iAB) = work(:,1:iAB)
-
-   offset = offset + iAB
-
-enddo
-
-end subroutine gen_swap_cols
 
 subroutine swap_cols(nA,nB,mat)
 implicit none

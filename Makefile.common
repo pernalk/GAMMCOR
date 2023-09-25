@@ -10,7 +10,7 @@ OBJ = $(O)mainp.o $(O)initia.o $(O)dmscf.o $(O)misc.o $(O)optocc.o \
       $(O)dftfun_exerf.o $(O)dftfun_ecerfpbe.o $(O)dftfun_ecerf.o \
       $(O)dftacg_pw92c.o $(O)projector.o $(O)ekt.o \
       $(O)xcfun.o \
-      $(O)gridmolpro.o \
+      $(O)gridmolpro.o $(O)griddalton.o \
       $(O)sorter.o $(O)tran.o $(O)systemdef.o \
       $(O)priunit.o $(O)rdwrext.o \
       $(O)types.o $(O)blocktypes.o \
@@ -107,6 +107,8 @@ $(O)xcfun.o : $(S)xcfun.f90
 	$(FCC) $(FFLAGS)  -c $(S)xcfun.f90  -o $(O)xcfun.o
 $(O)gridmolpro.o : $(S)gridmolpro.f90
 	$(FCC) $(FFLAGS)  -c $(S)gridmolpro.f90 -o $(O)gridmolpro.o
+$(O)griddalton.o : $(S)griddalton.f90 $(O)rdwrext.o
+	$(FCC) $(FFLAGS)  -c $(S)griddalton.f90 -o $(O)griddalton.o
 $(O)timing.o : $(S)timing.f90
 	$(FCC) $(FFLAGS)  -c $(S)timing.f90 -o $(O)timing.o
 $(O)priunit.o : $(S)priunit.f90
