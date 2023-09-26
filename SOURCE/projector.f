@@ -906,6 +906,71 @@ C
       Return
       End
 
+*Deck PrOcc1
+      Subroutine PrOcc1(XMiu,XNorm,Occ,NB)
+C
+C     PROJECTION OF Occ VECTOR FOLLOWING
+C     Cances&Pernal JCP 128, 134108 (2008), Eq.(17)
+C
+      Implicit Real*8 (A-H,O-Z)
+C
+      Dimension Occ(NB)
+C
+      Parameter (Zero=0.D0,One=1.D0,Two=2.D0,Ten=10.D0,Mx=5)
+C
+C     CHECK IF XMiu=0 IS OK
+C
+      Sum=Zero
+      Sum2=Zero
+      Do I=1,NB
+      Sum2=Sum2+Occ(I)
+      If(Occ(I).Ge.Zero) Sum=Sum+Occ(I)
+      EndDo
+C
+      If(Sum.Eq.Sum2.And.Sum.Eq.XNorm) Then
+      XMiu=Zero
+      GoTo 444
+      EndIf
+C
+      XMiu1=Zero
+C
+      If(XSum1(XNorm,XMiu1,Occ,NB).Gt.Zero) Then
+      XMiu2=-0.01
+      ICount=0
+  333   If(XSum1(XNorm,XMiu2,Occ,NB).Ge.Zero) Then
+      XMiu2=XMiu2*Two
+      ICount=ICount+1
+      If(ICount.Gt.Mx) Stop 'Fatal error2 in PrOcc1'
+      GoTo 333
+      EndIf
+      EndIf
+C
+      If(XSum1(XNorm,XMiu1,Occ,NB).Lt.Zero) Then
+      XMiu2= 0.01
+      ICount=0
+  336   If(XSum1(XNorm,XMiu2,Occ,NB).Le.Zero) Then
+      XMiu2=XMiu2*Two
+      ICount=ICount+1
+      If(ICount.Gt.Mx) Stop 'Fatal error3 in PrOcc1'
+      GoTo 336
+      EndIf
+      EndIf
+C
+      XMiu=RtBis(XSum1,XMiu1,XMiu2,XNorm,Occ,NB)
+C
+  444   Do I=1,NB
+C
+      If(Occ(I)+Xmiu.Gt.Zero) Then
+      Occ(I)=Min(Occ(I)+XMiu,One)
+      Else
+      Occ(I)=Zero
+      EndIf
+C
+      EndDo
+C
+      Return
+      End
+
 *Deck PrOcc2
       Subroutine PrOcc2(XMiu,XNorm,Pcc,NB)
 C
@@ -954,6 +1019,26 @@ C
       EndIf
 C
       EndDo
+C
+      Return
+      End
+
+*Deck XSum1
+      Real*8 Function XSum1(XNorm,XMiu,Occ,NB)
+C
+      Implicit Real*8 (A-H,O-Z)
+C
+      Dimension Occ(NB)
+C
+      Parameter (Zero=0.D0,One=1.D0)
+C
+      XSum1=Zero
+      Do I=1,NB
+      If(Occ(I)+Xmiu.Gt.Zero)
+     $  XSum1=XSum1+Min(Occ(I)+XMiu,One)
+      EndDo
+C
+      XSum1=XSum1-XNorm
 C
       Return
       End

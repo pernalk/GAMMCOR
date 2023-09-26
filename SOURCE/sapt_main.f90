@@ -171,10 +171,10 @@ logical          :: onlyDisp
  call sapt_interface(Flags,SAPT,NBasis,AOBasis,CholeskyVecsOTF)
 
  call sapt_mon_ints(SAPT%monA,Flags,NBasis,AOBasis,CholeskyVecsOTF)
- call sapt_response(Flags,SAPT%monB,SAPT%EnChck,NBasis)
+ call sapt_response(Flags,SAPT%monA,SAPT%EnChck,NBasis)
 
  call sapt_mon_ints(SAPT%monB,Flags,NBasis,AOBasis,CholeskyVecsOTF)
- call sapt_response(Flags,SAPT%monA,SAPT%EnChck,NBasis)
+ call sapt_response(Flags,SAPT%monB,SAPT%EnChck,NBasis)
 
  call sapt_ab_ints(Flags,SAPT%monA,SAPT%monB,SAPT%iPINO,NBasis,AOBasis,CholeskyVecsOTF)
 
@@ -681,6 +681,10 @@ if(Flags%ISERPA==0) then
      
 
      ! term A3-ind
+     print*, 'A:',A%num0,A%num1
+     print*, 'A:',B%num0,B%num1
+     if(allocated(A%FO)) print*, 'A%FO is allocated',A%NChol
+     if(allocated(B%FO)) print*, 'B%FO is allocated'
      call chol_fofo_batch(A%num0+A%num1,A%FO,B%num0+B%num1,B%FO, &
                           A%NChol,NBasis,'FOFOAABB')
      !call chol_fofo_full_batch(A%num0+A%num1,A%FF,B%num0+B%num1,B%FF, &

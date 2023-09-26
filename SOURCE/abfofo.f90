@@ -108,7 +108,8 @@ do i=1,NOccup
    val = val + Occ(i)*HNO(i,i)
 enddo
 ETot = ETot + 2*val
-write(LOUT,*) 'ONE ELECTRON ENERGY:', ETot
+
+write(LOUT,'(1x,a,5x,f15.8)') "CASSCF 1-electron Energy", ETot
 
 if(AB1) then
    do j=1,NBasis

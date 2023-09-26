@@ -324,7 +324,7 @@ C
 C
 C     LOCAL ARRAYS
 C
-      Dimension UReOld(NBasis,NBasis),Ind(1000),IndOcc(1000)
+      Dimension UReOld(NBasis,NBasis),Ind(5000),IndOcc(5000)
 C
 C     SORT THE OCCUPATION NUMBERS IN A DESCENDING ORDER
 C

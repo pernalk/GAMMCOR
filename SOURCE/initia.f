@@ -428,7 +428,7 @@ C
       Write(6,'(X,I3,E16.6,I6)') I,Occ(I),IGem(I)
       Sum=Sum+Occ(I)
       EndDo
-      Write(6,'(2X,"Sum of Occupancies: ",F5.2)') Sum
+      Write(6,'(2X,"Sum of Occupancies: ",F10.2)') Sum
 C
       NAct=NAcCAS
       INActive=NInAcCAS
@@ -1599,7 +1599,7 @@ C
       Write(6,'(X,I3,E16.6,I6)') I,Occ(I),IGem(I)
       Sum=Sum+Occ(I)
       EndDo
-      Write(6,'(2X,"Sum of Occupancies: ",F7.2)') Sum
+      Write(6,'(2X,"Sum of Occupancies: ",F10.2)') Sum
 C
       NAct=NAcCAS
       INActive=NInAcCAS
@@ -2325,7 +2325,7 @@ C
       Write(6,'('' *'',61X,''*'')')
 C
       Write(6,
-     $ '('' * NUCLEAR CHARGE = '',F9.6,''   CHARGE = '',F9.6,13X,
+     $ '('' * NUCLEAR CHARGE = '',F13.9,''   CHARGE = '',F9.6,13X,
      $ ''*'')') ZNucl,Charge
 C
       Write(6,'('' *'',61X,''*'')')

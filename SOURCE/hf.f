@@ -167,7 +167,7 @@ C
    45 ETot=ETot+FacIJ*P(IJ)*(XKin(IJ)+XNuc(IJ)+F(I,J))
 C
       If(IPrint.Ge.3) 
-     $ Write(6,'(/,'' SCF: ITERATION '',I3,'' TOTAL ENERGY '',E20.14)')
+     $ Write(6,'(/,'' SCF: ITERATION '',I3,'' TOTAL ENERGY '',E21.14)')
      $ Iter,ETot
 C
 C     DIAGONALIZE F
@@ -178,10 +178,10 @@ C
       Write(6,'(/,'' ORBITAL ENERGIES '')')
 C
       Do 776 I=1,NOcc
-  776 Write(6,'(1X,I3,4X,E20.14)') I,EigVal(I)
+  776 Write(6,'(1X,I3,4X,E21.14)') I,EigVal(I)
       Write(6,*)
       Do 777 I=NOcc+1,NBasis
-  777 Write(6,'(1X,I3,4X,E20.14)') I,EigVal(I)
+  777 Write(6,'(1X,I3,4X,E21.14)') I,EigVal(I)
       EndIf
 C
       Do 90 I=1,NBasis
@@ -225,17 +225,17 @@ C
   130 ETot=ETot+EOrb(K)       
 C
       If(IPrint.Ge.1) 
-     $ Write(6,'(/,'' TOTAL ENERGY   '',E20.14,
-     $           /,'' KINETIC ENERGY '',E20.14)') ETot,EKin
+     $ Write(6,'(/,'' TOTAL ENERGY   '',E21.14,
+     $           /,'' KINETIC ENERGY '',E21.14)') ETot,EKin
 C
       If(IPrint.Ge.2) Then
       Write(6,'(/,'' ORBITAL ENERGIES '')')
 C
       Do 778 I=1,NOcc
-  778 Write(6,'(1X,I3,4X,E20.14)') I,EigVal(I)
+  778 Write(6,'(1X,I3,4X,E21.14)') I,EigVal(I)
       Write(6,*)
       Do 779 I=NOcc+1,NBasis
-  779 Write(6,'(1X,I3,4X,E20.14)') I,EigVal(I)
+  779 Write(6,'(1X,I3,4X,E21.14)') I,EigVal(I)
       EndIf
 C 
       Do 900 I=1,NBasis

@@ -28,6 +28,7 @@ set(GAMMCOR_SOURCE
     SOURCE/exi.f90
     SOURCE/exmisc.f90
     SOURCE/gridmolpro.f90
+    SOURCE/griddalton.f90
     SOURCE/hf.f
     SOURCE/initia.f
     SOURCE/inputfill.f90

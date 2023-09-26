@@ -26,7 +26,8 @@ c      stop
 c      end
 
 
-      subroutine lsdsr(rs,z,mu,excsr,vxcsrup,vxcsrdown)
+c     subroutine lsdsr(rs,z,mu,excsr,vxcsrup,vxcsrdown)
+      subroutine lsdsr(rs,z,mu,excsr,exsr,ecsr,vxcsrup,vxcsrdown)
 ccc Hartree atomic units used
 ccc for given density parameter 'rs', spin polarization 'z'
 ccc and cutoff parameter 'mu' 
@@ -39,6 +40,7 @@ ccc from Paziani, Moroni, Gori-Giorgi, and Bachelet, cond-mat/0601353
       implicit none
       double precision rs,z,mu,excsr,vxcsrup,vxcsrdown
       double precision eclr,exlr,ec,ecd,ecz,ex
+      double precision ecsr,exsr
       double precision vclrup,vclrdown,vxlrup,vxlrdown
       double precision vxup,vxdown,vcup,vcdown
       double precision pi,alpha,cf
@@ -63,6 +65,8 @@ ccc from Paziani, Moroni, Gori-Giorgi, and Bachelet, cond-mat/0601353
       call vcorrlr(rs,z,mu,vclrup,vclrdown)
 
       excsr=ex+ec-(exlr+eclr)
+      exsr=ex-exlr
+      ecsr=ec-eclr
       vxcsrup=vxup+vcup-(vxlrup+vclrup)
       vxcsrdown=vxdown+vcdown-(vxlrdown+vclrdown)
 

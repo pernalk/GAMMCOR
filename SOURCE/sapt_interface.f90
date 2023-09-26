@@ -424,7 +424,13 @@ SAPT%monB%NDim = NBasis*(NBasis-1)/2
 
  ! transform Cholesky Vecs to NO
  if(Flags%ICholeskyBIN==1) then
-    call chol_sapt_AO2NO_BIN(SAPT,SAPT%monA,SAPT%monB,CholeskyVecs,NBasis,Flags%MemVal,Flags%MemType)
+    !call chol_sapt_AO2NO_BIN(SAPT,SAPT%monA,SAPT%monB,CholeskyVecs,NBasis,Flags%MemVal,Flags%MemType)
+    call chol_OO_sapt_AO2NO_BIN(SAPT,SAPT%monA,SAPT%monB,CholeskyVecs,NBasis,Flags%MemVal,Flags%MemType)
+    print*, 'after OO?'
+    call chol_FO_sapt_AO2NO_BIN(SAPT,SAPT%monA,SAPT%monB,CholeskyVecs,NBasis,Flags%MemVal,Flags%MemType)
+    print*, 'after FO?'
+    call chol_FF_sapt_AO2NO_BIN(SAPT,SAPT%monA,SAPT%monB,CholeskyVecs,NBasis,Flags%MemVal,Flags%MemType)
+    print*, 'after FF?'
     call clock('chol_AO2NO_BIN',Tcpu,Twall)
  elseif(Flags%ICholeskyOTF==1) then
     !call chol_sapt_AO2NO_OTF(SAPT,SAPT%monA,SAPT%monB,CholeskyVecsOTF,AOBasis,Flags,NBasis)
@@ -2813,6 +2819,59 @@ print*, 'B%FFBA',norm2(B%FFBA)
 
 end subroutine chol_sapt_AO2NO_OTF
 
+subroutine chol_OO_sapt_AO2NO_BIN(SAPT,A,B,CholeskyVecs,NBasis,MemVal,MemType)
+implicit none
+
+type(SaptData)      :: SAPT
+type(SystemBlock)   :: A, B
+type(TCholeskyVecs) :: CholeskyVecs
+integer,intent(in)  :: NBasis
+integer,intent(in)  :: MemVal,MemType
+
+integer          :: NCholesky
+integer          :: MaxBufferDimMB
+integer          :: dimOA,dimOB
+
+!   OOXX(NCholesky,dimO**2) -- for polarization
+
+! set buffer size
+if(MemType == 2) then       !MB
+   MaxBufferDimMB = MemVal
+elseif(MemType == 3) then   !GB
+   MaxBufferDimMB = MemVal * 1024_8
+endif
+write(lout,'(1x,a,i5,a)') 'Using ',MaxBufferDimMB,' MB for 3-indx Cholesky transformation'
+
+NCholesky = CholeskyVecs%NCholesky
+dimOA = A%num0+A%num1
+dimOB = B%num0+B%num1
+
+allocate(A%OO(NCholesky,dimOA**2),&
+         B%OO(NCholesky,dimOB**2) )
+
+call chol_MOTransf_TwoStep(A%OO,CholeskyVecs,&
+                    A%CMO,1,dimOA,&
+                    A%CMO,1,dimOA,&
+                    MaxBufferDimMB)
+call chol_MOTransf_TwoStep(B%OO,CholeskyVecs,&
+                   B%CMO,1,dimOB,&
+                   B%CMO,1,dimOB,&
+                   MaxBufferDimMB)
+
+allocate(A%OOAB(NCholesky,dimOA*dimOB), &
+         B%OOBA(NCholesky,dimOB*dimOA))
+
+call chol_MOTransf_TwoStep(A%OOAB,CholeskyVecs,&
+                   A%CMO,1,dimOA,&
+                   B%CMO,1,dimOB,&
+                   MaxBufferDimMB)
+call chol_MOTransf_TwoStep(B%OOBA,CholeskyVecs,&
+                       B%CMO,1,dimOB,&
+                       A%CMO,1,dimOA,&
+                       MaxBufferDimMB)
+
+end subroutine chol_OO_sapt_AO2NO_BIN
+
 subroutine chol_OO_sapt_AO2NO_OTF(SAPT,A,B,CholeskyVecsOTF,AOBasis,Flags,NBasis)
 implicit none
 
@@ -2889,9 +2948,149 @@ print*, 'A%OOBA',norm2(B%OOBA)
 
 end subroutine chol_OO_sapt_AO2NO_OTF
 
+subroutine chol_FO_sapt_AO2NO_BIN(SAPT,A,B,CholeskyVecs,NBasis,MemVal,MemType)
+!
+! prepare (NChol,NBasis*dimO) matrices for FOFO integrals (BIN version)
+! (FO|AA), (FO|BB), (FO|AB), (FO|BA)
+!
+implicit none
+
+type(SaptData)      :: SAPT
+type(SystemBlock)   :: A, B
+type(TCholeskyVecs) :: CholeskyVecs
+integer,intent(in)  :: NBasis
+integer,intent(in)  :: MemVal,MemType
+
+integer          :: NCholesky
+integer          :: MaxBufferDimMB
+integer          :: dimOA,dimOB
+
+! set dimensions
+NCholesky = CholeskyVecs%NCholesky
+dimOA = A%num0+A%num1
+dimOB = B%num0+B%num1
+
+! set buffer size
+if(MemType == 2) then       !MB
+   MaxBufferDimMB = MemVal
+elseif(MemType == 3) then   !GB
+   MaxBufferDimMB = MemVal * 1024_8
+endif
+write(lout,'(1x,a,i5,a)') 'Using ',MaxBufferDimMB,' MB for 3-indx Cholesky transformation'
+
+allocate(A%FO(NCholesky,NBasis*dimOA),B%FO(NCholesky,NBasis*dimOB))
+
+call chol_MOTransf_TwoStep(A%FO,CholeskyVecs,&
+                   A%CMO,1,NBasis,&
+                   A%CMO,1,dimOA, &
+                   MaxBufferDimMB)
+call chol_MOTransf_TwoStep(B%FO,CholeskyVecs,&
+                   B%CMO,1,NBasis,&
+                   B%CMO,1,dimOB, &
+                   MaxBufferDimMB)
+
+allocate(A%FOAB(NCholesky,NBasis*dimOB),B%FOBA(NCholesky,NBasis*dimOA))
+
+call chol_MOTransf_TwoStep(A%FOAB,CholeskyVecs,&
+                   A%CMO,1,NBasis,&
+                   B%CMO,1,dimOB, &
+                   MaxBufferDimMB)
+call chol_MOTransf_TwoStep(B%FOBA,CholeskyVecs,&
+                   B%CMO,1,NBasis,&
+                   A%CMO,1,dimOA, &
+                   MaxBufferDimMB)
+
+end subroutine chol_FO_sapt_AO2NO_BIN
+
+subroutine chol_FF_sapt_AO2NO_BIN(SAPT,A,B,CholeskyVecs,NBasis,MemVal,MemType)
+!
+!   FFXX(NCholesky,NBas**2) -- for polarization
+!   FFXY(NCholesky,NBas**2) -- for exchange
+!
+implicit none
+
+type(SaptData)      :: SAPT
+type(SystemBlock)   :: A, B
+type(TCholeskyVecs) :: CholeskyVecs
+integer,intent(in)  :: NBasis
+integer,intent(in)  :: MemVal,MemType
+
+integer          :: NCholesky
+integer          :: MaxBufferDimMB
+integer          :: dimOA,dimOB
+integer          :: i,j,ip,iq,ipq
+double precision :: Cpq
+
+double precision :: Tcpu,Twall
+
+call clock('START',Tcpu,Twall)
+
+! set dimensions
+NCholesky = CholeskyVecs%NCholesky
+
+! set buffer size
+if(MemType == 2) then       !MB
+   MaxBufferDimMB = MemVal
+elseif(MemType == 3) then   !GB
+   MaxBufferDimMB = MemVal * 1024_8
+endif
+!write(lout,'(1x,a,i5,a)') 'Using ',MaxBufferDimMB,' MB for 3-indx Cholesky transformation'
+
+allocate(A%FF(NCholesky,NBasis**2),&
+        B%FF(NCholesky,NBasis**2) )
+call chol_MOTransf_TwoStep(A%FF,CholeskyVecs,&
+                   A%CMO,1,NBasis,&
+                   A%CMO,1,NBasis,&
+                   MaxBufferDimMB)
+call clock('AFF',Tcpu,Twall)
+
+call chol_MOTransf_TwoStep(B%FF,CholeskyVecs,&
+                   B%CMO,1,NBasis,&
+                   B%CMO,1,NBasis,&
+                   MaxBufferDimMB)
+call clock('BFF',Tcpu,Twall)
+
+! DChol(NCholeksy,NDimX)
+allocate(A%DChol(NCholesky,A%NDimX), &
+         B%DChol(NCholesky,B%NDimX))
+
+do j=1,A%NDimX
+   ip = A%IndN(1,j)
+   iq = A%IndN(2,j)
+   ipq = iq + (ip-1)*NBasis
+   Cpq = A%CICoef(ip) + A%CICoef(iq)
+   A%DChol(:,j) = Cpq*A%FF(:,ipq)
+enddo
+
+do j=1,B%NDimX
+   ip = B%IndN(1,j)
+   iq = B%IndN(2,j)
+   ipq = iq + (ip-1)*NBasis
+   Cpq = B%CICoef(ip) + B%CICoef(iq)
+   B%DChol(:,j) = Cpq*B%FF(:,ipq)
+enddo
+
+if(SAPT%SaptLevel==999) return
+
+allocate(A%FFAB(NCholesky,NBasis**2))
+!         B%FFBA(NCholesky,NBasis**2) )
+ 
+call chol_MOTransf_TwoStep(A%FFAB,CholeskyVecs,&
+                   A%CMO,1,NBasis,&
+                   B%CMO,1,NBasis,&
+                   MaxBufferDimMB)
+!call chol_MOTransf_TwoStep(B%FFBA,CholeskyVecs,&
+!                   B%CMO,1,NBasis,&
+!                   A%CMO,1,NBasis,&
+!                   MaxBufferDimMB)
+
+print*, 'A%FFAB',norm2(A%FFAB)
+
+end subroutine chol_FF_sapt_AO2NO_BIN
+
 subroutine chol_FO_sapt_AO2NO_OTF(SAPT,A,B,CholeskyVecsOTF,AOBasis,Flags,NBasis)
 !
-! prepare (NChol,NBasis*dimO) matrices for FOFO integrals
+! prepare (NChol,NBasis*dimO) matrices for FOFO integrals (OTF version)
 ! (FO|AA), (FO|BB), (FO|AB), (FO|BA)
 !
 implicit none

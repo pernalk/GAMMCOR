@@ -9,6 +9,10 @@ implicit none
 contains
 
 subroutine e1elst(A,B,SAPT)
+!
+! calculate first-order electrostatic energy
+! using AO integrals
+!
 implicit none
 
 type(SystemBlock) :: A, B
@@ -16,8 +20,9 @@ type(SaptData)    :: SAPT
 
 integer :: i, j
 integer :: NBas
-double precision,allocatable :: PA(:,:),PB(:,:) 
-double precision,allocatable :: Va(:,:),Vb(:,:),Ja(:,:) 
+double precision,allocatable :: PA(:,:),PB(:,:)
+double precision,allocatable :: Va(:,:),Vb(:,:)
+double precision,allocatable :: Ja(:,:)
 double precision,allocatable :: work(:,:)
 double precision :: tmp,ea,eb,eabel,elst
 double precision,parameter :: Half=0.5d0
@@ -159,8 +164,8 @@ double precision :: tmp
  allocate(AlphaA(A%NDimX,A%NDimX),AlphaB(B%NDimX,B%NDimX), &
           WaBB(NBas,NBas),WbAA(NBas,NBas))
 
- call readresp(EVecA,OmA,A%NDimX,'PROP_A')
- call readresp(EVecB,OmB,B%NDimX,'PROP_B')
+ call readresp(EVecA,OmA,A%NDimX,'PROP_A') ! e2ind_resp
+ call readresp(EVecB,OmB,B%NDimX,'PROP_B') ! e2ind_resp
  
  call tran2MO(A%WPot,B%CMO,B%CMO,WaBB,NBas) 
  call tran2MO(B%WPot,A%CMO,A%CMO,WbAA,NBas) 
@@ -517,7 +522,7 @@ double precision,parameter :: SmallE = 1.D-6
  allocate(EVecB(B%NDimX,B%NDimX),OmB(B%NDimX))
  allocate(tmpB(B%NDimX),WaBB(NBas,NBas))
 
- call readresp(EVecB,OmB,B%NDimX,'PROP_B')
+ call readresp(EVecB,OmB,B%NDimX,'PROP_B') ! e2ind
  call tran2MO(A%WPot,B%CMO,B%CMO,WaBB,NBas)
 
  ! uncoupled - for CAS only
@@ -593,7 +598,7 @@ double precision,parameter :: SmallE = 1.D-6
  allocate(EVecA(A%NDimX,A%NDimX),OmA(A%NDimX))
  allocate(tmpA(A%NDimX),WbAA(NBas,NBas))
 
- call readresp(EVecA,OmA,A%NDimX,'PROP_A')
+ call readresp(EVecA,OmA,A%NDimX,'PROP_A') ! e2ind
  call tran2MO(B%WPot,A%CMO,A%CMO,WbAA,NBas)
 
  ! uncoupled - for CAS only
@@ -727,8 +732,8 @@ double precision :: e2tmp, tmp
  allocate(AlphaA(ADimEx,ADimEx),AlphaB(BDimEx,BDimEx), &
           WaBB(NBas,NBas),WbAA(NBas,NBas))
 
- call readresp(EVecA,OmA,coef*ADimEx,'PROP_A')
- call readresp(EVecB,OmB,coef*BDimEx,'PROP_B')
+ call readresp(EVecA,OmA,coef*ADimEx,'PROP_A') ! e2ind_apsg
+ call readresp(EVecB,OmB,coef*BDimEx,'PROP_B') ! e2ind_apsg
 
  call tran2MO(A%WPot,B%CMO,B%CMO,WaBB,NBas) 
  call tran2MO(B%WPot,A%CMO,A%CMO,WbAA,NBas) 
@@ -843,8 +848,8 @@ double precision,parameter :: SmallE = 1.D-3
  ! semi-coupled
  if(Flags%IFlag0==0.and.Flags%ICASSCF==1) then
     ! CAS
-    call readresp(EVecA1,OmA1,A%NDimX,'PROP_A1')
-    call readresp(EVecB1,OmB1,B%NDimX,'PROP_B1')
+    call readresp(EVecA1,OmA1,A%NDimX,'PROP_A1') ! e2disp_unc
+    call readresp(EVecB1,OmB1,B%NDimX,'PROP_B1') ! e2disp_unc
  elseif(Flags%IFlag0==0.and.Flags%ICASSCF==0) then
     ! GVB
     call readEval(OmA1,A%NDimX,'PROP_A1')
@@ -1689,8 +1694,10 @@ deallocate(tmpA)
 end subroutine e2disp_intermed1
  
 subroutine e2disp(Flags,A,B,SAPT)
+!
 ! calculate 2nd order dispersion energy
 ! in coupled and uncoupled approximations
+!
 use omp_lib
 use timing
 implicit none
@@ -2010,7 +2017,7 @@ call convert_XY0_to_Y01(B,Y01BlockB,OmB0,NBas,'XY0_B')
 ! read semicoupled
 allocate(EVecA1(A%NDimX*A%NDimX),OmA1(A%NDimX))
 
-call readresp(EVecA1,OmA1,A%NDimX,'PROP_A1')
+call readresp(EVecA1,OmA1,A%NDimX,'PROP_A1') ! e2disp_semi
 !call readresp(EVecB1,OmB1,B%NDimX,'PROP_B1')
 
 allocate(tmp01(A%NDimX,B%NDimX),tmp02(A%NDimX,B%NDimX))
@@ -2200,7 +2207,7 @@ allocate(Wij(nStSum))
 allocate(EVecA(A%NDimX,A%NDimX),OmA(A%NDimX))
 allocate(tmpA(A%NDimX),WbAA(NBas,NBas))
 
-call readresp(EVecA,OmA,A%NDimX,'PROP_A')
+call readresp(EVecA,OmA,A%NDimX,'PROP_A') ! e2ind_dexc
 call tran2MO(B%WPot,A%CMO,A%CMO,WbAA,NBas)
 
 ! skip negative excitations
@@ -2328,8 +2335,8 @@ allocate(Wij(nStSum))
 allocate(EVecA(A%NDimX*A%NDimX),OmA(A%NDimX),  &
          EVecB(B%NDimX*B%NDimX),OmB(B%NDimX))
 
-call readresp(EVecA,OmA,A%NDimX,'PROP_A')
-call readresp(EVecB,OmB,B%NDimX,'PROP_B')
+call readresp(EVecA,OmA,A%NDimX,'PROP_A') ! e2inddisp_dexc 
+call readresp(EVecB,OmB,B%NDimX,'PROP_B') ! e2inddisp_dexc 
 
 ! skip negative excitations
 offset = 0
@@ -2546,8 +2553,8 @@ nStSum = 2
  ! semi-coupled
  if(Flags%IFlag0==0.and.Flags%ICASSCF==1) then
     ! CAS
-    call readresp(EVecA1,OmA1,A%NDimX,'PROP_A1')
-    call readresp(EVecB1,OmB1,B%NDimX,'PROP_B1')
+    call readresp(EVecA1,OmA1,A%NDimX,'PROP_A1') ! e2disp_unc_dexc
+    call readresp(EVecB1,OmB1,B%NDimX,'PROP_B1') ! e2disp_unc_dexc
 
  elseif(Flags%IFlag0==0.and.Flags%ICASSCF==0) then
     ! GVB
@@ -3148,8 +3155,8 @@ double precision,parameter :: SmallE = 1.d-6
  allocate(EVecA(coef2*ADimEx**2),OmA(coef*ADimEx),&
           EVecB(coef2*BDimEx**2),OmB(coef*BDimEx))
 
- call readresp(EVecA,OmA,coef*ADimEx,'PROP_A')
- call readresp(EVecB,OmB,coef*BDimEx,'PROP_B')
+ call readresp(EVecA,OmA,coef*ADimEx,'PROP_A') ! e2disp_apsg
+ call readresp(EVecB,OmB,coef*BDimEx,'PROP_B') ! e2disp_apsg
 
 ! do i=1,coef*BDimEx
 !    print*, 'OmB',i,OmB(i)
@@ -3728,8 +3735,8 @@ double precision,parameter :: BigE = 1.D8
  allocate(EVecA(A%NDimX*A%NDimX),OmA(A%NDimX),&
           EVecB(B%NDimX*B%NDimX),OmB(B%NDimX))
 
- call readresp(EVecA,OmA,A%NDimX,'PROP_A')
- call readresp(EVecB,OmB,B%NDimX,'PROP_B')
+ call readresp(EVecA,OmA,A%NDimX,'PROP_A') ! c6_dummy
+ call readresp(EVecB,OmB,B%NDimX,'PROP_B') ! c6_dummy
 
  allocate(intA(3,A%NDimX),intB(3,B%NDimX))
 

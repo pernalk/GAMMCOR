@@ -117,6 +117,25 @@ C
       Write(6,'(2X,3I5,2E14.4)')I,Ind1,Ind2,Occ(Ind1),Occ(Ind2)
       EndDo
 C
+      If(IFlRESPONSE.Eq.1) Then
+C
+      Write(6,'(/,X,''Polarizability tensor calculation for Om ''
+     $ ,F8.4)') Om
+C
+      If(Max_Cn.Eq.-1) Then
+      Call Polariz(FreqOm,UNOAO,XOne,URe,Occ,
+     $   IGem,NAcCAS,NInAcCAS,NELE,NBasis,NInte1,NGem,IndAux,
+     $   IndN,IndX,NDimX,ICholesky)
+      Else
+      Write(6,'(/,X,''Expand C(Om) maximally up to order '',I4)') Max_Cn
+      Call PolarizAl(FreqOm,UNOAO,XOne,URe,Occ,
+     $   IGem,NAcCAS,NInAcCAS,NELE,NBasis,NInte1,NGem,IndAux,
+     $   IndN,IndX,NDimX,ICholesky,Max_Cn)
+      EndIf
+C
+      Return
+      EndIf
+C
 C     COMPUTE RESPONSE RDMs FROM AC0-CAS DERIVATIVE-LIKE EXPRESSION
 C
       If (IRedVirt.Eq.1) Then
@@ -168,7 +187,7 @@ C
       Call RunDFOnTop(ETot,ENuc,TwoNO,URe,UNOAO,Occ,XOne,
      $  IndAux,IPair,IndN,IndX,NDimX,Title,NBasis,NInte1,NInte2,NGem)
 C
-      Else 
+      Else
 C
       Call RunACCASLR(ETot,ENuc,TwoNO,URe,UNOAO,Occ,XOne,
      $  IndAux,IPair,IndN,IndX,NDimX,Title,NBasis,NInte1,NInte2,NGem)
@@ -180,7 +199,7 @@ C
       Return
       End
 
-* Deck RunACCAS 
+* Deck RunACCAS
       Subroutine RunACCAS(ETot,ENuc,TwoNO,URe,UNOAO,Occ,XOne,
      $  IndAux,IPair,IndN,IndX,NDimX,Title,NBasis,NInte1,NInte2,NGem)
 C
@@ -206,14 +225,12 @@ C
      $ ABPLUS(NDimX*NDimX),ABMIN(NDimX*NDimX),
      $ EigVecR(NDimX*NDimX),Eig(NDimX),
      $ ECorrG(NGem), EGOne(NGem)
-c herer!!! delete after tests
-c     $ ,EigX(NDimX*NDimX)
 C
 C     IFlAC   = 1 - adiabatic connection formula calculation
 C               0 - AC not used
 C     IFlSnd  = 1 - run AC0-CAS (linerized in alpha, MP2-like expression for AC is used)
 C             = 0 - do not run AC0-CAS
-C     IFlCore = 1 - core (inactive) orbitals included in ERPA correlation 
+C     IFlCore = 1 - core (inactive) orbitals included in ERPA correlation
 C             = 0 - core (inactive) orbitals excluded from ERPA correlation
 C
 C     PRINT FLAGS
@@ -222,15 +239,15 @@ C
      $ Write(6,'(/," *** ADIABATIC CONNECTION CALCULATIONS ***",/)')
 C
       If(IFlCore.Eq.0) Then
-      Write(6,'(/," *** IFlCore=0: Inactive orbitals (n_p=1) 
+      Write(6,'(/," *** IFlCore=0: Inactive orbitals (n_p=1)
      $ excluded from ERPA correlation ***",/)')
       Else
-      Write(6,'(/," *** IFlCore=1: Inactive orbitals (n_p=1) 
+      Write(6,'(/," *** IFlCore=1: Inactive orbitals (n_p=1)
      $ included in ERPA correlation ***",/)')
       EndIf
 C
 C     CALL AC If IFlAC=1 OR IFlSnd=1
-C  
+C
       If(IFlAC.Eq.1.Or.IFlSnd.Eq.1) Then
       NGOcc=0
       If(IFlACFREQ.Eq.0.And.IFlACFREQNTH.Eq.0.
@@ -239,7 +256,7 @@ C
      $ IndAux,ABPLUS,ABMIN,EigVecR,Eig,EGOne,
      $ Title,NBasis,NInte1,NInte2,NDimX,NGOcc,NGem,
      $ IndN,IndX,NDimX)
-      Else 
+      Else
       Call ACIter(ETot,ENuc,TwoNO,URe,Occ,XOne,UNOAO,
      $ IndAux,ABPLUS,ABMIN,EigVecR,Eig,EGOne,
      $ Title,NBasis,NInte1,NInte2,NDimX,NGOcc,NGem,
@@ -250,12 +267,12 @@ c exact AC
 c      NoEig=1
 c      NDimFull=NBasis*(NBasis-1)/2
 c      Call ACPINO(ENuc,TwoNO,Occ,XOne,
-c     $ NBasis,NInte1,NInte2,NDimFull,NGem,NoEig) 
+c     $ NBasis,NInte1,NInte2,NDimFull,NGem,NoEig)
 
 c AC with varying Alpha-dependent RDMs
 c      NDimFull=NBasis*(NBasis-1)/2
 c      Call ACRDM(ETot,ENuc,TwoNO,Occ,XOne,
-c     $ UNOAO,IndN,IndX,IndAux,NDimX,NBasis,NInte1,NInte2,NDimFull,NGem) 
+c     $ UNOAO,IndN,IndX,IndAux,NDimX,NBasis,NInte1,NInte2,NDimFull,NGem)
 C
       If(ITwoEl.Eq.3) Then
       If (ICholesky .Eq. 0) Then
@@ -360,7 +377,7 @@ C
 C
       Character*60 FMultTab,Title
       CHARACTER(100) :: num1char
-      Character*32 Str 
+      Character*32 Str
 C
       Include 'commons.inc'
 C
@@ -378,20 +395,20 @@ C     ***************************************
       If(ISymmAC0D.Eq.1) Then
 C     ***************************************
 C
-C     AC0D corrections are computed for states of the same symmetries as 
-C     the symmetries of SA-CAS states 
+C     AC0D corrections are computed for states of the same symmetries as
+C     the symmetries of SA-CAS states
 C
 C
 C     Symmetry of NO's
 C
       Call read_sym_molpro(NSymAO,MxSym,NumOSym,
      $                    'MOLPRO.MOPUN','CASORB  ',NBasis)
-C 
+C
       Call sym_inf_molpro('2RDM',NumOSym,NSym,NumStSym,IStSy,
      $                    NStSym,NSymAO,NBasis)
 C     number of irreps
       write(*,*)'NSym',NSym
-C     number of atomic orbitals in each irrep 
+C     number of atomic orbitals in each irrep
       write(*,*)'NumOSym',NumOSym(1:NSym)
 C     number of irreps in SA-CAS
       write(*,*)'NStSym',NStSym
@@ -454,9 +471,9 @@ C     grep ' !MCSCF STATE' filename.out > sacas_ene.dat
       NoStMx=0
       I=0
    20 I=I+1
-      Read(10,'(A14,I1,A1,I1,A15,F22.12)',End=40) 
+      Read(10,'(A14,I1,A1,I1,A15,F22.12)',End=40)
      $Str,IStCAS(1,I),Str,IStCAS(2,I),Str,EExcit(I)
-      Write(6,'(X,"SA-CAS Energy  ",I1,".",I1,F22.12)') 
+      Write(6,'(X,"SA-CAS Energy  ",I1,".",I1,F22.12)')
      $ IStCAS(1,I),IStCAS(2,I),EExcit(I)
       Read(10,*)
       NoStMx=NoStMx+1
@@ -503,7 +520,7 @@ C
       Write(6,*)
 
       Do I=1,NoStMx
-      If(ICORR(I).Eq.1.And.I.Ne.ICAS) 
+      If(ICORR(I).Eq.1.And.I.Ne.ICAS)
      $  Write
      $ (6,'(X,''Dexcitation correction for AC0 for '',
      $ I1,".",I1,"->",I1,".",I1," transition ",F15.8)')
@@ -514,7 +531,7 @@ C     ***************************************
       ElseIf(ISymmAC0D.Eq.0) Then
 C     ***************************************
 C
-C     AC0D corrections will be computed for states which have best overlap 
+C     AC0D corrections will be computed for states which have best overlap
 C     with SA-CAS states
 C
       NDimD=0
@@ -555,7 +572,7 @@ C     grep ' !MCSCF STATE' filename.out > sacas_ene.dat
       Close(10)
       Write(6,'(/,X,"The number of states in SA-CAS: ",I4,/)')NoStMx
 C
-      Do IH0St=NoSt,NoStMx 
+      Do IH0St=NoSt,NoStMx
 C
       Write(6,'(/,X,86("*"))')
       Write(6,'(X,"**** AC0D calculation for SA-CAS state no",
@@ -583,7 +600,7 @@ C     ITwoEl
 C
       If(IH0St.Eq.NoSt) Then
 C
-C     ECorr stores AC0 correlation correction for the NoSt state 
+C     ECorr stores AC0 correlation correction for the NoSt state
 C     (NoSt is specified in the input.inp)
 C
       Write
@@ -657,7 +674,7 @@ C     IFlAC   = 1 - adiabatic connection formula calculation
 C               0 - AC not used
 C     IFlSnd  = 1 - run AC0-CAS (linerized in alpha, MP2-like expression for AC is used)
 C             = 0 - do not run AC0-CAS
-C     IFlCore = 1 - core (inactive) orbitals included in ERPA correlation 
+C     IFlCore = 1 - core (inactive) orbitals included in ERPA correlation
 C             = 0 - core (inactive) orbitals excluded from ERPA correlation
 C
 C     PRINT FLAGS
@@ -666,10 +683,10 @@ C
      $ Write(6,'(/," *** LR ADIABATIC CONNECTION CALCULATIONS ***",/)')
 C
       If(IFlCore.Eq.0) Then
-      Write(6,'(/," *** IFlCore=0: Inactive orbitals (n_p=1) 
+      Write(6,'(/," *** IFlCore=0: Inactive orbitals (n_p=1)
      $ excluded from ERPA correlation ***",/)')
       Else
-      Write(6,'(/," *** IFlCore=1: Inactive orbitals (n_p=1) 
+      Write(6,'(/," *** IFlCore=1: Inactive orbitals (n_p=1)
      $ included in ERPA correlation ***",/)')
       EndIf
       Write(6,'(/,X,''****************************************'',
@@ -730,7 +747,7 @@ C     checking
       Do IOrb=1,NBasis
       If(NSymNO(IOrb).Eq.I) II=II+1
       EndDo
-      If(II.Ne.NumOSym(I)) 
+      If(II.Ne.NumOSym(I))
      $ Write(*,*) 'In RunACCASLR. Symmetry of NO cannot be established!'
       EndDo
 C
@@ -745,7 +762,7 @@ C
       EndDo
       EndIf
 C
-C     if IFunSR.Gt.0 (but different from 3) TwoEl includes lr-integrals with erf/r 
+C     if IFunSR.Gt.0 (but different from 3) TwoEl includes lr-integrals with erf/r
 C     load full-range two-electron integrals and transform to NO
 C
       Do I=1,60
@@ -785,7 +802,7 @@ C     TRANSFORM J AND K
      $        'FOFO','AOTWOSORT')
 C
       EndIf
-C     
+C
 C     compute sr potential (vsr=xc+hartree)
 C     as a byproduct a sr energy (ensr=sr-xc+sr-hartree) is obtained
 C
@@ -800,9 +817,9 @@ C
      $          VecAux,1,VecAux,1,Den,NBasis)
 C     $          UNOAO(I,:),1,UNOAO(I,:),1,Den,NBasis)
       EndDo
-C 
+C
       IJ = 0
-      Do J=1,NBasis      
+      Do J=1,NBasis
       Do I=1,J
       IJ = IJ + 1
       Work2(IJ) = Den(I,J)
@@ -873,7 +890,7 @@ C
       Call GetSRKer(SRKer,Occ,URe,OrbGrid,WGrid,NBasis,NGrid)
       Do I=1,NGrid
       Work(I)=WGrid(I)*SRKer(I)
-      EndDo 
+      EndDo
 C
       EndIf
 C
@@ -894,7 +911,7 @@ C
      $ 'FOFO','FFOOERF','FOFOERF',ICholesky,0,IFunSRKer,ECASSCF,ECorr)
 C
       ElseIf(ITWoEl.Eq.1) Then
-C 
+C
       Call AC0CASLR(ECorr,ECASSCF,TwoNO,Occ,URe,XOne,
      $ ABPLUS,ABMIN,EigVecR,Eig,
      $ IndN,IndX,NDimX,NBasis,NDim,NInte1,NInte2,
@@ -925,7 +942,7 @@ C
 C
       GoTo 777
 C
-      EndIf 
+      EndIf
 C
 C     ****** LR-AC CALCULATION *******************************************************
 C
@@ -933,7 +950,7 @@ C
 C
       Write(6,'(  X,"*** LR-AC-CAS CALCULATION *** ")')
 C
-      If(IFunSRKer.Eq.1) Then 
+      If(IFunSRKer.Eq.1) Then
 C
 C     GENERATE A SR KERNEL AND DUMP IT
 C
@@ -943,7 +960,7 @@ C
      $                   IndN,IndX,NDimX,NGrid,NBasis,
      $                   NAcCAS,NInAcCAS,'FOFO','FOFOERF',
      $                   .false.,'srdump')
-C 
+C
       ElseIf(ITwoEl.Eq.1) Then
       Open(20,File="srdump",Form='UNFORMATTED')
 C
@@ -986,7 +1003,7 @@ C
       Write(20) Four*(CA+CB)*(CD+CC)*(XKer1234+TwoSR)
 C
       EndDo
-      EndDo      
+      EndDo
 C
       Close(20)
 C
@@ -999,9 +1016,9 @@ C
       Call ACECORR(ECASSCF,ENuc,TwoNO,URe,Occ,XOne,UNOAO,
      $ IndAux,ABPLUS,ABMIN,EigVecR,Eig,EGOne,
      $ Title,NBasis,NInte1,NInte2,NDimX,NGOcc,NGem,
-     $ IndN,IndX,NDimX) 
+     $ IndN,IndX,NDimX)
       ECorr=EGOne(1)
-C 
+C
       Write(6,'(/,1X,  ''lrCASSCF+ENuc Energy       '',4X,F15.8)')
      $ ECASSCF-XVSR+ENuc
       Write(6,'(1X,  ''Total lrCASSCF+ENuc+srDF Energy'',F15.8,/)')
@@ -1077,7 +1094,7 @@ C      ISym=MultpC(I1I2S,I3I4S)
 CC
 C      If(ISym.Eq.1) Then
 C      Do I=1,NGrid
-C      XKer1234=XKer1234+Work(I)* 
+C      XKer1234=XKer1234+Work(I)*
 CC     $ OrbGrid(IA+(I-1)*NBasis)*OrbGrid(IB+(I-1)*NBasis)*
 CC     $ OrbGrid(IC+(I-1)*NBasis)*OrbGrid(ID+(I-1)*NBasis)
 C     $ OrbGrid(I+(IA-1)*NGrid)*OrbGrid(I+(IB-1)*NGrid)*
@@ -1100,7 +1117,7 @@ C
      $                   IndN,IndX,NDimX,NGrid,NBasis,
      $                   NAcCAS,NInAcCAS,'FOFO','FOFOERF',.false.)
 C      Print*,'ABMIN-MY',norm2(ABMIN)
-C     
+C
       ElseIf(ITwoEl.Eq.1) Then
       Call ModABMinSym(Occ,SRKer,WGrid,OrbGrid,TwoEl2,TwoNO,ABMIN,
      $          MultpC,NSymNO,IndN,IndX,NDimX,NGrid,NInte2,NBasis)
@@ -1190,7 +1207,7 @@ C
       DeAllocate  (OrbZGrid)
       DeAllocate  (Work)
       DeAllocate (SRKer)
-C     
+C
       Call delfile('AOTWOSORT')
       Call delfile('AOERFSORT')
 C
@@ -1207,7 +1224,7 @@ C
 *Deck GetSRKer
       Subroutine GetSRKer(SRKer,Occ,URe,OrbGrid,WGrid,NBasis,NGrid)
 C
-C     RETURNS a SR-ALDA KERNEL ON THE GRID 
+C     RETURNS a SR-ALDA KERNEL ON THE GRID
 C
       Implicit Real*8 (A-H,O-Z)
 C
@@ -1241,7 +1258,7 @@ C
      $ TwoEl2,OrbGrid,SRKerW,NSymNO,MultpC,NGrid)
 C
 C     A ROUTINE FOR COMPUTING AC INTEGRAND
-C   
+C
       use timing
 C      use abmat
 C
@@ -1513,7 +1530,7 @@ C
       Call AB0ELEMENT(ABP,ABM,IP,IQ,IR,IS,Occ,HNO,IGFact,
      $ TwoNO,AuxI,AuxIO,WMAT,RDM2Act,C,Ind1,Ind2,NAct,NRDM2Act,
      $ NInte1,NInte2,NBasis)
-C    
+C
 C     ADD A SR KERNEL
 C
       If(IFunSRKer.Eq.1) Then
@@ -1527,7 +1544,7 @@ C
      $ OrbGrid(I+(IP-1)*NGrid)*OrbGrid(I+(IQ-1)*NGrid)*
      $ OrbGrid(I+(IR-1)*NGrid)*OrbGrid(I+(IS-1)*NGrid)
       EndDo
-      EndIf  
+      EndIf
       TwoSR=TwoEl2(NAddr3(IP,IQ,IR,IS))-TwoNO(NAddr3(IP,IQ,IR,IS))
       ABM=ABM+Four*(C(IP)+C(IQ))*(C(IR)+C(IS))*(XKer1234+TwoSR)
       EndIf
@@ -1548,7 +1565,7 @@ C
       EndDo
 C
       If(NDimB.Ne.0) Then
-C     SYMMETRIZE BLOCK     
+C     SYMMETRIZE BLOCK
       Do I=1,NDimB
       Do J=I+1,NDimB
       ABPLUS((J-1)*NDimB+I)=
@@ -1642,7 +1659,7 @@ C
       EndDo
 C
       If(NDimB.Ne.0) Then
-C     SYMMETRIZE BLOCK     
+C     SYMMETRIZE BLOCK
       Do I=1,NDimB
       Do J=I+1,NDimB
       ABPLUS((J-1)*NDimB+I)=
@@ -1739,7 +1756,7 @@ C
       EndDo
 C
       If(NDimB.Ne.0) Then
-C     SYMMETRIZE BLOCK     
+C     SYMMETRIZE BLOCK
       Do I=1,NDimB
       Do J=I+1,NDimB
       ABPLUS((J-1)*NDimB+I)=
@@ -1867,7 +1884,7 @@ C      EndDo
 C      EndDo
 CC
 C     ALTERNATIVELY:
-C     1st: ADD INTEGRALS      
+C     1st: ADD INTEGRALS
 C
       Do IRow=1,NoEig
 C
@@ -1890,7 +1907,7 @@ C
 C
       EndDo
       EndDo
-C      
+C 
 C     2nd: ADD KERNEL IN BATCHES:
 C
       call clock('START',Tcpu,Twall)
@@ -1899,7 +1916,7 @@ C
       Do Offset=0,NGrid,Maxlen
       Batchlen=min(NGrid-Offset,Maxlen)
       If(Batchlen==0) exit
-C    
+C
       Work(1:Batchlen) = SRKerW(Offset+1:Offset+Batchlen)
       Call FILL_BATCH(OrbGrid,Batch,Maxlen,Batchlen,Offset,NGrid,NBasis)
 C
@@ -1946,7 +1963,7 @@ C
       Deallocate(RDM2Act)
 C
 C      Print*, 'ABM-KA',norm2(ABMIN(1:NoEig**2))
-C      
+C
       Write(6,'(/," *** DONE WITH COMPUTING AB(1) MATRICES ***")')
 C
 C     1ST-ORDER PART
@@ -2209,7 +2226,7 @@ C
       R=Two*OnTop/Rho**2
       XFactor=Zero
       If(R.Lt.One) XFactor=SQRT(One-R)
-C 
+C
       RhoA(I)=Rho/Two*(One+XFactor)
       RhoB(I)=Rho/Two*(One-XFactor)
 C
@@ -2240,7 +2257,7 @@ C
       EXCTOP=Zero
       Do I=1,NGrid
       EXCTOP=EXCTOP+Zk(I)*WGrid(I)
-      EndDo  
+      EndDo
 C
       Return
       End
@@ -2378,7 +2395,7 @@ C
       EXCTOP=Zero
       FDeriv=.False.
       Open=.True.
-C 
+C
       Call dftfun_exerfpbe(name,FDeriv,Open,igrad,NGrid,RhoGrid,RhoO,
      >                   Sigma,SigmaCO,SigmaOO,
      >                   Zk,vrhoc,vrhoo,
@@ -2410,11 +2427,11 @@ C
 *Deck RunDFOnTop
       Subroutine RunDFOnTop(ETot,ENuc,TwoNO,URe,UNOAO,Occ,XOne,
      $  IndAux,IPair,IndN,IndX,NDimX,Title,NBasis,NInte1,NInte2,NGem)
-C 
+C
 C     ETot is calculated from MC-PDFT
 C     with PBE xc functional
 C     see Eq.(6) in Manni, et al. JCTC 10, 3669-3680 (2014)
-C     doi: 10.1021/ct500483t 
+C     doi: 10.1021/ct500483t
 C
       Implicit Real*8 (A-H,O-Z)
 C
@@ -2504,7 +2521,7 @@ C
       EndDo
       EndDo
 C
-      ElseIf(ITwoEl.Eq.3) Then       
+      ElseIf(ITwoEl.Eq.3) Then
 C
       Call TwoEneChck(ETot,RDM2Act,Occ,INActive,NAct,NBasis)
 C
@@ -2513,7 +2530,7 @@ C     ITwoEl
 C
       Write(6,'(1X,''CASSCF Energy (w/o ENuc)'',X,F15.8)')ETot
       Write(6,'(1X,''Total CASSCF Energy '',5X,F15.8)')ETot+ENuc
-C      
+C
       Call molprogrid0(NGrid,NBasis)
       Write(6,'(/," The number of Grid Points = ",I8)')
      $ NGrid
@@ -2534,7 +2551,7 @@ C
       Write(6,'(/," PBE_xc from xcfun with translated densities",
      $ F15.8,/)') EXCTOP
 C
-c herer!!! 
+c herer!!
 c      Alpha=1.D-12
 c      Call SR_PBE_ONTOP(EXCTOP,URe,Occ,OrbGrid,OrbXGrid,OrbYGrid,
 c     $ OrbZGrid,WGrid,NGrid,NBasis)
@@ -2557,7 +2574,7 @@ C
       EndIf
 C
       ETot=EOne+EnH+EXCTOP
-      Write(6,'(1X,''E_Hartree                     '',X,F15.8)') EnH 
+      Write(6,'(1X,''E_Hartree                     '',X,F15.8)') EnH
       Write(6,'(1X,''EOne+EH+E_xc[OnTop] (w/o ENuc)'',X,F15.8)') ETot
       Write(6,'(1X,''EOne+EH+E_xc[OnTop] +ENuc'',5X,F15.8)')ETot+ENuc
 C
@@ -2674,7 +2691,7 @@ C
       Do I=1,NGrid
 C
       If(RhoGrid(I).Ne.Zero) Then
-C 
+C
       XX=Two*OnTop(I)/RhoGrid(I)**2
       If(XX.Le.One) Then
       PX=A*XX/(One+B*XX)
