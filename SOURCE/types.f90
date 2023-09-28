@@ -64,6 +64,11 @@ integer, parameter :: CHOL_ACCU_DEFAULT   = 1
 integer, parameter :: CHOL_ACCU_TIGHT     = 2
 integer, parameter :: CHOL_ACCU_LUDICROUS = 3
 
+integer, parameter :: GRID_PARAMS_SG1 = 1
+integer, parameter :: GRID_PARAMS_MEDIUM = 2
+integer, parameter :: GRID_PARAMS_FINE = 3
+integer, parameter :: GRID_PARAMS_XFINE = 4
+
 integer, parameter :: DF_NONE       = 0
 integer, parameter :: DF_SRLDA      = 1
 integer, parameter :: DF_SRPBE      = 2
@@ -102,45 +107,52 @@ character(*),parameter :: PossibleCholAccu(3) = &
 [character(9) :: &
 'DEFAULT', 'TIGHT', 'LUDICROUS']
 
-character(*),parameter :: PossibleMonomers(3) = &
-[character(8) :: 'A', 'B', 'AB']
+character(*),parameter :: PossibleGridType(4) = &
+[character(8) :: &
+'SG1', 'MEDIUM', 'FINE', 'XFINE']
 
-character(:), allocatable :: InputPath
-!InputPath = "./input.inp"
+   character(*),parameter :: PossibleMonomers(3) = &
+   [character(8) :: 'A', 'B', 'AB']
 
-type CalculationBlock
-      integer :: InterfaceType = INTER_TYPE_DAL
-      integer :: NBasis    = FLAG_NOBASIS
-      integer :: JobType   = JOB_TYPE_AC
-      integer :: RDMType ! = RDM_TYPE_GVB
-      integer :: RDMSource = INTER_TYPE_DAL
-      integer :: Response  = RESP_ERPA
-      integer :: DFApp     = DF_NONE
-      integer :: Kernel    = 1
-      integer :: TwoMoInt  = TWOMO_INCORE
-      integer :: Core      = FLAG_CORE
-      integer :: SymType   = TYPE_NO_SYM
-      integer :: SaptLevel = SAPTLEVEL2
-      integer :: SaptExch  = 0
-      integer :: vdWCoef   = 0
-      integer :: RedVirt   = FLAG_REDVIRT
-      integer :: Rdm2Type  = FLAG_RDM2TYP
-      integer :: OrbRelax  = FLAG_ORBRELAX
-      integer :: OrbIncl   = FLAG_ORBINCL
-      integer :: MemVal = 2, MemType = 3 ! default: use 2 GB for 3-ind_tran (Cholesky)
-      logical :: Restart    = FLAG_RESTART
-      logical :: Triplet    = FLAG_TRIPLET
-      logical :: PostCAS    = FLAG_POSTCAS
-      integer :: IPrint     = 0
-      double precision :: RPAThresh  = 1.0D-6
-      double precision :: ThreshVirt = 1.0D-6
-      integer :: imon = 1
-      character(:), allocatable :: JobTitle
-      character(:), allocatable :: BasisSet,BasisSetPath
-      character(:), allocatable :: IntegralsFilePath
-      integer :: Max_Cn = 3
-      double precision :: FreqOm = 0.d0
-      logical :: CAlpha = .false.
+   character(:), allocatable :: InputPath
+   !InputPath = "./input.inp"
+
+   type CalculationBlock
+         integer :: InterfaceType = INTER_TYPE_DAL
+         integer :: NBasis    = FLAG_NOBASIS
+         integer :: JobType   = JOB_TYPE_AC
+         integer :: RDMType ! = RDM_TYPE_GVB
+         integer :: RDMSource = INTER_TYPE_DAL
+         integer :: Response  = RESP_ERPA
+         integer :: DFApp     = DF_NONE
+         integer :: Kernel    = 1
+         integer :: TwoMoInt  = TWOMO_INCORE
+         integer :: Core      = FLAG_CORE
+         integer :: SymType   = TYPE_NO_SYM
+         integer :: SaptLevel = SAPTLEVEL2
+         integer :: SaptExch  = 0
+         integer :: vdWCoef   = 0
+         integer :: GridType  = GRID_PARAMS_MEDIUM
+         integer :: RedVirt   = FLAG_REDVIRT
+         integer :: Rdm2Type  = FLAG_RDM2TYP
+         integer :: OrbRelax  = FLAG_ORBRELAX
+         integer :: OrbIncl   = FLAG_ORBINCL
+         integer :: MemVal = 2, MemType = 3 ! default: use 2 GB for 3-ind_tran (Cholesky)
+         logical :: Restart    = FLAG_RESTART
+         logical :: Triplet    = FLAG_TRIPLET
+         logical :: PostCAS    = FLAG_POSTCAS
+         integer :: IPrint     = 0
+         double precision :: RPAThresh  = 1.0D-6
+         double precision :: ThreshVirt = 1.0D-6
+         integer :: imon = 1
+         character(:), allocatable :: JobTitle
+         character(:), allocatable :: BasisSet,BasisSetPath
+         character(:), allocatable :: IntegralsFilePath
+         integer :: Max_Cn = 3
+         double precision :: FreqOm = 0.d0
+         logical :: CAlpha = .false.
+
+         logical :: DeclareGrid = .false.
 end type CalculationBlock
 
 type SystemBlock
@@ -232,8 +244,6 @@ type SystemBlock
       ! SAO = symmetrized atomic orbitals
       ! CMO = C(SAO,NO); CAONO = C(AO,NO); CMONO = C(MO,NO)
       double precision,allocatable :: CMO(:,:),CAONO(:,:)
-      double precision,allocatable :: CNOGrid(:,:)
-      double precision,allocatable :: WGrid(:) ! remove that
       double precision,allocatable :: OV(:,:),OO(:,:), &
                                       FO(:,:),FF(:,:), &
                                       FOAB(:,:),FOBA(:,:), &
@@ -305,6 +315,7 @@ type FlagsData
      integer :: ICholeskyBIN  = FLAG_CHOLESKY_BIN
      integer :: ICholeskyOTF  = FLAG_CHOLESKY_OTF
      integer :: ICholeskyAccu = CHOL_ACCU_DEFAULT
+     integer :: IGridType = GRID_PARAMS_MEDIUM
      integer :: IH0Test   = FLAG_H0TEST
      integer :: ORBITAL_ORDERING = 0
      integer :: IFun      = 13

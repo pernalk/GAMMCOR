@@ -486,6 +486,18 @@ subroutine read_block_calculation(CalcParams, line)
       case ("KERNEL")
            read(val,*) CalcParams%Kernel
 
+      case ("GRIDTYPE", "GRID")
+           CalcParams%DeclareGrid = .true.
+           if (uppercase(val) == "SG1") then
+              CalcParams%GridType = GRID_PARAMS_SG1
+           elseif (uppercase(val) == "MEDIUM") then
+              CalcParams%GridType = GRID_PARAMS_MEDIUM
+           elseif (uppercase(val) == "FINE") then
+              CalcParams%GridType = GRID_PARAMS_FINE
+           elseif (uppercase(val) == "XFINE") then
+              CalcParams%GridType = GRID_PARAMS_XFINE
+           endif
+
       case ("RDMSOURCE")
            if (uppercase(val) == "DALTON") then
               CalcParams%RDMSource = INTER_TYPE_DAL
@@ -957,9 +969,13 @@ associate( CalcParams => Input%CalcParams)
                       PossibleJobType(CalcParams%JOBtype)
  write(LOUT,' (1x,a,5x,a)') "RDM TYPE: ",  &
               PossibleRDMType(CalcParams%RDMType)
- if(CalcParams%DFApp>0) then
+ if (CalcParams%DFApp>0) then
     write(LOUT,' (1x,a,5x,a)') "DFA TYPE: ",  &
                        PossibleDFAType(CalcParams%DFApp)
+ endif
+ if (CalcParams%DeclareGrid) then
+    write(LOUT,'(1x,a,4x,a)') "GRID TYPE: ", &
+                    PossibleGridType(CalcParams%GridType)
  endif
  write(LOUT,' (1x,a,3x,a)') "RDM SOURCE: ",  &
               PossibleInterface(CalcParams%RDMSource)

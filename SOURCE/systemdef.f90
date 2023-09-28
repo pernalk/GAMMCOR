@@ -138,6 +138,9 @@ else
    Flags%ICholeskyAccu = Input%CholeskyParams%CholeskyAccu
    Flags%IH0Test       = Input%CholeskyParams%H0Test
 
+  ! set DFT grid
+   Flags%IGridType = Input%CalcParams%GridType
+
   ! reduce virtuals
    Flags%IRedVirt = Input%CalcParams%RedVirt
 
@@ -186,7 +189,6 @@ else
      Flags%NoSym   = 1
      Flags%IA = 1
      Flags%ORBITAL_ORDERING = 2 ! ORBITAL_ORDERING_ORCA
-  ! ????
   end select
   Flags%InterFaceType = Input%CalcParams%InterfaceType
 
