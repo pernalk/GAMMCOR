@@ -306,7 +306,7 @@ type FlagsData
      integer :: NoSym   = 1
      integer :: NoSt    = 1
      integer :: IGVB    = 1
-     integer :: ITwoEl    = TWOMO_INCORE 
+     integer :: ITwoEl    = TWOMO_INCORE
      integer :: IRedVirt  = FLAG_REDVIRT
      integer :: IRdm2Typ  = FLAG_RDM2TYP
      integer :: IOrbRelax = FLAG_ORBRELAX
@@ -316,6 +316,7 @@ type FlagsData
      integer :: ICholeskyOTF  = FLAG_CHOLESKY_OTF
      integer :: ICholeskyAccu = CHOL_ACCU_DEFAULT
      integer :: IGridType = GRID_PARAMS_MEDIUM
+     integer :: InternalGrid = 0
      integer :: IH0Test   = FLAG_H0TEST
      integer :: ORBITAL_ORDERING = 0
      integer :: IFun      = 13

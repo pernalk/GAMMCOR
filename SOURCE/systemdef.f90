@@ -140,6 +140,7 @@ else
 
   ! set DFT grid
    Flags%IGridType = Input%CalcParams%GridType
+   if (Input%CalcParams%DeclareGrid) Flags%InternalGrid = 1
 
   ! reduce virtuals
    Flags%IRedVirt = Input%CalcParams%RedVirt

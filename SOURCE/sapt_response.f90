@@ -1688,7 +1688,7 @@ character(:),allocatable :: onefile,aoerfile,aosrfile, &
 double precision :: Tcpu,Twall
 integer :: InternalGrid
 
-InternalGrid = 1
+InternalGrid = Flags%InternalGrid
 
 !print*, 'Entering calc_resp_dft_dalton...'
 
