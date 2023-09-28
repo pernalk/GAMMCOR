@@ -170,6 +170,7 @@ type SystemBlock
       integer :: NActS(8), INActS(8)
       integer :: NDim, NDimX
       integer :: NDimN, DimEx
+      integer :: NGrid
       integer :: NCen = 0
       integer :: UCen = 0
       integer :: NMonBas(8) = 0
@@ -180,6 +181,7 @@ type SystemBlock
       integer :: NVZero = 0
       integer :: TwoMoInt = TWOMO_INCORE
       integer :: NatOrb = 0 ! if 1, natural orbs from Molpro
+
       logical :: DeclareTwoMo     = .false.
       logical :: DeclareSt        = .false.
       logical :: DeclareNatOrb    = .false.
@@ -230,6 +232,8 @@ type SystemBlock
       ! SAO = symmetrized atomic orbitals
       ! CMO = C(SAO,NO); CAONO = C(AO,NO); CMONO = C(MO,NO)
       double precision,allocatable :: CMO(:,:),CAONO(:,:)
+      double precision,allocatable :: CNOGrid(:,:)
+      double precision,allocatable :: WGrid(:) ! remove that
       double precision,allocatable :: OV(:,:),OO(:,:), &
                                       FO(:,:),FF(:,:), &
                                       FOAB(:,:),FOBA(:,:), &
@@ -302,6 +306,7 @@ type FlagsData
      integer :: ICholeskyOTF  = FLAG_CHOLESKY_OTF
      integer :: ICholeskyAccu = CHOL_ACCU_DEFAULT
      integer :: IH0Test   = FLAG_H0TEST
+     integer :: ORBITAL_ORDERING = 0
      integer :: IFun      = 13
      integer :: IFunSR    = 0 
      integer :: IFunSRKer = 0
@@ -379,8 +384,10 @@ type SaptData
      integer :: InterfaceType = INTER_TYPE_DAL
      integer :: SaptLevel = SAPTLEVEL2
      integer :: SaptExch  = 0
+     integer :: InternalGrid = 0 
      integer :: NAO
      integer :: NCholesky
+     integer :: NGrid
      integer :: Max_Cn = 4
      integer :: ic6 = 0
      integer :: iPINO=-1

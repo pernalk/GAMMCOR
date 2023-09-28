@@ -162,6 +162,7 @@ else
      Flags%INO     = 0
      Flags%NoSym   = 1
      Flags%IA = 1
+     Flags%ORBITAL_ORDERING = 3 ! ORBITAL_ORDERING_DALTON
 
   case(INTER_TYPE_MOL)
      Flags%IDALTON = 0
@@ -169,6 +170,7 @@ else
      Flags%INO     = 1
      !Flags%NoSym   = Input%CalcParams%SymType
      Flags%IA = 1
+     Flags%ORBITAL_ORDERING = 1 ! ORBITAL_ORDERING_MOLPRO
 
   case(INTER_TYPE_OWN)
      Flags%IDALTON = 0
@@ -183,6 +185,7 @@ else
      Flags%INO     = 0
      Flags%NoSym   = 1
      Flags%IA = 1
+     Flags%ORBITAL_ORDERING = 2 ! ORBITAL_ORDERING_ORCA
   ! ????
   end select
   Flags%InterFaceType = Input%CalcParams%InterfaceType

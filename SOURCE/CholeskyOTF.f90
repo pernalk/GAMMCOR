@@ -6,9 +6,60 @@ use basis_sets
 use sys_definitions
 use Auto2eInterface
 use CholeskyOTF, only : TCholeskyVecsOTF
-use Cholesky_driver, only : chol_Rkab_OTF, chol_F, chol_H0_mo
+use Cholesky_driver, only : chol_Rkpq_OTF, chol_Rkab_OTF, chol_F, chol_H0_mo
 
 contains
+
+subroutine CholeskyOTF_ao_vecs(CholeskyVecsOTF, &
+                          AOBasis,System,XYZPath,BasisSetPath, &
+                          SortAngularMomenta, Accuracy)
+!
+!           Generate Cholesky vectors in AO basis on-the-fly
+!
+!use arithmetic
+!use auto2e
+!use Cholesky, only: chol_CoulombMatrix, TCholeskyVecs, &
+!                    chol_Rkab_ExternalBinary, chol_MOTransf_TwoStep
+!use CholeskyOTF, only: chol_CoulombMatrix_OTF, &
+!                       TCholeskyVecsOTF, chol_MOTransf_TwoStep_OTF
+!use Cholesky_driver
+!use basis_sets
+!use sys_definitions
+!use chol_definitions
+
+            implicit none
+
+            type(TCholeskyVecsOTF), intent(out) :: CholeskyVecsOTF
+            type(TAOBasis), intent(out)         :: AOBasis
+            type(TSystem), intent(out)          :: System
+            character(*), intent(in)            :: XYZPath
+            character(*), intent(in)            :: BasisSetPath
+            logical, intent(in)                 :: SortAngularMomenta
+            integer, intent(in)                 :: Accuracy
+
+            logical, parameter :: SpherAO = .true.
+
+            ! Initialize the two-electron intergrals library
+            !
+            call auto2e_init()
+            !
+            ! Read the XYZ coordinates and atom types
+            !
+            call sys_Read_XYZ(System, XYZPath)
+            !
+            call sys_Init(System,SYS_TOTAL)
+            !
+            ! Read the basis set parameters from an EMSL text file
+            ! (GAMESS-US format, no need for any edits, just download it straight from the website)
+            !
+            call basis_NewAOBasis(AOBasis, System, &
+                            BasisSetPath, SpherAO, SortAngularMomenta)
+            !
+            ! Compute Cholesky vectors in AO basis
+            !
+            call chol_Rkpq_OTF(CholeskyVecsOTF, AOBasis, Accuracy)
+
+end subroutine CholeskyOTF_ao_vecs
 
 subroutine CholeskyOTF_Fock_MO_v1(F_mo,CholeskyVecsOTF, &
                            AOBasis,System,Monomer, & 

@@ -2,9 +2,9 @@ module git_info
 
     implicit none
     character(len=*), parameter :: GIT_HEAD_BRANCH = "IntOnTheFly"
-    character(len=*), parameter :: GIT_REVISION_HASH = "e00309315a9dfa3715206aaacde8346d51543ea9"
-    character(len=*), parameter :: GIT_REVISION = "e003093"
-    character(len=*), parameter :: GIT_COMMITTER_DATE = "Tue Jul 25 10:38:50 2023 +0200"
+    character(len=*), parameter :: GIT_REVISION_HASH = "200dce0b5dbff4f1ac5fac9f76aee9e60d3d896b"
+    character(len=*), parameter :: GIT_REVISION = "200dce0"
+    character(len=*), parameter :: GIT_COMMITTER_DATE = "Tue Sep 26 14:40:29 2023 +0200"
     character(len=*), parameter :: GIT_LATEST_TAG_LONG = "v-4.1"
 
     contains

@@ -10,6 +10,7 @@ OBJ = $(O)mainp.o $(O)initia.o $(O)dmscf.o $(O)misc.o $(O)optocc.o \
       $(O)dftfun_exerf.o $(O)dftfun_ecerfpbe.o $(O)dftfun_ecerf.o \
       $(O)dftacg_pw92c.o $(O)projector.o $(O)ekt.o \
       $(O)xcfun.o \
+      $(O)gammint.o\
       $(O)gridmolpro.o $(O)griddalton.o \
       $(O)sorter.o $(O)tran.o $(O)systemdef.o \
       $(O)priunit.o $(O)rdwrext.o \
@@ -36,7 +37,7 @@ $(PROG) :  $(OBJ)
 $(O)mainp.o : $(S)mainp.f $(S)commons.inc $(O)types.o $(O)inputfill.o $(O)systemdef.o $(O)sapt_main.o $(O)git_info.o $(O)build_info.o
 	$(FCC) $(FFLAGS)  -c $(S)mainp.f -o $(O)mainp.o
 $(O)initia.o : $(S)initia.f $(S)commons.inc $(O)priunit.o $(O)types.o $(O)sorter.o \
-               $(O)tran.o $(O)abmats.o $(O)rdwrext.o $(O)timing.o $(O)CholeskyOTF.o
+               $(O)tran.o $(O)abmats.o $(O)rdwrext.o $(O)timing.o $(O)CholeskyOTF.o $(O)gammint.o
 	$(FCC) $(FFLAGS)  -c $(S)initia.f -o $(O)initia.o 
 $(O)git_info.o : $(S)git_info.f90
 	$(FCC) $(FFLAGS)  -c $(S)git_info.f90 -o $(O)git_info.o
@@ -84,6 +85,8 @@ $(O)srlrdynamic.o : $(S)srlrdynamic.f
 	$(FCC) $(FFLAGS)  -c $(S)srlrdynamic.f -o $(O)srlrdynamic.o
 $(O)erpa.o : $(S)erpa.f
 	$(FCC) $(FFLAGS)  -c $(S)erpa.f -o $(O)erpa.o
+$(O)gammint.o : $(S)gammint.f90 $(O)CholeskyOTF.o
+	$(FCC) $(FFLAGS)  -c $(S)gammint.f90 -o $(O)gammint.o
 $(O)interpa.o : $(S)interpa.f $(O)abmats.o $(O)abfofo.o $(O)ab0fofo.o
 	$(FCC) $(FFLAGS)  -c $(S)interpa.f -o $(O)interpa.o
 $(O)exact2el.o : $(S)exact2el.f
@@ -158,7 +161,7 @@ $(O)sapt_main.o : $(S)sapt_main.f90 $(O)types.o \
 	$(FCC) $(FFLAGS)  -c $(S)sapt_main.f90 -o $(O)sapt_main.o
 $(O)sapt_interface.o : $(S)sapt_interface.f90 $(O)types.o $(O)timing.o \
                   $(O)sorter.o $(O)tran.o $(O)abmats.o $(O)rdwrext.o \
-                  $(O)CholeskyOTF.o
+                  $(O)CholeskyOTF.o $(O)gammint.o
 	$(FCC) $(FFLAGS)  -c $(S)sapt_interface.f90 -o $(O)sapt_interface.o
 $(O)sapt_response.o : $(S)sapt_response.f90 $(O)types.o $(O)tran.o $(O)abmats.o $(O)abfofo.o $(O)ab0fofo.o \
                   $(O)sapt_utils.o $(O)timing.o

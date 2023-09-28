@@ -24,6 +24,7 @@ implicit none
 type(FlagsData) :: Flags
 type(SaptData)  :: SAPT
 type(TAOBasis)  :: AOBasis
+type(TSystem)   :: System
 type(TCholeskyVecsOTF) :: CholeskyVecsOTF
 
 integer :: i

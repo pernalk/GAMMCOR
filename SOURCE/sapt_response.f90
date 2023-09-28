@@ -1678,6 +1678,9 @@ character(:),allocatable :: onefile,aoerfile,aosrfile, &
                             gridfile
 
 double precision :: Tcpu,Twall
+integer :: InternalGrid
+
+InternalGrid = 1
 
 !print*, 'Entering calc_resp_dft_dalton...'
 
@@ -1786,7 +1789,11 @@ call sq_to_triang2(work,XOne,NBasis)
 print*, 'XOne-1',norm2(XOne)
 
 ! load grid
-call daltongrid0(NGrid,gridfile,doGGA,NBasis)
+if (InternalGrid == 0) then
+   call daltongrid0(NGrid,gridfile,doGGA,NBasis)
+else
+   NGrid = SAPT%NGrid
+endif
 
 write(LOUT,'()')
 write(LOUT,'(1x,a,i8)') "The number of Grid Points =",NGrid
@@ -1800,9 +1807,18 @@ if(doGGA) then
    call daltongrid_gga(OrbGrid,OrbXGrid,OrbYGrid,OrbZGrid,WGrid,NGrid,gridfile,NBasis)
    call daltongrid_tran_gga(OrbGrid,OrbXGrid,OrbYGrid,OrbZGrid,CAONO,mon%UCen,NGrid,NBasis,Mon%switchAB)
 else
-   print*,'DALTON GRID LDA',NGrid,NBasis
-   call daltongrid_lda(OrbGrid,WGrid,NGrid,gridfile,NBasis)
-   call daltongrid_tran_lda(OrbGrid,CAONO,mon%UCen,NGrid,NBasis,Mon%switchAB)
+   if (InternalGrid==1) then
+      print*,'INTERNAL GRID LDA'
+      OrbGrid = Mon%CNOGrid
+      WGrid = Mon%WGrid
+      print*, 'OrbGrid = ',norm2(OrbGrid)
+      print*, 'WGrid   = ',norm2(WGrid)
+   else
+      print*,'DALTON GRID LDA',NGrid,NBasis
+      call daltongrid_lda(OrbGrid,WGrid,NGrid,gridfile,NBasis)
+      call daltongrid_tran_lda(OrbGrid,CAONO,mon%UCen,NGrid,NBasis,Mon%switchAB)
+      print*, 'OrbGrid = ',norm2(OrbGrid)
+   endif
 endif
 
 ! set/load Omega - range separation parameter

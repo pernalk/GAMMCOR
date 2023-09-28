@@ -5,14 +5,20 @@ use timing
 use tran
 use sorter
 !use Cholesky_old
-use Auto2eInterface
-use Cholesky, only : chol_CoulombMatrix, TCholeskyVecs, &
-                     chol_Rkab_ExternalBinary, chol_MOTransf_TwoStep
-use basis_sets
-use sys_definitions
-use CholeskyOTF_interface
-use CholeskyOTF, only : TCholeskyVecsOTF
-use Cholesky_driver, only : chol_Rkab_OTF
+
+use gammcor_integrals
+!use Auto2eInterface
+!use Cholesky, only : chol_CoulombMatrix, TCholeskyVecs, &
+!                     chol_Rkab_ExternalBinary, chol_MOTransf_TwoStep
+!use basis_sets
+!use sys_definitions
+!use CholeskyOTF_interface
+!use CholeskyOTF, only : TCholeskyVecsOTF
+!use Cholesky_driver, only : chol_Rkab_OTF
+!
+!use BeckeGrid
+!use GridFunctions
+!use grid_definitions
 
 use abmat
 use read_external
@@ -74,7 +80,6 @@ SAPT%monA%IPrint = SAPT%IPrint
 SAPT%monB%IPrint = SAPT%IPrint
 
 ! set basis set
-
 write(LOUT,'(/1x,"Flags:BasisSetPath ",a)') Flags%BasisSetPath
 write(LOUT,'(1x, "Flags:BasisSet ",a)')     Flags%BasisSet
 BasisSet = Flags%BasisSetPath // Flags%BasisSet
@@ -85,6 +90,9 @@ NInte1 = NBasis*(NBasis+1)/2
 NInte2 = NInte1*(NInte1+1)/2
 SAPT%monA%NDim = NBasis*(NBasis-1)/2
 SAPT%monB%NDim = NBasis*(NBasis-1)/2
+
+! sanity-check orbital ordering
+ call check_orbital_ordering(Flags%ICholeskyOTF)
 
 ! set RSH
  SAPT%doRSH = .false.
@@ -418,6 +426,41 @@ SAPT%monB%NDim = NBasis*(NBasis-1)/2
     SAPT%monB%CAONO = SAPT%monB%CMO
  endif
 
+! orbitals on a grid
+block
+!integer :: InternalGrid, NGrid
+integer :: NGrid
+double precision, allocatable :: Phi(:,:),WGrid(:)
+
+SAPT%InternalGrid = 1
+if (SAPT%InternalGrid==1) then
+   if (Flags%IFunSR/=0) then
+      print*,'Internal grid...',Flags%IFunSR
+      print*, 'ORBITAL_ORDERING =',Flags%ORBITAL_ORDERING
+      call internal_orbgrid(Flags,AOBasis,System,WGrid,Phi,NGrid,NBasis)
+
+      SAPT%NGrid      = NGrid
+      SAPT%monA%NGrid = NGrid
+      SAPT%monB%NGrid = NGrid
+      
+      allocate(SAPT%monA%WGrid(NGrid)) ! remove that
+      allocate(SAPT%monB%WGrid(NGrid)) ! remove that
+      SAPT%monA%WGrid = WGrid
+      SAPT%monB%WGrid = WGrid
+
+      allocate(SAPT%monA%CNOGrid(NGrid,NBasis))
+      call internal_tran_orbgrid(SAPT%monA%CNOGrid,SAPT%monA%CMO,Phi,AOBasis, &
+                                 Flags%ORBITAL_ORDERING,NGrid,NBasis,NBasis)
+
+
+      allocate(SAPT%monB%CNOGrid(NGrid,NBasis))
+      call internal_tran_orbgrid(SAPT%monB%CNOGrid,SAPT%monB%CMO,Phi,AOBasis, &
+                                 Flags%ORBITAL_ORDERING,NGrid,NBasis,NBasis)
+
+   endif
+endif
+end block
+
 ! look-up tables
  call select_active(SAPT%monA,NBasis,Flags)
  call select_active(SAPT%monB,NBasis,Flags)
@@ -426,11 +469,8 @@ SAPT%monB%NDim = NBasis*(NBasis-1)/2
  if(Flags%ICholeskyBIN==1) then
     !call chol_sapt_AO2NO_BIN(SAPT,SAPT%monA,SAPT%monB,CholeskyVecs,NBasis,Flags%MemVal,Flags%MemType)
     call chol_OO_sapt_AO2NO_BIN(SAPT,SAPT%monA,SAPT%monB,CholeskyVecs,NBasis,Flags%MemVal,Flags%MemType)
-    print*, 'after OO?'
     call chol_FO_sapt_AO2NO_BIN(SAPT,SAPT%monA,SAPT%monB,CholeskyVecs,NBasis,Flags%MemVal,Flags%MemType)
-    print*, 'after FO?'
     call chol_FF_sapt_AO2NO_BIN(SAPT,SAPT%monA,SAPT%monB,CholeskyVecs,NBasis,Flags%MemVal,Flags%MemType)
-    print*, 'after FF?'
     call clock('chol_AO2NO_BIN',Tcpu,Twall)
  elseif(Flags%ICholeskyOTF==1) then
     !call chol_sapt_AO2NO_OTF(SAPT,SAPT%monA,SAPT%monB,CholeskyVecsOTF,AOBasis,Flags,NBasis)
@@ -490,7 +530,6 @@ SAPT%monB%NDim = NBasis*(NBasis-1)/2
  if(SAPT%InterfaceType==1.and.Flags%ICholeskyOTF==1) then
     ! Dalton/CholeskyOTF: J,K,W in sapt_mon_ints
  else
-    print*, 'calc_elpot'
     call calc_elpot(SAPT%monA,SAPT%monB,CholeskyVecs,&
                     Flags%ICholesky,Flags%ICholeskyBIN,Flags%ICholeskyOTF,NBasis)
  endif
@@ -504,6 +543,95 @@ SAPT%monB%NDim = NBasis*(NBasis-1)/2
  endif
 
 end subroutine sapt_interface
+
+subroutine internal_orbgrid(Flags,AOBasis,System,Wg,Phi,NPoints,NAO)
+implicit none
+
+type(FlagsData) :: Flags
+type(TAOBasis)  :: AOBasis
+type(TSystem)   :: System
+integer,intent(in)  :: NAO
+integer,intent(out) :: NPoints
+
+double precision, dimension(:, :), allocatable :: Phi
+double precision, dimension(:), allocatable :: Wg
+
+integer :: NAOt
+double precision, dimension(:), allocatable :: Xg, Yg, Zg
+
+character(:),allocatable :: XYZPath
+character(:),allocatable :: BasisSet, BasisSetPath
+logical :: SortAngularMomenta
+
+logical, parameter :: SpherAO = .true.
+integer, parameter :: GridType = BECKE_PARAMS_MEDIUM
+
+BasisSet = Flags%BasisSetPath // Flags%BasisSet
+
+! set gridtype : where??
+! ...
+! set units 
+!Units = SYS_UNITS_BOHR
+
+if(Flags%ICholeskyOTF/=1) then
+   ! with Cholesky OTF AOBasis and System already avail
+
+   XYZPath = "./input.inp"
+   BasisSetPath = BasisSet
+   SortAngularMomenta = .true.
+
+   call auto2e_init()
+   call sys_Read_XYZ(System, XYZPath)
+   !call sys_Read_XYZ(System, XYZPath, Units)
+   call basis_NewAOBasis(AOBasis, System, BasisSetPath, SpherAO, SortAngularMomenta)
+   if (AOBasis%SpherAO) then
+         NAOt = AOBasis%NAOSpher
+   else
+         NAOt = AOBasis%NAOCart
+   end if
+   if(NAOt /= NAO) then
+     print*, 'NAO =',NAO, 'NAOlib',NAOt
+     stop "sth wrong with NAO in internal_orbgrid!"
+   endif
+endif
+
+! Molecular grid
+call becke_MolecularGrid(Xg, Yg, Zg, Wg, NPoints, GridType, System, AOBasis)
+
+! Atomic orbitals on the grid
+allocate(Phi(NPoints, NAO))            
+call gridfunc_Orbitals(Phi, Xg, Yg, Zg, NPoints, NAO, AOBasis)
+
+end subroutine internal_orbgrid
+
+subroutine internal_tran_orbgrid(OrbGrid,CAONO,Phi,AOBasis,ExternalOrdering,NPoints,NAO,NBasis)
+!
+! Phi = (NGrid,AO); CAONO(AO,NO)
+! output: OrbGrid(NGrid,NO) = Phi.CAONO
+!
+implicit none
+
+type(TAOBasis)     :: AOBasis
+integer,intent(in) :: NPoints, NBasis, NAO
+integer,intent(in) :: ExternalOrdering
+double precision,intent(in)  :: Phi(NPoints,NAO), CAONO(NAO,NBasis)
+double precision,intent(out) :: OrbGrid(NPoints,NBasis)
+
+integer :: NAOt
+double precision :: C_ao(NAO,NAO)
+
+if(NBasis/=NAO) stop "NAO.ne.NBasis in internal_tran_orbgrid!"
+
+! AOs from external program -> AOs in the Auto2e format
+call auto2e_interface_C(C_ao, CAONO, AOBasis, ExternalOrdering)
+
+print*, 'CAONO',norm2(CAONO)
+print*, 'C_ao',norm2(C_ao)
+
+call dgemm('N','N',NPoints,NBasis,NAO,1d0,Phi,NPoints,C_ao,NAO,0d0,OrbGrid,NPoints)
+print*, 'OrbGrid',norm2(OrbGrid)
+
+end subroutine internal_tran_orbgrid
 
 subroutine onel_molpro(mon,NBasis,NSq,NInte1,MonBlock,SAPT)
 implicit none
@@ -3489,6 +3617,32 @@ double precision,dimension(ndim) :: S, V, H
  write(LOUT,'(1x,a)') 'One-electron integrals written to file: '//mon
 
 end subroutine writeoneint
+
+subroutine check_orbital_ordering(ICholeskyOTF)
+!
+! 1) Marcin's library uses ORBITAL_ORDERING param
+! to distinguish between Orca, Dalton, ... interfaces
+! 2) In GammCor ORBITAL ORDERING flas is set in fill_Flags()
+! 3) this subroutine checks if the integers assigned to orderings 
+!    are the same
+!
+implicit none
+
+integer,intent(in) :: ICholeskyOTF
+
+integer :: val
+
+val = 0
+if (ORBITAL_ORDERING_MOLPRO /= 1) val = 1
+if (ORBITAL_ORDERING_ORCA   /= 2) val = 1
+if (ORBITAL_ORDERING_DALTON /= 3) val = 1
+
+if (val == 1) then
+   write(lout,*) 'ORBITAL_ORDERING inconsistent between GammCor and gammcor-integrals!'
+   if (ICholeskyOTF == 1) stop
+endif
+
+end subroutine check_orbital_ordering
 
 subroutine print_occ(nbas,SAPT,ICASSCF)
 implicit none
