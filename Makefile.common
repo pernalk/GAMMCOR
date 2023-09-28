@@ -11,7 +11,7 @@ OBJ = $(O)mainp.o $(O)initia.o $(O)dmscf.o $(O)misc.o $(O)optocc.o \
       $(O)dftacg_pw92c.o $(O)projector.o $(O)ekt.o \
       $(O)xcfun.o \
       $(O)gammint.o\
-      $(O)gridmolpro.o $(O)griddalton.o \
+      $(O)gridmolpro.o $(O)griddalton.o $(O)gridintern.o \
       $(O)sorter.o $(O)tran.o $(O)systemdef.o \
       $(O)priunit.o $(O)rdwrext.o \
       $(O)types.o $(O)blocktypes.o \
@@ -112,6 +112,8 @@ $(O)gridmolpro.o : $(S)gridmolpro.f90
 	$(FCC) $(FFLAGS)  -c $(S)gridmolpro.f90 -o $(O)gridmolpro.o
 $(O)griddalton.o : $(S)griddalton.f90 $(O)rdwrext.o
 	$(FCC) $(FFLAGS)  -c $(S)griddalton.f90 -o $(O)griddalton.o
+$(O)gridintern.o : $(S)gridintern.f90
+	$(FCC) $(FFLAGS)  -c $(S)gridintern.f90 -o $(O)gridintern.o
 $(O)timing.o : $(S)timing.f90
 	$(FCC) $(FFLAGS)  -c $(S)timing.f90 -o $(O)timing.o
 $(O)priunit.o : $(S)priunit.f90
@@ -164,7 +166,7 @@ $(O)sapt_interface.o : $(S)sapt_interface.f90 $(O)types.o $(O)timing.o \
                   $(O)CholeskyOTF.o $(O)gammint.o
 	$(FCC) $(FFLAGS)  -c $(S)sapt_interface.f90 -o $(O)sapt_interface.o
 $(O)sapt_response.o : $(S)sapt_response.f90 $(O)types.o $(O)tran.o $(O)abmats.o $(O)abfofo.o $(O)ab0fofo.o \
-                  $(O)sapt_utils.o $(O)timing.o
+                  $(O)sapt_utils.o $(O)timing.o $(O)gridintern.o
 	$(FCC) $(FFLAGS)  -c $(S)sapt_response.f90 -o $(O)sapt_response.o
 $(O)sapt_Chol_pol.o : $(S)sapt_Chol_pol.f90 $(O)tran.o $(O)sapt_utils.o \
                     $(O)iter_stats.o $(O)iter_algorithm.o $(O)iter_algorithm_diis.o $(O)timing.o \

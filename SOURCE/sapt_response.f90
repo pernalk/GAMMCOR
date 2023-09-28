@@ -7,6 +7,7 @@ use abmat
 use abfofo
 use ab0fofo
 use sapt_utils
+use grid_internal
 
 implicit none
 
@@ -1271,14 +1272,15 @@ deallocate(URe,XOne,work1,work2)
 
 end subroutine calc_resp_unc
 
-subroutine calc_resp_dft_molpro(Mon,MO,Flags,NBas)
+subroutine calc_resp_dft_molpro(Mon,MO,Flags,NAO,NBas)
 implicit none
 
 type(SystemBlock) :: Mon
 type(FlagsData) :: Flags
 
-double precision :: MO(:)
-integer :: NBas
+integer,intent(in) :: NAO,NBas
+double precision   :: MO(:)
+
 integer :: NSq,NInte1,NInte2,NGrid,NDimKer
 integer :: NSymNO(NBas),MultpC(15,15)
 double precision, allocatable :: work1(:),work2(:)
@@ -1642,7 +1644,7 @@ deallocate(VSR,URe,XOne,work1,work2)
 
 end subroutine calc_resp_dft_molpro
 
-subroutine calc_resp_dft_dalton(Mon,Flags,NBasis)
+subroutine calc_resp_dft_dalton(Mon,Flags,NAO,NBasis)
 !
 ! calculate DFT and srDFT response with files from Dalton
 !
@@ -1650,7 +1652,7 @@ implicit none
 
 type(SystemBlock)  :: Mon
 type(FlagsData)    :: Flags
-integer,intent(in) :: NBasis
+integer,intent(in) :: NAO,NBasis
 
 integer :: NINte1,NInte2
 integer :: ione
@@ -1665,13 +1667,19 @@ double precision :: h0ao(NBasis,NBasis)
 double precision :: ACAlpha
 double precision,allocatable :: ABPlus(:),ABMin(:),EigVecR(:)
 double precision,allocatable :: VSR(:),VSRDalton(:),SRKer(:)
-double precision,allocatable :: WGrid(:),OrbGrid(:,:)
-double precision,allocatable :: OrbXGrid(:,:),OrbYGrid(:,:),OrbZGrid(:,:)
+double precision,allocatable :: WGrid(:)
+
+double precision,allocatable,target :: PhiGGA(:,:,:)
+double precision,allocatable,target :: PhiLDA(:,:)
+double precision,pointer :: OrbGrid(:,:)
+double precision,pointer :: OrbXGrid(:,:),OrbYGrid(:,:),OrbZGrid(:,:)
+
 double precision,allocatable :: XOne(:)
 double precision,allocatable :: work(:,:),workTr(:)
 logical :: doGGA,doRSH
 
 character(8) :: label
+character(:),allocatable :: BasisSetPath
 character(:),allocatable :: onefile,aoerfile,aosrfile, &
                             twokfile,twojerf,twokerf,  &
                             propfile,propfile0,propfile1,xy0file,rdmfile, &
@@ -1791,35 +1799,61 @@ print*, 'XOne-1',norm2(XOne)
 ! load grid
 if (InternalGrid == 0) then
    call daltongrid0(NGrid,gridfile,doGGA,NBasis)
-else
-   NGrid = SAPT%NGrid
-endif
 
-write(LOUT,'()')
-write(LOUT,'(1x,a,i8)') "The number of Grid Points =",NGrid
+   ! load orbgrid and gradients, and wgrid from external files
+   allocate(WGrid(NGrid),SRKer(NGrid))
 
-! load orbgrid and gradients, and wgrid
-allocate(WGrid(NGrid),SRKer(NGrid),OrbGrid(NGrid,NBasis))
-allocate(OrbXGrid(NGrid,NBasis),OrbYGrid(NGrid,NBasis),OrbZGrid(NGrid,NBasis))
+   if(doGGA) then
+      allocate(PhiGGA(NGrid,NBasis,4))
+      OrbGrid  => PhiGGA(:,:,1)
+      OrbXGrid => PhiGGA(:,:,2)
+      OrbYGrid => PhiGGA(:,:,3)
+      OrbZGrid => PhiGGA(:,:,4)
 
-if(doGGA) then
-   print*,'DALTON GRID GGA',NGrid,NBasis
-   call daltongrid_gga(OrbGrid,OrbXGrid,OrbYGrid,OrbZGrid,WGrid,NGrid,gridfile,NBasis)
-   call daltongrid_tran_gga(OrbGrid,OrbXGrid,OrbYGrid,OrbZGrid,CAONO,mon%UCen,NGrid,NBasis,Mon%switchAB)
-else
-   if (InternalGrid==1) then
-      print*,'INTERNAL GRID LDA'
-      OrbGrid = Mon%CNOGrid
-      WGrid = Mon%WGrid
-      print*, 'OrbGrid = ',norm2(OrbGrid)
-      print*, 'WGrid   = ',norm2(WGrid)
+      write(lout,'(/1x,a)') 'DALTON GRID GGA'
+      call daltongrid_gga(OrbGrid,OrbXGrid,OrbYGrid,OrbZGrid,WGrid,NGrid,gridfile,NBasis)
+      call daltongrid_tran_gga(OrbGrid,OrbXGrid,OrbYGrid,OrbZGrid,CAONO,mon%UCen,NGrid,NBasis,Mon%switchAB)
    else
-      print*,'DALTON GRID LDA',NGrid,NBasis
+      allocate(PhiLDA(NGrid,NBasis))
+      OrbGrid  => PhiLDA
+
+      write(lout,'(/1x,a)') 'DALTON GRID LDA'
       call daltongrid_lda(OrbGrid,WGrid,NGrid,gridfile,NBasis)
       call daltongrid_tran_lda(OrbGrid,CAONO,mon%UCen,NGrid,NBasis,Mon%switchAB)
-      print*, 'OrbGrid = ',norm2(OrbGrid)
    endif
+
+elseif (InternalGrid == 1) then
+
+   ! generate orbgrid and gradients, and wgrid from external files
+   if (Flags%IFunSR == 1) doGGA = .false.
+   if (Flags%IFunSR == 2) doGGA = .true.
+
+   BasisSetPath = Flags%BasisSetPath // Flags%BasisSet
+
+   if(doGGA) then
+      write(lout,'(/1x,a)') 'INTERNAL GRID GGA'
+
+      call internal_gga_no_orbgrid(BasisSetPath,Flags%ORBITAL_ORDERING,CAONO,&
+                                   WGrid,PhiGGA,NGrid,NAO,NBasis)
+      OrbGrid  => PhiGGA(:,:,1)
+      OrbXGrid => PhiGGA(:,:,2)
+      OrbYGrid => PhiGGA(:,:,3)
+      OrbZGrid => PhiGGA(:,:,4)
+
+   else
+      write(lout,'(/1x,a)') 'INTERNAL GRID LDA'
+
+      call internal_lda_no_orbgrid(BasisSetPath,Flags%ORBITAL_ORDERING,CAONO, &
+                                   WGrid,PhiLDA,NGrid,NAO,NBasis)
+      OrbGrid  => PhiLDA
+
+   endif
+
+   allocate(SRKer(NGrid))
+
 endif
+
+write(LOUT,'(/1x,a,i8)') "The number of Grid Points =",NGrid
 
 ! set/load Omega - range separation parameter
 write(LOUT,'(1x,a,f15.8)') "The range-separation parameter =",Mon%Omega
@@ -2002,8 +2036,9 @@ deallocate(EigVecR)
 deallocate(work)
 deallocate(VSR)
 deallocate(XOne)
-deallocate(WGrid,SRKer,OrbGrid)
-deallocate(OrbXGrid,OrbYGrid,OrbZGrid)
+deallocate(WGrid,SRKer)
+if(.not.doGGA) deallocate(PhiLDA)
+if(doGGA) deallocate(PhiGGA)
 
 end subroutine calc_resp_dft_dalton
 

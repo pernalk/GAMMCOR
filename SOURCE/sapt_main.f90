@@ -501,10 +501,14 @@ type(SystemBlock)  :: Mon
 integer,intent(in) :: NBasis
 logical,intent(in) :: EnChck
 
+integer          :: NAO
 integer          :: i,j,ij
 integer          :: SaptLevel
 logical          :: regular,extrapolate
 double precision :: NO(NBasis*NBasis)
+
+ ! a quick fix
+ NAO = NBasis
 
  SaptLevel = Flags%SaptLevel
  if(Mon%Cubic) then
@@ -554,9 +558,9 @@ double precision :: NO(NBasis*NBasis)
 
           if(Flags%IFunSR/=0) then
              if (Flags%IDALTON == 1) then
-                call calc_resp_dft_dalton(Mon,Flags,NBasis)
+                call calc_resp_dft_dalton(Mon,Flags,NAO,NBasis)
              elseif (Flags%IDALTON == 0) then
-                call calc_resp_dft_molpro(Mon,NO,Flags,NBasis)
+                call calc_resp_dft_molpro(Mon,NO,Flags,NAO,NBasis)
              endif
           else
              call calc_resp_casgvb(Mon,NO,Flags,NBasis,EnChck)

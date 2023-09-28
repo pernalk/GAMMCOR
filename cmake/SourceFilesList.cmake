@@ -29,6 +29,7 @@ set(GAMMCOR_SOURCE
     SOURCE/exmisc.f90
     SOURCE/gridmolpro.f90
     SOURCE/griddalton.f90
+    SOURCE/gridintern.f90
     SOURCE/hf.f
     SOURCE/initia.f
     SOURCE/inputfill.f90
@@ -57,6 +58,7 @@ set(GAMMCOR_SOURCE
     SOURCE/types.f90
     SOURCE/vv10.f
     SOURCE/xcfun.f90
+    SOURCE/gammint.f90
     SOURCE/tran_Chol.f90
 	SOURCE/iter_stats.f90
     SOURCE/C_integrator.f90

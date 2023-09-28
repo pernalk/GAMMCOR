@@ -426,41 +426,6 @@ SAPT%monB%NDim = NBasis*(NBasis-1)/2
     SAPT%monB%CAONO = SAPT%monB%CMO
  endif
 
-! orbitals on a grid
-block
-!integer :: InternalGrid, NGrid
-integer :: NGrid
-double precision, allocatable :: Phi(:,:),WGrid(:)
-
-SAPT%InternalGrid = 1
-if (SAPT%InternalGrid==1) then
-   if (Flags%IFunSR/=0) then
-      print*,'Internal grid...',Flags%IFunSR
-      print*, 'ORBITAL_ORDERING =',Flags%ORBITAL_ORDERING
-      call internal_orbgrid(Flags,AOBasis,System,WGrid,Phi,NGrid,NBasis)
-
-      SAPT%NGrid      = NGrid
-      SAPT%monA%NGrid = NGrid
-      SAPT%monB%NGrid = NGrid
-      
-      allocate(SAPT%monA%WGrid(NGrid)) ! remove that
-      allocate(SAPT%monB%WGrid(NGrid)) ! remove that
-      SAPT%monA%WGrid = WGrid
-      SAPT%monB%WGrid = WGrid
-
-      allocate(SAPT%monA%CNOGrid(NGrid,NBasis))
-      call internal_tran_orbgrid(SAPT%monA%CNOGrid,SAPT%monA%CMO,Phi,AOBasis, &
-                                 Flags%ORBITAL_ORDERING,NGrid,NBasis,NBasis)
-
-
-      allocate(SAPT%monB%CNOGrid(NGrid,NBasis))
-      call internal_tran_orbgrid(SAPT%monB%CNOGrid,SAPT%monB%CMO,Phi,AOBasis, &
-                                 Flags%ORBITAL_ORDERING,NGrid,NBasis,NBasis)
-
-   endif
-endif
-end block
-
 ! look-up tables
  call select_active(SAPT%monA,NBasis,Flags)
  call select_active(SAPT%monB,NBasis,Flags)
