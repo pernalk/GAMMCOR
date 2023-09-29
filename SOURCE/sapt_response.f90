@@ -1816,6 +1816,9 @@ if (InternalGrid == 0) then
    else
       allocate(PhiLDA(NGrid,NBasis))
       OrbGrid  => PhiLDA
+      OrbXGrid => PhiLDA
+      OrbYGrid => PhiLDA
+      OrbZGrid => PhiLDa
 
       write(lout,'(/1x,a)') 'DALTON GRID LDA'
       call daltongrid_lda(OrbGrid,WGrid,NGrid,gridfile,NBasis)
@@ -1846,6 +1849,9 @@ elseif (InternalGrid == 1) then
       call internal_lda_no_orbgrid(Flags%IGridType,BasisSetPath,Flags%ORBITAL_ORDERING,CAONO,&
                                    WGrid,PhiLDA,NGrid,NAO,NBasis)
       OrbGrid  => PhiLDA
+      OrbXGrid => PhiLDA
+      OrbYGrid => PhiLDA
+      OrbZGrid => PhiLDa
 
    endif
 
@@ -1947,9 +1953,15 @@ allocate(EigVecR(Mon%NDimX**2))
 call system('cp '//rdmfile// ' rdm2.dat')
 
 ECASSCF = 0d0
+!if (Flags%ICholeskyOTF==1) then
+!call AB_CAS_FOFO(ABPlus,ABMin,ECASSCF,URe,Mon%Occ,XOne, &
+!               Mon%IndN,Mon%IndX,Mon%IGem,Mon%NAct,Mon%INAct,Mon%NDimX,NBasis,Mon%NDimX,&
+!               NInte1,twojerf,twokerf,0,ACAlpha,.false.)
+!else
 call AB_CAS_FOFO(ABPlus,ABMin,ECASSCF,URe,Mon%Occ,XOne, &
                Mon%IndN,Mon%IndX,Mon%IGem,Mon%NAct,Mon%INAct,Mon%NDimX,NBasis,Mon%NDimX,&
                NInte1,twojerf,twokerf,Flags%ICholesky,ACAlpha,.false.)
+!endif
 
 write(LOUT,'(/,1x,a,f16.8,a,1x,f16.8)') 'ABPlus',norm2(ABPlus),'ABMin',norm2(ABMin)
 

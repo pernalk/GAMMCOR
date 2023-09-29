@@ -255,9 +255,9 @@ SAPT%monB%NDim = NBasis*(NBasis-1)/2
              write(lout,'(1x,a)') "AOTWOSORT should contain full-range integrals"
              write(lout,'(1x,a)') "AOERFSORT should contain LR integrals"
           endif
-       endif
-    endif
- endif
+       endif ! doRSH
+    endif ! Interface
+ endif ! not Cholesky
 
 ! Cholesky decomposition
  if(Flags%ICholeskyBIN==1.or.Flags%ICholeskyOTF==1) then
@@ -313,6 +313,24 @@ SAPT%monB%NDim = NBasis*(NBasis-1)/2
 
        end block
 
+    endif
+
+    ! with Cholesky treat LR integrals in a regular manner...
+    if(doRSH) then
+
+      if (SAPT%SameOm) then
+         call readtwoint(NBasis,1,'AOERFINT_A','AOERFSORT',MemSrtSize)
+      else
+         call readtwoint(NBasis,1,'AOERFINT_A','AOERFSORT',MemSrtSize)
+         call readtwoint(NBasis,1,'AOERFINT_B','AOERFSORTB',MemSrtSize)
+      endif
+
+      if(SAPT%IPrint.gt.1) then
+         write(lout,'(/1x,a)') "Sorting AO integrals DALTON interface:"
+         write(lout,'(1x,a)') "AOTWOSORT should contain full-range integrals"
+         write(lout,'(1x,a)') "AOERFSORT should contain LR integrals"
+         !write(lout,'(1x,a)') "AOSR2SORT should contain SR integrals"
+      endif
     endif
 
  endif
