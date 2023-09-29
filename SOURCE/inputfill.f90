@@ -403,6 +403,14 @@ subroutine read_block_calculation(CalcParams, line)
               CalcParams%RDMType = RDM_TYPE_DMRG
            endif
 
+      case ("UNITS")
+         if (uppercase(val) == "BOHR" .or. &
+             uppercase(val) == "AU") then
+             CalcParams%Units = UNITS_BOHR
+         elseif (uppercase(val) == "ANGSTROM") then
+             CalcParams%Units = UNITS_ANGSTROM
+         endif
+
       case ("TWOMOINT")
          if(uppercase(val) == "FULL".or. &
             uppercase(val) == "FFFF") then
@@ -969,6 +977,10 @@ associate( CalcParams => Input%CalcParams)
                       PossibleJobType(CalcParams%JOBtype)
  write(LOUT,' (1x,a,5x,a)') "RDM TYPE: ",  &
               PossibleRDMType(CalcParams%RDMType)
+ write(LOUT,' (1x,a,3x,a)') "RDM SOURCE: ",  &
+              PossibleInterface(CalcParams%RDMSource)
+ write(LOUT,' (1x,a,8x,a)') "UNITS: ",  &
+              PossibleUnits(CalcParams%Units)
  if (CalcParams%DFApp>0) then
     write(LOUT,' (1x,a,5x,a)') "DFA TYPE: ",  &
                        PossibleDFAType(CalcParams%DFApp)
@@ -977,8 +989,6 @@ associate( CalcParams => Input%CalcParams)
     write(LOUT,'(1x,a,4x,a)') "GRID TYPE: ", &
                     PossibleGridType(CalcParams%GridType)
  endif
- write(LOUT,' (1x,a,3x,a)') "RDM SOURCE: ",  &
-              PossibleInterface(CalcParams%RDMSource)
  if (allocated(CalcParams%IntegralsFilePath)) then
        write(*, *) "Ints file: ", CalcParams%IntegralsFilePath
  end if

@@ -964,7 +964,7 @@ C
      $                    NCholesky,NBasis,'FFOO')
 C
       If(IOrbRelax==1) Then
-        Call chol_ffoo_batch(MatFF,NBasis,Num0+Num1,MatFF,
+        Call chol_ffoo_full_batch(.false.,MatFF,NBasis,Num0+Num1,MatFF,
      $                      NCholesky,NBasis,'FFFO')
       EndIf
       EndIf
@@ -2042,13 +2042,13 @@ C
         Write(6,'(/," Skipping FOFO/FFOO assembling")')
       ElseIf(IRedVirt==1) Then
         Write(6,'(/," Assemble FOFO/FFOO integrals")')
-        Call chol_fofo_batch(Num0+Num1,MatFF,Num0+Num1,MatFF,
+        Call chol_fofo_full_batch(Num0+Num1,MatFF,Num0+Num1,MatFF,
      $                       NCholesky,NBasis,'FOFO')
-        Call chol_ffoo_batch(MatFF,Num0+Num1,Num0+Num1,MatFF,
-     $                       NCholesky,NBasis,'FFOO')
+        Call chol_ffoo_full_batch(.false.,MatFF,Num0+Num1,Num0+Num1,
+     $                       MatFF,NCholesky,NBasis,'FFOO')
          If(IOrbRelax==1) Then
-           Call chol_ffoo_batch(MatFF,NBasis,Num0+Num1,MatFF,
-     $                          NCholesky,NBasis,'FFFO')
+            Call chol_ffoo_full_batch(.false.,MatFF,NBasis,Num0+Num1,
+     $                                MatFF,NCholesky,NBasis,'FFFO')
          EndIf
       EndIf
 C

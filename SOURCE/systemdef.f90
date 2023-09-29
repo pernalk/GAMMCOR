@@ -142,6 +142,9 @@ else
    Flags%IGridType = Input%CalcParams%GridType
    if (Input%CalcParams%DeclareGrid) Flags%InternalGrid = 1
 
+  ! set units
+  Flags%IUnits = Input%CalcParams%Units
+
   ! reduce virtuals
    Flags%IRedVirt = Input%CalcParams%RedVirt
 

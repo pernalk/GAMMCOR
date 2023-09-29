@@ -69,6 +69,9 @@ integer, parameter :: GRID_PARAMS_MEDIUM = 2
 integer, parameter :: GRID_PARAMS_FINE = 3
 integer, parameter :: GRID_PARAMS_XFINE = 4
 
+integer, parameter :: UNITS_ANGSTROM = 1
+integer, parameter :: UNITS_BOHR     = 2
+
 integer, parameter :: DF_NONE       = 0
 integer, parameter :: DF_SRLDA      = 1
 integer, parameter :: DF_SRPBE      = 2
@@ -111,6 +114,10 @@ character(*),parameter :: PossibleGridType(4) = &
 [character(8) :: &
 'SG1', 'MEDIUM', 'FINE', 'XFINE']
 
+character(*),parameter :: PossibleUnits(2) = &
+[character(8) :: &
+'ANGSTROM', 'BOHR']
+
    character(*),parameter :: PossibleMonomers(3) = &
    [character(8) :: 'A', 'B', 'AB']
 
@@ -123,6 +130,7 @@ character(*),parameter :: PossibleGridType(4) = &
          integer :: JobType   = JOB_TYPE_AC
          integer :: RDMType ! = RDM_TYPE_GVB
          integer :: RDMSource = INTER_TYPE_DAL
+         integer :: Units     = UNITS_ANGSTROM
          integer :: Response  = RESP_ERPA
          integer :: DFApp     = DF_NONE
          integer :: Kernel    = 1
@@ -316,6 +324,7 @@ type FlagsData
      integer :: ICholeskyOTF  = FLAG_CHOLESKY_OTF
      integer :: ICholeskyAccu = CHOL_ACCU_DEFAULT
      integer :: IGridType = GRID_PARAMS_MEDIUM
+     integer :: IUnits = UNITS_ANGSTROM
      integer :: InternalGrid = 0
      integer :: IH0Test   = FLAG_H0TEST
      integer :: ORBITAL_ORDERING = 0

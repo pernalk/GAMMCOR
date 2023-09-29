@@ -1837,7 +1837,7 @@ elseif (InternalGrid == 1) then
       write(lout,'(/1x,a)') 'INTERNAL GRID GGA'
 
       call internal_gga_no_orbgrid(Flags%IGridType,BasisSetPath,Flags%ORBITAL_ORDERING,CAONO,&
-                                   WGrid,PhiGGA,NGrid,NAO,NBasis)
+                                   WGrid,PhiGGA,NGrid,NAO,NBasis,Flags%IUnits)
       OrbGrid  => PhiGGA(:,:,1)
       OrbXGrid => PhiGGA(:,:,2)
       OrbYGrid => PhiGGA(:,:,3)
@@ -1847,7 +1847,7 @@ elseif (InternalGrid == 1) then
       write(lout,'(/1x,a)') 'INTERNAL GRID LDA'
 
       call internal_lda_no_orbgrid(Flags%IGridType,BasisSetPath,Flags%ORBITAL_ORDERING,CAONO,&
-                                   WGrid,PhiLDA,NGrid,NAO,NBasis)
+                                   WGrid,PhiLDA,NGrid,NAO,NBasis,Flags%IUnits)
       OrbGrid  => PhiLDA
       OrbXGrid => PhiLDA
       OrbYGrid => PhiLDA
