@@ -11,7 +11,7 @@ C     GTol1 - THRESHOLD FOR THE GRADIENT IN BFGSAPSG USED TILL ARAI OPTIMIZATION
 C
       Implicit Real*8 (A-H,O-Z)
 C
-      Character*60 FMultTab,Title
+      Character*60 Title
       Include 'commons.inc'
 C
       Parameter(Zero=0.0D0,Half=0.50D0,One=1.0D0,Two=2.0D0,Four=4.0D0)
@@ -268,7 +268,7 @@ C
 C
       If(IPrint.Ge.0)
      $ Write(6,'(/,X,''ITER'',I3,2X,''ENERGY'',F16.8,2X,
-     $ ''ENE DIFF '',E10.3,2X,''GRAD NORM '',E9.3)')
+     $ ''ENE DIFF '',E10.3,2X,''GRAD NORM '',E10.3)')
      $ Iter,ETot,ETot-ETotO,GradNo
       Write(6,'(/,X,''  ORBITAL OCCUPANCIES '')')
       Write(6,'(2X,"Orb",3X,"Occupancy",7X,"Gem",3X,"Sym")')
@@ -306,7 +306,6 @@ C     ON EXIT URe, Occ, AND CICoef ARE UPDATED
 C
       Implicit Real*8 (A-H,O-Z)
 C
-      Character*60 FMultTab 
       Include 'commons.inc'
 C
       Parameter(Zero=0.0D0,Half=0.5D0,One=1.0D0,Two=2.0D0,Four=4.D0)
@@ -372,7 +371,6 @@ C
      $ Gamma(NInte1),Gam(NGem,NInte1),GamC(NGem,NInte1),
      $ F(NGem*NInte1),GC(NGem*NInte1)
 C
-      Character*60 FMultTab
       Include 'commons.inc'
 C
 C     CONSTRUCT A DENSITY MATRIX
@@ -622,7 +620,6 @@ C
 C
       Real*8, Allocatable :: TNO(:)
 C
-      Character*60 FMultTab
       Include 'commons.inc'
 C
 C     CONSTRUCT A DENSITY MATRIX
@@ -1099,7 +1096,6 @@ C     CICoef AND URe ARE NOT MODIFFIED
 C     
       Implicit Real*8 (A-H,O-Z)
 C
-      Character*60 FMultTab
       Include 'commons.inc'
 C
       Parameter(Zero=0.0D0,Half=0.5D0,One=1.0D0,Two=2.0D0,Four=4.D0)
@@ -1360,7 +1356,6 @@ C     CALCULATE CICoef FROM CoefOld AND STEP
 C     
       Implicit Real*8 (A-H,O-Z)
 C
-      Character*60 FMultTab
       Include 'commons.inc'
 C
       Parameter(Zero=0.0D0,Half=0.5D0,One=1.0D0,Two=2.0D0,Four=4.D0)
@@ -1414,7 +1409,6 @@ C     NDimX > 0 and n > NDimX    ... vary X and x
 C     NDimX > 0 and n = NDimX    ... vary X only (minimization w.r.t. orb rotations)
 C     NDimX = 0 and n = NBasis   ... vary x only (minimization w.r.t. expansion coeffs c)
 C
-      Character*60 FMultTab
       Include 'commons.inc'
 C
       Parameter(Zero=0.0D0,Half=0.5D0,One=1.0D0)
@@ -1654,7 +1648,6 @@ C     TOLX is the convergence criterion on \Delta x.
 C
       Implicit Real*8 (A-H,O-Z)
 C
-      Character*60 FMultTab
       Include 'commons.inc'
 C
       Dimension UReOld(NBasis*NBasis),URe(NBasis*NBasis),
@@ -1856,7 +1849,6 @@ C
 C
       Implicit Real*8 (A-H,O-Z)
 C
-      Character*60 FMultTab
       Include 'commons.inc'
 C
       Dimension Occ(NBasis),URe(NBasis,NBasis),NSymNO(NBasis)
@@ -1947,7 +1939,7 @@ C     READ (IFlag=0) OR WRITE (IFlag=1) FROM/TO A RESTART FILE
 C
       Implicit Real*8 (A-H,O-Z)
 C
-      Character*60 Title,FName,FMultTab
+      Character*60 Title,FName
 C
       Include 'commons.inc'
 C
@@ -2089,7 +2081,7 @@ C     INITIATE GVB CACLUATIONS
 C
       Implicit Real*8 (A-H,O-Z)
 C
-      Character*60 FMultTab,Title
+      Character*60 Title
       Include 'commons.inc'
 C
       Parameter(Zero=0.0D0,One=1.D0)

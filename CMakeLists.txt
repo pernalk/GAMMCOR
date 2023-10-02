@@ -36,6 +36,12 @@ include(SourceFilesList)
 include(GitInfoService)
 include(BuildInfoService)
 
+# enable testing
+enable_testing()
+
+#define tests
+add_test(NAME gammcortest COMMAND python3 ${PROJECT_SOURCE_DIR}/testjobs/run_tests.py ${PROJECT_BINARY_DIR})
+
 # Create executable
 add_executable(${PROJECT_NAME}
     ${XCFUN_SOURCE}
@@ -43,9 +49,9 @@ add_executable(${PROJECT_NAME}
 )
 
 # Copy executable to main directory
-add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
-    COMMAND cp -f ${CMAKE_SOURCE_DIR}/build/gammcor ${CMAKE_SOURCE_DIR}/gammcor
-)
+#add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
+#    COMMAND cp -f ${CMAKE_SOURCE_DIR}/build/gammcor ${CMAKE_SOURCE_DIR}/gammcor
+#)
 
 # Link libraries
 target_link_libraries(${PROJECT_NAME} PRIVATE OpenMP::OpenMP_Fortran ${BLAS_LIBRARIES} ${TREXIO_LIBRARY} ${CHOLESKY_LIBRARY})

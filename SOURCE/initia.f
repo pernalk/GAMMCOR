@@ -9,8 +9,11 @@ C
       use types
       use sorter
       use tran
-      use Cholesky
       use read_external
+C
+C     Cholesky modules
+C      use Cholesky
+      use gammcor_integrals
 C
       Implicit Real*8 (A-H,O-Z)
 C
@@ -267,17 +270,18 @@ C
       use types
       use sorter
 C     Cholesky modules
-c     use Cholesky_old  ! create AOTWOSORT file
-C     binary
-      use Auto2eInterface
-      use Cholesky, only : chol_CoulombMatrix, TCholeskyVecs,
-     $              chol_Rkab_ExternalBinary, chol_MOTransf_TwoStep
-C     on-the-fly
-      use basis_sets
-      use sys_definitions
-      use CholeskyOTF_interface
-      use CholeskyOTF, only : TCholeskyVecsOTF
-      use Cholesky_driver, only : chol_Rkab_OTF
+      use gammcor_integrals
+Cc     use Cholesky_old  ! create AOTWOSORT file
+CC     binary
+C      use Auto2eInterface
+C      use Cholesky, only : chol_CoulombMatrix, TCholeskyVecs,
+C     $              chol_Rkab_ExternalBinary, chol_MOTransf_TwoStep
+CC     on-the-fly
+C      use basis_sets
+C      use sys_definitions
+C      use CholeskyOTF_interface
+C      use CholeskyOTF, only : TCholeskyVecsOTF
+C      use Cholesky_driver, only : chol_Rkab_OTF
 
       use tran
       use abmat
@@ -428,7 +432,7 @@ C
       Write(6,'(X,I3,E16.6,I6)') I,Occ(I),IGem(I)
       Sum=Sum+Occ(I)
       EndDo
-      Write(6,'(2X,"Sum of Occupancies: ",F5.2)') Sum
+      Write(6,'(2X,"Sum of Occupancies: ",F10.2)') Sum
 C
       NAct=NAcCAS
       INActive=NInAcCAS
@@ -960,7 +964,7 @@ C
      $                    NCholesky,NBasis,'FFOO')
 C
       If(IOrbRelax==1) Then
-        Call chol_ffoo_batch(MatFF,NBasis,Num0+Num1,MatFF,
+        Call chol_ffoo_full_batch(.false.,MatFF,NBasis,Num0+Num1,MatFF,
      $                      NCholesky,NBasis,'FFFO')
       EndIf
       EndIf
@@ -1289,17 +1293,21 @@ C
       use types
       use sorter
       use tran
-c     use Cholesky_old  ! requires AOTWOSORT
-C     Cholesky binary
-      use Auto2eInterface
-      use Cholesky, only : chol_CoulombMatrix, TCholeskyVecs,
-     $              chol_Rkab_ExternalBinary, chol_MOTransf_TwoStep
-C     Cholesky on-the-fly (OTF)
-      use basis_sets
-      use sys_definitions
-      use CholeskyOTF_interface
-      use CholeskyOTF, only : TCholeskyVecsOTF
-      use Cholesky_driver, only : chol_Rkab_OTF, chol_F
+C
+C     Cholesky modules
+      use gammcor_integrals
+C
+Cc     use Cholesky_old  ! requires AOTWOSORT
+CC     Cholesky binary
+C      use Auto2eInterface
+C      use Cholesky, only : chol_CoulombMatrix, TCholeskyVecs,
+C     $              chol_Rkab_ExternalBinary, chol_MOTransf_TwoStep
+CC     Cholesky on-the-fly (OTF)
+C      use basis_sets
+C      use sys_definitions
+C      use CholeskyOTF_interface
+C      use CholeskyOTF, only : TCholeskyVecsOTF
+C      use Cholesky_driver, only : chol_Rkab_OTF, chol_F
 
       use abmat
       use read_external
@@ -1480,6 +1488,7 @@ C     compute Cholesky vectors OTF
       BasisSetPath = BasisSet
       SortAngularMomenta = .true.
 
+      print*, 'how do you know CholeskyOTF_ao_vecs???'
       Call CholeskyOTF_ao_vecs(CholeskyVecsOTF,AOBasis,System,
      $            XYZPath,BasisSetPath,SortAngularMomenta,ICholeskyAccu)
 
@@ -1599,7 +1608,7 @@ C
       Write(6,'(X,I3,E16.6,I6)') I,Occ(I),IGem(I)
       Sum=Sum+Occ(I)
       EndDo
-      Write(6,'(2X,"Sum of Occupancies: ",F7.2)') Sum
+      Write(6,'(2X,"Sum of Occupancies: ",F10.2)') Sum
 C
       NAct=NAcCAS
       INActive=NInAcCAS
@@ -2033,13 +2042,13 @@ C
         Write(6,'(/," Skipping FOFO/FFOO assembling")')
       ElseIf(IRedVirt==1) Then
         Write(6,'(/," Assemble FOFO/FFOO integrals")')
-        Call chol_fofo_batch(Num0+Num1,MatFF,Num0+Num1,MatFF,
+        Call chol_fofo_full_batch(Num0+Num1,MatFF,Num0+Num1,MatFF,
      $                       NCholesky,NBasis,'FOFO')
-        Call chol_ffoo_batch(MatFF,Num0+Num1,Num0+Num1,MatFF,
-     $                       NCholesky,NBasis,'FFOO')
+        Call chol_ffoo_full_batch(.false.,MatFF,Num0+Num1,Num0+Num1,
+     $                       MatFF,NCholesky,NBasis,'FFOO')
          If(IOrbRelax==1) Then
-           Call chol_ffoo_batch(MatFF,NBasis,Num0+Num1,MatFF,
-     $                          NCholesky,NBasis,'FFFO')
+            Call chol_ffoo_full_batch(.false.,MatFF,NBasis,Num0+Num1,
+     $                                MatFF,NCholesky,NBasis,'FFFO')
          EndIf
       EndIf
 C
@@ -2218,57 +2227,57 @@ C
       Return
       End
 
-*Deck CholeskyOTF_ao_vecs
-      Subroutine CholeskyOTF_ao_vecs(CholeskyVecsOTF,
-     $                     AOBasis,System,XYZPath,BasisSetPath,
-     $                     SortAngularMomenta, Accuracy)
+C*Deck CholeskyOTF_ao_vecs
+C      Subroutine CholeskyOTF_ao_vecs(CholeskyVecsOTF,
+C     $                     AOBasis,System,XYZPath,BasisSetPath,
+C     $                     SortAngularMomenta, Accuracy)
+CC
+CC           Generate Cholesky vectors in AO basis on-the-fly
+CC
+C            use arithmetic
+C            use auto2e
+C            use Cholesky, only: chol_CoulombMatrix, TCholeskyVecs,
+C     $                   chol_Rkab_ExternalBinary, chol_MOTransf_TwoStep
+C            use CholeskyOTF, only: chol_CoulombMatrix_OTF,
+C     $                   TCholeskyVecsOTF, chol_MOTransf_TwoStep_OTF
+C            use Cholesky_driver
+C            use basis_sets
+C            use sys_definitions
+C            use chol_definitions
 C
-C           Generate Cholesky vectors in AO basis on-the-fly
+C            implicit none
 C
-            use arithmetic
-            use auto2e
-            use Cholesky, only: chol_CoulombMatrix, TCholeskyVecs,
-     $                   chol_Rkab_ExternalBinary, chol_MOTransf_TwoStep
-            use CholeskyOTF, only: chol_CoulombMatrix_OTF,
-     $                   TCholeskyVecsOTF, chol_MOTransf_TwoStep_OTF
-            use Cholesky_driver
-            use basis_sets
-            use sys_definitions
-            use chol_definitions
-
-            implicit none
-
-            type(TCholeskyVecsOTF), intent(out) :: CholeskyVecsOTF
-            type(TAOBasis), intent(out)         :: AOBasis
-            type(TSystem), intent(out)          :: System
-            character(*), intent(in)            :: XYZPath
-            character(*), intent(in)            :: BasisSetPath
-            logical, intent(in)                 :: SortAngularMomenta
-            integer, intent(in)                 :: Accuracy
-
-            logical, parameter :: SpherAO = .true.
-
-            ! Initialize the two-electron intergrals library
-            !
-            call auto2e_init()
-            !
-            ! Read the XYZ coordinates and atom types
-            !
-            call sys_Read_XYZ(System, XYZPath)
-            !
-            call sys_Init(System,SYS_TOTAL)
-            !
-            ! Read the basis set parameters from an EMSL text file
-            ! (GAMESS-US format, no need for any edits, just download it straight from the website)
-            !
-            call basis_NewAOBasis(AOBasis, System,
-     $                       BasisSetPath, SpherAO, SortAngularMomenta)
-            !
-            ! Compute Cholesky vectors in AO basis
-            !
-            call chol_Rkpq_OTF(CholeskyVecsOTF, AOBasis, Accuracy)
-
-      end subroutine CholeskyOTF_ao_vecs
+C            type(TCholeskyVecsOTF), intent(out) :: CholeskyVecsOTF
+C            type(TAOBasis), intent(out)         :: AOBasis
+C            type(TSystem), intent(out)          :: System
+C            character(*), intent(in)            :: XYZPath
+C            character(*), intent(in)            :: BasisSetPath
+C            logical, intent(in)                 :: SortAngularMomenta
+C            integer, intent(in)                 :: Accuracy
+C
+C            logical, parameter :: SpherAO = .true.
+C
+C            ! Initialize the two-electron intergrals library
+C            !
+C            call auto2e_init()
+C            !
+C            ! Read the XYZ coordinates and atom types
+C            !
+C            call sys_Read_XYZ(System, XYZPath)
+C            !
+C            call sys_Init(System,SYS_TOTAL)
+C            !
+C            ! Read the basis set parameters from an EMSL text file
+C            ! (GAMESS-US format, no need for any edits, just download it straight from the website)
+C            !
+C            call basis_NewAOBasis(AOBasis, System,
+C     $                       BasisSetPath, SpherAO, SortAngularMomenta)
+C            !
+C            ! Compute Cholesky vectors in AO basis
+C            !
+C            call chol_Rkpq_OTF(CholeskyVecsOTF, AOBasis, Accuracy)
+C
+C      end subroutine CholeskyOTF_ao_vecs
 
 *Deck DimSym
       Subroutine DimSym(NBasis,NInte1,NInte2,MxHVec,MaxXV)
@@ -2325,7 +2334,7 @@ C
       Write(6,'('' *'',61X,''*'')')
 C
       Write(6,
-     $ '('' * NUCLEAR CHARGE = '',F9.6,''   CHARGE = '',F9.6,13X,
+     $ '('' * NUCLEAR CHARGE = '',F13.9,''   CHARGE = '',F9.6,13X,
      $ ''*'')') ZNucl,Charge
 C
       Write(6,'('' *'',61X,''*'')')

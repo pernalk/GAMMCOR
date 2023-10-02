@@ -54,12 +54,12 @@ subroutine RhoKernel(Rho,SRKer,IFunSR,XMu,NGrid)
    do i=1,NGrid
 !   SRKer(i)=derivatives(XC_D10, i)
    SRKer(i)=derivatives(XC_D2, i)
-   enddo  
+   enddo
 
    deallocate(density_variables)
    deallocate(derivatives)
 
-   call xc_free_functional(id) 
+   call xc_free_functional(id)
 
 return
 end
@@ -109,7 +109,7 @@ subroutine LYP(Rho,Sigma,Ene,NGrid)
 
    do i=1,NGrid
    Ene(i)=derivatives(1, i)
-!   VKS(i)=derivatives(2, i) 
+!   VKS(i)=derivatives(2, i)
    enddo
 
    deallocate(density_variables)
@@ -119,6 +119,57 @@ subroutine LYP(Rho,Sigma,Ene,NGrid)
 
 return
 end subroutine LYP 
+
+subroutine SRLDAC(Rho,Ene,XMu,NGrid)
+!
+! computes short-range correlation energy density
+! on a grid
+!
+   use xcfun
+
+   implicit none
+
+   integer,intent(in)           :: NGrid
+   double precision,intent(in)  :: XMu
+   double precision,intent(in)  :: Rho(NGrid)
+   double precision,intent(out) :: Ene(NGrid)
+
+   character(1000)      :: text
+   integer              :: i,id,order,ilen,olen
+   double precision, allocatable :: density_variables(:,:),derivatives(:,:)
+
+!  create a new functional
+   id = xc_new_functional()
+!  use the following functionals
+   call xc_set_param(id, XC_LDAERFC, 1.0d0)
+   call xc_set_param(id, XC_RANGESEP_MU, XMu)
+
+   call xc_set_mode(id, XC_VARS_N)
+   order = 0
+
+   ilen = xc_input_length(id)
+   olen = xc_output_length(id, order)
+
+   allocate(density_variables(ilen, NGrid))
+   allocate(derivatives(olen, NGrid))
+
+   do i=1,NGrid
+      density_variables(1, i) = Rho(i)
+   enddo
+
+! evaluate what you need
+   call xc_eval(id,order,NGrid,density_variables,derivatives)
+
+   do i=1,NGrid
+      Ene(i)=derivatives(1,i)
+   enddo
+
+   deallocate(density_variables)
+   deallocate(derivatives)
+
+   call xc_free_functional(id)
+
+end subroutine SRLDAC
 
 subroutine PBECor(Rho,Sigma,Ene,NGrid)
 !   

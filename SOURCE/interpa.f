@@ -1593,6 +1593,17 @@ C
 C
       Call Diag8(EigY,NDimX,NDimX,Eig,Work)
 C
+CC     test 2
+C      NoNeg=0
+C      Do I=1,NDimX
+C      If(Eig(I).Lt.Zero) NoNeg=NoNeg+1
+C      EndDo
+C      If(NoNeg.Gt.Zero) write(6,*) 'NEGATIVE EIGENVALS : '
+C      Do I=1,NoNeg
+C         Print*, 'I=',I,Eig(I)
+C      EndDo
+C      NoNeg=0
+
 C     COMPUTE Y's
 C
       Do I=1,NDimX

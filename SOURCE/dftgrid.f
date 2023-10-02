@@ -130,7 +130,8 @@ C
       VxcSRi=Zero
       Else
       Rs=(Const/Rho)**(One/Three)
-      Call LSDSR(Rs,Zero,Alpha,EpsxcSR,VxcSRup,VxcSRdown)
+c      Call LSDSR(Rs,Zero,Alpha,EpsxcSR,VxcSRup,VxcSRdown)
+      Call LSDSR(Rs,Zero,Alpha,EpsxcSR,EpsxSR,EpscSR,VxcSRup,VxcSRdown)
       VxcSRi=VxcSRup
       EndIf
 C
@@ -199,6 +200,7 @@ C
       Parameter (Zero=0.0D0,One=1.D0,Two=2.D0,Three=3.0D0,Four=4.0D0)
       Dimension OrbGrid(NGrid,NBasis),WGrid(NGrid),Occ(NBasis),
      $ URe(NBasis,NBasis)
+      Dimension RhoGrid(NGrid)
 C
       Pi2=ASin(One)
       Pi=Two*Pi2
@@ -208,24 +210,52 @@ C     Short-Range LDA functional
 C     EnxcSR = Int rho*EpsxcSR d3r
 C
       EnxcSR=Zero
+      EnxSR=Zero
+      EncSR=Zero
+      RhoGrid=Zero
+C
       Do I=1,NGrid
 C
       Call DenGrid(I,Rho,Occ,URe,OrbGrid,NGrid,NBasis)
       If(Rho.Eq.Zero) Then
       EpsxcSR=Zero
+      EpsxSR=Zero
+      EpscSR=Zero
 C   
       Else
 C
 C     GET SR XC ENERGY DENSITY FOR HEG
 C
       Rs=(Const/Rho)**(One/Three)
-      Call LSDSR(Rs,Zero,Alpha,EpsxcSR,VxcSRup,VxcSRdown)
+c     Call LSDSR(Rs,Zero,Alpha,EpsxcSR,VxcSRup,VxcSRdown)
+      Call LSDSR(Rs,Zero,Alpha,EpsxcSR,EpsxSR,EpscSR,VxcSRup,VxcSRdown)
 C
       EndIf
 C
       EnxcSR=EnxcSR+Rho*EpsxcSR*WGrid(I)
+      EnxSR=EnxSR+Rho*EpsxSR*WGrid(I)
+      EncSR=EncSR+Rho*EpscSR*WGrid(I)
+C
+      RhoGrid(I) = Rho
 C
       EndDo
+C
+      Print*, 'EnxSR',EnxSR
+      Print*, 'EncSR',EncSR
+C
+C     Test XCFun
+      block
+      double precision :: XMu
+      double precision :: EpscSRGrid(NGrid)
+      XMu=0.4d0
+      EpscSRGrid=Zero
+      Call SRLDAC(RhoGrid,EpscSRGrid,XMu,NGrid)
+      EncSR = Zero
+      Do I=1,NGrid
+      EncSR = EncSR + EpscSRGrid(I)*WGrid(I)
+      EndDo
+      Print*, 'EncSR-XCFun',EncSR
+      end block
 C
       Return
       End

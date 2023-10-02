@@ -377,6 +377,75 @@ double precision :: tmp(ntr)
 
 end subroutine readoneint_molpro
 
+subroutine read_no_molpro(cno,istate,infile,text,nbasis)
+!
+! this subroutine reads C(SAO,NO) coefficients
+! these are dumped in Molpro through NATORBA and NATORBB
+! labels 
+!
+implicit none
+
+integer,intent(in) :: nbasis,istate
+character(*),intent(in) :: infile,text
+double precision,intent(out) :: cno(nbasis,nbasis)
+
+character(8) :: label
+integer :: iunit,ios
+integer :: nsym,nbas(8),offs(8),ncmot
+integer :: iset
+integer :: i,j,idx,irep,ioff
+double precision ::tmp(nbasis**2)
+
+ open(newunit=iunit,file=infile,status='OLD', &
+      access='SEQUENTIAL',form='UNFORMATTED')
+
+ !rewind(iunit)
+ do
+   read(iunit,iostat=ios) label
+   if(ios<0) then
+      write(6,*) 'ERROR!!! LABEL '//text//' not found!'
+      stop
+   endif
+   if(label==text) then
+      read(iunit) nsym,nbas(1:nsym),offs(1:nsym),iset
+      ncmot = sum(nbas(1:nsym)**2)
+      print*, 'iset?',iset
+      !print*, nsym,nbas(1:nsym),offs(1:nsym)
+      print*, ncmot,istate
+      if(istate==1.or.istate.lt.0) then
+         read(iunit) tmp(1:ncmot)
+      elseif(istate==2.and.(iset.lt.0)) then
+         read(iunit)
+         read(iunit) tmp(1:ncmot)
+      elseif(istate==2.and.(iset.ge.0)) then
+         stop "read_no_molpro: NOs for state 2 are missing!"
+      endif
+      exit
+   endif
+ enddo
+
+ cno = 0
+ idx = 0
+ do irep=1,nsym
+    ioff = offs(irep)
+    do j=1,nbas(irep)
+       do i=1,nbas(irep)
+          idx = idx + 1
+          cno(ioff+i,ioff+j) = tmp(idx)
+       enddo
+    enddo
+ enddo
+
+ write(LOUT,*) 'readm_no_molpro: CNO'
+ do j=1,NBasis
+    print*, j
+    write(*,'(14f11.6)') (cno(i,j),i=1,nbasis)
+ end do
+
+ close(iunit)
+
+end subroutine read_no_molpro
+
 subroutine read_mo_molpro(cmo,infile,text,nbasis)
 !
 ! this subroutine reads C(SAO,MO) coefficients
@@ -425,10 +494,11 @@ double precision ::tmp(nbasis**2)
     enddo
  enddo
 
-  !write(LOUT,*) 'test print'
-  !do i=1,NBasis
-  !   write(*,'(14f11.6)') (cmo(i,j),j=1,nbasis)
-  !end do
+ !write(LOUT,*) 'readm_mo_molpro: CMO'
+ !do j=1,NBasis
+ !   print*, j
+ !   write(*,'(14f11.6)') (cmo(i,j),i=1,nbasis)
+ !end do
 
  close(iunit)
 
@@ -1223,6 +1293,276 @@ enddo
 ! call print_sqmat(cmo,nbasis)
 
 end subroutine read_mo_dalton
+
+subroutine read_orbinf_dalton(sirifc,NSym,NOrb,NSymOrb)
+!
+! read the number of irreps (NSym)
+! the number of basis functions in irreps (NSymOrb)
+! from Dalton interface file (SIRIFC)
+!
+implicit none
+
+character(*),intent(in) :: sirifc
+integer,intent(out) :: NSym,NOrb,NSymOrb(8)
+
+integer :: iunit
+integer :: NBasist,NCMOt,NOcc(8)
+logical :: ex
+
+!print*, 'read_orbinf_dalton...'
+
+inquire(file=sirifc,EXIST=ex)
+if(ex) then
+    open(newunit=iunit,file=sirifc,status='OLD',access='SEQUENTIAL',form='UNFORMATTED')
+    call readlabel(iunit,'TRCCINT ')
+    read(iunit) NSym,NOrb,NBasist,NCMOt,NOcc(1:NSym),NSymOrb(1:NSym)
+else
+  write(lout,*) 'Error! No ',sirifc, ' file in read_orbinf_dalton!'
+  stop
+endif
+
+end subroutine read_orbinf_dalton
+
+
+subroutine read_syminf_dalton(ANSym,BNSym,BUcen,ANSymOrb,BNSymOrb,ANMonBas,BNMonBas)
+!
+! reads number of basis functions on each monomer
+! from SYMINFO(B) file!
+!
+! input: NSym -- no of irreps
+!        BUCen -- no of symmetry-independent centers on B (from input)
+!
+! output: NSymBas -- number of basis functions on each monomer (in different irreps)
+!
+implicit none
+
+integer,intent(in)  :: ANSym,BNSym
+integer,intent(in)  :: BUcen
+integer,intent(in)  :: ANSymOrb(8),BNSymOrb(8)
+integer,intent(out) :: ANMonBas(8),BNMonBas(8)
+
+integer :: iunit,ios
+integer :: ibas,icen,last_ibas,last_icen
+integer :: irep,ifun,offset
+logical :: ex,dump
+integer :: tmp
+integer :: ACenTst, ACenBeg, ACenEnd
+
+!print*, 'read_syminf_dalton...'
+
+! sanity checks
+if(ANSym/=BNSym) then
+  write(lout,*) 'ERROR in read_syminf_dalton: NSym different for A and B!'
+endif
+
+ANMonBas = 0
+ANMonBas = 0
+
+inquire(file='SYMINFO_B',EXIST=ex)
+
+if(ex) then
+   open(newunit=iunit,file='SYMINFO_B',status='OLD',&
+        form='FORMATTED')
+   read(iunit,*)
+   read(iunit,*)
+
+   ! new version : ok with sym
+   do irep=1,BNSym
+      do ifun=1,BNSymOrb(irep)
+         read(iunit,'(i5,i6)',iostat=ios) ibas,icen
+         if(icen.le.BUCen) then
+            BNMonBas(irep) = BNMonBas(irep) + 1
+         else
+            ANMonBas(irep) = ANMonBas(irep) + 1
+         endif
+      enddo
+   enddo
+
+   close(iunit)
+else
+   write(LOUT,'(1x,a)') 'ERROR! MISSING SYMINFO_B FILE!'
+   stop
+endif
+
+! sanity checks : out
+do irep=1,BNSym
+   ibas = ANMonBas(irep)+BNmonBas(irep)
+   if(ibas/=ANSymOrb(irep)) then
+      write(lout,'(1x,a)') 'ERROR in read_syminf!'
+      write(lout,'(1x,a,i3,a)') 'For irep =',irep, ':'
+      write(lout,*) 'A-NMonBas',ANMonBas(1:ANSym)
+      write(lout,*) 'B-NMonBas',BNMonBas(1:BNSym)
+      write(lout,*) 'Sum:     ',ANMonBas(1:ANSym)+BNMonBas(1:BNSym)
+      write(lout,*) 'Should be',ANSymOrb(1:ANSym)
+      stop
+   endif
+enddo
+
+end subroutine read_syminf_dalton
+
+subroutine read_vKS_dalton(VsrKS,vksfile,nbasis)
+!
+! read VKS from Dalton and save in triang form
+!
+implicit none
+character(*)                 :: vksfile
+integer,intent(in)           :: nbasis
+double precision,intent(out) :: VsrKS(nbasis,nbasis)
+
+integer :: iunit
+integer :: N2BASX
+integer :: i
+logical :: isfile
+
+inquire(file=vksfile,EXIST=isfile)
+if(isfile) then
+   open(newunit=iunit,file=vksfile,status='old', &
+        access='sequential',form='unformatted')
+   call readlabel(iunit,'VSRXC   ')
+   read(iunit) N2BASX
+   if (N2BASX /=nbasis**2) stop "Wrong dimension in VsrKS!"
+   read(iunit) VsrKS
+   close(iunit)
+else
+   write(lout,'(1x,a)') "No VsrKF in Dalton file!"
+   stop
+endif
+
+end subroutine read_vKS_dalton
+
+subroutine read_esrDFT_dalton(ESRDFT,vksfile)
+!
+! read ESRDFT from Dalton:
+!
+!     ESRDFT(1) : srDFT total exchange and correlation energy = ESRDFT(2) + ESRDFT(3)
+!     ESRDFT(2) : srDFT total exchange energy
+!     ESRDFT(3) : srDFT total correlation energy
+!
+implicit none
+character(*)                 :: vksfile
+double precision,intent(out) :: ESRDFT(3)
+
+integer :: iunit
+logical :: isfile
+
+inquire(file=vksfile,EXIST=isfile)
+if(isfile) then
+   open(newunit=iunit,file=vksfile,status='old', &
+        access='sequential',form='unformatted')
+   call readlabel(iunit,'VSRXC   ')
+   read(iunit)
+   read(iunit)
+   read(iunit) ESRDFT
+   close(iunit)
+else
+   write(lout,'(1x,a)') "No ESRDFT in Dalton file!"
+   stop
+endif
+
+! print*, 'ESRDFT-1',ESRDFT(1)
+! print*, 'ESRDFT-2',ESRDFT(2)
+! print*, 'ESRDFT-3',ESRDFT(3)
+
+end subroutine read_esrDFT_dalton
+
+subroutine read_Jsr_dalton(jsr,jsrfile,nbasis)
+!
+! read Jsr(NBasis,NBasis) from Dalton
+! I think we do not need that one
+!
+implicit none
+character(*)       :: jsrfile
+integer,intent(in) :: nbasis
+double precision,intent(out) :: Jsr(nbasis,nbasis)
+
+integer :: iunit
+integer :: N2BASX
+integer :: i
+logical :: isfile
+
+inquire(file=jsrfile,EXIST=isfile)
+if(isfile) then
+   open(newunit=iunit,file=jsrfile,status='old', &
+        access='sequential',form='unformatted')
+   call readlabel(iunit,'JSR     ')
+   read(iunit) N2BASX
+   if (N2BASX /=nbasis**2) stop "Wrong dimension in read_Jsr_dalton!"
+   read(iunit) Jsr
+   close(iunit)
+else
+   write(lout,'(1x,a)') "No Jsr Dalton file!"
+   stop
+endif
+
+end subroutine read_Jsr_dalton
+
+subroutine gen_swap_cols(mat,ndim1,ndim2,nsym,nA,nB)
+!
+! swap columns (with symmetry)
+! nsym = no of irreps
+! nA = number of basis functions in each irrep for mon A
+! nB = number of basis functions in each irrep for mon B
+!
+implicit none
+
+integer,intent(in) :: ndim1,ndim2,nsym,nA(8),nB(8)
+double precision   :: mat(ndim1,ndim2)
+double precision   :: work(ndim1,ndim2)
+
+integer :: irep,iA,iB,iAB,offset
+
+offset = 0
+
+do irep=1,nsym
+
+   iA = nA(irep)
+   iB = nB(irep)
+   iAB = iA + iB
+
+   work(:,1:iA) = mat(:,offset+iB+1:offset+iAB)
+   work(:,iA+1:iAB) = mat(:,offset+1:offset+iB)
+
+   mat(:,offset+1:offset+iAB) = work(:,1:iAB)
+
+   offset = offset + iAB
+
+enddo
+
+end subroutine gen_swap_cols
+
+subroutine gen_swap_rows(mat,ndim1,ndim2,nsym,nA,nB)
+!
+! swap rows (with symmetry)
+! nsym = no of irreps
+! nA = number of basis functions in each irrep for mon A
+! nB = number of basis functions in each irrep for mon B
+!
+implicit none
+
+integer,intent(in) :: ndim1,ndim2,nsym,nA(8),nB(8)
+double precision   :: mat(ndim1,ndim2)
+double precision   :: work(ndim1,ndim2)
+
+integer :: irep,iA,iB,iAB,offset
+
+offset = 0
+
+do irep=1,nsym
+
+   iA = nA(irep)
+   iB = nB(irep)
+   iAB = iA + iB
+
+   work(1:iA,:) = mat(offset+iB+1:offset+iAB,:)
+   work(iA+1:iAB,:) = mat(offset+1:offset+iB,:)
+
+   mat(offset+1:offset+iAB,:) = work(1:iAB,:)
+
+   offset = offset + iAB
+
+enddo
+
+end subroutine gen_swap_rows
 
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 ! Eugene subroutines

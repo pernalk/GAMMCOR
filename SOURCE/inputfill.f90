@@ -287,11 +287,14 @@ subroutine read_block_cholesky(CholeskyParams, line)
            endif
 
       case ("CHOL_ACCU","CHOL_ACCURACY","CHOLESKY_ACCU","CHOLESKY_ACCURACY")
-           if (uppercase(val) == "DEFAULT") then
+           if (uppercase(val) == "DEFAULT" .or. &
+               uppercase(val) == "D" ) then
               CholeskyParams%CholeskyAccu = CHOL_ACCU_DEFAULT
-           elseif (uppercase(val) == "TIGHT") then
+           elseif (uppercase(val) == "TIGHT" .or. &
+                   uppercase(val) == "T" ) then
               CholeskyParams%CholeskyAccu = CHOL_ACCU_TIGHT
-           elseif (uppercase(val) == "LUDICROUS") then
+           elseif (uppercase(val) == "LUDICROUS" .or. &
+                   uppercase(val) == "L" ) then
               CholeskyParams%CholeskyAccu = CHOL_ACCU_LUDICROUS
            endif
 
@@ -365,6 +368,8 @@ subroutine read_block_calculation(CalcParams, line)
                CalcParams%JobType = JOB_TYPE_ACFREQNTH
            elseif (uppercase(val) == "AC1FREQNTH" ) then
                CalcParams%JobType = JOB_TYPE_AC1FREQNTH
+           elseif (uppercase(val) == "RESPONSE" ) then
+               CalcParams%JobType = JOB_TYPE_RESPONSE
            elseif (uppercase(val) == "NLOCCORR" ) then
                CalcParams%JobType = JOB_TYPE_NLOCCORR
            endif
@@ -397,6 +402,14 @@ subroutine read_block_calculation(CalcParams, line)
            elseif (uppercase(val) == "DMRG" ) then
               CalcParams%RDMType = RDM_TYPE_DMRG
            endif
+
+      case ("UNITS")
+         if (uppercase(val) == "BOHR" .or. &
+             uppercase(val) == "AU") then
+             CalcParams%Units = UNITS_BOHR
+         elseif (uppercase(val) == "ANGSTROM") then
+             CalcParams%Units = UNITS_ANGSTROM
+         endif
 
       case ("TWOMOINT")
          if(uppercase(val) == "FULL".or. &
@@ -435,6 +448,18 @@ subroutine read_block_calculation(CalcParams, line)
                CalcParams%OrbIncl = 1
            endif
 
+      case ("RDM2APP")
+           if (uppercase(val) == "HF".or. &
+               uppercase(val) == "HARTREE-FOCK") then
+               CalcParams%Rdm2Type = 0
+           elseif (uppercase(val) == "BB".or. &
+               uppercase(val) == "DMFT") then
+               CalcParams%Rdm2Type = 1
+           elseif (uppercase(val) == "BBFULL".or. &
+               uppercase(val) == "DMFTFULL") then
+               CalcParams%Rdm2Type = 11
+           endif
+
       ! here not sure
       case ("RESPONSE")
            if (uppercase(val) == "ERPA-APSG".or.&
@@ -469,6 +494,18 @@ subroutine read_block_calculation(CalcParams, line)
       case ("KERNEL")
            read(val,*) CalcParams%Kernel
 
+      case ("GRIDTYPE", "GRID")
+           CalcParams%DeclareGrid = .true.
+           if (uppercase(val) == "SG1") then
+              CalcParams%GridType = GRID_PARAMS_SG1
+           elseif (uppercase(val) == "MEDIUM") then
+              CalcParams%GridType = GRID_PARAMS_MEDIUM
+           elseif (uppercase(val) == "FINE") then
+              CalcParams%GridType = GRID_PARAMS_FINE
+           elseif (uppercase(val) == "XFINE") then
+              CalcParams%GridType = GRID_PARAMS_XFINE
+           endif
+
       case ("RDMSOURCE")
            if (uppercase(val) == "DALTON") then
               CalcParams%RDMSource = INTER_TYPE_DAL
@@ -488,6 +525,9 @@ subroutine read_block_calculation(CalcParams, line)
 
       case("MAX_CN")
              read(val,*) CalcParams%Max_Cn
+
+      case("FREQOM")
+             read(val,*) CalcParams%FreqOm
 
       case ("CALPHA")
              read(val,*) CalcParams%CAlpha
@@ -512,6 +552,11 @@ subroutine read_block_calculation(CalcParams, line)
            elseif (uppercase(val) == "RS+".or. &
                    uppercase(val) == "RSPT2+") then
               CalcParams%SaptLevel = 666
+           endif
+
+      case("SAPTEXCH")
+           if (uppercase(val) == "DMFT") then
+               CalcParams%SaptExch = 1
            endif
 
       case("RESTART")
@@ -678,6 +723,14 @@ character(:), allocatable :: first, last
 
  case ("WEXCIT")
        read(val,*) SystemParams%Wexcit
+
+ case ("NATORB")
+       SystemParams%DeclareNatOrb = .true.
+      if(uppercase(val) == "MOLPRO") then
+         SystemParams%NatOrb = 1
+      else
+         stop "Unknown Natural Orbitals Source!" 
+      endif
 
  end select
 end subroutine read_block_system
@@ -924,12 +977,18 @@ associate( CalcParams => Input%CalcParams)
                       PossibleJobType(CalcParams%JOBtype)
  write(LOUT,' (1x,a,5x,a)') "RDM TYPE: ",  &
               PossibleRDMType(CalcParams%RDMType)
- if(CalcParams%DFApp>0) then
+ write(LOUT,' (1x,a,3x,a)') "RDM SOURCE: ",  &
+              PossibleInterface(CalcParams%RDMSource)
+ write(LOUT,' (1x,a,8x,a)') "UNITS: ",  &
+              PossibleUnits(CalcParams%Units)
+ if (CalcParams%DFApp>0) then
     write(LOUT,' (1x,a,5x,a)') "DFA TYPE: ",  &
                        PossibleDFAType(CalcParams%DFApp)
  endif
- write(LOUT,' (1x,a,3x,a)') "RDM SOURCE: ",  &
-              PossibleInterface(CalcParams%RDMSource)
+ if (CalcParams%DeclareGrid) then
+    write(LOUT,'(1x,a,4x,a)') "GRID TYPE: ", &
+                    PossibleGridType(CalcParams%GridType)
+ endif
  if (allocated(CalcParams%IntegralsFilePath)) then
        write(*, *) "Ints file: ", CalcParams%IntegralsFilePath
  end if

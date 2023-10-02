@@ -28,7 +28,8 @@ integer, parameter :: JOB_TYPE_NLOCCORR    = 12
 integer, parameter :: JOB_TYPE_AC0DP       = 13
 integer, parameter :: JOB_TYPE_ACFREQ      = 14
 integer, parameter :: JOB_TYPE_ACFREQNTH   = 15
-integer, parameter :: JOB_TYPE_AC1FREQNTH   = 16
+integer, parameter :: JOB_TYPE_AC1FREQNTH  = 16
+integer, parameter :: JOB_TYPE_RESPONSE    = 17
 
 integer, parameter :: SAPTLEVEL0 = 0
 integer, parameter :: SAPTLEVEL1 = 1
@@ -37,6 +38,7 @@ integer, parameter :: SAPTLEVEL2 = 2
 integer, parameter :: FLAG_CORE = 1
 integer, parameter :: FLAG_NOBASIS  = 0
 integer, parameter :: FLAG_REDVIRT  = 0
+integer, parameter :: FLAG_RDM2TYP  = 0
 integer, parameter :: FLAG_ORBRELAX = 1
 integer, parameter :: FLAG_ORBINCL  = 0
 logical, parameter :: FLAG_RESTART = .FALSE.
@@ -62,6 +64,14 @@ integer, parameter :: CHOL_ACCU_DEFAULT   = 1
 integer, parameter :: CHOL_ACCU_TIGHT     = 2
 integer, parameter :: CHOL_ACCU_LUDICROUS = 3
 
+integer, parameter :: GRID_PARAMS_SG1 = 1
+integer, parameter :: GRID_PARAMS_MEDIUM = 2
+integer, parameter :: GRID_PARAMS_FINE = 3
+integer, parameter :: GRID_PARAMS_XFINE = 4
+
+integer, parameter :: UNITS_ANGSTROM = 1
+integer, parameter :: UNITS_BOHR     = 2
+
 integer, parameter :: DF_NONE       = 0
 integer, parameter :: DF_SRLDA      = 1
 integer, parameter :: DF_SRPBE      = 2
@@ -83,10 +93,10 @@ character(*),parameter :: PossibleInterface(4) = &
 [character(8) :: &
 'DALTON', 'MOLPRO', 'OWN', 'ORCA']
 
-character(*),parameter :: PossibleJobType(16) = &
+character(*),parameter :: PossibleJobType(17) = &
 [character(9) :: &
 'AC', 'AC0', 'ERPA', 'EERPA', 'SAPT', 'PDFT', 'CASPiDFT','CASPiDFTOpt','EERPA-1', & 
-'AC0D', 'AC0DNOSYMM', 'NLOCCORR', 'AC0DP', 'ACFREQ','ACFREQNTH','AC1FREQNTH']
+'AC0D', 'AC0DNOSYMM', 'NLOCCORR', 'AC0DP', 'ACFREQ','ACFREQNTH','AC1FREQNTH','RESPONSE']
 
 character(*),parameter :: PossibleRDMType(5) = &
 [character(8) :: &
@@ -100,43 +110,57 @@ character(*),parameter :: PossibleCholAccu(3) = &
 [character(9) :: &
 'DEFAULT', 'TIGHT', 'LUDICROUS']
 
-character(*),parameter :: PossibleMonomers(3) = &
-[character(8) :: 'A', 'B', 'AB']
+character(*),parameter :: PossibleGridType(4) = &
+[character(8) :: &
+'SG1', 'MEDIUM', 'FINE', 'XFINE']
 
-character(:), allocatable :: InputPath
-!InputPath = "./input.inp"
+character(*),parameter :: PossibleUnits(2) = &
+[character(8) :: &
+'ANGSTROM', 'BOHR']
 
-type CalculationBlock
-      integer :: InterfaceType = INTER_TYPE_DAL
-      integer :: NBasis    = FLAG_NOBASIS
-      integer :: JobType   = JOB_TYPE_AC
-      integer :: RDMType ! = RDM_TYPE_GVB
-      integer :: RDMSource = INTER_TYPE_DAL
-      integer :: Response  = RESP_ERPA
-      integer :: DFApp     = DF_NONE
-      integer :: Kernel    = 1
-      integer :: TwoMoInt  = TWOMO_INCORE
-      integer :: Core      = FLAG_CORE
-      integer :: SymType   = TYPE_NO_SYM
-      integer :: SaptLevel = SAPTLEVEL2
-      integer :: vdWCoef   = 0
-      integer :: RedVirt   = FLAG_REDVIRT
-      integer :: OrbRelax  = FLAG_ORBRELAX
-      integer :: OrbIncl   = FLAG_ORBINCL
-      integer :: MemVal = 2, MemType = 3 ! default: use 2 GB for 3-ind_tran (Cholesky)
-      logical :: Restart    = FLAG_RESTART
-      logical :: Triplet    = FLAG_TRIPLET
-      logical :: PostCAS    = FLAG_POSTCAS
-      integer :: IPrint     = 0
-      double precision :: RPAThresh  = 1.0D-6
-      double precision :: ThreshVirt = 1.0D-6
-      integer :: imon = 1
-      character(:), allocatable :: JobTitle
-      character(:), allocatable :: BasisSet,BasisSetPath
-      character(:), allocatable :: IntegralsFilePath
-      integer :: Max_Cn = 3
-      double precision :: FreqOm = 0.d0
-      logical :: CAlpha = .false.
+   character(*),parameter :: PossibleMonomers(3) = &
+   [character(8) :: 'A', 'B', 'AB']
+
+   character(:), allocatable :: InputPath
+   !InputPath = "./input.inp"
+
+   type CalculationBlock
+         integer :: InterfaceType = INTER_TYPE_DAL
+         integer :: NBasis    = FLAG_NOBASIS
+         integer :: JobType   = JOB_TYPE_AC
+         integer :: RDMType ! = RDM_TYPE_GVB
+         integer :: RDMSource = INTER_TYPE_DAL
+         integer :: Units     = UNITS_ANGSTROM
+         integer :: Response  = RESP_ERPA
+         integer :: DFApp     = DF_NONE
+         integer :: Kernel    = 1
+         integer :: TwoMoInt  = TWOMO_INCORE
+         integer :: Core      = FLAG_CORE
+         integer :: SymType   = TYPE_NO_SYM
+         integer :: SaptLevel = SAPTLEVEL2
+         integer :: SaptExch  = 0
+         integer :: vdWCoef   = 0
+         integer :: GridType  = GRID_PARAMS_MEDIUM
+         integer :: RedVirt   = FLAG_REDVIRT
+         integer :: Rdm2Type  = FLAG_RDM2TYP
+         integer :: OrbRelax  = FLAG_ORBRELAX
+         integer :: OrbIncl   = FLAG_ORBINCL
+         integer :: MemVal = 2, MemType = 3 ! default: use 2 GB for 3-ind_tran (Cholesky)
+         logical :: Restart    = FLAG_RESTART
+         logical :: Triplet    = FLAG_TRIPLET
+         logical :: PostCAS    = FLAG_POSTCAS
+         integer :: IPrint     = 0
+         double precision :: RPAThresh  = 1.0D-6
+         double precision :: ThreshVirt = 1.0D-6
+         integer :: imon = 1
+         character(:), allocatable :: JobTitle
+         character(:), allocatable :: BasisSet,BasisSetPath
+         character(:), allocatable :: IntegralsFilePath
+         integer :: Max_Cn = 3
+         double precision :: FreqOm = 0.d0
+         logical :: CAlpha = .false.
+
+         logical :: DeclareGrid = .false.
 end type CalculationBlock
 
 type SystemBlock
@@ -166,6 +190,7 @@ type SystemBlock
       integer :: NActS(8), INActS(8)
       integer :: NDim, NDimX
       integer :: NDimN, DimEx
+      integer :: NGrid
       integer :: NCen = 0
       integer :: UCen = 0
       integer :: NMonBas(8) = 0
@@ -175,8 +200,11 @@ type SystemBlock
       integer :: num0,num1,num2
       integer :: NVZero = 0
       integer :: TwoMoInt = TWOMO_INCORE
+      integer :: NatOrb = 0 ! if 1, natural orbs from Molpro
+
       logical :: DeclareTwoMo     = .false.
       logical :: DeclareSt        = .false.
+      logical :: DeclareNatOrb    = .false.
       logical :: DeclareTrSt      = .false.
       logical :: DeclareSpin      = .false.
       logical :: DeclareThrSelAct = .false.
@@ -189,6 +217,8 @@ type SystemBlock
       logical :: PostCAS = .false.
       logical :: NActFromRDM = .true.
       logical :: reduceV = .false.
+      logical :: switchAB= .false.
+
       ! for cubic SAPT
       double precision :: ACAlpha0  = 1.d-10
       double precision :: ACAlpha1  = 0.01d0
@@ -203,6 +233,8 @@ type SystemBlock
       double precision :: ThrQVirt  = 1.d-7
       ! ThrQInact for quasi-inactive orbs (0.9998...)
       double precision :: ThrQInact = 1.d-4
+
+      double precision :: esrDFT(3) ! srDFT xc energy
 
       integer,allocatable :: InSt(:,:),InTrSt(:,:)
       integer,allocatable :: IGem(:), IndAux(:)
@@ -222,6 +254,7 @@ type SystemBlock
       double precision,allocatable :: CMO(:,:),CAONO(:,:)
       double precision,allocatable :: OV(:,:),OO(:,:), &
                                       FO(:,:),FF(:,:), &
+                                      FOAB(:,:),FOBA(:,:), &
                                       FFAB(:,:),FFBA(:,:), &
                                       OOAB(:,:),OOBA(:,:)
       double precision,allocatable :: DChol(:,:)
@@ -229,7 +262,8 @@ type SystemBlock
       double precision,allocatable :: Jmat(:,:),Kmat(:,:)
       double precision,allocatable :: Fmat(:,:)
       double precision,allocatable :: Wpot(:,:)
-      double precision,allocatable :: VCoul(:)
+      double precision,allocatable :: VCoul(:) ! Coulomb (SR) potential
+      double precision,allocatable :: VsrKS(:,:),Jsr(:,:)
       double precision,allocatable :: RDM2(:)
       double precision,allocatable :: RDM2val(:,:,:,:)
       double precision,allocatable :: dipm(:,:,:)
@@ -269,6 +303,8 @@ end type FileNames
 
 type FlagsData
 ! default setting: ERPA-GVB
+     ! sapt_main.f90
+     integer :: InterfaceType = INTER_TYPE_DAL
      ! mainp.f
      integer :: IDALTON = 1
      integer :: iORCA   = 0
@@ -278,15 +314,20 @@ type FlagsData
      integer :: NoSym   = 1
      integer :: NoSt    = 1
      integer :: IGVB    = 1
-     integer :: ITwoEl    = TWOMO_INCORE 
+     integer :: ITwoEl    = TWOMO_INCORE
      integer :: IRedVirt  = FLAG_REDVIRT
+     integer :: IRdm2Typ  = FLAG_RDM2TYP
      integer :: IOrbRelax = FLAG_ORBRELAX
      integer :: IOrbIncl  = FLAG_ORBINCL
      integer :: ICholesky     = FLAG_CHOLESKY
      integer :: ICholeskyBIN  = FLAG_CHOLESKY_BIN
      integer :: ICholeskyOTF  = FLAG_CHOLESKY_OTF
      integer :: ICholeskyAccu = CHOL_ACCU_DEFAULT
+     integer :: IGridType = GRID_PARAMS_MEDIUM
+     integer :: IUnits = UNITS_ANGSTROM
+     integer :: InternalGrid = 0
      integer :: IH0Test   = FLAG_H0TEST
+     integer :: ORBITAL_ORDERING = 0
      integer :: IFun      = 13
      integer :: IFunSR    = 0 
      integer :: IFunSRKer = 0
@@ -318,6 +359,7 @@ type FlagsData
      integer :: IFlACFREQ = 0
      integer :: IFlACFREQNTH = 0
      integer :: IFlAC1FREQNTH = 0
+     integer :: IFlRESPONSE = 0
      integer :: ISymmAC0D = 1
      integer :: IFlCore   = 1
      integer :: IFlFrag1  = 0
@@ -362,7 +404,11 @@ type SaptData
      double precision,allocatable :: CholVecs(:,:)
      integer :: InterfaceType = INTER_TYPE_DAL
      integer :: SaptLevel = SAPTLEVEL2
+     integer :: SaptExch  = 0
+     integer :: InternalGrid = 0 
+     integer :: NAO
      integer :: NCholesky
+     integer :: NGrid
      integer :: Max_Cn = 4
      integer :: ic6 = 0
      integer :: iPINO=-1

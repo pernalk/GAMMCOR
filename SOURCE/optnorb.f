@@ -202,7 +202,7 @@ C
 C
       If(IPrint.Ge.0)
      $ Write(6,'(/,X,''MACRO ITER'',I3,2X,''ENERGY'',F16.8,2X,
-     $ ''ENE DIFF '',E10.3,2X,''GRAD NORM '',E9.3)')
+     $ ''ENE DIFF '',E10.3,2X,''GRAD NORM '',E10.3)')
      $ It,ETot,ETot-ETotO,GNorm
 C
       If(IPrint.Ge.1) 

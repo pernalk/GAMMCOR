@@ -23,7 +23,6 @@ C
       Dimension
      $ Hess(NN,NN),G(NN),St(NN),EigVal(NN),Work(NN)
 C
-      Character*60 FMultTab
       Include 'commons.inc'
 C
 C     Maximal step for X (should be less than Pi/2, otherwise Exp(X) does not converge)
@@ -79,7 +78,7 @@ C
 C
       If(IPrint.Ge.0)
      $ Write(6,'(/,X,''QSCF ITER'',I3,2X,''ENERGY'',F16.8,2X,
-     $ ''ENE DIFF '',E10.3,2X,''GRAD NORM '',E9.3)')
+     $ ''ENE DIFF '',E10.3,2X,''GRAD NORM '',E10.3)')
      $ Iter,ETot,ETot-EOld,GradNo
       If(IPrint.Ge.1) Then
       Write(6,'(/,X,''  ORBITAL OCCUPANCIES '')')
@@ -399,7 +398,6 @@ C
 C
       Dimension XProj(MxHVec*(MxHVec+1)/2)
 C
-      Character*60 FMultTab
       Include 'commons.inc'
 C
       IJ=0
@@ -445,7 +443,6 @@ C
       Dimension Aux1(NBasis,NBasis),Aux2(NBasis,NBasis),
      $ Aux3(NBasis,NBasis)
 C
-      Character*60 FMultTab
       Include 'commons.inc'
 C
 C     COPY xx BLOCKS OF HESSIAN AND XProj TO AUXILIARY SQUARE ARRAYS

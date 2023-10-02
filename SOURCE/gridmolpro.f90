@@ -1,7 +1,7 @@
 subroutine molprogrid0(NGrid,NBasis)
 Implicit Real*8 (A-H,O-Z)
 
-integer :: i,j,k,igrid
+integer :: igrid
 integer :: npt, ndiff, ntg
 integer ::  NBasis, NGrid
 

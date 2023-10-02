@@ -1331,8 +1331,10 @@ implicit none
 
 type(AOReaderData) :: reader
 
-integer :: NBas
-double precision :: XA(*), XB(*), JA(NBas,NBas), JB(NBas,NBas)
+integer,intent(in)           :: NBas
+double precision,intent(in)  :: XA(*), XB(*)
+double precision,intent(out) :: JA(NBas,NBas), JB(NBas,NBas)
+
 integer :: iunit, ntr
 integer :: ir,is,irs
 logical :: empty

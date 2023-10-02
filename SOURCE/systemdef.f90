@@ -138,8 +138,18 @@ else
    Flags%ICholeskyAccu = Input%CholeskyParams%CholeskyAccu
    Flags%IH0Test       = Input%CholeskyParams%H0Test
 
+  ! set DFT grid
+   Flags%IGridType = Input%CalcParams%GridType
+   if (Input%CalcParams%DeclareGrid) Flags%InternalGrid = 1
+
+  ! set units
+  Flags%IUnits = Input%CalcParams%Units
+
   ! reduce virtuals
    Flags%IRedVirt = Input%CalcParams%RedVirt
+
+  ! RDM2 settings
+   Flags%IRdm2Typ = Input%CalcParams%Rdm2Type
 
   ! compute orbital relaxation
    Flags%IOrbRelax = Input%CalcParams%OrbRelax
@@ -159,6 +169,7 @@ else
      Flags%INO     = 0
      Flags%NoSym   = 1
      Flags%IA = 1
+     Flags%ORBITAL_ORDERING = 3 ! ORBITAL_ORDERING_DALTON
 
   case(INTER_TYPE_MOL)
      Flags%IDALTON = 0
@@ -166,6 +177,7 @@ else
      Flags%INO     = 1
      !Flags%NoSym   = Input%CalcParams%SymType
      Flags%IA = 1
+     Flags%ORBITAL_ORDERING = 1 ! ORBITAL_ORDERING_MOLPRO
 
   case(INTER_TYPE_OWN)
      Flags%IDALTON = 0
@@ -180,8 +192,9 @@ else
      Flags%INO     = 0
      Flags%NoSym   = 1
      Flags%IA = 1
-  ! ????
+     Flags%ORBITAL_ORDERING = 2 ! ORBITAL_ORDERING_ORCA
   end select
+  Flags%InterFaceType = Input%CalcParams%InterfaceType
 
   if(Input%CalcParams%Restart) Flags%IRes = 1
 
@@ -243,6 +256,9 @@ else
   case(JOB_TYPE_AC1FREQNTH)
      Flags%IFlAC  = 1
      Flags%IFlAC1FREQNTH = 1
+
+  case(JOB_TYPE_RESPONSE)
+     Flags%IFlRESPONSE = 1
 
   case(JOB_TYPE_AC0)
     ! HERE WILL BE CHANGED TO:
@@ -440,6 +456,7 @@ if(Flags%ISAPT.Eq.0) then
    System%IPrint = Input%CalcParams%IPrint
   
    System%Max_Cn = Input%CalcParams%Max_Cn
+   System%FreqOm = Input%CalcParams%FreqOm
 
    System%XELE = (System%ZNucl - System%Charge)/2.0d0
    System%NELE = (System%ZNucl - System%Charge)/2
@@ -458,6 +475,7 @@ elseif(Flags%ISAPT.Eq.1) then
 
  SAPT%InterfaceType = Input%CalcParams%InterfaceType
  SAPT%SaptLevel = Input%CalcParams%SaptLevel
+ SAPT%SaptExch  = Input%CalcParams%SaptExch
  SAPT%ic6 = Input%CalcParams%vdWCoef
  SAPT%Max_Cn = Input%CalcParams%Max_Cn
  SAPT%CAlpha = Input%CalcParams%CAlpha
@@ -506,6 +524,7 @@ elseif(Flags%ISAPT.Eq.1) then
       monA%ISHF     = Input%SystemInput(1)%ISHF
       monA%Cubic    = Input%SystemInput(1)%Cubic
       monA%Wexcit   = Input%SystemInput(1)%Wexcit
+      monA%NatOrb   = Input%SystemInput(1)%NatOrb
 
       monA%NCen    = Input%SystemInput(1)%NCen
       monA%UCen    = Input%SystemInput(1)%UCen
@@ -551,6 +570,7 @@ elseif(Flags%ISAPT.Eq.1) then
       monB%ISHF      = Input%SystemInput(2)%ISHF
       monB%Cubic     = Input%SystemInput(2)%Cubic
       monB%Wexcit    = Input%SystemInput(2)%Wexcit
+      monB%NatOrb    = Input%SystemInput(2)%NatOrb
 
       monB%NCen = Input%SystemInput(2)%NCen
       monB%UCen = Input%SystemInput(2)%UCen
@@ -597,6 +617,8 @@ elseif(Flags%ISAPT.Eq.1) then
       monA%ISHF    = Input%SystemInput(2)%ISHF
       monA%Cubic   = Input%SystemInput(2)%Cubic
       monA%Wexcit  = Input%SystemInput(2)%Wexcit
+      monA%NatOrb  = Input%SystemInput(2)%NatOrb
+
       monA%NCen    = Input%SystemInput(2)%NCen
       monA%UCen    = Input%SystemInput(2)%UCen
       monA%Monomer = Input%SystemInput(2)%Monomer
@@ -636,6 +658,8 @@ elseif(Flags%ISAPT.Eq.1) then
       monB%ISHF     = Input%SystemInput(1)%ISHF
       monB%Cubic    = Input%SystemInput(1)%Cubic
       monB%Wexcit   = Input%SystemInput(1)%Wexcit
+      monB%NatOrb   = Input%SystemInput(1)%NatOrb
+
       monB%NCen     = Input%SystemInput(1)%NCen
       monB%UCen     = Input%SystemInput(1)%UCen
       monB%Monomer  = Input%SystemInput(1)%Monomer

@@ -109,6 +109,8 @@ do i=1,NOccup
 enddo
 ETot = ETot + 2*val
 
+write(LOUT,'(1x,a,5x,f15.8)') "CASSCF 1-electron Energy", ETot
+
 if(AB1) then
    do j=1,NBasis
       do i=1,NBasis
@@ -801,9 +803,9 @@ NOccupResp=0
 NVirtResp=0
 Do I=1,NBasis
    AUXM0(I,I)=Occ(I)
-   !  include active orbitals 
+   !  include active orbitals
    If ( IOrbIncl==1 ) Then
-     If(Occ(I).Gt.0.5) NOccupResp=NOccupResp+1  
+     If(Occ(I).Gt.0.5) NOccupResp=NOccupResp+1
      If(Occ(I).Gt.0.5) NVirtResp=NVirtResp+1
    ElseIf ( IOrbIncl == 0 ) Then
    !  exclude active orbitals
@@ -899,7 +901,7 @@ do b=NVirtResp,NBasis
       enddo
 
       do i=1,NOccupResp
-         do c=NVirtResp,NBasis 
+         do c=NVirtResp,NBasis
             if(IPair(c,i).eq.1) then
              do a=NVirtResp,NBasis
                  if(IPair(a,i).eq.1) then
@@ -1005,7 +1007,7 @@ NDimRed=0
 XInd1=0
 IPair1=0
 do d=NS1+1,NBasis
-   do l=1,min(NOccup,d-1) 
+   do l=1,min(NOccup,d-1)
       if(IPair(d,l)==1) then
           NDimRed=NDimRed+1
           XInd1(d,l)=NDimRed
@@ -1016,7 +1018,7 @@ enddo
 allocate(IndBlock(2,NDimRed))
 NDimRed=0
 do d=NS1+1,NBasis
-   do l=1,min(NOccup,d-1) 
+   do l=1,min(NOccup,d-1)
       if(IPair(d,l)==1) then
         NDimRed=NDimRed+1
         IndBlock(1,NDimRed)=d
@@ -1112,9 +1114,9 @@ Call CFREQPROJ(AUX1,0.d0,AUX2,1, &
    0,IndBlock,IndX,NDimRed)
 
 do a=NS1+1,NBasis
-   do i=1,min(NOccup,a-1) 
+   do i=1,min(NOccup,a-1)
      if(IPair(a,i)==1) then
-       ! C(omega) is multiplied by 2, see the note 
+       ! C(omega) is multiplied by 2, see the note
        val=AUX1(XInd1(a,i))*2.0
        Gamma(i,a)=Gamma(i,a)+val
        Gamma(a,i)=Gamma(a,i)+val
@@ -1127,7 +1129,7 @@ deallocate(AUX1,ints_dl)
 
 Write(6,'(/,X,"NOccupResp NVirtResp in relaxed part: ",2I5)') NOccup,NS1+1
 
-! end of orbital relaxation 
+! end of orbital relaxation
 endif
 
 Gamma=0.5d0*(Gamma+transpose(Gamma))
@@ -1252,6 +1254,7 @@ enddo
 deallocate(RDM2Act)
 
 call triang_to_sq(XOne,work1,NBasis)
+print*, 'XOne',norm2(XOne)
 call dgemm('N','N',NBasis,NBasis,NBasis,1d0,URe,NBasis,work1,NBasis,0d0,work2,NBasis)
 call dgemm('N','T',NBasis,NBasis,NBasis,1d0,work2,NBasis,URe,NBasis,0d0,HNO,NBasis)
 call sq_symmetrize(HNO,NBasis)

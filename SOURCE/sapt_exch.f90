@@ -748,6 +748,7 @@ do jb=1,NBas
    enddo
 enddo
 tvk(3) = -2.0d0*tvk(3)
+print*, 'tvk(3)',tvk(3)*1000
 
 ! tNa
 tNa = 0
@@ -872,6 +873,410 @@ deallocate(intB,intA)
 deallocate(Sab,Vbba,Vaab,Vbaa,Vabb)
 
 end subroutine e1exch_NaNb
+
+subroutine e1exch_dmft(Flags,A,B,SAPT)
+implicit none
+
+type(FlagsData) :: Flags
+type(SystemBlock) :: A, B
+type(SaptData) :: SAPT
+integer :: i, j, k, l, ia, jb
+integer :: ij,ipr
+integer :: ip,iq,ir,is
+integer :: ipq,iu,it
+integer :: iunit
+integer :: rdm2type
+integer :: dimOA,dimOB,NBas
+double precision :: fac,val,nnS2,tmp
+double precision :: tmpELST,tmpDEL
+double precision :: e1ex_dmft
+double precision :: tvk(3),tNa(3),tNb(3),tNaNb(3)
+double precision,allocatable :: Va(:,:),Vb(:,:),S(:,:)
+double precision,allocatable :: Saa(:,:),Sbb(:,:),Sab(:,:)
+double precision,allocatable :: Vaab(:,:),Vbba(:,:),Vabb(:,:),Vbaa(:,:)
+double precision,allocatable :: AlphaA(:),AlphaB(:)
+double precision,allocatable :: work(:,:),ints(:)
+
+! set dimensions
+ NBas = A%NBasis
+ dimOA = A%num0+A%num1
+ dimOB = B%num0+B%num1
+
+ allocate(AlphaA(dimOA),AlphaB(dimOB))
+
+ rdm2type = Flags%IRdm2Typ
+ print*, 'First-order exchange with RDM2 type =',rdm2Type
+ select case(rdm2type)
+ case(0)
+ ! HF
+    AlphaA(1:dimOA) = A%Occ(1:dimOA)
+    AlphaB(1:dimOB) = B%Occ(1:dimOB)
+ case(1,11)
+    ! BB functional
+    do i=1,dimOA
+       AlphaA(i) = sqrt(A%Occ(i))
+    enddo
+    do j=1,dimOB
+       AlphaB(j) = sqrt(B%Occ(j))
+    enddo
+ case(2)
+   write(LOUT,*) 'POWER FUNCITONAL NOT READY YET!'
+   stop
+ end select
+
+ allocate(S(NBas,NBas))
+ allocate(Sab(NBas,NBas),Saa(NBas,NBas),Sbb(NBas,NBas))
+ allocate(Va(NBas,NBas),Vb(NBas,NBas),&
+          Vabb(NBas,NBas),Vbaa(NBas,NBas),&
+          Vaab(NBas,NBas),Vbba(NBas,NBas))
+
+ call get_one_mat('V',Va,A%Monomer,NBas)
+ call get_one_mat('V',Vb,B%Monomer,NBas)
+
+ call tran2MO(Va,B%CMO,B%CMO,Vabb,NBas)
+ call tran2MO(Vb,A%CMO,A%CMO,Vbaa,NBas)
+ call tran2MO(Va,A%CMO,B%CMO,Vaab,NBas)
+ call tran2MO(Vb,B%CMO,A%CMO,Vbba,NBas)
+
+ call get_one_mat('S',S,A%Monomer,NBas)
+ call tran2MO(S,A%CMO,B%CMO,Sab,NBas)
+ Saa = 0
+ Sbb = 0
+ do l=1,NBas
+    do k=1,NBas
+       do i=1,dimOA
+          Sbb(k,l) = Sbb(k,l) + A%Occ(i)*Sab(i,k)*Sab(i,l)
+       enddo
+       do j=1,dimOB
+          Saa(k,l) = Saa(k,l) + B%Occ(j)*Sab(k,j)*Sab(l,j)
+       enddo
+    enddo
+ enddo
+
+ deallocate(Vb,Va,S)
+
+ allocate(work(NBas,NBas),ints(NBas**2))
+
+ ! n^A n^B Sab Sab
+ nnS2 = 0
+ do j=1,dimOB
+ do i=1,dimOA
+    nnS2 = nnS2 + A%Occ(i)*B%Occ(j)*Sab(i,j)**2
+ enddo
+ enddo
+
+ ! this should = -tmpDEL
+ tmpELST = 2d0*(SAPT%elst-SAPT%Vnn)*nnS2
+ print*, 'tmpELST',tmpELST*1000
+
+ ! tvk = n_p n_q (v^A S + v^B S + v_pq^qp)
+ open(newunit=iunit,file='FFOOABAB',status='OLD',&
+     access='DIRECT',form='UNFORMATTED',recl=8*NBas**2)
+
+ ipq = 0
+ tvk = 0
+ do iq=1,dimOB
+    do ip=1,dimOA
+       ipq = ipq + 1
+       read(iunit,rec=ipq) ints(1:NBas*NBas)
+
+       tvk(3) = tvk(3) + A%Occ(ip)*B%Occ(iq)*ints(ip+(iq-1)*NBas)
+
+    enddo
+ enddo
+ tvk(3) = -2d0*tvk(3)
+ print*, 'tvk(3)',tvk(3)*1000
+
+ close(iunit)
+
+ do iq=1,dimOB
+    do ip=1,dimOA
+       tvk(1) = tvk(1) + A%Occ(ip)*B%Occ(iq)*Vaab(ip,iq)*Sab(ip,iq)
+    enddo
+ enddo
+ tvk(1) = -2d0*tvk(1)
+ print*, 'tvk(1)',tvk(1)*1000
+
+ do iq=1,dimOB
+    do ip=1,dimOA
+       tvk(2) = tvk(2) + A%Occ(ip)*B%Occ(iq)*Vbba(iq,ip)*Sab(ip,iq)
+    enddo
+ enddo
+ tvk(2) = -2d0*tvk(2)
+ print*, 'tvk(2)',tvk(2)*1000
+
+ tmpDEL = 0
+ do i=1,dimOA
+    tmpDEL = tmpDEL + A%Occ(i)*Vbaa(i,i)
+ enddo
+ do i=1,dimOB
+    tmpDEL = tmpDEL + B%Occ(i)*Vabb(i,i)
+ enddo
+ tmpDEL = -4d0*tmpDEL*nnS2
+
+ ! tNa
+ tNa = 0
+ do iq=1,dimOA
+    do ip=1,dimOA
+       tNa(1) = tNa(1) + AlphaA(ip)*AlphaA(iq)*Saa(ip,iq)*Vbaa(ip,iq)
+    enddo
+ enddo
+ tNa(1) = 2d0*tNa(1)
+
+!(FO|FO): (AA|AB)
+open(newunit=iunit,file='FOFOAAAB',status='OLD', &
+     access='DIRECT',recl=8*NBas*dimOA)
+
+! one loop over integrals
+ints = 0
+val  = 0
+do it=1,dimOB
+   do iq=1,dimOA
+      read(iunit,rec=iq+(it-1)*NBas) ints(1:NBas*dimOA)
+
+      fac = A%Occ(iq)*B%Occ(it)*Sab(iq,it)
+      val = 0
+      do ip=1,dimOA
+         val = val + A%Occ(ip)*ints(ip+(ip-1)*NBas)
+      enddo
+      tNa(2) = tNA(2) - 4d0*fac*val
+
+      fac = B%Occ(it)*AlphaA(iq)
+      val = 0
+      do ip=1,dimOA
+         val = val + AlphaA(ip)*Sab(ip,it)*ints(ip+(iq-1)*NBas)
+      enddo
+      tNa(3) = tNa(3) + 2d0*fac*val
+
+   enddo
+enddo
+
+print*, 'tNa-2',tNa(2)*1000
+print*, 'tNa-3',tNa(3)*1000
+
+close(iunit)
+
+ tNb = 0
+ do iq=1,dimOB
+    do ip=1,dimOB
+       tNb(1) = tNb(1) + AlphaB(ip)*AlphaB(iq)*Sbb(ip,iq)*Vabb(ip,iq)
+    enddo
+ enddo
+ tNb(1) = 2d0*tNb(1)
+ print*, 'tNb-1',tNb(1)*1000
+
+!(FO|FO): (BB|BA)
+open(newunit=iunit,file='FOFOBBBA',status='OLD', &
+     access='DIRECT',recl=8*NBas*dimOB)
+
+! one loop over integrals
+ints = 0
+val  = 0
+do it=1,dimOA
+   do iq=1,dimOB
+      read(iunit,rec=iq+(it-1)*NBas) ints(1:NBas*dimOB)
+
+      fac = A%Occ(it)*B%Occ(iq)*Sab(it,iq)
+      val = 0
+      do ip=1,dimOB
+         val = val + B%Occ(ip)*ints(ip+(ip-1)*NBas)
+      enddo
+      tNb(2) = tNb(2) - 4d0*fac*val
+
+      fac = A%Occ(it)*AlphaB(iq)
+      val = 0
+      do ip=1,dimOB
+         val = val + AlphaB(ip)*Sab(it,ip)*ints(ip+(iq-1)*NBas)
+      enddo
+      tNb(3) = tNb(3) + 2d0*fac*val
+
+   enddo
+enddo
+
+print*, 'tNb-2',tNb(2)*1000
+print*, 'tNb-3',tNb(3)*1000
+
+close(iunit)
+
+ open(newunit=iunit,file='TMPOOAB',status='OLD',&
+     access='DIRECT',form='UNFORMATTED',recl=8*dimOB**2)
+
+ work  = 0
+ tmp   = 0
+ tNaNb = 0
+ do iq=1,dimOA
+    do ip=1,dimOA
+      read(iunit,rec=ip+(iq-1)*dimOA) work(1:dimOB,1:dimOB)
+
+      if(ip==iq) then
+
+         val = 0
+         do it=1,dimOB
+            val = val + B%Occ(it)*work(it,it)
+         enddo
+         val = A%Occ(ip)*val
+         tmpDEL = tmpDEL - 8d0*nnS2*val
+         tmp = tmp - 8d0*nnS2*val
+
+         val = 0
+         do iu=1,dimOB
+            do it=1,dimOB
+               val = val + AlphaB(it)*AlphaB(iu)*Sbb(it,iu)*work(it,iu)
+            enddo
+         enddo
+         tNaNb(1) = tNaNb(1) - 2d0*val*A%Occ(ip)
+
+      endif
+
+      val = 0
+      do it=1,dimOB
+         val = val + B%Occ(it)*work(it,it)
+      enddo
+      tNaNb(2) = tNaNb(2) - 2d0*val*AlphaA(ip)*AlphaA(iq)*Saa(ip,iq)
+
+      val = 0
+      do iu=1,dimOB
+         do it=1,dimOB
+            val = val + AlphaB(it)*AlphaB(iu)*Sab(ip,iu)*Sab(iq,it)*work(it,iu)
+         enddo
+      enddo
+      tNaNb(3) = tNaNb(3) + AlphaA(ip)*AlphaA(iq)*val
+
+    enddo
+ enddo
+ tNaNB = -2d0*tNaNb
+ print*, 'A4',sum(tNaNB)*1000
+ print*, 'tmp-A4',(tmp+sum(tNaNB))*1000
+ print*, 'tNANB-1',tNaNB(1)*1000
+ print*, 'tNANB-2',tNaNB(2)*1000
+ print*, 'tNANB-3',tNaNB(3)*1000
+ !print*, 'tmpDEL',tmpDEL*1000
+
+ close(iunit)
+
+ e1ex_dmft = sum(tvk)+sum(tNa)+sum(tNb)+sum(tNaNb)
+ SAPT%exchs2 = e1ex_dmft
+
+ if(SAPT%SaptExch==0) then
+    call print_en('E1exch-DMFT(S2)',e1ex_dmft*1000,.true.)
+ elseif(SAPT%SaptExch==1) then
+    if(Flags%IRdm2Typ==0) then
+       call print_en('E1exch-DMFT(nn)',e1ex_dmft*1000,.true.)
+    elseif(Flags%IRDM2typ==1.or.Flags%IRDM2Typ==11) then
+       call print_en('E1exch-DMFT(BB)',e1ex_dmft*1000,.true.)
+    endif
+ endif
+
+ deallocate(Vbaa,Vabb,Vbba,Vaab)
+ deallocate(AlphaB,AlphaA)
+ deallocate(ints,work)
+ deallocate(Sbb,Saa,Sab)
+
+end subroutine e1exch_dmft
+
+subroutine e1exch_dmft_2(Flags,A,B,SAPT)
+implicit none
+
+type(FlagsData)   :: Flags
+type(SystemBlock) :: A, B
+type(SaptData)    :: SAPT
+
+integer :: i, j, k, l, ia, jb
+integer :: ij,ipr
+integer :: ip,iq,ir,is
+integer :: ipq,iu,it
+integer :: iunit
+integer :: rdm2type
+integer :: dimOA,dimOB,NBas
+double precision :: fac,val,nnS2,tmp
+double precision :: tmpELST,tmpDEL
+double precision :: e1ex_dmft
+double precision :: tvk(3),tNa(3),tNb(3),tNaNb(3)
+double precision,allocatable :: Va(:,:),Vb(:,:),S(:,:)
+double precision,allocatable :: Wbb(:,:)
+double precision,allocatable :: Saa(:,:),Sbb(:,:),Sab(:,:),Sabh(:,:)
+double precision,allocatable :: Vaab(:,:),Vbba(:,:),Vabb(:,:),Vbaa(:,:)
+double precision,allocatable :: AlphaA(:),AlphaB(:)
+double precision,allocatable :: work(:,:),ints(:)
+double precision,external :: ddot
+
+! set dimensions
+NBas  = A%NBasis
+dimOA = A%num0+A%num1
+dimOB = B%num0+B%num1
+
+allocate(AlphaA(dimOA),AlphaB(dimOB))
+
+rdm2type = Flags%IRdm2Typ
+print*, 'First-order exchange with RDM2 type =',rdm2Type
+select case(rdm2type)
+case(0)
+! HF
+   AlphaA(1:dimOA) = A%Occ(1:dimOA)
+   AlphaB(1:dimOB) = B%Occ(1:dimOB)
+case(1,11)
+   ! BB functional
+   do i=1,dimOA
+      AlphaA(i) = sqrt(A%Occ(i))
+   enddo
+   do j=1,dimOB
+      AlphaB(j) = sqrt(B%Occ(j))
+   enddo
+case(3)
+  write(LOUT,*) 'POWER FUNCITONAL NOT READY YET!'
+  stop
+end select
+
+allocate(S(NBas,NBas),Sab(NBas,NBas),Sabh(dimOA,dimOB))
+
+call get_one_mat('S',S,A%Monomer,NBas)
+call tran2MO(S,A%CMO,B%CMO,Sab,NBas)
+
+Sabh = 0d0
+do ip=1,dimOA
+   do iu=1,dimOB
+      Sabh(ip,iu) = Sabh(ip,iu) + Sab(ip,iu)*AlphaA(ip)*AlphaB(iu)
+   enddo
+enddo
+
+print*, norm2(Sabh)
+
+allocate(work(dimOB,dimOB))
+allocate(Wbb(dimOB,dimOB))
+
+open(newunit=iunit,file='TMPOOAB',status='OLD',&
+     access='DIRECT',form='UNFORMATTED',recl=8*dimOB**2)
+
+work  = 0d0
+tNaNb = 0d0
+do iq=1,dimOA
+   do ip=1,dimOA
+      read(iunit,rec=ip+(iq-1)*dimOA) work(1:dimOB,1:dimOB)
+
+      !if(ip==iq) then
+      !endif
+
+      Wbb = 0d0
+      do iu=1,dimOB
+         do it=1,dimOB
+            Wbb(it,iu) = Sabh(ip,iu)*Sabh(iq,it)
+         enddo
+      enddo
+      tNaNb(3) = tNaNb(3) + ddot(dimOB**2,work,1,Wbb,1)
+
+   enddo
+enddo
+tNaNB = -2d0*tNaNb
+
+close(iunit)
+
+print*, '@@@ tNANB-3',tNaNB(3)*1000
+
+deallocate(work,Wbb)
+deallocate(AlphaB,AlphaA)
+deallocate(Sabh,Sab,S)
+
+end subroutine e1exch_dmft_2
 
 !subroutine hl_2el(Flags,A,B,SAPT)
 !! calculate Heitler-London energy
@@ -1855,6 +2260,7 @@ double precision,allocatable :: tmpXA(:),tmpYA(:),&
                                 tmpXB(:),tmpYB(:)
 integer :: i,j,ipq,ip,iq,irs,ir,is
 logical :: both,uncoupled
+logical :: approx
 double precision :: termZ,termY,termX
 double precision :: e2exi
 double precision :: fact,tmp
@@ -1870,6 +2276,16 @@ double precision,parameter :: BigE = 1.D8
  if(Flags%ICASSCF==0)   uncoupled = .false.
  if(A%Cubic.or.B%Cubic) uncoupled = .false.
 
+ approx = .false.
+ if(SAPT%SaptExch==1) approx = .true.
+ if (approx) then
+    if(Flags%IRdm2Typ==0) then
+       write(6,*) 'Exch-ind based on HF functional'
+    elseif(Flags%IRdm2Typ==1.or.Flags%IRDM2Typ==11) then
+       write(6,*) 'Exch-ind based on BB functional'
+    endif
+ endif
+
 ! set dimensions
  NBas = A%NBasis
  dimOA = A%num0+A%num1
@@ -1881,6 +2297,57 @@ double precision,parameter :: BigE = 1.D8
 
  nelA = 2d0*A%XELE
  nelB = 2d0*B%XELE
+
+ ! for testing!
+ !if (approx) then
+ !  ! Gamma(prqs) = 2*np*nq \delta_pr \delta_qs - F_pq \delta_ps \delta_qr
+ !  !       1122
+ !  A%RDM2val = 0d0
+ !  ! Coulomb (nc part)
+ !  do ip=1,dimOA
+ !     do iq=1,dimOA
+ !        A%RDM2val(ip,ip,iq,iq) = A%RDM2val(ip,ip,iq,iq) + 2d0*A%Occ(ip)*A%Occ(iq)
+ !     enddo
+ !  enddo
+ !  if(Flags%IRdm2Typ==0) then
+ !     ! exchange
+ !     do ip=1,dimOA
+ !        do iq=1,dimOA
+ !           A%RDM2val(ip,iq,iq,ip) = A%RDM2val(ip,iq,iq,ip) - A%Occ(ip)*A%Occ(iq)
+ !        enddo
+ !     enddo
+ !  elseif(Flags%IRdm2Typ==1.or.Flags%IRdm2Typ==11) then
+ !     ! exchange-corr
+ !     do ip=1,dimOA
+ !        do iq=1,dimOA
+ !           A%RDM2val(ip,iq,iq,ip) = A%RDM2val(ip,iq,iq,ip) - sqrt(A%Occ(ip)*A%Occ(iq))
+ !        enddo
+ !     enddo
+ !  endif
+
+ !  B%RDM2val = 0d0
+ !  do ip=1,dimOB
+ !     do iq=1,dimOB
+ !        B%RDM2val(ip,ip,iq,iq) = B%RDM2val(ip,ip,iq,iq) + 2d0*B%Occ(ip)*B%Occ(iq)
+ !     enddo
+ !  enddo
+ !  if(Flags%IRdm2Typ==0) then
+ !     ! exchange
+ !     do ip=1,dimOB
+ !        do iq=1,dimOB
+ !           B%RDM2val(ip,iq,iq,ip) = B%RDM2val(ip,iq,iq,ip) - B%Occ(ip)*B%Occ(iq)
+ !        enddo
+ !     enddo
+ !  elseif(Flags%IRdm2Typ==1.or.Flags%IRDM2Typ==11) then
+ !     ! exchange-corr
+ !     do ip=1,dimOB
+ !        do iq=1,dimOB
+ !           B%RDM2val(ip,iq,iq,ip) = B%RDM2val(ip,iq,iq,ip) - sqrt(B%Occ(ip)*B%Occ(iq))
+ !        enddo
+ !     enddo
+ !  endif
+
+ !endif
 
  ! SAPT cubic
  ! A: get response properites
@@ -1982,17 +2449,12 @@ double precision,parameter :: BigE = 1.D8
  call tran2MO(A%WPot,B%CMO,B%CMO,WaBB,NBas)
  call tran2MO(B%WPot,A%CMO,A%CMO,WbAA,NBas)
 
+ if (.not. approx) then
  allocate(RDM2Aval(dimOA,dimOA,dimOA,dimOA),&
           RDM2Bval(dimOB,dimOB,dimOB,dimOB))
 
- if(Flags%ICASSCF==1) then
-    ! CAS
-    RDM2Aval = A%RDM2val
-    RDM2Bval = B%RDM2val
- elseif(Flags%ICASSCF==0) then
-    ! GVB
-    RDM2Aval = A%RDM2val
-    RDM2Bval = B%RDM2val
+ RDM2Aval = A%RDM2val
+ RDM2Bval = B%RDM2val
  endif
 
  allocate(posA(NBas,NBas),posB(NBas,NBas))
@@ -2018,33 +2480,40 @@ double precision,parameter :: BigE = 1.D8
  endif
 
  ! termZ
- ! PA(ab).S(bc)
- ! S(ad).PB(dc)
- tmp1 = 0
- tmp2 = 0
- termZ = 0
- call dgemm('N','N',NBas,NBas,NBas,1d0,PA,NBas,S,NBas,0d0,tmp1,NBas)
- call dgemm('N','N',NBas,NBas,NBas,1d0,S,NBas,PB,NBas,0d0,tmp2,NBas)
- do j=1,NBas
-    do i=1,NBas
-       termZ = termZ + tmp1(i,j)*tmp2(i,j)
-    enddo
- enddo
+ if (approx) then
 
- if(uncoupled) termZ_u = 2d0*SAPT%e2ind_unc*termZ
+    termZ = 0d0
 
- if(A%Cubic.or.B%Cubic) then
-   if(A%ACAlpha==A%ACAlpha0.or.B%ACAlpha==B%ACAlpha0) termZ = 2d0*SAPT%e2ind_a0*termZ
-   if(A%ACAlpha==A%ACAlpha1.or.B%ACAlpha==B%ACAlpha1) termZ = 2d0*SAPT%e2ind_a1*termZ
-   if(A%ACAlpha==A%ACAlpha2.or.B%ACAlpha==B%ACAlpha2) termZ = 2d0*SAPT%e2ind_a2*termZ
  else
-   termZ = 2d0*SAPT%e2ind*termZ
- endif
+
+    ! PA(ab).S(bc)
+    ! S(ad).PB(dc)
+    tmp1 = 0d0
+    tmp2 = 0d0
+    termZ = 0d0
+    call dgemm('N','N',NBas,NBas,NBas,1d0,PA,NBas,S,NBas,0d0,tmp1,NBas)
+    call dgemm('N','N',NBas,NBas,NBas,1d0,S,NBas,PB,NBas,0d0,tmp2,NBas)
+    do j=1,NBas
+       do i=1,NBas
+          termZ = termZ + tmp1(i,j)*tmp2(i,j)
+       enddo
+    enddo
+
+    if(uncoupled) termZ_u = 2d0*SAPT%e2ind_unc*termZ
+
+    if(A%Cubic.or.B%Cubic) then
+      if(A%ACAlpha==A%ACAlpha0.or.B%ACAlpha==B%ACAlpha0) termZ = 2d0*SAPT%e2ind_a0*termZ
+      if(A%ACAlpha==A%ACAlpha1.or.B%ACAlpha==B%ACAlpha1) termZ = 2d0*SAPT%e2ind_a1*termZ
+      if(A%ACAlpha==A%ACAlpha2.or.B%ACAlpha==B%ACAlpha2) termZ = 2d0*SAPT%e2ind_a2*termZ
+    else
+      termZ = 2d0*SAPT%e2ind*termZ
+    endif
+
+ endif ! approx => skip termZ
 
  deallocate(tmp2,tmp1)
 
 !! Y term
-
  allocate(tindA(A%NDimX),tindB(B%NDimX))
 
  ! unc
@@ -2081,28 +2550,32 @@ double precision,parameter :: BigE = 1.D8
     ! full unc
     !call dgemv('T',B%NDimX,B%NDimX,1d0,BVecY0-BVecX0,B%NDimX,tindB,1,0d0,uB0,1)
 
-    call make_tind_unc(tindA,SBlockA,SblockAIV,Sab,A%Occ,B%Occ,A%IndN,posA,nblkA,A%NDimX,NBas)
-    call make_tind_unc(tindB,SblockB,SblockBIV,Sba,B%Occ,A%Occ,B%IndN,posB,nblkB,B%NDimX,NBas)
+    if (approx) then
+       termY_u = 0d0
+    else
+       call make_tind_unc(tindA,SBlockA,SblockAIV,Sab,A%Occ,B%Occ,A%IndN,posA,nblkA,A%NDimX,NBas)
+       call make_tind_unc(tindB,SblockB,SblockBIV,Sba,B%Occ,A%Occ,B%IndN,posB,nblkB,B%NDimX,NBas)
 
-    ! full unc
-    !call make_tind(tindA,AVecX0,AVecY0,Sab,A%Occ,B%Occ,A%IndN,posA,A%NDimX,NBas)
-    !call make_tind(tindB,BVecX0,BVecY0,Sba,B%Occ,A%Occ,B%IndN,posB,B%NDimX,NBas)
+       ! full unc
+       !call make_tind(tindA,AVecX0,AVecY0,Sab,A%Occ,B%Occ,A%IndN,posA,A%NDimX,NBas)
+       !call make_tind(tindB,BVecX0,BVecY0,Sba,B%Occ,A%Occ,B%IndN,posB,B%NDimX,NBas)
 
-    termY_u = 0d0
-    do i=1,A%NDimX
-       if(abs(OmA0(i)).gt.SmallE.and.abs(OmA0(i)).lt.BigE) then
-          termY_u = termY_u + (tindA(i)*uA0(i))/OmA0(i)
-       endif
-    enddo
-    do i=1,B%NDimX
-       if(abs(OmB0(i)).gt.SmallE.and.abs(OmB0(i)).lt.BigE) then
-          termY_u = termY_u + (tindB(i)*uB0(i))/OmB0(i)
-       endif
-    enddo
+       termY_u = 0d0
+       do i=1,A%NDimX
+          if(abs(OmA0(i)).gt.SmallE.and.abs(OmA0(i)).lt.BigE) then
+             termY_u = termY_u + (tindA(i)*uA0(i))/OmA0(i)
+          endif
+       enddo
+       do i=1,B%NDimX
+          if(abs(OmB0(i)).gt.SmallE.and.abs(OmB0(i)).lt.BigE) then
+             termY_u = termY_u + (tindB(i)*uB0(i))/OmB0(i)
+          endif
+       enddo
 
-    termY_u=-4d0*(SAPT%elst-SAPT%Vnn)*termY_u
+       termY_u=-4d0*(SAPT%elst-SAPT%Vnn)*termY_u
+    endif ! approx => termY = 0
 
- endif
+ endif ! end uncoupled
 
  ! cpld
  if(both) then
@@ -2135,25 +2608,29 @@ double precision,parameter :: BigE = 1.D8
     call dgemv('T',B%NDimX,B%NDimX,1d0,B%EigY-B%EigX,B%NDimX,tindB,1,0d0,uB,1)
     !print*, 'uB',norm2(uB)
 
-     call make_tind(tindA,A%EigX,A%EigY,Sab,A%Occ,B%Occ,A%IndN,posA,A%NDimX,NBas)
-     call make_tind(tindB,B%EigX,B%EigY,Sba,B%Occ,A%Occ,B%IndN,posB,B%NDimX,NBas)
+    if (approx) then
+       termY = 0d0
+    else
+       call make_tind(tindA,A%EigX,A%EigY,Sab,A%Occ,B%Occ,A%IndN,posA,A%NDimX,NBas)
+       call make_tind(tindB,B%EigX,B%EigY,Sba,B%Occ,A%Occ,B%IndN,posB,B%NDimX,NBas)
 
-    termY=0d0
-    do i=1,A%NDimX
-       if(abs(A%Eig(i)).gt.SmallE.and.abs(A%Eig(i)).lt.BigE) then
-          termY = termY + (tindA(i)*uA(i))/A%Eig(i)
-       endif
-    enddo
-    do i=1,B%NDimX
-       if(abs(B%Eig(i)).gt.SmallE.and.abs(B%Eig(i)).lt.BigE) then
-          termY = termY + (tindB(i)*uB(i))/B%Eig(i)
-       endif
-    enddo
+       termY=0d0
+       do i=1,A%NDimX
+          if(abs(A%Eig(i)).gt.SmallE.and.abs(A%Eig(i)).lt.BigE) then
+             termY = termY + (tindA(i)*uA(i))/A%Eig(i)
+          endif
+       enddo
+       do i=1,B%NDimX
+          if(abs(B%Eig(i)).gt.SmallE.and.abs(B%Eig(i)).lt.BigE) then
+             termY = termY + (tindB(i)*uB(i))/B%Eig(i)
+          endif
+       enddo
 
-    termY=-4d0*(SAPT%elst-SAPT%Vnn)*termY
-    !write(*,*) 'termY',termY
+       termY=-4d0*(SAPT%elst-SAPT%Vnn)*termY
+       !write(*,*) 'termY',termY
+    endif ! approx => termY = 0
 
- endif
+ endif ! both cpld & uncpld
  deallocate(tindB,tindA)
 
  ! term A3
@@ -2214,10 +2691,16 @@ double precision,parameter :: BigE = 1.D8
  !call exind_A3_XY(B%NDimX,B%NDimX,tmpXB,tmpYB,RDM2Bval,RDM2Aval,Sba,nelB,Vbaa,nelA,Vabb,'FOFOBBAA',&
  !                 A%IndN,B%IndN,posA,posB,dimOA,dimOB,A%NDimX,B%NDimX,NBas)
 
- ! A3 here!!
- call exind_A3_XY_full(A%NDimX,B%NDimX,tmpXA,tmpXB,RDM2Aval,RDM2Bval,Sab, &
-                    nelA,Vabb,nelB,Vbaa,'FOFOAABB',&
-                    B%IndN,A%IndN,posB,posA,dimOB,dimOA,B%NDimX,A%NDimX,NBas)
+! A3
+ if (approx) then
+    call app_exi_A3_XY_full(A%NDimX,B%NDimX,tmpXA,tmpXB,A%Occ,B%Occ,Flags%IRdm2Typ,Sab, &
+                       nelA,Vabb,nelB,Vbaa,'FOFOAABB',&
+                       B%IndN,A%IndN,posB,posA,dimOB,dimOA,B%NDimX,A%NDimX,NBas)
+ else
+    call exind_A3_XY_full(A%NDimX,B%NDimX,tmpXA,tmpXB,RDM2Aval,RDM2Bval,Sab, &
+                       nelA,Vabb,nelB,Vbaa,'FOFOAABB',&
+                       B%IndN,A%IndN,posB,posA,dimOB,dimOA,B%NDimX,A%NDimX,NBas)
+ endif
 
  tmpYA = -tmpXA
  tmpYB = -tmpXB
@@ -2226,30 +2709,62 @@ double precision,parameter :: BigE = 1.D8
  call exind_A1_AB(A%NDimX,B%NDimX,tmpXA,tmpXB,tmpYA,tmpYB,nelA,nelB,dimOA,dimOB, &
                   A%Occ,B%Occ,PAaa,PBbb,Vaab,Vbab,Sab,A%IndN,B%IndN,posA,posB,NBas)
 ! A2
- call exind_A2_XX(A%NDimX,B%NDimX,tmpXA,tmpXB,RDM2Bval, &
-                  Sab,nelA,Vabb,nelB,Vbab,PAaa,'FOFOBBBA', &
-                  B%Occ,A%Occ,B%IndN,A%IndN,posB,posA,  &
-                  dimOB,dimOA,B%NDimX,A%NDimX,NBas,.false.)
- call exind_A2_XX(B%NDimX,A%NDimX,tmpXB,tmpXA,RDM2Aval, &
-                 Sba,nelB,Vbaa,nelA,Vaba,PBbb,'FOFOAAAB', &
-                  A%Occ,B%Occ,A%IndN,B%IndN,posA,posB,  &
-                  dimOA,dimOB,A%NDimX,B%NDimX,NBas,.false.)
+ if(approx) then
+
+    call app_exi_A2_XX(A%NDimX,B%NDimX,tmpXA,tmpXB,Flags%IRdm2Typ, &
+                     Sab,nelA,Vabb,nelB,Vbab,'FOFOBBBA', &
+                     B%Occ,A%Occ,B%IndN,A%IndN,posB,posA,  &
+                     dimOB,dimOA,B%NDimX,A%NDimX,NBas)
+
+    call app_exi_A2_XX(B%NDimX,A%NDimX,tmpXB,tmpXA,Flags%IRDM2Typ, &
+                     Sba,nelB,Vbaa,nelA,Vaba,'FOFOAAAB', &
+                     A%Occ,B%Occ,A%IndN,B%IndN,posA,posB,  &
+                     dimOA,dimOB,A%NDimX,B%NDimX,NBas)
+
+ else
+
+    call exind_A2_XX(A%NDimX,B%NDimX,tmpXA,tmpXB,RDM2Bval, &
+                     Sab,nelA,Vabb,nelB,Vbab,PAaa,'FOFOBBBA', &
+                     B%Occ,A%Occ,B%IndN,A%IndN,posB,posA,  &
+                     dimOB,dimOA,B%NDimX,A%NDimX,NBas,.false.)
+
+    call exind_A2_XX(B%NDimX,A%NDimX,tmpXB,tmpXA,RDM2Aval, &
+                     Sba,nelB,Vbaa,nelA,Vaba,PBbb,'FOFOAAAB', &
+                     A%Occ,B%Occ,A%IndN,B%IndN,posA,posB,  &
+                     dimOA,dimOB,A%NDimX,B%NDimX,NBas,.false.)
+
+ endif
 
  !print*, 'XA-tot',norm2(tmpXA)
  !print*, 'XB-tot',norm2(tmpXB)
 
- call exind_A2_YY(A%NDimX,B%NDimX,tmpYA,tmpYB,RDM2Bval, &
-                  Sab,nelA,Vabb,nelB,Vbab,PAaa,'FOFOBBAB', &
-                  B%Occ,A%Occ,B%IndN,A%IndN,posB,posA,  &
-                  dimOB,dimOA,B%NDimX,A%NDimX,NBas,.false.)
+ if(approx) then
 
- !print*, 'YA-tot-1',norm2(tmpYA)
- !print*, 'YB-tot-1',norm2(tmpYB)
+    call app_exi_A2_YY(A%NDimX,B%NDimX,tmpYA,tmpYB,Flags%IRDM2Typ, &
+                     Sab,nelA,Vabb,nelB,Vbab,'FOFOBBAB', &
+                     B%Occ,A%Occ,B%IndN,A%IndN,posB,posA,  &
+                     dimOB,dimOA,B%NDimX,A%NDimX,NBas)
 
- call exind_A2_YY(B%NDimX,A%NDimX,tmpYB,tmpYA,RDM2Aval, &
-                  Sba,nelB,Vbaa,nelA,Vaba,PBbb,'FOFOAABA', &
-                  A%Occ,B%Occ,A%IndN,B%IndN,posA,posB,  &
-                  dimOA,dimOB,A%NDimX,B%NDimX,NBas,.false.)
+    call app_exi_A2_YY(B%NDimX,A%NDimX,tmpYB,tmpYA,Flags%IRDM2Typ, &
+                     Sba,nelB,Vbaa,nelA,Vaba,'FOFOAABA', &
+                     A%Occ,B%Occ,A%IndN,B%IndN,posA,posB,&
+                     dimOA,dimOB,A%NDimX,B%NDimX,NBas)
+
+ else
+
+    call exind_A2_YY(A%NDimX,B%NDimX,tmpYA,tmpYB,RDM2Bval, &
+                     Sab,nelA,Vabb,nelB,Vbab,PAaa,'FOFOBBAB', &
+                     B%Occ,A%Occ,B%IndN,A%IndN,posB,posA,  &
+                     dimOB,dimOA,B%NDimX,A%NDimX,NBas,.false.)
+
+    !print*, 'YA-tot-1',norm2(tmpYA)
+    !print*, 'YB-tot-1',norm2(tmpYB)
+
+    call exind_A2_YY(B%NDimX,A%NDimX,tmpYB,tmpYA,RDM2Aval, &
+                     Sba,nelB,Vbaa,nelA,Vaba,PBbb,'FOFOAABA', &
+                     A%Occ,B%Occ,A%IndN,B%IndN,posA,posB,  &
+                     dimOA,dimOB,A%NDimX,B%NDimX,NBas,.false.)
+ endif
 
  !print*, 'YA-tot-2',norm2(tmpYA)
  !print*, 'YB-tot-2',norm2(tmpYB)
@@ -2359,7 +2874,15 @@ double precision,parameter :: BigE = 1.D8
       ! regular
       SAPT%e2exind = e2exi
       !write(LOUT,'(/1x,a,f16.8)') 'E2exch-ind  = ', e2exi*1.0d3
-      call print_en('E2exch-ind',e2exi*1.0d3,.true.)
+      if(SAPT%SaptExch==0) then
+         call print_en('E2exch-ind',e2exi*1.0d3,.true.)
+      elseif(SAPT%SaptExch==1) then
+         if(Flags%IRDM2typ==0) then
+            call print_en('E2exch-ind(nn)',e2exi*1.0d3,.true.)
+         elseif(Flags%IRDM2typ==1.or.Flags%IRDM2Typ==11) then
+            call print_en('E2exch-ind(BB)',e2exi*1.0d3,.true.)
+         endif
+      endif
 
     endif
 
@@ -2413,7 +2936,7 @@ double precision,parameter :: BigE = 1.D8
  deallocate(tmpYA,tmpXA)
 
  deallocate(posB,posA)
- deallocate(RDM2Bval,RDM2Aval)
+ if(.not.approx) deallocate(RDM2Bval,RDM2Aval)
  deallocate(PBbb,PAaa)
  deallocate(Vbab,Vaba,Vaab,Vbaa,Vb,Va)
  deallocate(WbAA,WaBB,PB,PA,Sba,Sab,S)
@@ -2424,6 +2947,7 @@ subroutine e2exdisp(Flags,A,B,SAPT)
 
 use exappr
 !use sref_exch
+use timing
 
 implicit none
 
@@ -2470,6 +2994,10 @@ double precision,external    :: trace,FRDM2,FRDM2GVB
 !double precision,parameter :: SmallE = 1.D-1
 double precision,parameter :: BigE   = 1.D8
 double precision,parameter :: SmallE = 1.D-3
+double precision :: TCpu,TWall
+
+! start clock
+call clock('START',Tcpu,Twall)
 
 ! set dimensions
  NBas = A%NBasis
@@ -2488,12 +3016,20 @@ double precision,parameter :: SmallE = 1.D-3
  nelB = 2d0*B%XELE
 
 ! set e2exd_version
- approx    = .false.
- !approx    = .true.
  both      = SAPT%iCpld
  uncoupled = .true.
  if(Flags%ICASSCF==0)   uncoupled = .false.
  if(A%Cubic.or.B%Cubic) uncoupled = .false.
+
+ approx = .false.
+ if(SAPT%SaptExch==1) approx = .true.
+ if (approx) then
+    if(Flags%IRdm2Typ==0) then
+       write(6,*) 'Exch-disp based on HF functional'
+    elseif(Flags%IRdm2Typ==1.or.Flags%IRDM2Typ==11) then
+       write(6,*) 'Exch-disp based on BB functional'
+    endif
+ endif
 
  ! SAPT cubic
  ! A: get response properites
@@ -2536,8 +3072,8 @@ double precision,parameter :: SmallE = 1.D-3
 ! approximate RDM2
  if(approx) then
     allocate(A%Fmat(NBas,NBas),B%Fmat(NBas,NBas))
-    call fill_Fmat(A%Fmat,A%Occ,NBas,1)
-    call fill_Fmat(B%Fmat,B%Occ,NBas,1)
+    call fill_Fmat(A%Fmat,A%Occ,NBas,Flags%IRdm2Typ)
+    call fill_Fmat(B%Fmat,B%Occ,NBas,Flags%IRdm2Typ)
  endif
 
  ! uncoupled - works for CAS only!
@@ -2619,29 +3155,35 @@ double precision,parameter :: SmallE = 1.D-3
  endif
 
  ! termZ
- ! PA(ab).S(bc)
- ! S(ad).PB(dc)
- tmp1 = 0
- tmp2 = 0
- termZ = 0
- call dgemm('N','N',NBas,NBas,NBas,1d0,PA,NBas,S,NBas,0d0,tmp1,NBas)
- call dgemm('N','N',NBas,NBas,NBas,1d0,S,NBas,PB,NBas,0d0,tmp2,NBas)
- do j=1,NBas
-    do i=1,NBas
-       termZ = termZ + tmp1(i,j)*tmp2(i,j)
-    enddo
- enddo
-
- termZ_u = termZ
- termZ_u = 2d0*SAPT%e2disp_unc*termZ_u
-
- if(A%Cubic.or.B%Cubic) then
-    if(A%ACAlpha==A%ACAlpha0.or.B%ACAlpha==B%ACAlpha0) termZ = 2d0*SAPT%e2disp_a0*termZ
-    if(A%ACAlpha==A%ACAlpha1.or.B%ACAlpha==B%ACAlpha1) termZ = 2d0*SAPT%e2disp_a1*termZ
-    if(A%ACAlpha==A%ACAlpha2.or.B%ACAlpha==B%ACAlpha2) termZ = 2d0*SAPT%e2disp_a2*termZ
+ if (approx) then
+    termZ   = 0d0
+    termZ_u = 0d0
  else
-    termZ   = 2d0*SAPT%e2disp*termZ
- endif
+    ! PA(ab).S(bc)
+    ! S(ad).PB(dc)
+    tmp1 = 0
+    tmp2 = 0
+    termZ = 0
+    call dgemm('N','N',NBas,NBas,NBas,1d0,PA,NBas,S,NBas,0d0,tmp1,NBas)
+    call dgemm('N','N',NBas,NBas,NBas,1d0,S,NBas,PB,NBas,0d0,tmp2,NBas)
+    do j=1,NBas
+       do i=1,NBas
+          termZ = termZ + tmp1(i,j)*tmp2(i,j)
+       enddo
+    enddo
+
+    termZ_u = termZ
+    termZ_u = 2d0*SAPT%e2disp_unc*termZ_u
+
+    if(A%Cubic.or.B%Cubic) then
+       if(A%ACAlpha==A%ACAlpha0.or.B%ACAlpha==B%ACAlpha0) termZ = 2d0*SAPT%e2disp_a0*termZ
+       if(A%ACAlpha==A%ACAlpha1.or.B%ACAlpha==B%ACAlpha1) termZ = 2d0*SAPT%e2disp_a1*termZ
+       if(A%ACAlpha==A%ACAlpha2.or.B%ACAlpha==B%ACAlpha2) termZ = 2d0*SAPT%e2disp_a2*termZ
+    else
+       termZ   = 2d0*SAPT%e2disp*termZ
+    endif
+
+ endif ! approx => termZ = 0
 
  !write(LOUT,*) 'termZ ',termZ
  !write(LOUT,'(1x,a,f16.8)') 'term Z      = ',  termZ*1.0d3
@@ -3067,24 +3609,32 @@ double precision,parameter :: SmallE = 1.D-3
     enddo
     termX_u = -4d0*termX_u
 
-    call make_tij_Y_unc(tmp_u,tmp1,A%Occ,B%Occ,SBlockA,SBlockAIV,SBlockB,SBlockBIV, &
-                        A%IndN,B%IndN,posA,posB,Sab,Sba,nblkA,nblkB,A%NDimX,B%NDimX,NBas)
+    if (approx) then
 
-    ! term Y(unc)
-    termY_u = 0d0
-    do j=1,B%NDimX
-       do i=1,A%NDimX
+       termY_u = 0d0
 
-          if(abs(OmA0(i)).gt.SmallE.and.abs(OmB0(j)).gt.SmallE&
-             .and.abs(OmA0(i)).lt.BigE.and.abs(OmB0(j)).lt.BigE) then
+    else
 
-             termY_u = termY_u + sij(i,j)*tmp_u(i,j)/(OmA0(i)+OmB0(j))
+       call make_tij_Y_unc(tmp_u,tmp1,A%Occ,B%Occ,SBlockA,SBlockAIV,SBlockB,SBlockBIV, &
+                           A%IndN,B%IndN,posA,posB,Sab,Sba,nblkA,nblkB,A%NDimX,B%NDimX,NBas)
 
-          endif
+       ! term Y(unc)
+       termY_u = 0d0
+       do j=1,B%NDimX
+          do i=1,A%NDimX
+
+             if(abs(OmA0(i)).gt.SmallE.and.abs(OmB0(j)).gt.SmallE&
+                .and.abs(OmA0(i)).lt.BigE.and.abs(OmB0(j)).lt.BigE) then
+
+                termY_u = termY_u + sij(i,j)*tmp_u(i,j)/(OmA0(i)+OmB0(j))
+
+             endif
+          enddo
        enddo
-    enddo
 
-    termY_u = -8d0*(SAPT%elst-SAPT%Vnn)*termY_u
+       termY_u = -8d0*(SAPT%elst-SAPT%Vnn)*termY_u
+
+    endif ! approx => termYu = 0
 
     !if(SAPT%IPrint>2) write(LOUT,'(/1x,a,f16.8)') 'term Z(unc) = ',  termZ_u*1.0d3
     !if(SAPT%IPrint>2) write(LOUT,'(1x,a,f16.8)')  'term X(unc) = ',  termX_u*1.0d3
@@ -3147,20 +3697,28 @@ double precision,parameter :: SmallE = 1.D-3
     else
 
        ! make s_ij
+       !call clock('START',Tcpu,Twall)
        if(Flags%ICholesky==0) then
           call make_sij_Y(sij,tmp1,A%Occ,B%Occ,A%EigY,A%EigX,B%EigY,B%EigX,&
                           A%num0,B%num0,dimOA,dimOB,nOVB,A%IndN,B%IndN, &
                           A%NDimX,B%NDimX,NBas)
        else if(Flags%ICholesky==1) then
-          call make_sij_Y_Chol(sij,tmp1,A%Occ,B%Occ,A%EigY,A%EigX,B%EigY,B%EigX,&
+          !call make_sij_Y_Chol_old(sij,tmp1,A%Occ,B%Occ,A%EigY,A%EigX,B%EigY,B%EigX,&
+          !                A%DChol,B%DChol, &
+          !                A%num0,B%num0,dimOA,dimOB,nOVB,A%IndN,B%IndN, &
+          !                A%NDimX,B%NDimX,A%NChol,NBas)
+          call make_sij_Y_Chol(sij,A%Occ,B%Occ,A%EigY,A%EigX,B%EigY,B%EigX,&
                           A%DChol,B%DChol, &
                           A%num0,B%num0,dimOA,dimOB,nOVB,A%IndN,B%IndN, &
                           A%NDimX,B%NDimX,A%NChol,NBas)
+          !call clock('make_sij_Y_Chol2',TCpu,TWall)
        endif
+       call writeampl(sij,'PROP_AB')
 
     endif
 
     ! term X
+    !call clock('START',Tcpu,Twall)
     termX = 0d0
     do j=1,B%NDimX
        do i=1,A%NDimX
@@ -3178,6 +3736,7 @@ double precision,parameter :: SmallE = 1.D-3
        enddo
     enddo
     termX = -4d0*termX
+    !call clock('termX',TCpu,TWall)
 
     !if(SAPT%IPrint>5) write(LOUT,'(/1x,a,f16.8)') 'term Z      = ',  termZ*1.0d3
     !if(SAPT%IPrint>5) write(LOUT,'(1x,a,f16.8)') 'term X      = ',  termX*1.0d3
@@ -3186,30 +3745,43 @@ double precision,parameter :: SmallE = 1.D-3
     if(SAPT%IPrint>5) call print_en('term X',termX*1.0d3,.false.)
 
     ! termY
-    ! term Y: t_ij
-    !call make_tij_Y(tmp3,tmp2,tmp1,posA,posB,Sab,Sba,A,B,NBas)
-    call make_tij_Y(tmp3,tmp2,tmp1,A%Occ,B%Occ,A%EigY,A%EigX,B%EigY,B%EigX,&
-                    A%IndN,B%IndN,posA,posB,Sab,Sba,A%NDimX,B%NDimX,NBas)
+    if (approx) then
 
-    ! term Y
-    termY = 0d0
-    do j=1,B%NDimX
-       do i=1,A%NDimX
+       termY = 0d0
 
-         ! if(A%Eig(i).gt.SmallE.and.B%Eig(j).gt.SmallE&
-         !    .and.A%Eig(i).lt.BigE.and.B%Eig(j).lt.BigE) then
+    else
 
-          if(abs(A%Eig(i)).gt.SmallE.and.abs(B%Eig(j)).gt.SmallE&
-             .and.abs(A%Eig(i)).lt.BigE.and.abs(B%Eig(j)).lt.BigE) then
+       !call clock('START',Tcpu,Twall)
+       ! term Y: t_ij
+       !call make_tij_Y(tmp3,tmp2,tmp1,posA,posB,Sab,Sba,A,B,NBas)
+       call make_tij_Y(tmp3,tmp2,tmp1,A%Occ,B%Occ,A%EigY,A%EigX,B%EigY,B%EigX,&
+                       A%IndN,B%IndN,posA,posB,Sab,Sba,A%NDimX,B%NDimX,NBas)
+       !call clock('make_tij_Y',TCpu,TWall)
 
-             !termY = termY + 1d0/(A%Eig(i)+B%Eig(j))
-             termY = termY + sij(i,j)*tmp3(i,j)/(A%Eig(i)+B%Eig(j))
+       ! term Y
+       !call clock('START',Tcpu,Twall)
+       termY = 0d0
+       do j=1,B%NDimX
+          do i=1,A%NDimX
 
-          endif
+            ! if(A%Eig(i).gt.SmallE.and.B%Eig(j).gt.SmallE&
+            !    .and.A%Eig(i).lt.BigE.and.B%Eig(j).lt.BigE) then
+
+             if(abs(A%Eig(i)).gt.SmallE.and.abs(B%Eig(j)).gt.SmallE&
+                .and.abs(A%Eig(i)).lt.BigE.and.abs(B%Eig(j)).lt.BigE) then
+
+                !termY = termY + 1d0/(A%Eig(i)+B%Eig(j))
+                termY = termY + sij(i,j)*tmp3(i,j)/(A%Eig(i)+B%Eig(j))
+
+             endif
+          enddo
        enddo
-    enddo
 
-    termY = -8d0*(SAPT%elst-SAPT%Vnn)*termY
+       termY = -8d0*(SAPT%elst-SAPT%Vnn)*termY
+       !call clock('termY',TCpu,TWall)
+
+    endif ! approx => termY = 0
+
     !if(SAPT%IPrint>5) write(LOUT,'(1x,a,f16.8)') 'term Y      = ',  termY*1.0d3
     if(SAPT%IPrint>5) call print_en('term Y',termY*1.0d3,.false.)
 
@@ -3231,7 +3803,17 @@ double precision,parameter :: SmallE = 1.D-3
     ! regular
     SAPT%e2exdisp     = e2exd
     !write(LOUT,'(/1x,a,f16.8)') 'E2exch-disp = ', e2exd*1.0d3
-    call print_en('E2exch-disp',e2exd*1.0d3,.true.)
+    !call print_en('E2exch-disp',e2exd*1.0d3,.true.)
+    if(SAPT%SaptExch==0) then
+       call print_en('E2exch-disp',e2exd*1.0d3,.true.)
+    elseif(SAPT%SaptExch==1) then
+       if(Flags%IRDM2typ==0) then
+          call print_en('E2exch-disp(nn)',e2exd*1.0d3,.true.)
+       elseif(Flags%IRDM2typ==1.or.Flags%IRDM2Typ==11) then
+          call print_en('E2exch-disp(BB)',e2exd*1.0d3,.true.)
+       endif
+    endif
+
 
  endif
 
@@ -3239,6 +3821,7 @@ double precision,parameter :: SmallE = 1.D-3
  endif
 
  deallocate(sij)
+ call clock('Exch-Disp',Tcpu,Twall)
 
  deallocate(posB,posA,ints)
  deallocate(Vbab,Vaba,Vaab,Vbaa,Vabb,Vb,Va,PB,PA,Sab,S)
@@ -3248,6 +3831,7 @@ double precision,parameter :: SmallE = 1.D-3
  ! SAPT cubic
  if(A%Cubic) deallocate(A%Eig,A%EigY,A%EigX)
  if(B%Cubic) deallocate(B%Eig,B%EigY,B%EigX)
+ if(approx)  deallocate(B%Fmat,A%Fmat)
 
 end subroutine e2exdisp
 

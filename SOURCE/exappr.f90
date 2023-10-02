@@ -8,6 +8,10 @@ contains
 subroutine app_A3_XY(dim1,dim2,intXY,AOcc,BOcc,AFmat,BFmat,Sab, &
                     AXELE,Vabb,BXELE,Vbaa,IntKFile,&
                     BIndN,AIndN,posB,posA,dimOB,dimOA,BDimX,ADimX,NBas)
+!
+! terms 1A-1B cancel with E2disp*( n_p*n_q*(S_p^q)^2 )
+! terms 2A-2B cancel with (Elst-VAB)*( n_q*n_b*<qb|qb>*S_p^c*S_r^a )
+!
 implicit none
 
 integer,intent(in) :: dim1,dim2,dimOA,dimOB,ADimX,BDimX,NBas
@@ -21,6 +25,7 @@ double precision,intent(in) :: AXELE,BXELE,AOcc(NBas),BOcc(NBas),&
 integer :: iunit
 integer :: i,k,l,kl,ip,iq,ir,ia,ib,ic,iac,ipr
 double precision :: factA,factB,fact,val,val2,valTr
+double precision :: prefac,factC
 double precision :: Sxx(NBas,NBas),Sbb(NBas,NBas),&
                     Amat(NBas,NBas),Emat(NBas,dimOA)
 double precision,allocatable :: work(:),ints(:,:)
@@ -87,7 +92,7 @@ do l=1,dimOB
             factB = 4d0*(BOcc(ia)-BOcc(ic))
 
             ! 1A-1B
-            intXY(ipr,iac) = intXY(ipr,iac) - fact*valTr*ints(ip,ir)
+            !intXY(ipr,iac) = intXY(ipr,iac) - fact*valTr*ints(ip,ir)
 
             val = 0
             do iq=1,dimOA
@@ -234,6 +239,11 @@ enddo
 
 close(iunit)
 
+prefac = 0
+do iq=1,dimOA
+   prefac = prefac + AOcc(iq)*Emat(iq,iq)
+enddo
+
 ! 2B terms 
 do l=1,BDimX
 
@@ -248,18 +258,20 @@ do l=1,BDimX
       ir = AIndN(2,k)
       ipr = posA(ip,ir)
 
-      fact = 2d0*factB*(AOcc(ir)-AOcc(ip))
+      fact  = 2d0*factB*(AOcc(ir)-AOcc(ip))
+      factC = prefac*fact
 
       !1A-2B
       intXY(ipr,iac) = intXY(ipr,iac) - fact*Emat(ip,ir)*Sbb(ia,ic)
 
-      val = 0
-      do iq=1,dimOA
-         val = val + AOcc(iq)*Emat(iq,iq)
-      enddo
+      !val = 0
+      !do iq=1,dimOA
+      !   val = val + AOcc(iq)*Emat(iq,iq)
+      !enddo
 
       !2A-2B
-      intXY(ipr,iac) = intXY(ipr,iac) - fact*val*Sab(ip,ia)*Sab(ir,ic)
+      !!intXY(ipr,iac) = intXY(ipr,iac) - fact*val*Sab(ip,ia)*Sab(ir,ic)
+      !intXY(ipr,iac) = intXY(ipr,iac) - factC*Sab(ip,ia)*Sab(ir,ic)
 
       val = 0
       do iq=1,dimOA
@@ -282,11 +294,11 @@ enddo
 
 deallocate(ints,work)
 
-print*, 'appA3_XY', norm2(intXY)
+!print*, 'app_A3_XY', norm2(intXY)
 
 end subroutine app_A3_XY
 
-subroutine app_A3_XX(dim1,dim2,intXX,AOcc,BOcc,AFmat,BFmat,Sab, &
+subroutine app_nn_A3_XX(dim1,dim2,intXX,AOcc,BOcc,AFmat,BFmat,Sab, &
                     AXELE,Vabb,BXELE,Vbaa,IntKFile,&
                     BIndN,AIndN,posB,posA,dimOB,dimOA,BDimX,ADimX,NBas)
 implicit none
@@ -302,6 +314,348 @@ double precision,intent(in) :: AXELE,BXELE,AOcc(NBas),BOcc(NBas),&
 integer :: iunit
 integer :: i,k,l,kl,ip,iq,ir,ia,ib,ic,iac,ipr
 double precision :: factA,factB,fact,val,val3B,val4B,valTr
+double precision :: Sxx(NBas,NBas),Sbb(NBas,NBas),&
+                    Amat(NBas,NBas),Emat(NBas,dimOA)
+double precision,allocatable :: work(:),ints(:,:)
+! test
+double precision :: preQ,preQa,factAn,factBn
+double precision,allocatable :: AOccN(:),BOccN(:),  &
+                                SNab(:,:),intV(:,:),&
+                                intE(:,:),intU(:,:,:)
+
+Sxx = 0
+do i=1,NBas
+   Sxx(i,i) = 1d0
+enddo
+
+allocate(AOccN(NBas),BOccN(NBas))
+
+! BB functional
+do i=1,NBas
+   AOccN(i) = sqrt(AOcc(i))
+   BOccN(i) = sqrt(BOcc(i))
+enddo
+
+allocate(SNab(NBas,NBas),intV(NBas,NBas),intE(NBas,NBas))
+allocate(intU(ADimX,dimOA,dimOB))
+
+SNab = 0
+do ib=1,dimOB
+   do iq=1,dimOA
+      SNab(iq,ib) = SNab(iq,ic) + AOccN(iq)*Sab(iq,ib)*BOccN(ib)
+   enddo
+enddo
+
+allocate(work(NBas*NBas),ints(NBas,NBas))
+
+Amat = 0
+do ib=1,dimOB
+   do ir=1,NBas !dimOA
+      do ip=1,NBas
+         Amat(ip,ir) = Amat(ip,ir) + BOcc(ib)*Sab(ip,ib)*Sab(ir,ib)
+      enddo
+   enddo
+enddo
+
+valTr = 0
+do iq=1,dimOA
+   valTr = valTr + AOcc(iq)*Amat(iq,iq)
+enddo
+
+Sbb = 0
+do ic=1,NBas
+   do ia=1,NBas
+      do iq=1,dimOA
+         Sbb(ia,ic) = Sbb(ia,ic) + AOcc(iq)*Sab(iq,ia)*Sab(iq,ic)
+      enddo
+   enddo
+enddo
+
+!(FO|FO): (AA|BB)
+open(newunit=iunit,file=trim(IntKFile),status='OLD', &
+     access='DIRECT',recl=8*NBas*dimOA)
+
+! one loop over integrals
+ints = 0
+Emat = 0
+intV = 0
+intU = 0
+kl   = 0
+do l=1,dimOB
+   do k=1,NBas
+      kl = kl + 1
+      read(iunit,rec=kl) work(1:NBas*dimOA)
+
+      call ints_modify(NBas,dimOA,ints,NBas,work,&
+                       Vabb(k,l)/AXELE,Sxx,Sxx(k,l)/BXELE,Vbaa)
+
+      !ints(dimOA+1:NBas,dimOA+1:NBas) = 0
+
+      ic = l
+      ia = k
+
+      iac = posB(ia,ic)
+
+      if(iac/=0) then
+
+         factB = 4d0*(BOcc(ic)-BOcc(ia))
+
+         do i=1,ADimX
+            ip = AIndN(1,i)
+            ir = AIndN(2,i)
+            ipr = posA(ip,ir)
+            
+            fact  = 2d0*(AOcc(ir)-AOcc(ip))*factB
+
+            ! 1A-1B
+            intXX(ipr,iac) = intXX(ipr,iac) - fact*valTr*ints(ip,ir)
+
+            val = 0
+            do iq=1,dimOA
+               val = val + AOcc(iq)*ints(iq,iq)
+            enddo
+
+            !2A-1B
+            intXX(ipr,iac) = intXX(ipr,iac) - fact*val*Amat(ip,ir)
+
+            val = 0
+            do iq=1,dimOA
+               val = val + (AFmat(ip,iq)-AFmat(ir,iq))*ints(ip,iq)*Amat(iq,ir)
+            enddo
+
+            !3A-1B
+            intXX(ipr,iac) = intXX(ipr,iac) - factB*val
+
+            val = 0
+            do iq=1,dimOA
+               val = val + (AFmat(iq,ip)-AFmat(iq,ir))*ints(iq,ir)*Amat(ip,iq)
+            enddo
+
+            !4A-1B
+            intXX(ipr,iac) = intXX(ipr,iac) - factB*val
+
+         enddo
+
+      endif
+
+      ! all 2B terms 
+      if(k==l) then
+
+         ib = k
+         Emat(1:NBas,1:dimOA) = Emat(1:NBas,1:dimOA) + BOcc(ib)*ints(1:NBas,1:dimOA)
+
+      endif
+
+      ib = l
+      ia = k
+   
+      val3B = 0 
+      do iq=1,dimOA
+         val3B = val3B + AOcc(iq)*ints(iq,iq)
+      enddo
+ 
+      do ic=1,dimOB
+
+         iac = posB(ia,ic)
+
+         if(iac/=0) then
+
+            factB = 2d0*(BFmat(ia,ib)-BFmat(ic,ib))
+
+            do i=1,ADimX
+
+               ip = AIndN(1,i)
+               ir = AIndN(2,i)
+               ipr = posA(ip,ir)
+
+               fact = 2d0*factB*(AOcc(ir)-AOcc(ip))
+
+               !1A-3B
+               intXX(ipr,iac) = intXX(ipr,iac) - fact*Sbb(ic,ib)*ints(ip,ir)
+               
+               !2A-3B
+               intXX(ipr,iac) = intXX(ipr,iac) - fact*val3B*Sab(ip,ic)*Sab(ir,ib)
+
+               val = 0
+               do iq=1,dimOA
+                  val = val + (AFmat(ip,iq)-AFmat(ir,iq))*ints(ip,iq)*Sab(iq,ic)
+               enddo
+
+               !3A-3B
+               intXX(ipr,iac) = intXX(ipr,iac) - factB*val*Sab(ir,ib)
+
+               val = 0
+               do iq=1,dimOA
+                  val = val + (AFmat(iq,ip)-AFmat(iq,ir))*ints(iq,ir)*Sab(iq,ib)
+               enddo
+
+               !4A-3B
+               intXX(ipr,iac) = intXX(ipr,iac) - factB*val*Sab(ip,ic)
+
+            enddo
+         endif
+      enddo
+
+      if(k<=dimOB) then
+
+         ic = l
+         ib = k
+
+         val4B = 0
+         do iq=1,dimOA
+            val4B = val4B + AOcc(iq)*ints(iq,iq)
+         enddo
+
+         ! new: 3A-4B
+         call dgemv('N',NBas,dimOA,1d0,ints,NBas,SNab(:,ib),1,1d0,intV(:,ic),1)
+         !do ip=1,NBas
+            !val = 0
+            !do iq=1,dimOA
+               !val = val + ints(ip,iq)*SNab(iq,ib)
+            !enddo
+            !intV(ip,ic) = intV(ip,ic) + val
+         !enddo
+
+         ! new: 4A-4B
+         do i=1,ADimX
+
+            ip = AIndN(1,i)
+            ir = AIndN(2,i)
+            ipr = posA(ip,ir)
+
+            do iq=1,dimOA 
+               intU(ipr,iq,ic) = intU(ipr,iq,ic) + BOccN(ib)*ints(iq,ir)*Sab(ip,ib)
+            enddo
+
+         enddo
+
+
+         do ia=1,NBas
+
+            iac = posB(ia,ic)
+
+            if(iac/=0) then
+
+               factB = 2d0*(BFmat(ib,ia)-BFmat(ib,ic))
+
+               do i=1,ADimX
+
+                  ip = AIndN(1,i)
+                  ir = AIndN(2,i)
+                  ipr = posA(ip,ir)
+
+                  fact = 2d0*factB*(AOcc(ir)-AOcc(ip))
+
+                  !1A-4B
+                  intXX(ipr,iac) = intXX(ipr,iac) - fact*ints(ip,ir)*Sbb(ib,ia)
+
+                  !2A-4B
+                  intXX(ipr,iac) = intXX(ipr,iac) - fact*val4B*Sab(ip,ib)*Sab(ir,ia)
+
+               enddo
+            endif
+
+         enddo
+      endif
+
+   enddo
+enddo
+
+close(iunit)
+
+! 2B terms
+
+preQ = 0
+do iq=1,dimOA
+   preQ = preQ + AOcc(iq)*Emat(iq,iq)
+enddo
+
+intE = 0
+do ic=1,NBas
+   do ip=1,NBas
+      do iq=1,dimOA
+         intE(ip,ic) = intE(ip,ic) - AOccN(iq)*Sab(iq,ic)*Emat(ip,iq)
+      enddo
+   enddo
+enddo
+
+do l=1,BDimX
+
+   ia = BIndN(1,l)
+   ic = BIndN(2,l)
+   iac = posB(ia,ic)
+
+   factB  = 4d0*(BOcc(ic)-BOcc(ia))
+   factBn = 2d0*(BOccN(ic)-BOccN(ia))
+
+   do k=1,ADimX
+
+      ip = AIndN(1,k)
+      ir = AIndN(2,k)
+      ipr = posA(ip,ir)
+
+      fact   = 2d0*(AOcc(ir)-AOcc(ip))*factB
+      factAn = (AOccN(ir)-AOccN(ip))
+
+      !1A-2B
+      intXX(ipr,iac) = intXX(ipr,iac) - fact*Emat(ip,ir)*Sbb(ic,ia)
+
+      !2A-2B
+      intXX(ipr,iac) = intXX(ipr,iac) - preQ*fact*Sab(ip,ic)*Sab(ir,ia)
+
+      !3A-2B
+      intXX(ipr,iac) = intXX(ipr,iac) - factAn*factB*intE(ip,ic)*Sab(ir,ia)
+
+      !4A-2B
+      ! not sure why this works - ?
+      intXX(ipr,iac) = intXX(ipr,iac) - factAn*factB*intE(ir,ia)*Sab(ip,ic)
+
+      ! new: 3A-4B
+      intXX(ipr,iac) = intXX(ipr,iac) - factAn*factBn*intV(ip,ic)*Sab(ir,ia)
+
+      val = 0
+      do iq=1,dimOA
+         val = val + AOccN(iq)*intU(ipr,iq,ic)*Sab(iq,ia)
+      enddo
+
+      ! new: 4A-4B
+      intXX(ipr,iac) = intXX(ipr,iac) - factAn*factBn*val
+
+   enddo 
+enddo
+
+deallocate(ints,work)
+deallocate(intU)
+deallocate(intV,intE)
+deallocate(BOccN,AOccN)
+
+!print*, 'appA3_nn_XX',norm2(intXX(1:dim1,1:dim2))
+
+end subroutine app_nn_A3_XX
+
+!check: a) is (OO|OO) here enough?
+!       b) Fpq = n_p^a * n_q^a
+subroutine app_A3_XX(dim1,dim2,intXX,AOcc,BOcc,AFmat,BFmat,Sab, &
+                    AXELE,Vabb,BXELE,Vbaa,IntKFile,&
+                    BIndN,AIndN,posB,posA,dimOB,dimOA,BDimX,ADimX,NBas)
+!
+! terms 1A-1B cancel with E2disp*( n_p*n_q*(S_p^q)^2 )
+! terms 2A-2B cancel with (Elst-VAB)*( n_q*n_b*<qb|qb>*S_p^c*S_r^a )
+!
+implicit none
+
+integer,intent(in) :: dim1,dim2,dimOA,dimOB,ADimX,BDimX,NBas
+integer,intent(in) :: AIndN(2,ADimX),BIndN(2,BDimX),posA(NBas,NBas),posB(NBas,NBas) 
+character(*) :: IntKFile
+double precision,intent(inout) :: intXX(dim1,dim2)
+double precision,intent(in) :: AXELE,BXELE,AOcc(NBas),BOcc(NBas),&
+                               AFmat(NBas,NBas),BFmat(NBas,NBas),&
+                               Sab(NBas,NBas),Vabb(NBas,NBas),Vbaa(NBas,NBas)
+
+integer :: iunit
+integer :: i,k,l,kl,ip,iq,ir,ia,ib,ic,iac,ipr
+double precision :: factA,factB,fact,val,val3B,val4B,valTr
+double precision :: prefac,factC
 double precision :: Sxx(NBas,NBas),Sbb(NBas,NBas),&
                     Amat(NBas,NBas),Emat(NBas,dimOA)
 double precision,allocatable :: work(:),ints(:,:)
@@ -369,7 +723,7 @@ do l=1,dimOB
             fact  = 2d0*(AOcc(ir)-AOcc(ip))*factB
 
             ! 1A-1B
-            intXX(ipr,iac) = intXX(ipr,iac) - fact*valTr*ints(ip,ir)
+            !intXX(ipr,iac) = intXX(ipr,iac) - fact*valTr*ints(ip,ir)
 
             val = 0
             do iq=1,dimOA
@@ -516,6 +870,11 @@ enddo
 
 close(iunit)
 
+prefac = 0
+do iq=1,dimOA
+   prefac = prefac + AOcc(iq)*Emat(iq,iq)
+enddo
+
 ! 2B terms
 do l=1,BDimX
 
@@ -531,18 +890,20 @@ do l=1,BDimX
       ir = AIndN(2,k)
       ipr = posA(ip,ir)
 
-      fact = 2d0*(AOcc(ir)-AOcc(ip))*factB
+      fact  = 2d0*(AOcc(ir)-AOcc(ip))*factB
+      factC = prefac*fact
 
       !1A-2B
       intXX(ipr,iac) = intXX(ipr,iac) - fact*Emat(ip,ir)*Sbb(ic,ia)
 
-      val = 0
-      do iq=1,dimOA
-         val = val + AOcc(iq)*Emat(iq,iq)
-      enddo
+      !val = 0
+      !do iq=1,dimOA
+      !   val = val + AOcc(iq)*Emat(iq,iq)
+      !enddo
 
       !2A-2B
-      intXX(ipr,iac) = intXX(ipr,iac) - fact*val*Sab(ip,ic)*Sab(ir,ia)
+      !!intXX(ipr,iac) = intXX(ipr,iac) - fact*val*Sab(ip,ic)*Sab(ir,ia)
+      !intXX(ipr,iac) = intXX(ipr,iac) - factC*Sab(ip,ic)*Sab(ir,ia)
 
       val = 0
       do iq=1,dimOA
@@ -565,7 +926,7 @@ enddo
 
 deallocate(ints,work)
 
-print*, 'appA3_XX',norm2(intXX)
+!print*, 'app_A3_XX',norm2(intXX(1:dim1,1:dim2))
 
 end subroutine app_A3_XX
 
@@ -775,7 +1136,7 @@ close(iunit)
 
 deallocate(ints,work,tmp)
 
-print*,'appYX', norm2(intYX)
+!print*,'app_A2_YX', norm2(intYX)
 
 end subroutine app_A2_YX 
 
@@ -949,7 +1310,7 @@ endif
 
 deallocate(ints,work,tmp)
 
-print*, 'appXY',norm2(intXY)
+!print*, 'app_A2_XY',norm2(intXY)
 
 end subroutine app_A2_XY
 
@@ -1124,7 +1485,7 @@ endif
 
 deallocate(ints,work,tmp)
 
-print*, 'appYY',norm2(intYY)
+!print*, 'app_A2_YY',norm2(intYY)
 
 end subroutine app_A2_YY
 
@@ -1299,7 +1660,7 @@ else
    enddo
 endif
 
-print*,'appXX:', norm2(intXX)
+!print*,'app_A2_XX:', norm2(intXX)
 
 deallocate(ints,work,tmp)
 

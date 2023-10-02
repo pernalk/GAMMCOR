@@ -82,7 +82,7 @@
             class(IterAlgorithmDamping) :: this
             character(:), allocatable :: res
             character(200) :: buffer
-            write(buffer, "(a, f4.2, a, e6.1e1, a, i0, a)") &
+            write(buffer, "(a, f4.2, a, e7.1e1, a, i0, a)") &
                 "{XMix: ", this%XMix, ", Threshold: ", this%Threshold, ", maxIterations: ", this%maxIterations, "}"
             res = trim(buffer)
 
@@ -94,7 +94,7 @@
             implicit none
             class(IterAlgorithmDamping) :: this
             character(50), intent(out) :: fileName
-            write(fileName, "(a, f4.2, a, e6.1e1)") 'damping_x', this%XMix, '_t', this%Threshold
+            write(fileName, "(a, f4.2, a, e7.1e1)") 'damping_x', this%XMix, '_t', this%Threshold
 
         end subroutine toString
 

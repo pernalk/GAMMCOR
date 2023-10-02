@@ -23,6 +23,10 @@ implicit none
 
 type(FlagsData) :: Flags
 type(SaptData)  :: SAPT
+type(TAOBasis)  :: AOBasis
+type(TSystem)   :: System
+type(TCholeskyVecsOTF) :: CholeskyVecsOTF
+
 integer :: i
 integer :: NBasis
 double precision :: Tcpu,Twall
@@ -42,24 +46,30 @@ double precision :: Tcpu,Twall
 
  call clock('START',Tcpu,Twall)
  call sapt_basinfo(SAPT,NBasis)
- call sapt_interface(Flags,SAPT,NBasis)
+ call sapt_interface(Flags,SAPT,NBasis,AOBasis,CholeskyVecsOTF)
 
- call sapt_mon_ints(SAPT%monA,Flags,NBasis)
- call sapt_mon_ints(SAPT%monB,Flags,NBasis)
-
+ call sapt_mon_ints(SAPT%monA,Flags,NBasis,AOBasis,CholeskyVecsOTF)
  call sapt_response(Flags,SAPT%monA,SAPT%EnChck,NBasis)
+
+ call sapt_mon_ints(SAPT%monB,Flags,NBasis,AOBasis,CholeskyVecsOTF)
  call sapt_response(Flags,SAPT%monB,SAPT%EnChck,NBasis)
 
- call sapt_ab_ints(Flags,SAPT%monA,SAPT%monB,SAPT%iPINO,NBasis)
+ call sapt_ab_ints(Flags,SAPT%monA,SAPT%monB,SAPT%iPINO,NBasis,AOBasis,CholeskyVecsOTF)
 
  ! SAPT components
  write(LOUT,'()')
+
+ ! switch to SAPT(DMFT)
+ if(SAPT%SaptExch==1) call sapt_dmft(Flags,SAPT,Tcpu,TWall,NBasis)
 
  ! switch to Cholesky SAPT
  if(Flags%ICholesky==1) call sapt_Cholesky(Flags,SAPT,Tcpu,TWall,NBasis)
 
  ! switch to extrapolated SAPT
  if(SAPT%monA%Cubic.or.SAPT%monB%Cubic) call sapt_extrapol(Flags,SAPT,NBasis)
+
+ ! MC-srDFT SAPT
+ SAPT%SemiCoupled = .false.
 
  if(Flags%ISERPA==0.and.SAPT%ic6==1) then
 
@@ -132,6 +142,9 @@ implicit none
 
 type(FlagsData)  :: Flags
 type(SaptData)   :: SAPT
+type(TAOBasis)   :: AOBasis
+type(TCholeskyVecsOTF) :: CholeskyVecsOTF
+
 integer          :: i
 integer          :: NBasis,NBasisRed
 integer          :: SAPT_LEVEL_SAVE
@@ -156,15 +169,15 @@ logical          :: onlyDisp
 
  call clock('START',Tcpu,Twall)
  call sapt_basinfo(SAPT,NBasis)
- call sapt_interface(Flags,SAPT,NBasis)
+ call sapt_interface(Flags,SAPT,NBasis,AOBasis,CholeskyVecsOTF)
 
- call sapt_mon_ints(SAPT%monA,Flags,NBasis)
- call sapt_mon_ints(SAPT%monB,Flags,NBasis)
-
+ call sapt_mon_ints(SAPT%monA,Flags,NBasis,AOBasis,CholeskyVecsOTF)
  call sapt_response(Flags,SAPT%monA,SAPT%EnChck,NBasis)
+
+ call sapt_mon_ints(SAPT%monB,Flags,NBasis,AOBasis,CholeskyVecsOTF)
  call sapt_response(Flags,SAPT%monB,SAPT%EnChck,NBasis)
 
- call sapt_ab_ints(Flags,SAPT%monA,SAPT%monB,SAPT%iPINO,NBasis)
+ call sapt_ab_ints(Flags,SAPT%monA,SAPT%monB,SAPT%iPINO,NBasis,AOBasis,CholeskyVecsOTF)
 
  write(LOUT,'(/,1x,a)') 'SAPT COMPONENTS'
  write(LOUT,'(8a10)') ('**********',i=1,6)
@@ -233,10 +246,89 @@ logical          :: onlyDisp
 
 end subroutine sapt_driver_red
 
+subroutine sapt_dmft(Flags,SAPT,Tcpu,Twall,NBasis)
+!
+! sapt driver with DMFT
+!
+implicit none
+
+type(FlagsData)    :: Flags
+type(SaptData)     :: SAPT
+integer,intent(in) :: NBasis
+double precision,intent(inout) :: Tcpu,Twall
+integer :: i
+
+write(LOUT,'(1x,a)') 'SAPT(MC) with DMFT exchange'
+
+if(Flags%ICholesky==0) then
+   call e1elst(SAPT%monA,SAPT%monB,SAPT)
+   call e1exch_dmft(Flags,SAPT%monA,SAPT%monB,SAPT)
+   !call e1exch_dmft_2(Flags,SAPT%monA,SAPT%monB,SAPT)
+
+   call e2ind(Flags,SAPT%monA,SAPT%monB,SAPT)
+   call e2disp(Flags,SAPT%monA,SAPT%monB,SAPT)
+
+   call e2exind(Flags,SAPT%monA,SAPT%monB,SAPT)
+   call e2exdisp(Flags,SAPT%monA,SAPT%monB,SAPT)
+
+   !call summary_sapt_verbose(SAPT)
+   call summary_sapt(SAPT)
+
+elseif(Flags%ICholesky==1) then
+
+   print*,'CHECKING CHOLESKY...',Flags%ICholeskyOTF
+   call e1elst_Chol(SAPT%monA,SAPT%monB,SAPT)
+
+   if(SAPT%SaptLevel==666.or.SAPT%SaptLevel==999) then
+      !print*, 'TESTING E1EXCH CHOL-DMFT'
+      !call e1exch_Chol_dmft(Flags,SAPT%monA,SAPT%monB,SAPT,0)
+      !call e1exch_Chol_dmft(Flags,SAPT%monA,SAPT%monB,SAPT,1)
+      call e1exch_Chol_dmft(Flags,SAPT%monA,SAPT%monB,SAPT,Flags%IRDM2Typ)
+   else
+      !Flags%IRdm2Typ=0 ! noncumulant
+      !call e1exch_dmft(Flags,SAPT%monA,SAPT%monB,SAPT)
+      !Flags%IRdm2Typ=1 ! DMFT
+      call e1exch_dmft(Flags,SAPT%monA,SAPT%monB,SAPT)
+   endif
+
+   call e2ind_icerpa(Flags,SAPT%monA,SAPT%monB,SAPT)
+
+   if(.not.SAPT%CAlpha) then
+      call e2disp_Cmat_Chol_block(Flags,SAPT%monA,SAPT%monB,SAPT)
+   else if(SAPT%CAlpha) then
+      call e2disp_CAlphaTilde_block(Flags,SAPT%monA,SAPT%monB,SAPT)
+   endif
+
+   if(SAPT%SaptLevel/=666.and.SAPT%SaptLevel/=999) then
+      !Flags%IRdm2Typ=0 ! noncumulant
+      !call e2exind(Flags,SAPT%monA,SAPT%monB,SAPT)
+      !call e2exdisp(Flags,SAPT%monA,SAPT%monB,SAPT)
+
+      !Flags%IRdm2Typ=1 ! DMFT
+      call e2exind(Flags,SAPT%monA,SAPT%monB,SAPT)
+      call e2exdisp(Flags,SAPT%monA,SAPT%monB,SAPT)
+
+      call summary_sapt(SAPT)
+   else
+      call summary_rspt(SAPT)
+   endif
+
+
+endif
+
+call print_warn(SAPT)
+call free_sapt(Flags,SAPT)
+
+call clock('SAPT',Tcpu,Twall)
+
+stop
+
+end subroutine sapt_dmft
+
 subroutine sapt_Cholesky(Flags,SAPT,Tcpu,Twall,NBasis)
 !
 ! sapt driver with Cholesky decompositon
-! Flags%isCholesky==1
+! Flags%ICholesky==1
 !
 implicit none
 
@@ -409,10 +501,14 @@ type(SystemBlock)  :: Mon
 integer,intent(in) :: NBasis
 logical,intent(in) :: EnChck
 
+integer          :: NAO
 integer          :: i,j,ij
 integer          :: SaptLevel
 logical          :: regular,extrapolate
-double precision :: MO(NBasis*NBasis)
+double precision :: NO(NBasis*NBasis)
+
+ ! a quick fix
+ NAO = NBasis
 
  SaptLevel = Flags%SaptLevel
  if(Mon%Cubic) then
@@ -427,7 +523,7 @@ double precision :: MO(NBasis*NBasis)
  do j=1,NBasis
     do i=1,NBasis
        ij = ij + 1
-       MO(ij) = Mon%CMO(i,j)
+       NO(ij) = Mon%CMO(i,j)
     enddo
  enddo
 
@@ -446,7 +542,7 @@ double precision :: MO(NBasis*NBasis)
 
  if(SaptLevel.eq.999 .or. SaptLevel.eq.666) then
     ! for RSPT2 only AB matrices are needed
-    call calc_ab_cas(Mon,MO,Flags,NBasis)
+    call calc_ab_cas(Mon,NO,Flags,NBasis)
     return
  endif
 
@@ -454,17 +550,20 @@ double precision :: MO(NBasis*NBasis)
     if(SaptLevel.eq.0.or.SaptLevel.eq.10) then
 
         if(SaptLevel.eq.10) Flags%IFlag0 = 1
-        call calc_resp_unc(Mon,MO,Flags,NBasis)
+        call calc_resp_unc(Mon,NO,Flags,NBasis)
 
     elseif(SaptLevel.gt.0) then
 
        if(regular) then
 
           if(Flags%IFunSR/=0) then
-             call calc_resp_dft(Mon,MO,Flags,NBasis)
+             if (Flags%IDALTON == 1) then
+                call calc_resp_dft_dalton(Mon,Flags,NAO,NBasis)
+             elseif (Flags%IDALTON == 0) then
+                call calc_resp_dft_molpro(Mon,NO,Flags,NAO,NBasis)
+             endif
           else
-             print*, 'here?'
-             call calc_resp_casgvb(Mon,MO,Flags,NBasis,EnChck)
+             call calc_resp_casgvb(Mon,NO,Flags,NBasis,EnChck)
           endif
 
        elseif(extrapolate) then
@@ -475,21 +574,26 @@ double precision :: MO(NBasis*NBasis)
 
     endif
  elseif(Flags%ISERPA==2) then
-    call calc_resp_pino(Mon,MO,Flags,NBasis)
-   ! call calc_resp_casgvb(Mon,MO,Flags,NBasis,EnChck)
+    call calc_resp_pino(Mon,NO,Flags,NBasis)
+   ! call calc_resp_casgvb(Mon,NO,Flags,NBasis,EnChck)
  endif
 
 end subroutine sapt_response
 
-subroutine sapt_ab_ints(Flags,A,B,iPINO,NBasis)
+subroutine sapt_ab_ints(Flags,A,B,iPINO,NBasis,AOBasis,CholeskyVecsOTF)
 implicit none
 
 type(FlagsData)    :: Flags
 type(SystemBlock)  :: A,B
 type(AOReaderData) :: reader
+type(TAOBasis)     :: AOBasis
+type(TCholeskyVecsOTF) :: CholeskyVecsOTF
 integer,intent(in) :: iPINO,NBasis
 integer            :: thr_id
 integer            :: ntr,iunit_aotwosort
+double precision :: Tcpu,TWall
+
+call clock('START',Tcpu,Twall)
 
 if(Flags%SaptLevel==999) then
   print*, 'In RSPT2 intermoner ints not calculated for now'
@@ -500,27 +604,29 @@ if(Flags%SaptLevel==999) then
 endif
 
 if(Flags%SaptLevel==666) then
-  print*, 'Get 1-st order exchange ints (RSPT2+)'
-  if (Flags%ICholesky==1) then
-     call chol_ints_oooo(A%num0+A%num1,A%num0+A%num1,A%OO,&
-                         B%num0+B%num1,B%num0+B%num1,B%OO,&
-                         A%NChol,'OOOOAABB')
-     !call chol_ints_fofo(NBasis,A%num0+A%num1,A%FF,&
-     !                    NBasis,B%num0+B%num1,B%FF,&
-     !                    A%NChol,NBasis,'FOFOAABB')
+   if (Flags%ICholesky==1) then
+      call chol_ints_oooo(A%num0+A%num1,A%num0+A%num1,A%OO,&
+                          B%num0+B%num1,B%num0+B%num1,B%OO,&
+                          A%NChol,'OOOOAABB')
+      !call chol_ints_fofo(NBasis,A%num0+A%num1,A%FF,&
+      !                    NBasis,B%num0+B%num1,B%FF,&
+      !                    A%NChol,NBasis,'FOFOAABB')
 
-     call chol_ints_oooo(B%num0+B%num1,B%num0+B%num1,B%OO,  &
-                         B%num0+B%num1,A%num0+A%num1,B%OOBA,&
-                         A%NChol,'OOOOBBBA')
+      call chol_ints_oooo(B%num0+B%num1,B%num0+B%num1,B%OO,  &
+                          B%num0+B%num1,A%num0+A%num1,B%OOBA,&
+                          A%NChol,'OOOOBBBA')
 
-     call chol_ints_oooo(A%num0+A%num1,A%num0+A%num1,A%OO,  &
-                         A%num0+A%num1,B%num0+B%num1,A%OOAB,&
-                         A%NChol,'OOOOAAAB')
-  endif
-  ! deallocate (FF|NCholesky) integrals
-  deallocate(A%FF)
-  deallocate(B%FF)
-  return
+      call chol_ints_oooo(A%num0+A%num1,A%num0+A%num1,A%OO,  &
+                          A%num0+A%num1,B%num0+B%num1,A%OOAB,&
+                          A%NChol,'OOOOAAAB')
+
+      call chol_ints_oooo(A%num0+A%num1,B%num0+B%num1,A%OOAB,  &
+                          A%num0+A%num1,B%num0+B%num1,A%OOAB,&
+                          A%NChol,'OOOOABAB')
+   endif
+
+   print*, 'Only 1-st order exchange ints in RSPT2+'
+   return
 endif
 
 if(Flags%ISERPA==0) then
@@ -565,26 +671,51 @@ if(Flags%ISERPA==0) then
 
      print*, 'dimOA',A%num0+A%num1
      print*, 'dimOB',B%num0+B%num1
+
+     if(Flags%ICholeskyOTF==1) then
+        call chol_FFXY_AB_AO2NO_OTF(Flags,A,B,CholeskyVecsOTF,AOBasis,NBasis,'AB')
+        ! deallocate AO cholesky vectors
+        deallocate(CholeskyVecsOTF%R)
+        !call chol_FFXY_AB_AO2NO_OTF(Flags,A,B,CholeskyVecsOTF,AOBasis,NBasis,'BA')
+        ! test prints 
+        !if(allocated(A%FF))   print*, 'A%FF   is here!'
+        !if(allocated(B%FF))   print*, 'B%FF   is here!'
+        !if(allocated(A%FFAB)) print*, 'A%FFAB is here!'
+        !if(allocated(B%FFBA)) print*, 'B%FFBA is here!'
+     endif
+     
+
      ! term A3-ind
+     print*, 'A:',A%num0,A%num1
+     print*, 'A:',B%num0,B%num1
+     if(allocated(A%FO)) print*, 'A%FO is allocated',A%NChol
+     if(allocated(B%FO)) print*, 'B%FO is allocated'
+     call chol_fofo_batch(A%num0+A%num1,A%FO,B%num0+B%num1,B%FO, &
+                          A%NChol,NBasis,'FOFOAABB')
+     !call chol_fofo_full_batch(A%num0+A%num1,A%FF,B%num0+B%num1,B%FF, &
+     !                     A%NChol,NBasis,'FOFOAABB')
      !call chol_ints_fofo(NBasis,A%num0+A%num1,A%FF,&
      !                    NBasis,B%num0+B%num1,B%FF,&
      !                    A%NChol,NBasis,'FOFOAABB')
-     call chol_fofo_batch(A%num0+A%num1,A%FF,B%num0+B%num1,B%FF, &
-                          A%NChol,NBasis,'FOFOAABB')
 
      ! term A1-ind
+     call chol_ffoo_batch(.false.,A%FFAB,A%num0+A%num1,B%num0+B%num1,A%OOAB, &
+                          A%NChol,NBasis,'FFOOABAB')
+     !call chol_ffoo_full_batch(.false.,A%FFAB,A%num0+A%num1,B%num0+B%num1,A%FFAB, &
+     !                        A%NChol,NBasis,'FFOOABAB')
      !call chol_ints_fofo(NBasis,NBasis,A%FFAB, &
      !                    A%num0+A%num1,B%num0+B%num1,A%FFAB,&
      !                    A%NChol,NBasis,'FFOOABAB')
-     call chol_ffoo_batch(A%FFAB,A%num0+A%num1,B%num0+B%num1,A%FFAB, &
-                          A%NChol,NBasis,'FFOOABAB')
 
      ! term A2-ind
+     call chol_fofo_batch(B%num0+B%num1,B%FO,A%num0+A%num1,B%FOBA, &
+                         A%NChol,NBasis,'FOFOBBBA')
+     !call chol_fofo_full_batch(B%num0+B%num1,B%FF,A%num0+A%num1,B%FFBA, &
+     !                    A%NChol,NBasis,'FOFOBBBA')
      !call chol_ints_fofo(NBasis,B%num0+B%num1,B%FF,  &
      !                    NBasis,A%num0+A%num1,B%FFBA,&
      !                    A%NChol,NBasis,'FOFOBBBA')
-     call chol_fofo_batch(B%num0+B%num1,B%FF,A%num0+A%num1,B%FFBA, &
-                         A%NChol,NBasis,'FOFOBBBA')
+
      ! test -- chol_gen_ket_batch worsk here
      !call chol_gen_ket_batch('N',NBasis,B%num0+B%num1,B%FF,  &
      !                            NBasis,A%num0+A%num1,B%FFBA,&
@@ -593,22 +724,36 @@ if(Flags%ISERPA==0) then
      !                            A%num0+A%num1,NBasis,A%FFAB,&
      !                            A%NChol,NBasis,'FOFOBBBA')
 
+     call chol_fofo_batch(A%num0+A%num1,A%FO,B%num0+B%num1,A%FOAB, &
+                         A%NChol,NBasis,'FOFOAAAB')
+     !call chol_fofo_full_batch(A%num0+A%num1,A%FF,B%num0+B%num1,A%FFAB, &
+     !                    A%NChol,NBasis,'FOFOAAAB')
      !call chol_ints_fofo(NBasis,A%num0+A%num1,A%FF,  &
      !                    NBasis,B%num0+B%num1,A%FFAB,&
      !                    A%NChol,NBasis,'FOFOAAAB')
-     call chol_fofo_batch(A%num0+A%num1,A%FF,B%num0+B%num1,A%FFAB, &
-                         A%NChol,NBasis,'FOFOAAAB')
+
      ! A2A(B): YY
+     call chol_fofo_batch(B%num0+B%num1,B%FO,B%num0+B%num1,A%FOAB, &
+                          A%NChol,NBasis,'FOFOBBAB')
+     !call chol_fofo_full_batch(B%num0+B%num1,B%FF,B%num0+B%num1,A%FFAB, &
+     !                     A%NChol,NBasis,'FOFOBBAB')
      !call chol_ints_fofo(NBasis,B%num0+B%num1,B%FF,  &
      !                    NBasis,B%num0+B%num1,A%FFAB,&
      !                    A%NChol,NBasis,'FOFOBBAB')
-     call chol_fofo_batch(B%num0+B%num1,B%FF,B%num0+B%num1,A%FFAB, &
-                          A%NChol,NBasis,'FOFOBBAB')
+
+     call chol_fofo_batch(A%num0+A%num1,A%FO,A%num0+A%num1,B%FOBA, &
+                          A%NChol,NBasis,'FOFOAABA')
+     !call chol_fofo_full_batch(A%num0+A%num1,A%FF,A%num0+A%num1,B%FFBA, &
+     !                     A%NChol,NBasis,'FOFOAABA')
      !call chol_ints_fofo(NBasis,A%num0+A%num1,A%FF,  &
      !                    NBasis,A%num0+A%num1,B%FFBA,&
      !                    A%NChol,NBasis,'FOFOAABA')
-     call chol_fofo_batch(A%num0+A%num1,A%FF,A%num0+A%num1,B%FFBA, &
-                          A%NChol,NBasis,'FOFOAABA')
+
+     deallocate(A%FO)
+     deallocate(B%FO)
+     deallocate(A%OOAB)
+
+     call clock('Time in Assemble:',Tcpu,Twall)
 
   else
    ! working stuff...
@@ -730,25 +875,37 @@ if(Flags%ISERPA==0) then
 
      write(LOUT,'(/1x,a)') 'Transforming E2exch-disp integrals...'
      if(Flags%ICholesky==1) then
+
+        call chol_fofo_batch(B%num0+B%num1,A%FOAB,A%num0+A%num1,B%FOBA, &
+                             A%NChol,NBasis,'FOFOABBA')
+        !call chol_fofo_full_batch(B%num0+B%num1,A%FFAB,A%num0+A%num1,B%FFBA, &
+        !                     A%NChol,NBasis,'FOFOABBA')
         !call chol_ints_fofo(NBasis,B%num0+B%num1,A%FFAB,&
         !                    NBasis,A%num0+A%num1,B%FFBA,&
         !                    A%NChol,NBasis,'FOFOABBA')
-        call chol_fofo_batch(B%num0+B%num1,A%FFAB,A%num0+A%num1,B%FFBA, &
-                             A%NChol,NBasis,'FOFOABBA')
+
         ! XY and YX, A2
+        call chol_ffoo_batch(.false.,A%FFAB,B%num0+B%num1,B%num0+B%num1,B%OO, &
+                             A%NChol,NBasis,'FFOOABBB')
+        !call chol_ffoo_full_batch(.false.,A%FFAB,B%num0+B%num1,B%num0+B%num1,B%FF, &
+        !                     A%NChol,NBasis,'FFOOABBB')
         !call chol_ints_fofo(NBasis,NBasis,A%FFAB, &
         !                    B%num0+B%num1,B%num0+B%num1,B%FF,&
         !                    A%NChol,NBasis,'FFOOABBB')
-        call chol_ffoo_batch(A%FFAB,B%num0+B%num1,B%num0+B%num1,B%FF, &
-                             A%NChol,NBasis,'FFOOABBB')
+        call chol_ffoo_batch(.true.,A%FFAB,A%num0+A%num1,A%num0+A%num1,A%OO, &
+                             A%NChol,NBasis,'FFOOBAAA')
+        !call chol_ffoo_full_batch(.true.,A%FFAB,A%num0+A%num1,A%num0+A%num1,A%FF, &
+        !                     A%NChol,NBasis,'FFOOBAAA')
         !call chol_ints_fofo(NBasis,NBasis,B%FFBA, &
         !                    A%num0+A%num1,A%num0+A%num1,A%FF,&
         !                    A%NChol,NBasis,'FFOOBAAA')
-        call chol_ffoo_batch(B%FFBA,A%num0+A%num1,A%num0+A%num1,A%FF, &
-                             A%NChol,NBasis,'FFOOBAAA')
         ! deallocate (FF|NCholesky) integrals
-        deallocate(A%FF)
-        deallocate(B%FF)
+        deallocate(B%FOBA)
+        deallocate(A%FOAB)
+        !deallocate(A%FF)
+        !deallocate(B%FF)
+        deallocate(A%FFAB)
+        !deallocate(B%FFBA)
      else
         call tran4_gen(NBasis,&
                  NBasis,B%CMO,&
@@ -1111,11 +1268,16 @@ subroutine reduce_virt(Flags,Mon,NBas)
 
 end subroutine reduce_virt
 
-subroutine sapt_mon_ints(Mon,Flags,NBas)
+subroutine sapt_mon_ints(Mon,Flags,NBas,AOBasis,CholeskyVecsOTF)
+!
+! Cholesky: generate FFXX(NCholesky,NBas**2)
+!
 implicit none
 
 type(SystemBlock) :: Mon
-type(FlagsData) :: Flags
+type(FlagsData)   :: Flags
+type(TAOBasis)    :: AOBasis
+type(TCholeskyVecsOTF) :: CholeskyVecsOTF
 
 integer :: NBas
 integer :: i,j,ij,ione
@@ -1123,7 +1285,7 @@ integer :: NSq,NInte1,NInte2
 
 double precision             :: URe(NBas,NBas),MO(NBas*NBas)
 double precision,allocatable :: TwoMO(:)
-double precision,allocatable :: work1(:),work2(:),XOne(:)
+double precision,allocatable :: work1(:),work2(:)
 character(8)                 :: label
 character(:),allocatable     :: onefile,twofile
 character(:),allocatable     :: twojfile,twokfile
@@ -1139,18 +1301,16 @@ call clock('START',Tcpu,Twall)
 
 ! set file names
  if(Mon%Monomer==1) then
-    onefile  = 'ONEEL_A'
     twofile  = 'TWOMOAA'
     twojfile = 'FFOOAA'
     twokfile = 'FOFOAA'
  elseif(Mon%Monomer==2) then
-    onefile  = 'ONEEL_B'
     twofile  = 'TWOMOBB'
     twojfile = 'FFOOBB'
     twokfile = 'FOFOBB'
  endif
 
- allocate(work1(NSq),work2(NSq),XOne(NInte1))
+ allocate(work1(NSq),work2(NSq))
 
  URe = 0d0
  do i=1,NBas
@@ -1167,7 +1327,7 @@ call clock('START',Tcpu,Twall)
  enddo
 
  ! read 1-el
- call get_1el_h_mo(XOne,MO,NBas,onefile)
+ !call get_1el_h_mo(XOne,MO,NBas,onefile)
 
  if(Flags%SaptLevel==1) return
 
@@ -1180,12 +1340,22 @@ call clock('START',Tcpu,Twall)
 
  case(TWOMO_FOFO)
    if(Flags%ICholesky==1) then
-      call chol_ints_fofo(NBas,NBas,Mon%FF, &
-                     Mon%num0+Mon%num1,Mon%num0+Mon%num1,Mon%FF,&
-                     Mon%NChol,NBas,twojfile)
-      call chol_ints_fofo(NBas,Mon%num0+Mon%num1,Mon%FF,&
-                     NBas,Mon%num0+Mon%num1,Mon%FF,&
-                     Mon%NChol,NBas,twokfile)
+      if (Flags%ICholeskyBIN==1) then
+         call chol_ints_fofo(NBas,NBas,Mon%FF, &
+                        Mon%num0+Mon%num1,Mon%num0+Mon%num1,Mon%FF,&
+                        Mon%NChol,NBas,twojfile)
+         call chol_ints_fofo(NBas,Mon%num0+Mon%num1,Mon%FF,&
+                        NBas,Mon%num0+Mon%num1,Mon%FF,&
+                        Mon%NChol,NBas,twokfile)
+      elseif (Flags%ICholeskyOTF==1) then
+          write(LOUT,'(1x,a,i2)') 'Skipping FFOO/FOFO for monomer ',Mon%Monomer
+          call chol_FFXX_mon_AO2NO_OTF(Flags,Mon,CholeskyVecsOTF,AOBasis,NBas)
+          ! SAPT+DALTON avoids Fock matrix in sapt_interface (no need
+          ! for canonicalization). The J, K and W (=V+J) matrices
+          ! are calculate now from Cholesky FFXX vectors.
+          if (Flags%InterfaceType==1) call chol_JKmat_AO_OTF(Mon,NBas)
+          if (Flags%InterfaceType==1) call CholeskyOTF_elpot_AO(Mon,NBas)
+      endif
       !call chol_ints_gen(NBas,NBas,Mon%FF, &
       !               Mon%num0+Mon%num1,Mon%num0+Mon%num1,Mon%OO,&
       !               Mon%NChol,twojfile)
@@ -1211,7 +1381,7 @@ call clock('START',Tcpu,Twall)
     endif
  end select
 
- deallocate(XOne,work2,work1)
+ deallocate(work2,work1)
  !if(Mon%TwoMoInt==1) deallocate(TwoMO)
 
 end subroutine sapt_mon_ints
@@ -1555,6 +1725,14 @@ if(SAPT%doRSH) then
    if(.not.SAPT%SameOm) call delfile('AOERFSORTB')
 endif
 
+if(SAPT%doRSH) then
+  if(allocated(SAPT%monA%VsrKS)) deallocate(SAPT%monA%VsrKS)
+  if(allocated(SAPT%monB%VsrKS)) deallocate(SAPT%monB%VsrKS)
+
+  if(allocated(SAPT%monA%Jsr)) deallocate(SAPT%monA%Jsr)
+  if(allocated(SAPT%monB%Jsr)) deallocate(SAPT%monB%Jsr)
+endif
+
 ! Wind,Wdisp terms
 if(allocated(SAPT%Wind)) then
    deallocate(SAPT%Wind)
@@ -1599,6 +1777,13 @@ endif
 if(.not.SAPT%doRSH) then
    call delfile('ABMAT_A')
    call delfile('ABMAT_B')
+endif
+
+if(SAPT%SaptLevel==999.or.SAPT%SaptLevel==666) then
+   call delfile('OOOOAABB')
+   call delfile('OOOOAAAB')
+   call delfile('OOOOBBBA')
+   call delfile('OOOOABAB')
 endif
 
 if(Flags%ISERPA==0) then
