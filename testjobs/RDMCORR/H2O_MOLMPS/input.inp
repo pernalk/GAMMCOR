@@ -1,0 +1,34 @@
+Calculation
+ JobTitle      H2O / ORCA / 1-rdm relaxed / exclude
+ Interface     ORCA
+ Basis         cc-pVTZ-OPT
+ JobType       AC0
+ RedVirt       .true.
+ OrbRelax      .true.
+ OrbIncl       .false.
+ NBasis        58
+ TwoMoInt      FOFO
+ BasisPath  /home/michalhapka/pr-dmft/basis/
+end
+
+CholeskyBlock
+ Cholesky       OTF
+ Cholesky_Accu  DEFAULT
+ H0Test         .false.
+
+!Cholesky_Accu TIGHT
+!Cholesky_Accu LUDICROUS
+end
+
+xyz
+3
+O         0.000000000   -0.0669721196   0.005754438 
+H         0.000000000    0.5668126641   0.7292018977
+H         0.000000000    0.4962602719  -0.8205441913
+end
+
+System
+ ZNucl   10
+ Charge  0
+ ThrSelAct    1.d-4
+end
