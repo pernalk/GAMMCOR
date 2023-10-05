@@ -291,12 +291,20 @@ elseif(Flags%ICholesky==1) then
       call e1exch_dmft(Flags,SAPT%monA,SAPT%monB,SAPT)
    endif
 
+   if (Flags%IRdm2Typ==11) then ! for BB in ERPA: temporary fix
+   call e2ind(Flags,SAPT%monA,SAPT%monB,SAPT)
+   else
    call e2ind_icerpa(Flags,SAPT%monA,SAPT%monB,SAPT)
+   endif
 
-   if(.not.SAPT%CAlpha) then
-      call e2disp_Cmat_Chol_block(Flags,SAPT%monA,SAPT%monB,SAPT)
-   else if(SAPT%CAlpha) then
-      call e2disp_CAlphaTilde_block(Flags,SAPT%monA,SAPT%monB,SAPT)
+   if (Flags%IRdm2Typ==11) then ! for BB in ERPA: temporary fix
+      call e2disp(Flags,SAPT%monA,SAPT%monB,SAPT)
+   else
+      if(.not.SAPT%CAlpha) then
+         call e2disp_Cmat_Chol_block(Flags,SAPT%monA,SAPT%monB,SAPT)
+      else if(SAPT%CAlpha) then
+         call e2disp_CAlphaTilde_block(Flags,SAPT%monA,SAPT%monB,SAPT)
+      endif
    endif
 
    if(SAPT%SaptLevel/=666.and.SAPT%SaptLevel/=999) then
@@ -660,6 +668,15 @@ if(Flags%ISERPA==0) then
                     B%num1+B%num2,B%CMO(1:NBasis,B%num0+1:NBasis),&
                     'TWOMOAB','AOTWOSORT')
 
+  endif
+
+  if(Flags%IRDM2Typ==11.and.Flags%ICholeskyOTF==1) then ! for BB in ERPA: temporary fix
+     ! integrals stored as (ov|ov)
+     !call chol_ovov_batch(B%num0+B%num1,B%num0,B%FO,A%num0+A%num1,A%num0,A%FO, &
+     !                     A%NChol,NBasis,'TWOMOAB')
+     ! ver0 allocates one extra FO|NChol matrix but is faster
+     call chol_ovov_batch_ver0(B%num0+B%num1,B%num0,B%FO,A%num0+A%num1,A%num0,A%FO, &
+                          A%NChol,NBasis,'TWOMOAB')
   endif
 
   write(LOUT,'(/1x,a)') 'Transforming E2exch-ind integrals...'
