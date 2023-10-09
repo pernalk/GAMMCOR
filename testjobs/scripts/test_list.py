@@ -35,8 +35,19 @@ def get():
             "ACn/AR_CAS":   {'atol': 1.e-5, 'level': 'short'},
             "ACn/H2O_CAS":  {'atol': 1.e-5, 'level': 'short'},
             "ACn/AR_HF":    {'atol': 1.e-5, 'level': 'short'},
-            #"ACn/H2O_MOLMPS": {'atol': 1.e-5, 'level': 'short'}
+            "ACn/H2O_MOLMPS": {'atol': 1.e-5, 'level': 'short'}
         }
     })
+
+    ### rdmcorr ###
+    tests_list.append({
+        'name': '* testing AC0-1RDM[orca] energy',
+        'fun': ac0_rdm,
+        'runner': run_test,
+        'units': {
+            "RDMCORR/H2O_MOLMPS": {'atol': 1.e-5, 'level': 'short'}
+        }
+    })
+
 
     return tests_list

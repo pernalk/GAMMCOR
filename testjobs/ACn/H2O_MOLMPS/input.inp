@@ -6,7 +6,7 @@ Calculation
  Max_Cn        10
  NBasis        24
  TwoMoInt      FOFO
- BasisPath /home/hapka/Programs/gammcor/basis/
+ BasisPath /home/michalhapka/pr-dmft/basis/
 end
 
 CholeskyBlock

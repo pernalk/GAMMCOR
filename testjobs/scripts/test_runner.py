@@ -22,6 +22,19 @@ def ac_en(file):
         S=s[a+75:a+89]
         return float(S)
 #
+def ac0_rdm(file):
+        lines_below = 6
+        target_phrase="AC0-correlated natural occupation numbers"
+        with open(file,'r') as file:
+         lines = file.readlines()
+         for i, line in enumerate(lines):
+                if target_phrase in line:
+                    if i + lines_below < len(lines):
+                       S = lines[i + lines_below].split()[1]
+                    else:
+                       return None
+        return float(S)
+#
 def ac1_en(file):
         f=open(file,'r')
         s=f.read()
