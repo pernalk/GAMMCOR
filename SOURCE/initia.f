@@ -561,7 +561,7 @@ C
       BasisSetPath = BasisSet
       SortAngularMomenta = .false.
 
-      Call CholeskyOTF_ao_vecs(CholeskyVecsOTF,AOBasis,System,
+      Call CholeskyOTF_ao_vecs(CholeskyVecsOTF,AOBasis,System,IUnits,
      $            XYZPath,BasisSetPath,SortAngularMomenta,ICholeskyAccu)
       end block
 
@@ -1488,8 +1488,7 @@ C     compute Cholesky vectors OTF
       BasisSetPath = BasisSet
       SortAngularMomenta = .true.
 
-      print*, 'how do you know CholeskyOTF_ao_vecs???'
-      Call CholeskyOTF_ao_vecs(CholeskyVecsOTF,AOBasis,System,
+      Call CholeskyOTF_ao_vecs(CholeskyVecsOTF,AOBasis,System,IUnits,
      $            XYZPath,BasisSetPath,SortAngularMomenta,ICholeskyAccu)
 
       end block
@@ -2226,58 +2225,6 @@ C
 C
       Return
       End
-
-C*Deck CholeskyOTF_ao_vecs
-C      Subroutine CholeskyOTF_ao_vecs(CholeskyVecsOTF,
-C     $                     AOBasis,System,XYZPath,BasisSetPath,
-C     $                     SortAngularMomenta, Accuracy)
-CC
-CC           Generate Cholesky vectors in AO basis on-the-fly
-CC
-C            use arithmetic
-C            use auto2e
-C            use Cholesky, only: chol_CoulombMatrix, TCholeskyVecs,
-C     $                   chol_Rkab_ExternalBinary, chol_MOTransf_TwoStep
-C            use CholeskyOTF, only: chol_CoulombMatrix_OTF,
-C     $                   TCholeskyVecsOTF, chol_MOTransf_TwoStep_OTF
-C            use Cholesky_driver
-C            use basis_sets
-C            use sys_definitions
-C            use chol_definitions
-C
-C            implicit none
-C
-C            type(TCholeskyVecsOTF), intent(out) :: CholeskyVecsOTF
-C            type(TAOBasis), intent(out)         :: AOBasis
-C            type(TSystem), intent(out)          :: System
-C            character(*), intent(in)            :: XYZPath
-C            character(*), intent(in)            :: BasisSetPath
-C            logical, intent(in)                 :: SortAngularMomenta
-C            integer, intent(in)                 :: Accuracy
-C
-C            logical, parameter :: SpherAO = .true.
-C
-C            ! Initialize the two-electron intergrals library
-C            !
-C            call auto2e_init()
-C            !
-C            ! Read the XYZ coordinates and atom types
-C            !
-C            call sys_Read_XYZ(System, XYZPath)
-C            !
-C            call sys_Init(System,SYS_TOTAL)
-C            !
-C            ! Read the basis set parameters from an EMSL text file
-C            ! (GAMESS-US format, no need for any edits, just download it straight from the website)
-C            !
-C            call basis_NewAOBasis(AOBasis, System,
-C     $                       BasisSetPath, SpherAO, SortAngularMomenta)
-C            !
-C            ! Compute Cholesky vectors in AO basis
-C            !
-C            call chol_Rkpq_OTF(CholeskyVecsOTF, AOBasis, Accuracy)
-C
-C      end subroutine CholeskyOTF_ao_vecs
 
 *Deck DimSym
       Subroutine DimSym(NBasis,NInte1,NInte2,MxHVec,MaxXV)

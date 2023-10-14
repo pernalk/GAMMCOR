@@ -134,7 +134,7 @@ integer :: nVA,nVB
 integer :: i,j,ij
 integer :: k,l,kl
 integer :: iBatch
-double precision,allocatable :: work(:,:)
+double precision,allocatable :: work(:,:),inter(:,:)
 
 ! set dimensions
 nVA = NBasis-inA
@@ -144,6 +144,7 @@ nOVA = nOA*nVA
 print*, 'Assemble ',fname,' from Cholesky Vectors in Batches'
 
 allocate(work(nOVA,nOB))
+allocate(inter(nVA,nOB))
 
 open(newunit=iunit,file=fname,status='REPLACE',&
      access='DIRECT',form='UNFORMATTED',recl=8*nOA*nVA)
@@ -151,9 +152,16 @@ open(newunit=iunit,file=fname,status='REPLACE',&
 kl = 0
 do l=1,nVB
 
-   do k=1,nVA
-      call dgemm('T','N',nOA,nOB,NCholesky,1d0,MatFA(1,inA+k),NCholesky*NBasis, &
-                 MatFB(1,inB+l),NCholesky*NBasis,0d0,work(1+(k-1)*nOA,1),nOVA)
+   !do k=1,nVA
+   !   call dgemm('T','N',nOA,nOB,NCholesky,1d0,MatFA(1,inA+k),NCholesky*NBasis, &
+   !              MatFB(1,inB+l),NCholesky*NBasis,0d0,work(1+(k-1)*nOA,1),nOVA)
+   !enddo
+
+   do k=1,nOA
+      call dgemm('T','N',nVA,nOB,NCholesky,1d0,MatFA(1,1+inA+(k-1)*NBasis),NCholesky, &
+                 MatFB(1,inB+l),NCholesky*NBasis,0d0,inter,nVA)
+      ! nOA is step
+      work(k::nOA,:) = inter
    enddo
 
    ! loop over integrals
@@ -166,6 +174,7 @@ enddo
 
 close(iunit)
 
+deallocate(inter)
 deallocate(work)
 
 end subroutine chol_ovov_batch

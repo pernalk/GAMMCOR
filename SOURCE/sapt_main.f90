@@ -56,6 +56,9 @@ double precision :: Tcpu,Twall
 
  call sapt_ab_ints(Flags,SAPT%monA,SAPT%monB,SAPT%iPINO,NBasis,AOBasis,CholeskyVecsOTF)
 
+ ! MC-srDFT SAPT with Cholesky OTF
+ if(SAPT%doRSH) call sapt_mcsrdft_otf(Flags,SAPT,NBasis)
+
  ! SAPT components
  write(LOUT,'()')
 
@@ -246,6 +249,71 @@ logical          :: onlyDisp
 
 end subroutine sapt_driver_red
 
+subroutine sapt_mcsrdft_otf(Flags,SAPT,NBasis)
+!
+! SAPT(MC-srDFT) with Cholesky On-The-Fly:
+!   a) calculate Cholesky ERF vectors in AO
+!   b) transform them to NO basis : (FO| and (FF|
+!   c) assemble FOFOERF integral files
+!   d) calculate response
+!
+type(FlagsData) :: Flags
+type(SaptData)  :: SAPT
+integer,intent(in) :: NBasis
+
+type(TAOBasis)  :: AOBasis
+type(TCholeskyVecsOTF) :: CholErfVecsOTF
+
+!character(:),allocatable :: twokfile,twokerf
+
+if(Flags%ICholeskyOTF==1) then
+
+   call sapt_erfint_OTF(Flags,SAPT%monA,NBasis,AOBasis,CholErfVecsOTF)
+   call chol_FOERF_AO2NO_OTF(SAPT,SAPT%monA,CholErfVecsOTF,AOBasis,Flags,NBasis)
+   call chol_FFERF_AO2NO_OTF(Flags,SAPT%monA,CholErfVecsOTF,AOBasis,NBasis)
+
+   ! temp solution: assemble FOFOERF files
+   call chol_fofo_batch(SAPT%monA%num0+SAPT%monA%num1,SAPT%monA%FOErf, &
+                        SAPT%monA%num0+SAPT%monA%num1,SAPT%monA%FOErf, &
+                        SAPT%monA%NCholErf,NBasis,'FOFOERFAA')
+
+   call sapt_response(Flags,SAPT%monA,SAPT%EnChck,NBasis)
+
+   if (.not.SAPT%SameOm) then
+
+      deallocate(CholErfVecsOTF%R)
+      deallocate(CholErfVecsOTF%ShellPairs)
+      deallocate(CholErfVecsOTF%ShellPairLoc,CholErfVecsOTF%ShellPairDim)
+      deallocate(CholErfVecsOTF%SubsetDim,CholErfVecsOTF%SubsetBounds)
+
+      call sapt_erfint_OTF(Flags,SAPT%monB,NBasis,AOBasis,CholErfVecsOTF)
+   elseif (SAPT%SameOm) then
+      SAPT%monB%NCholErf = SAPT%monA%NCholErf
+   endif
+
+   call chol_FOERF_AO2NO_OTF(SAPT,SAPT%monB,CholErfVecsOTF,AOBasis,Flags,NBasis)
+   call chol_FFERF_AO2NO_OTF(Flags,SAPT%monB,CholErfVecsOTF,AOBasis,NBasis)
+ 
+   deallocate(CholErfVecsOTF%R)
+   deallocate(CholErfVecsOTF%ShellPairs)
+   deallocate(CholErfVecsOTF%ShellPairLoc,CholErfVecsOTF%ShellPairDim)
+   deallocate(CholErfVecsOTF%SubsetDim,CholErfVecsOTF%SubsetBounds)
+
+   ! temp solution: assemble FOFOERF files
+   call chol_fofo_batch(SAPT%monB%num0+SAPT%monB%num1,SAPT%monB%FOErf, &
+                        SAPT%monB%num0+SAPT%monB%num1,SAPT%monB%FOErf, &
+                        SAPT%monB%NCholErf,NBasis,'FOFOERFBB')
+
+   call sapt_response(Flags,SAPT%monB,SAPT%EnChck,NBasis)
+
+elseif(Flags%ICholeskyOTF==1) then
+
+   return
+
+endif
+
+end subroutine sapt_mcsrdft_otf
+
 subroutine sapt_dmft(Flags,SAPT,Tcpu,Twall,NBasis)
 !
 ! sapt driver with DMFT
@@ -377,6 +445,7 @@ integer :: i
     !call e2disp_Chol(Flags,SAPT%monA,SAPT%monB,SAPT)
     !call e2disp_Cmat(Flags,SAPT%monA,SAPT%monB,SAPT)
 
+    !if (Flags%IFunSR/=0) call e2disp_cpld(Flags,SAPT%monA,SAPT%monB,SAPT)
     if(.not.SAPT%CAlpha) then
       ! Adam's test
       !call e2disp_Cmat_Chol(Flags,SAPT%monA,SAPT%monB,SAPT)
@@ -564,7 +633,7 @@ double precision :: NO(NBasis*NBasis)
 
        if(regular) then
 
-          if(Flags%IFunSR/=0) then
+          if (Flags%IFunSR/=0) then
              if (Flags%IDALTON == 1) then
                 call calc_resp_dft_dalton(Mon,Flags,NAO,NBasis)
              elseif (Flags%IDALTON == 0) then
@@ -671,12 +740,13 @@ if(Flags%ISERPA==0) then
   endif
 
   if(Flags%IRDM2Typ==11.and.Flags%ICholeskyOTF==1) then ! for BB in ERPA: temporary fix
+  !if(Flags%ICholeskyOTF==1) then ! for BB in ERPA: temporary fix
      ! integrals stored as (ov|ov)
-     !call chol_ovov_batch(B%num0+B%num1,B%num0,B%FO,A%num0+A%num1,A%num0,A%FO, &
-     !                     A%NChol,NBasis,'TWOMOAB')
-     ! ver0 allocates one extra FO|NChol matrix but is faster
-     call chol_ovov_batch_ver0(B%num0+B%num1,B%num0,B%FO,A%num0+A%num1,A%num0,A%FO, &
+     call chol_ovov_batch(B%num0+B%num1,B%num0,B%FO,A%num0+A%num1,A%num0,A%FO, &
                           A%NChol,NBasis,'TWOMOAB')
+     ! ver0 allocates one extra FO|NChol matrix but is faster
+     !call chol_ovov_batch_ver0(B%num0+B%num1,B%num0,B%FO,A%num0+A%num1,A%num0,A%FO, &
+     !                     A%NChol,NBasis,'TWOMOAB')
   endif
 
   write(LOUT,'(/1x,a)') 'Transforming E2exch-ind integrals...'
@@ -703,8 +773,6 @@ if(Flags%ISERPA==0) then
      
 
      ! term A3-ind
-     print*, 'A:',A%num0,A%num1
-     print*, 'A:',B%num0,B%num1
      if(allocated(A%FO)) print*, 'A%FO is allocated',A%NChol
      if(allocated(B%FO)) print*, 'B%FO is allocated'
      call chol_fofo_batch(A%num0+A%num1,A%FO,B%num0+B%num1,B%FO, &
@@ -765,6 +833,21 @@ if(Flags%ISERPA==0) then
      !call chol_ints_fofo(NBasis,A%num0+A%num1,A%FF,  &
      !                    NBasis,A%num0+A%num1,B%FFBA,&
      !                    A%NChol,NBasis,'FOFOAABA')
+
+     block
+     if (Flags%ICholeskyOTF==1 .and. A%doRSH) then
+        print*, 'temp solution for MC-srDFT with CholeskyOTF...'
+        ! temp solution: assemble FOFO files
+        call chol_fofo_batch(A%num0+A%num1,A%FO, &
+                             A%num0+A%num1,A%FO, &
+                             A%NChol,NBasis,'FOFOAA')
+     endif
+     if (Flags%ICholeskyOTF==1 .and. B%doRSH) then
+        call chol_fofo_batch(B%num0+B%num1,B%FO, &
+                             B%num0+B%num1,B%FO, &
+                             B%NChol,NBasis,'FOFOBB')
+     endif
+     end block
 
      deallocate(A%FO)
      deallocate(B%FO)
@@ -1357,6 +1440,7 @@ call clock('START',Tcpu,Twall)
 
  case(TWOMO_FOFO)
    if(Flags%ICholesky==1) then
+
       if (Flags%ICholeskyBIN==1) then
          call chol_ints_fofo(NBas,NBas,Mon%FF, &
                         Mon%num0+Mon%num1,Mon%num0+Mon%num1,Mon%FF,&
@@ -1367,12 +1451,16 @@ call clock('START',Tcpu,Twall)
       elseif (Flags%ICholeskyOTF==1) then
           write(LOUT,'(1x,a,i2)') 'Skipping FFOO/FOFO for monomer ',Mon%Monomer
           call chol_FFXX_mon_AO2NO_OTF(Flags,Mon,CholeskyVecsOTF,AOBasis,NBas)
+          
           ! SAPT+DALTON avoids Fock matrix in sapt_interface (no need
           ! for canonicalization). The J, K and W (=V+J) matrices
           ! are calculate now from Cholesky FFXX vectors.
           if (Flags%InterfaceType==1) call chol_JKmat_AO_OTF(Mon,NBas)
           if (Flags%InterfaceType==1) call CholeskyOTF_elpot_AO(Mon,NBas)
+
+          if (Flags%IFunSR/=0) deallocate(Mon%FF) ! only needed for JKmat
       endif
+
       !call chol_ints_gen(NBas,NBas,Mon%FF, &
       !               Mon%num0+Mon%num1,Mon%num0+Mon%num1,Mon%OO,&
       !               Mon%NChol,twojfile)
@@ -1772,7 +1860,8 @@ endif
 ! ....
 
 ! delete files
-call delfile('AOTWOSORT')
+if(Flags%ICholesky/=0) call delfile('AOTWOSORT')
+
 if(SAPT%monA%TwoMoInt==TWOMO_INCORE.or.&
    SAPT%monA%TwoMoInt==TWOMO_FFFF) then
    call delfile('TWOMOAA')
@@ -1785,6 +1874,8 @@ call delfile ('ONEEL_A')
 call delfile ('ONEEL_B')
 
 call delfile('TMPOOAB')
+
+if (Flags%ICholeskyOTF) call delfile('cholesky')
 
 if(SAPT%SaptLevel/=1) then
    call delfile('TWOMOAB')

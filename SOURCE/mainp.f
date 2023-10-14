@@ -78,6 +78,8 @@ C     FILL COMMONS AND CONSTANTS
 C
       Title   = Flags%JobTitle
 C
+      IUnits  = Flags%IUnits
+C
       ITwoEl  = Flags%ITwoEl
       ICholesky     = Flags%ICholesky
       ICholeskyBIN  = Flags%ICholeskyBIN

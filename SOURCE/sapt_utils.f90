@@ -445,7 +445,14 @@ double precision,allocatable :: ABMin(:,:),Work(:)
  ! zero iter
  !call amplitudes_T1_cphf(OmM0,wVecxYY,amps,M%NDimX)
  call amplitudes_T1_cerpa(ABlock,ABlockIV,nblk,wVecxYY,amps,M%NDimX)
- print*, 'amp-1',norm2(amps)
+
+ !block
+ !print*, 'amp-1',norm2(amps)
+ !do pq=1,10
+ !   print*, 'pq',pq,amps(pq)
+ !enddo
+ !end block
+
  e2indxy = 0
  do pq=1,M%NDimX
     ip = M%IndN(1,pq)
@@ -569,6 +576,7 @@ do iblk=1,nblk
      enddo
 
      call dsytrs('U',A%n,1,A%matY,A%n,A%ipiv,tmp,A%n,info)
+!     print*, 'info',info,norm2(A%matY)
 
      do i=1,A%n
         ipos = A%pos(i)
@@ -578,7 +586,6 @@ do iblk=1,nblk
 
    end associate
 enddo
-
 ! block IV
 associate(A => ABlockIV)
 

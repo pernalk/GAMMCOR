@@ -1,4 +1,4 @@
-module choleskyOTF_interface
+module CholeskyOTF_interface
 
 use print_units
 use tran
@@ -11,8 +11,8 @@ use Cholesky_driver, only : chol_Rkpq_OTF, chol_Rkab_OTF, chol_F, chol_H0_mo
 contains
 
 subroutine CholeskyOTF_ao_vecs(CholeskyVecsOTF, &
-                          AOBasis,System,XYZPath,BasisSetPath, &
-                          SortAngularMomenta, Accuracy)
+                          AOBasis,System,Units,XYZPath,BasisSetPath, &
+                          SortAngularMomenta, Accuracy, Omega)
 !
 !           Generate Cholesky vectors in AO basis on-the-fly
 !
@@ -29,13 +29,15 @@ subroutine CholeskyOTF_ao_vecs(CholeskyVecsOTF, &
 
             implicit none
 
-            type(TCholeskyVecsOTF), intent(out) :: CholeskyVecsOTF
-            type(TAOBasis), intent(out)         :: AOBasis
-            type(TSystem), intent(out)          :: System
-            character(*), intent(in)            :: XYZPath
-            character(*), intent(in)            :: BasisSetPath
-            logical, intent(in)                 :: SortAngularMomenta
-            integer, intent(in)                 :: Accuracy
+            type(TCholeskyVecsOTF), intent(out)    :: CholeskyVecsOTF
+            type(TAOBasis), intent(out)            :: AOBasis
+            type(TSystem), intent(out)             :: System
+            character(*), intent(in)               :: XYZPath
+            character(*), intent(in)               :: BasisSetPath
+            logical, intent(in)                    :: SortAngularMomenta
+            integer, intent(in)                    :: Units
+            integer, intent(in)                    :: Accuracy
+            double precision, optional, intent(in) :: Omega
 
             logical, parameter :: SpherAO = .true.
 
@@ -45,7 +47,7 @@ subroutine CholeskyOTF_ao_vecs(CholeskyVecsOTF, &
             !
             ! Read the XYZ coordinates and atom types
             !
-            call sys_Read_XYZ(System, XYZPath)
+            call sys_Read_XYZ(System, XYZPath,Units)
             !
             call sys_Init(System,SYS_TOTAL)
             !
@@ -57,7 +59,12 @@ subroutine CholeskyOTF_ao_vecs(CholeskyVecsOTF, &
             !
             ! Compute Cholesky vectors in AO basis
             !
-            call chol_Rkpq_OTF(CholeskyVecsOTF, AOBasis, Accuracy)
+            if (present(Omega)) then
+               print*, 'calling chol_Rkpq_OTF with omega = ',Omega
+               call chol_Rkpq_OTF(CholeskyVecsOTF, AOBasis, Accuracy, Omega)
+            else
+               call chol_Rkpq_OTF(CholeskyVecsOTF, AOBasis, Accuracy)
+            endif
 
 end subroutine CholeskyOTF_ao_vecs
 

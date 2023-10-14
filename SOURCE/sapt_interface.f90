@@ -59,6 +59,9 @@ double precision :: tmp
 double precision :: potnucA,potnucB
 double precision :: potnuc,emy,eactiv,emcscf
 
+character(:),allocatable :: XYZPath
+character(:),allocatable :: BasisSetPath
+
 double precision,allocatable :: work1(:),work2(:)
 double precision,allocatable :: work(:,:)
 double precision,allocatable :: Ha(:),Hb(:)
@@ -229,7 +232,6 @@ SAPT%monB%NDim = NBasis*(NBasis-1)/2
             call readtwoint(NBasis,1,'AOERFINT_A','AOERFSORT',MemSrtSize)
             call readtwoint(NBasis,1,'AOERFINT_B','AOERFSORTB',MemSrtSize)
          endif
-         !call readtwoint(NBasis,1,'AOSR2INT','AOSR2SORT',MemSrtSize)  ! skip that for now
 
          if(SAPT%IPrint.gt.1) then
             write(lout,'(/1x,a)') "Sorting AO integrals DALTON interface:"
@@ -294,16 +296,12 @@ SAPT%monB%NDim = NBasis*(NBasis-1)/2
 
        call auto2e_init()
 
-       block
-        character(:),allocatable :: XYZPath
-        character(:),allocatable :: BasisSetPath
 
-        XYZPath = "./input.inp"
-        BasisSetPath = BasisSet
-        SortAngularMomenta = .true.
+       XYZPath = "./input.inp"
+       BasisSetPath = BasisSet
+       SortAngularMomenta = .true.
 
-        print*, 'WARNING: move CholeskyOTF_ao_vecs to new module!'
-        call CholeskyOTF_ao_vecs(CholeskyVecsOTF,AOBasis,System, &
+       call CholeskyOTF_ao_vecs(CholeskyVecsOTF,AOBasis,System,Flags%IUnits, &
                                  XYZPath,BasisSetPath, &
                                  SortAngularMomenta,Flags%ICholeskyAccu)
 
@@ -311,27 +309,7 @@ SAPT%monB%NDim = NBasis*(NBasis-1)/2
        SAPT%monA%NChol = SAPT%NCholesky
        SAPT%monB%NChol = SAPT%NCholesky
 
-       end block
-
-    endif
-
-    ! with Cholesky treat LR integrals in a regular manner...
-    if(doRSH) then
-
-      if (SAPT%SameOm) then
-         call readtwoint(NBasis,1,'AOERFINT_A','AOERFSORT',MemSrtSize)
-      else
-         call readtwoint(NBasis,1,'AOERFINT_A','AOERFSORT',MemSrtSize)
-         call readtwoint(NBasis,1,'AOERFINT_B','AOERFSORTB',MemSrtSize)
-      endif
-
-      if(SAPT%IPrint.gt.1) then
-         write(lout,'(/1x,a)') "Sorting AO integrals DALTON interface:"
-         write(lout,'(1x,a)') "AOTWOSORT should contain full-range integrals"
-         write(lout,'(1x,a)') "AOERFSORT should contain LR integrals"
-         !write(lout,'(1x,a)') "AOSR2SORT should contain SR integrals"
-      endif
-    endif
+    endif ! CholeskyOTF
 
  endif
  call clock('2ints',Tcpu,Twall)
@@ -451,8 +429,8 @@ SAPT%monB%NDim = NBasis*(NBasis-1)/2
  ! transform Cholesky Vecs to NO
  if(Flags%ICholeskyBIN==1) then
     !call chol_sapt_AO2NO_BIN(SAPT,SAPT%monA,SAPT%monB,CholeskyVecs,NBasis,Flags%MemVal,Flags%MemType)
-    call chol_OO_sapt_AO2NO_BIN(SAPT,SAPT%monA,SAPT%monB,CholeskyVecs,NBasis,Flags%MemVal,Flags%MemType)
-    call chol_FO_sapt_AO2NO_BIN(SAPT,SAPT%monA,SAPT%monB,CholeskyVecs,NBasis,Flags%MemVal,Flags%MemType)
+    call chol_OO_sapt_AO2NO_BIN(SAPT%monA,SAPT%monB,CholeskyVecs,NBasis,Flags%MemVal,Flags%MemType)
+    call chol_FO_sapt_AO2NO_BIN(SAPT%monA,SAPT%monB,CholeskyVecs,NBasis,Flags%MemVal,Flags%MemType)
     call chol_FF_sapt_AO2NO_BIN(SAPT,SAPT%monA,SAPT%monB,CholeskyVecs,NBasis,Flags%MemVal,Flags%MemType)
     call clock('chol_AO2NO_BIN',Tcpu,Twall)
  elseif(Flags%ICholeskyOTF==1) then
@@ -526,6 +504,54 @@ SAPT%monB%NDim = NBasis*(NBasis-1)/2
  endif
 
 end subroutine sapt_interface
+
+subroutine sapt_erfint_OTF(Flags,MON,NBasis,AOBasis,CholErfVecsOTF)
+!
+! generate Long-Range Cholesky vectors in AO
+!
+implicit none
+
+type(FlagsData)        :: Flags
+type(SystemBlock)      :: Mon
+type(TCholeskyVecsOTF) :: CholErfVecsOTF
+type(TAOBasis)         :: AOBasis
+integer,intent(in)     :: NBasis
+
+type(TSystem)          :: System
+
+character(:),allocatable :: XYZPath
+character(:),allocatable :: BasisSet, BasisSetPath
+
+integer :: i
+logical :: doRSH
+logical :: SortAngularMomenta
+
+doRSH = .false.
+if(Flags%IFunSR==1.or.Flags%IFunSR==2) doRSH = .true.
+if(.not.doRSH) stop "Wrong Call for Cholesky Erf ERIs OTF!"
+
+XYZPath = "./input.inp"
+SortAngularMomenta = .true.
+
+! set basis set
+BasisSet = Flags%BasisSetPath // Flags%BasisSet
+
+write(lout,'(/1x,3a6)') ('******',i=1,3)
+write(lout,'(1x,a)') 'Cholesky LR On-The-Fly'
+write(lout,'(1x,3a6)') ('******',i=1,3)
+
+call auto2e_init()
+
+!Mon%Omega = 100.0
+!print*, 'Mon%OMega' , Mon%OMega
+call CholeskyOTF_ao_vecs(CholErfVecsOTF,AOBasis,System,Flags%IUnits, &
+                         XYZPath,BasisSet, &
+                         SortAngularMomenta,Flags%ICholeskyAccu, &
+                         Mon%Omega)
+
+Mon%NCholErf = CholErfVecsOTF%NVecs
+
+end subroutine sapt_erfint_OTF
 
 subroutine internal_orbgrid(Flags,AOBasis,System,Wg,Phi,NPoints,NAO)
 implicit none
@@ -2930,10 +2956,9 @@ print*, 'B%FFBA',norm2(B%FFBA)
 
 end subroutine chol_sapt_AO2NO_OTF
 
-subroutine chol_OO_sapt_AO2NO_BIN(SAPT,A,B,CholeskyVecs,NBasis,MemVal,MemType)
+subroutine chol_OO_sapt_AO2NO_BIN(A,B,CholeskyVecs,NBasis,MemVal,MemType)
 implicit none
 
-type(SaptData)      :: SAPT
 type(SystemBlock)   :: A, B
 type(TCholeskyVecs) :: CholeskyVecs
 integer,intent(in)  :: NBasis
@@ -3059,14 +3084,13 @@ print*, 'A%OOBA',norm2(B%OOBA)
 
 end subroutine chol_OO_sapt_AO2NO_OTF
 
-subroutine chol_FO_sapt_AO2NO_BIN(SAPT,A,B,CholeskyVecs,NBasis,MemVal,MemType)
+subroutine chol_FO_sapt_AO2NO_BIN(A,B,CholeskyVecs,NBasis,MemVal,MemType)
 !
 ! prepare (NChol,NBasis*dimO) matrices for FOFO integrals (BIN version)
 ! (FO|AA), (FO|BB), (FO|AB), (FO|BA)
 !
 implicit none
 
-type(SaptData)      :: SAPT
 type(SystemBlock)   :: A, B
 type(TCholeskyVecs) :: CholeskyVecs
 integer,intent(in)  :: NBasis
@@ -3271,6 +3295,116 @@ call chol_Rkab_OTF(B%FOBA,B%CAONO,1,NBasis,A%CAONO,1,dimOA, &
 call clock('AFOAB+BFOBA',Tcpu,Twall)
 
 end subroutine chol_FO_sapt_AO2NO_OTF
+
+subroutine chol_FOERF_AO2NO_OTF(SAPT,MON,CholErfVecsOTF,AOBasis,Flags,NBasis)
+!
+! prepare (NCholERF,NBasis*dimO) matrices for ERF FOFO integrals (OTF version)
+! (FO | erf(w_A r) | AA)
+!
+implicit none
+
+type(SaptData)         :: SAPT
+type(SystemBlock)      :: MON
+type(TAOBasis)         :: AOBasis
+type(TCholeskyVecsOTF) :: CholErfVecsOTF
+type(FlagsData)        :: Flags
+integer,intent(in)     :: NBasis
+
+integer :: NCholErf
+integer :: MaxBufferDimMB
+integer :: ORBITAL_ORDERING
+integer :: dimO
+integer :: i,j,ip,iq,ipq
+double precision :: Cpq
+
+double precision :: Tcpu,Twall
+
+call clock('START',Tcpu,Twall)
+
+! set dimensions
+NCholErf = CholErfVecsOTF%NVecs
+dimO = MON%num0+MON%num1
+
+! set orbital ordering
+if(SAPT%InterfaceType==1) then
+   ORBITAL_ORDERING = ORBITAL_ORDERING_DALTON
+elseif(SAPT%InterFaceType==2) then
+   ORBITAL_ORDERING = ORBITAL_ORDERING_MOLPRO
+else
+   print*, 'SAPT with Cholesky OTF does not work with this Interface!'
+   print*, SAPT%InterfaceType
+   stop
+endif
+
+! set buffer size
+if(Flags%MemType == 2) then       !MB
+   MaxBufferDimMB = Flags%MemVal
+elseif(Flags%MemType == 3) then   !GB
+   MaxBufferDimMB = Flags%MemVal * 1024_8
+endif
+
+allocate(MON%FOErf(NCholErf,NBasis*dimO))
+
+call chol_Rkab_OTF(MON%FOErf,MON%CAONO,1,NBasis,MON%CAONO,1,dimO, &
+                   MaxBufferDimMB,CholErfVecsOTF,AOBasis,ORBITAL_ORDERING)
+
+if (MON%Monomer==1) call clock('AFOERF',Tcpu,Twall)
+if (MON%Monomer==2) call clock('BFOERF',Tcpu,Twall)
+
+end subroutine chol_FOERF_AO2NO_OTF
+
+subroutine chol_FFERF_AO2NO_OTF(Flags,M,CholErfVecsOTF,AOBasis,NBasis)
+!
+! performs AO2NO transformation
+! to generate FFERF(NCholErf,NBasis**2) vectors
+!
+implicit none
+
+type(FlagsData)        :: Flags
+type(SystemBlock)      :: M
+type(TAOBasis)         :: AOBasis
+type(TCholeskyVecsOTF) :: CholErfVecsOTF
+integer,intent(in)     :: NBasis
+
+integer :: NCholErf
+integer :: MaxBufferDimMB
+integer :: ORBITAL_ORDERING
+
+double precision :: Tcpu,Twall
+
+call clock('START',Tcpu,Twall)
+
+! set dimensions
+NCholErf = CholErfVecsOTF%NVecs
+
+! set buffer size
+if(Flags%MemType == 2) then       !MB
+   MaxBufferDimMB = Flags%MemVal
+elseif(Flags%MemType == 3) then   !GB
+   MaxBufferDimMB = Flags%MemVal * 1024_8
+endif
+!write(lout,'(1x,a,i5,a)') 'Using ',MaxBufferDimMB,' MB for 3-indx AO2NO transformation'
+
+! set orbital ordering
+if(Flags%InterfaceType==1) then
+   ORBITAL_ORDERING = ORBITAL_ORDERING_DALTON
+elseif(Flags%InterFaceType==2) then
+   ORBITAL_ORDERING = ORBITAL_ORDERING_MOLPRO
+else
+   print*, 'SAPT with Cholesky OTF does not work with this Interface!'
+   stop
+endif
+
+allocate(M%FFERF(NCholErf,NBasis**2))
+
+call chol_Rkab_OTF(M%FFErf,M%CAONO,1,NBasis,M%CAONO,1,NBasis,&
+                   MaxBufferDimMB,CholErfVecsOTF, &
+                   AOBasis,ORBITAL_ORDERING)
+
+if (M%Monomer==1) call clock('AFFErf',Tcpu,Twall)
+if (M%Monomer==2) call clock('BFFErf',Tcpu,Twall)
+
+end subroutine chol_FFERF_AO2NO_OTF
 
 subroutine chol_FFXX_mon_AO2NO_OTF(Flags,M,CholeskyVecsOTF,AOBasis,NBasis)
 !

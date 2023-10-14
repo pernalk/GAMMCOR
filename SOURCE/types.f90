@@ -172,6 +172,7 @@ type SystemBlock
       integer :: ZNucl  = 0
       integer :: NBasis = 0
       integer :: NChol  = 0
+      integer :: NCholErf = 0
       integer :: Monomer = DIMER_AB
       integer :: NELE
       double precision :: XELE
@@ -254,6 +255,7 @@ type SystemBlock
       double precision,allocatable :: CMO(:,:),CAONO(:,:)
       double precision,allocatable :: OV(:,:),OO(:,:), &
                                       FO(:,:),FF(:,:), &
+                                      FOErf(:,:),FFErf(:,:), &
                                       FOAB(:,:),FOBA(:,:), &
                                       FFAB(:,:),FFBA(:,:), &
                                       OOAB(:,:),OOBA(:,:)
@@ -409,7 +411,7 @@ type SaptData
      integer :: NAO
      integer :: NCholesky
      integer :: NGrid
-     integer :: Max_Cn = 4
+     integer :: Max_Cn = 8
      integer :: ic6 = 0
      integer :: iPINO=-1
      integer :: IPrint = 1000
