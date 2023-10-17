@@ -1862,6 +1862,8 @@ endif
 ! delete files
 if(Flags%ICholesky/=0) call delfile('AOTWOSORT')
 
+if(Flags%ICholeskyOTF==1) call delfile('cholvecs')
+
 if(SAPT%monA%TwoMoInt==TWOMO_INCORE.or.&
    SAPT%monA%TwoMoInt==TWOMO_FFFF) then
    call delfile('TWOMOAA')

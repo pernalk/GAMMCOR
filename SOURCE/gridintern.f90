@@ -142,6 +142,13 @@ logical, parameter :: SpherAO = .true.
 XYZPath = "./input.inp"
 SortAngularMomenta = .true.
 
+! set units
+if (present(Units)) then
+   Units0 =  Units
+else
+   Units0 = SYS_UNITS_ANGSTROM
+endif
+
 call auto2e_init()
 call sys_Read_XYZ(System, XYZPath, Units0)
 call basis_NewAOBasis(AOBasis, System, BasisSetPath, SpherAO, SortAngularMomenta)
@@ -239,6 +246,27 @@ endif
 call internal_gga_ao_orbgrid(GridType,BasisSetPath,AOBasis,Wg,Phi,NPoints,NAO,Units0)
 call internal_tran_gga_orbgrid(CAONO,Phi(:,:,1),Phi(:,:,2),Phi(:,:,3),Phi(:,:,4), &
                                AOBasis,ExternalOrdering,NPoints,NAO,NBasis)
+
+!! additional tests
+!block
+!integer :: k
+!double precision :: RhoIntegral,DivRhoIntegral
+!double precision,allocatable :: Rho(:,:)
+!
+!allocate(Rho(NPoints, 4))
+!call gridfunc_GGA_Variables(Rho, Phi, CAONO, OccNumbers)
+!
+!DivRhoIntegral = 0d0
+!RhoIntegral = 0d0
+!do k = 1, NPoints
+!      RhoIntegral = RhoIntegral + Wg(k) * Rho(k, 1)
+!      DivRhoIntegral = DivRhoIntegral + Wg(k) * (Rho(k, 2) + Rho(k, 3) + Rho(k, 4))
+!end do
+!
+!print*, 'RhoIntegral    = ',RhoIntegral
+!print*, 'DivRhoIntegral = ',DivRhoIntegral
+!
+!end block
 
 end subroutine internal_gga_no_orbgrid
 

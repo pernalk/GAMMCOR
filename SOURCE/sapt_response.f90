@@ -1907,6 +1907,13 @@ endif
 ! testprints
 print*, 'IFunSR',Flags%IFunSR
 
+! test rho
+if (doGGA) then
+   call RhoGGAIntgrl(Mon%Occ,URe,OrbGrid,OrbXGrid,OrbYGrid,OrbZGrid,WGrid,NGrid,NBasis)
+else
+   call RhoLDAIntgrl(Mon%Occ,URe,OrbGrid,WGrid,NGrid,NBasis)
+endif
+
 call sq_to_triang2(Mon%Jsr,workTr,NBasis)
 allocate(VSR(NInte1))
 !
