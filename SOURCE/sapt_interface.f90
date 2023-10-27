@@ -393,8 +393,8 @@ SAPT%monB%NDim = NBasis*(NBasis-1)/2
  endif
 
  ! create approximate 2-rdm for SAPT(DMFT)
- if(SAPT%SaptExch==1.and.Flags%IRDM2Typ==11) call prepare_rdm2_approx(SAPT%monA,Flags%IRDM2Typ,NBasis)
- if(SAPT%SaptExch==1.and.Flags%IRDM2Typ==11) call prepare_rdm2_approx(SAPT%monB,Flags%IRDM2Typ,NBasis)
+ if(SAPT%SaptExch==1.and.Flags%IRDM2Typ/=1) call prepare_rdm2_approx(SAPT%monA,Flags%IRDM2Typ,NBasis)
+ if(SAPT%SaptExch==1.and.Flags%IRDM2Typ/=1) call prepare_rdm2_approx(SAPT%monB,Flags%IRDM2Typ,NBasis)
 
  allocate(SAPT%monA%CMO(NBasis,NBasis),SAPT%monB%CMO(NBasis,NBasis))
  ij=0
@@ -2059,6 +2059,7 @@ integer,intent(in) :: IRDM2Typ,NBasis
 integer :: i,j,k,l,ij,kl
 integer :: NOccup
 integer :: iunit,NRDM2Act
+double precision :: xnorm
 double precision,allocatable :: RDM2val(:,:,:,:)
 character(:),allocatable :: rdmfile
 integer,external :: NAddrRDM
@@ -2101,7 +2102,23 @@ elseif(IRdm2Typ==1.or.IRDM2Typ==11) then
       enddo
    enddo
 endif
-print*, 'RDM2val =',norm2(RDM2val)
+!print*, 'RDM2val =',norm2(RDM2val)
+
+xnorm = 0d0
+do i=1,NOccup
+   do j=1,NOccup
+      xnorm = xnorm + RDM2val(i,i,j,j)
+   enddo
+enddo
+
+if(mon%monomer==1) write(lout,'(/1x,a)') 'Monomer A'
+if(mon%monomer==2) write(lout,'(/1x,a)') 'Monomer B'
+write(lout,'(1x,a,f12.6)',advance="no") '2-RDM2 norm = ', xnorm
+write(lout,'(1x,a,f8.3,a)') '(reference =', Mon%XELE*(2d0*Mon%XELE-1), ')'
+
+!! re-normalize 2RDM
+!print*, 're-normalize 2-RDM...'
+!RDM2val = RDM2val * Mon%XELE*(2d0*Mon%XELE-1) / xnorm
 
 open(newunit=iunit,file=rdmfile,status='replace',&
      form='formatted')

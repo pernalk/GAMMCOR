@@ -1867,7 +1867,9 @@ subroutine ModABMin_FOFO(Occ,SRKer,Wt,OrbGrid,ABMin,&
                          IndN,IndX,NDimX,NGrid,NBasis,&
                          NAct,INActive,twokfile,twokerf,&
                          AB1,dfile)
-! ADD CONTRIBUTIONS FROM THE srALDA KERNEL TO AB MATRICES
+!
+! ADD CONTRIBUTIONS FROM THE srALDA KERNEL TO ABMIN MATRIX
+!
 use timing
 implicit none
 
