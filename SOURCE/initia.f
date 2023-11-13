@@ -324,6 +324,7 @@ C     on-the-fly
 C     for OTF Cholesky
       double precision :: UAONO(NBasis,NBasis)
       double precision,allocatable :: CMOAO(:,:),CAOMO(:,:)
+      logical :: iex
 
 
       If(iORCA==1) then
@@ -472,29 +473,37 @@ C
 C
       ElseIf(IBin.Eq.1) Then
 C
-      Open(10,File='NUC_REP.bin',form='unformatted',access='stream',
-     $ Status='Old')
-      Read(10) X
-      ENuc=X
-      Close(10)
+      Inquire(file='NUC_REP.bin',exist=iex)
+      if (iex) then
+         Open(10,File='NUC_REP.bin',form='unformatted',access='stream',
+     $        Status='Old')
+         Read(10) X
+         ENuc=X
+         Close(10)
+      Else
+         ENuc = 0d0
+      EndIf ! NUC_REP.bin
 C
-      Open(10,File='FACT.bin',form='unformatted',access='stream',
-     $ Status='Old')
-      If(LiborNew.Eq.1) Read(10)I,J,K
-      ICount=0
-      IJ=0
-      Do I=1,NBasis
-      Do J=1,I
-      IJ=IJ+1
-      Read(10,End=31) X
-      Ind=I*(I-1)/2+J
-      XKin(Ind)=X
-      ICount=ICount+1
-      EndDo
-      EndDo
-   31 Close(10)
-      Write(6,'(" The number of 1-el integrals read vs. expected",
-     $ 2I10)') ICount,NInte1
+      Inquire(file='FACT.bin',exist=iex)
+      If (iex) then
+         Open(10,File='FACT.bin',form='unformatted',access='stream',
+     $        Status='Old')
+         If(LiborNew.Eq.1) Read(10)I,J,K
+         ICount=0
+         IJ=0
+         Do I=1,NBasis
+         Do J=1,I
+         IJ=IJ+1
+         Read(10,End=31) X
+         Ind=I*(I-1)/2+J
+         XKin(Ind)=X
+         ICount=ICount+1
+         EndDo
+         EndDo
+   31    Close(10)
+         Write(6,'(" The number of 1-el integrals read vs. expected",
+     $         2I10)') ICount,NInte1
+      EndIf ! FACT.bin
 C
       If(ITwoEl.Eq.1) Then
 C

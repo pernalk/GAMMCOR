@@ -289,6 +289,8 @@ if(IH0Test==1) then
    call CholeskyOTF_H0_test(H0_int,H0_mo,NBasis)
 elseif(IH0Test==0) then
    write(6,'(/,1x,"Skipping H0 Test...")')
+   call sq_to_triang2(H0_int,H0in,NBasis)
+   H0_mo = H0_int
 endif
 
 !transform Cholesky vecs to MO
