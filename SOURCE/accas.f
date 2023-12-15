@@ -644,10 +644,10 @@ C
 C
       Character*60 FName
       Real*8, Dimension(:), Allocatable :: TwoEl2
-      Real*8, Dimension(:), Allocatable :: OrbGrid
-      Real*8, Dimension(:), Allocatable :: OrbXGrid
-      Real*8, Dimension(:), Allocatable :: OrbYGrid
-      Real*8, Dimension(:), Allocatable :: OrbZGrid
+      Real*8, Dimension(:,:), Allocatable :: OrbGrid
+      Real*8, Dimension(:,:), Allocatable :: OrbXGrid
+      Real*8, Dimension(:,:), Allocatable :: OrbYGrid
+      Real*8, Dimension(:,:), Allocatable :: OrbZGrid
       Real*8, Dimension(:), Allocatable :: WGrid
       Real*8, Dimension(:), Allocatable :: SRKer
       Real*8, Dimension(:), Allocatable :: Work
@@ -663,6 +663,8 @@ C
      $ VCoul(NInte1),Den(NBasis,NBasis),Work2(NInte1)
 C
 C     LOCAL ARRAYS
+C
+      Integer(8) :: MemSrtSize
 C
       Dimension
      $ ABPLUS(NDimX*NDimX),ABMIN(NDimX*NDimX),
@@ -701,10 +703,10 @@ C
 C
       Allocate  (TwoEl2(NInte2))
       Allocate  (WGrid(NGrid))
-      Allocate  (OrbGrid(NBasis*NGrid))
-      Allocate  (OrbXGrid(NBasis*NGrid))
-      Allocate  (OrbYGrid(NBasis*NGrid))
-      Allocate  (OrbZGrid(NBasis*NGrid))
+      Allocate  (OrbGrid(NGrid,NBasis))
+      Allocate  (OrbXGrid(NGrid,NBasis))
+      Allocate  (OrbYGrid(NGrid,NBasis))
+      Allocate  (OrbZGrid(NGrid,NBasis))
       Allocate  (Work(NGrid))
 C
 c      Call EKT(URe,Occ,XOne,TwoNO,NBasis,NInte1,NInte2)
@@ -712,7 +714,7 @@ C
 C     load orbgrid and gradients, and wgrid
 C
       Call molprogrid(OrbGrid,OrbXGrid,OrbYGrid,OrbZGrid,
-     $ WGrid,UNOAO,NGrid,NBasis)
+     $                WGrid,UNOAO,NGrid,NBasis)
 C
 C     set/load symmetries of NO's
 C
@@ -765,18 +767,19 @@ C
 C     if IFunSR.Gt.0 (but different from 3) TwoEl includes lr-integrals with erf/r
 C     load full-range two-electron integrals and transform to NO
 C
-      Do I=1,60
-      FName(I:I)=' '
-      EndDo
-      K=0
-    5 K=K+1
-      If (Title(K:K).Ne.' ') Then
-      FName(K:K)=Title(K:K)
-      GoTo 5
-      EndIf
-      FName(K:K+10)='.reg.integ'
+C      Do I=1,60
+C      FName(I:I)=' '
+C      EndDo
+C      K=0
+C    5 K=K+1
+C      If (Title(K:K).Ne.' ') Then
+C      FName(K:K)=Title(K:K)
+C      GoTo 5
+C      EndIf
+C      FName(K:K+10)='.reg.integ'
 C      Call Int2_AO(TwoEl2,NumOSym,MultpC,FName,NInte1,NInte2,NBasis)
-      Call readtwoint(NBasis,2,'AOTWOINT.mol','AOTWOSORT',134*1024_8**2)
+      MemSrtSize=MemVal*1024_8**MemType
+      Call readtwoint(NBasis,2,'AOTWOINT.mol','AOTWOSORT',MemSrtSize)
       If(ITwoEl.Eq.1) Call LoadSaptTwoEl(3,TwoEl2,NBasis,NInte2)
 C
       If(ITwoEl.Eq.1) Then
@@ -991,10 +994,11 @@ C
       If(ISym.Eq.1) Then
       Do I=1,NGrid
       XKer1234=XKer1234+Work(I)*
-C     $ OrbGrid(IA+(I-1)*NBasis)*OrbGrid(IB+(I-1)*NBasis)*
-C     $ OrbGrid(IC+(I-1)*NBasis)*OrbGrid(ID+(I-1)*NBasis)
-     $ OrbGrid(I+(IA-1)*NGrid)*OrbGrid(I+(IB-1)*NGrid)*
-     $ OrbGrid(I+(IC-1)*NGrid)*OrbGrid(I+(ID-1)*NGrid)
+CC     $ OrbGrid(IA+(I-1)*NBasis)*OrbGrid(IB+(I-1)*NBasis)*
+CC     $ OrbGrid(IC+(I-1)*NBasis)*OrbGrid(ID+(I-1)*NBasis)
+c    $ OrbGrid(I+(IA-1)*NGrid)*OrbGrid(I+(IB-1)*NGrid)*
+c    $ OrbGrid(I+(IC-1)*NGrid)*OrbGrid(I+(ID-1)*NGrid)
+     $ OrbGrid(I,IA)*OrbGrid(I,IB)*OrbGrid(I,IC)*OrbGrid(I,ID)
       EndDo
       EndIf
 C
