@@ -643,8 +643,8 @@ enddo
 ! energy loop
 allocate(ints(NBasis,NBasis))
 
-EAll   = 0
-EIntra = 0
+EAll   = 0d0
+EIntra = 0d0
 
 if(ICholesky==0) then
 
@@ -1128,8 +1128,8 @@ double precision :: AuxCoeff(3,3,3,3),AuxVal,val
 double precision :: EnDummy,Aux,Crs,Cpq,EIntra,EAll
 double precision,allocatable :: EigY(:,:),EigY1(:,:)
 double precision,allocatable :: Eig(:),Eig1(:)
-double precision,allocatable :: RDM2val(:,:,:,:),RDM2Act(:)
-double precision,allocatable :: work1(:),work2(:)
+double precision,allocatable :: RDM2Act(:)
+double precision,allocatable :: work1(:)
 double precision,allocatable :: workA(:,:)
 double precision,allocatable :: ints(:,:)
 double precision,allocatable :: EigYt(:,:),EigXt(:,:),Eigt(:)
@@ -1465,8 +1465,11 @@ do i=1,NDimX
 enddo
 !
 ! energy loop
-EAll = 0
-EIntra = 0
+allocate(work1(NBasis*NBasis),ints(NBasis,NBasis))
+
+EAll   = 0d0
+EIntra = 0d0
+
 open(newunit=iunit,file='FOFOERF',status='OLD', &
      access='DIRECT',recl=8*NBasis*NOccup)
 
@@ -1514,6 +1517,8 @@ ECorr = EAll-EIntra
 
 print*, 'EAll,EIntra',EAll,EIntra
 
+close(iunit)
+
 endif
 
 !call sq_to_triang2(HNO,work1,NBasis)
@@ -1538,8 +1543,7 @@ endif
 !
 !write(LOUT,*) 'WMAT-my', 2d0*norm2(WMAT)
 
-deallocate(RDM2val)
-deallocate(ints,work2,work1)
+deallocate(ints,work1)
 deallocate(Eig,EigY)
 
 call clock('Y01CASLR:ENE',Tcpu,Twall)
