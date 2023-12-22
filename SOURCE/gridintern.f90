@@ -55,7 +55,8 @@ type(TSystem)   :: System
 
 integer,intent(in)  :: GridType
 integer,intent(in)  :: NAO
-character(:),allocatable :: BasisSetPath
+character(*) :: BasisSetPath
+!character(:),allocatable :: BasisSetPath
 integer,intent(out) :: NPoints
 integer,optional :: Units
 
@@ -120,7 +121,8 @@ type(TSystem)   :: System
 
 integer,intent(in)  :: GridType
 integer,intent(in)  :: NAO
-character(:),allocatable :: BasisSetPath
+character(*)        :: BasisSetPath
+!character(:),allocatable :: BasisSetPath
 integer,intent(out) :: NPoints
 
 double precision, dimension(:,:,:), allocatable :: Phi
@@ -193,7 +195,8 @@ integer,intent(in) :: NAO,NBasis
 integer,intent(in) :: ExternalOrdering
 
 double precision,intent(in) :: CAONO(NAO,NBasis)
-character(:),allocatable    :: BasisSetPath
+character(*)        :: BasisSetPath
+!character(:),allocatable    :: BasisSetPath
 
 integer, optional :: Units
 
@@ -230,7 +233,8 @@ integer,intent(in) :: GridType
 integer,intent(in) :: NAO,NBasis
 integer,intent(in) :: ExternalOrdering
 double precision,intent(in) :: CAONO(NAO,NBasis)
-character(:),allocatable    :: BasisSetPath
+character(*) :: BasisSetPath
+!character(:),allocatable    :: BasisSetPath
 
 integer, optional :: Units
 

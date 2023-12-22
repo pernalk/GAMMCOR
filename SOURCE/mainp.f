@@ -87,6 +87,10 @@ C
       ICholeskyAccu = Flags%ICholeskyAccu
       IH0test       = Flags%IH0test
 C
+      InternalGrid  = Flags%InternalGrid
+      IGridType     = Flags%IGridType
+      IOrbOrder     = Flags%ORBITAL_ORDERING
+C
       MemVal  = Flags%MemVal
       MemType = Flags%MemType
 C
@@ -224,7 +228,8 @@ C     IFunSR = 0 - do not include a short-range functional
 C     IFunSR = 1 - SR-LSDA, Paziani et al.
 C     IFunSR = 2 - SR-PBE, Goll et al. PCCP 7, (2005) 3917
 C     IFunSR = 3 - Gagliardi-Truhlar with PBE
-C     IFunSR = 4 - LR-CAS+SR-PBE+LR-AC/AC0 (with full range CAS RDM's)
+C     IFunSR = 4 - LR-CAS+SR-DFA+LR-AC/AC0 (with full range CAS RDM's)
+C                  WARNING! IFunSR2 is used for SR-LSDA/SR-PBE
 C
 C     OTHERS
 C
@@ -234,6 +239,7 @@ C     IFunSR = 7 - VV10 (nonlocal correlation functional, integrals not loaded)
 C
       IFunSR=Flags%IFunSR
       IFunSRKer=Flags%IFunSRKer
+      IFunSR2=Flags%IFunSR2
 C
       If(IFunSRKer.Eq.2)Stop'Fatal Error: Kernel for PBE not available!'
       Write(*,'(/,1x,"IFunSR=",I1)')IFunSR
@@ -300,7 +306,7 @@ C
 C
       If(IFunSR.Ne.0) Then
 C      Call GetNGrid(NGrid,Title)
-      Call molprogrid0(NGrid,NBasis)
+      If (InternalGrid==0) Call molprogrid0(NGrid,NBasis)
       Else
       NGrid=1
       EndIf
@@ -381,7 +387,7 @@ C
       ElseIf(IFunSR.Eq.7) Then
       Call VV10(URe,UMOAO,Occ,NBasis)
       Else
-      Call DMSCF(Title,URe,Occ,XKin,XNuc,ENuc,UMOAO,
+      Call DMSCF(Title,BasisSet,URe,Occ,XKin,XNuc,ENuc,UMOAO,
      $ TwoEl,NBasis,NInte1,NInte2,NGem)
       EndIf
 C

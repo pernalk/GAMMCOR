@@ -504,6 +504,8 @@ subroutine read_block_calculation(CalcParams, line)
               CalcParams%GridType = GRID_PARAMS_FINE
            elseif (uppercase(val) == "XFINE") then
               CalcParams%GridType = GRID_PARAMS_XFINE
+           elseif (uppercase(val) == "MOLPRO") then
+              CalcParams%GridType = GRID_PARAMS_MOLPRO
            endif
 
       case ("RDMSOURCE")

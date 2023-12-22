@@ -133,8 +133,18 @@ double precision :: alpha,tmp
 integer :: iunit
 integer :: ios
 character(8) :: text, label
+logical :: check
 
 text = 'CHIVAL  '
+
+print*, 'here?'
+inquire(file='GRID',exist=check)
+print*, 'check',check
+if (.not. check) then
+   write(6,*) 'WARNING! Molpro GRID file not present!'
+   write(6,'(/,1x,a,f12.5)') 'RS PARAM IN INPUT:',  alpha
+   return
+endif
 
 open(newunit=iunit,file='GRID',access='sequential',&
      form='unformatted',status='old')

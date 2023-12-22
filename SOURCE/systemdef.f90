@@ -140,7 +140,9 @@ else
 
   ! set DFT grid
    Flags%IGridType = Input%CalcParams%GridType
-   if (Input%CalcParams%DeclareGrid) Flags%InternalGrid = 1
+   if (Input%CalcParams%DeclareGrid) then
+      if (Flags%IGridType <= 4) Flags%InternalGrid = 1
+   endif
 
   ! set units
   Flags%IUnits = Input%CalcParams%Units
@@ -266,13 +268,25 @@ else
      Flags%IFlAC   = 1
      Flags%IFlSnd  = 1
      Flags%IFlAC0D = 0
-     if(Input%CalcParams%DFApp==2) then
-        if(Input%CalcParams%PostCAS) then
-           Flags%IFunSR = 4
-        else
-           Flags%IFunSR = 2
-        endif
+     print*,'Input%CalcParams%PostCAS', Input%CalcParams%PostCAS
+     print*,'Input%CalcParams%DFApp  ', Input%CalcParams%DFApp
+     print*,'Flags%IFunSRKer         ', Input%CalcParams%Kernel
+     ! SET sr FUNCTIONAL
+     if(Input%CalcParams%DFApp==1) then
+        Flags%IFunSR = 1
+     elseif(Input%CalcParams%DFApp==2) then
+        Flags%IFunSR = 2
+     endif
+     ! POSTCAS FLAGS
+     if(Input%CalcParams%PostCAS) then
         Flags%IFunSRKer = Input%CalcParams%Kernel
+        Flags%IFunSR = 4
+        ! use IFunSR2 for srDFA
+        if(Input%CalcParams%DFApp==1) then
+           Flags%IFunSR2 = 1
+        elseif(Input%CalcParams%DFApp==2) then
+           Flags%IFunSR2 = 2
+        endif
      endif
 !     if(Input%CalcParams%DFApp==2) Flags%IFunSRKer = 1
 

@@ -64,10 +64,11 @@ integer, parameter :: CHOL_ACCU_DEFAULT   = 1
 integer, parameter :: CHOL_ACCU_TIGHT     = 2
 integer, parameter :: CHOL_ACCU_LUDICROUS = 3
 
-integer, parameter :: GRID_PARAMS_SG1 = 1
+integer, parameter :: GRID_PARAMS_SG1    = 1
 integer, parameter :: GRID_PARAMS_MEDIUM = 2
-integer, parameter :: GRID_PARAMS_FINE = 3
-integer, parameter :: GRID_PARAMS_XFINE = 4
+integer, parameter :: GRID_PARAMS_FINE   = 3
+integer, parameter :: GRID_PARAMS_XFINE  = 4
+integer, parameter :: GRID_PARAMS_MOLPRO = 5
 
 integer, parameter :: UNITS_ANGSTROM = 1
 integer, parameter :: UNITS_BOHR     = 2
@@ -110,9 +111,9 @@ character(*),parameter :: PossibleCholAccu(3) = &
 [character(9) :: &
 'DEFAULT', 'TIGHT', 'LUDICROUS']
 
-character(*),parameter :: PossibleGridType(4) = &
+character(*),parameter :: PossibleGridType(5) = &
 [character(8) :: &
-'SG1', 'MEDIUM', 'FINE', 'XFINE']
+'SG1', 'MEDIUM', 'FINE', 'XFINE', 'MOLPRO']
 
 character(*),parameter :: PossibleUnits(2) = &
 [character(8) :: &
@@ -333,6 +334,7 @@ type FlagsData
      integer :: IFun      = 13
      integer :: IFunSR    = 0 
      integer :: IFunSRKer = 0
+     integer :: IFunSR2   = 0 ! for POSTCAS
      double precision :: Alpha = 0
      integer :: IModG   = 1
      integer :: NGOcc   = 0

@@ -1,6 +1,6 @@
 *Deck ACCAS
       Subroutine ACCAS(ETot,ENuc,TwoNO,URe,UNOAO,Occ,XOne,
-     $  Title,NBasis,NInte1,NInte2,NGem)
+     $  Title,BasisSet,NBasis,NInte1,NInte2,NGem)
 C
 c     use types
       use print_units
@@ -14,6 +14,7 @@ C
       Implicit Real*8 (A-H,O-Z)
 C
       Character*60 FMultTab,Title
+      Character(*) :: BasisSet
       Include 'commons.inc'
 c
       Parameter(Zero=0.D0,Half=0.5D0,One=1.D0,Two=2.D0)
@@ -33,6 +34,7 @@ C
 C     START TIMING FOR AC PROCEDURES
 C
       call clock('START',Tcpu,Twall)
+      Print*, 'BasisSet = ', BasisSet
 C
 C     CONSTRUCT LOOK-UP TABLES
 C
@@ -189,7 +191,7 @@ C
 C
       Else
 C
-      Call RunACCASLR(ETot,ENuc,TwoNO,URe,UNOAO,Occ,XOne,
+      Call RunACCASLR(BasisSet,ETot,ENuc,TwoNO,URe,UNOAO,Occ,XOne,
      $  IndAux,IPair,IndN,IndX,NDimX,Title,NBasis,NInte1,NInte2,NGem)
 C
       call clock('ACLR model',Tcpu,Twall)
@@ -627,7 +629,7 @@ C
       End
 
 * Deck RunACCASLR
-      Subroutine RunACCASLR(ETot,ENuc,TwoNO,URe,UNOAO,Occ,XOne,
+      Subroutine RunACCASLR(BasisSet,ETot,ENuc,TwoNO,URe,UNOAO,Occ,XOne,
      $  IndAux,IPair,IndN,IndX,NDimX,Title,NBasis,NInte1,NInte2,NGem)
 C
       use sorter
@@ -635,26 +637,33 @@ C
       use abfofo
       use ab0fofo
       use read_external
+      use grid_internal
       use timing
 C
       Implicit Real*8 (A-H,O-Z)
 C
       Character*60 FMultTab,Title
+      Character(*) :: BasisSet
       Include 'commons.inc'
 C
       Character*60 FName
       Real*8, Dimension(:), Allocatable :: TwoEl2
-      Real*8, Dimension(:,:), Allocatable :: OrbGrid
-      Real*8, Dimension(:,:), Allocatable :: OrbXGrid
-      Real*8, Dimension(:,:), Allocatable :: OrbYGrid
-      Real*8, Dimension(:,:), Allocatable :: OrbZGrid
+C      Real*8, Dimension(:,:), Allocatable :: OrbGrid
+C      Real*8, Dimension(:,:), Allocatable :: OrbXGrid
+C      Real*8, Dimension(:,:), Allocatable :: OrbYGrid
+C      Real*8, Dimension(:,:), Allocatable :: OrbZGrid
+      Real*8,allocatable,target :: PhiGGA(:,:,:)
+      Real*8,allocatable,target :: PhiLDA(:,:)
+      Real*8,pointer :: OrbGrid(:,:)
+      Real*8,pointer :: OrbXGrid(:,:),OrbYGrid(:,:),OrbZGrid(:,:)
+
       Real*8, Dimension(:), Allocatable :: WGrid
       Real*8, Dimension(:), Allocatable :: SRKer
       Real*8, Dimension(:), Allocatable :: Work
       Dimension NSymNO(NBasis),VSR(NInte1),MultpC(15,15),NumOSym(15),
      $ IndInt(NBasis)
 C
-      Parameter(Zero=0.D0,Half=0.5D0,One=1.D0,Two=2.D0,Four=4.D0)
+c     Parameter(Zero=0.D0,Half=0.5D0,One=1.D0,Two=2.D0,Four=4.D0)
 C
       Dimension
      $ URe(NBasis,NBasis),UNOAO(NBasis,NBasis),Occ(NBasis),
@@ -665,6 +674,8 @@ C
 C     LOCAL ARRAYS
 C
       Integer(8) :: MemSrtSize
+C
+      Logical :: doGGA
 C
       Dimension
      $ ABPLUS(NDimX*NDimX),ABMIN(NDimX*NDimX),
@@ -697,24 +708,81 @@ C
       Write(6,'(/,1X,"The number of CASSCF Active Orbitals = ",I4)')
      $ NAcCAS
 C
+      Allocate  (TwoEl2(NInte2))
+C
+C     load orbgrid and gradients, and wgrid
+C
+      If (IFunSR == 4) Then ! POSTCAS
+         If (IFunSR2 == 1) doGGA = .false.
+         If (IFunSR2 > 1)  doGGA = .true.
+      Else ! REGULAR 
+         If (IFunSR == 1) doGGA = .false.
+         If (IFunSR > 1)  doGGA = .true.
+      End If
+C
+      If (InternalGrid==0) then
+C
+      Write(LOUT,'(/1x,a)') 'MOLRPO GRID '
+C
+C     read no of grid pts
       Call molprogrid0(NGrid,NBasis)
-      Write(6,'(/,1X,"The number of Grid Points = ",I8)')
+C
+      Write(6,'(1X,"The number of Grid Points = ",I8)')
      $ NGrid
 C
-      Allocate  (TwoEl2(NInte2))
       Allocate  (WGrid(NGrid))
-      Allocate  (OrbGrid(NGrid,NBasis))
-      Allocate  (OrbXGrid(NGrid,NBasis))
-      Allocate  (OrbYGrid(NGrid,NBasis))
-      Allocate  (OrbZGrid(NGrid,NBasis))
       Allocate  (Work(NGrid))
 C
 c      Call EKT(URe,Occ,XOne,TwoNO,NBasis,NInte1,NInte2)
 C
-C     load orbgrid and gradients, and wgrid
+      If (doGGA) then
+         allocate(PhiGGA(NGrid,NBasis,4))
+         OrbGrid  => PhiGGA(:,:,1)
+         OrbXGrid => PhiGGA(:,:,2)
+         OrbYGrid => PhiGGA(:,:,3)
+         OrbZGrid => PhiGGA(:,:,4)
+      ElseIf (.not.doGGA) then
+         allocate(PhiLDA(NGrid,NBasis))
+         OrbGrid  => PhiLDA
+         OrbXGrid => PhiLDA
+         OrbYGrid => PhiLDA
+         OrbZGrid => PhiLDa
+      EndIf
 C
       Call molprogrid(OrbGrid,OrbXGrid,OrbYGrid,OrbZGrid,
      $                WGrid,UNOAO,NGrid,NBasis)
+C
+      ElseIf (InternalGrid==1) then
+
+      Print*, 'IFunSR =',IFunSR
+      Print*, 'IUnits =',IUnits
+      Print*, 'InternalGrid =',InternalGrid
+      Print*, 'IGridType =', IGridType
+      Print*, 'ORBITAL_ORDERING', IOrbOrder
+C
+      If (doGGA) Then
+         Write(LOUT,'(/1x,a)') 'INTERNAL GRID GGA'
+         Call internal_gga_no_orbgrid(IGridType,BasisSet,
+     $                          IOrbOrder,transpose(UNOAO),
+     $                          WGrid,PhiGGA,NGrid,NBasis,NBasis,IUnits)
+         OrbGrid  => PhiGGA(:,:,1)
+         OrbXGrid => PhiGGA(:,:,2)
+         OrbYGrid => PhiGGA(:,:,3)
+         OrbZGrid => PhiGGA(:,:,4)
+      ElseIf(.not.doGGA) Then
+         Write(LOUT,'(/1x,a)') 'INTERNAL GRID LDA'
+         Call internal_lda_no_orbgrid(IGridType,BasisSet,
+     $                          IOrbOrder,transpose(UNOAO),
+     $                          WGrid,PhiLDA,NGrid,NBasis,NBasis,IUnits)
+         OrbGrid  => PhiLDA
+         OrbXGrid => PhiLDA
+         OrbYGrid => PhiLDA
+         OrbZGrid => PhiLDa
+      End If
+C
+      Allocate  (Work(NGrid))
+C
+      End If ! InternalGrid
 C
 C     set/load symmetries of NO's
 C
@@ -810,7 +878,7 @@ C     compute sr potential (vsr=xc+hartree)
 C     as a byproduct a sr energy (ensr=sr-xc+sr-hartree) is obtained
 C
       IFunSave=IFunSR
-      If(IFunSR.Eq.4) IFunSR=2
+      If(IFunSR.Eq.4) IFunSR=IFunSR2
 C
       Den=0
       Work2=0
@@ -1205,10 +1273,10 @@ C
 C
       DeAllocate  (TwoEl2)
       DeAllocate  (WGrid)
-      DeAllocate  (OrbGrid)
-      DeAllocate  (OrbXGrid)
-      DeAllocate  (OrbYGrid)
-      DeAllocate  (OrbZGrid)
+C      DeAllocate  (OrbGrid)
+C      DeAllocate  (OrbXGrid)
+C      DeAllocate  (OrbYGrid)
+C      DeAllocate  (OrbZGrid)
       DeAllocate  (Work)
       DeAllocate (SRKer)
 C

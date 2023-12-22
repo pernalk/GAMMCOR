@@ -1,14 +1,15 @@
 *Deck DMSCF 
       Subroutine DMSCF 
-     $ (Title,URe,Occ,XKin,XNuc,ENuc,UMOAO,TwoEl,NBasis,NInte1,NInte2,
-     $ NGem)
+     $ (Title,BasisSet,URe,Occ,XKin,XNuc,ENuc,UMOAO,TwoEl,
+     $ NBasis,NInte1,NInte2,NGem)
 C
 C     !!! XKin CONTAINS BOTH KINETIC AND EL-N CONTRIBUTIONS !!!
 C     !!! XNuc IS EMPTY 
 C
       Implicit Real*8 (A-H,O-Z)
 C
-      Character*60 Title,FMultTab
+      Character*60 FMultTab,Title
+      Character(*) :: BasisSet
 C
       Include 'commons.inc'
 C
@@ -63,7 +64,7 @@ C
       If(ICASSCF.Eq.1) Then
 C
       Call ACCAS(ETot,ENuc,TwoEl,URe,UReSav,Occ,XOne,
-     $  Title,NBasis,NInte1,NInte2,NGem)
+     $  Title,BasisSet,NBasis,NInte1,NInte2,NGem)
 C
       Else
 C
