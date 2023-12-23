@@ -1342,6 +1342,7 @@ C
 C     binary
       Type(TCholeskyVecs) :: CholeskyVecs
       Real*8, Allocatable :: MatFF(:,:)
+      Real*8, Allocatable :: FOErf(:,:)
       Real*8 Tcpu,Twall
       logical :: SortAngularMomenta
 C     test AO-->NO
@@ -1352,9 +1353,12 @@ C
 C
       integer :: NA, NB, a0, a1, b0, b1
       type(TCholeskyVecsOTF) :: CholeskyVecsOTF
+      Type(TCholeskyVecsOTF) :: CholErfVecsOTF
       type(TSystem)  :: System
       type(TAOBasis) :: AOBasis
-
+C
+      character(:),allocatable :: XYZPath
+      character(:),allocatable :: BasisSetPath
 C
       Character*60 FName,Aux1
       Character(*) :: Title,BasisSet
@@ -1489,10 +1493,6 @@ C     compute Cholesky vectors OTF
 
       Call auto2e_init()
 
-      block
-       character(:),allocatable :: XYZPath
-       character(:),allocatable :: BasisSetPath
-
       XYZPath = "./input.inp"
       BasisSetPath = BasisSet
       SortAngularMomenta = .true.
@@ -1500,7 +1500,22 @@ C     compute Cholesky vectors OTF
       Call CholeskyOTF_ao_vecs(CholeskyVecsOTF,AOBasis,System,IUnits,
      $            XYZPath,BasisSetPath,SortAngularMomenta,ICholeskyAccu)
 
-      end block
+C     generate LR-Cholesky integrals and assemble FOFOERF
+C     ... this is temporary workaround:  avoid disk in the future
+      If(IFunSR.Eq.1.Or.IFunSR.Eq.2.Or.IFunSR.Eq.4) Then
+
+      Write(lout,'(/1x,3a6)') ('******',i=1,3)
+      Write(lout,'(1x,a)') 'Cholesky LR On-The-Fly'
+      Write(lout,'(10x,a,f3.4)') 'MU = ',Alpha
+      Write(lout,'(1x,3a6)') ('******',i=1,3)
+
+      Call CholeskyOTF_ao_vecs(CholErfVecsOTF,AOBasis,System,IUnits,
+     $            XYZPath,BasisSetPath,SortAngularMomenta,ICholeskyAccu,
+     $            Alpha)
+
+      NCholErf = CholErfVecsOTF%NVecs
+
+      EndIf
 C
       EndIf ! CholeskyBIN .OR. CholeskyOTF
 C      EndIf ! IRes
@@ -1800,7 +1815,7 @@ C          load C(AO,MO) - already w/o symmety in MOs
            Call read_caomo_molpro(CAOMO,SAO,itsoao,jtsoao,
      &                           'MOLPRO.MOPUN','CASORBAO',NBasis)
 C
-C     V1 uses Fock subroutine in OTF module -- has to be improved
+C     V1 uses slow Fock subroutine in OTF module which has to be improved
 C
 C           Call CholeskyOTF_Fock_MO_v1(work1,CholeskyVecsOTF,
 C     $                          AOBasis,System,Monomer,
@@ -1820,14 +1835,23 @@ C
           EndIf
 C
       ElseIf (IFunSR.Eq.1.Or.IFunSR.Eq.2.Or.IFunSR.Eq.4) Then
+C
           If(ICholesky==0) Then
              Call FockGen_mithap(FockF,GammaAB,XKin,NInte1,NBasis,
      &                           'AOERFSORT')
-          ElseIf(ICholesky==1) Then
-             Write(6,'(1x,a)') 'Cholesky not ready for LR-ERF!'
-             Stop
+          ElseIf(ICholesky==1.and.ICholeskyOTF==1) Then
+             Call CholeskyOTF_Fock_MO_v2(work1,CholErfVecsOTF,
+     $                            AOBasis,System,Monomer,'MOLPRO',
+     $                            CAOMO,CSAOMO,XKin,GammaF,
+     $                            MemType,MemVal,NInte1,NBasis,
+     $                            IH0Test)
+C            unpack Fock in MO (work1) to triangle
+          Call sq_to_triang2(work1,FockF,NBasis)
+          ElseIf (ICholeskyBIN==1) Then
+             Stop "CholeskyBIN not ready with LR ints!"
           EndIf
-      EndIf
+C
+      EndIf ! Fock (IFunSR)
 C
 C      Call FockGen(FockF,GammaAB,XKin,TwoEl,NInte1,NBasis,NInte2)
 C     transform Fock to MO if not CholeskyOTF
@@ -1972,6 +1996,18 @@ C     ITwoEl
       Call TwoNO1(TwoEl,UAOMO,NBasis,NInte2)
 C
       ElseIf(ITwoEl.eq.3) Then
+
+      If (ICholesky==1) Then
+C     set buffer size for Cholesky AO2NO transformation
+      if(MemType == 2) then       !MB
+         MemMOTransfMB = MemVal
+      elseif(MemType == 3) then   !GB
+         MemMOTransfMB = MemVal * 1024_8
+      endif
+      Write(LOUT,'(1x,a,i5,a)') 'Using ',MemMOTransfMB,
+     $                          ' MB for 3-indx Cholesky transformation'
+      EndIf
+C
 C     PREPARE POINTERS: NOccup=num0+num1
       Call prepare_nums(Occ,Num0,Num1,NBasis)
       If(ISwitch.Eq.1) Num0=NInAC
@@ -2005,20 +2041,6 @@ C
       Call clock('tran4_FOFO',Tcpu,Twall)
 C
       ElseIf (ICholesky==1) Then
-C
-C     Old 1-step transformation (much slower)
-c     Call chol_MOTransf(MatFF,CholeskyVecs,
-c    $                   UAux,1,NBasis,
-c    $                   UAux,1,NBasis)
-C
-C    set buffer size for Cholesky AO2NO transformation
-      if(MemType == 2) then       !MB
-         MemMOTransfMB = MemVal
-      elseif(MemType == 3) then   !GB
-         MemMOTransfMB = MemVal * 1024_8
-      endif
-      Write(LOUT,'(1x,a,i5,a)') 'Using ',MemMOTransfMB,
-     $                          ' MB for 3-indx Cholesky transformation'
 C     cholesky BIN
       If (ICholeskyBIN==1) Then
       Allocate(MatFF(NCholesky,NBasis**2))
@@ -2042,6 +2064,7 @@ C
       call chol_Rkab_OTF(MatFF, UAux, a0, a1, UAux, b0, b1,
      $                   MemMOTransfMB, CholeskyVecsOTF,
      $                   AOBasis, ORBITAL_ORDERING_MOLPRO)
+C
       EndIf ! Cholesky BIN / OTF
 C
       Call clock('chol_NOTransf',Tcpu,Twall)
@@ -2074,7 +2097,9 @@ C
 C     TEST MITHAP
 C      call tran4_full(NBasis,UAux,UAux,'TWOMO','AOTWOSORT')
 C
-      Else
+      Else ! IFunSR.Eq.1.Or.IFunSR.Eq.2.Or.IFunSR.Eq.4
+C
+      If (ICholesky==0) Then
       Call tran4_gen(NBasis,
      $        Num0+Num1,UAux(1:NBasis,1:(Num0+Num1)),
      $        Num0+Num1,UAux(1:NBasis,1:(Num0+Num1)),
@@ -2089,8 +2114,32 @@ C
      $        'FOFOERF','AOERFSORT')
 C     TEST MITHAP
 C      call tran4_full(NBasis,UAux,UAux,'MO2ERF','AOERFSORT')
+C
+      ElseIf (ICholesky==1) Then
+C     cholesky OTF
+      If (ICholeskyOTF==1) Then
+      allocate(FOErf(NCholErf,NBasis*(num0+num1)))
+      Call Chol_Rkab_OTF(FOErf,UAux,1,NBasis,UAux,1,num0+num1,
+     $                   MemMOTransfMB, CholErfVecsOTF,
+     $                   AOBasis, ORBITAL_ORDERING_MOLPRO)
+C
+      Call chol_fofo_batch(num0+num1,FOErf,
+     $                     num0+num1,FOErf,
+     $                     NCholErf,NBasis,'FOFOERF')
+      Deallocate(FoErf)
+C
+      Stop "FOERF stop! Missing FFERF!"
+C     dump LR integrals
+      open(newunit=iunit,file='cholvecs',form='unformatted')
+      write(iunit) NCholErf
+      write(iunit) FOErf
+      close(iunit)
 
-      EndIF
+      ElseIf (ICholeskyBIN==1) Then
+      EndIf ! ICholesky OTF/BIN LR
+      EndIf ! ICholesky LR
+C
+      EndIf
 C
       EndIf
 C
