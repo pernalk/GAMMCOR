@@ -235,7 +235,7 @@ integer,external :: IndSym
 double precision,external :: ddot
 
 write(6,'(/,1x,a,i2)') "Construct Fock ver 2, monomer", Monomer
-if(present(J_mo)) print*, 'J_mo present?'
+!if(present(J_mo)) print*, 'J_mo present?'
 
 ! set dimensions
 NCholesky = CholeskyVecsOTF%NVecs
@@ -288,9 +288,11 @@ call chol_H0_mo(H0_int,Cmat,AOBasis,System,ORBITAL_ORDERING)
 if(IH0Test==1) then
    call CholeskyOTF_H0_test(H0_int,H0_mo,NBasis)
 elseif(IH0Test==0) then
-   write(6,'(/,1x,"Skipping H0 Test...")')
+   write(6,'(1x,"Skipping H0 Test: use internal H0")')
    call sq_to_triang2(H0_int,H0in,NBasis)
    H0_mo = H0_int
+elseif(IH0Test==2) then
+   write(6,'(1x,"Skipping H0 Test: use external H0")')
 endif
 
 !transform Cholesky vecs to MO
@@ -321,6 +323,9 @@ F_mo = H0_mo + 0.5d0*F_mo
 if(present(J_mo).and.present(K_mo)) then
    J_mo = 0.5d0*Jtmp
    K_mo = 0.5d0*Ktmp
+elseif(present(J_mo)) then
+   ! return only J in MO
+   J_mo = 0.5d0*Jtmp
 endif
 
 !print*, 'Fock in MO basis'
@@ -342,6 +347,133 @@ endif
 deallocate(MatFFMO,ints)
 
 end subroutine CholeskyOTF_Fock_MO_v2
+
+subroutine CholeskyOTF_Jmat_MO(J_mo,CholeskyVecsOTF, &
+                             AOBasis,System,Monomer,Source,&
+                             Cmat,CSAO,H0in,GammaF,&
+                             MemType,MemVal,NInte1,NBasis,&
+                             IH0Test)
+!
+!     Generate Coulomb matrix (NBasis,NBasis) in MO basis
+!     from Cholesky OTF vectors
+!
+!     CAREFUL! Involves one 3-ind AO --> MO transformation
+!              with FF indices
+!
+
+implicit none
+
+type(TCholeskyVecsOTF), intent(in) :: CholeskyVecsOTF
+type(TAOBasis), intent(in)         :: AOBasis
+type(TSystem), intent(inout)       :: System
+
+integer,intent(in)          :: Monomer
+character(6),intent(in)     :: Source
+integer,intent(in)          :: NInte1,NBasis
+integer,intent(in)          :: MemType,MemVal
+integer,intent(in)          :: IH0Test
+double precision,intent(in) :: H0in(NInte1),GammaF(NInte1)
+double precision,intent(in) :: Cmat(NBasis,NBasis),CSAO(NBasis,NBasis)
+
+double precision,intent(out)          :: J_mo(NBasis,NBasis)
+
+integer          :: i, j
+integer          :: NCholesky
+integer          :: ORBITAL_ORDERING
+integer          :: MemMOTransfMB
+double precision :: val
+double precision :: H0tr(NInte1)
+double precision :: D_mo(NBasis,NBasis), H0_mo(NBasis,NBasis)
+double precision :: H0_int(NBasis,NBasis)
+double precision :: Jtmp(NBasis,NBasis), Ktmp(NBasis,NBasis)
+double precision :: work(NBasis,NBasis)
+double precision, allocatable :: ints(:), matFFMO(:,:)
+double precision, parameter :: ThreshH0 = 1.0d-6
+
+integer,external :: IndSym
+double precision,external :: ddot
+
+write(6,'(/,1x,a,i2)') "Construct Jmat from OTF Cholesky vectors"
+
+! set dimensions
+NCholesky = CholeskyVecsOTF%NVecs
+
+! set orbital ordering
+if(trim(Source)=='MOLPRO') then
+   ORBITAL_ORDERING = ORBITAL_ORDERING_MOLPRO
+elseif(trim(Source)=='ORCA  ') then
+   ORBITAL_ORDERING = ORBITAL_ORDERING_ORCA
+elseif(trim(Source)=='DALTON') then
+   ORBITAL_ORDERING = ORBITAL_ORDERING_DALTON
+endif
+
+! Read whether to put ghost functions
+if(Monomer==1) then
+   call sys_Init(System,SYS_MONO_A)
+elseif(Monomer==2) then
+   call sys_Init(System,SYS_MONO_B)
+else
+   call sys_Init(System,SYS_TOTAL)
+endif
+
+! transform H0 (in SAO) to MO
+H0tr = H0in
+if(trim(Source)=='MOLPRO') then
+   call tran_matTr(H0tr,CSAO,CSAO,NBasis,.true.)
+   call triang_to_sq2(H0tr,H0_mo,NBasis)
+elseif(trim(Source)=='ORCA  ') then
+   call triang_to_sq2(H0in,H0_mo,NBasis)
+endif
+
+! prepare density matrix
+D_mo  = 0d0
+do J=1,NBasis
+   do I=1,NBasis
+      D_mo(I,J) = 2d0 * GammaF(IndSym(I,J))
+   enddo
+enddo
+
+! set memory for Fock transformation
+if(MemType == 2) then       !MB
+   MemMOTransfMB = MemVal
+elseif(MemType == 3) then   !GB
+   MemMOTransfMB = MemVal * 1024_8
+endif
+
+! obtain H0 and check if they match
+call chol_H0_mo(H0_int,Cmat,AOBasis,System,ORBITAL_ORDERING)
+
+if(IH0Test==1) then
+   call CholeskyOTF_H0_test(H0_int,H0_mo,NBasis)
+elseif(IH0Test==0) then
+   write(6,'(1x,"Skipping H0 Test: use internal H0")')
+   call sq_to_triang2(H0_int,H0in,NBasis)
+   H0_mo = H0_int
+elseif(IH0Test==2) then
+   write(6,'(1x,"Skipping H0 Test: use external H0")')
+endif
+
+!transform Cholesky vecs to MO
+allocate(MatFFMO(NCholesky,NBasis**2),ints(NBasis**2))
+
+call chol_Rkab_OTF(MatFFMO,Cmat,1,NBasis,Cmat,1,NBasis, &
+                   MemMOTransfMB,CholeskyVecsOTF, &
+                   AOBasis,ORBITAL_ORDERING)
+
+! construct J in MO
+ints = 0d0
+Jtmp = 0d0
+do i=1,NCholesky
+   ints(:) = MatFFMO(i,:)
+   val = ddot(NBasis**2,ints,1,D_mo,1)
+   call daxpy(NBasis**2,2d0*val,ints,1,Jtmp,1)
+enddo
+
+J_mo = 0.5d0*Jtmp
+
+deallocate(MatFFMO,ints)
+
+end subroutine CholeskyOTF_Jmat_MO
 
 subroutine CholeskyOTF_H0_test(H0_int,H0_mo,NBasis)
 !

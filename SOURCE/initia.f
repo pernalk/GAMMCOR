@@ -1342,13 +1342,16 @@ C
 C     binary
       Type(TCholeskyVecs) :: CholeskyVecs
       Real*8, Allocatable :: MatFF(:,:)
-      Real*8, Allocatable :: FOErf(:,:)
+      Real*8, Allocatable :: FFErf(:,:)
+      Real*8, Allocatable :: FOErf(:,:),OOErf(:,:)
       Real*8 Tcpu,Twall
       logical :: SortAngularMomenta
 C     test AO-->NO
       Integer :: itsoao(NBasis),jtsoao(NBasis)
       Real*8  :: CAOMO(NBasis,NBasis),CAONO(NBasis,NBasis),
      $           CSAOMO(NBasis,NBasis),SAO(NBasis,NBasis)
+      Real*8  :: JMO(NBasis,NBasis),JMOlr(NBasis,NBasis),
+     $           JMOsr(NBasis,NBasis)
 C
 C
       integer :: NA, NB, a0, a1, b0, b1
@@ -1506,7 +1509,7 @@ C     ... this is temporary workaround:  avoid disk in the future
 
       Write(lout,'(/1x,3a6)') ('******',i=1,3)
       Write(lout,'(1x,a)') 'Cholesky LR On-The-Fly'
-      Write(lout,'(10x,a,f3.4)') 'MU = ',Alpha
+      Write(lout,'(10x,a,f12.8)') 'MU = ',Alpha
       Write(lout,'(1x,3a6)') ('******',i=1,3)
 
       Call CholeskyOTF_ao_vecs(CholErfVecsOTF,AOBasis,System,IUnits,
@@ -1823,6 +1826,7 @@ C     $                          CAOMO,CSAOMO,XKin,GammaF,
 C     $                          MemType,MemVal,NInte1,NBasis,
 C     $                          JMO,KMO)
 C
+           Monomer = 3 ! SYS_TOTAL in System
            Call CholeskyOTF_Fock_MO_v2(work1,CholeskyVecsOTF,
      $                          AOBasis,System,Monomer,'MOLPRO',
      $                          CAOMO,CSAOMO,XKin,GammaF,
@@ -1840,16 +1844,39 @@ C
              Call FockGen_mithap(FockF,GammaAB,XKin,NInte1,NBasis,
      &                           'AOERFSORT')
           ElseIf(ICholesky==1.and.ICholeskyOTF==1) Then
-             Call CholeskyOTF_Fock_MO_v2(work1,CholErfVecsOTF,
+C
+C          obtain long-range Fmat and short-range Jmat
+c
+           CSAOMO = transpose(UAux)
+           Call read_caomo_molpro(CAOMO,SAO,itsoao,jtsoao,
+     &                           'MOLPRO.MOPUN','CASORBAO',NBasis)
+           Monomer = 3 ! SYS_TOTAL in System
+           Call CholeskyOTF_Fock_MO_v2(work1,CholErfVecsOTF,
      $                            AOBasis,System,Monomer,'MOLPRO',
      $                            CAOMO,CSAOMO,XKin,GammaF,
      $                            MemType,MemVal,NInte1,NBasis,
-     $                            IH0Test)
-C            unpack Fock in MO (work1) to triangle
+     $                            2,JMOlr)
+c    $                            IH0Test,JMOlr) ! IH0Test=2, use external H0
+C
+           Call CholeskyOTF_Jmat_MO(JMO,CholeskyVecsOTF,
+     $                          AOBasis,System,Monomer,'MOLPRO',
+     $                          CAOMO,CSAOMO,XKin,GammaF,
+     $                          MemType,MemVal,NInte1,NBasis,2)
+C
+           JMOsr = JMO - JMOlr
+c
+c        print*, 'J in MO long-range ', norm2(JMOlr)
+c        print*, 'J in MO full-range ', norm2(JMO)
+c        do j=1,NBasis
+c           write(LOUT,'(*(f13.8))') (JMOlr(i,j),i=1,NBasis)
+c            write(LOUT,'(*(f13.8))') (JMO(i,j)-JMOlr(i,j),i=1,NBasis)
+c        enddo
+C
+C         unpack Fock in MO (work1) to triangle
           Call sq_to_triang2(work1,FockF,NBasis)
           ElseIf (ICholeskyBIN==1) Then
              Stop "CholeskyBIN not ready with LR ints!"
-          EndIf
+          EndIf ! ICholeskyOTF/BIN
 C
       EndIf ! Fock (IFunSR)
 C
@@ -1867,7 +1894,6 @@ C      print*, 'Fock = ',norm2(Fmat)
 C      do j=1,NBasis
 C         write(LOUT,'(*(f13.8))') (Fmat(i,j),i=1,NBasis)
 C      enddo
-C
 C      end block
 C
       EndIf
@@ -1973,16 +1999,28 @@ C
 C
       If(ICholeskyOTF==1) Then
 C
-C     TEST GETTING AO --> NO
+C     GET AO --> NO matrix
 C     CAOMO = C(AO,MO) ; URe = C(NO,MO)
       Call dgemm('N','T',NBasis,NBasis,NBasis,1d0,CAOMO,NBasis,
      &           URe,NBasis,0d0,CAONO,NBasis)
+C
+      If (IFunSR.Eq.1.Or.IFunSR.Eq.2.Or.IFunSR.Eq.4) Then
+C     transform short-range Jmat from MO to AO
+      Call tranMO2AO(JMOsr,CAOMO,SAO,NBasis)
+C      
+C     dump short-range Jmat on disk
+      open(newunit=iunit,file='jsrmat',form='unformatted')
+      write(iunit) NBasis
+      write(iunit) JMOsr
+      close(iunit)
 C
 C     for external test
 C      Call dump_CAONO_SAO(CAONO,transpose(UAOMO),SAO,
 C     &               'CAONO.mol',NBasis)
 C      Call test_Smat(SAO,CAONO,transpose(UAOMO),NBasis)
-      EndIf
+C
+      EndIf ! IFunSR, Jsr mat
+      EndIf ! ICholeskyOTF
 C      
       If(IRes.Eq.1) Then
 C      
@@ -2128,13 +2166,29 @@ C
      $                     NCholErf,NBasis,'FOFOERF')
       Deallocate(FoErf)
 C
-      Stop "FOERF stop! Missing FFERF!"
+      allocate(FFErf(NCholErf,NBasis**2))
+      Call Chol_Rkab_OTF(FFErf,UAux,1,NBasis,UAux,1,NBasis,
+     $                   MemMOTransfMB, CholErfVecsOTF,
+     $                   AOBasis, ORBITAL_ORDERING_MOLPRO)
+      allocate(OOErf(NCholErf,(num0+num1)**2))
+      Call Chol_Rkab_OTF(OOErf,UAux,1,num0+num1,UAux,1,num0+num1,
+     $                   MemMOTransfMB, CholErfVecsOTF,
+     $                   AOBasis, ORBITAL_ORDERING_MOLPRO)
+C
+C     assemble FFOERF file (not really needed)
+c     Call chol_ffoo_batch(.false.,FFErf,num0+num1,
+c    $                     num0+num1,OOErf,
+c    $                     NCholErf,NBasis,'FFOOERF')
+C
 C     dump LR integrals
       open(newunit=iunit,file='cholvecs',form='unformatted')
       write(iunit) NCholErf
-      write(iunit) FOErf
+      write(iunit) FFErf
       close(iunit)
-
+C
+      Deallocate(FFErf,OOErf)
+C
+C
       ElseIf (ICholeskyBIN==1) Then
       EndIf ! ICholesky OTF/BIN LR
       EndIf ! ICholesky LR

@@ -1497,6 +1497,43 @@ integer :: i,j
 
 end subroutine tran2MO
 
+subroutine tranMO2AO(Mat,C,S,NDim)
+!
+! Purpose: tranform square matrix from MO to AO basis
+!          Mat_AO = SC . Mat_MO . (SC)^T
+!
+! WARNING! Assumes NAO = NMO
+!
+!  Remember: C^T(AO,MO).S(AO).C(AO,MO) = 1
+!    so that C^-1(AO,MO) = C^T.S(AO)
+!            J_MO = C^T . J_AO . C
+!            J_AO = SC . J_MO . (SC)^T
+!
+!  Input:
+!  S - overlap matrix
+!  C - C(AO,MO) matrix
+!
+implicit none
+
+integer,intent(in) :: NDim
+double precision, intent(in) ::  S(NDim,NDim)
+double precision, intent(in) ::  C(NDim,NDim)
+double precision, intent(inout) :: Mat(NDim,NDim)
+
+integer :: i,j
+double Precision :: SC(NDim,NDim),work(NDim,NDim)
+
+ Call dgemm('N','N',NDim,NDim,NDim,1d0,S,NDim,C,NDim,0d0,SC,NDim)
+ Call dgemm('N','N',NDim,NDim,NDim,1d0,SC,NDim,Mat,NDim,0d0,work,NDim)
+ Call dgemm('N','T',NDim,NDim,NDim,1d0,work,NDim,SC,NDim,0d0,Mat,NDim)
+
+!Print*, 'Matrix in AO basis =',norm2(Mat)
+!do j=1,NDim
+!     write(6,'(*(f13.8))') (Mat(i,j),i=1,NDim)
+!enddo
+
+end subroutine tranMO2AO
+
 subroutine transp_mat1dim(matIn,matOut,NBas)
 implicit none
 

@@ -682,6 +682,7 @@ C
      $ EigVecR(NDimX*NDimX),Eig(NDimX),
      $ ECorrG(NGem),EGOne(NGem),
      $ UAux(NBasis,NBasis),VecAux(NBasis)
+      Real*8, Dimension(:,:), Allocatable :: Jmat
 C
 C     IFlAC   = 1 - adiabatic connection formula calculation
 C               0 - AC not used
@@ -722,7 +723,7 @@ C
 C
       If (InternalGrid==0) then
 C
-      Write(LOUT,'(/1x,a)') 'MOLRPO GRID '
+      Write(LOUT,'(/1x,a)') 'MOLPRO GRID '
 C
 C     read no of grid pts
       Call molprogrid0(NGrid,NBasis)
@@ -754,11 +755,11 @@ C
 C
       ElseIf (InternalGrid==1) then
 
-      Print*, 'IFunSR =',IFunSR
-      Print*, 'IUnits =',IUnits
-      Print*, 'InternalGrid =',InternalGrid
-      Print*, 'IGridType =', IGridType
-      Print*, 'ORBITAL_ORDERING', IOrbOrder
+      Write(6,'(1x,a,i3)') 'IFunSR       =',IFunSR
+c     Write(6,'(1x,a,i3)') 'IUnits       =',IUnits
+c     Write(6,'(1x,a,i3)') 'InternalGrid =',InternalGrid
+      Write(6,'(1x,a,i3)') 'IGridType    =', IGridType
+      Write(6,'(1x,a,i3)') 'ORB_ORDERING =', IOrbOrder
 C
       If (doGGA) Then
          Write(LOUT,'(/1x,a)') 'INTERNAL GRID GGA'
@@ -847,6 +848,7 @@ C      EndIf
 C      FName(K:K+10)='.reg.integ'
 C      Call Int2_AO(TwoEl2,NumOSym,MultpC,FName,NInte1,NInte2,NBasis)
       MemSrtSize=MemVal*1024_8**MemType
+      If (ICholesky==0) Then
       Call readtwoint(NBasis,2,'AOTWOINT.mol','AOTWOSORT',MemSrtSize)
       If(ITwoEl.Eq.1) Call LoadSaptTwoEl(3,TwoEl2,NBasis,NInte2)
 C
@@ -872,7 +874,8 @@ C     TRANSFORM J AND K
      $        Num0+Num1,UAux(1:NBasis,1:(Num0+Num1)),
      $        'FOFO','AOTWOSORT')
 C
-      EndIf
+      EndIf ! ITwoEl
+      EndIf ! ICholesky
 C
 C     compute sr potential (vsr=xc+hartree)
 C     as a byproduct a sr energy (ensr=sr-xc+sr-hartree) is obtained
@@ -899,7 +902,21 @@ C
 C
       Write(6,'(/,1X,"RANGE PARAMETER ",F8.3)')Alpha
 C
-      Call PotCoul_mithap(VCoul,Work2,.true.,'AOERFSORT',NBasis)
+C     calculate short-range Coulomb matrix in AO
+      If (ICholesky==0) Then
+         Call PotCoul_mithap(VCoul,Work2,.true.,'AOERFSORT',NBasis)
+      ElseIf (ICholesky==1) Then
+         ! for Cholesky, Jmat(sr) is read from disk
+         Allocate(Jmat(NBasis,NBasis))
+         Open(newunit=iunit,file='jsrmat',form='unformatted')
+         Read(iunit) NBasis2
+         If(NBasis2.ne.NBasis) stop "NBasis error in RunACCASLR"
+         Read(iunit) Jmat
+         Close(iunit)
+         Call sq_to_triang2(Jmat,VCoul,NBasis)
+         Deallocate(Jmat)
+      EndIf
+C
       Print*, 'VCoul',norm2(VCoul)
       Call EPotSR(EnSR,EnHSR,VSR,Occ,URe,UNOAO,.false.,
      $        OrbGrid,OrbXGrid,OrbYGrid,OrbZGrid,WGrid,
