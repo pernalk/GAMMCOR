@@ -138,7 +138,6 @@ logical :: check
 text = 'CHIVAL  '
 
 inquire(file='GRID',exist=check)
-print*, 'check',check
 if (.not. check) then
    write(6,*) 'WARNING! Molpro GRID file not present!'
    write(6,'(/,1x,a,f12.5)') 'RS PARAM IN INPUT:',  alpha

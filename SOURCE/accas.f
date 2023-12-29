@@ -912,7 +912,7 @@ C     calculate short-range Coulomb matrix in AO
          Read(iunit) NBasis2
          If(NBasis2.ne.NBasis) stop "NBasis error in RunACCASLR"
          Read(iunit) Jmat
-         Close(iunit)
+         Close(iunit,status='delete')
          Call sq_to_triang2(Jmat,VCoul,NBasis)
          Deallocate(Jmat)
       EndIf

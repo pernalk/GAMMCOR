@@ -1173,6 +1173,20 @@ do i=NOccup+1,NBasis
    IGem(i) = 3
 enddo
 
+do l=1,3
+   do k=1,3
+      do j=1,3
+         do i=1,3
+            if((i==j).and.(j==k).and.(k==l)) then
+               AuxCoeff(i,j,k,l) = 1
+            else
+               AuxCoeff(i,j,k,l) = 0
+            endif
+         enddo
+      enddo
+   enddo
+enddo
+
 call create_blocks_ABPL0(nAA,nAI,nAV,nIV,tmpAA,tmpAI,tmpAV,tmpIV,&
                          limAA,limAI,limAV,limIV,pos,&
                          IGem,IndN,INActive,NAct,NBasis,NDimX)
@@ -1459,67 +1473,74 @@ end associate
 
 call clock('START',Tcpu,Twall)
 
-pos = 0
-do i=1,NDimX
-   pos(IndN(1,i),IndN(2,i)) = IndX(i)
-enddo
-!
-! energy loop
-allocate(work1(NBasis*NBasis),ints(NBasis,NBasis))
+if (ICholesky==1) then
 
-EAll   = 0d0
-EIntra = 0d0
+   call Chol_AC0ECorr(ECorr,ABPLUS,IndN,IndX,Occ, &
+                      INActive,NOccup,NDimX,NBasis,'cholvecs')
 
-open(newunit=iunit,file='FOFOERF',status='OLD', &
-     access='DIRECT',recl=8*NBasis*NOccup)
+else
 
-kl = 0
-do k=1,NOccup
-   do l=1,NBasis
-      kl = kl + 1
-      if(pos(l,k)/=0) then
-        irs = pos(l,k)
-        ir = l
-        is = k
-        read(iunit,rec=kl) work1(1:NBasis*NOccup)
-        do j=1,NOccup
-           do i=1,NBasis
-              ints(i,j) = work1((j-1)*NBasis+i)
-           enddo
-        enddo
-        ints(:,NOccup+1:NBasis) = 0
-
-        do j=1,NBasis
-           do i=1,j
-              if(pos(j,i)/=0) then
-                ipq = pos(j,i)
-                ip = j
-                iq = i
-                Crs = C(ir)+C(is)
-                Cpq = C(ip)+C(iq)
-
-                Aux = Crs*Cpq*ABPLUS(ipq,irs)
-                EAll = EAll + Aux*ints(j,i)
-
-                if(AuxCoeff(IGem(ip),IGem(iq),IGem(ir),IGem(is))==1) EIntra = EIntra + Aux*ints(j,i)
-
-              endif
-           enddo
-        enddo
-
-      endif
+   pos = 0
+   do i=1,NDimX
+      pos(IndN(1,i),IndN(2,i)) = IndX(i)
    enddo
-enddo
 
-close(iunit)
+   allocate(work1(NBasis*NBasis),ints(NBasis,NBasis))
 
-ECorr = EAll-EIntra
+   EAll   = 0d0
+   EIntra = 0d0
 
-print*, 'EAll,EIntra',EAll,EIntra
+   open(newunit=iunit,file='FOFOERF',status='OLD', &
+        access='DIRECT',recl=8*NBasis*NOccup)
 
-close(iunit)
+   ! energy loop
+   kl = 0
+   do k=1,NOccup
+      do l=1,NBasis
+         kl = kl + 1
+         if(pos(l,k)/=0) then
+           irs = pos(l,k)
+           ir = l
+           is = k
+           read(iunit,rec=kl) work1(1:NBasis*NOccup)
+           do j=1,NOccup
+              do i=1,NBasis
+                 ints(i,j) = work1((j-1)*NBasis+i)
+              enddo
+           enddo
+           ints(:,NOccup+1:NBasis) = 0
 
-endif
+           do j=1,NBasis
+              do i=1,j
+                 if(pos(j,i)/=0) then
+                   ipq = pos(j,i)
+                   ip = j
+                   iq = i
+                   Crs = C(ir)+C(is)
+                   Cpq = C(ip)+C(iq)
+
+                   Aux = Crs*Cpq*ABPLUS(ipq,irs)
+                   EAll = EAll + Aux*ints(j,i)
+
+                   if(AuxCoeff(IGem(ip),IGem(iq),IGem(ir),IGem(is))==1) EIntra = EIntra + Aux*ints(j,i)
+
+                 endif
+              enddo
+           enddo
+
+         endif
+      enddo
+   enddo
+
+   ECorr = EAll-EIntra
+
+   print*, 'EAll,EIntra',EAll,EIntra
+
+   close(iunit)
+   deallocate(ints,work1)
+
+endif ! ICholesky
+endif ! present(ECorr)
 
 !call sq_to_triang2(HNO,work1,NBasis)
 !write(LOUT,*) 'HNO-my', norm2(work1(1:NBasis*(NBasis+1)/2))
@@ -1543,7 +1564,6 @@ endif
 !
 !write(LOUT,*) 'WMAT-my', 2d0*norm2(WMAT)
 
-deallocate(ints,work1)
 deallocate(Eig,EigY)
 
 call clock('Y01CASLR:ENE',Tcpu,Twall)
