@@ -137,7 +137,6 @@ logical :: check
 
 text = 'CHIVAL  '
 
-print*, 'here?'
 inquire(file='GRID',exist=check)
 print*, 'check',check
 if (.not. check) then

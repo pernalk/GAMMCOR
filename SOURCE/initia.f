@@ -1502,9 +1502,13 @@ C     compute Cholesky vectors OTF
 
       Call CholeskyOTF_ao_vecs(CholeskyVecsOTF,AOBasis,System,IUnits,
      $            XYZPath,BasisSetPath,SortAngularMomenta,ICholeskyAccu)
+      NCholesky = CholeskyVecsOTF%NVecs
 
 C     generate LR-Cholesky integrals and assemble FOFOERF
-C     ... this is temporary workaround:  avoid disk in the future
+C     Note: full-range vectors are used to construct sr Coulomb
+C           and for sr kernel (optional)
+C     ... this is temporary workaround: avoid disk in the future
+C
       If(IFunSR.Eq.1.Or.IFunSR.Eq.2.Or.IFunSR.Eq.4) Then
 
       Write(lout,'(/1x,3a6)') ('******',i=1,3)
@@ -2095,7 +2099,7 @@ C     cholesky OTF
       a1 = NBasis
       b0 = 1
       b1 = NBasis
-      NCholesky = CholeskyVecsOTF%NVecs
+c     NCholesky = CholeskyVecsOTF%NVecs
       allocate(MatFF(NCholesky,NA*NB))
       UAux = CAONO
 C
@@ -2156,6 +2160,7 @@ C
       ElseIf (ICholesky==1) Then
 C     cholesky OTF
       If (ICholeskyOTF==1) Then
+      print*, 'NChol',NCholesky,NCholErf
       allocate(FOErf(NCholErf,NBasis*(num0+num1)))
       Call Chol_Rkab_OTF(FOErf,UAux,1,NBasis,UAux,1,num0+num1,
      $                   MemMOTransfMB, CholErfVecsOTF,
@@ -2164,7 +2169,19 @@ C
       Call chol_fofo_batch(num0+num1,FOErf,
      $                     num0+num1,FOErf,
      $                     NCholErf,NBasis,'FOFOERF')
-      Deallocate(FoErf)
+      Deallocate(FOErf)
+      If (IFunSRKer==1) Then ! assemble FOFO for sr kernel
+         print*, 'NChol',NCholesky,NCholErf
+         allocate(FOErf(NCholesky,NBasis*(num0+num1)))
+         Call Chol_Rkab_OTF(FOErf,UAux,1,NBasis,UAux,1,num0+num1,
+     $                      MemMOTransfMB, CholeskyVecsOTF,
+     $                      AOBasis, ORBITAL_ORDERING_MOLPRO)
+C
+         Call chol_fofo_batch(num0+num1,FOErf,
+     $                        num0+num1,FOErf,
+     $                        NCholesky,NBasis,'FOFO')
+      Deallocate(FOErf)
+      EndIf
 C
       allocate(FFErf(NCholErf,NBasis**2))
       Call Chol_Rkab_OTF(FFErf,UAux,1,NBasis,UAux,1,NBasis,
