@@ -1511,13 +1511,12 @@ C           and for sr kernel (optional)
 
       Write(lout,'(/1x,3a6)') ('******',i=1,3)
       Write(lout,'(1x,a)') 'Cholesky LR On-The-Fly'
-      Write(lout,'(10x,a,f12.8)') 'MU = ',Alpha
+      Write(lout,'(2x,a,f12.8)') 'MU = ',Alpha
       Write(lout,'(1x,3a6)') ('******',i=1,3)
 
       Call CholeskyOTF_ao_vecs(CholErfVecsOTF,AOBasis,System,IUnits,
      $            XYZPath,BasisSetPath,SortAngularMomenta,ICholeskyAccu,
      $            Alpha)
-
       NCholErf = CholErfVecsOTF%NVecs
 
       EndIf
@@ -1896,6 +1895,10 @@ C      print*, 'Fock = ',norm2(Fmat)
 C      do j=1,NBasis
 C         write(LOUT,'(*(f13.8))') (Fmat(i,j),i=1,NBasis)
 C      enddo
+Cc     print*, 'JMOsr = ',norm2(JMOsr)
+Cc     do j=1,NBasis
+Cc        write(LOUT,'(*(f13.8))') (JMOsr(i,j),i=1,NBasis)
+Cc     enddo
 C      end block
 C
       EndIf
@@ -2008,8 +2011,30 @@ C     CAOMO = C(AO,MO) ; URe = C(NO,MO)
 C
       If (IFunSR.Eq.1.Or.IFunSR.Eq.2.Or.IFunSR.Eq.4) Then
 C     transform short-range Jmat from MO to AO
+c       block
+cC     transform short-range Jmat from MO to NO
+c       Call dgemm('N','N',NBasis,NBasis,NBasis,1d0,URe,NBasis,
+c     &           JMOsr,NBasis,0d0,JMO,NBasis)
+c       Call dgemm('N','T',NBasis,NBasis,NBasis,1d0,JMO,NBasis,
+c     &           URe,NBasis,0d0,JMOsr,NBasis)
+c       Print*, 'JMOsr in NO basis =',norm2(JMOsr)
+c       do j=1,NBasis
+c         write(6,'(*(f13.8))') (JMOsr(i,j),i=1,NBasis)
+c       enddo
+c       end block
+C temp test: use JMat in NOs!
       Call tranMO2AO(JMOsr,CAOMO,SAO,NBasis)
-C      
+c      block
+c      Print*, 'SAO matrix =',norm2(SAO)
+c      do j=1,NBasis
+c         write(6,'(*(f13.8))') (SAO(i,j),i=1,NBasis)
+c      enddo
+c      Print*, 'JMOsr in AO basis =',norm2(JMOsr)
+c      do j=1,NBasis
+c         write(6,'(*(f13.8))') (JMOsr(i,j),i=1,NBasis)
+c      enddo
+c      end block
+C
 C     dump short-range Jmat on disk
       open(newunit=iunit,file='jsrmat',form='unformatted')
       write(iunit) NBasis
@@ -2158,6 +2183,7 @@ C
       ElseIf (ICholesky==1) Then
 C     cholesky OTF
       If (ICholeskyOTF==1) Then
+      UAux = CAONO
 C
       If (IFunSRKer==1) Then ! assemble FOFO for sr kernel
          Allocate(FOErf(NCholErf,NBasis*(num0+num1)))
@@ -2190,10 +2216,10 @@ C
      $                   MemMOTransfMB, CholErfVecsOTF,
      $                   AOBasis, ORBITAL_ORDERING_MOLPRO)
 C
-C     assemble FFOERF file (not really needed)
-c     Call chol_ffoo_batch(.false.,FFErf,num0+num1,
-c    $                     num0+num1,OOErf,
-c    $                     NCholErf,NBasis,'FFOOERF')
+CC     assemble FFOERF file (only for testing)
+C      Call chol_ffoo_batch(.false.,FFErf,num0+num1,
+C     $                     num0+num1,OOErf,
+C     $                     NCholErf,NBasis,'FFOOERF')
 C
 C     dump LR integrals
       open(newunit=iunit,file='cholvecs',form='unformatted')

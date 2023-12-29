@@ -328,6 +328,9 @@ elseif(present(J_mo)) then
    J_mo = 0.5d0*Jtmp
 endif
 
+! test
+
+
 !print*, 'Fock in MO basis'
 !print*, 'Fock = ',norm2(F_mo)
 !do j=1,NBasis

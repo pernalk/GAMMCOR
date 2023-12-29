@@ -1529,7 +1529,7 @@ double Precision :: SC(NDim,NDim),work(NDim,NDim)
 
 !Print*, 'Matrix in AO basis =',norm2(Mat)
 !do j=1,NDim
-!     write(6,'(*(f13.8))') (Mat(i,j),i=1,NDim)
+!   write(6,'(*(f13.8))') (Mat(i,j),i=1,NDim)
 !enddo
 
 end subroutine tranMO2AO

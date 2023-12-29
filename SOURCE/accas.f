@@ -905,6 +905,14 @@ C
 C     calculate short-range Coulomb matrix in AO
       If (ICholesky==0) Then
          Call PotCoul_mithap(VCoul,Work2,.true.,'AOERFSORT',NBasis)
+c         block
+c         double precision :: JMOsr(NBasis,NBasis)
+c         call triang_to_sq2(VCoul,JMOsr,NBasis)
+c         Print*, 'JMOsr in AO basis =',norm2(JMOsr)
+c         do j=1,NBasis
+c            write(6,'(*(f13.8))') (JMOsr(i,j),i=1,NBasis)
+c         enddo
+c         end block
       ElseIf (ICholesky==1) Then
          ! for Cholesky, Jmat(sr) is read from disk
          Allocate(Jmat(NBasis,NBasis))
@@ -914,8 +922,16 @@ C     calculate short-range Coulomb matrix in AO
          Read(iunit) Jmat
          Close(iunit,status='delete')
          Call sq_to_triang2(Jmat,VCoul,NBasis)
+c         Print*, 'JMOsr in AO basis =',norm2(Jmat)
+c         do j=1,NBasis
+c            write(6,'(*(f13.8))') (Jmat(i,j),i=1,NBasis)
+c         enddo
          Deallocate(Jmat)
       EndIf
+c     Print*, 'UNOAO =',norm2(UNOAO)
+c     do j=1,NBasis
+c        write(6,'(*(f13.8))') (UNOAO(i,j),i=1,NBasis)
+c     enddo
 C
       Print*, 'VCoul',norm2(VCoul)
       Call EPotSR(EnSR,EnHSR,VSR,Occ,URe,UNOAO,.false.,
