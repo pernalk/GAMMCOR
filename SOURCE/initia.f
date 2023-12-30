@@ -2011,24 +2011,10 @@ C     CAOMO = C(AO,MO) ; URe = C(NO,MO)
 C
       If (IFunSR.Eq.1.Or.IFunSR.Eq.2.Or.IFunSR.Eq.4) Then
 C     transform short-range Jmat from MO to AO
-c       block
-cC     transform short-range Jmat from MO to NO
-c       Call dgemm('N','N',NBasis,NBasis,NBasis,1d0,URe,NBasis,
-c     &           JMOsr,NBasis,0d0,JMO,NBasis)
-c       Call dgemm('N','T',NBasis,NBasis,NBasis,1d0,JMO,NBasis,
-c     &           URe,NBasis,0d0,JMOsr,NBasis)
-c       Print*, 'JMOsr in NO basis =',norm2(JMOsr)
-c       do j=1,NBasis
-c         write(6,'(*(f13.8))') (JMOsr(i,j),i=1,NBasis)
-c       enddo
-c       end block
-C temp test: use JMat in NOs!
-      Call tranMO2AO(JMOsr,CAOMO,SAO,NBasis)
+      Call tranMO2AO('T',JMOsr,UAux,NBasis)
+C
+CC    test Jsr in AO
 c      block
-c      Print*, 'SAO matrix =',norm2(SAO)
-c      do j=1,NBasis
-c         write(6,'(*(f13.8))') (SAO(i,j),i=1,NBasis)
-c      enddo
 c      Print*, 'JMOsr in AO basis =',norm2(JMOsr)
 c      do j=1,NBasis
 c         write(6,'(*(f13.8))') (JMOsr(i,j),i=1,NBasis)
@@ -2046,8 +2032,8 @@ C      Call dump_CAONO_SAO(CAONO,transpose(UAOMO),SAO,
 C     &               'CAONO.mol',NBasis)
 C      Call test_Smat(SAO,CAONO,transpose(UAOMO),NBasis)
 C
-      EndIf ! IFunSR, Jsr mat
-      EndIf ! ICholeskyOTF
+      EndIf ! IFunSR, Jsr
+      EndIf ! ICholeskyOTF, CAONO
 C      
       If(IRes.Eq.1) Then
 C      

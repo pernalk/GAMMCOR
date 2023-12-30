@@ -1497,7 +1497,7 @@ integer :: i,j
 
 end subroutine tran2MO
 
-subroutine tranMO2AO(Mat,C,S,NDim)
+subroutine tranMO2AOS(Mat,C,S,NDim)
 !
 ! Purpose: tranform square matrix from MO to AO basis
 !          Mat_AO = SC . Mat_MO . (SC)^T
@@ -1523,14 +1523,58 @@ double precision, intent(inout) :: Mat(NDim,NDim)
 integer :: i,j
 double Precision :: SC(NDim,NDim),work(NDim,NDim)
 
- Call dgemm('N','N',NDim,NDim,NDim,1d0,S,NDim,C,NDim,0d0,SC,NDim)
- Call dgemm('N','N',NDim,NDim,NDim,1d0,SC,NDim,Mat,NDim,0d0,work,NDim)
- Call dgemm('N','T',NDim,NDim,NDim,1d0,work,NDim,SC,NDim,0d0,Mat,NDim)
+call dgemm('N','N',NDim,NDim,NDim,1d0,S,NDim,C,NDim,0d0,SC,NDim)
+call dgemm('N','N',NDim,NDim,NDim,1d0,SC,NDim,Mat,NDim,0d0,work,NDim)
+call dgemm('N','T',NDim,NDim,NDim,1d0,work,NDim,SC,NDim,0d0,Mat,NDim)
 
 !Print*, 'Matrix in AO basis =',norm2(Mat)
 !do j=1,NDim
 !   write(6,'(*(f13.8))') (Mat(i,j),i=1,NDim)
 !enddo
+
+end subroutine tranMO2AOS
+
+subroutine tranMO2AO(tran,Mat,C,NDim)
+implicit none
+
+character(len=1),intent(in) :: tran
+integer,intent(in) :: NDim
+double precision, intent(in)    ::  C(NDim,NDim)
+double precision, intent(inout) :: Mat(NDim,NDim)
+
+integer :: i,j
+integer :: info,ipiv(NDim)
+double precision :: work(NDim)
+double precision :: Cinv(NDim,NDim),tmp(NDim,NDim)
+!
+! Purpose: tranform square matrix from MO to AO basis
+!          Mat_AO = C . Mat_MO . (C)^1
+!
+!          C^-1 = C^T.S
+! WARNING! Assumes NAO = NMO
+!
+! Input:
+! Mat(MO,MO) matrix
+! tran = 'N' --> C(AO,MO)
+! tran = 'T' --> C(MO,AO)
+!
+
+Cinv = C
+call dgetrf(NDim,NDim,Cinv,NDim,ipiv,info)
+call dgetri(NDim,Cinv,NDim,ipiv,work,NDim,info)
+
+if (info /= 0) stop "tranMO2AO_2: inv error"
+
+select case (tran)
+case('T', 't')
+   call dgemm('N','N',NDim,NDim,NDim,1d0,Cinv,NDim,Mat,NDim,0d0,tmp,NDim)
+   call dgemm('N','T',NDim,NDim,NDim,1d0,tmp,NDim,Cinv,NDim,0d0,Mat,NDim)
+case('N', 'n')
+   call dgemm('T','N',NDim,NDim,NDim,1d0,Cinv,NDim,Mat,NDim,0d0,tmp,NDim)
+   call dgemm('N','N',NDim,NDim,NDim,1d0,tmp,NDim,Cinv,NDim,0d0,Mat,NDim)
+case default
+
+end select
 
 end subroutine tranMO2AO
 
