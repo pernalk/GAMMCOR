@@ -2009,15 +2009,32 @@ C     CAOMO = C(AO,MO) ; URe = C(NO,MO)
       Call dgemm('N','T',NBasis,NBasis,NBasis,1d0,CAOMO,NBasis,
      &           URe,NBasis,0d0,CAONO,NBasis)
 C
+C     Careful! In CholeskyOTF the UAOMO matrix
+C              contains C(NO,AO) not C(NO,SAO)
+C              to match with gammcor-cholesky library
+C
+      UAOMO = transpose(CAONO)
+C
       If (IFunSR.Eq.1.Or.IFunSR.Eq.2.Or.IFunSR.Eq.4) Then
 C     transform short-range Jmat from MO to AO
-      Call tranMO2AO('T',JMOsr,UAux,NBasis)
+      Call tranMO2AO('N',JMOsr,CAOMO,NBasis)
 C
 CC    test Jsr in AO
 c      block
 c      Print*, 'JMOsr in AO basis =',norm2(JMOsr)
 c      do j=1,NBasis
 c         write(6,'(*(f13.8))') (JMOsr(i,j),i=1,NBasis)
+c      enddo
+c      end block
+C
+c      block
+c      Print*, 'CAONO =',norm2(CAONO)
+c      do i=1,NBasis
+c         write(6,'(*(f13.8))') (CAONO(i,j),j=1,NBasis)
+c      enddo
+c      Print*, 'CSAONO =',norm2(UAOMO)
+c      do j=1,NBasis
+c         write(6,'(*(f13.8))') (UAOMO(i,j),i=1,NBasis)
 c      enddo
 c      end block
 C
