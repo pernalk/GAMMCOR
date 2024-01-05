@@ -316,6 +316,8 @@ C     on-the-fly
 
       Dimension Gamma(NInte1),Work(NBasis),PC(NBasis),
      $ AUXM(NBasis,NBasis),AUXM1(NBasis,NBasis),
+c 03.01.2024
+     $ AUXM2(NBasis*NBasis),
      $ Fock(NBasis*NBasis),
      $ UAux(NBasis,NBasis),
      $ FockF(NInte1),GammaAB(NInte1),Eps(NBasis,NBasis)
@@ -357,10 +359,11 @@ C
       Read(10,End=61) X
       Ind=I*(I-1)/2+J
       Gamma(Ind)=X/Two
-      ICount=ICount+1
+      If(I.Eq.J) ICount=ICount+1
       EndDo
       EndDo
    61 Close(10)
+      NActDMRG=ICount
 C
       Else
 C
@@ -391,17 +394,59 @@ C
       EndIf
 C
       Call CpySym(AUXM,Gamma,NBasis)
-      Call Diag8(AUXM,NBasis,NBasis,PC,Work)
-      Call SortOcc(PC,AUXM,NBasis)
+C
+c 03.01.2024 beginning of changes
+      NAc=NActDMRG
+C
+C     DIAGONALIZE ONLY THE ACTIVE BLOCK OF Gamma TO AVOID THROWING AWAY
+C     ACTIVE ORBITAL OF ZERO-OCCUPANCY (which may happen for atoms for some states)
+C
+      Do I=1,NAc
+      Do J=1,NAc
+      AUXM2((J-1)*NAc+I)=AUXM(I,J)
+      EndDo
+      EndDo
+      Call Diag8(AUXM2,NAc,NAc,PC,Work)
+      Call SortP(PC,AUXM2,NAc)
+C
+      AUXM(1:NBasis,1:NBasis)=Zero
+      Do I=1,NAc
+      Do J=1,NAc
+      AUXM(I,J)=AUXM2((J-1)*NAc+I)
+      EndDo
+      EndDo
 C
       Sum=Zero
       NAc=0
       Do I=1,NBasis
+C     it may happen that an active orbital has a negative but very small occupation. set it to a positive
+      PC(I)=Abs(PC(I))
       Sum=Sum+PC(I)
       If(PC(I).Gt.Zero) NAc=NAc+1
       EndDo
 C
-      NInAc=XELE-Sum+1.D-1
+      ISwitch=0
+      If(NAc.Ne.NActDMRG) Then
+      Write(6,'(1x,"WARNING! The number of partially occ orbitals
+     $ different from NActDMRG read from orca. Some active orbitals
+     $ must be unoccupied.",/)')
+      NAc=NActDMRG
+      ISwitch=1
+      EndIf
+c
+c      Call Diag8(AUXM,NBasis,NBasis,PC,Work)
+c      Call SortOcc(PC,AUXM,NBasis)
+C
+c      Sum=Zero
+c      NAc=0
+c      Do I=1,NBasis
+c      Sum=Sum+PC(I)
+c      If(PC(I).Gt.Zero) NAc=NAc+1
+c      EndDo
+C
+c 03.01.2024 end of changes
+C
+      NInAc=XELE-Sum+1.D-2
       Do I=1,NInAc+NAc
       If(I.Le.NInAc) Then
       Occ(I)=One
