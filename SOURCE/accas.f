@@ -674,6 +674,7 @@ C
 C     LOCAL ARRAYS
 C
       Integer(8) :: MemSrtSize
+      Integer :: jtsoao(NBasis)
 C
       Logical :: doGGA
 C
@@ -795,18 +796,32 @@ C      Read(10,*) X
 C      NumOSym(I)=X
 C      EndDo
 C      Close(10)
-C     HAP
+C
       Call create_ind_molpro('2RDM',NumOSym,IndInt,NSym,NBasis)
       MxSym=NSym
 C
+      If (ICholesky==1) Then
+         Call read_aosao_map_molpro(jtsoao,
+     $              'MOLPRO.MOPUN','CASORBAO',NBasis)
+         If (InternalGrid==0.and.MxSym>1.and.IFunSRKer==1) Then
+            Stop "In RunACCASLR: Kernel & Sym /= 1 : use INTERNAL GRID!"
+         EndIf
+      EndIf
+
       NSymNO(1:NBasis)=0
       IStart=0
       Do I=1,MxSym
       Do J=IStart+1,IStart+NumOSym(I)
 C
-      Do IOrb=1,NBasis
-      If(Abs(UNOAO(IOrb,J)).Gt.1.D-1) NSymNO(IOrb)=I
-      EndDo
+      If (ICholesky==0) Then
+         Do IOrb=1,NBasis
+         If(Abs(UNOAO(IOrb,J)).Gt.1.D-1) NSymNO(IOrb)=I
+         EndDo
+      ElseIf (ICholesky==1) Then
+         Do IOrb=1,NBasis
+         If(Abs(UNOAO(IOrb,jtsoao(J))).Gt.1.D-1) NSymNO(IOrb)=I
+         EndDo
+      EndIf
 C
       EndDo
       IStart=IStart+NumOSym(I)
@@ -928,10 +943,10 @@ c            write(6,'(*(f13.8))') (Jmat(i,j),i=1,NBasis)
 c         enddo
          Deallocate(Jmat)
       EndIf
-c     Print*, 'UNOAO =',norm2(UNOAO)
-c     do j=1,NBasis
-c        write(6,'(*(f13.8))') (UNOAO(i,j),i=1,NBasis)
-c     enddo
+      Print*, 'UNOAO =',norm2(UNOAO)
+      do j=1,NBasis
+         write(6,'(*(f13.8))') (UNOAO(i,j),i=1,NBasis)
+      enddo
 C
       Print*, 'VCoul',norm2(VCoul)
       Call EPotSR(EnSR,EnHSR,VSR,Occ,URe,UNOAO,.false.,
