@@ -1500,6 +1500,7 @@ subroutine e2disp_CAlphaTilde_block(Flags,A,B,SAPT)
 !
 ! calculate 2nd order dispersion energy
 ! using expansion of C(w) in alpha around alpha=0, up to Max_Cn order
+! https://doi.org/10.1021/acs.jpclett.3c01568
 ! use A0 blocks (not diagonal)
 ! with Cholesky vectors
 !
@@ -1767,6 +1768,10 @@ enddo
 !call print_en('E2disp(Alph,unc)',e2du,.false.)
 !if(both) then
    SAPT%e2disp  = -32d0/Pi*e2d
+
+   ! skip uncoupled E2disp/E2exdisp with Cholesky...
+   SAPT%e2disp_unc = 0d0 !SAPT%e2disp
+
    e2d = -32d0/Pi*e2d*1d3
    !print*, 'e2d = ',e2d
    call print_en('E2disp(CAlpha)',e2d,.false.)
@@ -1786,6 +1791,117 @@ deallocate(CB,CA)
 !deallocate(B%DCholB,A%DCholA)
 
 end subroutine e2disp_CAlphaTilde_block
+
+subroutine e2disp_CAlphaTilde_unc(Flags,A,B,SAPT)
+!
+! calculate 2nd order uncoupled dispersion energy
+! using expansion of C(w) in alpha around alpha=0, up to Max_Cn order
+! use A0 blocks (not diagonal)
+! with Cholesky vectors
+!
+implicit none
+
+type(FlagsData)   :: Flags
+type(SystemBlock) :: A, B
+type(SaptData)    :: SAPT
+
+integer :: NBasis,NCholesky
+integer :: nblkA,nblkB
+integer :: i,j
+integer :: ifreq,NFreq
+
+double precision :: Pi
+double precision :: OmI,val
+double precision :: e2du
+
+double precision,allocatable :: XFreq(:),WFreq(:)
+double precision,allocatable :: ABP0TildeA(:,:),ABP0TildeB(:,:)
+double precision,allocatable :: C0TildeA(:,:),C0TildeB(:,:)
+double precision,allocatable :: CA(:,:),CB(:,:)
+
+type(EBlockData)             :: A0BlkIVA,A0BlkIVB
+type(EBlockData),allocatable :: A0BlkA(:),A0BlkB(:)
+
+Pi = 4.0d0*atan(1.0)
+
+! set dimensions
+NBasis = A%NBasis
+NCholesky = SAPT%NCholesky
+
+! get A0PLUS, A0MIN in blocks matY and matX
+call Sblock_to_ABMAT(A0BlkA,A0BlkIVA,A%IndN,A%CICoef,nblkA,NBasis,A%NDimX,'XY0_A')
+
+!Calc: APLUS0Tilde=ABPLUS0.DChol
+allocate(ABP0TildeA(A%NDimX,NCholesky))
+call ABPM_HALFTRAN_GEN_L(transpose(A%DChol),ABP0TildeA,0.0d0,A0BlkA,A0BlkIVA,nblkA,A%NDimX,NCholesky,'Y')
+print*, 'APLUS0Tilde-a',norm2(ABP0TildeA)
+
+call release_ac0block(A0BlkA,A0BlkIVA,nblkA)
+deallocate(A0BlkA)
+
+! get A0PLUS, A0MIN in blocks matY and matX
+call Sblock_to_ABMAT(A0BlkB,A0BlkIVB,B%IndN,B%CICoef,nblkB,NBasis,B%NDimX,'XY0_B')
+
+allocate(ABP0TildeB(B%NDimX,NCholesky))
+call ABPM_HALFTRAN_GEN_L(transpose(B%DChol),ABP0TildeB,0.0d0,A0BlkB,A0BlkIVB,nblkB,B%NDimX,NCholesky,'Y')
+print*, 'APLUS0Tilde-b',norm2(ABP0TildeB)
+
+call release_ac0block(A0BlkB,A0BlkIVB,nblkB)
+deallocate(A0BlkB)
+
+! get CAlphaTilde in 0th order
+NFreq = 12
+print*, ''
+print*, 'E2disp, unc from CAlphaTilde(0)'
+print*, 'SAPT%NFreq =', NFreq
+
+allocate(XFreq(NFreq),WFreq(NFreq))
+allocate(C0TildeA(A%NDimX,NCholesky),C0TildeB(B%NDimX,NCholesky))
+allocate(CA(NCholesky,NCholesky),CB(NCholesky,NCholesky))
+
+call FreqGrid(XFreq,WFreq,NFreq)
+
+! read ABPLUS0.ABMIN0 blocks
+call read_ABPM0Block(A0BlkA,A0BlkIVA,nblkA,'A0BLK_A')
+call read_ABPM0Block(A0BlkB,A0BlkIVB,nblkB,'A0BLK_B')
+
+e2du = 0
+do ifreq=1,NFreq
+
+   OmI = XFreq(ifreq)
+
+   call C_AlphaExpand_unc(C0TildeA,OmI,ABP0TildeA, &
+                      A0BlkA,A0BlkIVA,nblkA,NCholesky,A%NDimX)
+   call C_AlphaExpand_unc(C0TildeB,OmI,ABP0TildeB, &
+                      A0BlkB,A0BlkIVB,nblkB,NCholesky,B%NDimX)
+
+   call dgemm('N','N',NCholesky,NCholesky,A%NDimX,1d0,A%DChol,NCholesky,C0TildeA,A%NDimX,0d0,CA,NCholesky)
+   call dgemm('N','N',NCholesky,NCholesky,B%NDimX,1d0,B%DChol,NCholesky,C0TildeB,B%NDimX,0d0,CB,NCholesky)
+
+   val = 0
+   do j=1,NCholesky
+      do i=1,NCholesky
+         val = val + CA(j,i)*CB(i,j)
+      enddo
+   enddo
+   e2du = e2du + WFreq(ifreq)*val
+   !print*,'OmI, E2d,unc=', OmI,-32d0/Pi*e2du*1d3
+   write(6, '(1x,"OmI= ",F12.6,", E2d,unc=",F12.6)') OmI,-32d0/Pi*e2du*1d3
+
+enddo
+
+SAPT%e2disp_unc = -32d0/Pi*e2du
+e2du = -32d0/Pi*e2du*1d3
+
+!print*, 'E2disp(unc) =',e2du
+call print_en('E2disp,unc,C(0)',e2du,.true.)
+
+deallocate(CB,CA)
+deallocate(C0TildeB,C0TildeA)
+deallocate(ABP0TildeB,ABP0TildeA)
+deallocate(WFreq,XFreq)
+
+end subroutine e2disp_CAlphaTilde_unc
 
 subroutine e2disp_CAlphaTilde_full(Flags,A,B,SAPT)
 !
