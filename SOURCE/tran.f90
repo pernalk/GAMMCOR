@@ -1058,7 +1058,11 @@ end associate
 end subroutine ABPM_TRAN_GEN
 
 subroutine ABPM_HALFTRAN_GEN_L(AMAT,AOUT,fact,EBlock,EBlockIV,nblk,DimL,DimR,xyvar)
+! 
 ! AOUT = EBlock.AMAT
+! 
+! AMAT has a block structure!
+!
 implicit none
 
 integer,intent(in) :: nblk,DimL,DimR

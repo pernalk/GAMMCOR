@@ -496,7 +496,7 @@ elseif(Flags%ISAPT.Eq.1) then
  SAPT%IPrint = Input%CalcParams%IPrint
  if(SAPT%InterfaceType==2) SAPT%HFCheck = .false.
  ! temporary RSH
- if(Flags%IFunSR<3) then
+ if(Flags%IFunSR<3.and.Flags%IFunSR>0) then
    SAPT%doRSH = .true.
    SAPT%monA%doRSH = .true.
    SAPT%monB%doRSH = .true.

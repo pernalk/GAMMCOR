@@ -433,6 +433,23 @@ integer :: i
 
     call summary_rspt(SAPT)
 
+ elseif(SAPT%SaptLevel==0) then
+    write(LOUT,'(1x,a,/)') 'SAPT0 calculation requested'
+    SAPT%ICpld = .false.
+
+    call e1elst_Chol(SAPT%monA,SAPT%monB,SAPT)
+    call e1exch_Chol(Flags,SAPT%monA,SAPT%monB,SAPT)
+    call e2ind_icerpa(Flags,SAPT%monA,SAPT%monB,SAPT)
+    call e2exind(Flags,SAPT%monA,SAPT%monB,SAPT)
+    if(.not.SAPT%CAlpha) then
+    !  call e2disp_Cmat_Chol_block(Flags,SAPT%monA,SAPT%monB,SAPT)
+       stop "SAPT0/Cholesky: set CAlpha = .true."
+    else if(SAPT%CAlpha) then
+       call e2disp_CAlphaTilde_unc(Flags,SAPT%monA,SAPT%monB,SAPT)
+    endif
+    call e2exdisp(Flags,SAPT%monA,SAPT%monB,SAPT)
+    call summary_sapt(SAPT)
+
  else
 
     call e1elst_Chol(SAPT%monA,SAPT%monB,SAPT)
@@ -680,7 +697,7 @@ if(Flags%SaptLevel==999) then
   return
 endif
 
-if(Flags%SaptLevel==666) then
+if(Flags%SaptLevel==666.or.Flags%SaptLevel==0) then
    if (Flags%ICholesky==1) then
       call chol_ints_oooo(A%num0+A%num1,A%num0+A%num1,A%OO,&
                           B%num0+B%num1,B%num0+B%num1,B%OO,&
@@ -702,8 +719,10 @@ if(Flags%SaptLevel==666) then
                           A%NChol,'OOOOABAB')
    endif
 
-   print*, 'Only 1-st order exchange ints in RSPT2+'
-   return
+   if(Flags%SaptLevel==666) print*, 'Only 1-st order exchange ints in RSPT2+'
+   if(Flags%SaptLevel==666) return
+   if(Flags%SaptLevel==0)   write(6,'(/1x,a)') 'SAPT0: All FOFO/FFOO integrals will be assembled from Cholesky vecs...'
+                            ! with THC it will make sense to assemble them OTF...
 endif
 
 if(Flags%ISERPA==0) then
@@ -756,8 +775,8 @@ if(Flags%ISERPA==0) then
 
   if(Flags%ICholeskyBIN==1.or.Flags%ICholeskyOTF==1) then
 
-     print*, 'dimOA',A%num0+A%num1
-     print*, 'dimOB',B%num0+B%num1
+     !print*, 'dimOA',A%num0+A%num1
+     !print*, 'dimOB',B%num0+B%num1
 
      if(Flags%ICholeskyOTF==1) then
         call chol_FFXY_AB_AO2NO_OTF(Flags,A,B,CholeskyVecsOTF,AOBasis,NBasis,'AB')
@@ -773,8 +792,8 @@ if(Flags%ISERPA==0) then
      
 
      ! term A3-ind
-     if(allocated(A%FO)) print*, 'A%FO is allocated',A%NChol
-     if(allocated(B%FO)) print*, 'B%FO is allocated'
+     !if(allocated(A%FO)) print*, 'A%FO is allocated',A%NChol
+     !if(allocated(B%FO)) print*, 'B%FO is allocated'
      call chol_fofo_batch(A%num0+A%num1,A%FO,B%num0+B%num1,B%FO, &
                           A%NChol,NBasis,'FOFOAABB')
      !call chol_fofo_full_batch(A%num0+A%num1,A%FF,B%num0+B%num1,B%FF, &

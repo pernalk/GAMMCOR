@@ -126,6 +126,8 @@ if(Mon%TwoMoInt==TWOMO_INCORE) call LoadSaptTwoNO(Mon%Monomer,TwoMO,NBas,NInte2)
 ! response is obtained either for GVB or CASSCF functions
 
 ACAlpha=One
+ !print*, 'UNCOUPLED:'
+ !ACAlpha=1d-6
 ! GVB
 if(Flags%ICASSCF==0.and.Flags%ISERPA==0) then
 
@@ -476,15 +478,15 @@ if(Flags%ICASSCF==0.and.Flags%ISERPA==0) then
             NBas,Mon%NDimX,NInte1,Mon%NoSt,twofile,twojfile,twokfile,&
             Flags%IFlag0,Flags%ICholesky)
 
-  if(Flags%ICholesky==1) then
-     nblk = 1 + NBas - Mon%NAct
-     allocate(A0Block(nblk))
-     ! maybe just include blocks in Mon%...?
-     call AC0BLOCK(Mon%Occ,URe,XOne, &
-          Mon%IndN,Mon%IndX,Mon%IGem,Mon%NAct,Mon%INAct,Mon%NDimX, &
-          NBas,Mon%NDimX,NInte1,twojfile,twokfile,Flags%ICholesky, &
-          A0BlockIV,A0Block,nblk,1,abpm0file,1)
-  endif
+     if(Flags%ICholesky==1) then
+        nblk = 1 + NBas - Mon%NAct
+        allocate(A0Block(nblk))
+        ! maybe just include blocks in Mon%...?
+        call AC0BLOCK(Mon%Occ,URe,XOne, &
+             Mon%IndN,Mon%IndX,Mon%IGem,Mon%NAct,Mon%INAct,Mon%NDimX, &
+             NBas,Mon%NDimX,NInte1,twojfile,twokfile,Flags%ICholesky, &
+             A0BlockIV,A0Block,nblk,1,abpm0file,1)
+     endif
   case(TWOMO_FFFF)
      call Y01CAS_mithap(Mon%Occ,URe,XOne,ABPlus,ABMin, &
             propfile0,propfile1, &
@@ -1130,7 +1132,14 @@ integer,intent(in)            :: NBas
 double precision,intent(in)   :: MO(:)
 
 integer          :: i,ione
+integer          :: iunit
 integer          :: NSq,NInte1,NInte2
+
+! Cholesky OTF, A0 blocks stored in abpm0file
+integer          :: nblk
+type(EblockData),allocatable :: A0block(:)
+type(EblockData) :: A0blockIV
+
 double precision :: ETot
 double precision, allocatable :: work1(:),work2(:),XOne(:),TwoMO(:)
 double precision, allocatable :: ABPlus(:), ABMin(:), URe(:,:),      &
@@ -1138,7 +1147,7 @@ double precision, allocatable :: ABPlus(:), ABMin(:), URe(:,:),      &
 character(8)                  :: label
 character(:),allocatable      :: twojfile,twokfile
 character(:),allocatable      :: onefile,twofile,propfile0,propfile1,rdmfile
-character(:),allocatable      :: y01file,xy0file
+character(:),allocatable      :: y01file,xy0file,abpm0file
 
 ! set filenames
 if(Mon%Monomer==1) then
@@ -1151,6 +1160,7 @@ if(Mon%Monomer==1) then
    rdmfile   = 'rdm2_A.dat'
    y01file   = 'Y01_A'
    xy0file   = 'XY0_A'
+   abpm0file = 'A0BLK_A'
 elseif(Mon%Monomer==2) then
    onefile   = 'ONEEL_B'
    twofile   = 'TWOMOBB'
@@ -1161,6 +1171,7 @@ elseif(Mon%Monomer==2) then
    rdmfile   = 'rdm2_B.dat'
    y01file   = 'Y01_B'
    xy0file   = 'XY0_B'
+   abpm0file = 'A0BLK_B'
 endif
 
 ! set dimensions
@@ -1220,6 +1231,21 @@ if(Flags%ICASSCF==0.and.Flags%ISERPA==0) then
 ! CAS
 elseif(Flags%ICASSCF==1.and.Flags%ISERPA==0) then
 
+  if(Flags%ICholeskyOTF==1.or.Flags%ICholeskyBIN==1) then
+  ! write cholesky vecs on disk!
+     if(Mon%Monomer==2) then
+        open(newunit=iunit,file='cholvecs',status='old')
+        close(iunit,status='delete')
+     endif
+     open(newunit=iunit,file='cholvecs',form='unformatted')
+     write(iunit) Mon%NChol
+     write(iunit) Mon%FF
+     close(iunit)
+     ! they are needed in JK_Chol_loop
+     write(lout,'(1x,"Monomer ",i1,": deallocate FF(NBas^2|NChol)")') Mon%Monomer
+     deallocate(Mon%FF)
+  endif
+
   allocate(ABPlus(Mon%NDimX**2),ABMin(Mon%NDimX**2))
 
   select case(Mon%TwoMoInt)
@@ -1230,6 +1256,16 @@ elseif(Flags%ICASSCF==1.and.Flags%ISERPA==0) then
             Mon%IndN,Mon%IndX,Mon%IGem,Mon%NAct,Mon%INAct,Mon%NDimX, &
             NBas,Mon%NDim,NInte1,Mon%NoSt,twofile,twojfile,twokfile, &
             Flags%IFlag0,Flags%ICholesky)
+
+     if(Flags%ICholesky==1) then
+        nblk = 1 + NBas - Mon%NAct
+        allocate(A0Block(nblk))
+        call AC0BLOCK(Mon%Occ,URe,XOne, &
+             Mon%IndN,Mon%IndX,Mon%IGem,Mon%NAct,Mon%INAct,Mon%NDimX, &
+             NBas,Mon%NDimX,NInte1,twojfile,twokfile,Flags%ICholesky, &
+             A0BlockIV,A0Block,nblk,1,abpm0file,1)
+     endif
+
   case(TWOMO_FFFF)
      call Y01CAS_mithap(Mon%Occ,URe,XOne,ABPlus,ABMin, &
             propfile0,propfile1, &
