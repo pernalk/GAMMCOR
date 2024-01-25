@@ -7,7 +7,7 @@ module build_info
     character(len=*), parameter :: FC_COMPILER = "/opt/intel/oneapi/compiler/2021.1.2/linux/bin/intel64/ifort"
     character(len=*), parameter :: CXX_COMPILER = "/opt/intel/oneapi/compiler/2021.1.2/linux/bin/icx"
     character(len=*), parameter :: C_COMPILER = "/opt/intel/oneapi/compiler/2021.1.2/linux/bin/icx"
-    character(len=*), parameter :: COMPILE_OPTIONS = "-assume byterecl -heap-arrays -O3 -g -xHost"
+    character(len=*), parameter :: COMPILE_OPTIONS = "-assume byterecl -heap-arrays -mkl=parallel -coarray=single -O3 -xHost"
     character(len=*), parameter :: BLAS_LIBRARIES = "/opt/intel/oneapi/mkl/latest/lib/intel64/libmkl_intel_lp64.so /opt/intel/oneapi/mkl/latest/lib/intel64/libmkl_intel_thread.so /opt/intel/oneapi/mkl/latest/lib/intel64/libmkl_core.so /usr/lib/x86_64-linux-gnu/libiomp5.so -lpthread -lm -ldl"
 
     contains

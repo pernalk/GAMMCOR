@@ -1,0 +1,575 @@
+[0] MPI startup(): I_MPI_CAF_RUNTIME environment variable is not supported.
+[0] MPI startup(): Similar variables:
+	 I_MPI_THREAD_RUNTIME
+[0] MPI startup(): To check the list of supported variables, use the impi_info utility or refer to https://software.intel.com/en-us/mpi-library/documentation/get-started.
+ 
+ GIT INFO
+********************************************************************************
+ Branch:             IntOnTheFly
+ Revision (short):   5885f00
+ Revision (full):    5885f0021105f4c4b282e30fd681ef37bec3c044
+ Latest commit date: Mon Oct 2 08:44:00 2023 +0200
+ Latest tag:         v-4.1
+ 
+ 
+ BUILD INFO
+********************************************************************************
+ Fortran compiler:   Intel 
+ /opt/intel/oneapi/compiler/2021.1.2/linux/bin/intel64/ifort
+ C++ compiler:       Clang /opt/intel/oneapi/compiler/2021.1.2/linux/bin/icx
+ C compiler:         Clang /opt/intel/oneapi/compiler/2021.1.2/linux/bin/icx
+ Compile options:    
+ -assume byterecl -heap-arrays -mkl=parallel -coarray=single -O3 -xHost
+ BLAS libraries:     
+ /opt/intel/oneapi/mkl/latest/lib/intel64/libmkl_intel_lp64.so /opt/intel/oneapi
+ /mkl/latest/lib/intel64/libmkl_intel_thread.so /opt/intel/oneapi/mkl/latest/lib
+ /intel64/libmkl_core.so /usr/lib/x86_64-linux-gnu/libiomp5.so -lpthread -lm -ld
+ l
+ 
+
+ INPUT 
+********************************************************************************
+ JOB TITLE:     test
+ BASIS SET:     cc-pVDZ-OPT
+ BASIS PATH:    /home/michalhapka/pr-dmft/basis/
+ INTERFACE:     ORCA    
+ JOB TYPE:      ACFREQNTH
+ RDM TYPE:      DMRG    
+ RDM SOURCE:    ORCA    
+ UNITS:         ANGSTROM
+
+ CHOLESKY :     .TRUE.
+ ALGORITHM:     ON-THE-FLY
+ CHOLESKY ACCU: LUDICROUS
+
+ MONOMER:       AB      
+ ZNUCL:        10
+ CHARGE:        0
+ THRESHOLD SELECT ACTIVE :  0.100000E-03
+
+
+ INPUT CHECK PASSED
+********************************************************************************
+
+ SYSTEM 
+********************************************************************************
+ NUCLEAR CHARGE:  10
+ CHARGE:           0
+ PRINT LEVEL:      0
+
+
+ IFunSR=0
+
+ IFunSRKer=0
+
+ WARNING: SIRIUS.RST NOT FOUND!
+ TRYING TO READ NBasis FROM INPUT!
+
+ WARNING! ASSUMING RMDs CORRESPOND TO                     GROUND STATE FROM DALTON OUTPUT (NoSt=1)!
+ NoSt= 1
+
+ STARTING CALCULATIONS 
+********************************************************************************
+  No of DMRG inactive and active orbitals:    0  10
+  DMRG   Occupancy    Gem
+   1    0.999984E+00     1
+   2    0.999535E+00     1
+   3    0.994642E+00     1
+   4    0.986602E+00     1
+   5    0.985055E+00     1
+   6    0.138602E-01     1
+   7    0.119435E-01     1
+   8    0.444648E-02     1
+   9    0.197905E-02     1
+  10    0.195276E-02     1
+  11    0.000000E+00     2
+  12    0.000000E+00     2
+  13    0.000000E+00     2
+  14    0.000000E+00     2
+  15    0.000000E+00     2
+  16    0.000000E+00     2
+  17    0.000000E+00     2
+  18    0.000000E+00     2
+  19    0.000000E+00     2
+  20    0.000000E+00     2
+  21    0.000000E+00     2
+  22    0.000000E+00     2
+  23    0.000000E+00     2
+  24    0.000000E+00     2
+  Sum of Occupancies:       5.00
+ The number of 1-el integrals read vs. expected       300       300
+
+ ******************
+ Cholesky On-The-Fly
+ ******************
+ Prescreening (pq|pq) integrals for the Cholesky decomposition
+ Shell pairs will be sorted according to their max elements
+ Sorted shell pairs will be discarded as long as Tr(V-Vapprox) < 1.0E-014
+ Trace of exact Coulomb matrix: 3.9E+001
+ Trace of discarded integrals: 0.0E+000
+ Discarded 0 out of 78 shell pairs
+ (0 out of 300 orbital pairs)
+
+ Starting pivoted Cholesky decomposition
+ Two electron Coulomb integrals will be computed on the fly
+ Dimensions of the Coulomb matrix: (300,300)
+ Min decomposed Dpq: 1.0E-011
+ Target trace error: 1.0E-004
+ Target trace error for prescreening: 1.0E-014
+ Maximum number of Cholesky vectors: 240
+ Dimensions of 2e integral storage buffer: (300,300)
+ Memory allocation per image
+ Cholesky vectors (R): 5.4E-004 gigabytes
+ two-electron integrals (M):  6.7E-004 gigabytes
+ ---------------------------------------------------------------
+ #    Tr(V-R**T*R)  Dmin        Dmax        NCholesky   Time        
+ ---------------------------------------------------------------
+ 1    1.89E+000     4.7E-002    4.7E+000    31          1.5E-002    
+ 2    1.57E-002     4.6E-004    4.6E-002    99          7.2E-003    
+ 3    1.19E-004     4.6E-006    4.6E-004    160         4.5E-003    
+ 4    9.55E-005     4.5E-007    4.5E-006    163         2.9E-003    
+
+ Cholesky decomposition completed
+ Computed 163 Cholesky vectors
+ Trace of discarded matrix elements: -1.9E-015
+ Largest residual Dpq: 3.5E-006
+ Total trace error: Tr(Vexact-R**T R) = 9.5E-005
+ NCholesky/NAO = 6.8E+000
+ Cholesky decomposition completed in 3.1E-002 seconds
+ Detailed timings in seconds
+ subtract prev contribs I (M-R**T*R): 2.7E-003
+ subtract prev contribs II (Rk): 2.0E-003
+ two-electron integrals: 2.4E-002
+
+
+ Construct Fock ver 2, monomer 0
+ H0 (internal) vs. H0 (external) =     0.000000
+
+ Two step transformation of Cholesky vectors: R(k,pq)->R(k,ab)
+ Will perform 1 passes over R(k,pq)
+ Completed pass 1 in 2.2E-003 seconds
+ Completed transformation in 3.0E-003 seconds
+ Transforming two-electron integrals ...
+
+ Using  2048 MB for 3-indx Cholesky transformation
+ Two step transformation of Cholesky vectors: R(k,pq)->R(k,ab)
+ Will perform 1 passes over R(k,pq)
+ Completed pass 1 in 1.6E-003 seconds
+ Completed transformation in 1.7E-003 seconds
+
+ Skipping FOFO/FFOO assembling
+
+ Reading 2-RDM ...
+
+ FCI RDM2 TRANSFORMATION TO NO IN PROCESS...
+
+ DONE WITH FCI RDM2 TRANSFORMATION
+
+  NATURAL ORBITAL OCCUPANCIES
+  Orb   Occupancy       CICoef       Gem
+   1    0.999984E+00    0.000000E+00     1
+   2    0.999535E+00    0.000000E+00     1
+   3    0.994642E+00    0.000000E+00     1
+   4    0.986602E+00    0.000000E+00     1
+   5    0.985055E+00    0.000000E+00     1
+   6    0.138602E-01    0.000000E+00     1
+   7    0.119435E-01    0.000000E+00     1
+   8    0.444648E-02    0.000000E+00     1
+   9    0.197905E-02    0.000000E+00     1
+  10    0.195276E-02    0.000000E+00     1
+  11    0.000000E+00    0.000000E+00     2
+  12    0.000000E+00    0.000000E+00     2
+  13    0.000000E+00    0.000000E+00     2
+  14    0.000000E+00    0.000000E+00     2
+  15    0.000000E+00    0.000000E+00     2
+  16    0.000000E+00    0.000000E+00     2
+  17    0.000000E+00    0.000000E+00     2
+  18    0.000000E+00    0.000000E+00     2
+  19    0.000000E+00    0.000000E+00     2
+  20    0.000000E+00    0.000000E+00     2
+  21    0.000000E+00    0.000000E+00     2
+  22    0.000000E+00    0.000000E+00     2
+  23    0.000000E+00    0.000000E+00     2
+  24    0.000000E+00    0.000000E+00     2
+
+  Active Orbital:    1    0.1000E+01
+  Active Orbital:    2    0.9995E+00
+  Active Orbital:    3    0.9946E+00
+  Active Orbital:    4    0.9866E+00
+  Active Orbital:    5    0.9851E+00
+  Active Orbital:    6    0.1386E-01
+  Active Orbital:    7    0.1194E-01
+  Active Orbital:    8    0.4446E-02
+  Active Orbital:    9    0.1979E-02
+  Active Orbital:   10    0.1953E-02
+
+  In ACCAS: Active Orbitals   10
+
+  Threshold for quasi-degeneracy         0.10000E-03
+  Threshold for quasi-virtual orbital    0.10000E-06
+  Threshold for quasi-inactive orbital   0.10000E-03
+
+  Number of pairs reduced to:   185
+  Accepted pairs read:
+      1    2    1    0.9995E+00    0.1000E+01
+      2    3    1    0.9946E+00    0.1000E+01
+      3    3    2    0.9946E+00    0.9995E+00
+      4    4    1    0.9866E+00    0.1000E+01
+      5    4    2    0.9866E+00    0.9995E+00
+      6    4    3    0.9866E+00    0.9946E+00
+      7    5    1    0.9851E+00    0.1000E+01
+      8    5    2    0.9851E+00    0.9995E+00
+      9    5    3    0.9851E+00    0.9946E+00
+     10    5    4    0.9851E+00    0.9866E+00
+     11    6    1    0.1386E-01    0.1000E+01
+     12    6    2    0.1386E-01    0.9995E+00
+     13    6    3    0.1386E-01    0.9946E+00
+     14    6    4    0.1386E-01    0.9866E+00
+     15    6    5    0.1386E-01    0.9851E+00
+     16    7    1    0.1194E-01    0.1000E+01
+     17    7    2    0.1194E-01    0.9995E+00
+     18    7    3    0.1194E-01    0.9946E+00
+     19    7    4    0.1194E-01    0.9866E+00
+     20    7    5    0.1194E-01    0.9851E+00
+     21    7    6    0.1194E-01    0.1386E-01
+     22    8    1    0.4446E-02    0.1000E+01
+     23    8    2    0.4446E-02    0.9995E+00
+     24    8    3    0.4446E-02    0.9946E+00
+     25    8    4    0.4446E-02    0.9866E+00
+     26    8    5    0.4446E-02    0.9851E+00
+     27    8    6    0.4446E-02    0.1386E-01
+     28    8    7    0.4446E-02    0.1194E-01
+     29    9    1    0.1979E-02    0.1000E+01
+     30    9    2    0.1979E-02    0.9995E+00
+     31    9    3    0.1979E-02    0.9946E+00
+     32    9    4    0.1979E-02    0.9866E+00
+     33    9    5    0.1979E-02    0.9851E+00
+     34    9    6    0.1979E-02    0.1386E-01
+     35    9    7    0.1979E-02    0.1194E-01
+     36    9    8    0.1979E-02    0.4446E-02
+     37   10    1    0.1953E-02    0.1000E+01
+     38   10    2    0.1953E-02    0.9995E+00
+     39   10    3    0.1953E-02    0.9946E+00
+     40   10    4    0.1953E-02    0.9866E+00
+     41   10    5    0.1953E-02    0.9851E+00
+     42   10    6    0.1953E-02    0.1386E-01
+     43   10    7    0.1953E-02    0.1194E-01
+     44   10    8    0.1953E-02    0.4446E-02
+     45   10    9    0.1953E-02    0.1979E-02
+     46   11    1    0.0000E+00    0.1000E+01
+     47   11    2    0.0000E+00    0.9995E+00
+     48   11    3    0.0000E+00    0.9946E+00
+     49   11    4    0.0000E+00    0.9866E+00
+     50   11    5    0.0000E+00    0.9851E+00
+     51   11    6    0.0000E+00    0.1386E-01
+     52   11    7    0.0000E+00    0.1194E-01
+     53   11    8    0.0000E+00    0.4446E-02
+     54   11    9    0.0000E+00    0.1979E-02
+     55   11   10    0.0000E+00    0.1953E-02
+     56   12    1    0.0000E+00    0.1000E+01
+     57   12    2    0.0000E+00    0.9995E+00
+     58   12    3    0.0000E+00    0.9946E+00
+     59   12    4    0.0000E+00    0.9866E+00
+     60   12    5    0.0000E+00    0.9851E+00
+     61   12    6    0.0000E+00    0.1386E-01
+     62   12    7    0.0000E+00    0.1194E-01
+     63   12    8    0.0000E+00    0.4446E-02
+     64   12    9    0.0000E+00    0.1979E-02
+     65   12   10    0.0000E+00    0.1953E-02
+     66   13    1    0.0000E+00    0.1000E+01
+     67   13    2    0.0000E+00    0.9995E+00
+     68   13    3    0.0000E+00    0.9946E+00
+     69   13    4    0.0000E+00    0.9866E+00
+     70   13    5    0.0000E+00    0.9851E+00
+     71   13    6    0.0000E+00    0.1386E-01
+     72   13    7    0.0000E+00    0.1194E-01
+     73   13    8    0.0000E+00    0.4446E-02
+     74   13    9    0.0000E+00    0.1979E-02
+     75   13   10    0.0000E+00    0.1953E-02
+     76   14    1    0.0000E+00    0.1000E+01
+     77   14    2    0.0000E+00    0.9995E+00
+     78   14    3    0.0000E+00    0.9946E+00
+     79   14    4    0.0000E+00    0.9866E+00
+     80   14    5    0.0000E+00    0.9851E+00
+     81   14    6    0.0000E+00    0.1386E-01
+     82   14    7    0.0000E+00    0.1194E-01
+     83   14    8    0.0000E+00    0.4446E-02
+     84   14    9    0.0000E+00    0.1979E-02
+     85   14   10    0.0000E+00    0.1953E-02
+     86   15    1    0.0000E+00    0.1000E+01
+     87   15    2    0.0000E+00    0.9995E+00
+     88   15    3    0.0000E+00    0.9946E+00
+     89   15    4    0.0000E+00    0.9866E+00
+     90   15    5    0.0000E+00    0.9851E+00
+     91   15    6    0.0000E+00    0.1386E-01
+     92   15    7    0.0000E+00    0.1194E-01
+     93   15    8    0.0000E+00    0.4446E-02
+     94   15    9    0.0000E+00    0.1979E-02
+     95   15   10    0.0000E+00    0.1953E-02
+     96   16    1    0.0000E+00    0.1000E+01
+     97   16    2    0.0000E+00    0.9995E+00
+     98   16    3    0.0000E+00    0.9946E+00
+     99   16    4    0.0000E+00    0.9866E+00
+    100   16    5    0.0000E+00    0.9851E+00
+    101   16    6    0.0000E+00    0.1386E-01
+    102   16    7    0.0000E+00    0.1194E-01
+    103   16    8    0.0000E+00    0.4446E-02
+    104   16    9    0.0000E+00    0.1979E-02
+    105   16   10    0.0000E+00    0.1953E-02
+    106   17    1    0.0000E+00    0.1000E+01
+    107   17    2    0.0000E+00    0.9995E+00
+    108   17    3    0.0000E+00    0.9946E+00
+    109   17    4    0.0000E+00    0.9866E+00
+    110   17    5    0.0000E+00    0.9851E+00
+    111   17    6    0.0000E+00    0.1386E-01
+    112   17    7    0.0000E+00    0.1194E-01
+    113   17    8    0.0000E+00    0.4446E-02
+    114   17    9    0.0000E+00    0.1979E-02
+    115   17   10    0.0000E+00    0.1953E-02
+    116   18    1    0.0000E+00    0.1000E+01
+    117   18    2    0.0000E+00    0.9995E+00
+    118   18    3    0.0000E+00    0.9946E+00
+    119   18    4    0.0000E+00    0.9866E+00
+    120   18    5    0.0000E+00    0.9851E+00
+    121   18    6    0.0000E+00    0.1386E-01
+    122   18    7    0.0000E+00    0.1194E-01
+    123   18    8    0.0000E+00    0.4446E-02
+    124   18    9    0.0000E+00    0.1979E-02
+    125   18   10    0.0000E+00    0.1953E-02
+    126   19    1    0.0000E+00    0.1000E+01
+    127   19    2    0.0000E+00    0.9995E+00
+    128   19    3    0.0000E+00    0.9946E+00
+    129   19    4    0.0000E+00    0.9866E+00
+    130   19    5    0.0000E+00    0.9851E+00
+    131   19    6    0.0000E+00    0.1386E-01
+    132   19    7    0.0000E+00    0.1194E-01
+    133   19    8    0.0000E+00    0.4446E-02
+    134   19    9    0.0000E+00    0.1979E-02
+    135   19   10    0.0000E+00    0.1953E-02
+    136   20    1    0.0000E+00    0.1000E+01
+    137   20    2    0.0000E+00    0.9995E+00
+    138   20    3    0.0000E+00    0.9946E+00
+    139   20    4    0.0000E+00    0.9866E+00
+    140   20    5    0.0000E+00    0.9851E+00
+    141   20    6    0.0000E+00    0.1386E-01
+    142   20    7    0.0000E+00    0.1194E-01
+    143   20    8    0.0000E+00    0.4446E-02
+    144   20    9    0.0000E+00    0.1979E-02
+    145   20   10    0.0000E+00    0.1953E-02
+    146   21    1    0.0000E+00    0.1000E+01
+    147   21    2    0.0000E+00    0.9995E+00
+    148   21    3    0.0000E+00    0.9946E+00
+    149   21    4    0.0000E+00    0.9866E+00
+    150   21    5    0.0000E+00    0.9851E+00
+    151   21    6    0.0000E+00    0.1386E-01
+    152   21    7    0.0000E+00    0.1194E-01
+    153   21    8    0.0000E+00    0.4446E-02
+    154   21    9    0.0000E+00    0.1979E-02
+    155   21   10    0.0000E+00    0.1953E-02
+    156   22    1    0.0000E+00    0.1000E+01
+    157   22    2    0.0000E+00    0.9995E+00
+    158   22    3    0.0000E+00    0.9946E+00
+    159   22    4    0.0000E+00    0.9866E+00
+    160   22    5    0.0000E+00    0.9851E+00
+    161   22    6    0.0000E+00    0.1386E-01
+    162   22    7    0.0000E+00    0.1194E-01
+    163   22    8    0.0000E+00    0.4446E-02
+    164   22    9    0.0000E+00    0.1979E-02
+    165   22   10    0.0000E+00    0.1953E-02
+    166   23    1    0.0000E+00    0.1000E+01
+    167   23    2    0.0000E+00    0.9995E+00
+    168   23    3    0.0000E+00    0.9946E+00
+    169   23    4    0.0000E+00    0.9866E+00
+    170   23    5    0.0000E+00    0.9851E+00
+    171   23    6    0.0000E+00    0.1386E-01
+    172   23    7    0.0000E+00    0.1194E-01
+    173   23    8    0.0000E+00    0.4446E-02
+    174   23    9    0.0000E+00    0.1979E-02
+    175   23   10    0.0000E+00    0.1953E-02
+    176   24    1    0.0000E+00    0.1000E+01
+    177   24    2    0.0000E+00    0.9995E+00
+    178   24    3    0.0000E+00    0.9946E+00
+    179   24    4    0.0000E+00    0.9866E+00
+    180   24    5    0.0000E+00    0.9851E+00
+    181   24    6    0.0000E+00    0.1386E-01
+    182   24    7    0.0000E+00    0.1194E-01
+    183   24    8    0.0000E+00    0.4446E-02
+    184   24    9    0.0000E+00    0.1979E-02
+    185   24   10    0.0000E+00    0.1953E-02
+
+ *** ADIABATIC CONNECTION CALCULATIONS ***
+
+
+ *** IFlCore=1: Inactive orbitals (n_p=1) included in ERPA correlation ***
+
+ NCholesky         163
+
+ AC calculation through W_AC expansion around Alpha=0, Omega Grid =  18 and max order in C expansion =  10
+
+ XOne   39.9678876081418     
+
+ Active block of 2-RDM read from rdm2.dat
+ CASSCF 1-electron Energy       -122.67247164
+ CASSCF Energy (w/o ENuc)        -85.10115519
+ XOne   39.9678876081418     
+ Order (n), |Delta_C|  2    0.1810E-03
+ Order (n), |Delta_C|  3    0.7904E-04
+ Order (n), |Delta_C|  4    0.3387E-04
+ Order (n), |Delta_C|  5    0.1874E-04
+ Order (n), |Delta_C|  6    0.1095E-04
+ Order (n), |Delta_C|  7    0.7863E-05
+ Order (n), |Delta_C|  8    0.6184E-05
+ Order (n), |Delta_C|  9    0.5360E-05
+ Order (n), |Delta_C| 10    0.4813E-05
+ Omega, |C|  1    0.0042    0.0009
+ Order (n), |Delta_C|  2    0.4310E-03
+ Order (n), |Delta_C|  3    0.1880E-03
+ Order (n), |Delta_C|  4    0.8049E-04
+ Order (n), |Delta_C|  5    0.4449E-04
+ Order (n), |Delta_C|  6    0.2599E-04
+ Order (n), |Delta_C|  7    0.1867E-04
+ Order (n), |Delta_C|  8    0.1470E-04
+ Order (n), |Delta_C|  9    0.1275E-04
+ Order (n), |Delta_C| 10    0.1146E-04
+ Omega, |C|  2    0.0226    0.0029
+ Order (n), |Delta_C|  2    0.7030E-03
+ Order (n), |Delta_C|  3    0.3048E-03
+ Order (n), |Delta_C|  4    0.1297E-03
+ Order (n), |Delta_C|  5    0.7120E-04
+ Order (n), |Delta_C|  6    0.4156E-04
+ Order (n), |Delta_C|  7    0.2993E-04
+ Order (n), |Delta_C|  8    0.2371E-04
+ Order (n), |Delta_C|  9    0.2066E-04
+ Order (n), |Delta_C| 10    0.1862E-04
+ Omega, |C|  3    0.0567    0.0063
+ Order (n), |Delta_C|  2    0.1002E-02
+ Order (n), |Delta_C|  3    0.4257E-03
+ Order (n), |Delta_C|  4    0.1781E-03
+ Order (n), |Delta_C|  5    0.9573E-04
+ Order (n), |Delta_C|  6    0.5589E-04
+ Order (n), |Delta_C|  7    0.4072E-04
+ Order (n), |Delta_C|  8    0.3287E-04
+ Order (n), |Delta_C|  9    0.2901E-04
+ Order (n), |Delta_C| 10    0.2635E-04
+ Omega, |C|  4    0.1088    0.0111
+ Order (n), |Delta_C|  2    0.1316E-02
+ Order (n), |Delta_C|  3    0.5341E-03
+ Order (n), |Delta_C|  4    0.2148E-03
+ Order (n), |Delta_C|  5    0.1110E-03
+ Order (n), |Delta_C|  6    0.6603E-04
+ Order (n), |Delta_C|  7    0.5008E-04
+ Order (n), |Delta_C|  8    0.4204E-04
+ Order (n), |Delta_C|  9    0.3789E-04
+ Order (n), |Delta_C| 10    0.3476E-04
+ Omega, |C|  5    0.1823    0.0174
+ Order (n), |Delta_C|  2    0.1608E-02
+ Order (n), |Delta_C|  3    0.5982E-03
+ Order (n), |Delta_C|  4    0.2269E-03
+ Order (n), |Delta_C|  5    0.1151E-03
+ Order (n), |Delta_C|  6    0.7524E-04
+ Order (n), |Delta_C|  7    0.6141E-04
+ Order (n), |Delta_C|  8    0.5307E-04
+ Order (n), |Delta_C|  9    0.4829E-04
+ Order (n), |Delta_C| 10    0.4433E-04
+ Omega, |C|  6    0.2822    0.0252
+ Order (n), |Delta_C|  2    0.1810E-02
+ Order (n), |Delta_C|  3    0.5976E-03
+ Order (n), |Delta_C|  4    0.2267E-03
+ Order (n), |Delta_C|  5    0.1306E-03
+ Order (n), |Delta_C|  6    0.9413E-04
+ Order (n), |Delta_C|  7    0.7792E-04
+ Order (n), |Delta_C|  8    0.6641E-04
+ Order (n), |Delta_C|  9    0.6023E-04
+ Order (n), |Delta_C| 10    0.5509E-04
+ Omega, |C|  7    0.4167    0.0342
+ Order (n), |Delta_C|  2    0.1860E-02
+ Order (n), |Delta_C|  3    0.5755E-03
+ Order (n), |Delta_C|  4    0.2527E-03
+ Order (n), |Delta_C|  5    0.1611E-03
+ Order (n), |Delta_C|  6    0.1139E-03
+ Order (n), |Delta_C|  7    0.9415E-04
+ Order (n), |Delta_C|  8    0.8038E-04
+ Order (n), |Delta_C|  9    0.7320E-04
+ Order (n), |Delta_C| 10    0.6675E-04
+ Omega, |C|  8    0.5976    0.0438
+ Order (n), |Delta_C|  2    0.1753E-02
+ Order (n), |Delta_C|  3    0.5852E-03
+ Order (n), |Delta_C|  4    0.2803E-03
+ Order (n), |Delta_C|  5    0.1816E-03
+ Order (n), |Delta_C|  6    0.1317E-03
+ Order (n), |Delta_C|  7    0.1115E-03
+ Order (n), |Delta_C|  8    0.9506E-04
+ Order (n), |Delta_C|  9    0.8569E-04
+ Order (n), |Delta_C| 10    0.7735E-04
+ Omega, |C|  9    0.8437    0.0531
+ Order (n), |Delta_C|  2    0.1549E-02
+ Order (n), |Delta_C|  3    0.6143E-03
+ Order (n), |Delta_C|  4    0.3105E-03
+ Order (n), |Delta_C|  5    0.2093E-03
+ Order (n), |Delta_C|  6    0.1511E-03
+ Order (n), |Delta_C|  7    0.1241E-03
+ Order (n), |Delta_C|  8    0.1044E-03
+ Order (n), |Delta_C|  9    0.9168E-04
+ Order (n), |Delta_C| 10    0.8140E-04
+ Omega, |C| 10    1.1853    0.0612
+ Order (n), |Delta_C|  2    0.1530E-02
+ Order (n), |Delta_C|  3    0.7459E-03
+ Order (n), |Delta_C|  4    0.3611E-03
+ Order (n), |Delta_C|  5    0.2130E-03
+ Order (n), |Delta_C|  6    0.1504E-03
+ Order (n), |Delta_C|  7    0.1174E-03
+ Order (n), |Delta_C|  8    0.9752E-04
+ Order (n), |Delta_C|  9    0.8084E-04
+ Order (n), |Delta_C| 10    0.6942E-04
+ Omega, |C| 11    1.6734    0.0666
+ Order (n), |Delta_C|  2    0.2044E-02
+ Order (n), |Delta_C|  3    0.8282E-03
+ Order (n), |Delta_C|  4    0.3175E-03
+ Order (n), |Delta_C|  5    0.1543E-03
+ Order (n), |Delta_C|  6    0.1176E-03
+ Order (n), |Delta_C|  7    0.8140E-04
+ Order (n), |Delta_C|  8    0.6473E-04
+ Order (n), |Delta_C|  9    0.4765E-04
+ Order (n), |Delta_C| 10    0.3841E-04
+ Omega, |C| 12    2.3999    0.0684
+ Order (n), |Delta_C|  2    0.2477E-02
+ Order (n), |Delta_C|  3    0.5646E-03
+ Order (n), |Delta_C|  4    0.1785E-03
+ Order (n), |Delta_C|  5    0.7571E-04
+ Order (n), |Delta_C|  6    0.5805E-04
+ Order (n), |Delta_C|  7    0.3021E-04
+ Order (n), |Delta_C|  8    0.2254E-04
+ Order (n), |Delta_C|  9    0.1320E-04
+ Order (n), |Delta_C| 10    0.9596E-05
+ Omega, |C| 13    3.5431    0.0668
+ Order (n), |Delta_C|  2    0.2050E-02
+ Order (n), |Delta_C|  3    0.1732E-03
+ Order (n), |Delta_C|  4    0.7427E-04
+ Order (n), |Delta_C|  5    0.1861E-04
+ Order (n), |Delta_C|  6    0.1277E-04
+ Order (n), |Delta_C|  7    0.3899E-05
+ Omega, |C| 14    5.4869    0.0639
+ Order (n), |Delta_C|  2    0.1033E-02
+ Order (n), |Delta_C|  3    0.6187E-04
+ Order (n), |Delta_C|  4    0.1838E-04
+ Order (n), |Delta_C|  5    0.2675E-05
+ Omega, |C| 15    9.1887    0.0626
+ Order (n), |Delta_C|  2    0.2874E-03
+ Order (n), |Delta_C|  3    0.2594E-04
+ Order (n), |Delta_C|  4    0.1656E-05
+ Omega, |C| 16   17.6224    0.0639
+ Order (n), |Delta_C|  2    0.4404E-04
+ Order (n), |Delta_C|  3    0.3291E-05
+ Omega, |C| 17   44.2734    0.0660
+ Order (n), |Delta_C|  2    0.5211E-05
+ Order (n), |Delta_C|  3    0.5316E-07
+ Omega, |C| 18  236.1120    0.0673
+
+  ECASSCF+ENuc, ACn-Corr, ACn-CASSCF        -76.12507304    -0.10489462   -76.22996766
+
+ CPU  time in AC  model            is                0.326 s
+ Wall time in AC  model            is                0.325 s
+ WARNING! NOT POSSIBLE TO DELETE AOTWOSORT FILE
+
+ CPU  time in ACFREQNTH            is                5.463 s
+ Wall time in ACFREQNTH            is                0.702 s

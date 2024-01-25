@@ -1361,50 +1361,41 @@ subroutine read_D_array(NCholesky, DChol, DCholAct, NDimX, NBasis, IndN, Occ, In
 
 end subroutine read_D_array
 
-subroutine AC0BLOCK(Occ,URe,XOne, &
-                    IndN,IndX,IGemIN,NAct,INActive,NDimX,NBasis,NDim,NInte1, &
-                    IntJFile,IntKFile,ICholesky, &
-                    A0BlockIV,A0block,nblk,ver,dumpfile,dump)
+subroutine pack_AC0BLOCK(ABPlus,ABMin,A0Block,A0blockIV,nblk,IndN,INActive,NAct,NDimX,NBasis,ver,dumpfile)
 !
-!     A ROUTINE FOR COMPUTING : a) ver=0  ABPLUS^{(0)} and ABMIN^{(0)}
-!                                         (stored in matY and matX, respectively)
-!                               b) ver=1  A0=ABPLUS^{(0)}.ABMIN^{(0)}
-!                 (FOFO VERSION)
-!
+!     A ROUTINE FOR PACKING : a) ver=0  ABPLUS^{(0)} and ABMIN^{(0)}
+!                                       (stored in matY and matX, respectively)
+!                             b) ver=1  A0=ABPLUS^{(0)}.ABMIN^{(0)}
+
 use abfofo
-!use types,only : EblockData
 use blocktypes
-!
+
 implicit none
 
-integer,intent(in)           :: NAct,INActive,NDimX,NBasis,NDim,NInte1
-integer,intent(in)           :: ICholesky
-integer,intent(in)           :: IndN(2,NDim),IndX(NDim),IGemIN(NBasis)
-integer                      :: nblk
-double precision,intent(in)  :: URe(NBasis,NBasis),Occ(NBasis),XOne(NInte1)
-character(*)                 :: IntJFile,IntKFile
-character(*)                 :: dumpfile
-integer,intent(in)           :: ver,dump
-
-integer          :: iunit
-integer          :: NOccup
-integer          :: i,j,k,l,kl,ii,ip,iq,ir,is,ipq,irs
-integer          :: ipos,jpos,iblk,jblk
-integer          :: IGem(NBasis),Ind(NBasis),pos(NBasis,NBasis)
-integer          :: nAA,nAI(INActive),nAV(INActive+NAct+1:NBasis),nIV
-integer          :: tmpAA(NAct*(NAct-1)/2),tmpAI(NAct,1:INActive),&
-                    tmpAV(NAct,INActive+NAct+1:NBasis),&
-                    tmpIV(INActive*(NBasis-NAct-INActive))
-integer          :: limAA(2),limAI(2,1:INActive),&
-                    limAV(2,INActive+NAct+1:NBasis),limIV(2)
-double precision :: AuxCoeff(3,3,3,3),Aux,val,ETot
-double precision :: ABPLUS(NDimX,NDimX),ABMIN(NDimX,NDimX)
-double precision :: C(NBasis)
-! hererXXX
-!integer :: ICol,IRow
-!double precision :: xn1,xn2
+integer,intent(in) :: NAct,INActive
+integer,intent(in) :: NDimX,NBasis
+integer,intent(in) :: ver
+integer            :: nblk
+integer,intent(in) :: IndN(2,NDimX)
+double precision,intent(in) :: ABPlus(NDimX,NDimX),ABMin(NDimX,NDimX)
+character(*),optional       :: dumpfile
 
 type(EblockData) :: A0block(nblk), A0blockIV
+
+integer :: NOccup
+integer :: i,ii,ip,iq
+integer :: IGem(NBasis),Ind(NBasis)
+integer :: pos(NBasis,NBasis)
+
+integer :: iblk
+integer :: iunit
+
+integer :: nAA,nAI(INActive),nAV(INActive+NAct+1:NBasis),nIV
+integer :: tmpAA(NAct*(NAct-1)/2),tmpAI(NAct,1:INActive),&
+           tmpAV(NAct,INActive+NAct+1:NBasis),&
+           tmpIV(INActive*(NBasis-NAct-INActive))
+integer :: limAA(2),limAI(2,1:INActive),&
+           limAV(2,INActive+NAct+1:NBasis),limIV(2)
 
 ! set dimensions
 NOccup = NAct + INActive
@@ -1425,54 +1416,10 @@ do i=NOccup+1,NBasis
    IGem(i) = 3
 enddo
 
-do l=1,3
-   do k=1,3
-      do j=1,3
-         do i=1,3
-            if((i==j).and.(j==k).and.(k==l)) then
-               AuxCoeff(i,j,k,l) = 1
-            else
-               AuxCoeff(i,j,k,l) = 0
-            endif
-         enddo
-      enddo
-   enddo
-enddo
-
-call ABPM0_FOFO(Occ,URe,XOne,ABPLUS,ABMIN, &
-                IndN,IndX,IGemIN,NAct,INActive,NDimX,NBasis,NDim,NInte1, &
-                IntJFile,IntKFile,ICholesky,ETot)
-! hererXXX
-!do i=1,NBasis
-!   C(i) = sign(sqrt(Occ(i)),Occ(i)-0.5d0)
-!enddo
-!xn1=0.25
-!call create_pos_ABPL0(pos,IGem,IndN,INActive,NAct,NBasis,NDimX)
-!do ICol=1,NDimX
-!   ir = IndN(1,ICol)
-!   is = IndN(2,ICol)
-!   irs = pos(ir,is)
-!   do IRow=1,NDimX
-!         ip = IndN(1,IRow)
-!         iq = IndN(2,IRow)
-!         ipq = pos(ip,iq)
-!         if(ipq.Eq.irs) then
-!            xn2=(Occ(IP)-Occ(IQ))*(Occ(IP)+1.D0-Occ(IQ))*xn1
-!            ABPLUS(ipq,irs)=ABPLUS(ipq,irs)+xn2/(C(IP)+C(IQ))**2
-!            ABMIN(ipq,irs)=ABMIN(ipq,irs)+xn2/(C(IP)-C(IQ))**2
-!         endif
-!   enddo
-!enddo
-
 call create_blocks_ABPL0(nAA,nAI,nAV,nIV,tmpAA,tmpAI,tmpAV,tmpIV,&
                          limAA,limAI,limAV,limIV,pos,&
                          IGem,IndN,INActive,NAct,NBasis,NDimX)
 
-do i=1,NBasis
-   C(i) = sign(sqrt(Occ(i)),Occ(i)-0.5d0)
-enddo
-
-!allocate(A0block(1+NBasis-NAct))
 nblk = 0
 
 !pack AA
@@ -1521,7 +1468,7 @@ associate(B => A0blockIV)
 
 end associate
 
-if(dump==1) then
+if(present(dumpfile)) then
   ! dump to file
   open(newunit=iunit,file=dumpfile,form='unformatted')
   write(iunit) nblk
@@ -1536,18 +1483,318 @@ if(dump==1) then
     write(iunit) B%pos,B%vec
   end associate
   close(iunit)
-
-  !!deallocate blocks
-  !do iblk=1,nblk
-  !   associate(B => A0block(iblk))
-  !     deallocate(B%matX,B%pos)
-  !   end associate
-  !enddo
-  !! (IV part)
-  !associate(B => A0blockIV)
-  !  deallocate(B%pos,B%vec)
-  !end associate
 endif
+
+end subroutine pack_AC0BLOCK
+
+!subroutine pack_AC0LRBLOCK(ABPlus,ABMin,nblk,IndN,INActive,NAct,NDimX,NBasis,ver,dumpfile)
+!!
+!!     A ROUTINE FOR PACKING : a) ver=0  ABPLUS^{(0)} and ABMIN^{(0)}
+!!                                       (stored in matY and matX, respectively)
+!!                             b) ver=1  A0=ABPLUS^{(0)}.ABMIN^{(0)}
+!
+!use abfofo
+!use blocktypes
+!
+!implicit none
+!
+!integer,intent(in) :: NAct,INActive
+!integer,intent(in) :: NDimX,NBasis
+!integer,intent(in) :: ver
+!integer            :: nblk
+!integer,intent(in) :: IndN(2,NDimX)
+!double precision,intent(in) :: ABPlus(NDimX,NDimX),ABMin(NDimX,NDimX)
+!character(*),optional       :: dumpfile
+!
+!type(EblockData) :: A0block(nblk), A0blockIV
+!
+!integer :: NOccup
+!integer :: i,ii,ip,iq
+!integer :: IGem(NBasis),Ind(NBasis)
+!integer :: pos(NBasis,NBasis)
+!
+!integer :: iblk
+!integer :: iunit
+!
+!integer :: nAA,nAI(INActive),nAV(INActive+NAct+1:NBasis),nIV
+!integer :: tmpAA(NAct*(NAct-1)/2),tmpAI(NAct,1:INActive),&
+!           tmpAV(NAct,INActive+NAct+1:NBasis),&
+!           tmpIV(INActive*(NBasis-NAct-INActive))
+!integer :: limAA(2),limAI(2,1:INActive),&
+!           limAV(2,INActive+NAct+1:NBasis),limIV(2)
+!
+!! set dimensions
+!NOccup = NAct + INActive
+!
+!Ind = 0
+!do i=1,NAct
+!   Ind(INActive+i) = i
+!enddo
+!
+!! fix IGem
+!do i=1,INActive
+!   IGem(i) = 1
+!enddo
+!do i=INActive+1,NOccup
+!   IGem(i) = 2
+!enddo
+!do i=NOccup+1,NBasis
+!   IGem(i) = 3
+!enddo
+!
+!call create_blocks_ABPL0(nAA,nAI,nAV,nIV,tmpAA,tmpAI,tmpAV,tmpIV,&
+!                         limAA,limAI,limAV,limIV,pos,&
+!                         IGem,IndN,INActive,NAct,NBasis,NDimX)
+!
+!nblk = 0
+!
+!!pack AA
+!if(nAA>0) then
+!   nblk = nblk + 1
+!!   associate(B => Eblock(nblk))
+!!     B%n  = nAA
+!!     B%l1 = limAA(1)
+!!     B%l2 = limAA(2)
+!!     allocate(B%pos(B%n))
+!!     B%pos(1:B%n) = tmpAA(1:B%n)
+!!
+!!     allocate(B%vec(B%n),B%matX(B%n,B%n),B%matY(B%n,B%n))
+!!     allocate(ABP(B%n,B%n),ABM(B%n,B%n))
+!!
+!!     ABP = ABPLUS(B%l1:B%l2,B%l1:B%l2)
+!!     ABM = ABMIN(B%l1:B%l2,B%l1:B%l2)
+!!     if(IFunSRKer==1) then
+!!        call ModABMin_Act_FOFO(Occ,SRKer,Wt,OrbGrid,ABM,&
+!!               MultpC,NSymNO,tmpAA,&
+!!               IndN,IndX,NDimX,NGrid,NBasis,&
+!!               !NOccup,NAct,INActive,nAA,'FOFO','FOFOERF')
+!!               NOccup,NAct,INActive,nAA,IntFileName,IntKFile)
+!!     endif
+!!
+!!     if(NoSt==1) then
+!!        call ERPASYMM0(B%matY,B%matX,B%vec,ABP,ABM,B%n)
+!!     elseif(NoSt>1) then
+!!        call ERPAVECYX(B%matY,B%matX,B%vec,ABP,ABM,B%n)
+!!     endif
+!!
+!!     deallocate(ABM,ABP)
+!!
+!!   end associate
+!
+!endif
+!!pack AI
+!do iq=1,INActive
+!   if(nAI(iq)>0) then
+!      nblk = nblk + 1
+!      call pack_A0block(ABPLUS,ABMIN,nAI(iq),limAI(1,iq),limAI(2,iq),tmpAI(1:nAI(iq),iq),&
+!                        A0block(nblk),NDimX,ver)
+!   endif
+!enddo
+!!pack AV
+!do ip=NOccup+1,NBasis
+!   if(nAV(ip)>0) then
+!      nblk = nblk + 1
+!      call pack_A0block(ABPLUS,ABMIN,nAV(ip),limAV(1,ip),limAV(2,ip),tmpAV(1:nAV(ip),ip),&
+!                        A0block(nblk),NDimX,ver)
+!    endif
+!enddo
+!!pack IV
+!associate(B => A0blockIV)
+!
+!  B%l1 = limIV(1)
+!  B%l2 = limIV(2)
+!  B%n  = B%l2-B%l1+1
+!  allocate(B%pos(B%n))
+!  B%pos(1:B%n) = tmpIV(1:B%n)
+!
+!  allocate(B%vec(B%n))
+!
+!  if(ver==0) then
+!     do i=1,B%n
+!        ii = B%l1+i-1
+!        B%vec(i) = ABPLUS(ii,ii)
+!     enddo
+!  elseif(ver==1) then
+!     do i=1,B%n
+!        ii = B%l1+i-1
+!        B%vec(i) = ABPLUS(ii,ii)*ABMIN(ii,ii)
+!     enddo
+!  endif
+!
+!end associate
+!
+!if(present(dumpfile)) then
+!  ! dump to file
+!  open(newunit=iunit,file=dumpfile,form='unformatted')
+!  write(iunit) nblk
+!  do iblk=1,nblk
+!     associate(B => A0Block(iblk))
+!       write(iunit) iblk, B%n, B%l1, B%l2
+!       write(iunit) B%pos,B%matX
+!     end associate
+!  enddo
+!  associate(B => A0BlockIV)
+!    write(iunit) B%n,B%l1,B%l2
+!    write(iunit) B%pos,B%vec
+!  end associate
+!  close(iunit)
+!endif
+!
+!end subroutine pack_AC0LRBLOCK
+
+subroutine AC0BLOCK(Occ,URe,XOne, &
+                    IndN,IndX,IGemIN,NAct,INActive,NDimX,NBasis,NDim,NInte1, &
+                    IntJFile,IntKFile,ICholesky, &
+                    A0BlockIV,A0block,nblk,ver,dumpfile,dump)
+!
+!     A ROUTINE FOR COMPUTING : a) ver=0  ABPLUS^{(0)} and ABMIN^{(0)}
+!                                         (stored in matY and matX, respectively)
+!                               b) ver=1  A0=ABPLUS^{(0)}.ABMIN^{(0)}
+!                 (FOFO VERSION)
+!
+use abfofo
+!use types,only : EblockData
+use blocktypes
+!
+implicit none
+
+integer,intent(in)           :: NAct,INActive,NDimX,NBasis,NDim,NInte1
+integer,intent(in)           :: ICholesky
+integer,intent(in)           :: IndN(2,NDim),IndX(NDim),IGemIN(NBasis)
+integer                      :: nblk
+double precision,intent(in)  :: URe(NBasis,NBasis),Occ(NBasis),XOne(NInte1)
+character(*)                 :: IntJFile,IntKFile
+character(*)                 :: dumpfile
+integer,intent(in)           :: ver,dump
+
+integer          :: iunit
+integer          :: NOccup
+integer          :: i,j,k,l,kl,ii,ip,iq,ir,is,ipq,irs
+integer          :: ipos,jpos,iblk,jblk
+integer          :: IGem(NBasis),Ind(NBasis),pos(NBasis,NBasis)
+integer          :: nAA,nAI(INActive),nAV(INActive+NAct+1:NBasis),nIV
+integer          :: tmpAA(NAct*(NAct-1)/2),tmpAI(NAct,1:INActive),&
+                    tmpAV(NAct,INActive+NAct+1:NBasis),&
+                    tmpIV(INActive*(NBasis-NAct-INActive))
+integer          :: limAA(2),limAI(2,1:INActive),&
+                    limAV(2,INActive+NAct+1:NBasis),limIV(2)
+double precision :: ABPLUS(NDimX,NDimX),ABMIN(NDimX,NDimX)
+double precision :: C(NBasis)
+double precision :: ETot
+! hererXXX
+!integer :: ICol,IRow
+!double precision :: xn1,xn2
+
+type(EblockData) :: A0block(nblk), A0blockIV
+
+call ABPM0_FOFO(Occ,URe,XOne,ABPLUS,ABMIN, &
+                IndN,IndX,IGemIN,NAct,INActive,NDimX,NBasis,NDim,NInte1, &
+                IntJFile,IntKFile,ICholesky,ETot)
+! hererXXX
+!do i=1,NBasis
+!   C(i) = sign(sqrt(Occ(i)),Occ(i)-0.5d0)
+!enddo
+!xn1=0.25
+!call create_pos_ABPL0(pos,IGem,IndN,INActive,NAct,NBasis,NDimX)
+!do ICol=1,NDimX
+!   ir = IndN(1,ICol)
+!   is = IndN(2,ICol)
+!   irs = pos(ir,is)
+!   do IRow=1,NDimX
+!         ip = IndN(1,IRow)
+!         iq = IndN(2,IRow)
+!         ipq = pos(ip,iq)
+!         if(ipq.Eq.irs) then
+!            xn2=(Occ(IP)-Occ(IQ))*(Occ(IP)+1.D0-Occ(IQ))*xn1
+!            ABPLUS(ipq,irs)=ABPLUS(ipq,irs)+xn2/(C(IP)+C(IQ))**2
+!            ABMIN(ipq,irs)=ABMIN(ipq,irs)+xn2/(C(IP)-C(IQ))**2
+!         endif
+!   enddo
+!enddo
+
+!call create_blocks_ABPL0(nAA,nAI,nAV,nIV,tmpAA,tmpAI,tmpAV,tmpIV,&
+!                         limAA,limAI,limAV,limIV,pos,&
+!                         IGem,IndN,INActive,NAct,NBasis,NDimX)
+
+call pack_AC0Block(ABPLUS,ABMIN,A0block,A0blockIV,nblk,&
+                   IndN,INActive,NAct,NDimX,NBasis,ver,dumpfile)
+
+!!allocate(A0block(1+NBasis-NAct))
+!nblk = 0
+!
+!!pack AA
+!if(nAA>0) then
+!   nblk = nblk + 1
+!   call pack_A0block(ABPLUS,ABMIN,nAA,limAA(1),limAA(2),tmpAA,A0block(nblk),NDimX,ver)
+!endif
+!!pack AI
+!do iq=1,INActive
+!   if(nAI(iq)>0) then
+!      nblk = nblk + 1
+!      call pack_A0block(ABPLUS,ABMIN,nAI(iq),limAI(1,iq),limAI(2,iq),tmpAI(1:nAI(iq),iq),&
+!                        A0block(nblk),NDimX,ver)
+!   endif
+!enddo
+!!pack AV
+!do ip=NOccup+1,NBasis
+!   if(nAV(ip)>0) then
+!      nblk = nblk + 1
+!      call pack_A0block(ABPLUS,ABMIN,nAV(ip),limAV(1,ip),limAV(2,ip),tmpAV(1:nAV(ip),ip),&
+!                        A0block(nblk),NDimX,ver)
+!    endif
+!enddo
+!!pack IV
+!associate(B => A0blockIV)
+!
+!  B%l1 = limIV(1)
+!  B%l2 = limIV(2)
+!  B%n  = B%l2-B%l1+1
+!  allocate(B%pos(B%n))
+!  B%pos(1:B%n) = tmpIV(1:B%n)
+!
+!  allocate(B%vec(B%n))
+!
+!  if(ver==0) then
+!     do i=1,B%n
+!        ii = B%l1+i-1
+!        B%vec(i) = ABPLUS(ii,ii)
+!     enddo
+!  elseif(ver==1) then
+!     do i=1,B%n
+!        ii = B%l1+i-1
+!        B%vec(i) = ABPLUS(ii,ii)*ABMIN(ii,ii)
+!     enddo
+!  endif
+!
+!end associate
+!
+!if(dump==1) then
+!  ! dump to file
+!  open(newunit=iunit,file=dumpfile,form='unformatted')
+!  write(iunit) nblk
+!  do iblk=1,nblk
+!     associate(B => A0Block(iblk))
+!       write(iunit) iblk, B%n, B%l1, B%l2
+!       write(iunit) B%pos,B%matX
+!     end associate
+!  enddo
+!  associate(B => A0BlockIV)
+!    write(iunit) B%n,B%l1,B%l2
+!    write(iunit) B%pos,B%vec
+!  end associate
+!  close(iunit)
+!
+!  !!deallocate blocks
+!  !do iblk=1,nblk
+!  !   associate(B => A0block(iblk))
+!  !     deallocate(B%matX,B%pos)
+!  !   end associate
+!  !enddo
+!  !! (IV part)
+!  !associate(B => A0blockIV)
+!  !  deallocate(B%pos,B%vec)
+!  !end associate
+!endif
 
 end subroutine AC0BLOCK
 

@@ -45,7 +45,8 @@ $(PROG) : $(OBJ)
 
 $(O)mainp.o            : $(S)commons.inc $(O)types.o $(O)inputfill.o $(O)systemdef.o $(O)sapt_main.o $(O)git_info.o $(O)build_info.o
 $(O)initia.o           : $(S)commons.inc $(O)priunit.o $(O)timing.o $(O)rdwrext.o $(O)sorter.o $(O)abmats.o $(O)types.o $(O)tran.o $(O)CholeskyOTF.o $(O)gammint.o
-$(O)accas.o            : $(S)commons.inc $(O)priunit.o $(O)timing.o $(O)rdwrext.o $(O)sorter.o $(O)abmats.o $(O)abfofo.o $(O)ab0fofo.o
+$(O)accas.o            : $(S)commons.inc $(O)priunit.o $(O)timing.o $(O)rdwrext.o $(O)sorter.o $(O)abmats.o $(O)abfofo.o $(O)ab0fofo.o \
+                         $(O)gridintern.o
 $(O)acfd.o             : $(S)commons.inc $(O)abmats.o $(O)abfofo.o  $(O)ab0fofo.o $(O)rdwrext.o
 $(O)ac_iter.o          : $(S)commons.inc $(O)abmats.o $(O)abfofo.o
 $(O)interpa.o          : $(S)commons.inc $(O)abmats.o $(O)abfofo.o $(O)ab0fofo.o

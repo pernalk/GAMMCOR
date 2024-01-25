@@ -683,4 +683,152 @@ deallocate(work2,work1,ints)
 
 end subroutine JK_Chol_loop
 
+subroutine Chol_AC0ECorr(ECorr,ABPLUS,IndN,IndX,Occ,INActive,NOccup,NDimX,NBasis,CholVecFile)
+implicit none
+
+integer,intent(in)          :: INActive,NOccup,NDimX,NBasis
+integer,intent(in)          :: IndN(2,NDimX),IndX(NDimX)
+double precision,intent(in) :: Occ(NBasis)
+double precision,intent(in) :: ABPLUS(NDimX,NDimX)
+character(*),intent(in)     :: CholVecFile
+double precision,intent(out) :: ECorr
+
+integer :: iunit
+integer :: i,j,k,l
+integer :: ip,iq,ipq,ir,is,irs
+integer :: NCholesky
+integer :: dimFO,iBatch,BatchSize
+integer :: iloop,nloop,off
+integer :: MaxBatchSize = 100
+integer :: IGem(NBasis),AuxCoeff(3,3,3,3)
+integer :: pos(NBasis,NBasis)
+double precision :: EAll, EIntra
+double precision :: C(NBasis)
+double precision :: Cpq, Crs, Aux
+double precision,allocatable :: MatFF(:,:)
+double precision,allocatable :: ints(:,:),work(:,:)
+
+!print*, 'Entering Chol_AC0ECor...'
+
+! fix IGem
+do i=1,INActive
+   IGem(i) = 1
+enddo
+do i=INActive+1,NOccup
+   IGem(i) = 2
+enddo
+do i=NOccup+1,NBasis
+   IGem(i) = 3
+enddo
+
+do l=1,3
+   do k=1,3
+      do j=1,3
+         do i=1,3
+            if((i==j).and.(j==k).and.(k==l)) then
+               AuxCoeff(i,j,k,l) = 1
+            else
+               AuxCoeff(i,j,k,l) = 0
+            endif
+         enddo
+      enddo
+   enddo
+enddo
+
+pos = 0
+do i=1,NDimX
+   pos(IndN(1,i),IndN(2,i)) = IndX(i)
+enddo
+
+do i=1,NBasis
+   C(i) = sign(sqrt(Occ(i)),Occ(i)-0.5d0)
+enddo
+
+! read cholesky (FF|K) vectors
+open(newunit=iunit,file=CholVecFile,form='unformatted')
+read(iunit) NCholesky
+allocate(MatFF(NCholesky,NBasis**2))
+read(iunit) MatFF
+close(iunit)
+
+! set number of loops over integrals
+dimFO = NOccup*NBasis
+nloop = (dimFO - 1) / MaxBatchSize + 1
+
+allocate(work(dimFO,MaxBatchSize),ints(NBasis,NBasis))
+
+ECorr  = 0d0
+EAll   = 0d0
+EIntra = 0d0
+
+off = 0
+k   = 0
+l   = 1
+! exchange loop (FO|FO)
+do iloop=1,nloop
+
+   ! batch size for each iloop; last one is smaller
+   BatchSize = min(MaxBatchSize,dimFO-off)
+
+   ! assemble (FO|BatchSize) batch from CholVecs
+   call dgemm('T','N',dimFO,BatchSize,NCholesky,1d0,MatFF,NCholesky, &
+              MatFF(:,off+1:BatchSize),NCholesky,0d0,work,dimFO)
+
+   ! loop over integrals
+   do iBatch=1,BatchSize
+
+      k = k + 1
+      if(k>NBasis) then
+         k = 1
+         l = l + 1
+      endif
+
+      if(pos(k,l)==0) cycle
+       ir = k
+       is = l
+       irs = pos(k,l)
+
+       do j=1,NOccup
+          do i=1,NBasis
+             ints(i,j) = work((j-1)*NBasis+i,iBatch)
+          enddo
+       enddo
+
+      if(l>NOccup) cycle
+      ints(:,NOccup+1:NBasis) = 0
+
+       do j=1,NBasis
+          do i=1,j
+             if(pos(j,i)/=0) then
+               ipq = pos(j,i)
+               ip = j
+               iq = i
+               Crs = C(ir)+C(is)
+               Cpq = C(ip)+C(iq)
+
+               Aux = Crs*Cpq*ABPLUS(ipq,irs)
+               EAll = EAll + Aux*ints(j,i)
+
+               if(AuxCoeff(IGem(ip),IGem(iq),IGem(ir),IGem(is))==1) EIntra = EIntra + Aux*ints(j,i)
+
+             endif
+          enddo
+       enddo
+
+   enddo ! iBatch
+
+   off = off + MaxBatchSize
+
+enddo
+
+print*, 'EAll-Chol  ', EAll
+print*, 'EIntra-Chol', EIntra
+
+ECorr = EAll-EIntra
+
+deallocate(MatFF)
+deallocate(work,ints)
+
+end subroutine Chol_AC0ECorr
+
 end module

@@ -39,7 +39,8 @@ implicit real*8 (A-H,O-Z)
 double precision OrbGrid(NGrid,NBasis),WGrid(NGrid),UMOAO(NBasis,NBasis)
 double precision OrbXGrid(NGrid,NBasis),OrbYGrid(NGrid,NBasis),OrbZGrid(NGrid,NBasis),Aux(NGrid,NBasis)
 integer ::  NBasis, NGrid
-double precision, allocatable :: r(:,:),wt(:),mapinv(:),orbval(:,:,:)
+integer, allocatable :: mapinv(:)
+double precision, allocatable :: r(:,:),wt(:),orbval(:,:,:)
 integer :: i,j,k,igrid
 integer :: npt, ndiff, ntg
 
@@ -132,8 +133,16 @@ double precision :: alpha,tmp
 integer :: iunit
 integer :: ios
 character(8) :: text, label
+logical :: check
 
 text = 'CHIVAL  '
+
+inquire(file='GRID',exist=check)
+if (.not. check) then
+   write(6,*) 'WARNING! Molpro GRID file not present!'
+   write(6,'(/,1x,a,f12.5)') 'RS PARAM IN INPUT:',  alpha
+   return
+endif
 
 open(newunit=iunit,file='GRID',access='sequential',&
      form='unformatted',status='old')
@@ -165,7 +174,8 @@ implicit none
 integer :: iunit
 integer :: ios
 integer :: npt, ndiff, ntg
-double precision :: mapinv(ntg),orbval(npt,ndiff,ntg)
+integer :: mapinv(ntg)
+double precision :: orbval(npt,ndiff,ntg)
 character(8) :: text, label
 
 rewind(iunit)

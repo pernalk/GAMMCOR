@@ -316,6 +316,8 @@ C     on-the-fly
 
       Dimension Gamma(NInte1),Work(NBasis),PC(NBasis),
      $ AUXM(NBasis,NBasis),AUXM1(NBasis,NBasis),
+c 03.01.2024
+     $ AUXM2(NBasis*NBasis),
      $ Fock(NBasis*NBasis),
      $ UAux(NBasis,NBasis),
      $ FockF(NInte1),GammaAB(NInte1),Eps(NBasis,NBasis)
@@ -324,6 +326,7 @@ C     on-the-fly
 C     for OTF Cholesky
       double precision :: UAONO(NBasis,NBasis)
       double precision,allocatable :: CMOAO(:,:),CAOMO(:,:)
+      logical :: iex
 
 
       If(iORCA==1) then
@@ -356,10 +359,11 @@ C
       Read(10,End=61) X
       Ind=I*(I-1)/2+J
       Gamma(Ind)=X/Two
-      ICount=ICount+1
+      If(I.Eq.J) ICount=ICount+1
       EndDo
       EndDo
    61 Close(10)
+      NActDMRG=ICount
 C
       Else
 C
@@ -390,17 +394,59 @@ C
       EndIf
 C
       Call CpySym(AUXM,Gamma,NBasis)
-      Call Diag8(AUXM,NBasis,NBasis,PC,Work)
-      Call SortOcc(PC,AUXM,NBasis)
+C
+c 03.01.2024 beginning of changes
+      NAc=NActDMRG
+C
+C     DIAGONALIZE ONLY THE ACTIVE BLOCK OF Gamma TO AVOID THROWING AWAY
+C     ACTIVE ORBITAL OF ZERO-OCCUPANCY (which may happen for atoms for some states)
+C
+      Do I=1,NAc
+      Do J=1,NAc
+      AUXM2((J-1)*NAc+I)=AUXM(I,J)
+      EndDo
+      EndDo
+      Call Diag8(AUXM2,NAc,NAc,PC,Work)
+      Call SortP(PC,AUXM2,NAc)
+C
+      AUXM(1:NBasis,1:NBasis)=Zero
+      Do I=1,NAc
+      Do J=1,NAc
+      AUXM(I,J)=AUXM2((J-1)*NAc+I)
+      EndDo
+      EndDo
 C
       Sum=Zero
       NAc=0
       Do I=1,NBasis
+C     it may happen that an active orbital has a negative but very small occupation. set it to a positive
+      PC(I)=Abs(PC(I))
       Sum=Sum+PC(I)
       If(PC(I).Gt.Zero) NAc=NAc+1
       EndDo
 C
-      NInAc=XELE-Sum+1.D-1
+      ISwitch=0
+      If(NAc.Ne.NActDMRG) Then
+      Write(6,'(1x,"WARNING! The number of partially occ orbitals
+     $ different from NActDMRG read from orca. Some active orbitals
+     $ must be unoccupied.",/)')
+      NAc=NActDMRG
+      ISwitch=1
+      EndIf
+c
+c      Call Diag8(AUXM,NBasis,NBasis,PC,Work)
+c      Call SortOcc(PC,AUXM,NBasis)
+C
+c      Sum=Zero
+c      NAc=0
+c      Do I=1,NBasis
+c      Sum=Sum+PC(I)
+c      If(PC(I).Gt.Zero) NAc=NAc+1
+c      EndDo
+C
+c 03.01.2024 end of changes
+C
+      NInAc=XELE-Sum+1.D-2
       Do I=1,NInAc+NAc
       If(I.Le.NInAc) Then
       Occ(I)=One
@@ -472,29 +518,37 @@ C
 C
       ElseIf(IBin.Eq.1) Then
 C
-      Open(10,File='NUC_REP.bin',form='unformatted',access='stream',
-     $ Status='Old')
-      Read(10) X
-      ENuc=X
-      Close(10)
+      Inquire(file='NUC_REP.bin',exist=iex)
+      if (iex) then
+         Open(10,File='NUC_REP.bin',form='unformatted',access='stream',
+     $        Status='Old')
+         Read(10) X
+         ENuc=X
+         Close(10)
+      Else
+         ENuc = 0d0
+      EndIf ! NUC_REP.bin
 C
-      Open(10,File='FACT.bin',form='unformatted',access='stream',
-     $ Status='Old')
-      If(LiborNew.Eq.1) Read(10)I,J,K
-      ICount=0
-      IJ=0
-      Do I=1,NBasis
-      Do J=1,I
-      IJ=IJ+1
-      Read(10,End=31) X
-      Ind=I*(I-1)/2+J
-      XKin(Ind)=X
-      ICount=ICount+1
-      EndDo
-      EndDo
-   31 Close(10)
-      Write(6,'(" The number of 1-el integrals read vs. expected",
-     $ 2I10)') ICount,NInte1
+      Inquire(file='FACT.bin',exist=iex)
+      If (iex) then
+         Open(10,File='FACT.bin',form='unformatted',access='stream',
+     $        Status='Old')
+         If(LiborNew.Eq.1) Read(10)I,J,K
+         ICount=0
+         IJ=0
+         Do I=1,NBasis
+         Do J=1,I
+         IJ=IJ+1
+         Read(10,End=31) X
+         Ind=I*(I-1)/2+J
+         XKin(Ind)=X
+         ICount=ICount+1
+         EndDo
+         EndDo
+   31    Close(10)
+         Write(6,'(" The number of 1-el integrals read vs. expected",
+     $         2I10)') ICount,NInte1
+      EndIf ! FACT.bin
 C
       If(ITwoEl.Eq.1) Then
 C
@@ -561,7 +615,7 @@ C
       BasisSetPath = BasisSet
       SortAngularMomenta = .false.
 
-      Call CholeskyOTF_ao_vecs(CholeskyVecsOTF,AOBasis,System,
+      Call CholeskyOTF_ao_vecs(CholeskyVecsOTF,AOBasis,System,IUnits,
      $            XYZPath,BasisSetPath,SortAngularMomenta,ICholeskyAccu)
       end block
 
@@ -1333,19 +1387,26 @@ C
 C     binary
       Type(TCholeskyVecs) :: CholeskyVecs
       Real*8, Allocatable :: MatFF(:,:)
+      Real*8, Allocatable :: FFErf(:,:)
+      Real*8, Allocatable :: FOErf(:,:),OOErf(:,:)
       Real*8 Tcpu,Twall
       logical :: SortAngularMomenta
 C     test AO-->NO
       Integer :: itsoao(NBasis),jtsoao(NBasis)
       Real*8  :: CAOMO(NBasis,NBasis),CAONO(NBasis,NBasis),
      $           CSAOMO(NBasis,NBasis),SAO(NBasis,NBasis)
+      Real*8  :: JMO(NBasis,NBasis),JMOlr(NBasis,NBasis),
+     $           JMOsr(NBasis,NBasis)
 C
 C
       integer :: NA, NB, a0, a1, b0, b1
       type(TCholeskyVecsOTF) :: CholeskyVecsOTF
+      Type(TCholeskyVecsOTF) :: CholErfVecsOTF
       type(TSystem)  :: System
       type(TAOBasis) :: AOBasis
-
+C
+      character(:),allocatable :: XYZPath
+      character(:),allocatable :: BasisSetPath
 C
       Character*60 FName,Aux1
       Character(*) :: Title,BasisSet
@@ -1480,19 +1541,30 @@ C     compute Cholesky vectors OTF
 
       Call auto2e_init()
 
-      block
-       character(:),allocatable :: XYZPath
-       character(:),allocatable :: BasisSetPath
-
       XYZPath = "./input.inp"
       BasisSetPath = BasisSet
       SortAngularMomenta = .true.
 
-      print*, 'how do you know CholeskyOTF_ao_vecs???'
-      Call CholeskyOTF_ao_vecs(CholeskyVecsOTF,AOBasis,System,
+      Call CholeskyOTF_ao_vecs(CholeskyVecsOTF,AOBasis,System,IUnits,
      $            XYZPath,BasisSetPath,SortAngularMomenta,ICholeskyAccu)
+      NCholesky = CholeskyVecsOTF%NVecs
 
-      end block
+C     generate LR-Cholesky integrals
+C     Note: full-range vectors are used to construct sr Coulomb
+C           and for sr kernel (optional)
+      If(IFunSR.Eq.1.Or.IFunSR.Eq.2.Or.IFunSR.Eq.4) Then
+
+      Write(lout,'(/1x,3a6)') ('******',i=1,3)
+      Write(lout,'(1x,a)') 'Cholesky LR On-The-Fly'
+      Write(lout,'(2x,a,f12.8)') 'MU = ',Alpha
+      Write(lout,'(1x,3a6)') ('******',i=1,3)
+
+      Call CholeskyOTF_ao_vecs(CholErfVecsOTF,AOBasis,System,IUnits,
+     $            XYZPath,BasisSetPath,SortAngularMomenta,ICholeskyAccu,
+     $            Alpha)
+      NCholErf = CholErfVecsOTF%NVecs
+
+      EndIf
 C
       EndIf ! CholeskyBIN .OR. CholeskyOTF
 C      EndIf ! IRes
@@ -1792,7 +1864,7 @@ C          load C(AO,MO) - already w/o symmety in MOs
            Call read_caomo_molpro(CAOMO,SAO,itsoao,jtsoao,
      &                           'MOLPRO.MOPUN','CASORBAO',NBasis)
 C
-C     V1 uses Fock subroutine in OTF module -- has to be improved
+C     V1 uses slow Fock subroutine in OTF module which has to be improved
 C
 C           Call CholeskyOTF_Fock_MO_v1(work1,CholeskyVecsOTF,
 C     $                          AOBasis,System,Monomer,
@@ -1800,6 +1872,7 @@ C     $                          CAOMO,CSAOMO,XKin,GammaF,
 C     $                          MemType,MemVal,NInte1,NBasis,
 C     $                          JMO,KMO)
 C
+           Monomer = 3 ! SYS_TOTAL in System
            Call CholeskyOTF_Fock_MO_v2(work1,CholeskyVecsOTF,
      $                          AOBasis,System,Monomer,'MOLPRO',
      $                          CAOMO,CSAOMO,XKin,GammaF,
@@ -1812,14 +1885,46 @@ C
           EndIf
 C
       ElseIf (IFunSR.Eq.1.Or.IFunSR.Eq.2.Or.IFunSR.Eq.4) Then
+C
           If(ICholesky==0) Then
              Call FockGen_mithap(FockF,GammaAB,XKin,NInte1,NBasis,
      &                           'AOERFSORT')
-          ElseIf(ICholesky==1) Then
-             Write(6,'(1x,a)') 'Cholesky not ready for LR-ERF!'
-             Stop
-          EndIf
-      EndIf
+          ElseIf(ICholesky==1.and.ICholeskyOTF==1) Then
+C
+C          obtain long-range Fmat and short-range Jmat
+c
+           CSAOMO = transpose(UAux)
+           Call read_caomo_molpro(CAOMO,SAO,itsoao,jtsoao,
+     &                           'MOLPRO.MOPUN','CASORBAO',NBasis)
+           Monomer = 3 ! SYS_TOTAL in System
+           Call CholeskyOTF_Fock_MO_v2(work1,CholErfVecsOTF,
+     $                            AOBasis,System,Monomer,'MOLPRO',
+     $                            CAOMO,CSAOMO,XKin,GammaF,
+     $                            MemType,MemVal,NInte1,NBasis,
+     $                            2,JMOlr)
+c    $                            IH0Test,JMOlr) ! IH0Test=2, use external H0
+C
+           Call CholeskyOTF_Jmat_MO(JMO,CholeskyVecsOTF,
+     $                          AOBasis,System,Monomer,'MOLPRO',
+     $                          CAOMO,CSAOMO,XKin,GammaF,
+     $                          MemType,MemVal,NInte1,NBasis,2)
+C
+           JMOsr = JMO - JMOlr
+c
+c        print*, 'J in MO long-range ', norm2(JMOlr)
+c        print*, 'J in MO full-range ', norm2(JMO)
+c        do j=1,NBasis
+c           write(LOUT,'(*(f13.8))') (JMOlr(i,j),i=1,NBasis)
+c            write(LOUT,'(*(f13.8))') (JMO(i,j)-JMOlr(i,j),i=1,NBasis)
+c        enddo
+C
+C         unpack Fock in MO (work1) to triangle
+          Call sq_to_triang2(work1,FockF,NBasis)
+          ElseIf (ICholeskyBIN==1) Then
+             Stop "CholeskyBIN not ready with LR ints!"
+          EndIf ! ICholeskyOTF/BIN
+C
+      EndIf ! Fock (IFunSR)
 C
 C      Call FockGen(FockF,GammaAB,XKin,TwoEl,NInte1,NBasis,NInte2)
 C     transform Fock to MO if not CholeskyOTF
@@ -1835,7 +1940,10 @@ C      print*, 'Fock = ',norm2(Fmat)
 C      do j=1,NBasis
 C         write(LOUT,'(*(f13.8))') (Fmat(i,j),i=1,NBasis)
 C      enddo
-C
+Cc     print*, 'JMOsr = ',norm2(JMOsr)
+Cc     do j=1,NBasis
+Cc        write(LOUT,'(*(f13.8))') (JMOsr(i,j),i=1,NBasis)
+Cc     enddo
 C      end block
 C
       EndIf
@@ -1941,16 +2049,53 @@ C
 C
       If(ICholeskyOTF==1) Then
 C
-C     TEST GETTING AO --> NO
+C     GET AO --> NO matrix
 C     CAOMO = C(AO,MO) ; URe = C(NO,MO)
       Call dgemm('N','T',NBasis,NBasis,NBasis,1d0,CAOMO,NBasis,
      &           URe,NBasis,0d0,CAONO,NBasis)
+C
+C     Careful! In CholeskyOTF the UAOMO matrix
+C              contains C(NO,AO) not C(NO,SAO)
+C              to match with gammcor-cholesky library
+C
+      UAOMO = transpose(CAONO)
+C
+      If (IFunSR.Eq.1.Or.IFunSR.Eq.2.Or.IFunSR.Eq.4) Then
+C     transform short-range Jmat from MO to AO
+      Call tranMO2AO('N',JMOsr,CAOMO,NBasis)
+C
+CC    test Jsr in AO
+c      block
+c      Print*, 'JMOsr in AO basis =',norm2(JMOsr)
+c      do j=1,NBasis
+c         write(6,'(*(f13.8))') (JMOsr(i,j),i=1,NBasis)
+c      enddo
+c      end block
+C
+c      block
+c      Print*, 'CAONO =',norm2(CAONO)
+c      do i=1,NBasis
+c         write(6,'(*(f13.8))') (CAONO(i,j),j=1,NBasis)
+c      enddo
+c      Print*, 'CSAONO =',norm2(UAOMO)
+c      do j=1,NBasis
+c         write(6,'(*(f13.8))') (UAOMO(i,j),i=1,NBasis)
+c      enddo
+c      end block
+C
+C     dump short-range Jmat on disk
+      open(newunit=iunit,file='jsrmat',form='unformatted')
+      write(iunit) NBasis
+      write(iunit) JMOsr
+      close(iunit)
 C
 C     for external test
 C      Call dump_CAONO_SAO(CAONO,transpose(UAOMO),SAO,
 C     &               'CAONO.mol',NBasis)
 C      Call test_Smat(SAO,CAONO,transpose(UAOMO),NBasis)
-      EndIf
+C
+      EndIf ! IFunSR, Jsr
+      EndIf ! ICholeskyOTF, CAONO
 C      
       If(IRes.Eq.1) Then
 C      
@@ -1964,6 +2109,18 @@ C     ITwoEl
       Call TwoNO1(TwoEl,UAOMO,NBasis,NInte2)
 C
       ElseIf(ITwoEl.eq.3) Then
+
+      If (ICholesky==1) Then
+C     set buffer size for Cholesky AO2NO transformation
+      if(MemType == 2) then       !MB
+         MemMOTransfMB = MemVal
+      elseif(MemType == 3) then   !GB
+         MemMOTransfMB = MemVal * 1024_8
+      endif
+      Write(LOUT,'(1x,a,i5,a)') 'Using ',MemMOTransfMB,
+     $                          ' MB for 3-indx Cholesky transformation'
+      EndIf
+C
 C     PREPARE POINTERS: NOccup=num0+num1
       Call prepare_nums(Occ,Num0,Num1,NBasis)
       If(ISwitch.Eq.1) Num0=NInAC
@@ -1997,20 +2154,6 @@ C
       Call clock('tran4_FOFO',Tcpu,Twall)
 C
       ElseIf (ICholesky==1) Then
-C
-C     Old 1-step transformation (much slower)
-c     Call chol_MOTransf(MatFF,CholeskyVecs,
-c    $                   UAux,1,NBasis,
-c    $                   UAux,1,NBasis)
-C
-C    set buffer size for Cholesky AO2NO transformation
-      if(MemType == 2) then       !MB
-         MemMOTransfMB = MemVal
-      elseif(MemType == 3) then   !GB
-         MemMOTransfMB = MemVal * 1024_8
-      endif
-      Write(LOUT,'(1x,a,i5,a)') 'Using ',MemMOTransfMB,
-     $                          ' MB for 3-indx Cholesky transformation'
 C     cholesky BIN
       If (ICholeskyBIN==1) Then
       Allocate(MatFF(NCholesky,NBasis**2))
@@ -2027,13 +2170,14 @@ C     cholesky OTF
       a1 = NBasis
       b0 = 1
       b1 = NBasis
-      NCholesky = CholeskyVecsOTF%NVecs
+c     NCholesky = CholeskyVecsOTF%NVecs
       allocate(MatFF(NCholesky,NA*NB))
       UAux = CAONO
 C
       call chol_Rkab_OTF(MatFF, UAux, a0, a1, UAux, b0, b1,
      $                   MemMOTransfMB, CholeskyVecsOTF,
      $                   AOBasis, ORBITAL_ORDERING_MOLPRO)
+C
       EndIf ! Cholesky BIN / OTF
 C
       Call clock('chol_NOTransf',Tcpu,Twall)
@@ -2066,7 +2210,9 @@ C
 C     TEST MITHAP
 C      call tran4_full(NBasis,UAux,UAux,'TWOMO','AOTWOSORT')
 C
-      Else
+      Else ! IFunSR.Eq.1.Or.IFunSR.Eq.2.Or.IFunSR.Eq.4
+C
+      If (ICholesky==0) Then
       Call tran4_gen(NBasis,
      $        Num0+Num1,UAux(1:NBasis,1:(Num0+Num1)),
      $        Num0+Num1,UAux(1:NBasis,1:(Num0+Num1)),
@@ -2081,8 +2227,63 @@ C
      $        'FOFOERF','AOERFSORT')
 C     TEST MITHAP
 C      call tran4_full(NBasis,UAux,UAux,'MO2ERF','AOERFSORT')
-
-      EndIF
+C
+      ElseIf (ICholesky==1) Then
+C     cholesky OTF
+      If (ICholeskyOTF==1) Then
+      UAux = CAONO
+C
+      If (IFunSRKer==1) Then ! assemble FOFO for sr kernel
+         Allocate(FOErf(NCholErf,NBasis*(num0+num1)))
+         Call Chol_Rkab_OTF(FOErf,UAux,1,NBasis,UAux,1,num0+num1,
+     $                      MemMOTransfMB, CholErfVecsOTF,
+     $                      AOBasis, ORBITAL_ORDERING_MOLPRO)
+C
+         Call chol_fofo_batch(num0+num1,FOErf,
+     $                        num0+num1,FOErf,
+     $                        NCholErf,NBasis,'FOFOERF')
+         Deallocate(FOErf)
+C
+         Allocate(FOErf(NCholesky,NBasis*(num0+num1)))
+         Call Chol_Rkab_OTF(FOErf,UAux,1,NBasis,UAux,1,num0+num1,
+     $                      MemMOTransfMB, CholeskyVecsOTF,
+     $                      AOBasis, ORBITAL_ORDERING_MOLPRO)
+C
+         Call chol_fofo_batch(num0+num1,FOErf,
+     $                        num0+num1,FOErf,
+     $                        NCholesky,NBasis,'FOFO')
+         Deallocate(FOErf)
+      EndIf ! IFunSRKer
+C
+      allocate(FFErf(NCholErf,NBasis**2))
+      Call Chol_Rkab_OTF(FFErf,UAux,1,NBasis,UAux,1,NBasis,
+     $                   MemMOTransfMB, CholErfVecsOTF,
+     $                   AOBasis, ORBITAL_ORDERING_MOLPRO)
+      allocate(OOErf(NCholErf,(num0+num1)**2))
+      Call Chol_Rkab_OTF(OOErf,UAux,1,num0+num1,UAux,1,num0+num1,
+     $                   MemMOTransfMB, CholErfVecsOTF,
+     $                   AOBasis, ORBITAL_ORDERING_MOLPRO)
+C
+CC     assemble FFOERF file (only for testing)
+C      Call chol_ffoo_batch(.false.,FFErf,num0+num1,
+C     $                     num0+num1,OOErf,
+C     $                     NCholErf,NBasis,'FFOOERF')
+C
+C     dump LR integrals
+      open(newunit=iunit,file='cholvecs',form='unformatted')
+      write(iunit) NCholErf
+      write(iunit) FFErf
+      close(iunit)
+C
+      Deallocate(FFErf,OOErf)
+C
+C
+      ElseIf (ICholeskyBIN==1) Then
+        Stop "Cholesky ERF not ready with BIN"
+      EndIf ! ICholesky OTF/BIN LR
+      EndIf ! ICholesky LR
+C
+      EndIf
 C
       EndIf
 C
@@ -2226,58 +2427,6 @@ C
 C
       Return
       End
-
-C*Deck CholeskyOTF_ao_vecs
-C      Subroutine CholeskyOTF_ao_vecs(CholeskyVecsOTF,
-C     $                     AOBasis,System,XYZPath,BasisSetPath,
-C     $                     SortAngularMomenta, Accuracy)
-CC
-CC           Generate Cholesky vectors in AO basis on-the-fly
-CC
-C            use arithmetic
-C            use auto2e
-C            use Cholesky, only: chol_CoulombMatrix, TCholeskyVecs,
-C     $                   chol_Rkab_ExternalBinary, chol_MOTransf_TwoStep
-C            use CholeskyOTF, only: chol_CoulombMatrix_OTF,
-C     $                   TCholeskyVecsOTF, chol_MOTransf_TwoStep_OTF
-C            use Cholesky_driver
-C            use basis_sets
-C            use sys_definitions
-C            use chol_definitions
-C
-C            implicit none
-C
-C            type(TCholeskyVecsOTF), intent(out) :: CholeskyVecsOTF
-C            type(TAOBasis), intent(out)         :: AOBasis
-C            type(TSystem), intent(out)          :: System
-C            character(*), intent(in)            :: XYZPath
-C            character(*), intent(in)            :: BasisSetPath
-C            logical, intent(in)                 :: SortAngularMomenta
-C            integer, intent(in)                 :: Accuracy
-C
-C            logical, parameter :: SpherAO = .true.
-C
-C            ! Initialize the two-electron intergrals library
-C            !
-C            call auto2e_init()
-C            !
-C            ! Read the XYZ coordinates and atom types
-C            !
-C            call sys_Read_XYZ(System, XYZPath)
-C            !
-C            call sys_Init(System,SYS_TOTAL)
-C            !
-C            ! Read the basis set parameters from an EMSL text file
-C            ! (GAMESS-US format, no need for any edits, just download it straight from the website)
-C            !
-C            call basis_NewAOBasis(AOBasis, System,
-C     $                       BasisSetPath, SpherAO, SortAngularMomenta)
-C            !
-C            ! Compute Cholesky vectors in AO basis
-C            !
-C            call chol_Rkpq_OTF(CholeskyVecsOTF, AOBasis, Accuracy)
-C
-C      end subroutine CholeskyOTF_ao_vecs
 
 *Deck DimSym
       Subroutine DimSym(NBasis,NInte1,NInte2,MxHVec,MaxXV)

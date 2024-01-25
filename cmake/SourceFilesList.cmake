@@ -82,5 +82,4 @@ set(GAMMCOR_SOURCE
 
     SOURCE/git_info.f90
     SOURCE/build_info.f90
-    SOURCE/trexio_f.f90
 )

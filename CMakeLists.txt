@@ -26,7 +26,7 @@ include(CommonFortranConfig)
 
 # Libraries configuration
 include(XCFunConfig)
-include(TREXIOConfig)
+#include(TREXIOConfig)
 include(CHOLESKYConfig)
 
 # Source files list
@@ -54,4 +54,4 @@ add_executable(${PROJECT_NAME}
 #)
 
 # Link libraries
-target_link_libraries(${PROJECT_NAME} PRIVATE OpenMP::OpenMP_Fortran ${BLAS_LIBRARIES} ${TREXIO_LIBRARY} ${CHOLESKY_LIBRARY})
+target_link_libraries(${PROJECT_NAME} PRIVATE OpenMP::OpenMP_Fortran ${BLAS_LIBRARIES} ${CHOLESKY_LIBRARY})

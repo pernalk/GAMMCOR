@@ -2,12 +2,13 @@
      $ IInteg,IAO,IGVB,IFreeze,ILoc,NInActOrb,NActOrb,NVirtOrb,
      $ ISAPT,IWarn,ITwoEl,ITrpl,
      $ ICholesky,ICholeskyBIN,ICholeskyOTF,ICholeskyAccu,MemVal,MemType,
-     $ IH0test
-      Common/INTF/ IDALTON,IMOLPRO,ITREXIO
+     $ IH0test,IUnits,InternalGrid,IGridType
+      Common/INTF/ IDALTON,IMOLPRO,ITREXIO,
+     $ IOrbOrder
       Common/CAS/ ICASSCF,NAcCAS,NInAcCAS,NStates,
      $ InSt(2,100),InTrSt(2,1),ISpinMs2
       Common/BBC3/ IType(5000)
-      Common/DFTSR/ Alpha,Cmix
+      Common/DFTSR/ Alpha,Cmix,IFunSR2
       Common/Sym/ FMultTab,NoSym,MxSym
       Common/APSG/ IGem(5000),CICoef(5000)
       Common/EMBEDD/ IFrag,NGemSave,IAuxGem(5000),

@@ -1,6 +1,6 @@
 *Deck ACCAS
       Subroutine ACCAS(ETot,ENuc,TwoNO,URe,UNOAO,Occ,XOne,
-     $  Title,NBasis,NInte1,NInte2,NGem)
+     $  Title,BasisSet,NBasis,NInte1,NInte2,NGem)
 C
 c     use types
       use print_units
@@ -14,6 +14,7 @@ C
       Implicit Real*8 (A-H,O-Z)
 C
       Character*60 FMultTab,Title
+      Character(*) :: BasisSet
       Include 'commons.inc'
 c
       Parameter(Zero=0.D0,Half=0.5D0,One=1.D0,Two=2.D0)
@@ -33,6 +34,7 @@ C
 C     START TIMING FOR AC PROCEDURES
 C
       call clock('START',Tcpu,Twall)
+      Print*, 'BasisSet = ', BasisSet
 C
 C     CONSTRUCT LOOK-UP TABLES
 C
@@ -189,7 +191,7 @@ C
 C
       Else
 C
-      Call RunACCASLR(ETot,ENuc,TwoNO,URe,UNOAO,Occ,XOne,
+      Call RunACCASLR(BasisSet,ETot,ENuc,TwoNO,URe,UNOAO,Occ,XOne,
      $  IndAux,IPair,IndN,IndX,NDimX,Title,NBasis,NInte1,NInte2,NGem)
 C
       call clock('ACLR model',Tcpu,Twall)
@@ -627,7 +629,7 @@ C
       End
 
 * Deck RunACCASLR
-      Subroutine RunACCASLR(ETot,ENuc,TwoNO,URe,UNOAO,Occ,XOne,
+      Subroutine RunACCASLR(BasisSet,ETot,ENuc,TwoNO,URe,UNOAO,Occ,XOne,
      $  IndAux,IPair,IndN,IndX,NDimX,Title,NBasis,NInte1,NInte2,NGem)
 C
       use sorter
@@ -635,26 +637,33 @@ C
       use abfofo
       use ab0fofo
       use read_external
+      use grid_internal
       use timing
 C
       Implicit Real*8 (A-H,O-Z)
 C
       Character*60 FMultTab,Title
+      Character(*) :: BasisSet
       Include 'commons.inc'
 C
       Character*60 FName
       Real*8, Dimension(:), Allocatable :: TwoEl2
-      Real*8, Dimension(:), Allocatable :: OrbGrid
-      Real*8, Dimension(:), Allocatable :: OrbXGrid
-      Real*8, Dimension(:), Allocatable :: OrbYGrid
-      Real*8, Dimension(:), Allocatable :: OrbZGrid
+C      Real*8, Dimension(:,:), Allocatable :: OrbGrid
+C      Real*8, Dimension(:,:), Allocatable :: OrbXGrid
+C      Real*8, Dimension(:,:), Allocatable :: OrbYGrid
+C      Real*8, Dimension(:,:), Allocatable :: OrbZGrid
+      Real*8,allocatable,target :: PhiGGA(:,:,:)
+      Real*8,allocatable,target :: PhiLDA(:,:)
+      Real*8,pointer :: OrbGrid(:,:)
+      Real*8,pointer :: OrbXGrid(:,:),OrbYGrid(:,:),OrbZGrid(:,:)
+
       Real*8, Dimension(:), Allocatable :: WGrid
       Real*8, Dimension(:), Allocatable :: SRKer
       Real*8, Dimension(:), Allocatable :: Work
       Dimension NSymNO(NBasis),VSR(NInte1),MultpC(15,15),NumOSym(15),
      $ IndInt(NBasis)
 C
-      Parameter(Zero=0.D0,Half=0.5D0,One=1.D0,Two=2.D0,Four=4.D0)
+c     Parameter(Zero=0.D0,Half=0.5D0,One=1.D0,Two=2.D0,Four=4.D0)
 C
       Dimension
      $ URe(NBasis,NBasis),UNOAO(NBasis,NBasis),Occ(NBasis),
@@ -664,11 +673,17 @@ C
 C
 C     LOCAL ARRAYS
 C
+      Integer(8) :: MemSrtSize
+      Integer :: jtsoao(NBasis)
+C
+      Logical :: doGGA
+C
       Dimension
      $ ABPLUS(NDimX*NDimX),ABMIN(NDimX*NDimX),
      $ EigVecR(NDimX*NDimX),Eig(NDimX),
      $ ECorrG(NGem),EGOne(NGem),
      $ UAux(NBasis,NBasis),VecAux(NBasis)
+      Real*8, Dimension(:,:), Allocatable :: Jmat
 C
 C     IFlAC   = 1 - adiabatic connection formula calculation
 C               0 - AC not used
@@ -695,24 +710,81 @@ C
       Write(6,'(/,1X,"The number of CASSCF Active Orbitals = ",I4)')
      $ NAcCAS
 C
+      Allocate  (TwoEl2(NInte2))
+C
+C     load orbgrid and gradients, and wgrid
+C
+      If (IFunSR == 4) Then ! POSTCAS
+         If (IFunSR2 == 1) doGGA = .false.
+         If (IFunSR2 > 1)  doGGA = .true.
+      Else ! REGULAR 
+         If (IFunSR == 1) doGGA = .false.
+         If (IFunSR > 1)  doGGA = .true.
+      End If
+C
+      If (InternalGrid==0) then
+C
+      Write(LOUT,'(/1x,a)') 'MOLPRO GRID '
+C
+C     read no of grid pts
       Call molprogrid0(NGrid,NBasis)
-      Write(6,'(/,1X,"The number of Grid Points = ",I8)')
+C
+      Write(6,'(1X,"The number of Grid Points = ",I8)')
      $ NGrid
 C
-      Allocate  (TwoEl2(NInte2))
       Allocate  (WGrid(NGrid))
-      Allocate  (OrbGrid(NBasis*NGrid))
-      Allocate  (OrbXGrid(NBasis*NGrid))
-      Allocate  (OrbYGrid(NBasis*NGrid))
-      Allocate  (OrbZGrid(NBasis*NGrid))
       Allocate  (Work(NGrid))
 C
 c      Call EKT(URe,Occ,XOne,TwoNO,NBasis,NInte1,NInte2)
 C
-C     load orbgrid and gradients, and wgrid
+      If (doGGA) then
+         allocate(PhiGGA(NGrid,NBasis,4))
+         OrbGrid  => PhiGGA(:,:,1)
+         OrbXGrid => PhiGGA(:,:,2)
+         OrbYGrid => PhiGGA(:,:,3)
+         OrbZGrid => PhiGGA(:,:,4)
+      ElseIf (.not.doGGA) then
+         allocate(PhiLDA(NGrid,NBasis))
+         OrbGrid  => PhiLDA
+         OrbXGrid => PhiLDA
+         OrbYGrid => PhiLDA
+         OrbZGrid => PhiLDa
+      EndIf
 C
       Call molprogrid(OrbGrid,OrbXGrid,OrbYGrid,OrbZGrid,
-     $ WGrid,UNOAO,NGrid,NBasis)
+     $                WGrid,UNOAO,NGrid,NBasis)
+C
+      ElseIf (InternalGrid==1) then
+
+      Write(6,'(1x,a,i3)') 'IFunSR       =',IFunSR
+c     Write(6,'(1x,a,i3)') 'IUnits       =',IUnits
+c     Write(6,'(1x,a,i3)') 'InternalGrid =',InternalGrid
+      Write(6,'(1x,a,i3)') 'IGridType    =', IGridType
+      Write(6,'(1x,a,i3)') 'ORB_ORDERING =', IOrbOrder
+C
+      If (doGGA) Then
+         Write(LOUT,'(/1x,a)') 'INTERNAL GRID GGA'
+         Call internal_gga_no_orbgrid(IGridType,BasisSet,
+     $                          IOrbOrder,transpose(UNOAO),
+     $                          WGrid,PhiGGA,NGrid,NBasis,NBasis,IUnits)
+         OrbGrid  => PhiGGA(:,:,1)
+         OrbXGrid => PhiGGA(:,:,2)
+         OrbYGrid => PhiGGA(:,:,3)
+         OrbZGrid => PhiGGA(:,:,4)
+      ElseIf(.not.doGGA) Then
+         Write(LOUT,'(/1x,a)') 'INTERNAL GRID LDA'
+         Call internal_lda_no_orbgrid(IGridType,BasisSet,
+     $                          IOrbOrder,transpose(UNOAO),
+     $                          WGrid,PhiLDA,NGrid,NBasis,NBasis,IUnits)
+         OrbGrid  => PhiLDA
+         OrbXGrid => PhiLDA
+         OrbYGrid => PhiLDA
+         OrbZGrid => PhiLDa
+      End If
+C
+      Allocate  (Work(NGrid))
+C
+      End If ! InternalGrid
 C
 C     set/load symmetries of NO's
 C
@@ -724,18 +796,32 @@ C      Read(10,*) X
 C      NumOSym(I)=X
 C      EndDo
 C      Close(10)
-C     HAP
+C
       Call create_ind_molpro('2RDM',NumOSym,IndInt,NSym,NBasis)
       MxSym=NSym
 C
+      If (ICholesky==1) Then
+         Call read_aosao_map_molpro(jtsoao,
+     $              'MOLPRO.MOPUN','CASORBAO',NBasis)
+         If (InternalGrid==0.and.MxSym>1.and.IFunSRKer==1) Then
+            Stop "In RunACCASLR: Kernel & Sym /= 1 : use INTERNAL GRID!"
+         EndIf
+      EndIf
+
       NSymNO(1:NBasis)=0
       IStart=0
       Do I=1,MxSym
       Do J=IStart+1,IStart+NumOSym(I)
 C
-      Do IOrb=1,NBasis
-      If(Abs(UNOAO(IOrb,J)).Gt.1.D-1) NSymNO(IOrb)=I
-      EndDo
+      If (ICholesky==0) Then
+         Do IOrb=1,NBasis
+         If(Abs(UNOAO(IOrb,J)).Gt.1.D-1) NSymNO(IOrb)=I
+         EndDo
+      ElseIf (ICholesky==1) Then
+         Do IOrb=1,NBasis
+         If(Abs(UNOAO(IOrb,jtsoao(J))).Gt.1.D-1) NSymNO(IOrb)=I
+         EndDo
+      EndIf
 C
       EndDo
       IStart=IStart+NumOSym(I)
@@ -765,18 +851,20 @@ C
 C     if IFunSR.Gt.0 (but different from 3) TwoEl includes lr-integrals with erf/r
 C     load full-range two-electron integrals and transform to NO
 C
-      Do I=1,60
-      FName(I:I)=' '
-      EndDo
-      K=0
-    5 K=K+1
-      If (Title(K:K).Ne.' ') Then
-      FName(K:K)=Title(K:K)
-      GoTo 5
-      EndIf
-      FName(K:K+10)='.reg.integ'
+C      Do I=1,60
+C      FName(I:I)=' '
+C      EndDo
+C      K=0
+C    5 K=K+1
+C      If (Title(K:K).Ne.' ') Then
+C      FName(K:K)=Title(K:K)
+C      GoTo 5
+C      EndIf
+C      FName(K:K+10)='.reg.integ'
 C      Call Int2_AO(TwoEl2,NumOSym,MultpC,FName,NInte1,NInte2,NBasis)
-      Call readtwoint(NBasis,2,'AOTWOINT.mol','AOTWOSORT',134*1024_8**2)
+      MemSrtSize=MemVal*1024_8**MemType
+      If (ICholesky==0) Then
+      Call readtwoint(NBasis,2,'AOTWOINT.mol','AOTWOSORT',MemSrtSize)
       If(ITwoEl.Eq.1) Call LoadSaptTwoEl(3,TwoEl2,NBasis,NInte2)
 C
       If(ITwoEl.Eq.1) Then
@@ -801,13 +889,14 @@ C     TRANSFORM J AND K
      $        Num0+Num1,UAux(1:NBasis,1:(Num0+Num1)),
      $        'FOFO','AOTWOSORT')
 C
-      EndIf
+      EndIf ! ITwoEl
+      EndIf ! ICholesky
 C
 C     compute sr potential (vsr=xc+hartree)
 C     as a byproduct a sr energy (ensr=sr-xc+sr-hartree) is obtained
 C
       IFunSave=IFunSR
-      If(IFunSR.Eq.4) IFunSR=2
+      If(IFunSR.Eq.4) IFunSR=IFunSR2
 C
       Den=0
       Work2=0
@@ -828,7 +917,37 @@ C
 C
       Write(6,'(/,1X,"RANGE PARAMETER ",F8.3)')Alpha
 C
-      Call PotCoul_mithap(VCoul,Work2,.true.,'AOERFSORT',NBasis)
+C     calculate short-range Coulomb matrix in AO
+      If (ICholesky==0) Then
+         Call PotCoul_mithap(VCoul,Work2,.true.,'AOERFSORT',NBasis)
+c         block
+c         double precision :: JMOsr(NBasis,NBasis)
+c         call triang_to_sq2(VCoul,JMOsr,NBasis)
+c         Print*, 'JMOsr in AO basis =',norm2(JMOsr)
+c         do j=1,NBasis
+c            write(6,'(*(f13.8))') (JMOsr(i,j),i=1,NBasis)
+c         enddo
+c         end block
+      ElseIf (ICholesky==1) Then
+         ! for Cholesky, Jmat(sr) is read from disk
+         Allocate(Jmat(NBasis,NBasis))
+         Open(newunit=iunit,file='jsrmat',form='unformatted')
+         Read(iunit) NBasis2
+         If(NBasis2.ne.NBasis) stop "NBasis error in RunACCASLR"
+         Read(iunit) Jmat
+         Close(iunit,status='delete')
+         Call sq_to_triang2(Jmat,VCoul,NBasis)
+c         Print*, 'JMOsr in AO basis =',norm2(Jmat)
+c         do j=1,NBasis
+c            write(6,'(*(f13.8))') (Jmat(i,j),i=1,NBasis)
+c         enddo
+         Deallocate(Jmat)
+      EndIf
+      Print*, 'UNOAO =',norm2(UNOAO)
+      do j=1,NBasis
+         write(6,'(*(f13.8))') (UNOAO(i,j),i=1,NBasis)
+      enddo
+C
       Print*, 'VCoul',norm2(VCoul)
       Call EPotSR(EnSR,EnHSR,VSR,Occ,URe,UNOAO,.false.,
      $        OrbGrid,OrbXGrid,OrbYGrid,OrbZGrid,WGrid,
@@ -991,10 +1110,11 @@ C
       If(ISym.Eq.1) Then
       Do I=1,NGrid
       XKer1234=XKer1234+Work(I)*
-C     $ OrbGrid(IA+(I-1)*NBasis)*OrbGrid(IB+(I-1)*NBasis)*
-C     $ OrbGrid(IC+(I-1)*NBasis)*OrbGrid(ID+(I-1)*NBasis)
-     $ OrbGrid(I+(IA-1)*NGrid)*OrbGrid(I+(IB-1)*NGrid)*
-     $ OrbGrid(I+(IC-1)*NGrid)*OrbGrid(I+(ID-1)*NGrid)
+CC     $ OrbGrid(IA+(I-1)*NBasis)*OrbGrid(IB+(I-1)*NBasis)*
+CC     $ OrbGrid(IC+(I-1)*NBasis)*OrbGrid(ID+(I-1)*NBasis)
+c    $ OrbGrid(I+(IA-1)*NGrid)*OrbGrid(I+(IB-1)*NGrid)*
+c    $ OrbGrid(I+(IC-1)*NGrid)*OrbGrid(I+(ID-1)*NGrid)
+     $ OrbGrid(I,IA)*OrbGrid(I,IB)*OrbGrid(I,IC)*OrbGrid(I,ID)
       EndDo
       EndIf
 C
@@ -1201,10 +1321,10 @@ C
 C
       DeAllocate  (TwoEl2)
       DeAllocate  (WGrid)
-      DeAllocate  (OrbGrid)
-      DeAllocate  (OrbXGrid)
-      DeAllocate  (OrbYGrid)
-      DeAllocate  (OrbZGrid)
+C      DeAllocate  (OrbGrid)
+C      DeAllocate  (OrbXGrid)
+C      DeAllocate  (OrbYGrid)
+C      DeAllocate  (OrbZGrid)
       DeAllocate  (Work)
       DeAllocate (SRKer)
 C

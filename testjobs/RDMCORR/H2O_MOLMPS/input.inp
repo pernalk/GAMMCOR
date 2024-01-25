@@ -8,7 +8,7 @@ Calculation
  OrbIncl       .false.
  NBasis        58
  TwoMoInt      FOFO
- BasisPath  /home/michalhapka/pr-dmft/basis/
+ BasisPath /home/michalhapka/pr-dmft/basis/
 end
 
 CholeskyBlock

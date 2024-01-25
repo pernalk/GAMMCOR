@@ -415,16 +415,6 @@ double precision,allocatable :: ABMin(:,:),Work(:)
  if(M%Monomer==1) abfile='ABMAT_A'
  if(M%Monomer==2) abfile='ABMAT_B'
 
- allocate(ABMin(M%NDimX,M%NDimX))
-
- open(newunit=iunit,file=abfile,status='OLD',&
-      access='SEQUENTIAL',form='UNFORMATTED')
-
- read(iunit)
- read(iunit) ABMin
-
- close(iunit)
-
  call init_DIIS(DIISBlock,M%NDimX,M%NDimX,Flags%DIISN)
 
  allocate(WxYY(NBas,NBas))
@@ -445,8 +435,15 @@ double precision,allocatable :: ABMin(:,:),Work(:)
  ! zero iter
  !call amplitudes_T1_cphf(OmM0,wVecxYY,amps,M%NDimX)
  call amplitudes_T1_cerpa(ABlock,ABlockIV,nblk,wVecxYY,amps,M%NDimX)
- print*, 'amp-1',norm2(amps)
- e2indxy = 0
+
+ !block
+ !print*, 'amp-1',norm2(amps)
+ !do pq=1,10
+ !   print*, 'pq',pq,amps(pq)
+ !enddo
+ !end block
+
+ e2indxy = 0d0
  do pq=1,M%NDimX
     ip = M%IndN(1,pq)
     iq = M%IndN(2,pq)
@@ -454,7 +451,19 @@ double precision,allocatable :: ABMin(:,:),Work(:)
     e2indxy = e2indxy + fact*amps(pq)*WxYY(ip,iq)
  enddo
  e2indxy = 1d0*e2indxy
- print*, 'e2ind(unc)',e2indxy
+ if(Flags%SaptLevel/=0) print*, 'e2ind(unc)',e2indxy
+
+ if(Flags%SaptLevel==0) return
+
+ allocate(ABMin(M%NDimX,M%NDimX))
+
+ open(newunit=iunit,file=abfile,status='OLD',&
+      access='SEQUENTIAL',form='UNFORMATTED')
+
+ read(iunit)
+ read(iunit) ABMin
+
+ close(iunit)
 
  write(LOUT,'(1x,a,5x,a)') 'ITER', 'ERROR'
  iter = 0
@@ -569,6 +578,7 @@ do iblk=1,nblk
      enddo
 
      call dsytrs('U',A%n,1,A%matY,A%n,A%ipiv,tmp,A%n,info)
+!     print*, 'info',info,norm2(A%matY)
 
      do i=1,A%n
         ipos = A%pos(i)
@@ -578,7 +588,6 @@ do iblk=1,nblk
 
    end associate
 enddo
-
 ! block IV
 associate(A => ABlockIV)
 
@@ -1758,7 +1767,7 @@ deallocate(Work,C2Tilde,C1Tilde)
 
 end subroutine C_AlphaExpand
 
-subroutine C_AlphaExpand_unc(C0Tilde,OmI,A1,A2,ABP0Tilde,ABP1Tilde,&
+subroutine C_AlphaExpand_unc(C0Tilde,OmI,ABP0Tilde,&
                          A0Blk,A0BlkIV,nblk,NCholesky,NDimX)
 !
 !  For a given frequency OmI, CTilde(Alpha=1) is computed by expanding
@@ -1769,8 +1778,9 @@ implicit none
 integer,intent(in)           :: nblk,NCholesky,NDimX
 double precision,intent(in)  :: OmI
 
-double precision,intent(in)    :: A1(NDimX,NDimX),A2(NDimX,NDimX)
-double precision,intent(in)    :: ABP0Tilde(NDimX,NCholesky),ABP1TIlde(NDimX,NCholesky)
+!double precision,intent(in)    :: A1(NDimX,NDimX),A2(NDimX,NDimX)
+!double precision,intent(in)    :: ABP0Tilde(NDimX,NCholesky),ABP1TIlde(NDimX,NCholesky)
+double precision,intent(in)    :: ABP0Tilde(NDimX,NCholesky)
 double precision,intent(inout) :: C0Tilde(NDimX,NCholesky)
 
 integer :: N

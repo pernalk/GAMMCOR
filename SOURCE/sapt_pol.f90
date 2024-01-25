@@ -121,10 +121,17 @@ double precision :: Tcpu,Twall
 
  e2ic = (e2ab + e2ba)
 
- write(LOUT,'(1x,a,f16.8)') 'Ind(A--B)   = ', e2ab*1000d0 
- write(LOUT,'(1x,a,f16.8)') 'Ind(B--A)   = ', e2ba*1000d0 
- write(LOUT,'(1x,a,f16.8)') 'E2ind       = ', e2ic*1000d0 
- SAPT%e2ind = e2ic
+ if(Flags%SaptLevel==0) then
+    write(LOUT,'(1x,a,f16.8)') 'Ind,unc(A--B) = ', e2ab*1000d0
+    write(LOUT,'(1x,a,f16.8)') 'Ind,unc(B--A) = ', e2ba*1000d0
+    write(LOUT,'(1x,a,f16.8)') 'E2ind(unc)    = ', e2ic*1000d0
+    SAPT%e2ind_unc = e2ic
+ else
+    write(LOUT,'(1x,a,f16.8)') 'Ind(A--B)   = ', e2ab*1000d0
+    write(LOUT,'(1x,a,f16.8)') 'Ind(B--A)   = ', e2ba*1000d0
+    write(LOUT,'(1x,a,f16.8)') 'E2ind       = ', e2ic*1000d0
+    SAPT%e2ind = e2ic
+ endif
 
  call clock('E2ind',Tcpu,Twall)
 

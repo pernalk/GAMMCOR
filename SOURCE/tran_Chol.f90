@@ -43,9 +43,145 @@ close(iunit)
 
 end subroutine chol_ints_fofo
 
+subroutine chol_ovov_batch_ver0(nOA,inA,MatFA,nOB,inB,MatFB,NCholesky,NBasis,fname)
+!
+! assemble (OV|OV) | (FA|FB) integrals
+! from bra and ket (NChol,NBasis*dim) vectors
+!
+! CAREFUL!! One temporary (NChol,FO) matrix required
+!
+implicit none
+
+integer,intent(in) :: nOA,nOB
+integer,intent(in) :: inA,inB
+integer,intent(in) :: NBasis,NCholesky
+character(*),intent(in)     :: fname
+double precision,intent(in) :: MatFA(NCholesky,NBasis*nOA), &
+                               MatFB(NCholesky,NBasis*nOB)
+
+integer :: iunit
+integer :: nOVA
+integer :: nVA,nVB
+integer :: i,j,ij
+integer :: k,l,kl
+integer :: iBatch
+double precision,allocatable :: work(:,:)
+double precision,allocatable :: workFA(:,:)
+
+! number of virt orbs
+nVA = NBasis-inA
+nVB = NBasis-inB
+
+nOVA = nOA*nVA
+
+allocate(workFA(NCholesky,nOVA))
+
+ij = 0
+do j=1,nVA
+   do i=1,nOA
+      ij = ij + 1
+      workFA(:,ij) = MatFA(:,(inA+j)+(i-1)*NBasis)
+   enddo
+enddo
+
+print*, 'Assemble ',fname,' from Cholesky Vectors in Batches'
+
+allocate(work(nOVA,nOB))
+
+open(newunit=iunit,file=fname,status='REPLACE',&
+     access='DIRECT',form='UNFORMATTED',recl=8*nOA*nVA)
+
+kl = 0
+do k=1,nVB
+
+   call dgemm('T','N',nOVA,nOB,NCholesky,1d0,workFA,NCholesky, &
+              MatFB(1,inB+k),NCholesky*NBasis,0d0,work,nOVA)
+
+   ! loop over integrals
+   do iBatch=1,nOB
+      kl = kl + 1
+      write(iunit,rec=kl) work(:,iBatch)
+   enddo
+
+enddo
+
+close(iunit)
+
+deallocate(workFA)
+deallocate(work)
+
+end subroutine chol_ovov_batch_ver0
+
+subroutine chol_ovov_batch(nOA,inA,MatFA,nOB,inB,MatFB,NCholesky,NBasis,fname)
+!
+! assemble (OV|OV) | (FA|FB) integrals
+! from bra and ket (NChol,NBasis*dim) vectors
+!
+! CAREFUL! nVA*nVB dgemm loop, but no extra allocations
+!
+implicit none
+
+integer,intent(in) :: nOA,nOB
+integer,intent(in) :: inA,inB
+integer,intent(in) :: NBasis,NCholesky
+character(*),intent(in)     :: fname
+double precision,intent(in) :: MatFA(NCholesky,NBasis*nOA), &
+                               MatFB(NCholesky,NBasis*nOB)
+
+integer :: iunit
+integer :: nOVA
+integer :: nVA,nVB
+integer :: i,j,ij
+integer :: k,l,kl
+integer :: iBatch
+double precision,allocatable :: work(:,:),inter(:,:)
+
+! set dimensions
+nVA = NBasis-inA
+nVB = NBasis-inB
+nOVA = nOA*nVA
+
+print*, 'Assemble ',fname,' from Cholesky Vectors in Batches'
+
+allocate(work(nOVA,nOB))
+allocate(inter(nVA,nOB))
+
+open(newunit=iunit,file=fname,status='REPLACE',&
+     access='DIRECT',form='UNFORMATTED',recl=8*nOA*nVA)
+
+kl = 0
+do l=1,nVB
+
+   !do k=1,nVA
+   !   call dgemm('T','N',nOA,nOB,NCholesky,1d0,MatFA(1,inA+k),NCholesky*NBasis, &
+   !              MatFB(1,inB+l),NCholesky*NBasis,0d0,work(1+(k-1)*nOA,1),nOVA)
+   !enddo
+
+   do k=1,nOA
+      call dgemm('T','N',nVA,nOB,NCholesky,1d0,MatFA(1,1+inA+(k-1)*NBasis),NCholesky, &
+                 MatFB(1,inB+l),NCholesky*NBasis,0d0,inter,nVA)
+      ! nOA is step
+      work(k::nOA,:) = inter
+   enddo
+
+   ! loop over integrals
+   do iBatch=1,nOB
+      kl = kl + 1
+      write(iunit,rec=kl) work(:,iBatch)
+   enddo
+
+enddo
+
+close(iunit)
+
+deallocate(inter)
+deallocate(work)
+
+end subroutine chol_ovov_batch
+
 subroutine chol_fofo_batch(nOA,MatFA,nOB,MatFB,NCholesky,NBasis,fname)
 !
-! assemble (FO|FO) | (FA|FB) integrals
+! assemble (FO|FO) | (AA|BB) integrals
 ! from bra and ket (NChol,NBasis*dim) vectors
 !
 implicit none

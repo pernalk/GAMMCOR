@@ -643,8 +643,8 @@ enddo
 ! energy loop
 allocate(ints(NBasis,NBasis))
 
-EAll   = 0
-EIntra = 0
+EAll   = 0d0
+EIntra = 0d0
 
 if(ICholesky==0) then
 
@@ -1128,8 +1128,8 @@ double precision :: AuxCoeff(3,3,3,3),AuxVal,val
 double precision :: EnDummy,Aux,Crs,Cpq,EIntra,EAll
 double precision,allocatable :: EigY(:,:),EigY1(:,:)
 double precision,allocatable :: Eig(:),Eig1(:)
-double precision,allocatable :: RDM2val(:,:,:,:),RDM2Act(:)
-double precision,allocatable :: work1(:),work2(:)
+double precision,allocatable :: RDM2Act(:)
+double precision,allocatable :: work1(:)
 double precision,allocatable :: workA(:,:)
 double precision,allocatable :: ints(:,:)
 double precision,allocatable :: EigYt(:,:),EigXt(:,:),Eigt(:)
@@ -1173,55 +1173,6 @@ do i=NOccup+1,NBasis
    IGem(i) = 3
 enddo
 
-allocate(work1(NBasis**2),work2(NBasis**2),ints(NBasis,NBasis))
-allocate(RDM2val(NOccup,NOccup,NOccup,NOccup))
-
-NRDM2Act = NAct**2*(NAct**2+1)/2
-allocate(RDM2Act(NRDM2Act))
-
-RDM2Act = 0
-open(newunit=iunit,file='rdm2.dat',status='old')
-write(LOUT,'(/,1x,''Active block of 2-RDM read from rdm2.dat'')')
-do
-   read(iunit,*,iostat=ios) i,j,k,l,val
-   if(ios/=0) exit
-   RDM2Act(NAddrRDM(i,k,j,l,NAct)) = 0.5d0*val
-enddo
-close(iunit)
-
-do l=1,NOccup
-   do k=1,NOccup
-      do j=1,NOccup
-         do i=1,NOccup
-            RDM2val(i,j,k,l) = FRDM2(i,k,j,l,RDM2Act,Occ,Ind,NAct,NBasis)
-         enddo
-      enddo
-   enddo
-enddo
-
-deallocate(RDM2Act)
-
-call triang_to_sq(XOne,work1,NBasis)
-call dgemm('N','N',NBasis,NBasis,NBasis,1d0,URe,NBasis,work1,NBasis,0d0,work2,NBasis)
-call dgemm('N','T',NBasis,NBasis,NBasis,1d0,work2,NBasis,URe,NBasis,0d0,HNO,NBasis)
-call sq_symmetrize(HNO,NBasis)
-
-val = 0
-do i=1,NOccup
-   val = val + Occ(i)*HNO(i,i)
-enddo
-if(present(ETot)) ETot = ETot + 2*val
-
-do j=1,NBasis
-   do i=1,NBasis
-      if(IGem(i)/=IGem(j)) HNO(i,j) = 0d0
-   enddo
-enddo
-
-AuxInd = 0
-AuxInd(1:2,1:2) = 1
-AuxInd(2,2) = 2
-
 do l=1,3
    do k=1,3
       do j=1,3
@@ -1236,176 +1187,13 @@ do l=1,3
    enddo
 enddo
 
-nAA = 0
-nAI = 0
-nAV = 0
-nIV = 0
-tmpAA = 0
-tmpAI = 0
-tmpAV = 0
-tmpIV = 0
-limAA = 0
-limAI = 0
-limAV = 0
-limIV = 0
+call create_blocks_ABPL0(nAA,nAI,nAV,nIV,tmpAA,tmpAI,tmpAV,tmpIV,&
+                         limAA,limAI,limAV,limIV,pos,&
+                         IGem,IndN,INActive,NAct,NBasis,NDimX)
 
-do i=1,NDimX
-   ip = IndN(1,i)
-   iq = IndN(2,i)
-   if(IGem(ip)==2.and.IGem(iq)==2) then
-      nAA = nAA + 1
-      tmpAA(nAA) = i
-    elseif(IGem(ip)==2.and.IGem(iq)==1) then
-       nAI(iq) = nAI(iq) + 1
-       tmpAI(nAI(iq),iq) = i
-    elseif(IGem(ip)==3.and.IGem(iq)==2) then
-       nAV(ip) = nAV(ip) + 1
-       tmpAV(nAV(ip),ip) = i
-    elseif(IGem(ip)==3.and.IGem(iq)==1) then
-       nIV = nIV + 1
-       tmpIV(nIV) = i
-   endif
-enddo
-
-pos = 0
-ipos = 0
-limAA(1) = ipos + 1
-do ii=1,nAA
-   i = tmpAA(ii)
-   ! print*, ii,i
-   ip = IndN(1,i)
-   iq = IndN(2,i)
-   ipos = ipos + 1
-   pos(ip,iq) = ipos
-enddo
-limAA(2) = ipos
-do is=1,INActive
-   limAI(1,is) = ipos + 1
-   do ii=1,nAI(is)
-      i = tmpAI(ii,is)
-      ! print*, ii,is,i
-      ip = IndN(1,i)
-      iq = IndN(2,i)
-      ipos = ipos + 1
-      pos(ip,iq) = ipos
-   enddo
-   limAI(2,is) = ipos
-enddo
-!print*, ' '
-do ir=NOccup+1,NBasis
-   limAV(1,ir) = ipos + 1
-   do ii=1,nAV(ir)
-      i = tmpAV(ii,ir)
-      ! print*, ii,ir,i
-      ip = IndN(1,i)
-      iq = IndN(2,i)
-      ipos = ipos + 1
-      pos(ip,iq) = ipos
-   enddo
-   limAV(2,ir) = ipos
-enddo
-limIV(1) = ipos + 1
-do ii=1,nIV
-   i = tmpIV(ii)
-   ! print*, ii,i
-   ip = IndN(1,i)
-   iq = IndN(2,i)
-   ipos = ipos + 1
-   pos(ip,iq) = ipos
-enddo
-limIV(2) = ipos
-
-!not working... ???
-!call AB_CAS_assemb(ABPLUS,ABMIN,Occ,RDM2val,HNO,pos, &
-!           1d0,AuxInd,AuxCoeff, &
-!           IGem,IndN,IndX,NDimX,NDim,INActive,NOccup,NBasis, &
-!           IntJFile,IntKFile)
-
-AuxI  = 0
-AuxIO = 0
-WMAT  = 0
-
-if(present(ETot)) then
-   call JK_loop(ABPLUS,ABMIN,HNO,AuxI,AuxIO,WMAT,&
-                RDM2val,Occ,AuxCoeff,IGem,AuxInd,pos,&
-                INActive,NOccup,NDimX,NDimX,NBasis,NInte1,IntJFile,IntKFile,0d0,2,ETot)
-else
-   call JK_loop(ABPLUS,ABMIN,HNO,AuxI,AuxIO,WMAT,&
-                RDM2val,Occ,AuxCoeff,IGem,AuxInd,pos,&
-                INActive,NOccup,NDimX,NDimX,NBasis,NInte1,IntJFile,IntKFile,0d0,2)
-endif
-
-do i=1,NBasis
-   C(i) = sign(sqrt(Occ(i)),Occ(i)-0.5d0)
-enddo
-
-do ICol=1,NDimX
-   ir = IndN(1,ICol)
-   is = IndN(2,ICol)
-   irs = pos(ir,is)
-
-      do IRow=1,NDimX
-         ip = IndN(1,IRow)
-         iq = IndN(2,IRow)
-         ipq = pos(ip,iq)
-
-         val = 0
-
-         if(ip==ir) then
-            val = val + (Occ(ip)-Occ(is))*HNO(iq,is) - WMAT(iq,is)
-            select case(AuxInd(IGem(ip),IGem(ir)))
-            case(1)
-               val = val + Occ(ip)*AuxI(iq,is)
-            case(2)
-               val = val + Occ(ip)*AuxIO(iq,is)
-            end select
-         endif
-
-         if(iq==is) then
-            val = val + (Occ(iq)-Occ(ir))*HNO(ip,ir) - WMAT(ip,ir)
-            select case(AuxInd(IGem(iq),IGem(is)))
-            case(1)
-               val = val + Occ(iq)*AuxI(ip,ir)
-            case(2)
-               val = val + Occ(iq)*AuxIO(ip,ir)
-            end select
-         endif
-
-         ABPLUS(ipq,irs) = ABPLUS(ipq,irs) + val
-         ABMIN(ipq,irs) = ABMIN(ipq,irs) + val
-
-         val = 0
-
-         if(iq==ir) then
-            val = val + (Occ(iq)-Occ(is))*HNO(ip,is) - WMAT(ip,is)
-            select case(AuxInd(IGem(iq),IGem(ir)))
-            case(1)
-               val = val + Occ(iq)*AuxI(ip,is)
-            case(2)
-               val = val + Occ(iq)*AuxIO(ip,is)
-            end select
-         endif
-
-         if(ip==is) then
-            val = val + (Occ(ip)-Occ(ir))*HNO(iq,ir) - WMAT(iq,ir)
-            select case(AuxInd(IGem(ip),IGem(is)))
-            case(1)
-               val = val + Occ(ip)*AuxI(iq,ir)
-            case(2)
-               val = val + Occ(ip)*AuxIO(iq,ir)
-            end select
-         endif
-
-         ABPLUS(ipq,irs) = ABPLUS(ipq,irs) + val
-         ABMIN(ipq,irs) = ABMIN(ipq,irs) - val
-
-         val = (C(ip) + C(iq))*(C(ir) + C(is))
-         if(val/=0d0) ABPLUS(ipq,irs) = ABPLUS(ipq,irs)/val
-         val = (C(ip) - C(iq))*(C(ir) - C(is))
-         if(val/=0d0) ABMIN(ipq,irs)  = ABMIN(ipq,irs)/val
-
-      enddo
-enddo
+call ABPM0_FOFO(Occ,URe,XOne,ABPLUS,ABMIN, &
+                IndN,IndX,IGemIN,NAct,INActive,NDimX,NBasis,NDim,NInte1, &
+                IntJFile,IntKFile,ICholesky,ETot)
 
 call clock('Y01CASLR:ABMAT',Tcpu,Twall)
 call clock('START',Tcpu,Twall)
@@ -1442,6 +1230,8 @@ if(nAA>0) then
                IndN,IndX,NDimX,NGrid,NBasis,&
                !NOccup,NAct,INActive,nAA,'FOFO','FOFOERF')
                NOccup,NAct,INActive,nAA,IntFileName,IntKFile)
+        ! add the kernel in ABMIN0
+        ABMIN(B%l1:B%l2,B%l1:B%l2)=ABM(1:B%n,1:B%n)
      endif
 
      if(NoSt==1) then
@@ -1461,66 +1251,19 @@ write(*,'(/,1x,a)') 'Act-Act   block diagonalized!'
 !pack AI
 do iq=1,INActive
    if(nAI(iq)>0) then
-
       nblk = nblk + 1
-      associate(B => Eblock(nblk))
-        B%n  = nAI(iq)
-        B%l1 = limAI(1,iq)
-        B%l2 = limAI(2,iq)
-        allocate(B%pos(B%n))
-        B%pos(1:B%n) = tmpAI(1:B%n,iq)
-
-        allocate(B%vec(B%n),B%matX(B%n,B%n),B%matY(B%n,B%n))
-        allocate(ABP(B%n,B%n),ABM(B%n,B%n))
-
-        ABP = ABPLUS(B%l1:B%l2,B%l1:B%l2)
-        ABM = ABMIN(B%l1:B%l2,B%l1:B%l2)
-        if(NoSt==1) then
-           call ERPASYMM0(B%matY,B%matX,B%vec,ABP,ABM,B%n)
-        elseif(NoSt>1) then
-           call ERPAVECYX(B%matY,B%matX,B%vec,ABP,ABM,B%n)
-        endif
-
-        deallocate(ABM,ABP)
-
-      end associate
-
+      call pack_Eblock(ABPLUS,ABMIN,nAI(iq),limAI(1,iq),limAI(2,iq),tmpAI(1:nAI(iq),iq),&
+                       Eblock(nblk),NoSt,NDimX)
    endif
 enddo
-
-print*, 'Act-InAct block diagonalized!'
-
 !pack AV
 do ip=NOccup+1,NBasis
    if(nAV(ip)>0) then
-
       nblk = nblk + 1
-      associate(B => Eblock(nblk))
-        B%n  = nAV(ip)
-        B%l1 = limAV(1,ip)
-        B%l2 = limAV(2,ip)
-        allocate(B%pos(B%n))
-        B%pos(1:B%n) = tmpAV(1:B%n,ip)
-
-        allocate(B%vec(B%n),B%matX(B%n,B%n),B%matY(B%n,B%n))
-        allocate(ABP(B%n,B%n),ABM(B%n,B%n))
-
-        ABP = ABPLUS(B%l1:B%l2,B%l1:B%l2)
-        ABM = ABMIN(B%l1:B%l2,B%l1:B%l2)
-        if(NoSt==1) then
-           call ERPASYMM0(B%matY,B%matX,B%vec,ABP,ABM,B%n)
-        elseif(NoSt>1) then
-           call ERPAVECYX(B%matY,B%matX,B%vec,ABP,ABM,B%n)
-        endif
-
-        deallocate(ABM,ABP)
-
-      end associate
-
+      call pack_Eblock(ABPLUS,ABMIN,nAV(ip),limAV(1,ip),limAV(2,ip),tmpAV(1:nAV(ip),ip),&
+                       Eblock(nblk),NoSt,NDimX)
     endif
 enddo
-
-print*, 'Act-Virt  block diagonalized!'
 
 !pack IV
 associate(B => EblockIV)
@@ -1571,12 +1314,12 @@ call clock('START',Tcpu,Twall)
    allocate(workA(NDimX,NDimX))
 
    call ABPM_TRAN(ABPLUS,workA,EBlock,EBlockIV,nblk,NDimX,.true.)
-   call clock('MULT-1',Tcpu,Twall)
+   !call clock('MULT-1',Tcpu,Twall)
    ABPLUS=workA
    call ABPM_TRAN(ABMIN,workA,EBlock,EBlockIV,nblk,NDimX,.false.)
    ABMIN=workA
 
-   call clock('MULT-2',Tcpu,Twall)
+   !call clock('MULT-2',Tcpu,Twall)
 
    deallocate(workA)
 
@@ -1730,62 +1473,74 @@ end associate
 
 call clock('START',Tcpu,Twall)
 
-pos = 0
-do i=1,NDimX
-   pos(IndN(1,i),IndN(2,i)) = IndX(i)
-enddo
-!
-! energy loop
-EAll = 0
-EIntra = 0
-open(newunit=iunit,file='FOFOERF',status='OLD', &
-     access='DIRECT',recl=8*NBasis*NOccup)
+if (ICholesky==1) then
 
-kl = 0
-do k=1,NOccup
-   do l=1,NBasis
-      kl = kl + 1
-      if(pos(l,k)/=0) then
-        irs = pos(l,k)
-        ir = l
-        is = k
-        read(iunit,rec=kl) work1(1:NBasis*NOccup)
-        do j=1,NOccup
-           do i=1,NBasis
-              ints(i,j) = work1((j-1)*NBasis+i)
-           enddo
-        enddo
-        ints(:,NOccup+1:NBasis) = 0
+   call Chol_AC0ECorr(ECorr,ABPLUS,IndN,IndX,Occ, &
+                      INActive,NOccup,NDimX,NBasis,'cholvecs')
 
-        do j=1,NBasis
-           do i=1,j
-              if(pos(j,i)/=0) then
-                ipq = pos(j,i)
-                ip = j
-                iq = i
-                Crs = C(ir)+C(is)
-                Cpq = C(ip)+C(iq)
+else
 
-                Aux = Crs*Cpq*ABPLUS(ipq,irs)
-                EAll = EAll + Aux*ints(j,i)
-
-                if(AuxCoeff(IGem(ip),IGem(iq),IGem(ir),IGem(is))==1) EIntra = EIntra + Aux*ints(j,i)
-
-              endif
-           enddo
-        enddo
-
-      endif
+   pos = 0
+   do i=1,NDimX
+      pos(IndN(1,i),IndN(2,i)) = IndX(i)
    enddo
-enddo
 
-close(iunit)
+   allocate(work1(NBasis*NBasis),ints(NBasis,NBasis))
 
-ECorr = EAll-EIntra
+   EAll   = 0d0
+   EIntra = 0d0
 
-print*, 'EAll,EIntra',EAll,EIntra
+   open(newunit=iunit,file='FOFOERF',status='OLD', &
+        access='DIRECT',recl=8*NBasis*NOccup)
 
-endif
+   ! energy loop
+   kl = 0
+   do k=1,NOccup
+      do l=1,NBasis
+         kl = kl + 1
+         if(pos(l,k)/=0) then
+           irs = pos(l,k)
+           ir = l
+           is = k
+           read(iunit,rec=kl) work1(1:NBasis*NOccup)
+           do j=1,NOccup
+              do i=1,NBasis
+                 ints(i,j) = work1((j-1)*NBasis+i)
+              enddo
+           enddo
+           ints(:,NOccup+1:NBasis) = 0
+
+           do j=1,NBasis
+              do i=1,j
+                 if(pos(j,i)/=0) then
+                   ipq = pos(j,i)
+                   ip = j
+                   iq = i
+                   Crs = C(ir)+C(is)
+                   Cpq = C(ip)+C(iq)
+
+                   Aux = Crs*Cpq*ABPLUS(ipq,irs)
+                   EAll = EAll + Aux*ints(j,i)
+
+                   if(AuxCoeff(IGem(ip),IGem(iq),IGem(ir),IGem(is))==1) EIntra = EIntra + Aux*ints(j,i)
+
+                 endif
+              enddo
+           enddo
+
+         endif
+      enddo
+   enddo
+
+   ECorr = EAll-EIntra
+
+   print*, 'EAll,EIntra',EAll,EIntra
+
+   close(iunit)
+   deallocate(ints,work1)
+
+endif ! ICholesky
+endif ! present(ECorr)
 
 !call sq_to_triang2(HNO,work1,NBasis)
 !write(LOUT,*) 'HNO-my', norm2(work1(1:NBasis*(NBasis+1)/2))
@@ -1809,8 +1564,6 @@ endif
 !
 !write(LOUT,*) 'WMAT-my', 2d0*norm2(WMAT)
 
-deallocate(RDM2val)
-deallocate(ints,work2,work1)
 deallocate(Eig,EigY)
 
 call clock('Y01CASLR:ENE',Tcpu,Twall)

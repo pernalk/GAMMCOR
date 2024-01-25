@@ -1090,3 +1090,58 @@ C
       Return
       End
 
+      Subroutine RhoLDAIntgrl(Occ,URe,OrbGrid,Wg,NGrid,NBasis)
+C
+      Implicit Real*8 (A-H,O-Z)
+C
+      Integer :: NGrid,NBasis
+      Double Precision :: Occ(NBasis)
+      Double Precision :: Wg(NGrid),OrbGrid(NGrid,NBasis)
+      Double Precision :: RhoInt
+
+      RhoInt = 0d0
+      Do I=1,NGrid
+C
+      Call DenGrid(I,Rho,Occ,URe,OrbGrid,NGrid,NBasis)
+      RhoInt = RhoInt + Wg(I)*Rho
+C
+      EndDo
+      Write(6,'(/1x,a,f12.6/)') 'RhoIntegral = ',RhoInt
+
+      Return
+      End
+
+      Subroutine RhoGGAIntgrl(Occ,URe,OrbGrid,OrbXGrid,OrbYGrid,
+     $                        OrbZGrid,Wg,NGrid,NBasis)
+C
+      Implicit Real*8 (A-H,O-Z)
+C
+      Integer :: NGrid,NBasis
+      Double Precision :: Occ(NBasis)
+      Double Precision :: Wg(NGrid),OrbGrid(NGrid,NBasis)
+      Double Precision :: OrbXGrid(NGrid,NBasis),OrbYGrid(NGrid,NBasis)
+      Double Precision :: OrbZGrid(NGrid,NBasis)
+      Double Precision :: RhoInt,DevRhoInt
+      Double Precision :: RhoXDev,RhoYDev,RhoZDev
+
+      RhoInt = 0d0
+      DevRhoInt = 0d0
+      Do I=1,NGrid
+C
+      Call DenGrid(I,Rho,Occ,URe,OrbGrid,NGrid,NBasis)
+      Call DenGrad(I,RhoXDev,Occ,URe,OrbGrid,OrbXGrid,NGrid,NBasis)
+      Call DenGrad(I,RhoYDev,Occ,URe,OrbGrid,OrbYGrid,NGrid,NBasis)
+      Call DenGrad(I,RhoZDev,Occ,URe,OrbGrid,OrbZGrid,NGrid,NBasis)
+C
+      If (Rho > 1.0E-10) Then
+      RhoInt = RhoInt + Wg(I)*Rho
+      DevRhoInt = DevRhoInt + Wg(I)*(RhoXDev + RhoYDev + RhoZDev)
+      EndIf
+C
+      EndDo
+      write(6,'(/1x,a,f12.6)') 'RhoIntegral    = ',RhoInt
+      write(6,'(1x,a,f12.6)')  'DevRhoIntegral = ',DevRhoInt
+
+      Return
+      End
+

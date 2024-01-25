@@ -557,6 +557,48 @@ character(8) :: label
 
 end subroutine read_caomo_molpro
 
+subroutine read_aosao_map_molpro(jtsoao,infile,text,nbasis)
+!
+! this subroutine reads AO-->SAO map
+! transition from SAO-->AO is done in Molpro
+!
+implicit none
+
+integer,intent(in)           :: nbasis
+integer,intent(out)          :: jtsoao(nbasis)
+character(*),intent(in)      :: infile,text
+
+integer      :: iunit,ios
+integer      :: i,j,ntg
+integer      :: itsoao(nbasis)
+character(8) :: label
+
+ open(newunit=iunit,file=infile,status='OLD', &
+      access='SEQUENTIAL',form='UNFORMATTED')
+
+ do
+   read(iunit,iostat=ios) label
+   if(ios<0) then
+      write(6,*) 'ERROR!!! LABEL '//text//' not found!'
+      stop
+   endif
+   if(label==text) then
+      read(iunit) ntg
+      read(iunit) itsoao(1:ntg),jtsoao(1:ntg)
+      exit
+   endif
+ enddo
+
+ if(NBasis /= ntg) then
+   write(lout,'(1x,a)') 'ERROR! NBasis .ne. ntg in read_caomo_molpro!'
+   write(lout,'(1x,a,i4,a,i4)') 'NBasis = ', NBasis, 'ntg = ', ntg
+   stop
+ endif
+
+ close(iunit)
+
+end subroutine read_aosao_map_molpro
+
 subroutine dump_CAONO_SAO(CAONO,CSAONO,SAO,infile,NBasis)
 !
 ! THIS IS FOR TEST ONLY & SHOULD BE REMOVED
