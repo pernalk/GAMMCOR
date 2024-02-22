@@ -1644,8 +1644,12 @@ C     COMPUTE EigX
 C
       Do NU=1,NDimX
 C
-      If(Eig(NU).Gt.Small) Then
+      If(Eig(NU).Gt.Small ) Then
+C     DC : 12.12.2023
+      ! If(Eig(NU).Gt.Small .Or. Eig(NU).Lt.-1d0*Small) Then
 C    
+C     DC: kon ec zmiany
+C
       Do I=1,NDimX
       EigX((NU-1)*NDimX+I)=Zero
       Do J=1,NDimX

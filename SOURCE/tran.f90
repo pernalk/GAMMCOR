@@ -1482,9 +1482,11 @@ double precision,intent(in) :: MatIn(nbas,nbas)
 double precision,intent(in) :: Ca(nbas,nbas),Cb(nbas,nbas)
 double precision,intent(out) :: MatOut(nbas,nbas)
 double precision,allocatable :: tmp(:,:)
+
 integer :: i,j
 
  allocate(tmp(nbas,nbas))
+
  ! tmp=Ca^T.MatIn
  ! MatOut=tmp.Cb
  tmp = 0
@@ -1494,6 +1496,29 @@ integer :: i,j
  deallocate(tmp)
 
 end subroutine tran2MO
+
+subroutine tran2MOt(MatIn,Ca,Cb,MatOut,nbas)
+implicit none
+
+integer,intent(in) :: nbas
+double precision,intent(in) :: MatIn(nbas,nbas)
+double precision,intent(in) :: Ca(nbas,nbas),Cb(nbas,nbas)
+double precision,intent(out) :: MatOut(nbas,nbas)
+double precision,allocatable :: tmp(:,:)
+
+integer :: i,j
+
+ allocate(tmp(nbas,nbas))
+
+ ! tmp=Ca.MatIn
+ ! MatOut=tmp.Cb^T
+ tmp = 0
+ call dgemm('N','N',nbas,nbas,nbas,1d0,Ca,nbas,MatIn,nbas,0d0,tmp,nbas)
+ call dgemm('N','T',nbas,nbas,nbas,1d0,tmp,nbas,Cb,nbas,0d0,MatOut,nbas)
+
+ deallocate(tmp)
+
+end subroutine tran2MOt
 
 subroutine transp_mat1dim(matIn,matOut,NBas)
 implicit none

@@ -619,7 +619,8 @@ integer :: iexcited, iexcited2
 double precision :: A1B2PA1B2,A2B1PA2B1,A1B2PA2B1
 double precision :: A1B2VA1B2,A2B1VA2B1,A1B2VA2B1
 double precision :: A1B2VPA1B2,A2B1VPA2B1,A1B2VPA2B1,A2B1VPA1B2
-print*, 'Testing E1exch NaNb...'
+
+write(lout,'(/1x,a)') 'Running E1exch_NaNb...'
 
 ! set dimensions
 NBas = A%NBasis
@@ -628,15 +629,12 @@ dimOB = B%num0+B%num1
 !
 ! set irefs
 !
-iref   =  A%IREF1 !1
-iref2  =  A%IREF2 !4
+iref   =  A%IREF1
+iref2  =  A%IREF2
 irefB  =  B%IREF1
 iref2B  = B%IREF2
 iexcited = ((iref2-2)*(iref2-1))/2+iref
 iexcited2 = ((iref2B-2)*(iref2B-1))/2+irefB
-
-
-
 
 allocate(S(NBas,NBas),Sab(NBas,NBas))
 allocate(Va(NBas,NBas),Vb(NBas,NBas),&
@@ -940,18 +938,22 @@ enddo
 close(iunit)
 tNaNb = -2*val
 print*, 'tNaNb',tNaNb*1000
+
 A1B2VPA1B2 = sum(tvk) + sum(tNa) + sum(tNb) + tNaNb+nnS2*SAPT%Vnn
 SAPT%A1B2VPA1B2= A1B2VPA1B2
-exchs2 = -tElst + sum(tvk) + sum(tNa) + sum(tNb) + tNaNb+nnS2*SAPT%Vnn
+
+exchs2  = -tElst  + sum(tvk) + sum(tNa) + sum(tNb) + tNaNb+nnS2*SAPT%Vnn
 exchs21 = -tElst1 + sum(tvk) + sum(tNa) + sum(tNb) + tNaNb+nnS2*SAPT%Vnn
 exchs22 = -tElst2 + sum(tvk) + sum(tNa) + sum(tNb) + tNaNb+nnS2*SAPT%Vnn
 SAPT%exchs2 = exchs2
 SAPT%exchs21 = exchs21
 SAPT%exchs22 = exchs22
-!write(LOUT,'(/1x,a,f16.8)') 'ExchS2      = ', exchs2*1000d0
-call print_en('ExchS2',exchs2*1000,.true.)
-call print_en('ExchS21+',exchs21*1000,.true.)
-call print_en('ExchS22+',exchs22*1000,.true.)
+
+write(lout,'(/1x,a)') '<A1B2|VP|A1B2> - <A1B2|P|A1B2>*Elst'
+call print_en('ExchS2',exchs2*1000,.false.)
+call print_en('ExchS21+',exchs21*1000,.false.)
+call print_en('ExchS22+',exchs22*1000,.false.)
+
 deallocate(tmpAB)
 
 deallocate(ints,work)
@@ -960,12 +962,9 @@ deallocate(Sab,Vbba,Vaab,Vbaa,Vabb)
 
 end subroutine e1exch_NaNb
 
-
-
 subroutine e1exch_NaNb_AexcB(Flags,A,B,SAPT)
    !
-   ! E1exch(S2): Eq (9) in SAPT(MC) paper
-   ! doi: 10.1021/acs.jctc.1c00344
+   ! compute <A2B1|VP|A2B1> - <A2B1|P|A2B1> * E1elst
    !
    implicit none
    
@@ -997,8 +996,9 @@ subroutine e1exch_NaNb_AexcB(Flags,A,B,SAPT)
    double precision :: A1B2PA1B2,A2B1PA2B1,A1B2PA2B1
    double precision :: A1B2VA1B2,A2B1VA2B1,A1B2VA2B1
    double precision :: A1B2VPA1B2,A2B1VPA2B1,A1B2VPA2B1,A2B1VPA1B2
-   print*, 'ENTERING SAPT_NaNb_AexcB'
-   
+
+   write(lout,'(/1x,a)') 'Entering E1exch_NaNb_AexcB...'
+
    ! set dimensions
    NBas = A%NBasis
    dimOA = A%num0+A%num1
@@ -1006,76 +1006,71 @@ subroutine e1exch_NaNb_AexcB(Flags,A,B,SAPT)
    !
    ! set irefs
    !
-   iref   =  A%IREF1 !1
-   iref2  =  A%IREF2 !4
+   iref   =  A%IREF1
+   iref2  =  A%IREF2
    irefB  =  B%IREF1
    iref2B  = B%IREF2
    iexcited = ((iref2-2)*(iref2-1))/2+iref
    iexcited2 = ((iref2B-2)*(iref2B-1))/2+irefB
-   
-   
-   
-   
+
    allocate(S(NBas,NBas),Sab(NBas,NBas))
    allocate(Va(NBas,NBas),Vb(NBas,NBas),&
             Vabb(NBas,NBas),Vbaa(NBas,NBas),&
             Vaab(NBas,NBas),Vbba(NBas,NBas))
-   
+
    ! get V_ne in atomic orbs
    call get_one_mat('V',Va,A%Monomer,NBas)
    call get_one_mat('V',Vb,B%Monomer,NBas)
-   
+
    ! transform to NOs (MON%CMO contains AONO transformation)
    !call tran2MO(Va,B%CMO,B%CMO,Vabb,NBas)
    !call tran2MO(Vb,A%CMO,A%CMO,Vbaa,NBas)
    !call tran2MO(Va,A%CMO,B%CMO,Vaab,NBas)
    !call tran2MO(Vb,B%CMO,A%CMO,Vbba,NBas)
-   
+
    !call tran2MO(Vb,A%CAONO(iref,:,:),A%CAONO(iref,:,:),Vbaa,NBasis)
-   
+
    call tran2MO(Va,B%CAONO(irefB,:,:),B%CAONO(irefB,:,:),Vabb,NBas)
    call tran2MO(Vb,A%CAONO(iref2,:,:),A%CAONO(iref2,:,:),Vbaa,NBas)
    call tran2MO(Va,A%CAONO(iref2,:,:),B%CAONO(irefB,:,:),Vaab,NBas)
    call tran2MO(Vb,B%CAONO(irefB,:,:),A%CAONO(iref2,:,:),Vbba,NBas)
-   
-   
-   
+
    ! get overlap S matrix in AO and transform to NOs
    call get_one_mat('S',S,A%Monomer,NBas)
-   
+
    !call tran2MO(S,A%CMO,B%CMO,Sab,NBas)
-   
+
    call tran2MO(S,A%CAONO(iref2,:,:),B%CAONO(irefB,:,:),Sab,NBas)
-   
+
    allocate(AOcc(NBas),BOcc(NBas))
    
    ! load reference occupation numbers dSRS
    AOcc = A%rdm1(iref2,:)
    BOcc = B%rdm1(irefB,:)
-   
+
    allocate(RDM2Aval(dimOA,dimOA,dimOA,dimOA),&
             RDM2Bval(dimOB,dimOB,dimOB,dimOB))
    allocate(intA(dimOA,dimOA,dimOA,dimOB),&
             intB(dimOB,dimOB,dimOA,dimOB))
-   
+
    ! load reference 2-RDMs
    ! RDM2Aval = A%RDM2val
    ! RDM2Bval = B%RDM2val
    ! load reference 2-RDMs dSRS
    RDM2Aval(:,:,:,:) = A%rdm24(iref2,:,:,:,:)
    RDM2Bval(:,:,:,:) = B%rdm24(irefB,:,:,:,:)
-   
+
    call dgemm('N','N',dimOA**3,dimOB,dimOA,1d0,RDM2Aval,dimOA**3,Sab,NBas,0d0,intA,dimOA**3)
    !call dgemm('N','T',dimOB**3,NBas,dimOB,1d0,RDM2Bval,dimOB**3,Sab,NBas,0d0,intB,dimOB**3)
-   
+
    ! careful! intB(B,B,A,B)
    do is=1,dimOB
       call dgemm('N','T',dimOB**2,dimOA,dimOB,1d0,RDM2Bval(:,:,:,is),dimOB**2,Sab,NBas,0d0,intB(:,:,:,is),dimOB**2)
    enddo
-   
+
    deallocate(RDM2Bval,RDM2Aval)
    deallocate(Vb,Va,S)
-   
+
    ! n^A n^B Sab Sab
    nnS2 = 0
    do j=1,dimOB
@@ -1085,12 +1080,12 @@ subroutine e1exch_NaNb_AexcB(Flags,A,B,SAPT)
    enddo
    enddo
    nnS2=-2d0*nnS2
-   
+
    ! it can be checked if iref2B=1?
-   
-   print*,'good SAPT%elst = ', SAPT%elst
+if (SAPT%IPrint>=10) then
+   write(lout, '(/1x,a,f12.8)') 'Good SAPT%elst = ', SAPT%elst*1d3
    print *,'nnS2',nnS2*1000
-   print*, 'SAPT%elst1',SAPT%elst*1000
+   print*, 'SAPT%elst1',SAPT%elst1*1000
    print*,'SAPT%Vnn',SAPT%Vnn*1000
    print*,'SAPT%elst-SAPT%Vnn',(SAPT%elst-SAPT%Vnn)*1000
    print*,'SAPT%elst1-SAPT%Vnn',(SAPT%elst1-SAPT%Vnn)*1000
@@ -1100,8 +1095,9 @@ subroutine e1exch_NaNb_AexcB(Flags,A,B,SAPT)
    tElst2 = SAPT%elst2*nnS2
    print*, 'tELST1(dSRS)',tELST1*1000
    print*, 'tELST2(dSRS)',tELST2*1000
+endif
+
    allocate(ints(NBas**2),work(NBas,NBas))
-   
    ! tvk = n_p n_q (v^A S + v^B S + v_pq^qp)
    !open(newunit=iunit,file='FFOOABAB',status='OLD',&
    !    access='DIRECT',form='UNFORMATTED',recl=8*NBas**2)
@@ -1319,40 +1315,24 @@ subroutine e1exch_NaNb_AexcB(Flags,A,B,SAPT)
    close(iunit)
    tNaNb = -2*val
    print*, 'tNaNb',tNaNb*1000
+
    A2B1VPA2B1 = sum(tvk) + sum(tNa) + sum(tNb) + tNaNb+nnS2*SAPT%Vnn
    SAPT%A2B1VPA2B1= A2B1VPA2B1
-   exchs2 = -tElst + sum(tvk) + sum(tNa) + sum(tNb) + tNaNb+nnS2*SAPT%Vnn
+   exchs2  = -tElst  + sum(tvk) + sum(tNa) + sum(tNb) + tNaNb+nnS2*SAPT%Vnn
    exchs21 = -tElst1 + sum(tvk) + sum(tNa) + sum(tNb) + tNaNb+nnS2*SAPT%Vnn
    exchs22 = -tElst2 + sum(tvk) + sum(tNa) + sum(tNb) + tNaNb+nnS2*SAPT%Vnn
-   ! SAPT%exchs2 = exchs2
-   ! SAPT%exchs21 = exchs21
-   ! SAPT%exchs22 = exchs22
-   !write(LOUT,'(/1x,a,f16.8)') 'ExchS2      = ', exchs2*1000d0
-   call print_en('ExchS2',exchs2*1000,.true.)
-   call print_en('ExchS21+',exchs21*1000,.true.)
-   call print_en('ExchS22+',exchs22*1000,.true.)
+
+   write(lout,'(/1x,a)') '<A2B1|VP|A2B1> - <A2B1|P|A2B1>*Elst(?)'
+   call print_en('ExchS2',exchs2*1000,.false.)
+   call print_en('ExchS21+',exchs21*1000,.false.)
+   call print_en('ExchS22+',exchs22*1000,.false.)
    deallocate(tmpAB)
-   
+
    deallocate(ints,work)
    deallocate(intB,intA)
    deallocate(Sab,Vbba,Vaab,Vbaa,Vabb)
-   
+
    end subroutine e1exch_NaNb_AexcB
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 !subroutine hl_2el(Flags,A,B,SAPT)
 !! calculate Heitler-London energy

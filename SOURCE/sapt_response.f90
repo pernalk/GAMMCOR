@@ -1897,6 +1897,7 @@ double precision:: OvMax, OvXMax, OvYMax, SumERY, SumERX, SumCAY, SumCAX,SOvY,SO
 double precision:: YER,YCA,XER,XCA,valX,valY
 double precision :: CICoef(NBasis)
 double precision :: TESTdipMom,TRUEdipMom,N
+double precision :: SumTrdmTrdm,TRDM1CASnorm,TRDM1norm
 ! CHANGE IN FUTURE
 CICoef = mon%CICoef
 allocate(mon%trdm24(NBasis,NBasis,NBasis,NBasis))
@@ -2011,13 +2012,17 @@ EigY = 0
 ! nAA to liczba aktywnych
    associate(B => Sblock(1)) 
       do i=1,B%n
-           If(B%vec(i).lt.0) Then
-               Write(6,'(X,"Setting to Zero Negative Eigs",E15.6)') B%vec(i)
-               B%vec(i)=0
-               B%matY(1:B%n,i)=0
-               B%matX(1:B%n,i)=0
-           EndIf
+         print*,"i,B%vec(i),B%matY(1:B%n,i)"
+         print*,i,B%vec(i),B%matY(1:B%n,i)
 
+! ZMIANA 11.12.2023
+         !   If(B%vec(i).lt.0) Then
+         !       Write(6,'(X,"Setting to Zero Negative Eigs",E15.6)') B%vec(i)
+         !       B%vec(i)=0
+         !       B%matY(1:B%n,i)=0
+         !       B%matX(1:B%n,i)=0
+         !   EndIf
+! KONIEC ZMIANY
            iaddr(i)=B%pos(i)
           ! EigY(i,B%l1:B%l2) = B%matY(i,1:B%n)
           ! EigX(i,B%l1:B%l2) = B%matX(i,1:B%n)
@@ -2195,8 +2200,6 @@ deallocate(Eig,EigY,EigX,iaddr)
 
 
 
-
-
 allocate(RDM2(dimO,dimO,dimO,dimO))
 RDM2(:,:,:,:) = mon%rdm24(1,:,:,:,:)
 allocate(montrdm24(NBasis,NBasis,NBasis,NBasis))
@@ -2234,8 +2237,13 @@ N=0d0
 do ip=1,dimO
    N=N+RDM1TEST(ip,ip)
 enddo
-print *,"'Normalizacja",N,2*mon%NELE-1
-RDM1TEST(:,:)=RDM1TEST(:,:)/(2*mon%NELE-1)
+print *,"'Normalizacja",N,2*mon%NELE-1,mon%ZNucl-1
+! Zmiana 11.30.2023
+RDM1TEST(:,:)=RDM1TEST(:,:)/(mon%ZNucl-1)
+!RDM1TEST(:,:)=RDM1TEST(:,:)/(2*mon%NELE)
+!KONIEC ZMIANY
+!RDM1TEST(:,:)=RDM1TEST(:,:)/(2*mon%NELE-1)
+!USUNIĘTY FRAGMENT
 print*,"1RDM z 2RDM dla monomeru", Mon%Monomer
 do i=1,dimO
    write(lout,'(*(f12.6))') (RDM1TEST(i,j),j=1,dimO)
@@ -2243,6 +2251,11 @@ enddo
 print*,"1rdm",mon%rdm1(1,:)
 
    NU=IStERPA
+   ! ZMIANA 11.12.2023
+   ! NIE NA STAŁE
+ !  NU = 1
+   ! KONIEC ZMIANY
+
    print*,"We take vector number: ", NU
    EigY0 = 0d0
    EigX0 = 0d0
@@ -2336,11 +2349,53 @@ do ip=1,NBasis
       enddo
    enddo
 enddo
-TRDM1TEST(:,:)=TRDM1TEST(:,:)/(2*mon%NELE-1)
+!  11.12.2023
+TRDM1TEST(:,:)=TRDM1TEST(:,:)/(mon%ZNucl-1)
+! KONIEC ZMIANY
+!TRDM1TEST(:,:)=TRDM1TEST(:,:)/(2*mon%NELE-1)
+!ZMIENIONY KOD
+print *,"2*mon%NELE"
+print *,2*mon%NELE
 print*,"1TRDM odtworzny z TRDM"
 do i=1,10
    write(lout,'(*(f12.6))') (TRDM1TEST(i,j),j=1,10)
 enddo
+
+print*,"1TRDM CAS"
+do i=1,10
+   write(lout,'(*(f12.6))') (TRDM1CAS(i,j),j=1,10)
+enddo
+
+SumTrdmTrdm=0d0
+TRDM1CASnorm=0d0
+TRDM1norm=0d0
+
+do i=1,NBasis
+   do j=1,NBasis
+      SumTrdmTrdm=SumTrdmTrdm+TRDM1CAS(i,j)*TRDM1TEST(i,j)
+      TRDM1CASnorm=TRDM1CASnorm+TRDM1CAS(i,j)*TRDM1CAS(i,j)
+      TRDM1norm=TRDM1norm+TRDM1TEST(i,j)*TRDM1TEST(i,j)
+   enddo
+enddo   
+TRDM1CASnorm=sqrt(TRDM1CASnorm)
+TRDM1norm=sqrt(TRDM1norm)
+SumTrdmTrdm=SumTrdmTrdm/(TRDM1CASnorm*TRDM1norm)
+print*,"Nakładanie 1 TRDM CAS i 1TRDM z 2TRDM"
+write(lout,'(*(f12.6))') (SumTrdmTrdm)
+
+if(sign(1d0,SumTrdmTrdm) .NE. sign(1d0,1d0)) then
+   print *,"CHANGING SIGN OF 2TRDM"
+   montrdm24(:,:,:,:)= -1d0*montrdm24(:,:,:,:)
+   TRDM1TEST(:,:) = -1d0*TRDM1TEST(:,:)
+  endif  
+
+
+  print*,'BLad wzgledny'
+  write(lout,'(*(f12.6))') (norm2(Trdm1CAS-TRDM1TEST)/norm2(TRDM1CAS))
+  
+
+
+
 
 print*,"Norma 2TRDM"
 print*,norm2(montrdm24(:,:,:,:))
@@ -2391,6 +2446,8 @@ end block
 
 
 
+
+
 block
    double precision :: DipXao(NBasis**2),DipYao(NBasis**2),DipZao(NBasis**2)
    double precision :: DipX(NBasis,NBasis),DipY(NBasis,NBasis),DipZ(NBasis,NBasis)
@@ -2438,18 +2495,30 @@ block
    print*,'True max dip moment',TRUEdipMom
 end block
 
-if(sign(1d0,TESTdipMom) .NE. sign(1d0,TRUEdipMom)) then
- print *,"CHANGING SIGN OF 2TRDM"
- montrdm24(:,:,:,:)= -1d0*montrdm24(:,:,:,:)
-endif   
+
+
+! ZMIANA 18.12.2023
+! if(sign(1d0,TESTdipMom) .NE. sign(1d0,TRUEdipMom)) then
+!  print *,"CHANGING SIGN OF 2TRDM"
+!  montrdm24(:,:,:,:)= -1d0*montrdm24(:,:,:,:)
+!  TRDM1TEST(:,:) = -1d0*TRDM1TEST(:,:)
+! endif   
+! KONIEC ZMIANY
+
 
 
 mon%trdm24(:,:,:,:)=montrdm24(:,:,:,:)
 
 
-
-
-
+!!added 16.06.2023 FOR TEST PURPOUSE
+! block
+! double precision :: TRDM1MO(NBasis,NBasis)
+! call tran2MOt(TRDM1TEST,mon%CMONO(iref,:,:),mon%CMONO(iref,:,:),TRDM1MO,NBasis)!
+!
+!mon%trdm1(iexcited,:,:) = TRDM1MO(:,:)
+!
+! endblock
+!! end 16.06.2023
 
 
 
