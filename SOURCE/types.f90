@@ -226,7 +226,7 @@ type SystemBlock
       double precision,allocatable :: Pmat(:,:)
       double precision,allocatable :: WPot(:,:),Kmat(:,:)
       double precision,allocatable :: VCoul(:)
-      double precision,allocatable :: RDM2(:)
+      double precision,allocatable :: RDM2(:),RDM201(:)
       double precision,allocatable :: RDM2val(:,:,:,:)
       ! rdm1 and trdm1 in NOs: rdm1(nstates,NBasis),
       !                        trdm1(nstates,NBasis,NBasis)
@@ -237,7 +237,13 @@ type SystemBlock
       ! basic approximation
       ! trdm2(nstates,NBasis**4)
       double precision,allocatable :: trdm24(:,:,:,:)
-      
+
+      ! open-shell rdms
+      double precision,allocatable :: g1a(:,:), g1b(:,:)
+      double precision,allocatable :: g2aa(:,:),g2bb(:,:)
+      double precision,allocatable :: g2ab(:,:),g2ba(:,:)
+      double precision,allocatable :: g2aaba(:,:,:,:),g2bbab(:,:,:,:)
+
       double precision,allocatable :: Fmat(:,:) 
       double precision,allocatable :: dipm(:,:,:)
       double precision,allocatable :: TSdipXYZ(:,:)
@@ -363,6 +369,7 @@ type SaptData
      double precision,allocatable :: CholVecs(:,:)
      integer :: InterfaceType = INTER_TYPE_DAL
      integer :: SaptLevel = SAPTLEVEL2
+     integer :: NAO
      integer :: NCholesky
      integer :: Max_Cn = 4
      integer :: ic6 = 0
@@ -372,6 +379,7 @@ type SaptData
      logical :: Cubic  = .false.
      logical :: CAlpha = .false.
      ! MH : add keyword!
+     logical :: OpenShell = .false.  ! .true. for odd XELE (sapt_interface)
      logical :: SemiCoupled = .true.
      logical :: Wexcit  = .false.
      logical :: noE2exi = .true.

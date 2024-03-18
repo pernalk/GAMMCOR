@@ -50,6 +50,9 @@ double precision,allocatable :: AuxA(:,:),AuxB(:,:)
 double precision,allocatable :: OneRdmA(:),OneRdmB(:)
 
 logical :: doRSH
+! open-shell
+logical :: openA, openB
+
 double precision,allocatable :: Sa(:,:),Sb(:,:)
 double precision :: Tcpu,Twall
 
@@ -248,6 +251,12 @@ double precision :: Tcpu,Twall
  !if(SAPT%IPrint.ne.0) call print_mo(Ca,NBasis,'MONOMER A')
  !if(SAPT%IPrint.ne.0) call print_mo(Cb,NBasis,'MONOMER B')
 
+! check if both monomers are open-shell
+ openA = .false. ; openB = .false.
+ if ( mod( int(SAPT%monA%XELE), 2) /= 0) openA = .true.
+ if ( mod( int(SAPT%monB%XELE), 2) /= 0) openB = .true.
+ if (openA .and. openB) SAPT%OpenShell = .true.
+
 ! ABABABABABABABABABABABABABABABABABABABABABABABABABABABABAB
  if(SAPT%IPrint.gt.100) call print_TwoInt(NBasis)
 
@@ -303,6 +312,143 @@ double precision :: Tcpu,Twall
  endif
 
 end subroutine sapt_interface
+
+subroutine sapt_1rdm_spin(Flags,SAPT,NBasis)
+!
+! Purpose: construct alpha/beta spin densities in NOs
+! from charge/spin densities
+!
+! 1-RDM in NOs:
+! 1/2 * Gamma_{pq} = 1/2 * (GammaChrg^\alpha_{pq} + GammaChrg^\beta_{pq} ) = n_p \delta_pq
+!
+! charge densities are available as Occ(NBasis) (read in sapt_interface)
+!
+implicit none
+
+type(FlagsData)     :: Flags
+type(SaptData)      :: SAPT
+integer,intent(in)  :: NBasis
+
+integer             :: NActA,NActB
+integer             :: INActA,INActB
+integer             :: i,j
+double precision,allocatable :: GChrgA(:,:),GChrgB(:,:)
+double precision,allocatable :: GSpinA(:,:),GSpinB(:,:)
+double precision,allocatable :: GAAct(:,:),GBAct(:,:)
+
+! dimensions
+NActA  = SAPT%monA%NAct
+NActB  = SAPT%monB%NAct
+INActA = SAPT%monA%INAct
+INActB = SAPT%monB%INAct
+
+allocate(GAAct(NActA,NActA),GBAct(NActB,NActB))
+allocate(GChrgA(NBasis,NBasis),GChrgB(NBasis,NBasis))
+allocate(GSpinA(NBasis,NBasis),GSpinB(NBasis,NBasis))
+
+! charge densities
+print*, 'NASHT-A',SAPT%monA%NAct
+print*, 'NISHT-A',SAPT%monA%INAct
+
+GChrgA = 0d0
+GChrgB = 0d0
+do i=1,NBasis
+   GChrgA(i,i) = 2.0d0*SAPT%monA%Occ(i)
+   GChrgB(i,i) = 2.0d0*SAPT%monB%Occ(i)
+enddo
+
+! spin densities
+GSpinA = 0d0
+GSpinB = 0d0
+
+! active blocks
+call read_1rdm_spin_dalton(GAAct,'rdms1_A.dat',NActA,NBasis)
+call read_1rdm_spin_dalton(GBAct,'rdms1_B.dat',NActB,NBasis)
+
+! full spin matrices
+do j=1,NActA
+   do i=1,NActA
+      GSpinA(INActA+i,INActA+j) = GAAct(i,j)
+   enddo
+enddo
+do j=1,NActB
+   do i=1,NActB
+      GSpinB(INActB+i,INActB+j) = GBAct(i,j)
+   enddo
+enddo
+
+!if(NActA.gt.0) then
+!  print*, 'GChrgA = '
+!!  call print_sqmat(GChrgA,NBasis)
+!do i=1,NBasis
+!   write(lout,'(*(f12.8))') (GChrgA(i,j),j=1,NBasis)
+!enddo
+!  print*, 'GSpinA = '
+!!  call print_sqmat(GSpinA,NBasis)
+!do i=1,NBasis
+!   write(lout,'(*(f12.8))') (GSpinA(i,j),j=1,NBasis)
+!enddo
+!endif
+!
+!if(NActB.gt.0) then
+!  print*, 'GChrgB = '
+!!  call print_sqmat(GChrgB,NBasis)
+!do i=1,NBasis
+!   write(lout,'(*(f12.8))') (GChrgB(i,j),j=1,NBasis)
+!enddo
+!   print*, 'GSpinB = '
+!!   call print_sqmat(GSpinB,NBasis)
+!do i=1,NBasis
+!   write(lout,'(*(f12.8))') (GSpinB(i,j),j=1,NBasis)
+!enddo
+!endif
+! construct alpha/beta densities 
+allocate(SAPT%monA%g1a(NBasis,NBasis), &
+         SAPT%monB%g1b(NBasis,NBasis))
+
+!SAPT%monA%g1a = 0.5d0 * ( GChrgA + abs(GSpinA) )
+!SAPT%monA%g1b = 0.5d0 * ( GChrgA - abs(GSpinA) )
+SAPT%monA%g1a = 0.5d0 * ( GChrgA + GSpinA )
+SAPT%monA%g1b = 0.5d0 * ( GChrgA - GSpinA )
+
+  !print*, 'G1a = '
+  !call print_sqmat(SAPT%monA%g1a,NBasis)
+  !print*, 'G1b = '
+  !call print_sqmat(SAPT%monA%g1b,NBasis)
+
+SAPT%monB%g1a = 0.5d0 * ( GChrgB + GSpinB )
+SAPT%monB%g1b = 0.5d0 * ( GChrgB - GSpinB )
+
+!write(lout,*) 'A : g1a',norm2(SAPT%monA%g1a)
+!write(lout,*) 'A : g1b',norm2(SAPT%monA%g1b)
+!write(lout,*) 'B : g1a',norm2(SAPT%monB%g1a)
+!write(lout,*) 'B : g1b',norm2(SAPT%monB%g1b)
+
+!write(LOUT,*) '1RDMA-aa'
+!do i=1,NBasis
+!   write(*,'(*(f12.8))') (SAPT%monA%g1a(i,j),j=1,NBasis)
+!end do
+!write(LOUT,*) ''
+!write(LOUT,*) '1RDMA-bb'
+!do i=1,NBasis
+!   write(*,'(*(f12.8))') (SAPT%monA%g1b(i,j),j=1,NBasis)
+!end do
+!write(LOUT,*) ''
+!write(LOUT,*) '1RDMB-aa'
+!do i=1,NBasis
+!   write(*,'(*(f12.8))') (SAPT%monB%g1a(i,j),j=1,NBasis)
+!end do
+!write(LOUT,*) ''
+!write(LOUT,*) '1RDMB-bb'
+!do i=1,NBasis
+!   write(*,'(*(f12.8))') (SAPT%monB%g1b(i,j),j=1,NBasis)
+!end do
+
+deallocate(GBAct,GAAct)
+deallocate(GSpinB,GSpinA)
+deallocate(GChrgB,GChrgA)
+
+end subroutine sapt_1rdm_spin
 
 subroutine onel_molpro(mon,NBasis,NSq,NInte1,MonBlock,SAPT)
  implicit none
@@ -1171,6 +1317,8 @@ integer           :: isym,off_i,off_a,off_x
 integer           :: NISHT,NASHT,NOCCT,NORBT,NBAST,NCONF,NWOPT,NWOPH,&
                      NCDETS,NCMOT,NNASHX,NNASHY,NNORBT,N2ORBT,       &
                      NSYM,MULD2H(8,8),NRHF(8),NFRO(8),NISH(8),NASH(8),NORB(8),NBASM(8)
+integer           :: ISTATE,ISPIN,NACTEL,LSYM,MS2
+double precision  :: POTNUC,EMY,EACTIV,EMCSCF
 
 double precision             :: sum1,sum2
 double precision,allocatable :: OccX(:)
@@ -1198,10 +1346,15 @@ character(:),allocatable     :: sirfile,sirifile
                  NCDETS,NCMOT,NNASHX,NNASHY,NNORBT,N2ORBT,&
                  NSYM,MULD2H,NRHF,NFRO,NISH,NASH,NORB,NBASM
 
+    rewind(iunit)
+    call readlabel(iunit,'SIR IPH ')
+    read (iunit) POTNUC,EMY,EACTIV,EMCSCF,&
+                 ISTATE,ISPIN,NACTEL,LSYM,MS2
     close(iunit)
 
     mon%INAct = nisht
     mon%NAct  = nasht
+    mon%ISpinMs2 = MS2
 
     if(NSym/=mon%NSym) stop "NSym from SIRIFC and AOONEINT do not match!"
 
@@ -1503,6 +1656,56 @@ integer,external :: NAddrRDM
  Mon%Ind2 = Ind2
 
 end subroutine read2rdm
+
+subroutine read2rdm_spin(Mon,NBas)
+!
+! Purpose: a) load rdms201.dat file to memory
+!          as Mon%RDM201(NRDM2Act) matrix
+!          B) if Hartree-Fock, assume = 0 
+implicit none
+
+type(SystemBlock)   :: Mon
+integer, intent(in) :: NBas
+
+character(:),allocatable :: rdmfile
+integer :: iunit,ios
+integer :: NRDM2Act
+integer :: i,j,k,l
+double precision :: val
+integer,external :: NAddrRDM
+
+if (Mon%Monomer==1) then
+   rdmfile='rdms201_A.dat'
+elseif (Mon%Monomer==2) then
+   rdmfile='rdms201_B.dat'
+endif
+
+if(allocated(Mon%RDM201)) deallocate(Mon%RDM201)
+
+NRDM2Act = Mon%NAct**2*(Mon%NAct**2+1)/2
+
+allocate(Mon%RDM201(NRDM2Act))
+Mon%RDM201(1:NRDM2Act) = 0
+
+open(newunit=iunit,file=rdmfile,status='OLD',&
+     form='FORMATTED')
+
+do
+  read(iunit,'(4i4,f19.12)',iostat=ios) i,j,k,l,val
+
+!  val IS DEFINED AS: < E(IJ)E(KL) > - DELTA(J,K) < E(IL) > = 2 GAM2(JLIK)
+!  RDM201 = \Gamma^++++ - \Gamma^---- + \Gamma^-+-+ - \Gamma^+-+-
+
+  if(ios==0) then
+     Mon%RDM201(NAddrRDM(j,l,i,k,Mon%NAct)) = 0.5d0*val
+  elseif(ios/=0) then
+     exit
+  endif
+enddo
+
+close(iunit)
+
+end subroutine read2rdm_spin
 
 subroutine arrange_mo(mat,nbas,SAPT)
 implicit none
