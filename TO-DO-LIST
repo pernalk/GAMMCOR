@@ -1,4 +1,10 @@
 
+===== 16.12.2024 =====
+add TREXIO to dSRS branch...
+after the IntCholesky-->IntOnTheFly, merge dSRS
+
+===============================
+
 + sapt_pol.f90 -- e2disp_intermed, 
   EVecA(pq+(i-1)*NDimX)
 

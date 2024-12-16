@@ -148,7 +148,7 @@ else
      Flags%IA = 1
 
   case(INTER_TYPE_MOL)
-     Flags%IDALTON = 0
+     Flags%IMOLPRO = 1
      Flags%IAO     = 1
      Flags%INO     = 1
      !Flags%NoSym   = Input%CalcParams%SymType
@@ -167,7 +167,8 @@ else
      Flags%INO     = 0
      Flags%NoSym   = 1
      Flags%IA = 1
-  ! ????
+  case(INTER_TYPE_TREX)
+     Flags%ITREXIO = 1
   end select
 
   if(Input%CalcParams%Restart) Flags%IRes = 1
@@ -234,7 +235,7 @@ else
   case(JOB_TYPE_RESPONSE)
      Flags%IFlRESPONSE = 1
 
-  case(JOB_TYPE_AC0)
+  case(JOB_TYPE_AC0,JOB_TYPE_SRAC0)
     ! HERE WILL BE CHANGED TO:
     !Flags%IFlAC = 0
      Flags%IFlAC   = 1
@@ -247,6 +248,11 @@ else
            Flags%IFunSR = 2
         endif
         Flags%IFunSRKer = Input%CalcParams%Kernel
+     endif
+     if(Input%CalcParams%JobType==JOB_TYPE_SRAC0) then
+        stop "SRAC0 not ready on dSRS branch!"
+!       Flags%ICorrMD  = 1
+!       Flags%IFlFCorr = Input%CalcParams%FunCorr ! set fCAS/fCAS+fAC0
      endif
 !     if(Input%CalcParams%DFApp==2) Flags%IFunSRKer = 1
 
@@ -420,20 +426,24 @@ if(Flags%ISAPT.Eq.0) then
    endif
 !   Print*, 'InTrSt',System%InTrSt(1,1),System%InTrSt(2,1)
 
+   System%TrexFile = Input%SystemInput(1)%TrexFile
+
    System%ZNucl  = Input%SystemInput(1)%ZNucl
    System%Charge = Input%SystemInput(1)%Charge
    System%NBasis = Input%CalcParams%NBasis
+   System%NAO    = System%NBasis ! temporary
    System%Omega  = Input%SystemInput(1)%Omega
    System%PerVirt= Input%SystemInput(1)%PerVirt
    System%EigFCI = Input%SystemInput(1)%EigFCI
    System%ThrAct = Input%SystemInput(1)%ThrAct
+   System%ThrGemAct = Input%SystemInput(1)%ThrGemAct
    System%ThrSelAct = Input%SystemInput(1)%ThrSelAct
    System%ThrVirt = Input%SystemInput(1)%ThrVirt
    System%ThrQVirt  = Input%SystemInput(1)%ThrQVirt
    System%ThrQInact = Input%SystemInput(1)%ThrQInact
    System%TwoMoInt = Input%SystemInput(1)%TwoMoInt
    System%IPrint = Input%CalcParams%IPrint
- 
+
    System%IREF1 = Input%SystemInput(1)%IREF1
    System%IREF2 = Input%SystemInput(1)%IREF2
    
@@ -474,6 +484,8 @@ elseif(Flags%ISAPT.Eq.1) then
    select case(Input%SystemInput(1)%Monomer)
    case(1)
 
+      if(SAPT%InterfaceType==5) monA%TrexFile = Input%SystemInput(1)%TrexFile
+
       monA%NoSt     = Input%SystemInput(1)%NoSt
       monA%NStates  = Input%SystemInput(1)%NStates
       monA%ISpinMs2 = -255
@@ -495,6 +507,7 @@ elseif(Flags%ISAPT.Eq.1) then
       monA%EigFCI  = Input%SystemInput(1)%EigFCI
       monA%NBasis  = Input%CalcParams%NBasis
       monA%ThrAct      = Input%SystemInput(1)%ThrAct
+      monA%ThrGemAct   = Input%SystemInput(1)%ThrGemAct
       monA%ThrSelAct   = Input%SystemInput(1)%ThrSelAct
       monA%ThrVirt     = Input%SystemInput(1)%ThrVirt
       monA%ThrQVirt    = Input%SystemInput(1)%ThrQVirt
@@ -505,6 +518,7 @@ elseif(Flags%ISAPT.Eq.1) then
       monA%ISHF     = Input%SystemInput(1)%ISHF
       monA%Cubic    = Input%SystemInput(1)%Cubic
       monA%Wexcit   = Input%SystemInput(1)%Wexcit
+      monA%Cholesky2RDM = Input%SystemInput(1)%Cholesky2RDM
 
       monA%IREF1    = Input%SystemInput(1)%IREF1
       monA%IREF2    = Input%SystemInput(1)%IREF2
@@ -521,6 +535,8 @@ elseif(Flags%ISAPT.Eq.1) then
          monA%NAct=Input%SystemInput(1)%NAct
          monA%NActFromRDM = Input%SystemInput(1)%NActFromRDM
       endif
+
+      if(SAPT%InterfaceType==5) monB%TrexFile = Input%SystemInput(2)%TrexFile
 
       monB%NoSt     = Input%SystemInput(2)%NoSt
       monB%NStates  = Input%SystemInput(2)%NStates
@@ -543,6 +559,7 @@ elseif(Flags%ISAPT.Eq.1) then
       monB%EigFCI = Input%SystemInput(2)%EigFCI
       monB%NBasis = Input%CalcParams%NBasis
       monB%ThrAct = Input%SystemInput(2)%ThrAct
+      monB%ThrGemAct = Input%SystemInput(2)%ThrGemAct
       monB%ThrSelAct = Input%SystemInput(2)%ThrSelAct
       monB%ThrVirt   = Input%SystemInput(2)%ThrVirt
       monB%ThrQVirt  = Input%SystemInput(2)%ThrQVirt
@@ -553,6 +570,7 @@ elseif(Flags%ISAPT.Eq.1) then
       monB%ISHF      = Input%SystemInput(2)%ISHF
       monB%Cubic     = Input%SystemInput(2)%Cubic
       monB%Wexcit    = Input%SystemInput(2)%Wexcit
+      monB%Cholesky2RDM = Input%SystemInput(2)%Cholesky2RDM
 
       monB%IREF1    = Input%SystemInput(2)%IREF1
       monB%IREF2    = Input%SystemInput(2)%IREF2
@@ -575,6 +593,8 @@ elseif(Flags%ISAPT.Eq.1) then
 
    case(2)
 
+      if(SAPT%InterfaceType==5) monA%TrexFile = Input%SystemInput(2)%TrexFile
+
       monA%NoSt   = Input%SystemInput(2)%NoSt
       monA%NStates = Input%SystemInput(2)%NStates
       allocate(monA%InSt(2,System%NStates))
@@ -592,6 +612,7 @@ elseif(Flags%ISAPT.Eq.1) then
       monA%EigFCI = Input%SystemInput(2)%EigFCI
       monA%NBasis = Input%CalcParams%NBasis
       monA%ThrAct = Input%SystemInput(2)%ThrAct
+      monA%ThrGemAct = Input%SystemInput(2)%ThrGemAct
       monA%ThrSelAct = Input%SystemInput(2)%ThrSelAct
       monA%ThrVirt   = Input%SystemInput(2)%ThrVirt
       monA%ThrQVirt  = Input%SystemInput(2)%ThrQVirt
@@ -602,6 +623,8 @@ elseif(Flags%ISAPT.Eq.1) then
       monA%ISHF    = Input%SystemInput(2)%ISHF
       monA%Cubic   = Input%SystemInput(2)%Cubic
       monA%Wexcit  = Input%SystemInput(2)%Wexcit
+      monA%Cholesky2RDM = Input%SystemInput(2)%Cholesky2RDM
+
       monA%NCen    = Input%SystemInput(2)%NCen
       monA%UCen    = Input%SystemInput(2)%UCen
       monA%Monomer = Input%SystemInput(2)%Monomer
@@ -617,6 +640,8 @@ elseif(Flags%ISAPT.Eq.1) then
          monA%NAct=Input%SystemInput(2)%NAct
          monA%NActFromRDM = Input%SystemInput(2)%NActFromRDM
       endif
+
+      if(SAPT%InterfaceType==5) monB%TrexFile = Input%SystemInput(1)%TrexFile
 
       monB%NoSt   = Input%SystemInput(1)%NoSt
       monB%NStates = Input%SystemInput(1)%NStates
@@ -634,6 +659,7 @@ elseif(Flags%ISAPT.Eq.1) then
       monB%PerVirt = Input%SystemInput(1)%PerVirt
       monB%EigFCI  = Input%SystemInput(1)%EigFCI
       monB%ThrAct  = Input%SystemInput(1)%ThrAct
+      monB%ThrGemAct = Input%SystemInput(1)%ThrGemAct
       monB%ThrSelAct = Input%SystemInput(1)%ThrSelAct
       monB%ThrVirt   = Input%SystemInput(1)%ThrVirt
       monB%ThrQVirt  = Input%SystemInput(1)%ThrQVirt
@@ -644,6 +670,8 @@ elseif(Flags%ISAPT.Eq.1) then
       monB%ISHF     = Input%SystemInput(1)%ISHF
       monB%Cubic    = Input%SystemInput(1)%Cubic
       monB%Wexcit   = Input%SystemInput(1)%Wexcit
+      monB%Cholesky2RDM = Input%SystemInput(1)%Cholesky2RDM
+
       monB%NCen     = Input%SystemInput(1)%NCen
       monB%UCen     = Input%SystemInput(1)%UCen
       monB%Monomer  = Input%SystemInput(1)%Monomer

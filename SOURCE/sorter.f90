@@ -2,6 +2,7 @@ module sorter
 
 use print_units 
 use read_external
+use trexio
 
 implicit none
 
@@ -86,9 +87,12 @@ end type AOReaderData
 contains
 
 subroutine readtwoint(nbas,aosource,intfile,sortfile,maxmem,outinfo)
+!
 ! AOSorter1 : a single pass through AO integrals, creates TMPSORT
 ! AOSorter2 : multiple passes through the integral file, no TMPSORT
+!
 implicit none
+!
 integer,intent(in) :: nbas
 integer,intent(in) :: aosource
 character(*),intent(in) :: intfile,sortfile
@@ -101,7 +105,11 @@ integer :: npass,ipass
 integer :: maxrep, naos(8), lbuf, nibuf, nbits, lenint4
 integer :: nsk, nt(8), ntoff(8)
 integer :: nints, INDX
-integer,allocatable :: idx_buf(:)
+integer :: rc
+integer(8) :: f, BUFSIZE
+integer(8) :: offset,icount
+integer :: icnt
+integer,allocatable :: idx_buf(:),buf_idx(:,:)
 double precision :: val
 double precision,allocatable :: val_buf(:)!, mat(:)
 integer :: idx_p, idx_q, idx_r, idx_s, pq, rs, idx_end
@@ -450,6 +458,64 @@ case(4) ! Libor
       close(iunit)
 
    enddo
+
+case(5) ! TreX-io
+
+   write(6,'(1x,a)') 'Use TREXIO INTS SORTER'
+
+   f = trexio_open (intfile, 'r', TREXIO_HDF5, rc)
+
+   BUFSIZE = nbas**2
+   allocate(buf_idx(4,BUFSIZE))
+   allocate(val_buf(BUFSIZE))
+
+   !rc = trexio_has_ao_2e_int_eri(f)
+   !if (rc /= TREXIO_SUCCESS) then
+   !   stop "no ao 2e ints!"
+   !endif
+
+   do ipass=1,npass
+
+      call srt%iniPass(ipass)
+
+      offset = 0
+      icount = BUFSIZE
+      val_buf = 0
+      buf_idx = 0
+      do while(icount == BUFSIZE)
+
+         rc = trexio_read_ao_2e_int_eri(f,offset,icount,buf_idx,val_buf)
+
+         do i=1,icount
+
+            idx_p = buf_idx(1,i)
+            idx_q = buf_idx(3,i)
+            idx_r = buf_idx(2,i)
+            idx_s = buf_idx(4,i)
+
+            if (idx_q<=idx_p.and.idx_s<=idx_r) then
+               pq = idx_q + idx_p*(idx_p-1)/2
+               rs = idx_s + idx_r*(idx_r-1)/2
+               if(rs <= pq) then
+                  call srt%add(pq,rs,val_buf(i))
+                  call srt%add(rs,pq,val_buf(i))
+               endif
+            endif
+
+         enddo
+
+         offset = offset + icount
+
+      enddo
+
+      call srt%endPass
+
+   enddo
+
+   rc = trexio_close(f)
+
+   deallocate(buf_idx)
+   deallocate(val_buf)
 
 case default
 

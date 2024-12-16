@@ -1,3 +1,56 @@
+subroutine tran3_2rdmchol_trexio(RDM2Chol,CMONO,NRDMChol,NBasis)
+!
+! 3-indx transformation of cholesky-decomposed 2-rdm
+!
+implicit none
+
+integer,intent(in) :: NRDMChol,NBasis
+double precision,intent(in)    :: CMONO(NBasis,NBasis)
+double precision,intent(inout) :: RDM2Chol(NBasis,NBasis,NRDMChol)
+
+integer :: ichol
+double precision,allocatable :: Aux(:,:,:)
+
+allocate(Aux(NBasis,NBasis,NRDMChol))
+
+call dgemm('T','N',NBasis,NBasis*NRDMChol,NBasis,1d0,CMONO,NBasis,RDM2Chol,NBasis,0d0,Aux,NBasis)
+do ichol=1,NRDMChol
+   call dgemm('N','N',NBasis,NBasis,NBasis,1d0,Aux(:,:,ichol),NBasis,CMONO,NBasis,0d0,RDM2Chol(:,:,ichol),NBasis)
+enddo
+
+deallocate(Aux)
+
+end subroutine tran3_2rdmchol_trexio
+
+subroutine assemble_2rdmchol(RDM2Chol,RDM2val,NRDMChol,NOccup,NBasis)
+!
+! construct RDM2val(NOccup^2) out of RDM2Chol(NBasis^2,NChol)
+!
+implicit none
+
+integer,intent(in) :: NRDMChol,NOccup,NBasis
+
+double precision,intent(in)  :: RDM2chol(NBasis,NBasis,NRDMChol)
+double precision,intent(out) :: RDM2val(NOccup,NOccup,NOccup,NOccup)
+
+integer :: i,j,k,l,ichol
+
+RDM2val = 0d0
+do ichol=1,NRDMChol
+   do l=1,NOccup
+      do k=1,NOccup
+         do j=1,NOccup
+            do i=1,NOccup
+               RDM2val(i,k,j,l) = RDM2val(i,k,j,l) + RDM2Chol(i,j,ichol)*RDM2Chol(k,l,ichol)
+            enddo
+         enddo
+      enddo
+   enddo
+enddo
+RDM2val = 0.5d0*RDM2val
+
+end subroutine assemble_2rdmchol
+
 subroutine chol_ints_fofo(nA,nB,MatAB,nC,nD,MatCD,NCholesky,NBas,fname)
 !
 ! assumes that MatAB(CD) are NChol,FF type

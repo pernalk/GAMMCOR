@@ -1474,6 +1474,38 @@ deallocate(work2,work1)
 
 end subroutine tran_matTr
 
+subroutine tran_AO2MO(Ain,CA,CB,Aout,NAO,NMO)
+implicit none
+
+integer,intent(in) :: NAO, NMO
+double precision,intent(in)  :: Ain(:),CA(:),CB(:)
+double precision,intent(out) :: Aout(:)
+
+double precision             :: work(NAO*NMO)
+
+if(NAO>0.and.NMO>0) then
+  call dgemm('T','N',NMO,NAO,NAO,1d0,CA,NAO,Ain,NAO,0d0,work,NMO)
+  call dgemm('N','N',NMO,NMO,NAO,1d0,work,NMO,CB,NAO,0d0,Aout,NMO)
+endif
+
+end subroutine tran_AO2MO
+
+subroutine tran_AO2MO2(Ain,CA,CB,Aout,NAO,NMO)
+implicit none
+
+integer,intent(in) :: NAO, NMO
+double precision,intent(in)  :: Ain(:,:),CA(:,:),CB(:,:)
+double precision,intent(out) :: Aout(:,:)
+
+double precision :: work(NMO,NAO)
+
+if(NAO>0.and.NMO>0) then
+  call dgemm('T','N',NMO,NAO,NAO,1d0,CA,NAO,Ain,NAO,0d0,work,NMO)
+  call dgemm('N','N',NMO,NMO,NAO,1d0,work,NMO,CB,NAO,0d0,Aout,NMO)
+endif
+
+end subroutine tran_AO2MO2
+
 subroutine tran2MO(MatIn,Ca,Cb,MatOut,nbas)
 implicit none
 

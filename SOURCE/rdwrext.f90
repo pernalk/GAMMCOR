@@ -1190,6 +1190,177 @@ endif
 end subroutine read_1rdm_spin_dalton
 
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+! TREXIO subroutines
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+subroutine read_mo_trexio(C,trexfile,nao,nmo)
+use trexio
+implicit none
+
+integer,intent(in)           :: nao,nmo
+character(*),intent(in)      :: trexfile
+double precision,intent(out) :: C(nao*nmo)
+
+integer(8) :: f
+integer    :: rc
+
+f = trexio_open (TrexFile, 'r', TREXIO_HDF5, rc)
+
+rc = trexio_has_mo_coefficient(f)
+if (rc /= TREXIO_SUCCESS) then
+  stop 'No AOMO coefficients in file'
+end if
+
+rc = trexio_read_mo_coefficient(f, C)
+
+!call print_sqmat(C,NBas,'C')
+
+rc = trexio_close(f)
+
+end subroutine read_mo_trexio
+
+subroutine read_2rdm_trexio(RDM2val,trexfile,nmo)
+!
+! read 2-RDM(nmo,nmo,nmo,nmo) from hdf5 file
+! in TREXIO format
+!
+use trexio
+!
+implicit none
+
+integer,intent(in)      :: nmo
+character(*),intent(in) :: trexfile
+double precision,allocatable :: RDM2val(:,:,:,:)
+
+integer(8) :: f
+integer    :: rc
+integer(8) :: BUFSIZE
+integer(8) :: offset,icount
+
+integer :: i,idx_k,idx_l,idx_m,idx_n
+double precision :: xnorm
+
+integer,allocatable      :: idx_buf(:,:)
+double precision,allocatable :: val_buf(:)
+
+f = trexio_open(TrexFile, 'r', TREXIO_HDF5, rc)
+
+BUFSIZE = nmo**2
+
+allocate(RDM2val(nmo,nmo,nmo,nmo))
+RDM2val=0.d0
+allocate(val_buf(BUFSIZE),idx_buf(4,BUFSIZE))
+
+offset  = 0
+icount  = BUFSIZE
+val_buf = 0
+idx_buf = 0
+xnorm = 0d0
+do while(icount == BUFSIZE)
+
+   rc = trexio_read_rdm_2e(f,offset,icount,idx_buf,val_buf)
+
+   do i=1,icount
+
+      idx_k = idx_buf(1,i)
+      idx_l = idx_buf(2,i)
+      idx_m = idx_buf(3,i)
+      idx_n = idx_buf(4,i)
+
+      RDM2val(idx_k,idx_m,idx_l,idx_n) = 0.5d0*val_buf(i)
+!         if (idx_k<=NOccup .and. idx_l<=NOccup .and. idx_m <=NOccup .and. idx_n<=NOccup) then
+!            RDM2val(idx_k,idx_m,idx_l,idx_n) = 0.5d0*val_buf(i)
+      if(idx_k.eq.idx_m.and.idx_l.eq.idx_n) then
+         xnorm = xnorm + 0.5d0*val_buf(i)
+      endif
+!         endif
+
+   enddo
+
+   offset = offset + icount
+
+enddo
+
+write(lout,'(1x,a,f12.6,/)') '2-RDM2 norm = ', xnorm
+
+rc = trexio_close(f)
+
+deallocate(idx_buf,val_buf)
+
+end subroutine read_2rdm_trexio
+
+subroutine read_2rdmchol_trexio(RDM2chol,trexfile,nchol,nmo)
+!
+! read Cholesky-decomposed 2-RDM(nmo,nmo,nchol)
+! from hdf5 file in TREXIO format
+!
+use trexio
+
+implicit none
+
+integer,intent(in)      :: nmo
+integer,intent(out)     :: nchol
+character(*),intent(in) :: trexfile
+double precision,allocatable :: RDM2chol(:,:,:)
+
+integer(8) :: f
+integer    :: rc
+integer(8) :: BUFSIZE
+integer(8) :: offset,icount
+
+integer :: i,idx_k,idx_l,idx_m,idx_n
+
+integer,allocatable      :: idx_buf(:,:)
+double precision,allocatable :: val_buf(:)
+
+f = trexio_open(TrexFile, 'r', TREXIO_HDF5, rc)
+
+BUFSIZE = nmo**2
+
+allocate(val_buf(BUFSIZE),idx_buf(3,BUFSIZE))
+
+rc = trexio_read_rdm_2e_cholesky_num(f, nchol)
+
+write(lout,'(1x,a,i5)') 'Number of Cholesky 2-RDM vectors ', nchol
+write(lout,'(1x,a,i5)') '(compared to ',nmo**2
+
+allocate(RDM2Chol(nmo,nmo,nchol))
+
+RDM2Chol = 0d0
+
+! read Cholesky-decomposed 2-RDM from TREXIO
+offset  = 0
+icount  = BUFSIZE
+val_buf = 0
+idx_buf = 0
+
+do while(icount == BUFSIZE)
+
+   rc = trexio_read_rdm_2e_cholesky(f,offset,icount,idx_buf,val_buf)
+
+   do i=1,icount
+
+      idx_k = idx_buf(1,i)
+      idx_l = idx_buf(2,i)
+      idx_m = idx_buf(3,i)
+
+      RDM2Chol(idx_k,idx_l,idx_m) = val_buf(i)
+
+   enddo
+
+   offset = offset + icount
+
+enddo
+
+rc = trexio_close(f)
+
+deallocate(idx_buf,val_buf)
+
+end subroutine read_2rdmchol_trexio
+
+
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 ! Eugene subroutines
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 

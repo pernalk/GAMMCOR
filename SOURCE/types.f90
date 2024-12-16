@@ -8,6 +8,7 @@ integer, parameter :: INTER_TYPE_DAL  = 1
 integer, parameter :: INTER_TYPE_MOL  = 2
 integer, parameter :: INTER_TYPE_OWN  = 3
 integer, parameter :: INTER_TYPE_ORCA = 4
+integer, parameter :: INTER_TYPE_TREX = 5
 
 integer, parameter :: TYPE_NO_SYM = 1
 integer, parameter :: TYPE_SYM = 0
@@ -30,7 +31,8 @@ integer, parameter :: JOB_TYPE_ACFREQ      = 14
 integer, parameter :: JOB_TYPE_ACFREQNTH   = 15
 integer, parameter :: JOB_TYPE_AC1FREQNTH  = 16
 integer, parameter :: JOB_TYPE_RESPONSE    = 17
-integer, parameter :: JOB_TYPE_DSRS        = 18
+integer, parameter :: JOB_TYPE_SRAC0       = 18
+integer, parameter :: JOB_TYPE_DSRS        = 19
 
 integer, parameter :: SAPTLEVEL0 = 0
 integer, parameter :: SAPTLEVEL1 = 1
@@ -75,15 +77,15 @@ logical, parameter :: FLAG_POSTCAS  = .FALSE.
 
 integer,parameter :: maxcen = 500
 
-character(*),parameter :: PossibleInterface(4) = &
+character(*),parameter :: PossibleInterface(5) = &
 [character(8) :: &
-'DALTON', 'MOLPRO', 'OWN', 'ORCA']
+'DALTON', 'MOLPRO', 'OWN', 'ORCA','TREXIO']
 
-character(*),parameter :: PossibleJobType(18) = &
+character(*),parameter :: PossibleJobType(19) = &
 [character(9) :: &
 'AC', 'AC0', 'ERPA', 'EERPA', 'SAPT', 'PDFT', 'CASPiDFT','CASPiDFTOpt','EERPA-1', & 
 'AC0D', 'AC0DNOSYMM', 'NLOCCORR', 'AC0DP', 'ACFREQ','ACFREQNTH','AC1FREQNTH','RESPONSE', &
-'dSRS']
+'SRAC0','dSRS']
 
 character(*),parameter :: PossibleRDMType(5) = &
 [character(8) :: &
@@ -130,7 +132,7 @@ type CalculationBlock
       integer :: imon = 1
       character(:), allocatable :: JobTitle
       character(:), allocatable :: IntegralsFilePath
-      integer :: Max_Cn = 3
+      integer :: Max_Cn = 10
       double precision :: FreqOm = 0.d0
       logical :: CAlpha = .false.
 end type CalculationBlock
@@ -143,6 +145,7 @@ type SystemBlock
       integer :: Charge = 0
       integer :: ZNucl  = 0
       integer :: NBasis = 0
+      integer :: NAO    = 0
       integer :: NChol  = 0
       integer :: Monomer = MONOMER_A
       integer :: NELE
@@ -185,15 +188,21 @@ type SystemBlock
       logical :: Wexcit  = .false.
       logical :: doRSH   = .false., SameOm = .true.
       logical :: PostCAS = .false.
-      logical :: NActFromRDM = .true.
-      logical :: reduceV = .false.
+      logical :: NActFromRDM  = .true.
+      logical :: reduceV      = .false.
+      logical :: Cholesky2RDM = .true.
+      logical :: switchAB= .false.
+
       ! for cubic SAPT
       double precision :: ACAlpha0  = 1.d-10
       double precision :: ACAlpha1  = 0.01d0
       double precision :: ACAlpha2  = 0.45d0
 
-      ! ThrAct for active geminals selection
-      double precision :: ThrAct    = 0.992d0
+      ! ThrGemAct for active geminals selection
+      double precision :: ThrGemAct    = 0.992d0
+      ! ThrAct for active orbitals selection (CIPSI)
+      double precision :: ThrAct = 1.d-9
+      ! ThrSelAct selects active orbital pairs
       double precision :: ThrSelAct = 1.d-8
       ! ThrVirt for reduction of virtual orbs
       double precision :: ThrVirt   = 1.d-6
@@ -251,8 +260,10 @@ type SystemBlock
       double precision,allocatable :: AP(:,:),PP(:)
       double precision  :: charg(maxcen),xyz(maxcen,3)
 
-      integer :: Max_Cn = 3
+      integer :: Max_Cn = 10
       double precision :: FreqOm = 0.d0
+
+      character(:), allocatable :: TrexFile
 
 end type SystemBlock
 
@@ -274,8 +285,10 @@ end type FileNames
 type FlagsData
 ! default setting: ERPA-GVB
      ! mainp.f
-     integer :: IDALTON = 1
-     integer :: iORCA   = 0
+     integer :: IDALTON = 0
+     integer :: IMOLPRO = 0
+     integer :: IORCA   = 0
+     integer :: ITREXIO = 0
      integer :: IRes    = 0
      integer :: IAO     = 0
      integer :: INO     = 0
@@ -386,6 +399,7 @@ type SaptData
      logical :: EnChck  = .true., HFCheck=.true.
      logical :: doRSH   = .false., SameOm = .true.
      logical :: reduceV = .false.
+     character(:),allocatable :: TrexFile
 
 end type SaptData
 

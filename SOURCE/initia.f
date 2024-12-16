@@ -71,9 +71,21 @@ C
       EndDo
 C
       Call SortOrbDal(UMOAO,Occ,NInAc,NAc,NSym,NSymOrb,NBasis)
+      NFrac=0
       Do I=1,NInAc+NAc
       Occ(I)=Occ(I)/2.D0
+      If(Occ(I).Lt.One) NFrac=NFrac+1
       EndDo
+C
+      If(NAc.Ne.NFrac) Then
+      Write(6,'(/,1x,"WARNING! The number of partially occ orbitals
+     $ different from nact read from dalton.")')
+      Write(6,'(1x,"Some active orbitals
+     $ must be fully occupied or unoccupied.
+     $  Change active space in CAS")')
+      Write(6,'(1x,"EXIT")')
+      Stop
+      EndIf
 C
       Call read1elsym(XKin,UMOAO,NSym,NSymBas,NBasis,NInte1)
 C
@@ -266,9 +278,9 @@ C
 C
       use types
       use sorter
+      use tran
 c     use Cholesky_old  ! create AOTWOSORT file
       use Cholesky
-      use tran
       use abmat
       use read_external
 C
@@ -292,6 +304,7 @@ C
       Real*8, Allocatable :: MatFF(:,:)
       Dimension Gamma(NInte1),Work(NBasis),PC(NBasis),
      $ AUXM(NBasis,NBasis),AUXM1(NBasis,NBasis),
+     $ AUXM2(NBasis*NBasis),
      $ Fock(NBasis*NBasis),
      $ UAux(NBasis,NBasis),
      $ FockF(NInte1),GammaAB(NInte1),Eps(NBasis,NBasis)
@@ -305,14 +318,15 @@ C
       IEugene=1
       EndIf
 C
-      UMOAO(1:NBasis*NBasis)=Zero
-      URe(1:NBasis,1:NBasis)=Zero
-      Occ(1:NBasis)=Zero
-      PC(1:NBasis)=Zero
-      Gamma(1:NInte1)=Zero
+      UMOAO(1:NBasis*NBasis)=0d0
+      URe(1:NBasis,1:NBasis)=0d0
+      Occ(1:NBasis)=0d0
+      PC(1:NBasis)=0d0
+      Gamma(1:NInte1)=0d0
 C
 C     READ IN 1-RDM AND DIAGONALIZE IT
 C
+      NActDMRG=0
       If(IEugene.Eq.0) Then
 C
       If(LiborNew.Eq.1) Then
@@ -328,7 +342,7 @@ C
       Read(10,End=61) X
       Ind=I*(I-1)/2+J
       Gamma(Ind)=X/Two
-      ICount=ICount+1
+      If(I.Eq.J) ICount=ICount+1
       EndDo
       EndDo
    61 Close(10)
@@ -362,17 +376,51 @@ C
       EndIf
 C
       Call CpySym(AUXM,Gamma,NBasis)
-      Call Diag8(AUXM,NBasis,NBasis,PC,Work)
-      Call SortOcc(PC,AUXM,NBasis)
+C
+      If(NActDMRG.Ne.0) Then
+      NAc=NActDMRG
+      Else
+      Stop 'Fatal error in: ReadDMRG. NActDMRG not set'
+      EndIf 
+C
+C     DIAGONALIZE ONLY THE ACTIVE BLOCK OF Gamma TO AVOID THROWING AWAY
+C     ACTIVE ORBITAL OF ZERO-OCCUPANCY (which may happen for atoms for some states)
+C
+      Do I=1,NAc
+      Do J=1,NAc
+      AUXM2((J-1)*NAc+I)=AUXM(I,J)
+      EndDo
+      EndDo
+      Call Diag8(AUXM2,NAc,NAc,PC,Work)
+      Call SortP(PC,AUXM2,NAc)
+C
+      AUXM(1:NBasis,1:NBasis)=Zero
+      Do I=1,NAc
+      Do J=1,NAc
+      AUXM(I,J)=AUXM2((J-1)*NAc+I)
+      EndDo
+      EndDo
 C
       Sum=Zero
       NAc=0
       Do I=1,NBasis
+C     it may happen that an active orbital has a negative but very small occupation. set it to a positive
+      PC(I)=Abs(PC(I))
       Sum=Sum+PC(I)
       If(PC(I).Gt.Zero) NAc=NAc+1
       EndDo
 C
-      NInAc=XELE-Sum+1.D-1
+      ISwitch=0
+      If(NAc.Ne.NActDMRG) Then
+      Write(6,'(1x,"WARNING! The number of partially occ orbitals
+     $ different from NActDMRG read from orca. Some active orbitals
+     $ must be unoccupied.",/)')
+      NAc=NActDMRG
+      ISwitch=1
+      EndIf
+C
+C
+      NInAc=XELE-Sum+1.D-2
       Do I=1,NInAc+NAc
       If(I.Le.NInAc) Then
       Occ(I)=One
@@ -1826,6 +1874,512 @@ C
       Return
       End
 
+*Deck ReadTREXIO
+      Subroutine ReadTREXIO(XKin,XNuc,ENuc,Occ,URe,
+     $ TwoEl,UNOAO,NAO,NBasis,NInte1,NInte2,TrexFile)
+C
+C     READ AO INTEGRALS, CAONO AND RDMs
+C     FROM TREXIO HDF5 FILES
+C
+      use print_units
+      use types
+      use sorter
+      use tran
+      use Cholesky
+      use read_external
+      use trexio
+      use abmat
+C
+      Implicit Real*8 (A-H,O-Z)
+C
+      Double Precision XKin(NInte1),XNuc(NInte1),Occ(NBasis)
+      Double Precision URe(NBasis,NBasis)
+      Double Precision UAOMO(NAO,NBasis),UMONO(NBasis,NBasis)
+      Double Precision UNOAO(NBasis,NAO)
+      Double Precision TwoEl(NInte2)
+      Character(*) TrexFile
+C
+C     LOCAL ARRAYS
+C
+      Double Precision UAux(NBasis,NBasis),PC(NBasis),
+     $ Gamma(NBasis,NBasis),GammaAO((NAO+1)*NAO/2),
+     $ XOneAO((NAO+1)*NAO/2),FockAO((NAO+1)*NAO/2),
+     $ FockMO(NBasis,NBasis),Fock(NBasis*NBasis),
+     $ AuxAOAO(NAO,NAO),UCan(NBasis,NBasis)
+      Double Precision UAONO(NAO,NBasis),work1(NBasis,NBasis)
+      Double Precision Work(NBasis),AUXM(NBasis,NAO)
+      Double Precision, Allocatable :: RDM2val(:,:,:,:)
+      Double Precision, Allocatable :: RDM2tru(:,:,:,:)
+      Double Precision, Allocatable :: RDM2Chol(:,:,:)
+      Double Precision, Allocatable :: Kinetic(:,:),Vmat(:,:),HAO(:,:)
+C
+      Type(TCholeskyVecs) :: CholeskyVecs
+      Double Precision, Allocatable :: MatFF(:,:)
+
+      Integer rc
+      Integer i,num,offset
+      Integer(8) f
+      Integer(8) MemSrtSize
+C
+      Integer NRDMChol
+      Logical Cholesky2rdm
+C
+      Include 'commons.inc'
+
+      NoSt=1
+
+      f = trexio_open (TrexFile, 'r', TREXIO_HDF5, rc)
+
+C     nuclear repulsion
+      rc = trexio_has_nucleus_repulsion(f)
+      rc = trexio_read_nucleus_repulsion(f,ENuc)
+      call trexio_assert(rc, TREXIO_SUCCESS)
+
+      Allocate(Kinetic(NAO,NAO),Vmat(NAO,NAO),HAO(NAO,NAO))
+
+C     number kinetic energy
+      rc = trexio_has_ao_1e_int_kinetic(f)
+      rc = trexio_read_ao_1e_int_kinetic(f, kinetic)
+      call trexio_assert(rc, TREXIO_SUCCESS)
+
+C     number Vne potential energy
+      rc = trexio_has_ao_1e_int_potential_n_e(f)
+      rc = trexio_read_ao_1e_int_potential_n_e(f, Vmat)
+      call trexio_assert(rc, TREXIO_SUCCESS)
+
+C     two-electron integrals
+      If(ICholesky==0) Then
+      MemSrtSize = MemVal*1024_8**MemType
+      Call readtwoint(NAO,5,TrexFile,'AOTWOSORT',MemSrtSize)
+      ElseIf(ICholesky==1) Then
+      Call chol_CoulombMatrix(CholeskyVecs,NAO,TrexFile,5,ICholeskyAccu)
+      NCholesky=CholeskyVecs%NCholesky
+      EndIf
+
+C     caomo
+      Call read_mo_trexio(UAOMO,TrexFile,NAO,NBasis)
+C
+C      print*, 'UAOMO-Trexio',norm2(UAOMO)
+C      Do J=1,NBasis
+C      write(6,'(*(f12.6))') (UAOMO(I,J),I=1,NBasis)
+C      EndDo
+
+C     1-rdm
+C
+      Occ = 0d0
+      PC  = 0d0
+C
+      Write(6,'(/," Reading in 1-RDM ...")')
+C
+      rc = trexio_read_rdm_1e(f, UAux)
+      call trexio_assert(rc, TREXIO_SUCCESS)
+C
+!      UAux=UAux/2.d0
+      Gamma=UAux/2.d0
+      Call Diag8(UAux,NBasis,NBasis,PC,Work)
+      Do I=1,NBasis
+         If(PC(I).Lt.Zero) Then
+         Write(6,'(2X,"Negative Occ",I3,E16.6)')I,PC(I)
+         PC(I)=Zero
+         EndIf
+      EndDo
+      Call SortP(PC,UAux,NBasis)
+C
+      UMONO = transpose(UAux)
+C
+C      print*, 'UNOMO-Trexio',norm2(UMONO)
+C      ! testing against Molpro
+C      Do I=1,NBasis
+C      write(6,'(*(f12.6))') (UMONO(I,J),J=1,NBasis)
+C      EndDo
+C
+      NAc = 0
+      NInAc = 0
+      Do I=1,NBasis
+         If(Abs(PC(I)-2.d0).Le.1.d-8) NInAc = NInAc + 1
+         If(PC(I).Gt.0.d0 .And. Abs(PC(I)-2.d0).Gt.1.d-8) 
+     $     NAc = NAc + 1
+      EndDo
+C
+C     NInAc = 2d0*XELE - Sum + 1.D-2
+      Do I=1,NInAc+NAc
+         If(I.Le.NInAc) Then
+            Occ(I) = 1d0
+         Else
+            Occ(I) = PC(I)/2.d0 
+         EndIf
+      EndDo
+C
+C     set IGem
+      If(NInAc.Eq.0) Then
+         NGem = 2
+         IGem(1:NInAc+NAc) = 1
+         IGem(NInAc+NAc+1:NBasis) = 2
+      Else
+         NGem = 3
+         IGem(1:NInAc) = 1
+         IGem(NInAc+1:NInAc+NAc) = 2
+         IGem(NInAc+NAc+1:NBasis) = 3
+      EndIf
+C
+C     write to common block
+      NAcCAS   = NAc
+      NInAcCAS = NInAc
+C
+      Write(6,'(/,2X,"No of inactive and active orbitals: ",2I4)')
+     $ NInAcCAS, NAcCAS
+C
+      Write(6,'(2X,"CI",3X,"Occupancy",4X,"Gem")')
+      Sum = 0d0
+      Do I=1,NBasis
+         Write(6,'(X,I3,E16.6,I6)') I,Occ(I),IGem(I)
+         Sum = Sum + Occ(I)
+      EndDo
+      Write(6,'(2X,"Sum of Occupancies: ",F10.2)') Sum
+C
+      NAct   = NAcCAS
+      INAct  = NInAcCAS
+      NOccup = INAct + NAct
+c
+c      goto 111
+C
+C     begin cannonicalization
+C
+      Do I=1,NBasis
+      Do J=1,NBasis
+      URe(I,J)=UMONO(J,I)
+      EndDo
+      EndDo 
+      UCan=URe
+C
+      IAB=0
+      Do IA=1,NAO
+      Do IB=1,IA
+      IAB=IAB+1
+      GammaAO(IAB)=0.d0
+      XOneAO(IAB)=Kinetic(IA,IB)+Vmat(IA,IB)
+      Do I=1,NBasis
+      Do J=1,NBasis
+      GammaAO(IAB)=GammaAO(IAB)
+     $ +UAOMO(IA,I)*UAOMO(IB,J)*Gamma(I,J)
+      EndDo
+      EndDo
+      EndDo
+      EndDo   
+      NInte1AO=(NAO+1)*NAO/2
+C
+      If(ICholesky==0) Then
+          Call FockGen_mithap(FockAO,GammaAO,XOneAO,NInte1AO,NAO,
+     &                        'AOTWOSORT')
+      ElseIf(ICholesky==1) Then
+       Call FockGen_CholR(FockAO,
+     &                     CholeskyVecs%R(1:NCholesky,1:NInte1AO),
+     &                     GammaAO,XOneAO,NInte1AO,NCholesky,NAO)
+      EndIf 
+C
+      Call triang_to_sq2(FockAO,AuxAOAO,NAO)
+C
+      Call dgemm('T','N',NBasis,NAO,NAO,1d0,UAOMO,NAO,AuxAOAO,NAO,0d0,
+     $ AUXM,NBasis)
+      Call dgemm('N','N',NBasis,NBasis,NAO,1d0,AUXM,NBasis,UAOMO,NAO,
+     $ 0d0,FockMO,NBasis)
+C
+C     INACTIVE
+      If(NInAc.Ne.0) Then
+C
+      Do I=1,NInAc
+      Do J=1,NInAc
+      Fock((J-1)*NInAc+I)=FockMO(I,J)
+      EndDo
+      EndDo
+      Call Diag8(Fock,NInAc,NInAc,PC,Work)
+c      Do I=1,NInAc
+c      Do J=1,NInAc
+c      URe(I,J)=Fock((J-1)*NInAc+I)
+c      EndDo
+c      EndDo
+      Do I=1,NInAc
+      Do IA=1,NBasis
+      Sum=Zero
+      Do K=1,NInAc
+      Sum=Sum+Fock((K-1)*NInAc+I)*URe(K,IA)
+      EndDo
+      UCan(I,IA)=Sum
+      EndDo
+      EndDo
+C
+      Do I=1,NInAc
+      Do J=1,NBasis
+      work1(J,I)=PC(I)
+      EndDo
+      EndDo
+C
+      EndIf
+C
+C     VIRTUAL
+C
+      NVirt=NBasis-NInAc-NAc
+      If(NVirt.Ne.0) Then
+
+      Do I=1,NVirt
+      Do J=1,NVirt
+      Fock((J-1)*NVirt+I)=FockMO(I+NInAc+NAc,J+NInAc+NAc)
+      EndDo
+      EndDo
+      Call Diag8(Fock,NVirt,NVirt,PC,Work)
+C
+c      Do I=1,NVirt
+c      Do J=1,NVirt
+c      II=I+NInAc+NAc
+c      JJ=J+NInAc+NAc
+c      URe(II,JJ)=Fock((J-1)*NVirt+I)
+c      EndDo
+c      EndDo
+
+      Do I=1,NVirt
+      II=I+NInAc+NAc
+      Do IA=1,NBasis
+      Sum=Zero
+      Do K=1,NVirt
+      KK=K+NInAc+NAc
+      Sum=Sum+Fock((K-1)*NVirt+I)*URe(KK,IA) 
+      EndDo
+      UCan(II,IA)=Sum
+      EndDo
+      EndDo
+C
+      EndIf
+C
+      Do I=1,NBasis
+      Do J=1,NBasis
+c      UMONO(J,I)=URe(I,J)
+      UMONO(J,I)=UCan(I,J)
+      EndDo
+      EndDo
+
+      do i=1,nbasis
+      do j=1,nbasis
+      sum=zero
+      do k=1,nbasis
+      sum=sum+UMONO(I,K)*UMONO(J,K)
+      enddo
+      if(i.ne.j.and.abs(sum).gt.1.e-8)write(*,*)i,j,sum
+      enddo
+      enddo
+C
+C     END OF CANONICALIZING
+c  111 continue
+C
+C     2-rdm 
+C
+      Write(6,'(/," Reading in 2-RDM ...")')
+C
+      ! check full
+      rc = trexio_has_rdm_2e(f)
+      If(rc == TREXIO_SUCCESS) Then
+         Cholesky2rdm = .false.
+      Else
+         ! check Cholesky-decomposed
+         rc = trexio_has_rdm_2e_cholesky(f)
+         If(rc == TREXIO_SUCCESS) Then
+            Cholesky2rdm = .true.
+         Else
+            Stop "no 2-rdm in TREXIO file!"
+         EndIf
+      EndIf
+C
+C     close TREXIO file
+      rc = trexio_close(f)
+C
+      If (Cholesky2rdm) then
+C     2-rdm/chol
+      Call read_2rdmchol_trexio(RDM2Chol,TrexFile,NRDMChol,NBasis)
+      Call tran3_2rdmchol_trexio(RDM2Chol,UMONO,NRDMChol,NBasis)
+      Allocate(RDM2val(NOccup,NOccup,NOccup,NOccup))
+      Call assemble_2rdmchol(RDM2Chol,RDM2val,NRDMChol,NOccup,NBasis)
+      Write(lout,'(/1x,a/)') '2-RDM is not renormalized!'
+c     Call renormalize_2rdm(RDM2val,XELE,NOccup)
+C
+      Else
+C     2-rdm/full
+      Call read_2rdm_trexio(RDM2val,TrexFile,NBasis)
+      Call TrRDM24_dgemm(RDM2val,UMONO,NBasis)
+C
+C     truncate 2rdm to NOccup^4
+      If(NBasis.Ne.NOccup) Then
+      Write(6,'(/,1x,"Dimension of 2-RDM reduced from ",I3," to ",I3)')
+     $ NBasis,NOccup
+      Allocate(RDM2tru(NOccup,NOccup,NOccup,NOccup))
+C
+      RDM2tru = 0d0
+      Do k=1,NOccup
+      Do m=1,NOccup
+      Do l=1,NOccup
+      Do n=1,NOccup
+         RDM2tru(k,m,l,n) = RDM2val(k,m,l,n)
+      EndDo
+      EndDo
+      EndDo
+      EndDo
+C
+      Deallocate(RDM2val)
+      Allocate(RDM2val(NOccup,NOccup,NOccup,NOccup))
+      RDM2val = RDM2tru
+      Deallocate(RDM2tru)
+      EndIf ! truncation
+C
+      EndIf ! Cholesky2rdm
+C
+c     If(NOccup.Eq.NBasis) Then
+c     Write(6,'(1x,a)') 'No virt orbs: skip canonicalization'
+C     uaono(nao,nno) = uaomo(nao,nmo).umono(nmo,nno)
+      Call dgemm('N','N',NAO,NBasis,NBasis,1d0,UAOMO,NAO,UMONO,NBasis,
+     $           0d0,UAONO,NAO)
+c     EndIf
+      UNOAO = transpose(UAONO)
+C
+C     TRANSFORM INTEGRALS TO NO
+C
+      If(ITwoEl.Eq.1) Then
+         Write(6,'(1X,"Use FOFO with TREXIO!")')
+C
+      ElseIf(ITwoEl.Eq.3) Then
+C
+C     PREPARE POINTERS: NOccup=num0+num1
+      Call prepare_nums(Occ,Num0,Num1,NBasis)
+      print*, 'num0-Trexio',num0
+      print*, 'num1-Trexio',num1
+C
+      If(NOccup.Gt.num0+num1) 
+     $ stop 'Fatal error in ReadTREXIO: NOccup>num1+num2 !'
+C
+      If (ICholesky==0) Then
+C
+C      Print*, 'UAux-Trexio = UAONO',norm2(UAONO)
+C      Do J=1,NBasis
+C      write(6,'(*(f12.6))') (UAONO(I,J),I=1,NBasis)
+C      EndDo
+C
+      Call tran4_gen(NAO,
+     $        Num0+Num1,UAONO(1:NAO,1:(Num0+Num1)),
+     $        Num0+Num1,UAONO(1:NAO,1:(Num0+Num1)),
+     $        NBasis,UAONO,
+     $        NBasis,UAONO,
+     $        'FFOO','AOTWOSORT')
+      Call tran4_gen(NAO,
+     $        NBasis,UAONO,
+     $        Num0+Num1,UAONO(1:NAO,1:(Num0+Num1)),
+     $        NBasis,UAONO,
+     $        Num0+Num1,UAONO(1:NAO,1:(Num0+Num1)),
+     $        'FOFO','AOTWOSORT')
+      If (IRedVirt == 1) then
+         Call tran4_gen(NAO,
+     $        NBasis,UAONO,
+     $        Num0+Num1,UAONO(1:NAO,1:(Num0+Num1)),
+     $        NBasis,UAONO,
+     $        NBasis,UAONO,
+     $        'FFFO','AOTWOSORT')
+      EndIf
+C
+      ElseIf (ICholesky==1) Then
+
+      Allocate(MatFF(NCholesky,NBasis**2))
+      If (MemType == 2) then       !MB
+         MemMOTransfMB = MemVal
+      ElseIf (MemType == 3) then   !GB
+         MemMOTransfMB = MemVal * 1024_8
+      endif
+      Write(LOUT,'(1x,a,i5,a)') 'Using ',MemMOTransfMB,
+     $                         ' MB for 3-indx Cholesky transformation'
+      Call chol_MOTransf_TwoStep(MatFF,CholeskyVecs,
+     $              UAONO,1,NBasis,
+     $              UAONO,1,NBasis,
+     $              MemMOTransfMB)
+C
+      Open(newunit=iunit,file='cholvecs',form='unformatted')
+      Write(iunit) NCholesky
+      Write(iunit) MatFF
+      Close(iunit)
+      Deallocate(MatFF)
+C
+      EndIf ! ICholesky
+
+      EndIf ! ITwoEl
+C
+C     XKin = K+Vne (in NO)
+C
+      HAO = Kinetic + Vmat
+      Call dgemm('T','N',NBasis,NAO,NAO,1d0,UAONO,NAO,HAO,NAO,
+     $            0d0,AUXM,NBasis)
+      Call dgemm('N','N',NBasis,NBasis,NAO,1d0,AUXM,NBasis,UAONO,NAO,
+     $           0d0,UAux,NBasis)
+      Call sq_to_triang2(UAux,XKin,NBasis)
+C
+C     XNuc = Vne (in NO)
+C
+      Call dgemm('T','N',NBasis,NAO,NAO,1d0,UAONO,NAO,Vmat,NAO,
+     $            0d0,AUXM,NBasis)
+      Call dgemm('N','N',NBasis,NBasis,NAO,1d0,AUXM,NBasis,UAONO,NAO,
+     $           0d0,UAux,NBasis)
+      Call sq_to_triang2(UAux,XNuc,NBasis)
+C
+C     COMPUTE THE ENERGY FOR CHECKING
+C
+      EOne = 0d0
+      Do I=1,NOccup
+      II=(I*(I+1))/2
+      EOne = EOne + Two*Occ(I)*XKin(II)
+      EndDo
+C
+      If (ITwoEl.Eq.3) Then
+      If(ICholesky.eq.0) Then
+         Call TwoEneChckTREXIO(ETwo,RDM2val,Occ,NOccup,NBasis)
+      ElseIf(ICholesky.eq.1) Then
+         Call TwoEneChckCholTREXIO(ETwo,RDM2val,Occ,NOccup,NBasis)
+      EndIf
+      EndIf
+C
+      Write(6,'(/,1X,''One-electron Energy'',6X,F15.8)')
+     $ EOne
+      Write(6,'(1X,''Two-electron Energy'',6X,F15.8)')
+     $ ETwo
+      Write(6,'(1X,''CI Quantum Package Energy'',F15.8)')
+     $ EOne+ETwo+ENuc
+C
+      ETot = EOne + ETwo + ENuc
+C
+C  .. check energy
+C
+C     SAVE THE ACTIVE PART IN rdm2.dat
+C
+      Open(10,File='rdm2.dat')
+      Do I=1,NAct
+      Do J=1,NAct
+      IJ=(I-1)*NAct+J
+      Do K=1,NAct
+      Do L=1,NAct
+      KL=(K-1)*NAct+L
+      If(IJ.Ge.KL) Write(10,'(4I4,F19.12)')
+     $ K,I,L,J,Two*RDM2val(InAct+K,InAct+I,InAct+L,InAct+J)
+      EndDo
+      EndDo
+      EndDo
+      EndDo
+C
+      Close(10)
+C
+C     INTEGRALS ARE TRANSFORMED SO URe IS SET TO A UNIT MATRIX
+C
+      URe = 0d0
+      Do I=1,NBasis
+      URe(I,I) = 1d0
+      EndDo
+C
+      Deallocate(HAO,Vmat,Kinetic)
+C
+      Return
+      End Subroutine ReadTREXIO
+
 *Deck DimSym
       Subroutine DimSym(NBasis,NInte1,NInte2,MxHVec,MaxXV)
 C
@@ -3261,6 +3815,33 @@ C
       Return
       End
 
+*Deck TrRDM24_dgemm
+      Subroutine TrRDM24_dgemm(RDM2,URe,NBasis)
+      !
+      !     TRANSFORM RDM2 WITH URe
+      !
+      Implicit None
+      
+      Integer          :: NBasis
+      Double precision :: URe(NBasis,NBasis)
+      Double Precision :: RDM2(NBasis,NBasis,NBasis,NBasis)
+C
+C     LOCAL ARRAYS
+      Double Precision :: Aux(NBasis,NBasis,NBasis,NBasis)
+
+      Write(6,'(X,"FCI RDM2 TRANSFORMATION TO NO IN PROCESS...")')
+
+      Call dgemm('T','N', NBasis**3, NBasis, NBasis, 1.d0, RDM2, NBasis,
+     $ URe, NBasis, 0.d0, Aux, NBasis**3)
+      Call dgemm('T','N', NBasis**3, NBasis, NBasis, 1.d0, Aux,  NBasis,
+     $ URe, NBasis, 0.d0, RDM2,NBasis**3)
+      Call dgemm('T','N', NBasis**3, NBasis, NBasis, 1.d0, RDM2, NBasis,
+     $ URe, NBasis, 0.d0, Aux, NBasis**3)
+      Call dgemm('T','N', NBasis**3, NBasis, NBasis, 1.d0, Aux,  NBasis,
+     $ URe, NBasis, 0.d0, RDM2,NBasis**3)
+
+      End Subroutine
+
 *Deck FockGen
       Subroutine FockGen(Fock,Gamma,XOne,TwoEl,NInte1,NBasis,NInte2)
 C
@@ -3411,6 +3992,67 @@ C
 C
       end subroutine TwoEneChck
 
+      subroutine TwoEneChckTREXIO(ETwo,RDM2val,Occ,NOccup,NBasis)
+C
+C     calculate 2-el energy using RDM2val(NOccup,NOccup,NOccup,NOccup)
+C     read from TREXIO file
+C
+      Implicit Real*8 (A-H,O-Z)
+C
+      Include 'commons.inc'
+C
+      Parameter(Zero=0.D0,Half=0.5D0,One=1.D0,Two=2.D0)
+C
+      Integer NOccup,NBasis
+      Double Precision ETwo
+      Dimension Occ(NBasis),RDM2val(NOccup,NOccup,NOccup,NOccup)
+C
+C     LOCAL ARRAYS
+C
+      Double precision,Allocatable :: work(:),ints(:,:)
+      Character(:),Allocatable     :: IntJFile
+C
+C     SET FILES
+      If (IFunSR.Eq.0.Or.IFunSR.Eq.3.Or.IFunSR.Eq.5) Then
+      IntJFile='FFOO'
+      Else
+      IntJFile='FFOOERF'
+      EndIf
+C
+      Allocate(work(NBasis**2),ints(NBasis,NBasis))
+C
+      Open(newunit=iunit,file=IntJFile,status='OLD',
+     $     access='DIRECT',recl=8*NBasis**2)
+C
+      ETwo=0
+C     COULOMB LOOP (FF|OO)
+      kl=0
+      Do ll=1,NOccup
+      Do kk=1,NOccup
+      kl=kl+1
+      read(iunit,rec=kl) work(1:NBasis**2)
+      Do j=1,NBasis
+      Do i=1,NBasis
+      ints(i,j) = work((j-1)*NBasis+i)
+      EndDo
+      EndDo
+C
+      k = kk
+      l = ll
+C
+      If(k>NOccup.or.l>NOccup) Cycle
+C
+      ETwo = ETwo + sum(RDM2val(:,:,k,l)*ints(1:NOccup,1:NOccup))
+C
+      EndDo
+      EndDo
+C
+      Close(iunit)
+
+      Deallocate(ints,work)
+C
+      End Subroutine TwoEneChckTREXIO
+
       subroutine TwoEneChckChol(ETwo,RDM2Act,Occ,INActive,NAct,NBasis)
 C
 C     calculate 2-electron energy using Cholesky vectors
@@ -3512,6 +4154,89 @@ C
       Deallocate(RDM2val)
 C
       end subroutine TwoEneChckChol
+
+      subroutine TwoEneChckCholTREXIO(ETwo,RDM2val,Occ,NOccup,NBasis)
+C
+C     calculate 2-electron energy using Cholesky vectors
+C     and RDM2val(NOccup,NOccup,NOccup,NOccup) from TREXIO file
+C
+      Implicit Real*8 (A-H,O-Z)
+C
+      Include 'commons.inc'
+C
+      Parameter(Zero=0.D0,Half=0.5D0,One=1.D0,Two=2.D0)
+C
+c      Integer INActive,NAct,NBasis
+      Integer Noccup,NBasis
+      Double Precision ETwo
+      Dimension Occ(NBasis),RDM2val(NOccup,NOccup,NOccup,NOccup)
+C
+C     LOCAL ARRAYS
+C
+      Integer iloop,nloop,off
+      Integer dimFO,iBatch,BatchSize
+      Integer Ind(NBasis)
+      Double Precision, Allocatable :: work1(:,:),work2(:,:),
+     $                                 ints(:,:),MatFF(:,:)
+      Parameter(MaxBatchSize = 100)
+C
+c     SET FILES
+      Open(newunit=iunit,file='cholvecs',form='unformatted')
+      Read(iunit) NCholesky
+      Allocate(MatFF(NCholesky,NBasis**2))
+      Read(iunit) MatFF
+      Close(iunit)
+C
+      Allocate(ints(NBasis,NBasis))
+C
+      dimFO = NBasis*NOccup
+      nloop = (dimFO - 1) / MaxBatchSize + 1
+C
+      Allocate(work1(dimFO,MaxBatchSize))
+C
+      ETwo=0
+C     EXCHANGE LOOP (FO|FO), use only (OO|OO)
+      off = 0
+      k   = 0
+      l   = 1
+      Do iloop=1,nloop
+
+      ! batch size for each iloop; last one is smaller
+      BatchSize = min(MaxBatchSize,dimFO-off)
+C
+      ! assemble (FO|BatchSize) batch from CholVecs
+      Call dgemm('T','N',dimFO,BatchSize,NCholesky,1d0,
+     $           MatFF,NCholesky,MatFF(:,off+1:BatchSize),NCholesky,
+     $           0d0,work1,dimFO)
+C
+      Do iBatch=1,BatchSize
+
+      k = k + 1
+      if(k>NBasis) then
+         k = 1
+         l = l + 1
+      endif
+
+      do j=1,NOccup
+         do i=1,NBasis
+            ints(i,j) = work1((j-1)*NBasis+i,iBatch)
+         enddo
+      enddo
+C
+      if(k>NOccup) cycle
+C
+       ETwo = ETwo + sum(RDM2val(:,:,k,l)*ints(1:NOccup,1:NOccup))
+C
+      EndDo
+C
+      off = off + MaxBatchSize
+C
+      EndDo
+C
+      Deallocate(ints,MatFF)
+      Deallocate(work1)
+C
+      end subroutine TwoEneChckCholTREXIO
 
       subroutine TwoEneGVBChck(ETwo,Occ,NOccup,NBasis)
       Implicit Real*8 (A-H,O-Z)
@@ -3665,18 +4390,22 @@ C
       end subroutine TwoEHartree
 
 *Deck BasInfo
-      Subroutine basinfo(nbasis,basfile,intf)
+      Subroutine basinfo(nao,nbasis,basfile,intf)
 C
 C     Purpose: read NBasis from Dalton/Molpro
 C
       use print_units
       use read_external
+      use trexio
 C
       implicit none
 
       character(*),intent(in) :: basfile,intf
-      integer,intent(out) :: nbasis
-      integer :: iunit
+      integer,intent(out) :: nao,nbasis
+
+      integer    :: iunit
+      integer(8) :: f
+      integer :: rc
       integer :: nsym,nbas(8),norb(8),nrhf(8),ioprhf
       logical :: ex
 
@@ -3687,26 +4416,52 @@ C
      $        access='SEQUENTIAL',form='UNFORMATTED')
 
          if(trim(intf)=='DALTON') then
-            ! read basis info
-            call readlabel(iunit,'BASINFO ')
 
+            call readlabel(iunit,'BASINFO ')
             read (iunit) nsym,nbas,norb,nrhf,ioprhf
-            !write(LOUT,*)  nsym,nbas,norb,nrhf,ioprhf
+            nbasis = sum(nbas(1:nsym))
+            nao = nbasis
+
+            close(iunit)
 
          elseif(trim(intf)=='MOLPRO') then
+
             read(iunit)
             read(iunit) nsym,nbas(1:nsym)
+            nbasis = sum(nbas(1:nsym))
+            nao = nbasis
+
+            close(iunit)
+
+         elseif(trim(intf)=='TREXIO') then
+
+            f = trexio_open (basfile, 'r', TREXIO_HDF5, rc)
+            rc = trexio_read_mo_num(f, nbasis)
+
+            if (rc /= TREXIO_SUCCESS) then
+              write(lout,'(1x,a)') 'NBasis empty in TREXIO!'
+              stop 'Error reading MO num'
+            end if
+
+            rc = trexio_read_ao_num(f, nao)
+
+            if (rc /= TREXIO_SUCCESS) then
+              write(lout,'(1x,a)') 'NAO empty in TREXIO!'
+              stop 'Error reading AO num'
+            end if
+
+            rc = trexio_close(f)
+
          endif
 
-         close(iunit)
-         nbasis = sum(nbas(1:nsym))
-
       else
+
          write(LOUT,'(1x,a)') 'WARNING: '// basfile //' NOT FOUND!'
          write(LOUT,'(1x,a)') 'TRYING TO READ NBasis FROM INPUT!'
+
       endif
 
-      End Subroutine BasInfo
+      End Subroutine basinfo
 
 *Deck SortOrbDal
       Subroutine SortOrbDal(URe1,Occ2,NNIn,NNAct,NSym,IOrbSym,NBasis)
@@ -3863,6 +4618,7 @@ C
       double precision,allocatable :: OneAct(:,:),EigAct(:)
       double precision,allocatable :: work(:)
 
+      DV = 0d0
 
       ! read 1RDM in active orbs from SIRIFC file
       open(newunit=isirifc,file='SIRIFC',status='OLD',
@@ -3992,4 +4748,41 @@ C     print*, 'NASHT_G',NASHT_G
       ! print*,'CICoef-1',CICOef(1:NBasis)
 
       End
+
+*Deck renormalize_2rdm
+      Subroutine renormalize_2rdm(RDM2val,XELE,NOccup)
+C
+C     renormalize 2-rdm(NOccup^4)
+C
+      implicit none
+      integer,intent(in) :: NOccup
+      double precision,intent(in) :: XELE
+      double precision,intent(inout) :: RDM2val(NOccup,NOccup,
+     $                                          NOccup,NOccup)
+C
+      integer :: i,j
+      double precision :: xnorm
+
+      xnorm = 0d0
+      do j=1,NOccup
+         do i=1,NOccup
+            xnorm = xnorm + RDM2val(i,i,j,j)
+         enddo
+      enddo
+C
+      write(6,'(1x,a,f12.6)',advance="no") "2-RDM norm = ", xnorm
+      write(6,'(1x,a,f8.3,a)') "(reference =",XELE*(2d0*XELE-1d0),")"
+C
+      RDM2val = RDM2val * XELE*(2d0*XELE-1) / xnorm
+C
+CC     test new norm
+C      xnorm = 0d0
+C      do j=1,NOccup
+C         do i=1,NOccup
+C            xnorm = xnorm + RDM2val(i,i,j,j)
+C         enddo
+C      enddo
+C      print*, 'new norm:',xnorm
+
+      End Subroutine renormalize_2rdm
 

@@ -47,7 +47,7 @@ integer :: imon
  ! check monomers
  select case(Input%CalcParams%JobType)
  ! SAPT case
- case(5,18)
+ case(5,19)
 
     current_block = block_none
     isys = 0
@@ -267,10 +267,13 @@ subroutine read_block_calculation(CalcParams, line)
            elseif (uppercase(val) == "OWN".or.&
                    uppercase(val) == "NONE") then
                CalcParams%InterfaceType = INTER_TYPE_OWN
-           elseif (uppercase(val) == "ORCA") then
+           elseif (uppercase(val) == "ORCA" .or. &
+                   uppercase(val) == "MOLMPS") then
                CalcParams%InterfaceType = INTER_TYPE_ORCA
                CalcParams%RDMSource = INTER_TYPE_ORCA
                CalcParams%RDMType   = RDM_TYPE_DMRG
+           elseif (uppercase(val) == "TREXIO") then
+               CalcParams%InterfaceType = INTER_TYPE_TREX
            endif
 
       case ("JOBTYPE")
@@ -292,7 +295,6 @@ subroutine read_block_calculation(CalcParams, line)
                CalcParams%JobType = JOB_TYPE_SAPT
            elseif (uppercase(val) == "dSRS") then
                CalcParams%JobType = JOB_TYPE_DSRS
-               print*, 'here?'
            elseif (uppercase(val) == "PDFT" ) then
                CalcParams%JobType = JOB_TYPE_PDFT
            elseif (uppercase(val) == "CASPIDFT" ) then
@@ -315,6 +317,8 @@ subroutine read_block_calculation(CalcParams, line)
                CalcParams%JobType = JOB_TYPE_RESPONSE
            elseif (uppercase(val) == "NLOCCORR" ) then
                CalcParams%JobType = JOB_TYPE_NLOCCORR
+           elseif (uppercase(val) == "SRAC0" ) then
+               CalcParams%JobType = JOB_TYPE_SRAC0
            endif
 
      !case ("FRAGMENTS")
@@ -579,6 +583,9 @@ character(:), allocatable :: first, last
  case ("THRACT")
        read(val,*) SystemParams%ThrAct
 
+ case ("THRGEMACT")
+       read(val,*) SystemParams%ThrGemAct
+
  case ("THRSELACT")
        SystemParams%DeclareThrSelAct = .true.
        read(val,*) SystemParams%ThrSelAct
@@ -624,6 +631,20 @@ character(:), allocatable :: first, last
 
  case ("WEXCIT")
        read(val,*) SystemParams%Wexcit
+
+ case ("TREXFILE")
+       SystemParams%TrexFile = val
+
+ case ("CHOLESKY2RDM")
+       if (uppercase(val) == "TRUE".or.  &
+           uppercase(val) == ".TRUE.".or.&
+           uppercase(val) == "T") then
+          SystemParams%Cholesky2rdm = .true.
+       elseif (uppercase(val) == "FALSE".or.  &
+           uppercase(val) == ".FALSE.".or.&
+           uppercase(val) == "F") then
+          SystemParams%Cholesky2rdm = .false.
+       endif
 
  end select
 end subroutine read_block_system
