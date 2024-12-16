@@ -11,6 +11,6 @@ FFLAGS = $(WARNINGS) $(OPTIMIZATION) $(PARALLELIZATION) $(XCFUN) $(TREXIO) -assu
 MKL_LIB 		=	-L$(MKL_ROOT)lib/intel64/ -lmkl_intel_ilp64 -lmkl_sequential -lmkl_core
 XCFUN_LIB 		=	-L./xcfun/lib/ -lxcfun
 TREXIO_LIB = $(shell pkg-config --libs trexio) -Wl, -Xlinker="-rpath=$(shell pkg-config --variable=libdir trexio)"
-LIBS = $(MKL_LIB) $(XCFUN_LIB) $(TREXIO_LUB) -limf
+LIBS = $(MKL_LIB) $(XCFUN_LIB) $(TREXIO_LIB) -limf
 
 include Makefile.common
