@@ -16,7 +16,7 @@ OBJ = $(O)mainp.o $(O)initia.o $(O)dmscf.o $(O)misc.o $(O)optocc.o \
       $(O)priunit.o $(O)rdwrext.o \
       $(O)types.o $(O)blocktypes.o \
       $(O)inputfill.o $(O)abmats.o $(O)abfofo.o $(O)ab0fofo.o \
-      $(O)abchol.o \
+      $(O)abchol.o $(O)abcipsi.o \
       $(O)sapt_main.o $(O)sapt_exch.o $(O)sapt_pol.o $(O)sapt_utils.o \
       $(O)sapt_response.o $(O)sapt_interface.o \
       $(O)sapt_dRS.o $(O)sapt_os.o \
@@ -157,6 +157,8 @@ $(O)abfofo.o : $(S)abfofo.f90 $(O)abchol.o $(O)blocktypes.o $(O)priunit.o $(O)tr
 	$(FCC) $(FFLAGS)  -c $(S)abfofo.f90 -o $(O)abfofo.o
 $(O)ab0fofo.o : $(S)ab0fofo.f90 $(O)priunit.o $(O)blocktypes.o $(O)tran.o $(O)abfofo.o
 	$(FCC) $(FFLAGS)  -c $(S)ab0fofo.f90 -o $(O)ab0fofo.o
+$(O)abcipsi.o : $(S)abcipsi.f90 $(O)abfofo.o
+	$(FCC) $(FFLAGS)  -c $(S)abcipsi.f90 -o $(O)abcipsi.o
 $(O)abchol.o : $(S)abchol.f90
 	$(FCC) $(FFLAGS)  -c $(S)abchol.f90 -o $(O)abchol.o
 $(O)srefex.o : $(S)srefex.f90 $(O)types.o $(O)exmisc.o

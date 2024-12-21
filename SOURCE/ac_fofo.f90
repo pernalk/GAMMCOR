@@ -95,7 +95,7 @@ end subroutine Project_DChol
 
 subroutine WIter_D12Chol(ECorr,AC1,Max_Cn,XOne,URe,Occ,EGOne,NGOcc,&
    IGem,NAct,INActive,NELE,NBasis,NInte1,NDim,NGem,IndAux,&
-   IndN,IndX,NDimX)
+   IndN,IndX,NDimX,IAnalys,IGE,JGE,KGE,LGE)
 !
 !  AC energy cacluation using CHOLESKY VECTORS:
 !  (1) expanding AC integrand in alpha around alpha=0, up to Max_Cn order
@@ -104,6 +104,11 @@ subroutine WIter_D12Chol(ECorr,AC1,Max_Cn,XOne,URe,Occ,EGOne,NGOcc,&
 !
 !  A difference with WIter_DChol: no need to compute COMTildeAct
 !
+!  IAnalys = 1 : compute only (IGE,JGE)(KGE,LGE) contribution to ECorr
+!  warning! a sum of contributions computed with IAnalys=1 might slightly differ from ACn computed
+!  with IAnalys=0 as a result of the condition
+!  If(IAnalys==0.And.XNorm1.Lt.ErrMax) Exit
+!
 use abfofo
 use systemdef
 ! only to use Y01CAS_FOFO
@@ -111,29 +116,32 @@ use systemdef
 use sapt_utils
 
 implicit none
+integer,intent(in) :: IAnalys,IGE,JGE,KGE,LGE
 integer,intent(in) :: AC1,NGOcc,NBasis,NInte1,NDim,NGem,NDimX
 integer,intent(in) :: NAct,INActive,NELE
 integer,intent(in) :: IndN(2,NDim),IndX(NDim),IndAux(NBasis),&
                       IGem(NBasis)
-double precision :: ACAlpha
 double precision,intent(in) :: URe(NBasis,NBasis),Occ(NBasis),XONe(NInte1)
+
+double precision :: ACAlpha
 double precision :: ECorr,ECorrAct,EGOne(NGem)
 double precision :: XFreq(100),WFreq(100)
 
 integer :: ICholesky
+integer :: NCholesky
 integer :: iunit,NOccup
 integer :: ia,ib,ic,id,ICol,IRow
 integer :: i,j,k,l,kl,ip,iq,ir,is,ipq,irs
 integer :: NGrid,N,IGL,inf1,inf2,Max_Cn
 double precision :: ECASSCF,PI,WFact,XFactorial,XN1,XN2,FF,OmI,XNorm0,XNorm1,ErrMax
 character(:),allocatable :: twojfile,twokfile,IntKFile
+logical :: irdm2
 
 double precision, allocatable :: DChol(:,:),DCholT(:,:),DCholAct(:,:),DCholActT(:,:),WorkD(:,:)
 double precision, allocatable :: APLUS0Tilde(:), APLUS1Tilde(:), A1(:), &
                                  COMTilde(:),ABPLUS0(:),ABMIN0(:),ABPLUS1(:),ABMIN1(:), &
                                  C0Tilde(:),C1Tilde(:),C2Tilde(:), &
                                  WORK0(:),WORK1(:)
-integer :: NCholesky
 
 integer :: nblk
 type(EblockData) :: A0blockIV,LambdaIV
@@ -150,6 +158,18 @@ end interface
 
 ! Get DChol & DCholAct
 call read_D12_array(NCholesky, DChol, DCholAct, NDimX, NBasis, IndN, Occ, IndAux)
+!
+if (IAnalys) then
+   do i=1,NCholesky
+      do j=1,NDimX
+         ir=IndN(1,j)
+         is=IndN(2,j)
+         if(.not.( (IGem(ir)==IGE.and.IGem(is)==JGE) .or. (IGem(ir)==JGE.and.IGem(is)==IGE ) )) DChol(i,j)=0.d0
+         if(.not.( (IGem(ir)==KGE.and.IGem(is)==LGE) .or. (IGem(ir)==LGE.and.IGem(is)==KGE ) )) DCholAct(i,j)=0.d0
+      enddo
+   enddo
+endif
+!
 DCholT = transpose(DChol)
 DCholActT = transpose(DCholAct)
 ! ==========================================================================
@@ -278,7 +298,7 @@ Do IGL=1,NGrid
        If(AC1.Eq.1) FF=WFact/XFactorial/2.D0
        XNorm1=Norm2(FF*C2Tilde)
        Write(6,'(X,"Order (n), |Delta_C|",I3,E14.4)')N,XNorm1
-       If(XNorm1.Lt.ErrMax) Exit
+       If(IAnalys.Eq.0.And.XNorm1.Lt.ErrMax) Exit
        If(N.Gt.3.And.XNorm1.Gt.XNorm0) Then
            Write(6,'(X,"Divergence detected. Expansion of C terminated at order ",I3,3F10.4)')N-1
 !          Write(6,'(X,"Divergence detected. Continue up to order Max_Cn",I3,3F10.4)')N
@@ -429,7 +449,7 @@ nblk = 1 + NBasis - NAct
 allocate(A0block(nblk))
 Call AC0BLOCK(Occ,URe,XOne, &
      IndN,IndX,IGem,NAct,INActive,NDimX,NBasis,NDimX,NInte1,'FFOO','FOFO', &
-     A0BlockIV,A0Block,nblk,'A0BLK',0)
+     1,A0BlockIV,A0Block,nblk,1,'A0BLK',0)
 
 allocate(COMTilde(NDimX*NCholesky),COMTildeAct(NDimX*NCholesky))
 COMTilde=0.0
@@ -598,7 +618,7 @@ nblk = 1 + NBasis - NAct
 allocate(A0block(nblk))
 Call AC0BLOCK(Occ,URe,XOne, &
       IndN,IndX,IGem,NAct,INActive,NDimX,NBasis,NDimX,NInte1,'FFOO','FOFO', &
-      A0BlockIV,A0Block,nblk,'A0BLK',0)
+      0,A0BlockIV,A0Block,nblk,0,'A0BLK',0)
       !A0BlockIV,A0Block,nblk,1)
 
 COM=0d0
@@ -606,7 +626,7 @@ Do IGL=1,NGrid
    OmI=XFreq(IGL)
 
 !  Calc: WORK1=(A0+Om^2)^-1
-   Call INV_AC0BLK(OmI**2,WORK1,A0Block,A0BlockIV,nblk,NDimX)
+   Call INV_AC0BLK_OLD(OmI**2,WORK1,A0Block,A0BlockIV,nblk,NDimX)
 !  Calc: C0=1/2 Lambda.ABPLUS0
    Call dgemm('N','N',NDimX,NDimX,NDimX,0.5d0,WORK1,NDimX,&
               ABPLUS0,NDimX,0d0,C0,NDimX)
@@ -1929,7 +1949,7 @@ Enddo
 
 Call CFREQPROJ(ipiv,Om,DipCX,1, &
    Max_Cn,XOne,URe,Occ,&
-   IGem,NAct,INActive,NELE,NBasis,NInte1,NGem,IndAux,&
+   IGem,NAct,INActive,NBasis,NInte1,IndAux,&
    ICholesky,IndN,IndX,NDimX)
 
 AYX=8.d0*ddot(NDimx,DipCY,1,ipiv,1)
@@ -1938,7 +1958,7 @@ AXX=8.d0*ddot(NDimx,DipCX,1,ipiv,1)
 
 Call CFREQPROJ(ipiv,Om,DipCY,1, &
    Max_Cn,XOne,URe,Occ,&
-   IGem,NAct,INActive,NELE,NBasis,NInte1,NGem,IndAux,&
+   IGem,NAct,INActive,NBasis,NInte1,IndAux,&
    ICholesky,IndN,IndX,NDimX)
 
 AXY=8.d0*ddot(NDimx,DipCX,1,ipiv,1)
@@ -1947,7 +1967,7 @@ AYY=8.d0*ddot(NDimx,DipCY,1,ipiv,1)
 
 Call CFREQPROJ(ipiv,Om,DipCZ,1, &
    Max_Cn,XOne,URe,Occ,&
-   IGem,NAct,INActive,NELE,NBasis,NInte1,NGem,IndAux,&
+   IGem,NAct,INActive,NBasis,NInte1,IndAux,&
    ICholesky,IndN,IndX,NDimX)
 AXZ=8.d0*ddot(NDimx,DipCX,1,ipiv,1)
 AYZ=8.d0*ddot(NDimx,DipCY,1,ipiv,1)
@@ -1962,7 +1982,7 @@ end subroutine PolarizAl
 
 subroutine CFREQPROJ(COMTilde,OmI,DProj,NProj, &
    Max_Cn,XOne,URe,Occ,&
-   IGem,NAct,INActive,NELE,NBasis,NInte1,NGem,IndAux,&
+   IGem,NAct,INActive,NBasis,NInte1,IndAux,&
    ICholesky,IndN,IndX,NDimX)
 !
 !  For a given frequency OmI, return a product of the matrices C(Alpha=1,OmI) and DProj
@@ -1975,8 +1995,8 @@ use systemdef
 use sapt_utils
 
 implicit none
-integer,intent(in) :: NBasis,NInte1,NGem,NDimX,NProj
-integer,intent(in) :: NAct,INActive,NELE,ICholesky
+integer,intent(in) :: NBasis,NInte1,NDimX,NProj
+integer,intent(in) :: NAct,INActive,ICholesky
 integer,intent(in) :: IndN(2,NDimX),IndX(NDimX),IndAux(NBasis),&
                       IGem(NBasis)
 double precision :: ACAlpha,Eps
@@ -2001,7 +2021,7 @@ type(EblockData) :: A0blockIV,LambdaIV
 type(EblockData),allocatable :: A0block(:),Lambda(:)
 
 ! tolerance
-Eps=1.d-2
+Eps=1.d-5
 
 DProjT = transpose(DProj)
 

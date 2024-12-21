@@ -10,15 +10,23 @@ use sorter
 use Cholesky
 use abmat
 use read_external
+use trexio
 
 implicit none
+
+
+private :: truncate_2rdm_trexio
 
 contains
 
 subroutine sapt_interface(Flags,SAPT,NBasis)
 !
 ! SAPT-DALTON requires SIRIFC and SIRIUS.RST
-!                   or SIRIFC and occupations.dat
+!                   (or SIRIFC and occupations.dat)
+!                      and rdm2.dat files
+! SAPT-MOLPRO requires AOONEINT, AOTWOINT.mol,
+!                      DIP, 2RDM files
+! SAPT-TREXIO requires .h5 files
 !
 implicit none
 
@@ -27,8 +35,8 @@ type(SaptData)      :: SAPT
 type(TCholeskyVecs) :: CholeskyVecs
 integer,intent(in)  :: NBasis
 
-integer    :: NSq,NInte1,NInte2
-integer    :: NCholesky
+integer    :: NAO,NCholesky
+integer    :: NInte1,NInte2
 integer    :: dimOA,dimOB,dimVA,dimVB,nOVA,nOVB
 integer    :: NCMOt, NOrbt, NBasist
 integer    :: NSym, NBas(8)
@@ -61,7 +69,6 @@ double precision :: Tcpu,Twall
  SAPT%monB%IPrint = SAPT%IPrint
 
 ! set dimensions
- NSq = NBasis**2
  NInte1 = NBasis*(NBasis+1)/2
  NInte2 = NInte1*(NInte1+1)/2
  SAPT%monA%NDim = NBasis*(NBasis-1)/2
@@ -77,13 +84,19 @@ double precision :: Tcpu,Twall
     SAPT%SemiCoupled = .false.
  endif
 
-! read and dump 1-electron integrals
+! read and dump 1-electron integrals in AO
  if(SAPT%InterfaceType==1) then
-    call onel_dalton(SAPT%monA%Monomer,NBasis,NSq,NInte1,SAPT%monA,SAPT)
-    call onel_dalton(SAPT%monB%Monomer,NBasis,NSq,NInte1,SAPT%monB,SAPT)
+    call onel_dalton(SAPT%monA%Monomer,NBasis,NAO,NInte1,SAPT%monA,SAPT)
+    call onel_dalton(SAPT%monB%Monomer,NBasis,NAO,NInte1,SAPT%monB,SAPT)
  elseif(SAPT%InterfaceType==2) then
-    call onel_molpro(SAPT%monA%Monomer,NBasis,NSq,NInte1,SAPT%monA,SAPT)
-    call onel_molpro(SAPT%monB%Monomer,NBasis,NSq,NInte1,SAPT%monB,SAPT)
+    call onel_molpro(SAPT%monA%Monomer,NBasis,NAO,NInte1,SAPT%monA,SAPT)
+    call onel_molpro(SAPT%monB%Monomer,NBasis,NAO,NInte1,SAPT%monB,SAPT)
+ elseif(SAPT%InterfaceType==5) then
+    call onel_trexio(NBasis,NAO,SAPT%monA,SAPT)
+    call onel_trexio(NBasis,NAO,SAPT%monB,SAPT)
+ else
+    write(lout,'(1x,a)') 'Unrecognized InterfaceType for SAPT!'
+    stop
  endif
 
 ! add empty line
@@ -102,17 +115,28 @@ double precision :: Tcpu,Twall
  ! deallocate(Sb,Sa)
 
  elseif(SAPT%InterfaceType==2) then
+    ! AuxA and AuxB are MO-->NO coefficients
     allocate(AuxA(NBasis,NBasis),AuxB(NBasis,NBasis),&
              OneRdmA(NInte1),OneRdmB(NInte1))
     call readocc_molpro(NBasis,SAPT%monA,AuxA,OneRdmA,Flags)
     call readocc_molpro(NBasis,SAPT%monB,AuxB,OneRdmB,Flags)
+
+ elseif(SAPT%InterfaceType==5) then
+    allocate(AuxA(NBasis,NBasis),AuxB(NBasis,NBasis),&
+             OneRdmA(NInte1),OneRdmB(NInte1))
+    call readocc_trexio(NBasis,SAPT%monA,AuxA,OneRdmA,Flags)
+    call readocc_trexio(NBasis,SAPT%monB,AuxB,OneRdmB,Flags)
+
  endif
  call print_occ(NBasis,SAPT,Flags%ICASSCF)
 
 ! read orbitals
+! Dalton:
 ! norb.leq.nbas, orbitals mays be deleted due to linear
 ! dependecies in large basis sets; ncmot = norb*nbas
- allocate(Ca(NBasis*NBasis),Cb(NBasis*NBasis))
+! in general, NAO /= NBasis (e.g., in TREXIO)
+
+ allocate(Ca(NBasis*NAO),Cb(NBasis*NAO))
 
  if(SAPT%InterfaceType==1) then
 
@@ -123,11 +147,18 @@ double precision :: Tcpu,Twall
     call arrange_mo(Cb,NBasis,SAPT)
 
  elseif(SAPT%InterfaceType==2) then
+
     call read_mo_molpro(Ca,'MOLPRO_A.MOPUN','CASORB  ',NBasis)
     call read_mo_molpro(Cb,'MOLPRO_B.MOPUN','CASORB  ',NBasis)
+
+ elseif(SAPT%InterfaceType==5) then
+
+    call read_mo_trexio(Ca,SAPT%monA%TrexFile,NAO,NBasis)
+    call read_mo_trexio(Cb,SAPT%monB%TrexFile,NAO,NBasis)
+
  endif
 
-! symmetry sorting
+! symmetry sorting for Dalton
  if(SAPT%InterfaceType==1) then
     if(SAPT%monA%NSym.gt.1) then
        call sort_sym_mo(Ca,NBasis,SAPT%monA)
@@ -167,6 +198,8 @@ double precision :: Tcpu,Twall
              call readtwoint(NBasis,2,'AOTWOINT.erfB','AOERFSORTB',MemSrtSize)
           endif
        endif
+    elseif(SAPT%InterfaceType==5) then
+       call readtwoint(NAO,5,SAPT%monA%TrexFile,'AOTWOSORT',MemSrtSize)
     endif
  endif
 
@@ -183,6 +216,8 @@ double precision :: Tcpu,Twall
        call chol_CoulombMatrix(CholeskyVecs,NBasis,'AOTWOINT_A',1,Flags%ICholeskyAccu)
     elseif(SAPT%InterfaceType==2) then
        call chol_CoulombMatrix(CholeskyVecs,NBasis,'AOTWOINT.mol',2,Flags%ICholeskyAccu)
+    elseif(SAPT%InterfaceType==5) then
+       call chol_CoulombMatrix(CholeskyVecs,NAO,SAPT%monA%TrexFile,5,Flags%ICholeskyAccu)
     endif
 
     SAPT%NCholesky  = CholeskyVecs%NCholesky
@@ -197,6 +232,9 @@ double precision :: Tcpu,Twall
     call prepare_no_molpro(OneRdmB,AuxB,Cb,SAPT%monB,CholeskyVecs,Flags%IFunSR,Flags%ICholesky,NBasis)
     call prepare_rdm2_molpro(SAPT%monA,AuxA,NBasis)
     call prepare_rdm2_molpro(SAPT%monB,AuxB,NBasis)
+ elseif(SAPT%InterfaceType==5) then
+    call prepare_no_trexio(AuxA,Ca,NAO,NBasis)
+    call prepare_no_trexio(AuxB,Cb,NAO,NBasis)
  endif
 
  ! dSRS: read 1rdms, 1trdms, 2rdms
@@ -213,18 +251,10 @@ double precision :: Tcpu,Twall
     call read_2rdm_2trdm_molpro(NBasis,SAPT%monB)
  endif
 
-! maybe better: add writing Ca, Cb to file?!
- allocate(SAPT%monA%CMO(NBasis,NBasis),SAPT%monB%CMO(NBasis,NBasis))
- ij=0
- SAPT%monA%CMO = 0
- SAPT%monB%CMO = 0
- do i=1,NBasis
-    do j=1,NBasis
-       ij = ij + 1
-       SAPT%monA%CMO(j,i) = Ca(ij)
-       SAPT%monB%CMO(j,i) = Cb(ij)
-    enddo
- enddo
+ allocate(SAPT%monA%CMO(NAO,NBasis),SAPT%monB%CMO(NAO,NBasis))
+
+ call save_CAONO(Ca,SAPT%monA%CMO,NAO,NBasis)
+ call save_CAONO(Cb,SAPT%monB%CMO,NAO,NBasis)
 
 #if SAPT_INTERFACE_DEBUG > 5
  write(lout,'(/,1x,a,f14.8)') 'Monomer A : CAONO',norm2(SAPT%monA%CMO)
@@ -238,8 +268,30 @@ double precision :: Tcpu,Twall
 #endif
 
 ! look-up tables
- call select_active(SAPT%monA,NBasis,Flags)
- call select_active(SAPT%monB,NBasis,Flags)
+ if(SAPT%InterfaceType==5) then
+    call select_active_trexio(SAPT%monA,NBasis,Flags)
+    call select_active_trexio(SAPT%monB,NBasis,Flags)
+ else
+    call select_active(SAPT%monA,NBasis,Flags)
+    call select_active(SAPT%monB,NBasis,Flags)
+ endif
+
+! read & transform 2-rdm / trexio
+ if(SAPT%InterfaceType==5) then
+
+   !! test CIPSI energy
+   !call energy_trexio_no(SAPT%monA,OneRdmA,AuxA,Ca,NAO,NBasis)
+   !call energy_trexio_no(SAPT%monB,OneRdmB,AuxB,Cb,NAO,NBasis)
+
+   ! for testing
+   !call truncate_rdm2(SAPT%monA,NAO,NBasis)
+   !call truncate_rdm2(SAPT%monB,NAO,NBasis)
+
+   call rw_trexio_rdm2(SAPT%monA,AuxA,NBasis)
+   call rw_trexio_rdm2(SAPT%monB,AuxB,NBasis)
+   if (Flags%ICASSCF==1) call rw_trexio_save_rdm2file(Flags,SAPT%monA)
+   if (Flags%ICASSCF==1) call rw_trexio_save_rdm2file(Flags,SAPT%monB)
+ endif
 
  if(Flags%ICholesky==1) then
     ! transform Cholesky Vecs to NO
@@ -252,10 +304,11 @@ double precision :: Tcpu,Twall
  !if(SAPT%IPrint.ne.0) call print_mo(Cb,NBasis,'MONOMER B')
 
 ! check if both monomers are open-shell
- openA = .false. ; openB = .false.
- if ( mod( int(SAPT%monA%XELE), 2) /= 0) openA = .true.
- if ( mod( int(SAPT%monB%XELE), 2) /= 0) openB = .true.
- if (openA .and. openB) SAPT%OpenShell = .true.
+ ! temp discarded
+ !openA = .false. ; openB = .false.
+ !if ( mod( int(SAPT%monA%XELE), 2) /= 0) openA = .true.
+ !if ( mod( int(SAPT%monB%XELE), 2) /= 0) openB = .true.
+ !if (openA .and. openB) SAPT%OpenShell = .true.
 
 ! ABABABABABABABABABABABABABABABABABABABABABABABABABABABABAB
  if(SAPT%IPrint.gt.100) call print_TwoInt(NBasis)
@@ -283,25 +336,25 @@ double precision :: Tcpu,Twall
  endif
 
 ! calculate exchange K[PB] matrix in AO
- allocate(SAPT%monB%Kmat(NBasis,NBasis))
- allocate(work(NBasis,NBasis))
+ allocate(SAPT%monB%Kmat(NAO,NAO))
+ allocate(work(NAO,NAO))
  !get PB density in AO
  work = 0
  do i=1,NBasis
- call dger(NBasis,NBasis,SAPT%monB%Occ(i),SAPT%monB%CMO(:,i),1,SAPT%monB%CMO(:,i),1,work,NBasis)
+    call dger(NAO,NAO,SAPT%monB%Occ(i),SAPT%monB%CMO(:,i),1,SAPT%monB%CMO(:,i),1,work,NAO)
  enddo
 
  if(Flags%ICholesky==0) then
-    call make_K(NBasis,work,SAPT%monB%Kmat)
+    call make_K(NAO,work,SAPT%monB%Kmat)
  elseif(Flags%ICholesky==1) then
     NCholesky = CholeskyVecs%NCholesky
     call make_K_CholR(CholeskyVecs%R(1:NCholesky,1:NInte1), &
-                      NCholesky,NBasis,work,SAPT%monB%Kmat)
+                      NCholesky,NAO,work,SAPT%monB%Kmat)
  endif
  deallocate(work)
 
 ! calculate electrostatic potential
- call calc_elpot(SAPT%monA,SAPT%monB,CholeskyVecs,Flags%ICholesky,NBasis)
+ call calc_elpot(SAPT%monA,SAPT%monB,CholeskyVecs,Flags%ICholesky,NAO,NBasis)
 
 ! calc intermolecular repulsion
  SAPT%Vnn = calc_vnn(SAPT%monA,SAPT%monB)
@@ -450,18 +503,23 @@ deallocate(GChrgB,GChrgA)
 
 end subroutine sapt_1rdm_spin
 
-subroutine onel_molpro(mon,NBasis,NSq,NInte1,MonBlock,SAPT)
+subroutine onel_molpro(mon,NBasis,NAO,NInte1,MonBlock,SAPT)
  implicit none
 
- type(SaptData)     :: SAPT
- type(SystemBlock)  :: MonBlock
- integer,intent(in) :: mon,NBasis,NSq,NInte1
+ type(SaptData)      :: SAPT
+ type(SystemBlock)   :: MonBlock
+ integer,intent(in)  :: mon,NBasis,NInte1
+ integer,intent(out) :: NAO
 
+ integer :: NSq
  integer                       :: ione,ios,NSym,NBas(8),ncen
  double precision, allocatable :: Hmat(:),Vmat(:),Smat(:)
+ double precision, allocatable :: Kmat(:)
  double precision, allocatable :: work1(:),work2(:)
  character(8)                  :: label
  character(:),allocatable      :: infile,outfile
+
+ NSq = NBasis**2
 
  if(mon==1) then
    infile  = 'AOONEINT_A'
@@ -512,6 +570,9 @@ subroutine onel_molpro(mon,NBasis,NSq,NInte1,MonBlock,SAPT)
  MonBlock%NSym = NSym
  MonBlock%NSymBas(1:NSym) = NBas(1:NSym)
 
+ NAO = NBasis
+ SAPT%NAO = NAO
+
  !square form
  call writeoneint(outfile,NSq,Smat,Vmat,Hmat)
 
@@ -520,17 +581,24 @@ subroutine onel_molpro(mon,NBasis,NSq,NInte1,MonBlock,SAPT)
 
 end subroutine onel_molpro
 
-subroutine onel_dalton(mon,NBasis,NSq,NInte1,MonBlock,SAPT)
+subroutine onel_dalton(mon,NBasis,NAO,NInte1,MonBlock,SAPT)
  implicit none
 
  type(SaptData) :: SAPT
  type(SystemBlock) :: MonBlock
 
- integer,intent(in) :: mon,NBasis,NSq,NInte1
+ integer,intent(in)  :: mon,NBasis,NInte1
+ integer,intent(out) :: NAO
+
+ integer :: NSq
  integer :: ione,NSym,NBas(8),ncen
+ integer :: i,ncenA,ncenB
  double precision, allocatable :: Hmat(:),Vmat(:),Smat(:)
  double precision, allocatable :: work1(:),work2(:)
  character(:),allocatable :: infile,outfile
+
+ ! set dimensions
+ NSq = NBasis**2
 
  if(mon==1) then
    infile =  'AOONEINT_A'
@@ -548,8 +616,11 @@ subroutine onel_dalton(mon,NBasis,NSq,NInte1,MonBlock,SAPT)
  read(ione)
  read(ione) NSym,NBas(1:NSym),MonBlock%PotNuc
 
- ! HERE!!! temp!
+ MonBlock%NSym = NSym
  MonBlock%NSymOrb(1:NSym) = NBas(1:NSym)
+
+ NAO = NBasis
+ SAPT%NAO = NAO
 
  call readlabel(ione,'ONEHAMIL')
  call readoneint_dalton(ione,work1)
@@ -568,6 +639,32 @@ subroutine onel_dalton(mon,NBasis,NSq,NInte1,MonBlock,SAPT)
  read(ione)
  read(ione) MonBlock%charg,ncen,MonBlock%xyz
 
+ if(mon==2) then
+
+    ! check is B and A monomers were switched
+    if(MonBlock%charg(1)/=0d0) MonBlock%switchAB = .true.
+
+    !print*, 'charge before switch'
+    !write(LOUT,*) MonBlock%charg(1:ncen)
+    ! if Gh(A)-B :
+    !  a) adapt xyz coords of B
+    !  b) adapt chrge of B
+    if(MonBlock%charg(1)==0d0) then
+       ncenA = 0
+       do i=1,ncen
+          if(MonBlock%charg(i)==0d0) ncenA = ncenA + 1
+       enddo
+       ncenB=ncen-ncenA
+       !print*, 'ncenA,ncenB',ncenA,ncenB,ncen
+       do i=1,ncenB
+          MonBlock%xyz(i,:) = MonBlock%xyz(i+ncenA,:)
+          MonBlock%charg(i) = MonBlock%charg(i+ncenA)
+       enddo
+       MonBlock%charg(ncenB+1:ncen) = 0d0
+    endif
+
+ endif
+
 ! print*, 'MONO-A',ncen
 ! write(LOUT,*) SAPT%monA%charg(1:ncen)
 ! do i=1,ncen
@@ -585,12 +682,16 @@ subroutine onel_dalton(mon,NBasis,NSq,NInte1,MonBlock,SAPT)
 
  if(mon==2) then
  ! rearrange in V: (B,A) -> (A,B)
-    call read_syminf(SAPT%monA,SAPT%monB,NBasis)
+    !call read_syminf(SAPT%monA,SAPT%monB,NBasis)
+    if(MonBlock%switchAB) then
+       call read_syminf_dalton(SAPT%monA%NSym,SAPT%monB%NSym,SAPT%monB%UCen, &
+                               SAPT%monA%NSymOrb,SAPT%monB%NSymOrb,&
+                               SAPT%monA%NMonBas,SAPT%monB%NMonBas)
 
-    call arrange_oneint(Smat,NBasis,SAPT)
-    call arrange_oneint(Vmat,NBasis,SAPT)
-    call arrange_oneint(Hmat,NBasis,SAPT)
-
+       call arrange_oneint(Smat,NBasis,SAPT)
+       call arrange_oneint(Vmat,NBasis,SAPT)
+       call arrange_oneint(Hmat,NBasis,SAPT)
+    endif
  endif
 
  ! square form
@@ -600,6 +701,124 @@ subroutine onel_dalton(mon,NBasis,NSq,NInte1,MonBlock,SAPT)
  deallocate(Hmat,Vmat,Smat)
 
 end subroutine onel_dalton
+
+subroutine onel_trexio(NBasis,NAO,Mon,SAPT)
+!
+! Purpose:
+! reads NAO
+! reads Smat, Hmat, Tmat in AOs
+! reads geometry: charg,coord
+!
+ implicit none
+
+ type(SaptData)      :: SAPT
+ type(SystemBlock)   :: Mon
+ integer,intent(in)  :: NBasis
+ integer,intent(out) :: NAO
+
+ integer    :: rc
+ integer    :: i,num,offset
+ integer(8) :: f
+ double precision :: repulsion
+ double precision, allocatable :: Hmat(:),Vmat(:),Smat(:)
+ double precision, allocatable :: kinetic(:)
+ double precision, allocatable :: charge(:),coord(:,:)
+ character(:),allocatable      :: outfile
+
+if(Mon%Monomer==1) then
+  outfile = 'ONEEL_A'
+elseif(Mon%Monomer==2) then
+  outfile = 'ONEEL_B'
+endif
+
+f = trexio_open (Mon%TrexFile, 'r', TREXIO_HDF5, rc)
+
+rc = trexio_has_ao_num(f)
+if (rc /= TREXIO_SUCCESS) then
+  stop 'No AO num in file'
+end if
+rc = trexio_read_ao_num(f,NAO)
+
+allocate(Hmat(NAO**2),Vmat(NAO**2),Smat(NAO**2))
+allocate(kinetic(NAO**2))
+
+rc = trexio_has_ao_1e_int_overlap(f)
+if (rc /= TREXIO_SUCCESS) then
+  stop 'No overlap in file'
+end if
+
+rc = trexio_read_ao_1e_int_overlap(f, Smat)
+
+rc = trexio_has_ao_1e_int_kinetic(f)
+if (rc /= TREXIO_SUCCESS) then
+  stop 'No kinetic in file'
+end if
+
+rc = trexio_read_ao_1e_int_kinetic(f, kinetic)
+
+rc = trexio_has_ao_1e_int_potential_n_e(f)
+if (rc /= TREXIO_SUCCESS) then
+  stop 'No potential_n_e in file'
+end if
+
+rc = trexio_read_ao_1e_int_potential_n_e(f, Vmat)
+
+Hmat = 0
+Hmat = Vmat + kinetic
+
+! write in square form
+call writeoneint(outfile,NAO**2,Smat,Vmat,Hmat)
+
+SAPT%NAO = NAO
+
+rc = trexio_has_nucleus_charge(f)
+if (rc /= TREXIO_SUCCESS) then
+  stop 'No nucleus charge in file'
+end if
+rc = trexio_has_nucleus_coord(f)
+if (rc /= TREXIO_SUCCESS) then
+  stop 'No nuclei coords in file'
+end if
+
+rc = trexio_read_nucleus_num(f,num)
+allocate(charge(num),coord(3,num))
+rc = trexio_read_nucleus_charge(f,charge)
+rc = trexio_read_nucleus_coord(f,coord)
+
+offset = 0
+if(Mon%Monomer==2) offset = SAPT%monA%NCen
+do i=1,Mon%NCen
+   Mon%charg(i)   = charge(offset+i)
+   Mon%xyz(i,1:3) = coord(1:3,offset+i)
+enddo
+
+if(mon%IPrint.gt.10) then
+  print*, 'Total number of nuclei :',num
+  print*, 'Charges on centers'
+  do i=1,num
+     write(lout,'(i3,f12.6)') i, Mon%charg(i)
+  enddo
+  print*, 'Cartesian coordinates (Angstrom)'
+  do i=1,num
+      write(6,'(i3,3f12.6)') i, Mon%xyz(i,1:3)
+  enddo
+  print*, ''
+endif
+
+rc = trexio_has_nucleus_repulsion(f)
+if (rc /= TREXIO_SUCCESS) then
+  stop 'No nuclar repulson energy in file'
+end if
+rc = trexio_read_nucleus_repulsion(f,repulsion)
+Mon%PotNuc = repulsion
+
+rc = trexio_close(f)
+
+deallocate(coord,charge)
+deallocate(kinetic)
+deallocate(Smat,Vmat,Hmat)
+
+end subroutine onel_trexio
 
 subroutine readocc_dalton(NBasis,Mon,Flags)
 implicit none
@@ -805,17 +1024,180 @@ endif
     if(Mon%Occ(i).lt.0.5d0) Mon%CICoef(i)=-Mon%CICoef(i)
  enddo
 
- !block
- !integer :: j
- !print*, 'readocc_molpro: CMONO',norm2(OrbAux)
- !do j=1,NBasis
- !   write(lout,'(*(f12.6))') (OrbAux(i,j),i=1,NBasis)
- !enddo
- !end block
 
  deallocate(EVal,work)
 
 end subroutine readocc_molpro
+
+subroutine readocc_trexio(NBasis,Mon,OrbAux,OneRdm,Flags)
+!
+! Purpose:
+! read and 1-RDM, get Occ and MO-->NO
+! Comment:
+! Locally assume all orbitals are active!
+!
+! [output]: Mon%Occ           : occupation numbers (0:1)
+!           Mon%CICoef        : CI coefficients == sqrt(Occ)
+!           Mon%IGem          : number of geminals (1=inactive,2=active,3=virtual)
+! [output]: OrbAux(N,N)       : MO-->NO coeffs
+!           OneRdm(N*(N+1)/2) : triangular 1-RDM in MO 
+!
+use trexio
+implicit none
+
+type(SystemBlock)  :: Mon
+type(FlagsData)    :: Flags
+integer,intent(in) :: NBasis
+double precision   :: OrbAux(NBasis,NBasis), &
+                      OneRdm(NBasis*(NBasis+1)/2)
+
+integer    :: i,j,ij,rc,itmp
+integer    :: NOccup,HlpDim
+integer(8) :: f
+double precision :: tmp
+double precision :: tmp1,tmp2
+double precision,allocatable :: work(:),Eval(:)
+double precision,allocatable :: work1d(:)
+character(1) :: monlabel
+
+if(mon%monomer==1) monlabel='A'
+if(mon%monomer==2) monlabel='B'
+
+HlpDim = max(NBasis**2,3*NBasis)
+
+! allocate occupations, CI coefficients and IGem's
+allocate(Mon%CICoef(NBasis),Mon%IGem(NBasis),Mon%Occ(NBasis))
+
+allocate(work(HlpDim),EVal(NBasis))
+allocate(work1d(NBasis**2))
+
+f = trexio_open (Mon%TrexFile, 'r', TREXIO_HDF5, rc)
+
+rc = trexio_has_rdm_1e(f)
+if (rc /= TREXIO_SUCCESS) then
+  stop 'No 1-RDM in file'
+end if
+
+rc = trexio_read_rdm_1e(f, work1d)
+
+call sq_to_triang(work1d,OneRdm,NBasis)
+call Diag8(work1d,NBasis,NBasis,Eval,work)
+
+! sort descending
+do i=1,NBasis
+   Eval(i) = Abs(Eval(i))
+enddo
+
+call SortOcc(EVal,work1d,NBasis)
+
+! select: CI or CASSCF
+if(Flags%ICI==1) then
+
+   ! in CI all orbitals are active
+   ! they will be truncated later (ThrAct)
+   Mon%NAct = NBasis
+
+   ! read NAct from 1RDM
+   tmp = 0d0
+   j = 0
+   do i=1,NBasis
+      tmp = tmp + EVal(i) / 2d0
+      if((EVal(i)/2d0).lt.Mon%ThrAct) then
+         j = j + 1
+         if(mon%IPrint.gt.5) write(lout,'(1x,a,i3,e14.4)') 'Warning! Small occupation:',i,Eval(i)
+      end if
+   enddo
+   if(j.gt.0) write(lout,*) 'Monomoner '//monlabel//': ',j,'orbitals will be treated as virtual'
+
+   ! Set INAct (also works for open-shells)
+   Mon%INAct  = Mon%XELE - tmp + 1.d-1
+
+elseif(Flags%ICASSCF==1) then
+
+   Mon%NAct = 0
+   itmp = 0
+   tmp = 0d0
+   ! Quantum Package holds the entitre 1-rdm (not only the active part)
+   !
+   ! the 1-^-10 threshold is also used for Molpro
+   !
+   do i=1,NBasis
+      tmp = tmp + EVal(i) / 2d0
+      if(EVal(i)>1d-10) itmp = itmp + 1
+      if(abs(EVal(i)-2d0)<1d-10) Mon%INAct = Mon%INAct + 1
+   enddo
+   Mon%NAct = itmp - Mon%INAct
+
+   !! check Active with TREXIO
+   !block
+   !character(len=32) :: moclass(nbasis)
+   !rc = trexio_read_mo_class(f,moclass,32)
+   !print*, 'MO_CLASS'
+   !do i=1,nbasis
+   !  print*, moclass(i)
+   !enddo
+   !end block
+
+else
+   stop "readocc_trexio: wrong RDMType for TREXIO!"
+endif
+
+NOccup     = Mon%INAct + Mon%NAct
+Mon%SumOcc = tmp + Mon%INAct
+
+! fill Occ / TREXIO
+if (Flags%ICI == 1) then
+   Mon%Occ = 0
+   do i=1,NOccup
+      if(i<=Mon%INAct) then
+         Mon%Occ(i) = 1d0
+      else
+         Mon%Occ(i) = EVal(i) / 2
+         !Mon%Occ(i) = EVal(i-Mon%INAct) / 2
+      endif
+   enddo
+elseif (Flags%ICASSCF == 1 ) then
+   Mon%Occ = 0
+   Mon%Occ(1:NOccup) = EVal(1:NOccup) / 2
+   ! inactive part has to be set to 1d0 for FRDM2 function to work!
+   do i=1,Mon%INAct
+      Mon%Occ(i) = 1d0
+   enddo
+endif
+
+! construct IGem
+if(Mon%INAct==0) then
+   Mon%NGem = 2
+   Mon%IGem(1:Mon%NAct+Mon%INAct) = 1
+   Mon%IGem(Mon%NAct+Mon%INAct+1:NBasis) = 2
+else
+   Mon%NGem = 3
+   Mon%IGem(1:Mon%INAct) = 1
+   Mon%IGem(Mon%INAct+1:Mon%INAct+Mon%NAct) = 2
+   Mon%IGem(Mon%INAct+Mon%NAct+1:NBasis) = 3
+endif
+
+! construct CICoef
+do i=1,NBasis
+   Mon%CICoef(i)=sqrt(Mon%Occ(i))
+   if(Mon%Occ(i).lt.0.5d0) Mon%CICoef(i)=-Mon%CICoef(i)
+enddo
+
+! switch to MONO order!
+ij = 0
+do j=1,NBasis
+   do i=1,NBasis
+      ij = ij + 1
+      OrbAux(j,i) = work1d(ij)
+   enddo
+enddo
+
+rc = trexio_close(f)
+
+deallocate(Eval,work)
+deallocate(work1d)
+
+end subroutine readocc_trexio
 
 subroutine read_1rdm_1trdm_molpro(NBasis,mon)
 !
@@ -1128,18 +1510,7 @@ enddo
 !  enddo
 !returns TRDM in iref NO basis
 
-
-
-
 ! create approximate 2-TRDMs here...
-
-
-
-
-
-
-
-
 
 deallocate(work,RDM2Act)
 
@@ -1662,6 +2033,7 @@ subroutine read2rdm_spin(Mon,NBas)
 ! Purpose: a) load rdms201.dat file to memory
 !          as Mon%RDM201(NRDM2Act) matrix
 !          B) if Hartree-Fock, assume = 0 
+! DALTON subroutine
 implicit none
 
 type(SystemBlock)   :: Mon
@@ -1715,99 +2087,14 @@ type(SaptData) :: SAPT
 integer :: nbas
 double precision :: mat(nbas,nbas)
 
-call gen_swap_rows(mat,nbas,SAPT%monA%NSym,&
+if(SAPT%monB%switchAB) then
+   call gen_swap_rows(mat,nbas,SAPT%monA%NSym,&
                    SAPT%monA%NMonBas,SAPT%monB%NMonBas)
+endif
 
 !call swap_rows(NOrbA,NOrbB,mat)
 
 end subroutine arrange_mo
-
-subroutine read_syminf(A,B,nbas)
-! reads number of basis functions on each monomer
-! from SYMINFO(B) file!
-implicit none
-
-type(SystemBlock) :: A, B
-integer :: nbas
-integer :: iunit,ios
-integer :: ibas,icen,last_ibas,last_icen
-integer :: irep,ifun,offset
-logical :: ex,dump
-integer :: tmp
-integer :: ACenTst, ACenBeg, ACenEnd
-
-! sanity checks : in
-!print*, A%NCen, B%NCen
-!print*, A%UCen, B%UCen
-if(A%NSym/=B%NSym) then
-  write(lout,*) 'ERROR in read_syminf: NSym different for A and B!'
-endif
-
-inquire(file='SYMINFO_B',EXIST=ex)
-
-if(ex) then
-   open(newunit=iunit,file='SYMINFO_B',status='OLD',&
-        form='FORMATTED')
-   read(iunit,*)
-   read(iunit,*)
-
-   ! old version: does not work with sym
-   ! print*, 'old version'
-   ! offset = 0
-   ! irep   = 1
-   ! read(iunit,'(i5,i6)',iostat=ios) last_ibas,last_icen
-   ! do
-   !   read(iunit,'(i5,i6)',iostat=ios) ibas,icen
-   !   if(ios/=0) then
-   !      A%NMonBas(irep)=last_ibas-offset
-   !      exit
-   !   elseif(icen/=last_icen) then
-   !        if(last_icen==B%UCen) then
-   !           B%NMonBas(irep) = last_ibas-offset
-   !           offset = last_ibas
-   !        elseif(icen==1) then
-   !           A%NMonBas(irep) = last_ibas-offset
-   !           offset = last_ibas
-   !           irep   = irep + 1
-   !        endif
-   !   endif
-   !   last_ibas=ibas
-   !   last_icen=icen
-   !enddo
-
-   ! new version : ok with sym
-   do irep=1,B%NSym
-      do ifun=1,B%NSymOrb(irep)
-         read(iunit,'(i5,i6)',iostat=ios) ibas,icen
-         if(icen.le.B%UCen) then
-            B%NMonBas(irep) = B%NMonBas(irep) + 1
-         else
-            A%NMonBas(irep) = A%NMonBas(irep) + 1
-         endif
-      enddo
-   enddo
-
-   close(iunit)
-else
-   write(LOUT,'(1x,a)') 'ERROR! MISSING SYMINFO_B FILE!'
-   stop
-endif
-
-! sanity checks : out
-do irep=1,B%NSym
-   ibas = A%NMonBas(irep)+B%NmonBas(irep)
-   if(ibas/=A%NSymOrb(irep)) then
-      write(lout,'(1x,a)') 'ERROR in read_syminf!'
-      write(lout,'(1x,a,i3,a)') 'For irep =',irep, ':'
-      write(lout,*) 'A-NMonBas',A%NMonBas(1:A%NSym)
-      write(lout,*) 'B-NMonBas',B%NMonBas(1:B%NSym)
-      write(lout,*) 'Sum:     ',A%NMonBas(1:A%NSym)+B%NMonBas(1:B%NSym)
-      write(lout,*) 'Should be',A%NSymOrb(1:A%NSym)
-      stop
-   endif
-enddo
-
-end subroutine read_syminf
 
 subroutine arrange_oneint(mat,nbas,SAPT)
 implicit none
@@ -1818,13 +2105,12 @@ double precision :: mat(nbas,nbas)
 
 !call read_syminf(SAPT%monA,SAPT%monB,nbas)
 
-call gen_swap_rows(mat,nbas,SAPT%monA%NSym,&
-                   SAPT%monA%NMonBas,SAPT%monB%NMonBas)
-call gen_swap_cols(mat,nbas,SAPT%monA%NSym,&
-                   SAPT%monA%NMonBas,SAPT%monB%NMonBas)
-
-!call swap_rows(SAPT%monA%NMonOrb,SAPT%monB%NMonOrb,mat)
-!call swap_cols(SAPT%monA%NMonOrb,SAPT%monB%NMonOrb,mat)
+if(SAPT%monB%switchAB) then
+   call gen_swap_rows(mat,nbas,SAPT%monA%NSym,&
+                      SAPT%monA%NMonBas,SAPT%monB%NMonBas)
+   call gen_swap_cols(mat,nbas,SAPT%monA%NSym,&
+                      SAPT%monA%NMonBas,SAPT%monB%NMonBas)
+endif
 
 end subroutine arrange_oneint
 
@@ -1976,6 +2262,26 @@ double precision :: OccOrd(nbas)
 
 end subroutine sort_sym_occ
 
+subroutine prepare_no_trexio(CMONO,CAOMO,NAO,NBasis)
+implicit none
+!
+! Purpose: get AO-->NO transformation
+!
+! CMONO[in] :: on input MOtoNO
+! CAOMO[in] :: on input AOtoMO
+!     [out] :: on output AOtoNO
+!
+integer,intent(in) :: NAO,NBasis
+double precision   :: CMONO(NBasis,NBasis),CAOMO(NAO,NBasis)
+double precision   :: work(NAO,NBasis)
+
+! skip canonicalization
+
+ call dgemm('N','N',NAO,NBasis,NBasis,1d0,CAOMO,NAO,CMONO,NBasis,0d0,work,NAO)
+ CAOMO = work
+
+end subroutine prepare_no_trexio
+
 subroutine prepare_no_molpro(OneRdm,OrbAux,OrbCAS,Mon,CholeskyVecs,IFunSR,ICholesky,NBasis)
 implicit none
 !
@@ -2097,7 +2403,6 @@ integer :: info
 
    if(ICholesky==0) then
      call FockGen_mithap(work2,OneRdm,work1,NInte1,NBasis,'AOTWOSORT')
-     print*, 'FockGen_mithap',norm2(work2)
    elseif(ICholesky==1) then
      NCholesky = CholeskyVecs%NCholesky
      call FockGen_CholR(work2,CholeskyVecs%R(1:NCholesky,1:NInte1),OneRdm,work1, &
@@ -2177,8 +2482,324 @@ integer :: info
  OrbCAS = transpose(OrbCAS)
 
  deallocate(work3,work2,work1,Fock,OrbSym,URe)
+ !if (allocated(Mon%IndInt)) deallocate(Mon%IndInt)
 
 end subroutine prepare_no_molpro
+
+subroutine rw_trexio_rdm2(Mon,CMONO,NBasis)
+!
+! Purpose:
+! read RDM2 in MO and transform MO2NO (full transformation needed)
+! stored in Mon%RDM2val
+!
+! CAREFUL!!! CURRENTLY NBasis^4 has to fit into memory!
+!
+!
+use trexio
+implicit none
+
+type(SystemBlock) :: Mon
+
+integer,intent(in) :: NBasis
+double precision,intent(in) :: CMONO(NBasis,NBasis)
+
+integer    :: rc,iunit
+integer    :: NOccup
+integer    :: NCholesky2RDM
+integer(8) :: f, BUFSIZE
+integer(8) :: offset,icount
+integer    :: i,j,k,l,ij,kl
+integer    :: idx_k,idx_l,idx_m,idx_n
+double precision :: tmp
+integer,allocatable      :: idx_buf(:,:)
+double precision,allocatable :: val_buf(:)
+double precision,allocatable :: RDM2(:)
+double precision,allocatable :: RDM2Chol(:,:,:)
+double precision,allocatable :: xnorm
+integer :: ichol
+double precision             :: tol_chol
+
+f = trexio_open (Mon%TrexFile, 'r', TREXIO_HDF5, rc)
+
+NOccup = NBasis
+
+!print*, 'rw_2rdm_trexio:'
+!print*, 'NOccup,NBasis',NOccup,NBasis
+
+allocate(Mon%RDM2val(NOccup,NOccup,NOccup,NOccup))
+Mon%RDM2val = 0
+
+if(Mon%Cholesky2rdm) then
+   rc = trexio_has_rdm_2e_cholesky(f)
+   if(rc /= TREXIO_SUCCESS) then
+     stop "No Cholesky-decomposed 2-RDM file!"
+   endif
+else
+   rc = trexio_has_rdm_2e(f)
+   if(rc /= TREXIO_SUCCESS) then
+     stop "No 2-RDM file!"
+   endif
+endif
+
+BUFSIZE = NBasis**2
+
+if(Mon%Cholesky2rdm) then
+  
+   write(lout,'(/,1x,a)') 'WIP1: use 3-ind transformation for 2-RDMs!'
+   write(lout,'(1x,a)')   'WIP2: can the matrix be read-in and 3-indx transformed in batches? (rw_trexio_rdm2)'
+   allocate(val_buf(BUFSIZE),idx_buf(3,BUFSIZE))
+   rc = trexio_read_rdm_2e_cholesky_num(f, NCholesky2rdm)
+   write(lout,'(1x,a,i5)') 'Number of Cholesky 2-RDM vectors ', NCholesky2rdm
+   print*, '(compared to ',NBasis**2,")"
+
+   allocate(RDM2Chol(NOccup,NOccup,NCholesky2rdm))
+   RDM2Chol = 0
+
+   ! read Cholesky-decomposed 2-RDM from TREXIO
+   offset  = 0
+   icount  = BUFSIZE
+   val_buf = 0
+   idx_buf = 0
+   do while(icount == BUFSIZE)
+
+      rc = trexio_read_rdm_2e_cholesky(f,offset,icount,idx_buf,val_buf)
+
+      do i=1,icount
+
+         idx_k = idx_buf(1,i)
+         idx_l = idx_buf(2,i)
+         idx_m = idx_buf(3,i)
+
+         RDM2Chol(idx_k,idx_l,idx_m) = val_buf(i)
+
+      enddo
+
+      offset = offset + icount
+
+   enddo
+
+else
+
+   allocate(val_buf(BUFSIZE),idx_buf(4,BUFSIZE))
+
+   ! read full 2-RDM from TREXIO
+   offset  = 0
+   icount  = BUFSIZE
+   val_buf = 0
+   idx_buf = 0
+   tmp = 0
+   xnorm = 0
+   do while(icount == BUFSIZE)
+
+      rc = trexio_read_rdm_2e(f,offset,icount,idx_buf,val_buf)
+
+      do i=1,icount
+
+         idx_k = idx_buf(1,i)
+         idx_l = idx_buf(2,i)
+         idx_m = idx_buf(3,i)
+         idx_n = idx_buf(4,i)
+
+         !write(LOUT,'(a,4i3,es15.6)') 'k l m n', idx_k, idx_l, idx_m, idx_n, val_buf(i)
+         if (idx_k<=NOccup .and. idx_l<=NOccup .and. idx_m <=NOccup .and. idx_n<=NOccup) then
+            Mon%RDM2val(idx_k,idx_m,idx_l,idx_n) = 0.5d0*val_buf(i)
+            !Mon%RDM2val(idx_k,idx_l,idx_m,idx_n) = 0.5d0*val_buf(i)
+            if(idx_k.eq.idx_m.and.idx_l.eq.idx_n) then
+              xnorm = xnorm + 0.5d0*val_buf(i)
+            endif
+         endif
+
+      enddo
+
+      offset = offset + icount
+
+   enddo
+
+endif
+deallocate(val_buf,idx_buf)
+
+! test Cholesky decomposition
+if(Mon%Cholesky2rdm) then
+
+  do ichol=1,NCholesky2rdm
+     do l=1,NOccup
+        do k=1,NOccup
+           do j=1,NOccup
+              do i=1,NOccup
+                 Mon%RDM2val(i,k,j,l) = Mon%RDM2val(i,k,j,l) + RDM2Chol(i,j,ichol)*RDM2Chol(k,l,ichol)
+              enddo
+           enddo
+        enddo
+     enddo
+  enddo
+  Mon%RDM2val = 0.5d0*Mon%RDM2val
+  !print*, 'RDM2Chol-norm2 ',norm2(Mon%RDM2val)
+
+  xnorm = 0d0
+  do i=1,NOccup
+     do j=1,NOccup
+        xnorm = xnorm + Mon%RDM2val(i,i,j,j)
+     enddo
+  enddo
+
+  if(mon%monomer==1) write(lout,'(/1x,a)') 'Monomer A'
+  if(mon%monomer==2) write(lout,'(/1x,a)') 'Monomer B'
+  write(lout,'(1x,a,f12.6)',advance="no") '2-RDM2 norm = ', xnorm
+  write(lout,'(1x,a,f8.3,a)') '(reference =', Mon%XELE*(2d0*Mon%XELE-1), ')'
+
+  ! re-normalize 2RDM
+  Mon%RDM2val = Mon%RDM2val * Mon%XELE*(2d0*Mon%XELE-1) / xnorm
+
+endif
+
+call tran_2rdm_trexio(CMONO,Mon%RDM2val,Mon%Occ,   &
+                      0,NBasis,NBasis)
+
+rc = trexio_close(f)
+
+! truncate 2-RDM from NBasis^4 to NOccup^4
+call truncate_2rdm_trexio(Mon,mon%num0+mon%num1,NBasis)
+
+!print*, 'Gamma-test-NOccup',norm2(Mon%RDM2val)
+
+end subroutine rw_trexio_rdm2
+
+subroutine rw_trexio_save_rdm2file(Flags,Mon)
+
+type(FlagsData)   :: Flags
+type(SystemBlock) :: Mon
+
+integer :: iunit
+integer :: i,j,k,l,ij,kl
+character(:),allocatable :: outfile
+
+if(Mon%Monomer==1) then
+  outfile='rdm2_A.dat'
+elseif(Mon%Monomer==2) then
+  outfile='rdm2_B.dat'
+endif
+
+open(newunit=iunit,file=outfile,status='replace',&
+     form='formatted')
+do i=1,Mon%NAct
+  do j=1,Mon%NAct
+     ij = (i-1)*Mon%NAct+j
+     do k=1,Mon%NAct
+        do l=1,Mon%NAct
+           kl = (k-1)*Mon%NAct+l
+           if(ij>=kl) then
+             write(iunit,'(4i4,f19.12)')  k,i,l,j,2d0*Mon%RDM2val(Mon%INAct+i,Mon%INAct+k,Mon%INAct+j,Mon%INAct+l)
+             !write(6,'(4i2,f12.8)')       k,i,l,j,2d0*Mon%RDM2val(Mon%INAct+i,Mon%INAct+k,Mon%INAct+j,Mon%INAct+l)
+           endif
+        enddo
+     enddo
+  enddo
+enddo
+
+close(iunit)
+
+end subroutine rw_trexio_save_rdm2file
+
+subroutine truncate_2rdm_trexio(Mon,NOccup,NBasis)
+!
+! truncate 2-RDM from NBasis^4 to NOccup^4
+!
+implicit none
+
+type(SystemBlock)                :: Mon
+integer,intent(in)               :: NOccup,NBasis
+
+integer :: idx_k,idx_m,idx_l,idx_n
+double precision,allocatable :: RDM2tru(:,:,:,:)
+
+write(lout,'(1x,a,i1)',advance='no') '2-RDM dim for monomer ', Mon%Monomer
+write(lout,'(1x,a,i4,a,i4)') 'truncated from NBasis =', NBasis, ' to NOccup =', NOccup
+write(lout,'(1x,a,e13.6,a)') 'according to the', Mon%ThrAct, ' threshold (ThrAct)'
+
+allocate(RDM2tru(NOccup,NOccup,NOccup,NOccup))
+
+RDM2tru = 0d0
+do idx_k=1,NOccup
+do idx_m=1,NOccup
+do idx_l=1,NOccup
+do idx_n=1,NOccup
+   RDM2tru(idx_k,idx_m,idx_l,idx_n) = Mon%RDM2val(idx_k,idx_m,idx_l,idx_n)
+enddo
+enddo
+enddo
+enddo
+
+deallocate(Mon%RDM2val)
+allocate(Mon%RDM2val(NOccup,NOccup,NOccup,NOccup))
+
+Mon%RDM2val = RDM2tru
+
+deallocate(RDM2tru)
+
+end subroutine truncate_2rdm_trexio
+
+subroutine tran_2rdm_trexio(CMONO,RDM2val,Occ,INAct,NAct,NBasis)
+!
+! Purpose: 4-index tran MO2NO of 2-RDM
+! Comment: this is now in-core, will be out-of-core!
+!
+implicit none
+
+integer,intent(in)          :: INAct,NAct,NBasis
+double precision,intent(in) :: CMONO(NBasis,NBasis),Occ(NBasis)
+double precision,intent(inout)  :: RDM2val(INAct+NAct,INAct+NAct,INAct+NAct,INAct+NAct)
+
+integer :: i,j,k,l
+integer :: NOccup,Ind(NBasis)
+double precision,allocatable :: work(:,:)
+
+NOccup = INAct + NAct
+
+!print*, 'tran 2rdm:'
+!print*, 'INact,NAct',INact,NAct
+!print*, 'NOccup',NOccup
+
+Ind = 0
+do i=1,NAct
+   Ind(INAct+i) =  i
+enddo
+
+allocate(work(NBasis,NBasis))
+
+work = 0
+!work = transpose(CMONO)
+!
+!call TrRDM24(RDM2val,work,NOccup,NBasis)
+!print*, 'transformed 2-RDM to NO!'
+!print*, 'norm-RDM2val',norm2(RDM2val)
+
+work = CMONO
+call TrRDM24_dgemm(RDM2val,work,NBasis)
+!print*, 'norm-RDM2val',norm2(RDM2val)
+
+deallocate(work)
+
+end subroutine tran_2rdm_trexio
+
+!subroutine TrRDM24_dgemm(RDM2,URe,NBasis)
+!!
+!!     TRANSFORM RDM2 WITH URe
+!!
+!implicit none
+!
+!integer          :: NBasis
+!double precision :: URe(NBasis,NBasis),RDM2(NBasis,NBasis,NBasis,NBasis)
+!
+!double precision :: Aux(NBasis,NBasis,NBasis,NBasis)
+!
+!write(lout,'(X,"FCI RDM2 TRANSFORMATION TO NO IN PROCESS...")')
+!
+!call dgemm('T','N', NBasis**3, NBasis, NBasis, 1.d0, RDM2, NBasis, URe, NBasis, 0.d0, Aux, NBasis**3)
+!call dgemm('T','N', NBasis**3, NBasis, NBasis, 1.d0, Aux,  NBasis, URe, NBasis, 0.d0, RDM2,NBasis**3)
+!call dgemm('T','N', NBasis**3, NBasis, NBasis, 1.d0, RDM2, NBasis, URe, NBasis, 0.d0, Aux, NBasis**3)
+!call dgemm('T','N', NBasis**3, NBasis, NBasis, 1.d0, Aux,  NBasis, URe, NBasis, 0.d0, RDM2,NBasis**3)
+!
+!end subroutine TrRDM24_dgemm
 
 subroutine prepare_rdm2_molpro(Mon,OrbAux,NBasis)
 implicit none
@@ -2212,7 +2833,6 @@ integer,external :: NAddrRDM
     enddo
  enddo
  call TrRDM2(RDM2Act,work1,Mon%NAct,NRDM2Act)
- !print*, 'RDM2Act-transformed', norm2(RDM2Act)
 
  open(newunit=iunit,file=outfile,status='replace',&
       form='formatted')
@@ -2225,6 +2845,7 @@ integer,external :: NAddrRDM
             if(ij>=kl) then
               write(iunit,'(4i4,f19.12)') &
                 k,i,l,j,2d0*RDM2Act(NAddrRDM(i,j,k,l,Mon%NAct))
+               !write(6,'(4i2,f12.8)') k,i,l,j,2d0*RDM2Act(NAddrRDM(i,j,k,l,Mon%NAct))
             endif
          enddo
       enddo
@@ -2291,7 +2912,7 @@ character(1) :: mname
     mon%icnt = 0
     if(Flags%ICASSCF==0) then
        do i=1,mon%NELE
-          if(mon%Occ(i).lt.mon%ThrAct) then
+          if(mon%Occ(i).lt.mon%ThrGemAct) then
              mon%IndAux(i)=1
              !write(6,'(/,X," Active Orbital: ",I4,E14.4)') &
              !      i, mon%Occ(i)
@@ -2595,13 +3216,173 @@ end function FindGem
 
 end subroutine select_active
 
-subroutine calc_elpot(A,B,CholeskyVecs,ICholesky,NBas)
+subroutine select_active_trexio(mon,nbas,Flags)
+!
+! do we really need a separate procedure for TREXIO?
+! it would maybe make more sense to set RDMType CI?
+!
+! Purpose:
+! set dimensions: NDimX,num0,num1,num2
+! set matrices  : IndN,IndX,IPair,IndAux
+!
+implicit none
+
+type(SystemBlock)  :: mon
+type(FlagsData)    :: Flags
+integer,intent(in) :: nbas
+
+integer :: i,j,ij,ind,ind_ij
+
+print*, 'WIP: do we really need a separate procedure for TREXIO?'
+print*, '     it would maybe make more sense to set RDMType CI?'
+print*, '     or split: select_active_gvb/cas/ci? '
+
+allocate(mon%IndAux(nbas))
+
+! IndAux = 0 (inactive)
+!        = 1 (active)
+!        = 2 (virtual)
+do i=1,mon%NELE
+   mon%IndAux(i) = 0
+enddo
+do i=1+mon%NELE,nbas
+   mon%IndAux(i) = 2
+enddo
+
+if(mon%NActOrb/=0) then
+
+   ! select active orbitals based on ThrAct (sets IndAux)
+   mon%icnt = 0
+   write(LOUT,'()')
+   if(mon%Monomer==1) write(LOUT,'(1x,a)') 'Monomer A'
+   if(mon%Monomer==2) write(LOUT,'(1x,a)') 'Monomer B'
+   do i=1,nbas
+      if(abs(1.0d0-mon%Occ(i)).ge.1d-8 .and. mon%Occ(i) .gt. mon%ThrAct) then
+      !if(abs(1.0d0-mon%Occ(i)).ge.1d-8 .and. mon%Occ(i) .gt. 1d-10) then
+      !if(abs(1.0d0-mon%Occ(i)).ge.1d-8 .and. mon%Occ(i) .gt. 1d-14) then  ! original
+      !if(abs(1.0d0-mon%Occ(i)).ge.0d0  .and. mon%Occ(i) .gt. 1d-14) then ! no inactive
+         mon%IndAux(i) = 1
+         write(6,'(X,"Active Orbital: ",I4,E14.4)') i, mon%Occ(i)
+         mon%icnt = mon%icnt + 1
+      endif
+   enddo
+
+endif
+
+! set generalized "occupied" = num0 + num1
+! and "virtual" = num1 + num2 indices
+mon%num0 = 0
+do i=1,nbas
+   if(mon%IndAux(i)/=0) exit
+   mon%num0 = mon%num0 + 1
+enddo
+mon%num2 = 0
+do i=nbas,1,-1
+   if(mon%IndAux(i)/=2) exit
+   mon%num2 = mon%num2 + 1
+enddo
+mon%num1 = nbas - mon%num0 - mon%num2
+
+if(Mon%IPrint.gt.10) then
+  write(lout,'(/1x,a)')     'TREXIO-num:'
+  write(lout,'(1x,a,i4)')   'num0 (inactive)',mon%num0
+  write(lout,'(1x,a,i4)')   'num1   (active)',mon%num1
+  write(lout,'(1x,a,i4,/)') 'num2  (virtual)',mon%num2
+endif
+
+! active pairs
+allocate(mon%IPair(nbas,nbas),mon%IndX(mon%NDim),mon%IndN(2,mon%NDim))
+
+mon%IPair(1:nbas,1:nbas) = 0
+
+print*, 'maybe better call ThrSelAct : Threshold for nearly degenerate pairs?'
+
+write(LOUT,'(1x,a,e15.5)')  'Threshold for active orbital pairs:       ', mon%ThrSelAct
+write(LOUT,'(1x,a,2e15.5)') 'Threshold for quasi-virtual orbital pairs:', mon%ThrQVirt
+block
+double precision :: ThrInact
+ThrInact = 1d0-1d-8
+!mon%ThrAct = 1d-10
+write(lout,'(1x,a)',advance="no") 'Threshold for selecting active orbitals: '
+write(lout,'(1x,e15.5,a,e12.5)') mon%ThrAct, ' < Active < ', ThrInact
+end block
+
+if(mon%NCen==1.and.mon%ThrSelAct<1.d-3.and.mon%NAct>1) then
+   write(LOUT,'(1x,a)') 'Warning! For single atom ThrSelAct should probably have larger value!'
+   mon%IWarn = mon%IWarn + 1
+endif
+
+ij  = 0
+ind = 0
+do i=1,nbas
+   do j=1,i-1
+
+      ij = ij + 1
+      ind_ij = mon%IndAux(i)+mon%IndAux(j)
+      if((ind_ij/=0).and.(ind_ij/=4)) then
+         ! do not correlate active degenerate orbitals from different geminals
+         if((mon%IndAux(i)==1).and.(mon%IndAux(j)==1) &
+            .and. (abs(mon%Occ(i)-mon%Occ(j))/mon%Occ(i).lt.mon%ThrSelAct) ) then
+            write(LOUT,'(1x,a,2x,2i4)') 'Discarding nearly degenerate pair',i,j
+         else
+            ! if IFlCore=0 exclude core (inactive) orbitals
+            if(Flags%IFlCore==1.or.&
+                 (Flags%IFlCore==0.and.&
+                 mon%Occ(i)/=1d0.and.mon%Occ(j)/=1d0) ) then
+                 ! exclude pairs of nearly/virtual orbitals
+                 if(abs(mon%Occ(i)+mon%Occ(j)).lt.mon%ThrQVirt) then
+                    write(LOUT,'(1x,a,2x,2i4)') 'Discarding nearly virtual-orbitals pair',i,j
+                 elseif(abs(mon%Occ(i)+mon%Occ(j)-2d0).gt.1.D-10) then
+
+                    ind = ind + 1
+                    mon%IndX(ind) = ind
+                    mon%IndN(1,ind) = i
+                    mon%IndN(2,ind) = j
+                    mon%IPair(i,j) = 1
+                    mon%IPair(j,i) = 1
+                 endif
+
+            endif
+         endif
+      endif
+
+   enddo
+enddo
+
+mon%NDimX = ind
+
+end subroutine select_active_trexio
+
+subroutine save_CAONO(Cin,Cout,NAO,NBasis)
+!
+! C(NAO*NBasis) --> CAONO(NAO,NBasis)
+!
+implicit none
+
+integer,intent(in) :: NAO,NBasis
+double precision,intent(in)  :: Cin(:)
+double precision,intent(out) :: Cout(NAO,NBasis)
+
+integer :: i,j,ij
+
+Cout = 0
+ij = 0
+do j=1,NBasis
+   do i=1,NAO
+      ij = ij + 1
+      Cout(i,j) = Cin(ij)
+   enddo
+enddo
+
+end subroutine save_CAONO
+
+subroutine calc_elpot(A,B,CholeskyVecs,ICholesky,NAO,NBas)
 implicit none
 
 type(SystemBlock)   :: A, B
 type(TCholeskyVecs) :: CholeskyVecs
 
-integer,intent(in) :: ICholesky,NBas
+integer,intent(in) :: ICholesky,NAO,NBas
 
 integer :: ione,i
 integer :: NInte1,NCholesky
@@ -2613,19 +3394,16 @@ character(8)                 :: label
 
  NInte1 = NBas*(NBas+1)/2
 
- allocate(Pa(NBas,NBas),Pb(NBas,NBas),&
-          Va(NBas,NBas),Vb(NBas,NBas),&
-          Ja(NBas,NBas),Jb(NBas,NBas))
+ allocate(Pa(NAO,NAO),Pb(NAO,NAO),&
+          Va(NAO,NAO),Vb(NAO,NAO),&
+          Ja(NAO,NAO),Jb(NAO,NAO))
 
- !call get_den(NBas,A%CMO,A%Occ,2d0,Pa)
- !call get_den(NBas,B%CMO,B%Occ,2d0,Pb)
- Pa = 0d0
+ !call get_den(NAO,NBas,A%CMO,A%Occ,2d0,Pa)
+ !call get_den(NAO,NBas,B%CMO,B%Occ,2d0,Pb)
+ Pa = 0d0; Pb = 0d0
  do i=1,NBas
-    call dger(NBas,NBas,2d0*A%Occ(i),A%CMO(:,i),1,A%CMO(:,i),1,Pa,NBas)
- enddo
- Pb = 0d0
- do i=1,NBas
-    call dger(NBas,NBas,2d0*B%Occ(i),B%CMO(:,i),1,B%CMO(:,i),1,Pb,NBas)
+    call dger(NAO,NAO,2d0*A%Occ(i),A%CMO(:,i),1,A%CMO(:,i),1,Pa,NAO)
+    call dger(NAO,NAO,2d0*B%Occ(i),B%CMO(:,i),1,B%CMO(:,i),1,Pb,NAO)
  enddo
 
  !call get_one_mat('V',Va,A%Monomer,NBas)
@@ -2654,14 +3432,14 @@ character(8)                 :: label
  endif
 
  if(ICholesky==0) then
-    call make_J2(NBas,Pa,Pb,Ja,Jb)
+    call make_J2(NAO,Pa,Pb,Ja,Jb)
  elseif(ICholesky==1) then
     NCholesky = CholeskyVecs%NCholesky
     call make_J2_CholR(CholeskyVecs%R(1:NCholesky,1:NInte1), &
-                       Pa,Pb,Ja,Jb,NCholesky,NBas)
+                       Pa,Pb,Ja,Jb,NCholesky,NAO)
  endif
 
- allocate(A%WPot(NBas,NBas),B%WPot(NBas,NBas))
+ allocate(A%WPot(NAO,NAO),B%WPot(NAO,NAO))
 
  A%WPot = Va + Ja
  B%WPot = Vb + Jb

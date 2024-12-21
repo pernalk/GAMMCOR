@@ -21,9 +21,31 @@ C
      $ IndX(NDim),IndN(2,NDim)
       Real*8, Dimension(:,:), Allocatable :: PMat
 C
+C     analysis of ACn
+      Dimension ECorrIJ(6,6),IGIJ(4,4),IGemNo(6,2)
+C
 C     LOCAL ARRAYS
 C
+      Dimension ABPLUS(NDim*NDim),ABMIN(NDim*NDim)
       Dimension XGrid(100), WGrid(100)
+      Logical IURE, IFOFO
+C
+C     set IAanalys to 1 for computation of block-contributions to ACn
+C
+      IAnalys=0
+C
+      ECorrIJ=0.0d0
+      NGem=MAXVAL(IGem)
+      IJ=0
+      Do I=1,NGem
+      Do J=1,I
+      IJ=IJ+1
+      IGIJ(I,J)=IJ
+      IGIJ(J,I)=IJ
+      IGemNo(IJ,1)=I
+      IGemNo(IJ,2)=J
+      EndDo
+      EndDo
 C
       If (IFlACFREQNTH.Eq.1) Then
 C
@@ -55,12 +77,118 @@ C     If (ICholesky.Eq.0) Then
 C
 C     Find AC energy in one shot (no lambda integration) by expanding C in lambda
 C     and integrating analytically, Cholesky decomposition is employed
-C     to lower dimensionality of the C(omega)-problem 
+C     to lower dimensionality of the C(omega)-problem
 C
       Call WIter_D12Chol(ECorr,0,Max_Cn,XOne,URe,Occ,
      $ EGOne,NGOcc,IGem,NAcCAS,NInAcCAS,NELE,
      $ NBasis,NInte1,NDim,NGem,IndAux,
-     $ IndN,IndX,NDimX)
+     $ IndN,IndX,NDimX,0,0,0,0,0)
+C
+C     OBTAIN ACn decomposed into block-pair contributions 
+C
+      If(IAnalys.Eq.1) Then
+C 
+      Sum=Zero
+      Write(6,'(/,X,
+     $ "Contributions to ACn from (Mu)(Nu) pairs of blocks")')
+      IJ=0
+      Do I=1,NGem
+      Do J=1,I
+      IJ=IJ+1
+! NGem=3 case
+      If(NGem.Eq.3) Then
+       IOO=0
+       If(IGemNo(IJ,1).Eq.1.And.IGemNo(IJ,2).Eq.1) IOO=1
+       IVV=0
+       If(IGemNo(IJ,1).Eq.3.And.IGemNo(IJ,2).Eq.3) IVV=1
+       IAA1=0
+       If(IGemNo(IJ,1).Eq.2.And.IGemNo(IJ,2).Eq.2) IAA1=1
+! NGem=2 case (zero inactive orbitals)
+      ElseIf(NGem.Eq.2) Then
+       IOO=0
+       IVV=0
+       If(IGemNo(IJ,1).Eq.2.And.IGemNo(IJ,2).Eq.2) IVV=1
+       IAA1=0
+       If(IGemNo(IJ,1).Eq.1.And.IGemNo(IJ,2).Eq.1) IAA1=1
+      EndIf
+
+      If(IVV==0.And.IOO==0) Then
+      KL=0
+      Do K=1,NGem
+      Do L=1,K
+         KL=KL+1
+         If(NGem.Eq.3) Then
+             IOO=0
+             If(IGemNo(KL,1).Eq.1.And.IGemNo(KL,2).Eq.1) IOO=1
+             IVV=0
+             If(IGemNo(KL,1).Eq.3.And.IGemNo(KL,2).Eq.3) IVV=1
+             IAA2=0
+             If(IGemNo(KL,1).Eq.2.And.IGemNo(KL,2).Eq.2) IAA2=1
+         ElseIf(NGem.Eq.2) Then
+             IOO=0
+             IVV=0
+             If(IGemNo(KL,1).Eq.2.And.IGemNo(KL,2).Eq.2) IVV=1
+             IAA2=0
+             If(IGemNo(KL,1).Eq.1.And.IGemNo(KL,2).Eq.1) IAA2=1
+         EndIf
+         If(IVV==0.And.IOO==0.And.IAA1+IAA2.Ne.2) Then
+         If(IJ.Ge.KL) Then
+
+           I1=I
+           J1=J
+           K1=K
+           L1=L
+           If(IAA1) Then
+             I1=K
+             J1=L
+             K1=I
+             L1=J
+           EndIf
+           Call WIter_D12Chol(EE,0,Max_Cn,XOne,URe,Occ,
+     $          EGOne,NGOcc,IGem,NAcCAS,NInAcCAS,NELE,
+     $          NBasis,NInte1,NDim,NGem,IndAux,
+     $          IndN,IndX,NDimX,1,I1,J1,K1,L1)           
+           If(IJ.Ne.KL.And.IAA1.Eq.0.And.IAA2.Eq.0) EE=Two*EE
+           Write(6,'(/,X,"Term: (",2I1,")","(",2I1,")",F15.8,/)')
+     $     IGemNo(IJ,1),IGemNo(IJ,2),IGemNo(KL,1),IGemNo(KL,2),EE
+           ECorrIJ(IJ,KL)=EE
+           Sum=Sum+EE
+         EndIf
+         EndIf
+      EndDo
+      EndDo
+      EndIf
+      EndDo
+      EndDo
+      Write
+     $ (6,'(X,''Sum of contributions: '',4X,F15.8)')Sum
+C
+C     print a summary
+C  
+      Write(6,'(2/,X,
+     $ "Contributions to ACn from (Mu)(Nu) pairs of 
+     $ blocks up to order ",I3,/)') Max_Cn
+      Sum=Zero
+      Do IJ=1,6
+      Do KL=1,6
+         EE=ECorrIJ(IJ,KL)
+         If(EE.Ne.Zero) Then
+             Write(6,'(X,"(",2I1,")","(",2I1,")",F15.8)')
+     $       IGemNo(IJ,1),IGemNo(IJ,2),IGemNo(KL,1),IGemNo(KL,2),EE
+             Sum=Sum+EE
+         EndIf
+      EndDo
+      EndDo
+      Write
+     $ (6,'(X,''Sum of contributions: '',4X,F15.8)')Sum
+      Write(6,*)"WARNING: a sum of contributions may differ
+     $ from ACn-Corr either as a result of the condition
+     $  If(IAnalys==0.And.XNorm1.Lt.ErrMax) Exit
+     $ or because the series is divergent and expansion of
+     $ C is terminated"
+C
+C     If(IAnalys.Eq.1) Then
+      EndIf
 C
       EndIf
 C
@@ -70,7 +198,25 @@ C
       Write
      $ (6,'(/,2X,''ECASSCF+ENuc, ACn-Corr, ACn-CASSCF '',4X,3F15.8)')
      $ ETot+ENuc,ECorr,ETot+ENuc+ECorr
-C       
+C
+C     delete cholesky vecs
+      Open(newunit=iunit,file='cholvecs',status='OLD')
+      Close(iunit,status='DELETE')
+C     delete FOFO/FFOO ints
+      Inquire(file='FOFO',exist=IFOFO)
+      If (IFOFO) Then
+         Open(newunit=iunit,file='FOFO',status='OLD')
+         Close(iunit,status='DELETE')
+         Open(newunit=iunit,file='FFOO',status='OLD')
+         Close(iunit,status='DELETE')
+      EndIf
+C     delete CMONO matrixormation
+      Inquire(file='ure_casno.dat',exist=IURE)
+      If (IURE) Then
+         Open(newunit=iunit,file='ure_casno.dat',status='OLD')
+         Close(iunit,status='DELETE')
+      EndIf
+C
       Return
 C
       EndIf
@@ -83,7 +229,7 @@ C
        Call WIter_D12Chol(ECorr,1,Max_Cn,XOne,URe,Occ,
      $ EGOne,NGOcc,IGem,NAcCAS,NInAcCAS,NELE,
      $ NBasis,NInte1,NDim,NGem,IndAux,
-     $ IndN,IndX,NDimX)
+     $ IndN,IndX,NDimX,0,0,0,0,0)
 C
       ETot=EGOne(1)
       Write

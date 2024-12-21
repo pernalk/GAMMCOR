@@ -26,7 +26,7 @@ implicit none
 type(FlagsData) :: Flags
 type(SaptData)  :: SAPT
 integer :: i
-integer :: NBasis
+integer :: NBasis,NAO
 double precision :: Tcpu,Twall
 
  Flags%SaptLevel = SAPT%SaptLevel
@@ -34,6 +34,7 @@ double precision :: Tcpu,Twall
 ! ERPA
  Flags%IFlAC  = 0
  Flags%IFlSnd = 0
+
  write(LOUT,'()')
  write(LOUT,'(1x,a)') 'STARTING SAPT CALCULATIONS'
  write(LOUT,'(8a10)') ('**********',i=1,8)
@@ -42,22 +43,22 @@ double precision :: Tcpu,Twall
  if(Flags%IRedVirt==1) call sapt_driver_red(Flags,SAPT)
 
  call clock('START',Tcpu,Twall)
- call sapt_basinfo(SAPT,NBasis)
+ call sapt_basinfo(SAPT,NBasis,NAO)
  call sapt_interface(Flags,SAPT,NBasis)
 
- call sapt_mon_ints(SAPT%monA,Flags,NBasis)
- call sapt_mon_ints(SAPT%monB,Flags,NBasis)
+ call sapt_mon_ints(SAPT%monA,Flags,NAO,NBasis)
+ call sapt_mon_ints(SAPT%monB,Flags,NAO,NBasis)
 
- call sapt_response(Flags,SAPT%monA,SAPT%EnChck,NBasis)
- call sapt_response(Flags,SAPT%monB,SAPT%EnChck,NBasis)
+ call sapt_response(Flags,SAPT%monA,SAPT%EnChck,NAO,NBasis)
+ call sapt_response(Flags,SAPT%monB,SAPT%EnChck,NAO,NBasis)
 
- if(Flags%IdSRS/=1) call sapt_ab_ints(Flags,SAPT%monA,SAPT%monB,SAPT%iPINO,NBasis)
+ if(Flags%IdSRS/=1) call sapt_ab_ints(Flags,SAPT%monA,SAPT%monB,SAPT%iPINO,NAO,NBasis)
 
  ! SAPT components
  write(LOUT,'()')
 
  ! switch to dSRS
- if(Flags%IdSRS==1) call sapt_dSRS(Flags,SAPT,Tcpu,TWall,NBasis)
+ if(Flags%IdSRS==1) call sapt_dSRS(Flags,SAPT,Tcpu,TWall,NAO,NBasis)
 
  ! switch to Cholesky SAPT
  if(Flags%ICholesky==1) call sapt_Cholesky(Flags,SAPT,Tcpu,TWall,NBasis)
@@ -67,6 +68,9 @@ double precision :: Tcpu,Twall
 
  ! switch to extrapolated SAPT
  if(SAPT%monA%Cubic.or.SAPT%monB%Cubic) call sapt_extrapol(Flags,SAPT,NBasis)
+
+ ! only coupled components for SAPT(CI)
+ if(Flags%ICI==1) call sapt_only_cpld(Flags,Tcpu,Twall,SAPT)
 
  if(Flags%ISERPA==0.and.SAPT%ic6==1) then
 
@@ -140,7 +144,7 @@ implicit none
 type(FlagsData)  :: Flags
 type(SaptData)   :: SAPT
 integer          :: i
-integer          :: NBasis,NBasisRed
+integer          :: NAO,NBasis,NBasisRed
 integer          :: SAPT_LEVEL_SAVE
 double precision :: e2d,e2d_unc,e2dR,e2dR_unc
 double precision :: e2exd,e2exd_unc,e2exdR,e2exdR_unc
@@ -162,16 +166,16 @@ logical          :: onlyDisp
  Flags%IFlag0    = 1
 
  call clock('START',Tcpu,Twall)
- call sapt_basinfo(SAPT,NBasis)
+ call sapt_basinfo(SAPT,NBasis,NAO)
  call sapt_interface(Flags,SAPT,NBasis)
 
- call sapt_mon_ints(SAPT%monA,Flags,NBasis)
- call sapt_mon_ints(SAPT%monB,Flags,NBasis)
+ call sapt_mon_ints(SAPT%monA,Flags,NAO,NBasis)
+ call sapt_mon_ints(SAPT%monB,Flags,NAO,NBasis)
 
- call sapt_response(Flags,SAPT%monA,SAPT%EnChck,NBasis)
- call sapt_response(Flags,SAPT%monB,SAPT%EnChck,NBasis)
+ call sapt_response(Flags,SAPT%monA,SAPT%EnChck,NAO,NBasis)
+ call sapt_response(Flags,SAPT%monB,SAPT%EnChck,NAO,NBasis)
 
- call sapt_ab_ints(Flags,SAPT%monA,SAPT%monB,SAPT%iPINO,NBasis)
+ call sapt_ab_ints(Flags,SAPT%monA,SAPT%monB,SAPT%iPINO,NAO,NBasis)
 
  write(LOUT,'(/,1x,a)') 'SAPT COMPONENTS'
  write(LOUT,'(8a10)') ('**********',i=1,6)
@@ -199,8 +203,8 @@ logical          :: onlyDisp
     !Flags%IFlag0    = 1
  endif
 
- call sapt_response(Flags,SAPT%monA,SAPT%EnChck,NBasis)
- call sapt_response(Flags,SAPT%monB,SAPT%EnChck,NBasis)
+ call sapt_response(Flags,SAPT%monA,SAPT%EnChck,NAO,NBasis)
+ call sapt_response(Flags,SAPT%monB,SAPT%EnChck,NAO,NBasis)
 
  call sapt_ab_ints_red(Flags,SAPT%monA,SAPT%monB,SAPT%iPINO,NBasis,NBasisRed)
 
@@ -239,6 +243,38 @@ logical          :: onlyDisp
  stop
 
 end subroutine sapt_driver_red
+
+subroutine sapt_only_cpld(Flags,Tcpu,Twall,SAPT)
+implicit none
+
+type(FlagsData) :: Flags
+type(SaptData)  :: SAPT
+double precision,intent(inout) :: Tcpu,Twall
+
+Flags%SaptLevel = SAPT%SaptLevel
+
+! ERPA
+Flags%IFlAC  = 0
+Flags%IFlSnd = 0
+
+! SAPT components
+call e1elst(SAPT%monA,SAPT%monB,SAPT)
+call e1exchs2(Flags,SAPT%monA,SAPT%monB,SAPT)
+call e2ind_cpld(Flags,SAPT%monA,SAPT%monB,SAPT)
+call e2exind(Flags,SAPT%monA,SAPT%monB,SAPT)
+call e2disp_cpld(Flags,SAPT%monA,SAPT%monB,SAPT)
+call e2exdisp(Flags,SAPT%monA,SAPT%monB,SAPT)
+
+call summary_sapt(SAPT)
+
+call print_warn(SAPT)
+call free_sapt(Flags,SAPT)
+
+call clock('SAPT',Tcpu,Twall)
+
+stop
+
+end subroutine sapt_only_cpld
 
 subroutine sapt_OpenShell(Flags,SAPT,Tcpu,Twall,NBasis)
 !
@@ -281,7 +317,7 @@ stop "Open-shell SAPT not ready!"
 
 end subroutine sapt_OpenShell
 
-subroutine sapt_dSRS(Flags,SAPT,Tcpu,Twall,NBasis)
+subroutine sapt_dSRS(Flags,SAPT,Tcpu,Twall,NAO,NBasis)
 !
 ! sapt driver for degenerate SRS
 ! Flags%IdSRS==1
@@ -290,7 +326,7 @@ implicit none
 
 type(FlagsData)    :: Flags
 type(SaptData)     :: SAPT
-integer,intent(in) :: NBasis
+integer,intent(in) :: NAO,NBasis
 double precision,intent(inout) :: Tcpu,Twall
 
 integer :: i
@@ -298,7 +334,7 @@ integer :: i
 call sapt_ERPA_TRDMs(Flags,SAPT%monA,NBasis)
 call sapt_ERPA_TRDMs(Flags,SAPT%monB,NBasis)
 
-call sapt_ab_ints_dSRS(Flags,SAPT%monA,SAPT%monB,NBasis)
+call sapt_ab_ints_dSRS(Flags,SAPT%monA,SAPT%monB,NAO,NBasis)
 
 !call sapt_2trdm(Flags,SAPT%monA,SAPT%monB,NBasis)
 
@@ -458,17 +494,19 @@ integer            :: i
 
 end subroutine sapt_extrapol
 
-subroutine sapt_basinfo(SAPT,NBasis)
+subroutine sapt_basinfo(SAPT,NBasis,NAO)
 implicit none
 
 type(SaptData)      :: SAPT
-integer,intent(out) :: NBasis
+integer,intent(out) :: NBasis,NAO
 
  NBasis = 0
  if(SAPT%InterfaceType==1) then
-    call basinfo(NBasis,'SIRIUS_A.RST','DALTON')
+    call basinfo(NAO,NBasis,'SIRIUS_A.RST','DALTON')
  elseif(SAPT%InterfaceType==2) then
-    call basinfo(NBasis,'AOONEINT_A','MOLPRO')
+    call basinfo(NAO,NBasis,'AOONEINT_A','MOLPRO')
+ elseif(SAPT%InterfaceType==5) then
+    call basinfo(NAO,NBasis,SAPT%monA%trexfile,'TREXIO')
  endif
  if(NBasis==0.and.SAPT%monA%NBasis==0) then
     write(LOUT,'(1x,a)') 'ERROR! NBasis NOWHERE TO BE FOUND!'
@@ -488,18 +526,18 @@ integer,intent(out) :: NBasis
 
 end subroutine sapt_basinfo
 
-subroutine sapt_response(Flags,Mon,EnChck,NBasis)
+subroutine sapt_response(Flags,Mon,EnChck,NAO,NBasis)
 implicit none
 
 type(FlagsData)    :: Flags
 type(SystemBlock)  :: Mon
-integer,intent(in) :: NBasis
+integer,intent(in) :: NAO,NBasis
 logical,intent(in) :: EnChck
 
 integer          :: i,j,ij
 integer          :: SaptLevel
 logical          :: regular,extrapolate
-double precision :: MO(NBasis*NBasis)
+double precision :: MO(NAO*NBasis)
 
  SaptLevel = Flags%SaptLevel
  if(Mon%Cubic) then
@@ -512,11 +550,17 @@ double precision :: MO(NBasis*NBasis)
 
  ij = 0
  do j=1,NBasis
-    do i=1,NBasis
+    do i=1,NAO
        ij = ij + 1
        MO(ij) = Mon%CMO(i,j)
     enddo
  enddo
+
+! SAPT(CI)
+ if(Flags%ICI==1) then
+    call calc_resp_cipsi(Mon,Flags,NAO,NBasis)
+    return ! WITH TREXIO RDMs are not stored on disk
+ endif
 
 ! calculate response
  call SaptInter(NBasis,Mon,Flags%ICASSCF)
@@ -550,7 +594,7 @@ double precision :: MO(NBasis*NBasis)
           if(Flags%IFunSR/=0) then
              call calc_resp_dft(Mon,MO,Flags,NBasis)
           else
-             call calc_resp_casgvb(Mon,MO,Flags,NBasis,EnChck)
+             call calc_resp_casgvb(Mon,MO,Flags,NAO,NBasis,EnChck)
           endif
 
        elseif(extrapolate) then
@@ -562,7 +606,7 @@ double precision :: MO(NBasis*NBasis)
     endif
  elseif(Flags%ISERPA==2) then
     call calc_resp_pino(Mon,MO,Flags,NBasis)
-   ! call calc_resp_casgvb(Mon,MO,Flags,NBasis,EnChck)
+   ! call calc_resp_casgvb(Mon,MO,Flags,NAO,NBasis,EnChck)
  endif
 
 end subroutine sapt_response
@@ -589,15 +633,22 @@ endif
 
 end subroutine sapt_2rdm_spin
 
-subroutine sapt_ab_ints(Flags,A,B,iPINO,NBasis)
+subroutine sapt_ab_ints(Flags,A,B,iPINO,NAO,NBasis)
 implicit none
 
 type(FlagsData)    :: Flags
 type(SystemBlock)  :: A,B
 type(AOReaderData) :: reader
-integer,intent(in) :: iPINO,NBasis
+integer,intent(in) :: iPINO
+integer,intent(in) :: NAO,NBasis
+
+integer            :: dimOA,dimOB
 integer            :: thr_id
 integer            :: ntr,iunit_aotwosort
+
+! set dimensions
+dimOA = A%num0 + A%num1
+dimOB = B%num0 + B%num1
 
 if(Flags%SaptLevel==999) then
   print*, 'In RSPT2 intermoner ints not calculated for now'
@@ -654,12 +705,13 @@ if(Flags%ISERPA==0) then
   endif
 
   if(Flags%SaptLevel/=1.and.Flags%ICholesky==0) then
+     write(LOUT,'(/1x,a)') 'Transforming E2disp integrals...'
      ! integrals stored as (ov|ov)
-     call tran4_gen(NBasis,&
+     call tran4_gen(NAO,&
                     A%num0+A%num1,A%CMO,&
-                    A%num1+A%num2,A%CMO(1:NBasis,A%num0+1:NBasis),&
+                    A%num1+A%num2,A%CMO(1:NAO,A%num0+1:NBasis),&
                     B%num0+B%num1,B%CMO,&
-                    B%num1+B%num2,B%CMO(1:NBasis,B%num0+1:NBasis),&
+                    B%num1+B%num2,B%CMO(1:NAO,B%num0+1:NBasis),&
                     'TWOMOAB','AOTWOSORT')
 
   endif
@@ -752,19 +804,19 @@ if(Flags%ISERPA==0) then
          !$omp task
          !$ thr_id = omp_get_thread_num()
       ! term A3-ind
-      call new_tran4_gen(NBasis,&
+      call new_tran4_gen(NAO,&
                NBasis,B%CMO,&
-               B%num0+B%num1,B%CMO(1:NBasis,1:(B%num0+B%num1)),&
+               dimOB,B%CMO(1:NAO,1:dimOB),&
                NBasis,A%CMO,&
-               A%num0+A%num1,A%CMO(1:NBasis,1:(A%num0+A%num1)),&
+               dimOA,A%CMO(1:NAO,1:dimOA),&
                'FOFOAABB',reader,iunit_aotwosort,thr_id)
          !$omp end task
          !$omp task
          !$ thr_id = omp_get_thread_num()
       ! term A1-ind
-      call new_tran4_gen(NBasis,&
-               A%num0+A%num1,A%CMO(1:NBasis,1:(A%num0+A%num1)),&
-               B%num0+B%num1,B%CMO(1:NBasis,1:(B%num0+B%num1)),&
+      call new_tran4_gen(NAO,&
+               dimOA,A%CMO(1:NAO,1:dimOA),&
+               dimOB,B%CMO(1:NAO,1:dimOB),&
                NBasis,A%CMO,&
                NBasis,B%CMO,&
                'FFOOABAB',reader,iunit_aotwosort,thr_id)
@@ -773,35 +825,35 @@ if(Flags%ISERPA==0) then
          !$ thr_id = omp_get_thread_num()
       ! term A2-ind
       ! A2A(B): XX
-      call new_tran4_gen(NBasis,&
+      call new_tran4_gen(NAO,&
                NBasis,B%CMO,&
-               A%num0+A%num1,A%CMO(1:NBasis,1:(A%num0+A%num1)),&
+               dimOA,A%CMO(1:NAO,1:dimOA),&
                NBasis,B%CMO,&
-               B%num0+B%num1,B%CMO(1:NBasis,1:(B%num0+B%num1)),&
+               dimOB,B%CMO(1:NAO,1:dimOB),&
                'FOFOBBBA',reader,iunit_aotwosort,thr_id)
          !$omp end task
          !$omp task
          !$ thr_id = omp_get_thread_num()
-      call new_tran4_gen(NBasis,&
+      call new_tran4_gen(NAO,&
                NBasis,A%CMO,&
-               B%num0+B%num1,B%CMO(1:NBasis,1:(B%num0+B%num1)),&
+               dimOB,B%CMO(1:NAO,1:dimOB),&
                NBasis,A%CMO,&
-               A%num0+A%num1,A%CMO(1:NBasis,1:(A%num0+A%num1)),&
+               dimOA,A%CMO(1:NAO,1:dimOA),&
                'FOFOAAAB',reader,iunit_aotwosort,thr_id)
          !$omp end task
          !$omp task
          !$ thr_id = omp_get_thread_num()
       !! A2A(B): YY
-      call new_tran4_gen(NBasis,&
+      call new_tran4_gen(NAO,&
                NBasis,A%CMO,&
-               B%num0+B%num1,B%CMO(1:NBasis,1:(B%num0+B%num1)),&
+               dimOB,B%CMO(1:NAO,1:dimOB),&
                NBasis,B%CMO,&
-               B%num0+B%num1,B%CMO(1:NBasis,1:(B%num0+B%num1)),&
+               dimOB,B%CMO(1:NAO,1:dimOB),&
                'FOFOBBAB',reader,iunit_aotwosort,thr_id)
          !$omp end task
          !$omp task
          !$ thr_id = omp_get_thread_num()
-      call new_tran4_gen(NBasis,&
+      call new_tran4_gen(NAO,&
                NBasis,B%CMO,&
                A%num0+A%num1,A%CMO(1:NBasis,1:(A%num0+A%num1)),&
                NBasis,A%CMO,&
@@ -830,41 +882,41 @@ if(Flags%ISERPA==0) then
         deallocate(A%FF)
         deallocate(B%FF)
      else
-        call tran4_gen(NBasis,&
+       call tran4_gen(NAO,&
                  NBasis,B%CMO,&
-                 A%num0+A%num1,A%CMO(1:NBasis,1:(A%num0+A%num1)),&
+                 dimOA,A%CMO(1:NAO,1:dimOA),&
                  NBasis,A%CMO,&
-                 B%num0+B%num1,B%CMO(1:NBasis,1:(B%num0+B%num1)),&
+                 dimOB,B%CMO(1:NAO,1:dimOB),&
                  'FOFOABBA','AOTWOSORT')
         ! XY and YX, A2
-        call tran4_gen(NBasis,&
-                 B%num0+B%num1,B%CMO(1:NBasis,1:(B%num0+B%num1)),&
-                 B%num0+B%num1,B%CMO(1:NBasis,1:(B%num0+B%num1)),&
+        call tran4_gen(NAO,&
+                 dimOB,B%CMO(1:NAO,1:dimOB),&
+                 dimOB,B%CMO(1:NAO,1:dimOB),&
                  NBasis,A%CMO,&
                  NBasis,B%CMO,&
                  'FFOOABBB','AOTWOSORT')
-        call tran4_gen(NBasis,&
-                 A%num0+A%num1,A%CMO(1:NBasis,1:(A%num0+A%num1)),&
-                 A%num0+A%num1,A%CMO(1:NBasis,1:(A%num0+A%num1)),&
+        call tran4_gen(NAO,&
+                 dimOA,A%CMO(1:NAO,1:dimOA),&
+                 dimOA,A%CMO(1:NAO,1:dimOA),&
                  NBasis,B%CMO,&
                  NBasis,A%CMO,&
                  'FFOOBAAA','AOTWOSORT')
-
      endif
 
   !endif
 
-  ! <oo|oo>
+  ! <oo|oo> for e1exchs2
      if(Flags%ICholesky==1) then
         call chol_ints_gen(B%num0+B%num1,B%num0+B%num1,B%OO,&
                            A%num0+A%num1,A%num0+A%num1,A%OO,A%NChol,'TMPOOAB')
      else
-        call tran4_gen(NBasis,&
-                     A%num0+A%num1,A%CMO,&
-                     A%num0+A%num1,A%CMO,&
-                     B%num0+B%num1,B%CMO,&
-                     B%num0+B%num1,B%CMO,&
-                    'TMPOOAB','AOTWOSORT')
+        call tran4_gen(NAO, &
+                dimOA,A%CMO(1:NAO,1:dimOA), &
+                dimOA,A%CMO(1:NAO,1:dimOA), &
+                dimOB,B%CMO(1:NAO,1:dimOB), &
+                dimOB,B%CMO(1:NAO,1:dimOB), &
+               'TMPOOAB','AOTWOSORT')
+
      endif
 
 elseif(Flags%ISERPA==2) then
@@ -902,7 +954,7 @@ endif
 
 end subroutine sapt_ab_ints
 
-subroutine sapt_ab_ints_dSRS(Flags,A,B,NBasis)
+subroutine sapt_ab_ints_dSRS(Flags,A,B,NAO,NBasis)
 !
 ! transform integrals of the AB type for dSRS:
 ! OOOOAABB, OOOOAAAB, ...
@@ -911,7 +963,7 @@ implicit none
 
 type(FlagsData)    :: Flags
 type(SystemBlock)  :: A,B
-integer,intent(in) :: NBasis
+integer,intent(in) :: NAO,NBasis
 integer            :: iref, iref2, irefB, iref2B
 integer            :: iexcited, iexcited2 
 integer            :: dimOA, dimOB
@@ -927,97 +979,88 @@ dimOA  = A%num0+A%num1
 dimOB  = B%num0+B%num1
 
 
-call tran4_gen(NBasis,&
-     B%num0+B%num1,B%CAONO(iref2B,1:NBasis,1:(B%num0+B%num1)),&
-     B%num0+B%num1,B%CAONO(iref2B,1:NBasis,1:(B%num0+B%num1)),&
-     A%num0+A%num1,A%CAONO(iref,1:NBasis,1:(A%num0+A%num1)),&
-     A%num0+A%num1,A%CAONO(iref,1:NBasis,1:(A%num0+A%num1)),&
+call tran4_gen(NAO,&
+     B%num0+B%num1,B%CAONO(iref2B,1:NAO,1:(B%num0+B%num1)),&
+     B%num0+B%num1,B%CAONO(iref2B,1:NAO,1:(B%num0+B%num1)),&
+     A%num0+A%num1,A%CAONO(iref,  1:NAO,1:(A%num0+A%num1)),&
+     A%num0+A%num1,A%CAONO(iref,  1:NAO,1:(A%num0+A%num1)),&
      'OOOOAABB','AOTWOSORT')
 
-call tran4_gen(NBasis,&
-     B%num0+B%num1,B%CAONO(irefB,1:NBasis,1:(B%num0+B%num1)),&
-     B%num0+B%num1,B%CAONO(irefB,1:NBasis,1:(B%num0+B%num1)),&
-     A%num0+A%num1,A%CAONO(iref2,1:NBasis,1:(A%num0+A%num1)),&
-     A%num0+A%num1,A%CAONO(iref2,1:NBasis,1:(A%num0+A%num1)),&
+call tran4_gen(NAO,&
+     B%num0+B%num1,B%CAONO(irefB,1:NAO,1:(B%num0+B%num1)),&
+     B%num0+B%num1,B%CAONO(irefB,1:NAO,1:(B%num0+B%num1)),&
+     A%num0+A%num1,A%CAONO(iref2,1:NAO,1:(A%num0+A%num1)),&
+     A%num0+A%num1,A%CAONO(iref2,1:NAO,1:(A%num0+A%num1)),&
      'OOOOAABB2','AOTWOSORT')
 
-
- call tran4_gen(NBasis,&
+ call tran4_gen(NAO,&
                NBasis,A%CAONO(iref,:,:),&
-               B%num0+B%num1,B%CAONO(iref2B,1:NBasis,1:(B%num0+B%num1)),&
+               B%num0+B%num1,B%CAONO(iref2B,1:NAO,1:(B%num0+B%num1)),&
                NBasis,A%CAONO(iref,:,:),&
-               A%num0+A%num1,A%CAONO(iref,1:NBasis,1:(A%num0+A%num1)),&
+               A%num0+A%num1,A%CAONO(iref,1:NAO,1:(A%num0+A%num1)),&
                'FOFOAAAB','AOTWOSORT')
 
-
- call tran4_gen(NBasis,&
+ call tran4_gen(NAO,&
                NBasis,A%CAONO(iref2,:,:),&
-               B%num0+B%num1,B%CAONO(irefB,1:NBasis,1:(B%num0+B%num1)),&
+               B%num0+B%num1,B%CAONO(irefB,1:NAO,1:(B%num0+B%num1)),&
                NBasis,A%CAONO(iref2,:,:),&
-               A%num0+A%num1,A%CAONO(iref2,1:NBasis,1:(A%num0+A%num1)),&
+               A%num0+A%num1,A%CAONO(iref2,1:NAO,1:(A%num0+A%num1)),&
                'FOFOAAAB2','AOTWOSORT')
  
-  call tran4_gen(NBasis,&
+  call tran4_gen(NAO,&
                NBasis,B%CAONO(iref2B,:,:),&
-               A%num0+A%num1,A%CAONO(iref,1:NBasis,1:(A%num0+A%num1)),&
+               A%num0+A%num1,A%CAONO(iref,1:NAO,1:(A%num0+A%num1)),&
                NBasis,B%CAONO(iref2B,:,:),&
-               B%num0+B%num1,B%CAONO(iref2B,1:NBasis,1:(B%num0+B%num1)),&
+               B%num0+B%num1,B%CAONO(iref2B,1:NAO,1:(B%num0+B%num1)),&
                'FOFOBBBA','AOTWOSORT')
 
-   call tran4_gen(NBasis,&
+   call tran4_gen(NAO,&
                NBasis,B%CAONO(irefB,:,:),&
-               A%num0+A%num1,A%CAONO(iref2,1:NBasis,1:(A%num0+A%num1)),&
+               A%num0+A%num1,A%CAONO(iref2,1:NAO,1:(A%num0+A%num1)),&
                NBasis,B%CAONO(irefB,:,:),&
-               B%num0+B%num1,B%CAONO(irefB,1:NBasis,1:(B%num0+B%num1)),&
+               B%num0+B%num1,B%CAONO(irefB,1:NAO,1:(B%num0+B%num1)),&
                'FOFOBBBA2','AOTWOSORT')
 
-   call tran4_gen(NBasis,&
+   call tran4_gen(NAO,&
                NBasis,B%CAONO(iref2B,:,:),&
-               B%num0+B%num1,B%CAONO(iref2B,1:NBasis,1:(B%num0+B%num1)),&
+               B%num0+B%num1,B%CAONO(iref2B,1:NAO,1:(B%num0+B%num1)),&
                NBasis,A%CAONO(iref,:,:),&
-               A%num0+A%num1,A%CAONO(iref,1:NBasis,1:(A%num0+A%num1)),&
+               A%num0+A%num1,A%CAONO(iref,1:NAO,1:(A%num0+A%num1)),&
                'FOFOAABB','AOTWOSORT')
 
-   call tran4_gen(NBasis,&
+   call tran4_gen(NAO,&
                NBasis,B%CAONO(irefB,:,:),&
                B%num0+B%num1,B%CAONO(irefB,1:NBasis,1:(B%num0+B%num1)),&
                NBasis,A%CAONO(iref2,:,:),&
                A%num0+A%num1,A%CAONO(iref2,1:NBasis,1:(A%num0+A%num1)),&
                'FOFOAABB2','AOTWOSORT')
 
-   call tran4_gen(NBasis,&
-                 B%num0+B%num1,B%CAONO(iref2B,1:NBasis,1:(B%num0+B%num1)),&
-                 A%num0+A%num1,A%CAONO(iref,1:NBasis,1:(A%num0+A%num1)),&
-                 A%num0+A%num1,A%CAONO(iref,1:NBasis,1:(A%num0+A%num1)),&
-                 B%num0+B%num1,B%CAONO(iref2B,1:NBasis,1:(B%num0+B%num1)),&
+   call tran4_gen(NAO,&
+                 B%num0+B%num1,B%CAONO(iref2B,1:NAO,1:(B%num0+B%num1)),&
+                 A%num0+A%num1,A%CAONO(iref,  1:NAO,1:(A%num0+A%num1)),&
+                 A%num0+A%num1,A%CAONO(iref,  1:NAO,1:(A%num0+A%num1)),&
+                 B%num0+B%num1,B%CAONO(iref2B,1:NAO,1:(B%num0+B%num1)),&
                  'OOOOABBA','AOTWOSORT')
 
-   call tran4_gen(NBasis,&
-                 B%num0+B%num1,B%CAONO(irefB,1:NBasis,1:(B%num0+B%num1)),&
-                 A%num0+A%num1,A%CAONO(iref2,1:NBasis,1:(A%num0+A%num1)),&
-                 A%num0+A%num1,A%CAONO(iref2,1:NBasis,1:(A%num0+A%num1)),&
-                 B%num0+B%num1,B%CAONO(irefB,1:NBasis,1:(B%num0+B%num1)),&
+   call tran4_gen(NAO,&
+                 B%num0+B%num1,B%CAONO(irefB,1:NAO,1:(B%num0+B%num1)),&
+                 A%num0+A%num1,A%CAONO(iref2,1:NAO,1:(A%num0+A%num1)),&
+                 A%num0+A%num1,A%CAONO(iref2,1:NAO,1:(A%num0+A%num1)),&
+                 B%num0+B%num1,B%CAONO(irefB,1:NAO,1:(B%num0+B%num1)),&
                  'OOOOABBA2','AOTWOSORT')
    
- call tran4_gen(NBasis,&
-               B%num0+B%num1,B%CAONO(irefB,1:NBasis,1:(B%num0+B%num1)),&
-               A%num0+A%num1,A%CAONO(iref,1:NBasis,1:(A%num0+A%num1)),&
-               B%num0+B%num1,B%CAONO(irefB,1:NBasis,1:(B%num0+B%num1)),&
-               B%num0+B%num1,B%CAONO(irefB,1:NBasis,1:(B%num0+B%num1)),&
+ call tran4_gen(NAO,&
+               B%num0+B%num1,B%CAONO(irefB,1:NAO,1:(B%num0+B%num1)),&
+               A%num0+A%num1,A%CAONO(iref, 1:NAO,1:(A%num0+A%num1)),&
+               B%num0+B%num1,B%CAONO(irefB,1:NAO,1:(B%num0+B%num1)),&
+               B%num0+B%num1,B%CAONO(irefB,1:NAO,1:(B%num0+B%num1)),&
                'OOOOBBBA','AOTWOSORT')
                  
-! call tran4_gen(NBasis,&
-!                B%num0+B%num1,B%CMO(1:NBasis,1:(B%num0+B%num1)),&
-!                A%num0+A%num1,A%CMO(1:NBasis,1:(A%num0+A%num1)),&
-!                B%num0+B%num1,B%CMO(1:NBasis,1:(B%num0+B%num1)),&
-!                B%num0+B%num1,B%CMO(1:NBasis,1:(B%num0+B%num1)),&
-!                'OOOOBBBA','AOTWOSORT')
-
 call tran4_gen(NBasis,&
-                 A%num0+A%num1,A%CAONO(iref,1:NBasis,1:(A%num0+A%num1)),&
-                 B%num0+B%num1,B%CAONO(irefB,1:NBasis,1:(B%num0+B%num1)),&
-                 A%num0+A%num1,A%CAONO(iref,1:NBasis,1:(A%num0+A%num1)),&
-                 A%num0+A%num1,A%CAONO(iref,1:NBasis,1:(A%num0+A%num1)),&
+                 A%num0+A%num1,A%CAONO(iref, 1:NAO,1:(A%num0+A%num1)),&
+                 B%num0+B%num1,B%CAONO(irefB,1:NAO,1:(B%num0+B%num1)),&
+                 A%num0+A%num1,A%CAONO(iref, 1:NAO,1:(A%num0+A%num1)),&
+                 A%num0+A%num1,A%CAONO(iref, 1:NAO,1:(A%num0+A%num1)),&
                  'OOOOAAAB','AOTWOSORT')
   
 end subroutine sapt_ab_ints_dSRS
@@ -1416,19 +1459,17 @@ subroutine reduce_virt(Flags,Mon,NBas)
 
 end subroutine reduce_virt
 
-subroutine sapt_mon_ints(Mon,Flags,NBas)
+subroutine sapt_mon_ints(Mon,Flags,NAO,NBas)
 implicit none
 
-type(SystemBlock) :: Mon
-type(FlagsData) :: Flags
+type(SystemBlock)  :: Mon
+type(FlagsData)    :: Flags
+integer,intent(in) :: NAO,NBas
 
-integer :: NBas
 integer :: i,j,ij,ione
 integer :: NSq,NInte1,NInte2
 
-double precision             :: URe(NBas,NBas),MO(NBas*NBas)
-double precision,allocatable :: TwoMO(:)
-double precision,allocatable :: work1(:),work2(:),XOne(:)
+!double precision             :: URe(NBas,NBas),MO(NBas*NBas)
 character(8)                 :: label
 character(:),allocatable     :: onefile,twofile
 character(:),allocatable     :: twojfile,twokfile
@@ -1438,86 +1479,73 @@ double precision :: Tcpu,Twall
 call clock('START',Tcpu,Twall)
 
 ! set dimensions
- NSq = NBas**2
- NInte1 = NBas*(NBas+1)/2
- NInte2 = NInte1*(NInte1+1)/2
+NSq = NBas**2
+NInte1 = NBas*(NBas+1)/2
+NInte2 = NInte1*(NInte1+1)/2
 
 ! set file names
- if(Mon%Monomer==1) then
-    onefile  = 'ONEEL_A'
-    twofile  = 'TWOMOAA'
-    twojfile = 'FFOOAA'
-    twokfile = 'FOFOAA'
- elseif(Mon%Monomer==2) then
-    onefile  = 'ONEEL_B'
-    twofile  = 'TWOMOBB'
-    twojfile = 'FFOOBB'
-    twokfile = 'FOFOBB'
- endif
+if(Mon%Monomer==1) then
+   onefile  = 'ONEEL_A'
+   twofile  = 'TWOMOAA'
+   twojfile = 'FFOOAA'
+   twokfile = 'FOFOAA'
+elseif(Mon%Monomer==2) then
+   onefile  = 'ONEEL_B'
+   twofile  = 'TWOMOBB'
+   twojfile = 'FFOOBB'
+   twokfile = 'FOFOBB'
+endif
 
- allocate(work1(NSq),work2(NSq),XOne(NInte1))
+!MO = 0
+!ij = 0
+!do j=1,NBas
+!do i=1,NBas
+!  ij = ij + 1
+!  MO(ij) = Mon%CMO(i,j)
+!enddo
+!enddo
 
- URe = 0d0
- do i=1,NBas
-    URe(i,i) = 1d0
- enddo
+if(Flags%SaptLevel==1) return
 
- MO = 0
- ij = 0
- do j=1,NBas
- do i=1,NBas
-    ij = ij + 1
-    MO(ij) = Mon%CMO(i,j)
- enddo
- enddo
+! transform 2-el integrals
 
- ! read 1-el
- call get_1el_h_mo(XOne,MO,NBas,onefile)
+select case(Mon%TwoMoInt)
+case(TWOMO_INCORE,TWOMO_FFFF)
+ ! full - for GVB and CAS
+ call tran4_full(NBas,Mon%CMO,Mon%CMO,twofile,'AOTWOSORT')
 
- if(Flags%SaptLevel==1) return
-
- ! transform 2-el integrals
-
- select case(Mon%TwoMoInt)
- case(TWOMO_INCORE,TWOMO_FFFF)
-   ! full - for GVB and CAS
-   call tran4_full(NBas,MO,MO,twofile,'AOTWOSORT')
-
- case(TWOMO_FOFO)
-   if(Flags%ICholesky==1) then
-      call chol_ints_fofo(NBas,NBas,Mon%FF, &
-                     Mon%num0+Mon%num1,Mon%num0+Mon%num1,Mon%FF,&
-                     Mon%NChol,NBas,twojfile)
-      call chol_ints_fofo(NBas,Mon%num0+Mon%num1,Mon%FF,&
-                     NBas,Mon%num0+Mon%num1,Mon%FF,&
-                     Mon%NChol,NBas,twokfile)
-      !call chol_ints_gen(NBas,NBas,Mon%FF, &
-      !               Mon%num0+Mon%num1,Mon%num0+Mon%num1,Mon%OO,&
-      !               Mon%NChol,twojfile)
-      !call chol_ints_gen(NBas,Mon%num0+Mon%num1,Mon%FO,&
-      !               NBas,Mon%num0+Mon%num1,Mon%FO,&
-      !               Mon%NChol,twokfile)
-   else
-      ! transform J and K
-       call tran4_gen(NBas,&
-            Mon%num0+Mon%num1,MO(1:NBas*(Mon%num0+Mon%num1)),&
-            Mon%num0+Mon%num1,MO(1:NBas*(Mon%num0+Mon%num1)),&
-            NBas,MO,&
-            NBas,MO,&
-            twojfile,'AOTWOSORT')
-       call clock('FFOO',Tcpu,Twall)
-       call tran4_gen(NBas,&
-            NBas,MO,&
-            Mon%num0+Mon%num1,MO(1:NBas*(Mon%num0+Mon%num1)),&
-            NBas,MO,&
-            Mon%num0+Mon%num1,MO(1:NBas*(Mon%num0+Mon%num1)),&
-            twokfile,'AOTWOSORT')
-       call clock('FOFO',Tcpu,Twall)
-    endif
- end select
-
- deallocate(XOne,work2,work1)
- !if(Mon%TwoMoInt==1) deallocate(TwoMO)
+case(TWOMO_FOFO)
+ if(Flags%ICholesky==1) then
+    call chol_ints_fofo(NBas,NBas,Mon%FF, &
+                   Mon%num0+Mon%num1,Mon%num0+Mon%num1,Mon%FF,&
+                   Mon%NChol,NBas,twojfile)
+    call chol_ints_fofo(NBas,Mon%num0+Mon%num1,Mon%FF,&
+                   NBas,Mon%num0+Mon%num1,Mon%FF,&
+                   Mon%NChol,NBas,twokfile)
+    !call chol_ints_gen(NBas,NBas,Mon%FF, &
+    !               Mon%num0+Mon%num1,Mon%num0+Mon%num1,Mon%OO,&
+    !               Mon%NChol,twojfile)
+    !call chol_ints_gen(NBas,Mon%num0+Mon%num1,Mon%FO,&
+    !               NBas,Mon%num0+Mon%num1,Mon%FO,&
+    !               Mon%NChol,twokfile)
+ else
+     ! transform J and K
+      call tran4_gen(NAO,&
+           Mon%num0+Mon%num1,Mon%CMO(1:NAO,1:(Mon%num0+Mon%num1)),&
+           Mon%num0+Mon%num1,Mon%CMO(1:NAO,1:(Mon%num0+Mon%num1)),&
+           NBas,Mon%CMO,&
+           NBas,Mon%CMO,&
+           twojfile,'AOTWOSORT')
+      call clock('FFOO',Tcpu,Twall)
+      call tran4_gen(NAO,&
+           NBas,Mon%CMO,&
+           Mon%num0+Mon%num1,Mon%CMO(1:NAO,1:(Mon%num0+Mon%num1)),&
+           NBas,Mon%CMO,&
+           Mon%num0+Mon%num1,Mon%CMO(1:NAO,1:(Mon%num0+Mon%num1)),&
+           twokfile,'AOTWOSORT')
+      call clock('FOFO',Tcpu,Twall)
+   endif
+end select
 
 end subroutine sapt_mon_ints
 
@@ -1589,6 +1617,7 @@ write(LOUT,'(/,8a10)') ('**********',i=1,4)
 write(LOUT,'(1x,a)') 'SAPT SUMMARY / milliHartree'
 write(LOUT,'(8a10)') ('**********',i=1,4)
 
+write(LOUT,'(1x,2a)') 'Interface   = ', PossibleInterface(SAPT%InterfaceType)
 write(LOUT,'(1x,a,i3)') 'SAPT level  =', SAPT%SaptLevel
 
 write(LOUT,'(1x,a,t19,a,f16.8)') 'E1elst',    '=', SAPT%elst*1.d03
@@ -1704,6 +1733,7 @@ type(SaptData)  :: SAPT
 
 integer         :: ISERPA
 
+! deallocate occupation numbers, CI coefficients...
 deallocate(SAPT%monA%CICoef,SAPT%monA%IGem,SAPT%monA%Occ, &
            SAPT%monA%IndAux,SAPT%monA%IndX,SAPT%monA%IndN,&
            SAPT%monA%CMO,&
@@ -1712,6 +1742,11 @@ deallocate(SAPT%monB%CICoef,SAPT%monB%IGem,SAPT%monB%Occ, &
            SAPT%monB%IndAux,SAPT%monB%IndX,SAPT%monB%IndN,&
            SAPT%monB%CMO,&
            SAPT%monB%IPair)
+
+! remove RDM files
+call delfile('rdm2.dat')
+!if(SAPT%InterfaceType==INTER_TYPE_MOL) call delfile('rdm2_A.dat')
+!if(SAPT%InterfaceType==INTER_TYPE_MOL) call delfile('rdm2_B.dat')
 
 ! for PINO
 ISERPA = 0
@@ -1769,6 +1804,8 @@ if(allocated(SAPT%CholVecs)) then
    deallocate(SAPT%CholVecs)
 endif
 
+if(Flags%ICholesky==1) call delfile('cholvecs')
+
 ! end test Cholesky
 
 if(allocated(SAPT%monA%PP)) deallocate(SAPT%monA%PP)
@@ -1779,6 +1816,18 @@ if(allocated(SAPT%monA%CAONO)) deallocate(SAPT%monA%CAONO)
 if(allocated(SAPT%monB%CAONO)) deallocate(SAPT%monB%CAONO)
 if(allocated(SAPT%monA%rdm24)) deallocate(SAPT%monA%rdm24)
 if(allocated(SAPT%monB%rdm24)) deallocate(SAPT%monB%rdm24)
+
+if(Flags%IdSRS==1) then
+   call delfile('FOFOAAAB2')
+   call delfile('FOFOAABB2')
+   call delfile('FOFOBBBA2')
+   call delfile('OOOOAAAB')
+   call delfile('OOOOAABB')
+   call delfile('OOOOAABB2')
+   call delfile('OOOOABBA')
+   call delfile('OOOOABBA2')
+   call delfile('OOOOBBBA')
+endif
 
 ! HERE - change to SAPTLEVEL?
 if(allocated(SAPT%monA%WPot)) then

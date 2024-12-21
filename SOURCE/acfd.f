@@ -27,6 +27,8 @@ C
      $ Eig(NDim),EGOne(NGem),
      $ UNOAO(NBasis,NBasis),
      $ IndX(NDim),IndN(2,NDim)
+C      analysis of AC
+     $, ECorrIJ(6,6),ECorrIJA(6,6),IGIJ(4,4),IGemNo(6,2)
 C
 C     LOCAL ARRAYS
 C
@@ -35,9 +37,24 @@ C
 C     HAP
       Double precision,Allocatable :: WorkVec(:),WorkEig(:),MYAP(:) 
 C
-      real*8, dimension(:), allocatable :: ABPLUS_tmp, ABMIN_tmp
+      real*8, dimension(:), allocatable :: ABPLUS_tmp, ABMIN_tmp,
+     $ XOne_tmp
       real*8, dimension(:), allocatable :: EigVecR_tmp, Eig_tmp
-
+      real*8, dimension(:,:), allocatable :: ECorrIJA_tmp
+      Real*8, Dimension(:), Allocatable :: TwoEl2,TwoAux
+C
+      ECorrIJ=0.0d0
+      NGem=MAXVAL(IGem)
+      IJ=0
+      Do I=1,NGem
+      Do J=1,I
+      IJ=IJ+1
+      IGIJ(I,J)=IJ
+      IGIJ(J,I)=IJ
+      IGemNo(IJ,1)=I
+      IGemNo(IJ,2)=J
+      EndDo
+      EndDo
 C
       If(IFlSnd.Eq.1) Then
 C
@@ -71,7 +88,7 @@ C
 C
       Call AC0CAS_FOFO(ECorr,ETot,Occ,URe,XOne,ABPLUS,ABMIN,
      $ IndN,IndX,IGem,NAcCAS,NInAcCAS,NDimX,NBasis,NDim,NInte1,
-     $ NoSt,'FFOO','FOFO',ICholesky)
+     $ NoSt,'FFOO','FOFO',ICholesky,IFlFCorr)
 C
 C     now Y01CAS_FOFO is used in SAPT only
 C      Call Y01CAS_FOFO(Occ,URe,XOne,ABPLUS,ABMIN,
@@ -130,13 +147,21 @@ C
       ECorr=Zero
 C
 !$OMP PARALLEL PRIVATE(ABPLUS_tmp, ABMIN_tmp, I, ACAlpha, ECorrA,
-!$OMP$ EigVecR_tmp, Eig_tmp)
-      allocate(ABPLUS_tmp(NDim*NDim), ABMIN_tmp(NDim*NDim))
+!$OMP$ ECorrIJA_tmp, EigVecR_tmp, Eig_tmp, XOne_tmp
+c herer!!!
+!$OMP$ ,TwoAux, ECorrDel)
+c herer!!!
+      allocate(TwoAux(NInte2))
+
+      allocate(ABPLUS_tmp(NDim*NDim), ABMIN_tmp(NDim*NDim),
+     $ XOne_tmp(NInte1))
       ABPLUS_tmp = ABPLUS
       ABMIN_tmp = ABMIN
       EigVecR_tmp = EigVecR
       Eig_tmp = Eig
       ECorrA = Zero
+      allocate(ECorrIJA_tmp(6,6))
+      ECorrIJA_tmp=ECorrIJA
 !$OMP DO schedule(static,1)
 !$OMP$ REDUCTION(+:ECorr)
       Do I=1,NGrid
@@ -158,7 +183,7 @@ C
 
       If(ICASSCF.Eq.1) Then
 
-      Call ACEInteg_FOFO(ECorrA,URe,Occ,XOne,UNOAO,
+      Call ACEInteg_FOFO(ECorrA,ECorrIJA_tmp,URe,Occ,XOne,UNOAO,
      $ ABPLUS_tmp,ABMIN_tmp,EigVecR_tmp,Eig_tmp,
      $ EGOne,NGOcc,CICoef,
      $ NBasis,NInte1,NDimX,NGem,IndAux,ACAlpha,
@@ -168,7 +193,7 @@ C
 
       ElseIf(ICASSCF.Ne.1) Then
 
-      Call ACEInteg_FOFO(ECorrA,URe,Occ,XOne,UNOAO,
+      Call ACEInteg_FOFO(ECorrA,ECorrIJA_tmp,URe,Occ,XOne,UNOAO,
      $ ABPLUS_tmp,ABMIN_tmp,EigVecR_tmp,Eig_tmp,
      $ EGOne,NGOcc,CICoef,
      $ NBasis,NInte1,NDim,NGem,IndAux,ACAlpha,
@@ -183,15 +208,92 @@ C
 C
       ECorr=ECorr+WGrid(I)*ECorrA
 C
+C     AC analysis
+      IJ=0
+      Do I1=1,NGem
+      Do J=1,I1
+         IJ=IJ+1
+         KL=0
+         Do K=1,NGem
+         Do L=1,K
+            KL=KL+1
+            ECorrIJ(IJ,KL)=ECorrIJ(IJ,KL)+WGrid(I)*ECorrIJA_tmp(IJ,KL) 
+         EndDo
+         EndDo
+      EndDo
+      EndDo
+C
       EndDo
 !$OMP END DO
-      deallocate(ABPLUS_tmp, ABMIN_tmp)
+      deallocate(ABPLUS_tmp, ABMIN_tmp,ECorrIJA_tmp,XOne_tmp)
 !$OMP END PARALLEL
 C
       If(ICASSCF.Eq.1) Then
 C
       ETot=EGOne(1)
       If(IFunSR.Eq.0) Then
+
+!PRINT CONTRIBUTIONS TO AC ECorr FROM BLOCKS
+      Sum=Zero
+      Write(6,'(/,X,
+     $ "Contributions to AC from (Mu)(Nu) pairs of blocks")')
+      IJ=0
+      Do I=1,NGem
+      Do J=1,I
+      IJ=IJ+1
+! NGem=3 case
+      If(NGem.Eq.3) Then
+       IOO=0
+       If(IGemNo(IJ,1).Eq.1.And.IGemNo(IJ,2).Eq.1) IOO=1
+       IVV=0
+       If(IGemNo(IJ,1).Eq.3.And.IGemNo(IJ,2).Eq.3) IVV=1
+       IAA1=0
+       If(IGemNo(IJ,1).Eq.2.And.IGemNo(IJ,2).Eq.2) IAA1=1
+! NGem=2 case (zero inactive orbitals)
+      ElseIf(NGem.Eq.2) Then
+       IOO=0
+       IVV=0
+       If(IGemNo(IJ,1).Eq.2.And.IGemNo(IJ,2).Eq.2) IVV=1
+       IAA1=0
+       If(IGemNo(IJ,1).Eq.1.And.IGemNo(IJ,2).Eq.1) IAA1=1
+      EndIf
+
+      If(IVV==0.And.IOO==0) Then
+      KL=0
+      Do K=1,NGem
+      Do L=1,K
+         KL=KL+1
+         If(NGem.Eq.3) Then
+             IOO=0
+             If(IGemNo(KL,1).Eq.1.And.IGemNo(KL,2).Eq.1) IOO=1
+             IVV=0
+             If(IGemNo(KL,1).Eq.3.And.IGemNo(KL,2).Eq.3) IVV=1
+             IAA2=0
+             If(IGemNo(KL,1).Eq.2.And.IGemNo(KL,2).Eq.2) IAA2=1
+         ElseIf(NGem.Eq.2) Then
+             IOO=0
+             IVV=0
+             If(IGemNo(KL,1).Eq.2.And.IGemNo(KL,2).Eq.2) IVV=1
+             IAA2=0
+             If(IGemNo(KL,1).Eq.1.And.IGemNo(KL,2).Eq.1) IAA2=1
+         EndIf
+         If(IVV==0.And.IOO==0.And.IAA1+IAA2.Ne.2) Then
+         If(IJ.Ge.KL) Then
+           EE=ECorrIJ(IJ,KL)
+           If(IJ.Ne.KL)EE=EE+ECorrIJ(KL,IJ)
+           Write(6,'(X,"(",2I1,")","(",2I1,")",F15.8)') 
+     $     IGemNo(IJ,1),IGemNo(IJ,2),IGemNo(KL,1),IGemNo(KL,2),EE
+           Sum=Sum+EE
+         EndIf
+         EndIf
+      EndDo
+      EndDo
+      EndIf
+      EndDo
+      EndDo
+      Write
+     $ (6,'(X,''Sum of contributions: '',4X,F15.8)')Sum
+
       Write
      $ (6,'(/,2X,''ECASSCF+ENuc, AC-Corr, AC-ERPA-CASSCF '',4X,3F15.8)')
      $ ETot+ENuc,ECorr,ETot+ENuc+ECorr
@@ -7557,7 +7659,12 @@ C
 C
       Write(6,'(1X,A,3f12.8,/)') 'Total Dipole Moment     ',
      $                            NUC_DMX+DM_X,NUC_DMY+DM_Y,NUC_DMZ+DM_Z
-
+C
+      DXYZ=SQRT((NUC_DMX+DM_X)**2+(NUC_DMY+DM_Y)**2+(NUC_DMZ+DM_Z)**2)
+C
+      Write(6,'(1X,A,2f12.8,/)') '|dipole moment| a.u./D', DXYZ,
+     $ DXYZ/0.393456
+C
       Deallocate(XYZ,Charg)
       Return
       End
@@ -8586,7 +8693,7 @@ C end of AC0DSYMM
       Return
       End
 
-*Deck ACECORR
+*Deck DelInts
       Subroutine DelInts(ITwoEl)
 C
 C     DELETE MO INTEGRALS 

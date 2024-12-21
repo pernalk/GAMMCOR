@@ -203,7 +203,8 @@ C
       Dimension
      $ ABPLUS(NDimX*NDimX),ABMIN(NDimX*NDimX),
      $ EigVecR(NDimX*NDimX),Eig(NDimX),
-     $ ECorrG(NGem), EGOne(NGem)
+     $ ECorrG(NGem), EGOne(NGem),
+     $ ECorrIJ(6,6)
 C
 C     IFlAC   = 1 - adiabatic connection formula calculation
 C               0 - AC not used
@@ -309,7 +310,7 @@ C
       Write(6,'(/," *** Computing ERPA energy *** ",/)')
 
       If(ITwoEl.Eq.3) Then
-      Call ACEneERPA_FOFO(ECorr,EigVecR,Eig,Occ,
+      Call ACEneERPA_FOFO(ECorr,ECorrIJ,EigVecR,Eig,Occ,
      $ IGem,IndN,IndX,NAcCAS+NInAcCAS,
      $ NDimX,NBasis,'FOFO',ICholesky)
 C
@@ -630,7 +631,8 @@ C
      $ ABPLUS(NDimX*NDimX),ABMIN(NDimX*NDimX),
      $ EigVecR(NDimX*NDimX),Eig(NDimX),
      $ ECorrG(NGem),EGOne(NGem),
-     $ UAux(NBasis,NBasis),VecAux(NBasis)
+     $ UAux(NBasis,NBasis),VecAux(NBasis),
+     $ ECorrIJ(6,6),XMuMAT(NBasis,NBasis)
 C
 C     IFlAC   = 1 - adiabatic connection formula calculation
 C               0 - AC not used
@@ -874,12 +876,12 @@ C
 C
       ElseIf(ITWoEl.Eq.1) Then
 C 
-      Call AC0CASLR(ECorr,ECASSCF,TwoNO,Occ,URe,XOne,
+      Call AC0CASLR(ECorr,ECASSCF,TwoNO,Occ,URe,UNOAO,XOne,
      $ ABPLUS,ABMIN,EigVecR,Eig,
      $ IndN,IndX,NDimX,NBasis,NDim,NInte1,NInte2,
      $ TwoEl2,OrbGrid,Work,NSymNO,MultpC,NGrid)
 
-c      Call AC0CASLR(ECorr,ECASSCF,TwoEl2,Occ,URe,XOne,
+c      Call AC0CASLR(ECorr,ECASSCF,TwoEl2,Occ,URe,UNOAO,XOne,
 c     $ ABPLUS,ABMIN,EigVecR,Eig,
 c     $ IndN,IndX,NDimX,NBasis,NDim,NInte1,NInte2,
 c     $ TwoNO,OrbGrid,Work,NSymNO,MultpC,NGrid)
@@ -1140,7 +1142,7 @@ C
       Write(6,'(/," *** Computing LR-ERPA energy *** ",/)')
 
       If(ITwoEl.Eq.3) Then
-      Call ACEneERPA_FOFO(ECorr,EigVecR,Eig,Occ,
+      Call ACEneERPA_FOFO(ECorr,ECorrIJ,EigVecR,Eig,Occ,
      $ IGem,IndN,IndX,NAcCAS+NInAcCAS,
      $ NDimX,NBasis,'FOFOERF',ICholesky)
 C
@@ -1214,7 +1216,7 @@ C
       End
 
 *Deck AC0CASLR
-      Subroutine AC0CASLR(ECorr,ETot,TwoNO,Occ,URe,XOne,
+      Subroutine AC0CASLR(ECorr,ETot,TwoNO,Occ,URe,UNOAO,XOne,
      $ ABPLUS,ABMIN,EigY,Eig,
      $ IndN,IndX,NDimX,NBasis,NDim,NInte1,NInte2,
      $ TwoEl2,OrbGrid,SRKerW,NSymNO,MultpC,NGrid)
@@ -1234,7 +1236,8 @@ C
       Integer,Parameter :: Maxlen = 128
 C
       Dimension
-     $ URe(NBasis,NBasis),XOne(NInte1),Occ(NBasis),TwoNO(NInte2),
+     $ URe(NBasis,NBasis),UNOAO(NBasis,NBasis),
+     $ XOne(NInte1),Occ(NBasis),TwoNO(NInte2),
      $ IndAux(NBasis),
      $ ABPLUS(NDimX*NDimX),ABMIN(NDimX*NDimX),
      $ Eig(NDimX),EigY(NDimX*NDimX),IndX(NDim),IndN(2,NDim),
@@ -1252,7 +1255,23 @@ C
      $ AuxI(NInte1),AuxIO(NInte1),IPair(NBasis,NBasis),
      $ EigX(NDimX*NDimX),
      $ IEigAddY(2,NDimX),IEigAddInd(2,NDimX),IndBlock(2,NDimX),
-     $ XMAux(NDimX*NDimX)
+     $ XMAux(NDimX*NDimX),XMuMAT(NBasis,NBasis),work1(NBasis,NBasis)
+! analysis of AC0
+       double precision :: ECorrIJ(6,6)
+       integer          :: IGIJ(4,4),IGemNo(6,2)
+C
+      NGem=MAXVAL(IGem)
+      ECorrIJ=0.0d0
+      IJ=0
+      Do I=1,NGem
+         Do J=1,I
+            IJ=IJ+1
+            IGIJ(I,J)=IJ
+            IGIJ(J,I)=IJ
+            IGemNo(IJ,1)=I
+            IGemNo(IJ,2)=J
+        EndDo
+      EndDo
 C
       IPair(1:NBasis,1:NBasis)=0
       Do II=1,NDimX
@@ -1755,6 +1774,18 @@ C     Do IP
 C
 C     FIND THE 0TH-ORDER SOLUTION FOR THE VIRTUAL-INACTIVE BLOCKS
 C
+      if(idalton.eq.0) then
+      open(10,file='fock.dat')
+      work1=0
+      Do IP=NOccup+1,NBasis
+      Do IQ=1,INActive
+      read(10,*)iip,iiq,xx
+      work1(iip,iiq)=xx
+      EndDo
+      EndDo
+      close(10)
+      endif
+C
       Do IP=NOccup+1,NBasis
       Do IQ=1,INActive
 C
@@ -1776,6 +1807,12 @@ C
      $ NInte1,NInte2,NBasis)
 C
       Eig(NFree1)=ABP
+C
+      If(IDALTON.Eq.0) Then
+      If(ABS(ABP-work1(IP,IQ)).Gt.1.d-7)
+     $Write(*,*)'ABP inconsistent with eps_a-eps_i for',IP,IQ
+      EndIf
+C
       EigY(NFree2)=One/Sqrt(Two)
       EigX(NFree2)=One/Sqrt(Two)
 C
@@ -2071,7 +2108,10 @@ C
      $ And.IGem(IP).Eq.IGem(IQ))
 c herer!!!
      $ EIntra=EIntra+Aux*TwoNO(NAddr3(IP,IR,IQ,IS))
-c     $ EIntra=EIntra+Aux*TwoEl2(NAddr3(IP,IR,IQ,IS))
+C
+      ECorrIJ(IGIJ(IGem(IP),IGem(IR)),IGIJ(IGem(IQ),IGem(IS)))= 
+     $ ECorrIJ(IGIJ(IGem(IP),IGem(IR)),IGIJ(IGem(IQ),IGem(IS)))
+     $              +Aux*TwoNO(NAddr3(IP,IR,IQ,IS))
 C
 C     endinf of If(IP.Gt.IR.And.IQ.Gt.IS)
       EndIf
@@ -2082,6 +2122,63 @@ C
 C      Print*, EAll,EIntra
 C
       ECorr=EAll-EIntra
+C
+!PRINT CONTRIBUTIONS TO ECorr FROM BLOCKS
+      Write(6,'(/,X,
+     $ "Contributions to AC0 from (Mu)(Nu) pairs of blocks")')
+      IJ=0
+      Do I=1,NGem
+      Do J=1,I
+      IJ=IJ+1
+! NGem=3 case
+       If(NGem.Eq.3) Then
+       IOO=0
+       If(IGemNo(IJ,1).Eq.1.And.IGemNo(IJ,2).Eq.1) IOO=1
+       IVV=0
+       If(IGemNo(IJ,1).Eq.3.And.IGemNo(IJ,2).Eq.3) IVV=1
+       IAA1=0
+       If(IGemNo(IJ,1).Eq.2.And.IGemNo(IJ,2).Eq.2) IAA1=1
+! NGem=2 case (zero inactive orbitals)
+       ElseIf(NGem.Eq.2) Then
+       IOO=0
+       IVV=0
+       If(IGemNo(IJ,1).Eq.2.And.IGemNo(IJ,2).Eq.2) IVV=1
+       IAA1=0
+       If(IGemNo(IJ,1).Eq.1.And.IGemNo(IJ,2).Eq.1) IAA1=1
+       EndIf
+
+       If(IVV==0.And.IOO==0) Then
+       KL=0
+       Do K=1,NGem
+       Do L=1,K
+         KL=KL+1
+         If(NGem.Eq.3) Then
+             IOO=0
+             If(IGemNo(KL,1).Eq.1.And.IGemNo(KL,2).Eq.1) IOO=1
+             IVV=0
+             If(IGemNo(KL,1).Eq.3.And.IGemNo(KL,2).Eq.3) IVV=1
+             IAA2=0
+             If(IGemNo(KL,1).Eq.2.And.IGemNo(KL,2).Eq.2) IAA2=1
+         ElseIf(NGem.Eq.2) Then
+             IOO=0
+             IVV=0
+             If(IGemNo(KL,1).Eq.2.And.IGemNo(KL,2).Eq.2) IVV=1
+             IAA2=0
+             If(IGemNo(KL,1).Eq.1.And.IGemNo(KL,2).Eq.1) IAA2=1
+         EndIf
+         If(IVV==0.And.IOO==0.And.IAA1+IAA2.Ne.2) Then
+         If(IJ.Ge.KL) Then
+           EE=ECorrIJ(IJ,KL)
+           If(IJ.Ne.KL)EE=EE+ECorrIJ(KL,IJ)
+           Write(6,'(X,"(",2I1,")","(",2I1,")",F15.8)')
+     $           IGemNo(IJ,1),IGemNo(IJ,2),IGemNo(KL,1),IGemNo(KL,2),EE
+         EndIf
+         EndIf
+      EndDo
+      EndDo
+      EndIf
+      EndDo
+      EndDo
 C
       Return
       End

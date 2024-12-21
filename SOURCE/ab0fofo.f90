@@ -438,7 +438,7 @@ end subroutine ACABMAT0_FOFO
 
 subroutine AC0CAS_FOFO(ECorr,ETot,Occ,URe,XOne,ABPLUS,ABMIN, &
                        IndN,IndX,IGemIN,NAct,INActive,NDimX,NBasis,NDim,NInte1, &
-                       NoSt,IntJFile,IntKFile,ICholesky)
+                       NoSt,IntJFile,IntKFile,ICholesky,IFlFCorr)
 !
 !     A ROUTINE FOR COMPUTING AC0 INTEGRAND
 !     (FOFO VERSION, USED IN AC0-CAS)
@@ -446,6 +446,7 @@ subroutine AC0CAS_FOFO(ECorr,ETot,Occ,URe,XOne,ABPLUS,ABMIN, &
 !     - USES BLOCK STRUCTURE FOR ABPLUS0 and ABMIN0
 !       (DOES NOT DAMP TO FILE)
 !     - COMPUTES THE AC0 ENERGY
+!     - IFlFCorr =1 (for SR-AC0) : dumps rdmcorr matrix for fAC0
 !
 !use timing
 !
@@ -454,6 +455,7 @@ implicit none
 integer,intent(in)           :: NAct,INActive,NDimX,NBasis,NDim,NInte1,NoSt
 integer,intent(in)           :: IndN(2,NDim),IndX(NDim),IGemIN(NBasis)
 integer,intent(in)           :: ICholesky
+integer,intent(in)           :: IFlFCorr
 double precision,intent(in)  :: URe(NBasis,NBasis),Occ(NBasis),XOne(NInte1)
 character(*)                 :: IntJFile,IntKFile
 double precision,intent(out) :: ETot,ECorr
@@ -461,7 +463,7 @@ double precision,intent(out) :: ABPLUS(NDimX,NDimX),ABMIN(NDimX,NDimX)
 
 integer          :: iunit
 integer          :: NOccup,NCholesky
-integer          :: i,j,k,l,kl,ii,ip,iq,ir,is,ipq,irs
+integer          :: i,j,ij,k,l,kl,ii,ip,iq,ir,is,ipq,irs
 integer          :: ipos,jpos,iblk,jblk,nblk
 integer          :: IGem(NBasis),Ind(NBasis),pos(NBasis,NBasis)
 integer          :: nAA,nAI(INActive),nAV(INActive+NAct+1:NBasis),nIV
@@ -482,9 +484,31 @@ double precision :: C(NBasis)
 double precision,allocatable :: work1(:),ints(:,:)
 double precision,allocatable :: work(:,:),Eig(:)
 double precision,allocatable :: MatFF(:,:)
+! analysis of AC0
+double precision :: ECorrIJ(6,6),EE
+integer          :: NGem,IGIJ(4,4),IGemNo(6,2),IOO,IVV,IAA1,IAA2
+!
 
 type(EblockData),allocatable :: Eblock(:)
 type(EblockData) :: EblockIV
+
+if(IFlFCorr==1) then
+  write(lout,*) 'Error! Disabled CorrFun=fAC0 in AC0CAS_FOFO!'
+  stop
+endif
+
+ECorrIJ=0.0d0
+NGem=MAXVAL(IGemIN)
+IJ=0
+Do I=1,NGem
+  Do J=1,I
+    IJ=IJ+1
+    IGIJ(I,J)=IJ
+    IGIJ(J,I)=IJ
+    IGemNo(IJ,1)=I
+    IGemNo(IJ,2)=J
+  EndDo
+EndDo
 
 ! timing
 !call clock('START',Tcpu,Twall)
@@ -599,6 +623,7 @@ ABPLUS=work
 ! C = X^T.B
 call ABPM_TRAN(ABMIN,work,EBlock,EBlockIV,nblk,NDimX,.false.)
 ABMIN=work
+
 !call clock('ABPM_TRAN(2)',Tcpu,Twall)
 
 ! unpack Eig (1)
@@ -683,6 +708,10 @@ if(ICholesky==0) then
 
                    if(AuxCoeff(IGem(ip),IGem(iq),IGem(ir),IGem(is))==1) EIntra = EIntra + Aux*ints(j,i)
 
+                   ECorrIJ(IGIJ(IGemIN(IP),IGemIN(IQ)),IGIJ(IGemIN(IR),IGemIN(IS)))= &
+                   ECorrIJ(IGIJ(IGemIN(IP),IGemIN(IQ)),IGIJ(IGemIN(IR),IGemIN(IS)))  &
+                   +Aux*ints(j,i)
+
                  endif
               enddo
            enddo
@@ -759,6 +788,11 @@ elseif(ICholesky==1) then
 
                  if(AuxCoeff(IGem(ip),IGem(iq),IGem(ir),IGem(is))==1) EIntra = EIntra + Aux*ints(j,i)
 
+ 
+                 ECorrIJ(IGIJ(IGemIN(IP),IGemIN(IQ)),IGIJ(IGemIN(IR),IGemIN(IS)))= &
+                 ECorrIJ(IGIJ(IGemIN(IP),IGemIN(IQ)),IGIJ(IGemIN(IR),IGemIN(IS)))  &
+                 +Aux*ints(j,i)
+
                endif
             enddo
          enddo
@@ -792,6 +826,61 @@ associate(B => EblockIV)
   deallocate(B%pos)
 
 end associate
+
+!PRINT CONTRIBUTIONS TO ECorr FROM BLOCKS
+Write(6,'(/,X,"Contributions to AC0 from (Mu)(Nu) pairs of blocks")')
+IJ=0
+Do I=1,NGem
+Do J=1,I
+   IJ=IJ+1
+! NGem=3 case
+   If(NGem.Eq.3) Then
+       IOO=0
+       If(IGemNo(IJ,1).Eq.1.And.IGemNo(IJ,2).Eq.1) IOO=1
+       IVV=0
+       If(IGemNo(IJ,1).Eq.3.And.IGemNo(IJ,2).Eq.3) IVV=1 
+       IAA1=0
+       If(IGemNo(IJ,1).Eq.2.And.IGemNo(IJ,2).Eq.2) IAA1=1
+! NGem=2 case (zero inactive orbitals)
+   ElseIf(NGem.Eq.2) Then
+       IOO=0
+       IVV=0
+       If(IGemNo(IJ,1).Eq.2.And.IGemNo(IJ,2).Eq.2) IVV=1
+       IAA1=0
+       If(IGemNo(IJ,1).Eq.1.And.IGemNo(IJ,2).Eq.1) IAA1=1
+   EndIf
+
+   If(IVV==0.And.IOO==0) Then
+      KL=0
+      Do K=1,NGem
+      Do L=1,K
+         KL=KL+1
+         If(NGem.Eq.3) Then
+             IOO=0
+             If(IGemNo(KL,1).Eq.1.And.IGemNo(KL,2).Eq.1) IOO=1
+             IVV=0
+             If(IGemNo(KL,1).Eq.3.And.IGemNo(KL,2).Eq.3) IVV=1
+             IAA2=0
+             If(IGemNo(KL,1).Eq.2.And.IGemNo(KL,2).Eq.2) IAA2=1
+         ElseIf(NGem.Eq.2) Then
+             IOO=0
+             IVV=0
+             If(IGemNo(KL,1).Eq.2.And.IGemNo(KL,2).Eq.2) IVV=1
+             IAA2=0
+             If(IGemNo(KL,1).Eq.1.And.IGemNo(KL,2).Eq.1) IAA2=1
+         EndIf 
+         If(IVV==0.And.IOO==0.And.IAA1+IAA2.Ne.2) Then
+         If(IJ.Ge.KL) Then
+           EE=ECorrIJ(IJ,KL)
+           If(IJ.Ne.KL)EE=EE+ECorrIJ(KL,IJ)
+           Write(6,'(X,"(",2I1,")","(",2I1,")",F15.8)') IGemNo(IJ,1),IGemNo(IJ,2),IGemNo(KL,1),IGemNo(KL,2),EE
+         EndIf
+         EndIf
+      EndDo
+      EndDo
+    EndIf
+EndDo
+EndDo
 
 end subroutine AC0CAS_FOFO
 
@@ -3300,6 +3389,9 @@ integer :: NSym,NSymNO(NBasis),MultpC(8,8),IStCAS(2,100),ICORR(100),IStERPA(2,10
            IndMin,IndHlp,ICAS,IDCORR,NoEig,IAC0,ISt11ERPA(2,100),NoEig11,NegSym(8),NoERPASym(8),IStateInSACAS(100,8)
 integer,allocatable :: IZeroNU(:)
 logical :: file_exists
+! analysis of AC0
+double precision :: ECorrIJ(6,6),EE
+integer          :: NGem,IGIJ(4,4),IGemNo(6,2)
 !
 type(EblockData),allocatable :: Eblock(:)
 type(EblockData) :: EblockIV
@@ -3312,6 +3404,19 @@ integer :: IFlAC0DP
 
 ! timing
 call clock('START',Tcpu,Twall)
+
+ECorrIJ=0.0d0
+NGem=MAXVAL(IGemIN)
+IJ=0
+Do I=1,NGem
+  Do J=1,I
+    IJ=IJ+1
+    IGIJ(I,J)=IJ
+    IGIJ(J,I)=IJ
+    IGemNo(IJ,1)=I
+    IGemNo(IJ,2)=J
+  EndDo
+EndDo
 
 Do I=1,NBasis
    C(I)=SQRT(Occ(I))
@@ -3770,6 +3875,7 @@ IZeroNU(1:NDimX)=0
 !EndDo
 
 Do IDCORR=1,NoStMx
+ECorrIJ=0.0d0
 If (ICORR(IDCORR).Eq.1) Then
 
    IERPA=0
@@ -3785,14 +3891,14 @@ If (ICORR(IDCORR).Eq.1) Then
 allocate(workA(NDimX,NDimX))
 workA=0
 
-   If(IAC0.Eq.0.And.IERPA.Ne.0) Write(6,'(X, &
+   If(IAC0.Eq.0.And.IERPA.Ne.0) Write(6,'(/,X, &
       "Deexcitation correction is computed for ERPA vector no", &
       I2," Sym=",I1,".",I1," Eig=",F15.8)')  IERPA, &
       IStERPA(1,IERPA),IStERPA(2,IERPA),Eig(IERPA)
    If(IAC0.Eq.0.And.IERPA.Eq.0) Write(6,'(/, &
     " ERPA vector for deexcitation correction could not &
       be determined. The correction will be set to 0.")')
-   If(IAC0.Eq.1) Write(6,'(X,"AC0 correction is computed for SA-CAS state",I2," Sym=", &
+   If(IAC0.Eq.1) Write(6,'(/,X,"AC0 correction is computed for SA-CAS state",I2," Sym=", &
       I1,".",I1)')  ICAS, IStCAS(1,ICAS),IStCAS(2,ICAS)
 
 do j=1,NDimX
@@ -3863,6 +3969,10 @@ if(ICholesky==0) then
                    EAll = EAll + Aux*ints(j,i)
 
                    if(AuxCoeff(IGem(ip),IGem(iq),IGem(ir),IGem(is))==1) EIntra = EIntra + Aux*ints(j,i)
+
+                   ECorrIJ(IGIJ(IGemIN(IP),IGemIN(IQ)),IGIJ(IGemIN(IR),IGemIN(IS)))= &
+                   ECorrIJ(IGIJ(IGemIN(IP),IGemIN(IQ)),IGIJ(IGemIN(IR),IGemIN(IS)))  &
+                   +Aux*ints(j,i)
 
                  endif
               enddo
@@ -3944,6 +4054,10 @@ elseif(ICholesky==1) then
 
                  if(AuxCoeff(IGem(ip),IGem(iq),IGem(ir),IGem(is))==1) EIntra = EIntra + Aux*ints(j,i)
 
+                 ECorrIJ(IGIJ(IGemIN(IP),IGemIN(IQ)),IGIJ(IGemIN(IR),IGemIN(IS)))= &
+                 ECorrIJ(IGIJ(IGemIN(IP),IGemIN(IQ)),IGIJ(IGemIN(IR),IGemIN(IS)))  &
+                 +Aux*ints(j,i)
+
                endif
             enddo
          enddo
@@ -3962,6 +4076,34 @@ call clock('ENE-loop Y01CASDSYM_FOFO',Tcpu,Twall)
 
 ECorr = EAll-EIntra
 ECorrSym(IDCORR)=ECorr
+
+!PRINT CONTRIBUTIONS TO ECorr FROM BLOCKS
+If(IAC0.Eq.0) Write(6,'(/,X,"Contributions to D correction from (Mu)(Nu) pairs of blocks")')
+If(IAC0.Eq.1) Write(6,'(/,X,"Contributions to AC0 correction from (Mu)(Nu) pairs of blocks")')
+IJ=0
+Do I=1,NGem
+Do J=1,I
+   IJ=IJ+1
+   KL=0
+   Do K=1,NGem
+   Do L=1,K
+      KL=KL+1
+      If(IJ.Ge.KL) Then
+        EE=ECorrIJ(IJ,KL)
+        If(IJ.Ne.KL)EE=EE+ECorrIJ(KL,IJ)
+        If(IAC0.Eq.1) Then
+           Write(6,'(X,"AC0 : (",2I1,")","(",2I1,")",F15.8)') & 
+           IGemNo(IJ,1),IGemNo(IJ,2),IGemNo(KL,1),IGemNo(KL,2),EE
+        EndIf
+        If(IAC0.Eq.0) Then
+           Write(6,'(X,I1,".",I1," : (",2I1,")","(",2I1,")",F15.8)') &
+           IStERPA(1,IERPA),IStERPA(2,IERPA),IGemNo(IJ,1),IGemNo(IJ,2),IGemNo(KL,1),IGemNo(KL,2),EE
+        EndIf
+      EndIf
+   EndDo
+   EndDo
+EndDo
+EndDo
 
 deallocate(ints)
 !
@@ -3993,7 +4135,7 @@ deallocate(IZeroNU)
 
 end subroutine Y01CASDSYM_FOFO
 
-subroutine ACEInteg_FOFO(ECorr,URe,Occ,XOne,UNOAO,&
+subroutine ACEInteg_FOFO(ECorr,ECorrIJ,URe,Occ,XOne,UNOAO,&
       ABPLUS,ABMIN,EigVecR,Eig,&
       EGOne,NGOcc,CICoef,&
       NBasis,NInte1,NDim,NGem,IndAux,ACAlpha,&
@@ -4023,7 +4165,8 @@ integer :: i,j,k,l,kl,ip,iq,ir,is,ipq,irs
 integer :: pos(NBasis,NBasis)
 double precision :: ECASSCF,XKer
 character(:),allocatable :: twojfile,twokfile
-
+! analysis of AC
+double precision :: ECorrIJ(6,6)
 
  NOccup = NAct + INActive
 
@@ -4114,7 +4257,7 @@ character(:),allocatable :: twojfile,twokfile
  endif
 
  if(ICASSCF==1) then
-    call ACEneERPA_FOFO(ECorr,EigVecR,Eig,Occ, &
+    call ACEneERPA_FOFO(ECorr,ECorrIJ,EigVecR,Eig,Occ, &
                         IGemIN,IndN,IndX,INActive+NAct, &
                         NDimX,NBasis,twokfile,ICholesky)
  else
@@ -4125,7 +4268,7 @@ character(:),allocatable :: twojfile,twokfile
 
 end subroutine ACEInteg_FOFO
 
-subroutine ACEneERPA_FOFO(ECorr,EVec,EVal,Occ,IGem, &
+subroutine ACEneERPA_FOFO(ECorr,ECorrIJ,EVec,EVal,Occ,IGem, &
                           IndN,IndX,NOccup,NDimX,NBasis,IntKFile,ICholesky)
 implicit none
 
@@ -4138,7 +4281,7 @@ double precision,intent(out) :: ECorr
 double precision,intent(in) :: EVec(NDimX,NDimX),EVal(NDimX)
 double precision :: Occ(NBasis)
 
-integer :: i,j,k,l,kl,kk,ip,iq,ir,is,ipq,irs
+integer :: i,j,ij,k,l,kl,kk,ip,iq,ir,is,ipq,irs
 integer :: iunit,ISkippedEig
 integer :: pos(NBasis,NBasis)
 integer :: NCholesky
@@ -4154,6 +4297,20 @@ double precision,allocatable :: work1(:,:),MatFF(:,:)
 double precision,allocatable :: tVec(:,:)
 double precision,parameter   :: SmallE = 1.d-3,BigE = 1.d8
 double precision,external    :: ddot
+! analysis of AC
+double precision :: ECorrIJ(6,6)
+integer          :: NGem,IGIJ(4,4)
+
+ECorrIJ=0.0d0
+NGem=MAXVAL(IGem)
+IJ=0
+Do I=1,NGem
+  Do J=1,I
+    IJ=IJ+1
+    IGIJ(I,J)=IJ
+    IGIJ(J,I)=IJ
+  EndDo
+EndDo
 
 do i=1,NBasis
    CICoef(i) = sign(sqrt(Occ(i)),Occ(i)-0.5d0)
@@ -4244,6 +4401,10 @@ if(ICholesky==0) then
                       endif
 
                       ECorr = ECorr + Aux*ints(j,i)
+
+                      ECorrIJ(IGIJ(IGem(IP),IGem(IQ)),IGIJ(IGem(IR),IGem(IS)))= &
+                      ECorrIJ(IGIJ(IGem(IP),IGem(IQ)),IGIJ(IGem(IR),IGem(IS)))  &
+                      +Aux*ints(j,i)
 
                    ! endinf of If(IP.Gt.IR.And.IQ.Gt.IS)
                    endif
@@ -4338,6 +4499,10 @@ elseif(ICholesky==1) then
                     endif
 
                     ECorr = ECorr + Aux*ints(j,i)
+
+                    ECorrIJ(IGIJ(IGem(IP),IGem(IQ)),IGIJ(IGem(IR),IGem(IS)))= &
+                    ECorrIJ(IGIJ(IGem(IP),IGem(IQ)),IGIJ(IGem(IR),IGem(IS)))  &
+                    +Aux*ints(j,i)
 
                  ! endinf of If(IP.Gt.IR.And.IQ.Gt.IS)
                  endif

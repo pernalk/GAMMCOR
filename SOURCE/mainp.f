@@ -167,6 +167,12 @@ C     IFlRESPONSE = 1 : compute polarizability tensor for a given frequency Freq
 C
       IFlRESPONSE=Flags%IFlRESPONSE
 C
+C     IFlFCorr  = 1 : AC0+Ecmd^sr with self-adapting mu based on fCAS+fAC0
+C                 0 : AC0+Ecmd^sr with self-adapting mu based on fCAS (default)
+C
+C     NOT READY ON THIS BRANCH!!!
+      IFlFCorr = Flags%IFlFCorr
+C
 C     *************************************************************************
 C
 C     SELECT A LONG-RANGE DMFT FUNCTIONAL

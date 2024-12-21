@@ -134,6 +134,12 @@ else
   ! reduce virtuals
    Flags%IRedVirt = Input%CalcParams%RedVirt
 
+  ! RDM2 settings
+   Flags%IRdm2Typ = Input%CalcParams%Rdm2Type
+
+  ! compute orbital relaxation ! not on this branch
+  ! Flags%IOrbRelax = Input%CalcParams%OrbRelax
+
   ! memory in 2ints sorter (readtwoint) 
    Flags%MemVal   = Input%CalcParams%MemVal
    Flags%MemType  = Input%CalcParams%MemType
@@ -195,6 +201,12 @@ else
      FLags%IGVB = 0
      Flags%ICASSCF = 1
      Flags%ISHF = 1
+
+  case(RDM_TYPE_CI)
+     Flags%ICI     = 1
+     Flags%IGVB    = 0
+     Flags%ICASSCF = 1
+
   case default
      write(LOUT,'(1x,a)') 'RDMType not declared! Assuming ICASSCF=1!'
      FLags%IGVB    = 0
@@ -739,13 +751,13 @@ elseif(Flags%ISAPT.Eq.1) then
     write(LOUT,'(1x,a,1x,i2)') 'NUCLEAR CHARGE: ', SAPT%monA%ZNucl
     write(LOUT,'(1x,a,8x,i3)') 'CHARGE: ', SAPT%monA%Charge
     write(LOUT,'(1x,a,3x,i3)') 'NO.OF ATOMS: ', SAPT%monA%NCen
-    write(LOUT,'(1x,a,2x,f9.4)') 'THRESH ACTIVE: ', SAPT%monA%ThrAct
+    write(LOUT,'(1x,a,2x,e13.6)') 'THRESH ACTIVE: ', SAPT%monA%ThrAct
     write(LOUT,'()')
     write(LOUT,'(1x,a)') 'MONOMER B'
     write(LOUT,'(1x,a,1x,i2)') 'NUCLEAR CHARGE: ', SAPT%monB%ZNucl
     write(LOUT,'(1x,a,8x,i3)') 'CHARGE: ', SAPT%monB%Charge
     write(LOUT,'(1x,a,3x,i3)') 'NO.OF ATOMS: ', SAPT%monB%NCen
-    write(LOUT,'(1x,a,2x,f9.4)') 'THRESH ACTIVE: ', SAPT%monB%ThrAct
+    write(LOUT,'(1x,a,2x,e13.6)') 'THRESH ACTIVE: ', SAPT%monB%ThrAct
 
 endif
 

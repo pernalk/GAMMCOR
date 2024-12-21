@@ -1085,10 +1085,10 @@ if (SAPT%IPrint > 10) then
    print*, 'tNb2(2)',TNb2(2)
    print*, 'TNaNb ',TNaNb
    print*, 'TNaNb2',TNaNb2
-   print*, 'exchange elst dSRS 1', exch1tot1*1000
-   print*, 'exchange elst dSRS 2', exch1tot2*1000
-   print*, 'elst dSRS 1', SAPT%elst1*1000
-   print*, 'elst dSRS 2', SAPT%elst2*1000
+   print*, 'exchange elst dSRS 1 = ', exch1tot1*1000
+   print*, 'exchange elst dSRS 2 = ', exch1tot2*1000
+   print*, 'elst dSRS 1 = ', SAPT%elst1*1000
+   print*, 'elst dSRS 2 = ', SAPT%elst2*1000
 endif
 
 write(lout,'(/1x,a)') 'Now we calculate matrix elements of V in Psi basis:'

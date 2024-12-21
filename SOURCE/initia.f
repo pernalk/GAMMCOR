@@ -346,6 +346,7 @@ C
       EndDo
       EndDo
    61 Close(10)
+      NActDMRG=ICount
 C
       Else
 C

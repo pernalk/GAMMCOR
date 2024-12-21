@@ -2312,9 +2312,9 @@ enddo
 
 close(iunit1)
 
-print*, 'from JK_Loop'
-print*, 'ABPLUS-after K',norm2(ABPLUS)
-print*, 'ABMIN -after K',norm2(ABMIN)
+!print*, 'from JK_Loop'
+!print*, 'ABPLUS-after K',norm2(ABPLUS)
+!print*, 'ABMIN -after K',norm2(ABMIN)
 
 open(newunit=iunit2,file=trim(IntJFile),status='OLD', &
      access='DIRECT',recl=8*NBasis**2)

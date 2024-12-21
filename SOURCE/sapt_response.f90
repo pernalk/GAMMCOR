@@ -6,6 +6,7 @@ use tran
 use abmat
 use abfofo
 use ab0fofo
+use abcipsi
 use sapt_utils
 use sapt_inter
 
@@ -13,285 +14,13 @@ implicit none
 
 contains
 
-! subroutine sapt_2trdm(Flags,A,B,NBasis)
-! implicit none
-
-! type(FlagsData)    :: Flags
-! type(SystemBlock)  :: A,B
-! integer,intent(in) :: NBasis
-! integer :: pq,ip,iq,ir,is,it,exc,i,j
-! integer :: dimOA,dimOB
-! integer :: nstatesA,nstatesB
-! double precision,allocatable :: RDM2A(:,:,:,:),RDM2B(:,:,:,:),TRDM1(:,:),TRDM1TEST(:,:),RDM1TEST(:,:)
-
-! write(lout,'(/1x,a)') 'entering 2trdm...'
-! dimOA  = A%num0+A%num1
-! dimOB  = B%num0+B%num1
-! nstatesA = A%NStates
-! nstatesB = B%NStates
-! allocate(RDM2A(dimOA,dimOA,dimOA,dimOA),&
-!          RDM2B(dimOB,dimOB,dimOB,dimOB))
-
-! RDM2A(:,:,:,:) = A%rdm24(A%iref1,:,:,:,:)
-! RDM2B(:,:,:,:) = B%rdm24(B%iref1,:,:,:,:)
-! !print*,"RDM2A"
-! !print*,RDM2A
-
-
-! !allocate(A%trdm24(nstatesA,NBasis,NBasis,NBasis,NBasis))
-! !allocate(B%trdm24(nstatesB,NBasis,NBasis,NBasis,NBasis))
-
-! allocate(A%trdm24(4,NBasis,NBasis,NBasis,NBasis))
-! allocate(B%trdm24(4,NBasis,NBasis,NBasis,NBasis))
-
-! allocate(TRDM1(A%NDimX,A%NDimX))
-! allocate(TRDM1TEST(A%NDimX,A%NDIMX))
-! TRDM1=0d0
-
-
-! do exc=1,4 
-!    A%trdm24(exc,:,:,:,:)=0d0
-! enddo
-
-
-! print*, 'A EigX',norm2(A%EigX)
-! print*, 'A EigY',norm2(A%EigY)
-! print*, 'B EigX',norm2(B%EigX)
-! print*, 'B EigY',norm2(B%EigY)
-! print*,'NDimX',A%NDimX
-! !print*,'A%EigX'
-! do pq=1,A%NDimX
-!    if (A%EigX(2*A%NDimX+pq)/= 0d0) then
-! !   print *,A%EigX(2*A%NDimX+pq)
-!    endif
-! enddo
-! ! 1 OK OK 
-! do exc=1,4
-!    do pq=1,A%NDimX
-!       ip = A%IndN(1,pq)
-!       iq = A%IndN(2,pq)
-!       do ir = 1,dimOA
-!          do is = 1,dimOA
-!             do it =1,dimOA
-!             A%trdm24(exc,ip,is,ir,it) =  A%trdm24(exc,ip,is,ir,it)+A%EigX((exc-1)*A%NDimX+pq)*RDM2A(iq,is,ir,it)
-! !            print*, A%EigX((exc-1)*A%NDimX+pq)
-!             enddo
-!          enddo
-!       enddo
-!    enddo
-!  ! 2  OK 
-!    do pq=1,A%NDimX
-!       ip = A%IndN(1,pq)
-!       iq = A%IndN(2,pq)
-!       do ir = 1,dimOA
-!          do is = 1,dimOA
-!             do it =1,dimOA
-!             A%trdm24(exc,ir,is,ip,it) =  A%trdm24(exc,ir,is,ip,it)+A%EigX((exc-1)*A%NDimX+pq)*RDM2A(ir,is,iq,it)
-!             enddo
-!          enddo
-!       enddo
-!    enddo
-! !3   OK
-!    do pq=1,A%NDimX
-!       ip = A%IndN(1,pq)
-!       iq = A%IndN(2,pq)
-!       do ir = 1,dimOA
-!          do is = 1,dimOA
-!             do it =1,dimOA
-!                if (ip <= dimOA) then
-!                   A%trdm24(exc,ir,iq,is,it) =  A%trdm24(exc,ir,iq,is,it)-A%EigX((exc-1)*A%NDimX+pq)*RDM2A(ir,ip,is,it)
-!             endif
-!             enddo
-!          enddo
-!       enddo
-!    enddo
-! !4   OK
-!    do pq=1,A%NDimX
-!       ip = A%IndN(1,pq)
-!       iq = A%IndN(2,pq)
-!       do ir = 1,dimOA
-!          do is = 1,dimOA
-!             do it =1,dimOA
-!                if(ip<=dimOA) then
-!                   A%trdm24(exc,ir,it,is,iq) =  A%trdm24(exc,ir,it,is,iq)-A%EigX((exc-1)*A%NDimX+pq)*RDM2A(ir,it,is,ip)
-!                endif   
-!             enddo
-!          enddo
-!       enddo
-!    enddo
-
-
-
-! !5 OK
-!       do pq=1,A%NDimX
-!          ip = A%IndN(1,pq)
-!          iq = A%IndN(2,pq)
-!          do ir = 1,dimOA
-!             do is = 1,dimOA
-!                do it =1,dimOA
-!                   if(ip <= dimOA) then
-!                      A%trdm24(exc,iq,is,ir,it) =  A%trdm24(exc,iq,is,ir,it)+A%EigY((exc-1)*A%NDimX+pq)*RDM2A(ip,is,ir,it)
-!                   endif   
-!                enddo
-!             enddo
-!          enddo
-!       enddo
-
-
-! !6  OK    
-!       do pq=1,A%NDimX
-!          ip = A%IndN(1,pq)
-!          iq = A%IndN(2,pq)
-!          do ir = 1,dimOA
-!             do is = 1,dimOA
-!                do it =1,dimOA
-!                      if(ip<= dimOA) then
-!                         A%trdm24(exc,ir,is,iq,it) =  A%trdm24(exc,ir,is,iq,it)+A%EigY((exc-1)*A%NDimX+pq)*RDM2A(ir,is,ip,it)
-!                      endif     
-!                enddo
-!             enddo
-!          enddo
-!       enddo
-!  !7   OK  
-!       do pq=1,A%NDimX
-!          ip = A%IndN(1,pq)
-!          iq = A%IndN(2,pq)
-!          do ir = 1,dimOA
-!             do is = 1,dimOA
-!                do it =1,dimOA
-!                A%trdm24(exc,ir,ip,is,it) =  A%trdm24(exc,ir,ip,is,it)-A%EigY((exc-1)*A%NDimX+pq)*RDM2A(ir,iq,is,it)
-!                enddo
-!             enddo
-!          enddo
-!       enddo
-! !8      OK
-!       do pq=1,A%NDimX
-!          ip = A%IndN(1,pq)
-!          iq = A%IndN(2,pq)
-!          do ir = 1,dimOA
-!             do is = 1,dimOA
-!                do it =1,dimOA
-!                A%trdm24(exc,ir,it,is,ip) =  A%trdm24(exc,ir,it,is,ip)-A%EigY((exc-1)*A%NDimX+pq)*RDM2A(ir,it,is,iq)
-!                enddo
-!             enddo
-!          enddo
-!       enddo
-
-! enddo
-! print*,"2TRDM"
-! do ip=1,10
-!    do iq = 1,10
-!       do ir = 1,10
-!          do is =1,10
-!             if(abs(A%trdm24(1,ip,iq,ir,is))>1d-2) then
-!                print*,ip,iq,ir,is,A%trdm24(1,ip,iq,ir,is)
-!             endif
-!          enddo
-!       enddo
-!    enddo
-! enddo
-! print*,'Firs few eigenvalues',A%Eig(1),A%Eig(2),A%Eig(3)
-! print*,'Dla pewności',A%rdm1(1,:)
-
-! do pq=1,A%NDimX
-!    ip = A%IndN(1,pq)
-!    iq = A%IndN(2,pq)
-!    print*,"ip,iq",ip,",",iq
-!          TRDM1(ip,iq)=TRDM1(ip,iq)-(A%rdm1(1,ip)-A%rdm1(1,iq))*A%EigX(0*A%NDimX+pq)
-!          TRDM1(iq,ip)=TRDM1(iq,ip)-(A%rdm1(1,iq)-A%rdm1(1,ip))*A%EigY(0*A%NDimX+pq)
-! enddo
-! print*,"1TRDM z X i Y"
-! do j=1,10
-!    write(lout,'(*(f12.6))') (TRDM1(i,j),i=1,10)
-! enddo
-! print*, "1TRDM z X i Y norma : ", norm2(TRDM1)
-! do i=1,A%NDimX
-!    do j=1,A%NDimX
-!    if(abs(TRDM1(i,j))>1d-2) then
-!       print *,"TRDM1 duze dla :",i, j, "wynosi", TRDM1(i,j)
-!    endif
-!    enddo
-! enddo   
-! TRDM1TEST=0d0
-! do ip=1,NBasis
-!    do ir=1,NBAsis
-!       do iq=1,NBasis
-!          TRDM1TEST(ip,ir)= TRDM1TEST(ip,ir)+A%trdm24(1,ip,ir,iq,iq)
-!       enddo
-!    enddo
-! enddo
-
-! print*,"1TRDM odtworzny z TRDM"
-! do j=1,10
-!    write(lout,'(*(f12.6))') (TRDM1TEST(i,j),i=1,10)
-! enddo
-
-! print*,"Norma 2TRDM"
-! print*,norm2(A%trdm24(1,:,:,:,:))
-! print*,"A czy działa dla zwykłego 2RDM?"
-! RDM1TEST=0d0
-! allocate(RDM1TEST(dimOA,dimOA))
-! do ip=1,dimOA
-!    do ir=1,dimOA
-!       do iq=1,dimOA
-!          RDM1TEST(ip,ir)= RDM1TEST(ip,ir)+A%rdm24(1,ip,ir,iq,iq)
-!       enddo
-!    enddo
-! enddo
-! print*,"1RDM odtworzny z 2RDM"
-! do j=1,10
-!    write(lout,'(*(f12.6))') (RDM1TEST(i,j),i=1,10)
-! enddo
-! print*,"AOCC",A%Occ
-
-
-
-! block
-!    double precision :: DipXao(NBasis**2),DipYao(NBasis**2),DipZao(NBasis**2)
-!    double precision :: DipX(NBasis,NBasis),DipY(NBasis,NBasis),DipZ(NBasis,NBasis)
-!    double precision:: TSDipXYZ(3)
-!    character(:),allocatable     :: mname,dipfile,mofile
-   
-!       mname  = 'A'
-!       dipfile= "DIP_A"
-!       mofile = 'MOLPRO_A.MOPUN'
-
-
-!    call read_dip_sym_molpro(DipXao,DipYao,DipZao,dipfile,NBasis)
-
-! !print*, 'DipX-AO:',norm2(DipXao)
-! !print*, 'DipY-AO:',norm2(DipYao)
-! !print*, 'DipZ-AO:',norm2(DipZao)
-
-!    call unpack_sym_molpro(DipXao,dipfile,NBasis)
-!    call unpack_sym_molpro(DipYao,dipfile,NBasis)
-!    call unpack_sym_molpro(DipZao,dipfile,NBasis)
-
-!    call tran2MO(DipXao,A%CAONO(A%iref1,:,:),A%CAONO(A%iref1,:,:),DipX,NBasis)
-!    call tran2MO(DipYao,A%CAONO(A%iref1,:,:),A%CAONO(A%iref1,:,:),DipY,NBasis)
-!    call tran2MO(DipZao,A%CAONO(A%iref1,:,:),A%CAONO(A%iref1,:,:),DipZ,NBasis)
-!    TSDipXYZ = 0d0
-!    do j=1,NBasis
-!       do i=1,NBasis
-!          TSDipXYZ(1) = TSDipXYZ(1) - 2d0*TRDM1(j,i)*DipX(i,j)
-!          TSDipXYZ(2) = TSDipXYZ(2) - 2d0*TRDM1(j,i)*DipY(i,j)
-!          TSDipXYZ(3) = TSDipXYZ(3) - 2d0*TRDM1(j,i)*DipZ(i,j)
-!       enddo
-!    enddo
-!    print *,'X,Y,Z moments from X and Y matrix'
-!    print *,TSDipXYZ
-! end block
-
-! deallocate(TRDM1TEST)
-! end subroutine sapt_2trdm
-
-subroutine calc_resp_casgvb(Mon,MO,Flags,NBas,EChck)
+subroutine calc_resp_casgvb(Mon,MO,Flags,NAO,NBas,EChck)
 implicit none
 
 type(SystemBlock) :: Mon
 type(FlagsData) :: Flags
 double precision :: MO(:)
-integer :: NBas
+integer :: NAO,NBas
 logical :: EChck
 integer :: NSq,NInte1,NInte2
 double precision, allocatable :: work1(:),work2(:),XOne(:),TwoMO(:)
@@ -313,7 +42,7 @@ integer :: INegExcit
 integer :: iter
 
 double precision :: ACAlpha
-double precision :: ECASSCF,ETot,ECorr
+double precision :: ECASSCF,ETot,ECorr,ECorrIJ(6,6)
 
 character(8) :: label
 character(:),allocatable :: onefile,twofile,propfile,rdmfile
@@ -502,6 +231,25 @@ if(Flags%ICASSCF==0.and.Flags%ISERPA==0) then
   ! CAS-SCF
   elseif(Flags%ICASSCF==1.and.Flags%ISERPA==0) then
 
+  if(Flags%ICholesky==1) then
+     open(newunit=iunit,file='cholvecs',form='unformatted')
+     write(iunit) Mon%NChol
+     write(iunit) Mon%FF
+     close(iunit)
+
+     ! sub-snippet for testing Pmat
+     ! this will not work now, shit -- Pmat!
+     ! uncomment this for e2disp_Cmat_Chol / e2disp_Cmat_Chol_proj
+     !allocate(Mon%Pmat(Mon%NDimX,Mon%NDimX))
+     !call Project_DChol(Mon%PMat,Mon%IndN,NBas,Mon%NDimX)
+
+     !call CIter_FOFO(ECorr,ACAlpha,XOne,URe,Mon%Occ,EGOne,NGOcc,&
+     !                Mon%IGem,Mon%NAct,Mon%INAct,Mon%NELE,NBas,NInte1, &
+     !                Mon%NDim,Mon%NGem,Mon%IndAux,Mon%IndN,Mon%IndX,Mon%NDimX,&
+     !                twojfile,twokfile)
+     !deallocate(Pmat)
+  endif
+
   allocate(ABPlus(Mon%NDimX**2),ABMin(Mon%NDimX**2),&
             EigVecR(Mon%NDimX**2),Eig(Mon%NDimX))
 
@@ -525,13 +273,16 @@ if(Flags%ICASSCF==0.and.Flags%ISERPA==0) then
 !   endif
 
   !ACAlpha=sqrt(2d0)/2d0
-  ACAlpha=1d-12
-  Print*, 'UNCOUPLED,ACAlpha',ACAlpha
+  if(Flags%IdSRS==1) then
+     ACAlpha=1d-12
+     print*, 'dSRS set ACAlpha unc =', ACAlpha
+  endif
 
   !ACAlpha=0.953089922969332
   !print*, 'ACAlpha',ACAlpha
   select case(Mon%TwoMoInt)
   case(TWOMO_FOFO)
+
      call AB_CAS_FOFO(ABPlus,ABMin,ECASSCF,URe,Mon%Occ,XOne, &
                  Mon%IndN,Mon%IndX,Mon%IGem,Mon%NAct,Mon%INAct,Mon%NDimX,NBas,Mon%NDimX,&
                  NInte1,twojfile,twokfile,Flags%ICholesky,ACAlpha,.false.)
@@ -669,7 +420,7 @@ if(Flags%ICASSCF==0.and.Flags%ISERPA==0) then
      ECorr=0
      select case(Mon%TwoMoInt)
      case(TWOMO_FOFO)
-        call ACEneERPA_FOFO(ECorr,EigVecR,Eig,Mon%Occ, &
+        call ACEneERPA_FOFO(ECorr,ECorrIJ,EigVecR,Eig,Mon%Occ, &
                              Mon%IGem,Mon%IndN,Mon%IndX,Mon%num0+Mon%num1, &
                              Mon%NDimX,NBas,twokfile,Flags%ICholesky)
      case(TWOMO_FFFF)
@@ -693,25 +444,6 @@ if(Flags%ICASSCF==0.and.Flags%ISERPA==0) then
   !EGOne = 0
   !NGOcc = 0
   !ECorr = 0
-
-  if(Flags%ICholesky==1) then
-     open(newunit=iunit,file='cholvecs',form='unformatted')
-     write(iunit) Mon%NChol
-     write(iunit) Mon%FF
-     close(iunit)
-
-     ! sub-snippet for testing Pmat
-     ! this will not work now, shit -- Pmat!
-     ! uncomment this for e2disp_Cmat_Chol / e2disp_Cmat_Chol_proj
-     !allocate(Mon%Pmat(Mon%NDimX,Mon%NDimX))
-     !call Project_DChol(Mon%PMat,Mon%IndN,NBas,Mon%NDimX)
-
-     !call CIter_FOFO(ECorr,ACAlpha,XOne,URe,Mon%Occ,EGOne,NGOcc,&
-     !                Mon%IGem,Mon%NAct,Mon%INAct,Mon%NELE,NBas,NInte1, &
-     !                Mon%NDim,Mon%NGem,Mon%IndAux,Mon%IndN,Mon%IndX,Mon%NDimX,&
-     !                twojfile,twokfile)
-     !deallocate(Pmat)
-  endif
 
   ! UNCOUPLED
 
@@ -737,8 +469,8 @@ if(Flags%ICASSCF==0.and.Flags%ISERPA==0) then
      ! maybe just include blocks in Mon%...?
      call AC0BLOCK(Mon%Occ,URe,XOne, &
           Mon%IndN,Mon%IndX,Mon%IGem,Mon%NAct,Mon%INAct,Mon%NDimX, &
-          NBas,Mon%NDimX,NInte1,twojfile,twokfile, &
-          A0BlockIV,A0Block,nblk,abpm0file,1)
+          NBas,Mon%NDimX,NInte1,twojfile,twokfile,Flags%ICholesky, &
+          A0BlockIV,A0Block,nblk,1,abpm0file,1)
   endif
   case(TWOMO_FFFF)
      call Y01CAS_mithap(Mon%Occ,URe,XOne,ABPlus,ABMin, &
@@ -910,6 +642,13 @@ if(Mon%TwoMoInt==TWOMO_INCORE) call LoadSaptTwoNO(Mon%Monomer,TwoMO,NBas,NInte2)
 
 ! get AB matrices for CAS function
 
+if(Flags%ICholesky==1) then
+   open(newunit=iunit,file='cholvecs',form='unformatted')
+   write(iunit) Mon%NChol
+   write(iunit) Mon%FF
+   close(iunit)
+endif
+
 ACAlpha=One
 allocate(ABPlus(Mon%NDimX**2),ABMin(Mon%NDimX**2))
 
@@ -955,14 +694,190 @@ case(TWOMO_FOFO)
    allocate(A0Block(nblk))
    call AC0BLOCK(Mon%Occ,URe,XOne, &
         Mon%IndN,Mon%IndX,Mon%IGem,Mon%NAct,Mon%INAct,Mon%NDimX, &
-        NBas,Mon%NDimX,NInte1,twojfile,twokfile, &
-        A0BlockIV,A0Block,nblk,abpm0file,1)
+        NBas,Mon%NDimX,NInte1,twojfile,twokfile,Flags%ICholesky, &
+        A0BlockIV,A0Block,nblk,1,abpm0file,1)
 end select
 
 deallocate(TwoMO)
 deallocate(ABMin,ABPlus)
 
 end subroutine calc_ab_cas
+
+subroutine calc_resp_cipsi(Mon,Flags,NAO,NBasis)
+implicit none
+
+type(SystemBlock)  :: Mon
+type(FlagsData)    :: Flags
+integer,intent(in) :: NAO, NBasis
+
+integer          :: i,j,ip,iq
+integer          :: iunit
+integer          :: NInte1,NOccup,NDimX
+double precision :: val
+double precision :: ACAlpha, ECIPSI
+
+integer :: nblk
+type(EblockData) :: A0blockIV
+type(EblockData),allocatable :: A0block(:)
+
+double precision, allocatable :: XOne(:), URe(:,:)
+double precision, allocatable :: ABPlus(:,:), ABMin(:,:)
+double precision, allocatable :: ABPlus0(:,:), ABMin0(:,:)
+double precision, allocatable :: Eig(:), EigVecR(:)
+character(:),     allocatable :: onefile,twojfile,twokfile, &
+                                 propfile,abfile,abpm0file, &
+                                 testfile
+
+print*, 'calc_resp_cispi --> calc_resp_casgvb?'
+
+! set filenames
+if(Mon%Monomer==1) then
+   onefile    = 'ONEEL_A'
+   twojfile   = 'FFOOAA'
+   twokfile   = 'FOFOAA'
+   propfile   = 'PROP_A'
+   abfile     = 'ABMAT_A'
+   abpm0file  = 'A0BLK_A'
+   testfile   = 'A0MAT_A'
+!   propfile0  = 'PROP_A0'
+!   propfile1  = 'PROP_A1'
+!   rdmfile    = 'rdm2_A.dat'
+elseif(Mon%Monomer==2) then
+   onefile    = 'ONEEL_B'
+   twojfile   = 'FFOOBB'
+   twokfile   = 'FOFOBB'
+   propfile   = 'PROP_B'
+   abfile     = 'ABMAT_B'
+   abpm0file  = 'A0BLK_B'
+   testfile   = 'A0MAT_B'
+!   propfile0  = 'PROP_B0'
+!   propfile1  = 'PROP_B1'
+!   rdmfile    = 'rdm2_B.dat'
+endif
+
+! set dimensions
+NInte1 = NBasis*(NBasis+1)/2
+NDimX  = Mon%NDimX
+Mon%INAct = Mon%num0
+Mon%NAct  = Mon%num1
+
+allocate(XOne(NInte1),URe(NBasis,NBasis))
+
+! read 1-el Hamiltonian
+call get_h0_no(Mon%CMO,XOne,onefile,NAO,NBasis)
+
+! get unit matrix
+URe = 0d0
+do i=1,NBasis
+   URe(i,i) = 1d0
+enddo
+
+ACAlpha = 1.0d0
+ECIPSI  = 0.0d0
+
+print*, 'Mon%NAct',Mon%Nact
+print*, 'Mon%INAct',Mon%INact
+print*, 'Mon%mon0',Mon%num0,Mon%num1
+!Mon%NAct = Mon%num0 + Mon%num1
+Mon%INAct = Mon%num0
+Mon%NAct = Mon%num1
+NOccup   = Mon%num0 + Mon%num1
+
+select case(Mon%TwoMoInt)
+
+ case(TWOMO_FFFF,TWOMO_INCORE)
+     write(LOUT,'(1x,a)') "TREXIO does not work with INCORE/FFFF"
+     stop
+
+  case(TWOMO_FOFO)
+
+     allocate(ABPlus(NDimX,NDimX),ABMin(NDimX,NDimX),&
+              EigVecR(NDimX*NDimX),Eig(NDimX))
+
+     !ACAlpha = 1.d-9
+     !print*, 'Testing UNCOUPLED:', ACAlpha
+     call AB_CIPSI_FOFO(ABPlus,ABMin,Mon%RDM2val,ECIPSI,URe,Mon%Occ,XOne, &
+                 Mon%IndN,Mon%IndX, &
+                 Mon%NAct,Mon%INAct,NDimX,NBasis,NDimX,&
+                 NInte1,twojfile,twokfile,ACAlpha,.false.)
+
+     print*, 'ABPLUS',norm2(ABPlus)
+     print*, 'ABMIN ',norm2(ABMin)
+
+! for e2disp Cmat
+! dump matrices for iterative C-ERPA
+open(newunit=iunit,file=abfile,form='unformatted')
+write(iunit) ABPlus
+write(iunit) ABMin
+close(iunit)
+
+if(Flags%ICholesky==1) then
+   ! this is only for testing e2disp_CAlphaTilde_full
+   allocate(ABPlus0(NDimX,NDImX),&
+            ABMin0(NDimX,NDimX))
+   call AB_CIPSI_FOFO(ABPlus0,ABMin0,Mon%RDM2val,ECIPSI,URe,Mon%Occ,XOne, &
+               Mon%IndN,Mon%IndX, &
+               Mon%NAct,Mon%INAct,NDimX,NBasis,NDimX,&
+               NInte1,twojfile,twokfile,0d0 ,.false.)
+    ! dump matrices for iterative C-ERPA
+    open(newunit=iunit,file=testfile,form='unformatted')
+    write(iunit) ABPlus0
+    write(iunit) ABMin0
+    close(iunit)
+    deallocate(ABMin0,ABPlus0)
+
+   if (Mon%NAct ==0) then
+      nblk = 1
+   else
+      nblk = 1 + NBasis - Mon%NAct
+   endif
+   allocate(A0Block(nblk))
+   call AC0BLOCK_CIPSI(Mon%RDM2val,Mon%Occ,URe,XOne, &
+        Mon%IndN,Mon%IndX,Mon%IGem,Mon%NAct,Mon%INAct,NOccup,&
+        Mon%NDimX,NBasis,Mon%NDimX,NInte1,twojfile,twokfile, &
+        A0BlockIV,A0Block,nblk,abpm0file,1)
+
+endif
+
+end select
+
+if(Flags%ICholesky==1) return ! only AB matrices needed with Cholesky
+
+write(lout,'(1x,a/)') 'Solving symmetric eigenvalue equation...'
+
+allocate(Mon%EigY(Mon%NDimX**2),Mon%EigX(Mon%NDimX**2),&
+         Mon%Eig(Mon%NDimX))
+
+call ERPASYMMXY_CIPSI(Mon%EigY,Mon%EigX,Mon%Eig,ABPlus,ABMin,&
+                Mon%CICoef,Mon%IndN,NDimX,NBasis)
+
+Eig = Mon%Eig
+do j=1,NDimX
+   do i=1,NDimX
+      ip = Mon%IndN(1,i)
+      iq = Mon%IndN(2,i)
+      val = Mon%CICoef(ip)-Mon%CICoef(iq)
+      EigVecR((j-1)*NDimX+i) = val * &
+                               (Mon%EigY((j-1)*NDimX+i) - Mon%EigX((j-1)*NDimX+i))
+   enddo
+enddo
+
+if(Mon%IPrint.gt.10) then
+   write(lout,'(1x,a,f12.8)') 'ERPA EigVec norm', norm2(EigVecR)
+   write(lout,'(1x,a,f14.8)') 'ERPA EigVal norm', norm2(Eig)
+   write(lout,'(1x,a,i5,a)') 'ERPA first 6 Eigenvalues (NDimX =',NDimX,'):'
+   do i=1,6 !NDimX
+      write(lout,'(1x,i4,f12.6)') i,Eig(i)
+   enddo
+endif
+
+! dump response
+call writeresp(EigVecR,Eig,propfile)
+
+deallocate(XOne)
+deallocate(Eig,EigVecR,ABPlus,ABMin)
+
+end subroutine calc_resp_cipsi
 
 subroutine calc_resp_extrapolate(Mon,Flags,NBasis)
 ! calculate response for extrapolated SAPT formulas

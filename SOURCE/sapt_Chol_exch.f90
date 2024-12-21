@@ -19,13 +19,15 @@ implicit none
 type(FlagsData)   :: Flags
 type(SystemBlock) :: A, B
 type(SaptData)    :: SAPT
+
 integer :: i, j, k, l, ia, jb
 integer :: ij,ipr
 integer :: ip,iq,ir,is
 integer :: ipq,iu,it
 integer :: iunit
 integer :: rdm2type
-integer :: dimOA,dimOB,NBas
+integer :: dimOA,dimOB
+integer :: NAO,NBas
 double precision :: fac,val,nnS2,tmp
 double precision :: tElst,tvk(3),tNa(2),tNb(2),tNaNb
 double precision :: exchs2
@@ -40,6 +42,7 @@ double precision,external  :: ddot
 print*, 'Testing E1exch Chol...'
 
 ! set dimensions
+NAO  = SAPT%NAO
 NBas = A%NBasis
 dimOA = A%num0+A%num1
 dimOB = B%num0+B%num1
@@ -115,7 +118,7 @@ tvk(2) = -2d0*tvk(2)
 print*, 'tvk(2)',tvk(2)*1000
 
 ! work = PA
-call get_den(NBas,A%CMO,A%Occ,1d0,work)
+call get_den(NAO,NBas,A%CMO,A%Occ,1d0,work)
 ! tvk = n_p n_q v_pq^qp = PA.K[PB]
 do jb=1,NBas
    do ia=1,NBas

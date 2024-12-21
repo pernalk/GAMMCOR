@@ -41,6 +41,8 @@ integer, parameter :: SAPTLEVEL2 = 2
 integer, parameter :: FLAG_CORE = 1
 integer, parameter :: FLAG_NOBASIS = 0
 integer, parameter :: FLAG_REDVIRT = 0
+integer, parameter :: FLAG_RDM2TYP = 0
+!integer, parameter :: FLAG_ORBRELAX = 1
 logical, parameter :: FLAG_RESTART = .FALSE.
 logical, parameter :: FLAG_TRIPLET = .FALSE.
 integer, parameter :: FLAG_PRINT_LEVEL = 0
@@ -51,6 +53,7 @@ integer, parameter :: RDM_TYPE_APSG = 2
 integer, parameter :: RDM_TYPE_CAS  = 3
 integer, parameter :: RDM_TYPE_DMRG = 4
 integer, parameter :: RDM_TYPE_HF   = 5
+integer, parameter :: RDM_TYPE_CI   = 6
 
 integer, parameter :: TWOMO_INCORE = 1
 integer, parameter :: TWOMO_FFFF   = 2
@@ -87,9 +90,9 @@ character(*),parameter :: PossibleJobType(19) = &
 'AC0D', 'AC0DNOSYMM', 'NLOCCORR', 'AC0DP', 'ACFREQ','ACFREQNTH','AC1FREQNTH','RESPONSE', &
 'SRAC0','dSRS']
 
-character(*),parameter :: PossibleRDMType(5) = &
+character(*),parameter :: PossibleRDMType(6) = &
 [character(8) :: &
-'GVB', 'APSG', 'CASSCF', 'DMRG', 'HF']
+'GVB', 'APSG', 'CASSCF', 'DMRG', 'HF', 'CI']
 
 character(*),parameter :: PossibleDFAType(3) = &
 [character(8) :: &
@@ -122,6 +125,7 @@ type CalculationBlock
       integer :: SaptLevel = SAPTLEVEL2
       integer :: vdWCoef   = 0
       integer :: RedVirt   = FLAG_REDVIRT
+      integer :: Rdm2Type  = FLAG_RDM2TYP
       integer :: MemVal = 2, MemType = 3 ! default: use 2 GB for 3-ind_tran (Cholesky)
       logical :: Restart    = FLAG_RESTART
       logical :: Triplet    = FLAG_TRIPLET
@@ -297,11 +301,13 @@ type FlagsData
      integer :: IGVB    = 1
      integer :: ITwoEl    = TWOMO_INCORE 
      integer :: IRedVirt  = FLAG_REDVIRT
+     integer :: IRdm2Typ  = FLAG_RDM2TYP
      integer :: ICholesky = FLAG_CHOLESKY
      integer :: ICholeskyAccu = CHOL_ACCU_DEFAULT
      integer :: IFun      = 13
      integer :: IFunSR    = 0 
      integer :: IFunSRKer = 0
+     integer :: IFlFCorr  = 0 ! for SRAC0
      double precision :: Alpha = 0
      integer :: IModG   = 1
      integer :: NGOcc   = 0
@@ -322,6 +328,7 @@ type FlagsData
      integer :: IA        = 1
      integer :: ICASSCF   = 0
      integer :: IDMRG     = 0  
+     integer :: ICI       = 0
      ! interpa.f  
      integer :: IFlAC     = 0
      integer :: IFlSnd    = 0
