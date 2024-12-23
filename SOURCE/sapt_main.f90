@@ -855,9 +855,9 @@ if(Flags%ISERPA==0) then
          !$ thr_id = omp_get_thread_num()
       call new_tran4_gen(NAO,&
                NBasis,B%CMO,&
-               A%num0+A%num1,A%CMO(1:NBasis,1:(A%num0+A%num1)),&
+               dimOA,A%CMO(1:NAO,1:dimOA),&
                NBasis,A%CMO,&
-               A%num0+A%num1,A%CMO(1:NBasis,1:(A%num0+A%num1)),&
+               dimOA,A%CMO(1:NAO,1:dimOA),&
                'FOFOAABA',reader,iunit_aotwosort,thr_id)
          !$omp end task
          !$omp end single

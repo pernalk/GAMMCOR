@@ -116,7 +116,8 @@ do i=1,NBas
 enddo
 
 ! read 1-el
-call get_1el_h_mo(XOne,MO,NBas,onefile)
+!call get_1el_h_mo(XOne,MO,NBas,onefile)
+call get_h0_no(MO,XOne,onefile,NAO,NBas)
 
 ! INCORE: load 2-el integrals
 if(Mon%TwoMoInt==TWOMO_INCORE) call LoadSaptTwoNO(Mon%Monomer,TwoMO,NBas,NInte2)
