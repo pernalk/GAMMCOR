@@ -1791,6 +1791,10 @@ deallocate(VSR,URe,XOne,work1,work2)
 end subroutine calc_resp_dft
 
 subroutine sapt_ERPA_TRDMs(Flags,Mon,NBasis)
+!
+! add description!
+! what is the orb representation for 2-TRDM(EPRA), NOs of IRef1?
+!
 implicit none
 
 type(SystemBlock) :: Mon
@@ -1799,25 +1803,29 @@ integer,intent(in) :: NBasis
 
 type(EBlockData)             :: SBlockIV
 type(EBlockData),allocatable :: SBlock(:)
-character(:),allocatable :: xy0file
-integer :: iblk, nblk,nAA,NU
-integer :: i,j, ii ,ipos, ip, iq,ir,is,it, pq
+integer :: iblk,nblk,nAA,NU
+integer :: i,j,ii ,ipos, ip, iq,ir,is,it, pq
 integer :: dimO,exc
-double precision, allocatable :: EigX0(:,:),EigY0(:,:)
-double precision :: TRDM1(NBasis,NBasis),TRDM1CAS(NBasis,NBasis),XCAS(NBAsis,NBasis),YCAS(NBasis,NBASIs),C(NBasis)
-double precision,allocatable :: RDM2(:,:,:,:),montrdm24(:,:,:,:),TRDM1TEST(:,:),TRDM1fromTilde(:,:),RDM1TEST(:,:)
-integer :: iref,iref2,iexcited,NumX, IStERPA
+integer :: iref,iref2,iexcited,NumX,IStERPA
 double precision :: SSgn,SumNU
-double precision, allocatable :: Eig(:),EigY(:,:),EigX(:,:),iaddr(:)
-double precision:: OvMax, OvXMax, OvYMax, SumERY, SumERX, SumCAY, SumCAX,SOvY,SOvX, EigOv
-double precision:: YER,YCA,XER,XCA,valX,valY
-double precision :: CICoef(NBasis)
+double precision :: YER,YCA,XER,XCA,valX,valY
+double precision :: OvMax, OvXMax, OvYMax, SumERY, SumERX, SumCAY, SumCAX,SOvY,SOvX, EigOv
 double precision :: TESTdipMom,TRUEdipMom,N
 double precision :: SumTrdmTrdm,TRDM1CASnorm,TRDM1norm
-! CHANGE IN FUTURE
+!
+double precision, allocatable :: EigX0(:,:),EigY0(:,:)
+double precision :: CICoef(NBasis),C(NBasis)
+double precision :: XCAS(NBAsis,NBasis),YCAS(NBasis,NBASIs)
+double precision :: TRDM1(NBasis,NBasis),TRDM1CAS(NBasis,NBasis)
+double precision,allocatable :: TRDM1TEST(:,:),TRDM1fromTilde(:,:),RDM1TEST(:,:)
+double precision,allocatable :: RDM2(:,:,:,:),montrdm24(:,:,:,:)
+double precision,allocatable :: Eig(:),EigY(:,:),EigX(:,:),iaddr(:)
+!
+character(:),allocatable :: xy0file
+
+! CHANGE IN THE FUTURE
 CICoef = mon%CICoef
 allocate(mon%trdm24(NBasis,NBasis,NBasis,NBasis))
-
 
 if(Mon%Monomer == 1) then
    xy0file = "XY0_A"
@@ -1850,7 +1858,6 @@ TRDM1CAS(:,:),NBasis)
 !
 ! now we make X_Cas and Y_Cas from TRDM1CAS
 !
-
 SumNU=0d0
 XCAS=0d0
 YCAS=0d0
@@ -1865,6 +1872,7 @@ YCAS=0d0
 !       endif
 !    enddo
 ! enddo
+
 block
 ! assemble X_SA-CAS / Y_SA-CAS like in Kasia's code
 ! works with skipped XTilde-->X transformation in dump_EBlock
@@ -1882,8 +1890,6 @@ do ip=1,NBasis
 enddo
 end block
 
-
-
 do ip=1,NBasis
    do iq=1,ip-1
       SumNU=SumNU+YCAS(ip,iq)*XCAS(ip,iq)
@@ -1891,13 +1897,13 @@ do ip=1,NBasis
 enddo
 
 SSgn=1d0
-write(6,'(1x,a,i2)') 'Monomer',mon%monomer
+write(6,'(/,1x,a,i2)') 'Monomer',mon%monomer
 write(6,'(X,"SumNu Y*X before normalization",E15.6)') SumNU
 If(SumNU.Lt.0d0) SSgn=-1d0
 If(Abs(SumNu).Gt.1.D-8) Then
-SumNU=2d0/Sqrt(Abs(SumNU))
+   SumNU=2d0/Sqrt(Abs(SumNU))
 Else
-SumNU=0d0
+   SumNU=0d0
 EndIf
 do ip=1,NBasis
    do iq=1,ip-1
@@ -1908,18 +1914,7 @@ do ip=1,NBasis
       EndIf
    EndDo
 EndDo
-!
 
-
-
-
-
-!
-!
-!tu skończyliśmy
-!
-!
-!
 nAA=SBlock(1)%n
 allocate(Eig(nAA),EigY(nAA,nAA),EigX(nAA,nAA),iaddr(nAA))
 allocate(TRDM1TEST(NBasis,NBasis))
@@ -2058,14 +2053,6 @@ EigY = 0
       EndIf
 deallocate(Eig,EigY,EigX,iaddr)
 
-
-
-
-
-
-
-
-
 ! If(IA.Ne.IB.And.IPair(IA,IB).Eq.1) Then
 ! c      If(IA.Ne.IB) Then
 ! If(C(IA)+C(IB).Ne.Zero) YCAS(IKet,IAB)=
@@ -2111,9 +2098,6 @@ deallocate(Eig,EigY,EigX,iaddr)
 ! EndIf
 ! EndDo
 ! EndDo
-
-
-
 
 
 allocate(RDM2(dimO,dimO,dimO,dimO))
@@ -2185,7 +2169,7 @@ print*,"1rdm",mon%rdm1(1,:)
    !        EigX0(ipos,B%l1:B%l2) = B%matX(i,1:B%n)
          ip = mon%IndN(1,ipos)
          iq = mon%IndN(2,ipos)
-         print *,ip,iq
+         !print *,ip,iq
                TRDM1(ip,iq)=TRDM1(ip,iq)-(mon%rdm1(1,ip)-mon%rdm1(1,iq))*B%matX(i,NU)!EigX0(pq,1)
                TRDM1(iq,ip)=TRDM1(iq,ip)-(mon%rdm1(1,iq)-mon%rdm1(1,ip))*B%matY(i,NU)
                ! WORKS ONLY WITHOUT XTilde-->X CHANGE
@@ -2228,7 +2212,7 @@ print*,"1rdm",mon%rdm1(1,:)
 !          TRDM1(iq,ip)=TRDM1(iq,ip)-(mon%rdm1(1,iq)-mon%rdm1(1,ip))*EigY0(pq,1)
 ! enddo
 
-print*,"1TRDM z X i Y z procedury sapt_ERPA_TRDMs dla monomeru", Mon%Monomer
+write(lout,'(/,1x,a,i3)')"1TRDM z X i Y z procedury sapt_ERPA_TRDMs dla monomeru", Mon%Monomer
 do i=1,10
    write(lout,'(*(f12.6))') (TRDM1(i,j),j=1,10)
 enddo
@@ -2310,58 +2294,64 @@ if(sign(1d0,SumTrdmTrdm) .NE. sign(1d0,1d0)) then
   write(lout,'(*(f12.6))') (norm2(Trdm1CAS-TRDM1TEST)/norm2(TRDM1CAS))
   
 
-
-
-
 print*,"Norma 2TRDM"
 print*,norm2(montrdm24(:,:,:,:))
 
 
 block
+
    double precision :: DipXao(NBasis**2),DipYao(NBasis**2),DipZao(NBasis**2)
    double precision :: DipX(NBasis,NBasis),DipY(NBasis,NBasis),DipZ(NBasis,NBasis)
    double precision:: TSDipXYZ(3)
    character(:),allocatable     :: mname,dipfile,mofile
-   
-   if (Mon%Monomer == 1) then
-      mname  = 'A'
-      dipfile= "DIP_A"
-      mofile = 'MOLPRO_A.MOPUN'
-   elseif (Mon%Monomer == 2) then
-      mname  = 'B'
-      dipfile= "DIP_B"
-      mofile = 'MOLPRO_B.MOPUN' 
-   endif
+   logical :: isfile
 
-   call read_dip_sym_molpro(DipXao,DipYao,DipZao,dipfile,NBasis)
+   ! this works only with Molpro for now...
+   inquire(file='DIP_A',exist=isfile)
+   if (isfile) then
 
-!print*, 'DipX-AO:',norm2(DipXao)
-!print*, 'DipY-AO:',norm2(DipYao)
-!print*, 'DipZ-AO:',norm2(DipZao)
+      if (Mon%Monomer == 1) then
+         mname  = 'A'
+         dipfile= "DIP_A"
+         mofile = 'MOLPRO_A.MOPUN'
+      elseif (Mon%Monomer == 2) then
+         mname  = 'B'
+         dipfile= "DIP_B"
+         mofile = 'MOLPRO_B.MOPUN' 
+      endif
 
-   call unpack_sym_molpro(DipXao,dipfile,NBasis)
-   call unpack_sym_molpro(DipYao,dipfile,NBasis)
-   call unpack_sym_molpro(DipZao,dipfile,NBasis)
+      call read_dip_sym_molpro(DipXao,DipYao,DipZao,dipfile,NBasis)
 
-   call tran2MO(DipXao,mon%CAONO(mon%iref1,:,:),mon%CAONO(mon%iref1,:,:),DipX,NBasis)
-   call tran2MO(DipYao,mon%CAONO(mon%iref1,:,:),mon%CAONO(mon%iref1,:,:),DipY,NBasis)
-   call tran2MO(DipZao,mon%CAONO(mon%iref1,:,:),mon%CAONO(mon%iref1,:,:),DipZ,NBasis)
-   TSDipXYZ = 0d0
-   do j=1,NBasis
-      do i=1,NBasis
-         TSDipXYZ(1) = TSDipXYZ(1) - 2d0*TRDM1TEST(j,i)*DipX(i,j)
-         TSDipXYZ(2) = TSDipXYZ(2) - 2d0*TRDM1TEST(j,i)*DipY(i,j)
-         TSDipXYZ(3) = TSDipXYZ(3) - 2d0*TRDM1TEST(j,i)*DipZ(i,j)
+      !print*, 'DipX-AO:',norm2(DipXao)
+      !print*, 'DipY-AO:',norm2(DipYao)
+      !print*, 'DipZ-AO:',norm2(DipZao)
+
+      call unpack_sym_molpro(DipXao,dipfile,NBasis)
+      call unpack_sym_molpro(DipYao,dipfile,NBasis)
+      call unpack_sym_molpro(DipZao,dipfile,NBasis)
+
+      call tran2MO(DipXao,mon%CAONO(mon%iref1,:,:),mon%CAONO(mon%iref1,:,:),DipX,NBasis)
+      call tran2MO(DipYao,mon%CAONO(mon%iref1,:,:),mon%CAONO(mon%iref1,:,:),DipY,NBasis)
+      call tran2MO(DipZao,mon%CAONO(mon%iref1,:,:),mon%CAONO(mon%iref1,:,:),DipZ,NBasis)
+      TSDipXYZ = 0d0
+      do j=1,NBasis
+         do i=1,NBasis
+            TSDipXYZ(1) = TSDipXYZ(1) - 2d0*TRDM1TEST(j,i)*DipX(i,j)
+            TSDipXYZ(2) = TSDipXYZ(2) - 2d0*TRDM1TEST(j,i)*DipY(i,j)
+            TSDipXYZ(3) = TSDipXYZ(3) - 2d0*TRDM1TEST(j,i)*DipZ(i,j)
+         enddo
       enddo
-   enddo
-   print *,'X,Y,Z moments from X and Y matrix'
-   print *,TSDipXYZ
-   TESTdipMom=TSDipXYZ(maxloc(abs(TSDipXYZ(1:3)),1))
-   print *,'Max dipole moment calculated using 1TRDM made from 2TRDM', TESTdipMom
+      print *,'X,Y,Z moments from X and Y matrix'
+      print *,TSDipXYZ
+      TESTdipMom=TSDipXYZ(maxloc(abs(TSDipXYZ(1:3)),1))
+      write(lout, '(/1x,"Max dipole moment calculated using 1TRDM made from 2TRDM", F12.6)') TESTdipMom
+
+   else
+
+      print *,'No dipole moment integrals: skipping 1TDM test!'
+
+   endif ! DIP_A
 end block
-
-
-
 
 
 block
@@ -2370,47 +2360,51 @@ block
    double precision :: montrdm(NBasis,NBasis)
    double precision:: TSDipXYZ(3)
    character(:),allocatable     :: mname,dipfile,mofile
-   
-   if (Mon%Monomer == 1) then
-      mname  = 'A'
-      dipfile= "DIP_A"
-      mofile = 'MOLPRO_A.MOPUN'
-   elseif (Mon%Monomer == 2) then
-      mname  = 'B'
-      dipfile= "DIP_B"
-      mofile = 'MOLPRO_B.MOPUN' 
-   endif
+   logical :: isfile
 
-   call read_dip_sym_molpro(DipXao,DipYao,DipZao,dipfile,NBasis)
+   inquire(file='DIP_A',exist=isfile)
+   if (isfile) then
+      if (Mon%Monomer == 1) then
+         mname  = 'A'
+         dipfile= "DIP_A"
+         mofile = 'MOLPRO_A.MOPUN'
+      elseif (Mon%Monomer == 2) then
+         mname  = 'B'
+         dipfile= "DIP_B"
+         mofile = 'MOLPRO_B.MOPUN' 
+      endif
 
-!print*, 'DipX-AO:',norm2(DipXao)
-!print*, 'DipY-AO:',norm2(DipYao)
-!print*, 'DipZ-AO:',norm2(DipZao)
-   call tran2MO(mon%trdm1(iexcited,:,:),mon%CMONO(iref,:,:),mon%CMONO(iref,:,:), &
-                        montrdm(:,:),NBasis)
+      call read_dip_sym_molpro(DipXao,DipYao,DipZao,dipfile,NBasis)
 
+      call tran2MO(mon%trdm1(iexcited,:,:),mon%CMONO(iref,:,:),mon%CMONO(iref,:,:), &
+                           montrdm(:,:),NBasis)
 
-   call unpack_sym_molpro(DipXao,dipfile,NBasis)
-   call unpack_sym_molpro(DipYao,dipfile,NBasis)
-   call unpack_sym_molpro(DipZao,dipfile,NBasis)
+      call unpack_sym_molpro(DipXao,dipfile,NBasis)
+      call unpack_sym_molpro(DipYao,dipfile,NBasis)
+      call unpack_sym_molpro(DipZao,dipfile,NBasis)
 
-   call tran2MO(DipXao,mon%CAONO(mon%iref1,:,:),mon%CAONO(mon%iref1,:,:),DipX,NBasis)
-   call tran2MO(DipYao,mon%CAONO(mon%iref1,:,:),mon%CAONO(mon%iref1,:,:),DipY,NBasis)
-   call tran2MO(DipZao,mon%CAONO(mon%iref1,:,:),mon%CAONO(mon%iref1,:,:),DipZ,NBasis)
-   TSDipXYZ = 0d0
-   do j=1,NBasis
-      do i=1,NBasis
-         TSDipXYZ(1) = TSDipXYZ(1) - 2d0*montrdm(j,i)*DipX(i,j)
-         TSDipXYZ(2) = TSDipXYZ(2) - 2d0*montrdm(j,i)*DipY(i,j)
-         TSDipXYZ(3) = TSDipXYZ(3) - 2d0*montrdm(j,i)*DipZ(i,j)
+      call tran2MO(DipXao,mon%CAONO(mon%iref1,:,:),mon%CAONO(mon%iref1,:,:),DipX,NBasis)
+      call tran2MO(DipYao,mon%CAONO(mon%iref1,:,:),mon%CAONO(mon%iref1,:,:),DipY,NBasis)
+      call tran2MO(DipZao,mon%CAONO(mon%iref1,:,:),mon%CAONO(mon%iref1,:,:),DipZ,NBasis)
+      TSDipXYZ = 0d0
+      do j=1,NBasis
+         do i=1,NBasis
+            TSDipXYZ(1) = TSDipXYZ(1) - 2d0*montrdm(j,i)*DipX(i,j)
+            TSDipXYZ(2) = TSDipXYZ(2) - 2d0*montrdm(j,i)*DipY(i,j)
+            TSDipXYZ(3) = TSDipXYZ(3) - 2d0*montrdm(j,i)*DipZ(i,j)
+         enddo
       enddo
-   enddo
-   print *,'X,Y,Z moments from true trdm'
-   print *,TSDipXYZ
-   TRUEdipMom=TSDipXYZ(maxloc(abs(TSDipXYZ(1:3)),1))
-   print*,'True max dip moment',TRUEdipMom
-end block
+      print *,'X,Y,Z moments from true trdm'
+      print *,TSDipXYZ
+      TRUEdipMom=TSDipXYZ(maxloc(abs(TSDipXYZ(1:3)),1))
+      print*,'True max dip moment',TRUEdipMom
 
+   else
+
+      print *,'No dipole moment integrals: skipping 1TDM test!'
+
+   endif ! DIP_A 
+end block
 
 
 ! ZMIANA 18.12.2023
@@ -2425,6 +2419,34 @@ end block
 
 mon%trdm24(:,:,:,:)=montrdm24(:,:,:,:)
 
+!! mh : what is the dimension of 2-TRDM?
+!block
+!integer :: k,l
+!double precision :: val
+! val = 0d0
+! do l=dimO+1,NBasis
+! do k=dimO+1,NBasis
+! do j=dimO+1,NBasis
+! do i=dimO+1,NBasis
+!    val = val + abs(mon%trdm24(i,j,k,l))
+! enddo
+! enddo
+! enddo
+! enddo
+! print*, 'val = ', val
+! print*, 'inactive part of 2-TRDM...',mon%num0
+! do l=1,mon%num0 
+! do k=1,mon%num0
+! do j=1,mon%num0
+! do i=1,mon%num0
+!    write(6,'(4i3,f12.6)')i,j,k,l,mon%trdm24(i,j,k,l)
+! enddo
+! enddo
+! enddo
+! enddo
+!
+!
+!end block
 
 !!added 16.06.2023 FOR TEST PURPOUSE
 ! block

@@ -1,4 +1,4 @@
-#define SAPT_INTERFACE_DEBUG 5
+#define SAPT_INTERFACE_DEBUG 11
 
 module sapt_inter
 
@@ -128,7 +128,11 @@ double precision :: Tcpu,Twall
     call readocc_trexio(NBasis,SAPT%monB,AuxB,OneRdmB,Flags)
 
  endif
- call print_occ(NBasis,SAPT,Flags%ICASSCF)
+ ! for dSRS/TREXIO, set occupation numbers later
+ ! based on IRef1 declared in input
+ if(Flags%IdSRS/=1) then
+    call print_occ(NBasis,SAPT,Flags%ICASSCF)
+ endif
 
 ! read orbitals
 ! Dalton:
@@ -239,22 +243,31 @@ double precision :: Tcpu,Twall
 
  ! dSRS: read 1rdms, 1trdms, 2rdms
  if(Flags%IdSRS==1) then
-    call read_1rdm_1trdm_molpro(NBasis,SAPT%monA)
-    call read_1rdm_1trdm_molpro(NBasis,SAPT%monB)
+    if(SAPT%InterfaceType==2) then
+       call read_1rdm_1trdm_molpro(NBasis,SAPT%monA)
+       call read_1rdm_1trdm_molpro(NBasis,SAPT%monB)
 
-    call calc_trdip(NBasis,SAPT%monA)
-    call calc_trdip(NBasis,SAPT%monB)
-    if(SAPT%monA%IRef2 /= 1 .OR. SAPT%monB%IRef2 /= 1) then
-      ! call set_iref(SAPT%monA,SAPT%monB)
+       call calc_trdip(NBasis,SAPT%monA)
+       call calc_trdip(NBasis,SAPT%monB)
+       !if(SAPT%monA%IRef2 /= 1 .OR. SAPT%monB%IRef2 /= 1) then
+         ! call set_iref(SAPT%monA,SAPT%monB)
+       !endif
+       call read_2rdm_2trdm_molpro(NBasis,SAPT%monA)
+       call read_2rdm_2trdm_molpro(NBasis,SAPT%monB)
+    elseif(SAPT%InterfaceType==5) then
+       call read_1rdm_1trdm_trexio(NAO,NBasis,SAPT%monA)
+       call read_1rdm_1trdm_trexio(NAO,NBasis,SAPT%monB)
+
+       call read_2rdm_2trdm_trexio(NAO,NBasis,SAPT%monA)
+       call read_2rdm_2trdm_trexio(NAO,NBasis,SAPT%monB)
     endif
-    call read_2rdm_2trdm_molpro(NBasis,SAPT%monA)
-    call read_2rdm_2trdm_molpro(NBasis,SAPT%monB)
+    call print_occ(NBasis,SAPT,Flags%ICASSCF)
  endif
 
  allocate(SAPT%monA%CMO(NAO,NBasis),SAPT%monB%CMO(NAO,NBasis))
 
- call save_CAONO(Ca,SAPT%monA%CMO,NAO,NBasis)
- call save_CAONO(Cb,SAPT%monB%CMO,NAO,NBasis)
+ call save_CAONO(Ca,SAPT%monA%CMO,SAPT%monA,Flags%IdSRS,NAO,NBasis)
+ call save_CAONO(Cb,SAPT%monB%CMO,SAPT%monB,Flags%IdSRS,NAO,NBasis)
 
 #if SAPT_INTERFACE_DEBUG > 5
  write(lout,'(/,1x,a,f14.8)') 'Monomer A : CAONO',norm2(SAPT%monA%CMO)
@@ -287,8 +300,8 @@ double precision :: Tcpu,Twall
    !call truncate_rdm2(SAPT%monA,NAO,NBasis)
    !call truncate_rdm2(SAPT%monB,NAO,NBasis)
 
-   call rw_trexio_rdm2(SAPT%monA,AuxA,NBasis)
-   call rw_trexio_rdm2(SAPT%monB,AuxB,NBasis)
+   if (Flags%IdSRS/=1) call rw_trexio_rdm2(SAPT%monA,AuxA,NBasis)
+   if (Flags%IdSRS/=1) call rw_trexio_rdm2(SAPT%monB,AuxB,NBasis)
    if (Flags%ICASSCF==1) call rw_trexio_save_rdm2file(Flags,SAPT%monA)
    if (Flags%ICASSCF==1) call rw_trexio_save_rdm2file(Flags,SAPT%monB)
  endif
@@ -1205,7 +1218,10 @@ subroutine read_1rdm_1trdm_molpro(NBasis,mon)
 ! b) read all 1-trdms, transform to NO of RefState, and store in mon%Trdm1(nstates*(nstates-1)/2)
 ! c) save all CAONO transformation matrices and store in mon%CAONO(nstates,NBasis,NBasis)
 ! d) save all CMONO transformation matrices and store in mon%CMONO(nstates,NBasis,NBasis)
-!  
+!
+! IMPORTANT! 
+! Replace previous, state-averaged Occ with 1-RDM(IRef1)! 
+!
 implicit none
 
 integer,intent(in) :: NBasis
@@ -1325,7 +1341,7 @@ do ist=1,nstates
       enddo
    enddo
 
-   Mon%CMONO(ist,:,:)=CMONO(ist,:,:)
+   Mon%CMONO(ist,:,:) = CMONO(ist,:,:)
    
 #if SAPT_INTERFACE_DEBUG > 10
    print*, 'Occupation numbers, istate',ist
@@ -1336,13 +1352,13 @@ do ist=1,nstates
    do j=1,NOccup
       write(lout,'(*(f12.6))') (CMONO(ist,i,j),i=1,NOccup)
    enddo
-   print*, 'CAONO, istate=',ist, 'norm',norm2(Mon%CAONO)
+   write(lout, '("Monomer ",I0," state ",I0," CAONO = ",F12.6)') Mon%Monomer,ist,norm2(Mon%CAONO(ist,:,:))
    do j=1,NBasis
       write(lout,'(*(f12.6))') (Mon%CAONO(ist,i,j),i=1,NBasis)
    enddo
 #endif
 
-enddo
+enddo ! ist
 deallocate(AuxRDM)
 
 ! read all 1-TRDMs and transform to NOs
@@ -1403,13 +1419,296 @@ deallocate(work)
 
 end subroutine read_1rdm_1trdm_molpro
 
+subroutine read_1rdm_1trdm_trexio(NAO,NBasis,mon)
+!
+! this is nearly identical to molpro version
+! except for read-trexio interface
+! can be merged into a single procedure
+!
+! a) read all 1-rdms,  transform to NO of RefState, and store in mon%rdm1(nstates)
+! b) read all 1-trdms, transform to NO of RefState, and store in mon%Trdm1(nstates*(nstates-1)/2)
+! c) save all CAONO transformation matrices and store in mon%CAONO(nstates,NBasis,NBasis)
+! d) save all CMONO transformation matrices and store in mon%CMONO(nstates,NBasis,NBasis)
+!  
+implicit none
+
+integer,intent(in) :: NAO,NBasis
+type(SystemBlock)  :: mon
+
+integer(8)         :: f
+integer            :: rc
+integer            :: i,j
+integer            :: ist,itr,ibra,iket,nstates,nnstates
+integer            :: iref 
+integer            :: NOccup,HlpDim
+
+double precision   :: AuxSq(NBasis,NBasis)
+!double precision   :: AuxTr(NBasis*(NBasis+1)/2)
+double precision, allocatable :: EVal(:,:)
+double precision, allocatable :: work(:,:),workTr(:)
+double precision, allocatable :: DTS(:,:,:,:)
+double precision,allocatable :: AuxRDM(:,:,:),CAOMO(:,:),CMONO(:,:,:)
+
+! temp txt interface
+character(len=20), dimension(:), allocatable :: filenames
+
+print*, 'Warning! read_1rdm_1trdm is temporary!'
+
+! get state-averaged AO-->MO transformation matrix
+allocate(CAOMO(NAO,NBasis))
+f = trexio_open (Mon%TrexFile, 'r', TREXIO_HDF5, rc)
+rc = trexio_has_mo_coefficient(f)
+if (rc /= TREXIO_SUCCESS) then
+  stop 'No AOMO coefficients in file'
+end if
+rc = trexio_read_mo_coefficient(f, CAOMO)
+
+rc = trexio_read_state_num(f,nstates)
+call trexio_assert(rc, TREXIO_SUCCESS)
+
+nnstates = nstates*(nstates-1)/2
+
+allocate (filenames(nstates))
+
+if(Mon%Monomer==1) then
+ filenames(1) = 'A_1trdm_1_1.txt'
+ filenames(2) = 'A_1trdm_2_2.txt'
+elseif(Mon%Monomer==2) then
+ filenames(1) = 'B_1trdm_1_1.txt'
+ filenames(2) = 'B_1trdm_2_2.txt'
+endif
+
+! set reference state
+iref = Mon%IREF1
+if (iref.le.0) stop "Error! IREF1 not set in input!"
+!if (Mon%InSt(1,1) > 0) then
+!   RefState = Mon%InSt(1,1)
+!else
+!   RefState = 1
+!endif
+
+HlpDim = max(NBasis**2,3*NBasis)
+NOccup = Mon%INAct + Mon%NAct
+
+! get state-averaged AO-->MO transformation matrix
+! get the number of states
+Mon%NStates = nstates
+
+#if SAPT_INTERFACE_DEBUG > 5
+print*, 'NOccup in read_1rdm_1trdm    : ', NOccup
+print*, 'Inact  in read_1rdm_1trdm    : ', Mon%INAct
+print*, 'NAct   in read_1rdm_1trdm    : ', Mon%NAct
+#endif
+
+if(mon%Monomer==1) then
+   write(lout,'(/1x,a)') "Monomer A:"
+elseif(mon%Monomer==2) then
+   write(lout,'(/1x,a)') "Monomer B:"
+endif
+write(lout,'(1x,a,i3)') 'The number of states from SA-CAS  :',  nstates
+write(lout,'(1x,a,i3,/)') 'Reference state for dSRS          :',iref
+
+! read all all 1-RDMs in MO and transform to NOs
+allocate(Mon%rdm1(nstates,NBasis))
+allocate(Mon%CMONO(nstates,NBasis,NBasis))
+allocate(Mon%CAONO(nstates,NAO,NBasis))
+allocate(AuxRDM(nstates,Mon%NAct,Mon%NAct),Eval(nstates,NBasis))
+allocate(CMONO(nstates,NBasis,NBasis))
+allocate(work(NBasis,NBasis),workTr(HlpDim))
+!allocate(work(NOccup,NOccup),workTr(HlpDim))
+
+AuxRDM = 0d0
+CMONO  = 0d0
+
+allocate(DTS(NBasis,NBasis,nstates,nstates))
+rc = trexio_read_rdm_1e_transition(f, DTS)
+
+do ist=1,nstates
+   ! read in NOccup,NOccup
+   !call read_txt_1mat_trexio(filenames(ist),work,NOccup,NOccup)
+   !!! MAYBE TRY USING PREPARE_NO_MOLPRO here ??? call sq_to_triang(work1d,OneRdm,NBasis)
+   !! reduce to act only
+   !do j=1,Mon%NAct
+   !   do i=1,Mon%NAct
+   !      AuxRDM(ist,i,j) = work(Mon%INAct+i,Mon%INAct+j)
+   !   enddo
+   !enddo
+
+   ! what about the virt-virt block?
+   !call Diag8(AuxRDM(ist,:,:),Mon%NAct,Mon%NAct,EVal(ist,1:Mon%NAct),workTr)
+   !call SortOcc(EVal(ist,1:Mon%Nact),AuxRDM(ist,1:Mon%NAct,1:Mon%NAct),Mon%NAct)
+   !CMONO(ist,:,:) = transpose(AuxRDM(ist,:,:))
+
+   call Diag8(DTS(:,:,ist,ist),NBasis,NBasis,Eval(ist,:),work)
+   call SortOcc(EVal(ist,:),DTS(:,:,ist,ist),NBasis)
+
+   CMONO(ist,:,:) = transpose(DTS(:,:,ist,ist))
+
+   ! save occupation numbers == 1-RDMs
+   Mon%rdm1(ist,:) = 0d0
+   do i=1,NOccup
+      if(i<=Mon%INAct) then
+         Mon%rdm1(ist,i) = 1.0d0
+      else
+         Mon%rdm1(ist,i) = 0.5d0*EVal(ist,i)
+      endif
+   enddo
+
+   !! expand MO --> NO from NAct to NOccup
+   !AuxSq = CMONO(ist,:,:)
+   !CMONO(ist,:,:) = 0d0
+   !do i=1,Mon%INAct
+   !   CMONO(ist,i,i) = 1d0
+   !enddo
+   !do j=1,Mon%NAct
+   !   do i=1,Mon%NAct
+   !      CMONO(ist,Mon%INAct+i,Mon%INAct+j) = AuxSq(i,j)
+   !   enddo
+   !enddo
+
+   Mon%CMONO(ist,:,:) = CMONO(ist,:,:)
+
+   ! obtain AO-->NO transformation matrix
+   Mon%CAONO(ist,1:NAO,1:NBasis) = CAOMO(1:NAO,1:NBasis)
+   call prepare_no_trexio(CMONO(ist,:,:),Mon%CAONO(ist,:,:),NAO,NBasis)
+
+#if SAPT_INTERFACE_DEBUG > 10
+   print*, 'Occupation numbers, istate',ist
+   do i=1,NOccup
+      write(lout,'(1x,f12.6)') Mon%rdm1(ist,i)
+   enddo
+   print*, 'CMONO, istate=',ist,norm2(CMONO(ist,:,:))
+   do j=1,NBasis
+      write(lout,'(*(f12.6))') (CMONO(ist,i,j),i=1,NBasis)
+   enddo
+   write(lout, '("Monomer ",I0," state ",I0," CAONO = ",F12.6)') Mon%Monomer,ist,norm2(Mon%CAONO(ist,:,:))
+   do j=1,NBasis
+      write(lout,'(*(f12.6))') (Mon%CAONO(ist,i,j),i=1,NBasis)
+   enddo
+#endif
+
+enddo
+
+deallocate(AuxRDM)
+
+! Replace Occ and CICoef
+Print*, 'Warning! Using Occupation numbers for State IRef1 =',Mon%IRef1
+Mon%Occ(1:NBasis) = Mon%rdm1(Mon%IRef1,1:NBasis)
+do i=1,NBasis
+   Mon%CICoef(i) = sign(sqrt(Mon%Occ(i)),Mon%Occ(i)-0.5d0)
+enddo
+
+! read all 1-TRDMs in NO
+! transformation to NO of the reference state
+! is done in ...
+allocate(Mon%trdm1(nnstates,NBasis,NBasis))
+if(Mon%Monomer==1) then
+ filenames(1) = 'A_1trdm_2_1.txt'
+ filenames(2) = 'A_1trdm_3_1.txt'
+elseif(Mon%Monomer==2) then
+ filenames(1) = 'B_1trdm_2_1.txt'
+ filenames(2) = 'B_1trdm_3_1.txt'
+endif
+
+work = 0d0
+itr  = 0
+do iket=1,nstates
+   do ibra=1,iket-1
+      itr = itr + 1
+      !call read_txt_1mat_trexio(filenames(itr),work,NOccup,NOccup)
+      !Mon%trdm1(itr,1:NOccup,1:NOccup)=work(1:NOccup,1:NOccup)
+
+      Mon%trdm1(itr,:,:) = 0.5d0*DTS(:,:,iket,ibra) ! is it correct?
+      !Mon%trdm1(itr,:,:)=DTS(:,:,ibra,iket)
+
+#if SAPT_INTERFACE_DEBUG > 3
+     print*, '1-TRDM MO <ket|bra> =',iket,ibra
+     do j=1,NOccup
+        write(lout,'(*(f12.6))') (Mon%trdm1(itr,i,j),i=1,NOccup)
+     enddo
+#endif
+
+   enddo
+enddo
+
+rc = trexio_close(f)
+
+deallocate(DTS)
+deallocate(work)
+deallocate(CMONO,CAOMO)
+
+end subroutine read_1rdm_1trdm_trexio
+
+subroutine read_txt_1mat_trexio(filename,Mat,dim1,dim2)
+!
+! tmp subroutine to read 1-el matrices
+! dumped from QP2
+!
+implicit none
+
+character(*) :: filename
+character(100) :: header_line
+integer,intent(in) :: dim1,dim2
+double precision,intent(out) :: Mat(dim1,dim2)
+
+integer :: i, k, l
+double precision :: val
+
+  Mat=0d0
+  open(unit=10, file=filename, status='old', action='read',form='formatted')
+  read(10, '(A)', iostat=i) header_line
+    if (i /= 0) then
+      print *, "Error reading header in file:", filename
+      close(10)
+      return
+  end if
+
+  do
+      read(10, *, iostat=i) k, l, val
+      if (i /= 0) exit  ! Exit when end of file or error is encountered
+      Mat(k, l) = val
+  end do
+  close(10)
+
+end subroutine read_txt_1mat_trexio
+
+subroutine read_txt_2mat_trexio(filename,Mat,n)
+!
+! tmp subroutine to read 2-el matrices
+! dumped from QP2
+!
+implicit none
+
+character(*) :: filename
+character(100) :: header_line
+integer,intent(in) :: n
+double precision,intent(out) :: Mat(n,n,n,n)
+
+integer :: i, j, k, l, io
+double precision :: val
+
+Mat=0d0
+open(unit=10, file=filename, status='old', action='read',form='formatted')
+read(10, '(A)', iostat=i) header_line
+  if (i /= 0) then
+    print *, "Error reading header in file:", filename
+    close(10)
+    return
+end if
+
+do
+    read(10, *, iostat=io) i, j, k, l, val
+    if (io /= 0) exit
+    Mat(i, j, k, l) = val
+end do
+close(10)
+
+end subroutine read_txt_2mat_trexio
+
 subroutine read_2rdm_2trdm_molpro(NBasis,mon)
 !
-! a) read 2-RDMs for all states, transform them from MO-->NO
-!    using Mon%CMONO
-! b-1) construct 2-TRDMs in noncumulant approx.
-!      TGamma = ... tgamma +/-
-! b-2) read 2-TRDMs from Molpro (future)
+! read 2-RDMs for all states, transform them from MO-->NO
+! using Mon%CMONO
 !
 implicit none
 
@@ -1425,7 +1724,8 @@ double precision,allocatable :: RDM2Act(:),work(:,:)
 character(:),allocatable     :: rdmfile
 double precision,external :: FRDM2
 integer :: iref,iexcited
-double precision,allocatable :: Montrdm(:,:)
+!double precision,allocatable :: Montrdm(:,:)
+! is Montrdm ever used? 2-trdm in noncum approxim?
 
 if(mon%Monomer==1) then
   rdmfile='2RDMA'
@@ -1477,17 +1777,33 @@ do ist=1,nstates
       enddo
    enddo
    print*, 'RDM2val, state', ist, norm2(mon%rdm24(ist,:,:,:,:))
+   block
+   double precision :: xtrace
+   xtrace=0d0
+   do k=1,NOccup
+      do i=1,NOccup
+      xtrace = xtrace + mon%rdm24(ist,i,i,k,k)
+      enddo
+   enddo
+   print*, 'xtrace =',ist,xtrace
+   end block
+
+#if SAPT_INTERFACE_DEBUG > 5
+   call get_1rdm_from_2rdm(Mon%rdm24(ist,:,:,:,:),mon%rdm1(ist,:),NOccup,Mon%XELE,1,1)
+#endif
 
 enddo
-!Make 2 trdm in noncumulant approximation
-allocate(Montrdm(NBasis,NBasis))
-iref=Mon%IREF1
-!Mon%trdm24 = 0d0
-do ist=1,nstates
-   iexcited = ((ist-2)*(ist-1))/2+iref
-call tran2MO(Mon%trdm1(iexcited,:,:),Mon%CMONO(iref,:,:),Mon%CMONO(iref,:,:), &
-                        Montrdm(:,:),NBasis)
-enddo 
+
+!!Make 2 trdm in noncumulant approximation
+!allocate(Montrdm(NBasis,NBasis))
+!iref=Mon%IREF1
+!!Mon%trdm24 = 0d0
+!do ist=1,nstates
+!   iexcited = ((ist-2)*(ist-1))/2+iref
+!call tran2MO(Mon%trdm1(iexcited,:,:),Mon%CMONO(iref,:,:),Mon%CMONO(iref,:,:), &
+!                        Montrdm(:,:),NBasis)
+!enddo 
+!
 !do l=1,NOccup
 !   do k=1,NOccup
 !       do j=1,NOccup
@@ -1515,6 +1831,342 @@ enddo
 deallocate(work,RDM2Act)
 
 end subroutine read_2rdm_2trdm_molpro
+
+subroutine read_2rdm_2trdm_trexio(NAO,NBasis,mon)
+!
+! a) read active 2-RDMs for all states,
+!    transform them from MO-->NO, using Mon%CMONO
+!    expand to NOccup = Inact+Act
+! b) read 2-TRDMs
+!
+! c) save 2-RDM for IRef1 in NO rep in Mon%RDM2val
+!
+implicit none
+
+integer,intent(in) :: NAO,NBasis
+type(SystemBlock)  :: mon
+
+integer(8) :: f, BUFSIZE
+integer(8) :: offset,icount
+integer    :: rc
+integer    :: ist,nstates
+integer    :: NRDM2Act,NOccup
+integer    :: i,j,k,l
+integer    :: idx_k,idx_l,idx_m,idx_n
+integer    :: Ind2(NBasis)
+!
+integer,allocatable          :: idx_buf(:,:)
+double precision,allocatable :: val_buf(:)
+
+double precision :: xtrace,val
+double precision, allocatable :: Occ(:),work(:,:)
+double precision, allocatable :: rdm24act(:,:,:,:)
+
+! temp txt interface
+character(len=20), dimension(:), allocatable :: filenames
+
+print*, 'Monomer =', Mon%Monomer
+
+f = trexio_open (Mon%TrexFile, 'r', TREXIO_HDF5, rc)
+rc = trexio_has_mo_coefficient(f)
+
+!nstates = 2
+rc = trexio_read_state_num(f,nstates)
+call trexio_assert(rc, TREXIO_SUCCESS)
+
+NRDM2Act = Mon%NAct**2*(Mon%NAct**2+1)/2
+NOccup = Mon%INAct + Mon%NAct
+
+Ind2 = 0
+do i=1,Mon%NAct
+   Ind2(Mon%INAct+i) = i
+enddo
+
+allocate(filenames(nstates))
+allocate(Mon%rdm24(nstates,NOccup,NOccup,NOccup,NOccup))
+allocate(rdm24act(Mon%NAct,Mon%NAct,Mon%NAct,Mon%NAct))
+allocate(Occ(NOccup),work(NOccup,Noccup))
+
+if(Mon%Monomer==1) then
+ filenames(1) = 'A_2trdm_1_1.txt'
+ filenames(2) = 'A_2trdm_2_2.txt'
+elseif(Mon%Monomer==2) then
+ filenames(1) = 'B_2trdm_1_1.txt'
+ filenames(2) = 'B_2trdm_2_2.txt'
+endif
+
+! read all active 2-RDMs in SA-MOs
+do ist=1,nstates
+  call read_txt_2mat_trexio(filenames(ist),rdm24act,Mon%NAct)
+  ! CMONO --> CMONOAct
+  work = 0d0
+  do j=1,Mon%NAct
+     do i=1,Mon%NAct
+        work(i,j) = Mon%CMONO(ist,Mon%INAct+i,Mon%INAct+j)
+        !print*,i,j,work(i,j)
+     enddo
+  enddo
+  print*, 'RDM2 MO norm', ist, norm2(rdm24act)
+  call TrRDM24_dgemm(rdm24act,work(1:Mon%NAct,1:Mon%NAct),Mon%NAct)
+  print*, 'RDM2 NO norm', ist, norm2(rdm24act)
+  xtrace = 0d0
+  do k=1,Mon%NAct
+     do i=1,Mon%NAct
+        xtrace = xtrace + 0.5d0*rdm24act(i,k,i,k)
+     enddo
+  enddo
+  rdm24act=0.5d0*rdm24act
+  write(lout, '("2-RDM (act) no. ",I0," has trace = ",F12.6)') ist,xtrace
+  ! expand 2-rdm from act to noccup 
+  do l=1,NOccup
+     do k=1,NOccup
+        do j=1,NOccup
+           do i=1,NOccup
+              mon%rdm24(ist,i,j,k,l) = FRDM24(i,k,j,l,rdm24act,&
+                                       mon%rdm1(ist,:),Ind2,Mon%NAct,NBasis)
+           enddo
+        enddo
+     enddo
+  enddo
+  block
+   double precision :: xtrace
+   xtrace=0d0
+   do k=1,NOccup
+      do i=1,NOccup
+      xtrace = xtrace + mon%rdm24(ist,i,i,k,k)
+      enddo
+   enddo
+   print*, 'xtrace =',ist,xtrace
+  end block
+  print*, 'read_2rdm_2trdm =', ist,norm2(mon%rdm24(ist,:,:,:,:))
+!
+#if SAPT_INTERFACE_DEBUG > 5
+   call get_1rdm_from_2rdm(Mon%rdm24(ist,:,:,:,:),mon%rdm1(ist,:),NOccup,Mon%XELE,1,1)
+#endif
+
+enddo ! istate
+
+print*, 'Warning! Saving 2-RDM for IRef1 = ', Mon%IRef1
+allocate(Mon%RDM2val(NOccup,NOccup,NOccup,NOccup))
+Mon%RDM2val(:,:,:,:) = mon%rdm24(mon%IRef1,:,:,:,:)
+
+! read active 1trdm
+if(Mon%Monomer==1) then
+ filenames(1) = 'A_2trdm_2_1.txt'
+ filenames(2) = 'A_2trdm_3_1.txt'
+elseif(Mon%Monomer==2) then
+ filenames(1) = 'B_2trdm_2_1.txt'
+ filenames(2) = 'B_2trdm_3_1.txt'
+endif
+
+! check how they are constructed from ERPA vecs
+call read_txt_2mat_trexio(filenames(1),rdm24act,Mon%NAct)
+
+!! read active 2-trdm
+!rc = trexio_has_rdm_2e_transition(f)
+!call trexio_assert(rc, TREXIO_SUCCESS)
+!
+!BUFSIZE = NBasis**2
+!
+!allocate(val_buf(BUFSIZE),idx_buf(4,BUFSIZE))
+!
+!print*, 'reading 2-trdm...',mon%NAct
+!offset  = 0
+!icount  = BUFSIZE
+!val_buf = 0
+!idx_buf = 0
+!rdm24act = 0d0
+!xtrace   = 0d0
+!do while(icount == BUFSIZE)
+!   rc = trexio_read_rdm_2e_transition(f,offset,icount,idx_buf,val_buf)
+!   print*, 'icount = ',icount
+!   do i=1,icount
+!      idx_k = idx_buf(1,i)
+!      idx_l = idx_buf(2,i)
+!      idx_m = idx_buf(3,i)
+!      idx_n = idx_buf(4,i)
+!      if (idx_k <= Mon%NAct .and. idx_l <= Mon%NAct .and. idx_m <= Mon%NAct .and. idx_n <= Mon%NAct) then
+!         write(6,'(4i3,f14.10)') idx_k,idx_l,idx_m,idx_n,val_buf(i)
+!         rdm24act(idx_k,idx_l,idx_m,idx_n) = val_buf(i)
+!         !if(idx_k.eq.idx_m.and.idx_l.eq.idx_n) then
+!         if(idx_k.eq.idx_l.and.idx_m.eq.idx_n) then
+!            xtrace= xtrace + 0.5d0*val_buf(i)
+!         endif
+!      endif
+!   enddo
+!   offset = offset + icount
+!enddo
+!deallocate(val_buf,idx_buf)
+!
+!print*, 'xtrace 2-trdm trexio =',xtrace
+
+! CMONO --> CMONOAct
+work = 0d0
+do j=1,Mon%NAct
+   do i=1,Mon%NAct
+      work(i,j) = Mon%CMONO(Mon%IRef1,Mon%INAct+i,Mon%INAct+j)
+   enddo
+enddo
+print*, '2-TRDM MO norm', norm2(rdm24act)
+
+print*, 'MO 1111',rdm24act(1,1,1,1)
+print*, 'MO 2111',rdm24act(2,1,1,1)
+print*, 'MO 1131',rdm24act(1,1,3,1)
+
+call TrRDM24_dgemm(rdm24act,work(1:Mon%NAct,1:Mon%NAct),Mon%NAct)
+print*, '2-TRDM NO norm', norm2(rdm24act)
+
+print*, 'NO 6121',0.5d0*rdm24act(6,1,2,1)
+print*, 'NO 8121',0.5d0*rdm24act(8,1,2,1)
+print*, 'NO 4111',0.5d0*rdm24act(4,1,1,1)
+
+! scale and reorder 2-trdm act
+block
+integer :: NACT
+double precision,allocatable :: mat(:,:,:,:)
+
+NACT=Mon%NACT
+allocate(mat(NACT,NACT,NACT,NACT))
+mat = rdm24act
+rdm24act = 0d0
+do l=1,Mon%NAct
+   do k=1,Mon%NAct
+      do j=1,Mon%NAct
+         do i=1,Mon%NAct
+            rdm24act(i,k,j,l) = 0.5d0*mat(k,j,i,l)
+         enddo
+      enddo
+   enddo
+enddo
+
+deallocate(mat)
+
+xtrace=0d0
+do k=1,Mon%NAct
+   do i=1,Mon%NAct
+   xtrace = xtrace + rdm24act(i,i,k,k)
+   enddo
+enddo
+print*, 'xtrace =',xtrace
+end block
+
+! Dominik's convention : how come no normalization factor????
+!do ip=1,NBasis
+!   do ir=1,NBasis
+!      do iq=1,NBasis
+!         TRDM1TEST(ip,ir)= TRDM1TEST(ip,ir)+montrdm24(ip,ir,iq,iq)
+!      enddo
+!   enddo
+!enddo
+
+call get_1rdm_from_2rdm(rdm24act,mon%rdm1(ist,:),Mon%NAct,Mon%XELE,1,2)
+
+! transform 1-TRDM to NO and compare
+!work=0d0
+!call tran2MO(Mon%trdm1(1,:,:),Mon%CMONO(Mon%IRef1,1:NOccup,1:NOccup),Mon%CMONO(Mon%IRef1,1:NOccup,1:NOccup), &
+!           work(1:NOccup,1:NOccup),NOccup)
+!print*, 'Real DT in NO '
+!do i=1,NOccup
+!   write(6,'(*(f13.8))') (work(i,j),j=1,NOccup)
+!enddo
+
+rc = trexio_close(f)
+
+end subroutine read_2rdm_2trdm_trexio
+
+subroutine get_1rdm_from_2rdm(P,Occ,NACT,XELE,order,dtype)
+!
+! get 1rdm from 2rdm by using the sum rule:
+! order = 0 :
+!       D(p,q) = fac *sum_r P(p,r,q,r)
+! order = 1 :
+!       D(p,q) = fac* sum_r P(p,q,r,r)
+!
+!       fac = 1 / (NELE-1) 
+!
+implicit none
+
+integer,intent(in) :: NACT
+integer,intent(in) :: order,dtype
+double precision,intent(in) :: XELE
+double precision,intent(in) :: Occ(NACT)
+double precision,intent(in) :: P(NACT,NACT,NACT,NACT)
+
+integer :: i,j,k
+double precision :: fac,val
+double precision   :: DfromP(NACT,NACT)
+
+DfromP = 0d0
+select case (order)
+case(0)
+   do k=1,NACT
+      do j=1,NACT
+         do i=1,NACT
+            DfromP(i,j) = DfromP(i,j) + P(i,k,j,k)
+         enddo
+      enddo
+   enddo
+case(1)
+   do k=1,NACT
+      do j=1,NACT
+         do i=1,NACT
+            DfromP(i,j) = DfromP(i,j) + P(i,j,k,k)
+         enddo
+      enddo
+   enddo
+case default
+   stop "Error! wrong call of get_1rdm_from_2rdm!"
+end select
+
+if (dtype==1) then
+   do i=1,NACT
+      val = abs(Occ(i))-abs(DfromP(i,i))
+      if (val.gt.1d-4) print*, 'Warning! Occ(i) \= DfromP(i,i) : ', i, val
+   enddo
+endif
+
+if (dtype==1) fac = 1d0/(2d0*XELE-1d0)
+if (dtype==2) fac = 1d0/(NACT-1d0)
+
+if (dtype==1) print*, 'D from P with norm fac =', fac
+if (dtype==2) print*, 'DT from PT with norm fac =', fac
+do i=1,NACT
+   write(6,'(*(f13.8))') (fac*DfromP(i,j),j=1,NACT)
+enddo
+
+end subroutine get_1rdm_from_2rdm
+
+real*8 Function FRDM24(IP,IQ,IR,IS,RDM24Act,Occ,Ind2,NAct,NBasis)
+!
+! a 4-index version of the FRDM2 subroutine
+! for a given set of indices and the known part of active rdm2
+! returns the element of rdm2_pqrs for cas
+!
+ implicit none
+!
+ integer,intent(in) :: IP,IQ,IR,IS
+ integer,intent(in) :: NAct,NBasis
+ integer,intent(in) :: Ind2(NBasis)
+ double precision,intent(in) :: RDM24Act(NAct,NAct,NAct,NAct)
+ double precision,intent(in) :: Occ(NBasis)
+ double precision :: RDM2
+!
+ RDM2=0d0
+ If(IP.Eq.IR.And.IQ.Eq.IS.And. (Occ(IP).Eq.1d0.Or.Occ(IQ).Eq.1d0) ) &
+  RDM2=RDM2+2d0*Occ(IP)*Occ(IQ)
+ If(IP.Eq.IS.And.IQ.Eq.IR.And. (Occ(IP).Eq.1d0.Or.Occ(IQ).Eq.1d0) ) &
+  RDM2=RDM2-Occ(IP)*Occ(IQ)
+!
+! ACTIVE PART
+!
+ if(Ind2(IP)*Ind2(IQ)*Ind2(IR)*Ind2(IS).Ne.0d0) then
+ RDM2 = RDM24Act(Ind2(IP),Ind2(IQ),Ind2(IR),Ind2(IS))
+ EndIf
+!
+ FRDM24=RDM2
+!
+ return
+ end function FRDM24
 
 subroutine calc_trdip(NBasis,mon)
 !
@@ -2275,6 +2927,19 @@ integer,intent(in) :: NAO,NBasis
 double precision   :: CMONO(NBasis,NBasis),CAOMO(NAO,NBasis)
 double precision   :: work(NAO,NBasis)
 
+integer :: i,j
+
+#if SAPT_INTERFACE_DEBUG > 10
+   print*, 'CMONO (prepare_no_trexio) =',norm2(CMONO)
+   do j=1,NBasis
+      write(lout,'(*(f12.6))') (CMONO(i,j),i=1,NBasis)
+   enddo
+   print*, 'CAOMO (prepare_no_trexio) =',norm2(CAOMO)
+   do j=1,NBasis
+      write(lout,'(*(f12.6))') (CAOMO(i,j),i=1,NBasis)
+   enddo
+#endif
+
 ! skip canonicalization
 
  call dgemm('N','N',NAO,NBasis,NBasis,1d0,CAOMO,NAO,CMONO,NBasis,0d0,work,NAO)
@@ -2350,6 +3015,13 @@ integer :: info
  !enddo
 !print*, norm2(URe)
 ! call print_sqmat(URe,NBasis)
+
+#if SAPT_INTERFACE_DEBUG > 10
+   print*, 'CMONO Monomer =',Mon%Monomer,norm2(URe)
+   do j=1,NBasis
+      write(lout,'(*(f12.6))') (URe(i,j),i=1,NBasis)
+   enddo
+#endif
 
 ! FIND CANONICAL INACTIVE AND VIRTUAL ORBITALS
  work1 = 0
@@ -2733,6 +3405,7 @@ deallocate(Mon%RDM2val)
 allocate(Mon%RDM2val(NOccup,NOccup,NOccup,NOccup))
 
 Mon%RDM2val = RDM2tru
+print*, 'RDM2val =',norm2(Mon%RDM2val)
 
 deallocate(RDM2tru)
 
@@ -3353,26 +4026,37 @@ mon%NDimX = ind
 
 end subroutine select_active_trexio
 
-subroutine save_CAONO(Cin,Cout,NAO,NBasis)
+subroutine save_CAONO(Cin,Cout,mon,idSRS,NAO,NBasis)
 !
 ! C(NAO*NBasis) --> CAONO(NAO,NBasis)
+!
+! dSRS: use CAONO for IRef1
+! obtained in read_1rdm_1trdm
 !
 implicit none
 
 integer,intent(in) :: NAO,NBasis
+integer,intent(in) :: idSRS
 double precision,intent(in)  :: Cin(:)
 double precision,intent(out) :: Cout(NAO,NBasis)
 
+type(SystemBlock) :: mon
+
 integer :: i,j,ij
 
-Cout = 0
-ij = 0
-do j=1,NBasis
-   do i=1,NAO
-      ij = ij + 1
-      Cout(i,j) = Cin(ij)
+if (idSRS==1) then
+   print*, 'Warning! Using CAONO for IRef1 = ',Mon%IRef1
+   Cout(1:NBasis,1:NBasis) = Mon%CAONO(Mon%IRef1,1:NAO,1:NBasis)
+else
+   Cout = 0
+   ij = 0
+   do j=1,NBasis
+      do i=1,NAO
+         ij = ij + 1
+         Cout(i,j) = Cin(ij)
+      enddo
    enddo
-enddo
+endif
 
 end subroutine save_CAONO
 

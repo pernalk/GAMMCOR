@@ -14,6 +14,8 @@ subroutine elst_dRS(A,B,SAPT)
 ! calculate electrostatic energy
 ! in degenerate RS (in NO representation)
 !
+! requires 1-RDMs and 1-TRDMs
+!
 implicit none
 
 type(SystemBlock) :: A, B
@@ -95,6 +97,7 @@ if(irefB .eq. iref2B) then
    allocate(Atrdm(NBasis,NBasis))
    call tran2MO(A%trdm1(iexcited,:,:),A%CMONO(iref,:,:),A%CMONO(iref,:,:), &
                         Atrdm(:,:),NBasis)
+
    do i=1,A%num0+A%num1
       do j=1,A%num0+A%num1
        eas1 = eas1 + Atrdm(i,j)*vbaa(i,j)
@@ -158,6 +161,17 @@ if(irefB .ne. iref2B) then
                         Atrdm(:,:),NBasis)
    call tran2MO(B%trdm1(iexcited2,:,:),B%CMONO(iref2B,:,:),B%CMONO(iref2B,:,:), &
                         Btrdm(:,:),NBasis)
+
+    print*, 'DTA in NO(iref) '
+    do i=1,dimOA
+       write(6,'(*(f13.8))') (Atrdm(i,j),j=1,dimOA)
+    enddo
+    print*, ''
+    print*, 'Real DTB in NO(iref2B) '
+    do i=1,dimOB
+       write(6,'(*(f13.8))') (Btrdm(i,j),j=1,dimOB)
+    enddo
+
 endif
 if(irefB .eq. iref2B) then
 Btrdm(:,:) = 0d0

@@ -343,10 +343,13 @@ write(LOUT,'(1x,a)') 'Degenerate SAPT(MC)'
 write(LOUT,'(8a10)') ('----------',i=1,8)
 
 call elst_dRS(SAPT%monA,SAPT%monB,SAPT)
-! modify e1exch_NaNb to arbitrary IREFA / IREFB
-call e1exch_NaNb(Flags,SAPT%monA,SAPT%monB,SAPT)
-call e1exch_NaNb_AexcB(Flags,SAPT%monA,SAPT%monB,SAPT)
-call e1exch_dSRS(SAPT%monA,SAPT%monB,SAPT) 
+
+print*, 'skipping exch..!'
+
+!! modify e1exch_NaNb to arbitrary IREFA / IREFB
+!call e1exch_NaNb(Flags,SAPT%monA,SAPT%monB,SAPT)
+!call e1exch_NaNb_AexcB(Flags,SAPT%monA,SAPT%monB,SAPT)
+!call e1exch_dSRS(SAPT%monA,SAPT%monB,SAPT)
 
 call clock('SAPT',Tcpu,Twall)
 
