@@ -21,8 +21,8 @@ integer :: ij,ipr
 integer :: ip, iq, ir, is
 integer :: iv, iz, iu, it
 integer :: iunit
-integer :: dimOA,dimOB
 integer :: NAO,NBas
+integer :: dimOA,dimOB
 double precision,allocatable :: S(:,:),Sab(:,:)
 double precision,allocatable :: USa(:,:),USb(:,:)
 double precision,allocatable :: PA(:,:),PB(:,:), &
@@ -699,7 +699,7 @@ print*,'good SAPT%elst = ', SAPT%elst
 print *,'nnS2',nnS2*1000
 print*, 'SAPT%elst1',SAPT%elst*1000
 print*,'SAPT%Vnn',SAPT%Vnn*1000
-print*,'SAPT%elst-SAPT%Vnn',(SAPT%elst-SAPT%Vnn)*1000
+print*,'SAPT%elst-SAPT%Vnn ',(SAPT%elst-SAPT%Vnn)*1000
 print*,'SAPT%elst1-SAPT%Vnn',(SAPT%elst1-SAPT%Vnn)*1000
 tElst = SAPT%elst*nnS2
 print*, 'tELST',tELST*1000
@@ -884,17 +884,9 @@ allocate(tmpAB(dimOA,dimOA,dimOB,dimOB))
 
 call dgemm('N','T',dimOA**2,dimOB**2,dimOA*dimOB,1d0,intA,dimOA**2,intB,dimOB**2,0d0,tmpAB,dimOA**2)
 
-val  = 0
-work = 0
-!do ir=1,dimOA
-!   do ip=1,dimOA
-    ! read(iunit,rec=ip+(ir-1)*dimOA) work(1:dimOB,1:dimOB)
-     !val = val + sum(work(1:dimOB,1:dimOB)*tmpAB(ip,ir,1:dimOB,1:dimOB))
-     !intA(ip,ir,iq,it)*intB(it,iu,is,iq)*ints(it,is)
-!   enddo
-!enddo
-
-ints = 0
+val  = 0d0
+work = 0d0
+ints = 0d0
 do ir=1,dimOB
    do ip=1,dimOB
      read(iunit,rec=ip+(ir-1)*NBas) ints(1:dimOA*NBas)
@@ -950,7 +942,8 @@ subroutine e1exch_NaNb_AexcB(Flags,A,B,SAPT)
    integer :: ipq,iu,it
    integer :: iunit
    integer :: rdm2type
-   integer :: dimOA,dimOB,NBas
+   integer :: NAO,NBas
+   integer :: dimOA,dimOB
    double precision :: fac,val,nnS2,tmp
    double precision :: tElst,tvk(3),tNa(2),tNb(2),tNaNb
    double precision :: tElst1, tElst2
@@ -973,7 +966,8 @@ subroutine e1exch_NaNb_AexcB(Flags,A,B,SAPT)
    write(lout,'(/1x,a)') 'Entering E1exch_NaNb_AexcB...'
 
    ! set dimensions
-   NBas = A%NBasis
+   NAO   = SAPT%NAO
+   NBas  = A%NBasis
    dimOA = A%num0+A%num1
    dimOB = B%num0+B%num1
    !
@@ -986,14 +980,14 @@ subroutine e1exch_NaNb_AexcB(Flags,A,B,SAPT)
    iexcited = ((iref2-2)*(iref2-1))/2+iref
    iexcited2 = ((iref2B-2)*(iref2B-1))/2+irefB
 
-   allocate(S(NBas,NBas),Sab(NBas,NBas))
-   allocate(Va(NBas,NBas),Vb(NBas,NBas),&
+   allocate(S(NAO,NAO),Sab(NBas,NBas))
+   allocate(Va(NAO,NAO),Vb(NAO,NAO), &
             Vabb(NBas,NBas),Vbaa(NBas,NBas),&
             Vaab(NBas,NBas),Vbba(NBas,NBas))
 
    ! get V_ne in atomic orbs
-   call get_one_mat('V',Va,A%Monomer,NBas)
-   call get_one_mat('V',Vb,B%Monomer,NBas)
+   call get_one_mat('V',Va,A%Monomer,NAO)
+   call get_one_mat('V',Vb,B%Monomer,NAO)
 
    ! transform to NOs (MON%CMO contains AONO transformation)
    !call tran2MO(Va,B%CMO,B%CMO,Vabb,NBas)
@@ -1003,17 +997,17 @@ subroutine e1exch_NaNb_AexcB(Flags,A,B,SAPT)
 
    !call tran2MO(Vb,A%CAONO(iref,:,:),A%CAONO(iref,:,:),Vbaa,NBasis)
 
-   call tran2MO(Va,B%CAONO(irefB,:,:),B%CAONO(irefB,:,:),Vabb,NBas)
-   call tran2MO(Vb,A%CAONO(iref2,:,:),A%CAONO(iref2,:,:),Vbaa,NBas)
-   call tran2MO(Va,A%CAONO(iref2,:,:),B%CAONO(irefB,:,:),Vaab,NBas)
-   call tran2MO(Vb,B%CAONO(irefB,:,:),A%CAONO(iref2,:,:),Vbba,NBas)
+   call tran_AO2MO2(Va,B%CAONO(irefB,:,:),B%CAONO(irefB,:,:),Vabb,NAO,NBas)
+   call tran_AO2MO2(Vb,A%CAONO(iref2,:,:),A%CAONO(iref2,:,:),Vbaa,NAO,NBas)
+   call tran_AO2MO2(Va,A%CAONO(iref2,:,:),B%CAONO(irefB,:,:),Vaab,NAO,NBas)
+   call tran_AO2MO2(Vb,B%CAONO(irefB,:,:),A%CAONO(iref2,:,:),Vbba,NAO,NBas)
 
    ! get overlap S matrix in AO and transform to NOs
-   call get_one_mat('S',S,A%Monomer,NBas)
+   call get_one_mat('S',S,A%Monomer,NAO)
 
    !call tran2MO(S,A%CMO,B%CMO,Sab,NBas)
 
-   call tran2MO(S,A%CAONO(iref2,:,:),B%CAONO(irefB,:,:),Sab,NBas)
+   call tran_AO2MO2(S,A%CAONO(iref2,:,:),B%CAONO(irefB,:,:),Sab,NAO,NBas)
 
    allocate(AOcc(NBas),BOcc(NBas))
    
@@ -1060,7 +1054,7 @@ if (SAPT%IPrint>=10) then
    print *,'nnS2',nnS2*1000
    print*, 'SAPT%elst1',SAPT%elst1*1000
    print*,'SAPT%Vnn',SAPT%Vnn*1000
-   print*,'SAPT%elst-SAPT%Vnn',(SAPT%elst-SAPT%Vnn)*1000
+   print*,'SAPT%elst-SAPT%Vnn ',(SAPT%elst-SAPT%Vnn) *1000
    print*,'SAPT%elst1-SAPT%Vnn',(SAPT%elst1-SAPT%Vnn)*1000
    tElst = SAPT%elst*nnS2
    print*, 'tELST',tELST*1000
@@ -1236,7 +1230,6 @@ endif
    
          do ir=1,dimOB
             do ip=1,dimOB
-               !   tNb(2) = tNb(2) + A%Occ(it)*intB(ip,ir,it,iq)*ints(ip+(ir-1)*NBas)
                tNb(2) = tNb(2) + AOcc(it)*intB(ip,ir,it,iq)*ints(ip+(ir-1)*NBas)
             enddo
          enddo
@@ -1256,33 +1249,25 @@ endif
    !
    open(newunit=iunit,file='FOFOAABB2',status='OLD',&
        access='DIRECT',form='UNFORMATTED',recl=8*dimOA*NBas)
-   
+
    allocate(tmpAB(dimOA,dimOA,dimOB,dimOB))
    
    call dgemm('N','T',dimOA**2,dimOB**2,dimOA*dimOB,1d0,intA,dimOA**2,intB,dimOB**2,0d0,tmpAB,dimOA**2)
-   
-   val  = 0
-   work = 0
-   !do ir=1,dimOA
-   !   do ip=1,dimOA
-       ! read(iunit,rec=ip+(ir-1)*dimOA) work(1:dimOB,1:dimOB)
-        !val = val + sum(work(1:dimOB,1:dimOB)*tmpAB(ip,ir,1:dimOB,1:dimOB))
-        !intA(ip,ir,iq,it)*intB(it,iu,is,iq)*ints(it,is)
-   !   enddo
-   !enddo
-   
-   ints = 0
+
+   val  = 0d0
+   work = 0d0
+   ints = 0d0
    do ir=1,dimOB
       do ip=1,dimOB
         read(iunit,rec=ip+(ir-1)*NBas) ints(1:dimOA*NBas)
-   
+
         do j=1,dimOA
            do i=1,dimOA
               work(i,j) = ints(i+(j-1)*NBas)
            enddo
         enddo
         val = val + sum(work(1:dimOA,1:dimOA)*tmpAB(1:dimOA,1:dimOA,ip,ir))
-   
+
       enddo
    enddo
    close(iunit)

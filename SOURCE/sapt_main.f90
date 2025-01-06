@@ -344,12 +344,10 @@ write(LOUT,'(8a10)') ('----------',i=1,8)
 
 call elst_dRS(SAPT%monA,SAPT%monB,SAPT)
 
-print*, 'skipping exch..!'
-
-!! modify e1exch_NaNb to arbitrary IREFA / IREFB
-!call e1exch_NaNb(Flags,SAPT%monA,SAPT%monB,SAPT)
-!call e1exch_NaNb_AexcB(Flags,SAPT%monA,SAPT%monB,SAPT)
-!call e1exch_dSRS(SAPT%monA,SAPT%monB,SAPT)
+! modify e1exch_NaNb to arbitrary IREFA / IREFB
+call e1exch_NaNb(Flags,SAPT%monA,SAPT%monB,SAPT)
+call e1exch_NaNb_AexcB(Flags,SAPT%monA,SAPT%monB,SAPT)
+call e1exch_dSRS(SAPT%monA,SAPT%monB,SAPT)
 
 call clock('SAPT',Tcpu,Twall)
 
@@ -1038,9 +1036,9 @@ call tran4_gen(NAO,&
 
    call tran4_gen(NAO,&
                NBasis,B%CAONO(irefB,:,:),&
-               B%num0+B%num1,B%CAONO(irefB,1:NBasis,1:(B%num0+B%num1)),&
+               B%num0+B%num1,B%CAONO(irefB,1:NAO,1:(B%num0+B%num1)),&
                NBasis,A%CAONO(iref2,:,:),&
-               A%num0+A%num1,A%CAONO(iref2,1:NBasis,1:(A%num0+A%num1)),&
+               A%num0+A%num1,A%CAONO(iref2,1:NAO,1:(A%num0+A%num1)),&
                'FOFOAABB2','AOTWOSORT')
 
    call tran4_gen(NAO,&
@@ -1064,12 +1062,12 @@ call tran4_gen(NAO,&
                B%num0+B%num1,B%CAONO(irefB,1:NAO,1:(B%num0+B%num1)),&
                'OOOOBBBA','AOTWOSORT')
                  
-call tran4_gen(NBasis,&
-                 A%num0+A%num1,A%CAONO(iref, 1:NAO,1:(A%num0+A%num1)),&
-                 B%num0+B%num1,B%CAONO(irefB,1:NAO,1:(B%num0+B%num1)),&
-                 A%num0+A%num1,A%CAONO(iref, 1:NAO,1:(A%num0+A%num1)),&
-                 A%num0+A%num1,A%CAONO(iref, 1:NAO,1:(A%num0+A%num1)),&
-                 'OOOOAAAB','AOTWOSORT')
+call tran4_gen(NAO,&
+               A%num0+A%num1,A%CAONO(iref, 1:NAO,1:(A%num0+A%num1)),&
+               B%num0+B%num1,B%CAONO(irefB,1:NAO,1:(B%num0+B%num1)),&
+               A%num0+A%num1,A%CAONO(iref, 1:NAO,1:(A%num0+A%num1)),&
+               A%num0+A%num1,A%CAONO(iref, 1:NAO,1:(A%num0+A%num1)),&
+               'OOOOAAAB','AOTWOSORT')
   
 end subroutine sapt_ab_ints_dSRS
 

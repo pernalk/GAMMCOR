@@ -21,7 +21,7 @@ implicit none
 type(SystemBlock) :: A, B
 type(SaptData)    :: SAPT
 
-integer :: NBasis,dimOA,dimOB
+integer :: NAO,NBasis,dimOA,dimOB
 integer :: iunit
 integer :: iref,iref2,irefB,iref2B
 integer :: iexcited,iexcited2
@@ -60,27 +60,23 @@ iref2B  = B%IREF2
 iexcited = ((iref2-2)*(iref2-1))/2+iref
 iexcited2 = ((iref2B-2)*(iref2B-1))/2+irefB
 
+NAO    = SAPT%NAO
 NBasis = A%NBasis
 dimOA  = A%num0+A%num1
 dimOB  = B%num0+B%num1
 
-allocate(Vb(NBasis,NBasis),Vbaa(NBasis,NBasis))
-allocate(Vbaa2(NBasis,NBasis))
+allocate(Vb(NAO,NAO),Va(NAO,NAO))
+allocate(Vbaa(NBasis,NBasis),Vbaa2(NBasis,NBasis))
+allocate(Vabb(NBasis,NBasis),Vabb2(NBasis,NBasis))
 
+call get_one_mat('V',Vb,B%Monomer,NAO)
+call get_one_mat('V',Va,A%Monomer,NAO)
 
-allocate(Va(NBasis,NBasis),Vabb(NBasis,NBasis))
-allocate(Vabb2(NBasis,NBasis))
+call tran_AO2MO2(Vb,A%CAONO(iref,:,:), A%CAONO(iref,:,:), Vbaa, NAO,NBasis)
+call tran_AO2MO2(Vb,A%CAONO(iref2,:,:),A%CAONO(iref2,:,:),Vbaa2,NAO,NBasis)
 
-
-call get_one_mat('V',Vb,B%Monomer,NBasis)
-call get_one_mat('V',Va,A%Monomer,NBasis)
-
-
-call tran2MO(Vb,A%CAONO(iref,:,:),A%CAONO(iref,:,:),Vbaa,NBasis)
-call tran2MO(Vb,A%CAONO(iref2,:,:),A%CAONO(iref2,:,:),Vbaa2,NBasis)
-
-call tran2MO(Va,B%CAONO(irefB,:,:),B%CAONO(irefB,:,:),Vabb,NBasis)
-call tran2MO(Va,B%CAONO(iref2B,:,:),B%CAONO(iref2B,:,:),Vabb2,NBasis)
+call tran_AO2MO2(Va,B%CAONO(irefB,:,:), B%CAONO(irefB,:,:), Vabb, NAO,NBasis)
+call tran_AO2MO2(Va,B%CAONO(iref2B,:,:),B%CAONO(iref2B,:,:),Vabb2,NAO,NBasis)
 
 ! sum_p n_p v^B_pp
 ea1 = 0d0
@@ -105,7 +101,6 @@ if(irefB .eq. iref2B) then
    enddo
    eas1 = 2d0*eas1
 endif
-
 
 print*, 'ea1',ea1
 print*, 'ea2',ea2
@@ -241,8 +236,8 @@ A2B1A2B1=SAPT%Vnn+eb1+ea2+elab2B
 A1B2A2B1=elab3+eas1
 
 write(LOUT,'(/1x,a,f16.8)') '<AB*|V|AB*>      = ', A1B2A1B2*1000d0
-write(LOUT,'(/1x,a,f16.8)') '<A*B|V|A*B>      = ', A2B1A2B1*1000d0
-write(LOUT,'(/1x,a,f16.8)') '<AB*|V|A*B>      = ', A1B2A2B1*1000d0
+write(LOUT,'(1x,a,f16.8)')  '<A*B|V|A*B>      = ', A2B1A2B1*1000d0
+write(LOUT,'(1x,a,f16.8)')  '<AB*|V|A*B>      = ', A1B2A2B1*1000d0
 
 gamma=0.5d0*atan2(2*A1B2A2B1,A1B2A1B2-A2B1A2B1)
 write(LOUT,'(/1x,a,f16.8)') 'gamma      = ', gamma
@@ -294,7 +289,8 @@ implicit none
 
 type(SystemBlock) :: A, B
 type(SaptData)    :: SAPT
-integer :: NBasis,dimOA,dimOB
+integer :: NAO,NBasis
+integer :: dimOA,dimOB
 integer :: iunit
 integer :: iref,iref2,irefB,iref2B
 integer :: iexcited,iexcited2
@@ -384,6 +380,7 @@ iexcited = ((iref2-2)*(iref2-1))/2+iref
 iexcited2 = ((iref2B-2)*(iref2B-1))/2+irefB
 tvk = 0d0
 
+NAO    = SAPT%NAO
 NBasis = A%NBasis
 dimOA  = A%num0+A%num1
 dimOB  = B%num0+B%num1
@@ -391,33 +388,33 @@ dimOB  = B%num0+B%num1
 allocate(Atrdm(NBasis,NBasis))
 allocate(Btrdm(NBasis,NBasis),Btrdm2(NBasis,NBasis))
 
-allocate(S(NBasis,NBasis),Va(NBasis,NBasis),Vb(NBasis,NBasis))
+allocate(S(NAO,NAO),Va(NAO,NAO),Vb(NAO,NAO))
 allocate(Sab(NBasis,NBasis),Sab2(NBasis,NBasis),Sab3(NBasis,NBasis))
 allocate(Vabb(NBasis,NBasis),Vbaa(NBasis,NBasis),&
          Vaab(NBasis,NBasis),Vbba(NBasis,NBasis),&
          Vbab(NBasis,NBasis),Vbab2(NBasis,NBasis),Vabb2(NBasis,NBasis),Vaab2(NBasis,NBasis))
 
 ! get V_ne in atomic orbs
-call get_one_mat('V',Va,A%Monomer,NBasis)
-call get_one_mat('V',Vb,B%Monomer,NBasis)
+call get_one_mat('V',Va,A%Monomer,NAO)
+call get_one_mat('V',Vb,B%Monomer,NAO)
 
 !call tran2MO(Vb,A%CAONO(iref,:,:),A%CAONO(iref,:,:),Vbaa,NBasis)
 ! not sure all are needed
-call tran2MO(Va,B%CAONO(iref2B,:,:),B%CAONO(iref2B,:,:),Vabb,NBasis)
-call tran2MO(Va,B%CAONO(irefB,:,:),B%CAONO(irefB,:,:),Vabb2,NBasis)
-call tran2MO(Vb,A%CAONO(iref,:,:),A%CAONO(iref,:,:),Vbaa,NBasis)
-call tran2MO(Va,A%CAONO(iref,:,:),B%CAONO(iref2B,:,:),Vaab,NBasis)
-call tran2MO(Va,A%CAONO(iref,:,:),B%CAONO(irefB,:,:),Vaab2,NBasis)
-call tran2MO(Vb,B%CAONO(iref2B,:,:),A%CAONO(iref,:,:),Vbba,NBasis)
-call tran2MO(Vb,A%CAONO(iref,:,:),B%CAONO(iref2B,:,:),Vbab,NBasis)
-call tran2MO(Vb,A%CAONO(iref,:,:),B%CAONO(irefB,:,:),Vbab2,NBasis)
+call tran_AO2MO2(Va,B%CAONO(iref2B,:,:),B%CAONO(iref2B,:,:),Vabb,NAO,NBasis)
+call tran_AO2MO2(Va,B%CAONO(irefB,:,:), B%CAONO(irefB,:,:), Vabb2,NAO,NBasis)
+call tran_AO2MO2(Vb,A%CAONO(iref,:,:),  A%CAONO(iref,:,:),  Vbaa,NAO,NBasis)
+call tran_AO2MO2(Va,A%CAONO(iref,:,:),  B%CAONO(iref2B,:,:),Vaab,NAO,NBasis)
+call tran_AO2MO2(Va,A%CAONO(iref,:,:),  B%CAONO(irefB,:,:), Vaab2,NAO,NBasis)
+call tran_AO2MO2(Vb,B%CAONO(iref2B,:,:),A%CAONO(iref,:,:),  Vbba,NAO,NBasis)
+call tran_AO2MO2(Vb,A%CAONO(iref,:,:),  B%CAONO(iref2B,:,:),Vbab,NAO,NBasis)
+call tran_AO2MO2(Vb,A%CAONO(iref,:,:),  B%CAONO(irefB,:,:), Vbab2,NAO,NBasis)
 
 ! get overlap S matrix in AO and transform to NOs
-call get_one_mat('S',S,A%Monomer,NBasis)
+call get_one_mat('S',S,A%Monomer,NAO)
 
 !call tran2MO(S,A%CMO,B%CMO,Sab,NBas)
-call tran2MO(S,A%CAONO(iref,:,:),B%CAONO(iref2B,:,:),Sab,NBasis)
-call tran2MO(S,A%CAONO(iref2,:,:),B%CAONO(irefB,:,:),Sab3,NBasis)
+call tran_AO2MO2(S,A%CAONO(iref,:,:), B%CAONO(iref2B,:,:),Sab,NAO,NBasis)
+call tran_AO2MO2(S,A%CAONO(iref2,:,:),B%CAONO(irefB,:,:),Sab3,NAO,NBasis)
 
 call tran2MO(A%trdm1(iexcited,:,:),A%CMONO(iref,:,:),A%CMONO(iref,:,:), &
              Atrdm(:,:),NBasis)
@@ -453,12 +450,23 @@ if(irefB .eq. iref2B) then
 endif
 
 ! "2" denotes basis of B ground-state NOs
-call tran2MO(S,A%CAONO(iref,:,:),B%CAONO(irefB,:,:),Sab2,NBasis)
+call tran_AO2MO2(S,A%CAONO(iref,:,:),B%CAONO(irefB,:,:),Sab2,NAO,NBasis)
 deallocate(Vb,Va,S)
 if(irefB .ne. iref2B) then
    call tran2MO(B%trdm1(iexcited2,:,:),B%CMONO(irefB,:,:),B%CMONO(irefB,:,:), &
              Btrdm2(:,:),NBasis)
 endif
+
+print*, 'iexcited2',iexcited2
+print*, 'Btrdm2 MO',norm2(B%trdm1(iexcited2,:,:))
+do j=1,NBasis
+   write(6,'(*(f12.6))') (B%trdm1(iexcited2,i,j),i=1,NBasis)
+enddo
+print*, 'Btrdm2 NO',norm2(Btrdm2)
+do j=1,NBasis
+   write(6,'(*(f12.6))') (Btrdm2(i,j),i=1,NBasis)
+enddo
+
 A1B2PA1B2 = 0d0
 do j=1,dimOB
    do i=1,dimOA
@@ -479,8 +487,6 @@ enddo
 
 A2B1PA2B1=-2d0*A2B1PA2B1
    
-
-
 ! !Trik do testowania
 ! Atrdm=0d0
 ! Btrdm=0d0
@@ -504,9 +510,9 @@ A2B1PA2B1=-2d0*A2B1PA2B1
 
 !tvk(1)=- 4sum(trdm(A->A*)_{pq}trdm(B*->B)_{rs}VB_{ps}S_{qr})
 !P_1=-2sum(trdm(A->A*)_{pq}trdm(B*->B)_{rs}S_{ps}S_{qr})
-P1=0d0
-tvk = 0d0
-tvk2 =0d0
+P1   = 0d0
+tvk  = 0d0
+tvk2 = 0d0
 do iq=1,dimOA
    do ip=1,dimOA
       do ir=1,dimOB
@@ -519,9 +525,9 @@ do iq=1,dimOA
             tvk2(1) = tvk2(1) + Atrdm(iq,ip)*Btrdm(is,ir)*Vaab(iq,is)*Sab(ip,ir)
             tvktest(2) = tvktest(2) + Atrdm(ip,iq)*Btrdm2(ir,is)*Vbab2(ip,ir)*Sab2(iq,is)
             tvktest(1) = tvktest(1) + Atrdm(ip,iq)*Btrdm2(ir,is)*Vaab2(iq,is)*Sab2(ip,ir)
-         Enddo
+         enddo
       enddo
-   Enddo
+   enddo
 enddo
 tvk(1) = -2d0*tvk(1)
 tvk(2) = -2d0*tvk(2)
@@ -693,8 +699,6 @@ tvk2(3)= tvk(3)
 
 ! end block
 
-
-print *,"dimOA",dimOA
 allocate(ints(dimOA,dimOA))
 allocate(Atrdmtest(NBasis,NBasis),Btrdmtest(NBasis,NBasis))
 Atrdmtest = 0d0
@@ -767,17 +771,20 @@ enddo
 ! print*,"rdm24(1,2,2,2,2) dla A", trdm2A(2,2,2,2)
 ! print*,"rdm24(1,2,2,2,2) dla B", trdm2B(2,2,2,2)
 
-call tran4_gen(NBasis,&
-     B%num0+B%num1,B%CAONO(irefB,1:NBasis,1:(B%num0+B%num1)),&
-     B%num0+B%num1,B%CAONO(irefB,1:NBasis,1:(B%num0+B%num1)),&
-     A%num0+A%num1,A%CAONO(iref,1:NBasis,1:(A%num0+A%num1)),&
-     A%num0+A%num1,A%CAONO(iref,1:NBasis,1:(A%num0+A%num1)),&
+call tran4_gen(NAO,&
+     B%num0+B%num1,B%CAONO(irefB,1:NAO,1:(B%num0+B%num1)),&
+     B%num0+B%num1,B%CAONO(irefB,1:NAO,1:(B%num0+B%num1)),&
+     A%num0+A%num1,A%CAONO(iref, 1:NAO,1:(A%num0+A%num1)),&
+     A%num0+A%num1,A%CAONO(iref, 1:NAO,1:(A%num0+A%num1)),&
      'OOOOAABB','AOTWOSORT')
 
+! mh test
+print*, 'Sab2 ', norm2(Sab2)
+print*, 'Vbaa ', norm2(Vbaa)
 
+TNa  = 0d0
+TNa2 = 0d0
 test = 0d0
-TNa = 0d0
-TNa2= 0d0
 do iu=1,dimOB
    do it=1,dimOB
       do iq=1,dimOA
@@ -793,16 +800,14 @@ do iu=1,dimOB
       enddo
    enddo
 enddo
-  tNa(1)=-2d0*tNa(1)!poprawione
+tNa(1)=-2d0*tNa(1)!poprawione
 test = -2d0 * test
 tNa2(1)=tNa(1)
-print *,"tNa1 licznoe w innej bazie", test
-print*,"1trdmB norm",norm2(Btrdm2)
+print *,"tNa1 liczone w innej bazie", test
+print*,"1trdmB norm", norm2(Btrdm2)
 print*,"1trdmA norm", norm2(Atrdm)
-print*,"2trdmB norm",norm2(trdm2B)
+print*,"2trdmB norm", norm2(trdm2B)
 print*,"2trdmA norm", norm2(trdm2A)
-print*,"dimOA",dimOA
-print*,"NBasis",NBasis
 
 open(newunit=iunit,file='OOOOAAAB',status='OLD', access='DIRECT', &
   form='unformatted' ,recl=8*dimOA*dimOA)
@@ -950,30 +955,24 @@ TNb2(2) = -2d0*TNb2(2)
 close(iunit)
 
 
-
-
 print*, 'tNb-1',tNb(1)*1000
 print*, 'tNb-2',tNb(2)*1000
 
 call delfile('OOOOAABB')
 
-call tran4_gen(NBasis,&
-     B%num0+B%num1,B%CAONO(irefB,1:NBasis,1:(B%num0+B%num1)),&
-     B%num0+B%num1,B%CAONO(irefB,1:NBasis,1:(B%num0+B%num1)),&
-     A%num0+A%num1,A%CAONO(iref,1:NBasis,1:(A%num0+A%num1)),&
-     A%num0+A%num1,A%CAONO(iref,1:NBasis,1:(A%num0+A%num1)),&
+call tran4_gen(NAO,&
+     B%num0+B%num1,B%CAONO(irefB,1:NAO,1:(B%num0+B%num1)),&
+     B%num0+B%num1,B%CAONO(irefB,1:NAO,1:(B%num0+B%num1)),&
+     A%num0+A%num1,A%CAONO(iref, 1:NAO,1:(A%num0+A%num1)),&
+     A%num0+A%num1,A%CAONO(iref, 1:NAO,1:(A%num0+A%num1)),&
      'OOOOAABB','AOTWOSORT')
 
-
-
 ! TERAZ PRACUJEMY TU
-
-
 
 allocate(ints2(dimOA*dimOA))
 allocate(workTEST(dimOA,dimOA))
 allocate(intA(dimOA,dimOA,dimOA,dimOB),&
-     intB(dimOB,dimOB,dimOA,dimOB))
+         intB(dimOB,dimOB,dimOA,dimOB))
 intA=0d0
 intB=0d0
 ! load reference 2-RDMs
@@ -1077,7 +1076,7 @@ write(LOUT,'(1x,a,f16.8)') '<A*B|VP|AB*>     = ',VP2*1000d0
 if (SAPT%IPrint > 10) then
    write(lout,'(1x,a)') 'Print all <VP> ingregients:'
    print*, 'SAPT%exchs21', SAPT%exchs21
-   print*, 'SAPT%elst1', SAPT%elst1
+   print*, 'SAPT%elst1  ', SAPT%elst1
    print*, 'P1', P1
    print*, 'SAPT%elst1-SAPT%Vnn', SAPT%elst1-SAPT%Vnn
    print*, 'tvk(1)', tvk(1)

@@ -1824,14 +1824,17 @@ double precision,allocatable :: RDM2(:,:,:,:),montrdm24(:,:,:,:)
 double precision,allocatable :: Eig(:),EigY(:,:),EigX(:,:),iaddr(:)
 !
 character(:),allocatable :: xy0file
+character(len=1) :: prefix
 
 ! CHANGE IN THE FUTURE
 CICoef = mon%CICoef
 allocate(mon%trdm24(NBasis,NBasis,NBasis,NBasis))
 
 if(Mon%Monomer == 1) then
+   prefix  = "A"
    xy0file = "XY0_A"
 elseif(Mon%Monomer == 2) then
+   prefix  = "B"
    xy0file = "XY0_B"
 endif
 
@@ -2139,18 +2142,19 @@ N=0d0
 do ip=1,dimO
    N=N+RDM1TEST(ip,ip)
 enddo
-print *,"'Normalizacja",N,2*mon%NELE-1,mon%ZNucl-1
+write(lout,'("Normalizacja =",F8.6,2I2)') N, 2*mon%NELE-1, mon%ZNucl-1
 ! Zmiana 11.30.2023
 RDM1TEST(:,:)=RDM1TEST(:,:)/(mon%ZNucl-1)
 !RDM1TEST(:,:)=RDM1TEST(:,:)/(2*mon%NELE)
 !KONIEC ZMIANY
 !RDM1TEST(:,:)=RDM1TEST(:,:)/(2*mon%NELE-1)
 !USUNIĘTY FRAGMENT
-print*,"1RDM z 2RDM dla monomeru", Mon%Monomer
+write(lout,'("1-RDM from 2-RDM for monomer ",A2)') prefix
 do i=1,dimO
    write(lout,'(*(f12.6))') (RDM1TEST(i,j),j=1,dimO)
 enddo
-print*,"1rdm",mon%rdm1(1,:)
+write(lout,'("1-RDM CAS for monomer ",A2)') prefix
+write(lout,'(*(f12.6))') (mon%rdm1(1,i),i=1,dimO)
 
    NU=IStERPA
    ! ZMIANA 11.12.2023
@@ -2258,19 +2262,19 @@ TRDM1TEST(:,:)=TRDM1TEST(:,:)/(mon%ZNucl-1)
 !ZMIENIONY KOD
 print *,"2*mon%NELE"
 print *,2*mon%NELE
-print*,"1TRDM odtworzny z TRDM"
+write(lout, '(/,"1-TRDM from 2-TRDM for monomer ",A2," norm2 = ",F12.6)') prefix,norm2(TRDM1TEST)
 do i=1,10
    write(lout,'(*(f12.6))') (TRDM1TEST(i,j),j=1,10)
 enddo
 
-print*,"1TRDM CAS"
+write(lout, '("1-TRDM CAS for monomer ",A2," norm2 = ",F12.6)') prefix,norm2(TRDM1CAS)
 do i=1,10
    write(lout,'(*(f12.6))') (TRDM1CAS(i,j),j=1,10)
 enddo
 
-SumTrdmTrdm=0d0
-TRDM1CASnorm=0d0
-TRDM1norm=0d0
+SumTrdmTrdm  = 0d0
+TRDM1CASnorm = 0d0
+TRDM1norm    = 0d0
 
 do i=1,NBasis
    do j=1,NBasis
@@ -2289,16 +2293,13 @@ if(sign(1d0,SumTrdmTrdm) .NE. sign(1d0,1d0)) then
    print *,"CHANGING SIGN OF 2TRDM"
    montrdm24(:,:,:,:)= -1d0*montrdm24(:,:,:,:)
    TRDM1TEST(:,:) = -1d0*TRDM1TEST(:,:)
-  endif  
+endif  
 
-
-  print*,'BLad wzgledny'
-  write(lout,'(*(f12.6))') (norm2(Trdm1CAS-TRDM1TEST)/norm2(TRDM1CAS))
-  
+print*,'Blad wzgledny'
+write(lout,'(*(f12.6))') (norm2(Trdm1CAS-TRDM1TEST)/norm2(TRDM1CAS))
 
 print*,"Norma 2TRDM"
 print*,norm2(montrdm24(:,:,:,:))
-
 
 block
 
