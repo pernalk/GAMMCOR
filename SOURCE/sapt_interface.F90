@@ -1451,6 +1451,7 @@ double precision,allocatable :: AuxRDM(:,:,:),CAOMO(:,:),CMONO(:,:,:)
 
 ! temp txt interface
 character(len=20), dimension(:), allocatable :: filenames
+character(len=1) :: prefix
 
 print*, 'Warning! read_1rdm_1trdm is temporary!'
 
@@ -1471,12 +1472,13 @@ nnstates = nstates*(nstates-1)/2
 allocate (filenames(nstates))
 
 if(Mon%Monomer==1) then
- filenames(1) = 'A_1trdm_1_1.txt'
- filenames(2) = 'A_1trdm_2_2.txt'
+ prefix = 'A'
 elseif(Mon%Monomer==2) then
- filenames(1) = 'B_1trdm_1_1.txt'
- filenames(2) = 'B_1trdm_2_2.txt'
+ prefix = 'B'
 endif
+do i = 1, nstates
+   write(filenames(i), '(A,"_1trdm_",I0,"_",I0,".txt")') trim(prefix), i, i
+end do
 
 ! set reference state
 iref = Mon%IREF1
@@ -1581,9 +1583,9 @@ do ist=1,nstates
    do j=1,NBasis
       write(lout,'(*(f12.6))') (CMONO(ist,i,j),i=1,NBasis)
    enddo
-   write(lout, '("Monomer ",I0," state ",I0," CAONO = ",F12.6)') Mon%Monomer,ist,norm2(Mon%CAONO(ist,:,:))
+   write(lout, '("Monomer ",I0," state ",I0," CAONO = ",F15.10)') Mon%Monomer,ist,norm2(Mon%CAONO(ist,:,:))
    do j=1,NBasis
-      write(lout,'(*(f12.6))') (Mon%CAONO(ist,i,j),i=1,NBasis)
+      write(lout,'(*(f12.8))') (Mon%CAONO(ist,i,j),i=1,NAO)
    enddo
 #endif
 
@@ -4046,7 +4048,7 @@ integer :: i,j,ij
 
 if (idSRS==1) then
    print*, 'Warning! Using CAONO for IRef1 = ',Mon%IRef1
-   Cout(1:NBasis,1:NBasis) = Mon%CAONO(Mon%IRef1,1:NAO,1:NBasis)
+   Cout(1:NAO,1:NBasis) = Mon%CAONO(Mon%IRef1,1:NAO,1:NBasis)
 else
    Cout = 0
    ij = 0

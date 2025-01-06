@@ -284,6 +284,8 @@ if(Flags%ICASSCF==0.and.Flags%ISERPA==0) then
   select case(Mon%TwoMoInt)
   case(TWOMO_FOFO)
 
+     !print*, 'XOne =',norm2(XOne)
+ 
      call AB_CAS_FOFO(ABPlus,ABMin,ECASSCF,URe,Mon%Occ,XOne, &
                  Mon%IndN,Mon%IndX,Mon%IGem,Mon%NAct,Mon%INAct,Mon%NDimX,NBas,Mon%NDimX,&
                  NInte1,twojfile,twokfile,Flags%ICholesky,ACAlpha,.false.)
