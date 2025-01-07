@@ -934,6 +934,11 @@ end subroutine readocc_dalton
 
 subroutine readocc_molpro(NBasis,Mon,OrbAux,OneRdm,Flags)
 !
+! Purpose:
+! - read and 1-RDM, get Occ and MO-->NO
+! - set NAct, INAct
+!
+! Comment:
 ! OneRdm -- 1-RDM in MO (triang)
 ! OrbAux -- CMONO transformation matrix (square)
 !
@@ -1066,12 +1071,14 @@ double precision   :: OrbAux(NBasis,NBasis), &
 
 integer    :: i,j,ij,rc,itmp
 integer    :: NOccup,HlpDim
+integer    :: core,inactive,active,virtual
 integer(8) :: f
 double precision :: tmp
 double precision :: tmp1,tmp2
 double precision,allocatable :: work(:),Eval(:)
 double precision,allocatable :: work1d(:)
-character(1) :: monlabel
+character(1)   :: monlabel
+character*(32) :: mo_class(NBasis)
 
 if(mon%monomer==1) monlabel='A'
 if(mon%monomer==2) monlabel='B'
@@ -1141,18 +1148,51 @@ elseif(Flags%ICASSCF==1) then
    enddo
    Mon%NAct = itmp - Mon%INAct
 
-   !! check Active with TREXIO
-   !block
-   !character(len=32) :: moclass(nbasis)
-   !rc = trexio_read_mo_class(f,moclass,32)
-   !print*, 'MO_CLASS'
-   !do i=1,nbasis
-   !  print*, moclass(i)
-   !enddo
-   !end block
-
 else
    stop "readocc_trexio: wrong RDMType for TREXIO!"
+endif
+
+! check with mo_class in TREXIO
+rc = trexio_has_mo_class(f)
+if (rc /= TREXIO_SUCCESS) then
+   stop "No MO_CLASS in TREXIO file!"
+endif
+rc = trexio_read_mo_class(f, mo_class, 32)
+call trexio_assert(rc, TREXIO_SUCCESS)
+core     = 0
+inactive = 0
+active   = 0
+virtual  = 0
+do i=1,NBasis
+   if (trim(mo_class(i)) == 'Core')     core     = core   + 1
+   if (trim(mo_class(i)) == 'Inactive') inactive = active + 1
+   if (trim(mo_class(i)) == 'Active')   active   = active + 1
+   if (trim(mo_class(i)) == 'Virtual')  virtual  = virtual + 1
+enddo
+if (core+inactive+active+virtual /= NBasis) then
+   stop "Sum of mo_class .ne. NBasis"
+endif
+
+#if SAPT_INTERFACE_DEBUG > 5
+   write(lout,'(1X,"readocc_trexio :")')
+   write(lout,'(1X,"Monomer  =",A3)') monlabel
+   write(lout,'(1X,"core     =",I3)') core
+   write(lout,'(1X,"inactive =",I3)') inactive
+   write(lout,'(1X,"active   =",I3)') active
+   write(lout,'(1X,"virtual  =",I3)') virtual
+   write(lout,'(1X,"NBasis   =",I3)') NBasis
+#endif
+
+if(Mon%NAct/=active) then
+   write(lout,'(1x,2a)') 'Warning! In monomer ', monlabel
+   write(lout,'(1x,"The number of partially occ orbitals '// &
+         'different from active read from TREXIO. '// &
+         'Some active orbitals must be unoccupied.",/)')
+   write(lout,'("NAct from 1-RDM =" I3, "NAct from TREXIO=", I3)') Mon%NAct, active
+   Mon%NAct  = active
+   Mon%INAct = core+inactive
+   Mon%ISwitchAct = 1  ! change Mon%num0 and Mon%num1 in select_active
+   Mon%IWarn = Mon%IWarn + 1
 endif
 
 NOccup     = Mon%INAct + Mon%NAct
