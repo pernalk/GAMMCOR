@@ -331,8 +331,13 @@ double precision,intent(inout) :: Tcpu,Twall
 
 integer :: i
 
-call sapt_ERPA_TRDMs(Flags,SAPT%monA,NBasis)
-call sapt_ERPA_TRDMs(Flags,SAPT%monB,NBasis)
+! construct 2-TRDMs from ERPA eigenvectors
+if (SAPT%monA%TRDMType==2) then
+   call sapt_ERPA_TRDMs(Flags,SAPT%monA,NBasis)
+endif
+if (SAPT%monB%TRDMType==2) then
+   call sapt_ERPA_TRDMs(Flags,SAPT%monB,NBasis)
+endif
 
 call sapt_ab_ints_dSRS(Flags,SAPT%monA,SAPT%monB,NAO,NBasis)
 

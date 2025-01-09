@@ -1838,6 +1838,8 @@ elseif(Mon%Monomer == 2) then
    xy0file = "XY0_B"
 endif
 
+write(lout, '(/,1x,"Construct 2-TRDM from ERPA for monomer ", A2)') prefix
+
 dimO  = mon%num0+mon%num1
 call read_SBlock(SBlock,SBlockIV,nblk,xy0file)
 !
@@ -1902,8 +1904,8 @@ do ip=1,NBasis
 enddo
 
 SSgn=1d0
-write(6,'(/,1x,a,i2)') 'Monomer',mon%monomer
-write(6,'(X,"SumNu Y*X before normalization",E15.6)') SumNU
+write(lout,'(/,1x,"Monomer =", A2)') prefix
+write(lout,'(X,"SumNu Y*X before normalization",E15.6)') SumNU
 If(SumNU.Lt.0d0) SSgn=-1d0
 If(Abs(SumNu).Gt.1.D-8) Then
    SumNU=2d0/Sqrt(Abs(SumNU))
@@ -2149,11 +2151,11 @@ RDM1TEST(:,:)=RDM1TEST(:,:)/(mon%ZNucl-1)
 !KONIEC ZMIANY
 !RDM1TEST(:,:)=RDM1TEST(:,:)/(2*mon%NELE-1)
 !USUNIĘTY FRAGMENT
-write(lout,'("1-RDM from 2-RDM for monomer ",A2)') prefix
+write(lout,'(1x,"1-RDM from 2-RDM for monomer ",A2)') prefix
 do i=1,dimO
    write(lout,'(*(f12.6))') (RDM1TEST(i,j),j=1,dimO)
 enddo
-write(lout,'("1-RDM CAS for monomer ",A2)') prefix
+write(lout,'(1x,"1-RDM CAS for monomer ",A2)') prefix
 write(lout,'(*(f12.6))') (mon%rdm1(1,i),i=1,dimO)
 
    NU=IStERPA
@@ -2162,7 +2164,7 @@ write(lout,'(*(f12.6))') (mon%rdm1(1,i),i=1,dimO)
  !  NU = 1
    ! KONIEC ZMIANY
 
-   print*,"We take vector number: ", NU
+   write(lout,'(/1x,"We select ERPA vector number: ", I3)') NU
    EigY0 = 0d0
    EigX0 = 0d0
    ! unpack (1)
@@ -2189,10 +2191,10 @@ write(lout,'(*(f12.6))') (mon%rdm1(1,i),i=1,dimO)
                   montrdm24(ir,ip,is,it) =  montrdm24(ir,ip,is,it)-B%matY(i,NU)*RDM2(ir,iq,is,it)
                   montrdm24(ir,it,is,ip) =  montrdm24(ir,it,is,ip)-B%matY(i,NU)*RDM2(ir,it,is,iq)
                   if (ip <= dimO) then
-                     montrdm24(ir,iq,is,it) =  montrdm24(ir,iq,is,it)-B%matX(i,NU)*RDM2(ir,ip,is,it)
-                     montrdm24(ir,it,is,iq) =  montrdm24(ir,it,is,iq)-B%matX(i,NU)*RDM2(ir,it,is,ip)
                      montrdm24(iq,is,ir,it) =  montrdm24(iq,is,ir,it)+B%matY(i,NU)*RDM2(ip,is,ir,it)
                      montrdm24(ir,is,iq,it) =  montrdm24(ir,is,iq,it)+B%matY(i,NU)*RDM2(ir,is,ip,it)
+                     montrdm24(ir,iq,is,it) =  montrdm24(ir,iq,is,it)-B%matX(i,NU)*RDM2(ir,ip,is,it)
+                     montrdm24(ir,it,is,iq) =  montrdm24(ir,it,is,iq)-B%matX(i,NU)*RDM2(ir,it,is,ip)
                   endif
 
                   enddo
@@ -2217,7 +2219,6 @@ write(lout,'(*(f12.6))') (mon%rdm1(1,i),i=1,dimO)
 !          TRDM1(ip,iq)=TRDM1(ip,iq)-(mon%rdm1(1,ip)-mon%rdm1(1,iq))*EigX0(pq,1)
 !          TRDM1(iq,ip)=TRDM1(iq,ip)-(mon%rdm1(1,iq)-mon%rdm1(1,ip))*EigY0(pq,1)
 ! enddo
-
 write(lout,'(/,1x,a,i3)')"1TRDM z X i Y z procedury sapt_ERPA_TRDMs dla monomeru", Mon%Monomer
 do i=1,10
    write(lout,'(*(f12.6))') (TRDM1(i,j),j=1,10)
@@ -2231,21 +2232,23 @@ enddo
 !    enddo
 ! enddo   
 
-
-! print*,"2TRDM"
-! do ip=1,10
-!    do iq = 1,10
-!       do ir = 1,10
-!          do is =1,10
-!             if(abs(montrdm24(exc,ip,iq,ir,is))>1d-2) then
-!                print*,ip,iq,ir,is,montrdm24(exc,ip,iq,ir,is)
-!             endif
-!          enddo
-!       enddo
-!    enddo
-! enddo
-! print*,"2TRDM norm", norm2(montrdm24(exc,:,:,:,:))
-
+write(lout, '(/,"2-TRDM (ERPA) for monomer ",A2," norm2 = ",F12.6)') prefix,norm2(montrdm24)
+print*, 'DOUBLE CHECK IF IT IS CORRECT (diagonal elements)'
+do is=1,dimO
+   do ir=1,dimO
+      do iq=1,dimO
+         do ip=1,dimO
+            if(abs(montrdm24(ip,iq,ir,is))>1d-3) then
+               write(6,'(4i3,f12.8)')ip,iq,ir,is,montrdm24(ip,iq,ir,is)
+            endif
+         enddo
+      enddo
+   enddo
+enddo
+!print*, 'Diagonal '
+!do ip=1,dimO
+!   write(6,'(i3,f12.8)')ip,montrdm24(ip,ip,ip,ip)
+!enddo
 
 TRDM1TEST=0d0
 do ip=1,NBasis
@@ -2260,8 +2263,7 @@ TRDM1TEST(:,:)=TRDM1TEST(:,:)/(mon%ZNucl-1)
 ! KONIEC ZMIANY
 !TRDM1TEST(:,:)=TRDM1TEST(:,:)/(2*mon%NELE-1)
 !ZMIENIONY KOD
-print *,"2*mon%NELE"
-print *,2*mon%NELE
+print *,"2*mon%NELE = ", 2*mon%NELE
 write(lout, '(/,"1-TRDM from 2-TRDM for monomer ",A2," norm2 = ",F12.6)') prefix,norm2(TRDM1TEST)
 do i=1,10
    write(lout,'(*(f12.6))') (TRDM1TEST(i,j),j=1,10)
@@ -2286,20 +2288,16 @@ enddo
 TRDM1CASnorm=sqrt(TRDM1CASnorm)
 TRDM1norm=sqrt(TRDM1norm)
 SumTrdmTrdm=SumTrdmTrdm/(TRDM1CASnorm*TRDM1norm)
-print*,"Nakładanie 1 TRDM CAS i 1TRDM z 2TRDM"
-write(lout,'(*(f12.6))') (SumTrdmTrdm)
+write(lout,'(/1x,"Overlap of 1-TRDM CAS and 1-TRDM from ERPA:",F12.6)') SumTrdmTrdm
+write(lout,'(1x,"Relative error of 1-TRDM from ERPA:", 9x, F12.6)') norm2(Trdm1CAS-TRDM1TEST)/norm2(TRDM1CAS)
 
 if(sign(1d0,SumTrdmTrdm) .NE. sign(1d0,1d0)) then
-   print *,"CHANGING SIGN OF 2TRDM"
+   write(lout, '(/1x,"WARNING! Changing sign of 2TRDM for monomer =", A2)') prefix
    montrdm24(:,:,:,:)= -1d0*montrdm24(:,:,:,:)
    TRDM1TEST(:,:) = -1d0*TRDM1TEST(:,:)
 endif  
 
-print*,'Blad wzgledny'
-write(lout,'(*(f12.6))') (norm2(Trdm1CAS-TRDM1TEST)/norm2(TRDM1CAS))
-
-print*,"Norma 2TRDM"
-print*,norm2(montrdm24(:,:,:,:))
+write(lout, '(/1x,"Norm of 2-TRDM",F12.6)') norm2(montrdm24(:,:,:,:))
 
 block
 
@@ -2422,6 +2420,9 @@ end block
 
 mon%trdm24(:,:,:,:)=montrdm24(:,:,:,:)
 
+print*, 'sapt_ERPA: M-5211 =', mon%trdm24(5,2,1,1)
+print*, 'sapt_ERPA: M-1251 =', mon%trdm24(1,2,5,1)
+
 !! mh : what is the dimension of 2-TRDM?
 !block
 !integer :: k,l
@@ -2461,15 +2462,7 @@ mon%trdm24(:,:,:,:)=montrdm24(:,:,:,:)
 ! endblock
 !! end 16.06.2023
 
-
-
-
-
 end subroutine sapt_ERPA_TRDMs
-
-
-
-
 
 subroutine init_pino(NBas,Mon,ICASSCF)
 implicit none

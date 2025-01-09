@@ -649,6 +649,13 @@ character(:), allocatable :: first, last
           SystemParams%Cholesky2rdm = .false.
        endif
 
+ case ("TRDMTYPE") ! dSRS : use 2-TRDMs from ERPA eigenvecs
+      if (uppercase(val) == "ERPA") then
+         SystemParams%TRDMType = TRDM_TYPE_ERPA
+      elseif (uppercase(val) == "CAS") then
+         SystemParams%TRDMType = TRDM_TYPE_CAS
+      endif
+
  end select
 end subroutine read_block_system
 

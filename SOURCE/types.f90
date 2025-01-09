@@ -55,6 +55,9 @@ integer, parameter :: RDM_TYPE_DMRG = 4
 integer, parameter :: RDM_TYPE_HF   = 5
 integer, parameter :: RDM_TYPE_CI   = 6
 
+integer, parameter :: TRDM_TYPE_CAS  = 1
+integer, parameter :: TRDM_TYPE_ERPA = 2
+
 integer, parameter :: TWOMO_INCORE = 1
 integer, parameter :: TWOMO_FFFF   = 2
 integer, parameter :: TWOMO_FOFO   = 3
@@ -197,6 +200,9 @@ type SystemBlock
       logical :: Cholesky2RDM = .true.
       logical :: switchAB= .false.
 
+      ! for dSRS
+      integer :: TRDMType = TRDM_TYPE_CAS
+
       ! for cubic SAPT
       double precision :: ACAlpha0  = 1.d-10
       double precision :: ACAlpha1  = 0.01d0
@@ -241,6 +247,7 @@ type SystemBlock
       double precision,allocatable :: VCoul(:)
       double precision,allocatable :: RDM2(:),RDM201(:)
       double precision,allocatable :: RDM2val(:,:,:,:)
+      ! dSRS
       ! rdm1 and trdm1 in NOs: rdm1(nstates,NBasis),
       !                        trdm1(nstates,NBasis,NBasis)
       ! rdm2 in NOs: rdm2(nstates,NBasis**4)

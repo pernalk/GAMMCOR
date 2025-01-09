@@ -532,8 +532,10 @@ elseif(Flags%ISAPT.Eq.1) then
       monA%Wexcit   = Input%SystemInput(1)%Wexcit
       monA%Cholesky2RDM = Input%SystemInput(1)%Cholesky2RDM
 
+      ! dSRS
       monA%IREF1    = Input%SystemInput(1)%IREF1
       monA%IREF2    = Input%SystemInput(1)%IREF2
+      monA%TRDMType = Input%SystemInput(1)%TRDMType
 
       monA%NCen    = Input%SystemInput(1)%NCen
       monA%UCen    = Input%SystemInput(1)%UCen
@@ -584,8 +586,10 @@ elseif(Flags%ISAPT.Eq.1) then
       monB%Wexcit    = Input%SystemInput(2)%Wexcit
       monB%Cholesky2RDM = Input%SystemInput(2)%Cholesky2RDM
 
+      ! dSRS
       monB%IREF1    = Input%SystemInput(2)%IREF1
       monB%IREF2    = Input%SystemInput(2)%IREF2
+      monB%TRDMType = Input%SystemInput(2)%TRDMType
       
       monB%NCen = Input%SystemInput(2)%NCen
       monB%UCen = Input%SystemInput(2)%UCen
@@ -642,8 +646,10 @@ elseif(Flags%ISAPT.Eq.1) then
       monA%Monomer = Input%SystemInput(2)%Monomer
       monA%IPrint  = Input%CalcParams%IPrint
 
+      ! dSRS
       monA%IREF1    = Input%SystemInput(2)%IREF1
       monA%IREF2    = Input%SystemInput(2)%IREF2
+      monA%TRDMType = Input%SystemInput(2)%TRDMType
 
       monA%XELE = (monA%ZNucl - monA%Charge)/2.0d0
       monA%NELE = (monA%ZNucl - monA%Charge)/2
@@ -689,8 +695,10 @@ elseif(Flags%ISAPT.Eq.1) then
       monB%Monomer  = Input%SystemInput(1)%Monomer
       monB%IPrint   = Input%CalcParams%IPrint
 
+      ! dSRS
       monB%IREF1    = Input%SystemInput(1)%IREF1
       monB%IREF2    = Input%SystemInput(1)%IREF2
+      monB%TRDMType = Input%SystemInput(1)%TRDMType
       
       monB%XELE = (monB%ZNucl - monB%Charge)/2.0d0
       monB%NELE = (monB%ZNucl - monB%Charge)/2

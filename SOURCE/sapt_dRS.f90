@@ -178,9 +178,6 @@ endif
 !call tran2MO(A%trdm(iref,:,:),CMONO(RefState,:,:),CMONO(RefState,:,:), &
 !                        Atrdm(iref,:,:),NBasis)
 
-
-
-
 open(newunit=iunit,file='OOOOAABB',status='old',access='direct',&
      form='unformatted',recl=8*dimOA**2)
 elab2 = 0
@@ -1074,34 +1071,34 @@ write(LOUT,'(1x,a,f16.8)') '<AB*|VP|A*B>     = ',VP*1000d0
 write(LOUT,'(1x,a,f16.8)') '<A*B|VP|AB*>     = ',VP2*1000d0
 
 if (SAPT%IPrint > 10) then
-   write(lout,'(1x,a)') 'Print all <VP> ingregients:'
-   print*, 'SAPT%exchs21', SAPT%exchs21
-   print*, 'SAPT%elst1  ', SAPT%elst1
-   print*, 'P1', P1
-   print*, 'SAPT%elst1-SAPT%Vnn', SAPT%elst1-SAPT%Vnn
-   print*, 'tvk(1)', tvk(1)
-   print*, 'tvk(2)', tvk(2)
-   print*, 'tvktest(1)', tvktest(1)
-   print*, 'tvktest(2)', tvktest(2)
-   print*, 'tvk(3)', tvk(3)
-   print*, 'tvk2(1)',tvk2(1)
-   print*, 'tvk2(2)',tvk2(2)
-   print*, 'tvk2(3)',tvk2(3)
-   print*, 'sum tvk', sum(tvk)
-   print*, 'tNa(1)',TNa(1)
-   print*, 'tNa(2)',TNa(2)
-   print*, 'tNa2(1)',TNa2(1)
-   print*, 'tNa2(2)',tNa2(2)
-   print*, 'tNb(1)',tNb(1)
-   print*, 'tNb(2)',tNb(2)
-   print*, 'tNb2(1)',TNb2(1)
-   print*, 'tNb2(2)',TNb2(2)
-   print*, 'TNaNb ',TNaNb
-   print*, 'TNaNb2',TNaNb2
-   print*, 'exchange elst dSRS 1 = ', exch1tot1*1000
-   print*, 'exchange elst dSRS 2 = ', exch1tot2*1000
-   print*, 'elst dSRS 1 = ', SAPT%elst1*1000
-   print*, 'elst dSRS 2 = ', SAPT%elst2*1000
+   write(lout,'(/1x,a)') 'Print all <VP> ingregients:'
+   write(lout,'(1x,a,f16.10)') 'SAPT%exchs21', SAPT%exchs21
+   write(lout,'(1x,a,f16.10)') 'SAPT%elst1  ', SAPT%elst1
+   write(lout,'(1x,a,f16.10)') 'P1', P1
+   write(lout,'(1x,a,f16.10)') 'SAPT%elst1-SAPT%Vnn', SAPT%elst1-SAPT%Vnn
+   write(lout,'(1x,a,f16.10)') 'tvk(1)', tvk(1)
+   write(lout,'(1x,a,f16.10)') 'tvk(2)', tvk(2)
+   write(lout,'(1x,a,f16.10)') 'tvktest(1)', tvktest(1)
+   write(lout,'(1x,a,f16.10)') 'tvktest(2)', tvktest(2)
+   write(lout,'(1x,a,f16.10)') 'tvk(3) ', tvk(3)
+   write(lout,'(1x,a,f16.10)') 'tvk2(1)',tvk2(1)
+   write(lout,'(1x,a,f16.10)') 'tvk2(2)',tvk2(2)
+   write(lout,'(1x,a,f16.10)') 'tvk2(3)',tvk2(3)
+   write(lout,'(1x,a,f16.10)') 'sum tvk', sum(tvk)
+   write(lout,'(1x,a,f16.10)') 'tNa(1) ',TNa(1)
+   write(lout,'(1x,a,f16.10)') 'tNa(2) ',TNa(2)
+   write(lout,'(1x,a,f16.10)') 'tNa2(1)',TNa2(1)
+   write(lout,'(1x,a,f16.10)') 'tNa2(2)',tNa2(2)
+   write(lout,'(1x,a,f16.10)') 'tNb(1) ',tNb(1)
+   write(lout,'(1x,a,f16.10)') 'tNb(2) ',tNb(2)
+   write(lout,'(1x,a,f16.10)') 'tNb2(1)',TNb2(1)
+   write(lout,'(1x,a,f16.10)') 'tNb2(2)',TNb2(2)
+   write(lout,'(1x,a,f16.10)') 'TNaNb  ',TNaNb
+   write(lout,'(1x,a,f16.10)') 'TNaNb2 ',TNaNb2
+   write(lout,'(1x,a,f16.10)') 'elst dSRS 1 = ', SAPT%elst1*1000
+   write(lout,'(1x,a,f16.10)') 'elst dSRS 2 = ', SAPT%elst2*1000
+   write(lout,'(1x,a,f16.10)') 'exchange elst dSRS 1 = ', exch1tot1*1000
+   write(lout,'(1x,a,f16.10)') 'exchange elst dSRS 2 = ', exch1tot2*1000
 endif
 
 write(lout,'(/1x,a)') 'Now we calculate matrix elements of V in Psi basis:'

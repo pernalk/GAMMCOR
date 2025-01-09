@@ -1644,13 +1644,15 @@ enddo
 ! transformation to NO of the reference state
 ! is done in ...
 allocate(Mon%trdm1(nnstates,NBasis,NBasis))
-if(Mon%Monomer==1) then
- filenames(1) = 'A_1trdm_2_1.txt'
- filenames(2) = 'A_1trdm_3_1.txt'
-elseif(Mon%Monomer==2) then
- filenames(1) = 'B_1trdm_2_1.txt'
- filenames(2) = 'B_1trdm_3_1.txt'
-endif
+
+! for txt interface
+!if(Mon%Monomer==1) then
+! filenames(1) = 'A_1trdm_2_1.txt'
+! filenames(2) = 'A_1trdm_3_1.txt'
+!elseif(Mon%Monomer==2) then
+! filenames(1) = 'B_1trdm_2_1.txt'
+! filenames(2) = 'B_1trdm_3_1.txt'
+!endif
 
 work = 0d0
 itr  = 0
@@ -1766,12 +1768,15 @@ double precision,allocatable :: RDM2Act(:),work(:,:)
 character(:),allocatable     :: rdmfile
 double precision,external :: FRDM2
 integer :: iref,iexcited
+character(len=1) :: prefix
 !double precision,allocatable :: Montrdm(:,:)
 ! is Montrdm ever used? 2-trdm in noncum approxim?
 
 if(mon%Monomer==1) then
+  prefix  = "A"
   rdmfile='2RDMA'
 elseif(mon%Monomer==2) then
+  prefix  = "B"
   rdmfile='2RDMB'
 endif
 
@@ -1831,10 +1836,15 @@ do ist=1,nstates
    end block
 
 #if SAPT_INTERFACE_DEBUG > 5
-   call get_1rdm_from_2rdm(Mon%rdm24(ist,:,:,:,:),mon%rdm1(ist,:),NOccup,Mon%XELE,1,1)
+   call get_1rdm_from_2rdm(Mon%rdm24(ist,:,:,:,:),mon%rdm1(ist,:),NOccup,Mon%INAct,Mon%XELE,1,1)
 #endif
 
 enddo
+
+if (Mon%TRDMType==1) then
+   Mon%TRDMType==2
+   print*, 'WARNING! With Molpro only 2-TRDMs from ERPA available!'
+endif
 
 !!Make 2 trdm in noncumulant approximation
 !allocate(Montrdm(NBasis,NBasis))
@@ -1903,11 +1913,12 @@ double precision,allocatable :: val_buf(:)
 double precision :: xtrace,val
 double precision, allocatable :: Occ(:),work(:,:)
 double precision, allocatable :: rdm24act(:,:,:,:)
+double precision,allocatable :: mat(:,:,:,:), DTNO(:,:)
 
 ! temp txt interface
 character(len=20), dimension(:), allocatable :: filenames
+character(len=1) :: prefix
 
-print*, 'Monomer =', Mon%Monomer
 
 f = trexio_open (Mon%TrexFile, 'r', TREXIO_HDF5, rc)
 rc = trexio_has_mo_coefficient(f)
@@ -1930,9 +1941,11 @@ allocate(rdm24act(Mon%NAct,Mon%NAct,Mon%NAct,Mon%NAct))
 allocate(Occ(NOccup),work(NOccup,Noccup))
 
 if(Mon%Monomer==1) then
+ prefix  = "A"
  filenames(1) = 'A_2trdm_1_1.txt'
  filenames(2) = 'A_2trdm_2_2.txt'
 elseif(Mon%Monomer==2) then
+ prefix  = "B"
  filenames(1) = 'B_2trdm_1_1.txt'
  filenames(2) = 'B_2trdm_2_2.txt'
 endif
@@ -1983,7 +1996,7 @@ do ist=1,nstates
   print*, 'read_2rdm_2trdm =', ist,norm2(mon%rdm24(ist,:,:,:,:))
 !
 #if SAPT_INTERFACE_DEBUG > 5
-   call get_1rdm_from_2rdm(Mon%rdm24(ist,:,:,:,:),mon%rdm1(ist,:),NOccup,Mon%XELE,1,1)
+   call get_1rdm_from_2rdm(Mon%rdm24(ist,:,:,:,:),mon%rdm1(ist,:),NOccup,Mon%INAct,Mon%XELE,1,1)
 #endif
 
 enddo ! istate
@@ -1991,6 +2004,9 @@ enddo ! istate
 print*, 'Warning! Saving 2-RDM for IRef1 = ', Mon%IRef1
 allocate(Mon%RDM2val(NOccup,NOccup,NOccup,NOccup))
 Mon%RDM2val(:,:,:,:) = mon%rdm24(mon%IRef1,:,:,:,:)
+
+! return if TRDMTYPE = ERPA (2)
+if (Mon%TRDMType==2) return
 
 ! read active 1trdm
 if(Mon%Monomer==1) then
@@ -2063,19 +2079,14 @@ print*, 'NO 8121',0.5d0*rdm24act(8,1,2,1)
 print*, 'NO 4111',0.5d0*rdm24act(4,1,1,1)
 
 ! scale and reorder 2-trdm act
-block
-integer :: NACT
-double precision,allocatable :: mat(:,:,:,:)
-
-NACT=Mon%NACT
-allocate(mat(NACT,NACT,NACT,NACT))
+allocate(mat(Mon%NAct,Mon%NACT,Mon%NAct,Mon%NAct))
 mat = rdm24act
 rdm24act = 0d0
 do l=1,Mon%NAct
    do k=1,Mon%NAct
       do j=1,Mon%NAct
          do i=1,Mon%NAct
-            rdm24act(i,k,j,l) = 0.5d0*mat(k,j,i,l)
+            rdm24act(k,i,l,j) = 0.5d0*mat(i,j,k,l)
          enddo
       enddo
    enddo
@@ -2090,7 +2101,6 @@ do k=1,Mon%NAct
    enddo
 enddo
 print*, 'xtrace =',xtrace
-end block
 
 ! Dominik's convention : how come no normalization factor????
 !do ip=1,NBasis
@@ -2101,22 +2111,120 @@ end block
 !   enddo
 !enddo
 
-call get_1rdm_from_2rdm(rdm24act,mon%rdm1(ist,:),Mon%NAct,Mon%XELE,1,2)
+call get_1rdm_from_2rdm(rdm24act,mon%rdm1(ist,:),Mon%NAct,Mon%INAct,Mon%XELE,1,2)
 
-! transform 1-TRDM to NO and compare
-!work=0d0
-!call tran2MO(Mon%trdm1(1,:,:),Mon%CMONO(Mon%IRef1,1:NOccup,1:NOccup),Mon%CMONO(Mon%IRef1,1:NOccup,1:NOccup), &
-!           work(1:NOccup,1:NOccup),NOccup)
-!print*, 'Real DT in NO '
-!do i=1,NOccup
-!   write(6,'(*(f13.8))') (work(i,j),j=1,NOccup)
+!write(lout, '(/,"2-TRDM act CAS for monomer ",A2," norm2 = ",F12.6)') prefix,norm2(rdm24act)
+!do l=1,Mon%NAct
+!   do k=1,Mon%NAct
+!      do j=1,Mon%NAct
+!         do i=1,Mon%NAct
+!            if(abs(rdm24act(i,j,k,l))>1d-3) then
+!               write(6,'(4i3,f12.8)')i,j,k,l, rdm24act(i,j,k,l)
+!            endif
+!         enddo
+!      enddo
+!   enddo
 !enddo
+
+!
+allocate(mat(NOccup,NOccup,NOccup,NOccup))
+! prepare 1-TRDM in NO
+!allocate(DTNO(NOccup,NOccup))
+!call tran2MO(mon%trdm1(1,:,:),mon%CMONO(Mon%IRef1,1:NOccup,1:NOccup),mon%CMONO(Mon%IRef1,1:NOccup,1:NOccup),DTNO(:,:),NOccup)
+allocate(DTNO(NBasis,NBasis))
+call tran2MO(mon%trdm1(1,:,:),mon%CMONO(Mon%IRef1,:,:),mon%CMONO(Mon%IRef1,:,:),DTNO(:,:),NBasis)
+print*, 'DT form CAS = ', prefix
+do i=1,NOccup
+   write(6,'(*(f13.8))') (DTNO(i,j),j=1,NOccup)
+enddo
+
+mat = 0d0
+! active part
+!write(lout, '(/,"2-TRDM act CAS for monomer ",A2," norm2 = ",F12.6)') prefix,norm2(rdm24act)
+do l=1,Mon%NAct
+   do k=1,Mon%NAct
+      do j=1,Mon%NAct
+         do i=1,Mon%NAct
+            mat(Mon%INAct+i,mon%INAct+j,mon%INAct+k,mon%INAct+l) = rdm24act(i,j,k,l)
+            !mat(Mon%INAct+i,mon%INAct+j,mon%INAct+k,mon%INAct+l) = rdm24act(i,j,k,l)
+            !if(abs(rdm24act(i,j,k,l))>1d-3) then
+            !   write(6,'(4i3,f12.8)') Mon%INAct+i,mon%INAct+j,mon%INAct+k,mon%INAct+l, rdm24act(i,j,k,l)
+            !endif
+         enddo
+      enddo
+   enddo
+enddo
+
+! inactive part
+!
+! Gamma0n(p,q,r,s) for all indices inact = 0
+! Gamma0n(p,q,r,s) for r and s inact = 2 * delta_rs gamma0n(p,q)
+! Gamma0n(p,q,r,s) for p and s inact = - delta_ps gamma0n(q,r)
+!
+do k=1,Mon%INAct
+   do j=1,Mon%NAct
+      do i=1,Mon%NAct
+         mat(Mon%INAct+i,Mon%INAct+j,k,k) = 2d0*DTNO(Mon%INact+i,Mon%INAct+j)
+         mat(k,k,Mon%INAct+i,Mon%INAct+j) = mat(Mon%INAct+i,Mon%INAct+j,k,k)
+      enddo
+   enddo
+enddo
+do k=1,Mon%INAct
+   do j=1,Mon%NAct
+      do i=1,Mon%NAct
+         mat(k,Mon%INAct+i,Mon%INAct+j,k) = -DTNO(Mon%INact+j,Mon%INAct+i) ! why i <--> j ????
+         mat(Mon%INAct+j,k,k,Mon%INAct+i) = mat(k,Mon%INAct+i,Mon%INAct+j,k)
+      enddo
+   enddo
+enddo
+deallocate(DTNO)
+
+!print*, 'Zero diagonal 2-TRDM part...'
+!allocate(mon%trdm24(NOccup,NOccup,NOccup,NOccup))
+!mon%trdm24 = 0d0
+!do l=1,NOccup
+!   do k=1,NOccup
+!      do j=1,NOccup
+!         do i=1,NOccup
+!            if ((k==l).and.(i==j)) cycle
+!            if ((i==l).and.(k==j)) cycle
+!            if ((j==l).and.(i==k)) cycle
+!!            print*, i, j, k, l
+!            mon%trdm24(i,j,k,l) = mat(i,j,k,l)
+!         enddo
+!      enddo
+!   enddo
+!enddo
+!mat = 0d0
+!mat = mon%trdm24
+!deallocate(mon%trdm24)
+
+write(lout, '(/,"2-TRDM CAS for monomer ",A2," norm2 = ",F12.6)') prefix,norm2(mat)
+do l=1,NOccup
+   do k=1,NOccup
+      do j=1,NOccup
+         do i=1,NOccup
+            if(abs(mat(i,j,k,l))>1d-3) then
+               write(6,'(4i3,f12.8)')i,j,k,l, mat(i,j,k,l)
+            endif
+         enddo
+      enddo
+   enddo
+enddo
+
+allocate(mon%trdm24(NBasis,NBasis,NBasis,NBasis))
+mon%trdm24 = 0d0
+mon%trdm24(1:NOccup,1:NOccup,1:NOccup,1:NOccup) = mat(1:NOccup,1:NOccup,1:NOccup,1:NOccup)
+deallocate(mat)
 
 rc = trexio_close(f)
 
 end subroutine read_2rdm_2trdm_trexio
 
-subroutine get_1rdm_from_2rdm(P,Occ,NACT,XELE,order,dtype)
+subroutine get_1rdm_from_2rdm(P,Occ,NACT,INACT,XELE,order,dtype)
+!
+! NACT  - no of active   orbitals
+! INACT - no of inactive orbitals
 !
 ! get 1rdm from 2rdm by using the sum rule:
 ! order = 0 :
@@ -2124,11 +2232,12 @@ subroutine get_1rdm_from_2rdm(P,Occ,NACT,XELE,order,dtype)
 ! order = 1 :
 !       D(p,q) = fac* sum_r P(p,q,r,r)
 !
-!       fac = 1 / (NELE-1) 
+!       fac = 1 / (NELE-1)
+!       fac = 1 / (NACTEL-1) , for active 1-TRDM
 !
 implicit none
 
-integer,intent(in) :: NACT
+integer,intent(in) :: NACT,INACT
 integer,intent(in) :: order,dtype
 double precision,intent(in) :: XELE
 double precision,intent(in) :: Occ(NACT)
@@ -2136,7 +2245,10 @@ double precision,intent(in) :: P(NACT,NACT,NACT,NACT)
 
 integer :: i,j,k
 double precision :: fac,val
+double precision :: NACTEL
 double precision   :: DfromP(NACT,NACT)
+
+NACTEL = 2*XELE-2*INACT
 
 DfromP = 0d0
 select case (order)
@@ -2168,9 +2280,12 @@ if (dtype==1) then
 endif
 
 if (dtype==1) fac = 1d0/(2d0*XELE-1d0)
-if (dtype==2) fac = 1d0/(NACT-1d0)
+if (dtype==2) fac = 1d0/(NACTEL-1d0)
 
-if (dtype==1) print*, 'D from P with norm fac =', fac
+print*, 'nactel-1 =', NACTEL-1
+print*, '2*xele-1 =', 2*XELE-1
+
+if (dtype==1) print*, 'D from P with norm fac =',   fac
 if (dtype==2) print*, 'DT from PT with norm fac =', fac
 do i=1,NACT
    write(6,'(*(f13.8))') (fac*DfromP(i,j),j=1,NACT)
