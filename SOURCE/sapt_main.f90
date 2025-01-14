@@ -562,10 +562,10 @@ double precision :: MO(NAO*NBasis)
     enddo
  enddo
 
- print*, 'sapt_response: CAONO', Mon%Monomer,norm2(Mon%CMO)
- do i=1,NAO
-    write(6,'(*(f13.8))') (Mon%CMO(i,j),j=1,NBasis)
- enddo
+ !print*, 'sapt_response: CAONO', Mon%Monomer,norm2(Mon%CMO)
+ !do i=1,NAO
+ !   write(6,'(*(f13.8))') (Mon%CMO(i,j),j=1,NBasis)
+ !enddo
 
 ! SAPT(CI)
  if(Flags%ICI==1) then

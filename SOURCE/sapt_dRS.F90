@@ -1,3 +1,5 @@
+#define SAPT_DSRS_DEBUG 11
+
 module sapt_dRS
 use types
 use tran
@@ -59,6 +61,8 @@ irefB  =  B%IREF1
 iref2B  = B%IREF2
 iexcited = ((iref2-2)*(iref2-1))/2+iref
 iexcited2 = ((iref2B-2)*(iref2B-1))/2+irefB
+!print*, 'iexcited  = ',iexcited
+!print*, 'iexcited2 = ',iexcited2
 
 NAO    = SAPT%NAO
 NBasis = A%NBasis
@@ -156,16 +160,16 @@ if(irefB .ne. iref2B) then
                         Atrdm(:,:),NBasis)
    call tran2MO(B%trdm1(iexcited2,:,:),B%CMONO(iref2B,:,:),B%CMONO(iref2B,:,:), &
                         Btrdm(:,:),NBasis)
-
+#if SAPT_DSRS_DEBUG > 10   
     print*, 'DTA in NO(iref) '
     do i=1,dimOA
        write(6,'(*(f13.8))') (Atrdm(i,j),j=1,dimOA)
     enddo
-    print*, ''
-    print*, 'Real DTB in NO(iref2B) '
+    print*, 'DTB in NO(iref2B) '
     do i=1,dimOB
        write(6,'(*(f13.8))') (Btrdm(i,j),j=1,dimOB)
     enddo
+#endif
 
 endif
 if(irefB .eq. iref2B) then
@@ -454,7 +458,7 @@ if(irefB .ne. iref2B) then
              Btrdm2(:,:),NBasis)
 endif
 
-print*, 'iexcited2',iexcited2
+#if SAPT_DSRS_DEBUG > 15
 print*, 'Btrdm2 MO',norm2(B%trdm1(iexcited2,:,:))
 do j=1,NBasis
    write(6,'(*(f12.6))') (B%trdm1(iexcited2,i,j),i=1,NBasis)
@@ -463,6 +467,7 @@ print*, 'Btrdm2 NO',norm2(Btrdm2)
 do j=1,NBasis
    write(6,'(*(f12.6))') (Btrdm2(i,j),i=1,NBasis)
 enddo
+#endif
 
 A1B2PA1B2 = 0d0
 do j=1,dimOB
@@ -1053,22 +1058,22 @@ deallocate(intA,intB,tmpAB)
 ! close(iunit)
 ! tvk(4) = -2d0*val!poprawione
 
-VP  = sum(tvk)+sum(TNa)+sum(TNb)+TNaNb+P1*SAPT%Vnn
-VP2 = sum(tvk2) + sum(TNa2) +sum(TNb2)+TNaNb2+P1*SAPT%Vnn
+VP  = sum(tvk)  + sum(TNa)  + sum(TNb)  + TNaNb  + P1*SAPT%Vnn
+VP2 = sum(tvk2) + sum(TNa2) + sum(TNb2) + TNaNb2 + P1*SAPT%Vnn
 exch1tot1 = SAPT%exchs21 - VP + P1*SAPT%elst1
 exch1tot2 = SAPT%exchs22 + VP - P1*SAPT%elst2
 
 A1B2PA2B1 = P1
-write(LOUT,'(/1x,a,f16.8)') '<AB*|V|AB*>      = ',SAPT%A1B2VA1B2*1000d0 
-write(LOUT,'(1x,a,f16.8)') '<A*B|V|A*B>      = ',SAPT%A2B1VA2B1*1000d0
-write(LOUT,'(1x,a,f16.8)') '<AB*|V|A*B>      = ',SAPT%A1B2VA2B1*1000d0 
-write(LOUT,'(1x,a,f16.8)') '<AB*|P|AB*>      = ', A1B2PA1B2*1000d0
-write(LOUT,'(1x,a,f16.8)') '<A*B|P|A*B>      = ', A2B1PA2B1*1000d0
-write(LOUT,'(1x,a,f16.8)') '<AB*|P|A*B>      = ', A1B2PA2B1*1000d0
-write(LOUT,'(1x,a,f16.8)') '<AB*|VP|AB*>     = ',SAPT%A1B2VPA1B2*1000d0
-write(LOUT,'(1x,a,f16.8)') '<A*B|VP|A*B>     = ',SAPT%A2B1VPA2B1*1000d0
-write(LOUT,'(1x,a,f16.8)') '<AB*|VP|A*B>     = ',VP*1000d0
-write(LOUT,'(1x,a,f16.8)') '<A*B|VP|AB*>     = ',VP2*1000d0
+write(LOUT,'(/1x,a,f16.8)') '<AB*|V|AB*>      = ',SAPT%A1B2VA1B2*1000d0
+write(LOUT,'(1x,a,f16.8)')  '<A*B|V|A*B>      = ',SAPT%A2B1VA2B1*1000d0
+write(LOUT,'(1x,a,f16.8)')  '<AB*|V|A*B>      = ',SAPT%A1B2VA2B1*1000d0
+write(LOUT,'(1x,a,f16.8)')  '<AB*|P|AB*>      = ', A1B2PA1B2*1000d0
+write(LOUT,'(1x,a,f16.8)')  '<A*B|P|A*B>      = ', A2B1PA2B1*1000d0
+write(LOUT,'(1x,a,f16.8)')  '<AB*|P|A*B>      = ', A1B2PA2B1*1000d0
+write(LOUT,'(1x,a,f16.8)')  '<AB*|VP|AB*>     = ',SAPT%A1B2VPA1B2*1000d0
+write(LOUT,'(1x,a,f16.8)')  '<A*B|VP|A*B>     = ',SAPT%A2B1VPA2B1*1000d0
+write(LOUT,'(1x,a,f16.8)')  '<AB*|VP|A*B>     = ',VP*1000d0
+write(LOUT,'(1x,a,f16.8)')  '<A*B|VP|AB*>     = ',VP2*1000d0
 
 if (SAPT%IPrint > 10) then
    write(lout,'(/1x,a)') 'Print all <VP> ingregients:'

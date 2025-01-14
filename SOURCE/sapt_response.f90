@@ -2289,7 +2289,7 @@ TRDM1CASnorm=sqrt(TRDM1CASnorm)
 TRDM1norm=sqrt(TRDM1norm)
 SumTrdmTrdm=SumTrdmTrdm/(TRDM1CASnorm*TRDM1norm)
 write(lout,'(/1x,"Overlap of 1-TRDM CAS and 1-TRDM from ERPA:",F12.6)') SumTrdmTrdm
-write(lout,'(1x,"Relative error of 1-TRDM from ERPA:", 9x, F12.6)') norm2(Trdm1CAS-TRDM1TEST)/norm2(TRDM1CAS)
+write(lout,'(1x,"Relative error of 1-TRDM from ERPA:", 8x, F12.6)') norm2(Trdm1CAS-TRDM1TEST)/norm2(TRDM1CAS)
 
 if(sign(1d0,SumTrdmTrdm) .NE. sign(1d0,1d0)) then
    write(lout, '(/1x,"WARNING! Changing sign of 2TRDM for monomer =", A2)') prefix
@@ -2416,12 +2416,7 @@ end block
 ! endif   
 ! KONIEC ZMIANY
 
-
-
 mon%trdm24(:,:,:,:)=montrdm24(:,:,:,:)
-
-print*, 'sapt_ERPA: M-5211 =', mon%trdm24(5,2,1,1)
-print*, 'sapt_ERPA: M-1251 =', mon%trdm24(1,2,5,1)
 
 !! mh : what is the dimension of 2-TRDM?
 !block
