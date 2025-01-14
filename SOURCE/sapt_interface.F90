@@ -258,8 +258,8 @@ double precision :: Tcpu,Twall
        call read_1rdm_1trdm_trexio(NAO,NBasis,SAPT%monA)
        call read_1rdm_1trdm_trexio(NAO,NBasis,SAPT%monB)
 
-       !call read_2rdm_2trdm_trexio_tmp(NAO,NBasis,SAPT%monA) ! test_txt_files
-       !call read_2rdm_2trdm_trexio_tmp(NAO,NBasis,SAPT%monB) ! test_txt_files
+       !call read_2rdm_2trdm_trexio_tmp(NAO,NBasis,SAPT%monA) ! test:txt_files
+       !call read_2rdm_2trdm_trexio_tmp(NAO,NBasis,SAPT%monB) ! test:txt_files
 
        call read_2rdm_2trdm_trexio(NAO,NBasis,SAPT%monA)
        call read_2rdm_2trdm_trexio(NAO,NBasis,SAPT%monB)
@@ -1923,15 +1923,11 @@ allocate(Mon%rdm24(nstates,NOccup,NOccup,NOccup,NOccup))
 allocate(rdm24act(Mon%NAct,Mon%NAct,Mon%NAct,Mon%NAct))
 allocate(Occ(NOccup),work(NOccup,Noccup))
 
-if(Mon%Monomer==1) then
- prefix  = "A"
- filenames(1) = 'A_2trdm_1_1.txt'
- filenames(2) = 'A_2trdm_2_2.txt'
-elseif(Mon%Monomer==2) then
- prefix  = "B"
- filenames(1) = 'B_2trdm_1_1.txt'
- filenames(2) = 'B_2trdm_2_2.txt'
-endif
+if(Mon%Monomer==1) prefix  = "A"
+if(Mon%Monomer==2) prefix  = "B"
+do i = 1, nstates
+   write(filenames(i), '(A,"_2trdm_",I0,"_",I0,".txt")') trim(prefix), i, i
+end do
 
 ! read all active 2-RDMs in SA-MOs
 do ist=1,nstates
@@ -2178,7 +2174,7 @@ do l=1,NOccup
    enddo
 enddo
 
-allocate(mon%trdm24(NBasis,NBasis,NBasis,NBasis))
+allocate(mon%trdm24(NOccup,NOccup,NOccup,NOccup))
 mon%trdm24 = 0d0
 mon%trdm24(1:NOccup,1:NOccup,1:NOccup,1:NOccup) = mat(1:NOccup,1:NOccup,1:NOccup,1:NOccup)
 deallocate(mat)
@@ -2408,6 +2404,9 @@ enddo ! istate
 !write(lout,'(/,1x,"Saving 2-RDM for monomer = ", I2)') Mon%IRef1
 allocate(Mon%RDM2val(NOccup,NOccup,NOccup,NOccup))
 Mon%RDM2val(:,:,:,:) = mon%rdm24(mon%IRef1,:,:,:,:)
+
+! return if TRDMType == ERPA
+if (Mon%TRDMType==2) return
 
 ! 2-TRDM part
 write(lout,'(/1x,"Reading <", I2, " |", I2, " > 2-TRDM" )') jst,ist
@@ -4463,7 +4462,7 @@ if (mon%Monomer==1) prefix = 'A'
 if (mon%Monomer==2) prefix = 'B'
 
 if (idSRS==1) then
-   write(lout, '(/1x,"Saving CAONO for Monomer",A3," State",I2)') prefix,Mon%IRef1
+   write(lout, '(1x,"Saving CAONO for Monomer",A3," State",I2)') prefix,Mon%IRef1
    Cout(1:NAO,1:NBasis) = Mon%CAONO(Mon%IRef1,1:NAO,1:NBasis)
 else
    Cout = 0

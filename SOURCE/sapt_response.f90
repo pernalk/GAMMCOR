@@ -2256,9 +2256,9 @@ enddo
 !enddo
 
 TRDM1TEST=0d0
-do ip=1,NBasis
-   do ir=1,NBasis
-      do iq=1,NBasis
+do ip=1,dimO
+   do ir=1,dimO
+      do iq=1,dimO
          TRDM1TEST(ip,ir)= TRDM1TEST(ip,ir)+montrdm24(ip,ir,iq,iq)
       enddo
    enddo
@@ -2283,11 +2283,11 @@ SumTrdmTrdm  = 0d0
 TRDM1CASnorm = 0d0
 TRDM1norm    = 0d0
 
-do i=1,NBasis
-   do j=1,NBasis
-      SumTrdmTrdm=SumTrdmTrdm+TRDM1CAS(i,j)*TRDM1TEST(i,j)
-      TRDM1CASnorm=TRDM1CASnorm+TRDM1CAS(i,j)*TRDM1CAS(i,j)
-      TRDM1norm=TRDM1norm+TRDM1TEST(i,j)*TRDM1TEST(i,j)
+do i=1,dimO
+   do j=1,dimO
+      SumTrdmTrdm  = SumTrdmTrdm+TRDM1CAS(i,j)*TRDM1TEST(i,j)
+      TRDM1CASnorm = TRDM1CASnorm+TRDM1CAS(i,j)*TRDM1CAS(i,j)
+      TRDM1norm    = TRDM1norm+TRDM1TEST(i,j)*TRDM1TEST(i,j)
    enddo
 enddo   
 TRDM1CASnorm=sqrt(TRDM1CASnorm)
@@ -2298,9 +2298,9 @@ write(lout,'(1x,"Relative error of 1-TRDM from ERPA:", 8x, F12.6)') norm2(Trdm1C
 
 if(sign(1d0,SumTrdmTrdm) .NE. sign(1d0,1d0)) then
    write(lout, '(/1x,"WARNING! Changing sign of 2TRDM for monomer =", A2)') prefix
-   montrdm24(:,:,:,:)= -1d0*montrdm24(:,:,:,:)
-   TRDM1TEST(:,:) = -1d0*TRDM1TEST(:,:)
-endif  
+   montrdm24 = -1d0*montrdm24
+   TRDM1TEST = -1d0*TRDM1TEST
+endif
 
 write(lout, '(/1x,"Norm of 2-TRDM",F12.6)') norm2(montrdm24(:,:,:,:))
 
