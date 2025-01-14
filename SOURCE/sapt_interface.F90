@@ -2438,7 +2438,8 @@ write(lout,'(1x,"2-TRMD <", I2, " |", I2, " >  has trace ", F12.6, "and norm ", 
 allocate(DTNO(NBasis,NBasis))
 call tran2MO(mon%trdm1(1,:,:),mon%CMONO(ist,:,:),mon%CMONO(ist,:,:),DTNO,NBasis)
 
-allocate(mon%trdm24(NBasis,NBasis,NBasis,NBasis))
+allocate(mon%trdm24(NOCCUP,NOCCUP,NOCCUP,NOCCUP))
+!allocate(mon%trdm24(NBasis,NBasis,NBasis,NBasis))
 mon%trdm24 = 0d0
 !write(lout, '(/,"2-TRDM  <", I2, " |", I2, " > act CAS for monomer ",A2," norm2 = ",F12.6)') jst,ist,prefix
 ! write active part 

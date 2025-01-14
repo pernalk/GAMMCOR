@@ -432,8 +432,8 @@ if(irefB .eq. iref2B) then
    Btrdm2(:,:) = Btrdm(:,:)
 endif
 
-allocate(trdm2A(NBasis,NBasis,NBasis,NBasis))
-allocate(trdm2B(NBasis,NBasis,NBasis,NBasis))
+allocate(trdm2A(dimOA,dimOA,dimOA,dimOA))
+allocate(trdm2B(dimOB,dimOB,dimOB,dimOB))
 ! trdm2A(:,:,:,:)=A%trdm24(iref2,:,:,:,:)! TO TYLKO DO TESTÓW TRZEBA ZMIENIĆ PÓŹNIEJ
 ! trdm2B(:,:,:,:)=B%trdm24(iref2B,:,:,:,:)
 

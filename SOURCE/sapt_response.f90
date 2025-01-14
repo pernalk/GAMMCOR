@@ -1828,7 +1828,7 @@ character(len=1) :: prefix
 
 ! CHANGE IN THE FUTURE
 CICoef = mon%CICoef
-allocate(mon%trdm24(NBasis,NBasis,NBasis,NBasis))
+!allocate(mon%trdm24(NBasis,NBasis,NBasis,NBasis))
 
 if(Mon%Monomer == 1) then
    prefix  = "A"
@@ -1840,7 +1840,10 @@ endif
 
 write(lout, '(/,1x,"Construct 2-TRDM from ERPA for monomer ", A2)') prefix
 
-dimO  = mon%num0+mon%num1
+dimO = mon%num0+mon%num1
+
+allocate(mon%trdm24(dimO,dimO,dimO,dimO))
+
 call read_SBlock(SBlock,SBlockIV,nblk,xy0file)
 !
 ! First, we want to make XCas a YCas vectors
@@ -2109,9 +2112,10 @@ deallocate(Eig,EigY,EigX,iaddr)
 
 allocate(RDM2(dimO,dimO,dimO,dimO))
 RDM2(:,:,:,:) = mon%rdm24(1,:,:,:,:)
-allocate(montrdm24(NBasis,NBasis,NBasis,NBasis))
+allocate(montrdm24(dimO,dimO,dimO,dimO))
+!allocate(montrdm24(NBasis,NBasis,NBasis,NBasis))
 !allocate(mon%trdm24(4,NBasis,NBasis,NBasis,NBasis))
-montrdm24(:,:,:,:)=0d0
+montrdm24 = 0d0
 ! exc = NU !!! tak trzeba będzie tu wrocic
 TRDM1 = 0d0
 allocate(EigY0(mon%NDimX,mon%NDimX),EigX0(mon%NDimX,mon%NDimX))
@@ -2177,6 +2181,7 @@ write(lout,'(*(f12.6))') (mon%rdm1(1,i),i=1,dimO)
    !        EigX0(ipos,B%l1:B%l2) = B%matX(i,1:B%n)
          ip = mon%IndN(1,ipos)
          iq = mon%IndN(2,ipos)
+         if ( ip > dimO ) stop "dimO exceeded in sapt_ERPA_2TRDM!"
          !print *,ip,iq
                TRDM1(ip,iq)=TRDM1(ip,iq)-(mon%rdm1(1,ip)-mon%rdm1(1,iq))*B%matX(i,NU)!EigX0(pq,1)
                TRDM1(iq,ip)=TRDM1(iq,ip)-(mon%rdm1(1,iq)-mon%rdm1(1,ip))*B%matY(i,NU)
@@ -2233,7 +2238,7 @@ enddo
 ! enddo   
 
 write(lout, '(/,"2-TRDM (ERPA) for monomer ",A2," norm2 = ",F12.6)') prefix,norm2(montrdm24)
-print*, 'DOUBLE CHECK IF IT IS CORRECT (diagonal elements)'
+!print*, 'DOUBLE CHECK IF IT IS CORRECT (diagonal elements)'
 do is=1,dimO
    do ir=1,dimO
       do iq=1,dimO
@@ -2416,7 +2421,7 @@ end block
 ! endif   
 ! KONIEC ZMIANY
 
-mon%trdm24(:,:,:,:)=montrdm24(:,:,:,:)
+mon%trdm24 = montrdm24
 
 !! mh : what is the dimension of 2-TRDM?
 !block
