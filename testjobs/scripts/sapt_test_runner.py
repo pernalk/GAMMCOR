@@ -1,6 +1,7 @@
 import os
 import numpy as np
 import subprocess
+import re
 from numpy.testing import assert_allclose
 from numpy.testing import assert_approx_equal
 from scripts.colors import *
@@ -32,8 +33,12 @@ EXI0_TAG = "E2exch-ind(unc)"
 INT0_TAG = "Eint(SAPT0)"
 
 ## dSRS ENERGY TAGS
-dELST_TAG = "elst dSRS"
-dE1EX_TAG = "exchange elst dSRS"
+dELST_TAG = "Electrostatic energy from matrix element"
+dE1EX_TAG = "Exch energy from matrix element"
+dELSTS1_TAG = "Elst State 1"
+dELSTS2_TAG = "Elst State 2"
+dE1EXS1_TAG = "Exch State 1"
+dE1EXS2_TAG = "Exch State 2"
 
 #
 def get_jobname(log_path,log_name):
@@ -154,11 +159,27 @@ def get_dsrs0_energies(log_path,log_name):
         for line in f:
          line_adjl = line.lstrip("! ")
          if line_adjl.startswith(dELST_TAG):
-             e_elst = float(line_adjl.split("=")[1])
-             dSRS0.append([dELST_TAG,e_elst])
+             first_line  = next(f).strip()
+             second_line = next(f).strip()
+             first_match  = re.search(r"First\s+([-+]?\d*\.?\d+)", first_line)
+             second_match = re.search(r"Second\s+([-+]?\d*\.?\d+)", second_line)
+             if first_match and second_match:
+                els1 = float(first_match.group(1))
+                els2 = float(second_match.group(1))
+             dSRS0.append([dELSTS1_TAG,els1])
+             dSRS0.append([dELSTS2_TAG,els2])
+
          if line_adjl.startswith(dE1EX_TAG):
-             e_exch = float(line_adjl.split("=")[1])
-             dSRS0.append([dE1EX_TAG,e_exch])
+             first_line  = next(f).strip()
+             second_line = next(f).strip()
+             # Extract the values using regex
+             first_match  = re.search(r"First\s+([\d\.]+)", first_line)
+             second_match = re.search(r"Second\s+([\d\.]+)", second_line)
+             if first_match and second_match:
+                exs1 = float(first_match.group(1))
+                exs2 = float(second_match.group(1))
+             dSRS0.append([dE1EXS1_TAG,exs1])
+             dSRS0.append([dE1EXS2_TAG,exs2])
 
     f.close()
 

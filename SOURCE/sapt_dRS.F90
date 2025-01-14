@@ -780,10 +780,6 @@ call tran4_gen(NAO,&
      A%num0+A%num1,A%CAONO(iref, 1:NAO,1:(A%num0+A%num1)),&
      'OOOOAABB','AOTWOSORT')
 
-! mh test
-print*, 'Sab2 ', norm2(Sab2)
-print*, 'Vbaa ', norm2(Vbaa)
-
 TNa  = 0d0
 TNa2 = 0d0
 test = 0d0

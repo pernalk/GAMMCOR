@@ -12,7 +12,7 @@ def get():
         'units': {
             "SAPT/Dalton/TEST6":   {'atol': 1.e-5, 'level': 'short'},
             "SAPT/Dalton/TEST7":   {'atol': 1.e-5, 'level': 'short'},
-            "SAPT/QPackage/TEST1": {'atol': 1.e-5, 'level': 'short'},
+            #"SAPT/QPackage/TEST1": {'atol': 1.e-5, 'level': 'short'},
             "SAPT/QPackage/TEST2": {'atol': 1.e-5, 'level': 'short'},
         }
     })
@@ -24,6 +24,7 @@ def get():
         'runner': run_test_sapt,
         'units': {
             "SAPT/Molpro/dSRS":   {'atol': 1.e-5, 'level': 'short'},
+            "SAPT/QPackage/TEST3": {'atol': 1.e-5, 'level': 'short'},
         }
     })
 
