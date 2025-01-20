@@ -160,6 +160,14 @@ if(irefB .ne. iref2B) then
                         Atrdm(:,:),NBasis)
    call tran2MO(B%trdm1(iexcited2,:,:),B%CMONO(iref2B,:,:),B%CMONO(iref2B,:,:), &
                         Btrdm(:,:),NBasis)
+endif
+if(irefB .eq. iref2B) then
+Btrdm(:,:) = 0d0
+   do i=1,NBasis
+      Btrdm(i,i)=B%rdm1(irefB,i)
+   enddo
+endif
+
 #if SAPT_DSRS_DEBUG > 10   
     print*, 'DTA in NO(iref) '
     do i=1,dimOA
@@ -170,14 +178,6 @@ if(irefB .ne. iref2B) then
        write(6,'(*(f13.8))') (Btrdm(i,j),j=1,dimOB)
     enddo
 #endif
-
-endif
-if(irefB .eq. iref2B) then
-Btrdm(:,:) = 0d0
-   do i=1,NBasis
-      Btrdm(i,i)=B%rdm1(irefB,i)
-   enddo
-endif
 
 !call tran2MO(A%trdm(iref,:,:),CMONO(RefState,:,:),CMONO(RefState,:,:), &
 !                        Atrdm(iref,:,:),NBasis)
@@ -285,6 +285,9 @@ subroutine e1exch_dSRS(A,B,SAPT)
 !
 ! calculate exchange energy
 ! in degenerate SRS (in NO representation)
+!
+! describe IRef1 , IRef2 convention!
+! (electronic and spatial degeneracy...)
 !
 implicit none
 
@@ -425,11 +428,11 @@ if(irefB .ne. iref2B) then
 endif
 
 if(irefB .eq. iref2B) then
-   Btrdm(:,:) = 0d0
+   Btrdm = 0d0
    do i=1,NBasis
       Btrdm(i,i) = B%rdm1(irefB,i)
    enddo
-   Btrdm2(:,:) = Btrdm(:,:)
+   Btrdm2 = Btrdm
 endif
 
 allocate(trdm2A(dimOA,dimOA,dimOA,dimOA))
@@ -458,14 +461,14 @@ if(irefB .ne. iref2B) then
              Btrdm2(:,:),NBasis)
 endif
 
-#if SAPT_DSRS_DEBUG > 15
+#if SAPT_DSRS_DEBUG > 10
 print*, 'Btrdm2 MO',norm2(B%trdm1(iexcited2,:,:))
-do j=1,NBasis
-   write(6,'(*(f12.6))') (B%trdm1(iexcited2,i,j),i=1,NBasis)
+do j=1,dimOB
+   write(6,'(*(f12.6))') (B%trdm1(iexcited2,i,j),i=1,dimOB)
 enddo
 print*, 'Btrdm2 NO',norm2(Btrdm2)
-do j=1,NBasis
-   write(6,'(*(f12.6))') (Btrdm2(i,j),i=1,NBasis)
+do j=1,dimOB
+   write(6,'(*(f12.6))') (Btrdm2(i,j),i=1,dimOB)
 enddo
 #endif
 
