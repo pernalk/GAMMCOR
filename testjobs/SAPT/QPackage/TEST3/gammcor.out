@@ -1,0 +1,843 @@
+ 
+ GIT INFO
+********************************************************************************
+ Branch:             dSRS
+ Revision (short):   8235967
+ Revision (full):    8235967b202fa4a8727e7591b67385230cfce9f1
+ Latest commit date: Sun Dec 22 00:30:29 2024 +0100
+ Latest tag:         v-4.1
+ 
+ 
+ BUILD INFO
+********************************************************************************
+ Fortran compiler:   Intel 
+ /opt/intel/oneapi/compiler/2023.2.1/linux/bin/intel64/ifort
+ C++ compiler:       Intel 
+ /opt/intel/oneapi/compiler/2023.2.1/linux/bin/intel64/icpc
+ C compiler:         Intel 
+ /opt/intel/oneapi/compiler/2023.2.1/linux/bin/intel64/icc
+ Compile options:    -assume byterecl -heap-arrays -O3 -g -xCOMMON-AVX512
+ BLAS libraries:     
+ /opt/intel/oneapi/mkl/2023.2.0/lib/intel64/libmkl_intel_lp64.so /opt/intel/onea
+ pi/mkl/2023.2.0/lib/intel64/libmkl_intel_thread.so /opt/intel/oneapi/mkl/2023.2
+ .0/lib/intel64/libmkl_core.so /opt/intel/oneapi/compiler/2023.2.1/linux/compile
+ r/lib/intel64_lin/libiomp5.so -lpthread -lm -ldl
+ 
+ NBasis WILL BE READ FROM MOLPRO
+
+ INPUT 
+********************************************************************************
+ JOB TITLE:     be-be dSRS qp2
+ INTERFACE:     TREXIO  
+ JOB TYPE:      dSRS     
+ RDM TYPE:      CASSCF  
+ RDM SOURCE:    DALTON  
+
+ MONOMER:       A       
+ ZNUCL:         4
+ CHARGE:        0
+ NO. OF ATOMS:  1
+ NO. OF SYM. EQUIV. ATOMS:  1
+ THRESHOLD SELECT ACTIVE :  0.100000E-03
+
+ MONOMER:       B       
+ ZNUCL:         4
+ CHARGE:        0
+ NO. OF ATOMS:  1
+ NO. OF SYM. EQUIV. ATOMS:  1
+ THRESHOLD SELECT ACTIVE :  0.100000E-03
+
+
+ INPUT CHECK PASSED
+********************************************************************************
+
+ IDALTON         0
+ IRes            0
+ IAO             0
+ INO             0
+ NoSym           1
+ IGVB            0
+ IFun           13
+ IFunSR          0
+ IFunSRKer       0
+ IModG           1
+ NGOcc           0
+ ILoc            1
+ IFreeze         0
+ IAPSG           0
+ ISERPA          0
+ IA              1
+ ICASSCF         1
+ IDMRG           0
+ IFlAC           0
+ IFLSnd          0
+ IFlCore         1
+ IFlFrag         0
+ IFl12           1
+ ISAPT           1
+ IdSRS           1
+
+ SYSTEM 
+********************************************************************************
+ MONOMER A
+ NUCLEAR CHARGE:   4
+ CHARGE:           0
+ NO.OF ATOMS:      1
+ THRESH ACTIVE:    0.100000E-08
+
+ MONOMER B
+ NUCLEAR CHARGE:   4
+ CHARGE:           0
+ NO.OF ATOMS:      1
+ THRESH ACTIVE:    0.100000E-08
+ PRINT LEVEL:     11
+
+
+ IFunSR=0
+
+ IFunSRKer=0
+
+
+ STARTING SAPT CALCULATIONS
+********************************************************************************
+ One-electron integrals written to file: ONEEL_A
+ Total number of nuclei :           2
+ Charges on centers
+  1    4.000000
+  2    0.000000
+ Cartesian coordinates (Angstrom)
+  1    0.000000    0.000000    2.375000
+  2    0.000000    0.000000    0.000000
+ 
+ One-electron integrals written to file: ONEEL_B
+ Total number of nuclei :           2
+ Charges on centers
+  1    4.000000
+  2    0.000000
+ Cartesian coordinates (Angstrom)
+  1    0.000000    0.000000   -2.375000
+  2    0.000000    0.000000    0.000000
+ 
+
+ readocc_trexio :
+ Monomer  =  A
+ core     =  1
+ inactive =  0
+ active   =  4
+ virtual  = 13
+ NBasis   = 18
+ readocc_trexio :
+ Monomer  =  B
+ core     =  1
+ inactive =  0
+ active   =  4
+ virtual  = 13
+ NBasis   = 18
+
+ Number of basis functions:                        18
+ Number of independent pairs:                     171
+ Number of columns in segment:                    171
+ Number of passes:                                  1
+ Use TREXIO INTS SORTER
+
+ CPU  time in 2ints                is                0.005 s
+ Wall time in 2ints                is                0.005 s
+ Warning! read_1rdm_1trdm is temporary!
+ NOccup in read_1rdm_1trdm    :            5
+ Inact  in read_1rdm_1trdm    :            1
+ NAct   in read_1rdm_1trdm    :            4
+
+ Monomer A
+ The number of states from SA-CAS  :  4
+ Reference state for dSRS          :  1
+
+ Occupation numbers, istate           1
+     1.000000
+     0.914088
+     0.030893
+     0.030893
+     0.024127
+ Occupation numbers, istate           2
+     1.000000
+     0.612844
+     0.382020
+     0.002568
+     0.002568
+ Occupation numbers, istate           3
+     1.000000
+     0.500000
+     0.500000
+     0.000000
+     0.000000
+ Occupation numbers, istate           4
+     1.000000
+     0.500000
+     0.500000
+     0.000000
+     0.000000
+ 1-TRDM MO <ket|bra> =           2           1
+ 1-TRDM < 2 | 1 >
+    0.000000    0.000000    0.000000    0.000000    0.000000
+    0.000000   -0.042766   -0.000000    0.000000   -0.661420
+    0.000000    0.000000   -0.008907    0.000000    0.000000
+    0.000000    0.000000    0.000000   -0.008907    0.000000
+    0.000000    0.112555    0.000000    0.000000    0.060580
+ 1-TRDM MO <ket|bra> =           3           1
+ 1-TRDM < 3 | 1 >
+   -0.000000    0.000000    0.000000    0.000000    0.000000
+    0.000000   -0.000000   -0.674545   -0.001126    0.000000
+    0.000000    0.124076    0.000000    0.000000   -0.007170
+    0.000000    0.000207    0.000000    0.000000   -0.000012
+    0.000000   -0.000000    0.044798    0.000075   -0.000000
+ 1-TRDM MO <ket|bra> =           3           2
+ 1-TRDM < 3 | 2 >
+    0.000000    0.000000    0.000000    0.000000    0.000000
+    0.000000    0.000000    0.040664    0.000068   -0.000000
+    0.000000   -0.035774    0.000000    0.000000    0.002067
+    0.000000   -0.000060    0.000000   -0.000000    0.000003
+    0.000000   -0.000000    0.491630    0.000821   -0.000000
+ 1-TRDM MO <ket|bra> =           4           1
+ 1-TRDM < 4 | 1 >
+    0.000000    0.000000    0.000000    0.000000    0.000000
+    0.000000    0.000000   -0.001126    0.674545   -0.000000
+    0.000000    0.000207    0.000000   -0.000000   -0.000012
+    0.000000   -0.124076    0.000000    0.000000    0.007170
+    0.000000    0.000000    0.000075   -0.044798    0.000000
+ 1-TRDM MO <ket|bra> =           4           2
+ 1-TRDM < 4 | 2 >
+    0.000000    0.000000    0.000000    0.000000    0.000000
+    0.000000    0.000000    0.000068   -0.040664   -0.000000
+    0.000000   -0.000060    0.000000   -0.000000    0.000003
+    0.000000    0.035774    0.000000    0.000000   -0.002067
+    0.000000   -0.000000    0.000821   -0.491630    0.000000
+ 1-TRDM MO <ket|bra> =           4           3
+ 1-TRDM < 4 | 3 >
+    0.000000    0.000000    0.000000    0.000000    0.000000
+    0.000000    0.000000    0.000000   -0.000000   -0.000000
+    0.000000    0.000000    0.000835   -0.499999   -0.000000
+    0.000000   -0.000000    0.000001   -0.000835    0.000000
+    0.000000   -0.000000   -0.000000    0.000000    0.000000
+ Warning! read_1rdm_1trdm is temporary!
+ NOccup in read_1rdm_1trdm    :            5
+ Inact  in read_1rdm_1trdm    :            1
+ NAct   in read_1rdm_1trdm    :            4
+
+ Monomer B
+ The number of states from SA-CAS  :  4
+ Reference state for dSRS          :  1
+
+ Occupation numbers, istate           1
+     1.000000
+     0.914088
+     0.030893
+     0.030893
+     0.024127
+ Occupation numbers, istate           2
+     1.000000
+     0.612844
+     0.382020
+     0.002568
+     0.002568
+ Occupation numbers, istate           3
+     1.000000
+     0.500000
+     0.500000
+     0.000000
+     0.000000
+ Occupation numbers, istate           4
+     1.000000
+     0.500000
+     0.500000
+     0.000000
+     0.000000
+ 1-TRDM MO <ket|bra> =           2           1
+ 1-TRDM < 2 | 1 >
+   -0.000000    0.000000    0.000000    0.000000    0.000000
+    0.000000    0.042766   -0.000000   -0.000000   -0.661420
+    0.000000    0.000000    0.008907   -0.000000   -0.000000
+    0.000000    0.000000   -0.000000    0.008907   -0.000000
+    0.000000    0.112555   -0.000000   -0.000000   -0.060580
+ 1-TRDM MO <ket|bra> =           3           1
+ 1-TRDM < 3 | 1 >
+    0.000000    0.000000    0.000000    0.000000    0.000000
+    0.000000    0.000000   -0.673902   -0.029486    0.000000
+    0.000000    0.123958   -0.000000   -0.000000    0.007163
+    0.000000    0.005424   -0.000000   -0.000000    0.000313
+    0.000000   -0.000000   -0.044755   -0.001958    0.000000
+ 1-TRDM MO <ket|bra> =           3           2
+ 1-TRDM < 3 | 2 >
+    0.000000    0.000000    0.000000    0.000000    0.000000
+    0.000000    0.000000   -0.040625   -0.001778    0.000000
+    0.000000    0.035739    0.000000    0.000000    0.002065
+    0.000000    0.001564    0.000000    0.000000    0.000090
+    0.000000    0.000000    0.491161    0.021490   -0.000000
+ 1-TRDM MO <ket|bra> =           4           1
+ 1-TRDM < 4 | 1 >
+    0.000000    0.000000    0.000000    0.000000    0.000000
+    0.000000    0.000000   -0.029486    0.673902   -0.000000
+    0.000000    0.005424    0.000000    0.000000    0.000313
+    0.000000   -0.123958   -0.000000    0.000000   -0.007163
+    0.000000    0.000000   -0.001958    0.044755   -0.000000
+ 1-TRDM MO <ket|bra> =           4           2
+ 1-TRDM < 4 | 2 >
+    0.000000    0.000000    0.000000    0.000000    0.000000
+    0.000000   -0.000000   -0.001778    0.040625   -0.000000
+    0.000000    0.001564    0.000000   -0.000000    0.000090
+    0.000000   -0.035739    0.000000   -0.000000   -0.002065
+    0.000000   -0.000000    0.021490   -0.491161    0.000000
+ 1-TRDM MO <ket|bra> =           4           3
+ 1-TRDM < 4 | 3 >
+   -0.000000    0.000000    0.000000    0.000000    0.000000
+    0.000000   -0.000000    0.000000    0.000000    0.000000
+    0.000000    0.000000    0.021835   -0.499045    0.000000
+    0.000000    0.000000    0.000955   -0.021835    0.000000
+    0.000000    0.000000   -0.000000    0.000000    0.000000
+ 2-RDM (act) no. 1 has trace =     1.000000 and norm =    1.000000
+ 2-RDM full  no. 1 has trace =     6.000000
+ D from P with norm fac =  0.333333333333333     
+   1.00000000   0.00000000   0.00000000   0.00000000   0.00000000
+   0.00000000   0.91408764   0.00000000   0.00000000  -0.00000000
+   0.00000000   0.00000000   0.03089284  -0.00000000   0.00000000
+   0.00000000   0.00000000  -0.00000000   0.03089284   0.00000000
+   0.00000000   0.00000000   0.00000000   0.00000000   0.02412668
+ 2-RDM (act) no. 2 has trace =     1.000000 and norm =    1.000000
+ 2-RDM full  no. 2 has trace =     6.000000
+ D from P with norm fac =  0.333333333333333     
+   1.00000000   0.00000000   0.00000000   0.00000000   0.00000000
+   0.00000000   0.61284395  -0.00000000  -0.00000000  -0.00000000
+   0.00000000   0.00000000   0.38201994   0.00000000   0.00000000
+   0.00000000  -0.00000000   0.00000000   0.00256806   0.00000000
+   0.00000000  -0.00000000   0.00000000   0.00000000   0.00256806
+ 2-RDM (act) no. 3 has trace =     1.000000 and norm =    1.000000
+ 2-RDM full  no. 3 has trace =     6.000000
+ D from P with norm fac =  0.333333333333333     
+   1.00000000   0.00000000   0.00000000   0.00000000   0.00000000
+   0.00000000   0.50000000   0.00000000  -0.00000000   0.00000000
+   0.00000000  -0.00000000   0.50000000  -0.00000000   0.00000000
+   0.00000000  -0.00000000  -0.00000000   0.00000000   0.00000000
+   0.00000000   0.00000000   0.00000000   0.00000000   0.00000000
+ 2-RDM (act) no. 4 has trace =     1.000000 and norm =    1.000000
+ 2-RDM full  no. 4 has trace =     6.000000
+ D from P with norm fac =  0.333333333333333     
+   1.00000000   0.00000000   0.00000000   0.00000000   0.00000000
+   0.00000000   0.50000000   0.00000000  -0.00000000  -0.00000000
+   0.00000000   0.00000000   0.50000000   0.00000000   0.00000000
+   0.00000000  -0.00000000   0.00000000   0.00000000   0.00000000
+   0.00000000  -0.00000000   0.00000000  -0.00000000   0.00000000
+
+ Reading < 2 | 1 > 2-TRDM
+ 2-TRMD < 2 | 1 >  has trace     0.000000and norm     1.000000
+ DT from PT with norm fac =   1.00000000000000     
+  -0.00669157  -0.00000000  -0.00000000  -0.10816898
+   0.00000000  -0.00890699  -0.00000000   0.00000000
+   0.00000000  -0.00000000  -0.00890699   0.00000000
+   0.66580628   0.00000000   0.00000000   0.02450556
+ 2-RDM (act) no. 1 has trace =     1.000000 and norm =    1.000000
+ 2-RDM full  no. 1 has trace =     6.000000
+ D from P with norm fac =  0.333333333333333     
+   1.00000000   0.00000000   0.00000000   0.00000000   0.00000000
+   0.00000000   0.91408764  -0.00000000  -0.00000000   0.00000000
+   0.00000000  -0.00000000   0.03089284  -0.00000000   0.00000000
+   0.00000000  -0.00000000  -0.00000000   0.03089284   0.00000000
+   0.00000000   0.00000000   0.00000000   0.00000000   0.02412668
+ 2-RDM (act) no. 2 has trace =     1.000000 and norm =    1.000000
+ 2-RDM full  no. 2 has trace =     6.000000
+ D from P with norm fac =  0.333333333333333     
+   1.00000000   0.00000000   0.00000000   0.00000000   0.00000000
+   0.00000000   0.61284395  -0.00000000  -0.00000000   0.00000000
+   0.00000000  -0.00000000   0.38201994  -0.00000000   0.00000000
+   0.00000000  -0.00000000  -0.00000000   0.00256806   0.00000000
+   0.00000000   0.00000000   0.00000000   0.00000000   0.00256806
+ 2-RDM (act) no. 3 has trace =     1.000000 and norm =    1.000000
+ 2-RDM full  no. 3 has trace =     6.000000
+ D from P with norm fac =  0.333333333333333     
+   1.00000000   0.00000000   0.00000000   0.00000000   0.00000000
+   0.00000000   0.50000000  -0.00000000  -0.00000000   0.00000000
+   0.00000000  -0.00000000   0.50000000   0.00000000   0.00000000
+   0.00000000  -0.00000000   0.00000000   0.00000000  -0.00000000
+   0.00000000   0.00000000   0.00000000  -0.00000000   0.00000000
+ 2-RDM (act) no. 4 has trace =     1.000000 and norm =    1.000000
+ 2-RDM full  no. 4 has trace =     6.000000
+ D from P with norm fac =  0.333333333333333     
+   1.00000000   0.00000000   0.00000000   0.00000000   0.00000000
+   0.00000000   0.50000000   0.00000000  -0.00000000   0.00000000
+   0.00000000   0.00000000   0.50000000   0.00000000   0.00000000
+   0.00000000  -0.00000000   0.00000000   0.00000000   0.00000000
+   0.00000000   0.00000000   0.00000000   0.00000000   0.00000000
+
+ Reading < 2 | 1 > 2-TRDM
+ 2-TRMD < 2 | 1 >  has trace    -0.000000and norm     1.000000
+ DT from PT with norm fac =   1.00000000000000     
+   0.00669157   0.00000000  -0.00000000  -0.10816898
+  -0.00000000   0.00890699   0.00000000   0.00000000
+   0.00000000   0.00000000   0.00890699  -0.00000000
+   0.66580628   0.00000000  -0.00000000  -0.02450556
+
+ CAS ORBITALS           Monomer A     Monomer B
+ INACTIVE                   1             1
+ ACTIVE                     4             4
+
+ ORBITAL OCCUPANCIES
+ CASSCF   Occupancy-A    Gem-A          Occupancy-B      Gem-B
+   1     0.100000E+01      1           0.100000E+01        1
+   2     0.914088E+00      2           0.914088E+00        2
+   3     0.308928E-01      2           0.308928E-01        2
+   4     0.308928E-01      2           0.308928E-01        2
+   5     0.241267E-01      2           0.241267E-01        2
+   6     0.000000E+00      3           0.000000E+00        3
+   7     0.000000E+00      3           0.000000E+00        3
+   8     0.000000E+00      3           0.000000E+00        3
+   9     0.000000E+00      3           0.000000E+00        3
+  10     0.000000E+00      3           0.000000E+00        3
+  11     0.000000E+00      3           0.000000E+00        3
+  12     0.000000E+00      3           0.000000E+00        3
+  13     0.000000E+00      3           0.000000E+00        3
+  14     0.000000E+00      3           0.000000E+00        3
+  15     0.000000E+00      3           0.000000E+00        3
+  16     0.000000E+00      3           0.000000E+00        3
+  17     0.000000E+00      3           0.000000E+00        3
+  18     0.000000E+00      3           0.000000E+00        3
+  SUM OF OCCUPANCIES:   3.0000                    3.0000
+
+
+ Saving CAONO for Monomer  A State 1
+
+ Saving CAONO for Monomer  B State 1
+ WIP: do we really need a separate procedure for TREXIO?
+      it would maybe make more sense to set RDMType CI?
+      or split: select_active_gvb/cas/ci? 
+
+ Monomer A
+ Active Orbital:    2    0.9141E+00
+ Active Orbital:    3    0.3089E-01
+ Active Orbital:    4    0.3089E-01
+ Active Orbital:    5    0.2413E-01
+
+ TREXIO-num:
+ num0 (inactive)   1
+ num1   (active)   4
+ num2  (virtual)  13
+
+ maybe better call ThrSelAct : Threshold for nearly degenerate pairs?
+ Threshold for active orbital pairs:           0.10000E-03
+ Threshold for quasi-virtual orbital pairs:    0.10000E-06
+ Threshold for selecting active orbitals:      0.10000E-08 < Active <  0.10000E+01
+ Warning! For single atom ThrSelAct should probably have larger value!
+ Discarding nearly degenerate pair     4   3
+ WIP: do we really need a separate procedure for TREXIO?
+      it would maybe make more sense to set RDMType CI?
+      or split: select_active_gvb/cas/ci? 
+
+ Monomer B
+ Active Orbital:    2    0.9141E+00
+ Active Orbital:    3    0.3089E-01
+ Active Orbital:    4    0.3089E-01
+ Active Orbital:    5    0.2413E-01
+
+ TREXIO-num:
+ num0 (inactive)   1
+ num1   (active)   4
+ num2  (virtual)  13
+
+ maybe better call ThrSelAct : Threshold for nearly degenerate pairs?
+ Threshold for active orbital pairs:           0.10000E-03
+ Threshold for quasi-virtual orbital pairs:    0.10000E-06
+ Threshold for selecting active orbitals:      0.10000E-08 < Active <  0.10000E+01
+ Warning! For single atom ThrSelAct should probably have larger value!
+ Discarding nearly degenerate pair     4   3
+
+                           Monomer A    Monomer B
+ Active orbital:    2    0.9141E+00    0.9141E+00
+ Active orbital:    3    0.3089E-01    0.3089E-01
+ Active orbital:    4    0.3089E-01    0.3089E-01
+ Active orbital:    5    0.2413E-01    0.2413E-01
+ ------------------------------------------------
+ Total Active:                 4           4
+
+                          Monomer A     Monomer B
+ Total number of pairs:      153           153
+ Reduced to:                 74            74
+
+
+  Accepted pairs:
+  p  q           Monomer A                            MonomerB
+  --------------------------------     --------------------------------
+  2  1    0.9141E+00    0.1000E+01     2  1    0.9141E+00    0.1000E+01
+  3  1    0.3089E-01    0.1000E+01     3  1    0.3089E-01    0.1000E+01
+  3  2    0.3089E-01    0.9141E+00     3  2    0.3089E-01    0.9141E+00
+  4  1    0.3089E-01    0.1000E+01     4  1    0.3089E-01    0.1000E+01
+  4  2    0.3089E-01    0.9141E+00     4  2    0.3089E-01    0.9141E+00
+  5  1    0.2413E-01    0.1000E+01     5  1    0.2413E-01    0.1000E+01
+  5  2    0.2413E-01    0.9141E+00     5  2    0.2413E-01    0.9141E+00
+  5  3    0.2413E-01    0.3089E-01     5  3    0.2413E-01    0.3089E-01
+  5  4    0.2413E-01    0.3089E-01     5  4    0.2413E-01    0.3089E-01
+  6  1    0.0000E+00    0.1000E+01     6  1    0.0000E+00    0.1000E+01
+  6  2    0.0000E+00    0.9141E+00     6  2    0.0000E+00    0.9141E+00
+  6  3    0.0000E+00    0.3089E-01     6  3    0.0000E+00    0.3089E-01
+  6  4    0.0000E+00    0.3089E-01     6  4    0.0000E+00    0.3089E-01
+  6  5    0.0000E+00    0.2413E-01     6  5    0.0000E+00    0.2413E-01
+  7  1    0.0000E+00    0.1000E+01     7  1    0.0000E+00    0.1000E+01
+  7  2    0.0000E+00    0.9141E+00     7  2    0.0000E+00    0.9141E+00
+  7  3    0.0000E+00    0.3089E-01     7  3    0.0000E+00    0.3089E-01
+  7  4    0.0000E+00    0.3089E-01     7  4    0.0000E+00    0.3089E-01
+  7  5    0.0000E+00    0.2413E-01     7  5    0.0000E+00    0.2413E-01
+  8  1    0.0000E+00    0.1000E+01     8  1    0.0000E+00    0.1000E+01
+  8  2    0.0000E+00    0.9141E+00     8  2    0.0000E+00    0.9141E+00
+  8  3    0.0000E+00    0.3089E-01     8  3    0.0000E+00    0.3089E-01
+  8  4    0.0000E+00    0.3089E-01     8  4    0.0000E+00    0.3089E-01
+  8  5    0.0000E+00    0.2413E-01     8  5    0.0000E+00    0.2413E-01
+  9  1    0.0000E+00    0.1000E+01     9  1    0.0000E+00    0.1000E+01
+  9  2    0.0000E+00    0.9141E+00     9  2    0.0000E+00    0.9141E+00
+  9  3    0.0000E+00    0.3089E-01     9  3    0.0000E+00    0.3089E-01
+  9  4    0.0000E+00    0.3089E-01     9  4    0.0000E+00    0.3089E-01
+  9  5    0.0000E+00    0.2413E-01     9  5    0.0000E+00    0.2413E-01
+ 10  1    0.0000E+00    0.1000E+01    10  1    0.0000E+00    0.1000E+01
+ 10  2    0.0000E+00    0.9141E+00    10  2    0.0000E+00    0.9141E+00
+ 10  3    0.0000E+00    0.3089E-01    10  3    0.0000E+00    0.3089E-01
+ 10  4    0.0000E+00    0.3089E-01    10  4    0.0000E+00    0.3089E-01
+ 10  5    0.0000E+00    0.2413E-01    10  5    0.0000E+00    0.2413E-01
+ 11  1    0.0000E+00    0.1000E+01    11  1    0.0000E+00    0.1000E+01
+ 11  2    0.0000E+00    0.9141E+00    11  2    0.0000E+00    0.9141E+00
+ 11  3    0.0000E+00    0.3089E-01    11  3    0.0000E+00    0.3089E-01
+ 11  4    0.0000E+00    0.3089E-01    11  4    0.0000E+00    0.3089E-01
+ 11  5    0.0000E+00    0.2413E-01    11  5    0.0000E+00    0.2413E-01
+ 12  1    0.0000E+00    0.1000E+01    12  1    0.0000E+00    0.1000E+01
+ 12  2    0.0000E+00    0.9141E+00    12  2    0.0000E+00    0.9141E+00
+ 12  3    0.0000E+00    0.3089E-01    12  3    0.0000E+00    0.3089E-01
+ 12  4    0.0000E+00    0.3089E-01    12  4    0.0000E+00    0.3089E-01
+ 12  5    0.0000E+00    0.2413E-01    12  5    0.0000E+00    0.2413E-01
+ 13  1    0.0000E+00    0.1000E+01    13  1    0.0000E+00    0.1000E+01
+ 13  2    0.0000E+00    0.9141E+00    13  2    0.0000E+00    0.9141E+00
+ 13  3    0.0000E+00    0.3089E-01    13  3    0.0000E+00    0.3089E-01
+ 13  4    0.0000E+00    0.3089E-01    13  4    0.0000E+00    0.3089E-01
+ 13  5    0.0000E+00    0.2413E-01    13  5    0.0000E+00    0.2413E-01
+ 14  1    0.0000E+00    0.1000E+01    14  1    0.0000E+00    0.1000E+01
+ 14  2    0.0000E+00    0.9141E+00    14  2    0.0000E+00    0.9141E+00
+ 14  3    0.0000E+00    0.3089E-01    14  3    0.0000E+00    0.3089E-01
+ 14  4    0.0000E+00    0.3089E-01    14  4    0.0000E+00    0.3089E-01
+ 14  5    0.0000E+00    0.2413E-01    14  5    0.0000E+00    0.2413E-01
+ 15  1    0.0000E+00    0.1000E+01    15  1    0.0000E+00    0.1000E+01
+ 15  2    0.0000E+00    0.9141E+00    15  2    0.0000E+00    0.9141E+00
+ 15  3    0.0000E+00    0.3089E-01    15  3    0.0000E+00    0.3089E-01
+ 15  4    0.0000E+00    0.3089E-01    15  4    0.0000E+00    0.3089E-01
+ 15  5    0.0000E+00    0.2413E-01    15  5    0.0000E+00    0.2413E-01
+ 16  1    0.0000E+00    0.1000E+01    16  1    0.0000E+00    0.1000E+01
+ 16  2    0.0000E+00    0.9141E+00    16  2    0.0000E+00    0.9141E+00
+ 16  3    0.0000E+00    0.3089E-01    16  3    0.0000E+00    0.3089E-01
+ 16  4    0.0000E+00    0.3089E-01    16  4    0.0000E+00    0.3089E-01
+ 16  5    0.0000E+00    0.2413E-01    16  5    0.0000E+00    0.2413E-01
+ 17  1    0.0000E+00    0.1000E+01    17  1    0.0000E+00    0.1000E+01
+ 17  2    0.0000E+00    0.9141E+00    17  2    0.0000E+00    0.9141E+00
+ 17  3    0.0000E+00    0.3089E-01    17  3    0.0000E+00    0.3089E-01
+ 17  4    0.0000E+00    0.3089E-01    17  4    0.0000E+00    0.3089E-01
+ 17  5    0.0000E+00    0.2413E-01    17  5    0.0000E+00    0.2413E-01
+ 18  1    0.0000E+00    0.1000E+01    18  1    0.0000E+00    0.1000E+01
+ 18  2    0.0000E+00    0.9141E+00    18  2    0.0000E+00    0.9141E+00
+ 18  3    0.0000E+00    0.3089E-01    18  3    0.0000E+00    0.3089E-01
+ 18  4    0.0000E+00    0.3089E-01    18  4    0.0000E+00    0.3089E-01
+ 18  5    0.0000E+00    0.2413E-01    18  5    0.0000E+00    0.2413E-01
+ Transforming integrals for FFOOAA
+
+ CPU  time in FFOO                 is                0.001 s
+ Wall time in FFOO                 is                0.002 s
+ Transforming integrals for FOFOAA
+
+ CPU  time in FOFO                 is                0.003 s
+ Wall time in FOFO                 is                0.003 s
+ Transforming integrals for FFOOBB
+
+ CPU  time in FFOO                 is                0.001 s
+ Wall time in FFOO                 is                0.001 s
+ Transforming integrals for FOFOBB
+
+ CPU  time in FOFO                 is                0.003 s
+ Wall time in FOFO                 is                0.002 s
+ dSRS set ACAlpha unc =  1.000000000000000E-012
+
+ Active block of 2-RDM read from rdm2.dat
+ ABPLUS-after J  0.495568446486710     
+ ABMIN -after J  0.756122102643863     
+ CASSCF Energy (w/o ENuc)        -14.60160060
+ ABPlus   30.4909449456832     
+ ABMin   224.156636951974     
+
+ Calculating reponse for the ground state
+ Solving symmetric eigenvalue equation...
+
+
+ ECASSCF+ENuc, Corr, ERPA-CASSCF         -14.60160060    -0.00000000   -14.60160060
+ ABPLUS-after J  0.495568446486710     
+ ABMIN -after J  0.756122102643863     
+
+ Active block of 2-RDM read from rdm2.dat
+ ABPLUS-after J   1.84229867370216     
+ ABMIN -after J   1.83638757197960     
+ CASSCF Energy (w/o ENuc)        -14.60160060
+ dSRS set ACAlpha unc =  1.000000000000000E-012
+
+ Active block of 2-RDM read from rdm2.dat
+ ABPLUS-after J  0.495568446487008     
+ ABMIN -after J  0.756122102644660     
+ CASSCF Energy (w/o ENuc)        -14.60160060
+ ABPlus   30.4909449455630     
+ ABMin   224.156636950822     
+
+ Calculating reponse for the ground state
+ Solving symmetric eigenvalue equation...
+
+
+ ECASSCF+ENuc, Corr, ERPA-CASSCF         -14.60160060    -0.00000000   -14.60160060
+ ABPLUS-after J  0.495568446487008     
+ ABMIN -after J  0.756122102644660     
+
+ Active block of 2-RDM read from rdm2.dat
+ ABPLUS-after J   1.84229867370195     
+ ABMIN -after J   1.83638757197920     
+ CASSCF Energy (w/o ENuc)        -14.60160060
+
+ Transforming integrals for OOOOAABB
+ Transforming integrals for OOOOAABB2
+ Transforming integrals for FOFOAAAB
+ Transforming integrals for FOFOAAAB2
+ Transforming integrals for FOFOBBBA
+ Transforming integrals for FOFOBBBA2
+ Transforming integrals for FOFOAABB
+ Transforming integrals for FOFOAABB2
+ Transforming integrals for OOOOABBA
+ Transforming integrals for OOOOABBA2
+ Transforming integrals for OOOOBBBA
+ Transforming integrals for OOOOAAAB
+--------------------------------------------------------------------------------
+ Degenerate SAPT(MC)
+--------------------------------------------------------------------------------
+ A%IREF1           1
+ A%IREF2           2
+ B%IREF1           1
+ B%IREF2           2
+ ea1  -3.38709274584814     
+ ea2  -3.53336934287420     
+ eas1  0.000000000000000E+000
+ eb1  -3.38709274583960     
+ eb2  -3.53336934288012     
+ elab =    3.46380754760676     
+ elabB =    3.46380754759354     
+ DTA in NO(iref) 
+   0.00000000   0.00000000   0.00000000   0.00000000   0.00000000
+   0.00000000  -0.00669157  -0.00000000  -0.00000000  -0.10816898
+   0.00000000   0.00000000  -0.00890699  -0.00000000   0.00000000
+   0.00000000   0.00000000  -0.00000000  -0.00890699   0.00000000
+   0.00000000   0.66580628   0.00000000   0.00000000   0.02450556
+ DTB in NO(iref2B) 
+  -0.00000000   0.00000000   0.00000000   0.00000000   0.00000000
+   0.00000000   0.26661356  -0.43250222   0.00000000  -0.00000000
+   0.00000000   0.34147303  -0.28442755   0.00000000  -0.00000000
+   0.00000000  -0.00000000   0.00000000   0.00890699   0.00000000
+   0.00000000   0.00000000  -0.00000000   0.00000000   0.00890699
+ elab2 =    3.46380754760676     
+ elab3 =  -1.730162933031106E-002
+ elab2B =    3.46380754759354     
+
+ <AB*|V|AB*>      =     -88.23350097
+ <A*B|V|A*B>      =     -88.23350097
+ <AB*|V|A*B>      =     -17.30162933
+
+ gamma      =      -0.78539816
+ 4*gamma =   -3.14159265366094     
+ COS(gamma)^2  0.499999999982213     
+ EdRS(1,exp)=   -70.9318716375084     
+ EdRS(2,exp)=   -105.535130298131     
+ elstb1  -105.535130303426     
+ elstb2  -70.9318716428036     
+ EdRS(1)=   -70.9318716322129     
+ EdRS(2)=   -105.535130292835     
+ elstSAPT=   -88.2335009625241     
+ Vnn   3368.42104015306     
+
+ Running E1exch_NaNb...
+ good SAPT%elst =  -8.823350096252414E-002
+ nnS2  -383.125765550865     
+ SAPT%elst1  -88.2335009625241     
+ SAPT%Vnn   3368.42104015306     
+ SAPT%elst-SAPT%Vnn   -3456.65454111558     
+ SAPT%elst1-SAPT%Vnn  -3439.35291179057     
+ tELST   33.8045276035001     
+ tELST1(dSRS)   27.1758276230761     
+ tELST2(dSRS)   40.4332275879816     
+ tvk(1)-rhoArhoBVaSab   665.524076471895     
+ tvk(2)-rhoArhoBSabVb   424.946250152626     
+ tvk(3)=   -150.689419527361     
+ tNa-1   955.346321706545     
+ tNa-2  -438.500189301721     
+ tNb-1   1057.28185965780     
+ tNb-2  -318.772432420757     
+ tNaNb  -773.643967297075     
+
+ <A1B2|VP|A1B2> - <A1B2|P|A1B2>*Elst
+ ExchS2           =     97.15908213
+ ExchS21+         =    103.78778211
+ ExchS22+         =     90.53038215
+
+ Entering E1exch_NaNb_AexcB...
+
+ Good SAPT%elst = -88.23350096
+ nnS2  -383.125765560423     
+ SAPT%elst1  -70.9318716375084     
+ SAPT%Vnn   3368.42104015306     
+ SAPT%elst-SAPT%Vnn   -3456.65454111558     
+ SAPT%elst1-SAPT%Vnn  -3439.35291179057     
+ tELST   33.8045276043434     
+ tELST1(dSRS)   27.1758276237541     
+ tELST2(dSRS)   40.4332275889903     
+ tvk(1)-rhoArhoBVaSab   424.946250175465     
+ tvk(2)-rhoArhoBSabVb   665.524076474355     
+ tvk(3)=   -150.689419528318     
+ tNa-1   1057.28185968035     
+ tNa-2  -318.772432435504     
+ tNb-1   955.346321726910     
+ tNb-2  -438.500189308703     
+ tNaNb  -773.643967311270     
+
+ <A2B1|VP|A2B1> - <A2B1|P|A2B1>*Elst(?)
+ ExchS2           =     97.15908213
+ ExchS21+         =    103.78778211
+ ExchS22+         =     90.53038215
+
+ Running e1exch_dSRS...
+ exch w DRS   0.103787782112596     
+ SAPT%gamma -0.785398163415236     
+ Transforming integrals for OOOOAABB
+ Sab2    4.24264068696152     
+ Vbaa    16.4062467044630     
+ tNa1 liczone w innej bazie  0.108289322573610     
+ 1trdmB norm  0.675131464668288     
+ 1trdmA norm  0.675131464666067     
+ 2trdmB norm   2.35754638254521     
+ 2trdmA norm   2.35754638253878     
+ tNa(2)  -46.4154527996929     
+ tNa2(2)  -22.0098217839148     
+ tNb-1   108.289322572929     
+ tNb-2  -22.0098217837204     
+ Transforming integrals for OOOOAABB
+ tNaNb from dgemm procedure  -57.0513777025500     
+
+ <AB*|V|AB*>      =     -88.23350097
+ <A*B|V|A*B>      =     -88.23350097
+ <AB*|V|A*B>      =     -17.30162933
+ <AB*|P|AB*>      =    -383.12576555
+ <A*B|P|A*B>      =    -383.12576556
+ <AB*|P|A*B>      =     -56.69463974
+ <AB*|VP|AB*>     =     130.96360974
+ <A*B|VP|A*B>     =     130.96360973
+ <AB*|VP|A*B>     =       6.08382118
+ <A*B|VP|AB*>     =       6.08382118
+
+ Print all <VP> ingregients:
+ SAPT%exchs21    0.1037877821
+ SAPT%elst1     -0.0709318716
+ P1   -0.0566946397
+ SAPT%elst1-SAPT%Vnn   -3.4393529118
+ tvk(1)    0.0734339390
+ tvk(2)    0.0269081201
+ tvktest(1)    0.0734339390
+ tvktest(2)    0.0269081201
+ tvk(3)     0.0056111866
+ tvk2(1)    0.0269081201
+ tvk2(2)    0.0734339390
+ tvk2(3)    0.0056111866
+ sum tvk    0.1059532457
+ tNa(1)     0.1082893226
+ tNa(2)    -0.0464154528
+ tNa2(1)    0.1082893226
+ tNa2(2)   -0.0220098218
+ tNb(1)     0.1082893226
+ tNb(2)    -0.0220098218
+ tNb2(1)    0.1082893226
+ tNb2(2)   -0.0464154528
+ TNaNb     -0.0570513777
+ TNaNb2    -0.0570513777
+ elst dSRS 1 =   -70.9318716375
+ elst dSRS 2 =  -105.5351302981
+ exchange elst dSRS 1 =   101.7254178400
+ exchange elst dSRS 2 =    90.6309271367
+
+ Now we calculate matrix elements of V in Psi basis:
+   -0.070932   -0.000000
+   -0.000000   -0.105535
+
+ Calculate matrix elements of P in Psi basis:
+   -0.326431    0.000000
+    0.000000   -0.439820
+
+ Calculate matrix elements of VP in Psi basis:
+    0.124880   -0.000000
+    0.000000    0.137047
+
+ Electrostatic energy from matrix element(in millihartree)
+ First   -70.9318716375084     
+ Second  -105.535130298131     
+
+ Exch energy from matrix element(in millihartree)
+ First    101.725417838873     
+ Second   90.6309271360840     
+
+ Interaction energy in S2 approx.
+ Eint1   30.7935462013648     
+ Eint2  -14.9042031620465     
+
+ Coefficients from diagonalizing V:
+ For first state:
+ C11:   0.707106781173970     
+ C12:  -0.707106781199125     
+ For second state:
+ C21:   0.707106781199125     
+ C12:   0.707106781173970     
+ gamma_exch1  -3.14159265356025     
+
+ Coefficients from exchange diagonalization:
+ For first state:
+ C11:  -0.707106781194862     
+ C12:   0.707106781178233     
+ gamma_exch2  1.759217904469913E-011
+ For second state:
+ C21:   0.707106781186686     
+ C12:   0.707106781186409     
+
+ How good is trygonometric approximation?:
+ We can check is the vec proposed above an eigenvector or not:
+ -5.394791691615111E-002
+ -1.471397978762324E-012
+ VERSUS
+ -2.074157424702172E-002
+ -7.189316958666043E-013
+ and
+ -1.057520159703199E-012
+  3.151230061868966E-002
+ VERSUS
+  7.532107944836566E-014
+ -8.349030486694775E-003
+ Diagonalizing full eigenvalue problem
+ Is alphai=0?
+ 0.0000000
+ 0.0000000
+ Eigenvalues2 from dgevv(in milihartree)
+ 0.0800927
+ 0.0562539
+ Eigenvectors2 from dgevv:
+ -0.7071  0.7071
+  0.7071  0.7071
+
+ CPU  time in SAPT                 is                0.230 s
+ Wall time in SAPT                 is                0.122 s
+
+ SAPT: CHECK OUTPUT FOR 2 WARNINGS!
+********************************************************************************
+ WARNING! NOT POSSIBLE TO DELETE TMPOOAB FILE
+ WARNING! NOT POSSIBLE TO DELETE TWOMOAB FILE
+ WARNING! NOT POSSIBLE TO DELETE FOFOABBA FILE
+ WARNING! NOT POSSIBLE TO DELETE FOFOBBAB FILE
+ WARNING! NOT POSSIBLE TO DELETE FOFOAABA FILE
+ WARNING! NOT POSSIBLE TO DELETE FFOOABAB FILE
+ WARNING! NOT POSSIBLE TO DELETE FFOOABBB FILE
+ WARNING! NOT POSSIBLE TO DELETE FFOOBAAA FILE
+ WARNING! NOT POSSIBLE TO DELETE PROP_AB0 FILE
+ WARNING! NOT POSSIBLE TO DELETE PROP_AB FILE
