@@ -79,7 +79,7 @@ set(GAMMCOR_SOURCE
     SOURCE/ac_fofo.f90
     SOURCE/sorter_Cholesky.f90
     SOURCE/sapt_Chol_pol.f90
-    SOURCE/sapt_dRS.f90
+    SOURCE/sapt_dRS.F90
     SOURCE/sapt_Chol_exch.f90
     SOURCE/ab0fofo.f90
     SOURCE/sapt_response.f90
