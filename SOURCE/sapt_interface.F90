@@ -4052,7 +4052,7 @@ character(1) :: mname
     mon%IndAux(i)=2
  enddo
 
- if(mon%NActOrb/=0) then
+ if(mon%MOClass==1) then ! select act orbitals from Occ(:)
 
     ! active orbitals
     mon%icnt = 0
@@ -4083,7 +4083,21 @@ character(1) :: mname
        enddo
     endif
 
- endif
+ elseif(mon%MOClass==0) then ! select act orbs from ????
+     ! choose num0 = Core+Inactive
+     !        num1 = Active
+     !        num2 = Virtual
+   mon%icnt = 0
+   if(mon%Monomer==1) write(LOUT,'(/1x,a)') 'Monomer A'
+   if(mon%Monomer==2) write(LOUT,'(/1x,a)') 'Monomer B'
+
+   do i=1,mon%NAct
+      mon%IndAux(mon%INACT+i) = 1
+      write(lout,'(x,"Active Orbital: ",I4,E14.4)') i, mon%Occ(mon%INACT+i)
+      mon%icnt = mon%icnt + 1
+   enddo
+
+ endif ! MOClass selection
 
 ! set generalized "occupied" = num0 + num1
 ! and "virtual" = num1 + num2 indices
@@ -4394,13 +4408,16 @@ do i=1+mon%NELE,nbas
    mon%IndAux(i) = 2
 enddo
 
-if(mon%NActOrb/=0) then
+if (mon%MOClass == 0 ) then
+   print*, 'Warning! Active orbitals will match TREXIO mo_class!'
+endif
 
-   ! select active orbitals based on ThrAct (sets IndAux)
+if(mon%MOClass==1) then
+
+   ! select active orbitals based on occupation numbers : ThrAct controls IndAux
    mon%icnt = 0
-   write(LOUT,'()')
-   if(mon%Monomer==1) write(LOUT,'(1x,a)') 'Monomer A'
-   if(mon%Monomer==2) write(LOUT,'(1x,a)') 'Monomer B'
+   if(mon%Monomer==1) write(LOUT,'(/1x,a)') 'Monomer A'
+   if(mon%Monomer==2) write(LOUT,'(/1x,a)') 'Monomer B'
    do i=1,nbas
       if(abs(1.0d0-mon%Occ(i)).ge.1d-8 .and. mon%Occ(i) .gt. mon%ThrAct) then
       !if(abs(1.0d0-mon%Occ(i)).ge.1d-8 .and. mon%Occ(i) .gt. 1d-10) then
@@ -4410,6 +4427,20 @@ if(mon%NActOrb/=0) then
          write(6,'(X,"Active Orbital: ",I4,E14.4)') i, mon%Occ(i)
          mon%icnt = mon%icnt + 1
       endif
+   enddo
+
+elseif(mon%MOClass==0) then
+     ! choose num0 = Core+Inactive
+     !        num1 = Active
+     !        num2 = Virtual
+   mon%icnt = 0
+   if(mon%Monomer==1) write(LOUT,'(/1x,a)') 'Monomer A'
+   if(mon%Monomer==2) write(LOUT,'(/1x,a)') 'Monomer B'
+
+   do i=1,mon%NAct
+      mon%IndAux(mon%INACT+i) = 1
+      write(lout,'(x,"Active Orbital: ",I4,E14.4)') i, mon%Occ(mon%INACT+i)
+      mon%icnt = mon%icnt + 1
    enddo
 
 endif

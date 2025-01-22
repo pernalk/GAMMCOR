@@ -168,7 +168,7 @@ type SystemBlock
       integer :: NSym
       integer :: NSymBas(8),NSymOrb(8)
       integer :: NOrb, NGem
-      integer :: NActOrb = 1
+      integer :: MOClass = 1 ! 1: select inact,act,virt from Occ(:) ; 0: from mo_class (TREXIO)
       integer :: NAct, INAct
       integer :: ISwitchAct = 0
       integer :: NActS(8), INActS(8)

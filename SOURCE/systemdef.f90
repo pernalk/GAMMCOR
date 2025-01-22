@@ -549,6 +549,7 @@ elseif(Flags%ISAPT.Eq.1) then
          monA%NAct=Input%SystemInput(1)%NAct
          monA%NActFromRDM = Input%SystemInput(1)%NActFromRDM
       endif
+      monA%MOClass = Input%SystemInput(1)%MOClass
 
       if(SAPT%InterfaceType==5) monB%TrexFile = Input%SystemInput(2)%TrexFile
 
@@ -603,6 +604,7 @@ elseif(Flags%ISAPT.Eq.1) then
          monB%NAct=Input%SystemInput(2)%NAct
          monB%NActFromRDM = Input%SystemInput(2)%NActFromRDM
       endif
+      monB%MOClass = Input%SystemInput(2)%MOClass
 
    ! write(LOUT,*) monA%ZNucl,'MONO(1)A,case1,dupaaa'
    ! write(LOUT,*) monB%ZNucl,'MONO(1)B,case1'
@@ -658,6 +660,7 @@ elseif(Flags%ISAPT.Eq.1) then
          monA%NAct=Input%SystemInput(2)%NAct
          monA%NActFromRDM = Input%SystemInput(2)%NActFromRDM
       endif
+      monA%MOClass = Input%SystemInput(2)%MOClass
 
       if(SAPT%InterfaceType==5) monB%TrexFile = Input%SystemInput(1)%TrexFile
 
@@ -707,6 +710,7 @@ elseif(Flags%ISAPT.Eq.1) then
          monB%NActFromRDM = Input%SystemInput(1)%NActFromRDM
          monB%NAct=Input%SystemInput(1)%NAct
       endif
+      monB%MOClass = Input%SystemInput(1)%MOClass
 
    end select
  end associate

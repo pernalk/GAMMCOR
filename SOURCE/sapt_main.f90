@@ -332,11 +332,13 @@ double precision,intent(inout) :: Tcpu,Twall
 integer :: i
 
 ! construct 2-TRDMs from ERPA eigenvectors
-if (SAPT%monA%TRDMType==2) then
-   call sapt_ERPA_TRDMs(Flags,SAPT%monA,NBasis)
-endif
-if (SAPT%monB%TRDMType==2) then
-   call sapt_ERPA_TRDMs(Flags,SAPT%monB,NBasis)
+if (SAPT%SaptLevel/=999) then ! not RS
+   if (SAPT%monA%TRDMType==2) then
+      call sapt_ERPA_TRDMs(Flags,SAPT%monA,NBasis)
+   endif
+   if (SAPT%monB%TRDMType==2) then
+      call sapt_ERPA_TRDMs(Flags,SAPT%monB,NBasis)
+   endif
 endif
 
 call sapt_ab_ints_dSRS(Flags,SAPT%monA,SAPT%monB,NAO,NBasis)
@@ -349,10 +351,12 @@ write(LOUT,'(8a10)') ('----------',i=1,8)
 
 call elst_dRS(SAPT%monA,SAPT%monB,SAPT)
 
-! modify e1exch_NaNb to arbitrary IREFA / IREFB
-call e1exch_NaNb(Flags,SAPT%monA,SAPT%monB,SAPT)
-call e1exch_NaNb_AexcB(Flags,SAPT%monA,SAPT%monB,SAPT)
-call e1exch_dSRS(SAPT%monA,SAPT%monB,SAPT)
+if(SAPT%SaptLevel/=999) then ! not RS
+   ! modify e1exch_NaNb to arbitrary IREFA / IREFB
+   call e1exch_NaNb(Flags,SAPT%monA,SAPT%monB,SAPT)
+   call e1exch_NaNb_AexcB(Flags,SAPT%monA,SAPT%monB,SAPT)
+   call e1exch_dSRS(SAPT%monA,SAPT%monB,SAPT)
+endif
 
 call clock('SAPT',Tcpu,Twall)
 

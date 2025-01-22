@@ -552,6 +552,14 @@ character(:), allocatable :: first, last
        read(val, *) SystemParams%NAct
        SystemParams%NActFromRDM = .false.
 
+ case ("MOCLASS")
+      if(uppercase(val) == "TREXIO" .or. &
+         uppercase(val) == "MOLPRO") then
+         SystemParams%MOClass = 0
+      elseif(uppercase(val) == "OCC") then
+         SystemParams%MOClass = 1
+      endif
+
  case ("CHARGE")
        read(val, *) SystemParams%Charge
 
