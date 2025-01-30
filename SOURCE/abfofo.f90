@@ -50,6 +50,9 @@ double precision,allocatable :: work1(:),work2(:)
 double precision,allocatable :: ints(:,:)
 integer,external :: NAddrRDM
 double precision,external :: FRDM2
+! DMRG-in-DFT
+double precision  :: XVEMB(NInte1)
+logical :: IVEMB
 
 ABPLUS = 0
 ABMIN  = 0
@@ -202,6 +205,30 @@ else
                 RDM2val,Occ,AuxCoeff,IGem,AuxInd,pos,&
                 INActive,NOccup,NDim,NDimX,NBasis,NInte1,IntJFile,IntKFile,ACAlpha,switch,ETot)
 endif
+
+! DMRG-in-DFT
+Inquire(file='embedding_potential_NO.bin',exist=IVEMB)
+if (IVEMB) then
+   Open(10,File='embedding_potential_NO.bin',form='unformatted',access='stream')
+   Do I=1,NInte1
+      Read(10) XVEMB(I)
+   EndDo
+   Close(10)
+   call triang_to_sq(XVEMB,work2,NBasis)
+   do j=1,NBasis
+      do i=1,NBasis
+         if(IGem(i)==IGem(j).And.IGem(i)==2) then
+             if(AB1) then
+                    HNO(i,j) = -work2(nbasis*(i-1)+j)
+             else
+                    ij=(max(i,j)*(max(i,j)-1))/2+min(i,j)
+                    HNO(i,j) = XOne(ij)+(1.d0-ACAlpha)*work2(nbasis*(i-1)+j)
+             endif
+         endif
+      enddo
+   enddo
+endif
+! DMRG-in-DFT end
 
 write(LOUT,'(1x,a,5x,f15.8)') "CASSCF Energy (w/o ENuc)", ETot
 
@@ -1239,6 +1266,9 @@ double precision,allocatable :: work1(:),work2(:)
 double precision,allocatable :: RDM2val(:,:,:,:),RDM2Act(:)
 integer,external          :: NAddrRDM
 double precision,external :: FRDM2
+! DMRG-in-DFT
+double precision  :: XVEMB(NInte1)
+logical :: IVEMB
 
 ABPLUS = 0
 ABMIN  = 0
@@ -1366,6 +1396,23 @@ else
                    INActive,NOccup,NDimX,NDimX,NBasis,NInte1,IntJFile,IntKFile,0d0,2)
    endif
 endif
+! DMRG-in-DFT
+Inquire(file='embedding_potential_NO.bin',exist=IVEMB)
+if (IVEMB) then
+   Open(10,File='embedding_potential_NO.bin',form='unformatted',access='stream')
+   Do I=1,NInte1
+      Read(10) XVEMB(I)
+   EndDo
+   Close(10)
+   XVEMB=XVEMB+XOne
+   call triang_to_sq(XVEMB,work2,NBasis)
+   do j=1,NBasis
+      do i=1,NBasis
+         if(IGem(i)==IGem(j).And.IGem(i)==2) HNO(i,j) = work2(nbasis*(i-1)+j)
+      enddo
+   enddo
+endif
+! DMRG-in-DFT end
 
 do i=1,NBasis
    C(i) = sign(sqrt(Occ(i)),Occ(i)-0.5d0)

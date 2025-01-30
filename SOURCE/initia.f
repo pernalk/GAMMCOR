@@ -559,7 +559,9 @@ C     for OTF Cholesky
       double precision :: UAONO(NBasis,NBasis)
       double precision,allocatable :: CMOAO(:,:),CAOMO(:,:)
       logical :: iex
-
+C DMRG-in-DFT
+      Real*8 XVEMB(NInte1)
+      Logical IVEMB
 
       If(iORCA==1) then
       LiborNew=1
@@ -781,6 +783,32 @@ C
          Write(6,'(" The number of 1-el integrals read vs. expected",
      $         2I10)') ICount,NInte1
       EndIf ! FACT.bin
+C
+C DMRG-in-DFT
+      Inquire(file='embedding_potential_MO.bin',exist=IVEMB)
+      If(IVEMB) Then
+C
+      XVEMB=Zero
+      Open(10,File='embedding_potential_MO.bin',form='unformatted',
+     $ access='stream', Status='Old')
+      If(LiborNew.Eq.1) Read(10)I,J,K
+      ICount=0
+      IJ=0
+      Do I=1,NBasis
+      Do J=1,I
+      IJ=IJ+1
+      Read(10,End=32) X
+      Ind=I*(I-1)/2+J
+      XVEMB(Ind)=X
+      ICount=ICount+1
+      EndDo
+      EndDo
+   32 Close(10)
+      Write(6,'(" The number of vemb integrals read vs. expected",
+     $ 2I10)') ICount,NInte1
+C
+      EndIf
+C DMRG-in-DFT end
 C
       If(ITwoEl.Eq.1) Then
 C
@@ -1155,6 +1183,27 @@ C
       Write(6,'(" Transforming two-electron integrals ...",/)')
 C
       Call MatTr(XKin,URe,NBasis)
+C
+C DMRG-in-DFT
+      If (IVEMB) Then
+C
+      Call MatTr(XVEMB,URe,NBasis)
+      Open(10,File='embedding_potential_NO.bin',form='unformatted',
+     $ access='stream')
+      Do I=1,NInte1
+      Write(10) XVEMB(I)
+      EndDo
+      Close(10)
+C     for tests
+      Var=Zero
+      Do I=1,NBasis
+      II=(I*(I+1))/2
+      Var=Var+Occ(I)*XVEMB(II)
+      EndDo
+      Write(6,'(X,"*** Tr[gamma.vemb] = *** ",E16.6,/)') Var
+C
+      EndIf
+C DMRG-in-DFT end
 C
       If(ITwoEl.Eq.1) Then
       Call TwoNO1(TwoEl,URe,NBasis,NInte2)
