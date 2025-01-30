@@ -71,7 +71,6 @@ integer, parameter :: CHOL_ACCU_LUDICROUS = 3
 double precision :: DCholeskyThr = -1.e0
 double precision :: DTHCThr = -1.e0
 
-
 integer, parameter :: GRID_PARAMS_SG1    = 1
 integer, parameter :: GRID_PARAMS_MEDIUM = 2
 integer, parameter :: GRID_PARAMS_FINE   = 3
@@ -201,6 +200,7 @@ type SystemBlock
       integer :: NOrb, NGem
       integer :: NActOrb  = 1
       integer :: NCoreOrb = 0
+      integer :: NStronglyOccOrb = 0
       integer :: NAct, INAct
       integer :: ISwitchAct = 0
       integer :: NActS(8), INActS(8)

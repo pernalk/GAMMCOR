@@ -11,7 +11,6 @@ import numpy as np
 from pyscf import gto, scf, mcscf, ao2mo, symm, tools, fci, mrpt
 import sys
 from copy import deepcopy
-import basis_set_exchange as bse
 sys.path.append('/home/aleksandra.tucholska/test/gammcor/')
 from Pyscf2Gammcor import get_data_for_gammcor
 from Pyscf2Gammcor import irrep_analyze, analysis_of_mo

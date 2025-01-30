@@ -125,8 +125,12 @@ else
    Flags%JobType = Input%CalcParams%JobType
 
   ! set BasisSet
-   Flags%BasisSet = Input%CalcParams%BasisSet
-   Flags%BasisSetPath = Input%CalcParams%BasisSetPath
+   if( allocated(Input%CalcParams%BasisSet)) then
+      Flags%BasisSet = Input%CalcParams%BasisSet
+   endif
+   if( allocated(Input%CalcParams%BasisSetPath)) then
+      Flags%BasisSetPath = Input%CalcParams%BasisSetPath
+   endif
 
   ! set TwoEl type
    Flags%ITwoEl = Input%CalcParams%TwoMoInt
@@ -205,7 +209,7 @@ else
      Flags%IDALTON = 0
      Flags%IPYSCF  = 1
      Flags%ORBITAL_ORDERING = 5 ! ORBITAL_ORDERING_PYSCF
-     print*, Flags%IPYSCF, 'ipyscf'
+
 end select
 
   Flags%InterFaceType = Input%CalcParams%InterfaceType
@@ -485,6 +489,7 @@ if(Flags%ISAPT.Eq.0) then
    System%Charge = Input%SystemInput(1)%Charge
    System%NBasis = Input%CalcParams%NBasis
    System%NCoreOrb = Input%SystemInput(1)%NCoreOrb
+   System%NStronglyOccOrb = Input%SystemInput(1)%NStronglyOccOrb
    System%Omega  = Input%SystemInput(1)%Omega
    System%PerVirt= Input%SystemInput(1)%PerVirt
    System%EigFCI = Input%SystemInput(1)%EigFCI

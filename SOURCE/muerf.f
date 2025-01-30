@@ -9,7 +9,6 @@ C
       use ab0fofo
       use timing
 C
-c     implicit none
       Implicit Real*8 (A-H,O-Z)
 
       include 'commons.inc'
@@ -50,11 +49,10 @@ C
      $ NoSt,'FFOO','FOFO',ICholesky,IDBBSC,IFlFCorr)
 C
       Write
-     $ (6,'(/1X,''CASSCF+ENuc, AC0-Corr, Total'',6X,3F15.8)')
+     $ (6,'(/1X,''CASSCF+ENuc, AC0-Corr    , Total'',6X,3F15.8)')
      $ ECASSCF+ENuc,ECorr,ECASSCF+ENuc+ECorr
-C
       Write
-     $ (6,'(1X,''CASSCF+ENuc, AC0-CBS[DFT], Total'',2X,3F15.8)')
+     $ (6,'(1X,''CASSCF+ENuc, AC0-CBS[DFT], Total'',6X,3F15.8)')
      $ ECASSCF+ENuc,ECorr+ECorrMD,ECASSCF+ENuc+ECorr+ECorrMD
        ETot=ECASSCF+ENuc+ECorr
 C
@@ -76,23 +74,6 @@ C     R(k,pq).(q|mu(r)|t) = R(k,pt)
       Allocate(CholVecs(NCholesky,NBasis**2),Work(NCholesky,NBasis**2))
       read(iunit) CholVecs
       close(iunit)
-
-C      ! try (k|p*q)
-C      block
-C      integer :: jj
-C      double precision :: Tmp(NBasis,NBasis)
-C      do i=1,NCholesky
-C         jj=0
-C         do l=1,NBasis
-C         do k=1,NBasis
-C            jj=jj+1
-C            Tmp(k,l) = CholVecs(i,jj)
-C         enddo
-C         enddo
-C         call dgemm('N','N',NBasis,NBasis,NBasis,1d0,
-C     $               XMuMat,NBasis,Tmp,NBasis,0d0,Work(i,:),NBasis)
-C      enddo
-C      end block
 
 C     SET TIMING FOR 3-ind transformations of Cholesky vecs
       Call gclock('START',Tcpu,Twall)
@@ -117,22 +98,6 @@ C     transform long-range (LR) cholesky vecs
      $           CholVecs,NCholErf*NBasis,XMuMat,NBasis,
      $           0d0,Work,NCholErf*NBasis)
       Call gclock('3-idx tran LR(k,pq)',Tcpu,Twall)
-C       block
-C       integer :: jj
-C       double precision :: Tmp(NBasis,NBasis)
-C       do i=1,NCholErf
-C          jj=0
-C          do l=1,NBasis
-C          do k=1,NBasis
-C             jj=jj+1
-C             Tmp(k,l) = CholVecs(i,jj)
-C          enddo
-C          enddo
-C         call dgemm('N','N',NBasis,NBasis,NBasis,1d0,
-C     $               XMuMat,NBasis,Tmp,NBasis,0d0,Work(i,:),NBasis)
-C       enddo
-C       end block
-
 C     save to disk
       open(newunit=iunit,file='chol1vLR',form='unformatted')
       write(iunit) NCholErf
@@ -144,6 +109,10 @@ C     save to disk
      $ IndN,IndX,IGem,NAcCAS,NInAcCAS,NDimX,NBasis,NDimX,NInte1,
      $ NoSt,'FFOO','FOFO',ICholesky,IDBBSC,IFlFCorr)
 
+      Call FirstOrderSREne(ETwoSR,NBasis)
+      Write(6,'(/,X,"1st-order SR energy for",I4," active orbitals")') 
+     $ NAcCAS+NInAcCAS-NStronglyOccOrb
+      Write(6,'(X," <Ref|H^SR|Ref> = ",F10.6)') ETwoSR
 
 c     print*, 'ABPLUS-my =',norm2(ABPLUS)
 c     print*, 'ABMIN -my =',norm2(ABMIN)
@@ -168,7 +137,7 @@ c      Print*, 'ECorr = ', ECorr
       End
 C *End Subroutine DBBSCH
 
-*Deck LOC_MU_CBS_v2
+*Deck LOC_MU_CBS_CHOL
       Subroutine LOC_MU_CBS_CHOL(XMuMat,CorrMD,AvMU,URe,
      $                           UNOAO,Occ,BasisSet,NBasis)
 C
@@ -211,6 +180,7 @@ C
       Double Precision, Allocatable :: Work(:,:),WorkD(:,:)
       Dimension IAct(NBasis),Ind2(NBasis)
       Dimension IndInt(NBasis),NSymNO(NBasis),NumOSym(15),MultpC(15,15)
+      Dimension OrbIGGrid(NBasis)
 C
       double precision :: Twall,TCpu
 C
@@ -220,7 +190,7 @@ C
 C
       call gclock('START',Tcpu,Twall)
 C
-      If(IFlCore.Eq.0) Then
+      If(IFlCore.Eq.0.And.IDBBSC.Eq.1) Then
          ICore = NCoreOrb ! from input.inp
          Do I=1,ICore
          Occ(I)=Zero
@@ -285,13 +255,17 @@ c        Write(6,'(1x,a,i3)') 'IFunSR       =',IFunSR
 c        Write(6,'(1x,a,i3)') 'IGridType    =', IGridType
 c        Write(6,'(1x,a,i3)') 'ORB_ORDERING =', IOrbOrder
 C
+         Allocate(Work(NBasis,NBasis))
+         Work = transpose(UNOAO)
          Call internal_gga_no_orbgrid(IGridType,BasisSet,
-     $                          IOrbOrder,transpose(UNOAO),
+     $                          IOrbOrder,Work,
      $                          WGrid,PhiGGA,NGrid,NBasis,NBasis,IUnits)
          OrbGrid  => PhiGGA(:,:,1)
          OrbXGrid => PhiGGA(:,:,2)
          OrbYGrid => PhiGGA(:,:,3)
          OrbZGrid => PhiGGA(:,:,4)
+
+         Deallocate(Work)
 C
       EndIf ! InternalGrid
 C
@@ -392,6 +366,9 @@ C
       endif
 c     PRint*, 'INActiveC =', INActiveC
 C
+c     Allocate(RDM2val(NOccup,NOccup,NOccup,NOccup))
+c     Call get_RDM2Occ(RDM2val,Occ,NAct,NOccup,NBasis)
+C
       NRDM2Act = NAct**2*(NAct**2+1)/2
       Allocate (RDM2Act(NRDM2Act))
       RDM2Act(1:NRDM2Act)=Zero
@@ -410,6 +387,7 @@ C
       Do K=1,NOccup
       Do J=1,NOccup
       Do I=1,NOccup
+C     change later from 1212 to 11,22!
       RDM2val(I,K,J,L)=FRDM2(I,K,J,L,RDM2Act,Occ,Ind2,NAct,NBasis)
       Enddo
       Enddo
@@ -484,8 +462,10 @@ C
 C
 C     active-active
 C
+      OrbIGGrid(1:NBasis) = OrbGrid(IG,1:NBasis)
       Call dgemv('N',NCholesky*NAct,NBasis,1d0,CHVCSAF,NCholesky*NAct,
-     $           OrbGrid(IG,1:NBasis),1,0d0,Oa,1)
+     $           OrbIGGrid,1,0d0,Oa,1)
+c    $           OrbGrid(IG,1:NBasis),1,0d0,Oa,1)
 c     print*, 'Oa =',norm2(Oa)
 C
 C     Q(pq) = \sum_rs \Gamma_pqrs phi_r \phi_s
@@ -514,8 +494,9 @@ c     If(IFlCore.Ne.0) Then
 C
 C     inactive-inactive
 C
+      OrbIGGrid(1:NBasis) = OrbGrid(IG,1:NBasis)
       Call dgemv('N',NCholesky*INActiveC,NBasis,1d0,CHVCSIF,
-     $          NCholesky*INActiveC,OrbGrid(IG,1:NBasis),1,0d0,Oi,1)
+     $          NCholesky*INActiveC,OrbIGGrid,1,0d0,Oi,1)
 !C
 !     ver 1
 !      Call dgemm('T','N',INActive,INActive,NCholesky,1d0,Oi,NCholesky,
@@ -529,8 +510,10 @@ C
 !c     print*, '2nd FPsiB =', IG, FPsiB(IG)
 C
 !     ver 2
+      OrbIGGrid(1:INActiveC) = OrbGrid(IG,ICore+1:INActive)
       Call dgemv('N',NCholesky,INActiveC,1d0,Oi,
-     $          NCholesky,OrbGrid(IG,ICore+1:INActive),1,0d0,tOi,1)
+     $          NCholesky,OrbIGGrid,1,0d0,tOi,1)
+C    $          NCholesky,OrbGrid(IG,ICore+1:INActive),1,0d0,tOi,1)
       FPsiB(IG)=FPsiB(IG)+ddot(NCholesky,tOi,1,tOi,1)
 !
 C     active-inactive
@@ -605,6 +588,10 @@ C
 C
 C     COMPUTE XMuMAT MATRIX in NO
 C
+      C=1.0d0
+      Write(*,*)
+      Write(*,*)"*** C= *** ",C
+C
       Do IP=1,NBasis
       Do IQ=1,IP
       XMuMAT(IP,IQ)=0d0
@@ -614,7 +601,7 @@ C
 C
       Do I=1,NGrid
       XMuMAT(IP,IQ)=XMuMAT(IP,IQ)
-     $ +OrbGrid(I,IP)*OrbGrid(I,IQ)*WGrid(I)*Exp(-XMuLoc(I))
+     $ +OrbGrid(I,IP)*OrbGrid(I,IQ)*WGrid(I)*Exp(-C*XMuLoc(I))
       EndDo
 C
       EndIf
@@ -674,10 +661,11 @@ C
 
       End Subroutine LOC_MU_CBS_CHOL
 
-C     incore version
 *Deck LOC_MU_CBS
       Subroutine LOC_MU_CBS(XMuMAT,URe,UNOAO,Occ,TwoEl,
      $ NBasis,NInte2)
+C
+C     INCORE VERSION
 C
 C     COMPUTES A "BASIS-SET ERROR CORRECTION" WITH SR-PBE ONTOP CORRELATION from Giner et al. JCP 152, 174104 (2020)
 C     RETURNS XMuMAT USED TO COMPUTE CBS CORRECTION BY MODIFICATION OF H' IN AC0
@@ -937,10 +925,394 @@ c      EndDo
 c      Write(6,'(/,1X,"*** CBS CORRECTION EXCLUDING CORE ORBITALS ***")')
 c      EndIf
 C
-      Write(6,'(/," CBS correction, average Mu",
+      Write(6,'(/," CBS[DFT] correction, average Mu",
      $ F15.8,F15.2/)') CorrMD,AvMU
 C
       Return
       End
 C*End Subroutine LOC_MU_CBS
+
+*Deck get_RDM2Occ
+      Subroutine get_RDM2Occ(RDM2val,Occ,INActive,NAct,NOccup,NBasis)
+C
+C     read active triangle of 2-RDM (stored in rdm2.dat)
+C     fill the entire RDM2val(NOccup^4) matrix
+C
+C     Comment: RDM2Act is 1212, then RDM2val is 1122
+C
+      implicit none
+C
+      integer,intent(in) :: INActive,NAct,NOccup,NBasis
+      double precision,intent(in)  :: Occ(NBasis)
+      double precision,intent(out) :: RDM2val(NOccup,NOccup, 
+     $                                        NOccup,NOccup)
+
+      integer :: i,j,k,l
+      integer :: iunit,ios
+      integer :: NRDM2Act
+      integer :: Ind(NBasis)
+      double precision :: VAL
+      double precision, allocatable :: RDM2Act(:)
+      integer,external :: NAddrRDM
+      double precision,external :: FRDM2
+
+C     index matrix
+      Ind = 0
+      do i=1,NAct
+         Ind(INActive+i) = i
+      enddo
+C
+      NRDM2Act = NAct**2*(NAct**2+1)/2
+      Allocate (RDM2Act(NRDM2Act))
+      RDM2Act(1:NRDM2Act)=0d0
+C
+      Open(newunit=iunit,file='rdm2.dat',status='old')
+      Do
+         read(iunit,*,iostat=ios) i,j,k,l,VAL
+         if(ios/=0) exit
+         RDM2Act(NAddrRDM(i,k,j,l,NAct)) = 0.5d0*val
+      Enddo
+      Close(iunit)
+C
+      Do L=1,NOccup
+      Do K=1,NOccup
+      Do J=1,NOccup
+      Do I=1,NOccup
+      RDM2val(I,J,K,L)=FRDM2(I,K,J,L,RDM2Act,Occ,Ind,NAct,NBasis)
+      Enddo
+      Enddo
+      Enddo
+      Enddo
+c     Print*, 'RDM2val = ', norm2(RDM2val)
+C
+      End
+*     End Subroutine get_RDM2Occ
+
+*Deck PairD_Vis
+      Subroutine PairD_Vis(URe,UNOAO,Occ,NBasis)
+C
+C     Visualise electron pair density of HELIUM atom on a sphere of the 
+C     radius 0.5 bohr
+C     2-RDM is constructed from PMAT read from pmat.dat
+C
+C     Do not use symmetry!
+C
+      use read_external
+C
+      Implicit Real*8 (A-H,O-Z)
+C
+      Parameter(Zero=0.D0, Half=0.5D0, One=1.D0, Two=2.D0, Three=3.0D0,
+     $ Four=4.D0)
+C
+      Include 'commons.inc'
+C
+      Real*8, Allocatable ::  OrbGrid(:,:),RhoGrid(:),
+     $ OrbXGrid(:,:),OrbYGrid(:,:),OrbZGrid(:,:),WGrid(:),
+     $ RR(:,:)
+C
+      Dimension URe(NBasis,NBasis),Occ(NBasis),UNOAO(NBasis,NBasis),
+     $ PMAT(NBasis,NBasis)
+C
+      Call molprogrid0(NGrid,NBasis)
+      Write(6,'(/,1X,"The number of Grid Points = ",I8)')
+     $ NGrid
+C
+      Allocate (WGrid(NGrid))
+      Allocate (OrbGrid(NGrid,NBasis))
+      Allocate (OrbXGrid(NGrid,NBasis))
+      Allocate (OrbYGrid(NGrid,NBasis))
+      Allocate (OrbZGrid(NGrid,NBasis))
+      Allocate(RhoGrid(NGrid))
+      Allocate(RR(3,NGrid))
+C
+      Call molprogrid(OrbGrid,OrbXGrid,OrbYGrid,OrbZGrid,
+     $ WGrid,UNOAO,NGrid,NBasis)
+      Call molprogrid1(RR,NGrid)
+C
+      Open(10,file="pmat.dat")
+      Read(10,*)X
+      Do I=1,NBasis
+      Do J=1,NBasis
+      Read(10,*) I1,I2,PMAT(I,J)
+      EndDo
+      EndDo
+      Close(10)
+C
+C     find the radius closest to 0.5 bohr
+C
+      Radius=Zero
+      Err=1.0d5
+      Do I1=1,NGrid
+C
+      R1=RR(1,I1)**2+RR(2,I1)**2+RR(3,I1)**2
+      R1=SQRT(R1)
+      If(Abs(R1-0.5D0).Lt.Err) Then
+      Radius=R1
+      Err=Abs(R1-0.5D0)
+      EndIf
+C
+      EndDo
+C
+      Do I1=1,NGrid
+C
+      R1=RR(1,I1)**2+RR(2,I1)**2+RR(3,I1)**2
+      R1=SQRT(R1)
+C
+      If(Abs(R1-Radius).Lt.1.D-2) Then
+C     
+      Do I2=1,NGrid
+C
+      R2=RR(1,I2)**2+RR(2,I2)**2+RR(3,I2)**2
+      R2=SQRT(R2)
+C
+      If(Abs(R2-Radius).Lt.1.D-2) Then
+C
+      R12=(RR(1,I1)-RR(1,I2))**2+(RR(2,I1)-RR(2,I2))**2
+     $   +(RR(3,I1)-RR(3,I2))**2
+      R12=SQRT(R12)
+C
+      PairD=Zero
+      Do IP=1,NBasis
+      Do IQ=1,NBasis
+      PairD=PairD
+     $ +SQRT(Two)*PMAT(IP,IQ)
+     $ *OrbGrid(I1,IP)*OrbGrid(I2,IQ)
+      EndDo
+      EndDo
+      PairD=PairD*PairD
+C
+      Write(*,*)R12,PairD
+C
+      EndIf
+      EndDo
+C
+      Stop
+      EndIf
+      EndDo
+C
+      Write(*,*)'Radius of the sphere =',Radius
+C
+      Return
+      End
+
+*Deck FistOrderSREne
+      Subroutine FirstOrderSREne(ETwoSR,NBasis)
+C
+C     calculate <Ref | H^SR | Ref> = Gamma_prqs * (pq | rs)_sr
+C     adopted from TwoEneChol
+C
+      Implicit Real*8 (A-H,O-Z)
+C
+      Include 'commons.inc'
+C
+      Integer NBasis
+      Double Precision ETwoSR
+C
+C     LOCAL ARRAYS
+C
+      Integer INActive,NAct,NOccup
+      Integer iloop,nloop,off
+      Integer dimFO,iBatch,BatchSize
+      Integer :: Ind(NBasis)
+      Double Precision, Allocatable :: FF(:,:), FFtr(:,:)
+      Double Precision, Allocatable :: FFErf(:,:), FFErftr(:,:)
+      Double Precision, Allocatable :: TmpTr(:,:), TmpErfTr(:,:)
+      Double Precision, Allocatable :: RDM2val(:,:,:,:)
+      Double Precision, Allocatable :: ints(:,:),work1(:,:)
+      Double precision :: AuxICoeff(2,2,2,2),AuxVal,AuxIVal
+      Double precision :: AuxActCoeff(3,3,3,3),AuxInactCoeff(3,3,3,3)
+c
+      Parameter(MaxBatchSize = 120)
+C
+C     SET DIMENSIONS
+      NAct=NAcCAS
+      INActive=NInAcCAS
+      NOccup=NAct+INActive
+c
+c     INDEX STRONGLY OCCUPIED (SO) ORBITALS
+c     (includes inactive)
+      Ind = 1
+      Do I=1,NStronglyOccOrb
+      Ind(I) = 2
+      EndDo
+C     Auxiliary matrices
+C     act:   IGem(i)=1 Igem(i)=Igem(j)=Igem(k)=Igem(l)
+C     inact: IGem(i)=2 Igem(i)=Igem(j)=Igem(k)=Igem(l)
+      Do l=1,3
+         Do k=1,3
+            do j=1,3
+               Do i=1,3
+                  If((i==2).and.(i==j).and.(j==k).and.(k==l)) then
+                     AuxActCoeff(i,j,k,l) = 1
+                  Else
+                     AuxActCoeff(i,j,k,l) = 0
+                  Endif
+               Enddo
+            enddo
+         Enddo
+      Enddo
+      Do l=1,3
+         Do k=1,3
+            do j=1,3
+               Do i=1,3
+                  If((i==1).and.(i==j).and.(j==k).and.(k==l)) then
+                     AuxInActCoeff(i,j,k,l) = 1
+                  Else
+                     AuxInActCoeff(i,j,k,l) = 0
+                  Endif
+               Enddo
+            enddo
+         Enddo
+      Enddo
+c
+      Do l=1,2
+         Do k=1,2
+            do j=1,2
+               Do i=1,2
+                  If((i==2).and.(i==j).and.(j==k).and.(k==l)) then
+                     AuxICoeff(i,j,k,l) = 0
+                  Else
+                     AuxICoeff(i,j,k,l) = 1
+                  Endif
+               Enddo
+            enddo
+         Enddo
+      Enddo
+C
+c     Load Cholesky Vecs
+      Open(newunit=iunit,file='cholvecs',form='unformatted')
+      Read(iunit) NCholesky
+      Allocate(FF(NCholesky,NBasis**2))
+      Read(iunit) FF
+      Close(iunit)
+c
+      Open(newunit=iunit,file='chol1vFR',form='unformatted')
+      Read(iunit) NCholesky
+      Allocate(FFTr(NCholesky,NBasis**2))
+      Read(iunit) FFTr
+      Close(iunit)
+c
+      Open(newunit=iunit,file='cholvErf',form='unformatted')
+      Read(iunit) NCholErf
+      Allocate(FFErf(NCholErf,NBasis**2))
+      Read(iunit) FFErf
+      Close(iunit)
+c
+      Open(newunit=iunit,file='chol1vLR',form='unformatted')
+      Read(iunit) NCholErf
+      Allocate(FFErfTr(NCholErf,NBasis**2))
+      Read(iunit) FFErfTr
+      Close(iunit)
+C
+c     print*, 'NCholesk =',NCholesky
+c     print*, 'NCholErf =',NCholErf
+      Allocate(TmpErfTr(NCholErf,NBasis*NOccup))
+      ! p*q : LR
+      Do iq=1,NOccup
+         Do ip=1,NBasis
+            TmpErfTr(:,ip+(iq-1)*NBasis)=FFErfTr(:,iq+(ip-1)*NBasis)
+         EndDo
+      EndDo
+      Allocate(TmpTr(NCholesky,NBasis*NOccup))
+      ! p*q : FR
+      Do iq=1,NOccup
+         Do ip=1,NBasis
+            TmpTr(:,ip+(iq-1)*NBasis)=FFTr(:,iq+(ip-1)*NBasis)
+         EndDo
+      Enddo
+C
+      Allocate(RDM2val(NOccup,NOccup,NOccup,NOccup))
+      CAll get_RDM2Occ(RDM2val,Occ,INActive,NAct,NOccup,NBasis)
+C
+      dimFO = NBasis*NOccup
+      nloop = (dimFO - 1) / MaxBatchSize + 1
+C
+      Allocate(ints(NBasis,NBasis))
+      Allocate(work1(dimFO,MaxBatchSize))
+C
+      ETwoSR=0
+C     EXCHANGE LOOP (FO|FO), use only (OO|OO)
+      off = 0
+      k   = 0
+      l   = 1
+      Do iloop=1,nloop
+
+      ! batch size for each iloop; last one is smaller
+      BatchSize = min(MaxBatchSize,dimFO-off)
+C
+      ! assemble (FO|BatchSize)_Sr batch from CholVecs
+      ! (pq*|rs) : SR=-LR+FR
+      call dgemm('T','N',dimFO,BatchSize,NCholErf,
+     $         -0.25d0,FFErfTr,NCholErf,
+     $          FFErf(:,off+1:off+BatchSize),NCholErf,0d0,work1,dimFO)
+      call dgemm('T','N',dimFO,BatchSize,NCholesky,
+     $          0.25d0,FFTr,NCholesky,
+     $          FF(:,off+1:off+BatchSize),NCholesky,1d0,work1,dimFO)
+      ! (pq|rs*): SR=-LR+FR
+      call dgemm('T','N',dimFO,BatchSize,NCholErf,
+     $         -0.25d0,FFErf,NCholErf,
+     $          FFErfTr(:,off+1:off+BatchSize),NCholErf,1d0,work1,dimFO)
+      call dgemm('T','N',dimFO,BatchSize,NCholesky,0.25d0,FF,NCholesky,
+     $          FFTr(:,off+1:off+BatchSize),NCholesky,1d0,work1,dimFO)
+      ! (p*q|rs)
+      call dgemm('T','N',dimFO,BatchSize,NCholErf,
+     $         -0.25d0,TmpErfTr,NCholErf,
+     $          FFErf(:,off+1:off+BatchSize),NCholErf,1d0,work1,dimFO)
+      call dgemm('T','N',dimFO,BatchSize,NCholesky,
+     $          0.25d0,TmpTr,NCholesky,
+     $          FF(:,off+1:off+BatchSize),NCholesky,1d0,work1,dimFO)
+      ! (pq|r*s)
+      call dgemm('T','N',dimFO,BatchSize,NCholErf,
+     $         -0.25d0,FFErf,NCholErf,
+     $         TmpErfTr(:,off+1:off+BatchSize),NCholErf,1d0,work1,dimFO)
+      call dgemm('T','N',dimFO,BatchSize,NCholesky,0.25d0,FF,NCholesky,
+     $           TmpTr(:,off+1:off+BatchSize),NCholesky,1d0,work1,dimFO)
+C
+      Do iBatch=1,BatchSize
+
+      k = k + 1
+      if(k>NBasis) then
+         k = 1
+         l = l + 1
+      endif
+
+      do j=1,NOccup
+         do i=1,NBasis
+            ints(i,j) = work1((j-1)*NBasis+i,iBatch)
+         enddo
+      enddo
+C
+      if(k>NOccup) cycle
+C
+        Do j=1,NOccup
+           Do i=1,NOccup
+              AuxVal  = AuxActCoeff(IGem(i),IGem(j),IGem(k),IGem(k))
+              AuxIVal = AuxICoeff(Ind(i),Ind(j),Ind(k),Ind(l))
+              ETwoSR  = ETwoSR
+     $                + AuxVal*AuxIVal*RDM2val(i,j,k,l)*ints(i,j)
+
+              If(NInAcCAS.Eq.0) Then
+                AuxVal  = AuxInActCoeff(IGem(i),IGem(j),IGem(k),IGem(k))
+                ETwoSR  = ETwoSR
+     $                  + AuxVal*AuxIVal*RDM2val(i,j,k,l)*ints(i,j)
+
+              EndIf
+          EndDo
+        EndDo
+C
+      EndDo
+C
+      off = off + MaxBatchSize
+C
+      EndDo
+c
+c     print*, 'ETwoSr = ', ETwoSR
+C
+      Deallocate(ints,work1)
+      Deallocate(FF,FFtr,FFErf,FFErfTr)
+      Deallocate(TmpTr,TmpErfTr)
+      Deallocate(RDM2val)
+C
+      End
+C     End Subroutine FirstOrderSREne
 

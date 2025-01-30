@@ -82,6 +82,7 @@ C     FILL COMMONS AND CONSTANTS
       BasisSet= Flags%BasisSetPath // Flags%BasisSet
 C
       NCoreOrb = System%NCoreOrb
+      NStronglyOccOrb = System%NStronglyOccOrb
 C
       Title   = Flags%JobTitle
 C
@@ -124,8 +125,7 @@ C
 c     ITREXIO = Flags%ITREXIO
       IMOLPRO = Flags%IMOLPRO
       IDMRG   = Flags%IDMRG
-      IPYSCF = Flags%IPYSCF
-      print*, IPYSCF, Flags%IPYSCF, 'Flags%IPYSCF222'
+      IPYSCF  = Flags%IPYSCF
 C
 C     IF IRes=1 - RESTART THE CALCULATIONS FROM A RESTART FILE
 C
@@ -298,9 +298,9 @@ C
 C      Print*,'VALUE DECLARED IN INPUT: ',NoSt
 C
       ElseIf(IDALTON.Eq.0.and.IDMRG.Eq.0) Then
-         if (IPYSCF.ne.1)then
+         if (IPYSCF.ne.1) then
             Call read_NoSt_molpro(NoSt,'2RDM')
-            endif
+         endif
       ElseIf(IDALTON.Eq.1) Then
       NoSt = 1
       Write(6,'(/,1x,a)') 'WARNING! ASSUMING RMDs CORRESPOND TO

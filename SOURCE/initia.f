@@ -2122,8 +2122,12 @@ C
      &                        'AOTWOSORT')
 C
           ElseIf (ICholeskyBIN==1) Then
-          Call FockGen_CholR(FockF,CholeskyVecs%R(1:NCholesky,1:NInte1),
+          Allocate(MatFF(NCholesky,NInte1))
+        MatFF(1:NCholesky,1:NInte1)=CholeskyVecs%R(1:NCholesky,1:NInte1)
+C         Call FockGen_CholR(FockF,CholeskyVecs%R(1:NCholesky,1:NInte1),
+          Call FockGen_CholR(FockF,MatFF,
      &                       GammaAB,XKin,NInte1,NCholesky,NBasis)
+          Deallocate(MatFF)
 
 C          block
 CC         try to construct Fock in MO in CholeskyBIN
@@ -2831,9 +2835,10 @@ C
 C
       Return
       End
-Cc    End Subroutine LdInteg
+C     c    End Subroutine LdInteg
 
-      subroutine ReadPYSCF(THCData, BasisSet, XKin, XNuc, ENuc, Occ,    
+      subroutine ReadPYSCF(THCData, BasisSet, XKin, XNuc, ENuc, Occ,
+      
      &    URe, TwoEl, UMOAO,  NInte1, NBasis, NInte2, NGem, Flags, anSt)
       use interface_pp
       use print_units
@@ -2871,7 +2876,8 @@ Cc    End Subroutine LdInteg
 
       integer i, j, ab
 
-C     Cholesky OnTheFly                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         
+C     Cholesky OnTheFly
+
       type(TCholeskyVecsOTF) :: CholeskyVecsOTF
       Type(TCholeskyVecsOTF) :: CholErfVecsOTF
       type(TSystem)  :: System
@@ -2882,7 +2888,7 @@ C     Cholesky OnTheFly
 
       Type(TCholeskyVecs) :: CholeskyVecs
       Real*8, Allocatable :: MatFF(:,:)
-      
+
       print*, 'yest'
 
       call PYSCF_wrapper(THCData, NInte1, NInte2, NBasis, ENuc, CAONO,
@@ -2952,17 +2958,17 @@ C     Cholesky OnTheFly
             print*, 'This setting is not supported with PYSCF, exiting'
             stop
 
-         EndIf                  !ICholesky
+         EndIf                  !ICholesky                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  
 
          Else
             print*, 'This setting is now supported with PYSCF, :)'
             UMOAO = transpose(CAONO)
             call TwoNO1(TwoEl,UMOAO,NBasis,NInte2)
-         EndIf                  !ITwoEl
+         EndIf                  !ITwoEl                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     
       return
       End
-C*    End Subroutine ReadPYSCF                                                                                                                 
-      
+C*    End Subroutine ReadPYSCF                                                           
+
 *Deck DimSym
       Subroutine DimSym(NBasis,NInte1,NInte2,MxHVec,MaxXV)
 C

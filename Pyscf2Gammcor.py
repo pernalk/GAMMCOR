@@ -7,7 +7,6 @@ from collections import Counter
 from pyscf.tools import molden
 import sys
 from copy import deepcopy
-import basis_set_exchange as bse
 from functools import reduce
 
 def get_one_indices(binary_string):

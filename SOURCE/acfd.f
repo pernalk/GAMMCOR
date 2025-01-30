@@ -2404,7 +2404,7 @@ C
 C
       Eig(NFree1)=ABP
 C
-      If(IDALTON.Eq.0.and.ipyscf.eq.0) Then         
+      If(IDALTON.Eq.0.and.ipyscf.eq.0) Then
       If(ABS(ABP-work1(IP,IQ)).Gt.1.d-7)
      $Write(*,*)'ABP inconsistent with eps_a-eps_i for',IP,IQ
       EndIf

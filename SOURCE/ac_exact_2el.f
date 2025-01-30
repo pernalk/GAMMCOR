@@ -1119,8 +1119,8 @@ C
 C
 C change to ISpin=0 for singlets or ISpin=1 for triplets
 c herer!!!
-c      ISpin=0
-      ISpin=1
+      ISpin=0
+c      ISpin=1
 C
       SpinFac=One
       If(ISpin.Eq.1) SpinFac=-One
@@ -1944,4 +1944,682 @@ C
       Return
       End
 
+*Deck ACPINORS
+      Subroutine ACPINORS(ERef,ENuc,TwoElLR,TwoElSR,Occ,XOne,VSR,
+     $ NBasis,NInte1,NInte2,NDim,NGem,NoEig)
+C
+C     A ROUTINE FOR COMPUTING EXACT AC CORRELATION ENERGY FOR 2-ELECTRON SYSTEMS
+C     H0 = T + Vne + V^SR + Vee^LR
+C
+      Implicit Real*8 (A-H,O-Z)
+C
+      Include 'commons.inc'
+c
+      Parameter(Zero=0.D0,Half=0.5D0,One=1.D0,Two=2.D0,Three=3.D0,
+     $ Four=4.D0)
+C
+      Dimension
+     $ Occ(NBasis),TwoElLR(NInte2),TwoElSR(NInte2),
+     $ XOne(NInte1),VSR(NInte1)
+C
+C     LOCAL ARRAYS
+C
+      Dimension
+     $ UReAlph(NBasis,NBasis),OccAlph(NBasis),CIAlph(NBasis),
+     $ TwoAlph(NInte2),H1Alph(NInte1),
+     $ ABPLUS(NDim*NDim),ABMIN(NDim*NDim),
+     $ CMAT(NDim*NDim),EMAT(NBasis*NBasis),DMAT(NDim*NBasis),
+     $ EMATM(NBasis*NBasis),DMATK(NDim*NBasis),
+     $ IndX(NDim),IndN(2,NDim),
+     $ EigVecR(2*(NDim+NBasis)*2*(NDim+NBasis)),
+     $ Eig(2*(NDim+NBasis)),IndAux(NBasis),
+     $ XGrid(100), WGrid(100),CISave(NBasis),IGemS(NBasis),
+     $ TrGamm(NInte1,NInte1),EExcit(NInte1),GammAl(NInte1),
+     $ TrGamm0(NInte1,NInte1),EExcit0(NInte1)
+C
+      Do I=1,NBasis
+      CISave(I)=CICoef(I)
+      IGemS(I)=IGem(I)
+      EndDo
+      NGemS=NGem
+C
+C     CONSTRUCT A LOOK-UP TABLE
+C
+      IJ=0
+      Ind=0
+      Do I=1,NBasis
+      Do J=1,I-1
+C
+      IJ=IJ+1
+C
+      Ind=Ind+1
+      IndX(Ind)=IJ
+      IndN(1,Ind)=I
+      IndN(2,Ind)=J
+C
+      EndDo
+      EndDo
+C
+      NDimX=Ind
+      NDimN=NBasis
+C
+      NGrid=30
+C
+      Call GauLeg(Zero,One,XGrid,WGrid,NGrid) 
+C
+      ACAlpha=Zero
+      TwoAlph(1:NInte2)=TwoElLR(1:NInte2)
+      Call OptTwoRS(TrGamm0,GammAl,EExcit0,ETot,ENuc,Occ,XOne,TwoAlph,
+     $ TwoElSR,VSR,
+     $ UReAlph,OccAlph,
+     $ NBasis,NInte1,NInte2,NoEig,ACAlpha)     
+C
+      ECorr=Zero
+      ECorrSR1=Zero
+      ECorrSR2=Zero
+      Delta=Zero
+      DeltaInter=Zero
+C
+      Do N=1,NGrid
+C
+      ACAlpha=XGrid(N)
+C
+      TwoAlph(1:NInte2)=TwoElLR(1:NInte2)
+      Call OptTwoRS(TrGamm,GammAl,EExcit,ETot,ENuc,Occ,XOne,TwoAlph,
+     $ TwoElSR,VSR,
+     $ UReAlph,OccAlph,
+     $ NBasis,NInte1,NInte2,NoEig,ACAlpha)
+C
+       Call ACEneRS(ECorrA,WSR1,WSR2,DeltaA,DeltaB,TrGamm,GammAl,EExcit,
+     $ TrGamm0,EExcit0,
+     $ TwoElLR,TwoELSR,VSR,
+     $ Occ,XOne,IndN,NBasis,NInte1,NInte2,NDimX,NDimN)
+      Write(6,'(/,X,''ACAlpha:'',F11.8,3X,"W_ALPHA:",F12.8,
+     $ 3X,"W_ALPHA^SR:",2F12.8,
+     $ 3X,"Delta_ALPHA:",F12.8)')ACAlpha,ECorrA,WSR1,WSR2,DeltaA
+C
+      ECorr=ECorr+WGrid(N)*ECorrA
+      ECorrSR1=ECorrSR1+WGrid(N)*WSR1
+      ECorrSR2=ECorrSR2+WGrid(N)*WSR2 
+      Delta=Delta+WGrid(N)*DeltaA
+      DeltaInter=DeltaInter+WGrid(N)*DeltaB
+C
+      EndDo
+C
+      Write (6,'(/,X,
+     $''ECorrLR, ECorrSRinter, ECorrSRintra, DeltaInter, DeltaIntra'',
+     $ 5F15.8)')
+     $ ECorr,ECorrSR1,ECorrSR2,DeltaInter,Delta-DeltaInter
+C
+      ECorrTot=ECorr+ECorrSR1+ECorrSR2+Delta
+      Write (6,'(/,X,
+     $''ERef+ENuc, ECorrTot, Total'',3F15.8)')
+     $ ERef+ENuc, ECorrTot, ERef+ENuc+ECorrTot
+C
+      TwoAlph(1:NInte2)=TwoElLR(1:NInte2)
+      ACAlpha=One
+      Write(6,'(/,X,''********* FIND THE EXACT ENERGY (ACAlpha ='',
+     $ F5.2,") *********")') ACAlpha
+C
+      Call OptTwoRS(TrGamm,GammAl,EExcit,ETot,ENuc,Occ,XOne,TwoAlph,
+     $ TwoElSR,VSR,
+     $ UReAlph,OccAlph,
+     $ NBasis,NInte1,NInte2,NoEig,ACAlpha)
+C
+      Return
+      End
 
+*Deck OptTwoRS
+      Subroutine OptTwoRS(TrGamm,GammAl,
+     $ EExcit,ETotAlph,ENuc,Occ,XOne,TwoEl,
+     $ TwoElSR,VSR,
+     $ UReAlph,OccAlph,
+     $ NBasis,NInte1,NInte2,NoEig,ACAlpha)
+C
+C     OPTIMIZATION ALGORITHM FOR TWO-ELECTRON SINGLET OR TRIPLET SYSTEMS
+C     ISpin=0 or ISpin=1
+C
+C     ON EXIT TRANSITION 1-RDM's ARE RETURNED:
+C     Gamma_pq+Gamm_qp for p.ne.q
+C     and Gamma_pp
+C
+      Implicit Real*8 (A-H,O-Z)
+C
+      Parameter(Zero=0.0D0,Half=0.50D0,One=1.0D0,Two=2.0D0,Four=4.0D0)
+C
+      Include 'commons.inc'
+C
+      Dimension UReAlph(Nbasis,NBasis),Occ(NBasis),
+     $ OccAlph(NBasis),CIAlph(NBasis),XOne(NInte1),TwoEl(NInte2),
+     $ TrGamm(NInte1,NInte1),GammAl(NInte1),EExcit(NInte1),
+     $ TwoElSR(NInte2),VSR(NInte1)
+C
+C     LOCAL ARRAYS
+C
+      Dimension AP(NInte1,NInte1),PP(NInte1),PWork(NInte1),
+     $ H1Alph(NInte1),HNO(NInte1),PFull(NBasis,NBasis,NInte1),
+     $ ISkip(NInte1)
+C
+C change to ISpin=0 for singlets or ISpin=1 for triplets
+c herer!!!
+      ISpin=0
+c      ISpin=1
+C
+      SpinFac=One
+      If(ISpin.Eq.1) SpinFac=-One
+C
+      ISkip(1:NInte1)=0
+C
+C     CONSTRUCT ONE-ELECTRON PART OF THE AC ALPHA-HAMILTONIAN
+C
+      Do I=1,NInte1
+      H1Alph(I)=XOne(I)
+      EndDo
+C
+      IJ=0
+      Do I=1,NBasis
+      Do J=1,I
+      IJ=IJ+1
+C
+      If(IGem(I).Ne.IGem(J)) Then
+C
+      H1Alph(IJ)=ACAlpha*H1Alph(IJ)
+C
+      Else
+C
+      Aux=Zero
+C
+      Do IT=NCore+1,NBasis
+      If(IGem(IT).Ne.IGem(I))
+     $  Aux=Aux+(One-ACAlpha)*Occ(IT)*
+     $ (Two*TwoEl(NAddr3(IT,IT,I,J))-TwoEl(NAddr3(IT,I,IT,J)))
+      Enddo
+C
+      H1Alph(IJ)=H1Alph(IJ)+Aux+(One-ACAlpha)*VSR(IJ)
+C
+      EndIf
+C
+      EndDo
+      EndDo
+C
+C     CONSTRUCT TWO-ELECTRON PART OF THE AC ALPHA-HAMILTONIAN
+C
+      NAdd=Zero
+      IJ=0
+      Do I=1,NBasis
+      Do J=1,I
+      IJ=IJ+1
+      KL=0
+      Do K=1,NBasis
+      Do L=1,K
+      KL=KL+1
+C
+      If(IJ.Ge.KL) Then
+      NAdd=NAdd+1
+C
+      If(.Not.(
+     $IGem(I).Eq.IGem(J).And.IGem(J).Eq.IGem(K).And.IGem(K).Eq.IGem(L)))
+     $ TwoEl(NAdd)=ACAlpha*TwoEl(NAdd)
+C
+      TwoEl(NAdd)=TwoEl(NAdd)+ACAlpha*TwoElSR(NAdd)
+C
+      EndIf
+C
+      EndDo
+      EndDo
+      EndDo
+      EndDo
+C
+      IAB=0
+      Do IA=1,NBasis
+      Do IB=1,IA
+      IAB=IAB+1
+C
+      FAB=One
+      If(IA.Eq.IB.And.ISpin.Eq.1) FAB=Zero
+      If(IA.Eq.IB.And.ISpin.Eq.0) FAB=SQRT(Half)
+C
+      ICD=0
+      Do IC=1,NBasis
+      Do ID=1,IC
+      ICD=ICD+1
+      FCD=One
+      If(IC.Eq.ID.And.ISpin.Eq.1) FCD=Zero
+      If(IC.Eq.ID.And.ISpin.Eq.0) FCD=SQRT(Half)
+C
+      AP(IAB,ICD)=TwoEl(NAddr3(IA,IC,ID,IB))
+     $               +SpinFac*TwoEl(NAddr3(IA,ID,IC,IB))
+C
+      IAC=(Max(IA,IC)*(Max(IA,IC)-1))/2+Min(IA,IC)
+      IAD=(Max(IA,ID)*(Max(IA,ID)-1))/2+Min(IA,ID)
+      IBC=(Max(IC,IB)*(Max(IC,IB)-1))/2+Min(IC,IB)
+      IBD=(Max(ID,IB)*(Max(ID,IB)-1))/2+Min(ID,IB)
+C
+      If(IB.Eq.ID) AP(IAB,ICD)=AP(IAB,ICD)+H1Alph(IAC)
+      If(IA.Eq.ID) AP(IAB,ICD)=AP(IAB,ICD)+SpinFac*H1Alph(IBC)
+      If(IB.Eq.IC) AP(IAB,ICD)=AP(IAB,ICD)+SpinFac*H1Alph(IAD)
+      If(IA.Eq.IC) AP(IAB,ICD)=AP(IAB,ICD)+H1Alph(IBD)
+C
+      AP(IAB,ICD)=FAB*FCD*AP(IAB,ICD)
+C
+      EndDo
+      EndDo
+      EndDo
+      EndDo      
+C
+      Call Diag8(AP,NInte1,NInte1,PP,PWork)
+C
+      ETotAlph=PP(NoEig)
+C
+      Do I=1,NInte1
+      EExcit(I)=PP(I)-PP(NoEig)
+      EndDo
+C
+      Write(6,'(/,X,
+     $ ''RESULTS FROM THE TWO-ELECTRON FUNCTIONAL OPTIMIZATION'')')
+C
+      Write(6,'(X,''ACAlpha:'',F11.8,3X,"ETwoEl:",F12.8)')
+     $ACAlpha,ETotAlph
+      Write(6,'(X,''State no'',I3,'' Total Energy'',F15.8)') NoEig,
+     $ ETotAlph+ENuc
+C
+      Do I=1,NInte1
+C
+      IAB=0
+      Do IA=1,NBasis
+      Do IB=1,IA
+      IAB=IAB+1
+      FAB=One
+      If(IA.Ne.IB) FAB=SQRT(Half)
+      PFull(IA,IB,I)=FAB*AP(I,IAB)
+      If(IA.Ne.IB) PFull(IB,IA,I)=FAB*SpinFac*AP(I,IAB)
+C
+C in addition to proper triplet state, some other eigenvectors (junk) are found
+C this must be removed by checking if the diag element (remember that for triplet P_pq=-P_qp => P_pp=0)
+C is not zero (in practice if gt 1.-5)
+      If(IA.Eq.IB.And.ISpin.Eq.1.And.Abs(PFull(IB,IA,I)).Gt.1D-5) Then
+      ISkip(I)=1
+      EndIf
+      EndDo
+      EndDo
+C
+      Sum=Zero
+      Do IA=1,NBasis
+      Do IB=1,NBasis
+      Sum=Sum+PFull(IA,IB,I)**2
+      EndDo
+      EndDo
+      If(Abs(Sum-One).Gt.1.D-10)
+     $  Stop 'Error: wrong normalization of P matrix'
+C
+      EndDo
+C
+      If(ISpin.Eq.1) Then
+C
+      Do I=1,NInte1
+      If(ISkip(I).Eq.1) Then
+      EExcit(I)=Zero
+      Do IA=1,NBasis
+      Do IB=1,IA
+      PFull(IA,IB,I)=Zero
+      PFull(IB,IA,I)=Zero
+      EndDo
+      EndDo
+      EndIf
+      EndDo
+C
+      EndIf   
+C
+      IJ=0
+      Do I=1,NBasis
+      Do J=1,I
+      IJ=IJ+1
+      UReAlph(I,J)=Zero
+      Do K=1,NBasis
+      UReAlph(I,J)=UReAlph(I,J)+PFull(I,K,NoEig)*PFull(J,K,NoEig)
+      EndDo
+      UReAlph(J,I)=UReAlph(I,J)
+      GammAl(IJ)=UReAlph(I,J)
+      EndDo
+      EndDo
+C
+C quick check of the energy
+C
+      open(10,File="pmat.dat")
+      write(10,*)ACAlpha
+      eneone=zero
+      do i=1,nbasis
+      do j=1,nbasis
+      ij=(Max(i,j)*(Max(i,j)-1))/2+Min(i,j)
+      eneone=eneone+2.d0*UReAlph(i,j)*H1Alph(ij)
+      write(10,*)i,j,PFull(i,j,NoEig)
+      enddo
+      enddo
+      close(10)
+      write(*,*)'One-electron energy',eneone
+      etwo=zero
+      do i=1,nbasis
+      do j=1,nbasis
+      do k=1,nbasis
+      do l=1,nbasis
+      etwo=etwo+PFull(i,j,NoEig)*PFull(k,l,NoEig)*
+     $ TwoEl(NAddr3(i,k,j,l))
+      enddo
+      enddo
+      enddo
+      enddo
+      write(*,*)'Two-electron energy',etwo
+      write(*,*)'Total energy (w/o ENuc)',eneone+etwo
+C
+      Call Diag8(UReAlph,NBasis,NBasis,OccAlph,PWork)
+C
+      Write(6,'('' EXACT ORBITAL OCCUPANCIES FOR THE NoEig STATE'')')
+      Do 100 I=1,NBasis
+  100 Write(6,'(X,I3,E16.6)') I,OccAlph(I)
+C
+      Do INU=1,NInte1
+C
+      IAB=0
+      Do IA=1,NBasis
+      Do IB=1,IA
+      IAB=IAB+1
+C
+      TrGamm(IAB,INU)=Zero
+C
+      Do I=1,NBasis
+      If(IA.Ne.IB) TrGamm(IAB,INU)=TrGamm(IAB,INU)
+     $ +PFull(IA,I,NoEig)*PFull(IB,I,INU)
+     $ +PFull(IB,I,NoEig)*PFull(IA,I,INU)
+      If(IA.Eq.IB) TrGamm(IAB,INU)=TrGamm(IAB,INU)
+     $ +PFull(IA,I,NoEig)*PFull(IA,I,INU)
+      EndDo
+C
+      EndDo
+      EndDo
+C
+      EndDo
+C
+      Return
+      End
+
+*Deck ACEneRS
+      Subroutine ACEneRS(ECorr,ECorrSR1,ECorrSR2,
+     $ Delta,DeltaInter,TrGamm,GammaAlph,EExcit,
+     $ TrGamm0,EExcit0,
+     $ TwoElLR,TwoElSR,VSR,
+     $ Occ,HNO,IndN,NBasis,NInte1,NInte2,NDimX,NDimN)
+C
+      Implicit Real*8 (A-H,O-Z)
+C
+      Parameter(Zero=0.D0, Half=0.5D0, One=1.D0, Two=2.D0, Four=4.D0)
+C
+      Include 'commons.inc'
+C
+      Dimension
+     $ Occ(NBasis),TwoElLR(NInte2),
+     $ TwoElSR(NInte2),VSR(NInte1),
+     $ HNO(NInte1),
+     $ IndN(2,NDimX),
+     $ TrGamm(NInte1,NInte1),EExcit(NInte1),
+     $ TrGamm0(NInte1,NInte1),EExcit0(NInte1)
+C
+C     LOCAL ARRAYS
+C
+      Dimension GammaAlph(NInte1),H1(NInte1)
+C
+      NI=2*(NDimX+NDimN)
+C
+      H1(1:NInte1)=HNO(1:NInte1)
+C
+      ECorr=Zero
+      ECorrSR1=Zero
+      Do I=1,NDimX+NDimN
+C
+      If(I.Le.NDimX) Then
+      IP=IndN(1,I)
+      IR=IndN(2,I)
+      Else
+      IP=I-NDimX
+      IR=IP
+      EndIf
+      IPR=(Max(IR,IP)*(Max(IR,IP)-1))/2+Min(IR,IP)
+C
+      Do J=1,NDimX+NDimN
+C
+      If(J.Le.NDimX) Then
+      IQ=IndN(1,J)
+      IS=IndN(2,J)
+      Else
+      IQ=J-NDimX
+      IS=IQ
+      EndIf
+      IQS=(Max(IS,IQ)*(Max(IS,IQ)-1))/2+Min(IS,IQ)
+C
+      If(.NOT.(IGem(IP).Eq.IGem(IR).And.IGem(IQ).Eq.IGem(IS).
+     $ And.IGem(IP).Eq.IGem(IQ))) Then
+C
+      If(IP.Gt.IR.And.IQ.Gt.IS) Then
+C
+      SumY=Zero
+      Do K=1,NInte1
+      If(Abs(EExcit(K)).Gt.1.D-8) Then
+      SumY=SumY+TrGamm(IPR,K)*TrGamm(IQS,K)
+      EndIf
+      EndDo
+C
+      Aux=Two*SumY
+      If(IR.Eq.IS.And.IP.Eq.IQ) Aux=Aux+
+     $ (-Occ(IP)*(One-Occ(IS))-Occ(IS)*(One-Occ(IP)) )
+      ECorr=ECorr+Aux*TwoElLR(NAddr3(IP,IR,IQ,IS))
+      ECorrSR1=ECorrSR1+Aux*TwoElSR(NAddr3(IP,IR,IQ,IS))
+C
+      EndIf
+C
+      If(IP.Gt.IR.And.IQ.Eq.IS) Then
+C
+      SumY=Zero
+      Do K=1,NInte1
+      If(Abs(EExcit(K)).Gt.1.D-8) Then
+      SumY=SumY+TrGamm(IPR,K)*TrGamm(IQS,K)
+      EndIf
+      EndDo
+C
+      ECorr=ECorr+Four*SumY*TwoElLR(NAddr3(IP,IR,IQ,IQ))
+      ECorrSR1=ECorrSR1+Four*SumY*TwoElSR(NAddr3(IP,IR,IQ,IQ))
+C
+      EndIf
+C
+      If(IP.Eq.IR.And.IQ.Eq.IS) Then
+      SumY=Zero
+      Do K=1,NInte1
+      If(Abs(EExcit(K)).Gt.1.D-8) Then
+      SumY=SumY+TrGamm(IPR,K)*TrGamm(IQS,K)
+      EndIf
+      EndDo
+C
+      ECorr=ECorr+Two*SumY*TwoElLR(NAddr3(IP,IP,IQ,IQ))
+      ECorrSR1=ECorrSR1+Two*SumY*TwoElSR(NAddr3(IP,IP,IQ,IQ))
+C
+      EndIf
+C
+      EndIf
+C
+      EndDo
+      EndDo
+C
+C     SHORT-RANGE INTRA-GROUP CORRELATION
+C
+      ECorrSR2=Zero
+      Do I=1,NDimX+NDimN
+C
+      If(I.Le.NDimX) Then
+      IP=IndN(1,I)
+      IR=IndN(2,I)
+      Else
+      IP=I-NDimX
+      IR=IP
+      EndIf
+      IPR=(Max(IR,IP)*(Max(IR,IP)-1))/2+Min(IR,IP)
+C
+      Do J=1,NDimX+NDimN
+C
+      If(J.Le.NDimX) Then
+      IQ=IndN(1,J)
+      IS=IndN(2,J)
+      Else
+      IQ=J-NDimX
+      IS=IQ
+      EndIf
+      IQS=(Max(IS,IQ)*(Max(IS,IQ)-1))/2+Min(IS,IQ)
+C 
+      If((IGem(IP).Eq.IGem(IR).And.IGem(IQ).Eq.IGem(IS).
+     $ And.IGem(IP).Eq.IGem(IQ))) Then
+C
+      If(IP.Gt.IR.And.IQ.Gt.IS) Then
+C
+      SumY=Zero
+      Do K=1,NInte1
+      If(Abs(EExcit(K)).Gt.1.D-8) SumY=SumY+TrGamm(IPR,K)*TrGamm(IQS,K)
+      If(Abs(EExcit0(K)).Gt.1.D-8) 
+     $ SumY=SumY-TrGamm0(IPR,K)*TrGamm0(IQS,K)
+      EndDo
+C
+      Aux=Two*SumY
+      ECorrSR2=ECorrSR2+Aux*TwoElSR(NAddr3(IP,IR,IQ,IS))
+C
+      EndIf
+C
+      If(IP.Gt.IR.And.IQ.Eq.IS) Then
+C
+      SumY=Zero
+      Do K=1,NInte1
+      If(Abs(EExcit(K)).Gt.1.D-8) SumY=SumY+TrGamm(IPR,K)*TrGamm(IQS,K)
+      If(Abs(EExcit0(K)).Gt.1.D-8) 
+     $ SumY=SumY-TrGamm0(IPR,K)*TrGamm0(IQS,K)
+      EndDo
+C
+      ECorrSR2=ECorrSR2+Four*SumY*TwoElSR(NAddr3(IP,IR,IQ,IQ))
+C
+      EndIf
+C
+      If(IP.Eq.IR.And.IQ.Eq.IS) Then
+      SumY=Zero
+      Do K=1,NInte1
+      If(Abs(EExcit(K)).Gt.1.D-8) SumY=SumY+TrGamm(IPR,K)*TrGamm(IQS,K)
+      If(Abs(EExcit0(K)).Gt.1.D-8) 
+     $ SumY=SumY-TrGamm0(IPR,K)*TrGamm0(IQS,K)
+      EndDo
+C
+      ECorrSR2=ECorrSR2+Two*SumY*TwoElSR(NAddr3(IP,IP,IQ,IQ))
+C
+      EndIf
+C
+      EndIf
+C
+      EndDo
+      EndDo
+C
+C     COMPUTE DELTA
+C
+      Delta=Zero
+C
+      Do IP=1,NBasis
+      Do IQ=1,NBasis
+      Do IR=1,NBasis
+      Do IS=1,NBasis
+      If(.NOT.(IGem(IP).Eq.IGem(IR).And.IGem(IQ).Eq.IGem(IS).
+     $ And.IGem(IP).Eq.IGem(IQ))) Then
+C
+      IPR=(Max(IR,IP)*(Max(IR,IP)-1))/2+Min(IR,IP)
+      IQS=(Max(IS,IQ)*(Max(IS,IQ)-1))/2+Min(IS,IQ)
+      Aux=Two*GammaAlph(IPR)*GammaAlph(IQS)
+      IQR=(Max(IR,IQ)*(Max(IR,IQ)-1))/2+Min(IR,IQ)
+      If(IP.Eq.IS) Aux=Aux-GammaAlph(IQR)
+      If(IP.Eq.IS.And.IQ.Eq.IR) Aux=Aux+Occ(IQ)
+      If(IP.Eq.IR.And.IQ.Eq.IS) Aux=Aux-Two*Occ(IP)*Occ(IQ)
+C
+      Aux=Aux*TwoElLR(NAddr3(IP,IR,IQ,IS))
+      Delta=Delta+Aux
+C
+      EndIf
+      EndDo
+      EndDo
+      EndDo
+      EndDo
+C
+      Do IP=1,NBasis
+      Do IQ=1,NBasis
+      Do IR=1,NBasis
+      If((IGem(IP).Eq.IGem(IQ)).And.(IGem(IP).Ne.IGem(IR))) Then
+C
+      IPQ=(Max(IQ,IP)*(Max(IQ,IP)-1))/2+Min(IQ,IP)
+      Aux=-GammaAlph(IPQ)
+      If(IP.Eq.IQ) Aux=Aux+Occ(IP)
+      Aux=Two*Occ(IR)*Aux*
+     $ (Two*TwoElLR(NAddr3(IP,IQ,IR,IR))-TwoElLR(NAddr3(IP,IR,IQ,IR)))
+      Delta=Delta+Aux
+C
+      EndIf
+      EndDo
+      EndDo
+      EndDo
+C
+      Do IP=1,NBasis
+      Do IQ=1,NBasis
+      If(IGem(IP).Ne.IGem(IQ)) Then
+C
+      IPQ=(Max(IQ,IP)*(Max(IQ,IP)-1))/2+Min(IQ,IP)
+      Delta=Delta+Two*H1(IPQ)*GammaAlph(IPQ)
+C
+      EndIf
+      EndDo
+      EndDo
+C
+C     COMPUTE SR DELTA
+C
+      DeltaSR=Zero
+      DeltaInter=Zero
+C
+      Do IP=1,NBasis
+      Do IQ=1,NBasis
+      Do IR=1,NBasis
+      Do IS=1,NBasis
+C
+      IPR=(Max(IR,IP)*(Max(IR,IP)-1))/2+Min(IR,IP)
+      IQS=(Max(IS,IQ)*(Max(IS,IQ)-1))/2+Min(IS,IQ)
+      Aux=Two*GammaAlph(IPR)*GammaAlph(IQS)
+      IQR=(Max(IR,IQ)*(Max(IR,IQ)-1))/2+Min(IR,IQ)
+      If(IP.Eq.IS) Aux=Aux-GammaAlph(IQR)
+      If(IP.Eq.IS.And.IQ.Eq.IR) Aux=Aux+Occ(IQ)
+      If(IP.Eq.IR.And.IQ.Eq.IS) Aux=Aux-Two*Occ(IP)*Occ(IQ)
+C
+      Aux=Aux*TwoElSR(NAddr3(IP,IR,IQ,IS))
+      DeltaSR=DeltaSR+Aux
+      If(.NOT.(IGem(IP).Eq.IGem(IR).And.IGem(IQ).Eq.IGem(IS).
+     $ And.IGem(IP).Eq.IGem(IQ))) DeltaInter=DeltaInter+Aux
+C
+      EndDo
+      EndDo
+      EndDo
+      EndDo
+C
+      Do IP=1,NBasis
+      Do IQ=1,NBasis
+      If(IGem(IP).Eq.IGem(IQ)) Then
+C
+      IPQ=(Max(IQ,IP)*(Max(IQ,IP)-1))/2+Min(IQ,IP)
+      Aux=GammaAlph(IPQ)
+      If(IP.Eq.IQ) Aux=Aux-Occ(IP)
+      DeltaSR=DeltaSR-Two*VSR(IPQ)*Aux
+      If(.NOT.(IGem(IP).Eq.IGem(IQ)) ) 
+     $ DeltaInter=DeltaInter-Two*VSR(IPQ)*Aux
+C
+      EndIf
+      EndDo
+      EndDo
+C
+      DeltaInter=Delta+DeltaInter
+      Delta=Delta+DeltaSR
+C
+      Return
+      End

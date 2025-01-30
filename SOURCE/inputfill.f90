@@ -706,6 +706,9 @@ character(:), allocatable :: first, last
  case ("NCORE", "NCOREORB")
        read(val, *) SystemParams%NCoreOrb
 
+ case ("NSTRONGLYOCCORB")
+       read(val, *) SystemParams%NStronglyOccOrb
+
  case ("ACALPHA")
        read(val, *) SystemParams%ACAlpha
 

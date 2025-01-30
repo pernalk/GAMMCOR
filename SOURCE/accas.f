@@ -36,6 +36,12 @@ C     START TIMING FOR AC PROCEDURES
 C
       call gclock('START',Tcpu,Twall)
       If (ICholeskyOTF==1) Write(6,'(1x," BasisSet = ", A)') BasisSet
+
+c      NoEig=1
+c      NDimFull=NBasis*(NBasis-1)/2
+c      Call ACPINO(ENuc,TwoNO,Occ,XOne,
+c     $ NBasis,NInte1,NInte2,NDimFull,NGem,NoEig)
+c      Stop
 C
 C     CONSTRUCT LOOK-UP TABLES
 C
@@ -69,7 +75,17 @@ C
 
       Write(LOUT,'(2x,a,2e14.5)')'Threshold for quasi-inactive orbital',
      $ ThrQInact
-
+C
+      If(IFlCore.Eq.0) Then
+        If(NCoreOrb.Eq.0) Then
+           Do I=1,NBasis
+              If(Occ(I).Eq.One) NCoreOrb=NCoreOrb+1
+           EndDo
+        EndIf
+        Write(6,'(/,1X,"*** NO. OF CORE ORBITALS :",I3)') 
+     $ NCoreOrb
+      EndIf
+C
       IJ=0
       Ind=0
       Do I=1,NBasis
@@ -89,7 +105,9 @@ C
 C
 C     If IFlCore=0 do not include core (inactive) orbitals
       If((IFlCore.Eq.1).Or.
-     $ (IFlCore.Eq.0.And.Occ(I).Ne.One.And.Occ(J).Ne.One)) Then
+C     $ (IFlCore.Eq.0.And.Occ(I).Ne.One.And.Occ(J).Ne.One)) Then
+     $ (IFlCore.Eq.0.And.I.Gt.NCoreOrb.And.J.Gt.NCoreOrb))    
+     $ Then
 C
       If(Abs(Occ(i)+Occ(j)-Two).Gt.ThrQInact.And.
      $   Abs(Occ(i)+Occ(j)).Gt.ThrQVirt) Then
@@ -308,7 +326,7 @@ c      NoEig=1
 c      NDimFull=NBasis*(NBasis-1)/2
 c      Call ACPINO(ENuc,TwoNO,Occ,XOne,
 c     $ NBasis,NInte1,NInte2,NDimFull,NGem,NoEig)
-
+c
 c AC with varying Alpha-dependent RDMs
 c      NDimFull=NBasis*(NBasis-1)/2
 c      Call ACRDM(ETot,ENuc,TwoNO,Occ,XOne,
@@ -384,8 +402,14 @@ C     the purpose of sorting is only to print a few highest (sorted) eigenvector
       Write(6,'(I4,4X,2E16.6)') I,Eig(I),27.211*Eig(I)
       EndDo
 C
+      If(ITwoEl.Eq.1) Then
+      Write(6,'(/," *** Computing ERPA 2-RDM *** ")')
+      Call RDM2FULL(EigVecR,Eig,ABMIN,TwoNO,NInte2,IndN,
+     $ Occ,Title,NBasis,NDimX,NGem,NDim)
+      EndIf
+C
       Write(6,'(/," *** Computing ERPA energy *** ",/)')
-
+C
       If(ITwoEl.Eq.3) Then
       Call ACEneERPA_FOFO(ECorr,EigVecR,Eig,Occ,
      $ IGem,IndN,IndX,NAcCAS+NInAcCAS,
@@ -1157,10 +1181,9 @@ C
 C
       If (IDBBSC.Eq.2) Then
 C
-c KP 23.11.2024
 c if CBS[H] is computed: XOne contains h0 without vrs
 c                        TwoNO contains 1/r integrals, TwoEl2: erf/r
-      Call AC0CASLR(ECorr,ECASSCF,TwoNO,Occ,URe,UNOAO,XOne,
+      Call AC0CASLR(ECorr,ECASSCF,ENuc,TwoNO,Occ,URe,UNOAO,XOne,
      $ ABPLUS,ABMIN,EigVecR,Eig,
      $ IndN,IndX,NDimX,NBasis,NDim,NInte1,NInte2,
      $ TwoEl2,OrbGrid,Work,NSymNO,MultpC,NGrid)
@@ -1174,12 +1197,12 @@ C
       EndIf
 C
 C
-      Call AC0CASLR(ECorr,ECASSCF,TwoNO,Occ,URe,UNOAO,XOne,
+      Call AC0CASLR(ECorr,ECASSCF,ENuc,TwoNO,Occ,URe,UNOAO,XOne,
      $ ABPLUS,ABMIN,EigVecR,Eig,
      $ IndN,IndX,NDimX,NBasis,NDim,NInte1,NInte2,
      $ TwoEl2,OrbGrid,Work,NSymNO,MultpC,NGrid)
 
-c      Call AC0CASLR(ECorr,ECASSCF,TwoEl2,Occ,URe,XOne,
+c      Call AC0CASLR(ECorr,ECASSCF,ENuc,TwoEl2,Occ,URe,XOne,
 c     $ ABPLUS,ABMIN,EigVecR,Eig,
 c     $ IndN,IndX,NDimX,NBasis,NDim,NInte1,NInte2,
 c     $ TwoNO,OrbGrid,Work,NSymNO,MultpC,NGrid)
@@ -1515,7 +1538,7 @@ C
       End
 
 *Deck AC0CASLR
-      Subroutine AC0CASLR(ECorr,ETot,TwoNO,Occ,URe,UNOAO,XOne,
+      Subroutine AC0CASLR(ECorr,ETot,ENuc,TwoNO,Occ,URe,UNOAO,XOne,
      $ ABPLUS,ABMIN,EigY,Eig,
      $ IndN,IndX,NDimX,NBasis,NDim,NInte1,NInte2,
      $ TwoEl2,OrbGrid,SRKerW,NSymNO,MultpC,NGrid)
@@ -1550,11 +1573,13 @@ C
       Double Precision, Allocatable :: Work(:),Batch(:,:)
       Dimension C(NBasis),HNO(NInte1),
      $ IGFact(NInte2),
-     $ Ind1(NBasis),Ind2(NBasis),WMAT(NBasis,NBasis),
+     $ Ind1(NBasis),Ind2(NBasis),Ind3(NBasis),WMAT(NBasis,NBasis),
      $ AuxI(NInte1),AuxIO(NInte1),IPair(NBasis,NBasis),
      $ EigX(NDimX*NDimX),
      $ IEigAddY(2,NDimX),IEigAddInd(2,NDimX),IndBlock(2,NDimX),
      $ XMAux(NDimX*NDimX),XMuMAT(NBasis,NBasis),work1(NBasis,NBasis)
+! delete after tests
+     $ ,WorkH(NInte1),TwoElSR(NInte2)
 ! analysis of AC0
        double precision :: ECorrIJ(6,6)
        integer          :: IGIJ(4,4),IGemNo(6,2)
@@ -2151,6 +2176,7 @@ C     COMPUTE 1st-ORDER ONE-ELECTRON HAMILTONIAN (USING 1/r INTEGRALS)
 C
 C     SET THE FLAG FOR AB1_CAS
 C
+      WorkH=XOne
       IHNO1=1
 C
       IJ=0
@@ -2178,6 +2204,7 @@ C
 C     COMPUTE SR INTEGRALS
 C
       TwoEl2=TwoNO-TwoEl2
+      TwoElSR=Zero
 C
 C     ADD MODIFIED SR INTEGRALS TO FULL-COULOMB INTEGRALS
 C
@@ -2208,7 +2235,17 @@ C
       EndDo
 C
       AuxSR=AuxSR/Four
+C
+      TwoElSR(NAddr)=AuxSR
       TwoNO(NAddr)=TwoNO(NAddr)+AuxSR
+
+c      If(.not.(IGem(IP).eq.1.and.
+c     $ IGem(IP).Eq.IGem(IR).And.IGem(IQ).Eq.IGem(IS).
+c     $ And.IGem(IP).Eq.IGem(IQ))) then
+c       TwoElSR(NAddr)=AuxSR
+c       TwoNO(NAddr)=TwoNO(NAddr)+AuxSR
+c       endif
+C
 C
 c comment out the line above and uncomment the lines below to
 c include in-active contribution to the CBS correction
@@ -2228,6 +2265,114 @@ c uncomment to include in-active contribution to the CBS correction (see above)
 c      IGFact=0
 c comment out to include in-active contribution to the CBS correction (see above)
       IHNO1=0
+C
+      Ind3=0
+      Do I=1,NStronglyOccOrb
+      Ind3(I)=1
+      EndDo
+      ETotSR=Zero
+      Do IP=1,NOccup
+      Do IQ=1,NOccup
+      Do IR=1,NOccup
+      Do IS=1,NOccup
+C
+      If(.Not.(Ind3(IP).Eq.1.And.
+     $ Ind3(IP).Eq.Ind3(IR).And.Ind3(IQ).Eq.Ind3(IS).
+     $ And.Ind3(IP).Eq.Ind3(IQ))) Then
+
+      If(IGem(IP).Eq.2.And.
+     $ IGem(IP).Eq.IGem(IR).And.IGem(IQ).Eq.IGem(IS).
+     $ And.IGem(IP).Eq.IGem(IQ) )  
+     $ ETotSR=ETotSR+FRDM2(IP,IQ,IR,IS,RDM2Act,Occ,Ind2,NAct,NBasis)
+     $  *TwoElSR(NAddr3(IP,IR,IQ,IS))
+
+      If(NInAcCAS.Eq.0) Then
+      If(IGem(IP).Eq.1.And.
+     $ IGem(IP).Eq.IGem(IR).And.IGem(IQ).Eq.IGem(IS).
+     $ And.IGem(IP).Eq.IGem(IQ) )
+     $ ETotSR=ETotSR+FRDM2(IP,IQ,IR,IS,RDM2Act,Occ,Ind2,NAct,NBasis)
+     $  *TwoElSR(NAddr3(IP,IR,IQ,IS))
+      EndIf
+  
+      EndIf
+
+c      If(.Not.(Ind3(IP).Eq.1.And.
+c     $ Ind3(IP).Eq.Ind3(IR).And.Ind3(IQ).Eq.Ind3(IS).
+c     $ And.Ind3(IP).Eq.Ind3(IQ))) then
+c      if(FRDM2(IP,IQ,IR,IS,RDM2Act,Occ,Ind2,NAct,NBasis).ne.zero) 
+c     $ write(*,*)ip,iq,ir,is
+c      endif
+ 
+      EndDo
+      EndDo
+      EndDo
+      EndDo
+      Write(6,'(/,X,"1st-order SR energy for",I4," active orbitals")') 
+     $ NAcCAS+NInAcCAS-NStronglyOccOrb
+      Write(6,'(X," <Ref|H^SR|Ref> = ",F10.6,/)') ETotSR
+
+      goto 444
+C    ***** Two-Electron systems investigation
+      NDim=NBasis*(NBasis-1)/2
+C     AuxI=VSR
+      AuxI=Zero 
+      NGem=MAXVAL(IGem)
+      NoEig=1
+      TwoNO=TwoNO-TwoElSR
+C
+      NAddr=0
+      IPR=0
+      Do IP=1,NBasis
+      Do IR=1,IP
+      IPR=IPR+1
+      IQS=0
+      Do IQ=1,NBasis
+      Do IS=1,IQ
+      IQS=IQS+1
+      If(IPR.Ge.IQS) Then
+      NAddr=NAddr+1
+C
+      If((IGem(IP).Eq.1.And.
+     $ IGem(IP).Eq.IGem(IR).And.IGem(IQ).Eq.IGem(IS).
+     $ And.IGem(IP).Eq.IGem(IQ))) Then 
+      If((Ind3(IP).Eq.1.And.
+     $ Ind3(IP).Eq.Ind3(IR).And.Ind3(IQ).Eq.Ind3(IS).
+     $ And.Ind3(IP).Eq.Ind3(IQ))) TwoElSR(NAddr)=Zero
+      EndIf
+C
+      EndIf
+      EndDo
+      EndDo
+      EndDo
+      EndDo
+C Set TwoElSR to Zero to reproduce FCI[H] energy
+c      TwoElSR=Zero 
+C
+C     ETot=<Psi_ref|H0+H'|Psi_ref> so a contribution from the SR interaction must be added
+C
+      ETotSR=Zero
+      Do IP=1,NOccup
+      Do IQ=1,NOccup
+      Do IR=1,NOccup
+      Do IS=1,NOccup
+      ETotSR=ETotSR+FRDM2(IP,IQ,IR,IS,RDM2Act,Occ,Ind2,NAct,NBasis)
+     $ *TwoElSR(NAddr3(IP,IR,IQ,IS))
+      EndDo
+      EndDo
+      EndDo
+      EndDo
+      ERef=ETot
+      ETot=ETot+ETotSR
+      Call ACPINORS(ETot,ENuc,TwoNO,TwoElSR,Occ,WorkH,AuxI,
+     $ NBasis,NInte1,NInte2,NDim,NGem,NoEig)
+      Write(6,'(/,X," Where, <Ref|H0|Ref> + ENuc = ",F10.6,
+     $" <Ref|H^SR|Ref> = ",F10.6)') ERef+ENuc,ETotSR 
+      Write(6,'(X," H^SR for ",I2," active orbitals")')
+     $ NAcCAS+NInAcCAS-NStronglyOccOrb
+c      Call PairD_Vis(URe,UNOAO,Occ,NBasis)
+      Stop 
+  444 continue
+C end of  ***** Two-Electron systems investigation
 C
       EndIf
   999 continue
