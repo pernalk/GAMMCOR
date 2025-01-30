@@ -1,3 +1,5 @@
+module tran_Chol
+      contains
 subroutine chol_ints_fofo(nA,nB,MatAB,nC,nD,MatCD,NCholesky,NBas,fname)
 !
 ! assumes that MatAB(CD) are NChol,FF type
@@ -943,3 +945,4 @@ double precision,external :: ddot
 
 end subroutine make_J2_CholR
 
+end module tran_Chol

@@ -302,7 +302,11 @@ subroutine read_block_cholesky(CholeskyParams, line)
            elseif (uppercase(val) == "LUDICROUS" .or. &
                    uppercase(val) == "L" ) then
               CholeskyParams%CholeskyAccu = CHOL_ACCU_LUDICROUS
-           endif
+        endif
+      case ("CHOLTHR","CHOLTHRESHOLD","CHOLESKYTHR","CHOLESKYTHRESHOLD")
+            read(val, *) CholeskyParams%CholeskyThr
+      case ("THCTHR","THCTHRESHOLD")
+            read(val, *) CholeskyParams%THCThr        
 
       case ("H0TEST")
            if (uppercase(val) == ".FALSE.".or. &
@@ -337,6 +341,9 @@ subroutine read_block_calculation(CalcParams, line)
                CalcParams%InterfaceType = INTER_TYPE_ORCA
                CalcParams%RDMSource = INTER_TYPE_ORCA
                CalcParams%RDMType   = RDM_TYPE_DMRG
+         elseif (uppercase(val) == "PYSCF")then
+               CalcParams%InterfaceType = INTER_TYPE_PYSCF
+                CalcParams%RDMSource = INTER_TYPE_PYSCF               
            endif
 
       case ("JOBTYPE")
@@ -538,7 +545,9 @@ subroutine read_block_calculation(CalcParams, line)
            if (uppercase(val) == "DALTON") then
               CalcParams%RDMSource = INTER_TYPE_DAL
            elseif (uppercase(val) == "OWN" ) then
-              CalcParams%RDMSource = INTER_TYPE_OWN
+                 CalcParams%RDMSource = INTER_TYPE_OWN
+           elseif (uppercase(val) == "PYSCF" ) then
+                 CalcParams%RDMSource = INTER_TYPE_PYSCF                 
            endif
 
       case ("SYMMETRY")
@@ -696,6 +705,9 @@ character(:), allocatable :: first, last
 
  case ("NCORE", "NCOREORB")
        read(val, *) SystemParams%NCoreOrb
+
+ case ("NSTRONGLYOCCORB")
+       read(val, *) SystemParams%NStronglyOccOrb
 
  case ("ACALPHA")
        read(val, *) SystemParams%ACAlpha

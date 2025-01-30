@@ -8,6 +8,7 @@ integer, parameter :: INTER_TYPE_DAL  = 1
 integer, parameter :: INTER_TYPE_MOL  = 2
 integer, parameter :: INTER_TYPE_OWN  = 3
 integer, parameter :: INTER_TYPE_ORCA = 4
+integer, parameter :: INTER_TYPE_PYSCF = 5
 
 integer, parameter :: TYPE_NO_SYM = 1
 integer, parameter :: TYPE_SYM = 0
@@ -67,6 +68,8 @@ integer, parameter :: FLAG_H0TEST         = 1
 integer, parameter :: CHOL_ACCU_DEFAULT   = 1
 integer, parameter :: CHOL_ACCU_TIGHT     = 2
 integer, parameter :: CHOL_ACCU_LUDICROUS = 3
+double precision :: DCholeskyThr = -1.e0
+double precision :: DTHCThr = -1.e0
 
 integer, parameter :: GRID_PARAMS_SG1    = 1
 integer, parameter :: GRID_PARAMS_MEDIUM = 2
@@ -95,9 +98,9 @@ logical, parameter :: FLAG_POSTCAS  = .FALSE.
 
 integer,parameter :: maxcen = 500
 
-character(*),parameter :: PossibleInterface(4) = &
+character(*),parameter :: PossibleInterface(5) = &
 [character(8) :: &
-'DALTON', 'MOLPRO', 'OWN', 'ORCA']
+'DALTON', 'MOLPRO', 'OWN', 'ORCA', 'PYSCF']
 
 character(*),parameter :: PossibleJobType(18) = &
 [character(9) :: &
@@ -197,6 +200,7 @@ type SystemBlock
       integer :: NOrb, NGem
       integer :: NActOrb  = 1
       integer :: NCoreOrb = 0
+      integer :: NStronglyOccOrb = 0
       integer :: NAct, INAct
       integer :: ISwitchAct = 0
       integer :: NActS(8), INActS(8)
@@ -308,6 +312,9 @@ type CholeskyBlock
       integer :: CholeskyBIN  = FLAG_CHOLESKY_BIN
       integer :: CholeskyOTF  = FLAG_CHOLESKY_OTF
       integer :: CholeskyAccu = CHOL_ACCU_DEFAULT
+      double precision :: CholeskyThr  = -1.e0
+      double precision :: THCThr       = -1.e0
+
       integer :: H0test       = FLAG_H0TEST ! check 1el ints with CholeskyOTF
 
 end type CholeskyBlock
@@ -333,6 +340,7 @@ type FlagsData
      integer :: InterfaceType = INTER_TYPE_DAL
      ! mainp.f
      integer :: IDALTON = 1
+     integer :: IPYSCF  = 0     
      integer :: IMOLPRO = 0
      integer :: IORCA   = 0
      integer :: IRes    = 0
@@ -352,6 +360,9 @@ type FlagsData
      integer :: ICholeskyBIN  = FLAG_CHOLESKY_BIN
      integer :: ICholeskyOTF  = FLAG_CHOLESKY_OTF
      integer :: ICholeskyAccu = CHOL_ACCU_DEFAULT
+     double precision :: DCholeskyThr = -1.e0
+     double precision :: DTHCThr = -1.e0
+
      integer :: IGridType = GRID_PARAMS_MEDIUM
      integer :: IUnits = UNITS_ANGSTROM
      integer :: InternalGrid = 0

@@ -2370,7 +2370,7 @@ C
 C     FIND THE 0TH-ORDER SOLUTION FOR THE VIRTUAL-INACTIVE BLOCKS
 
 C KP 15.05.2019
-      if(idalton.eq.0) then
+      if(idalton.eq.0.and.ipyscf.eq.0) then
       open(10,file='fock.dat')
       work1=0
       Do IP=NOccup+1,NBasis
@@ -2404,7 +2404,7 @@ C
 C
       Eig(NFree1)=ABP
 C
-      If(IDALTON.Eq.0) Then
+      If(IDALTON.Eq.0.and.ipyscf.eq.0) Then
       If(ABS(ABP-work1(IP,IQ)).Gt.1.d-7)
      $Write(*,*)'ABP inconsistent with eps_a-eps_i for',IP,IQ
       EndIf

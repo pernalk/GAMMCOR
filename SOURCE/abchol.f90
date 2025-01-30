@@ -724,7 +724,7 @@ double precision,allocatable :: work6(:,:),work8(:,:)
 double precision,allocatable :: work10(:,:),work12(:,:)
 !
 ! compute Hessian matrices with modified integrals : 
-! a) calculate modified SR integrals: <p*q|rs>_SR = \sum_t <p|mu(r)|t> <tq|rs>^SR
+! a) assemble all required integrals
 ! b) symmetrize : g^SR = 1/4 * ( <p*q|rs>_SR + <pq*|rs>_SR + <pq|r*s>_SR + <pq|rs*>_SR )
 ! c) use : <pq|rs>_mod =  <pq|rs>^full-range + g^SR
 !
@@ -830,7 +830,6 @@ do iloop=1,nloop
    !call dgemm('T','N',dimFO,BatchSize,NCholErf,-1d0,FFErf,NCholErf, &
    !           FFErf(:,off+1:BatchSize),NCholErf,1d0,work1,dimFO)
    !!! work1=short-range
-
 
    ! regular
    call dgemm('T','N',dimFO,BatchSize,NCholesky,1d0,FF,NCholesky, &

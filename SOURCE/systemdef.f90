@@ -125,8 +125,12 @@ else
    Flags%JobType = Input%CalcParams%JobType
 
   ! set BasisSet
-   Flags%BasisSet = Input%CalcParams%BasisSet
-   Flags%BasisSetPath = Input%CalcParams%BasisSetPath
+   if( allocated(Input%CalcParams%BasisSet)) then
+      Flags%BasisSet = Input%CalcParams%BasisSet
+   endif
+   if( allocated(Input%CalcParams%BasisSetPath)) then
+      Flags%BasisSetPath = Input%CalcParams%BasisSetPath
+   endif
 
   ! set TwoEl type
    Flags%ITwoEl = Input%CalcParams%TwoMoInt
@@ -137,6 +141,9 @@ else
    Flags%ICholeskyOTF  = Input%CholeskyParams%CholeskyOTF
    Flags%ICholeskyTHC  = Input%CholeskyParams%CholeskyTHC
    Flags%ICholeskyAccu = Input%CholeskyParams%CholeskyAccu
+   Flags%DCholeskyThr  = Input%CholeskyParams%CholeskyThr
+   Flags%DTHCThr       = Input%CholeskyParams%THCThr
+   
    Flags%IH0Test       = Input%CholeskyParams%H0Test
 
   ! set DFT grid
@@ -197,7 +204,14 @@ else
      Flags%NoSym   = 1
      Flags%IA = 1
      Flags%ORBITAL_ORDERING = 2 ! ORBITAL_ORDERING_ORCA
-  end select
+
+  case(INTER_TYPE_PYSCF)
+     Flags%IDALTON = 0
+     Flags%IPYSCF  = 1
+     Flags%ORBITAL_ORDERING = 5 ! ORBITAL_ORDERING_PYSCF                                                                                                                                                                              
+
+end select
+
   Flags%InterFaceType = Input%CalcParams%InterfaceType
 
   if(Input%CalcParams%Restart) Flags%IRes = 1
@@ -475,6 +489,7 @@ if(Flags%ISAPT.Eq.0) then
    System%Charge = Input%SystemInput(1)%Charge
    System%NBasis = Input%CalcParams%NBasis
    System%NCoreOrb = Input%SystemInput(1)%NCoreOrb
+   System%NStronglyOccOrb = Input%SystemInput(1)%NStronglyOccOrb
    System%Omega  = Input%SystemInput(1)%Omega
    System%PerVirt= Input%SystemInput(1)%PerVirt
    System%EigFCI = Input%SystemInput(1)%EigFCI

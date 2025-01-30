@@ -2266,7 +2266,7 @@ c comment out to include in-active contribution to the CBS correction (see above
       IHNO1=0
 C
       Ind3=0
-      Do I=1,NCoreOrb
+      Do I=1,NStronglyOccOrb
       Ind3(I)=1
       EndDo
       ETotSR=Zero
@@ -2307,7 +2307,7 @@ c      endif
       EndDo
       EndDo
       Write(6,'(/,X,"1st-order SR energy for",I4," active orbitals")') 
-     $ NAcCAS+NInAcCAS-NCoreOrb
+     $ NAcCAS+NInAcCAS-NStronglyOccOrb
       Write(6,'(X," <Ref|H^SR|Ref> = ",F10.6,/)') ETotSR
 
       goto 444
@@ -2367,7 +2367,7 @@ C
       Write(6,'(/,X," Where, <Ref|H0|Ref> + ENuc = ",F10.6,
      $" <Ref|H^SR|Ref> = ",F10.6)') ERef+ENuc,ETotSR 
       Write(6,'(X," H^SR for ",I2," active orbitals")')
-     $ NAcCAS+NInAcCAS-NCoreOrb
+     $ NAcCAS+NInAcCAS-NStronglyOccOrb
 c      Call PairD_Vis(URe,UNOAO,Occ,NBasis)
       Stop 
   444 continue

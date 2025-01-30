@@ -1,10 +1,10 @@
       Common/MISCFL/ XELE,IFun,IFunSR,IFunSRKer,NELE,IRes,INO,IPrint,
      $ IInteg,IAO,IGVB,IFreeze,ILoc,NInActOrb,NActOrb,NVirtOrb,NCoreOrb,
-     $ ISAPT,IWarn,ITwoEl,ITrpl,
+     $ NStronglyOccOrb,ISAPT,IWarn,ITwoEl,ITrpl,
      $ ICholesky,ICholeskyBIN,ICholeskyOTF,ICholeskyTHC,
      $ ICholeskyAccu,Monomer,MemVal,MemType,
      $ IH0test,IUnits,InternalGrid,IGridType
-      Common/INTF/ IDALTON,IMOLPRO,ITREXIO,
+      Common/INTF/ IDALTON,IMOLPRO,ITREXIO, IPYSCF,
      $ IOrbOrder
       Common/CAS/ ICASSCF,NAcCAS,NInAcCAS,NStates,
      $ InSt(2,100),InTrSt(2,1),ISpinMs2

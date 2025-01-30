@@ -20,11 +20,13 @@ C
       use git_info
       use build_info
       use omp_lib
+      use interface_pp
+      use acpp_types
 C
       Implicit Real*8 (A-H,O-Z)
 C
-      Character*60 FMultTab
-      Character(:),allocatable :: Title,BasisSet
+      Character*60 FMultTab,Title,BasisSet
+C      Character(:),allocatable :: Title,BasisSet
 C
       Real*8, Dimension(:), Allocatable :: Occ
       Real*8, Dimension(:), Allocatable :: URe
@@ -48,6 +50,8 @@ C
       type(FlagsData)   :: Flags
       type(SystemBlock) :: System
       type(SaptData)    :: Sapt
+      type(TTHCData)   :: THCData
+      type(TACppData)  :: AuxData      
 C
       Include 'commons.inc'
 C
@@ -78,6 +82,7 @@ C     FILL COMMONS AND CONSTANTS
       BasisSet= Flags%BasisSetPath // Flags%BasisSet
 C
       NCoreOrb = System%NCoreOrb
+      NStronglyOccOrb = System%NStronglyOccOrb
 C
       Title   = Flags%JobTitle
 C
@@ -120,6 +125,8 @@ C
 c     ITREXIO = Flags%ITREXIO
       IMOLPRO = Flags%IMOLPRO
       IDMRG   = Flags%IDMRG
+      IPYSCF = Flags%IPYSCF
+
 C
 C     IF IRes=1 - RESTART THE CALCULATIONS FROM A RESTART FILE
 C
@@ -292,7 +299,9 @@ C
 C      Print*,'VALUE DECLARED IN INPUT: ',NoSt
 C
       ElseIf(IDALTON.Eq.0.and.IDMRG.Eq.0) Then
-      Call read_NoSt_molpro(NoSt,'2RDM')
+         if (IPYSCF.ne.1)then
+            Call read_NoSt_molpro(NoSt,'2RDM')
+         endif
       ElseIf(IDALTON.Eq.1) Then
       NoSt = 1
       Write(6,'(/,1x,a)') 'WARNING! ASSUMING RMDs CORRESPOND TO
@@ -374,6 +383,17 @@ C
       write(LOUT,'(8a10)') ('**********',i=1,8)
 C
       Call gclock('START',Tcpu,Twall)
+
+      if(IPYSCF.Eq.1) then
+         print*, 'here'
+         Call ReadPYSCF(THCData, BasisSet,XKin,XNuc,ENuc,Occ,
+     $        URe,TwoEl,UMOAO,
+     $        NInte1,NBasis,NInte2,NGem,Flags, System%InSt(:,1))
+         If(InSt(2,1).Gt.0) Then
+            NoSt = System%InSt(1,1)
+         End if
+      Else
+
 C
 C     LOAD THE INTEGRALS
 C
@@ -402,6 +422,7 @@ C
       Call ReadDAL(BasisSet,XKin,XNuc,ENuc,Occ,URe,TwoEl,UMOAO,
      $ NInte1,NBasis,NInte2,NGem,Flags)
 C
+      EndIf
       EndIf
 C
       If(IFunSR.Eq.5) Then

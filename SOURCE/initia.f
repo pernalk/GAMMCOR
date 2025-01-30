@@ -9,6 +9,7 @@ C
       use types
       use sorter
       use tran
+      use tran_Chol
       use read_external
 C
 C     Cholesky modules
@@ -508,6 +509,7 @@ C      use sys_definitions
 C      use CholeskyOTF_interface
 
       use tran
+      use tran_Chol
       use abmat
       use read_external
 C
@@ -1636,6 +1638,8 @@ C
       use types
       use sorter
       use tran
+      use tran_Chol
+
 C
 C     Cholesky and THC modules
       use gammcor_integrals
@@ -2118,8 +2122,12 @@ C
      &                        'AOTWOSORT')
 C
           ElseIf (ICholeskyBIN==1) Then
-          Call FockGen_CholR(FockF,CholeskyVecs%R(1:NCholesky,1:NInte1),
+          Allocate(MatFF(NCholesky,NInte1))
+        MatFF(1:NCholesky,1:NInte1)=CholeskyVecs%R(1:NCholesky,1:NInte1)
+C         Call FockGen_CholR(FockF,CholeskyVecs%R(1:NCholesky,1:NInte1),
+          Call FockGen_CholR(FockF,MatFF,
      &                       GammaAB,XKin,NInte1,NCholesky,NBasis)
+          Deallocate(MatFF)
 
 C          block
 CC         try to construct Fock in MO in CholeskyBIN
@@ -2827,7 +2835,139 @@ C
 C
       Return
       End
-Cc    End Subroutine LdInteg
+C     c    End Subroutine LdInteg
+
+      subroutine ReadPYSCF(THCData, BasisSet, XKin, XNuc, ENuc, Occ,
+      
+     &    URe, TwoEl, UMOAO,  NInte1, NBasis, NInte2, NGem, Flags, anSt)
+      use interface_pp
+      use print_units
+      use types
+      use acpp_types
+      use sorter
+      use tran
+      use tran_Chol
+      use read_external
+      use clock
+      use gammcor_integrals
+
+      Implicit Real*8 (A-H,O-Z)
+
+      character*(*) BasisSet
+      integer NInte1, NInte2, NBasis
+      real*8 ENuc
+      real*8 XKin(NInte1), XNuc(NInte1)
+      real*8 Occ(NBasis)
+      real*8 UMOAO(NBasis, NBasis)
+      real*8 URe(NBasis, NBasis)
+      real*8 TwoEl(*)
+      real*8 CAONO(NBasis, NBasis)
+      integer NGem
+      type(FlagsData) Flags
+      integer, dimension(2) :: anSt
+      integer :: start_count, end_count, count_rate, elapsed_count
+      real :: elapsed_time
+      type (tclock) :: timer
+      type(TTHCData) :: THCData
+
+
+      Include 'commons.inc'
+
+
+      integer i, j, ab
+
+C     Cholesky OnTheFly
+
+      type(TCholeskyVecsOTF) :: CholeskyVecsOTF
+      Type(TCholeskyVecsOTF) :: CholErfVecsOTF
+      type(TSystem)  :: System
+      type(TAOBasis) :: AOBasis
+      logical :: SortAngularMomenta
+      character(:),allocatable :: XYZPath
+      character(:),allocatable :: BasisSetPath
+
+      Type(TCholeskyVecs) :: CholeskyVecs
+      Real*8, Allocatable :: MatFF(:,:)
+
+      print*, 'yest'
+
+      call PYSCF_wrapper(THCData, NInte1, NInte2, NBasis, ENuc, CAONO,
+     $ XKin, TwoEl, Occ, NAc, NInAc, anSt, Flags)
+      Do I=1,NBasis
+         Do J=1,NBasis
+            URe(I,J)=0.D0
+            If(I.Eq.J) URe(I,J)=1.0D0
+         EndDo
+      EndDo
+
+      If(ICASSCF.Eq.1) Then
+
+         Sum=0.D0
+         Do I=1,NInAc+NAc
+            Sum=Sum+Occ(I)
+         EndDo
+
+         If(NInAc.Eq.0) Then
+            NGem=2
+            IGem(1:NInAc+NAc)=1
+            IGem(NInAc+NAc+1:NBasis)=2
+         Else
+            NGem=3
+            IGem(1:NInAc)=1
+            IGem(NInAc+1:NInAc+NAc)=2
+            IGem(NInAc+NAc+1:NBasis)=3
+         EndIf
+
+         NAcCAS=NAc
+         NInAcCAS=NInAc
+         Write(6,'(2x,a,4x,2i3)')
+     $        "No of CAS inactive and active orbitals",NInAcCAS,NAcCAS
+         Write(6,'(2X,"CASSCF",3X,"Occupancy",4X,"Gem")')
+         Do I=1,NBasis
+            Write(6,'(X,I3,E16.6,I6)') I,Occ(I),IGem(I)
+         EndDo
+         Write(6,'(2X,"Sum of Occupancies: ",E16.6)') Sum
+         If(Abs(Sum-NELE).Gt.1.D-8)
+     $        Stop "Fatal Error: Occupancies do not sum up to NELE"
+
+      Close(10)
+
+      EndIf
+
+      If(ITwoEl.Eq.3) Then
+
+         If (ICholeskyOTF==1) Then
+            call clock_start(timer)
+            allocate(MatFF(THCData%NTHC,NBasis**2))
+
+            Call thc_gammcor_Rkab_2(MatFF, THCData%Xga, THCData%Xga,
+     $           THCData%Zgk, NBasis, NBasis,
+     $           THCData%NChol, THCData%NTHC)
+
+            print*, 'TIME FOR CHOL_GAMMCOR_Rkab', clock_readwall(timer)
+            call clock_start(timer)
+            Open(newunit=iunit,file='cholvecs',form='unformatted')
+            Write(iunit) THCData%NChol
+            Write(iunit) MatFF
+            Close(iunit)
+            Deallocate(MatFF)
+            print*, 'TIME FOR WRITE MatFF', clock_readwall(timer)
+            UMOAO = transpose(CAONO)
+
+         Else
+            print*, 'This setting is not supported with PYSCF, exiting'
+            stop
+
+         EndIf                  !ICholesky                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  
+
+         Else
+            print*, 'This setting is now supported with PYSCF, :)'
+            UMOAO = transpose(CAONO)
+            call TwoNO1(TwoEl,UMOAO,NBasis,NInte2)
+         EndIf                  !ITwoEl                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     
+      return
+      End
+C*    End Subroutine ReadPYSCF                                                           
 
 *Deck DimSym
       Subroutine DimSym(NBasis,NInte1,NInte2,MxHVec,MaxXV)
