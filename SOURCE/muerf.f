@@ -988,6 +988,9 @@ C
       Call molprogrid(OrbGrid,OrbXGrid,OrbYGrid,OrbZGrid,
      $ WGrid,UNOAO,NGrid,NBasis)
       Call molprogrid1(RR,NGrid)
+      Do I=1,NGrid
+      Call DenGrid(I,RhoGrid(I),Occ,URe,OrbGrid,NGrid,NBasis)
+      EndDo
 C
       Open(10,file="pmat.dat")
       Read(10,*)X
@@ -1013,19 +1016,21 @@ C
 C
       EndDo
 C
+      Write(*,*)'Radius of the sphere =',Radius
+C
       Do I1=1,NGrid
 C
       R1=RR(1,I1)**2+RR(2,I1)**2+RR(3,I1)**2
       R1=SQRT(R1)
 C
-      If(Abs(R1-Radius).Lt.1.D-2) Then
+      If(Abs(R1-Radius).Lt.1.D-3) Then
 C     
       Do I2=1,NGrid
 C
       R2=RR(1,I2)**2+RR(2,I2)**2+RR(3,I2)**2
       R2=SQRT(R2)
 C
-      If(Abs(R2-Radius).Lt.1.D-2) Then
+      If(Abs(R2-Radius).Lt.1.D-3) Then
 C
       R12=(RR(1,I1)-RR(1,I2))**2+(RR(2,I1)-RR(2,I2))**2
      $   +(RR(3,I1)-RR(3,I2))**2
@@ -1042,6 +1047,7 @@ C
       PairD=PairD*PairD
 C
       Write(*,*)R12,PairD
+C ,0.5*RhoGrid(I2)**2
 C
       EndIf
       EndDo
@@ -1049,8 +1055,6 @@ C
       Stop
       EndIf
       EndDo 
-C
-      Write(*,*)'Radius of the sphere =',Radius
 C
       Return
       End     

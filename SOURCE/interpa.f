@@ -3683,6 +3683,142 @@ C
       Return
       End
 
+*Deck RDM2FULL
+      Subroutine RDM2FULL(EigVecR,Eig,ABMIN,TwoNO,NInte2,IndN,Occ,Title,
+     $ NBasis,NDimX,NGem,NDim)
+C
+C     FULL 2RDM FROM ERPA AS IN Eq.(47) OF IJQC 2017 
+C
+      Implicit Real*8 (A-H,O-Z)
+C
+      Character*60 Title,FName
+C
+      Parameter(Zero=0.D0,Half=0.5D0,One=1.D0,Two=2.D0,Three=3.D0,
+     $ Four=4.D0)
+C
+C     make sure the params below are the same as in EneERPA, otherwise
+C     2RDM does not yield the same energy as calculated in EneERPA
+      Parameter(SmallE=1.D-3,BigE=1.D2)
+C
+      Include 'commons.inc'
+C
+      Dimension
+     $ ABMIN(NDimX,NDimX),EigVecR(NDimX*NDimX),
+     $ Eig(NDimX),Occ(NBasis),IndN(2,NDim),TwoNO(NInte2)
+C
+C     LOCAL ARRAYS
+C
+      Dimension TNU(NBasis,NBasis,NDimX),AuxPair(NBasis,NBasis)
+C
+      TNU(1:NBasis,1:NBasis,1:NDimX)=Zero
+      AuxPair(1:NBasis,1:NBasis)=Zero
+C 
+C     COMPUTE TRANSITION DENSITY MATRIX ELEMENTS TNU
+C
+      Do NU=1,NDimX
+C
+      If(Eig(NU).Gt.SmallE.And.Eig(NU).Lt.BigE) Then
+C
+C     CHECK THE NORM TO BE SURE IT IS OK
+C
+      XNormXY=Zero
+      Do I=1,NDimX
+C
+      IP=IndN(1,I)
+      IQ=IndN(2,I)
+      AuxPair(IP,IQ)=One
+      AuxPair(IQ,IP)=One
+C
+      YPQ=EigVecR((NU-1)*NDimX+I)
+C
+C     COMPUTE XPQ
+C
+      XPQ=Zero
+      Do J=1,NDimX
+      XPQ=XPQ+One/Eig(NU)*ABMIN(I,J)*EigVecR((NU-1)*NDimX+J)
+      EndDo
+C
+      XNormXY=XNormXY+Two*YPQ*XPQ
+C
+      TNU(IP,IQ,NU)=Half*( (CICoef(IP)+CICoef(IQ))*YPQ
+     $ - (CICoef(IP)-CICoef(IQ))*XPQ)
+      TNU(IQ,IP,NU)=Half*( (CICoef(IP)+CICoef(IQ))*YPQ
+     $ + (CICoef(IP)-CICoef(IQ))*XPQ)
+C
+      EndDo
+C
+      If(Abs(XNormXY-One).Gt.1.D-8)
+     $ Write(6,*)'Wrong norm of Y,X!', NU,XNormXY
+C
+C     if eig(nu)
+C
+      EndIf
+c     enddo NU
+      EndDo
+C
+      Do I=1,60
+      FName(I:I)=' '
+      EndDo
+      K=0
+    6 K=K+1
+      If (Title(K:K).Ne.' ') Then
+      FName(K:K)=Title(K:K)
+      GoTo 6
+      EndIf
+C
+      K=1
+      FName(K:K+14)='ERPA_2RDM.dat'
+      Open(30,File=FName)
+      Write(30,'(X,"ERPA 2RDM IN THE NO REPRESENTATION")')
+      Write(30,'(X,"P Q R S 2RDM_pqrs")')
+C
+      Eee=Zero
+      EeeH=Zero
+      EeeX=Zero
+C
+      Do IP=1,NBasis
+      Do IQ=1,NBasis
+      Do IR=1,NBasis
+      Do IS=1,NBasis
+C
+      RDM2=Zero
+      RDM2H=Zero
+      RDM2x=Zero
+C
+      If(IP.Eq.IR.And.IQ.Eq.IS) RDM2=RDM2+2.0D0*Occ(IP)*Occ(IQ)
+      If(IP.Eq.IS.And.IQ.Eq.IR) RDM2x=RDM2x-Occ(IP)*Occ(IQ)
+      RDM2H=RDM2
+C
+      If(IP.Eq.IS.And.IQ.Eq.IR)
+     $RDM2=RDM2-Occ(IQ)
+c*AuxPair(IP,IR)*AuxPair(IQ,IS)
+C
+      Do NU=1,NDimX
+      RDM2=RDM2+Two*TNU(IP,IR,NU)*TNU(IS,IQ,NU)
+      EndDo
+C
+      Write(30,'(4I3,E14.6)')IP,IQ,IR,IS,RDM2
+C
+      EeeH=EeeH+RDM2H*TwoNO(NAddr3(IP,IR,IQ,IS))
+      EeeX=EeeX+RDM2X*TwoNO(NAddr3(IP,IR,IQ,IS))
+      Eee=Eee+RDM2*TwoNO(NAddr3(IP,IR,IQ,IS))
+C
+      EndDo
+      EndDo
+      EndDo
+      EndDo
+C
+      Close(30)
+C
+      Write(6,
+     $ '(/,1X," *** ERPA 2RDM CONSTRUCTED AND SAVED IN A FILE ***")')
+C
+      Write(6, '(X,"Hartree , Exchange",2F17.8)')EeeH, EeeX
+      Write(6, '(\,X,"Eee from full ERPA-reconstructed 2RDM",F17.8)')Eee
+C
+      Return
+      End
+
 *Deck IFindG
       Integer Function IFindG(IO)
 C
