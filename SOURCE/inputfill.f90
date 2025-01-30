@@ -555,9 +555,9 @@ character(:), allocatable :: first, last
  case ("MOCLASS")
       if(uppercase(val) == "TREXIO" .or. &
          uppercase(val) == "MOLPRO") then
-         SystemParams%MOClass = 0
-      elseif(uppercase(val) == "OCC") then
          SystemParams%MOClass = 1
+      elseif(uppercase(val) == "OCC") then
+         SystemParams%MOClass = 0
       endif
 
  case ("CHARGE")
@@ -645,6 +645,9 @@ character(:), allocatable :: first, last
 
  case ("TREXFILE")
        SystemParams%TrexFile = val
+ ! dSRS
+ case ("TREXORBFILE")
+       SystemParams%TrexOrbFile = val
 
  case ("CHOLESKY2RDM")
        if (uppercase(val) == "TRUE".or.  &

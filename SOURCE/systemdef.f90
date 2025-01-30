@@ -536,6 +536,9 @@ elseif(Flags%ISAPT.Eq.1) then
       monA%IREF1    = Input%SystemInput(1)%IREF1
       monA%IREF2    = Input%SystemInput(1)%IREF2
       monA%TRDMType = Input%SystemInput(1)%TRDMType
+      if (allocated(Input%SystemInput(1)%TrexOrbFile)) then
+          monA%TrexOrbFile = Input%SystemInput(1)%TrexOrbFile
+      endif
 
       monA%NCen    = Input%SystemInput(1)%NCen
       monA%UCen    = Input%SystemInput(1)%UCen
@@ -591,6 +594,9 @@ elseif(Flags%ISAPT.Eq.1) then
       monB%IREF1    = Input%SystemInput(2)%IREF1
       monB%IREF2    = Input%SystemInput(2)%IREF2
       monB%TRDMType = Input%SystemInput(2)%TRDMType
+      if (allocated(Input%SystemInput(2)%TrexOrbFile)) then
+          monB%TrexOrbFile = Input%SystemInput(2)%TrexOrbFile
+      endif
       
       monB%NCen = Input%SystemInput(2)%NCen
       monB%UCen = Input%SystemInput(2)%UCen
@@ -652,6 +658,9 @@ elseif(Flags%ISAPT.Eq.1) then
       monA%IREF1    = Input%SystemInput(2)%IREF1
       monA%IREF2    = Input%SystemInput(2)%IREF2
       monA%TRDMType = Input%SystemInput(2)%TRDMType
+      if (allocated(Input%SystemInput(2)%TrexOrbFile)) then
+         monA%TrexOrbFile = Input%SystemInput(2)%TrexOrbFile
+      endif
 
       monA%XELE = (monA%ZNucl - monA%Charge)/2.0d0
       monA%NELE = (monA%ZNucl - monA%Charge)/2
@@ -702,6 +711,9 @@ elseif(Flags%ISAPT.Eq.1) then
       monB%IREF1    = Input%SystemInput(1)%IREF1
       monB%IREF2    = Input%SystemInput(1)%IREF2
       monB%TRDMType = Input%SystemInput(1)%TRDMType
+      if (allocated(Input%SystemInput(1)%TrexOrbFile)) then
+         monB%TrexOrbFile = Input%SystemInput(1)%TrexOrbFile
+      endif
       
       monB%XELE = (monB%ZNucl - monB%Charge)/2.0d0
       monB%NELE = (monB%ZNucl - monB%Charge)/2

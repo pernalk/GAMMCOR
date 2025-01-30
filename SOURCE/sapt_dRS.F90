@@ -47,7 +47,10 @@ double precision :: sumA,sumB
 double precision :: elst1,elst2,elstSAPT
 double precision :: elst1exp,elst2exp,elstEXPsym1,elstEXPsym2,ElstEXPsymTrAng1,ELstEXPsymTrAng2
 double precision :: A1B2A1B2,A2B1A2B1,A1B2A2B1
-double precision :: gamma
+double precision :: pi
+double precision :: gamma,gammadeg
+
+pi = 4d0*atan(1d0)
 
 ! set dimensions
 print*, 'A%IREF1',A%IREF1
@@ -61,6 +64,7 @@ irefB  =  B%IREF1
 iref2B  = B%IREF2
 iexcited = ((iref2-2)*(iref2-1))/2+iref
 iexcited2 = ((iref2B-2)*(iref2B-1))/2+irefB
+
 !print*, 'iexcited  = ',iexcited
 !print*, 'iexcited2 = ',iexcited2
 
@@ -96,7 +100,8 @@ if(irefB .eq. iref2B) then
 
    allocate(Atrdm(NBasis,NBasis))
    call tran2MO(A%trdm1(iexcited,:,:),A%CMONO(iref,:,:),A%CMONO(iref,:,:), &
-                        Atrdm(:,:),NBasis)
+                        Atrdm,NBasis)
+   !!print*, 'Atrdm = ',norm2(Atrdm)
 
    do i=1,A%num0+A%num1
       do j=1,A%num0+A%num1
@@ -151,7 +156,6 @@ close(iunit)
 ! test
 print*, 'elab = ',4d0*elab
 print*, 'elabB = ',4d0*elabB
-
 
 allocate(Btrdm(NBasis,NBasis))
 if(irefB .ne. iref2B) then
@@ -232,6 +236,16 @@ close(iunit)
 elab2B = 4d0*elab2B
 print*, 'elab2B = ',elab2B
 
+call print_en('V_nucA_elB*',eb2,.false.)
+call print_en('V_nucB_elA', ea1,.false.)
+call print_en('V_elA_elB*', elab2,.false.)
+call print_en('V_nn',SAPT%Vnn,.false.)
+
+call print_en('V_nucA_elB', eb1,.true.)
+call print_en('V_nucB_elA*',ea2,.false.)
+call print_en('V_elA*_elB', elab2B,.false.)
+call print_en('V_nn',SAPT%Vnn,.false.)
+
 A1B2A1B2=SAPT%Vnn+ea1+eb2+elab2
 A2B1A2B1=SAPT%Vnn+eb1+ea2+elab2B
 A1B2A2B1=elab3+eas1
@@ -241,9 +255,13 @@ write(LOUT,'(1x,a,f16.8)')  '<A*B|V|A*B>      = ', A2B1A2B1*1000d0
 write(LOUT,'(1x,a,f16.8)')  '<AB*|V|A*B>      = ', A1B2A2B1*1000d0
 
 gamma=0.5d0*atan2(2*A1B2A2B1,A1B2A1B2-A2B1A2B1)
-write(LOUT,'(/1x,a,f16.8)') 'gamma      = ', gamma
- print*,'4*gamma = ',4*gamma
- print*,'COS(gamma)^2',COS(gamma)**2
+gammadeg = gamma * 180d0 / pi
+write(lout,'(/1x,a,f16.8)') 'gamma      = ', gamma
+write(lout,'(1x,"Mixing angle (elst), rad", f12.8)') gamma
+write(lout,'(1x,"Mixing angle (elst), deg", f9.3)')  gammadeg
+
+print*,'4*gamma = ',4*gamma
+print*,'COS(gamma)^2',COS(gamma)**2
 
 !TRACK MINUS/PLUS SIGN  (NOT SURE ABOUT IT)
 elst1exp=COS(gamma)**2*A1B2A1B2+SIN(gamma)**2*A2B1A2B1+2d0*SIN(gamma)*COS(gamma)*A1B2A2B1
@@ -323,10 +341,13 @@ double precision :: A1B2PA1B2,A2B1PA2B1,A1B2PA2B1
 double precision :: A1B2VA1B2,A2B1VA2B1,A1B2VA2B1
 double precision :: A1B2VPA1B2,A2B1VPA2B1,A1B2VPA2B1,A2B1VPA1B2
 double precision :: P(2,2),V(2,2),VPnb(2,2)
+double precision :: pi
 double precision :: gamma
 double precision :: gamma_exch1,gamma_exch2
+double precision :: gamma_exch1deg,gamma_exch2deg
 double precision :: tNaNbTEST
 
+pi = 4d0*atan(1d0)
 
 write(lout,'(/1x,a)') "Running e1exch_dSRS..."
 
@@ -1153,6 +1174,8 @@ print *,"C21: ", -SIN(gamma)
 print *,"C12: ", COS(gamma)
 
 gamma_exch1 = -atan2(VPnb(2,1)-V(1,1)*P(2,1),V(2,2)-V(1,1))
+gamma_exch1deg = 180 * gamma_exch1 / pi
+
 print *,"gamma_exch1",gamma_exch1
 
 write(lout,'(/1x,a)') "Coefficients from exchange diagonalization:"
@@ -1161,11 +1184,18 @@ print *,"C11: ",COS(gamma+gamma_exch1)
 print *,"C12: ",SIN(gamma+gamma_exch1)
 
 gamma_exch2=atan2(VPnb(1,2)-V(2,2)*P(1,2),V(1,1)-V(2,2))
+gamma_exch2deg = 180 * gamma_exch2 / pi
 
 print *,"gamma_exch2",gamma_exch2
- print *,"For second state:"
- print *,"C21: ", -sin(gamma+gamma_exch2)
- print *,"C12: ", cos(gamma+gamma_exch2)
+
+write(lout,'(/1x,"Delta-1 Mixing angle (exch),rad", f12.6)') gamma_exch1
+write(lout,'( 1x,"Delta-1 Mixing angle (exch),deg", f9.3)')  gamma_exch1deg
+write(lout,'(/1x,"Delta-2 Mixing angle (exch),rad", f12.6)') gamma_exch2
+write(lout, '(1x,"Delta-2 Mixing angle (exch),deg", f9.3,/)')  gamma_exch2deg
+
+print *,"For second state:"
+print *,"C21: ", -sin(gamma+gamma_exch2)
+print *,"C12: ", cos(gamma+gamma_exch2)
 
 if (SAPT%IPrint >= 10) then
    write(lout, '(/1x,a)') "How good is trygonometric approximation?:"

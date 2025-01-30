@@ -496,7 +496,7 @@ end subroutine readorbsmolpro
 subroutine read_nact_molpro(nact,infile)
 !
 ! Purpose: reads the number of active electrons
-!          which is kept in 2RDM file
+!          which is kept in 1RDM file
 !
 implicit none
 

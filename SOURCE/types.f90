@@ -168,7 +168,8 @@ type SystemBlock
       integer :: NSym
       integer :: NSymBas(8),NSymOrb(8)
       integer :: NOrb, NGem
-      integer :: MOClass = 1 ! 1: select inact,act,virt from Occ(:) ; 0: from mo_class (TREXIO)
+      integer :: MOClass = 0! 0: inact,act,virt (num0,num1,num2) from Occ
+                            ! 1: from mo_class (TREXIO, MOLPRO)
       integer :: NAct, INAct
       integer :: ISwitchAct = 0
       integer :: NActS(8), INActS(8)
@@ -275,6 +276,7 @@ type SystemBlock
       double precision :: FreqOm = 0.d0
 
       character(:), allocatable :: TrexFile
+      character(:), allocatable :: TrexOrbFile ! used in dSRS
 
 end type SystemBlock
 
@@ -413,7 +415,6 @@ type SaptData
      logical :: EnChck  = .true., HFCheck=.true.
      logical :: doRSH   = .false., SameOm = .true.
      logical :: reduceV = .false.
-     character(:),allocatable :: TrexFile
 
 end type SaptData
 

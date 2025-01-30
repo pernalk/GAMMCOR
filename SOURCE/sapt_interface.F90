@@ -140,27 +140,32 @@ double precision :: Tcpu,Twall
 ! dependecies in large basis sets; ncmot = norb*nbas
 ! in general, NAO /= NBasis (e.g., in TREXIO)
 
- allocate(Ca(NBasis*NAO),Cb(NBasis*NAO))
+allocate(Ca(NBasis*NAO),Cb(NBasis*NAO))
 
- if(SAPT%InterfaceType==1) then
+if(SAPT%InterfaceType==1) then
 
-    call read_mo_dalton(Ca,NBasis,SAPT%monA%NSym,SAPT%monA%NSymBas,SAPT%monA%NSymOrb,&
-                 'SIRIUS_A.RST','DALTON_A.MOPUN')
-    call read_mo_dalton(Cb,NBasis,SAPT%monB%NSym,SAPT%monB%NSymBas,SAPT%monB%NSymOrb,&
-                 'SIRIUS_B.RST','DALTON_B.MOPUN')
-    call arrange_mo(Cb,NBasis,SAPT)
+   call read_mo_dalton(Ca,NBasis,SAPT%monA%NSym,SAPT%monA%NSymBas,SAPT%monA%NSymOrb,&
+                'SIRIUS_A.RST','DALTON_A.MOPUN')
+   call read_mo_dalton(Cb,NBasis,SAPT%monB%NSym,SAPT%monB%NSymBas,SAPT%monB%NSymOrb,&
+                'SIRIUS_B.RST','DALTON_B.MOPUN')
+   call arrange_mo(Cb,NBasis,SAPT)
 
- elseif(SAPT%InterfaceType==2) then
+elseif(SAPT%InterfaceType==2) then
 
-    call read_mo_molpro(Ca,'MOLPRO_A.MOPUN','CASORB  ',NBasis)
-    call read_mo_molpro(Cb,'MOLPRO_B.MOPUN','CASORB  ',NBasis)
+   call read_mo_molpro(Ca,'MOLPRO_A.MOPUN','CASORB  ',NBasis)
+   call read_mo_molpro(Cb,'MOLPRO_B.MOPUN','CASORB  ',NBasis)
 
- elseif(SAPT%InterfaceType==5) then
+elseif(SAPT%InterfaceType==5) then
 
-    call read_mo_trexio(Ca,SAPT%monA%TrexFile,NAO,NBasis)
-    call read_mo_trexio(Cb,SAPT%monB%TrexFile,NAO,NBasis)
+!  if (Flags%IdSRS==1) then
+     call read_dSRS_mo_trexio(Ca,SAPT%monA,NAO,NBasis)
+     call read_dSRS_mo_trexio(Cb,SAPT%monB,NAO,NBasis)
+!  else
+!     call read_mo_trexio(Ca,SAPT%monA%TrexFile,NAO,NBasis)
+!     call read_mo_trexio(Cb,SAPT%monB%TrexFile,NAO,NBasis)
+!  endif
 
- endif
+endif
 
 ! symmetry sorting for Dalton
  if(SAPT%InterfaceType==1) then
@@ -740,6 +745,7 @@ subroutine onel_trexio(NBasis,NAO,Mon,SAPT)
  double precision, allocatable :: kinetic(:)
  double precision, allocatable :: charge(:),coord(:,:)
  character(:),allocatable      :: outfile
+ character(1)   :: prefix
 
 if(Mon%Monomer==1) then
   outfile = 'ONEEL_A'
@@ -747,7 +753,11 @@ elseif(Mon%Monomer==2) then
   outfile = 'ONEEL_B'
 endif
 
+if(mon%monomer==1) prefix='A'
+if(mon%monomer==2) prefix='B'
+
 f = trexio_open (Mon%TrexFile, 'r', TREXIO_HDF5, rc)
+write(lout,'(1x,"Monomer ", A2, "Reading 1-el ints from ",A)') prefix,Mon%TrexFile
 
 rc = trexio_has_ao_num(f)
 if (rc /= TREXIO_SUCCESS) then
@@ -1053,9 +1063,14 @@ end subroutine readocc_molpro
 subroutine readocc_trexio(NBasis,Mon,OrbAux,OneRdm,Flags)
 !
 ! Purpose:
-! read and 1-RDM, get Occ and MO-->NO
+! - read and 1-RDM, get Occ and MO-->NO
+! - set NAct, INAct
+!
 ! Comment:
-! Locally assume all orbitals are active!
+! - distinguishes between ICI and ICASSCF flags
+! - for Flags%ICI: Locally assume all orbitals are active
+! - if NAct from Occ differs from mo_class, override
+!   with mo_class, unless Mon%MOClass=0 in input!
 !
 ! [output]: Mon%Occ           : occupation numbers (0:1)
 !           Mon%CICoef        : CI coefficients == sqrt(Occ)
@@ -1080,11 +1095,11 @@ double precision :: tmp
 double precision :: tmp1,tmp2
 double precision,allocatable :: work(:),Eval(:)
 double precision,allocatable :: work1d(:)
-character(1)   :: monlabel
+character(1)   :: prefix
 character*(32) :: mo_class(NBasis)
 
-if(mon%monomer==1) monlabel='A'
-if(mon%monomer==2) monlabel='B'
+if(mon%monomer==1) prefix='A'
+if(mon%monomer==2) prefix='B'
 
 HlpDim = max(NBasis**2,3*NBasis)
 
@@ -1094,7 +1109,12 @@ allocate(Mon%CICoef(NBasis),Mon%IGem(NBasis),Mon%Occ(NBasis))
 allocate(work(HlpDim),EVal(NBasis))
 allocate(work1d(NBasis**2))
 
-f = trexio_open (Mon%TrexFile, 'r', TREXIO_HDF5, rc)
+if (allocated(Mon%TrexOrbFile)) then
+   f = trexio_open (Mon%TrexOrbFile, 'r', TREXIO_HDF5, rc)
+   write(lout,'(1x,"Monomer ", A2, " Reading 1-RDM from ",A)') prefix,Mon%TrexOrbFile
+else
+   f = trexio_open (Mon%TrexFile, 'r', TREXIO_HDF5, rc)
+endif
 
 rc = trexio_has_rdm_1e(f)
 if (rc /= TREXIO_SUCCESS) then
@@ -1130,7 +1150,7 @@ if(Flags%ICI==1) then
          if(mon%IPrint.gt.5) write(lout,'(1x,a,i3,e14.4)') 'Warning! Small occupation:',i,Eval(i)
       end if
    enddo
-   if(j.gt.0) write(lout,*) 'Monomoner '//monlabel//': ',j,'orbitals will be treated as virtual'
+   if(j.gt.0) write(lout,*) 'Monomoner '//prefix//': ',j,'orbitals will be treated as virtual'
 
    ! Set INAct (also works for open-shells)
    Mon%INAct  = Mon%XELE - tmp + 1.d-1
@@ -1177,8 +1197,8 @@ if (core+inactive+active+virtual /= NBasis) then
 endif
 
 #if SAPT_INTERFACE_DEBUG > 5
-   write(lout,'(1X,"readocc_trexio :")')
-   write(lout,'(1X,"Monomer  =",A3)') monlabel
+   write(lout,'(1X,"Debug: readocc_trexio :")')
+   write(lout,'(1X,"Monomer  =",A3)') prefix
    write(lout,'(1X,"core     =",I3)') core
    write(lout,'(1X,"inactive =",I3)') inactive
    write(lout,'(1X,"active   =",I3)') active
@@ -1187,15 +1207,17 @@ endif
 #endif
 
 if(Mon%NAct/=active) then
-   write(lout,'(1x,2a)') 'Warning! In monomer ', monlabel
+   write(lout,'(/1x,2a)') 'Warning! In monomer ', prefix
    write(lout,'(1x,"The number of partially occ orbitals '// &
-         'different from active read from TREXIO. '// &
-         'Some active orbitals must be unoccupied.",/)')
-   write(lout,'("NAct from 1-RDM =" I3, "NAct from TREXIO=", I3)') Mon%NAct, active
+         'different from active read from TREXIO.")')
+   write(lout,'(1x,"Some active orbitals are unoccupied or doubly occupied")')
+   write(lout,'(1x,"NAct from 1-RDM  =" I3, " NAct from TREXIO =", I3)') Mon%NAct, active
+   write(lout,'(1x,"INAct from 1-RDM =" I3, " INAct from TREXIO=", I3)') Mon%INAct, inactive
    Mon%NAct  = active
    Mon%INAct = core+inactive
-   Mon%ISwitchAct = 1  ! change Mon%num0 and Mon%num1 in select_active
+   Mon%MOClass = 1
    Mon%IWarn = Mon%IWarn + 1
+   write(lout,'(1x,"Using TREXIO mo_class values!",/)')
 endif
 
 NOccup     = Mon%INAct + Mon%NAct
@@ -1393,9 +1415,11 @@ do ist=1,nstates
    enddo
 #endif
 #if SAPT_INTERFACE_DEBUG > 15
-   print*, 'CMONO, istate=',ist
-   do j=1,NOccup
-      write(lout,'(*(f12.6))') (CMONO(ist,i,j),i=1,NOccup)
+   print*, 'CMONO, istate=',ist,norm2(CMONO(ist,:,:))
+   do j=1,NBasis
+   !do j=1,NOccup
+      write(lout,'(*(f12.6))') (CMONO(ist,i,j),i=1,NBasis)
+      !write(lout,'(*(f12.6))') (CMONO(ist,i,j),i=1,NOccup)
    enddo
    write(lout, '("Monomer ",I0," state ",I0," CAONO = ",F12.6)') Mon%Monomer,ist,norm2(Mon%CAONO(ist,:,:))
    do j=1,NBasis
@@ -1509,9 +1533,23 @@ INACT  = Mon%INAct
 NACT   = Mon%NAct
 NOccup = Mon%INAct + Mon%NAct
 
+if(Mon%Monomer==1) then
+ prefix = 'A'
+elseif(Mon%Monomer==2) then
+ prefix = 'B'
+endif
+
 ! get state-averaged AO-->MO transformation matrix
 allocate(CAOMO(NAO,NBasis))
-f = trexio_open (Mon%TrexFile, 'r', TREXIO_HDF5, rc)
+
+if (allocated(Mon%TrexOrbFile)) then
+   f = trexio_open (Mon%TrexOrbFile, 'r', TREXIO_HDF5, rc)
+   write(lout,'(/1x,"Monomer ", A2, ": Reading 1-TRDM from ",A)') prefix,Mon%TrexOrbFile
+else
+   f = trexio_open (Mon%TrexFile, 'r', TREXIO_HDF5, rc)
+   write(lout,'(/1x,"Monomer ", A2, ": Reading 1-TRDM from ",A)') prefix,Mon%TrexFile
+endif
+
 rc = trexio_has_mo_coefficient(f)
 if (rc /= TREXIO_SUCCESS) then
   stop 'No AOMO coefficients in file'
@@ -1527,12 +1565,6 @@ call trexio_assert(rc, TREXIO_SUCCESS)
 nnstates = nstates*(nstates-1)/2
 
 !allocate (filenames(nstates))
-
-if(Mon%Monomer==1) then
- prefix = 'A'
-elseif(Mon%Monomer==2) then
- prefix = 'B'
-endif
 !do i = 1, nstates
 !   write(filenames(i), '(A,"_1trdm_",I0,"_",I0,".txt")') trim(prefix), i, i
 !end do
@@ -1569,10 +1601,14 @@ CMONO  = 0d0
 allocate(DTS(NBasis,NBasis,nstates,nstates))
 
 if (mon%IRef1 /= mon%IRef2) then
+   rc = trexio_has_rdm_1e_transition(f)
+   if ( rc /= TREXIO_SUCCESS) then
+      stop "No 1-TRDM in file!"
+   endif
    rc = trexio_read_rdm_1e_transition(f, DTS)
 elseif (mon%IRef1 == mon%IRef2) then
    print*, 'nstates in read_trdm_TREXIO : ',nstates
-   write(lout,'(/1x,a)') "Warning! IRef1=IRef2: spatial degeneracy?"
+   write(lout,'(/1x,a)') "Warning! IRef1=IRef2: is it spatial degeneracy?"
    rc = trexio_read_rdm_1e(f, DTS(:,:,1,1))
    if (mon%Monomer == 1) then
        print*, 'Monomer A:'
@@ -1618,6 +1654,9 @@ do ist=1,nstates
    do i=1,NACT
       CMONO(ist,INACT+j,INACT+i) = AuxRDM(i,j)
    enddo
+   enddo
+   do i=INACT+NACT+1,NBasis
+      CMONO(ist,i,i) = 1d0
    enddo
    !print*, 'CMONO , state =',ist
    !do j=1,NOccup
@@ -1971,9 +2010,16 @@ double precision,allocatable :: mat(:,:,:,:), DTNO(:,:)
 character(len=20), dimension(:), allocatable :: filenames
 character(len=1) :: prefix
 
+if (allocated(Mon%TrexOrbFile)) then
+   f = trexio_open (Mon%TrexOrbFile, 'r', TREXIO_HDF5, rc)
+   write(lout,'(/1x,"Monomer ", A2, ": Reading 2-TRDM from ",A)') prefix,Mon%TrexOrbFile
+else
+   f = trexio_open (Mon%TrexFile, 'r', TREXIO_HDF5, rc)
+   write(lout,'(/1x,"Monomer ", A2, ": Reading 2-TRDM from ",A)') prefix,Mon%TrexFile
+endif
 
-f = trexio_open (Mon%TrexFile, 'r', TREXIO_HDF5, rc)
 rc = trexio_has_mo_coefficient(f)
+call trexio_assert(rc, TREXIO_SUCCESS)
 
 rc = trexio_read_state_num(f,nstates)
 call trexio_assert(rc, TREXIO_SUCCESS)
@@ -2309,7 +2355,7 @@ integer(8) :: offset,icount
 integer(8) :: size_max
 integer    :: rc
 integer    :: nstates
-integer    :: ist,jst,istate,jstate
+integer    :: ist,jst,itr,istate,jstate
 integer    :: i,j,k,l
 integer    :: idx_i,idx_j,idx_k,idx_l
 integer    :: Ind2(NBasis)
@@ -2333,7 +2379,13 @@ elseif(Mon%Monomer==2) then
  prefix  = "B"
 endif
 
-f  = trexio_open (Mon%TrexFile, 'r', TREXIO_HDF5, rc)
+if (allocated(Mon%TrexOrbFile)) then
+   f = trexio_open (Mon%TrexOrbFile, 'r', TREXIO_HDF5, rc)
+   write(lout,'(1x,"Monomer ", A2, ": Reading 2-TRDM from ",A)') prefix,Mon%TrexOrbFile
+else
+   f = trexio_open (Mon%TrexFile, 'r', TREXIO_HDF5, rc)
+   write(lout,'(1x,"Monomer ", A2, ": Reading 2-TRDM from ",A)') prefix,Mon%TrexFile
+endif
 rc = trexio_has_mo_coefficient(f)
 
 rc = trexio_read_state_num(f,nstates)
@@ -2342,6 +2394,8 @@ call trexio_assert(rc, TREXIO_SUCCESS)
 ! set dimensions
 ist = Mon%IRef1 ! ket state
 jst = Mon%IRef2 ! bra state
+itr = ist + (jst-2)*(jst-1)/2 ! pos in low triang
+!print*, 'itr = ', itr
 
 INACT  = Mon%INAct
 NACT   = Mon%NAct
@@ -2359,7 +2413,8 @@ if (mon%IRef1 == mon%IRef2) then
    ! save 2-RDM(NOccup^4) in RDM2val as usual
    call rw_trexio_rdm2(mon,mon%CMONO(mon%IRef1,:,:),NBasis)
    allocate(Mon%rdm24(nstates,NOccup,NOccup,NOccup,NOccup))
-   print*, 'test: saving rdm24 for dSRS monomer ',prefix
+   !print*, 'test: saving rdm24 for dSRS monomer ',prefix
+   write(lout,'(/1x,"IRef1=IRef2: 2-TRDM replaced by 2-RDM for monomer B!")')
    Mon%rdm24(mon%IRef1,:,:,:,:) = Mon%RDM2val(:,:,:,:)
    return
 endif
@@ -2438,15 +2493,12 @@ allocate(Mon%rdm24(nstates,NOccup,NOccup,NOccup,NOccup))
 mon%rdm24 = 0d0
 do istate=1,nstates
    ! CMONO --> CMONOAct
-   print*, 'CMONO full',istate,norm2(Mon%CMONO(istate,:,:))
    work = 0d0
    do j=1,NAct
       do i=1,NAct
          work(i,j) = Mon%CMONO(istate,INACT+i,INACT+j)
-        print*,i,j,work(i,j)
       enddo
    enddo
-   !print*, 'CMONO act ?',norm2(work)
    call TrRDM24_dgemm(rdm24act(1:NACT,1:NACT,1:NACT,1:NACT,istate,istate),work,NACT)
    !print*, 'i, rdm24act(i) NO = ',istate,norm2(rdm24act(:,:,:,:,istate,istate))
    !print*, '2rdm NO act 1 1 1 1', rdm24act(1,1,1,1,istate,istate)
@@ -2519,7 +2571,20 @@ if (Mon%TRDMType==2) return
 
 ! 2-TRDM part
 write(lout,'(/1x,"Reading <", I2, " |", I2, " > 2-TRDM" )') jst,ist
+
 !write(lout,'(1x,"Norm of 2-TRDM MO", F12.6)') norm2(rdm24act(:,:,:,:,jst,ist))
+!print*, 'test MO reading...'
+!do l=1,NACT
+!   do k=1,NACT
+!      do j=1,NACT
+!         do i=1,NACT
+!            if(abs(rdm24act(i,j,k,l,2,1))>1d-3) then
+!               write(6,'(4i3,f12.8)') i,j,k,l, rdm24act(i,j,k,l,jst,ist)
+!            endif
+!         enddo
+!      enddo
+!   enddo
+!enddo
 
 ! CMONO --> CMONOAct
 work = 0d0
@@ -2544,7 +2609,7 @@ write(lout,'(1x,"2-TRMD <", I2, " |", I2, " >  has trace ", F12.6, "and norm ", 
 #endif
 
 allocate(DTNO(NBasis,NBasis))
-call tran2MO(mon%trdm1(1,:,:),mon%CMONO(ist,:,:),mon%CMONO(ist,:,:),DTNO,NBasis)
+call tran2MO(mon%trdm1(itr,:,:),mon%CMONO(ist,:,:),mon%CMONO(ist,:,:),DTNO,NBasis)
 
 #if SAPT_INTERFACE_DEBUG > 5
    print*, '1-TRDM in NO from CAS state =',ist
@@ -4024,8 +4089,13 @@ call dgemm('T','N', NBasis**3, NBasis, NBasis, 1.d0, Aux,  NBasis, URe, NBasis, 
 end subroutine TrRDM24_dgemm
 
 subroutine select_active(mon,nbas,Flags)
+!
 ! set dimensions: NDimX,num0,num1,num2
 ! set matrices  : IndN,IndX,IPair,IndAux
+!
+! Note: ISwitchAct = 1 is set in readocc_molpro 
+!       --> if NAct from common block /= NAct from 1-RDM,
+!           then set num0-2 to Molpro values
 !
 implicit none
 
@@ -4052,7 +4122,7 @@ character(1) :: mname
     mon%IndAux(i)=2
  enddo
 
- if(mon%MOClass==1) then ! select act orbitals from Occ(:)
+ if(mon%MOClass==0) then ! select num0, num1, num2 orbitals from Occ(:)
 
     ! active orbitals
     mon%icnt = 0
@@ -4083,7 +4153,8 @@ character(1) :: mname
        enddo
     endif
 
- elseif(mon%MOClass==0) then ! select act orbs from ????
+ elseif(mon%MOClass==1) then ! select num0, num1, num2 orbs from Molpro common block
+                             ! stored in 1-RDM file by GammCor interface
      ! choose num0 = Core+Inactive
      !        num1 = Active
      !        num2 = Virtual
@@ -4384,6 +4455,10 @@ subroutine select_active_trexio(mon,nbas,Flags)
 ! set dimensions: NDimX,num0,num1,num2
 ! set matrices  : IndN,IndX,IPair,IndAux
 !
+! MOClass controls num0,num1,num2 selection
+!   = 0: use OCC
+!   = 1: use MO_CLASS
+!
 implicit none
 
 type(SystemBlock)  :: mon
@@ -4408,13 +4483,11 @@ do i=1+mon%NELE,nbas
    mon%IndAux(i) = 2
 enddo
 
-if (mon%MOClass == 0 ) then
-   print*, 'Warning! Active orbitals will match TREXIO mo_class!'
-endif
+print*, 'MOCLASS = ', mon%MOCLASS
 
-if(mon%MOClass==1) then
+if(mon%MOClass==0) then
 
-   ! select active orbitals based on occupation numbers : ThrAct controls IndAux
+   ! select num0-2 based on occupation numbers : ThrAct controls IndAux
    mon%icnt = 0
    if(mon%Monomer==1) write(LOUT,'(/1x,a)') 'Monomer A'
    if(mon%Monomer==2) write(LOUT,'(/1x,a)') 'Monomer B'
@@ -4429,7 +4502,7 @@ if(mon%MOClass==1) then
       endif
    enddo
 
-elseif(mon%MOClass==0) then
+elseif(mon%MOClass==1) then ! select num0-2 from mo_class
      ! choose num0 = Core+Inactive
      !        num1 = Active
      !        num2 = Virtual
@@ -4528,6 +4601,35 @@ enddo
 mon%NDimX = ind
 
 end subroutine select_active_trexio
+
+subroutine read_dSRS_mo_trexio(C,mon,NAO,NBasis)
+!
+! Purpose:
+! read C(NAO,NBasis) orbital coefficients for dSRS calculation
+!
+! Comment:
+! use TrexOrbFile, if declared
+!
+implicit none
+
+type(SystemBlock)  :: mon
+integer,intent(in) :: NAO,NBasis
+double precision,intent(out) :: C(NAO,NBasis)
+
+character(1)   :: prefix
+
+if(mon%monomer==1) prefix='A'
+if(mon%monomer==2) prefix='B'
+
+if (allocated(Mon%TrexOrbFile)) then
+   call read_mo_trexio(C,mon%TrexOrbFile,NAO,NBasis)
+   write(lout,'(1x,"Monomer ", A1, ": Reading orbital coeffs from ",A)') prefix, Mon%TrexOrbFile
+else
+   call read_mo_trexio(C,mon%TrexFile,NAO,NBasis)
+   write(lout,'(1x,"Monomer ", A1, ": Reading orbital coeffs from ",A)') prefix, Mon%TrexFile
+endif
+
+end subroutine read_dSRS_mo_trexio
 
 subroutine save_CAONO(Cin,Cout,mon,idSRS,NAO,NBasis)
 !
