@@ -402,8 +402,14 @@ C     the purpose of sorting is only to print a few highest (sorted) eigenvector
       Write(6,'(I4,4X,2E16.6)') I,Eig(I),27.211*Eig(I)
       EndDo
 C
+      If(ITwoEl.Eq.1) Then
+      Write(6,'(/," *** Computing ERPA 2-RDM *** ")')
+      Call RDM2FULL(EigVecR,Eig,ABMIN,TwoNO,NInte2,IndN,
+     $ Occ,Title,NBasis,NDimX,NGem,NDim)
+      EndIf
+C
       Write(6,'(/," *** Computing ERPA energy *** ",/)')
-
+C
       If(ITwoEl.Eq.3) Then
       Call ACEneERPA_FOFO(ECorr,EigVecR,Eig,Occ,
      $ IGem,IndN,IndX,NAcCAS+NInAcCAS,
@@ -1124,7 +1130,6 @@ C
       XVSR=XVSR+Two*Occ(I)*VSR(II)
       EndDo
 C
-c ???
       If(IFunSR.Eq.4) Then
 c      Write(6,'(X,/,
 c     $"*** REMOVING VSR_HXC FROM A ONE-ELECTRON HAMILTONIAN*** ",/)')
@@ -1567,7 +1572,7 @@ C
       Double Precision, Allocatable :: Work(:),Batch(:,:)
       Dimension C(NBasis),HNO(NInte1),
      $ IGFact(NInte2),
-     $ Ind1(NBasis),Ind2(NBasis),WMAT(NBasis,NBasis),
+     $ Ind1(NBasis),Ind2(NBasis),Ind3(NBasis),WMAT(NBasis,NBasis),
      $ AuxI(NInte1),AuxIO(NInte1),IPair(NBasis,NBasis),
      $ EigX(NDimX*NDimX),
      $ IEigAddY(2,NDimX),IEigAddInd(2,NDimX),IndBlock(2,NDimX),
@@ -2260,8 +2265,51 @@ c      IGFact=0
 c comment out to include in-active contribution to the CBS correction (see above)
       IHNO1=0
 C
-C     KP 12.01.2025
-c      stop
+      Ind3=0
+      Do I=1,NCoreOrb
+      Ind3(I)=1
+      EndDo
+      ETotSR=Zero
+      Do IP=1,NOccup
+      Do IQ=1,NOccup
+      Do IR=1,NOccup
+      Do IS=1,NOccup
+C
+      If(.Not.(Ind3(IP).Eq.1.And.
+     $ Ind3(IP).Eq.Ind3(IR).And.Ind3(IQ).Eq.Ind3(IS).
+     $ And.Ind3(IP).Eq.Ind3(IQ))) Then
+
+      If(IGem(IP).Eq.2.And.
+     $ IGem(IP).Eq.IGem(IR).And.IGem(IQ).Eq.IGem(IS).
+     $ And.IGem(IP).Eq.IGem(IQ) )  
+     $ ETotSR=ETotSR+FRDM2(IP,IQ,IR,IS,RDM2Act,Occ,Ind2,NAct,NBasis)
+     $  *TwoElSR(NAddr3(IP,IR,IQ,IS))
+
+      If(NInAcCAS.Eq.0) Then
+      If(IGem(IP).Eq.1.And.
+     $ IGem(IP).Eq.IGem(IR).And.IGem(IQ).Eq.IGem(IS).
+     $ And.IGem(IP).Eq.IGem(IQ) )
+     $ ETotSR=ETotSR+FRDM2(IP,IQ,IR,IS,RDM2Act,Occ,Ind2,NAct,NBasis)
+     $  *TwoElSR(NAddr3(IP,IR,IQ,IS))
+      EndIf
+  
+      EndIf
+
+c      If(.Not.(Ind3(IP).Eq.1.And.
+c     $ Ind3(IP).Eq.Ind3(IR).And.Ind3(IQ).Eq.Ind3(IS).
+c     $ And.Ind3(IP).Eq.Ind3(IQ))) then
+c      if(FRDM2(IP,IQ,IR,IS,RDM2Act,Occ,Ind2,NAct,NBasis).ne.zero) 
+c     $ write(*,*)ip,iq,ir,is
+c      endif
+ 
+      EndDo
+      EndDo
+      EndDo
+      EndDo
+      Write(6,'(/,X,"1st-order SR energy for",I4," active orbitals")') 
+     $ NAcCAS+NInAcCAS-NCoreOrb
+      Write(6,'(X," <Ref|H^SR|Ref> = ",F10.6,/)') ETotSR
+
       goto 444
 C    ***** Two-Electron systems investigation
       NDim=NBasis*(NBasis-1)/2
@@ -2271,9 +2319,6 @@ C     AuxI=VSR
       NoEig=1
       TwoNO=TwoNO-TwoElSR
 C
-c      Ind1=0
-c      Ind1(1)=1
-
       NAddr=0
       IPR=0
       Do IP=1,NBasis
@@ -2285,17 +2330,22 @@ c      Ind1(1)=1
       IQS=IQS+1
       If(IPR.Ge.IQS) Then
       NAddr=NAddr+1
+C
       If((IGem(IP).Eq.1.And.
      $ IGem(IP).Eq.IGem(IR).And.IGem(IQ).Eq.IGem(IS).
-     $ And.IGem(IP).Eq.IGem(IQ))) TwoElSR(NAddr)=Zero
-c      If((Ind1(IP).Eq.1.And.
-c     $ Ind1(IP).Eq.Ind1(IR).And.Ind1(IQ).Eq.Ind1(IS).
-c     $ And.Ind1(IP).Eq.Ind1(IQ))) TwoElSR(NAddr)=Zero
+     $ And.IGem(IP).Eq.IGem(IQ))) Then 
+      If((Ind3(IP).Eq.1.And.
+     $ Ind3(IP).Eq.Ind3(IR).And.Ind3(IQ).Eq.Ind3(IS).
+     $ And.Ind3(IP).Eq.Ind3(IQ))) TwoElSR(NAddr)=Zero
+      EndIf
+C
       EndIf
       EndDo
       EndDo
       EndDo
       EndDo
+C Set TwoElSR to Zero to reproduce FCI[H] energy
+c      TwoElSR=Zero 
 C
 C     ETot=<Psi_ref|H0+H'|Psi_ref> so a contribution from the SR interaction must be added
 C
@@ -2316,7 +2366,9 @@ C
      $ NBasis,NInte1,NInte2,NDim,NGem,NoEig)
       Write(6,'(/,X," Where, <Ref|H0|Ref> + ENuc = ",F10.6,
      $" <Ref|H^SR|Ref> = ",F10.6)') ERef+ENuc,ETotSR 
-      Call PairD_Vis(URe,UNOAO,Occ,NBasis)
+      Write(6,'(X," H^SR for ",I2," active orbitals")')
+     $ NAcCAS+NInAcCAS-NCoreOrb
+c      Call PairD_Vis(URe,UNOAO,Occ,NBasis)
       Stop 
   444 continue
 C end of  ***** Two-Electron systems investigation
