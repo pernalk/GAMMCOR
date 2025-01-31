@@ -2743,13 +2743,18 @@ C
 
 *Deck GGA_ONTOP
       Subroutine GGA_ONTOP(EXCTOP,URe,Occ,
-     $ OrbGrid,OrbXGrid,OrbYGrid,OrbZGrid,WGrid,NGrid,NBasis)
+     $ OrbGrid,OrbXGrid,OrbYGrid,OrbZGrid,WGrid,NGrid,NBasis,IFlTrans)
 C
 C     RETURNS A GGA_XC ENERGY IF THE DENSITY AND SPIN-DENSITY ARE COMPUTED AS:
 C     RHO_A/B = 1/2 ( RHO +/- SQRT(RHO^2 - 2 PI )  )
 C     WHERE PI IS THE ON-TOP PAIR DENSITY, see Gagliardi JCP 146, 034101 (2017)
 C
+C     IFlTrans = 1 - translate rho
+C                0 - use real (untranslated) rho
+C
 C     XCFUN IS USED !!!
+C 
+      use timing
 C
       Implicit Real*8 (A-H,O-Z)
 C
@@ -2765,7 +2770,8 @@ C
      $ OrbYGrid(NGrid,NBasis),OrbZGrid(NGrid,NBasis)
 C
       Dimension Zk(NGrid),RhoA(NGrid),RhoB(NGrid),
-     & SigmaAA(NGrid),SigmaAB(NGrid),SigmaBB(NGrid)
+     & SigmaAA(NGrid),SigmaAB(NGrid),SigmaBB(NGrid),
+     & OrbTGrid(NBasis,NGrid)
 C
 C     READ 2RDM, COMPUTE THE ENERGY
 C
@@ -2801,23 +2807,95 @@ C
       Close(10)
 C
       Do I=1,NGrid
+      Do IP=1,NBasis
+      OrbTGrid(IP,I)=OrbGrid(I,IP)
+      EndDo
+      EndDo
+C
+c      call gclock('START ON-TOP',Tcpu,Twall)
+C
+      Do I=1,NGrid
 C
       Call DenGrid(I,RhoGrid,Occ,URe,OrbGrid,NGrid,NBasis)
 C
-      If(RhoGrid.Gt.1.D-12) Then
+      If(RhoGrid.Gt.1.D-8) Then
 C
+      If(IFlTrans.Eq.1) Then
+C
+c      OnTop=Zero
+c      Do IS=1,NOccup
+c         ValS=Two*OrbTGrid(IS,I)
+c         If(Abs(ValS).Gt.1.D-8) Then
+c         Do IR=1,NOccup
+c            ValRS=OrbTGrid(IR,I)*ValS
+c            If(Abs(ValRS).Gt.1.D-8) Then
+c            Do IQ=1,NOccup
+c               ValQRS=OrbTGrid(IQ,I)*ValRS
+c               If(Abs(ValQRS).Gt.1.D-8) Then
+c               Do IP=1,NOccup
+c                  OnTop=OnTop +
+c     $            FRDM2(IP,IQ,IR,IS,RDM2Act,Occ,Ind2,NAct,NBasis)
+c     $            *OrbTGrid(IP,I)*ValQRS
+c               EndDo
+c               EndIf 
+c            EndDo
+c            EndIf
+c         EndDo
+c         EndIf
+c      EndDo
+
+C new version
       OnTop=Zero
+      OnTopIA=Zero
       Do IP=1,NOccup
-      Do IQ=1,NOccup
-      Do IR=1,NOccup
-      Do IS=1,NOccup
-      OnTop=OnTop
-     $ +Two*FRDM2(IP,IQ,IR,IS,RDM2Act,Occ,Ind2,NAct,NBasis)
-     $ *OrbGrid(I,IP)*OrbGrid(I,IQ)*OrbGrid(I,IR)*OrbGrid(I,IS)
+         ValP=OrbTGrid(IP,I)
+         IAP=0
+         If(IP.Gt.INActive) IAP=1
+         Do IQ=1,NOccup
+            Val=(ValP*OrbTGrid(IQ,I))**2
+            OnTop=OnTop+Occ(IP)*Occ(IQ)*Val
+            IAQ=0
+            If(IQ.Gt.INActive) IAQ=1
+            If(IAP*IAQ.Eq.1) OnTopIA=OnTopIA+Occ(IP)*Occ(IQ)*Val
+         EndDo
       EndDo
+      OnTop=OnTop*Two
+      OnTopIA=OnTopIA*Two 
+C
+      OnTopAct=Zero
+      Do IS=INActive+1,NOccup
+         ValS=OrbTGrid(IS,I)
+         If(Abs(ValS).Gt.1.D-8) Then
+         Do IR=INActive+1,NOccup
+            ValRS=OrbTGrid(IR,I)*ValS
+            If(Abs(ValRS).Gt.1.D-8) Then
+            Do IQ=INActive+1,NOccup
+               ValQRS=OrbTGrid(IQ,I)*ValRS
+               If(Abs(ValQRS).Gt.1.D-8) Then
+               Do IP=INActive+1,NOccup
+                  OnTopAct=OnTopAct +
+     $            FRDM2(IP,IQ,IR,IS,RDM2Act,Occ,Ind2,NAct,NBasis)
+     $            *OrbTGrid(IP,I)*ValQRS
+               EndDo
+               EndIf
+            EndDo
+            EndIf
+         EndDo
+         EndIf
       EndDo
-      EndDo
-      EndDo
+      OnTopAct=OnTopAct*Two
+C
+      OnTop=OnTop-OnTopIA+OnTopAct
+C
+
+C      II=I/1000
+C      If(II*1000.Eq.I) call gclock('END ON-TOP',Tcpu,Twall)
+C
+      Else
+C
+      OnTop=RhoGrid**2/Two
+C
+      EndIf
 C
       Call DenGrad(I,RhoX,Occ,URe,OrbGrid,OrbXGrid,NGrid,NBasis)
       Call DenGrad(I,RhoY,Occ,URe,OrbGrid,OrbYGrid,NGrid,NBasis)
@@ -3148,7 +3226,7 @@ C
      $ WGrid,UNOAO,NGrid,NBasis)
 C
       Call GGA_ONTOP(EXCTOP,URe,Occ,OrbGrid,OrbXGrid,OrbYGrid,
-     $ OrbZGrid,WGrid,NGrid,NBasis)
+     $ OrbZGrid,WGrid,NGrid,NBasis,1)
       Write(6,'(/," PBE_xc from xcfun with translated densities",
      $ F15.8,/)') EXCTOP
 C
