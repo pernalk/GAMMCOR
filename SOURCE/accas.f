@@ -2812,8 +2812,6 @@ C
       EndDo
       EndDo
 C
-c      call gclock('START ON-TOP',Tcpu,Twall)
-C
       Do I=1,NGrid
 C
       Call DenGrid(I,RhoGrid,Occ,URe,OrbGrid,NGrid,NBasis)
@@ -2822,29 +2820,6 @@ C
 C
       If(IFlTrans.Eq.1) Then
 C
-c      OnTop=Zero
-c      Do IS=1,NOccup
-c         ValS=Two*OrbTGrid(IS,I)
-c         If(Abs(ValS).Gt.1.D-8) Then
-c         Do IR=1,NOccup
-c            ValRS=OrbTGrid(IR,I)*ValS
-c            If(Abs(ValRS).Gt.1.D-8) Then
-c            Do IQ=1,NOccup
-c               ValQRS=OrbTGrid(IQ,I)*ValRS
-c               If(Abs(ValQRS).Gt.1.D-8) Then
-c               Do IP=1,NOccup
-c                  OnTop=OnTop +
-c     $            FRDM2(IP,IQ,IR,IS,RDM2Act,Occ,Ind2,NAct,NBasis)
-c     $            *OrbTGrid(IP,I)*ValQRS
-c               EndDo
-c               EndIf 
-c            EndDo
-c            EndIf
-c         EndDo
-c         EndIf
-c      EndDo
-
-C new version
       OnTop=Zero
       OnTopIA=Zero
       Do IP=1,NOccup
@@ -2886,10 +2861,6 @@ C
       OnTopAct=OnTopAct*Two
 C
       OnTop=OnTop-OnTopIA+OnTopAct
-C
-
-C      II=I/1000
-C      If(II*1000.Eq.I) call gclock('END ON-TOP',Tcpu,Twall)
 C
       Else
 C
