@@ -529,6 +529,8 @@ C
 C
 C     LOCAL ARRAYS
 C
+      real(8) :: EOne, ETwo
+      real(8) :: XKinSq(NBasis,NBasis)
       Real*8, Allocatable :: RDM2(:),RDMAB2(:)
 C     binary Cholesky
       Type(TCholeskyVecs) :: CholeskyVecs
@@ -558,6 +560,7 @@ c 03.01.2024
 C     for OTF Cholesky
       double precision :: UAONO(NBasis,NBasis)
       double precision,allocatable :: CMOAO(:,:),CAOMO(:,:)
+      double precision,allocatable :: TmpChol(:,:)
       logical :: iex
 C DMRG-in-DFT
       Real*8 XVEMB(NInte1)
@@ -957,7 +960,11 @@ C
          Call FockGen_mithap(FockF,GammaAB,XKin,NInte1,NBasis,
      &                       'AOTWOSORT')
       ElseIf(ICholeskyBIN==1) Then
-         Call FockGen_CholR(FockF,CholeskyVecs%R(1:NCholesky,1:NInte1),
+         allocate(TmpChol(NCholesky,NInte1))
+         TmpChol(1:NCholesky,1:NInte1) =
+     &                            CholeskyVecs%R(1:NCholesky,1:NInte1)
+         Call FockGen_CholR(FockF,TmpChol,
+c        Call FockGen_CholR(FockF,CholeskyVecs%R(1:NCholesky,1:NInte1),
      &                      GammaAB,XKin,NInte1,NCholesky,NBasis)
 C
       ElseIf(ICholeskyOTF==1) Then
@@ -974,7 +981,7 @@ C
          read(iunt) CMOAO
          close(iunt)
 C
-        CAOMO = transpose(CMOAO) 
+        CAOMO = transpose(CMOAO)
 C
 C       temp solution
         if(ICholeskyTHC==1) stop "Error! THC not ready in ReadDMRG!"
@@ -983,6 +990,8 @@ C       set THC for FockOTF subroutine
         NCholeskyTHC=1
         allocate(Xgp(NGridTHC,1),Zgk(NCholeskyTHC,1))
 C
+c       IH0Test=0
+c       print*, 'IH0test = ',IH0Test
          Call CholeskyOTF_Fock_MO_v2(WorkSq,CholeskyVecsOTF,
      $                         AOBasis,System,Monomer,'ORCA  ',
      $                         CAOMO,CAOMO,XKin,GammaAB,
@@ -991,6 +1000,8 @@ C
      $                         IH0Test)
 C        unpack Fock in MO (WorkSq) to triangle
          Call sq_to_triang2(WorkSq,FockF,NBasis)
+
+c        Call test_1el_mo(CAOMO,XKin,GammaAB,NInte1,NBasis)
 C
       EndIf
 C
@@ -1183,6 +1194,14 @@ C
       Write(6,'(" Transforming two-electron integrals ...",/)')
 C
       Call MatTr(XKin,URe,NBasis)
+
+c     one-electron electron energy
+      call triang_to_sq2(XKin,XKinSq,NBasis)
+      EOne = 0d0
+      do i=1,NOccup
+         EOne = EOne + Occ(i)*XKinSq(i,i)
+      enddo
+      EOne = 2d0*EOne
 C
 C DMRG-in-DFT
       If (IVEMB) Then
@@ -1216,6 +1235,7 @@ C     PREPARE POINTERS: NOccup=num0+num1
       If(ISwitch.Eq.1) Num1=NAc
 C     TRANSFORM J AND K
       UAux=transpose(URe)
+
       If(ICholesky==0) Then
       Call tran4_gen(NBasis,
      $        Num0+Num1,UAux(1:NBasis,1:(Num0+Num1)),
@@ -1284,6 +1304,9 @@ C      write(LOUT,'()')
       !UAONO = (CMOAO)^T.UMONO
       call dgemm('T','N',NBasis,NBasis,NBasis,1d0,CMOAO,NBasis,
      $           UAux,NBasis,0d0,UAONO,NBasis)
+
+C      test: U^T.S.U = 1
+C      call test_CtSC(UAONO,AOBasis,NBasis,Nbasis)
 c
 Cc     save C(AO,NO) orbitals to a file
 Cc     (e.g., for SRAC0)
@@ -1291,7 +1314,7 @@ Cc
 C      open(newunit=iunt,file='uaono.dat',form='unformatted')
 C      write(iunt) UAONO(1:NBasis,1:NBasis)
 C      close(iunt)
-
+     
       call chol_gammcor_Rkab(MatFF,UAONO,1,NBasis,UAONO,1,NBasis,
      $                   MemMOTransfMB, CholeskyVecsOTF,
      $                   AOBasis, ORBITAL_ORDERING_ORCA)
@@ -1611,7 +1634,20 @@ c *****************************************
 
 C
   777 Continue
+C     two-electron energy
+      If(ICholesky.eq.1) Then
+         Call TwoEneChckChol(ETwo,RDM2,Occ,num0,NAc,NBSave)
+      ElseIf(ITwoEl.eq.3) Then
+         Call TwoEneChck(ETwo,RDM2,Occ,num0,NAc,NBSave)
+      Else
+         ETwo=0d0
+      EndIf
+
+      Write(6,'(/,1X,''ReadDMRG: One-electron Energy'',5X,F15.8)')EOne
+      Write(6,'(/,1X,''ReadDMRG: Two-electron Energy'',5X,F15.8)')ETwo
+C
 C     SAVE THE ACTIVE PART IN rdm2.dat
+c
       Open(10,File='rdm2.dat')
       Do I=NInAc+1,NInAc+NAc
       IIAct=I-NInAc
@@ -1669,6 +1705,7 @@ C
 C
       Return
       End
+C End Subroutine ReadDMRG
 
 *Deck LdInteg
       Subroutine LdInteg(Title,BasisSet,XKin,XNuc,ENuc,Occ,URe,
