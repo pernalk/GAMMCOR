@@ -11,6 +11,7 @@ use Cholesky_Gammcor, only : TCholeskyVecsOTF, &
                              chol_gammcor_Rkpq, chol_gammcor_Rkab
 use THC_Gammcor, only : thc_gammcor_XZ, thc_gammcor_Xga, thc_gammcor_Rkab_2
 use OneElectronInts_Gammcor, only : ints1e_gammcor_H0_mo, ints1e_gammcor_H0_extao
+use OneElectronInts, only : ints1e_S
 
 contains
 
@@ -642,6 +643,7 @@ double precision,intent(in) :: H0_int(NBasis,NBasis)
 double precision,intent(in) :: H0_mo(NBasis,NBasis)
 
 integer :: i,j
+integer :: ierr
 double precision            :: val1,val2
 double precision, parameter :: ThreshH0 = 1d-6
 
@@ -669,6 +671,65 @@ if(abs(val1)-abs(val2).gt.ThreshH0) then
   stop
 endif
 
+! norms may be ok but...
+ierr = 0
+do j=1,NBasis
+   do i=1,NBasis
+      val1 = abs(H0_int(i,j)) - abs(H0_mo(i,j))
+      if (val1 .gt. 1d-4) then
+         ierr = ierr + 1
+        ! print*, i,j, H0_int(i,j),H0_mo(i,j)
+      endif
+   enddo
+enddo
+if (ierr .gt. 0) then
+  write(6,'(1x,"H0 ext and int differ in ", I5, " places!")') ierr
+  stop
+endif
+
 end subroutine CholeskyOTF_H0_test
+
+subroutine test_CtSC(C,AOBasis,NAO,NBasis)
+!
+! check if C^T(AO,MO).S.C(AO,MO) = 1
+! working : works with Orca now!
+!
+implicit none
+
+integer,intent(in) :: NAO,NBasis
+double precision,intent(in) :: C(NAO,NBasis)
+type(TAOBasis), intent(in)  :: AOBasis
+
+integer :: i,j
+double precision :: val
+double precision :: S_ao(NAO,NAO)
+double precision :: S_extao(NAO,NAO)
+double precision :: work(NBasis,NBasis)
+
+call ints1e_S(S_ao, AOBasis)
+call auto2e_interface_ApplyOrcaPhases_Matrix(S_ao, AOBasis, .true.)
+call auto2e_interface_AngFuncTransf(S_extao, S_ao, .false., .true., AOBasis, ORBITAL_ORDERING_ORCA)
+call dgemm('T','N',NBasis,NAO,NAO,1d0,C,NBasis, &
+           S_extao,NAO,0d0,work,NBasis)
+call dgemm('N','N',NBasis,NBasis,NAO,1d0,work,NBasis, &
+           C,NBasis,0d0,S_ao,NBasis)
+
+do j=1,NBasis
+   do i=j+1,NBasis
+      val = abs(S_ao(i,j))
+      if (val .gt. 1d-6) then
+         print*, i,j,val
+      endif
+   enddo
+enddo
+
+#if CHOLOTF_DEBUG > 5
+   print*, 'UAONO : C^T.S.C norm =', norm2(S_AO)
+   do i=1,NBasis
+      write(LOUT,'(*(f13.8))') (S_AO(i,j),j=1,NBasis)
+   enddo
+#endif
+
+end subroutine test_CtSC
 
 end module choleskyOTF_interface
