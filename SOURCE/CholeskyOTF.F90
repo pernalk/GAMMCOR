@@ -323,6 +323,27 @@ do J=1,NBasis
    enddo
 enddo
 
+!! test 1-el MO
+!block
+!   double precision :: trace
+!   trace=0d0
+!   ! set inact
+!   do j=1,12
+!   do i=1,12
+!      D_mo(i,j)=0d0
+!   enddo
+!   enddo
+!
+!   do j=1,NBasis
+!      val=0d0
+!      do i=1,NBasis
+!         val = val + D_mo(i,j)*H0_mo(j,i)
+!      enddo
+!      trace = trace + val
+!   enddo
+!   print*, 'One-electron active enenrgy (MO)', trace
+!end block
+
 ! set memory for Fock transformation
 if(MemType == 2) then       !MB
    MemMOTransfMB = MemVal

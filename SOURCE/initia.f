@@ -564,7 +564,9 @@ C     for OTF Cholesky
       logical :: iex
 C DMRG-in-DFT
       Real*8 XVEMB(NInte1)
-      Logical IVEMB
+      Real*8 OccA(NBasis)
+      Real*8 EOneA,ETwoA,EVEmb
+      Logical IVEMB_CHCK
 
       If(iORCA==1) then
       LiborNew=1
@@ -788,7 +790,11 @@ C
       EndIf ! FACT.bin
 C
 C DMRG-in-DFT
-      Inquire(file='embedding_potential_MO.bin',exist=IVEMB)
+      Inquire(file='embedding_potential_MO.bin',exist=IVEMB_CHCK)
+      If (.NOT.IVEMB_CHCK .AND. IVEMB)
+     $        Stop "Error! Missing emedding_potential.MO.bin"
+c     print*, 'ReadDMRG: IVEMB keyword =', IVEMB
+c     print*, 'NElecBEmb :', NElecBEmb
       If(IVEMB) Then
 C
       XVEMB=Zero
@@ -1213,13 +1219,36 @@ C
       Write(10) XVEMB(I)
       EndDo
       Close(10)
-C     for tests
-      Var=Zero
+
+      Write(6,'(/,1X,''DMRG-in-DFT: no. of electrons in A '',5X,I5)')
+     $  2*NELE-NElecBEmb
+      Write(6,'(1X,''DMRG-in-DFT: no. of electrons in B '',5X,I5)')
+     $  NElecBEmb
+C
+C     ! subsystem A check: set B to zero
+      NOccupB = NElecBEmb/2
+      OccA = Occ
+      OccA(1:NOccupB) = Zero
+c     print*, 'NOCCUP-B', NOCCUPB
+c     do i=1,NOCcup
+c       print*, i, 2d0*OccA(i)
+c     enddo
+c
+c     DMRG-in-DFT: one-el energy for A
+      EOneA=Zero
       Do I=1,NBasis
       II=(I*(I+1))/2
-      Var=Var+Occ(I)*XVEMB(II)
+      EOneA=EOneA+OccA(i)*XKin(II)
       EndDo
-      Write(6,'(X,"*** Tr[gamma.vemb] = *** ",E16.6,/)') Var
+      EOneA = 2d0*EOneA
+C
+      EVEmb=Zero
+      Do I=1,NBasis
+      II=(I*(I+1))/2
+      EVEmb=EVEmb+OccA(I)*XVEMB(II)
+      EndDo
+      EVEmb=2d0*EVEmb
+c     Write(6,'(X,"*** Tr[gamma.vemb] = *** ",E16.6,/)') EVEmb
 C
       EndIf
 C DMRG-in-DFT end
@@ -1634,6 +1663,32 @@ c *****************************************
 
 C
   777 Continue
+C
+C DMRG-in-DFT: two-el energy for A
+      If (IVEMB) Then
+         If(ICholesky.eq.1) Then
+            Call TwoEneChckChol(ETwoA,RDM2,OccA,num0,NAc,NBSave)
+         ElseIf(ITwoEl.eq.3) Then
+            Call TwoEneChck(ETwoA,RDM2,OccA,num0,NAc,NBSave)
+         Else
+            ETwoA = 0d0
+         EndIf
+ 
+        Write(6,4410) EOneA
+        Write(6,4420) EVEmb
+        Write(6,4430) ETwoA
+        Write(6,4440) EOneA+ETwoA
+        Write(6,4450) EOneA+EVEmb+ETwoA
+
+ 4410 Format(/,1x,"DMRG-in-DFT: One-electron A Energy",T50,F15.8)
+ 4420 Format(1x,"DMRG-in-DFT: One-electron A VEmb Energy",T50,F15.8)
+ 4430 Format(1x,"DMRG-in-DFT: Two-electron A Energy",T50,F15.8)
+ 4440 Format(1x,"DMRG-in-DFT: Total A Energy (w/o ENuc)",T50,F15.8)
+ 4450 Format(1x,"DMRG-in-DFT: Total A+VEmb Energy (w/o ENuc)",T50,F15.8)
+
+      EndIf
+C DMRG-in-DFT end
+C
 C     two-electron energy
       If(ICholesky.eq.1) Then
          Call TwoEneChckChol(ETwo,RDM2,Occ,num0,NAc,NBSave)
@@ -1644,7 +1699,7 @@ C     two-electron energy
       EndIf
 
       Write(6,'(/,1X,''ReadDMRG: One-electron Energy'',5X,F15.8)')EOne
-      Write(6,'(/,1X,''ReadDMRG: Two-electron Energy'',5X,F15.8)')ETwo
+      Write(6,'(1X,''ReadDMRG: Two-electron Energy'',5X,F15.8)')  ETwo
 C
 C     SAVE THE ACTIVE PART IN rdm2.dat
 c

@@ -1,6 +1,6 @@
       Common/MISCFL/ XELE,IFun,IFunSR,IFunSRKer,NELE,IRes,INO,IPrint,
      $ IInteg,IAO,IGVB,IFreeze,ILoc,NInActOrb,NActOrb,NVirtOrb,NCoreOrb,
-     $ NStronglyOccOrb,ISAPT,IWarn,ITwoEl,ITrpl,
+     $ NStronglyOccOrb,NElecBEmb,ISAPT,IWarn,ITwoEl,ITrpl,
      $ ICholesky,ICholeskyBIN,ICholeskyOTF,ICholeskyTHC,
      $ ICholeskyAccu,Monomer,MemVal,MemType,
      $ IH0test,IUnits,InternalGrid,IGridType
@@ -19,7 +19,7 @@
       Common/AC/ IFlAC,IFlSnd,IFlAC0D,IFlAC0DP,IFlCore,IFlFrag1,IFl12,
      $ NoSt,ISymmAC0D,IFlACFREQ,IFlACFREQNTH,IFlAC1FREQNTH,Max_Cn,
      $ IFlRESPONSE,IFlCorrMD,IRedVirt,IOrbRelax,IOrbIncl,FreqOm,
-     $ IFlFCorr,IDBBSC,IHNO1
+     $ IFlFCorr,IDBBSC,IHNO1,IVEMB
       Common/THRGEM/ ThrGemAct
       Common/THR/ ThrSelAct,ThrAct,ThrQVirt,ThrQInact
 C

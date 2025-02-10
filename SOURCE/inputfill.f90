@@ -491,6 +491,13 @@ subroutine read_block_calculation(CalcParams, line)
            ! = 2 , K. Pernal formulation
            read(val, *) CalcParams%DBBSC
 
+      case ("DMRG-IN-DFT","EMBEDDING") ! DMRG-in-DFT embedding
+           if (uppercase(val) == ".TRUE.".or. &
+               uppercase(val) == "TRUE".or.   &
+               uppercase(val) == "T") then
+               CalcParams%IVEMB = 1
+           endif
+
       ! here not sure
       case ("RESPONSE")
            if (uppercase(val) == "ERPA-APSG".or.&
@@ -706,8 +713,11 @@ character(:), allocatable :: first, last
  case ("NCORE", "NCOREORB")
        read(val, *) SystemParams%NCoreOrb
 
- case ("NSTRONGLYOCCORB")
+ case ("NSTRONGLYOCCORB") ! for CBS[H]
        read(val, *) SystemParams%NStronglyOccOrb
+
+ case ("NB_EMB","NELECBEMB")
+       read(val, *) SystemParams%NElecBEmb
 
  case ("ACALPHA")
        read(val, *) SystemParams%ACAlpha

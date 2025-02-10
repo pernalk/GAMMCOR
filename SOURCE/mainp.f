@@ -83,6 +83,7 @@ C     FILL COMMONS AND CONSTANTS
 C
       NCoreOrb = System%NCoreOrb
       NStronglyOccOrb = System%NStronglyOccOrb
+      NElecBEmb = System%NElecBEmb
 C
       Title   = Flags%JobTitle
 C
@@ -200,6 +201,10 @@ C     IDBBSC   = 1 : compute density-based basis set correction (Giner et al., J
 C     IDBBSC   = 2 : compute SR-based basis set correction (K. Pernal et al., XXXX )
 C
       IDBBSC = Flags%IDBBSC
+C
+C     IVEMB    = 1 : activates DMRG-in-DFT embedding in AC0
+C
+      IVEMB  = Flags%IVEMB
 C
 C     *************************************************************************
 C
