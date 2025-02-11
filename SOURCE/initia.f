@@ -1229,10 +1229,10 @@ C     ! subsystem A check: set B to zero
       NOccupB = NElecBEmb/2
       OccA = Occ
       OccA(1:NOccupB) = Zero
-c     print*, 'NOCCUP-B', NOCCUPB
-c     do i=1,NOCcup
-c       print*, i, 2d0*OccA(i)
-c     enddo
+c      print*, 'NOCCUP-B', NOCCUPB
+c      do i=1,NOCcup
+c        print*, i, 2d0*OccA(i)
+c      enddo
 c
 c     DMRG-in-DFT: one-el energy for A
       EOneA=Zero
@@ -1334,6 +1334,12 @@ C      write(LOUT,'()')
       call dgemm('T','N',NBasis,NBasis,NBasis,1d0,CMOAO,NBasis,
      $           UAux,NBasis,0d0,UAONO,NBasis)
 
+C       Print*, 'OTF: UAONO orbitals:'
+C       do i=1,NBasis
+C          write(LOUT,*) i
+C          write(LOUT,'(10f13.8)') (UAONO(i,j),j=1,nbasis)
+C       enddo
+c
 C      test: U^T.S.U = 1
 C      call test_CtSC(UAONO,AOBasis,NBasis,Nbasis)
 c
@@ -1666,25 +1672,27 @@ C
 C
 C DMRG-in-DFT: two-el energy for A
       If (IVEMB) Then
-         If(ICholesky.eq.1) Then
-            Call TwoEneChckChol(ETwoA,RDM2,OccA,num0,NAc,NBSave)
-         ElseIf(ITwoEl.eq.3) Then
-            Call TwoEneChck(ETwoA,RDM2,OccA,num0,NAc,NBSave)
-         Else
-            ETwoA = 0d0
-         EndIf
- 
-        Write(6,4410) EOneA
-        Write(6,4420) EVEmb
-        Write(6,4430) ETwoA
-        Write(6,4440) EOneA+ETwoA
-        Write(6,4450) EOneA+EVEmb+ETwoA
-
- 4410 Format(/,1x,"DMRG-in-DFT: One-electron A Energy",T50,F15.8)
- 4420 Format(1x,"DMRG-in-DFT: One-electron A VEmb Energy",T50,F15.8)
- 4430 Format(1x,"DMRG-in-DFT: Two-electron A Energy",T50,F15.8)
- 4440 Format(1x,"DMRG-in-DFT: Total A Energy (w/o ENuc)",T50,F15.8)
- 4450 Format(1x,"DMRG-in-DFT: Total A+VEmb Energy (w/o ENuc)",T50,F15.8)
+        If(ICholesky.eq.1) Then
+           Call TwoEneChckChol(ETwoA,RDM2,OccA,num0,NAc,NBSave)
+        ElseIf(ITwoEl.eq.3) Then
+           Call TwoEneChck(ETwoA,RDM2,OccA,num0,NAc,NBSave)
+        Else
+           ETwoA = 0d0
+        EndIf
+C DMRG-in-DFT: Print subsystem A energy components
+      Write(6,'(/1x,"DMRG-in-DFT: Subsystem A energy components:")')
+      Write(6,4410) EOneA
+      Write(6,4420) EVEmb
+      Write(6,4430) EOneA+EVEmb
+      Write(6,4440) ETwoA
+      Write(6,4450) EOneA+ETwoA
+      Write(6,4460) EOneA+EVEmb+ETwoA
+ 4410 Format(1x," One-electron A Energy",T50,F15.8,1x,"Eh")
+ 4420 Format(1x," One-electron A VEmb Energy",T50,F15.8,1x,"Eh")
+ 4430 Format(1x," One-electron A-Emb Energy",T50,F15.8,1x,"Eh")
+ 4440 Format(1x," Two-electron A Energy",T50,F15.8,1x,"Eh")
+ 4450 Format(1x," Total A Energy (w/o ENuc)",T50,F15.8,1x,"Eh")
+ 4460 Format(1x," Total A+VEmb Energy (w/o ENuc)",T50,F15.8,1x,"Eh")
 
       EndIf
 C DMRG-in-DFT end
@@ -1698,8 +1706,10 @@ C     two-electron energy
          ETwo=0d0
       EndIf
 
-      Write(6,'(/,1X,''ReadDMRG: One-electron Energy'',5X,F15.8)')EOne
-      Write(6,'(1X,''ReadDMRG: Two-electron Energy'',5X,F15.8)')  ETwo
+      Write(6,5510) EOne
+      Write(6,5520) ETwo
+ 5510 Format(/1x,"ReadDMRG: One-electron Energy",T50,F15.8,1x,"Eh")
+ 5520 Format(1x,"ReadDMRG: Two-electron Energy",T50,F15.8,1x,"Eh")
 C
 C     SAVE THE ACTIVE PART IN rdm2.dat
 c
