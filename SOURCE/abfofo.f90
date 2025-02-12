@@ -227,6 +227,15 @@ if (IVEMB) then
                     HNO(i,j) = XOne(ij)+(1.d0-ACAlpha)*work2(nbasis*(i-1)+j)
              endif
          endif
+         if(IGem(i)==IGem(j).And.IGem(i)==1.And.i.gt.NElecBEmb/2.and.j.gt.NElecBEmb/2) then
+             if(AB1) then
+                    HNO(i,j) = -work2(nbasis*(i-1)+j)
+             else
+                    ij=(max(i,j)*(max(i,j)-1))/2+min(i,j)
+                    HNO(i,j) = XOne(ij)+(1.d0-ACAlpha)*work2(nbasis*(i-1)+j)
+             endif            
+         endif
+
       enddo
    enddo
 endif
@@ -1418,6 +1427,7 @@ if (IVEMB) then
    do j=1,NBasis
       do i=1,NBasis
          if(IGem(i)==IGem(j).And.IGem(i)==2) HNO(i,j) = work2(nbasis*(i-1)+j)
+         if(IGem(i)==IGem(j).And.IGem(i)==1.And.i.gt.NElecBEmb/2.and.j.gt.NElecBEmb/2) HNO(i,j) = work2(nbasis*(i-1)+j)
       enddo
    enddo
 endif
