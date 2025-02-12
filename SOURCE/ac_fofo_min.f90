@@ -1444,7 +1444,8 @@ do l=1,3
 enddo
 
 !call ABPM0_FOFO(Occ,URe,XOne,ABPLUS,ABMIN, &
-!                IndN,IndX,IGemIN,NAct,INActive,NDimX,NBasis,NDim,NInte1, &
+!                IndN,IndX,IGemIN,NAct,INActive,NElecBEmb,&
+!                NDimX,NBasis,NDim,NInte1, &
 !                IntJFile,IntKFile,ETot)
 ABPLUS = 0
 ABMIN  = 0

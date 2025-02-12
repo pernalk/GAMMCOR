@@ -285,7 +285,8 @@ if(Flags%ICASSCF==0.and.Flags%ISERPA==0) then
   select case(Mon%TwoMoInt)
   case(TWOMO_FOFO)
      call AB_CAS_FOFO(ABPlus,ABMin,ECASSCF,URe,Mon%Occ,XOne, &
-                 Mon%IndN,Mon%IndX,Mon%IGem,Mon%NAct,Mon%INAct,Mon%NDimX,NBas,Mon%NDimX,&
+                 Mon%IndN,Mon%IndX,Mon%IGem,Mon%NAct,Mon%INAct,Mon%NElecBEmb, &
+                 Mon%NDimX,NBas,Mon%NDimX,&
                  NInte1,twojfile,twokfile,Flags%ICholesky,Flags%IDBBSC,ACAlpha,.false.)
   case(TWOMO_FFFF)
 
@@ -478,8 +479,8 @@ if(Flags%ICASSCF==0.and.Flags%ISERPA==0) then
      call Y01CAS_FOFO(Mon%Occ,URe,XOne,ABPlus,ABMin,ECASSCF, &
             propfile0,propfile1, &
             y01file,xy0file,     &
-            Mon%IndN,Mon%IndX,Mon%IGem,Mon%NAct,Mon%INAct,Mon%NDimX, &
-            NBas,Mon%NDimX,NInte1,Mon%NoSt,twofile,twojfile,twokfile,&
+            Mon%IndN,Mon%IndX,Mon%IGem,Mon%NAct,Mon%INAct,Mon%NElecBEmb, &
+            Mon%NDimX,NBas,Mon%NDimX,NInte1,Mon%NoSt,twofile,twojfile,twokfile,&
             Flags%IFlag0,Flags%ICholesky)
 
      if(Flags%ICholesky==1) then
@@ -691,7 +692,8 @@ ECASSCF = 0
 select case(Mon%TwoMoInt)
 case(TWOMO_FOFO)
    call AB_CAS_FOFO(ABPlus,ABMin,ECASSCF,URe,Mon%Occ,XOne, &
-               Mon%IndN,Mon%IndX,Mon%IGem,Mon%NAct,Mon%INAct,Mon%NDimX,NBas,Mon%NDimX,&
+               Mon%IndN,Mon%IndX,Mon%IGem,Mon%NAct,Mon%INAct,Mon%NElecBEmb, &
+               Mon%NDimX,NBas,Mon%NDimX,&
                NInte1,twojfile,twokfile,Flags%ICholesky,Flags%IDBBSC,ACAlpha,.false.)
 case(TWOMO_FFFF)
 
@@ -720,8 +722,8 @@ case(TWOMO_FOFO)
    call Y01CAS_FOFO(Mon%Occ,URe,XOne,ABPlus,ABMin,ECASSCF, &
           'DUMMY','DUMMY',     &
           'DUMMY',xy0file,     &
-          Mon%IndN,Mon%IndX,Mon%IGem,Mon%NAct,Mon%INAct,Mon%NDimX, &
-          NBas,Mon%NDimX,NInte1,Mon%NoSt,twofile,twojfile,twokfile,&
+          Mon%IndN,Mon%IndX,Mon%IGem,Mon%NAct,Mon%INAct,Mon%NElecBEmb, &
+          Mon%NDimX,NBas,Mon%NDimX,NInte1,Mon%NoSt,twofile,twojfile,twokfile,&
           Flags%IFlag0,Flags%ICholesky)
 
    nblk = 1 + NBas - Mon%NAct
@@ -823,7 +825,8 @@ select case(Mon%TwoMoInt)
 case(TWOMO_FOFO)
 
    call AB_CAS_FOFO(ABPlus,ABMin,ECASSCF,URe,Mon%Occ,XOne, &
-               Mon%IndN,Mon%IndX,Mon%IGem,Mon%NAct,Mon%INAct,Mon%NDimX,NBas,Mon%NDimX,&
+               Mon%IndN,Mon%IndX,Mon%IGem,Mon%NAct,Mon%INAct,Mon%NElecBEmb,&
+               Mon%NDimX,NBas,Mon%NDimX,&
                NInte1,FNam%twojfile,FNam%twokfile,ICholesky,0,ACAlpha,.false.)
 case(TWOMO_FFFF)
 
@@ -1267,8 +1270,8 @@ elseif(Flags%ICASSCF==1.and.Flags%ISERPA==0) then
      call Y01CAS_FOFO(Mon%Occ,URe,XOne,ABPlus,ABMin,ETot, &
             propfile0,propfile1, &
             y01file,xy0file,     &
-            Mon%IndN,Mon%IndX,Mon%IGem,Mon%NAct,Mon%INAct,Mon%NDimX, &
-            NBas,Mon%NDim,NInte1,Mon%NoSt,twofile,twojfile,twokfile, &
+            Mon%IndN,Mon%IndX,Mon%IGem,Mon%NAct,Mon%INAct,Mon%NElecBEmb, &
+            Mon%NDimX,NBas,Mon%NDim,NInte1,Mon%NoSt,twofile,twojfile,twokfile, &
             Flags%IFlag0,Flags%ICholesky)
 
      if(Flags%ICholesky==1) then
@@ -1557,7 +1560,8 @@ case(TWOMO_FFFF)
                NInte1,twoerffile,ACAlpha,.false.)
 case(TWOMO_FOFO)
    call AB_CAS_FOFO(ABPlus,ABMin,ECASSCF,URe,Mon%Occ,XOne, &
-               Mon%IndN,Mon%IndX,Mon%IGem,Mon%NAct,Mon%INAct,Mon%NDimX,NBas,Mon%NDimX,&
+               Mon%IndN,Mon%IndX,Mon%IGem,Mon%NAct,Mon%INAct,Mon%NElecBEmb,&
+               Mon%NDimX,NBas,Mon%NDimX,&
                NInte1,twojerf,twokerf,Flags%ICholesky,Flags%IDBBSC,ACAlpha,.false.)
 !else
 ! HERE:: ADD SEPARATE PROCEDURE FOR Kohn-Sham!
@@ -1682,7 +1686,7 @@ case(TWOMO_FOFO)
   call Y01CASLR_FOFO(Mon%Occ,URe,XOne,ABPlus,ABMin,&
                  Mon%MultpC,Mon%NSymNO,SRKer,WGrid,OrbGrid,&
                  propfile0,propfile1,xy0file,&
-                 Mon%IndN,Mon%IndX,Mon%IGem,Mon%NAct,Mon%INAct,&
+                 Mon%IndN,Mon%IndX,Mon%IGem,Mon%NAct,Mon%INAct,Mon%NelecBEmb,&
                  NGrid,Mon%NDimX,NBas,Mon%NDimX,NInte1,Mon%NoSt,&
                  twokfile,Twojerf,twokerf,Flags%ICholesky,1,1)
 
@@ -2072,7 +2076,8 @@ ECASSCF = 0d0
 !ACAlpha=1d-6
 print*, 'ACAlpha in Hessians = ', ACAlpha
 call AB_CAS_FOFO(ABPlus,ABMin,ECASSCF,URe,Mon%Occ,XOne, &
-               Mon%IndN,Mon%IndX,Mon%IGem,Mon%NAct,Mon%INAct,Mon%NDimX,NBasis,Mon%NDimX,&
+               Mon%IndN,Mon%IndX,Mon%IGem,Mon%NAct,Mon%INAct,Mon%NElecBEmb,&
+               Mon%NDimX,NBasis,Mon%NDimX,&
                NInte1,twojerf,twokerf,Flags%ICholesky,Flags%IDBBSC,ACAlpha,.false.)
 !endif
 
@@ -2161,7 +2166,7 @@ call writeresp(EigVecR,Mon%Eig,propfile)
 call Y01CASLR_FOFO(Mon%Occ,URe,XOne,ABPlus,ABMin,&
                MultpC,NSymNO,SRKer,WGrid,OrbGrid,&
                propfile0,propfile1,xy0file,&
-               Mon%IndN,Mon%IndX,Mon%IGem,Mon%NAct,Mon%INAct,&
+               Mon%IndN,Mon%IndX,Mon%IGem,Mon%NAct,Mon%INAct,Mon%NElecBEmb,&
                NGrid,Mon%NDimX,NBasis,Mon%NDimX,NInte1,Mon%NoSt,&
                twokfile,twojerf,twokerf,Flags%ICholesky,1,1)
 

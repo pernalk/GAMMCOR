@@ -45,7 +45,8 @@ C
      $                     BasisSet,NBasis)
 
       Call AC0CAS_FOFO(ECorr,ECASSCF,Occ,URe,XOne,ABPLUS,ABMIN,
-     $ IndN,IndX,IGem,NAcCAS,NInAcCAS,NDimX,NBasis,NDimX,NInte1,
+     $ IndN,IndX,IGem,NAcCAS,NInAcCAS,NElecBEmb,
+     $ NDimX,NBasis,NDimX,NInte1,
      $ NoSt,'FFOO','FOFO',ICholesky,IDBBSC,IFlFCorr)
 C
       Write
@@ -106,7 +107,8 @@ C     save to disk
       deallocate(CholVecs,Work)
 
       Call AC0CAS_FOFO(ECorr,ECASSCF,Occ,URe,XOne,ABPLUS,ABMIN,
-     $ IndN,IndX,IGem,NAcCAS,NInAcCAS,NDimX,NBasis,NDimX,NInte1,
+     $ IndN,IndX,IGem,NAcCAS,NInAcCAS,NElecBEmb,
+     $ NDimX,NBasis,NDimX,NInte1,
      $ NoSt,'FFOO','FOFO',ICholesky,IDBBSC,IFlFCorr)
 
       Call FirstOrderSREne(ETwoSR,NBasis)

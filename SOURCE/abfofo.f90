@@ -10,7 +10,8 @@ implicit none
 contains
 
 subroutine AB_CAS_FOFO(ABPLUS,ABMIN,ETot,URe,Occ,XOne, &
-     IndN,IndX,IGemIN,NAct,INActive,NDimX,NBasis,NDim,NInte1, &
+     IndN,IndX,IGemIN,NAct,INActive,NElecBEmb, &
+     NDimX,NBasis,NDim,NInte1, &
      IntJFile,IntKFile,ICholesky,IDBBSC,ACAlpha,AB1)
 !
 ! COMPUTE THE A+B AND A-B MATRICES FOR 2-RDM READ FROM A rdm2.dat FILE
@@ -25,7 +26,8 @@ subroutine AB_CAS_FOFO(ABPLUS,ABMIN,ETot,URe,Occ,XOne, &
 !
  implicit none
 
-integer,intent(in) :: NAct,INActive,NDimX,NBasis,NDim,NInte1
+integer,intent(in) :: NAct,INActive,NElecBEmb
+integer,intent(in) :: NDimX,NBasis,NDim,NInte1
 integer,intent(in) :: ICholesky
 integer,intent(in) :: IDBBSC
 character(*) :: IntJFile,IntKFile
@@ -347,14 +349,15 @@ deallocate(ints,work2,work1)
 end subroutine AB_CAS_FOFO
 
 subroutine MP2RDM_FOFO(PerVirt,Eps,Occ,URe,UNOAO,XOne,IndN,IndX,IndAux,IGemIN, &
-                       NAct,INActive,NDimX,NDim,NBasis,NInte1,     &
+                       NAct,INActive,NElecBEmb,NDimX,NDim,NBasis,NInte1,     &
                        IntJFile,IntKFile,ICholesky,ThrVirt,NVZero,IPrint)
 !
 !
 !
 implicit none
 
-integer,intent(in)           :: NAct,INActive,NDimX,NDim,NBasis,NInte1
+integer,intent(in)           :: NAct,INActive,NElecBEmb
+integer,intent(in)           :: NDimX,NDim,NBasis,NInte1
 integer,intent(in)           :: ICholesky
 integer,intent(in)           :: IPrint
 integer,intent(in)           :: IndN(2,NDim),IndX(NDim),IndAux(NBasis),IGemIN(NBasis)
@@ -439,7 +442,8 @@ call create_blocks_ABPL0(nAA,nAI,nAV,nIV,tmpAA,tmpAI,tmpAV,tmpIV,&
                          IGem,IndN,INActive,NAct,NBasis,NDimX)
 
 call ABPM0_FOFO(Occ,URe,XOne,ABPLUS,ABMIN, &
-                IndN,IndX,IGemIN,NAct,INActive,NDimX,NBasis,NDim,NInte1, &
+                IndN,IndX,IGemIN,NAct,INActive,NElecBEmb,&
+                NDimX,NBasis,NDim,NInte1, &
                 IntJFile,IntKFile,ICholesky,ETot)
 
 Eps = 0
@@ -756,12 +760,13 @@ deallocate(ints_J,ints_K,work)
 end subroutine MP2RDM_FOFO
 
 subroutine RDMResp_FOFO(Occ,URe,UNOAO,XOne,IndN,IndX,IndAux,IGemIN, &
-                       NAct,INActive,NDimX,NDim,NBasis,NInte1,     &
+                       NAct,INActive,NElecBEmb,NDimX,NDim,NBasis,NInte1,&
                        IntJFile,IntKFile,ICholesky,IOrbRelax,IOrbIncl)
 implicit none
 integer,intent(in)           :: ICholesky
    integer,intent(in)           :: IOrbRelax,IOrbIncl
-   integer,intent(in)           :: NAct,INActive,NDimX,NDim,NBasis,NInte1
+   integer,intent(in)           :: NAct,INActive,NelecBEmb
+   integer,intent(in)           :: NDimX,NDim,NBasis,NInte1
    integer,intent(in)           :: IndN(2,NDim),IndX(NDim),IndAux(NBasis),IGemIN(NBasis)
    double precision,intent(in)  :: Occ(NBasis),XOne(NInte1),UNOAO(NBasis,NBasis)
    double precision             :: Eps(NBasis,NBasis),CI(NBasis),ipiv(NDimX)
@@ -829,7 +834,8 @@ integer,intent(in)           :: ICholesky
                             IGem,IndN,INActive,NAct,NBasis,NDimX)
 
    call ABPM0_FOFO(Occ,URe,XOne,ABPLUS,ABMIN, &
-                   IndN,IndX,IGemIN,NAct,INActive,NDimX,NBasis,NDim,NInte1, &
+                   IndN,IndX,IGemIN,NAct,INActive,NElecBEmb,&
+                   NDimX,NBasis,NDim,NInte1, &
                    IntJFile,IntKFile,ICholesky,ETot)
 
    Eps = 0
@@ -843,7 +849,8 @@ integer,intent(in)           :: ICholesky
 
    ! AB(1) PART
    call AB_CAS_FOFO(ABPLUS,ABMIN,val,URe,Occ,XOne,&
-                 IndN,IndX,IGem,NAct,INActive,NDimX,NBasis,NDimX,&
+                 IndN,IndX,IGem,NAct,INActive,NElecBEmb,&
+                 NDimX,NBasis,NDimX,&
                  NInte1,IntJFile,IntKFile,ICholesky,0,1d0,.true.)
 
    ! a separate procedure for ints OTF
@@ -1241,11 +1248,13 @@ EndIf
 end subroutine RDMResp_FOFO
 
 subroutine ABPM0_FOFO(Occ,URe,XOne,ABPLUS,ABMIN, &
-                      IndN,IndX,IGemIN,NAct,INActive,NDimX,NBasis,NDim,NInte1, &
+                      IndN,IndX,IGemIN,NAct,INActive,NElecBEmb,&
+                      NDimX,NBasis,NDim,NInte1, &
                       IntJFile,IntKFile,ICholesky,ETot)
 implicit none
 
-integer,intent(in)           :: NAct,INActive,NDimX,NBasis,NDim,NInte1
+integer,intent(in)           :: NAct,INActive,NElecBEmb
+integer,intent(in)           :: NDimX,NBasis,NDim,NInte1
 integer,intent(in)           :: IndN(2,NDim),IndX(NDim),IGemIN(NBasis)
 integer,intent(in)           :: ICholesky
 double precision,intent(in)  :: URe(NBasis,NBasis),Occ(NBasis),XOne(NInte1)

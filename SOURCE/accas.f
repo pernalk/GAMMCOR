@@ -164,7 +164,8 @@ C
       If(ITwoEl.eq.3) Then
 C
       Call RDMResp_FOFO(Occ,URe,UNOAO,XOne,IndN,IndX,IndAux,IGem,
-     $                  NAcCAS,NInAcCAS,NDimX,NDim,NBasis,NInte1,
+     $                  NAcCAS,NInAcCAS,NElecBEmb,
+     $                  NDimX,NDim,NBasis,NInte1,
      $                  'FFOO','FOFO',ICholesky,IOrbRelax,IOrbIncl)
 C
       If (IOrbRelax==1) Call delfile('FFFO')
@@ -357,7 +358,8 @@ c      ACAlpha=zero
 C
       If(ITwoEl.Eq.3) Then
       Call AB_CAS_FOFO(ABPLUS,ABMIN,ECASSCF,URe,Occ,XOne,
-     $ IndN,IndX,IGem,NAcCAS,NInAcCAS,NDimX,NBasis,NDimX,
+     $ IndN,IndX,IGem,NAcCAS,NInAcCAS,NElecBEmb,
+     $ NDimX,NBasis,NDimX,
      $ NInte1,'FFOO','FOFO',ICholesky,0,ACAlpha,.false.)
 C
       ElseIf(ITwoEl.Eq.1) Then
@@ -571,8 +573,8 @@ C
      $ ECorrSym,Occ,URe,XOne,
      $ 'PROP0','PROP1',
      $ 'XY0',UNOAO,
-     $ IndN,IndX,IGem,NAcCAS,NInAcCAS,NDimX,
-     $ NBasis,NDimX,NInte1,NoSt,'EMPTY','FFOO',
+     $ IndN,IndX,IGem,NAcCAS,NInAcCAS,NElecBEmb,
+     $ NDimX,NBasis,NDimX,NInte1,NoSt,'EMPTY','FFOO',
      $ 'FOFO',ICholesky,ETot,IFlAC0DP)
 C
       EndIf
@@ -655,8 +657,8 @@ C
       Call Y01CASD_FOFO(IH0St,Occ,URe,XOne,
      $ 'PROP0','PROP1',
      $ 'XY0',UNOAO,
-     $ IndN,IndX,IGem,NAcCAS,NInAcCAS,NDimX,
-     $ NBasis,NDimX,NInte1,NoSt,'EMPTY','FFOO',
+     $ IndN,IndX,IGem,NAcCAS,NInAcCAS,NElecBEmb,
+     $ NDimX,NBasis,NDimX,NInte1,NoSt,'EMPTY','FFOO',
      $ 'FOFO',ICholesky,ETot,ECorr)
 C
 C     ITwoEl
@@ -1172,7 +1174,7 @@ C
      $ MultpC,NSymNO,
      $ SRKer,WGrid,OrbGrid,
      $ 'PROP0','PROP1','XY0',
-     $ IndN,IndX,IGem,NAcCAS,NInAcCAS,
+     $ IndN,IndX,IGem,NAcCAS,NInAcCAS,NElecBEmb,
      $ NGrid,NDimX,NBasis,NDimX,NInte1,NoSt,
      $ 'FOFO','FFOOERF','FOFOERF',ICholesky,0,IFunSRKer,ECASSCF,ECorr)
 C
@@ -1330,7 +1332,8 @@ C
 C
       If(ITwoEl.Eq.3) Then
       Call AB_CAS_FOFO(ABPLUS,ABMIN,ECASSCF,URe,Occ,XOne,
-     $ IndN,IndX,IGem,NAcCAS,NInAcCAS,NDimX,NBasis,NDimX,
+     $ IndN,IndX,IGem,NAcCAS,NInAcCAS,NElecBEmb,
+     $ NDimX,NBasis,NDimX,
      $ NInte1,'FFOOERF','FOFOERF',ICholesky,0,ACAlpha,.false.)
 C
       ElseIf(ITwoEl.Eq.1) Then
