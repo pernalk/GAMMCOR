@@ -90,7 +90,8 @@ C
       ElseIf(ITwoEl.eq.3) Then
 C
       Call AC0CAS_FOFO(ECorr,ETot,Occ,URe,XOne,ABPLUS,ABMIN,
-     $ IndN,IndX,IGem,NAcCAS,NInAcCAS,NDimX,NBasis,NDim,NInte1,
+     $ IndN,IndX,IGem,NAcCAS,NInAcCAS,NElecBEmb,
+     $ NDimX,NBasis,NDim,NInte1,
      $ NoSt,'FFOO','FOFO',ICholesky,IDBBSC,IFlFCorr)
 C
 C     now Y01CAS_FOFO is used in SAPT only
@@ -182,7 +183,8 @@ C
      $ ABPLUS_tmp,ABMIN_tmp,EigVecR_tmp,Eig_tmp,
      $ EGOne,NGOcc,CICoef,
      $ NBasis,NInte1,NDimX,NGem,IndAux,ACAlpha,
-     $ IGem,NAcCAS,NInAcCAS,NELE,IndN,IndX,NDimX,
+     $ IGem,NAcCAS,NInAcCAS,NElecBEmb,
+     $ NELE,IndN,IndX,NDimX,
      $ NoSt,ICASSCF,IFlFrag1,IFunSR,IFunSRKer,
      $ ICholesky)
 
@@ -192,7 +194,8 @@ C
      $ ABPLUS_tmp,ABMIN_tmp,EigVecR_tmp,Eig_tmp,
      $ EGOne,NGOcc,CICoef,
      $ NBasis,NInte1,NDim,NGem,IndAux,ACAlpha,
-     $ IGem,NActive,NInAcCAS,NELE,IndN,IndX,NDimX,
+     $ IGem,NActive,NInAcCAS,NElecBEmb,
+     $ NELE,IndN,IndX,NDimX,
      $ NoSt,ICASSCF,IFlFrag1,IFunSR,IFunSRKer,
      $ ICholesky)
 

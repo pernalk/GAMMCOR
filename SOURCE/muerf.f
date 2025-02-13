@@ -45,7 +45,8 @@ C
      $                     BasisSet,NBasis)
 
       Call AC0CAS_FOFO(ECorr,ECASSCF,Occ,URe,XOne,ABPLUS,ABMIN,
-     $ IndN,IndX,IGem,NAcCAS,NInAcCAS,NDimX,NBasis,NDimX,NInte1,
+     $ IndN,IndX,IGem,NAcCAS,NInAcCAS,NElecBEmb,
+     $ NDimX,NBasis,NDimX,NInte1,
      $ NoSt,'FFOO','FOFO',ICholesky,IDBBSC,IFlFCorr)
 C
       Write
@@ -106,7 +107,8 @@ C     save to disk
       deallocate(CholVecs,Work)
 
       Call AC0CAS_FOFO(ECorr,ECASSCF,Occ,URe,XOne,ABPLUS,ABMIN,
-     $ IndN,IndX,IGem,NAcCAS,NInAcCAS,NDimX,NBasis,NDimX,NInte1,
+     $ IndN,IndX,IGem,NAcCAS,NInAcCAS,NElecBEmb,
+     $ NDimX,NBasis,NDimX,NInte1,
      $ NoSt,'FFOO','FOFO',ICholesky,IDBBSC,IFlFCorr)
 
       Call FirstOrderSREne(ETwoSR,NBasis)
@@ -160,7 +162,8 @@ C    $ Four=4.D0)
 C
       Include 'commons.inc'
 C
-      Dimension URe(NBasis,NBasis),UNOAO(NBasis,NBasis),Occ(NBasis)
+      Dimension URe(NBasis,NBasis),UNOAO(NBasis,NBasis),Occ(NBasis),
+     $ OccS(NBasis)
       Real*8 :: XMuMat(NBasis,NBasis)
       Character(*) :: BasisSet
 C
@@ -178,6 +181,7 @@ C
       Double Precision, Allocatable :: RDM2Act(:)
       Double Precision, Allocatable :: RDM2val(:,:,:,:)
       Double Precision, Allocatable :: Work(:,:),WorkD(:,:)
+      Double Precision, Allocatable :: OrbTGrid(:,:)
       Dimension IAct(NBasis),Ind2(NBasis)
       Dimension IndInt(NBasis),NSymNO(NBasis),NumOSym(15),MultpC(15,15)
       Dimension OrbIGGrid(NBasis)
@@ -277,6 +281,57 @@ c      print*, 'OrbXGrid = ', norm2(OrbXGrid)
 c      print*, 'OrbYGrid = ', norm2(OrbYGrid)
 c      print*, 'OrbZGrid = ', norm2(OrbZGrid)
 c      print*, ''
+C
+C
+C     for DMRG-in-DFT compute XC energies with translated symmetries
+C
+      Inquire(file='embedding_potential_MO.bin',exist=IVEMB)
+      If(IVEMB) Then
+C
+C     AB
+C
+      Write(6,'(/," Computing PBE_xc for AB")') 
+      Call GGA_ONTOP(EXCTOP,URe,Occ,
+     $ OrbGrid,OrbXGrid,OrbYGrid,OrbZGrid,WGrid,NGrid,NBasis,1)   
+      Write(6,'(" PBE_xc[AB] from xcfun with translated densities",
+     $ F15.8)') EXCTOP
+      Call GGA_ONTOP(EXCTOP,URe,Occ,
+     $ OrbGrid,OrbXGrid,OrbYGrid,OrbZGrid,WGrid,NGrid,NBasis,0)
+      Write(6,'(" PBE_xc[AB] from xcfun with physical densities",
+     $ F15.8)') EXCTOP
+C
+C     A
+C
+      OccS=Occ
+      Do I=1,NStronglyOccOrb
+      OccS(I)=Zero
+      EndDo
+      Write(6,'(/," Computing PBE_xc for A")')
+      Call GGA_ONTOP(EXCTOP,URe,OccS,
+     $ OrbGrid,OrbXGrid,OrbYGrid,OrbZGrid,WGrid,NGrid,NBasis,1)
+      Write(6,'(" PBE_xc[A] from xcfun with translated densities",
+     $ F15.8)') EXCTOP
+      Call GGA_ONTOP(EXCTOP,URe,OccS,
+     $ OrbGrid,OrbXGrid,OrbYGrid,OrbZGrid,WGrid,NGrid,NBasis,0)
+      Write(6,'(" PBE_xc[A] from xcfun with physical densities",
+     $ F15.8)') EXCTOP
+C
+C     B includes only fully occupied orbitals -> rho_translated=rho
+C 
+      OccS=Occ
+      Do I=NStronglyOccOrb+1,NBasis
+      OccS(I)=Zero
+      EndDo
+      Write(6,'(/," Computing PBE_xc for B using",I4," orbitals")')
+     $ NStronglyOccOrb
+      Call GGA_ONTOP(EXCTOP,URe,OccS,
+     $ OrbGrid,OrbXGrid,OrbYGrid,OrbZGrid,WGrid,NGrid,NBasis,0)
+      Write(6,
+     $ '(" PBE_xc[B] from xcfun with physical=translated densities",
+     $ F15.8,/)') EXCTOP
+C
+      EndIf
+C
 C
 C     ... symmetry
       If (InternalGrid==1) Then
@@ -551,6 +606,13 @@ C
       Allocate(XMuLoc(NGrid))
       Allocate(RhoGrid(NGrid))
       Allocate(Sigma(NGrid))
+      Allocate(OrbTGrid(NBasis,NGrid))
+C
+      Do I=1,NGrid
+      Do IP=1,NBasis
+      OrbTGrid(IP,I)=OrbGrid(I,IP)
+      EndDo
+      EndDo
 C
       Do I=1,NGrid
 C
@@ -560,20 +622,64 @@ C
       Call DenGrad(I,RhoZ,Occ,URe,OrbGrid,OrbZGrid,NGrid,NBasis)
       Sigma(I)=RhoX**2+RhoY**2+RhoZ**2
 C
-      OnTop(I)=Zero
-      Do IS=1,NOccup
-         ValS=Two*OrbGrid(I,IS)
-         Do IR=1,NOccup
-            ValRS=OrbGrid(I,IR)*ValS
-            Do IQ=1,NOccup
-               ValQRS=OrbGrid(I,IQ)*ValRS
-               Do IP=1,NOccup
-                  OnTop(I)=OnTop(I)
-     &                 +RDM2val(IP,IQ,IR,IS)*OrbGrid(I,IP)*ValQRS
-               EndDo
-            EndDo
+c      OnTop(I)=Zero
+c      Do IS=1,NOccup
+c         ValS=Two*OrbGrid(I,IS)
+c         Do IR=1,NOccup
+c            ValRS=OrbGrid(I,IR)*ValS
+c            Do IQ=1,NOccup
+c               ValQRS=OrbGrid(I,IQ)*ValRS
+c               Do IP=1,NOccup
+c                  OnTop(I)=OnTop(I)
+c     &                 +RDM2val(IP,IQ,IR,IS)*OrbGrid(I,IP)*ValQRS
+c               EndDo
+c            EndDo
+c         EndDo
+c      EndDo
+
+C
+      OT=Zero
+      OnTopIA=Zero
+      Do IP=1,NOccup
+         ValP=OrbTGrid(IP,I)
+         IAP=0
+         If(IP.Gt.INActive) IAP=1
+         Do IQ=1,NOccup
+            Val=(ValP*OrbTGrid(IQ,I))**2
+            OT=OT+Occ(IP)*Occ(IQ)*Val
+            IAQ=0
+            If(IQ.Gt.INActive) IAQ=1
+            If(IAP*IAQ.Eq.1) OnTopIA=OnTopIA+Occ(IP)*Occ(IQ)*Val
          EndDo
       EndDo
+      OT=OT*Two
+      OnTopIA=OnTopIA*Two
+C
+      OnTopAct=Zero
+      Do IS=INActive+1,NOccup
+         ValS=OrbTGrid(IS,I)
+         If(Abs(ValS).Gt.1.D-8) Then
+         Do IR=INActive+1,NOccup
+            ValRS=OrbTGrid(IR,I)*ValS
+            If(Abs(ValRS).Gt.1.D-8) Then
+            Do IQ=INActive+1,NOccup
+               ValQRS=OrbTGrid(IQ,I)*ValRS
+               If(Abs(ValQRS).Gt.1.D-8) Then
+               Do IP=INActive+1,NOccup
+                  OnTopAct=OnTopAct +
+     $            FRDM2(IP,IQ,IR,IS,RDM2Act,Occ,Ind2,NAct,NBasis)
+     $            *OrbTGrid(IP,I)*ValQRS
+               EndDo
+               EndIf
+            EndDo
+            EndIf
+         EndDo
+         EndIf
+      EndDo
+      OnTopAct=OnTopAct*Two
+C
+      OT=OT-OnTopIA+OnTopAct
+      OnTop(I)=OT
 C
       XMuLoc(I)=Zero
 C
@@ -658,6 +764,7 @@ C
       call gclock('Esrcmd CBS ',Tcpu,Twall)
 
       Deallocate(RDM2val)
+      Deallocate(OrbTGrid)
 
       End Subroutine LOC_MU_CBS_CHOL
 
@@ -1028,6 +1135,9 @@ C
       Call molprogrid(OrbGrid,OrbXGrid,OrbYGrid,OrbZGrid,
      $ WGrid,UNOAO,NGrid,NBasis)
       Call molprogrid1(RR,NGrid)
+      Do I=1,NGrid
+      Call DenGrid(I,RhoGrid(I),Occ,URe,OrbGrid,NGrid,NBasis)
+      EndDo
 C
       Open(10,file="pmat.dat")
       Read(10,*)X
@@ -1053,19 +1163,21 @@ C
 C
       EndDo
 C
+      Write(*,*)'Radius of the sphere =',Radius
+C
       Do I1=1,NGrid
 C
       R1=RR(1,I1)**2+RR(2,I1)**2+RR(3,I1)**2
       R1=SQRT(R1)
 C
-      If(Abs(R1-Radius).Lt.1.D-2) Then
+      If(Abs(R1-Radius).Lt.1.D-3) Then
 C     
       Do I2=1,NGrid
 C
       R2=RR(1,I2)**2+RR(2,I2)**2+RR(3,I2)**2
       R2=SQRT(R2)
 C
-      If(Abs(R2-Radius).Lt.1.D-2) Then
+      If(Abs(R2-Radius).Lt.1.D-3) Then
 C
       R12=(RR(1,I1)-RR(1,I2))**2+(RR(2,I1)-RR(2,I2))**2
      $   +(RR(3,I1)-RR(3,I2))**2
@@ -1082,6 +1194,7 @@ C
       PairD=PairD*PairD
 C
       Write(*,*)R12,PairD
+C ,0.5*RhoGrid(I2)**2
 C
       EndIf
       EndDo
@@ -1089,8 +1202,6 @@ C
       Stop
       EndIf
       EndDo
-C
-      Write(*,*)'Radius of the sphere =',Radius
 C
       Return
       End

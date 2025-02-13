@@ -3687,7 +3687,7 @@ C
       Subroutine RDM2FULL(EigVecR,Eig,ABMIN,TwoNO,NInte2,IndN,Occ,Title,
      $ NBasis,NDimX,NGem,NDim)
 C
-C     FULL 2RDM FROM ERPA AS IN Eq.(47) OF IJQC 2017 
+C     FULL 2RDM FROM ERPA AS IN Eq.(47) OF K.PERNAL Int J Quantum Chem. 2018;118:e25462.
 C
       Implicit Real*8 (A-H,O-Z)
 C

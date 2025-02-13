@@ -529,6 +529,8 @@ C
 C
 C     LOCAL ARRAYS
 C
+      real(8) :: EOne, ETwo
+      real(8) :: XKinSq(NBasis,NBasis)
       Real*8, Allocatable :: RDM2(:),RDMAB2(:)
 C     binary Cholesky
       Type(TCholeskyVecs) :: CholeskyVecs
@@ -558,8 +560,13 @@ c 03.01.2024
 C     for OTF Cholesky
       double precision :: UAONO(NBasis,NBasis)
       double precision,allocatable :: CMOAO(:,:),CAOMO(:,:)
+      double precision,allocatable :: TmpChol(:,:)
       logical :: iex
-
+C DMRG-in-DFT
+      Real*8 XVEMB(NInte1)
+      Real*8 OccA(NBasis)
+      Real*8 EOneA,ETwoA,EVEmb
+      Logical IVEMB_CHCK
 
       If(iORCA==1) then
       LiborNew=1
@@ -782,6 +789,36 @@ C
      $         2I10)') ICount,NInte1
       EndIf ! FACT.bin
 C
+C DMRG-in-DFT
+      Inquire(file='embedding_potential_MO.bin',exist=IVEMB_CHCK)
+      If (.NOT.IVEMB_CHCK .AND. IVEMB)
+     $        Stop "Error! Missing emedding_potential.MO.bin"
+c     print*, 'ReadDMRG: IVEMB keyword =', IVEMB
+c     print*, 'NElecBEmb :', NElecBEmb
+      If(IVEMB) Then
+C
+      XVEMB=Zero
+      Open(10,File='embedding_potential_MO.bin',form='unformatted',
+     $ access='stream', Status='Old')
+      If(LiborNew.Eq.1) Read(10)I,J,K
+      ICount=0
+      IJ=0
+      Do I=1,NBasis
+      Do J=1,I
+      IJ=IJ+1
+      Read(10,End=32) X
+      Ind=I*(I-1)/2+J
+      XVEMB(Ind)=X
+      ICount=ICount+1
+      EndDo
+      EndDo
+   32 Close(10)
+      Write(6,'(" The number of vemb integrals read vs. expected",
+     $ 2I10)') ICount,NInte1
+C
+      EndIf
+C DMRG-in-DFT end
+C
       If(ITwoEl.Eq.1) Then
 C
       Open(10,File='DPQRS.bin',form='unformatted',access='stream',
@@ -929,7 +966,11 @@ C
          Call FockGen_mithap(FockF,GammaAB,XKin,NInte1,NBasis,
      &                       'AOTWOSORT')
       ElseIf(ICholeskyBIN==1) Then
-         Call FockGen_CholR(FockF,CholeskyVecs%R(1:NCholesky,1:NInte1),
+         allocate(TmpChol(NCholesky,NInte1))
+         TmpChol(1:NCholesky,1:NInte1) =
+     &                            CholeskyVecs%R(1:NCholesky,1:NInte1)
+         Call FockGen_CholR(FockF,TmpChol,
+c        Call FockGen_CholR(FockF,CholeskyVecs%R(1:NCholesky,1:NInte1),
      &                      GammaAB,XKin,NInte1,NCholesky,NBasis)
 C
       ElseIf(ICholeskyOTF==1) Then
@@ -946,7 +987,7 @@ C
          read(iunt) CMOAO
          close(iunt)
 C
-        CAOMO = transpose(CMOAO) 
+        CAOMO = transpose(CMOAO)
 C
 C       temp solution
         if(ICholeskyTHC==1) stop "Error! THC not ready in ReadDMRG!"
@@ -955,6 +996,8 @@ C       set THC for FockOTF subroutine
         NCholeskyTHC=1
         allocate(Xgp(NGridTHC,1),Zgk(NCholeskyTHC,1))
 C
+c       IH0Test=0
+c       print*, 'IH0test = ',IH0Test
          Call CholeskyOTF_Fock_MO_v2(WorkSq,CholeskyVecsOTF,
      $                         AOBasis,System,Monomer,'ORCA  ',
      $                         CAOMO,CAOMO,XKin,GammaAB,
@@ -963,6 +1006,8 @@ C
      $                         IH0Test)
 C        unpack Fock in MO (WorkSq) to triangle
          Call sq_to_triang2(WorkSq,FockF,NBasis)
+
+c        Call test_1el_mo(CAOMO,XKin,GammaAB,NInte1,NBasis)
 C
       EndIf
 C
@@ -1155,6 +1200,58 @@ C
       Write(6,'(" Transforming two-electron integrals ...",/)')
 C
       Call MatTr(XKin,URe,NBasis)
+
+c     one-electron electron energy
+      call triang_to_sq2(XKin,XKinSq,NBasis)
+      EOne = 0d0
+      do i=1,NOccup
+         EOne = EOne + Occ(i)*XKinSq(i,i)
+      enddo
+      EOne = 2d0*EOne
+C
+C DMRG-in-DFT
+      If (IVEMB) Then
+C
+      Call MatTr(XVEMB,URe,NBasis)
+      Open(10,File='embedding_potential_NO.bin',form='unformatted',
+     $ access='stream')
+      Do I=1,NInte1
+      Write(10) XVEMB(I)
+      EndDo
+      Close(10)
+
+      Write(6,'(/,1X,''DMRG-in-DFT: no. of electrons in A '',5X,I5)')
+     $  2*NELE-NElecBEmb
+      Write(6,'(1X,''DMRG-in-DFT: no. of electrons in B '',5X,I5)')
+     $  NElecBEmb
+C
+C     ! subsystem A check: set B to zero
+      NOccupB = NElecBEmb/2
+      OccA = Occ
+      OccA(1:NOccupB) = Zero
+c      print*, 'NOCCUP-B', NOCCUPB
+c      do i=1,NOCcup
+c        print*, i, 2d0*OccA(i)
+c      enddo
+c
+c     DMRG-in-DFT: one-el energy for A
+      EOneA=Zero
+      Do I=1,NBasis
+      II=(I*(I+1))/2
+      EOneA=EOneA+OccA(i)*XKin(II)
+      EndDo
+      EOneA = 2d0*EOneA
+C
+      EVEmb=Zero
+      Do I=1,NBasis
+      II=(I*(I+1))/2
+      EVEmb=EVEmb+OccA(I)*XVEMB(II)
+      EndDo
+      EVEmb=2d0*EVEmb
+c     Write(6,'(X,"*** Tr[gamma.vemb] = *** ",E16.6,/)') EVEmb
+C
+      EndIf
+C DMRG-in-DFT end
 C
       If(ITwoEl.Eq.1) Then
       Call TwoNO1(TwoEl,URe,NBasis,NInte2)
@@ -1167,6 +1264,7 @@ C     PREPARE POINTERS: NOccup=num0+num1
       If(ISwitch.Eq.1) Num1=NAc
 C     TRANSFORM J AND K
       UAux=transpose(URe)
+
       If(ICholesky==0) Then
       Call tran4_gen(NBasis,
      $        Num0+Num1,UAux(1:NBasis,1:(Num0+Num1)),
@@ -1235,6 +1333,15 @@ C      write(LOUT,'()')
       !UAONO = (CMOAO)^T.UMONO
       call dgemm('T','N',NBasis,NBasis,NBasis,1d0,CMOAO,NBasis,
      $           UAux,NBasis,0d0,UAONO,NBasis)
+
+C       Print*, 'OTF: UAONO orbitals:'
+C       do i=1,NBasis
+C          write(LOUT,*) i
+C          write(LOUT,'(10f13.8)') (UAONO(i,j),j=1,nbasis)
+C       enddo
+c
+C      test: U^T.S.U = 1
+C      call test_CtSC(UAONO,AOBasis,NBasis,Nbasis)
 c
 Cc     save C(AO,NO) orbitals to a file
 Cc     (e.g., for SRAC0)
@@ -1242,7 +1349,7 @@ Cc
 C      open(newunit=iunt,file='uaono.dat',form='unformatted')
 C      write(iunt) UAONO(1:NBasis,1:NBasis)
 C      close(iunt)
-
+     
       call chol_gammcor_Rkab(MatFF,UAONO,1,NBasis,UAONO,1,NBasis,
      $                   MemMOTransfMB, CholeskyVecsOTF,
      $                   AOBasis, ORBITAL_ORDERING_ORCA)
@@ -1562,7 +1669,50 @@ c *****************************************
 
 C
   777 Continue
+C
+C DMRG-in-DFT: two-el energy for A
+      If (IVEMB) Then
+        If(ICholesky.eq.1) Then
+           Call TwoEneChckChol(ETwoA,RDM2,OccA,num0,NAc,NBSave)
+        ElseIf(ITwoEl.eq.3) Then
+           Call TwoEneChck(ETwoA,RDM2,OccA,num0,NAc,NBSave)
+        Else
+           ETwoA = 0d0
+        EndIf
+C DMRG-in-DFT: Print subsystem A energy components
+      Write(6,'(/1x,"DMRG-in-DFT: Subsystem A energy components:")')
+      Write(6,4410) EOneA
+      Write(6,4420) EVEmb
+      Write(6,4430) EOneA+EVEmb
+      Write(6,4440) ETwoA
+      Write(6,4450) EOneA+ETwoA
+      Write(6,4460) EOneA+EVEmb+ETwoA
+ 4410 Format(1x," One-electron A Energy",T50,F15.8,1x,"Eh")
+ 4420 Format(1x," One-electron A VEmb Energy",T50,F15.8,1x,"Eh")
+ 4430 Format(1x," One-electron A-Emb Energy",T50,F15.8,1x,"Eh")
+ 4440 Format(1x," Two-electron A Energy",T50,F15.8,1x,"Eh")
+ 4450 Format(1x," Total A Energy (w/o ENuc)",T50,F15.8,1x,"Eh")
+ 4460 Format(1x," Total A+VEmb Energy (w/o ENuc)",T50,F15.8,1x,"Eh")
+
+      EndIf
+C DMRG-in-DFT end
+C
+C     two-electron energy
+      If(ICholesky.eq.1) Then
+         Call TwoEneChckChol(ETwo,RDM2,Occ,num0,NAc,NBSave)
+      ElseIf(ITwoEl.eq.3) Then
+         Call TwoEneChck(ETwo,RDM2,Occ,num0,NAc,NBSave)
+      Else
+         ETwo=0d0
+      EndIf
+
+      Write(6,5510) EOne
+      Write(6,5520) ETwo
+ 5510 Format(/1x,"ReadDMRG: One-electron Energy",T50,F15.8,1x,"Eh")
+ 5520 Format(1x,"ReadDMRG: Two-electron Energy",T50,F15.8,1x,"Eh")
+C
 C     SAVE THE ACTIVE PART IN rdm2.dat
+c
       Open(10,File='rdm2.dat')
       Do I=NInAc+1,NInAc+NAc
       IIAct=I-NInAc
@@ -1620,6 +1770,7 @@ C
 C
       Return
       End
+C End Subroutine ReadDMRG
 
 *Deck LdInteg
       Subroutine LdInteg(Title,BasisSet,XKin,XNuc,ENuc,Occ,URe,

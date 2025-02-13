@@ -157,6 +157,7 @@ character(*),parameter :: PossibleUnits(2) = &
          integer :: OrbIncl   = FLAG_ORBINCL
          integer :: FunCorr   = 0 ! SR-AC0,fCAS (default)
          integer :: DBBSC     = 0 ! AC0, CBS correction (0=inactive, default)
+         integer :: IVEMB     = 0 ! DMRG-in-DFT
          integer :: MemVal = 2, MemType = 3 ! default: use 2 GB for 3-ind_tran (Cholesky)
          logical :: Visual     = FLAG_VISUAL
          logical :: Restart    = FLAG_RESTART
@@ -198,8 +199,9 @@ type SystemBlock
       integer :: NSym
       integer :: NSymBas(8),NSymOrb(8)
       integer :: NOrb, NGem
-      integer :: NActOrb  = 1
-      integer :: NCoreOrb = 0
+      integer :: NActOrb   = 1
+      integer :: NCoreOrb  = 0
+      ! CBS[H]: number of strongly occupied (all > 0.5) orbs
       integer :: NStronglyOccOrb = 0
       integer :: NAct, INAct
       integer :: ISwitchAct = 0
@@ -207,6 +209,9 @@ type SystemBlock
 
       ! APSG/GVB Dalton
       integer :: NISHT_G, NASHT_G
+
+      ! DMRG-in-DFT : no of electrons in B
+      integer :: NElecBEmb
 
       ! unrestricted
       integer :: NOa, NOb, NVa, NVb
@@ -375,6 +380,7 @@ type FlagsData
      integer :: ICorrMD   = 0 ! for SRAC0
      integer :: IFlFCorr  = 0 ! for SRAC0
      integer :: IDBBSC    = 0 ! for AC0
+     integer :: IVEMB     = 0 ! for DMRG-in-DFT
      double precision :: Alpha = 0
      integer :: IModG   = 1
      integer :: NGOcc   = 0
