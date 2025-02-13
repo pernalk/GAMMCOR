@@ -458,7 +458,7 @@ if(Flags%ICASSCF==0.and.Flags%ISERPA==0) then
      !call Project_DChol(Mon%PMat,Mon%IndN,NBas,Mon%NDimX)
 
      !call CIter_FOFO(ECorr,ACAlpha,XOne,URe,Mon%Occ,EGOne,NGOcc,&
-     !                Mon%IGem,Mon%NAct,Mon%INAct,Mon%NELE,NBas,NInte1, &
+     !                Mon%IGem,Mon%NAct,Mon%INAct,Mon%NElecBEmb,Mon%NELE,NBas,NInte1, &
      !                Mon%NDim,Mon%NGem,Mon%IndAux,Mon%IndN,Mon%IndX,Mon%NDimX,&
      !                twojfile,twokfile)
      !deallocate(Pmat)
@@ -488,8 +488,8 @@ if(Flags%ICASSCF==0.and.Flags%ISERPA==0) then
         allocate(A0Block(nblk))
         ! maybe just include blocks in Mon%...?
         call AC0BLOCK(Mon%Occ,URe,XOne, &
-             Mon%IndN,Mon%IndX,Mon%IGem,Mon%NAct,Mon%INAct,Mon%NDimX, &
-             NBas,Mon%NDimX,NInte1,twojfile,twokfile,Flags%ICholesky, &
+             Mon%IndN,Mon%IndX,Mon%IGem,Mon%NAct,Mon%INAct,Mon%NElecBEmb, &
+             Mon%NDimX,NBas,Mon%NDimX,NInte1,twojfile,twokfile,Flags%ICholesky, &
              A0BlockIV,A0Block,nblk,1,abpm0file,1)
      endif
   case(TWOMO_FFFF)
@@ -729,8 +729,8 @@ case(TWOMO_FOFO)
    nblk = 1 + NBas - Mon%NAct
    allocate(A0Block(nblk))
    call AC0BLOCK(Mon%Occ,URe,XOne, &
-        Mon%IndN,Mon%IndX,Mon%IGem,Mon%NAct,Mon%INAct,Mon%NDimX, &
-        NBas,Mon%NDimX,NInte1,twojfile,twokfile,Flags%ICholesky, &
+        Mon%IndN,Mon%IndX,Mon%IGem,Mon%NAct,Mon%INAct,Mon%NElecBEmb, &
+        Mon%NDimX,NBas,Mon%NDimX,NInte1,twojfile,twokfile,Flags%ICholesky, &
         A0BlockIV,A0Block,nblk,1,abpm0file,1)
 end select
 
@@ -1278,8 +1278,8 @@ elseif(Flags%ICASSCF==1.and.Flags%ISERPA==0) then
         nblk = 1 + NBas - Mon%NAct
         allocate(A0Block(nblk))
         call AC0BLOCK(Mon%Occ,URe,XOne, &
-             Mon%IndN,Mon%IndX,Mon%IGem,Mon%NAct,Mon%INAct,Mon%NDimX, &
-             NBas,Mon%NDimX,NInte1,twojfile,twokfile,Flags%ICholesky, &
+             Mon%IndN,Mon%IndX,Mon%IGem,Mon%NAct,Mon%INAct,Mon%NElecBEmb, &
+             Mon%NDimX,NBas,Mon%NDimX,NInte1,twojfile,twokfile,Flags%ICholesky, &
              A0BlockIV,A0Block,nblk,1,abpm0file,1)
      endif
 

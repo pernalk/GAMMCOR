@@ -118,7 +118,8 @@ module class_LambdaCalculatorBlock
             this%A2 = this%A2 - this%A0
 
             Call AC0BLOCK(this%Occ,this%URe,this%XOne, &
-                this%IndN,this%IndX,this%IGem,this%NAct,this%INActive,this%NDimX,this%NBasis,this%NDimX,&
+                this%IndN,this%IndX,this%IGem,this%NAct,this%INActive,0,&
+                this%NDimX,this%NBasis,this%NDimX,&
                 this%NInte1,'FFOO','FOFO', &
                 this%A0BlockIV,this%A0Block,this%nblk,'A0BLK',0)
 

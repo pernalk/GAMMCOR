@@ -145,12 +145,14 @@ C
 C
       If(Max_Cn.Eq.-1) Then
       Call Polariz(FreqOm,UNOAO,XOne,URe,Occ,
-     $   IGem,NAcCAS,NInAcCAS,NELE,NBasis,NInte1,NGem,IndAux,
+     $   IGem,NAcCAS,NInAcCAS,NElecBEmb,NELE,
+     $   NBasis,NInte1,NGem,IndAux,
      $   IndN,IndX,NDimX,ICholesky)
       Else
       Write(6,'(/,X,''Expand C(Om) maximally up to order '',I4)') Max_Cn
       Call PolarizAl(FreqOm,UNOAO,XOne,URe,Occ,
-     $   IGem,NAcCAS,NInAcCAS,NELE,NBasis,NInte1,NGem,IndAux,
+     $   IGem,NAcCAS,NInAcCAS,NElecBEmb,NELE,
+     $   NBasis,NInte1,NGem,IndAux,
      $   IndN,IndX,NDimX,ICholesky,Max_Cn)
       EndIf
 C

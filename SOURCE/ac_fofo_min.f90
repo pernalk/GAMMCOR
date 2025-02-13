@@ -245,7 +245,8 @@ print*, 'nblk',nblk
 
 allocate(A0block(nblk))
 Call AC0BLOCK(Occ,URe,XOne, &
-     IndN,IndX,IGem,NAct,INActive,NDimX,NBasis,NDimX,NInte1,'FFOO','FOFO', &
+     IndN,IndX,IGem,NAct,INActive,NElecBEmb, &
+     NDimX,NBasis,NDimX,NInte1,'FFOO','FOFO', &
      A0BlockIV,A0Block,nblk,'A0BLK',0)
 
 call makieta_1_petli_po_IV(LambdaIV,A0BlockIV,nblk,NDimX)
@@ -443,7 +444,8 @@ Call FreqGrid(XFreq,WFreq,NGrid)
 nblk = 1 + NBasis - NAct
 allocate(A0block(nblk))
 Call AC0BLOCK(Occ,URe,XOne, &
-     IndN,IndX,IGem,NAct,INActive,NDimX,NBasis,NDimX,NInte1,'FFOO','FOFO', &
+     IndN,IndX,IGem,NAct,INActive,NElecBEmb, &
+     NDimX,NBasis,NDimX,NInte1,'FFOO','FOFO', &
      A0BlockIV,A0Block,nblk,'A0BLK',0)
 
 allocate(COMTilde(NDimX*NCholesky),COMTildeAct(NDimX*NCholesky))
@@ -612,7 +614,8 @@ Call FreqGrid(XFreq,WFreq,NGrid)
 nblk = 1 + NBasis - NAct
 allocate(A0block(nblk))
 Call AC0BLOCK(Occ,URe,XOne, &
-      IndN,IndX,IGem,NAct,INActive,NDimX,NBasis,NDimX,NInte1,'FFOO','FOFO', &
+      IndN,IndX,IGem,NAct,INActive,NElecBEmb, &
+      NDimX,NBasis,NDimX,NInte1,'FFOO','FOFO', &
       A0BlockIV,A0Block,nblk,'A0BLK',0)
       !A0BlockIV,A0Block,nblk,1)
 !

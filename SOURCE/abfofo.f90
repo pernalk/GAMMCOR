@@ -1183,7 +1183,8 @@ AUX1=0.d0
 Write(6,'(/,X,"**** Expansion of the C response matrix up to n_max = ",I5," ****")') Max_Cn
 Call CFREQPROJ(AUX1,0.d0,AUX2,1, &
                Max_Cn,XOne,URe,Occ,&
-               IGem,NAct,INActive,NBasis,NInte1,IndAux,&
+               IGem,NAct,INActive,NElecBEmb,&
+               NBasis,NInte1,IndAux,&
                0,IndBlock,IndX,NDimRed)
 
 do a=NS1+1,NBasis

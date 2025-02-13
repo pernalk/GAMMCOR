@@ -133,7 +133,7 @@ C
 C
 C      Call WInteg_FOFO(ECorrA,XOne,URe,Occ,
 C     $ EGOne,NGOcc,
-C     $ IGem,NAcCAS,NInAcCAS,NELE,
+C     $ IGem,NAcCAS,NInAcCAS,NElecBEmb,NELE,
 C     $ NBasis,NInte1,NDim,NGem,IndAux,ACAlpha,
 C     $ IndN,IndX,NDimX)
 CC
@@ -164,7 +164,7 @@ C     C(Omega) WILL BE FOUND NONITERATIVELY BY INVERTING THE NDimX X NDimX matri
 C
 C      Call WInteg_FOFO(ECorrA,XOne,URe,Occ,
 C     $ EGOne,NGOcc,
-C     $ IGem,NAcCAS,NInAcCAS,NELE,
+C     $ IGem,NAcCAS,NInAcCAS,NElecBEmb,NELE,
 C     $ NBasis,NInte1,NDim,NGem,IndAux,ACAlpha,
 C     $ IndN,IndX,NDimX)
 CC

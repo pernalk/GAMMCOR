@@ -190,7 +190,8 @@ allocate(A0block(nblk))
 ! AC0BLOCK with ver=0 stores A-(0) and A+(0) matrices
 !                            in X and Y, respectively
 Call AC0BLOCK(Occ,URe,XOne, &
-     IndN,IndX,IGem,NAct,INActive,NDimX,NBasis,NDimX,NInte1,'FFOO','FOFO', &
+     IndN,IndX,IGem,NAct,INActive,NElecBEmb, &
+     NDimX,NBasis,NDimX,NInte1,'FFOO','FOFO', &
      ICholesky,A0BlockIV,A0Block,nblk,0,'DUMMY',0)
 
 ! get AB1PLUS and AB1MIN
@@ -237,7 +238,8 @@ Call FreqGrid(XFreq,WFreq,NGrid)
 allocate(A0block(nblk))
 ! ver=1: store A+(0).A-(0) in blocks 
 Call AC0BLOCK(Occ,URe,XOne, &
-     IndN,IndX,IGem,NAct,INActive,NDimX,NBasis,NDimX,NInte1,'FFOO','FOFO', &
+     IndN,IndX,IGem,NAct,INActive,NElecBEmb, &
+     NDimX,NBasis,NDimX,NInte1,'FFOO','FOFO', &
      ICholesky,A0BlockIV,A0Block,nblk,1,'A0BLK',0)
 
 !allocate(COMTilde(NDimX*NCholesky))
@@ -467,7 +469,8 @@ Call FreqGrid(XFreq,WFreq,NGrid)
 nblk = 1 + NBasis - NAct
 allocate(A0block(nblk))
 Call AC0BLOCK(Occ,URe,XOne, &
-     IndN,IndX,IGem,NAct,INActive,NDimX,NBasis,NDimX,NInte1,'FFOO','FOFO', &
+     IndN,IndX,IGem,NAct,INActive,NElecBEmb, &
+     NDimX,NBasis,NDimX,NInte1,'FFOO','FOFO', &
      1,A0BlockIV,A0Block,nblk,1,'A0BLK',0)
 
 allocate(COMTilde(NDimX*NCholesky),COMTildeAct(NDimX*NCholesky))
@@ -639,7 +642,8 @@ Call FreqGrid(XFreq,WFreq,NGrid)
 nblk = 1 + NBasis - NAct
 allocate(A0block(nblk))
 Call AC0BLOCK(Occ,URe,XOne, &
-      IndN,IndX,IGem,NAct,INActive,NDimX,NBasis,NDimX,NInte1,'FFOO','FOFO', &
+      IndN,IndX,IGem,NAct,INActive,NElecBEmb, &
+      NDimX,NBasis,NDimX,NInte1,'FFOO','FOFO', &
       0,A0BlockIV,A0Block,nblk,0,'A0BLK',0)
       !A0BlockIV,A0Block,nblk,1)
 
@@ -2065,7 +2069,7 @@ Write(6,'(X,''ZX   ZY   ZZ  '',3F15.8,2/)') AZX, AZY, AZZ
 end subroutine Polariz
 
 subroutine PolarizAl(FreqOm,UNOAO,XOne,URe,Occ,&
-   IGem,NAct,INActive,NELE,NBasis,NInte1,NGem,IndAux,&
+   IGem,NAct,INActive,NElecBEmb,NELE,NBasis,NInte1,NGem,IndAux,&
    IndN,IndX,NDimX,ICholesky,Max_Cn)
 !
 ! Returns dynamic polarizability tensor for a given frequency FreqOm
@@ -2076,7 +2080,7 @@ use abfofo
 
 implicit none
 integer,intent(in) :: NBasis,NInte1,NGem,NDimX,Max_cn
-integer,intent(in) :: NAct,INActive,NELE
+integer,intent(in) :: NAct,INActive,NElecBEmb,NELE
 integer,intent(in) :: IndN(2,NDimX),IndX(NDimX),IndAux(NBasis),IGem(NBasis)
 double precision,intent(in) :: FreqOm,UNOAO(NBasis,NBasis),URe(NBasis,NBasis),Occ(NBasis),XOne(NInte1)
 double precision :: DipX(NBasis,NBasis),DipY(NBasis,NBasis),DipZ(NBasis,NBasis),CICoef(NBasis)
@@ -2107,7 +2111,8 @@ Enddo
 
 Call CFREQPROJ(ipiv,Om,DipCX,1, &
    Max_Cn,XOne,URe,Occ,&
-   IGem,NAct,INActive,NBasis,NInte1,IndAux,&
+   IGem,NAct,INActive,NElecBEmb,&
+   NBasis,NInte1,IndAux,&
    ICholesky,IndN,IndX,NDimX)
 
 AYX=8.d0*ddot(NDimx,DipCY,1,ipiv,1)
@@ -2116,7 +2121,8 @@ AXX=8.d0*ddot(NDimx,DipCX,1,ipiv,1)
 
 Call CFREQPROJ(ipiv,Om,DipCY,1, &
    Max_Cn,XOne,URe,Occ,&
-   IGem,NAct,INActive,NBasis,NInte1,IndAux,&
+   IGem,NAct,INActive,NElecBEmb,&
+   NBasis,NInte1,IndAux,&
    ICholesky,IndN,IndX,NDimX)
 
 AXY=8.d0*ddot(NDimx,DipCX,1,ipiv,1)
@@ -2125,7 +2131,8 @@ AYY=8.d0*ddot(NDimx,DipCY,1,ipiv,1)
 
 Call CFREQPROJ(ipiv,Om,DipCZ,1, &
    Max_Cn,XOne,URe,Occ,&
-   IGem,NAct,INActive,NBasis,NInte1,IndAux,&
+   IGem,NAct,INActive,NElecBEmb,&
+   NBasis,NInte1,IndAux,&
    ICholesky,IndN,IndX,NDimX)
 AXZ=8.d0*ddot(NDimx,DipCX,1,ipiv,1)
 AYZ=8.d0*ddot(NDimx,DipCY,1,ipiv,1)
@@ -2201,7 +2208,8 @@ allocate(A0block(nblk))
 ! AC0BLOCK with ver=0 stores A-(0) and A+(0) matrices
 !                            in X and Y, respectively
 Call AC0BLOCK(Occ,URe,XOne, &
-     IndN,IndX,IGem,NAct,INActive,NDimX,NBasis,NDimX,NInte1,'FFOO','FOFO', &
+     IndN,IndX,IGem,NAct,INActive,NElecBEmb, &
+     NDimX,NBasis,NDimX,NInte1,'FFOO','FOFO', &
      ICholesky,A0BlockIV,A0Block,nblk,0,'DUMMY',0)
 
 ! get AB1PLUS and AB1MIN
@@ -2238,7 +2246,8 @@ deallocate(A0BlockIV%vec,A0BlockIV%pos)
 allocate(A0block(nblk))
 ! ver=1: store A+(0).A-(0) in blocks
 Call AC0BLOCK(Occ,URe,XOne, &
-     IndN,IndX,IGem,NAct,INActive,NDimX,NBasis,NDimX,NInte1,'FFOO','FOFO', &
+     IndN,IndX,IGem,NAct,INActive,NElecBEmb, &
+     NDimX,NBasis,NDimX,NInte1,'FFOO','FOFO', &
      ICholesky,A0BlockIV,A0Block,nblk,1,'A0BLK',0)
 
 COMTilde=0.0
