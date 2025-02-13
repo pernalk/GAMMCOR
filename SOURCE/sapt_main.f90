@@ -1493,7 +1493,8 @@ subroutine reduce_virt(Flags,Mon,NBas)
 
     call MP2RDM_FOFO(Mon%PerVirt,Eps,Mon%Occ,URe,workSq,XOne,&
                      Mon%IndN,Mon%IndX,Mon%IndAux,Mon%IGem,  &
-                     Mon%NAct,Mon%INAct,Mon%NDimX,Mon%NDim,NBas,NInte1,&
+                     Mon%NAct,Mon%INAct,Mon%NElecBEmb,&
+                     Mon%NDimX,Mon%NDim,NBas,NInte1,&
                      twojfile,twokfile,Flags%ICholesky,&
                      Mon%ThrVirt,Mon%NVZero,Mon%IPrint)
 

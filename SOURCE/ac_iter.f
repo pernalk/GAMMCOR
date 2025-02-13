@@ -49,7 +49,7 @@ C     and integrating analytically
 C
       Call WIter_FOFO(ECorr,Max_Cn,XOne,URe,Occ,
      $ EGOne,NGOcc,
-     $ IGem,NAcCAS,NInAcCAS,NELE,
+     $ IGem,NAcCAS,NInAcCAS,NElecBEmb,NELE,
      $ NBasis,NInte1,NDim,NGem,IndAux,
      $ IndN,IndX,NDimX)
 C
@@ -63,7 +63,7 @@ C     and integrating analytically, Cholesky decomposition is employed
 C     to lower dimensionality of the C(omega)-problem 
 C
       Call WIter_D12Chol(ECorr,0,Max_Cn,XOne,URe,Occ,
-     $ EGOne,NGOcc,IGem,NAcCAS,NInAcCAS,NELE,
+     $ EGOne,NGOcc,IGem,NAcCAS,NInAcCAS,NElecBEmb,NELE,
      $ NBasis,NInte1,NDim,NGem,IndAux,
      $ IndN,IndX,NDimX)
 C
@@ -86,7 +86,7 @@ C
      $ with Cholesky'
 C
        Call WIter_D12Chol(ECorr,1,Max_Cn,XOne,URe,Occ,
-     $ EGOne,NGOcc,IGem,NAcCAS,NInAcCAS,NELE,
+     $ EGOne,NGOcc,IGem,NAcCAS,NInAcCAS,NElecBEmb,NELE,
      $ NBasis,NInte1,NDim,NGem,IndAux,
      $ IndN,IndX,NDimX)
 C
@@ -133,14 +133,14 @@ C
 C
 C      Call WInteg_FOFO(ECorrA,XOne,URe,Occ,
 C     $ EGOne,NGOcc,
-C     $ IGem,NAcCAS,NInAcCAS,NELE,
+C     $ IGem,NAcCAS,NInAcCAS,NElecBEmb,NELE,
 C     $ NBasis,NInte1,NDim,NGem,IndAux,ACAlpha,
 C     $ IndN,IndX,NDimX)
 CC
 C      goto 777
       Call CIter_FOFO(PMat,ECorrA,ACAlpha,XOne,URe,Occ,
      $ EGOne,NGOcc,
-     $ IGem,NAcCAS,NInAcCAS,NELE,
+     $ IGem,NAcCAS,NInAcCAS,NElecBEmb,NELE,
      $ NBasis,NInte1,NDim,NGem,IndAux,
      $ IndN,IndX,NDimX)
   
@@ -164,7 +164,7 @@ C     C(Omega) WILL BE FOUND NONITERATIVELY BY INVERTING THE NDimX X NDimX matri
 C
 C      Call WInteg_FOFO(ECorrA,XOne,URe,Occ,
 C     $ EGOne,NGOcc,
-C     $ IGem,NAcCAS,NInAcCAS,NELE,
+C     $ IGem,NAcCAS,NInAcCAS,NElecBEmb,NELE,
 C     $ NBasis,NInte1,NDim,NGem,IndAux,ACAlpha,
 C     $ IndN,IndX,NDimX)
 CC
@@ -174,7 +174,7 @@ C     ITERATIVE SOLUTION FOR C(Omega)
 C
       Call CIter_FOFO(PMat,ECorrA,ACAlpha,XOne,URe,Occ,
      $ EGOne,NGOcc,
-     $ IGem,NAcCAS,NInAcCAS,NELE,
+     $ IGem,NAcCAS,NInAcCAS,NElecBEmb,NELE,
      $ NBasis,NInte1,NDim,NGem,IndAux,
      $ IndN,IndX,NDimX)
   666 continue

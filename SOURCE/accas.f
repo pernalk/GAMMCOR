@@ -145,12 +145,14 @@ C
 C
       If(Max_Cn.Eq.-1) Then
       Call Polariz(FreqOm,UNOAO,XOne,URe,Occ,
-     $   IGem,NAcCAS,NInAcCAS,NELE,NBasis,NInte1,NGem,IndAux,
+     $   IGem,NAcCAS,NInAcCAS,NElecBEmb,NELE,
+     $   NBasis,NInte1,NGem,IndAux,
      $   IndN,IndX,NDimX,ICholesky)
       Else
       Write(6,'(/,X,''Expand C(Om) maximally up to order '',I4)') Max_Cn
       Call PolarizAl(FreqOm,UNOAO,XOne,URe,Occ,
-     $   IGem,NAcCAS,NInAcCAS,NELE,NBasis,NInte1,NGem,IndAux,
+     $   IGem,NAcCAS,NInAcCAS,NElecBEmb,NELE,
+     $   NBasis,NInte1,NGem,IndAux,
      $   IndN,IndX,NDimX,ICholesky,Max_Cn)
       EndIf
 C
@@ -164,7 +166,8 @@ C
       If(ITwoEl.eq.3) Then
 C
       Call RDMResp_FOFO(Occ,URe,UNOAO,XOne,IndN,IndX,IndAux,IGem,
-     $                  NAcCAS,NInAcCAS,NDimX,NDim,NBasis,NInte1,
+     $                  NAcCAS,NInAcCAS,NElecBEmb,
+     $                  NDimX,NDim,NBasis,NInte1,
      $                  'FFOO','FOFO',ICholesky,IOrbRelax,IOrbIncl)
 C
       If (IOrbRelax==1) Call delfile('FFFO')
@@ -357,7 +360,8 @@ c      ACAlpha=zero
 C
       If(ITwoEl.Eq.3) Then
       Call AB_CAS_FOFO(ABPLUS,ABMIN,ECASSCF,URe,Occ,XOne,
-     $ IndN,IndX,IGem,NAcCAS,NInAcCAS,NDimX,NBasis,NDimX,
+     $ IndN,IndX,IGem,NAcCAS,NInAcCAS,NElecBEmb,
+     $ NDimX,NBasis,NDimX,
      $ NInte1,'FFOO','FOFO',ICholesky,0,ACAlpha,.false.)
 C
       ElseIf(ITwoEl.Eq.1) Then
@@ -571,8 +575,8 @@ C
      $ ECorrSym,Occ,URe,XOne,
      $ 'PROP0','PROP1',
      $ 'XY0',UNOAO,
-     $ IndN,IndX,IGem,NAcCAS,NInAcCAS,NDimX,
-     $ NBasis,NDimX,NInte1,NoSt,'EMPTY','FFOO',
+     $ IndN,IndX,IGem,NAcCAS,NInAcCAS,NElecBEmb,
+     $ NDimX,NBasis,NDimX,NInte1,NoSt,'EMPTY','FFOO',
      $ 'FOFO',ICholesky,ETot,IFlAC0DP)
 C
       EndIf
@@ -655,8 +659,8 @@ C
       Call Y01CASD_FOFO(IH0St,Occ,URe,XOne,
      $ 'PROP0','PROP1',
      $ 'XY0',UNOAO,
-     $ IndN,IndX,IGem,NAcCAS,NInAcCAS,NDimX,
-     $ NBasis,NDimX,NInte1,NoSt,'EMPTY','FFOO',
+     $ IndN,IndX,IGem,NAcCAS,NInAcCAS,NElecBEmb,
+     $ NDimX,NBasis,NDimX,NInte1,NoSt,'EMPTY','FFOO',
      $ 'FOFO',ICholesky,ETot,ECorr)
 C
 C     ITwoEl
@@ -1130,7 +1134,6 @@ C
       XVSR=XVSR+Two*Occ(I)*VSR(II)
       EndDo
 C
-c ???
       If(IFunSR.Eq.4) Then
 c      Write(6,'(X,/,
 c     $"*** REMOVING VSR_HXC FROM A ONE-ELECTRON HAMILTONIAN*** ",/)')
@@ -1173,7 +1176,7 @@ C
      $ MultpC,NSymNO,
      $ SRKer,WGrid,OrbGrid,
      $ 'PROP0','PROP1','XY0',
-     $ IndN,IndX,IGem,NAcCAS,NInAcCAS,
+     $ IndN,IndX,IGem,NAcCAS,NInAcCAS,NElecBEmb,
      $ NGrid,NDimX,NBasis,NDimX,NInte1,NoSt,
      $ 'FOFO','FFOOERF','FOFOERF',ICholesky,0,IFunSRKer,ECASSCF,ECorr)
 C
@@ -1331,7 +1334,8 @@ C
 C
       If(ITwoEl.Eq.3) Then
       Call AB_CAS_FOFO(ABPLUS,ABMIN,ECASSCF,URe,Occ,XOne,
-     $ IndN,IndX,IGem,NAcCAS,NInAcCAS,NDimX,NBasis,NDimX,
+     $ IndN,IndX,IGem,NAcCAS,NInAcCAS,NElecBEmb,
+     $ NDimX,NBasis,NDimX,
      $ NInte1,'FFOOERF','FOFOERF',ICholesky,0,ACAlpha,.false.)
 C
       ElseIf(ITwoEl.Eq.1) Then
@@ -2744,13 +2748,18 @@ C
 
 *Deck GGA_ONTOP
       Subroutine GGA_ONTOP(EXCTOP,URe,Occ,
-     $ OrbGrid,OrbXGrid,OrbYGrid,OrbZGrid,WGrid,NGrid,NBasis)
+     $ OrbGrid,OrbXGrid,OrbYGrid,OrbZGrid,WGrid,NGrid,NBasis,IFlTrans)
 C
 C     RETURNS A GGA_XC ENERGY IF THE DENSITY AND SPIN-DENSITY ARE COMPUTED AS:
 C     RHO_A/B = 1/2 ( RHO +/- SQRT(RHO^2 - 2 PI )  )
 C     WHERE PI IS THE ON-TOP PAIR DENSITY, see Gagliardi JCP 146, 034101 (2017)
 C
+C     IFlTrans = 1 - translate rho
+C                0 - use real (untranslated) rho
+C
 C     XCFUN IS USED !!!
+C 
+      use timing
 C
       Implicit Real*8 (A-H,O-Z)
 C
@@ -2766,7 +2775,8 @@ C
      $ OrbYGrid(NGrid,NBasis),OrbZGrid(NGrid,NBasis)
 C
       Dimension Zk(NGrid),RhoA(NGrid),RhoB(NGrid),
-     & SigmaAA(NGrid),SigmaAB(NGrid),SigmaBB(NGrid)
+     & SigmaAA(NGrid),SigmaAB(NGrid),SigmaBB(NGrid),
+     & OrbTGrid(NBasis,NGrid)
 C
 C     READ 2RDM, COMPUTE THE ENERGY
 C
@@ -2802,23 +2812,66 @@ C
       Close(10)
 C
       Do I=1,NGrid
+      Do IP=1,NBasis
+      OrbTGrid(IP,I)=OrbGrid(I,IP)
+      EndDo
+      EndDo
+C
+      Do I=1,NGrid
 C
       Call DenGrid(I,RhoGrid,Occ,URe,OrbGrid,NGrid,NBasis)
 C
-      If(RhoGrid.Gt.1.D-12) Then
+      If(RhoGrid.Gt.1.D-8) Then
+C
+      If(IFlTrans.Eq.1) Then
 C
       OnTop=Zero
+      OnTopIA=Zero
       Do IP=1,NOccup
-      Do IQ=1,NOccup
-      Do IR=1,NOccup
-      Do IS=1,NOccup
-      OnTop=OnTop
-     $ +Two*FRDM2(IP,IQ,IR,IS,RDM2Act,Occ,Ind2,NAct,NBasis)
-     $ *OrbGrid(I,IP)*OrbGrid(I,IQ)*OrbGrid(I,IR)*OrbGrid(I,IS)
+         ValP=OrbTGrid(IP,I)
+         IAP=0
+         If(IP.Gt.INActive) IAP=1
+         Do IQ=1,NOccup
+            Val=(ValP*OrbTGrid(IQ,I))**2
+            OnTop=OnTop+Occ(IP)*Occ(IQ)*Val
+            IAQ=0
+            If(IQ.Gt.INActive) IAQ=1
+            If(IAP*IAQ.Eq.1) OnTopIA=OnTopIA+Occ(IP)*Occ(IQ)*Val
+         EndDo
       EndDo
+      OnTop=OnTop*Two
+      OnTopIA=OnTopIA*Two 
+C
+      OnTopAct=Zero
+      Do IS=INActive+1,NOccup
+         ValS=OrbTGrid(IS,I)
+         If(Abs(ValS).Gt.1.D-8) Then
+         Do IR=INActive+1,NOccup
+            ValRS=OrbTGrid(IR,I)*ValS
+            If(Abs(ValRS).Gt.1.D-8) Then
+            Do IQ=INActive+1,NOccup
+               ValQRS=OrbTGrid(IQ,I)*ValRS
+               If(Abs(ValQRS).Gt.1.D-8) Then
+               Do IP=INActive+1,NOccup
+                  OnTopAct=OnTopAct +
+     $            FRDM2(IP,IQ,IR,IS,RDM2Act,Occ,Ind2,NAct,NBasis)
+     $            *OrbTGrid(IP,I)*ValQRS
+               EndDo
+               EndIf
+            EndDo
+            EndIf
+         EndDo
+         EndIf
       EndDo
-      EndDo
-      EndDo
+      OnTopAct=OnTopAct*Two
+C
+      OnTop=OnTop-OnTopIA+OnTopAct
+C
+      Else
+C
+      OnTop=RhoGrid**2/Two
+C
+      EndIf
 C
       Call DenGrad(I,RhoX,Occ,URe,OrbGrid,OrbXGrid,NGrid,NBasis)
       Call DenGrad(I,RhoY,Occ,URe,OrbGrid,OrbYGrid,NGrid,NBasis)
@@ -3149,7 +3202,7 @@ C
      $ WGrid,UNOAO,NGrid,NBasis)
 C
       Call GGA_ONTOP(EXCTOP,URe,Occ,OrbGrid,OrbXGrid,OrbYGrid,
-     $ OrbZGrid,WGrid,NGrid,NBasis)
+     $ OrbZGrid,WGrid,NGrid,NBasis,1)
       Write(6,'(/," PBE_xc from xcfun with translated densities",
      $ F15.8,/)') EXCTOP
 C

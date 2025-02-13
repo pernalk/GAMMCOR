@@ -294,6 +294,7 @@ end select
      Flags%IFlSnd  = 1
      Flags%IFlAC0D = 0
      Flags%IDBBSC  = Input%CalcParams%DBBSC
+     Flags%IVEMB   = Input%CalcParams%IVEMB
      print*,'Input%CalcParams%PostCAS', Input%CalcParams%PostCAS
      print*,'Input%CalcParams%DFApp  ', Input%CalcParams%DFApp
      print*,'Flags%IFunSRKer         ', Input%CalcParams%Kernel
@@ -490,6 +491,7 @@ if(Flags%ISAPT.Eq.0) then
    System%NBasis = Input%CalcParams%NBasis
    System%NCoreOrb = Input%SystemInput(1)%NCoreOrb
    System%NStronglyOccOrb = Input%SystemInput(1)%NStronglyOccOrb
+   System%NElecBEmb = Input%SystemInput(1)%NElecBEmb
    System%Omega  = Input%SystemInput(1)%Omega
    System%PerVirt= Input%SystemInput(1)%PerVirt
    System%EigFCI = Input%SystemInput(1)%EigFCI
