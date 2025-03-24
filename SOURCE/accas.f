@@ -7,6 +7,7 @@ c     use types
       use timing
       use read_external
       use abfofo
+      use polari
 C
 C     A ROUTINE FOR COMPUTING ELECTRONIC ENERGY USING ERPA TRANSITION
 C     DENSITY MATRIX ELEMENTS
@@ -42,6 +43,11 @@ c      NDimFull=NBasis*(NBasis-1)/2
 c      Call ACPINO(ENuc,TwoNO,Occ,XOne,
 c     $ NBasis,NInte1,NInte2,NDimFull,NGem,NoEig)
 c      Stop
+C
+C     SET INTERFACE TYPE (for Polariz)
+      INTIDX = 0
+      If(IMOLPRO==1) INTIDX = 1
+      If(IDALTON==1) INTIDX = 2
 C
 C     CONSTRUCT LOOK-UP TABLES
 C
@@ -141,19 +147,20 @@ C
       If(IFlRESPONSE.Eq.1) Then
 C
       Write(6,'(/,X,''Polarizability tensor calculation for Om ''
-     $ ,F8.4)') Om
+     $ ,F8.4)') FreqOm
 C
       If(Max_Cn.Eq.-1) Then
-      Call Polariz(FreqOm,UNOAO,XOne,URe,Occ,
+      Call Polariz(FreqOm,ECASSCF,UNOAO,XOne,URe,Occ,
      $   IGem,NAcCAS,NInAcCAS,NElecBEmb,NELE,
-     $   NBasis,NInte1,NGem,IndAux,
-     $   IndN,IndX,NDimX,ICholesky)
+     $   NBasis,NInte1,IndAux,
+     $   IndN,IndX,NDimX,ICholesky,IFunSR,IFunSRKer,INTIDX,
+     $   MemVal,MemType)
       Else
       Write(6,'(/,X,''Expand C(Om) maximally up to order '',I4)') Max_Cn
-      Call PolarizAl(FreqOm,UNOAO,XOne,URe,Occ,
+      Call PolarizAl(FreqOm,ECASSCF,UNOAO,XOne,URe,Occ,
      $   IGem,NAcCAS,NInAcCAS,NElecBEmb,NELE,
      $   NBasis,NInte1,NGem,IndAux,
-     $   IndN,IndX,NDimX,ICholesky,Max_Cn)
+     $   IndN,IndX,NDimX,ICholesky,Max_Cn,IntIdx)
       EndIf
 C
       Return

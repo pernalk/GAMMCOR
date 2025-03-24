@@ -31,6 +31,7 @@ OBJ = $(O)mainp.o $(O)initia.o $(O)dmscf.o $(O)misc.o $(O)optocc.o \
       $(O)iter_stats.o $(O)C_integrator.o $(O)iter_algorithm.o $(O)iter_algorithm_diis.o $(O)iter_algorithm_damping.o \
       $(O)lambda_calculator.o $(O)lambda_calculator_diag.o $(O)lambda_calculator_block.o $(O)lambda_calculator_projector.o \
       $(O)ac_iter.o $(O)ac_fofo.o \
+      $(O)polari.o \
        $(O)git_info.o $(O)build_info.o
 
 XOBJ = xcfun/fortran/xcfun_module.o xcfun/fortran/xcfun_autogen.o
@@ -48,7 +49,7 @@ $(PROG) : $(OBJ)
 $(O)mainp.o            : $(S)commons.inc $(O)memory.o $(O)types.o $(O)inputfill.o $(O)systemdef.o $(O)sapt_main.o $(O)git_info.o $(O)build_info.o  $(O)interface_pp.o $(O)acpp_types.o
 $(O)initia.o           : $(S)commons.inc $(O)memory.o $(O)priunit.o $(O)timing.o $(O)rdwrext.o $(O)sorter.o $(O)abmats.o $(O)types.o $(O)tran.o  $(O)tran_Chol.o $(O)CholeskyOTF.o $(O)gammint.o $(O)interface_pp.o $(O)acpp_types.o
 $(O)accas.o            : $(S)commons.inc $(O)priunit.o $(O)timing.o $(O)rdwrext.o $(O)sorter.o $(O)abmats.o $(O)abfofo.o $(O)ab0fofo.o \
-                         $(O)gridintern.o
+                         $(O)gridintern.o $(O)polari.o
 $(O)acfd.o             : $(S)commons.inc $(O)abmats.o $(O)abfofo.o  $(O)ab0fofo.o $(O)rdwrext.o
 $(O)ac_iter.o          : $(S)commons.inc $(O)abmats.o $(O)abfofo.o
 $(O)interpa.o          : $(S)commons.inc $(O)abmats.o $(O)abfofo.o $(O)ab0fofo.o
@@ -96,6 +97,7 @@ $(O)gridintern.o       : $(O)gammint.o
 
 $(O)CholeskyOTF.o      : $(O)priunit.o $(O)tran.o
 $(O)gammint.o          : $(O)CholeskyOTF.o
+$(O)polari.o           : $(O)priunit.o $(O)tran.o $(O)abfofo.o $(O)rdwrext.o
 
 $(O)sapt_utils.o       : $(O)types.o $(O)tran.o $(O)diis.o $(O)iter_stats.o $(O)abfofo.o
 $(O)sapt_interface.o   : $(O)types.o $(O)timing.o \

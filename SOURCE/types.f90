@@ -1,5 +1,5 @@
 module types
-! written by M. Hapka, M. Modrzejewski
+! written by M. Hapka, M. Modrzejewski,
 !            K. Pernal
 
 use print_units

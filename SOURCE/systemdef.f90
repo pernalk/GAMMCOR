@@ -286,6 +286,9 @@ end select
 
   case(JOB_TYPE_RESPONSE)
      Flags%IFlRESPONSE = 1
+     ! SET sr FUNCITONAL
+     Flags%IFunSR = Input%CalcParams%DFApp
+     Flags%IFunSRKer = Input%CalcParams%Kernel
 
   case(JOB_TYPE_AC0,JOB_TYPE_SRAC0)
     ! HERE WILL BE CHANGED TO:

@@ -449,6 +449,9 @@ C      Write(6,'(8a10)') ('**********',i=1,9)
 C
       If(ITwoEl.Eq.2)  Call delfile('TWOMO')
       Call delfile('AOTWOSORT')
+      If(IFunSR.Eq.1.Or.IFunSR.Eq.2.Or.IFunSR.Eq.4) Then
+      Call delfile('AOERFSORT')
+      EndIf
 C
       Call free_System(System)
       Call gclock(PossibleJobType(Flags%JobType),Tcpu,Twall)

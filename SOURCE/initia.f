@@ -4,6 +4,9 @@
 C
 C     READ HAO, 2-EL INTEGRALS IN NO, C_COEFFICIENTS, IGEM FROM A DALTON_GENERATED FILE
 C     READ UMOAO FROM SIRIUS.RST or DALTON.MOPUN
+C     MC-srDFT: XKin contains just 1el hamiltonian :
+C               XKin = T + Vne
+C     The missing VKS^sr + J^sr parts have to be added outside
 C
       use print_units
       use types
@@ -192,7 +195,6 @@ C       deallocate(WorkTr)
 C       deallocate(Work,Jsr,VsrKS)
 C      EndIf
 C
-C
 C     GET 2-EL NO INTEGRALS AND CICoef
 C
       If(ITwoEl.Eq.1) Then
@@ -323,8 +325,8 @@ C     OUT-OF-CORE INTEGRAL TRANSFORMATIONS
 C     PREPARE POINTERS: NOccup=num0+num1
       Call prepare_nums(Occ,Num0,Num1,NBasis)
 
-      If(ISwitch.Eq.1) Num0=NInAC
-      If(ISwitch.Eq.1) Num1=NAc
+c     If(ISwitch.Eq.1) Num0=NInAC
+c     If(ISwitch.Eq.1) Num1=NAc
       EndIf
 C
       If(ITwoEl.Eq.2) Then
