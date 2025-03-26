@@ -16,6 +16,17 @@ subroutine AB_CAS_FOFO(ABPLUS,ABMIN,ETot,URe,Occ,XOne, &
 !
 ! COMPUTE THE A+B AND A-B MATRICES FOR 2-RDM READ FROM A rdm2.dat FILE
 !
+! Input:
+!
+! AB1       = .true.  if A^(1) +/- B^(1)
+!              first-order Hessian matrices
+!
+!           = .false. if A^(alpha) +/- B^(alpha)
+!
+! IDBBSC = 2: hessians with effective SR integrals (only with Cholesky)
+!
+! Comments:
+!
 ! RDM2 IS IN NO REPRESENTATION. IT IS PARTIALLY SPIN-SUMMED
 ! THE FOLLOWING SYMMETRY IS ASSUMED
 ! RDM2(ij,kl) = RDM2(kl,ij)
@@ -24,7 +35,7 @@ subroutine AB_CAS_FOFO(ABPLUS,ABMIN,ETot,URe,Occ,XOne, &
 ! COULOMB INTEGRALS ARE READ FROM IntJFile IN (FF|OO) FORMAT
 ! EXCHANGE INTEGRALS ARE READ FROM IntKFile IN (FO|FO) FORMAT
 !
- implicit none
+implicit none
 
 integer,intent(in) :: NAct,INActive,NElecBEmb
 integer,intent(in) :: NDimX,NBasis,NDim,NInte1
