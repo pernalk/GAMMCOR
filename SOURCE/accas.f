@@ -18,7 +18,8 @@ C
       Character(*) :: BasisSet
       Include 'commons.inc'
 c
-      Parameter(Zero=0.D0,Half=0.5D0,One=1.D0,Two=2.D0)
+      Parameter(Half=0.5D0)
+c     Parameter(Zero=0.D0,Half=0.5D0,One=1.D0,Two=2.D0)
 C
       Dimension
      $ URe(NBasis,NBasis),UNOAO(NBasis,NBasis),Occ(NBasis),
@@ -160,7 +161,8 @@ C
       Call PolarizAl(FreqOm,ECASSCF,UNOAO,XOne,URe,Occ,
      $   IGem,NAcCAS,NInAcCAS,NElecBEmb,NELE,
      $   NBasis,NInte1,NGem,IndAux,
-     $   IndN,IndX,NDimX,ICholesky,Max_Cn,IntIdx)
+     $   IndN,IndX,NDimX,
+     $   BasisSet,ICholesky,Max_Cn,IntIdx)
       EndIf
 C
       Return
@@ -864,6 +866,7 @@ C
 C
       ElseIf (InternalGrid==1) then
 
+      UAux=transpose(UNOAO)
       Write(6,'(1x,a,i3)') 'IFunSR       =',IFunSR
 c     Write(6,'(1x,a,i3)') 'IUnits       =',IUnits
 c     Write(6,'(1x,a,i3)') 'InternalGrid =',InternalGrid
@@ -873,7 +876,7 @@ C
       If (doGGA) Then
          Write(LOUT,'(/1x,a)') 'INTERNAL GRID GGA'
          Call internal_gga_no_orbgrid(IGridType,BasisSet,
-     $                          IOrbOrder,transpose(UNOAO),
+     $                          IOrbOrder,UAux,
      $                          WGrid,PhiGGA,NGrid,NBasis,NBasis,IUnits)
          OrbGrid  => PhiGGA(:,:,1)
          OrbXGrid => PhiGGA(:,:,2)
@@ -882,7 +885,7 @@ C
       ElseIf(.not.doGGA) Then
          Write(LOUT,'(/1x,a)') 'INTERNAL GRID LDA'
          Call internal_lda_no_orbgrid(IGridType,BasisSet,
-     $                          IOrbOrder,transpose(UNOAO),
+     $                          IOrbOrder,UAux,
      $                          WGrid,PhiLDA,NGrid,NBasis,NBasis,IUnits)
          OrbGrid  => PhiLDA
          OrbXGrid => PhiLDA

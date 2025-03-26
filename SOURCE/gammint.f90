@@ -13,5 +13,6 @@ use THC_Gammcor, only : thc_gammcor_XZ, thc_gammcor_Xga, thc_gammcor_Rkab_2
 use BeckeGrid
 use GridFunctions
 use grid_definitions
+use Multipoles
 
 end module gammcor_integrals

@@ -4,6 +4,7 @@ use print_units
 use read_external
 use tran
 use abfofo
+use gammcor_integrals
 
 implicit none
 
@@ -66,6 +67,7 @@ character(*),Parameter :: griddalfile='dftgrid.dat'
 Om=FreqOm
 
 NOccup=NAct+INActive
+
 If (IntIdx == 1) then ! Molpro
    Call ComputeDipoleMom(UNOAO,Occ,'DIP','AOONEINT.mol',NOccup,NBasis)
    Call ReadDip(DipX,DipY,DipZ,UNOAO,'DIP',NBasis)
@@ -309,7 +311,7 @@ end subroutine EneMCsrDFT
 
 subroutine PolarizAl(FreqOm,ECASSCF,UNOAO,XOne,URe,Occ,&
    IGem,NAct,INActive,NElecBEmb,NELE,NBasis,NInte1,NGem,IndAux,&
-   IndN,IndX,NDimX,ICholesky,Max_Cn,IntIdx)
+   IndN,IndX,NDimX,BasisSet,ICholesky,Max_Cn,IntIdx)
 !
 ! Returns dynamic polarizability tensor for a given frequency FreqOm
 ! find C(omega) by expanding around Alpha=0 with a tolerance Eps or
@@ -321,23 +323,50 @@ integer,intent(in) :: NBasis,NInte1,NGem,NDimX,Max_cn
 integer,intent(in) :: NAct,INActive,NElecBEmb,NELE
 integer,intent(in) :: IndN(2,NDimX),IndX(NDimX),IndAux(NBasis),IGem(NBasis)
 integer,intent(in) :: IntIdx
-double precision,intent(in) :: FreqOm,UNOAO(NBasis,NBasis),URe(NBasis,NBasis),Occ(NBasis),XOne(NInte1)
-double precision :: DipX(NBasis,NBasis),DipY(NBasis,NBasis),DipZ(NBasis,NBasis),CICoef(NBasis)
+character(6) :: Source
+character(*) :: BasisSet
+double precision,intent(in) :: FreqOm
+double precision,intent(in) :: Occ(NBasis),XOne(NInte1)
+double precision,intent(in) :: UNOAO(NBasis,NBasis),URe(NBasis,NBasis)
+double precision :: ECASSCF
+
+integer :: i,j,ij,inf,ICholesky,NOccup
+double precision :: CICoef(NBasis)
+double precision :: DipX(NBasis,NBasis),DipY(NBasis,NBasis),DipZ(NBasis,NBasis)
 double precision :: DipCX(NDimX),DipCY(NDimX),DipCZ(NDimX)
 double precision :: ipiv(NDimX)
-double precision :: ECASSCF,AXX,AYX,AXY,AZX,AXZ,AYY,AZY,AYZ,AZZ,Om,ddot,Alpha
+double precision :: AXX,AYX,AXY,AZX,AXZ,AYY,AZY,AYZ,AZZ,Om,ddot,Alpha
+character(:),allocatable ::  XYZPath
 character(:),allocatable :: twojfile,twokfile
-integer :: I,J,IJ,inf,ICholesky,NOccup
+
 
 Om=FreqOm
 
-NOccup=NAct+INActive
-Call ComputeDipoleMom(UNOAO,Occ,'DIP','AOONEINT.mol',NOccup,NBasis)
+! set source
+If (IntIdx == 1) then
+ Source='MOLPRO'
+ElseIf (IntIdx == 2) then
+ Source='DALTON'
+ElseIf (IntIdx == 0) then
+   Stop "Unknown Interface in PolarizAl!"
+EndIf
 
-Call ReadDip(DipX,DipY,DipZ,UNOAO,'DIP',NBasis)
+XYZPath="./input.inp"
+!Call DipMomOTF_ao(DIpX,DIpY,DipZ,BasisSetPath,XYZPath,IUnits,'MOLPRO')
+!Call CompDipMomOTF(AOBasis,System,CAONO,Occ,DipX,DipY,DipZ,NBasis,NBasis)
+!stop "stop here..."
+
+NOccup=NAct+INActive
+if(trim(Source)=='MOLPRO') then
+   Call ComputeDipoleMom(UNOAO,Occ,'DIP','AOONEINT.mol',NOccup,NBasis)
+   Call ReadDip(DipX,DipY,DipZ,UNOAO,'DIP',NBasis)
+elseif(trim(Source)=='DALTON') then
+   Call ComputeDipoleMom(UNOAO,Occ,'AOPROPER','AOONEINT',NOccup,NBasis)
+   Call ReadDip(DipX,DipY,DipZ,UNOAO,'AOPROPER',NBasis)
+EndIf
 
 do i=1,NBasis
-CICoef(i) = sign(sqrt(Occ(i)),Occ(i)-0.5d0)
+   CICoef(i) = sign(sqrt(Occ(i)),Occ(i)-0.5d0)
 enddo
 
 Do IJ=1,NDimX

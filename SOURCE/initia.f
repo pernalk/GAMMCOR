@@ -46,6 +46,7 @@ C
       logical :: SortAngularMomenta
       character(:),allocatable :: XYZPath
       character(:),allocatable :: BasisSetPath
+      real(F64),allocatable    :: DipX(:,:),DipY(:,:),DipZ(:,:)
 C
 C     Cholesky Binary
       Type(TCholeskyVecs) :: CholeskyVecs
@@ -319,6 +320,21 @@ C
 c     If(ICASSCF.Eq.0)
       EndIf
 C
+C     print CASSCF dipole moments
+      If(ICASSCF.Eq.1) Then
+      If (ICholeskyOTF==1) Then
+c
+c     If(NSym.gt.1) UAux = CAONO
+      Call DipMomOTF_ao(DipX,DipY,DipZ,BasisSetPath,XYZPath,
+     $                  IUnits,'DALTON')
+      Call CompDipMomOTF(AOBasis,System,CAONO,Occ,
+     $                   DipX,DipY,DipZ,NBasis,NBasis)
+      Else
+      inquire(file='AOPROPER',EXIST=ex)
+      if (ex) Call ComputeDipoleMom(UMOAO,Occ,'AOPROPER','AOONEINT',
+     $                              NAc+NInAc,NBasis)
+      EndIf !ICholeskyOTF
+      EndIf !ICASSCF
 
 C     OUT-OF-CORE INTEGRAL TRANSFORMATIONS
       If(ITwoEl.Ne.1) Then
@@ -1840,6 +1856,7 @@ C     Cholesky and THC
       Type(TCholeskyVecsOTF) :: CholErfVecsOTF
       type(TSystem)  :: System
       type(TAOBasis) :: AOBasis
+      real(F64), allocatable :: dipx(:,:),dipy(:,:),dipz(:,:)
 C
 C     THC
       integer :: NCholeskyTHC, NGridTHC
@@ -2855,8 +2872,15 @@ c     If(IFunSR.Eq.5) Then
       EndIf
 C
 C     test dipole moments
+      If (ICholeskyOTF == 1) then
+      Call DipMomOTF_ao(DIpX,DIpY,DipZ,BasisSetPath,
+     $                  XYZPath,IUnits,'MOLPRO')
+      Call CompDipMomOTF(AOBasis,System,CAONO,Occ,
+     $                   DipX,DipY,DipZ,NBasis,NBasis)
+      Else
       Call ComputeDipoleMom(UAOMO,Occ,'DIP','AOONEINT.mol',
      $                      NOccup,NBasis)
+      EndIf
 C
 C     READ ACTIVE 2-RDM AND TRANSFORM TO NO'S
 C

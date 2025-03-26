@@ -623,7 +623,7 @@ subroutine read_block_calculation(CalcParams, line)
       case ("JOBTITLE")
             CalcParams%JobTitle = val
 
-      case ("BASIS")
+      case ("BASIS","BASISSET")
             CalcParams%BasisSet = val
 
       case ("BASISPATH")
