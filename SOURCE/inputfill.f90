@@ -292,7 +292,7 @@ subroutine read_block_cholesky(CholeskyParams, line)
               stop "Unknown keyword for Cholesky!"
            endif
 
-      case ("CHOL_ACCU","CHOL_ACCURACY","CHOLESKY_ACCU","CHOLESKY_ACCURACY")
+      case ("ACCURACY","CHOL_ACCU","CHOL_ACCURACY","CHOLESKY_ACCU","CHOLESKY_ACCURACY")
            if (uppercase(val) == "DEFAULT" .or. &
                uppercase(val) == "D" ) then
               CholeskyParams%CholeskyAccu = CHOL_ACCU_DEFAULT
@@ -487,8 +487,8 @@ subroutine read_block_calculation(CalcParams, line)
            endif
 
       case ("CBS","DBBSC") ! CBS correction
-           ! = 1 , E. Giner formulation
-           ! = 2 , K. Pernal formulation
+           ! = 1 , DBBSC correctoin (E. Giner, et al, 2018)
+           ! = 2 , CBS[H] (K. Pernal et al, 2025)
            read(val, *) CalcParams%DBBSC
 
       case ("DMRG-IN-DFT","EMBEDDING") ! DMRG-in-DFT embedding

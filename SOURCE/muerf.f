@@ -32,8 +32,12 @@ C
       double precision :: XMuMat(NBasis,NBasis)
       double precision :: ABMIN(NDimX,NDimX),ABPLUS(NDimX,NDimX)
       double precision, allocatable :: CholVecs(:,:),Work(:,:)
+      character(:),allocatable :: rdmfile
 C
       double precision :: Tcpu,Twall
+
+c     set rdmfile
+      rdmfile='rdm2.dat'
 
       If (ITwoEl.eq.1) then
          write(6,'(1x,a)') "Set PostCAS=.true. and DFunc for DBBSCH!"
@@ -41,8 +45,8 @@ C
 
       ElseIf (IDBBSC.eq.1.and.ITwoEl.eq.3.and.ICholesky.ne.0) Then
 C
-      Call LOC_MU_CBS_CHOL(XMuMat,ECorrMD,AvMU,URe,UNOAO,Occ,
-     $                     BasisSet,NBasis)
+      Call LOC_MU_CBS_CHOL(XMuMat,ECorrMD,AvMU,UNOAO,Occ,
+     $                     RdmFile,BasisSet,NBasis)
 
       Call AC0CAS_FOFO(ECorr,ECASSCF,Occ,URe,XOne,ABPLUS,ABMIN,
      $ IndN,IndX,IGem,NAcCAS,NInAcCAS,NElecBEmb,
@@ -60,8 +64,8 @@ C
       ElseIf (IDBBSC.eq.2.and.ITwoEl.eq.3.and.ICholesky.ne.0) Then
 C
 C     Compute local mu(r): XMuMat(p,q) = <p|mu(r)|q>
-      Call LOC_MU_CBS_CHOL(XMuMat,CorrMD,AvMU,URe,UNOAO,Occ,
-     $                     BasisSet,NBasis)
+      Call LOC_MU_CBS_CHOL(XMuMat,CorrMD,AvMU,UNOAO,Occ,
+     $                     rdmfile,BasisSet,NBasis)
 c     Print*, 'LOC_MU_CBS_CHOL: XMuMat = ',norm2(XMuMat)
 C
 C     ... test : recover AC0!
@@ -140,8 +144,8 @@ c      Print*, 'ECorr = ', ECorr
 C *End Subroutine DBBSCH
 
 *Deck LOC_MU_CBS_CHOL
-      Subroutine LOC_MU_CBS_CHOL(XMuMat,CorrMD,AvMU,URe,
-     $                           UNOAO,Occ,BasisSet,NBasis)
+      Subroutine LOC_MU_CBS_CHOL(XMuMat,CorrMD,AvMU,
+     $                           UNOAO,Occ,Rdm2File,BasisSet,NBasis)
 C
       use read_external
       use grid_internal
@@ -162,11 +166,11 @@ C    $ Four=4.D0)
 C
       Include 'commons.inc'
 C
-      Dimension URe(NBasis,NBasis),UNOAO(NBasis,NBasis),Occ(NBasis),
-     $ OccS(NBasis)
+      Dimension UNOAO(NBasis,NBasis),Occ(NBasis),OccS(NBasis)
       Real*8 :: XMuMat(NBasis,NBasis)
-      Character(*) :: BasisSet
+      Character(*) :: Rdm2File,BasisSet
 C
+      Real*8 :: URe(NBasis,NBasis)
       Real*8 :: UNOSAO(NBasis,NBasis)
       Real*8, Allocatable :: FPsiB(:), OnTop(:), XMuLoc(:)
       Real*8,allocatable,target :: PhiLDA(:,:)
@@ -193,6 +197,12 @@ C
       Character(*),Parameter :: griddalfile='dftgrid.dat'
 C
       call gclock('START',Tcpu,Twall)
+C
+C     set URe (unitary matrix)
+      URe=Zero
+      Do I=1,NBasis
+      URe(I,I)=One
+      EndDo
 C
       If(IFlCore.Eq.0.And.IDBBSC.Eq.1) Then
          ICore = NCoreOrb ! from input.inp
@@ -256,6 +266,7 @@ C        Call dalton_grid_coord(NGrid,RR,griddalfile)
 c
       ElseIf (InternalGrid==1) then
 c        Write(6,'(1x,a,i3)') 'IFunSR       =',IFunSR
+c        Write(6,'(1x,a,i3)') 'IUnits       =', IUnits
 c        Write(6,'(1x,a,i3)') 'IGridType    =', IGridType
 c        Write(6,'(1x,a,i3)') 'ORB_ORDERING =', IOrbOrder
 C
@@ -273,14 +284,14 @@ C
 C
       EndIf ! InternalGrid
 C
-c      print*, ''
-c      print*, 'NGrid    = ', NGrid
-c      print*, 'WGrid    = ', norm2(Wgrid)
-c      print*, 'OrbGrid  = ', norm2(OrbGrid)
-c      print*, 'OrbXGrid = ', norm2(OrbXGrid)
-c      print*, 'OrbYGrid = ', norm2(OrbYGrid)
-c      print*, 'OrbZGrid = ', norm2(OrbZGrid)
-c      print*, ''
+C       print*, ''
+C       print*, 'NGrid    = ', NGrid
+C       print*, 'WGrid    = ', norm2(Wgrid)
+C       print*, 'OrbGrid  = ', norm2(OrbGrid)
+C       print*, 'OrbXGrid = ', norm2(OrbXGrid)
+C       print*, 'OrbYGrid = ', norm2(OrbYGrid)
+C       print*, 'OrbZGrid = ', norm2(OrbZGrid)
+C       print*, ''
 C
 C
 C     for DMRG-in-DFT compute XC energies with translated symmetries
@@ -403,6 +414,8 @@ C
       NAct=NAcCAS
       INActive=NInAcCAS
       NOccup=INActive+NAct
+c     print*, 'NAct     =',NAcCAS
+c     print*, 'INActive =',NInAcCAS
       Ind2(1:NBasis)=0
       Do I=1,NAct
       Ind2(INActive+I)=I
@@ -428,7 +441,7 @@ C
       Allocate (RDM2Act(NRDM2Act))
       RDM2Act(1:NRDM2Act)=Zero
 C
-      Open(10,File="rdm2.dat",Status='Old')
+      Open(10,File=trim(Rdm2File),Status='Old')
 C
    10 Read(10,*,End=40)I,J,K,L,X
 C     X IS DEFINED AS: < E(IJ)E(KL) > - DELTA(J,K) < E(IL) > = 2 GAM2(JLIK)
@@ -722,6 +735,8 @@ C
 C
       Call PBECor(RhoGrid,Sigma,Zk,NGrid)
 C
+c     Print*, 'RhoGrid =',norm2(RhoGrid)
+c     Print*, 'Zk =',norm2(Zk)
       SPi=SQRT(3.141592653589793)
       Const=Three/Two/SPi/(One-SQRT(Two))
 C

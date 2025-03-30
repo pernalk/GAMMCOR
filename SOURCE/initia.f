@@ -42,15 +42,15 @@ C     Cholesky OnTheFly
       Type(TCholeskyVecsOTF) :: CholErfVecsOTF
       type(TSystem)  :: System
       type(TAOBasis) :: AOBasis
+C     Cholesky Binary
+      Type(TCholeskyVecs) :: CholeskyVecs
 C
+      Real(F64),Allocatable :: MatFF(:,:)
+      Real(F64),Allocatable :: FFErf(:,:)
+      Real(F64),Allocatable :: DipX(:,:),DipY(:,:),DipZ(:,:)
       logical :: SortAngularMomenta
       character(:),allocatable :: XYZPath
       character(:),allocatable :: BasisSetPath
-      real(F64),allocatable    :: DipX(:,:),DipY(:,:),DipZ(:,:)
-C
-C     Cholesky Binary
-      Type(TCholeskyVecs) :: CholeskyVecs
-      Real*8, Allocatable :: MatFF(:,:)
 C
       Include 'commons.inc'
 C
@@ -241,8 +241,20 @@ C
       Call CholeskyOTF_H0_test0(AOBasis,System,'DALTON',
      &                         CAONO,XKin,NINte1,NBasis)
       EndIf
-
-      EndIf ! ICholesky
+C
+      If (IDBBSC.Eq.2) Then
+      Write(lout,'(/1x,3a6)') ('*******',i=1,3)
+      Write(lout,'(1x,a)') 'Cholesky LR On-The-Fly'
+      Write(lout,'(2x,a,f14.8)') 'MU = ',Alpha
+      Write(lout,'(1x,3a6)') ('*******',i=1,3)
+      Call CholeskyOTF_ao_vecs(CholErfVecsOTF,AOBasis,System,IUnits,
+     $            XYZPath,BasisSetPath,SortAngularMomenta,ICholeskyAccu,
+     $            Alpha)
+      NCholErf = CholErfVecsOTF%Chol2Data%NVecs
+C
+      EndIf ! IDBBSC
+C
+      EndIf ! ICholesky OTF, BIN
       EndIf ! ITwoEl
 
 C     JOBTYPE=SRAC0 (IFlCorrdMD=1) : save Cholesky vecs
@@ -420,6 +432,13 @@ C
      $                   MemMOTransfMB, CholeskyVecsOTF,
      $                   AOBasis, ORBITAL_ORDERING_DALTON)
 c     Call gclock('chol_gammcor_Rkab',Tcpu,Twall)
+
+      If(IDBBSC==2) Then
+      allocate(FFErf(NCholErf,NBasis**2))
+      Call Chol_gammcor_Rkab(FFErf,UAux,1,NBasis,UAux,1,NBasis,
+     $                   MemMOTransfMB, CholErfVecsOTF,
+     $                   AOBasis, ORBITAL_ORDERING_DALTON)
+      EndIf
 C
       ElseIf (ICholeskyTHC==1) Then
       Stop "Implement ICholeskyTHC in ReadDAL!"
@@ -431,6 +450,14 @@ C
       Write(iunit) MatFF
       Close(iunit)
       Deallocate(MatFF)
+C
+      If (IDBBSC.Eq.2) Then
+C     dump LR integrals
+      open(newunit=iunt,file='cholvErf',form='unformatted')
+      write(iunt) NCholErf
+      write(iunt) FFErf
+      close(iunt)
+      EndIf ! IDBBSC
 C
       EndIf ! ICholesky
       EndIf ! ITwoEl
@@ -921,7 +948,7 @@ C
       EndIf ! IDBBSC
       end block
 
-      EndIf ! ICholesky, OTF, BIN
+      EndIf ! ICholesky OTF, BIN
 C
       EndIf ! ITwoEl ?
 C
@@ -4286,6 +4313,21 @@ C      write(*,*) CICoef(1:NBasis)
 C      write(*,*) IGem(1:NBasis)
 
       End
+
+*Deck FlagsToCommons
+      Subroutine FlagsToCommons(System,Flags)
+      use types
+      Implicit Real*8 (A-H,O-Z)
+      type(SystemBlock) :: System
+      type(FlagsData)   :: Flags
+C
+      Include 'commons.inc'
+
+      NAcCAS   = System%NAct
+      NInAcCAS = System%INAct
+
+      End
+C End Subroutine FlagsToCommons
 
 *Deck LoadSaptTwoEl
       Subroutine LoadSaptTwoEl(Mon,TwoNO,NBasis,NInte2)
