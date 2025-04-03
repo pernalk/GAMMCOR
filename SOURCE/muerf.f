@@ -72,43 +72,9 @@ C     ... test : recover AC0!
 c      XMuMat=0d0
 c      print*, 'Use FR only !',norm2(XMuMat)
 
-C     transform full-range (FR) cholesky vecs
-C     R(k,pq).(q|mu(r)|t) = R(k,pt)
-      open(newunit=iunit,file='cholvecs',form='unformatted')
-      read(iunit) NCholesky
-      Allocate(CholVecs(NCholesky,NBasis**2),Work(NCholesky,NBasis**2))
-      read(iunit) CholVecs
-      close(iunit)
-
-C     SET TIMING FOR 3-ind transformations of Cholesky vecs
-      Call gclock('START',Tcpu,Twall)
-      Call dgemm('N','N',NCholesky*NBasis,NBasis,NBasis,1d0,
-     $           CholVecs,NCholesky*NBasis,XMuMat,NBasis,
-     $           0d0,Work,NCholesky*NBasis)
-      Call gclock('3-idx tran FR(k,pq)',Tcpu,Twall)
-C     save to disk
-      open(newunit=iunit,file='chol1vFR',form='unformatted')
-      write(iunit) NCholesky
-      write(iunit) Work
-      close(iunit)
-      deallocate(CholVecs,Work)
-C
-C     transform long-range (LR) cholesky vecs
-      open(newunit=iunit,file='cholvErf',form='unformatted')
-      read(iunit) NCholErf
-      Allocate(CholVecs(NCholErf,NBasis**2),Work(NCholErf,NBasis**2))
-      read(iunit) CholVecs
-      close(iunit)
-      Call dgemm('N','N',NCholErf*NBasis,NBasis,NBasis,1d0,
-     $           CholVecs,NCholErf*NBasis,XMuMat,NBasis,
-     $           0d0,Work,NCholErf*NBasis)
-      Call gclock('3-idx tran LR(k,pq)',Tcpu,Twall)
-C     save to disk
-      open(newunit=iunit,file='chol1vLR',form='unformatted')
-      write(iunit) NCholErf
-      write(iunit) Work
-      close(iunit)
-      deallocate(CholVecs,Work)
+C     transform full-range (FR) and long-range (LR) cholesky vecs
+      Call TRAN_MU_CHOL(XMuMat,'cholvecs','chol1vFR',NBasis)
+      Call TRAN_MU_CHOL(XMuMat,'cholvErf','chol1vLR',NBasis)
 
       Call AC0CAS_FOFO(ECorr,ECASSCF,Occ,URe,XOne,ABPLUS,ABMIN,
      $ IndN,IndX,IGem,NAcCAS,NInAcCAS,NElecBEmb,
@@ -735,8 +701,8 @@ C
 C
       Call PBECor(RhoGrid,Sigma,Zk,NGrid)
 C
-c     Print*, 'RhoGrid =',norm2(RhoGrid)
-c     Print*, 'Zk =',norm2(Zk)
+      Print*, 'RhoGrid =',norm2(RhoGrid)
+      Print*, 'Zk =',norm2(Zk)
       SPi=SQRT(3.141592653589793)
       Const=Three/Two/SPi/(One-SQRT(Two))
 C
@@ -1053,6 +1019,46 @@ C
       Return
       End
 C*End Subroutine LOC_MU_CBS
+
+*Deck TRAN_MU_CHOL
+      Subroutine TRAN_MU_CHOL(XMuMat,FileIN,FileOUT,NBasis)
+C
+C     Transform 1 index in Cholesky vectors
+c     with XMuMat : R(k,pq).(q|mu(r)|t) = R(k,pt)
+C     and save to disk (FileOUT)
+C
+C     Comments:
+C     -- assumed FF dimensions, i.e. (NCholeksy,NBasisi**2)
+c
+      Integer,intent(in) :: NBasis
+      Real*8, intent(in) :: XMuMat(NBasis,NBasis)
+      Character(*) :: FileIN,FileOUT
+C
+      Integer :: NCholesky
+      Integer :: iunit
+      Real*8,Dimension(:,:),Allocatable :: CholVecs,Work
+
+      open(newunit=iunit,file=trim(FileIN),form='unformatted')
+      read(iunit) NCholesky
+      Allocate(CholVecs(NCholesky,NBasis**2),Work(NCholesky,NBasis**2))
+      read(iunit) CholVecs
+      close(iunit)
+
+c     Call gclock('START',Tcpu,Twall)
+      Call dgemm('N','N', NCholesky*NBasis,NBasis,NBasis,1d0,
+     $           CholVecs,NCholesky*NBasis,XMuMat,NBasis,
+     $           0d0,Work,NCholesky*NBasis)
+
+C     save to disk
+      open(newunit=iunit,file=trim(FileOUT),form='unformatted')
+      write(iunit) NCholesky
+      write(iunit) Work
+      close(iunit)
+
+      deallocate(CholVecs,Work)
+c
+      End
+* End Subroutine TRAN_MU_CHOL
 
 *Deck get_RDM2Occ
       Subroutine get_RDM2Occ(RDM2val,Occ,INActive,NAct,NOccup,NBasis)

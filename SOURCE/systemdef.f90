@@ -391,6 +391,7 @@ end select
      Flags%ISAPT  = 1
      Flags%IFlAC  = 0
      Flags%IFlSnd = 0
+     Flags%IDBBSC = Input%CalcParams%DBBSC
 
      ! Response for SAPT
      select case(Input%CalcParams%Response)

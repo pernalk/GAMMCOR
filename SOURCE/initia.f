@@ -235,10 +235,13 @@ C
       Call CholeskyOTF_ao_vecs(CholeskyVecsOTF,AOBasis,System,IUnits,
      $            XYZPath,BasisSetPath,SortAngularMomenta,ICholeskyAccu)
       NCholesky = CholeskyVecsOTF%Chol2Data%NVecs
+      if(Monomer.eq.1) call sys_Init(System,SYS_MONO_A)
+      if(Monomer.eq.2) call sys_Init(System,SYS_MONO_B)
+      if(Monomer.eq.3) call sys_Init(System,SYS_TOTAL)
       Call sys_NuclearRepulsion(ENucOTF,System)
 
       If(IH0Test==1) then
-      Call CholeskyOTF_H0_test0(AOBasis,System,'DALTON',
+      Call CholeskyOTF_H0_test0(AOBasis,System,Monomer,'DALTON',
      &                         CAONO,XKin,NINte1,NBasis)
       EndIf
 C
@@ -453,10 +456,10 @@ C
 C
       If (IDBBSC.Eq.2) Then
 C     dump LR integrals
-      open(newunit=iunt,file='cholvErf',form='unformatted')
-      write(iunt) NCholErf
-      write(iunt) FFErf
-      close(iunt)
+      open(newunit=iunit,file='cholvErf',form='unformatted')
+      write(iunit) NCholErf
+      write(iunit) FFErf
+      close(iunit)
       EndIf ! IDBBSC
 C
       EndIf ! ICholesky
@@ -931,6 +934,9 @@ C
 
       Call CholeskyOTF_ao_vecs(CholeskyVecsOTF,AOBasis,System,IUnits,
      $            XYZPath,BasisSetPath,SortAngularMomenta,ICholeskyAccu)
+      if(Monomer.eq.1) call sys_Init(System,SYS_MONO_A)
+      if(Monomer.eq.2) call sys_Init(System,SYS_MONO_B)
+      if(Monomer.eq.3) call sys_Init(System,SYS_TOTAL)
       Call sys_NuclearRepulsion(ENuc,System)
 
       If (IDBBSC.Eq.2) Then

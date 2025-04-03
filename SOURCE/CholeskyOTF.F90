@@ -476,7 +476,7 @@ deallocate(MatFFMO,ints)
 
 end subroutine CholeskyOTF_Fock_MO_v2
 
-subroutine CholeskyOTF_H0_test0(AOBasis,System,Source,Cmat,H0in,NINte1,NBasis)
+subroutine CholeskyOTF_H0_test0(AOBasis,System,Monomer,Source,Cmat,H0in,NINte1,NBasis)
 
 implicit none
 
@@ -484,6 +484,7 @@ type(TAOBasis), intent(in)   :: AOBasis
 type(TSystem), intent(inout) :: System
 
 integer,intent(in)      :: NInte1,NBasis
+integer,intent(in)      :: Monomer
 character(6),intent(in) :: Source
 
 double precision,intent(in) :: H0in(NInte1)
@@ -501,6 +502,16 @@ elseif(trim(Source)=='ORCA  ') then
 elseif(trim(Source)=='DALTON') then
    ORBITAL_ORDERING = ORBITAL_ORDERING_DALTON
 endif
+
+! Read whether to put ghost functions
+if(Monomer==1) then
+   call sys_Init(System,SYS_MONO_A)
+elseif(Monomer==2) then
+   call sys_Init(System,SYS_MONO_B)
+else
+   call sys_Init(System,SYS_TOTAL)
+endif
+
 
 if(trim(Source)=='DALTON') then
   call triang_to_sq2(H0in,H0_mo,NBasis)

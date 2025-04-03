@@ -545,9 +545,11 @@ integer :: i
       !call e2disp_Cmat_Chol(Flags,SAPT%monA,SAPT%monB,SAPT)
       !call e2disp_Cmat_Chol_diag(Flags,SAPT%monA,SAPT%monB,SAPT)
       call e2disp_Cmat_Chol_block(Flags,SAPT%monA,SAPT%monB,SAPT)
+      call e2disp_Chol_cpld_batch(Flags,SAPT%monA,SAPT%monB,SAPT)
       !call e2disp_Cmat_Chol_proj(Flags,SAPT%monA,SAPT%monB,SAPT)
     else if(SAPT%CAlpha) then
       call e2disp_CAlphaTilde_block(Flags,SAPT%monA,SAPT%monB,SAPT)
+      call e2disp_Chol_cpld_batch(Flags,SAPT%monA,SAPT%monB,SAPT)
       !call e2disp_CAlphaTilde_full(Flags,SAPT%monA,SAPT%monB,SAPT)
     endif
     call e2exdisp(Flags,SAPT%monA,SAPT%monB,SAPT)
@@ -1521,7 +1523,8 @@ end subroutine reduce_virt
 
 subroutine sapt_mon_ints(Mon,Flags,NBas,AOBasis,CholeskyVecsOTF)
 !
-! Cholesky: generate FFXX(NCholesky,NBas**2)
+! Cholesky    : generate FFXX(NCholesky,NBas**2)
+! CBS[H]      : generate FFErfXX(NCholErf,NBas**2)
 !
 implicit none
 
@@ -1529,39 +1532,45 @@ type(SystemBlock) :: Mon
 type(FlagsData)   :: Flags
 type(TAOBasis)    :: AOBasis
 type(TCholeskyVecsOTF) :: CholeskyVecsOTF
+type(TCholeskyVecsOTF) :: CholErfVecsOTF
 
 integer :: NBas
+integer :: NInte1
+integer :: iunit
 integer :: i,j,ij,ione
-integer :: NSq,NInte1,NInte2
 
 double precision             :: URe(NBas,NBas),MO(NBas*NBas)
+double precision             :: UNOAO(NBas,NBas)
+double precision             :: CorrMD
 double precision,allocatable :: TwoMO(:)
 double precision,allocatable :: work1(:),work2(:)
 character(8)                 :: label
 character(:),allocatable     :: onefile,twofile
 character(:),allocatable     :: twojfile,twokfile
+character(:),allocatable     :: rdmfile
+character(:),allocatable     :: BasisSet
 !test
 double precision :: Tcpu,Twall
 
 call gclock('START',Tcpu,Twall)
 
 ! set dimensions
- NSq = NBas**2
- NInte1 = NBas*(NBas+1)/2
- NInte2 = NInte1*(NInte1+1)/2
+NInte1 = NBas*(NBas+1)/2
 
 ! set file names
  if(Mon%Monomer==1) then
     twofile  = 'TWOMOAA'
     twojfile = 'FFOOAA'
     twokfile = 'FOFOAA'
+    rdmfile  = 'rdm2_A.dat'
  elseif(Mon%Monomer==2) then
     twofile  = 'TWOMOBB'
     twojfile = 'FFOOBB'
     twokfile = 'FOFOBB'
+    rdmfile  = 'rdm2_B.dat'
  endif
 
- allocate(work1(NSq),work2(NSq))
+ allocate(work1(NBas*NBas),work2(NBas*NBas))
 
  URe = 0d0
  do i=1,NBas
@@ -1618,6 +1627,54 @@ call gclock('START',Tcpu,Twall)
       !call chol_ints_gen(NBas,Mon%num0+Mon%num1,Mon%FO,&
       !               NBas,Mon%num0+Mon%num1,Mon%FO,&
       !               Mon%NChol,twokfile)
+
+      ! this is needed in JK_Chol_loop
+
+      if(Mon%Monomer==2) then
+         open(newunit=iunit,file='cholvecs',status='old')
+         close(iunit,status='delete')
+      endif
+      open(newunit=iunit,file='cholvecs',form='unformatted')
+      write(iunit) Mon%NChol
+      write(iunit) Mon%FF
+      close(iunit)
+      ! for JK(_SR)_Chol_loop
+      deallocate(Mon%FF)
+
+      if (Flags%IDBBSC == 2) then
+
+         ! compute LR Cholesky vectors
+         ! transform to FFErf, save to cholvErf
+         call sapt_erfint_OTF(Flags,Mon,NBas,AOBasis,CholErfVecsOTF)
+         call chol_FFERF_AO2NO_OTF(Flags,Mon,CholErfVecsOTF,AOBasis,NBas)
+
+         if(Mon%Monomer==2) then
+            open(newunit=iunit,file='cholvErf',status='old')
+            close(iunit,status='delete')
+         endif
+         open(newunit=iunit,file='cholvErf',form='unformatted')
+         write(iunit) Mon%NCholErf
+         write(iunit) Mon%FFErf
+         close(iunit)
+
+         ! for JK(_SR)_Chol_loop
+         deallocate(Mon%FFErf)
+
+         ! compute local mu(r): XMuMat(p,q) = <p|mu(r)|q>
+         ! transform    Cholesky vecs (save to chol1vFR)
+         ! transform LR Cholesky vecs (save to chol1vLR)
+         !
+         allocate(Mon%XMuMat(NBas,NBas))
+         BasisSet = Flags%BasisSetPath // Flags%BasisSet
+         UNOAO = transpose(Mon%CAONO)
+         call FlagsToCommons(Mon,Flags)
+         call LOC_MU_CBS_CHOL(Mon%XMuMat,CorrMD,Mon%AvMU, &
+                              UNOAO,Mon%Occ,rdmfile,BasisSet,NBas)
+         print*, 'XMuMat Monomer', norm2(Mon%XMuMat),mon%Monomer
+         call TRAN_MU_CHOL(Mon%XMuMat,'cholvecs','chol1vFR',NBas)
+         call TRAN_MU_CHOL(Mon%XMuMat,'cholvErf','chol1vLR',NBas)
+      endif
+
    else
       ! transform J and K
        call tran4_gen(NBas,&

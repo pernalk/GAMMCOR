@@ -1572,6 +1572,7 @@ if(ex) then
     open(newunit=iunit,file=sirifc,status='OLD',access='SEQUENTIAL',form='UNFORMATTED')
     call readlabel(iunit,'TRCCINT ')
     read(iunit) NSym,NOrb,NBasist,NCMOt,NOcc(1:NSym),NSymOrb(1:NSym)
+    close(iunit)
 else
   write(lout,*) 'Error! No ',sirifc, ' file in read_orbinf_dalton!'
   stop

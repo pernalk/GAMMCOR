@@ -700,7 +700,8 @@ integer,intent(in) :: IGem(NBasis),AuxInd(3,3),pos(NBasis,NBasis)
 double precision,intent(inout) :: ABPLUS(NDimX,NDimX),ABMIN(NDimX,NDimX)
 double precision,intent(inout) :: HNO(NBasis,NBasis),AuxI(NBasis,NBasis),AuxIO(NBasis,NBasis),WMAT(NBasis,NBasis)
 double precision,intent(in) :: ACAlpha
-double precision,intent(in) :: AuxCoeff(3,3,3,3),Occ(NBasis),RDM2val(NOccup,NOccup,NOccup,NOccup)
+double precision,intent(in) :: Occ(NBasis),RDM2val(NOccup,NOccup,NOccup,NOccup)
+double precision,intent(in) :: AuxCoeff(3,3,3,3)
 character(*) :: IntJFile,IntKFile
 double precision,intent(inout),optional :: ETot
 
@@ -712,12 +713,14 @@ integer :: mloop
 integer :: iBatch
 integer :: BatchSize,MaxBatchSize = 120
 integer :: NCholesky,NCholErf
+double precision :: AuxSRCoeff(3,3,3,3)
 double precision :: val
 double precision :: AuxVal,HNOCoef
 double precision,allocatable :: FF(:,:),FFErf(:,:)
 double precision,allocatable :: FFTr(:,:),FFErfTr(:,:)
 double precision,allocatable :: TmpTr(:,:),TmpErfTr(:,:)
 double precision,allocatable :: ints(:,:),intsFR(:,:)
+double precision,allocatable :: intsSR(:,:)
 double precision,allocatable :: work1(:,:),work2(:,:)
 double precision,allocatable :: work3(:,:),work4(:,:)
 double precision,allocatable :: work6(:,:),work8(:,:)
@@ -736,6 +739,26 @@ elseif(AB==0) then
 elseif(AB==2) then
    HNOCoef = 1
 endif
+
+! SR integrals enter hessian as :
+! [alpha + \delta (1-alpha) ]*g^FR + alpha*(1-\delta)*g^SR
+! c.f. Eq. (27) in 10.1021/acs.jctc.8b00213
+! In practice, we achieve this by zeroing g^SR for orbitals
+! from the same group (only active contribute)
+do l=1,3
+   do k=1,3
+      do j=1,3
+         do i=1,3
+            if((i==j).and.(j==k).and.(k==l)) then
+               AuxSRCoeff(i,j,k,l) = 0
+            else
+               AuxSRCoeff(i,j,k,l) = 1
+            endif
+         enddo
+      enddo
+   enddo
+enddo
+
 
 ! read regular cholesky (k|r|FF) vecs
 open(newunit=iunit,file='cholvecs',form='unformatted')
@@ -786,14 +809,15 @@ nloop = (dimFO - 1) / MaxBatchSize + 1
 
 allocate(work1(dimFO,MaxBatchSize),work2(dimFO,MaxBatchSize))
 allocate(ints(NBasis,NBasis))
+allocate(intsSR(NBasis,NBasis))
 allocate(intsFR(NBasis,NBasis))
 
 off = 0
 k   = 0
 l   = 1
 
-  kk = 0
-  ll = 1
+kk = 0
+ll = 1
 ! exchange loop (FO|FO)
 !print*,'exchange loop (FO|FO)'
 do iloop=1,nloop
@@ -834,8 +858,8 @@ do iloop=1,nloop
    ! regular
    call dgemm('T','N',dimFO,BatchSize,NCholesky,1d0,FF,NCholesky, &
               FF(:,off+1:off+BatchSize),NCholesky,0d0,work2,dimFO)
-   work1 = work1 + work2
-   ! work1 = regular + short-range* 
+   !work1 = work1 + work2
+   ! work1 = regular + short-range*
 
    ! loop over integrals
    do iBatch=1,BatchSize
@@ -846,12 +870,17 @@ do iloop=1,nloop
          l = l + 1
       endif
 
+      ! work1 = short-range* 
+      ! zero SR integrals from the same group Igem(ip)=Igem(iq)=... 
+      ! and THEN add to FR!
       do j=1,NOccup
          do i=1,NBasis
-            ints(i,j)   = work1((j-1)*NBasis+i,iBatch)
+            intsSR(i,j) = AuxSRCoeff(IGem(i),IGem(j),IGem(k),IGem(l))*work1((j-1)*NBasis+i,iBatch)
+                        !* AuxSRCoeff(IGem(i),IGem(j),IGem(l),IGem(k))
             intsFR(i,j) = work2((j-1)*NBasis+i,iBatch)
          enddo
       enddo
+      ints = intsSR + intsFR
 
       if(l>NOccup) cycle
       ints(:,NOccup+1:NBasis) = 0
@@ -1176,9 +1205,11 @@ allocate(work8(NCholErf,MaxBatchSize))
 allocate(work10(NCholesky,MaxBatchSize))
 allocate(work12(NCholErf,MaxBatchSize))
 
-off = 0
-k   = 0
-l   = 1
+off    = 0
+k      = 0
+l      = 1
+ints   = 0
+intsSR = 0
 ! Coulomb loop (FF|OO)
 !print*, 'Coulomb loop (FF|OO)...'
 do iloop=1,nloop
@@ -1239,8 +1270,8 @@ do iloop=1,nloop
    ! regular
    call dgemm('T','N',NBasis**2,BatchSize,NCholesky,1d0,FF,NCholesky, &
               work2,NCholesky,0d0,work3,NBasis**2)
-   work1 = work1 + work3
-   !! work1 = regular + short-range* 
+   ! work1 = work1 + work3
+   ! work1 = regular + short-range* 
 
    ! loop over integrals
    do iBatch=1,BatchSize
@@ -1253,10 +1284,11 @@ do iloop=1,nloop
 
       do j=1,NBasis
          do i=1,NBasis
-            ints(i,j) = work1((j-1)*NBasis+i,iBatch)
+            intsSR(i,j) = AuxSRCoeff(IGem(i),IGem(j),IGem(k),IGem(l))*work1((j-1)*NBasis+i,iBatch)
             intsFR(i,j) = work3((j-1)*NBasis+i,iBatch)
          enddo
       enddo
+      ints = intsSR + intsFR
 
       if(k>NOccup.or.l>NOccup) cycle
       kl = (l - 1)*NOccup + k
@@ -1265,7 +1297,8 @@ do iloop=1,nloop
 
       ! COMPUTE THE ENERGY FOR CHECKING
       if(present(ETot)) then
-      if((k<=NOccup).and.(l<=NOccup)) ETot = ETot + sum(RDM2val(:,:,k,l)*ints(1:NOccup,1:NOccup))
+      if((k<=NOccup).and.(l<=NOccup)) ETot = ETot + sum(RDM2val(:,:,k,l)*intsFR(1:NOccup,1:NOccup))
+      !if((k<=NOccup).and.(l<=NOccup)) ETot = ETot + sum(RDM2val(:,:,k,l)*ints(1:NOccup,1:NOccup))
       endif
 
       ! CONSTRUCT ONE-ELECTRON PART OF THE AC ALPHA-HAMILTONIAN

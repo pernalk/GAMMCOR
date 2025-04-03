@@ -30,14 +30,16 @@ double precision,intent(inout) :: tvec(NDimX)
 
 integer :: i,ip,iq,ir,ipq
 integer :: ii,j,k
-double precision,allocatable :: tmp1(:),tmp2(:)
+double precision,allocatable :: tmp1(:),tmp2(:,:)
 double precision :: fact,val
 
 tvec = 0
 
 !Sba=transpose(Sab)
 
+allocate(tmp2(NDimX,NDimX))
 allocate(tmp1(NDimX))
+tmp2 = Ymat-Xmat
 tmp1 = 0
 do i=1,NDimX
    ip = AIndN(1,i)
@@ -56,9 +58,11 @@ do i=1,NDimX
 enddo
 !print*, 'tmp1',norm2(tmp1) 
 
-call dgemv('T',NDimX,NDimX,1d0,Ymat-Xmat,NDimX,tmp1,1,0d0,tvec,1)
+call dgemv('T',NDimX,NDimX,1d0,tmp2,NDimX,tmp1,1,0d0,tvec,1)
+!call dgemv('T',NDimX,NDimX,1d0,Ymat-Xmat,NDimX,tmp1,1,0d0,tvec,1)
 
-deallocate(tmp1)
+deallocate(tmp2,tmp1)
+!deallocate(tmp1)
 
 end subroutine make_tind
 

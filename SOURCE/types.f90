@@ -196,6 +196,7 @@ type SystemBlock
       double precision :: Omega   = 1d0
       double precision :: PerVirt = 0d0
       double precision :: ECASSCF = 0d0
+      double precision :: AvMu    = 0d0
       integer :: NSym
       integer :: NSymBas(8),NSymOrb(8)
       integer :: NOrb, NGem
@@ -291,6 +292,7 @@ type SystemBlock
                                       FOAB(:,:),FOBA(:,:), &
                                       FFAB(:,:),FFBA(:,:), &
                                       OOAB(:,:),OOBA(:,:)
+      double precision,allocatable :: XMuMat(:,:) ! for CBS[H]
       double precision,allocatable :: DChol(:,:)
       double precision,allocatable :: Pmat(:,:)
       double precision,allocatable :: Jmat(:,:),Kmat(:,:)

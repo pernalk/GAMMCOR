@@ -186,7 +186,7 @@ C
      $ IGem,NAcCAS,NInAcCAS,NElecBEmb,
      $ NELE,IndN,IndX,NDimX,
      $ NoSt,ICASSCF,IFlFrag1,IFunSR,IFunSRKer,
-     $ ICholesky)
+     $ ICholesky,IDBBSC)
 
       ElseIf(ICASSCF.Ne.1) Then
 
@@ -197,7 +197,7 @@ C
      $ IGem,NActive,NInAcCAS,NElecBEmb,
      $ NELE,IndN,IndX,NDimX,
      $ NoSt,ICASSCF,IFlFrag1,IFunSR,IFunSRKer,
-     $ ICholesky)
+     $ ICholesky,IDBBSC)
 
       EndIf
       EndIf
