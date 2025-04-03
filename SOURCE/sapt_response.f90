@@ -47,7 +47,7 @@ double precision :: ACAlpha
 double precision :: ECASSCF,ETot,ECorr
 
 character(8) :: label
-character(:),allocatable :: onefile,twofile,propfile,rdmfile
+character(:),allocatable :: onefile,twofile,propfile
 character(:),allocatable :: twojfile,twokfile
 character(:),allocatable :: propfile0,propfile1
 character(:),allocatable :: propbatch
@@ -86,7 +86,6 @@ if(Mon%Monomer==1) then
    y01file    = 'Y01_A'
    xy0file    = 'XY0_A'
    abpm0file  = 'A0BLK_A'
-   rdmfile    = 'rdm2_A.dat'
    abfile     = 'ABMAT_A'
    testfile   = 'A0MAT_A'
 elseif(Mon%Monomer==2) then
@@ -101,7 +100,6 @@ elseif(Mon%Monomer==2) then
    y01file    = 'Y01_B'
    xy0file    = 'XY0_B'
    abpm0file  = 'A0BLK_B'
-   rdmfile    = 'rdm2_B.dat'
    abfile     = 'ABMAT_B'
    testfile   = 'A0MAT_B'
 endif
@@ -242,20 +240,19 @@ if(Flags%ICASSCF==0.and.Flags%ISERPA==0) then
   allocate(ABPlus(Mon%NDimX**2),ABMin(Mon%NDimX**2),&
             EigVecR(Mon%NDimX**2),Eig(Mon%NDimX))
 
-
-  if(Flags%ICholeskyOTF==1.or.Flags%ICholeskyBIN==1) then
-  ! write cholesky vecs on disk!
-     if(Mon%Monomer==2) then
-        open(newunit=iunit,file='cholvecs',status='old')
-        close(iunit,status='delete')
-     endif
-     open(newunit=iunit,file='cholvecs',form='unformatted')
-     write(iunit) Mon%NChol
-     write(iunit) Mon%FF
-     close(iunit)
-     ! they are needed in JK_Chol_loop
-     deallocate(Mon%FF)
-  endif
+  !if(Flags%ICholeskyOTF==1.or.Flags%ICholeskyBIN==1) then
+  !! write cholesky vecs on disk!
+  !   if(Mon%Monomer==2) then
+  !      open(newunit=iunit,file='cholvecs',status='old')
+  !      close(iunit,status='delete')
+  !   endif
+  !   open(newunit=iunit,file='cholvecs',form='unformatted')
+  !   write(iunit) Mon%NChol
+  !   write(iunit) Mon%FF
+  !   close(iunit)
+  !   ! they are needed in JK_Chol_loop
+  !   deallocate(Mon%FF)
+  !endif
 
   ECASSCF = 0d0
 !
@@ -279,6 +276,7 @@ if(Flags%ICASSCF==0.and.Flags%ISERPA==0) then
   !ACAlpha=sqrt(2d0)/2d0
   !ACAlpha=1d-12
   !Print*, 'UNCOUPLED,ACAlpha',ACAlpha
+  !ACAlpha=1d-5
 
   !ACAlpha=0.953089922969332
   !print*, 'ACAlpha',ACAlpha
@@ -367,6 +365,11 @@ if(Flags%ICASSCF==0.and.Flags%ISERPA==0) then
   !print*, 'EigVecR',norm2(EigVecR)
   !print*, 'Eig    ',norm2(Mon%Eig)
 
+  write(lout,'(/,''Excitation Energies in [au] and [eV]'')')
+  do i=1,10
+     write(lout,'(i4,4x,2E16.6)') i,Mon%Eig(i),toeV(Eig(i))
+  enddo
+
   ! test for e2ind_hf
   !allocate(Mon%PP(Mon%NDimX**2))
   !call AB_CAS_FOFO(ABPlus,Mon%PP,ECASSCF,URe,Mon%Occ,XOne, &
@@ -426,8 +429,8 @@ if(Flags%ICASSCF==0.and.Flags%ISERPA==0) then
      select case(Mon%TwoMoInt)
      case(TWOMO_FOFO)
         call ACEneERPA_FOFO(ECorr,EigVecR,Eig,Mon%Occ, &
-                             Mon%IGem,Mon%IndN,Mon%IndX,Mon%num0+Mon%num1, &
-                             Mon%NDimX,NBas,twokfile,Flags%ICholesky)
+                            Mon%IGem,Mon%IndN,Mon%IndX,Mon%num0+Mon%num1, &
+                            Mon%NDimX,NBas,twokfile,Flags%ICholesky,Flags%IDBBSC)
      case(TWOMO_FFFF)
         call ACEneERPA_FFFF(ECorr,EigVecR,Eig,Mon%Occ, &
                              Mon%IGem,Mon%IndN,Mon%IndX,Mon%num0+Mon%num1, &
@@ -439,10 +442,18 @@ if(Flags%ICASSCF==0.and.Flags%ISERPA==0) then
      ECorr=Ecorr*0.5d0
 
      Mon%ECASSCF = ECASSCF+Mon%PotNuc
+     print*, 'ECASSCF =',ECASSCF
+     print*, 'ECorr   =',ECorr  
+     print*, 'ENuc    =',Mon%PotNuc
      write(LOUT,'(/,1x,''ECASSCF+ENuc, Corr, ERPA-CASSCF'',6x,3f15.8)') &
           ECASSCF+Mon%PotNuc,ECorr,ECASSCF+Mon%PotNuc+ECorr
   else
      write(LOUT,'(1x,a,5x,f15.8)') "CASSCF Energy           ", ECASSCF+Mon%PotNuc
+  endif
+
+  if (ACAlpha < 1.d-2) then
+   Print*, 'With ACAlpha ', ACAlpha, 'we recover AC0:'
+   print*, 'AC0-Corr', ECorr/ACAlpha
   endif
 
   !! snippet for testing Cmat
@@ -481,7 +492,7 @@ if(Flags%ICASSCF==0.and.Flags%ISERPA==0) then
             y01file,xy0file,     &
             Mon%IndN,Mon%IndX,Mon%IGem,Mon%NAct,Mon%INAct,Mon%NElecBEmb, &
             Mon%NDimX,NBas,Mon%NDimX,NInte1,Mon%NoSt,twofile,twojfile,twokfile,&
-            Flags%IFlag0,Flags%ICholesky)
+            Flags%IFlag0,Flags%ICholesky,Flags%IDBBSC)
 
      if(Flags%ICholesky==1) then
         nblk = 1 + NBas - Mon%NAct
@@ -581,16 +592,21 @@ endif
 ! dump response
  call writeresp(EigVecR,Eig,propfile)
 
-!block
-!! dump response in batches
-! integer,parameter :: MaxBatchSize = 120
-! call WriteRespBatch(Mon%NDimX,MaxBatchSize,Eig,EigVecR,propbatch)
-!end block
+block
+! dump response in batches
+ integer,parameter :: MaxBatchSize = 120
+! if(Flags%IDBBSC==2) then
+ print*, 'dump response in batches...'
+ call WriteRespBatch(Mon%NDimX,MaxBatchSize,Eig,EigVecR,propbatch)
+! endif
+end block
 
  deallocate(work1,work2,XOne,URe)
  !if(Mon%TwoMoInt==1) deallocate(TwoMO)
  deallocate(TwoMO)
  deallocate(ABPlus,ABMin,EigVecR,Eig)
+
+ !stop "STOP AT CALC_RESP_CASGVB"
 
 end subroutine calc_resp_casgvb
 
@@ -724,7 +740,7 @@ case(TWOMO_FOFO)
           'DUMMY',xy0file,     &
           Mon%IndN,Mon%IndX,Mon%IGem,Mon%NAct,Mon%INAct,Mon%NElecBEmb, &
           Mon%NDimX,NBas,Mon%NDimX,NInte1,Mon%NoSt,twofile,twojfile,twokfile,&
-          Flags%IFlag0,Flags%ICholesky)
+          Flags%IFlag0,Flags%ICholesky,Flags%IDBBSC)
 
    nblk = 1 + NBas - Mon%NAct
    allocate(A0Block(nblk))
@@ -1272,7 +1288,7 @@ elseif(Flags%ICASSCF==1.and.Flags%ISERPA==0) then
             y01file,xy0file,     &
             Mon%IndN,Mon%IndX,Mon%IGem,Mon%NAct,Mon%INAct,Mon%NElecBEmb, &
             Mon%NDimX,NBas,Mon%NDim,NInte1,Mon%NoSt,twofile,twojfile,twokfile, &
-            Flags%IFlag0,Flags%ICholesky)
+            Flags%IFlag0,Flags%ICholesky,Flags%IDBBSC)
 
      if(Flags%ICholesky==1) then
         nblk = 1 + NBas - Mon%NAct
@@ -1375,6 +1391,10 @@ logical :: doRSH
 ! temporary RSH solution
 doRSH = .false.
 if(Flags%IFunSR==1.or.Flags%IFunSR==2) doRSH = .true.
+
+! Molpro will likely crash for MC-sDFT/OTF...
+!         print*, ' Skipping sapt_dft_resp for monomer ',Mon%Monomer
+!         print*, ' because LR ints not ready yet...'
 
 ! set filenames
 if(Mon%Monomer==1) then
@@ -1783,6 +1803,8 @@ if (Flags%ICholeskyOTF==1) then
       if (allocated(Mon%FFErf)) then
          print*, 'sapt_dft_reponse with Cholesky OTF...'
       else
+         print*, ' Skipping sapt_dft_resp for monomer ',Mon%Monomer
+         print*, ' because LR ints not ready yet...'
          return
       endif
    endif

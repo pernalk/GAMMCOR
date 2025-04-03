@@ -18,8 +18,21 @@ contains
 
 subroutine sapt_interface(Flags,SAPT,NBasis,AOBasis,CholeskyVecsOTF)
 !
+! Possible interface: Dalton, Molpro
+!
+
+! Read 1-RDM, get C(AO,NO) and Occ from diagonalization
+!     -- canonicalize orbitals, if needed
+! Read 2-RDM (active), transform to NO
+! Read / Generate 1-, 2-el integrals
+!     -- For CBS[H], create local mu(r)
+! Transform integrals to NOs
+! Calculate elst potential in AO: W=J+K 
+! Calculate K[PB] matrix in AO
+!
+! Comments :
 ! SAPT-DALTON requires SIRIFC and SIRIUS.RST
-!                   or SIRIFC and occupations.dat
+! or SIRIFC and occupations.dat
 !
 implicit none
 
@@ -292,7 +305,6 @@ SAPT%monB%NDim = NBasis*(NBasis-1)/2
        write(lout,'(1x,3a6)') ('******',i=1,3)
 
        call auto2e_init()
-
 
        XYZPath = "./input.inp"
        BasisSetPath = BasisSet
@@ -618,9 +630,13 @@ SAPT%Vnn = calc_vnn(SAPT%monA,SAPT%monB)
 
 end subroutine saptuks_interface
 
-subroutine sapt_erfint_OTF(Flags,MON,NBasis,AOBasis,CholErfVecsOTF)
+subroutine sapt_erfint_OTF(Flags,Mon,NBasis,AOBasis,CholErfVecsOTF)
 !
 ! generate Long-Range Cholesky vectors in AO
+!
+! Comments:
+!  - when called in CBS[H], sets Omega=1.0
+!  - saves NCholErf to Mon
 !
 implicit none
 
@@ -636,18 +652,26 @@ character(:),allocatable :: XYZPath
 character(:),allocatable :: BasisSet, BasisSetPath
 
 integer :: i
+double precision :: Omega
 logical :: doRSH
 logical :: SortAngularMomenta
 
 doRSH = .false.
 if(Flags%IFunSR==1.or.Flags%IFunSR==2) doRSH = .true.
-if(.not.doRSH) stop "Wrong Call for Cholesky Erf ERIs OTF!"
+if(.not.doRSH .and. Flags%IDBBSC/=2) stop "doRSH=F and CBS/=2! in Erf ERIs OTF!"
 
 XYZPath = "./input.inp"
 SortAngularMomenta = .true.
 
 ! set basis set
 BasisSet = Flags%BasisSetPath // Flags%BasisSet
+
+! set RS parameter
+if (Flags%IDBBSC==2) then
+   Omega = 1.0
+else
+   Omega = Mon%Omega
+endif
 
 write(lout,'(/1x,3a6)') ('******',i=1,3)
 write(lout,'(1x,a)') 'Cholesky LR On-The-Fly'
@@ -660,7 +684,7 @@ call auto2e_init()
 call CholeskyOTF_ao_vecs(CholErfVecsOTF,AOBasis,System,Flags%IUnits, &
                          XYZPath,BasisSet, &
                          SortAngularMomenta,Flags%ICholeskyAccu, &
-                         Mon%Omega)
+                         Omega)
 
 Mon%NCholErf = CholErfVecsOTF%Chol2Data%NVecs
 
@@ -955,24 +979,24 @@ integer                  :: NSym,NOrbt,NBasist,NCMOt,NOcc(8),NOrbs(8)
 integer                  :: i,isiri
 double precision         :: potnuc,emy,eactiv,emcscf
 logical                  :: exsiri,noSiri,noOccu
-character(:),allocatable :: occfile,sirifile,siriusfile,coefile
+character(:),allocatable :: occfile,ifcfile,siriusfile,coefile
 
 
  if(Mon%Monomer==1) then
    coefile='coeff_A.dat'
    occfile='occupations_A.dat'
-   sirifile='SIRIFC_A'
+   ifcfile='SIRIFC_A'
    siriusfile='SIRIUS_A.RST'
  elseif(Mon%Monomer==2) then
    coefile='coeff_B.dat'
    occfile='occupations_B.dat'
-   sirifile='SIRIFC_B'
+   ifcfile='SIRIFC_B'
    siriusfile='SIRIUS_B.RST'
  endif
 
- inquire(file=sirifile,EXIST=exsiri)
+ inquire(file=ifcfile,EXIST=exsiri)
  if(exsiri) then
-    call read_orbinf_dalton(sirifile,NSym,Mon%NOrb,Mon%NSymOrb)
+    call read_orbinf_dalton(ifcfile,NSym,Mon%NOrb,Mon%NSymOrb)
  else
     NBasist = NBasis
  endif
@@ -981,7 +1005,7 @@ character(:),allocatable :: occfile,sirifile,siriusfile,coefile
 
     ! CASSCF
 
-    if(exsiri) close(isiri)
+    !if(exsiri) close(isiri)
 
     call readocc_cas_siri(Mon,NBasis,noSiri)
     if(noSiri) call readocc_cas_occu(Mon,NBasis,noOccu)
