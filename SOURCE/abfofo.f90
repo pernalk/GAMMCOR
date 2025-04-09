@@ -1516,6 +1516,10 @@ do ICol=1,NDimX
 !           endif
 !         endif
 
+! Tamm-Dankoff Approximation for AC0
+!         AuxVal=(ABPLUS(ipq,irs)+ABMIN(ipq,irs))/2.D0
+!         ABPLUS(ipq,irs)=AuxVal
+!         ABMIN(ipq,irs)=AuxVal
          val = (C(ip) + C(iq))*(C(ir) + C(is))
          if(val/=0d0) ABPLUS(ipq,irs) = ABPLUS(ipq,irs)/val
          val = (C(ip) - C(iq))*(C(ir) - C(is))

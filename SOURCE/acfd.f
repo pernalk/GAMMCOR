@@ -147,7 +147,38 @@ C
 c      NGrid=30
 C
       Call GauLeg(Zero,One,XGrid,WGrid,NGrid)
+C
+C     AC-CBS[H]       
 C 
+      If(IDBBSC.Eq.2.And.ITwoEl.Eq.1) Then
+C
+      ECorr=Zero 
+C
+      Do I=1,NGrid
+C
+      ACAlpha=XGrid(I)
+      Call ACEInteg(ECorrA,TwoNO,URe,Occ,XOne,UNOAO,
+     $ ABPLUS,ABMIN,EigVecR,Eig,
+     $ EGOne,NGOcc,
+     $ Title,NBasis,NInte1,NInte2,NDim,NGem,IndAux,ACAlpha,
+     $ IndN,IndX,NDimX)
+C     
+      Write(*,*)'ACAlpha ',ACAlpha,' W_ALPHA ',ECorrA
+C
+      ECorr=ECorr+WGrid(I)*ECorrA 
+C
+      EndDo      
+C
+      ECASSCF =EGOne(1)
+C
+      Write
+     $ (6,'(1X,''CASSCF+ENuc, AC-CBS[H], Total'',6X,3F15.8)')
+     $ ECASSCF+ENuc,ECorr,ECASSCF+ENuc+ECorr
+C
+      Return
+C     end of AC-CBS[H]
+      EndIf
+C
       ECorr=Zero
 C
 !$OMP PARALLEL PRIVATE(ABPLUS_tmp, ABMIN_tmp, I, ACAlpha, ECorrA,
@@ -5046,6 +5077,37 @@ C     LOCAL ARRAYS
 C
       Dimension C(NBasis),Skipped(NDimX)
 C
+C     MODIFY ITEGRALS
+C
+      If (IDBBSC.Eq.2) Then
+      Open(10,file="sr_integrals.dat")
+      NAddr=0
+C
+      IPR=0
+      Do IP=1,NBasis
+      Do IR=1,IP
+
+      IPR=IPR+1
+C
+      IQS=0
+      Do IQ=1,NBasis
+      Do IS=1,IQ
+
+      IQS=IQS+1
+C
+      If(IPR.Ge.IQS) Then
+C
+      NAddr=NAddr+1
+      Read(10,*) AuxSR
+      TwoNO(NAddr)=TwoNO(NAddr)+AuxSR
+      EndIf
+      EndDo
+      EndDo
+      EndDo
+      EndDo
+      Close(10)
+      EndIf
+C
       Do I=1,NBasis
       C(I)=CICoef(I)
       EndDo
@@ -5096,6 +5158,38 @@ C
       Do II=1,ISkippedEig
       Write(6,*)'Skipped',II,Skipped(II)
       EndDo
+      EndIf
+C
+C     RESTORE INTEGRALS
+      If (IDBBSC.Eq.2) Then
+C
+      Open(10,file="sr_integrals.dat")
+      NAddr=0
+C
+      IPR=0
+      Do IP=1,NBasis
+      Do IR=1,IP
+
+      IPR=IPR+1
+C
+      IQS=0
+      Do IQ=1,NBasis
+      Do IS=1,IQ
+
+      IQS=IQS+1
+C
+      If(IPR.Ge.IQS) Then
+C
+      NAddr=NAddr+1
+      Read(10,*) AuxSR
+      TwoNO(NAddr)=TwoNO(NAddr)-AuxSR
+      EndIf
+      EndDo
+      EndDo
+      EndDo
+      EndDo
+      Close(10)
+C
       EndIf
 C
       Return

@@ -760,7 +760,7 @@ C
      $ ABPLUS(NDimX*NDimX),ABMIN(NDimX*NDimX),
      $ EigVecR(NDimX*NDimX),Eig(NDimX),
      $ ECorrG(NGem),EGOne(NGem),
-     $ UAux(NBasis,NBasis),VecAux(NBasis)
+     $ UAux(NBasis,NBasis),VecAux(NBasis),XMuMAT(NBasis,NBasis)
       Real*8, Dimension(:,:), Allocatable :: Jmat
 C
 C     IFlAC   = 1 - adiabatic connection formula calculation
@@ -1243,6 +1243,11 @@ C
       EndIf
 C
 C     ****** LR-AC CALCULATION *******************************************************
+C    
+      If(IFlAC.Eq.0.And.IFlSnd.Eq.0) Then
+      Write(6,'(1X,''INCORE VERSION OF AC1-CBS[H] NOT AVAILABLE'')')
+      Stop
+      EndIf
 C
       If(IFlAC.Eq.1.And.IFlSnd.Eq.0) Then
 C
@@ -1312,6 +1317,69 @@ C
       EndIf
 C
       NGOcc=0
+C
+C     AC-CBS[H]
+C
+      If (IDBBSC.Eq.2.And.ITwoEl.Eq.1) Then
+C if CBS[H] is computed: XOne contains h0 without vrs
+C                        TwoNO contains 1/r integrals, TwoEl2: erf/r
+C
+C     COMPUTE SR INTEGRALS
+      Call LOC_MU_CBS(XMuMAT,URe,UNOAO,Occ,TwoNO,NBasis,NInte2)
+C
+      Open(10,file="sr_integrals.dat")
+      TwoEl2=TwoNO-TwoEl2 
+      NAddr=0
+C
+      IPR=0
+      Do IP=1,NBasis
+      Do IR=1,IP
+
+      IPR=IPR+1
+C
+      IQS=0
+      Do IQ=1,NBasis
+      Do IS=1,IQ
+
+      IQS=IQS+1
+C
+      If(IPR.Ge.IQS) Then
+C
+      NAddr=NAddr+1
+      AuxSR=Zero
+      Do I=1,NBasis
+      AuxSR=AuxSR
+     $ +TwoEl2(NAddr3(I,IR,IQ,IS))*XMuMAT(IP,I)
+     $ +TwoEl2(NAddr3(IP,I,IQ,IS))*XMuMAT(IR,I)
+     $ +TwoEl2(NAddr3(IP,IR,I,IS))*XMuMAT(IQ,I)
+     $ +TwoEl2(NAddr3(IP,IR,IQ,I))*XMuMAT(IS,I)
+      EndDo
+C
+      AuxSR=AuxSR/Four
+
+      If(IGem(IP).Eq.IGem(IR).And.IGem(IR).Eq.IGem(IS).
+     $ And.IGem(IS).Eq.IGem(IQ)
+c     $ .And.(IGem(IP).Eq.1.Or.IGem(IP).Eq.1)
+     $ ) AuxSR=Zero
+
+      Write(10,*) AuxSR  
+C
+      EndIf
+      EndDo
+      EndDo
+      EndDo
+      EndDo
+      Close(10)
+C
+      Call ACECORR(ECASSCF,ENuc,TwoNO,URe,Occ,XOne,UNOAO,
+     $ IndAux,ABPLUS,ABMIN,EigVecR,Eig,EGOne,
+     $ Title,NBasis,NInte1,NInte2,NDimX,NGOcc,NGem,
+     $ IndN,IndX,NDimX)
+C
+      Return 
+C
+      EndIf
+C
       Call ACECORR(ECASSCF,ENuc,TwoNO,URe,Occ,XOne,UNOAO,
      $ IndAux,ABPLUS,ABMIN,EigVecR,Eig,EGOne,
      $ Title,NBasis,NInte1,NInte2,NDimX,NGOcc,NGem,

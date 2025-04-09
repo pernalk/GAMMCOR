@@ -280,6 +280,7 @@ end select
      if(Input%CalcParams%DFApp==2) then
         if(Input%CalcParams%PostCAS) then
            Flags%IFunSR = 4
+           Flags%IDBBSC  = Input%CalcParams%DBBSC
         else
            Flags%IFunSR = 2
         endif
