@@ -36,19 +36,34 @@ endif
 
 ! check JobType
 select case(CalcParams%JobType)
+
+! AC
+case(1,14,15,16)
+  if (CalcParams%DBBSC==2.and.CalcParams%TwoMoInt>1) then
+     write(6,'(1x,a)') "ERROR! AC(n)-CBS[H] not ready with FOFO!"
+     stop "Error: check_Calc"
+   endif
+
+! AC1
+case(3)
+  if (CalcParams%DBBSC==2.and.CalcPArams%TwoMoInt==1) then
+     write(6,'(1x,a)') "ERROR! AC1-CBS[H] not ready with INCORE"
+     stop "Error: check_Calc"
+   endif
+
 !SAPT
 case(5)
 
    if(CalcParams%InterfaceType.eq.INTER_TYPE_OWN) then
       write(6,'(1x,a)') "ERROR! SAPT REQUIRES:"
       write(6,'(1x,a)') "Interface    DALTON/MOLPRO"
-      stop
+     stop "Error: check_Calc"
    endif
 
    if(CalcParams%RDMSource.eq.INTER_TYPE_OWN) then
       write(6,'(1x,a)') "ERROR! SAPT REQUIRES:"
       write(6,'(1x,a)') "RDMSource    DALTON/MOLPRO"
-      stop
+      stop "Error: check_Calc"
    endif
 end select
 

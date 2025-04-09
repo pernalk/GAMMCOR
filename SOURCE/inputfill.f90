@@ -486,10 +486,17 @@ subroutine read_block_calculation(CalcParams, line)
                CalcParams%FunCorr = 1
            endif
 
-      case ("CBS","DBBSC") ! CBS correction
-           ! = 1 , DBBSC correctoin (E. Giner, et al, 2018)
-           ! = 2 , CBS[H] (K. Pernal et al, 2025)
-           read(val, *) CalcParams%DBBSC
+      case ("CBS") ! CBS correction
+           ! = 1 , DBBSC correction (E. Giner, et al, 2018)
+           ! = 2 , CBS[H] (K. Pernal and friends, 2025)
+           if (uppercase(val) == "1" .or.&
+               uppercase(val) == "DBBSC") then
+               CalcParams%DBBSC = 1
+           elseif (uppercase(val) == "2" .or.&
+               uppercase(val) == "H" .or.&
+               uppercase(val) == "CBS[H]" ) then
+               CalcParams%DBBSC = 2
+           endif
 
       case ("DMRG-IN-DFT","EMBEDDING") ! DMRG-in-DFT embedding
            if (uppercase(val) == ".TRUE.".or. &
