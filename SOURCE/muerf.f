@@ -27,12 +27,16 @@ C     local
 C
       integer :: iunit
       integer :: NCholesky,NCholErf
-      double precision :: ECASSCF,ECorr
-      double precision :: AvMu,ECorrMD
-      double precision :: XMuMat(NBasis,NBasis)
-      double precision :: ABMIN(NDimX,NDimX),ABPLUS(NDimX,NDimX)
+      real(8) :: ECASSCF,ECorr
+      real(8) :: AvMu,ECorrMD
+      real(8) :: XMuMat(NBasis,NBasis)
+      real(8) :: ABMIN(NDimX,NDimX),ABPLUS(NDimX,NDimX)
+      real(8) :: EigVecR(NDimX,NDimX),Eig(NDimX)
       double precision, allocatable :: CholVecs(:,:),Work(:,:)
       character(:),allocatable :: rdmfile
+C
+      Parameter(Zero=0.D0,Half=0.5D0,One=1.D0,Two=2.D0)
+      Parameter(toeV=27.21138386d0)
 C
       double precision :: Tcpu,Twall
 
@@ -76,10 +80,39 @@ C     transform full-range (FR) and long-range (LR) cholesky vecs
       Call TRAN_MU_CHOL(XMuMat,'cholvecs','chol1vFR',NBasis)
       Call TRAN_MU_CHOL(XMuMat,'cholvErf','chol1vLR',NBasis)
 
+c     print*, 'IFlSnd ', IFlSnd
+c     print*, 'IFlAC  ', IFlAC
+      If (IFlSnd.Eq.1) Then
+C     AC0-CBS[H]
       Call AC0CAS_FOFO(ECorr,ECASSCF,Occ,URe,XOne,ABPLUS,ABMIN,
      $ IndN,IndX,IGem,NAcCAS,NInAcCAS,NElecBEmb,
      $ NDimX,NBasis,NDimX,NInte1,
      $ NoSt,'FFOO','FOFO',ICholesky,IDBBSC,IFlFCorr)
+      ElseIf (IFlSnd.Eq.0) Then
+C     AC1-CBS[H]
+C
+      Write(6,'(/,X,"***************************** ")')
+      Write(6,'(  X,"*** ERPA-CAS CALCULATIONS *** ")')
+C
+C     FIND EIGENVECTORS (EigVecR) AND COMPUTE THE ENERGY
+C
+      ACAlpha=One
+      Call AB_CAS_FOFO(ABPLUS,ABMIN,ECASSCF,URe,Occ,XOne,
+     $ IndN,IndX,IGem,NAcCAS,NInAcCAS,NElecBEmb,
+     $ NDimX,NBasis,NDimX,
+     $ NInte1,'FFOO','FOFO',ICholesky,IDBBSC,ACAlpha,.false.)
+
+      Call ERPASYMM1(EigVecR,Eig,ABPLUS,ABMIN,NBasis,NDimX)
+      Write(6,'(/,
+     $ " *** ERPA-CBS[H]-CAS Excitation Energies (a.u., eV) *** ")')
+      Call SortEig(1,Eig,ABPLUS,EigVecR,NDimX)
+      Do I=1,10
+      Write(6,'(I4,4X,2E16.6)') I,Eig(I),toeV*Eig(I)
+      EndDo
+      Call ACEneERPA_FOFO(ECorr,EigVecR,Eig,Occ,
+     $ IGem,IndN,IndX,NAcCAS+NInAcCAS,
+     $ NDimX,NBasis,'FOFO',ICholesky,IDBBSC)
+      EndIf ! IFlSnd
 
       Call FirstOrderSREne(ETwoSR,NBasis)
       Write(6,'(/,X,"1st-order SR energy for",I4," active orbitals")') 
@@ -89,10 +122,17 @@ C     transform full-range (FR) and long-range (LR) cholesky vecs
 c     print*, 'ABPLUS-my =',norm2(ABPLUS)
 c     print*, 'ABMIN -my =',norm2(ABMIN)
 
+      If (IFlSnd.Eq.1) Then
       Write
      $ (6,'(/1X,''CASSCF+ENuc, AC0-CBS[H], Total'',6X,3F15.8)')
      $ ECASSCF+ENuc,ECorr,ECASSCF+ENuc+ECorr
        ETot=ECASSCF+ENuc+ECorr
+      Else
+      ECorr=Ecorr*Half
+      Write
+     $ (6,'(/1X,''CASSCF+ENuc, AC1-CBS[H], Total'',6X,3F15.8)')
+     $ ECASSCF+ENuc,ECorr,ECASSCF+ENuc+ECorr
+      EndIf ! IFlSnd
 
 c     ... delete transformed cholesky vecs
       Open(newunit=iunit,file='chol1vFR',status='OLD')
@@ -493,6 +533,8 @@ C
       Do IP=1,NAct
       OrbGridP(IP)=Occ(INActive+IP)*OrbGrid(IG,INActive+IP)
       EndDo
+
+c     If (NAct.Gt.0) Then
 C
 C     active-active
 C
@@ -523,6 +565,8 @@ C
       FPsiB(IG)=ddot(NAct*NAct,Oaa,1,Q,1)
 c     print*, '1st FPsiB =', IG, FPsiB(IG)
 C
+c     EndIf ! NAct
+C
 c     If(IFlCore.Ne.0) Then
       If (INActiveC.Gt.0) Then
 C
@@ -550,6 +594,7 @@ C
 C    $          NCholesky,OrbGrid(IG,ICore+1:INActive),1,0d0,tOi,1)
       FPsiB(IG)=FPsiB(IG)+ddot(NCholesky,tOi,1,tOi,1)
 !
+c     If (NAct.Gt.0) Then
 C     active-inactive
 C
 CC     ver 1 : NChol*NAct*INact scaling
@@ -571,6 +616,7 @@ C     ver2 : NChol*NOccup scaling
 C
 C     If(IFlCore.Ne.0)
 c     EndIf
+c     EndIf ! NAct.Gt.0
       EndIf ! INActiveC.Gt.0
 C
       EndDo ! IG=1,NGrid

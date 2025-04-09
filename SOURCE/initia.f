@@ -2035,11 +2035,12 @@ Cc     Call chol_CoulombMatrix(CholeskyVecs,'AOTWOSORT',ICholeskyAccu)
      &                         ICholeskyAccu)
       NCholesky=CholeskyVecs%NCholesky
 
+      print*, 'IDBBSC = ', IDBBSC
       If(IFunSR.Eq.1.Or.IFunSR.Eq.2.Or.IFunSR.Eq.4.Or.IDBBSC.Eq.2) Then
 C     generate LR-Cholesky integrals
       Write(LOUT,'(/1x,3a6)') ('*******',i=1,3)
       Write(lout,'(1x,a)') 'Cholesky LR Binary'
-      Write(lout,'(2x,a,f12.6)') 'MU = ',Alpha
+      Write(lout,'(1x,a,f12.6)') 'MU = ',Alpha
       Write(LOUT,'(/1x,3a6)') ('*******',i=1,3)
        Call chol_CoulombMatrix(CholErfVecs,NBasis,'AOTWOINT.erf',2,
      &                         ICholeskyAccu)

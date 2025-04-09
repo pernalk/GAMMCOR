@@ -365,6 +365,7 @@ end select
   case(JOB_TYPE_AC1)
      Flags%IFlAC  = 0
      Flags%IFlSnd = 0
+     Flags%IDBBSC  = Input%CalcParams%DBBSC
      if(Input%CalcParams%DFApp==2) then
         if(Input%CalcParams%PostCAS) then
            Flags%IFunSR = 4
