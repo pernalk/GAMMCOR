@@ -200,6 +200,7 @@ C
 C
       Logical :: doGGA
       Double Precision, Allocatable :: RR(:,:)
+      real(8),parameter :: ThrOnTop=1d-8
       Character(*),Parameter :: griddalfile='dftgrid.dat'
 C
       call gclock('START',Tcpu,Twall)
@@ -428,10 +429,10 @@ c     print*, 'INActive =',NInAcCAS
       EndDo
 C
 C     ... more test prints
-C      print*, 'NAct    =', NAct
-C      print*, 'INActive=', INActive
-C      print*, 'NOccup  =', NOccup
-C      print*, 'ICore   =', ICore
+C       print*, 'NAct    =', NAct
+C       print*, 'INActive=', INActive
+C       print*, 'NOccup  =', NOccup
+C       print*, 'ICore   =', ICore
 C
       if (IFlCore.Eq.0) Then
          INActiveC=INactive-ICore ! skip core within inactive
@@ -708,7 +709,7 @@ C
 C
       XMuLoc(I)=Zero
 C
-      If(OnTop(I).Gt.1.D-8) Then
+      If(OnTop(I).Gt.ThrOnTop) Then
       XMuLoc(I)=SQRT(3.1415)/Two*FPsiB(I)/OnTop(I)
       EndIf
 C
@@ -794,6 +795,262 @@ C
       Deallocate(OrbTGrid)
 
       End Subroutine LOC_MU_CBS_CHOL
+
+*Deck LOC_MU_CBS_CHOL
+      Subroutine LOC_MU_CBS_AB(XMuA,XMuB,AvMU,
+     $                        UA,UB,NOccupA,OccA,NOccupB,OccB,
+     $                        LA,LB,IGridType,BasisSet,NCholesky,NBasis)
+C
+C   compute mu(r) for noninteractig dimer
+C   used in SAPT with CBS[H]
+C
+C   f(r) = \sum_{pt in A} \sum_{qu \in B} <pq|tu> n_p n_q \phi_t \phi_u \phi_p \phi_q
+C
+C    Comments : U(NO,AO) - natural orbitals for monomers
+C               L(NChol,Occup) - Cholesky NO vecs
+C               IGridType = 1 (Molpro)
+C               IGridType = 2 (Dalton)
+C               IGridType = 3 (Internal)
+C
+      Implicit None
+
+      integer,intent(in) :: NOccupA,NOccupB
+      integer,intent(in) :: NCholesky,NBasis
+      integer,intent(in) :: IGridType
+      real(8),intent(in) :: UA(NBasis,NBasis),UB(NBasis,NBasis)
+      real(8),intent(in) :: LA(NCholesky,NOccupA*NBasis)
+      real(8),intent(in) :: LB(NCholesky,NOccupB*NBasis)
+      real(8),intent(in) :: OccA(NOccupA),OccB(NOccupB)
+      real(8),intent(out):: XMuA(NBasis,NBasis),XMuB(NBasis,NBasis)
+      Character(*) :: BasisSet
+
+C     LOCAL
+C
+      integer :: NGrid
+      integer :: i,j,ip,ir,iq,ig
+      integer :: k
+      real(8) :: SPi,SPiHlf
+      real(8) :: CFac,XElA,XElB,AvMu
+      real(8) :: URe(NBasis,NBasis)
+      real(8) :: OnTopA, OnTopB
+      real(8) :: OrbIGGrid(NBasis),OrbGridP(NOccupA),OrbGridR(NOccupB)
+      real(8),allocatable :: FPsiB(:)
+      real(8),allocatable :: OnTop(:), XMuLoc(:)
+      real(8),allocatable :: RhoAGrid(:),RhoBGrid(:)
+      real(8),allocatable :: WGrid(:)
+      real(8),allocatable :: OA(:,:),OB(:,:),OAB(:,:)
+      real(8),allocatable :: OrbTAGrid(:,:),OrbTBGrid(:,:)
+      real(8),allocatable :: OrbAGrid(:,:),OrbBGrid(:,:)
+      real(8),allocatable :: OrbXGrid(:,:),OrbYGrid(:,:),OrbZGrid(:,:)
+      real(8),parameter :: ThrOnTop=1d-8
+
+      SPi=SQRT(3.141592653589793)
+      SPiHlf=SPi/2d0
+
+C     set URe (unitary matrix)
+      URe=0d0
+      Do I=1,NBasis
+      URe(I,I)=1d0
+      EndDo
+C
+      Write(6,'(/1x,5a6)') ('******',i=1,5)
+      Write(6,'(1x,a)') "Local MU for A...B"
+      Write(6,'(1x,5a6)') ('******',i=1,5)
+
+C      block
+C      integer :: ip,iq
+Cc     real(8) :: LTA(NCholesky,NOccupA*NBasis)
+C      print*, 'test CHVCSAF 1... A'
+C      do k=1,3
+C      do j=1,NOccupA*NBasis
+C      print*, 'k j val',k,j,LA(k,j)
+C      enddo
+C      enddo
+CC      print*, 'test CHVCSAF 1... A^T'
+CC      do iq=1,NOccupA
+CC      do ip=1,NBasis
+CC         LTA(:,iq+(ip-1)*NOccupA)=LA(:,ip+(iq-1)*NBasis)
+CC      enddo
+CC      enddo
+CC      do k=1,3
+CC      do j=1,NOccupA*NBasis
+CC      print*, 'k j val',k,j,LTA(k,j)
+CC      enddo
+CC      enddo
+C      end block
+
+      If (IGridType==1) Then
+         Call molprogrid0(NGrid,NBasis)
+      ElseIf (IGridType==2) Then
+         Stop "Too lazy for Dalton Grid!"
+      ElseIf (IGridType==3) Then
+         Stop "Too lazy for Internal Grid!"
+      EndIf
+
+      allocate (WGrid(NGrid))
+      allocate (OrbAGrid(NGrid,NBasis))
+      allocate (OrbBGrid(NGrid,NBasis))
+      allocate (OrbXGrid(NGrid,NBasis))
+      allocate (OrbYGrid(NGrid,NBasis))
+      allocate (OrbZGrid(NGrid,NBasis))
+      call molprogrid(OrbAGrid,OrbXGrid,OrbYGrid,OrbZGrid,
+     &                WGrid,UA,NGrid,NBasis)
+      call molprogrid(OrbBGrid,OrbXGrid,OrbYGrid,OrbZGrid,
+     &                WGrid,UB,NGrid,NBasis)
+      deallocate(OrbZGrid,OrbYGrid,OrbXGrid) 
+
+C     ...no symmetry
+C     ...skip core within inactive?
+
+      print*, 'Wgrid   ', norm2(WGrid)
+      print*, 'OrbAGrid', norm2(OrbAGrid)
+      print*, 'OrbBGrid', norm2(OrbBGrid)
+      print*, 'NOccupA', NOccupA
+      print*, 'NOccupB', NOccupB
+      print*, 'NChol NBas', NCholesky,NBasis
+C
+C     COMPUTE f(r)
+C
+      allocate (FPsiB(NGrid))
+      allocate (OA(NCholesky,NOccupA))
+      allocate (OB(NCholesky,NOccupB))
+      allocate (OAB(NOccupA,NOccupB))
+
+      do IG=1,NGrid
+
+      FPsiB(IG)=0d0
+
+      do IP=1,NOccupA
+      OrbGridP(IP)=OccA(IP)*OrbAGrid(IG,IP)
+      enddo
+      do IR=1,NOccupB
+      OrbGridR(IR)=OccB(IR)*OrbBGrid(IG,IR)
+      enddo
+
+C     O = L(k,pq)*Phi(q)
+      OrbIGGrid(1:NBasis) = OrbAGrid(IG,1:NBasis)
+      Call dgemv('N',NCholesky*NOccupA,NBasis,1d0,LA,
+     $          NCholesky*NOccupA,OrbIGGrid,1,0d0,OA,1)
+
+      OrbIGGrid(1:NBasis) = OrbBGrid(IG,1:NBasis)
+      Call dgemv('N',NCholesky*NOccupB,NBasis,1d0,LB,
+     $          NCholesky*NOccupB,OrbIGGrid,1,0d0,OB,1)
+
+C    dgemm OAB = OA^T.OB
+      Call dgemm('T','N',NOccupA,NOccupB,NCholesky,1d0,OA,NCholesky,
+     $           OB,NCholesky,0d0,OAB,NOccupA)
+
+C     OAB(a,b)*n_a*n_b
+      do IR=1,NOccupB
+      do IP=1,NOccupA
+c     FPsiB(IG) = FPsiB(IG) + OAB(IP,IR)*OrbGridP(IP)*OrbGridR(IR)
+      FPsiB(IG) = FPsiB(IG) + OAB(IP,IR)*OccA(IP)*OrbAGrid(IG,IP)
+     $                       *OccB(IR)*OrbBGrid(IG,IR)
+      enddo
+      enddo
+
+      enddo ! NGrid
+
+C     include factor 2 for consistency with 
+C     f^A and f^B
+      FPsiB = 2d0*FPsiB
+      print*, 'FPsiB AB = ', norm2(FPsiB)
+
+      deallocate(OB,OA)
+
+      allocate(OrbTAGrid(NOccupA,NGrid))
+      allocate(OrbTBGrid(NOccupA,NGrid))
+      Do I=1,NGrid
+         Do IP=1,NOccupA
+         OrbTAGrid(IP,I)=OrbAGrid(I,IP)
+         EndDo
+         Do IR=1,NOccupB
+         OrbTBGrid(IR,I)=OrbBGrid(I,IR)
+         EndDo
+      EndDo
+
+      allocate(RhoAGrid(NGrid),RhoBGrid(NGrid))
+      allocate(OnTop(NGrid))
+      allocate(XMuLoc(NGrid))
+
+      OnTop = 0d0
+      AvMu  = 0d0
+      XElA  = 0d0
+      XElB  = 0d0
+      Do IG=1,NGrid
+C
+      Call DenGrid(IG,RhoAGrid(IG),OccA,URe,OrbAGrid,NGrid,NBasis)
+      Call DenGrid(IG,RhoBGrid(IG),OccB,URe,OrbBGrid,NGrid,NBasis)
+
+      OnTopA=0d0
+      Do IP=1,NOccupA
+      OnTopA=OnTopA+OccA(IP)*OrbTAGrid(IP,IG)**2
+      EndDo
+      OnTopB=0d0
+      Do IR=1,NOccupB
+      OnTopB=OnTopB+OccB(IR)*OrbTBGrid(IR,IG)**2
+      EndDo
+      OnTop(IG)=OnTopA*OnTopB
+C
+      XMuLoc(IG)=0d0
+
+      If(OnTop(IG).Gt.ThrOnTop) Then
+      XMuLoc(IG)=SPiHlf*FPsiB(IG)/OnTop(IG)
+      EndIf
+
+      AvMU=AvMU+XMuLoc(IG)*(RhoAGrid(IG)+RhoBGrid(IG))*WGrid(IG)
+      XElA=XElA+RhoAGrid(IG)*WGrid(IG)
+      XElB=XElB+RhoBGrid(IG)*WGrid(IG)
+
+      EndDo ! NGrid
+
+      OnTop=2d0*OnTop
+
+      Print*, 'RhoGrid A =', norm2(RhoAGrid)
+      Print*, 'RhoGrid B =', norm2(RhoBGrid)
+      Print*, 'OnTop(AB) =', norm2(OnTop)
+      print*, 'XMuLoc(AB)=', norm2(XMuLoc)
+C
+C     COMPUTE XMuMAT MATRIX in NO
+C
+      CFac=1.0d0
+C
+      Do IP=1,NBasis
+      Do IQ=1,IP
+      XMuA(IP,IQ)=0d0
+      XMuB(IP,IQ)=0d0
+C
+c     ISym=MultpC(NSymNO(IP),NSymNO(IQ))
+c     If(ISym.Eq.1) Then
+C
+      Do IG=1,NGrid
+      XMuA(IP,IQ)=XMuA(IP,IQ)
+     $ +OrbAGrid(IG,IP)*OrbAGrid(IG,IQ)*WGrid(IG)*Exp(-CFac*XMuLoc(IG))
+      XMuB(IP,IQ)=XMuB(IP,IQ)
+     $ +OrbBGrid(IG,IP)*OrbBGrid(IG,IQ)*WGrid(IG)*Exp(-CFac*XMuLoc(IG))
+      EndDo
+C
+c     EndIf
+      XMuA(IQ,IP)=XMuA(IP,IQ)
+      XMuB(IQ,IP)=XMuB(IP,IQ)
+C
+      EndDo
+      EndDo
+C
+      AvMu=AvMu/(XElA+XElB)
+C
+      print*, 'XMu(A)=', norm2(XMuA)
+      print*, 'XMu(B)=', norm2(XMuB)
+      write(6,*) 'XelA XelB  =', XElA,XElB
+      write(6,*) 'Average Mu =', AvMu
+C
+      deallocate(FPsiB)
+      deallocate(OrbTBGrid,OrbTAGrid)
+      deallocate(RhoBGrid,RhoAGrid)
+      deallocate(OnTop,XMuLoc)
+
+      End Subroutine LOC_MU_CBS_AB
+
 
 *Deck LOC_MU_CBS
       Subroutine LOC_MU_CBS(XMuMAT,URe,UNOAO,Occ,TwoEl,

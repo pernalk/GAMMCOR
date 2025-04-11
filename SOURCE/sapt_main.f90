@@ -55,14 +55,16 @@ double precision :: Tcpu,Twall
  call sapt_interface(Flags,SAPT,NBasis,AOBasis,CholeskyVecsOTF)
 
  call sapt_mon_ints(SAPT%monA,Flags,NBasis,AOBasis,CholeskyVecsOTF)
- if(Flags%IDBBSC==2) call sapt_mon_lr_ints(SAPT%monA,Flags,NBasis,AOBasis,CholErfVecsOTF)
+ !if(Flags%IDBBSC==2) call sapt_mon_lr_ints(SAPT%monA,Flags,NBasis,AOBasis,CholErfVecsOTF)
  call sapt_response(Flags,SAPT%monA,SAPT%EnChck,NBasis)
 
  call sapt_mon_ints(SAPT%monB,Flags,NBasis,AOBasis,CholeskyVecsOTF)
- if(Flags%IDBBSC==2) call sapt_mon_lr_ints(SAPT%monB,Flags,NBasis,AOBasis,CholErfVecsOTF)
+ !if(Flags%IDBBSC==2) call sapt_mon_lr_ints(SAPT%monB,Flags,NBasis,AOBasis,CholErfVecsOTF)
  call sapt_response(Flags,SAPT%monB,SAPT%EnChck,NBasis)
 
  call sapt_ab_ints(Flags,SAPT%monA,SAPT%monB,SAPT%iPINO,NBasis,AOBasis,CholeskyVecsOTF)
+ call sapt_ab_lr_ints(Flags,SAPT,SAPT%monA,SAPT%monB,NBasis,AOBasis,CholeskyVecsOTF,CholErfVecsOTF)
+ !if(Flags%IDBBSC==2) call sapt_ab_lr_ints(Flags,SAPT,SAPT%monA,SAPT%monB,NBasis,AOBasis,CholeskyVecsOTF,CholErfVecsOTF)
 
  ! MC-srDFT SAPT with Cholesky OTF
  if(SAPT%doRSH) call sapt_mcsrdft_otf(Flags,SAPT,NBasis)
@@ -765,6 +767,9 @@ type(AOReaderData) :: reader
 type(TAOBasis)     :: AOBasis
 type(TCholeskyVecsOTF) :: CholeskyVecsOTF
 integer,intent(in) :: iPINO,NBasis
+
+integer            :: ip,iq
+integer            :: dimOA,dimOB,NCholesky
 integer            :: thr_id
 integer            :: ntr,iunit_aotwosort
 double precision :: Tcpu,TWall
@@ -950,9 +955,30 @@ if(Flags%ISERPA==0) then
      endif
      end block
 
-     deallocate(A%FO)
-     deallocate(B%FO)
      deallocate(A%OOAB)
+
+     ! for CBS[H], transpose FO --> OF
+     !if (Flags%IDBBSC==2) then
+        dimOA=A%num0+A%num1
+        allocate(A%OF(A%NChol,dimOA*NBasis))
+        do iq=1,dimOA
+           do ip=1,NBasis
+              A%OF(:,iq+(ip-1)*dimOA)=A%FO(:,ip+(iq-1)*NBasis)
+           enddo
+        enddo
+     !endif
+     deallocate(A%FO)
+
+    ! if (Flags%IDBBSC==2) then
+        dimOB=B%num0+B%num1
+        allocate(B%OF(B%NChol,dimOB*NBasis))
+        do iq=1,dimOB
+           do ip=1,NBasis
+              B%OF(:,iq+(ip-1)*dimOB)=B%FO(:,ip+(iq-1)*NBasis)
+           enddo
+        enddo
+     !endif
+     deallocate(B%FO)
 
      call gclock('Time in Assemble:',Tcpu,Twall)
 
@@ -1179,6 +1205,44 @@ elseif(Flags%ISERPA==2) then
 endif
 
 end subroutine sapt_ab_ints
+
+subroutine sapt_ab_lr_ints(Flags,SAPT,A,B,NBasis,AOBasis,CholeskyVecsOTF,CholErfVecsOTF)
+!
+! calculate SR mu-transformed Cholesky vectors
+! for dispersion
+!
+implicit none
+
+type(FlagsData)    :: Flags
+type(SaptData)     :: SAPT
+type(SystemBlock)  :: A,B
+type(TAOBasis)     :: AOBasis
+type(TCholeskyVecsOTF) :: CholeskyVecsOTF
+type(TCholeskyVecsOTF) :: CholErfVecsOTF
+integer,intent(in) :: NBasis
+
+integer :: NOccupA,NOccupB
+integer :: NCholesky
+integer :: IGridType
+real(8) :: UA(NBasis,NBasis),UB(NBasis,NBasis)
+real(8) :: XMuA(NBasis,NBasis),XMuB(NBasis,NBasis),AvMu
+character(:),allocatable :: BasisSet
+
+NOccupA = A%num0 + A%num1
+NOccupB = B%num0 + B%num1
+BasisSet = Flags%BasisSetPath // Flags%BasisSet
+
+UA = transpose(A%CAONO)
+UB = transpose(B%CAONO)
+
+IGridType = 1 ! Molpro 
+
+call LOC_MU_CBS_AB(XMuA,XMuB,AvMu,UA,UB,NOccupA,A%Occ,NOccupB,B%Occ, &
+                   A%OF,B%OF,IGridType,BasisSet,SAPT%NCholesky,NBasis)
+
+stop "here!"
+
+end subroutine sapt_ab_lr_ints
 
 subroutine saptuks_ab_ints(Flags,A,B,NBasis,AOBasis,CholeskyVecsOTF)
 !
