@@ -823,6 +823,7 @@ do
   endif
   if(label=='ISORDK  ') then
      read(ione) ncen
+     allocate(MonBlock%charg(ncen),MonBlock%xyz(ncen,3))
      read(ione) MonBlock%charg(1:ncen),MonBlock%xyz(1:ncen,1:3)
      exit
   endif
@@ -901,6 +902,7 @@ subroutine onel_dalton(mon,NBasis,NSq,NInte1,MonBlock,SAPT)
  call readoneint_dalton(ione,work1)
  call square_oneint(work1,Smat,NBasis,NSym,NBas)
 
+ allocate(MonBlock%charg(maxcen),MonBlock%xyz(maxcen,3))
  call readlabel(ione,'ISORDK  ')
  read(ione)
  read(ione) MonBlock%charg,ncen,MonBlock%xyz

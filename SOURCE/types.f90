@@ -96,7 +96,7 @@ integer, parameter :: RESP_DFT  = 3
 
 logical, parameter :: FLAG_POSTCAS  = .FALSE.
 
-integer,parameter :: maxcen = 500
+integer,parameter :: maxcen = 500 ! to match Dalton
 
 character(*),parameter :: PossibleInterface(5) = &
 [character(8) :: &
@@ -293,6 +293,7 @@ type SystemBlock
                                       FFAB(:,:),FFBA(:,:), &
                                       OOAB(:,:),OOBA(:,:)
       double precision,allocatable :: XMuMat(:,:) ! for CBS[H]
+      double precision,allocatable :: OF(:,:)     ! for CBS[H]
       double precision,allocatable :: DChol(:,:)
       double precision,allocatable :: Pmat(:,:)
       double precision,allocatable :: Jmat(:,:),Kmat(:,:)
@@ -305,7 +306,8 @@ type SystemBlock
       double precision,allocatable :: dipm(:,:,:)
       double precision,allocatable :: Eig(:),EigX(:),EigY(:)
       double precision,allocatable :: AP(:,:),PP(:)
-      double precision  :: charg(maxcen),xyz(maxcen,3)
+      !double precision  :: charg(maxcen),xyz(maxcen,3)
+      double precision,allocatable :: charg(:),xyz(:,:)
 
       integer :: Max_Cn = 10
       double precision :: FreqOm = 0.d0
