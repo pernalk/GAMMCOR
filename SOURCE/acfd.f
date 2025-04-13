@@ -179,6 +179,14 @@ C
 C     end of AC-CBS[H]
       EndIf
 C
+      If(IVEMB.Eq.1) Then
+      NGrid=2
+      XGrid(1)=0.0d0
+      XGrid(2)=1.D-4
+      WGrid(1)=0.0d0
+      WGrid(2)=0.5D0/XGrid(2)
+      EndIf
+C
       ECorr=Zero
 C
 !$OMP PARALLEL PRIVATE(ABPLUS_tmp, ABMIN_tmp, I, ACAlpha, ECorrA,
@@ -191,6 +199,7 @@ C
       ECorrA = Zero
 !$OMP DO schedule(static,1)
 !$OMP$ REDUCTION(+:ECorr)
+C
       Do I=1,NGrid
 C   
       ACAlpha=XGrid(I)

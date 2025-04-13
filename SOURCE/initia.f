@@ -1077,7 +1077,14 @@ C      enddo
 C      enddo
 C      Print*, 'Err-2',Sqrt(Err)
 C
+C     if VEMBEDD is called with AC - do not perform canonicalisation
+C     (in this case the AC subroutine wil be used to perform numerical AC0 with noncanonical
+C     orbitals, which is useful if virtual orbitals are localised)
+C
+      If(.Not.(IVEMB.Eq.1.And.IFlAC.Eq.1.And.IFlSnd.Eq.0)) Then 
+C
 C     INACTIVE
+C
       If(NInAc.Ne.Zero) Then
 C
       Do I=1,NInAc
@@ -1087,7 +1094,7 @@ C
       EndDo
       EndDo
       Call Diag8(Fock,NInAc,NInAc,PC,Work)
-
+C
       Do I=1,NInAc
       Do J=1,NInAc
       URe(I,J)=Fock((J-1)*NInAc+I)
@@ -1121,6 +1128,14 @@ C      Print*, 'VIRT-MY',norm2(Fock)
       URe(II,JJ)=Fock((J-1)*NVirt+I)
       EndDo
       EndDo
+C
+      EndIf
+C
+C     If(.Not.(IVEMB.Eq.1.And.IFlAC.Eq.1.And.IFlSnd.Eq.0))
+C
+      Else
+C
+      Write(6,'(" **** ORBITALS ARE NOT CANONICALISED!!! ****")')
 C
       EndIf
 C
