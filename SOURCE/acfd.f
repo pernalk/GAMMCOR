@@ -180,11 +180,9 @@ C     end of AC-CBS[H]
       EndIf
 C
       If(IVEMB.Eq.1) Then
-      NGrid=2
-      XGrid(1)=0.0d0
-      XGrid(2)=1.D-4
-      WGrid(1)=0.0d0
-      WGrid(2)=0.5D0/XGrid(2)
+      NGrid=1
+      XGrid(1)=1.D-4
+      WGrid(1)=0.5D0/XGrid(2)
       EndIf
 C
       ECorr=Zero
@@ -252,6 +250,9 @@ C
 !$OMP END PARALLEL
 C
       If(ICASSCF.Eq.1) Then
+C
+      If(IVEMB.Eq.1) Write (6,'(2/,1X,
+     $ '' Embedding Calculation. AC energy below = numerical AC0'')')
 C
       ETot=EGOne(1)
       If(IFunSR.Eq.0) Then

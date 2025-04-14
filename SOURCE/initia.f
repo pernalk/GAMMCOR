@@ -1192,7 +1192,7 @@ C     If(.Not.(IVEMB.Eq.1.And.IFlAC.Eq.1.And.IFlSnd.Eq.0))
 C
       Else
 C
-      Write(6,'(" **** ORBITALS ARE NOT CANONICALISED!!! ****")')
+      Write(6,'(2/," **** ORBITALS ARE NOT CANONICALISED!!! ****",2/)')
 C
       EndIf
 C
