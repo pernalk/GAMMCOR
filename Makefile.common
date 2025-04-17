@@ -20,7 +20,7 @@ OBJ = $(O)mainp.o $(O)initia.o $(O)dmscf.o $(O)misc.o $(O)optocc.o \
        $(O)sapt_main.o $(O)sapt_exch.o $(O)sapt_pol.o $(O)sapt_utils.o \
        $(O)sapt_response.o $(O)sapt_interface.o \
        $(O)sapt_Chol_pol.o $(O)sapt_Chol_exch.o \
-       $(O)sapt_visual.o \
+       $(O)sapt_visual.o $(O)sapt_files.o \
        $(O)exmisc.o $(O)exdpino.o $(O)exi.o $(O)exappr.o \
        $(O)srefex.o $(O)diis.o \
        $(O)timing.o \
@@ -53,7 +53,7 @@ $(O)accas.o            : $(S)commons.inc $(O)priunit.o $(O)timing.o $(O)rdwrext.
 $(O)acfd.o             : $(S)commons.inc $(O)abmats.o $(O)abfofo.o  $(O)ab0fofo.o $(O)rdwrext.o
 $(O)ac_iter.o          : $(S)commons.inc $(O)abmats.o $(O)abfofo.o
 $(O)interpa.o          : $(S)commons.inc $(O)abmats.o $(O)abfofo.o $(O)ab0fofo.o
-$(O)muerf.o            : $(S)commons.inc $(O)ab0fofo.o $(O)timing.o $(O)gridintern.o
+$(O)muerf.o            : $(S)commons.inc $(O)ab0fofo.o $(O)timing.o $(O)gridintern.o $(O)sapt_files.o
 $(O)dftgrid.o          : $(S)commons.inc $(O)abmats.o
 $(O)caspidft.o         : $(S)commons.inc $(O)rdwrext.o
 $(O)ac_exact_2el.o     : $(S)commons.inc

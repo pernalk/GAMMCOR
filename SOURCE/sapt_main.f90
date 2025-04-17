@@ -55,11 +55,11 @@ double precision :: Tcpu,Twall
  call sapt_interface(Flags,SAPT,NBasis,AOBasis,CholeskyVecsOTF)
 
  call sapt_mon_ints(SAPT%monA,Flags,NBasis,AOBasis,CholeskyVecsOTF)
- !if(Flags%IDBBSC==2) call sapt_mon_lr_ints(SAPT%monA,Flags,NBasis,AOBasis,CholErfVecsOTF)
+ if(Flags%IDBBSC==2) call sapt_mon_lr_ints(SAPT%monA,Flags,NBasis,AOBasis,CholErfVecsOTF)
  call sapt_response(Flags,SAPT%monA,SAPT%EnChck,NBasis)
 
  call sapt_mon_ints(SAPT%monB,Flags,NBasis,AOBasis,CholeskyVecsOTF)
- !if(Flags%IDBBSC==2) call sapt_mon_lr_ints(SAPT%monB,Flags,NBasis,AOBasis,CholErfVecsOTF)
+ if(Flags%IDBBSC==2) call sapt_mon_lr_ints(SAPT%monB,Flags,NBasis,AOBasis,CholErfVecsOTF)
  call sapt_response(Flags,SAPT%monB,SAPT%EnChck,NBasis)
 
  call sapt_ab_ints(Flags,SAPT%monA,SAPT%monB,SAPT%iPINO,NBasis,AOBasis,CholeskyVecsOTF)
@@ -1796,7 +1796,10 @@ BasisSet = Flags%BasisSetPath // Flags%BasisSet
 UNOAO = transpose(Mon%CAONO)
 call FlagsToCommons(Mon,Flags)
 call LOC_MU_CBS_CHOL(Mon%XMuMat,CorrMD,Mon%AvMU, &
-                     UNOAO,Mon%Occ,rdmfile,BasisSet,NBasis)
+                     UNOAO,Mon%Occ,rdmfile,BasisSet,NBasis,.true.)
+
+if(Mon%Monomer==1) call system('cp locmu.dat locmu_A.dat')
+if(Mon%Monomer==2) call system('cp locmu.dat locmu_B.dat')
 
 print*, 'XMuMat Monomer', norm2(Mon%XMuMat),mon%Monomer
 call TRAN_MU_CHOL(Mon%XMuMat,'cholvecs','chol1vFR',NBasis)

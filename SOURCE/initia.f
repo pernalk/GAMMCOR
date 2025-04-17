@@ -4345,6 +4345,7 @@ C      write(*,*) IGem(1:NBasis)
 C
       Include 'commons.inc'
 
+      Monomer  = System%Monomer
       NAcCAS   = System%NAct
       NInAcCAS = System%INAct
 

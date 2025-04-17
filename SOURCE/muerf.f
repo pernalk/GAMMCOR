@@ -49,8 +49,9 @@ c     set rdmfile
 
       ElseIf (IDBBSC.eq.1.and.ITwoEl.eq.3.and.ICholesky.ne.0) Then
 C
+      print*, '0 calling loc_mu_cbs_chol from DBBSC...', Monomer
       Call LOC_MU_CBS_CHOL(XMuMat,ECorrMD,AvMU,UNOAO,Occ,
-     $                     RdmFile,BasisSet,NBasis)
+     $                     RdmFile,BasisSet,NBasis,.false.)
 
       Call AC0CAS_FOFO(ECorr,ECASSCF,Occ,URe,XOne,ABPLUS,ABMIN,
      $ IndN,IndX,IGem,NAcCAS,NInAcCAS,NElecBEmb,
@@ -68,8 +69,9 @@ C
       ElseIf (IDBBSC.eq.2.and.ITwoEl.eq.3.and.ICholesky.ne.0) Then
 C
 C     Compute local mu(r): XMuMat(p,q) = <p|mu(r)|q>
+      print*, '1 calling loc_mu_cbs_chol from DBBSC...', Monomer
       Call LOC_MU_CBS_CHOL(XMuMat,CorrMD,AvMU,UNOAO,Occ,
-     $                     rdmfile,BasisSet,NBasis)
+     $                     rdmfile,BasisSet,NBasis,.false.)
 c     Print*, 'LOC_MU_CBS_CHOL: XMuMat = ',norm2(XMuMat)
 C
 C     ... test : recover AC0!
@@ -151,17 +153,21 @@ C *End Subroutine DBBSCH
 
 *Deck LOC_MU_CBS_CHOL
       Subroutine LOC_MU_CBS_CHOL(XMuMat,CorrMD,AvMU,
-     $                           UNOAO,Occ,Rdm2File,BasisSet,NBasis)
+     $                           UNOAO,Occ,Rdm2File,BasisSet,NBasis,
+     $                           DiskSav)
 C
       use read_external
       use grid_internal
+      use sapt_files
       use timing
 C
 C     RETURNS A "BASIS-SET ERROR CORRECTION" WITH SR-PBE ONTOP CORRELATION from Giner et al. JCP 152, 174104 (2020)
 C     RETURNS XMuMAT USED TO COMPUTE CBS CORRECTION BY MODIFICATION OF H' IN AC0
 C
-C     CAREFUL!
-C     UNOAO are U(NO,AO) not U(NO,SAO) orbitals!
+C     Comments:
+C     - DiskSav = .true. : save FPsiB and OnTop
+C                          on disk (locmu.dat, for SAPT)
+C     - UNOAO are U(NO,AO) not U(NO,SAO) orbitals!
 C
       Implicit Real*8 (A-H,O-Z)
 C
@@ -174,6 +180,7 @@ C
 C
       Dimension UNOAO(NBasis,NBasis),Occ(NBasis),OccS(NBasis)
       Real*8 :: XMuMat(NBasis,NBasis)
+      Logical :: DiskSav
       Character(*) :: Rdm2File,BasisSet
 C
       Real*8 :: URe(NBasis,NBasis)
@@ -201,7 +208,8 @@ C
       Logical :: doGGA
       Double Precision, Allocatable :: RR(:,:)
       real(8),parameter :: ThrOnTop=1d-8
-      Character(*),Parameter :: griddalfile='dftgrid.dat'
+      character(*),Parameter :: dfile='locmu.dat'
+      character(*),Parameter :: griddalfile='dftgrid.dat'
 C
       call gclock('START',Tcpu,Twall)
 C
@@ -210,7 +218,7 @@ C     set URe (unitary matrix)
       Do I=1,NBasis
       URe(I,I)=One
       EndDo
-C
+CC
       If(IFlCore.Eq.0.And.IDBBSC.Eq.1) Then
          ICore = NCoreOrb ! from input.inp
          Do I=1,ICore
@@ -236,6 +244,10 @@ C
       If (InternalGrid==0) then
 C
       If (IMOLPRO == 1) Then
+
+C        setting Molpro 2-rdm files
+         Call set_rdm2_filename(Monomer)
+
          Write(LOUT,'(/1x,a)') 'MOLPRO GRID '
          Call molprogrid0(NGrid,NBasis)
       ElseIf(IDALTON == 1) Then
@@ -360,7 +372,9 @@ c        write(lout,'(/1x,a)') "Internal grid does not use symmetry!"
          NumOSym(1)=NBasis
       ElseIf(InternalGrid==0) Then
          If (IMOLPRO == 1) Then 
-            Call create_ind_molpro('2RDM',NumOSym,IndInt,NSym,NBasis)
+            print*, 'reading sym info from ', rdm2_file
+            Call create_ind_molpro(rdm2_file,NumOSym,IndInt,NSym,NBasis)
+C           Call create_ind_molpro('2RDM',NumOSym,IndInt,NSym,NBasis)
             MxSym=NSym
          Else
             Stop "Fix NSym in LOC_MU_CBS_CHOL!"
@@ -789,6 +803,15 @@ C
      $" CBS[DFT] correction, average Mu",
      $ F15.8,F15.3/)') CorrMD,AvMU
 C
+C ... save on disk
+      if (DiskSav) then
+        open(newunit=iunit,file=dfile,form='unformatted')
+        write(iunit) NGrid,AvMu
+        write(iunit) FPsiB
+        write(iunit) OnTop
+        close(iunit)
+      endif
+C
       call gclock('Esrcmd CBS ',Tcpu,Twall)
 
       Deallocate(RDM2val)
@@ -827,25 +850,33 @@ C
 C     LOCAL
 C
       integer :: NGrid
+      integer :: NGridA,NGridB
       integer :: i,j,ip,ir,iq,ig
-      integer :: k
+      integer :: iunit
       real(8) :: SPi,SPiHlf
-      real(8) :: CFac,XElA,XElB,AvMu
+      real(8) :: OTA,OTB
+      real(8) :: CFac,XElA,XElB
+      real(8) :: AvMu,AvMuA,AvMuB
       real(8) :: URe(NBasis,NBasis)
-      real(8) :: OnTopA, OnTopB
       real(8) :: OrbIGGrid(NBasis),OrbGridP(NOccupA),OrbGridR(NOccupB)
-      real(8),allocatable :: FPsiB(:)
-      real(8),allocatable :: OnTop(:), XMuLoc(:)
+      real(8),allocatable :: FPsiAB(:),FPsiA(:),FPsiB(:)
+      real(8),allocatable :: OnTop(:),OnTopA(:),OnTopB(:)
+      real(8),allocatable :: XMuLoc(:)
       real(8),allocatable :: RhoAGrid(:),RhoBGrid(:)
       real(8),allocatable :: WGrid(:)
       real(8),allocatable :: OA(:,:),OB(:,:),OAB(:,:)
       real(8),allocatable :: OrbTAGrid(:,:),OrbTBGrid(:,:)
       real(8),allocatable :: OrbAGrid(:,:),OrbBGrid(:,:)
       real(8),allocatable :: OrbXGrid(:,:),OrbYGrid(:,:),OrbZGrid(:,:)
-      real(8),parameter :: ThrOnTop=1d-8
+      real(8),parameter :: ThrOnTop=1d-10
+c     real(8),parameter :: ThrOnTop=1d-8
+      logical :: full
 
       SPi=SQRT(3.141592653589793)
       SPiHlf=SPi/2d0
+C
+c     full = .false.
+      full = .true.
 
 C     set URe (unitary matrix)
       URe=0d0
@@ -911,14 +942,14 @@ C     ...skip core within inactive?
 C
 C     COMPUTE f(r)
 C
-      allocate (FPsiB(NGrid))
+      allocate (FPsiAB(NGrid))
       allocate (OA(NCholesky,NOccupA))
       allocate (OB(NCholesky,NOccupB))
       allocate (OAB(NOccupA,NOccupB))
 
       do IG=1,NGrid
 
-      FPsiB(IG)=0d0
+      FPsiAB(IG)=0d0
 
       do IP=1,NOccupA
       OrbGridP(IP)=OccA(IP)*OrbAGrid(IG,IP)
@@ -944,7 +975,7 @@ C     OAB(a,b)*n_a*n_b
       do IR=1,NOccupB
       do IP=1,NOccupA
 c     FPsiB(IG) = FPsiB(IG) + OAB(IP,IR)*OrbGridP(IP)*OrbGridR(IR)
-      FPsiB(IG) = FPsiB(IG) + OAB(IP,IR)*OccA(IP)*OrbAGrid(IG,IP)
+      FPsiAB(IG) = FPsiAB(IG) + OAB(IP,IR)*OccA(IP)*OrbAGrid(IG,IP)
      $                       *OccB(IR)*OrbBGrid(IG,IR)
       enddo
       enddo
@@ -953,11 +984,34 @@ c     FPsiB(IG) = FPsiB(IG) + OAB(IP,IR)*OrbGridP(IP)*OrbGridR(IR)
 
 C     include factor 2 for consistency with 
 C     f^A and f^B
-      FPsiB = 2d0*FPsiB
-      print*, 'FPsiB AB = ', norm2(FPsiB)
+      FPsiAB = 2d0*FPsiAB
+      print*, 'FPsi AB = ', norm2(FPsiAB)
 
-      deallocate(OB,OA)
+      deallocate(OB,OA,OAB)
 
+      if (full) then
+C     load f^A and OnTop^A
+      open(newunit=iunit,file='locmu_A.dat',form='unformatted')
+      read(iunit) NGridA,AvMuA
+      if (NGridA.ne.NGrid) stop "Error! Gridsize in loc_mu_ab"
+      allocate(FPsiA(NGrid),OnTopA(NGrid))
+      read(iunit) FPsiA
+      read(iunit) OnTopA
+      close(iunit)
+      print*, 'FPsiA  = ',norm2(FPsiA)
+      print*, 'OnTopA = ',norm2(OnTopA)
+C     load f^B and OnTop^B
+      open(newunit=iunit,file='locmu_B.dat',form='unformatted')
+      read(iunit) NGridB,AvMuB
+      if (NGridB.ne.NGrid) stop "Error! Gridsize in loc_mu_ab"
+      allocate(FPsiB(NGrid),OnTopB(NGrid))
+      read(iunit) FPsiB
+      read(iunit) OnTopB
+      close(iunit)
+      print*, 'FPsiB  = ',norm2(FPsiB)
+      print*, 'OnTopB = ',norm2(OnTopB)
+      endif ! full
+c
       allocate(OrbTAGrid(NOccupA,NGrid))
       allocate(OrbTBGrid(NOccupA,NGrid))
       Do I=1,NGrid
@@ -974,6 +1028,14 @@ C     f^A and f^B
       allocate(XMuLoc(NGrid))
 
       OnTop = 0d0
+C     muAB = sqrt(pi)/2 * f^AB/ot^AB
+      if (full) then
+C     muAB = sqrt(pi)/2 * (f^A + f^B + f^AB)/(ot^A + ot^B + ot^AB)
+C     CAREFUL! OnTopA and OnTopB include factor "2"!
+      FPsiAB = FPsiAB + FPsiA + FPsiB
+      OnTop = OnTopA + OnTopB
+      endif
+
       AvMu  = 0d0
       XElA  = 0d0
       XElB  = 0d0
@@ -982,20 +1044,21 @@ C
       Call DenGrid(IG,RhoAGrid(IG),OccA,URe,OrbAGrid,NGrid,NBasis)
       Call DenGrid(IG,RhoBGrid(IG),OccB,URe,OrbBGrid,NGrid,NBasis)
 
-      OnTopA=0d0
+      OTA=0d0
       Do IP=1,NOccupA
-      OnTopA=OnTopA+OccA(IP)*OrbTAGrid(IP,IG)**2
+      OTA=OTA+OccA(IP)*OrbTAGrid(IP,IG)**2
       EndDo
-      OnTopB=0d0
+      OTB=0d0
       Do IR=1,NOccupB
-      OnTopB=OnTopB+OccB(IR)*OrbTBGrid(IR,IG)**2
+      OTB=OTB+OccB(IR)*OrbTBGrid(IR,IG)**2
       EndDo
-      OnTop(IG)=OnTopA*OnTopB
+c     OnTop(IG)=2d0*OTA*OTB
+      OnTop(IG)=OnTop(IG)+2d0*OTA*OTB
 C
       XMuLoc(IG)=0d0
 
       If(OnTop(IG).Gt.ThrOnTop) Then
-      XMuLoc(IG)=SPiHlf*FPsiB(IG)/OnTop(IG)
+      XMuLoc(IG)=SPiHlf*FPsiAB(IG)/OnTop(IG)
       EndIf
 
       AvMU=AvMU+XMuLoc(IG)*(RhoAGrid(IG)+RhoBGrid(IG))*WGrid(IG)
@@ -1004,8 +1067,7 @@ C
 
       EndDo ! NGrid
 
-      OnTop=2d0*OnTop
-
+      Print*, 'ThrOnTop  =', ThrOnTop
       Print*, 'RhoGrid A =', norm2(RhoAGrid)
       Print*, 'RhoGrid B =', norm2(RhoBGrid)
       Print*, 'OnTop(AB) =', norm2(OnTop)
@@ -1044,7 +1106,8 @@ C
       write(6,*) 'XelA XelB  =', XElA,XElB
       write(6,*) 'Average Mu =', AvMu
 C
-      deallocate(FPsiB)
+      deallocate(FPsiAB)
+      if (full) deallocate(FPsiB,FPsiA)
       deallocate(OrbTBGrid,OrbTAGrid)
       deallocate(RhoBGrid,RhoAGrid)
       deallocate(OnTop,XMuLoc)
