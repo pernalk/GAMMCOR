@@ -3875,7 +3875,7 @@ C
 C
       Dimension XKin(NInte1),UMOAO(NBasis,NBasis)
 C
-      parameter (mxbuf = 10000)  ! KP
+      parameter (mxbuf = 100000)  ! KP
       double precision  dbuf(mxbuf)
       integer ibuf(mxbuf*2)
       integer iunit77,iunit88, iunit99, ndim, norb, nbas, nfone
@@ -3927,7 +3927,7 @@ C     Reads 1-el integrals in AO in symm blocks and transform to NO
 C
       Dimension XKin(NInte1),UMOAO(NBasis,NBasis),NSymBas(8)
 C
-      parameter (mxbuf = 10000)  ! KP
+      parameter (mxbuf = 100000)  ! KP
       double precision  dbuf(mxbuf)
       integer ibuf(mxbuf*2),iibuf(mxbuf*2)
       integer iunit77,iunit88, iunit99, ndim, norb, nbas, nfone
