@@ -1,7 +1,8 @@
 #This file probably requires GNU Make, but should be easily
 #convertible to regular Make format.
 
-PATHS:=-Iinclude -Isrc -Isrc/taylor -Isrc/functionals -Llib -I/usr/include/x86_64-linux-gnu/c++/4.9/
+#PATHS:=-Iinclude -Isrc -Isrc/taylor -Isrc/functionals -Llib -I/usr/include/x86_64-linux-gnu/c++/4.9/
+PATHS:=-Iinclude -Isrc -Isrc/taylor -Isrc/functionals -Llib -isystem /usr/include/c++/11 -isystem /usr/include/x86_64-linux-gnu/c++/11 -isystem /usr/include/x86_64-linux-gnu
 CFLAGS+=$(PATHS)
 
 BASE_OBJ:=src/xcfun.o src/functional.o src/parameters.o \
