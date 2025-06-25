@@ -87,6 +87,12 @@ C      endif
 C
       Call read_sym_dalton(NSym,NSymBas,NSymOrb,'SIRIUS.RST','BASINFO ')
       Write(LOUT,'(1x,a,i3/)') 'Point Group = ', NSym
+      if (sum(NSymOrb).ne.sum(NSymBas)) then
+         print*, 'ERROR in ReadDAL!'
+         print*, 'NBasis = ', sum(NSymBas)
+         print*, 'NOrb   = ', sum(NSymOrb)
+         stop "NOrb .ne. NBasis...!"
+      endif
 C
       Call read_mo_dalton(UAux,NBasis,NSym,NSymBas,NSymOrb,
      $            'SIRIUS.RST','DALTON.MOPUN')
@@ -299,9 +305,9 @@ C      set Occ
 C
       ElseIf(ICASSCF.Eq.1) Then
 C
-      Sum=0.D0
+      SumOcc=0.D0
       Do I=1,NInAc+NAc
-      Sum=Sum+Occ(I)
+      SumOcc=SumOcc+Occ(I)
       EndDo
 C
       If(NInAc.Eq.0) Then
@@ -326,8 +332,8 @@ C     $ NInAcCAS,NAcCAS
       Do I=1,NBasis
       Write(6,'(X,I3,E16.6,I6)') I,Occ(I),IGem(I)
       EndDo
-      Write(6,'(2X,"Sum of Occupancies: ",E16.6)') Sum
-      If(Abs(Sum-NELE).Gt.1.D-8)
+      Write(6,'(2X,"Sum of Occupancies: ",E16.6)') SumOcc
+      If(Abs(SumOcc-NELE).Gt.1.D-8)
      $ Stop "Fatal Error: Occupancies do not sum up to NELE"
 C
       Close(10)
@@ -703,12 +709,12 @@ C
       EndDo
       EndDo
 c
-      Sum=Zero
+      SumOcc=Zero
       NAc=0
       Do I=1,NBasis
 C     it may happen that an active orbital has a negative but very small occupation. set it to a positive
       PC(I)=Abs(PC(I))
-      Sum=Sum+PC(I)
+      SumOcc=SumOcc+PC(I)
       If(PC(I).Gt.Zero) NAc=NAc+1
       EndDo
 C
@@ -733,7 +739,7 @@ c      EndDo
 C
 c 03.01.2024 end of changes
 C
-      NInAc=XELE-Sum+1.D-2
+      NInAc=XELE-SumOcc+1.D-2
       Do I=1,NInAc+NAc
       If(I.Le.NInAc) Then
       Occ(I)=One
@@ -760,12 +766,12 @@ C
      $ NInAcCAS,NAcCAS
 C
       Write(6,'(2X,"DMRG",3X,"Occupancy",4X,"Gem")')
-      Sum=Zero
+      SumOcc=Zero
       Do I=1,NBasis
       Write(6,'(X,I3,E16.6,I6)') I,Occ(I),IGem(I)
-      Sum=Sum+Occ(I)
+      SumOcc=SumOcc+Occ(I)
       EndDo
-      Write(6,'(2X,"Sum of Occupancies: ",F10.2)') Sum
+      Write(6,'(2X,"Sum of Occupancies: ",F10.2)') SumOcc
 C
       NAct=NAcCAS
       INActive=NInAcCAS
@@ -1703,12 +1709,12 @@ C
       ETot=ETot+Two*Occ(I)*XKin(II)
 C
       If(Occ(I).Ne.1.D0) Then
-      sum=zero
+      suma=zero
       Do J=1,INActive
-      sum=sum+
+      suma=suma+
      $ 2.D0*TwoEl(NAddr3(I,I,J,J))-TwoEl(NAddr3(I,J,I,J))
       EndDo
-      eact=eact+Two*Occ(I)*(XKin(II)+sum)
+      eact=eact+Two*Occ(I)*(XKin(II)+suma)
       EndIf
 C
       EndDo
@@ -2181,13 +2187,13 @@ C KP 30.07.2020
       EndDo
       EndDo
 C
-      Sum=Zero
+      SumOcc=Zero
       NAc=0
       Do I=1,NBasis
 C KP 08.08.2020
 C     it may happen that an active orbital has a negative but very small occupation. set it to a positive
       PC(I)=Abs(PC(I))
-      Sum=Sum+PC(I)
+      SumOcc=SumOcc+PC(I)
       If(PC(I).Gt.Zero) NAc=NAc+1
       EndDo
 C
@@ -2203,7 +2209,7 @@ c      Call read_nact_molpro(nact,'2RDM')
       IWarn=IWarn+1
       EndIf
 C
-      NInAc=XELE-Sum+1.D-2
+      NInAc=XELE-SumOcc+1.D-2
       Do I=1,NInAc+NAc
       If(I.Le.NInAc) Then
       Occ(I)=One
@@ -2230,12 +2236,12 @@ C
      $ NInAcCAS,NAcCAS
 C
       Write(6,'(2X,"MCSCF",3X,"Occupancy",4X,"Gem")')
-      Sum=Zero
+      SumOcc=Zero
       Do I=1,NBasis
       Write(6,'(X,I3,E16.6,I6)') I,Occ(I),IGem(I)
-      Sum=Sum+Occ(I)
+      SumOcc=SumOcc+Occ(I)
       EndDo
-      Write(6,'(2X,"Sum of Occupancies: ",F10.2)') Sum
+      Write(6,'(2X,"Sum of Occupancies: ",F10.2)') SumOcc
 C
       NAct=NAcCAS
       INActive=NInAcCAS
@@ -3128,9 +3134,9 @@ C     Cholesky OnTheFly
 
       If(ICASSCF.Eq.1) Then
 
-         Sum=0.D0
+         SumOcc=0.D0
          Do I=1,NInAc+NAc
-            Sum=Sum+Occ(I)
+            SumOcc=SumOcc+Occ(I)
          EndDo
 
          If(NInAc.Eq.0) Then
@@ -3152,8 +3158,8 @@ C     Cholesky OnTheFly
          Do I=1,NBasis
             Write(6,'(X,I3,E16.6,I6)') I,Occ(I),IGem(I)
          EndDo
-         Write(6,'(2X,"Sum of Occupancies: ",E16.6)') Sum
-         If(Abs(Sum-NELE).Gt.1.D-8)
+         Write(6,'(2X,"Sum of Occupancies: ",E16.6)') SumOcc
+         If(Abs(SumOcc-NELE).Gt.1.D-8)
      $        Stop "Fatal Error: Occupancies do not sum up to NELE"
 
       Close(10)
@@ -5132,6 +5138,12 @@ C        read 1rdm from SIRIFC file...
          Write(6,'(1x,a)') 'Occupation numbers from Dalton not found!'
          Stop
       EndIf ! FileOcc
+
+C      print*, 'NNIn     = ', NNIn
+C      print*, 'NNAct    = ', NNAct
+C      print*, 'NSym     = ', NSym
+C      print*, 'IActOrb  = ', IActOrb(1:NSym)
+C      print*, 'InActOrb = ', InActOrb(1:NSym)
 C
       II=0
       Do I=1,NSym
@@ -5145,33 +5157,53 @@ C
       EndDo
       EndDo
 C
-      Do I=1,NNIn+NNAct
-      ICpy1(I)=0
-      ICpy2(I)=0
-      EndDo
+C set markers
+      Ntot = NNIn+NNAct
+      do I = 1, Ntot
+        ICpy1(I) = 0 !=1 once slot I in the new list is filled
+        ICpy2(I) = 0 !=1 once source orb I has been used 
+      end do
 C
-      Do II=1,NNIn+NNAct
+C     ! Pass 1: LabelIAct == 1 first
+      do II = 1, Ntot
+        do I = 1, Ntot
+          if (ICpy2(I)==0 .and. ICpy1(II)==0 .and. LabelIAct(I)==1) then
+            ICpy2(I)=1; ICpy1(II)=1
+            Occ2(II)=Occ1(I)
+            exit   ! slot II done
+          end if
+        end do
+      end do
 C
-      Do I=1,NNIn+NNAct
-      If(ICpy2(I).Eq.0.And.ICpy1(II).Eq.0.And.Occ1(I).Eq.2.0D0) Then
-      ICpy2(I)=1
-      ICpy1(II)=1
-      Occ2(II)=Occ1(I)
-      EndIf
-      EndDo
+C     ! Pass 2: LabelAct == 1 : next
+      do II = 1, Ntot
+        if (ICpy1(II)==0) then
+          do I = 1, Ntot
+            if (ICpy2(I)==0 .and. LabelAct(I)==1) then
+              ICpy2(I)=1; ICpy1(II)=1
+              Occ2(II)=Occ1(I)
+              exit
+            end if
+          end do
+        end if
+      end do
 C
-      If(ICpy1(II).Eq.0) Then
-      Do I=1,NNIn+NNAct
-      If(ICpy2(I).Eq.0.And.ICpy1(II).Eq.0) Then
-      ICpy2(I)=1
-      ICpy1(II)=1
-      Occ2(II)=Occ1(I)
-      EndIf
-      EndDo
-      EndIf
+C     ! Pass 3: everything else : last
+      do II = 1, Ntot
+        if (ICpy1(II)==0) then
+          do I = 1, Ntot
+            if (ICpy2(I)==0) then
+              ICpy2(I)=1; ICpy1(II)=1
+              Occ2(II)=Occ1(I)
+              exit
+            end if
+          end do
+        end if
+      end do
 C
-      EndDo
+C sort orbitals in the same way
 C
+C reset markers
       Do I=1,NBasis
       ICpy1(I)=0
       ICpy2(I)=0

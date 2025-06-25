@@ -1,3 +1,5 @@
+!#define POLARI_DEBUG 6
+
 module polari
 
 use print_units
@@ -156,6 +158,19 @@ if(IFunSRKer.Eq.1) then
      IStart=IStart+NumOSym(I)
   enddo
 
+!#if POLARI_DEBUG > 5
+  print*, 'Polariz: NSym =',NSym
+  print*, 'UNOAO orbitals ',norm2(UNOAO)
+  do j=1,NBasis
+     write(6,'(*(f13.8))') (UNOAO(i,j),i=1,NBasis)
+  enddo
+  print*, 'NumOSym '
+  do i=1,NSym
+     print*, i,NumOSym(i)
+  enddo
+
+!#endif
+
 ! checking
   do I=1,NSym
   II=0
@@ -204,6 +219,7 @@ Call AB_CAS_FOFO(ABPLUS,ABMIN,ECASSCF,URe,Occ,XOne, &
               NDimX,NBasis,NDimX,&
               NInte1,twojfile,twokfile,ICholesky,0,Alpha,.false.)
 
+!print*, 'ABMIN-before  =', norm2(ABMIN)
 
 if(IFunSR.Eq.1.Or.IFunSR.Eq.2.Or.IFunSR.Eq.4) then
    if(IFunSRKer.Eq.1) then
@@ -218,6 +234,12 @@ if(IFunSR.Eq.1.Or.IFunSR.Eq.2.Or.IFunSR.Eq.4) then
    endif
 endif
 
+!Print*, 'XOne = ', norm2(XOne)
+!Print*, 'ABPLUS =', norm2(ABPLUS)
+!Print*, 'ABMIN  =', norm2(ABMIN)
+!print*, 'NAct  = ', NAct
+!print*, 'INAct = ', INActive
+!print*, 'NDimX = ', NDimX
 
 AIN=0d0
 Do I=1,NDimX
