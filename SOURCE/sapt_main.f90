@@ -63,7 +63,7 @@ double precision :: Tcpu,Twall
  call sapt_response(Flags,SAPT%monB,SAPT%EnChck,NBasis)
 
  call sapt_ab_ints(Flags,SAPT%monA,SAPT%monB,SAPT%iPINO,NBasis,AOBasis,CholeskyVecsOTF)
- call sapt_ab_lr_ints(Flags,SAPT,SAPT%monA,SAPT%monB,NBasis,AOBasis,CholeskyVecsOTF,CholErfVecsOTF)
+ !call sapt_ab_lr_ints(Flags,SAPT,SAPT%monA,SAPT%monB,NBasis,AOBasis,CholeskyVecsOTF,CholErfVecsOTF)
  !if(Flags%IDBBSC==2) call sapt_ab_lr_ints(Flags,SAPT,SAPT%monA,SAPT%monB,NBasis,AOBasis,CholeskyVecsOTF,CholErfVecsOTF)
 
  ! MC-srDFT SAPT with Cholesky OTF

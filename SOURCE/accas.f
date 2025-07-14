@@ -52,20 +52,27 @@ C     SET INTERFACE TYPE (for Polariz)
 C
 C     CONSTRUCT LOOK-UP TABLES
 C
-      Do I=1,NELE
-      IndAux(I)=0
-      EndDo
-      Do I=1+NELE,NBasis
-      IndAux(I)=2
-      EndDo
+C     mh 14.07.25: this fails when Dalton+sym!
+C
+C      Do I=1,NELE
+C      IndAux(I)=0
+C      EndDo
+C      Do I=1+NELE,NBasis
+C      IndAux(I)=2
+C      EndDo
+C
+      IndAux=2 ! assume all secondary
 C
       ICount=0
 C
       Do I=1,NBasis
 C
-      If(Occ(I).Lt.One.And.Occ(I).Ne.Zero) Then
+      If (Abs(Occ(i)-One).lt.epsilon(One)) Then
+      IndAux(I)=0
+c     Write(6,'(X," InActive Orbital: ",I4,ES14.4)') I, Occ(I)
+      ElseIf(Occ(I).Lt.One.And.Occ(I).Ne.Zero) Then
       IndAux(I)=1
-      Write(6,'(X," Active Orbital: ",I4,E14.4)') I, Occ(I)
+      Write(6,'(X," Active Orbital  : ",I4,ES14.4)') I, Occ(I)
       ICount=ICount+1
       EndIf
       EndDo

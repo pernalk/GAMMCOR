@@ -20,6 +20,7 @@ C      use Cholesky
       use gammcor_integrals
 C
       Implicit Real*8 (A-H,O-Z)
+      Character*60 FMultTab
 C
       Real*8 XKin(NInte1),XNuc(NInte1),Occ(NBasis),URe(NBasis,NBasis),
      $ TwoEl(NInte2),UMOAO(NBasis,NBasis),
@@ -87,6 +88,7 @@ C      endif
 C
       Call read_sym_dalton(NSym,NSymBas,NSymOrb,'SIRIUS.RST','BASINFO ')
       Write(LOUT,'(1x,a,i3/)') 'Point Group = ', NSym
+      MxSym = NSym
       if (sum(NSymOrb).ne.sum(NSymBas)) then
          print*, 'ERROR in ReadDAL!'
          print*, 'NBasis = ', sum(NSymBas)
@@ -1921,6 +1923,7 @@ C
       character(:),allocatable :: BasisSetPath
 C
       Character*60 FName,Aux1
+      Character*60 FMultTab
       Character(*) :: Title,BasisSet
 C
       Include 'commons.inc'
