@@ -906,6 +906,72 @@ C
       Return
       End
 
+*Deck PrOcc1
+      Subroutine PrOcc1(XMiu,XNorm,Occ,NB)
+C
+C     PROJECTION OF Occ VECTOR FOLLOWING
+C     Cances&Pernal JCP 128, 134108 (2008), Eq.(17)
+C
+      Implicit Real*8 (A-H,O-Z)
+C
+      Dimension Occ(NB)
+C
+      Parameter (Zero=0.D0,One=1.D0,Two=2.D0,Ten=10.D0,Mx=5)
+C
+C     CHECK IF XMiu=0 IS OK
+C
+      Sum=Zero
+      Sum2=Zero
+      Do I=1,NB
+      Sum2=Sum2+Occ(I)
+      If(Occ(I).Ge.Zero) Sum=Sum+Occ(I)
+      EndDo
+C
+      If(Sum.Eq.Sum2.And.Sum.Eq.XNorm) Then
+      XMiu=Zero
+      GoTo 444
+      EndIf
+C
+      XMiu1=Zero
+C
+      If(XSum1(XNorm,XMiu1,Occ,NB).Gt.Zero) Then
+      XMiu2=-0.01
+      ICount=0
+  333   If(XSum1(XNorm,XMiu2,Occ,NB).Ge.Zero) Then
+      XMiu2=XMiu2*Two
+      ICount=ICount+1
+      If(ICount.Gt.Mx) Stop 'Fatal error2 in PrOcc1'
+      GoTo 333
+      EndIf
+      EndIf
+C
+      If(XSum1(XNorm,XMiu1,Occ,NB).Lt.Zero) Then
+      XMiu2= 0.01
+      ICount=0
+  336   If(XSum1(XNorm,XMiu2,Occ,NB).Le.Zero) Then
+      XMiu2=XMiu2*Two
+      ICount=ICount+1
+      If(ICount.Gt.Mx) Stop 'Fatal error3 in PrOcc1'
+      GoTo 336
+      EndIf
+      EndIf
+C
+C      XMiu=RtBis(XSum1,XMiu1,XMiu2,XNorm,Occ,NB)
+      XMiu=RtBis(1,XMiu1,XMiu2,XNorm,Occ,NB)
+C
+  444   Do I=1,NB
+C
+      If(Occ(I)+Xmiu.Gt.Zero) Then
+      Occ(I)=Min(Occ(I)+XMiu,One)
+      Else
+      Occ(I)=Zero
+      EndIf
+C
+      EndDo
+C
+      Return
+      End
+
 *Deck PrOcc2
       Subroutine PrOcc2(XMiu,XNorm,Pcc,NB)
 C
@@ -943,7 +1009,8 @@ C
       GoTo 333 
       EndIf
 C
-      XMiu=RtBis(XSum2,XMiu1,XMiu2,XNorm,Pcc,NB)
+C      XMiu=RtBis(XSum2,XMiu1,XMiu2,XNorm,Pcc,NB)
+      XMiu=RtBis(2,XMiu1,XMiu2,XNorm,Pcc,NB)
 C
   444 Do I=1,NB
 C
@@ -954,6 +1021,26 @@ C
       EndIf
 C
       EndDo
+C
+      Return
+      End
+
+*Deck XSum1
+      Real*8 Function XSum1(XNorm,XMiu,Occ,NB)
+C
+      Implicit Real*8 (A-H,O-Z)
+C
+      Dimension Occ(NB)
+C
+      Parameter (Zero=0.D0,One=1.D0)
+C
+      XSum1=Zero
+      Do I=1,NB
+      If(Occ(I)+Xmiu.Gt.Zero)
+     $  XSum1=XSum1+Min(Occ(I)+XMiu,One)
+      EndDo
+C
+      XSum1=XSum1-XNorm
 C
       Return
       End
@@ -979,7 +1066,7 @@ C
       End
 
 *Deck RtBis
-      Real*8 Function RtBis(XSum,x1,x2,XNorm,Occ,NB)
+      Real*8 Function RtBis(ISum,x1,x2,XNorm,Occ,NB)
 C
 C     Using bisection, find the root of a function known to lie between
 C     x1 and x2. The root, returned as rtbis, will be refined until its 
@@ -996,9 +1083,14 @@ C
 C     Maximum allowed number of bisections. 
 C     
       Parameter (xacc=1.D-12,JMAX=50)
-C     
-      fmid=XSum(XNorm,x2,Occ,NB)
-      f=XSum(XNorm,x1,Occ,NB)
+C
+      if (ISum.eq.1)then
+         fmid=XSum1(XNorm,x2,Occ,NB)
+         f=XSum1(XNorm,x1,Occ,NB)
+      else if (ISum.eq.2)then
+         fmid=XSum2(XNorm,x2,Occ,NB)
+         f=XSum2(XNorm,x1,Occ,NB)
+      end if
 C     
       if(f*fmid.ge.zero) stop 'root must be bracketed in rtbis'
 C     
@@ -1021,8 +1113,12 @@ C
 C     Bisection loop. 
 C     
       dx=dx*half 
-      xmid=rtbis+dx 
-      fmid=XSum(XNorm,xmid,Occ,NB)
+      xmid=rtbis+dx
+      if (ISum.eq.1)then
+         fmid=XSum1(XNorm,xmid,Occ,NB)
+      else if (ISum.eq.2)then
+         fmid=XSum2(XNorm,xmid,Occ,NB)
+      end if
 C     
       if(fmid.le.zero) rtbis=xmid 
       if(abs(dx).lt.xacc.or.fmid.eq.zero) return

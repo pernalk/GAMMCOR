@@ -7,6 +7,10 @@ set(CMAKE_MODULE_PATH
     ${CMAKE_SOURCE_DIR}/cmake
 )
 
+set(CMAKE_VERBOSE_MAKEFILE OFF)
+set(CMAKE_FIND_DEBUG_MODE FALSE)
+set(CMAKE_MESSAGE_LOG_LEVEL "WARNING")
+
 # Services
 include(MessageService)
 include(SettingsService)

@@ -4,7 +4,7 @@ message(NOTICE "🗃️  TREXIO info")
 find_library(
     TREXIO_LIBRARY 
     NAMES trexio
-    PATHS /home/hapka/.local/lib
+    PATHS /home/michalhapka/.local/lib
     NO_DEFAULT_PATH
 )
 
