@@ -865,11 +865,11 @@ C
          call daltongrid_lda(OrbGrid,WGrid,NGrid,griddalfile,NBasis)
          call daltongrid_tran_lda(OrbGrid,UAux,0,NGrid,NBasis,.false.)
       EndIf ! doGGA
+      EndIf ! Interface
       print*, 'OrbGrid  =',norm2(OrbGrid)
       print*, 'OrbXGrid =',norm2(OrbXGrid)
       print*, 'OrbYGrid =',norm2(OrbYGrid)
       print*, 'OrbZGrid =',norm2(OrbZGrid)
-      EndIf ! Interface
 C
       ElseIf (InternalGrid==1) then
 
@@ -1099,16 +1099,25 @@ C      do j=1,NBasis
 C         write(6,'(*(f13.8))') (UNOAO(i,j),i=1,NBasis)
 C      enddo
 C
-      Print*, 'VCoul',norm2(VCoul)
+      Write(6,'(1x,"VHsr AO potential (norm2 = ",F0.8,")")')
+     &  norm2(VCoul)
       Call EPotSR(EnSR,EnHSR,VSR,Occ,URe,UNOAO,.false.,
      $        OrbGrid,OrbXGrid,OrbYGrid,OrbZGrid,WGrid,
      $        NSymNO,VCoul,Alpha,IFunSR,
 C     $        NSymNO,VCoul,TwoEl2,TwoNO,Alpha,IFunSR,
      $        NGrid,NInte1,NInte2,NBasis)
 C
+C     VSR = VsrH + VsrXC
+C     Dalton: always add VSR to 1-el potential
+C     Molpro: add VSR to 1-el potential only for OTF jobs
       If (IDALTON==1) Then
-        Print*, 'Dalton: add VHsr[rho] contribution...'
         XOne = XOne + VSR
+        Write(6,'(1x,"srXC potential from XCFUN (norm2 = ",F0.8,")")')
+     &  norm2(VSR)
+      ElseIf (IMOLPRO==1.and.ICholeskyOTF==1) Then
+        XOne = XOne + VSR
+        Write(6,'(1x,"srXC potential from XCFUN (norm2 = ",F0.8,")")')
+     &  norm2(VSR)
       EndIf
 C      block
 C        double precision :: VHsr(NBasis,NBasis)
@@ -1583,6 +1592,8 @@ C      DeAllocate  (OrbZGrid)
       DeAllocate  (Work)
       DeAllocate (SRKer)
 C
+C     Delete out-of-core integrals
+      If (ICholeskyOTF==0) Then
       Call delfile('AOTWOSORT')
       Call delfile('AOERFSORT')
 C
@@ -1592,9 +1603,13 @@ C
       Call delfile('FOFOERF')
       Call delfile('FFOOERF')
       EndIf
+      ElseIf (ICholeskyOTF==1) Then
+      Call delfile('cholvecs')
+      EndIf ! ICholeskyOTF
 C
       Return
       End
+C     End Subroutine RunACCASLR
 
 *Deck GetSRKer
       Subroutine GetSRKer(SRKer,Occ,URe,OrbGrid,WGrid,NBasis,NGrid)

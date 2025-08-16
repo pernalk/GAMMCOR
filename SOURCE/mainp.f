@@ -447,10 +447,13 @@ C
 C      Write(6,'(8a10)') ('**********',i=1,9)
       EndIf
 C
+C     Delete out-of-core integrals
       If(ITwoEl.Eq.2)  Call delfile('TWOMO')
-      Call delfile('AOTWOSORT')
-      If(IFunSR.Eq.1.Or.IFunSR.Eq.2.Or.IFunSR.Eq.4) Then
-      Call delfile('AOERFSORT')
+      If (ICholeskyOTF==0) Then
+         Call delfile('AOTWOSORT')
+         If(IFunSR.Eq.1.Or.IFunSR.Eq.2.Or.IFunSR.Eq.4) Then
+         Call delfile('AOERFSORT')
+         EndIf
       EndIf
 C
       Call free_System(System)

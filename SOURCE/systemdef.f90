@@ -790,7 +790,7 @@ write(LOUT,'(1x,a)') 'SYSTEM '
 write(LOUT,'(8a10)') ('**********',i=1,8)
 
 if(Flags%ISAPT.Eq.0) then
-   write(LOUT,'(1x,a,1x,i2)') 'NUCLEAR CHARGE: ', System%ZNucl
+   write(LOUT,'(1x,a,1x,i3)') 'NUCLEAR CHARGE: ', System%ZNucl
    write(LOUT,'(1x,a,8x,i3)') 'CHARGE: ', System%Charge
 
 elseif(Flags%ISAPT.Eq.1) then
