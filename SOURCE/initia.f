@@ -93,7 +93,7 @@ C
          print*, 'ERROR in ReadDAL!'
          print*, 'NBasis = ', sum(NSymBas)
          print*, 'NOrb   = ', sum(NSymOrb)
-         stop "NOrb .ne. NBasis...!"
+      !   stop "NOrb .ne. NBasis...!"
       endif
 C
       Call read_mo_dalton(UAux,NBasis,NSym,NSymBas,NSymOrb,
@@ -358,6 +358,55 @@ c     If(NSym.gt.1) UAux = CAONO
      $                              NAc+NInAc,NBasis)
       EndIf !ICholeskyOTF
       EndIf !ICASSCF
+
+CC     POSTCAS OTF: compute Jsr and save on disk
+C      If (IFunSR==4.and.ICholeskyOTF==1) Then
+C      Print*, 'CAONO',norm2(CAONO)
+C      do j=1,NBasis
+C         write(6,'(*(f13.8))') (CAONO(i,j),i=1,NBasis)
+C      enddo
+C      Print*, 'UMOAO',norm2(UMOAO)
+C      do j=1,NBasis
+C         write(6,'(*(f13.8))') (UMOAO(i,j),i=1,NBasis)
+C      enddo
+C      Print*, 'Monomer = ' , Monomer
+C      UAux=transpose(UMOAO)
+C      block 
+Cc     Real*8  :: JMO(NBasis,NBasis),JMOlr(NBasis,NBasis),
+Cc    $           JMOsr(NBasis,NBasis)
+CC     Real*8  :: GammaF(NInte1)
+C      Real*8  :: Jsr(NBasis,NBasis)
+CC
+C      ! read it SAO from Dalton, save on disk?
+C      Call read_Jsr_dalton(Jsr,'dftSRfile.dat',NBasis)
+C      print*, 'Jsr norm2',norm2(Jsr)
+C      write(LOUT,'(1x,a)')  'SR Coulomb ints read from dftSRfile.dat'
+C
+CC     dump short-range Jmat AO on disk
+C      open(newunit=iunit,file='jsrmat',form='unformatted')
+C      write(iunit) NBasis
+C      write(iunit) Jsr
+C      close(iunit)
+CC     prepare 1-el density (NOccup) in MO
+Cc     GammaF=Zero
+C      ! NO--> AO
+CC           Call CholeskyOTF_Fock_MO_v2(work1,CholErfVecsOTF,
+CC     $                            AOBasis,System,Monomer,'DALTON',
+CC     $                            CAONO,CSAOMO,XKin,GammaF,
+CC     $                            Xgp,Zgk,NGridTHC,NCholeskyTHC,
+CC     $                            MemType,MemVal,NInte1,NBasis,
+CC     $                            2,JMOlr)
+CC
+Cc          Call CholeskyOTF_Jmat_MO(JMO,CholeskyVecsOTF,
+Cc    $                          AOBasis,System,Monomer,'DALTON',
+Cc    $                          CAONO,UAux,XKin,GammaF,
+Cc    $                          MemType,MemVal,NInte1,NBasis,2)
+CC
+CC           JMOsr = JMO - JMOlr
+Cc       print*, 'J in MO full-range ', norm2(JMO)
+C      end block
+C
+C      EndIf
 
 C     OUT-OF-CORE INTEGRAL TRANSFORMATIONS
       If(ITwoEl.Ne.1) Then
@@ -2510,7 +2559,7 @@ C
            JMOsr = JMO - JMOlr
 c
 c        print*, 'J in MO long-range ', norm2(JMOlr)
-c        print*, 'J in MO full-range ', norm2(JMO)
+         print*, 'J in MO full-range ', norm2(JMO)
 c        do j=1,NBasis
 c           write(LOUT,'(*(f13.8))') (JMOlr(i,j),i=1,NBasis)
 c            write(LOUT,'(*(f13.8))') (JMO(i,j)-JMOlr(i,j),i=1,NBasis)
@@ -2685,7 +2734,7 @@ c      enddo
 c      end block
 C
 C
-C     dump short-range Jmat on disk
+C     dump short-range Jmat AO on disk
       open(newunit=iunit,file='jsrmat',form='unformatted')
       write(iunit) NBasis
       write(iunit) JMOsr
@@ -5104,6 +5153,7 @@ C
 
 *Deck SortOrbDal
       Subroutine SortOrbDal(URe1,Occ2,NNIn,NNAct,NSym,IOrbSym,NBasis)
+C
 C     sorts the orbitals in URe1 so that the
 C     inactive orbitals go first, then active, and secondary orbitals
 C
@@ -5118,6 +5168,7 @@ C
       Dimension LabelAct(NBasis),LabelIAct(NBasis),
      $ ICpy1(NBasis),ICpy2(NBasis)
       Logical FileOcc,FileSIRIFC
+      Logical ISortOcc
 C
       Occ2(1:NBasis)=0.0
       Occ1(1:NBasis)=0.0
@@ -5145,9 +5196,19 @@ C        read 1rdm from SIRIFC file...
 C      print*, 'NNIn     = ', NNIn
 C      print*, 'NNAct    = ', NNAct
 C      print*, 'NSym     = ', NSym
+C      print*, 'IOrbSym  = ', IOrbSym(1:NSym)
 C      print*, 'IActOrb  = ', IActOrb(1:NSym)
 C      print*, 'InActOrb = ', InActOrb(1:NSym)
 C
+c     print*, 'before sort =', Occ1(1:NNIn+NNAct)
+C     Check if occupation numbers are sorted descending
+      Ntot = NNIn+NNAct
+      ISortOcc=.true.
+      Do I=1,Ntot-1
+      If (Occ1(I) < Occ1(I+1)) ISortOcc=.false.
+      EndDo
+C
+C  Build labels by symmetry blocks
       II=0
       Do I=1,NSym
       Do J=1,IOrbSym(I)
@@ -5159,14 +5220,18 @@ C
       If(J.Le.InActOrb(I)) LabelIAct(II)=1
       EndDo
       EndDo
-C
+C   
 C set markers
-      Ntot = NNIn+NNAct
       do I = 1, Ntot
         ICpy1(I) = 0 !=1 once slot I in the new list is filled
         ICpy2(I) = 0 !=1 once source orb I has been used 
       end do
 C
+!      print*, 'LabelIAct = ', LabelIAct(1:Ntot)
+!      print*, 'LabelAct  = ', LabelAct(1:Ntot)
+C
+C     1. Sort occupation numbers
+      if (ISortOcc) Then
 C     ! Pass 1: LabelIAct == 1 first
       do II = 1, Ntot
         do I = 1, Ntot
@@ -5203,6 +5268,11 @@ C     ! Pass 3: everything else : last
           end do
         end if
       end do
+C
+      else ! do not sort occ numbers
+      Occ2=0
+      Occ2(1:Ntot) = Occ1(1:Ntot)
+      endif
 C
 C sort orbitals in the same way
 C
