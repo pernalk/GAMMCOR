@@ -107,11 +107,13 @@ C
       IWarn   = 0
       Max_Cn  = System%Max_Cn
       ITrpl   = Flags%ITrpl
-      FreqOm  = System%FreqOm
       IRedVirt  = Flags%IRedVirt
       IOrbRelax = Flags%IOrbRelax
       IOrbIncl  = Flags%IOrbIncl
 C
+C     ...RESPONSE (POLARIZABITY FREQUENCIES)
+      NFreqOm = System%NFreqOm
+      FreqOm(1:NFreqOm) = System%FreqOm(1:System%NFreqOm)
 C
 C     *************************************************************************
 C

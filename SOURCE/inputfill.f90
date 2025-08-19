@@ -578,7 +578,7 @@ subroutine read_block_calculation(CalcParams, line)
              read(val,*) CalcParams%Max_Cn
 
       case("FREQOM")
-             read(val,*) CalcParams%FreqOm
+             call read_freqarray(val,CalcParams%FreqOm,CalcParams%NFreqOm,',')
 
       case ("CALPHA")
              read(val,*) CalcParams%CAlpha
@@ -1333,6 +1333,65 @@ subroutine read_trstatearray(val,intrst,delim)
      end if
 
 end subroutine read_trstatearray
+
+subroutine read_freqarray(val,freqs,infreqs,delim)
+
+     character(*), intent(in) :: val
+     character(1), intent(in) :: delim
+     integer,intent(inout) :: infreqs
+
+     integer :: ii,k
+     logical :: dot
+     real*8,allocatable :: freqs(:)
+     character(:), allocatable :: w,v,f
+
+     w = trim(adjustl(val))
+     v = trim(adjustl(val))
+
+     if (len(w) == 0) then
+           write(LOUT,'(1x,a)') 'ERROR!!! NO FREQUENCIES GIVEN!'
+           stop
+     else
+           !! check for dots
+           !k = index(v,'.')
+           !if(k /= 0) then
+           !   dot=.true.
+           !else
+           !   dot=.false.
+           !endif
+
+           ! get number of frequencies
+           infreqs = 0
+           dimloop: do
+                     k = index(v, delim)
+                     infreqs = infreqs + 1
+                     v = trim(adjustl(v(k+1:)))
+                     if (k == 0) exit dimloop
+                    enddo dimloop
+
+           ! assign frequencies
+           allocate(freqs(infreqs))
+           infreqs = 0
+           arrloop: do
+                     k = index(w, delim)
+                     infreqs = infreqs + 1
+                     if(k /= 0) then
+                         f = w(1:k-1)
+                         read(f, *) freqs(infreqs)
+                         w = trim(adjustl(w(k+1:)))
+                         !print*, '',inst(1,instates),inst(2,instates)
+                     elseif (k == 0) then
+                         !print*, 'last ', w
+                         f = w
+                         read(f, *) freqs(infreqs)
+                         !print*, '1 2',inst(1,instates),inst(2,instates)
+                         exit arrloop
+                     endif
+                  enddo arrloop
+
+     end if
+
+end subroutine read_freqarray
 
 subroutine split(s, s1, s2, delimiter)
       !

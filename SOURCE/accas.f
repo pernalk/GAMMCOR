@@ -154,19 +154,19 @@ C
 C
       If(IFlRESPONSE.Eq.1) Then
 C
-      Write(6,'(/,X,''Polarizability tensor calculation for Om ''
-     $ ,F8.4)') FreqOm
+      Write(6,'(/,X,''Polarizability tensor calculation for ''
+     $ ,I2, '' frequencies'')') NFreqOm
 C
       If(Max_Cn.Eq.-1) Then
       Call Polariz(FreqOm,ECASSCF,UNOAO,XOne,URe,Occ,
-     $   IGem,NAcCAS,NInAcCAS,NElecBEmb,NELE,
+     $   IGem,NAcCAS,NInAcCAS,NElecBEmb,NELE,NFreqOm,
      $   NBasis,NInte1,IndAux,
      $   IndN,IndX,NDimX,ICholesky,IFunSR,IFunSRKer,INTIDX,
      $   MemVal,MemType)
       Else
       Write(6,'(/,X,''Expand C(Om) maximally up to order '',I4)') Max_Cn
       Call PolarizAl(FreqOm,ECASSCF,UNOAO,XOne,URe,Occ,
-     $   IGem,NAcCAS,NInAcCAS,NElecBEmb,NELE,
+     $   IGem,NAcCAS,NInAcCAS,NElecBEmb,NELE,NFreqOm,
      $   NBasis,NInte1,NGem,IndAux,
      $   IndN,IndX,NDimX,
      $   BasisSet,ICholesky,Max_Cn,IntIdx)
@@ -930,14 +930,33 @@ c     If (NSym.gt.1) stop "Dalton with Symmetry in RunACCASLR!"
       EndIf
       MxSym=NSym
 C
+CC     test 2
+C      print*, 'MxSym ...', MxSym
+C      print*, 'UNOAO ...'
+C      do j=1,NBasis
+C         write(6,'(*(f13.8))') (UNOAO(i,j),i=1,NBasis)
+C      enddo
+
       If (ICholesky==1) Then
-         if (IDALTON==1) stop "Finish Dalton+Chol in RunACCASLR!"
+         if (IDALTON==1) then
+         print*, 'skip NSymNO ? '
+         jtsoao=1
+         elseif (IMOLPRO==1) then 
+         !if (IDALTON==1) stop "Finish Dalton+Chol in RunACCASLR!"
          Call read_aosao_map_molpro(jtsoao,
      $              'MOLPRO.MOPUN','CASORBAO',NBasis)
+         endif
          If (InternalGrid==0.and.MxSym>1.and.IFunSRKer==1) Then
             Stop "In RunACCASLR: Kernel & Sym /= 1 : use INTERNAL GRID!"
          EndIf
       EndIf
+
+C      ! test 1
+C      print*, 'NumOSym..',NumOSym
+C      print*, 'jtsoao...'
+C      do i=1,nbasis
+C         print*, i,jtsoao(i)
+C      enddo
 
       NSymNO(1:NBasis)=0
       IStart=0
@@ -958,6 +977,13 @@ C
       IStart=IStart+NumOSym(I)
       EndDo
 C
+C      ! test 3
+C!     NSymNO=1
+C      print*, 'NSymNO...'
+C      do i=1,nbasis
+C         print*, i,NSymNO(i)
+C      enddo
+
 C     checking
       Do I=1,MxSym
       II=0
@@ -1037,7 +1063,7 @@ C
       EndIf ! ITwoEl
       EndIf ! ICholesky
 C
-      If (IDALTON==1) Then
+      If (IDALTON==1.and.ITwoEl==3.and.ICholeskyOTF==0) Then
       NAct=NAcCAS
       INActive=NInAcCAS
       Call PsiHPsi(EPsiHPsi,Occ,XOne,ENuc,INActive,NAct,NInte1,NBasis)
@@ -1080,7 +1106,7 @@ C            write(6,'(*(f13.8))') (JMOsr(i,j),i=1,NBasis)
 C         enddo
 C         end block
       ElseIf (ICholesky==1) Then
-         ! for Cholesky, Jmat(sr) is read from disk
+         ! for Cholesky, Jmat(sr) in AO is read from disk
          Allocate(Jmat(NBasis,NBasis))
          Open(newunit=iunit,file='jsrmat',form='unformatted')
          Read(iunit) NBasis2

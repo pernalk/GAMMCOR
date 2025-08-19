@@ -65,6 +65,14 @@ case(5)
       write(6,'(1x,a)') "RDMSource    DALTON/MOLPRO"
       stop "Error: check_Calc"
    endif
+
+! RESPONSE
+case(17)
+   if (CalcParams%NFreqOm .gt. 10) then
+      write(6,'(1x,a)') "ERROR! MORE THAN 10 FREQUENCIES!"
+      stop "Error: check_Calc"
+   endif
+
 end select
 
 ! check interface
@@ -526,6 +534,8 @@ if(Flags%ISAPT.Eq.0) then
    System%IPrint = Input%CalcParams%IPrint
   
    System%Max_Cn = Input%CalcParams%Max_Cn
+   System%NFreqOm = Input%CalcParams%NFreqOm
+   Allocate(System%FreqOm(System%NFreqOm))
    System%FreqOm = Input%CalcParams%FreqOm
 
    System%XELE = (System%ZNucl - System%Charge)/2.0d0

@@ -13,7 +13,7 @@ implicit none
 contains
 
 subroutine Polariz(FreqOm,ECASSCF,UNOAO,XOne,URe,Occ,&
-   IGem,NAct,INActive,NElecBEmb,NELE,&
+   IGem,NAct,INActive,NElecBEmb,NELE,NFreq,&
    NBasis,NInte1,IndAux,&
    IndN,IndX,NDimX,ICholesky,IFunSR,IFunSrKer,IntIdx, &
    MemVal,MemType)
@@ -32,7 +32,8 @@ integer,intent(in) :: NAct,INActive,NElecBEmb,NELE
 integer,intent(in) :: IndN(2,NDimX),IndX(NDimX),IndAux(NBasis),IGem(NBasis)
 integer,intent(in) :: ICholesky,IFunSR,IFunSRKer,IntIdx
 integer,intent(in) :: MemVal,MemType
-double precision,intent(in) :: FreqOm,Occ(NBasis)
+integer,intent(in) :: NFreq
+double precision,intent(in) :: FreqOm(NFreq),Occ(NBasis)
 double precision,intent(in) :: UNOAO(NBasis,NBasis),URe(NBasis,NBasis)
 double precision,intent(inout) :: XONe(NInte1)
 double precision,intent(out)   :: ECASSCF
@@ -43,6 +44,7 @@ double precision :: DipX(NBasis,NBasis),DipY(NBasis,NBasis),DipZ(NBasis,NBasis)
 double precision :: DipCX(NDimX),DipCY(NDimX),DipCZ(NDimX)
 double precision :: ABPLUS(NDimX*NDimX),ABMIN(NDimX*NDimX),AIN(NDimX*NDimX),CMAT(NDimX*NDimX)
 double precision :: AXX,AYX,AXY,AZX,AXZ,AYY,AZY,AYZ,AZZ,Om,Alpha
+double precision :: AISO
 !
 double precision :: VsrKS(NBasis,NBasis),Jsr(NBasis,NBasis)
 double precision :: JsrTR(NInte1),VsrTR(NInte1)
@@ -54,7 +56,7 @@ double precision,allocatable :: OrbGrid(:,:),WGrid(:)
 double precision,allocatable :: OrbXGrid(:,:),OrbYGrid(:,:),OrbZGrid(:,:)
 
 integer :: NOccup,NGrid
-integer :: I,J,II,IJ
+integer :: I,J,II,IJ,im
 integer :: IStart,IOrb,inf
 integer :: num0,num1
 integer :: NSymBas(8),NSymOrb(8)
@@ -66,8 +68,7 @@ double precision,external :: ddot
 
 character(*),Parameter :: griddalfile='dftgrid.dat'
 
-Om=FreqOm
-
+!Om=FreqOm
 NOccup=NAct+INActive
 
 If (IntIdx == 1) then ! Molpro
@@ -241,6 +242,9 @@ endif
 !print*, 'INAct = ', INActive
 !print*, 'NDimX = ', NDimX
 
+do im=1,NFreq
+Om = FreqOm(im)
+
 AIN=0d0
 Do I=1,NDimX
     AIN((I-1)*NDimX+I)=1.0
@@ -267,11 +271,15 @@ Call dgemv('N',NDimX,NDimX,1.d0,CMAT,NDimx,DipCZ,1,0.d0,ipiv,1)
 AXZ=8.d0*ddot(NDimx,DipCX,1,ipiv,1)
 AYZ=8.d0*ddot(NDimx,DipCY,1,ipiv,1)
 AZZ=8.d0*ddot(NDimx,DipCZ,1,ipiv,1)
+AISO=(AXX+AYY+AZZ)/3d0
 
 Write(6,'(/,X,''Polarizability tensor for frequency '',F8.4)') Om
 Write(6,'(/,X,''XX   XY   XZ  '',3F15.8)') AXX, AXY, AXZ
 Write(6,'(X,''YX   YY   YZ  '',3F15.8)') AYX, AYY, AYZ
-Write(6,'(X,''ZX   ZY   ZZ  '',3F15.8,2/)') AZX, AZY, AZZ
+Write(6,'(X,''ZX   ZY   ZZ  '',3F15.8,1/)') AZX, AZY, AZZ
+Write(6,'(X,''Isotropic Polarizability'',F15.8)') AISO
+
+enddo ! Om
 
 If(IFunSR.Eq.1.Or.IFunSR.Eq.2.Or.IFunSR.Eq.4) Then
   Call EneMCsrDFT(ECASSCF,esrDFT(1),Occ,XOne,JsrTR,VsrTR,NInte1,NBasis)
@@ -332,7 +340,7 @@ write(6,'(1X,"Total lrCASSCF+ENuc+srDF Energy",T40,F15.8,/)') ECASSCF - XVSR + E
 end subroutine EneMCsrDFT
 
 subroutine PolarizAl(FreqOm,ECASSCF,UNOAO,XOne,URe,Occ,&
-   IGem,NAct,INActive,NElecBEmb,NELE,NBasis,NInte1,NGem,IndAux,&
+   IGem,NAct,INActive,NElecBEmb,NELE,NFreq,NBasis,NInte1,NGem,IndAux,&
    IndN,IndX,NDimX,BasisSet,ICholesky,Max_Cn,IntIdx)
 !
 ! Returns dynamic polarizability tensor for a given frequency FreqOm
@@ -347,22 +355,24 @@ integer,intent(in) :: IndN(2,NDimX),IndX(NDimX),IndAux(NBasis),IGem(NBasis)
 integer,intent(in) :: IntIdx
 character(6) :: Source
 character(*) :: BasisSet
-double precision,intent(in) :: FreqOm
+!double precision,intent(in) :: FreqOm
+integer,intent(in) :: NFreq
+double precision,intent(in) :: FreqOm(NFreq)
 double precision,intent(in) :: Occ(NBasis),XOne(NInte1)
 double precision,intent(in) :: UNOAO(NBasis,NBasis),URe(NBasis,NBasis)
 double precision :: ECASSCF
 
-integer :: i,j,ij,inf,ICholesky,NOccup
+integer :: i,j,ij,im,inf,ICholesky,NOccup
 double precision :: CICoef(NBasis)
 double precision :: DipX(NBasis,NBasis),DipY(NBasis,NBasis),DipZ(NBasis,NBasis)
 double precision :: DipCX(NDimX),DipCY(NDimX),DipCZ(NDimX)
 double precision :: ipiv(NDimX)
 double precision :: AXX,AYX,AXY,AZX,AXZ,AYY,AZY,AYZ,AZZ,Om,ddot,Alpha
+double precision :: AISO
 character(:),allocatable ::  XYZPath
 character(:),allocatable :: twojfile,twokfile
 
-
-Om=FreqOm
+!Om=FreqOm
 
 ! set source
 If (IntIdx == 1) then
@@ -399,6 +409,10 @@ Do IJ=1,NDimX
   DipCZ(IndX(IJ))=(CICoef(I)+CICoef(J))*DipZ(I,J)
 Enddo
 
+do im=1,NFreq
+
+Om = FreqOm(im)
+
 Call CFREQPROJ(ipiv,Om,DipCX,1, &
    Max_Cn,XOne,URe,Occ,&
    IGem,NAct,INActive,NElecBEmb,&
@@ -427,11 +441,15 @@ Call CFREQPROJ(ipiv,Om,DipCZ,1, &
 AXZ=8.d0*ddot(NDimx,DipCX,1,ipiv,1)
 AYZ=8.d0*ddot(NDimx,DipCY,1,ipiv,1)
 AZZ=8.d0*ddot(NDimx,DipCZ,1,ipiv,1)
+AISO=(AXX+AYY+AZZ)/3d0
 
 Write(6,'(/,X,''Polarizability tensor for frequency '',F8.4)') Om
 Write(6,'(/,X,''XX   XY   XZ  '',3F15.8)') AXX, AXY, AXZ
 Write(6,'(X,''YX   YY   YZ  '',3F15.8)') AYX, AYY, AYZ
-Write(6,'(X,''ZX   ZY   ZZ  '',3F15.8,2/)') AZX, AZY, AZZ
+Write(6,'(X,''ZX   ZY   ZZ  '',3F15.8,/)') AZX, AZY, AZZ
+Write(6,'(X,''Isotropic Polarizability'',F15.8)') AISO
+
+enddo ! Om
 
 end subroutine PolarizAl
 

@@ -171,7 +171,8 @@ character(*),parameter :: PossibleUnits(2) = &
          character(:), allocatable :: BasisSet,BasisSetPath
          character(:), allocatable :: IntegralsFilePath
          integer :: Max_Cn = 3
-         double precision :: FreqOm = 0.d0
+         integer :: NFreqOm
+         double precision,allocatable :: FreqOm(:)
          logical :: CAlpha = .false.
 
          logical :: DeclareGrid = .false.
@@ -310,7 +311,10 @@ type SystemBlock
       double precision,allocatable :: charg(:),xyz(:,:)
 
       integer :: Max_Cn = 10
-      double precision :: FreqOm = 0.d0
+      !double precision :: FreqOm = 0.d0
+
+      integer :: NFreqOm
+      double precision,allocatable :: FreqOm(:)
 
 end type SystemBlock
 
