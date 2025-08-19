@@ -35,6 +35,9 @@ C
       double precision, allocatable :: CholVecs(:,:),Work(:,:)
       character(:),allocatable :: rdmfile
 C
+! analysis of AC
+      double precision :: ECorrIJ(6,6)
+C
       Parameter(Zero=0.D0,Half=0.5D0,One=1.D0,Two=2.D0)
       Parameter(toeV=27.21138386d0)
 C
@@ -111,7 +114,7 @@ C
       Do I=1,10
       Write(6,'(I4,4X,2E16.6)') I,Eig(I),toeV*Eig(I)
       EndDo
-      Call ACEneERPA_FOFO(ECorr,EigVecR,Eig,Occ,
+      Call ACEneERPA_FOFO(ECorr,ECorrIJ,EigVecR,Eig,Occ,
      $ IGem,IndN,IndX,NAcCAS+NInAcCAS,
      $ NDimX,NBasis,'FOFO',ICholesky,IDBBSC)
       EndIf ! IFlSnd

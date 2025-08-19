@@ -70,6 +70,8 @@ double precision :: OmI
 double precision,allocatable :: COMTilde(:)
 double precision,allocatable :: ABPlus0(:,:),ABMin0(:,:)
 double precision :: Tcpu,Twall
+! analysis of AC
+double precision :: ECorrIJ(6,6)
 
 call gclock('START',Tcpu,Twall)
 
@@ -428,7 +430,7 @@ if(Flags%ICASSCF==0.and.Flags%ISERPA==0) then
      ECorr=0
      select case(Mon%TwoMoInt)
      case(TWOMO_FOFO)
-        call ACEneERPA_FOFO(ECorr,EigVecR,Eig,Mon%Occ, &
+        call ACEneERPA_FOFO(ECorr,ECorrIJ,EigVecR,Eig,Mon%Occ, &
                             Mon%IGem,Mon%IndN,Mon%IndX,Mon%num0+Mon%num1, &
                             Mon%NDimX,NBas,twokfile,Flags%ICholesky,Flags%IDBBSC)
      case(TWOMO_FFFF)

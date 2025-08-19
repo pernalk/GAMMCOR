@@ -210,7 +210,7 @@ if(ICholesky==1) then
    else
       call JK_Chol_loop(ABPLUS,ABMIN,HNO,AuxI,AuxIO,WMAT,&
                         RDM2val,Occ,AuxCoeff,IGem,AuxInd,pos,&
-                        INActive,NOccup,NDimX,NDimX,NBasis,NInte1,IntJFile,IntKFile,&
+                        INActive,NOccup,NElecBEmb,NDimX,NDimX,NBasis,NInte1,IntJFile,IntKFile,&
                         ACAlpha,switch,ETot)
    endif
 else
@@ -235,7 +235,8 @@ if (IVEMB) then
                     HNO(i,j) = -work2(nbasis*(i-1)+j)
              else
                     ij=(max(i,j)*(max(i,j)-1))/2+min(i,j)
-                    HNO(i,j) = XOne(ij)+(1.d0-ACAlpha)*work2(nbasis*(i-1)+j)
+      !              HNO(i,j) = XOne(ij)+(1.d0-ACAlpha)*work2(nbasis*(i-1)+j)
+                    HNO(i,j) = HNO(i,j)+(1.d0-ACAlpha)*work2(nbasis*(i-1)+j)
              endif
          endif
          if(IGem(i)==IGem(j).And.IGem(i)==1.And.i.gt.NElecBEmb/2.and.j.gt.NElecBEmb/2) then
@@ -243,7 +244,8 @@ if (IVEMB) then
                     HNO(i,j) = -work2(nbasis*(i-1)+j)
              else
                     ij=(max(i,j)*(max(i,j)-1))/2+min(i,j)
-                    HNO(i,j) = XOne(ij)+(1.d0-ACAlpha)*work2(nbasis*(i-1)+j)
+      !              HNO(i,j) = XOne(ij)+(1.d0-ACAlpha)*work2(nbasis*(i-1)+j)
+      !              HNO(i,j) = HNO(i,j)+(1.d0-ACAlpha)*work2(nbasis*(i-1)+j)
              endif            
          endif
 
@@ -1409,11 +1411,11 @@ if(ICholesky==1) then
    if(present(ETot)) then
       call JK_Chol_loop(ABPLUS,ABMIN,HNO,AuxI,AuxIO,WMAT,&
                         RDM2val,Occ,AuxCoeff,IGem,AuxInd,pos,&
-                        INActive,NOccup,NDimX,NDimX,NBasis,NInte1,IntJFile,IntKFile,0d0,2,ETot)
+                        INActive,NOccup,NElecBEmb,NDimX,NDimX,NBasis,NInte1,IntJFile,IntKFile,0d0,2,ETot)
    else
       call JK_Chol_loop(ABPLUS,ABMIN,HNO,AuxI,AuxIO,WMAT,&
                         RDM2val,Occ,AuxCoeff,IGem,AuxInd,pos,&
-                        INActive,NOccup,NDimX,NDimX,NBasis,NInte1,IntJFile,IntKFile,0d0,2)
+                        INActive,NOccup,NElecBEmb,NDimX,NDimX,NBasis,NInte1,IntJFile,IntKFile,0d0,2)
    endif
 else
    if(present(ETot)) then

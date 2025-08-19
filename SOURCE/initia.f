@@ -1301,11 +1301,15 @@ C
       EndDo
 C     Print*, 'Err',Err
       If(Err.Gt.1.D-5) IUNIT=0
-      If(IUNIT==1.and.ICholeskyOTF==1) Then
-        Write(6,'(1x,a)') 'Assembling FOFO and FFOO from Cholesky
-     $                    not ready for Cholesky = OTF!'
-        Stop
-      EndIf
+C 
+C      If(IUNIT==1.and.ICholeskyOTF==1) Then
+C        Write(6,'(1x,a)') 'Assembling FOFO and FFOO from Cholesky
+C     $                    not ready for Cholesky = OTF!'
+C        Stop
+C      EndIf
+C
+C     if IUNIT=1 - CholeskyOTF will crash
+      If(ICholeskyOTF==1) IUNIT=0
 C
       If(IUNIT.Eq.1) Then
       Write(6,'(/,X,"URe is a unit matrix up to ",E16.6)') ERR
@@ -1534,7 +1538,7 @@ C     dump LR integrals
 C
       EndIf ! ICholesky
 CC
-      EndIf
+      EndIf ! ITwoEl
 C
       ElseIf(IUNIT.Eq.1.And.ITwoEl.Eq.3) Then
 C

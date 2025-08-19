@@ -5,7 +5,7 @@ implicit none
 contains
 
 subroutine JK_Chol_loop(ABPLUS,ABMIN,HNO,AuxI,AuxIO,WMAT,RDM2val,Occ,AuxCoeff,IGem,AuxInd,pos,&
-                   INActive,NOccup,NDim,NDimX,NBasis,NInte1,IntJFile,IntKFile,ACAlpha,AB,ETot)
+                   INActive,NOccup,NElecBEmb,NDim,NDimX,NBasis,NInte1,IntJFile,IntKFile,ACAlpha,AB,ETot)
 
 implicit none
 
@@ -31,6 +31,13 @@ double precision :: val
 double precision :: AuxVal,HNOCoef
 double precision,allocatable :: work1(:,:),work2(:,:)
 double precision,allocatable :: ints(:,:),MatFF(:,:)
+! DMRG-in-DFT
+double precision  :: XVEMB(NInte1)
+logical :: IVEMB
+integer ::NElecBEmb,NOccupB
+NOccupB=NElecBEmb/2
+! if the file with v_emb exists - hone will be modified 
+Inquire(file='embedding_potential_NO.bin',exist=IVEMB) 
 
 !print*, 'start JK Chol:'
 
@@ -108,10 +115,14 @@ do iloop=1,nloop
          if(IGem(l)==1) then
             if(IGem(k)==2) then
                do i=INActive+1,NOccup
-                  HNO(i,k) = HNO(i,k) - val*ints(i,l)
+                  ! i,k in active, l in inactive
+                  HNO(i,k) = HNO(i,k) - val*ints(i,l)      
+                  ! DMRG-in-DFT 
+                  if(IVEMB.and.l.le.NOccupB) HNO(i,k) = HNO(i,k) + val*ints(i,l)
                enddo
             elseif(IGem(k)==3) then
                do i=NOccup+1,NBasis
+                  ! i,k in virt, l in inactive
                   HNO(i,k) = HNO(i,k) - val*ints(i,l)
                enddo
             endif
@@ -120,10 +131,12 @@ do iloop=1,nloop
          if(IGem(l)==2) then
             if(IGem(k)==1) then
                do i=1,INActive
+                  ! i,k in inactive, l in active
                   HNO(i,k) = HNO(i,k) - val*ints(i,l)
                enddo
             elseif(IGem(k)==3) then
                do i=NOccup+1,NBasis
+                  ! i,k in virt, l in active
                   HNO(i,k) = HNO(i,k) - val*ints(i,l)
                enddo
             endif
@@ -450,6 +463,7 @@ do iloop=1,nloop
          if(k>INActive) then
             do j=1,INActive
                do i=1,INActive
+                  ! i,j in inactive, k in active
                   HNO(i,j) = HNO(i,j) + val*ints(i,j)
                enddo
             enddo
@@ -457,12 +471,16 @@ do iloop=1,nloop
          if(k<=INActive) then
             do j=INActive+1,NOccup
                do i=INActive+1,NOccup
+                  ! i,j in active, k in inactive
                   HNO(i,j) = HNO(i,j) + val*ints(i,j)
+                  ! DMRG-in-DFT
+                  if(IVEMB.and.k.le.NOccupB) HNO(i,j) = HNO(i,j) - val*ints(i,j)
                enddo
             enddo
          endif
          do j=NOccup+1,NBasis
             do i=NOccup+1,NBasis
+               ! i,j in virt
                HNO(i,j) = HNO(i,j) + val*ints(i,j)
             enddo
          enddo

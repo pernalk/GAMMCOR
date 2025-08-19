@@ -302,6 +302,8 @@ C
      $ ABPLUS(NDimX*NDimX),ABMIN(NDimX*NDimX),
      $ EigVecR(NDimX*NDimX),Eig(NDimX),
      $ ECorrG(NGem), EGOne(NGem)
+! analysis of AC
+      double precision :: ECorrIJ(6,6)
 C
 C     IFlAC   = 1 - adiabatic connection formula calculation
 C               0 - AC not used
@@ -422,16 +424,16 @@ C     the purpose of sorting is only to print a few highest (sorted) eigenvector
       Write(6,'(I4,4X,2E16.6)') I,Eig(I),27.211*Eig(I)
       EndDo
 C
-      If(ITwoEl.Eq.1) Then
-      Write(6,'(/," *** Computing ERPA 2-RDM *** ")')
-      Call RDM2FULL(EigVecR,Eig,ABMIN,TwoNO,NInte2,IndN,
-     $ Occ,Title,NBasis,NDimX,NGem,NDim)
-      EndIf
+c      If(ITwoEl.Eq.1) Then
+c      Write(6,'(/," *** Computing ERPA 2-RDM *** ")')
+c      Call RDM2FULL(EigVecR,Eig,ABMIN,TwoNO,NInte2,IndN,
+c     $ Occ,Title,NBasis,NDimX,NGem,NDim)
+c      EndIf
 C
       Write(6,'(/," *** Computing ERPA energy *** ",/)')
 C
       If(ITwoEl.Eq.3) Then
-      Call ACEneERPA_FOFO(ECorr,EigVecR,Eig,Occ,
+      Call ACEneERPA_FOFO(ECorr,ECorrIJ,EigVecR,Eig,Occ,
      $ IGem,IndN,IndX,NAcCAS+NInAcCAS,
      $ NDimX,NBasis,'FOFO',ICholesky,IDBBSC)
 C
@@ -770,6 +772,9 @@ C
      $ UAux(NBasis,NBasis),VecAux(NBasis),XMuMAT(NBasis,NBasis)
       Real*8, Dimension(:,:), Allocatable :: Jmat
 C
+! analysis of AC
+      double precision :: ECorrIJ(6,6)
+C
 C     IFlAC   = 1 - adiabatic connection formula calculation
 C               0 - AC not used
 C     IFlSnd  = 1 - run AC0-CAS (linerized in alpha, MP2-like expression for AC is used)
@@ -794,6 +799,10 @@ C
 C
       Write(6,'(/,1X,"The number of CASSCF Active Orbitals = ",I4)')
      $ NAcCAS
+C
+      If((IFunSR.Eq.4.And.IFunSR2.Eq.1).Or.
+     $ (IFunSR.Eq.1.And.IFunSR2.Eq.0)) Stop ' RunACCASLR does not work with 
+     $ srLDA'
 C
       Allocate  (TwoEl2(NInte2))
 C
@@ -1186,18 +1195,35 @@ C
       XVSR=XVSR+Two*Occ(I)*VSR(II)
       EndDo
 C
-      If(IFunSR.Eq.4) Then
-c      Write(6,'(X,/,
-c     $"*** REMOVING VSR_HXC FROM A ONE-ELECTRON HAMILTONIAN*** ",/)')
-      Do I=1,NInte1
-c ??? uncomment for srcaspi calculations
-c      XOne(I)=XOne(I)-VSR(I)
-      EndDo
-      eone=zero
+c      If(IFunSR.Eq.4) Then
+cc      Write(6,'(X,/,
+cc     $"*** REMOVING VSR_HXC FROM A ONE-ELECTRON HAMILTONIAN*** ",/)')
+c      Do I=1,NInte1
+cc ??? uncomment for srcaspi calculations
+cc      XOne(I)=XOne(I)-VSR(I)
+c      EndDo
+c      eone=zero
+c      Do I=1,NBasis
+c      II=(I*(I+1))/2
+c      eone=eone+Two*Occ(I)*xone(II)
+c      EndDo
+c      EndIf
+C
       Do I=1,NBasis
       II=(I*(I+1))/2
       eone=eone+Two*Occ(I)*xone(II)
       EndDo
+
+      If(IFunSR.Eq.2.Or.IFunSR.Eq.1) Then
+          Write(6,'(X,/,
+     $    " *** ADDING VSR_HXC TO A ONE-ELECTRON HAMILTONIAN*** ",/)')
+          Do I=1,NInte1
+             XOne(I)=XOne(I)+VSR(I)
+          EndDo
+          eone=eone+XVSR
+      Else
+          Write(6,'(X,/,
+     $" *** VSR_HXC IS NOT ADDED TO A ONE-ELECTRON HAMILTONIAN*** ",/)')
       EndIf
 C
       Allocate (SRKer(NGrid))
@@ -1588,7 +1614,7 @@ C
       Write(6,'(/," *** Computing LR-ERPA energy *** ",/)')
 
       If(ITwoEl.Eq.3) Then
-      Call ACEneERPA_FOFO(ECorr,EigVecR,Eig,Occ,
+      Call ACEneERPA_FOFO(ECorr,ECorrIJ,EigVecR,Eig,Occ,
      $ IGem,IndN,IndX,NAcCAS+NInAcCAS,
      $ NDimX,NBasis,'FOFOERF',ICholesky,IDBBSC)
 C
@@ -3305,6 +3331,7 @@ C
       ElseIf(ITwoEl.Eq.3) Then
 C
       Call TwoEneChck(ETot,RDM2Act,Occ,INActive,NAct,NBasis)
+      ETot=ETot+EOne
 C
 C     ITwoEl
       EndIf

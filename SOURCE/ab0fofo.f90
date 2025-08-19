@@ -576,10 +576,12 @@ allocate(Eblock(1+NBasis-NAct))
 
 nblk = 0
 
+write(*,*)'ERPA alpha=0 eigenproblems for NoSt=',NoSt
 !pack AA
 if(nAA>0) then
    nblk = nblk + 1
    call pack_Eblock(ABPLUS,ABMIN,nAA,limAA(1),limAA(2),tmpAA,Eblock(nblk),NoSt,NDimX)
+   write(*,*)'act-act done' 
 endif
 !pack AI
 do iq=1,INActive
@@ -589,6 +591,7 @@ do iq=1,INActive
                        Eblock(nblk),NoSt,NDimX)
    endif
 enddo
+write(*,*)'act-inact done' 
 !pack AV
 do ip=NOccup+1,NBasis
    if(nAV(ip)>0) then
@@ -597,6 +600,7 @@ do ip=NOccup+1,NBasis
                        Eblock(nblk),NoSt,NDimX)
     endif
 enddo
+write(*,*) 'act-vir done' 
 !pack IV
 associate(B => EblockIV)
 
@@ -643,6 +647,8 @@ do iblk=1,nblk
    associate(B => Eblock(iblk))
 
      Eig(B%l1:B%l2) = B%vec(1:B%n)
+!     write(*,*)'block=',iblk
+!     write(*,*)'eigvals',(eig(i),i=B%l1,B%l2) 
 
    end associate
 enddo
@@ -3537,7 +3543,7 @@ deallocate(IZeroNU)
 
 end subroutine Y01CASDSYM_FOFO
 
-subroutine ACEInteg_FOFO(ECorr,URe,Occ,XOne,UNOAO,&
+subroutine ACEInteg_FOFO(ECorr,ECorrIJ,URe,Occ,XOne,UNOAO,&
       ABPLUS,ABMIN,EigVecR,Eig,&
       EGOne,NGOcc,CICoef,&
       NBasis,NInte1,NDim,NGem,IndAux,ACAlpha,&
@@ -3569,7 +3575,8 @@ integer :: i,j,k,l,kl,ip,iq,ir,is,ipq,irs
 integer :: pos(NBasis,NBasis)
 double precision :: ECASSCF,XKer
 character(:),allocatable :: twojfile,twokfile
-
+! analysis of AC
+double precision :: ECorrIJ(6,6)
 
  NOccup = NAct + INActive
 
@@ -3662,7 +3669,7 @@ character(:),allocatable :: twojfile,twokfile
  endif
 
  if(ICASSCF==1) then
-    call ACEneERPA_FOFO(ECorr,EigVecR,Eig,Occ, &
+    call ACEneERPA_FOFO(ECorr,ECorrIJ,EigVecR,Eig,Occ, &
                         IGemIN,IndN,IndX,INActive+NAct, &
                         NDimX,NBasis,twokfile,ICholesky,IDBBSC)
  else
@@ -3673,7 +3680,7 @@ character(:),allocatable :: twojfile,twokfile
 
 end subroutine ACEInteg_FOFO
 
-subroutine ACEneERPA_FOFO(ECorr,EVec,EVal,Occ,IGem, &
+subroutine ACEneERPA_FOFO(ECorr,ECorrIJ,EVec,EVal,Occ,IGem, &
                           IndN,IndX,NOccup,NDimX,NBasis,&
                           IntKFile,ICholesky,IDBBSC)
 implicit none
@@ -3687,7 +3694,7 @@ double precision,intent(out) :: ECorr
 double precision,intent(in) :: EVec(NDimX,NDimX),EVal(NDimX)
 double precision :: Occ(NBasis)
 
-integer :: i,j,k,l,kl,kk,ip,iq,ir,is,ipq,irs
+integer :: i,j,ii,ij,k,l,kl,kk,ip,iq,ir,is,ipq,irs
 integer :: iunit,ISkippedEig
 integer :: pos(NBasis,NBasis)
 integer :: NCholesky
@@ -3710,6 +3717,58 @@ double precision,allocatable :: workSR(:,:),intsSR(:,:)
 
 double precision,parameter   :: SmallE = 1.d-3,BigE = 1.d8
 double precision,external    :: ddot
+! analysis of AC
+double precision :: ECorrIJ(6,6)
+integer          :: NGem,IGIJ(4,4)
+! analysis DMRG-in-DFT embedding 
+integer :: IOrbEmbb(NBasis),ioccB,ioccA,ivirtA,ivirtB,IGEmbb(4,4)
+logical :: IVirtLoc
+double precision :: ECEmbb(20,20),sum
+
+ECorrIJ=0.0d0
+NGem=MAXVAL(IGem)
+IJ=0
+Do I=1,NGem
+  Do J=1,I
+    IJ=IJ+1
+    IGIJ(I,J)=IJ
+    IGIJ(J,I)=IJ
+  EndDo
+EndDo
+
+! this is run if virtual orbitals for DMRG-in-DFT embedding have been localised
+IOrbEmbb=0
+ECEmbb=0.0d0
+Inquire(file='locorbitals.txt',exist=IVirtLoc)
+if (IVirtLoc) then
+  open(10,file='locorbitals.txt')
+  read(10,*)
+  read(10,*)ioccB
+  IOrbEmbb(1:ioccB)=1
+  ii=ioccB
+  read(10,*)ioccA
+  IOrbEmbb(ii+1:ii+ioccA)=2
+  ii=ii+ioccA
+  read(10,*)ivirtA
+  IOrbEmbb(ii+1:ii+ivirtA)=3
+  ii=ii+ivirtA
+  read(10,*)ivirtB
+  IOrbEmbb(ii+1:ii+ivirtB)=4
+  IJ=0
+  Do I=1,4
+  Do J=1,I
+    IJ=IJ+1
+    IGEmbb(I,J)=IJ
+    IGEmbb(J,I)=IJ
+  EndDo
+  EndDo 
+  Write(6,'(/,X,"DMRG-in-DFT with localised virtual orbitals")')
+  Write(6,'(X,"Assignments of orbitals to fragments")')
+  Write(6,'(X,"(1:occB 2:occA 3:virtA 4:virtB )")')
+  do i=1,nbasis
+  write(*,*)i,IOrbEmbb(i)
+  enddo
+endif 
 
 do i=1,NBasis
    CICoef(i) = sign(sqrt(Occ(i)),Occ(i)-0.5d0)
@@ -3800,6 +3859,10 @@ if(ICholesky==0) then
                       endif
 
                       ECorr = ECorr + Aux*ints(j,i)
+
+                      ECorrIJ(IGIJ(IGem(IP),IGem(IQ)),IGIJ(IGem(IR),IGem(IS)))= &
+                      ECorrIJ(IGIJ(IGem(IP),IGem(IQ)),IGIJ(IGem(IR),IGem(IS)))  &
+                      +Aux*ints(j,i)
 
                    ! endinf of If(IP.Gt.IR.And.IQ.Gt.IS)
                    endif
@@ -3897,6 +3960,16 @@ elseif(ICholesky==1) then
 
                        ECorr = ECorr + Aux*ints(j,i)
 
+                       ECorrIJ(IGIJ(IGem(IP),IGem(IQ)),IGIJ(IGem(IR),IGem(IS)))= &
+                       ECorrIJ(IGIJ(IGem(IP),IGem(IQ)),IGIJ(IGem(IR),IGem(IS)))  &
+                      +Aux*ints(j,i)
+
+                       if (IVirtLoc) then
+                           ECEmbb(IGEmbb(IOrbEmbb(IP),IOrbEmbb(IQ)),IGEmbb(IOrbEmbb(IR),IOrbEmbb(IS)))= &
+                           ECEmbb(IGEmbb(IOrbEmbb(IP),IOrbEmbb(IQ)),IGEmbb(IOrbEmbb(IR),IOrbEmbb(IS)))  &
+                      + Aux*ints(j,i)
+                       endif
+
                     ! endinf of If(IP.Gt.IR.And.IQ.Gt.IS)
                     endif
 
@@ -3911,6 +3984,29 @@ elseif(ICholesky==1) then
       !print*, 'ECorr Chol ',ECorr
 
    deallocate(work1,MatFF)
+
+   if(IVirtLoc) then
+      Write(6,'(/,X,"(1:occB 2:occA 3:virtA 4:virtB )")')
+      Sum=0.0d0
+      IJ=0
+      Do I=1,4
+      Do J=1,I
+         IJ=IJ+1
+         KL=0 
+         Do K=1,4
+         Do L=1,K
+            KL=KL+1 
+            if (ECEmbb(IJ,KL).ne.0.0) then
+                ! AC0 = 0.5 W(alpha=1.d-4)/1.d-4
+                Write(6,'(X,"(",2I1,")","(",2I1,")",F15.8)') I,J,K,L,ECEmbb(IJ,KL)/2.0/1.d-4
+                Sum=Sum+ECEmbb(IJ,KL)/2.0/1.d-4
+            endif 
+         EndDo
+         EndDo
+      EndDo
+      EndDo
+      Write(6,'(X,"Sum = ",F15.8,/)')sum
+   endif    
 
    elseif (IDBBSC==2) then
 
