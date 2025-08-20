@@ -800,9 +800,9 @@ C
       Write(6,'(/,1X,"The number of CASSCF Active Orbitals = ",I4)')
      $ NAcCAS
 C
-      If((IFunSR.Eq.4.And.IFunSR2.Eq.1).Or.
-     $ (IFunSR.Eq.1.And.IFunSR2.Eq.0)) Stop ' RunACCASLR does not work with 
-     $ srLDA'
+c      If((IFunSR.Eq.4.And.IFunSR2.Eq.1).Or.
+c     $ (IFunSR.Eq.1.And.IFunSR2.Eq.0)) Stop ' RunACCASLR does not work with 
+c     $ srLDA'
 C
       Allocate  (TwoEl2(NInte2))
 C
@@ -1169,20 +1169,30 @@ C
 C     CALCULATE THE SR_XC_PBE ENERGY WITH "TRANSLATED" ALPHA AND BETA DENSITIES
 C     [as in Gagliardi J. Chem. Phys. 146, 034101 (2017)]
 C
-      Call SR_PBE_ONTOP(EXCTOP,URe,Occ,OrbGrid,OrbXGrid,OrbYGrid,
-     $ OrbZGrid,WGrid,NGrid,NBasis)
-      Write(6,'(/," SR_xc_PBE with translated densities",F15.8,/)')
-     $ EXCTOP
+      If(IFunSR.Eq.2) Then 
 C
-      Call PBE_ONTOP_MD(PBEMD,URe,Occ,
-     $ OrbGrid,OrbXGrid,OrbYGrid,OrbZGrid,WGrid,NGrid,NBasis)
-      Write(6,'(/," SR_PBE_corr_md ",F15.8,/)') PBEMD
+          Call SR_PBE_ONTOP(EXCTOP,URe,Occ,OrbGrid,OrbXGrid,OrbYGrid,
+     $    OrbZGrid,WGrid,NGrid,NBasis)
+          Write(6,'(/," SR_xc_PBE with translated densities",F15.8,/)')
+     $    EXCTOP
 C
-      If (IFlCorrMD.Eq.1) Then
-      Call PBE_ONTOP_C_MD(PBEmodMD,5.d0,URe,Occ,
-     $ OrbGrid,OrbXGrid,OrbYGrid,OrbZGrid,WGrid,NGrid,NBasis)
-      Write(6,'(1x,"SR_PBE_C_corr_md",F15.8,/)') PBEmodMD
-      EndIf
+          Call PBE_ONTOP_MD(PBEMD,URe,Occ,
+     $    OrbGrid,OrbXGrid,OrbYGrid,OrbZGrid,WGrid,NGrid,NBasis)
+          Write(6,'(/," SR_PBE_corr_md ",F15.8,/)') PBEMD
+C
+          If (IFlCorrMD.Eq.1) Then
+          Call PBE_ONTOP_C_MD(PBEmodMD,5.d0,URe,Occ,
+     $    OrbGrid,OrbXGrid,OrbYGrid,OrbZGrid,WGrid,NGrid,NBasis)
+          Write(6,'(1x,"SR_PBE_C_corr_md",F15.8,/)') PBEmodMD
+          EndIf
+C
+       ElseIf(IFunSR.Eq.1) Then
+C
+          Call SR_LDA_ONTOP(EXCTOP,URe,Occ,OrbGrid,WGrid,NGrid,NBasis)
+          Write(6,'(/," SR_xc_LDA with translated densities",F15.8,/)')
+     $    EXCTOP 
+C
+       EndIf
 C
 c      Call CASPI_SR_PBE(URe,Occ,
 c     $ OrbGrid,OrbXGrid,OrbYGrid,OrbZGrid,WGrid,NGrid,NBasis)
@@ -3227,6 +3237,124 @@ C
 C
       Write(6,'(/," SR_xch_PBE with translated densities",F15.8)')Exch
       Write(6,'(" SR_cor_PBE with translated densities",F15.8)')EnC
+C
+      Return
+      End
+
+*Deck SR_LDA_ONTOP
+      Subroutine SR_LDA_ONTOP(EXCTOP,URe,Occ,OrbGrid,WGrid,NGrid,NBasis)
+C
+C     RETURNS A SR-LDA XC ENERGY IF THE DENSITY AND SPIN-DENSITY ARE COMPUTED AS:
+C     RHO_A/B = 1/2 ( RHO +/- SQRT(RHO^2 - 2 PI )  )
+C     WHERE PI IS THE ON-TOP PAIR DENSITY, see Gagliardi JCP 146, 034101 (2017)
+C
+      Implicit Real*8 (A-H,O-Z)
+C
+      Parameter(Zero=0.D0, Half=0.5D0, One=1.D0, Two=2.D0, Three=3.D0,
+     $ Four=4.D0)
+C
+      Include 'commons.inc'
+C
+      Real*8, Allocatable :: RDM2Act(:)
+C
+      Dimension Ind1(NBasis), Ind2(NBasis) 
+C
+      Dimension URe(NBasis,NBasis),Occ(NBasis),
+     $ WGrid(NGrid),OrbGrid(NGrid,NBasis)
+C
+      Pi2=ASin(One)
+      Pi=Two*Pi2
+      Const=Three/Four/Pi
+C
+C     READ 2RDM, COMPUTE THE ENERGY
+C
+      NAct=NAcCAS
+      INActive=NInAcCAS
+      NOccup=INActive+NAct
+      Ind2(1:NBasis)=0
+      Do I=1,NAct
+      Ind1(I)=INActive+I
+      Ind2(INActive+I)=I
+      EndDo
+C
+      NRDM2Act = NAct**2*(NAct**2+1)/2
+      Allocate (RDM2Act(NRDM2Act))
+      RDM2Act(1:NRDM2Act)=Zero
+C
+      Open(10,File="rdm2.dat",Status='Old')
+      Write(6,'(/,1X,''Active block of 2-RDM read from rdm2.dat'')')
+C
+   10 Read(10,*,End=40)I,J,K,L,X
+C
+C     X IS DEFINED AS: < E(IJ)E(KL) > - DELTA(J,K) < E(IL) > = 2 GAM2(JLIK)
+C
+      RDM2Act(NAddrRDM(J,L,I,K,NAct))=Half*X
+C
+      I=Ind1(I)
+      J=Ind1(J)
+      K=Ind1(K)
+      L=Ind1(L)
+C
+      GoTo 10
+   40 Continue
+      Close(10)
+C
+      EnxSR=Zero
+      EncSR=Zero
+      EXCTOP=Zero
+C
+      Do I=1,NGrid
+C
+      Call DenGrid(I,Rho,Occ,URe,OrbGrid,NGrid,NBasis)
+C 
+      XFactor=Zero 
+C
+      If(Rho.Gt.1.D-12) Then
+C
+      OnTop=Zero
+      Do IP=1,NOccup
+      Do IQ=1,NOccup
+      Do IR=1,NOccup
+      Do IS=1,NOccup
+      OnTop=OnTop
+     $ +Two*FRDM2(IP,IQ,IR,IS,RDM2Act,Occ,Ind2,NAct,NBasis)
+     $ *OrbGrid(I,IP)*OrbGrid(I,IQ)*OrbGrid(I,IR)*OrbGrid(I,IS)
+      EndDo
+      EndDo
+      EndDo
+      EndDo
+C
+      R=Two*OnTop/Rho**2
+      If(R.Lt.One) XFactor=SQRT(One-R)
+C
+      Else
+C
+      Rho=Zero
+C
+      EndIf
+C
+      Rhoa=Rho/Two*(One+XFactor)
+      Rhob=Rho/Two*(One-XFactor)
+C
+      If(Rho.Eq.Zero) Then
+         EpsxcSR=Zero
+         EpsxSR=Zero
+         EpscSR=Zero
+      Else
+         Rs=(Const/Rho)**(One/Three)
+         Zet=(Rhoa-Rhob)/Rho
+         Call LSDSR(Rs,Zet,Alpha,EpsxcSR,EpsxSR,EpscSR,
+     $   VxcSRup,VxcSRdown)
+      EndIf 
+C
+      EXCTOP=EXCTOP+Rho*EpsxcSR*WGrid(I)
+      EnxSR=EnxSR+Rho*EpsxSR*WGrid(I)
+      EncSR=EncSR+Rho*EpscSR*WGrid(I)
+C
+      EndDo
+C
+      Write(6,'(/," SR_xch_LDA with translated densities",F15.8)')EnxSR
+      Write(6,'(" SR_cor_LDA with translated densities",F15.8)')EncSR
 C
       Return
       End
