@@ -940,7 +940,6 @@ c     If (NSym.gt.1) stop "Dalton with Symmetry in RunACCASLR!"
       MxSym=NSym
 C
 CC     test 2
-C      print*, 'MxSym ...', MxSym
 C      print*, 'UNOAO ...'
 C      do j=1,NBasis
 C         write(6,'(*(f13.8))') (UNOAO(i,j),i=1,NBasis)
@@ -948,8 +947,7 @@ C      enddo
 
       If (ICholesky==1) Then
          if (IDALTON==1) then
-         print*, 'skip NSymNO ? '
-         jtsoao=1
+         Print*, "Setting NoSym for Dalton+Cholesky..."
          elseif (IMOLPRO==1) then 
          !if (IDALTON==1) stop "Finish Dalton+Chol in RunACCASLR!"
          Call read_aosao_map_molpro(jtsoao,
@@ -977,17 +975,20 @@ C
          If(Abs(UNOAO(IOrb,J)).Gt.1.D-1) NSymNO(IOrb)=I
          EndDo
       ElseIf (ICholesky==1) Then
-         Do IOrb=1,NBasis
-         If(Abs(UNOAO(IOrb,jtsoao(J))).Gt.1.D-1) NSymNO(IOrb)=I
-         EndDo
+         If(IDALTON==1) Then
+c        temp fix! set nosym for Dalton+OTF
+           NSymNO=1
+         Else
+            Do IOrb=1,NBasis
+            If(Abs(UNOAO(IOrb,jtsoao(J))).Gt.1.D-1) NSymNO(IOrb)=I
+            EndDo
+         EndIf
       EndIf
 C
       EndDo
       IStart=IStart+NumOSym(I)
       EndDo
 C
-C      ! test 3
-C!     NSymNO=1
 C      print*, 'NSymNO...'
 C      do i=1,nbasis
 C         print*, i,NSymNO(i)
@@ -1259,6 +1260,7 @@ C
       Write(6,'(  X,"*** LR-AC0-CAS CALCULATION *** ")')
 C
       If(ITwoEl.Eq.3) Then
+C
 C
       Call Y01CASLR_FOFO(Occ,URe,XOne,ABPLUS,ABMIN,
      $ MultpC,NSymNO,

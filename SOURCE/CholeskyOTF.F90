@@ -623,7 +623,8 @@ H0tr = H0in
 if(trim(Source)=='MOLPRO') then
    call tran_matTr(H0tr,CSAO,CSAO,NBasis,.true.)
    call triang_to_sq2(H0tr,H0_mo,NBasis)
-elseif(trim(Source)=='ORCA  ') then
+elseif(trim(Source)=='ORCA  ' .or.  &
+       trim(Source)=='DALTON' ) then
    call triang_to_sq2(H0in,H0_mo,NBasis)
 endif
 
@@ -634,6 +635,12 @@ do J=1,NBasis
       D_mo(I,J) = 2d0 * GammaF(IndSym(I,J))
    enddo
 enddo
+#if CHOLOTF_DEBUG > 4
+print*, 'Dmat in MO:'
+do j=1,NBasis
+   write(LOUT,'(*(f13.8))') (D_mo(i,j),i=1,NBasis)
+enddo
+#endif
 
 ! set memory for Fock transformation
 if(MemType == 2) then       !MB

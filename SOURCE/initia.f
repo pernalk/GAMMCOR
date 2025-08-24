@@ -30,6 +30,10 @@ C
       logical :: exione,exinuc,ex
       double precision,allocatable :: CAONO(:,:)
       double precision, allocatable :: VsrKS(:,:),Jsr(:,:)
+      double precision :: GammaF(NInte1)
+      double precision :: JNO(NBasis,NBasis),JNOlr(NBasis,NBasis),
+     $                    JNOsr(NBasis,NBasis)
+
       double precision, allocatable :: Work(:,:),WorkTr(:)
 C
       Character*60 Line
@@ -253,7 +257,7 @@ C
      &                         CAONO,XKin,NINte1,NBasis)
       EndIf
 C
-      If (IDBBSC.Eq.2) Then
+      If (IDBBSC.Eq.2.Or.IFunSR.Eq.4) Then
       Write(lout,'(/1x,3a6)') ('*******',i=1,3)
       Write(lout,'(1x,a)') 'Cholesky LR On-The-Fly'
       Write(lout,'(2x,a,f14.8)') 'MU = ',Alpha
@@ -360,54 +364,37 @@ c     If(NSym.gt.1) UAux = CAONO
       EndIf !ICASSCF
 
 CC     POSTCAS OTF: compute Jsr and save on disk
-C      If (IFunSR==4.and.ICholeskyOTF==1) Then
-C      Print*, 'CAONO',norm2(CAONO)
-C      do j=1,NBasis
-C         write(6,'(*(f13.8))') (CAONO(i,j),i=1,NBasis)
-C      enddo
-C      Print*, 'UMOAO',norm2(UMOAO)
-C      do j=1,NBasis
-C         write(6,'(*(f13.8))') (UMOAO(i,j),i=1,NBasis)
-C      enddo
-C      Print*, 'Monomer = ' , Monomer
-C      UAux=transpose(UMOAO)
-C      block 
-Cc     Real*8  :: JMO(NBasis,NBasis),JMOlr(NBasis,NBasis),
-Cc    $           JMOsr(NBasis,NBasis)
-CC     Real*8  :: GammaF(NInte1)
-C      Real*8  :: Jsr(NBasis,NBasis)
+      If (IFunSR==4.and.ICholeskyOTF==1) Then
 CC
-C      ! read it SAO from Dalton, save on disk?
-C      Call read_Jsr_dalton(Jsr,'dftSRfile.dat',NBasis)
-C      print*, 'Jsr norm2',norm2(Jsr)
-C      write(LOUT,'(1x,a)')  'SR Coulomb ints read from dftSRfile.dat'
+C        prepare 1-el density (NOccup) in NO
+         JNOsr=0d0
+         Do I=1,NBasis
+         JNOsr(I,I)=Occ(I)
+         EndDo
+         call sq_to_triang2(JNOsr,GammaF,NBasis)
 C
-CC     dump short-range Jmat AO on disk
-C      open(newunit=iunit,file='jsrmat',form='unformatted')
-C      write(iunit) NBasis
-C      write(iunit) Jsr
-C      close(iunit)
-CC     prepare 1-el density (NOccup) in MO
-Cc     GammaF=Zero
-C      ! NO--> AO
-CC           Call CholeskyOTF_Fock_MO_v2(work1,CholErfVecsOTF,
-CC     $                            AOBasis,System,Monomer,'DALTON',
-CC     $                            CAONO,CSAOMO,XKin,GammaF,
-CC     $                            Xgp,Zgk,NGridTHC,NCholeskyTHC,
-CC     $                            MemType,MemVal,NInte1,NBasis,
-CC     $                            2,JMOlr)
-CC
-Cc          Call CholeskyOTF_Jmat_MO(JMO,CholeskyVecsOTF,
-Cc    $                          AOBasis,System,Monomer,'DALTON',
-Cc    $                          CAONO,UAux,XKin,GammaF,
-Cc    $                          MemType,MemVal,NInte1,NBasis,2)
-CC
-CC           JMOsr = JMO - JMOlr
-Cc       print*, 'J in MO full-range ', norm2(JMO)
-C      end block
+         Call CholeskyOTF_Jmat_MO(JNOlr,CholErfVecsOTF,
+     $                          AOBasis,System,Monomer,'DALTON',
+     $                          CAONO,CAONO,XKin,GammaF,
+     $                          MemType,MemVal,NInte1,NBasis,2)
+         Call CholeskyOTF_Jmat_MO(JNO,CholeskyVecsOTF,
+     $                          AOBasis,System,Monomer,'DALTON',
+     $                          CAONO,CAONO,XKin,GammaF,
+     $                          MemType,MemVal,NInte1,NBasis,2)
+         JNOsr = JNO - JNOlr
+         Call tranMO2AO('N',JNOsr,CAONO,NBasis)
+C       print*, 'JAOsr',norm2(JNOsr)
+C        do j=1,NBasis
+C           write(6,'(*(f13.8))') (JNOsr(i,j),i=1,NBasis)
+C        enddo
+C         dump short-range Jmat AO on disk
+          open(newunit=iunit,file='jsrmat',form='unformatted')
+          write(iunit) NBasis
+          write(iunit) JNOsr
+          close(iunit)
 C
-C      EndIf
-
+      EndIf ! POSTCAS+OTF
+C
 C     OUT-OF-CORE INTEGRAL TRANSFORMATIONS
       If(ITwoEl.Ne.1) Then
 C     PREPARE POINTERS: NOccup=num0+num1
@@ -469,6 +456,7 @@ C
       Write(LOUT,'(1x,a,i5,a)') 'Using ',MemMOTransfMB,
      $                          ' MB for 3-indx Cholesky transformation'
 C
+      If (IFunSR.Eq.0.Or.IFunSR.Eq.3.Or.IFunSR.Eq.5) Then
 C     cholesky BIN
       If (ICholeskyBIN==1) Then
 C
@@ -492,18 +480,6 @@ C
      $                   MemMOTransfMB, CholeskyVecsOTF,
      $                   AOBasis, ORBITAL_ORDERING_DALTON)
 c     Call gclock('chol_gammcor_Rkab',Tcpu,Twall)
-
-      If(IDBBSC==2) Then
-      allocate(FFErf(NCholErf,NBasis**2))
-      Call Chol_gammcor_Rkab(FFErf,UAux,1,NBasis,UAux,1,NBasis,
-     $                   MemMOTransfMB, CholErfVecsOTF,
-     $                   AOBasis, ORBITAL_ORDERING_DALTON)
-      EndIf
-C
-      ElseIf (ICholeskyTHC==1) Then
-      Stop "Implement ICholeskyTHC in ReadDAL!"
-C
-      EndIf ! Cholesky BIN / OTF / THC
 C
       Open(newunit=iunit,file='cholvecs',form='unformatted')
       Write(iunit) NCholesky
@@ -511,13 +487,38 @@ C
       Close(iunit)
       Deallocate(MatFF)
 C
-      If (IDBBSC.Eq.2) Then
+      ElseIf (ICholeskyTHC==1) Then
+      Stop "Implement ICholeskyTHC in ReadDAL!"
+C
+      EndIf ! Cholesky BIN / OTF / THC for IFun=0,3,5
+C
+      ElseIf(IFunSR.Eq.4.Or.IDBBSC==2) Then
+C
+      If (ICholeskyOTF==1) Then
+
+      If(NSym.gt.1) UAux = CAONO
+
+         allocate(FFErf(NCholErf,NBasis**2))
+         Call Chol_gammcor_Rkab(FFErf,UAux,1,NBasis,UAux,1,NBasis,
+     $                      MemMOTransfMB, CholErfVecsOTF,
+     $                      AOBasis, ORBITAL_ORDERING_DALTON)
+      ElseIf (ICholeskBIN==1) Then
+         Stop "ICholeskyBIN not ready for PostCAS!"
+      ElseIf (ICholeskyTHC==1) Then
+         Stop "Implement ICholeskyTHC in ReadDAL!"
+      EndIf ! Cholesky BIN / OTF / THC for IFun=4 or DBBSC=2
+C
 C     dump LR integrals
-      open(newunit=iunit,file='cholvErf',form='unformatted')
+      if (IDBBSC==2) then 
+         open(newunit=iunit,file='cholvErf',form='unformatted')
+      elseif (IFunSR==4) then
+         open(newunit=iunit,file='cholvecs',form='unformatted')
+      endif
       write(iunit) NCholErf
       write(iunit) FFErf
       close(iunit)
-      EndIf ! IDBBSC
+C
+      EndIf ! IDBBSC, IFunSR=4 (postCAS)
 C
       EndIf ! ICholesky
       EndIf ! ITwoEl
@@ -2563,7 +2564,7 @@ C
            JMOsr = JMO - JMOlr
 c
 c        print*, 'J in MO long-range ', norm2(JMOlr)
-         print*, 'J in MO full-range ', norm2(JMO)
+c        print*, 'J in MO full-range ', norm2(JMO)
 c        do j=1,NBasis
 c           write(LOUT,'(*(f13.8))') (JMOlr(i,j),i=1,NBasis)
 c            write(LOUT,'(*(f13.8))') (JMO(i,j)-JMOlr(i,j),i=1,NBasis)
@@ -2729,16 +2730,16 @@ C
 C     transform short-range Jmat from MO to AO
       Call tranMO2AO('N',JMOsr,CAOMO,NBasis)
 C
-CC    test Jsr in AO
-c      block
-c      Print*, 'JMOsr in AO basis =',norm2(JMOsr)
-c      do j=1,NBasis
-c         write(6,'(*(f13.8))') (JMOsr(i,j),i=1,NBasis)
-c      enddo
-c      end block
-C
+CCC    test Jsr in AO
+C      block
+C      Print*, 'JMOsr in AO basis =',norm2(JMOsr)
+C      do j=1,NBasis
+C         write(6,'(*(f13.8))') (JMOsr(i,j),i=1,NBasis)
+C      enddo
+C      end block
 C
 C     dump short-range Jmat AO on disk
+c     print*, 'JAOsr',norm2(JMOsr)
       open(newunit=iunit,file='jsrmat',form='unformatted')
       write(iunit) NBasis
       write(iunit) JMOsr

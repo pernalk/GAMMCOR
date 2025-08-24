@@ -112,8 +112,10 @@ C
       IOrbIncl  = Flags%IOrbIncl
 C
 C     ...RESPONSE (POLARIZABITY FREQUENCIES)
+      if (allocated(System%FreqOm)) then
       NFreqOm = System%NFreqOm
       FreqOm(1:NFreqOm) = System%FreqOm(1:System%NFreqOm)
+      endif
 C
 C     *************************************************************************
 C
