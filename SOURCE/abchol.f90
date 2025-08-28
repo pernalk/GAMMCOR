@@ -717,11 +717,11 @@ double precision :: AuxVal,HNOCoef
 double precision,allocatable :: FF(:,:),FFErf(:,:)
 double precision,allocatable :: FFTr(:,:),FFErfTr(:,:)
 double precision,allocatable :: TmpTr(:,:),TmpErfTr(:,:)
-double precision,allocatable :: ints(:,:),intsFR(:,:)
+double precision,allocatable :: ints(:,:),intsFR(:,:), intsola(:,:)
 double precision,allocatable :: work1(:,:),work2(:,:)
 double precision,allocatable :: work3(:,:),work4(:,:)
 double precision,allocatable :: work6(:,:),work8(:,:)
-double precision,allocatable :: work10(:,:),work12(:,:)
+double precision,allocatable :: work10(:,:),work12(:,:)!, workola2(:,:)
 !
 ! compute Hessian matrices with modified integrals : 
 ! a) calculate modified SR integrals: <p*q|rs>_SR = \sum_t <p|mu(r)|t> <tq|rs>^SR
@@ -785,9 +785,14 @@ dimFO = NBasis*NOccup
 nloop = (dimFO - 1) / MaxBatchSize + 1
 
 allocate(work1(dimFO,MaxBatchSize),work2(dimFO,MaxBatchSize))
+! print*, 'callworkola1'
+! allocate(workola2(dimFO,MaxBatchSize))
 allocate(ints(NBasis,NBasis))
 allocate(intsFR(NBasis,NBasis))
+! allocate(intsola(NBasis,NBasis))
 
+print*, 'MaxBatchsize', MaxBatchsize, nloop
+print*, 'dimfo', dimfo
 off = 0
 k   = 0
 l   = 1
@@ -799,7 +804,23 @@ l   = 1
 do iloop=1,nloop
 
    ! batch size for each iloop; last one is smaller
-   BatchSize = min(MaxBatchSize,dimFO-off)
+      BatchSize = min(MaxBatchSize,dimFO-off)
+
+      ! call dgemm('T','N',dimFO,BatchSize,NCholErf,1d0,FFErfTr,NCholErf, &
+      !       FFErf(:,off+1:off+BatchSize),NCholErf,0d0,workola2,dimFO)
+      ! call dgemm('T','N',dimFO,BatchSize,NCholErf,1d0,FFErf,NCholErf, &
+      !       FFErfTr(:,off+1:off+BatchSize),NCholErf,0d0,workola2,dimFO)
+
+      ! call dgemm('T','N',dimFO,BatchSize,NCholErf,1d0,TmpErfTr,NCholErf, &
+      !       FFErf(:,off+1:off+BatchSize),NCholErf,0d0,workola2,dimFO)
+      ! call dgemm('T','N',dimFO,BatchSize,NCholErf,1d0,FFErf,NCholErf, &
+      !       TmpErfTr(:,off+1:off+BatchSize),NCholErf,0d0,workola2,dimFO)
+      
+      ! call dgemm('T','N',dimFO,BatchSize,NCholesky,1d0,FFTr,NCholesky, &
+      !       FF(:,off+1:off+BatchSize),NCholesky,0d0,workola2,dimFO)
+      ! call dgemm('T','N',dimFO,BatchSize,NCholesky,1d0,FF,NCholesky, &
+      !         FFTr(:,off+1:off+BatchSize),NCholesky,0d0,workola2,dimFO)
+
 
    ! (pq*|rs) : SR=-LR+FR
    call dgemm('T','N',dimFO,BatchSize,NCholErf,-0.25d0,FFErfTr,NCholErf, &
@@ -834,7 +855,9 @@ do iloop=1,nloop
 
    ! regular
    call dgemm('T','N',dimFO,BatchSize,NCholesky,1d0,FF,NCholesky, &
-              FF(:,off+1:off+BatchSize),NCholesky,0d0,work2,dimFO)
+         FF(:,off+1:off+BatchSize),NCholesky,0d0,work2,dimFO)
+
+!   workola2 = work1
    work1 = work1 + work2
    ! work1 = regular + short-range* 
 
@@ -851,9 +874,13 @@ do iloop=1,nloop
          do i=1,NBasis
             ints(i,j)   = work1((j-1)*NBasis+i,iBatch)
             intsFR(i,j) = work2((j-1)*NBasis+i,iBatch)
+            ! intsola(i,j)   = workola2((j-1)*NBasis+i,iBatch)
+            ! if (abs(ints(i, j)).gt.1d-5)then
+            !       write(*, '(A6, 4I5, 3F20.15)')'pqrs0', k-1, l-1, i-1, j-1, ints(i, j), intsFR(i,j), intsola(i, j)
+            ! end if
          enddo
       enddo
-
+      
       if(l>NOccup) cycle
       ints(:,NOccup+1:NBasis) = 0
       intsFR(:,NOccup+1:NBasis) = 0
@@ -957,7 +984,6 @@ do iloop=1,nloop
                      if(AuxInd(IGem(ip),IGem(ir))==1) val = val - Occ(ip)*Occ(ir)
                      if(AuxInd(IGem(iq),IGem(is))==1) val = val - Occ(iq)*Occ(is)
                      val = 2*AuxVal*val*ints(ip,iq)
-
                      ABPLUS(ipq,irs) = ABPLUS(ipq,irs) + val
                      ABMIN(ipq,irs) = ABMIN(ipq,irs) - val
 
@@ -1013,7 +1039,8 @@ do iloop=1,nloop
                   if(ipq>0) then
 
                      val = AuxCoeff(IGem(ip),IGem(is),2,2)* &
-                          sum(RDM2val(INActive+1:NOccup,INActive+1:NOccup,iq,ir)*ints(INActive+1:NOccup,INActive+1:NOccup))
+                           sum(RDM2val(INActive+1:NOccup,INActive+1:NOccup,iq,ir)*ints(INActive+1:NOccup,INActive+1:NOccup))
+                     
 
                      ABPLUS(ipq,irs) = ABPLUS(ipq,irs) + val
                      ABMIN(ipq,irs) = ABMIN(ipq,irs) - val
@@ -1166,6 +1193,7 @@ do iq=1,NBasis
 enddo
 
 allocate(work1(NBasis**2,MaxBatchSize))
+
 allocate(work3(NBasis**2,MaxBatchSize))
 !
 allocate(work2(NCholesky,MaxBatchSize))
@@ -1348,6 +1376,7 @@ do iloop=1,nloop
 
                         ABPLUS(ipq,irs) = ABPLUS(ipq,irs) + val
                         ABMIN(ipq,irs) = ABMIN(ipq,irs) + val
+                        
 
                      endif
                   enddo
@@ -1504,6 +1533,7 @@ deallocate(work4,Work2,work1)
 deallocate(work6,work8)
 deallocate(ints)
 deallocate(intsFR)
+!deallocate(intsola)
 
 !Print*, 'from JK_SR_Chol_loop'
 !Print*, 'ABPLUS-after JK',norm2(ABPLUS)

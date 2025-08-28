@@ -1297,12 +1297,11 @@ print*, 'XOne',norm2(XOne)
 call dgemm('N','N',NBasis,NBasis,NBasis,1d0,URe,NBasis,work1,NBasis,0d0,work2,NBasis)
 call dgemm('N','T',NBasis,NBasis,NBasis,1d0,work2,NBasis,URe,NBasis,0d0,HNO,NBasis)
 call sq_symmetrize(HNO,NBasis)
-
 deallocate(work1)
 
 val = 0
 do i=1,NOccup
-   val = val + Occ(i)*HNO(i,i)
+      val = val + Occ(i)*HNO(i,i)
 enddo
 EnOne = EnOne + 2*val
 

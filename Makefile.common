@@ -4,7 +4,7 @@ O = OBJ/
 PROG = gammcor
 
 OBJ = $(O)mainp.o $(O)initia.o $(O)dmscf.o $(O)misc.o $(O)optocc.o \
-       $(O)acpp_types.o $(O)interface_pp.o $(O)eigenno.o $(O)optnorb.o\
+       $(O)acpp_types.o $(O)interface_pp.o $(O)mp.o $(O)eigenno.o $(O)optnorb.o\
        $(O)matvec.o $(O)hf.o $(O)matrix.o $(O)cpdmft.o \
        $(O)nonadia.o $(O)dftgrid.o $(O)lsd_sr.o $(O)dftfun_exerfpbe.o \
        $(O)dftfun_exerf.o $(O)dftfun_ecerfpbe.o $(O)dftfun_ecerf.o \
@@ -45,19 +45,19 @@ $(O)%.o : $(S)%.f
 $(PROG) : $(OBJ)
 	$(FCC) -o $@ $^ $(XOBJ) $(FFLAGS) $(LIBS)
 
-$(O)mainp.o            : $(S)commons.inc $(O)memory.o $(O)types.o $(O)inputfill.o $(O)systemdef.o $(O)sapt_main.o $(O)git_info.o $(O)build_info.o  $(O)interface_pp.o $(O)acpp_types.o
+$(O)mainp.o            : $(S)commons.inc $(O)memory.o $(O)types.o $(O)inputfill.o $(O)systemdef.o $(O)sapt_main.o $(O)git_info.o $(O)build_info.o  $(O)interface_pp.o $(O)acpp_types.o $(O)mp.o
 $(O)initia.o           : $(S)commons.inc $(O)memory.o $(O)priunit.o $(O)timing.o $(O)rdwrext.o $(O)sorter.o $(O)abmats.o $(O)types.o $(O)tran.o  $(O)tran_Chol.o $(O)CholeskyOTF.o $(O)gammint.o $(O)interface_pp.o $(O)acpp_types.o
 $(O)accas.o            : $(S)commons.inc $(O)priunit.o $(O)timing.o $(O)rdwrext.o $(O)sorter.o $(O)abmats.o $(O)abfofo.o $(O)ab0fofo.o \
-                         $(O)gridintern.o
+                         $(O)gridintern.o  $(O)acpp_types.o
 $(O)acfd.o             : $(S)commons.inc $(O)abmats.o $(O)abfofo.o  $(O)ab0fofo.o $(O)rdwrext.o
 $(O)ac_iter.o          : $(S)commons.inc $(O)abmats.o $(O)abfofo.o
 $(O)interpa.o          : $(S)commons.inc $(O)abmats.o $(O)abfofo.o $(O)ab0fofo.o
-$(O)muerf.o            : $(S)commons.inc $(O)ab0fofo.o $(O)timing.o $(O)gridintern.o
+$(O)muerf.o            : $(S)commons.inc $(O)ab0fofo.o $(O)timing.o $(O)gridintern.o  $(O)acpp_types.o
 $(O)dftgrid.o          : $(S)commons.inc $(O)abmats.o
 $(O)caspidft.o         : $(S)commons.inc $(O)rdwrext.o
 $(O)ac_exact_2el.o     : $(S)commons.inc
 $(O)cpdmft.o           : $(S)commons.inc
-$(O)dmscf.o            : $(S)commons.inc
+$(O)dmscf.o            : $(S)commons.inc $(O)acpp_types.o
 $(O)eigenno.o          : $(S)commons.inc
 $(O)ekt.o              : $(S)commons.inc
 $(O)erpa.o             : $(S)commons.inc
@@ -79,6 +79,7 @@ $(O)ac_fofo.o          : $(O)abmats.o $(O)abfofo.o $(O)ab0fofo.o $(O)blocktypes.
 
 $(O)types.o            : $(O)priunit.o
 $(O)acpp_types.o       : $(O)types.o
+$(O)mp.o               : $(O)types.o $(O)acpp_types.o
 $(O)diis.o             : $(O)priunit.o
 $(O)inputfill.o        : $(O)types.o $(O)priunit.o
 $(O)systemdef.o        : $(O)types.o
@@ -89,7 +90,7 @@ $(O)tran_Chol.o        : $(O)tran.o
 $(O)interface_pp.o      : $(S)interface_pp.f90  $(O)acpp_types.o $(O)gammint.o
 $(O)abfofo.o           : $(O)priunit.o $(O)tran.o $(O)blocktypes.o $(O)abchol.o $(O)timing.o
 $(O)abmats.o           : $(O)priunit.o $(O)tran.o
-$(O)ab0fofo.o          : $(O)priunit.o $(O)tran.o $(O)blocktypes.o $(O)abfofo.o
+$(O)ab0fofo.o          : $(O)priunit.o $(O)tran.o $(O)blocktypes.o $(O)abfofo.o $(O)acpp_types.o
 
 $(O)griddalton.o       : $(O)rdwrext.o
 $(O)gridintern.o       : $(O)gammint.o

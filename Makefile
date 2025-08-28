@@ -1,9 +1,9 @@
 MKL_ROOT = /opt/intel/mkl/
 
-FCC = ifort
+FCC = ifx
 WARNINGS          =     -warn nounused
 OPTIMIZATION      =     -xHost -O3
-PARALLELIZATION   = -coarray=single -mkl=parallel -qopenmp
+PARALLELIZATION   = -coarray=single -qmkl=parallel -qopenmp
 XCFUN                   =     -I xcfun/fortran
 CHOLESKY       =  -I ./gammcor-integrals/include
 

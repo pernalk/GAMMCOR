@@ -287,7 +287,7 @@ end select
   case(JOB_TYPE_RESPONSE)
      Flags%IFlRESPONSE = 1
 
-  case(JOB_TYPE_AC0,JOB_TYPE_SRAC0)
+  case(JOB_TYPE_AC0,JOB_TYPE_SRAC0,JOB_TYPE_MP2, JOB_TYPE_SRMP2)
     ! HERE WILL BE CHANGED TO:
     !Flags%IFlAC = 0
      Flags%IFlAC   = 1

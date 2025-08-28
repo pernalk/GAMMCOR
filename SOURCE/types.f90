@@ -32,6 +32,8 @@ integer, parameter :: JOB_TYPE_ACFREQNTH   = 15
 integer, parameter :: JOB_TYPE_AC1FREQNTH  = 16
 integer, parameter :: JOB_TYPE_RESPONSE    = 17
 integer, parameter :: JOB_TYPE_SRAC0       = 18
+integer, parameter :: JOB_TYPE_MP2       = 19
+integer, parameter :: JOB_TYPE_SRMP2       = 20
 
 integer, parameter :: SAPTLEVEL0 = 0
 integer, parameter :: SAPTLEVEL1 = 1
@@ -102,11 +104,11 @@ character(*),parameter :: PossibleInterface(5) = &
 [character(8) :: &
 'DALTON', 'MOLPRO', 'OWN', 'ORCA', 'PYSCF']
 
-character(*),parameter :: PossibleJobType(18) = &
+character(*),parameter :: PossibleJobType(20) = &
 [character(9) :: &
 'AC', 'AC0', 'ERPA', 'EERPA', 'SAPT', 'PDFT', 'CASPiDFT','CASPiDFTOpt','EERPA-1', & 
 'AC0D', 'AC0DNOSYMM', 'NLOCCORR', 'AC0DP', 'ACFREQ','ACFREQNTH','AC1FREQNTH', &
-'RESPONSE','SRAC0']
+'RESPONSE','SRAC0', 'MP2', 'SRMP2']
 
 character(*),parameter :: PossibleRDMType(6) = &
 [character(8) :: &

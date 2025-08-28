@@ -956,7 +956,8 @@ C
       EndIf
       EndIf
 C
-      XMiu=RtBis(XSum1,XMiu1,XMiu2,XNorm,Occ,NB)
+C      XMiu=RtBis(XSum1,XMiu1,XMiu2,XNorm,Occ,NB)
+      XMiu=RtBis(1,XMiu1,XMiu2,XNorm,Occ,NB)
 C
   444   Do I=1,NB
 C
@@ -1008,7 +1009,8 @@ C
       GoTo 333 
       EndIf
 C
-      XMiu=RtBis(XSum2,XMiu1,XMiu2,XNorm,Pcc,NB)
+C      XMiu=RtBis(XSum2,XMiu1,XMiu2,XNorm,Pcc,NB)
+      XMiu=RtBis(2,XMiu1,XMiu2,XNorm,Pcc,NB)
 C
   444 Do I=1,NB
 C
@@ -1064,7 +1066,7 @@ C
       End
 
 *Deck RtBis
-      Real*8 Function RtBis(XSum,x1,x2,XNorm,Occ,NB)
+      Real*8 Function RtBis(ISum,x1,x2,XNorm,Occ,NB)
 C
 C     Using bisection, find the root of a function known to lie between
 C     x1 and x2. The root, returned as rtbis, will be refined until its 
@@ -1081,9 +1083,14 @@ C
 C     Maximum allowed number of bisections. 
 C     
       Parameter (xacc=1.D-12,JMAX=50)
-C     
-      fmid=XSum(XNorm,x2,Occ,NB)
-      f=XSum(XNorm,x1,Occ,NB)
+C
+      if (ISum.eq.1)then
+         fmid=XSum1(XNorm,x2,Occ,NB)
+         f=XSum1(XNorm,x1,Occ,NB)
+      else if (ISum.eq.2)then
+         fmid=XSum2(XNorm,x2,Occ,NB)
+         f=XSum2(XNorm,x1,Occ,NB)
+      end if
 C     
       if(f*fmid.ge.zero) stop 'root must be bracketed in rtbis'
 C     
@@ -1106,8 +1113,12 @@ C
 C     Bisection loop. 
 C     
       dx=dx*half 
-      xmid=rtbis+dx 
-      fmid=XSum(XNorm,xmid,Occ,NB)
+      xmid=rtbis+dx
+      if (ISum.eq.1)then
+         fmid=XSum1(XNorm,xmid,Occ,NB)
+      else if (ISum.eq.2)then
+         fmid=XSum2(XNorm,xmid,Occ,NB)
+      end if
 C     
       if(fmid.le.zero) rtbis=xmid 
       if(abs(dx).lt.xacc.or.fmid.eq.zero) return

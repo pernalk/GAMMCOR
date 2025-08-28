@@ -4,7 +4,7 @@
 C
 C     READ HAO, 2-EL INTEGRALS IN NO, C_COEFFICIENTS, IGEM FROM A DALTON_GENERATED FILE
 C     READ UMOAO FROM SIRIUS.RST or DALTON.MOPUN
-C
+C 
       use print_units
       use types
       use sorter
@@ -310,7 +310,8 @@ C     $ NInAcCAS,NAcCAS
       EndDo
       Write(6,'(2X,"Sum of Occupancies: ",E16.6)') Sum
       If(Abs(Sum-NELE).Gt.1.D-8)
-     $ Stop "Fatal Error: Occupancies do not sum up to NELE"
+     $    Stop "Fatal Error: Occupancies do not sum up to NELE"
+
 C
       Close(10)
 C
@@ -2833,8 +2834,8 @@ C
       End
 C     c    End Subroutine LdInteg
 
-      subroutine ReadPYSCF(THCData, BasisSet, XKin, XNuc, ENuc, Occ,
-      
+      subroutine ReadPYSCF(THCData, AuxData, BasisSet, CAONO, XKin,
+     &    XNuc, ENuc, Occ,      
      &    URe, TwoEl, UMOAO,  NInte1, NBasis, NInte2, NGem, Flags, anSt)
       use interface_pp
       use print_units
@@ -2865,6 +2866,7 @@ C     c    End Subroutine LdInteg
       real :: elapsed_time
       type (tclock) :: timer
       type(TTHCData) :: THCData
+      type(TACppData) :: AuxData
 
 
       Include 'commons.inc'
@@ -2883,11 +2885,12 @@ C     Cholesky OnTheFly
       character(:),allocatable :: BasisSetPath
 
       Type(TCholeskyVecs) :: CholeskyVecs
-      Real*8, Allocatable :: MatFF(:,:)
+      Real*8, Allocatable :: MatFF(:,:), FFErf(:,:)
 
-      print*, 'yest'
+      print*, 'yest', alpha
 
-      call PYSCF_wrapper(THCData, NInte1, NInte2, NBasis, ENuc, CAONO,
+      call PYSCF_wrapper(THCData, AuxData, NInte1, NInte2,
+     $ NBasis, ENuc, CAONO,
      $ XKin, TwoEl, Occ, NAc, NInAc, anSt, Flags)
       Do I=1,NBasis
          Do J=1,NBasis
@@ -2923,8 +2926,14 @@ C     Cholesky OnTheFly
             Write(6,'(X,I3,E16.6,I6)') I,Occ(I),IGem(I)
          EndDo
          Write(6,'(2X,"Sum of Occupancies: ",E16.6)') Sum
-         If(Abs(Sum-NELE).Gt.1.D-8)
-     $        Stop "Fatal Error: Occupancies do not sum up to NELE"
+!     If(Abs(Sum-NELE).Gt.1.D-8)then
+         if(Flags%JobType .ne.  JOB_TYPE_MP2 .and.
+     $   Flags%JobType .ne. JOB_TYPE_SRMP2)then
+            If(Abs(Sum-XELE).Gt.1.D-8)then
+               print*, 'nele2', nele, xele
+               Stop "Fatal Error: Occupancies do not sum up to NELE"
+            end if
+            end if
 
       Close(10)
 
@@ -2948,7 +2957,21 @@ C     Cholesky OnTheFly
             Close(iunit)
             Deallocate(MatFF)
             print*, 'TIME FOR WRITE MatFF', clock_readwall(timer)
-            UMOAO = transpose(CAONO)
+
+            If (IDBBSC.Eq.2) Then
+               allocate(FFErf(THCData%NTHCErf,NBasis**2))
+          Call thc_gammcor_Rkab_2(FFErf, THCData%XgaErf, THCData%XgaErf,
+     $           THCData%ZgkErf, NBasis, NBasis,
+     $           THCData%NCholErf, THCData%NTHCErf)
+            open(newunit=iunt,file='cholvErf',form='unformatted')
+            write(iunt) THCData%NCholErf
+            write(iunt) FFErf
+            close(iunt)
+            Deallocate(FFErf)
+         EndIf
+            
+            
+         UMOAO = transpose(CAONO)
 
          Else
             print*, 'This setting is not supported with PYSCF, exiting'
@@ -4158,7 +4181,8 @@ C
         IPQ=0
         Do IQ=1,NBasis
         Do IP=1,IQ
-        IPQ = IPQ + 1
+           IPQ = IPQ + 1
+
         TwoNO(NAddr3(IP,IQ,IR,IS)) = Work1(IPQ)
 C        Write(6,*) IP,IQ,IR,IS, Work1(IPQ)
 C        Write(6,*) IP,IQ,IR,IS, TwoNO(NAddr3(IP,IQ,IR,IS))

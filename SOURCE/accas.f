@@ -1,12 +1,13 @@
 *Deck ACCAS
       Subroutine ACCAS(ETot,ENuc,TwoNO,URe,UNOAO,Occ,XOne,
-     $  Title,BasisSet,NBasis,NInte1,NInte2,NGem)
+     $  Title,BasisSet,NBasis,NInte1,NInte2,NGem, THCData)
 C
 c     use types
       use print_units
       use timing
       use read_external
       use abfofo
+      use acpp_types
 C
 C     A ROUTINE FOR COMPUTING ELECTRONIC ENERGY USING ERPA TRANSITION
 C     DENSITY MATRIX ELEMENTS
@@ -15,6 +16,7 @@ C
 C
       Character*60 FMultTab,Title
       Character(*) :: BasisSet
+      type(TTHCData), intent(in) :: THCData
       Include 'commons.inc'
 c
       Parameter(Zero=0.D0,Half=0.5D0,One=1.D0,Two=2.D0)
@@ -76,6 +78,7 @@ C
       Write(LOUT,'(2x,a,2e14.5)')'Threshold for quasi-inactive orbital',
      $ ThrQInact
 C
+
       If(IFlCore.Eq.0) Then
         If(NCoreOrb.Eq.0) Then
            Do I=1,NBasis
@@ -199,7 +202,7 @@ C
 C this is a version of AC0 with CBS basis set corrections (SR integrals are required)
 C
       Call DBBSCH(ETot,ENuc,URe,Occ,XOne,UNOAO,
-     $   BasisSet,NBasis,NInte1,IndN,IndX,NDimX)
+     $   BasisSet,NBasis,NInte1,IndN,IndX,NDimX, THCData)
 
       Call delfile('cholvecs')
       Call delfile('cholvErf')
@@ -1635,7 +1638,7 @@ C
       RDM2Act(1:NRDM2Act)=Zero
 C
       Open(10,File="rdm2.dat",Status='Old')
-      Write(6,'(/,1X,''Active block of 2-RDM read from rdm2.dat'')')
+      Write(6,'(/,1X,''Active block of 2-RDM read from rdm2.dat-a'')')
 C
    10 Read(10,*,End=40)I,J,K,L,X
 C
@@ -2731,7 +2734,7 @@ C
       RDM2Act(1:NRDM2Act)=Zero
 C
       Open(10,File="rdm2.dat",Status='Old')
-      Write(6,'(/,1X,''Active block of 2-RDM read from rdm2.dat'')')
+      Write(6,'(/,1X,''Active block of 2-RDM read from rdm2.dat -b '')')
 C
    10 Read(10,*,End=40)I,J,K,L,X
 C
@@ -2860,7 +2863,7 @@ C
       RDM2Act(1:NRDM2Act)=Zero
 C
       Open(10,File="rdm2.dat",Status='Old')
-      Write(6,'(/,1X,''Active block of 2-RDM read from rdm2.dat'')')
+      Write(6,'(/,1X,''Active block of 2-RDM read from rdm2.dat -c'')')
 C
    10 Read(10,*,End=40)I,J,K,L,X
 C
@@ -3029,7 +3032,7 @@ C
       RDM2Act(1:NRDM2Act)=Zero
 C
       Open(10,File="rdm2.dat",Status='Old')
-      Write(6,'(/,1X,''Active block of 2-RDM read from rdm2.dat'')')
+      Write(6,'(/,1X,''Active block of 2-RDM read from rdm2.dat -e '')')
 C
    10 Read(10,*,End=40)I,J,K,L,X
 C
@@ -3187,7 +3190,7 @@ C
       RDM2Act(1:NRDM2Act)=Zero
 C
       Open(10,File="rdm2.dat",Status='Old')
-      Write(6,'(/,1X,''Active block of 2-RDM read from rdm2.dat'')')
+      Write(6,'(/,1X,''Active block of 2-RDM read from rdm2.dat -w'')')
 C
    10 Read(10,*,End=40)I,J,K,L,X
 C

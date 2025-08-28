@@ -2009,12 +2009,13 @@ C
       ETot=ETot+Two*Occ(I)*HNO(II)
       EndDo
 C
+      print*, occ
       Do IP=1,NOccup
       Do IQ=1,NOccup
       Do IR=1,NOccup
-      Do IS=1,NOccup
+         Do IS=1,NOccup
       ETot=ETot+FRDM2(IP,IQ,IR,IS,RDM2Act,Occ,Ind2,NAct,NBasis)
-     $ *TwoNO(NAddr3(IP,IR,IQ,IS))
+     $        *TwoNO(NAddr3(IP,IR,IQ,IS))
       EndDo
       EndDo
       EndDo
