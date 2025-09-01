@@ -252,7 +252,7 @@ C
 C
       ElseIf(IFunSR.Eq.3) Then
 C
-      Call RunDFOnTop(ETot,ENuc,TwoNO,URe,UNOAO,Occ,XOne,
+      Call RunDFOnTop(BasisSet,ETot,ENuc,TwoNO,URe,UNOAO,Occ,XOne,
      $  IndAux,IPair,IndN,IndX,NDimX,Title,NBasis,NInte1,NInte2,NGem)
 C
       Else
@@ -3362,7 +3362,7 @@ C
       End
 
 *Deck RunDFOnTop
-      Subroutine RunDFOnTop(ETot,ENuc,TwoNO,URe,UNOAO,Occ,XOne,
+      Subroutine RunDFOnTop(BasisSet,ETot,ENuc,TwoNO,URe,UNOAO,Occ,XOne,
      $  IndAux,IPair,IndN,IndX,NDimX,Title,NBasis,NInte1,NInte2,NGem)
 C
 C     ETot is calculated from MC-PDFT
@@ -3370,21 +3370,28 @@ C     with PBE xc functional
 C     see Eq.(6) in Manni, et al. JCTC 10, 3669-3680 (2014)
 C     doi: 10.1021/ct500483t
 C
+      use grid_internal
+C
       Implicit Real*8 (A-H,O-Z)
 C
       Character*60 FMultTab,Title
+      Character(*) :: BasisSet
       Include 'commons.inc'
 C
       Character*60 FName
-      Real*8, Dimension(:), Allocatable :: OrbGrid
-      Real*8, Dimension(:), Allocatable :: OrbXGrid
-      Real*8, Dimension(:), Allocatable :: OrbYGrid
-      Real*8, Dimension(:), Allocatable :: OrbZGrid
+c     Real*8, Dimension(:), Allocatable :: OrbGrid
+c     Real*8, Dimension(:), Allocatable :: OrbXGrid
+c     Real*8, Dimension(:), Allocatable :: OrbYGrid
+c     Real*8, Dimension(:), Allocatable :: OrbZGrid
+      Real*8,allocatable,target :: PhiGGA(:,:,:)
+      Real*8,allocatable,target :: PhiLDA(:,:)
+      Real*8,pointer :: OrbGrid(:,:)
+      Real*8,pointer :: OrbXGrid(:,:),OrbYGrid(:,:),OrbZGrid(:,:)
       Real*8, Dimension(:), Allocatable :: WGrid
       Real*8, Dimension(:), Allocatable :: RDM2Act
       Dimension NSymNO(NBasis),VSR(NInte1),MultpC(15,15),NumOSym(15)
-C
-      Parameter(Zero=0.D0,Half=0.5D0,One=1.D0,Two=2.D0,Four=4.D0)
+      Dimension UAux(NBasis,NBasis)
+      Logical :: doGGA
 C
       Dimension
      $ URe(NBasis,NBasis),UNOAO(NBasis,NBasis),Occ(NBasis),
@@ -3436,10 +3443,10 @@ C
 C
 C     COMPUTE THE ENERGY FOR CHECKING
 C
-      EOne=Zero
+      EOne=0d0
       Do I=1,NBasis
       II=(I*(I+1))/2
-      EOne=EOne+Two*Occ(I)*XOne(II)
+      EOne=EOne+2d0*Occ(I)*XOne(II)
       EndDo
       Write(6,'(/,1X,''One-Electron Energy'',6X,F15.8)')EOne
 C
@@ -3460,7 +3467,11 @@ C
 C
       ElseIf(ITwoEl.Eq.3) Then
 C
-      Call TwoEneChck(ETot,RDM2Act,Occ,INActive,NAct,NBasis)
+      If(ICholesky.eq.0) Then
+         Call TwoEneChck(ETot,RDM2Act,Occ,INActive,NAct,NBasis)
+      ElseIf(ICholesky.eq.1) Then
+         Call TwoEneChckChol(ETwo,RDM2Act,Occ,INActive,NAct,NBasis)
+      EndIf
       ETot=ETot+EOne
 C
 C     ITwoEl
@@ -3468,21 +3479,73 @@ C     ITwoEl
 C
       Write(6,'(1X,''CASSCF Energy (w/o ENuc)'',X,F15.8)')ETot
       Write(6,'(1X,''Total CASSCF Energy '',5X,F15.8)')ETot+ENuc
+
+C     load orbgrid and gradients, and wgrid
 C
+      If (IFunSR == 4) Then ! POSTCAS
+         If (IFunSR2 == 1) doGGA = .false.
+         If (IFunSR2 > 1)  doGGA = .true.
+      Else ! REGULAR
+         If (IFunSR == 1) doGGA = .false.
+         If (IFunSR > 1)  doGGA = .true.
+      End If
+C
+      If (InternalGrid==0) then
+C
+      If(IDALTON==1) Stop "Dalton not ready with PDFT!"
+
       Call molprogrid0(NGrid,NBasis)
       Write(6,'(/," The number of Grid Points = ",I8)')
      $ NGrid
 C
       Allocate  (WGrid(NGrid))
-      Allocate  (OrbGrid(NBasis*NGrid))
-      Allocate  (OrbXGrid(NBasis*NGrid))
-      Allocate  (OrbYGrid(NBasis*NGrid))
-      Allocate  (OrbZGrid(NBasis*NGrid))
+C
+      If (doGGA) then
+         allocate(PhiGGA(NGrid,NBasis,4))
+         OrbGrid  => PhiGGA(:,:,1)
+         OrbXGrid => PhiGGA(:,:,2)
+         OrbYGrid => PhiGGA(:,:,3)
+         OrbZGrid => PhiGGA(:,:,4)
+      ElseIf (.not.doGGA) then
+         allocate(PhiLDA(NGrid,NBasis))
+         OrbGrid  => PhiLDA
+         OrbXGrid => PhiLDA
+         OrbYGrid => PhiLDA
+         OrbZGrid => PhiLDa
+      EndIf
+C      Allocate  (OrbGrid(NBasis*NGrid))
+C      Allocate  (OrbXGrid(NBasis*NGrid))
+C      Allocate  (OrbYGrid(NBasis*NGrid))
+C      Allocate  (OrbZGrid(NBasis*NGrid))
 C
 C     load orbgrid and gradients, and wgrid
 C
       Call molprogrid(OrbGrid,OrbXGrid,OrbYGrid,OrbZGrid,
      $ WGrid,UNOAO,NGrid,NBasis)
+
+      ElseIf (InternalGrid==1) then
+C
+      UAux=transpose(UNOAO)
+      If (doGGA) Then
+         Write(LOUT,'(/1x,a)') 'INTERNAL GRID GGA'
+         Call internal_gga_no_orbgrid(IGridType,BasisSet,
+     $                          IOrbOrder,UAux,
+     $                          WGrid,PhiGGA,NGrid,NBasis,NBasis,IUnits)
+         OrbGrid  => PhiGGA(:,:,1)
+         OrbXGrid => PhiGGA(:,:,2)
+         OrbYGrid => PhiGGA(:,:,3)
+         OrbZGrid => PhiGGA(:,:,4)
+      ElseIf(.not.doGGA) Then
+         Write(LOUT,'(/1x,a)') 'INTERNAL GRID LDA'
+         Call internal_lda_no_orbgrid(IGridType,BasisSet,
+     $                          IOrbOrder,UAux,
+     $                          WGrid,PhiLDA,NGrid,NBasis,NBasis,IUnits)
+         OrbGrid  => PhiLDA
+         OrbXGrid => PhiLDA
+         OrbYGrid => PhiLDA
+         OrbZGrid => PhiLDa
+      EndIf
+      EndIf ! InternalGrid
 C
       Call GGA_ONTOP(EXCTOP,URe,Occ,OrbGrid,OrbXGrid,OrbYGrid,
      $ OrbZGrid,WGrid,NGrid,NBasis,1)
@@ -3507,7 +3570,11 @@ C     ITwoEl
 C
       ElseIf(ITwoEl.Eq.3) Then
 C
-      Call TwoEHartree(EnH,RDM2Act,Occ,INActive,NAct,NBasis)
+      If(ICholesky.eq.0) Then
+         Call TwoEHartree(EnH,RDM2Act,Occ,INActive,NAct,NBasis)
+      ElseIf(ICholesky.eq.1) Then
+         Call TwoEHartreeChol(EnH,Occ,INActive,NAct,NBasis)
+      EndIf
 C
       EndIf
 C
@@ -3518,10 +3585,10 @@ C
 C
       DeAllocate (RDM2Act)
       DeAllocate  (WGrid)
-      DeAllocate  (OrbGrid)
-      DeAllocate  (OrbXGrid)
-      DeAllocate  (OrbYGrid)
-      DeAllocate  (OrbZGrid)
+C      DeAllocate  (OrbGrid)
+C      DeAllocate  (OrbXGrid)
+C      DeAllocate  (OrbYGrid)
+C      DeAllocate  (OrbZGrid)
 C
       Return
       End

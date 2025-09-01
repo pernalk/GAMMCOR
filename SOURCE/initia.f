@@ -381,7 +381,21 @@ C
      $                          AOBasis,System,Monomer,'DALTON',
      $                          CAONO,CAONO,XKin,GammaF,
      $                          MemType,MemVal,NInte1,NBasis,2)
+c        print*, 'JNO  =',norm2(JNO)
+c        print*, 'JNOlr=',norm2(JNOlr)
+c
          JNOsr = JNO - JNOlr
+
+C       Print*, 'CAONO =',norm2(CAONO)
+C       do j=1,NBasis
+C          write(6,'(*(f13.8))') (CAONO(i,j),i=1,NBasis)
+C       enddo
+C
+C       Print*, 'JMOsr in MO basis =',norm2(JNOsr)
+C       do j=1,NBasis
+C          write(6,'(*(f13.8))') (JNOsr(i,j),i=1,NBasis)
+C       enddo
+
          Call tranMO2AO('N',JNOsr,CAONO,NBasis)
 C       print*, 'JAOsr',norm2(JNOsr)
 C        do j=1,NBasis
@@ -2559,8 +2573,12 @@ C
            Call CholeskyOTF_Jmat_MO(JMO,CholeskyVecsOTF,
      $                          AOBasis,System,Monomer,'MOLPRO',
      $                          CAOMO,CSAOMO,XKin,GammaF,
-     $                          MemType,MemVal,NInte1,NBasis,2)
+     $                          MemType,MemVal,NInte1,NBasis,1)
 C
+C           print*, 'CAOMO =',norm2(CAOMO)
+C           print*, 'CSAOMO =',norm2(CSAOMO)
+C           print*, 'JMO   =',norm2(JMO)
+C           print*, 'JMOlr =',norm2(JMOlr)
            JMOsr = JMO - JMOlr
 c
 c        print*, 'J in MO long-range ', norm2(JMOlr)
@@ -2715,7 +2733,7 @@ C              to match with gammcor-cholesky library
 C
       UAOMO = transpose(CAONO)
 C
-C      block
+c      block
 C      Print*, 'CAONO =',norm2(CAONO)
 C      do j=1,NBasis
 C         write(6,'(*(f13.8))') (CAONO(i,j),i=1,NBasis)
@@ -2724,7 +2742,18 @@ C      Print*, 'CSAONO =',norm2(UAOMO)
 C      do j=1,NBasis
 C         write(6,'(*(f13.8))') (UAOMO(i,j),i=1,NBasis)
 C      enddo
-C      end block
+C
+C       Print*, 'CAOMO =',norm2(CAOMO)
+C       do j=1,NBasis
+C          write(6,'(*(f13.8))') (CAOMO(i,j),i=1,NBasis)
+C       enddo
+C
+C       Print*, 'JMOsr in MO basis =',norm2(JMOsr)
+C       do j=1,NBasis
+C          write(6,'(*(f13.8))') (JMOsr(i,j),i=1,NBasis)
+C       enddo
+C
+C       end block
 C
       If (IFunSR.Eq.1.Or.IFunSR.Eq.2.Or.IFunSR.Eq.4) Then
 C     transform short-range Jmat from MO to AO
@@ -5111,6 +5140,46 @@ C
       Close(iunit)
 C
       end subroutine TwoEHartree
+
+*Deck TwoEHartreeChol
+      subroutine TwoEHartreeChol(EnH,Occ,INActive,NAct,NBasis)
+      Implicit Real*8 (A-H,O-Z)
+C
+      Include 'commons.inc'
+C
+      Parameter(Zero=0.D0,Half=0.5D0,One=1.D0,Two=2.D0)
+C
+      Integer INActive,NAct,NBasis
+      Double Precision EnH
+      Dimension Occ(NBasis)
+C
+C     LOCAL ARRAYS
+C
+      Double Precision, Allocatable :: MatFF(:,:)
+
+
+c     SET FILES
+      Open(newunit=iunit,file='cholvecs',form='unformatted')
+      Read(iunit) NCholesky
+      Allocate(MatFF(NCholesky,NBasis**2))
+      Read(iunit) MatFF
+      Close(iunit)
+C
+C     SET DIMENSIONS
+      NOccup=NAct+INActive
+
+C     GET E_HARTREE
+      EnH=0
+      do j=1,NOccup
+      do i=1,NOccup
+        EnH = EnH + Occ(i)*Occ(j)
+     $   *dot_product(MatFF(:,i+(i-1)*NBasis),MatFF(:,j+(j-1)*NBasis))
+      enddo
+      enddo
+C
+      EnH = Two*EnH
+
+      end subroutine
 
 *Deck BasInfo
       Subroutine basinfo(nbasis,basfile,intf)
