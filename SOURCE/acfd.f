@@ -27,15 +27,14 @@ C
      $ Eig(NDim),EGOne(NGem),
      $ UNOAO(NBasis,NBasis),
      $ IndX(NDim),IndN(2,NDim)
+C      analysis of AC
+     $, ECorrIJ(6,6),ECorrIJA(6,6),IGIJ(4,4),IGemNo(6,2)     
 C
 C     LOCAL ARRAYS
 C
       Dimension XGrid(100), WGrid(100)
       Integer Points
       real*8 :: XMuMat(NBasis,NBasis)
-C
-C     analysis of AC
-      Dimension ECorrIJ(6,6),ECorrIJA(6,6),IGIJ(4,4),IGemNo(6,2)
 C
       Double precision,Allocatable :: WorkVec(:),WorkEig(:),MYAP(:) 
 C
@@ -90,7 +89,8 @@ C
       ElseIf(ITwoEl.eq.3) Then
 C
       Call AC0CAS_FOFO(ECorr,ETot,Occ,URe,XOne,ABPLUS,ABMIN,
-     $ IndN,IndX,IGem,NAcCAS,NInAcCAS,NDimX,NBasis,NDim,NInte1,
+     $ IndN,IndX,IGem,NAcCAS,NInAcCAS,NElecBEmb,
+     $ NDimX,NBasis,NDim,NInte1,
      $ NoSt,'FFOO','FOFO',ICholesky,IDBBSC,IFlFCorr)
 C
 C     now Y01CAS_FOFO is used in SAPT only
@@ -112,7 +112,7 @@ C
 C
       If(IFlFrag1.Eq.1) Then
 C
-      Write(6,'(/,2X,''*** Embedding-AC0-GVB Calculation ***'',/)')
+      Write(6,'(X,''*** Embedding-AC0-GVB Calculation ***'',/)')
 C
 C This is not going to work
       NFrag=NGem-1
@@ -146,19 +146,59 @@ C
 c      NGrid=30
 C
       Call GauLeg(Zero,One,XGrid,WGrid,NGrid)
+C
+C     AC-CBS[H]       
 C 
+      If(IDBBSC.Eq.2.And.ITwoEl.Eq.1) Then
+C
+      ECorr=Zero 
+C
+      Do I=1,NGrid
+C
+      ACAlpha=XGrid(I)
+      Call ACEInteg(ECorrA,TwoNO,URe,Occ,XOne,UNOAO,
+     $ ABPLUS,ABMIN,EigVecR,Eig,
+     $ EGOne,NGOcc,
+     $ Title,NBasis,NInte1,NInte2,NDim,NGem,IndAux,ACAlpha,
+     $ IndN,IndX,NDimX)
+C     
+      Write(*,*)'ACAlpha ',ACAlpha,' W_ALPHA ',ECorrA
+C
+      ECorr=ECorr+WGrid(I)*ECorrA 
+C
+      EndDo      
+C
+      ECASSCF =EGOne(1)
+C
+      Write
+     $ (6,'(1X,''CASSCF+ENuc, AC-CBS[H], Total'',6X,3F15.8)')
+     $ ECASSCF+ENuc,ECorr,ECASSCF+ENuc+ECorr
+C
+      Return
+C     end of AC-CBS[H]
+      EndIf
+C
+      If(IVEMB.Eq.1) Then
+      NGrid=1
+      XGrid(1)=1.D-4
+      WGrid(1)=0.5D0/XGrid(1)
+      EndIf
+C
       ECorr=Zero
 C
 !$OMP PARALLEL PRIVATE(ABPLUS_tmp, ABMIN_tmp, I, ACAlpha, ECorrA,
-!$OMP$ EigVecR_tmp, Eig_tmp)
+!$OMP$ ECorrIJA_tmp,EigVecR_tmp, Eig_tmp)
       allocate(ABPLUS_tmp(NDim*NDim), ABMIN_tmp(NDim*NDim))
       ABPLUS_tmp = ABPLUS
       ABMIN_tmp = ABMIN
       EigVecR_tmp = EigVecR
       Eig_tmp = Eig
       ECorrA = Zero
+      allocate(ECorrIJA_tmp(6,6))
+      ECorrIJA_tmp=ECorrIJA
 !$OMP DO schedule(static,1)
 !$OMP$ REDUCTION(+:ECorr)
+C
       Do I=1,NGrid
 C   
       ACAlpha=XGrid(I)
@@ -178,23 +218,25 @@ C
 
       If(ICASSCF.Eq.1) Then
 
-      Call ACEInteg_FOFO(ECorrA,URe,Occ,XOne,UNOAO,
+      Call ACEInteg_FOFO(ECorrA,ECorrIJA_tmp,URe,Occ,XOne,UNOAO,
      $ ABPLUS_tmp,ABMIN_tmp,EigVecR_tmp,Eig_tmp,
      $ EGOne,NGOcc,CICoef,
      $ NBasis,NInte1,NDimX,NGem,IndAux,ACAlpha,
-     $ IGem,NAcCAS,NInAcCAS,NELE,IndN,IndX,NDimX,
+     $ IGem,NAcCAS,NInAcCAS,NElecBEmb,
+     $ NELE,IndN,IndX,NDimX,
      $ NoSt,ICASSCF,IFlFrag1,IFunSR,IFunSRKer,
-     $ ICholesky)
+     $ ICholesky,IDBBSC)
 
       ElseIf(ICASSCF.Ne.1) Then
 
-      Call ACEInteg_FOFO(ECorrA,URe,Occ,XOne,UNOAO,
+      Call ACEInteg_FOFO(ECorrA,ECorrIJA_tmp,URe,Occ,XOne,UNOAO,
      $ ABPLUS_tmp,ABMIN_tmp,EigVecR_tmp,Eig_tmp,
      $ EGOne,NGOcc,CICoef,
      $ NBasis,NInte1,NDim,NGem,IndAux,ACAlpha,
-     $ IGem,NActive,NInAcCAS,NELE,IndN,IndX,NDimX,
+     $ IGem,NActive,NInAcCAS,NElecBEmb,
+     $ NELE,IndN,IndX,NDimX,
      $ NoSt,ICASSCF,IFlFrag1,IFunSR,IFunSRKer,
-     $ ICholesky)
+     $ ICholesky,IDBBSC)
 
       EndIf
       EndIf
@@ -203,17 +245,103 @@ C
 C
       ECorr=ECorr+WGrid(I)*ECorrA
 C
+      If(ICASSCF.Eq.1) Then
+C        AC analysis
+         IJ=0
+         Do I1=1,NGem
+         Do J=1,I1
+            IJ=IJ+1
+            KL=0
+            Do K=1,NGem
+            Do L=1,K
+              KL=KL+1
+              ECorrIJ(IJ,KL)=ECorrIJ(IJ,KL)+WGrid(I)*ECorrIJA_tmp(IJ,KL)
+            EndDo
+            EndDo
+         EndDo
+         EndDo
+      EndIf
+C
       EndDo
 !$OMP END DO
-      deallocate(ABPLUS_tmp, ABMIN_tmp)
+      deallocate(ABPLUS_tmp, ABMIN_tmp,ECorrIJA_tmp)
 !$OMP END PARALLEL
 C
       If(ICASSCF.Eq.1) Then
 C
+      If(IVEMB.Eq.1) Write (6,'(2/,1X,
+     $ ''*** DMRG-in-DFT. Energies below = numerical AC0'')')
+C
       ETot=EGOne(1)
       If(IFunSR.Eq.0) Then
+
+!PRINT CONTRIBUTIONS TO AC ECorr FROM BLOCKS
+      Sum=Zero
+      Write(6,'(X,
+     $ "Contributions to AC from (Mu)(Nu) pairs of blocks")')
+      Write(6,'(X,
+     $ "1:inactive 2:active 3:virtual")') 
+      IJ=0
+      Do I=1,NGem
+      Do J=1,I
+      IJ=IJ+1
+! NGem=3 case
+      If(NGem.Eq.3) Then
+       IOO=0
+       If(IGemNo(IJ,1).Eq.1.And.IGemNo(IJ,2).Eq.1) IOO=1
+       IVV=0
+       If(IGemNo(IJ,1).Eq.3.And.IGemNo(IJ,2).Eq.3) IVV=1
+       IAA1=0
+       If(IGemNo(IJ,1).Eq.2.And.IGemNo(IJ,2).Eq.2) IAA1=1
+! NGem=2 case (zero inactive orbitals)
+      ElseIf(NGem.Eq.2) Then
+       IOO=0
+       IVV=0
+       If(IGemNo(IJ,1).Eq.2.And.IGemNo(IJ,2).Eq.2) IVV=1
+       IAA1=0
+       If(IGemNo(IJ,1).Eq.1.And.IGemNo(IJ,2).Eq.1) IAA1=1
+      EndIf
+
+      If(IVV==0.And.IOO==0) Then
+      KL=0
+      Do K=1,NGem
+      Do L=1,K
+         KL=KL+1
+         If(NGem.Eq.3) Then
+             IOO=0
+             If(IGemNo(KL,1).Eq.1.And.IGemNo(KL,2).Eq.1) IOO=1
+             IVV=0
+             If(IGemNo(KL,1).Eq.3.And.IGemNo(KL,2).Eq.3) IVV=1
+             IAA2=0
+             If(IGemNo(KL,1).Eq.2.And.IGemNo(KL,2).Eq.2) IAA2=1
+         ElseIf(NGem.Eq.2) Then
+             IOO=0
+             IVV=0
+             If(IGemNo(KL,1).Eq.2.And.IGemNo(KL,2).Eq.2) IVV=1
+             IAA2=0
+             If(IGemNo(KL,1).Eq.1.And.IGemNo(KL,2).Eq.1) IAA2=1
+         EndIf
+         If(IVV==0.And.IOO==0.And.IAA1+IAA2.Ne.2) Then
+         If(IJ.Ge.KL) Then
+           EE=ECorrIJ(IJ,KL)
+           If(IJ.Ne.KL)EE=EE+ECorrIJ(KL,IJ)
+           Write(6,'(X,"(",2I1,")","(",2I1,")",F15.8)')
+     $     IGemNo(IJ,1),IGemNo(IJ,2),IGemNo(KL,1),IGemNo(KL,2),EE
+           Sum=Sum+EE
+         EndIf
+         EndIf
+      EndDo
+      EndDo
+      EndIf
+      EndDo
+      EndDo
       Write
-     $ (6,'(/,2X,''ECASSCF+ENuc, AC-Corr, AC-ERPA-CASSCF '',4X,3F15.8)')
+     $ (6,'(X,''Sum of contributions: '',4X,F15.8)')Sum
+
+      If(IVEMB.Eq.1) Write (6,'(2/,1X,
+     $ '' ** DMRG-in-DFT ** Correlation energy = numerical AC0 !!!'')')
+      Write
+     $ (6,'(2X,''ECASSCF+ENuc, AC-Corr, AC-ERPA-CASSCF '',4X,3F15.8)')
      $ ETot+ENuc,ECorr,ETot+ENuc+ECorr
       Else
       EGOne(1)=ECorr
@@ -5044,6 +5172,37 @@ C     LOCAL ARRAYS
 C
       Dimension C(NBasis),Skipped(NDimX)
 C
+C     MODIFY ITEGRALS
+C
+      If (IDBBSC.Eq.2) Then
+      Open(10,file="sr_integrals.dat")
+      NAddr=0
+C
+      IPR=0
+      Do IP=1,NBasis
+      Do IR=1,IP
+
+      IPR=IPR+1
+C
+      IQS=0
+      Do IQ=1,NBasis
+      Do IS=1,IQ
+
+      IQS=IQS+1
+C
+      If(IPR.Ge.IQS) Then
+C
+      NAddr=NAddr+1
+      Read(10,*) AuxSR
+      TwoNO(NAddr)=TwoNO(NAddr)+AuxSR
+      EndIf
+      EndDo
+      EndDo
+      EndDo
+      EndDo
+      Close(10)
+      EndIf
+C
       Do I=1,NBasis
       C(I)=CICoef(I)
       EndDo
@@ -5094,6 +5253,38 @@ C
       Do II=1,ISkippedEig
       Write(6,*)'Skipped',II,Skipped(II)
       EndDo
+      EndIf
+C
+C     RESTORE INTEGRALS
+      If (IDBBSC.Eq.2) Then
+C
+      Open(10,file="sr_integrals.dat")
+      NAddr=0
+C
+      IPR=0
+      Do IP=1,NBasis
+      Do IR=1,IP
+
+      IPR=IPR+1
+C
+      IQS=0
+      Do IQ=1,NBasis
+      Do IS=1,IQ
+
+      IQS=IQS+1
+C
+      If(IPR.Ge.IQS) Then
+C
+      NAddr=NAddr+1
+      Read(10,*) AuxSR
+      TwoNO(NAddr)=TwoNO(NAddr)-AuxSR
+      EndIf
+      EndDo
+      EndDo
+      EndDo
+      EndDo
+      Close(10)
+C
       EndIf
 C
       Return
@@ -7530,7 +7721,13 @@ C
       Dimension DipX(NBasis,NBasis),DipY(NBasis,NBasis),
      $ DipZ(NBasis,NBasis),UNOAO(NBasis,NBasis),AUXM(NBasis,NBasis)
 C
+      If (IMOLPRO == 1) Then
       Call read_dip_molpro(DipX,DipY,DipZ,filename,NBasis)
+      ElseIf (IDALTON == 1) Then
+      Call read_dip_dalton(DipX,DipY,DipZ,filename,NBasis)
+      Else
+      Stop "Unknown Interface in ReadDip!"
+      EndIf
 C
       Call dgemm('N','N',NBasis,NBasis,NBasis,1d0,UNOAO,NBasis,
      $           dipz,NBasis,0d0,AUXM,NBasis)
@@ -7554,6 +7751,8 @@ C
 C
 C     compute electronic part of the DM
 C     using occupation numbers
+C
+      use read_external
 C
       Implicit Real*8 (A-H,O-Z)
       Character(*),Intent(In) :: filedip,filegeom
@@ -7579,6 +7778,8 @@ C
       Open(newunit=ione,file=filegeom,access='sequential',
      $     form='unformatted',status='old')
 C
+      If (IMOLPRO == 1) Then
+C
       Do
         Read(ione,iostat=ios) label
         If(ios<0) then
@@ -7592,6 +7793,16 @@ C
            Exit
         EndIf
       EndDo
+C
+      ElseIf (IDALTON == 1) Then
+C
+      Call readlabel(ione,'ISORDK  ')
+      MaxCen = 500
+      Allocate(Charg(MaxCen),XYZ(MaxCen,3))
+      Read(ione)
+      Read(ione) Charg,NCen,XYZ(1:MaxCen,1:3)
+      EndIf
+C
       Close(ione)
 C
       NUC_DMX=0; NUC_DMY=0; NUC_DMZ=0

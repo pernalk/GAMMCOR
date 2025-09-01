@@ -92,7 +92,8 @@ deallocate(work1)
 end subroutine Project_DChol
 
 subroutine WIter_D12Chol(ECorr,AC1,Max_Cn,XOne,URe,Occ,EGOne,NGOcc,&
-   IGem,NAct,INActive,NELE,NBasis,NInte1,NDim,NGem,IndAux,&
+   IGem,NAct,INActive,NElecBEmb,NELE,&
+   NBasis,NInte1,NDim,NGem,IndAux,&
    IndN,IndX,NDimX)
 !
 !  AC energy cacluation using CHOLESKY VECTORS:
@@ -111,7 +112,7 @@ use memory
 
 implicit none
 integer,intent(in) :: AC1,NGOcc,NBasis,NInte1,NDim,NGem,NDimX
-integer,intent(in) :: NAct,INActive,NELE
+integer,intent(in) :: NAct,INActive,NElecBEmb,NELE
 integer,intent(in) :: IndN(2,NDim),IndX(NDim),IndAux(NBasis),&
                       IGem(NBasis)
 double precision,intent(in) :: URe(NBasis,NBasis),Occ(NBasis),XONe(NInte1)
@@ -189,13 +190,15 @@ allocate(A0block(nblk))
 ! AC0BLOCK with ver=0 stores A-(0) and A+(0) matrices
 !                            in X and Y, respectively
 Call AC0BLOCK(Occ,URe,XOne, &
-     IndN,IndX,IGem,NAct,INActive,NDimX,NBasis,NDimX,NInte1,'FFOO','FOFO', &
+     IndN,IndX,IGem,NAct,INActive,NElecBEmb, &
+     NDimX,NBasis,NDimX,NInte1,'FFOO','FOFO', &
      ICholesky,A0BlockIV,A0Block,nblk,0,'DUMMY',0)
 
 ! get AB1PLUS and AB1MIN
 ACAlpha=1.D0
 call AB_CAS_FOFO(ABPLUS1,ABMIN1,ECASSCF,URe,Occ,XOne, &
-              IndN,IndX,IGem,NAct,INActive,NDimX,NBasis,NDimX,&
+              IndN,IndX,IGem,NAct,INActive,NElecBEmb, &
+              NDimX,NBasis,NDimX,&
               NInte1,twojfile,twokfile,ICholesky,0,ACAlpha,.false.)
 
 Call sq_symmetrize(ABPLUS1,NDimX)
@@ -235,7 +238,8 @@ Call FreqGrid(XFreq,WFreq,NGrid)
 allocate(A0block(nblk))
 ! ver=1: store A+(0).A-(0) in blocks 
 Call AC0BLOCK(Occ,URe,XOne, &
-     IndN,IndX,IGem,NAct,INActive,NDimX,NBasis,NDimX,NInte1,'FFOO','FOFO', &
+     IndN,IndX,IGem,NAct,INActive,NElecBEmb, &
+     NDimX,NBasis,NDimX,NInte1,'FFOO','FOFO', &
      ICholesky,A0BlockIV,A0Block,nblk,1,'A0BLK',0)
 
 !allocate(COMTilde(NDimX*NCholesky))
@@ -347,7 +351,8 @@ Call RELEASE_AC0BLOCK(A0Block,A0blockIV,nblk)
 end subroutine WIter_D12Chol
 
 subroutine WIter_DChol(ECorr,Max_Cn,XOne,URe,Occ,EGOne,NGOcc,&
-   IGem,NAct,INActive,NELE,NBasis,NInte1,NDim,NGem,IndAux,&
+   IGem,NAct,INActive,NElecBEmb,NELE,&
+   NBasis,NInte1,NDim,NGem,IndAux,&
    IndN,IndX,NDimX)
 !
 !  AC energy cacluation using CHOLESKY VECTORS:
@@ -360,7 +365,7 @@ use systemdef
 
 implicit none
 integer,intent(in) :: NGOcc,NBasis,NInte1,NDim,NGem,NDimX
-integer,intent(in) :: NAct,INActive,NELE
+integer,intent(in) :: NAct,INActive,NElecBEmb,NELE
 integer,intent(in) :: IndN(2,NDim),IndX(NDim),IndAux(NBasis),&
                    IGem(NBasis)
 double precision :: ACAlpha
@@ -420,12 +425,14 @@ allocate(ABPLUS0(NDimX*NDimX),ABMIN0(NDimX*NDimX),ABPLUS1(NDimX*NDimX),ABMIN1(ND
 
 ACAlpha=0.D0
 call AB_CAS_FOFO(ABPLUS0,ABMIN0,ECASSCF,URe,Occ,XOne, &
-              IndN,IndX,IGem,NAct,INActive,NDimX,NBasis,NDimX,&
+              IndN,IndX,IGem,NAct,INActive,NElecBEmb, &
+              NDimX,NBasis,NDimX,&
               NInte1,twojfile,twokfile,1,0,ACAlpha,.false.)
 
 ACAlpha=1.D0
 call AB_CAS_FOFO(ABPLUS1,ABMIN1,ECASSCF,URe,Occ,XOne, &
-              IndN,IndX,IGem,NAct,INActive,NDimX,NBasis,NDimX,&
+              IndN,IndX,IGem,NAct,INActive,NElecBEmb, &
+              NDimX,NBasis,NDimX,&
               NInte1,twojfile,twokfile,1,0,ACAlpha,.false.)
 
 ABPLUS1=ABPLUS1-ABPLUS0
@@ -462,7 +469,8 @@ Call FreqGrid(XFreq,WFreq,NGrid)
 nblk = 1 + NBasis - NAct
 allocate(A0block(nblk))
 Call AC0BLOCK(Occ,URe,XOne, &
-     IndN,IndX,IGem,NAct,INActive,NDimX,NBasis,NDimX,NInte1,'FFOO','FOFO', &
+     IndN,IndX,IGem,NAct,INActive,NElecBEmb, &
+     NDimX,NBasis,NDimX,NInte1,'FFOO','FOFO', &
      1,A0BlockIV,A0Block,nblk,1,'A0BLK',0)
 
 allocate(COMTilde(NDimX*NCholesky),COMTildeAct(NDimX*NCholesky))
@@ -554,7 +562,8 @@ Call RELEASE_AC0BLOCK(A0Block,A0blockIV,nblk)
 end subroutine WIter_DChol
 
 subroutine WIter_FOFO(ECorr,Max_Cn,XOne,URe,Occ,EGOne,NGOcc,&
-   IGem,NAct,INActive,NELE,NBasis,NInte1,NDim,NGem,IndAux,&
+   IGem,NAct,INActive,NElecBEmb,NELE,&
+   NBasis,NInte1,NDim,NGem,IndAux,&
    IndN,IndX,NDimX)
 !
 !  AC energy cacluation by: (1) expanding AC integrand in alpha around alpha=0, up to Max_Cn order
@@ -569,7 +578,7 @@ use print_units
 implicit none
 
 integer,intent(in) :: NGOcc,NBasis,NInte1,NDim,NGem,NDimX
-integer,intent(in) :: NAct,INActive,NELE
+integer,intent(in) :: NAct,INActive,NElecBEmb,NELE
 integer,intent(in) :: IndN(2,NDim),IndX(NDim),IndAux(NBasis),&
                    IGem(NBasis)
 double precision :: ACAlpha
@@ -607,12 +616,14 @@ IntKFile = twokfile
 
 ACAlpha=0.D0
 call AB_CAS_FOFO(ABPLUS0,WORK0,ECASSCF,URe,Occ,XOne, &
-              IndN,IndX,IGem,NAct,INActive,NDimX,NBasis,NDimX,&
+              IndN,IndX,IGem,NAct,INActive,NElecBEmb,&
+              NDimX,NBasis,NDimX,&
               NInte1,twojfile,twokfile,1,0,ACAlpha,.false.)
 
 ACAlpha=1.D0
 call AB_CAS_FOFO(ABPLUS1,WORK1,ECASSCF,URe,Occ,XOne, &
-              IndN,IndX,IGem,NAct,INActive,NDimX,NBasis,NDimX,&
+              IndN,IndX,IGem,NAct,INActive,NElecBEmb,&
+              NDimX,NBasis,NDimX,&
               NInte1,twojfile,twokfile,1,0,ACAlpha,.false.)
 
 ABPLUS1=ABPLUS1-ABPLUS0
@@ -631,7 +642,8 @@ Call FreqGrid(XFreq,WFreq,NGrid)
 nblk = 1 + NBasis - NAct
 allocate(A0block(nblk))
 Call AC0BLOCK(Occ,URe,XOne, &
-      IndN,IndX,IGem,NAct,INActive,NDimX,NBasis,NDimX,NInte1,'FFOO','FOFO', &
+      IndN,IndX,IGem,NAct,INActive,NElecBEmb, &
+      NDimX,NBasis,NDimX,NInte1,'FFOO','FOFO', &
       0,A0BlockIV,A0Block,nblk,0,'A0BLK',0)
       !A0BlockIV,A0Block,nblk,1)
 
@@ -756,7 +768,7 @@ end subroutine WIter_FOFO
 
 subroutine WInteg_FOFO(ECorr,XOne,URe,Occ,&
    EGOne,NGOcc,&
-   IGem,NAct,INActive,NELE,&
+   IGem,NAct,INActive,NElecBEmb,NELE,&
    NBasis,NInte1,NDim,NGem,IndAux,ACAlpha,&
    IndN,IndX,NDimX)
 !
@@ -768,7 +780,7 @@ use abfofo
 implicit none
 
 integer,intent(in) :: NGOcc,NBasis,NInte1,NDim,NGem,NDimX
-integer,intent(in) :: NAct,INActive,NELE
+integer,intent(in) :: NAct,INActive,NElecBEmb,NELE
 integer,intent(in) :: IndN(2,NDim),IndX(NDim),IndAux(NBasis),&
                    IGem(NBasis)
 double precision :: ACAlpha
@@ -795,7 +807,8 @@ twokfile = 'FOFO'
 IntKFile = twokfile
 
 call AB_CAS_FOFO(ABPLUS,ABMIN,ECASSCF,URe,Occ,XOne, &
-              IndN,IndX,IGem,NAct,INActive,NDimX,NBasis,NDimX,&
+              IndN,IndX,IGem,NAct,INActive,NElecBEmb,&
+              NDimX,NBasis,NDimX,&
               NInte1,twojfile,twokfile,0,0,ACAlpha,.false.)
 EGOne(1)=ECASSCF
 
@@ -904,7 +917,8 @@ deallocate(ints,work)
 end subroutine WInteg_FOFO
 
 subroutine CIter_FOFO_old(PMat,ECorr,ACAlpha,XOne,URe,Occ,EGOne,NGOcc,&
-   IGem,NAct,INActive,NELE,NBasis,NInte1,NDim,NGem,IndAux,&
+   IGem,NAct,INActive,NElecBEmb,NELE,&
+   NBasis,NInte1,NDim,NGem,IndAux,&
    IndN,IndX,NDimX)
 
 use abfofo
@@ -912,7 +926,7 @@ use abfofo
 implicit none
 
 integer,intent(in) :: NGOcc,NBasis,NInte1,NDim,NGem,NDimX
-integer,intent(in) :: NAct,INActive,NELE
+integer,intent(in) :: NAct,INActive,NElecBEmb,NELE
 integer,intent(in) :: IndN(2,NDim),IndX(NDim),IndAux(NBasis),&
                    IGem(NBasis)
 double precision :: ACAlpha,ACAlpha0,XMix
@@ -958,12 +972,14 @@ IntKFile = twokfile
 
 ACAlpha0=0.D0
 call AB_CAS_FOFO(ABPLUS0,WORK0,ECASSCF,URe,Occ,XOne, &
-              IndN,IndX,IGem,NAct,INActive,NDimX,NBasis,NDimX,&
+              IndN,IndX,IGem,NAct,INActive,NElecBEmb,&
+              NDimX,NBasis,NDimX,&
               NInte1,twojfile,twokfile,1,0,ACAlpha0,.false.)
 Call dgemm('N','N',NDimX,NDimX,NDimX,1d0,ABPLUS0,NDimX,WORK0,NDimX,0d0,A0,NDimX)
 
 call AB_CAS_FOFO(ABPLUS1,WORK1,ECASSCF,URe,Occ,XOne, &
-              IndN,IndX,IGem,NAct,INActive,NDimX,NBasis,NDimX,&
+              IndN,IndX,IGem,NAct,INActive,NElecBEmb,&
+              NDimX,NBasis,NDimX,&
               NInte1,twojfile,twokfile,1,0,ACAlpha,.false.)
 EGOne(1)=ECASSCF
 !A2=ABPLUS1*ABMIN1
@@ -1161,7 +1177,8 @@ end subroutine CIter_FOFO_old
 
 !subroutine Eccor_iter()
 subroutine CIter_FOFO(PMat,ECorr,ACAlpha,XOne,URe,Occ,EGOne,NGOcc,&
-   IGem,NAct,INActive,NELE,NBasis,NInte1,NDim,NGem,IndAux,IndN,IndX,NDimX)
+   IGem,NAct,INActive,NElecBEmb,NELE,&
+   NBasis,NInte1,NDim,NGem,IndAux,IndN,IndX,NDimX)
 !
 !  to do: get rid of multiplication of NDimX.NDimX matrices
 !  reduce the number of matrices: do not keep A0, only diagonals of Lambda
@@ -1182,7 +1199,7 @@ subroutine CIter_FOFO(PMat,ECorr,ACAlpha,XOne,URe,Occ,EGOne,NGOcc,&
    implicit none
 
    integer,intent(in) :: NGOcc,NBasis,NInte1,NDim,NGem,NDimX
-   integer,intent(in) :: NAct,INActive,NELE
+   integer,intent(in) :: NAct,INActive,NElecBEmb,NELE
    integer,intent(in) :: IndN(2,NDim),IndX(NDim),IndAux(NBasis),IGem(NBasis)
    double precision,intent(in) :: URe(NBasis,NBasis),Occ(NBasis),XONe(NInte1)
    double precision :: ACAlpha
@@ -1226,7 +1243,8 @@ subroutine CIter_FOFO(PMat,ECorr,ACAlpha,XOne,URe,Occ,EGOne,NGOcc,&
    IntKFile = twokfile
 
    call AB_CAS_FOFO(ABPLUS1,WORK1,ECASSCF,URe,Occ,XOne, &
-                  IndN,IndX,IGem,NAct,INActive,NDimX,NBasis,NDimX,&
+                  IndN,IndX,IGem,NAct,INActive,NElecBEmb,&
+                  NDimX,NBasis,NDimX,&
                   NInte1,twojfile,twokfile,1,0,ACAlpha,.false.)
    EGOne(1)=ECASSCF
    ! Calc A2=ABPLUS1*ABMIN1
@@ -1544,7 +1562,8 @@ end subroutine read_D_array
 !end subroutine pack_AC0LRBLOCK
 
 subroutine AC0BLOCK(Occ,URe,XOne, &
-                    IndN,IndX,IGemIN,NAct,INActive,NDimX,NBasis,NDim,NInte1, &
+                    IndN,IndX,IGemIN,NAct,INActive,NElecBEmb,&
+                    NDimX,NBasis,NDim,NInte1, &
                     IntJFile,IntKFile,ICholesky, &
                     A0BlockIV,A0block,nblk,ver,dumpfile,dump)
 !
@@ -1560,7 +1579,8 @@ use blocktypes
 !
 implicit none
 
-integer,intent(in)           :: NAct,INActive,NDimX,NBasis,NDim,NInte1
+integer,intent(in)           :: NAct,INActive,NElecBEmb
+integer,intent(in)           :: NDimX,NBasis,NDim,NInte1
 integer,intent(in)           :: ICholesky
 integer,intent(in)           :: IndN(2,NDim),IndX(NDim),IGemIN(NBasis)
 integer                      :: nblk
@@ -1590,7 +1610,8 @@ double precision :: ETot
 type(EblockData) :: A0block(nblk), A0blockIV
 
 call ABPM0_FOFO(Occ,URe,XOne,ABPLUS,ABMIN, &
-                IndN,IndX,IGemIN,NAct,INActive,NDimX,NBasis,NDim,NInte1, &
+                IndN,IndX,IGemIN,NAct,INActive,NElecBEmb,&
+                NDimX,NBasis,NDim,NInte1, &
                 IntJFile,IntKFile,ICholesky,ETot)
 ! hererXXX
 !do i=1,NBasis
@@ -1964,164 +1985,10 @@ end associate
 
 end subroutine pack_A0block
 
-subroutine Polariz(FreqOm,UNOAO,XOne,URe,Occ,&
-   IGem,NAct,INActive,NELE,NBasis,NInte1,NGem,IndAux,&
-   IndN,IndX,NDimX,ICholesky)
-!
-! Returns dynamic polarizability tensor for a given frequency
-! find C(omega) by inversion
-!
-use abfofo
-
-implicit none
-integer,intent(in) :: NBasis,NInte1,NGem,NDimX
-integer,intent(in) :: NAct,INActive,NELE
-integer,intent(in) :: IndN(2,NDimX),IndX(NDimX),IndAux(NBasis),IGem(NBasis)
-double precision,intent(in) :: FreqOm,UNOAO(NBasis,NBasis),URe(NBasis,NBasis),Occ(NBasis),XONe(NInte1)
-double precision :: DipX(NBasis,NBasis),DipY(NBasis,NBasis),DipZ(NBasis,NBasis),CICoef(NBasis)
-double precision :: DipCX(NDimX),DipCY(NDimX),DipCZ(NDimX)
-double precision :: ipiv(NDimX),ABPLUS(NDimX*NDimX),ABMIN(NDimX*NDimX),AIN(NDimX*NDimX),CMAT(NDimX*NDimX)
-double precision :: ECASSCF,AXX,AYX,AXY,AZX,AXZ,AYY,AZY,AYZ,AZZ,Om,ddot,Alpha
-character(:),allocatable :: twojfile,twokfile
-integer :: I,J,IJ,inf,ICholesky,NOccup
-
-Om=FreqOm
-
-NOccup=NAct+INActive
-Call ComputeDipoleMom(UNOAO,Occ,'DIP','AOONEINT.mol',NOccup,NBasis)
-
-Call ReadDip(DipX,DipY,DipZ,UNOAO,'DIP',NBasis)
-
-do i=1,NBasis
-CICoef(i) = sign(sqrt(Occ(i)),Occ(i)-0.5d0)
-enddo
-
-Do IJ=1,NDimX
-  I=IndN(1,IJ)
-  J=IndN(2,IJ)
-  DipCX(IndX(IJ))=(CICoef(I)+CICoef(J))*DipX(I,J)
-  DipCY(IndX(IJ))=(CICoef(I)+CICoef(J))*DipY(I,J)
-  DipCZ(IndX(IJ))=(CICoef(I)+CICoef(J))*DipZ(I,J)
-Enddo
-
-twojfile = 'FFOO'
-twokfile = 'FOFO'
-
-Alpha=1.0
-Call AB_CAS_FOFO(ABPLUS,ABMIN,ECASSCF,URe,Occ,XOne, &
-              IndN,IndX,IGem,NAct,INActive,NDimX,NBasis,NDimX,&
-              NInte1,twojfile,twokfile,ICholesky,0,Alpha,.false.)
-AIN=0d0
-Do I=1,NDimX
-    AIN((I-1)*NDimX+I)=1.0
-EndDo
-!  ABPLUS*ABMIN - 1 Om^2
-Call dgemm('N','N',NDimX,NDimX,NDimX,1d0,ABPLUS,NDimX,&
-           ABMIN,NDimX,-Om**2,AIN,NDimX)
-CMAT=0.5d0*ABPLUS
-Call dgesv(NDimX,NDimX,AIN,NDimX,ipiv,CMAT,NDimX,inf)
-
-! contract CMAT with dipole moment vectors
-Call dgemv('N',NDimX,NDimX,1.d0,CMAT,NDimx,DipCX,1,0.d0,ipiv,1)
-
-AYX=8.d0*ddot(NDimx,DipCY,1,ipiv,1)
-AZX=8.d0*ddot(NDimx,DipCZ,1,ipiv,1)
-AXX=8.d0*ddot(NDimx,DipCX,1,ipiv,1)
-
-Call dgemv('N',NDimX,NDimX,1.d0,CMAT,NDimx,DipCY,1,0.d0,ipiv,1)
-AXY=8.d0*ddot(NDimx,DipCX,1,ipiv,1)
-AZY=8.d0*ddot(NDimx,DipCZ,1,ipiv,1)
-AYY=8.d0*ddot(NDimx,DipCY,1,ipiv,1)
-
-Call dgemv('N',NDimX,NDimX,1.d0,CMAT,NDimx,DipCZ,1,0.d0,ipiv,1)
-AXZ=8.d0*ddot(NDimx,DipCX,1,ipiv,1)
-AYZ=8.d0*ddot(NDimx,DipCY,1,ipiv,1)
-AZZ=8.d0*ddot(NDimx,DipCZ,1,ipiv,1)
-
-Write(6,'(/,X,''Polarizability tensor for frequency '',F8.4)') Om
-Write(6,'(/,X,''XX   XY   XZ  '',3F15.8)') AXX, AXY, AXZ
-Write(6,'(X,''YX   YY   YZ  '',3F15.8)') AYX, AYY, AYZ
-Write(6,'(X,''ZX   ZY   ZZ  '',3F15.8,2/)') AZX, AZY, AZZ
-
-end subroutine Polariz
-
-subroutine PolarizAl(FreqOm,UNOAO,XOne,URe,Occ,&
-   IGem,NAct,INActive,NELE,NBasis,NInte1,NGem,IndAux,&
-   IndN,IndX,NDimX,ICholesky,Max_Cn)
-!
-! Returns dynamic polarizability tensor for a given frequency FreqOm
-! find C(omega) by expanding around Alpha=0 with a tolerance Eps or
-! up to maximal order Max_Cn
-!
-use abfofo
-
-implicit none
-integer,intent(in) :: NBasis,NInte1,NGem,NDimX,Max_cn
-integer,intent(in) :: NAct,INActive,NELE
-integer,intent(in) :: IndN(2,NDimX),IndX(NDimX),IndAux(NBasis),IGem(NBasis)
-double precision,intent(in) :: FreqOm,UNOAO(NBasis,NBasis),URe(NBasis,NBasis),Occ(NBasis),XOne(NInte1)
-double precision :: DipX(NBasis,NBasis),DipY(NBasis,NBasis),DipZ(NBasis,NBasis),CICoef(NBasis)
-double precision :: DipCX(NDimX),DipCY(NDimX),DipCZ(NDimX)
-double precision :: ipiv(NDimX)
-double precision :: ECASSCF,AXX,AYX,AXY,AZX,AXZ,AYY,AZY,AYZ,AZZ,Om,ddot,Alpha
-character(:),allocatable :: twojfile,twokfile
-integer :: I,J,IJ,inf,ICholesky,NOccup
-
-Om=FreqOm
-
-NOccup=NAct+INActive
-Call ComputeDipoleMom(UNOAO,Occ,'DIP','AOONEINT.mol',NOccup,NBasis)
-
-Call ReadDip(DipX,DipY,DipZ,UNOAO,'DIP',NBasis)
-
-do i=1,NBasis
-CICoef(i) = sign(sqrt(Occ(i)),Occ(i)-0.5d0)
-enddo
-
-Do IJ=1,NDimX
-  I=IndN(1,IJ)
-  J=IndN(2,IJ)
-  DipCX(IndX(IJ))=(CICoef(I)+CICoef(J))*DipX(I,J)
-  DipCY(IndX(IJ))=(CICoef(I)+CICoef(J))*DipY(I,J)
-  DipCZ(IndX(IJ))=(CICoef(I)+CICoef(J))*DipZ(I,J)
-Enddo
-
-Call CFREQPROJ(ipiv,Om,DipCX,1, &
-   Max_Cn,XOne,URe,Occ,&
-   IGem,NAct,INActive,NBasis,NInte1,IndAux,&
-   ICholesky,IndN,IndX,NDimX)
-
-AYX=8.d0*ddot(NDimx,DipCY,1,ipiv,1)
-AZX=8.d0*ddot(NDimx,DipCZ,1,ipiv,1)
-AXX=8.d0*ddot(NDimx,DipCX,1,ipiv,1)
-
-Call CFREQPROJ(ipiv,Om,DipCY,1, &
-   Max_Cn,XOne,URe,Occ,&
-   IGem,NAct,INActive,NBasis,NInte1,IndAux,&
-   ICholesky,IndN,IndX,NDimX)
-
-AXY=8.d0*ddot(NDimx,DipCX,1,ipiv,1)
-AZY=8.d0*ddot(NDimx,DipCZ,1,ipiv,1)
-AYY=8.d0*ddot(NDimx,DipCY,1,ipiv,1)
-
-Call CFREQPROJ(ipiv,Om,DipCZ,1, &
-   Max_Cn,XOne,URe,Occ,&
-   IGem,NAct,INActive,NBasis,NInte1,IndAux,&
-   ICholesky,IndN,IndX,NDimX)
-AXZ=8.d0*ddot(NDimx,DipCX,1,ipiv,1)
-AYZ=8.d0*ddot(NDimx,DipCY,1,ipiv,1)
-AZZ=8.d0*ddot(NDimx,DipCZ,1,ipiv,1)
-
-Write(6,'(/,X,''Polarizability tensor for frequency '',F8.4)') Om
-Write(6,'(/,X,''XX   XY   XZ  '',3F15.8)') AXX, AXY, AXZ
-Write(6,'(X,''YX   YY   YZ  '',3F15.8)') AYX, AYY, AYZ
-Write(6,'(X,''ZX   ZY   ZZ  '',3F15.8,2/)') AZX, AZY, AZZ
-
-end subroutine PolarizAl
-
 subroutine CFREQPROJ(COMTilde,OmI,DProj,NProj, &
    Max_Cn,XOne,URe,Occ,&
-   IGem,NAct,INActive,NBasis,NInte1,IndAux,&
+   IGem,NAct,INActive,NElecBEmb,&
+   NBasis,NInte1,IndAux,&
    ICholesky,IndN,IndX,NDimX)
 !
 !  For a given frequency OmI, return a product of the matrices C(Alpha=1,OmI) and DProj
@@ -2135,7 +2002,7 @@ use sapt_utils
 
 implicit none
 integer,intent(in) :: NBasis,NInte1,NDimX,NProj
-integer,intent(in) :: NAct,INActive,ICholesky
+integer,intent(in) :: NAct,INActive,NElecBEmb,ICholesky
 integer,intent(in) :: IndN(2,NDimX),IndX(NDimX),IndAux(NBasis),&
                       IGem(NBasis)
 double precision :: ACAlpha,Eps
@@ -2181,13 +2048,15 @@ allocate(A0block(nblk))
 ! AC0BLOCK with ver=0 stores A-(0) and A+(0) matrices
 !                            in X and Y, respectively
 Call AC0BLOCK(Occ,URe,XOne, &
-     IndN,IndX,IGem,NAct,INActive,NDimX,NBasis,NDimX,NInte1,'FFOO','FOFO', &
+     IndN,IndX,IGem,NAct,INActive,NElecBEmb, &
+     NDimX,NBasis,NDimX,NInte1,'FFOO','FOFO', &
      ICholesky,A0BlockIV,A0Block,nblk,0,'DUMMY',0)
 
 ! get AB1PLUS and AB1MIN
 ACAlpha=1.D0
 call AB_CAS_FOFO(ABPLUS1,ABMIN1,ECASSCF,URe,Occ,XOne, &
-              IndN,IndX,IGem,NAct,INActive,NDimX,NBasis,NDimX,&
+              IndN,IndX,IGem,NAct,INActive,NElecBEmb, &
+              NDimX,NBasis,NDimX,&
               NInte1,twojfile,twokfile,ICholesky,0,ACAlpha,.false.)
 
 Call sq_symmetrize(ABPLUS1,NDimX)
@@ -2217,7 +2086,8 @@ deallocate(A0BlockIV%vec,A0BlockIV%pos)
 allocate(A0block(nblk))
 ! ver=1: store A+(0).A-(0) in blocks
 Call AC0BLOCK(Occ,URe,XOne, &
-     IndN,IndX,IGem,NAct,INActive,NDimX,NBasis,NDimX,NInte1,'FFOO','FOFO', &
+     IndN,IndX,IGem,NAct,INActive,NElecBEmb, &
+     NDimX,NBasis,NDimX,NInte1,'FFOO','FOFO', &
      ICholesky,A0BlockIV,A0Block,nblk,1,'A0BLK',0)
 
 COMTilde=0.0

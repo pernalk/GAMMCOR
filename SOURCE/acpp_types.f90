@@ -42,6 +42,7 @@ module acpp_types
             double precision, dimension(:,:), allocatable :: XgaErf, ZgkErf
             double precision, dimension(:,:), allocatable :: TXgaErf, TXga
             double precision, dimension(:,:), allocatable :: HNO
+            double precision, dimension(:,:), allocatable :: J_SR
             
       end type TTHCData
 

@@ -10,10 +10,22 @@ implicit none
 contains
 
 subroutine AB_CAS_FOFO(ABPLUS,ABMIN,ETot,URe,Occ,XOne, &
-     IndN,IndX,IGemIN,NAct,INActive,NDimX,NBasis,NDim,NInte1, &
+     IndN,IndX,IGemIN,NAct,INActive,NElecBEmb, &
+     NDimX,NBasis,NDim,NInte1, &
      IntJFile,IntKFile,ICholesky,IDBBSC,ACAlpha,AB1)
 !
 ! COMPUTE THE A+B AND A-B MATRICES FOR 2-RDM READ FROM A rdm2.dat FILE
+!
+! Input:
+!
+! AB1       = .true.  if A^(1) +/- B^(1)
+!              first-order Hessian matrices
+!
+!           = .false. if A^(alpha) +/- B^(alpha)
+!
+! IDBBSC = 2: hessians with effective SR integrals (only with Cholesky)
+!
+! Comments:
 !
 ! RDM2 IS IN NO REPRESENTATION. IT IS PARTIALLY SPIN-SUMMED
 ! THE FOLLOWING SYMMETRY IS ASSUMED
@@ -23,9 +35,10 @@ subroutine AB_CAS_FOFO(ABPLUS,ABMIN,ETot,URe,Occ,XOne, &
 ! COULOMB INTEGRALS ARE READ FROM IntJFile IN (FF|OO) FORMAT
 ! EXCHANGE INTEGRALS ARE READ FROM IntKFile IN (FO|FO) FORMAT
 !
- implicit none
+implicit none
 
-integer,intent(in) :: NAct,INActive,NDimX,NBasis,NDim,NInte1
+integer,intent(in) :: NAct,INActive,NElecBEmb
+integer,intent(in) :: NDimX,NBasis,NDim,NInte1
 integer,intent(in) :: ICholesky
 integer,intent(in) :: IDBBSC
 character(*) :: IntJFile,IntKFile
@@ -50,6 +63,9 @@ double precision,allocatable :: work1(:),work2(:)
 double precision,allocatable :: ints(:,:)
 integer,external :: NAddrRDM
 double precision,external :: FRDM2
+! DMRG-in-DFT
+double precision  :: XVEMB(NInte1)
+logical :: IVEMB
 
 ABPLUS = 0
 ABMIN  = 0
@@ -194,7 +210,7 @@ if(ICholesky==1) then
    else
       call JK_Chol_loop(ABPLUS,ABMIN,HNO,AuxI,AuxIO,WMAT,&
                         RDM2val,Occ,AuxCoeff,IGem,AuxInd,pos,&
-                        INActive,NOccup,NDimX,NDimX,NBasis,NInte1,IntJFile,IntKFile,&
+                        INActive,NOccup,NElecBEmb,NDimX,NDimX,NBasis,NInte1,IntJFile,IntKFile,&
                         ACAlpha,switch,ETot)
    endif
 else
@@ -202,6 +218,41 @@ else
                 RDM2val,Occ,AuxCoeff,IGem,AuxInd,pos,&
                 INActive,NOccup,NDim,NDimX,NBasis,NInte1,IntJFile,IntKFile,ACAlpha,switch,ETot)
 endif
+
+! DMRG-in-DFT
+Inquire(file='embedding_potential_NO.bin',exist=IVEMB)
+if (IVEMB) then
+   Open(10,File='embedding_potential_NO.bin',form='unformatted',access='stream')
+   Do I=1,NInte1
+      Read(10) XVEMB(I)
+   EndDo
+   Close(10)
+   call triang_to_sq(XVEMB,work2,NBasis)
+   do j=1,NBasis
+      do i=1,NBasis
+         if(IGem(i)==IGem(j).And.IGem(i)==2) then
+             if(AB1) then
+                    HNO(i,j) = -work2(nbasis*(i-1)+j)
+             else
+                    ij=(max(i,j)*(max(i,j)-1))/2+min(i,j)
+      !              HNO(i,j) = XOne(ij)+(1.d0-ACAlpha)*work2(nbasis*(i-1)+j)
+                    HNO(i,j) = HNO(i,j)+(1.d0-ACAlpha)*work2(nbasis*(i-1)+j)
+             endif
+         endif
+         if(IGem(i)==IGem(j).And.IGem(i)==1.And.i.gt.NElecBEmb/2.and.j.gt.NElecBEmb/2) then
+             if(AB1) then
+                    HNO(i,j) = -work2(nbasis*(i-1)+j)
+             else
+                    ij=(max(i,j)*(max(i,j)-1))/2+min(i,j)
+      !              HNO(i,j) = XOne(ij)+(1.d0-ACAlpha)*work2(nbasis*(i-1)+j)
+      !              HNO(i,j) = HNO(i,j)+(1.d0-ACAlpha)*work2(nbasis*(i-1)+j)
+             endif            
+         endif
+
+      enddo
+   enddo
+endif
+! DMRG-in-DFT end
 
 write(LOUT,'(1x,a,5x,f15.8)') "CASSCF Energy (w/o ENuc)", ETot
 
@@ -320,14 +371,15 @@ deallocate(ints,work2,work1)
 end subroutine AB_CAS_FOFO
 
 subroutine MP2RDM_FOFO(PerVirt,Eps,Occ,URe,UNOAO,XOne,IndN,IndX,IndAux,IGemIN, &
-                       NAct,INActive,NDimX,NDim,NBasis,NInte1,     &
+                       NAct,INActive,NElecBEmb,NDimX,NDim,NBasis,NInte1,     &
                        IntJFile,IntKFile,ICholesky,ThrVirt,NVZero,IPrint)
 !
 !
 !
 implicit none
 
-integer,intent(in)           :: NAct,INActive,NDimX,NDim,NBasis,NInte1
+integer,intent(in)           :: NAct,INActive,NElecBEmb
+integer,intent(in)           :: NDimX,NDim,NBasis,NInte1
 integer,intent(in)           :: ICholesky
 integer,intent(in)           :: IPrint
 integer,intent(in)           :: IndN(2,NDim),IndX(NDim),IndAux(NBasis),IGemIN(NBasis)
@@ -412,7 +464,8 @@ call create_blocks_ABPL0(nAA,nAI,nAV,nIV,tmpAA,tmpAI,tmpAV,tmpIV,&
                          IGem,IndN,INActive,NAct,NBasis,NDimX)
 
 call ABPM0_FOFO(Occ,URe,XOne,ABPLUS,ABMIN, &
-                IndN,IndX,IGemIN,NAct,INActive,NDimX,NBasis,NDim,NInte1, &
+                IndN,IndX,IGemIN,NAct,INActive,NElecBEmb,&
+                NDimX,NBasis,NDim,NInte1, &
                 IntJFile,IntKFile,ICholesky,ETot)
 
 Eps = 0
@@ -729,12 +782,13 @@ deallocate(ints_J,ints_K,work)
 end subroutine MP2RDM_FOFO
 
 subroutine RDMResp_FOFO(Occ,URe,UNOAO,XOne,IndN,IndX,IndAux,IGemIN, &
-                       NAct,INActive,NDimX,NDim,NBasis,NInte1,     &
+                       NAct,INActive,NElecBEmb,NDimX,NDim,NBasis,NInte1,&
                        IntJFile,IntKFile,ICholesky,IOrbRelax,IOrbIncl)
 implicit none
 integer,intent(in)           :: ICholesky
    integer,intent(in)           :: IOrbRelax,IOrbIncl
-   integer,intent(in)           :: NAct,INActive,NDimX,NDim,NBasis,NInte1
+   integer,intent(in)           :: NAct,INActive,NelecBEmb
+   integer,intent(in)           :: NDimX,NDim,NBasis,NInte1
    integer,intent(in)           :: IndN(2,NDim),IndX(NDim),IndAux(NBasis),IGemIN(NBasis)
    double precision,intent(in)  :: Occ(NBasis),XOne(NInte1),UNOAO(NBasis,NBasis)
    double precision             :: Eps(NBasis,NBasis),CI(NBasis),ipiv(NDimX)
@@ -802,7 +856,8 @@ integer,intent(in)           :: ICholesky
                             IGem,IndN,INActive,NAct,NBasis,NDimX)
 
    call ABPM0_FOFO(Occ,URe,XOne,ABPLUS,ABMIN, &
-                   IndN,IndX,IGemIN,NAct,INActive,NDimX,NBasis,NDim,NInte1, &
+                   IndN,IndX,IGemIN,NAct,INActive,NElecBEmb,&
+                   NDimX,NBasis,NDim,NInte1, &
                    IntJFile,IntKFile,ICholesky,ETot)
 
    Eps = 0
@@ -816,7 +871,8 @@ integer,intent(in)           :: ICholesky
 
    ! AB(1) PART
    call AB_CAS_FOFO(ABPLUS,ABMIN,val,URe,Occ,XOne,&
-                 IndN,IndX,IGem,NAct,INActive,NDimX,NBasis,NDimX,&
+                 IndN,IndX,IGem,NAct,INActive,NElecBEmb,&
+                 NDimX,NBasis,NDimX,&
                  NInte1,IntJFile,IntKFile,ICholesky,0,1d0,.true.)
 
    ! a separate procedure for ints OTF
@@ -1149,7 +1205,8 @@ AUX1=0.d0
 Write(6,'(/,X,"**** Expansion of the C response matrix up to n_max = ",I5," ****")') Max_Cn
 Call CFREQPROJ(AUX1,0.d0,AUX2,1, &
                Max_Cn,XOne,URe,Occ,&
-               IGem,NAct,INActive,NBasis,NInte1,IndAux,&
+               IGem,NAct,INActive,NElecBEmb,&
+               NBasis,NInte1,IndAux,&
                0,IndBlock,IndX,NDimRed)
 
 do a=NS1+1,NBasis
@@ -1214,11 +1271,13 @@ EndIf
 end subroutine RDMResp_FOFO
 
 subroutine ABPM0_FOFO(Occ,URe,XOne,ABPLUS,ABMIN, &
-                      IndN,IndX,IGemIN,NAct,INActive,NDimX,NBasis,NDim,NInte1, &
+                      IndN,IndX,IGemIN,NAct,INActive,NElecBEmb,&
+                      NDimX,NBasis,NDim,NInte1, &
                       IntJFile,IntKFile,ICholesky,ETot)
 implicit none
 
-integer,intent(in)           :: NAct,INActive,NDimX,NBasis,NDim,NInte1
+integer,intent(in)           :: NAct,INActive,NElecBEmb
+integer,intent(in)           :: NDimX,NBasis,NDim,NInte1
 integer,intent(in)           :: IndN(2,NDim),IndX(NDim),IGemIN(NBasis)
 integer,intent(in)           :: ICholesky
 double precision,intent(in)  :: URe(NBasis,NBasis),Occ(NBasis),XOne(NInte1)
@@ -1239,6 +1298,9 @@ double precision,allocatable :: work1(:),work2(:)
 double precision,allocatable :: RDM2val(:,:,:,:),RDM2Act(:)
 integer,external          :: NAddrRDM
 double precision,external :: FRDM2
+! DMRG-in-DFT
+double precision  :: XVEMB(NInte1)
+logical :: IVEMB
 
 ABPLUS = 0
 ABMIN  = 0
@@ -1348,11 +1410,11 @@ if(ICholesky==1) then
    if(present(ETot)) then
       call JK_Chol_loop(ABPLUS,ABMIN,HNO,AuxI,AuxIO,WMAT,&
                         RDM2val,Occ,AuxCoeff,IGem,AuxInd,pos,&
-                        INActive,NOccup,NDimX,NDimX,NBasis,NInte1,IntJFile,IntKFile,0d0,2,ETot)
+                        INActive,NOccup,NElecBEmb,NDimX,NDimX,NBasis,NInte1,IntJFile,IntKFile,0d0,2,ETot)
    else
       call JK_Chol_loop(ABPLUS,ABMIN,HNO,AuxI,AuxIO,WMAT,&
                         RDM2val,Occ,AuxCoeff,IGem,AuxInd,pos,&
-                        INActive,NOccup,NDimX,NDimX,NBasis,NInte1,IntJFile,IntKFile,0d0,2)
+                        INActive,NOccup,NElecBEmb,NDimX,NDimX,NBasis,NInte1,IntJFile,IntKFile,0d0,2)
    endif
 else
    if(present(ETot)) then
@@ -1365,6 +1427,24 @@ else
                    INActive,NOccup,NDimX,NDimX,NBasis,NInte1,IntJFile,IntKFile,0d0,2)
    endif
 endif
+! DMRG-in-DFT
+Inquire(file='embedding_potential_NO.bin',exist=IVEMB)
+if (IVEMB) then
+   Open(10,File='embedding_potential_NO.bin',form='unformatted',access='stream')
+   Do I=1,NInte1
+      Read(10) XVEMB(I)
+   EndDo
+   Close(10)
+   XVEMB=XVEMB+XOne
+   call triang_to_sq(XVEMB,work2,NBasis)
+   do j=1,NBasis
+      do i=1,NBasis
+         if(IGem(i)==IGem(j).And.IGem(i)==2) HNO(i,j) = work2(nbasis*(i-1)+j)
+         if(IGem(i)==IGem(j).And.IGem(i)==1.And.i.gt.NElecBEmb/2.and.j.gt.NElecBEmb/2) HNO(i,j) = work2(nbasis*(i-1)+j)
+      enddo
+   enddo
+endif
+! DMRG-in-DFT end
 
 do i=1,NBasis
    C(i) = sign(sqrt(Occ(i)),Occ(i)-0.5d0)
@@ -1437,6 +1517,10 @@ do ICol=1,NDimX
 !           endif
 !         endif
 
+! Tamm-Dankoff Approximation for AC0
+!         AuxVal=(ABPLUS(ipq,irs)+ABMIN(ipq,irs))/2.D0
+!         ABPLUS(ipq,irs)=AuxVal
+!         ABMIN(ipq,irs)=AuxVal
          val = (C(ip) + C(iq))*(C(ir) + C(is))
          if(val/=0d0) ABPLUS(ipq,irs) = ABPLUS(ipq,irs)/val
          val = (C(ip) - C(iq))*(C(ir) - C(is))

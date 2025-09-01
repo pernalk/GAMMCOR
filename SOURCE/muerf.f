@@ -1,6 +1,6 @@
 *Deck DBBSCH
       Subroutine DBBSCH(ETot,ENuc,URe,Occ,XOne,UNOAO,
-     $                  BasisSet,NBasis,NInte1,IndN,IndX,NDimX)
+     $                  BasisSet,NBasis,NInte1,IndN,IndX,NDimX, THCData)
 C
 C     Compute the CBS[H] correction
 C     with SR integrals composed from Cholesky vectors
@@ -8,6 +8,7 @@ C     CBS[DFT] correction [E. Giner et al. 2018] is a byproduct
 C
       use ab0fofo
       use timing
+      use acpp_types
 C
       Implicit Real*8 (A-H,O-Z)
 
@@ -21,7 +22,8 @@ C
       double precision,intent(out) :: ETot
       double precision,intent(in) :: Occ(NBasis),XOne(NInte1)
       double precision,intent(in) :: URe(NBasis,NBasis),
-     $                               UNOAO(NBasis,NBasis)
+     $     UNOAO(NBasis,NBasis)
+      type(TTHCData), intent(in) :: THCData
 C
 C     local
 C
@@ -294,6 +296,7 @@ c        Write(6,'(1x,a,i3)') 'ORB_ORDERING =', IOrbOrder
 C
          Allocate(Work(NBasis,NBasis))
          Work = transpose(UNOAO)
+         print*, 'igridtype', igridtype, ngrid, nbasis
          Call internal_gga_no_orbgrid(IGridType,BasisSet,
      $                          IOrbOrder,Work,
      $                          WGrid,PhiGGA,NGrid,NBasis,NBasis,IUnits)

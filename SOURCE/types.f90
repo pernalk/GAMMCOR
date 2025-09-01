@@ -1,5 +1,5 @@
 module types
-! written by M. Hapka, M. Modrzejewski
+! written by M. Hapka, M. Modrzejewski,
 !            K. Pernal
 
 use print_units
@@ -98,7 +98,7 @@ integer, parameter :: RESP_DFT  = 3
 
 logical, parameter :: FLAG_POSTCAS  = .FALSE.
 
-integer,parameter :: maxcen = 500
+integer,parameter :: maxcen = 500 ! to match Dalton
 
 character(*),parameter :: PossibleInterface(5) = &
 [character(8) :: &
@@ -159,6 +159,7 @@ character(*),parameter :: PossibleUnits(2) = &
          integer :: OrbIncl   = FLAG_ORBINCL
          integer :: FunCorr   = 0 ! SR-AC0,fCAS (default)
          integer :: DBBSC     = 0 ! AC0, CBS correction (0=inactive, default)
+         integer :: IVEMB     = 0 ! DMRG-in-DFT
          integer :: MemVal = 2, MemType = 3 ! default: use 2 GB for 3-ind_tran (Cholesky)
          logical :: Visual     = FLAG_VISUAL
          logical :: Restart    = FLAG_RESTART
@@ -172,7 +173,8 @@ character(*),parameter :: PossibleUnits(2) = &
          character(:), allocatable :: BasisSet,BasisSetPath
          character(:), allocatable :: IntegralsFilePath
          integer :: Max_Cn = 3
-         double precision :: FreqOm = 0.d0
+         integer :: NFreqOm
+         double precision,allocatable :: FreqOm(:)
          logical :: CAlpha = .false.
 
          logical :: DeclareGrid = .false.
@@ -197,17 +199,23 @@ type SystemBlock
       double precision :: Omega   = 1d0
       double precision :: PerVirt = 0d0
       double precision :: ECASSCF = 0d0
+      double precision :: AvMu    = 0d0
       integer :: NSym
       integer :: NSymBas(8),NSymOrb(8)
       integer :: NOrb, NGem
-      integer :: NActOrb  = 1
-      integer :: NCoreOrb = 0
+      integer :: NActOrb   = 1
+      integer :: NCoreOrb  = 0
+      ! CBS[H]: number of strongly occupied (all > 0.5) orbs
+      integer :: NStronglyOccOrb = 0
       integer :: NAct, INAct
       integer :: ISwitchAct = 0
       integer :: NActS(8), INActS(8)
 
       ! APSG/GVB Dalton
       integer :: NISHT_G, NASHT_G
+
+      ! DMRG-in-DFT : no of electrons in B
+      integer :: NElecBEmb
 
       ! unrestricted
       integer :: NOa, NOb, NVa, NVb
@@ -287,6 +295,8 @@ type SystemBlock
                                       FOAB(:,:),FOBA(:,:), &
                                       FFAB(:,:),FFBA(:,:), &
                                       OOAB(:,:),OOBA(:,:)
+      double precision,allocatable :: XMuMat(:,:) ! for CBS[H]
+      double precision,allocatable :: OF(:,:)     ! for CBS[H]
       double precision,allocatable :: DChol(:,:)
       double precision,allocatable :: Pmat(:,:)
       double precision,allocatable :: Jmat(:,:),Kmat(:,:)
@@ -299,10 +309,14 @@ type SystemBlock
       double precision,allocatable :: dipm(:,:,:)
       double precision,allocatable :: Eig(:),EigX(:),EigY(:)
       double precision,allocatable :: AP(:,:),PP(:)
-      double precision  :: charg(maxcen),xyz(maxcen,3)
+      !double precision  :: charg(maxcen),xyz(maxcen,3)
+      double precision,allocatable :: charg(:),xyz(:,:)
 
       integer :: Max_Cn = 10
-      double precision :: FreqOm = 0.d0
+      !double precision :: FreqOm = 0.d0
+
+      integer :: NFreqOm
+      double precision,allocatable :: FreqOm(:)
 
 end type SystemBlock
 
@@ -376,6 +390,7 @@ type FlagsData
      integer :: ICorrMD   = 0 ! for SRAC0
      integer :: IFlFCorr  = 0 ! for SRAC0
      integer :: IDBBSC    = 0 ! for AC0
+     integer :: IVEMB     = 0 ! for DMRG-in-DFT
      double precision :: Alpha = 0
      integer :: IModG   = 1
      integer :: NGOcc   = 0

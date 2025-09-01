@@ -86,6 +86,8 @@ C     FILL COMMONS AND CONSTANTS
 C
       NCoreOrb = System%NCoreOrb
       AuxData%NCoreOrb = System%NCoreOrb
+      NStronglyOccOrb = System%NStronglyOccOrb
+      NElecBEmb = System%NElecBEmb
 C
       Title   = Flags%JobTitle
 C
@@ -109,11 +111,15 @@ C
       IWarn   = 0
       Max_Cn  = System%Max_Cn
       ITrpl   = Flags%ITrpl
-      FreqOm  = System%FreqOm
       IRedVirt  = Flags%IRedVirt
       IOrbRelax = Flags%IOrbRelax
       IOrbIncl  = Flags%IOrbIncl
 C
+C     ...RESPONSE (POLARIZABITY FREQUENCIES)
+      if (allocated(System%FreqOm)) then
+      NFreqOm = System%NFreqOm
+      FreqOm(1:NFreqOm) = System%FreqOm(1:System%NFreqOm)
+      endif
 C
 C     *************************************************************************
 C
@@ -203,6 +209,10 @@ C     IDBBSC   = 1 : compute density-based basis set correction (Giner et al., J
 C     IDBBSC   = 2 : compute SR-based basis set correction (K. Pernal et al., XXXX )
 C
       IDBBSC = Flags%IDBBSC
+C
+C     IVEMB    = 1 : activates DMRG-in-DFT embedding in AC0
+C
+      IVEMB  = Flags%IVEMB
 C
 C     *************************************************************************
 C
@@ -452,7 +462,7 @@ c         call mp2_driver(BasisSet, URe,Occ, XKin,XNuc,ENuc,UMOAO,
 c     $        TwoEl,NBasis,NInte1,NInte2,NGem, THCData)
       case default 
 !         IFlCore=0
-!         Flags%IFlCore = 0
+!     Flags%IFlCore = 0
       Call DMSCF(Title,BasisSet,URe,Occ,XKin,XNuc,ENuc,UMOAO,
      $        TwoEl,NBasis,NInte1,NInte2,NGem, THCData)
       end select
@@ -464,8 +474,14 @@ C
 C      Write(6,'(8a10)') ('**********',i=1,9)
       EndIf
 C
+C     Delete out-of-core integrals
       If(ITwoEl.Eq.2)  Call delfile('TWOMO')
-      Call delfile('AOTWOSORT')
+      If (ICholeskyOTF==0) Then
+         Call delfile('AOTWOSORT')
+         If(IFunSR.Eq.1.Or.IFunSR.Eq.2.Or.IFunSR.Eq.4) Then
+         Call delfile('AOERFSORT')
+         EndIf
+      EndIf
 C
       Call free_System(System)
       Call gclock(PossibleJobType(Flags%JobType),Tcpu,Twall)

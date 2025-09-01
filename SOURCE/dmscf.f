@@ -66,7 +66,7 @@ C
       NDimKer=NBasis*(1+NBasis)*(2+NBasis)*(3+NBasis)/24
 C
       If(ICASSCF.Eq.1) Then
-C
+C     
       Call ACCAS(ETot,ENuc,TwoEl,URe,UReSav,Occ,XOne,
      $  Title,BasisSet,NBasis,NInte1,NInte2,NGem, THCData)
 C

@@ -321,18 +321,18 @@ contains
               allocate(THCData%fvw(NV))
 
               
-              if (Flags%JOBTYPE .ne. JOB_TYPE_MP2 .and. Flags%JOBTYPE .ne. JOB_TYPE_SRMP2) then                    
-                    allocate(THCData%eorbi(AuxData%NI+AuxData%NA))
-                    allocate(THCData%eorba(AuxData%NV))
+              ! if (Flags%JOBTYPE .ne. JOB_TYPE_MP2 .and. Flags%JOBTYPE .ne. JOB_TYPE_SRMP2) then                    
+              !       allocate(THCData%eorbi(AuxData%NI+AuxData%NA))
+              !       allocate(THCData%eorba(AuxData%NV))
 
-                    open(unit=20, file='eorbi.bin', status='old', access='stream', form='unformatted')
-                    read(20) THCData%eorbi
-                    close(20)
+              !       open(unit=20, file='eorbi.bin', status='old', access='stream', form='unformatted')
+              !       read(20) THCData%eorbi
+              !       close(20)
 
-                    open(unit=21, file='eorba.bin', status='old', access='stream', form='unformatted')
-                    read(21) THCData%eorba
-                    close(21)
-              end if
+              !       open(unit=21, file='eorba.bin', status='old', access='stream', form='unformatted')
+              !       read(21) THCData%eorba
+              !       close(21)
+              ! end if
 
             !----------------------------------------------------------------------------------------
             ! READ 1-el integrals.
@@ -588,7 +588,7 @@ contains
           Occ = AuxData%Occ
           NAc = AuxData%NA
           NInAc = AuxData%NI
-          print*, 'aha1', occ
+!          print*, 'aha1', occ
           ! One-electron integrals are now transformed to NO
           do i = 1, Nbasis
                 do j = 1, i
@@ -657,7 +657,7 @@ contains
           allocate(work(this_dim))
           read(unit) work
           close(10)
-          print*, 'na', NA
+!          print*, 'na', NA
           allocate(G1(NA, NA))
           G1 = zero
 
@@ -1375,7 +1375,7 @@ contains
                 print*, 'CholAccu', CholAccu
                 call thc_gammcor_XZ(Xgp, THCData%Zgk, AOBasis, System, CholAccu)
 
-                if (Flags%IDBBSC == 2)then
+                if (Flags%IFunSR==2 .or. Flags%IDBBSC == 2)then
                       Omega = One
                       call thc_gammcor_XZ(XgpErf, THCData%ZgkErf, AOBasis, System, CholAccu, Omega=Omega)
                 end if
@@ -1385,7 +1385,7 @@ contains
                 print*, 'THCThreshold', THCThr
                 call thc_gammcor_XZ(Xgp, THCData%Zgk, AOBasis, System,CholAccu, CholThr, THCThr)
 
-                if (Flags%IDBBSC == 2)then
+                if (Flags%IFunSR==2 .or. Flags%IDBBSC == 2)then
                       Omega = One
                       call thc_gammcor_XZ(XgpErf, THCData%ZgkErf, AOBasis, System, CholAccu, CholThr, THCThr, Omega=Omega)
                 end if
@@ -1430,7 +1430,7 @@ contains
           Call thc_gammcor_Xga(THCData%Xga, Xgp, CAONO,&
                 AOBasis, THCData%ExternalOrdering)
 
-          if (Flags%IDBBSC == 2)then
+          if (Flags%IFunSR==2 .or. Flags%IDBBSC == 2)then
                 THCData%NTHCErf=size(XgpErf,dim=1)
                 THCData%NCholErf=size(THCData%ZgkErf,dim=2)
                 allocate(THCData%XgaErf(THCData%NTHCErf,NBasis))
@@ -1439,7 +1439,14 @@ contains
                 THCData%TXgaErf = zero
                 THCData%TXga = zero
                 Call thc_gammcor_Xga(THCData%XgaErf, XgpErf, CAONO,&
-                AOBasis, THCData%ExternalOrdering)
+                      AOBasis, THCData%ExternalOrdering)
+
+                if(Flags%IFunSR==2)then
+
+                      allocate(THCData%J_SR(NBasis, NBasis))
+                      call calc_J_SR(CAONO, THCData, AuxData)
+                end if
+                
           end if
 
           
@@ -1643,9 +1650,9 @@ contains
                                                       end if
                                                 end if
                                                 etot = etot + val * this
-                                                if (abs(val * this).gt.1.d-5)then
-                                                      write(*, '(A20, 4I5, 3F20.15)')'energy-inter', p, q, r, s, val, this, etot
-                                                end if
+                                                ! if (abs(val * this).gt.1.d-5)then
+                                                !       write(*, '(A20, 4I5, 3F20.15)')'energy-inter', p, q, r, s, val, this, etot
+                                                ! end if
                                           end do
                                     end do
                               end do
@@ -1664,6 +1671,50 @@ contains
           end if
 
     end subroutine THC_init2
+
+    subroutine calc_J_SR(CAONO, THCData, AuxData)
+          use Cholesky_Gammcor
+          use THC_Gammcor
+          use THCFock
+          use OneElectronInts_Gammcor
+          use basis_sets
+          use sys_definitions
+          use gammcor_integrals
+
+
+          double precision, dimension(:,:), intent(inout) :: CAONO
+          type(TACppData), intent(in) :: AuxData
+          type(TTHCData), intent(inout) :: THCData
+
+          double precision, dimension(:,:, :), allocatable :: Cpo
+          double precision, dimension(:,:, :), allocatable :: J_LR, J_FR
+          double precision :: Nk
+          integer, dimension(2) :: NOcc
+          integer k
+          
+          allocate(Cpo(AuxData%NBasis, AuxData%NIA, 1))
+          Cpo = zero
+          do k = 1, AuxData%NIA
+                Nk = max(ZERO, AuxData%Occ(k))
+                Cpo(:, k, 1) = Sqrt(Nk) * CAONO(:, k)
+          end do
+
+          allocate(J_LR(AuxData%NBasis, AuxdATA%NBasis, 1))
+          allocate(J_FR(AuxData%NBasis, AuxdATA%NBasis, 1))
+          NOcc(1) = AuxData%NIA
+          Nocc(2) = 0
+          
+          call thc_Fock_JK(J_LR, Cpo, THCData%ZgkErf, THCData%XgaErf, Nocc, .true., .false., one)
+
+          call thc_Fock_JK(J_FR, Cpo, THCData%Zgk, THCData%Xga, Nocc, .true., .false., one)
+
+          !
+          ! thc_Fock_JK subroutine returns Jmat * 2.0 for Nspins=1 (closed-shell system for HF)
+          !
+          ! THCData%J_SR = (J_FR(:,:,1) -J_LR(:,:,1))/Two
+          THCData%J_SR = J_FR(:,:,1) -J_LR(:,:,1)
+
+    end subroutine calc_J_SR
 
     subroutine canonicalize(CAONO, fij, fvw, AuxData, THCData, Xgp, AObasis, System)
           use Cholesky_Gammcor

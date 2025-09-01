@@ -5,7 +5,7 @@ implicit none
 contains
 
 subroutine JK_Chol_loop(ABPLUS,ABMIN,HNO,AuxI,AuxIO,WMAT,RDM2val,Occ,AuxCoeff,IGem,AuxInd,pos,&
-                   INActive,NOccup,NDim,NDimX,NBasis,NInte1,IntJFile,IntKFile,ACAlpha,AB,ETot)
+                   INActive,NOccup,NElecBEmb,NDim,NDimX,NBasis,NInte1,IntJFile,IntKFile,ACAlpha,AB,ETot)
 
 implicit none
 
@@ -31,6 +31,13 @@ double precision :: val
 double precision :: AuxVal,HNOCoef
 double precision,allocatable :: work1(:,:),work2(:,:)
 double precision,allocatable :: ints(:,:),MatFF(:,:)
+! DMRG-in-DFT
+double precision  :: XVEMB(NInte1)
+logical :: IVEMB
+integer ::NElecBEmb,NOccupB
+NOccupB=NElecBEmb/2
+! if the file with v_emb exists - hone will be modified 
+Inquire(file='embedding_potential_NO.bin',exist=IVEMB) 
 
 !print*, 'start JK Chol:'
 
@@ -108,10 +115,14 @@ do iloop=1,nloop
          if(IGem(l)==1) then
             if(IGem(k)==2) then
                do i=INActive+1,NOccup
-                  HNO(i,k) = HNO(i,k) - val*ints(i,l)
+                  ! i,k in active, l in inactive
+                  HNO(i,k) = HNO(i,k) - val*ints(i,l)      
+                  ! DMRG-in-DFT 
+                  if(IVEMB.and.l.le.NOccupB) HNO(i,k) = HNO(i,k) + val*ints(i,l)
                enddo
             elseif(IGem(k)==3) then
                do i=NOccup+1,NBasis
+                  ! i,k in virt, l in inactive
                   HNO(i,k) = HNO(i,k) - val*ints(i,l)
                enddo
             endif
@@ -120,10 +131,12 @@ do iloop=1,nloop
          if(IGem(l)==2) then
             if(IGem(k)==1) then
                do i=1,INActive
+                  ! i,k in inactive, l in active
                   HNO(i,k) = HNO(i,k) - val*ints(i,l)
                enddo
             elseif(IGem(k)==3) then
                do i=NOccup+1,NBasis
+                  ! i,k in virt, l in active
                   HNO(i,k) = HNO(i,k) - val*ints(i,l)
                enddo
             endif
@@ -450,6 +463,7 @@ do iloop=1,nloop
          if(k>INActive) then
             do j=1,INActive
                do i=1,INActive
+                  ! i,j in inactive, k in active
                   HNO(i,j) = HNO(i,j) + val*ints(i,j)
                enddo
             enddo
@@ -457,12 +471,16 @@ do iloop=1,nloop
          if(k<=INActive) then
             do j=INActive+1,NOccup
                do i=INActive+1,NOccup
+                  ! i,j in active, k in inactive
                   HNO(i,j) = HNO(i,j) + val*ints(i,j)
+                  ! DMRG-in-DFT
+                  if(IVEMB.and.k.le.NOccupB) HNO(i,j) = HNO(i,j) - val*ints(i,j)
                enddo
             enddo
          endif
          do j=NOccup+1,NBasis
             do i=NOccup+1,NBasis
+               ! i,j in virt
                HNO(i,j) = HNO(i,j) + val*ints(i,j)
             enddo
          enddo
@@ -700,7 +718,8 @@ integer,intent(in) :: IGem(NBasis),AuxInd(3,3),pos(NBasis,NBasis)
 double precision,intent(inout) :: ABPLUS(NDimX,NDimX),ABMIN(NDimX,NDimX)
 double precision,intent(inout) :: HNO(NBasis,NBasis),AuxI(NBasis,NBasis),AuxIO(NBasis,NBasis),WMAT(NBasis,NBasis)
 double precision,intent(in) :: ACAlpha
-double precision,intent(in) :: AuxCoeff(3,3,3,3),Occ(NBasis),RDM2val(NOccup,NOccup,NOccup,NOccup)
+double precision,intent(in) :: Occ(NBasis),RDM2val(NOccup,NOccup,NOccup,NOccup)
+double precision,intent(in) :: AuxCoeff(3,3,3,3)
 character(*) :: IntJFile,IntKFile
 double precision,intent(inout),optional :: ETot
 
@@ -712,19 +731,21 @@ integer :: mloop
 integer :: iBatch
 integer :: BatchSize,MaxBatchSize = 120
 integer :: NCholesky,NCholErf
+double precision :: AuxSRCoeff(3,3,3,3)
 double precision :: val
 double precision :: AuxVal,HNOCoef
 double precision,allocatable :: FF(:,:),FFErf(:,:)
 double precision,allocatable :: FFTr(:,:),FFErfTr(:,:)
 double precision,allocatable :: TmpTr(:,:),TmpErfTr(:,:)
-double precision,allocatable :: ints(:,:),intsFR(:,:), intsola(:,:)
+double precision,allocatable :: ints(:,:),intsFR(:,:)
+double precision,allocatable :: intsSR(:,:)
 double precision,allocatable :: work1(:,:),work2(:,:)
 double precision,allocatable :: work3(:,:),work4(:,:)
 double precision,allocatable :: work6(:,:),work8(:,:)
 double precision,allocatable :: work10(:,:),work12(:,:)!, workola2(:,:)
 !
 ! compute Hessian matrices with modified integrals : 
-! a) calculate modified SR integrals: <p*q|rs>_SR = \sum_t <p|mu(r)|t> <tq|rs>^SR
+! a) assemble all required integrals
 ! b) symmetrize : g^SR = 1/4 * ( <p*q|rs>_SR + <pq*|rs>_SR + <pq|r*s>_SR + <pq|rs*>_SR )
 ! c) use : <pq|rs>_mod =  <pq|rs>^full-range + g^SR
 !
@@ -736,6 +757,26 @@ elseif(AB==0) then
 elseif(AB==2) then
    HNOCoef = 1
 endif
+
+! SR integrals enter hessian as :
+! [alpha + \delta (1-alpha) ]*g^FR + alpha*(1-\delta)*g^SR
+! c.f. Eq. (27) in 10.1021/acs.jctc.8b00213
+! In practice, we achieve this by zeroing g^SR for orbitals
+! from the same group (only active contribute)
+do l=1,3
+   do k=1,3
+      do j=1,3
+         do i=1,3
+            if((i==j).and.(j==k).and.(k==l)) then
+               AuxSRCoeff(i,j,k,l) = 0
+            else
+               AuxSRCoeff(i,j,k,l) = 1
+            endif
+         enddo
+      enddo
+   enddo
+enddo
+
 
 ! read regular cholesky (k|r|FF) vecs
 open(newunit=iunit,file='cholvecs',form='unformatted')
@@ -788,8 +829,9 @@ allocate(work1(dimFO,MaxBatchSize),work2(dimFO,MaxBatchSize))
 ! print*, 'callworkola1'
 ! allocate(workola2(dimFO,MaxBatchSize))
 allocate(ints(NBasis,NBasis))
+allocate(intsSR(NBasis,NBasis))
 allocate(intsFR(NBasis,NBasis))
-! allocate(intsola(NBasis,NBasis))
+
 
 print*, 'MaxBatchsize', MaxBatchsize, nloop
 print*, 'dimfo', dimfo
@@ -797,8 +839,8 @@ off = 0
 k   = 0
 l   = 1
 
-  kk = 0
-  ll = 1
+kk = 0
+ll = 1
 ! exchange loop (FO|FO)
 !print*,'exchange loop (FO|FO)'
 do iloop=1,nloop
@@ -852,14 +894,12 @@ do iloop=1,nloop
    !           FFErf(:,off+1:BatchSize),NCholErf,1d0,work1,dimFO)
    !!! work1=short-range
 
-
    ! regular
    call dgemm('T','N',dimFO,BatchSize,NCholesky,1d0,FF,NCholesky, &
-         FF(:,off+1:off+BatchSize),NCholesky,0d0,work2,dimFO)
+              FF(:,off+1:off+BatchSize),NCholesky,0d0,work2,dimFO)
+   !work1 = work1 + work2
+   ! work1 = regular + short-range*
 
-!   workola2 = work1
-   work1 = work1 + work2
-   ! work1 = regular + short-range* 
 
    ! loop over integrals
    do iBatch=1,BatchSize
@@ -870,17 +910,20 @@ do iloop=1,nloop
          l = l + 1
       endif
 
+      ! work1 = short-range* 
+      ! zero SR integrals from the same group Igem(ip)=Igem(iq)=... 
+      ! and THEN add to FR!
       do j=1,NOccup
          do i=1,NBasis
-            ints(i,j)   = work1((j-1)*NBasis+i,iBatch)
+            intsSR(i,j) = AuxSRCoeff(IGem(i),IGem(j),IGem(k),IGem(l))*work1((j-1)*NBasis+i,iBatch)
+                        !* AuxSRCoeff(IGem(i),IGem(j),IGem(l),IGem(k))
             intsFR(i,j) = work2((j-1)*NBasis+i,iBatch)
-            ! intsola(i,j)   = workola2((j-1)*NBasis+i,iBatch)
-            ! if (abs(ints(i, j)).gt.1d-5)then
-            !       write(*, '(A6, 4I5, 3F20.15)')'pqrs0', k-1, l-1, i-1, j-1, ints(i, j), intsFR(i,j), intsola(i, j)
-            ! end if
          enddo
       enddo
-      
+
+      ints = intsSR + intsFR
+
+
       if(l>NOccup) cycle
       ints(:,NOccup+1:NBasis) = 0
       intsFR(:,NOccup+1:NBasis) = 0
@@ -1205,9 +1248,11 @@ allocate(work8(NCholErf,MaxBatchSize))
 allocate(work10(NCholesky,MaxBatchSize))
 allocate(work12(NCholErf,MaxBatchSize))
 
-off = 0
-k   = 0
-l   = 1
+off    = 0
+k      = 0
+l      = 1
+ints   = 0
+intsSR = 0
 ! Coulomb loop (FF|OO)
 !print*, 'Coulomb loop (FF|OO)...'
 do iloop=1,nloop
@@ -1268,8 +1313,8 @@ do iloop=1,nloop
    ! regular
    call dgemm('T','N',NBasis**2,BatchSize,NCholesky,1d0,FF,NCholesky, &
               work2,NCholesky,0d0,work3,NBasis**2)
-   work1 = work1 + work3
-   !! work1 = regular + short-range* 
+   ! work1 = work1 + work3
+   ! work1 = regular + short-range* 
 
    ! loop over integrals
    do iBatch=1,BatchSize
@@ -1282,10 +1327,11 @@ do iloop=1,nloop
 
       do j=1,NBasis
          do i=1,NBasis
-            ints(i,j) = work1((j-1)*NBasis+i,iBatch)
+            intsSR(i,j) = AuxSRCoeff(IGem(i),IGem(j),IGem(k),IGem(l))*work1((j-1)*NBasis+i,iBatch)
             intsFR(i,j) = work3((j-1)*NBasis+i,iBatch)
          enddo
       enddo
+      ints = intsSR + intsFR
 
       if(k>NOccup.or.l>NOccup) cycle
       kl = (l - 1)*NOccup + k
@@ -1294,7 +1340,8 @@ do iloop=1,nloop
 
       ! COMPUTE THE ENERGY FOR CHECKING
       if(present(ETot)) then
-      if((k<=NOccup).and.(l<=NOccup)) ETot = ETot + sum(RDM2val(:,:,k,l)*ints(1:NOccup,1:NOccup))
+      if((k<=NOccup).and.(l<=NOccup)) ETot = ETot + sum(RDM2val(:,:,k,l)*intsFR(1:NOccup,1:NOccup))
+      !if((k<=NOccup).and.(l<=NOccup)) ETot = ETot + sum(RDM2val(:,:,k,l)*ints(1:NOccup,1:NOccup))
       endif
 
       ! CONSTRUCT ONE-ELECTRON PART OF THE AC ALPHA-HAMILTONIAN
@@ -1533,7 +1580,7 @@ deallocate(work4,Work2,work1)
 deallocate(work6,work8)
 deallocate(ints)
 deallocate(intsFR)
-!deallocate(intsola)
+
 
 !Print*, 'from JK_SR_Chol_loop'
 !Print*, 'ABPLUS-after JK',norm2(ABPLUS)
