@@ -1858,6 +1858,7 @@ if(IFlag0==1) return
 !return
 
 ! AB(1) PART
+
 call AB_CAS_FOFO(ABPLUS,ABMIN,EnDummy,URe,Occ,XOne,&
               IndN,IndX,IGem,NAct,INActive,NElecBEmb,&
               NDimX,NBasis,NDimX,&

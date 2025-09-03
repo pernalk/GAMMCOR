@@ -407,7 +407,7 @@ contains
                   allocate(AuxData%rdm2_pp(AuxData%NA, AuxData%NA, AuxData%NA, AuxData%NA))
                   allocate(AuxData%rdm2_pm(AuxData%NA, AuxData%NA, AuxData%NA, AuxData%NA))
           
-
+                  
                   unit = 20
                   open(unit=unit, file=file_rdm2_aaaa, status='old', access='stream', form='unformatted')
                   read(unit) AuxData%rdm2_pp
@@ -1355,7 +1355,7 @@ contains
           integer :: p, q, r, s, k, l, a, b, ii, nn, t
           double precision, allocatable :: Rkab(:,:,:), Rkcd(:,:,:), Rkef(:,:,:)
           double precision :: this, ETot, etot0, val, val_this, thisfr, thistr, thistr1
-          double precision :: Omega, this0, that0, then0, sniez, thisJ, thisK
+          double precision ::  this0, that0, then0, thisJ, thisK
 
 
           NA = AuxData%NA
@@ -1373,21 +1373,20 @@ contains
 
           if (CholThr < zero.or.THCThr <zero)then
                 print*, 'CholAccu', CholAccu
-                call thc_gammcor_XZ(Xgp, THCData%Zgk, AOBasis, System, CholAccu)
+                call thc_gammcor_XZ(THCData%Xgp, THCData%Zgk, AOBasis, System, CholAccu)
 
-                if (Flags%IFunSR==2 .or. Flags%IDBBSC == 2)then
-                      Omega = One
-                      call thc_gammcor_XZ(XgpErf, THCData%ZgkErf, AOBasis, System, CholAccu, Omega=Omega)
+                if (Flags%IDBBSC == 2 .or. Flags%IFunSR==4)then
+                      call thc_gammcor_XZ(THCData%XgpErf, THCData%ZgkErf, AOBasis, System, CholAccu, Omega=AuxData%Omega)
                 end if
 
           else
                 print*, 'CholeskyThreshold', CholThr
                 print*, 'THCThreshold', THCThr
-                call thc_gammcor_XZ(Xgp, THCData%Zgk, AOBasis, System,CholAccu, CholThr, THCThr)
+                call thc_gammcor_XZ(THCData%Xgp, THCData%Zgk, AOBasis, System,CholAccu, CholThr, THCThr)
 
-                if (Flags%IFunSR==2 .or. Flags%IDBBSC == 2)then
-                      Omega = One
-                      call thc_gammcor_XZ(XgpErf, THCData%ZgkErf, AOBasis, System, CholAccu, CholThr, THCThr, Omega=Omega)
+                if (Flags%IDBBSC == 2 .or.Flags%IFunSR==4)then
+
+                      call thc_gammcor_XZ(THCData%XgpErf, THCData%ZgkErf, AOBasis, System, CholAccu, CholThr, THCThr, Omega=AuxData%Omega)
                 end if
 
                 print*, 'CholeskyThreshold', CholThr
@@ -1406,11 +1405,11 @@ contains
                 print*, CAONO(1,2), CAONO(2, 1)
           end if
 
-          call canonicalize(CAONO, THCData%fij, THCData%fvw, AuxData, THCData, Xgp, AObasis, System)
-          open(unit=10,file='CAONO_can.bin',form='unformatted')
-          write(10) NBasis
-          write(10) CAONO
-          close(10)
+          call canonicalize(CAONO, THCData%fij, THCData%fvw, AuxData, THCData, THCData%Xgp, AObasis, System)
+          ! open(unit=10,file='CAONO_can.bin',form='unformatted')
+          ! write(10) NBasis
+          ! write(10) CAONO
+          ! close(10)
 
 
 
@@ -1423,28 +1422,30 @@ contains
           call real_ab(work, H0_extao, CAONO)
           call real_atb(AuxData%HNO0_THC, CAONO, work)
 
-          THCData%NTHC=size(Xgp,dim=1)
+          THCData%NTHC=size(THCData%Xgp,dim=1)
           THCData%NChol=size(THCData%Zgk,dim=2)
           allocate(THCData%Xga(THCData%NTHC,NBasis))
 
-          Call thc_gammcor_Xga(THCData%Xga, Xgp, CAONO,&
+          Call thc_gammcor_Xga(THCData%Xga, THCData%Xgp, CAONO,&
                 AOBasis, THCData%ExternalOrdering)
 
-          if (Flags%IFunSR==2 .or. Flags%IDBBSC == 2)then
-                THCData%NTHCErf=size(XgpErf,dim=1)
+          if (Flags%IDBBSC == 2 .or. Flags%IFunSR==4)then
+
+                THCData%NTHCErf=size(THCData%XgpErf,dim=1)
                 THCData%NCholErf=size(THCData%ZgkErf,dim=2)
+                
                 allocate(THCData%XgaErf(THCData%NTHCErf,NBasis))
                 allocate(THCData%TXgaErf(THCData%NTHCErf,NBasis))
                 allocate(THCData%TXga(THCData%NTHC,NBasis))
                 THCData%TXgaErf = zero
                 THCData%TXga = zero
-                Call thc_gammcor_Xga(THCData%XgaErf, XgpErf, CAONO,&
+                Call thc_gammcor_Xga(THCData%XgaErf, THCData%XgpErf, CAONO,&
                       AOBasis, THCData%ExternalOrdering)
 
-                if(Flags%IFunSR==2)then
+                if(Flags%IFunSR==4)then
 
                       allocate(THCData%J_SR(NBasis, NBasis))
-                      call calc_J_SR(CAONO, THCData, AuxData)
+                      call calc_J_SR(CAONO, THCData, AuxData, AObasis, System)
                 end if
                 
           end if
@@ -1672,7 +1673,7 @@ contains
 
     end subroutine THC_init2
 
-    subroutine calc_J_SR(CAONO, THCData, AuxData)
+    subroutine calc_J_SR(CAONO, THCData, AuxData, AOBasis, System)
           use Cholesky_Gammcor
           use THC_Gammcor
           use THCFock
@@ -1680,40 +1681,55 @@ contains
           use basis_sets
           use sys_definitions
           use gammcor_integrals
+          type(TAOBASIS) :: AObasis
+          type(TSystem) :: System
 
 
           double precision, dimension(:,:), intent(inout) :: CAONO
           type(TACppData), intent(in) :: AuxData
           type(TTHCData), intent(inout) :: THCData
 
-          double precision, dimension(:,:, :), allocatable :: Cpo
+          double precision, dimension(:,:, :), allocatable :: Cpo, Cpq
           double precision, dimension(:,:, :), allocatable :: J_LR, J_FR
+          double precision, dimension(:,:), allocatable :: Zgh, ZghErf
           double precision :: Nk
           integer, dimension(2) :: NOcc
           integer k
-          
-          allocate(Cpo(AuxData%NBasis, AuxData%NIA, 1))
-          Cpo = zero
-          do k = 1, AuxData%NIA
-                Nk = max(ZERO, AuxData%Occ(k))
-                Cpo(:, k, 1) = Sqrt(Nk) * CAONO(:, k)
-          end do
 
-          allocate(J_LR(AuxData%NBasis, AuxdATA%NBasis, 1))
-          allocate(J_FR(AuxData%NBasis, AuxdATA%NBasis, 1))
-          NOcc(1) = AuxData%NIA
+
+          associate(Zgk=>THCData%Zgk, ZgkErf=>THCData%ZgkErf, Xga=>THCData%Xga, &
+                XgaErf=>THCData%XgaErf, NI=>AuxData%NI, NA=>AuxData%NA, NIA=>AuxData%NIA, NBasis=>AuxData%NBasis, &
+                Occ=>AuxData%Occ, NTHC=>THCData%NTHC, NTHCErf=>THCData%NTHCErf, ExternalOrdering=>THCData%ExternalOrdering)
+
+
+
+            allocate(Cpq(NBasis, NBasis, 1))
+
+            allocate(Cpo(NBasis, NIA, 1))
+            Cpo = zero
+            call auto2e_interface_C(Cpq(:, :, 1), CAONO, AOBasis, ExternalOrdering)            
+            do k = 1, NIA
+                  Nk = max(ZERO, Occ(k))
+                  Cpo(k, k, 1) = Sqrt(Nk) 
+            end do
+
+          allocate(J_LR(NBasis, NBasis, 1))
+          allocate(J_FR(NBasis, NBasis, 1))
+
+          NOcc(1) = NIA
           Nocc(2) = 0
+          allocate(Zgh(NTHC, NTHC))
+          allocate(ZghErf(NTHCErf, NTHCErf))
+
+          call real_abT(Zgh, Zgk, Zgk)
+          call real_abT(ZghErf, ZgkErf, ZgkErf)
           
-          call thc_Fock_JK(J_LR, Cpo, THCData%ZgkErf, THCData%XgaErf, Nocc, .true., .false., one)
-
-          call thc_Fock_JK(J_FR, Cpo, THCData%Zgk, THCData%Xga, Nocc, .true., .false., one)
-
-          !
-          ! thc_Fock_JK subroutine returns Jmat * 2.0 for Nspins=1 (closed-shell system for HF)
-          !
-          ! THCData%J_SR = (J_FR(:,:,1) -J_LR(:,:,1))/Two
+          call thc_Fock_JK(J_LR, Cpo, ZghErf, XgaErf, Nocc, .true., .false., one)
+          call thc_Fock_JK(J_FR, Cpo, Zgh, Xga, Nocc, .true., .false., one)
+          
           THCData%J_SR = J_FR(:,:,1) -J_LR(:,:,1)
-
+          
+        end associate
     end subroutine calc_J_SR
 
     subroutine canonicalize(CAONO, fij, fvw, AuxData, THCData, Xgp, AObasis, System)
@@ -1735,7 +1751,7 @@ contains
           double precision, dimension(:,:), allocatable :: Cpi_extao, Cpv_extao
           double precision, dimension(:,:), allocatable :: Fockij, Fockvw
           double precision, dimension(:,:), intent(in) :: Xgp
-          integer :: i
+          integer :: i, j
 
           associate(Zgk=>THCData%Zgk, ExternalOrdering=>THCData%ExternalOrdering)
 
@@ -1757,9 +1773,12 @@ contains
                   CAONO(:, AuxData%NIA+1:AuxData%NBasis), &
                   AuxData%Occ(1:AuxData%NIA), Zgk, Xgp, AOBasis, System, ExternalOrdering)
 
-            ! print*, 'fiij', AuxData%NI
+            print*, 'fiij', AuxData%NI
+            print*, 'Fockij(1,1)', Fockij(1,1)
             ! do i = 1, AuxData%NI
-            !       print*, Fockij(i,i)
+            !       do i = j, AuxData%NI
+            !             write(*,'(2I5, F15.6)') Fockij(i,j)
+            !       end do
             ! end do
             ! print*, ''
             if (AuxData%NI>0)then

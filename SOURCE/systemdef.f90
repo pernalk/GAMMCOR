@@ -671,7 +671,7 @@ elseif(Flags%ISAPT.Eq.1) then
          monB%NActFromRDM = Input%SystemInput(2)%NActFromRDM
       endif
 
-   ! write(LOUT,*) monA%ZNucl,'MONO(1)A,case1,dupaaa'
+   ! write(LOUT,*) monA%ZNucl,'MONO(1)A,case1,'
    ! write(LOUT,*) monB%ZNucl,'MONO(1)B,case1'
 
    case(2)

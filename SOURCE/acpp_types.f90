@@ -35,6 +35,7 @@ module acpp_types
       type TTHCData
             integer :: NTHC, NChol
             double precision, dimension(:,:), allocatable :: Xga, Zgk
+            double precision, dimension(:,:), allocatable :: Xgp, XgpErf
             integer :: ExternalOrdering
             double precision, dimension(:), allocatable :: fij, fvw
             double precision, dimension(:), allocatable :: eorbi, eorba
@@ -101,6 +102,7 @@ module acpp_types
             logical :: OnlyEnergy  = .false.
             integer :: iflmp2
             integer :: NCoreOrb
+            double precision :: omega = 1.0
             
       end type TACppData
 

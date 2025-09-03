@@ -7,6 +7,7 @@ from collections import Counter
 from pyscf.tools import molden
 import sys
 from copy import deepcopy
+
 from functools import reduce
 
 def get_one_indices(binary_string):
@@ -71,7 +72,7 @@ def irrep_analyze(mol, myhf):
     elif mol.groupname == 'C2h':
         order = ['Ag', 'Bg', 'Au', 'Bu']
     else:
-
+        # Dla innych grup po prostu użyj wszystkich znalezionych irrepsów
         order = sorted(set(mo_irreps))
     
     print()
@@ -110,6 +111,7 @@ def irrep_analyze_mo(mol, mo, occ):
     elif mol.groupname == 'C2h':
         order = ['Ag', 'Bg', 'Au', 'Bu']
     else:
+        # Dla innych grup po prostu użyj wszystkich znalezionych irrepsów                                                                                                                                                                                                                 
         order = sorted(set(mo_irreps))
 
     print()
@@ -166,19 +168,19 @@ def analysis_of_mo_cas(mol, mycas):
     for i in range(num_mo):
         irrep = mo_irreps[i]
         energy = mycas.mo_energy[i]
-        occupancy = mycas.mo_occ[i]  
+        occupancy = mycas.mo_occ[i]  # Ensure mo_occ is available
         print("{:<6} {:<6} {:<15.6f} {:<20.15f}".format(i+1, irrep, energy, occupancy))
 
-
+        # Print significant AO contributions
         print("  Significant Atomic Orbital Contributions:")
-        significant_aos = mo_coeff[:, i][abs(mo_coeff[:, i]) > 0.2] 
+        significant_aos = mo_coeff[:, i][abs(mo_coeff[:, i]) > 0.2]  # Adjust threshold if needed
         for ao_idx, coef in enumerate(mo_coeff[:, i]):
             if abs(coef) > 0.2:
-                ao_label = mol.ao_labels()[ao_idx] 
+                ao_label = mol.ao_labels()[ao_idx]  # e.g., 'C 2s', 'C 2px'
                 print(f"    {ao_label}: {coef:.3f}")
         print()
 
-
+    # Export MOs to Molden file for visualization
     molden_filename = 'molden_casscf.molden'
     molden.from_mo(mol, molden_filename, mycas.mo_coeff)
     print(f"Molecular orbitals have been exported to '{molden_filename}' for visualization.\n")
@@ -229,7 +231,322 @@ def calc_full_dm(dm2s):
                     if (abs(value)>1.e-8):
                         content += f"{j+1:>4d} {i+1:>4d} {l+1:>4d} {k+1:>4d} {value:>19.12f} \n"
                         #print(f"{j+1:>4d} {i+1:>4d} {l+1:>4d} {k+1:>4d} {value:>19.12f}")
+    return content
+
+
+def calc_full_dm_nospin(dm2):
+
+    dim = dm2.shape[0]
+
+    content = ""
+
+    for l in range(dim):
+        for k in range(dim):
+            for j in range(dim):
+                for i in range(dim):
+
+                    aa = dm2[i, j, k, l]
+
+                    value   = aa
+                    if (abs(value)>1.e-8):
+                        content += f"{j+1:>4d} {i+1:>4d} {l+1:>4d} {k+1:>4d} {value:>19.12f} \n"
+    return content
+
+
+def calc_full_dm_ms(dm2s):
+
+    dm2_aaaa, dm2_abab, dm2_bbbb = dm2s
+    dim = dm2s[0].shape[0]
+
+    content = ""
+
+    for l in range(dim):
+        for k in range(dim):
+            for j in range(dim):
+                for i in range(dim):
+
+                    # aa = dm2s[0][i, j, k, l]
+                    # ab = dm2s[1][i, j, k, l]
+
+                    aa = dm2_aaaa[i, j, k, l]
+                    ab = dm2_abab[i, j, k, l]
+                    bb = dm2_bbbb[i, j, k, l]
+
+                    #dm2_reorer[j, i, l, k] = 2.0*(aa+ab)
+                    value   = 2.0*(ab) + aa + bb
+                    if (abs(value)>1.e-8):
+                        content += f"{j+1:>4d} {i+1:>4d} {l+1:>4d} {k+1:>4d} {value:>19.12f} \n"
+                        print(f"{j+1:>4d} {i+1:>4d} {l+1:>4d} {k+1:>4d} {value:>19.12f}")
+    return content
+
+
+def calc_full_dm2_3(dm2s, thresh=1e-8):
+    """
+    Build and dump the spin-traced 2-RDM from spin blocks:
+      dm2s = (dm2_aaaa, dm2_abab, dm2_bbbb)
+    Returns a string of nonzero entries in chemists' ordering (i j k l value).
+    """
+    dm2_aaaa, dm2_abab, dm2_bbbb = dm2s
+    # build the β→α block by permuting indices
+    dm2_ba = dm2_abab.transpose(2, 3, 0, 1)
+
+    n = dm2_aaaa.shape[0]
+    print('nnn', n)
+    content = ""
+    for i in range(n):
+        for j in range(n):
+            for k in range(n):
+                for l in range(n):
+                    print(i, j, k, l)
+                    val = (
+                        dm2_aaaa[i, j, k, l]
+                        + dm2_abab[i, j, k, l]
+                        + dm2_ba[i, j, k, l]
+                        + dm2_bbbb[i, j, k, l]
+                    )
+                    a = dm2_aaaa[i, j, k, l]
+                    b = dm2_abab[i, j, k, l]
+                    c= dm2_ba[i, j, k, l]
+                    d=dm2_bbbb[i, j, k, l]
+
+                    print(val, a, b, c, d)
+                    if abs(val) > thresh:
+                        # use 1-based indices for output
+                        print(  f"{i+1:4d} {j+1:4d} {k+1:4d} {l+1:4d} {a:19.12f} {b:19.12f} {c:19.12f} {d:19.12f}")
+                    line = f"{i+1:4d} {j+1:4d} {k+1:4d} {l+1:4d} {val:19.12f}\n"
+                    content += line
+                    #print(line, end="")
+    return content
                         
+
+import numpy as np
+import time
+import os
+from pyscf import gto, scf, mcscf, ao2mo, symm, tools, fci
+from pyscf.tools import mo_mapping
+from collections import Counter
+from pyscf.tools import molden
+import sys
+from copy import deepcopy
+import basis_set_exchange as bse
+from functools import reduce
+
+def get_one_indices(binary_string):
+    return [i+1 for i, bit in enumerate(reversed(binary_string)) if bit == '1']
+
+
+def analyze_ci_coeffes(mycas):
+
+    ci_coeffs = mycas.ci
+    print(type(ci_coeffs))
+
+    if hasattr(mycas.fcisolver, 'fcisolvers'):
+        solver = mycas.fcisolver
+        nroots = solver.nroots
+    else:
+        nroots = 1
+
+    for root in range(0, nroots):
+        for state_index in range(0, 1):
+            #state_index = 0
+            if nroots > 1:
+                ci_state=ci_coeffs[root][state_index]
+            else:
+                ci_state=ci_coeffs[state_index]
+
+            N = 20
+            sorted_indices = np.argsort(np.abs(ci_state))[::-1]
+            top_configs = sorted_indices[:N]
+            top_ci_values = ci_state[top_configs]
+            number_of_active_orbitals = mycas.ncas
+
+            print("Top configurations for state {}: {}".format(state_index, top_configs))
+            print("Corresponding CI coefficients: {}".format(top_ci_values))
+    
+            for idx in top_configs:
+                binary = bin(idx)[2:].zfill(number_of_active_orbitals)
+                print(idx, ' ', binary)
+                print(get_one_indices(binary))
+
+
+def irrep_analyze(mol, myhf):
+    mo_irreps = symm.label_orb_symm(mol, mol.irrep_name, mol.symm_orb, myhf.mo_coeff)
+    total_mo_counts = Counter(mo_irreps)
+    mo_occ = myhf.mo_occ
+    occupied_indices = np.where(mo_occ > 0)[0]
+    occupied_irreps = mo_irreps[occupied_indices]
+    counts_occ = Counter(occupied_irreps)
+    print(occupied_irreps)
+    print(counts_occ)
+    print(mo_irreps)
+    for i in range(0, len(mo_irreps)):
+        print(i+1, mo_irreps[i])
+
+
+    print('mol_groupname', mol.groupname)
+    if mol.groupname == 'D2h':
+        order = ['Ag', 'B3u', 'B2u', 'B1g', 'B1u', 'B2g', 'B3g', 'Au']
+    elif mol.groupname == 'C2v':
+        order = ['A1', 'A2', 'B1', 'B2']
+    elif mol.groupname == 'Cs':
+        order = ["A'", 'A"']
+    elif mol.groupname == 'C2h':
+        order = ['Ag', 'Bg', 'Au', 'Bu']
+    else:
+        # Dla innych grup po prostu użyj wszystkich znalezionych irrepsów
+        order = sorted(set(mo_irreps))
+    
+    print()
+    print('Symmetry occupancy after HF')
+    print()
+    print('  '.join(f'{x:3}' for x in order))
+    values = [str(counts_occ.get(key, 0)) for key in order]
+    print('  '.join(f'{x:3}' for x in values))
+    
+
+    print('\nTotal number of orbitals:')
+    total_values = [str(total_mo_counts.get(key, 0)) for key in order]
+    print('  '.join(f'{x:3}' for x in total_values))
+    
+def irrep_analyze_mo(mol, mo, occ):
+    mo_irreps = symm.label_orb_symm(mol, mol.irrep_name, mol.symm_orb, mo)
+    total_mo_counts = Counter(mo_irreps)
+
+    occupied_indices = np.where(occ > 0)[0]
+    occupied_irreps = mo_irreps[occupied_indices]
+    counts_occ = Counter(occupied_irreps)
+    print(occupied_irreps)
+    print(counts_occ)
+    print(mo_irreps)
+    for i in range(0, len(mo_irreps)):
+        print(i+1, mo_irreps[i])
+
+
+    print('mol_groupname', mol.groupname)
+    if mol.groupname == 'D2h':
+        order = ['Ag', 'B3u', 'B2u', 'B1g', 'B1u', 'B2g', 'B3g', 'Au']
+    elif mol.groupname == 'C2v':
+        order = ['A1', 'A2', 'B1', 'B2']
+    elif mol.groupname == 'Cs':
+        order = ["A'", 'A"']
+    elif mol.groupname == 'C2h':
+        order = ['Ag', 'Bg', 'Au', 'Bu']
+    else:
+        # Dla innych grup po prostu użyj wszystkich znalezionych irrepsów                                                                                                                                                                                                                 
+        order = sorted(set(mo_irreps))
+
+    print()
+    print('Symmetry occupancy after mp2')
+    print()
+    print('  '.join(f'{x:3}' for x in order))
+    values = [str(counts_occ.get(key, 0)) for key in order]
+    print('  '.join(f'{x:3}' for x in values))
+
+
+    print('\nTotal number of orbitals:')
+    total_values = [str(total_mo_counts.get(key, 0)) for key in order]
+    print('  '.join(f'{x:3}' for x in total_values))
+
+
+def analysis_of_mo(mol, myhf):
+
+    mo_irreps = symm.label_orb_symm(mol, mol.irrep_name, mol.symm_orb, myhf.mo_coeff)
+
+    mo_coeff = myhf.mo_coeff
+    num_mo = mo_coeff.shape[1]
+    
+    print("\n=== Molecular Orbital Analysis ===\n")
+    print("{:<6} {:<6} {:<15} {:<12}".format("MO#", "Irrep", "Energy (Hartree)", "Occupancy"))
+
+    for i in range(num_mo):
+        irrep = mo_irreps[i]
+        energy = myhf.mo_energy[i]
+        occupancy = myhf.mo_occ[i]
+        print("{:<6} {:<6} {:<15.6f} {:<12}".format(i+1, irrep, energy, occupancy))
+        
+        print("  Significant Atomic Orbital Contributions:")
+        significant_aos = mo_coeff[:, i][abs(mo_coeff[:, i]) > 0.2]  # Threshold can be adjusted
+        for ao_idx, coef in enumerate(mo_coeff[:, i]):
+            if abs(coef) > 0.2:
+                ao_label = mol.ao_labels()[ao_idx]  # e.g., 'C 2s', 'C 2px'
+                print(f"    {ao_label}: {coef:.3f}")
+        print()
+    
+    molden_filename = 'molden_hf.molden'
+    molden.from_mo(mol, molden_filename, myhf.mo_coeff)
+    print(f"Molecular orbitals have been exported to '{molden_filename}' for visualization.\n")
+    
+
+def analysis_of_mo_cas(mol, mycas):
+    mo_irreps = symm.label_orb_symm(mol, mol.irrep_name, mol.symm_orb, mycas.mo_coeff)
+
+    mo_coeff = mycas.mo_coeff
+    num_mo = mo_coeff.shape[1]
+
+    print("\n=== Molecular Orbital Analysis ===\n")
+    print("{:<6} {:<6} {:<15} {:<12}".format("MO#", "Irrep", "Energy (Hartree)", "Occupancy"))
+
+    for i in range(num_mo):
+        irrep = mo_irreps[i]
+        energy = mycas.mo_energy[i]
+        occupancy = mycas.mo_occ[i]  # Ensure mo_occ is available
+        print("{:<6} {:<6} {:<15.6f} {:<20.15f}".format(i+1, irrep, energy, occupancy))
+
+        # Print significant AO contributions
+        print("  Significant Atomic Orbital Contributions:")
+        significant_aos = mo_coeff[:, i][abs(mo_coeff[:, i]) > 0.2]  # Adjust threshold if needed
+        for ao_idx, coef in enumerate(mo_coeff[:, i]):
+            if abs(coef) > 0.2:
+                ao_label = mol.ao_labels()[ao_idx]  # e.g., 'C 2s', 'C 2px'
+                print(f"    {ao_label}: {coef:.3f}")
+        print()
+
+    # Export MOs to Molden file for visualization
+    molden_filename = 'molden_casscf.molden'
+    molden.from_mo(mol, molden_filename, mycas.mo_coeff)
+    print(f"Molecular orbitals have been exported to '{molden_filename}' for visualization.\n")
+    
+    
+
+
+def check_dm_aaaa_minus_bbbb_norm(dm2_aaaa, dm2_bbbb):
+
+    diff = dm2_aaaa - dm2_bbbb
+    norm = np.sum(diff ** 2)
+    return norm
+
+def myocc(mf):
+    mol = mf.mol
+    orbsym = symm.label_orb_symm(mol, mol.irrep_id, mol.symm_orb, mf.mo_coeff)
+    doccsym = np.array(orbsym)[mf.mo_occ==2]
+    soccsym = np.array(orbsym)[mf.mo_occ==1]
+    for ir,irname in zip(mol.irrep_id, mol.irrep_name):
+        print('%s, double-occ = %d, single-occ = %d' %
+              (irname, sum(doccsym==ir), sum(soccsym==ir)))
+
+def reorder_rdm(dm2):
+
+    return dm2.transpose(0, 2, 1, 3)
+
+
+def calc_full_dm_mp2(dm2):
+
+    dim = dm2[0].shape[0]
+
+    content = ""
+
+    for l in range(dim):
+        for k in range(dim):
+            for j in range(dim):
+                for i in range(dim):
+
+                    
+                    aa = dm2[i, j, k, l]
+
+                    value   = aa
+                    if (abs(value)>1.e-8):
+                        content += f"{j+1:>4d} {i+1:>4d} {l+1:>4d} {k+1:>4d} {value:>19.12f} \n"
+                        #print(f"{j+1:>4d} {i+1:>4d} {l+1:>4d} {k+1:>4d} {value:>19.12f}")
 
     return content
 
@@ -255,7 +572,8 @@ def get_irrep_labels(irrep, point_group):
 
 
 
-def get_data_for_gammcor(mol, myhf, mycas, dump_eri=False):
+def get_data_for_gammcor(mol, myhf, mycas, mymp = None, dump_eri=False, simple = True):
+
     lll = 180
     c = "-"
     """Process and export CASSCF calculation data for GAMMCOR."""
@@ -286,6 +604,25 @@ def get_data_for_gammcor(mol, myhf, mycas, dump_eri=False):
         print("-" * 70)
         print(f"{'State':^8} {'Symmetry':^12} {'Energy':^20} {'State #':^8} {'Sym #':^8}")
         print("-" * 70)
+
+        tdm1_ij = []
+        tdm2_ij = []
+        norb = mycas.ncas
+        nelec = mycas.nelecas 
+
+        for i in range(0, solver.nroots):
+            for j in range(0, solver.nroots):
+                tdm1, tdm2 = solver.trans_rdm12(solver.ci[i], solver.ci[j], norb, nelec)
+           #     print('type of tdm1', type(tdm1), tdm1.shape)
+            #    print('type of tdm2', type(tdm2), tdm2.shape)
+                np.set_printoptions(precision=4, suppress=True)  # Adjust precision and suppress scientific notation
+             #   print("tdm1:")
+              #  print(tdm1)
+               # print("\ntdm2:")
+                #print(tdm2)
+                tdm1_ij.append(tdm1)
+                tdm2_ij.append(tdm2)
+
 
         # Process each state
         symmetry_state_numbers = {}
@@ -325,10 +662,11 @@ def get_data_for_gammcor(mol, myhf, mycas, dump_eri=False):
             full_occ[active_slice] = eval_sorted
 
             # Save molden file
-            mol_nosym = mol.copy()
-            mol_nosym.symmetry = False
-            tools.molden.from_mo(mol_nosym, f"molden_{state_number}.{sym_idx}.inp", 
-                               transformed_CAONO, occ=full_occ)
+            if not simple:
+                mol_nosym = mol.copy()
+                mol_nosym.symmetry = False
+                tools.molden.from_mo(mol_nosym, f"molden_{state_number}.{sym_idx}.inp", 
+                                     transformed_CAONO, occ=full_occ)
 
             # Print orbital analysis
             if mol.symmetry and mol.symm_orb is not None:
@@ -353,13 +691,16 @@ def get_data_for_gammcor(mol, myhf, mycas, dump_eri=False):
             # Save density matrices
             dm2_aaaa = reorder_rdm(dm2s[0][i])
             dm2_abab = reorder_rdm(dm2s[1][i])
-            dm2_full = calc_full_dm((dm2s[0][i], dm2s[1][i]))
+#            dm2_full = calc_full_dm((dm2s[0][i], dm2s[1][i]))
+            dm2_full = calc_full_dm_ms((dm2s[0][i], dm2s[1][i], dm2s[2][i]))
 
             # Write files
             dm2_aaaa.tofile(f'rdm2_aaaa_{state_number}.{sym_idx}.bin')
             dm2_abab.tofile(f'rdm2_abab_{state_number}.{sym_idx}.bin')
-            dm1.tofile(f'rdm1_{state_number}.{sym_idx}.bin')
 
+            
+            dm1.tofile(f'rdm1_{state_number}.{sym_idx}.bin')
+            
             with open(f'rdm2_{state_number}.{sym_idx}.dat', 'w') as f:
                 f.write(dm2_full)
 
@@ -377,7 +718,8 @@ def get_data_for_gammcor(mol, myhf, mycas, dump_eri=False):
 
         # Save additional data
         HCore = mol.intor('int1e_kin') + mol.intor('int1e_nuc')
-        tools.molden.from_scf(myhf, "moldenhf.inp")
+        if not simple:
+            tools.molden.from_scf(myhf, "moldenhf.inp")
         CAONO.T.astype(np.float64).tofile('C.bin')
         HCore.T.astype(np.float64).tofile('HCore.bin')
 
@@ -397,14 +739,35 @@ def get_data_for_gammcor(mol, myhf, mycas, dump_eri=False):
         #print('hcore', HCore[0,0], HCore[1,1])
 
         HCore = mol.intor('int1e_kin') + mol.intor('int1e_nuc')
+        print("\nZ określoną precyzją:")
+        np.set_printoptions(precision=6, suppress=True)
+        print(HCore[:5, :5])
         HCore.T.astype(np.float64).tofile('HCore.bin')
 
 
 
         dm1s, dm2s = mycas.fcisolver.make_rdm12s(mycas.ci, mycas.ncas, mycas.nelecas)
+        print(type(dm1s), 'type-1')
+        print(dm1s[0].shape, 'shape-1')
+        print("Macierz dm1s[0]:")
+        np.set_printoptions(precision=6, suppress=True, linewidth=100)
+        print(dm1s[0])
 
+        stdm1, stdm2 = mycas.fcisolver.make_rdm12(mycas.ci, mycas.ncas, mycas.nelecas)
+        print(type(stdm2), 'rr2-type')
+        print(stdm2.shape, 'rr2-shape')
+
+        rdm1, rdm2, rdm3= mycas.fcisolver.make_rdm123(mycas.ci, mycas.ncas, mycas.nelecas)
+        print(rdm3.shape, 'rr')
+
+        rdm1, rdm2, rdm3= mycas.fcisolver.make_rdm123s(mycas.ci, mycas.ncas, mycas.nelecas)
+        print(type(rdm3), 'rr2')
+        print(rdm3[0].shape, 'rr3')
+        
 
         dm1 = dm1s[0]+dm1s[1]
+        for i in range(0, len(dm1s[0])):
+            print('pluszek', dm1s[0][i], dm1s[1][i])
         
         print('dm1dm1dm1dm1dm1')
         print(np.array_str(dm1, precision=2, suppress_small=True))
@@ -442,19 +805,39 @@ def get_data_for_gammcor(mol, myhf, mycas, dump_eri=False):
     
         dm2_aaaa = reorder_rdm(dm2s[0])
         dm2_abab = reorder_rdm(dm2s[1])
-        dm2_full = calc_full_dm((dm2s[0], dm2s[1]))
+        dm2_baba = dm2_abab.transpose(2,3,0,1)
+        dm2_bbbb = reorder_rdm(dm2s[2])
+        dm2_full_zzz = calc_full_dm((dm2s[0], dm2s[1]))
+#        dm2_full = calc_full_dm_ms((dm2s[0], dm2s[1], dm2s[2]))
+
+        dm2_full = calc_full_dm2_3(dm2s)
         #dm2_full = calc_full_dm(dm2s)
-        
+
+        st_rdm2 = reorder_rdm(stdm2)
+        st_rdm2 = calc_full_dm_nospin(st_rdm2)
+
+        if not simple:
+            with open('st_rdm2.dat', 'w') as f:
+                f.write(st_rdm2)
+            print()
+            #print('im here', dm2_full)
+            print()
         with open('rdm2.dat', 'w') as f:
             f.write(dm2_full)
-            
+
+        if not simple:
+            with open('rdm2_zzz.dat', 'w') as f:
+                f.write(dm2_full_zzz)
+
         # dm2_aaaa = np.asfortranarray(dm2_aaaa)
         # dm2_abab = np.asfortranarray(dm2_abab)
     
         dm2_aaaa.tofile('rdm2_aaaa.bin')
         dm2_abab.tofile('rdm2_abab.bin')
+        dm2_bbbb.tofile('rdm2_bbbb.bin')
 
-        dm2_full_bin = 2.0*(dm2s[0]+dm2s[1])
+        
+        dm2_full_bin = 2.0*(dm2s[1])+dm2s[0]+dm2s[2]
         dm2_full_bin.tofile('rdm2_full.bin')
 
         # rdm2_full.tofile('rdm2_full.bin')
@@ -467,24 +850,51 @@ def get_data_for_gammcor(mol, myhf, mycas, dump_eri=False):
         casscf_energy = mycas.e_tot
         Enuc = mol.energy_nuc()
         NEL = mol.nelectron
+
+
+        rdm1p = np.zeros(NI + NA)
+        rdm1m = np.zeros(NI + NA)
+        rdm1p[:NI] = 1.0
+        rdm1m[:NI] = 1.0
+        rdm1p[NI:NI+NA] = np.diag(dm1s[0])
+        rdm1m[NI:NI+NA] = np.diag(dm1s[1])
+        if not simple:
+            rdm1p.astype(np.float64).tofile('rdm1p.bin')
+            rdm1m.astype(np.float64).tofile('rdm1m.bin')
+        
         if (mycas.natorb == True):
             natorb = 1
             print("Natural orbitals used. mycas.natorb:", mycas.natorb)
         else:
             natorb = 0
-            print("Natural orbitals NOT used. mycas.natorb=", mycas.natorb)        
+            print("Natural orbitals NOT used. mycas.natorb=", mycas.natorb)
+
+        frozen = 0
+        if mymp is not None:
+            frozen = mymp.frozen
 
         with open('auxdata.txt', 'w') as f:
-            f.write(f"{nbasis}\n{NI}\n{NA}\n{NV}\n{casscf_energy}\n{Enuc}\n{NEL}\n{natorb}\n")
+            f.write(f"{nbasis}\n{NI}\n{NA}\n{NV}\n{casscf_energy}\n{Enuc}\n{NEL}\n{natorb}\n{frozen}\n")
 
         # Extract atom coordinates
         atom_coords = mol.atom_coords()  # Shape: (n_atoms, 3)
         n_atoms = mol.natm
-        tools.molden.from_scf(myhf, "moldenhf.inp")
-        tools.molden.from_mcscf(mycas, "molden_mcscf.inp")
+        if not simple:
+            tools.molden.from_scf(myhf, "moldenhf.inp")
+            tools.molden.from_mcscf(mycas, "molden_mcscf.inp")
         CAONO.T.astype(np.float64).tofile('C.bin')
         occ.astype(np.float64).tofile('rdm1.bin')
         HCore.T.astype(np.float64).tofile('HCore.bin')
+
+        NIA = NI + NA
+        orbital_energies = myhf.mo_energy
+        occupied_energies = orbital_energies[:NIA]
+        virtual_energies = orbital_energies[NIA:]
+        if not simple:
+            print(f"Zajęte (core+active): {len(occupied_energies)} orbitali")
+            print(f"Wirtualne: {len(virtual_energies)} orbitali")
+            occupied_energies.astype(np.float64).tofile('eorbi.bin')
+            virtual_energies.astype(np.float64).tofile('eorba.bin')
 
         if mol.symmetry and mol.symm_orb is not None:
             mo_irreps = symm.label_orb_symm(mol, mol.irrep_name, mol.symm_orb, mycas.mo_coeff)
@@ -516,7 +926,7 @@ def get_data_for_gammcor(mol, myhf, mycas, dump_eri=False):
 
         if dump_eri:
 
-            doMOtrans = False
+            doMOtrans = True
             
             # This is version with MO transoformation done in pyscf
             start_time = time.time()
@@ -562,8 +972,22 @@ def get_data_for_gammcor(mol, myhf, mycas, dump_eri=False):
 
             
             twono[addrs.ravel()] = eri_mo.ravel()                
-                                
-                            
+            idx = naddr3_vec(0, 0, 0, 13)
+            print(f"twono({idx}) = {twono[idx]}")                                
+            print(f"Liczba elementów: {twono.size}")
+
+            # Wymiary tablicy
+            print(f"Wymiary (shape): {twono.shape}")
+
+            # Rozmiar w bajtach
+            print(f"Rozmiar w bajtach: {twono.nbytes}")
+
+            # Typ danych i rozmiar pojedynczego elementu
+            print(f"Typ danych: {twono.dtype}")
+            print(f"Bajtów na element: {twono.itemsize}")
+
+            # Rozmiar w MB
+            print(f"Rozmiar w MB: {twono.nbytes / (1024*1024):.2f}")
             twono.astype(np.float64).tofile('TWOEl.bin')
 
             
@@ -572,13 +996,193 @@ def get_data_for_gammcor(mol, myhf, mycas, dump_eri=False):
             print(f"\nTime spent on ERI transformation and processing: {end_time - mid_time:.2f} seconds")
 
 
+import numpy as np
+
+def get_rohf_for_gammcor(mol, myhf):
+    hf_occ = myhf.mo_occ
+    
+    occ_integers = np.zeros(len(hf_occ), dtype=np.int32)
+    for i, occ in enumerate(hf_occ):
+        if occ == 2.0:
+            occ_integers[i] = 2
+        elif occ == 1.0:
+            occ_integers[i] = 1
+        else:  # occ == 0.0
+            occ_integers[i] = 0
+    
+    occ_integers.astype(np.int32).tofile('mo_occ_int.bin')
+    print(f"Zapisano tablicę okupacji do mo_occ_int.bin: {occ_integers}")
+    
+    nbasis = mol.nao_nr()
+    print('nbasis', nbasis)
+    NI = np.sum(hf_occ == 2.0)
+    NA = np.sum(hf_occ == 1.0)
+    NV = nbasis - NI - NA
+    NOccup = NI + NA
+    
+    ROHF = myhf.e_tot
+    Enuc = mol.energy_nuc()
+    NEL = mol.nelectron
+    
+    print(f"NI (podwójnie obsadzone): {NI}")
+    print(f"NA (pojedynczo obsadzone): {NA}")
+    print(f"NV (wirtualne): {NV}")
+
+    occ = myhf.mo_occ
+    CAONO = myhf.mo_coeff  
+    HCore = mol.intor('int1e_kin') + mol.intor('int1e_nuc')
+    HCore.T.astype(np.float64).tofile('HCore.bin')
+    CAONO.T.astype(np.float64).tofile('C.bin')
+    occ.astype(np.float64).tofile('occ_rohf.bin')
+    
+
+    with open('auxdata_rohf.txt', 'w') as f:
+        f.write(f"{nbasis}\n{NI}\n{NA}\n{NV}\n{ROHF}\n{Enuc}\n{NEL}\n")
+
+         # ===================================================================
+    # Efektywne obsadzenie alfa to 0.5 dla wszystkich NA orbitali
+    occ_alpha_eff = np.full(NA, 0.5)
+    # Efektywne obsadzenie beta to 0.0 dla wszystkich NA orbitali
+    occ_beta_eff = np.full(NA, 0.0)
+
+    # ===================================================================
+    # Krok 2: Zbuduj 2-RDM i zapisz do pliku z przenumerowanymi indeksami
+    # ===================================================================
+    filename="rdm2_rohf.dat"
+    with open(filename, 'w') as f:
+        # Pętle po indeksach w przestrzeni aktywnej, od 1 do NA
+        for I_fortran in range(1, NA + 1):
+            for J_fortran in range(1, NA + 1):
+                for K_fortran in range(1, NA + 1):
+                    for L_fortran in range(1, NA + 1):
+                        
+                        # Indeksy Pythona wewnątrz podprzestrzeni (od 0 do NA-1)
+                        i, j, k, l = I_fortran-1, J_fortran-1, K_fortran-1, L_fortran-1
+                        
+                        # Obliczamy element Γ_JL,IK używając EFEKTYWNYCH obsadzeń
+                        gamma_JL_IK = 0.0
+                        
+                        # Część kulombowska
+                        if j == i and l == k:
+                            gamma_JL_IK += (occ_alpha_eff[j] + occ_beta_eff[j]) * (occ_alpha_eff[l] + occ_beta_eff[l])
+                            
+                        # Część wymienna
+                        if j == k and l == i:
+                            gamma_JL_IK -= (occ_alpha_eff[j] * occ_alpha_eff[l] + occ_beta_eff[j] * occ_beta_eff[l])
+                            
+                        # Zgodnie z komentarzem w kodzie Fortran, X = 2 * Γ_JL,IK
+                        X = 2.0 * gamma_JL_IK
+                        
+                       # if abs(X) > 1e-9:
+                            # Zapisujemy indeksy z pętli (od 1 do NA)
+                        f.write(f"{I_fortran:5d}{J_fortran:5d}{K_fortran:5d}{L_fortran:5d}    {X:20.12f}\n")
+            
+
+
+            
+# def get_mp2_for_gammcor(mol, myhf, mymp):
+
+# #    natorb_threshold = 1.e-8
+    
+#     aaa = True
+#     if aaa == True:
+        
+#         dm1 = mymp.make_rdm1()
+#         dm2 = mymp.make_rdm2()
+#         # nbasis = mol.n_ao_nr()
+#         noons, natorbs = np.linalg.eigh(dm1)
+#         #       noons = noons[::-1]  # sort descending                                                                                                             
+#         #       print("Natural orbital occupation numbers:", noons)
+
+#         # occ = np.zeros(nbasis))
+#         # for i in range(0, nbasis):
+#         #     if n
+
+# #        occ = mymp.mo_occ  
+# #        occ = occ / 2.0          
+
+#         CAONO = mymp.mo_coeff  # Natural orbital coefficients
+
+#         # HCore = mol.intor('int1e_kin') + mol.intor('int1e_nuc')
+#         # HCore.T.astype(np.float64).tofile('HCore.bin')
+
+#  #       dm1 = mymp.make_rdm1()
+#  #       dm2 = mymp.make_rdm2()
+
+#         dm2_full = reorder_rdm(dm2)
+#         dm2_full = calc_full_dm_mp2(dm2_full)
+        
+#         with open('rdm2_mp2.dat', 'w') as f:
+#             f.write(dm2_full)
+            
+        # dm2_full_bin = 2.0*(dm2s[0]+dm2s[1])
+        # dm2_full_bin.tofile('rdm2_full.bin')
+
+        # rdm2_full.tofile('rdm2_full.bin')
+
+#         nbasis = mol.nao_nr()
+#         print('nbasis', nbasis)
+#         NI = (mol.nelectron )//2
+#         NA = 0
+#         NV = nbasis - NI-NA
+#         casscf_energy = mymp.e_tot
+#         Enuc = mol.energy_nuc()
+#         NEL = mol.nelectron
+#         #      if (mycas.natorb == True):
+#         natorb = 1
+# #        print("Natural orbitals used. mycas.natorb:")
+#    #     else:
+#     #        natorb = 0
+#      #       print("Natural orbitals NOT used. mycas.natorb=", mycas.natorb)        
+
+#         with open('auxdata.txt', 'w') as f:
+#             f.write(f"{nbasis}\n{NI}\n{NA}\n{NV}\n{casscf_energy}\n{Enuc}\n{NEL}\n{natorb}\n")
+
+#         # Extract atom coordinates
+#         atom_coords = mol.atom_coords()  # Shape: (n_atoms, 3)
+#         n_atoms = mol.natm
+#         tools.molden.from_scf(myhf, "moldenhf.inp")
+# #        toaols.molden.from_mcscf(mycas, "molden_mcscf.inp")
+#         CAONO.T.astype(np.float64).tofile('C.bin')
+#         occ.astype(np.float64).tofile('rdm1.bin')
+#         HCore.T.astype(np.float64).tofile('HCore.bin')
+
+#         if mol.symmetry and mol.symm_orb is not None:
+#             mo_irreps = symm.label_orb_symm(mol, mol.irrep_name, mol.symm_orb, mycas.mo_coeff)
+        
+#             ncore = mycas.ncore
+#             ncas = mycas.ncas
+
+#             active_irreps = mo_irreps[ncore:ncore+ncas]
+
+#             occ = mycas.mo_occ
+            
+#             print("\n=== Active Space Orbitals ===\n")
+#             print("{:<6} {:<12} {:<6}".format("MO#", "Occupancy", "Irrep"))
+#             for j in range(ncas):
+#                 print("{:<6} {:<18.9f} {:<6}".format(
+#                     j + ncore + 1,
+#                     occ[j+ncore],
+#                     active_irreps[j]))
+#         else:
+#             # Print without symmetry labels
+#             print("\n===  Active Space Orbitals ===\n")
+#             print("{:<6} {:<12}".format("MO#", "Occupancy"))
+#             for j in range(ncas):
+#                 print("{:<6} {:<18.9f}".format(
+#                     j + ncore + 1,
+#                     occ[j+ncore]))
+
+
+
+
 
 def analyze_configurations(mol, myhf, mycas):
     """
     Analyze and print dominant electronic configurations for each state in a CASSCF calculation.
     """
 
-
+    # Determine if the calculation is State-Averaged or State-Specific
     is_sa = hasattr(mycas.fcisolver, 'nroots') and mycas.fcisolver.nroots > 1
     
     if is_sa:
@@ -588,14 +1192,16 @@ def analyze_configurations(mol, myhf, mycas):
         n_states = 1
         print(f"\nState-Specific CASSCF: Single State\n")
     
+    # Get MO coefficients and energies
     mo_coeff = mycas.mo_coeff  # Shape: (num_AOs, num_MOs)
     mo_energies = mycas.mo_energy
     mo_irreps = symm.label_orb_symm(mol, mol.irrep_name, mol.symm_orb, mo_coeff)
     
+    # Access CI coefficients
     if is_sa:
         ci_vectors = mycas.fcisolver.ci  # Shape: (n_states, n_configs)
     else:
-        ci_vectors = [mycas.fcisolver.ci]  
+        ci_vectors = [mycas.fcisolver.ci]  # List with one element
     
     for state in range(n_states):
         print(f"--- State {state + 1} ---")
@@ -604,18 +1210,20 @@ def analyze_configurations(mol, myhf, mycas):
         else:
             wfnsym = mycas.fcisolver.wfnsym
         print(f"Symmetry: {wfnsym}")
-        print(f"Energy: {mycas.e_tot:.6f} Hartree\n")  
+        print(f"Energy: {mycas.e_tot:.6f} Hartree\n")  # For SA, e_tot is averaged
         
+        # Get CI coefficients for the state
         ci = ci_vectors[state]
         
+        # Identify the dominant configurations (e.g., top 3)
         top_n = 3
-        top_indices = np.argsort(np.abs(ci))[-top_n:][::-1]
+        top_indices = np.argsort(np.abs(ci))[-top_n:][::-1]  # Indices of top_n configurations
         print(f"Top {top_n} Dominant Configurations:")
         
         for idx in top_indices:
             coef = ci[idx]
 
-
+            # Attempt to retrieve the configuration bitstring
             if hasattr(mycas.fcisolver, 'get_config'):
                 config = mycas.fcisolver.get_config(idx)
                 print(f"    Configuration: {config}")

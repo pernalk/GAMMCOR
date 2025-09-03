@@ -45,8 +45,12 @@ C
 C
 C     COMPUTE THE HARTREE POTENTIAL AND THE ENERGY
 C     HAP: VHSR is computed in AO during canonicalization
+C     AT:  VHSR is computed in NO with PYSCF interface      
 C
-      Call tran_matTr(VCoul,UNOAO,UNOAO,NBasis,Transp)
+      if (IPYSCF == 0)then
+         Call tran_matTr(VCoul,UNOAO,UNOAO,NBasis,Transp)
+      endif
+
       VHSR = VCoul
 C     Old:
 C      Call PotHSR(VHSR,Occ,URe,TwoEl,TwoElErf,NInte1,NInte2,NBasis)

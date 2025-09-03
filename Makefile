@@ -7,7 +7,7 @@ PARALLELIZATION   = -coarray=single -qmkl=parallel -qopenmp
 XCFUN                   =     -I xcfun/fortran
 CHOLESKY       =  -I ./gammcor-integrals/include
 
-COMMON_FLAGS = $(WARNINGS) $(PARALLELIZATION) $(XCFUN) $(CHOLESKY) -assume byterecl -heap-arrays -g
+COMMON_FLAGS = $(WARNINGS) $(PARALLELIZATION) $(XCFUN) $(CHOLESKY) -assume byterecl -heap-arrays 
 FFLAGS = $(COMMON_FLAGS) $(OPTIMIZATION) 
 DEBUG_FLAGS = -O0 -traceback -check all
 

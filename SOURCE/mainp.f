@@ -340,10 +340,14 @@ C     OLD INPUT-READ
 C      Call RWInput(Title,ZNucl,Charge,NBasis)
 C
 C     CALCULATE THE DIMENSIONS
-      If(IDALTON.Eq.0) then
+      If(IDALTON.Eq.0.AND.IPYSCF.Eq.0) then
 C        Call CheckNBa(NBasis,Title)
         Call basinfo(NBasis,'AOONEINT.mol','MOLPRO')
       endif
+
+      If(IPYSCF.Eq.1)then
+         Call basinfo_pyscf(nbasis)
+      end if
 C
       Call DimSym(NBasis,NInte1,NInte2,MxHVec,MaxXV)
 C
@@ -359,15 +363,20 @@ C
 C     GET THE VALUE OF THE SEPARATION PARAMETER OM
 C
       Alpha = System%Omega
+
 c      If(IFunSR.Ne.0.And.IFunSR.Ne.3.And.IFunSR.Ne.5) Then
       If(IFunSR.Eq.1.Or.IFunSR.Eq.2.Or.IFunSR.Eq.4) Then
 C      Call GetAlpha(Title)
-      Call readalphamolpro(Alpha)
+         Call readalphamolpro(Alpha)
+         
       ElseIf(IDBBSC.Eq.2) Then
       Alpha=1.D0
       Else
       Alpha=0.D0
       EndIf
+
+      AuxData%omega = Alpha
+
 C
 C     ALLOCATE THE MATRICES
 C

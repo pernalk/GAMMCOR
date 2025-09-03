@@ -382,7 +382,21 @@ C
      $                          AOBasis,System,Monomer,'DALTON',
      $                          CAONO,CAONO,XKin,GammaF,
      $                          MemType,MemVal,NInte1,NBasis,2)
+c        print*, 'JNO  =',norm2(JNO)
+c        print*, 'JNOlr=',norm2(JNOlr)
+c
          JNOsr = JNO - JNOlr
+
+C       Print*, 'CAONO =',norm2(CAONO)
+C       do j=1,NBasis
+C          write(6,'(*(f13.8))') (CAONO(i,j),i=1,NBasis)
+C       enddo
+C
+C       Print*, 'JMOsr in MO basis =',norm2(JNOsr)
+C       do j=1,NBasis
+C          write(6,'(*(f13.8))') (JNOsr(i,j),i=1,NBasis)
+C       enddo
+
          Call tranMO2AO('N',JNOsr,CAONO,NBasis)
 C       print*, 'JAOsr',norm2(JNOsr)
 C        do j=1,NBasis
@@ -1108,6 +1122,7 @@ C       set THC for FockOTF subroutine
 C
 c       IH0Test=0
 c       print*, 'IH0test = ',IH0Test
+
          Call CholeskyOTF_Fock_MO_v2(WorkSq,CholeskyVecsOTF,
      $                         AOBasis,System,Monomer,'ORCA  ',
      $                         CAOMO,CAOMO,XKin,GammaAB,
@@ -2516,6 +2531,7 @@ c          Monomer = 3 ! SYS_TOTAL in System
 c          Print*, 'Monomer =',Monomer
 c          IH0Test=0
 c          Print*, 'IH0Test =',IH0Test
+           
            Call CholeskyOTF_Fock_MO_v2(work1,CholeskyVecsOTF,
      $                          AOBasis,System,Monomer,'MOLPRO',
      $                          CAOMO,CSAOMO,XKin,GammaF,
@@ -2548,7 +2564,8 @@ c
            CSAOMO = transpose(UAux)
            Call read_caomo_molpro(CAOMO,SAO,itsoao,jtsoao,
      &                           'MOLPRO.MOPUN','CASORBAO',NBasis)
-c          Monomer = 3 ! SYS_TOTAL in System
+c        Monomer = 3 ! SYS_TOTAL in System
+
            Call CholeskyOTF_Fock_MO_v2(work1,CholErfVecsOTF,
      $                            AOBasis,System,Monomer,'MOLPRO',
      $                            CAOMO,CSAOMO,XKin,GammaF,
@@ -2557,12 +2574,19 @@ c          Monomer = 3 ! SYS_TOTAL in System
      $                            2,JMOlr)
 c    $                            IH0Test,JMOlr) ! IH0Test=2, use external H0
 C
+
            Call CholeskyOTF_Jmat_MO(JMO,CholeskyVecsOTF,
      $                          AOBasis,System,Monomer,'MOLPRO',
      $                          CAOMO,CSAOMO,XKin,GammaF,
-     $                          MemType,MemVal,NInte1,NBasis,2)
+     $                          MemType,MemVal,NInte1,NBasis,1)
 C
+C           print*, 'CAOMO =',norm2(CAOMO)
+C           print*, 'CSAOMO =',norm2(CSAOMO)
+C           print*, 'JMO   =',norm2(JMO)
+C           print*, 'JMOlr =',norm2(JMOlr)
            JMOsr = JMO - JMOlr
+
+
 c
 c        print*, 'J in MO long-range ', norm2(JMOlr)
 c        print*, 'J in MO full-range ', norm2(JMO)
@@ -2716,7 +2740,7 @@ C              to match with gammcor-cholesky library
 C
       UAOMO = transpose(CAONO)
 C
-C      block
+c      block
 C      Print*, 'CAONO =',norm2(CAONO)
 C      do j=1,NBasis
 C         write(6,'(*(f13.8))') (CAONO(i,j),i=1,NBasis)
@@ -2725,7 +2749,18 @@ C      Print*, 'CSAONO =',norm2(UAOMO)
 C      do j=1,NBasis
 C         write(6,'(*(f13.8))') (UAOMO(i,j),i=1,NBasis)
 C      enddo
-C      end block
+C
+C       Print*, 'CAOMO =',norm2(CAOMO)
+C       do j=1,NBasis
+C          write(6,'(*(f13.8))') (CAOMO(i,j),i=1,NBasis)
+C       enddo
+C
+C       Print*, 'JMOsr in MO basis =',norm2(JMOsr)
+C       do j=1,NBasis
+C          write(6,'(*(f13.8))') (JMOsr(i,j),i=1,NBasis)
+C       enddo
+C
+C       end block
 C
       If (IFunSR.Eq.1.Or.IFunSR.Eq.2.Or.IFunSR.Eq.4) Then
 C     transform short-range Jmat from MO to AO
@@ -3181,15 +3216,13 @@ C     Cholesky OnTheFly
       Type(TCholeskyVecs) :: CholeskyVecs
       Real*8, Allocatable :: MatFF(:,:), FFErf(:,:)
 
-      print*, 'yest', alpha
-
       call PYSCF_wrapper(THCData, AuxData, NInte1, NInte2,
      $ NBasis, ENuc, CAONO,
      $     XKin, TwoEl, Occ, NAc, NInAc, anSt, Flags)
 
 
       print*, Flags%Ifunsr
-      if (IFunSR==2)then
+      if (IFunSR==4)then
 
          iunit = 11
          open(newunit=iunit,file='jsrmat',form='unformatted')
@@ -3247,8 +3280,10 @@ C     Cholesky OnTheFly
       If(ITwoEl.Eq.3) Then
 
          If (ICholeskyOTF==1) Then
+            if (IFunSR.ne.4)then
+
             call clock_start(timer)
-            allocate(MatFF(THCData%NTHC,NBasis**2))
+            allocate(MatFF(THCData%NChol,NBasis**2))
 
             Call thc_gammcor_Rkab_2(MatFF, THCData%Xga, THCData%Xga,
      $           THCData%Zgk, NBasis, NBasis,
@@ -3262,16 +3297,23 @@ C     Cholesky OnTheFly
             Close(iunit)
             Deallocate(MatFF)
             print*, 'TIME FOR WRITE MatFF', clock_readwall(timer)
+         EndIf
+         If (IDBBSC.Eq.2.or.IFunSR==4) Then
 
-            If (IDBBSC.Eq.2) Then
-               allocate(FFErf(THCData%NTHCErf,NBasis**2))
+               allocate(FFErf(THCData%NCholErf,NBasis**2))
           Call thc_gammcor_Rkab_2(FFErf, THCData%XgaErf, THCData%XgaErf,
      $           THCData%ZgkErf, NBasis, NBasis,
-     $           THCData%NCholErf, THCData%NTHCErf)
-            open(newunit=iunt,file='cholvErf',form='unformatted')
-            write(iunt) THCData%NCholErf
-            write(iunt) FFErf
-            close(iunt)
+     $              THCData%NCholErf, THCData%NTHCErf)
+
+          if (IDBBSC .Eq. 2) then
+             open(newunit=iunit,file='cholvErf',form='unformatted')
+          else
+             open(newunit=iunit,file='cholvecs',form='unformatted')
+          EndIf
+
+            write(iunit) THCData%NCholErf
+            write(iunit) FFErf
+            close(iunit)
             Deallocate(FFErf)
          EndIf
             
@@ -5148,6 +5190,81 @@ C
 C
       end subroutine TwoEHartree
 
+*Deck TwoEHartreeChol
+      subroutine TwoEHartreeChol(EnH,Occ,INActive,NAct,NBasis)
+      Implicit Real*8 (A-H,O-Z)
+C
+      Include 'commons.inc'
+C
+      Parameter(Zero=0.D0,Half=0.5D0,One=1.D0,Two=2.D0)
+C
+      Integer INActive,NAct,NBasis
+      Double Precision EnH
+      Dimension Occ(NBasis)
+C
+C     LOCAL ARRAYS
+C
+      Double Precision, Allocatable :: MatFF(:,:)
+
+
+c     SET FILES
+      Open(newunit=iunit,file='cholvecs',form='unformatted')
+      Read(iunit) NCholesky
+      Allocate(MatFF(NCholesky,NBasis**2))
+      Read(iunit) MatFF
+      Close(iunit)
+C
+C     SET DIMENSIONS
+      NOccup=NAct+INActive
+
+C     GET E_HARTREE
+      EnH=0
+      do j=1,NOccup
+      do i=1,NOccup
+        EnH = EnH + Occ(i)*Occ(j)
+     $   *dot_product(MatFF(:,i+(i-1)*NBasis),MatFF(:,j+(j-1)*NBasis))
+      enddo
+      enddo
+C
+      EnH = Two*EnH
+
+      end subroutine
+
+* Deck BasInfo pyscf
+      Subroutine basinfo_pyscf(nbasis)
+      implicit none
+      integer, intent(out) :: nbasis
+
+      character(len=256) :: filename
+      character(len=:), allocatable :: command
+      character(len=15)  :: temp_file = 'list.tmp'
+      integer :: unit_num, io_status, unit
+
+      filename = ''
+      command='ls -1 auxda*.txt 2>/dev/null | head -n 1 >' // temp_file
+      call execute_command_line(command, wait=.true.)
+
+      open(newunit=unit_num, file=temp_file, status='old',
+     $     action='read', iostat=io_status)
+      if (io_status == 0) then 
+         read(unit_num, '(A)', end=10) filename
+ 10      close(unit_num, status='delete')
+      end if
+
+      if (trim(filename) == '') then
+         print *, "ERROR: no auxdata file"
+         stop 
+      end if
+
+      unit = 10
+      open(unit=unit, file=filename, status='old', action='read')
+      read(unit, *) Nbasis
+      close(unit)
+
+      End Subroutine basinfo_pyscf
+      
+
+      
 *Deck BasInfo
       Subroutine basinfo(nbasis,basfile,intf)
 C

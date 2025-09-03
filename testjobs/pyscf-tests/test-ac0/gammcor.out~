@@ -1,0 +1,576 @@
+ 
+ GIT INFO
+********************************************************************************
+ Branch:             IntOnTheFly
+ Revision (short):   200dce0
+ Revision (full):    200dce0b5dbff4f1ac5fac9f76aee9e60d3d896b
+ Latest commit date: Tue Sep 26 14:40:29 2023 +0200
+ Latest tag:         v-4.1
+ 
+ 
+ BUILD INFO
+********************************************************************************
+ Fortran compiler:   Intel 
+ /opt/intel/oneapi/compiler/2021.1.2/linux/bin/intel64/ifort
+ C++ compiler:       Clang /opt/intel/oneapi/compiler/2021.1.2/linux/bin/icx
+ C compiler:         Clang /opt/intel/oneapi/compiler/2021.1.2/linux/bin/icx
+ Compile options:    
+ -assume byterecl -heap-arrays -mkl=parallel -coarray=single -O3 -xHost
+ BLAS libraries:     
+ /opt/intel/oneapi/mkl/latest/lib/intel64/libmkl_intel_lp64.so /opt/intel/oneapi
+ /mkl/latest/lib/intel64/libmkl_intel_thread.so /opt/intel/oneapi/mkl/latest/lib
+ /intel64/libmkl_core.so /usr/lib/x86_64-linux-gnu/libiomp5.so -lpthread -lm -ld
+ l
+ 
+ NBasis WILL BE READ FROM MOLPRO
+
+ INPUT 
+********************************************************************************
+ JOB TITLE:     AC
+ BASIS SET:     cc-pvdz.txt
+ BASIS PATH:    /home/aleksandra.tucholska/test/gammcor/bazy-do-pyscf/
+ INTERFACE:     PYSCF   
+ JOB TYPE:      AC0      
+ RDM TYPE:      CASSCF  
+ RDM SOURCE:    PYSCF   
+ UNITS:         BOHR    
+
+ CHOLESKY :     .TRUE.
+ ALGORITHM:     ON-THE-FLY
+ CHOLESKY ACCU: LUDICROUS
+
+ MONOMER:       AB      
+ ZNUCL:        14
+ CHARGE:        0
+ THRESHOLD SELECT ACTIVE  :  0.100000E-03
+ THRESHOLD QUASI-INACTIVE :  0.100000E-01
+
+ sys1           0
+
+ INPUT CHECK PASSED
+********************************************************************************
+ sys2           0
+ Input%CalcParams%PostCAS F
+ Input%CalcParams%DFApp             0
+ Flags%IFunSRKer                    1
+ sys3           0
+
+ SYSTEM 
+********************************************************************************
+ NUCLEAR CHARGE:   14
+ CHARGE:           0
+ PRINT LEVEL:      0
+
+ sys4           0
+
+ IFunSR=0
+
+ IFunSRKer=0
+
+ NoSt= 0
+ nnnnn          28
+
+ STARTING CALCULATIONS 
+********************************************************************************
+ here
+ yest  0.000000000000000E+000
+ inside wrapper
+           3
+ basis_path/home/aleksandra.tucholska/test/gammcor/bazy-do-pyscf/cc-pvdz.txt
+ NAtoms =            2
+ NElectrons =           14
+ NEL          14
+ NBasis          28
+ AuxData%nst        -255        -255
+ Flags%JOBTYPE           2
+ 
+ -------------------------------------------------------------------------
+ Assuming state            1 .           1
+ -------------------------------------------------------------------------
+ 
+ suffix is          
+ reading from
+ reading from
+ auxdata.txt                                                                    
+                                                                                
+                                                                                
+                    
+ NBasis:          28
+ NInactive:           4
+ NActive:           6
+ NVirtual:          18
+ CASSCF Energy:  -109.090057703102     
+ Nuclear Energy:   23.6144578313253     
+ Natural orbitals           1 (0 - not used, 1 - used)
+ auxddata
+ auxdata.txt                                                                    
+                                                                                
+                                                                                
+                    
+ file_rdm2_aaaa
+ rdm2_aaaa.bin                                                                  
+                                                                                
+                                                                                
+                    
+ rdm2_aaaa
+ rdm2_abab.bin                                                                  
+                                                                                
+                                                                                
+                    
+ AuxData%HNO0(1,1)  -27.8003561823687     
+ AuxData%HNO0(1,1)   6.66533590193869     
+ NBasis:          28
+ NInactive:           4
+ NActive:           6
+ NVirtual:          18
+ CASSCF Energy:  -109.090057703102     
+ Nuclear Energy:   23.6144578313253     
+ Natural orbitals           1 (0 - not used, 1 - used)
+   1.00000000000000        1.00000000000000        1.00000000000000     
+   1.00000000000000       0.991119332218265       0.970851378821168     
+  0.970851378821168       2.910530319668791E-002  2.910530319668808E-002
+  8.967303746021839E-003
+ CholAccu           3
+ Prescreening (pq|pq) integrals for the Cholesky decomposition
+ Shell pairs will be sorted according to their max elements
+ Max diagonal integral MaxDrs=4.1E+000
+ Applying Eq. 15 in J. Chem. Phys. 150, 194112 (2019); doi: 10.1063/1.5083802
+ Schwarz inequality: Dpq<min(10**(-8),Tau)**2/MaxDrs=2.4E-017
+ Trace of exact Coulomb matrix: 4.4E+001
+ Trace of discarded integrals: 0.0E+000
+ Discarded 0 out of 78 shell pairs
+ (0 out of 406 orbital pairs)
+
+ Step 1 of Cholesky decomposition: locating pivots
+ -------------------------------------------------
+ Dimensions of the Coulomb matrix: (406,406)
+ Threshold for diagonal matrix elements: Dpq > 1.0E-007
+ Max number of Cholesky vectors: 406
+ Rk storage block size: 500
+ Max dimension of 2e integrals buffer: (406,406)
+
+ ----------------------------------------------------------------------------
+ #    Dmax        Memory (MB)    NPivots     %    Time        
+ ----------------------------------------------------------------------------
+ 1    3.8E-002    2.8E+000       34          9    2.5E-002    
+ 2    3.5E-004    2.7E+000       126         36   2.0E-002    
+ 3    3.5E-006    1.8E+000       177         55   1.1E-002    
+ 4    9.3E-008    1.2E+000       233         100  8.7E-003    
+
+ Step 1 of the Cholesky decomposition completed
+ Computed 233 pivots
+ Largest residual Dpq: 9.3E-008
+ NCholesky/NAO = 8.3E+000
+ Step 1 of Cholesky decomposition completed in 6.5E-002 seconds
+ Detailed timings in seconds
+ Subtract prev contribs I (M-R**T*R)     1.1E-002
+ Subtract prev contribs II (Rk)          7.3E-003
+ Two-electron integrals                  3.9E-002
+ Reallocation                            3.7E-003
+
+ Step 2 of Cholesky decomposition completed in 6.0E-003 seconds
+ Detailed timings in seconds
+ Reduced-dimension matrix V    4.5E-003
+ V=L*L**T                      8.3E-004
+ L**(-1)                       6.1E-004
+
+
+ ----------------------------------------------------------------------------
+ Tensor hypercontraction
+ ----------------------------------------------------------------------------
+ Initial Becke grid: SG-1 7632 points
+ Discarded 596 points with Becke weight <= 0.0E+000
+ Discarded 1810 points with Max|PhiP(r)|**2 <= 1.0E-011
+ Final grid: 5226
+ Average 2613 points per atom
+
+ Pivoted Cholesky decomposition with on-the-fly generation of matrix S
+ ---------------------------------------------------------------------
+ QR relative pivot threshold Eps=1.0E-005
+ QR relative pivot threshold (reduced grid) Eps=1.0E-005
+ Block dimension: 500 Cholesky vectors per macro iteration
+ Starting from Becke grid composed of 5226 points
+ Cholesky absolute pivot threshold Eps**2=1.0E-010
+ Cholesky absolute pivot threshold (reduced grid) Eps**2=1.0E-010
+
+ ----------------------------------------------------------------------------
+ #    Dmax        Memory (MB)    NPivots     %    Time        
+ ----------------------------------------------------------------------------
+ 1    7.7E-011    1.6E+001       365         100  2.9E-001    
+ ----------------------------------------------------------------------------
+ Rank-revealing decomposition converged with 365 pivots
+ Average 182 points per atom
+ NGridTHC/NAO=1.3E+001
+ Reduced grid: 365 pivots
+ Reduced grid: NGridTHC/NAO=1.3E+001
+ Total time 2.9E-001 seconds
+
+ Detailed timings
+ ----------------
+ Orbital values Xgp                 3.6E-003
+ Overlap matrix S + Cholesky vecs   2.9E-001
+ Reallocation                       1.2E-005
+
+ THC grid completed in 3.0E-001 seconds
+ Least squares fitting of Z: LDL**T linear system solver
+ thc_Z will generate full-dimension Cholesky vecs on the fly
+ THC least squares completed in 3.1E-002 seconds
+
+ here           4          10          28
+  0.708495986213332       1.767764782435460E-003
+ order2           5
+ order3           5
+                   Fockij,        0.00000011920928955078
+                   Fockvw,        0.00000241398811340332
+                Cpi_extao,        0.00000083446502685547
+                Cpv_extao,        0.00000375509262084961
+ Started THC Fock matrix build
+ Fock matrix completed in 4.1E-002 seconds
+ fiij           4
+ Fockij(1,1)  -15.6449184781616     
+ h01  -27.8003561823475     
+ etot1 z HNO thc  -194.437209150017     
+ etoat0  -194.437209150017     
+ etot1  -132.704516304169     
+ etot w/o enuc  -327.141725454186     
+ etot  -303.527267622861     
+ ecas from pyscf  -109.090057703102     
+ po read
+           0
+  No of CAS inactive and active orbitals      4  6
+  CASSCF   Occupancy    Gem
+   1    0.100000E+01     1
+   2    0.100000E+01     1
+   3    0.100000E+01     1
+   4    0.100000E+01     1
+   5    0.991119E+00     2
+   6    0.970851E+00     2
+   7    0.970851E+00     2
+   8    0.291053E-01     2
+   9    0.291053E-01     2
+  10    0.896730E-02     2
+  11    0.000000E+00     3
+  12    0.000000E+00     3
+  13    0.000000E+00     3
+  14    0.000000E+00     3
+  15    0.000000E+00     3
+  16    0.000000E+00     3
+  17    0.000000E+00     3
+  18    0.000000E+00     3
+  19    0.000000E+00     3
+  20    0.000000E+00     3
+  21    0.000000E+00     3
+  22    0.000000E+00     3
+  23    0.000000E+00     3
+  24    0.000000E+00     3
+  25    0.000000E+00     3
+  26    0.000000E+00     3
+  27    0.000000E+00     3
+  28    0.000000E+00     3
+  Sum of Occupancies:     0.700000E+01
+ TIME FOR CHOL_GAMMCOR_Rkab  1.511597633361816E-002
+ TIME FOR WRITE MatFF  1.023054122924805E-003
+
+  NATURAL ORBITAL OCCUPANCIES
+  Orb   Occupancy       CICoef       Gem
+   1    0.100000E+01    0.000000E+00     1
+   2    0.100000E+01    0.000000E+00     1
+   3    0.100000E+01    0.000000E+00     1
+   4    0.100000E+01    0.000000E+00     1
+   5    0.991119E+00    0.000000E+00     2
+   6    0.970851E+00    0.000000E+00     2
+   7    0.970851E+00    0.000000E+00     2
+   8    0.291053E-01    0.000000E+00     2
+   9    0.291053E-01    0.000000E+00     2
+  10    0.896730E-02    0.000000E+00     2
+  11    0.000000E+00    0.000000E+00     3
+  12    0.000000E+00    0.000000E+00     3
+  13    0.000000E+00    0.000000E+00     3
+  14    0.000000E+00    0.000000E+00     3
+  15    0.000000E+00    0.000000E+00     3
+  16    0.000000E+00    0.000000E+00     3
+  17    0.000000E+00    0.000000E+00     3
+  18    0.000000E+00    0.000000E+00     3
+  19    0.000000E+00    0.000000E+00     3
+  20    0.000000E+00    0.000000E+00     3
+  21    0.000000E+00    0.000000E+00     3
+  22    0.000000E+00    0.000000E+00     3
+  23    0.000000E+00    0.000000E+00     3
+  24    0.000000E+00    0.000000E+00     3
+  25    0.000000E+00    0.000000E+00     3
+  26    0.000000E+00    0.000000E+00     3
+  27    0.000000E+00    0.000000E+00     3
+  28    0.000000E+00    0.000000E+00     3
+
+  BasisSet = /home/aleksandra.tucholska/test/gammcor/bazy-do-pyscf/cc-pvdz.txt
+  Active Orbital  :    5    9.9112E-01
+  Active Orbital  :    6    9.7085E-01
+  Active Orbital  :    7    9.7085E-01
+  Active Orbital  :    8    2.9105E-02
+  Active Orbital  :    9    2.9105E-02
+  Active Orbital  :   10    8.9673E-03
+
+  In ACCAS: Active Orbitals    6
+
+  Threshold for quasi-degeneracy         0.10000E-03
+  Threshold for quasi-virtual orbital    0.10000E-06
+  Threshold for quasi-inactive orbital   0.10000E-01
+  Discarding nearly degenerate pair    7   6
+  Discarding nearly degenerate pair    9   8
+
+  Number of pairs reduced to:   213
+  Accepted pairs read:
+      1    6    1    0.9709E+00    0.1000E+01
+      2    6    2    0.9709E+00    0.1000E+01
+      3    6    3    0.9709E+00    0.1000E+01
+      4    6    4    0.9709E+00    0.1000E+01
+      5    6    5    0.9709E+00    0.9911E+00
+      6    7    1    0.9709E+00    0.1000E+01
+      7    7    2    0.9709E+00    0.1000E+01
+      8    7    3    0.9709E+00    0.1000E+01
+      9    7    4    0.9709E+00    0.1000E+01
+     10    7    5    0.9709E+00    0.9911E+00
+     11    8    1    0.2911E-01    0.1000E+01
+     12    8    2    0.2911E-01    0.1000E+01
+     13    8    3    0.2911E-01    0.1000E+01
+     14    8    4    0.2911E-01    0.1000E+01
+     15    8    5    0.2911E-01    0.9911E+00
+     16    8    6    0.2911E-01    0.9709E+00
+     17    8    7    0.2911E-01    0.9709E+00
+     18    9    1    0.2911E-01    0.1000E+01
+     19    9    2    0.2911E-01    0.1000E+01
+     20    9    3    0.2911E-01    0.1000E+01
+     21    9    4    0.2911E-01    0.1000E+01
+     22    9    5    0.2911E-01    0.9911E+00
+     23    9    6    0.2911E-01    0.9709E+00
+     24    9    7    0.2911E-01    0.9709E+00
+     25   10    1    0.8967E-02    0.1000E+01
+     26   10    2    0.8967E-02    0.1000E+01
+     27   10    3    0.8967E-02    0.1000E+01
+     28   10    4    0.8967E-02    0.1000E+01
+     29   10    5    0.8967E-02    0.9911E+00
+     30   10    6    0.8967E-02    0.9709E+00
+     31   10    7    0.8967E-02    0.9709E+00
+     32   10    8    0.8967E-02    0.2911E-01
+     33   10    9    0.8967E-02    0.2911E-01
+     34   11    1    0.0000E+00    0.1000E+01
+     35   11    2    0.0000E+00    0.1000E+01
+     36   11    3    0.0000E+00    0.1000E+01
+     37   11    4    0.0000E+00    0.1000E+01
+     38   11    5    0.0000E+00    0.9911E+00
+     39   11    6    0.0000E+00    0.9709E+00
+     40   11    7    0.0000E+00    0.9709E+00
+     41   11    8    0.0000E+00    0.2911E-01
+     42   11    9    0.0000E+00    0.2911E-01
+     43   11   10    0.0000E+00    0.8967E-02
+     44   12    1    0.0000E+00    0.1000E+01
+     45   12    2    0.0000E+00    0.1000E+01
+     46   12    3    0.0000E+00    0.1000E+01
+     47   12    4    0.0000E+00    0.1000E+01
+     48   12    5    0.0000E+00    0.9911E+00
+     49   12    6    0.0000E+00    0.9709E+00
+     50   12    7    0.0000E+00    0.9709E+00
+     51   12    8    0.0000E+00    0.2911E-01
+     52   12    9    0.0000E+00    0.2911E-01
+     53   12   10    0.0000E+00    0.8967E-02
+     54   13    1    0.0000E+00    0.1000E+01
+     55   13    2    0.0000E+00    0.1000E+01
+     56   13    3    0.0000E+00    0.1000E+01
+     57   13    4    0.0000E+00    0.1000E+01
+     58   13    5    0.0000E+00    0.9911E+00
+     59   13    6    0.0000E+00    0.9709E+00
+     60   13    7    0.0000E+00    0.9709E+00
+     61   13    8    0.0000E+00    0.2911E-01
+     62   13    9    0.0000E+00    0.2911E-01
+     63   13   10    0.0000E+00    0.8967E-02
+     64   14    1    0.0000E+00    0.1000E+01
+     65   14    2    0.0000E+00    0.1000E+01
+     66   14    3    0.0000E+00    0.1000E+01
+     67   14    4    0.0000E+00    0.1000E+01
+     68   14    5    0.0000E+00    0.9911E+00
+     69   14    6    0.0000E+00    0.9709E+00
+     70   14    7    0.0000E+00    0.9709E+00
+     71   14    8    0.0000E+00    0.2911E-01
+     72   14    9    0.0000E+00    0.2911E-01
+     73   14   10    0.0000E+00    0.8967E-02
+     74   15    1    0.0000E+00    0.1000E+01
+     75   15    2    0.0000E+00    0.1000E+01
+     76   15    3    0.0000E+00    0.1000E+01
+     77   15    4    0.0000E+00    0.1000E+01
+     78   15    5    0.0000E+00    0.9911E+00
+     79   15    6    0.0000E+00    0.9709E+00
+     80   15    7    0.0000E+00    0.9709E+00
+     81   15    8    0.0000E+00    0.2911E-01
+     82   15    9    0.0000E+00    0.2911E-01
+     83   15   10    0.0000E+00    0.8967E-02
+     84   16    1    0.0000E+00    0.1000E+01
+     85   16    2    0.0000E+00    0.1000E+01
+     86   16    3    0.0000E+00    0.1000E+01
+     87   16    4    0.0000E+00    0.1000E+01
+     88   16    5    0.0000E+00    0.9911E+00
+     89   16    6    0.0000E+00    0.9709E+00
+     90   16    7    0.0000E+00    0.9709E+00
+     91   16    8    0.0000E+00    0.2911E-01
+     92   16    9    0.0000E+00    0.2911E-01
+     93   16   10    0.0000E+00    0.8967E-02
+     94   17    1    0.0000E+00    0.1000E+01
+     95   17    2    0.0000E+00    0.1000E+01
+     96   17    3    0.0000E+00    0.1000E+01
+     97   17    4    0.0000E+00    0.1000E+01
+     98   17    5    0.0000E+00    0.9911E+00
+     99   17    6    0.0000E+00    0.9709E+00
+    100   17    7    0.0000E+00    0.9709E+00
+    101   17    8    0.0000E+00    0.2911E-01
+    102   17    9    0.0000E+00    0.2911E-01
+    103   17   10    0.0000E+00    0.8967E-02
+    104   18    1    0.0000E+00    0.1000E+01
+    105   18    2    0.0000E+00    0.1000E+01
+    106   18    3    0.0000E+00    0.1000E+01
+    107   18    4    0.0000E+00    0.1000E+01
+    108   18    5    0.0000E+00    0.9911E+00
+    109   18    6    0.0000E+00    0.9709E+00
+    110   18    7    0.0000E+00    0.9709E+00
+    111   18    8    0.0000E+00    0.2911E-01
+    112   18    9    0.0000E+00    0.2911E-01
+    113   18   10    0.0000E+00    0.8967E-02
+    114   19    1    0.0000E+00    0.1000E+01
+    115   19    2    0.0000E+00    0.1000E+01
+    116   19    3    0.0000E+00    0.1000E+01
+    117   19    4    0.0000E+00    0.1000E+01
+    118   19    5    0.0000E+00    0.9911E+00
+    119   19    6    0.0000E+00    0.9709E+00
+    120   19    7    0.0000E+00    0.9709E+00
+    121   19    8    0.0000E+00    0.2911E-01
+    122   19    9    0.0000E+00    0.2911E-01
+    123   19   10    0.0000E+00    0.8967E-02
+    124   20    1    0.0000E+00    0.1000E+01
+    125   20    2    0.0000E+00    0.1000E+01
+    126   20    3    0.0000E+00    0.1000E+01
+    127   20    4    0.0000E+00    0.1000E+01
+    128   20    5    0.0000E+00    0.9911E+00
+    129   20    6    0.0000E+00    0.9709E+00
+    130   20    7    0.0000E+00    0.9709E+00
+    131   20    8    0.0000E+00    0.2911E-01
+    132   20    9    0.0000E+00    0.2911E-01
+    133   20   10    0.0000E+00    0.8967E-02
+    134   21    1    0.0000E+00    0.1000E+01
+    135   21    2    0.0000E+00    0.1000E+01
+    136   21    3    0.0000E+00    0.1000E+01
+    137   21    4    0.0000E+00    0.1000E+01
+    138   21    5    0.0000E+00    0.9911E+00
+    139   21    6    0.0000E+00    0.9709E+00
+    140   21    7    0.0000E+00    0.9709E+00
+    141   21    8    0.0000E+00    0.2911E-01
+    142   21    9    0.0000E+00    0.2911E-01
+    143   21   10    0.0000E+00    0.8967E-02
+    144   22    1    0.0000E+00    0.1000E+01
+    145   22    2    0.0000E+00    0.1000E+01
+    146   22    3    0.0000E+00    0.1000E+01
+    147   22    4    0.0000E+00    0.1000E+01
+    148   22    5    0.0000E+00    0.9911E+00
+    149   22    6    0.0000E+00    0.9709E+00
+    150   22    7    0.0000E+00    0.9709E+00
+    151   22    8    0.0000E+00    0.2911E-01
+    152   22    9    0.0000E+00    0.2911E-01
+    153   22   10    0.0000E+00    0.8967E-02
+    154   23    1    0.0000E+00    0.1000E+01
+    155   23    2    0.0000E+00    0.1000E+01
+    156   23    3    0.0000E+00    0.1000E+01
+    157   23    4    0.0000E+00    0.1000E+01
+    158   23    5    0.0000E+00    0.9911E+00
+    159   23    6    0.0000E+00    0.9709E+00
+    160   23    7    0.0000E+00    0.9709E+00
+    161   23    8    0.0000E+00    0.2911E-01
+    162   23    9    0.0000E+00    0.2911E-01
+    163   23   10    0.0000E+00    0.8967E-02
+    164   24    1    0.0000E+00    0.1000E+01
+    165   24    2    0.0000E+00    0.1000E+01
+    166   24    3    0.0000E+00    0.1000E+01
+    167   24    4    0.0000E+00    0.1000E+01
+    168   24    5    0.0000E+00    0.9911E+00
+    169   24    6    0.0000E+00    0.9709E+00
+    170   24    7    0.0000E+00    0.9709E+00
+    171   24    8    0.0000E+00    0.2911E-01
+    172   24    9    0.0000E+00    0.2911E-01
+    173   24   10    0.0000E+00    0.8967E-02
+    174   25    1    0.0000E+00    0.1000E+01
+    175   25    2    0.0000E+00    0.1000E+01
+    176   25    3    0.0000E+00    0.1000E+01
+    177   25    4    0.0000E+00    0.1000E+01
+    178   25    5    0.0000E+00    0.9911E+00
+    179   25    6    0.0000E+00    0.9709E+00
+    180   25    7    0.0000E+00    0.9709E+00
+    181   25    8    0.0000E+00    0.2911E-01
+    182   25    9    0.0000E+00    0.2911E-01
+    183   25   10    0.0000E+00    0.8967E-02
+    184   26    1    0.0000E+00    0.1000E+01
+    185   26    2    0.0000E+00    0.1000E+01
+    186   26    3    0.0000E+00    0.1000E+01
+    187   26    4    0.0000E+00    0.1000E+01
+    188   26    5    0.0000E+00    0.9911E+00
+    189   26    6    0.0000E+00    0.9709E+00
+    190   26    7    0.0000E+00    0.9709E+00
+    191   26    8    0.0000E+00    0.2911E-01
+    192   26    9    0.0000E+00    0.2911E-01
+    193   26   10    0.0000E+00    0.8967E-02
+    194   27    1    0.0000E+00    0.1000E+01
+    195   27    2    0.0000E+00    0.1000E+01
+    196   27    3    0.0000E+00    0.1000E+01
+    197   27    4    0.0000E+00    0.1000E+01
+    198   27    5    0.0000E+00    0.9911E+00
+    199   27    6    0.0000E+00    0.9709E+00
+    200   27    7    0.0000E+00    0.9709E+00
+    201   27    8    0.0000E+00    0.2911E-01
+    202   27    9    0.0000E+00    0.2911E-01
+    203   27   10    0.0000E+00    0.8967E-02
+    204   28    1    0.0000E+00    0.1000E+01
+    205   28    2    0.0000E+00    0.1000E+01
+    206   28    3    0.0000E+00    0.1000E+01
+    207   28    4    0.0000E+00    0.1000E+01
+    208   28    5    0.0000E+00    0.9911E+00
+    209   28    6    0.0000E+00    0.9709E+00
+    210   28    7    0.0000E+00    0.9709E+00
+    211   28    8    0.0000E+00    0.2911E-01
+    212   28    9    0.0000E+00    0.2911E-01
+    213   28   10    0.0000E+00    0.8967E-02
+
+ *** ADIABATIC CONNECTION CALCULATIONS ***
+
+
+ *** IFlCore=1: Inactive orbitals (n_p=1) included in ERPA correlation ***
+
+ XOne   51.1404002171444     
+ ERPA alpha=0 eigenproblems for NoSt=           1
+ act-act done
+ act-inact done
+ act-vir done
+
+ Active block of 2-RDM read from rdm2.dat
+ CASSCF 1-electron Energy       -194.43720915
+ CASSCF Energy (w/o ENuc)       -132.70451630
+ ABPLUS =   8.36539947155876     
+ ABMIN  =   394.737909088017     
+ EAll,Einta -0.155190288123546      -1.870579972353391E-017
+
+ Contributions to AC0 from (Mu)(Nu) pairs of blocks
+ (21)(21)    -0.00720443
+ (22)(21)    -0.00193357
+ (31)(21)    -0.00665898
+ (31)(22)    -0.01479356
+ (31)(31)    -0.01746074
+ (32)(21)    -0.03228585
+ (32)(22)    -0.00467422
+ (32)(31)    -0.02305164
+ (32)(32)    -0.04712730
+
+ ECASSCF+ENuc, AC0-Corr, AC0-CASSCF       -109.09005847    -0.15519029  -109.24524876
+
+ CPU  time in AC  model            is                4.279 s
+ Wall time in AC  model            is                0.554 s
+
+ CPU  time in AC0                  is               13.004 s
+ Wall time in AC0                  is                1.117 s
+ 
+ Max. memory allocated for LOGICAL:          0  b
+ Max. memory allocated for INTEGER:          0  b
+ Max. memory allocated for REAL:             0  b
