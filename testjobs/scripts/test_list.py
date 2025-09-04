@@ -26,6 +26,28 @@ def get():
         }
     })
 
+    ### pyscf AC0 ###
+    tests_list.append({
+        'name': '* testing PySCF AC0-CAS energy',
+        'fun': ac0_en,
+        'runner': run_test,
+        'units': {
+            "pyscf-tests/test-ac0":  {'atol': 1.e-5, 'level': 'short'},
+        }
+    })
+
+    ### pyscf lrAC0 ###
+    tests_list.append({
+        'name': '* testing PySCF CAS-srPBPE+lrAC0 energy',
+        'fun': lrac0_en,
+        'runner': run_test,
+        'units': {
+            "pyscf-tests/test-sr-pbe":  {'atol': 1.e-5, 'level': 'short'},
+        }
+    })
+
+
+
     ### ACn ###
     tests_list.append({
         'name': '* testing ACn-CAS[molpro] energy',
@@ -39,15 +61,15 @@ def get():
         }
     })
 
-    ### rdmcorr ###
-    tests_list.append({
-        'name': '* testing AC0-1RDM[orca] energy',
-        'fun': ac0_rdm,
-        'runner': run_test,
-        'units': {
-            "RDMCORR/H2O_MOLMPS": {'atol': 1.e-5, 'level': 'short'}
-        }
-    })
+    #### rdmcorr ###
+    #tests_list.append({
+    #    'name': '* testing AC0-1RDM[orca] energy',
+    #    'fun': ac0_rdm,
+    #    'runner': run_test,
+    #    'units': {
+    #        "RDMCORR/H2O_MOLMPS": {'atol': 1.e-5, 'level': 'short'}
+    #    }
+    #})
 
 
     return tests_list

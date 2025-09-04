@@ -22,6 +22,14 @@ def ac_en(file):
         S=s[a+75:a+89]
         return float(S)
 #
+def lrac0_en(file):
+    f=open(file,'r')
+    s=f.read()
+    f.close()
+    a=s.find(" lrCASSCF+srDF+ENuc, lrAC0-Corr, Total")
+    S=s[a+74:a+89]
+    return float(S)
+#
 def ac0_rdm(file):
         lines_below = 6
         target_phrase="AC0-correlated natural occupation numbers"

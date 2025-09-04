@@ -77,7 +77,7 @@ if no_failed == 0:
     print(f"*** SUCCESS ***")
     print(f"\n===============================================")
     # DELETE UNNECESSARY FILES
-    patterns = ["FOFO", "FFOO", "fock.dat", "fort*"]    
+    patterns = ["FOFO", "FFOO", "fock.dat", "fort*" "cholvecs"]
     for test in test_list.get():
         for path in test['units'] :
             for pattern in patterns:

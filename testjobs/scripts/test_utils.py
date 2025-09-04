@@ -37,15 +37,22 @@ def modify_input(units,BasisPath):
     index = BasisPath.rfind(substring)
     if index != -1:
         BasisPath = BasisPath[:index] + BasisPath[index + len(substring):]
+        BasisPySCFPath = BasisPath
     BasisPath+="basis/"
+    BasisPySCFPath+="bazy-do-pyscf/"
 
     for unit in units:
       filename=unit['name']+"/input.inp"
 
       if check_word_in_file(filename,"BasisPath"):
-         print(filename,BasisPath)
-         remove_text_from_line(filename,"BasisPath")
-         append_string_to_line(filename,"BasisPath",BasisPath)
+         if check_word_in_file(filename,"PYSCF"):
+            print(filename,BasisPath)
+            remove_text_from_line(filename,"BasisPath")
+            append_string_to_line(filename,"BasisPath",BasisPySCFPath)
+         else:
+            print(filename,BasisPath)
+            remove_text_from_line(filename,"BasisPath")
+            append_string_to_line(filename,"BasisPath",BasisPath)
 
 def check_word_in_file(filename, word):
     with open(filename, 'r') as file:

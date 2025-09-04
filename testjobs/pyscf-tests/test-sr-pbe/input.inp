@@ -1,5 +1,5 @@
 Calculation
- BasisPath /home/aleksandra.tucholska/test/gammcor/bazy-do-pyscf/
+ BasisPath /home/michalhapka/pr-dmft/bazy-do-pyscf/
  JobTitle   POSTCAS-LR
  Interface  PYSCF
  JobType  AC0
