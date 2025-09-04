@@ -535,10 +535,10 @@ if(Flags%ISAPT.Eq.0) then
   
    System%Max_Cn = Input%CalcParams%Max_Cn
    System%NFreqOm = Input%CalcParams%NFreqOm
-   if (System%NFreqOm.gt.0)then
-         Allocate(System%FreqOm(System%NFreqOm))
-         System%FreqOm = Input%CalcParams%FreqOm
-   end if
+   if (allocated(Input%CalcParams%FreqOm)) then
+   allocate(System%FreqOm(System%NFreqOm))
+   System%FreqOm = Input%CalcParams%FreqOm
+   endif
 
    System%XELE = (System%ZNucl - System%Charge)/2.0d0
    System%NELE = (System%ZNucl - System%Charge)/2
