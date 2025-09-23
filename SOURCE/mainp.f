@@ -494,7 +494,7 @@ C     Delete out-of-core integrals
 C
       Call free_System(System)
       Call gclock(PossibleJobType(Flags%JobType),Tcpu,Twall)
-      call mem_report
+c     call mem_report
 C      Stop
       End
 C

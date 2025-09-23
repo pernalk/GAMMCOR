@@ -175,9 +175,9 @@ twojfile = 'FFOO'
 twokfile = 'FOFO'
 IntKFile = twokfile
 
-!allocate(ABPLUS1(NDimX*NDimX),ABMIN1(NDimX*NDimX))
-call mem_alloc(ABPLUS1,NDimX*NDimX)
-call mem_alloc(ABMIN1,NDimX*NDimX)
+allocate(ABPLUS1(NDimX*NDimX),ABMIN1(NDimX*NDimX))
+!call mem_alloc(ABPLUS1,NDimX*NDimX)
+!call mem_alloc(ABMIN1,NDimX*NDimX)
 
 if(NAct==1) then
   ! active-virtual block
@@ -211,8 +211,8 @@ call add_blk_right(ABMIN1, A0Block,A0BlockIV,-1d0,.true., nblk,NDimX)
 !print*, 'add_blk_right: ABMIN1 ',norm2(ABMIN1)
 
 !Calc: A1=ABPLUS0*ABMIN1+ABPLUS1*ABMIN0
-!allocate(A1(NDimX*NDimX))
-call mem_alloc(A1,NDimX*NDimX)
+allocate(A1(NDimX*NDimX))
+!call mem_alloc(A1,NDimX*NDimX)
 call ABPM_HALFTRAN_GEN_L(ABMIN1, A1,0.0d0,A0Block,A0BlockIV,nblk,NDimX,NDimX,'Y')
 call ABPM_HALFTRAN_GEN_R(ABPLUS1,A1,1.0d0,A0Block,A0BlockIV,nblk,NDimX,NDimX,'X')
 !print*, 'A1',norm2(A1)
@@ -220,13 +220,13 @@ call ABPM_HALFTRAN_GEN_R(ABPLUS1,A1,1.0d0,A0Block,A0BlockIV,nblk,NDimX,NDimX,'X'
 EGOne(1)=ECASSCF
 
 !Calc: APLUS0Tilde=ABPLUS0.DChol
-!allocate(APLUS0Tilde(NDimX*NCholesky))
-call mem_alloc(APLUS0Tilde,NDimX*NCholesky)
+allocate(APLUS0Tilde(NDimX*NCholesky))
+!call mem_alloc(APLUS0Tilde,NDimX*NCholesky)
 call ABPM_HALFTRAN_GEN_L(DCholT,APLUS0Tilde,0.0d0,A0Block,A0BlockIV,nblk,NDimX,NCholesky,'Y')
 
 !Calc: APLUS1Tilde=ABPLUS1.DChol
-!allocate(APLUS1Tilde(NDimX*NCholesky))
-call mem_alloc(APLUS1Tilde,NDimX*NCholesky)
+allocate(APLUS1Tilde(NDimX*NCholesky))
+!call mem_alloc(APLUS1Tilde,NDimX*NCholesky)
 Call dgemm('N','N',NDimX,NCholesky,NDimX,1d0,ABPLUS1,NDimX,DCholT,NDimX,0.0d0,APLUS1Tilde,NDimX)
 
 deallocate(A0block)
@@ -242,17 +242,17 @@ Call AC0BLOCK(Occ,URe,XOne, &
      NDimX,NBasis,NDimX,NInte1,'FFOO','FOFO', &
      ICholesky,A0BlockIV,A0Block,nblk,1,'A0BLK',0)
 
-!allocate(COMTilde(NDimX*NCholesky))
-call mem_alloc(COMTilde,NDimX*NCholesky)
+allocate(COMTilde(NDimX*NCholesky))
+!call mem_alloc(COMTilde,NDimX*NCholesky)
 COMTilde=0.0
 
-!allocate(C0Tilde(NDimX*NCholesky),C1Tilde(NDimX*NCholesky),C2Tilde(NDimX*NCholesky),WORK0(NDimX*NCholesky))
-!allocate(WORK1(NDimX*NCholesky))
-call mem_alloc(C0Tilde,NDimX*NCholesky)
-call mem_alloc(C1Tilde,NDimX*NCholesky)
-call mem_alloc(C2Tilde,NDimX*NCholesky)
-call mem_alloc(WORK0,NDimX*NCholesky)
-call mem_alloc(WORK1,NDimX*NCholesky)
+allocate(C0Tilde(NDimX*NCholesky),C1Tilde(NDimX*NCholesky),C2Tilde(NDimX*NCholesky),WORK0(NDimX*NCholesky))
+allocate(WORK1(NDimX*NCholesky))
+!call mem_alloc(C0Tilde,NDimX*NCholesky)
+!call mem_alloc(C1Tilde,NDimX*NCholesky)
+!call mem_alloc(C2Tilde,NDimX*NCholesky)
+!call mem_alloc(WORK0,NDimX*NCholesky)
+!call mem_alloc(WORK1,NDimX*NCholesky)
 allocate(Lambda(nblk))
 associate(A => A0BlockIV, L => LambdaIV)
   L%n = A%n
@@ -309,19 +309,18 @@ Do IGL=1,NGrid
    If(IGL.Eq.1) ErrMax=XNorm1
 EndDo
 
-!deallocate(A1,WORK0,C0Tilde,C1Tilde,C2Tilde,Lambda,APLUS0Tilde,APLUS1Tilde)
-!deallocate(ABMIN1,ABPLUS1,WORK1)
-deallocate(Lambda)
-call mem_dealloc(WORK1)
-call mem_dealloc(WORK0)
-call mem_dealloc(C2tilde)
-call mem_dealloc(C1tilde)
-call mem_dealloc(C0tilde)
-call mem_dealloc(A1)
-call mem_dealloc(APLUS0Tilde)
-call mem_dealloc(APLUS1Tilde)
-call mem_dealloc(ABMIN1)
-call mem_dealloc(ABPLUS1)
+deallocate(A1,WORK0,C0Tilde,C1Tilde,C2Tilde,Lambda,APLUS0Tilde,APLUS1Tilde)
+deallocate(ABMIN1,ABPLUS1,WORK1)
+!call mem_dealloc(WORK1)
+!call mem_dealloc(WORK0)
+!call mem_dealloc(C2tilde)
+!call mem_dealloc(C1tilde)
+!call mem_dealloc(C0tilde)
+!call mem_dealloc(A1)
+!call mem_dealloc(APLUS0Tilde)
+!call mem_dealloc(APLUS1Tilde)
+!call mem_dealloc(ABMIN1)
+!call mem_dealloc(ABPLUS1)
 
 !allocate(WorkD(NDimX,NCholesky))
 call mem_alloc(WorkD,NDimX,NCholesky)
@@ -334,9 +333,9 @@ do j=1,NDimX
    enddo
 enddo
 
-!deallocate(WorkD,COMTilde)
-call mem_dealloc(WorkD)
-call mem_dealloc(COMTilde)
+deallocate(WorkD,COMTilde)
+!call mem_dealloc(WorkD)
+!call mem_dealloc(COMTilde)
 
 Call RELEASE_AC0BLOCK(A0Block,A0blockIV,nblk)
 
