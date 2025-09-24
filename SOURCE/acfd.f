@@ -276,8 +276,16 @@ C
       If(IFunSR.Eq.0) Then
 
 !PRINT CONTRIBUTIONS TO AC ECorr FROM BLOCKS
+      If(ITwoEl.Ne.1) Then
+C
+      NOccup=0
+      Do I=1,NBAsis
+      If(Occ(I).Gt.Zero) NOccup=NOccup+1
+      EndDo
+      NoVirt=1
+      If(NOccup.Eq.NBasis) NoVirt=0
       Sum=Zero
-      Write(6,'(X,
+      Write(6,'(/,X,
      $ "Contributions to AC from (Mu)(Nu) pairs of blocks")')
       Write(6,'(X,
      $ "1:inactive 2:active 3:virtual")') 
@@ -285,21 +293,21 @@ C
       Do I=1,NGem
       Do J=1,I
       IJ=IJ+1
-! NGem=3 case
-      If(NGem.Eq.3) Then
-       IOO=0
-       If(IGemNo(IJ,1).Eq.1.And.IGemNo(IJ,2).Eq.1) IOO=1
-       IVV=0
-       If(IGemNo(IJ,1).Eq.3.And.IGemNo(IJ,2).Eq.3) IVV=1
-       IAA1=0
-       If(IGemNo(IJ,1).Eq.2.And.IGemNo(IJ,2).Eq.2) IAA1=1
+! NGem=3 case or zero virtual orbitals case
+      If(NGem.Eq.3.Or.(NGem.Eq.2.And.NoVirt.Eq.0)) Then
+          IOO=0
+          If(IGemNo(IJ,1).Eq.1.And.IGemNo(IJ,2).Eq.1) IOO=1
+          IVV=0
+          If(IGemNo(IJ,1).Eq.3.And.IGemNo(IJ,2).Eq.3) IVV=1
+          IAA1=0
+          If(IGemNo(IJ,1).Eq.2.And.IGemNo(IJ,2).Eq.2) IAA1=1
+      ElseIf(NGem.Eq.2.And.NoVirt.Ne.0) Then
 ! NGem=2 case (zero inactive orbitals)
-      ElseIf(NGem.Eq.2) Then
-       IOO=0
-       IVV=0
-       If(IGemNo(IJ,1).Eq.2.And.IGemNo(IJ,2).Eq.2) IVV=1
-       IAA1=0
-       If(IGemNo(IJ,1).Eq.1.And.IGemNo(IJ,2).Eq.1) IAA1=1
+          IOO=0
+          IVV=0
+          If(IGemNo(IJ,1).Eq.2.And.IGemNo(IJ,2).Eq.2) IVV=1
+          IAA1=0
+          If(IGemNo(IJ,1).Eq.1.And.IGemNo(IJ,2).Eq.1) IAA1=1
       EndIf
 
       If(IVV==0.And.IOO==0) Then
@@ -307,14 +315,14 @@ C
       Do K=1,NGem
       Do L=1,K
          KL=KL+1
-         If(NGem.Eq.3) Then
+         If(NGem.Eq.3.Or.(NGem.Eq.2.And.NoVirt.Eq.0)) Then
              IOO=0
              If(IGemNo(KL,1).Eq.1.And.IGemNo(KL,2).Eq.1) IOO=1
              IVV=0
              If(IGemNo(KL,1).Eq.3.And.IGemNo(KL,2).Eq.3) IVV=1
              IAA2=0
              If(IGemNo(KL,1).Eq.2.And.IGemNo(KL,2).Eq.2) IAA2=1
-         ElseIf(NGem.Eq.2) Then
+         ElseIf(NGem.Eq.2.And.NoVirt.Ne.0) Then
              IOO=0
              IVV=0
              If(IGemNo(KL,1).Eq.2.And.IGemNo(KL,2).Eq.2) IVV=1
@@ -336,8 +344,11 @@ C
       EndDo
       EndDo
       Write
-     $ (6,'(X,''Sum of contributions: '',4X,F15.8)')Sum
-
+     $ (6,'(X,''Sum of contributions: '',4X,F15.8,/)')Sum
+C
+C     If (ITwoEl.Ne.1)
+      EndIf
+C
       If(IVEMB.Eq.1) Write (6,'(2/,1X,
      $ '' ** DMRG-in-DFT ** Correlation energy = numerical AC0 !!!'')')
       Write
