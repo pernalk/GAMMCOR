@@ -175,9 +175,9 @@ twojfile = 'FFOO'
 twokfile = 'FOFO'
 IntKFile = twokfile
 
-!allocate(ABPLUS1(NDimX*NDimX),ABMIN1(NDimX*NDimX))
-call mem_alloc(ABPLUS1,NDimX*NDimX)
-call mem_alloc(ABMIN1,NDimX*NDimX)
+allocate(ABPLUS1(NDimX*NDimX),ABMIN1(NDimX*NDimX))
+!call mem_alloc(ABPLUS1,NDimX*NDimX)
+!call mem_alloc(ABMIN1,NDimX*NDimX)
 
 if(NAct==1) then
   ! active-virtual block
@@ -211,8 +211,8 @@ call add_blk_right(ABMIN1, A0Block,A0BlockIV,-1d0,.true., nblk,NDimX)
 !print*, 'add_blk_right: ABMIN1 ',norm2(ABMIN1)
 
 !Calc: A1=ABPLUS0*ABMIN1+ABPLUS1*ABMIN0
-!allocate(A1(NDimX*NDimX))
-call mem_alloc(A1,NDimX*NDimX)
+allocate(A1(NDimX*NDimX))
+!call mem_alloc(A1,NDimX*NDimX)
 call ABPM_HALFTRAN_GEN_L(ABMIN1, A1,0.0d0,A0Block,A0BlockIV,nblk,NDimX,NDimX,'Y')
 call ABPM_HALFTRAN_GEN_R(ABPLUS1,A1,1.0d0,A0Block,A0BlockIV,nblk,NDimX,NDimX,'X')
 !print*, 'A1',norm2(A1)
@@ -220,13 +220,13 @@ call ABPM_HALFTRAN_GEN_R(ABPLUS1,A1,1.0d0,A0Block,A0BlockIV,nblk,NDimX,NDimX,'X'
 EGOne(1)=ECASSCF
 
 !Calc: APLUS0Tilde=ABPLUS0.DChol
-!allocate(APLUS0Tilde(NDimX*NCholesky))
-call mem_alloc(APLUS0Tilde,NDimX*NCholesky)
+allocate(APLUS0Tilde(NDimX*NCholesky))
+!call mem_alloc(APLUS0Tilde,NDimX*NCholesky)
 call ABPM_HALFTRAN_GEN_L(DCholT,APLUS0Tilde,0.0d0,A0Block,A0BlockIV,nblk,NDimX,NCholesky,'Y')
 
 !Calc: APLUS1Tilde=ABPLUS1.DChol
-!allocate(APLUS1Tilde(NDimX*NCholesky))
-call mem_alloc(APLUS1Tilde,NDimX*NCholesky)
+allocate(APLUS1Tilde(NDimX*NCholesky))
+!call mem_alloc(APLUS1Tilde,NDimX*NCholesky)
 Call dgemm('N','N',NDimX,NCholesky,NDimX,1d0,ABPLUS1,NDimX,DCholT,NDimX,0.0d0,APLUS1Tilde,NDimX)
 
 deallocate(A0block)
@@ -242,17 +242,17 @@ Call AC0BLOCK(Occ,URe,XOne, &
      NDimX,NBasis,NDimX,NInte1,'FFOO','FOFO', &
      ICholesky,A0BlockIV,A0Block,nblk,1,'A0BLK',0)
 
-!allocate(COMTilde(NDimX*NCholesky))
-call mem_alloc(COMTilde,NDimX*NCholesky)
+allocate(COMTilde(NDimX*NCholesky))
+!call mem_alloc(COMTilde,NDimX*NCholesky)
 COMTilde=0.0
 
-!allocate(C0Tilde(NDimX*NCholesky),C1Tilde(NDimX*NCholesky),C2Tilde(NDimX*NCholesky),WORK0(NDimX*NCholesky))
-!allocate(WORK1(NDimX*NCholesky))
-call mem_alloc(C0Tilde,NDimX*NCholesky)
-call mem_alloc(C1Tilde,NDimX*NCholesky)
-call mem_alloc(C2Tilde,NDimX*NCholesky)
-call mem_alloc(WORK0,NDimX*NCholesky)
-call mem_alloc(WORK1,NDimX*NCholesky)
+allocate(C0Tilde(NDimX*NCholesky),C1Tilde(NDimX*NCholesky),C2Tilde(NDimX*NCholesky),WORK0(NDimX*NCholesky))
+allocate(WORK1(NDimX*NCholesky))
+!call mem_alloc(C0Tilde,NDimX*NCholesky)
+!call mem_alloc(C1Tilde,NDimX*NCholesky)
+!call mem_alloc(C2Tilde,NDimX*NCholesky)
+!call mem_alloc(WORK0,NDimX*NCholesky)
+!call mem_alloc(WORK1,NDimX*NCholesky)
 allocate(Lambda(nblk))
 associate(A => A0BlockIV, L => LambdaIV)
   L%n = A%n
@@ -309,19 +309,18 @@ Do IGL=1,NGrid
    If(IGL.Eq.1) ErrMax=XNorm1
 EndDo
 
-!deallocate(A1,WORK0,C0Tilde,C1Tilde,C2Tilde,Lambda,APLUS0Tilde,APLUS1Tilde)
-!deallocate(ABMIN1,ABPLUS1,WORK1)
-deallocate(Lambda)
-call mem_dealloc(WORK1)
-call mem_dealloc(WORK0)
-call mem_dealloc(C2tilde)
-call mem_dealloc(C1tilde)
-call mem_dealloc(C0tilde)
-call mem_dealloc(A1)
-call mem_dealloc(APLUS0Tilde)
-call mem_dealloc(APLUS1Tilde)
-call mem_dealloc(ABMIN1)
-call mem_dealloc(ABPLUS1)
+deallocate(A1,WORK0,C0Tilde,C1Tilde,C2Tilde,Lambda,APLUS0Tilde,APLUS1Tilde)
+deallocate(ABMIN1,ABPLUS1,WORK1)
+!call mem_dealloc(WORK1)
+!call mem_dealloc(WORK0)
+!call mem_dealloc(C2tilde)
+!call mem_dealloc(C1tilde)
+!call mem_dealloc(C0tilde)
+!call mem_dealloc(A1)
+!call mem_dealloc(APLUS0Tilde)
+!call mem_dealloc(APLUS1Tilde)
+!call mem_dealloc(ABMIN1)
+!call mem_dealloc(ABPLUS1)
 
 !allocate(WorkD(NDimX,NCholesky))
 call mem_alloc(WorkD,NDimX,NCholesky)
@@ -334,9 +333,9 @@ do j=1,NDimX
    enddo
 enddo
 
-!deallocate(WorkD,COMTilde)
-call mem_dealloc(WorkD)
-call mem_dealloc(COMTilde)
+deallocate(WorkD,COMTilde)
+!call mem_dealloc(WorkD)
+!call mem_dealloc(COMTilde)
 
 Call RELEASE_AC0BLOCK(A0Block,A0blockIV,nblk)
 
@@ -1984,166 +1983,6 @@ associate(B => Eblock(1))
 end associate
 
 end subroutine pack_A0block
-
-subroutine Polariz(FreqOm,UNOAO,XOne,URe,Occ,&
-   IGem,NAct,INActive,NElecBEmb,NELE,&
-   NBasis,NInte1,NGem,IndAux,&
-   IndN,IndX,NDimX,ICholesky)
-!
-! Returns dynamic polarizability tensor for a given frequency
-! find C(omega) by inversion
-!
-use abfofo
-
-implicit none
-integer,intent(in) :: NBasis,NInte1,NGem,NDimX
-integer,intent(in) :: NAct,INActive,NElecBEmb,NELE
-integer,intent(in) :: IndN(2,NDimX),IndX(NDimX),IndAux(NBasis),IGem(NBasis)
-double precision,intent(in) :: FreqOm,UNOAO(NBasis,NBasis),URe(NBasis,NBasis),Occ(NBasis),XONe(NInte1)
-double precision :: DipX(NBasis,NBasis),DipY(NBasis,NBasis),DipZ(NBasis,NBasis),CICoef(NBasis)
-double precision :: DipCX(NDimX),DipCY(NDimX),DipCZ(NDimX)
-double precision :: ipiv(NDimX),ABPLUS(NDimX*NDimX),ABMIN(NDimX*NDimX),AIN(NDimX*NDimX),CMAT(NDimX*NDimX)
-double precision :: ECASSCF,AXX,AYX,AXY,AZX,AXZ,AYY,AZY,AYZ,AZZ,Om,ddot,Alpha
-character(:),allocatable :: twojfile,twokfile
-integer :: I,J,IJ,inf,ICholesky,NOccup
-
-Om=FreqOm
-
-NOccup=NAct+INActive
-Call ComputeDipoleMom(UNOAO,Occ,'DIP','AOONEINT.mol',NOccup,NBasis)
-
-Call ReadDip(DipX,DipY,DipZ,UNOAO,'DIP',NBasis)
-
-do i=1,NBasis
-CICoef(i) = sign(sqrt(Occ(i)),Occ(i)-0.5d0)
-enddo
-
-Do IJ=1,NDimX
-  I=IndN(1,IJ)
-  J=IndN(2,IJ)
-  DipCX(IndX(IJ))=(CICoef(I)+CICoef(J))*DipX(I,J)
-  DipCY(IndX(IJ))=(CICoef(I)+CICoef(J))*DipY(I,J)
-  DipCZ(IndX(IJ))=(CICoef(I)+CICoef(J))*DipZ(I,J)
-Enddo
-
-twojfile = 'FFOO'
-twokfile = 'FOFO'
-
-Alpha=1.0
-Call AB_CAS_FOFO(ABPLUS,ABMIN,ECASSCF,URe,Occ,XOne, &
-              IndN,IndX,IGem,NAct,INActive,NElecBEmb,&
-              NDimX,NBasis,NDimX,&
-              NInte1,twojfile,twokfile,ICholesky,0,Alpha,.false.)
-AIN=0d0
-Do I=1,NDimX
-    AIN((I-1)*NDimX+I)=1.0
-EndDo
-!  ABPLUS*ABMIN - 1 Om^2
-Call dgemm('N','N',NDimX,NDimX,NDimX,1d0,ABPLUS,NDimX,&
-           ABMIN,NDimX,-Om**2,AIN,NDimX)
-CMAT=0.5d0*ABPLUS
-Call dgesv(NDimX,NDimX,AIN,NDimX,ipiv,CMAT,NDimX,inf)
-
-! contract CMAT with dipole moment vectors
-Call dgemv('N',NDimX,NDimX,1.d0,CMAT,NDimx,DipCX,1,0.d0,ipiv,1)
-
-AYX=8.d0*ddot(NDimx,DipCY,1,ipiv,1)
-AZX=8.d0*ddot(NDimx,DipCZ,1,ipiv,1)
-AXX=8.d0*ddot(NDimx,DipCX,1,ipiv,1)
-
-Call dgemv('N',NDimX,NDimX,1.d0,CMAT,NDimx,DipCY,1,0.d0,ipiv,1)
-AXY=8.d0*ddot(NDimx,DipCX,1,ipiv,1)
-AZY=8.d0*ddot(NDimx,DipCZ,1,ipiv,1)
-AYY=8.d0*ddot(NDimx,DipCY,1,ipiv,1)
-
-Call dgemv('N',NDimX,NDimX,1.d0,CMAT,NDimx,DipCZ,1,0.d0,ipiv,1)
-AXZ=8.d0*ddot(NDimx,DipCX,1,ipiv,1)
-AYZ=8.d0*ddot(NDimx,DipCY,1,ipiv,1)
-AZZ=8.d0*ddot(NDimx,DipCZ,1,ipiv,1)
-
-Write(6,'(/,X,''Polarizability tensor for frequency '',F8.4)') Om
-Write(6,'(/,X,''XX   XY   XZ  '',3F15.8)') AXX, AXY, AXZ
-Write(6,'(X,''YX   YY   YZ  '',3F15.8)') AYX, AYY, AYZ
-Write(6,'(X,''ZX   ZY   ZZ  '',3F15.8,2/)') AZX, AZY, AZZ
-
-end subroutine Polariz
-
-subroutine PolarizAl(FreqOm,UNOAO,XOne,URe,Occ,&
-   IGem,NAct,INActive,NElecBEmb,NELE,NBasis,NInte1,NGem,IndAux,&
-   IndN,IndX,NDimX,ICholesky,Max_Cn)
-!
-! Returns dynamic polarizability tensor for a given frequency FreqOm
-! find C(omega) by expanding around Alpha=0 with a tolerance Eps or
-! up to maximal order Max_Cn
-!
-use abfofo
-
-implicit none
-integer,intent(in) :: NBasis,NInte1,NGem,NDimX,Max_cn
-integer,intent(in) :: NAct,INActive,NElecBEmb,NELE
-integer,intent(in) :: IndN(2,NDimX),IndX(NDimX),IndAux(NBasis),IGem(NBasis)
-double precision,intent(in) :: FreqOm,UNOAO(NBasis,NBasis),URe(NBasis,NBasis),Occ(NBasis),XOne(NInte1)
-double precision :: DipX(NBasis,NBasis),DipY(NBasis,NBasis),DipZ(NBasis,NBasis),CICoef(NBasis)
-double precision :: DipCX(NDimX),DipCY(NDimX),DipCZ(NDimX)
-double precision :: ipiv(NDimX)
-double precision :: ECASSCF,AXX,AYX,AXY,AZX,AXZ,AYY,AZY,AYZ,AZZ,Om,ddot,Alpha
-character(:),allocatable :: twojfile,twokfile
-integer :: I,J,IJ,inf,ICholesky,NOccup
-
-Om=FreqOm
-
-NOccup=NAct+INActive
-Call ComputeDipoleMom(UNOAO,Occ,'DIP','AOONEINT.mol',NOccup,NBasis)
-
-Call ReadDip(DipX,DipY,DipZ,UNOAO,'DIP',NBasis)
-
-do i=1,NBasis
-CICoef(i) = sign(sqrt(Occ(i)),Occ(i)-0.5d0)
-enddo
-
-Do IJ=1,NDimX
-  I=IndN(1,IJ)
-  J=IndN(2,IJ)
-  DipCX(IndX(IJ))=(CICoef(I)+CICoef(J))*DipX(I,J)
-  DipCY(IndX(IJ))=(CICoef(I)+CICoef(J))*DipY(I,J)
-  DipCZ(IndX(IJ))=(CICoef(I)+CICoef(J))*DipZ(I,J)
-Enddo
-
-Call CFREQPROJ(ipiv,Om,DipCX,1, &
-   Max_Cn,XOne,URe,Occ,&
-   IGem,NAct,INActive,NElecBEmb,&
-   NBasis,NInte1,IndAux,&
-   ICholesky,IndN,IndX,NDimX)
-
-AYX=8.d0*ddot(NDimx,DipCY,1,ipiv,1)
-AZX=8.d0*ddot(NDimx,DipCZ,1,ipiv,1)
-AXX=8.d0*ddot(NDimx,DipCX,1,ipiv,1)
-
-Call CFREQPROJ(ipiv,Om,DipCY,1, &
-   Max_Cn,XOne,URe,Occ,&
-   IGem,NAct,INActive,NElecBEmb,&
-   NBasis,NInte1,IndAux,&
-   ICholesky,IndN,IndX,NDimX)
-
-AXY=8.d0*ddot(NDimx,DipCX,1,ipiv,1)
-AZY=8.d0*ddot(NDimx,DipCZ,1,ipiv,1)
-AYY=8.d0*ddot(NDimx,DipCY,1,ipiv,1)
-
-Call CFREQPROJ(ipiv,Om,DipCZ,1, &
-   Max_Cn,XOne,URe,Occ,&
-   IGem,NAct,INActive,NElecBEmb,&
-   NBasis,NInte1,IndAux,&
-   ICholesky,IndN,IndX,NDimX)
-AXZ=8.d0*ddot(NDimx,DipCX,1,ipiv,1)
-AYZ=8.d0*ddot(NDimx,DipCY,1,ipiv,1)
-AZZ=8.d0*ddot(NDimx,DipCZ,1,ipiv,1)
-
-Write(6,'(/,X,''Polarizability tensor for frequency '',F8.4)') Om
-Write(6,'(/,X,''XX   XY   XZ  '',3F15.8)') AXX, AXY, AXZ
-Write(6,'(X,''YX   YY   YZ  '',3F15.8)') AYX, AYY, AYZ
-Write(6,'(X,''ZX   ZY   ZZ  '',3F15.8,2/)') AZX, AZY, AZZ
-
-end subroutine PolarizAl
 
 subroutine CFREQPROJ(COMTilde,OmI,DProj,NProj, &
    Max_Cn,XOne,URe,Occ,&

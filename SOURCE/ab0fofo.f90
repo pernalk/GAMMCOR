@@ -491,7 +491,6 @@ double precision,allocatable :: MatFF(:,:)
 ! analysis of AC0
 double precision :: ECorrIJ(6,6),EE
 integer          :: NGem,IGIJ(4,4),IGemNo(6,2),IOO,IVV,IAA1,IAA2
-!
 
 type(EblockData),allocatable :: Eblock(:)
 type(EblockData) :: EblockIV
@@ -577,10 +576,12 @@ allocate(Eblock(1+NBasis-NAct))
 
 nblk = 0
 
+write(*,*)'ERPA alpha=0 eigenproblems for NoSt=',NoSt
 !pack AA
 if(nAA>0) then
    nblk = nblk + 1
    call pack_Eblock(ABPLUS,ABMIN,nAA,limAA(1),limAA(2),tmpAA,Eblock(nblk),NoSt,NDimX)
+   write(*,*)'act-act done' 
 endif
 !pack AI
 do iq=1,INActive
@@ -590,6 +591,7 @@ do iq=1,INActive
                        Eblock(nblk),NoSt,NDimX)
    endif
 enddo
+write(*,*)'act-inact done' 
 !pack AV
 do ip=NOccup+1,NBasis
    if(nAV(ip)>0) then
@@ -598,6 +600,7 @@ do ip=NOccup+1,NBasis
                        Eblock(nblk),NoSt,NDimX)
     endif
 enddo
+write(*,*) 'act-vir done' 
 !pack IV
 associate(B => EblockIV)
 
@@ -644,6 +647,8 @@ do iblk=1,nblk
    associate(B => Eblock(iblk))
 
      Eig(B%l1:B%l2) = B%vec(1:B%n)
+!     write(*,*)'block=',iblk
+!     write(*,*)'eigvals',(eig(i),i=B%l1,B%l2) 
 
    end associate
 enddo
@@ -746,252 +751,255 @@ if(ICholesky==0) then
 
 elseif(ICholesky==1) then
 
-   if(IDBBSC/=2) then
+   !if(IDBBSC/=2) then
 
-   ! read cholesky (FF|K) vectors
-   open(newunit=iunit,file='cholvecs',form='unformatted')
-   read(iunit) NCholesky
-   allocate(MatFF(NCholesky,NBasis**2))
-   read(iunit) MatFF
-   close(iunit)
+   call AC0EneOTF_FOFO(EAll,EIntra,ECorrIJ,ABPLUS,C,IGemIN,IndN,IndX, &
+                       INActive,NAct,NDimX,NBasis,IDBBSC)
 
-   !! dump Gamma^corr
-   !open(newunit=iunit,file='rdmcorr',form='unformatted')
-   Print*, 'ABPLUS-energy corr=',norm2(ABPLUS)
+   !! read cholesky (FF|K) vectors
+   !open(newunit=iunit,file='cholvecs',form='unformatted')
+   !read(iunit) NCholesky
+   !allocate(MatFF(NCholesky,NBasis**2))
+   !read(iunit) MatFF
+   !close(iunit)
 
-   ! set number of loops over integrals
-   dimFO = NOccup*NBasis
-   nloop = (dimFO - 1) / MaxBatchSize + 1
+   !!! dump Gamma^corr
+   !!open(newunit=iunit,file='rdmcorr',form='unformatted')
+   !Print*, 'ABPLUS-energy corr=',norm2(ABPLUS)
 
-   allocate(work(dimFO,MaxBatchSize))
+   !! set number of loops over integrals
+   !dimFO = NOccup*NBasis
+   !nloop = (dimFO - 1) / MaxBatchSize + 1
 
-   off = 0
-   k   = 0
-   l   = 1
-   ! exchange loop (FO|FO)
-   do iloop=1,nloop
+   !allocate(work(dimFO,MaxBatchSize))
 
-      ! batch size for each iloop; last one is smaller
-      BatchSize = min(MaxBatchSize,dimFO-off)
+   !off = 0
+   !k   = 0
+   !l   = 1
+   !! exchange loop (FO|FO)
+   !do iloop=1,nloop
 
-      ! assemble (FO|BatchSize) batch from CholVecs
-      call dgemm('T','N',dimFO,BatchSize,NCholesky,1d0,MatFF,NCholesky, &
-                 MatFF(:,off+1:off+BatchSize),NCholesky,0d0,work,dimFO)
+   !   ! batch size for each iloop; last one is smaller
+   !   BatchSize = min(MaxBatchSize,dimFO-off)
 
-      ! loop over integrals
-      do iBatch=1,BatchSize
+   !   ! assemble (FO|BatchSize) batch from CholVecs
+   !   call dgemm('T','N',dimFO,BatchSize,NCholesky,1d0,MatFF,NCholesky, &
+   !              MatFF(:,off+1:off+BatchSize),NCholesky,0d0,work,dimFO)
 
-         k = k + 1
-         if(k>NBasis) then
-            k = 1
-            l = l + 1
-         endif
+   !   ! loop over integrals
+   !   do iBatch=1,BatchSize
 
-         if(pos(k,l)==0) cycle
-         ir = k
-         is = l
-         irs = pos(k,l)
+   !      k = k + 1
+   !      if(k>NBasis) then
+   !         k = 1
+   !         l = l + 1
+   !      endif
 
-         do j=1,NOccup
-            do i=1,NBasis
-               ints(i,j) = work((j-1)*NBasis+i,iBatch)
-            enddo
-         enddo
+   !      if(pos(k,l)==0) cycle
+   !      ir = k
+   !      is = l
+   !      irs = pos(k,l)
 
-         if(l>NOccup) cycle
-         ints(:,NOccup+1:NBasis) = 0
+   !      do j=1,NOccup
+   !         do i=1,NBasis
+   !            ints(i,j) = work((j-1)*NBasis+i,iBatch)
+   !         enddo
+   !      enddo
 
-         do j=1,NBasis
-            do i=1,j
-               if(pos(j,i)/=0) then
-                 ipq = pos(j,i)
-                 ip = j
-                 iq = i
-                 Crs = C(ir)+C(is)
-                 Cpq = C(ip)+C(iq)
+   !      if(l>NOccup) cycle
+   !      ints(:,NOccup+1:NBasis) = 0
 
-                 Aux = Crs*Cpq*ABPLUS(ipq,irs)
-                 EAll = EAll + Aux*ints(j,i)
+   !      do j=1,NBasis
+   !         do i=1,j
+   !            if(pos(j,i)/=0) then
+   !              ipq = pos(j,i)
+   !              ip = j
+   !              iq = i
+   !              Crs = C(ir)+C(is)
+   !              Cpq = C(ip)+C(iq)
 
-                 if(AuxCoeff(IGem(ip),IGem(iq),IGem(ir),IGem(is))==1) EIntra = EIntra + Aux*ints(j,i)
+   !              Aux = Crs*Cpq*ABPLUS(ipq,irs)
+   !              EAll = EAll + Aux*ints(j,i)
 
-                   ECorrIJ(IGIJ(IGemIN(IP),IGemIN(IQ)),IGIJ(IGemIN(IR),IGemIN(IS)))= &
-                   ECorrIJ(IGIJ(IGemIN(IP),IGemIN(IQ)),IGIJ(IGemIN(IR),IGemIN(IS)))  &
-                   +Aux*ints(j,i)
+   !              if(AuxCoeff(IGem(ip),IGem(iq),IGem(ir),IGem(is))==1) EIntra = EIntra + Aux*ints(j,i)
 
-                 !! dump Gamma^corr
-                 !if(AuxCoeff(IGem(ip),IGem(iq),IGem(ir),IGem(is)).ne.1.and.abs(Aux).gt.1.d-8)  write(iunit)ir,ip,is,iq,Aux
+   !                ECorrIJ(IGIJ(IGemIN(IP),IGemIN(IQ)),IGIJ(IGemIN(IR),IGemIN(IS)))= &
+   !                ECorrIJ(IGIJ(IGemIN(IP),IGemIN(IQ)),IGIJ(IGemIN(IR),IGemIN(IS)))  &
+   !                +Aux*ints(j,i)
 
-               endif
-            enddo
-         enddo
+   !              !! dump Gamma^corr
+   !              !if(AuxCoeff(IGem(ip),IGem(iq),IGem(ir),IGem(is)).ne.1.and.abs(Aux).gt.1.d-8)  write(iunit)ir,ip,is,iq,Aux
 
-      enddo
+   !            endif
+   !         enddo
+   !      enddo
 
-      off = off + MaxBatchSize
+   !   enddo
 
-   enddo
+   !   off = off + MaxBatchSize
 
-   deallocate(work,MatFF)
-   ! close a file with Gamma^corr
-   close(iunit)
+   !enddo
 
-   elseif(IDBBSC==2) then
+   !deallocate(work,MatFF)
+   !! close a file with Gamma^corr
+   !close(iunit)
 
-      block
-      integer :: NCholErf
-      double precision,allocatable :: FF(:,:),FFErf(:,:)
-      double precision,allocatable :: FFTr(:,:),FFErfTr(:,:)
-      double precision,allocatable :: TmpTr(:,:),TmpErfTr(:,:)
-      double precision,allocatable :: workSR(:,:),intsSR(:,:)
+   !elseif(IDBBSC==2) then
 
-      ! read cholesky (k|rFF) vectors
-      open(newunit=iunit,file='cholvecs',form='unformatted')
-      read(iunit) NCholesky
-      allocate(FF(NCholesky,NBasis**2))
-      read(iunit) FF
-      close(iunit)
-      ! read transformed cholesky (k|r|FF) vecs
-      open(newunit=iunit,file='chol1vFR',form='unformatted')
-      read(iunit) NCholesky
-      allocate(FFTr(NCholesky,NBasis**2))
-      read(iunit) FFTr
-      close(iunit)
-      ! read LR cholesky (k|erf|FF) vecs
-      open(newunit=iunit,file='cholvErf',form='unformatted')
-      read(iunit) NCholErf
-      allocate(FFErf(NCholErf,NBasis**2))
-      read(iunit) FFErf
-      close(iunit)
-      ! read transformed LR cholesky (k|erf|FF) vecs
-      open(newunit=iunit,file='chol1vLR',form='unformatted')
-      read(iunit) NCholErf
-      allocate(FFErfTr(NCholErf,NBasis**2))
-      read(iunit) FFErfTr
-      close(iunit)
+   !   block
+   !   integer :: NCholErf
+   !   double precision,allocatable :: FF(:,:),FFErf(:,:)
+   !   double precision,allocatable :: FFTr(:,:),FFErfTr(:,:)
+   !   double precision,allocatable :: TmpTr(:,:),TmpErfTr(:,:)
+   !   double precision,allocatable :: workSR(:,:),intsSR(:,:)
 
-      allocate(TmpErfTr(NCholErf,NBasis*NOccup))
-      ! p*q : LR
-      do iq=1,NOccup
-         do ip=1,NBasis
-            TmpErfTr(:,ip+(iq-1)*NBasis)=FFErfTr(:,iq+(ip-1)*NBasis)
-         enddo
-      enddo
-      allocate(TmpTr(NCholesky,NBasis*NOccup))
-      ! p*q : FR
-      do iq=1,NOccup
-         do ip=1,NBasis
-            TmpTr(:,ip+(iq-1)*NBasis)=FFTr(:,iq+(ip-1)*NBasis)
-         enddo
-      enddo
+   !   ! read cholesky (k|rFF) vectors
+   !   open(newunit=iunit,file='cholvecs',form='unformatted')
+   !   read(iunit) NCholesky
+   !   allocate(FF(NCholesky,NBasis**2))
+   !   read(iunit) FF
+   !   close(iunit)
+   !   ! read transformed cholesky (k|r|FF) vecs
+   !   open(newunit=iunit,file='chol1vFR',form='unformatted')
+   !   read(iunit) NCholesky
+   !   allocate(FFTr(NCholesky,NBasis**2))
+   !   read(iunit) FFTr
+   !   close(iunit)
+   !   ! read LR cholesky (k|erf|FF) vecs
+   !   open(newunit=iunit,file='cholvErf',form='unformatted')
+   !   read(iunit) NCholErf
+   !   allocate(FFErf(NCholErf,NBasis**2))
+   !   read(iunit) FFErf
+   !   close(iunit)
+   !   ! read transformed LR cholesky (k|erf|FF) vecs
+   !   open(newunit=iunit,file='chol1vLR',form='unformatted')
+   !   read(iunit) NCholErf
+   !   allocate(FFErfTr(NCholErf,NBasis**2))
+   !   read(iunit) FFErfTr
+   !   close(iunit)
 
-      Print*, 'ABPLUS-energy corr=',norm2(ABPLUS)
+   !   allocate(TmpErfTr(NCholErf,NBasis*NOccup))
+   !   ! p*q : LR
+   !   do iq=1,NOccup
+   !      do ip=1,NBasis
+   !         TmpErfTr(:,ip+(iq-1)*NBasis)=FFErfTr(:,iq+(ip-1)*NBasis)
+   !      enddo
+   !   enddo
+   !   allocate(TmpTr(NCholesky,NBasis*NOccup))
+   !   ! p*q : FR
+   !   do iq=1,NOccup
+   !      do ip=1,NBasis
+   !         TmpTr(:,ip+(iq-1)*NBasis)=FFTr(:,iq+(ip-1)*NBasis)
+   !      enddo
+   !   enddo
 
-      ! set number of loops over integrals
-      dimFO = NBasis*NOccup
-      nloop = (dimFO - 1) / MaxBatchSize + 1
+   !   Print*, 'ABPLUS-energy corr=',norm2(ABPLUS)
 
-      allocate(intsSR(NBasis,NBasis))
-      allocate(work(dimFO,MaxBatchSize))
-      allocate(workSR(dimFO,MaxBatchSize))
+   !   ! set number of loops over integrals
+   !   dimFO = NBasis*NOccup
+   !   nloop = (dimFO - 1) / MaxBatchSize + 1
 
-      off = 0
-      k   = 0
-      l   = 1
-      ! exchange loop (FO|FO)
-      do iloop=1,nloop
+   !   allocate(intsSR(NBasis,NBasis))
+   !   allocate(work(dimFO,MaxBatchSize))
+   !   allocate(workSR(dimFO,MaxBatchSize))
 
-         ! batch size for each iloop; last one is smaller
-         BatchSize = min(MaxBatchSize,dimFO-off)
+   !   off = 0
+   !   k   = 0
+   !   l   = 1
+   !   ! exchange loop (FO|FO)
+   !   do iloop=1,nloop
 
-         ! (pq*|rs) : SR=-LR+FR
-         call dgemm('T','N',dimFO,BatchSize,NCholErf,-0.25d0,FFErfTr,NCholErf, &
-                    FFErf(:,off+1:off+BatchSize),NCholErf,0d0,work,dimFO)
-         call dgemm('T','N',dimFO,BatchSize,NCholesky,0.25d0,FFTr,NCholesky, &
-                    FF(:,off+1:off+BatchSize),NCholesky,1d0,work,dimFO)
-         ! (pq|rs*): SR=-LR+FR
-         call dgemm('T','N',dimFO,BatchSize,NCholErf,-0.25d0,FFErf,NCholErf, &
-                    FFErfTr(:,off+1:off+BatchSize),NCholErf,1d0,work,dimFO)
-         call dgemm('T','N',dimFO,BatchSize,NCholesky,0.25d0,FF,NCholesky, &
-                 FFTr(:,off+1:off+BatchSize),NCholesky,1d0,work,dimFO)
-         ! (p*q|rs)
-         call dgemm('T','N',dimFO,BatchSize,NCholErf,-0.25d0,TmpErfTr,NCholErf, &
-                    FFErf(:,off+1:off+BatchSize),NCholErf,1d0,work,dimFO)
-         call dgemm('T','N',dimFO,BatchSize,NCholesky,0.25d0,TmpTr,NCholesky, &
-                    FF(:,off+1:off+BatchSize),NCholesky,1d0,work,dimFO)
-         ! (pq|r*s)
-         call dgemm('T','N',dimFO,BatchSize,NCholErf,-0.25d0,FFErf,NCholErf, &
-                    TmpErfTr(:,off+1:off+BatchSize),NCholErf,1d0,work,dimFO)
-         call dgemm('T','N',dimFO,BatchSize,NCholesky,0.25d0,FF,NCholesky, &
-                    TmpTr(:,off+1:off+BatchSize),NCholesky,1d0,work,dimFO)
-         workSR=work
+   !      ! batch size for each iloop; last one is smaller
+   !      BatchSize = min(MaxBatchSize,dimFO-off)
 
-         ! regular+short-range*
-         call dgemm('T','N',dimFO,BatchSize,NCholesky,1d0,FF,NCholesky, &
-                    FF(:,off+1:off+BatchSize),NCholesky,1d0,work,dimFO)
+   !      ! (pq*|rs) : SR=-LR+FR
+   !      call dgemm('T','N',dimFO,BatchSize,NCholErf,-0.25d0,FFErfTr,NCholErf, &
+   !                 FFErf(:,off+1:off+BatchSize),NCholErf,0d0,work,dimFO)
+   !      call dgemm('T','N',dimFO,BatchSize,NCholesky,0.25d0,FFTr,NCholesky, &
+   !                 FF(:,off+1:off+BatchSize),NCholesky,1d0,work,dimFO)
+   !      ! (pq|rs*): SR=-LR+FR
+   !      call dgemm('T','N',dimFO,BatchSize,NCholErf,-0.25d0,FFErf,NCholErf, &
+   !                 FFErfTr(:,off+1:off+BatchSize),NCholErf,1d0,work,dimFO)
+   !      call dgemm('T','N',dimFO,BatchSize,NCholesky,0.25d0,FF,NCholesky, &
+   !              FFTr(:,off+1:off+BatchSize),NCholesky,1d0,work,dimFO)
+   !      ! (p*q|rs)
+   !      call dgemm('T','N',dimFO,BatchSize,NCholErf,-0.25d0,TmpErfTr,NCholErf, &
+   !                 FFErf(:,off+1:off+BatchSize),NCholErf,1d0,work,dimFO)
+   !      call dgemm('T','N',dimFO,BatchSize,NCholesky,0.25d0,TmpTr,NCholesky, &
+   !                 FF(:,off+1:off+BatchSize),NCholesky,1d0,work,dimFO)
+   !      ! (pq|r*s)
+   !      call dgemm('T','N',dimFO,BatchSize,NCholErf,-0.25d0,FFErf,NCholErf, &
+   !                 TmpErfTr(:,off+1:off+BatchSize),NCholErf,1d0,work,dimFO)
+   !      call dgemm('T','N',dimFO,BatchSize,NCholesky,0.25d0,FF,NCholesky, &
+   !                 TmpTr(:,off+1:off+BatchSize),NCholesky,1d0,work,dimFO)
+   !      workSR=work
 
-         ! loop over integrals
-         do iBatch=1,BatchSize
+   !      ! regular+short-range*
+   !      call dgemm('T','N',dimFO,BatchSize,NCholesky,1d0,FF,NCholesky, &
+   !                 FF(:,off+1:off+BatchSize),NCholesky,1d0,work,dimFO)
 
-            k = k + 1
-            if(k>NBasis) then
-               k = 1
-               l = l + 1
-            endif
+   !      ! loop over integrals
+   !      do iBatch=1,BatchSize
 
-            if(pos(k,l)==0) cycle
-            ir = k
-            is = l
-            irs = pos(k,l)
+   !         k = k + 1
+   !         if(k>NBasis) then
+   !            k = 1
+   !            l = l + 1
+   !         endif
 
-            do j=1,NOccup
-               do i=1,NBasis
-                  ints(i,j)   = work((j-1)*NBasis+i,iBatch)
-                  intsSR(i,j) = workSR((j-1)*NBasis+i,iBatch)
-               enddo
-            enddo
+   !         if(pos(k,l)==0) cycle
+   !         ir = k
+   !         is = l
+   !         irs = pos(k,l)
 
-            if(l>NOccup) cycle
-            ints(:,NOccup+1:NBasis) = 0
+   !         do j=1,NOccup
+   !            do i=1,NBasis
+   !               ints(i,j)   = work((j-1)*NBasis+i,iBatch)
+   !               intsSR(i,j) = workSR((j-1)*NBasis+i,iBatch)
+   !            enddo
+   !         enddo
 
-            do j=1,NBasis
-               do i=1,j
-                  if(pos(j,i)/=0) then
-                    ipq = pos(j,i)
-                    ip = j
-                    iq = i
-                    Crs = C(ir)+C(is)
-                    Cpq = C(ip)+C(iq)
+   !         if(l>NOccup) cycle
+   !         ints(:,NOccup+1:NBasis) = 0
 
-                    Aux = Crs*Cpq*ABPLUS(ipq,irs)
-                    EAll = EAll + Aux*ints(j,i)
+   !         do j=1,NBasis
+   !            do i=1,j
+   !               if(pos(j,i)/=0) then
+   !                 ipq = pos(j,i)
+   !                 ip = j
+   !                 iq = i
+   !                 Crs = C(ir)+C(is)
+   !                 Cpq = C(ip)+C(iq)
 
-                    if(AuxCoeff(IGem(ip),IGem(iq),IGem(ir),IGem(is))==1) EIntra = EIntra + Aux*ints(j,i)
-                    ! I think it should be SR here!
-                    !if(AuxCoeff(IGem(ip),IGem(iq),IGem(ir),IGem(is))==1) EIntra = EIntra + Aux*intsSR(j,i)
+   !                 Aux = Crs*Cpq*ABPLUS(ipq,irs)
+   !                 EAll = EAll + Aux*ints(j,i)
 
-                 ECorrIJ(IGIJ(IGemIN(IP),IGemIN(IQ)),IGIJ(IGemIN(IR),IGemIN(IS)))= &
-                 ECorrIJ(IGIJ(IGemIN(IP),IGemIN(IQ)),IGIJ(IGemIN(IR),IGemIN(IS)))  &
-                 +Aux*ints(j,i)
+   !                 if(AuxCoeff(IGem(ip),IGem(iq),IGem(ir),IGem(is))==1) EIntra = EIntra + Aux*ints(j,i)
+   !                 ! I think it should be SR here!
+   !                 !if(AuxCoeff(IGem(ip),IGem(iq),IGem(ir),IGem(is))==1) EIntra = EIntra + Aux*intsSR(j,i)
 
-                  endif
-               enddo
-            enddo
+   !              ECorrIJ(IGIJ(IGemIN(IP),IGemIN(IQ)),IGIJ(IGemIN(IR),IGemIN(IS)))= &
+   !              ECorrIJ(IGIJ(IGemIN(IP),IGemIN(IQ)),IGIJ(IGemIN(IR),IGemIN(IS)))  &
+   !              +Aux*ints(j,i)
 
-         enddo
+   !               endif
+   !            enddo
+   !         enddo
 
-         off = off + MaxBatchSize
+   !      enddo
 
-      enddo
+   !      off = off + MaxBatchSize
 
-      deallocate(work,workSR,intsSR)
-      deallocate(FF,FFErf,FFTr,FFErfTr)
-      deallocate(TmpTr,TmpErfTr)
+   !   enddo
 
-      print*, 'EAll,Einta',EAll,Eintra
-      end block
+   !   deallocate(work,workSR,intsSR)
+   !   deallocate(FF,FFErf,FFTr,FFErfTr)
+   !   deallocate(TmpTr,TmpErfTr)
 
-   endif ! IDBBSC
+   !   print*, 'EAll,Einta',EAll,Eintra
+   !   end block
+
+   !endif ! IDBBSC
 endif ! ICholesky
 
 print*, 'EAll,Einta',EAll,Eintra
@@ -1073,12 +1081,253 @@ end associate
 
 end subroutine AC0CAS_FOFO
 
+subroutine AC0EneOTF_FOFO(EAll,EIntra,ECorrIJ,ABPLUS,C,IGemIN,IndN,IndX, &
+                          INActive,NAct,NDimX,NBasis,IDBBSC)
+!
+! calculate AC0 energy OTF
+!
+implicit none
+
+integer,intent(in) :: INActive,NAct,NDimX,NBasis
+integer,intent(in) :: IDBBSC
+integer,intent(in) :: IGemIN(NBasis),IndN(2,NDimX),IndX(NDimX)
+double precision,intent(in)  :: ABPLUS(NDimX,NDimX),C(NBasis)
+double precision,intent(out) :: ECorrIJ(6,6)
+double precision,intent(out) :: EAll,EIntra
+
+integer :: NOccup,NCholesky,NCholErf
+integer :: iunit
+integer :: dimFO,iloop,nloop,off
+integer :: i,j,k,l,ij,ip,iq,ir,is,ipq,irs
+integer :: iBatch,BatchSize
+integer :: MaxBatchSize = 100
+integer :: IGem(NBasis),Ind(NBasis),pos(NBasis,NBasis)
+
+double precision :: Cpq,Crs
+double precision :: AuxCoeff(3,3,3,3),Aux,val
+integer          :: NGem,IGIJ(4,4),IGemNo(6,2),IOO,IVV,IAA1,IAA2
+double precision :: ints(NBasis,NBasis)
+double precision,allocatable :: FF(:,:),FFErf(:,:)
+double precision,allocatable :: FFTr(:,:),FFErfTr(:,:)
+double precision,allocatable :: TmpTr(:,:),TmpErfTr(:,:)
+double precision,allocatable :: work(:,:),workSR(:,:)
+
+! set dimensions
+NOccup = INActive + NAct
+
+! set aux matrices
+NGem=MAXVAL(IGemIN)
+IJ=0
+Do I=1,NGem
+  Do J=1,I
+    IJ=IJ+1
+    IGIJ(I,J)=IJ
+    IGIJ(J,I)=IJ
+    IGemNo(IJ,1)=I
+    IGemNo(IJ,2)=J
+  EndDo
+EndDo
+
+pos = 0
+do i=1,NDimX
+   pos(IndN(1,i),IndN(2,i)) = IndX(i)
+enddo
+
+do i=1,INActive
+   IGem(i) = 1
+enddo
+do i=INActive+1,NOccup
+   IGem(i) = 2
+enddo
+do i=NOccup+1,NBasis
+   IGem(i) = 3
+enddo
+
+do l=1,3
+   do k=1,3
+      do j=1,3
+         do i=1,3
+            if((i==j).and.(j==k).and.(k==l)) then
+               AuxCoeff(i,j,k,l) = 1
+            else
+               AuxCoeff(i,j,k,l) = 0
+            endif
+         enddo
+      enddo
+   enddo
+enddo
+
+! read cholesky (FF|K) vectors
+open(newunit=iunit,file='cholvecs',form='unformatted')
+read(iunit) NCholesky
+allocate(FF(NCholesky,NBasis**2))
+read(iunit) FF
+close(iunit)
+
+if (IDBBSC==2) then
+   ! read transformed cholesky (k|r|FF) vecs
+   open(newunit=iunit,file='chol1vFR',form='unformatted')
+   read(iunit) NCholesky
+   allocate(FFTr(NCholesky,NBasis**2))
+   read(iunit) FFTr
+   close(iunit)
+   ! read LR cholesky (k|erf|FF) vecs
+   open(newunit=iunit,file='cholvErf',form='unformatted')
+   read(iunit) NCholErf
+   allocate(FFErf(NCholErf,NBasis**2))
+   read(iunit) FFErf
+   close(iunit)
+   ! read transformed LR cholesky (k|erf|FF) vecs
+   open(newunit=iunit,file='chol1vLR',form='unformatted')
+   read(iunit) NCholErf
+   allocate(FFErfTr(NCholErf,NBasis**2))
+   read(iunit) FFErfTr
+   close(iunit)
+
+   allocate(TmpErfTr(NCholErf,NBasis*NOccup))
+   ! p*q : LR
+   do iq=1,NOccup
+      do ip=1,NBasis
+         TmpErfTr(:,ip+(iq-1)*NBasis)=FFErfTr(:,iq+(ip-1)*NBasis)
+      enddo
+   enddo
+   allocate(TmpTr(NCholesky,NBasis*NOccup))
+   ! p*q : FR
+   do iq=1,NOccup
+      do ip=1,NBasis
+         TmpTr(:,ip+(iq-1)*NBasis)=FFTr(:,iq+(ip-1)*NBasis)
+      enddo
+   enddo
+   !print*, 'FF     ',norm2(FF),FF(2,3)
+   !print*, 'FFTr   ',norm2(FFTr)
+   !print*, 'FFErf  ',norm2(FFErf) 
+   !print*, 'FFErfTr',norm2(FFErfTr)
+   !print*, 'TmpTr  ',norm2(TmpTr)
+   !print*, 'TmpErfTr',norm2(TmperfTr)
+endif
+
+!Print*, 'ABPLUS-energy corr=',norm2(ABPLUS)
+
+! set number of loops over integrals
+dimFO = NOccup*NBasis
+nloop = (dimFO - 1) / MaxBatchSize + 1
+
+allocate(work(dimFO,MaxBatchSize))
+
+EAll   = 0d0
+EIntra = 0d0
+off = 0
+k   = 0
+l   = 1
+! exchange loop (FO|FO)
+do iloop=1,nloop
+
+  ! batch size for each iloop; last one is smaller
+  BatchSize = min(MaxBatchSize,dimFO-off)
+
+  ! assemble (FO|BatchSize) batch from CholVecs
+  if (IDBBSC==2) then
+     ! (pq*|rs) : SR=-LR+FR
+     call dgemm('T','N',dimFO,BatchSize,NCholErf,-0.25d0,FFErfTr,NCholErf, &
+                FFErf(:,off+1:off+BatchSize),NCholErf,0d0,work,dimFO)
+     call dgemm('T','N',dimFO,BatchSize,NCholesky,0.25d0,FFTr,NCholesky, &
+                FF(:,off+1:off+BatchSize),NCholesky,1d0,work,dimFO)
+     !print*, '1',norm2(work)
+     ! (pq|rs*): SR=-LR+FR
+     call dgemm('T','N',dimFO,BatchSize,NCholErf,-0.25d0,FFErf,NCholErf, &
+                FFErfTr(:,off+1:off+BatchSize),NCholErf,1d0,work,dimFO)
+     call dgemm('T','N',dimFO,BatchSize,NCholesky,0.25d0,FF,NCholesky, &
+             FFTr(:,off+1:off+BatchSize),NCholesky,1d0,work,dimFO)
+     !print*, '2',norm2(work)
+     ! (p*q|rs)
+     call dgemm('T','N',dimFO,BatchSize,NCholErf,-0.25d0,TmpErfTr,NCholErf, &
+                FFErf(:,off+1:off+BatchSize),NCholErf,1d0,work,dimFO)
+     call dgemm('T','N',dimFO,BatchSize,NCholesky,0.25d0,TmpTr,NCholesky, &
+                FF(:,off+1:off+BatchSize),NCholesky,1d0,work,dimFO)
+     !print*, '3',norm2(work)
+     ! (pq|r*s)
+     call dgemm('T','N',dimFO,BatchSize,NCholErf,-0.25d0,FFErf,NCholErf, &
+                TmpErfTr(:,off+1:off+BatchSize),NCholErf,1d0,work,dimFO)
+     call dgemm('T','N',dimFO,BatchSize,NCholesky,0.25d0,FF,NCholesky, &
+                TmpTr(:,off+1:off+BatchSize),NCholesky,1d0,work,dimFO)
+     !print*, '4',norm2(work)
+     ! regular+short-range*
+     call dgemm('T','N',dimFO,BatchSize,NCholesky,1d0,FF,NCholesky, &
+                FF(:,off+1:off+BatchSize),NCholesky,1d0,work,dimFO)
+     !print*, '5',norm2(work)
+  else
+     call dgemm('T','N',dimFO,BatchSize,NCholesky,1d0,FF,NCholesky, &
+                FF(:,off+1:off+BatchSize),NCholesky,0d0,work,dimFO)
+  endif ! idbbsc
+  !print*, iloop,norm2(work)
+
+  ! loop over integrals
+  do iBatch=1,BatchSize
+
+     k = k + 1
+     if(k>NBasis) then
+        k = 1
+        l = l + 1
+     endif
+
+     if(pos(k,l)==0) cycle
+     ir = k
+     is = l
+     irs = pos(k,l)
+
+     do j=1,NOccup
+        do i=1,NBasis
+           ints(i,j) = work((j-1)*NBasis+i,iBatch)
+        enddo
+     enddo
+     !print*, 'ib,ints',ibatch,norm2(ints)
+
+     if(l>NOccup) cycle
+     ints(:,NOccup+1:NBasis) = 0
+
+     do j=1,NBasis
+        do i=1,j
+           if(pos(j,i)/=0) then
+             ipq = pos(j,i)
+             ip = j
+             iq = i
+             Crs = C(ir)+C(is)
+             Cpq = C(ip)+C(iq)
+
+             Aux = Crs*Cpq*ABPLUS(ipq,irs)
+             EAll = EAll + Aux*ints(j,i)
+
+                 if(AuxCoeff(IGem(ip),IGem(iq),IGem(ir),IGem(is))==1) EIntra = EIntra + Aux*ints(j,i)
+
+                   ECorrIJ(IGIJ(IGemIN(IP),IGemIN(IQ)),IGIJ(IGemIN(IR),IGemIN(IS)))= &
+                   ECorrIJ(IGIJ(IGemIN(IP),IGemIN(IQ)),IGIJ(IGemIN(IR),IGemIN(IS)))  &
+                   +Aux*ints(j,i)
+
+                 !! dump Gamma^corr
+                 !if(AuxCoeff(IGem(ip),IGem(iq),IGem(ir),IGem(is)).ne.1.and.abs(Aux).gt.1.d-8)  write(iunit)ir,ip,is,iq,Aux
+
+               endif
+            enddo
+         enddo
+
+      enddo
+
+      off = off + MaxBatchSize
+
+   enddo
+
+   deallocate(work,FF)
+   if(idbbsc==2) deallocate(FFErf,FFTr,FFErfTr)
+   if(idbbsc==2) deallocate(TmpTr,TmpErfTr)
+
+end subroutine AC0EneOTF_FOFO
+
 subroutine Y01CAS_FOFO(Occ,URe,XOne,ABPLUS,ABMIN,ETot, &
      propfile0,propfile1, &
      y01file, xy0file, &
      IndN,IndX,IGemIN,NAct,INActive,NElecBEmb,&
      NDimX,NBasis,NDim,NInte1, &
-     NoSt,IntFileName,IntJFile,IntKFile,IFlag0,ICholesky)
+     NoSt,IntFileName,IntJFile,IntKFile,IFlag0,ICholesky,IDBBSC)
 !
 !     A ROUTINE FOR COMPUTING Y VECTORS AND EIGENVALUES OF ERPA
 !     IN THE 0TH- AND 1ST-ORDER APPROXIMATIONS (USED IN SAPT)
@@ -1094,7 +1343,7 @@ implicit none
 integer,intent(in)           :: NAct,INActive,NElecBEmb
 integer,intent(in)           :: NDimX,NBasis,NDim,NInte1,NoSt
 integer,intent(in)           :: IndN(2,NDim),IndX(NDim),IGemIN(NBasis)
-integer,intent(in)           :: IFlag0,ICholesky
+integer,intent(in)           :: IFlag0,ICholesky,IDBBSC
 double precision,intent(in)  :: URe(NBasis,NBasis),Occ(NBasis),XOne(NInte1)
 double precision,intent(out) :: ABPLUS(NDimX,NDimX),ABMIN(NDimX,NDimX)
 double precision,intent(out) :: ETot
@@ -1265,7 +1514,7 @@ if(IFlag0==0) then
    call AB_CAS_FOFO(ABPLUS,ABMIN,EnDummy,URe,Occ,XOne,&
                     IndN,IndX,IGem,NAct,INActive,NElecBEmb,&
                     NDimX,NBasis,NDimX,&
-                    NInte1,IntJFile,IntKFile,ICholesky,0,1d0,.true.)
+                    NInte1,IntJFile,IntKFile,ICholesky,IDBBSC,1d0,.true.)
 
    !call gclock('ABPM(1)',Tcpu,Twall)
 
@@ -1288,6 +1537,37 @@ if(IFlag0==0) then
    do i=1,NDimX
       Eig1(i)=ABPLUS(i,i)+ABMIN(i,i)
    enddo
+
+   block
+   ! Testing AC0-energy
+   double precision :: ECorrIJ(6,6)
+   double precision :: EAll,EIntra
+   double precision :: work2(NDimX,NDimX)
+   work2 = 0
+   do j=1,NDimX
+      if(Eig(j)/=0d0) then
+         do i=1,NDimX
+            if(Eig(i)/=0d0) work2(i,j) = 2d0*(ABPLUS(i,j)-ABMIN(i,j))/(Eig(i)+Eig(j))
+         enddo
+      endif
+   enddo
+
+   !print*, 'y01cas: work 1',norm2(work2)
+   call ABPM_BACKTRAN(work2,ABPLUS,EBlock,EBlockIV,nblk,NDimX)
+   !print*, 'ABPLUS po BACKTRAN 1:',norm2(ABPLUS)
+
+   if (ICholesky==1) then
+      call AC0EneOTF_FOFO(EAll,EIntra,ECorrIJ,ABPLUS,C,IGemIN,IndN,IndX, &
+                          INActive,NAct,NDimX,NBasis,IDBBSC)
+      write(lout,'(1x,a,f12.8)') 'AC0-EAll  ', EAll
+      write(lout,'(1x,a,f12.8)') 'AC0-EIntra', EIntra
+      write(lout,'(1x,a,f12.8)') 'AC0-ECorr ', EAll-EIntra
+   else
+     print*, 'Y01CAS: No AC0 energy test w/o Cholesky!'
+     ! stop "Y01CAS_FOFO: AC0 energy test not ready without Cholesky!"
+   endif
+   end block
+ 
 
    EigY1 = 0
    allocate(work(NDimX,NDimX))
@@ -1312,7 +1592,7 @@ if(IFlag0==0) then
    write(iunit) EigY1
    write(iunit) Eig1
    close(iunit)
-
+ 
    deallocate(work)
    deallocate(EigY1,Eig1)
 
@@ -1578,6 +1858,7 @@ if(IFlag0==1) return
 !return
 
 ! AB(1) PART
+
 call AB_CAS_FOFO(ABPLUS,ABMIN,EnDummy,URe,Occ,XOne,&
               IndN,IndX,IGem,NAct,INActive,NElecBEmb,&
               NDimX,NBasis,NDimX,&
@@ -3263,12 +3544,12 @@ deallocate(IZeroNU)
 
 end subroutine Y01CASDSYM_FOFO
 
-subroutine ACEInteg_FOFO(ECorr,URe,Occ,XOne,UNOAO,&
+subroutine ACEInteg_FOFO(ECorr,ECorrIJ,URe,Occ,XOne,UNOAO,&
       ABPLUS,ABMIN,EigVecR,Eig,&
       EGOne,NGOcc,CICoef,&
       NBasis,NInte1,NDim,NGem,IndAux,ACAlpha,&
       IGemIN,NAct,INActive,NElecBEmb,NELE,IndN,IndX,NDimX,&
-      NoSt,ICASSCF,IFlFrag1,IFunSR,IFunSRKer,ICholesky)
+      NoSt,ICASSCF,IFlFrag1,IFunSR,IFunSRKer,ICholesky,IDBBSC)
 use omp_lib
 !
 !  A ROUTINE FOR COMPUTING AC INTEGRAND
@@ -3278,6 +3559,7 @@ integer,intent(in) :: NGOcc,NBasis,NInte1,NDim,NGem,NDimX
 integer,intent(in) :: NAct,INActive,NElecBEmb,NELE,NoSt,ICASSCF
 integer,intent(in) :: IFlFrag1,IFunSR,IFunSRKer
 integer,intent(in) :: ICholesky
+integer,intent(in) :: IDBBSC
 integer,intent(in) :: IndN(2,NDim),IndX(NDim),IndAux(NBasis),&
                       IGemIN(NBasis)
 double precision,intent(in) :: ACAlpha
@@ -3294,7 +3576,8 @@ integer :: i,j,k,l,kl,ip,iq,ir,is,ipq,irs
 integer :: pos(NBasis,NBasis)
 double precision :: ECASSCF,XKer
 character(:),allocatable :: twojfile,twokfile
-
+! analysis of AC
+double precision :: ECorrIJ(6,6)
 
  NOccup = NAct + INActive
 
@@ -3387,9 +3670,9 @@ character(:),allocatable :: twojfile,twokfile
  endif
 
  if(ICASSCF==1) then
-    call ACEneERPA_FOFO(ECorr,EigVecR,Eig,Occ, &
+    call ACEneERPA_FOFO(ECorr,ECorrIJ,EigVecR,Eig,Occ, &
                         IGemIN,IndN,IndX,INActive+NAct, &
-                        NDimX,NBasis,twokfile,ICholesky)
+                        NDimX,NBasis,twokfile,ICholesky,IDBBSC)
  else
     call EneERPA_FOFO(ECorr,EigVecR,Eig,Occ,CICoef, &
                       IGemIN,IndN,NDimX,NELE+NAct,NBasis,'FOFO')
@@ -3398,20 +3681,21 @@ character(:),allocatable :: twojfile,twokfile
 
 end subroutine ACEInteg_FOFO
 
-subroutine ACEneERPA_FOFO(ECorr,EVec,EVal,Occ,IGem, &
-                          IndN,IndX,NOccup,NDimX,NBasis,IntKFile,ICholesky)
+subroutine ACEneERPA_FOFO(ECorr,ECorrIJ,EVec,EVal,Occ,IGem, &
+                          IndN,IndX,NOccup,NDimX,NBasis,&
+                          IntKFile,ICholesky,IDBBSC)
 implicit none
 
 integer,intent(in) :: NDimX,NBasis
 integer,intent(in) :: IGem(NBasis),IndN(2,NDimX),IndX(NDimX)
 integer,intent(in) :: NOccup
-integer,intent(in) :: ICholesky
+integer,intent(in) :: ICholesky,IDBBSC
 character(*),intent(in) :: IntKFile
 double precision,intent(out) :: ECorr
 double precision,intent(in) :: EVec(NDimX,NDimX),EVal(NDimX)
 double precision :: Occ(NBasis)
 
-integer :: i,j,k,l,kl,kk,ip,iq,ir,is,ipq,irs
+integer :: i,j,ii,ij,k,l,kl,kk,ip,iq,ir,is,ipq,irs
 integer :: iunit,ISkippedEig
 integer :: pos(NBasis,NBasis)
 integer :: NCholesky
@@ -3425,8 +3709,67 @@ double precision             :: CICoef(NBasis),Cpq,Crs,SumY,Aux
 double precision,allocatable :: work(:),ints(:,:),Skipped(:)
 double precision,allocatable :: work1(:,:),MatFF(:,:)
 double precision,allocatable :: tVec(:,:)
+! cbs[h] 
+integer :: NCholErf
+double precision,allocatable :: FF(:,:),FFErf(:,:)
+double precision,allocatable :: FFTr(:,:),FFErfTr(:,:)
+double precision,allocatable :: TmpTr(:,:),TmpErfTr(:,:)
+double precision,allocatable :: workSR(:,:),intsSR(:,:)
+
 double precision,parameter   :: SmallE = 1.d-3,BigE = 1.d8
 double precision,external    :: ddot
+! analysis of AC
+double precision :: ECorrIJ(6,6)
+integer          :: NGem,IGIJ(4,4)
+! analysis DMRG-in-DFT embedding 
+integer :: IOrbEmbb(NBasis),ioccB,ioccA,ivirtA,ivirtB,IGEmbb(4,4)
+logical :: IVirtLoc
+double precision :: ECEmbb(20,20),sum
+
+ECorrIJ=0.0d0
+NGem=MAXVAL(IGem)
+IJ=0
+Do I=1,NGem
+  Do J=1,I
+    IJ=IJ+1
+    IGIJ(I,J)=IJ
+    IGIJ(J,I)=IJ
+  EndDo
+EndDo
+
+! this is run if virtual orbitals for DMRG-in-DFT embedding have been localised
+IOrbEmbb=0
+ECEmbb=0.0d0
+Inquire(file='locorbitals.txt',exist=IVirtLoc)
+if (IVirtLoc) then
+  open(10,file='locorbitals.txt')
+  read(10,*)
+  read(10,*)ioccB
+  IOrbEmbb(1:ioccB)=1
+  ii=ioccB
+  read(10,*)ioccA
+  IOrbEmbb(ii+1:ii+ioccA)=2
+  ii=ii+ioccA
+  read(10,*)ivirtA
+  IOrbEmbb(ii+1:ii+ivirtA)=3
+  ii=ii+ivirtA
+  read(10,*)ivirtB
+  IOrbEmbb(ii+1:ii+ivirtB)=4
+  IJ=0
+  Do I=1,4
+  Do J=1,I
+    IJ=IJ+1
+    IGEmbb(I,J)=IJ
+    IGEmbb(J,I)=IJ
+  EndDo
+  EndDo 
+  Write(6,'(/,X,"DMRG-in-DFT with localised virtual orbitals")')
+  Write(6,'(X,"Assignments of orbitals to fragments")')
+  Write(6,'(X,"(1:occB 2:occA 3:virtA 4:virtB )")')
+  do i=1,nbasis
+  write(*,*)i,IOrbEmbb(i)
+  enddo
+endif 
 
 do i=1,NBasis
    CICoef(i) = sign(sqrt(Occ(i)),Occ(i)-0.5d0)
@@ -3518,6 +3861,10 @@ if(ICholesky==0) then
 
                       ECorr = ECorr + Aux*ints(j,i)
 
+                      ECorrIJ(IGIJ(IGem(IP),IGem(IQ)),IGIJ(IGem(IR),IGem(IS)))= &
+                      ECorrIJ(IGIJ(IGem(IP),IGem(IQ)),IGIJ(IGem(IR),IGem(IS)))  &
+                      +Aux*ints(j,i)
+
                    ! endinf of If(IP.Gt.IR.And.IQ.Gt.IS)
                    endif
 
@@ -3536,98 +3883,282 @@ if(ICholesky==0) then
 
 elseif(ICholesky==1) then
 
-  inquire(file='cholvecs',EXIST=yes)
-  if(.not.yes) stop "cholvecs not found in ACEneERPA_FOFO"
+  if (IDBBSC/=2) then
 
-   ! read cholesky (FF|K) vectors
-   open(newunit=iunit,file='cholvecs',form='unformatted')
-   read(iunit) NCholesky
-   allocate(MatFF(NCholesky,NBasis**2))
-   read(iunit) MatFF
-   close(iunit)
+     inquire(file='cholvecs',EXIST=yes)
+     if(.not.yes) stop "cholvecs not found in ACEneERPA_FOFO"
 
-   ! set number of loops over integrals
-   dimFO = NOccup*NBasis
-   nloop = (dimFO - 1) / MaxBatchSize + 1
+      ! read cholesky (FF|K) vectors
+      open(newunit=iunit,file='cholvecs',form='unformatted')
+      read(iunit) NCholesky
+      allocate(MatFF(NCholesky,NBasis**2))
+      read(iunit) MatFF
+      close(iunit)
 
-   allocate(work1(dimFO,MaxBatchSize))
+      ! set number of loops over integrals
+      dimFO = NOccup*NBasis
+      nloop = (dimFO - 1) / MaxBatchSize + 1
 
-   off = 0
-   k   = 0
-   l   = 1
-   SumY = 0
-   ! exchange loop (FO|FO)
-   do iloop=1,nloop
+      allocate(work1(dimFO,MaxBatchSize))
 
-      ! batch size for each iloop; last one is smaller
-      BatchSize = min(MaxBatchSize,dimFO-off)
+      off = 0
+      k   = 0
+      l   = 1
+      SumY = 0
+      ! exchange loop (FO|FO)
+      do iloop=1,nloop
 
-      ! assemble (FO|BatchSize) batch from CholVecs
-      call dgemm('T','N',dimFO,BatchSize,NCholesky,1d0,MatFF,NCholesky, &
-                 MatFF(:,off+1:BatchSize),NCholesky,0d0,work1,dimFO)
+         ! batch size for each iloop; last one is smaller
+         BatchSize = min(MaxBatchSize,dimFO-off)
 
-      ! loop over integrals
-      do iBatch=1,BatchSize
+         ! assemble (FO|BatchSize) batch from CholVecs
+         call dgemm('T','N',dimFO,BatchSize,NCholesky,1d0,MatFF,NCholesky, &
+                    MatFF(:,off+1:BatchSize),NCholesky,0d0,work1,dimFO)
 
-         k = k + 1
-         if(k>NBasis) then
-            k = 1
-            l = l + 1
-         endif
+         ! loop over integrals
+         do iBatch=1,BatchSize
 
-         if(pos(k,l)==0) cycle
-         ir = k
-         is = l
-         irs = pos(k,l)
+            k = k + 1
+            if(k>NBasis) then
+               k = 1
+               l = l + 1
+            endif
 
-         do j=1,NOccup
-            do i=1,NBasis
-               ints(i,j) = work1((j-1)*NBasis+i,iBatch)
+            if(pos(k,l)==0) cycle
+            ir = k
+            is = l
+            irs = pos(k,l)
+
+            do j=1,NOccup
+               do i=1,NBasis
+                  ints(i,j) = work1((j-1)*NBasis+i,iBatch)
+               enddo
             enddo
-         enddo
 
-         if(l>NOccup) cycle
-         ints(:,NOccup+1:NBasis) = 0
+            if(l>NOccup) cycle
+            ints(:,NOccup+1:NBasis) = 0
 
-         do j=1,NBasis
-            do i=1,j
-               if(pos(j,i)/=0) then
-                 ipq = pos(j,i)
-                 ip = j
-                 iq = i
-                 Crs = CICoef(l)+CICoef(k)
-                 Cpq = CICoef(j)+CICoef(i)
+            do j=1,NBasis
+               do i=1,j
+                  if(pos(j,i)/=0) then
+                    ipq = pos(j,i)
+                    ip = j
+                    iq = i
+                    Crs = CICoef(l)+CICoef(k)
+                    Cpq = CICoef(j)+CICoef(i)
 
-                 !if(.not.(IGem(ir).eq.IGem(is).and.IGem(ip).eq.IGem(iq)&
-                 !.and.IGem(ir).eq.IGem(ip)).and.ir.gt.is.and.ip.gt.iq) then
-                 if(AuxCoeff(IGem(ip),IGem(iq),IGem(ir),IGem(is))) then
+                    !if(.not.(IGem(ir).eq.IGem(is).and.IGem(ip).eq.IGem(iq)&
+                    !.and.IGem(ir).eq.IGem(ip)).and.ir.gt.is.and.ip.gt.iq) then
+                    if(AuxCoeff(IGem(ip),IGem(iq),IGem(ir),IGem(is))) then
 
-                    SumY = ddot(NDimX,tVec(:,ipq),1,tVec(:,irs),1)
+                       SumY = ddot(NDimX,tVec(:,ipq),1,tVec(:,irs),1)
 
-                    Aux = 2*Crs*Cpq*SumY
+                       Aux = 2*Crs*Cpq*SumY
 
-                    if(iq.Eq.is.and.ip.Eq.ir) then
-                       Aux = Aux - Occ(ip)*(1d0-Occ(is))-Occ(is)*(1d0-Occ(ip))
+                       if(iq.Eq.is.and.ip.Eq.ir) then
+                          Aux = Aux - Occ(ip)*(1d0-Occ(is))-Occ(is)*(1d0-Occ(ip))
+                       endif
+
+                       ECorr = ECorr + Aux*ints(j,i)
+
+                       ECorrIJ(IGIJ(IGem(IP),IGem(IQ)),IGIJ(IGem(IR),IGem(IS)))= &
+                       ECorrIJ(IGIJ(IGem(IP),IGem(IQ)),IGIJ(IGem(IR),IGem(IS)))  &
+                      +Aux*ints(j,i)
+
+                       if (IVirtLoc) then
+                           ECEmbb(IGEmbb(IOrbEmbb(IP),IOrbEmbb(IQ)),IGEmbb(IOrbEmbb(IR),IOrbEmbb(IS)))= &
+                           ECEmbb(IGEmbb(IOrbEmbb(IP),IOrbEmbb(IQ)),IGEmbb(IOrbEmbb(IR),IOrbEmbb(IS)))  &
+                      + Aux*ints(j,i)
+                       endif
+
+                    ! endinf of If(IP.Gt.IR.And.IQ.Gt.IS)
                     endif
 
-                    ECorr = ECorr + Aux*ints(j,i)
-
-                 ! endinf of If(IP.Gt.IR.And.IQ.Gt.IS)
-                 endif
-
-               endif
+                  endif
+               enddo
             enddo
-         enddo
 
-      enddo ! iBatch
+         enddo ! iBatch
 
-      off = off + MaxBatchSize
-   enddo
-   !print*, 'ECorr Chol ',ECorr
+         off = off + MaxBatchSize
+      enddo
+      !print*, 'ECorr Chol ',ECorr
 
    deallocate(work1,MatFF)
 
-endif
+   if(IVirtLoc) then
+      Write(6,'(/,X,"(1:occB 2:occA 3:virtA 4:virtB )")')
+      Sum=0.0d0
+      IJ=0
+      Do I=1,4
+      Do J=1,I
+         IJ=IJ+1
+         KL=0 
+         Do K=1,4
+         Do L=1,K
+            KL=KL+1 
+            if (ECEmbb(IJ,KL).ne.0.0) then
+                ! AC0 = 0.5 W(alpha=1.d-4)/1.d-4
+                Write(6,'(X,"(",2I1,")","(",2I1,")",F15.8)') I,J,K,L,ECEmbb(IJ,KL)/2.0/1.d-4
+                Sum=Sum+ECEmbb(IJ,KL)/2.0/1.d-4
+            endif 
+         EndDo
+         EndDo
+      EndDo
+      EndDo
+      Write(6,'(X,"Sum = ",F15.8,/)')sum
+   endif    
+
+   elseif (IDBBSC==2) then
+
+   !stop "ACeneERPA_FOFO not ready with IDBBSC!"
+   ! THIS CODE DOES NOT HAVE TO BE DOUBLED, I GUESS...
+      open(newunit=iunit,file='cholvecs',form='unformatted')
+      read(iunit) NCholesky
+      allocate(FF(NCholesky,NBasis**2))
+      read(iunit) FF
+      close(iunit)
+      ! read transformed cholesky (k|r|FF) vecs
+      open(newunit=iunit,file='chol1vFR',form='unformatted')
+      read(iunit) NCholesky
+      allocate(FFTr(NCholesky,NBasis**2))
+      read(iunit) FFTr
+      close(iunit)
+      ! read LR cholesky (k|erf|FF) vecs
+      open(newunit=iunit,file='cholvErf',form='unformatted')
+      read(iunit) NCholErf
+      allocate(FFErf(NCholErf,NBasis**2))
+      read(iunit) FFErf
+      close(iunit)
+      ! read transformed LR cholesky (k|erf|FF) vecs
+      open(newunit=iunit,file='chol1vLR',form='unformatted')
+      read(iunit) NCholErf
+      allocate(FFErfTr(NCholErf,NBasis**2))
+      read(iunit) FFErfTr
+      close(iunit)
+
+      allocate(TmpErfTr(NCholErf,NBasis*NOccup))
+      ! p*q : LR
+      do iq=1,NOccup
+         do ip=1,NBasis
+            TmpErfTr(:,ip+(iq-1)*NBasis)=FFErfTr(:,iq+(ip-1)*NBasis)
+         enddo
+      enddo
+      allocate(TmpTr(NCholesky,NBasis*NOccup))
+      ! p*q : FR
+      do iq=1,NOccup
+         do ip=1,NBasis
+            TmpTr(:,ip+(iq-1)*NBasis)=FFTr(:,iq+(ip-1)*NBasis)
+         enddo
+      enddo
+
+      ! set number of loops over integrals
+      dimFO = NBasis*NOccup
+      nloop = (dimFO - 1) / MaxBatchSize + 1
+
+      allocate(work1(dimFO,MaxBatchSize))
+      !allocate(intsSR(NBasis,NBasis))
+      !allocate(workSR(dimFO,MaxBatchSize))
+
+      off  = 0
+      k    = 0
+      l    = 1
+      SumY = 0
+      do iloop=1,nloop
+
+         ! batch size for each iloop; last one is smaller
+         BatchSize = min(MaxBatchSize,dimFO-off)
+
+         ! (pq*|rs) : SR=-LR+FR
+         call dgemm('T','N',dimFO,BatchSize,NCholErf,-0.25d0,FFErfTr,NCholErf, &
+                    FFErf(:,off+1:off+BatchSize),NCholErf,0d0,work1,dimFO)
+         call dgemm('T','N',dimFO,BatchSize,NCholesky,0.25d0,FFTr,NCholesky, &
+                    FF(:,off+1:off+BatchSize),NCholesky,1d0,work1,dimFO)
+         ! (pq|rs*): SR=-LR+FR
+         call dgemm('T','N',dimFO,BatchSize,NCholErf,-0.25d0,FFErf,NCholErf, &
+                    FFErfTr(:,off+1:off+BatchSize),NCholErf,1d0,work1,dimFO)
+         call dgemm('T','N',dimFO,BatchSize,NCholesky,0.25d0,FF,NCholesky, &
+                 FFTr(:,off+1:off+BatchSize),NCholesky,1d0,work1,dimFO)
+         ! (p*q|rs)
+         call dgemm('T','N',dimFO,BatchSize,NCholErf,-0.25d0,TmpErfTr,NCholErf, &
+                    FFErf(:,off+1:off+BatchSize),NCholErf,1d0,work1,dimFO)
+         call dgemm('T','N',dimFO,BatchSize,NCholesky,0.25d0,TmpTr,NCholesky, &
+                    FF(:,off+1:off+BatchSize),NCholesky,1d0,work1,dimFO)
+         ! (pq|r*s)
+         call dgemm('T','N',dimFO,BatchSize,NCholErf,-0.25d0,FFErf,NCholErf, &
+                    TmpErfTr(:,off+1:off+BatchSize),NCholErf,1d0,work1,dimFO)
+         call dgemm('T','N',dimFO,BatchSize,NCholesky,0.25d0,FF,NCholesky, &
+                    TmpTr(:,off+1:off+BatchSize),NCholesky,1d0,work1,dimFO)
+         !work1SR=work1
+
+         ! regular+short-range*
+         call dgemm('T','N',dimFO,BatchSize,NCholesky,1d0,FF,NCholesky, &
+                    FF(:,off+1:off+BatchSize),NCholesky,1d0,work1,dimFO)
+
+         ! loop over integrals
+         do iBatch=1,BatchSize
+
+            k = k + 1
+            if(k>NBasis) then
+               k = 1
+               l = l + 1
+            endif
+
+            if(pos(k,l)==0) cycle
+            ir = k
+            is = l
+            irs = pos(k,l)
+
+            do j=1,NOccup
+               do i=1,NBasis
+                  ints(i,j) = work1((j-1)*NBasis+i,iBatch)
+               enddo
+            enddo
+
+            if(l>NOccup) cycle
+            ints(:,NOccup+1:NBasis) = 0
+
+            do j=1,NBasis
+               do i=1,j
+                  if(pos(j,i)/=0) then
+                    ipq = pos(j,i)
+                    ip = j
+                    iq = i
+                    Crs = CICoef(l)+CICoef(k)
+                    Cpq = CICoef(j)+CICoef(i)
+
+                    !if(.not.(IGem(ir).eq.IGem(is).and.IGem(ip).eq.IGem(iq)&
+                    !.and.IGem(ir).eq.IGem(ip)).and.ir.gt.is.and.ip.gt.iq) then
+                    if(AuxCoeff(IGem(ip),IGem(iq),IGem(ir),IGem(is))) then
+
+                       SumY = ddot(NDimX,tVec(:,ipq),1,tVec(:,irs),1)
+
+                       Aux = 2*Crs*Cpq*SumY
+
+                       if(iq.Eq.is.and.ip.Eq.ir) then
+                          Aux = Aux - Occ(ip)*(1d0-Occ(is))-Occ(is)*(1d0-Occ(ip))
+                       endif
+
+                       ECorr = ECorr + Aux*ints(j,i)
+
+                    ! endinf of If(IP.Gt.IR.And.IQ.Gt.IS)
+                    endif
+
+                  endif
+               enddo
+            enddo
+
+         enddo ! iBatch
+
+         off = off + MaxBatchSize
+      enddo
+      !print*, 'ECorr Chol ',ECorr
+
+   deallocate(work1)
+   deallocate(FF,FFTr,FFErf,FFErfTr,TmpErfTr,TmpTr)
+
+   endif ! IDBBSC
+endif ! ICholesky
 
 if(ISkippedEig/=0) then
   write(LOUT,'(/,1x,"The number of discarded eigenvalues is",i4)') &
@@ -4259,6 +4790,9 @@ end associate
 end subroutine ABPM_BACKTRAN
 
 subroutine ABPM_HALFBACKTRAN(AMAT,AOUT,EBlock,EBlockIV,nblk,NDimX)
+!
+!
+!
 implicit none
 
 integer,intent(in) :: nblk,NDimX

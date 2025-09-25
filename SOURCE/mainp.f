@@ -22,11 +22,12 @@ C
       use omp_lib
       use interface_pp
       use acpp_types
+      use mp
 C
       Implicit Real*8 (A-H,O-Z)
 C
-      Character*60 FMultTab,Title,BasisSet
-C      Character(:),allocatable :: Title,BasisSet
+      Character*60 FMultTab,Title
+      Character(:),allocatable :: BasisSet
 C
       Real*8, Dimension(:), Allocatable :: Occ
       Real*8, Dimension(:), Allocatable :: URe
@@ -44,6 +45,7 @@ C
       Real*8, Dimension(:), Allocatable :: DipZ
       Real*8, Dimension(:), Allocatable :: EpsHF 
       Real*8, Dimension(:), Allocatable :: UMOAO
+      Real*8, Dimension(:, :), Allocatable :: CAONO
       Integer, Dimension(:), Allocatable :: NSymMO
 C
       type(InputData)   :: Input
@@ -80,8 +82,10 @@ C     FILL COMMONS AND CONSTANTS
       Charge  = System%Charge
       NBasis  = System%NBasis
       BasisSet= Flags%BasisSetPath // Flags%BasisSet
+      IJobType = Flags%JobType
 C
       NCoreOrb = System%NCoreOrb
+      AuxData%NCoreOrb = System%NCoreOrb
       NStronglyOccOrb = System%NStronglyOccOrb
       NElecBEmb = System%NElecBEmb
 C
@@ -107,11 +111,15 @@ C
       IWarn   = 0
       Max_Cn  = System%Max_Cn
       ITrpl   = Flags%ITrpl
-      FreqOm  = System%FreqOm
       IRedVirt  = Flags%IRedVirt
       IOrbRelax = Flags%IOrbRelax
       IOrbIncl  = Flags%IOrbIncl
 C
+C     ...RESPONSE (POLARIZABITY FREQUENCIES)
+      if (allocated(System%FreqOm)) then
+      NFreqOm = System%NFreqOm
+      FreqOm(1:NFreqOm) = System%FreqOm(1:System%NFreqOm)
+      endif
 C
 C     *************************************************************************
 C
@@ -331,10 +339,14 @@ C     OLD INPUT-READ
 C      Call RWInput(Title,ZNucl,Charge,NBasis)
 C
 C     CALCULATE THE DIMENSIONS
-      If(IDALTON.Eq.0) then
+      If(IDALTON.Eq.0.AND.IPYSCF.Eq.0) then
 C        Call CheckNBa(NBasis,Title)
         Call basinfo(NBasis,'AOONEINT.mol','MOLPRO')
       endif
+
+      If(IPYSCF.Eq.1)then
+         Call basinfo_pyscf(nbasis)
+      end if
 C
       Call DimSym(NBasis,NInte1,NInte2,MxHVec,MaxXV)
 C
@@ -350,15 +362,20 @@ C
 C     GET THE VALUE OF THE SEPARATION PARAMETER OM
 C
       Alpha = System%Omega
+
 c      If(IFunSR.Ne.0.And.IFunSR.Ne.3.And.IFunSR.Ne.5) Then
       If(IFunSR.Eq.1.Or.IFunSR.Eq.2.Or.IFunSR.Eq.4) Then
 C      Call GetAlpha(Title)
-      Call readalphamolpro(Alpha)
+         Call readalphamolpro(Alpha)
+         
       ElseIf(IDBBSC.Eq.2) Then
       Alpha=1.D0
       Else
       Alpha=0.D0
       EndIf
+
+      AuxData%omega = Alpha
+
 C
 C     ALLOCATE THE MATRICES
 C
@@ -372,6 +389,8 @@ C
       Allocate  (XNuc(NInte1))
       Allocate  (TwoEl(NInte2))
       Allocate  (UMOAO(NBasis*NBasis))
+      Allocate  (CAONO(NBasis, NBasis))
+
 C
       Occ(1:NBasis)=           0.D0
       URe(1:NBasis*NBasis)=    0.D0
@@ -390,7 +409,9 @@ C
 
       if(IPYSCF.Eq.1) then
          print*, 'here'
-         Call ReadPYSCF(THCData, BasisSet,XKin,XNuc,ENuc,Occ,
+         NoSt = 1
+         Call ReadPYSCF(THCData, AuxData, BasisSet, CAONO, 
+     $    XKin,XNuc,ENuc,Occ,
      $        URe,TwoEl,UMOAO,
      $        NInte1,NBasis,NInte2,NGem,Flags, System%InSt(:,1))
          If(InSt(2,1).Gt.0) Then
@@ -410,6 +431,7 @@ C     temporarily set IFunSR to 6 to avoid loading integrals and their transform
       IFFSR=7
       EndIf
 C
+
       Call LdInteg(Title,BasisSet,XKin,XNuc,ENuc,Occ,URe,
      $             TwoEl,UMOAO,NInte1,NBasis,NInte2,NGem)
 C
@@ -437,8 +459,22 @@ C
       ElseIf(IFunSR.Eq.7) Then
       Call VV10(URe,UMOAO,Occ,NBasis)
       Else
+         select case(Input%CalcParams%JobType)
+
+      case(JOB_TYPE_MP2, JOB_TYPE_SRMP2)
+         IFlCore=0
+         Flags%IFlCore = 0
+
+         call mp2_driver(BasisSet, THCData, AuxData, CAONO, Flags)
+c         call mp2_driver(BasisSet, URe,Occ, XKin,XNuc,ENuc,UMOAO,
+c     $        TwoEl,NBasis,NInte1,NInte2,NGem, THCData)
+      case default 
+!         IFlCore=0
+!     Flags%IFlCore = 0
       Call DMSCF(Title,BasisSet,URe,Occ,XKin,XNuc,ENuc,UMOAO,
-     $ TwoEl,NBasis,NInte1,NInte2,NGem)
+     $        TwoEl,NBasis,NInte1,NInte2,NGem, THCData)
+      end select
+      
       EndIf
 C
       If(IWarn.Gt.0) Then
@@ -446,12 +482,18 @@ C
 C      Write(6,'(8a10)') ('**********',i=1,9)
       EndIf
 C
+C     Delete out-of-core integrals
       If(ITwoEl.Eq.2)  Call delfile('TWOMO')
-      Call delfile('AOTWOSORT')
+      If (ICholeskyOTF==0) Then
+         Call delfile('AOTWOSORT')
+         If(IFunSR.Eq.1.Or.IFunSR.Eq.2.Or.IFunSR.Eq.4) Then
+         Call delfile('AOERFSORT')
+         EndIf
+      EndIf
 C
       Call free_System(System)
       Call gclock(PossibleJobType(Flags%JobType),Tcpu,Twall)
-      call mem_report
+c     call mem_report
 C      Stop
       End
 C

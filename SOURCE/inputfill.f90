@@ -292,7 +292,7 @@ subroutine read_block_cholesky(CholeskyParams, line)
               stop "Unknown keyword for Cholesky!"
            endif
 
-      case ("CHOL_ACCU","CHOL_ACCURACY","CHOLESKY_ACCU","CHOLESKY_ACCURACY")
+      case ("ACCURACY","CHOL_ACCU","CHOL_ACCURACY","CHOLESKY_ACCU","CHOLESKY_ACCURACY")
            if (uppercase(val) == "DEFAULT" .or. &
                uppercase(val) == "D" ) then
               CholeskyParams%CholeskyAccu = CHOL_ACCU_DEFAULT
@@ -386,7 +386,11 @@ subroutine read_block_calculation(CalcParams, line)
            elseif (uppercase(val) == "NLOCCORR" ) then
                CalcParams%JobType = JOB_TYPE_NLOCCORR
            elseif (uppercase(val) == "SRAC0" ) then
-               CalcParams%JobType = JOB_TYPE_SRAC0
+                 CalcParams%JobType = JOB_TYPE_SRAC0
+           elseif (uppercase(val) == "MP2" ) then
+                 CalcParams%JobType = JOB_TYPE_MP2
+           elseif (uppercase(val) == "SRMP2" ) then
+                 CalcParams%JobType = JOB_TYPE_SRMP2
            endif
 
      !case ("FRAGMENTS")
@@ -486,10 +490,17 @@ subroutine read_block_calculation(CalcParams, line)
                CalcParams%FunCorr = 1
            endif
 
-      case ("CBS","DBBSC") ! CBS correction
-           ! = 1 , E. Giner formulation
-           ! = 2 , K. Pernal formulation
-           read(val, *) CalcParams%DBBSC
+      case ("CBS") ! CBS correction
+           ! = 1 , DBBSC correction (E. Giner, et al, 2018)
+           ! = 2 , CBS[H] (K. Pernal and friends, 2025)
+           if (uppercase(val) == "1" .or.&
+               uppercase(val) == "DBBSC") then
+               CalcParams%DBBSC = 1
+           elseif (uppercase(val) == "2" .or.&
+               uppercase(val) == "H" .or.&
+               uppercase(val) == "CBS[H]" ) then
+               CalcParams%DBBSC = 2
+           endif
 
       case ("DMRG-IN-DFT","EMBEDDING") ! DMRG-in-DFT embedding
            if (uppercase(val) == ".TRUE.".or. &
@@ -571,7 +582,7 @@ subroutine read_block_calculation(CalcParams, line)
              read(val,*) CalcParams%Max_Cn
 
       case("FREQOM")
-             read(val,*) CalcParams%FreqOm
+             call read_freqarray(val,CalcParams%FreqOm,CalcParams%NFreqOm,',')
 
       case ("CALPHA")
              read(val,*) CalcParams%CAlpha
@@ -623,7 +634,7 @@ subroutine read_block_calculation(CalcParams, line)
       case ("JOBTITLE")
             CalcParams%JobTitle = val
 
-      case ("BASIS")
+      case ("BASIS","BASISSET")
             CalcParams%BasisSet = val
 
       case ("BASISPATH")
@@ -1326,6 +1337,65 @@ subroutine read_trstatearray(val,intrst,delim)
      end if
 
 end subroutine read_trstatearray
+
+subroutine read_freqarray(val,freqs,infreqs,delim)
+
+     character(*), intent(in) :: val
+     character(1), intent(in) :: delim
+     integer,intent(inout) :: infreqs
+
+     integer :: ii,k
+     logical :: dot
+     real*8,allocatable :: freqs(:)
+     character(:), allocatable :: w,v,f
+
+     w = trim(adjustl(val))
+     v = trim(adjustl(val))
+
+     if (len(w) == 0) then
+           write(LOUT,'(1x,a)') 'ERROR!!! NO FREQUENCIES GIVEN!'
+           stop
+     else
+           !! check for dots
+           !k = index(v,'.')
+           !if(k /= 0) then
+           !   dot=.true.
+           !else
+           !   dot=.false.
+           !endif
+
+           ! get number of frequencies
+           infreqs = 0
+           dimloop: do
+                     k = index(v, delim)
+                     infreqs = infreqs + 1
+                     v = trim(adjustl(v(k+1:)))
+                     if (k == 0) exit dimloop
+                    enddo dimloop
+
+           ! assign frequencies
+           allocate(freqs(infreqs))
+           infreqs = 0
+           arrloop: do
+                     k = index(w, delim)
+                     infreqs = infreqs + 1
+                     if(k /= 0) then
+                         f = w(1:k-1)
+                         read(f, *) freqs(infreqs)
+                         w = trim(adjustl(w(k+1:)))
+                         !print*, '',inst(1,instates),inst(2,instates)
+                     elseif (k == 0) then
+                         !print*, 'last ', w
+                         f = w
+                         read(f, *) freqs(infreqs)
+                         !print*, '1 2',inst(1,instates),inst(2,instates)
+                         exit arrloop
+                     endif
+                  enddo arrloop
+
+     end if
+
+end subroutine read_freqarray
 
 subroutine split(s, s1, s2, delimiter)
       !

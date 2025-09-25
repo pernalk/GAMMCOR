@@ -1,5 +1,5 @@
 module types
-! written by M. Hapka, M. Modrzejewski
+! written by M. Hapka, M. Modrzejewski,
 !            K. Pernal
 
 use print_units
@@ -32,6 +32,8 @@ integer, parameter :: JOB_TYPE_ACFREQNTH   = 15
 integer, parameter :: JOB_TYPE_AC1FREQNTH  = 16
 integer, parameter :: JOB_TYPE_RESPONSE    = 17
 integer, parameter :: JOB_TYPE_SRAC0       = 18
+integer, parameter :: JOB_TYPE_MP2       = 19
+integer, parameter :: JOB_TYPE_SRMP2       = 20
 
 integer, parameter :: SAPTLEVEL0 = 0
 integer, parameter :: SAPTLEVEL1 = 1
@@ -96,17 +98,17 @@ integer, parameter :: RESP_DFT  = 3
 
 logical, parameter :: FLAG_POSTCAS  = .FALSE.
 
-integer,parameter :: maxcen = 500
+integer,parameter :: maxcen = 500 ! to match Dalton
 
 character(*),parameter :: PossibleInterface(5) = &
 [character(8) :: &
 'DALTON', 'MOLPRO', 'OWN', 'ORCA', 'PYSCF']
 
-character(*),parameter :: PossibleJobType(18) = &
+character(*),parameter :: PossibleJobType(20) = &
 [character(9) :: &
 'AC', 'AC0', 'ERPA', 'EERPA', 'SAPT', 'PDFT', 'CASPiDFT','CASPiDFTOpt','EERPA-1', & 
 'AC0D', 'AC0DNOSYMM', 'NLOCCORR', 'AC0DP', 'ACFREQ','ACFREQNTH','AC1FREQNTH', &
-'RESPONSE','SRAC0']
+'RESPONSE','SRAC0', 'MP2', 'SRMP2']
 
 character(*),parameter :: PossibleRDMType(6) = &
 [character(8) :: &
@@ -171,7 +173,8 @@ character(*),parameter :: PossibleUnits(2) = &
          character(:), allocatable :: BasisSet,BasisSetPath
          character(:), allocatable :: IntegralsFilePath
          integer :: Max_Cn = 3
-         double precision :: FreqOm = 0.d0
+         integer :: NFreqOm
+         double precision,allocatable :: FreqOm(:)
          logical :: CAlpha = .false.
 
          logical :: DeclareGrid = .false.
@@ -196,6 +199,7 @@ type SystemBlock
       double precision :: Omega   = 1d0
       double precision :: PerVirt = 0d0
       double precision :: ECASSCF = 0d0
+      double precision :: AvMu    = 0d0
       integer :: NSym
       integer :: NSymBas(8),NSymOrb(8)
       integer :: NOrb, NGem
@@ -291,6 +295,8 @@ type SystemBlock
                                       FOAB(:,:),FOBA(:,:), &
                                       FFAB(:,:),FFBA(:,:), &
                                       OOAB(:,:),OOBA(:,:)
+      double precision,allocatable :: XMuMat(:,:) ! for CBS[H]
+      double precision,allocatable :: OF(:,:)     ! for CBS[H]
       double precision,allocatable :: DChol(:,:)
       double precision,allocatable :: Pmat(:,:)
       double precision,allocatable :: Jmat(:,:),Kmat(:,:)
@@ -303,10 +309,14 @@ type SystemBlock
       double precision,allocatable :: dipm(:,:,:)
       double precision,allocatable :: Eig(:),EigX(:),EigY(:)
       double precision,allocatable :: AP(:,:),PP(:)
-      double precision  :: charg(maxcen),xyz(maxcen,3)
+      !double precision  :: charg(maxcen),xyz(maxcen,3)
+      double precision,allocatable :: charg(:),xyz(:,:)
 
       integer :: Max_Cn = 10
-      double precision :: FreqOm = 0.d0
+      !double precision :: FreqOm = 0.d0
+
+      integer :: NFreqOm
+      double precision,allocatable :: FreqOm(:)
 
 end type SystemBlock
 

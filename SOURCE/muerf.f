@@ -1,6 +1,6 @@
 *Deck DBBSCH
       Subroutine DBBSCH(ETot,ENuc,URe,Occ,XOne,UNOAO,
-     $                  BasisSet,NBasis,NInte1,IndN,IndX,NDimX)
+     $                  BasisSet,NBasis,NInte1,IndN,IndX,NDimX, THCData)
 C
 C     Compute the CBS[H] correction
 C     with SR integrals composed from Cholesky vectors
@@ -8,6 +8,7 @@ C     CBS[DFT] correction [E. Giner et al. 2018] is a byproduct
 C
       use ab0fofo
       use timing
+      use acpp_types
 C
       Implicit Real*8 (A-H,O-Z)
 
@@ -21,19 +22,31 @@ C
       double precision,intent(out) :: ETot
       double precision,intent(in) :: Occ(NBasis),XOne(NInte1)
       double precision,intent(in) :: URe(NBasis,NBasis),
-     $                               UNOAO(NBasis,NBasis)
+     $     UNOAO(NBasis,NBasis)
+      type(TTHCData), intent(in) :: THCData
 C
 C     local
 C
       integer :: iunit
       integer :: NCholesky,NCholErf
-      double precision :: ECASSCF,ECorr
-      double precision :: AvMu,ECorrMD
-      double precision :: XMuMat(NBasis,NBasis)
-      double precision :: ABMIN(NDimX,NDimX),ABPLUS(NDimX,NDimX)
+      real(8) :: ECASSCF,ECorr
+      real(8) :: AvMu,ECorrMD
+      real(8) :: XMuMat(NBasis,NBasis)
+      real(8) :: ABMIN(NDimX,NDimX),ABPLUS(NDimX,NDimX)
+      real(8) :: EigVecR(NDimX,NDimX),Eig(NDimX)
       double precision, allocatable :: CholVecs(:,:),Work(:,:)
+      character(:),allocatable :: rdmfile
+C
+! analysis of AC
+      double precision :: ECorrIJ(6,6)
+C
+      Parameter(Zero=0.D0,Half=0.5D0,One=1.D0,Two=2.D0)
+      Parameter(toeV=27.21138386d0)
 C
       double precision :: Tcpu,Twall
+
+c     set rdmfile
+      rdmfile='rdm2.dat'
 
       If (ITwoEl.eq.1) then
          write(6,'(1x,a)') "Set PostCAS=.true. and DFunc for DBBSCH!"
@@ -41,8 +54,9 @@ C
 
       ElseIf (IDBBSC.eq.1.and.ITwoEl.eq.3.and.ICholesky.ne.0) Then
 C
-      Call LOC_MU_CBS_CHOL(XMuMat,ECorrMD,AvMU,URe,UNOAO,Occ,
-     $                     BasisSet,NBasis)
+      print*, '0 calling loc_mu_cbs_chol from DBBSC...', Monomer
+      Call LOC_MU_CBS_CHOL(XMuMat,ECorrMD,AvMU,UNOAO,Occ,
+     $                     RdmFile,BasisSet,NBasis,.false.)
 
       Call AC0CAS_FOFO(ECorr,ECASSCF,Occ,URe,XOne,ABPLUS,ABMIN,
      $ IndN,IndX,IGem,NAcCAS,NInAcCAS,NElecBEmb,
@@ -60,56 +74,52 @@ C
       ElseIf (IDBBSC.eq.2.and.ITwoEl.eq.3.and.ICholesky.ne.0) Then
 C
 C     Compute local mu(r): XMuMat(p,q) = <p|mu(r)|q>
-      Call LOC_MU_CBS_CHOL(XMuMat,CorrMD,AvMU,URe,UNOAO,Occ,
-     $                     BasisSet,NBasis)
+      print*, '1 calling loc_mu_cbs_chol from DBBSC...', Monomer
+      Call LOC_MU_CBS_CHOL(XMuMat,CorrMD,AvMU,UNOAO,Occ,
+     $                     rdmfile,BasisSet,NBasis,.false.)
 c     Print*, 'LOC_MU_CBS_CHOL: XMuMat = ',norm2(XMuMat)
 C
 C     ... test : recover AC0!
 c      XMuMat=0d0
 c      print*, 'Use FR only !',norm2(XMuMat)
 
-C     transform full-range (FR) cholesky vecs
-C     R(k,pq).(q|mu(r)|t) = R(k,pt)
-      open(newunit=iunit,file='cholvecs',form='unformatted')
-      read(iunit) NCholesky
-      Allocate(CholVecs(NCholesky,NBasis**2),Work(NCholesky,NBasis**2))
-      read(iunit) CholVecs
-      close(iunit)
+C     transform full-range (FR) and long-range (LR) cholesky vecs
+      Call TRAN_MU_CHOL(XMuMat,'cholvecs','chol1vFR',NBasis)
+      Call TRAN_MU_CHOL(XMuMat,'cholvErf','chol1vLR',NBasis)
 
-C     SET TIMING FOR 3-ind transformations of Cholesky vecs
-      Call gclock('START',Tcpu,Twall)
-      Call dgemm('N','N',NCholesky*NBasis,NBasis,NBasis,1d0,
-     $           CholVecs,NCholesky*NBasis,XMuMat,NBasis,
-     $           0d0,Work,NCholesky*NBasis)
-      Call gclock('3-idx tran FR(k,pq)',Tcpu,Twall)
-C     save to disk
-      open(newunit=iunit,file='chol1vFR',form='unformatted')
-      write(iunit) NCholesky
-      write(iunit) Work
-      close(iunit)
-      deallocate(CholVecs,Work)
-C
-C     transform long-range (LR) cholesky vecs
-      open(newunit=iunit,file='cholvErf',form='unformatted')
-      read(iunit) NCholErf
-      Allocate(CholVecs(NCholErf,NBasis**2),Work(NCholErf,NBasis**2))
-      read(iunit) CholVecs
-      close(iunit)
-      Call dgemm('N','N',NCholErf*NBasis,NBasis,NBasis,1d0,
-     $           CholVecs,NCholErf*NBasis,XMuMat,NBasis,
-     $           0d0,Work,NCholErf*NBasis)
-      Call gclock('3-idx tran LR(k,pq)',Tcpu,Twall)
-C     save to disk
-      open(newunit=iunit,file='chol1vLR',form='unformatted')
-      write(iunit) NCholErf
-      write(iunit) Work
-      close(iunit)
-      deallocate(CholVecs,Work)
-
+c     print*, 'IFlSnd ', IFlSnd
+c     print*, 'IFlAC  ', IFlAC
+      If (IFlSnd.Eq.1) Then
+C     AC0-CBS[H]
       Call AC0CAS_FOFO(ECorr,ECASSCF,Occ,URe,XOne,ABPLUS,ABMIN,
      $ IndN,IndX,IGem,NAcCAS,NInAcCAS,NElecBEmb,
      $ NDimX,NBasis,NDimX,NInte1,
      $ NoSt,'FFOO','FOFO',ICholesky,IDBBSC,IFlFCorr)
+      ElseIf (IFlSnd.Eq.0) Then
+C     AC1-CBS[H]
+C
+      Write(6,'(/,X,"***************************** ")')
+      Write(6,'(  X,"*** ERPA-CAS CALCULATIONS *** ")')
+C
+C     FIND EIGENVECTORS (EigVecR) AND COMPUTE THE ENERGY
+C
+      ACAlpha=One
+      Call AB_CAS_FOFO(ABPLUS,ABMIN,ECASSCF,URe,Occ,XOne,
+     $ IndN,IndX,IGem,NAcCAS,NInAcCAS,NElecBEmb,
+     $ NDimX,NBasis,NDimX,
+     $ NInte1,'FFOO','FOFO',ICholesky,IDBBSC,ACAlpha,.false.)
+
+      Call ERPASYMM1(EigVecR,Eig,ABPLUS,ABMIN,NBasis,NDimX)
+      Write(6,'(/,
+     $ " *** ERPA-CBS[H]-CAS Excitation Energies (a.u., eV) *** ")')
+      Call SortEig(1,Eig,ABPLUS,EigVecR,NDimX)
+      Do I=1,10
+      Write(6,'(I4,4X,2E16.6)') I,Eig(I),toeV*Eig(I)
+      EndDo
+      Call ACEneERPA_FOFO(ECorr,ECorrIJ,EigVecR,Eig,Occ,
+     $ IGem,IndN,IndX,NAcCAS+NInAcCAS,
+     $ NDimX,NBasis,'FOFO',ICholesky,IDBBSC)
+      EndIf ! IFlSnd
 
       Call FirstOrderSREne(ETwoSR,NBasis)
       Write(6,'(/,X,"1st-order SR energy for",I4," active orbitals")') 
@@ -119,10 +129,17 @@ C     save to disk
 c     print*, 'ABPLUS-my =',norm2(ABPLUS)
 c     print*, 'ABMIN -my =',norm2(ABMIN)
 
+      If (IFlSnd.Eq.1) Then
       Write
      $ (6,'(/1X,''CASSCF+ENuc, AC0-CBS[H], Total'',6X,3F15.8)')
      $ ECASSCF+ENuc,ECorr,ECASSCF+ENuc+ECorr
        ETot=ECASSCF+ENuc+ECorr
+      Else
+      ECorr=Ecorr*Half
+      Write
+     $ (6,'(/1X,''CASSCF+ENuc, AC1-CBS[H], Total'',6X,3F15.8)')
+     $ ECASSCF+ENuc,ECorr,ECASSCF+ENuc+ECorr
+      EndIf ! IFlSnd
 
 c     ... delete transformed cholesky vecs
       Open(newunit=iunit,file='chol1vFR',status='OLD')
@@ -140,18 +157,22 @@ c      Print*, 'ECorr = ', ECorr
 C *End Subroutine DBBSCH
 
 *Deck LOC_MU_CBS_CHOL
-      Subroutine LOC_MU_CBS_CHOL(XMuMat,CorrMD,AvMU,URe,
-     $                           UNOAO,Occ,BasisSet,NBasis)
+      Subroutine LOC_MU_CBS_CHOL(XMuMat,CorrMD,AvMU,
+     $                           UNOAO,Occ,Rdm2File,BasisSet,NBasis,
+     $                           DiskSav)
 C
       use read_external
       use grid_internal
+      use sapt_files
       use timing
 C
 C     RETURNS A "BASIS-SET ERROR CORRECTION" WITH SR-PBE ONTOP CORRELATION from Giner et al. JCP 152, 174104 (2020)
 C     RETURNS XMuMAT USED TO COMPUTE CBS CORRECTION BY MODIFICATION OF H' IN AC0
 C
-C     CAREFUL!
-C     UNOAO are U(NO,AO) not U(NO,SAO) orbitals!
+C     Comments:
+C     - DiskSav = .true. : save FPsiB and OnTop
+C                          on disk (locmu.dat, for SAPT)
+C     - UNOAO are U(NO,AO) not U(NO,SAO) orbitals!
 C
       Implicit Real*8 (A-H,O-Z)
 C
@@ -162,11 +183,12 @@ C    $ Four=4.D0)
 C
       Include 'commons.inc'
 C
-      Dimension URe(NBasis,NBasis),UNOAO(NBasis,NBasis),Occ(NBasis),
-     $ OccS(NBasis)
+      Dimension UNOAO(NBasis,NBasis),Occ(NBasis),OccS(NBasis)
       Real*8 :: XMuMat(NBasis,NBasis)
-      Character(*) :: BasisSet
+      Logical :: DiskSav
+      Character(*) :: Rdm2File,BasisSet
 C
+      Real*8 :: URe(NBasis,NBasis)
       Real*8 :: UNOSAO(NBasis,NBasis)
       Real*8, Allocatable :: FPsiB(:), OnTop(:), XMuLoc(:)
       Real*8,allocatable,target :: PhiLDA(:,:)
@@ -190,10 +212,18 @@ C
 C
       Logical :: doGGA
       Double Precision, Allocatable :: RR(:,:)
-      Character(*),Parameter :: griddalfile='dftgrid.dat'
+      real(8),parameter :: ThrOnTop=1d-8
+      character(*),Parameter :: dfile='locmu.dat'
+      character(*),Parameter :: griddalfile='dftgrid.dat'
 C
       call gclock('START',Tcpu,Twall)
 C
+C     set URe (unitary matrix)
+      URe=Zero
+      Do I=1,NBasis
+      URe(I,I)=One
+      EndDo
+CC
       If(IFlCore.Eq.0.And.IDBBSC.Eq.1) Then
          ICore = NCoreOrb ! from input.inp
          Do I=1,ICore
@@ -219,6 +249,10 @@ C
       If (InternalGrid==0) then
 C
       If (IMOLPRO == 1) Then
+
+C        setting Molpro 2-rdm files
+         Call set_rdm2_filename(Monomer)
+
          Write(LOUT,'(/1x,a)') 'MOLPRO GRID '
          Call molprogrid0(NGrid,NBasis)
       ElseIf(IDALTON == 1) Then
@@ -256,11 +290,13 @@ C        Call dalton_grid_coord(NGrid,RR,griddalfile)
 c
       ElseIf (InternalGrid==1) then
 c        Write(6,'(1x,a,i3)') 'IFunSR       =',IFunSR
+c        Write(6,'(1x,a,i3)') 'IUnits       =', IUnits
 c        Write(6,'(1x,a,i3)') 'IGridType    =', IGridType
 c        Write(6,'(1x,a,i3)') 'ORB_ORDERING =', IOrbOrder
 C
          Allocate(Work(NBasis,NBasis))
          Work = transpose(UNOAO)
+         print*, 'igridtype', igridtype, ngrid, nbasis
          Call internal_gga_no_orbgrid(IGridType,BasisSet,
      $                          IOrbOrder,Work,
      $                          WGrid,PhiGGA,NGrid,NBasis,NBasis,IUnits)
@@ -273,14 +309,14 @@ C
 C
       EndIf ! InternalGrid
 C
-c      print*, ''
-c      print*, 'NGrid    = ', NGrid
-c      print*, 'WGrid    = ', norm2(Wgrid)
-c      print*, 'OrbGrid  = ', norm2(OrbGrid)
-c      print*, 'OrbXGrid = ', norm2(OrbXGrid)
-c      print*, 'OrbYGrid = ', norm2(OrbYGrid)
-c      print*, 'OrbZGrid = ', norm2(OrbZGrid)
-c      print*, ''
+C       print*, ''
+C       print*, 'NGrid    = ', NGrid
+C       print*, 'WGrid    = ', norm2(Wgrid)
+C       print*, 'OrbGrid  = ', norm2(OrbGrid)
+C       print*, 'OrbXGrid = ', norm2(OrbXGrid)
+C       print*, 'OrbYGrid = ', norm2(OrbYGrid)
+C       print*, 'OrbZGrid = ', norm2(OrbZGrid)
+C       print*, ''
 C
 C
 C     for DMRG-in-DFT compute XC energies with translated symmetries
@@ -342,7 +378,9 @@ c        write(lout,'(/1x,a)') "Internal grid does not use symmetry!"
          NumOSym(1)=NBasis
       ElseIf(InternalGrid==0) Then
          If (IMOLPRO == 1) Then 
-            Call create_ind_molpro('2RDM',NumOSym,IndInt,NSym,NBasis)
+            print*, 'reading sym info from ', rdm2_file
+            Call create_ind_molpro(rdm2_file,NumOSym,IndInt,NSym,NBasis)
+C           Call create_ind_molpro('2RDM',NumOSym,IndInt,NSym,NBasis)
             MxSym=NSym
          Else
             Stop "Fix NSym in LOC_MU_CBS_CHOL!"
@@ -403,16 +441,18 @@ C
       NAct=NAcCAS
       INActive=NInAcCAS
       NOccup=INActive+NAct
+c     print*, 'NAct     =',NAcCAS
+c     print*, 'INActive =',NInAcCAS
       Ind2(1:NBasis)=0
       Do I=1,NAct
       Ind2(INActive+I)=I
       EndDo
 C
 C     ... more test prints
-C      print*, 'NAct    =', NAct
-C      print*, 'INActive=', INActive
-C      print*, 'NOccup  =', NOccup
-C      print*, 'ICore   =', ICore
+C       print*, 'NAct    =', NAct
+C       print*, 'INActive=', INActive
+C       print*, 'NOccup  =', NOccup
+C       print*, 'ICore   =', ICore
 C
       if (IFlCore.Eq.0) Then
          INActiveC=INactive-ICore ! skip core within inactive
@@ -428,7 +468,7 @@ C
       Allocate (RDM2Act(NRDM2Act))
       RDM2Act(1:NRDM2Act)=Zero
 C
-      Open(10,File="rdm2.dat",Status='Old')
+      Open(10,File=trim(Rdm2File),Status='Old')
 C
    10 Read(10,*,End=40)I,J,K,L,X
 C     X IS DEFINED AS: < E(IJ)E(KL) > - DELTA(J,K) < E(IL) > = 2 GAM2(JLIK)
@@ -514,6 +554,8 @@ C
       Do IP=1,NAct
       OrbGridP(IP)=Occ(INActive+IP)*OrbGrid(IG,INActive+IP)
       EndDo
+
+c     If (NAct.Gt.0) Then
 C
 C     active-active
 C
@@ -544,6 +586,8 @@ C
       FPsiB(IG)=ddot(NAct*NAct,Oaa,1,Q,1)
 c     print*, '1st FPsiB =', IG, FPsiB(IG)
 C
+c     EndIf ! NAct
+C
 c     If(IFlCore.Ne.0) Then
       If (INActiveC.Gt.0) Then
 C
@@ -571,6 +615,7 @@ C
 C    $          NCholesky,OrbGrid(IG,ICore+1:INActive),1,0d0,tOi,1)
       FPsiB(IG)=FPsiB(IG)+ddot(NCholesky,tOi,1,tOi,1)
 !
+c     If (NAct.Gt.0) Then
 C     active-inactive
 C
 CC     ver 1 : NChol*NAct*INact scaling
@@ -592,6 +637,7 @@ C     ver2 : NChol*NOccup scaling
 C
 C     If(IFlCore.Ne.0)
 c     EndIf
+c     EndIf ! NAct.Gt.0
       EndIf ! INActiveC.Gt.0
 C
       EndDo ! IG=1,NGrid
@@ -683,7 +729,7 @@ C
 C
       XMuLoc(I)=Zero
 C
-      If(OnTop(I).Gt.1.D-8) Then
+      If(OnTop(I).Gt.ThrOnTop) Then
       XMuLoc(I)=SQRT(3.1415)/Two*FPsiB(I)/OnTop(I)
       EndIf
 C
@@ -722,6 +768,8 @@ C
 C
       Call PBECor(RhoGrid,Sigma,Zk,NGrid)
 C
+      Print*, 'RhoGrid =',norm2(RhoGrid)
+      Print*, 'Zk =',norm2(Zk)
       SPi=SQRT(3.141592653589793)
       Const=Three/Two/SPi/(One-SQRT(Two))
 C
@@ -761,12 +809,317 @@ C
      $" CBS[DFT] correction, average Mu",
      $ F15.8,F15.3/)') CorrMD,AvMU
 C
+C ... save on disk
+      if (DiskSav) then
+        open(newunit=iunit,file=dfile,form='unformatted')
+        write(iunit) NGrid,AvMu
+        write(iunit) FPsiB
+        write(iunit) OnTop
+        close(iunit)
+      endif
+C
       call gclock('Esrcmd CBS ',Tcpu,Twall)
 
       Deallocate(RDM2val)
       Deallocate(OrbTGrid)
 
       End Subroutine LOC_MU_CBS_CHOL
+
+*Deck LOC_MU_CBS_CHOL
+      Subroutine LOC_MU_CBS_AB(XMuA,XMuB,AvMU,
+     $                        UA,UB,NOccupA,OccA,NOccupB,OccB,
+     $                        LA,LB,IGridType,BasisSet,NCholesky,NBasis)
+C
+C   compute mu(r) for noninteractig dimer
+C   used in SAPT with CBS[H]
+C
+C   f(r) = \sum_{pt in A} \sum_{qu \in B} <pq|tu> n_p n_q \phi_t \phi_u \phi_p \phi_q
+C
+C    Comments : U(NO,AO) - natural orbitals for monomers
+C               L(NChol,Occup) - Cholesky NO vecs
+C               IGridType = 1 (Molpro)
+C               IGridType = 2 (Dalton)
+C               IGridType = 3 (Internal)
+C
+      Implicit None
+
+      integer,intent(in) :: NOccupA,NOccupB
+      integer,intent(in) :: NCholesky,NBasis
+      integer,intent(in) :: IGridType
+      real(8),intent(in) :: UA(NBasis,NBasis),UB(NBasis,NBasis)
+      real(8),intent(in) :: LA(NCholesky,NOccupA*NBasis)
+      real(8),intent(in) :: LB(NCholesky,NOccupB*NBasis)
+      real(8),intent(in) :: OccA(NOccupA),OccB(NOccupB)
+      real(8),intent(out):: XMuA(NBasis,NBasis),XMuB(NBasis,NBasis)
+      Character(*) :: BasisSet
+
+C     LOCAL
+C
+      integer :: NGrid
+      integer :: NGridA,NGridB
+      integer :: i,j,ip,ir,iq,ig
+      integer :: iunit
+      real(8) :: SPi,SPiHlf
+      real(8) :: OTA,OTB
+      real(8) :: CFac,XElA,XElB
+      real(8) :: AvMu,AvMuA,AvMuB
+      real(8) :: URe(NBasis,NBasis)
+      real(8) :: OrbIGGrid(NBasis),OrbGridP(NOccupA),OrbGridR(NOccupB)
+      real(8),allocatable :: FPsiAB(:),FPsiA(:),FPsiB(:)
+      real(8),allocatable :: OnTop(:),OnTopA(:),OnTopB(:)
+      real(8),allocatable :: XMuLoc(:)
+      real(8),allocatable :: RhoAGrid(:),RhoBGrid(:)
+      real(8),allocatable :: WGrid(:)
+      real(8),allocatable :: OA(:,:),OB(:,:),OAB(:,:)
+      real(8),allocatable :: OrbTAGrid(:,:),OrbTBGrid(:,:)
+      real(8),allocatable :: OrbAGrid(:,:),OrbBGrid(:,:)
+      real(8),allocatable :: OrbXGrid(:,:),OrbYGrid(:,:),OrbZGrid(:,:)
+      real(8),parameter :: ThrOnTop=1d-10
+c     real(8),parameter :: ThrOnTop=1d-8
+      logical :: full
+
+      SPi=SQRT(3.141592653589793)
+      SPiHlf=SPi/2d0
+C
+c     full = .false.
+      full = .true.
+
+C     set URe (unitary matrix)
+      URe=0d0
+      Do I=1,NBasis
+      URe(I,I)=1d0
+      EndDo
+C
+      Write(6,'(/1x,5a6)') ('******',i=1,5)
+      Write(6,'(1x,a)') "Local MU for A...B"
+      Write(6,'(1x,5a6)') ('******',i=1,5)
+
+C      block
+C      integer :: ip,iq
+Cc     real(8) :: LTA(NCholesky,NOccupA*NBasis)
+C      print*, 'test CHVCSAF 1... A'
+C      do k=1,3
+C      do j=1,NOccupA*NBasis
+C      print*, 'k j val',k,j,LA(k,j)
+C      enddo
+C      enddo
+CC      print*, 'test CHVCSAF 1... A^T'
+CC      do iq=1,NOccupA
+CC      do ip=1,NBasis
+CC         LTA(:,iq+(ip-1)*NOccupA)=LA(:,ip+(iq-1)*NBasis)
+CC      enddo
+CC      enddo
+CC      do k=1,3
+CC      do j=1,NOccupA*NBasis
+CC      print*, 'k j val',k,j,LTA(k,j)
+CC      enddo
+CC      enddo
+C      end block
+
+      If (IGridType==1) Then
+         Call molprogrid0(NGrid,NBasis)
+      ElseIf (IGridType==2) Then
+         Stop "Too lazy for Dalton Grid!"
+      ElseIf (IGridType==3) Then
+         Stop "Too lazy for Internal Grid!"
+      EndIf
+
+      allocate (WGrid(NGrid))
+      allocate (OrbAGrid(NGrid,NBasis))
+      allocate (OrbBGrid(NGrid,NBasis))
+      allocate (OrbXGrid(NGrid,NBasis))
+      allocate (OrbYGrid(NGrid,NBasis))
+      allocate (OrbZGrid(NGrid,NBasis))
+      call molprogrid(OrbAGrid,OrbXGrid,OrbYGrid,OrbZGrid,
+     &                WGrid,UA,NGrid,NBasis)
+      call molprogrid(OrbBGrid,OrbXGrid,OrbYGrid,OrbZGrid,
+     &                WGrid,UB,NGrid,NBasis)
+      deallocate(OrbZGrid,OrbYGrid,OrbXGrid) 
+
+C     ...no symmetry
+C     ...skip core within inactive?
+
+      print*, 'Wgrid   ', norm2(WGrid)
+      print*, 'OrbAGrid', norm2(OrbAGrid)
+      print*, 'OrbBGrid', norm2(OrbBGrid)
+      print*, 'NOccupA', NOccupA
+      print*, 'NOccupB', NOccupB
+      print*, 'NChol NBas', NCholesky,NBasis
+C
+C     COMPUTE f(r)
+C
+      allocate (FPsiAB(NGrid))
+      allocate (OA(NCholesky,NOccupA))
+      allocate (OB(NCholesky,NOccupB))
+      allocate (OAB(NOccupA,NOccupB))
+
+      do IG=1,NGrid
+
+      FPsiAB(IG)=0d0
+
+      do IP=1,NOccupA
+      OrbGridP(IP)=OccA(IP)*OrbAGrid(IG,IP)
+      enddo
+      do IR=1,NOccupB
+      OrbGridR(IR)=OccB(IR)*OrbBGrid(IG,IR)
+      enddo
+
+C     O = L(k,pq)*Phi(q)
+      OrbIGGrid(1:NBasis) = OrbAGrid(IG,1:NBasis)
+      Call dgemv('N',NCholesky*NOccupA,NBasis,1d0,LA,
+     $          NCholesky*NOccupA,OrbIGGrid,1,0d0,OA,1)
+
+      OrbIGGrid(1:NBasis) = OrbBGrid(IG,1:NBasis)
+      Call dgemv('N',NCholesky*NOccupB,NBasis,1d0,LB,
+     $          NCholesky*NOccupB,OrbIGGrid,1,0d0,OB,1)
+
+C    dgemm OAB = OA^T.OB
+      Call dgemm('T','N',NOccupA,NOccupB,NCholesky,1d0,OA,NCholesky,
+     $           OB,NCholesky,0d0,OAB,NOccupA)
+
+C     OAB(a,b)*n_a*n_b
+      do IR=1,NOccupB
+      do IP=1,NOccupA
+c     FPsiB(IG) = FPsiB(IG) + OAB(IP,IR)*OrbGridP(IP)*OrbGridR(IR)
+      FPsiAB(IG) = FPsiAB(IG) + OAB(IP,IR)*OccA(IP)*OrbAGrid(IG,IP)
+     $                       *OccB(IR)*OrbBGrid(IG,IR)
+      enddo
+      enddo
+
+      enddo ! NGrid
+
+C     include factor 2 for consistency with 
+C     f^A and f^B
+      FPsiAB = 2d0*FPsiAB
+      print*, 'FPsi AB = ', norm2(FPsiAB)
+
+      deallocate(OB,OA,OAB)
+
+      if (full) then
+C     load f^A and OnTop^A
+      open(newunit=iunit,file='locmu_A.dat',form='unformatted')
+      read(iunit) NGridA,AvMuA
+      if (NGridA.ne.NGrid) stop "Error! Gridsize in loc_mu_ab"
+      allocate(FPsiA(NGrid),OnTopA(NGrid))
+      read(iunit) FPsiA
+      read(iunit) OnTopA
+      close(iunit)
+      print*, 'FPsiA  = ',norm2(FPsiA)
+      print*, 'OnTopA = ',norm2(OnTopA)
+C     load f^B and OnTop^B
+      open(newunit=iunit,file='locmu_B.dat',form='unformatted')
+      read(iunit) NGridB,AvMuB
+      if (NGridB.ne.NGrid) stop "Error! Gridsize in loc_mu_ab"
+      allocate(FPsiB(NGrid),OnTopB(NGrid))
+      read(iunit) FPsiB
+      read(iunit) OnTopB
+      close(iunit)
+      print*, 'FPsiB  = ',norm2(FPsiB)
+      print*, 'OnTopB = ',norm2(OnTopB)
+      endif ! full
+c
+      allocate(OrbTAGrid(NOccupA,NGrid))
+      allocate(OrbTBGrid(NOccupA,NGrid))
+      Do I=1,NGrid
+         Do IP=1,NOccupA
+         OrbTAGrid(IP,I)=OrbAGrid(I,IP)
+         EndDo
+         Do IR=1,NOccupB
+         OrbTBGrid(IR,I)=OrbBGrid(I,IR)
+         EndDo
+      EndDo
+
+      allocate(RhoAGrid(NGrid),RhoBGrid(NGrid))
+      allocate(OnTop(NGrid))
+      allocate(XMuLoc(NGrid))
+
+      OnTop = 0d0
+C     muAB = sqrt(pi)/2 * f^AB/ot^AB
+      if (full) then
+C     muAB = sqrt(pi)/2 * (f^A + f^B + f^AB)/(ot^A + ot^B + ot^AB)
+C     CAREFUL! OnTopA and OnTopB include factor "2"!
+      FPsiAB = FPsiAB + FPsiA + FPsiB
+      OnTop = OnTopA + OnTopB
+      endif
+
+      AvMu  = 0d0
+      XElA  = 0d0
+      XElB  = 0d0
+      Do IG=1,NGrid
+C
+      Call DenGrid(IG,RhoAGrid(IG),OccA,URe,OrbAGrid,NGrid,NBasis)
+      Call DenGrid(IG,RhoBGrid(IG),OccB,URe,OrbBGrid,NGrid,NBasis)
+
+      OTA=0d0
+      Do IP=1,NOccupA
+      OTA=OTA+OccA(IP)*OrbTAGrid(IP,IG)**2
+      EndDo
+      OTB=0d0
+      Do IR=1,NOccupB
+      OTB=OTB+OccB(IR)*OrbTBGrid(IR,IG)**2
+      EndDo
+c     OnTop(IG)=2d0*OTA*OTB
+      OnTop(IG)=OnTop(IG)+2d0*OTA*OTB
+C
+      XMuLoc(IG)=0d0
+
+      If(OnTop(IG).Gt.ThrOnTop) Then
+      XMuLoc(IG)=SPiHlf*FPsiAB(IG)/OnTop(IG)
+      EndIf
+
+      AvMU=AvMU+XMuLoc(IG)*(RhoAGrid(IG)+RhoBGrid(IG))*WGrid(IG)
+      XElA=XElA+RhoAGrid(IG)*WGrid(IG)
+      XElB=XElB+RhoBGrid(IG)*WGrid(IG)
+
+      EndDo ! NGrid
+
+      Print*, 'ThrOnTop  =', ThrOnTop
+      Print*, 'RhoGrid A =', norm2(RhoAGrid)
+      Print*, 'RhoGrid B =', norm2(RhoBGrid)
+      Print*, 'OnTop(AB) =', norm2(OnTop)
+      print*, 'XMuLoc(AB)=', norm2(XMuLoc)
+C
+C     COMPUTE XMuMAT MATRIX in NO
+C
+      CFac=1.0d0
+C
+      Do IP=1,NBasis
+      Do IQ=1,IP
+      XMuA(IP,IQ)=0d0
+      XMuB(IP,IQ)=0d0
+C
+c     ISym=MultpC(NSymNO(IP),NSymNO(IQ))
+c     If(ISym.Eq.1) Then
+C
+      Do IG=1,NGrid
+      XMuA(IP,IQ)=XMuA(IP,IQ)
+     $ +OrbAGrid(IG,IP)*OrbAGrid(IG,IQ)*WGrid(IG)*Exp(-CFac*XMuLoc(IG))
+      XMuB(IP,IQ)=XMuB(IP,IQ)
+     $ +OrbBGrid(IG,IP)*OrbBGrid(IG,IQ)*WGrid(IG)*Exp(-CFac*XMuLoc(IG))
+      EndDo
+C
+c     EndIf
+      XMuA(IQ,IP)=XMuA(IP,IQ)
+      XMuB(IQ,IP)=XMuB(IP,IQ)
+C
+      EndDo
+      EndDo
+C
+      AvMu=AvMu/(XElA+XElB)
+C
+      print*, 'XMu(A)=', norm2(XMuA)
+      print*, 'XMu(B)=', norm2(XMuB)
+      write(6,*) 'XelA XelB  =', XElA,XElB
+      write(6,*) 'Average Mu =', AvMu
+C
+      deallocate(FPsiAB)
+      if (full) deallocate(FPsiB,FPsiA)
+      deallocate(OrbTBGrid,OrbTAGrid)
+      deallocate(RhoBGrid,RhoAGrid)
+      deallocate(OnTop,XMuLoc)
+
+      End Subroutine LOC_MU_CBS_AB
+
 
 *Deck LOC_MU_CBS
       Subroutine LOC_MU_CBS(XMuMAT,URe,UNOAO,Occ,TwoEl,
@@ -1038,6 +1391,46 @@ C
       Return
       End
 C*End Subroutine LOC_MU_CBS
+
+*Deck TRAN_MU_CHOL
+      Subroutine TRAN_MU_CHOL(XMuMat,FileIN,FileOUT,NBasis)
+C
+C     Transform 1 index in Cholesky vectors
+c     with XMuMat : R(k,pq).(q|mu(r)|t) = R(k,pt)
+C     and save to disk (FileOUT)
+C
+C     Comments:
+C     -- assumed FF dimensions, i.e. (NCholeksy,NBasisi**2)
+c
+      Integer,intent(in) :: NBasis
+      Real*8, intent(in) :: XMuMat(NBasis,NBasis)
+      Character(*) :: FileIN,FileOUT
+C
+      Integer :: NCholesky
+      Integer :: iunit
+      Real*8,Dimension(:,:),Allocatable :: CholVecs,Work
+
+      open(newunit=iunit,file=trim(FileIN),form='unformatted')
+      read(iunit) NCholesky
+      Allocate(CholVecs(NCholesky,NBasis**2),Work(NCholesky,NBasis**2))
+      read(iunit) CholVecs
+      close(iunit)
+
+c     Call gclock('START',Tcpu,Twall)
+      Call dgemm('N','N', NCholesky*NBasis,NBasis,NBasis,1d0,
+     $           CholVecs,NCholesky*NBasis,XMuMat,NBasis,
+     $           0d0,Work,NCholesky*NBasis)
+
+C     save to disk
+      open(newunit=iunit,file=trim(FileOUT),form='unformatted')
+      write(iunit) NCholesky
+      write(iunit) Work
+      close(iunit)
+
+      deallocate(CholVecs,Work)
+c
+      End
+* End Subroutine TRAN_MU_CHOL
 
 *Deck get_RDM2Occ
       Subroutine get_RDM2Occ(RDM2val,Occ,INActive,NAct,NOccup,NBasis)

@@ -1,0 +1,41 @@
+Calculation
+ BasisPath /home/michalhapka/pr-dmft/bazy-do-pyscf/
+ JobTitle   POSTCAS-LR
+ Interface  PYSCF
+ JobType  AC0
+ DFunc      SR-PBE
+ PostCAS    .TRUE.     
+ RDMType    CAS
+ TwoMoInt   FOFO
+ Kernel     0
+
+ Basis cc-pvdz.txt
+ units bohr
+!  cbs 2
+ grid sg1
+end
+
+
+
+Choleskyblock
+Cholesky OTF
+Cholesky_Accuracy L
+end
+
+xyz
+2
+B    0.000000000    0.000000000   -0.426444880
+H    0.000000000    0.000000000    4.573555120
+end
+
+System
+ ZNucl           6
+! NStronglyOccOrb 4
+ Charge          0
+  Omega       0.400
+ ThrSelAct       1.d-4
+ ThrQInact       1.d-2
+end
+
+
+

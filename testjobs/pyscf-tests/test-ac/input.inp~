@@ -1,0 +1,38 @@
+Calculation
+ BasisPath /home/aleksandra.tucholska/test/gammcor/bazy-do-pyscf/
+ JobTitle   AC
+ Interface  PYSCF
+ JobType  AC
+! DFunc      SR-PBE
+ RDMType    CAS
+ TwoMoInt   FOFO
+ Triplet False
+ Basis cc-pvdz.txt
+ units bohr
+!  cbs 2
+ grid medium
+end
+
+
+
+Choleskyblock
+Cholesky OTF
+Cholesky_Accuracy L
+end
+
+xyz
+2
+N    0.000000000    0.000000000   0.0000000000
+N    0.000000000    0.000000000   2.075000
+end
+
+System
+ ZNucl           14
+! NStronglyOccOrb 4
+ Charge          0
+ ThrSelAct       1.d-4
+ ThrQInact       1.d-2
+end
+
+
+

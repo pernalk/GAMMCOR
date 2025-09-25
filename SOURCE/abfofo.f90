@@ -16,6 +16,17 @@ subroutine AB_CAS_FOFO(ABPLUS,ABMIN,ETot,URe,Occ,XOne, &
 !
 ! COMPUTE THE A+B AND A-B MATRICES FOR 2-RDM READ FROM A rdm2.dat FILE
 !
+! Input:
+!
+! AB1       = .true.  if A^(1) +/- B^(1)
+!              first-order Hessian matrices
+!
+!           = .false. if A^(alpha) +/- B^(alpha)
+!
+! IDBBSC = 2: hessians with effective SR integrals (only with Cholesky)
+!
+! Comments:
+!
 ! RDM2 IS IN NO REPRESENTATION. IT IS PARTIALLY SPIN-SUMMED
 ! THE FOLLOWING SYMMETRY IS ASSUMED
 ! RDM2(ij,kl) = RDM2(kl,ij)
@@ -24,7 +35,7 @@ subroutine AB_CAS_FOFO(ABPLUS,ABMIN,ETot,URe,Occ,XOne, &
 ! COULOMB INTEGRALS ARE READ FROM IntJFile IN (FF|OO) FORMAT
 ! EXCHANGE INTEGRALS ARE READ FROM IntKFile IN (FO|FO) FORMAT
 !
- implicit none
+implicit none
 
 integer,intent(in) :: NAct,INActive,NElecBEmb
 integer,intent(in) :: NDimX,NBasis,NDim,NInte1
@@ -199,7 +210,7 @@ if(ICholesky==1) then
    else
       call JK_Chol_loop(ABPLUS,ABMIN,HNO,AuxI,AuxIO,WMAT,&
                         RDM2val,Occ,AuxCoeff,IGem,AuxInd,pos,&
-                        INActive,NOccup,NDimX,NDimX,NBasis,NInte1,IntJFile,IntKFile,&
+                        INActive,NOccup,NElecBEmb,NDimX,NDimX,NBasis,NInte1,IntJFile,IntKFile,&
                         ACAlpha,switch,ETot)
    endif
 else
@@ -224,7 +235,8 @@ if (IVEMB) then
                     HNO(i,j) = -work2(nbasis*(i-1)+j)
              else
                     ij=(max(i,j)*(max(i,j)-1))/2+min(i,j)
-                    HNO(i,j) = XOne(ij)+(1.d0-ACAlpha)*work2(nbasis*(i-1)+j)
+      !              HNO(i,j) = XOne(ij)+(1.d0-ACAlpha)*work2(nbasis*(i-1)+j)
+                    HNO(i,j) = HNO(i,j)+(1.d0-ACAlpha)*work2(nbasis*(i-1)+j)
              endif
          endif
          if(IGem(i)==IGem(j).And.IGem(i)==1.And.i.gt.NElecBEmb/2.and.j.gt.NElecBEmb/2) then
@@ -232,7 +244,8 @@ if (IVEMB) then
                     HNO(i,j) = -work2(nbasis*(i-1)+j)
              else
                     ij=(max(i,j)*(max(i,j)-1))/2+min(i,j)
-                    HNO(i,j) = XOne(ij)+(1.d0-ACAlpha)*work2(nbasis*(i-1)+j)
+      !              HNO(i,j) = XOne(ij)+(1.d0-ACAlpha)*work2(nbasis*(i-1)+j)
+      !              HNO(i,j) = HNO(i,j)+(1.d0-ACAlpha)*work2(nbasis*(i-1)+j)
              endif            
          endif
 
@@ -1346,12 +1359,11 @@ print*, 'XOne',norm2(XOne)
 call dgemm('N','N',NBasis,NBasis,NBasis,1d0,URe,NBasis,work1,NBasis,0d0,work2,NBasis)
 call dgemm('N','T',NBasis,NBasis,NBasis,1d0,work2,NBasis,URe,NBasis,0d0,HNO,NBasis)
 call sq_symmetrize(HNO,NBasis)
-
 deallocate(work1)
 
 val = 0
 do i=1,NOccup
-   val = val + Occ(i)*HNO(i,i)
+      val = val + Occ(i)*HNO(i,i)
 enddo
 EnOne = EnOne + 2*val
 
@@ -1398,11 +1410,11 @@ if(ICholesky==1) then
    if(present(ETot)) then
       call JK_Chol_loop(ABPLUS,ABMIN,HNO,AuxI,AuxIO,WMAT,&
                         RDM2val,Occ,AuxCoeff,IGem,AuxInd,pos,&
-                        INActive,NOccup,NDimX,NDimX,NBasis,NInte1,IntJFile,IntKFile,0d0,2,ETot)
+                        INActive,NOccup,NElecBEmb,NDimX,NDimX,NBasis,NInte1,IntJFile,IntKFile,0d0,2,ETot)
    else
       call JK_Chol_loop(ABPLUS,ABMIN,HNO,AuxI,AuxIO,WMAT,&
                         RDM2val,Occ,AuxCoeff,IGem,AuxInd,pos,&
-                        INActive,NOccup,NDimX,NDimX,NBasis,NInte1,IntJFile,IntKFile,0d0,2)
+                        INActive,NOccup,NElecBEmb,NDimX,NDimX,NBasis,NInte1,IntJFile,IntKFile,0d0,2)
    endif
 else
    if(present(ETot)) then
@@ -1505,6 +1517,10 @@ do ICol=1,NDimX
 !           endif
 !         endif
 
+! Tamm-Dankoff Approximation for AC0
+!         AuxVal=(ABPLUS(ipq,irs)+ABMIN(ipq,irs))/2.D0
+!         ABPLUS(ipq,irs)=AuxVal
+!         ABMIN(ipq,irs)=AuxVal
          val = (C(ip) + C(iq))*(C(ir) + C(is))
          if(val/=0d0) ABPLUS(ipq,irs) = ABPLUS(ipq,irs)/val
          val = (C(ip) - C(iq))*(C(ir) - C(is))

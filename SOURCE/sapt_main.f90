@@ -28,6 +28,7 @@ type(SaptData)  :: SAPT
 type(TAOBasis)  :: AOBasis
 type(TSystem)   :: System
 type(TCholeskyVecsOTF) :: CholeskyVecsOTF
+type(TCholeskyVecsOTF) :: CholErfVecsOTF
 
 integer :: i
 integer :: NBasis
@@ -54,12 +55,16 @@ double precision :: Tcpu,Twall
  call sapt_interface(Flags,SAPT,NBasis,AOBasis,CholeskyVecsOTF)
 
  call sapt_mon_ints(SAPT%monA,Flags,NBasis,AOBasis,CholeskyVecsOTF)
+ if(Flags%IDBBSC==2) call sapt_mon_lr_ints(SAPT%monA,Flags,NBasis,AOBasis,CholErfVecsOTF)
  call sapt_response(Flags,SAPT%monA,SAPT%EnChck,NBasis)
 
  call sapt_mon_ints(SAPT%monB,Flags,NBasis,AOBasis,CholeskyVecsOTF)
+ if(Flags%IDBBSC==2) call sapt_mon_lr_ints(SAPT%monB,Flags,NBasis,AOBasis,CholErfVecsOTF)
  call sapt_response(Flags,SAPT%monB,SAPT%EnChck,NBasis)
 
  call sapt_ab_ints(Flags,SAPT%monA,SAPT%monB,SAPT%iPINO,NBasis,AOBasis,CholeskyVecsOTF)
+ !call sapt_ab_lr_ints(Flags,SAPT,SAPT%monA,SAPT%monB,NBasis,AOBasis,CholeskyVecsOTF,CholErfVecsOTF)
+ !if(Flags%IDBBSC==2) call sapt_ab_lr_ints(Flags,SAPT,SAPT%monA,SAPT%monB,NBasis,AOBasis,CholeskyVecsOTF,CholErfVecsOTF)
 
  ! MC-srDFT SAPT with Cholesky OTF
  if(SAPT%doRSH) call sapt_mcsrdft_otf(Flags,SAPT,NBasis)
@@ -545,9 +550,11 @@ integer :: i
       !call e2disp_Cmat_Chol(Flags,SAPT%monA,SAPT%monB,SAPT)
       !call e2disp_Cmat_Chol_diag(Flags,SAPT%monA,SAPT%monB,SAPT)
       call e2disp_Cmat_Chol_block(Flags,SAPT%monA,SAPT%monB,SAPT)
+      call e2disp_Chol_cpld_batch(Flags,SAPT%monA,SAPT%monB,SAPT)
       !call e2disp_Cmat_Chol_proj(Flags,SAPT%monA,SAPT%monB,SAPT)
     else if(SAPT%CAlpha) then
       call e2disp_CAlphaTilde_block(Flags,SAPT%monA,SAPT%monB,SAPT)
+      call e2disp_Chol_cpld_batch(Flags,SAPT%monA,SAPT%monB,SAPT)
       !call e2disp_CAlphaTilde_full(Flags,SAPT%monA,SAPT%monB,SAPT)
     endif
     call e2exdisp(Flags,SAPT%monA,SAPT%monB,SAPT)
@@ -760,6 +767,9 @@ type(AOReaderData) :: reader
 type(TAOBasis)     :: AOBasis
 type(TCholeskyVecsOTF) :: CholeskyVecsOTF
 integer,intent(in) :: iPINO,NBasis
+
+integer            :: ip,iq
+integer            :: dimOA,dimOB,NCholesky
 integer            :: thr_id
 integer            :: ntr,iunit_aotwosort
 double precision :: Tcpu,TWall
@@ -945,9 +955,30 @@ if(Flags%ISERPA==0) then
      endif
      end block
 
-     deallocate(A%FO)
-     deallocate(B%FO)
      deallocate(A%OOAB)
+
+     ! for CBS[H], transpose FO --> OF
+     !if (Flags%IDBBSC==2) then
+        dimOA=A%num0+A%num1
+        allocate(A%OF(A%NChol,dimOA*NBasis))
+        do iq=1,dimOA
+           do ip=1,NBasis
+              A%OF(:,iq+(ip-1)*dimOA)=A%FO(:,ip+(iq-1)*NBasis)
+           enddo
+        enddo
+     !endif
+     deallocate(A%FO)
+
+    ! if (Flags%IDBBSC==2) then
+        dimOB=B%num0+B%num1
+        allocate(B%OF(B%NChol,dimOB*NBasis))
+        do iq=1,dimOB
+           do ip=1,NBasis
+              B%OF(:,iq+(ip-1)*dimOB)=B%FO(:,ip+(iq-1)*NBasis)
+           enddo
+        enddo
+     !endif
+     deallocate(B%FO)
 
      call gclock('Time in Assemble:',Tcpu,Twall)
 
@@ -1174,6 +1205,44 @@ elseif(Flags%ISERPA==2) then
 endif
 
 end subroutine sapt_ab_ints
+
+subroutine sapt_ab_lr_ints(Flags,SAPT,A,B,NBasis,AOBasis,CholeskyVecsOTF,CholErfVecsOTF)
+!
+! calculate SR mu-transformed Cholesky vectors
+! for dispersion
+!
+implicit none
+
+type(FlagsData)    :: Flags
+type(SaptData)     :: SAPT
+type(SystemBlock)  :: A,B
+type(TAOBasis)     :: AOBasis
+type(TCholeskyVecsOTF) :: CholeskyVecsOTF
+type(TCholeskyVecsOTF) :: CholErfVecsOTF
+integer,intent(in) :: NBasis
+
+integer :: NOccupA,NOccupB
+integer :: NCholesky
+integer :: IGridType
+real(8) :: UA(NBasis,NBasis),UB(NBasis,NBasis)
+real(8) :: XMuA(NBasis,NBasis),XMuB(NBasis,NBasis),AvMu
+character(:),allocatable :: BasisSet
+
+NOccupA = A%num0 + A%num1
+NOccupB = B%num0 + B%num1
+BasisSet = Flags%BasisSetPath // Flags%BasisSet
+
+UA = transpose(A%CAONO)
+UB = transpose(B%CAONO)
+
+IGridType = 1 ! Molpro 
+
+call LOC_MU_CBS_AB(XMuA,XMuB,AvMu,UA,UB,NOccupA,A%Occ,NOccupB,B%Occ, &
+                   A%OF,B%OF,IGridType,BasisSet,SAPT%NCholesky,NBasis)
+
+stop "here!"
+
+end subroutine sapt_ab_lr_ints
 
 subroutine saptuks_ab_ints(Flags,A,B,NBasis,AOBasis,CholeskyVecsOTF)
 !
@@ -1519,9 +1588,9 @@ subroutine reduce_virt(Flags,Mon,NBas)
 
 end subroutine reduce_virt
 
-subroutine sapt_mon_ints(Mon,Flags,NBas,AOBasis,CholeskyVecsOTF)
+subroutine sapt_mon_ints(Mon,Flags,NBasis,AOBasis,CholeskyVecsOTF)
 !
-! Cholesky: generate FFXX(NCholesky,NBas**2)
+! Cholesky    : generate FFXX(NCholesky,NBasis**2)
 !
 implicit none
 
@@ -1530,11 +1599,15 @@ type(FlagsData)   :: Flags
 type(TAOBasis)    :: AOBasis
 type(TCholeskyVecsOTF) :: CholeskyVecsOTF
 
-integer :: NBas
-integer :: i,j,ij,ione
-integer :: NSq,NInte1,NInte2
+integer,intent(in) :: NBasis
 
-double precision             :: URe(NBas,NBas),MO(NBas*NBas)
+integer :: NInte1
+integer :: iunit
+integer :: i,j,ij,ione
+
+double precision             :: URe(NBasis,NBasis),MO(NBasis*NBasis)
+double precision             :: UNOAO(NBasis,NBasis)
+double precision             :: CorrMD
 double precision,allocatable :: TwoMO(:)
 double precision,allocatable :: work1(:),work2(:)
 character(8)                 :: label
@@ -1546,9 +1619,7 @@ double precision :: Tcpu,Twall
 call gclock('START',Tcpu,Twall)
 
 ! set dimensions
- NSq = NBas**2
- NInte1 = NBas*(NBas+1)/2
- NInte2 = NInte1*(NInte1+1)/2
+NInte1 = NBasis*(NBasis+1)/2
 
 ! set file names
  if(Mon%Monomer==1) then
@@ -1561,24 +1632,24 @@ call gclock('START',Tcpu,Twall)
     twokfile = 'FOFOBB'
  endif
 
- allocate(work1(NSq),work2(NSq))
+ allocate(work1(NBasis*NBasis),work2(NBasis*NBasis))
 
  URe = 0d0
- do i=1,NBas
+ do i=1,NBasis
     URe(i,i) = 1d0
  enddo
 
  MO = 0
  ij = 0
- do j=1,NBas
- do i=1,NBas
+ do j=1,NBasis
+ do i=1,NBasis
     ij = ij + 1
     MO(ij) = Mon%CMO(i,j)
  enddo
  enddo
 
  ! read 1-el
- !call get_1el_h_mo(XOne,MO,NBas,onefile)
+ !call get_1el_h_mo(XOne,MO,NBasis,onefile)
 
  if(Flags%SaptLevel==1) return
 
@@ -1587,60 +1658,154 @@ call gclock('START',Tcpu,Twall)
  select case(Mon%TwoMoInt)
  case(TWOMO_INCORE,TWOMO_FFFF)
    ! full - for GVB and CAS
-   call tran4_full(NBas,MO,MO,twofile,'AOTWOSORT')
+   call tran4_full(NBasis,MO,MO,twofile,'AOTWOSORT')
 
  case(TWOMO_FOFO)
    if(Flags%ICholesky==1) then
 
       if (Flags%ICholeskyBIN==1) then
-         call chol_ints_fofo(NBas,NBas,Mon%FF, &
+         call chol_ints_fofo(NBasis,NBasis,Mon%FF, &
                         Mon%num0+Mon%num1,Mon%num0+Mon%num1,Mon%FF,&
-                        Mon%NChol,NBas,twojfile)
-         call chol_ints_fofo(NBas,Mon%num0+Mon%num1,Mon%FF,&
-                        NBas,Mon%num0+Mon%num1,Mon%FF,&
-                        Mon%NChol,NBas,twokfile)
+                        Mon%NChol,NBasis,twojfile)
+         call chol_ints_fofo(NBasis,Mon%num0+Mon%num1,Mon%FF,&
+                        NBasis,Mon%num0+Mon%num1,Mon%FF,&
+                        Mon%NChol,NBasis,twokfile)
       elseif (Flags%ICholeskyOTF==1) then
           write(LOUT,'(1x,a,i2)') 'Skipping FFOO/FOFO for monomer ',Mon%Monomer
-          call chol_FFXX_mon_AO2NO_OTF(Flags,Mon,CholeskyVecsOTF,AOBasis,NBas)
+          call chol_FFXX_mon_AO2NO_OTF(Flags,Mon,CholeskyVecsOTF,AOBasis,NBasis)
           
           ! SAPT+DALTON avoids Fock matrix in sapt_interface (no need
           ! for canonicalization). The J, K and W (=V+J) matrices
           ! are calculate now from Cholesky FFXX vectors.
-          if (Flags%InterfaceType==1) call chol_JKmat_AO_OTF(Mon,NBas)
-          if (Flags%InterfaceType==1) call CholeskyOTF_elpot_AO(Mon,NBas)
+          if (Flags%InterfaceType==1) call chol_JKmat_AO_OTF(Mon,NBasis)
+          if (Flags%InterfaceType==1) call CholeskyOTF_elpot_AO(Mon,NBasis)
 
           if (Flags%IFunSR/=0) deallocate(Mon%FF) ! only needed for JKmat
       endif
 
-      !call chol_ints_gen(NBas,NBas,Mon%FF, &
+      !call chol_ints_gen(NBasis,NBasis,Mon%FF, &
       !               Mon%num0+Mon%num1,Mon%num0+Mon%num1,Mon%OO,&
       !               Mon%NChol,twojfile)
-      !call chol_ints_gen(NBas,Mon%num0+Mon%num1,Mon%FO,&
-      !               NBas,Mon%num0+Mon%num1,Mon%FO,&
+      !call chol_ints_gen(NBasis,Mon%num0+Mon%num1,Mon%FO,&
+      !               NBasis,Mon%num0+Mon%num1,Mon%FO,&
       !               Mon%NChol,twokfile)
+
+      ! this is needed in JK_Chol_loop
+
+      if(Mon%Monomer==2) then
+         open(newunit=iunit,file='cholvecs',status='old')
+         close(iunit,status='delete')
+      endif
+      open(newunit=iunit,file='cholvecs',form='unformatted')
+      write(iunit) Mon%NChol
+      write(iunit) Mon%FF
+      close(iunit)
+      ! for JK(_SR)_Chol_loop
+      deallocate(Mon%FF)
+
    else
       ! transform J and K
-       call tran4_gen(NBas,&
-            Mon%num0+Mon%num1,MO(1:NBas*(Mon%num0+Mon%num1)),&
-            Mon%num0+Mon%num1,MO(1:NBas*(Mon%num0+Mon%num1)),&
-            NBas,MO,&
-            NBas,MO,&
+       call tran4_gen(NBasis,&
+            Mon%num0+Mon%num1,MO(1:NBasis*(Mon%num0+Mon%num1)),&
+            Mon%num0+Mon%num1,MO(1:NBasis*(Mon%num0+Mon%num1)),&
+            NBasis,MO,&
+            NBasis,MO,&
             twojfile,'AOTWOSORT')
        call gclock('FFOO',Tcpu,Twall)
-       call tran4_gen(NBas,&
-            NBas,MO,&
-            Mon%num0+Mon%num1,MO(1:NBas*(Mon%num0+Mon%num1)),&
-            NBas,MO,&
-            Mon%num0+Mon%num1,MO(1:NBas*(Mon%num0+Mon%num1)),&
+       call tran4_gen(NBasis,&
+            NBasis,MO,&
+            Mon%num0+Mon%num1,MO(1:NBasis*(Mon%num0+Mon%num1)),&
+            NBasis,MO,&
+            Mon%num0+Mon%num1,MO(1:NBasis*(Mon%num0+Mon%num1)),&
             twokfile,'AOTWOSORT')
        call gclock('FOFO',Tcpu,Twall)
-    endif
+    endif ! ICholesky
  end select
 
  deallocate(work2,work1)
  !if(Mon%TwoMoInt==1) deallocate(TwoMO)
 
 end subroutine sapt_mon_ints
+
+subroutine sapt_mon_lr_ints(Mon,Flags,NBasis,AOBasis,CholErfVecsOTF)
+!
+! for CBS[H] : 
+!             - compute LR integrals (AO)
+!             - tran to NO, FFErf(NCholErf,NBasis**2) (save to disk: cholvErf)
+!             - compute mu=<p|mu(r)|q>
+!             - tran to NO, FFErfTr = FFErf*mu (save to disk: chol1vFR) 
+!             - tran to NO, FFErfTr = FFErf*mu (save to disk: chol1vLR)
+!
+implicit none
+
+type(SystemBlock) :: Mon
+type(FlagsData)   :: Flags
+type(TAOBasis)    :: AOBasis
+type(TCholeskyVecsOTF) :: CholErfVecsOTF
+
+integer,intent(in) :: NBasis
+
+integer :: iunit
+double precision             :: UNOAO(NBasis,NBasis)
+double precision             :: CorrMD
+character(:),allocatable     :: rdmfile
+character(:),allocatable     :: BasisSet
+!test
+double precision :: Tcpu,Twall
+
+call gclock('START',Tcpu,Twall)
+
+if (Flags%ICholesky==0) stop "sapt_mon_lr_ints called with Cholesky=0!"
+if (Flags%IDBBSC/=2) stop "sapt_mon_lr_ints called with IDBBSC/=2!"
+
+! set file names
+if(Mon%Monomer==1) rdmfile  = 'rdm2_A.dat'
+if(Mon%Monomer==2) rdmfile  = 'rdm2_B.dat'
+
+! compute LR Cholesky vectors
+!  -- In CBS[H], we use OM=1.0 for both monomers
+if (Mon%Monomer==1) then
+   call sapt_erfint_OTF(Flags,Mon,NBasis,AOBasis,CholErfVecsOTF)
+endif
+
+Mon%NCholErf = CholErfVecsOTF%Chol2Data%NVecs
+!print*, 'is it ok here NCholErf?', Mon%Monomer, Mon%NCholErf
+
+! transform to FFErf, save to cholvErf
+call chol_FFERF_AO2NO_OTF(Flags,Mon,CholErfVecsOTF,AOBasis,NBasis)
+
+if(Mon%Monomer==2) then
+   open(newunit=iunit,file='cholvErf',status='old')
+   close(iunit,status='delete')
+endif
+open(newunit=iunit,file='cholvErf',form='unformatted')
+write(iunit) Mon%NCholErf
+write(iunit) Mon%FFErf
+close(iunit)
+
+! for JK(_SR)_Chol_loop
+deallocate(Mon%FFErf)
+
+! compute local mu(r): XMuMat(p,q) = <p|mu(r)|q>
+! transform    Cholesky vecs (save to chol1vFR)
+! transform LR Cholesky vecs (save to chol1vLR)
+!
+print*, 'Computing mu(r) for monomer =', Mon%Monomer
+allocate(Mon%XMuMat(NBasis,NBasis))
+BasisSet = Flags%BasisSetPath // Flags%BasisSet
+UNOAO = transpose(Mon%CAONO)
+call FlagsToCommons(Mon,Flags)
+call LOC_MU_CBS_CHOL(Mon%XMuMat,CorrMD,Mon%AvMU, &
+                     UNOAO,Mon%Occ,rdmfile,BasisSet,NBasis,.true.)
+
+if(Mon%Monomer==1) call system('cp locmu.dat locmu_A.dat')
+if(Mon%Monomer==2) call system('cp locmu.dat locmu_B.dat')
+
+print*, 'XMuMat Monomer', norm2(Mon%XMuMat),mon%Monomer
+call TRAN_MU_CHOL(Mon%XMuMat,'cholvecs','chol1vFR',NBasis)
+call TRAN_MU_CHOL(Mon%XMuMat,'cholvErf','chol1vLR',NBasis)
+
+end subroutine sapt_mon_lr_ints
 
 subroutine chol_ints_gen(nA,nB,MatAB,nC,nD,MatCD,NCholesky,fname)
 ! MatAB and MatCD may have any NChol,XX shape

@@ -4,6 +4,9 @@
 C
 C     READ HAO, 2-EL INTEGRALS IN NO, C_COEFFICIENTS, IGEM FROM A DALTON_GENERATED FILE
 C     READ UMOAO FROM SIRIUS.RST or DALTON.MOPUN
+C     MC-srDFT: XKin contains just 1el hamiltonian :
+C               XKin = T + Vne
+C     The missing VKS^sr + J^sr parts have to be added outside
 C
       use print_units
       use types
@@ -17,6 +20,7 @@ C      use Cholesky
       use gammcor_integrals
 C
       Implicit Real*8 (A-H,O-Z)
+      Character*60 FMultTab
 C
       Real*8 XKin(NInte1),XNuc(NInte1),Occ(NBasis),URe(NBasis,NBasis),
      $ TwoEl(NInte2),UMOAO(NBasis,NBasis),
@@ -26,6 +30,10 @@ C
       logical :: exione,exinuc,ex
       double precision,allocatable :: CAONO(:,:)
       double precision, allocatable :: VsrKS(:,:),Jsr(:,:)
+      double precision :: GammaF(NInte1)
+      double precision :: JNO(NBasis,NBasis),JNOlr(NBasis,NBasis),
+     $                    JNOsr(NBasis,NBasis)
+
       double precision, allocatable :: Work(:,:),WorkTr(:)
 C
       Character*60 Line
@@ -39,14 +47,15 @@ C     Cholesky OnTheFly
       Type(TCholeskyVecsOTF) :: CholErfVecsOTF
       type(TSystem)  :: System
       type(TAOBasis) :: AOBasis
+C     Cholesky Binary
+      Type(TCholeskyVecs) :: CholeskyVecs
 C
+      Real(F64),Allocatable :: MatFF(:,:)
+      Real(F64),Allocatable :: FFErf(:,:)
+      Real(F64),Allocatable :: DipX(:,:),DipY(:,:),DipZ(:,:)
       logical :: SortAngularMomenta
       character(:),allocatable :: XYZPath
       character(:),allocatable :: BasisSetPath
-C
-C     Cholesky Binary
-      Type(TCholeskyVecs) :: CholeskyVecs
-      Real*8, Allocatable :: MatFF(:,:)
 C
       Include 'commons.inc'
 C
@@ -83,6 +92,13 @@ C      endif
 C
       Call read_sym_dalton(NSym,NSymBas,NSymOrb,'SIRIUS.RST','BASINFO ')
       Write(LOUT,'(1x,a,i3/)') 'Point Group = ', NSym
+      MxSym = NSym
+      if (sum(NSymOrb).ne.sum(NSymBas)) then
+         print*, 'ERROR in ReadDAL!'
+         print*, 'NBasis = ', sum(NSymBas)
+         print*, 'NOrb   = ', sum(NSymOrb)
+      !   stop "NOrb .ne. NBasis...!"
+      endif
 C
       Call read_mo_dalton(UAux,NBasis,NSym,NSymBas,NSymOrb,
      $            'SIRIUS.RST','DALTON.MOPUN')
@@ -192,7 +208,6 @@ C       deallocate(WorkTr)
 C       deallocate(Work,Jsr,VsrKS)
 C      EndIf
 C
-C
 C     GET 2-EL NO INTEGRALS AND CICoef
 C
       If(ITwoEl.Eq.1) Then
@@ -232,14 +247,29 @@ C
       Call CholeskyOTF_ao_vecs(CholeskyVecsOTF,AOBasis,System,IUnits,
      $            XYZPath,BasisSetPath,SortAngularMomenta,ICholeskyAccu)
       NCholesky = CholeskyVecsOTF%Chol2Data%NVecs
+      if(Monomer.eq.1) call sys_Init(System,SYS_MONO_A)
+      if(Monomer.eq.2) call sys_Init(System,SYS_MONO_B)
+      if(Monomer.eq.3) call sys_Init(System,SYS_TOTAL)
       Call sys_NuclearRepulsion(ENucOTF,System)
 
       If(IH0Test==1) then
-      Call CholeskyOTF_H0_test0(AOBasis,System,'DALTON',
+      Call CholeskyOTF_H0_test0(AOBasis,System,Monomer,'DALTON',
      &                         CAONO,XKin,NINte1,NBasis)
       EndIf
-
-      EndIf ! ICholesky
+C
+      If (IDBBSC.Eq.2.Or.IFunSR.Eq.4) Then
+      Write(lout,'(/1x,3a6)') ('*******',i=1,3)
+      Write(lout,'(1x,a)') 'Cholesky LR On-The-Fly'
+      Write(lout,'(2x,a,f14.8)') 'MU = ',Alpha
+      Write(lout,'(1x,3a6)') ('*******',i=1,3)
+      Call CholeskyOTF_ao_vecs(CholErfVecsOTF,AOBasis,System,IUnits,
+     $            XYZPath,BasisSetPath,SortAngularMomenta,ICholeskyAccu,
+     $            Alpha)
+      NCholErf = CholErfVecsOTF%Chol2Data%NVecs
+C
+      EndIf ! IDBBSC
+C
+      EndIf ! ICholesky OTF, BIN
       EndIf ! ITwoEl
 
 C     JOBTYPE=SRAC0 (IFlCorrdMD=1) : save Cholesky vecs
@@ -281,9 +311,9 @@ C      set Occ
 C
       ElseIf(ICASSCF.Eq.1) Then
 C
-      Sum=0.D0
+      SumOcc=0.D0
       Do I=1,NInAc+NAc
-      Sum=Sum+Occ(I)
+      SumOcc=SumOcc+Occ(I)
       EndDo
 C
       If(NInAc.Eq.0) Then
@@ -308,23 +338,85 @@ C     $ NInAcCAS,NAcCAS
       Do I=1,NBasis
       Write(6,'(X,I3,E16.6,I6)') I,Occ(I),IGem(I)
       EndDo
-      Write(6,'(2X,"Sum of Occupancies: ",E16.6)') Sum
-      If(Abs(Sum-NELE).Gt.1.D-8)
+      Write(6,'(2X,"Sum of Occupancies: ",E16.6)') SumOcc
+      If(Abs(SumOcc-NELE).Gt.1.D-8)
      $ Stop "Fatal Error: Occupancies do not sum up to NELE"
+
 C
       Close(10)
 C
 c     If(ICASSCF.Eq.0)
       EndIf
 C
+C     print CASSCF dipole moments
+      If(ICASSCF.Eq.1) Then
+      If (ICholeskyOTF==1) Then
+c
+c     If(NSym.gt.1) UAux = CAONO
+      Call DipMomOTF_ao(DipX,DipY,DipZ,BasisSetPath,XYZPath,
+     $                  IUnits,'DALTON')
+      Call CompDipMomOTF(AOBasis,System,CAONO,Occ,
+     $                   DipX,DipY,DipZ,NBasis,NBasis)
+      Else
+      inquire(file='AOPROPER',EXIST=ex)
+      if (ex) Call ComputeDipoleMom(UMOAO,Occ,'AOPROPER','AOONEINT',
+     $                              NAc+NInAc,NBasis)
+      EndIf !ICholeskyOTF
+      EndIf !ICASSCF
 
+CC     POSTCAS OTF: compute Jsr and save on disk
+      If (IFunSR==4.and.ICholeskyOTF==1) Then
+CC
+C        prepare 1-el density (NOccup) in NO
+         JNOsr=0d0
+         Do I=1,NBasis
+         JNOsr(I,I)=Occ(I)
+         EndDo
+         call sq_to_triang2(JNOsr,GammaF,NBasis)
+C
+         Call CholeskyOTF_Jmat_MO(JNOlr,CholErfVecsOTF,
+     $                          AOBasis,System,Monomer,'DALTON',
+     $                          CAONO,CAONO,XKin,GammaF,
+     $                          MemType,MemVal,NInte1,NBasis,2)
+         Call CholeskyOTF_Jmat_MO(JNO,CholeskyVecsOTF,
+     $                          AOBasis,System,Monomer,'DALTON',
+     $                          CAONO,CAONO,XKin,GammaF,
+     $                          MemType,MemVal,NInte1,NBasis,2)
+c        print*, 'JNO  =',norm2(JNO)
+c        print*, 'JNOlr=',norm2(JNOlr)
+c
+         JNOsr = JNO - JNOlr
+
+C       Print*, 'CAONO =',norm2(CAONO)
+C       do j=1,NBasis
+C          write(6,'(*(f13.8))') (CAONO(i,j),i=1,NBasis)
+C       enddo
+C
+C       Print*, 'JMOsr in MO basis =',norm2(JNOsr)
+C       do j=1,NBasis
+C          write(6,'(*(f13.8))') (JNOsr(i,j),i=1,NBasis)
+C       enddo
+
+         Call tranMO2AO('N',JNOsr,CAONO,NBasis)
+C       print*, 'JAOsr',norm2(JNOsr)
+C        do j=1,NBasis
+C           write(6,'(*(f13.8))') (JNOsr(i,j),i=1,NBasis)
+C        enddo
+C         dump short-range Jmat AO on disk
+         open(newunit=iunit,file='jsrmat',form='unformatted')
+          write(iunit) NBasis
+          write(iunit) JNOsr
+          close(iunit)
+C
+      EndIf ! POSTCAS+OTF
+C
 C     OUT-OF-CORE INTEGRAL TRANSFORMATIONS
       If(ITwoEl.Ne.1) Then
 C     PREPARE POINTERS: NOccup=num0+num1
       Call prepare_nums(Occ,Num0,Num1,NBasis)
 
-      If(ISwitch.Eq.1) Num0=NInAC
-      If(ISwitch.Eq.1) Num1=NAc
+c     If(ISwitch.Eq.1) Num0=NInAC
+c     If(ISwitch.Eq.1) Num1=NAc
       EndIf
 C
       If(ITwoEl.Eq.2) Then
@@ -379,6 +471,7 @@ C
       Write(LOUT,'(1x,a,i5,a)') 'Using ',MemMOTransfMB,
      $                          ' MB for 3-indx Cholesky transformation'
 C
+      If (IFunSR.Eq.0.Or.IFunSR.Eq.3.Or.IFunSR.Eq.5) Then
 C     cholesky BIN
       If (ICholeskyBIN==1) Then
 C
@@ -403,16 +496,44 @@ C
      $                   AOBasis, ORBITAL_ORDERING_DALTON)
 c     Call gclock('chol_gammcor_Rkab',Tcpu,Twall)
 C
-      ElseIf (ICholeskyTHC==1) Then
-      Stop "Implement ICholeskyTHC in ReadDAL!"
-C
-      EndIf ! Cholesky BIN / OTF / THC
-C
       Open(newunit=iunit,file='cholvecs',form='unformatted')
       Write(iunit) NCholesky
       Write(iunit) MatFF
       Close(iunit)
       Deallocate(MatFF)
+C
+      ElseIf (ICholeskyTHC==1) Then
+      Stop "Implement ICholeskyTHC in ReadDAL!"
+C
+      EndIf ! Cholesky BIN / OTF / THC for IFun=0,3,5
+C
+      ElseIf(IFunSR.Eq.4.Or.IDBBSC==2) Then
+C
+      If (ICholeskyOTF==1) Then
+
+      If(NSym.gt.1) UAux = CAONO
+
+         allocate(FFErf(NCholErf,NBasis**2))
+         Call Chol_gammcor_Rkab(FFErf,UAux,1,NBasis,UAux,1,NBasis,
+     $                      MemMOTransfMB, CholErfVecsOTF,
+     $                      AOBasis, ORBITAL_ORDERING_DALTON)
+      ElseIf (ICholeskBIN==1) Then
+         Stop "ICholeskyBIN not ready for PostCAS!"
+      ElseIf (ICholeskyTHC==1) Then
+         Stop "Implement ICholeskyTHC in ReadDAL!"
+      EndIf ! Cholesky BIN / OTF / THC for IFun=4 or DBBSC=2
+C
+C     dump LR integrals
+      if (IDBBSC==2) then 
+         open(newunit=iunit,file='cholvErf',form='unformatted')
+      elseif (IFunSR==4) then
+         open(newunit=iunit,file='cholvecs',form='unformatted')
+      endif
+      write(iunit) NCholErf
+      write(iunit) FFErf
+      close(iunit)
+C
+      EndIf ! IDBBSC, IFunSR=4 (postCAS)
 C
       EndIf ! ICholesky
       EndIf ! ITwoEl
@@ -655,12 +776,12 @@ C
       EndDo
       EndDo
 c
-      Sum=Zero
+      SumOcc=Zero
       NAc=0
       Do I=1,NBasis
 C     it may happen that an active orbital has a negative but very small occupation. set it to a positive
       PC(I)=Abs(PC(I))
-      Sum=Sum+PC(I)
+      SumOcc=SumOcc+PC(I)
       If(PC(I).Gt.Zero) NAc=NAc+1
       EndDo
 C
@@ -685,7 +806,7 @@ c      EndDo
 C
 c 03.01.2024 end of changes
 C
-      NInAc=XELE-Sum+1.D-2
+      NInAc=XELE-SumOcc+1.D-2
       Do I=1,NInAc+NAc
       If(I.Le.NInAc) Then
       Occ(I)=One
@@ -712,12 +833,12 @@ C
      $ NInAcCAS,NAcCAS
 C
       Write(6,'(2X,"DMRG",3X,"Occupancy",4X,"Gem")')
-      Sum=Zero
+      SumOcc=Zero
       Do I=1,NBasis
       Write(6,'(X,I3,E16.6,I6)') I,Occ(I),IGem(I)
-      Sum=Sum+Occ(I)
+      SumOcc=SumOcc+Occ(I)
       EndDo
-      Write(6,'(2X,"Sum of Occupancies: ",F10.2)') Sum
+      Write(6,'(2X,"Sum of Occupancies: ",F10.2)') SumOcc
 C
       NAct=NAcCAS
       INActive=NInAcCAS
@@ -886,6 +1007,9 @@ C
 
       Call CholeskyOTF_ao_vecs(CholeskyVecsOTF,AOBasis,System,IUnits,
      $            XYZPath,BasisSetPath,SortAngularMomenta,ICholeskyAccu)
+      if(Monomer.eq.1) call sys_Init(System,SYS_MONO_A)
+      if(Monomer.eq.2) call sys_Init(System,SYS_MONO_B)
+      if(Monomer.eq.3) call sys_Init(System,SYS_TOTAL)
       Call sys_NuclearRepulsion(ENuc,System)
 
       If (IDBBSC.Eq.2) Then
@@ -903,7 +1027,7 @@ C
       EndIf ! IDBBSC
       end block
 
-      EndIf ! ICholesky, OTF, BIN
+      EndIf ! ICholesky OTF, BIN
 C
       EndIf ! ITwoEl ?
 C
@@ -998,6 +1122,7 @@ C       set THC for FockOTF subroutine
 C
 c       IH0Test=0
 c       print*, 'IH0test = ',IH0Test
+
          Call CholeskyOTF_Fock_MO_v2(WorkSq,CholeskyVecsOTF,
      $                         AOBasis,System,Monomer,'ORCA  ',
      $                         CAOMO,CAOMO,XKin,GammaAB,
@@ -1026,7 +1151,14 @@ C      enddo
 C      enddo
 C      Print*, 'Err-2',Sqrt(Err)
 C
+C     if VEMBEDD is called with AC - do not perform canonicalisation
+C     (in this case the AC subroutine wil be used to perform numerical AC0 with noncanonical
+C     orbitals, which is useful if virtual orbitals are localised)
+C
+      If(.Not.(IVEMB.Eq.1.And.IFlAC.Eq.1.And.IFlSnd.Eq.0)) Then 
+C
 C     INACTIVE
+C
       If(NInAc.Ne.Zero) Then
 C
       Do I=1,NInAc
@@ -1036,7 +1168,7 @@ C
       EndDo
       EndDo
       Call Diag8(Fock,NInAc,NInAc,PC,Work)
-
+C
       Do I=1,NInAc
       Do J=1,NInAc
       URe(I,J)=Fock((J-1)*NInAc+I)
@@ -1070,6 +1202,14 @@ C      Print*, 'VIRT-MY',norm2(Fock)
       URe(II,JJ)=Fock((J-1)*NVirt+I)
       EndDo
       EndDo
+C
+      EndIf
+C
+C     If(.Not.(IVEMB.Eq.1.And.IFlAC.Eq.1.And.IFlSnd.Eq.0))
+C
+      Else
+C
+      Write(6,'(2/," **** ORBITALS ARE NOT CANONICALISED!!! ****",2/)')
 C
       EndIf
 C
@@ -1178,11 +1318,15 @@ C
       EndDo
 C     Print*, 'Err',Err
       If(Err.Gt.1.D-5) IUNIT=0
-      If(IUNIT==1.and.ICholeskyOTF==1) Then
-        Write(6,'(1x,a)') 'Assembling FOFO and FFOO from Cholesky
-     $                    not ready for Cholesky = OTF!'
-        Stop
-      EndIf
+C 
+C      If(IUNIT==1.and.ICholeskyOTF==1) Then
+C        Write(6,'(1x,a)') 'Assembling FOFO and FFOO from Cholesky
+C     $                    not ready for Cholesky = OTF!'
+C        Stop
+C      EndIf
+C
+C     if IUNIT=1 - CholeskyOTF will crash
+      If(ICholeskyOTF==1) IUNIT=0
 C
       If(IUNIT.Eq.1) Then
       Write(6,'(/,X,"URe is a unit matrix up to ",E16.6)') ERR
@@ -1411,7 +1555,7 @@ C     dump LR integrals
 C
       EndIf ! ICholesky
 CC
-      EndIf
+      EndIf ! ITwoEl
 C
       ElseIf(IUNIT.Eq.1.And.ITwoEl.Eq.3) Then
 C
@@ -1637,12 +1781,12 @@ C
       ETot=ETot+Two*Occ(I)*XKin(II)
 C
       If(Occ(I).Ne.1.D0) Then
-      sum=zero
+      suma=zero
       Do J=1,INActive
-      sum=sum+
+      suma=suma+
      $ 2.D0*TwoEl(NAddr3(I,I,J,J))-TwoEl(NAddr3(I,J,I,J))
       EndDo
-      eact=eact+Two*Occ(I)*(XKin(II)+sum)
+      eact=eact+Two*Occ(I)*(XKin(II)+suma)
       EndIf
 C
       EndDo
@@ -1838,6 +1982,7 @@ C     Cholesky and THC
       Type(TCholeskyVecsOTF) :: CholErfVecsOTF
       type(TSystem)  :: System
       type(TAOBasis) :: AOBasis
+      real(F64), allocatable :: dipx(:,:),dipy(:,:),dipz(:,:)
 C
 C     THC
       integer :: NCholeskyTHC, NGridTHC
@@ -1848,6 +1993,7 @@ C
       character(:),allocatable :: BasisSetPath
 C
       Character*60 FName,Aux1
+      Character*60 FMultTab
       Character(*) :: Title,BasisSet
 C
       Include 'commons.inc'
@@ -1983,11 +2129,12 @@ Cc     Call chol_CoulombMatrix(CholeskyVecs,'AOTWOSORT',ICholeskyAccu)
      &                         ICholeskyAccu)
       NCholesky=CholeskyVecs%NCholesky
 
+      print*, 'IDBBSC = ', IDBBSC
       If(IFunSR.Eq.1.Or.IFunSR.Eq.2.Or.IFunSR.Eq.4.Or.IDBBSC.Eq.2) Then
 C     generate LR-Cholesky integrals
       Write(LOUT,'(/1x,3a6)') ('*******',i=1,3)
       Write(lout,'(1x,a)') 'Cholesky LR Binary'
-      Write(lout,'(2x,a,f12.6)') 'MU = ',Alpha
+      Write(lout,'(1x,a,f12.6)') 'MU = ',Alpha
       Write(LOUT,'(/1x,3a6)') ('*******',i=1,3)
        Call chol_CoulombMatrix(CholErfVecs,NBasis,'AOTWOINT.erf',2,
      &                         ICholeskyAccu)
@@ -2113,13 +2260,13 @@ C KP 30.07.2020
       EndDo
       EndDo
 C
-      Sum=Zero
+      SumOcc=Zero
       NAc=0
       Do I=1,NBasis
 C KP 08.08.2020
 C     it may happen that an active orbital has a negative but very small occupation. set it to a positive
       PC(I)=Abs(PC(I))
-      Sum=Sum+PC(I)
+      SumOcc=SumOcc+PC(I)
       If(PC(I).Gt.Zero) NAc=NAc+1
       EndDo
 C
@@ -2135,7 +2282,7 @@ c      Call read_nact_molpro(nact,'2RDM')
       IWarn=IWarn+1
       EndIf
 C
-      NInAc=XELE-Sum+1.D-2
+      NInAc=XELE-SumOcc+1.D-2
       Do I=1,NInAc+NAc
       If(I.Le.NInAc) Then
       Occ(I)=One
@@ -2162,12 +2309,12 @@ C
      $ NInAcCAS,NAcCAS
 C
       Write(6,'(2X,"MCSCF",3X,"Occupancy",4X,"Gem")')
-      Sum=Zero
+      SumOcc=Zero
       Do I=1,NBasis
       Write(6,'(X,I3,E16.6,I6)') I,Occ(I),IGem(I)
-      Sum=Sum+Occ(I)
+      SumOcc=SumOcc+Occ(I)
       EndDo
-      Write(6,'(2X,"Sum of Occupancies: ",F10.2)') Sum
+      Write(6,'(2X,"Sum of Occupancies: ",F10.2)') SumOcc
 C
       NAct=NAcCAS
       INActive=NInAcCAS
@@ -2384,6 +2531,7 @@ c          Monomer = 3 ! SYS_TOTAL in System
 c          Print*, 'Monomer =',Monomer
 c          IH0Test=0
 c          Print*, 'IH0Test =',IH0Test
+           
            Call CholeskyOTF_Fock_MO_v2(work1,CholeskyVecsOTF,
      $                          AOBasis,System,Monomer,'MOLPRO',
      $                          CAOMO,CSAOMO,XKin,GammaF,
@@ -2416,7 +2564,8 @@ c
            CSAOMO = transpose(UAux)
            Call read_caomo_molpro(CAOMO,SAO,itsoao,jtsoao,
      &                           'MOLPRO.MOPUN','CASORBAO',NBasis)
-c          Monomer = 3 ! SYS_TOTAL in System
+c        Monomer = 3 ! SYS_TOTAL in System
+
            Call CholeskyOTF_Fock_MO_v2(work1,CholErfVecsOTF,
      $                            AOBasis,System,Monomer,'MOLPRO',
      $                            CAOMO,CSAOMO,XKin,GammaF,
@@ -2425,12 +2574,19 @@ c          Monomer = 3 ! SYS_TOTAL in System
      $                            2,JMOlr)
 c    $                            IH0Test,JMOlr) ! IH0Test=2, use external H0
 C
+
            Call CholeskyOTF_Jmat_MO(JMO,CholeskyVecsOTF,
      $                          AOBasis,System,Monomer,'MOLPRO',
      $                          CAOMO,CSAOMO,XKin,GammaF,
-     $                          MemType,MemVal,NInte1,NBasis,2)
+     $                          MemType,MemVal,NInte1,NBasis,1)
 C
+C           print*, 'CAOMO =',norm2(CAOMO)
+C           print*, 'CSAOMO =',norm2(CSAOMO)
+C           print*, 'JMO   =',norm2(JMO)
+C           print*, 'JMOlr =',norm2(JMOlr)
            JMOsr = JMO - JMOlr
+
+
 c
 c        print*, 'J in MO long-range ', norm2(JMOlr)
 c        print*, 'J in MO full-range ', norm2(JMO)
@@ -2584,7 +2740,7 @@ C              to match with gammcor-cholesky library
 C
       UAOMO = transpose(CAONO)
 C
-C      block
+c      block
 C      Print*, 'CAONO =',norm2(CAONO)
 C      do j=1,NBasis
 C         write(6,'(*(f13.8))') (CAONO(i,j),i=1,NBasis)
@@ -2593,23 +2749,35 @@ C      Print*, 'CSAONO =',norm2(UAOMO)
 C      do j=1,NBasis
 C         write(6,'(*(f13.8))') (UAOMO(i,j),i=1,NBasis)
 C      enddo
-C      end block
+C
+C       Print*, 'CAOMO =',norm2(CAOMO)
+C       do j=1,NBasis
+C          write(6,'(*(f13.8))') (CAOMO(i,j),i=1,NBasis)
+C       enddo
+C
+C       Print*, 'JMOsr in MO basis =',norm2(JMOsr)
+C       do j=1,NBasis
+C          write(6,'(*(f13.8))') (JMOsr(i,j),i=1,NBasis)
+C       enddo
+C
+C       end block
 C
       If (IFunSR.Eq.1.Or.IFunSR.Eq.2.Or.IFunSR.Eq.4) Then
 C     transform short-range Jmat from MO to AO
       Call tranMO2AO('N',JMOsr,CAOMO,NBasis)
 C
-CC    test Jsr in AO
-c      block
-c      Print*, 'JMOsr in AO basis =',norm2(JMOsr)
-c      do j=1,NBasis
-c         write(6,'(*(f13.8))') (JMOsr(i,j),i=1,NBasis)
-c      enddo
-c      end block
+CCC    test Jsr in AO
+C      block
+C      Print*, 'JMOsr in AO basis =',norm2(JMOsr)
+C      do j=1,NBasis
+C         write(6,'(*(f13.8))') (JMOsr(i,j),i=1,NBasis)
+C      enddo
+C      end block
 C
-C
-C     dump short-range Jmat on disk
+C     dump short-range Jmat AO on disk
+c     print*, 'JAOsr',norm2(JMOsr)
       open(newunit=iunit,file='jsrmat',form='unformatted')
+
       write(iunit) NBasis
       write(iunit) JMOsr
       close(iunit)
@@ -2853,8 +3021,15 @@ c     If(IFunSR.Eq.5) Then
       EndIf
 C
 C     test dipole moments
+      If (ICholeskyOTF == 1) then
+      Call DipMomOTF_ao(DIpX,DIpY,DipZ,BasisSetPath,
+     $                  XYZPath,IUnits,'MOLPRO')
+      Call CompDipMomOTF(AOBasis,System,CAONO,Occ,
+     $                   DipX,DipY,DipZ,NBasis,NBasis)
+      Else
       Call ComputeDipoleMom(UAOMO,Occ,'DIP','AOONEINT.mol',
      $                      NOccup,NBasis)
+      EndIf
 C
 C     READ ACTIVE 2-RDM AND TRANSFORM TO NO'S
 C
@@ -2988,8 +3163,8 @@ C
       End
 C     c    End Subroutine LdInteg
 
-      subroutine ReadPYSCF(THCData, BasisSet, XKin, XNuc, ENuc, Occ,
-      
+      subroutine ReadPYSCF(THCData, AuxData, BasisSet, CAONO, XKin,
+     &    XNuc, ENuc, Occ,      
      &    URe, TwoEl, UMOAO,  NInte1, NBasis, NInte2, NGem, Flags, anSt)
       use interface_pp
       use print_units
@@ -3004,7 +3179,7 @@ C     c    End Subroutine LdInteg
 
       Implicit Real*8 (A-H,O-Z)
 
-      character*(*) BasisSet
+      character(*) BasisSet
       integer NInte1, NInte2, NBasis
       real*8 ENuc
       real*8 XKin(NInte1), XNuc(NInte1)
@@ -3020,6 +3195,7 @@ C     c    End Subroutine LdInteg
       real :: elapsed_time
       type (tclock) :: timer
       type(TTHCData) :: THCData
+      type(TACppData) :: AuxData
 
 
       Include 'commons.inc'
@@ -3038,12 +3214,23 @@ C     Cholesky OnTheFly
       character(:),allocatable :: BasisSetPath
 
       Type(TCholeskyVecs) :: CholeskyVecs
-      Real*8, Allocatable :: MatFF(:,:)
+      Real*8, Allocatable :: MatFF(:,:), FFErf(:,:)
 
-      print*, 'yest'
+      call PYSCF_wrapper(THCData, AuxData, NInte1, NInte2,
+     $ NBasis, ENuc, CAONO,
+     $     XKin, TwoEl, Occ, NAc, NInAc, anSt, Flags)
 
-      call PYSCF_wrapper(THCData, NInte1, NInte2, NBasis, ENuc, CAONO,
-     $ XKin, TwoEl, Occ, NAc, NInAc, anSt, Flags)
+
+      print*, Flags%Ifunsr
+      if (IFunSR==4)then
+
+         iunit = 11
+         open(newunit=iunit,file='jsrmat',form='unformatted')
+         write(iunit) NBasis
+         write(iunit) THCData%J_SR
+         close(iunit)
+      end if
+      
       Do I=1,NBasis
          Do J=1,NBasis
             URe(I,J)=0.D0
@@ -3053,9 +3240,9 @@ C     Cholesky OnTheFly
 
       If(ICASSCF.Eq.1) Then
 
-         Sum=0.D0
+         SumOcc=0.D0
          Do I=1,NInAc+NAc
-            Sum=Sum+Occ(I)
+            SumOcc=SumOcc+Occ(I)
          EndDo
 
          If(NInAc.Eq.0) Then
@@ -3077,9 +3264,14 @@ C     Cholesky OnTheFly
          Do I=1,NBasis
             Write(6,'(X,I3,E16.6,I6)') I,Occ(I),IGem(I)
          EndDo
-         Write(6,'(2X,"Sum of Occupancies: ",E16.6)') Sum
-         If(Abs(Sum-NELE).Gt.1.D-8)
-     $        Stop "Fatal Error: Occupancies do not sum up to NELE"
+         
+      Write(6,'(2X,"Sum of Occupancies: ",E16.6)') SumOcc
+               if(Flags%JobType .ne.  JOB_TYPE_MP2 .and.                    
+     $   Flags%JobType .ne. JOB_TYPE_SRMP2)then
+         If(Abs(SumOcc-NELE).Gt.1.D-8)
+     $   Stop "Fatal Error: Occupancies do not sum up to NELE"
+         end if
+
 
       Close(10)
 
@@ -3088,8 +3280,10 @@ C     Cholesky OnTheFly
       If(ITwoEl.Eq.3) Then
 
          If (ICholeskyOTF==1) Then
+            if (IFunSR.ne.4)then
+
             call clock_start(timer)
-            allocate(MatFF(THCData%NTHC,NBasis**2))
+            allocate(MatFF(THCData%NChol,NBasis**2))
 
             Call thc_gammcor_Rkab_2(MatFF, THCData%Xga, THCData%Xga,
      $           THCData%Zgk, NBasis, NBasis,
@@ -3103,7 +3297,28 @@ C     Cholesky OnTheFly
             Close(iunit)
             Deallocate(MatFF)
             print*, 'TIME FOR WRITE MatFF', clock_readwall(timer)
-            UMOAO = transpose(CAONO)
+         EndIf
+         If (IDBBSC.Eq.2.or.IFunSR==4) Then
+
+               allocate(FFErf(THCData%NCholErf,NBasis**2))
+          Call thc_gammcor_Rkab_2(FFErf, THCData%XgaErf, THCData%XgaErf,
+     $           THCData%ZgkErf, NBasis, NBasis,
+     $              THCData%NCholErf, THCData%NTHCErf)
+
+          if (IDBBSC .Eq. 2) then
+             open(newunit=iunit,file='cholvErf',form='unformatted')
+          else
+             open(newunit=iunit,file='cholvecs',form='unformatted')
+          EndIf
+
+            write(iunit) THCData%NCholErf
+            write(iunit) FFErf
+            close(iunit)
+            Deallocate(FFErf)
+         EndIf
+            
+            
+         UMOAO = transpose(CAONO)
 
          Else
             print*, 'This setting is not supported with PYSCF, exiting'
@@ -3800,7 +4015,7 @@ C
 C
       Dimension XKin(NInte1),UMOAO(NBasis,NBasis)
 C
-      parameter (mxbuf = 10000)  ! KP
+      parameter (mxbuf = 100000)  ! KP
       double precision  dbuf(mxbuf)
       integer ibuf(mxbuf*2)
       integer iunit77,iunit88, iunit99, ndim, norb, nbas, nfone
@@ -3852,7 +4067,7 @@ C     Reads 1-el integrals in AO in symm blocks and transform to NO
 C
       Dimension XKin(NInte1),UMOAO(NBasis,NBasis),NSymBas(8)
 C
-      parameter (mxbuf = 10000)  ! KP
+      parameter (mxbuf = 100000)  ! KP
       double precision  dbuf(mxbuf)
       integer ibuf(mxbuf*2),iibuf(mxbuf*2)
       integer iunit77,iunit88, iunit99, ndim, norb, nbas, nfone
@@ -4261,6 +4476,22 @@ C      write(*,*) IGem(1:NBasis)
 
       End
 
+*Deck FlagsToCommons
+      Subroutine FlagsToCommons(System,Flags)
+      use types
+      Implicit Real*8 (A-H,O-Z)
+      type(SystemBlock) :: System
+      type(FlagsData)   :: Flags
+C
+      Include 'commons.inc'
+
+      Monomer  = System%Monomer
+      NAcCAS   = System%NAct
+      NInAcCAS = System%INAct
+
+      End
+C End Subroutine FlagsToCommons
+
 *Deck LoadSaptTwoEl
       Subroutine LoadSaptTwoEl(Mon,TwoNO,NBasis,NInte2)
 C
@@ -4313,7 +4544,8 @@ C
         IPQ=0
         Do IQ=1,NBasis
         Do IP=1,IQ
-        IPQ = IPQ + 1
+           IPQ = IPQ + 1
+
         TwoNO(NAddr3(IP,IQ,IR,IS)) = Work1(IPQ)
 C        Write(6,*) IP,IQ,IR,IS, Work1(IPQ)
 C        Write(6,*) IP,IQ,IR,IS, TwoNO(NAddr3(IP,IQ,IR,IS))
@@ -4958,6 +5190,81 @@ C
 C
       end subroutine TwoEHartree
 
+*Deck TwoEHartreeChol
+      subroutine TwoEHartreeChol(EnH,Occ,INActive,NAct,NBasis)
+      Implicit Real*8 (A-H,O-Z)
+C
+      Include 'commons.inc'
+C
+      Parameter(Zero=0.D0,Half=0.5D0,One=1.D0,Two=2.D0)
+C
+      Integer INActive,NAct,NBasis
+      Double Precision EnH
+      Dimension Occ(NBasis)
+C
+C     LOCAL ARRAYS
+C
+      Double Precision, Allocatable :: MatFF(:,:)
+
+
+c     SET FILES
+      Open(newunit=iunit,file='cholvecs',form='unformatted')
+      Read(iunit) NCholesky
+      Allocate(MatFF(NCholesky,NBasis**2))
+      Read(iunit) MatFF
+      Close(iunit)
+C
+C     SET DIMENSIONS
+      NOccup=NAct+INActive
+
+C     GET E_HARTREE
+      EnH=0
+      do j=1,NOccup
+      do i=1,NOccup
+        EnH = EnH + Occ(i)*Occ(j)
+     $   *dot_product(MatFF(:,i+(i-1)*NBasis),MatFF(:,j+(j-1)*NBasis))
+      enddo
+      enddo
+C
+      EnH = Two*EnH
+
+      end subroutine
+
+* Deck BasInfo pyscf
+      Subroutine basinfo_pyscf(nbasis)
+      implicit none
+      integer, intent(out) :: nbasis
+
+      character(len=256) :: filename
+      character(len=:), allocatable :: command
+      character(len=15)  :: temp_file = 'list.tmp'
+      integer :: unit_num, io_status, unit
+
+      filename = ''
+      command='ls -1 auxda*.txt 2>/dev/null | head -n 1 >' // temp_file
+      call execute_command_line(command, wait=.true.)
+
+      open(newunit=unit_num, file=temp_file, status='old',
+     $     action='read', iostat=io_status)
+      if (io_status == 0) then 
+         read(unit_num, '(A)', end=10) filename
+ 10      close(unit_num, status='delete')
+      end if
+
+      if (trim(filename) == '') then
+         print *, "ERROR: no auxdata file"
+         stop 
+      end if
+
+      unit = 10
+      open(unit=unit, file=filename, status='old', action='read')
+      read(unit, *) Nbasis
+      close(unit)
+
+      End Subroutine basinfo_pyscf
+      
+
+      
 *Deck BasInfo
       Subroutine basinfo(nbasis,basfile,intf)
 C
@@ -5004,6 +5311,7 @@ C
 
 *Deck SortOrbDal
       Subroutine SortOrbDal(URe1,Occ2,NNIn,NNAct,NSym,IOrbSym,NBasis)
+C
 C     sorts the orbitals in URe1 so that the
 C     inactive orbitals go first, then active, and secondary orbitals
 C
@@ -5018,6 +5326,7 @@ C
       Dimension LabelAct(NBasis),LabelIAct(NBasis),
      $ ICpy1(NBasis),ICpy2(NBasis)
       Logical FileOcc,FileSIRIFC
+      Logical ISortOcc
 C
       Occ2(1:NBasis)=0.0
       Occ1(1:NBasis)=0.0
@@ -5041,7 +5350,23 @@ C        read 1rdm from SIRIFC file...
          Write(6,'(1x,a)') 'Occupation numbers from Dalton not found!'
          Stop
       EndIf ! FileOcc
+
+C      print*, 'NNIn     = ', NNIn
+C      print*, 'NNAct    = ', NNAct
+C      print*, 'NSym     = ', NSym
+C      print*, 'IOrbSym  = ', IOrbSym(1:NSym)
+C      print*, 'IActOrb  = ', IActOrb(1:NSym)
+C      print*, 'InActOrb = ', InActOrb(1:NSym)
 C
+c     print*, 'before sort =', Occ1(1:NNIn+NNAct)
+C     Check if occupation numbers are sorted descending
+      Ntot = NNIn+NNAct
+      ISortOcc=.true.
+      Do I=1,Ntot-1
+      If (Occ1(I) < Occ1(I+1)) ISortOcc=.false.
+      EndDo
+C
+C  Build labels by symmetry blocks
       II=0
       Do I=1,NSym
       Do J=1,IOrbSym(I)
@@ -5053,34 +5378,63 @@ C
       If(J.Le.InActOrb(I)) LabelIAct(II)=1
       EndDo
       EndDo
+C   
+C set markers
+      do I = 1, Ntot
+        ICpy1(I) = 0 !=1 once slot I in the new list is filled
+        ICpy2(I) = 0 !=1 once source orb I has been used 
+      end do
 C
-      Do I=1,NNIn+NNAct
-      ICpy1(I)=0
-      ICpy2(I)=0
-      EndDo
+!      print*, 'LabelIAct = ', LabelIAct(1:Ntot)
+!      print*, 'LabelAct  = ', LabelAct(1:Ntot)
 C
-      Do II=1,NNIn+NNAct
+C     1. Sort occupation numbers
+      if (ISortOcc) Then
+C     ! Pass 1: LabelIAct == 1 first
+      do II = 1, Ntot
+        do I = 1, Ntot
+          if (ICpy2(I)==0 .and. ICpy1(II)==0 .and. LabelIAct(I)==1) then
+            ICpy2(I)=1; ICpy1(II)=1
+            Occ2(II)=Occ1(I)
+            exit   ! slot II done
+          end if
+        end do
+      end do
 C
-      Do I=1,NNIn+NNAct
-      If(ICpy2(I).Eq.0.And.ICpy1(II).Eq.0.And.Occ1(I).Eq.2.0D0) Then
-      ICpy2(I)=1
-      ICpy1(II)=1
-      Occ2(II)=Occ1(I)
-      EndIf
-      EndDo
+C     ! Pass 2: LabelAct == 1 : next
+      do II = 1, Ntot
+        if (ICpy1(II)==0) then
+          do I = 1, Ntot
+            if (ICpy2(I)==0 .and. LabelAct(I)==1) then
+              ICpy2(I)=1; ICpy1(II)=1
+              Occ2(II)=Occ1(I)
+              exit
+            end if
+          end do
+        end if
+      end do
 C
-      If(ICpy1(II).Eq.0) Then
-      Do I=1,NNIn+NNAct
-      If(ICpy2(I).Eq.0.And.ICpy1(II).Eq.0) Then
-      ICpy2(I)=1
-      ICpy1(II)=1
-      Occ2(II)=Occ1(I)
-      EndIf
-      EndDo
-      EndIf
+C     ! Pass 3: everything else : last
+      do II = 1, Ntot
+        if (ICpy1(II)==0) then
+          do I = 1, Ntot
+            if (ICpy2(I)==0) then
+              ICpy2(I)=1; ICpy1(II)=1
+              Occ2(II)=Occ1(I)
+              exit
+            end if
+          end do
+        end if
+      end do
 C
-      EndDo
+      else ! do not sort occ numbers
+      Occ2=0
+      Occ2(1:Ntot) = Occ1(1:Ntot)
+      endif
 C
+C sort orbitals in the same way
+C
+C reset markers
       Do I=1,NBasis
       ICpy1(I)=0
       ICpy2(I)=0

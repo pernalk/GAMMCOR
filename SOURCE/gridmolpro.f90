@@ -65,7 +65,6 @@ integer :: npt, ndiff, ntg
  call readgridmolpro(igrid,'GRIDKS  ',npt,r,wt)
  Call CpyV(WGrid,wt,npt)
  call readorbsmolpro(igrid,'ORBVAL  ',mapinv,orbval,npt,ndiff,ntg)
-
  do J=1,NBasis
     do I=1,NGrid
        OrbGrid(I,J)=orbval(I,1,mapinv(J))
@@ -88,12 +87,14 @@ integer :: npt, ndiff, ntg
 
  Call CpyV(Aux,OrbGrid,NBasis*NGrid)
  call dgemm('N','T',NGrid,NBasis,NBasis,1d0,Aux,NGrid,UMOAO,NBasis,0d0,OrbGrid,NGrid)
- Call CpyV(Aux,OrbXGrid,NBasis*NGrid)
- call dgemm('N','T',NGrid,NBasis,NBasis,1d0,Aux,NGrid,UMOAO,NBasis,0d0,OrbXGrid,NGrid)
- Call CpyV(Aux,OrbYGrid,NBasis*NGrid)
- call dgemm('N','T',NGrid,NBasis,NBasis,1d0,Aux,NGrid,UMOAO,NBasis,0d0,OrbYGrid,NGrid)
- Call CpyV(Aux,OrbZGrid,NBasis*NGrid)
- call dgemm('N','T',NGrid,NBasis,NBasis,1d0,Aux,NGrid,UMOAO,NBasis,0d0,OrbZGrid,NGrid)
+ if(ndiff.gt.1) then
+    Call CpyV(Aux,OrbXGrid,NBasis*NGrid)
+    call dgemm('N','T',NGrid,NBasis,NBasis,1d0,Aux,NGrid,UMOAO,NBasis,0d0,OrbXGrid,NGrid)
+    Call CpyV(Aux,OrbYGrid,NBasis*NGrid)
+    call dgemm('N','T',NGrid,NBasis,NBasis,1d0,Aux,NGrid,UMOAO,NBasis,0d0,OrbYGrid,NGrid)
+    Call CpyV(Aux,OrbZGrid,NBasis*NGrid)
+    call dgemm('N','T',NGrid,NBasis,NBasis,1d0,Aux,NGrid,UMOAO,NBasis,0d0,OrbZGrid,NGrid)
+ endif
 
  close(igrid)
  deallocate(orbval,wt,r,mapinv)

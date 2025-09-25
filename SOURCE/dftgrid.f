@@ -45,8 +45,12 @@ C
 C
 C     COMPUTE THE HARTREE POTENTIAL AND THE ENERGY
 C     HAP: VHSR is computed in AO during canonicalization
+C     AT:  VHSR is computed in NO with PYSCF interface      
 C
-      Call tran_matTr(VCoul,UNOAO,UNOAO,NBasis,Transp)
+      if (IPYSCF == 0)then
+         Call tran_matTr(VCoul,UNOAO,UNOAO,NBasis,Transp)
+      endif
+
       VHSR = VCoul
 C     Old:
 C      Call PotHSR(VHSR,Occ,URe,TwoEl,TwoElErf,NInte1,NInte2,NBasis)
@@ -68,6 +72,7 @@ C     COMPUTE THE XC PARTS OF THE POTENTIAL AND THE ENERGY
 C
       If(IFunSR.Eq.1) Then
 C
+      Write(6,'(/," *** SR_LDA")')
       Call PotXCSR_LDA(VSR,Occ,URe,OrbGrid,
      $ OrbXGrid,OrbYGrid,OrbZGrid,
      $ WGrid,NSymMO,NGrid,NInte1,NBasis)
@@ -75,11 +80,13 @@ C
 C
       ElseIf(IFunSR.Eq.2) Then
 C
+      Write(6,'(/," *** SR_PBE")')
       Call GetExcSR_PBE(EnxcSR,VSR,Occ,URe,OrbGrid,OrbXGrid,OrbYGrid,
      $ OrbZGrid,WGrid,NSymMO,NGrid,NInte1,NBasis)
 C
       ElseIf(IFunSR.Eq.3) Then
 C
+       Write(6,'(/," *** PBE")')
        Call GetExc_PBE(EnxcSR,VSR,Occ,URe,OrbGrid,OrbXGrid,OrbYGrid,
      $ OrbZGrid,WGrid,NSymMO,NGrid,NInte1,NBasis)
 C
@@ -89,7 +96,7 @@ C
       VSR(I)=VSR(I)+VHSR(I)
       EndDo 
 C
-      Write(6,'(/," SR_xc Energy",X,F15.8)') EnxcSR
+      Write(6,'(" SR_xc Energy",X,F15.8)') EnxcSR
       Write(6,'(" SR_H  Energy",X,F15.8)')   EnHSR
       EnSR=EnxcSR+EnHSR 
 C
@@ -247,7 +254,8 @@ C     Test XCFun
       block
       double precision :: XMu
       double precision :: EpscSRGrid(NGrid)
-      XMu=0.4d0
+c      XMu=0.4d0
+      XMu=Alpha
       EpscSRGrid=Zero
       Call SRLDAC(RhoGrid,EpscSRGrid,XMu,NGrid)
       EncSR = Zero

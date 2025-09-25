@@ -4021,6 +4021,39 @@ C
       EndDo
       EndDo
       EndDo
+C
+C     MODIFY ITEGRALS
+C
+      If (IDBBSC.Eq.2) Then
+C
+      Open(10,file="sr_integrals.dat")
+      NAddr=0
+C
+      IPR=0
+      Do IP=1,NBasis
+      Do IR=1,IP
+
+      IPR=IPR+1
+C
+      IQS=0
+      Do IQ=1,NBasis
+      Do IS=1,IQ
+
+      IQS=IQS+1
+C
+      If(IPR.Ge.IQS) Then
+C
+      NAddr=NAddr+1
+      Read(10,*) AuxSR
+      TwoNO(NAddr)=TwoNO(NAddr)+AuxSR 
+      EndIf
+      EndDo
+      EndDo
+      EndDo
+      EndDo
+      Close(10)
+C
+      EndIf
 C    
 C     AUXILIARY MATRIX AuxI  
 C   
@@ -4283,6 +4316,38 @@ C
 C      Print*, "AB-Ka",norm2(ABPLUS),norm2(ABMIN)
 C
       Deallocate(RDM2Act)
+C
+C     RESTORE INTEGRALS
+      If (IDBBSC.Eq.2) Then
+C
+      Open(10,file="sr_integrals.dat")
+      NAddr=0
+C
+      IPR=0
+      Do IP=1,NBasis
+      Do IR=1,IP
+
+      IPR=IPR+1
+C
+      IQS=0
+      Do IQ=1,NBasis
+      Do IS=1,IQ
+
+      IQS=IQS+1
+C
+      If(IPR.Ge.IQS) Then
+C
+      NAddr=NAddr+1
+      Read(10,*) AuxSR
+      TwoNO(NAddr)=TwoNO(NAddr)-AuxSR
+      EndIf
+      EndDo
+      EndDo
+      EndDo
+      EndDo
+      Close(10)
+C
+      EndIf
 C
       Return
       End
@@ -5924,7 +5989,7 @@ C
 C     ACTIVE PART
 C
       If(Ind2(IP)*Ind2(IQ)*Ind2(IR)*Ind2(IS).Ne.Zero) Then 
-      RDM2=RDM2Act(NAddrRDM(Ind2(IP),Ind2(IQ),Ind2(IR),Ind2(IS),NAct))
+       RDM2=RDM2Act(NAddrRDM(Ind2(IP),Ind2(IQ),Ind2(IR),Ind2(IS),NAct))
       EndIf
 C
       FRDM2=RDM2

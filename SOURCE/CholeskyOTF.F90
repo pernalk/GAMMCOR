@@ -476,7 +476,7 @@ deallocate(MatFFMO,ints)
 
 end subroutine CholeskyOTF_Fock_MO_v2
 
-subroutine CholeskyOTF_H0_test0(AOBasis,System,Source,Cmat,H0in,NINte1,NBasis)
+subroutine CholeskyOTF_H0_test0(AOBasis,System,Monomer,Source,Cmat,H0in,NINte1,NBasis)
 
 implicit none
 
@@ -484,6 +484,7 @@ type(TAOBasis), intent(in)   :: AOBasis
 type(TSystem), intent(inout) :: System
 
 integer,intent(in)      :: NInte1,NBasis
+integer,intent(in)      :: Monomer
 character(6),intent(in) :: Source
 
 double precision,intent(in) :: H0in(NInte1)
@@ -501,6 +502,16 @@ elseif(trim(Source)=='ORCA  ') then
 elseif(trim(Source)=='DALTON') then
    ORBITAL_ORDERING = ORBITAL_ORDERING_DALTON
 endif
+
+! Read whether to put ghost functions
+if(Monomer==1) then
+   call sys_Init(System,SYS_MONO_A)
+elseif(Monomer==2) then
+   call sys_Init(System,SYS_MONO_B)
+else
+   call sys_Init(System,SYS_TOTAL)
+endif
+
 
 if(trim(Source)=='DALTON') then
   call triang_to_sq2(H0in,H0_mo,NBasis)
@@ -612,7 +623,8 @@ H0tr = H0in
 if(trim(Source)=='MOLPRO') then
    call tran_matTr(H0tr,CSAO,CSAO,NBasis,.true.)
    call triang_to_sq2(H0tr,H0_mo,NBasis)
-elseif(trim(Source)=='ORCA  ') then
+elseif(trim(Source)=='ORCA  ' .or.  &
+       trim(Source)=='DALTON' ) then
    call triang_to_sq2(H0in,H0_mo,NBasis)
 endif
 
@@ -623,6 +635,12 @@ do J=1,NBasis
       D_mo(I,J) = 2d0 * GammaF(IndSym(I,J))
    enddo
 enddo
+#if CHOLOTF_DEBUG > 4
+print*, 'Dmat in MO:'
+do j=1,NBasis
+   write(LOUT,'(*(f13.8))') (D_mo(i,j),i=1,NBasis)
+enddo
+#endif
 
 ! set memory for Fock transformation
 if(MemType == 2) then       !MB
@@ -725,6 +743,156 @@ if (ierr .gt. 0) then
 endif
 
 end subroutine CholeskyOTF_H0_test
+
+subroutine DipMomOTF_ao(Dx_extao,Dy_extao,Dz_extao,BasisSetPath,XYZPath,Units,Source)
+!
+! calculate dipole moments
+!
+use Multipoles
+
+character(*), intent(in) :: BasisSetPath
+character(*), intent(in) :: XYZPath
+character(6),intent(in)  :: Source
+integer, intent(in)      :: Units
+real(F64), dimension(:, :), allocatable :: Dx_extao, Dy_extao, Dz_extao
+
+type(TSystem)  :: System
+type(TAOBasis) :: AOBasis
+real(F64), dimension(3) :: Rc
+real(F64), dimension(:, :), allocatable :: Dx, Dy, Dz
+!
+integer :: NAO
+integer            :: ORBITAL_ORDERING
+logical, parameter :: SortAngularMomenta = .false.
+logical, parameter :: SpherAO = .true.
+
+! set orbital ordering
+if(trim(Source)=='MOLPRO') then
+   ORBITAL_ORDERING = ORBITAL_ORDERING_MOLPRO
+elseif(trim(Source)=='ORCA  ') then
+   ORBITAL_ORDERING = ORBITAL_ORDERING_ORCA
+elseif(trim(Source)=='DALTON') then
+   ORBITAL_ORDERING = ORBITAL_ORDERING_DALTON
+endif
+print*, 'orbital_ordering',orbital_ordering
+
+call auto2e_init()
+!
+! Initialize the Boys function interpolation table
+! (used for Coulomb integrals evaluation).
+!
+call boys_init(4 * AUTO2E_MAXL)
+call sys_Read_XYZ(System, XYZPath, Units)
+call basis_NewAOBasis(AOBasis, System, BasisSetPath, SpherAO, SortAngularMomenta)
+NAO = AOBasis%NAOSpher
+
+!
+! Compute the charge center of the nuclei
+! Dipole moments will be computed with respect to Rc
+!
+call sys_ChargeCenter(Rc, System)
+!
+
+! Calculate x, y, and z electronic dipole moment matrices
+! in the spherical AO gaussian Basis. The ordering of orbitals
+! follows the gammcor-integrals convention.
+!
+allocate(Dx(NAO, NAO))
+allocate(Dy(NAO, NAO))
+allocate(Dz(NAO, NAO))
+Rc(1)=0
+Rc(2)=0
+Rc(3)=0
+print*, 'use 0 0 0 ...'
+call multi_ElectronicDipole(Dx, Dy, Dz, Rc, AOBasis)
+!
+! Convert Dx, Dy, Dz matrices
+! to the AO basis with Molpro/Dalton's ordering
+!
+allocate(Dx_extao(NAO, NAO))
+allocate(Dy_extao(NAO, NAO))
+allocate(Dz_extao(NAO, NAO))
+call auto2e_interface_AngFuncTransf(Dx_extao, Dx, .false., .true., AOBasis, ORBITAL_ORDERING)
+call auto2e_interface_AngFuncTransf(Dy_extao, Dy, .false., .true., AOBasis, ORBITAL_ORDERING)
+call auto2e_interface_AngFuncTransf(Dz_extao, Dz, .false., .true., AOBasis, ORBITAL_ORDERING)
+
+#if CHOLOTF_DEBUG > 4
+   call msg("---------------- dipole matrices ---------------------")
+   print*, 'DIPX AO',norm2(Dx_extao)
+   call msg("Dx")
+   call geprn(Dx_extao)
+   print*, 'DIPY AO',norm2(Dy_extao)
+   call msg("Dy")
+   call geprn(Dy_extao)
+   print*, 'DIPZ AO',norm2(Dz_extao)
+   call msg("Dz")
+   call geprn(Dz_extao)
+#endif
+
+call boys_free()
+
+end subroutine DipMomOTF_ao
+
+subroutine CompDipMomOTF(AOBasis,System,CAONO,Occ,DipX,DipY,DipZ,NAO,NMO)
+!
+! calculate dipole moments
+! Input  : DipX, DipY, DipZ in AO
+!
+type(TSystem)  :: System
+type(TAOBasis) :: AOBasis
+!
+integer,intent(in)  :: NAO,NMO
+real(F64),intent(in) :: CAONO(NAO,NMO),Occ(NMO)
+real(F64),dimension(NAO,NAO),intent(in)  :: DipX,DipY,DipZ
+
+integer :: l
+real(F64) :: Qc
+real(F64) :: DM_X, DM_Y, DM_Z, DXYZ
+real(F64) :: NUC_DMX, NUC_DMY, NUC_DMZ
+real(F64), dimension(3) :: Rc
+real(F64), dimension(NMO,NMO) :: Dx, Dy, Dz
+real(F64), dimension(NMO,NAO) :: AUXM
+
+associate( &
+ NAtoms   => System%NAtoms, &
+ ZNumbers => System%ZNumbers, &
+ AtomCoords => AOBasis%AtomCoords &
+ )
+NUC_DMX=0; NUC_DMY=0; NUC_DMZ=0
+do l = 1,NAtoms
+      Qc = real(ZNumbers(l), F64)
+      !write(6,'(i3,4f12.6)')l,Rc(1),Rc(2),Rc(3),Qc
+      NUC_DMX = NUC_DMX + Qc*AtomCoords(1,l)
+      NUC_DMY = NUC_DMY + Qc*AtomCoords(2,l)
+      NUC_DMZ = NUC_DMZ + Qc*AtomCoords(3,l)
+enddo
+end associate
+
+Call dgemm('T','N',NAO,NMO,NMO,1d0,CAONO,NMO,DipX,NMO,0d0,AUXM,NMO)
+Call dgemm('N','N',NMO,NMO,NMO,1d0,AUXM,NMO,CAONO,NMO,0d0,Dx,NMO)
+!
+Call dgemm('T','N',NAO,NMO,NMO,1d0,CAONO,NMO,DipY,NMO,0d0,AUXM,NMO)
+Call dgemm('N','N',NMO,NMO,NMO,1d0,AUXM,NMO,CAONO,NMO,0d0,Dy,NMO)
+!
+Call dgemm('T','N',NAO,NMO,NMO,1d0,CAONO,NMO,DipZ,NAO,0d0,AUXM,NMO)
+Call dgemm('N','N',NMO,NMO,NAO,1d0,AUXM,NMO,CAONO,NAO,0d0,Dz,NMO)
+
+DM_X=0d0; DM_Y=0d0; DM_Z=0d0
+Do I=1,NMO
+   DM_X = DM_X - 2d0*Occ(i)*Dx(i,i)
+   DM_Y = DM_Y - 2d0*Occ(i)*Dy(i,i)
+   DM_Z = DM_Z - 2d0*Occ(i)*Dz(i,i)
+EndDo
+
+Write(6,'(/1X,"Nuclear Dipole Moment   ",3f12.8)')  NUC_DMX,NUC_DMY,NUC_DMZ
+Write(6,'(1X,"Electronic Dipole Moment",3f12.8)')   DM_X,DM_Y,DM_Z
+Write(6,'(1X,"Total Dipole Moment     ",3f12.8,/)') NUC_DMX+DM_X,NUC_DMY+DM_Y,NUC_DMZ+DM_Z
+
+DXYZ=SQRT((NUC_DMX+DM_X)**2+(NUC_DMY+DM_Y)**2+(NUC_DMZ+DM_Z)**2)
+
+Write(6,'(1X,A,2f12.8,/)') '|dipole moment| a.u./D', DXYZ, DXYZ/0.393456
+
+end subroutine CompDipMomOTF
 
 subroutine reorder_by_first_row(A, B, matrix_to_reorder, N, reordered, column_map, sign_map, tolerance)
 ! 

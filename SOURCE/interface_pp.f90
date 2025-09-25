@@ -38,6 +38,7 @@ contains
             double precision, dimension(:, :), allocatable :: G1, CAOMO
             double precision, dimension(:, :), allocatable :: work
             double precision, dimension(:,:,:,:), allocatable :: rdm2_full
+            double precision, dimension(:, :), allocatable :: mo_occ_int
             logical :: STATE_AV = .false.
             integer :: natural
             integer :: anst(2)
@@ -52,6 +53,7 @@ contains
             type(TAOBASIS) :: AObasis
             type(TSystem)  :: System
 
+
             call GEOM_init(Flags, AuxData, AObasis, System)
             
             !-----------------------------------------------------------------------------------------------------
@@ -59,220 +61,278 @@ contains
             !-----------------------------------------------------------------------------------------------------
             print*, 'AuxData%nst', AuxData%nst
 
-            anst = 0
 
-            if (AuxData%nst(1) < 0)then
 
-                  inquire(file='auxdata.txt', exist=existsNosf, iostat=iostat)
-                  if (iostat /= 0) then
-                        existsNosf = .false.
-                  end if
 
-                  count_suffix_files = 0
+            print*, 'Flags%JOBTYPE', Flags%JOBTYPE
 
-                  do x = 1, 10
-                        do y = 1, 10
+            if (Flags%JOBTYPE == JOB_TYPE_MP2 .or. Flags%JOBTYPE == JOB_TYPE_SRMP2) then
 
-                              write(filename, '("auxdata_", I0, ".", I0, ".txt")') x, y                              
-                              inquire(file=trim(filename), exist=existsSf, iostat=iostat)
-                              if (iostat /= 0) then
-                                    existsSf = .false.
-                              end if
+                  unit = 10
+                  open(unit=unit, file='auxdata_rohf.txt', status='old', action='read')
 
-                              if (existsSf) then
-                                    anst(1) = x
-                                    anst(2) = y
-                                    count_suffix_files = count_suffix_files + 1
-                              end if
-                        end do
+                  read(unit, *) AuxData%Nbasis
+                  read(unit, *) AuxData%NI
+                  read(unit, *) AuxData%NA
+                  read(unit, *) AuxData%NV
+                  read(unit, *) AuxData%EROHF
+                  read(unit, *) AuxData%ENuc
+                  read(unit, *) AuxData%NEL
+                  close(unit)
+
+                  print *, 'NBasis:', AuxData%nbasis
+                  print *, 'NInactive:', AuxData%NI
+                  print *, 'NActive:', AuxData%NA
+                  print *, 'NVirtual:', AuxData%NV
+                  print *, 'ROHF Energy:', AuxData%EROHF
+                  print *, 'Nuclear Energy:', AuxData%ENuc
+
+
+                  allocate(AuxData%IndAux(AuxData%NBasis))            
+                  open(unit=21, file='mo_occ_int.bin', status='old', access='stream', form='unformatted')
+                  read(21) AuxData%IndAux
+                  close(21)
+
+                  do i = 1, AuxData%NBasis
+                        write(*,*) 'Orbital', i, 'occupation:',AuxData%IndAux(i)
                   end do
 
+                  AuxData%PYSCF = 1
+            end if
 
-                  if (count_suffix_files == 0) then
-                        if (existsNosf == .false.) then
-                              print*, ''
-                              print*, '-------------------------------------------------------------------------'
-                              print *, 'Warning: Neither auxdata.txt nor any auxdata_x.y.txt found, exiting.'
-                              print*, '-------------------------------------------------------------------------'
-                              print*, ''
 
-                              stop                              
-                        else
-                              write(suffix, '("")')
-                              anst(1) = 1
-                              anst(2) = 1
-                              print*, ''
-                              print*, '-------------------------------------------------------------------------'                              
-                              print *, 'Assuming state ', anst(1), '.', anst(2)
-                              print*, '-------------------------------------------------------------------------'
-                              print*, ''
 
+            if (Flags%JOBTYPE .ne. JOB_TYPE_MP2 .and. Flags%JOBTYPE .ne. JOB_TYPE_SRMP2) then
+
+                  anst = 0
+                  
+                  if (AuxData%nst(1) < 0)then
+
+                        inquire(file='auxdata.txt', exist=existsNosf, iostat=iostat)
+                        if (iostat /= 0) then
+                              existsNosf = .false.
                         end if
-                  else if (count_suffix_files > 1) then
-                        if (existsNosf == .false.) then
-                              ! no auxdata.txt and multiple other files
+
+                        count_suffix_files = 0
+
+                        do x = 1, 10
+                              do y = 1, 10
+
+                                    write(filename, '("auxdata_", I0, ".", I0, ".txt")') x, y                              
+                                    inquire(file=trim(filename), exist=existsSf, iostat=iostat)
+                                    if (iostat /= 0) then
+                                          existsSf = .false.
+                                    end if
+
+                                    if (existsSf) then
+                                          anst(1) = x
+                                          anst(2) = y
+                                          count_suffix_files = count_suffix_files + 1
+                                    end if
+                              end do
+                        end do
+
+
+                        if (count_suffix_files == 0) then
+                              if (existsNosf == .false.) then
+                                    print*, ''
+                                    print*, '-------------------------------------------------------------------------'
+                                    print *, 'Warning: Neither auxdata.txt nor any auxdata_x.y.txt found, exiting.'
+                                    print*, '-------------------------------------------------------------------------'
+                                    print*, ''
+
+                                    stop                              
+                              else
+                                    write(suffix, '("")')
+                                    anst(1) = 1
+                                    anst(2) = 1
+                                    print*, ''
+                                    print*, '-------------------------------------------------------------------------'                              
+                                    print *, 'Assuming state ', anst(1), '.', anst(2)
+                                    print*, '-------------------------------------------------------------------------'
+                                    print*, ''
+
+                              end if
+                        else if (count_suffix_files > 1) then
+                              if (existsNosf == .false.) then
+                                    ! no auxdata.txt and multiple other files
+                                    print*, ''
+                                    print*, '-------------------------------------------------------------------------'
+                                    print *, 'Warning: Multiple auxdata_x.y.txt files found. No auxdata.txt file found. State notspecified, exiting'
+                                    print*, '-------------------------------------------------------------------------'
+                                    print*, ''
+
+                                    stop
+                              else
+                                    ! auxdata.txt and multiple other files
+                                    print*, ''
+                                    print*, '-------------------------------------------------------------------------'
+                                    print *, 'Warning: Multiple auxdata_x.y.txt files found. Auxdata.txt file found. State notspecified.'
+                                    print*, '-------------------------------------------------------------------------'
+                                    print*, ''
+
+                                    write(suffix, '("")')
+                                    anst(1) = 1
+                                    anst(2) = 1
+                                    print*, ''
+                                    print*, '-------------------------------------------------------------------------'
+
+                                    print *, 'Assuming state ', anst(1), '.', anst(2)
+                                    print *, 'Using auxdata.txt'
+                                    print*, '-------------------------------------------------------------------------'
+                                    print*, ''
+
+                              end if
+                        else if (count_suffix_files == 1) then
+                              if (existsNosf == .false.) then
+                                    write(suffix, '("_", I0,".",I0)') anst(1), anst(2)
+                                    print*, ''
+                                    print*, '-------------------------------------------------------------------------'                              
+                                    print *, 'Assuming state ', anst(1), '.', anst(2)
+                                    print*, '-------------------------------------------------------------------------'
+                                    print*, ''
+
+                              else
+                                    print*, ''
+                                    print*, '-------------------------------------------------------------------------'
+                                    print *, 'Warning: Both auxdata.txt and one auxdata_x.y, exist. State notspecified.'
+                                    print*, '-------------------------------------------------------------------------'
+                                    print*, ''
+
+                                    write(suffix, '("")')
+                                    anst(1) = 1
+                                    anst(2) = 1
+                                    print*, ''
+                                    print*, '-------------------------------------------------------------------------'
+
+                                    print *, 'Assuming state ', anst(1), '.', anst(2)
+                                    print *, 'Using auxdata.txt'
+                                    print*, '-------------------------------------------------------------------------'
+                                    print*, ''
+
+                              end if
+                        end if
+
+
+                  else if (AuxData%nst(1) > 0) then
+
+                        inquire(file='auxdata.txt', exist=existsNosf, iostat=iostat)
+                        if (iostat /= 0) then
+                              existsNosf = .false.
+                        end if
+
+                        write(suffix, '("_", I0,".",I0)') AuxData%nst(1), AuxData%nst(2)
+
+                        ! Check for "auxdata_x.y.txt"
+                        write(filename, '("auxdata", A, ".txt")') trim(suffix)
+                        inquire(file=trim(filename), exist=existsSf, iostat=iostat)
+                        if (iostat /= 0) then
+                              existsSf = .false.
+                        end if
+
+                        if (existsNosf .and. existsSf) then
                               print*, ''
                               print*, '-------------------------------------------------------------------------'
-                              print *, 'Warning: Multiple auxdata_x.y.txt files found. No auxdata.txt file found. State notspecified, exiting'
+                              print *, 'Warning: Both auxdata.txt and', filename, ' specified. Exiting.'
+                              print*, '-------------------------------------------------------------------------'
+                              print*, ''
+
+                              stop 
+                        else if (.not. existsNosf .and. .not. existsSf) then
+                              print*, ''
+                              print*, '-------------------------------------------------------------------------'
+                              print *, 'Warning: Neither auxdata.txt nor auxdata_', trim(suffix), ' found, exiting'
                               print*, '-------------------------------------------------------------------------'
                               print*, ''
 
                               stop
                         else
-                              ! auxdata.txt and multiple other files
-                              print*, ''
-                              print*, '-------------------------------------------------------------------------'
-                              print *, 'Warning: Multiple auxdata_x.y.txt files found. Auxdata.txt file found. State notspecified.'
-                              print*, '-------------------------------------------------------------------------'
-                              print*, ''
+                              if (existsNosf)write(suffix, '("")')
 
-                              write(suffix, '("")')
-                              anst(1) = 1
-                              anst(2) = 1
+                              anst(1) = AuxData%nst(1)
+                              anst(2) = AuxData%nst(2)
                               print*, ''
                               print*, '-------------------------------------------------------------------------'
-
-                              print *, 'Assuming state ', anst(1), '.', anst(2)
-                              print *, 'Using auxdata.txt'
-                              print*, '-------------------------------------------------------------------------'
-                              print*, ''
-
-                        end if
-                  else if (count_suffix_files == 1) then
-                        if (existsNosf == .false.) then
-                              write(suffix, '("_", I0,".",I0)') anst(1), anst(2)
-                              print*, ''
-                              print*, '-------------------------------------------------------------------------'                              
-                              print *, 'Assuming state ', anst(1), '.', anst(2)
-                              print*, '-------------------------------------------------------------------------'
-                              print*, ''
-
-                        else
-                              print*, ''
-                              print*, '-------------------------------------------------------------------------'
-                              print *, 'Warning: Both auxdata.txt and one auxdata_x.y, exist. State notspecified.'
-                              print*, '-------------------------------------------------------------------------'
-                              print*, ''
-
-                              write(suffix, '("")')
-                              anst(1) = 1
-                              anst(2) = 1
-                              print*, ''
-                              print*, '-------------------------------------------------------------------------'
-
-                              print *, 'Assuming state ', anst(1), '.', anst(2)
-                              print *, 'Using auxdata.txt'
-                              print*, '-------------------------------------------------------------------------'
-                              print*, ''
-
+                              print *, 'State', anst(1), '. ', anst(2), 'requested.'
                         end if
                   end if
 
 
-            else if (AuxData%nst(1) > 0) then
+                  AuxData%PYSCF = 1
 
-                  inquire(file='auxdata.txt', exist=existsNosf, iostat=iostat)
-                  if (iostat /= 0) then
-                        existsNosf = .false.
-                  end if
 
-                  write(suffix, '("_", I0,".",I0)') AuxData%nst(1), AuxData%nst(2)
+                  print*, 'suffix is', suffix
+                  write(file_auxdata, '("auxdata", A, ".txt")') trim(suffix)
+                  print*, 'reading from'
+                  print*, 'reading from', file_auxdata
+                  unit = 10    
+                  open(unit=unit, file=file_auxdata, status='old', action='read')
 
-                  ! Check for "auxdata_x.y.txt"
-                  write(filename, '("auxdata", A, ".txt")') trim(suffix)
-                  inquire(file=trim(filename), exist=existsSf, iostat=iostat)
-                  if (iostat /= 0) then
-                        existsSf = .false.
-                  end if
+                  read(unit, *) AuxData%Nbasis
+                  read(unit, *) AuxData%NI
+                  read(unit, *) AuxData%NA
+                  read(unit, *) AuxData%NV
+                  read(unit, *) AuxData%ECAS
+                  read(unit, *) AuxData%ENuc
+                  read(unit, *) AuxData%NEL
+                  read(unit, *) natural
+                  close(unit)
 
-                  if (existsNosf .and. existsSf) then
-                        print*, ''
-                        print*, '-------------------------------------------------------------------------'
-                        print *, 'Warning: Both auxdata.txt and', filename, ' specified. Exiting.'
-                        print*, '-------------------------------------------------------------------------'
-                        print*, ''
+                  print *, 'NBasis:', AuxData%nbasis
+                  print *, 'NInactive:', AuxData%NI
+                  print *, 'NActive:', AuxData%NA
+                  print *, 'NVirtual:', AuxData%NV
+                  print *, 'CASSCF Energy:', AuxData%ECAS
+                  print *, 'Nuclear Energy:', AuxData%ENuc
+                  print *, 'Natural orbitals', natural, '(0 - not used, 1 - used)'
 
-                        stop 
-                  else if (.not. existsNosf .and. .not. existsSf) then
-                        print*, ''
-                        print*, '-------------------------------------------------------------------------'
-                        print *, 'Warning: Neither auxdata.txt nor auxdata_', trim(suffix), ' found, exiting'
-                        print*, '-------------------------------------------------------------------------'
-                        print*, ''
 
-                        stop
+                  write(file_rdm2_aaaa, '("rdm2_aaaa", A, ".bin")') trim(suffix)
+                  write(file_rdm2_abab, '("rdm2_abab", A, ".bin")') trim(suffix)
+                  if (natural == 0) then
+                        write(file_rdm2_full, '("rdm2", A, ".bin")') trim(suffix)
+                        write(file_rdm1, '("rdm1", A, ".bin")') trim(suffix)
+
+                        print*, file_auxdata
+                        print*, file_rdm2_aaaa
+                        print*, file_rdm2_abab
+                        print*, file_rdm1
+                        print*, file_rdm2_full
+
                   else
-                        if (existsNosf)write(suffix, '("")')
 
-                        anst(1) = AuxData%nst(1)
-                        anst(2) = AuxData%nst(2)
-                        print*, ''
-                        print*, '-------------------------------------------------------------------------'
-                        print *, 'State', anst(1), '. ', anst(2), 'requested.'
+                        print*, 'auxddata', file_auxdata
+                        print*, 'file_rdm2_aaaa', file_rdm2_aaaa
+                        print*, 'rdm2_aaaa', file_rdm2_abab
+
                   end if
-            end if
-
-            
-            AuxData%PYSCF = 1
-
-            
-            print*, 'suffix is', suffix
-            write(file_auxdata, '("auxdata", A, ".txt")') trim(suffix)
-            print*, 'reading from'
-            print*, 'reading from', file_auxdata
-            unit = 10    
-            open(unit=unit, file=file_auxdata, status='old', action='read')
-
-            read(unit, *) AuxData%Nbasis
-            read(unit, *) AuxData%NI
-            read(unit, *) AuxData%NA
-            read(unit, *) AuxData%NV
-            read(unit, *) AuxData%ECAS
-            read(unit, *) AuxData%ENuc
-            read(unit, *) AuxData%NEL
-            read(unit, *) natural
-            close(unit)
-
-            print *, 'NBasis:', AuxData%nbasis
-            print *, 'NInactive:', AuxData%NI
-            print *, 'NActive:', AuxData%NA
-            print *, 'NVirtual:', AuxData%NV
-            print *, 'CASSCF Energy:', AuxData%ECAS
-            print *, 'Nuclear Energy:', AuxData%ENuc
-            print *, 'Natural orbitals', natural, '(0 - not used, 1 - used)'
-
-
-            write(file_rdm2_aaaa, '("rdm2_aaaa", A, ".bin")') trim(suffix)
-            write(file_rdm2_abab, '("rdm2_abab", A, ".bin")') trim(suffix)
-            if (natural == 0) then
-                  write(file_rdm2_full, '("rdm2", A, ".bin")') trim(suffix)
-                  write(file_rdm1, '("rdm1", A, ".bin")') trim(suffix)
-
-                  print*, file_auxdata
-                  print*, file_rdm2_aaaa
-                  print*, file_rdm2_abab
-                  print*, file_rdm1
-                  print*, file_rdm2_full
-
-            else
-                  
-                  print*, 'auxddata', file_auxdata
-                  print*, 'file_rdm2_aaaa', file_rdm2_aaaa
-                  print*, 'rdm2_aaaa', file_rdm2_abab
 
             end if
-
-
+            
             AuxData%NIA = AuxData%NI + AuxData%NA
+            
 
             associate(NI=>AuxData%NI, NA=>AuxData%NA, NV=>AuxData%NV, NBasis=>AuxData%NBasis, NIA=>AuxData%NIA)
               allocate(AuxData%HNO0(NBasis, NBasis))
+              allocate(THCData%HNO(NBasis, NBasis))
 
               THCData%ExternalOrdering = ORBITAL_ORDERING_PYSCF
               allocate(THCData%fij(NI))
               allocate(THCData%fvw(NV))
 
+              
+              ! if (Flags%JOBTYPE .ne. JOB_TYPE_MP2 .and. Flags%JOBTYPE .ne. JOB_TYPE_SRMP2) then                    
+              !       allocate(THCData%eorbi(AuxData%NI+AuxData%NA))
+              !       allocate(THCData%eorba(AuxData%NV))
 
+              !       open(unit=20, file='eorbi.bin', status='old', access='stream', form='unformatted')
+              !       read(20) THCData%eorbi
+              !       close(20)
+
+              !       open(unit=21, file='eorba.bin', status='old', access='stream', form='unformatted')
+              !       read(21) THCData%eorba
+              !       close(21)
+              ! end if
 
             !----------------------------------------------------------------------------------------
             ! READ 1-el integrals.
@@ -285,27 +345,42 @@ contains
             close(unit)
             print*, 'AuxData%HNO0(1,1)', AuxData%HNO0(1,1)
             print*, 'AuxData%HNO0(1,1)', AuxData%HNO0(1,2)
+            THCData%HNO = AuxData%HNO0
 
+            
 
-            if (natural == 0) then
-                  !----------------------------------------------------------------------------------------
-                  ! READ CAOMO. Natural orbitals not used
-                  !----------------------------------------------------------------------------------------
-                  allocate(CAOMO(nbasis, nbasis))
-                  unit = 30
-                  inquire(file='C.bin', exist=file_exists)
-                  if (file_exists) then
-                        open(unit=unit, file='C.bin', status='old', access='stream', form='unformatted')
+            if (Flags%JOBTYPE .ne. JOB_TYPE_MP2 .and. Flags%JOBTYPE .ne. JOB_TYPE_SRMP2) then                    
+                  if (natural == 0) then
+                        !----------------------------------------------------------------------------------------
+                        ! READ CAOMO. Natural orbitals not used
+                        !----------------------------------------------------------------------------------------
+                        allocate(CAOMO(nbasis, nbasis))
+                        unit = 30
+                        inquire(file='C.bin', exist=file_exists)
+                        if (file_exists) then
+                              open(unit=unit, file='C.bin', status='old', access='stream', form='unformatted')
+                        else
+                              open(unit=unit, file='CAONO.bin', status='old', access='stream', form='unformatted')
+                        endif
+                        read(unit) CAOMO                  
+                        close(unit)
                   else
-                        open(unit=unit, file='CAONO.bin', status='old', access='stream', form='unformatted')
-                  endif
-                  read(unit) CAOMO                  
-                  close(unit)
+                        !----------------------------------------------------------------------------------------
+                        ! READ CAONO (already in natural orbitals)
+                        !----------------------------------------------------------------------------------------
+                        
+                        allocate(CAONO(nbasis, nbasis))
+                        unit = 30
+                        inquire(file='C.bin', exist=file_exists)
+                        if (file_exists) then
+                              open(unit=unit, file='C.bin', status='old', access='stream', form='unformatted')
+                        else
+                              open(unit=unit, file='CAONO.bin', status='old', access='stream', form='unformatted')
+                        endif
+                        read(unit) CAONO                  
+                        close(unit)
+                  end if
             else
-                  !----------------------------------------------------------------------------------------
-                  ! READ CAONO (already in natural orbitals)
-                  !----------------------------------------------------------------------------------------
-
                   allocate(CAONO(nbasis, nbasis))
                   unit = 30
                   inquire(file='C.bin', exist=file_exists)
@@ -314,133 +389,165 @@ contains
                   else
                         open(unit=unit, file='CAONO.bin', status='old', access='stream', form='unformatted')
                   endif
-                  read(unit) CAONO                  
+                  read(unit) CAONO
                   close(unit)
+                  
             end if
 
             
-            print *, 'NBasis:', AuxData%nbasis
-            print *, 'NInactive:', AuxData%NI
-            print *, 'NActive:', AuxData%NA
-            print *, 'NVirtual:', AuxData%NV
-            print *, 'CASSCF Energy:', AuxData%ECAS
-            print *, 'Nuclear Energy:', AuxData%ENuc
-            print *, 'Natural orbitals', natural, '(0 - not used, 1 - used)'
+            if (Flags%JOBTYPE .ne. JOB_TYPE_MP2 .and. Flags%JOBTYPE .ne. JOB_TYPE_SRMP2) then                    
+                  print *, 'NBasis:', AuxData%nbasis
+                  print *, 'NInactive:', AuxData%NI
+                  print *, 'NActive:', AuxData%NA
+                  print *, 'NVirtual:', AuxData%NV
+                  print *, 'CASSCF Energy:', AuxData%ECAS
+                  print *, 'Nuclear Energy:', AuxData%ENuc
+                  print *, 'Natural orbitals', natural, '(0 - not used, 1 - used)'
 
-            allocate(AuxData%rdm2_pp(AuxData%NA, AuxData%NA, AuxData%NA, AuxData%NA))
-            allocate(AuxData%rdm2_pm(AuxData%NA, AuxData%NA, AuxData%NA, AuxData%NA))
+                  allocate(AuxData%rdm2_pp(AuxData%NA, AuxData%NA, AuxData%NA, AuxData%NA))
+                  allocate(AuxData%rdm2_pm(AuxData%NA, AuxData%NA, AuxData%NA, AuxData%NA))
           
-
-            unit = 20
-            open(unit=unit, file=file_rdm2_aaaa, status='old', access='stream', form='unformatted')
-            read(unit) AuxData%rdm2_pp
-            close(unit)
-
-            unit = 21
-            open(unit=unit, file=file_rdm2_abab, status='old', access='stream', form='unformatted')
-            read(unit) AuxData%rdm2_pm
-            close(unit)
-            
-            if (natural == 0)then
-                  allocate(G1(AuxData%NA, AuxData%NA))
+                  
                   unit = 20
-                  open(unit=unit, file=file_rdm1, status='old', access='stream', form='unformatted')
-                  read(unit) G1
-                  close(unit)
-                  G1 = G1 / Two
-                                    
-                  !----------------------------------------------------------------------------------------
-                  ! If natural orbitals are used, there is no need to read rdm2_full and transform it.
-                  ! rdm2.dat is already prepared in NO basis, ready to be read later in AC subroutines.
-                  !----------------------------------------------------------------------------------------
-
-                  print*, 'reading rdm2_full', 'from binary file'
-                  allocate(rdm2_full(AuxData%NA, AuxData%NA, AuxData%NA, AuxData%NA))
-                  unit = 20
-                  open(unit=unit, file=file_rdm2_full, status='old', access='stream', form='unformatted')
-                  read(unit) rdm2_full
+                  open(unit=unit, file=file_rdm2_aaaa, status='old', access='stream', form='unformatted')
+                  read(unit) AuxData%rdm2_pp
                   close(unit)
 
-                  ! print for debugging
-                  ! do i = 1, NA
-                  !       do j = 1, NA
-                  !             do k = 1, NA
-                  !                   do l = 1, NA
-                  !                         if (abs(rdm2_full(i, j, k, l)).gt.1.d-5)then
-                  !                               write(*,'(4I5, F20.15)') i, j, k, l, rdm2_full(i, j, k, l)
-                  !                         end if
-                  !                   end do
-                  !             end do
-                  !       end do
-                  ! end do
-                  ! print*, ''
+                  unit = 21
+                  open(unit=unit, file=file_rdm2_abab, status='old', access='stream', form='unformatted')
+                  read(unit) AuxData%rdm2_pm
+                  close(unit)
+                  
+                  if (natural == 0)then
+                        allocate(G1(AuxData%NA, AuxData%NA))
+                        unit = 20
+                        open(unit=unit, file=file_rdm1, status='old', access='stream', form='unformatted')
+                        read(unit) G1
+                        close(unit)
+                        G1 = G1 / Two
 
-                  allocate(CAONO(nbasis, nbasis))
+                        !----------------------------------------------------------------------------------------
+                        ! If natural orbitals are used, there is no need to read rdm2_full and transform it.
+                        ! rdm2.dat is already prepared in NO basis, ready to be read later in AC subroutines.
+                        !----------------------------------------------------------------------------------------
 
-                  if (present(TwoEl)) then
-                        call Trans2NO(G1, THCData, AuxData, CAOMO, CAONO, Flags, AObasis, System, rdm2_full=rdm2_full, TwoEl=TwoEl)
+                        print*, 'reading rdm2_full', 'from binary file'
+                        allocate(rdm2_full(AuxData%NA, AuxData%NA, AuxData%NA, AuxData%NA))
+                        unit = 20
+                        open(unit=unit, file=file_rdm2_full, status='old', access='stream', form='unformatted')
+                        read(unit) rdm2_full
+                        close(unit)
+
+                        ! print for debugging
+                        ! do i = 1, NA
+                        !       do j = 1, NA
+                        !             do k = 1, NA
+                        !                   do l = 1, NA
+                        !                         if (abs(rdm2_full(i, j, k, l)).gt.1.d-5)then
+                        !                               write(*,'(4I5, F20.15)') i, j, k, l, rdm2_full(i, j, k, l)
+                        !                         end if
+                        !                   end do
+                        !             end do
+                        !       end do
+                        ! end do
+                        ! print*, ''
+
+                        allocate(CAONO(nbasis, nbasis))
+
+                        if (present(TwoEl)) then
+                              call Trans2NO(G1, THCData, AuxData, CAOMO, CAONO, Flags, AObasis, System, rdm2_full=rdm2_full, TwoEl=TwoEl)
+                        else
+                              call Trans2NO(G1, THCData, AuxData, CAOMO, CAONO, Flags, AObasis, System, rdm2_full=rdm2_full)
+                              AuxData%HNO0 = AuxData%HNO0_THC
+                        end if
+
+
+                        ! print for debugging
+                        ! print*, 'after trans rdm2'
+                        ! do i = 1, NA
+                        !       do j = 1, NA
+                        !             do k = 1,	NA
+                        !                   do l = 1, NA
+                        !                         if (abs(rdm2_full(i, j, k, l)).gt.1.d-5)then
+                        !                               write(*,'(4I5, F20.15)') i, j, k, l, rdm2_full(i, j, k, l)
+                        !                         end if
+                        !                   end do
+                        !             end do
+                        !       end do
+                        ! end do
+                        ! print*, ''
+
+
+                        call write_rdm2_dat(rdm2_full, NA)
+                  
                   else
-                        call Trans2NO(G1, THCData, AuxData, CAOMO, CAONO, Flags, AObasis, System, rdm2_full=rdm2_full)
-                        AuxData%HNO0 = AuxData%HNO0_THC
+
+                        allocate(occ_temp(AuxData%NI+AuxData%NA))
+
+                        unit = 20
+                        inquire(file='rdm1.bin', exist=file_exists)
+                        if (file_exists) then
+                              open(unit=unit, file='rdm1.bin', status='old', access='stream', form='unformatted')
+                        else
+                              open(unit=unit, file='occ.bin', status='old', access='stream', form='unformatted')
+                        endif
+                        read(unit) occ_temp
+                        close(unit)
+                        allocate(AuxData%Occ(AuxData%NBasis))
+                        AuxData%Occ = zero
+                        AuxData%Occ(1: AuxData%NI+AuxData%NA) = occ_temp
+                        print*, AuxData%Occ(1:AuxData%NI+AuxData%NA)
+
+                        allocate(AuxData%IndAux(NBasis))
+                        AuxData%IndAux = 2
+                        AuxData%IndAux(1:NI) = 0
+                        AuxData%IndAux(NI+1:NIA) = 1
+
+                        if (Flags%ITwoEl > 1)then
+                              call THC_init2(Flags, THCData, AuxData,  AObasis, System, CAONO)
+                              THCData%HNO = AuxData%HNO0
+                        else
+                              allocate(work(NBasis, NBasis))
+                              call real_ab(work, AuxData%HNO0, CAONO)
+                              call real_atb(AuxData%HNO0, CAONO, work)
+                              THCData%HNO = AuxData%HNO0
+                        end if
+
                   end if
-
-
-                  ! print for debugging
-                  ! print*, 'after trans rdm2'
-                  ! do i = 1, NA
-                  !       do j = 1, NA
-                  !             do k = 1,	NA
-                  !                   do l = 1, NA
-                  !                         if (abs(rdm2_full(i, j, k, l)).gt.1.d-5)then
-                  !                               write(*,'(4I5, F20.15)') i, j, k, l, rdm2_full(i, j, k, l)
-                  !                         end if
-                  !                   end do
-                  !             end do
-                  !       end do
-                  ! end do
-                  ! print*, ''
-
-                  
-                  call write_rdm2_dat(rdm2_full, NA)
-                  
             else
-                  
-                  allocate(occ_temp(AuxData%NI+AuxData%NA))
+
+
+                  allocate(AuxData%Occ_rohf(AuxData%NBasis))
+                  allocate(AuxData%Occ(AuxData%NBasis))
 
                   unit = 20
-                  inquire(file='rdm1.bin', exist=file_exists)
+                  inquire(file='occ_rohf.bin', exist=file_exists)
                   if (file_exists) then
-                        open(unit=unit, file='rdm1.bin', status='old', access='stream', form='unformatted')
-                  else
-                        open(unit=unit, file='occ.bin', status='old', access='stream', form='unformatted')
+                        open(unit=unit, file='occ_rohf.bin', status='old', access='stream', form='unformatted')
                   endif
-                  read(unit) occ_temp
+                  read(unit) AuxData%Occ_rohf
                   close(unit)
-                  allocate(AuxData%Occ(AuxData%NBasis))
-                  AuxData%Occ = zero
-                  AuxData%Occ(1: AuxData%NI+AuxData%NA) = occ_temp
-                  print*, AuxData%Occ(1:AuxData%NI+AuxData%NA)
-            
-                  allocate(AuxData%IndAux(NBasis))
-                  AuxData%IndAux = 2
-                  AuxData%IndAux(1:NI) = 0
-                  AuxData%IndAux(NI+1:NIA) = 1
+                  print*, AuxData%Occ_rohf(1:AuxData%NI+AuxData%NA)
+                  AuxData%Occ = AuxData%Occ_rohf/two
+
 
                   if (Flags%ITwoEl > 1)then
                         call THC_init2(Flags, THCData, AuxData,  AObasis, System, CAONO)
+                        THCData%HNO = AuxData%HNO0
                   else
                         allocate(work(NBasis, NBasis))
                         call real_ab(work, AuxData%HNO0, CAONO)
                         call real_atb(AuxData%HNO0, CAONO, work)
+                        THCData%HNO = AuxData%HNO0
                   end if
 
-            end if            
+            end if
 
           end associate
             
     end subroutine read_PYSCF
 
-    subroutine PYSCF_wrapper(THCData, NInte1, Ninte2, NBasis, ENuc, CAONO, XKin, TwoEl, Occ, NAc, NInAc, anSt, Flags)
+    subroutine PYSCF_wrapper(THCData, AuxData, NInte1, Ninte2, NBasis, ENuc, CAONO, XKin, TwoEl, Occ, NAc, NInAc, anSt, Flags)
 
           type(TTHCData), intent(out) :: THCData
           type(TACppData) :: AuxData
@@ -457,6 +564,7 @@ contains
           integer :: unit
 
           integer :: i, j, ab
+          integer, external :: NAddr3 
 
           AuxData%nst = anSt
           print*, 'inside wrapper'
@@ -467,7 +575,10 @@ contains
                 open(unit=unit, file='TWOEl.bin', status='old', access='stream', form='unformatted')
                 read(unit) TwoEl
                 close(unit)
+                !print*, TwoEl(NAddr3(1,1,1,14))
+                !stop
                 call read_PYSCF(THCData, AuxData, CAONO_PYSCF, Flags, TwoEl)
+                
           else
                 call read_PYSCF(THCData, AuxData, CAONO_PYSCF, Flags)
           end if
@@ -477,12 +588,15 @@ contains
           Occ = AuxData%Occ
           NAc = AuxData%NA
           NInAc = AuxData%NI
-
+!          print*, 'aha1', occ
           ! One-electron integrals are now transformed to NO
           do i = 1, Nbasis
                 do j = 1, i
                       ab = (max(i, j)*(max(i,j)-1))/2 + min(i, j)
                       XKin(ab) = AuxData%HNO0(i,j)
+                      ! if (i==j)then
+                      !       print*, 'jjj', j, AuxData%HNO0(i,j)
+                      ! end if
                 end do
           end do
           
@@ -543,7 +657,7 @@ contains
           allocate(work(this_dim))
           read(unit) work
           close(10)
-          print*, 'na', NA
+!          print*, 'na', NA
           allocate(G1(NA, NA))
           G1 = zero
 
@@ -1074,11 +1188,20 @@ contains
             call real_ab(work, AuxData%HNO0, CAONO)
             call real_atb(AuxData%HNO0, CAONO, work)
 
+            
             ETot0 = zero
-            do i = 1, NBasis
-                  ETot0 = ETot0 + two* AuxData%Occ(i) * AuxData%HNO0(i,i)                  
-                  !write(*, '(I5, 2F20.15)') i, AuxData%HNO0(i,i), AuxData%Occ(i)
-            end do
+            
+            
+            if (Flags%JOBTYPE .ne. JOB_TYPE_MP2 .and. Flags%JOBTYPE .ne. JOB_TYPE_SRMP2) then                    
+                  do i = 1, NBasis
+                        ETot0 = ETot0 + two* AuxData%Occ(i) * AuxData%HNO0(i,i)                  
+                        !write(*, '(I5, 2F20.15)') i, AuxData%HNO0(i,i), AuxData%Occ(i)
+                  end do
+            else
+                  do i = 1, NBasis
+                        ETot0 = ETot0 + two* AuxData%Occ_rohf(i) * AuxData%HNO0(i,i)                  
+                  end do
+            end if
             print*, 'etot1 z HNO_ext', ETot0
             
           end associate
@@ -1214,9 +1337,11 @@ contains
 
           double precision :: CholThr, THCThr
           integer :: CholAccu
-          integer :: i, j, NAO, ij, ab
+          integer :: i, j, NAO, ij, ab, u
           double precision, allocatable :: Xgp(:,:)
-          integer :: NA, NI, NV, NIA
+          double precision, allocatable :: XgpErf(:,:), xmumat(:,:)
+          integer :: NA, NI, NV, NIA, nnn
+          integer :: unit
           integer :: units, nbasis
           type (tclock) :: timer
           double precision :: val1, val2, val3
@@ -1227,9 +1352,10 @@ contains
           double precision, dimension(:,:), allocatable :: work, H0_extao
 
           !---------------------testing energy                                                                                                                                                                                                                                                                              
-          integer :: p, q, r, s, k, l, a, b, ii, nn
-          double precision, allocatable :: Rkab(:,:,:), Rkcd(:,:,:)
-          double precision :: this, ETot, etot0, val, val_this
+          integer :: p, q, r, s, k, l, a, b, ii, nn, t
+          double precision, allocatable :: Rkab(:,:,:), Rkcd(:,:,:), Rkef(:,:,:)
+          double precision :: this, ETot, etot0, val, val_this, thisfr, thistr, thistr1
+          double precision ::  this0, that0, then0, thisJ, thisK
 
 
           NA = AuxData%NA
@@ -1240,18 +1366,29 @@ contains
 
           call auto2e_init()
           call clock_start(timer)
-
+          
           CholThr = Flags%DCholeskyThr
           THCThr = Flags%DTHCthr
           CholAccu = Flags%ICholeskyAccu
 
           if (CholThr < zero.or.THCThr <zero)then
                 print*, 'CholAccu', CholAccu
-                call thc_gammcor_XZ(Xgp, THCData%Zgk, AOBasis, System, CholAccu)
+                call thc_gammcor_XZ(THCData%Xgp, THCData%Zgk, AOBasis, System, CholAccu)
+
+                if (Flags%IDBBSC == 2 .or. Flags%IFunSR==4)then
+                      call thc_gammcor_XZ(THCData%XgpErf, THCData%ZgkErf, AOBasis, System, CholAccu, Omega=AuxData%Omega)
+                end if
+
           else
                 print*, 'CholeskyThreshold', CholThr
                 print*, 'THCThreshold', THCThr
-                call thc_gammcor_XZ(Xgp, THCData%Zgk, AOBasis, System,CholAccu, CholThr, THCThr)
+                call thc_gammcor_XZ(THCData%Xgp, THCData%Zgk, AOBasis, System,CholAccu, CholThr, THCThr)
+
+                if (Flags%IDBBSC == 2 .or.Flags%IFunSR==4)then
+
+                      call thc_gammcor_XZ(THCData%XgpErf, THCData%ZgkErf, AOBasis, System, CholAccu, CholThr, THCThr, Omega=AuxData%Omega)
+                end if
+
                 print*, 'CholeskyThreshold', CholThr
                 print*, 'THCThreshold', THCThr
           end if
@@ -1268,7 +1405,12 @@ contains
                 print*, CAONO(1,2), CAONO(2, 1)
           end if
 
-          call canonicalize(CAONO, THCData%fij, THCData%fvw, AuxData, THCData, Xgp, AObasis, System)
+          call canonicalize(CAONO, THCData%fij, THCData%fvw, AuxData, THCData, THCData%Xgp, AObasis, System)
+          ! open(unit=10,file='CAONO_can.bin',form='unformatted')
+          ! write(10) NBasis
+          ! write(10) CAONO
+          ! close(10)
+
 
 
           allocate(H0_extao(nao, nao))
@@ -1280,85 +1422,315 @@ contains
           call real_ab(work, H0_extao, CAONO)
           call real_atb(AuxData%HNO0_THC, CAONO, work)
 
-          THCData%NTHC=size(Xgp,dim=1)
+          THCData%NTHC=size(THCData%Xgp,dim=1)
           THCData%NChol=size(THCData%Zgk,dim=2)
           allocate(THCData%Xga(THCData%NTHC,NBasis))
 
-          Call thc_gammcor_Xga(THCData%Xga, Xgp, CAONO,&
+          Call thc_gammcor_Xga(THCData%Xga, THCData%Xgp, CAONO,&
                 AOBasis, THCData%ExternalOrdering)
 
-          ETot0 = zero
-          do i = 1, NIA
-                ETot0 = ETot0 + two* AuxData%Occ(i) * AuxData%HNO0_THC(i,i)
-                ! if (abs(AuxData%Occ(i) * AuxData%HNO0_THC(i,i)).gt.1.d-1)then
-                !       write(*, '(A10, I5, 2F20.15)')'etot-1', i, AuxData%Occ(i), AuxData%HNO0_THC(i,i)
-                ! end if
-          end do
+          if (Flags%IDBBSC == 2 .or. Flags%IFunSR==4)then
+
+                THCData%NTHCErf=size(THCData%XgpErf,dim=1)
+                THCData%NCholErf=size(THCData%ZgkErf,dim=2)
+                
+                allocate(THCData%XgaErf(THCData%NTHCErf,NBasis))
+                allocate(THCData%TXgaErf(THCData%NTHCErf,NBasis))
+                allocate(THCData%TXga(THCData%NTHC,NBasis))
+                THCData%TXgaErf = zero
+                THCData%TXga = zero
+                Call thc_gammcor_Xga(THCData%XgaErf, THCData%XgpErf, CAONO,&
+                      AOBasis, THCData%ExternalOrdering)
+
+                if(Flags%IFunSR==4)then
+
+                      allocate(THCData%J_SR(NBasis, NBasis))
+                      call calc_J_SR(CAONO, THCData, AuxData, AObasis, System)
+                end if
+                
+          end if
+
+          
+          if (Flags%JOBTYPE .ne. JOB_TYPE_MP2 .and. Flags%JOBTYPE .ne. JOB_TYPE_SRMP2) then                    
+                ETot0 = zero
+                do i = 1, NIA
+                      ETot0 = ETot0 + two* AuxData%Occ(i) * AuxData%HNO0_THC(i,i)
+                      ! if (abs(AuxData%Occ(i) * AuxData%HNO0_THC(i,i)).gt.1.d-1)then
+                      !       write(*, '(A10, I5, 2F20.15)')'etot-1', i, AuxData%Occ(i), AuxData%HNO0_THC(i,i)
+                      ! end if
+                end do
+          else
+                ETot0 = zero
+                do i = 1, NIA
+                      ETot0 = ETot0 + AuxData%Occ_rohf(i) * AuxData%HNO0_THC(i,i)
+                      ! if (abs(AuxData%Occ(i) * AuxData%HNO0_THC(i,i)).gt.1.d-1)then
+                      !       write(*, '(A10, I5, 2F20.15)')'etot-1', i, AuxData%Occ(i), AuxData%HNO0_THC(i,i)
+                      ! end if
+                end do
+          end if
           print*, 'etot1 z HNO thc', ETot0
 
           AuxData%HNO0 = AuxData%HNO0_THC
 
 
           CAONO_IN = CAONO
-
+          AuxData%OnlyEnergy = .true.
           if (AuxData%OnlyEnergy == .true.)then
-                allocate(Rkab(THCData%NChol,nao, nao))                                                                                                                                                                                     
-                Call thc_gammcor_Rkab_2(Rkab, THCData%Xga, THCData%Xga, THCData%Zgk, NBasis, NBasis,&                                                                                                                                      
-                      THCData%NChol, THCData%NTHC)
-                associate(Occ=>AuxData%Occ, IndAux=>AuxData%IndAux)
 
-                  ! do p = 1, 10
-                  !       do q = 1, 10
-                  !             do r = 1, 10
-                  !                   do s = 1, 10
-                  !                         call real_vw_x(this, Rkab(:, p, r), Rkab(:, q, s), THCData%NChol)
-                  !                         if (abs(this).gt.1.d-5)then
-                  !                               write(*, '(4I5, F20.15)')p, r, q, s, this
+                ! if (Flags%IDBBSC == 2)then
+                !       allocate(Rkab(THCData%NCholErf,nao, nao))
+                !       allocate(Rkef(THCData%NCholErf,nao, nao))                                                                                                                                                                                   
+                !       Call thc_gammcor_Rkab_2(Rkab, THCData%XgaErf, THCData%XgaErf, THCData%ZgkErf, NBasis, NBasis,&                                
+                !             THCData%NCholErf, THCData%NTHCErf)
+                ! end if
+
+                allocate(Rkab(THCData%NChol,nao, nao))         
+                Call thc_gammcor_Rkab_2(Rkab, THCData%Xga, THCData%Xga, THCData%Zgk, NBasis, NBasis,&                
+                      THCData%NChol, THCData%NTHC)
+                
+                
+                associate(Occ=>AuxData%Occ, IndAux=>AuxData%IndAux)
+                  ! if (Flags%IDBBSC == 2)then
+                  !       allocate(xmumat(nbasis, nbasis))
+                  !       open(unit=10,file='xmumat.bin',form='unformatted')
+                  !       read(10) nnn
+                  !       read(10) XMuMAT
+                  !       close(10)
+                        
+                  !       Call dgemm('N','N',THCData%NCholErf*NBasis,NBasis,NBasis,One,Rkab,THCData%NCholErf*NBasis,XMuMat,NBasis,zero,Rkef,THCData%NCholErf*NBasis)
+                  ! end if
+                  ! call real_vw_x(this, Rkab(:, 1, 2), Rkab(:, 6, 15), THCData%NCholErf)
+                  ! ! call real_vw_x(that0, Rkab(:, 1, 2), Rkef(:, 6, 9), THCData%NCholErf)
+                  ! print*, this
+                  ! call real_vw_x(this, Rkab(:, 1, 2), Rkab(:, 6, 14), THCData%NCholErf)
+                  ! print*, this
+                  ! call real_vw_x(this, Rkab(:, 1, 2), Rkab(:, 6, 16), THCData%NCholErf)
+                  ! print*, this
+                  ! STOP
+                  ! ! this = zero
+                  ! that0 = zero
+                  ! do t = 1, THCData%NCholErf                        
+                  !       this = this + Rkab(t, 1, 2) * Rkab(t, 6, 9)
+                  !       do p = 1, nbasis
+                  !             that0 = that0 + Rkab(t, 1, 2) * Rkab(t, 6, 9)*xmumat(p, 9)
+                  !       end do
+                  ! end do
+
+                        
+
+                  ! that0 = zero
+                  ! do p = 1, nbasis
+                  !       sniez = zero
+                  !       do t = 1, THCData%NCholErf
+                  !             sniez = sniez + Rkab(t, 1, 2) * Rkab(t, 6, p)
+                  !       end do
+                  !       !that0 = that0 + Rkab(t, 1, 2) * Rkab(t, 6, p)*xmumat(p, 9)
+                  !       write(*, '(4I5, 3F20.15)')0, 1, 5, p-1, sniez, xmumat(p, 9), that0
+                  !       !print*, p, sniez, xmumat(p, 9), that0
+                  !       that0 = that0 + sniez*xmumat(p, 9)
+                  ! end do
+                  ! print*, 'that', that0
+                  ! stop
+                  
+                  ! this0 = this
+                  !  do t = 1, nbasis
+                  !        this0 = this0 + xmumat(t,  9)
+                  !  end do
+                  !  print*, 't1', this0
+                  !  this0 = this
+                  !  do t = 1, nbasis
+                  !        this0 = this0 + xmumat( t, 6)
+                  !  end do
+                  !  print*, 't2', this0
+                  !  this0 = this
+                  !  do t = 1, nbasis
+                  !        this0 = this0 + xmumat(t, 2)
+                  !  end do
+                  !  print*, 't3', this0
+                  !  this0 = this
+                  !  do t = 1, nbasis
+                  !        this0 = this0 + xmumat(t, 1)
+                  !  end do
+                  !  print*, 't4', this0
+
+
+                  ! print*, 'thisssss', this, that0
+                  ! stop
+                  ! do p = 1, 1
+                  !       do r = 1, 1
+                  !             do q = 1, 1
+                  !                   do s = 1, nbasis
+                  !                         call real_vw_x(this, Rkab(:, p, r), Rkab(:, q, s), THCData%NCholErf)
+                  !                         call real_vw_x(thisfr, Rkcd(:, p, r), Rkcd(:, q, s), THCData%NChol)
+                  !                         call real_vw_x(thistr, Rkab(:, p, r), Rkef(:, q, s), THCData%NCholErf)
+                  !                         call real_vw_x(thistr1, Rkef(:, p, r), Rkab(:, q, s), THCData%NCholErf)
+                  !                         ! do t = 1, nbasis
+                  !                         !       this = this	+ xmumat(s, t)
+                  !                         ! end do
+
+                  !                         if (abs(thisfr).gt.1.d-5)then
+                  !                               write(*, '(4I5, 5F20.15)')p-1, r-1, q-1, s-1, thisfr!, thisfr, thisfr-this, thistr, thistr1
                   !                         end if
                   !                   end do
                   !             end do
                   !       end do
                   ! end do
+                  ! stop
+
                   
-                  etot = zero
-                  etot = etot0
-                  do p = 1, NI+NA
-                        do q = 1, NI+NA
-                              do r = 1, NI+NA
-                                    do s = 1, NI+NA
-                                          call real_vw_x(this, Rkab(:, p, r), Rkab(:, q, s), THCData%NChol)
-                                          !write(*, '(4I5, F20.15)')p, r, q, s, this
+                  if (Flags%JOBTYPE == JOB_TYPE_MP2 .or. Flags%JOBTYPE == JOB_TYPE_SRMP2) then                    
+                        etot = zero
+                        do i = 1, NI
+                              do j = 1, NI
+                                    !  J = (ii|jj)
+                                    call real_vw_x(thisJ, Rkab(:, i, i), Rkab(:, j, j), THCData%NChol)
+                                    !  K = (ij|ji)
+                                    call real_vw_x(thisK, Rkab(:, i, j), Rkab(:, j, i), THCData%NChol)
+                                    etot = etot + (two * thisJ - thisK)
+                              end do
+                        end do
 
-                                          val = zero
-                                          if (IndAux(p)==1.and.IndAux(q)==1.and.IndAux(r)==1.and.IndAux(s)==1)then
-                                                val = val+  (AuxData%rdm2_pp(p-NI, q-NI, r-NI, s-NI) + AuxData%rdm2_pm(p-NI, q-NI, r-NI, s-NI))
-                                          else
-                                                if (p==r.and.q==s.and.(IndAux(p)==0.or. IndAux(q)==0))then
-                                                      val =  val + two * Occ(p) * Occ(q)
-                                                end if
+                        do i = 1, NI
+                              do t = NI + 1, NI + NA
+                                    ! J = (ii|tt)
+                                    call real_vw_x(thisJ, Rkab(:, i, i), Rkab(:, t, t), THCData%NChol)
 
-                                                if (p==s.and.q==r.and.(IndAux(p)==0.or. IndAux(q)==0))then
-                                                      val = val +  -Occ(p) * Occ(q)
+                                    ! K = (it|ti)
+                                    call real_vw_x(thisK, Rkab(:, i, t), Rkab(:, t, i), THCData%NChol)
+
+                                    etot = etot + (two * thisJ - thisK)
+                              end do
+                        end do
+
+
+                        do t = NI + 1, NI + NA
+                              do u = t, NI + NA
+                                    !  J = (tt|uu)
+                                    call real_vw_x(thisJ, Rkab(:, t, t), Rkab(:, u, u), THCData%NChol)
+
+                                    ! K = (tu|ut)
+                                    call real_vw_x(thisK, Rkab(:, t, u), Rkab(:, u, t), THCData%NChol)
+
+                                    if (t == u) then
+                                          etot = etot + (thisJ - thisK)
+                                    else
+                                          etot = etot + two * (thisJ - thisK)
+                                    end if
+                              end do
+                        end do
+
+                        print*, 'etot0', etot0
+                        print*, 'etot1', etot
+                        print*, 'etot w/o enuc', etot+etot0
+                        print*, 'etot', etot+etot0+AuxData%enuc
+                        
+
+                        print*, 'erohf from pyscf', AuxData%EROHF                        
+                  else
+                  
+                        
+                        etot = zero
+                        etot = etot0
+                        do p = 1, NI+NA
+                              do q = 1, NI+NA
+                                    do r = 1, NI+NA
+                                          do s = 1, NI+NA
+                                                call real_vw_x(this, Rkab(:, p, r), Rkab(:, q, s), THCData%NChol)
+                                                !write(*, '(4I5, F20.15)')p, r, q, s, this
+
+                                                val = zero
+                                                if (IndAux(p)==1.and.IndAux(q)==1.and.IndAux(r)==1.and.IndAux(s)==1)then
+                                                      val = val+  (AuxData%rdm2_pp(p-NI, q-NI, r-NI, s-NI) + AuxData%rdm2_pm(p-NI, q-NI, r-NI, s-NI))
+                                                else
+                                                      if (p==r.and.q==s.and.(IndAux(p)==0.or. IndAux(q)==0))then
+                                                            val =  val + two * Occ(p) * Occ(q)
+                                                      end if
+
+                                                      if (p==s.and.q==r.and.(IndAux(p)==0.or. IndAux(q)==0))then
+                                                            val = val +  -Occ(p) * Occ(q)
+                                                      end if
                                                 end if
-                                          end if
-                                          etot = etot + val * this
-                                          if (abs(val * this).gt.1.d-5)then
-                                                write(*, '(A20, 4I5, 3F20.15)')'kupsko', p, q, r, s, val, this, etot
-                                          end if
+                                                etot = etot + val * this
+                                                ! if (abs(val * this).gt.1.d-5)then
+                                                !       write(*, '(A20, 4I5, 3F20.15)')'energy-inter', p, q, r, s, val, this, etot
+                                                ! end if
+                                          end do
                                     end do
                               end do
                         end do
-                  end do
-                  print*, 'etot0', etot0
-                  print*, 'etot1', etot
-                  print*, 'etot w/o enuc', etot+etot0
-                  print*, 'etot', etot+etot0+AuxData%enuc
-                  print*, 'ecas', AuxData%Ecas
+
+                        print*, 'etoat0', etot0
+                        print*, 'etot1', etot
+                        print*, 'etot w/o enuc', etot+etot0
+                        print*, 'etot', etot+etot0+AuxData%enuc
+                        
+                        print*, 'ecas from pyscf', AuxData%Ecas
+                  end if
+            
                 end associate
-                stop
+
           end if
 
     end subroutine THC_init2
+
+    subroutine calc_J_SR(CAONO, THCData, AuxData, AOBasis, System)
+          use Cholesky_Gammcor
+          use THC_Gammcor
+          use THCFock
+          use OneElectronInts_Gammcor
+          use basis_sets
+          use sys_definitions
+          use gammcor_integrals
+          type(TAOBASIS) :: AObasis
+          type(TSystem) :: System
+
+
+          double precision, dimension(:,:), intent(inout) :: CAONO
+          type(TACppData), intent(in) :: AuxData
+          type(TTHCData), intent(inout) :: THCData
+
+          double precision, dimension(:,:, :), allocatable :: Cpo, Cpq
+          double precision, dimension(:,:, :), allocatable :: J_LR, J_FR
+          double precision, dimension(:,:), allocatable :: Zgh, ZghErf
+          double precision :: Nk
+          integer, dimension(2) :: NOcc
+          integer k
+
+
+          associate(Zgk=>THCData%Zgk, ZgkErf=>THCData%ZgkErf, Xga=>THCData%Xga, &
+                XgaErf=>THCData%XgaErf, NI=>AuxData%NI, NA=>AuxData%NA, NIA=>AuxData%NIA, NBasis=>AuxData%NBasis, &
+                Occ=>AuxData%Occ, NTHC=>THCData%NTHC, NTHCErf=>THCData%NTHCErf, ExternalOrdering=>THCData%ExternalOrdering)
+
+
+
+            allocate(Cpq(NBasis, NBasis, 1))
+
+            allocate(Cpo(NBasis, NIA, 1))
+            Cpo = zero
+            call auto2e_interface_C(Cpq(:, :, 1), CAONO, AOBasis, ExternalOrdering)            
+            do k = 1, NIA
+                  Nk = max(ZERO, Occ(k))
+                  Cpo(k, k, 1) = Sqrt(Nk) 
+            end do
+
+          allocate(J_LR(NBasis, NBasis, 1))
+          allocate(J_FR(NBasis, NBasis, 1))
+
+          NOcc(1) = NIA
+          Nocc(2) = 0
+          allocate(Zgh(NTHC, NTHC))
+          allocate(ZghErf(NTHCErf, NTHCErf))
+
+          call real_abT(Zgh, Zgk, Zgk)
+          call real_abT(ZghErf, ZgkErf, ZgkErf)
+          
+          call thc_Fock_JK(J_LR, Cpo, ZghErf, XgaErf, Nocc, .true., .false., one)
+          call thc_Fock_JK(J_FR, Cpo, Zgh, Xga, Nocc, .true., .false., one)
+          
+          THCData%J_SR = J_FR(:,:,1) -J_LR(:,:,1)
+          
+        end associate
+    end subroutine calc_J_SR
 
     subroutine canonicalize(CAONO, fij, fvw, AuxData, THCData, Xgp, AObasis, System)
           use Cholesky_Gammcor
@@ -1379,6 +1751,7 @@ contains
           double precision, dimension(:,:), allocatable :: Cpi_extao, Cpv_extao
           double precision, dimension(:,:), allocatable :: Fockij, Fockvw
           double precision, dimension(:,:), intent(in) :: Xgp
+          integer :: i, j
 
           associate(Zgk=>THCData%Zgk, ExternalOrdering=>THCData%ExternalOrdering)
 
@@ -1400,15 +1773,32 @@ contains
                   CAONO(:, AuxData%NIA+1:AuxData%NBasis), &
                   AuxData%Occ(1:AuxData%NIA), Zgk, Xgp, AOBasis, System, ExternalOrdering)
 
-            call symmetric_eigenproblem(fij, Fockij, AuxData%NI, .true.)
+            print*, 'fiij', AuxData%NI
+            print*, 'Fockij(1,1)', Fockij(1,1)
+            ! do i = 1, AuxData%NI
+            !       do i = j, AuxData%NI
+            !             write(*,'(2I5, F15.6)') Fockij(i,j)
+            !       end do
+            ! end do
+            ! print*, ''
+            if (AuxData%NI>0)then
+                  call symmetric_eigenproblem(fij, Fockij, AuxData%NI, .true.)
+            end if
+            ! print*, fij
+            ! print*, 'fvvww', AuxData%NV
             call symmetric_eigenproblem(fvw, Fockvw, AuxData%NV, .true.)
+            ! print*, fvw
 
-
-            call real_ab(Cpi_extao, CAONO(:, 1:AuxData%NI), Fockij)
+            if (AuxData%NI>0)then
+                  call real_ab(Cpi_extao, CAONO(:, 1:AuxData%NI), Fockij)
+            end if
             call real_ab(Cpv_extao, CAONO(:, AuxData%NIA+1:AuxData%NBasis), Fockvw)
 
-            CAONO(:, 1:AuxData%NI)=Cpi_extao
+            if (AuxData%NI>0)then
+                  CAONO(:, 1:AuxData%NI)=Cpi_extao
+            end if
             CAONO(:, AuxData%NIA+1:AuxData%NBasis) = Cpv_extao
+            
           end associate
     end subroutine canonicalize
 

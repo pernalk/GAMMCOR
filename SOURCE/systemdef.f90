@@ -36,20 +36,43 @@ endif
 
 ! check JobType
 select case(CalcParams%JobType)
+
+! AC
+case(1,14,15,16)
+  if (CalcParams%DBBSC==2.and.CalcParams%TwoMoInt>1) then
+     write(6,'(1x,a)') "ERROR! AC(n)-CBS[H] not ready with FOFO!"
+     stop "Error: check_Calc"
+   endif
+
+! AC1
+case(3)
+  if (CalcParams%DBBSC==2.and.CalcPArams%TwoMoInt==1) then
+     write(6,'(1x,a)') "ERROR! AC1-CBS[H] not ready with INCORE"
+     stop "Error: check_Calc"
+   endif
+
 !SAPT
 case(5)
 
    if(CalcParams%InterfaceType.eq.INTER_TYPE_OWN) then
       write(6,'(1x,a)') "ERROR! SAPT REQUIRES:"
       write(6,'(1x,a)') "Interface    DALTON/MOLPRO"
-      stop
+     stop "Error: check_Calc"
    endif
 
    if(CalcParams%RDMSource.eq.INTER_TYPE_OWN) then
       write(6,'(1x,a)') "ERROR! SAPT REQUIRES:"
       write(6,'(1x,a)') "RDMSource    DALTON/MOLPRO"
-      stop
+      stop "Error: check_Calc"
    endif
+
+! RESPONSE
+case(17)
+   if (CalcParams%NFreqOm .gt. 10) then
+      write(6,'(1x,a)') "ERROR! MORE THAN 10 FREQUENCIES!"
+      stop "Error: check_Calc"
+   endif
+
 end select
 
 ! check interface
@@ -262,9 +285,11 @@ end select
   case(JOB_TYPE_AC)
      Flags%IFlAC  = 1
      Flags%IFlSnd = 0
+     Flags%IVEMB   = Input%CalcParams%IVEMB
      if(Input%CalcParams%DFApp==2) then
         if(Input%CalcParams%PostCAS) then
            Flags%IFunSR = 4
+           Flags%IDBBSC  = Input%CalcParams%DBBSC
         else
            Flags%IFunSR = 2
         endif
@@ -286,8 +311,11 @@ end select
 
   case(JOB_TYPE_RESPONSE)
      Flags%IFlRESPONSE = 1
+     ! SET sr FUNCITONAL
+     Flags%IFunSR = Input%CalcParams%DFApp
+     Flags%IFunSRKer = Input%CalcParams%Kernel
 
-  case(JOB_TYPE_AC0,JOB_TYPE_SRAC0)
+  case(JOB_TYPE_AC0,JOB_TYPE_SRAC0,JOB_TYPE_MP2, JOB_TYPE_SRMP2)
     ! HERE WILL BE CHANGED TO:
     !Flags%IFlAC = 0
      Flags%IFlAC   = 1
@@ -362,6 +390,7 @@ end select
   case(JOB_TYPE_AC1)
      Flags%IFlAC  = 0
      Flags%IFlSnd = 0
+     Flags%IDBBSC  = Input%CalcParams%DBBSC
      if(Input%CalcParams%DFApp==2) then
         if(Input%CalcParams%PostCAS) then
            Flags%IFunSR = 4
@@ -388,6 +417,7 @@ end select
      Flags%ISAPT  = 1
      Flags%IFlAC  = 0
      Flags%IFlSnd = 0
+     Flags%IDBBSC = Input%CalcParams%DBBSC
 
      ! Response for SAPT
      select case(Input%CalcParams%Response)
@@ -504,7 +534,11 @@ if(Flags%ISAPT.Eq.0) then
    System%IPrint = Input%CalcParams%IPrint
   
    System%Max_Cn = Input%CalcParams%Max_Cn
+   System%NFreqOm = Input%CalcParams%NFreqOm
+   if (allocated(Input%CalcParams%FreqOm)) then
+   allocate(System%FreqOm(System%NFreqOm))
    System%FreqOm = Input%CalcParams%FreqOm
+   endif
 
    System%XELE = (System%ZNucl - System%Charge)/2.0d0
    System%NELE = (System%ZNucl - System%Charge)/2
@@ -637,7 +671,7 @@ elseif(Flags%ISAPT.Eq.1) then
          monB%NActFromRDM = Input%SystemInput(2)%NActFromRDM
       endif
 
-   ! write(LOUT,*) monA%ZNucl,'MONO(1)A,case1,dupaaa'
+   ! write(LOUT,*) monA%ZNucl,'MONO(1)A,case1,'
    ! write(LOUT,*) monB%ZNucl,'MONO(1)B,case1'
 
    case(2)
@@ -768,7 +802,7 @@ write(LOUT,'(1x,a)') 'SYSTEM '
 write(LOUT,'(8a10)') ('**********',i=1,8)
 
 if(Flags%ISAPT.Eq.0) then
-   write(LOUT,'(1x,a,1x,i2)') 'NUCLEAR CHARGE: ', System%ZNucl
+   write(LOUT,'(1x,a,1x,i3)') 'NUCLEAR CHARGE: ', System%ZNucl
    write(LOUT,'(1x,a,8x,i3)') 'CHARGE: ', System%Charge
 
 elseif(Flags%ISAPT.Eq.1) then

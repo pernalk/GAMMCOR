@@ -1,7 +1,10 @@
 *Deck DMSCF 
       Subroutine DMSCF 
      $ (Title,BasisSet,URe,Occ,XKin,XNuc,ENuc,UMOAO,TwoEl,
-     $ NBasis,NInte1,NInte2,NGem)
+     $     NBasis,NInte1,NInte2,NGem, THCData)
+
+      use acpp_types
+
 C
 C     !!! XKin CONTAINS BOTH KINETIC AND EL-N CONTRIBUTIONS !!!
 C     !!! XNuc IS EMPTY 
@@ -10,6 +13,7 @@ C
 C
       Character*60 FMultTab,Title
       Character(*) :: BasisSet
+      type(TTHCData), intent(in) :: THCData
 C
       Include 'commons.inc'
 C
@@ -62,9 +66,9 @@ C
       NDimKer=NBasis*(1+NBasis)*(2+NBasis)*(3+NBasis)/24
 C
       If(ICASSCF.Eq.1) Then
-C
+C     
       Call ACCAS(ETot,ENuc,TwoEl,URe,UReSav,Occ,XOne,
-     $  Title,BasisSet,NBasis,NInte1,NInte2,NGem)
+     $  Title,BasisSet,NBasis,NInte1,NInte2,NGem, THCData)
 C
       Else
 C

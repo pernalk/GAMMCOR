@@ -35,8 +35,16 @@ module acpp_types
       type TTHCData
             integer :: NTHC, NChol
             double precision, dimension(:,:), allocatable :: Xga, Zgk
+            double precision, dimension(:,:), allocatable :: Xgp, XgpErf
             integer :: ExternalOrdering
             double precision, dimension(:), allocatable :: fij, fvw
+            double precision, dimension(:), allocatable :: eorbi, eorba
+            integer :: NTHCErf, NCholErf
+            double precision, dimension(:,:), allocatable :: XgaErf, ZgkErf
+            double precision, dimension(:,:), allocatable :: TXgaErf, TXga
+            double precision, dimension(:,:), allocatable :: HNO
+            double precision, dimension(:,:), allocatable :: J_SR
+            
       end type TTHCData
 
       type tMxA
@@ -74,9 +82,10 @@ module acpp_types
             double precision, dimension(:, :, :, :), allocatable :: rdm2_pm
             double precision, dimension(:), allocatable :: TwoNO
             double precision, dimension(:), allocatable :: XOne
-            double precision, allocatable :: Occ(:)
+            double precision, allocatable :: Occ(:), Occ_rohf(:)
             double precision :: ENuc
             double precision :: ECas
+            double precision :: EROHF
             integer :: general_version, version
             integer :: switch = 0
             integer :: ACType
@@ -91,6 +100,9 @@ module acpp_types
             integer :: true_NA, true_NI
             integer :: NInte1, NInte2
             logical :: OnlyEnergy  = .false.
+            integer :: iflmp2
+            integer :: NCoreOrb
+            double precision :: omega = 1.0
             
       end type TACppData
 
