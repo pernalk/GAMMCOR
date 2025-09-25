@@ -166,7 +166,7 @@ else
    Flags%ICholeskyAccu = Input%CholeskyParams%CholeskyAccu
    Flags%DCholeskyThr  = Input%CholeskyParams%CholeskyThr
    Flags%DTHCThr       = Input%CholeskyParams%THCThr
-   
+
    Flags%IH0Test       = Input%CholeskyParams%H0Test
 
   ! set DFT grid
@@ -231,7 +231,7 @@ else
   case(INTER_TYPE_PYSCF)
      Flags%IDALTON = 0
      Flags%IPYSCF  = 1
-     Flags%ORBITAL_ORDERING = 5 ! ORBITAL_ORDERING_PYSCF                                                                                                                                                                              
+     Flags%ORBITAL_ORDERING = 5 ! ORBITAL_ORDERING_PYSCF
 
 end select
 

@@ -732,7 +732,7 @@ do j=1,NBasis
    do i=1,NBasis
       val1 = abs(H0_int(i,j)) - abs(H0_mo(i,j))
       if (val1 .gt. 1d-4) then
-         ierr = ierr + 1 
+         ierr = ierr + 1
         ! print*, i,j, H0_int(i,j),H0_mo(i,j)
       endif
    enddo

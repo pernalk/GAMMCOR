@@ -53,7 +53,7 @@ C
       type(SystemBlock) :: System
       type(SaptData)    :: Sapt
       type(TTHCData)   :: THCData
-      type(TACppData)  :: AuxData      
+      type(TACppData)  :: AuxData
 C
       Include 'commons.inc'
 C
@@ -134,8 +134,7 @@ C
 c     ITREXIO = Flags%ITREXIO
       IMOLPRO = Flags%IMOLPRO
       IDMRG   = Flags%IDMRG
-      IPYSCF = Flags%IPYSCF
-
+      IPYSCF  = Flags%IPYSCF
 C
 C     IF IRes=1 - RESTART THE CALCULATIONS FROM A RESTART FILE
 C
@@ -312,7 +311,7 @@ C
 C      Print*,'VALUE DECLARED IN INPUT: ',NoSt
 C
       ElseIf(IDALTON.Eq.0.and.IDMRG.Eq.0) Then
-         if (IPYSCF.ne.1)then
+         if (IPYSCF.ne.1) then
             Call read_NoSt_molpro(NoSt,'2RDM')
          endif
       ElseIf(IDALTON.Eq.1) Then
