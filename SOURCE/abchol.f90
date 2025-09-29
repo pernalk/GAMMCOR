@@ -832,9 +832,6 @@ allocate(ints(NBasis,NBasis))
 allocate(intsSR(NBasis,NBasis))
 allocate(intsFR(NBasis,NBasis))
 
-
-print*, 'MaxBatchsize', MaxBatchsize, nloop
-print*, 'dimfo', dimfo
 off = 0
 k   = 0
 l   = 1

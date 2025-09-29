@@ -471,6 +471,10 @@ C
       Write(LOUT,'(1x,a,i5,a)') 'Using ',MemMOTransfMB,
      $                          ' MB for 3-indx Cholesky transformation'
 C
+C     CBS[H] + Dalton
+      If (IDBBSC.Eq.2) IFunSRTmp=IFunSR ! Dalton only: CBS[H]-OTF (no BIN/INCORE)
+      If (IDBBSC.Eq.2) IFunSR=-1        ! set IFunSR<0 to enter correct branch
+C
       If (IFunSR.Eq.0.Or.IFunSR.Eq.3.Or.IFunSR.Eq.5) Then
 C     cholesky BIN
       If (ICholeskyBIN==1) Then
@@ -537,10 +541,14 @@ C
 C
       EndIf ! ICholesky
       EndIf ! ITwoEl
+
+      If (IDBBSC.Eq.2) IFunSR=IFunSRTmp ! Dalton only: CBS[H]-OTF (no BIN/INCORE)
 C
 C     JOBTYPE=SRAC0 (IFlCorrdMD=1) : save Cholesky vecs
 C                                    with L accuracy at disk
-      If (IFlCorrMD==1) then
+      If (IFlCorrMD==1.Or.IDBBSC==2) then
+       print*,  'UAux =',norm2(UAux)
+       print*,  'NChol=',NCholesky
       Allocate(MatFF(NCholesky,NBasis**2))
       If(MemType == 2) then       !MB
          MemMOTransfMB = MemVal
@@ -549,10 +557,16 @@ C                                    with L accuracy at disk
       Endif
       Write(LOUT,'(1x,a,i5,a)') 'Using ',MemMOTransfMB,
      $                          ' MB for 3-indx Cholesky transformation'
+      If (ICholeskyOTF==1) Then
+      call chol_gammcor_Rkab(MatFF,UAux,1,NBasis,UAux,1,NBasis,
+     $                   MemMOTransfMB, CholeskyVecsOTF,
+     $                   AOBasis, ORBITAL_ORDERING_DALTON)
+      ElseIf (ICholeskyBIN==1) Then
       Call chol_MOTransf_TwoStep(MatFF,CholeskyVecs,
      $              UAux,1,NBasis,
      $              UAux,1,NBasis,
      $              MemMOTransfMB)
+      EndIf
 C
       Open(newunit=iunit,file='cholvecs',form='unformatted')
       Write(iunit) NCholesky
@@ -3127,6 +3141,7 @@ C
       EndIf
 C
       Write(6,'(/,1X,''Two-electron Energy'',5X,F15.8)')ETwo
+      Write(6,'(/,1X,''Nuc. repuls. Energy'',5X,F15.8)')ENuc
       Write(6,'(/,1X,''MCSCF Molpro Energy'',5X,F15.8)')EOne+ETwo+ENuc
 C
       EndIf
