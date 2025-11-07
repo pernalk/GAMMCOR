@@ -413,11 +413,16 @@ end select
      Flags%IFlFrag1 = 1
      Flags%IFl12 = 1
 
-  case(JOB_TYPE_SAPT)
+  case(JOB_TYPE_SAPT,JOB_TYPE_SAPTOS)
      Flags%ISAPT  = 1
      Flags%IFlAC  = 0
      Flags%IFlSnd = 0
      Flags%IDBBSC = Input%CalcParams%DBBSC
+
+     ! open-shell SAPT
+     if (Input%CalcParams%JobType==JOB_TYPE_SAPTOS) then
+        Flags%ISAPTOS = 1
+     endif
 
      ! Response for SAPT
      select case(Input%CalcParams%Response)

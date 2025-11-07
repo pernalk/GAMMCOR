@@ -46,8 +46,8 @@ integer :: imon
 
  ! check monomers
  select case(Input%CalcParams%JobType)
- ! SAPT case
- case(5)
+ ! SAPT and SAPT-OS case
+ case(5,21)
 
     current_block = block_none
     isys = 0
@@ -391,6 +391,9 @@ subroutine read_block_calculation(CalcParams, line)
                  CalcParams%JobType = JOB_TYPE_MP2
            elseif (uppercase(val) == "SRMP2" ) then
                  CalcParams%JobType = JOB_TYPE_SRMP2
+           elseif (uppercase(val) == "SAPT-OS" .or. &
+                   uppercase(val) == "SAPTOS") then
+               CalcParams%JobType = JOB_TYPE_SAPTOS
            endif
 
      !case ("FRAGMENTS")
@@ -901,6 +904,9 @@ character(:), allocatable :: key, val
   case ("JOBTYPE")
       if (uppercase(val) == "SAPT" ) then
           CalcParams%JobType = JOB_TYPE_SAPT
+          CalcParams%imon = 2
+      elseif (uppercase(val) == "SAPT-OS" ) then
+          CalcParams%JobType = JOB_TYPE_SAPTOS
           CalcParams%imon = 2
       endif
  end select

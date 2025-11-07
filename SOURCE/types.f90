@@ -32,8 +32,9 @@ integer, parameter :: JOB_TYPE_ACFREQNTH   = 15
 integer, parameter :: JOB_TYPE_AC1FREQNTH  = 16
 integer, parameter :: JOB_TYPE_RESPONSE    = 17
 integer, parameter :: JOB_TYPE_SRAC0       = 18
-integer, parameter :: JOB_TYPE_MP2       = 19
+integer, parameter :: JOB_TYPE_MP2         = 19
 integer, parameter :: JOB_TYPE_SRMP2       = 20
+integer, parameter :: JOB_TYPE_SAPTOS      = 21
 
 integer, parameter :: SAPTLEVEL0 = 0
 integer, parameter :: SAPTLEVEL1 = 1
@@ -104,11 +105,11 @@ character(*),parameter :: PossibleInterface(5) = &
 [character(8) :: &
 'DALTON', 'MOLPRO', 'OWN', 'ORCA', 'PYSCF']
 
-character(*),parameter :: PossibleJobType(20) = &
+character(*),parameter :: PossibleJobType(21) = &
 [character(9) :: &
 'AC', 'AC0', 'ERPA', 'EERPA', 'SAPT', 'PDFT', 'CASPiDFT','CASPiDFTOpt','EERPA-1', & 
 'AC0D', 'AC0DNOSYMM', 'NLOCCORR', 'AC0DP', 'ACFREQ','ACFREQNTH','AC1FREQNTH', &
-'RESPONSE','SRAC0', 'MP2', 'SRMP2']
+'RESPONSE','SRAC0', 'MP2', 'SRMP2', 'SAPT-OS']
 
 character(*),parameter :: PossibleRDMType(6) = &
 [character(8) :: &
@@ -304,8 +305,16 @@ type SystemBlock
       double precision,allocatable :: Wpot(:,:)
       double precision,allocatable :: VCoul(:) ! Coulomb (SR) potential
       double precision,allocatable :: VsrKS(:,:),Jsr(:,:)
-      double precision,allocatable :: RDM2(:)
+
+      ! open-shell SAPT rdms
+      double precision,allocatable :: g1a(:,:), g1b(:,:)
+      double precision,allocatable :: g2aa(:,:),g2bb(:,:)
+      double precision,allocatable :: g2ab(:,:),g2ba(:,:)
+      double precision,allocatable :: g2aaba(:,:,:,:),g2bbab(:,:,:,:)
+      ! RDM2 = RDM200
+      double precision,allocatable :: RDM2(:),RDM201(:)
       double precision,allocatable :: RDM2val(:,:,:,:)
+
       double precision,allocatable :: dipm(:,:,:)
       double precision,allocatable :: Eig(:),EigX(:),EigY(:)
       double precision,allocatable :: AP(:,:),PP(:)
@@ -401,6 +410,7 @@ type FlagsData
      integer :: ITrpl   = 0
      integer :: ISAPT   = 0
      integer :: IUKS    = 0
+     integer :: ISAPTOS = 0
      integer :: SaptLevel = 0
      integer :: ISHF      = 0
      character(:), allocatable :: JobTitle
