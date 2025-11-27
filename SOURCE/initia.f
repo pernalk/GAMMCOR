@@ -2712,6 +2712,7 @@ C
       real(8) :: onerdms(NInte1)
       !print*, 'reading 1-RDM(AO)/SPIN...'
       call read_1rdm_ao_spin_molpro(onerdms,'2RDM',ispin,NBasis)
+      print*, 'Test 1-rdm spin: ', norm2(onerdms)
       !do i=1,NInte1
       !print*, i,onerdms(i)
       !enddo

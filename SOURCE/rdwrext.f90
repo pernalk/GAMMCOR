@@ -248,10 +248,11 @@ character(8) :: label
            if(ios<0) then
               !write(LOUT,*) '1RDM spin  not found!'
               ispin=0
+              exit fileloop
            endif
            if(label=='1RDMSAO ') then
               read(iunit) dump_ntdg
-              print*, dump_ntdg
+              !print*, dump_ntdg
               if (dump_ntdg.ne.ntdg) then
                 stop "Error in read_1rdm_ao_spin_molpro"
               endif
