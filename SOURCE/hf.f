@@ -1,5 +1,5 @@
 *Deck HF
-      Subroutine HF(URe,EOrb,Occ,XKin,XNuc,TwoEl,NSymMO,
+      Subroutine HF(URe,EOrb,ENuc,Occ,XKin,XNuc,TwoEl,TwoElSR,NSymMO,
      $ NInte1,NInte2,NBasis,NOcc,IPrint,IEps)
 C
       Implicit Real*8 (A-H,O-Z)
@@ -9,10 +9,11 @@ C
 C     IEps = 1 - OBTAIN ORBITAL ENERGIES AND RETURN
 C            0 - HF CALCULATIONS
 C
-      Parameter(TolOrE=5.0D-5,DumpF=0.25D0,MxItSC=1)
+      Parameter(TolOrE=5.0D-8,DumpF=0.25D0,MxItSC=30)
 C
       Dimension URe(NBasis,NBasis),EOrb(NBasis),
      $          XKin(NInte1),XNuc(NInte1),TwoEl(NInte2),
+     $          TwoElSR(NInte2),
      $          NSymMO(NBasis),Occ(NBasis)
 C
 C     LOCAL ARRAYS 
@@ -22,6 +23,39 @@ C
       Real*8 F(NBasis,NBasis),EigVal(NBasis),Work(NBasis)
 C
       Parameter(Zero=0.0D0,Half=0.5D0,One=1.0D0,Two=2.0D0)
+C
+      NAddr=0
+      IPR=0
+      Do IP=1,NBasis
+      Do IR=1,IP
+      IPR=IPR+1
+      IQS=0
+      Do IQ=1,NBasis
+      Do IS=1,IQ
+      IQS=IQS+1
+      If(IPR.Ge.IQS) Then
+      NAddr=NAddr+1
+C
+c      If(Occ(IP)+Occ(IQ)+Occ(IR)+Occ(IS).lt.3) Then
+c      TwoEl(NAddr)=TwoEl(NAddr)+TwoElSR(NAddr)
+c      EndIf
+C set integrals with core indices to zero
+c      If(IP.Eq.1.Or.IQ.Eq.1.Or.IR.Eq.1.Or.IS.Eq.1) TwoElSR(NAddr)=Zero
+C
+      EndIf
+      EndDo
+      EndDo
+      EndDo
+      EndDo
+C
+c      E2=Zero
+c      do i=1,nbasis
+c      do j=1,nbasis
+c      E2=E2+occ(i)*occ(j)*(
+c     $ 2.*TwoEl(NAddr3(i,i,j,j))-TwoEl(NAddr3(i,j,i,j)))
+c      enddo
+c      enddo
+c      write(*,*)'Two-el energy 01',E2
 C
 C     INITIALIZE DENSITY MATRIX
 C
@@ -166,9 +200,8 @@ C
       F(J,I)=F(I,J)
    45 ETot=ETot+FacIJ*P(IJ)*(XKin(IJ)+XNuc(IJ)+F(I,J))
 C
-      If(IPrint.Ge.3) 
-     $ Write(6,'(/,'' SCF: ITERATION '',I3,'' TOTAL ENERGY '',E21.14)')
-     $ Iter,ETot
+      Write(6,'(/,'' SCF: ITERATION '',I3,'' TOTAL ENERGY '',E21.14)')
+     $ Iter,ETot+ENuc
 C
 C     DIAGONALIZE F
 C
@@ -190,7 +223,7 @@ C
 C
       If((Iter.Lt.MxItSC).And.(IFlag.Eq.1)) GoTo 100
 C
-c      If(Iter.Eq.MxItSC) Stop 'FATAL ERROR: NO CONVERGENCE IN SCF!'
+      If(Iter.Eq.MxItSC) Stop 'FATAL ERROR: NO CONVERGENCE IN SCF!'
 C
       If((IPrint.Eq.1).Or.(IPrint.Eq.2))
      $ Write(6,'(/,'' SCF: Convergence attained after '',I3,
@@ -225,8 +258,7 @@ C
   130 ETot=ETot+EOrb(K)       
 C
       If(IPrint.Ge.1) 
-     $ Write(6,'(/,'' TOTAL ENERGY   '',E21.14,
-     $           /,'' KINETIC ENERGY '',E21.14)') ETot,EKin
+     $ Write(6,'(/,'' TOTAL ENERGY   '',E21.14)') ETot+ENuc
 C
       If(IPrint.Ge.2) Then
       Write(6,'(/,'' ORBITAL ENERGIES '')')
@@ -238,9 +270,42 @@ C
   779 Write(6,'(1X,I3,4X,E21.14)') I,EigVal(I)
       EndIf
 C 
-      Do 900 I=1,NBasis
-      Do 900 J=1,NBasis
-  900 URe(J,I)=F(J,I)
+      ECBSPT=Zero
+      ECBSAC1=Zero
+C
+      Do I=1,NOcc
+      Do IA=NOcc+1,NBasis
+C
+      SumJ=Zero
+      SumJ1=Zero
+      Do J=1,NOcc
+C
+      SumJ=SumJ+Two*TwoElSR(NAddr3(IA,I,J,J))
+     $ -TwoElSR(NAddr3(IA,J,I,J)) 
+C
+      SumJ1=SumJ1+TwoEl(NAddr3(IA,J,I,J))
+C
+      EndDo
+C
+      SumJ1=SumJ1*SumJ
+      SumJ=SumJ**2 
+      ECBSPT=ECBSPT+SumJ/(EOrb(I)-EOrb(IA))
+      ECBSAC1=ECBSAC1+SumJ1/(EOrb(I)-EOrb(IA))
+C
+      EndDo
+      EndDo
+      ECBSPT=Two*ECBSPT
+      Write(6,'(/,'' HF, ECBS_PT(S), HF+ECBS_PT(S)     '',3F16.8)') 
+     $ ETot+ENuc,ECBSPT,ECBSPT+ETot+ENuc
+       ECBSAC1=Two*ECBSAC1+ECBSPT
+       Write(6,'(/,'' HF, ECBS_AC(S1), HF+ECBS_AC(S1)   '',3F16.8)')
+     $ ETot+ENuc,ECBSAC1,ECBSAC1+ETot+ENuc
+C
+c      Do 900 I=1,NBasis
+c      Do 900 J=1,NBasis
+c  900 URe(J,I)=F(J,I)
+C
+
 C
       Return
       End

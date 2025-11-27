@@ -1341,6 +1341,7 @@ C      EndIf
 C
 C     if IUNIT=1 - CholeskyOTF will crash
       If(ICholeskyOTF==1) IUNIT=0
+      IUNIT=0
 C
       If(IUNIT.Eq.1) Then
       Write(6,'(/,X,"URe is a unit matrix up to ",E16.6)') ERR

@@ -216,7 +216,7 @@ if(ICholesky==1) then
 else
    call JK_loop(ABPLUS,ABMIN,HNO,AuxI,AuxIO,WMAT,&
                 RDM2val,Occ,AuxCoeff,IGem,AuxInd,pos,&
-                INActive,NOccup,NDim,NDimX,NBasis,NInte1,IntJFile,IntKFile,ACAlpha,switch,ETot)
+                INActive,NOccup,NElecBEmb,NDim,NDimX,NBasis,NInte1,IntJFile,IntKFile,ACAlpha,switch,ETot)
 endif
 
 ! DMRG-in-DFT
@@ -253,7 +253,6 @@ if (IVEMB) then
    enddo
 endif
 ! DMRG-in-DFT end
-
 write(LOUT,'(1x,a,5x,f15.8)') "CASSCF Energy (w/o ENuc)", ETot
 
 do i=1,NBasis
@@ -1420,11 +1419,11 @@ else
    if(present(ETot)) then
       call JK_loop(ABPLUS,ABMIN,HNO,AuxI,AuxIO,WMAT,&
                    RDM2val,Occ,AuxCoeff,IGem,AuxInd,pos,&
-                   INActive,NOccup,NDimX,NDimX,NBasis,NInte1,IntJFile,IntKFile,0d0,2,ETot)
+                   INActive,NOccup,NElecBEmb,NDimX,NDimX,NBasis,NInte1,IntJFile,IntKFile,0d0,2,ETot)
    else
       call JK_loop(ABPLUS,ABMIN,HNO,AuxI,AuxIO,WMAT,&
                    RDM2val,Occ,AuxCoeff,IGem,AuxInd,pos,&
-                   INActive,NOccup,NDimX,NDimX,NBasis,NInte1,IntJFile,IntKFile,0d0,2)
+                   INActive,NOccup,NElecBEmb,NDimX,NDimX,NBasis,NInte1,IntJFile,IntKFile,0d0,2)
    endif
 endif
 ! DMRG-in-DFT
@@ -2586,7 +2585,7 @@ deallocate(ints_bi,ints_bj,work)
 end subroutine check_mp2
 
 subroutine JK_loop(ABPLUS,ABMIN,HNO,AuxI,AuxIO,WMAT,RDM2val,Occ,AuxCoeff,IGem,AuxInd,pos,&
-                   INActive,NOccup,NDim,NDimX,NBasis,NInte1,IntJFile,IntKFile,ACAlpha,AB,ETot)
+                   INActive,NOccup,NElecBEmb,NDim,NDimX,NBasis,NInte1,IntJFile,IntKFile,ACAlpha,AB,ETot)
 
 implicit none
 
@@ -2608,6 +2607,13 @@ double precision :: val
 double precision :: AuxVal,HNOCoef
 double precision,allocatable :: work1(:),work2(:)
 double precision,allocatable :: ints(:,:)
+! DMRG-in-DFT
+double precision  :: XVEMB(NInte1)
+logical :: IVEMB
+integer ::NElecBEmb,NOccupB
+NOccupB=NElecBEmb/2
+! if the file with v_emb exists - hone will be modified
+Inquire(file='embedding_potential_NO.bin',exist=IVEMB)
 
 !print*, 'start JK loop:',AB
 
@@ -2654,6 +2660,8 @@ do ll=1,NOccup
             if(IGem(k)==2) then
                do i=INActive+1,NOccup
                   HNO(i,k) = HNO(i,k) - val*ints(i,l)
+                  ! DMRG-in-DFT
+                  if(IVEMB.and.l.le.NOccupB) HNO(i,k) = HNO(i,k) + val*ints(i,l)
                enddo
             elseif(IGem(k)==3) then
                do i=NOccup+1,NBasis
@@ -2968,6 +2976,8 @@ do ll=1,NOccup
             do j=INActive+1,NOccup
                do i=INActive+1,NOccup
                   HNO(i,j) = HNO(i,j) + val*ints(i,j)
+                  ! DMRG-in-DFT
+                  if(IVEMB.and.k.le.NOccupB) HNO(i,j) = HNO(i,j) - val*ints(i,j)
                enddo
             enddo
          endif
