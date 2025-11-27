@@ -223,6 +223,47 @@ character(8) :: label
 
 end subroutine read_1rdm_molpro
 
+subroutine read_1rdm_ao_spin_molpro(D,infile,ispin,nbasis)
+!
+! Read 1-RDM SPIN in AO basis
+! - D(n*(n+1)/2)
+! - ispin=1 if the matrix is present
+!
+integer,intent(in)  :: nbasis
+integer,intent(out) :: ispin
+character(*),intent(in) :: infile
+double precision,intent(out) :: D(nbasis*(nbasis+1)/2)
+
+integer :: ntdg,dump_ntdg
+character(8) :: label
+
+ ntdg = nbasis*(nbasis+1)/2
+ ispin = 1 ! if no 1-RDM SPIN, set to 0
+
+ open(newunit=iunit,file=infile,status='OLD', &
+      access='SEQUENTIAL',form='UNFORMATTED')
+
+ fileloop: do
+           read(iunit,iostat=ios) label
+           if(ios<0) then
+              !write(LOUT,*) '1RDM spin  not found!'
+              ispin=0
+           endif
+           if(label=='1RDMSAO ') then
+              read(iunit) dump_ntdg
+              print*, dump_ntdg
+              if (dump_ntdg.ne.ntdg) then
+                stop "Error in read_1rdm_ao_spin_molpro"
+              endif
+              read(iunit) D(1:ntdg)
+              exit fileloop
+           endif
+         enddo fileloop
+
+ close(iunit)
+
+end subroutine read_1rdm_ao_spin_molpro
+
 subroutine read_1trdm_molpro(onerdm,stbrIn,stketIn,infile,nbasis)
 implicit none
 

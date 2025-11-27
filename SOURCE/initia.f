@@ -2143,7 +2143,6 @@ Cc     Call chol_CoulombMatrix(CholeskyVecs,'AOTWOSORT',ICholeskyAccu)
      &                         ICholeskyAccu)
       NCholesky=CholeskyVecs%NCholesky
 
-      print*, 'IDBBSC = ', IDBBSC
       If(IFunSR.Eq.1.Or.IFunSR.Eq.2.Or.IFunSR.Eq.4.Or.IDBBSC.Eq.2) Then
 C     generate LR-Cholesky integrals
       Write(LOUT,'(/1x,3a6)') ('*******',i=1,3)
@@ -2707,6 +2706,16 @@ c     endif ! IRes
 C
 C
   543 Continue
+C
+      block
+      ! test subroutine for reading 1-rdm spin in AOs
+      real(8) :: onerdms(NInte1)
+      !print*, 'reading 1-RDM(AO)/SPIN...'
+      call read_1rdm_ao_spin_molpro(onerdms,'2RDM',ispin,NBasis)
+      !do i=1,NInte1
+      !print*, i,onerdms(i)
+      !enddo
+      end block
 C
 C     If CASPiDFT then skip integral transformation
       If(IFunSR.Eq.6) Then
