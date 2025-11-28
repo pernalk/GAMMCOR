@@ -3865,6 +3865,12 @@ if(ICholesky==0) then
                       ECorrIJ(IGIJ(IGem(IP),IGem(IQ)),IGIJ(IGem(IR),IGem(IS)))  &
                       +Aux*ints(j,i)
 
+                      if (IVirtLoc) then
+                           ECEmbb(IGEmbb(IOrbEmbb(IP),IOrbEmbb(IQ)),IGEmbb(IOrbEmbb(IR),IOrbEmbb(IS)))= &
+                           ECEmbb(IGEmbb(IOrbEmbb(IP),IOrbEmbb(IQ)),IGEmbb(IOrbEmbb(IR),IOrbEmbb(IS)))  &
+                      + Aux*ints(j,i)
+                       endif
+
                    ! endinf of If(IP.Gt.IR.And.IQ.Gt.IS)
                    endif
 
@@ -3877,6 +3883,29 @@ if(ICholesky==0) then
       enddo
    enddo
    !print*, 'ECorr FOFO ',ECorr
+
+    if(IVirtLoc) then
+      Write(6,'(/,X,"(1:occB 2:occA 3:virtA 4:virtB )")')
+      Sum=0.0d0
+      IJ=0
+      Do I=1,4
+      Do J=1,I
+         IJ=IJ+1
+         KL=0
+         Do K=1,4
+         Do L=1,K
+            KL=KL+1
+            if (ECEmbb(IJ,KL).ne.0.0) then
+                ! AC0 = 0.5 W(alpha=1.d-4)/1.d-4
+                Write(6,'(X,"(",2I1,")","(",2I1,")",F15.8)') I,J,K,L,ECEmbb(IJ,KL)/2.0/1.d-4
+                Sum=Sum+ECEmbb(IJ,KL)/2.0/1.d-4
+            endif
+         EndDo
+         EndDo
+      EndDo
+      EndDo
+      Write(6,'(X,"Sum = ",F15.8,/)')sum
+   endif
 
    close(iunit)
    !$OMP END CRITICAL(crit_ACEneERPA_FOFO_1)

@@ -73,7 +73,8 @@ C
       If (Abs(Occ(i)-One).lt.epsilon(One)) Then
       IndAux(I)=0
 c     Write(6,'(X," InActive Orbital: ",I4,ES14.4)') I, Occ(I)
-      ElseIf(Occ(I).Lt.One.And.Occ(I).Ne.Zero) Then
+c      ElseIf(Occ(I).Lt.One.And.Occ(I).Ne.Zero) Then
+      ElseIf(Abs(Occ(I)-One).Ge.epsilon(One).And.Occ(I).Ne.Zero) Then
       IndAux(I)=1
       Write(6,'(X," Active Orbital  : ",I4,ES14.4)') I, Occ(I)
       ICount=ICount+1
@@ -1198,9 +1199,11 @@ C
           Write(6,'(/," SR_xc_PBE with translated densities",F15.8,/)')
      $    EXCTOP
 C
-          Call PBE_ONTOP_MD(PBEMD,URe,Occ,
-     $    OrbGrid,OrbXGrid,OrbYGrid,OrbZGrid,WGrid,NGrid,NBasis)
-          Write(6,'(/," SR_PBE_corr_md ",F15.8,/)') PBEMD
+C KP 21.11.2025
+C commenting this out (takes forever for large grid)
+c          Call PBE_ONTOP_MD(PBEMD,URe,Occ,
+c     $    OrbGrid,OrbXGrid,OrbYGrid,OrbZGrid,WGrid,NGrid,NBasis)
+c          Write(6,'(/," SR_PBE_corr_md ",F15.8,/)') PBEMD
 C
           If (IFlCorrMD.Eq.1) Then
           Call PBE_ONTOP_C_MD(PBEmodMD,5.d0,URe,Occ,
@@ -1768,7 +1771,8 @@ C
      $ AuxI(NInte1),AuxIO(NInte1),IPair(NBasis,NBasis),
      $ EigX(NDimX*NDimX),
      $ IEigAddY(2,NDimX),IEigAddInd(2,NDimX),IndBlock(2,NDimX),
-     $ XMAux(NDimX*NDimX),XMuMAT(NBasis,NBasis),work1(NBasis,NBasis)
+     $ XMAux(NDimX*NDimX),XMuMAT(NBasis,NBasis),work1(NBasis,NBasis),
+     $ work2(NBasis)
 ! delete after tests
      $ ,WorkH(NInte1),TwoElSR(NInte2)
 ! analysis of AC0
@@ -2385,7 +2389,8 @@ C
      $ (Two*TwoNO(NAddr3(IT,IT,I,J))-TwoNO(NAddr3(IT,I,IT,J)))
       EndDo
 C
-      XOne(IJ)=-Aux
+c this is not used for anything and may cause problems because XOne is changed 
+c      XOne(IJ)=-Aux
 C
       EndIf
 C
@@ -2501,7 +2506,48 @@ c      endif
       Write(6,'(/,X,"1st-order SR energy for",I4," active orbitals")') 
      $ NAcCAS+NInAcCAS-NStronglyOccOrb
       Write(6,'(X," <Ref|H^SR|Ref> = ",F10.6,/)') ETotSR
+C
+C     HF with SR-modified integrals
+C    
+c      work2=Zero
+c      Work1=Zero
+c      TwoEl2=TwoNO-TwoElSR
 
+c      E2=Zero
+c      do i=1,nbasis
+c      do j=1,nbasis
+c      E2=E2+occ(i)*occ(j)*(
+c     $ 2.*TwoEl2(NAddr3(i,i,j,j))-TwoEl2(NAddr3(i,j,i,j)))
+c      enddo
+c      enddo
+c      write(*,*)'Two-el energy 0',E2
+
+c      NAddr=0
+c      IPR=0
+c      Do IP=1,NBasis
+c      Do IR=1,IP
+c      IPR=IPR+1
+c      IQS=0
+c      Do IQ=1,NBasis
+c      Do IS=1,IQ
+c      IQS=IQS+1
+c      If(IPR.Ge.IQS) Then
+c      NAddr=NAddr+1
+cC
+c      If(Occ(IP)+Occ(IQ)+Occ(IR)+Occ(IS).lt.3) Then
+c      TwoEl2(NAddr)=TwoEl2(NAddr)+TwoElSR(NAddr)
+c      EndIf
+cC
+c      EndIf
+c      EndDo
+c      EndDo
+c      EndDo
+c      EndDo
+c
+c      IPrint=2
+c      Call HF(URe,Work2,ENuc,Occ,XOne,Work1,TwoEl2,TwoElSR,NSymNO,
+c     $ NInte1,NInte2,NBasis,NELE,IPrint,0)
+C
       goto 444
 C    ***** Two-Electron systems investigation
       NDim=NBasis*(NBasis-1)/2
@@ -2964,6 +3010,75 @@ C
       Dimension Zk(NGrid),RhoA(NGrid),RhoB(NGrid),
      & SigmaAA(NGrid),SigmaAB(NGrid),SigmaBB(NGrid),
      & OrbTGrid(NBasis,NGrid)
+C
+C     FRACTIONAL SPIN ERROR (makes sense if there are only doubly occupied and one single 
+C     occupied orbital 
+C
+      Dimension OccS(NBasis)
+C
+      Goto 234
+      OccS=Zero
+      Do I=1,NBasis
+      If(Occ(I).Eq.Half) OccS(I)=Occ(I)
+      EndDo          
+C
+C      Do K=1,6
+C      XOm=(K-1)*0.2
+      Do K=1,2
+      XOm=(K-1)*1.0
+C
+      Do I=1,NGrid
+      Call DenGrid(I,RhoGrid,Occ,URe,OrbGrid,NGrid,NBasis)
+      Call DenGrad(I,RhoX,Occ,URe,OrbGrid,OrbXGrid,NGrid,NBasis)
+      Call DenGrad(I,RhoY,Occ,URe,OrbGrid,OrbYGrid,NGrid,NBasis)
+      Call DenGrad(I,RhoZ,Occ,URe,OrbGrid,OrbZGrid,NGrid,NBasis)
+C
+      Call DenGrid(I,RhoGridS,OccS,URe,OrbGrid,NGrid,NBasis)
+      Call DenGrad(I,RhoXS,OccS,URe,OrbGrid,OrbXGrid,NGrid,NBasis)
+      Call DenGrad(I,RhoYS,OccS,URe,OrbGrid,OrbYGrid,NGrid,NBasis)
+      Call DenGrad(I,RhoZS,OccS,URe,OrbGrid,OrbZGrid,NGrid,NBasis)
+C
+      RhoA(I)=RhoGrid/Two+RhoGridS/Two*XOm
+      RhoB(I)=RhoGrid/Two-RhoGridS/Two*XOm
+C
+      RhoXa=RhoX/Two+RhoXS/Two*XOm
+      RhoXb=RhoX/Two-RhoXS/Two*XOm
+      RhoYa=RhoY/Two+RhoYS/Two*XOm
+      RhoYb=RhoY/Two-RhoYS/Two*XOm
+      RhoZa=RhoZ/Two+RhoZS/Two*XOm
+      RhoZb=RhoZ/Two-RhoZS/Two*XOm
+C
+c      RhoA(I)=RhoGridS/Two+RhoGridS/Two*XOm
+c      RhoB(I)=RhoGridS/Two-RhoGridS/Two*XOm
+cC
+c      RhoXa=RhoXS/Two+RhoXS/Two*XOm
+c      RhoXb=RhoXS/Two-RhoXS/Two*XOm
+c      RhoYa=RhoYS/Two+RhoYS/Two*XOm
+c      RhoYb=RhoYS/Two-RhoYS/Two*XOm
+c      RhoZa=RhoZS/Two+RhoZS/Two*XOm
+c      RhoZb=RhoZS/Two-RhoZS/Two*XOm
+C
+      SigmaAA(I)=RhoXa*RhoXa+RhoYa*RhoYa+RhoZa*RhoZa
+      SigmaAB(I)=RhoXa*RhoXb+RhoYa*RhoYb+RhoZa*RhoZb
+      SigmaBB(I)=RhoXb*RhoXb+RhoYb*RhoYb+RhoZb*RhoZb
+C
+      EndDo
+C
+      Call dfun_GGA_AB(RhoA,RhoB,SigmaAA,SigmaAB,SigmaBB,Zk,NGrid)
+C
+      EXC=Zero
+      Do I=1,NGrid
+      EXC=EXC+Zk(I)*WGrid(I)
+      EndDo
+C
+      write(*,*) 'Sz',XOm*0.5,'EXC_PBE',EXC
+      If(XOm.Eq.Zero) EXC0=EXC
+      If(XOm.Eq.One)  EXC1=EXC
+C
+      EndDo
+      write(*,*)'Fractional Spin XC Error', EXC0-EXC1
+  234 Continue
+CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC
 C
 C     READ 2RDM, COMPUTE THE ENERGY
 C
