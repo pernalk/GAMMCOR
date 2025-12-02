@@ -1052,6 +1052,8 @@ associate( CalcParams => Input%CalcParams)
               PossibleInterface(CalcParams%InterfaceType)
  write(LOUT,' (1x,a,5x,a)') "JOB TYPE: ",  &
                       PossibleJobType(CalcParams%JOBtype)
+ if (CalcParams%IVEMB==1) &
+ write(LOUT, '(1x,a,2x,a)')"DMRG-in-DFT: ", ".TRUE."
  write(LOUT,' (1x,a,5x,a)') "RDM TYPE: ",  &
               PossibleRDMType(CalcParams%RDMType)
  write(LOUT,' (1x,a,3x,a)') "RDM SOURCE: ",  &

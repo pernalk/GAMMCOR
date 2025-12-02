@@ -259,7 +259,6 @@ C
 C
       Call RunDFOnTop(BasisSet,ETot,ENuc,TwoNO,URe,UNOAO,Occ,XOne,
      $  IndAux,IPair,IndN,IndX,NDimX,Title,NBasis,NInte1,NInte2,NGem)
-
 C
       Else
 C
@@ -3685,6 +3684,18 @@ C
       EndIf
       EndIf ! InternalGrid
 C
+C     DMRG-in-DFT On-Top
+      If (IVEMB.Eq.1) Then
+      ! EXCTOP = nadd_xc
+      ! nadd_xc = E_xc[rho_AB,OT_AB]- E_xc[rho_A,OT_A] - E_xc[rho_B,OT_B]
+      EXCTOP = 0d0
+         print*, 'new entry point: '
+         print*, 'nadd_xc=Exc[rhoAB,OTAB]-Exc[rhoA,OTA]-E_xc[rhoB,OTB]'
+         print*, 'not implemented yet!'
+         print*, 'nadd_xc =  ', EXCTOP
+      Return
+      EndIf
+
       Call GGA_ONTOP(EXCTOP,URe,Occ,OrbGrid,OrbXGrid,OrbYGrid,
      $ OrbZGrid,WGrid,NGrid,NBasis,1)
       Write(6,'(/," PBE_xc from xcfun with translated densities",

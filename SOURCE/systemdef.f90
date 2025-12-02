@@ -285,7 +285,7 @@ end select
   case(JOB_TYPE_AC)
      Flags%IFlAC  = 1
      Flags%IFlSnd = 0
-     Flags%IVEMB   = Input%CalcParams%IVEMB
+     Flags%IVEMB  = Input%CalcParams%IVEMB
      if(Input%CalcParams%DFApp==2) then
         if(Input%CalcParams%PostCAS) then
            Flags%IFunSR = 4
@@ -442,6 +442,7 @@ end select
      Flags%IFlAC  = 0
      Flags%IFlSnd = 0
      Flags%IFunSR = 3
+     Flags%IVEMB  = Input%CalcParams%IVEMB
 
   case(JOB_TYPE_CASPIDFT)
      Flags%IFunSR = 5
