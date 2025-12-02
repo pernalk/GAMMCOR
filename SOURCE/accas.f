@@ -773,7 +773,7 @@ C
       Integer :: jtsoao(NBasis)
       Integer :: NSymBas(8),NSymOrb(8)
 C
-      Logical :: doGGA, doGGAdal
+      Logical :: doGGA, doGGAdal,iexs
 C
       Character(*),Parameter :: griddalfile='dftgrid.dat'
 C
@@ -1198,6 +1198,15 @@ C
           Write(6,'(/," SR_xc_PBE with translated densities",F15.8,/)')
      $    EXCTOP
 C
+C KP 29.11.2025
+          Inquire(file='RHOS.dat',exist=iexs) 
+          If(iexs) Then
+          Call SR_PBE_SPIN(EXCSPIN,URe,UNOAO,Occ,OrbGrid,OrbXGrid,
+     $    OrbYGrid,OrbZGrid,WGrid,NGrid,NInte1,NBasis)
+          Write(6,'(/," SR_xc_PBE with spin densities",F15.8,/)')
+     $    EXCSPIN
+          EndIf
+C
 C KP 21.11.2025
 C commenting this out (takes forever for large grid)
 c          Call PBE_ONTOP_MD(PBEMD,URe,Occ,
@@ -1342,6 +1351,12 @@ C
       Write
      $ (6,'(1X,''lrCASSCF+srDF[OnTop]+ENuc, lrAC0-Corr,Total'',3F15.8)')
      $ ECASSCF-XVSR+Del+ENuc,ECorr,ECASSCF-XVSR+Del+ENuc+ECorr
+C KP 29.11.2025
+      If(iexs) Write
+     $ (6,'(1X,''lrCASSCF+srDF[RhoC,RhoS]+ENuc, lrAC0-Corr,
+     $ Total'',3F15.8)')
+     $ ECASSCF-XVSR+EnHSR+EXCSPIN+ENuc,ECorr,
+     $ ECASSCF-XVSR+EnHSR+EXCSPIN+ENuc+ECorr 
 C
       GoTo 777
 C
@@ -3376,6 +3391,163 @@ C
 C
       Write(6,'(/," SR_xch_PBE with translated densities",F15.8)')Exch
       Write(6,'(" SR_cor_PBE with translated densities",F15.8)')EnC
+C
+      Return
+      End
+
+c KP 29.11
+*Deck SR_PBE_SPIN  
+      Subroutine SR_PBE_SPIN(EXCSPIN,URe,UNOAO,Occ,OrbGrid,OrbXGrid,
+     $ OrbYGrid,OrbZGrid,WGrid,NGrid,NInte1,NBasis)
+C
+C     RETURNS A SR-PBE XC ENERGY COMPUTED WITH SPIN-FUNCTIONAL (USING SPIN AND CHARGE DENSITIES)
+C
+      Implicit Real*8 (A-H,O-Z)
+C
+      Parameter(Zero=0.D0, Half=0.5D0, One=1.D0, Two=2.D0, Four=4.D0)
+C
+      Include 'commons.inc' 
+      Dimension URe(NBasis,NBasis),UNOAO(NBasis,NBasis),
+     $ Occ(NBasis),
+     $ Ind1(NBasis),Ind2(NBasis),
+     $ WGrid(NGrid),OrbGrid(NGrid,NBasis),OrbXGrid(NGrid,NBasis),
+     $ OrbYGrid(NGrid,NBasis),OrbZGrid(NGrid,NBasis),
+     $ GammaS(NInte1),Gamma(NInte1)
+       logical iex
+C
+! input
+      Dimension Zk(NGrid),RhoGrid(NGrid),RhoO(NGrid),
+     & Sigma(NGrid),SigmaCO(NGrid),SigmaOO(NGrid)
+      logical fderiv,open
+! output
+      integer igrad
+      character*(30) name
+      double precision vrhoc(ngrid),vrhoo(ngrid)
+      double precision vsigmacc(ngrid),vsigmaco(ngrid),vsigmaoo(ngrid)
+C
+C     READ Charge-1-RDM and check the diagonal 
+C      
+      Inquire(file='RHOC.dat',exist=iex)
+      If(.not.iex) 
+     $ Stop 'fatal error in SR_PBE_SPIN: RHOC.dat does not exist'     
+C
+      Open(10,File='RHOC.dat')
+      Read(10,*)Gamma
+      Close(10)
+      Err=Zero
+      Trace=Zero
+      Do I=1,NBasis
+      II=I*(I-1)/2+I
+      Trace=Trace+Gamma(II)
+      Err=Err+Abs(Occ(I)-Gamma(II))
+      EndDo 
+      Err=Err/XELE
+      Write(6,'(1X,''Trace of RHOC'',5X,F15.8)')Trace
+      Write(6,'(1X,''Mean deviation of diag[RHOC] 
+     $ from Occ'',5X,F15.8)') Err
+      If(Err.Gt.1.D-6) 
+     $ Write(*,*) 'WARNING! Large deviation of diag[RHOC] from Occ!!!'
+c     $ Stop'Fatal error in SR_PBE_SPIN: wrong data in RHOC.dat'
+C
+C     READ Spin-1-RDM
+C       
+      Inquire(file='RHOS.dat',exist=iex)
+      If(.not.iex)
+     $ Stop 'fatal error in SR_PBE_SPIN: RHOS.dat does not exist'
+C
+      Open(10,File='RHOS.dat')
+      Read(10,*)GammaS
+      Close(10)
+      Trace=Zero
+      Do I=1,NBasis
+      II=I*(I-1)/2+I
+      Trace=Trace+GammaS(II)
+      EndDo
+      Write(6,'(1X,''Trace of RHOS'',5X,F15.8)')Trace
+C
+      Do I=1,NGrid
+C
+      Call DenGrid(I,RhoGrid(I),Occ,URe,OrbGrid,NGrid,NBasis)
+      Call DenGrad(I,RhoX,Occ,URe,OrbGrid,OrbXGrid,NGrid,NBasis)
+      Call DenGrad(I,RhoY,Occ,URe,OrbGrid,OrbYGrid,NGrid,NBasis)
+      Call DenGrad(I,RhoZ,Occ,URe,OrbGrid,OrbZGrid,NGrid,NBasis)
+C
+      RhoS=Zero
+      RhoSX=Zero
+      RhoSY=Zero
+      RhoSZ=Zero
+      Do J=1,NBasis
+        Sum=Zero
+        Do K=1,NBasis
+           JK=(Max(J,K)*(Max(J,K)-1))/2+Min(J,K)
+           Sum=Sum+GammaS(JK)*OrbGrid(I,K)
+        EndDo
+        RhoS=RhoS+Sum*OrbGrid(I,J)
+        RhoSX=RhoSX+Sum*OrbXGrid(I,J)
+        RhoSY=RhoSY+Sum*OrbYGrid(I,J)
+        RhoSZ=RhoSZ+Sum*OrbZGrid(I,J)
+      EndDo
+      RhoS=RhoS*Two
+      RhoSX=RhoSX*Four
+      RhoSY=RhoSY*Four
+      RhoSZ=RhoSZ*Four
+C
+      If(RhoGrid(I).Gt.1.D-12) Then
+C 
+      RhoO(I)=RhoS
+C
+      RhoXC=RhoX
+      RhoYC=RhoY
+      RhoZC=RhoZ
+
+      RhoXO=RhoSX
+      RhoYO=RhoSY
+      RhoZO=RhoSZ
+C       
+      Sigma(I)=  RhoXC*RhoXC+RhoYC*RhoYC+RhoZC*RhoZC
+      SigmaCO(I)=RhoXC*RhoXO+RhoYC*RhoYO+RhoZC*RhoZO
+      SigmaOO(I)=RhoXO*RhoXO+RhoYO*RhoYO+RhoZO*RhoZO
+C      
+      Else
+C
+      RhoGrid(I)=Zero
+      RhoO(I)=Zero
+      Sigma(I)=Zero
+      SigmaCO(I)=Zero
+      SigmaOO(I)=Zero
+C
+      EndIf
+C loop over grid
+      EndDo
+C
+      EXCSPIN=Zero
+      FDeriv=.False.
+      Open=.True.
+C
+      Call dftfun_exerfpbe(name,FDeriv,Open,igrad,NGrid,RhoGrid,RhoO,
+     >                   Sigma,SigmaCO,SigmaOO,
+     >                   Zk,vrhoc,vrhoo,
+     >                   vsigmacc,vsigmaco,vsigmaoo,Alpha)
+
+      Do I=1,NGrid
+      EXCSPIN=EXCSPIN+Zk(I)*WGrid(I)
+      EndDo
+      Exch=EXCSPIN
+C
+      Call dftfun_ecerfpbe(name,FDeriv,Open,igrad,NGrid,RhoGrid,RhoO,
+     >                   Sigma,SigmaCO,SigmaOO,
+     >                   Zk,vrhoc,vrhoo,
+     >                   vsigmacc,vsigmaco,vsigmaoo,Alpha)
+C
+      EnC=Zero
+      Do I=1,NGrid
+      EnC=EnC+Zk(I)*WGrid(I)
+      EndDo
+C
+      EXCSPIN=EXCSPIN+EnC
+C
+      Write(6,'(/," SR_xch_PBE with spin densities",F15.8)')Exch
+      Write(6,'(" SR_cor_PBE with spin densities",F15.8)')EnC
 C
       Return
       End

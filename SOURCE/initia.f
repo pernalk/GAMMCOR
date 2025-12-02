@@ -3056,6 +3056,34 @@ C     test dipole moments
      $                      NOccup,NBasis)
       EndIf
 C
+C     READ CHARGE AND SPIN DENSITIES (ASSUMED TO BE TRANSFORMED WITH THE OVERLAP S
+C     TRANSFORM THEM TO NO AND SAVE IN FILES
+C
+C KP 29.11.2025
+      Do I=1,60
+      FName(I:I)=' '
+      EndDo
+      Inquire(file='sdenas.txt',exist=iex)
+      If(iex) Then
+              FName(1:1+10)='sdenas.txt'
+              Call Int1_AO(Tmp,NInte1,FName,NumOSym,Nbasis)
+              Call MatTr(Tmp,UAOMO,NBasis) 
+              Tmp=Tmp/2.d0
+              Open(10,File='RHOC.dat')
+              Write(10,*)Tmp
+              Close(10)
+      EndIf        
+      Inquire(file='sdenbs.txt',exist=iex)
+      If(iex) Then
+              FName(1:1+10)='sdenbs.txt'
+              Call Int1_AO(Tmp,NInte1,FName,NumOSym,Nbasis)
+              Call MatTr(Tmp,UAOMO,NBasis)
+              Tmp=Tmp/2.d0
+              Open(10,File='RHOS.dat')
+              Write(10,*)Tmp
+              Close(10)
+      EndIf
+C
 C     READ ACTIVE 2-RDM AND TRANSFORM TO NO'S
 C
       Write(6,'(" Reading in 2-RDM ...")')
@@ -3753,6 +3781,7 @@ C
       Implicit Real*8 (A-H,O-Z)
 C
       Parameter (Zero=0.D0)
+      Character*60 FMultTab
       Include 'commons.inc'
 C
       Character*60 FName,Aux1
