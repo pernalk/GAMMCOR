@@ -22,6 +22,27 @@ contains
 !
 !end subroutine get_den
 
+!---------------------------------------------------------------------
+subroutine tran2MO2AO_gen(Ain,dim1,dim2,nao,nmo,CA,CB,Aout)
+!---------------------------------------------------------------------
+!
+! MO2AO backtransformation
+! for general A(dim1,dim2) matrix
+!
+  integer, intent(in) :: dim1,dim2,nao,nmo
+  real(8), intent(in) :: Ain(dim1,dim2),CA(nao,nmo),CB(nao,nmo)
+  real(8), intent(out):: Aout(nao,nao)
+  real(8), dimension(:,:), allocatable :: work
+
+  allocate(work(nao,dim2))
+
+  call dgemm('N','N',nao,dim2,dim1,1d0,CA(1:nao,1:dim1),nao,Ain,dim1,0d0,work,nao)
+  call dgemm('N','T',nao,nao,dim2,1d0,work,nao,CB(1:nao,1:dim2),nao,0d0,Aout,nao)
+
+  deallocate(work)
+
+end subroutine tran2MO2AO_gen
+
 subroutine get_one_mat(var,mat,mono,nbas)
 !
 ! Purpose: get 1-el V, S or H matrix from ONEEL files

@@ -696,7 +696,6 @@ double precision :: val
    if(label==text) then
       read(iunit) nsym,nbas(1:nsym),offs(1:nsym)
       nmo = sum(nbas(1:nsym))
-      if(nsym.gt.1) stop 'sym not ready in read_uocc_molpro!'
       read(iunit)
       read(iunit)
       read(iunit) uocc(1:nmo,1)
@@ -750,7 +749,6 @@ double precision :: val
    if(label==text) then
       read(iunit) nsym,nbas(1:nsym),offs(1:nsym)
       nmo = sum(nbas(1:nsym))
-      if(nsym.gt.1) stop 'sym not ready in read_uorbe_molpro!'
       read(iunit)
       read(iunit)
       read(iunit)
@@ -1378,7 +1376,11 @@ character(8) :: label
  close(ifile)
  ivirt(1:NSym) = NumOSym(1:NSym)-iclos(1:NSym)-iact(1:NSym)
 
-! print*, 'nact',iact(1:NSym)
+ !print*, 'NSym   ',NSym
+ !print*, 'nact   ',iact(1:NSym)
+ !print*, 'nclos  ',iclos(1:NSym)
+ !print*, 'nvirt  ',ivirt(1:NSym)
+ !print*, 'NumOSym',NumOSym(1:NSym)
 
  if(NSym>1) then
    ! symmetry
@@ -1439,6 +1441,129 @@ character(8) :: label
 
 end subroutine create_ind_molpro
 
+subroutine create_ind_uks_molpro(spin,infile,NumOSymS,IndIntS,NSym,NBasis)
+!
+! Purpose: reads number of atomic orbitals in each irrep (NumOSym)
+!          creates index array IndInt(NBasis):
+!          in Molpro UHF/UKS, orbitals are arranged into occ-virtual in each irrep
+!          here we create a no-symmetry mapping, i.e. orbs are arranged within a single irrep
+!
+!          spin = A : alpha orbitals
+!               = B : beta  orbitals
+!
+!          it seems that alpha occupations are stored in occ(1:NSym)
+!                        beta  occupations are stored in closed(1:NSym)
+!
+implicit none
+
+character(*),intent(in) :: infile
+character(len=1),intent(in) :: spin
+
+integer :: NSym,NBasis
+integer :: NumOSymS(15),IndIntS(NBasis)
+integer :: ifile,ios,i,j,k,isym
+integer :: NState,NStSym,IOld,INew
+integer :: iclos(8),iocc(8),nt(8),ivirt(8),istsy(16),nstats(16)
+integer :: ioccs(8)
+character(8) :: label
+
+integer :: NumOSym(15),IndInt(NBasis)
+
+ iclos = 0
+ ivirt = 0
+ iocc  = 0
+ nstats  = 0
+ istsy   = 0
+ NumOSym = 0
+ open(newunit=ifile,file=infile,access='sequential',&
+      form='unformatted',status='old')
+
+ do
+   read(ifile,iostat=ios) label
+    if(ios<0) then
+      write(6,*) 'ERROR!!! LABEL ISORDK   not found!'
+      stop
+   endif
+   if(label=='BASINFO ') then
+      read(ifile) NSym
+      read(ifile) NStSym
+      read(ifile) nstats(1:NStSym)
+      read(ifile) istsy(1:NStSym)
+      read(ifile) iclos(1:NSym)
+      read(ifile)
+      read(ifile) NumOSym(1:NSym)
+      read(ifile) iocc(1:NSym)
+      exit
+   endif
+ enddo
+
+ close(ifile)
+
+ ! iocc  contain alpha
+ ! iclos contain beta
+ ioccs = 0
+ select case (spin)
+ case ('A', 'a')
+    ioccs(1:NSym) = iocc(1:NSym)
+ case ('B', 'b')
+    ioccs(1:NSym) = iclos(1:NSym)
+ end select
+
+ ivirt(1:NSym)   = NumOSym(1:NSym)-ioccs(1:NSym)
+
+ select case (spin)
+ case ('A', 'a')
+    write(lout,'(1x,a)') 'Alpha spin'
+ case ('B', 'b')
+    write(lout,'(1x,a)') 'Beta  spin'
+ end select
+ write(lout,'("Occupied:",1x, *(i2,1x) )') ( ioccs(i), i = 1, NSym )
+ write(lout,'("Virtual :",1x, *(i2,1x) )') ( ivirt(i), i = 1, NSym )
+ write(lout,'("Total   :",1x, *(i2,1x) )') ( NumOSym(i), i = 1, NSym )
+ !print*, 'virtual  ',ivirt(1:NSym)
+ !print*, 'total    ',NumOSym(1:NSym)
+
+ if(NSym>1) then
+   ! symmetry
+   IOld = 0
+   INew = 0
+   do isym=1,NSym
+      do k=1,ioccs(isym)
+         IOld = IOld + 1
+         INew = INew + 1
+         IndInt(IOld) = INew
+         !print*, IOld,INew
+      enddo
+      do i=1,ivirt(isym)
+         IOld = IOld + 1
+      enddo
+   enddo
+   IOld = 0
+   do isym=1,NSym
+      do k=1,ioccs(isym)
+         IOld = IOld + 1
+      enddo
+      do i=1,ivirt(isym)
+         IOld = IOld + 1
+         INew = INew + 1
+         IndInt(IOld) = INew
+         !print*, IOld,INew
+      enddo
+   enddo
+
+ else
+   ! nosym
+   do i=1,NBasis
+      IndInt(i) = i
+   enddo
+
+ endif
+
+ ! output
+ NumOSymS(1:NSym) = NumOSym(1:NSym)
+ IndIntS = IndInt
+
+end subroutine create_ind_uks_molpro
 
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 ! Dalton subroutines

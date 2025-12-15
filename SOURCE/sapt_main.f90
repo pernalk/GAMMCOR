@@ -180,7 +180,8 @@ print*, 'Skipping monomer integrals...'
 print*, 'Skipping response ...'
 
 call e1elst_o(SAPT%monA,SAPT%monB,SAPT)
-call e1exchs2_sq_o(SAPT%monA,SAPT%monB,SAPT)
+call e1exchs2_sq_os(SAPT%monA,SAPT%monB,SAPT)
+call e1exch_os(SAPT%monA,SAPT%monB,SAPT)
 call e2ind_o(Flags,SAPT%monA,SAPT%monB,SAPT)
 call e2disp_o(SAPT%monA,SAPT%monB,SAPT)
 
@@ -1355,7 +1356,7 @@ call tran4_gen(NBasis,&
 ! (OV|OV) alpha-beta
 call tran4_gen(NBasis,&
                B%NOb,B%UMO(:,:,2),&
-               B%NVb,B%UMO(1:NBasis,B%NOa+1:NBasis,2),&
+               B%NVb,B%UMO(1:NBasis,B%NOb+1:NBasis,2),&
                A%NOa,A%UMO(:,:,1),&
                A%NVa,A%UMO(1:NBasis,A%NOa+1:NBasis,1),&
                'OVOVABab','AOTWOSORT')

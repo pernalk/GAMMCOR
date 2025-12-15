@@ -1385,13 +1385,15 @@ double precision,external :: ddot
 
 end subroutine make_J2
 
-subroutine make_K(NBas,X,K)
+subroutine make_K(NBas,X,K,intfile)
 implicit none
 
 type(AOReaderData) :: reader
 integer,intent(in) :: NBas
+character(*) :: intfile
 double precision,intent(in) :: X(NBas,NBas)
 double precision,intent(inout) :: K(NBas,NBas)
+
 integer :: iunit, ntr
 integer :: ir,is,irs
 logical :: empty
@@ -1407,7 +1409,8 @@ double precision,allocatable :: work1(:),work2(:)
  !open(newunit=iunit,file='AOTWOSORT',status='OLD',&
  !     access='DIRECT',form='UNFORMATTED',recl=8*ntr)
  !
- call reader%open('AOTWOSORT')
+ !call reader%open('AOTWOSORT')
+ call reader%open(trim(intfile))
 
  irs = 0
  do is=1,NBas

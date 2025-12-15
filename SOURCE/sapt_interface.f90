@@ -86,9 +86,13 @@ SAPT%monA%IPrint = SAPT%IPrint
 SAPT%monB%IPrint = SAPT%IPrint
 
 ! set basis set
-write(LOUT,'(/1x,"Flags:BasisSetPath ",a)') Flags%BasisSetPath
-write(LOUT,'(1x, "Flags:BasisSet ",a)')     Flags%BasisSet
-BasisSet = Flags%BasisSetPath // Flags%BasisSet
+if (allocated(Flags%BasisSetPath)) then
+   write(LOUT,'(/1x,"Flags:BasisSetPath ",a)') Flags%BasisSetPath
+   write(LOUT,'(1x, "Flags:BasisSet ",a)')     Flags%BasisSet
+   BasisSet = Flags%BasisSetPath // Flags%BasisSet
+else
+   BasisSet = "Empty"
+endif
 
 ! set dimensions
 NSq = NBasis**2
@@ -497,7 +501,7 @@ SAPT%monB%NDim = NBasis*(NBasis-1)/2
  enddo
 
  if(Flags%ICholesky==0) then
-    call make_K(NBasis,work,SAPT%monB%Kmat)
+    call make_K(NBasis,work,SAPT%monB%Kmat,'AOTWOSORT')
  elseif(Flags%ICholeskyBIN==1) then
     NCholesky = CholeskyVecs%NCholesky
     call make_K_CholR(CholeskyVecs%R(1:NCholesky,1:NInte1), &
@@ -554,9 +558,12 @@ double precision :: Tcpu,Twall
 if (SAPT%InterfaceType/=2) stop "Unrestricted SAPT only works with Molpro"
 
 ! set basis set
-write(LOUT,'(/1x,"Flags:BasisSetPath ",a)') Flags%BasisSetPath
-write(LOUT,'(1x, "Flags:BasisSet ",a)')     Flags%BasisSet
-BasisSet = Flags%BasisSetPath // Flags%BasisSet
+!write(LOUT,'(/1x,"Flags:BasisSetPath ",a)') Flags%BasisSetPath
+!write(LOUT,'(1x, "Flags:BasisSet ",a)')     Flags%BasisSet
+!BasisSet = Flags%BasisSetPath // Flags%BasisSet
+
+! check where molpro keeps nao
+SAPT%NAO = NBasis
 
 ! read and dump 1-electron integrals
 call onel_molpro(SAPT%monA%Monomer,NBasis,SAPT%monA,SAPT)
@@ -576,6 +583,10 @@ call read_uocc_molpro(SAPT%monB%UOcc,NBasis,'UKSORB  ','MOLPRO_B.MOPUN')
 allocate(SAPT%monA%UOrbE(NBasis,2),SAPT%monB%UOrbE(NBasis,2))
 call read_uorbe_molpro(SAPT%monA%UOrbE,NBasis,'UKSORB  ','MOLPRO_A.MOPUN')
 call read_uorbe_molpro(SAPT%monB%UOrbE,NBasis,'UKSORB  ','MOLPRO_B.MOPUN')
+
+! unpack to C1 sym
+call unpack_uks_sym(SAPT%monA,NBasis)
+call unpack_uks_sym(SAPT%monB,NBasis)
 
 ! look-up tables
 ! set unrestricted occ, virt, ov, IndN, ...
@@ -629,6 +640,100 @@ call calc_uks_elpot(SAPT%monB,CholeskyVecs,&
 SAPT%Vnn = calc_vnn(SAPT%monA,SAPT%monB)
 
 end subroutine saptuks_interface
+
+subroutine unpack_uks_sym(Mon,NBasis)
+!
+! destroy symmetry in UHF/UHF occupations, orb. energies and orbitals
+! Molpro keeps occ-virt in each irrep
+! we reorder to occ1-occ2-...-virt1-...-virtN
+!
+! Ca = C(SAO,MO) alpha
+! Cb = C(SAO,MO) beta
+
+implicit none
+
+type(SystemBlock) :: Mon
+integer,intent(in) :: NBasis
+
+integer :: i,j
+integer :: NSym
+real(8) :: UOcca(NBasis),UOccb(NBasis)
+real(8) :: UOrbEa(NBasis),UOrbEb(NBasis)
+real(8) :: Ca(NBasis,NBasis),Cb(NBasis,NBasis)
+
+integer :: IndIntA(NBasis),IndIntB(NBasis)
+integer :: NumOSymA(15),NumOSymB(15)
+character(:),allocatable :: basinfile
+
+if (Mon%Monomer==1) then
+   basinfile = 'BASINFA'
+elseif (Mon%Monomer==2) then
+   basinfile = 'BASINFB'
+endif
+
+allocate(Mon%NumOSym(15),Mon%IndInt(NBasis))
+! alpha and beta
+call create_ind_uks_molpro('A',basinfile,NumOSymA,IndIntA,NSym,NBasis)
+call create_ind_uks_molpro('B',basinfile,NumOSymB,IndIntB,NSym,NBasis)
+
+!print*, 'Monomer= ', Mon%Monomer
+!print*, 'IndInt = '
+!do i=1,NBasis
+!  write(lout,'(1x,3i3)') i,IndIntA(i),IndIntB(i)
+!enddo
+
+! reorder MO to no symmetry
+do i=1,NBasis
+   do j=1,NBasis
+      Ca(IndIntA(i),j) = mon%UMO(j,i,1)
+      Cb(IndIntB(i),j) = mon%UMO(j,i,2)
+   enddo
+enddo
+
+! reorder Occ to no symmetry
+do i=1,NBasis
+   UOrbEa(IndInta(i)) = mon%UOrbE(i,1)
+   UOrbEb(IndIntb(i)) = mon%UOrbE(i,2)
+   UOcca(IndInta(i))  = mon%UOcc(i,1)
+   UOccb(IndIntb(i))  = mon%UOcc(i,2)
+enddo
+
+!print*,' UOcc  alpha beta'
+!do i=1,NBasis
+!   write(6,'(i3,2f12.8)') i, UOcca(i), UOccb(i)
+!enddo
+!
+!print*,' OrbEne  alpha beta'
+!do i=1,NBasis
+!   write(6,'(i3,2f12.8)') i, UOrbEa(i), UOrbEb(i)
+!enddo
+!
+!print*, 'Monomer = ', Mon%Monomer
+!Print*, 'CSAOMO-alpha sym unpacked =',norm2(Ca)
+!do i=1,NBasis
+!   write(6,'(*(f13.8))') (Ca(i,j),j=1,NBasis)
+!enddo
+!Print*, 'CSAOMO-beta  sym unpacked =',norm2(Cb)
+!do i=1,NBasis
+!   write(6,'(*(f13.8))') (Cb(i,j),j=1,NBasis)
+!enddo
+
+! rewrite
+Mon%UOcc(:,1)=UOcca
+Mon%UOcc(:,2)=UOccb
+!
+Mon%UOrbE(:,1)=UOrbEa
+Mon%UOrbE(:,2)=UOrbEb
+!
+mon%UMO = 0
+do i=1,NBasis
+   do j=1,NBasis
+      mon%UMO(i,j,1)=Ca(j,i)
+      mon%UMO(i,j,2)=Cb(j,i)
+   enddo
+enddo
+
+end subroutine unpack_uks_sym
 
 subroutine sapt_interface_spin(Flags,SAPT,NBasis)
 !
@@ -1793,6 +1898,9 @@ endif
 end subroutine arrange_oneint
 
 subroutine sort_sym_mo(CMO,nbas,mon)
+!
+! requires: NSym, NSymOrb, INActS, NActS
+!
 implicit none
 
 type(SystemBlock)              :: mon
@@ -2089,13 +2197,22 @@ integer :: info
     enddo
  enddo
 
- ! reorder MOs to no symmetry 
- ! (in Molpro they are arranged by irreps)
- do i=1,NBasis
-    do j=1,NBasis
-       CSAOMO(Mon%IndInt(i),j) = OrbCAS(j,i)
-    enddo
- enddo
+! reorder MOs to no symmetry
+! (in Molpro they are arranged by irreps)
+do i=1,NBasis
+   do j=1,NBasis
+      CSAOMO(Mon%IndInt(i),j) = OrbCAS(j,i)
+   enddo
+enddo
+
+!print*, 'IndInt = '
+!do i=1,NBasis
+!  print*,i,mon%IndInt(i)
+!enddo
+!Print*, 'CSAOMO-prepare no =',norm2(CSAOMO)
+!do i=1,NBasis
+!   write(6,'(*(f13.8))') (CSAOMO(i,j),j=1,NBasis)
+!enddo
 
  iab = 0
  do ia=1,NBasis
