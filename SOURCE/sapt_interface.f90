@@ -448,6 +448,10 @@ SAPT%monB%NDim = NBasis*(NBasis-1)/2
  call select_active(SAPT%monA,NBasis,Flags)
  call select_active(SAPT%monB,NBasis,Flags)
 
+ !print*, 'NACT...'
+ !SAPT%monA%NAct=SAPT%monA%num1
+ !SAPT%monB%NAct=SAPT%monB%num1
+
  ! transform Cholesky Vecs to NO
  if(Flags%ICholeskyBIN==1) then
     !call chol_sapt_AO2NO_BIN(SAPT,SAPT%monA,SAPT%monB,CholeskyVecs,NBasis,Flags%MemVal,Flags%MemType)
@@ -1196,6 +1200,7 @@ character(:),allocatable :: occfile,ifcfile,siriusfile,coefile
  else
     NBasist = NBasis
  endif
+ !print*, 'readocc: NSym, NOrb', NSym,Mon%NOrb
 
  if(Flags%ICASSCF==1.and.Flags%ISHF==0.and.(.not.Mon%ISHF)) then
 
@@ -1365,44 +1370,49 @@ character(:),allocatable :: rdmfile
 
 end subroutine readocc_molpro
 
-subroutine readocc_cas_siri(mon,nbas,noSiri)
+subroutine readocc_cas_siri(mon,nbas,noSiriusRst)
 !
-! From SIRIFC
-! a) read number of active inactive orbs for SAPT-DALTON
+! From SIRIFC (SIRIUS InterFaCe)
+! a) read no. of active inactive orbs for SAPT-DALTON
 !    total: NAct and INAct
 !    in a given symmetry: INActS(1:NSym), NActS(1:NSym)
+! b) read active 1-RDM (DVX)
+!
 ! From SIRIUST.RST
-! b) read occupation numbers
+! a') read occupation numbers
 !
 implicit none
 
 type(SystemBlock)   :: mon
 integer,intent(in)  :: nbas
-logical,intent(out) :: noSiri
+logical,intent(out) :: noSiriusRst
 
 logical           :: ioccsir,exsiri
 integer           :: i,iunit,ios
 integer           :: isym,off_i,off_a,off_x
+integer           :: JACT,JORB,JOFF
 integer           :: NISHT,NASHT,NOCCT,NORBT,NBAST,NCONF,NWOPT,NWOPH,&
                      NCDETS,NCMOT,NNASHX,NNASHY,NNORBT,N2ORBT,       &
                      NSYM,MULD2H(8,8),NRHF(8),NFRO(8),NISH(8),NASH(8),NORB(8),NBASM(8)
 
 double precision             :: sum1,sum2
 double precision,allocatable :: OccX(:)
-character(:),allocatable     :: sirfile,sirifile
+integer :: MMASHX
+double precision,allocatable :: DVX(:)
+character(:),allocatable     :: sirfile,sirifcfile
 
  ! set filnames
  if(Mon%Monomer==1) then
     sirfile  = 'SIRIUS_A.RST'
-    sirifile = 'SIRIFC_A'
+    sirifcfile = 'SIRIFC_A'
  elseif(Mon%Monomer==2) then
     sirfile  = 'SIRIUS_B.RST'
-    sirifile = 'SIRIFC_B'
+    sirifcfile = 'SIRIFC_B'
  endif
 
- inquire(file=sirifile,EXIST=exsiri)
+ inquire(file=sirifcfile,EXIST=exsiri)
  if(exsiri) then
-    open(newunit=iunit,file=sirifile,status='OLD', &
+    open(newunit=iunit,file=sirifcfile,status='OLD', &
          access='SEQUENTIAL',form='UNFORMATTED')
     call readlabel(iunit,'TRCCINT ')
 
@@ -1413,10 +1423,22 @@ character(:),allocatable     :: sirfile,sirifile
                  NCDETS,NCMOT,NNASHX,NNASHY,NNORBT,N2ORBT,&
                  NSYM,MULD2H,NRHF,NFRO,NISH,NASH,NORB,NBASM
 
+    read (iunit)
+    read (iunit)
+
+    ! DV = 1-RDM in Dalton
+    MMASHX = MAX(4,NNASHX)
+    allocate (DVX(MMASHX))
+    read (iunit) DVX(1:MMASHX)  ! 1-rdm, triang
     close(iunit)
 
     mon%INAct = nisht
     mon%NAct  = nasht
+
+    !print*, 'DV (1-rdm Dalton)'
+    !do i=1,mmashx
+    !   print*, i ,dvx(i)
+    !enddo
 
     if(NSym/=mon%NSym) stop "NSym from SIRIFC and AOONEINT do not match!"
 
@@ -1435,60 +1457,93 @@ character(:),allocatable     :: sirfile,sirifile
     stop
  endif
 
- ! CASCF
- inquire(file=sirfile,EXIST=ioccsir)
- if(ioccsir) then
+ !print*, 'NCONF =', NCONF
+ !print*, 'INACT =', mon%INACt
+ !print*, ' NACT =', mon%NAct
+ !print*, 'NISH  =', NISH(1:NSym)
+ !print*, 'NASH  =', NASH(1:NSym)
 
-    noSiri=.false.
-    allocate(mon%Occ(nbas))
-    allocate(OccX(1:norbt))
+ ! CASSCF
+ allocate(OccX(1:norbt))
 
-    if (mon%Nact.ge.2) then
+ if (NCONF.eq.1 .and. NASHT.gt.1) then ! get occupations from 1-rdm
+    ! for a single configuration (NCONF=1), e.g., CAS(5,3) for F2 (MS=1/2),
+    ! Dalton does not store NATOCC in SIRIUS.RST
+    ! In this case, use DV to get occupations
+    OccX = 0d0
+    JACT = 0
+    JOFF = 0
+    do ISYM=1,NSym
+       JORB = 0
+       do I=1,NISH(ISYM)
+          JORB = JORB + 1
+          OccX(JOFF+JORB) = 2.0D0
+       enddo
+       do I=1,NASH(ISYM) ! assume natural orbitals
+          JORB = JORB + 1
+          JACT = JACT + 1
+          OccX(JOFF+JORB) = DVX((JACT*JACT+JACT)/2)
+       enddo
+       JOFF = JOFF + NORB(ISYM)
+    enddo
+    write(LOUT,'(1x,a,i2,a)') 'Occupancies for monomer',mon%Monomer,' read from 1-RDM (SIRIFC)'
 
-      open(newunit=iunit,file=sirfile,status='OLD', &
-           access='SEQUENTIAL',form='UNFORMATTED')
-      call readlabel(iunit,'NATOCC  ')
-      read(iunit) OccX(1:NORBT)
-      close(iunit)
+ elseif (NCONF.gt.1) then
+    ! use NATOCC label from SIRIUS.RST
+    ! to read occupation numbers
+    inquire(file=sirfile,EXIST=ioccsir)
+    if(ioccsir) then
 
-    elseif(mon%NAct.le.1) then
+       noSiriusRst=.false.
 
-      write(lout,'(/1x,a,i3)') 'Warning! Number of active orbitals = ',mon%NAct
-      write(lout,'(1x,a)') 'Assuming a Hartree-Fock calculation...'
-      OccX(1:mon%INAct) = 2d0
-      OccX(mon%INAct+1:mon%INAct+mon%NAct) = 1d0
+       if (mon%Nact.ge.2) then
+
+         open(newunit=iunit,file=sirfile,status='OLD', &
+              access='SEQUENTIAL',form='UNFORMATTED')
+         call readlabel(iunit,'NATOCC  ')
+         read(iunit) OccX(1:NORBT)
+         close(iunit)
+
+       elseif(mon%NAct.le.1) then
+
+         write(lout,'(/1x,a,i3)') 'Warning! Number of active orbitals = ',mon%NAct
+         write(lout,'(1x,a)') 'Assuming a Hartree-Fock calculation...'
+         OccX(1:mon%INAct) = 2d0
+         OccX(mon%INAct+1:mon%INAct+mon%NAct) = 1d0
+
+       endif
+       write(LOUT,'(1x,a,i2,a)') 'Occupancies for monomer',mon%Monomer,' read from '// sirfile
+
+    else
+
+       noSiriusRst=.true.
+       write(lout,'(1x,a)') 'SIRIUS.RST not available!'
+       return
 
     endif
 
-    ! save occupations in mon%Occ
-    ! order from sym ordering to inact-act (ISW/ISX in Dalton)
-    mon%Occ = 0d0
-    off_i = 0
-    off_a = NISHT
-    off_x = 0
-    do isym=1,NSym
-       mon%Occ(off_i+1:off_i+NISH(isym)) = OccX(off_x+1:off_x+NISH(isym))
-       mon%Occ(off_a+1:off_a+NASH(isym)) = OccX(off_x+NISH(isym)+1:off_x+NISH(isym)+NASH(isym))
-       off_i = off_i + NISH(isym)
-       off_a = off_a + NASH(isym)
-       off_x = off_x + NORB(isym)
-    enddo
+  endif ! NCONF test for OccX 
 
-    deallocate(OccX)
+  !Print*, 'Occupations symmetry-packed:'
+  !do i=1,norbt
+  !  print*, i, occX(i)
+  !enddo
 
-    write(LOUT,'(1x,a,i2,a)') 'Occupancies for monomer',mon%Monomer,' read from '// sirfile
-
- else
-
-    noSiri=.true.
-    write(lout,'(1x,a)') 'SIRIUS.RST not available!'
-    return
-
- endif
-
- ! Hartree-Fock case
- !mon%Occ = 0d0
- !mon%Occ(1:mon%NAct+mon%INAct) = 2d0
+ allocate(mon%Occ(nbas))
+ ! save occupations in mon%Occ
+ ! order from sym ordering to inact-act (ISW/ISX in Dalton)
+ mon%Occ = 0d0
+ off_i = 0
+ off_a = NISHT
+ off_x = 0
+ do isym=1,NSym
+    mon%Occ(off_i+1:off_i+NISH(isym)) = OccX(off_x+1:off_x+NISH(isym))
+    mon%Occ(off_a+1:off_a+NASH(isym)) = OccX(off_x+NISH(isym)+1:off_x+NISH(isym)+NASH(isym))
+    off_i = off_i + NISH(isym)
+    off_a = off_a + NASH(isym)
+    off_x = off_x + NORB(isym)
+ enddo
+ deallocate(OccX)
 
  sum1 = 0d0
  do i=1,mon%INAct+mon%NAct
@@ -1496,7 +1551,6 @@ character(:),allocatable     :: sirfile,sirifile
      sum1 = sum1 + mon%Occ(i)
  enddo
  mon%SumOcc = sum1
-
 
 end subroutine readocc_cas_siri
 

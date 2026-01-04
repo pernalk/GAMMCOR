@@ -285,6 +285,7 @@ if(Flags%ICASSCF==0.and.Flags%ISERPA==0) then
   select case(Mon%TwoMoInt)
   case(TWOMO_FOFO)
      call AB_CAS_FOFO(ABPlus,ABMin,ECASSCF,URe,Mon%Occ,XOne, &
+                 !Mon%IndN,Mon%IndX,Mon%IGem,Mon%num1,Mon%num0,Mon%NElecBEmb, &
                  Mon%IndN,Mon%IndX,Mon%IGem,Mon%NAct,Mon%INAct,Mon%NElecBEmb, &
                  Mon%NDimX,NBas,Mon%NDimX,&
                  NInte1,twojfile,twokfile,Flags%ICholesky,Flags%IDBBSC,ACAlpha,.false.)

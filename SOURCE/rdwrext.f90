@@ -1586,7 +1586,7 @@ do
 
   read(iunit,iostat=ios) label
   if(ios<0) then
-     write(6,*) 'ERROR!!! Empty section in AOTWOINT!'
+     write(6,*) 'ERROR!!! Empty section :', text
      stop
   endif
   if(label(1)=='********') then
