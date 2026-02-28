@@ -1,15 +1,14 @@
 *Deck DMSCF 
       Subroutine DMSCF 
      $ (Title,URe,Occ,XKin,XNuc,ENuc,UMOAO,TwoEl,NBasis,NInte1,NInte2,
-     $ NGem,System)
+     $ NGem)
 C
-      use types
 C     !!! XKin CONTAINS BOTH KINETIC AND EL-N CONTRIBUTIONS !!!
 C     !!! XNuc IS EMPTY 
 C
       Implicit Real*8 (A-H,O-Z)
 C
-      Character*60 Title,FMultTab
+      Character*60 Title
 C
       Include 'commons.inc'
 C
@@ -17,8 +16,6 @@ C
 C
       Dimension URe(Nbasis,NBasis),Occ(NBasis),XKin(NInte1),
      $ XNuc(NInte1),TwoEl(NInte2),UMOAO(NBasis,NBasis)
-C
-      type(SystemBlock) :: System
 C
 C     LOCAL ARRAYS
 C
@@ -66,7 +63,7 @@ C
       If(ICASSCF.Eq.1) Then
 C
       Call ACCAS(ETot,ENuc,TwoEl,URe,UReSav,Occ,XOne,
-     $  Title,NBasis,NInte1,NInte2,NGem,System)
+     $  Title,NBasis,NInte1,NInte2,NGem)
 C
       Else
 C
@@ -114,7 +111,7 @@ C     IOrbA(I) = 1 - ITH ORBITAL IS ACTIVE
 C     IOrbA(I) = 0 - ITH ORBTIAL IS INACTIVE 
 C     NoAt - THE NUMBER OF ATOMS IN A MOLECULE
 C
-      Dimension NAt(NBasis),NBasisAt(1000),NPair(1000,2)
+      Dimension NAt(NBasis),NBasisAt(5000),NPair(5000,2)
 C    
 C     BEGINNING OF THE INPUT
 C c herer!!! - change NBasisAt if basis set changes
@@ -255,7 +252,7 @@ C     (in molden cartesian gaussians are assumed)
 C
       Implicit Real*8 (A-H,O-Z)
 C
-      Character*60 Title,FMultTab
+      Character*60 Title
       Include 'commons.inc'
 C 
       Character*60 FName,FName2
@@ -343,7 +340,7 @@ C
 C
       Implicit Real*8 (A-H,O-Z)
 C
-      Character*60 Title,FMultTab
+      Character*60 Title
       Include 'commons.inc'
 C 
       Character*60 FName,FName2
@@ -462,7 +459,7 @@ C
 C
       Implicit Real*8 (A-H,O-Z)
 C
-      Character*60 Title,FName,FMultTab,Aux1
+      Character*60 Title,FName,Aux1
       Include 'commons.inc'
 C 
       Parameter(Zero=0.0D0,One=1.0D0,Two=2.D0)

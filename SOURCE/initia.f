@@ -5,10 +5,12 @@ C
 C     READ HAO, 2-EL INTEGRALS IN NO, C_COEFFICIENTS, IGEM FROM A DALTON_GENERATED FILE
 C     READ UMOAO FROM DALTON.MOPUN
 C
-      use types   
+      use print_units
+      use types
       use sorter
-      use tran   
-      use sapt_main
+      use tran
+      use Cholesky
+      use read_external
 C
       Implicit Real*8 (A-H,O-Z)
 C
@@ -16,13 +18,17 @@ C
      $ TwoEl(NInte2),UMOAO(NBasis,NBasis),
      $ UAux(NBasis,NBasis)
       integer :: ione,NBas(8),NSymBas(8),NSymOrb(8),nrhf(8),ioprhf
-      logical :: exione,ex 
+      integer(8) :: MemSrtSize
+      logical :: exione,ex
       double precision, allocatable :: TMPMO(:,:)
 C
       Character*60 Line
       Character*30 Line1
 C
       type(FlagsData) :: Flags
+C
+      Type(TCholeskyVecs) :: CholeskyVecs
+      Real*8, Allocatable :: MatFF(:,:)
 C
       Include 'commons.inc'
 C
@@ -46,7 +52,7 @@ C     READ UMOAO FROM SIRIUS.RST
 C
       inquire(file='SIRIUS.RST',EXIST=ex)
       if(ex) then
-      open(newunit=iunit,file='SIRIUS.RST',status='OLD', 
+      open(newunit=iunit,file='SIRIUS.RST',status='OLD',
      $    access='SEQUENTIAL',form='UNFORMATTED')
       call readlabel(iunit,'BASINFO ')
       read (iunit) NSym,NSymBas,NSymOrb,nrhf,ioprhf
@@ -73,7 +79,7 @@ C
 C
       Else
 C
-C     READ UMOAO FROM DALTON.MOPUN 
+C     READ UMOAO FROM DALTON.MOPUN
 C
       Open(10,File='DALTON.MOPUN',Form='Formatted',Status='Old')
       Read(10,'(A60)') Line
@@ -93,24 +99,30 @@ C
       EndDo
 C
 C     GET 2-EL NO INTEGRALS AND CICoef
-C 
+C
       If(ITwoEl.Eq.1) Then
       Call read2el(TwoEl,UMOAO,NBasis,NInte2)
       Else
-      Call readtwoint(NBasis,1,'AOTWOINT','AOTWOSORT')
+
+      If(ICholesky==0) Then
+      MemSrtSize=MemVal*1024_8**MemType
+      Call readtwoint(NBasis,1,'AOTWOINT','AOTWOSORT',MemSrtSize)
+      ElseIf(ICholesky==1) Then
+       Call chol_CoulombMatrix(CholeskyVecs,NBasis,'AOTWOINT',1,
+     &                         ICholeskyAccu)
+      NCholesky=CholeskyVecs%NCholesky
+      EndIf
       EndIf
 C
       If(ICASSCF.Eq.0) Then
 C
-      CICoef(1:NBasis)=0.D0
-      Open(10,File='coeff.dat',Form='Formatted',Status='Old')
-      Read(10,*) NActive
-      INActive=NELE-NActive
+C     read geminal coefficients
+      Call ReadCGemDal(CICoef,NELE,INActive,NActive,NBasis)
+C
+C     set IGem and Occ
       Do I=1,INActive
-      CICoef(I)=1.D0
       IGem(I)=I
       EndDo
-      Read(10,*) (CICoef(I+INActive),I=1,2*NActive)
       Do I=INActive+1,NELE
       IGem(I)=I
       IGem(NELE+I-INActive)=I
@@ -120,22 +132,9 @@ C
       If(CICoef(I).Eq.0.D0) IGem(I)=NGem
       Occ(I)=CICoef(I)**2
       EndDo
-      Close(10)
 C
       ElseIf(ICASSCF.Eq.1) Then
 C
-c      Occ(1:NBasis)=0.D0
-cC
-c      Open(10,File='occupations.dat',Form='Formatted',Status='Old') 
-cC
-c      Read(10,*) NInAc,NAc
-c      NInAc=NInAc/2
-c      Read(10,*) (Occ(I),I=1,NInAc+NAc)
-c      Sum=0.D0
-c      Do I=1,NInAc+NAc
-c      Occ(I)=Occ(I)/2.D0
-c      Sum=Sum+Occ(I)
-c      EndDo
       Sum=0.D0
       Do I=1,NInAc+NAc
       Sum=Sum+Occ(I)
@@ -156,7 +155,7 @@ C
       NInAcCAS=NInAc
 C
 C      Write(6,'(2X,"No of CAS inactive and active orbitals: ",4X,4I)')
-C     $ NInAcCAS,NAcCAS 
+C     $ NInAcCAS,NAcCAS
       Write(6,'(2x,a,4x,2i3)')
      $ "No of CAS inactive and active orbitals",NInAcCAS,NAcCAS
       Write(6,'(2X,"CASSCF",3X,"Occupancy",4X,"Gem")')
@@ -164,7 +163,7 @@ C     $ NInAcCAS,NAcCAS
       Write(6,'(X,I3,E16.6,I6)') I,Occ(I),IGem(I)
       EndDo
       Write(6,'(2X,"Sum of Occupancies: ",E16.6)') Sum
-      If(Abs(Sum-NELE).Gt.1.D-8) 
+      If(Abs(Sum-NELE).Gt.1.D-8)
      $ Stop "Fatal Error: Occupancies do not sum up to NELE"
 C
       Close(10)
@@ -189,7 +188,9 @@ C
       ElseIf(ITwoEl.Eq.3) Then
 C     TRANSFORM J AND K
       UAux=transpose(UMOAO)
-      print*, 'Num0-1',Num0,Num1
+C
+      If (ICholesky==0) Then
+C
       Call tran4_gen(NBasis,
      $        Num0+Num1,UAux(1:NBasis,1:(Num0+Num1)),
      $        Num0+Num1,UAux(1:NBasis,1:(Num0+Num1)),
@@ -203,7 +204,30 @@ C     TRANSFORM J AND K
      $        Num0+Num1,UAux(1:NBasis,1:(Num0+Num1)),
      $        'FOFO','AOTWOSORT')
 C
-      EndIf
+      ElseIf (ICholesky==1) Then
+C
+      Allocate(MatFF(NCholesky,NBasis**2))
+C
+      If(MemType == 2) then       !MB
+         MemMOTransfMB = MemVal
+      ElseIf(MemType == 3) then   !GB
+         MemMOTransfMB = MemVal * 1024_8
+      Endif
+      Write(LOUT,'(1x,a,i5,a)') 'Using ',MemMOTransfMB,
+     $                          ' MB for 3-indx Cholesky transformation'
+      Call chol_MOTransf_TwoStep(MatFF,CholeskyVecs,
+     $              UAux,1,NBasis,
+     $              UAux,1,NBasis,
+     $              MemMOTransfMB)
+C
+      Open(newunit=iunit,file='cholvecs',form='unformatted')
+      Write(iunit) NCholesky
+      Write(iunit) MatFF
+      Close(iunit)
+      Deallocate(MatFF)
+C
+      EndIf ! ICholesky
+      EndIf ! ITwoEl
 C
       If(ITwoEl.Gt.1) Then
 C     DELETE SORTED AOTWOINTS FOFO
@@ -216,8 +240,8 @@ C
 C
       Open(newunit=ione,File='AOONEINT',access='SEQUENTIAL',
      $     Form='UNFORMATTED',Status='OLD')
-      Read(ione) 
-      Read(ione) NSym,NBas(1:NSym),ENuc 
+      Read(ione)
+      Read(ione) NSym,NBas(1:NSym),ENuc
       Write(6,'(/,"  Nuclear repulsion:",F20.12)')ENuc
       Close(ione)
 C
@@ -240,18 +264,23 @@ C
       Subroutine ReadDMRG(XKin,XNuc,ENuc,Occ,URe,
      $ TwoEl,UMOAO,NInte1,NBasis,NInte2,NGem,iORCA)
 C
+      use types
       use sorter
+c     use Cholesky_old  ! create AOTWOSORT file
+      use Cholesky
       use tran
-      use abmat 
+      use abmat
+      use read_external
 C
 C     READ Integrals and 1-RDM - needed for AC-DMRG CALCULATION
 C
       Implicit Real*8 (A-H,O-Z)
 C
-      Parameter (Zero=0.D0,One=1.D0,Two=2.D0)
+!      Parameter (Zero=0.D0,One=1.D0,Two=2.D0)
 C
       Real*8 XKin(NInte1),XNuc(NInte1),Occ(NBasis),URe(NBasis,NBasis),
      $ TwoEl(NInte2),UMOAO(NBasis*NBasis)
+      Type(TCholeskyVecs) :: CholeskyVecs
 C
       Character*60 FName,Aux1
 C
@@ -260,12 +289,14 @@ C
 C     LOCAL ARRAYS
 C
       Real*8, Allocatable :: RDM2(:),RDMAB2(:)
+      Real*8, Allocatable :: MatFF(:,:)
       Dimension Gamma(NInte1),Work(NBasis),PC(NBasis),
      $ AUXM(NBasis,NBasis),AUXM1(NBasis,NBasis),
      $ Fock(NBasis*NBasis),
      $ UAux(NBasis,NBasis),
      $ FockF(NInte1),GammaAB(NInte1),Eps(NBasis,NBasis)
-      Integer(8) IOutInfo
+      Integer(8) MemSrtSize,IOutInfo
+      Dimension FockF2(NInte1),WorkSq(NBasis,NBasis)
 
       If(iORCA==1) then
       LiborNew=1
@@ -283,7 +314,7 @@ C
 C     READ IN 1-RDM AND DIAGONALIZE IT
 C
       If(IEugene.Eq.0) Then
-C   
+C
       If(LiborNew.Eq.1) Then
 C
       Open(10,File='G1.bin',form='unformatted', access='stream',
@@ -341,7 +372,7 @@ C
       If(PC(I).Gt.Zero) NAc=NAc+1
       EndDo
 C
-      NInAc=NELE-Sum+1.D-1
+      NInAc=XELE-Sum+1.D-1
       Do I=1,NInAc+NAc
       If(I.Le.NInAc) Then
       Occ(I)=One
@@ -354,7 +385,7 @@ C
       NGem=2
       IGem(1:NInAc+NAc)=1
       IGem(NInAc+NAc+1:NBasis)=2
-      Else 
+      Else
       NGem=3
       IGem(1:NInAc)=1
       IGem(NInAc+1:NInAc+NAc)=2
@@ -366,14 +397,14 @@ C
 C
       Write(6,'(2X,"No of DMRG inactive and active orbitals: ",2I4)')
      $ NInAcCAS,NAcCAS
-C 
+C
       Write(6,'(2X,"DMRG",3X,"Occupancy",4X,"Gem")')
       Sum=Zero
       Do I=1,NBasis
       Write(6,'(X,I3,E16.6,I6)') I,Occ(I),IGem(I)
       Sum=Sum+Occ(I)
       EndDo
-      Write(6,'(2X,"Sum of Occupancies: ",F5.2)') Sum
+      Write(6,'(2X,"Sum of Occupancies: ",F10.2)') Sum
 C
       NAct=NAcCAS
       INActive=NInAcCAS
@@ -386,7 +417,7 @@ C     COPY AUXM TO URe AND OFF SET BY NInAc
       If(I.Eq.J) URe(I,J)=One
       JJAct=J-NInAc
       If(IIAct.Gt.0.And.IIAct.Le.NAc.And.JJAct.Gt.0.And.JJAct.Le.NAc)
-     $ Then 
+     $ Then
       URe(I,J)=AUXM(IIAct,JJAct)
       EndIf
       EndDo
@@ -398,12 +429,12 @@ C
 C
 C IBin=1 - integrals in binary files
 C IBin=0 - integrals in text files
-C      
+C
       IBin=1
 c      IBin=0
 C
       If(IBin.Eq.0) Then
-C              
+C
       Write(6,'(" Reading in one-ele integrals ...",/)')
       FName(1:12)='intcoul.dat'
       Call GetENuc(ENuc,FName,NBasis)
@@ -435,10 +466,10 @@ C
       EndDo
    31 Close(10)
       Write(6,'(" The number of 1-el integrals read vs. expected",
-     $ 2I10)') ICount,NInte1 
+     $ 2I10)') ICount,NInte1
 C
-      If(ITwoEl.Eq.1) Then    
-C 
+      If(ITwoEl.Eq.1) Then
+C
       Open(10,File='DPQRS.bin',form='unformatted',access='stream',
      $ Status='Old')
       If(LiborNew.Eq.1) Read(10)I,J,K
@@ -466,11 +497,24 @@ C
 C
       ElseIf(ITwoEl.Gt.1) Then
 C
-      Call readtwoint(NBasis,4,'DPQRS.bin','AOTWOSORT',IOutInfo)
+      If(ICholesky==0) Then
+      MemSrtSize=MemVal*1024_8**MemType
+      Call readtwoint(NBasis,4,'DPQRS.bin','AOTWOSORT',
+     $                MemSrtSize,IOutInfo)
+C
+      Else If(ICholesky==1) Then
+c     If(ICholesky==1) Then
+c     print*, 'use Cholesky-old'
+!     Call chol_CoulombMatrix(CholeskyVecs,'AOTWOSORT',ICholeskyAccu)
+c     print*, 'use Cholesky-new'
+      Call chol_CoulombMatrix(CholeskyVecs,NBasis,'DPQRS.bin',4,
+     &                        ICholeskyAccu)
+      NCholesky=CholeskyVecs%NCholesky
+      EndIf
 C
       EndIf
 C
-c     If(IBin.Eq.0)      
+c     If(IBin.Eq.0)
       EndIf
 C
 C else of IEugene.Eq.0
@@ -497,7 +541,9 @@ C
 C
       ElseIf(ITwoEl.Gt.1) Then
 C
-      Call readtwoint(NBasis,3,'intcoul.dat','AOTWOSORT',IOutInfo)
+      MemSrtSize=MemVal*1024_8**MemType
+      Call readtwoint(NBasis,3,'intcoul.dat','AOTWOSORT',
+     $                MemSrtSize,IOutInfo)
 C      Call CheckSaptTwoEl(3,TwoEl,NBasis,NInte2)
 C      Call LoadSaptTwoEl(3,TwoEl,NBasis,NInte2)
       Call readoneint_eugene(XKin,ENuc,'intcoul.dat',NInte1,IOutInfo)
@@ -523,11 +569,32 @@ C
       EndDo
       Call sq_to_triang2(UAux,GammaAB,NBasis)
 C
-      Call FockGen_mithap(FockF,GammaAB,XKin,NInte1,NBasis,'AOTWOSORT')
+      If(ICholesky==0) Then
+         Call FockGen_mithap(FockF,GammaAB,XKin,NInte1,NBasis,
+     &                       'AOTWOSORT')
+      ElseIf(ICholesky==1) Then
+         Call FockGen_CholR(FockF,CholeskyVecs%R(1:NCholesky,1:NInte1),
+     &                      GammaAB,XKin,NInte1,NCholesky,NBasis)
+      EndIf
+C
+C      WorkSq = 0
+C      call triang_to_sq2(FockF,WorkSq,NBasis)
+C      Err = 0
+C      do J=1,NInAc
+C      do I=1,j
+C      if(i.ne.j) Err = Err + WorkSq(i,j)**2
+C      enddo
+C      enddo
+C      do J=NInAc+NAc+1,NBasis
+C      do I=NInAc+NAc+1,J
+C      if(i.ne.j) Err = Err + WorkSq(i,j)**2
+C      enddo
+C      enddo
+C      Print*, 'Err-2',Sqrt(Err)
 C
 C     INACTIVE
       If(NInAc.Ne.Zero) Then
-C      
+C
       Do I=1,NInAc
       Do J=1,NInAc
       IJ=(Max(I,J)*(Max(I,J)-1))/2+Min(I,J)
@@ -540,15 +607,13 @@ C
       Do J=1,NInAc
       URe(I,J)=Fock((J-1)*NInAc+I)
       EndDo
-      EndDo 
-C
-C      Print*, 'INAct-MY', norm2(URe)
+      EndDo
 C
       EndIf
 C
 C     VIRTUAL
 C
-      NVirt=NBasis-NInAc-NAc 
+      NVirt=NBasis-NInAc-NAc
 
       If(NVirt.Ne.Zero) Then
 
@@ -557,11 +622,9 @@ C
       IJ=IndSym(I+NInAc+NAc,J+NInAc+NAc)
       Fock((J-1)*NVirt+I)=FockF(IJ)
       EndDo
-      EndDo      
+      EndDo
       Call Diag8(Fock,NVirt,NVirt,PC,Work)
 C
-C      Print*, PC(1:5)
-C      Print*, 'VIRT-MY',norm2(Fock)
       Do I=1,NVirt
       Do J=1,NVirt
       II=I+NInAc+NAc
@@ -573,7 +636,7 @@ C
       EndIf
 C
       ElseIf(ITWoEl.Eq.1) Then
-C      
+C
 C     INACTIVE
 C
       If(NInAc.Ne.0) Then
@@ -599,7 +662,7 @@ C
 C
       Do I=1,NInAc
       Do J=1,NInAc
-      URe(I,J)=Fock((J-1)*NInAc+I) 
+      URe(I,J)=Fock((J-1)*NInAc+I)
       EndDo
       EndDo
 C
@@ -614,7 +677,7 @@ C      Print*, 'INAct-KA',norm2(URe)
 C
 C     VIRTUAL
 C
-      NVirt=NBasis-NInAc-NAc 
+      NVirt=NBasis-NInAc-NAc
 C
       If(NVirt.Ne.0) Then
 C
@@ -660,7 +723,7 @@ C
       EndDo
 C
       EndIf
-C     end of ITwoEl==1      
+C     end of ITwoEl==1
       EndIf
 C
 C     END OF CANONICALIZING
@@ -675,30 +738,39 @@ C
       If(I.Ne.J) Err=Err+Abs(URe(I,J))
       EndDo
       EndDo
+C     Print*, 'Err',Err
       If(Err.Gt.1.D-5) IUNIT=0
+C     If(Err.Gt.1.D-4) IUNIT=0 ! this should work with Cholesky/Ludicrous
 C
       If(IUNIT.Eq.1) Then
       Write(6,'(/,X,"URe is a unit matrix up to ",E16.6)') ERR
-      Write(6,'(X,"do not transform integrals")') 
+      Write(6,'(X,"do not transform integrals")')
+      Do I=1,NBasis
+      Do J=1,NBasis
+      If(I.Eq.J) URe(I,J)=One
+      If(I.Ne.J) URe(I,J)=Zero
+      EndDo
+      EndDo
       EndIf
 C
       If(IUNIT.Eq.0) Then
 C
+      Write(6,'(" Transforming two-electron integrals ...",/)')
+C
       Call MatTr(XKin,URe,NBasis)
 C
       If(ITwoEl.Eq.1) Then
-      Write(6,'(" Transforming two-electron integrals ...",/)')
       Call TwoNO1(TwoEl,URe,NBasis,NInte2)
 C
       ElseIf(ITwoEl.Eq.3) Then
 C
-C     CREATE FOFO and FFOO ?
 C     PREPARE POINTERS: NOccup=num0+num1
       Call prepare_nums(Occ,Num0,Num1,NBasis)
       If(ISwitch.Eq.1) Num0=NInAC
       If(ISwitch.Eq.1) Num1=NAc
 C     TRANSFORM J AND K
       UAux=transpose(URe)
+      If(ICholesky==0) Then
       Call tran4_gen(NBasis,
      $        Num0+Num1,UAux(1:NBasis,1:(Num0+Num1)),
      $        Num0+Num1,UAux(1:NBasis,1:(Num0+Num1)),
@@ -711,6 +783,41 @@ C     TRANSFORM J AND K
      $        NBasis,UAux,
      $        Num0+Num1,UAux(1:NBasis,1:(Num0+Num1)),
      $        'FOFO','AOTWOSORT')
+      ElseIf(ICholesky==1) Then
+      Allocate(MatFF(NCholesky,NBasis**2))
+C       print*, 'use chol_MOTransf-old,IUNIT',IUNIT
+C       Call chol_MOTransf(MatFF,CholeskyVecs,
+C     $              UAux,1,NBasis,
+C     $              UAux,1,NBasis)
+C
+C    set buffer size for Cholesky AO2NO transformation
+      if(MemType == 2) then       !MB
+         MemMOTransfMB = MemVal
+      elseif(MemType == 3) then   !GB
+         MemMOTransfMB = MemVal * 1024_8
+      endif
+      Write(LOUT,'(1x,a,i5,a)') 'Using ',MemMOTransfMB,
+     $                          ' MB for 3-indx Cholesky transformation'
+      Call chol_MOTransf_TwoStep(MatFF,CholeskyVecs,
+     $              UAux,1,NBasis,
+     $              UAux,1,NBasis,
+     $              MemMOTransfMB)
+C
+C
+      Call chol_ints_fofo(NBasis,Num0+Num1,MatFF,
+     $                    NBasis,Num0+Num1,MatFF,
+     $                    NCholesky,NBasis,'FOFO')
+      Call chol_ints_fofo(NBasis,NBasis,MatFF,
+     $                    Num0+Num1,Num0+Num1,MatFF,
+     $                    NCholesky,NBasis,'FFOO')
+C
+      open(newunit=iunt,file='cholvecs',form='unformatted')
+      write(iunt) NCholesky
+      write(iunt) MatFF(1:NCholesky,1:NBasis**2)
+      close(iunt)
+
+      Deallocate(MatFF)
+      EndIf
 CC
       EndIf
 C
@@ -725,25 +832,46 @@ C     READ J AND K AND DUMP TO DISC
       Do I=1,NBasis
       UAux(I,I) = 1d0
       EndDo
-      Call read4_gen(NBasis,
-     $        Num0+Num1,UAux(1:NBasis,1:(Num0+Num1)),
-     $        Num0+Num1,UAux(1:NBasis,1:(Num0+Num1)),
-     $        NBasis,UAux,
-     $        NBasis,UAux,
-     $        'FFOO','AOTWOSORT')
-      Call read4_gen(NBasis,
-     $        NBasis,UAux,
-     $        Num0+Num1,UAux(1:NBasis,1:(Num0+Num1)),
-     $        NBasis,UAux,
-     $        Num0+Num1,UAux(1:NBasis,1:(Num0+Num1)),
-     $        'FOFO','AOTWOSORT')
+!
+      If(ICholesky==1) then
+c      print*, 'use chol_triang_fofo,IUNIT',IUNIT
+         call chol_triang_fofo(NBasis,NBasis,
+     $                  CholeskyVecs%R(1:NCholesky,1:NInte1),
+     $                  Num0+Num1,Num0+Num1,
+     $                  CholeskyVecs%R(1:NCholesky,1:NInte1),
+     $                  NCholesky,NInte1,NBasis,'FFOO')
+         call chol_triang_fofo(NBasis,Num0+Num1,
+     $                  CholeskyVecs%R(1:NCholesky,1:NInte1),
+     $                  NBasis,Num0+Num1,
+     $                  CholeskyVecs%R(1:NCholesky,1:NInte1),
+     $                  NCholesky,NInte1,NBasis,'FOFO')
+
+      Allocate(MatFF(NCholesky,NBasis**2))
+      do i=1,NCholesky
+         call triang_to_sq(CholeskyVecs%R(i,1:NInte1),MatFF(i,:),NBasis)
+      enddo
+      open(newunit=iunt,file='cholvecs',form='unformatted')
+      write(iunt) NCholesky
+      write(iunt) MatFF(1:NCholesky,1:NBasis**2)
+      close(iunt)
+      Deallocate(MatFF)
+
+      Else
+         Call read4_gen(NBasis,
+     $           Num0+Num1,Num0+Num1,NBasis,NBasis,
+     $           'FFOO','AOTWOSORT')
+         Call read4_gen(NBasis,
+     $           NBasis,Num0+Num1,NBasis,Num0+Num1,
+     $           'FOFO','AOTWOSORT')
+C
+      EndIf ! ICholesky
 C
       EndIf
 C
 C     CHECK IF INACT AND VIRT ORBITALS ARE CANONICAL
 C
       If(IBin.Ge.0) Then
-      NBSave=NBasis        
+      NBSave=NBasis
       NBasis=NAc
       NInAc=0
       EndIf
@@ -752,7 +880,7 @@ c      Write(6,'(" Skipping reading 2-RDM from rdmdump.dat.",/)')
 c      Write(6,'(" 2-RDM will be read from rdm2.dat file ...",/)')
 c      GoTo 888
 C
-C     READ ACTIVE 2-RDM AND TRANSFORM TO NO'S  
+C     READ ACTIVE 2-RDM AND TRANSFORM TO NO'S
 C
       Write(6,'(/," Reading 2-RDM ...")')
       NRDM2 = NBasis**2*(NBasis**2+1)/2
@@ -812,11 +940,11 @@ C
       If(IAAAA.Eq.0.And.IABBA.Eq.0.And.I1+I2+I3+I4.Eq.0) Then
       IABBA=1
       GoTo 22
-      EndIf 
+      EndIf
 C
       If(IAAAA.Eq.1) Then
       RDM2(NAddrRDM(L,K,I,J,NBasis))=X
-      RDM2(NAddrRDM(K,L,I,J,NBasis))=-X 
+      RDM2(NAddrRDM(K,L,I,J,NBasis))=-X
       RDM2(NAddrRDM(L,K,J,I,NBasis))=-X
       RDM2(NAddrRDM(K,L,J,I,NBasis))=X
       EndIf
@@ -829,7 +957,7 @@ C
       GoTo 22
    33 Close(10)
 C
-      Do I=1,NRDM2 
+      Do I=1,NRDM2
       RDM2(I)=RDM2(I)+RDMAB2(I)
       EndDo
 C
@@ -865,12 +993,12 @@ C
       UMOAO((J-1)*NBasis+I)=AUXM(I,J)
       EndDo
       EndDo
-C      
+C
       If(IUNIT.Eq.0) Call TrRDM2(RDM2,UMOAO,NBasis,NRDM2)
       GoTo 777
 C
-      EndIf      
-C 
+      EndIf
+C
       Call TrRDM2(RDM2,URe,NBasis,NRDM2)
 C
       Do IP=1,NBasis
@@ -948,7 +1076,7 @@ C
 c *****************************************
 
 C
-  777 Continue    
+  777 Continue
 C     SAVE THE ACTIVE PART IN rdm2.dat
       Open(10,File='rdm2.dat')
       Do I=NInAc+1,NInAc+NAc
@@ -961,25 +1089,31 @@ C     SAVE THE ACTIVE PART IN rdm2.dat
       Do L=NInAc+1,NInAc+NAc
       LLAct=L-NInAc
       KL=(K-1)*NBasis+L
-      If(IJ.Ge.KL) Write(10,'(4I4,F19.12)') 
+      If(IJ.Ge.KL) Write(10,'(4I4,F19.12)')
      $ KKAct,IIAct,LLAct,JJAct,Two*RDM2(NAddrRDM(I,J,K,L,NBasis))
 c herer!!!
 c      If(IJ.Ge.KL) Write(*,'(8I4,F19.12)')
 c     $ KKAct,IIAct,LLAct,JJAct,I,J,K,L,
-c     $Two*RDM2(NAddrRDM(I,J,K,L,NBasis))      
+c     $Two*RDM2(NAddrRDM(I,J,K,L,NBasis))
       EndDo
       EndDo
       EndDo
-      EndDo 
+      EndDo
       Close(10)
       Deallocate(RDM2)
       If(IEugene.Eq.0.And.LiborNew.Eq.0) Deallocate(RDMAB2)
       If(IBin.Ge.0) NBasis=NBSave
 
-c herer!!! 
+c herer!!!
   888 Continue
 C
-C     INTEGRALS ARE TRANSFORMED SO URe IS SET AS A UNIT MATRIX 
+C     dump URe, it may be usefull
+C
+      open(10,file='ure_casno.dat')
+      write(10,*)URe
+      close(10)
+C
+C     INTEGRALS ARE TRANSFORMED SO URe IS SET AS A UNIT MATRIX
 C
       Do I=1,NBasis
       Do J=1,NBasis
@@ -996,21 +1130,27 @@ C
      $ TwoEl,UAOMO,NInte1,NBasis,NInte2,NGem)
 C     $ TwoEl,UAOMO,NInte1,NBasis,NInte2,NGem,NoSt)
 C
-C     READ/WRITE THE ONE- AND TWO-ELECTRON INTEGRALS 
+C     READ/WRITE THE ONE- AND TWO-ELECTRON INTEGRALS
 C     INTERFACED WITH MOLPRO (INTEGRALS ARE READ FROM FCIDUMP FILES)
 C
+      use types
       use sorter
       use tran
-      use abmat 
+c     use Cholesky_old  ! requires AOTWOSORT
+      use Cholesky
+      use abmat
+      use read_external
+      use timing
 C
       Implicit Real*8 (A-H,O-Z)
-      Parameter (Zero=0.D0,Half=0.5D0,One=1.D0,Two=2.D0)
+      Parameter (Half=0.5D0)
+C      Parameter (Zero=0.D0,Half=0.5D0,One=1.D0,Two=2.D0)
 C
       Real*8 XKin(NInte1),XNuc(NInte1),TwoEl(NInte2),
      $ UAOMO(NBasis,NBasis),URe(NBasis,NBasis),Occ(NBasis),
      $ UAux(NBasis,NBasis),
-     $ Tmp(NInte1) 
-C      
+     $ Tmp(NInte1)
+C
       Real*8, Allocatable :: RDM2Act(:)
       Real*8, Allocatable :: HlpRDM2(:)
       Dimension Gamma(NInte1),Work(NBasis),PC(NBasis),
@@ -1018,8 +1158,10 @@ C
      $ IndInt(NBasis),NumOSym(15),MultpC(15,15),Fock(NBasis*NBasis),
      $ GammaF(NInte1),FockF(NInte1),GammaAB(NInte1),
      $ work1(NBasis,NBasis)
-c herer!!! delete after tests
-c     $ ,UMOAOInv(NBasis,NBasis),TwoElAO(NInte2)
+      Integer(8) :: MemSrtSize
+      Type(TCholeskyVecs) :: CholeskyVecs
+      Real*8, Allocatable :: MatFF(:,:)
+      Real*8 Tcpu,Twall
 C
       Character*60 FName,Aux1,Title
 C
@@ -1033,7 +1175,7 @@ C
 C
       K=1
 C
-      If(IAO.Eq.0) Then      
+      If(IAO.Eq.0) Then
 C
 C     IF INTEGRALS ARE IN MO REPRESENTATION THEN
 C
@@ -1043,13 +1185,13 @@ C
       Open(10,File='indices_int.dat')
       Read(10,*) NN
 C
-      If(NN.Eq.1) Then      
+      If(NN.Eq.1) Then
 C
       FName(K:K+11)='intcoul.dat'
       Call Int1(XKin,XNuc,NInte1,FName,Nbasis)
 C
       FName(K:K+11)='intcoul.dat'
-      Call Int2(TwoEl,FName,NInte2,NBasis) 
+      Call Int2(TwoEl,FName,NInte2,NBasis)
 C
       Else
 C
@@ -1072,64 +1214,84 @@ c
       If((I1+I2.Ne.0).And.(I3+I4.Eq.0)) Then
       IA=IndInt(I1)
       IB=IndInt(I2)
-      IAB=(Max(IA,IB)*(Max(IA,IB)-1))/2+Min(IA,IB)        
+      IAB=(Max(IA,IB)*(Max(IA,IB)-1))/2+Min(IA,IB)
       XKin(IAB)=X
       EndIf
       If(I3+I4.Ne.0) Then
-      IA1=IndInt(I1)        
+      IA1=IndInt(I1)
       IA2=IndInt(I2)
       IA3=IndInt(I3)
       IA4=IndInt(I4)
       TwoEl(NAddr3(IA1,IA2,IA3,IA4))=X
-      EndIf        
+      EndIf
 C
       GoTo 20
 C
    30 Close(20)
-C      
-      EndIf 
-      Close(10)     
 C
-C     If(IAO.Eq.0)      
-      EndIf      
+      EndIf
+      Close(10)
+C
+C     If(IAO.Eq.0)
+      EndIf
 C
       If(IAO.Eq.1) Then
 C
-C     HAP 
+C     HAP
 C      Call GetENuc_AO(ENuc,Title)
-      Call GetEnuc_AOBin(ENuc,'AOONEINT.mol') 
+      Call GetEnuc_AOBin(ENuc,'AOONEINT.mol')
 C
 C     HAP
-      Call create_ind('2RDM',NumOSym,IndInt,MxSym,NBasis)
-C 
+      Call create_ind_molpro('2RDM',NumOSym,IndInt,MxSym,NBasis)
+C
 C     LOAD ONE-ELE INTEGS IN AO
       FName(K:K+8)='xone.dat'
 C      Call Int1_AO(XKin,NInte1,FName,NumOSym,Nbasis)
 C
-C     HAP
       Call readoneint_molpro(XKin,'AOONEINT.mol','ONEHAMIL',
      $     .true.,NInte1)
 C
-C     HAP
+C     SET TIMING FOR 2-el integrals
+      Call clock('START',Tcpu,Twall)
+C
+CCC     bug!!!
+C       If(IRes==1) then
+C          print*, 'RESTART : read NCholesky from file!'
+C          open(newunit=iunit,file='cholvecs',form='unformatted')
+C          read(iunit) NCholesky
+C          close(iunit)
+C       Else
+C
+      If(ICholesky==0) Then
+C     memory allocation for sorter
+      MemSrtSize=MemVal*1024_8**MemType
 C     KP: If IFunSR=6 integrals are not needed and are not loaded
       If (IFunSR.Eq.0.Or.IFunSR.Eq.3.Or.IFunSR.Eq.5) Then
-      write(6,'(/,"calling readtwoint")')
-      Call readtwoint(NBasis,2,'AOTWOINT.mol','AOTWOSORT')
-      write(6,'("done with readtwoint")') 
+      Call readtwoint(NBasis,2,'AOTWOINT.mol','AOTWOSORT',MemSrtSize)
       If(ITwoEl.Eq.1) Call LoadSaptTwoEl(3,TwoEl,NBasis,NInte2)
       ElseIf(IFunSR.Eq.1.Or.IFunSR.Eq.2.Or.IFunSR.Eq.4) Then
-      Call readtwoint(NBasis,2,'AOTWOINT.erf','AOERFSORT')
+      Call readtwoint(NBasis,2,'AOTWOINT.erf','AOERFSORT',MemSrtSize)
       If(ITwoEl.Eq.1) Call LoadSaptTwoEl(4,TwoEl,NBasis,NInte2)
       EndIf
 C
+      Else If(ICholesky==1) Then
+c     If(ICholesky==1) Then
+c     Call chol_CoulombMatrix(CholeskyVecs,'AOTWOSORT',ICholeskyAccu)
+       Call chol_CoulombMatrix(CholeskyVecs,NBasis,'AOTWOINT.mol',2,
+     &                         ICholeskyAccu)
+      NCholesky=CholeskyVecs%NCholesky
+      EndIf ! ICholesky
+C      EndIf ! IRes
+      Call clock('2-electron ints',Tcpu,Twall)
+C
 C     LOAD AO TO CAS_MO ORBITAL TRANSFORMATION MATRIX FROM uaomo.dat
-C      
+C
 C      Call GetUAOMO(UAOMO,NumOSym,NBasis)
-C     HAP 
+C     HAP
       Call read_mo_molpro(UAOMO,'MOLPRO.MOPUN','CASORB  ',NBasis)
-C      
-C     If(IAO.Eq.1)      
-      EndIf              
+C
+C     If(IAO.Eq.1)
+      EndIf
 C
       URe(1:NBasis,1:NBasis)=Zero
       Occ(1:NBasis)=Zero
@@ -1139,14 +1301,14 @@ C
 C     READ RDMs: OLD
       Write(6,'(/," Reading in 1-RDM ...")')
 C
-C      Call read_1rdm_molpro(Gamma,InSt(1,1),InSt(2,1),
+C      Call read_1rdm_molpro(Gamma,InSt(1,1),InSt(2,1),ISpinMs2,
 C     $ '2RDM',IWarn,NBasis)
 C
 C     READ RDMs: NEW
       Wght=One/Float(NStates)
       Do I=1,NStates
       GammaAB(1:NInte1)=Zero
-      Call read_1rdm_molpro(GammaAB,InSt(1,I),InSt(2,I),
+      Call read_1rdm_molpro(GammaAB,InSt(1,I),InSt(2,I),ISpinMs2,
      $ '2RDM',IWarn,NBasis)
       Do K=1,NInte1
       Gamma(K)=Gamma(K)+Wght*GammaAB(K)
@@ -1159,7 +1321,7 @@ C KP 30.07.2020
       Call read_nact_molpro(nact,'2RDM')
       NAc=nact
 C
-C     DIAGONALIZE ONLY THE ACTIVE BLOCK OF Gamma TO AVOID THROWING AWAY 
+C     DIAGONALIZE ONLY THE ACTIVE BLOCK OF Gamma TO AVOID THROWING AWAY
 C     ACTIVE ORBITAL OF ZERO-OCCUPANCY (which may happen for atoms for some states)
 C
       Do I=1,NAc
@@ -1182,7 +1344,7 @@ C
       NAc=0
       Do I=1,NBasis
 C KP 08.08.2020
-C     it may happen that an active orbital has a negative but very small occupation. set it to a positive 
+C     it may happen that an active orbital has a negative but very small occupation. set it to a positive
       PC(I)=Abs(PC(I))
       Sum=Sum+PC(I)
       If(PC(I).Gt.Zero) NAc=NAc+1
@@ -1190,6 +1352,7 @@ C     it may happen that an active orbital has a negative but very small occupat
 C
 C KP 30.07.2020, no need to call read_nact_molpro again
 c      Call read_nact_molpro(nact,'2RDM')
+      ISwitch=0
       If(NAc.Ne.nact) Then
       Write(6,'(1x,"WARNING! The number of partially occ orbitals
      $ different from nact read from molpro. Some active orbitals
@@ -1231,12 +1394,12 @@ C
       Write(6,'(X,I3,E16.6,I6)') I,Occ(I),IGem(I)
       Sum=Sum+Occ(I)
       EndDo
-      Write(6,'(2X,"Sum of Occupancies: ",F5.2)') Sum
+      Write(6,'(2X,"Sum of Occupancies: ",F10.2)') Sum
 C
       NAct=NAcCAS
       INActive=NInAcCAS
       NOccup=INActive+NAct
-C 
+C
 C     COPY AUXM TO URe AND OFF SET BY NInAc
       Do I=1,NBasis
       IIAct=I-NInAc
@@ -1264,8 +1427,13 @@ C
       EndDo
       EndDo
 C
-C     FIND CANONICAL INACTIVE AND VIRTUAL ORBITALS 
-C      
+CCc     bug!
+C       if(IRes==1) then
+C          print*, 'Restart: Skip canonicalization...'
+C       else
+C
+C     FIND CANONICAL INACTIVE AND VIRTUAL ORBITALS
+C
       If(IAO.Eq.0) Then
 C
       Call FockGen(FockF,GammaF,XKin,TwoEl,NInte1,NBasis,NInte2)
@@ -1293,9 +1461,21 @@ C
       EndDo
 C
       If (IFunSR.Eq.0.Or.IFunSR.Eq.3.Or.IFunSR.Eq.5.Or.IFunSR.Eq.6) Then
-      Call FockGen_mithap(FockF,GammaAB,XKin,NInte1,NBasis,'AOTWOSORT')
+          If(ICholesky==0) Then
+          Call FockGen_mithap(FockF,GammaAB,XKin,NInte1,NBasis,
+     &                        'AOTWOSORT')
+          ElseIf(ICholesky==1) Then
+          Call FockGen_CholR(FockF,CholeskyVecs%R(1:NCholesky,1:NInte1),
+     &                       GammaAB,XKin,NInte1,NCholesky,NBasis)
+          EndIf
       ElseIf (IFunSR.Eq.1.Or.IFunSR.Eq.2.Or.IFunSR.Eq.4) Then
-      Call FockGen_mithap(FockF,GammaAB,XKin,NInte1,NBasis,'AOERFSORT')
+          If(ICholesky==0) Then
+             Call FockGen_mithap(FockF,GammaAB,XKin,NInte1,NBasis,
+     &                           'AOERFSORT')
+          ElseIf(ICholesky==1) Then
+             Write(6,'(1x,a)') 'Cholesky not ready for LR-ERF!'
+             Stop
+          EndIf
       EndIf
 C
 C     TESTY:
@@ -1306,12 +1486,12 @@ C      print*,'Fock:', norm2(FockF)
 C
 C      Call FockGen(FockF,GammaAB,XKin,TwoEl,NInte1,NBasis,NInte2)
       Call MatTr(FockF,UAux,NBasis)
-C      
+C
       EndIf
 C
 C     INACTIVE
       If(NInAc.Ne.Zero) Then
-C      
+C
       Do I=1,NInAc
       Do J=1,NInAc
       IJ=IndSym(I,J)
@@ -1344,7 +1524,7 @@ C
       IJ=IndSym(I+NInAc+NAc,J+NInAc+NAc)
       Fock((J-1)*NVirt+I)=FockF(IJ)
       EndDo
-      EndDo      
+      EndDo
       Call Diag8(Fock,NVirt,NVirt,PC,Work)
 C      Print*, PC(1:5)
 c KP 15.05.2019
@@ -1369,6 +1549,9 @@ C
 C
 C     END OF CANONICALIZING
 C
+c     endif ! IRes
+C
+C
   543 Continue
 C
 C     If CASPiDFT then skip integral transformation
@@ -1386,23 +1569,28 @@ C
 C
 C     TRANSFORM INTEGRALS TO NO
 C
-      If(IAO.Eq.0) Then 
-C      
+      If(IAO.Eq.0) Then
+C
       Call MatTr(XKin,URe,NBasis)
       Write(6,'(/," Transforming two-electron integrals ...",/)')
       Call TwoNO1(TwoEl,URe,NBasis,NInte2)
 C
-C     If(IAO.Eq.0)      
+C     If(IAO.Eq.0)
       Else
 C
       Call MultpM(UAOMO,URe,UAux,NBasis)
       Call MatTr(XKin,UAOMO,NBasis)
 C
+      If(IRes.Eq.1) Then
+      Write(6,'(/," Skipping AO-NO transformation...",/)')
+C      
+      Else ! IRes=0, perform 2-ints transformation
+C
 C     ITwoEl
       If(ITwoEl.Eq.1) Then
       Write(6,'(/," Transforming two-electron integrals ...",/)')
       Call TwoNO1(TwoEl,UAOMO,NBasis,NInte2)
-C     
+C
       ElseIf(ITwoEl.eq.3) Then
 C     PREPARE POINTERS: NOccup=num0+num1
       Call prepare_nums(Occ,Num0,Num1,NBasis)
@@ -1411,6 +1599,8 @@ C     PREPARE POINTERS: NOccup=num0+num1
 C     TRANSFORM J AND K
       UAux=transpose(UAOMO)
       If (IFunSR.Eq.0.Or.IFunSR.Eq.3.Or.IFunSR.Eq.5) Then
+      If (ICholesky==0) Then
+C
       Call tran4_gen(NBasis,
      $        Num0+Num1,UAux(1:NBasis,1:(Num0+Num1)),
      $        Num0+Num1,UAux(1:NBasis,1:(Num0+Num1)),
@@ -1423,6 +1613,51 @@ C     TRANSFORM J AND K
      $        NBasis,UAux,
      $        Num0+Num1,UAux(1:NBasis,1:(Num0+Num1)),
      $        'FOFO','AOTWOSORT')
+C
+      Call clock('tran4_FOFO',Tcpu,Twall)
+C
+      ElseIf (ICholesky==1) Then
+C
+      Allocate(MatFF(NCholesky,NBasis**2))
+C     Old 1-step transformation (much slower)
+c     Call chol_MOTransf(MatFF,CholeskyVecs,
+c    $                   UAux,1,NBasis,
+c    $                   UAux,1,NBasis)
+C
+C    set buffer size for Cholesky AO2NO transformation
+      if(MemType == 2) then       !MB
+         MemMOTransfMB = MemVal
+      elseif(MemType == 3) then   !GB
+         MemMOTransfMB = MemVal * 1024_8
+      endif
+      Write(LOUT,'(1x,a,i5,a)') 'Using ',MemMOTransfMB,
+     $                          ' MB for 3-indx Cholesky transformation'
+      Call chol_MOTransf_TwoStep(MatFF,CholeskyVecs,
+     $              UAux,1,NBasis,
+     $              UAux,1,NBasis,
+     $              MemMOTransfMB)
+C
+      Call clock('chol_NOTransf',Tcpu,Twall)
+C
+      Write(6,'(/," Skipping FOFO/FFOO assembling")')
+C      Call chol_ints_fofo(NBasis,Num0+Num1,MatFF,
+C     $                    NBasis,Num0+Num1,MatFF,
+C     $                    NCholesky,NBasis,'FOFO')
+C      Call chol_ints_fofo(NBasis,NBasis,MatFF,
+C     $                    Num0+Num1,Num0+Num1,MatFF,
+C     $                    NCholesky,NBasis,'FFOO')
+C
+C     Call clock('chol_FFOOFOFO',Tcpu,Twall)
+C
+C KP 07.2021: dump MatFF
+C
+      open(newunit=iunit,file='cholvecs',form='unformatted')
+      write(iunit) NCholesky
+      write(iunit) MatFF
+      close(iunit)
+      Deallocate(MatFF)
+C
+      EndIf
 C     TEST MITHAP
 C      call tran4_full(NBasis,UAux,UAux,'TWOMO','AOTWOSORT')
 C
@@ -1445,13 +1680,18 @@ C      call tran4_full(NBasis,UAux,UAux,'MO2ERF','AOERFSORT')
       EndIF
 C
       EndIf
-C              
-      EndIf  
+C
+      EndIf
+C
+      EndIf ! IRes
 C
 c     If(IFunSR.Eq.5) Then
       EndIf
 C
-C     READ ACTIVE 2-RDM AND TRANSFORM TO NO'S  
+C     test dipole moments
+      Call ComputeDipoleMom(UAOMO,Occ,NOccup,NBasis)
+C
+C     READ ACTIVE 2-RDM AND TRANSFORM TO NO'S
 C
       Write(6,'(" Reading in 2-RDM ...")')
       Ind2(1:NBasis)=0
@@ -1466,13 +1706,13 @@ C
 C
 C     READ RDMs: OLD
 C      Call read_2rdm_molpro(RDM2Act,InSt(1,1),InSt(2,1),
-C     $ '2RDM',IWarn,NAct)
+C     $ ISpinMs2,'2RDM',IWarn,NAct)
 C
 C     READ RDMs: NEW
       Wght=One/Float(NStates)
       Do I=1,NStates
       GammaAB(1:NInte1)=Zero
-      Call read_2rdm_molpro(HlpRDM2,InSt(1,I),InSt(2,I),
+      Call read_2rdm_molpro(HlpRDM2,InSt(1,I),InSt(2,I),ISpinMs2,
      $ '2RDM',IWarn,NAct)
       Do K=1,NRDM2Act
       RDM2Act(K)=RDM2Act(K)+Wght*HlpRDM2(K)
@@ -1493,7 +1733,7 @@ C      If(I3+I4.Gt.0.And.IStart.Eq.1) Then
 C      I=I1
 C      J=I2
 C      K=I3
-C      L=I4        
+C      L=I4
 C      RDM2Act(NAddrRDM(J,L,I,K,NAct))=X*Half
 C      RDM2Act(NAddrRDM(L,J,K,I,NAct))=X*Half
 C      EndIf
@@ -1523,8 +1763,8 @@ C
       EOne=ETot
 C
 C     ITwoEl
-      If(ITwoEl.Eq.1) Then 
-      ETwo=Zero 
+      If(ITwoEl.Eq.1) Then
+      ETwo=Zero
       Do IP=1,NOccup
       Do IQ=1,NOccup
       Do IR=1,NOccup
@@ -1537,9 +1777,13 @@ C      ETot=ETot+Hlp
       EndDo
       EndDo
       EndDo
-C     
+C
       ElseIf(ITwoEl.eq.3) Then
-      Call TwoEneChck(ETwo,RDM2Act,Occ,INActive,NAct,NBasis)
+      If(ICholesky.eq.0) Then
+         Call TwoEneChck(ETwo,RDM2Act,Occ,INActive,NAct,NBasis)
+      ElseIf(ICholesky.eq.1) Then
+         Call TwoEneChckChol(ETwo,RDM2Act,Occ,INActive,NAct,NBasis)
+      EndIf
       EndIf
 C
       Write(6,'(/,1X,''Two-electron Energy'',5X,F15.8)')ETwo
@@ -1562,11 +1806,11 @@ C
       EndDo
       EndDo
       EndDo
-C      
+C
       Close(10)
       Deallocate(RDM2Act)
 C
-C     INTEGRALS ARE TRANSFORMED SO URe IS SET TO A UNIT MATRIX 
+C     INTEGRALS ARE TRANSFORMED SO URe IS SET TO A UNIT MATRIX
 C
       Do I=1,NBasis
       Do J=1,NBasis
@@ -1580,7 +1824,7 @@ C
 
 *Deck DimSym
       Subroutine DimSym(NBasis,NInte1,NInte2,MxHVec,MaxXV)
-C 
+C
       Implicit Real*8 (A-H,O-Z)
 C
 C     CALCULATES THE ARRAY DIMENSIONS
@@ -1590,10 +1834,10 @@ C     NBasis - maximal index of the integrals (the number of basis functions)
 C     NInte1 - dimension of the one-electron integrals array
 C     NInte2 - dimension of the two-electron integrals array
 C     MxHVec - dimension of the total hessian matrix
-C     MaxXV  - the number of the independent rotations (X parameters) 
+C     MaxXV  - the number of the independent rotations (X parameters)
 C
-      NInte1=NBasis*(NBasis+1)/2 
-C     
+      NInte1=NBasis*(NBasis+1)/2
+C
       NInte2=NInte1*(NInte1+1)/2
 C
       MaxXV=NBasis*(NBasis-1)/2
@@ -1608,7 +1852,7 @@ C
 C
       Implicit Real*8 (A-H,O-Z)
 C
-      Character*60 Title,FMultTab
+      Character*60 Title
 C
       Include 'commons.inc'
 C
@@ -1633,7 +1877,7 @@ C
       Write(6,'('' *'',61X,''*'')')
 C
       Write(6,
-     $ '('' * NUCLEAR CHARGE = '',F9.6,''   CHARGE = '',F9.6,13X,
+     $ '('' * NUCLEAR CHARGE = '',F13.9,''   CHARGE = '',F9.6,13X,
      $ ''*'')') ZNucl,Charge
 C
       Write(6,'('' *'',61X,''*'')')
@@ -1657,14 +1901,14 @@ C
       EndIf
 C
       Return
-      End 
+      End
 
 *Deck RInput
       Subroutine RInput(ZNucl,Charge,IPrint,NBasis,NELE,XELE)
-C 
+C
       Implicit Real*8 (A-H,O-Z)
 C
-C     READS THE INPUT KEYWORDS 
+C     READS THE INPUT KEYWORDS
 C
       Character*80 Line1
       Character*160 Line
@@ -1680,7 +1924,7 @@ C
       Read(10,'(A80)',End=15) Line1
 C
       Do 20 I=1,80
-   20 Line(I+NLines*80:I+NLines*80)=Line1(I:I) 
+   20 Line(I+NLines*80:I+NLines*80)=Line1(I:I)
 C
    15 Close(10,Status='Keep')
 C
@@ -1712,17 +1956,17 @@ C
       Do 260 J=1,NDig1
       I=-1
   270 I=I+1
-      If (I.Gt.10) 
+      If (I.Gt.10)
      $ Stop 'FATAL ERROR: INCORRECT ENTRY ZNucl IN THE INPUT FILE!'
-      If (Line(K+5+J:K+5+J).Ne.Digit(I+1)) GoTo 270    
+      If (Line(K+5+J:K+5+J).Ne.Digit(I+1)) GoTo 270
   260 ZNucl=ZNucl+Float(I)*Ten**(NDig1-J)
 C
       Do 280 J=1,NDig2
       I=-1
   290 I=I+1
-      If (I.Gt.10) 
+      If (I.Gt.10)
      $ Stop 'FATAL ERROR: INCORRECT ENTRY ZNucl IN THE INPUT FILE!'
-      If (Line(K+6+NDig1+J:K+NDig1+6+J).Ne.Digit(I+1)) GoTo 290    
+      If (Line(K+6+NDig1+J:K+NDig1+6+J).Ne.Digit(I+1)) GoTo 290
   280 ZNucl=ZNucl+Float(I)/Ten**J
 C
 C     *****Charge*****
@@ -1757,7 +2001,7 @@ C
       Do 320 J=1,NDig1
       I=-1
   330 I=I+1
-      If (I.Gt.10) 
+      If (I.Gt.10)
      $ Stop 'FATAL ERROR: INCORRECT ENTRY Charge IN THE INPUT FILE!'
       If (Line(K+6+J:K+6+J).Ne.Digit(I+1)) GoTo 330
   320 Charge=Charge+Float(I)*Ten**(NDig1-J)
@@ -1765,9 +2009,9 @@ C
       Do 340 J=1,NDig2
       I=-1
   350 I=I+1
-      If (I.Gt.10) 
+      If (I.Gt.10)
      $ Stop 'FATAL ERROR: INCORRECT ENTRY Charge IN THE INPUT FILE!'
-      If (Line(K+7+NDig1+J:K+NDig1+7+J).Ne.Digit(I+1)) GoTo 350    
+      If (Line(K+7+NDig1+J:K+NDig1+7+J).Ne.Digit(I+1)) GoTo 350
   340 Charge=Charge+Float(I)/Ten**J
 C
       Charge=Float(ISg)*Charge
@@ -1795,7 +2039,7 @@ C
       Do 420 J=1,NDig1
       I=-1
   430 I=I+1
-      If (I.Gt.10) 
+      If (I.Gt.10)
      $ Stop 'FATAL ERROR: INCORRECT ENTRY NBasis IN THE INPUT FILE!'
       If (Line(K+6+J:K+6+J).Ne.Digit(I+1)) GoTo 430
   420 NBasis=NBasis+Float(I)*Ten**(NDig1-J)
@@ -1813,8 +2057,8 @@ C
       If (Line(K+7:K+7).Eq.'2') IPrint=2
       If (Line(K+7:K+7).Eq.'3') IPrint=3
       If (Line(K+7:K+7).Eq.'4') IPrint=4
-      If (IPrint.Eq.-1) 
-     $ Stop 'FATAL ERROR: INCORRECT ENTRY IPrint IN THE INPUT FILE!' 
+      If (IPrint.Eq.-1)
+     $ Stop 'FATAL ERROR: INCORRECT ENTRY IPrint IN THE INPUT FILE!'
 C
       XELE=Half*(ZNucl-Charge)
       NELE=Int(ZNucl-Charge+Half)/2
@@ -1843,7 +2087,7 @@ C
       XNuc(I)=Zero
       EndDo
 C
-C     READ ONE-ELECTRON INTEGRALS IN THE MO REPR      
+C     READ ONE-ELECTRON INTEGRALS IN THE MO REPR
 C
       Open(10,File=FName)
 C
@@ -1854,17 +2098,17 @@ c      If(Aux1(1:5).Eq." &END") GoTo 20
       GoTo 20
       EndIf
       GoTo 2
-C 
+C
    20 Continue
       Read(10,*,End=30) X,I1,I2,I3,I4
 
       If((I1+I2.Ne.0).And.(I3+I4.Eq.0)) Then
       Ind=(Max(I1,I2)*(Max(I1,I2)-1))/2+Min(I1,I2)
       XKin(Ind)=X
-      EndIf 
-      GoTo 20   
+      EndIf
+      GoTo 20
 C
-  30  Close(10)      
+  30  Close(10)
 C
       Return
       End
@@ -1872,7 +2116,7 @@ C
 *Deck Int2
       Subroutine Int2(TwoEl,FName,NInte2,NBasis)
 C
-C     READS TWO-ELECTRON INTEGRALS FROM THE MOLPRO FCIDUMP FILE 
+C     READS TWO-ELECTRON INTEGRALS FROM THE MOLPRO FCIDUMP FILE
 C     (CHEMICAL NOTATION IS USED!)
 C
       Implicit Real*8 (A-H,O-Z)
@@ -1889,43 +2133,45 @@ c      If(Aux1(1:5).Eq." &END") GoTo 20
       GoTo 20
       EndIf
       GoTo 2
-C 
+C
    20 Continue
-      Read(10,*,End=30) X,I1,I2,I3,I4 
+      Read(10,*,End=30) X,I1,I2,I3,I4
       If(I3+I4.Ne.0) TwoEl(NAddr3(I1,I2,I3,I4))=X
       GoTo 20
 C
   30  Close(10)
-C 
+C
       Return
-      End  
+      End
 
 *Deck GetENuc_AOBin
       Subroutine GetENuc_AOBin(ENuc,infile)
+C
+      use print_units
 C
       Implicit Real*8 (A-H,O-Z)
       Character(*) infile
       Logical ex
 
       inquire(file=trim(infile),EXIST=ex)
-     
+
       if(ex) then
-         open(newunit=iunit,file=trim(infile),status='OLD', 
+         open(newunit=iunit,file=trim(infile),status='OLD',
      $        access='SEQUENTIAL',form='UNFORMATTED')
-      
+
          read(iunit)
          read(iunit)
          read(iunit) ENuc
- 
+
          close(iunit)
 
       else
- 
+
         write(LOUT,'(1x,a)') 'WARNING: '// infile //' NOT FOUND!'
         write(LOUT,'(1x,a)') 'CANNOT READ ENuc!'
         stop
 
-      endif     
+      endif
 
       End
 
@@ -1976,14 +2222,14 @@ C
 C
       Do I=1,NInte1
       XOne(I)=Zero
-      EndDo 
+      EndDo
 C
       Open(10,File=FName)
 C
       Read(10,'(A10)')Aux1
       Read(10,'(A10)')Aux1
 C
-      Ind=0  
+      Ind=0
       Do ISym=1,MxSym
 C
       Do I=1,NumOSym(ISym)
@@ -1991,7 +2237,7 @@ C
       EndDo
 C
       Ind=Ind+NumOSym(ISym)
-C   
+C
       EndDo
       Close(10)
 C
@@ -2028,7 +2274,7 @@ C
       Do NSymP=1,MxSym
 C
       NSymQ=MultpC(NSymPQ,NSymP)
-      If(NSymQ.Gt.NSymP) Cycle 
+      If(NSymQ.Gt.NSymP) Cycle
 C
       Do IP=1,NumOSym(NSymP)
 C
@@ -2041,14 +2287,14 @@ C
       Do IQ=1,NEndQ
 C
 C     READ A RECORD
-C 
+C
       Read(10) NRecL
       Read(10) (Record(I),I=1,NRecL)
       ICounter=0
 C
 C     LOOP OVER IR, IS
 C
-      NSymRS=NSymPQ     
+      NSymRS=NSymPQ
       Do NSymR=1,MxSym
 C
       NSymS=MultpC(NSymRS,NSymR)
@@ -2070,7 +2316,7 @@ C
 C
       Else
 C
-      NBlock=NTB(NSymR)*NTB(NSymS) 
+      NBlock=NTB(NSymR)*NTB(NSymS)
       ICountRS=0
 C
       Do IS=1,NumOSym(NSymS)
@@ -2094,12 +2340,12 @@ C
 C
 c     enddo NSymR
       EndDo
-      If(NRecL-ICounter.Gt.10) 
+      If(NRecL-ICounter.Gt.10)
      $ Stop 'Fatal error in initia.f. Check MxSym'
 c     enddo IQ
       EndDo
 c     enddo IP
-      EndDo     
+      EndDo
 c     enddo symp
       EndDo
 c     enddo sympq
@@ -2111,7 +2357,7 @@ C
 C
       End
 
-*Deck GetENuc 
+*Deck GetENuc
       Subroutine GetENuc(ENuc,FName,NBasis)
 C
 C     READS THE NUCLEAR ENERGY FROM THE MOLPRO FCIDUMP FILE
@@ -2130,9 +2376,9 @@ c      If(Aux1(1:5).Eq." &END") GoTo 20
       GoTo 20
       EndIf
       GoTo 2
-C 
+C
    20 Continue
-      Read(10,*,End=30) X,I1,I2,I3,I4 
+      Read(10,*,End=30) X,I1,I2,I3,I4
       If(I1+I2+I3+I4.Eq.0) ENuc=X
       GoTo 20
 C
@@ -2144,12 +2390,11 @@ C
 *Deck DetSym
       Subroutine DetSym(MultpC,NSymMO,NumOSym,NBasis)
 C
-C     DETRMINE THE NUMBER OF ORBITALS IN EACH SYMMETRY 
+C     DETRMINE THE NUMBER OF ORBITALS IN EACH SYMMETRY
 C     AND READ THE MULTIPLICATION TABLE
 C
       Implicit Real*8 (A-H,O-Z)
 C
-      Character*60 FMultTab
       Include 'commons.inc'
 C
       Parameter (Zero=0.D0)
@@ -2177,7 +2422,7 @@ C
 C
       EndDo
 C
-      Return 
+      Return
       End
 
 *Deck GetUAOMO
@@ -2229,7 +2474,7 @@ C
       Function IndOrb(I,NSymI,NumOSym)
 C
 C     RETURNS THE INDEX OF AN ORBITALS WHICH IS THE ITH ORBITALS OF THE SYMMETRY NSymI
-C 
+C
       Implicit Real*8 (A-H,O-Z)
 C
       Include 'commons.inc'
@@ -2266,7 +2511,7 @@ C
       integer nxx
 C
       XKin(1:NInte1)=         0.D0
-C      
+C
       iunit77=77
       iunit88=88
       iunit99=99
@@ -2371,6 +2616,8 @@ C
       Call MatTr(XKin,UMOAO,NBasis)
         write(56,*) XKin
 
+      close(iunit77)
+
       return
       end
 
@@ -2401,7 +2648,7 @@ C
         write(*,*) 'Error finding label ', ONEHAMIL
         stop
 C      else
-C        write(*,*) 'label ', ONEHAMIL, " was founded" 
+C        write(*,*) 'label ', ONEHAMIL, " was founded"
 C        stop
       end if
       end
@@ -2411,6 +2658,8 @@ C        stop
 C
 C     Reads 2-el integrals in AO and ttransform to NO
 C     Returns TwoEl in NO
+C
+      use read_external
 C
       Implicit Real*8 (A-H,O-Z)
 C
@@ -2431,26 +2680,26 @@ C
       ! newunit works with Fortran 2008
       open(newunit=iunit,file='AOTWOINT',status='OLD',
      $     access='SEQUENTIAL',form='UNFORMATTED')
-    
+
       ! read info
-      call readlabel2(iunit,'BASINFO ')
-      read(iunit) maxrep, naos, lbuf, nibuf, nbits 
-    
+      call readlabel(iunit,'BASINFO ')
+      read(iunit) maxrep, naos, lbuf, nibuf, nbits
+
       write(6,'()')
       write(6,'(1x, a)') 'Dalton two-el. file initialized'
       write(6,*) lbuf,nibuf,nbits
 C      write(6,'(1x,a,i3,a,i3,a,i3)') 'Buffer size: ', lbuf, &
 C           & ', integers per index packet: ', nibuf,       &
 C           & ', bits: ', nbits
-    
+
       allocate(val_buf(lbuf))
       allocate(idx_buf(lbuf*nibuf))
-    
-      call readlabel2(iunit,'BASTWOEL')
-    
+
+      call readlabel(iunit,'BASTWOEL')
+
       select case(nibuf)
       case(1)
-    
+
         do
            read(iunit) val_buf, idx_buf, nints
            if(nints<0) exit
@@ -2460,19 +2709,19 @@ C           & ', bits: ', nbits
               idx_q = ibits(INDX,8,8)
               idx_r = ibits(INDX,16,8)
               idx_s = ibits(INDX,24,8)
-    
+
               ! pq: position in Batch
               ! rs: Batch number
               pq = idx_p + idx_q*(idx_q-1)/2
-              rs = idx_r + idx_s*(idx_s-1)/2 
-              !write(*,*) idx_p,idx_q,idx_r,idx_s 
+              rs = idx_r + idx_s*(idx_s-1)/2
+              !write(*,*) idx_p,idx_q,idx_r,idx_s
               swap_pqrs = (pq<rs)
            TwoEl(NAddr3(idx_p,idx_q,idx_r,idx_s))=val_buf(i)
            enddo
         enddo
-       
+
       case(2)
-    
+
         do
            read(iunit) val_buf, idx_buf, nints
            if(nints<0) exit
@@ -2483,16 +2732,16 @@ C           & ', bits: ', nbits
               INDX = idx_buf(i+lbuf)
               idx_p = ibits(INDX,0,16)
               idx_q = ibits(INDX,16,16)
-    
+
               pq = idx_p + idx_q*(idx_q-1)/2
-              rs = idx_r + idx_s*(idx_s-1)/2 
+              rs = idx_r + idx_s*(idx_s-1)/2
               swap_pqrs = (pq<rs)
            TwoEl(NAddr3(idx_p,idx_q,idx_r,idx_s))=val_buf(i)
            enddo
         enddo
-    
+
       end select
-    
+
       deallocate(val_buf,idx_buf)
       close(unit=iunit)
 
@@ -2504,7 +2753,7 @@ C
 
 ****** SUBROUTINES FROM RAFAL PODESZWA, 03/2017 ******
 *
-*Deck read2el 
+*Deck read2el
       subroutine read2el(TwoEl,UMOAO,NBasis,NInte2)
 C
 C     Reads 2-el integrals in AO and ttransform to NO
@@ -2525,23 +2774,23 @@ C
       Integer(8),external :: NAddr3
 C
       TwoEl(1:NInte2)=         0.D0
-C      
+C
       iunit77=77
       iunit88=88
       iunit99=99
-      
+
       OPEN(UNIT=iunit77,FILE='AOTWOINT',STATUS='OLD',
      &           ACCESS='SEQUENTIAL',FORM='UNFORMATTED')
-     
+
       call inittwoel(iunit77)
       if (nibuf*lbuf .gt. mxbuf) then
         write(*,*) 'Dalton buffer greater than mxbuf. Stop'
         stop
       end if
-      
+
 10    continue
       call readtwoel(iunit77, dbuf, ibuf, lbuf, nibuf, nxx)
-      
+
 c      write (*,*) nxx, ' two electron integrals read'
       do i=1,nxx
 C       call unpckdlt(ibuf(i), ibuf(i+lbuf), nibuf, nbits,ip,iq,ir,is)
@@ -2551,7 +2800,7 @@ C        if (dabs(dbuf(i)).gt.1e-8)
 c     *          write(*,'(4I4,F12.8)') ip, iq, ir, is, dbuf(i)
       TwoEl(NAddr3(ip,iq,ir,is))=dbuf(i)
       end do
-      
+
       if (nxx .ge. 0) go to 10
 
 C     TEST read2el vs. readtwoint
@@ -2572,13 +2821,13 @@ C      do ir=1,NBasis
 C      read(iunit,rec=min(ir,is)+max(ir,is)*(max(ir,is)-1)/2) mat
 C      do iq=1,NBasis
 C      do ip=1,NBasis
-CC  
-CC      write(*,*) ip,iq,ir,is,TwoEl(NAddr3(ip,iq,ir,is)) 
-C      TMP1 = TwoEl(NAddr3(ip,iq,ir,is)) 
+CC
+CC      write(*,*) ip,iq,ir,is,TwoEl(NAddr3(ip,iq,ir,is))
+C      TMP1 = TwoEl(NAddr3(ip,iq,ir,is))
 C      TMP2 = mat(min(ip,iq)+max(ip,iq)*(max(ip,iq)-1)/2)
 CC
 C      if(TMP1.ne.TMP2) write(6,*) TMP1,TMP2
-CC    
+CC
 C      enddo
 C      enddo
 C      enddo
@@ -2593,14 +2842,14 @@ C
       Write(6,'(" Transforming two-electron integrals ...",/)')
       Call TwoNO1(TwoEl,UMOAO,NBasis,NInte2)
 C
-      return  
+      return
       end
-      
-      
+
+
       subroutine unpckdlt(ibuf, ibuf2, nibuf, nbits, ip, iq, ir, is)
       integer ibuf, ibuf2, nibuf, nbits, ip, iq, ir, is
-      
-      
+
+
       IF (NIBUF .EQ. 1) THEN
       IF (NBITS .EQ. 8) THEN
             LABEL = ibuf
@@ -2628,29 +2877,29 @@ c#endif
       END IF
 
       end
-     
+
       subroutine readtwoel(iunit, dbuf, ibuf, lbuf, nibuf, nxx)
       integer iunit, ibuf, lbuf, nibuf, nxx
       double precision dbuf
       dimension dbuf(lbuf), ibuf(lbuf, nibuf)
-      
+
       read (iunit) dbuf, ibuf, nxx
-      
+
       end
-       
+
       subroutine inittwoel(iunit)
       integer iunit
       character*8 BASINFO, BASTWOEL
       data BASINFO /'BASINFO'/, BASTWOEL /'BASTWOEL'/
-      
+
       integer  maxrep, naos, lbuf, nibuf, nbits
       common /daltwoel/  maxrep, naos(8), lbuf, nibuf, nbits
-      
+
       logical findlab
-      
+
       integer i
-      
-      
+
+
       if (.not. findlab(BASINFO,iunit)) then
         write(*,*) 'Error finding label', BASINFO
         stop
@@ -2664,13 +2913,13 @@ c#endif
         stop
       end if
       end
-    
-      
-      
+
+
+
       logical function findlab(label, labelunit)
       character*8 label, stars, b(4)
       parameter (stars = '********')
-      
+
       rewind(labelunit)
 10    read (labelunit, END=100, ERR=50) b
       if (b(1).ne.stars) go to 10
@@ -2685,12 +2934,12 @@ c#endif
 
 *Deck SaptInter
       Subroutine SaptInter(NBasis,Mon,ICAS)
-C     
+C
 C     FEEDS COMMONS.INC WITH SAPT VALUES
       Use types
-C     
+C
       Implicit Real*8 (A-H,O-Z)
-C      
+C
       type(SystemBlock) :: Mon
 C
       Include 'commons.inc'
@@ -2699,7 +2948,7 @@ C
       CICoef(I) = Mon%CICoef(I)
       IGem(I) = Mon%IGem(I)
       EndDo
-     
+
       If(ICAS.Eq.1) Then
       ICASSCF = ICAS
       NELE = Mon%NELE
@@ -2710,19 +2959,24 @@ C
 C      write(*,*) 'SINTER,NDimX', Mon%NDimX
 C      write(*,*) CICoef(1:NBasis)
 C      write(*,*) IGem(1:NBasis)
-      
-      End 
+
+      End
 
 *Deck LoadSaptTwoEl
       Subroutine LoadSaptTwoEl(Mon,TwoNO,NBasis,NInte2)
 C
+      use sorter
+C
       Implicit Real*8 (A-H,O-Z)
-C   
+C
+      Type(AOReaderData) :: reader
+C
       Integer :: Mon, NInte2, NBasis
       Integer :: IRS, IS, IR, IPQ, IQ, IP
       Integer :: iunit
       Integer(8),external :: NAddr3
-      Dimension :: TwoNO(NInte2), Work1(NBasis**2)    
+      Dimension :: TwoNO(NInte2), Work1(NBasis**2)
+      Logical :: empty
       Character*9 :: fname
 
       If(Mon.Eq.1) Then
@@ -2738,27 +2992,36 @@ C
       ElseIf(Mon.Eq.6) Then
       fname='MO2ERFBB'
       EndIf
- 
+
       Work1 = 0d0
-      TwoNO = 0d0 
-C      write(*,*) trim(fname) 
-      open(newunit=iunit,file=trim(fname),status='OLD',
-     $ access='DIRECT',recl=8*NBasis*(NBasis+1)/2)
+      TwoNO = 0d0
+C      write(*,*) trim(fname)
+C      open(newunit=iunit,file=trim(fname),status='OLD',
+C     $ access='DIRECT',recl=8*NBasis*(NBasis+1)/2)
+
+      call reader%open(trim(fname))
 
       IRS=0
       Do IS=1,NBasis
       Do IR=1,IS
       IRS=IRS+1
-      read(iunit,rec=IRS) Work1(1:NBasis*(NBasis+1)/2)
-      IPQ=0
-      Do IQ=1,NBasis
-      Do IP=1,IQ
-      IPQ = IPQ + 1
-      TwoNO(NAddr3(IP,IQ,IR,IS)) = Work1(IPQ)
-C      Write(6,*) IP,IQ,IR,IS, Work1(IPQ)
-C      Write(6,*) IP,IQ,IR,IS, TwoNO(NAddr3(IP,IQ,IR,IS)) 
-      EndDo
-      EndDo
+C
+      !read(iunit,rec=IRS) Work1(1:NBasis*(NBasis+1)/2)
+      Call reader%getTR(IRS,Work1,empty)
+      If(empty) Then
+         Work1 = 0d0
+      Else
+        IPQ=0
+        Do IQ=1,NBasis
+        Do IP=1,IQ
+        IPQ = IPQ + 1
+        TwoNO(NAddr3(IP,IQ,IR,IS)) = Work1(IPQ)
+C        Write(6,*) IP,IQ,IR,IS, Work1(IPQ)
+C        Write(6,*) IP,IQ,IR,IS, TwoNO(NAddr3(IP,IQ,IR,IS))
+        EndDo
+        EndDo
+      End If
+C
       EndDo
       EndDo
 
@@ -2769,7 +3032,7 @@ C      Do IR=1,IS
 C      Do IQ=1,NBasis
 C      Do IP=1,IQ
 C
-C      Write(6,*) ip,iq,ir,is,TwoNO(NAddr3(IP,IQ,IR,IS))  
+C      Write(6,*) ip,iq,ir,is,TwoNO(NAddr3(IP,IQ,IR,IS))
 C
 C      EndDo
 C      EndDo
@@ -2777,19 +3040,76 @@ C      EndDo
 C      EndDo
 C      EndIf
 
+      Call reader%close
+
+      End
+
+*Deck LoadSaptTwoNO
+      Subroutine LoadSaptTwoNO(Mon,TwoNO,NBasis,NInte2)
+C
+      use sorter
+C
+      Implicit Real*8 (A-H,O-Z)
+C
+      Type(AOReaderData) :: reader
+C
+      Integer :: Mon, NInte2, NBasis
+      Integer :: IRS, IS, IR, IPQ, IQ, IP
+      Integer :: iunit
+      Integer(8),external :: NAddr3
+      Dimension :: TwoNO(NInte2), Work1(NBasis**2)
+      Logical :: empty
+      Character*9 :: fname
+
+      If(Mon.Eq.1) Then
+      fname='TWOMOAA '
+      ElseIf(Mon.Eq.2) Then
+      fname='TWOMOBB '
+      ElseIf(Mon.Eq.5) Then
+      fname='MO2ERFAA'
+      ElseIf(Mon.Eq.6) Then
+      fname='MO2ERFBB'
+      EndIf
+
+      Work1 = 0d0
+      TwoNO = 0d0
+C      write(*,*) trim(fname)
+      open(newunit=iunit,file=trim(fname),status='OLD',
+     $ access='DIRECT',recl=8*NBasis*(NBasis+1)/2)
+
+      IRS=0
+      Do IS=1,NBasis
+      Do IR=1,IS
+      IRS=IRS+1
+C
+      read(iunit,rec=IRS) Work1(1:NBasis*(NBasis+1)/2)
+      IPQ=0
+      Do IQ=1,NBasis
+      Do IP=1,IQ
+      IPQ = IPQ + 1
+      TwoNO(NAddr3(IP,IQ,IR,IS)) = Work1(IPQ)
+C      Write(6,*) IP,IQ,IR,IS, Work1(IPQ)
+C      Write(6,*) IP,IQ,IR,IS, TwoNO(NAddr3(IP,IQ,IR,IS))
+      EndDo
+      EndDo
+C
+      EndDo
+      EndDo
+
       close(iunit)
+
       End
 
 *Deck CheckSaptTwoEl
       Subroutine CheckSaptTwoEl(Mon,TwoNO,NBasis,NInte2)
 C
       Implicit Real*8 (A-H,O-Z)
-C   
+C
       Integer :: Mon, NInte2, NBasis
       Integer :: IRS, IS, IR, IPQ, IQ, IP
       Integer :: iunit
       Integer(8),external :: NAddr3
-      Dimension :: TwoNO(NInte2), Work1(NBasis**2)    
+      Dimension :: TwoNO(NInte2), Work1(NBasis**2)
       Character*9 :: fname
 
       If(Mon.Eq.1) Then
@@ -2805,7 +3125,7 @@ C
       ElseIf(Mon.Eq.6) Then
       fname='MO2ERFBB'
       EndIf
- 
+
       Work1 = 0d0
       open(newunit=iunit,file=trim(fname),status='OLD',
      $ access='DIRECT',recl=8*NBasis*(NBasis+1)/2)
@@ -2821,9 +3141,9 @@ C
       IPQ = IPQ + 1
       TMP=Abs(TwoNO(NAddr3(IP,IQ,IR,IS))-Work1(IPQ))
       If(TMP>1.D-6) Write(*,*) IP,IQ,IR,IS,
-     $ TwoNO(NAddr3(IP,IQ,IR,IS)),Work1(IPQ) 
+     $ TwoNO(NAddr3(IP,IQ,IR,IS)),Work1(IPQ)
 C      Write(6,*) IP,IQ,IR,IS, Work1(IPQ)
-C      Write(6,*) IP,IQ,IR,IS, TwoNO(NAddr3(IP,IQ,IR,IS)) 
+C      Write(6,*) IP,IQ,IR,IS, TwoNO(NAddr3(IP,IQ,IR,IS))
       EndDo
       EndDo
       EndDo
@@ -2844,7 +3164,7 @@ C
       Dimension URe(NBasis,NBasis),RDM2(NRDM2)
 C
 C     LOCAL ARRAYS
-C 
+C
       Dimension Aux1(NBasis,NBasis,NBasis,NBasis),
      $  Aux2(NBasis,NBasis,NBasis,NBasis)
 C
@@ -2914,7 +3234,7 @@ C
       EndDo
 C
 C     FOURTH INDEX
-C     
+C
       Do IA=1,NBasis
       Do IB=1,NBasis
       Do IC=1,NBasis
@@ -2936,7 +3256,7 @@ C
       Return
       End
 
-*Deck FockGen      
+*Deck FockGen
       Subroutine FockGen(Fock,Gamma,XOne,TwoEl,NInte1,NBasis,NInte2)
 C
 C     GENERALIZED FOCK MATRIX
@@ -2963,39 +3283,13 @@ C
 C
       EndDo
       EndDo
-C      
+C
       Return
       End
 
-      subroutine readlabel2(iunit,text)
-      ! sets file pointer 
-      ! to first data after text
-      implicit none
-      
-      integer :: iunit
-      integer :: ios
-      character(8) :: text, label(4)
-      
-      rewind(iunit)
-      do 
-      
-        read(iunit,iostat=ios) label
-        if(ios<0) then
-           write(6,*) 'ERROR!!! Empty section in AOTWOINT!'
-           stop
-        endif
-        if(label(1)=='********') then
-           if(label(4)==text) exit
-        endif
-      
-      enddo
-      
-      end subroutine readlabel2
-
-
       subroutine prepare_nums(Occ,Num0,Num1,NBasis)
       Implicit Real*8 (A-H,O-Z)
-C       
+C
       Include 'commons.inc'
 C
       Parameter(Zero=0.D0,Half=0.5D0,One=1.D0,Two=2.D0)
@@ -3036,7 +3330,7 @@ C
 
       subroutine TwoEneChck(ETwo,RDM2Act,Occ,INActive,NAct,NBasis)
       Implicit Real*8 (A-H,O-Z)
-C       
+C
       Include 'commons.inc'
 C
       Parameter(Zero=0.D0,Half=0.5D0,One=1.D0,Two=2.D0)
@@ -3051,7 +3345,7 @@ C
       Double Precision, Allocatable :: RDM2val(:,:,:,:),
      $                                 work(:),ints(:,:)
       Character(:),Allocatable :: IntJFile
-C  
+C
 C     SET FILES
       If (IFunSR.Eq.0.Or.IFunSR.Eq.3.Or.IFunSR.Eq.5) Then
       IntJFile='FFOO'
@@ -3094,7 +3388,7 @@ C     COULOMB LOOP (FF|OO)
       ints(i,j) = work((j-1)*NBasis+i)
       EndDo
       EndDo
-C 
+C
       k = kk
       l = ll
 C
@@ -3111,6 +3405,108 @@ C
       Deallocate(RDM2val)
 C
       end subroutine TwoEneChck
+
+      subroutine TwoEneChckChol(ETwo,RDM2Act,Occ,INActive,NAct,NBasis)
+C
+C     calculate 2-electron energy using Cholesky vectors
+C     maybe better to have MatOO and save on the transformation?
+C
+      Implicit Real*8 (A-H,O-Z)
+C
+      Include 'commons.inc'
+C
+      Parameter(Zero=0.D0,Half=0.5D0,One=1.D0,Two=2.D0)
+C
+      Integer INActive,NAct,NBasis
+      Double Precision ETwo
+      Dimension Occ(NBasis),RDM2Act(NAct**2*(NAct**2+1)/2)
+C
+C     LOCAL ARRAYS
+C
+      Integer iloop,nloop,off
+      Integer dimFO,iBatch,BatchSize
+      Integer Ind(NBasis)
+      Double Precision, Allocatable :: RDM2val(:,:,:,:),
+     $                                 work1(:,:),work2(:,:),
+     $                                 ints(:,:),MatFF(:,:)
+      Parameter(MaxBatchSize = 100)
+C
+c     SET FILES
+      Open(newunit=iunit,file='cholvecs',form='unformatted')
+      Read(iunit) NCholesky
+      Allocate(MatFF(NCholesky,NBasis**2))
+      Read(iunit) MatFF
+      Close(iunit)
+C
+C     SET DIMENSIONS
+      NOccup=NAct+INActive
+      Ind=0
+      Do I=1,NAct
+      Ind(INActive+I)=I
+      EndDo
+C
+      Allocate(ints(NBasis,NBasis))
+      Allocate(RDM2val(NOccup,NOccup,NOccup,NOccup))
+C
+      Do L=1,NOccup
+      Do K=1,NOccup
+      Do J=1,NOccup
+      Do I=1,NOccup
+      RDM2val(I,J,K,L) = FRDM2(I,K,J,L,RDM2Act,Occ,Ind,NAct,NBasis)
+      EndDo
+      EndDo
+      EndDo
+      EndDo
+C
+      dimFO = NBasis*NOccup
+      nloop = (dimFO - 1) / MaxBatchSize + 1
+C
+      Allocate(work1(dimFO,MaxBatchSize))
+C
+      ETwo=0
+C     EXCHANGE LOOP (FO|FO), use only (OO|OO)
+      off = 0
+      k   = 0
+      l   = 1
+      Do iloop=1,nloop
+
+      ! batch size for each iloop; last one is smaller
+      BatchSize = min(MaxBatchSize,dimFO-off)
+C
+      ! assemble (FO|BatchSize) batch from CholVecs
+      Call dgemm('T','N',dimFO,BatchSize,NCholesky,1d0,
+     $           MatFF,NCholesky,MatFF(:,off+1:BatchSize),NCholesky,
+     $           0d0,work1,dimFO)
+C
+      Do iBatch=1,BatchSize
+
+      k = k + 1
+      if(k>NBasis) then
+         k = 1
+         l = l + 1
+      endif
+
+      do j=1,NOccup
+         do i=1,NBasis
+            ints(i,j) = work1((j-1)*NBasis+i,iBatch)
+         enddo
+      enddo
+C
+      if(k>NOccup) cycle
+C
+       ETwo = ETwo + sum(RDM2val(:,:,k,l)*ints(1:NOccup,1:NOccup))
+C
+      EndDo
+C
+      off = off + MaxBatchSize
+C
+      EndDo
+C
+      Deallocate(ints,MatFF)
+      Deallocate(work1)
+      Deallocate(RDM2val)
+C
+      end subroutine TwoEneChckChol
 
       subroutine TwoEneGVBChck(ETwo,Occ,NOccup,NBasis)
       Implicit Real*8 (A-H,O-Z)
@@ -3150,7 +3546,7 @@ C
       Open(newunit=iunit,file=IntJFile,status='OLD',
      $     access='DIRECT',recl=8*NBasis**2)
 C
-      ETwo=0    
+      ETwo=0
 C     COULOMB LOOP (FF|OO)
       kl=0
       Do ll=1,NOccup
@@ -3179,10 +3575,10 @@ C
       Deallocate(RDM2val)
 C
       end subroutine TwoEneGVBChck
-      
+
       subroutine TwoEHartree(EnH,RDM2Act,Occ,INActive,NAct,NBasis)
       Implicit Real*8 (A-H,O-Z)
-C       
+C
       Include 'commons.inc'
 C
       Parameter(Zero=0.D0,Half=0.5D0,One=1.D0,Two=2.D0)
@@ -3228,7 +3624,7 @@ C
       Open(newunit=iunit,file=IntJFile,status='OLD',
      $     access='DIRECT',recl=8*NBasis**2)
 
-C     GET E_HARTREE     
+C     GET E_HARTREE
       EnH=0
 C
       kl=0
@@ -3242,7 +3638,7 @@ C
       ints(i,j) = work((j-1)*NBasis+i)
       EndDo
       EndDo
-C 
+C
       k = kk
       l = ll
 C
@@ -3263,7 +3659,72 @@ C
 C
       end subroutine TwoEHartree
 
-*Deck SortOrbDal 
+*Deck BasInfo
+      Subroutine basinfo(nbasis,basfile,intf)
+C
+C     Purpose: read NBasis from Dalton/Molpro
+C
+      use print_units
+      use read_external
+      use trexio
+C
+      implicit none
+
+      character(*),intent(in) :: basfile,intf
+      integer,intent(out) :: nbasis
+
+      integer    :: iunit
+      integer(8) :: f
+      integer :: rc
+      integer :: nsym,nbas(8),norb(8),nrhf(8),ioprhf
+      logical :: ex
+
+      inquire(file=basfile,EXIST=ex)
+
+      if(ex) then
+         open(newunit=iunit,file=basfile,status='OLD',
+     $        access='SEQUENTIAL',form='UNFORMATTED')
+
+         if(trim(intf)=='DALTON') then
+
+            call readlabel(iunit,'BASINFO ')
+            read (iunit) nsym,nbas,norb,nrhf,ioprhf
+            nbasis = sum(nbas(1:nsym))
+
+            close(iunit)
+
+         elseif(trim(intf)=='MOLPRO') then
+
+            read(iunit)
+            read(iunit) nsym,nbas(1:nsym)
+            nbasis = sum(nbas(1:nsym))
+
+            close(iunit)
+
+         elseif(trim(intf)=='TREXIO') then
+
+            f = trexio_open (basfile, 'r', TREXIO_HDF5, rc)
+            rc = trexio_read_mo_num(f, nbasis)
+
+            if (rc /= TREXIO_SUCCESS) then
+              write(lout,'(1x,a)') 'NBasis empty in TREXIO!'
+              stop 'Error reading MO num'
+            end if
+
+            rc = trexio_close(f)
+
+         endif
+
+      else
+
+         write(LOUT,'(1x,a)') 'WARNING: '// basfile //' NOT FOUND!'
+         write(LOUT,'(1x,a)') 'TRYING TO READ NBasis FROM INPUT!'
+
+      endif
+
+      End Subroutine BasInfo
+
+*Deck SortOrbDal
       Subroutine SortOrbDal(URe1,Occ2,NNIn,NNAct,NSym,IOrbSym,NBasis)
 C     sorts the orbitals in URe1 so that the
 C     inactive orbitals go first, then active, and secondary orbitals
@@ -3275,17 +3736,29 @@ C
       Dimension IOrbSym(8),IActOrb(NBasis),InActOrb(NBasis)
       Dimension LabelAct(NBasis),LabelIAct(NBasis),
      $ ICpy1(NBasis),ICpy2(NBasis)
+      Logical FileOcc,FileSIRIFC
 C
       Occ2(1:NBasis)=0.0
       Occ1(1:NBasis)=0.0
 C
-      Open(10,File="occupations.dat",Form='Formatted',Status='Old')
-      Read(10,*)NNIn,NNAct
-      NNIn=NNIn/2
-      Read(10,*)(Occ1(I),I=1,NNAct+NNIn)
-      Read(10,*) (IActOrb(I),I=1,NSym)
-      Read(10,*) (InActOrb(I),I=1,NSym)
-      Close(10)
+      Inquire(file="occupations.dat",EXIST=FileOcc)
+      Inquire(file="SIRIFC",EXIST=FileSIRIFC)
+      If (FileOcc) Then
+C        read occupations from Dalton output...
+         Open(10,File="occupations.dat",Form='Formatted',Status='Old')
+         Read(10,*)NNIn,NNAct
+         NNIn=NNIn/2
+         Read(10,*) (Occ1(I),I=1,NNAct+NNIn)
+         Read(10,*) (IActOrb(I),I=1,NSym)
+         Read(10,*) (InActOrb(I),I=1,NSym)
+         Close(10)
+      ElseIf(FileSIRIFC) Then
+C        read 1rdm from SIRIFC file...
+         Call read_1rdm_dalton(Occ1,IActOrb,InActOrb,NNIn,NNAct,NBasis)
+      Else
+         Write(6,'(1x,a)') 'Occupation numbers from Dalton not found!'
+         Stop
+      EndIf ! FileOcc
 C
       II=0
       Do I=1,NSym
@@ -3375,5 +3848,165 @@ C
       EndDo
 C
       Return
+      End
+
+      Subroutine read_1rdm_dalton(Occ,IActOrb,InActOrb,
+     $                             NNIn,NNAct,NBasis)
+C
+C     Purpose: read 1RDM from from Daton together with
+C              the number of inactive and active orbitals in each irrep
+C
+C     Dalton naming convention
+C     NASHT  -- no of active orbitals
+C     NISHT  -- no of inactive orbitals
+C     NNASHX -- triang of active orbitals
+C     DV(1:NNASHX) - triangular 1RDM
+C
+      use tran
+      implicit none
+
+      integer,intent(in)  :: NBasis
+      integer,intent(out) :: NNIn,NNAct
+      integer,intent(out) :: IActOrb(NBasis),InActOrb(NBasis)
+      double precision,intent(out) :: Occ(NBasis)
+
+      integer :: isirifc
+      integer :: NISHT,NASHT,NNASHX,NSYM
+      integer :: MULD2H(8,8),NISH(8),NASH(8)
+      integer :: N2ASHX,DUMMY,NDUM(8),HlpDim
+      integer :: I
+      double precision :: DV(1:NBasis**2)
+      double precision,allocatable :: OneAct(:,:),EigAct(:)
+      double precision,allocatable :: work(:)
+
+      DV = 0d0
+
+      ! read 1RDM in active orbs from SIRIFC file
+      open(newunit=isirifc,file='SIRIFC',status='OLD',
+     &     access='SEQUENTIAL',form='UNFORMATTED')
+      read(isirifc)
+      read(isirifc)
+      read(isirifc) NISHT,NASHT,DUMMY,DUMMY,DUMMY,DUMMY,DUMMY,DUMMY,
+     &              DUMMY,DUMMY,NNASHX,DUMMY,DUMMY,DUMMY,
+     &              NSYM,MULD2H,NDUM,NDUM,
+     &              NISH,NASH
+
+      read(isirifc)
+      read(isirifc)
+      read(isirifc) DV(1:NNASHX) ! how to correctly read DS?
+
+C      print*, 'DV',DV(1:NNASHX)
+      close(isirifc)
+
+      allocate(EigAct(NASHT))
+c      print*, 'Active occ numbers'
+      Do I=1,NASHT
+         EigAct(I) = DV((I-1)*I/2+I)
+C        print*, I,EigAct(i)
+      EndDo
+
+C     test if DV diagonal
+      If (abs(norm2(EigAct)-norm2(DV)).gt.1D-8) Then
+
+         write(LOUT,'(1x,a)') "Diagonalize DV from Dalton..."
+         N2ASHX = NASHT*NASHT
+         HlpDim = max(N2ASHX,3*NASHT)
+         allocate(OneAct(NASHT,NASHT),work(HlpDim))
+         EigAct = 0
+         Call triang_to_sq2(DV,OneAct,NASHT)
+         Call Diag8(OneAct,NASHT,NASHT,EigAct,work)
+
+         deallocate(OneAct,work)
+
+      End If
+
+C     transfer to GammCor variables
+      NNIn  = NISHT
+      NNAct = NASHT
+      IActOrb(1:NSym)  = NASH(1:NSYM)
+      InActOrb(1:NSym) = NISH(1:NSYM)
+      Occ = 0d0
+      Occ(1:NISHT) = 2d0
+      Occ(NISHT+1:NISHT+NASHT) = EigAct(1:NASHT)
+
+      End
+
+      Subroutine ReadCGemDal(CICoef,NELE,INActive,NActive,NBasis)
+C
+C     Purpose: read geminal coefficients either from Dalton output (coeff.dat)
+C              or SIRIFC file
+C
+      implicit none
+C
+      integer,intent(in)  :: NELE,NBasis
+      integer,intent(out) :: INActive,NActive
+      double precision,intent(out) :: CICoef(NBasis)
+C
+      integer :: i
+      logical :: FileCoeff, FileSIRIFC
+
+      Inquire(file="coeff.dat", EXIST=FileCoeff)
+      Inquire(file="SIRIFC",EXIST=FileSIRIFC)
+C
+      If (FileCoeff) Then
+C        read coefficients from Dalton output...
+         CICoef(1:NBasis)=0.D0
+         Open(10,File='coeff.dat',Form='Formatted',Status='Old')
+         Read(10,*) NActive
+         INActive=NELE-NActive
+         Do I=1,INActive
+         CICoef(I)=1.D0
+         EndDo
+         Read(10,*) (CICoef(I+INActive),I=1,2*NActive)
+         Close(10)
+      ElseIf(FileSIRIFC) Then
+C        read coefficients from Dalton SIRIFC file...
+         call read_CGEM_dalton(CICoef,INActive,NActive,NBasis)
+      Else
+         Write(6,'(1x,a)') 'Geminal coefficients from Dalton not found!'
+         Stop
+      EndIf
+C
+      End
+
+      Subroutine read_CGEM_dalton(CICoef,INActive,NActive,NBasis)
+C
+C     Purpose: read geminal coefficients from Dalton SIRIFC file
+C              set the number of (in)active geminals
+C
+      use read_external
+      implicit none
+
+      integer,intent(in)  :: NBasis
+      integer,intent(out) :: INActive,NActive
+      double precision,intent(out) :: CICoef(NBasis)
+C
+      integer :: isirifc
+      integer :: NGEM,NISHT_G,NASHT_G
+      double precision :: CGEM(NBasis)
+
+      CGEM(1:NBasis) = 0.D0
+      CICoef(1:NBasis)=0.D0
+
+      open(newunit=isirifc,file='SIRIFC',status='OLD',
+     &     access='SEQUENTIAL',form='UNFORMATTED')
+
+      call readlabel(isirifc,'CI+APSG ')
+      read(isirifc) NGEM,NISHT_G,NASHT_G
+      read(isirifc) CGEM(1:NASHT_G)
+
+C     print*, 'NGEM',   NGEM
+C     print*, 'NISHT_G',NISHT_G
+C     print*, 'NASHT_G',NASHT_G
+      close(isirifc)
+
+      ! set no of (in)active geminals
+      INActive = NISHT_G
+      NActive  = NASHT_G / 2
+
+      CICoef(1:INActive) = 1.d0
+      CICoef(INActive+1:INActive+NASHT_G) = CGEM(1:NASHT_G)
+      ! print*,'CICoef-1',CICOef(1:NBasis)
+
       End
 

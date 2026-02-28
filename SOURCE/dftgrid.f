@@ -48,7 +48,6 @@ C     HAP: VHSR is computed in AO during canonicalization
 C
       Call tran_matTr(VCoul,UNOAO,UNOAO,NBasis,Transp)
       VHSR = VCoul
-C      Print*, 'VHSR-MY',norm2(VHSR)
 C     Old:
 C      Call PotHSR(VHSR,Occ,URe,TwoEl,TwoElErf,NInte1,NInte2,NBasis)
 C      Print*,'VHSR-Ka', norm2(VHSR)

@@ -1,14 +1,18 @@
 *Deck ACCAS
       Subroutine ACCAS(ETot,ENuc,TwoNO,URe,UNOAO,Occ,XOne,
-     $  Title,NBasis,NInte1,NInte2,NGem,System)
+     $  Title,NBasis,NInte1,NInte2,NGem)
 C
-      use types
+c     use types
+      use print_units
+      use timing
+      use abfofo
+C
 C     A ROUTINE FOR COMPUTING ELECTRONIC ENERGY USING ERPA TRANSITION
 C     DENSITY MATRIX ELEMENTS
 C
       Implicit Real*8 (A-H,O-Z)
 C
-      Character*60 FMultTab,Title
+      Character*60 Title
       Include 'commons.inc'
 c
       Parameter(Zero=0.D0,Half=0.5D0,One=1.D0,Two=2.D0)
@@ -23,7 +27,11 @@ C
      $ IndX(NBasis*(NBasis-1)/2),IndN(2,NBasis*(NBasis-1)/2),
      $ IndAux(NBasis),IPair(NBasis,NBasis)
 C
-      type(SystemBlock) :: System
+      Double Precision  :: Tcpu,Twall
+C
+C     START TIMING FOR AC PROCEDURES
+C
+      call clock('START',Tcpu,Twall)
 C
 C     CONSTRUCT LOOK-UP TABLES
 C
@@ -55,6 +63,9 @@ C
       Write(LOUT,'(2x,a,2e15.5)') 'Threshold for quasi-virtual orbital',
      $ ThrQVirt
 
+      Write(LOUT,'(2x,a,2e14.5)')'Threshold for quasi-inactive orbital',
+     $ ThrQInact
+
       IJ=0
       Ind=0
       Do I=1,NBasis
@@ -76,7 +87,7 @@ C     If IFlCore=0 do not include core (inactive) orbitals
       If((IFlCore.Eq.1).Or.
      $ (IFlCore.Eq.0.And.Occ(I).Ne.One.And.Occ(J).Ne.One)) Then
 C
-      If(Abs(Occ(i)+Occ(j)-Two).Gt.1.D-10.And.
+      If(Abs(Occ(i)+Occ(j)-Two).Gt.ThrQInact.And.
      $   Abs(Occ(i)+Occ(j)).Gt.ThrQVirt) Then
       Ind=Ind+1
       IndX(Ind)=Ind
@@ -102,8 +113,47 @@ C
       Do I=1,Ind
       Ind1=IndN(1,I)
       Ind2=IndN(2,I)
-      Write(6,'(2X,3I5,2E14.4)')I,Ind1,Ind2,Occ(Ind1),Occ(Ind2)
+      Write(6,'(2X,I8,2I5,2E14.4)')I,Ind1,Ind2,Occ(Ind1),Occ(Ind2)
       EndDo
+C
+      If(IFlRESPONSE.Eq.1) Then
+C
+      Write(6,'(/,X,''Polarizability tensor calculation for Om ''
+     $ ,F8.4)') Om
+C
+      If(Max_Cn.Eq.-1) Then
+      Call Polariz(FreqOm,UNOAO,XOne,URe,Occ,
+     $   IGem,NAcCAS,NInAcCAS,NELE,NBasis,NInte1,NGem,IndAux,
+     $   IndN,IndX,NDimX,ICholesky)
+      Else
+      Write(6,'(/,X,''Expand C(Om) maximally up to order '',I4)') Max_Cn
+      Call PolarizAl(FreqOm,UNOAO,XOne,URe,Occ,
+     $   IGem,NAcCAS,NInAcCAS,NELE,NBasis,NInte1,NGem,IndAux,
+     $   IndN,IndX,NDimX,ICholesky,Max_Cn)
+      EndIf
+C
+      Return
+      EndIf
+C
+C     COMPUTE RESPONSE RDMs FROM AC0-CAS DERIVATIVE-LIKE EXPRESSION 
+C
+      If (IRedVirt.Eq.1) Then
+C
+      If(ITwoEl.eq.3) Then
+C
+      Call RDMResp_FOFO(Occ,URe,UNOAO,XOne,IndN,IndX,IndAux,IGem,
+     $                  NAcCAS,NInAcCAS,NDimX,NDim,NBasis,NInte1,
+     $                  'FFOO','FOFO')
+C
+      Else
+C
+      Write(6,'(/,X,
+     $ ''Response RDM is available only with FOFO integrals '')') 
+      Stop  
+C
+      EndIf
+C
+      EndIf
 C
       If(IFunSR.Eq.0) Then 
 C
@@ -114,10 +164,22 @@ C
       Call RunACDEXIT(ETot,ENuc,TwoNO,URe,UNOAO,Occ,XOne,
      $  IndAux,IPair,IndN,IndX,NDimX,Title,NBasis,NInte1,NInte2,NGem)
 C
+      call clock('ACD model',Tcpu,Twall)
+
       Else
 C
+      If(IFlACFREQ.Eq.1.Or.IFlACFREQNTH.Eq.1.
+     $ Or.IFlAC1FREQNTH.Eq.1) Then
+      Call ACIter(ETot,ENuc,TwoNO,URe,Occ,XOne,UNOAO,
+     $ IndAux,NBasis,NInte1,NInte2,NDimX,NGem,
+     $ IndN,IndX,NDimX)
+      Return
+      Else
       Call RunACCAS(ETot,ENuc,TwoNO,URe,UNOAO,Occ,XOne,
      $  IndAux,IPair,IndN,IndX,NDimX,Title,NBasis,NInte1,NInte2,NGem)
+      EndIf
+
+      call clock('AC  model',Tcpu,Twall)
 C
       EndIf
 C
@@ -131,6 +193,8 @@ C
       Call RunACCASLR(ETot,ENuc,TwoNO,URe,UNOAO,Occ,XOne,
      $  IndAux,IPair,IndN,IndX,NDimX,Title,NBasis,NInte1,NInte2,NGem)
 C
+      call clock('ACLR model',Tcpu,Twall)
+
       EndIf
 C
       Return
@@ -141,10 +205,11 @@ C
      $  IndAux,IPair,IndN,IndX,NDimX,Title,NBasis,NInte1,NInte2,NGem)
 C
       use abfofo
+      use ab0fofo
 C
       Implicit Real*8 (A-H,O-Z)
 C
-      Character*60 FMultTab,Title
+      Character*60 Title
       Include 'commons.inc'
 C
       Parameter(Zero=0.D0,Half=0.5D0,One=1.D0,Two=2.D0)
@@ -160,8 +225,6 @@ C
      $ ABPLUS(NDimX*NDimX),ABMIN(NDimX*NDimX),
      $ EigVecR(NDimX*NDimX),Eig(NDimX),
      $ ECorrG(NGem), EGOne(NGem)
-c herer!!! delete after tests
-c     $ ,EigX(NDimX*NDimX)
 C
 C     IFlAC   = 1 - adiabatic connection formula calculation
 C               0 - AC not used
@@ -184,27 +247,24 @@ C
       EndIf
 C
 C     CALL AC If IFlAC=1 OR IFlSnd=1
-C
+C  
       If(IFlAC.Eq.1.Or.IFlSnd.Eq.1) Then
       NGOcc=0
-
-      If(IFlACFREQ.Eq.0) Then
       Call ACECORR(ETot,ENuc,TwoNO,URe,Occ,XOne,UNOAO,
      $ IndAux,ABPLUS,ABMIN,EigVecR,Eig,EGOne,
      $ Title,NBasis,NInte1,NInte2,NDimX,NGOcc,NGem,
      $ IndN,IndX,NDimX)
-      ElseIf(IFlACFREQ.Eq.1) Then
-      Call ACIter(ETot,ENuc,TwoNO,URe,Occ,XOne,UNOAO,
-     $ IndAux,ABPLUS,ABMIN,EigVecR,Eig,EGOne,
-     $ Title,NBasis,NInte1,NInte2,NDimX,NGOcc,NGem,
-     $ IndN,IndX,NDimX)
-      EndIf
 c 
 c exact AC
 c      NoEig=1
 c      NDimFull=NBasis*(NBasis-1)/2
 c      Call ACPINO(ENuc,TwoNO,Occ,XOne,
 c     $ NBasis,NInte1,NInte2,NDimFull,NGem,NoEig) 
+
+c AC with varying Alpha-dependent RDMs
+c      NDimFull=NBasis*(NBasis-1)/2
+c      Call ACRDM(ETot,ENuc,TwoNO,Occ,XOne,
+c     $ UNOAO,IndN,IndX,IndAux,NDimX,NBasis,NInte1,NInte2,NDimFull,NGem) 
       
       Return
       EndIf
@@ -223,7 +283,7 @@ C
       If(ITwoEl.Eq.3) Then
       Call AB_CAS_FOFO(ABPLUS,ABMIN,ECASSCF,URe,Occ,XOne,
      $ IndN,IndX,IGem,NAcCAS,NInAcCAS,NDimX,NBasis,NDimX,
-     $ NInte1,'FFOO','FOFO',ACAlpha,.false.)
+     $ NInte1,'FFOO','FOFO',ICholesky,ACAlpha,.false.)
 C
       ElseIf(ITwoEl.Eq.1) Then
       Call AB_CAS(ABPLUS,ABMIN,ECASSCF,URe,Occ,XOne,TwoNO,IPair,
@@ -272,7 +332,7 @@ C
       If(ITwoEl.Eq.3) Then
       Call ACEneERPA_FOFO(ECorr,EigVecR,Eig,Occ,
      $ IGem,IndN,IndX,NAcCAS+NInAcCAS,
-     $ NDimX,NBasis,'FOFO')
+     $ NDimX,NBasis,'FOFO',ICholesky)
 C
       ElseIf(ITwoEl.Eq.1) Then
       Call ACEneERPA(ECorr,EigVecR,Eig,TwoNO,URe,Occ,XOne,
@@ -292,12 +352,13 @@ C
      $  IndAux,IPair,IndN,IndX,NDimX,Title,NBasis,NInte1,NInte2,NGem)
 C
 c      use abmat
-      use types
       use abfofo
+      use ab0fofo
+      use read_external
 C
       Implicit Real*8 (A-H,O-Z)
 C
-      Character*60 FMultTab,Title
+      Character*60 Title
       CHARACTER(100) :: num1char
       Character*32 Str 
 C
@@ -324,10 +385,10 @@ C
 C     Symmetry of NO's
 C
       Call read_sym_molpro(NSymAO,MxSym,NumOSym,
-     $ 'MOLPRO.MOPUN','CASORB  ',NBasis)
+     $                    'MOLPRO.MOPUN','CASORB  ',NBasis)
 C 
-      Call sym_inf('2RDM',NumOSym,NSym,NumStSym,IStSy,
-     $ NStSym,NSymAO,NBasis) 
+      Call sym_inf_molpro('2RDM',NumOSym,NSym,NumStSym,IStSy,
+     $                    NStSym,NSymAO,NBasis)
 C     number of irreps
       write(*,*)'NSym',NSym
 C     number of atomic orbitals in each irrep 
@@ -431,7 +492,7 @@ C
      $ 'XY0',UNOAO,
      $ IndN,IndX,IGem,NAcCAS,NInAcCAS,NDimX,
      $ NBasis,NDimX,NInte1,NoSt,'EMPTY','FFOO',
-     $ 'FOFO',ETot,IFlAC0DP) 
+     $ 'FOFO',ICholesky,ETot,IFlAC0DP)
 C
       EndIf
 C
@@ -515,7 +576,7 @@ C
      $ 'XY0',UNOAO,
      $ IndN,IndX,IGem,NAcCAS,NInAcCAS,NDimX,
      $ NBasis,NDimX,NInte1,NoSt,'EMPTY','FFOO',
-     $ 'FOFO',ETot,ECorr)
+     $ 'FOFO',ICholesky,ETot,ECorr)
 C
 C     ITwoEl
       EndIf
@@ -552,15 +613,16 @@ C
       Subroutine RunACCASLR(ETot,ENuc,TwoNO,URe,UNOAO,Occ,XOne,
      $  IndAux,IPair,IndN,IndX,NDimX,Title,NBasis,NInte1,NInte2,NGem)
 C
-      use types
       use sorter
       use abmat
       use abfofo
+      use ab0fofo
+      use read_external
       use timing
 C
       Implicit Real*8 (A-H,O-Z)
 C
-      Character*60 FMultTab,Title
+      Character*60 Title
       Include 'commons.inc'
 C
       Character*60 FName
@@ -646,7 +708,7 @@ C      NumOSym(I)=X
 C      EndDo
 C      Close(10)
 C     HAP
-      Call create_ind('2RDM',NumOSym,IndInt,NSym,NBasis)
+      Call create_ind_molpro('2RDM',NumOSym,IndInt,NSym,NBasis)
       MxSym=NSym
 C
       NSymNO(1:NBasis)=0
@@ -697,7 +759,7 @@ C
       EndIf
       FName(K:K+10)='.reg.integ'
 C      Call Int2_AO(TwoEl2,NumOSym,MultpC,FName,NInte1,NInte2,NBasis)
-      Call readtwoint(NBasis,2,'AOTWOINT.mol','AOTWOSORT')
+      Call readtwoint(NBasis,2,'AOTWOINT.mol','AOTWOSORT',134*1024_8**2)
       If(ITwoEl.Eq.1) Call LoadSaptTwoEl(3,TwoEl2,NBasis,NInte2)
 C
       If(ITwoEl.Eq.1) Then
@@ -829,7 +891,7 @@ C
      $ 'PROP0','PROP1','XY0',
      $ IndN,IndX,IGem,NAcCAS,NInAcCAS,
      $ NGrid,NDimX,NBasis,NDimX,NInte1,NoSt,
-     $ 'FOFO','FFOOERF','FOFOERF',0,IFunSRKer,ECASSCF,ECorr)
+     $ 'FOFO','FFOOERF','FOFOERF',ICholesky,0,IFunSRKer,ECASSCF,ECorr)
 C
       ElseIf(ITWoEl.Eq.1) Then
 C 
@@ -967,7 +1029,7 @@ C
       If(ITwoEl.Eq.3) Then
       Call AB_CAS_FOFO(ABPLUS,ABMIN,ECASSCF,URe,Occ,XOne,
      $ IndN,IndX,IGem,NAcCAS,NInAcCAS,NDimX,NBasis,NDimX,
-     $ NInte1,'FFOOERF','FOFOERF',ACAlpha,.false.)
+     $ NInte1,'FFOOERF','FOFOERF',ICholesky,ACAlpha,.false.)
 C
       ElseIf(ITwoEl.Eq.1) Then
       Call AB_CAS(ABPLUS,ABMIN,ECASSCF,URe,Occ,XOne,TwoNO,IPair,
@@ -1101,7 +1163,7 @@ C
       If(ITwoEl.Eq.3) Then
       Call ACEneERPA_FOFO(ECorr,EigVecR,Eig,Occ,
      $ IGem,IndN,IndX,NAcCAS+NInAcCAS,
-     $ NDimX,NBasis,'FOFOERF')
+     $ NDimX,NBasis,'FOFOERF',ICholesky)
 C
       ElseIf(ITwoEl.Eq.1) Then
       Call ACEneERPA(ECorr,EigVecR,Eig,TwoNO,URe,Occ,XOne,
@@ -2356,7 +2418,7 @@ C     doi: 10.1021/ct500483t
 C
       Implicit Real*8 (A-H,O-Z)
 C
-      Character*60 FMultTab,Title
+      Character*60 Title
       Include 'commons.inc'
 C
       Character*60 FName
@@ -2377,10 +2439,7 @@ C
 C
 C     LOCAL ARRAYS
 C
-      Dimension
-     $ ABPLUS(NDimX*NDimX),ABMIN(NDimX*NDimX),
-     $ EigVecR(NDimX*NDimX),Eig(NDimX),
-     $ ECorrG(NGem), EGOne(NGem)
+      Dimension ECorrG(NGem), EGOne(NGem)
 C
 C     READ 2RDM, COMPUTE THE ENERGY
 C

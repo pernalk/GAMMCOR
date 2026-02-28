@@ -1,0 +1,23 @@
+! input for SAPT-CAS with Dalton interface
+ 
+Calculation
+ JobTitle   Dalton / H2O-H2O
+ Interface  DALTON
+ JobType    SAPT
+ RDMType    CAS
+end
+
+System
+ Monomer A
+ NAtoms  3
+ ZNucl   10
+ Charge  0
+end
+
+System
+ Monomer B
+ NAtoms  3
+ ZNucl   10
+ Charge  0
+end
+

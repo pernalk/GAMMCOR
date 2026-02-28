@@ -1,0 +1,287 @@
+
+ INPUT 
+********************************************************************************
+ JOB TITLE:     TEST
+ INTERFACE:     DALTON  
+ JOB TYPE:      SAPT     
+ RDM TYPE:      CASSCF  
+ RDM SOURCE:    DALTON  
+
+ MONOMER:       A       
+ ZNUCL:         2
+ CHARGE:        0
+ NO. OF ATOMS:  1
+ NO. OF SYM. EQUIV. ATOMS:  1
+
+ MONOMER:       B       
+ ZNUCL:        10
+ CHARGE:        0
+ NO. OF ATOMS:  3
+ NO. OF SYM. EQUIV. ATOMS:  2
+
+
+ INPUT CHECK PASSED
+********************************************************************************
+
+ IDALTON         1
+ IRes            0
+ IAO             0
+ INO             0
+ NoSym           1
+ IGVB            0
+ IFun           13
+ IFunSR          0
+ IFunSRKer       0
+ IModG           1
+ NGOcc           0
+ ILoc            1
+ IFreeze         0
+ IAPSG           0
+ ISERPA          0
+ IA              1
+ ICASSCF         1
+ IDMRG           0
+ IFlAC           0
+ IFLSnd          0
+ IFlCore         1
+ IFlFrag         0
+ IFl12           1
+ ISAPT           1
+
+ SYSTEM 
+********************************************************************************
+ MONOMER A
+ NUCLEAR CHARGE:   2
+ CHARGE:           0
+ NO.OF ATOMS:      1
+ THRESH ACTIVE:      0.9920
+
+ MONOMER B
+ NUCLEAR CHARGE:  10
+ CHARGE:           0
+ NO.OF ATOMS:      3
+ THRESH ACTIVE:      0.9920
+ PRINT LEVEL:      1
+
+ IFlFrag1           0
+
+ IFunSR=0
+
+ IFunSRKer=0
+
+
+ STARTING SAPT CALCULATIONS
+********************************************************************************
+ One-electron integrals written to file: ONEEL_A
+ One-electron integrals written to file: ONEEL_B
+
+ Occupancies for monomer 1 read from SIRIUS_A.RST
+ Occupancies for monomer 2 read from SIRIUS_B.RST
+
+ CAS ORBITALS           Monomer A     Monomer B
+ INACTIVE                   0             3
+ ACTIVE                     2             4
+
+ ORBITAL OCCUPANCIES
+ CASSCF   Occupancy-A    Gem-A          Occupancy-B      Gem-B
+   1     0.995633E+00      1           0.100000E+01        1
+   2     0.436656E-02      1           0.100000E+01        1
+   3     0.000000E+00      2           0.100000E+01        1
+   4     0.000000E+00      2           0.990052E+00        2
+   5     0.000000E+00      2           0.103334E-01        2
+   6     0.000000E+00      2           0.989400E+00        2
+   7     0.000000E+00      2           0.102147E-01        2
+   8     0.000000E+00      2           0.000000E+00        3
+   9     0.000000E+00      2           0.000000E+00        3
+  10     0.000000E+00      2           0.000000E+00        3
+  11     0.000000E+00      2           0.000000E+00        3
+  12     0.000000E+00      2           0.000000E+00        3
+  13     0.000000E+00      2           0.000000E+00        3
+  14     0.000000E+00      2           0.000000E+00        3
+  15     0.000000E+00      2           0.000000E+00        3
+  16     0.000000E+00      2           0.000000E+00        3
+  17     0.000000E+00      2           0.000000E+00        3
+  18     0.000000E+00      2           0.000000E+00        3
+  19     0.000000E+00      2           0.000000E+00        3
+  20     0.000000E+00      2           0.000000E+00        3
+  21     0.000000E+00      2           0.000000E+00        3
+  22     0.000000E+00      2           0.000000E+00        3
+  23     0.000000E+00      2           0.000000E+00        3
+  24     0.000000E+00      2           0.000000E+00        3
+  25     0.000000E+00      2           0.000000E+00        3
+  26     0.000000E+00      2           0.000000E+00        3
+  27     0.000000E+00      2           0.000000E+00        3
+  28     0.000000E+00      2           0.000000E+00        3
+  29     0.000000E+00      2           0.000000E+00        3
+  SUM OF OCCUPANCIES:   1.0000                    5.0000
+
+ Orbitals read from SIRIUS_A.RST
+ Orbitals read from SIRIUS_B.RST
+
+ Dalton two-el. file initialized
+ Buffer size:   600, integers per index packet:     1, bits:     8, record lenght in INT*4:  1801
+
+ Monomer A
+  Active Orbital:    1    0.9956E+00
+  Active Orbital:    2    0.4367E-02
+ Threshold for active orbitals:     0.10000E-07
+ Warning! For single atom ThrSelAct should probably have larger value!
+
+ Monomer B
+  Active Orbital:    4    0.9901E+00
+  Active Orbital:    5    0.1033E-01
+  Active Orbital:    6    0.9894E+00
+  Active Orbital:    7    0.1021E-01
+ Threshold for active orbitals:     0.10000E-07
+
+                           Monomer A    Monomer B
+ Active orbital:    1    0.9956E+00
+ Active orbital:    2    0.4367E-02
+ Active orbital:    4                  0.9901E+00
+ Active orbital:    5                  0.1033E-01
+ Active orbital:    6                  0.9894E+00
+ Active orbital:    7                  0.1021E-01
+ ------------------------------------------------
+ Total Active:                 2           4
+
+                          Monomer A     Monomer B
+ Total number of pairs:      406           406
+ Reduced to:                 55           172
+
+ Transforming integrals for FFOOAA
+ Transforming integrals for FOFOAA
+ Transforming integrals for FFOOBB
+ Transforming integrals for FOFOBB
+
+ Active block of 2-RDM read from rdm2.dat
+ CASSCF Energy (w/o ENuc)         -2.87059057
+
+ ABPlus     61.45060201ABMin      60.04260335
+
+ Calculating reponse for the ground state
+ Solving symmetric eigenvalue equation...
+
+
+ ECASSCF+ENuc, Corr, ERPA-CASSCF          -2.87059057    -0.01700639    -2.88759695
+
+ Active block of 2-RDM read from rdm2.dat
+ ONE ELECTRON ENERGY:  -3.86178560904086     
+
+ CPU  time in ABPM(0)              is                0.001 s
+ Wall time in ABPM(0)              is                0.001 s
+
+ CPU  time in PACK                 is                0.000 s
+ Wall time in PACK                 is                0.000 s
+
+ CPU  time in UNPACK               is                0.000 s
+ Wall time in UNPACK               is                0.000 s
+
+ Active block of 2-RDM read from rdm2.dat
+ CASSCF Energy (w/o ENuc)         -2.87059057
+
+ CPU  time in ABPM(1)              is                0.000 s
+ Wall time in ABPM(1)              is                0.001 s
+
+ CPU  time in ABPM_TRAN(1)         is                0.001 s
+ Wall time in ABPM_TRAN(1)         is                0.000 s
+
+ CPU  time in ABPM_TRAN(2)         is                0.000 s
+ Wall time in ABPM_TRAN(2)         is                0.000 s
+
+ Active block of 2-RDM read from rdm2.dat
+ CASSCF Energy (w/o ENuc)        -85.40602286
+
+ ABPlus    118.08859579ABMin  491902.77664745
+
+ Calculating reponse for the ground state
+ Solving symmetric eigenvalue equation...
+
+
+ ECASSCF+ENuc, Corr, ERPA-CASSCF         -76.07717269    -0.14603323   -76.22320592
+
+ Active block of 2-RDM read from rdm2.dat
+ ONE ELECTRON ENERGY:  -123.341415230372     
+
+ CPU  time in ABPM(0)              is                0.003 s
+ Wall time in ABPM(0)              is                0.003 s
+
+ CPU  time in PACK                 is                0.001 s
+ Wall time in PACK                 is                0.000 s
+
+ CPU  time in UNPACK               is                0.000 s
+ Wall time in UNPACK               is                0.000 s
+
+ Active block of 2-RDM read from rdm2.dat
+ CASSCF Energy (w/o ENuc)        -85.40602286
+
+ CPU  time in ABPM(1)              is                0.003 s
+ Wall time in ABPM(1)              is                0.003 s
+
+ CPU  time in ABPM_TRAN(1)         is                0.001 s
+ Wall time in ABPM_TRAN(1)         is                0.001 s
+
+ CPU  time in ABPM_TRAN(2)         is                0.000 s
+ Wall time in ABPM_TRAN(2)         is                0.000 s
+ Transforming integrals for TWOMOAB
+
+ Transforming E2exch-ind integrals...
+ Transforming integrals for FOFOAABB
+ Transforming integrals for FFOOABAB
+ Transforming integrals for FOFOBBBA
+ Transforming integrals for FOFOAAAB
+ Transforming integrals for FOFOBBAB
+ Transforming integrals for FOFOAABA
+
+ Transforming E2exch-disp integrals...
+ Transforming integrals for FOFOABBA
+ Transforming integrals for FFOOABBB
+ Transforming integrals for FFOOBAAA
+ Transforming integrals for TMPOOAB
+
+ V_nn        =       8.77979094
+ Eelst       =    -149.01734142
+
+ Transforming integrals for TWOA3B
+ Transforming integrals for TWOB3A
+
+ ExchS2        =     437.86832074
+
+ Ind(B<--A)     =     -48.25045510
+ Ind(A<--B)     =    -132.53583408
+ E2ind          =    -180.78628918
+
+ Ind(B<--A,unc) =     -36.42618066
+ Ind(A<--B,unc) =    -104.87515892
+ E2ind(unc)     =    -141.30133958
+
+ E2disp      =     -27.44329677
+
+ E2disp(unc) =     -26.24752732
+ E2disp(sp) =      -29.66068147
+ E2disp(sc) =      -26.45400893
+
+ E2exch-ind(unc)  = 55.21299018
+
+ E2exch-ind  =      70.09813598
+
+ E2exch-disp(unc) =  0.69132109
+
+ E2exch-disp =       1.88919335
+
+****************************************
+ SAPT SUMMARY / milliHartree
+****************************************
+ SAPT level  = 2
+ E1elst      =    -149.01734142
+ E1exch(S2)  =     437.86832074
+ E2ind       =    -180.78628918
+ E2exch-ind  =      70.09813598
+ E2disp      =     -27.44329677
+ E2exch-disp =       1.88919335
+ Eint(SAPT2) =     152.60872271
+
+ SAPT: CHECK OUTPUT FOR 1 WARNINGS!
+********************************************************************************
+
+ CPU  time in SAPT                 is                0.203 s
+ Wall time in SAPT                 is                0.218 s

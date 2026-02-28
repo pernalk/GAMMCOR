@@ -4,8 +4,6 @@ C     WRITTEN BY REZA JAN/2021
 C
 C     COMPUTATION OF THE VV10 NONLOCAL CORRELATION
 C
-      use types
-C
       Implicit Real*8 (A-H,O-Z)
 C
       Parameter(Zero=0.D0, Half=0.5D0, One=1.D0, Two=2.D0, Four=4.D0)

@@ -1,6 +1,11 @@
 module tran
 !!! CAREFUL :: unsym procedures yet to be tested!!!
-use types,only: LOUT,EblockData
+
+!use types,only: EblockData
+use blocktypes
+use print_units
+use sorter
+
 implicit none
 
 contains
@@ -226,16 +231,19 @@ subroutine tran4_full(NBas,CA,CB,fname,srtfile)
 !!! ie. (NBas,n,C)
 implicit none
 
+type(AOReaderData) :: reader
+
 integer,intent(in) :: NBas
-!integer,intent(in) :: nA,nB,nC,nD
 ! CA(NBas*nA)
 double precision,intent(in) :: CA(*), CB(*)
-character(*) :: fname, srtfile
+
+character(*)      :: fname, srtfile
+logical           :: empty
 double precision, allocatable :: work1(:), work2(:), work3(:,:)
-integer :: iunit,iunit2,iunit3
-integer :: ntr,nloop
+integer           :: ntr,nloop
+integer           :: i,rs,ab
+integer           :: iunit,iunit2,iunit3
 integer,parameter :: cbuf=512
-integer :: i,rs,ab
 
  write(6,'()') 
 ! write(6,'(1x,a)') 'TRAN4_SYM_OUT_OF_CORE'
@@ -251,8 +259,9 @@ integer :: i,rs,ab
  allocate(work3(cbuf,ntr))
 
  !open(newunit=iunit,file='AOTWOSORT',status='OLD',&
- open(newunit=iunit,file=trim(srtfile),status='OLD',&
-      access='DIRECT',form='UNFORMATTED',recl=8*NBas*(NBas+1)/2)
+ !open(newunit=iunit,file=trim(srtfile),status='OLD',&
+ !     access='DIRECT',form='UNFORMATTED',recl=8*NBas*(NBas+1)/2)
+ call reader%open(trim(srtfile))
 
  ! half-transformed file
  open(newunit=iunit2,file='TMPMO',status='REPLACE',&
@@ -263,15 +272,20 @@ integer :: i,rs,ab
     ! loop over cbuf
     do rs=(i-1)*cbuf+1,min(i*cbuf,ntr)
 
-       read(iunit,rec=rs) work1(1:ntr)
-       call triang_to_sq(work1,work2,NBas)
-       ! work1=CA^T.work2
-       ! work2=work1.CB
-       call dgemm('T','N',NBas,NBas,NBas,1d0,CA,NBas,work2,NBas,0d0,work1,NBas) 
-       call dgemm('N','N',NBas,NBas,NBas,1d0,work1,NBas,CA,NBas,0d0,work2,NBas)
-       call sq_to_triang(work2,work1,NBas)
-       ! transpose
-       work3(rs-(i-1)*cbuf,1:ntr) = work1(1:ntr)
+       !read(iunit,rec=rs) work1(1:ntr)
+       call reader%getTR(rs,work1(1:ntr),empty)
+       if(empty) then
+          work3(rs-(i-1)*cbuf,1:ntr) = 0
+       else
+          call triang_to_sq(work1,work2,NBas)
+          ! work1=CA^T.work2
+          ! work2=work1.CB
+          call dgemm('T','N',NBas,NBas,NBas,1d0,CA,NBas,work2,NBas,0d0,work1,NBas)
+          call dgemm('N','N',NBas,NBas,NBas,1d0,work1,NBas,CA,NBas,0d0,work2,NBas)
+          call sq_to_triang(work2,work1,NBas)
+          ! transpose
+          work3(rs-(i-1)*cbuf,1:ntr) = work1(1:ntr)
+       endif
 
     enddo
 
@@ -281,7 +295,8 @@ integer :: i,rs,ab
 
  enddo
 
- close(iunit)
+ !close(iunit)
+ call reader%close
 
 ! |cd)
  open(newunit=iunit3,file=fname,status='REPLACE',&
@@ -318,6 +333,8 @@ subroutine tran4_gen(NBas,nA,CA,nB,CB,nC,CC,nD,CD,fname,srtfile)
 !!! ie. (NBas,n,C)
 implicit none
 
+type(AOReaderData) :: reader
+
 integer,intent(in) :: NBas
 integer,intent(in) :: nA,nB,nC,nD
 ! CA(NBas*nA)
@@ -328,6 +345,7 @@ integer :: iunit,iunit2,iunit3
 integer :: ntr,nAB,nCD,nloop
 integer,parameter :: cbuf=512
 integer :: i,rs,ab
+logical :: empty
 !  test
 integer :: l,k,kl
 
@@ -346,9 +364,10 @@ integer :: l,k,kl
  allocate(work1(NBas*NBas),work2(NBas*NBas))
  allocate(work3(cbuf,nAB))
 
- !open(newunit=iunit,file='AOTWOSORT',status='OLD',&
- open(newunit=iunit,file=trim(srtfile),status='OLD',&
-      access='DIRECT',form='UNFORMATTED',recl=8*ntr)
+ !!open(newunit=iunit,file='AOTWOSORT',status='OLD',&
+ !open(newunit=iunit,file=trim(srtfile),status='OLD',&
+ !     access='DIRECT',form='UNFORMATTED',recl=8*ntr)
+ call reader%open(trim(srtfile))
 
  ! half-transformed file
  open(newunit=iunit2,file='TMPMO',status='REPLACE',&
@@ -359,23 +378,33 @@ integer :: l,k,kl
     ! loop over cbuf
     do rs=(i-1)*cbuf+1,min(i*cbuf,ntr)
 
-       read(iunit,rec=rs) work1(1:ntr)
-       call triang_to_sq(work1,work2,NBas)
-       ! work1=CA^T.work2
-       ! work2=work1.CB
-       call dgemm('T','N',nA,NBas,NBas,1d0,CA,NBas,work2,NBas,0d0,work1,nA) 
-       call dgemm('N','N',nA,nB,NBas,1d0,work1,nA,CB,NBas,0d0,work2,nA)
-       ! transpose
-       work3(rs-(i-1)*cbuf,1:nAB) = work2(1:nAB)
-       !work1 = 0
-       !kl = 0 
-       !do l=1,nB
-       !do k=1,nA
-       !   kl = kl + 1
-       !   work1(kl) = work2((k-1)*NBas+l)
-       !enddo
-       !enddo
-       !work3(rs-(i-1)*cbuf,1:nAB) = work1(1:nAB)
+       work1 = 0
+       !read(iunit,rec=rs) work1(1:ntr)
+       call reader%getTR(rs,work1,empty)
+       if(empty) then
+
+          work3(rs-(i-1)*cbuf,1:nAB) = 0
+
+       else
+
+          call triang_to_sq(work1,work2,NBas)
+          ! work1=CA^T.work2
+          ! work2=work1.CB
+          call dgemm('T','N',nA,NBas,NBas,1d0,CA,NBas,work2,NBas,0d0,work1,nA) 
+          call dgemm('N','N',nA,nB,NBas,1d0,work1,nA,CB,NBas,0d0,work2,nA)
+          ! transpose
+          work3(rs-(i-1)*cbuf,1:nAB) = work2(1:nAB)
+          !work1 = 0
+          !kl = 0 
+          !do l=1,nB
+          !do k=1,nA
+          !   kl = kl + 1
+          !   work1(kl) = work2((k-1)*NBas+l)
+          !enddo
+          !enddo
+          !work3(rs-(i-1)*cbuf,1:nAB) = work1(1:nAB)
+
+       endif
 
     enddo
 
@@ -385,7 +414,8 @@ integer :: l,k,kl
 
  enddo
 
- close(iunit)
+! close(iunit)
+ call reader%close
 
 ! |cd)
  open(newunit=iunit3,file=fname,status='REPLACE',&
@@ -422,15 +452,16 @@ integer :: l,k,kl
 
 end subroutine tran4_gen
 
-
 subroutine new_tran4_gen(NBas,nA,CA,nB,CB,nC,CC,nD,CD, &
-                         fname,iunit_srt,thread_id)
+                         fname,reader,iunit_srt,thread_id)
 ! 4-index transformation out of core
 ! dumps all integrals on disk in the (square,square) form
 ! CAREFUL: C have to be in AOMO form!
 !!! CAREFUL: write to simpler form
 !!! ie. (NBas,n,C)
 implicit none
+
+type(AOReaderData) :: reader
 
 integer,intent(in) :: NBas
 integer,intent(in) :: nA,nB,nC,nD
@@ -442,12 +473,12 @@ integer, intent(in) :: iunit_srt
 integer, intent(in), optional:: thread_id
 ! tmp file
 character(len=80) :: tmpfile, thread_str
-
+logical           :: empty
 double precision, allocatable :: work1(:), work2(:), work3(:,:)
-integer :: iunit,iunit2,iunit3
-integer :: ntr,nAB,nCD,nloop
+integer           :: i,rs,ab
+integer           :: iunit,iunit2,iunit3
+integer           :: ntr,nAB,nCD,nloop
 integer,parameter :: cbuf=512
-integer :: i,rs,ab
 !  test
 integer :: l,k,kl
 
@@ -471,7 +502,7 @@ integer :: l,k,kl
  !     access='DIRECT',form='UNFORMATTED',recl=8*ntr)
  tmpfile = 'TMPMO'
  iunit2 = 75  !no reason for this particular value
- !print *, "DEBUG: ", thread_id 
+ !print *, "DEBUG: ", thread_id
  !print *, "DEBUG: unit", iunit2
  if (present(thread_id)) then
     write(thread_str, "(I0)") thread_id
@@ -480,7 +511,7 @@ integer :: l,k,kl
  end if
  !print *, "DEBUG: ", thread_id
  !print *, "DEBUG: before open ", tmpfile, "at", iunit2
- 
+
  ! half-transformed file
  open(iunit2,file=tmpfile,status='REPLACE',&
       access='DIRECT',form='UNFORMATTED',recl=8*cbuf)
@@ -491,24 +522,29 @@ integer :: l,k,kl
     ! loop over cbuf
     do rs=(i-1)*cbuf+1,min(i*cbuf,ntr)
       !$omp critical
-       read(iunit_srt,rec=rs) work1(1:ntr)
+       !read(iunit_srt,rec=rs) work1(1:ntr)
+       call reader%getTR(rs,work1,empty)
       !$omp end critical
-       call triang_to_sq(work1,work2,NBas)
-       ! work1=CA^T.work2
-       ! work2=work1.CB
-       call dgemm('T','N',nA,NBas,NBas,1d0,CA,NBas,work2,NBas,0d0,work1,nA) 
-       call dgemm('N','N',nA,nB,NBas,1d0,work1,nA,CB,NBas,0d0,work2,nA)
-       ! transpose
-       work3(rs-(i-1)*cbuf,1:nAB) = work2(1:nAB)
-       !work1 = 0
-       !kl = 0 
-       !do l=1,nB
-       !do k=1,nA
-       !   kl = kl + 1
-       !   work1(kl) = work2((k-1)*NBas+l)
-       !enddo
-       !enddo
-       !work3(rs-(i-1)*cbuf,1:nAB) = work1(1:nAB)
+       if(empty) then
+          work3(rs-(i-1)*cbuf,1:nAB) = 0
+       else
+          call triang_to_sq(work1,work2,NBas)
+          ! work1=CA^T.work2
+          ! work2=work1.CB
+          call dgemm('T','N',nA,NBas,NBas,1d0,CA,NBas,work2,NBas,0d0,work1,nA)
+          call dgemm('N','N',nA,nB,NBas,1d0,work1,nA,CB,NBas,0d0,work2,nA)
+          ! transpose
+          work3(rs-(i-1)*cbuf,1:nAB) = work2(1:nAB)
+          !work1 = 0
+          !kl = 0
+          !do l=1,nB
+          !do k=1,nA
+          !   kl = kl + 1
+          !   work1(kl) = work2((k-1)*NBas+l)
+          !enddo
+          !enddo
+          !work3(rs-(i-1)*cbuf,1:nAB) = work1(1:nAB)
+       endif
 
     enddo
 
@@ -537,7 +573,7 @@ integer :: l,k,kl
     call dgemm('N','N',nC,nD,NBas,1d0,work1,nC,CD,NBas,0d0,work2,nC)
     write(iunit3,rec=ab) work2(1:nCD)
     !work1 = 0
-    !kl = 0 
+    !kl = 0
     !do l=1,nD
     !do k=1,nC
     !   kl = kl + 1
@@ -554,26 +590,26 @@ integer :: l,k,kl
 
 end subroutine new_tran4_gen
 
-
-subroutine read4_gen(NBas,nA,CA,nB,CB,nC,CC,nD,CD,fname,srtfile)
-! reads 4-index ints from sorted file 
+subroutine read4_gen(NBas,nA,nB,nC,nD,fname,srtfile)
+!
+! reads 4-index ints from sorted file
 ! dumps all integrals on disk in the (square,square) form
 ! CAREFUL: C have to be in AOMO form!
-!!! CAREFUL: write to simpler form
-!!! ie. (NBas,n,C)
+!
 implicit none
+
+type(AOReaderData) :: reader
 
 integer,intent(in) :: NBas
 integer,intent(in) :: nA,nB,nC,nD
-! CA(NBas*nA)
-double precision,intent(in) :: CA(*), CB(*), CC(*), CD(*)
 character(*) :: fname,srtfile
 double precision, allocatable :: work1(:), work2(:)
 integer :: iunit,iunit2
 integer :: ntr,nAB,nCD
 integer :: ip,iq,ir,is,pq,rs
+logical :: empty
 
- write(6,'()') 
+ write(6,'()')
  write(6,'(1x,a)') 'Reading integrals for '//fname
 
  ntr = NBas*(NBas+1)/2
@@ -582,8 +618,9 @@ integer :: ip,iq,ir,is,pq,rs
 
  allocate(work1(NBas*NBas),work2(NBas*NBas))
 
- open(newunit=iunit,file=trim(srtfile),status='OLD',&
-      access='DIRECT',form='UNFORMATTED',recl=8*ntr)
+ !open(newunit=iunit,file=trim(srtfile),status='OLD',&
+ !     access='DIRECT',form='UNFORMATTED',recl=8*ntr)
+ call reader%open(trim(srtfile))
 
  open(newunit=iunit2,file=fname,status='REPLACE',&
      access='DIRECT',form='UNFORMATTED',recl=8*nCD)
@@ -593,16 +630,21 @@ integer :: ip,iq,ir,is,pq,rs
        pq=max(ip,iq)
        pq=min(ip,iq)+pq*(pq-1)/2
 
-       read(iunit,rec=pq) work1(1:ntr)
-       call triang_to_sq(work1,work2,NBas)
+       !read(iunit,rec=pq) work1(1:ntr)
+       call reader%getTR(pq,work1,empty)
+       if(empty) then
+          work1(1:nCD) = 0
+       else
+          call triang_to_sq(work1,work2,NBas)
 
-       rs = 0
-       do is=1,nD
-          do ir=1,nC
-             rs = rs + 1
-             work1(rs) = work2(ir+(is-1)*NBas)
+          rs = 0
+          do is=1,nD
+             do ir=1,nC
+                rs = rs + 1
+                work1(rs) = work2(ir+(is-1)*NBas)
+             enddo
           enddo
-       enddo
+       endif
 
        pq=ip+(iq-1)*nA
        write(iunit2,rec=pq) work1(1:nCD)
@@ -611,13 +653,14 @@ integer :: ip,iq,ir,is,pq,rs
  enddo
  
  close(iunit2)
- close(iunit)
+ !close(iunit)
+ call reader%close
 
  deallocate(work1,work2)
 
 end subroutine read4_gen
 
-subroutine abpm_tran(AMAT,AOUT,EBlock,EBlockIV,nblk,NDimX,isPl)
+subroutine ABPM_TRAN(AMAT,AOUT,EBlock,EBlockIV,nblk,NDimX,isPl)
 implicit none
 
 integer,intent(in) :: nblk,NDimX
@@ -726,9 +769,9 @@ associate(B => EblockIV)
 
 end associate
 
-end subroutine abpm_tran
+end subroutine ABPM_TRAN
 
-subroutine abpm_dgemv_gen(AMAT,AOUT,EBlock,EBlockIV,&
+subroutine ABPM_DGEMV_GEN(AMAT,AOUT,EBlock,EBlockIV,&
                          nblk,NDimX,xyvar)
 implicit none
 
@@ -799,9 +842,9 @@ associate(A => EblockIV)
   endif
 end associate
 
-end subroutine abpm_dgemv_gen
+end subroutine ABPM_DGEMV_GEN
 
-subroutine abpm_tran_gen(AMAT,AOUT,EBlockA,EBlockAIV,EBlockB,EBlockBIV,&
+subroutine ABPM_TRAN_GEN(AMAT,AOUT,EBlockA,EBlockAIV,EBlockB,EBlockBIV,&
                          nblkA,nblkB,ANDimX,BNDimX,xyvar)
 implicit none
 
@@ -1012,32 +1055,262 @@ associate(A => EblockAIV,&
 
 end associate
 
-end subroutine abpm_tran_gen
+end subroutine ABPM_TRAN_GEN
+
+subroutine ABPM_HALFTRAN_GEN_L(AMAT,AOUT,fact,EBlock,EBlockIV,nblk,DimL,DimR,xyvar)
+! AOUT = EBlock.AMAT
+implicit none
+
+integer,intent(in) :: nblk,DimL,DimR
+double precision,intent(in) :: fact
+character(*),intent(in) :: xyvar
+double precision,intent(in)    :: AMAT(DimL,DimR)
+double precision,intent(inout) :: AOUT(DimL,DimR)
+
+type(EBlockData),intent(in) :: EBlock(nblk),EBlockIV
+
+integer :: i,ii,ipos,iblk
+integer :: maxEBlockN
+double precision,allocatable :: ABP(:,:),ABM(:,:)
+
+AOUT = fact*AOUT
+
+maxEBlockN = maxval(EBlock%n)
+if(maxEBlockN > 1) allocate(ABP(maxEBlockN,DimR),ABM(maxEBlockN,DimR))
+
+select case(xyvar)
+case('Y','y')
+
+do iblk=1,nblk
+   associate(iB => Eblock(iblk))
+
+     if(iB%n==1) then
+
+        ipos = iB%pos(1)
+        AOUT(ipos,:) = iB%matY(1,1)*AMAT(ipos,:)
+
+     else
+
+        do i=1,iB%n
+           ipos = iB%pos(i)
+           ABP(i,:) = AMAT(ipos,:)
+        enddo
+
+        call dgemm('N','N',iB%n,DimR,iB%n,1d0,iB%matY,iB%n,ABP,maxEBlockN,0d0,ABM,maxEBlockN)
+
+        do i=1,iB%n
+           ipos = iB%pos(i)
+           AOUT(ipos,:) = ABM(i,:)
+        enddo
+
+     endif
+
+   end associate
+enddo
+
+case('X','x')
+
+do iblk=1,nblk
+   associate(iB => Eblock(iblk))
+
+     if(iB%n==1) then
+
+        ipos = iB%pos(1)
+        AOUT(ipos,:) = iB%matX(1,1)*AMAT(ipos,:)
+
+     else
+
+        do i=1,iB%n
+           ipos = iB%pos(i)
+           ABP(i,:) = AMAT(ipos,:)
+        enddo
+
+        call dgemm('N','N',iB%n,DimR,iB%n,1d0,iB%matX,iB%n,ABP,maxEBlockN,0d0,ABM,maxEBlockN)
+
+        do i=1,iB%n
+           ipos = iB%pos(i)
+           AOUT(ipos,:) = ABM(i,:)
+        enddo
+
+     endif
+
+   end associate
+enddo
+
+case default
+  write(lout,'(a)') 'Error in ABPM_HALFTRAN_LR!'
+  stop
+end select
+
+if(maxEBlockN > 1) deallocate(ABM,ABP)
+
+associate(B => EblockIV)
+
+  do i=1,B%n
+     !ipos = B%pos(i)
+     !AOUT(ipos,:) = B%vec(i)*AMAT(ipos,:)
+     ! MH 19.10.2022 change below is a bypass of some weird bug
+     !               which is to be fixed!
+     AOUT(B%pos(i),:) = B%vec(i)*AMAT(B%pos(i),:)
+  enddo
+
+end associate
+
+end subroutine ABPM_HALFTRAN_GEN_L
+
+subroutine ABPM_HALFTRAN_GEN_R(AMAT,AOUT,fact,EBlock,EBlockIV,nblk,DimL,DimR,xyvar)
+implicit none
+
+integer,intent(in) :: nblk,DimL,DimR
+double precision,intent(in) :: fact
+character(*),intent(in)     :: xyvar
+double precision,intent(in)    :: AMAT(DimL,DimR)
+double precision,intent(inout) :: AOUT(DimL,DimR)
+
+type(EBlockData),intent(in) :: EBlock(nblk),EBlockIV
+
+integer :: i,ii,ipos,iblk
+integer :: maxEBlockN
+double precision,allocatable :: ABP(:,:),ABM(:,:)
+
+AOUT = fact*AOUT
+
+maxEBlockN = maxval(EBlock%n)
+if(maxEBlockN > 1) allocate(ABP(DimL,maxEBlockN),ABM(DimL,maxEBlockN))
+
+select case(xyvar)
+case('Y','y')
+
+   do iblk=1,nblk
+      associate(iB => Eblock(iblk))
+
+        if(iB%n==1) then
+
+           ipos = iB%pos(1)
+           AOUT(:,ipos) = AOUT(:,ipos) + iB%matY(1,1)*AMAT(:,ipos)
+
+        else
+   
+           do i=1,iB%n
+              ipos = iB%pos(i)
+              ABP(:,i) = AMAT(:,ipos)
+           enddo
+   
+           call dgemm('N','N',DimL,iB%n,iB%n,1d0,ABP,DimL,iB%matY,iB%n,0d0,ABM,DimL)
+
+           do i=1,iB%n
+              ipos = iB%pos(i)
+              AOUT(:,ipos) = AOUT(:,ipos) + ABM(:,i)
+           enddo
+
+        endif
+
+      end associate
+   enddo
+
+case('X','x')
+
+   do iblk=1,nblk
+      associate(iB => Eblock(iblk))
+
+        if(iB%n==1) then
+
+           ipos = iB%pos(1)
+           AOUT(:,ipos) = AOUT(:,ipos) + iB%matX(1,1)*AMAT(:,ipos)
+
+        else
+
+           do i=1,iB%n
+              ipos = iB%pos(i)
+              ABP(:,i) = AMAT(:,ipos)
+           enddo
+   
+           call dgemm('N','N',DimL,iB%n,iB%n,1d0,ABP,DimL,iB%matX,iB%n,0d0,ABM,DimL)
+
+           do i=1,iB%n
+              ipos = iB%pos(i)
+              AOUT(:,ipos) = AOUT(:,ipos) + ABM(:,i)
+           enddo
+
+        endif
+
+      end associate
+   enddo
+
+case default
+  write(lout,'(a)') 'Error in ABPM_HALFTRAN_LR!'
+  stop
+end select
+
+if(maxEBlockN > 1) deallocate(ABM,ABP)
+
+associate(B => EblockIV)
+
+  do i=1,B%n
+     !ipos = B%pos(i)
+     !AOUT(:,ipos) = AOUT(:,ipos) + B%vec(i)*AMAT(:,ipos)
+     ! MH 19.10.2022 change below is a bypass of some weird bug
+     !               which is to be fixed!  
+     AOUT(:,B%pos(i)) = AOUT(:,B%pos(i)) + B%vec(i)*AMAT(:,B%pos(i))
+  enddo
+
+end associate
+
+end subroutine ABPM_HALFTRAN_GEN_R
+
+subroutine MultpDiagMat(Diag,matA,fact,matC,dimA,dimB)
+! multiply matC = diagonal*matrix
+implicit none
+
+integer,intent(in) :: dimA,dimB
+double precision,intent(in)    :: fact
+double precision,intent(in)    :: Diag(dimA),matA(dimA,dimB)
+double precision,intent(inout) :: matC(dimA,dimB)
+
+integer :: i,j
+
+matC = fact * matC
+do j=1,dimB
+   do i=1,dimA
+      matC(i,j) = matC(i,j) + Diag(i)*matA(i,j)
+   enddo
+enddo
+
+end subroutine MultpDiagMat
 
 subroutine make_J1(NBas,X,J,intfile)
 implicit none
+
 integer :: NBas
 double precision :: X(*), J(NBas,NBas)
 character(*) :: intfile
+
+type(AOReaderData) :: reader
 integer :: iunit, ntr
 integer :: ir,is,irs
+logical :: empty
 double precision :: tmp
 double precision,allocatable :: work1(:),work2(:)
 double precision,external :: ddot
 ! works in DCBS
 
+ J = 0
  ntr = NBas*(NBas+1)/2
 
  allocate(work1(NBas*NBas),work2(NBas*NBas))
 
- open(newunit=iunit,file=trim(intfile),status='OLD',&
-      access='DIRECT',form='UNFORMATTED',recl=8*ntr)
+ !open(newunit=iunit,file=trim(intfile),status='OLD',&
+ !     access='DIRECT',form='UNFORMATTED',recl=8*ntr)
+ !     
+ call reader%open(trim(intfile))
 
  irs=0
  do is=1,NBas
     do ir=1,is
     irs = irs + 1
-    read(iunit,rec=irs) work1(1:ntr)
+    !read(iunit,rec=irs) work1(1:ntr)
+    call reader%getTR(irs,work1,empty)
+    if(empty) cycle
     call triang_to_sq(work1,work2,NBas)
 
     tmp = ddot(NBas**2,work2,1,X,1)
@@ -1048,33 +1321,44 @@ double precision,external :: ddot
  enddo
 
  deallocate(work1,work2)
- close(iunit)
+ !close(iunit)
+ call reader%close
 
 end subroutine make_J1
 
 subroutine make_J2(NBas,XA,XB,JA,JB)
 implicit none
+
+type(AOReaderData) :: reader
+
 integer :: NBas
 double precision :: XA(*), XB(*), JA(NBas,NBas), JB(NBas,NBas)
 integer :: iunit, ntr
 integer :: ir,is,irs
+logical :: empty
 double precision :: tmp
 double precision,allocatable :: work1(:),work2(:)
 double precision,external :: ddot
 ! works in DCBS
 
+ JA = 0
+ JB = 0
  ntr = NBas*(NBas+1)/2
 
  allocate(work1(NBas*NBas),work2(NBas*NBas))
 
- open(newunit=iunit,file='AOTWOSORT',status='OLD',&
-      access='DIRECT',form='UNFORMATTED',recl=8*ntr)
+ !open(newunit=iunit,file='AOTWOSORT',status='OLD',&
+ !     access='DIRECT',form='UNFORMATTED',recl=8*ntr)
+ !
+ call reader%open('AOTWOSORT')
 
  irs=0
  do is=1,NBas
     do ir=1,is
     irs = irs + 1
-    read(iunit,rec=irs) work1(1:ntr)    
+    !read(iunit,rec=irs) work1(1:ntr)
+    call reader%getTR(irs,work1,empty)
+    if(empty) cycle
     call triang_to_sq(work1,work2,NBas)
 
     tmp = ddot(NBas**2,work2,1,XA,1)
@@ -1090,17 +1374,21 @@ double precision,external :: ddot
 
 
  deallocate(work1,work2)
- close(iunit)
+ !close(iunit)
+ call reader%close
 
 end subroutine make_J2
 
 subroutine make_K(NBas,X,K)
 implicit none
+
+type(AOReaderData) :: reader
 integer,intent(in) :: NBas
 double precision,intent(in) :: X(NBas,NBas)
 double precision,intent(inout) :: K(NBas,NBas)
 integer :: iunit, ntr
 integer :: ir,is,irs
+logical :: empty
 double precision :: tmp
 double precision,allocatable :: work1(:),work2(:)
 ! works in DCBS
@@ -1110,14 +1398,18 @@ double precision,allocatable :: work1(:),work2(:)
 
  allocate(work1(NBas*NBas),work2(NBas*NBas))
 
- open(newunit=iunit,file='AOTWOSORT',status='OLD',&
-      access='DIRECT',form='UNFORMATTED',recl=8*ntr)
+ !open(newunit=iunit,file='AOTWOSORT',status='OLD',&
+ !     access='DIRECT',form='UNFORMATTED',recl=8*ntr)
+ !
+ call reader%open('AOTWOSORT')
 
  irs = 0
  do is=1,NBas
     do ir=1,is
     irs = irs + 1
-    read(iunit,rec=irs) work1(1:ntr)
+    !read(iunit,rec=irs) work1(1:ntr)
+    call reader%getTR(irs,work1,empty)
+    if(empty) cycle
     call triang_to_sq(work1,work2,NBas)
 
     if(ir==is) then
@@ -1135,7 +1427,8 @@ double precision,allocatable :: work1(:),work2(:)
  enddo
 
  deallocate(work2,work1)
- close(iunit)
+ !close(iunit)
+ call reader%close
 
 end subroutine make_K
 
@@ -1180,6 +1473,38 @@ allocate(work1(nbas*nbas),work2(nbas*nbas))
 deallocate(work2,work1)
 
 end subroutine tran_matTr
+
+subroutine tran_AO2MO(Ain,CA,CB,Aout,NAO,NMO)
+implicit none
+
+integer,intent(in) :: NAO, NMO
+double precision,intent(in)  :: Ain(:),CA(:),CB(:)
+double precision,intent(out) :: Aout(:)
+
+double precision             :: work(NAO*NMO)
+
+if(NAO>0.and.NMO>0) then
+  call dgemm('T','N',NMO,NAO,NAO,1d0,CA,NAO,Ain,NAO,0d0,work,NMO)
+  call dgemm('N','N',NMO,NMO,NAO,1d0,work,NMO,CB,NAO,0d0,Aout,NMO)
+endif
+
+end subroutine tran_AO2MO
+
+subroutine tran_AO2MO2(Ain,CA,CB,Aout,NAO,NMO)
+implicit none
+
+integer,intent(in) :: NAO, NMO
+double precision,intent(in)  :: Ain(:,:),CA(:,:),CB(:,:)
+double precision,intent(out) :: Aout(:,:)
+
+double precision :: work(NMO,NAO)
+
+if(NAO>0.and.NMO>0) then
+  call dgemm('T','N',NMO,NAO,NAO,1d0,CA,NAO,Ain,NAO,0d0,work,NMO)
+  call dgemm('N','N',NMO,NMO,NAO,1d0,work,NMO,CB,NAO,0d0,Aout,NMO)
+endif
+
+end subroutine tran_AO2MO2
 
 subroutine tran2MO(MatIn,Ca,Cb,MatOut,nbas)
 implicit none

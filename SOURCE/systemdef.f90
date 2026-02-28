@@ -127,8 +127,16 @@ else
   ! set TwoEl type
    Flags%ITwoEl = Input%CalcParams%TwoMoInt
 
+  ! set Cholesky decomposition
+   Flags%ICholesky    = Input%CalcParams%Cholesky
+   Flags%ICholeskyAccu = Input%CalcParams%CholeskyAccu
+
   ! reduce virtuals
    Flags%IRedVirt = Input%CalcParams%RedVirt
+
+  ! memory in 2ints sorter (readtwoint) 
+   Flags%MemVal   = Input%CalcParams%MemVal
+   Flags%MemType  = Input%CalcParams%MemType
 
   ! Interface
   select case(Input%CalcParams%InterfaceType)
@@ -159,7 +167,9 @@ else
      Flags%INO     = 0
      Flags%NoSym   = 1
      Flags%IA = 1
-  ! ????
+  case(INTER_TYPE_TREX)
+     Flags%IDALTON = 0
+     Flags%ITREXIO = 1
   end select
 
   if(Input%CalcParams%Restart) Flags%IRes = 1
@@ -186,6 +196,12 @@ else
      FLags%IGVB = 0
      Flags%ICASSCF = 1
      Flags%ISHF = 1
+
+  case(RDM_TYPE_CI)
+     FLags%ICI     = 1
+     FLags%IGVB    = 0
+     Flags%ICASSCF = 0
+
   case default
      write(LOUT,'(1x,a)') 'RDMType not declared! Assuming ICASSCF=1!'
      FLags%IGVB    = 0
@@ -214,6 +230,17 @@ else
   case(JOB_TYPE_ACFREQ)
      Flags%IFlAC  = 1
      Flags%IFlACFREQ = 1
+
+  case(JOB_TYPE_ACFREQNTH)
+     Flags%IFlAC  = 1
+     Flags%IFlACFREQNTH = 1
+
+  case(JOB_TYPE_AC1FREQNTH)
+     Flags%IFlAC  = 1
+     Flags%IFlAC1FREQNTH = 1
+
+  case(JOB_TYPE_RESPONSE)
+     Flags%IFlRESPONSE = 1
 
   case(JOB_TYPE_AC0)
     ! HERE WILL BE CHANGED TO:
@@ -329,6 +356,9 @@ else
 
   end select
 
+ ! Triplet response
+  if(Input%CalcParams%Triplet) Flags%ITrpl = 1
+
  ! Inactive
   Flags%IFlCore = Input%CalcParams%Core
 
@@ -355,10 +385,10 @@ end subroutine fill_Flags
 subroutine create_System(Input,Flags,System,SAPT)
 implicit none
 
-type(InputData) :: Input
-type(FlagsData) :: Flags
+type(InputData)   :: Input
+type(FlagsData)   :: Flags
 type(SystemBlock) :: System
-type(SaptData) :: SAPT
+type(SaptData)    :: SAPT
 
 ! fill System
 if(Flags%ISAPT.Eq.0) then
@@ -369,8 +399,12 @@ if(Flags%ISAPT.Eq.0) then
      stop
    endif
 
-   System%NoSt = Input%SystemInput(1)%NoSt
-   System%NStates = Input%SystemInput(1)%NStates
+   System%NoSt     = Input%SystemInput(1)%NoSt
+   System%NStates  = Input%SystemInput(1)%NStates
+   System%ISpinMs2 = -255
+   if(Input%SystemInput(1)%DeclareSpin) then
+      System%ISpinMs2 = Input%SystemInput(1)%ISpinMs2
+   endif
    allocate(System%InSt(2,System%NStates))
    if(Input%SystemInput(1)%DeclareSt) then
       System%InSt = Input%SystemInput(1)%InSt
@@ -395,11 +429,16 @@ if(Flags%ISAPT.Eq.0) then
    System%PerVirt= Input%SystemInput(1)%PerVirt
    System%EigFCI = Input%SystemInput(1)%EigFCI
    System%ThrAct = Input%SystemInput(1)%ThrAct
+   System%ThrGemAct = Input%SystemInput(1)%ThrGemAct
    System%ThrSelAct = Input%SystemInput(1)%ThrSelAct
    System%ThrVirt = Input%SystemInput(1)%ThrVirt
    System%ThrQVirt  = Input%SystemInput(1)%ThrQVirt
+   System%ThrQInact = Input%SystemInput(1)%ThrQInact
    System%TwoMoInt = Input%SystemInput(1)%TwoMoInt
    System%IPrint = Input%CalcParams%IPrint
+  
+   System%Max_Cn = Input%CalcParams%Max_Cn
+   System%FreqOm = Input%CalcParams%FreqOm
 
    System%XELE = (System%ZNucl - System%Charge)/2.0d0
    System%NELE = (System%ZNucl - System%Charge)/2
@@ -417,9 +456,11 @@ if(Flags%ISAPT.Eq.0) then
 elseif(Flags%ISAPT.Eq.1) then
 
  SAPT%InterfaceType = Input%CalcParams%InterfaceType
- SAPT%IPrint = Input%CalcParams%IPrint
  SAPT%SaptLevel = Input%CalcParams%SaptLevel
  SAPT%ic6 = Input%CalcParams%vdWCoef
+ SAPT%Max_Cn = Input%CalcParams%Max_Cn
+ SAPT%CAlpha = Input%CalcParams%CAlpha
+ SAPT%IPrint = Input%CalcParams%IPrint
  if(SAPT%InterfaceType==2) SAPT%HFCheck = .false.
  ! temporary RSH
  if(Flags%IFunSR<3) then
@@ -433,8 +474,14 @@ elseif(Flags%ISAPT.Eq.1) then
    select case(Input%SystemInput(1)%Monomer)
    case(1)
 
-      monA%NoSt    = Input%SystemInput(1)%NoSt
-      monA%NStates = Input%SystemInput(1)%NStates
+      if(SAPT%InterfaceType==5) monA%TrexFile = Input%SystemInput(1)%TrexFile
+
+      monA%NoSt     = Input%SystemInput(1)%NoSt
+      monA%NStates  = Input%SystemInput(1)%NStates
+      monA%ISpinMs2 = -255
+      if(Input%SystemInput(1)%DeclareSpin) then
+         monA%ISpinMs2 = Input%SystemInput(1)%ISpinMs2
+      endif
       allocate(monA%InSt(2,System%NStates))
       if(Input%SystemInput(1)%DeclareSt) then
          monA%InSt = Input%SystemInput(1)%InSt
@@ -449,16 +496,19 @@ elseif(Flags%ISAPT.Eq.1) then
       monA%PerVirt = Input%SystemInput(1)%PerVirt
       monA%EigFCI  = Input%SystemInput(1)%EigFCI
       monA%NBasis  = Input%CalcParams%NBasis
-      monA%ThrAct       = Input%SystemInput(1)%ThrAct
-      monA%ThrSelAct    = Input%SystemInput(1)%ThrSelAct
+      monA%ThrAct      = Input%SystemInput(1)%ThrAct
+      monA%ThrGemAct   = Input%SystemInput(1)%ThrGemAct
+      monA%ThrSelAct   = Input%SystemInput(1)%ThrSelAct
       monA%ThrVirt     = Input%SystemInput(1)%ThrVirt
-      monA%ThrQVirt     = Input%SystemInput(1)%ThrQVirt
+      monA%ThrQVirt    = Input%SystemInput(1)%ThrQVirt
+      monA%ThrQInact   = Input%SystemInput(1)%ThrQInact
       monA%DeclareTwoMo = Input%SystemInput(1)%DeclareTwoMo
       monA%TwoMoInt = Input%SystemInput(1)%TwoMoInt
       monA%PostCAS  = Input%SystemInput(1)%PostCAS
       monA%ISHF     = Input%SystemInput(1)%ISHF
       monA%Cubic    = Input%SystemInput(1)%Cubic
       monA%Wexcit   = Input%SystemInput(1)%Wexcit
+      monA%Cholesky2RDM = Input%SystemInput(1)%Cholesky2RDM
 
       monA%NCen    = Input%SystemInput(1)%NCen
       monA%UCen    = Input%SystemInput(1)%UCen
@@ -473,8 +523,14 @@ elseif(Flags%ISAPT.Eq.1) then
          monA%NActFromRDM = Input%SystemInput(1)%NActFromRDM
       endif
 
-      monB%NoSt    = Input%SystemInput(2)%NoSt
-      monB%NStates = Input%SystemInput(2)%NStates
+      if(SAPT%InterfaceType==5) monB%TrexFile = Input%SystemInput(2)%TrexFile
+
+      monB%NoSt     = Input%SystemInput(2)%NoSt
+      monB%NStates  = Input%SystemInput(2)%NStates
+      monB%ISpinMs2 = -255
+      if(Input%SystemInput(2)%DeclareSpin) then
+         monB%ISpinMs2 = Input%SystemInput(2)%ISpinMs2
+      endif
       allocate(monB%InSt(2,System%NStates))
       if(Input%SystemInput(2)%DeclareSt) then
          monB%InSt = Input%SystemInput(2)%InSt
@@ -490,15 +546,19 @@ elseif(Flags%ISAPT.Eq.1) then
       monB%EigFCI = Input%SystemInput(2)%EigFCI
       monB%NBasis = Input%CalcParams%NBasis
       monB%ThrAct = Input%SystemInput(2)%ThrAct
+      monB%ThrGemAct = Input%SystemInput(2)%ThrGemAct
       monB%ThrSelAct = Input%SystemInput(2)%ThrSelAct
       monB%ThrVirt   = Input%SystemInput(2)%ThrVirt
       monB%ThrQVirt  = Input%SystemInput(2)%ThrQVirt
+      monB%ThrQInact   = Input%SystemInput(2)%ThrQInact
       monB%DeclareTwoMo = Input%SystemInput(2)%DeclareTwoMo
       monB%TwoMoInt  = Input%SystemInput(2)%TwoMoInt
       monB%PostCAS   = Input%SystemInput(2)%PostCAS
       monB%ISHF      = Input%SystemInput(2)%ISHF
       monB%Cubic     = Input%SystemInput(2)%Cubic
       monB%Wexcit    = Input%SystemInput(2)%Wexcit
+      monB%Cholesky2RDM = Input%SystemInput(2)%Cholesky2RDM
+
       monB%NCen = Input%SystemInput(2)%NCen
       monB%UCen = Input%SystemInput(2)%UCen
       monB%Monomer = Input%SystemInput(2)%Monomer
@@ -517,6 +577,8 @@ elseif(Flags%ISAPT.Eq.1) then
 
    case(2)
 
+      if(SAPT%InterfaceType==5) monA%TrexFile = Input%SystemInput(2)%TrexFile
+
       monA%NoSt   = Input%SystemInput(2)%NoSt
       monA%NStates = Input%SystemInput(2)%NStates
       allocate(monA%InSt(2,System%NStates))
@@ -534,15 +596,19 @@ elseif(Flags%ISAPT.Eq.1) then
       monA%EigFCI = Input%SystemInput(2)%EigFCI
       monA%NBasis = Input%CalcParams%NBasis
       monA%ThrAct = Input%SystemInput(2)%ThrAct
+      monA%ThrGemAct = Input%SystemInput(2)%ThrGemAct
       monA%ThrSelAct = Input%SystemInput(2)%ThrSelAct
       monA%ThrVirt   = Input%SystemInput(2)%ThrVirt
       monA%ThrQVirt  = Input%SystemInput(2)%ThrQVirt
+      monA%ThrQInact = Input%SystemInput(2)%ThrQInact
       monA%DeclareTwoMo = Input%SystemInput(2)%DeclareTwoMo
       monA%TwoMoInt = Input%SystemInput(2)%TwoMoInt
       monA%PostCAS = Input%SystemInput(2)%PostCAS
       monA%ISHF    = Input%SystemInput(2)%ISHF
       monA%Cubic   = Input%SystemInput(2)%Cubic
       monA%Wexcit  = Input%SystemInput(2)%Wexcit
+      monA%Cholesky2RDM = Input%SystemInput(2)%Cholesky2RDM
+
       monA%NCen    = Input%SystemInput(2)%NCen
       monA%UCen    = Input%SystemInput(2)%UCen
       monA%Monomer = Input%SystemInput(2)%Monomer
@@ -555,6 +621,8 @@ elseif(Flags%ISAPT.Eq.1) then
          monA%NAct=Input%SystemInput(2)%NAct
          monA%NActFromRDM = Input%SystemInput(2)%NActFromRDM
       endif
+
+      if(SAPT%InterfaceType==5) monB%TrexFile = Input%SystemInput(1)%TrexFile
 
       monB%NoSt   = Input%SystemInput(1)%NoSt
       monB%NStates = Input%SystemInput(1)%NStates
@@ -572,15 +640,19 @@ elseif(Flags%ISAPT.Eq.1) then
       monB%PerVirt = Input%SystemInput(1)%PerVirt
       monB%EigFCI  = Input%SystemInput(1)%EigFCI
       monB%ThrAct  = Input%SystemInput(1)%ThrAct
+      monB%ThrGemAct = Input%SystemInput(1)%ThrGemAct
       monB%ThrSelAct = Input%SystemInput(1)%ThrSelAct
       monB%ThrVirt   = Input%SystemInput(1)%ThrVirt
       monB%ThrQVirt  = Input%SystemInput(1)%ThrQVirt
+      monB%ThrQInact = Input%SystemInput(1)%ThrQInact
       monB%DeclareTwoMo = Input%SystemInput(1)%DeclareTwoMo
       monB%TwoMoInt = Input%SystemInput(1)%TwoMoInt
       monB%PostCAS  = Input%SystemInput(1)%PostCAS
       monB%ISHF     = Input%SystemInput(1)%ISHF
       monB%Cubic    = Input%SystemInput(1)%Cubic
       monB%Wexcit   = Input%SystemInput(1)%Wexcit
+      monB%Cholesky2RDM = Input%SystemInput(1)%Cholesky2RDM
+
       monB%NCen     = Input%SystemInput(1)%NCen
       monB%UCen     = Input%SystemInput(1)%UCen
       monB%Monomer  = Input%SystemInput(1)%Monomer
@@ -598,11 +670,9 @@ elseif(Flags%ISAPT.Eq.1) then
  end associate
 
  ! set in/out-of-core
- ! SAPT-CAS: unless defined in input, set FOFO as default!
- if(Flags%ICASSCF==1.and.Flags%ISERPA==0) then
-    if(.not.SAPT%monA%DeclareTwoMo) SAPT%monA%TwoMoInt = TWOMO_FOFO
-    if(.not.SAPT%monB%DeclareTwoMo) SAPT%monB%TwoMoInt = TWOMO_FOFO
- endif
+ ! SAPT: unless defined in input, set FOFO as default!
+ if(.not.SAPT%monA%DeclareTwoMo) SAPT%monA%TwoMoInt = TWOMO_FOFO
+ if(.not.SAPT%monB%DeclareTwoMo) SAPT%monB%TwoMoInt = TWOMO_FOFO
 
  ! set SameOm for SAPT-RSH
  if(SAPT%doRSH) then
@@ -645,13 +715,13 @@ elseif(Flags%ISAPT.Eq.1) then
     write(LOUT,'(1x,a,1x,i2)') 'NUCLEAR CHARGE: ', SAPT%monA%ZNucl
     write(LOUT,'(1x,a,8x,i3)') 'CHARGE: ', SAPT%monA%Charge
     write(LOUT,'(1x,a,3x,i3)') 'NO.OF ATOMS: ', SAPT%monA%NCen
-    write(LOUT,'(1x,a,2x,f9.4)') 'THRESH ACTIVE: ', SAPT%monA%ThrAct
+    write(LOUT,'(1x,a,2x,e13.6)') 'THRESH ACTIVE: ', SAPT%monA%ThrAct
     write(LOUT,'()')
     write(LOUT,'(1x,a)') 'MONOMER B'
     write(LOUT,'(1x,a,1x,i2)') 'NUCLEAR CHARGE: ', SAPT%monB%ZNucl
     write(LOUT,'(1x,a,8x,i3)') 'CHARGE: ', SAPT%monB%Charge
     write(LOUT,'(1x,a,3x,i3)') 'NO.OF ATOMS: ', SAPT%monB%NCen
-    write(LOUT,'(1x,a,2x,f9.4)') 'THRESH ACTIVE: ', SAPT%monB%ThrAct
+    write(LOUT,'(1x,a,2x,e13.6)') 'THRESH ACTIVE: ', SAPT%monB%ThrAct
 
 endif
 
@@ -735,5 +805,13 @@ write(LOUT, '(1x,a,6x,i3)') "ISAPT   ", &
               (Flags%ISAPT)
 
 end subroutine print_Flags
+
+subroutine free_System(System)
+implicit none
+type(SystemBlock) :: System 
+
+deallocate(System%InSt)
+
+end subroutine free_System
 
 end module systemdef

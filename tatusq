@@ -1,0 +1,314 @@
+[33medf36f8[m[33m ([m[1;36mHEAD -> [m[1;32mcmake-aks[m[33m, [m[1;31morigin/cmake-aks[m[33m)[m 🏗️  Work on CMake #2
+[33md58621d[m 🏗️  Work on CMake * Add InitialCacheParser.cmake * Add config2 with new format * Add cmake/git_info.f90 * Add git info to mainp.f * Add logging * Update README
+[33md4ed99f[m Add: * GitInfoService.cmake * GetCPM.cmake * new config file
+[33m23db2a5[m[33m ([m[1;32mcmake[m[33m)[m Divide CMakeLists into cmake files
+[33m7ee8ab4[m mh. -- updated README.md
+[33m1373bba[m m -- added CMakeLists.txt
+[33m7a6ce8d[m mh. -- fixed an ancient bug (only on GNU)
+[33mb1b016c[m mh. -- an old bug fixed in ECorrAC0GVB_FOFO
+[33m60ae6b9[m mh. 3'th iteration (with a small fix)
+[33ma6b2eb8[m mh.  -- 3rd iteration of CMakeLists.txt (for Hackaton)
+[33m817dccf[m Merge branch 'cmake' of https://gitlab.com/qchem/gammcor into cmake mh. -- trying to add march check
+[33md4b4682[m as.   -- added 2-nd iteration of the CMakeLists.txt
+[33me18ccc1[m Merge branch 'cmake' of gitlab.com:qchem/gammcor into cmake
+[33m1b53aa6[m as.   -- added 2-nd iteration of the CMakeLists.txt
+[33m68b1834[m Merge branch 'cmake' of https://gitlab.com/qchem/gammcor into cmake
+[33m370bba2[m mh.   -- added 1-st iteration of the CMakeLists.txt
+[33md72da45[m Initial work on CMake
+[33mdd5f4a6[m Initial work on CMake
+[33m5a61cf4[m[33m ([m[1;32mkasia[m[33m)[m mh.  -- fixed bugs (0.0 instead of 0d0) in ac_fofo      -- removed some trailing spaces
+[33me367c64[m Update README.md
+[33m7047221[m added printout of the components (nuclearB-A, nuclearA-B, electronA-electronB) of electrostatics in SAPT
+[33m2484331[m Merge branch 'kasia' of https://gitlab.com/qchem/gammcor into kasia
+[33ma2a284c[m[33m ([m[1;33mtag: v-4-🐀[m[33m)[m Merge branch 'openmp' into 'kasia'
+[33me6743ac[m 🔨 Add OpenMP directives
+[33m8130c6b[m added printouts in readtwoel to trace down the bug(?) or maybe not a bug
+[33m6d65d29[m Merge branch 'kasia' of https://gitlab.com/michal.hapka/pr-dmft into kasia
+[33mec3398e[m added ThrSelAct and ThrQVirt in SAPT(GVB)
+[33md7207e2[m Merge branch 'WIP' into kasia
+[33m7e99097[m some testing options removed. cleaned.
+[33mb195f40[m new procedure: MoldenCAS. it generates molden file cas_ss.molden with NOs. it works under conditions: (1) cas.molden file is available; (2) molpro is run with CARTESIAN basis set. it is useful when SA-CAS is run in molpro and only state-averaged orbitals from molpro are known.
+[33m084368b[m problem with nearly zero, negative occupation fixed in sapt_main [now abs(eval) is taken as occ]
+[33m7fbef0d[m threshold 'ThrQVirt' is now utilized in SAPT (before the quasi-degeneracy threshold was fixed at 1.D-7. now this is a default value)
+[33m5030d9f[m  just temporary changes for testing purpose
+[33me718997[m new procedure: WInteg_FOFO - fofo version of the AC calculation by alpha and omega integration
+[33m9905e92[m[33m ([m[1;33mtag: v-3-🐭[m[33m, [m[1;33mtag: v-3-🐁[m[33m)[m Merge branch 'gian' into 'kasia'
+[33mf7c442e[m Added OMP tasks in `sapt_main.f90`
+[33m73b17b8[m ac_fofo.f90 added (previously it was not added by mistake)
+[33m96c6f7c[m Iterative procedure for AC with FOFO [ac_fofo.f90, WIter_FOFO] added and tested.
+[33m6c7c5e2[m Iteration procedure for AC is working (WIter). Derivatives of C matrix w.r.t Alpha from the iterative procedure has been tested against finite difference formulae of the W Alpha integrand (in acfd.f. this test is commented out)
+[33mec21d9e[m 📚 Update README.md
+[33m76b24ee[m 🙈 Add xcfun/geninterface to .gitignore
+[33m7647e43[m Update README_DEV.md
+[33mde9c470[m mh. removed the binary xcfun/geninterface file
+[33m031e7b5[m Merge branch 'kasia' of https://gitlab.com/michal.hapka/pr-dmft into kasia
+[33m9da803f[m AC0DP (AC0D prime) finnished and tested
+[33mba110fd[m Merge branch 'docs' into 'kasia'
+[33me2952e5[m :books: add README_DEV.md
+[33m59f3eca[m new keywords: ACFREQ - runs AC using a formula with frequency integration; AC0DP (AC0D prime) - not working yet
+[33m7d9f412[m Merge branch 'auto_test' into 'kasia'
+[33mdc79371[m intermediate step in adding a new keyword: AC0DP (AC0D')
+[33m481cc0b[m :sparkles: stops the execution of test scripts if a pipeline has an error
+[33m409601e[m :bug: fix git pre-push bug 'connection closed by remote host'
+[33mbcf63a2[m :sparkles: add rebuild feature to post-merge hook
+[33m9478d5b[m :bug: fix installation of post-merge hook
+[33m7fc4ae6[m first step toward iterative AC with frequency integration: ACIter.
+[33m7618925[m minor corrections in SAPT prints
+[33m5edbeb5[m added some small changes when testing HF-DIIS for E2ind
+[33m0e9fd73[m Update README.md
+[33m9d7ac08[m mh. added missing dependencies in Makefile.common for compilation on many nodes
+[33md43b502[m added small fixes in SAPT prints
+[33m1607a78[m Update README.md
+[33mc9eb3aa[m Merge branch 'auto_test' into 'kasia'
+[33m3fb3c39[m Merge branch 'kasia' of gitlab.com:michal.hapka/pr-dmft into auto_test
+[33mf3c116b[m mh. improved prints of SAPT energies
+[33m7d7a9cb[m corrected the confusing README.md file (to use GitLab!)
+[33m8a0d2be[m docs: update README.md
+[33mb2dba06[m test: add auto_test scripts
+[33ma3699b0[m test: replace gammcor_verify.py with gammcor_verify.bash
+[33m14ffd5b[m[33m ([m[1;33mtag: v-2-🐨[m[33m)[m Merge branch 'gcc' into 'kasia'
+[33m2f2f0b7[m Merge branch 'kasia' of gitlab.com:michal.hapka/pr-dmft into gcc
+[33mf2b1985[m test(gammcor_verify.py): set script path
+[33m7cb4c17[m build(gammcor): add makefiles
+[33maf36cee[m build(xcfun): add makefiles
+[33m6d3d19e[m chore: add XCFun sources
+[33m2925633[m Merge branch 'kasia' of https://gitlab.com/michal.hapka/pr-dmft into kasia
+[33m8c07ccf[m ACOD' turned off (for triplet excitations it is not justified, for singlet it can be brought back by uncommenting the pertinent lines in abfofo)
+[33m52710e6[m Merge branch 'kasia' of gitlab.com:michal.hapka/pr-dmft into kasia
+[33mdb58be6[m added Wind / Wdisp in summary_sapt
+[33m68b20d5[m testing script gammcor_verify.py added
+[33mf622c43[m[33m ([m[1;33mtag: v-1-🐢[m[33m)[m new Diag8 procedure, using -mkl=parallel [added by Anthony Scemama], changes in Makefile
+[33m52f74f3[m numerical instability in CASPiDFT discovered. pertinent warning has been added in Subroutine CASPIDFTOPT
+[33m8d245cb[m[33m ([m[1;33mtag: v-0-🐌[m[33m)[m (1) fixed incosistency with selection of quasi-degenerate pairs in EERPA. now it is done based on ThrSelAct. (2) some modifications in delta-correlons
+[33md8e79cc[m Merge branch 'kasia' of https://gitlab.com/michal.hapka/pr-dmft into kasia
+[33mf3cf906[m makefile
+[33m24cd7e3[m mh. replaced MultpM with dgemm in ERPASYMM0
+[33m6a30e4d[m mh. added PerVirt (= Percent Virtual) keyword     to control the percent of virtual orbitals we remove in RedVirt
+[33m179c528[m corrected error in ints generation for RedVirt
+[33m43a9de4[m mh. corrected ACEneERPA_FOFO for faster execution
+[33mcc91d21[m mh. added keyword "Wexcit" in SystemBlock for calculations of Wind and Wdisp terms (due to dexcitations)
+[33md49377f[m some minor changes in file deletions for Disp-in-CAS (SaptLevel=10)
+[33m43a08ec[m Merge branch 'kasia' of gitlab.com:michal.hapka/pr-dmft into kasia
+[33m04c18d2[m some minor improvement in file deletion
+[33m26dcada[m Merge branch 'kasia' of https://gitlab.com/michal.hapka/pr-dmft into kasia
+[33m3e3f0d9[m fixed EBlock allocation problem in reduce_to_XY0CAS (may cause errors in INCORE)
+[33m189165f[m fixed a bug in e2disp (trying to open the same file twice)
+[33mf858dee[m -- SAPT with lrCAS-srDFT should be working now -- Careful! uncoupled srDFT results are printed, but not well-defined
+[33m9ede50d[m[33m ([m[1;31morigin/kasia-sapt-extrapolate[m[33m)[m -- changed "E2dExt" to "Cubic" (also as a keyword)
+[33mb043cb8[m improved formatting of SAPT cubic E(2)
+[33m8754067[m added E2disp(cubic) and E2ind(cubic) -- should work for both (alpha,beta) and (alpha,1) or (1,beta) cases (i.e., instabilities in either both or only one of the monomers)
+[33mb83b899[m mh: SAPT-DALTON should now work with symmetry :
+[33m398c1f2[m -in SAPT-DALTON the SIRIFC files are de facto requires which is now made explicit in the output
+[33m585a771[m Merge branch 'kasia' of gitlab.com:michal.hapka/pr-dmft into kasia
+[33m6c6a9be[m corrected last commit and started working on better "readmulti" structure for SAPT-DALTON
+[33mb64ecc9[m Merge branch 'kasia' of https://gitlab.com/michal.hapka/pr-dmft into kasia
+[33m33d2cb9[m AC was crashing when no active orbitals and rdm2.dat is empty (HF-DALTON case). it is fixed by changing "Read(10,'(4I4,F19.12)'..." to "Read(10,*,..." when reading from rdm2.dat
+[33m9440efa[m corrected SAPT-DALTON with symmetry: a) reading Occ from SIRIUS.RST file (in inact-act-secondary order), b) corrected error in sort_sym_mo
+[33m16fe18c[m marginal change in vv10
+[33mb84906e[m Merge branch 'kasia' of https://gitlab.com/michal.hapka/pr-dmft into kasia
+[33m7190fc7[m fix interface with dalton for CASSCF WITH symmetry. new procedure SortOrbDal. occupations.dat (new format) still needed. Tests for AC0_DALTON added.
+[33m08c7c16[m added E2disp=ax^3+bx+c when both monomers are modified
+[33m23bc8c3[m modify gitigore
+[33mb51f094[m modify gitignore
+[33mff145bb[m Merge branch 'kasia' of https://gitlab.com/michal.hapka/pr-dmft into kasia
+[33m9744cda[m nbasis read from AOONEINT.mol (instaed of AOTWOINT.mol)
+[33mc6c0cc4[m WIP. started work on E2disp from extrapolation (E2DAX3 option)
+[33m2746508[m improved uncoupled Exch-ind for SAPT-CAS (added block version of dgemv in exch-ind)
+[33m45f710b[m fixed SAPT-CAS with INCORE
+[33m49efdf4[m Merge branch 'kasia' of https://gitlab.com/michal.hapka/pr-dmft into kasia
+[33m18dff1a[m prdmft.exe modified
+[33m5b36650[m added missing sapt  files
+[33m8a9ab41[m started work on making PINO/FCI work again
+[33m9e30f1b[m -- added ReduceVirt in SAPT-CAS
+[33mee24b49[m -- added SAPT-GVB in FOFO version
+[33m7b14c13[m -- added SAPT with all energy components
+[33m300bf16[m fixed e2disp on this branch (uncoupled was broken)
+[33m7398b99[m new functionality: computation of delta correlons
+[33m338d954[m new keyword: NLOCCORR (JobType). if used then VV10 subroutine (from vv10.f) is called. VV10 written by Reza.
+[33mc48bf32[m changes in .gitignore
+[33m200cf3f[m Merge branch 'kasia' of https://gitlab.com/michal.hapka/pr-dmft into kasia
+[33m04f5282[m added ThrQVirt threshold for discarding quasi-virtual orbital (active) and truly virtual pairs to avoid singularities in AC1, AC default set to ThrQVirt = 1.d-7 (AC0 works OK with even lower thresholds, e.g., 1d-13)
+[33mc35d26a[m added executable
+[33m11ff651[m script for testing prdmft.exe
+[33m5ec3802[m Merge branch 'kasia' of https://gitlab.com/michal.hapka/pr-dmft into kasia
+[33m17c8033[m .gitignore modified
+[33ma2e6ec5[m added deleting files in EERPA (FOFO)
+[33m451c2df[m -- modified Y01CASLR_FOFO to use the JK_loop -- added removing FOFO and FFOO integrals in GVB-AC1 and GVB-AC
+[33m425bd53[m -- added JK_loop in FOFO, -- divided Y01CAS_FOFO into AC0CAS_FOFO (used in AC0) and Y01CAS_FOFO (used in SAPT)
+[33me618e87[m accas and main agreed, conflicts resolved
+[33m04843ca[m criterium on virtual vs. active orbital in accas lossened
+[33md726efe[m added: AC0D, AC0D_NOSYM, changes in CASPiDFT
+[33m504ff57[m changes related to intorducing AC0D and new CASPiDFT. merging with changes intorduced recently by Michal.
+[33m75771ce[m[33m ([m[1;31morigin/kasia-old[m[33m)[m added an option to use the existing AOTWOSORT file
+[33m68d3ba5[m fixed previous commit
+[33m0633a7c[m changed condition for active orbital selection
+[33mb0c1e33[m 3-body in EERPA is not active by default
+[33mb51d07a[m test for APSG gradient lowered temporarily
+[33meb82a21[m manual has been extended by EERPA and AC0D keywords and their description
+[33m86ba35c[m added FOFO version of AC-GVB
+[33m49e6163[m added FFFF and FOFO AC1-GVB version
+[33me1f948b[m added FFFF and FOFO versions of EERPA
+[33m45001ad[m added GVB energy check in FOFO version of AC0-GVB
+[33m2c93eb7[m fixed errors with NOccup in ACABMAT0_FOFO
+[33m36e8ea4[m Merge branch 'kasia' of https://gitlab.com/michal.hapka/pr-dmft into kasia
+[33mca5b344[m in SndOrder: fixed NDim*NDim --> NDim,NDim (for NBasis>300)
+[33m1596c5f[m removed some old prints from ABCAS matrices
+[33m527e60e[m fixed minor issue (CHANGE3) in ERPAVECYX; fixed 0 occupied in LdInteg
+[33m57bab86[m fixed a small error in ERPAVECYX (closing of a DO loop)
+[33me680a4a[m added new pieces in the CASPiDFT-OPT code (act part)
+[33m199cec4[m changed from large dgemm's to block multiplication (ABPM_TRAN and ABPM_BACKTRAN) in Y01CASLR_FOFO (faster lrAC0(-postCAS)
+[33me3f6f0f[m fixed a problem with passing orbitals in DMSCF
+[33m9424ca9[m one error fixed (MultpC in RunACCASLR), but many more to go
+[33m87ced52[m added Discarding virt-virt pairs
+[33mf3cda32[m added temporary code for MCORRECTION for CASPi(M)DFT
+[33m11c1e1d[m speed up for caspidft done (ifunsr=6 related)
+[33m2f812e9[m added CASPIDFTOPT keyword
+[33mc28e65a[m caspidftopt procedure added to speed up optimization of parameters in caspidft
+[33m5d6b248[m Merge branch 'kasia' of https://gitlab.com/michal.hapka/pr-dmft into kasia
+[33ma737bf3[m added E2exch-disp(UNC), better read4_gen for ORCA
+[33m30fdd00[m format of the output changed (orbitals are not printed)
+[33m7572c23[m fixed reading 2-el NO integrals for ORCA (read4_gen)
+[33md300f9b[m Libor interface with orca made possible
+[33m08fc0bd[m added e2dispCAS (Disp-CAS input option) based on uncoupled vectors (XY0 files)
+[33m9de405e[m Merge branch 'kasia' of https://gitlab.com/michal.hapka/pr-dmft into kasia
+[33md659fbe[m changes in e2dispCAS and e2dispCAS_pino: now dipsersion included in supermolecular CAS is computed
+[33ma6faa3e[m unblocked E1exch(S2) in SAPT
+[33m2ff499a[m some changes after testing e2dispCAS_Alpha
+[33ma32d00e[m fixed IGems condition in e2dispCAS_pino
+[33ma9dd570[m finished working on e2dispCAS_pino
+[33m649d698[m started working on e2dispCAS_pino
+[33mce3b240[m fixed IGem condition in e2dispCAS
+[33mdac026c[m fixed problems with multiple calls of sapt_response in DISP-CAS (SaptLevel=10)
+[33mb40409a[m fixed EblockData allocation bug
+[33ma670e86[m added e2disp(CAS) and adapted sapt_driver for Alpha integration
+[33m52934f2[m fixed minor issue in abfofo
+[33ma2df1d2[m added block multiplication in Y01CAS_FOFO
+[33m941e5c4[m in accas.f: if occ of the active orbital is equal to 1 than piars of this orbital with inactive orbs are excluded
+[33md21760e[m fixed problem with ThrSelAct
+[33m8ca03c4[m -added missing ac_exact_2el file
+[33m2f9b54c[m in accas.f CASPI_SR_PBE: caspidft with the sr_pbe functional; PBE_ONTOP_MD: implementation of the md, sr functional of Toulouse JCP 150, 084103 (2019)
+[33m549c441[m added M-correction and reading TRDMs in CASPiDFT
+[33m2ba2411[m disable "check_mp2" in abfofo.f90
+[33m5684873[m --added checking of MP2 energy in AC0 calculations (both INCORE and FOFO)
+[33m501900a[m --removed keyword Fragments --> now JobType EERPA or EERPA-OLD set IFlFrag1 = 1
+[33mad45949[m more info in MANUAL
+[33m56a9d0e[m print out of a sum of "2-body correlation for fragments in different monomers" added
+[33mf3e27e0[m --added keyword Core == IFlCore --added keyword JobType EERPA-OLD (or EERPA-1) --> IFl12=2
+[33m7527abc[m in interpa.f: old version of eerpa added (use Fil12=2) together with local descriptor of dispersion
+[33m64f1332[m --fixed some problems (integer(8) missing) with Eugene-DMRG
+[33m171f77c[m -fixed issue with module dependencies in Makefile (exdpino)
+[33m49825f9[m --added Eugene-DMRG (changes in ReadDMRG, sorter.f90), --added AC0-GVB and AC0-/AC1-/AC-CAS with Dalton (changes in ReadDAL and others...); ---AC0-GVB should work with FOFO (AC1 and AC not yet), --EERPA-GVB should also work (tests done for CH4-Ne)
+[33mf088190[m oh, forgot to add exmisc file!
+[33m4633369[m added exdisp and PINO
+[33mdae8dc1[m changed ERPAVECYX, PINOVEC and PINOVECRED to handle om<0 case
+[33md3f4265[m CASPIDFT now works. For it some changes has been made in xcfun.f90 molprogrid1 added to read x,y,z values of a grid (needed for analysis in caspidft interpa.f: transformation from tilded to untilded X,Y for ERPAVECYX added
+[33m55ab0c2[m -- added good Inactive value in SAPT!
+[33meee91cb[m -- added passing ThrSelAct in CAS through a common (set in main.f)
+[33m911f811[m -- added recognition of 'CASPIDFT' keyword for JobType
+[33mec38ad9[m -- added reading ACAlpha parameter from input's System blocks
+[33m351478a[m -- for now Exch1(s2) is commented
+[33m8082711[m -- fixed problem in srCAS+PBE SAPT calculations
+[33m7df7bd4[m -- added ERPASYMMYX in interpa.f
+[33mf38950e[m -- changed loops over Qab/Qba matrices in Exch(S2) not to use FRDM2
+[33m9dedd1b[m --- commented out some unecessary prints
+[33m34cdbc2[m Merge branch 'kasia-fofo' into kasia
+[33m627318b[m -- replaced SAPT call in mainp.f and added procedure for reading NoSt
+[33md17bfd3[m -- added better handling of integral in tra3Q_full! still need to work on ExchS2...
+[33m5888720[m changed files in MOLPRO (added dump_dens for POSTCAS jobs!)
+[33m90f0075[m -- INCORE and FOFO are now separated (i.e. NInte2=1 in FOFO), -- PDFT is available in FOFO version
+[33mb7e84c6[m -- added separate module "abfofo" which handles all ABPLUS/ABMIN routines using Coulomb (FFOO) and exchange (FOFO) integrals
+[33mdbd7719[m --fixed adding kernel in batches in AC0CASLR, --Y01CASLR_FOFO should be working fine now!
+[33m99ebce5[m -- corrected canonicalization in POSTCAS -- working on proper symmetrization in POSTCAS (both AC0CASLR and Y01CASLR_FOFO)
+[33m47d9281[m -- fixed problems with Hartree-Fock (1 active orb in CAS) reference for AC0 (Y01CAS_mithap/FOFO), -- PostCAS AC0 still not working,
+[33m34baaed[m -- fixed ModABMin_Act_FOFO, but still errors in PostCAS-AC0
+[33mf5cc410[m - added AC1 FOFO, - working on AC0 FOFO with LR (nothing works here?!)
+[33mf196adf[m -- added AC0-FOFO (works on modified Y01CAS_FOFO), -- AC0LR not added yet!
+[33md3744bc[m -- updated reading-in "States" (with ensemble), -- first (prototype) AC-FOFO, -- started work on AC0-FOFO (sth wrong still),
+[33mf2201bd[m - if no states are provided read 1,2RDMs for first available state from molpro file - print and count warnings
+[33m140efe2[m - added new use of the"State" keyword (it is possible to give several states for ensemble calculations) - NoSt.NoSym convention is used, where NoSt is the state number and NoSym denotes irrep
+[33m33799c4[m fixing the problem when some active orbitals are unoccupied (n_p=0). a new procedure (read_nact_molpro(nact,'2RDM')) has been created for reading the number of active orbitals from the molpro file. it is called from LdInteg. if the number of partially occupied orbitals (NAc) is different from the number of active orbitals nact (read from molpro) NAc is set to nact and a warning message is printed.
+[33m0981637[m new dfun_GGA_AB subroutine for computatin of GGA xc functional for alpha and beta inputs (in xcfun.f90). new GGA_ONTOP subroutine. in RunDFOnTop (Gagliardi method) a Call to SR_PBE_ONTOP (with omega=1.D-12) has been replaced with GGA_ONTOP. PBE is used but it can be changed to another functional in dfun_GGA_AB.
+[33m956db3b[m printout of the range separation parameter add in accas.f
+[33m5c43089[m - added caspidft.f file, - added batches in srKernel in lrAC1, started to work on batches in lrAC0
+[33md5be4ea[m - cleaned unecessary output prints
+[33m238bd1a[m -added Kernel keyword
+[33mbd9f4a2[m -fixed execute_command_line --> system in sapt_main!
+[33m74b71f8[m - added NoSt, added ERPAVECYX/ERPASYMM
+[33mdfab6d8[m - added orthogonalization of degenerate eigenvectors in ERPAVECYX (required in AC0CAS)
+[33me9940e6[m - srPBE+lrCAS (both SCF and PostCAS) should work, - also: open-shell system (AC and AC0 tested)
+[33m8216892[m - still works on srPBE+lrCAS
+[33me81c946[m - modified accas.f,acfd.f,dmscf.f,mainp.f , - AC/AC1/AC0 with CAS from Molpro should work , - srPBE+lrCAS+lrAC in progress
+[33m3618bbe[m - added some SAPT-MANUAL file (MANUAL)
+[33m74a7ec4[m - added new EKT (still missing mithap and FOFO versions), - added different omegas
+[33m96f96b5[m -- fixed ModABMin and MonABMin_mithap, -- included FOFO procedures in calc_resp_dft
+[33m7f92a40[m -- added missing files for Molpro2012
+[33m9a89ae0[m - added Y01CAS_FOFO (but sth seems slower there than in Y01CAS_mithap-?), - added ACEneERPA_FOFO and ACEneERPA_mithap, - added TwoMoInt keyword for System (=InCore/In-Core,Full,FOFO)
+[33mf92804f[m added abmats in one file
+[33m9e30a23[m -- added AB_CAS_FOFO (based on partial transformation to MO: uses J and K integrals, (FF|OO) and (FO|FO), respectively), -- moved all _mithap procedures to "abmat" module in abmats.f90,
+[33mbf8223a[m -- added ThrSelAct keyword for SystemBlock! (default=1.d-8) -- added PostCAS keyword for SystemBlock (adds VxcSR to XOne, but postCAS idea seems bad due to instabilities in Hessians)
+[33m5c04e7b[m -modified ModABMin_mithap to grid-in-batches, -started modification in Qab/Qba terms in exchs2
+[33m820cf0f[m - modified addition of kernel in ModABMin (still needs to be added in mithap version) - modified OrbGrid(NBasis,NGrid) --> OrbGrid(NGrid,NBasis) - modified ExchS2 FRDM2-->RDM2val!
+[33mfc78aa0[m working on DFT (GGA and RSH, no hybrids) in SAPT
+[33ma92bd07[m added gridmolpro.f90
+[33mde36dbe[m added preliminary interface for LR integrals from Molpro (including SAPT) added first batch of procedures for SAPT-DFT (with Molpro interface)
+[33m1f741f0[m added folder with integral/grid interface from MOLPRO2012 to pr-dmft (including SAPT)
+[33m193942b[m added interface to MOLPRO (CAS,HF). Perhaps more tests needed.
+[33maecab32[m added DE_CAS, Y01GVB (only UNC and SP, no SC!), delfile (not incorporated yet)
+[33m69d1409[m added sorting and orthogonalization in PINOVEC added DE_CAS (for 2-el systems should equal APSG_NEST with D(E)MIN=D(E)PLUS
+[33m4303887[m first working version of ACABMAT0_MITHAP!
+[33mcb91344[m added AuxH and AuxXC in ACABMAT0_mithap
+[33md501f5e[m ordered Y01CAS_mithap, started working on ACABMAT0_mithap!
+[33maed2b32[m  First working version of Y01CAS_mithap! Add IFlag0!
+[33md3dff4c[m added symmetrization on entry to PINOVEC
+[33mb041219[m fixed the problem for INActive=0 in AB_CAS_mithap (still to be fixed in Y01CAS_mithap!)
+[33m68fa56f[m Y01CAS_mithap---first working version!
+[33mbf5757e[m started work on Y01CAS_mithap
+[33ma9328fb[m eliminated IGFact(NInte2) matrix in AB_CAS and Y01CAS
+[33ma671abd[m AB_CAS_mithap: final version (yay!)
+[33md8208dc[m first working version of AB_CAS_mithap (uses FullPLUS,FullMIN)
+[33ma9a66b8[m added T5+T6 in AB_CAS_mithap
+[33m1587b75[m before dramatic change in AB_CAS_mithap
+[33mbc2141c[m improved upon AB_CASmithap (up to WMAT). Check if nothing screwed up in select_active!
+[33mc3fe567[m added E2disp(w12) and E2disp(sc2) tests, started working on AB_CAS_mithap
+[33mc42d7c4[m IndN problem fixed by Kasia: now Y01CAS sorts EigVecs to match old IndN (N^4 scaling..)
+[33m6a631a1[m added changes to ExchS2, E2disp_unc, problem with ERPAVEC Achtung!!! Still problem with running E2disp_cpld and E2disp_unc simultaneously -- something wrong with IndN in Y0Y1CAS(?)
+[33mb003791[m added sorting occupations and orbitals to make symmetry work!
+[33m52b1d5b[m -- some preliminary work on uncoupled, semicoupled (still messy!), -- added handling 1-el integrals and CMOs with symmetry
+[33mf11e74e[m further work on E1exchS2 (first crude working HF/CAS implementation)
+[33mb5f204a[m started work on E1Exch(S2)
+[33md2bb252[m some changes from laptop version (SmallE and BigE in "e2disp")
+[33m665b537[m fixed(?) a mysterious bug in SAPT-CAS
+[33m879face[m added option for HF/CAS SAPT calculations (needed for NH3-F2 in CAS)
+[33m242bddd[m added timing module (CPU Time, Wall Time)
+[33m32221a4[m E2ind with TD-APSG response. Moreover, some changes to PINO part.
+[33m09804bf[m some crude work on 2-electron FCI systems
+[33m24d35c5[m work on E2disp_APSG
+[33m87b54ee[m added E2ind (to be verified!)
+[33mf51d9c8[m added make_K, make_elpot
+[33me127bf2[m First part of works on TD-APSG E2disp (not working yet...)
+[33ma7720f9[m added E1pol which seems to work
+[33m18e4e78[m added tran4_gen (for general 4-idx transformation), adapted E2disp(unc); added make_J in tran.f90
+[33m12aff62[m Several changes: - E2disp(unc/cpld) (integrals read directly from TWOMOAB), - fixed read_syminof, - reduced the size TMPSORT (ival and rval kept in one record), - tran4sym -> tran4full. - WARNING! Still missing general tran4_unsym -> TwoMO(Sq,Sq)!
+[33m38bcd46[m some changes: 2el-ints, added SAPT-HF disp (disp not working properly yet)
+[33m733000b[m added some preliminary e2disp
+[33m1121262[m some work on NAddr3, e2disp (still not good..)
+[33mbe138a1[m response for GVB ready - still missing response for CAS
+[33m17a2107[m added look-up tables in sapt_interface
+[33mef3e0ce[m sorting and tranformation of 2-el intergrals added to SAPT
+[33m5e28e5e[m added sapt_main.f90!
+[33m6227586[m so the work on sapt_driver continues ...
+[33mbb772ee[m changes to sapt_interface: reading orbitals, GVB and CAS occupations, CICOef etc. (not ready yet)
+[33m2d943f3[m some initial work on one_int
+[33mb3c42cd[m added reading NBasis from SIRIUS.RST for DALTON (basinfo)
+[33m019a5b7[m some minor improvements to switch to the new input file
+[33me29bcbe[m Added create_System (also for SAPT)
+[33m8ee88fa[m Flags for calculations are read from input.inp! (AC/AC1/AC0 - GVB/CAS checked for F2/H2O)
+[33mc8e237c[m ignore TESTS/*
+[33m3b10e6a[m eh only Makefile
+[33mdee9684[m solve the 'makefile' business somehow in the future
+[33m03fe206[m merged with Kasia's CORE CODE
+[33md6886da[m added some changes to flags
+[33mf547370[m fixed small mistake in types.f90 (found in ifort)
+[33mf0c9517[m Added AOTWOINT sorter, tran4_sym_out_of_core, tran4_sym_in_core. Basic data structures for Input.
+[33mbf6f923[m added "make clean"
+[33m5501507[m initial commit

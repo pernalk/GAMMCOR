@@ -3,12 +3,13 @@ use types
 use tran
 use timing
 use exmisc
+use sapt_utils
 
 implicit none
 
 contains
 
-subroutine e2exdisp_apsg(Flags,A,B,SAPT)
+subroutine e2exdisp_pino(Flags,A,B,SAPT)
 
 implicit none
 
@@ -80,8 +81,8 @@ double precision,parameter :: BigE = 1.D8
           Vaba(NBas,NBas),Vaab(NBas,NBas),Vbab(NBas,NBas))
  allocate(tmp1(NBas,NBas),tmp2(NBas,NBas))
 
- call get_den(NBas,A%CMO,A%Occ,1d0,PA)
- call get_den(NBas,B%CMO,B%Occ,1d0,PB)
+ call get_den(NBas,NBas,A%CMO,A%Occ,1d0,PA)
+ call get_den(NBas,NBas,B%CMO,B%Occ,1d0,PB)
 
  !print*, A%Occ
  !print*, 'AAAA' 
@@ -429,7 +430,7 @@ double precision,parameter :: BigE = 1.D8
  deallocate(posB,posA)
  deallocate(Vbab,Vaba,Vaab,Vbaa,Vabb,Vb,Va,PB,PA,Sab,S)
 
-end subroutine e2exdisp_apsg
+end subroutine e2exdisp_pino
 
 subroutine make_tij_Y_PINO(tmp3,tmp2,tmp1,posA,posB,Sab,Sba,A,B,NBas)
 implicit none

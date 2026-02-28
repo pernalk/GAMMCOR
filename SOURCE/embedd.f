@@ -12,7 +12,7 @@ C     !!! V_XC WILL BE STORED IN XNuc
 C
       Implicit Real*8 (A-H,O-Z)
 C
-      Character*60 Title,FMultTab
+      Character*60 Title
 C
       Include 'commons.inc'
 C

@@ -1,36 +1,35 @@
 *Deck ACIter
       Subroutine ACIter(ETot,ENuc,TwoNO,URe,Occ,XOne,UNOAO,
-     $ IndAux,ABPLUS,ABMIN,EigVecR,Eig,EGOne,
-     $ Title,NBasis,NInte1,NInte2,NDim,NGOcc,NGem,
+     $ IndAux,NBasis,NInte1,NInte2,NDim,NGem,
      $ IndN,IndX,NDimX)
 C
       use abmat
       use abfofo
-C 
+C
 C     AC Iteratively
 C
       Implicit Real*8 (A-H,O-Z)
 C
-      Character*60 FMultTab,Title
       Include 'commons.inc'
 c
       Parameter(Zero=0.D0,Half=0.5D0,One=1.D0,Two=2.D0,Three=3.D0,
      $ Four=4.D0)
 C
       Dimension URe(NBasis,NBasis),Occ(NBasis),
-     $ TwoNO(NInte2),
-     $ XOne(NInte1),IndAux(NBasis),
-     $ ABPLUS(NDim*NDim),ABMIN(NDim*NDim),
-     $ EigVecR(NDim*NDim),
-     $ Eig(NDim),EGOne(NGem),
-     $ UNOAO(NBasis,NBasis),
+     $ TwoNO(NInte2),XOne(NInte1),IndAux(NBasis),
+     $ EGOne(NGem),UNOAO(NBasis,NBasis),
      $ IndX(NDim),IndN(2,NDim)
+      Real*8, Dimension(:,:), Allocatable :: PMat
 C
 C     LOCAL ARRAYS
 C
+      Dimension ABPLUS(NDim*NDim),ABMIN(NDim*NDim)
       Dimension XGrid(100), WGrid(100)
+      Logical IURE, IFOFO
 C
-c      goto 132
+      If (IFlACFREQNTH.Eq.1) Then
+C
+      If (ICholesky.Eq.0) Then
 C
       If(ITwoEl.eq.1) Then
 C
@@ -41,7 +40,11 @@ C
 C
       ElseIf(ITwoEl.eq.3) Then
 C
-      Call WIter_FOFO(ECorr,XOne,URe,Occ,
+C     Find AC energy in one shot (no lambda integration) by expanding C in lambda 
+C     and integrating analytically
+C
+      Stop 'Set Cholesky .true. in input.inp'
+      Call WIter_FOFO(ECorr,Max_Cn,XOne,URe,Occ,
      $ EGOne,NGOcc,
      $ IGem,NAcCAS,NInAcCAS,NELE,
      $ NBasis,NInte1,NDim,NGem,IndAux,
@@ -49,24 +52,120 @@ C
 C
       EndIf
 C
+C     If (ICholesky.Eq.0) Then
+      Else
+C
+C     Find AC energy in one shot (no lambda integration) by expanding C in lambda
+C     and integrating analytically, Cholesky decomposition is employed
+C     to lower dimensionality of the C(omega)-problem 
+C
+      Call WIter_D12Chol(ECorr,0,Max_Cn,XOne,URe,Occ,
+     $ EGOne,NGOcc,IGem,NAcCAS,NInAcCAS,NELE,
+     $ NBasis,NInte1,NDim,NGem,IndAux,
+     $ IndN,IndX,NDimX)
+C
+      EndIf
+C
+C     If (IFlACFREQNTH.Eq.1) Then
+C
       ETot=EGOne(1)
       Write
-     $ (6,'(/,2X,''ECASSCF+ENuc, AC-Corr, AC-ERPA-CASSCF '',4X,3F15.8)')
+     $ (6,'(/,2X,''ECASSCF+ENuc, ACn-Corr, ACn-CASSCF '',4X,3F15.8)')
      $ ETot+ENuc,ECorr,ETot+ENuc+ECorr
-      stop
 C
-  132 continue
+C     delete cholesky vecs
+      Open(newunit=iunit,file='cholvecs',status='OLD')
+      Close(iunit,status='DELETE')
+C     delete FOFO/FFOO ints
+      Inquire(file='FOFO',exist=IFOFO)
+      If (IFOFO) Then
+         Open(newunit=iunit,file='FOFO',status='OLD')
+         Close(iunit,status='DELETE')
+         Open(newunit=iunit,file='FFOO',status='OLD')
+         Close(iunit,status='DELETE')
+      EndIf
+C     delete CMONO matrixormation
+      Inquire(file='ure_casno.dat',exist=IURE)
+      If (IURE) Then
+         Open(newunit=iunit,file='ure_casno.dat',status='OLD')
+         Close(iunit,status='DELETE')
+      EndIf
+C
+      Return
+C
+      EndIf
+C
+      If (IFlAC1FREQNTH.Eq.1) Then
+C
+      If (ICholesky.Eq.0) Stop 'Error: AC1FREQNTH only available 
+     $ with Cholesky'
+C
+       Call WIter_D12Chol(ECorr,1,Max_Cn,XOne,URe,Occ,
+     $ EGOne,NGOcc,IGem,NAcCAS,NInAcCAS,NELE,
+     $ NBasis,NInte1,NDim,NGem,IndAux,
+     $ IndN,IndX,NDimX)
+C
+      ETot=EGOne(1)
+      Write
+     $ (6,'(/,2X,''ECASSCF+ENuc, AC1-Corr, AC1-CASSCF '',4X,3F15.8)')
+     $ ETot+ENuc,ECorr,ETot+ENuc+ECorr
+C
+      Return
+C
+      EndIf
+C
+C     *************************************************************************************
+C     what follows is AC calculation with omega frequency integration by iteration C(omega)
+C     available only together with cholesky decomposition
+C     *************************************************************************************
+c      If (ICholesky.Eq.0) Then
+c      Write(6,'(" ACFREQ is only available with Cholesky .true.")')
+c      Stop
+c      EndIf
+C
+C     Find the projector PMat
+C
+      Allocate(PMat(NDimX,NDimX))
+      If(ICholesky.Eq.1.And.ITwoEl.eq.3) 
+     $ Call Project_DChol(PMat,IndN,NBasis,NDimX)
 C
 C     GENERATE ABSCISSAS AND WEIGHTS FOR GAUSSIAN-LEGENDRE QUADRATURE
 C
       NGrid=5
-c      NGrid=30
 C
       Call GauLeg(Zero,One,XGrid,WGrid,NGrid)
-C 
+C
       ECorr=Zero
+C
+      If(ITwoEl.eq.3) Then
+C
+      If (ICholesky.Eq.0) Then
+      Write(6,
+     $ '(" ACFREQ with FOFO is only available with Cholesky .true.")')
+      Stop
+      EndIf
+C
+      ACAlpha=Zero
+C
+C      Call WInteg_FOFO(ECorrA,XOne,URe,Occ,
+C     $ EGOne,NGOcc,
+C     $ IGem,NAcCAS,NInAcCAS,NELE,
+C     $ NBasis,NInte1,NDim,NGem,IndAux,ACAlpha,
+C     $ IndN,IndX,NDimX)
+CC
+C      goto 777
+      Call CIter_FOFO(PMat,ECorrA,ACAlpha,XOne,URe,Occ,
+     $ EGOne,NGOcc,
+     $ IGem,NAcCAS,NInAcCAS,NELE,
+     $ NBasis,NInte1,NDim,NGem,IndAux,
+     $ IndN,IndX,NDimX)
+  
+  777 ECorr=-ECorrA
+      ECorr0=ECorrA
+      EndIf
+C
       Do I=1,NGrid
-C   
+C
       ACAlpha=XGrid(I)
 C
       If(ITwoEl.eq.1) Then
@@ -77,15 +176,28 @@ C
 C
       ElseIf(ITwoEl.eq.3) Then
 C
-      Call WInteg_FOFO(ECorrA,XOne,URe,Occ,
+C     C(Omega) WILL BE FOUND NONITERATIVELY BY INVERTING THE NDimX X NDimX matrix 
+C
+C      Call WInteg_FOFO(ECorrA,XOne,URe,Occ,
+C     $ EGOne,NGOcc,
+C     $ IGem,NAcCAS,NInAcCAS,NELE,
+C     $ NBasis,NInte1,NDim,NGem,IndAux,ACAlpha,
+C     $ IndN,IndX,NDimX)
+CC
+C      goto 666
+C
+C     ITERATIVE SOLUTION FOR C(Omega)
+C
+      Call CIter_FOFO(PMat,ECorrA,ACAlpha,XOne,URe,Occ,
      $ EGOne,NGOcc,
      $ IGem,NAcCAS,NInAcCAS,NELE,
-     $ NBasis,NInte1,NDim,NGem,IndAux,ACAlpha,
+     $ NBasis,NInte1,NDim,NGem,IndAux,
      $ IndN,IndX,NDimX)
+  666 continue
 C
       EndIf
 C
-      Write(*,*)'ACAlpha ',ACAlpha,' W_ALPHA ',ECorrA
+      Write(*,*)'ACAlpha ',ACAlpha,' W_ALPHA ',ECorrA-ECorr0
 C
       ECorr=ECorr+WGrid(I)*ECorrA
 C
@@ -96,6 +208,7 @@ C
      $ (6,'(/,2X,''ECASSCF+ENuc, AC-Corr, AC-ERPA-CASSCF '',4X,3F15.8)')
      $ ETot+ENuc,ECorr,ETot+ENuc+ECorr
 C
+      Deallocate(PMat)
       Call DelInts(ITwoEl)
 C
       Return
@@ -157,12 +270,12 @@ C
       EndDo
       EndDo
 C
-C     Frequency integration of CMAT 
+C     Frequency integration of CMAT
 C
       NGrid=18
       Call FreqGrid(XFreq,WFreq,NGrid)
-C   
-      COM=0.0 
+C
+      COM=0d0
       Do IGL=1,NGrid
 C
       OmI=XFreq(IGL)
@@ -269,7 +382,7 @@ C
      $ IndN,IndX,NDimX,NBasis,NDim,NInte1,NInte2,ACAlpha)
 C
       ABPLUS1=ABPLUS1-ABPLUS0
-      WORK1=WORK1-WORK0 
+      WORK1=WORK1-WORK0
 C
       EGOne(1)=ECASSCF
 C
@@ -286,23 +399,23 @@ C
       EndDo
       EndDo
 C
-C     A0=ABPLUS0*ABMIN0      
+C     A0=ABPLUS0*ABMIN0
       Call dgemm('N','N',NDimX,NDimX,NDimX,1d0,ABPLUS0,NDimX,
-     $           WORK0,NDimX,0.0,A0,NDimX)
+     $           WORK0,NDimX,0d0,A0,NDimX)
 C     A1=ABPLUS0*ABMIN1+ABPLUS1*ABMIN0
       Call dgemm('N','N',NDimX,NDimX,NDimX,1d0,ABPLUS0,NDimX,
-     $           WORK1,NDimX,0.0,A1,NDimX)
+     $           WORK1,NDimX,0d0,A1,NDimX)
       Call dgemm('N','N',NDimX,NDimX,NDimX,1d0,ABPLUS1,NDimX,
      $           WORK0,NDimX,1d0,A1,NDimX)
 C     A2=ABPLUS1*ABMIN1
       Call dgemm('N','N',NDimX,NDimX,NDimX,1d0,ABPLUS1,NDimX,
-     $           WORK1,NDimX,0.0,A2,NDimX)      
+     $           WORK1,NDimX,0d0,A2,NDimX)
 C
 c      NGrid=18
       NGrid=25
       Call FreqGrid(XFreq,WFreq,NGrid)
-C   
-      COM=0.0 
+C
+      COM=0d0
       Do IGL=1,NGrid
 C
       OmI=XFreq(IGL)
@@ -318,19 +431,19 @@ C
 C
 C     C0=C(0)
       Call dgemm('N','N',NDimX,NDimX,NDimX,0.5d0,WORK1,NDimX,
-     $           ABPLUS0,NDimX,0.0,C0,NDimX)
+     $           ABPLUS0,NDimX,0d0,C0,NDimX)
 C     WORK0=LAMBDA*A1
       Call dgemm('N','N',NDimX,NDimX,NDimX,1d0,WORK1,NDimX,
-     $           A1,NDimX,0.0,WORK0,NDimX)  
+     $           A1,NDimX,0d0,WORK0,NDimX)
 C     C1=C(1)
       Call dgemm('N','N',NDimX,NDimX,NDimX,1d0,WORK0,NDimX,
-     $           C0,NDimX,0.0,C1,NDimX) 
+     $           C0,NDimX,0d0,C1,NDimX)
       Call dgemm('N','N',NDimX,NDimX,NDimX,0.5d0,WORK1,NDimX,
      $           ABPLUS1,NDimX,-1.d0,C1,NDimX)
 C
 C     WORK1=LAMBDA*A2
       Call dgemm('N','N',NDimX,NDimX,NDimX,1.d0,WORK1,NDimX,
-     $           A2,NDimX,0.0,C2,NDimX)
+     $           A2,NDimX,0d0,C2,NDimX)
       WORK1=C2
 C
 C     FROM NOW ON: LAMBDA*A2 in WORK1, LAMBDA*A1 in WORK0
@@ -340,7 +453,7 @@ CC     C(2)
 C      Call dgemm('N','N',NDimX,NDimX,NDimX,1d0,AIN,NDimX,
 C     $           C1,NDimX,0.0,C2,NDimX)
 C      Call dgemm('N','N',NDimX,NDimX,NDimX,-2.d0,ABMIN0,NDimX,
-C     $           C0,NDimX,-2.d0,C2,NDimX)      
+C     $           C0,NDimX,-2.d0,C2,NDimX)
 C
 CC     C(3)
 C      Call dgemm('N','N',NDimX,NDimX,NDimX,1d0,AIN,NDimX,
@@ -362,7 +475,7 @@ C     C(n)
       XN1=-N
       XN2=-N*(N-1)
       Call dgemm('N','N',NDimX,NDimX,NDimX,1d0,WORK0,NDimX,
-     $           C1,NDimX,0.0,C2,NDimX)
+     $           C1,NDimX,0d0,C2,NDimX)
 
       Call dgemm('N','N',NDimX,NDimX,NDimX,XN2,WORK1,NDimX,
      $           C0,NDimX,XN1,C2,NDimX)
@@ -378,7 +491,7 @@ C
 C     IGL
       EndDo
 C
-C     W Integrand 
+C     W Integrand
 C
       ECorr=Zero
 C
@@ -416,9 +529,9 @@ C
       Implicit Real*8 (A-H,O-Z)
       Dimension XFreq(NFreq),WFreq(NFreq)
 C
-      Call GauLeg(-1.D0,1.D0,XFreq,WFreq,NFreq) 
+      Call GauLeg(-1.D0,1.D0,XFreq,WFreq,NFreq)
 C
-      X0=0.5D0
+      X0=1.0D0
 C
       Do IGL=1,NFreq
       WFreq(IGL)=2.*X0*WFreq(IGL)/(1.-XFreq(IGL))**2

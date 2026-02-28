@@ -1,6 +1,8 @@
 module abmat
-use types,only : LOUT
+
+use print_units
 use tran
+
 implicit none
 
 contains 
@@ -3190,11 +3192,14 @@ subroutine FockGen_mithap(Fock,OneRdm,XOne,NInte1,NBasis,IntFileName)
 !
 implicit none
 
+type(AOReaderData) :: reader
+
 integer,intent(in) :: NInte1,NBasis
 character(*) :: IntFileName
-double precision,intent(in) :: OneRdm(NInte1),XOne(NInte1)
+double precision,intent(in)  :: OneRdm(NInte1),XOne(NInte1)
 double precision,intent(out) :: Fock(Ninte1)
-integer :: iunit,kk,ll,kl,klround,k,l
+integer :: iunit,kl,k,l
+logical :: empty
 double precision,allocatable :: OneRdmSq(:,:),FockSq(:,:),ints(:,:),work1(:)
 
 
@@ -3203,14 +3208,15 @@ allocate(OneRdmSq(NBasis,NBasis),FockSq(NBasis,NBasis),ints(NBasis,NBasis),work1
 call triang_to_sq2(OneRdm,OneRdmSq,NBasis)
 call triang_to_sq2(XOne,FockSq,NBasis)
 
-open(newunit=iunit,file=trim(IntFileName),status='OLD',&
-     access='DIRECT',form='UNFORMATTED',recl=8*NInte1)
+call reader%open(trim(IntFileName))
 
 kl = 0
 do l=1,NBasis
    do k=1,l
       kl = kl + 1
-      read(iunit,rec=kl) work1(1:NBasis*(NBasis+1)/2)
+      !read(iunit,rec=kl) work1(1:NBasis*(NBasis+1)/2)
+      call reader%getTR(kl,work1,empty)
+      if(empty) cycle
       call triang_to_sq2(work1,ints,NBasis)
        
       if(k==l) then
@@ -3225,7 +3231,8 @@ do l=1,NBasis
    enddo
 enddo
 
-close(iunit)
+!close(iunit)
+call reader%close
 
 call sq_to_triang2(FockSq,Fock,NBasis) 
 

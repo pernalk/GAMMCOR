@@ -1,0 +1,22 @@
+! test for input
+
+Calculation
+ JobTitle   AC
+ Interface  MOLPRO
+ JobType    ACFREQNTH
+ Max_Cn 10
+ !JobType AC
+ RDMType    CAS
+ TwoMoInt   FOFO
+
+ Cholesky    .true.
+ Cholesky_Accuracy DEFAULT
+end
+
+System
+ ZNucl   18
+ Charge  0
+ ThrSelAct    1.d-2
+! ThrSelAct    1.d-4
+ ThrQVirt      1.D-1
+end

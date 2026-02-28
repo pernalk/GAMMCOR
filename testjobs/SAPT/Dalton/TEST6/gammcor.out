@@ -1,0 +1,297 @@
+ 
+ GIT INFO
+********************************************************************************
+ Branch:             IntCholesky
+ Revision (short):   3873c1f
+ Revision (full):    3873c1f17f00ed54ec5a879f598782f8aef42919
+ Latest commit date: Wed Mar 29 18:57:54 2023 +0200
+ Latest tag:         v-4.1
+ 
+ 
+ BUILD INFO
+********************************************************************************
+ Fortran compiler:   GNU /usr/bin/gfortran
+ C++ compiler:       GNU /usr/bin/g++
+ C compiler:         GNU /usr/bin/gcc
+ Compile options:    
+ -funroll-loops -O3 -ffree-line-length-none -fallow-argument-mismatch -march=nat
+ ive
+ BLAS libraries:     /usr/lib/x86_64-linux-gnu/libopenblas.so
+ 
+
+ INPUT 
+********************************************************************************
+ JOB TITLE:     Dalton / H2O-H2O
+ INTERFACE:     DALTON  
+ JOB TYPE:      SAPT     
+ RDM TYPE:      CASSCF  
+ RDM SOURCE:    DALTON  
+
+ MONOMER:       A       
+ ZNUCL:        10
+ CHARGE:        0
+ NO. OF ATOMS:  3
+ NO. OF SYM. EQUIV. ATOMS:  3
+
+ MONOMER:       B       
+ ZNUCL:        10
+ CHARGE:        0
+ NO. OF ATOMS:  3
+ NO. OF SYM. EQUIV. ATOMS:  3
+
+
+ INPUT CHECK PASSED
+********************************************************************************
+
+ SYSTEM 
+********************************************************************************
+ MONOMER A
+ NUCLEAR CHARGE:  10
+ CHARGE:           0
+ NO.OF ATOMS:      3
+ THRESH ACTIVE:    0.100000E-08
+
+ MONOMER B
+ NUCLEAR CHARGE:  10
+ CHARGE:           0
+ NO.OF ATOMS:      3
+ THRESH ACTIVE:    0.100000E-08
+ PRINT LEVEL:      0
+
+
+ IFunSR=0
+
+ IFunSRKer=0
+
+
+ STARTING SAPT CALCULATIONS
+********************************************************************************
+ One-electron integrals written to file: ONEEL_A
+ One-electron integrals written to file: ONEEL_B
+
+ Occupancies for monomer 1 read from SIRIUS_A.RST
+ Occupancies for monomer 2 read from SIRIUS_B.RST
+
+ CAS ORBITALS           Monomer A     Monomer B
+ INACTIVE                   1             1
+ ACTIVE                     8             8
+
+ ORBITAL OCCUPANCIES
+ CASSCF   Occupancy-A    Gem-A          Occupancy-B      Gem-B
+   1     0.100000E+01      1           0.100000E+01        1
+   2     0.994321E+00      2           0.994188E+00        2
+   3     0.990565E+00      2           0.990440E+00        2
+   4     0.987842E+00      2           0.987757E+00        2
+   5     0.986735E+00      2           0.986774E+00        2
+   6     0.131486E-01      2           0.130972E-01        2
+   7     0.124400E-01      2           0.124740E-01        2
+   8     0.901754E-02      2           0.914559E-02        2
+   9     0.593109E-02      2           0.612367E-02        2
+  10     0.000000E+00      3           0.000000E+00        3
+  11     0.000000E+00      3           0.000000E+00        3
+  12     0.000000E+00      3           0.000000E+00        3
+  13     0.000000E+00      3           0.000000E+00        3
+  14     0.000000E+00      3           0.000000E+00        3
+  15     0.000000E+00      3           0.000000E+00        3
+  16     0.000000E+00      3           0.000000E+00        3
+  17     0.000000E+00      3           0.000000E+00        3
+  18     0.000000E+00      3           0.000000E+00        3
+  19     0.000000E+00      3           0.000000E+00        3
+  20     0.000000E+00      3           0.000000E+00        3
+  21     0.000000E+00      3           0.000000E+00        3
+  22     0.000000E+00      3           0.000000E+00        3
+  23     0.000000E+00      3           0.000000E+00        3
+  24     0.000000E+00      3           0.000000E+00        3
+  25     0.000000E+00      3           0.000000E+00        3
+  26     0.000000E+00      3           0.000000E+00        3
+  SUM OF OCCUPANCIES:   5.0000                    5.0000
+
+ Orbitals read from SIRIUS_A.RST
+ Orbitals read from SIRIUS_B.RST
+
+ Number of basis functions:                        26
+ Number of independent pairs:                     351
+ Number of columns in segment:                    351
+ Number of passes:                                  1
+
+ CPU  time in 2ints                is                0.003 s
+ Wall time in 2ints                is                0.003 s
+
+ Monomer A
+  Active Orbital:    2    0.9943E+00
+  Active Orbital:    3    0.9906E+00
+  Active Orbital:    4    0.9878E+00
+  Active Orbital:    5    0.9867E+00
+  Active Orbital:    6    0.1315E-01
+  Active Orbital:    7    0.1244E-01
+  Active Orbital:    8    0.9018E-02
+  Active Orbital:    9    0.5931E-02
+ num0           1
+ num1           8
+ num2          17
+ Threshold for active orbitals:           0.10000E-07
+ Threshold for quasi-virtual orbitals:    0.10000E-06
+ Threshold for quasi-inactive orbitals:   0.10000E-03
+
+ Monomer B
+  Active Orbital:    2    0.9942E+00
+  Active Orbital:    3    0.9904E+00
+  Active Orbital:    4    0.9878E+00
+  Active Orbital:    5    0.9868E+00
+  Active Orbital:    6    0.1310E-01
+  Active Orbital:    7    0.1247E-01
+  Active Orbital:    8    0.9146E-02
+  Active Orbital:    9    0.6124E-02
+ num0           1
+ num1           8
+ num2          17
+ Threshold for active orbitals:           0.10000E-07
+ Threshold for quasi-virtual orbitals:    0.10000E-06
+ Threshold for quasi-inactive orbitals:   0.10000E-03
+
+                           Monomer A    Monomer B
+ Active orbital:    2    0.9943E+00    0.9942E+00
+ Active orbital:    3    0.9906E+00    0.9904E+00
+ Active orbital:    4    0.9878E+00    0.9878E+00
+ Active orbital:    5    0.9867E+00    0.9868E+00
+ Active orbital:    6    0.1315E-01    0.1310E-01
+ Active orbital:    7    0.1244E-01    0.1247E-01
+ Active orbital:    8    0.9018E-02    0.9146E-02
+ Active orbital:    9    0.5931E-02    0.6124E-02
+ ------------------------------------------------
+ Total Active:                 8           8
+ Transforming integrals for FFOOAA
+
+ CPU  time in FFOO                 is                0.006 s
+ Wall time in FFOO                 is                0.028 s
+ Transforming integrals for FOFOAA
+
+ CPU  time in FOFO                 is                0.009 s
+ Wall time in FOFO                 is                0.009 s
+ Transforming integrals for FFOOBB
+
+ CPU  time in FFOO                 is                0.003 s
+ Wall time in FFOO                 is                0.003 s
+ Transforming integrals for FOFOBB
+
+ CPU  time in FOFO                 is                0.005 s
+ Wall time in FOFO                 is                0.005 s
+
+ Active block of 2-RDM read from rdm2.dat
+ CASSCF Energy (w/o ENuc)        -85.26296591
+
+ Warning: Hessian AB matrices are NOT symmetrized!
+          (AB_CAS_FOFO)
+ ABPlus   158.074579115680     
+ ABMin   193338.384361883     
+
+ Calculating reponse for the ground state
+ Solving symmetric eigenvalue equation...
+
+
+ ECASSCF+ENuc, Corr, ERPA-CASSCF         -76.10735620    -0.01242184   -76.11977803
+
+ Warning: Hessian AB(0) matrices are NOT symmetrized!
+          Max Difference in AB0PLUS:    0.000000
+          Max Difference in AB0MIN :    0.000076
+
+ Active block of 2-RDM read from rdm2.dat
+ CASSCF Energy (w/o ENuc)        -85.26296591
+
+ Warning: Hessian AB(1) matrices are symmetrized!
+          (AB_CAS_FOFO : AB1)
+
+ Active block of 2-RDM read from rdm2.dat
+ CASSCF Energy (w/o ENuc)        -85.28315918
+
+ Warning: Hessian AB matrices are NOT symmetrized!
+          (AB_CAS_FOFO)
+ ABPlus   158.338559984406     
+ ABMin   243544.425455042     
+
+ Calculating reponse for the ground state
+ Solving symmetric eigenvalue equation...
+
+
+ ECASSCF+ENuc, Corr, ERPA-CASSCF         -76.10873907    -0.01272331   -76.12146239
+
+ Warning: Hessian AB(0) matrices are NOT symmetrized!
+          Max Difference in AB0PLUS:    0.000000
+          Max Difference in AB0MIN :    0.000011
+
+ Active block of 2-RDM read from rdm2.dat
+ CASSCF Energy (w/o ENuc)        -85.28315918
+
+ Warning: Hessian AB(1) matrices are symmetrized!
+          (AB_CAS_FOFO : AB1)
+
+ Transforming E2disp integrals...
+ Transforming integrals for TWOMOAB
+
+ Transforming E2exch-ind integrals...
+ Transforming integrals for FOFOAABB
+ Transforming integrals for FOFOBBBA
+ Transforming integrals for FOFOAAAB
+ Transforming integrals for FFOOABAB
+ Transforming integrals for FOFOBBAB
+ Transforming integrals for FOFOAABA
+
+ Transforming E2exch-disp integrals...
+ Transforming integrals for FOFOABBA
+ Transforming integrals for FFOOABBB
+ Transforming integrals for FFOOBAAA
+ Transforming integrals for TMPOOAB
+
+ V_nucB_elA       =    -17.95966018
+ V_nucA_elB       =    -18.51953462
+ V_elA_elB        =     18.23887894
+ V_nn             =     18.22120943
+
+ Eelst            =    -19.10642461
+ Transforming integrals for TWOA3B
+ Transforming integrals for TWOB3A
+
+ ExchS2           =     13.01592704
+
+ Ind(B<--A)       =     -3.41372561
+ Ind(A<--B)       =     -1.94528891
+ E2ind            =     -5.35901452
+
+ Ind(B<--A,unc)   =     -2.31324468
+ Ind(A<--B,unc)   =     -1.67493181
+ E2ind(unc)       =     -3.98817649
+
+ CPU  time in E2ind                is                0.000 s
+ Wall time in E2ind                is                0.000 s
+
+ E2disp           =     -1.21241380
+ E2disp(unc)      =     -0.95074302
+ E2disp(sp)       =     -1.03189684
+ E2disp(sc)       =     -1.10884599
+
+ CPU  time in E2disp               is                0.008 s
+ Wall time in E2disp               is                0.008 s
+
+ E2exch-ind(unc)  =      2.46361523
+
+ E2exch-ind       =      3.29065466
+
+ E2exch-disp(unc) =      0.21874691
+
+ E2exch-disp      =      0.28086370
+
+****************************************
+ SAPT SUMMARY / milliHartree
+****************************************
+ Interface   = DALTON  
+ SAPT level  =  2
+ E1elst           =    -19.10642461
+ E1exch(S2)       =     13.01592704
+ E2ind            =     -5.35901452
+ E2exch-ind       =      3.29065466
+ E2disp           =     -1.21241380
+ E2exch-disp      =      0.28086370
+ Eint(SAPT2)      =     -9.09040754
+
+ CPU  time in SAPT                 is                0.328 s
+ Wall time in SAPT                 is                0.355 s

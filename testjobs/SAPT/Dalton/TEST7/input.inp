@@ -1,0 +1,40 @@
+! input for SAPT-CAS with Dalton interface
+ 
+Calculation
+ JobTitle   Dalton+symmetry / He-H2O
+ Interface  DALTON
+ JobType    SAPT
+ RDMType    CAS
+ IPrint     1
+end
+
+System
+ Monomer A
+ NAtoms  1
+ UAtoms  1
+ ZNucl   2
+ Charge  0
+ !TwoMOInt INCORE
+end
+
+System
+ Monomer B
+ NAtoms  3
+ UAtoms  2
+ ZNucl   10
+ Charge  0
+ !TwoMOInt INCORE
+end
+
+! BENCHMARK
+! E1elst      =    -149.01734142
+! E1exch(S2)  =     437.86832074
+! E2ind(unc)  =    -141.30133958
+! E2ind       =    -180.78628918
+! E2exch-ind(unc)  = 55.21299018
+! E2exch-ind  =      70.09813598
+! E2disp      =     -27.44329677
+! E2exch-disp(unc) =  0.69132109
+! E2exch-disp =       1.88919335
+! Eint(SAPT2) =     152.60872271
+

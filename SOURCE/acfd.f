@@ -6,12 +6,14 @@
 C
       use abmat
       use abfofo
+      use ab0fofo
+      use omp_lib
 C 
 C     A ROUTINE FOR COMPUTING ELECTRONIC ENERGY USING AC CORRELATION ENERGY FORMULA
 C
       Implicit Real*8 (A-H,O-Z)
 C
-      Character*60 FMultTab,Title
+      Character*60 Title
       Include 'commons.inc'
 c
       Parameter(Zero=0.D0,Half=0.5D0,One=1.D0,Two=2.D0,Three=3.D0,
@@ -32,6 +34,10 @@ C
       Integer Points
 C     HAP
       Double precision,Allocatable :: WorkVec(:),WorkEig(:),MYAP(:) 
+C
+      real*8, dimension(:), allocatable :: ABPLUS_tmp, ABMIN_tmp
+      real*8, dimension(:), allocatable :: EigVecR_tmp, Eig_tmp
+
 C
       If(IFlSnd.Eq.1) Then
 C
@@ -65,7 +71,7 @@ C
 C
       Call AC0CAS_FOFO(ECorr,ETot,Occ,URe,XOne,ABPLUS,ABMIN,
      $ IndN,IndX,IGem,NAcCAS,NInAcCAS,NDimX,NBasis,NDim,NInte1,
-     $ NoSt,'FFOO','FOFO')
+     $ NoSt,'FFOO','FOFO',ICholesky)
 C
 C     now Y01CAS_FOFO is used in SAPT only
 C      Call Y01CAS_FOFO(Occ,URe,XOne,ABPLUS,ABMIN,
@@ -116,80 +122,59 @@ C     If(IFlSnd.Eq.1)
 C
 C     GENERATE ABSCISSAS AND WEIGHTS FOR GAUSSIAN-LEGENDRE QUADRATURE
 C
-c      NGrid=30
       NGrid=5
+c      NGrid=30
 C
       Call GauLeg(Zero,One,XGrid,WGrid,NGrid)
 C 
-c herer!!!
-c      h=5.d-4
-c      ACAlpha=0*h
-c      Call ACEInteg(ECorr0,TwoNO,URe,Occ,XOne,UNOAO,
-c     $ ABPLUS,ABMIN,EigVecR,Eig,
-c     $ EGOne,NGOcc,
-c     $ Title,NBasis,NInte1,NInte2,NDim,NGem,IndAux,ACAlpha,
-c     $ IndN,IndX,NDimX) 
-c      
-c      ACAlpha=h
-c      Call ACEInteg(ECorr1,TwoNO,URe,Occ,XOne,UNOAO,
-c     $ ABPLUS,ABMIN,EigVecR,Eig,
-c     $ EGOne,NGOcc,
-c     $ Title,NBasis,NInte1,NInte2,NDim,NGem,IndAux,ACAlpha,
-c     $ IndN,IndX,NDimX) 
-c 
-c      ACAlpha=2.*h
-c      Call ACEInteg(ECorr2,TwoNO,URe,Occ,XOne,UNOAO,
-c     $ ABPLUS,ABMIN,EigVecR,Eig,
-c     $ EGOne,NGOcc,
-c     $ Title,NBasis,NInte1,NInte2,NDim,NGem,IndAux,ACAlpha,
-c     $ IndN,IndX,NDimX)
-c
-c      ACAlpha=3.*h
-c      Call ACEInteg(ECorr3,TwoNO,URe,Occ,XOne,UNOAO,
-c     $ ABPLUS,ABMIN,EigVecR,Eig,
-c     $ EGOne,NGOcc,
-c     $ Title,NBasis,NInte1,NInte2,NDim,NGem,IndAux,ACAlpha,
-c     $ IndN,IndX,NDimX)
-c
-c      ECorr=ECorr0+0.5*(ECorr1-ECorr0)/h
-c     $ +1./6.d0*(ECorr2+ECorr0-2.*ECorr1)/h**2
-c     $ +1./24.*(-ECorr0+3.*ECorr1-3.*ECorr2+ECorr3)/h**3
-c      write(*,*)'ecorr',ECorr
-c
-c      stop
-
       ECorr=Zero
+C
+!$OMP PARALLEL PRIVATE(ABPLUS_tmp, ABMIN_tmp, I, ACAlpha, ECorrA,
+!$OMP$ EigVecR_tmp, Eig_tmp)
+      allocate(ABPLUS_tmp(NDim*NDim), ABMIN_tmp(NDim*NDim))
+      ABPLUS_tmp = ABPLUS
+      ABMIN_tmp = ABMIN
+      EigVecR_tmp = EigVecR
+      Eig_tmp = Eig
+      ECorrA = Zero
+!$OMP DO schedule(static,1)
+!$OMP$ REDUCTION(+:ECorr)
       Do I=1,NGrid
 C   
       ACAlpha=XGrid(I)
 C
       If(ITwoEl.eq.1) Then
 
+c hererXXX
+c      ACAlpha=1.D0
       Call ACEInteg(ECorrA,TwoNO,URe,Occ,XOne,UNOAO,
-     $ ABPLUS,ABMIN,EigVecR,Eig,
+     $ ABPLUS_tmp,ABMIN_tmp,EigVecR_tmp,Eig_tmp,
      $ EGOne,NGOcc,
      $ Title,NBasis,NInte1,NInte2,NDim,NGem,IndAux,ACAlpha,
      $ IndN,IndX,NDimX)
+
 C
       ElseIf(ITwoEl.eq.3) Then
 
       If(ICASSCF.Eq.1) Then
 
       Call ACEInteg_FOFO(ECorrA,URe,Occ,XOne,UNOAO,
-     $ ABPLUS,ABMIN,EigVecR,Eig,
+     $ ABPLUS_tmp,ABMIN_tmp,EigVecR_tmp,Eig_tmp,
      $ EGOne,NGOcc,CICoef,
      $ NBasis,NInte1,NDimX,NGem,IndAux,ACAlpha,
      $ IGem,NAcCAS,NInAcCAS,NELE,IndN,IndX,NDimX,
-     $ NoSt,ICASSCF,IFlFrag1,IFunSR,IFunSRKer)
+     $ NoSt,ICASSCF,IFlFrag1,IFunSR,IFunSRKer,
+     $ ICholesky)
 
       ElseIf(ICASSCF.Ne.1) Then
 
       Call ACEInteg_FOFO(ECorrA,URe,Occ,XOne,UNOAO,
-     $ ABPLUS,ABMIN,EigVecR,Eig,
+     $ ABPLUS_tmp,ABMIN_tmp,EigVecR_tmp,Eig_tmp,
      $ EGOne,NGOcc,CICoef,
      $ NBasis,NInte1,NDim,NGem,IndAux,ACAlpha,
      $ IGem,NActive,NInAcCAS,NELE,IndN,IndX,NDimX,
-     $ NoSt,ICASSCF,IFlFrag1,IFunSR,IFunSRKer)
+     $ NoSt,ICASSCF,IFlFrag1,IFunSR,IFunSRKer,
+     $ ICholesky)
 
       EndIf
       EndIf
@@ -199,6 +184,9 @@ C
       ECorr=ECorr+WGrid(I)*ECorrA
 C
       EndDo
+!$OMP END DO
+      deallocate(ABPLUS_tmp, ABMIN_tmp)
+!$OMP END PARALLEL
 C
       If(ICASSCF.Eq.1) Then
 C
@@ -1005,7 +993,7 @@ C
       Subroutine ConvertXYtilde(EigY,EigX,Eig,C,IEigAddY,IEigAddInd,
      $ IndN,IndBlock,NFree2,NBasis,NDimX,NDim,filename,ifdump)
 C
-      use abfofo,only : reduce_to_XY0CAS
+      use ab0fofo,only : reduce_to_XY0CAS
 C
       Implicit Real*8 (A-H,O-Z)
 C
@@ -4565,10 +4553,11 @@ C     A ROUTINE FOR COMPUTING AC INTEGRAND
 C
       use abmat
       use abfofo
+      use ab0fofo
 C
       Implicit Real*8 (A-H,O-Z)
 C
-      Character*60 FMultTab,Title
+      Character*60 Title
       Include 'commons.inc'
 c
       Parameter(Zero=0.D0,Half=0.5D0,One=1.D0,Two=2.D0,Three=3.D0,
@@ -4839,7 +4828,7 @@ C     A ROUTINE FOR COMPUTING AC INTEGRAND
 C
       Implicit Real*8 (A-H,O-Z)
 C
-      Character*60 FMultTab,Title
+      Character*60 Title
       Include 'commons.inc'
 c
       Parameter(Zero=0.D0,Half=0.5D0,One=1.D0,Two=2.D0,Three=3.D0,
@@ -4865,13 +4854,17 @@ C
       IPair(I,J)=1
       IPair(J,I)=1
       EndDo
+
 C
 C     CALCULATE THE A+B AND A-B MATRICES
 C   
       If(ICASSCF.Eq.0) Then
 C
+c hererXXX
       Call ACABMAT0(ABPLUS,ABMIN,URe,Occ,XOne,TwoNO,
      $ NBasis,NDim,NInte1,NInte2,NGem,ACAlpha,1)
+c      Call AB_T_CAS(ABPLUS,ABMIN,ECASSCF,URe,Occ,XOne,TwoNO,IPair,
+c     $ IndN,IndX,NDimX,NBasis,NDim,NInte1,NInte2,ACAlpha)
 C
       ElseIf(ICASSCF.Eq.1) Then
 C
@@ -4881,9 +4874,13 @@ C
 c      Call Gamma2_AB(ABPLUS,ABMIN,ECASSCF,URe,Occ,XOne,TwoNO,IPair,
 c     $ NBasis,NDim,NInte1,NInte2,ACAlpha)
 C
+
+c hererXXX
       Call AB_CAS(ABPLUS,ABMIN,ECASSCF,URe,Occ,XOne,TwoNO,IPair,
      $ IndN,IndX,NDimX,NBasis,NDim,NInte1,NInte2,ACAlpha)
-c
+c      Call AB_T_CAS(ABPLUS,ABMIN,ECASSCF,URe,Occ,XOne,TwoNO,IPair,
+c     $ IndN,IndX,NDimX,NBasis,NDim,NInte1,NInte2,ACAlpha)
+C
       EGOne(1)=ECASSCF
 C
       EndIf
@@ -4955,6 +4952,12 @@ C     FIND EIGENVECTORS (EigVecR) AND COMPUTE THE ENERGY
 C
       If(NoSt.Eq.1) Then
       Call ERPASYMM1(EigVecR,Eig,ABPLUS,ABMIN,NBasis,NDimX)
+c hererXXX
+c      do i=1,10
+c      write(*,*)eig(i)
+c      enddo
+c      stop      
+
       Else
       Call ERPAVEC(EigVecR,Eig,ABPLUS,ABMIN,NBasis,NDimX)
       EndIf
@@ -6130,6 +6133,8 @@ C             0th-order correlation only if (IP,IQ) pair is allowed
          enddo
       enddo
 C
+      close(iunit)
+C
       End Subroutine ECorrAC0GVB_FOFO
 
 *Deck MP2RDM
@@ -6598,7 +6603,7 @@ C
       Subroutine AcceptPair(IndN,IndX,NDimX,IndAux,Occ,
      $ NOccup,NVirt,NBasis)
 C
-      use types 
+      use print_units
 C
       Implicit Real*8 (A-H,O-Z)
 C
@@ -6607,11 +6612,8 @@ C
       Dimension IndX(NBasis*(NBasis-1)/2),IndN(2,NBasis*(NBasis-1)/2),
      $ IndAux(NBasis),Occ(NBasis)
 C
-      type(SystemBlock) :: System
-C
       NOK=NOccup+NVirt
 C
-C      ThrSelAct=System%ThrSelAct
       Write(LOUT,'(1x,a,2e15.5)') 'Threshold for quasi-degeneracy ',
      $ ThrSelAct
 C
@@ -6684,7 +6686,7 @@ C
 C
 C     LOCAL ARRAYS
 C
-      Dimension UReOld(NBasis,NBasis),Ind(1000),IndOcc(1000)
+      Dimension UReOld(NBasis,NBasis),Ind(5000),IndOcc(5000)
 C
 C     SORT THE OCCUPATION NUMBERS IN A DESCENDING ORDER
 C
@@ -6746,7 +6748,7 @@ C
 C
 C     LOCAL ARRAYS
 C
-      Dimension UReOld(NBasis,NBasis),Ind(1000),IndPcc(1000)
+      Dimension UReOld(NBasis,NBasis),Ind(5000),IndPcc(5000)
 C
 C     SORT THE Pcc NUMBERS IN A DESCENDING ORDER OF THEIR ABS VALUES
 C
@@ -6805,7 +6807,7 @@ C
 C     READS 1RDMs FOR STATES FROM 1 TO NoStMx AND TRANSFROM THEM 
 C     TO THE REPRESENTATION OF NO's OF THE NoState's STATE
 C
-      use types
+      use read_external
 C
       Implicit Real*8 (A-H,O-Z)
 C
@@ -6857,7 +6859,7 @@ C
 C
 C     Prepare MO->NO_NoState
 C
-      Call read_1rdm_molpro(GammaAB,NoState,InSt(2,1),
+      Call read_1rdm_molpro(GammaAB,NoState,InSt(2,1),ISpinMs2,
      $ '2RDM',IWarn,NBasis)
 C
       Call CpySym(AUXM,GammaAB,NBasis)
@@ -6888,7 +6890,8 @@ C     1-RDMs FROM ALL STATES IN THE REPRESENTATION OF NOs OF THE NoState's STATE
 C
       Do IS=1,NoStMx
 C
-      call read_1rdm_molpro(GammaAB,IS,InSt(2,1),'2RDM',IWarn,NBasis)
+      call read_1rdm_molpro(GammaAB,IS,InSt(2,1),ISpinMs2,
+     $                      '2RDM',IWarn,NBasis)
       Call CpySym(AUXM,GammaAB,NBasis)
 C
       rdm=0
@@ -7072,7 +7075,7 @@ C
 C     READS TRDM FOR DEEXCITATION FROM molpro SA-CAS (nosymmetry) 
 C     AND TRANSFORMS THEM TO X,Y TILDED VECTORS NORMALIZED TO 1/2
 C
-      use types
+      use read_external
 C
       Implicit Real*8 (A-H,O-Z)
 C
@@ -7114,7 +7117,7 @@ C
 C
 C     Prepare MO->NO
 C
-      Call read_1rdm_molpro(GammaAB,InSt(1,1),InSt(2,1),
+      Call read_1rdm_molpro(GammaAB,InSt(1,1),InSt(2,1),ISpinMs2,
      $ '2RDM',IWarn,NBasis)
 C
       Call CpySym(AUXM,GammaAB,NBasis)
@@ -7152,8 +7155,7 @@ C     Stop if IBra is greater than NBasis (dimension of XCAS, YCAS would be exce
 C
       Do IKet=1,IBra-1
 C
-      Call read_1trdm_molpro(AUXM,IBra,IKet,
-     $ '2RDM',NBasis)
+      Call read_1trdm_molpro(AUXM,IBra,IKet,'2RDM',NBasis)
 C
       trdm=0
 C
@@ -7219,7 +7221,7 @@ C
 C
 C     THIS PROCEDURE HAS BEEN USED MAINLY FOR DIFFERENT TESTS
 C
-      use types
+      use read_external
 C
       Implicit Real*8 (A-H,O-Z)
 C
@@ -7269,7 +7271,7 @@ c      Return
 C
 C     Prepare MO->NO
 C
-      Call read_1rdm_molpro(GammaAB,InSt(1,1),InSt(2,1),
+      Call read_1rdm_molpro(GammaAB,InSt(1,1),InSt(2,1),ISpinMs2,
      $ '2RDM',IWarn,NBasis)
 C
       Call CpySym(AUXM,GammaAB,NBasis)
@@ -7304,8 +7306,7 @@ C
       Do IKet=1,IBra-1
       write(*,*)'KET',iket
 C
-      Call read_1trdm_molpro(AUXM,IBra,IKet,
-     $ '2RDM',NBasis)
+      Call read_1trdm_molpro(AUXM,IBra,IKet,'2RDM',NBasis)
 C
       trdm=0
 C
@@ -7460,7 +7461,7 @@ C
 C
 C     Read dipole moment matrices and transform them to NO
 C
-      use types
+      use read_external
 C
       Implicit Real*8 (A-H,O-Z)
 C
@@ -7486,6 +7487,78 @@ C
       Call dgemm('N','T',NBasis,NBasis,NBasis,1d0,AUXM,NBasis,
      $           UNOAO,NBasis,0d0,dipx,NBasis)
 C
+      Return
+      End
+
+*Deck ComputeDipoleMom
+      Subroutine ComputeDipoleMom(UNOAO,Occ,NOccup,NBasis)
+C
+C     compute electronic part of the DM
+C     using occupation numbers
+C
+      Implicit Real*8 (A-H,O-Z)
+C
+      Include 'commons.inc'
+C
+      Dimension Occ(NBasis),UNOAO(NBasis,NBasis)
+      Parameter(Zero=0.D0,Half=0.5D0,One=1.D0,Two=2.D0,Three=3.D0)
+C
+C     LOCAL ARRAYS
+C
+      Dimension DipX(NBasis,NBasis),DipY(NBasis,NBasis),
+     $          DipZ(NBasis,NBasis)
+      Real*8,Allocatable :: XYZ(:,:),Charg(:)
+      Real*8 DM_X,DM_Y,DM_Z
+      Real*8 NUC_DMX,NUC_DMY,NUC_DMZ
+      Character(8) label
+
+      Call ReadDip(DipX,DipY,DipZ,UNOAO,NBasis)
+
+C     Nuclear
+C
+      Open(newunit=ione,file='AOONEINT.mol',access='sequential',
+     $     form='unformatted',status='old')
+C
+      Do
+        Read(ione,iostat=ios) label
+        If(ios<0) then
+           Write(6,*) 'ERROR!!! LABEL ISORDK   not found!'
+           stop
+        EndIf
+        If(label=='ISORDK  ') then
+           Read(ione) NCen
+           Allocate(Charg(ncen),XYZ(ncen,3))
+           Read(ione) Charg(1:ncen),XYZ(1:ncen,1:3)
+           Exit
+        EndIf
+      EndDo
+      Close(ione)
+C
+      NUC_DMX=0; NUC_DMY=0; NUC_DMZ=0
+      Do I=1,NCen
+         NUC_DMX = NUC_DMX + Charg(i)*XYZ(i,1)
+         NUC_DMY = NUC_DMY + Charg(i)*XYZ(i,2)
+         NUC_DMZ = NUC_DMZ + Charg(i)*XYZ(i,3)
+      Enddo
+C
+      Write(6,'(/,1X,A,3f12.8)') 'Nuclear Dipole Moment   ',
+     $                            NUC_DMX,NUC_DMY,NUC_DMZ
+C
+C     Electronic
+C
+      DM_X = 0; DM_Y = 0; DM_Z = 0
+      Do I=1,NOccup
+         DM_X = DM_X + 2d0*Occ(i)*DipX(i,i)
+         DM_Y = DM_Y + 2d0*Occ(i)*DipY(i,i)
+         DM_Z = DM_Z + 2d0*Occ(i)*DipZ(i,i)
+      Enddo
+      Write(6,'(1X,A,3f12.8)')   'Electronic Dipole Moment',
+     $                           DM_X,DM_Y,DM_Z
+C
+      Write(6,'(1X,A,3f12.8,/)') 'Total Dipole Moment     ',
+     $                            NUC_DMX+DM_X,NUC_DMY+DM_Y,NUC_DMZ+DM_Z
+
+      Deallocate(XYZ,Charg)
       Return
       End
 
@@ -8519,15 +8592,22 @@ C
 C     DELETE MO INTEGRALS 
 C
       Implicit Real*8 (A-H,O-Z)
+      Logical yes
 
       If(ITwoel.Eq.2) Then
-        Open(newunit=iunit,file='TWOMO',status='OLD')
-        Close(iunit,status='DELETE')
+        inquire(file='TWOMO',exist=yes)
+        If(yes) then
+           Open(newunit=iunit,file='TWOMO',status='OLD')
+           Close(iunit,status='DELETE')
+        Endif
       ElseIf(ITwoel.Eq.3) Then
-        Open(newunit=iunit,file='FFOO',status='OLD')
-        Close(iunit,status='DELETE')
-        Open(newunit=iunit,file='FOFO',status='OLD')
-        Close(iunit,status='DELETE')
+        inquire(file='TWOMO',exist=yes)
+        If(yes) then
+           Open(newunit=iunit,file='FFOO',status='OLD')
+           Close(iunit,status='DELETE')
+           Open(newunit=iunit,file='FOFO',status='OLD')
+           Close(iunit,status='DELETE')
+        Endif
       EndIf
 
       Return
