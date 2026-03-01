@@ -764,7 +764,7 @@ C      Call Int2_AO(TwoEl2,NumOSym,MultpC,FName,NInte1,NInte2,NBasis)
 C
       If(ITwoEl.Eq.1) Then
       Write(6,'(" Transforming two-electron erf integrals ...")')
-      Call TwoNO1(TwoEl2,UNOAO,NBasis,NInte2)
+      Call TwoNO1_dgemm(TwoEl2,UNOAO,NBasis,NInte2)
 C
       ElseIf(ITwoEl.Eq.3) Then
 C     PREPARE POINTERS: NOccup=num0+num1

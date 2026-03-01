@@ -1645,3 +1645,109 @@ end subroutine sq_symmetrize
 
 end module
 
+
+subroutine TwoNO1_dgemm(TNO,URe,NBasis,NInte2)
+! Full transformation of two-electron integrals using BLAS dgemm.
+! Drop-in replacement for TwoNO1 (SOURCE/misc.f).
+! Same interface: TNO(NInte2) packed triangular in/out, URe(NBasis,NBasis).
+!
+! Algorithm: 2-phase transformation via dgemm (like tran4_gen):
+!   Phase 1: transform indices 1,2 (AO p,q -> MO a,b)
+!   Phase 2: transform indices 3,4 (AO r,s -> MO c,d)
+! Each phase: triang_to_sq + dgemm('T','N') + dgemm('N','N')
+use tran, only: triang_to_sq
+implicit none
+
+integer, intent(in)    :: NBasis, NInte2
+double precision, intent(inout) :: TNO(NInte2)
+double precision, intent(in)    :: URe(NBasis,NBasis)
+
+double precision, allocatable :: work1(:), work2(:)
+double precision, allocatable :: halfT(:,:), row(:)
+integer :: NInte1, nAB
+integer :: rs, pq, ab, ab_sq, a, b, c, d, cd, addr
+integer :: base_addr
+
+NInte1 = NBasis*(NBasis+1)/2
+nAB    = NBasis*NBasis
+
+allocate(work1(nAB), work2(nAB))
+! halfT layout: (nAB, NInte1) — columns are contiguous for stride-1 writes in phase 1
+allocate(halfT(nAB, NInte1))
+allocate(row(NInte1))
+
+! --- Phase 1: transform first two indices ---
+! For each (r,s) pair: extract row from TNO, unpack, apply dgemm twice
+do rs = 1, NInte1
+
+   ! Extract row: row(pq) = TNO at (pq,rs) using symmetry
+   ! Split loop to avoid branch in inner loop
+   base_addr = rs*(rs-1)/2
+   do pq = 1, rs-1
+      row(pq) = TNO(base_addr + pq)
+   enddo
+   do pq = rs, NInte1
+      row(pq) = TNO(pq*(pq-1)/2 + rs)
+   enddo
+
+   ! Unpack triangular -> symmetric square NBasis x NBasis
+   call triang_to_sq(row, work2, NBasis)
+
+   ! work1 = URe^T * work2 (transform first index)
+   call dgemm('T','N', NBasis, NBasis, NBasis, 1d0, &
+              URe, NBasis, work2, NBasis, 0d0, work1, NBasis)
+   ! work2 = work1 * URe (transform second index)
+   call dgemm('N','N', NBasis, NBasis, NBasis, 1d0, &
+              work1, NBasis, URe, NBasis, 0d0, work2, NBasis)
+
+   ! Store half-transformed result: halfT(:, rs) = (a,b|r,s) — contiguous write
+   halfT(1:nAB, rs) = work2(1:nAB)
+
+enddo
+
+! --- Phase 2: transform last two indices ---
+TNO(1:NInte2) = 0d0
+
+ab = 0
+do a = 1, NBasis
+   do b = 1, a
+      ab = ab + 1
+      ! Square index in column-major: element (a,b) = a + (b-1)*NBasis
+      ab_sq = a + (b-1)*NBasis
+
+      ! Collect half-transformed row for compound pair (a,b)
+      ! halfT(ab_sq, rs) for rs=1..NInte1 — strided access with stride nAB
+      do rs = 1, NInte1
+         row(rs) = halfT(ab_sq, rs)
+      enddo
+
+      ! Unpack triangular -> symmetric square NBasis x NBasis
+      call triang_to_sq(row, work2, NBasis)
+
+      ! work1 = URe^T * work2 (transform third index)
+      call dgemm('T','N', NBasis, NBasis, NBasis, 1d0, &
+                 URe, NBasis, work2, NBasis, 0d0, work1, NBasis)
+      ! work2 = work1 * URe (transform fourth index)
+      call dgemm('N','N', NBasis, NBasis, NBasis, 1d0, &
+                 work1, NBasis, URe, NBasis, 0d0, work2, NBasis)
+
+      ! Pack result into TNO: for each (c,d) with c>=d and AB>=CD
+      cd = 0
+      do c = 1, NBasis
+         do d = 1, c
+            cd = cd + 1
+            if (ab >= cd) then
+               addr = ab*(ab-1)/2 + cd
+               ! work2 is column-major: element (c,d) = c + (d-1)*NBasis
+               TNO(addr) = work2(c + (d-1)*NBasis)
+            endif
+         enddo
+      enddo
+
+   enddo
+enddo
+
+deallocate(work1, work2, halfT, row)
+
+end subroutine TwoNO1_dgemm
+

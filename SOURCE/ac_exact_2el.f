@@ -688,7 +688,7 @@ C
       EndDo
       EndDo
 C
-      Call TwoNO1(TwoEl,UReAlph,NBasis,NInte2) 
+      Call TwoNO1_dgemm(TwoEl,UReAlph,NBasis,NInte2)
 C
       Return
       End 
@@ -1050,7 +1050,7 @@ C
       Do 100 I=1,NBasis
   100 Write(6,'(X,I3,2E16.6)') I,OccAlph(I),CIAlph(I)
 C
-      Call TwoNO1(TwoEl,UReAlph,NBasis,NInte2) 
+      Call TwoNO1_dgemm(TwoEl,UReAlph,NBasis,NInte2)
 C
       Return
 C

@@ -760,7 +760,7 @@ C
       Call MatTr(XKin,URe,NBasis)
 C
       If(ITwoEl.Eq.1) Then
-      Call TwoNO1(TwoEl,URe,NBasis,NInte2)
+      Call TwoNO1_dgemm(TwoEl,URe,NBasis,NInte2)
 C
       ElseIf(ITwoEl.Eq.3) Then
 C
@@ -1573,7 +1573,7 @@ C
 C
       Call MatTr(XKin,URe,NBasis)
       Write(6,'(/," Transforming two-electron integrals ...",/)')
-      Call TwoNO1(TwoEl,URe,NBasis,NInte2)
+      Call TwoNO1_dgemm(TwoEl,URe,NBasis,NInte2)
 C
 C     If(IAO.Eq.0)
       Else
@@ -1589,7 +1589,7 @@ C
 C     ITwoEl
       If(ITwoEl.Eq.1) Then
       Write(6,'(/," Transforming two-electron integrals ...",/)')
-      Call TwoNO1(TwoEl,UAOMO,NBasis,NInte2)
+      Call TwoNO1_dgemm(TwoEl,UAOMO,NBasis,NInte2)
 C
       ElseIf(ITwoEl.eq.3) Then
 C     PREPARE POINTERS: NOccup=num0+num1
@@ -2746,7 +2746,7 @@ C           & ', bits: ', nbits
       close(unit=iunit)
 
       Write(6,'(" Transforming two-electron integrals ...",/)')
-      Call TwoNO1(TwoEl,UMOAO,NBasis,NInte2)
+      Call TwoNO1_dgemm(TwoEl,UMOAO,NBasis,NInte2)
 C
       end subroutine altread2el
 
@@ -2840,7 +2840,7 @@ CC
 C     TRANSFORM THE INTEGRALS
 C
       Write(6,'(" Transforming two-electron integrals ...",/)')
-      Call TwoNO1(TwoEl,UMOAO,NBasis,NInte2)
+      Call TwoNO1_dgemm(TwoEl,UMOAO,NBasis,NInte2)
 C
       return
       end

@@ -6572,7 +6572,7 @@ C      Print*, 'XOne-Ka',norm2(XOne)
 C
       If(iTwoNOout) Then
 C     TRANSFORM 2-el INTEGRALS INCORE
-      Call TwoNO1(TwoNO,Eps,NBasis,NInte2)
+      Call TwoNO1_dgemm(TwoNO,Eps,NBasis,NInte2)
 C
       Else
 C     DUMP TO DISC
