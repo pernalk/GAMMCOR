@@ -430,6 +430,15 @@ subroutine read_block_calculation(CalcParams, line)
               CalcParams%Cholesky = 1
            endif
 
+      case ("FOFO_RAM")
+           if (uppercase(val) == ".FALSE.".or. &
+               uppercase(val) == "FALSE".or.   &
+               uppercase(val) == "F") then
+              CalcParams%FOFORam = 0
+           else
+              CalcParams%FOFORam = 1
+           endif
+
       case("MAX_CN")
              read(val,*) CalcParams%Max_Cn
 

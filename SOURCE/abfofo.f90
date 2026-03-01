@@ -2206,6 +2206,7 @@ end subroutine check_mp2
 subroutine JK_loop(ABPLUS,ABMIN,HNO,AuxI,AuxIO,WMAT,RDM2val,Occ,AuxCoeff,IGem,AuxInd,pos,&
                    INActive,NOccup,NDim,NDimX,NBasis,NInte1,IntJFile,IntKFile,ACAlpha,AB,ETot)
 
+use fofo_data
 implicit none
 
 integer,intent(in) :: NDim,NDimX,NBasis,NInte1
@@ -2239,15 +2240,21 @@ endif
 
 allocate(work1(NBasis**2),ints(NBasis,NBasis))
 
-open(newunit=iunit1,file=trim(IntKFile),status='OLD', &
-     access='DIRECT',recl=8*NBasis*NOccup)
+if(IFOFO_ram==0) then
+   open(newunit=iunit1,file=trim(IntKFile),status='OLD', &
+        access='DIRECT',recl=8*NBasis*NOccup)
+endif
 
 ! exchange loop (FO|FO)
 kl = 0
 do ll=1,NOccup
    do kk=1,NBasis
       kl = kl + 1
-      read(iunit1,rec=kl) work1(1:NBasis*NOccup)
+      if(IFOFO_ram==1) then
+         work1(1:NBasis*NOccup) = IntsFOFO(1:NBasis*NOccup,kl)
+      else
+         read(iunit1,rec=kl) work1(1:NBasis*NOccup)
+      endif
       !call triang_to_sq2(work1,ints,NBasis)
       do j=1,NOccup
          do i=1,NBasis
@@ -2535,21 +2542,27 @@ do ll=1,NOccup
    enddo
 enddo
 
-close(iunit1)
+if(IFOFO_ram==0) close(iunit1)
 
 !print*, 'from JK_Loop'
 !print*, 'ABPLUS-after K',norm2(ABPLUS)
 !print*, 'ABMIN -after K',norm2(ABMIN)
 
-open(newunit=iunit2,file=trim(IntJFile),status='OLD', &
-     access='DIRECT',recl=8*NBasis**2)
+if(IFOFO_ram==0) then
+   open(newunit=iunit2,file=trim(IntJFile),status='OLD', &
+        access='DIRECT',recl=8*NBasis**2)
+endif
 
 ! Coulomb loop (FF|OO)
 kl = 0
 do ll=1,NOccup
    do kk=1,NOccup
       kl = kl + 1
-      read(iunit2,rec=kl) work1(1:NBasis**2)
+      if(IFOFO_ram==1) then
+         work1(1:NBasis**2) = IntsFFOO(1:NBasis**2,kl)
+      else
+         read(iunit2,rec=kl) work1(1:NBasis**2)
+      endif
       do j=1,NBasis
          do i=1,NBasis
             ints(i,j) = work1((j-1)*NBasis+i)
@@ -2797,7 +2810,7 @@ enddo
 !print*, 'ABPLUS-after J',norm2(ABPLUS)
 !print*, 'ABMIN -after J',norm2(ABMIN)
 
-close(iunit2)
+if(IFOFO_ram==0) close(iunit2)
 
 deallocate(ints)
 deallocate(work1)

@@ -1643,6 +1643,68 @@ enddo
 
 end subroutine sq_symmetrize
 
+subroutine tran4_gen_incore(NBas,nA,CA,nB,CB,nC,CC,nD,CD,outarray,srtfile)
+! 4-index transformation fully in-core
+! Same as tran4_gen but everything in RAM — no TMPMO, no output file
+! outarray(nCD, nAB) — result stored in memory instead of file
+implicit none
+
+type(AOReaderData) :: reader
+
+integer,intent(in) :: NBas
+integer,intent(in) :: nA,nB,nC,nD
+double precision,intent(in) :: CA(*), CB(*), CC(*), CD(*)
+double precision,intent(out) :: outarray(*)
+character(*) :: srtfile
+double precision, allocatable :: work1(:), work2(:), tmpmo(:,:)
+integer :: ntr,nAB,nCD,rs,ab
+logical :: empty
+
+ write(6,'(1x,a)') 'Transforming integrals in-core'
+
+ ntr = NBas*(NBas+1)/2
+ nAB = nA*nB
+ nCD = nC*nD
+
+ allocate(work1(NBas*NBas),work2(NBas*NBas))
+ allocate(tmpmo(ntr,nAB))
+
+ call reader%open(trim(srtfile))
+
+ ! Pass 1: AO -> half-MO (in RAM)
+ do rs=1,ntr
+
+    work1 = 0
+    call reader%getTR(rs,work1,empty)
+
+    if(empty) then
+       tmpmo(rs,1:nAB) = 0
+    else
+       call triang_to_sq(work1,work2,NBas)
+       call dgemm('T','N',nA,NBas,NBas,1d0,CA,NBas,work2,NBas,0d0,work1,nA)
+       call dgemm('N','N',nA,nB,NBas,1d0,work1,nA,CB,NBas,0d0,work2,nA)
+       tmpmo(rs,1:nAB) = work2(1:nAB)
+    endif
+
+ enddo
+
+ call reader%close
+
+ ! Pass 2: half-MO -> full MO (in RAM)
+ do ab=1,nAB
+
+    work1(1:ntr) = tmpmo(1:ntr,ab)
+    call triang_to_sq(work1,work2,NBas)
+    call dgemm('T','N',nC,NBas,NBas,1d0,CC,NBas,work2,NBas,0d0,work1,nC)
+    call dgemm('N','N',nC,nD,NBas,1d0,work1,nC,CD,NBas,0d0,work2,nC)
+    outarray((ab-1)*nCD+1 : ab*nCD) = work2(1:nCD)
+
+ enddo
+
+ deallocate(work1,work2,tmpmo)
+
+end subroutine tran4_gen_incore
+
 end module
 
 

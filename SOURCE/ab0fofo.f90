@@ -448,6 +448,8 @@ subroutine AC0CAS_FOFO(ECorr,ETot,Occ,URe,XOne,ABPLUS,ABMIN, &
 !     - COMPUTES THE AC0 ENERGY
 !
 !use timing
+use chol_data
+use fofo_data
 !
 implicit none
 
@@ -481,7 +483,7 @@ double precision :: Tcpu,Twall
 double precision :: C(NBasis)
 double precision,allocatable :: work1(:),ints(:,:)
 double precision,allocatable :: work(:,:),Eig(:)
-double precision,allocatable :: MatFF(:,:)
+double precision,pointer :: MatFF(:,:)
 
 type(EblockData),allocatable :: Eblock(:)
 type(EblockData) :: EblockIV
@@ -652,8 +654,10 @@ if(ICholesky==0) then
 
    allocate(work1(NBasis*NBasis))
 
-   open(newunit=iunit,file='FOFO',status='OLD', &
-        access='DIRECT',recl=8*NBasis*NOccup)
+   if(IFOFO_ram==0) then
+      open(newunit=iunit,file='FOFO',status='OLD', &
+           access='DIRECT',recl=8*NBasis*NOccup)
+   endif
 
    kl = 0
    do k=1,NOccup
@@ -663,7 +667,11 @@ if(ICholesky==0) then
            irs = pos(l,k)
            ir = l
            is = k
-           read(iunit,rec=kl) work1(1:NBasis*NOccup)
+           if(IFOFO_ram==1) then
+              work1(1:NBasis*NOccup) = IntsFOFO(1:NBasis*NOccup,kl)
+           else
+              read(iunit,rec=kl) work1(1:NBasis*NOccup)
+           endif
            do j=1,NOccup
               do i=1,NBasis
                  ints(i,j) = work1((j-1)*NBasis+i)
@@ -693,17 +701,14 @@ if(ICholesky==0) then
       enddo
    enddo
 
-   close(iunit)
+   if(IFOFO_ram==0) close(iunit)
    deallocate(work1)
 
 elseif(ICholesky==1) then
 
-   ! read cholesky (FF|K) vectors
-   open(newunit=iunit,file='cholvecs',form='unformatted')
-   read(iunit) NCholesky
-   allocate(MatFF(NCholesky,NBasis**2))
-   read(iunit) MatFF
-   close(iunit)
+   ! use in-memory cholesky (FF|K) vectors
+   NCholesky = NCholesky_stored
+   MatFF => CholVecsFF
 
    ! set number of loops over integrals
    dimFO = NOccup*NBasis
@@ -771,7 +776,8 @@ elseif(ICholesky==1) then
 
    enddo
 
-   deallocate(work,MatFF)
+   deallocate(work)
+   nullify(MatFF)
 endif
 
 ECorr = EAll - EIntra
@@ -4129,6 +4135,7 @@ end subroutine ACEInteg_FOFO
 
 subroutine ACEneERPA_FOFO(ECorr,EVec,EVal,Occ,IGem, &
                           IndN,IndX,NOccup,NDimX,NBasis,IntKFile,ICholesky)
+use fofo_data
 implicit none
 
 integer,intent(in) :: NDimX,NBasis
@@ -4204,8 +4211,10 @@ enddo
 if(ICholesky==0) then
 
    !$OMP CRITICAL(crit_ACEneERPA_FOFO_1)
+   if(IFOFO_ram==0) then
    open(newunit=iunit,file=trim(IntKFile),status='OLD', &
         access='DIRECT',recl=8*NBasis*NOccup)
+   endif
 
    kl   = 0
    SumY = 0
@@ -4216,7 +4225,11 @@ if(ICholesky==0) then
            irs = pos(l,k)
            ir = l
            is = k
-           read(iunit,rec=kl) work(1:NBasis*NOccup)
+           if(IFOFO_ram==1) then
+              work(1:NBasis*NOccup) = IntsFOFO(1:NBasis*NOccup,kl)
+           else
+              read(iunit,rec=kl) work(1:NBasis*NOccup)
+           endif
            do j=1,NOccup
               do i=1,NBasis
                  ints(i,j) = work((j-1)*NBasis+i)
@@ -4260,7 +4273,7 @@ if(ICholesky==0) then
    enddo
    !print*, 'ECorr FOFO ',ECorr
 
-   close(iunit)
+   if(IFOFO_ram==0) close(iunit)
    !$OMP END CRITICAL(crit_ACEneERPA_FOFO_1)
 
 elseif(ICholesky==1) then
@@ -4376,6 +4389,7 @@ end subroutine ACEneERPA_FOFO
 !                        IndN,NDimX,NOccup,NBasis,IntKFile)
 subroutine EneERPA_FOFO(ECorr,EVec,EVal,Occ,CICoef,IGem,   &
                         IndN,NDimX,NOccup,NBasis,IntKFile)
+use fofo_data
 implicit none
 
 integer,intent(in) :: NDimX,NOccup,NBasis
@@ -4405,8 +4419,10 @@ EIntra = 0
 ECorr  = 0
 
 !$OMP CRITICAL(crit_EneERPA_FOFO_1)
+if(IFOFO_ram==0) then
 open(newunit=iunit,file=trim(IntKFile),status='OLD', &
      access='DIRECT',recl=8*NBasis*NOccup)
+endif
 
 kl = 0
 do k=1,NOccup
@@ -4416,7 +4432,11 @@ do k=1,NOccup
         irs = pos(l,k)
         ir = l
         is = k
-        read(iunit,rec=kl) work(1:NBasis*NOccup)
+        if(IFOFO_ram==1) then
+           work(1:NBasis*NOccup) = IntsFOFO(1:NBasis*NOccup,kl)
+        else
+           read(iunit,rec=kl) work(1:NBasis*NOccup)
+        endif
         do j=1,NOccup
            do i=1,NBasis
               ints(i,j) = work((j-1)*NBasis+i)
@@ -4465,7 +4485,7 @@ do k=1,NOccup
    enddo
 enddo
 
-close(iunit)
+if(IFOFO_ram==0) close(iunit)
 !$OMP END CRITICAL(crit_EneERPA_FOFO_1)
 
 if(ISkippedEig/=0) then

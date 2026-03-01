@@ -11,6 +11,7 @@ C
       use tran
       use Cholesky
       use read_external
+      use chol_data
 C
       Implicit Real*8 (A-H,O-Z)
 C
@@ -220,11 +221,8 @@ C
      $              UAux,1,NBasis,
      $              MemMOTransfMB)
 C
-      Open(newunit=iunit,file='cholvecs',form='unformatted')
-      Write(iunit) NCholesky
-      Write(iunit) MatFF
-      Close(iunit)
-      Deallocate(MatFF)
+      Call move_alloc(MatFF, CholVecsFF)
+      NCholesky_stored = NCholesky
 C
       EndIf ! ICholesky
       EndIf ! ITwoEl
@@ -271,6 +269,7 @@ c     use Cholesky_old  ! create AOTWOSORT file
       use tran
       use abmat
       use read_external
+      use chol_data
 C
 C     READ Integrals and 1-RDM - needed for AC-DMRG CALCULATION
 C
@@ -804,19 +803,10 @@ C    set buffer size for Cholesky AO2NO transformation
      $              MemMOTransfMB)
 C
 C
-      Call chol_ints_fofo(NBasis,Num0+Num1,MatFF,
-     $                    NBasis,Num0+Num1,MatFF,
-     $                    NCholesky,NBasis,'FOFO')
-      Call chol_ints_fofo(NBasis,NBasis,MatFF,
-     $                    Num0+Num1,Num0+Num1,MatFF,
-     $                    NCholesky,NBasis,'FFOO')
+C     Skip FOFO/FFOO file generation - not needed with in-memory Cholesky
 C
-      open(newunit=iunt,file='cholvecs',form='unformatted')
-      write(iunt) NCholesky
-      write(iunt) MatFF(1:NCholesky,1:NBasis**2)
-      close(iunt)
-
-      Deallocate(MatFF)
+      Call move_alloc(MatFF, CholVecsFF)
+      NCholesky_stored = NCholesky
       EndIf
 CC
       EndIf
@@ -834,27 +824,14 @@ C     READ J AND K AND DUMP TO DISC
       EndDo
 !
       If(ICholesky==1) then
-c      print*, 'use chol_triang_fofo,IUNIT',IUNIT
-         call chol_triang_fofo(NBasis,NBasis,
-     $                  CholeskyVecs%R(1:NCholesky,1:NInte1),
-     $                  Num0+Num1,Num0+Num1,
-     $                  CholeskyVecs%R(1:NCholesky,1:NInte1),
-     $                  NCholesky,NInte1,NBasis,'FFOO')
-         call chol_triang_fofo(NBasis,Num0+Num1,
-     $                  CholeskyVecs%R(1:NCholesky,1:NInte1),
-     $                  NBasis,Num0+Num1,
-     $                  CholeskyVecs%R(1:NCholesky,1:NInte1),
-     $                  NCholesky,NInte1,NBasis,'FOFO')
-
+C     Skip FFOO/FOFO file generation - not needed with in-memory Cholesky
+C
       Allocate(MatFF(NCholesky,NBasis**2))
       do i=1,NCholesky
          call triang_to_sq(CholeskyVecs%R(i,1:NInte1),MatFF(i,:),NBasis)
       enddo
-      open(newunit=iunt,file='cholvecs',form='unformatted')
-      write(iunt) NCholesky
-      write(iunt) MatFF(1:NCholesky,1:NBasis**2)
-      close(iunt)
-      Deallocate(MatFF)
+      Call move_alloc(MatFF, CholVecsFF)
+      NCholesky_stored = NCholesky
 
       Else
          Call read4_gen(NBasis,
@@ -1141,6 +1118,8 @@ c     use Cholesky_old  ! requires AOTWOSORT
       use abmat
       use read_external
       use timing
+      use chol_data
+      use fofo_data
 C
       Implicit Real*8 (A-H,O-Z)
       Parameter (Half=0.5D0)
@@ -1601,6 +1580,27 @@ C     TRANSFORM J AND K
       If (IFunSR.Eq.0.Or.IFunSR.Eq.3.Or.IFunSR.Eq.5) Then
       If (ICholesky==0) Then
 C
+      If (IFOFO_ram==1) Then
+C
+      Allocate(IntsFFOO(NBasis**2,(Num0+Num1)**2))
+      Call tran4_gen_incore(NBasis,
+     $        Num0+Num1,UAux(1:NBasis,1:(Num0+Num1)),
+     $        Num0+Num1,UAux(1:NBasis,1:(Num0+Num1)),
+     $        NBasis,UAux,
+     $        NBasis,UAux,
+     $        IntsFFOO,'AOTWOSORT')
+C
+      Allocate(IntsFOFO(NBasis*(Num0+Num1),
+     $                  NBasis*(Num0+Num1)))
+      Call tran4_gen_incore(NBasis,
+     $        NBasis,UAux,
+     $        Num0+Num1,UAux(1:NBasis,1:(Num0+Num1)),
+     $        NBasis,UAux,
+     $        Num0+Num1,UAux(1:NBasis,1:(Num0+Num1)),
+     $        IntsFOFO,'AOTWOSORT')
+C
+      Else
+C
       Call tran4_gen(NBasis,
      $        Num0+Num1,UAux(1:NBasis,1:(Num0+Num1)),
      $        Num0+Num1,UAux(1:NBasis,1:(Num0+Num1)),
@@ -1613,6 +1613,8 @@ C
      $        NBasis,UAux,
      $        Num0+Num1,UAux(1:NBasis,1:(Num0+Num1)),
      $        'FOFO','AOTWOSORT')
+C
+      EndIf
 C
       Call clock('tran4_FOFO',Tcpu,Twall)
 C
@@ -1649,13 +1651,10 @@ C     $                    NCholesky,NBasis,'FFOO')
 C
 C     Call clock('chol_FFOOFOFO',Tcpu,Twall)
 C
-C KP 07.2021: dump MatFF
+C KP 07.2021: keep MatFF in memory
 C
-      open(newunit=iunit,file='cholvecs',form='unformatted')
-      write(iunit) NCholesky
-      write(iunit) MatFF
-      close(iunit)
-      Deallocate(MatFF)
+      Call move_alloc(MatFF, CholVecsFF)
+      NCholesky_stored = NCholesky
 C
       EndIf
 C     TEST MITHAP
@@ -3329,6 +3328,7 @@ C
       end subroutine prepare_nums
 
       subroutine TwoEneChck(ETwo,RDM2Act,Occ,INActive,NAct,NBasis)
+      use fofo_data
       Implicit Real*8 (A-H,O-Z)
 C
       Include 'commons.inc'
@@ -3373,8 +3373,10 @@ C
       EndDo
       EndDo
 C
+      If(IFOFO_ram==0) Then
       Open(newunit=iunit,file=IntJFile,status='OLD',
      $     access='DIRECT',recl=8*NBasis**2)
+      EndIf
 C
       ETwo=0
 C     COULOMB LOOP (FF|OO)
@@ -3382,7 +3384,11 @@ C     COULOMB LOOP (FF|OO)
       Do ll=1,NOccup
       Do kk=1,NOccup
       kl=kl+1
+      If(IFOFO_ram==1) Then
+      work(1:NBasis**2) = IntsFFOO(1:NBasis**2,kl)
+      Else
       read(iunit,rec=kl) work(1:NBasis**2)
+      EndIf
       Do j=1,NBasis
       Do i=1,NBasis
       ints(i,j) = work((j-1)*NBasis+i)
@@ -3399,7 +3405,7 @@ C
       EndDo
       EndDo
 C
-      Close(iunit)
+      If(IFOFO_ram==0) Close(iunit)
 C
       Deallocate(ints,work)
       Deallocate(RDM2val)
@@ -3407,6 +3413,7 @@ C
       end subroutine TwoEneChck
 
       subroutine TwoEneChckChol(ETwo,RDM2Act,Occ,INActive,NAct,NBasis)
+      use chol_data
 C
 C     calculate 2-electron energy using Cholesky vectors
 C     maybe better to have MatOO and save on the transformation?
@@ -3428,15 +3435,13 @@ C
       Integer Ind(NBasis)
       Double Precision, Allocatable :: RDM2val(:,:,:,:),
      $                                 work1(:,:),work2(:,:),
-     $                                 ints(:,:),MatFF(:,:)
+     $                                 ints(:,:)
+      Double Precision, Pointer :: MatFF(:,:)
       Parameter(MaxBatchSize = 100)
 C
-c     SET FILES
-      Open(newunit=iunit,file='cholvecs',form='unformatted')
-      Read(iunit) NCholesky
-      Allocate(MatFF(NCholesky,NBasis**2))
-      Read(iunit) MatFF
-      Close(iunit)
+c     USE IN-MEMORY CHOLESKY VECTORS
+      NCholesky = NCholesky_stored
+      MatFF => CholVecsFF
 C
 C     SET DIMENSIONS
       NOccup=NAct+INActive
@@ -3502,7 +3507,8 @@ C
 C
       EndDo
 C
-      Deallocate(ints,MatFF)
+      Deallocate(ints)
+      Nullify(MatFF)
       Deallocate(work1)
       Deallocate(RDM2val)
 C

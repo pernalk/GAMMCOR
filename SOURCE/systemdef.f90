@@ -1,5 +1,6 @@
 module systemdef
 use types
+use fofo_data
 
 implicit none
 
@@ -365,6 +366,9 @@ else
  !Flags%IFl12 = FLAG_DEBUG_FL12
 
 endif
+
+! set FOFO in-memory mode (always from CalcParams, regardless of FLAGS block)
+IFOFO_ram = Input%CalcParams%FOFORam
 
 ! SELECT ELECTRONIC STATE
 Flags%NoSt = Input%SystemInput(1)%NoSt

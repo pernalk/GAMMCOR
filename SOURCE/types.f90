@@ -113,8 +113,9 @@ type CalculationBlock
       integer :: DFApp     = DF_NONE
       integer :: Kernel    = 1
       integer :: TwoMoInt  = TWOMO_INCORE
-      integer :: Cholesky  = FLAG_CHOLESKY 
+      integer :: Cholesky  = FLAG_CHOLESKY
       integer :: CholeskyAccu = CHOL_ACCU_DEFAULT
+      integer :: FOFORam  = 0
       integer :: Core      = FLAG_CORE
       integer :: SymType   = TYPE_NO_SYM
       integer :: SaptLevel = SAPTLEVEL2

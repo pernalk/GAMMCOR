@@ -7,6 +7,7 @@ contains
 subroutine JK_Chol_loop(ABPLUS,ABMIN,HNO,AuxI,AuxIO,WMAT,RDM2val,Occ,AuxCoeff,IGem,AuxInd,pos,&
                    INActive,NOccup,NDim,NDimX,NBasis,NInte1,IntJFile,IntKFile,ACAlpha,AB,ETot)
 
+use chol_data
 implicit none
 
 integer,intent(in) :: NDim,NDimX,NBasis,NInte1
@@ -30,7 +31,8 @@ integer :: NCholesky
 double precision :: val
 double precision :: AuxVal,HNOCoef
 double precision,allocatable :: work1(:,:),work2(:,:)
-double precision,allocatable :: ints(:,:),MatFF(:,:)
+double precision,allocatable :: ints(:,:)
+double precision,pointer :: MatFF(:,:)
 
 !print*, 'start JK Chol:'
 
@@ -50,12 +52,9 @@ endif
 !print*, 'AuxIO',norm2(AuxIO)
 !print*, 'RDM2val',norm2(RDM2val)
 
-! read cholesky (FF|K) vectors
-open(newunit=iunit,file='cholvecs',form='unformatted')
-read(iunit) NCholesky
-allocate(MatFF(NCholesky,NBasis**2))
-read(iunit) MatFF
-close(iunit)
+! use in-memory cholesky (FF|K) vectors
+NCholesky = NCholesky_stored
+MatFF => CholVecsFF
 
 ! set number of loops over integrals
 dimFO = NOccup*NBasis
@@ -680,6 +679,7 @@ enddo
 !AuxIO = 0
 
 deallocate(work2,work1,ints)
+nullify(MatFF)
 
 end subroutine JK_Chol_loop
 

@@ -5,6 +5,8 @@
 C
       use abmat
       use abfofo
+      use chol_data
+      use fofo_data
 C
 C     AC Iteratively
 C
@@ -73,16 +75,21 @@ C
      $ (6,'(/,2X,''ECASSCF+ENuc, ACn-Corr, ACn-CASSCF '',4X,3F15.8)')
      $ ETot+ENuc,ECorr,ETot+ENuc+ECorr
 C
-C     delete cholesky vecs
-      Open(newunit=iunit,file='cholvecs',status='OLD')
-      Close(iunit,status='DELETE')
-C     delete FOFO/FFOO ints
-      Inquire(file='FOFO',exist=IFOFO)
-      If (IFOFO) Then
-         Open(newunit=iunit,file='FOFO',status='OLD')
-         Close(iunit,status='DELETE')
-         Open(newunit=iunit,file='FFOO',status='OLD')
-         Close(iunit,status='DELETE')
+C     deallocate in-memory cholesky vecs
+      If(Allocated(CholVecsFF)) Deallocate(CholVecsFF)
+      NCholesky_stored = 0
+C     deallocate/delete FOFO/FFOO ints
+      If(IFOFO_ram==1) Then
+         If(Allocated(IntsFOFO)) Deallocate(IntsFOFO)
+         If(Allocated(IntsFFOO)) Deallocate(IntsFFOO)
+      Else
+         Inquire(file='FOFO',exist=IFOFO)
+         If (IFOFO) Then
+            Open(newunit=iunit,file='FOFO',status='OLD')
+            Close(iunit,status='DELETE')
+            Open(newunit=iunit,file='FFOO',status='OLD')
+            Close(iunit,status='DELETE')
+         EndIf
       EndIf
 C     delete CMONO matrixormation
       Inquire(file='ure_casno.dat',exist=IURE)
