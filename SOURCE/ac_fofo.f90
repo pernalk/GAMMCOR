@@ -2,6 +2,7 @@ subroutine Project_DChol(PMat,IndN,NBasis,NDimX)
 !
 ! compute the projector matrix PMat, used optionally in ACFREQ
 !
+use chol_data, only: CholVecsFF, NCholesky_stored
 implicit none
 
 integer,intent(in) :: NBasis,NDimX,IndN(2,NDimX)
@@ -12,14 +13,23 @@ integer :: ia,ib,ic,id,ICol,IRow
 integer :: i,j,k,l,kl,ip,iq,ir,is,ipq,irs
 integer :: pos(NBasis,NBasis),N,IGL,inf1,inf2,info
 double precision,allocatable :: work(:),ints(:,:)
+Real*8, Pointer :: MatFF_full(:,:) => null()
 Real*8, Allocatable :: MatFF(:,:),work2(:,:),work3(:),work1(:,:),work4(:),work5(:,:),work6(:,:)
 integer :: NCholesky,lwork
+logical :: MatFF_from_disk
 
-open(newunit=iunit,file='cholvecs',form='unformatted')
-read(iunit) NCholesky
-allocate(MatFF(NCholesky,NBasis**2))
-read(iunit) MatFF
-close(iunit)
+if (NCholesky_stored > 0) then
+   NCholesky = NCholesky_stored
+   MatFF_full => CholVecsFF
+   MatFF_from_disk = .false.
+else
+   open(newunit=iunit,file='cholvecs',form='unformatted')
+   read(iunit) NCholesky
+   allocate(MatFF_full(NCholesky,NBasis**2))
+   read(iunit) MatFF_full
+   close(iunit)
+   MatFF_from_disk = .true.
+endif
 
 print*,'NCholesky',NCholesky
 
@@ -32,10 +42,11 @@ ir=IndN(1,j)
 is=IndN(2,j)
 irs = is+(ir-1)*NBasis
 do i=1,NCholesky
-    work1(i,j) = MatFF(i,irs)
+    work1(i,j) = MatFF_full(i,irs)
 enddo
 enddo
-deallocate(MatFF)
+if (MatFF_from_disk) deallocate(MatFF_full)
+nullify(MatFF_full)
 
 allocate(MatFF(NCholesky,NDimX))
 MatFF=work1
@@ -109,6 +120,7 @@ use systemdef
 ! only to use Y01CAS_FOFO
 !use ab0fofo
 use sapt_utils
+use chol_data, only: CholVecsFF, NCholesky_stored
 
 implicit none
 integer,intent(in) :: AC1,NGOcc,NBasis,NInte1,NDim,NGem,NDimX
@@ -131,7 +143,8 @@ double precision :: ECASSCF,PI,WFact,XFactorial,XN1,XN2,FF,OmI,XNorm0,XNorm1,Err
 character(:),allocatable :: twojfile,twokfile,IntKFile
 logical :: irdm2
 
-double precision, allocatable :: DChol(:,:),DCholT(:,:),DCholAct(:,:),DCholActT(:,:),WorkD(:,:)
+double precision, allocatable :: DChol(:,:),DCholT(:,:),DCholAct(:,:),DCholActT(:,:)
+double precision, pointer :: WorkD(:,:) => null()
 double precision, allocatable :: APLUS0Tilde(:), APLUS1Tilde(:), A1(:), &
                                  COMTilde(:),ABPLUS0(:),ABMIN0(:),ABPLUS1(:),ABMIN1(:), &
                                  C0Tilde(:),C1Tilde(:),C2Tilde(:), &
@@ -881,6 +894,7 @@ subroutine CIter_FOFO_old(PMat,ECorr,ACAlpha,XOne,URe,Occ,EGOne,NGOcc,&
    IndN,IndX,NDimX)
 
 use abfofo
+use chol_data, only: CholVecsFF, NCholesky_stored
 
 implicit none
 
@@ -908,7 +922,8 @@ integer :: pos(NBasis,NBasis),NGrid,N,IGL,inf1,inf2,Max_Cn
 double precision :: ECASSCF,PI,WFact,XFactorial,XN1,XN2,FF,CICoef(NBasis),Cpq,Crs,SumY,Aux,OmI
 character(:),allocatable :: twojfile,twokfile,IntKFile
 logical :: AuxCoeff(3,3,3,3)
-double precision,allocatable :: work(:),ints(:,:),DChol(:,:),WorkD(:,:),DCholAct(:,:)
+double precision,allocatable :: work(:),ints(:,:),DChol(:,:),DCholAct(:,:)
+double precision,pointer :: WorkD(:,:) => null()
 integer :: NCholesky
 
 NGrid=15
@@ -1018,11 +1033,16 @@ enddo
 enddo
 
 
-open(newunit=iunit,file='cholvecs',form='unformatted')
-read(iunit) NCholesky
-allocate(WorkD(NCholesky,NBasis**2))
-read(iunit) WorkD
-close(iunit)
+if (NCholesky_stored > 0) then
+   NCholesky = NCholesky_stored
+   WorkD => CholVecsFF
+else
+   open(newunit=iunit,file='cholvecs',form='unformatted')
+   read(iunit) NCholesky
+   allocate(WorkD(NCholesky,NBasis**2))
+   read(iunit) WorkD
+   close(iunit)
+endif
 
 print*,'NCholesky',NCholesky
 
@@ -1045,7 +1065,8 @@ if(IndAux(ir)*IndAux(is)==1) then
     enddo
 endif
 enddo
-deallocate(WorkD)
+if (.not.associated(WorkD,CholVecsFF)) deallocate(WorkD)
+nullify(WorkD)
 
 !!!!!!!!!!!!!!!
 allocate(WorkD(NDimX,NCholesky))
@@ -1271,19 +1292,25 @@ end subroutine CIter_FOFO
 
 subroutine read_D12_array(NCholesky, DChol, DCholAct, NDimX, NBasis, IndN, Occ, IndAux)
 
+   use chol_data, only: CholVecsFF, NCholesky_stored
    implicit none
    integer, intent(in) :: NDimX, NBasis, IndN(2,NDimX), IndAux(NBasis)
    double precision, intent(in) :: Occ(NBasis)
    double precision, allocatable, intent(out) :: DChol(:,:), DCholAct(:,:)
    integer :: NCholesky, iunit, i, j, ir, is, irs
-   double precision, allocatable :: WorkD(:,:)
+   double precision, pointer :: WorkD(:,:) => null()
    double precision :: Crs, CICoef(NBasis)
 
-   open(newunit=iunit,file='cholvecs',form='unformatted')
-   read(iunit) NCholesky
-   allocate(WorkD(NCholesky,NBasis**2))
-   read(iunit) WorkD
-   close(iunit)
+   if (NCholesky_stored > 0) then
+      NCholesky = NCholesky_stored
+      WorkD => CholVecsFF
+   else
+      open(newunit=iunit,file='cholvecs',form='unformatted')
+      read(iunit) NCholesky
+      allocate(WorkD(NCholesky,NBasis**2))
+      read(iunit) WorkD
+      close(iunit)
+   endif
 
    print*,'NCholesky',NCholesky
 
@@ -1313,25 +1340,32 @@ subroutine read_D12_array(NCholesky, DChol, DCholAct, NDimX, NBasis, IndN, Occ, 
             enddo
       endif
    enddo
-   deallocate(WorkD)
+   if (.not.associated(WorkD,CholVecsFF)) deallocate(WorkD)
+   nullify(WorkD)
 
 end subroutine read_D12_array
 
 subroutine read_D_array(NCholesky, DChol, DCholAct, NDimX, NBasis, IndN, Occ, IndAux)
 
+   use chol_data, only: CholVecsFF, NCholesky_stored
    implicit none
    integer, intent(in) :: NDimX, NBasis, IndN(2,NDimX), IndAux(NBasis)
    double precision, intent(in) :: Occ(NBasis)
    double precision, allocatable, intent(out) :: DChol(:,:), DCholAct(:,:)
    integer :: NCholesky, iunit, i, j, ir, is, irs
-   double precision, allocatable :: WorkD(:,:)
+   double precision, pointer :: WorkD(:,:) => null()
    double precision :: Crs, CICoef(NBasis)
 
-   open(newunit=iunit,file='cholvecs',form='unformatted')
-   read(iunit) NCholesky
-   allocate(WorkD(NCholesky,NBasis**2))
-   read(iunit) WorkD
-   close(iunit)
+   if (NCholesky_stored > 0) then
+      NCholesky = NCholesky_stored
+      WorkD => CholVecsFF
+   else
+      open(newunit=iunit,file='cholvecs',form='unformatted')
+      read(iunit) NCholesky
+      allocate(WorkD(NCholesky,NBasis**2))
+      read(iunit) WorkD
+      close(iunit)
+   endif
 
    print*,'NCholesky',NCholesky
 
@@ -1357,7 +1391,8 @@ subroutine read_D_array(NCholesky, DChol, DCholAct, NDimX, NBasis, IndN, Occ, In
             enddo
       endif
    enddo
-   deallocate(WorkD)
+   if (.not.associated(WorkD,CholVecsFF)) deallocate(WorkD)
+   nullify(WorkD)
 
 end subroutine read_D_array
 

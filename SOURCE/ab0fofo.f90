@@ -3256,6 +3256,7 @@ subroutine Y01CASDSYM_FOFO(ICAS,NoStMx,ICORR,EExcit,IStCAS,NSym,NSymNO,MultpC,EC
 !     TRANSITION DIPOLE MOMENTS IN THE 0- AND 1 - ORDER APPROXIMATIONS
 !
 use timing
+use chol_data, only: CholVecsFF, NCholesky_stored
 !
 implicit none
 double precision   :: UNOAO(NBasis,NBasis),DipX(NBasis,NBasis),DipY(NBasis,NBasis),DipZ(NBasis,NBasis)
@@ -3300,7 +3301,8 @@ integer          :: NCholesky
 integer          :: dimFO,iBatch,BatchSize
 integer          :: MaxBatchSize = 100
 logical          :: yes
-double precision,allocatable :: MatFF(:,:),work2(:,:)
+double precision,pointer     :: MatFF(:,:) => null()
+double precision,allocatable :: work2(:,:)
 ! end Cholesky
 double precision,allocatable :: ABPLUS(:,:),ABMIN(:,:)
 double precision :: ECorrSym(100),EExcit(100),ECorr,EigMin,Hlp,TDIP2,Eig11(100)
@@ -3887,13 +3889,18 @@ if(ICholesky==0) then
 elseif(ICholesky==1) then
 
    ! read cholesky (FF|K) vectors
-   inquire(file='cholvecs',exist=yes)
-   if(.not.yes) stop "cholvecs absent in Y01CASDSYM_FOFO!"
-   open(newunit=iunit,file='cholvecs',form='unformatted')
-   read(iunit) NCholesky
-   allocate(MatFF(NCholesky,NBasis**2))
-   read(iunit) MatFF
-   close(iunit)
+   if (NCholesky_stored > 0) then
+      NCholesky = NCholesky_stored
+      MatFF => CholVecsFF
+   else
+      inquire(file='cholvecs',exist=yes)
+      if(.not.yes) stop "cholvecs absent in Y01CASDSYM_FOFO!"
+      open(newunit=iunit,file='cholvecs',form='unformatted')
+      read(iunit) NCholesky
+      allocate(MatFF(NCholesky,NBasis**2))
+      read(iunit) MatFF
+      close(iunit)
+   endif
 
    ! set number of loops over integrals
    dimFO = NOccup*NBasis
@@ -3962,7 +3969,9 @@ elseif(ICholesky==1) then
 
    enddo
 
-   deallocate(work2,MatFF)
+   deallocate(work2)
+   if (.not.associated(MatFF,CholVecsFF)) deallocate(MatFF)
+   nullify(MatFF)
 
 endif ! ICholesky
 
@@ -4136,6 +4145,7 @@ end subroutine ACEInteg_FOFO
 subroutine ACEneERPA_FOFO(ECorr,EVec,EVal,Occ,IGem, &
                           IndN,IndX,NOccup,NDimX,NBasis,IntKFile,ICholesky)
 use fofo_data
+use chol_data, only: CholVecsFF, NCholesky_stored
 implicit none
 
 integer,intent(in) :: NDimX,NBasis
@@ -4159,7 +4169,8 @@ logical :: AuxCoeff(3,3,3,3)
 logical,allocatable          :: condition(:)
 double precision             :: CICoef(NBasis),Cpq,Crs,SumY,Aux
 double precision,allocatable :: work(:),ints(:,:),Skipped(:)
-double precision,allocatable :: work1(:,:),MatFF(:,:)
+double precision,allocatable :: work1(:,:)
+double precision,pointer     :: MatFF(:,:) => null()
 double precision,allocatable :: tVec(:,:)
 double precision,parameter   :: SmallE = 1.d-3,BigE = 1.d8
 double precision,external    :: ddot
@@ -4278,15 +4289,19 @@ if(ICholesky==0) then
 
 elseif(ICholesky==1) then
 
-  inquire(file='cholvecs',EXIST=yes)
-  if(.not.yes) stop "cholvecs not found in ACEneERPA_FOFO"
-
    ! read cholesky (FF|K) vectors
-   open(newunit=iunit,file='cholvecs',form='unformatted')
-   read(iunit) NCholesky
-   allocate(MatFF(NCholesky,NBasis**2))
-   read(iunit) MatFF
-   close(iunit)
+   if (NCholesky_stored > 0) then
+      NCholesky = NCholesky_stored
+      MatFF => CholVecsFF
+   else
+      inquire(file='cholvecs',EXIST=yes)
+      if(.not.yes) stop "cholvecs not found in ACEneERPA_FOFO"
+      open(newunit=iunit,file='cholvecs',form='unformatted')
+      read(iunit) NCholesky
+      allocate(MatFF(NCholesky,NBasis**2))
+      read(iunit) MatFF
+      close(iunit)
+   endif
 
    ! set number of loops over integrals
    dimFO = NOccup*NBasis
@@ -4367,7 +4382,9 @@ elseif(ICholesky==1) then
    enddo
    !print*, 'ECorr Chol ',ECorr
 
-   deallocate(work1,MatFF)
+   deallocate(work1)
+   if (.not.associated(MatFF,CholVecsFF)) deallocate(MatFF)
+   nullify(MatFF)
 
 endif
 
