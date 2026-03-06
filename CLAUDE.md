@@ -55,10 +55,14 @@ This invokes `run_tests_timed.py`, which walks `TESTS/` for directories containi
 
 ```bash
 source env.sh
-python gammcor_verify.py
+python test_report.py              # run all tests, compare energies, generate test_report.md
+python test_report.py CHOLESKY     # only CHOLESKY tests
+python test_report.py --no-run     # report from cached gammcor_test.out files
 ```
 
-This requires a `TESTS/` directory (gitignored) containing test cases with reference `gammcor.out` files. The script runs gammcor in each test directory and compares energy values against references. Tolerance: 1e-7 Ha for AC/ERPA methods, 1e-5 mHa for SAPT components.
+`test_report.py` runs gammcor in each test directory, captures stdout to `gammcor_test.out`, compares computed energies against reference `gammcor.out`, and generates `test_report.md` with a full table of results. Statuses: MATCH (within tolerance), DIFF (real value difference), MISSING (no computed energy).
+
+**After every code change:** always run `test_report.py`, record execution times (to 1ms precision) and energy values, and compare against previous results. This ensures no regressions are introduced. Include the timing/energy comparison table in commit messages or notes when relevant.
 
 ### Test variant convention
 
@@ -94,7 +98,10 @@ fofo_data.f90  (in-memory FOFO/FFOO: IntsFOFO, IntsFFOO, IFOFO_ram flag)
   └── used by: initia.f, systemdef.f90, abfofo.f90, ab0fofo.f90, ac_iter.f
 
 chol_data.f90  (in-memory Cholesky: CholVecsFF, NCholesky_stored)
-  └── used by: initia.f, abchol.f90, ab0fofo.f90, ac_iter.f
+  └── used by: initia.f, abchol.f90, ab0fofo.f90, ac_fofo.f90, ac_fofo_min.f90, ac_iter.f
+
+batch_dgemm.F90  (batched DGEMM wrapper: MKL / OpenMP / CUDA backends)
+  └── used by: tran.f90 (tran4_gen, tran4_gen_incore)
 ```
 
 ### Program Flow (mainp.f)
@@ -113,6 +120,7 @@ chol_data.f90  (in-memory Cholesky: CholVecsFF, NCholesky_stored)
   - `FOFO`: Half-transformed integrals as FOFO/FFOO. With `FOFO_RAM TRUE`, arrays from `fofo_data` module are in memory; with `FOFO_RAM FALSE` (default), read from/written to disk.
   - `Cholesky`: Cholesky decomposition vectors in `chol_data` module. Accuracy: DEFAULT/TIGHT/LUDICROUS.
 - **Data modules** (`fofo_data.f90`, `chol_data.f90`): Allocatable arrays for in-memory integral storage.
+- **Batched BLAS** (`batch_dgemm.F90`): Portable wrapper for batched DGEMM. Uses MKL `dgemm_batch_strided` when `-DUSE_MKL_BATCH` is defined, otherwise falls back to OpenMP loop over standard `dgemm`. CUDA skeleton via `USE_CUDA_BATCH` for future GPU support.
 - **DFT/XCFun** (`xcfun.f90`, `dftgrid.f`, `caspidft.f`): Short-range DFT functionals and CASPiDFT. XCFun library in `xcfun/` provides exchange-correlation functionals.
 - **Exchange contributions** (`exmisc.f90`, `exdpino.f90`, `exi.f90`, `exappr.f90`): Exchange energy terms for SAPT and DMFT functionals.
 
@@ -129,13 +137,17 @@ The program reads integrals from external quantum chemistry codes configured via
 - `IFunSR` flag selects the short-range DFT functional (0=none, 1=srLDA, 2=srPBE, 5-7=CASPiDFT/VV10)
 - `TwoMoInt` flag selects integral storage: `INCORE` (1, default), `FFFF` (2), `FOFO` (3)
 - `FOFO_RAM` input keyword (default `.false.`): when true, FOFO/FFOO integrals held in memory instead of disk files
-- `Cholesky` input keyword (default `.false.`): enables Cholesky decomposition of two-electron integrals
+- `Cholesky` input keyword (default `.false.`): enables Cholesky decomposition of two-electron integrals. Vectors stored in-memory (`CholVecsFF`) and accessed via pointer (`MatFF => CholVecsFF`) — no disk I/O for `cholvecs` file in non-SAPT paths. Known limitations: incompatible with frozen core (`NCoreOrb`) and LR-ERF.
+- `Cholesky_Accuracy` input keyword: `DEFAULT` (TraceError 1e-2), `TIGHT` (1e-3, ~10× more accurate, +30% cost), `LUDICROUS` (1e-4, ~30× more accurate, +70% cost)
 - `NBasis` = number of basis functions; `NELE` = number of electrons
 - Integer flags use Fortran convention: 0=false/off, 1=true/on
 - Constants are in `SOURCE/constants.h`; common blocks in `SOURCE/commons.inc`
 - Build produces `.o` files in `OBJ/` and `.mod` files in the project root
 - `env.sh` must be sourced before building or running tests
 - Test convention: old tests are never modified; new variants are added as subdirectories with symlinks to parent data files
+- `-DUSE_MKL_BATCH` compile flag: enables MKL batched DGEMM in integral transformations. Without it, falls back to OpenMP loop (works with any BLAS)
+- `-DUSE_CUDA_BATCH` compile flag (future): enables GPU batched DGEMM via cuBLAS. Requires `-lcublas -lcudart`
+- `.F90` files (uppercase) use Fortran preprocessor; `.f90` files do not
 
 ## TODO
 

@@ -896,6 +896,19 @@ associate( CalcParams => Input%CalcParams)
     write(LOUT,' (1x,a,a)') "CHOLESKY ACCU: ", &
                PossibleCholAccu(CalcParams%CholeskyAccu)
  endif
+ ! Validate conflicting flags
+ if (CalcParams%TwoMoInt == TWOMO_INCORE .and. CalcParams%Cholesky > 0) then
+    write(LOUT,'(/,1x,a)') 'WARNING! TwoMoInt=INCORE is incompatible with Cholesky.'
+    write(LOUT,'(1x,a)')   '         Cholesky will be IGNORED. Use TwoMoInt=FOFO for Cholesky.'
+ endif
+ if (CalcParams%TwoMoInt == TWOMO_INCORE .and. CalcParams%FOFORam > 0) then
+    write(LOUT,'(/,1x,a)') 'WARNING! TwoMoInt=INCORE is incompatible with FOFO_RAM.'
+    write(LOUT,'(1x,a)')   '         FOFO_RAM will be IGNORED.'
+ endif
+ if (CalcParams%Cholesky > 0 .and. CalcParams%FOFORam > 0) then
+    write(LOUT,'(/,1x,a)') 'WARNING! Cholesky and FOFO_RAM are both set.'
+    write(LOUT,'(1x,a)')   '         FOFO_RAM will be IGNORED (Cholesky uses its own in-memory path).'
+ endif
  if (allocated(CalcParams%IntegralsFilePath)) then
        write(*, *) "Ints file: ", CalcParams%IntegralsFilePath
  end if
