@@ -326,85 +326,87 @@ integer,parameter :: cbuf=512
 end subroutine tran4_full
 
 subroutine tran4_gen(NBas,nA,CA,nB,CB,nC,CC,nD,CD,fname,srtfile)
-! 4-index transformation out of core
+! 4-index transformation out of core (Phase 1 batched)
 ! dumps all integrals on disk in the (square,square) form
 ! CAREFUL: C have to be in AOMO form!
-!!! CAREFUL: write to simpler form
-!!! ie. (NBas,n,C)
+use batch_dgemm, only: batch_dgemm_strided
 implicit none
 
 type(AOReaderData) :: reader
 
 integer,intent(in) :: NBas
 integer,intent(in) :: nA,nB,nC,nD
-! CA(NBas*nA)
 double precision,intent(in) :: CA(*), CB(*), CC(*), CD(*)
 character(*) :: fname,srtfile
 double precision, allocatable :: work1(:), work2(:), work3(:,:)
+double precision, allocatable :: B_batch(:), C_batch(:), D_batch(:)
 integer :: iunit,iunit2,iunit3
-integer :: ntr,nAB,nCD,nloop
+integer :: ntr,nAB,nCD,nloop,N2
 integer,parameter :: cbuf=512
-integer :: i,rs,ab
+integer, parameter :: BSIZE = 64
+integer :: i,rs,ab,j,bcount,rs_batch,rs_end
 logical :: empty
-!  test
-integer :: l,k,kl
 
-! write(6,'()') 
-! write(6,'(1x,a)') 'TRAN4_SYM_OUT_OF_CORE'
-! write(6,'(1x,a)') 'Transforming integrals for AB dimer'
  write(6,'(1x,a)') 'Transforming integrals for '//fname
 
  ntr = NBas*(NBas+1)/2
  nAB = nA*nB
  nCD = nC*nD
+ N2  = NBas*NBas
 
  ! set no. of triangles in buffer
  nloop = (ntr-1)/cbuf+1
 
- allocate(work1(NBas*NBas),work2(NBas*NBas))
+ allocate(work1(N2),work2(N2))
  allocate(work3(cbuf,nAB))
+ allocate(B_batch(N2*BSIZE))
+ allocate(C_batch(N2*BSIZE))
+ allocate(D_batch(N2*BSIZE))
 
- !!open(newunit=iunit,file='AOTWOSORT',status='OLD',&
- !open(newunit=iunit,file=trim(srtfile),status='OLD',&
- !     access='DIRECT',form='UNFORMATTED',recl=8*ntr)
  call reader%open(trim(srtfile))
 
  ! half-transformed file
  open(newunit=iunit2,file='TMPMO',status='REPLACE',&
      access='DIRECT',form='UNFORMATTED',recl=8*cbuf)
 
-! (ab|
+! (ab| — Phase 1 (batched dgemm)
  do i=1,nloop
-    ! loop over cbuf
-    do rs=(i-1)*cbuf+1,min(i*cbuf,ntr)
 
-       work1 = 0
-       !read(iunit,rec=rs) work1(1:ntr)
-       call reader%getTR(rs,work1,empty)
-       if(empty) then
+    do rs_batch=(i-1)*cbuf+1,min(i*cbuf,ntr),BSIZE
+       rs_end = min(rs_batch + BSIZE - 1, min(i*cbuf, ntr))
+       bcount = rs_end - rs_batch + 1
 
-          work3(rs-(i-1)*cbuf,1:nAB) = 0
+       ! Stage: sequential read + unpack
+       do j = 1, bcount
+          rs = rs_batch + j - 1
+          work1 = 0
+          call reader%getTR(rs, work1, empty)
+          if (empty) then
+             B_batch((j-1)*N2+1 : j*N2) = 0d0
+          else
+             call triang_to_sq(work1, B_batch((j-1)*N2+1 : j*N2), NBas)
+          endif
+       enddo
 
-       else
+       ! Batch dgemm #1: CA^T × B_i → C_i
+       call batch_dgemm_strided('T','N', nA, NBas, NBas, &
+            1d0, CA, NBas, 0, &
+            B_batch, NBas, N2, &
+            0d0, C_batch, nA, nA*NBas, &
+            bcount)
 
-          call triang_to_sq(work1,work2,NBas)
-          ! work1=CA^T.work2
-          ! work2=work1.CB
-          call dgemm('T','N',nA,NBas,NBas,1d0,CA,NBas,work2,NBas,0d0,work1,nA) 
-          call dgemm('N','N',nA,nB,NBas,1d0,work1,nA,CB,NBas,0d0,work2,nA)
-          ! transpose
-          work3(rs-(i-1)*cbuf,1:nAB) = work2(1:nAB)
-          !work1 = 0
-          !kl = 0 
-          !do l=1,nB
-          !do k=1,nA
-          !   kl = kl + 1
-          !   work1(kl) = work2((k-1)*NBas+l)
-          !enddo
-          !enddo
-          !work3(rs-(i-1)*cbuf,1:nAB) = work1(1:nAB)
+       ! Batch dgemm #2: C_i × CB → D_i
+       call batch_dgemm_strided('N','N', nA, nB, NBas, &
+            1d0, C_batch, nA, nA*NBas, &
+            CB, NBas, 0, &
+            0d0, D_batch, nA, nAB, &
+            bcount)
 
-       endif
+       ! Store to work3
+       do j = 1, bcount
+          rs = rs_batch + j - 1
+          work3(rs-(i-1)*cbuf, 1:nAB) = D_batch((j-1)*nAB+1 : j*nAB)
+       enddo
 
     enddo
 
@@ -446,7 +448,7 @@ integer :: l,k,kl
 
  enddo
 
- deallocate(work1,work2,work3)
+ deallocate(work1,work2,work3,B_batch,C_batch,D_batch)
  close(iunit3)
  close(iunit2,status='DELETE')
 
@@ -1644,9 +1646,11 @@ enddo
 end subroutine sq_symmetrize
 
 subroutine tran4_gen_incore(NBas,nA,CA,nB,CB,nC,CC,nD,CD,outarray,srtfile)
-! 4-index transformation fully in-core
+! 4-index transformation fully in-core (batched dgemm)
 ! Same as tran4_gen but everything in RAM — no TMPMO, no output file
 ! outarray(nCD, nAB) — result stored in memory instead of file
+! Uses batched dgemm for reduced per-call overhead
+use batch_dgemm, only: batch_dgemm_strided
 implicit none
 
 type(AOReaderData) :: reader
@@ -1656,52 +1660,101 @@ integer,intent(in) :: nA,nB,nC,nD
 double precision,intent(in) :: CA(*), CB(*), CC(*), CD(*)
 double precision,intent(out) :: outarray(*)
 character(*) :: srtfile
-double precision, allocatable :: work1(:), work2(:), tmpmo(:,:)
-integer :: ntr,nAB,nCD,rs,ab
+double precision, allocatable :: work1(:), tmpmo(:,:)
+double precision, allocatable :: B_batch(:), C_batch(:), D_batch(:)
+integer :: ntr,nAB,nCD,N2,rs,ab,j,bcount,rs_start,ab_start
+integer, parameter :: BSIZE = 64
 logical :: empty
 
- write(6,'(1x,a)') 'Transforming integrals in-core'
+ write(6,'(1x,a)') 'Transforming integrals in-core (batched)'
 
  ntr = NBas*(NBas+1)/2
  nAB = nA*nB
  nCD = nC*nD
+ N2  = NBas*NBas
 
- allocate(work1(NBas*NBas),work2(NBas*NBas))
+ allocate(work1(N2))
  allocate(tmpmo(ntr,nAB))
+ allocate(B_batch(N2*BSIZE))
+ allocate(C_batch(N2*BSIZE))
+ allocate(D_batch(N2*BSIZE))
 
  call reader%open(trim(srtfile))
 
- ! Pass 1: AO -> half-MO (in RAM)
- do rs=1,ntr
+ ! Pass 1: AO -> half-MO (batched)
+ do rs_start = 1, ntr, BSIZE
+    bcount = min(BSIZE, ntr - rs_start + 1)
 
-    work1 = 0
-    call reader%getTR(rs,work1,empty)
+    ! Stage: sequential read + unpack into batch buffer
+    do j = 1, bcount
+       rs = rs_start + j - 1
+       work1 = 0
+       call reader%getTR(rs, work1, empty)
+       if (empty) then
+          B_batch((j-1)*N2+1 : j*N2) = 0d0
+       else
+          call triang_to_sq(work1, B_batch((j-1)*N2+1 : j*N2), NBas)
+       endif
+    enddo
 
-    if(empty) then
-       tmpmo(rs,1:nAB) = 0
-    else
-       call triang_to_sq(work1,work2,NBas)
-       call dgemm('T','N',nA,NBas,NBas,1d0,CA,NBas,work2,NBas,0d0,work1,nA)
-       call dgemm('N','N',nA,nB,NBas,1d0,work1,nA,CB,NBas,0d0,work2,nA)
-       tmpmo(rs,1:nAB) = work2(1:nAB)
-    endif
+    ! Batch dgemm #1: CA^T × B_i → C_i
+    call batch_dgemm_strided('T','N', nA, NBas, NBas, &
+         1d0, CA, NBas, 0, &
+         B_batch, NBas, N2, &
+         0d0, C_batch, nA, nA*NBas, &
+         bcount)
+
+    ! Batch dgemm #2: C_i × CB → D_i
+    call batch_dgemm_strided('N','N', nA, nB, NBas, &
+         1d0, C_batch, nA, nA*NBas, &
+         CB, NBas, 0, &
+         0d0, D_batch, nA, nAB, &
+         bcount)
+
+    ! Store to tmpmo
+    do j = 1, bcount
+       rs = rs_start + j - 1
+       tmpmo(rs, 1:nAB) = D_batch((j-1)*nAB+1 : j*nAB)
+    enddo
 
  enddo
 
  call reader%close
 
- ! Pass 2: half-MO -> full MO (in RAM)
- do ab=1,nAB
+ ! Pass 2: half-MO -> full MO (batched)
+ do ab_start = 1, nAB, BSIZE
+    bcount = min(BSIZE, nAB - ab_start + 1)
 
-    work1(1:ntr) = tmpmo(1:ntr,ab)
-    call triang_to_sq(work1,work2,NBas)
-    call dgemm('T','N',nC,NBas,NBas,1d0,CC,NBas,work2,NBas,0d0,work1,nC)
-    call dgemm('N','N',nC,nD,NBas,1d0,work1,nC,CD,NBas,0d0,work2,nC)
-    outarray((ab-1)*nCD+1 : ab*nCD) = work2(1:nCD)
+    ! Stage: extract columns from tmpmo + unpack
+    do j = 1, bcount
+       ab = ab_start + j - 1
+       work1(1:ntr) = tmpmo(1:ntr, ab)
+       call triang_to_sq(work1, B_batch((j-1)*N2+1 : j*N2), NBas)
+    enddo
+
+    ! Batch dgemm #3: CC^T × B_i → C_i
+    call batch_dgemm_strided('T','N', nC, NBas, NBas, &
+         1d0, CC, NBas, 0, &
+         B_batch, NBas, N2, &
+         0d0, C_batch, nC, nC*NBas, &
+         bcount)
+
+    ! Batch dgemm #4: C_i × CD → D_i
+    call batch_dgemm_strided('N','N', nC, nD, NBas, &
+         1d0, C_batch, nC, nC*NBas, &
+         CD, NBas, 0, &
+         0d0, D_batch, nC, nCD, &
+         bcount)
+
+    ! Store to outarray
+    do j = 1, bcount
+       ab = ab_start + j - 1
+       outarray((ab-1)*nCD+1 : ab*nCD) = D_batch((j-1)*nCD+1 : j*nCD)
+    enddo
 
  enddo
 
- deallocate(work1,work2,tmpmo)
+ deallocate(work1, tmpmo, B_batch, C_batch, D_batch)
 
 end subroutine tran4_gen_incore
 

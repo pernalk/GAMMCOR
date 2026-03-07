@@ -10,6 +10,7 @@ C     K.PERNAL 2018
 C
       Program PRDMFT
 C
+      use memory
       use types
       use inputfill
       use systemdef
@@ -19,10 +20,12 @@ C
       use git_info
       use build_info
       use omp_lib
+      use acpp_types
 C
       Implicit Real*8 (A-H,O-Z)
 C
       Character*60 Title
+      Character(:),allocatable :: BasisSet
 C
       Real*8, Dimension(:), Allocatable :: Occ
       Real*8, Dimension(:), Allocatable :: URe
@@ -46,6 +49,8 @@ C
       type(FlagsData) :: Flags
       type(SystemBlock) :: System
       type(SaptData) :: Sapt
+      type(TTHCData)  :: THCData
+      type(TACppData) :: AuxData
 C
       Include 'commons.inc'
 C
@@ -73,6 +78,12 @@ C     FILL COMMONS AND CONSTANTS
       Charge  = System%Charge
       NBasis  = System%NBasis
       Title   = Flags%JobTitle
+      if(allocated(Flags%BasisSetPath).and.
+     $   allocated(Flags%BasisSet)) then
+         BasisSet = Flags%BasisSetPath // Flags%BasisSet
+      else
+         BasisSet = ''
+      endif
       ITwoEl  = Flags%ITwoEl
       ICholesky = Flags%ICholesky
       ICholeskyAccu = Flags%ICholeskyAccu
@@ -81,9 +92,51 @@ C     FILL COMMONS AND CONSTANTS
       IWarn   = 0
       Max_Cn  = System%Max_Cn
       ITrpl   = Flags%ITrpl
-      FreqOm  = System%FreqOm
       IRedVirt=Flags%IRedVirt
 c      ThrVirt=System%ThrVirt
+C
+C     FILL NEW COMMON BLOCK VARIABLES (from pr-dmft merge)
+C
+C     --- MISCFL new fields ---
+      ICholeskyBIN = Flags%ICholeskyBIN
+      ICholeskyOTF = Flags%ICholeskyOTF
+      ICholeskyTHC = Flags%ICholeskyTHC
+      IH0test  = Flags%IH0Test
+      IUnits   = Flags%IUnits
+      InternalGrid = Flags%InternalGrid
+      IGridType = Flags%IGridType
+      Monomer  = System%Monomer
+      NCoreOrb = System%NCoreOrb
+      NStronglyOccOrb = System%NStronglyOccOrb
+      NElecBEmb = System%NElecBEmb
+C     --- INTF ---
+      IMOLPRO  = Flags%IMOLPRO
+      IPYSCF   = Flags%IPYSCF
+      IOrbOrder = Flags%ORBITAL_ORDERING
+      IJobType = Flags%JobType
+C     --- DALTON ---
+      NISHT_G  = System%NISHT_G
+      NASHT_G  = System%NASHT_G
+      ISAPSG   = Flags%ISAPSG
+C     --- DFTSR ---
+      IFunSR2  = Flags%IFunSR2
+C     --- AC new fields ---
+      IFlCorrMD = Flags%ICorrMD
+      IOrbRelax = Flags%IOrbRelax
+      IOrbIncl  = Flags%IOrbIncl
+      IFlFCorr  = Flags%IFlFCorr
+      IDBBSC    = Flags%IDBBSC
+      IVEMB     = Flags%IVEMB
+      IHNO1     = 0
+      NFreqOm   = System%NFreqOm
+      do i=1,10
+         FreqOm(i) = 0.d0
+      enddo
+      if(allocated(System%FreqOm).and.System%NFreqOm>0) then
+         do i=1,min(System%NFreqOm,10)
+            FreqOm(i) = System%FreqOm(i)
+         enddo
+      endif
 C
 C     *************************************************************************
 C
@@ -252,7 +305,9 @@ C
 C      Print*,'VALUE DECLARED IN INPUT: ',NoSt
 C
       ElseIf(IDALTON.Eq.0.and.IDMRG.Eq.0) Then
-      Call read_NoSt_molpro(NoSt,'2RDM')
+         if (IPYSCF.ne.1) then
+            Call read_NoSt_molpro(NoSt,'2RDM')
+         endif
       ElseIf(IDALTON.Eq.1) Then
       NoSt = 1
       Write(6,'(/,1x,a)') 'WARNING! ASSUMING RMDs CORRESPOND TO
@@ -280,18 +335,20 @@ C     OLD INPUT-READ
 C      Call RWInput(Title,ZNucl,Charge,NBasis)
 C
 C     CALCULATE THE DIMENSIONS
-      If(IDALTON.Eq.0) then
+      If(IDALTON.Eq.0.AND.IPYSCF.Eq.0) then
 C        Call CheckNBa(NBasis,Title)
         Call basinfo(NBasis,'AOONEINT.mol','MOLPRO')
       endif
 C
       Call DimSym(NBasis,NInte1,NInte2,MxHVec,MaxXV)
 C
+      If(IDALTON.eq.0) Then
       If(IFunSR.Ne.0) Then
 C      Call GetNGrid(NGrid,Title)
-      Call molprogrid0(NGrid,NBasis)
+      If (InternalGrid.Eq.0) Call molprogrid0(NGrid,NBasis)
       Else
       NGrid=1
+      EndIf
       EndIf
 C
 C     GET THE VALUE OF THE SEPARATION PARAMETER OM
@@ -301,6 +358,8 @@ c      If(IFunSR.Ne.0.And.IFunSR.Ne.3.And.IFunSR.Ne.5) Then
       If(IFunSR.Eq.1.Or.IFunSR.Eq.2.Or.IFunSR.Eq.4) Then
 C      Call GetAlpha(Title)
       Call readalphamolpro(Alpha)
+      ElseIf(IDBBSC.Eq.2) Then
+      Alpha=1.D0
       Else
       Alpha=0.D0
       EndIf
@@ -344,8 +403,8 @@ C     temporarily set IFunSR to 6 to avoid loading integrals and their transform
       IFFSR=7
       EndIf
 C
-      Call LdInteg(Title,XKin,XNuc,ENuc,Occ,URe,TwoEl,UMOAO,NInte1,
-     $ NBasis,NInte2,NGem)
+      Call LdInteg(Title,BasisSet,XKin,XNuc,ENuc,Occ,URe,
+     $ TwoEl,UMOAO,NInte1,NBasis,NInte2,NGem)
 C
 C     create cas_ss.molden file with NOs (useful after SA-CAS calculations to inspect 
 C     the character of NOs in a state requested in input.inp)
@@ -357,7 +416,7 @@ C     set back IFunSR to IFFSR
 C
       Else
 C
-      Call ReadDAL(XKin,XNuc,ENuc,Occ,URe,TwoEl,UMOAO,
+      Call ReadDAL(BasisSet,XKin,XNuc,ENuc,Occ,URe,TwoEl,UMOAO,
      $ NInte1,NBasis,NInte2,NGem,Flags)
 C
       EndIf
@@ -370,7 +429,7 @@ C
       ElseIf(IFunSR.Eq.7) Then
       Call VV10(URe,UMOAO,Occ,NBasis)
       Else
-      Call DMSCF(Title,URe,Occ,XKin,XNuc,ENuc,UMOAO,
+      Call DMSCF(Title,BasisSet,URe,Occ,XKin,XNuc,ENuc,UMOAO,
      $ TwoEl,NBasis,NInte1,NInte2,NGem)
       EndIf
 C
@@ -380,7 +439,12 @@ C      Write(6,'(8a10)') ('**********',i=1,9)
       EndIf
 C
       If(ITwoEl.Eq.2)  Call delfile('TWOMO')
-      Call delfile('AOTWOSORT')
+      If (ICholeskyOTF.Eq.0) Then
+         Call delfile('AOTWOSORT')
+         If(IFunSR.Eq.1.Or.IFunSR.Eq.2.Or.IFunSR.Eq.4) Then
+         Call delfile('AOERFSORT')
+         EndIf
+      EndIf
 C
       Call free_System(System)
       Call clock(PossibleJobType(Flags%JobType),Tcpu,Twall)

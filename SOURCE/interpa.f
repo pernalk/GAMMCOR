@@ -5863,7 +5863,50 @@ C
      $ RDM2=RDM2-Occ(IP)*Occ(IQ)
 C
       FRDM2GVB=RDM2
-C     
+C
       Return
+      End
+C
+*Deck FRDM2AABA
+      Real*8 Function FRDM2AABA(IMon,IP,IQ,IR,IS,g1a,g1b,RDM2Act,
+     $                          Ind2,NAct,NBasis)
+C
+C     FOR A GIVEN SET OF INDICES AND THE KNOWN PART OF ACTIVE RDM2
+C     RETURNS THE ELEMENT OF RDM2_PQRS FOR CAS
+C
+C     ISpin=0 RDM2= [++++ + -+-+] = \Gamma^00 + \Gamma^01
+C     ISpin=1 RDM2= [---- + +-+-] = \Gamma^00 - \Gamma^01
+C
+      Implicit Real*8 (A-H,O-Z)
+C
+      include 'commons.inc'
+C
+      Dimension RDM2Act(NAct**2*(NAct**2+1)/2)
+      Dimension g1a(NBasis,NBasis),g1b(NBasis,NBasis),Ind2(NBasis)
+C
+      Dimension work(NBasis,NBasis)
+C
+      if(ICASSCF.Eq.0) then
+        write(6,'(1x,a)') "Spin resolved FRDM2 n/a for GVB yet!"
+        stop
+      endif
+C
+      RDM2 = 0d0
+C
+      if(Ind2(ip)*Ind2(iq)*Ind2(ir)*Ind2(is) == 0d0) then
+        RDM2 = RDM2 + g1a(ip,ir)*g1a(iq,is) - g1a(ip,is)*g1a(iq,ir)
+     $              + g1b(ip,ir)*g1a(iq,is)
+C
+      endif
+C
+C     ACTIVE PART
+      if(Ind2(ip)*Ind2(iq)*Ind2(ir)*Ind2(is) /= 0d0) then
+        RDM2=RDM2Act(NAddrRDM(Ind2(ip),Ind2(iq),Ind2(ir),Ind2(is),
+     $                        NAct))
+      endif
+C
+      FRDM2AABA = RDM2
+C
+      return
       End
 

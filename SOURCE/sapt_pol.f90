@@ -3756,5 +3756,226 @@ deallocate(OmB,EVecB,OmA,EVecA)
 
 end subroutine c6_dummy
 
+subroutine e1elst_o(A,B,SAPT)
+!
+! unrestricted open-shell electrostatic energy (AO)
+! see Eq. (7) in https://doi.org/10.1063/1.4758455
+!
+implicit none
+
+type(SystemBlock) :: A, B
+type(SaptData)    :: SAPT
+
+integer :: i, j
+integer :: NBas
+
+double precision :: ea,eb,elst
+double precision,allocatable :: work(:,:)
+double precision,allocatable :: Vb(:,:)
+double precision,allocatable :: PA(:,:),PB(:,:)
+double precision,external  :: trace
+
+! set dimensions
+NBas = A%NBasis
+
+allocate(PA(NBas,NBas),PB(NBas,NBas),Vb(NBas,NBas))
+allocate(work(NBas,NBas))
+
+call get_den(NBas,NBas,A%UMO(:,:,1),A%UOcc(:,1),1d0,PA)
+call get_den(NBas,NBas,A%UMO(:,:,2),A%UOcc(:,2),1d0,work)
+PA = PA + work
+
+call get_den(NBas,NBas,B%UMO(:,:,1),B%UOcc(:,1),1d0,PB)
+call get_den(NBas,NBas,B%UMO(:,:,2),B%UOcc(:,2),1d0,work)
+PB = PB + work
+
+call get_one_mat('V',Vb,B%Monomer,NBas)
+
+! Tr[PA.Vb + PB.WA] + Vnn
+call dgemm('N','N',NBas,NBas,NBas,1d0,PA,NBas,Vb,NBas,0d0,work,NBas)
+ea = trace(work,NBas)
+
+call dgemm('N','N',NBas,NBas,NBas,1d0,PB,NBas,A%WPot,NBas,0d0,work,NBas)
+eb = trace(work,NBas)
+
+elst = ea + eb + SAPT%Vnn
+
+call print_en('PA.Vb',ea,.false.)
+call print_en('PB.Wa',eb,.false.)
+call print_en('V_nn',SAPT%Vnn,.false.)
+call print_en('Eelst',elst*1000,.true.)
+
+SAPT%elst = elst
+
+deallocate(work)
+deallocate(Vb,PB,PA)
+
+end subroutine e1elst_o
+
+subroutine e2ind_o(Flags,A,B,SAPT)
+!
+! calculate uncoupled and coupled e2ind
+! c.f. Eq (17) in https://doi.org/10.1063/1.4758455
+!
+implicit none
+
+type(FlagsData)   :: Flags
+type(SystemBlock) :: A, B
+type(SaptData)    :: SAPT
+
+integer :: Nbasis
+double precision :: e2iBAa,e2iBAb,e2iABa,e2iABb
+double precision :: e2ab_unc,e2ba_unc,e2ind_unc
+double precision :: e2ab,e2ba,e2ind
+double precision, allocatable :: Waa(:,:),Wab(:,:)
+double precision, allocatable :: Wba(:,:),Wbb(:,:)
+
+NBasis = A%NBasis
+
+allocate(Waa(NBasis,NBasis),Wab(NBasis,NBasis))
+allocate(Wba(NBasis,NBasis),Wbb(NBasis,NBasis))
+
+call tran2MO(A%WPot,B%UMO(:,:,1),B%UMO(:,:,1),Waa,NBasis)
+call tran2MO(A%WPot,B%UMO(:,:,2),B%UMO(:,:,2),Wab,NBasis)
+
+call tran2MO(B%WPot,A%UMO(:,:,1),A%UMO(:,:,1),Wba,NBasis)
+call tran2MO(B%WPot,A%UMO(:,:,2),A%UMO(:,:,2),Wbb,NBasis)
+
+! uncoupled
+e2iBAa = e2ind_unc_o(Wba,A%UOrbE(:,1),A%NOa,A%NVa,NBasis)
+e2iBAb = e2ind_unc_o(Wbb,A%UOrbE(:,2),A%NOb,A%NVb,NBasis)
+e2ba_unc = e2iBAa + e2iBAb
+
+e2iABa = e2ind_unc_o(Waa,B%UOrbE(:,1),B%NOa,B%NVa,NBasis)
+e2iABb = e2ind_unc_o(Wab,B%UOrbE(:,2),B%NOb,B%NVb,NBasis)
+e2ab_unc = e2iABa + e2iABb
+
+e2ind_unc = e2ba_unc + e2ab_unc
+
+call print_en('Ind(B<--A,unc)',e2ab_unc*1000d0,.true.)
+call print_en('Ind(A<--B,unc)',e2ba_unc*1000d0,.false.)
+call print_en('E2ind(unc)',e2ind_unc*1000d0,.false.)
+
+SAPT%e2ind_unc = e2ind_unc
+
+deallocate(Wbb,Wba)
+deallocate(Wab,Waa)
+
+contains
+
+function e2ind_unc_o(Wmat,OrbE,no,nv,n) result(res)
+implicit none
+
+integer :: no,nv,n
+double precision :: Wmat(n,n), OrbE(n)
+double precision :: delta_e, res
+
+integer :: ip, iq
+
+res = 0d0
+do iq=1,no
+   do ip=1,nv
+      delta_e = OrbE(iq) - OrbE(no+ip)
+      res = res + Wmat(iq,no+ip)*Wmat(no+ip,iq)/delta_e
+   enddo
+enddo
+
+end function e2ind_unc_o
+
+end subroutine e2ind_o
+
+subroutine e2disp_o(A,B,SAPT)
+!
+! calculated unrestricted uncoupled dispersion energy
+!
+implicit none
+
+type(FlagsData)   :: Flags
+type(SystemBlock) :: A, B
+type(SaptData)    :: SAPT
+
+integer :: NBasis
+double precision :: e2daa,e2dbb,e2dab,e2dba
+double precision :: e2du
+
+NBasis = A%NBasis
+
+! uncoupled
+call e2do_unc(e2daa,A%UOrbE(:,1),B%UOrbE(:,1),B%IndNa,A%NOa,A%NVa,B%NOa,B%NVa,NBasis,'OVOVABaa')
+call e2do_unc(e2dbb,A%UOrbE(:,2),B%UOrbE(:,2),B%IndNb,A%NOb,A%NVb,B%NOb,B%NVb,NBasis,'OVOVABbb')
+call e2do_unc(e2dab,A%UOrbE(:,1),B%UOrbE(:,2),B%IndNb,A%NOa,A%NVa,B%NOb,B%NVb,NBasis,'OVOVABab')
+call e2do_unc(e2dba,A%UOrbE(:,2),B%UOrbE(:,1),B%IndNa,A%NOb,A%NVb,B%NOa,B%NVa,NBasis,'OVOVABba')
+
+if(SAPT%IPrint>=10) write(LOUT,'(1x,a,f16.8)') 'E2disp(unc,aa) = ', e2daa*1000d0
+if(SAPT%IPrint>=10) write(LOUT,'(1x,a,f16.8)') 'E2disp(unc,ab) = ', e2dab*1000d0
+if(SAPT%IPrint>=10) write(LOUT,'(1x,a,f16.8)') 'E2disp(unc,ba) = ', e2dba*1000d0
+if(SAPT%IPrint>=10) write(LOUT,'(1x,a,f16.8)') 'E2disp(unc,bb) = ', e2dbb*1000d0
+
+e2du = e2daa + e2dbb + e2dab + e2dba
+SAPT%e2disp_unc = e2du
+
+! coupled
+
+! summary
+call print_en('E2disp(unc)',e2du*1000,.false.)
+
+end subroutine e2disp_o
+
+subroutine e2do_unc(e2do,EnA,EnB,IndNB,noA,nvA,noB,nvB,n,intfile)
+
+character(*) :: intfile
+integer, intent(in) :: noA,nvA,noB,nvB,n
+integer, intent(in) :: IndNB(2,noB*nvB)
+double precision, intent(in) :: EnA(n),EnB(n)
+
+double precision, intent(out) :: e2do
+
+integer :: iunit
+integer :: nova,novb
+integer :: ip,iq,ipq,ir,is,irs
+
+double precision :: val,inv_omega
+double precision :: OmA,OmB
+double precision :: AuxA(noA*nvA)
+double precision :: ints(nvA,noA)
+
+novA = noA*nvA
+novB = noB*nvB
+
+! (OV|OV) (AA|BB)
+open(newunit=iunit,file=intfile,status='OLD',&
+     access='DIRECT',form='UNFORMATTED',recl=8*novA)
+
+ints = 0d0
+e2do = 0d0
+do irs=1,novB
+
+    ir = IndNB(1,irs)
+    is = IndNB(2,irs)
+    read(iunit,rec=is+(ir-noB-1)*noB) AuxA(1:novA)
+
+    do ip=1,nvA
+       do iq=1,noA
+          ints(ip,iq) = AuxA(iq+(ip-1)*noA)
+       enddo
+    enddo
+
+    OmB = EnB(is) - EnB(ir)
+
+    do iq=1,noA
+       do ip=1,nvA
+          OmA = EnA(iq) - EnA(noA+ip)
+          inv_omega = 1d0 / (OmA + OmB)
+          e2do = e2do + ints(ip,iq)**2*inv_omega
+       enddo
+    enddo
+
+enddo
+close(iunit)
+
+print*, 'e2do = ', e2do*1000
+
+end subroutine e2do_unc
+
 end module sapt_pol
 

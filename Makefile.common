@@ -14,7 +14,8 @@ OBJ = $(O)mainp.o $(O)initia.o $(O)dmscf.o $(O)misc.o $(O)optocc.o \
        $(O)sorter.o $(O)tran.o $(O)systemdef.o \
        $(O)sorter_Cholesky.o \
        $(O)priunit.o $(O)rdwrext.o \
-       $(O)types.o $(O)blocktypes.o \
+       $(O)globals.o $(O)types.o $(O)blocktypes.o $(O)memory.o \
+       $(O)acpp_types.o $(O)sapt_files.o $(O)sapt_visual.o $(O)sapt_os.o \
        $(O)inputfill.o $(O)abmats.o $(O)abfofo.o $(O)ab0fofo.o \
        $(O)abchol.o $(O)abcipsi.o \
        $(O)sapt_main.o $(O)sapt_exch.o $(O)sapt_pol.o $(O)sapt_utils.o \
@@ -25,7 +26,7 @@ OBJ = $(O)mainp.o $(O)initia.o $(O)dmscf.o $(O)misc.o $(O)optocc.o \
        $(O)timing.o \
        $(O)srlrdynamic.o $(O)erpa.o $(O)interpa.o  $(O)exact2el.o $(O)optapsg.o $(O)newton.o $(O)acfd.o $(O)accas.o \
        $(O)caspidft.o $(O)ac_exact_2el.o $(O)vv10.o \
-       $(O)arithmetic.o $(O)io.o $(O)clock.o $(O)string.o $(O)sort.o $(O)display.o $(O)fofo_data.o $(O)chol_data.o $(O)Cholesky.o $(O)Cholesky_old.o $(O)tran_Chol.o \
+       $(O)arithmetic.o $(O)io.o $(O)clock.o $(O)string.o $(O)sort.o $(O)display.o $(O)fofo_data.o $(O)chol_data.o $(O)batch_dgemm.o $(O)Cholesky.o $(O)Cholesky_old.o $(O)tran_Chol.o \
        $(O)iter_stats.o $(O)C_integrator.o $(O)iter_algorithm.o $(O)iter_algorithm_diis.o $(O)iter_algorithm_damping.o \
        $(O)lambda_calculator.o $(O)lambda_calculator_diag.o $(O)lambda_calculator_block.o $(O)lambda_calculator_projector.o \
        $(O)ac_iter.o $(O)ac_fofo.o \
@@ -44,7 +45,13 @@ $(O)%.o : $(S)%.f
 $(PROG) : $(OBJ)
 	$(FCC) -o $@ $^ $(XOBJ) $(FFLAGS) $(LIBS)
 
-$(O)mainp.o            : $(S)commons.inc $(O)types.o $(O)inputfill.o $(O)systemdef.o $(O)sapt_main.o $(O)git_info.o $(O)build_info.o
+$(O)globals.o          :
+$(O)memory.o           :
+$(O)acpp_types.o       : $(O)types.o
+$(O)sapt_files.o       :
+$(O)sapt_visual.o      : $(O)types.o
+$(O)sapt_os.o          : $(O)types.o $(O)sapt_utils.o
+$(O)mainp.o            : $(S)commons.inc $(O)globals.o $(O)types.o $(O)inputfill.o $(O)systemdef.o $(O)sapt_main.o $(O)git_info.o $(O)build_info.o $(O)memory.o $(O)acpp_types.o
 $(O)initia.o           : $(S)commons.inc $(O)priunit.o $(O)timing.o $(O)rdwrext.o $(O)sorter.o $(O)abmats.o $(O)types.o $(O)tran.o $(O)trexio_module.o $(O)chol_data.o $(O)fofo_data.o
 $(O)accas.o            : $(S)commons.inc $(O)priunit.o $(O)timing.o $(O)rdwrext.o $(O)sorter.o $(O)abmats.o $(O)abfofo.o $(O)ab0fofo.o
 $(O)acfd.o             : $(S)commons.inc $(O)abmats.o $(O)abfofo.o  $(O)ab0fofo.o $(O)rdwrext.o
@@ -81,7 +88,8 @@ $(O)systemdef.o        : $(O)types.o $(O)fofo_data.o
 $(O)rdwrext.o          : $(O)priunit.o $(O)trexio_module.o
 $(O)sorter.o           : $(O)priunit.o $(O)rdwrext.o $(O)trexio_module.o
 $(O)sorter_Cholesky.o  : $(O)priunit.o $(O)rdwrext.o $(O)trexio_module.o
-$(O)tran.o             : $(O)blocktypes.o $(O)sorter.o
+$(O)batch_dgemm.o      :
+$(O)tran.o             : $(O)blocktypes.o $(O)sorter.o $(O)batch_dgemm.o
 $(O)tran_Chol.o        : $(O)tran.o
 $(O)abfofo.o           : $(O)priunit.o $(O)tran.o $(O)blocktypes.o $(O)abchol.o $(O)timing.o $(O)fofo_data.o
 $(O)abmats.o           : $(O)priunit.o $(O)tran.o
@@ -109,7 +117,8 @@ $(O)sapt_response.o    : $(O)types.o $(O)tran.o $(O)abmats.o $(O)abfofo.o $(O)ab
 $(O)sapt_main.o        : $(O)types.o \
                          $(O)sapt_pol.o $(O)sapt_exch.o $(O)sapt_Chol_pol.o $(O)sapt_Chol_exch.o \
                          $(O)sapt_utils.o $(O)exdpino.o \
-                         $(O)sapt_response.o $(O)sapt_interface.o
+                         $(O)sapt_response.o $(O)sapt_interface.o \
+                         $(O)sapt_os.o $(O)sapt_visual.o $(O)sapt_files.o
 
 $(O)exmisc.o           : $(O)types.o
 $(O)exappr.o           : $(O)exmisc.o

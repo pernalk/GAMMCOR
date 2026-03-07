@@ -37,6 +37,20 @@ endif
 
 ! check JobType
 select case(CalcParams%JobType)
+! AC
+case(1,14,15,16)
+  if (CalcParams%DBBSC==2.and.CalcParams%TwoMoInt>1) then
+     write(6,'(1x,a)') "ERROR! AC(n)-CBS[H] not ready with FOFO!"
+     stop "Error: check_Calc"
+   endif
+
+! AC1
+case(3)
+  if (CalcParams%DBBSC==2.and.CalcParams%TwoMoInt==1) then
+     write(6,'(1x,a)') "ERROR! AC1-CBS[H] not ready with INCORE"
+     stop "Error: check_Calc"
+   endif
+
 !SAPT
 case(5)
 
@@ -51,6 +65,13 @@ case(5)
       write(6,'(1x,a)') "RDMSource    DALTON/MOLPRO"
       stop
    endif
+! RESPONSE
+case(17)
+   if (CalcParams%NFreqOm .gt. 10) then
+      write(6,'(1x,a)') "ERROR! MORE THAN 10 FREQUENCIES!"
+      stop "Error: check_Calc"
+   endif
+
 end select
 
 ! check interface
@@ -128,9 +149,46 @@ else
   ! set TwoEl type
    Flags%ITwoEl = Input%CalcParams%TwoMoInt
 
-  ! set Cholesky decomposition
+  ! set BasisSet
+   if( allocated(Input%CalcParams%BasisSet)) then
+      Flags%BasisSet = Input%CalcParams%BasisSet
+   endif
+   if( allocated(Input%CalcParams%BasisSetPath)) then
+      Flags%BasisSetPath = Input%CalcParams%BasisSetPath
+   endif
+
+  ! set Cholesky decomposition (from CalcParams for backward compat)
    Flags%ICholesky    = Input%CalcParams%Cholesky
    Flags%ICholeskyAccu = Input%CalcParams%CholeskyAccu
+  ! set Cholesky decomposition (from CholeskyBlock — overrides if set)
+   if(Input%CholeskyParams%Cholesky>0) then
+      Flags%ICholesky     = Input%CholeskyParams%Cholesky
+      Flags%ICholeskyBIN  = Input%CholeskyParams%CholeskyBIN
+      Flags%ICholeskyOTF  = Input%CholeskyParams%CholeskyOTF
+      Flags%ICholeskyTHC  = Input%CholeskyParams%CholeskyTHC
+      Flags%ICholeskyAccu = Input%CholeskyParams%CholeskyAccu
+      Flags%DCholeskyThr  = Input%CholeskyParams%CholeskyThr
+      Flags%DTHCThr       = Input%CholeskyParams%THCThr
+      Flags%IH0Test       = Input%CholeskyParams%H0Test
+   endif
+
+  ! set DFT grid
+   Flags%IGridType = Input%CalcParams%GridType
+   if (Input%CalcParams%DeclareGrid) then
+      if (Flags%IGridType <= 4) Flags%InternalGrid = 1
+   endif
+
+  ! set units
+   Flags%IUnits = Input%CalcParams%Units
+
+  ! RDM2 settings
+   Flags%IRdm2Typ = Input%CalcParams%Rdm2Type
+
+  ! compute orbital relaxation
+   Flags%IOrbRelax = Input%CalcParams%OrbRelax
+
+  ! include orbital response
+   Flags%IOrbIncl  = Input%CalcParams%OrbIncl
 
   ! reduce virtuals
    Flags%IRedVirt = Input%CalcParams%RedVirt
@@ -147,6 +205,7 @@ else
      Flags%INO     = 0
      Flags%NoSym   = 1
      Flags%IA = 1
+     Flags%ORBITAL_ORDERING = 3
 
   case(INTER_TYPE_MOL)
      Flags%IDALTON = 0
@@ -154,6 +213,7 @@ else
      Flags%INO     = 1
      !Flags%NoSym   = Input%CalcParams%SymType
      Flags%IA = 1
+     Flags%ORBITAL_ORDERING = 1
 
   case(INTER_TYPE_OWN)
      Flags%IDALTON = 0
@@ -168,10 +228,20 @@ else
      Flags%INO     = 0
      Flags%NoSym   = 1
      Flags%IA = 1
+     Flags%ORBITAL_ORDERING = 2
+
   case(INTER_TYPE_TREX)
      Flags%IDALTON = 0
      Flags%ITREXIO = 1
+
+  case(INTER_TYPE_PYSCF)
+     Flags%IDALTON = 0
+     Flags%IPYSCF  = 1
+     Flags%ORBITAL_ORDERING = 5
+
   end select
+
+  Flags%InterfaceType = Input%CalcParams%InterfaceType
 
   if(Input%CalcParams%Restart) Flags%IRes = 1
 
@@ -203,6 +273,12 @@ else
      FLags%IGVB    = 0
      Flags%ICASSCF = 0
 
+  case(RDM_TYPE_UKS)
+     Flags%IUKS = 1
+     Flags%ISHF = 1
+     Flags%IGVB = 0
+     Flags%ICASSCF = 1
+
   case default
      write(LOUT,'(1x,a)') 'RDMType not declared! Assuming ICASSCF=1!'
      FLags%IGVB    = 0
@@ -218,15 +294,16 @@ else
   case(JOB_TYPE_AC)
      Flags%IFlAC  = 1
      Flags%IFlSnd = 0
+     Flags%IVEMB  = Input%CalcParams%IVEMB
      if(Input%CalcParams%DFApp==2) then
         if(Input%CalcParams%PostCAS) then
            Flags%IFunSR = 4
+           Flags%IDBBSC  = Input%CalcParams%DBBSC
         else
            Flags%IFunSR = 2
         endif
         Flags%IFunSRKer = Input%CalcParams%Kernel
      endif
-!     if(Input%CalcParams%DFApp==2) Flags%IFunSRKer = 1
 
   case(JOB_TYPE_ACFREQ)
      Flags%IFlAC  = 1
@@ -242,22 +319,36 @@ else
 
   case(JOB_TYPE_RESPONSE)
      Flags%IFlRESPONSE = 1
+     Flags%IFunSR = Input%CalcParams%DFApp
+     Flags%IFunSRKer = Input%CalcParams%Kernel
 
-  case(JOB_TYPE_AC0)
-    ! HERE WILL BE CHANGED TO:
-    !Flags%IFlAC = 0
+  case(JOB_TYPE_AC0,JOB_TYPE_SRAC0,JOB_TYPE_MP2,JOB_TYPE_SRMP2)
      Flags%IFlAC   = 1
      Flags%IFlSnd  = 1
      Flags%IFlAC0D = 0
-     if(Input%CalcParams%DFApp==2) then
-        if(Input%CalcParams%PostCAS) then
-           Flags%IFunSR = 4
-        else
-           Flags%IFunSR = 2
-        endif
-        Flags%IFunSRKer = Input%CalcParams%Kernel
+     Flags%IDBBSC  = Input%CalcParams%DBBSC
+     Flags%IVEMB   = Input%CalcParams%IVEMB
+     ! SET sr FUNCTIONAL
+     if(Input%CalcParams%DFApp==1) then
+        Flags%IFunSR = 1
+     elseif(Input%CalcParams%DFApp==2) then
+        Flags%IFunSR = 2
      endif
-!     if(Input%CalcParams%DFApp==2) Flags%IFunSRKer = 1
+     ! POSTCAS FLAGS
+     if(Input%CalcParams%PostCAS) then
+        Flags%IFunSRKer = Input%CalcParams%Kernel
+        Flags%IFunSR = 4
+        ! use IFunSR2 for srDFA
+        if(Input%CalcParams%DFApp==1) then
+           Flags%IFunSR2 = 1
+        elseif(Input%CalcParams%DFApp==2) then
+           Flags%IFunSR2 = 2
+        endif
+     endif
+     if(Input%CalcParams%JobType==JOB_TYPE_SRAC0) then
+       Flags%ICorrMD  = 1
+       Flags%IFlFCorr = Input%CalcParams%FunCorr
+     endif
 
   case(JOB_TYPE_AC0D)
     ! HERE WILL BE CHANGED TO:
@@ -300,6 +391,7 @@ else
   case(JOB_TYPE_AC1)
      Flags%IFlAC  = 0
      Flags%IFlSnd = 0
+     Flags%IDBBSC  = Input%CalcParams%DBBSC
      if(Input%CalcParams%DFApp==2) then
         if(Input%CalcParams%PostCAS) then
            Flags%IFunSR = 4
@@ -322,10 +414,16 @@ else
      Flags%IFlFrag1 = 1
      Flags%IFl12 = 1
 
-  case(JOB_TYPE_SAPT)
+  case(JOB_TYPE_SAPT,JOB_TYPE_SAPTOS)
      Flags%ISAPT  = 1
      Flags%IFlAC  = 0
      Flags%IFlSnd = 0
+     Flags%IDBBSC = Input%CalcParams%DBBSC
+
+     ! open-shell SAPT
+     if (Input%CalcParams%JobType==JOB_TYPE_SAPTOS) then
+        Flags%ISAPTOS = 1
+     endif
 
      ! Response for SAPT
      select case(Input%CalcParams%Response)
@@ -345,6 +443,7 @@ else
      Flags%IFlAC  = 0
      Flags%IFlSnd = 0
      Flags%IFunSR = 3
+     Flags%IVEMB  = Input%CalcParams%IVEMB
 
   case(JOB_TYPE_CASPIDFT)
      Flags%IFunSR = 5
@@ -426,9 +525,13 @@ if(Flags%ISAPT.Eq.0) then
    endif
 !   Print*, 'InTrSt',System%InTrSt(1,1),System%InTrSt(2,1)
 
+   System%Monomer = Input%SystemInput(1)%Monomer
    System%ZNucl  = Input%SystemInput(1)%ZNucl
    System%Charge = Input%SystemInput(1)%Charge
    System%NBasis = Input%CalcParams%NBasis
+   System%NCoreOrb = Input%SystemInput(1)%NCoreOrb
+   System%NStronglyOccOrb = Input%SystemInput(1)%NStronglyOccOrb
+   System%NElecBEmb = Input%SystemInput(1)%NElecBEmb
    System%Omega  = Input%SystemInput(1)%Omega
    System%PerVirt= Input%SystemInput(1)%PerVirt
    System%EigFCI = Input%SystemInput(1)%EigFCI
@@ -442,7 +545,11 @@ if(Flags%ISAPT.Eq.0) then
    System%IPrint = Input%CalcParams%IPrint
   
    System%Max_Cn = Input%CalcParams%Max_Cn
-   System%FreqOm = Input%CalcParams%FreqOm
+   System%NFreqOm = Input%CalcParams%NFreqOm
+   if(allocated(Input%CalcParams%FreqOm)) then
+      allocate(System%FreqOm(System%NFreqOm))
+      System%FreqOm = Input%CalcParams%FreqOm
+   endif
 
    System%XELE = (System%ZNucl - System%Charge)/2.0d0
    System%NELE = (System%ZNucl - System%Charge)/2
@@ -461,13 +568,15 @@ elseif(Flags%ISAPT.Eq.1) then
 
  SAPT%InterfaceType = Input%CalcParams%InterfaceType
  SAPT%SaptLevel = Input%CalcParams%SaptLevel
+ SAPT%SaptExch  = Input%CalcParams%SaptExch
  SAPT%ic6 = Input%CalcParams%vdWCoef
  SAPT%Max_Cn = Input%CalcParams%Max_Cn
  SAPT%CAlpha = Input%CalcParams%CAlpha
+ SAPT%Visual = Input%CalcParams%Visual
  SAPT%IPrint = Input%CalcParams%IPrint
  if(SAPT%InterfaceType==2) SAPT%HFCheck = .false.
  ! temporary RSH
- if(Flags%IFunSR<3) then
+ if(Flags%IFunSR<3.and.Flags%IFunSR>0) then
    SAPT%doRSH = .true.
    SAPT%monA%doRSH = .true.
    SAPT%monB%doRSH = .true.

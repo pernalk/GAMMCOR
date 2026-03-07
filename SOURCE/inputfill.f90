@@ -46,8 +46,8 @@ integer :: imon
 
  ! check monomers
  select case(Input%CalcParams%JobType)
- ! SAPT case
- case(5)
+ ! SAPT and SAPT-OS case
+ case(5,21)
 
     current_block = block_none
     isys = 0
@@ -140,6 +140,7 @@ integer, parameter        :: block_none        = 0
 integer, parameter        :: block_calculation = 1
 integer, parameter        :: block_system      = 2
 integer, parameter        :: block_flags       = 3
+integer, parameter        :: block_cholesky    = 4
 character(:), allocatable :: line
 
  open(newunit=u, file=filename, status="old", &
@@ -179,6 +180,14 @@ character(:), allocatable :: line
              current_block = block_flags
              cycle lines
 
+       case ("CHOLESKYBLOCK")
+             current_block = block_cholesky
+             cycle lines
+
+       case("XYZ")
+             current_block = block_none
+             cycle lines
+
        case ("END")
              current_block = block_none
              cycle lines
@@ -191,6 +200,8 @@ character(:), allocatable :: line
              call read_block_calculation(Input%CalcParams, line)
        else if (current_block == block_flags) then
              call read_block_flags(Input%Flags, line)
+       else if (current_block == block_cholesky) then
+             call read_block_cholesky(Input%CholeskyParams, line)
        end if
  end do lines
 
@@ -274,6 +285,9 @@ subroutine read_block_calculation(CalcParams, line)
                CalcParams%RDMType   = RDM_TYPE_DMRG
            elseif (uppercase(val) == "TREXIO") then
                CalcParams%InterfaceType = INTER_TYPE_TREX
+           elseif (uppercase(val) == "PYSCF") then
+               CalcParams%InterfaceType = INTER_TYPE_PYSCF
+               CalcParams%RDMSource = INTER_TYPE_PYSCF
            endif
 
       case ("JOBTYPE")
@@ -315,6 +329,15 @@ subroutine read_block_calculation(CalcParams, line)
                CalcParams%JobType = JOB_TYPE_RESPONSE
            elseif (uppercase(val) == "NLOCCORR" ) then
                CalcParams%JobType = JOB_TYPE_NLOCCORR
+           elseif (uppercase(val) == "SRAC0" ) then
+               CalcParams%JobType = JOB_TYPE_SRAC0
+           elseif (uppercase(val) == "MP2" ) then
+               CalcParams%JobType = JOB_TYPE_MP2
+           elseif (uppercase(val) == "SRMP2" ) then
+               CalcParams%JobType = JOB_TYPE_SRMP2
+           elseif (uppercase(val) == "SAPT-OS" .or. &
+                   uppercase(val) == "SAPTOS") then
+               CalcParams%JobType = JOB_TYPE_SAPTOS
            endif
 
      !case ("FRAGMENTS")
@@ -347,6 +370,9 @@ subroutine read_block_calculation(CalcParams, line)
            elseif (uppercase(val) == "CIPSI".or.&
                  & uppercase(val) == "CI") then
               CalcParams%RDMType = RDM_TYPE_CI
+           elseif (uppercase(val) == "UKS".or.    &
+                 & uppercase(val) == "UNRESTRICTED") then
+              CalcParams%RDMType = RDM_TYPE_UKS
            endif
 
       case ("TWOMOINT")
@@ -411,6 +437,8 @@ subroutine read_block_calculation(CalcParams, line)
               CalcParams%RDMSource = INTER_TYPE_DAL
            elseif (uppercase(val) == "OWN" ) then
               CalcParams%RDMSource = INTER_TYPE_OWN
+           elseif (uppercase(val) == "PYSCF" ) then
+              CalcParams%RDMSource = INTER_TYPE_PYSCF
            endif
 
       case ("SYMMETRY")
@@ -439,11 +467,104 @@ subroutine read_block_calculation(CalcParams, line)
               CalcParams%FOFORam = 1
            endif
 
+      case ("UNITS")
+         if (uppercase(val) == "BOHR" .or. &
+             uppercase(val) == "AU") then
+             CalcParams%Units = UNITS_BOHR
+         elseif (uppercase(val) == "ANGSTROM") then
+             CalcParams%Units = UNITS_ANGSTROM
+         endif
+
+      case ("ORBRELAX")
+           if (uppercase(val) == ".FALSE.".or. &
+               uppercase(val) == "FALSE".or.   &
+               uppercase(val) == "F") then
+               CalcParams%OrbRelax = 0
+           endif
+
+      case ("ORBINCL", "ORBINCLUDE")
+           if (uppercase(val) == ".TRUE.".or. &
+               uppercase(val) == "TRUE".or.   &
+               uppercase(val) == "T") then
+               CalcParams%OrbIncl = 1
+           endif
+
+      case ("RDM2APP")
+           if (uppercase(val) == "HF".or. &
+               uppercase(val) == "HARTREE-FOCK") then
+               CalcParams%Rdm2Type = 0
+           elseif (uppercase(val) == "BB".or. &
+               uppercase(val) == "DMFT") then
+               CalcParams%Rdm2Type = 1
+           elseif (uppercase(val) == "BBFULL".or. &
+               uppercase(val) == "DMFTFULL") then
+               CalcParams%Rdm2Type = 11
+           endif
+
+      case ("CORRFUNCTION","CORRFUN","FCORR")
+           if (uppercase(val) == "FCAS") then
+               CalcParams%FunCorr = 0
+           elseif (uppercase(val) == "FCORR".or. &
+               uppercase(val) == "FAC0") then
+               CalcParams%FunCorr = 1
+           endif
+
+      case ("CBS")
+           if (uppercase(val) == "1" .or.&
+               uppercase(val) == "DBBSC") then
+               CalcParams%DBBSC = 1
+           elseif (uppercase(val) == "2" .or.&
+               uppercase(val) == "H" .or.&
+               uppercase(val) == "CBS[H]" ) then
+               CalcParams%DBBSC = 2
+           endif
+
+      case ("DMRG-IN-DFT","EMBEDDING")
+           if (uppercase(val) == ".TRUE.".or. &
+               uppercase(val) == "TRUE".or.   &
+               uppercase(val) == "T") then
+               CalcParams%IVEMB = 1
+           endif
+
+      case ("GRIDTYPE", "GRID")
+           CalcParams%DeclareGrid = .true.
+           if (uppercase(val) == "SG1") then
+              CalcParams%GridType = GRID_PARAMS_SG1
+           elseif (uppercase(val) == "MEDIUM") then
+              CalcParams%GridType = GRID_PARAMS_MEDIUM
+           elseif (uppercase(val) == "FINE") then
+              CalcParams%GridType = GRID_PARAMS_FINE
+           elseif (uppercase(val) == "XFINE") then
+              CalcParams%GridType = GRID_PARAMS_XFINE
+           elseif (uppercase(val) == "MOLPRO") then
+              CalcParams%GridType = GRID_PARAMS_MOLPRO
+           elseif (uppercase(val) == "DALTON") then
+              CalcParams%GridType = GRID_PARAMS_DALTON
+           endif
+
+      case("SAPTEXCH")
+           if (uppercase(val) == "DMFT") then
+               CalcParams%SaptExch = 1
+           endif
+
+      case("VISUALIZE")
+           if (uppercase(val) == "TRUE".or.  &
+               uppercase(val) == ".TRUE.".or.&
+               uppercase(val) == "T") then
+               CalcParams%Visual = .TRUE.
+           endif
+
+      case ("BASIS","BASISSET")
+            CalcParams%BasisSet = val
+
+      case ("BASISPATH")
+            CalcParams%BasisSetPath = val
+
       case("MAX_CN")
              read(val,*) CalcParams%Max_Cn
 
       case("FREQOM")
-             read(val,*) CalcParams%FreqOm
+             call read_freqarray(val,CalcParams%FreqOm,CalcParams%NFreqOm,',')
 
       case ("CALPHA")
              read(val,*) CalcParams%CAlpha
@@ -550,6 +671,16 @@ character(:), allocatable :: first, last
 ! case ("STATE")
 !      read(val, *) SystemParams%NoSt
 
+ case ("MONOMER")
+     if(uppercase(val)=="A") then
+         SystemParams%Monomer = MONOMER_A
+     elseif(uppercase(val)=="B") then
+         SystemParams%Monomer = MONOMER_B
+     elseif(uppercase(val)=="AB" .or. &
+            uppercase(val)=="DIMER") then
+         SystemParams%Monomer = DIMER_AB
+     endif
+
  case ("NACTIVE")
        read(val, *) SystemParams%NAct
        SystemParams%NActFromRDM = .false.
@@ -579,6 +710,23 @@ character(:), allocatable :: first, last
        read(val, *) SystemParams%UCen
 ! maybe sth more fancy i.e. swapping monomers
       ! call get_ncen(val,SystemParams)
+ case ("NCORE", "NCOREORB")
+       read(val, *) SystemParams%NCoreOrb
+
+ case ("NSTRONGLYOCCORB")
+       read(val, *) SystemParams%NStronglyOccOrb
+
+ case ("NB_EMB","NELECBEMB")
+       read(val, *) SystemParams%NElecBEmb
+
+ case ("NATORB")
+       SystemParams%DeclareNatOrb = .true.
+      if(uppercase(val) == "MOLPRO") then
+         SystemParams%NatOrb = 1
+      else
+         stop "Unknown Natural Orbitals Source!"
+      endif
+
  case ("THRACT")
        read(val,*) SystemParams%ThrAct
 
@@ -744,6 +892,9 @@ character(:), allocatable :: key, val
       if (uppercase(val) == "SAPT" ) then
           CalcParams%JobType = JOB_TYPE_SAPT
           CalcParams%imon = 2
+      elseif (uppercase(val) == "SAPT-OS" ) then
+          CalcParams%JobType = JOB_TYPE_SAPTOS
+          CalcParams%imon = 2
       endif
  end select
 
@@ -765,6 +916,9 @@ character(:), allocatable      :: key, val
          Input%SystemInput(isys)%Monomer = MONOMER_A
      elseif(uppercase(val)=="B") then
          Input%SystemInput(isys)%Monomer = MONOMER_B
+     elseif(uppercase(val)=="AB" .or. &
+            uppercase(val)=="DIMER") then
+         Input%SystemInput(isys)%Monomer = DIMER_AB
      endif
  end select
 
@@ -890,6 +1044,20 @@ associate( CalcParams => Input%CalcParams)
  endif
  write(LOUT,' (1x,a,3x,a)') "RDM SOURCE: ",  &
               PossibleInterface(CalcParams%RDMSource)
+ if(allocated(CalcParams%BasisSet)) &
+    write(LOUT,'(1x,a,4x,a)') "BASIS SET: ", &
+                 CalcParams%BasisSet
+ if(allocated(CalcParams%BasisSetPath)) &
+    write(LOUT,'(1x,a,4x,a)') "BASIS PATH:", &
+                 CalcParams%BasisSetPath
+ if (CalcParams%IVEMB==1) &
+    write(LOUT, '(1x,a,2x,a)')"DMRG-in-DFT: ", ".TRUE."
+ write(LOUT,' (1x,a,8x,a)') "UNITS: ",  &
+              PossibleUnits(CalcParams%Units)
+ if (CalcParams%DeclareGrid) then
+    write(LOUT,'(1x,a,4x,a)') "GRID TYPE: ", &
+                    PossibleGridType(CalcParams%GridType)
+ endif
  if(CalcParams%Cholesky>0) then
     write(LOUT,' (1x,a,5x,a)') "CHOLESKY: ",  &
                        ".TRUE."
@@ -912,6 +1080,26 @@ associate( CalcParams => Input%CalcParams)
  if (allocated(CalcParams%IntegralsFilePath)) then
        write(*, *) "Ints file: ", CalcParams%IntegralsFilePath
  end if
+
+ ! CHOLESKY BLOCK
+ associate( CholeskyParams => Input%CholeskyParams)
+ if(CholeskyParams%Cholesky>0) then
+    write(LOUT, '()')
+    write(LOUT,' (1x,a,5x,a)') "CHOLESKY :",  &
+                       ".TRUE."
+    if(CholeskyParams%CholeskyBIN>0) then
+       write(LOUT,'(1x,a,5x,a)') "ALGORITHM:", &
+                       "BINARY"
+    endif
+    if(CholeskyParams%CholeskyOTF>0) then
+       write(LOUT,'(1x,a,5x,a)') "ALGORITHM:", &
+                       "ON-THE-FLY"
+    endif
+    write(LOUT,' (1x,a,a)') "CHOLESKY ACCU: ", &
+               PossibleCholAccu(CholeskyParams%CholeskyAccu)
+ endif
+ end associate
+
   switch = 0
   if(Input%SystemInput(1)%Monomer==2) switch = 3
 
@@ -1005,6 +1193,114 @@ write(LOUT,'()')
 end subroutine print_Input
 
 
+
+subroutine read_block_cholesky(CholeskyParams, line)
+      type(CholeskyBlock), intent(inout) :: CholeskyParams
+      character(*), intent(in) :: line
+
+      character(:), allocatable :: key, val
+
+      call split(line, key, val)
+      select case (uppercase(key))
+
+      case ("CHOLESKY")
+           if (uppercase(val) == "BINARY".or. &
+               uppercase(val) == "BIN"   .or. &
+               uppercase(val) == "B") then
+              CholeskyParams%Cholesky    = 1
+              CholeskyParams%CholeskyBIN = 1
+              CholeskyParams%CholeskyOTF = 0
+           elseif (uppercase(val) == "ON-THE-FLY".or. &
+                   uppercase(val) == "OTF"   .or. &
+                   uppercase(val) == "O") then
+              CholeskyParams%Cholesky    = 1
+              CholeskyParams%CholeskyBIN = 0
+              CholeskyParams%CholeskyOTF = 1
+           elseif (uppercase(val) == "THC".or. &
+                   uppercase(val) == "TENSORHYPERCONTRACTION") then
+              CholeskyParams%CholeskyTHC = 1
+              CholeskyParams%Cholesky    = 1
+              CholeskyParams%CholeskyBIN = 0
+              CholeskyParams%CholeskyOTF = 0
+           else
+              stop "Unknown keyword for Cholesky!"
+           endif
+
+      case ("ACCURACY","CHOL_ACCU","CHOL_ACCURACY","CHOLESKY_ACCU","CHOLESKY_ACCURACY")
+           if (uppercase(val) == "DEFAULT" .or. &
+               uppercase(val) == "D" ) then
+              CholeskyParams%CholeskyAccu = CHOL_ACCU_DEFAULT
+           elseif (uppercase(val) == "TIGHT" .or. &
+                   uppercase(val) == "T" ) then
+              CholeskyParams%CholeskyAccu = CHOL_ACCU_TIGHT
+           elseif (uppercase(val) == "LUDICROUS" .or. &
+                   uppercase(val) == "L" ) then
+              CholeskyParams%CholeskyAccu = CHOL_ACCU_LUDICROUS
+           endif
+
+      case ("CHOLTHR","CHOLTHRESHOLD","CHOLESKYTHR","CHOLESKYTHRESHOLD")
+            read(val, *) CholeskyParams%CholeskyThr
+
+      case ("THCTHR","THCTHRESHOLD")
+            read(val, *) CholeskyParams%THCThr
+
+      case ("H0TEST")
+           if (uppercase(val) == ".FALSE.".or. &
+               uppercase(val) == "FALSE".or.   &
+               uppercase(val) == "F") then
+               CholeskyParams%H0test = 0
+           endif
+
+      end select
+
+end subroutine read_block_cholesky
+
+subroutine read_freqarray(val,freqs,infreqs,delim)
+
+     character(*), intent(in) :: val
+     character(1), intent(in) :: delim
+     integer,intent(inout) :: infreqs
+
+     integer :: k
+     double precision,allocatable :: freqs(:)
+     character(:), allocatable :: w,v,f
+
+     w = trim(adjustl(val))
+     v = trim(adjustl(val))
+
+     if (len(w) == 0) then
+           write(LOUT,'(1x,a)') 'ERROR!!! NO FREQUENCIES GIVEN!'
+           stop
+     else
+           ! get number of frequencies
+           infreqs = 0
+           dimloop: do
+                     k = index(v, delim)
+                     infreqs = infreqs + 1
+                     v = trim(adjustl(v(k+1:)))
+                     if (k == 0) exit dimloop
+                    enddo dimloop
+
+           ! assign frequencies
+           allocate(freqs(infreqs))
+           infreqs = 0
+           arrloop: do
+                     k = index(w, delim)
+                     infreqs = infreqs + 1
+                     if(k /= 0) then
+                         f = w(1:k-1)
+                         read(f, *) freqs(infreqs)
+                         w = trim(adjustl(w(k+1:)))
+                     elseif (k == 0) then
+                         f = w
+                         read(f, *) freqs(infreqs)
+                         exit arrloop
+                     endif
+                  enddo arrloop
+
+     end if
+
+end subroutine read_freqarray
 
 subroutine read_memsrt(val,MemVal,MemType)
 

@@ -1243,4 +1243,38 @@ logical :: iexist
 
 end subroutine delfile
 
+subroutine read_1rdm_spin_dalton(Gspin,infile,nact,nbas)
+!
+! Purpose: a) read 1rdm charge and spin from Dalton
+!          b) if file is empty, assume Hartree-Fock calculation
+!
+implicit none
+
+integer,intent(in)           :: nact,nbas
+character(*),intent(in)      :: infile
+double precision,intent(out) :: Gspin(nact,nact)
+
+integer          :: iunit,ios
+integer          :: i,j,ij
+double precision :: val
+
+open(newunit=iunit,file=infile,status='old')
+ij = 0
+do
+   read(iunit,*,iostat=ios) i,j,val
+   if(ios/=0) exit
+   GSpin(i,j) = val
+   ij = ij + 1
+enddo
+close(iunit)
+
+if(ij==0) then
+  write(6,'(1x,a,i3)') 'Constructing spin 1-RDM for NAct = ',nact
+  do i=1,nact
+     GSpin(i,i) = 1d0
+  enddo
+endif
+
+end subroutine read_1rdm_spin_dalton
+
 end module read_external

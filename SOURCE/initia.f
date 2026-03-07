@@ -1,5 +1,5 @@
 *Deck ReadDAL
-      Subroutine ReadDAL(XKin,XNuc,ENuc,Occ,URe,
+      Subroutine ReadDAL(BasisSet,XKin,XNuc,ENuc,Occ,URe,
      $ TwoEl,UMOAO,NInte1,NBasis,NInte2,NGem,Flags)
 C
 C     READ HAO, 2-EL INTEGRALS IN NO, C_COEFFICIENTS, IGEM FROM A DALTON_GENERATED FILE
@@ -15,6 +15,7 @@ C
 C
       Implicit Real*8 (A-H,O-Z)
 C
+      Character(*) :: BasisSet
       Real*8 XKin(NInte1),XNuc(NInte1),Occ(NBasis),URe(NBasis,NBasis),
      $ TwoEl(NInte2),UMOAO(NBasis,NBasis),
      $ UAux(NBasis,NBasis)
@@ -1103,7 +1104,7 @@ C
       End
 
 *Deck LdInteg
-      Subroutine LdInteg(Title,XKin,XNuc,ENuc,Occ,URe,
+      Subroutine LdInteg(Title,BasisSet,XKin,XNuc,ENuc,Occ,URe,
      $ TwoEl,UAOMO,NInte1,NBasis,NInte2,NGem)
 C     $ TwoEl,UAOMO,NInte1,NBasis,NInte2,NGem,NoSt)
 C
@@ -1125,6 +1126,7 @@ C
       Parameter (Half=0.5D0)
 C      Parameter (Zero=0.D0,Half=0.5D0,One=1.D0,Two=2.D0)
 C
+      Character(*) :: BasisSet
       Real*8 XKin(NInte1),XNuc(NInte1),TwoEl(NInte2),
      $ UAOMO(NBasis,NBasis),URe(NBasis,NBasis),Occ(NBasis),
      $ UAux(NBasis,NBasis),

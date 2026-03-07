@@ -1,6 +1,6 @@
 *Deck ACCAS
       Subroutine ACCAS(ETot,ENuc,TwoNO,URe,UNOAO,Occ,XOne,
-     $  Title,NBasis,NInte1,NInte2,NGem)
+     $  Title,BasisSet,NBasis,NInte1,NInte2,NGem)
 C
 c     use types
       use print_units
@@ -13,6 +13,7 @@ C
       Implicit Real*8 (A-H,O-Z)
 C
       Character*60 Title
+      Character(*) :: BasisSet
       Include 'commons.inc'
 c
       Parameter(Zero=0.D0,Half=0.5D0,One=1.D0,Two=2.D0)

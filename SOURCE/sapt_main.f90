@@ -9,6 +9,9 @@ use sapt_Chol_pol
 use sapt_Chol_exch
 use sapt_exch
 use exd_pino
+use sapt_open
+use sapt_visual
+use sapt_files
 use omp_lib
 
 implicit none
@@ -1668,6 +1671,442 @@ if(SAPT%SemiCoupled) call delfile('PROP_A1')
 if(SAPT%SemiCoupled) call delfile('PROP_B1')
 
 end subroutine free_sapt
+
+subroutine sapt_driver_uks(Flags,SAPT)
+!
+! attempt at SAPT(UKS)/SAPT(UHF) interface
+!
+implicit none
+
+type(FlagsData)  :: Flags
+type(SaptData)   :: SAPT
+type(TAOBasis)   :: AOBasis
+type(TCholeskyVecsOTF) :: CholeskyVecsOTF
+
+integer :: NBasis
+double precision :: Tcpu,Twall
+
+call clock('START',Tcpu,Twall)
+
+print*, 'Experimental SAPT(UKS) implementation...'
+
+call sapt_basinfo(SAPT,NBasis)
+call saptuks_interface(Flags,SAPT,NBasis,AOBasis,CholeskyVecsOTF)
+
+call saptuks_ab_ints(Flags,SAPT%monA,SAPT%monB,NBasis,AOBasis,CholeskyVecsOTF)
+
+print*, 'Skipping monomer integrals...'
+print*, 'Skipping response ...'
+
+call e1elst_o(SAPT%monA,SAPT%monB,SAPT)
+call e1exchs2_sq_os(SAPT%monA,SAPT%monB,SAPT)
+call e1exch_os(SAPT%monA,SAPT%monB,SAPT)
+call e2ind_o(Flags,SAPT%monA,SAPT%monB,SAPT)
+call e2disp_o(SAPT%monA,SAPT%monB,SAPT)
+
+call summary_saptuks(SAPT)
+call free_saptuks(Flags,SAPT)
+
+call clock('SAPT',Tcpu,Twall)
+
+stop
+
+end subroutine sapt_driver_uks
+
+subroutine sapt_OpenShell(Flags,SAPT,Tcpu,Twall,NBasis)
+!
+! sapt driver for open-shell monomers
+!
+implicit none
+
+type(FlagsData)    :: Flags
+type(SaptData)     :: SAPT
+integer,intent(in) :: NBasis
+double precision,intent(inout) :: Tcpu,Twall
+integer :: i
+
+if(PossibleInterface(SAPT%InterfaceType)=='MOLPRO') then
+   write(lout,'(1x,a)') 'Ms2 /= 0 not available with Molpro yet!'
+   stop
+endif
+
+call sapt_interface_spin(Flags,SAPT,NBasis)
+
+call sapt_response_spin(Flags,SAPT%monA,NBasis)
+call sapt_response_spin(Flags,SAPT%monB,NBasis)
+
+call e1elst(SAPT%monA,SAPT%monB,SAPT)
+
+write(lout,'(/1x,a)') 'closed-shell E1exch:'
+call e1exch_NaNb(Flags,SAPT%monA,SAPT%monB,SAPT)
+
+call e1exchs2_os(Flags,SAPT%monA,SAPT%monB,SAPT)
+
+call e2ind(Flags,SAPT%monA,SAPT%monB,SAPT)
+call e2disp(Flags,SAPT%monA,SAPT%monB,SAPT)
+
+call summary_saptos(SAPT)
+
+call print_warn(SAPT)
+call free_sapt(Flags,SAPT)
+
+call clock('SAPT',Tcpu,Twall)
+
+stop
+
+end subroutine sapt_OpenShell
+
+subroutine sapt_dmft(Flags,SAPT,Tcpu,Twall,NBasis)
+!
+! sapt driver with DMFT
+!
+implicit none
+
+type(FlagsData)    :: Flags
+type(SaptData)     :: SAPT
+integer,intent(in) :: NBasis
+double precision,intent(inout) :: Tcpu,Twall
+integer :: i
+
+write(LOUT,'(1x,a)') 'SAPT(MC) with DMFT exchange'
+
+if(Flags%ICholesky==0) then
+   call e1elst(SAPT%monA,SAPT%monB,SAPT)
+   call e1exch_dmft(Flags,SAPT%monA,SAPT%monB,SAPT)
+
+   call e2ind(Flags,SAPT%monA,SAPT%monB,SAPT)
+   call e2disp(Flags,SAPT%monA,SAPT%monB,SAPT)
+
+   call e2exind(Flags,SAPT%monA,SAPT%monB,SAPT)
+   call e2exdisp(Flags,SAPT%monA,SAPT%monB,SAPT)
+
+   call summary_sapt(SAPT)
+
+elseif(Flags%ICholesky==1) then
+
+   print*,'CHECKING CHOLESKY...',Flags%ICholeskyOTF
+   call e1elst_Chol(SAPT%monA,SAPT%monB,SAPT)
+
+   if(SAPT%SaptLevel==666.or.SAPT%SaptLevel==999) then
+      call e1exch_Chol_dmft(Flags,SAPT%monA,SAPT%monB,SAPT,Flags%IRDM2Typ)
+   else
+      call e1exch_dmft(Flags,SAPT%monA,SAPT%monB,SAPT)
+   endif
+
+   if (Flags%IRdm2Typ==11) then ! for BB in ERPA: temporary fix
+   call e2ind(Flags,SAPT%monA,SAPT%monB,SAPT)
+   else
+   call e2ind_icerpa(Flags,SAPT%monA,SAPT%monB,SAPT)
+   endif
+
+   if (Flags%IRdm2Typ==11) then ! for BB in ERPA: temporary fix
+      call e2disp(Flags,SAPT%monA,SAPT%monB,SAPT)
+   else
+      if(.not.SAPT%CAlpha) then
+         call e2disp_Cmat_Chol_block(Flags,SAPT%monA,SAPT%monB,SAPT)
+      else if(SAPT%CAlpha) then
+         call e2disp_CAlphaTilde_block(Flags,SAPT%monA,SAPT%monB,SAPT)
+      endif
+   endif
+
+   if(SAPT%SaptLevel/=666.and.SAPT%SaptLevel/=999) then
+      call e2exind(Flags,SAPT%monA,SAPT%monB,SAPT)
+      call e2exdisp(Flags,SAPT%monA,SAPT%monB,SAPT)
+
+      call summary_sapt(SAPT)
+   else
+      call summary_rspt(SAPT)
+   endif
+
+
+endif
+
+if(SAPT%ic6==1) then
+    print*, 'calculate only C6 coeffs!'
+    call c6_dummy(Flags,SAPT%monA,SAPT%monB,SAPT)
+endif
+
+
+call print_warn(SAPT)
+call free_sapt(Flags,SAPT)
+
+call clock('SAPT',Tcpu,Twall)
+
+stop
+
+end subroutine sapt_dmft
+
+subroutine sapt_response_spin(Flags,Mon,NBasis)
+!
+! Purpose: WIP : obtain spin RDM2s
+!          and store them in memory
+!
+implicit none
+
+type(FlagsData)    :: Flags
+type(SystemBlock)  :: Mon
+integer,intent(in) :: NBasis
+
+! prepare spin RDM2
+if(Flags%ICASSCF==1) then
+   call read2rdm(Mon,NBasis)
+   call read2rdm_spin(Mon,NBasis)
+   call prepare_RDM2_spin(Mon,Flags%ICASSCF,NBasis)
+endif
+
+end subroutine sapt_response_spin
+
+subroutine saptuks_ab_ints(Flags,A,B,NBasis,AOBasis,CholeskyVecsOTF)
+!
+! calculate : (OV|OV) alpha/beta
+!
+implicit none
+
+type(FlagsData)    :: Flags
+type(SystemBlock)  :: A,B
+type(TAOBasis)     :: AOBasis
+type(TCholeskyVecsOTF) :: CholeskyVecsOTF
+
+integer,intent(in) :: NBasis
+
+if(Flags%ICholesky/=0) stop "Cholesky not ready in saptuks_ab_ints"
+
+
+! (OV|OV) alpha-alpha
+call tran4_gen(NBasis,&
+               B%NOa,B%UMO(:,:,1),&
+               B%NVa,B%UMO(1:NBasis,B%NOa+1:NBasis,1),&
+               A%NOa,A%UMO(:,:,1),&
+               A%NVa,A%UMO(1:NBasis,A%NOa+1:NBasis,1),&
+               'OVOVABaa','AOTWOSORT')
+! (OV|OV) beta-beta
+call tran4_gen(NBasis,&
+               B%NOb,B%UMO(:,:,2),&
+               B%NVb,B%UMO(1:NBasis,B%NOb+1:NBasis,2),&
+               A%NOb,A%UMO(:,:,2),&
+               A%NVb,A%UMO(1:NBasis,A%NOb+1:NBasis,2),&
+               'OVOVABbb','AOTWOSORT')
+! (OV|OV) alpha-beta
+call tran4_gen(NBasis,&
+               B%NOb,B%UMO(:,:,2),&
+               B%NVb,B%UMO(1:NBasis,B%NOb+1:NBasis,2),&
+               A%NOa,A%UMO(:,:,1),&
+               A%NVa,A%UMO(1:NBasis,A%NOa+1:NBasis,1),&
+               'OVOVABab','AOTWOSORT')
+! (OV|OV) beta-alpha
+call tran4_gen(NBasis,&
+               B%NOa,B%UMO(:,:,1),&
+               B%NVa,B%UMO(1:NBasis,B%NOa+1:NBasis,1),&
+               A%NOb,A%UMO(:,:,2),&
+               A%NVb,A%UMO(1:NBasis,A%NOb+1:NBasis,2),&
+               'OVOVABba','AOTWOSORT')
+
+end subroutine saptuks_ab_ints
+
+subroutine prepare_RDM2_spin(Mon,ICASSCF,NBasis)
+!
+! prepare spin-resolved RDM2s: g2aaba and g2bbab
+! from packed active RDM2(NAddr) and RDM201(NAddr)
+! and spin 1-RDMs
+!
+implicit none
+
+type(SystemBlock)  :: Mon
+integer,intent(in) :: ICASSCF
+integer,intent(in) :: NBasis
+
+integer :: i,j,k,l
+integer :: NRDM2Act,NOccup
+double precision,allocatable :: TmpRDM2(:)
+double precision, external   :: FRDM2AABA
+! test
+double precision :: val, diff
+
+print*, 'RDM2 spin for monomer =', Mon%Monomer
+
+
+if (ICASSCF==0) then
+   print*, "SAPT-OS not ready for GVB!"
+   stop
+endif
+
+! dimensions
+NRDM2Act = Mon%NAct**2*(Mon%NAct**2+1)/2
+NOccup   = Mon%num0+Mon%num1
+
+! \Gamma^aa + \Gamma^ba = \Gamma^00 + \Gamma^01
+
+allocate(TmpRDM2(NRDM2Act))
+if(allocated(Mon%g2aaba)) deallocate(Mon%g2aaba)
+allocate(Mon%g2aaba(NOccup,NOccup,NOccup,NOccup))
+
+! active part
+TmpRDM2 = 0d0
+do i=1,NRDM2Act
+   TmpRDM2(i) = Mon%RDM2(i) + Mon%RDM201(i)
+enddo
+! full \Gamma^aaba
+do l=1,NOccup
+   do k=1,NOccup
+      do j=1,NOccup
+         do i=1,NOccup
+            Mon%g2aaba(i,j,k,l) = &
+            FRDM2AABA(Mon%monomer,i,k,j,l,Mon%g1a,Mon%g1b,TmpRDM2,Mon%Ind2,Mon%NAct,NBasis)
+         enddo
+      enddo
+   enddo
+enddo
+print*, 'Gamma^aaba = ',norm2(Mon%g2aaba)
+
+! \Gamma^bb + \Gamma^ab = \Gamma^00 - \Gamma^01
+
+if(allocated(Mon%g2bbab)) deallocate(Mon%g2bbab)
+allocate(Mon%g2bbab(NOccup,NOccup,NOccup,NOccup))
+
+! active part
+TmpRDM2 = 0d0
+do i=1,NRDM2Act
+   TmpRDM2(i) = Mon%RDM2(i) - Mon%RDM201(i)
+enddo
+! full \Gamma^bbab
+do l=1,NOccup
+   do k=1,NOccup
+      do j=1,NOccup
+         do i=1,NOccup
+            Mon%g2bbab(i,j,k,l) = &
+            FRDM2AABA(Mon%Monomer,i,k,j,l,Mon%g1b,Mon%g1a,TmpRDM2,Mon%Ind2,Mon%NAct,NBasis)
+         enddo
+      enddo
+   enddo
+enddo
+print*, 'Gamma^bbab = ',norm2(Mon%g2bbab)
+
+! test
+print*, 'RDM2val-1', norm2(Mon%RDM2val)
+print*, 'RDM2val-t', 0.5d0*norm2(Mon%g2aaba+Mon%g2bbab)
+val = 0
+diff = 0
+do l=1,NOccup
+   do k=1,NOccup
+      do j=1,NOccup
+         do i=1,NOccup
+            val = 0.5d0*(Mon%g2aaba(i,j,k,l)+Mon%g2bbab(i,j,k,l))
+            diff = Mon%RDM2val(i,j,k,l) -val
+            if( abs(diff).gt.1d-6) then
+              write(lout,'(4i3,4f12.6)') i,j,k,l,val,Mon%RDM2val(i,j,k,l),Mon%g2aaba(i,j,k,l),Mon%g2bbab(i,j,k,l)
+            endif
+            ! use our new RDM...
+             Mon%RDM2val(i,j,k,l) = val
+         enddo
+      enddo
+   enddo
+enddo
+
+deallocate(TmpRDM2)
+deallocate(Mon%RDM201,Mon%RDM2)
+
+end subroutine prepare_RDM2_spin
+
+subroutine summary_saptuks(SAPT)
+!
+! print results for unrestricted SAPT (UHF, UKS)
+!
+implicit none
+
+type(SaptData) :: SAPT
+
+integer          :: i,j
+double precision :: esapt2
+
+SAPT%esapt2 = SAPT%elst + SAPT%exchs2 + SAPT%e2ind &
+              + SAPT%e2exind + SAPT%e2disp + SAPT%e2exdisp
+
+SAPT%esapt0 = SAPT%elst + SAPT%exchs2 + SAPT%e2ind_unc &
+              + SAPT%e2exind_unc + SAPT%e2disp_unc + SAPT%e2exdisp_unc
+
+write(LOUT,'(/,8a10)') ('**********',i=1,4)
+write(LOUT,'(1x,a)') 'OS-SAPT SUMMARY / milliHartree'
+write(LOUT,'(8a10)') ('**********',i=1,4)
+
+write(LOUT,'(1x,a,i3)') 'SAPT level  =', SAPT%SaptLevel
+
+write(LOUT,'(1x,a,t19,a,f16.8)') 'E1elst',    '=', SAPT%elst*1.d03
+write(LOUT,'(1x,a,t19,a,f16.8)') 'E1exch(S2)','=', SAPT%exchs2*1.d03
+write(LOUT,'(1x,a,t19,a,f16.8)') 'E1exch    ','=', SAPT%e1exch*1.d03
+
+if(SAPT%SaptLevel==0) then
+   write(LOUT,'(1x,a,t19,a,f16.8)') 'E2ind(unc)',   '=', SAPT%e2ind_unc*1.d03
+   write(LOUT,'(1x,a,t19,a,f16.8)') 'E2disp(unc)',  '=', SAPT%e2disp_unc*1.d03
+endif
+
+end subroutine summary_saptuks
+
+subroutine summary_saptos(SAPT)
+implicit none
+
+type(SaptData) :: SAPT
+
+integer          :: i,j
+double precision :: esapt2
+
+SAPT%esapt2 = SAPT%elst + SAPT%exchs2 + SAPT%e2ind &
+              + SAPT%e2exind + SAPT%e2disp + SAPT%e2exdisp
+
+SAPT%esapt0 = SAPT%elst + SAPT%exchs2 + SAPT%e2ind_unc &
+              + SAPT%e2exind_unc + SAPT%e2disp_unc + SAPT%e2exdisp_unc
+
+write(LOUT,'(/,8a10)') ('**********',i=1,4)
+write(LOUT,'(1x,a)') 'SAPT-OS SUMMARY / milliHartree'
+write(LOUT,'(8a10)') ('**********',i=1,4)
+
+write(LOUT,'(1x,a,i3)') 'SAPT level  =', SAPT%SaptLevel
+
+write(LOUT,'(1x,a,t19,a,f16.8)') 'E1elst',    '=', SAPT%elst*1.d03
+write(LOUT,'(1x,a,t19,a,f16.8)') 'E1exch(S2)','=', SAPT%exchs2*1.d03
+
+if(SAPT%SaptLevel==2) then
+   write(LOUT,'(1x,a,t19,a,f16.8)') 'E2ind',      '=', SAPT%e2ind*1.d03
+   write(LOUT,'(1x,a,t19,a)')       'E2exch-ind', '=     Not ready'
+   write(LOUT,'(1x,a,t19,a,f16.8)') 'E2disp',     '=', SAPT%e2disp*1.d03
+   write(LOUT,'(1x,a,t19,a)')       'E2exch-disp','=     Not ready'
+
+elseif(SAPT%SaptLevel==1) then
+   write(LOUT,'(1x,a,t19,a,f16.8)') 'Eint(SAPT1)', '=', SAPT%esapt2*1.0d3
+
+elseif(SAPT%SaptLevel==10) then
+   write(LOUT,'(1x,a,t19,a,f16.8)') 'E2disp(CAS)', '=', SAPT%e2dispinCAS*1.d03
+
+elseif(SAPT%SaptLevel==0) then
+   write(LOUT,'(1x,a,t19,a,f16.8)') 'E2ind(unc)',  '=', SAPT%e2ind_unc*1.d03
+   write(LOUT,'(1x,a,t19,a,f16.8)') 'E2exch-ind',  '=', SAPT%e2exind_unc*1.0d3
+   write(LOUT,'(1x,a,t19,a,f16.8)') 'E2disp(unc)', '=', SAPT%e2disp_unc*1.d03
+   write(LOUT,'(1x,a,t19,a,f16.8)') 'E2exch-disp', '=', SAPT%e2exdisp_unc*1.0d3
+   write(LOUT,'(1x,a,t19,a,f16.8)') 'Eint(SAPT0)', '=', SAPT%esapt0*1.0d3
+endif
+
+end subroutine summary_saptos
+
+subroutine free_saptuks(Flags,SAPT)
+implicit none
+
+type(FlagsData) :: Flags
+type(SaptData)  :: SAPT
+
+! orbitals, occupations, energies
+deallocate(SAPT%monA%UMO,SAPT%monB%UMO)
+deallocate(SAPT%monA%UOcc,SAPT%monB%UOcc)
+deallocate(SAPT%monA%UOrbE,SAPT%monB%UOrbE)
+! electrostatic potential
+deallocate(SAPT%monA%WPot,SAPT%monB%WPot)
+
+if(Flags%ICholesky==0) call delfile('AOTWOSORT')
+
+call delfile('OVOVABbb')
+call delfile('OVOVABaa')
+call delfile('OVOVABab')
+call delfile('OVOVABba')
+
+end subroutine free_saptuks
 
 end module sapt_main
 

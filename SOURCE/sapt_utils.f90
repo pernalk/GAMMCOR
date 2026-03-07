@@ -1983,4 +1983,226 @@ endif
 
 end subroutine print_en
 
+subroutine tran2MO2AO_gen(Ain,dim1,dim2,nao,nmo,CA,CB,Aout)
+!---------------------------------------------------------------------
+!
+! MO2AO backtransformation
+! for general A(dim1,dim2) matrix
+!
+  integer, intent(in) :: dim1,dim2,nao,nmo
+  real(8), intent(in) :: Ain(dim1,dim2),CA(nao,nmo),CB(nao,nmo)
+  real(8), intent(out):: Aout(nao,nao)
+  real(8), dimension(:,:), allocatable :: work
+
+  allocate(work(nao,dim2))
+
+  call dgemm('N','N',nao,dim2,dim1,1d0,CA(1:nao,1:dim1),nao,Ain,dim1,0d0,work,nao)
+  call dgemm('N','T',nao,nao,dim2,1d0,work,nao,CB(1:nao,1:dim2),nao,0d0,Aout,nao)
+
+  deallocate(work)
+
+end subroutine tran2MO2AO_gen
+
+subroutine solve_ucphf(M,WPot,e2ind_unc,e2ind,Flags,NBas)
+implicit none
+
+type(SystemBlock) :: M
+type(FlagsData)   :: Flags
+
+integer,intent(in)           :: NBas
+double precision,intent(in)  :: WPot(NBas,NBas)
+double precision,intent(out) :: e2ind_unc,e2ind
+
+type(DIISData)                 :: DIISBlock
+
+integer :: ip,iq,ipq
+integer :: NDimX
+
+double precision,allocatable :: wVecxYY(:)
+double precision,allocatable :: amps(:),vecR(:),delta(:)
+double precision,allocatable :: work(:,:)
+
+NDimX = M%NOVa + M%NOVb
+
+call init_DIIS(DIISBlock,NDimX,NDimX,Flags%DIISN)
+
+allocate(wVecxYY(NDimX))
+allocate(work(NBas,NBas))
+
+! Arrange w(alpha;beta)
+call tran2MO(WPot,M%UMO(:,:,1),M%UMO(:,:,1),work,NBas)
+ipq = 0
+do iq=1,M%NOa
+   do ip=1,M%NVa
+      ipq = ipq + 1
+      wVecxYY(ipq) = work(iq,M%NOa+ip)
+   enddo
+enddo
+call tran2MO(WPot,M%UMO(:,:,2),M%UMO(:,:,2),work,NBas)
+do iq=1,M%NOb
+   do ip=1,M%NVb
+      ipq = ipq + 1
+      wVecxYY(ipq) = work(iq,M%NOb+ip)
+   enddo
+enddo
+
+allocate(vecR(NDimX),amps(NDimX),delta(NDimX))
+
+! uncoupled denominators
+delta = 0d0
+ipq = 0
+do iq=1,M%NOa
+   do ip=1,M%NVa
+      ipq = ipq + 1
+      delta(ipq) = M%UOrbE(iq,1) - M%UOrbE(M%NOa+ip,1)
+   enddo
+enddo
+do iq=1,M%NOb
+   do ip=1,M%NVb
+      ipq = ipq + 1
+      delta(ipq) = M%UOrbE(iq,2) - M%UOrbE(M%NOb+ip,2)
+   enddo
+enddo
+
+call amplitudes_T1_cphf(delta,wVecxYY,amps,NDimX)
+
+e2ind_unc = 0d0
+do ipq=1,NDimX
+   e2ind_unc = e2ind_unc - amps(ipq)*wVecxYY(ipq)
+enddo
+
+if(Flags%SaptLevel==0) return
+
+e2ind = 0d0
+print*, 'E2ind coupled not ready in solve_ucphf!'
+
+call free_DIIS(DIISBlock)
+
+deallocate(delta,amps,vecR)
+deallocate(wVecxYY)
+deallocate(work)
+
+end subroutine solve_ucphf
+
+subroutine WriteRespBatch(NDim,MaxBatchSize,EVal,EVec,fname)
+implicit none
+
+integer,intent(in) :: NDim,MaxBatchSize
+double precision :: EVal(NDim)
+double precision :: EVec(NDim,NDim)
+character(*) :: fname
+integer :: iunit
+integer :: iloop,nloop,off
+integer :: BatchSize
+
+ nloop = (NDim - 1) / MaxBatchSize + 1
+
+ open(newunit=iunit,file=fname,form='UNFORMATTED',&
+    access='SEQUENTIAL')
+
+ write(iunit) NDim,MaxBatchSize
+ write(iunit) EVal
+
+ off = 0
+ do iloop=1,nloop
+    BatchSize = min(MaxBatchSize,NDim-off)
+    write(iunit) EVec(:,off+1:off+BatchSize)
+    off = off + BatchSize
+ enddo
+
+ close(iunit)
+
+end subroutine WriteRespBatch
+
+subroutine Open_RespBatch(NDim,MaxBatchSize,EVal,iunit,fname)
+implicit none
+
+integer,intent(in)  :: NDim
+integer,intent(out) :: MaxBatchSize
+integer,intent(out) :: iunit
+double precision,intent(out)   :: EVal(NDim)
+character(*),intent(in) :: fname
+
+integer :: NDimFile
+
+ open(newunit=iunit,file=fname,form='UNFORMATTED',&
+    access='SEQUENTIAL',status='OLD')
+
+ read(iunit) NDimFile, MaxBatchSize
+ if (NDimFile .ne. NDim) stop "Error: Open_RespBatch: inconsistent NDim size"
+ read(iunit) EVal
+
+end subroutine Open_RespBatch
+
+subroutine Close_RespBatch(iunit)
+implicit none
+integer, intent(in) :: iunit
+ close(iunit)
+end subroutine Close_RespBatch
+
+subroutine Rewind_RespBatch(iunit)
+implicit none
+integer, intent(in) :: iunit
+ rewind(iunit)
+ read(iunit)
+ read(iunit)
+end subroutine Rewind_RespBatch
+
+subroutine Get_RespBatch(NDim,BatchSize,EVec,iunit)
+implicit none
+integer,intent(in)  :: NDim,BatchSize,iunit
+double precision,intent(out) :: EVec(NDim,BatchSize)
+ read(iunit) EVec
+end subroutine Get_RespBatch
+
+subroutine sapt_trdipm(RefSt,iskip,nStates,DipAO,UAONO,CICoef,IndN,NDimX,NBasis,cpld)
+!
+! transition dipole moments from (full) ERPA eigenvectors
+!
+implicit none
+integer,intent(in) :: RefSt,iskip,nStates,NDimX,NBasis
+integer,intent(in) :: IndN(2,NDimX)
+logical,intent(in) :: cpld
+double precision,intent(in) :: CICoef(NBasis),DipAO(3,NBasis,NBasis)
+double precision,intent(in) :: UAONO(NBasis,NBasis)
+
+integer :: ist,i,j,ip,iq
+double precision :: fact,TDIP2
+double precision,allocatable :: EigY(:,:),Eig(:)
+double precision,allocatable :: DipNO(:,:,:)
+double precision,allocatable :: EigX0(:,:),EigY0(:,:)
+
+allocate(DipNO(3,NBasis,NBasis))
+call tran2MO(DipAO(1,:,:),UAONO,UAONO,DipNO(1,:,:),NBasis)
+call tran2MO(DipAO(2,:,:),UAONO,UAONO,DipNO(2,:,:),NBasis)
+call tran2MO(DipAO(3,:,:),UAONO,UAONO,DipNO(3,:,:),NBasis)
+
+if (cpld) then
+   allocate(EigY(NDimX,NDimX),Eig(NDimX))
+   call readresp(EigY,Eig,NDimX,'PROP_A')
+else
+   allocate(EigY(NDimX,NDimX),Eig(NDimX))
+   allocate(EigY0(NDimX,NDimX),EigX0(NDimX,NDimX))
+    call unpack_XY0_full(EigX0,EigY0,Eig,CICoef,IndN,NDimX,NBasis,'XY0_A')
+    do j=1,NDimX
+       do i=1,NDimX
+          ip = IndN(1,i)
+          iq = IndN(2,i)
+          fact = CICoef(ip) - CICoef(iq)
+          EigY(i,j) = fact*(EigY0(i,j)-EigX0(i,j))
+       enddo
+    enddo
+    deallocate(EigY0,EigX0)
+endif
+
+do ist=iskip+1,iskip+nStates
+   call TrDipMoms(ist,TDIP2,EigY,CICoef,IndN,DipNO(1,:,:),DipNO(2,:,:),DipNO(3,:,:),NDimX,NBasis)
+   write(6,'(X,I2,"->",I2,"-ERPA vec  Y <X>^2+<Y>^2+<Z>^2",F15.8,/)') RefSt,ISt,TDIP2
+enddo
+
+deallocate(DipNO)
+deallocate(Eig,EigY)
+
+end subroutine sapt_trdipm
+
 end module sapt_utils

@@ -3335,4 +3335,145 @@ integer :: i
  return
 end subroutine print_diag
 
+subroutine saptuks_interface(Flags,SAPT,NBasis,AOBasis,CholeskyVecsOTF)
+!
+! SAPT(UKS) interface — stub
+! Full implementation requires UKS helper functions from pr-dmft
+!
+implicit none
+
+type(FlagsData)        :: Flags
+type(SaptData)         :: SAPT
+type(TCholeskyVecsOTF) :: CholeskyVecsOTF
+type(TAOBasis)         :: AOBasis
+integer,intent(in)     :: NBasis
+
+stop "saptuks_interface not yet ported — requires UKS helper functions"
+
+end subroutine saptuks_interface
+
+subroutine sapt_interface_spin(Flags,SAPT,NBasis)
+!
+! Interface for open-shell SAPT (SAPT-OS JobType)
+!
+! Purpose: construct alpha/beta spin densities in NOs
+! from charge/spin densities
+!
+implicit none
+
+type(FlagsData)     :: Flags
+type(SaptData)      :: SAPT
+integer,intent(in)  :: NBasis
+
+integer             :: NActA,NActB
+integer             :: INActA,INActB
+integer             :: i,j
+double precision,allocatable :: GChrgA(:,:),GChrgB(:,:)
+double precision,allocatable :: GSpinA(:,:),GSpinB(:,:)
+double precision,allocatable :: GAAct(:,:),GBAct(:,:)
+
+! dimensions
+NActA  = SAPT%monA%NAct
+NActB  = SAPT%monB%NAct
+INActA = SAPT%monA%INAct
+INActB = SAPT%monB%INAct
+
+allocate(GAAct(NActA,NActA),GBAct(NActB,NActB))
+allocate(GChrgA(NBasis,NBasis),GChrgB(NBasis,NBasis))
+allocate(GSpinA(NBasis,NBasis),GSpinB(NBasis,NBasis))
+
+! charge densities
+print*, 'NASHT-A',SAPT%monA%NAct
+print*, 'NISHT-A',SAPT%monA%INAct
+
+GChrgA = 0d0
+GChrgB = 0d0
+do i=1,NBasis
+   GChrgA(i,i) = 2.0d0*SAPT%monA%Occ(i)
+   GChrgB(i,i) = 2.0d0*SAPT%monB%Occ(i)
+enddo
+
+! spin densities
+GSpinA = 0d0
+GSpinB = 0d0
+
+! active blocks
+call read_1rdm_spin_dalton(GAAct,'rdms1_A.dat',NActA,NBasis)
+call read_1rdm_spin_dalton(GBAct,'rdms1_B.dat',NActB,NBasis)
+
+! full spin matrices
+do j=1,NActA
+   do i=1,NActA
+      GSpinA(INActA+i,INActA+j) = GAAct(i,j)
+   enddo
+enddo
+do j=1,NActB
+   do i=1,NActB
+      GSpinB(INActB+i,INActB+j) = GBAct(i,j)
+   enddo
+enddo
+
+! construct alpha/beta densities
+allocate(SAPT%monA%g1a(NBasis,NBasis), &
+         SAPT%monB%g1b(NBasis,NBasis))
+
+SAPT%monA%g1a = 0.5d0 * ( GChrgA + GSpinA )
+SAPT%monA%g1b = 0.5d0 * ( GChrgA - GSpinA )
+
+SAPT%monB%g1a = 0.5d0 * ( GChrgB + GSpinB )
+SAPT%monB%g1b = 0.5d0 * ( GChrgB - GSpinB )
+
+deallocate(GBAct,GAAct)
+deallocate(GSpinB,GSpinA)
+deallocate(GChrgB,GChrgA)
+
+end subroutine sapt_interface_spin
+
+subroutine read2rdm_spin(Mon,NBas)
+!
+! Purpose: a) load rdms201.dat file to memory
+!          as Mon%RDM201(NRDM2Act) matrix
+!          B) if Hartree-Fock, assume = 0
+implicit none
+
+type(SystemBlock)   :: Mon
+integer, intent(in) :: NBas
+
+character(:),allocatable :: rdmfile
+integer :: iunit,ios
+integer :: NRDM2Act
+integer :: i,j,k,l
+double precision :: val
+integer,external :: NAddrRDM
+
+if (Mon%Monomer==1) then
+   rdmfile='rdms201_A.dat'
+elseif (Mon%Monomer==2) then
+   rdmfile='rdms201_B.dat'
+endif
+
+if(allocated(Mon%RDM201)) deallocate(Mon%RDM201)
+
+NRDM2Act = Mon%NAct**2*(Mon%NAct**2+1)/2
+
+allocate(Mon%RDM201(NRDM2Act))
+Mon%RDM201(1:NRDM2Act) = 0
+
+open(newunit=iunit,file=rdmfile,status='OLD',&
+     form='FORMATTED')
+
+do
+  read(iunit,'(4i4,f19.12)',iostat=ios) i,j,k,l,val
+
+  if(ios==0) then
+     Mon%RDM201(NAddrRDM(j,l,i,k,Mon%NAct)) = 0.5d0*val
+  elseif(ios/=0) then
+     exit
+  endif
+enddo
+
+close(iunit)
+
+end subroutine read2rdm_spin
+
 end module sapt_inter

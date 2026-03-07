@@ -1851,6 +1851,8 @@ double precision,allocatable :: uA(:),uB(:)
 double precision,allocatable :: tindA(:),tindB(:),&
                                 tindX(:),VindX(:)
 double precision,allocatable :: WaBB(:,:),WbAA(:,:)
+double precision,allocatable :: RDM2Aval(:,:,:,:), &
+                                RDM2Bval(:,:,:,:)
 ! unc
 type(EBlockData)             :: SBlockAIV,SBlockBIV
 type(EBlockData),allocatable :: SBlockA(:),SBlockB(:)
@@ -1871,6 +1873,7 @@ double precision,allocatable :: tmpXA(:),tmpYA(:),&
                                 tmpXB(:),tmpYB(:)
 integer :: i,j,ipq,ip,iq,irs,ir,is
 logical :: both,uncoupled
+logical :: approx
 double precision :: termZ,termY,termX
 double precision :: e2exi
 double precision :: fact,tmp
@@ -1886,6 +1889,16 @@ double precision,parameter :: BigE = 1.D8
  if(Flags%ICASSCF==0)   uncoupled = .false.
  if(Flags%ITREXIO==1)   uncoupled = .false.
  if(A%Cubic.or.B%Cubic) uncoupled = .false.
+
+ approx = .false.
+ if(SAPT%SaptExch==1) approx = .true.
+ if (approx) then
+    if(Flags%IRdm2Typ==0) then
+       write(6,*) 'Exch-ind based on HF functional'
+    elseif(Flags%IRdm2Typ==1.or.Flags%IRDM2Typ==11) then
+       write(6,*) 'Exch-ind based on BB functional'
+    endif
+ endif
 
 ! set dimensions
  NAO  = SAPT%NAO
@@ -3374,5 +3387,1000 @@ call abpm_tran_gen(tmp1,tmp2,SBlockA,SBlockAIV,SBlockB,SBlockBIV, &
                    nblkA,nblkB,ANDimX,BNDimX,'YX')
 
 end subroutine make_tij_Y_unc
+
+subroutine e1exch_dmft(Flags,A,B,SAPT)
+implicit none
+
+type(FlagsData) :: Flags
+type(SystemBlock) :: A, B
+type(SaptData) :: SAPT
+integer :: i, j, k, l, ia, jb
+integer :: ij,ipr
+integer :: ip,iq,ir,is
+integer :: ipq,iu,it
+integer :: iunit
+integer :: rdm2type
+integer :: dimOA,dimOB,NBas
+double precision :: fac,val,nnS2,tmp
+double precision :: tmpELST,tmpDEL
+double precision :: e1ex_dmft
+double precision :: tvk(3),tNa(3),tNb(3),tNaNb(3)
+double precision,allocatable :: Va(:,:),Vb(:,:),S(:,:)
+double precision,allocatable :: Saa(:,:),Sbb(:,:),Sab(:,:)
+double precision,allocatable :: Vaab(:,:),Vbba(:,:),Vabb(:,:),Vbaa(:,:)
+double precision,allocatable :: AlphaA(:),AlphaB(:)
+double precision,allocatable :: work(:,:),ints(:)
+
+! set dimensions
+ NBas = A%NBasis
+ dimOA = A%num0+A%num1
+ dimOB = B%num0+B%num1
+
+ allocate(AlphaA(dimOA),AlphaB(dimOB))
+
+ rdm2type = Flags%IRdm2Typ
+ print*, 'First-order exchange with RDM2 type =',rdm2Type
+ select case(rdm2type)
+ case(0)
+ ! HF
+    AlphaA(1:dimOA) = A%Occ(1:dimOA)
+    AlphaB(1:dimOB) = B%Occ(1:dimOB)
+ case(1,11)
+    ! BB functional
+    do i=1,dimOA
+       AlphaA(i) = sqrt(A%Occ(i))
+    enddo
+    do j=1,dimOB
+       AlphaB(j) = sqrt(B%Occ(j))
+    enddo
+ case(2)
+   write(LOUT,*) 'POWER FUNCITONAL NOT READY YET!'
+   stop
+ end select
+
+ allocate(S(NBas,NBas))
+ allocate(Sab(NBas,NBas),Saa(NBas,NBas),Sbb(NBas,NBas))
+ allocate(Va(NBas,NBas),Vb(NBas,NBas),&
+          Vabb(NBas,NBas),Vbaa(NBas,NBas),&
+          Vaab(NBas,NBas),Vbba(NBas,NBas))
+
+ call get_one_mat('V',Va,A%Monomer,NBas)
+ call get_one_mat('V',Vb,B%Monomer,NBas)
+
+ call tran2MO(Va,B%CMO,B%CMO,Vabb,NBas)
+ call tran2MO(Vb,A%CMO,A%CMO,Vbaa,NBas)
+ call tran2MO(Va,A%CMO,B%CMO,Vaab,NBas)
+ call tran2MO(Vb,B%CMO,A%CMO,Vbba,NBas)
+
+ call get_one_mat('S',S,A%Monomer,NBas)
+ call tran2MO(S,A%CMO,B%CMO,Sab,NBas)
+ Saa = 0
+ Sbb = 0
+ do l=1,NBas
+    do k=1,NBas
+       do i=1,dimOA
+          Sbb(k,l) = Sbb(k,l) + A%Occ(i)*Sab(i,k)*Sab(i,l)
+       enddo
+       do j=1,dimOB
+          Saa(k,l) = Saa(k,l) + B%Occ(j)*Sab(k,j)*Sab(l,j)
+       enddo
+    enddo
+ enddo
+
+ deallocate(Vb,Va,S)
+
+ allocate(work(NBas,NBas),ints(NBas**2))
+
+ ! n^A n^B Sab Sab
+ nnS2 = 0
+ do j=1,dimOB
+ do i=1,dimOA
+    nnS2 = nnS2 + A%Occ(i)*B%Occ(j)*Sab(i,j)**2
+ enddo
+ enddo
+
+ ! this should = -tmpDEL
+ tmpELST = 2d0*(SAPT%elst-SAPT%Vnn)*nnS2
+ print*, 'tmpELST',tmpELST*1000
+
+ ! tvk = n_p n_q (v^A S + v^B S + v_pq^qp)
+ open(newunit=iunit,file='FFOOABAB',status='OLD',&
+     access='DIRECT',form='UNFORMATTED',recl=8*NBas**2)
+
+ ipq = 0
+ tvk = 0
+ do iq=1,dimOB
+    do ip=1,dimOA
+       ipq = ipq + 1
+       read(iunit,rec=ipq) ints(1:NBas*NBas)
+
+       tvk(3) = tvk(3) + A%Occ(ip)*B%Occ(iq)*ints(ip+(iq-1)*NBas)
+
+    enddo
+ enddo
+ tvk(3) = -2d0*tvk(3)
+ print*, 'tvk(3)',tvk(3)*1000
+
+ close(iunit)
+
+ do iq=1,dimOB
+    do ip=1,dimOA
+       tvk(1) = tvk(1) + A%Occ(ip)*B%Occ(iq)*Vaab(ip,iq)*Sab(ip,iq)
+    enddo
+ enddo
+ tvk(1) = -2d0*tvk(1)
+ print*, 'tvk(1)',tvk(1)*1000
+
+ do iq=1,dimOB
+    do ip=1,dimOA
+       tvk(2) = tvk(2) + A%Occ(ip)*B%Occ(iq)*Vbba(iq,ip)*Sab(ip,iq)
+    enddo
+ enddo
+ tvk(2) = -2d0*tvk(2)
+ print*, 'tvk(2)',tvk(2)*1000
+
+ tmpDEL = 0
+ do i=1,dimOA
+    tmpDEL = tmpDEL + A%Occ(i)*Vbaa(i,i)
+ enddo
+ do i=1,dimOB
+    tmpDEL = tmpDEL + B%Occ(i)*Vabb(i,i)
+ enddo
+ tmpDEL = -4d0*tmpDEL*nnS2
+
+ ! tNa
+ tNa = 0
+ do iq=1,dimOA
+    do ip=1,dimOA
+       tNa(1) = tNa(1) + AlphaA(ip)*AlphaA(iq)*Saa(ip,iq)*Vbaa(ip,iq)
+    enddo
+ enddo
+ tNa(1) = 2d0*tNa(1)
+
+!(FO|FO): (AA|AB)
+open(newunit=iunit,file='FOFOAAAB',status='OLD', &
+     access='DIRECT',recl=8*NBas*dimOA)
+
+! one loop over integrals
+ints = 0
+val  = 0
+do it=1,dimOB
+   do iq=1,dimOA
+      read(iunit,rec=iq+(it-1)*NBas) ints(1:NBas*dimOA)
+
+      fac = A%Occ(iq)*B%Occ(it)*Sab(iq,it)
+      val = 0
+      do ip=1,dimOA
+         val = val + A%Occ(ip)*ints(ip+(ip-1)*NBas)
+      enddo
+      tNa(2) = tNA(2) - 4d0*fac*val
+
+      fac = B%Occ(it)*AlphaA(iq)
+      val = 0
+      do ip=1,dimOA
+         val = val + AlphaA(ip)*Sab(ip,it)*ints(ip+(iq-1)*NBas)
+      enddo
+      tNa(3) = tNa(3) + 2d0*fac*val
+
+   enddo
+enddo
+
+print*, 'tNa-2',tNa(2)*1000
+print*, 'tNa-3',tNa(3)*1000
+
+close(iunit)
+
+ tNb = 0
+ do iq=1,dimOB
+    do ip=1,dimOB
+       tNb(1) = tNb(1) + AlphaB(ip)*AlphaB(iq)*Sbb(ip,iq)*Vabb(ip,iq)
+    enddo
+ enddo
+ tNb(1) = 2d0*tNb(1)
+ print*, 'tNb-1',tNb(1)*1000
+
+!(FO|FO): (BB|BA)
+open(newunit=iunit,file='FOFOBBBA',status='OLD', &
+     access='DIRECT',recl=8*NBas*dimOB)
+
+! one loop over integrals
+ints = 0
+val  = 0
+do it=1,dimOA
+   do iq=1,dimOB
+      read(iunit,rec=iq+(it-1)*NBas) ints(1:NBas*dimOB)
+
+      fac = A%Occ(it)*B%Occ(iq)*Sab(it,iq)
+      val = 0
+      do ip=1,dimOB
+         val = val + B%Occ(ip)*ints(ip+(ip-1)*NBas)
+      enddo
+      tNb(2) = tNb(2) - 4d0*fac*val
+
+      fac = A%Occ(it)*AlphaB(iq)
+      val = 0
+      do ip=1,dimOB
+         val = val + AlphaB(ip)*Sab(it,ip)*ints(ip+(iq-1)*NBas)
+      enddo
+      tNb(3) = tNb(3) + 2d0*fac*val
+
+   enddo
+enddo
+
+print*, 'tNb-2',tNb(2)*1000
+print*, 'tNb-3',tNb(3)*1000
+
+close(iunit)
+
+ open(newunit=iunit,file='TMPOOAB',status='OLD',&
+     access='DIRECT',form='UNFORMATTED',recl=8*dimOB**2)
+
+ work  = 0
+ tmp   = 0
+ tNaNb = 0
+ do iq=1,dimOA
+    do ip=1,dimOA
+      read(iunit,rec=ip+(iq-1)*dimOA) work(1:dimOB,1:dimOB)
+
+      if(ip==iq) then
+
+         val = 0
+         do it=1,dimOB
+            val = val + B%Occ(it)*work(it,it)
+         enddo
+         val = A%Occ(ip)*val
+         tmpDEL = tmpDEL - 8d0*nnS2*val
+         tmp = tmp - 8d0*nnS2*val
+
+         val = 0
+         do iu=1,dimOB
+            do it=1,dimOB
+               val = val + AlphaB(it)*AlphaB(iu)*Sbb(it,iu)*work(it,iu)
+            enddo
+         enddo
+         tNaNb(1) = tNaNb(1) - 2d0*val*A%Occ(ip)
+
+      endif
+
+      val = 0
+      do it=1,dimOB
+         val = val + B%Occ(it)*work(it,it)
+      enddo
+      tNaNb(2) = tNaNb(2) - 2d0*val*AlphaA(ip)*AlphaA(iq)*Saa(ip,iq)
+
+      val = 0
+      do iu=1,dimOB
+         do it=1,dimOB
+            val = val + AlphaB(it)*AlphaB(iu)*Sab(ip,iu)*Sab(iq,it)*work(it,iu)
+         enddo
+      enddo
+      tNaNb(3) = tNaNb(3) + AlphaA(ip)*AlphaA(iq)*val
+
+    enddo
+ enddo
+ tNaNB = -2d0*tNaNb
+ print*, 'A4',sum(tNaNB)*1000
+ print*, 'tmp-A4',(tmp+sum(tNaNB))*1000
+ print*, 'tNANB-1',tNaNB(1)*1000
+ print*, 'tNANB-2',tNaNB(2)*1000
+ print*, 'tNANB-3',tNaNB(3)*1000
+
+ close(iunit)
+
+ e1ex_dmft = sum(tvk)+sum(tNa)+sum(tNb)+sum(tNaNb)
+ SAPT%exchs2 = e1ex_dmft
+
+ if(SAPT%SaptExch==0) then
+    call print_en('E1exch-DMFT(S2)',e1ex_dmft*1000,.true.)
+ elseif(SAPT%SaptExch==1) then
+    if(Flags%IRdm2Typ==0) then
+       call print_en('E1exch-DMFT(nn)',e1ex_dmft*1000,.true.)
+    elseif(Flags%IRDM2typ==1.or.Flags%IRDM2Typ==11) then
+       call print_en('E1exch-DMFT(BB)',e1ex_dmft*1000,.true.)
+    endif
+ endif
+
+ deallocate(Vbaa,Vabb,Vbba,Vaab)
+ deallocate(AlphaB,AlphaA)
+ deallocate(ints,work)
+ deallocate(Sbb,Saa,Sab)
+
+end subroutine e1exch_dmft
+
+subroutine e1exch_dmft_2(Flags,A,B,SAPT)
+implicit none
+
+type(FlagsData)   :: Flags
+type(SystemBlock) :: A, B
+type(SaptData)    :: SAPT
+
+integer :: i, j, k, l, ia, jb
+integer :: ij,ipr
+integer :: ip,iq,ir,is
+integer :: ipq,iu,it
+integer :: iunit
+integer :: rdm2type
+integer :: dimOA,dimOB,NBas
+double precision :: fac,val,nnS2,tmp
+double precision :: tmpELST,tmpDEL
+double precision :: e1ex_dmft
+double precision :: tvk(3),tNa(3),tNb(3),tNaNb(3)
+double precision,allocatable :: Va(:,:),Vb(:,:),S(:,:)
+double precision,allocatable :: Wbb(:,:)
+double precision,allocatable :: Saa(:,:),Sbb(:,:),Sab(:,:),Sabh(:,:)
+double precision,allocatable :: Vaab(:,:),Vbba(:,:),Vabb(:,:),Vbaa(:,:)
+double precision,allocatable :: AlphaA(:),AlphaB(:)
+double precision,allocatable :: work(:,:),ints(:)
+double precision,external :: ddot
+
+! set dimensions
+NBas  = A%NBasis
+dimOA = A%num0+A%num1
+dimOB = B%num0+B%num1
+
+allocate(AlphaA(dimOA),AlphaB(dimOB))
+
+rdm2type = Flags%IRdm2Typ
+print*, 'First-order exchange with RDM2 type =',rdm2Type
+select case(rdm2type)
+case(0)
+! HF
+   AlphaA(1:dimOA) = A%Occ(1:dimOA)
+   AlphaB(1:dimOB) = B%Occ(1:dimOB)
+case(1,11)
+   ! BB functional
+   do i=1,dimOA
+      AlphaA(i) = sqrt(A%Occ(i))
+   enddo
+   do j=1,dimOB
+      AlphaB(j) = sqrt(B%Occ(j))
+   enddo
+case(3)
+  write(LOUT,*) 'POWER FUNCITONAL NOT READY YET!'
+  stop
+end select
+
+allocate(S(NBas,NBas),Sab(NBas,NBas),Sabh(dimOA,dimOB))
+
+call get_one_mat('S',S,A%Monomer,NBas)
+call tran2MO(S,A%CMO,B%CMO,Sab,NBas)
+
+Sabh = 0d0
+do ip=1,dimOA
+   do iu=1,dimOB
+      Sabh(ip,iu) = Sabh(ip,iu) + Sab(ip,iu)*AlphaA(ip)*AlphaB(iu)
+   enddo
+enddo
+
+print*, norm2(Sabh)
+
+allocate(work(dimOB,dimOB))
+allocate(Wbb(dimOB,dimOB))
+
+open(newunit=iunit,file='TMPOOAB',status='OLD',&
+     access='DIRECT',form='UNFORMATTED',recl=8*dimOB**2)
+
+work  = 0d0
+tNaNb = 0d0
+do iq=1,dimOA
+   do ip=1,dimOA
+      read(iunit,rec=ip+(iq-1)*dimOA) work(1:dimOB,1:dimOB)
+
+      Wbb = 0d0
+      do iu=1,dimOB
+         do it=1,dimOB
+            Wbb(it,iu) = Sabh(ip,iu)*Sabh(iq,it)
+         enddo
+      enddo
+      tNaNb(3) = tNaNb(3) + ddot(dimOB**2,work,1,Wbb,1)
+
+   enddo
+enddo
+tNaNB = -2d0*tNaNb
+
+close(iunit)
+
+print*, '@@@ tNANB-3',tNaNB(3)*1000
+
+deallocate(work,Wbb)
+deallocate(AlphaB,AlphaA)
+deallocate(Sabh,Sab,S)
+
+end subroutine e1exch_dmft_2
+
+subroutine e1exchs2_sq_os(A,B,SAPT)
+!
+! open-shell unrestricted E1exch(S2)
+! in second-quanitzed form (o2v2 cost)
+! cf. Eq. (13) in https://doi.org/10.1063/1.4758455
+!
+implicit none
+
+type(FlagsData)   :: Flags
+type(SystemBlock) :: A, B
+type(SaptData)    :: SAPT
+
+
+integer :: NBasis
+integer :: iunit
+integer :: i,j,k
+integer :: ip,iq,pq,ir,is,rs
+double precision :: val,tmp
+double precision :: ex1(2),ex2(2),ex3(2),e1exs2
+double precision, allocatable :: Sa(:,:),Sb(:,:)
+double precision, allocatable :: Sat(:,:),Sbt(:,:)
+double precision, allocatable :: Waa(:,:),Wab(:,:)
+double precision, allocatable :: Wba(:,:),Wbb(:,:)
+double precision, allocatable :: ints(:,:),Aux(:)
+double precision, allocatable :: work(:,:)
+double precision,external  :: trace
+
+! set dimensions
+NBasis = A%NBasis
+
+allocate(Waa(NBasis,NBasis),Wab(NBasis,NBasis))
+allocate(Wba(NBasis,NBasis),Wbb(NBasis,NBasis))
+
+call tran2MO(A%WPot,B%UMO(:,:,1),B%UMO(:,:,1),Waa,NBasis)
+call tran2MO(A%WPot,B%UMO(:,:,2),B%UMO(:,:,2),Wab,NBasis)
+
+call tran2MO(B%WPot,A%UMO(:,:,1),A%UMO(:,:,1),Wba,NBasis)
+call tran2MO(B%WPot,A%UMO(:,:,2),A%UMO(:,:,2),Wbb,NBasis)
+
+allocate(Sa(NBasis,NBasis),Sb(NBasis,NBasis))
+allocate(Sat(NBasis,NBasis),Sbt(NBasis,NBasis))
+allocate(work(NBasis,NBasis))
+
+call get_one_mat('S',work,A%Monomer,NBasis)
+call tran2MO(work,A%UMO(:,:,1),B%UMO(:,:,1),Sa,NBasis)
+call tran2MO(work,A%UMO(:,:,2),B%UMO(:,:,2),Sb,NBasis)
+
+Sat = transpose(Sa)
+Sbt = transpose(Sb)
+
+! Waa(ja,ba).S(ia,ba).S(ia,ja)
+! alpha-alpha
+ex1 = 0d0
+do k=1,B%NOa
+   do j=1,B%NVa
+      val = 0d0
+      do i=1,A%NOa
+         val = val + Sat(B%NOa+j,i)*Sa(i,k)
+      enddo
+      ex1(1) = ex1(1) + Waa(k,B%NOa+j)*val
+   enddo
+enddo
+if(SAPT%IPrint>=10) write(LOUT,'(/,1x,a,f16.8)') 'ExchS2(T1-a ) = ', ex1(1)*1000d0
+
+! Wab(jb,bb).S(ib,jb).S(ib,bb)
+! beta-beta
+do k=1,B%NOb
+   do j=1,B%NVb
+      val = 0d0
+      do i=1,A%NOb
+         val = val + Sbt(B%NOb+j,i)*Sb(i,k)
+      enddo
+      ex1(2) = ex1(2) + Wab(k,B%NOb+j)*val
+   enddo
+enddo
+if(SAPT%IPrint>=10) write(LOUT,'(1x,a,f16.8)') 'ExchS2(T1-b ) = ', ex1(2)*1000d0
+
+! Wba(ia,aa).S(ia,ja).S(ja,aa)
+! alpha-alpha
+ex2 = 0d0
+do k=1,A%NOa
+   do j=1,A%NVa
+      val = 0d0
+      do i=1,B%NOa
+         val = val + Sa(k,i)*Sat(i,A%NOa+j)
+      enddo
+      ex2(1) = ex2(1) + Wba(k,A%NOa+j)*val
+   enddo
+enddo
+if(SAPT%IPrint>=10) write(LOUT,'(1x,a,f16.8)') 'ExchS2(T2-a ) = ', ex2(1)*1000d0
+! beta-beta
+do k=1,A%NOb
+   do j=1,A%NVb
+      val = 0d0
+      do i=1,B%NOb
+         val = val + Sb(k,i)*Sbt(i,A%NOb+j)
+      enddo
+      ex2(2) = ex2(2) + Wbb(k,A%NOb+j)*val
+   enddo
+enddo
+if(SAPT%IPrint>=10) write(LOUT,'(1x,a,f16.8)') 'ExchS2(T2-b ) = ', ex2(2)*1000d0
+
+! alpha-alpha (pq|rs).S(q,r).S(p,s)
+allocate(Aux(A%NOVa),ints(A%NVa,A%NOa))
+open(newunit=iunit,file='OVOVABaa',status='OLD',&
+     access='DIRECT',form='UNFORMATTED',recl=8*A%NOVa)
+
+ints = 0d0
+ex3 = 0d0
+do rs=1,B%NOVa
+
+    ir = B%IndNa(1,rs)
+    is = B%IndNa(2,rs)
+    read(iunit,rec=is+(ir-B%NOa-1)*B%NOa) Aux(1:A%NOVa)
+
+    do ip=1,A%NVa
+       do iq=1,A%NOa
+          ints(ip,iq) = Aux(iq+(ip-1)*A%NOa)
+       enddo
+    enddo
+
+    val = 0d0
+    do ip=1,A%NVa
+       do iq=1,A%NOa
+          val = val + ints(ip,iq)*Sa(iq,ir)*Sat(is,A%NOa+ip)
+       enddo
+    enddo
+
+    ex3(1) = ex3(1) + val
+
+enddo
+
+close(iunit)
+deallocate(ints,Aux)
+if(SAPT%IPrint>=10) write(LOUT,'(1x,a,f16.8)') 'ExchS2(T3-a ) = ', ex3(1)*1000d0
+
+allocate(Aux(A%NOVb),ints(A%NVb,A%NOb))
+open(newunit=iunit,file='OVOVABbb',status='OLD',&
+     access='DIRECT',form='UNFORMATTED',recl=8*A%NOVb)
+
+do rs=1,B%NOVb
+
+    ir = B%IndNb(1,rs)
+    is = B%IndNb(2,rs)
+    read(iunit,rec=is+(ir-B%NOb-1)*B%NOb) Aux(1:A%NOVb)
+
+    do ip=1,A%NVb
+       do iq=1,A%NOb
+          ints(ip,iq) = Aux(iq+(ip-1)*A%NOb)
+       enddo
+    enddo
+
+    val = 0d0
+    do ip=1,A%NVb
+       do iq=1,A%NOb
+          val = val + ints(ip,iq)*Sb(iq,ir)*Sbt(is,A%NOb+ip)
+       enddo
+    enddo
+
+    ex3(2) = ex3(2) + val
+
+enddo
+close(iunit)
+deallocate(ints)
+
+if(SAPT%IPrint>=10) write(LOUT,'(1x,a,f16.8)') 'ExchS2(T3-b ) = ', ex3(2)*1000d0
+
+e1exs2 = sum(ex1) + sum(ex2) + sum(ex3)
+e1exs2 = - e1exs2
+SAPT%exchs2 = e1exs2
+
+call print_en('E1exch(S2)',e1exs2*1000,.true.)
+
+deallocate(Wbb,Wba,Wab,Waa)
+deallocate(Sb,Sa,Sbt,Sat)
+deallocate(Aux,work)
+
+end subroutine e1exchs2_sq_os
+
+subroutine e1exch_os(A,B,SAPT)
+!
+! open-shell unrestricted E1exch (S^infty)
+! in the AO basis
+! cf. Eq. (8) in https://doi.org/10.1063/1.4758455
+!
+implicit none
+
+type(FlagsData)   :: Flags
+type(SystemBlock) :: A, B
+type(SaptData)    :: SAPT
+
+integer :: NAO,NMO
+integer :: occa,occb
+integer :: i,j,k
+integer :: info
+integer, allocatable :: ipiv(:)
+
+real(8) :: pex(16),pmix
+real(8) :: e1ex
+
+real(8), allocatable :: Sa(:,:),Sb(:,:)
+real(8), allocatable :: Va(:,:),Vb(:,:)
+real(8), allocatable :: taa(:,:),tbb(:,:)
+real(8), allocatable :: tab(:,:),tba(:,:)
+real(8), allocatable :: taba(:,:),tabb(:,:),&
+                        tbaa(:,:),tbab(:,:)
+real(8), allocatable :: pa(:,:),pb(:,:)
+real(8), allocatable :: Paa(:,:),Pab(:,:),&
+                        Pba(:,:),Pbb(:,:)
+real(8), allocatable :: pinva(:,:),pinvb(:,:)
+real(8), allocatable :: pinvAAa(:,:),pinvAAb(:,:),&
+                        pinvBBa(:,:),pinvBBb(:,:),&
+                        pinvABa(:,:),pinvABb(:,:),&
+                        pinvBAa(:,:),pinvBAb(:,:)
+real(8), allocatable :: haa(:,:),hba(:,:),&
+                        hab(:,:),hbb(:,:)
+real(8), allocatable :: Kaa(:,:),Kab(:,:),&
+                        Kba(:,:),Kbb(:,:)
+real(8), allocatable :: Jalpha(:,:),Jbeta(:,:)
+real(8), allocatable :: Jtaa(:,:),Ktaa(:,:),&
+                        Jtba(:,:),Ktba(:,:),&
+                        Jtaba(:,:),Ktaba(:,:)
+real(8), allocatable :: Jtab(:,:),Ktab(:,:),&
+                        Jtbb(:,:),Ktbb(:,:),&
+                        Jtabb(:,:),Ktabb(:,:)
+real(8), allocatable :: work(:,:),work2(:,:)
+
+double precision, allocatable :: Waa(:,:),Wab(:,:)
+double precision, allocatable :: Wba(:,:),Wbb(:,:)
+double precision,external  :: trace
+
+! set dimensions
+NAO = SAPT%NAO
+NMO = A%NBasis
+
+! occuppied A + occupied B
+occa = A%NOa+B%NOa
+occb = A%NOb+B%NOb
+
+if (NAO.ne.NMO)  then
+   print*, 'NAO =', NAO
+   print*, 'NMO =', NMO
+   stop "e1exh os!"
+endif
+
+allocate(PAa(nao,nao),PAb(nao,nao))
+allocate(PBa(nao,nao),PBb(nao,nao))
+
+call get_den(nmo,nmo,A%UMO(:,:,1),A%Uocc(:,1),1d0,PAa)
+call get_den(nmo,nmo,A%UMO(:,:,2),A%Uocc(:,2),1d0,PAb)
+call get_den(nmo,nmo,B%UMO(:,:,1),B%Uocc(:,1),1d0,PBa)
+call get_den(nmo,nmo,B%UMO(:,:,2),B%Uocc(:,2),1d0,PBb)
+
+! h matrices
+allocate(Va(nao,nao),Vb(nao,nao))
+call get_one_mat('V',Va,A%Monomer,nao)
+call get_one_mat('V',Vb,B%Monomer,nao)
+
+allocate(haa(nao,nao),hab(nao,nao))
+allocate(Kaa(nao,nao),Kab(nao,nao))
+allocate(hba(nao,nao),hbb(nao,nao))
+allocate(Kba(nao,nao),Kbb(nao,nao))
+allocate(Jalpha(nao,nao),Jbeta(nao,nao))
+
+call make_J1(nao,PAa,jalpha,'AOTWOSORT')
+call make_J1(nao,PAb,jbeta ,'AOTWOSORT')
+call make_K(nao,PAa,Kaa)
+call make_K(nao,PAb,Kab)
+haa = Va + Jalpha + JBeta - Kaa
+hab = Va + Jalpha + JBeta - Kab
+
+if(SAPT%IPrint>=50) then
+   print*, '-----'
+   print*, 'hAa =', norm2(hAa)
+   print*, 'Kaa =', norm2(Kaa)
+   print*, '-----'
+   print*, 'hAb =', norm2(hAb)
+   print*, 'Kab =', norm2(Kab)
+endif
+
+call make_J1(nao,PBa,jalpha,'AOTWOSORT')
+call make_J1(nao,PBb,jbeta ,'AOTWOSORT')
+call make_K(nao,PBa,Kba)
+call make_K(nao,PBb,Kbb)
+hba = Vb + Jalpha + JBeta - Kba
+hbb = Vb + Jalpha + JBeta - Kbb
+
+if(SAPT%IPrint>=50) then
+   print*, '-----'
+   print*, 'hBa =', norm2(hBa)
+   print*, 'KBa =', norm2(Kba)
+   print*, '-----'
+   print*, 'hBb =', norm2(hBb)
+   print*, 'KBb =', norm2(Kbb)
+   print*, '-----'
+endif
+
+allocate(work(NAO,NAO))
+allocate(Sa(NMO,NMO),Sb(NMO,NMO))
+
+call get_one_mat('S',work,A%Monomer,NAO)
+call tran2MO(work,A%UMO(:,:,1),B%UMO(:,:,1),Sa,NMO)
+call tran2MO(work,A%UMO(:,:,2),B%UMO(:,:,2),Sb,NMO)
+
+! P matrix
+!    P = [S + 1]^{-1}-1
+allocate(pa(occa,occa))
+pa=0d0
+do concurrent(i=1:occa)
+   pa(i,i)=1d0
+enddo
+do j=1,B%NOa
+   do i=1,A%NOa
+      pa(i,A%NOa+j)=Sa(i,j)
+      pa(A%NOa+j,i)=Sa(i,j)
+   enddo
+enddo
+! P beta
+allocate(pb(occb,occb))
+pb=0d0
+do concurrent(i=1:occb)
+   pb(i,i)=1d0
+enddo
+do j=1,B%NOb
+   do i=1,A%NOb
+      pb(i,A%NOb+j)=Sb(i,j)
+      pb(A%NOb+j,i)=Sb(i,j)
+   enddo
+enddo
+! invert alpha
+allocate(ipiv(occa))
+allocate(pinva(occa,occa))
+allocate(pinvAAa(A%NOa,A%NOa),pinvBBa(B%NOa,B%NOa), &
+         pinvABa(A%NOa,B%NOa),pinvBAa(B%NOa,A%NOa))
+pinva=0d0
+do concurrent(i=1:occa)
+   pinva(i,i)=1d0
+enddo
+call dgesv(occa,occa,pa,occa,ipiv,pinva,occa,info)
+! -1 alpha
+do i=1,occa
+  pinva(i,i)=pinva(i,i)-1d0
+enddo
+! monomer blocks P alpha
+pinvAAa(1:A%NOa,1:A%NOa)=pinva(1:A%NOa,1:A%NOa)
+pinvABa(1:A%NOa,1:B%NOa)=pinva(1:A%NOa,A%NOa+1:occa)
+pinvBAa(1:B%NOa,1:A%NOa)=pinva(A%NOa+1:occa,1:A%NOa)
+pinvBBa(1:B%NOa,1:B%NOa)=pinva(A%NOa+1:occa,A%NOa+1:occa)
+
+deallocate(ipiv)
+deallocate(pinva,pa)
+
+! invert beta
+allocate(ipiv(occb))
+allocate(pinvb(occb,occb))
+allocate(pinvAAb(A%NOb,A%NOb),pinvBBb(B%NOb,B%NOb), &
+         pinvABb(A%NOb,B%NOb),pinvBAb(B%NOb,A%NOb))
+pinvb=0d0
+do concurrent(i=1:occb)
+   pinvb(i,i)=1d0
+enddo
+call dgesv(occb,occb,pb,occb,ipiv,pinvb,occb,info)
+! -1 beta
+do i=1,occb
+  pinvb(i,i)=pinvb(i,i)-1d0
+enddo
+! monomer blocks P beta
+pinvAAb(1:A%NOb,1:A%NOb)=pinvb(1:A%NOb,1:A%NOb)
+pinvABb(1:A%NOb,1:B%NOb)=pinvb(1:A%NOb,A%NOb+1:occb)
+pinvBAb(1:B%NOb,1:A%NOb)=pinvb(A%NOb+1:occb,1:A%NOb)
+pinvBBb(1:B%NOb,1:B%NOb)=pinvb(A%NOb+1:occb,A%NOb+1:occb)
+
+deallocate(ipiv)
+deallocate(pinvb,pb)
+
+! Tmatrix alpha
+allocate(taa(nao,nao),tba(nao,nao),taba(nao,nao),tbaa(nao,nao))
+
+call tran2mo2ao_gen(pinvAAa,A%NOa,A%NOa,NAO,NMO,A%UMO(:,:,1),A%UMO(:,:,1),taa)
+call tran2mo2ao_gen(pinvBBa,B%NOa,B%NOa,NAO,NMO,B%UMO(:,:,1),B%UMO(:,:,1),tba)
+call tran2mo2ao_gen(pinvABa,A%NOa,B%NOa,NAO,NMO,A%UMO(:,:,1),B%UMO(:,:,1),taba)
+call tran2mo2ao_gen(pinvBAa,B%NOa,A%NOa,NAO,NMO,B%UMO(:,:,1),A%UMO(:,:,1),tbaa)
+
+if(SAPT%IPrint>=50) then
+   print*, 'Tmatrix alpha'
+   print*, 'tAa  = ', norm2(taa)
+   print*, 'tBa  = ', norm2(tba)
+   print*, 'tABa = ', norm2(taba)
+   print*, 'tBAa = ', norm2(tbaa)
+endif
+
+deallocate(pinvBBa,pinvBAa,pinvABa,pinvAAa)
+
+! Tmatrix beta
+allocate(tab(nao,nao),tbb(nao,nao),tabb(nao,nao),tbab(nao,nao))
+
+call tran2mo2ao_gen(pinvAAb,A%NOb,A%NOb,NAO,NMO,A%UMO(:,:,2),A%UMO(:,:,2),tab)
+call tran2mo2ao_gen(pinvBBb,B%NOb,B%NOb,NAO,NMO,B%UMO(:,:,2),B%UMO(:,:,2),tbb)
+call tran2mo2ao_gen(pinvABb,A%NOb,B%NOb,NAO,NMO,A%UMO(:,:,2),B%UMO(:,:,2),tabb)
+call tran2mo2ao_gen(pinvBAb,B%NOb,A%NOb,NAO,NMO,B%UMO(:,:,2),A%UMO(:,:,2),tbab)
+
+if(SAPT%IPrint>=50) then
+   print*, 'Tmatrix beta'
+   print*, 'tAb  = ', norm2(tab)
+   print*, 'tBb  = ', norm2(tbb)
+   print*, 'tABb = ', norm2(tabb)
+   print*, 'tBAb = ', norm2(tbab)
+endif
+
+deallocate(pinvBBb,pinvBAb,pinvABb,pinvAAb)
+
+! Coulomb exchange alpha
+allocate(Jtaa(nao,nao),Ktaa(nao,nao))
+allocate(Jtba(nao,nao),Ktba(nao,nao))
+allocate(Jtaba(nao,nao),Ktaba(nao,nao))
+
+call make_J1(nao,taa, Jtaa, 'AOTWOSORT')
+call make_J1(nao,tba, Jtba, 'AOTWOSORT')
+call make_J1(nao,taba,Jtaba,'AOTWOSORT')
+
+call make_K(nao,taa, Ktaa)
+call make_K(nao,tba, Ktba)
+call make_K(nao,taba,Ktaba)
+
+if(SAPT%IPrint>=50) then
+   write(6,'(/1x,a)')'Jmat alpha'
+   print*, 'Jtaa   =', norm2(Jtaa)
+   print*, 'Jtba   =', norm2(Jtba)
+   print*, 'Jtaba  =', norm2(Jtaba)
+   print*,'Kmat alpha'
+   print*, 'Ktaa   =', norm2(Ktaa)
+   print*, 'Ktba   =', norm2(Ktba)
+   print*, 'Ktaba  =', norm2(Ktaba)
+endif
+
+! Coulomb exchange beta
+allocate(Jtab(nao,nao),Ktab(nao,nao))
+allocate(Jtbb(nao,nao),Ktbb(nao,nao))
+allocate(Jtabb(nao,nao),Ktabb(nao,nao))
+
+call make_J1(nao,tab, Jtab, 'AOTWOSORT')
+call make_J1(nao,tbb, Jtbb, 'AOTWOSORT')
+call make_J1(nao,tabb,Jtabb,'AOTWOSORT')
+
+call make_K(nao,tab, Ktab)
+call make_K(nao,tbb, Ktbb)
+call make_K(nao,tabb,Ktabb)
+
+write(6,'(/1x,a)') 'Jmat beta '
+print*, 'Jtab   =', norm2(Jtab)
+print*, 'Jtbb   =', norm2(Jtbb)
+print*, 'Jtabb  =', norm2(Jtabb)
+print*,'Kmat beta '
+print*, 'Ktab   =', norm2(Ktab)
+print*, 'Ktbb   =', norm2(Ktbb)
+print*, 'Ktabb  =', norm2(Ktabb)
+
+! calculations
+pex=0d0
+!PART(1): PA_alfa*KB_alfa + PA_beta*KB_beta
+call dgemm('N','T',nao,nao,nao,1d0,PAa,nao,Kba,nao,0d0,work,nao)
+pex(1) = -trace(work,nao)
+call dgemm('N','T',nao,nao,nao,1d0,PAb,nao,Kbb,nao,0d0,work,nao)
+pex(1) = pex(1) - trace(work,nao)
+if(SAPT%IPrint>=10) write(LOUT,'(1x,a,f16.8)') 'part (1) = ', pex(1)
+
+!PART(2): TA_alfa*hB_alfa + TA_beta*hB_beta
+call dgemm('N','T',nao,nao,nao,1d0,taa,nao,hba,nao,0d0,work,nao)
+pex(2) = trace(work,nao)
+call dgemm('N','T',nao,nao,nao,1d0,tab,nao,hbb,nao,0d0,work,nao)
+pmix = trace(work,nao)
+pex(2) = pex(2) + trace(work,nao)
+if(SAPT%IPrint>=10) write(LOUT,'(1x,a,f16.8)') 'part (2) = ', pex(2)
+
+!PART(3): TB_alfa*hA_alfa + TB_beta*hA_beta
+call dgemm('N','T',nao,nao,nao,1d0,tba,nao,haa,nao,0d0,work,nao)
+pex(3) = trace(work,nao)
+call dgemm('N','T',nao,nao,nao,1d0,tbb,nao,hab,nao,0d0,work,nao)
+pex(3) = pex(3) + trace(work,nao)
+if(SAPT%IPrint>=10) write(LOUT,'(1x,a,f16.8)') 'part (3) = ', pex(3)
+
+!PART(4): T^{AB}_alfa*h^A_alfa + T^{AB}_beta*h^A_beta
+call dgemm('N','T',nao,nao,nao,1d0,taba,nao,haa,nao,0d0,work,nao)
+pex(4) = trace(work,nao)
+call dgemm('N','T',nao,nao,nao,1d0,tabb,nao,hab,nao,0d0,work,nao)
+pex(4) = pex(4) + trace(work,nao)
+if(SAPT%IPrint>=10) write(LOUT,'(1x,a,f16.8)') 'part (4) = ', pex(4)
+
+!PART(5): T^{AB}_alfa*h^B_alfa + T^{AB}_beta*h^B_beta
+call dgemm('N','T',nao,nao,nao,1d0,taba,nao,hba,nao,0d0,work,nao)
+pex(5) = trace(work,nao)
+call dgemm('N','T',nao,nao,nao,1d0,tabb,nao,hbb,nao,0d0,work,nao)
+pex(5) = pex(5) + trace(work,nao)
+if(SAPT%IPrint>=10) write(LOUT,'(1x,a,f16.8)') 'part (5) = ', pex(5)
+
+!PART(6): T^{AB}_alfa(J[T^B_alfa]-K[T^B_alfa])
+call dgemm('N','T',nao,nao,nao,1d0,taba,nao,jtba,nao,0d0,work,nao)
+pex(6) = trace(work,nao)
+call dgemm('N','T',nao,nao,nao,-1d0,taba,nao,ktba,nao,0d0,work,nao)
+pex(6) = pex(6) + trace(work,nao)
+! beta
+call dgemm('N','T',nao,nao,nao,1d0,tabb,nao,jtbb,nao,0d0,work,nao)
+pex(6) = pex(6) + trace(work,nao)
+call dgemm('N','T',nao,nao,nao,-1d0,tabb,nao,ktbb,nao,0d0,work,nao)
+pex(6) = pex(6) + trace(work,nao)
+if(SAPT%IPrint>=10) write(LOUT,'(1x,a,f16.8)') 'part (6) = ', pex(6)
+
+!L terms (included in part-6)
+call dgemm('N','T',nao,nao,nao,1d0,taba,nao,jtbb,nao,0d0,work,nao)
+pmix = trace(work,nao)
+pex(6) = pex(6) + pmix
+call dgemm('N','T',nao,nao,nao,1d0,tabb,nao,jtba,nao,0d0,work,nao)
+pmix = trace(work,nao)
+pex(6) = pex(6) + pmix
+if(SAPT%IPrint>=10) write(LOUT,'(1x,a,f16.8)') 'pt(6)+mix= ', pex(6)
+
+!PART(7): T^{AB}_alfa*(J[T^A_alfa]-K[T^A_alfa]) + T^{AB}_beta*(J[]-K[])
+call dgemm('N','T',nao,nao,nao,1d0,taba,nao,jtaa,nao,0d0,work,nao)
+pex(7) = trace(work,nao)
+call dgemm('N','T',nao,nao,nao,-1d0,taba,nao,ktaa,nao,0d0,work,nao)
+pex(7) = pex(7) + trace(work,nao)
+! beta
+call dgemm('N','T',nao,nao,nao, 1d0,tabb,nao,jtab,nao,0d0,work,nao)
+pex(7) = pex(7) + trace(work,nao)
+call dgemm('N','T',nao,nao,nao,-1d0,tabb,nao,ktab,nao,0d0,work,nao)
+pex(7) = pex(7) + trace(work,nao)
+if(SAPT%IPrint>=10) write(LOUT,'(1x,a,f16.8)') 'part (7) = ', pex(7)
+
+!L2 terms (included in part-7)
+call dgemm('N','T',nao,nao,nao,1d0,taba,nao,jtab,nao,0d0,work,nao)
+pmix = trace(work,nao)
+pex(7) = pex(7) + pmix
+call dgemm('N','T',nao,nao,nao,1d0,tabb,nao,jtaa,nao,0d0,work,nao)
+pmix = trace(work,nao)
+pex(7) = pex(7) + pmix
+if(SAPT%IPrint>=10) write(LOUT,'(1x,a,f16.8)') 'pt(7)+mix= ', pex(7)
+
+!PART(8): T^A_alfa(J[T^B_alfa]-K[T^B_alfa]) + T^A_beta(J[T^B_beta]-K[T^B_beta])
+call dgemm('N','T',nao,nao,nao, 1d0,taa,nao,jtba,nao,0d0,work,nao)
+pex(8) = pex(8) + trace(work,nao)
+call dgemm('N','T',nao,nao,nao,-1d0,taa,nao,ktba,nao,0d0,work,nao)
+pex(8) = pex(8) + trace(work,nao)
+! beta
+call dgemm('N','T',nao,nao,nao, 1d0,tab,nao,jtbb,nao,0d0,work,nao)
+pex(8) = pex(8) + trace(work,nao)
+call dgemm('N','T',nao,nao,nao,-1d0,tab,nao,ktbb,nao,0d0,work,nao)
+pex(8) = pex(8) + trace(work,nao)
+if(SAPT%IPrint>=10) write(LOUT,'(1x,a,f16.8)') 'part (8) = ', pex(8)
+
+! mix 1: T^A_alpha . J^B_beta
+call dgemm('N','T',nao,nao,nao, 1d0,taa,nao,jtbb,nao,0d0,work,nao)
+pmix = trace(work,nao)
+pex(8) = pex(8) + pmix
+! mix 2: T^A_beta . J^B_alpha
+call dgemm('N','T',nao,nao,nao, 1d0,tab,nao,jtba,nao,0d0,work,nao)
+pmix = trace(work,nao)
+pex(8) = pex(8) + pmix
+if(SAPT%IPrint>=10) write(LOUT,'(1x,a,f16.8)') 'pt(8)+mix= ', pex(8)
+
+!PART(9): TAB_a(J[TAB_a]-K[TAB_a])
+call dgemm('N','T',nao,nao,nao, 1d0,taba,nao,jtaba,nao,0d0,work,nao)
+pex(9) = trace(work,nao)
+call dgemm('N','T',nao,nao,nao,-1d0,taba,nao,ktaba,nao,0d0,work,nao)
+pex(9) = pex(9) + trace(work,nao)
+! beta
+call dgemm('N','T',nao,nao,nao, 1d0,tabb,nao,jtabb,nao,0d0,work,nao)
+pex(9) = pex(9) + trace(work,nao)
+call dgemm('N','T',nao,nao,nao,-1d0,tabb,nao,ktabb,nao,0d0,work,nao)
+pex(9) = pex(9) + trace(work,nao)
+if(SAPT%IPrint>=10) write(LOUT,'(1x,a,f16.8)') 'part (9) = ', pex(9)
+
+! mix 2*T^AB_beta.J[T^AB_alpha]
+call dgemm('N','T',nao,nao,nao,2d0,tabb,nao,jtaba,nao,0d0,work,nao)
+pmix = trace(work,nao)
+pex(9) = pex(9) + trace(work,nao)
+if(SAPT%IPrint>=10) write(LOUT,'(1x,a,f16.8)') 'pt(9)+mix= ', pex(9)
+
+e1ex = sum(pex)
+SAPT%e1exch = e1ex
+write(6,*) 'E1ex = ', e1ex*1000
+
+call print_en('E1exch',e1ex*1.0d3,.true.)
+
+deallocate(Pab,Paa)
+deallocate(Pba,Pbb)
+deallocate(Jtab,Jtbb,Jtabb)
+deallocate(Ktab,Ktbb,Ktabb)
+deallocate(Jtaa,Jtba,Jtaba)
+deallocate(Ktaa,Ktba,Ktaba)
+
+deallocate(Sb,Sa)
+deallocate(work)
+
+end subroutine e1exch_os
 
 end module sapt_exch
