@@ -549,6 +549,10 @@ C                                    with L accuracy at disk
       If (IFlCorrMD==1.Or.IDBBSC==2) then
        print*,  'UAux =',norm2(UAux)
        print*,  'NChol=',NCholesky
+       If (IFlCorrMD==1) then
+          ICholeskyBIN = 1
+          Print*,'SR-AC0 Dalton: using CholeskyBIN...'
+       Endif
       Allocate(MatFF(NCholesky,NBasis**2))
       If(MemType == 2) then       !MB
          MemMOTransfMB = MemVal
