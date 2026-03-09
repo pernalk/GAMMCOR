@@ -1,4 +1,5 @@
 S = SOURCE/
+SS = SOURCE/sapt/
 O = OBJ/
 
 PROG = gammcor
@@ -41,6 +42,8 @@ $(O)%.o : $(S)%.F90
 $(O)%.o : $(S)%.f90
 	$(FCC) -c -o $@ $< $(FFLAGS)
 $(O)%.o : $(S)%.f
+	$(FCC) -c -o $@ $< $(FFLAGS)
+$(O)%.o : $(SS)%.f90
 	$(FCC) -c -o $@ $< $(FFLAGS)
 
 $(PROG) : $(OBJ)
