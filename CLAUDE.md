@@ -149,6 +149,36 @@ The program reads integrals from external quantum chemistry codes configured via
 - `-DUSE_CUDA_BATCH` compile flag (future): enables GPU batched DGEMM via cuBLAS. Requires `-lcublas -lcudart`
 - `.F90` files (uppercase) use Fortran preprocessor; `.f90` files do not
 
+## Notatki o trudnościach (Issue Tracking)
+
+Podczas każdej sesji pracy prowadź notatki o **wszystkich** napotkanych trudnościach — błędach kompilacji, segfaultach, regresji testów, problemach z konfiguracją, niezgodnościach interfejsów, problemach z zależnościami, itp. Notatki zapisuj w katalogu `memory/issues/`.
+
+Każda notatka powinna zawierać:
+
+1. **Opis problemu** — co się dzieje, jaki błąd, w jakim kontekście
+2. **Diagnostyka** — co sprawdzono, jakie hipotezy testowano, co wykluczone
+3. **Status** — aktywny / rozwiązany
+4. **Rozwiązanie** (gdy znalezione) — co było przyczyną i jak naprawiono
+
+### Workflow
+- Gdy napotkasz nową trudność → utwórz plik w `memory/issues/nazwa-problemu.md`
+- Aktualizuj notatkę w miarę postępów diagnostyki (dodawaj nowe obserwacje, wyniki testów)
+- Gdy problem zostanie rozwiązany → przenieś plik do `memory/resolved/`
+- W MEMORY.md utrzymuj krótką listę aktywnych issues z linkami
+
+### Format notatki
+
+Nazwa pliku: krótka-nazwa-problemu.md (np. `cholvecs-write-bug.md`, `mkl-link-error.md`)
+
+Zawartość:
+- **Status:** aktywny | rozwiązany
+- **Data:** kiedy napotkano
+- **Pliki:** lista dotkniętych plików źródłowych
+- **Objaw:** krótki opis błędu (komunikat, backtrace)
+- **Przyczyna:** (gdy znana) root cause
+- **Rozwiązanie:** (gdy znalezione) co zmieniono i dlaczego to działa
+- **Diagnostyka:** chronologiczna lista kroków diagnostycznych z wynikami
+
 ## TODO
 
 - Rozważyć dodanie `results/` do `.gitignore` — katalog zawiera generowane dane profilowania (perf.data, flamegraph.svg itp.) i nie powinien być śledzony w repo na dłuższą metę

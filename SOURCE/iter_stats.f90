@@ -74,7 +74,11 @@ module class_IterStats
         integer, optional :: unitOp
         integer :: unit
 
-        unit = merge(unitOp, 6, present(unitOp))
+        if (present(unitOp)) then
+            unit = unitOp
+        else
+            unit = 6
+        endif
 
         write (unit, *) "--------------------------------------------------------------------"
         write (unit, *) "[IterStats] Iteration statistics"

@@ -16,6 +16,7 @@ OBJ = $(O)mainp.o $(O)initia.o $(O)dmscf.o $(O)misc.o $(O)optocc.o \
        $(O)priunit.o $(O)rdwrext.o \
        $(O)globals.o $(O)types.o $(O)blocktypes.o $(O)memory.o \
        $(O)acpp_types.o $(O)sapt_files.o $(O)sapt_visual.o $(O)sapt_os.o \
+       $(O)gammint.o $(O)CholeskyOTF.o $(O)interface_pp.o $(O)gridintern.o \
        $(O)inputfill.o $(O)abmats.o $(O)abfofo.o $(O)ab0fofo.o \
        $(O)abchol.o $(O)abcipsi.o \
        $(O)sapt_main.o $(O)sapt_exch.o $(O)sapt_pol.o $(O)sapt_utils.o \
@@ -91,6 +92,10 @@ $(O)sorter_Cholesky.o  : $(O)priunit.o $(O)rdwrext.o $(O)trexio_module.o
 $(O)batch_dgemm.o      :
 $(O)tran.o             : $(O)blocktypes.o $(O)sorter.o $(O)batch_dgemm.o
 $(O)tran_Chol.o        : $(O)tran.o
+$(O)CholeskyOTF.o      : $(O)priunit.o $(O)tran.o
+$(O)gammint.o          : $(O)CholeskyOTF.o
+$(O)interface_pp.o     : $(O)acpp_types.o $(O)gammint.o
+$(O)gridintern.o       : $(O)gammint.o
 $(O)abfofo.o           : $(O)priunit.o $(O)tran.o $(O)blocktypes.o $(O)abchol.o $(O)timing.o $(O)fofo_data.o
 $(O)abmats.o           : $(O)priunit.o $(O)tran.o
 $(O)ab0fofo.o          : $(O)priunit.o $(O)tran.o $(O)blocktypes.o $(O)abfofo.o $(O)chol_data.o $(O)fofo_data.o
@@ -99,13 +104,16 @@ $(O)abcipsi.o          : $(O)abfofo.o
 
 $(O)clock.o            : $(O)arithmetic.o
 $(O)string.o           : $(O)arithmetic.o
-$(O)io.o               : $(O)arithmetic.o
+$(O)display.o          : $(O)arithmetic.o $(O)string.o
+$(O)io.o               : $(O)arithmetic.o $(O)display.o
 $(O)Cholesky_old.o     : $(O)arithmetic.o $(O)io.o $(O)clock.o $(O)string.o $(O)sort.o $(O)display.o $(O)sorter.o
-$(O)Cholesky.o         : $(O)arithmetic.o $(O)io.o $(O)clock.o $(O)string.o $(O)sort.o $(O)display.o $(O)sorter_Cholesky.o
+$(O)Cholesky.o        : $(O)arithmetic.o $(O)io.o $(O)clock.o $(O)string.o $(O)sort.o $(O)display.o $(O)sorter.o
+# Cholesky module also provided by gammcor-integrals library (--allow-multiple-definition resolves conflicts)
 
 $(O)sapt_utils.o       : $(O)types.o $(O)tran.o $(O)diis.o $(O)iter_stats.o $(O)abfofo.o
 $(O)sapt_interface.o   : $(O)types.o $(O)timing.o \
-                         $(O)sorter.o $(O)tran.o $(O)Cholesky.o $(O)Cholesky_old.o $(O)abmats.o $(O)rdwrext.o $(O)trexio_module.o
+                         $(O)sorter.o $(O)tran.o $(O)CholeskyOTF.o $(O)Cholesky_old.o $(O)abmats.o $(O)rdwrext.o $(O)trexio_module.o \
+                         $(O)gammint.o $(O)tran_Chol.o
 $(O)sapt_pol.o         : $(O)types.o $(O)tran.o $(O)sapt_utils.o $(O)rdwrext.o
 $(O)sapt_exch.o        : $(O)types.o $(O)tran.o $(O)timing.o $(O)sapt_utils.o $(O)exmisc.o $(O)exi.o $(O)exappr.o $(O)srefex.o
 $(O)sapt_Chol_pol.o    : $(O)tran.o $(O)sapt_utils.o \
@@ -118,7 +126,8 @@ $(O)sapt_main.o        : $(O)types.o \
                          $(O)sapt_pol.o $(O)sapt_exch.o $(O)sapt_Chol_pol.o $(O)sapt_Chol_exch.o \
                          $(O)sapt_utils.o $(O)exdpino.o \
                          $(O)sapt_response.o $(O)sapt_interface.o \
-                         $(O)sapt_os.o $(O)sapt_visual.o $(O)sapt_files.o
+                         $(O)sapt_os.o $(O)sapt_visual.o $(O)sapt_files.o \
+                         $(O)tran_Chol.o
 
 $(O)exmisc.o           : $(O)types.o
 $(O)exappr.o           : $(O)exmisc.o

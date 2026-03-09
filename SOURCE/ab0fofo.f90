@@ -1111,6 +1111,7 @@ subroutine Y01CASLR_FOFO(Occ,URe,XOne,ABPLUS,ABMIN, &
 !              0 - compute both 0th-order and 1st-order Y [EigY1] and omega [Eig1]
 !
 use timing
+use abchol, only: Chol_AC0ECorr
 
 implicit none
 integer,intent(in) :: NAct,INActive,NGrid,NDimX,NBasis,NDim,NInte1,NoSt
@@ -1738,60 +1739,69 @@ end associate
 
 call clock('START',Tcpu,Twall)
 
-pos = 0
-do i=1,NDimX
-   pos(IndN(1,i),IndN(2,i)) = IndX(i)
-enddo
-!
-! energy loop
-EAll = 0
-EIntra = 0
-open(newunit=iunit,file='FOFOERF',status='OLD', &
-     access='DIRECT',recl=8*NBasis*NOccup)
+if (ICholesky==1) then
 
-kl = 0
-do k=1,NOccup
-   do l=1,NBasis
-      kl = kl + 1
-      if(pos(l,k)/=0) then
-        irs = pos(l,k)
-        ir = l
-        is = k
-        read(iunit,rec=kl) work1(1:NBasis*NOccup)
-        do j=1,NOccup
-           do i=1,NBasis
-              ints(i,j) = work1((j-1)*NBasis+i)
-           enddo
-        enddo
-        ints(:,NOccup+1:NBasis) = 0
+   call Chol_AC0ECorr(ECorr,ABPLUS,IndN,IndX,Occ, &
+                      INActive,NOccup,NDimX,NBasis,'cholvecs')
 
-        do j=1,NBasis
-           do i=1,j
-              if(pos(j,i)/=0) then
-                ipq = pos(j,i)
-                ip = j
-                iq = i
-                Crs = C(ir)+C(is)
-                Cpq = C(ip)+C(iq)
+else
 
-                Aux = Crs*Cpq*ABPLUS(ipq,irs)
-                EAll = EAll + Aux*ints(j,i)
-
-                if(AuxCoeff(IGem(ip),IGem(iq),IGem(ir),IGem(is))==1) EIntra = EIntra + Aux*ints(j,i)
-
-              endif
-           enddo
-        enddo
-
-      endif
+   pos = 0
+   do i=1,NDimX
+      pos(IndN(1,i),IndN(2,i)) = IndX(i)
    enddo
-enddo
+   !
+   ! energy loop
+   EAll = 0
+   EIntra = 0
+   open(newunit=iunit,file='FOFOERF',status='OLD', &
+        access='DIRECT',recl=8*NBasis*NOccup)
 
-close(iunit)
+   kl = 0
+   do k=1,NOccup
+      do l=1,NBasis
+         kl = kl + 1
+         if(pos(l,k)/=0) then
+           irs = pos(l,k)
+           ir = l
+           is = k
+           read(iunit,rec=kl) work1(1:NBasis*NOccup)
+           do j=1,NOccup
+              do i=1,NBasis
+                 ints(i,j) = work1((j-1)*NBasis+i)
+              enddo
+           enddo
+           ints(:,NOccup+1:NBasis) = 0
 
-ECorr = EAll-EIntra
+           do j=1,NBasis
+              do i=1,j
+                 if(pos(j,i)/=0) then
+                   ipq = pos(j,i)
+                   ip = j
+                   iq = i
+                   Crs = C(ir)+C(is)
+                   Cpq = C(ip)+C(iq)
 
-print*, 'EAll,EIntra',EAll,EIntra
+                   Aux = Crs*Cpq*ABPLUS(ipq,irs)
+                   EAll = EAll + Aux*ints(j,i)
+
+                   if(AuxCoeff(IGem(ip),IGem(iq),IGem(ir),IGem(is))==1) EIntra = EIntra + Aux*ints(j,i)
+
+                 endif
+              enddo
+           enddo
+
+         endif
+      enddo
+   enddo
+
+   close(iunit)
+
+   ECorr = EAll-EIntra
+
+   print*, 'EAll,EIntra',EAll,EIntra
+
+endif ! ICholesky
 
 endif
 

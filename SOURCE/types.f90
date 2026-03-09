@@ -328,7 +328,7 @@ type SystemBlock
       double precision,allocatable :: dipm(:,:,:)
       double precision,allocatable :: Eig(:),EigX(:),EigY(:)
       double precision,allocatable :: AP(:,:),PP(:)
-      double precision  :: charg(maxcen),xyz(maxcen,3)
+      double precision,allocatable :: charg(:),xyz(:,:)
 
       integer :: Max_Cn = 10
 
@@ -353,16 +353,8 @@ type CholeskyBlock
 
 end type CholeskyBlock
 
-! Stub types for Cholesky OTF / gammcor-integrals (Faza 6)
-type TAOBasis
-      integer :: dummy = 0
-end type TAOBasis
-
-type TCholeskyVecsOTF
-      integer :: dummy = 0
-end type TCholeskyVecsOTF
-
-! TCholeskyVecs is defined in Cholesky.f90/Cholesky_old.f90
+! TAOBasis, TCholeskyVecsOTF — defined in gammcor-integrals library
+! TCholeskyVecs — defined in Cholesky.f90/Cholesky_old.f90
 
 type FileNames
 

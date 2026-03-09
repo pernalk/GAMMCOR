@@ -1277,4 +1277,537 @@ endif
 
 end subroutine read_1rdm_spin_dalton
 
+subroutine read_no_molpro(cno,istate,infile,text,nbasis)
+!
+! this subroutine reads C(SAO,NO) coefficients
+! these are dumped in Molpro through NATORBA and NATORBB
+! labels
+!
+implicit none
+
+integer,intent(in) :: nbasis,istate
+character(*),intent(in) :: infile,text
+double precision,intent(out) :: cno(nbasis,nbasis)
+
+character(8) :: label
+integer :: iunit,ios
+integer :: nsym,nbas(8),offs(8),ncmot
+integer :: iset
+integer :: i,j,idx,irep,ioff
+double precision ::tmp(nbasis**2)
+
+ open(newunit=iunit,file=infile,status='OLD', &
+      access='SEQUENTIAL',form='UNFORMATTED')
+
+ do
+   read(iunit,iostat=ios) label
+   if(ios<0) then
+      write(6,*) 'ERROR!!! LABEL '//text//' not found!'
+      stop
+   endif
+   if(label==text) then
+      read(iunit) nsym,nbas(1:nsym),offs(1:nsym),iset
+      ncmot = sum(nbas(1:nsym)**2)
+      print*, 'iset?',iset
+      print*, ncmot,istate
+      if(istate==1.or.istate.lt.0) then
+         read(iunit) tmp(1:ncmot)
+      elseif(istate==2.and.(iset.lt.0)) then
+         read(iunit)
+         read(iunit) tmp(1:ncmot)
+      elseif(istate==2.and.(iset.ge.0)) then
+         stop "read_no_molpro: NOs for state 2 are missing!"
+      endif
+      exit
+   endif
+ enddo
+
+ cno = 0
+ idx = 0
+ do irep=1,nsym
+    ioff = offs(irep)
+    do j=1,nbas(irep)
+       do i=1,nbas(irep)
+          idx = idx + 1
+          cno(ioff+i,ioff+j) = tmp(idx)
+       enddo
+    enddo
+ enddo
+
+ write(LOUT,*) 'readm_no_molpro: CNO'
+ do j=1,NBasis
+    print*, j
+    write(*,'(14f11.6)') (cno(i,j),i=1,nbasis)
+ end do
+
+ close(iunit)
+
+end subroutine read_no_molpro
+
+subroutine read_uocc_molpro(uocc,nbasis,text,infile)
+!
+! this subroutine reads alpha/beta occupation numbers
+!
+implicit none
+
+integer,intent(in) :: nbasis
+character(*),intent(in) :: infile,text
+double precision,intent(out) :: uocc(nbasis,2)
+
+character(8) :: label
+integer :: iunit,ios
+integer :: nsym,nbas(8),offs(8),nmo
+integer :: i,j,idx,irep,ioff
+double precision :: val
+
+ open(newunit=iunit,file=infile,status='OLD', &
+      access='SEQUENTIAL',form='UNFORMATTED')
+
+ do
+   read(iunit,iostat=ios) label
+   if(ios<0) then
+      write(6,*) 'ERROR!!! LABEL '//text//' not found!'
+      stop
+   endif
+   if(label==text) then
+      read(iunit) nsym,nbas(1:nsym),offs(1:nsym)
+      nmo = sum(nbas(1:nsym))
+      read(iunit)
+      read(iunit)
+      read(iunit) uocc(1:nmo,1)
+      read(iunit) uocc(1:nmo,2)
+      exit
+   endif
+ enddo
+
+end subroutine read_uocc_molpro
+
+subroutine read_uorbe_molpro(uorbe,nbasis,text,infile)
+!
+! this subroutine reads alpha/beta orbital energies
+!
+implicit none
+
+integer,intent(in) :: nbasis
+character(*),intent(in) :: infile,text
+double precision,intent(out) :: uorbe(nbasis,2)
+
+character(8) :: label
+integer :: iunit,ios
+integer :: nsym,nbas(8),offs(8),nmo
+integer :: i,j,idx,irep,ioff
+double precision :: val
+
+ open(newunit=iunit,file=infile,status='OLD', &
+      access='SEQUENTIAL',form='UNFORMATTED')
+
+ do
+   read(iunit,iostat=ios) label
+   if(ios<0) then
+      write(6,*) 'ERROR!!! LABEL '//text//' not found!'
+      stop
+   endif
+   if(label==text) then
+      read(iunit) nsym,nbas(1:nsym),offs(1:nsym)
+      nmo = sum(nbas(1:nsym))
+      read(iunit)
+      read(iunit)
+      read(iunit)
+      read(iunit)
+      read(iunit) uorbe(1:nmo,1)
+      read(iunit) uorbe(1:nmo,2)
+      exit
+   endif
+ enddo
+
+end subroutine read_uorbe_molpro
+
+subroutine read_vKS_dalton(VsrKS,vksfile,nbasis)
+!
+! read VKS from Dalton and save in triang form
+!
+implicit none
+character(*)                 :: vksfile
+integer,intent(in)           :: nbasis
+double precision,intent(out) :: VsrKS(nbasis,nbasis)
+
+integer :: iunit
+integer :: N2BASX
+integer :: i
+logical :: isfile
+
+inquire(file=vksfile,EXIST=isfile)
+if(isfile) then
+   open(newunit=iunit,file=vksfile,status='old', &
+        access='sequential',form='unformatted')
+   call readlabel(iunit,'VSRXC   ')
+   read(iunit) N2BASX
+   if (N2BASX /=nbasis**2) stop "Wrong dimension in VsrKS!"
+   read(iunit) VsrKS
+   close(iunit)
+else
+   write(lout,'(1x,a)') "No VsrKF in Dalton file!"
+   stop
+endif
+
+end subroutine read_vKS_dalton
+
+subroutine read_esrDFT_dalton(ESRDFT,vksfile)
+!
+! read ESRDFT from Dalton
+!
+implicit none
+character(*)                 :: vksfile
+double precision,intent(out) :: ESRDFT(3)
+
+integer :: iunit
+logical :: isfile
+
+inquire(file=vksfile,EXIST=isfile)
+if(isfile) then
+   open(newunit=iunit,file=vksfile,status='old', &
+        access='sequential',form='unformatted')
+   call readlabel(iunit,'VSRXC   ')
+   read(iunit)
+   read(iunit)
+   read(iunit) ESRDFT
+   close(iunit)
+else
+   write(lout,'(1x,a)') "No ESRDFT in Dalton file!"
+   stop
+endif
+
+end subroutine read_esrDFT_dalton
+
+subroutine read_Jsr_dalton(jsr,jsrfile,nbasis)
+!
+! read Jsr(NBasis,NBasis) from Dalton
+!
+implicit none
+character(*)       :: jsrfile
+integer,intent(in) :: nbasis
+double precision,intent(out) :: Jsr(nbasis,nbasis)
+
+integer :: iunit
+integer :: N2BASX
+integer :: i
+logical :: isfile
+
+inquire(file=jsrfile,EXIST=isfile)
+if(isfile) then
+   open(newunit=iunit,file=jsrfile,status='old', &
+        access='sequential',form='unformatted')
+   call readlabel(iunit,'JSR     ')
+   read(iunit) N2BASX
+   if (N2BASX /=nbasis**2) stop "Wrong dimension in read_Jsr_dalton!"
+   read(iunit) Jsr
+   close(iunit)
+else
+   write(lout,'(1x,a)') "No Jsr Dalton file!"
+   stop
+endif
+
+end subroutine read_Jsr_dalton
+
+subroutine read_caomo_molpro(caomo,sao,itsoao,jtsoao,infile,text,nbasis)
+!
+! this subroutine reads C(AO,MO) coefficients
+! transition from SAO-->AO is done in Molpro
+!
+implicit none
+
+integer,intent(in)           :: nbasis
+integer,intent(out)          :: itsoao(nbasis),jtsoao(nbasis)
+character(*),intent(in)      :: infile,text
+double precision,intent(out) :: caomo(nbasis,nbasis)
+double precision,intent(out) :: sao(nbasis,nbasis)
+
+integer      :: iunit,ios
+integer      :: i,j,ntg
+character(8) :: label
+
+ open(newunit=iunit,file=infile,status='OLD', &
+      access='SEQUENTIAL',form='UNFORMATTED')
+
+ do
+   read(iunit,iostat=ios) label
+   if(ios<0) then
+      write(6,*) 'ERROR!!! LABEL '//text//' not found!'
+      stop
+   endif
+   if(label==text) then
+      read(iunit) ntg
+      read(iunit) itsoao(1:ntg),jtsoao(1:ntg)
+      read(iunit) caomo(1:ntg,1:ntg)
+      read(iunit) sao(1:ntg,1:ntg)
+      exit
+   endif
+ enddo
+
+ if(NBasis /= ntg) then
+   write(lout,'(1x,a)') 'ERROR! NBasis .ne. ntg in read_caomo_molpro!'
+   write(lout,'(1x,a,i4,a,i4)') 'NBasis = ', NBasis, 'ntg = ', ntg
+   stop
+ endif
+
+ close(iunit)
+
+end subroutine read_caomo_molpro
+
+subroutine square_oneint(tr,sq,nbas,nsym,norb)
+!
+! tr(:) to sq(nbas,nbas) with sym
+!
+implicit none
+
+integer,intent(in) :: nbas,nsym,norb(8)
+double precision,intent(in) :: tr(:)
+double precision,intent(out) :: sq(nbas,nbas)
+
+integer :: irep,i,j
+integer :: offset,idx
+
+sq=0
+
+offset=0
+idx=0
+do irep=1,nsym
+   do j=offset+1,offset+norb(irep)
+      do i=offset+1,j
+
+         idx=idx+1
+         sq(i,j)=tr(idx)
+         sq(j,i)=tr(idx)
+
+      enddo
+   enddo
+   offset=offset+norb(irep)
+enddo
+
+end subroutine square_oneint
+
+subroutine read_umo_molpro(umo,nbasis,text,infile)
+!
+! this subroutine reads C(SAO,MO,:) alpha/beta coefficients
+!
+implicit none
+
+integer,intent(in) :: nbasis
+character(*),intent(in) :: infile,text
+double precision,intent(out) :: umo(nbasis,nbasis,2)
+
+character(8) :: label
+integer :: iunit,ios
+integer :: nsym,nbas(8),offs(8),ncmot
+integer :: i,j,idx,irep,ioff
+double precision ::tmp_a(nbasis**2),tmp_b(nbasis**2)
+
+ open(newunit=iunit,file=infile,status='OLD', &
+      access='SEQUENTIAL',form='UNFORMATTED')
+
+ do
+   read(iunit,iostat=ios) label
+   if(ios<0) then
+      write(6,*) 'ERROR!!! LABEL '//text//' not found!'
+      stop
+   endif
+   if(label==text) then
+      read(iunit) nsym,nbas(1:nsym),offs(1:nsym)
+      ncmot = sum(nbas(1:nsym)**2)
+      read(iunit) tmp_a(1:ncmot)
+      read(iunit) tmp_b(1:ncmot)
+      exit
+   endif
+ enddo
+
+ umo = 0d0
+ idx = 0
+ do irep=1,nsym
+    ioff = offs(irep)
+    do j=1,nbas(irep)
+       do i=1,nbas(irep)
+          idx = idx + 1
+          umo(ioff+i,ioff+j,1) = tmp_a(idx)
+          umo(ioff+i,ioff+j,2) = tmp_b(idx)
+       enddo
+    enddo
+ enddo
+
+ close(iunit)
+
+end subroutine read_umo_molpro
+
+subroutine create_ind_uks_molpro(spin,infile,NumOSymS,IndIntS,NSym,NBasis)
+!
+! Purpose: reads number of atomic orbitals in each irrep (NumOSym)
+!          creates index array IndInt(NBasis) for UHF/UKS
+!
+implicit none
+
+character(*),intent(in) :: infile
+character(len=1),intent(in) :: spin
+
+integer :: NSym,NBasis
+integer :: NumOSymS(15),IndIntS(NBasis)
+integer :: ifile,ios,i,j,k,isym
+integer :: NState,NStSym,IOld,INew
+integer :: iclos(8),iocc(8),nt(8),ivirt(8),istsy(16),nstats(16)
+integer :: ioccs(8)
+character(8) :: label
+
+integer :: NumOSym(15),IndInt(NBasis)
+
+ iclos = 0
+ ivirt = 0
+ iocc  = 0
+ nstats  = 0
+ istsy   = 0
+ NumOSym = 0
+ open(newunit=ifile,file=infile,access='sequential',&
+      form='unformatted',status='old')
+
+ do
+   read(ifile,iostat=ios) label
+    if(ios<0) then
+      write(6,*) 'ERROR!!! LABEL BASINFO not found!'
+      stop
+   endif
+   if(label=='BASINFO ') then
+      read(ifile) NSym
+      read(ifile) NStSym
+      read(ifile) nstats(1:NStSym)
+      read(ifile) istsy(1:NStSym)
+      read(ifile) iclos(1:NSym)
+      read(ifile)
+      read(ifile) NumOSym(1:NSym)
+      read(ifile) iocc(1:NSym)
+      exit
+   endif
+ enddo
+
+ close(ifile)
+
+ ioccs = 0
+ select case (spin)
+ case ('A', 'a')
+    ioccs(1:NSym) = iocc(1:NSym)
+ case ('B', 'b')
+    ioccs(1:NSym) = iclos(1:NSym)
+ end select
+
+ ivirt(1:NSym) = NumOSym(1:NSym)-ioccs(1:NSym)
+
+ select case (spin)
+ case ('A', 'a')
+    write(lout,'(1x,a)') 'Alpha spin'
+ case ('B', 'b')
+    write(lout,'(1x,a)') 'Beta  spin'
+ end select
+ write(lout,'("Occupied:",1x, *(i2,1x) )') ( ioccs(i), i = 1, NSym )
+ write(lout,'("Virtual :",1x, *(i2,1x) )') ( ivirt(i), i = 1, NSym )
+ write(lout,'("Total   :",1x, *(i2,1x) )') ( NumOSym(i), i = 1, NSym )
+
+ if(NSym>1) then
+   IOld = 0
+   INew = 0
+   do isym=1,NSym
+      do k=1,ioccs(isym)
+         IOld = IOld + 1
+         INew = INew + 1
+         IndInt(IOld) = INew
+      enddo
+      do i=1,ivirt(isym)
+         IOld = IOld + 1
+      enddo
+   enddo
+   IOld = 0
+   do isym=1,NSym
+      do k=1,ioccs(isym)
+         IOld = IOld + 1
+      enddo
+      do i=1,ivirt(isym)
+         IOld = IOld + 1
+         INew = INew + 1
+         IndInt(IOld) = INew
+      enddo
+   enddo
+ else
+   do i=1,NBasis
+      IndInt(i) = i
+   enddo
+ endif
+
+ NumOSymS(1:NSym) = NumOSym(1:NSym)
+ IndIntS = IndInt
+
+end subroutine create_ind_uks_molpro
+
+subroutine gen_swap_cols(mat,ndim1,ndim2,nsym,nA,nB)
+!
+! swap columns (with symmetry)
+! nsym = no of irreps
+! nA = number of basis functions in each irrep for mon A
+! nB = number of basis functions in each irrep for mon B
+!
+implicit none
+
+integer,intent(in) :: ndim1,ndim2,nsym,nA(8),nB(8)
+double precision   :: mat(ndim1,ndim2)
+double precision   :: work(ndim1,ndim2)
+
+integer :: irep,iA,iB,iAB,offset
+
+offset = 0
+
+do irep=1,nsym
+
+   iA = nA(irep)
+   iB = nB(irep)
+   iAB = iA + iB
+
+   work(:,1:iA) = mat(:,offset+iB+1:offset+iAB)
+   work(:,iA+1:iAB) = mat(:,offset+1:offset+iB)
+
+   mat(:,offset+1:offset+iAB) = work(:,1:iAB)
+
+   offset = offset + iAB
+
+enddo
+
+end subroutine gen_swap_cols
+
+subroutine gen_swap_rows(mat,ndim1,ndim2,nsym,nA,nB)
+!
+! swap rows (with symmetry)
+! nsym = no of irreps
+! nA = number of basis functions in each irrep for mon A
+! nB = number of basis functions in each irrep for mon B
+!
+implicit none
+
+integer,intent(in) :: ndim1,ndim2,nsym,nA(8),nB(8)
+double precision   :: mat(ndim1,ndim2)
+double precision   :: work(ndim1,ndim2)
+
+integer :: irep,iA,iB,iAB,offset
+
+offset = 0
+
+do irep=1,nsym
+
+   iA = nA(irep)
+   iB = nB(irep)
+   iAB = iA + iB
+
+   work(1:iA,:) = mat(offset+iB+1:offset+iAB,:)
+   work(iA+1:iAB,:) = mat(offset+1:offset+iB,:)
+
+   mat(offset+1:offset+iAB,:) = work(1:iAB,:)
+
+   offset = offset + iAB
+
+enddo
+
+end subroutine gen_swap_rows
+
 end module read_external

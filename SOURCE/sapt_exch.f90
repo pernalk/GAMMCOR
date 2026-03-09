@@ -3065,13 +3065,23 @@ double precision,parameter :: SmallE = 1.D-3
        close(iunit)
 
     else
-
        ! make s_ij uncoupled
-       !call make_sij_Y_unc(sij,tmp1,A%Occ,B%Occ,A%EigY,A%EigX,B%EigY,B%EigX,&
-       !                A%num0,B%num0,dimOA,dimOB,nOVB,A%IndN,B%IndN,A%NDimX,B%NDimX,NBas)
-       write(LOUT,'(/1x,a)') 'ERROR! make_sij_Yunc not ready yet!'
-       write(LOUT,'(1x,a)')  'E2exch-disp(unc) = 0!'
-       !stop
+       if(Flags%ICholesky==0) then
+          call make_sij_Y_unc(sij,A%Occ,B%Occ,SBlockA,SblockAIV,SBlockB,SBlockBIV,&
+                          nblkA,nblkB,A%num0,A%num1,B%num0,B%num1, &
+                          A%IndN,B%IndN,A%NDimX,B%NDimX,NBas)
+       elseif(Flags%ICholesky==1) then
+          block
+          type(Y01BlockData),allocatable :: Y01BlockA(:),Y01BlockB(:)
+          allocate(Y01BlockA(A%NDimX),Y01BlockB(B%NDimX))
+          call convert_XY0_to_Y01(A,Y01BlockA,OmA0,NBas,'XY0_A')
+          call convert_XY0_to_Y01(B,Y01BlockB,OmB0,NBas,'XY0_B')
+          call make_sij_Y_Chol_unc(sij,Y01BlockA,Y01BlockB, &
+                          A%DChol,B%DChol,A%NDimX,B%NDimX,A%NChol,NBas)
+          end block
+       else
+         stop "e2exd: wrong ICholesky Flag!"
+       endif
 
     endif
 
@@ -4382,5 +4392,125 @@ deallocate(Sb,Sa)
 deallocate(work)
 
 end subroutine e1exch_os
+
+
+subroutine make_sij_Y_unc(sij,AOcc,BOcc,SBlockA,SblockAIV,SBlockB,SBlockBIV,nblkA,nblkB, &
+                          Anum0,Anum1,Bnum0,Bnum1,AIndN,BIndN,ANDimX,BNDimX,NBasis)
+
+implicit none
+
+integer,intent(in) :: ANDimX,BNDimX,NBasis
+integer,intent(in) :: nblkA,nblkB
+integer,intent(in) :: Anum0,Anum1,Bnum0,Bnum1
+integer,intent(in) :: AIndN(2,ANDimX),BIndN(2,BNDimX)
+double precision,intent(in) :: AOcc(NBasis),BOcc(NBasis)
+
+type(EBlockData)               :: SBlockA(nblkA),SBlockAIV,&
+                                  SBlockB(nblkB),SBlockBIV
+
+double precision,intent(out) :: sij(ANDimX,BNDimX)
+
+integer :: iunit
+integer :: ip,iq,ipq,ir,is,irs
+integer :: Bnum2,dimOA,dimVB,dimOB,nOVB
+double precision :: fact
+double precision :: tmp1(ANDimX,BNDimX)
+double precision,allocatable :: work(:)
+
+Bnum2 = NBasis - Bnum0 - Bnum1
+dimOA = Anum0 + Anum1
+dimOB = Bnum0 + Bnum1
+dimVB = Bnum1 + Bnum2
+nOVB  = dimOB * dimVB
+
+allocate(work(nOVB))
+
+open(newunit=iunit,file='TWOMOAB',status='OLD',&
+     access='DIRECT',form='UNFORMATTED',recl=8*nOVB)
+
+tmp1=0d0
+do ipq=1,ANDimX
+   ip = AIndN(1,ipq)
+   iq = AIndN(2,ipq)
+   read(iunit,rec=iq+(ip-Anum0-1)*dimOA) work(1:nOVB)
+   do irs=1,BNDimX
+      ir = BIndN(1,irs)
+      is = BIndN(2,irs)
+
+      fact = (AOcc(ip)-AOcc(iq)) * &
+             (BOcc(ir)-BOcc(is))
+
+      tmp1(ipq,irs) = tmp1(ipq,irs) + fact*work(is+(ir-Bnum0-1)*dimOB)
+
+   enddo
+enddo
+close(iunit)
+
+sij = 0d0
+!X_A.I.Y_B
+call abpm_tran_gen(tmp1,sij,SBlockA,SBlockAIV,SBlockB,SBlockBIV, &
+                   nblkA,nblkB,ANDimX,BNDimX,'XY')
+!Y_A.I.X_B
+call abpm_tran_gen(tmp1,sij,SBlockA,SBlockAIV,SBlockB,SBlockBIV, &
+                   nblkA,nblkB,ANDimX,BNDimX,'YX')
+sij = -sij
+
+!X_A.I.X_B
+call abpm_tran_gen(tmp1,sij,SBlockA,SBlockAIV,SBlockB,SBlockBIV, &
+                   nblkA,nblkB,ANDimX,BNDimX,'XX')
+!Y_A.I.Y_B
+call abpm_tran_gen(tmp1,sij,SBlockA,SBlockAIV,SBlockB,SBlockBIV, &
+                   nblkA,nblkB,ANDimX,BNDimX,'YY')
+
+deallocate(work)
+
+end subroutine make_sij_Y_unc
+
+
+subroutine make_sij_Y_Chol_unc(sij,Y01BlockA,Y01BlockB, &
+                               OVA,OVB,ANDimX,BNDimX,NCholesky,NBasis)
+!
+! Careful! OV contains integrals multiplied by (c_j+c_i), j>i
+!
+implicit none
+
+integer,intent(in) :: ANDimX,BNDimX,NCholesky,NBasis
+double precision,intent(in) :: OVA(NCholesky,ANDimX),OVB(NCholesky,BNDimX)
+
+type(Y01BlockData) :: Y01BlockA(ANDimX),Y01BlockB(BNDimX)
+
+double precision,intent(out) :: sij(ANDimX,BNDimX)
+
+integer :: i,j
+integer :: ip,iq,ir,is,ipq,irs
+double precision :: fact, work(NBasis)
+double precision,allocatable :: tmpA(:,:),tmpB(:,:)
+
+allocate(tmpA(NCholesky,ANDimX),tmpB(NCholesky,BNDimX))
+
+tmpA=0d0
+do ipq=1,ANDimX
+   associate(Y => Y01BlockA(ipq))
+      do i=1,NCholesky
+         tmpA(i,Y%l1:Y%l2) = tmpA(i,Y%l1:Y%l2) + OVA(i,ipq) * Y%vec0(1:Y%n)
+      enddo
+   end associate
+enddo
+
+tmpB=0d0
+do irs=1,BNDimX
+   associate(Y => Y01BlockB(irs))
+      do j=1,NCholesky
+         tmpB(j,Y%l1:Y%l2) = tmpB(j,Y%l1:Y%l2) + OVB(j,irs) * Y%vec0(1:Y%n)
+      enddo
+   end associate
+enddo
+
+call dgemm('T','N',ANDimX,BNDimX,NCholesky,1d0,tmpA,NCholesky,tmpB,NCholesky,0d0,sij,ANDimX)
+
+deallocate(tmpB,tmpA)
+
+end subroutine make_sij_Y_Chol_unc
+
 
 end module sapt_exch

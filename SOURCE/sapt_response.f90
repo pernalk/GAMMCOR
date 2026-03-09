@@ -47,6 +47,7 @@ character(8) :: label
 character(:),allocatable :: onefile,twofile,propfile,rdmfile
 character(:),allocatable :: twojfile,twokfile
 character(:),allocatable :: propfile0,propfile1
+character(:),allocatable :: propbatch
 character(:),allocatable :: y01file,xy0file
 character(:),allocatable :: abpm0file
 character(:),allocatable :: abfile,testfile
@@ -78,6 +79,7 @@ if(Mon%Monomer==1) then
    propfile   = 'PROP_A'
    propfile0  = 'PROP_A0'
    propfile1  = 'PROP_A1'
+   propbatch  = 'PROB_A'
    y01file    = 'Y01_A'
    xy0file    = 'XY0_A'
    abpm0file  = 'A0BLK_A'
@@ -92,6 +94,7 @@ elseif(Mon%Monomer==2) then
    propfile   = 'PROP_B'
    propfile0  = 'PROP_B0'
    propfile1  = 'PROP_B1'
+   propbatch  = 'PROB_B'
    y01file    = 'Y01_B'
    xy0file    = 'XY0_B'
    abpm0file  = 'A0BLK_B'
@@ -555,6 +558,12 @@ endif
 ! dump response
  call writeresp(EigVecR,Eig,propfile)
 
+block
+! dump response in batches (for e2disp_Chol_cpld_batch)
+ integer,parameter :: MaxBatchSize = 120
+ call WriteRespBatch(Mon%NDimX,MaxBatchSize,Eig,EigVecR,propbatch)
+end block
+
  deallocate(work1,work2,XOne,URe)
  !if(Mon%TwoMoInt==1) deallocate(TwoMO)
  deallocate(TwoMO)
@@ -721,7 +730,7 @@ double precision, allocatable :: ABPlus(:,:), ABMin(:,:)
 double precision, allocatable :: ABPlus0(:,:), ABMin0(:,:)
 double precision, allocatable :: Eig(:), EigVecR(:)
 character(:),     allocatable :: onefile,twojfile,twokfile, &
-                                 propfile,abfile,abpm0file, &
+                                 propfile,propbatch,abfile,abpm0file, &
                                  testfile
 
 print*, 'calc_resp_cispi --> calc_resp_casgvb?'
@@ -732,6 +741,7 @@ if(Mon%Monomer==1) then
    twojfile   = 'FFOOAA'
    twokfile   = 'FOFOAA'
    propfile   = 'PROP_A'
+   propbatch  = 'PROB_A'
    abfile     = 'ABMAT_A'
    abpm0file  = 'A0BLK_A'
    testfile   = 'A0MAT_A'
@@ -743,6 +753,7 @@ elseif(Mon%Monomer==2) then
    twojfile   = 'FFOOBB'
    twokfile   = 'FOFOBB'
    propfile   = 'PROP_B'
+   propbatch  = 'PROB_B'
    abfile     = 'ABMAT_B'
    abpm0file  = 'A0BLK_B'
    testfile   = 'A0MAT_B'
@@ -869,6 +880,12 @@ endif
 
 ! dump response
 call writeresp(EigVecR,Eig,propfile)
+
+block
+! dump response in batches (for e2disp_Chol_cpld_batch)
+ integer,parameter :: MaxBatchSize = 120
+ call WriteRespBatch(Mon%NDimX,MaxBatchSize,Eig,EigVecR,propbatch)
+end block
 
 deallocate(XOne)
 deallocate(Eig,EigVecR,ABPlus,ABMin)

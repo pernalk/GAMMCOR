@@ -1757,7 +1757,7 @@ deallocate(Work,C2Tilde,C1Tilde)
 
 end subroutine C_AlphaExpand
 
-subroutine C_AlphaExpand_unc(C0Tilde,OmI,A1,A2,ABP0Tilde,ABP1Tilde,&
+subroutine C_AlphaExpand_unc(C0Tilde,OmI,ABP0Tilde,&
                          A0Blk,A0BlkIV,nblk,NCholesky,NDimX)
 !
 !  For a given frequency OmI, CTilde(Alpha=1) is computed by expanding
@@ -1768,8 +1768,7 @@ implicit none
 integer,intent(in)           :: nblk,NCholesky,NDimX
 double precision,intent(in)  :: OmI
 
-double precision,intent(in)    :: A1(NDimX,NDimX),A2(NDimX,NDimX)
-double precision,intent(in)    :: ABP0Tilde(NDimX,NCholesky),ABP1TIlde(NDimX,NCholesky)
+double precision,intent(in)    :: ABP0Tilde(NDimX,NCholesky)
 double precision,intent(inout) :: C0Tilde(NDimX,NCholesky)
 
 integer :: N

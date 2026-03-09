@@ -11,9 +11,12 @@ XCFUN_LIB = -L./xcfun/lib/ -lxcfun
 TREXIO         = $(shell pkg-config --cflags trexio)
 TREXIO_LIB = $(shell pkg-config --libs trexio) -Wl,-rpath=$(shell pkg-config --variable=libdir trexio)
 
-FFLAGS = $(XCFUN) $(TREXIO) -g -O3 -fopenmp -funroll-loops -ffree-line-length-none -std=legacy -DUSE_MKL_BATCH
+CHOLESKY       = -I ./gammcor-integrals/include
+CHOLESKY_LIB   = ./gammcor-integrals/lib/cholesky.a
+
+FFLAGS = $(XCFUN) $(TREXIO) $(CHOLESKY) -g -O3 -fopenmp -funroll-loops -ffree-line-length-none -std=legacy -DUSE_MKL_BATCH
 #LIBS = $(BLAS) $(XCFUN_LIB) $(TREXIO_LIB)
-LIBS = $(MKL_LIB) $(XCFUN_LIB) $(TREXIO_LIB)
+LIBS = $(MKL_LIB) $(XCFUN_LIB) $(TREXIO_LIB) -Wl,--allow-multiple-definition $(CHOLESKY_LIB)
 
 include Makefile.common
 

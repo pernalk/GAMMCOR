@@ -9,7 +9,9 @@ C
       use types
       use sorter
       use tran
-      use Cholesky
+      use Cholesky, only : TCholeskyVecs, chol_CoulombMatrix,
+     $   chol_MOTransf_TwoStep
+      use math_constants, only : ZERO, ONE, TWO
       use read_external
       use chol_data
 C
@@ -266,8 +268,11 @@ C
       use types
       use sorter
 c     use Cholesky_old  ! create AOTWOSORT file
-      use Cholesky
+      use Cholesky, only : TCholeskyVecs, chol_CoulombMatrix,
+     $   chol_MOTransf_TwoStep
+      use math_constants, only : ZERO, ONE, TWO
       use tran
+      use tran_Chol, only: FockGen_CholR
       use abmat
       use read_external
       use chol_data
@@ -1114,8 +1119,11 @@ C
       use types
       use sorter
       use tran
+      use tran_Chol, only: FockGen_CholR
 c     use Cholesky_old  ! requires AOTWOSORT
-      use Cholesky
+      use Cholesky, only : TCholeskyVecs, chol_CoulombMatrix,
+     $   chol_MOTransf_TwoStep
+      use math_constants, only : ZERO, ONE, TWO
       use abmat
       use read_external
       use timing
