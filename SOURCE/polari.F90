@@ -44,6 +44,7 @@ double precision :: DipX(NBasis,NBasis),DipY(NBasis,NBasis),DipZ(NBasis,NBasis)
 double precision :: DipCX(NDimX),DipCY(NDimX),DipCZ(NDimX)
 double precision :: ABPLUS(NDimX*NDimX),ABMIN(NDimX*NDimX),AIN(NDimX*NDimX),CMAT(NDimX*NDimX)
 double precision :: AXX,AYX,AXY,AZX,AXZ,AYY,AZY,AYZ,AZZ,Om,Alpha
+double precision :: ACAlpha
 double precision :: AISO
 !
 double precision :: VsrKS(NBasis,NBasis),Jsr(NBasis,NBasis)
@@ -159,7 +160,7 @@ if(IFunSRKer.Eq.1) then
      IStart=IStart+NumOSym(I)
   enddo
 
-!#if POLARI_DEBUG > 5
+#if POLARI_DEBUG > 5
   print*, 'Polariz: NSym =',NSym
   print*, 'UNOAO orbitals ',norm2(UNOAO)
   do j=1,NBasis
@@ -169,8 +170,7 @@ if(IFunSRKer.Eq.1) then
   do i=1,NSym
      print*, i,NumOSym(i)
   enddo
-
-!#endif
+#endif
 
 ! checking
   do I=1,NSym
@@ -214,11 +214,11 @@ if(IFunSRKer.Eq.1) then
 endif ! IFunSRKer
 endif
 
-Alpha=1.0
+ACAlpha=1.0
 Call AB_CAS_FOFO(ABPLUS,ABMIN,ECASSCF,URe,Occ,XOne, &
               IndN,IndX,IGem,NAct,INActive,NElecBEmb,&
               NDimX,NBasis,NDimX,&
-              NInte1,twojfile,twokfile,ICholesky,0,Alpha,.false.)
+              NInte1,twojfile,twokfile,ICholesky,0,ACAlpha,.false.)
 
 !print*, 'ABMIN-before  =', norm2(ABMIN)
 

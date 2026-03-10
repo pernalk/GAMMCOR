@@ -174,10 +174,15 @@ print*, 'Experimental SAPT(UKS) implementation...'
 call sapt_basinfo(SAPT,NBasis)
 call saptuks_interface(Flags,SAPT,NBasis,AOBasis,CholeskyVecsOTF)
 
+call saptuks_mon_ints(SAPT%monA,Flags,NBasis,AOBasis,CholeskyVecsOTF)
+call saptuks_response(SAPT%monA,Flags,NBasis)
+
+call saptuks_mon_ints(SAPT%monB,Flags,NBasis,AOBasis,CholeskyVecsOTF)
+call saptuks_response(SAPT%monB,Flags,NBasis)
+
 call saptuks_ab_ints(Flags,SAPT%monA,SAPT%monB,NBasis,AOBasis,CholeskyVecsOTF)
 
-print*, 'Skipping monomer integrals...'
-print*, 'Skipping response ...'
+print*, 'Skipping cpl response ...' ! not ready yet
 
 call e1elst_o(SAPT%monA,SAPT%monB,SAPT)
 call e1exchs2_sq_os(SAPT%monA,SAPT%monB,SAPT)
@@ -813,6 +818,35 @@ double precision :: NO(NBasis*NBasis)
  endif
 
 end subroutine sapt_response
+
+subroutine saptuks_response(Mon,Flags,NBasis)
+!
+! either uncoupled (SAPT0) 
+!     or coupled (SAPT2) response
+! UHF / UKS
+!
+implicit none
+
+type(FlagsData)    :: Flags
+type(SystemBlock)  :: Mon
+integer,intent(in) :: NBasis
+
+integer :: NAO
+
+! NAO in Molpro ?
+NAO = NBasis
+
+if (Flags%SaptLevel==0) then
+   ! unc
+   call calc_resp_unc_uks(Mon,Flags,NAO,NBasis)
+elseif (Flags%SaptLevel==2) then
+   ! cpld
+   !call calc_resp_uks(Mon,Flags,NBasis)
+   stop "Coupled not ready!"
+else
+   stop "Wrong SaptLevel in saptuks_response!"
+endif
+end subroutine saptuks_response
 
 subroutine sapt_response_spin(Flags,Mon,NBasis)
 !
@@ -1911,6 +1945,136 @@ NInte1 = NBasis*(NBasis+1)/2
 
 end subroutine sapt_mon_ints
 
+subroutine saptuks_mon_ints(Mon,Flags,NBasis,AOBasis,CholeskyVecsOTF)
+!
+! generate FFOO : alpha-alpha (aa)
+!                 beta-beta (bb)
+!          FOFO : aa,bb,ab
+!
+implicit none
+
+type(SystemBlock) :: Mon
+type(FlagsData)   :: Flags
+type(TAOBasis)    :: AOBasis
+type(TCholeskyVecsOTF) :: CholeskyVecsOTF
+
+integer,intent(in) :: NBasis
+
+integer :: iunit
+integer :: i,j,ij,ione
+
+double precision             :: Ca(NBasis,NBasis),Cb(NBasis,NBasis)
+character(:),allocatable     :: twojfileaa,twojfilebb
+character(:),allocatable     :: twokfileaa,twokfilebb,twokfileab
+!test
+double precision :: Tcpu,Twall
+
+call gclock('START',Tcpu,Twall)
+
+! set file names
+if(Mon%Monomer==1) then
+   twojfileaa = 'FFOOAAaa'
+   twojfilebb = 'FFOOAAbb'
+   twokfileaa = 'FOFOAAaa'
+   twokfilebb = 'FOFOAAbb'
+   twokfileab = 'FOFOAAab'
+elseif(Mon%Monomer==2) then
+   twojfileaa = 'FFOOBBaa'
+   twojfilebb = 'FFOOBBbb'
+   twokfileaa = 'FOFOBBaa'
+   twokfilebb = 'FOFOBBbb'
+   twokfileab = 'FOFOBBab'
+endif
+
+print*, 'Occ  Monomer', Mon%NOa,Mon%Monomer
+print*, 'Virt Monomer', Mon%NVa,Mon%Monomer
+print*, 'OV   Monomer', Mon%NOVa,Mon%Monomer
+
+! load C(AO,MO) alpha/beta
+Ca=0d0
+Cb=0d0
+do j=1,NBasis
+   do i=1,NBasis
+      Ca(i,j)=Mon%UMO(i,j,1)
+      Cb(i,j)=Mon%UMO(i,j,2)
+   enddo
+enddo
+
+if(Flags%SaptLevel==1) return
+
+! transform 2-el integrals
+select case(Mon%TwoMoInt)
+case(TWOMO_INCORE,TWOMO_FFFF)
+
+   stop "INCORE/FFFF  not ready in saptuks_mon!"
+
+case(TWOMO_FOFO)
+
+   if(Flags%ICholesky==1) then
+      stop "Choleksy not ready in saptuks_mon!"
+
+      !if (Flags%ICholeskyBIN==1) then
+      !elseif (Flags%ICholeskyOTF==1) then
+      !else
+      !endif
+
+   elseif(Flags%ICholesky==0) then
+
+   ! transform J and K
+      ! alpha-alpha
+      call tran4_gen(NBasis,&
+           Mon%NOa,Ca(1:NBasis,1:Mon%NOa),&
+           Mon%NOa,Ca(1:NBasis,1:Mon%NOa),&
+           NBasis,Ca,&
+           NBasis,Ca,&
+           twojfileaa,'AOTWOSORT')
+      write(lout,'(1x,a)') "tran4: J alpha-alpha..."
+      ! beta-beta
+      call tran4_gen(NBasis,&
+           Mon%NOb,Cb(1:NBasis,1:Mon%NOb),&
+           Mon%NOb,Cb(1:NBasis,1:Mon%NOb),&
+           NBasis,Cb,&
+           NBasis,Cb,&
+           twojfilebb,'AOTWOSORT')
+      write(lout,'(1x,a)') "tran4: J beta-beta..."
+      call gclock('FFOO all',Tcpu,Twall)
+      ! alpha-alpha
+      call tran4_gen(NBasis,&
+           NBasis,Ca,&
+           Mon%NOa,Ca(1:NBasis,1:Mon%NOa),&
+           NBasis,Ca,&
+           Mon%NOa,Ca(1:NBasis,1:Mon%NOa),&
+           twokfileaa,'AOTWOSORT')
+      write(lout,'(1x,a)') "tran4: K alpha-alpha.."
+     ! beta-beta
+     call tran4_gen(NBasis,&
+           NBasis,Cb,&
+           Mon%NOb,Cb(1:NBasis,1:Mon%NOb),&
+           NBasis,Cb,&
+           Mon%NOb,Cb(1:NBasis,1:Mon%NOb),&
+           twokfilebb,'AOTWOSORT')
+      write(lout,'(1x,a)') "tran4: K beta-beta..."
+     ! alpha-beta
+     call tran4_gen(NBasis,&
+           NBasis,Cb,&
+           Mon%NOb,Cb(1:NBasis,1:Mon%NOb),&
+           NBasis,Ca,&
+           Mon%NOa,Ca(1:NBasis,1:Mon%NOa),&
+           twokfileab,'AOTWOSORT')
+           !NBasis,Ca,&
+           !Mon%NOa,Ca(1:NBasis,1:Mon%NOa),&
+           !NBasis,Cb,&
+           !Mon%NOb,Cb(1:NBasis,1:Mon%NOb),&
+           !twokfileab,'AOTWOSORT')
+      write(lout,'(1x,a)') "tran4: K alpha-beta..."
+     call gclock('FOFO all',Tcpu,Twall)
+
+   endif ! ICholesky
+
+end select
+
+end subroutine saptuks_mon_ints
+
 subroutine sapt_mon_lr_ints(Mon,Flags,NBasis,AOBasis,CholErfVecsOTF)
 !
 ! for CBS[H] : 
@@ -2194,7 +2358,8 @@ write(LOUT,'(1x,a,t19,a,f16.8)') 'E1exch(S2)','=', SAPT%exchs2*1.d03
 write(LOUT,'(1x,a,t19,a,f16.8)') 'E1exch    ','=', SAPT%e1exch*1.d03
 
 if(SAPT%SaptLevel==0) then
-   write(LOUT,'(1x,a,t19,a,f16.8)') 'E2ind(unc)',   '=', SAPT%e2ind_unc*1.d03
+  ! write(LOUT,'(1x,a,t19,a,f16.8)') 'E2ind(unc)',   '=', SAPT%e2ind_unc*1.d03
+   write(LOUT,'(1x,a,t19,a,f16.8)') 'E2ind',        '=', SAPT%e2ind*1.d03
    write(LOUT,'(1x,a,t19,a,f16.8)') 'E2disp(unc)',  '=', SAPT%e2disp_unc*1.d03
 elseif(SAPT%SaptLevel==2) then
 !   write(LOUT,'(1x,a,t19,a,f16.8)') 'E2ind',      '=', SAPT%e2ind*1.d03
@@ -2555,6 +2720,19 @@ call delfile('OVOVABbb')
 call delfile('OVOVABaa')
 call delfile('OVOVABab')
 call delfile('OVOVABba')
+
+call delfile('FFOOAAaa')
+call delfile('FFOOAAbb')
+call delfile('FFOOBBaa')
+call delfile('FFOOBBbb')
+
+call delfile('FOFOAAaa')
+call delfile('FOFOAAbb')
+call delfile('FOFOBBaa')
+call delfile('FOFOBBbb')
+
+call delfile('FOFOAAab')
+call delfile('FOFOBBab')
 
 end subroutine free_saptuks
 

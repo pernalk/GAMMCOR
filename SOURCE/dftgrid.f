@@ -562,6 +562,8 @@ C
 C
 C     PRODUCE A KERNEL ON A GRID FOR DENSITIES RhoVec
 C
+
+      Write(6,'(1x,a,f8.3)') 'RS Parameter = ', Alpha
       Call RhoKernel(RhoVec,SRKer,IFunSR,Alpha,NGrid)
 C
       Return

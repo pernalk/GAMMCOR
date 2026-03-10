@@ -551,9 +551,10 @@ double precision,allocatable :: ABMin(:,:),Work(:)
 
 end subroutine solve_cphf
 
-subroutine solve_ucphf(M,WPot,e2ind_unc,e2ind,Flags,NBas)
+subroutine solve_cpuhf(M,WPot,e2ind_unc,e2ind,Flags,NBas)
 !
-!
+! compute open-shell E2ind via solving coupled pertubed UHF equations
+! see, e.g. SI for https://doi.org/10.1021/acs.jpclett.3c01568
 !
 implicit none
 
@@ -567,14 +568,26 @@ double precision,intent(out) :: e2ind_unc,e2ind
 type(DIISData)                 :: DIISBlock
 
 integer :: ip,iq,ipq
-integer :: NDimX
+integer :: NDimX,NDimXSav
+integer :: iunit
+
+integer :: iter
+logical      :: conv=.FALSE.
+double precision :: error
+integer,parameter          :: MaxIt = 20
+double precision,parameter :: ThrDIIS = 1.d-8
 
 double precision,allocatable :: WxYY(:,:)
 double precision,allocatable :: wVecxYY(:)
 double precision,allocatable :: amps(:),vecR(:),delta(:)
-double precision,allocatable :: work(:,:)
+double precision,allocatable :: OmM0(:)
+double precision,allocatable :: ABMin(:,:),work(:,:)
+character(8) :: abfile
 
 NDimX = M%NOVa + M%NOVb
+
+if(M%Monomer==1) abfile='ABMAT_A'
+if(M%Monomer==2) abfile='ABMAT_B'
 
 call init_DIIS(DIISBlock,NDimX,NDimX,Flags%DIISN)
 
@@ -622,49 +635,72 @@ e2ind_unc = 0d0
 do ipq=1,NDimX
    e2ind_unc = e2ind_unc - amps(ipq)*wVecxYY(ipq)
 enddo
+
+print*, 'E2ind unc =', e2ind_unc
+
 !if(Flags%SaptLevel/=0) print*, 'E2ind(unc)',e2indxy
 
-if(Flags%SaptLevel==0) return
+allocate(OmM0(NDimX))
+OmM0 = delta
+delta = 0d0
+
+allocate(ABMin(NDimX,NDimX))
+
+open(newunit=iunit,file=abfile,status='OLD',&
+     access='SEQUENTIAL',form='UNFORMATTED')
+
+read(iunit) NDimXSav
+read(iunit) ABMin
+
+close(iunit)
+
+print*, 'abmin =', norm2(ABMin)
+if(NDimX.ne.NDimXSav) stop "NDimX mismatch in E2ind!"
+
+write(LOUT,'(1x,a,5x,a)') 'ITER', 'ERROR'
+iter = 0
+do
+
+vecR = wVecxYY
+call dgemv('N',NDimX,NDimX,1.d0,ABMin,NDimX,amps,1,1d0,vecR,1)
+
+error = norm2(vecR)
+conv=error.le.ThrDIIS
+
+write(LOUT,'(1x,i3,f11.6)') iter,error
+
+if(conv) then
+   exit
+elseif(.not.conv.and.iter.le.MaxIt) then
+   iter = iter + 1
+elseif(.not.conv.and.iter.gt.MaxIt) then
+  write(*,*) 'Error!!! E2ind DIIS not converged!'
+  exit
+endif
+
+! HF test
+! delta = delta - vecR/OmM0
+call amplitudes_T1_cphf(OmM0,vecR,delta,NDimX)
+amps = amps + delta
+if(iter>Flags%DIISOn) call use_DIIS(DIISBlock,amps,vecR)
+
+enddo
 
 e2ind = 0d0
-print*, 'E2ind coupled not ready in solve_ucphf!'
-
-!write(LOUT,'(1x,a,5x,a)') 'ITER', 'ERROR'
-!iter = 0
-!do
-!
-!vecR = wVecxYY
-!call dgemv('N',M%NDimX,M%NDimX,1.d0,ABMin,M%NDimX,amps,1,1d0,vecR,1)
-!
-!error = norm2(vecR)
-!conv=error.le.ThrDIIS
-!
-!write(LOUT,'(1x,i3,f11.6)') iter,error
-!
-!if(conv) then
-!   exit
-!elseif(.not.conv.and.iter.le.MaxIt) then
-!   iter = iter + 1
-!elseif(.not.conv.and.iter.gt.MaxIt) then
-!  write(*,*) 'Error!!! E2ind DIIS not converged!'
-!  exit
-!endif
-!
-!! HF test
-!call amplitudes_T1_cphf(OmM0,vecR,delta,NDimX)
-!amps = amps + delta
-!if(iter>Flags%DIISOn) call use_DIIS(DIISBlock,amps,vecR)
-!
-!enddo
+do ipq=1,NDimX
+   e2ind = e2ind + amps(ipq)*wVecxYY(ipq)
+enddo
+!print*, 'E2ind cpld =', e2ind
 
 call free_DIIS(DIISBlock)
 
 deallocate(delta,amps,vecR)
+deallocate(OmM0)
 
 deallocate(wVecxYY)
 deallocate(work)
 
-end subroutine solve_ucphf
+end subroutine solve_cpuhf
 
 subroutine amplitudes_T1_cphf(deps,ints,res,NDimX)
 implicit none

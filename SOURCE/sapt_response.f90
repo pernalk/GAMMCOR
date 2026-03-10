@@ -2218,6 +2218,71 @@ if(doGGA) deallocate(PhiGGA)
 
 end subroutine calc_resp_dft_dalton
 
+
+subroutine calc_resp_unc_uks(Mon,Flags,NAO,NBasis)
+!
+! calculate A+B and A-B
+! for uncoupled we only need A-B (for E2ind)
+! but A+B we get for free
+!
+implicit none
+
+type(SystemBlock)  :: Mon
+type(FlagsData)    :: Flags
+integer,intent(in) :: NAO,NBasis
+
+integer :: i,j
+integer :: iunit,NDimX
+real(8) :: xfac
+
+real(8),allocatable :: ABPlus(:,:),ABMin(:,:)
+character(:),allocatable     :: abfile
+character(:),allocatable     :: twojfileaa,twojfilebb
+character(:),allocatable     :: twokfileaa,twokfilebb,twokfileab
+
+! dimensions
+!   full hessian
+NDimX = Mon%NOVa+Mon%NOVb
+
+! set filenames
+if(Mon%Monomer==1) then
+   abfile = 'ABMAT_A'
+   twojfileaa = 'FFOOAAaa'
+   twojfilebb = 'FFOOAAbb'
+   twokfileaa = 'FOFOAAaa'
+   twokfilebb = 'FOFOAAbb'
+   twokfileab = 'FOFOAAab'
+elseif(Mon%Monomer==2) then
+   abfile = 'ABMAT_B'
+   twojfileaa = 'FFOOBBaa'
+   twojfilebb = 'FFOOBBbb'
+   twokfileaa = 'FOFOBBaa'
+   twokfilebb = 'FOFOBBbb'
+   twokfileab = 'FOFOBBab'
+else
+  stop "wrong Monomer in calc_resp_unc_uks"
+endif
+
+allocate(ABPlus(NDimX,NDimX),ABMin(NDimX,NDimX))
+
+! UHF test
+xfac = 1d0
+print*,  'Fraction of HF exchanghe...', xfac
+
+call AB_UKS_FOFO(ABPlus,ABMin,Mon%NOa,Mon%NVa,Mon%NOb,Mon%NVb,NDimX,NBasis, &
+                 Mon%UOrbE(:,1),Mon%UOrbE(:,2),xfac, &
+                 twojfileaa,twojfilebb,twokfileaa,twokfilebb,twokfileab,&
+                 Flags%ICholesky)
+
+open(newunit=iunit,file=abfile,form='unformatted')
+write(iunit) NDimX
+write(iunit) ABMin
+close(iunit)
+
+deallocate(ABMin,ABPlus)
+
+end subroutine calc_resp_unc_uks
+
 subroutine init_pino(NBas,Mon,ICASSCF)
 implicit none
 

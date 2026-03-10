@@ -876,39 +876,42 @@ call tran2MO(A%WPot,B%UMO(:,:,2),B%UMO(:,:,2),Wab,NBasis)
 call tran2MO(B%WPot,A%UMO(:,:,1),A%UMO(:,:,1),Wba,NBasis)
 call tran2MO(B%WPot,A%UMO(:,:,2),A%UMO(:,:,2),Wbb,NBasis)
 
-! uncoupled
-e2iBAa = e2ind_unc_o(Wba,A%UOrbE(:,1),A%NOa,A%NVa,NBasis)
-e2iBAb = e2ind_unc_o(Wbb,A%UOrbE(:,2),A%NOb,A%NVb,NBasis)
-!print*, 'e2ind(A<-B)-a = ', e2iBAa*1000
-!print*, 'e2ind(A<-B)-b = ', e2iBAb*1000
-e2ba_unc = e2iBAa + e2iBAb
+!! uncoupled
+!e2iBAa = e2ind_unc_o(Wba,A%UOrbE(:,1),A%NOa,A%NVa,NBasis)
+!e2iBAb = e2ind_unc_o(Wbb,A%UOrbE(:,2),A%NOb,A%NVb,NBasis)
+!!print*, 'e2ind(A<-B)-a = ', e2iBAa*1000
+!!print*, 'e2ind(A<-B)-b = ', e2iBAb*1000
+!e2ba_unc = e2iBAa + e2iBAb
+!
+!e2iABa = e2ind_unc_o(Waa,B%UOrbE(:,1),B%NOa,B%NVa,NBasis)
+!e2iABb = e2ind_unc_o(Wab,B%UOrbE(:,2),B%NOb,B%NVb,NBasis)
+!!print*, 'e2ind(A->B)-a = ', e2iABa*1000
+!!print*, 'e2ind(A->B)-b = ', e2iABb*1000
+!e2ab_unc = e2iABa + e2iABb
+!
+!e2ind_unc = e2ba_unc + e2ab_unc
+!
+!call print_en('Ind(B<--A,unc)',e2ab_unc*1000d0,.true.)
+!call print_en('Ind(A<--B,unc)',e2ba_unc*1000d0,.false.)
+!call print_en('E2ind(unc)',e2ind_unc*1000d0,.false.)
 
-e2iABa = e2ind_unc_o(Waa,B%UOrbE(:,1),B%NOa,B%NVa,NBasis)
-e2iABb = e2ind_unc_o(Wab,B%UOrbE(:,2),B%NOb,B%NVb,NBasis)
-!print*, 'e2ind(A->B)-a = ', e2iABa*1000
-!print*, 'e2ind(A->B)-b = ', e2iABb*1000
-e2ab_unc = e2iABa + e2iABb
+! uncoupled + coupled
+call solve_cpuhf(A,B%WPot,e2ba_unc,e2ba,Flags,NBasis)
+call solve_cpuhf(B,A%WPot,e2ba_unc,e2ab,Flags,NBasis)
 
 e2ind_unc = e2ba_unc + e2ab_unc
+e2ind     = e2ba + e2ab
+
+SAPT%e2ind_unc = e2ind_unc
+SAPT%e2ind = e2ind
 
 call print_en('Ind(B<--A,unc)',e2ab_unc*1000d0,.true.)
 call print_en('Ind(A<--B,unc)',e2ba_unc*1000d0,.false.)
 call print_en('E2ind(unc)',e2ind_unc*1000d0,.false.)
 
-! STH WRONG WITH THIS PIECE OF CODE...
-
-!! uncoupled + coupled
-!call solve_ucphf(A,B%WPot,e2ba_unc,e2ba,Flags,NBasis)
-!call solve_ucphf(B,A%WPot,e2ba_unc,e2ab,Flags,NBasis)
-!
-!e2ind_unc = e2ba_unc + e2ab_unc
-!e2ind     = e2ba + e2ab
-!
-SAPT%e2ind_unc = e2ind_unc
-!
-!call print_en('Ind(B<--A,unc)',e2ab_unc*1000d0,.true.)
-!call print_en('Ind(A<--B,unc)',e2ba_unc*1000d0,.false.)
-!call print_en('E2ind(unc)',e2ind_unc*1000d0,.false.)
+call print_en('Ind(B<--A)',e2ab*1000d0,.true.)
+call print_en('Ind(A<--B)',e2ba*1000d0,.false.)
+call print_en('E2ind',e2ind*1000d0,.false.)
 
 deallocate(Wbb,Wba)
 deallocate(Wab,Waa)
@@ -2318,7 +2321,7 @@ call e2do_unc(e2dbb,A%UOrbE(:,2),B%UOrbE(:,2),B%IndNb,A%NOb,A%NVb,B%NOb,B%NVb,NB
 call e2do_unc(e2dab,A%UOrbE(:,1),B%UOrbE(:,2),B%IndNb,A%NOa,A%NVa,B%NOb,B%NVb,NBasis,'OVOVABab')
 call e2do_unc(e2dba,A%UOrbE(:,2),B%UOrbE(:,1),B%IndNa,A%NOb,A%NVb,B%NOa,B%NVa,NBasis,'OVOVABba')
 
-if(SAPT%IPrint>=10) write(LOUT,'(1x,a,f16.8)') 'E2disp(unc,aa) = ', e2daa*1000d0
+if(SAPT%IPrint>=10) write(LOUT,'(/1x,a,f16.8)') 'E2disp(unc,aa) = ', e2daa*1000d0
 if(SAPT%IPrint>=10) write(LOUT,'(1x,a,f16.8)') 'E2disp(unc,ab) = ', e2dab*1000d0
 if(SAPT%IPrint>=10) write(LOUT,'(1x,a,f16.8)') 'E2disp(unc,ba) = ', e2dba*1000d0
 if(SAPT%IPrint>=10) write(LOUT,'(1x,a,f16.8)') 'E2disp(unc,bb) = ', e2dbb*1000d0
@@ -2385,7 +2388,7 @@ do irs=1,novB
 enddo
 close(iunit)
 
-print*, 'e2do = ', e2do*1000
+!print*, 'e2do = ', e2do*1000
 
 end subroutine e2do_unc
 

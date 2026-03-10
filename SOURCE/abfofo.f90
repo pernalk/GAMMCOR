@@ -369,6 +369,140 @@ deallocate(ints,work2,work1)
 
 end subroutine AB_CAS_FOFO
 
+subroutine AB_UKS_FOFO(ABPLUS,ABMin,noa,nva,nob,nvb,NDimX,NBasis, &
+                       occa,occb,xfac, &
+                       IntJaa,IntJbb,IntKaa,IntKbb,IntKab,&
+                       ICholesky)
+!
+! compute A+B and A-B matrices fro UHF / UKS reference
+!
+! NDimX = nova + novb
+! xfac : HF exchange fraction
+!
+! COULOMB INTEGRALS ARE READ FROM IntJFile IN (FF|OO) FORMAT
+! EXCHANGE INTEGRALS ARE READ FROM IntKFile IN (FO|FO) FORMAT
+!
+implicit none
+
+integer,intent(in) :: noa,nva,nob,nvb
+integer,intent(in) :: NDimX,NBasis
+integer,intent(in) :: ICholesky
+real(8),intent(in) :: xfac
+real(8),intent(in) :: occa(NBasis),occb(NBasis)
+character(*)       :: IntJaa,IntJbb
+character(*)       :: IntKaa,IntKbb,IntKab
+real(8),intent(out) :: ABPLUS(NDimX,NDimX),ABMIN(NDimX,NDimX)
+
+integer :: nvoa,nvob
+integer :: i,j,a,ipos
+real(8),allocatable :: blockP(:,:),blockM(:,:)
+
+nvoa = nva*noa
+nvob = nvb*nob
+
+!print*, 'NDimX =', NDimX
+!print*, 'nvoa  =', nvoa
+!print*, 'nvob  =', nvob
+
+ABPlus = 0d0
+ABMin  = 0d0
+
+if (ICholesky==1) then
+
+   stop "Cholesky not ready in AB_UKS_FOFO"
+elseif (ICholesky==0) then
+
+   ! alpha-alpha
+   allocate(blockP(nvoa,nvoa),blockM(nvoa,nvoa))
+   blockP = 0d0
+   ipos = 0
+   do i=1,noa
+      do a=1,nva
+         ipos = ipos + 1
+         blockP(ipos,ipos) = occa(noa+a)-occa(i)
+      enddo
+   enddo
+   blockM = blockP
+
+   !print*, 'diagonal part:'
+   !print*, 'ABPLUS-aa =', norm2(blockP)
+   !print*, 'ABMIN -aa =', norm2(blockM)
+
+   !print*, 'ABMIN-diag'
+   !do i=1,nvoa
+   !  write(6,'(*(f13.8))') (blockM(i,j),j=1,nvoa)
+   !enddo
+   !write(LOUT,'()')
+
+   ! 2-el part
+   call JK_UKS_SameSpin(blockP,blockM,xfac,nva,noa,nvoa,NBasis,IntJaa,IntKaa)
+
+   !print*, 'ABMIN-all'
+   !do i=1,nvoa
+   !  write(6,'(*(f13.8))') (blockM(i,j),j=1,nvoa)
+   !enddo
+   !write(LOUT,'()')
+
+   !print*, 'alpha-alpha'
+   !print*, 'ABPLUS-aa =', norm2(blockP)
+   !print*, 'ABMIN -aa =', norm2(blockM)
+
+   ABPLUS(1:nvoa,1:nvoa) = blockP(1:nvoa,1:nvoa)
+   ABMIN(1:nvoa,1:nvoa)  = blockM(1:nvoa,1:nvoa)
+
+   deallocate(blockM,blockP)
+
+   ! beta-beta
+   allocate(blockP(nvob,nvob),blockM(nvob,nvob))
+   blockP = 0d0
+   ipos = 0
+   do i=1,nob
+      do a=1,nvb
+         ipos = ipos + 1
+         blockP(ipos,ipos) = occb(nob+a)-occb(i)
+      enddo
+   enddo
+   blockM = blockP
+
+   !print*,  ''
+   !print*, 'diagonal part:'
+   !print*, 'ABPLUS-bb =', norm2(blockP)
+   !print*, 'ABMIN -bb =', norm2(blockM)
+
+   ! 2-el part
+   call JK_UKS_SameSpin(blockP,blockM,xfac,nvb,nob,nvob,NBasis,IntJbb,IntKbb)
+
+   !print*, 'beta-beta:'
+   !print*, 'ABPLUS-bb =', norm2(blockP)
+   !print*, 'ABMIN -bb =', norm2(blockM)
+
+   ABPLUS(nvoa+1:nvoa+nvob,nvoa+1:nvoa+nvob) = blockP(1:nvob,1:nvob)
+   ABMIN(nvoa+1:nvoa+nvob,nvoa+1:nvoa+nvob)  = blockM(1:nvob,1:nvob)
+
+   deallocate(blockM,blockP)
+
+   ! alpha-beta and beta-alfa
+   allocate(blockP(nvoa,nvob))
+
+   blockP = 0d0
+   call JK_UKS_AlfaBeta(blockP,xfac,nva,noa,nvoa,nvb,nob,nvob,NBasis,IntKab)
+
+   !print*,  ''
+   !print*, 'alfa-beta:'
+   !print*, 'ABPLUS-ab =', norm2(blockP)
+
+   ABPLUS(1:nvoa,nvoa+1:nvoa+nvob) = blockP(1:nvoa,1:nvob)
+   ABPLUS(nvoa+1:nvoa+nvob,1:nvoa) = transpose(blockP(1:nvoa,1:nvob))
+
+   deallocate(blockP)
+
+   print*, 'ABPLUS =',norm2(ABPLUS)
+   print*, 'ABMIN  =',norm2(ABMIN)
+
+endif ! ICholesky
+
+end subroutine AB_UKS_FOFO
+
 subroutine MP2RDM_FOFO(PerVirt,Eps,Occ,URe,UNOAO,XOne,IndN,IndX,IndAux,IGemIN, &
                        NAct,INActive,NElecBEmb,NDimX,NDim,NBasis,NInte1,     &
                        IntJFile,IntKFile,ICholesky,ThrVirt,NVZero,IPrint)
@@ -3195,5 +3329,167 @@ deallocate(ints)
 deallocate(work1)
 
 end subroutine JK_loop
+
+subroutine JK_UKS_SameSpin(ABPLUS,ABMIN,xfac,nv,no,nvo,NBasis,IntJFile,IntKFile)
+!
+! (vo | vo)
+! two-electron part of the same-spin UKS hessian matrix :
+! (A - B)_ai,bj =
+!  - xfac * [ (ij | ab) - (ib | aj) ]
+!  + (1-xfac) * [ Kxc... ]
+!
+! (A + B)_ai,bj = 2 (ia | jb )
+!  - xfac * [ (ij | ab) + (ib | aj) ]
+!  + (1-xfac) * [ kernel ]
+!
+implicit none
+
+integer,intent(in)  :: nv,no,nvo
+integer,intent(in)  :: NBasis
+real(8),intent(in)  :: xfac
+real(8),intent(out) :: ABPLUS(nvo,nvo),ABMIN(nvo,nvo)
+character(*) :: IntJFile,IntKFile
+
+integer :: iunit1,iunit2
+integer :: i,j,k,l
+integer :: ai,bj
+integer :: irec
+
+real(8),allocatable :: work1(:),work2(:)
+real(8),allocatable :: ints(:,:)
+
+allocate(work1(NBasis**2),ints(NBasis,NBasis))
+
+open(newunit=iunit1,file=trim(IntKFile),status='OLD', &
+        access='DIRECT',recl=8*NBasis*no)
+
+! exchange loop (FO|FO)
+irec = 0
+do l=1,no
+   irec = irec + no
+   do k=1,nv
+      irec = irec + 1
+      read(iunit1,rec=irec) work1(1:NBasis*no)
+
+      do j=1,no
+         do i=1,nv
+            ints(i,j) = work1((j-1)*NBasis+no+i)
+         enddo
+      enddo
+
+      do j=1,no
+         do i=1,nv
+            ai = (j-1)*nv + i
+            bj = (l-1)*nv + k
+            ABPLUS(ai,bj) = ABPLUS(ai,bj) + 2d0*ints(i,j)
+         enddo
+      enddo
+
+      do j=1,no
+         do i=1,nv
+            ai = (l-1)*nv + i
+            bj = (j-1)*nv + k
+            ABMIN(ai,bj)  = ABMIN(ai,bj)  + xfac*ints(i,j)
+            ABPLUS(ai,bj) = ABPLUS(ai,bj) - xfac*ints(i,j)
+         enddo
+      enddo
+
+   enddo
+enddo
+
+close(iunit1)
+
+open(newunit=iunit2,file=trim(IntJFile),status='OLD', &
+     access='DIRECT',recl=8*NBasis**2)
+
+! Coulomb loop (FF|OO)
+irec = 0
+do l=1,no
+   do k=1,no
+      irec = irec + 1
+      read(iunit2,rec=irec) work1(1:NBasis**2)
+      do j=1,nv
+         do i=1,nv
+            ints(i,j) = work1((no+j-1)*NBasis+no+i)
+         enddo
+      enddo
+
+      do j=1,nv
+         do i=1,nv
+            ai = (k-1)*nv + i
+            bj = (l-1)*nv + j
+            ABMIN(ai,bj)  = ABMIN(ai,bj)  - xfac*ints(i,j)
+            ABPLUS(ai,bj) = ABPLUS(ai,bj) - xfac*ints(i,j)
+         enddo
+      enddo
+
+   enddo
+enddo
+
+close(iunit2)
+
+deallocate(ints,work1)
+
+end subroutine JK_UKS_SameSpin
+
+subroutine JK_UKS_AlfaBeta(ABPLUS,xfac,nva,noa,nvoa,nvb,nob,nvob,NBasis,IntKFile)
+!
+! (vo | vo)
+! two-electron part of the same-spin UKS hessian matrix :
+! (A + B)_ai,bj = 2 (ia | jb )
+!  - xfac * [ (ij | ab) + (ib | aj) ]
+!  + (1-xfac) * [ kernel ]
+!
+implicit none
+
+integer,intent(in)  :: nva,noa,nvoa,nvb,nob,nvob
+integer,intent(in)  :: NBasis
+real(8),intent(in)  :: xfac
+real(8),intent(out) :: ABPLUS(nvoa,nvob)
+character(*) :: IntKFile
+
+integer :: iunit
+integer :: i,j,k,l
+integer :: ai,bj
+integer :: irec
+
+real(8),allocatable :: work(:)
+real(8),allocatable :: ints(:,:)
+
+allocate(work(NBasis**2),ints(NBasis,NBasis))
+
+open(newunit=iunit,file=trim(IntKFile),status='OLD', &
+        access='DIRECT',recl=8*NBasis*noa)
+
+! exchange loop (FO|FO)
+irec = 0
+do l=1,nob
+   irec = irec + nob
+   do k=1,nvb
+      irec = irec + 1
+      read(iunit,rec=irec) work(1:NBasis*noa)
+
+      do j=1,noa
+         do i=1,nva
+            ints(i,j) = work((j-1)*NBasis+noa+i)
+         enddo
+      enddo
+
+      do j=1,noa
+         do i=1,nva
+            ai = (j-1)*nva + i
+            bj = (l-1)*nvb + k
+            ABPLUS(ai,bj) = ABPLUS(ai,bj) + 2d0*ints(i,j)
+         enddo
+      enddo
+
+   enddo
+enddo
+
+close(iunit)
+
+deallocate(ints,work)
+
+end subroutine JK_UKS_AlfaBeta
 
 end module
