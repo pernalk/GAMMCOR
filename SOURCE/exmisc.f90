@@ -221,9 +221,9 @@ double precision               :: OVA(NCholesky,ANDimX),OVB(NCholesky,BNDimX)
 double precision,intent(inout) :: tmp1(ANDimX,BNDimX),&
                                   sij(ANDimX,BNDimX)
 
-integer :: i,j,ir,is,irs,ip,iq,ipq
-double precision :: fact
+integer :: i,irs,ip,iq,ipq
 double precision,allocatable :: work(:)
+double precision,allocatable :: WORK2D(:,:),dOccA(:),dOccB(:)
 
 ! we do not need the Cpq prefacor...
 allocate(work(NBas))
@@ -245,43 +245,38 @@ do ipq=1,BNDimX
 enddo
 deallocate(work)
 
-allocate(work(BNDimX))
-tmp1=0
+! Stage 1: OVA^T @ OVB — single dgemm replaces ANDimX dgemv calls
+allocate(WORK2D(ANDimX, BNDimX))
+call dgemm('T','N',ANDimX,BNDimX,NCholesky, &
+           1d0,OVA,NCholesky,OVB,NCholesky,0d0,WORK2D,ANDimX)
+!
+! Scale WORK2D(ipq,irs) by occupation differences
+allocate(dOccA(ANDimX), dOccB(BNDimX))
 do ipq=1,ANDimX
-   ip = AIndN(1,ipq)
-   iq = AIndN(2,ipq)
-   call dgemv('T',NCholesky,BNDimX,1d0,OVB,NCholesky,OVA(:,ipq),1,0d0,work,1)
-
-   do irs=1,BNDimX
-      ir = BIndN(1,irs)
-      is = BIndN(2,irs)
-
-      fact = (AOcc(ip)-AOcc(iq)) * &
-             (BOcc(ir)-BOcc(is)) * &
-              work(irs)
-
-      do i=1,ANDimX
-         tmp1(i,irs) = tmp1(i,irs) + &
-                      fact * &
-                      (AEigY(ipq+(i-1)*ANDimX)-AEigX(ipq+(i-1)*ANDimX))
-      enddo
-
+   dOccA(ipq) = AOcc(AIndN(1,ipq)) - AOcc(AIndN(2,ipq))
+enddo
+do irs=1,BNDimX
+   dOccB(irs) = BOcc(BIndN(1,irs)) - BOcc(BIndN(2,irs))
+enddo
+do irs=1,BNDimX
+   do ipq=1,ANDimX
+      WORK2D(ipq,irs) = WORK2D(ipq,irs) * dOccA(ipq) * dOccB(irs)
    enddo
 enddo
-
-sij=0
-do j=1,BNDimX
-   do i=1,ANDimX
-      do irs=1,BNDimX
-         ir = BIndN(1,irs)
-         is = BIndN(2,irs)
-         sij(i,j) = sij(i,j) + &
-                    (BEigY(irs+(j-1)*BNDimX)-BEigX(irs+(j-1)*BNDimX))*tmp1(i,irs)
-      enddo
-   enddo
- enddo
-
-deallocate(work)
+deallocate(dOccA, dOccB)
+!
+! tmp1 = (AEigY - AEigX)^T @ WORK2D — two dgemm calls avoid allocating DeltaA
+call dgemm('T','N',ANDimX,BNDimX,ANDimX, &
+           1d0,AEigY,ANDimX,WORK2D,ANDimX,0d0,tmp1,ANDimX)
+call dgemm('T','N',ANDimX,BNDimX,ANDimX, &
+           -1d0,AEigX,ANDimX,WORK2D,ANDimX,1d0,tmp1,ANDimX)
+deallocate(WORK2D)
+!
+! Stage 2: sij = tmp1 @ (BEigY - BEigX) — two dgemm calls
+call dgemm('N','N',ANDimX,BNDimX,BNDimX, &
+           1d0,tmp1,ANDimX,BEigY,BNDimX,0d0,sij,ANDimX)
+call dgemm('N','N',ANDimX,BNDimX,BNDimX, &
+           -1d0,tmp1,ANDimX,BEigX,BNDimX,1d0,sij,ANDimX)
 
 end subroutine make_sij_Y_Chol
 

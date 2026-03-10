@@ -1613,19 +1613,26 @@ C     OMEGA'S
 C
 C     SINCE X = Om^-1 ABMIN.Y THEN THE NORMALIZATION READS 2 Om^-1 Y^T AMIN Y = 1
 C
+C     PRE-COMPUTE HlpAB = ABMIN @ EigY (ONE DGEMM REPLACES TWO O(N^3) LOOPS)
+C
+      Call dgemm('N','N',NDimX,NDimX,NDimX,One,ABMIN,NDimX,
+     $           EigY,NDimX,Zero,HlpAB,NDimX)
+C
+C     NORMALIZE Y's AND COMPUTE X's USING PRE-COMPUTED ABMIN @ Y
+C
       Do NU=1,NDimX
-      SumNU=Zero
 C
       If(Eig(NU).Gt.Small) Then
-C    
+C
       Eig(NU)=SQRT(Eig(NU))
 C
+C     SumNU = (2/omega) * Y(:,NU)^T * ABMIN * Y(:,NU)
+C           = (2/omega) * dot(EigY(:,NU), HlpAB(:,NU))
+      SumNU=Zero
       Do I=1,NDimX
-      Do J=1,NDimX
-      SumNU=SumNU+Two/Eig(NU)*ABMIN(I,J)*
-     $ EigY((NU-1)*NDimX+I)*EigY((NU-1)*NDimX+J)
+      SumNU=SumNU+EigY((NU-1)*NDimX+I)*HlpAB(I,NU)
       EndDo
-      EndDo
+      SumNU=Two/Eig(NU)*SumNU
 C
       If(SumNU.Gt.Zero) Then
       SumNU=One/Sqrt(SumNU)
@@ -1633,26 +1640,10 @@ C
       SumNU=Zero
       EndIf
 C
+C     SCALE Y AND COMPUTE X = (SumNU/omega) * ABMIN @ Y_old
       Do I=1,NDimX
       EigY((NU-1)*NDimX+I)=EigY((NU-1)*NDimX+I)*SumNU
-      EndDo
-C
-      EndIf
-c     enddo NU
-      EndDo
-C
-C     COMPUTE EigX
-C
-      Do NU=1,NDimX
-C
-      If(Eig(NU).Gt.Small) Then
-C    
-      Do I=1,NDimX
-      EigX((NU-1)*NDimX+I)=Zero
-      Do J=1,NDimX
-      EigX((NU-1)*NDimX+I)=EigX((NU-1)*NDimX+I)
-     $ +One/Eig(NU)*ABMIN(I,J)*EigY((NU-1)*NDimX+J)
-      EndDo
+      EigX((NU-1)*NDimX+I)=SumNU/Eig(NU)*HlpAB(I,NU)
       EndDo
 C
       Else
