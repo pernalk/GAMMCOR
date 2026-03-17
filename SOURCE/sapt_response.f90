@@ -2219,7 +2219,7 @@ if(doGGA) deallocate(PhiGGA)
 end subroutine calc_resp_dft_dalton
 
 
-subroutine calc_resp_unc_uks(Mon,Flags,NAO,NBasis)
+subroutine calc_resp_uks(Mon,Flags,NAO,NBasis)
 !
 ! calculate A+B and A-B
 ! for uncoupled we only need A-B (for E2ind)
@@ -2236,12 +2236,14 @@ integer :: iunit,NDimX
 real(8) :: xfac
 
 real(8),allocatable :: ABPlus(:,:),ABMin(:,:)
+real(8),allocatable :: EigVecR(:,:),Eig(:)
 character(:),allocatable     :: abfile
+character(:),allocatable     :: propfile
 character(:),allocatable     :: twojfileaa,twojfilebb
 character(:),allocatable     :: twokfileaa,twokfilebb,twokfileab
 
 ! dimensions
-!   full hessian
+! full hessian
 NDimX = Mon%NOVa+Mon%NOVb
 
 ! set filenames
@@ -2252,6 +2254,7 @@ if(Mon%Monomer==1) then
    twokfileaa = 'FOFOAAaa'
    twokfilebb = 'FOFOAAbb'
    twokfileab = 'FOFOAAab'
+   propfile   = 'EIGPRBLA'
 elseif(Mon%Monomer==2) then
    abfile = 'ABMAT_B'
    twojfileaa = 'FFOOBBaa'
@@ -2259,6 +2262,7 @@ elseif(Mon%Monomer==2) then
    twokfileaa = 'FOFOBBaa'
    twokfilebb = 'FOFOBBbb'
    twokfileab = 'FOFOBBab'
+   propfile   = 'EIGPRBLB'
 else
   stop "wrong Monomer in calc_resp_unc_uks"
 endif
@@ -2267,7 +2271,7 @@ allocate(ABPlus(NDimX,NDimX),ABMin(NDimX,NDimX))
 
 ! UHF test
 xfac = 1d0
-print*,  'Fraction of HF exchanghe...', xfac
+write(lout,'(1x,a,f12.6)') 'Fraction of HF exchanghe...', xfac
 
 call AB_UKS_FOFO(ABPlus,ABMin,Mon%NOa,Mon%NVa,Mon%NOb,Mon%NVb,NDimX,NBasis, &
                  Mon%UOrbE(:,1),Mon%UOrbE(:,2),xfac, &
@@ -2279,9 +2283,47 @@ write(iunit) NDimX
 write(iunit) ABMin
 close(iunit)
 
-deallocate(ABMin,ABPlus)
+if (Flags%SaptLevel==0) then 
+   deallocate(ABMin,ABPlus)
+   return
+endif
 
-end subroutine calc_resp_unc_uks
+! 
+allocate(EigVecR(NDimX,NDimX),Eig(NDimX))
+
+! B --> -B
+call ERPASYMM(EigVecR,Eig,ABMin,ABPlus,NBasis,NDimX)
+!call ERPASYMM(EigVecR,Eig,ABPlus,ABMin,NBasis,NDimX)
+!call RPASYMM(EigVecR,Eig,ABPlus,ABMin,NBasis,NDimX)
+
+write(lout,'(/,''Excitation Energies in [au] and [eV]'')')
+do i=1,10
+   write(lout,'(i4,4x,2E16.6)') i,Eig(i),toeV(Eig(i))
+enddo
+
+EigVecR = sqrt(2d0)*EigVecR
+print*, 'Eig...',norm2(Eig)
+!do i=1,NDimX
+!  print*, i, Eig(i)
+!enddo
+print*, 'EigVecR',norm2(EigVecR)
+do i=1,NdimX
+  write(6,'(*(f13.8))') (EigVecR(i,j),j=1,NdimX)
+enddo
+write(LOUT,'()')
+
+
+
+! dump response
+open(newunit=iunit,file=propfile,form='unformatted')
+write(iunit) EigVecR
+write(iunit) Eig
+close(iunit)
+
+deallocate(ABMin,ABPlus)
+deallocate(EigVecR,Eig)
+
+end subroutine calc_resp_uks
 
 subroutine init_pino(NBas,Mon,ICASSCF)
 implicit none

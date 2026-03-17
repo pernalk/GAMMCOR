@@ -182,13 +182,13 @@ call saptuks_response(SAPT%monB,Flags,NBasis)
 
 call saptuks_ab_ints(Flags,SAPT%monA,SAPT%monB,NBasis,AOBasis,CholeskyVecsOTF)
 
-print*, 'Skipping cpl response ...' ! not ready yet
-
 call e1elst_o(SAPT%monA,SAPT%monB,SAPT)
 call e1exchs2_sq_os(SAPT%monA,SAPT%monB,SAPT)
 call e1exch_os(SAPT%monA,SAPT%monB,SAPT)
 call e2ind_o(Flags,SAPT%monA,SAPT%monB,SAPT)
-call e2disp_o(SAPT%monA,SAPT%monB,SAPT)
+call e2disp_o(Flags,SAPT%monA,SAPT%monB,SAPT)
+
+call e2exdisp_o(Flags,SAPT%monA,SAPT%monB,SAPT)
 
 call summary_saptuks(SAPT)
 call free_saptuks(Flags,SAPT)
@@ -833,19 +833,10 @@ integer,intent(in) :: NBasis
 
 integer :: NAO
 
-! NAO in Molpro ?
+! NAO in Molpro
 NAO = NBasis
+call calc_resp_uks(Mon,Flags,NAO,NBasis)
 
-if (Flags%SaptLevel==0) then
-   ! unc
-   call calc_resp_unc_uks(Mon,Flags,NAO,NBasis)
-elseif (Flags%SaptLevel==2) then
-   ! cpld
-   !call calc_resp_uks(Mon,Flags,NBasis)
-   stop "Coupled not ready!"
-else
-   stop "Wrong SaptLevel in saptuks_response!"
-endif
 end subroutine saptuks_response
 
 subroutine sapt_response_spin(Flags,Mon,NBasis)

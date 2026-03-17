@@ -380,4 +380,923 @@ deallocate(Vbab)
 
 end subroutine e1exchs2_os
 
+subroutine e2exdisp_o(Flags,A,B,SAPT)
+!
+! uncoupled E2exch-disp
+! see Eq. (23) in 2012 JCP paper
+!
+use timing
+
+implicit none
+
+type(FlagsData) :: Flags
+type(SystemBlock) :: A, B
+type(SaptData) :: SAPT
+
+integer :: NBasis
+
+double precision, allocatable :: work(:,:)
+double precision, allocatable :: Sa(:,:),Sb(:,:)
+double precision, allocatable :: Saboo_aa(:,:),Sabov_aa(:,:),Sabvo_aa(:,:)
+double precision, allocatable :: Sbaoo_aa(:,:),Sabvv_aa(:,:),Sbavo_aa(:,:)
+double precision, allocatable :: Sat(:,:),Sbt(:,:)
+double precision, allocatable :: Waa(:,:),Wab(:,:)
+double precision, allocatable :: Wba(:,:),Wbb(:,:)
+double precision, allocatable :: Waa_ov(:,:),Wba_ov(:,:)
+double precision, allocatable :: ints(:),amps(:)
+
+integer :: i,j
+real*8 :: e2xd_vterms(8),e2xd_oterms(4)
+real*8 :: e2xd_aa,e2xd_bb,e2xd_ab,e2xd_ba
+real*8 :: e2exd_unc
+
+NBasis = A%NBasis
+
+! omega potential
+allocate(Waa(NBasis,NBasis),Wab(NBasis,NBasis))
+allocate(Wba(NBasis,NBasis),Wbb(NBasis,NBasis))
+
+call tran2MO(A%WPot,B%UMO(:,:,1),B%UMO(:,:,1),Waa,NBasis)
+call tran2MO(A%WPot,B%UMO(:,:,2),B%UMO(:,:,2),Wab,NBasis)
+
+call tran2MO(B%WPot,A%UMO(:,:,1),A%UMO(:,:,1),Wba,NBasis)
+call tran2MO(B%WPot,A%UMO(:,:,2),A%UMO(:,:,2),Wbb,NBasis)
+
+! S matrix
+allocate(work(NBasis,NBasis))
+allocate(Sa(NBasis,NBasis),Sb(NBasis,NBasis))
+allocate(Sat(NBasis,NBasis),Sbt(NBasis,NBasis))
+
+call get_one_mat('S',work,A%Monomer,NBasis)
+call tran2MO(work,A%UMO(:,:,1),B%UMO(:,:,1),Sa,NBasis)
+call tran2MO(work,A%UMO(:,:,2),B%UMO(:,:,2),Sb,NBasis)
+
+deallocate(work)
+
+! alpha-alpha
+e2xd_aa=0d0
+allocate(ints(A%NVa*A%NOa*B%NVa*B%NOa))
+allocate(amps(A%NVa*A%NOa*B%NVa*B%NOa))
+call load_vovo('OVOVABaa',ints,B%IndNa,A%NVa,A%NOa,B%NVa,B%NOa)
+call calc_amps(amps,ints,A%UOrbE(:,1),B%UOrbE(:,1),A%NVa,A%NOa,B%NVa,B%NOa,NBasis)
+!print*, 'vovo aaaa = ', norm2(ints)
+!print*, 'amps aaaa = ', norm2(amps)
+
+call e2exd_vterms_SameSpin(e2xd_aa,ints,amps,Sa,Sb,A%NOa,A%NVa,B%NOa,B%NVa,NBasis)
+call e2exd_oterms_SameSpin(e2xd_aa,ints,amps,Waa,Wba,Sa,Sb,A%NOa,A%NVa,B%NOa,B%NVa,NBasis)
+
+deallocate(amps,ints)
+
+! beta-beta
+e2xd_bb=0d0
+allocate(ints(A%NVb*A%NOb*B%NVb*B%NOb))
+allocate(amps(A%NVb*A%NOb*B%NVb*B%NOb))
+call load_vovo('OVOVABbb',ints,B%IndNb,A%NVb,A%NOb,B%NVb,B%NOb)
+call calc_amps(amps,ints,A%UOrbE(:,2),B%UOrbE(:,2),A%NVb,A%NOb,B%NVb,B%NOb,NBasis)
+
+call e2exd_vterms_SameSpin(e2xd_bb,ints,amps,Sa,Sb,A%NOb,A%NVb,B%NOb,B%NVb,NBasis)
+call e2exd_oterms_SameSpin(e2xd_bb,ints,amps,Wab,Wbb,Sa,Sb,A%NOb,A%NVb,B%NOb,B%NVb,NBasis)
+
+deallocate(amps,ints)
+
+! alpha-beta
+e2xd_ab=0d0
+allocate(ints(A%NVa*A%NOa*B%NVb*B%NOb))
+allocate(amps(A%NVa*A%NOa*B%NVb*B%NOb))
+
+call load_vovo('OVOVABab',ints,B%IndNb,A%NVa,A%NOa,B%NVb,B%NOb)
+call calc_amps(amps,ints,A%UOrbE(:,1),B%UOrbE(:,2),A%NVa,A%NOa,B%NVb,B%NOb,NBasis)
+call e2exd_ovterms_OppSpin(e2xd_ab,ints,amps,Waa,Wbb,Sa,Sb,A%NOa,A%NVa,B%NOb,B%NVb,NBasis)
+
+!! Sov_aa
+!allocate(Sabov_aa(A%NOa,B%NVa))
+!do j=1,B%NVa
+!   do i=1,A%NOa
+!      Sabov_aa(i,j) = Sa(i,B%NOa+j)
+!   enddo
+!enddo
+!! Svo_aa
+!allocate(Sabvo_aa(A%NVa,B%NOa))
+!do j=1,B%NOa
+!   do i=1,A%NVa
+!      Sabvo_aa(i,j) = Sa(A%NOa+i,j)
+!   enddo
+!enddo
+!! Soo_aa
+!allocate(Saboo_aa(A%NOa,B%NOa))
+!allocate(Sbaoo_aa(B%NOa,A%NOa))
+!do j=1,B%NOa
+!   do i=1,A%NOa
+!      Saboo_aa(i,j) = Sa(i,j)
+!   enddo
+!enddo
+!Sbaoo_aa = transpose(Saboo_aa)
+!! Svv_aa
+!allocate(Sabvv_aa(A%NVa,B%NVa))
+!do j=1,B%NVa
+!   do i=1,A%NVa
+!      Sabvv_aa(i,j) = Sa(A%NOa+i,B%NOa+j)
+!   enddo
+!enddo
+!
+!! transposed S
+!Sat = transpose(Sa)
+!Sbt = transpose(Sb)
+!
+!!Sbavo_aa
+!allocate(Sbavo_aa(B%NVa,A%NOa))
+!do j=1,A%NOa
+!   do i=1,B%NVa
+!      Sbavo_aa(i,j) = Sat(B%NOa+i,j)
+!   enddo
+!enddo
+!
+!deallocate(Sbt,Sat,Sb,Sa)
+!
+!e2xd_vterms = 0d0
+!call vterm1_e2exd(e2xd_vterms(1),amps,ints,Sabvv_aa,A%NVa,A%NOa,B%NVa,B%NOa)
+!print*, 'e2xd T1 aa =', e2xd_vterms(1)*1d3
+!
+!call vterm2_e2exd(e2xd_vterms(2),amps,ints,Sabov_aa,A%NVa,A%NOa,B%NVa,B%NOa)
+!call vterm4_e2exd(e2xd_vterms(4),amps,ints,Sabvo_aa,A%NVa,A%NOa,B%NVa,B%NOa)
+!print*, 'e2xd T2 aa =', e2xd_vterms(2)*1d3
+!print*, 'e2xd T4 aa =', e2xd_vterms(4)*1d3
+!
+!call vterm3_e2exd(e2xd_vterms(3),amps,ints,Sbavo_aa,A%NVa,A%NOa,B%NVa,B%NOa)
+!call vterm5_e2exd(e2xd_vterms(5),amps,ints,Sabvo_aa,A%NVa,A%NOa,B%NVa,B%NOa)
+!print*, 'e2xd T3 aa =', e2xd_vterms(3)*1d3
+!print*, 'e2xd T5 aa =', e2xd_vterms(5)*1d3
+!
+!call vterm6_e2exd(e2xd_vterms(6),amps,ints,Sbaoo_aa,A%NVa,A%NOa,B%NVa,B%NOa)
+!print*, 'e2xd T6 aa =', e2xd_vterms(6)*1d3
+!
+!call vterm7_e2exd(e2xd_vterms(7),amps,ints,Saboo_aa,A%NVa,A%NOa,B%NVa,B%NOa)
+!call vterm8_e2exd(e2xd_vterms(8),amps,ints,Saboo_aa,A%NVa,A%NOa,B%NVa,B%NOa)
+!print*, 'e2xd T7 aa =', e2xd_vterms(7)*1d3
+!print*, 'e2xd T8 aa =', e2xd_vterms(8)*1d3
+
+!! omega terms
+!! alpha-alpha
+!allocate(Waa_ov(B%NOa,B%NVa),Wba_ov(A%NOa,A%NVa))
+!
+!do j=1,B%NVa
+!   do i=1,B%NOa
+!      Waa_ov(i,j) = Waa(i,B%NOa+j)
+!   enddo
+!enddo
+!do j=1,A%NVa
+!   do i=1,A%NOa
+!      Wba_ov(i,j) = Wba(i,A%NOa+j)
+!   enddo
+!enddo
+!
+!e2xd_oterms = 0d0
+!call oterms15_e2exd(e2xd_oterms(1),amps,Saboo_aa,Sabvo_aa,Sabvv_aa,&
+!                    Waa_ov,Wba_ov,A%NVa,A%NOa,B%NVa,B%NOa)
+!call oterms36_e2exd(e2xd_oterms(3),amps,Saboo_aa,Sabov_aa,Sabvv_aa,&
+!                    Waa_ov,Wba_ov,A%NVa,A%NOa,B%NVa,B%NOa)
+!call oterm2_e2exd(e2xd_oterms(2),amps,Sbaoo_aa,Sabvo_aa,&
+!                  Waa_ov,A%NVa,A%NOa,B%NVa,B%NOa)
+!call oterm4_e2exd(e2xd_oterms(4),amps,Saboo_aa,Sbavo_aa,&
+!                  Wba_ov,A%NVa,A%NOa,B%NVa,B%NOa)
+!
+!e2exd_unc = sum(e2xd_vterms) + sum(e2xd_oterms)
+
+! sum aa, bb, ab, ba terms
+e2exd_unc = e2xd_aa + e2xd_bb + e2xd_ab
+
+print*, 'aa =', e2xd_aa
+print*, 'bb =', e2xd_bb
+print*, 'ab =', e2xd_ab
+print*, 'E2exch-disp(unc) = ', e2exd_unc*1d3
+
+deallocate(Wbb,Waa,Wab,Wba)
+
+end subroutine e2exdisp_o
+
+subroutine e2exd_vterms_SameSpin(e2xd_ss,ints,amps,Sa,Sb,noA,nvA,noB,nvB,NBasis)
+!
+! compute v-like contributions to E2exch-disp (8),
+! see Eq. (23) in https://doi.org/10.1063/1.4758455 
+!
+implicit none
+
+integer, intent(in) :: noA,nvA,noB,nvB,NBasis
+real*8, intent(in)  :: Sa(NBasis,NBasis),Sb(NBasis,NBasis)
+real*8, intent(in)  :: ints(nva*noa*nvb*nob)
+real*8, intent(in)  :: amps(nva*noa*nvb*nob)
+
+real*8, intent(inout) :: e2xd_ss
+
+integer :: i,j
+real*8  :: e2xd_vterms(8),e2xd_vsum
+
+double precision, allocatable :: Saboo(:,:),Sabov(:,:),Sabvo(:,:)
+double precision, allocatable :: Sbaoo(:,:),Sabvv(:,:),Sbavo(:,:)
+double precision, allocatable :: Waa_ov(:,:),Wba_ov(:,:)
+
+allocate(Sabov(noa,nvb),Sabvo(nva,nob))
+allocate(Saboo(noa,nob),Sbaoo(nob,noa))
+allocate(Sabvv(nva,nvb))
+allocate(Sbavo(nvb,noa))
+! Sov
+do j=1,nvb
+   do i=1,noa
+      Sabov(i,j) = Sa(i,nob+j)
+   enddo
+enddo
+! Svo
+do j=1,nob
+   do i=1,nva
+      Sabvo(i,j) = Sa(noa+i,j)
+   enddo
+enddo
+! Soo
+do j=1,nob
+   do i=1,noa
+      Saboo(i,j) = Sa(i,j)
+   enddo
+enddo
+Sbaoo = transpose(Saboo)
+! Svv
+do j=1,nvb
+   do i=1,nva
+      Sabvv(i,j) = Sa(noa+i,nob+j)
+   enddo
+enddo
+!Sbavo
+do j=1,noa
+   do i=1,nvb
+      Sbavo(i,j) = Sa(j,nob+i)
+   enddo
+enddo
+
+e2xd_vterms = 0d0
+call vterm1_e2exd(e2xd_vterms(1),amps,ints,Sabvv,nva,noa,nvb,nob)
+print*, 'e2xd T1 =', e2xd_vterms(1)*1d3
+
+call vterm2_e2exd(e2xd_vterms(2),amps,ints,Sabov,nva,noa,nvb,nob)
+call vterm4_e2exd(e2xd_vterms(4),amps,ints,Sabvo,nva,noa,nvb,nob)
+print*, 'e2xd T2 =', e2xd_vterms(2)*1d3
+print*, 'e2xd T4 =', e2xd_vterms(4)*1d3
+
+call vterm3_e2exd(e2xd_vterms(3),amps,ints,Sbavo,nva,noa,nvb,nob)
+call vterm5_e2exd(e2xd_vterms(5),amps,ints,Sabvo,nva,noa,nvb,nob)
+print*, 'e2xd T3 =', e2xd_vterms(3)*1d3
+print*, 'e2xd T5 =', e2xd_vterms(5)*1d3
+
+call vterm6_e2exd(e2xd_vterms(6),amps,ints,Sbaoo,nva,noa,nvb,nob)
+print*, 'e2xd T6 =', e2xd_vterms(6)*1d3
+
+call vterm7_e2exd(e2xd_vterms(7),amps,ints,Saboo,nva,noa,nvb,nob)
+call vterm8_e2exd(e2xd_vterms(8),amps,ints,Saboo,nva,noa,nvb,nob)
+print*, 'e2xd T7 =', e2xd_vterms(7)*1d3
+print*, 'e2xd T8 =', e2xd_vterms(8)*1d3
+
+deallocate(Saboo,Sbaoo,Sabvv)
+deallocate(Sabvo,Sabov,Sbavo)
+
+e2xd_vsum = sum(e2xd_vterms)
+e2xd_ss = e2xd_ss + e2xd_vsum
+
+print*, 'E2exd vterms =', e2xd_ss*1d3
+
+end subroutine e2exd_vterms_SameSpin
+
+subroutine e2exd_oterms_SameSpin(e2xd_ss,ints,amps,Wa,Wb,Sa,Sb,noA,nvA,noB,nvB,NBasis)
+!
+! compute omega-like contributions to E2exch-disp (8),
+! see Eq. (23) in https://doi.org/10.1063/1.4758455
+!
+implicit none
+
+integer, intent(in) :: noA,nvA,noB,nvB,NBasis
+real*8, intent(in)  :: Sa(NBasis,NBasis),Sb(NBasis,NBasis)
+real*8, intent(in)  :: Wa(NBasis,NBasis),Wb(NBasis,NBasis)
+real*8, intent(in)  :: ints(nva*noa*nvb*nob)
+real*8, intent(in)  :: amps(nva*noa*nvb*nob)
+
+real*8, intent(inout) :: e2xd_ss
+
+integer :: i,j
+real*8  :: e2xd_oterms(4),e2xd_osum
+
+double precision, allocatable :: Saboo(:,:),Sabov(:,:),Sabvo(:,:)
+double precision, allocatable :: Sbaoo(:,:),Sabvv(:,:),Sbavo(:,:)
+double precision, allocatable :: Wa_ov(:,:),Wb_ov(:,:)
+
+allocate(Sabov(noa,nvb),Sabvo(nva,nob))
+allocate(Saboo(noa,nob),Sbaoo(nob,noa))
+allocate(Sabvv(nva,nvb))
+allocate(Sbavo(nvb,noa))
+! Sov
+do j=1,nvb
+   do i=1,noa
+      Sabov(i,j) = Sa(i,nob+j)
+   enddo
+enddo
+! Svo
+do j=1,nob
+   do i=1,nva
+      Sabvo(i,j) = Sa(noa+i,j)
+   enddo
+enddo
+! Soo
+do j=1,nob
+   do i=1,noa
+      Saboo(i,j) = Sa(i,j)
+   enddo
+enddo
+Sbaoo = transpose(Saboo)
+! Svv
+do j=1,nvb
+   do i=1,nva
+      Sabvv(i,j) = Sa(noa+i,nob+j)
+   enddo
+enddo
+!Sbavo
+do j=1,noa
+   do i=1,nvb
+      Sbavo(i,j) = Sa(j,nob+i)
+   enddo
+enddo
+
+allocate(Wa_ov(nob,nvb),Wb_ov(noa,nva))
+
+do j=1,nvb
+   do i=1,nob
+      Wa_ov(i,j) = Wa(i,nob+j)
+   enddo
+enddo
+do j=1,nva
+   do i=1,noa
+      Wb_ov(i,j) = Wb(i,noa+j)
+   enddo
+enddo
+
+e2xd_oterms = 0d0
+call oterms15_e2exd(e2xd_oterms(1),amps,Saboo,Sabvo,Sabvv,Wa_ov,Wb_ov,nva,noa,nvb,nob)
+call oterms36_e2exd(e2xd_oterms(3),amps,Saboo,Sabov,Sabvv,Wa_ov,Wb_ov,nva,noa,nvb,nob)
+call oterm2_e2exd(e2xd_oterms(2),amps,Sbaoo,Sabvo,Wa_ov,nva,noa,nvb,nob)
+call oterm4_e2exd(e2xd_oterms(4),amps,Saboo,Sbavo,Wb_ov,nva,noa,nvb,nob)
+
+e2xd_osum = sum(e2xd_oterms)
+e2xd_ss = e2xd_ss + e2xd_osum 
+
+print*, 'E2exd oterms =', e2xd_osum*1d3
+
+deallocate(Wb_ov,Wa_ov)
+deallocate(Saboo,Sbaoo,Sabvv)
+deallocate(Sabvo,Sabov,Sbavo)
+
+end subroutine e2exd_oterms_SameSpin
+
+subroutine e2exd_ovterms_OppSpin(e2xd_os,ints,amps,Wa,Wb,Sa,Sb,noA,nvA,noB,nvB,NBasis)
+!
+! compute v-like contributions to E2exch-disp (8),
+! see Eq. (24) in https://doi.org/10.1063/1.4758455
+!
+implicit none
+
+integer, intent(in) :: noA,nvA,noB,nvB,NBasis
+real*8, intent(in)  :: Sa(NBasis,NBasis),Sb(NBasis,NBasis)
+real*8, intent(in)  :: Wa(NBasis,NBasis),Wb(NBasis,NBasis)
+real*8, intent(in)  :: ints(nva*noa*nvb*nob)
+real*8, intent(in)  :: amps(nva*noa*nvb*nob)
+
+real*8, intent(inout) :: e2xd_os
+
+integer :: i,j
+real*8  :: e2xd_vterms(4),e2xd_oterms(2)
+real*8  :: e2xd_vsum,e2xd_osum
+
+double precision, allocatable :: Saboo(:,:),Sabov(:,:),Sabvo(:,:)
+double precision, allocatable :: Sbaoo(:,:),Sabvv(:,:),Sbavo(:,:)
+double precision, allocatable :: Wa_ov(:,:),Wb_ov(:,:)
+
+allocate(Sabov(noa,nvb),Sabvo(nva,nob))
+allocate(Saboo(noa,nob),Sbaoo(nob,noa))
+allocate(Sbavo(nvb,noa))
+
+! Sov
+do j=1,nvb
+   do i=1,noa
+      Sabov(i,j) = Sa(i,nob+j)
+   enddo
+enddo
+! Svo
+do j=1,nob
+   do i=1,nva
+      Sabvo(i,j) = Sa(noa+i,j)
+   enddo
+enddo
+! Soo
+do j=1,nob
+   do i=1,noa
+      Saboo(i,j) = Sa(i,j)
+   enddo
+enddo
+Sbaoo = transpose(Saboo)
+!Sbavo
+do j=1,noa
+   do i=1,nvb
+      Sbavo(i,j) = Sa(j,nob+i)
+   enddo
+enddo
+
+allocate(Wa_ov(nob,nvb),Wb_ov(noa,nva))
+
+do j=1,nvb
+   do i=1,nob
+      Wa_ov(i,j) = Wa(i,nob+j)
+   enddo
+enddo
+do j=1,nva
+   do i=1,noa
+      Wb_ov(i,j) = Wb(i,noa+j)
+   enddo
+enddo
+
+! v-terms
+e2xd_vterms = 0d0
+call vterm2_e2exd(e2xd_vterms(1),amps,ints,Sabov,nva,noa,nvb,nob)
+print*, 'e2xd T2 =', e2xd_vterms(1)*1d3
+
+call vterm5_e2exd(e2xd_vterms(2),amps,ints,Sabvo,nva,noa,nvb,nob)
+print*, 'e2xd T5 =', e2xd_vterms(2)*1d3
+
+call vterm6_e2exd(e2xd_vterms(3),amps,ints,Sbaoo,nva,noa,nvb,nob)
+print*, 'e2xd T6 =', e2xd_vterms(3)*1d3
+
+call vterm7_e2exd(e2xd_vterms(4),amps,ints,Saboo,nva,noa,nvb,nob)
+print*, 'e2xd T7 =', e2xd_vterms(4)*1d3
+
+! o-terms
+call oterm2_e2exd(e2xd_oterms(1),amps,Sbaoo,Sabvo,Wa_ov,nva,noa,nvb,nob)
+call oterm4_e2exd(e2xd_oterms(2),amps,Saboo,Sbavo,Wb_ov,nva,noa,nvb,nob)
+
+e2xd_vsum = sum(e2xd_vterms)
+e2xd_osum = sum(e2xd_oterms)
+
+print*, 'E2exd vterms ab =', e2xd_vsum*1d3
+print*, 'E2exd oterms ab =', e2xd_osum*1d3
+
+e2xd_os = e2xd_vsum + e2xd_osum
+
+deallocate(Wb_ov,Wa_ov)
+deallocate(Saboo,Sbaoo)
+deallocate(Sabvo,Sabov,Sbavo)
+
+end subroutine e2exd_ovterms_OppSpin
+
+subroutine load_vovo(intfile,ints,IndNb,nva,noa,nvb,nob)
+!
+! load (VO|VO) integrals
+!
+implicit none
+
+character(*) :: intfile
+integer, intent(in) :: nva, noa, nvb, nob
+integer, intent(in) :: IndNb(2,nob*nvb)
+real*8, intent(out) :: ints(nva,noa,nvb,nob)
+
+integer :: iunit
+integer :: nova,novb
+integer :: ip,iq,ir,is,irs
+double precision :: AuxA(noA*nvA)
+
+novA = noA*nvA
+novB = noB*nvB
+
+! (OV|OV) (AA|BB) --> (VO|VO)
+open(newunit=iunit,file=intfile,status='OLD',&
+     access='DIRECT',form='UNFORMATTED',recl=8*novA)
+
+do irs=1,novB
+
+    ir  = IndNB(1,irs)
+    is  = IndNB(2,irs)
+    read(iunit,rec=is+(ir-noB-1)*noB) AuxA(1:novA)
+
+    do ip=1,nvA
+       do iq=1,noA
+          ints(ip,iq,ir-noB,is) = AuxA(iq+(ip-1)*noA)
+       enddo
+    enddo
+
+enddo
+
+close(iunit)
+
+end subroutine load_vovo
+
+subroutine calc_amps(amps,ints,EnA,EnB,nvA,noA,nvB,noB,n)
+
+integer, intent(in) :: noA,nvA,noB,nvB,n
+double precision, intent(in) :: EnA(n),EnB(n)
+real*8, intent(in)  :: ints(nva,noa,nvb,nob)
+real*8, intent(out) :: amps(nva,noa,nvb,nob)
+
+integer :: ip,iq,ir,is
+integer :: ipp,irr
+real*8 :: dEnA,dEnB
+!real*8 :: e2du
+
+amps = 0d0
+
+!e2du=0d0
+do is=1,noB
+   do ir=1,nvB
+      irr=ir+noB
+      dEnB = EnB(irr)-EnB(is)
+      do iq=1,noA
+         do ip=1,nvA
+            ipp=ip+noA
+            dEnA = EnA(ipp)-EnA(iq)
+            amps(ip,iq,ir,is) = ints(ip,iq,ir,is)/(dEnA+dEnB)
+            !e2du = e2du + ints(ip,iq,ir,is)**2/(dEnA+dEnB)
+         enddo
+      enddo
+   enddo
+enddo
+!print*, 'e2du aa =', e2du*1000
+
+end subroutine calc_amps
+
+subroutine vterm1_e2exd(ene,amps,ints,Sab,nva,noa,nvb,nob)
+!
+! Term1: +v(a',i,b',j) . S(a',b) . t(a,i,b,j) . S(b'a)
+!
+integer, intent(in) :: noA,nvA,noB,nvB
+real*8, intent(in)  :: Sab(nva,nvb)
+real*8, intent(in)  :: ints(nva,noa,nvb,nob)
+real*8, intent(in)  :: amps(nva,noa,nvb,nob)
+real*8, intent(out) :: ene
+
+integer :: i,j
+integer :: novo
+real*8,allocatable  :: P(:,:,:,:),Q(:,:,:,:)
+
+novo = noa*nvb*nob
+
+allocate(P(nvb,noa,nvb,nob),Q(nvb,nob,nvb,noa))
+
+call dgemm('T','N',nvb,novo,nva,1d0,Sab,nva,ints,nva,0d0,P,nvb)
+call tranP_vterm1(P,Q,nvb*noa,nvb*nob)
+
+deallocate(P)
+
+allocate(P(nva,nob,nvb,noa))
+call dgemm('N','N',nva,novo,nvb,1d0,Sab,nva,Q,nvb,0d0,P,nva)
+
+do j=1,nob
+   do i=1,noa
+      ene = ene + sum(P(:,j,:,i)*amps(:,i,:,j))
+   enddo
+enddo
+
+deallocate(Q,P)
+
+end subroutine vterm1_e2exd
+
+subroutine tranP_vterm1(P,Q,novab,novbb)
+!
+! transpose P to Q
+!
+integer, intent(in) :: novab,novbb
+real*8, intent(in)  :: P(novab,novbb)
+real*8, intent(out) :: Q(novbb,novab)
+
+Q = transpose(P)
+
+end subroutine tranP_vterm1
+
+subroutine vterm2_e2exd(ene,amps,ints,Sab,nva,noa,nvb,nob)
+!
+! Term2: -v(a,i',b',j) . S(i',b') . t(a,i,b,j) . S(i,b)
+!
+integer, intent(in) :: noA,nvA,noB,nvB
+real*8, intent(in)  :: Sab(noa,nvb)
+real*8, intent(in)  :: ints(nva,noa,nvb,nob)
+real*8, intent(in)  :: amps(nva,noa,nvb,nob)
+real*8, intent(out) :: ene
+
+integer :: j,a
+real*8  :: P(nva,nob), Q(nva,nob)
+
+P=0d0 ; Q=0d0
+do j=1,nob
+   do a=1,nva
+      P(a,j) = sum(ints(a,:,:,j)*Sab(:,:))
+      Q(a,j) = sum(amps(a,:,:,j)*Sab(:,:))
+   enddo
+enddo
+
+ene = ene - sum(P(:,:)*Q(:,:))
+
+end subroutine vterm2_e2exd
+
+subroutine vterm3_e2exd(ene,amps,ints,Sba,nva,noa,nvb,nob)
+!
+! Term2: +v(a,i,b',j) . S(b',i') . t(a,i,b,j) . S(b,i')
+!
+integer, intent(in) :: noA,nvA,noB,nvB
+real*8, intent(in)  :: Sba(nvb,noa)
+real*8, intent(in)  :: ints(nva*noa,nvb,nob)
+real*8, intent(in)  :: amps(nva*noa,nvb,nob)
+real*8, intent(out) :: ene
+
+integer :: j
+integer :: nova
+real*8,allocatable :: P(:,:,:),Q(:,:,:)
+
+nova = noa*nva
+
+allocate(P(nva*noa,noa,nob),Q(nva*noa,noa,nob))
+
+do j=1,nob
+   call dgemm('N','N',nova,noa,nvb,1d0,ints(:,:,j),nova,Sba,nvb,0d0,P(:,:,j),nova)
+   call dgemm('N','N',nova,noa,nvb,1d0,amps(:,:,j),nova,Sba,nvb,0d0,Q(:,:,j),nova)
+enddo
+
+ene = ene + sum(P(:,:,:)*Q(:,:,:))
+
+deallocate(Q,P)
+
+end subroutine vterm3_e2exd
+
+subroutine vterm4_e2exd(ene,amps,ints,Sab,nva,noa,nvb,nob)
+!
+! Term 4: -v(a',i,b,j') . S(a',j') . t(a,i,b,j) . S(a,j)
+!
+integer, intent(in) :: noA,nvA,noB,nvB
+real*8, intent(in)  :: Sab(nva,nob)
+real*8, intent(in)  :: ints(nva,noa,nvb,nob)
+real*8, intent(in)  :: amps(nva,noa,nvb,nob)
+real*8, intent(out) :: ene
+
+integer :: i,b
+real*8  :: P(noa,nvb), Q(noa,nvb)
+
+P=0d0 ; Q=0d0
+do i=1,noa
+   do b=1,nvb
+      P(i,b) = sum(ints(:,i,b,:)*Sab(:,:))
+      Q(i,b) = sum(amps(:,i,b,:)*Sab(:,:))
+   enddo
+enddo
+
+ene = ene - sum(P(:,:)*Q(:,:))
+
+end subroutine vterm4_e2exd
+
+subroutine vterm5_e2exd(ene,amps,ints,Sab,nva,noa,nvb,nob)
+!
+! Term 5: +v(a',i,b,j) . S(a',j') . t(a,i,b,j) . S(a,j')
+!
+integer, intent(in) :: noA,nvA,noB,nvB
+real*8, intent(in)  :: Sab(nva,nob)
+real*8, intent(in)  :: ints(nva,noa*nvb*nob)
+real*8, intent(in)  :: amps(nva,noa*nvb*nob)
+real*8, intent(out) :: ene
+
+integer :: novo
+real*8,allocatable :: P(:,:),Q(:,:)
+
+novo = noa*nvb*nob
+allocate(P(nob,novo),Q(nob,novo))
+
+call dgemm('T','N',nob,novo,nva,1d0,Sab,nva,ints,nva,0d0,P,nob)
+call dgemm('T','N',nob,novo,nva,1d0,Sab,nva,amps,nva,0d0,Q,nob)
+
+ene = ene + sum(P*Q)
+
+deallocate(Q,P)
+
+end subroutine vterm5_e2exd
+
+subroutine vterm6_e2exd(ene,amps,ints,Sba,nva,noa,nvb,nob)
+!
+! Term6: +v(a,i',b,j') . S(j',i) . t(a,i,b,j) . S(j,i')
+!
+integer, intent(in) :: noA,nvA,noB,nvB
+real*8, intent(in)  :: Sba(nob,noa)
+real*8, intent(in)  :: ints(nva*noa*nvb,nob)
+real*8, intent(in)  :: amps(nva*noa*nvb,nob)
+real*8, intent(out) :: ene
+
+integer :: i,j
+integer :: nvov
+real*8,allocatable  :: P(:,:,:,:),Q(:,:,:,:)
+
+nvov = nva*noa*nvb
+
+allocate(P(nva,noa,nvb,noa),Q(nva,noa,nvb,noa))
+
+call dgemm('N','N',nvov,noa,nob,1d0,ints,nvov,Sba,nob,0d0,P,nvov)
+call dgemm('N','N',nvov,noa,nob,1d0,amps,nvov,Sba,nob,0d0,Q,nvov)
+
+do j=1,noa
+   do i=1,noa
+      ene = ene + sum(P(:,j,:,i)*Q(:,i,:,j))
+   enddo
+enddo
+
+deallocate(Q,P)
+
+end subroutine vterm6_e2exd
+
+subroutine vterm7_e2exd(ene,amps,ints,Sab,nva,noa,nvb,nob)
+!
+! Term 7: -v(a,i,b,j') . t(a,i,b,j) . S(i',j') . S(i',j)
+!
+integer, intent(in) :: noA,nvA,noB,nvB
+real*8, intent(in)  :: Sab(noa,nob)
+real*8, intent(in)  :: ints(nva*noa*nvb,nob)
+real*8, intent(in)  :: amps(nva*noa*nvb,nob)
+real*8, intent(out) :: ene
+
+integer :: j,jp
+real*8  :: P(nob,nob),Q(nob,nob)
+
+P=0d0
+do j=1,nob
+   do jp=1,nob
+      P(jp,j) = sum(ints(:,jp)*amps(:,j))
+   enddo
+enddo
+
+call dgemm('T','N',nob,nob,noa,1d0,Sab,noa,Sab,noa,0d0,Q,nob)
+
+ene = ene - sum(P*Q)
+
+end subroutine vterm7_e2exd
+
+subroutine vterm8_e2exd(ene,amps,ints,Sab,nva,noa,nvb,nob)
+!
+! Term 8: -v(a,i',b,j) . t(a,i,b,j) . S(i',j') . S(i,j')
+!
+integer, intent(in) :: noA,nvA,noB,nvB
+real*8, intent(in)  :: Sab(noa,nob)
+real*8, intent(in)  :: ints(nva,noa,nvb*nob)
+real*8, intent(in)  :: amps(nva,noa,nvb*nob)
+real*8, intent(out) :: ene
+
+integer :: i,ip
+real*8  :: P(noa,noa),Q(noa,noa)
+
+P=0d0
+do i=1,noa
+   do ip=1,noa
+      P(ip,i) = sum(ints(:,ip,:)*amps(:,i,:))
+   enddo
+enddo
+
+call dgemm('N','T',noa,noa,nob,1d0,Sab,noa,Sab,noa,0d0,Q,noa)
+
+ene = ene - sum(P*Q)
+
+end subroutine vterm8_e2exd
+
+subroutine oterms15_e2exd(ene,amps,Soo,Svo,Svv,Wa,Wb,nva,noa,nvb,nob)
+!
+! omega terms 1 and 5
+! term 1 : -t(a,i,b,j) . S(a,j) . S(i,j') . wA(j',b)
+! term 5 : -t(a,i,b,j) . S(a,j) . wB(i,a'). S(a',b)
+!
+implicit none
+
+integer, intent(in) :: noA,nvA,noB,nvB
+real*8, intent(in)  :: Soo(noa,nob),Svo(nva,nob),Svv(nva,nvb)
+real*8, intent(in)  :: Wa(nob,nvb),Wb(noa,nva)
+real*8, intent(in)  :: amps(nva,noa,nvb,nob)
+real*8, intent(out) :: ene
+
+integer :: i,b
+real*8 ::  P(noa,nvb),Q(noa,nvb)
+real*8 :: t1, t5
+
+P=0d0
+do b=1,nvb
+   do i=1,noa
+      P(i,b) = P(i,b) + sum(amps(:,i,b,:)*Svo(:,:))
+   enddo
+enddo
+
+call dgemm('N','N',noa,nvb,nob,1d0,Soo,noa,Wa,nob,0d0,Q,noa)
+
+t1 = t1 - sum(P*Q)
+print*, 'Om term 1 =', t1
+
+call dgemm('N','N',noa,nvb,nva,1d0,Wb,noa,Svv,nva,0d0,Q,noa)
+
+t5 = t5 + sum(P*Q)
+print*, 'Om term 5 =', t5
+
+ene = ene + t1 + t5
+
+end subroutine oterms15_e2exd
+
+subroutine oterms36_e2exd(ene,amps,Soo,Sov,Svv,Wa,Wb,nva,noa,nvb,nob)
+!
+! omega terms 3 and 6
+! term 3 : -t(a,i,b,j) . S(i,b) . wB(a,i'). S(i',j)
+! term 6 : +t(a,i,b,j) . S(i,b) . S(a,b') . wA(b',j)
+!
+implicit none
+
+integer, intent(in) :: noA,nvA,noB,nvB
+real*8, intent(in)  :: Soo(noa,nob),Sov(noa,nvb),Svv(nva,nvb)
+real*8, intent(in)  :: Wa(nob,nvb),Wb(noa,nva)
+real*8, intent(in)  :: amps(nva,noa,nvb,nob)
+real*8, intent(out) :: ene
+
+integer :: j,a
+real*8 :: WaT(nvb,nob)
+real*8 :: P(nva,nob),Q(nva,nob)
+real*8 :: t3, t6
+
+P=0d0
+do j=1,nob
+   do a=1,nva
+      P(a,j) = P(a,j) + sum(amps(a,:,:,j)*Sov(:,:))
+   enddo
+enddo
+
+call dgemm('T','N',nva,nob,noa,1d0,Wb,noa,Soo,noa,0d0,Q,nva)
+
+t3 = - sum(P*Q)
+print*, 'Om term 3 =', t3
+
+WaT=transpose(Wa)
+call dgemm('N','N',nva,nob,nvb,1d0,Svv,nva,WaT,nvb,0d0,Q,nva)
+
+t6 = sum(P*Q)
+print*, 'Om term 6 =', t6
+
+ene = ene + t3 + t6
+
+end subroutine oterms36_e2exd
+
+subroutine oterm2_e2exd(ene,amps,Soo,Svo,Wa,nva,noa,nvb,nob)
+!
+! omega term 2
+! term 2 : t(a,i,b,j) . wA(b,j). S(a,j').S(j',i)
+!
+implicit none
+
+integer, intent(in) :: noA,nvA,noB,nvB
+real*8, intent(in)  :: Soo(nob,noa),Svo(nva,nob)
+real*8, intent(in)  :: Wa(nob,nvb)
+real*8, intent(in)  :: amps(nva*noa,nvb*nob)
+real*8, intent(out) :: ene
+
+integer :: nova,novb
+real*8 :: WaT(nvb,nob)
+real*8 :: P(nva,noa),Q(nva,noa)
+
+nova = nva*noa
+novb = nvb*nob
+
+WaT=transpose(Wa)
+call dgemv('N',nova,novb,1d0,amps,nova,WaT,1,0d0,P,1)
+call dgemm('N','N',nva,noa,nob,1d0,Svo,nva,Soo,nob,0d0,Q,nva)
+
+ene = sum(P*Q)
+
+print*, 'Om Term 2 =', ene
+
+end subroutine oterm2_e2exd
+
+subroutine oterm4_e2exd(ene,amps,Soo,Svo,Wb,nva,noa,nvb,nob)
+!
+! omega term 4
+! term 4 : t(a,i,b,j) . wB(a,i). S(i',b).S(i',j)
+!
+implicit none
+
+integer, intent(in) :: noA,nvA,noB,nvB
+real*8, intent(in)  :: Soo(noa,nob),Svo(nvb,noa)
+real*8, intent(in)  :: Wb(noa,nva)
+real*8, intent(in)  :: amps(nva*noa,nvb*nob)
+real*8, intent(out) :: ene
+
+integer :: nova,novb
+real*8 :: WbT(nva,noa)
+real*8 :: P(nvb,nob),Q(nvb,nob)
+
+nova = nva*noa
+novb = nvb*nob
+
+WbT=transpose(Wb)
+call dgemv('T',nova,novb,1d0,amps,nova,WbT,1,0d0,P,1)
+call dgemm('N','N',nvb,nob,noa,1d0,Svo,nvb,Soo,noa,0d0,Q,nvb)
+
+ene = sum(P*Q)
+
+print*, 'Om Term 4 =', ene
+
+end subroutine oterm4_e2exd
+
 end module sapt_open
+

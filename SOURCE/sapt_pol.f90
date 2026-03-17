@@ -2299,9 +2299,9 @@ deallocate(OmA1)
 
 end subroutine e2disp_semi
 
-subroutine e2disp_o(A,B,SAPT)
+subroutine e2disp_o(Flags,A,B,SAPT)
 !
-! calculated unrestricted uncoupled dispersion energy
+! calculated unrestricted uncoupled / coupled dispersion energy
 !
 implicit none
 
@@ -2310,8 +2310,12 @@ type(SystemBlock) :: A, B
 type(SaptData)    :: SAPT
 
 integer :: NBasis
+integer :: ANDimX,BNDimX
 double precision :: e2daa,e2dbb,e2dab,e2dba
 double precision :: e2du
+
+real*8, allocatable :: OmA(:),OmB(:)
+real*8, allocatable :: EVecA(:,:),EVecB(:,:)
 
 NBasis = A%NBasis
 
@@ -2329,10 +2333,29 @@ if(SAPT%IPrint>=10) write(LOUT,'(1x,a,f16.8)') 'E2disp(unc,bb) = ', e2dbb*1000d0
 e2du = e2daa + e2dbb + e2dab + e2dba
 SAPT%e2disp_unc = e2du
 
+! summary unc
+call print_en('E2disp(unc)',e2du*1000,.false.)
+
+if (Flags%SaptLevel==0) return
+
 ! coupled
 
-! summary
-call print_en('E2disp(unc)',e2du*1000,.false.)
+ANDimX = A%NOVa+A%NOVb
+BNDimX = B%NOVa+B%NOVb
+
+allocate(EVecA(ANDimX,ANdimX),OmA(ANDimX))
+allocate(EVecB(BNDimX,BNdimX),OmB(BNDimX))
+
+call readresp(EVecA,OmA,ANDimX,'EIGPRBLA')
+call readresp(EVecB,OmB,BNDimX,'EIGPRBLA')
+
+print*, 'EVecA', norm2(EVecA)
+print*, 'EVecB', norm2(EVecB)
+
+!call assemble_pqrs_uks(ovov,ANDimX,BNDimX)
+
+deallocate(OmB,EVecB)
+deallocate(OmA,EVecA)
 
 end subroutine e2disp_o
 
