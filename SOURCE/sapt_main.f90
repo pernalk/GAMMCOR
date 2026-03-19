@@ -2352,6 +2352,7 @@ if(SAPT%SaptLevel==0) then
   ! write(LOUT,'(1x,a,t19,a,f16.8)') 'E2ind(unc)',   '=', SAPT%e2ind_unc*1.d03
    write(LOUT,'(1x,a,t19,a,f16.8)') 'E2ind',        '=', SAPT%e2ind*1.d03
    write(LOUT,'(1x,a,t19,a,f16.8)') 'E2disp(unc)',  '=', SAPT%e2disp_unc*1.d03
+   write(LOUT,'(1x,a,t19,a,f16.8)') 'E2exch-disp(unc)','=', SAPT%e2exdisp_unc*1.0d3
 elseif(SAPT%SaptLevel==2) then
 !   write(LOUT,'(1x,a,t19,a,f16.8)') 'E2ind',      '=', SAPT%e2ind*1.d03
 !   write(LOUT,'(1x,a,t19,a,f16.8)') 'E2exch-ind', '=', SAPT%e2exind*1.0d3
@@ -2706,6 +2707,12 @@ deallocate(SAPT%monA%UOrbE,SAPT%monB%UOrbE)
 deallocate(SAPT%monA%WPot,SAPT%monB%WPot)
 
 if(Flags%ICholesky==0) call delfile('AOTWOSORT')
+
+call delfile ('ONEEL_A')
+call delfile ('ONEEL_B')
+
+call delfile ('ABMAT_A')
+call delfile ('ABMAT_B')
 
 call delfile('OVOVABbb')
 call delfile('OVOVABaa')

@@ -897,7 +897,7 @@ call tran2MO(B%WPot,A%UMO(:,:,2),A%UMO(:,:,2),Wbb,NBasis)
 
 ! uncoupled + coupled
 call solve_cpuhf(A,B%WPot,e2ba_unc,e2ba,Flags,NBasis)
-call solve_cpuhf(B,A%WPot,e2ba_unc,e2ab,Flags,NBasis)
+call solve_cpuhf(B,A%WPot,e2ab_unc,e2ab,Flags,NBasis)
 
 e2ind_unc = e2ba_unc + e2ab_unc
 e2ind     = e2ba + e2ab
