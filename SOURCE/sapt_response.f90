@@ -2280,7 +2280,7 @@ call AB_UKS_FOFO(ABPlus,ABMin,Mon%NOa,Mon%NVa,Mon%NOb,Mon%NVb,NDimX,NBasis, &
 
 open(newunit=iunit,file=abfile,form='unformatted')
 write(iunit) NDimX
-write(iunit) ABMin
+write(iunit) ABPlus
 close(iunit)
 
 if (Flags%SaptLevel==0) then 
@@ -2307,12 +2307,10 @@ print*, 'Eig...',norm2(Eig)
 !  print*, i, Eig(i)
 !enddo
 print*, 'EigVecR',norm2(EigVecR)
-do i=1,NdimX
-  write(6,'(*(f13.8))') (EigVecR(i,j),j=1,NdimX)
-enddo
-write(LOUT,'()')
-
-
+!do i=1,NdimX
+!  write(6,'(*(f13.8))') (EigVecR(i,j),j=1,NdimX)
+!enddo
+!write(LOUT,'()')
 
 ! dump response
 open(newunit=iunit,file=propfile,form='unformatted')

@@ -1607,6 +1607,22 @@ call make_K(nao,PBb,Kbb,'AOTWOSORT')
 hba = Vb + Jalpha + JBeta - Kba
 hbb = Vb + Jalpha + JBeta - Kbb
 
+! save k matrices for exch-ind
+allocate(A%ka(nao,nao),A%kb(nao,nao))
+allocate(B%ka(nao,nao),B%kb(nao,nao))
+A%Ka = Kaa
+A%Kb = Kab
+B%Ka = Kba
+B%Kb = Kbb
+
+! save h matrices for exch-ind
+allocate(A%ha(nao,nao),A%hb(nao,nao))
+allocate(B%ha(nao,nao),B%hb(nao,nao))
+A%ha = haa
+A%hb = hab
+B%ha = hba
+B%hb = hbb
+
 if(SAPT%IPrint>=50) then
    print*, '-----'
    print*, 'hBa =', norm2(hBa)

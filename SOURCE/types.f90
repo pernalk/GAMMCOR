@@ -235,6 +235,10 @@ type SystemBlock
       integer :: NVZero = 0
       integer :: TwoMoInt = TWOMO_INCORE
       integer :: NatOrb = 0 ! if 1, natural orbs from Molpro
+      ! ha = Va + Ja + Jb - Ka
+      double precision, allocatable :: ha(:,:),hb(:,:)
+      double precision, allocatable :: Ka(:,:),Kb(:,:)
+      double precision, allocatable :: ta(:),tb(:)
 
       logical :: DeclareTwoMo     = .false.
       logical :: DeclareSt        = .false.

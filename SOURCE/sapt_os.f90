@@ -380,10 +380,318 @@ deallocate(Vbab)
 
 end subroutine e1exchs2_os
 
+subroutine e2exind_o(Flags,A,B,SAPT)
+!
+! uncoupled E2exch-ind
+! see Eq. (21) in 2012 JCP paper
+!
+use timing
+
+implicit none
+
+type(FlagsData)   :: Flags
+type(SystemBlock) :: A, B
+type(SaptData)    :: SAPT
+
+integer :: NAO,NMO
+integer :: i
+
+real(8) :: e2exi_ba(4),e2exi_ab(4)
+real(8) :: e2exi_ab_sum,e2exi_ba_sum,e2exi
+
+real(8), allocatable :: S(:,:)
+real(8), allocatable :: Oa(:,:),Ob(:,:)
+real(8), allocatable :: JOa(:,:),JOb(:,:)
+real(8), allocatable :: JPBSOa(:,:),JPBSOb(:,:)
+real(8), allocatable :: JPASOa(:,:),JPASOb(:,:)
+real(8), allocatable :: Paa(:,:),Pab(:,:),Pba(:,:),Pbb(:,:)
+real(8), allocatable :: work(:,:)
+
+! set dimensions
+NAO = SAPT%NAO
+NMO = A%NBasis
+
+allocate(PAa(nao,nao),PAb(nao,nao))
+allocate(PBa(nao,nao),PBb(nao,nao))
+call get_den(nmo,A%UMO(:,:,1),A%Uocc(:,1),1d0,PAa)
+call get_den(nmo,A%UMO(:,:,2),A%Uocc(:,2),1d0,PAb)
+call get_den(nmo,B%UMO(:,:,1),B%Uocc(:,1),1d0,PBa)
+call get_den(nmo,B%UMO(:,:,2),B%Uocc(:,2),1d0,PBb)
+
+allocate(S(nao,nao),work(nao,nao))
+call get_one_mat('S',S,A%Monomer,nao)
+
+if(SAPT%IPrint>=50) then
+   print*, '-----'
+   print*, 'KAa =', norm2(A%Ka)
+   print*, 'KAb =', norm2(A%Kb)
+   print*, '-----'
+   print*, 'KBa =', norm2(B%Ka)
+   print*, 'KBb =', norm2(B%Kb)
+   print*, '-----'
+endif
+
+if(SAPT%IPrint>=50) then
+   print*, '-----'
+   print*, 'hAa =', norm2(A%ha)
+   print*, 'hAb =', norm2(A%hb)
+   print*, '-----'
+   print*, 'hBa =', norm2(B%ha)
+   print*, 'hBb =', norm2(B%hb)
+   print*, '-----'
+endif
+
+! o matrices
+allocate(Oa(nao,nao),Ob(nao,nao))
+call dgemm('N','N',nao,nao,nao,1d0,PAa,nao,S,nao,0d0,work,nao)
+call dgemm('N','N',nao,nao,nao,1d0,work,nao,PBa,nao,0d0,Oa,nao)
+call dgemm('N','N',nao,nao,nao,1d0,PAb,nao,S,nao,0d0,work,nao)
+call dgemm('N','N',nao,nao,nao,1d0,work,nao,PBb,nao,0d0,Ob,nao)
+
+if(SAPT%IPrint>=50) then
+   print*, '-----'
+   print*, 'Oa =', norm2(Oa)
+   print*, 'Ob =', norm2(Ob)
+   print*, '-----'
+   print*, 'tAa',norm2(A%ta)
+   print*, 'tBa',norm2(A%tb)
+   print*, '-----'
+endif
+
+!!!!!!!!!!!!!!!!!!!!
+! E2exch-ind(A<--B)
+!!!!!!!!!!!!!!!!!!!!
+e2exi_ba=0d0
+allocate(JOa(nao,nao),JOb(nao,nao))
+allocate(JPBSOa(nao,nao),JPBSOb(nao,nao))
+! alpha-alpha
+call e2exi_terms_SameSpin(e2exi_ba(1),A%UMO(:,:,1),PAa,PBa,S,A%ta,A%WPot,B%WPot,&
+                          A%ha,B%ha,B%Ka,Oa,JOa,JPBSOa,A%NOa,A%NVa,nao,nmo)
+! beta-beta
+call e2exi_terms_SameSpin(e2exi_ba(2),A%UMO(:,:,2),PAb,PBb,S,A%tb,A%WPot,B%WPot,&
+                          A%hb,B%hb,B%Kb,Ob,JOb,JPBSOb,A%NOb,A%NVb,nao,nmo)
+! alpha-beta/beta-alpha
+call e2exi_terms_OppSpin(e2exi_ba(3),A%UMO(:,:,1),A%UMO(:,:,2),A%ta,A%tb,JOa,JOb,&
+                         JPBSOa,JPBSOb,A%NOa,A%NVa,A%NOb,A%NVb,nao,nmo)
+
+e2exi_ba_sum = sum(e2exi_ba)
+call print_en('E2exch-ind(A<--B)',e2exi_ba_sum*1.0d3,.true.)
+deallocate(JPBSOb,JPBSOa)
+
+!!!!!!!!!!!!!!!!!!!!
+! E2exch-ind(A-->B)
+!!!!!!!!!!!!!!!!!!!!
+e2exi_ab=0d0
+
+! transpose O
+work = Oa
+Oa = transpose(work)
+work = Ob
+Ob = transpose(work)
+
+allocate(JPASOa(nao,nao),JPASOb(nao,nao))
+! alpha-alpha
+call e2exi_terms_SameSpin(e2exi_ab(1),B%UMO(:,:,1),PBa,PAa,S,B%ta,B%WPot,A%WPot,&
+                          B%ha,A%ha,A%Ka,Oa,JOa,JPASOa,B%NOa,B%NVa,nao,nmo)
+! beta-beta
+call e2exi_terms_SameSpin(e2exi_ab(2),B%UMO(:,:,2),PBb,PAb,S,B%tb,B%WPot,A%WPot,&
+                          B%hb,A%hb,A%Kb,Ob,JOb,JPASOb,B%NOb,B%NVb,nao,nmo)
+! alpha-beta/beta-alpha
+call e2exi_terms_OppSpin(e2exi_ab(3),B%UMO(:,:,1),B%UMO(:,:,2),B%ta,B%tb,JOa,JOb,&
+                         JPASOa,JPASOb,B%NOa,B%NVa,B%NOb,B%NVb,nao,nmo)
+
+e2exi_ab_sum = sum(e2exi_ab)
+call print_en('E2exch-ind(B<--A)',e2exi_ab_sum*1.0d3,.true.)
+
+e2exi = e2exi_ba_sum + e2exi_ab_sum
+SAPT%e2exind = e2exi
+call print_en('E2exch-ind',e2exi*1.0d3,.false.)
+
+deallocate(JPASOb,JPASOa)
+deallocate(Ob,Oa)
+deallocate(work,S)
+deallocate(PBb,PBa,PAb,PAa)
+
+end subroutine e2exind_o
+
+subroutine e2exi_terms_SameSpin(e2exi_ss,CA,PA,PB,S,tA,WA,WB,hA,hB,KB,O,JO,JPBSO,noa,nva,nao,nmo)
+!
+! Same spin
+! returns E2ind(A<--B)
+! together with JO JPBSO matrices
+!
+! see Eq. (17) in https://doi.org/10.1063/5.0090688
+!
+integer,intent(in) :: noa,nva
+integer,intent(in) :: nao,nmo
+real*8,intent(in)  :: tA(noa*nva)
+real*8,intent(in)  :: PA(nao,nao),PB(nao,nao)
+real*8,intent(in)  :: CA(nao,nmo),S(nao,nao)
+real*8,intent(in)  :: WA(nao,nao),WB(nao,nao)
+real*8,intent(in)  :: hA(nao,nao),hB(nao,nao)
+real*8,intent(in)  :: KB(nao,nao),O(nao,nao)
+!
+real*8,intent(out) :: e2exi_ss
+real*8,intent(out) :: JO(nao,nao),JPBSO(nao,nao)
+
+integer :: i,j,ij
+real*8  :: intvo(nva,noa)
+real*8  :: PBS(nao,nao),PBSO(nao,nao)
+real*8  :: SPA(nao,nao),SPAWB(nao,nao)
+real*8  :: WAPBS(nao,nao),WBPAS(nao,nao)
+real*8  :: Ko(nao,nao)
+real*8  :: intao(nao,nao)
+real*8  :: intA(nao,nao),intB(nao,nao)
+real*8 ::  tAao(nao,nao),tmp(nao,nva)
+real*8,allocatable :: work(:,:)
+
+double precision,external  :: trace
+
+call dgemm('N','N',nao,nao,nao,1d0,PB,nao,S,nao,0d0,PBS,nao)
+call dgemm('N','N',nao,nao,nao,1d0,PBS,nao,O,nao,0d0,PBSO,nao)
+
+call dgemm('N','N',nao,nao,nao,1d0,S,nao,PA,nao,0d0,SPA,nao)
+call dgemm('N','N',nao,nao,nao,1d0,SPA,nao,WB,nao,0d0,SPAWB,nao)
+
+call dgemm('N','N',nao,nao,nao,1d0,WA,nao,PBS,nao,0d0,WAPBS,nao)
+call dgemm('N','T',nao,nao,nao,1d0,WB,nao,SPA,nao,0d0,WBPAS,nao)
+
+call make_J1(nao,O,Jo,'AOTWOSORT')
+call make_J1(nao,PBSO,JPBSO,'AOTWOSORT')
+call make_K(nao,O,Ko,'AOTWOSORT')
+
+!print*, 'Jo=', norm2(Jo)
+!print*, 'Ko=', norm2(Ko)
+
+! test terms 1
+intao=KB+Jo-Ko-JPBSO
+
+allocate(work(nao,nao))
+! test terms 2
+!call dgemm('T','N',nao,nao,nao,1d0,PBS,nao,hA,nao,0d0,intA,nao)
+!call dgemm('T','N',nao,nao,nao,1d0,PBS,nao,SPAWB,nao,-1d0,intA,nao)
+!call dgemm('T','N',nao,nao,nao,1d0,PBS,nao,WAPBS,nao,-1d0,intA,nao)
+!call dgemm('T','T',nao,nao,nao,1d0,PBS,nao,Ko,nao,0d0,intA,nao)
+
+work = transpose(Ko)
+work = work + hA - SPAWB- WAPBS
+call dgemm('T','N',nao,nao,nao,1d0,PBS,nao,work,nao,0d0,intA,nao)
+
+! test terms 3
+!call dgemm('N','N',nao,nao,nao,1d0,hB,nao,PBS,nao,0d0,intB,nao)
+!call dgemm('N','N',nao,nao,nao,1d0,WBPAS,nao,PBS,nao,0d0,intB,nao)
+!call dgemm('N','N',nao,nao,nao,1d0,Ko,nao,PBS,nao,0d0,intB,nao)
+!call dgemm('N','N',nao,nao,nao,1d0,Ko,nao,PBS,nao,0d0,intB,nao)
+
+work = 0d0
+work = hB-WBPAS+Ko
+call dgemm('N','N',nao,nao,nao,1d0,work,nao,PBS,nao,0d0,intB,nao)
+
+intao=intao+intA+intB
+
+deallocate(work)
+
+!allocate(work(nva,nao))
+!! intvo=Cvirt^T(nao,nvirt).inter(nao,nao).Cocc(nao,occ)
+!call dgemm('T','N',nva,nao,nao,1d0,CA(:,noa+1:nmo),nao,intao,nao,0d0,work,nva)
+!call dgemm('N','N',nva,noa,nao,1d0,work,nva,CA(:,1:noa),nao,0d0,intvo,nva)
+!!
+!!print*, 'intvo =',norm2(intvo)
+!!
+!!! e2exi = xA.intvo
+!e2exi_ss = 0d0
+!ij = 0
+!do j=1,noa
+!   do i=1,nva
+!      ij = ij + 1
+!      !print*, 'tA(ij)',ij,tA(ij),intvo(i,j)
+!      e2exi_ss = e2exi_ss + tA(ij)*intvo(i,j)
+!   enddo
+!enddo
+!print*, 'e2exch-ind aa =', e2exi_ss
+!
+!deallocate(work)
+
+call tranMO2AO_vovo(tAao,tA,CA,noa,nva,nao,nmo)
+
+allocate(work(nao,nao))
+call dgemm('T','N',nao,nao,nao,1d0,tAao,nao,intao,nao,0d0,work,nao)
+e2exi_ss = 0d0
+do i=1,nao
+      e2exi_ss = e2exi_ss - work(i,i)
+enddo
+print*, 'e2exch-ind aa =', e2exi_ss
+
+deallocate(work)
+
+end subroutine e2exi_terms_SameSpin
+
+subroutine tranMO2AO_vovo(tout,tin,C,no,nv,nao,nmo)
+integer,intent(in) :: no,nv,nao,nmo
+real*8,intent(in)  :: tin(nv,no),C(nao,nmo)
+real*8,intent(out) :: tout(nao,nao)
+
+integer :: i,j,ij
+real*8  :: tmp(nao,nv)
+
+call dgemm('N','T',nao,nv,no,1d0,C(1:nao,1:no),nao,tin,nv,0d0,tmp,nao)
+call dgemm('N','T',nao,nao,nv,1d0,tmp,nao,C(1:nao,no+1:nao),nao,0d0,tout,nao)
+
+end subroutine tranMO2AO_vovo
+
+subroutine e2exi_terms_OppSpin(e2exi_os,CAa,CAb,tAa,tAb,JOa,JOb,JPBSOa,JPBSOb,noa_a,nva_a,noa_b,nva_b,nao,nmo)
+!
+! Opposite ab spin
+! returns E2ind(A<--B)
+!
+integer,intent(in) :: noa_a,nva_a,noa_b,nva_b
+integer,intent(in) :: nao,nmo
+real*8,intent(in)  :: CAa(nao,nmo),CAb(nao,nao)
+real*8,intent(in)  :: tAa(noa_a*nva_a),tAb(noa_b*nva_b)
+real*8,intent(in)  :: JOa(nao,nao),JOb(nao,nao)
+real*8,intent(in)  :: JPBSOa(nao,nao),JPBSOb(nao,nao)
+
+real*8,intent(out) :: e2exi_os
+
+integer :: i
+real*8 :: vala,valb
+real*8 :: tAao(nao,nao),intao(nao,nao)
+real(8), allocatable :: work(:,:)
+
+! t-alpha
+allocate(work(nao,nao))
+intao = JOb-JPBSOb
+call tranMO2AO_vovo(tAao,tAa,CAa,noa_a,nva_a,nao,nmo)
+call dgemm('T','N',nao,nao,nao,1d0,tAao,nao,intao,nao,0d0,work,nao)
+
+vala = 0d0
+do i=1,nao
+      vala = vala - work(i,i)
+enddo
+print*, 'e2exch-ind ab =', vala
+
+! t-beta
+intao = JOa-JPBSOa
+call tranMO2AO_vovo(tAao,tAb,CAb,noa_b,nva_b,nao,nmo)
+call dgemm('T','N',nao,nao,nao,1d0,tAao,nao,intao,nao,0d0,work,nao)
+
+valb = 0d0
+do i=1,nao
+      valb = valb - work(i,i)
+enddo
+print*, 'e2exch-ind ba =', valb
+
+e2exi_os = vala + valb
+print*, 'e2exch-ind os =', e2exi_os
+
+deallocate(work)
+
+end subroutine e2exi_terms_OppSpin
+
 subroutine e2exdisp_o(Flags,A,B,SAPT)
 !
 ! uncoupled E2exch-disp
-! see Eq. (23) in 2012 JCP paper
+! see Eq. (23) in https://doi.org/10.1063/1.4758455
 !
 use timing
 

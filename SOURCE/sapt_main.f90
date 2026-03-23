@@ -188,6 +188,7 @@ call e1exch_os(SAPT%monA,SAPT%monB,SAPT)
 call e2ind_o(Flags,SAPT%monA,SAPT%monB,SAPT)
 call e2disp_o(Flags,SAPT%monA,SAPT%monB,SAPT)
 
+call e2exind_o(Flags,SAPT%monA,SAPT%monB,SAPT)
 call e2exdisp_o(Flags,SAPT%monA,SAPT%monB,SAPT)
 
 call summary_saptuks(SAPT)
@@ -2332,14 +2333,14 @@ type(SaptData) :: SAPT
 integer          :: i,j
 double precision :: esapt2
 
-SAPT%esapt2 = SAPT%elst + SAPT%exchs2 + SAPT%e2ind &
+SAPT%esapt2 = SAPT%elst + SAPT%e1exch + SAPT%e2ind &
               + SAPT%e2exind + SAPT%e2disp + SAPT%e2exdisp
 
-SAPT%esapt0 = SAPT%elst + SAPT%exchs2 + SAPT%e2ind_unc &
-              + SAPT%e2exind_unc + SAPT%e2disp_unc + SAPT%e2exdisp_unc
+SAPT%esapt0 = SAPT%elst + SAPT%e1exch + SAPT%e2ind &
+              + SAPT%e2exind + SAPT%e2disp_unc + SAPT%e2exdisp_unc
 
 write(LOUT,'(/,8a10)') ('**********',i=1,4)
-write(LOUT,'(1x,a)') 'OS-SAPT SUMMARY / milliHartree'
+write(LOUT,'(1x,a)') 'SAPT(UKS) SUMMARY / milliHartree'
 write(LOUT,'(8a10)') ('**********',i=1,4)
 
 write(LOUT,'(1x,a,i3)') 'SAPT level  =', SAPT%SaptLevel
@@ -2350,9 +2351,11 @@ write(LOUT,'(1x,a,t19,a,f16.8)') 'E1exch    ','=', SAPT%e1exch*1.d03
 
 if(SAPT%SaptLevel==0) then
   ! write(LOUT,'(1x,a,t19,a,f16.8)') 'E2ind(unc)',   '=', SAPT%e2ind_unc*1.d03
-   write(LOUT,'(1x,a,t19,a,f16.8)') 'E2ind',        '=', SAPT%e2ind*1.d03
-   write(LOUT,'(1x,a,t19,a,f16.8)') 'E2disp(unc)',  '=', SAPT%e2disp_unc*1.d03
+   write(LOUT,'(1x,a,t19,a,f16.8)') 'E2ind',       '=', SAPT%e2ind*1.d03
+   write(LOUT,'(1x,a,t19,a,f16.8)') 'E2exch-ind',  '=', SAPT%e2exind*1.0d3
+   write(LOUT,'(1x,a,t19,a,f16.8)') 'E2disp(unc)', '=', SAPT%e2disp_unc*1.d03
    write(LOUT,'(1x,a,t19,a,f16.8)') 'E2exch-disp(unc)','=', SAPT%e2exdisp_unc*1.0d3
+   write(LOUT,'(1x,a,t19,a,f16.8)') 'Eint(SAPT0)', '=', SAPT%esapt0*1.0d3
 elseif(SAPT%SaptLevel==2) then
 !   write(LOUT,'(1x,a,t19,a,f16.8)') 'E2ind',      '=', SAPT%e2ind*1.d03
 !   write(LOUT,'(1x,a,t19,a,f16.8)') 'E2exch-ind', '=', SAPT%e2exind*1.0d3
@@ -2705,6 +2708,15 @@ deallocate(SAPT%monA%UOcc,SAPT%monB%UOcc)
 deallocate(SAPT%monA%UOrbE,SAPT%monB%UOrbE)
 ! electrostatic potential
 deallocate(SAPT%monA%WPot,SAPT%monB%WPot)
+! h matrices
+deallocate(SAPT%monA%ha,SAPT%monA%hb)
+deallocate(SAPT%monB%ha,SAPT%monB%hb)
+! k matrices
+deallocate(SAPT%monA%Ka,SAPT%monA%Kb)
+deallocate(SAPT%monB%Ka,SAPT%monB%Kb)
+! coupled ind amplitudes
+deallocate(SAPT%monA%ta,SAPT%monA%tb)
+deallocate(SAPT%monB%ta,SAPT%monB%tb)
 
 if(Flags%ICholesky==0) call delfile('AOTWOSORT')
 

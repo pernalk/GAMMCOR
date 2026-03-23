@@ -692,6 +692,11 @@ do ipq=1,NDimX
 enddo
 !print*, 'E2ind cpld =', e2ind
 
+! save amplitudes for exch-ind
+allocate(M%ta(M%NOVa),M%tb(M%NOVb))
+M%ta(1:M%NOVa)=amps(1:M%NOVa)
+M%tb(1:M%NOVb)=amps(M%NOVa+1:NDimX)
+
 call free_DIIS(DIISBlock)
 
 deallocate(delta,amps,vecR)
