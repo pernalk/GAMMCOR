@@ -1124,47 +1124,6 @@ deallocate(Sabvo_aa,Sabov_aa,Sbavo_aa)
 
 end subroutine e2exd_ovterms_OppSpin
 
-subroutine load_vovo(intfile,ints,IndNb,nva,noa,nvb,nob)
-!
-! load (VO|VO) integrals
-!
-implicit none
-
-character(*) :: intfile
-integer, intent(in) :: nva, noa, nvb, nob
-integer, intent(in) :: IndNb(2,nob*nvb)
-real*8, intent(out) :: ints(nva,noa,nvb,nob)
-
-integer :: iunit
-integer :: nova,novb
-integer :: ip,iq,ir,is,irs
-double precision :: AuxA(noA*nvA)
-
-novA = noA*nvA
-novB = noB*nvB
-
-! (OV|OV) (AA|BB) --> (VO|VO)
-open(newunit=iunit,file=intfile,status='OLD',&
-     access='DIRECT',form='UNFORMATTED',recl=8*novA)
-
-do irs=1,novB
-
-    ir  = IndNB(1,irs)
-    is  = IndNB(2,irs)
-    read(iunit,rec=is+(ir-noB-1)*noB) AuxA(1:novA)
-
-    do ip=1,nvA
-       do iq=1,noA
-          ints(ip,iq,ir-noB,is) = AuxA(iq+(ip-1)*noA)
-       enddo
-    enddo
-
-enddo
-
-close(iunit)
-
-end subroutine load_vovo
-
 subroutine calc_amps(amps,ints,EnA,EnB,nvA,noA,nvB,noB,n)
 
 integer, intent(in) :: noA,nvA,noB,nvB,n

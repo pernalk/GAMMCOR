@@ -2301,7 +2301,25 @@ end subroutine e2disp_semi
 
 subroutine e2disp_o(Flags,A,B,SAPT)
 !
-! calculated unrestricted uncoupled / coupled dispersion energy
+! calculated unrestricted uncoupled / cpld E20disp
+!
+implicit none
+
+type(FlagsData)   :: Flags
+type(SystemBlock) :: A, B
+type(SaptData)    :: SAPT
+
+if (Flags%SaptLevel==0) then
+   call e2disp_unc_o(Flags,A,B,SAPT)
+else
+   call e2disp_cpld_o(Flags,A,B,SAPT)
+endif
+
+end subroutine e2disp_o
+
+subroutine e2disp_unc_o(Flags,A,B,SAPT)
+!
+! calculated unrestricted uncoupled dispersion energy
 !
 implicit none
 
@@ -2336,28 +2354,109 @@ SAPT%e2disp_unc = e2du
 ! summary unc
 call print_en('E2disp(unc)',e2du*1000,.false.)
 
-if (Flags%SaptLevel==0) return
+end subroutine e2disp_unc_o
 
-! coupled
+subroutine e2disp_cpld_o(Flags,A,B,SAPT)
+!
+! calculated unrestricted coupled dispersion energy
+!  (uncoupled as a byproduct)
+!
+implicit none
+
+type(FlagsData)   :: Flags
+type(SystemBlock) :: A, B
+type(SaptData)    :: SAPT
+
+integer :: NBasis
+integer :: ANDimX,BNDimX
+integer :: i,j
+double precision :: e2daa,e2dbb,e2dab,e2dba
+double precision :: e2disp_unc
+double precision :: e2disp
+
+real*8, allocatable :: OmA(:),OmB(:)
+real*8, allocatable :: EVecA(:,:),EVecB(:,:)
+real*8, allocatable :: tmp(:,:),ints(:,:)
+
+NBasis = A%NBasis
 
 ANDimX = A%NOVa+A%NOVb
 BNDimX = B%NOVa+B%NOVb
 
 allocate(EVecA(ANDimX,ANdimX),OmA(ANDimX))
-allocate(EVecB(BNDimX,BNdimX),OmB(BNDimX))
+allocate(ints(ANDimX,BNdimX))
+!allocate(ints(ANDimX,BNdimX),tmp(ANDimX,BNDimX))
 
 call readresp(EVecA,OmA,ANDimX,'EIGPRBLA')
-call readresp(EVecB,OmB,BNDimX,'EIGPRBLA')
 
 print*, 'EVecA', norm2(EVecA)
+
+!call assemble_spin_ints(A,B,ints,e2disp_unc,NBasis)
+! Assemble integrals
+allocate(tmp(A%NOVa,B%NOVa))
+call load_vovo('OVOVABaa',tmp,B%IndNa,A%NVa,A%NOa,B%NVa,B%NOa)
+ints(1:A%NOVa,1:B%NOVa) = tmp(1:A%NOVa,1:B%NOVa)
+call e2do_incore_unc(e2daa,tmp,A%UOrbE(:,1),B%UOrbE(:,1),A%NOa,A%NVa,B%NOa,B%NVa)
+deallocate(tmp)
+
+allocate(tmp(A%NOVb,B%NOVb))
+call load_vovo('OVOVABbb',tmp,B%IndNb,A%NVb,A%NOb,B%NVb,B%NOb)
+ints(A%NOVa+1:ANDimX,B%NOVa+1:BNDimX) = tmp(1:A%NOVb,1:B%NOVb)
+call e2do_incore_unc(e2dbb,tmp,A%UOrbE(:,2),B%UOrbE(:,2),A%NOb,A%NVb,B%NOb,B%NVb)
+deallocate(tmp)
+
+allocate(tmp(A%NOVa,B%NOVb))
+call load_vovo('OVOVABab',tmp,B%IndNb,A%NVa,A%NOa,B%NVb,B%NOb)
+ints(1:A%NOVa,B%NOVa+1:BNDimX) = tmp(1:A%NOVa,1:B%NOVb)
+call e2do_incore_unc(e2dab,tmp,A%UOrbE(:,1),B%UOrbE(:,2),A%NOa,A%NVa,B%NOb,B%NVb)
+deallocate(tmp)
+
+allocate(tmp(A%NOVb,B%NOVa))
+call load_vovo('OVOVABba',tmp,B%IndNa,A%NVb,A%NOb,B%NVa,B%NOa)
+ints(A%NOVa+1:ANDimX,1:B%NOVa) = tmp(1:A%NOVb,1:B%NOVa)
+call e2do_incore_unc(e2dba,tmp,A%UOrbE(:,2),B%UOrbE(:,1),A%NOb,A%NVb,B%NOa,B%NVa)
+deallocate(tmp)
+
+if(SAPT%IPrint>=10) then 
+   write(LOUT,'(/1x,a,f16.8)') 'E2disp(unc,aa) = ', e2daa*1000d0
+   write(LOUT,'(1x,a,f16.8)') 'E2disp(unc,ab) = ',  e2dab*1000d0
+   write(LOUT,'(1x,a,f16.8)') 'E2disp(unc,ba) = ',  e2dba*1000d0
+   write(LOUT,'(1x,a,f16.8)') 'E2disp(unc,bb) = ',  e2dbb*1000d0
+endif
+
+e2disp_unc = e2daa + e2dbb + e2dab + e2dba
+SAPT%e2disp_unc = e2disp_unc
+
+call print_en('E2disp(unc)',e2disp_unc*1000,.false.)
+
+! coupled 
+allocate(tmp(ANDimX,BNDimX))
+call dgemm('T','N',ANDimX,BNDimX,ANDimX,1d0,EVecA,ANDimX,ints,ANDimX,0d0,tmp,ANDimX)
+
+deallocate(EVecA)
+
+allocate(EVecB(BNDimX,BNDimX),OmB(BNDimX))
+
+call readresp(EVecB,OmB,BNDimX,'EIGPRBLB')
 print*, 'EVecB', norm2(EVecB)
 
-!call assemble_pqrs_uks(ovov,ANDimX,BNDimX)
+call dgemm('N','N',ANDimX,BNDimX,BNDimX,1d0,tmp,ANDimX,EVecB,BNDimX,0d0,ints,ANDimX)
 
-deallocate(OmB,EVecB)
-deallocate(OmA,EVecA)
+e2disp=0d0
+do j=1,BNDimX
+   do i=1,ANDimX
+      e2disp = e2disp - ints(i,j)**2d0/(OmA(i)+OmB(j))
+   enddo
+enddo
 
-end subroutine e2disp_o
+SAPT%e2disp = e2disp
+ 
+call print_en('E2disp',e2disp*1000,.false.)
+
+deallocate(tmp,ints)
+deallocate(OmB,OmA,EVecB)
+
+end subroutine e2disp_cpld_o
 
 subroutine e2do_unc(e2do,EnA,EnB,IndNB,noA,nvA,noB,nvB,n,intfile)
 
@@ -2388,8 +2487,10 @@ ints = 0d0
 e2do = 0d0
 do irs=1,novB
 
-    ir = IndNB(1,irs)
-    is = IndNB(2,irs)
+    ir = IndNB(1,irs) ! virt index
+    is = IndNB(2,irs) ! occ index
+    !ir = noB + mod(irs - 1, nVB) + 1
+    !is = (irs - 1)/nVB + 1
     read(iunit,rec=is+(ir-noB-1)*noB) AuxA(1:novA)
 
     do ip=1,nvA
@@ -2414,6 +2515,40 @@ close(iunit)
 !print*, 'e2do = ', e2do*1000
 
 end subroutine e2do_unc
+
+subroutine e2do_incore_unc(e2do,ints,EnA,EnB,noA,nvA,noB,nvB)
+!
+! uncoupled incore
+!
+integer, intent(in) :: noA,nvA,noB,nvB
+double precision, intent(in) :: ints(nva,noa,nvb,nob)
+double precision, intent(in) :: EnA(noA+nvA),EnB(noB+nvB)
+
+double precision, intent(out) :: e2do
+
+integer :: ip,iq,ir,is
+
+double precision :: inv_omega
+double precision :: OmA,OmB
+
+e2do = 0d0
+do is=1,noB
+   do ir=1,nvB
+
+    OmB = EnB(is) - EnB(noB+ir)
+
+       do iq=1,noA
+          do ip=1,nvA
+             OmA = EnA(iq) - EnA(noA+ip)
+             inv_omega = 1d0 / (OmA + OmB)
+             e2do = e2do + ints(ip,iq,ir,is)**2*inv_omega
+          enddo
+       enddo
+
+   enddo
+enddo
+
+end subroutine e2do_incore_unc
 
 subroutine e2ind_dexc(Flags,A,B,SAPT)
 implicit none

@@ -2357,9 +2357,10 @@ if(SAPT%SaptLevel==0) then
    write(LOUT,'(1x,a,t19,a,f16.8)') 'E2exch-disp(unc)','=', SAPT%e2exdisp_unc*1.0d3
    write(LOUT,'(1x,a,t19,a,f16.8)') 'Eint(SAPT0)', '=', SAPT%esapt0*1.0d3
 elseif(SAPT%SaptLevel==2) then
-!   write(LOUT,'(1x,a,t19,a,f16.8)') 'E2ind',      '=', SAPT%e2ind*1.d03
-!   write(LOUT,'(1x,a,t19,a,f16.8)') 'E2exch-ind', '=', SAPT%e2exind*1.0d3
-!   write(LOUT,'(1x,a,t19,a,f16.8)') 'E2disp',     '=', SAPT%e2disp*1.d03
+   write(LOUT,'(1x,a,t19,a,f16.8)') 'E2ind',      '=', SAPT%e2ind*1.d03
+   write(LOUT,'(1x,a,t19,a,f16.8)') 'E2exch-ind', '=', SAPT%e2exind*1.0d3
+   write(LOUT,'(1x,a,t19,a,f16.8)') 'E2disp(unc)', '=', SAPT%e2disp_unc*1.d03
+   write(LOUT,'(1x,a,t19,a,f16.8)') 'E2disp',     '=', SAPT%e2disp*1.d03
 !   write(LOUT,'(1x,a,t19,a,f16.8)') 'E2exch-disp','=', SAPT%e2exdisp*1.0d3
 !   write(LOUT,'(1x,a,t19,a,f16.8)') 'Eint(SAPT2)','=', SAPT%esapt2*1.0d3
 endif

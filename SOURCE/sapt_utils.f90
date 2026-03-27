@@ -399,6 +399,51 @@ integer :: iunit
 
 end subroutine writeampl
 
+subroutine load_vovo(intfile,ints,IndNb,nva,noa,nvb,nob)
+!
+! load (VO|VO) integrals
+!
+implicit none
+
+character(*) :: intfile
+integer, intent(in) :: nva, noa, nvb, nob
+integer, intent(in) :: IndNb(2,nob*nvb)
+real*8, intent(out) :: ints(nva,noa,nvb,nob)
+
+integer :: iunit
+integer :: nova,novb
+integer :: ip,iq,ir,is,irs
+double precision :: AuxA(noA*nvA)
+
+novA = noA*nvA
+novB = noB*nvB
+
+! (OV|OV) (AA|BB) --> (VO|VO)
+open(newunit=iunit,file=intfile,status='OLD',&
+     access='DIRECT',form='UNFORMATTED',recl=8*novA)
+
+do irs=1,novB
+
+    ir  = IndNB(1,irs)
+    is  = IndNB(2,irs)
+    !ir = noB + mod(irs - 1, nVB) + 1
+    !is = (irs - 1)/nVB + 1
+    read(iunit,rec=is+(ir-noB-1)*noB) AuxA(1:novA)
+
+    do ip=1,nvA
+       do iq=1,noA
+          ints(ip,iq,ir-noB,is) = AuxA(iq+(ip-1)*noA)
+       enddo
+    enddo
+
+enddo
+
+close(iunit)
+
+end subroutine load_vovo
+
+
+
 subroutine solve_cphf(M,WPot,e2indxy,Flags,NBas)
 implicit none
 

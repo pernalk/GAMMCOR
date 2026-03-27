@@ -2297,7 +2297,7 @@ call ERPASYMM(EigVecR,Eig,ABMin,ABPlus,NBasis,NDimX)
 !call RPASYMM(EigVecR,Eig,ABPlus,ABMin,NBasis,NDimX)
 
 write(lout,'(/,''Excitation Energies in [au] and [eV]'')')
-do i=1,10
+do i=1,min(10,NDimX)
    write(lout,'(i4,4x,2E16.6)') i,Eig(i),toeV(Eig(i))
 enddo
 
