@@ -1861,8 +1861,6 @@ allocate(ints(A%NVa*A%NOa*B%NVa*B%NOa))
 allocate(amps(A%NVa*A%NOa*B%NVa*B%NOa))
 call load_vovo('OVOVABaa',ints,B%IndNa,A%NVa,A%NOa,B%NVa,B%NOa)
 call calc_amps(amps,ints,A%UOrbE(:,1),B%UOrbE(:,1),A%NVa,A%NOa,B%NVa,B%NOa,NBasis)
-!print*, 'vovo aaaa = ', norm2(ints)
-!print*, 'amps aaaa = ', norm2(amps)
 e2xd_ssv=0 ; e2xd_sso=0d0 
 call e2exd_vterms_SameSpin(e2xd_ssv,ints,amps,Sa,A%NOa,A%NVa,B%NOa,B%NVa,NBasis)
 call e2exd_oterms_SameSpin(e2xd_sso,ints,amps,Waa,Wba,Sa,A%NOa,A%NVa,B%NOa,B%NVa,NBasis)
@@ -2550,15 +2548,17 @@ do b=1,nvb
       P(i,b) = P(i,b) + sum(amps(:,i,b,:)*Svo(:,:))
    enddo
 enddo
-
 call dgemm('N','N',noa,nvb,nob,1d0,Soo,noa,Wa,nob,0d0,Q,noa)
 
+t1=0d0
 t1 = t1 - sum(P*Q)
 print*, 'Om term 1 =', t1
 
 call dgemm('N','N',noa,nvb,nva,1d0,Wb,noa,Svv,nva,0d0,Q,noa)
 
+t5=0d0
 t5 = t5 + sum(P*Q)
+
 print*, 'Om term 5 =', t5
 
 ene = ene + t1 + t5
@@ -2593,12 +2593,14 @@ enddo
 
 call dgemm('T','N',nva,nob,noa,1d0,Wb,noa,Soo,noa,0d0,Q,nva)
 
+t3 = 0d0
 t3 = - sum(P*Q)
 print*, 'Om term 3 =', t3
 
 WaT=transpose(Wa)
 call dgemm('N','N',nva,nob,nvb,1d0,Svv,nva,WaT,nvb,0d0,Q,nva)
 
+t6 = 0d0
 t6 = sum(P*Q)
 print*, 'Om term 6 =', t6
 

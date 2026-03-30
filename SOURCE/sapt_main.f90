@@ -2746,6 +2746,11 @@ call delfile('FOFOBBbb')
 call delfile('FOFOAAab')
 call delfile('FOFOBBab')
 
+if (SAPT%SaptLevel==2) then
+   call delfile('EIGPRBLA')
+   call delfile('EIGPRBLB')
+endif
+
 end subroutine free_saptuks
 
 end module sapt_main
