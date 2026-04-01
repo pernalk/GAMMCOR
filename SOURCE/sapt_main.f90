@@ -46,7 +46,7 @@ double precision :: Tcpu,Twall
  write(LOUT,'(8a10)') ('**********',i=1,8)
 
  ! jump to SAPT(UKS)  framework
- if(Flags%IUKS==1) call sapt_driver_uks(Flags,SAPT)
+ if(Flags%IUKS==1.or.Flags%IUHF==1) call sapt_driver_uks(Flags,SAPT)
 
  ! jump to reduceVirt framework
  if(Flags%IRedVirt==1) call sapt_driver_red(Flags,SAPT)
@@ -169,7 +169,8 @@ double precision :: Tcpu,Twall
 
 call gclock('START',Tcpu,Twall)
 
-print*, 'Experimental SAPT(UKS) implementation...'
+if(Flags%IUKS==1) print*, 'Experimental SAPT(UKS)...'
+if(Flags%IUHF==1) print*, 'Experimental SAPT(UHF)...'
 
 call sapt_basinfo(SAPT,NBasis)
 call saptuks_interface(Flags,SAPT,NBasis,AOBasis,CholeskyVecsOTF)
@@ -191,7 +192,7 @@ call e2disp_o(Flags,SAPT%monA,SAPT%monB,SAPT)
 call e2exind_o(Flags,SAPT%monA,SAPT%monB,SAPT)
 call e2exdisp_o(Flags,SAPT%monA,SAPT%monB,SAPT)
 
-call summary_saptuks(SAPT)
+call summary_saptuks(SAPT,Flags%IUKS)
 call free_saptuks(Flags,SAPT)
 
 call gclock('SAPT',Tcpu,Twall)
@@ -2322,13 +2323,14 @@ write(LOUT,'()')
 
 end subroutine summary_rspt
 
-subroutine summary_saptuks(SAPT)
+subroutine summary_saptuks(SAPT,IUKS)
 !
 ! print results for unrestricted SAPT (UHF, UKS)
 !
 implicit none
 
 type(SaptData) :: SAPT
+integer,intent(in) :: IUKS
 
 integer          :: i,j
 double precision :: esapt2
@@ -2340,7 +2342,8 @@ SAPT%esapt0 = SAPT%elst + SAPT%e1exch + SAPT%e2ind &
               + SAPT%e2exind + SAPT%e2disp_unc + SAPT%e2exdisp_unc
 
 write(LOUT,'(/,8a10)') ('**********',i=1,4)
-write(LOUT,'(1x,a)') 'SAPT(UKS) SUMMARY / milliHartree'
+if (IUKS==1) write(LOUT,'(1x,a)') 'SAPT(UKS) SUMMARY / milliHartree'
+if (IUKS==0) write(LOUT,'(1x,a)') 'SAPT(UHF) SUMMARY / milliHartree'
 write(LOUT,'(8a10)') ('**********',i=1,4)
 
 write(LOUT,'(1x,a,i3)') 'SAPT level  =', SAPT%SaptLevel

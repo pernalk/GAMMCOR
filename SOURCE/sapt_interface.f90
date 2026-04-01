@@ -596,6 +596,18 @@ call unpack_uks_sym(SAPT%monB,NBasis)
 ! set unrestricted occ, virt, ov, IndN, ...
 call select_uactive(SAPT%monA,SAPT%monB,NBasis)
 
+! read exact exchange fraction
+if (Flags%IUKS==1) then
+   !call read_exfac(SAPT%monA%exfac,'')
+   !call read_exfac(SAPT%monB%exfac,'')
+   SAPT%monA%exfac=0d0
+   SAPT%monB%exfac=0d0
+   write(lout,'(/1x,a)') 'WARNING! Assuming pure DFT!'
+elseif (Flags%IUHF==1) then
+   SAPT%monA%exfac=1d0 
+   SAPT%monB%exfac=1d0
+endif
+
 call print_uocc(NBasis,SAPT)
 
 ! read 2-el integrals

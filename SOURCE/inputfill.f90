@@ -423,9 +423,10 @@ subroutine read_block_calculation(CalcParams, line)
               CalcParams%RDMType = RDM_TYPE_HF
            elseif (uppercase(val) == "DMRG" ) then
               CalcParams%RDMType = RDM_TYPE_DMRG
-           elseif (uppercase(val) == "UKS".or.    &
-                 & uppercase(val) == "UNRESTRICTED") then
+           elseif (uppercase(val) == "UKS" ) then
               CalcParams%RDMType = RDM_TYPE_UKS
+           elseif (uppercase(val) == "UHF" ) then
+              CalcParams%RDMType = RDM_TYPE_UHF
            endif
 
       case ("UNITS")

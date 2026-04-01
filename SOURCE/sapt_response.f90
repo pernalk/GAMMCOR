@@ -6,6 +6,7 @@ use tran
 use abmat
 use abfofo
 use ab0fofo
+use abuksfofo
 use sapt_utils
 use grid_internal
 
@@ -2269,14 +2270,20 @@ endif
 
 allocate(ABPlus(NDimX,NDimX),ABMin(NDimX,NDimX))
 
-! UHF test
-xfac = 1d0
-write(lout,'(1x,a,f12.6)') 'Fraction of HF exchanghe...', xfac
+xfac = Mon%exfac
+write(lout,'(1x,a,f12.6)') 'Fraction of HF exchange =', xfac
 
 call AB_UKS_FOFO(ABPlus,ABMin,Mon%NOa,Mon%NVa,Mon%NOb,Mon%NVb,NDimX,NBasis, &
                  Mon%UOrbE(:,1),Mon%UOrbE(:,2),xfac, &
                  twojfileaa,twojfilebb,twokfileaa,twokfilebb,twokfileab,&
                  Flags%ICholesky)
+
+! add kernel contribution
+if (xfac.ne.1d0) then
+   call AB_UKS_KER(ABPlus,Mon%UMO(:,:,1),Mon%UMO(:,:,2),Mon%UOrbE(:,1),Mon%UOrbE(:,2), &
+                   Mon%IndNa,Mon%IndNb,xfac, &
+                   Mon%NOa,Mon%NVa,Mon%NOb,Mon%NVb,NDimX,NBasis)
+endif
 
 open(newunit=iunit,file=abfile,form='unformatted')
 write(iunit) NDimX

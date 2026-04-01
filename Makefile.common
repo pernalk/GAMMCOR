@@ -21,7 +21,7 @@ OBJ = $(O)mainp.o $(O)initia.o $(O)dmscf.o $(O)misc.o $(O)optocc.o \
        $(O)sapt_response.o $(O)sapt_interface.o \
        $(O)sapt_Chol_pol.o $(O)sapt_Chol_exch.o \
        $(O)sapt_visual.o $(O)sapt_files.o \
-       $(O)sapt_os.o \
+       $(O)sapt_os.o $(O)abuks.o\
        $(O)exmisc.o $(O)exdpino.o $(O)exi.o $(O)exappr.o \
        $(O)srefex.o $(O)diis.o \
        $(O)timing.o \
@@ -93,6 +93,7 @@ $(O)interface_pp.o      : $(S)interface_pp.f90  $(O)acpp_types.o $(O)gammint.o
 $(O)abfofo.o           : $(O)priunit.o $(O)tran.o $(O)blocktypes.o $(O)abchol.o $(O)timing.o
 $(O)abmats.o           : $(O)priunit.o $(O)tran.o
 $(O)ab0fofo.o          : $(O)priunit.o $(O)tran.o $(O)blocktypes.o $(O)abfofo.o $(O)acpp_types.o
+$(O)abuks.o            : $(O)priunit.o $(O)gridintern.o
 
 $(O)griddalton.o       : $(O)rdwrext.o
 $(O)gridintern.o       : $(O)gammint.o
@@ -112,7 +113,7 @@ $(O)sapt_Chol_pol.o    : $(O)tran.o $(O)sapt_utils.o \
                          $(O)iter_stats.o $(O)iter_algorithm.o $(O)iter_algorithm_diis.o $(O)timing.o \
                          $(O)lambda_calculator.o $(O)lambda_calculator_diag.o $(O)lambda_calculator_projector.o
 $(O)sapt_Chol_exch.o   : $(O)types.o $(O)rdwrext.o $(O)sapt_utils.o
-$(O)sapt_response.o    : $(O)types.o $(O)tran.o $(O)abmats.o $(O)abfofo.o $(O)ab0fofo.o \
+$(O)sapt_response.o    : $(O)types.o $(O)tran.o $(O)abmats.o $(O)abfofo.o $(O)ab0fofo.o $(O)abuks.o \
                          $(O)sapt_utils.o $(O)timing.o $(O)gridintern.o
 $(O)sapt_main.o        : $(O)types.o \
                          $(O)sapt_pol.o $(O)sapt_exch.o $(O)sapt_Chol_pol.o $(O)sapt_Chol_exch.o \

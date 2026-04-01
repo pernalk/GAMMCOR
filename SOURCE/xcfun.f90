@@ -64,6 +64,59 @@ subroutine RhoKernel(Rho,SRKer,IFunSR,XMu,NGrid)
 return
 end
 
+subroutine RhoKernelSpin(XKer,Rhoa,Rhob,NGrid)
+!
+! ALDA spin kernel
+!     Rhoa = rho_alpha; Rhob = rho_beta
+!
+   use xcfun
+
+   implicit none
+
+   integer,intent(in)   :: NGrid
+   real(8),intent(in)   :: Rhoa(NGrid),Rhob(NGrid)
+   real(8),intent(out)  :: XKer(NGrid,3)
+   character(1000)      :: text
+   integer              :: id, order, ilen, olen
+   real(8), allocatable :: density_variables(:, :), derivatives(:, :)
+
+   integer              :: i
+
+   id = xc_new_functional()
+   call xc_set_param(id, XC_SLATERX, 1.0d0)
+   call xc_set_param(id, XC_VWN5C, 1.0d0)
+
+   call xc_set_mode(id, XC_VARS_AB)
+
+   order = 2
+
+   ilen = xc_input_length(id)
+   olen = xc_output_length(id, order)
+
+   allocate(density_variables(ilen, NGrid))
+   allocate(derivatives(olen, NGrid))
+
+   do i=1,NGrid
+      density_variables(1, i) = Rhoa(i)
+      density_variables(2, i) = Rhob(i)
+   enddo
+
+   call xc_eval(id, order, NGrid, density_variables, derivatives)
+
+   XKer = 0d0
+   do i=1,NGrid
+      XKer(i,1) = derivatives(XC_D20,i) ! d^2 e_xc / d rho_a^2
+      XKer(i,2) = derivatives(XC_D11,i) ! d^2 e_xc / d rho_a d rho_b
+      XKer(i,3) = derivatives(XC_D02,i) ! d^2 e_xc / d rho_b^2
+   enddo
+
+   deallocate(density_variables)
+   deallocate(derivatives)
+
+   call xc_free_functional(id)
+
+end subroutine RhoKernelSpin
+
 subroutine LYP(Rho,Sigma,Ene,NGrid)
 !
 ! computes short-range kernel for densities stored in a vector Rho

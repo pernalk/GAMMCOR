@@ -76,15 +76,6 @@ integer :: npt, ndiff, ntg
     enddo
  enddo
 
-! Call CpyV(Aux,OrbGrid,NBasis*NGrid)
-! Call TrOrbG(OrbGrid,UMOAO,Aux,NGrid,NBasis)
-! Call CpyV(Aux,OrbXGrid,NBasis*NGrid)
-! Call TrOrbG(OrbXGrid,UMOAO,Aux,NGrid,NBasis)
-! Call CpyV(Aux,OrbYGrid,NBasis*NGrid)
-! Call TrOrbG(OrbYGrid,UMOAO,Aux,NGrid,NBasis)
-! Call CpyV(Aux,OrbZGrid,NBasis*NGrid)
-! Call TrOrbG(OrbZGrid,UMOAO,Aux,NGrid,NBasis)
-
  Call CpyV(Aux,OrbGrid,NBasis*NGrid)
  call dgemm('N','T',NGrid,NBasis,NBasis,1d0,Aux,NGrid,UMOAO,NBasis,0d0,OrbGrid,NGrid)
  if(ndiff.gt.1) then
@@ -101,6 +92,46 @@ integer :: npt, ndiff, ntg
 
 end subroutine molprogrid
 
+subroutine molprogridAO(OrbGrid,mapinv,WGrid,NGrid,NBasis)
+!
+! get orbitals on a grid in AO
+! for LDA kernel
+! mapinv - orbital mapping array
+!
+implicit real*8 (A-H,O-Z)
+
+integer,intent(in)  :: NBasis, NGrid
+integer,intent(out) :: mapinv(NBasis)
+double precision,intent(out) :: OrbGrid(NGrid,NBasis),WGrid(NGrid)
+
+double precision, allocatable :: r(:,:),wt(:),orbval(:,:,:)
+integer :: i,j,k,igrid
+integer :: npt, ndiff, ntg
+
+ open(newunit=igrid,file='GRID',access='sequential',&
+      form='unformatted',status='old')
+ ! read(igrid)
+ read(igrid) npt,ndiff,ntg
+ If(NBasis.Ne.ntg) Stop 'Fatal Error in molprogrid: NBasis Ne ntg'
+ If(NGrid.Ne.npt) Stop 'Fatal Error in molprogrid: NGrid Ne npt'
+
+ allocate(r(3,npt),wt(npt),orbval(npt,ndiff,ntg))
+ !... idftgra: functional contains grad rho terms (1) , del.2 rho (2)
+ !... ndiff = (idftgra + 1) * (idftgra + 2) * (idftgra + 3) / 6
+
+ call readgridmolpro(igrid,'GRIDKS  ',npt,r,wt)
+ Call CpyV(WGrid,wt,npt)
+ call readorbsmolpro(igrid,'ORBVAL  ',mapinv,orbval,npt,ndiff,ntg)
+ do J=1,NBasis
+    do I=1,NGrid
+       OrbGrid(I,J)=orbval(I,1,mapinv(J))
+    enddo
+ enddo
+
+ close(igrid)
+ deallocate(orbval,wt,r)
+
+end subroutine molprogridAO
 
 subroutine readgridmolpro(iunit,text,npt,r,wt)
 implicit none

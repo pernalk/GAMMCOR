@@ -57,7 +57,8 @@ integer, parameter :: RDM_TYPE_APSG = 2
 integer, parameter :: RDM_TYPE_CAS  = 3
 integer, parameter :: RDM_TYPE_DMRG = 4
 integer, parameter :: RDM_TYPE_HF   = 5
-integer, parameter :: RDM_TYPE_UKS  = 6
+integer, parameter :: RDM_TYPE_UHF  = 6
+integer, parameter :: RDM_TYPE_UKS  = 7
 
 integer, parameter :: TWOMO_INCORE = 1
 integer, parameter :: TWOMO_FFFF   = 2
@@ -111,9 +112,9 @@ character(*),parameter :: PossibleJobType(21) = &
 'AC0D', 'AC0DNOSYMM', 'NLOCCORR', 'AC0DP', 'ACFREQ','ACFREQNTH','AC1FREQNTH', &
 'RESPONSE','SRAC0', 'MP2', 'SRMP2', 'SAPT-OS']
 
-character(*),parameter :: PossibleRDMType(6) = &
+character(*),parameter :: PossibleRDMType(7) = &
 [character(8) :: &
-'GVB', 'APSG', 'CASSCF', 'DMRG', 'HF', 'UKS']
+'GVB', 'APSG', 'CASSCF', 'DMRG', 'HF', 'UHF', 'UKS']
 
 character(*),parameter :: PossibleDFAType(3) = &
 [character(8) :: &
@@ -201,6 +202,7 @@ type SystemBlock
       double precision :: PerVirt = 0d0
       double precision :: ECASSCF = 0d0
       double precision :: AvMu    = 0d0
+      double precision :: exfac   = 0d0
       integer :: NSym
       integer :: NSymBas(8),NSymOrb(8)
       integer :: NOrb, NGem
@@ -413,6 +415,7 @@ type FlagsData
      integer :: ISERPA  = 0 ! ERPA response
      integer :: ITrpl   = 0
      integer :: ISAPT   = 0
+     integer :: IUHF    = 0
      integer :: IUKS    = 0
      integer :: ISAPTOS = 0
      integer :: SaptLevel = 0

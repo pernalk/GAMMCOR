@@ -266,7 +266,13 @@ end select
 
   case(RDM_TYPE_UKS)
      Flags%IUKS = 1
-     Flags%ISHF = 1
+     Flags%IUHF = 0
+     Flags%IGVB = 0
+     Flags%ICASSCF = 1
+
+  case(RDM_TYPE_UHF)
+     Flags%IUKS = 0
+     Flags%IUHF = 1
      Flags%IGVB = 0
      Flags%ICASSCF = 1
 

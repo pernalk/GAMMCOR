@@ -442,8 +442,6 @@ close(iunit)
 
 end subroutine load_vovo
 
-
-
 subroutine solve_cphf(M,WPot,e2indxy,Flags,NBas)
 implicit none
 

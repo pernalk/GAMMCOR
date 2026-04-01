@@ -771,6 +771,20 @@ double precision :: val
 
 end subroutine read_uorbe_molpro
 
+subroutine read_exfac(exfac,infile)
+!
+! this subroutine reads exact exchange factor
+! from Molpro KS_DFT calculation
+!
+implicit none
+
+character(*),intent(in)      :: infile
+real(8),intent(out)          :: exfac
+
+stop "read_exfac not ready!"
+
+end subroutine read_exfac
+
 subroutine read_aosao_map_molpro(jtsoao,infile,text,nbasis)
 !
 ! this subroutine reads AO-->SAO map
@@ -1511,17 +1525,15 @@ integer :: NumOSym(15),IndInt(NBasis)
 
  ivirt(1:NSym)   = NumOSym(1:NSym)-ioccs(1:NSym)
 
- select case (spin)
- case ('A', 'a')
-    write(lout,'(1x,a)') 'Alpha spin'
- case ('B', 'b')
-    write(lout,'(1x,a)') 'Beta  spin'
- end select
- write(lout,'("Occupied:",1x, *(i2,1x) )') ( ioccs(i), i = 1, NSym )
- write(lout,'("Virtual :",1x, *(i2,1x) )') ( ivirt(i), i = 1, NSym )
- write(lout,'("Total   :",1x, *(i2,1x) )') ( NumOSym(i), i = 1, NSym )
- !print*, 'virtual  ',ivirt(1:NSym)
- !print*, 'total    ',NumOSym(1:NSym)
+ !select case (spin)
+ !case ('A', 'a')
+ !   write(lout,'(1x,a)') 'Alpha spin'
+ !case ('B', 'b')
+ !   write(lout,'(1x,a)') 'Beta  spin'
+ !end select
+ !write(lout,'("Occupied:",1x, *(i2,1x) )') ( ioccs(i), i = 1, NSym )
+ !write(lout,'("Virtual :",1x, *(i2,1x) )') ( ivirt(i), i = 1, NSym )
+ !write(lout,'("Total   :",1x, *(i2,1x) )') ( NumOSym(i), i = 1, NSym )
 
  if(NSym>1) then
    ! symmetry
