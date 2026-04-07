@@ -2238,10 +2238,11 @@ real(8) :: xfac
 
 real(8),allocatable :: ABPlus(:,:),ABMin(:,:)
 real(8),allocatable :: EigVecR(:,:),Eig(:)
-character(:),allocatable     :: abfile
-character(:),allocatable     :: propfile
-character(:),allocatable     :: twojfileaa,twojfilebb
-character(:),allocatable     :: twokfileaa,twokfilebb,twokfileab
+character(:),allocatable :: abfile
+character(:),allocatable :: propfile
+character(:),allocatable :: twojfileaa,twojfilebb
+character(:),allocatable :: twokfileaa,twokfilebb,twokfileab
+character(:),allocatable :: BasisSetPath
 
 ! dimensions
 ! full hessian
@@ -2279,10 +2280,15 @@ call AB_UKS_FOFO(ABPlus,ABMin,Mon%NOa,Mon%NVa,Mon%NOb,Mon%NVb,NDimX,NBasis, &
                  Flags%ICholesky)
 
 ! add kernel contribution
+! if internal grid not invoked, use Molpro Grid
+if (Flags%InternalGrid == 0) Flags%IGridType = 5
 if (xfac.ne.1d0) then
+   print*, " Units = ", Flags%Iunits
+   BasisSetPath = Flags%BasisSetPath // Flags%BasisSet
    call AB_UKS_KER(ABPlus,Mon%UMO(:,:,1),Mon%UMO(:,:,2),Mon%UOrbE(:,1),Mon%UOrbE(:,2), &
                    Mon%IndNa,Mon%IndNb,xfac, &
-                   Mon%NOa,Mon%NVa,Mon%NOb,Mon%NVb,NDimX,NBasis)
+                   Mon%NOa,Mon%NVa,Mon%NOb,Mon%NVb,NDimX,NBasis, &
+                   Flags%IUnits,Flags%IGridType,Flags%ORBITAL_ORDERING,BasisSetPath)
 endif
 
 open(newunit=iunit,file=abfile,form='unformatted')
@@ -2303,7 +2309,7 @@ call ERPASYMM(EigVecR,Eig,ABMin,ABPlus,NBasis,NDimX)
 !call ERPASYMM(EigVecR,Eig,ABPlus,ABMin,NBasis,NDimX)
 !call RPASYMM(EigVecR,Eig,ABPlus,ABMin,NBasis,NDimX)
 
-write(lout,'(/,''Excitation Energies in [au] and [eV]'')')
+write(lout,'(/1x,''Excitation Energies in [au] and [eV]'')')
 do i=1,min(10,NDimX)
    write(lout,'(i4,4x,2E16.6)') i,Eig(i),toeV(Eig(i))
 enddo

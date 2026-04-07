@@ -1,7 +1,7 @@
 module abuksfofo
 
 use print_units
-use grid_internal
+use gammcor_integrals
 
 implicit none
 
@@ -302,7 +302,245 @@ deallocate(ints,work)
 
 end subroutine JK_UKS_AlfaBeta
 
-subroutine AB_UKS_KER(ABPLUS,Ca,Cb,Ena,Enb,IndNa,IndNb,xfac,noa,nva,nob,nvb,NDimX,NAO)
+subroutine AB_UKS_KER(ABPLUS,Ca,Cb,Ena,Enb,IndNa,IndNb,xfac, &
+                      noa,nva,nob,nvb,NDimX,NAO,Units,GridType,ExternalOrdering,BasisSetPath)
+!
+! obtain ALDA kernel
+!   GridType = 0 (Molpro)
+!   GridType = 1 (Internal)
+!
+implicit none
+
+integer,intent(in) :: Units,GridType
+integer,intent(in) :: ExternalOrdering
+integer,intent(in) :: noa,nva,nob,nvb
+integer,intent(in) :: NDimX,NAO
+integer, intent(in) :: IndNa(2,noa*nva),IndNb(2,nob*nvb)
+real(8),intent(in) :: xfac
+real(8),intent(in) :: Ca(NAO,NAO),Cb(NAO,NAO)
+real(8),intent(in) :: Ena(NAO),Enb(NAO)
+character(*) :: BasisSetPath
+
+real(8),intent(inout) :: ABPLUS(NDimX,NDimX)
+
+integer :: nvoa,nvob
+!integer :: NGrid
+
+!print*, 'Grid Type =',GridType
+select case (GridType)
+case (5) ! Molpro Grid
+   call AB_UKS_KER_EXTGrid(ABPLUS,Ca,Cb,Ena,Enb,IndNa,IndNb,xfac, &
+                           noa,nva,nob,nvb,NDimX,NAO)
+case (1,2,3,4) ! Internal Grid
+   call AB_UKS_KER_INTGrid(ABPLUS,Ca,Cb,Ena,Enb,IndNa,IndNb,xfac, &
+                           noa,nva,nob,nvb,NDimX,NAO,Units,&
+                           GridType,ExternalOrdering,BasisSetPath)
+case default
+   write(6,*) "Error: Invalid Grid Type = ", GridType
+   stop "in AB_UKS_KER"
+end select
+
+!!allocate(WGrid(NGrid),OrbGAO(NGrid*NAO))
+!!call molprogridAO(OrbGAO,mapinv,WGrid,NGrid,NAO)
+!!call get_den(NAO,Ca,Ena,1d0,Pa)
+!!call get_den(NAO,Cb,Enb,1d0,Pb)
+!!call DenAOGrid(RhoVeca,PA,OrbGAO,NGrid,NAO) ! like dft_rho_sparse
+!!call DenAOGrid(RhoVecb,PB,OrbGAO,NGrid,NAO)
+
+
+end subroutine AB_UKS_KER
+
+subroutine AB_UKS_KER_INTGrid(ABPLUS,Ca,Cb,Ena,Enb,IndNa,IndNb,xfac, &
+                              noa,nva,nob,nvb,NDimX,NAO,&
+                              Units,GridType,ExternalOrdering,BasisSetPath)
+implicit none
+
+type(TAOBasis)  :: AOBasis
+type(TSystem)   :: System
+
+integer :: Units
+integer,intent(in) :: GridType
+integer,intent(in) :: ExternalOrdering
+integer,intent(in) :: noa,nva,nob,nvb
+integer,intent(in) :: NDimX,NAO
+integer, intent(in) :: IndNa(2,noa*nva),IndNb(2,nob*nvb)
+real(8),intent(in) :: xfac
+real(8),intent(in) :: Ca(NAO,NAO),Cb(NAO,NAO)
+real(8),intent(in) :: Ena(NAO),Enb(NAO)
+character(*) :: BasisSetPath
+
+real(8),intent(inout) :: ABPLUS(NDimX,NDimX)
+
+integer :: NMO
+integer :: nvoa,nvob
+
+! grid
+integer :: NAOt
+integer :: NGrid
+character(:), allocatable :: XYZPath
+real(8), dimension(:), allocatable :: Xg, Yg, Zg
+real(8), dimension(:), allocatable :: Wg
+logical :: SortAngularMomenta
+logical, parameter :: SpherAO = .true.
+
+integer :: offset, batchlen
+integer :: nbatches
+!integer,parameter :: maxlen = 7000
+integer,parameter :: maxlen = 800
+
+integer :: i,j,ig,mu
+real(8) :: Pa(NAO,NAO),Pb(NAO,NAO)
+real(8) :: Car(NAO,NAO),Cbr(NAO,NAO)
+real(8),allocatable :: blockS(:,:)
+real(8),allocatable :: XKer(:,:),WtKer(:)
+real(8),allocatable :: Phi(:,:),Phia(:,:),Phib(:,:)
+real(8),allocatable :: WgB(:),XgB(:),YgB(:),ZgB(:)
+real(8),allocatable :: Rhoa(:),Rhob(:)
+real(8) :: URe(NAO,NAO),Occa(NAO),Occb(NAO)
+real(8) :: Rhointa,Rhointb
+real(8) :: vala,valb
+real(8),allocatable :: work(:,:),batch(:,:)
+
+nvoa = nva*noa
+nvob = nvb*nob
+
+NMO=NAO
+
+print*, 'Units =', Units
+print*, 'Orb Ordering =', ExternalOrdering
+write(LOUT,'(/,1x,a)') "Internal GRID"
+
+call auto2e_init()
+
+XYZPath = "./input.inp"
+SortAngularMomenta = .true.
+
+call sys_Read_XYZ(System, XYZPath, Units)
+call basis_NewAOBasis(AOBasis, System, BasisSetPath, SpherAO, SortAngularMomenta)
+if (AOBasis%SpherAO) then
+      NAOt = AOBasis%NAOSpher
+else
+      NAOt = AOBasis%NAOCart
+end if
+if(NAOt /= NAO) then
+  print*, 'NAO =',NAO, 'NAOlib',NAOt
+  stop "sth wrong with NAO in internal_orbgrid!"
+endif
+
+Occa = 0d0; Occb = 0d0
+Occa(1:noa)=0.5d0
+Occb(1:nob)=0.5d0
+call get_den(NAO,Ca,Occa,1d0,Pa)
+call get_den(NAO,Cb,Occb,1d0,Pb)
+
+! Molecular grid
+call becke_MolecularGrid(Xg, Yg, Zg, Wg, NGrid, GridType, System, AOBasis)
+
+call auto2e_interface_C(Car,Ca,AOBasis,ExternalOrdering)
+call auto2e_interface_C(Cbr,Cb,AOBasis,ExternalOrdering)
+
+allocate(Phi(maxlen,NAO),Phia(maxlen,NAO),Phib(maxlen,NAO))
+allocate(Rhoa(maxlen),Rhob(maxlen))
+allocate(XgB(maxlen),YgB(maxlen),ZgB(maxlen),WgB(maxlen))
+
+nbatches = (NGrid + maxlen - 1)/maxlen
+write(6,'(1x,a,i4)') 'Number of batches =', nbatches
+
+rhointa=0d0 ; rhointb=0d0
+do offset=0,NGrid,maxlen
+   batchlen = min(NGrid-offset,maxlen)
+   if(batchlen==0) exit
+
+   !print*, 'batchlen,offset=', batchlen,offset
+   ! Atomic orbitals on the grid
+   !batch(1:batchlen,1:NBasis) = OrbGrid(offset+1:offset+batchlen,1:NBasis)
+   !WtKer(1:batchlen) = Wt(offset+1:offset+batchlen)*SRKer(offset+1:offset+batchlen)
+   WgB(1:batchlen) = Wg(offset+1:offset+batchlen)
+   XgB(1:batchlen) = Xg(offset+1:offset+batchlen)
+   YgB(1:batchlen) = Yg(offset+1:offset+batchlen)
+   ZgB(1:batchlen) = Zg(offset+1:offset+batchlen)
+   allocate(batch(batchlen,NAO))
+   call gridfunc_Orbitals(batch,XgB,YgB,ZgB,batchlen,NAO,AOBasis)
+
+   !call DenAOGrid(Rhoa,Pa,batch,batchlen,NAO)
+   !call DenAOGrid(Rhob,Pb,batch,batchlen,NAO)
+
+   !! test rho
+   !do i=1,batchlen
+   !   if (Rhoa(i)>1.0e-10) then 
+   !    rhointa = rhointa + WgB(i)*RhoA(i)
+   !    rhointb = rhointb + WgB(i)*RhoB(i)
+   !   endif
+   !enddo
+
+   !! kernel in AO
+   !allocate(XKer(batchlen,3),WtKer(batchlen))
+   !call RhoKernelSpin(XKer,Rhoa,Rhob,batchlen)
+   !print*, 'XKer aa', norm2(XKer(:,1))
+   !print*, 'XKer ab', norm2(XKer(:,2))
+   !print*, 'XKer bb', norm2(XKer(:,3))
+
+   ! orbitals AO-->MO
+   !Phia=0d0
+   !Phib=0d0
+   !do j=1,NMO
+   !   do mu=1,NAO
+   !      do ig=1,batchlen
+   !         Phia(ig,j)=Phia(ig,j)+batch(ig,mu)*Ca(mu,j)
+   !         Phib(ig,j)=Phib(ig,j)+batch(ig,mu)*Cb(mu,j)
+   !      enddo
+   !   enddo
+   !enddo
+
+   call dgemm('N','N',batchlen,NAO,NAO,1d0,batch,batchlen,Car,NAO,0d0,Phia,batchlen)
+   call dgemm('N','N',batchlen,NAO,NAO,1d0,batch,batchlen,Cbr,NAO,0d0,Phib,batchlen)
+
+   URe = 0d0
+   do i=1,NAO
+      URe(i,i) = 1d0
+   enddo
+   Rhoa = 0d0; Rhob = 0d0
+   do i=1,batchlen
+      call DenGrid(i,vala,Occa,URe,Phia,batchlen,NAO)
+      call DenGrid(i,valb,Occb,URe,Phib,batchlen,NAO)
+      Rhoa(I)=vala
+      Rhob(I)=valb
+   enddo
+   ! test rho
+   do i=1,batchlen
+      if (Rhoa(i)>1.0e-10) then 
+       rhointa = rhointa + WgB(i)*RhoA(i)
+       rhointb = rhointb + WgB(i)*RhoB(i)
+      endif
+   enddo
+
+   allocate(XKer(batchlen,3),WtKer(batchlen))
+   call RhoKernelSpin(XKer,Rhoa,Rhob,batchlen)
+
+   WtKer(1:batchlen) = WgB(1:batchlen)*2d0*XKer(1:batchlen,1)
+   call AB_UKS_Spin(ABPLUS,WtKer,Phia,Phia,IndNa,IndNa,nvoa,nvoa,NDimX,0,0,batchlen,NAO)
+   !print*, 'after AB-Ker aa =',norm2(ABPLUS)
+   WtKer(1:batchlen)= WgB(1:batchlen)*2d0*XKer(1:batchlen,3)
+   call AB_UKS_Spin(ABPLUS,WtKer,Phib,Phib,IndNb,IndNb,nvob,nvob,NDimX,nvoa,nvoa,batchlen,NAO)
+   !print*, 'after AB-Ker bb =',norm2(ABPLUS)
+   WtKer(1:batchlen) = WgB(1:batchlen)*2d0*XKer(1:batchlen,2)
+   call AB_UKS_Spin(ABPLUS,WtKer,Phia,Phib,IndNa,IndNb,nvoa,nvob,NDimX,0,nvoa,batchlen,NAO)
+   !print*, 'after AB-Ker ab+ba =',norm2(ABPLUS)
+
+   deallocate(WtKer,XKer)
+   deallocate(batch)
+enddo
+
+write(6,'(1x,a,f12.6)') 'Alpha Electrons =', rhointa
+write(6,'(1x,a,f12.6)') 'Beta  Electrons =', rhointb
+
+deallocate(ZgB,YgB,XgB)
+deallocate(Phi)
+
+end subroutine AB_UKS_KER_INTGrid
+
+subroutine AB_UKS_KER_EXTGrid(ABPLUS,Ca,Cb,Ena,Enb,IndNa,IndNb,xfac, &
+                              noa,nva,nob,nvb,NDimX,NAO)
 implicit none
 
 integer,intent(in) :: noa,nva,nob,nvb
@@ -321,7 +559,7 @@ integer :: i,j
 integer :: mapinv(NAO)
 real(8) :: Pa(NAO,NAO),Pb(NAO,NAO)
 real(8),allocatable :: blockS(:,:)
-real(8),allocatable :: WGrid(:),XKer(:,:),XKerS(:)
+real(8),allocatable :: WGrid(:),XKer(:,:),WtKer(:)
 real(8),allocatable :: RhoVeca(:),RhoVecb(:)
 real(8),allocatable :: OrbGAO(:),OrbGa(:),OrbGb(:)
 real(8),allocatable :: OrbXGa(:),OrbYGa(:),OrbZGa(:)
@@ -333,16 +571,13 @@ real(8),allocatable :: work(:,:)
 nvoa = nva*noa
 nvob = nvb*nob
 
-! proper way : loop over batches, OrbGrid(AO,batch)-->MO...
-
-! dumb way to do it! load OrbGrid(AO)-->OrbGridMO
+! any benefit from batches ?
 write(LOUT,'(/,1x,a)') "MOLPRO GRID"
 call molprogrid0(NGrid,NAO)
 
 write(LOUT,'(1x,a,i8)') "The number of Grid Points =",NGrid
 
 allocate(OrbGAO(NGrid*NAO),OrbGa(NGrid*NAO),OrbGb(NGrid*NAO))
-!allocate(OrbXGa(NGrid*NAO),OrbYGa(NGrid*NAO),OrbZGa(NGrid*NAO))
 allocate(WGrid(NGrid),RhoVeca(NGrid),RhoVecB(NGrid))
 
 call molprogridAO(OrbGAO,mapinv,WGrid,NGrid,NAO)
@@ -385,108 +620,137 @@ end block
 allocate(XKer(NGrid,3))
 call RhoKernelSpin(XKer,RhoVeca,RhoVecb,NGrid)
 
-allocate(XKerS(NGrid))
+allocate(WtKer(NGrid))
 
 !alpha-alpha
-allocate(blockS(nvoa,nvoa))
-
-XKerS = 2d0*XKer(:,1)
-!blockS(1:nvoa,1:nvoa) = ABPLUS(1:nvoa,1:nvoa)
-call AB_UKS_Spin(blockS,XKerS,WGrid,OrbGa,OrbGa,IndNa,IndNa,noa,nva,noa,nva,NGrid,NAO)
-print*, 'AB-Ker aa =',norm2(blockS)
-do j=1,nvoa
-   do i=1,nvoa
-      ABPLUS(i,j) = ABPLUS(i,j) + blockS(i,j)
-   enddo
-enddo
-deallocate(blockS)
-
-allocate(blockS(nvob,nvob))
-XKerS = 2d0*XKer(:,3)
-call AB_UKS_Spin(blockS,XKerS,WGrid,OrbGb,OrbGb,IndNb,IndNb,nob,nvb,nob,nvb,NGrid,NAO)
-print*, 'AB-Ker bb =',norm2(blockS)
-do j=1,nvob
-   do i=1,nvob
-      ABPLUS(nvoa+i,nvoa+j) = ABPLUS(nvoa+i,nvoa+j) + blockS(i,j)
-   enddo
-enddo
-deallocate(blockS)
-
-allocate(blockS(nvoa,nvob))
-XKerS = 2d0*XKer(:,2)
-call AB_UKS_Spin(blockS,XKerS,WGrid,OrbGa,OrbGb,IndNa,IndNb,noa,nva,nob,nvb,NGrid,NAO)
-print*, 'AB-Ker ab =',norm2(blockS)
-do j=1,nvob
-   do i=1,nvoa
-      ABPLUS(i,nvoa+j) = ABPLUS(i,nvoa+j) + blockS(i,j)
-   enddo
-enddo
-allocate(work(nvob,nvoa))
-work = 0d0
-work = transpose(blockS)
-do j=1,nvoa
-   do i=1,nvob
-      ABPLUS(nvoa+i,j) = ABPLUS(nvoa+i,j) + work(i,j)
-   enddo
-enddo
-
-deallocate(work)
-deallocate(blockS)
-
-!! proba w AO ...? 
-!!allocate(WGrid(NGrid),OrbGAO(NGrid*NAO))
-!!call molprogridAO(OrbGAO,mapinv,WGrid,NGrid,NAO)
-!!call get_den(NAO,Ca,Ena,1d0,Pa)
-!!call get_den(NAO,Cb,Enb,1d0,Pb)
-!!call DenAOGrid(RhoVeca,PA,OrbGAO,NGrid,NAO) ! like dft_rho_sparse
-!!call DenAOGrid(RhoVecb,PB,OrbGAO,NGrid,NAO)
-
-!allocate(OrbGAO(NGrid*NAO))
-!call molprogrid(OrbGAO,mapinv,WGrid,NGrid,NAO)
+!allocate(blockS(nvoa,nvoa))
+WtKer(1:NGrid) = 2d0*XKer(1:NGrid,1)*WGrid(1:NGrid)
+call AB_UKS_Spin(ABPLUS,WtKer,OrbGa,OrbGa,IndNa,IndNa,nvoa,nvoa,NDimX,0,0,NGrid,NAO)
+!print*, 'after AB-Ker aa =',norm2(ABPLUS)
 !
+!print*, 'AB-Ker aa =',norm2(blockS)
+!do j=1,nvoa
+!   do i=1,nvoa
+!      ABPLUS(i,j) = ABPLUS(i,j) + blockS(i,j)
+!   enddo
+!enddo
+!deallocate(blockS)
+
+!allocate(blockS(nvob,nvob))
+WtKer(1:NGrid) = 2d0*XKer(1:NGrid,3)*WGrid(1:NGrid)
+call AB_UKS_Spin(ABPLUS,WtKer,OrbGb,OrbGb,IndNb,IndNb,nvob,nvob,NDimX,nvoa,nvoa,NGrid,NAO)
+!print*, 'after AB-Ker bb =',norm2(ABPLUS)
 !
-deallocate(XKer)
+!print*, 'AB-Ker bb =',norm2(blockS)
+!do j=1,nvob
+!   do i=1,nvob
+!      ABPLUS(nvoa+i,nvoa+j) = ABPLUS(nvoa+i,nvoa+j) + blockS(i,j)
+!   enddo
+!enddo
+!deallocate(blockS)
+
+!allocate(blockS(nvoa,nvob))
+WtKer(1:NGrid) = 2d0*XKer(1:NGrid,2)*WGrid(1:NGrid)
+call AB_UKS_Spin(ABPLUS,WtKer,OrbGa,OrbGb,IndNa,IndNb,nvoa,nvob,NDimX,0,nvoa,NGrid,NAO)
+!print*, 'after AB-Ker ab+ba =',norm2(ABPLUS)
 !
+!call AB_UKS_Spin(ABPLUS,XKerS,WGrid,OrbGb,OrbGa,IndNb,IndNa,nvob,nvoa,NDimX,nvoa,0,NGrid,NAO)
+!print*, 'AB-Ker ab =',norm2(blockS)
+!do j=1,nvob
+!   do i=1,nvoa
+!      ABPLUS(i,nvoa+j) = ABPLUS(i,nvoa+j) + blockS(i,j)
+!   enddo
+!enddo
+!allocate(work(nvob,nvoa))
+!work = 0d0
+!work = transpose(blockS)
+!do j=1,nvoa
+!   do i=1,nvob
+!      ABPLUS(nvoa+i,j) = ABPLUS(nvoa+i,j) + work(i,j)
+!   enddo
+!enddo
+
+deallocate(XKer,WtKer)
 deallocate(WGrid,OrbGAO,OrbGb,OrbGa)
 
-end subroutine AB_UKS_KER
+end subroutine AB_UKS_KER_EXTGrid
 
-subroutine AB_UKS_Spin(ABPLUS,XKer,Wt,Ca,Cb,IndNa,IndNB,noa,nva,nob,nvb,NGrid,NAO)
-
+subroutine AB_UKS_Spin(ABPLUS,WtKer,Ca,Cb,IndNa,IndNB,nvoa,nvob,NDimX,offa,offb,NGrid,NAO)
+!
+! WtKer = Wt*Ker
+!
 implicit none
 
-integer,intent(in) :: NGrid,NAO
-integer,intent(in) :: noa,nva,nob,nvb
-integer, intent(in) :: IndNa(2,noa*nva),IndNb(2,nob*nvb)
-real(8),intent(in) :: XKer(NGrid),Wt(NGrid)
+integer,intent(in) :: NGrid,NAO,NDimX
+integer,intent(in) :: nvoa,nvob
+integer,intent(in) :: offa,offb
+integer, intent(in) :: IndNa(2,nvoa),IndNb(2,nvob)
+real(8),intent(in) :: WtKer(NGrid)
 real(8),intent(in) :: Ca(NGrid,NAO),Cb(NGrid,NAO)
-real(8),intent(inout) :: ABPLUS(nva*noa,nvb*nob) 
+real(8),intent(inout) :: ABPLUS(NDimX,NDimX)
 
 integer :: ai,bj,ig,i,a,j,b
-integer :: nvoa,nvob
 real(8) :: val
+logical :: notsame
 
-nvoa = noa*nva
-nvob = nob*nvb
+notsame = offa.ne.offb
 
-ABPLUS = 0d0
-do ai=1,nvoa
-   a = IndNa(1,ai)
-   i = IndNa(2,ai)
-   !print*, a,i
-   do bj=1,nvob
-      !if(bj.gt.ai) cycle
-      b = IndNb(1,bj)
-      j = IndNb(2,bj)
-      val = 0d0
-      do ig=1,NGrid
-         val = val + Wt(ig)*Ca(ig,a)*Ca(ig,i)*Cb(ig,b)*Cb(ig,j)* &
-               XKer(ig)
+!ABPLUS = 0d0
+if (notsame) then ! alpha-beta, beta-alpha
+   do ai=1,nvoa
+      a = IndNa(1,ai)
+      i = IndNa(2,ai)
+      do bj=1,nvob
+         b = IndNb(1,bj)
+         j = IndNb(2,bj)
+         val = 0d0
+         do ig=1,NGrid
+            val = val + Ca(ig,a)*Ca(ig,i)*Cb(ig,b)*Cb(ig,j)* &
+                  WtKer(ig)
+         enddo
+         ABPLUS(offa+ai,offb+bj) = ABPLUS(offa+ai,offb+bj) + val
+         ABPLUS(offb+bj,offa+ai) = ABPLUS(offb+bj,offa+ai) + val
       enddo
-      ABPLUS(ai,bj) = ABPLUS(ai,bj) + val
-      !ABPLUS(ai,bj) = ABPLUS(bj,ai)
    enddo
-enddo
+else ! alpha-alpha, beta-beta
+   do ai=1,nvoa
+      a = IndNa(1,ai)
+      i = IndNa(2,ai)
+      !print*, a,i
+      do bj=1,nvob
+         !if(bj.gt.ai) cycle
+         b = IndNb(1,bj)
+         j = IndNb(2,bj)
+         val = 0d0
+         do ig=1,NGrid
+            val = val + Ca(ig,a)*Ca(ig,i)*Cb(ig,b)*Cb(ig,j)* &
+                  WtKer(ig)
+         enddo
+         ABPLUS(offa+ai,offb+bj) = ABPLUS(offa+ai,offb+bj) + val
+      enddo
+   enddo
+endif
+
+!
+!do ai=1,nvoa
+!   a = IndNa(1,ai)
+!   i = IndNa(2,ai)
+!   !print*, a,i
+!   do bj=1,nvob
+!      !if(bj.gt.ai) cycle
+!      b = IndNb(1,bj)
+!      j = IndNb(2,bj)
+!      val = 0d0
+!      do ig=1,NGrid
+!         val = val + Ca(ig,a)*Ca(ig,i)*Cb(ig,b)*Cb(ig,j)* &
+!               WtKer(ig)
+!      enddo
+!      ABPLUS(offa+ai,offb+bj) = ABPLUS(offa+ai,offb+bj) + val
+!      !ABPLUS(ai,bj) = ABPLUS(bj,ai)
+!      if (notsame) then
+!         ABPLUS(offb+bj,offa+ai) = ABPLUS(offb+bj,offa+ai) + val
+!      endif
+!   enddo
 
 !print*, 'AB Spin =', norm2(ABPLUS)
 
