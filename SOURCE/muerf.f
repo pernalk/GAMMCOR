@@ -224,7 +224,11 @@ C     set URe (unitary matrix)
       URe(I,I)=One
       EndDo
 CC
-      If(IFlCore.Eq.0.And.IDBBSC.Eq.1) Then
+      !If(IFlCore.Eq.0.And.IDBBSC.Eq.1) Then
+C ... mh 28.04.26: freezing core via NCoreOrb 
+C                  in input now available for both 
+C                  DBBSC and CBS[H]
+      If(IFlCore.Eq.0) Then
          ICore = NCoreOrb ! from input.inp
          Do I=1,ICore
          Occ(I)=Zero
@@ -232,6 +236,7 @@ CC
       Else
          ICore = 0
       EndIf
+      print*, 'ICORE from LOC_MU_CBS_CHOL =', ICORE
 C
 C     debug printlevel
       IIPRINT=5
