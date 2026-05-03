@@ -1357,7 +1357,6 @@ C     CHANGE 2
       Write(6,'(X,"Negative Excit Norm",I4,2E12.4)')
      $  NU,Eig(NU),SumNU
       EndIf
-C
 C      
       Work(NU)=One
       If(SumNU.Lt.Zero) Work(NU)=-One
@@ -1369,6 +1368,15 @@ C
       Eig(NU)=Zero
       SumNU=Zero
 C
+      EndIf
+C
+C KP 02.04.2026 allowing eigenvectors with negative omega to contribute to AC0 may lead to kinks in PES (e.g. LiF, S1)
+C it is safer to remove them 
+      If(Eig(NU).Lt.Zero.And.SumNU.Gt.Zero) Then
+      Write(6,'(X,"Negative excitation vector set to zero",I4,2E12.4)')
+     $ NU,Eig(NU),SumNU
+      SumNU=Zero
+      Eig(NU)=Zero
       EndIf
 C
       Do I=1,NDimX

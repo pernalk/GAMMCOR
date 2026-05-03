@@ -157,6 +157,8 @@ C
       Write(6,'(2X,3I5,2E14.4)')I,Ind1,Ind2,Occ(Ind1),Occ(Ind2)
       EndDo
 C
+c      Call EKT(URe,Occ,XOne,TwoNO,NBasis,NInte1,NInte2)
+C
       If(IFlRESPONSE.Eq.1) Then
 C
       Write(6,'(/,X,''Polarizability tensor calculation for ''
@@ -3023,7 +3025,9 @@ C
 C
       Dimension Zk(NGrid),RhoA(NGrid),RhoB(NGrid),
      & SigmaAA(NGrid),SigmaAB(NGrid),SigmaBB(NGrid),
-     & OrbTGrid(NBasis,NGrid)
+     & OrbTGrid(NBasis,NGrid),
+     $ GammaS(NBasis*(NBasis+1)/2),Gamma(NBasis*(NBasis+1)/2)
+       logical iex
 C
 C     FRACTIONAL SPIN ERROR (makes sense if there are only doubly occupied and one single 
 C     occupied orbital 
@@ -3031,21 +3035,108 @@ C
       Dimension OccS(NBasis)
 C
       Goto 234
+C
+      Inquire(file='RHOC.dat',exist=iex)
+C
+      If(iex) Then
+C
+      Open(10,File='RHOC.dat')
+      Read(10,*)Gamma
+      Close(10)
+      Err=Zero
+      Trace=Zero
+      Do I=1,NBasis
+      II=I*(I-1)/2+I
+      Trace=Trace+Gamma(II)
+      Err=Err+Abs(Occ(I)-Gamma(II))
+      EndDo
+      Err=Err/XELE
+      Write(6,'(1X,''Trace of RHOC'',5X,F15.8)')Trace
+      Write(6,'(1X,''Mean deviation of diag[RHOC]
+     $ from Occ'',5X,F15.8)') Err
+      If(Err.Gt.1.D-6)
+     $ Write(*,*) 'WARNING! Large deviation of diag[RHOC] from Occ!!!'
+c     $ Stop'Fatal error in SR_PBE_SPIN: wrong data in RHOC.dat'
+C
+C     READ Spin-1-RDM
+C
+      Inquire(file='RHOS.dat',exist=iex)
+      If(.not.iex)
+     $ Stop 'fatal error in SR_PBE_SPIN: RHOS.dat does not exist'
+C
+      Open(10,File='RHOS.dat')
+      Read(10,*)GammaS
+      Close(10)
+      Trace=Zero
+      Do I=1,NBasis
+      II=I*(I-1)/2+I
+      Trace=Trace+GammaS(II)
+      EndDo
+      Write(6,'(1X,''Trace of RHOS'',5X,F15.8)')Trace
+C
+      Else
+C
       OccS=Zero
       Do I=1,NBasis
-      If(Occ(I).Eq.Half) OccS(I)=Occ(I)
+      If(Occ(I).Eq.Half) Then
+      OccS(I)=Occ(I)
+      EndIf
+      Write(*,*)"Occ",I,"=",OccS(I)
       EndDo          
 C
-C      Do K=1,6
-C      XOm=(K-1)*0.2
-      Do K=1,2
-      XOm=(K-1)*1.0
+      EndIf
+      
+c      do ii=1,9
+c      occ(ii)=zero
+c      enddo
+c      occ(3)=1.d0 
+
+C
+C      Do KK=1,6
+C      XOm=(KK-1)*0.2
+      Do KK=1,2
+      XOm=(KK-1)*1.0
 C
       Do I=1,NGrid
+C
       Call DenGrid(I,RhoGrid,Occ,URe,OrbGrid,NGrid,NBasis)
       Call DenGrad(I,RhoX,Occ,URe,OrbGrid,OrbXGrid,NGrid,NBasis)
       Call DenGrad(I,RhoY,Occ,URe,OrbGrid,OrbYGrid,NGrid,NBasis)
       Call DenGrad(I,RhoZ,Occ,URe,OrbGrid,OrbZGrid,NGrid,NBasis)
+C
+      If(iex) Then
+C
+      RhoS=Zero
+      RhoSX=Zero
+      RhoSY=Zero
+      RhoSZ=Zero
+      Do J=1,NBasis
+        Sum=Zero
+        Do K=1,NBasis
+           JK=(Max(J,K)*(Max(J,K)-1))/2+Min(J,K)
+           Sum=Sum+GammaS(JK)*OrbGrid(I,K)
+        EndDo
+        RhoS=RhoS+Sum*OrbGrid(I,J)
+        RhoSX=RhoSX+Sum*OrbXGrid(I,J)
+        RhoSY=RhoSY+Sum*OrbYGrid(I,J)
+        RhoSZ=RhoSZ+Sum*OrbZGrid(I,J)
+      EndDo
+      RhoS=RhoS*Two
+      RhoSX=RhoSX*Four
+      RhoSY=RhoSY*Four
+      RhoSZ=RhoSZ*Four
+C
+      RhoA(I)=RhoGrid/Two+RhoS/Two*XOm
+      RhoB(I)=RhoGrid/Two-RhoS/Two*XOm
+C
+      RhoXa=RhoX/Two+RhoSX/Two*XOm
+      RhoXb=RhoX/Two-RhoSX/Two*XOm
+      RhoYa=RhoY/Two+RhoSY/Two*XOm
+      RhoYb=RhoY/Two-RhoSY/Two*XOm
+      RhoZa=RhoZ/Two+RhoSZ/Two*XOm
+      RhoZb=RhoZ/Two-RhoSZ/Two*XOm
+C
+      Else
 C
       Call DenGrid(I,RhoGridS,OccS,URe,OrbGrid,NGrid,NBasis)
       Call DenGrad(I,RhoXS,OccS,URe,OrbGrid,OrbXGrid,NGrid,NBasis)
@@ -3072,6 +3163,8 @@ c      RhoYb=RhoYS/Two-RhoYS/Two*XOm
 c      RhoZa=RhoZS/Two+RhoZS/Two*XOm
 c      RhoZb=RhoZS/Two-RhoZS/Two*XOm
 C
+      EndIf
+C
       SigmaAA(I)=RhoXa*RhoXa+RhoYa*RhoYa+RhoZa*RhoZa
       SigmaAB(I)=RhoXa*RhoXb+RhoYa*RhoYb+RhoZa*RhoZb
       SigmaBB(I)=RhoXb*RhoXb+RhoYb*RhoYb+RhoZb*RhoZb
@@ -3079,7 +3172,6 @@ C
       EndDo
 C
       Call dfun_GGA_AB(RhoA,RhoB,SigmaAA,SigmaAB,SigmaBB,Zk,NGrid)
-C
       EXC=Zero
       Do I=1,NGrid
       EXC=EXC+Zk(I)*WGrid(I)
@@ -3255,6 +3347,7 @@ C
      $ OrbYGrid(NGrid,NBasis),OrbZGrid(NGrid,NBasis)
 C     $ WGrid(NGrid),OrbGrid(NBasis,NGrid),OrbXGrid(NBasis,NGrid),
 C     $ OrbYGrid(NBasis,NGrid),OrbZGrid(NBasis,NGrid)
+     $ ,OrbTGrid(NBasis,NGrid)
 C
 ! input
       Dimension Zk(NGrid),RhoGrid(NGrid),RhoO(NGrid),
@@ -3299,25 +3392,76 @@ C
    40 Continue
       Close(10)
 C
+C KP 29.01.2026
+      Do I=1,NGrid
+      Do IP=1,NBasis
+      OrbTGrid(IP,I)=OrbGrid(I,IP)
+      EndDo
+      EndDo
+C
       Do I=1,NGrid
 C
       Call DenGrid(I,RhoGrid(I),Occ,URe,OrbGrid,NGrid,NBasis)
 C
-      If(RhoGrid(I).Gt.1.D-12) Then
+      If(RhoGrid(I).Gt.1.D-8) Then
+C
+c      OnTop=Zero
+c      Do IP=1,NOccup
+c      Do IQ=1,NOccup
+c      Do IR=1,NOccup
+c      Do IS=1,NOccup
+c      OnTop=OnTop
+c     $ +Two*FRDM2(IP,IQ,IR,IS,RDM2Act,Occ,Ind2,NAct,NBasis)
+cC     $ *OrbGrid(IP,I)*OrbGrid(IQ,I)*OrbGrid(IR,I)*OrbGrid(IS,I)
+c     $ *OrbGrid(I,IP)*OrbGrid(I,IQ)*OrbGrid(I,IR)*OrbGrid(I,IS)
+c      EndDo
+c      EndDo
+c      EndDo
+c      EndDo
+c 
+C KP 29.01.2026
 C
       OnTop=Zero
+      OnTopIA=Zero
       Do IP=1,NOccup
-      Do IQ=1,NOccup
-      Do IR=1,NOccup
-      Do IS=1,NOccup
-      OnTop=OnTop
-     $ +Two*FRDM2(IP,IQ,IR,IS,RDM2Act,Occ,Ind2,NAct,NBasis)
-C     $ *OrbGrid(IP,I)*OrbGrid(IQ,I)*OrbGrid(IR,I)*OrbGrid(IS,I)
-     $ *OrbGrid(I,IP)*OrbGrid(I,IQ)*OrbGrid(I,IR)*OrbGrid(I,IS)
+         ValP=OrbTGrid(IP,I)
+         IAP=0
+         If(IP.Gt.INActive) IAP=1
+         Do IQ=1,NOccup
+            Val=(ValP*OrbTGrid(IQ,I))**2
+            OnTop=OnTop+Occ(IP)*Occ(IQ)*Val
+            IAQ=0
+            If(IQ.Gt.INActive) IAQ=1
+            If(IAP*IAQ.Eq.1) OnTopIA=OnTopIA+Occ(IP)*Occ(IQ)*Val
+         EndDo
       EndDo
+      OnTop=OnTop*Two
+      OnTopIA=OnTopIA*Two
+C
+      OnTopAct=Zero
+      Do IS=INActive+1,NOccup
+         ValS=OrbTGrid(IS,I)
+         If(Abs(ValS).Gt.1.D-8) Then
+         Do IR=INActive+1,NOccup
+            ValRS=OrbTGrid(IR,I)*ValS
+            If(Abs(ValRS).Gt.1.D-8) Then
+            Do IQ=INActive+1,NOccup
+               ValQRS=OrbTGrid(IQ,I)*ValRS
+               If(Abs(ValQRS).Gt.1.D-8) Then
+               Do IP=INActive+1,NOccup
+                  OnTopAct=OnTopAct +
+     $            FRDM2(IP,IQ,IR,IS,RDM2Act,Occ,Ind2,NAct,NBasis)
+     $            *OrbTGrid(IP,I)*ValQRS
+               EndDo
+               EndIf
+            EndDo
+            EndIf
+         EndDo
+         EndIf
       EndDo
-      EndDo
-      EndDo
+      OnTopAct=OnTopAct*Two
+C
+      OnTop=OnTop-OnTopIA+OnTopAct
 C
       Call DenGrad(I,RhoX,Occ,URe,OrbGrid,OrbXGrid,NGrid,NBasis)
       Call DenGrad(I,RhoY,Occ,URe,OrbGrid,OrbYGrid,NGrid,NBasis)
@@ -3712,7 +3856,7 @@ C
       Dimension
      $ ABPLUS(NDimX*NDimX),ABMIN(NDimX*NDimX),
      $ EigVecR(NDimX*NDimX),Eig(NDimX),
-     $ ECorrG(NGem), EGOne(NGem)
+     $ ECorrG(NGem), EGOne(NGem),OccX(NBasis)
 C
 C     READ 2RDM, COMPUTE THE ENERGY
 C
@@ -3858,14 +4002,48 @@ C
 C
 C     DMRG-in-DFT On-Top
       If (IVEMB.Eq.1) Then
-      ! EXCTOP = nadd_xc
-      ! nadd_xc = E_xc[rho_AB,OT_AB]- E_xc[rho_A,OT_A] - E_xc[rho_B,OT_B]
-      EXCTOP = 0d0
-         print*, 'new entry point: '
-         print*, 'nadd_xc=Exc[rhoAB,OTAB]-Exc[rhoA,OTA]-E_xc[rhoB,OTB]'
-         print*, 'not implemented yet!'
-         print*, 'nadd_xc =  ', EXCTOP
+C
+      Call GGA_ONTOP(EXCTOP,URe,Occ,OrbGrid,OrbXGrid,OrbYGrid,
+     $ OrbZGrid,WGrid,NGrid,NBasis,1)
+       print*, 'E_xc[rho_AB,OT_AB] =  ', EXCTOP
+C
+      NB=NElecBEmb/2
+      OccX=Occ
+      OccX(1:NB)=Zero
+      Write(6,'(/," Density A")')
+      Do I=1,NBasis
+      If(OccX(I).Gt.0.0) Write(6,'(I4,E15.6)') I,Occ(I)
+      EndDo
+      Call GGA_ONTOP(EXCTOPA,URe,OccX,OrbGrid,OrbXGrid,OrbYGrid,
+     $ OrbZGrid,WGrid,NGrid,NBasis,1) 
+      print*, 'E_xc[rho_A,OT_A] =  ', EXCTOPA
+C
+      OccX=Occ
+      OccX(NB+1:NBasis)=Zero
+      Write(6,'(/," Density B")')
+      Do I=1,NBasis
+      If(OccX(I).Gt.0.0) Write(6,'(I4,E15.6)') I,Occ(I)
+      EndDo
+      Call GGA_ONTOP(EXCTOPB,URe,OccX,OrbGrid,OrbXGrid,OrbYGrid,
+     $ OrbZGrid,WGrid,NGrid,NBasis,0)
+      print*, 'E_xc[rho_B] =  ', EXCTOPB 
+C
+      print*
+      print*, 'nadd_xc=Exc[rhoAB,OTAB]-Exc[rhoA,OTA]-E_xc[rhoB]'
+      Write(6,'(/," nadd_xc from tPBE_xc : ",
+     $ F15.8,/)') EXCTOP-EXCTOPA-EXCTOPB
+C
+c test : EnxcSR should be equal to EXCTOPB; consider calling GetExc_PBE instead of GGA_ONTOP, if it is faster
+C         
+c      Alpha=1.D-12
+c      Call GetExc_PBE(EnxcSR,xone,OccX,URe,OrbGrid,OrbXGrid,OrbYGrid,
+c     $ OrbZGrid,WGrid,NSymNO,NGrid,NInte1,NBasis)
+c      write(*,*)EnxcSR
+C 
+        
+C
       Return
+C
       EndIf
 
       Call GGA_ONTOP(EXCTOP,URe,Occ,OrbGrid,OrbXGrid,OrbYGrid,

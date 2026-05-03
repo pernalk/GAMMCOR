@@ -103,7 +103,8 @@ C     $ 'FOFO',0,ETot,ECorr)
 C
 C     ITwoEl
       EndIf
-C      
+C     
+      Write(*,'(/,X,''ENuc'',F15.8)') ENuc 
       Write
      $ (6,'(/,X,''ECASSCF+ENuc, AC0-Corr, AC0-CASSCF '',4X,3F15.8)')
      $ ETot+ENuc,ECorr,ETot+ENuc+ECorr
@@ -2076,7 +2077,11 @@ C
      $ AuxI(NInte1),AuxIO(NInte1),IPair(NBasis,NBasis),
      $ EigX(NDimX*NDimX),
      $ IEigAddY(2,NDimX),IEigAddInd(2,NDimX),IndBlock(2,NDimX),
-     $ XMAux(NDimX*NDimX),work1(NBasis,NBasis)
+     $ XMAux(NDimX*NDimX),work1(NBasis,NBasis),
+C     MS-AC0
+     $ TRDMNO(10,NBasis,NBasis),IPairEig(NBasis,NBasis),
+     $ EigYm(NDimX*NDimX),EigYmD(NDimX*NBasis),ABD(NDimX*NBasis),
+     $ EigYmT(NDimX*NDimX),EigYmDT(NDimX*NBasis)
 C
       IPair(1:NBasis,1:NBasis)=0
       Do II=1,NDimX
@@ -2148,7 +2153,6 @@ C
       ETot=ETot+Two*Occ(I)*HNO(II)
       EndDo
 C
-      print*, occ
       Do IP=1,NOccup
       Do IQ=1,NOccup
       Do IR=1,NOccup
@@ -2344,6 +2348,8 @@ C      Print*, 'ACT-KA',norm2(ABPLUS(1:NDimB**2)),norm2(ABMIN)
      $ NDimB)
       EndIf
       EndIf
+      write(*,*)'act-act NDimB=',NDimB
+      write(*,*)'act-act eigvals',(Eig(NFree1+i-1),i=1,NDimB)
 C
       NoEig=NoEig+NDimB
       NFree1=NoEig+1
@@ -2684,7 +2690,195 @@ C
 C
 C      Print*, 'FIRST',norm2(XMAux)
 C
-      ABPLUS(1:NoEig*NoEig)=Zero 
+C     BEGIN MS-AC0
+C
+      NoStMx=1
+      Call TRDM_MS(TRDMNO,Occ,UNOAO,NoStMx,NInte1,NBasis,IEx)
+      If(IEx.Eq.1) Write(6,'(/,2X,''MS-AC0: Computing H^eff for n='',I2,
+     $ '' NoStates = '',
+     $ I2,/)')NoSt,NoStMx
+C      
+      IPairEig=0
+      Do II=1,NoEig
+      I=IndBlock(1,II)
+      J=IndBlock(2,II)
+      IPairEig(I,J)=II
+      EndDo
+C
+C     LOOP OVER STATES
+      Do ISS=1,NoStMx
+C
+      ABPLUS(1:NoEig*NoEig)=Zero
+C
+      If(NoStMx.Gt.1.And.ISS.Ne.NoSt) Then
+c herer!!!
+c      do i=1,nbasis
+c      do j=1,nbasis
+c      TRDMNO(ISS,i,j)=zero
+c      if(i.eq.j) TRDMNO(ISS,i,i)=occ(i)
+c      enddo
+c      enddo
+C
+      EigYm=Zero
+      EigYmD=Zero
+      EigYmT=Zero
+      EigYmDT=Zero
+C
+      Do MU=1,NoEig
+      IStart=IEigAddY(1,MU)
+      II=0
+      Do I=IEigAddInd(1,MU),IEigAddInd(2,MU)
+C
+      I1=IndBlock(1,I)
+      I2=IndBlock(2,I)
+      YT=EigY(IStart+II)
+      XX=EigX(IStart+II)/(C(I1)+C(I2))
+      YY=EigY(IStart+II)/(C(I1)-C(I2)) 
+      X=Half*(XX-YY)
+      Y=Half*(XX+YY)
+      if(abs(XX).gt.10.0)write(*,*)'xx',mu,i1,i2,XX
+      if(abs(yy).gt.10.0)write(*,*)'yy',mu,i1,i2,YY
+
+c      if(mu.le.13) then 
+c      x=zero
+c      y=zero
+c      yt=zero
+c      endif
+C
+      Do I3=1,NBasis
+C
+      IR=I1
+      IP=I2
+      IQ=I3
+      IPQ=IPairEig(IP,IQ)
+      If(IPQ.Ne.0) EigYm(IPQ+(MU-1)*NoEig)=EigYm(IPQ+(MU-1)*NoEig)
+c     $ +Y*TRDMNO(ISS,IR,IQ)-X*TRDMNO(ISS,IQ,IR)
+     $ +Y*TRDMNO(ISS,IQ,IR)-X*TRDMNO(ISS,IR,IQ)
+      If(IP.Eq.IQ.And.Occ(IP).Lt.One.And.Occ(IP).Gt.Zero) 
+     $ EigYmD(IP+(MU-1)*NBasis)=EigYmD(IP+(MU-1)*NBasis)
+     $ +Y*TRDMNO(ISS,IR,IQ)-X*TRDMNO(ISS,IQ,IR)
+
+      TRC=Zero
+      If(C(IR).Ne.Zero) TRC=TRDMNO(ISS,IQ,IR)/C(IR)
+      If(IPQ.Ne.0) EigYmT(IPQ+(MU-1)*NoEig)=EigYmT(IPQ+(MU-1)*NoEig)
+     $ + YT*TRC
+      If(IP.Eq.IQ) EigYmDT(IP+(MU-1)*NBasis)=EigYmDT(IP+(MU-1)*NBasis)
+     $ + YT*TRC
+
+c herer!!!
+      if(abs(ym.gt.10.0))
+     $ write(*,*)'Ym 1',mu,ip,iq,x,y
+C
+      IP=I1
+      IR=I2
+      IQ=I3
+      IPQ=IPairEig(IP,IQ) 
+      If(IPQ.Ne.0) EigYm(IPQ+(MU-1)*NoEig)=EigYm(IPQ+(MU-1)*NoEig)
+c     $ -Y*TRDMNO(ISS,IQ,IR)+X*TRDMNO(ISS,IR,IQ)  
+     $ -Y*TRDMNO(ISS,IR,IQ)+X*TRDMNO(ISS,IQ,IR)
+      If(IP.Eq.IQ.And.Occ(IP).Lt.One.And.Occ(IP).Gt.Zero)
+     $ EigYmD(IP+(MU-1)*NBasis)=EigYmD(IP+(MU-1)*NBasis) 
+     $ -Y*TRDMNO(ISS,IQ,IR)+X*TRDMNO(ISS,IR,IQ) 
+
+      TRC=Zero
+      If(C(IR).Ne.Zero) TRC=TRDMNO(ISS,IQ,IR)/C(IR)
+      If(IPQ.Ne.0) EigYmT(IPQ+(MU-1)*NoEig)=EigYmT(IPQ+(MU-1)*NoEig)
+     $ + YT*TRC
+      If(IP.Eq.IQ) EigYmDT(IP+(MU-1)*NBasis)=EigYmDT(IP+(MU-1)*NBasis)
+     $ + YT*TRC
+C
+c herer!!!
+      if(abs(ym.gt.10.0))
+     $ write(*,*)'Ym 2',mu,ip,iq,x,y
+
+      IQ=I1
+      IR=I2
+      IP=I3
+      IPQ=IPairEig(IP,IQ)
+      If(IPQ.Ne.0) EigYm(IPQ+(MU-1)*NoEig)=EigYm(IPQ+(MU-1)*NoEig)
+c     $ -Y*TRDMNO(ISS,IP,IR)+X*TRDMNO(ISS,IR,IP)
+     $ -Y*TRDMNO(ISS,IR,IP)+X*TRDMNO(ISS,IP,IR)
+      If(IP.Eq.IQ.And.Occ(IP).Lt.One.And.Occ(IP).Gt.Zero)
+     $ EigYmD(IP+(MU-1)*NBasis)=EigYmD(IP+(MU-1)*NBasis)
+     $ -Y*TRDMNO(ISS,IP,IR)+X*TRDMNO(ISS,IR,IP)
+
+      TRC=Zero
+      If(C(IR).Ne.Zero) TRC=TRDMNO(ISS,IP,IR)/C(IR)
+      If(IPQ.Ne.0) EigYmT(IPQ+(MU-1)*NoEig)=EigYmT(IPQ+(MU-1)*NoEig)
+     $ + YT*TRC
+      If(IP.Eq.IQ) EigYmDT(IP+(MU-1)*NBasis)=EigYmDT(IP+(MU-1)*NBasis)
+     $ + YT*TRC
+C
+c herer!!!
+      if(abs(ym.gt.10.0))
+     $ write(*,*)'Ym 3',mu,ip,iq,x,y
+C
+      IR=I1
+      IQ=I2
+      IP=I3
+      IPQ=IPairEig(IP,IQ)
+      If(IPQ.Ne.0) EigYm(IPQ+(MU-1)*NoEig)=EigYm(IPQ+(MU-1)*NoEig)
+c     $ +Y*TRDMNO(ISS,IR,IP)-X*TRDMNO(ISS,IP,IR)
+     $ +Y*TRDMNO(ISS,IP,IR)-X*TRDMNO(ISS,IR,IP)
+      If(IP.Eq.IQ.And.Occ(IP).Lt.One.And.Occ(IP).Gt.Zero)
+     $ EigYmD(IP+(MU-1)*NBasis)=EigYmD(IP+(MU-1)*NBasis)
+     $ +Y*TRDMNO(ISS,IR,IP)-X*TRDMNO(ISS,IP,IR)
+C
+      TRC=Zero
+      If(C(IR).Ne.Zero) TRC=TRDMNO(ISS,IP,IR)/C(IR)
+      If(IPQ.Ne.0) EigYmT(IPQ+(MU-1)*NoEig)=EigYmT(IPQ+(MU-1)*NoEig)
+     $ + YT*TRC
+      If(IP.Eq.IQ) EigYmDT(IP+(MU-1)*NBasis)=EigYmDT(IP+(MU-1)*NBasis)
+     $ + YT*TRC 
+C
+c herer!!!
+      if(abs(ym.gt.10.0))
+     $ write(*,*)'Ym 4',mu,ip,iq,x,y
+      if(abs(ym.gt.10.0))
+     $ write(*,*)'TRDM 4',iss,ir,ip,TRDMNO(ISS,IR,IP),TRDMNO(ISS,IP,IR)
+
+      EndDo
+C
+      II=II+1
+      EndDo
+      EndDo      
+C
+      Do MU=1,NoEig
+C
+      Do I=1,NoEig
+      I1=IndBlock(1,I)
+      I2=IndBlock(2,I)
+      Ym=EigYm(I+(MU-1)*NoEig)/(C(I1)+C(I2))
+c      Ym=EigYmT(I+(MU-1)*NoEig)/(C(I1)+C(I2))
+      if(abs(ym.gt.0.5))
+     $ write(*,*)'Ymm',mu,i1,i2,EigYm(I+(MU-1)*NoEig)
+C
+      Do J=1,NoEig
+      ABPLUS(I+(J-1)*NoEig)=ABPLUS(I+(J-1)*NoEig)
+     $ +XMAux(MU+(J-1)*NoEig)*Ym
+      EndDo
+C
+      EndDo
+      EndDo
+C
+      ABD=Zero
+      Do MU=1,NoEig
+C
+      Do I=1,NOccup
+C     YmD includes factor 2, remove it 
+      YmD=EigYmD(I+(MU-1)*NBasis)/(C(I)+C(I))*Half
+c      YmD=EigYmDT(I+(MU-1)*NBasis)/(C(I)+C(I))*Half
+C
+      Do J=1,NoEig
+      ABD(I+(J-1)*NBasis)=ABD(I+(J-1)*NBasis)
+     $ +XMAux(MU+(J-1)*NoEig)*YmD
+      EndDo
+C
+      EndDo
+      EndDo
+C
+C     If(ISS.Ne.NoSt)
+      ElseIf(NoStMx.Eq.1.Or.ISS.Eq.NoSt) Then
 C
       Do MU=1,NoEig
 C
@@ -2700,6 +2894,10 @@ C
       II=II+1
       EndDo
       EndDo
+C
+C     If(ISS.Ne.NoSt)
+      EndIf
+C
       Print*, 'ABPLUS-Ka',norm2(ABPLUS(1:NoEig*NoEig))
 C
 C     FINALLY THE ENERGY CORRECTION
@@ -2709,6 +2907,7 @@ C     $ NAct,INActive,NDimX,NDimX,NBasis)
 C
       EAll=Zero
       EIntra=Zero
+      ED=Zero
 C
       Do I=1,NoEig
 C
@@ -2724,6 +2923,8 @@ C
 C
       SumY=ABPLUS(I+(J-1)*NoEig)
       Aux=(C(IS)+C(IQ))*(C(IP)+C(IR))*SumY
+      if(abs(aux.gt.0.5))
+     $ write(*,*)'Aux',ip,ir,iq,is,aux,Aux*TwoNO(NAddr3(IP,IR,IQ,IS))
 C
       EAll=EAll+Aux*TwoNO(NAddr3(IP,IR,IQ,IS))
 C
@@ -2734,11 +2935,45 @@ C
 C     endinf of If(IP.Gt.IR.And.IQ.Gt.IS) 
       EndIf
 C
+c     Do J=1,NoEig
       EndDo
+C
+C     MS-AC0
+C
+      If(NoStMx.Gt.1.And.ISS.Ne.NoSt) Then
+      Do IQ=1,NOccup
+      IS=IQ
+C
+      If(IP.Gt.IR) Then 
+      SumY=ABD(IQ+(I-1)*NBasis)
+      Aux=(C(IS)+C(IQ))*(C(IP)+C(IR))*SumY
+      If(.NOT.(IGem(IP).Eq.IGem(IR).And.IGem(IP).Eq.IGem(IQ))) Then
+      ED=ED+Aux*TwoNO(NAddr3(IP,IR,IQ,IS))
+      EndIf
+      EndIf
+C
+      EndDo
+      EndIf
+C
+C     Do I=1,NoEig
       EndDo
 C
       ECorr=EAll-EIntra
       Print*, 'EAll,EIntra',EAll,EIntra
+C
+      If(NoStMx.Gt.1) Then
+      If(ISS.Eq.NoSt) Then
+      Write(*,*) 'H_mn',ISS,NoSt,ETot+ECorr
+      ECorr0=ECorr
+      Else
+      write(*,*)'ED',ED
+      Write(*,*) 'H_mn',ISS,NoSt,ECorr
+      ECorr=ECorr0
+      EndIf
+      EndIf
+C
+C     Do ISS=1,NoStMx
+      EndDo
 C
 C     MP2 energy (only inactive-virtual enter)
 C     to compare with molpro use {mp2;core,0}
@@ -7286,6 +7521,157 @@ C
       Return
       End
 
+*Deck TRDM_MS
+      Subroutine TRDM_MS(TRDMNO,Occ,UNOAO,NoStMx,NInte1,NBasis,IEx)
+C
+C     LOAD 1-TRDMs and transform them to NO's
+C      
+      use read_external
+C
+      Implicit Real*8 (A-H,O-Z)
+C
+      Include 'commons.inc'
+C
+      Parameter(Zero=0.D0,Half=0.5D0,One=1.D0,Two=2.D0)
+C
+      Dimension URe(NBasis,NBasis),GammaS(100,NInte1),EExcit(10)
+      Dimension TRDMNO(10,NBasis,NBasis),Occ(NBasis),
+     $          UNOAO(NBasis,NBasis)
+      Double precision,dimension(NBasis,NBasis) :: dipx,dipy,dipz
+C
+C     LOCAL ARRAYS
+C
+      Double precision :: GammaAB(NInte1),PC(NBasis)
+      Double precision :: rdm(NBasis,NBasis),trdm(NBasis,NBasis),
+     $                    AUXM(NBasis,NBasis),
+     $                    WorkV(NBasis),AUXM1(NBasis*NBasis)
+      Character*32 Str0
+      Logical ex
+C
+      Inquire(file='sacas_ene.dat',exist=ex)
+      If(ex) Then
+      IEx=1
+      Else
+      IEx=0
+      Return
+      EndIf
+C     grep ' !MCSCF STATE' filename.out > sacas_ene.dat
+      Open(10,File="sacas_ene.dat",Status='Old')
+C
+      NoStMx=0
+   20 Read(10,'(A32,F22.12)',End=40) Str0,EExcit(NoStMx+1)
+      Write(6,'(X,"SA-CAS Energy for state no ",I3,4X,F12.7)')
+     $ NoStMx+1,EExcit(NoStMx+1)
+      Read(10,*)
+      NoStMx=NoStMx+1
+      If(NoStMx.Gt.10) Stop 'Fatal error in TRDM_MS NoStMx>10!'
+      GoTo 20
+   40 Continue
+      Close(10)
+C
+      NAc=NAcCAS
+      NInAc=NInAcCAS
+      INActive=NInAc
+C
+C     Prepare MO->NO_NoState
+C
+      Call read_1rdm_molpro(GammaAB,NoSt,InSt(2,1),ISpinMs2,
+     $ '2RDM',IWarn,NBasis)
+C
+      Call CpySym(AUXM,GammaAB,NBasis)
+C
+      Do I=1,NAc
+      Do J=1,NAc
+      AUXM1((J-1)*NAc+I)=AUXM(I,J)
+      EndDo
+      EndDo
+      Call Diag8(AUXM1,NAc,NAc,PC,WorkV)
+C
+      Call SortP(PC,AUXM1,NAc)
+C
+C     FULL TRANSFORMATION
+C
+      URe=0
+      Do I=1,NBasis
+      IIAct=I-NInAc
+      Do J=1,NBasis
+      If(I.Eq.J) URe(I,J)=One
+      JJAct=J-NInAc
+      If(IIAct.Gt.0.And.IIAct.Le.NAc.And.JJAct.Gt.0.And.JJAct.Le.NAc)
+     $ URe(I,J)=AUXM1(IIAct+(JJAct-1)*NAc)
+      EndDo
+      EndDo
+C
+C     IBra is the index of the state of interest 
+      IBra=NoSt
+C
+      Do IKet=1,NoStMx
+      If(IKet.Ne.IBra) Then
+C
+C     AUXM_pq = 1/2 <min(Bra,Ket) | q^+_alpha p_alpha + q^+_beta p_beta |max(Bra,Ket)>
+      Call read_1trdm_molpro(AUXM,IBra,IKet,'2RDM',NBasis)
+C
+      trdm=0
+C
+      Do J=1,NAc
+      Do I=1,NAc
+      If(IBra.Lt.IKet) Then
+            trdm(INActive+I,INActive+J) = AUXM(I,J)
+      Else
+            trdm(INActive+I,INActive+J) = AUXM(J,I)
+      EndIf
+      Enddo
+      Enddo
+C
+      Call dgemm('N','N',NBasis,NBasis,NBasis,1d0,URe,NBasis,
+     $           trdm,NBasis,0d0,AUXM,NBasis)
+      Call dgemm('N','T',NBasis,NBasis,NBasis,1d0,AUXM,NBasis,
+     $           URe,NBasis,0d0,trdm,NBasis)
+C
+C     TRDMNO_ab = 1/2 < Bra| b^+_alpha a_alpha + b^+_beta a_beta  |Ket>
+C
+       Write(6, '(/,X,"Constructing TRDM_pq = <",I2,"|q^+ p|",I2, 
+     $  "> in NOs of state",I2,/)') IBra,IKet,IBra
+ 
+      Do IA=1,NBasis
+      Do IB=1,NBasis
+      TRDMNO(IKet,IA,IB)=trdm(IA,IB)
+      if(abs(trdm(IA,IB)).gt.1.d-5)
+     $  write(*,*)'TRDM',ia,ib,TRDMNO(IKet,IA,IB)
+      EndDo
+      EndDo 
+C
+C     TRANSITION DIPOLE MOMENTS (FOR CHECKING)
+C    
+c      Call ReadDip(DipX,DipY,DipZ,UNOAO,'DIP',NBasis)
+      open(10,file='dipmom.dat')
+      read(10,*)DipX
+      read(10,*)DipY
+      read(10,*)DipZ
+      close(10)
+C
+      TSDipZ=0
+      TSDipY=0
+      TSDipX=0
+      Do I=1,NBasis
+      Do J=1,NBasis
+      TSDipZ = TSDipZ + Two*TRDMNO(IKET,I,J)*dipz(I,J)
+      TSDipY = TSDipY + Two*TRDMNO(IKET,I,J)*dipy(I,J)
+      TSDipX = TSDipX + Two*TRDMNO(IKET,I,J)*dipx(I,J)
+      Enddo
+      Enddo
+      Write(6, '(X,I2,"->",I2, " Transition DipMom",4F15.8,/)')
+     $ IBra,IKet, TSDipX,TSDipY,TSDipZ,
+     $ SQRT(TSDipX**2+TSDipY**2+TSDipZ**2)
+C
+C     If(IKet.Ne.IBra)
+      EndIf
+C     IKet
+      EndDo
+C
+      Return
+      End
+
 *Deck TrDipMoms
       Subroutine TrDipMoms(NU,TDIP2,EigY,C,IndN,DipX,DipY,DipZ,
      $ NDimX,NBasis)
@@ -7753,6 +8139,11 @@ C
       Call dgemm('N','T',NBasis,NBasis,NBasis,1d0,AUXM,NBasis,
      $           UNOAO,NBasis,0d0,dipx,NBasis)
 C
+      open(10,file='dipmom.dat')
+      write(10,*)DipX
+      write(10,*)DipY
+      write(10,*)DipZ
+      close(10)
       Return
       End
 
