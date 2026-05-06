@@ -2349,6 +2349,7 @@ C      Print*, 'ACT-KA',norm2(ABPLUS(1:NDimB**2)),norm2(ABMIN)
       EndIf
       EndIf
       write(*,*)'act-act NDimB=',NDimB
+      NDimBAct=NDimB
       write(*,*)'act-act eigvals',(Eig(NFree1+i-1),i=1,NDimB)
 C
       NoEig=NoEig+NDimB
@@ -2736,14 +2737,14 @@ C
       YY=EigY(IStart+II)/(C(I1)-C(I2)) 
       X=Half*(XX-YY)
       Y=Half*(XX+YY)
-      if(abs(XX).gt.10.0)write(*,*)'xx',mu,i1,i2,XX
-      if(abs(yy).gt.10.0)write(*,*)'yy',mu,i1,i2,YY
+      if(abs(X).gt.10.0)write(*,*)'xx',mu,i1,i2,X
+      if(abs(Y).gt.10.0)write(*,*)'yy',mu,i1,i2,Y
 
-c      if(mu.le.13) then 
+      if(mu.le.NDimBAct) then 
 c      x=zero
 c      y=zero
 c      yt=zero
-c      endif
+      endif
 C
       Do I3=1,NBasis
 C
@@ -2764,10 +2765,6 @@ c     $ +Y*TRDMNO(ISS,IR,IQ)-X*TRDMNO(ISS,IQ,IR)
      $ + YT*TRC
       If(IP.Eq.IQ) EigYmDT(IP+(MU-1)*NBasis)=EigYmDT(IP+(MU-1)*NBasis)
      $ + YT*TRC
-
-c herer!!!
-      if(abs(ym.gt.10.0))
-     $ write(*,*)'Ym 1',mu,ip,iq,x,y
 C
       IP=I1
       IR=I2
@@ -2787,10 +2784,6 @@ c     $ -Y*TRDMNO(ISS,IQ,IR)+X*TRDMNO(ISS,IR,IQ)
       If(IP.Eq.IQ) EigYmDT(IP+(MU-1)*NBasis)=EigYmDT(IP+(MU-1)*NBasis)
      $ + YT*TRC
 C
-c herer!!!
-      if(abs(ym.gt.10.0))
-     $ write(*,*)'Ym 2',mu,ip,iq,x,y
-
       IQ=I1
       IR=I2
       IP=I3
@@ -2808,10 +2801,6 @@ c     $ -Y*TRDMNO(ISS,IP,IR)+X*TRDMNO(ISS,IR,IP)
      $ + YT*TRC
       If(IP.Eq.IQ) EigYmDT(IP+(MU-1)*NBasis)=EigYmDT(IP+(MU-1)*NBasis)
      $ + YT*TRC
-C
-c herer!!!
-      if(abs(ym.gt.10.0))
-     $ write(*,*)'Ym 3',mu,ip,iq,x,y
 C
       IR=I1
       IQ=I2
@@ -2831,12 +2820,6 @@ C
       If(IP.Eq.IQ) EigYmDT(IP+(MU-1)*NBasis)=EigYmDT(IP+(MU-1)*NBasis)
      $ + YT*TRC 
 C
-c herer!!!
-      if(abs(ym.gt.10.0))
-     $ write(*,*)'Ym 4',mu,ip,iq,x,y
-      if(abs(ym.gt.10.0))
-     $ write(*,*)'TRDM 4',iss,ir,ip,TRDMNO(ISS,IR,IP),TRDMNO(ISS,IP,IR)
-
       EndDo
 C
       II=II+1
@@ -2850,8 +2833,6 @@ C
       I2=IndBlock(2,I)
       Ym=EigYm(I+(MU-1)*NoEig)/(C(I1)+C(I2))
 c      Ym=EigYmT(I+(MU-1)*NoEig)/(C(I1)+C(I2))
-      if(abs(ym.gt.0.5))
-     $ write(*,*)'Ymm',mu,i1,i2,EigYm(I+(MU-1)*NoEig)
 C
       Do J=1,NoEig
       ABPLUS(I+(J-1)*NoEig)=ABPLUS(I+(J-1)*NoEig)
