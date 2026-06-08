@@ -213,6 +213,7 @@ C
       Logical :: doGGA
       Double Precision, Allocatable :: RR(:,:)
       real(8),parameter :: ThrOnTop=1d-8
+      real(8),parameter :: BigE=1.D2
       character(*),Parameter :: dfile='locmu.dat'
       character(*),Parameter :: griddalfile='dftgrid.dat'
 C
@@ -732,11 +733,12 @@ C
       OT=OT-OnTopIA+OnTopAct
       OnTop(I)=OT
 C
-      XMuLoc(I)=Zero
+      XMuLoc(I)=BigE
 C
       If(OnTop(I).Gt.ThrOnTop) Then
       XMuLoc(I)=SQRT(3.1415)/Two*FPsiB(I)/OnTop(I)
       EndIf
+      If(Abs(XMuLoc(I)).Gt.BigE) XMuLoc(I)=BigE
 C
       EndDo ! NGrid
 C
@@ -766,6 +768,7 @@ C
 C
       EndDo
       EndDo
+      print*, 'XMuMAT',norm2(XMuMAT)
 C
 C     COMPUTE CBS CORRECTION
 C
@@ -830,7 +833,7 @@ C
 
       End Subroutine LOC_MU_CBS_CHOL
 
-*Deck LOC_MU_CBS_CHOL
+*Deck LOC_MU_CBS_AB
       Subroutine LOC_MU_CBS_AB(XMuA,XMuB,AvMU,
      $                        UA,UB,NOccupA,OccA,NOccupB,OccB,
      $                        LA,LB,IGridType,BasisSet,NCholesky,NBasis)
