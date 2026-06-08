@@ -2083,6 +2083,23 @@ C     MS-AC0
      $ EigYm(NDimX*NDimX),EigYmD(NDimX*NBasis),ABD(NDimX*NBasis),
      $ EigYmT(NDimX*NDimX),EigYmDT(NDimX*NBasis)
 C
+! analysis of AC0
+       double precision :: ECorrIJ(6,6)
+       integer          :: IGIJ(4,4),IGemNo(6,2)
+C
+      NGem=MAXVAL(IGem)
+      ECorrIJ=0.0d0
+      IJ=0
+      Do I=1,NGem
+         Do J=1,I
+            IJ=IJ+1
+            IGIJ(I,J)=IJ
+            IGIJ(J,I)=IJ
+            IGemNo(IJ,1)=I
+            IGemNo(IJ,2)=J
+        EndDo
+      EndDo
+C
       IPair(1:NBasis,1:NBasis)=0
       Do II=1,NDimX
       I=IndN(1,II)
@@ -2737,14 +2754,14 @@ C
       YY=EigY(IStart+II)/(C(I1)-C(I2)) 
       X=Half*(XX-YY)
       Y=Half*(XX+YY)
-      if(abs(X).gt.10.0)write(*,*)'xx',mu,i1,i2,X
-      if(abs(Y).gt.10.0)write(*,*)'yy',mu,i1,i2,Y
+c      if(abs(X).gt.10.0)write(*,*)'xx',mu,i1,i2,X
+c      if(abs(Y).gt.10.0)write(*,*)'yy',mu,i1,i2,Y
 
-      if(mu.le.NDimBAct) then 
-c      x=zero
-c      y=zero
-c      yt=zero
-      endif
+      If(MU.Le.NDimBAct) Then 
+      X=Zero
+      Y=Zero
+      YT=Zero
+      EndIf
 C
       Do I3=1,NBasis
 C
@@ -2886,6 +2903,8 @@ C     TESTY Z sapt.f90 -- remove later!
 C      Call check_loop(ABPLUS,Occ,IndN,IndBlock,
 C     $ NAct,INActive,NDimX,NDimX,NBasis)
 C
+      ECorrIJ=Zero
+C
       EAll=Zero
       EIntra=Zero
       ED=Zero
@@ -2912,6 +2931,10 @@ C
       If(IGem(IP).Eq.IGem(IR).And.IGem(IQ).Eq.IGem(IS).
      $ And.IGem(IP).Eq.IGem(IQ))
      $ EIntra=EIntra+Aux*TwoNO(NAddr3(IP,IR,IQ,IS))
+C
+      ECorrIJ(IGIJ(IGem(IP),IGem(IR)),IGIJ(IGem(IQ),IGem(IS)))=
+     $ ECorrIJ(IGIJ(IGem(IP),IGem(IR)),IGIJ(IGem(IQ),IGem(IS)))
+     $              +Aux*TwoNO(NAddr3(IP,IR,IQ,IS))
 C
 C     endinf of If(IP.Gt.IR.And.IQ.Gt.IS) 
       EndIf
@@ -2941,6 +2964,63 @@ C     Do I=1,NoEig
 C
       ECorr=EAll-EIntra
       Print*, 'EAll,EIntra',EAll,EIntra
+C
+!PRINT CONTRIBUTIONS TO ECorr FROM BLOCKS
+      Write(6,'(/,X,
+     $ "Contributions to AC0 from (Mu)(Nu) pairs of blocks")')
+      IJ=0
+      Do I=1,NGem
+      Do J=1,I
+      IJ=IJ+1
+! NGem=3 case
+       If(NGem.Eq.3) Then
+       IOO=0
+       If(IGemNo(IJ,1).Eq.1.And.IGemNo(IJ,2).Eq.1) IOO=1
+       IVV=0
+       If(IGemNo(IJ,1).Eq.3.And.IGemNo(IJ,2).Eq.3) IVV=1
+       IAA1=0
+       If(IGemNo(IJ,1).Eq.2.And.IGemNo(IJ,2).Eq.2) IAA1=1
+! NGem=2 case (zero inactive orbitals)
+       ElseIf(NGem.Eq.2) Then
+       IOO=0
+       IVV=0
+       If(IGemNo(IJ,1).Eq.2.And.IGemNo(IJ,2).Eq.2) IVV=1
+       IAA1=0
+       If(IGemNo(IJ,1).Eq.1.And.IGemNo(IJ,2).Eq.1) IAA1=1
+       EndIf
+
+       If(IVV==0.And.IOO==0) Then
+       KL=0
+       Do K=1,NGem
+       Do L=1,K
+         KL=KL+1
+         If(NGem.Eq.3) Then
+             IOO=0
+             If(IGemNo(KL,1).Eq.1.And.IGemNo(KL,2).Eq.1) IOO=1
+             IVV=0
+             If(IGemNo(KL,1).Eq.3.And.IGemNo(KL,2).Eq.3) IVV=1
+             IAA2=0
+             If(IGemNo(KL,1).Eq.2.And.IGemNo(KL,2).Eq.2) IAA2=1
+         ElseIf(NGem.Eq.2) Then
+             IOO=0
+             IVV=0
+             If(IGemNo(KL,1).Eq.2.And.IGemNo(KL,2).Eq.2) IVV=1
+             IAA2=0
+             If(IGemNo(KL,1).Eq.1.And.IGemNo(KL,2).Eq.1) IAA2=1
+         EndIf
+         If(IVV==0.And.IOO==0.And.IAA1+IAA2.Ne.2) Then
+         If(IJ.Ge.KL) Then
+           EE=ECorrIJ(IJ,KL)
+           If(IJ.Ne.KL)EE=EE+ECorrIJ(KL,IJ)
+           Write(6,'(X,"(",2I1,")","(",2I1,")",F15.8)')
+     $           IGemNo(IJ,1),IGemNo(IJ,2),IGemNo(KL,1),IGemNo(KL,2),EE
+         EndIf
+         EndIf
+      EndDo
+      EndDo
+      EndIf
+      EndDo
+      EndDo
 C
       If(NoStMx.Gt.1) Then
       If(ISS.Eq.NoSt) Then
