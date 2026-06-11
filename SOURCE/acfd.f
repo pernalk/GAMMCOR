@@ -2754,13 +2754,11 @@ C
       YY=EigY(IStart+II)/(C(I1)-C(I2)) 
       X=Half*(XX-YY)
       Y=Half*(XX+YY)
-c      if(abs(X).gt.10.0)write(*,*)'xx',mu,i1,i2,X
-c      if(abs(Y).gt.10.0)write(*,*)'yy',mu,i1,i2,Y
 
       If(MU.Le.NDimBAct) Then 
       X=Zero
       Y=Zero
-      YT=Zero
+c      YT=Zero
       EndIf
 C
       Do I3=1,NBasis
@@ -2772,16 +2770,16 @@ C
       If(IPQ.Ne.0) EigYm(IPQ+(MU-1)*NoEig)=EigYm(IPQ+(MU-1)*NoEig)
 c     $ +Y*TRDMNO(ISS,IR,IQ)-X*TRDMNO(ISS,IQ,IR)
      $ +Y*TRDMNO(ISS,IQ,IR)-X*TRDMNO(ISS,IR,IQ)
-      If(IP.Eq.IQ.And.Occ(IP).Lt.One.And.Occ(IP).Gt.Zero) 
-     $ EigYmD(IP+(MU-1)*NBasis)=EigYmD(IP+(MU-1)*NBasis)
-     $ +Y*TRDMNO(ISS,IR,IQ)-X*TRDMNO(ISS,IQ,IR)
+c      If(IP.Eq.IQ.And.Occ(IP).Lt.One.And.Occ(IP).Gt.Zero) 
+c     $ EigYmD(IP+(MU-1)*NBasis)=EigYmD(IP+(MU-1)*NBasis)
+c     $ +Y*TRDMNO(ISS,IR,IQ)-X*TRDMNO(ISS,IQ,IR)
 
-      TRC=Zero
-      If(C(IR).Ne.Zero) TRC=TRDMNO(ISS,IQ,IR)/C(IR)
-      If(IPQ.Ne.0) EigYmT(IPQ+(MU-1)*NoEig)=EigYmT(IPQ+(MU-1)*NoEig)
-     $ + YT*TRC
-      If(IP.Eq.IQ) EigYmDT(IP+(MU-1)*NBasis)=EigYmDT(IP+(MU-1)*NBasis)
-     $ + YT*TRC
+c      TRC=Zero
+c      If(C(IR).Ne.Zero) TRC=TRDMNO(ISS,IQ,IR)/C(IR)
+c      If(IPQ.Ne.0) EigYmT(IPQ+(MU-1)*NoEig)=EigYmT(IPQ+(MU-1)*NoEig)
+c     $ + YT*TRC
+c      If(IP.Eq.IQ) EigYmDT(IP+(MU-1)*NBasis)=EigYmDT(IP+(MU-1)*NBasis)
+c     $ + YT*TRC
 C
       IP=I1
       IR=I2
@@ -2790,16 +2788,16 @@ C
       If(IPQ.Ne.0) EigYm(IPQ+(MU-1)*NoEig)=EigYm(IPQ+(MU-1)*NoEig)
 c     $ -Y*TRDMNO(ISS,IQ,IR)+X*TRDMNO(ISS,IR,IQ)  
      $ -Y*TRDMNO(ISS,IR,IQ)+X*TRDMNO(ISS,IQ,IR)
-      If(IP.Eq.IQ.And.Occ(IP).Lt.One.And.Occ(IP).Gt.Zero)
-     $ EigYmD(IP+(MU-1)*NBasis)=EigYmD(IP+(MU-1)*NBasis) 
-     $ -Y*TRDMNO(ISS,IQ,IR)+X*TRDMNO(ISS,IR,IQ) 
+c      If(IP.Eq.IQ.And.Occ(IP).Lt.One.And.Occ(IP).Gt.Zero)
+c     $ EigYmD(IP+(MU-1)*NBasis)=EigYmD(IP+(MU-1)*NBasis) 
+c     $ -Y*TRDMNO(ISS,IQ,IR)+X*TRDMNO(ISS,IR,IQ) 
 
-      TRC=Zero
-      If(C(IR).Ne.Zero) TRC=TRDMNO(ISS,IQ,IR)/C(IR)
-      If(IPQ.Ne.0) EigYmT(IPQ+(MU-1)*NoEig)=EigYmT(IPQ+(MU-1)*NoEig)
-     $ + YT*TRC
-      If(IP.Eq.IQ) EigYmDT(IP+(MU-1)*NBasis)=EigYmDT(IP+(MU-1)*NBasis)
-     $ + YT*TRC
+c      TRC=Zero
+c      If(C(IR).Ne.Zero) TRC=TRDMNO(ISS,IQ,IR)/C(IR)
+c      If(IPQ.Ne.0) EigYmT(IPQ+(MU-1)*NoEig)=EigYmT(IPQ+(MU-1)*NoEig)
+c     $ + YT*TRC
+c      If(IP.Eq.IQ) EigYmDT(IP+(MU-1)*NBasis)=EigYmDT(IP+(MU-1)*NBasis)
+c     $ + YT*TRC
 C
       IQ=I1
       IR=I2
@@ -2808,16 +2806,16 @@ C
       If(IPQ.Ne.0) EigYm(IPQ+(MU-1)*NoEig)=EigYm(IPQ+(MU-1)*NoEig)
 c     $ -Y*TRDMNO(ISS,IP,IR)+X*TRDMNO(ISS,IR,IP)
      $ -Y*TRDMNO(ISS,IR,IP)+X*TRDMNO(ISS,IP,IR)
-      If(IP.Eq.IQ.And.Occ(IP).Lt.One.And.Occ(IP).Gt.Zero)
-     $ EigYmD(IP+(MU-1)*NBasis)=EigYmD(IP+(MU-1)*NBasis)
-     $ -Y*TRDMNO(ISS,IP,IR)+X*TRDMNO(ISS,IR,IP)
+c      If(IP.Eq.IQ.And.Occ(IP).Lt.One.And.Occ(IP).Gt.Zero)
+c     $ EigYmD(IP+(MU-1)*NBasis)=EigYmD(IP+(MU-1)*NBasis)
+c     $ -Y*TRDMNO(ISS,IP,IR)+X*TRDMNO(ISS,IR,IP)
 
-      TRC=Zero
-      If(C(IR).Ne.Zero) TRC=TRDMNO(ISS,IP,IR)/C(IR)
-      If(IPQ.Ne.0) EigYmT(IPQ+(MU-1)*NoEig)=EigYmT(IPQ+(MU-1)*NoEig)
-     $ + YT*TRC
-      If(IP.Eq.IQ) EigYmDT(IP+(MU-1)*NBasis)=EigYmDT(IP+(MU-1)*NBasis)
-     $ + YT*TRC
+c      TRC=Zero
+c      If(C(IR).Ne.Zero) TRC=TRDMNO(ISS,IP,IR)/C(IR)
+c      If(IPQ.Ne.0) EigYmT(IPQ+(MU-1)*NoEig)=EigYmT(IPQ+(MU-1)*NoEig)
+c     $ + YT*TRC
+c      If(IP.Eq.IQ) EigYmDT(IP+(MU-1)*NBasis)=EigYmDT(IP+(MU-1)*NBasis)
+c     $ + YT*TRC
 C
       IR=I1
       IQ=I2
@@ -2826,16 +2824,16 @@ C
       If(IPQ.Ne.0) EigYm(IPQ+(MU-1)*NoEig)=EigYm(IPQ+(MU-1)*NoEig)
 c     $ +Y*TRDMNO(ISS,IR,IP)-X*TRDMNO(ISS,IP,IR)
      $ +Y*TRDMNO(ISS,IP,IR)-X*TRDMNO(ISS,IR,IP)
-      If(IP.Eq.IQ.And.Occ(IP).Lt.One.And.Occ(IP).Gt.Zero)
-     $ EigYmD(IP+(MU-1)*NBasis)=EigYmD(IP+(MU-1)*NBasis)
-     $ +Y*TRDMNO(ISS,IR,IP)-X*TRDMNO(ISS,IP,IR)
+c      If(IP.Eq.IQ.And.Occ(IP).Lt.One.And.Occ(IP).Gt.Zero)
+c     $ EigYmD(IP+(MU-1)*NBasis)=EigYmD(IP+(MU-1)*NBasis)
+c     $ +Y*TRDMNO(ISS,IR,IP)-X*TRDMNO(ISS,IP,IR)
 C
-      TRC=Zero
-      If(C(IR).Ne.Zero) TRC=TRDMNO(ISS,IP,IR)/C(IR)
-      If(IPQ.Ne.0) EigYmT(IPQ+(MU-1)*NoEig)=EigYmT(IPQ+(MU-1)*NoEig)
-     $ + YT*TRC
-      If(IP.Eq.IQ) EigYmDT(IP+(MU-1)*NBasis)=EigYmDT(IP+(MU-1)*NBasis)
-     $ + YT*TRC 
+c      TRC=Zero
+c      If(C(IR).Ne.Zero) TRC=TRDMNO(ISS,IP,IR)/C(IR)
+c      If(IPQ.Ne.0) EigYmT(IPQ+(MU-1)*NoEig)=EigYmT(IPQ+(MU-1)*NoEig)
+c     $ + YT*TRC
+c      If(IP.Eq.IQ) EigYmDT(IP+(MU-1)*NBasis)=EigYmDT(IP+(MU-1)*NBasis)
+c     $ + YT*TRC 
 C
       EndDo
 C
@@ -2859,21 +2857,21 @@ C
       EndDo
       EndDo
 C
-      ABD=Zero
-      Do MU=1,NoEig
+c      ABD=Zero
+c      Do MU=1,NoEig
 C
-      Do I=1,NOccup
-C     YmD includes factor 2, remove it 
-      YmD=EigYmD(I+(MU-1)*NBasis)/(C(I)+C(I))*Half
-c      YmD=EigYmDT(I+(MU-1)*NBasis)/(C(I)+C(I))*Half
-C
-      Do J=1,NoEig
-      ABD(I+(J-1)*NBasis)=ABD(I+(J-1)*NBasis)
-     $ +XMAux(MU+(J-1)*NoEig)*YmD
-      EndDo
-C
-      EndDo
-      EndDo
+c      Do I=1,NOccup
+cC     YmD includes factor 2, remove it 
+c      YmD=EigYmD(I+(MU-1)*NBasis)/(C(I)+C(I))*Half
+cc      YmD=EigYmDT(I+(MU-1)*NBasis)/(C(I)+C(I))*Half
+cC
+c      Do J=1,NoEig
+c      ABD(I+(J-1)*NBasis)=ABD(I+(J-1)*NBasis)
+c     $ +XMAux(MU+(J-1)*NoEig)*YmD
+c      EndDo
+cC
+c      EndDo
+c      EndDo
 C
 C     If(ISS.Ne.NoSt)
       ElseIf(NoStMx.Eq.1.Or.ISS.Eq.NoSt) Then
@@ -2944,20 +2942,20 @@ c     Do J=1,NoEig
 C
 C     MS-AC0
 C
-      If(NoStMx.Gt.1.And.ISS.Ne.NoSt) Then
-      Do IQ=1,NOccup
-      IS=IQ
-C
-      If(IP.Gt.IR) Then 
-      SumY=ABD(IQ+(I-1)*NBasis)
-      Aux=(C(IS)+C(IQ))*(C(IP)+C(IR))*SumY
-      If(.NOT.(IGem(IP).Eq.IGem(IR).And.IGem(IP).Eq.IGem(IQ))) Then
-      ED=ED+Aux*TwoNO(NAddr3(IP,IR,IQ,IS))
-      EndIf
-      EndIf
-C
-      EndDo
-      EndIf
+c      If(NoStMx.Gt.1.And.ISS.Ne.NoSt) Then
+c      Do IQ=1,NOccup
+c      IS=IQ
+cC
+c      If(IP.Gt.IR) Then 
+c      SumY=ABD(IQ+(I-1)*NBasis)
+c      Aux=(C(IS)+C(IQ))*(C(IP)+C(IR))*SumY
+c      If(.NOT.(IGem(IP).Eq.IGem(IR).And.IGem(IP).Eq.IGem(IQ))) Then
+c      ED=ED+Aux*TwoNO(NAddr3(IP,IR,IQ,IS))
+c      EndIf
+c      EndIf
+cC
+c      EndDo
+c      EndIf
 C
 C     Do I=1,NoEig
       EndDo
