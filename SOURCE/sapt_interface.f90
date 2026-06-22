@@ -996,7 +996,7 @@ type(SaptData)     :: SAPT
 type(SystemBlock)  :: MonBlock
 integer,intent(in) :: mon,NBasis
 
-integer :: NSq,NInte1
+integer :: NSq,NInte1,i
 integer                       :: ione,ios,NSym,NBas(8),ncen
 double precision, allocatable :: Hmat(:),Vmat(:),Smat(:)
 double precision, allocatable :: Kmat(:)
@@ -1038,8 +1038,20 @@ do
      exit
   endif
 enddo
- !print*, 'ncen',MonBlock%charg(1:ncen)
- !print*, 'ncen',MonBlock%xyz(1:ncen,1:3)
+ ! check if monomers correctly defined)
+ if (ncen .ne. MonBlock%NCen) then
+    write(lout,'(/1x,a,i0,a,i0,a/)') &
+    'ERROR: Number of centers in input (', MonBlock%NCen, &
+    ') differs from Molpro (', ncen, ').'
+    stop "ERROR in geometries!"
+ endif
+
+! print*, 'ncen',MonBlock%charg(1:ncen)
+! print*, 'xyz ',MonBlock%xyz(1:ncen,1:3)
+! write(*,'(A)') 'XYZ coordinates:'
+! do i = 1, ncen
+!     write(*,'(I5,3F14.6)') i, MonBlock%xyz(i,1), MonBlock%xyz(i,2), MonBlock%xyz(i,3)
+! end do
 
  close(ione)
 
@@ -3254,9 +3266,21 @@ function calc_vnn(A,B) result(Vnn)
 implicit none
 
 type(SystemBlock) :: A,B
-integer :: ia, ib
+integer :: ia, ib, im, i
 double precision :: dx,dy,dz,dist
 double precision :: Vnn
+character(len=1), parameter :: label(2) = [ 'A', 'B' ]
+
+ associate (mon => [A, B])
+     do im = 1, 2
+         write(*,'(/1x,A,A,A)') 'Monomer ', label(im), ' coordinates:'
+         write(*,'(A8,3A14)') 'Charge', 'X', 'Y', 'Z'
+         do i = 1, mon(im)%ncen
+             write(*,'(I8,3F14.6)') &
+                 int(mon(im)%charg(i)), mon(im)%xyz(i,1:3)
+         end do
+     end do
+ end associate
 
  Vnn=0d0
  do ia=1,A%NCen
@@ -3268,6 +3292,8 @@ double precision :: Vnn
        Vnn = Vnn + A%charg(ia)*B%charg(ib)/dist
     enddo
  enddo
+
+ write(lout,'(/1x,a,f14.6/)') "Intermonomer repulsion: ", Vnn
 
 end function calc_vnn
 
