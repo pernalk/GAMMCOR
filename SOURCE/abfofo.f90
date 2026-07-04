@@ -66,10 +66,17 @@ double precision,external :: FRDM2
 ! DMRG-in-DFT
 double precision  :: XVEMB(NInte1)
 logical :: IVEMB
+! FOFO-INCORE Comparison (debug purpose only)
+logical :: FOFO2INCORE
 
 ABPLUS = 0
 ABMIN  = 0
 ETot   = 0
+
+FOFO2INCORE = .FALSE.
+! set to TRUE to compare FOFO
+! and INCORE Hessians for SA-CAS
+! FOFO2INCORE = .TRUE.
 
 ! set dimensions
 NOccup = NAct + INActive
@@ -121,6 +128,13 @@ call triang_to_sq(XOne,work1,NBasis)
 call dgemm('N','N',NBasis,NBasis,NBasis,1d0,URe,NBasis,work1,NBasis,0d0,work2,NBasis)
 call dgemm('N','T',NBasis,NBasis,NBasis,1d0,work2,NBasis,URe,NBasis,0d0,HNO,NBasis)
 call sq_symmetrize(HNO,NBasis)
+
+if (FOFO2INCORE) then
+   call sq_to_triang2(HNO,work1,NBasis)
+   write(LOUT,*) 'XOne-tr   :', norm2(XOne(1:NBasis*(NBasis+1)/2))
+   write(LOUT,*) 'HNO-1el-tr:', norm2(work1(1:NBasis*(NBasis+1)/2))
+   write(LOUT,*) 'HNO-1el-sq:', norm2(HNO)
+endif
 
 val = 0
 do i=1,NOccup
@@ -234,7 +248,7 @@ if (IVEMB) then
              if(AB1) then
                     HNO(i,j) = -work2(nbasis*(i-1)+j)
              else
-                    ij=(max(i,j)*(max(i,j)-1))/2+min(i,j)
+      !              ij=(max(i,j)*(max(i,j)-1))/2+min(i,j)
       !              HNO(i,j) = XOne(ij)+(1.d0-ACAlpha)*work2(nbasis*(i-1)+j)
                     HNO(i,j) = HNO(i,j)+(1.d0-ACAlpha)*work2(nbasis*(i-1)+j)
              endif
@@ -336,13 +350,42 @@ do ICol=1,NDimX
 enddo
 
 if(AB1) then
-   ! symmetrize AB1
-   call sq_symmetrize(ABPLUS,NDimX)
-   call sq_symmetrize(ABMIN,NDimX)
+   if (FOFO2INCORE) then
+   ! debug: INCORE version uses lower/upper triangles
+   !        instead of symmetrization
+   !        (block (22)(21) is treated differently than others)
+      write(lout,'(/1x,a)') 'FOFO-2-INCORE: Hessian AB(1) via copied triangle'
+      do ipq=2,NDimX
+         ip = IndN(1,ipq)
+         iq = IndN(2,ipq)
+         do irs=1,ipq-1
+            ir = IndN(1,irs)
+            is = IndN(2,irs)
+
+            if (IGem(ip)==2.and.IGem(iq)==2.and.IGem(ir)==2.and.IGem(is)==1) then
+               ABPLUS(irs,ipq) = ABPLUS(ipq,irs)
+               ABMIN(irs,ipq)  = ABMIN(ipq,irs)
+            else
+               ABPLUS(ipq,irs) = ABPLUS(irs,ipq)
+               ABMIN(ipq,irs)  = ABMIN(irs,ipq)
+            endif
+         enddo
+      enddo
+   else
+      write(lout,'(/1x,a)') 'Warning: Hessian AB(1) matrices are symmetrized!'
+      write(lout,'(10x,a)') '(AB_CAS_FOFO : AB1)'
+      ! symmetrize AB1
+      call sq_symmetrize(ABPLUS,NDimX)
+      call sq_symmetrize(ABMIN,NDimX)
+      endif
+else
+   write(lout,'(/1x,a)') 'Warning: Hessian AB matrices are NOT symmetrized!'
+   write(lout,'(10x,a)') '(AB_CAS_FOFO)'
 endif
 
 !print*, "AB-my",norm2(ABPLUS),norm2(ABMIN)
 
+!write(lout,*) 'HNO-my-sq', norm2(HNO)
 !call sq_to_triang2(HNO,work1,NBasis)
 !write(LOUT,*) 'HNO-my', norm2(work1(1:NBasis*(NBasis+1)/2))
 !HNO=transpose(HNO)
@@ -351,19 +394,23 @@ endif
 !!!!$
 !!!!$write(LOUT,'(/,1X,''CASSCF Energy (w/o ENuc)'',5X,F15.8)') ETot
 !!!!$
-!call sq_to_triang2(AuxI,work1,NBasis)
-!write(LOUT,*) 'AuxI-my', norm2(work1(1:NBasis*(NBasis+1)/2))
-!AuxI=transpose(AuxI)
-!call sq_to_triang2(AuxI,work1,NBasis)
-!write(LOUT,*) 'AuxI-tr', norm2(work1(1:NBasis*(NBasis+1)/2))
-!!
-!call sq_to_triang2(AuxIO,work1,NBasis)
-!write(LOUT,*) 'AuxIO-my', norm2(work1(1:NBasis*(NBasis+1)/2))
+if (FOFO2INCORE) then
+   call sq_to_triang2(AuxI,work1,NBasis)
+   write(LOUT,*) 'AuxI-my-sq:', norm2(AuxI)
+   write(LOUT,*) 'AuxI-my-tr:', norm2(work1(1:NBasis*(NBasis+1)/2))
+   !AuxI=transpose(AuxI)
+   !call sq_to_triang2(AuxI,work1,NBasis)
+   !write(LOUT,*) 'AuxI-tr', norm2(work1(1:NBasis*(NBasis+1)/2))
+   !!
+   call sq_to_triang2(AuxIO,work1,NBasis)
+   write(LOUT,*) 'AuxIO-my-sq:', norm2(AuxIO)
+   write(LOUT,*) 'AuxIO-my-tr:', norm2(work1(1:NBasis*(NBasis+1)/2))
+   write(LOUT,*) 'WMAT-my-sq :', 2d0*norm2(WMAT)
+endif
 !AuxIO=transpose(AuxIO)
 !call sq_to_triang2(AuxIO,work1,NBasis)
 !write(LOUT,*) 'AuxIO-tr', norm2(work1(1:NBasis*(NBasis+1)/2))
 !!
-!write(LOUT,*) 'WMAT-my', 2d0*norm2(WMAT)
 deallocate(RDM2val)
 deallocate(ints,work2,work1)
 

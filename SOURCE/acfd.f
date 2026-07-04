@@ -4311,6 +4311,7 @@ C
 C
 c     IHNO1=1
 c     print*, 'set IHNO1=1 in AB1_CAS!'
+c     print*, 'IHNO1 =', IHNO1
 c     IHNO1=0
 
       If(IHNO1.Eq.1) Then
@@ -4339,6 +4340,13 @@ C
       EndDo
       EndDo
 C
+CC     ... check HNO 1el
+c      block
+C      double precision :: HNOsq(NBasis,NBasis)
+C      call triang_to_sq2(HNO,HNOsq,NBasis)
+C      print*, 'HNO one-el  =',norm2(HNOsq)
+C      end block
+C
 C     CONSTRUCT ONE-ELECTRON PART OF THE AC ALPHA-HAMILTONIAN
 C
       IJ=0
@@ -4365,11 +4373,11 @@ C
 C
       EndIf !IHNO1
 C
-C      block
 CC     ... check HNO
+C      block
 C      double precision :: HNOsq(NBasis,NBasis)
 C      call triang_to_sq2(HNO,HNOsq,NBasis)
-C      print*, 'HNO on entry =',norm2(HNOsq)
+C      print*, 'HNO-sq =',norm2(HNOsq)
 C      end block
 C
       NAct=NAcCAS
@@ -4425,7 +4433,7 @@ C
       EndDo
       EndDo
 C
-Cc     ...mh test
+Cc     ...check WMAT, AuxI, AuxI Squared
 C      Print*, 'WMAT on exit   = ',norm2(WMAT)
 C      block
 C      double precision :: tmp(NBasis,NBasis)
