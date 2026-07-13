@@ -803,7 +803,7 @@ allocate(Dz(NAO, NAO))
 Rc(1)=0
 Rc(2)=0
 Rc(3)=0
-print*, 'use 0 0 0 ...'
+!print*, 'use 0 0 0 ...'
 call multi_ElectronicDipole(Dx, Dy, Dz, Rc, AOBasis)
 !
 ! Convert Dx, Dy, Dz matrices

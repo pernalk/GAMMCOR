@@ -1,9 +1,11 @@
 *Deck DBBSCH
-      Subroutine DBBSCH(ETot,ENuc,URe,Occ,XOne,UNOAO,
-     $                  BasisSet,NBasis,NInte1,IndN,IndX,NDimX, THCData)
+      Subroutine AC_CBSH(ETot,ENuc,URe,Occ,XOne,UNOAO,
+     $           BasisSet,NBasis,NInte1,NGem,IndAux,IndN,IndX,NDimX,
+     $           THCData)
 C
 C     Compute the CBS[H] correction
 C     with SR integrals composed from Cholesky vectors
+C
 C     CBS[DFT] correction [E. Giner et al. 2018] is a byproduct
 C
       use ab0fofo
@@ -15,7 +17,9 @@ C
       include 'commons.inc'
 
       character(*)       :: BasisSet
-      integer,intent(in) :: NBasis,NInte1,NDimX
+      integer,intent(in) :: NBasis,NInte1
+      integer,intent(in) :: NGem,NDimX
+      integer,intent(in) :: IndAux(NBasis)
       integer,intent(in) :: IndX(NDimX),IndN(2,NDimX)
 
       double precision,intent(in)  :: ENuc
@@ -34,6 +38,7 @@ C
       real(8) :: XMuMat(NBasis,NBasis)
       real(8) :: ABMIN(NDimX,NDimX),ABPLUS(NDimX,NDimX)
       real(8) :: EigVecR(NDimX,NDimX),Eig(NDimX)
+      real(8) :: EGOne(NGem)
       double precision, allocatable :: CholVecs(:,:),Work(:,:)
       character(:),allocatable :: rdmfile
 C
@@ -89,14 +94,22 @@ C     transform full-range (FR) and long-range (LR) cholesky vecs
 
 c     print*, 'IFlSnd ', IFlSnd
 c     print*, 'IFlAC  ', IFlAC
+c     print*, 'IFlACFREQNTH', IFlACFREQNTH
+C
+C     Select between AC0-, AC1-, and ACn-CBS[H]
+C
       If (IFlSnd.Eq.1) Then
-C     AC0-CBS[H]
+C
+C     AC0-CBS[H] calculation
+C
       Call AC0CAS_FOFO(ECorr,ECASSCF,Occ,URe,XOne,ABPLUS,ABMIN,
      $ IndN,IndX,IGem,NAcCAS,NInAcCAS,NElecBEmb,
      $ NDimX,NBasis,NDimX,NInte1,
      $ NoSt,'FFOO','FOFO',ICholesky,IDBBSC,IFlFCorr)
-      ElseIf (IFlSnd.Eq.0) Then
-C     AC1-CBS[H]
+C
+      ElseIf (IFlSnd.Eq.0.and.IFlACFREQNTH.Eq.0) Then
+C
+C     AC1-CBS[H] calcultation
 C
       Write(6,'(/,X,"***************************** ")')
       Write(6,'(  X,"*** ERPA-CAS CALCULATIONS *** ")')
@@ -119,6 +132,18 @@ C
       Call ACEneERPA_FOFO(ECorr,ECorrIJ,EigVecR,Eig,Occ,
      $ IGem,IndN,IndX,NAcCAS+NInAcCAS,
      $ NDimX,NBasis,'FOFO',ICholesky,IDBBSC)
+
+      ElseIf (IFlSnd.Eq.0.and.IFlACFREQNTH.Eq.1) Then
+C
+C     ACn-CBS[H] calcultation
+C
+      NGOcc=0 ! is it used?
+      Write(6,'(/,  X,"*** ACn-CBS[H] CALCULATION *** ")')
+      Call WIter_D12Chol(ECorr,0,Max_Cn,XOne,URe,Occ,
+     $ EGOne,NGOcc,IGem,NAcCAS,NInAcCAS,NElecBEmb,NELE,
+     $ NBasis,NInte1,NDimX,NGem,IndAux,
+     $ IndN,IndX,NDimX,IDBBSC)
+C
       EndIf ! IFlSnd
 
       Call FirstOrderSREne(ETwoSR,NBasis)
@@ -134,11 +159,18 @@ c     print*, 'ABMIN -my =',norm2(ABMIN)
      $ (6,'(/1X,''CASSCF+ENuc, AC0-CBS[H], Total'',6X,3F15.8)')
      $ ECASSCF+ENuc,ECorr,ECASSCF+ENuc+ECorr
        ETot=ECASSCF+ENuc+ECorr
-      Else
+      ElseIf (IFlSnd.Eq.0.and.IFlACFREQNTH.Eq.0) Then
       ECorr=Ecorr*Half
       Write
      $ (6,'(/1X,''CASSCF+ENuc, AC1-CBS[H], Total'',6X,3F15.8)')
      $ ECASSCF+ENuc,ECorr,ECASSCF+ENuc+ECorr
+C
+      ElseIf (IFlSnd.Eq.0.and.IFlACFREQNTH.Eq.1) Then
+      ETot=EGOne(1)
+      Write
+     $ (6,'(/,2X,''CASSCF+ENuc, ACn-CBS[H], Total'',6X,3F15.8)')
+     $ ETot+ENuc,ECorr,ETot+ENuc+ECorr
+C
       EndIf ! IFlSnd
 
 c     ... delete transformed cholesky vecs
@@ -154,7 +186,7 @@ c      Print*, 'ECorr = ', ECorr
       EndIf ! ITwoEl, IDBBSC
 
       End
-C *End Subroutine DBBSCH
+C *End Subroutine AC_CBSH
 
 *Deck LOC_MU_CBS_CHOL
       Subroutine LOC_MU_CBS_CHOL(XMuMat,CorrMD,AvMU,

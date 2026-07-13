@@ -180,7 +180,7 @@ C
       EndIf
 C
       Return
-      EndIf
+      EndIf ! IFlResponse
 C
 C     COMPUTE RESPONSE RDMs FROM AC0-CAS DERIVATIVE-LIKE EXPRESSION
 C
@@ -224,14 +224,16 @@ C
 C
 C this is a version of AC0 with CBS basis set corrections (SR integrals are required)
 C
-      Call DBBSCH(ETot,ENuc,URe,Occ,XOne,UNOAO,
-     $   BasisSet,NBasis,NInte1,IndN,IndX,NDimX, THCData)
+      Call AC_CBSH(ETot,ENuc,URe,Occ,XOne,UNOAO,
+     $   BasisSet,NBasis,NInte1,NGem,IndAux,IndN,IndX,NDimX,THCData)
 
       Call delfile('cholvecs')
       Call delfile('cholvErf')
       call gclock('DBBSC',Tcpu,Twall)
 C
       Else
+C
+C this is a regular AC (AC0/AC/ACn) calculation
 C
       Call RunACCAS(ETot,ENuc,TwoNO,URe,UNOAO,Occ,XOne,
      $  IndAux,IPair,IndN,IndX,NDimX,Title,NBasis,NInte1,NInte2,NGem)

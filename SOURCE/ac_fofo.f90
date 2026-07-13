@@ -94,7 +94,7 @@ end subroutine Project_DChol
 subroutine WIter_D12Chol(ECorr,AC1,Max_Cn,XOne,URe,Occ,EGOne,NGOcc,&
    IGem,NAct,INActive,NElecBEmb,NELE,&
    NBasis,NInte1,NDim,NGem,IndAux,&
-   IndN,IndX,NDimX)
+   IndN,IndX,NDimX,IDBBSC)
 !
 !  AC energy cacluation using CHOLESKY VECTORS:
 !  (1) expanding AC integrand in alpha around alpha=0, up to Max_Cn order
@@ -113,9 +113,10 @@ use memory
 implicit none
 integer,intent(in) :: AC1,NGOcc,NBasis,NInte1,NDim,NGem,NDimX
 integer,intent(in) :: NAct,INActive,NElecBEmb,NELE
-integer,intent(in) :: IndN(2,NDim),IndX(NDim),IndAux(NBasis),&
-                      IGem(NBasis)
-double precision,intent(in) :: URe(NBasis,NBasis),Occ(NBasis),XONe(NInte1)
+integer,intent(in) :: IndN(2,NDim),IndX(NDim)
+integer,intent(in) :: IndAux(NBasis),IGem(NBasis)
+integer,intent(in) :: IDBBSC
+double precision,intent(in) :: URe(NBasis,NBasis),Occ(NBasis),XOne(NInte1)
 
 double precision :: ACAlpha
 double precision :: ECorr,ECorrAct,EGOne(NGem)
@@ -199,7 +200,7 @@ ACAlpha=1.D0
 call AB_CAS_FOFO(ABPLUS1,ABMIN1,ECASSCF,URe,Occ,XOne, &
               IndN,IndX,IGem,NAct,INActive,NElecBEmb, &
               NDimX,NBasis,NDimX,&
-              NInte1,twojfile,twokfile,ICholesky,0,ACAlpha,.false.)
+              NInte1,twojfile,twokfile,ICholesky,IDBBSC,ACAlpha,.false.)
 
 Call sq_symmetrize(ABPLUS1,NDimX)
 Call sq_symmetrize(ABMIN1,NDimX)

@@ -60,7 +60,7 @@ C     If (ICholesky.Eq.0) Then
 C
 C     Find AC energy in one shot (no lambda integration) by expanding C in lambda
 C     and integrating analytically, Cholesky decomposition is employed
-C     to lower dimensionality of the C(omega)-problem 
+C     to lower dimensionality of the C(omega)-problem
 C
       Call WIter_D12Chol(ECorr,0,Max_Cn,XOne,URe,Occ,
      $ EGOne,NGOcc,IGem,NAcCAS,NInAcCAS,NElecBEmb,NELE,
@@ -75,7 +75,7 @@ C
       Write
      $ (6,'(/,2X,''ECASSCF+ENuc, ACn-Corr, ACn-CASSCF '',4X,3F15.8)')
      $ ETot+ENuc,ECorr,ETot+ENuc+ECorr
-C       
+C
       Return
 C
       EndIf

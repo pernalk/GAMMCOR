@@ -442,7 +442,7 @@ subroutine AC0CAS_FOFO(ECorr,ETot,Occ,URe,XOne,ABPLUS,ABMIN, &
                        NoSt,IntJFile,IntKFile,ICholesky,IDBBSC,IFlFCorr)
 !
 !     A ROUTINE FOR COMPUTING AC0 INTEGRAND
-!     (FOFO VERSION, USED IN AC0-CAS)
+!     (FOFO VERSION, USED IN AC0-CAS and AC0-CBS[H])
 !
 !     - USES BLOCK STRUCTURE FOR ABPLUS0 and ABMIN0
 !       (DOES NOT DAMP TO FILE)
@@ -581,7 +581,7 @@ write(*,*)'ERPA alpha=0 eigenproblems for NoSt=',NoSt
 if(nAA>0) then
    nblk = nblk + 1
    call pack_Eblock(ABPLUS,ABMIN,nAA,limAA(1),limAA(2),tmpAA,Eblock(nblk),NoSt,NDimX)
-   write(*,*)'act-act done' 
+   write(*,*)'Act-Act block done'
 endif
 !pack AI
 do iq=1,INActive
@@ -591,7 +591,7 @@ do iq=1,INActive
                        Eblock(nblk),NoSt,NDimX)
    endif
 enddo
-write(*,*)'act-inact done' 
+write(*,*)'Act-Inact block done'
 !pack AV
 do ip=NOccup+1,NBasis
    if(nAV(ip)>0) then
@@ -600,7 +600,7 @@ do ip=NOccup+1,NBasis
                        Eblock(nblk),NoSt,NDimX)
     endif
 enddo
-write(*,*) 'act-vir done' 
+write(*,*) 'Act-Vir block done'
 !pack IV
 associate(B => EblockIV)
 
