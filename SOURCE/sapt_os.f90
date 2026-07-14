@@ -194,6 +194,9 @@ real*8, allocatable :: EVecA(:,:),EVecB(:,:)
 
 NBasis = A%NBasis
 
+!print*, 'ISkipped-A =', A%ISkipped
+!print*, 'ISkipped-B =', B%ISkipped
+
 ! uncoupled
 call e2do_unc(e2daa,A%UOrbE(:,1),B%UOrbE(:,1),B%IndNa,A%NOa,A%NVa,B%NOa,B%NVa,NBasis,'OVOVABaa')
 call e2do_unc(e2dbb,A%UOrbE(:,2),B%UOrbE(:,2),B%IndNb,A%NOb,A%NVb,B%NOb,B%NVb,NBasis,'OVOVABbb')
@@ -235,6 +238,10 @@ real*8, allocatable :: OmA(:),OmB(:)
 real*8, allocatable :: EVecA(:,:),EVecB(:,:)
 real*8, allocatable :: tmp(:,:),ints(:,:)
 
+integer :: ISkipped
+double precision,parameter :: BigE   = 1.D8
+double precision,parameter :: SmallE = 1.D-3
+
 NBasis = A%NBasis
 
 ANDimX = A%NOVa+A%NOVb
@@ -246,7 +253,12 @@ allocate(ints(ANDimX,BNdimX))
 
 call readresp(EVecA,OmA,ANDimX,'EIGPRBLA')
 
-print*, 'EVecA', norm2(EVecA)
+ISkipped = A%ISkipped + B%ISkipped
+if (ISkipped /= 0) then
+   write(LOUT,'(/,1x,a)') 'Thresholds in E2disp:'
+   write(LOUT,'(1x,a,2x,e15.4)') 'SmallE      =', SmallE
+   write(LOUT,'(1x,a,2x,e15.4)') 'BigE        =', BigE
+endif
 
 !call assemble_spin_ints(A,B,ints,e2disp_unc,NBasis)
 ! Assemble integrals
@@ -275,10 +287,10 @@ call e2do_incore_unc(e2dba,tmp,A%UOrbE(:,2),B%UOrbE(:,1),A%NOb,A%NVb,B%NOa,B%NVa
 deallocate(tmp)
 
 if(SAPT%IPrint>=10) then 
-   write(LOUT,'(/1x,a,f16.8)') 'E2disp(unc,aa) = ', e2daa*1000d0
-   write(LOUT,'(1x,a,f16.8)') 'E2disp(unc,ab) = ',  e2dab*1000d0
-   write(LOUT,'(1x,a,f16.8)') 'E2disp(unc,ba) = ',  e2dba*1000d0
-   write(LOUT,'(1x,a,f16.8)') 'E2disp(unc,bb) = ',  e2dbb*1000d0
+  write(LOUT,'(/1x,a,f16.8)') 'E2disp(unc,aa) = ', e2daa*1000d0
+   write(LOUT,'(1x,a,f16.8)') 'E2disp(unc,ab) = ', e2dab*1000d0
+   write(LOUT,'(1x,a,f16.8)') 'E2disp(unc,ba) = ', e2dba*1000d0
+   write(LOUT,'(1x,a,f16.8)') 'E2disp(unc,bb) = ', e2dbb*1000d0
 endif
 
 e2disp_unc = e2daa + e2dbb + e2dab + e2dba
@@ -300,11 +312,27 @@ print*, 'EVecB', norm2(EVecB)
 call dgemm('N','N',ANDimX,BNDimX,BNDimX,1d0,tmp,ANDimX,EVecB,BNDimX,0d0,ints,ANDimX)
 
 e2disp=0d0
-do j=1,BNDimX
-   do i=1,ANDimX
-      e2disp = e2disp - ints(i,j)**2d0/(OmA(i)+OmB(j))
+if (iskipped==0) then
+
+   do j=1,BNDimX
+      do i=1,ANDimX
+         e2disp = e2disp - ints(i,j)**2d0/(OmA(i)+OmB(j))
+      enddo
    enddo
-enddo
+
+else ! negative/small eigenvalues present
+
+   do j=1,BNDimX
+      if(OmB(j).gt.SmallE.and.OmB(j).lt.BigE) then
+         do i=1,ANDimX
+            if(OmA(i).gt.SmallE.and.OmA(i).lt.BigE) then
+               e2disp = e2disp - ints(i,j)**2d0/(OmA(i)+OmB(j))
+            endif
+         enddo
+      endif
+   enddo
+
+endif
 
 SAPT%e2disp = e2disp
  
@@ -384,26 +412,91 @@ double precision, intent(in) :: EnA(noA+nvA),EnB(noB+nvB)
 double precision, intent(out) :: e2do
 
 integer :: ip,iq,ir,is
+integer :: ipq,irs
+integer :: novA,novB
+integer :: iskipped
 
 double precision :: inv_omega
 double precision :: OmA,OmB
 
-e2do = 0d0
-do is=1,noB
-   do ir=1,nvB
+real(8),allocatable :: OmA0(:),OmB0(:)
+logical,allocatable :: condOmA0(:),condOmB0(:)
 
-    OmB = EnB(is) - EnB(noB+ir)
+double precision,parameter :: BigE   = 1.D8
+double precision,parameter :: SmallE = 1.D-3
 
-       do iq=1,noA
-          do ip=1,nvA
-             OmA = EnA(iq) - EnA(noA+ip)
-             inv_omega = 1d0 / (OmA + OmB)
-             e2do = e2do + ints(ip,iq,ir,is)**2*inv_omega
-          enddo
-       enddo
-
+! check for small/negative eigenvals
+novA = noA*nvA
+novB = noB*nvB
+allocate(OmA0(novA),OmB0(novB))
+ipq = 0
+do iq=1,noA
+   do ip=1,nvA
+      ipq = ipq + 1
+      OmA0(ipq) = EnA(noA+ip) - EnA(iq)
    enddo
 enddo
+irs = 0
+do is=1,noB
+   do ir=1,nvB
+      irs = irs + 1
+      OmB0(irs) = EnB(noB+ir) - EnB(is)
+   enddo
+enddo
+allocate(condOmA0(novA),condOmB0(novB))
+condOmA0 = (OmA0.gt.SmallE.and.OmA0.lt.BigE)
+condOmB0 = (OmB0.gt.SmallE.and.OmB0.lt.BigE)
+
+iskipped = count(.not. condOmA0) + count(.not. condOmB0)
+
+if (iskipped .gt. 0) then
+  print*, 'Skipped ', iskipped, 'value(s) in E2disp(unc)!'
+endif
+
+e2do = 0d0
+! no negative/small eigenvals
+if (iskipped==0) then
+   do is=1,noB
+      do ir=1,nvB
+
+       OmB = EnB(is) - EnB(noB+ir)
+
+          do iq=1,noA
+             do ip=1,nvA
+                OmA = EnA(iq) - EnA(noA+ip)
+                inv_omega = 1d0 / (OmA + OmB)
+                e2do = e2do + ints(ip,iq,ir,is)**2*inv_omega
+             enddo
+          enddo
+
+      enddo
+   enddo
+
+else ! negative/small/huge eigenvalues present
+
+   irs = 0
+   do is=1,noB
+      do ir=1,nvB
+         irs = irs + 1
+         if(condOmB0(irs)) then
+           ipq = 0
+           do iq=1,noA
+              do ip=1,nvA
+                 ipq = ipq + 1
+                 if(condOmA0(ipq)) then
+                    inv_omega = 1d0 / (OmA0(ipq) + OmB0(irs))
+                    e2do = e2do - ints(ip,iq,ir,is)**2*inv_omega
+                 endif
+              enddo
+           enddo
+        endif
+      enddo
+   enddo
+
+endif
+
+deallocate(OmB0,OmA0)
+deallocate(condOmB0,condOmA0)
 
 end subroutine e2do_incore_unc
 

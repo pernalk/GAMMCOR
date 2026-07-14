@@ -186,6 +186,7 @@ call saptuks_ab_ints(Flags,SAPT%monA,SAPT%monB,NBasis,AOBasis,CholeskyVecsOTF)
 call e1elst_o(SAPT%monA,SAPT%monB,SAPT)
 call e1exchs2_sq_os(SAPT%monA,SAPT%monB,SAPT)
 call e1exch_os(SAPT%monA,SAPT%monB,SAPT)
+
 call e2ind_o(Flags,SAPT%monA,SAPT%monB,SAPT)
 call e2disp_o(Flags,SAPT%monA,SAPT%monB,SAPT)
 

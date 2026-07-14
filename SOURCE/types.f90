@@ -223,6 +223,7 @@ type SystemBlock
       ! unrestricted
       integer :: NOa, NOb, NVa, NVb
       integer :: NOVa, NOVb
+      integer :: ISkipped
 
       integer :: NDim, NDimX
       integer :: NDimN, DimEx

@@ -663,12 +663,14 @@ do iq=1,M%NOa
    do ip=1,M%NVa
       ipq = ipq + 1
       delta(ipq) = M%UOrbE(iq,1) - M%UOrbE(M%NOa+ip,1)
+      !if(abs(delta(ipq)).lt.1d-3) print*, 'ipq,delta-a',ipq,delta(ipq)
    enddo
 enddo
 do iq=1,M%NOb
    do ip=1,M%NVb
       ipq = ipq + 1
       delta(ipq) = M%UOrbE(iq,2) - M%UOrbE(M%NOb+ip,2)
+      !if(abs(delta(ipq)).lt.1d-3) print*, 'ipq,delta-b',ipq,delta(ipq)
    enddo
 enddo
 
@@ -676,6 +678,7 @@ call amplitudes_T1_cphf(delta,wVecxYY,amps,NDimX)
 
 e2ind_unc = 0d0
 do ipq=1,NDimX
+   !print*, 'i,amps',ipq,amps(ipq)
    e2ind_unc = e2ind_unc - amps(ipq)*wVecxYY(ipq)
 enddo
 
@@ -759,11 +762,19 @@ double precision,intent(out) :: res(NDimX)
 
 integer :: pq,ip,iq
 
+integer :: iskipped
+double precision, parameter :: SmallE=1.D-3,BigE=1.D8
+
+!res = 0
+!do pq=1,NDimX
+!      res(pq) = res(pq) - ints(pq) / deps(pq)
+!enddo
+
 res = 0
 do pq=1,NDimX
-   res(pq) = res(pq) - ints(pq) / deps(pq)
+      if (abs(deps(pq)).lt.SmallE) cycle
+      res(pq) = res(pq) - ints(pq) / deps(pq)
 enddo
-
 end subroutine amplitudes_T1_cphf
 
 subroutine amplitudes_T1_cerpa(ABlock,ABlockIV,nblk,ints,res,NDimX)

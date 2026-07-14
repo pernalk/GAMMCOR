@@ -2244,6 +2244,9 @@ character(:),allocatable :: twojfileaa,twojfilebb
 character(:),allocatable :: twokfileaa,twokfilebb,twokfileab
 character(:),allocatable :: BasisSetPath
 
+integer :: iskipped
+double precision, parameter :: SmallE=1.D-3,BigE=1.D8
+
 ! dimensions
 ! full hessian
 NDimX = Mon%NOVa+Mon%NOVb
@@ -2314,12 +2317,21 @@ do i=1,min(10,NDimX)
    write(lout,'(i4,4x,2E16.6)') i,Eig(i),toeV(Eig(i))
 enddo
 
+ISkipped=0
+do i=1,NDimX
+   if(Eig(i).lt.SmallE.or.Eig(i).gt.BigE) iskipped = iskipped+1
+enddo
+if(ISkipped.ne.0) Then
+   write(6,'(/,1X,"The number of discarded eigenvalues is",I4/)') ISkipped
+endif
+Mon%ISkipped = ISkipped
+
 EigVecR = sqrt(2d0)*EigVecR
-print*, 'Eig...',norm2(Eig)
+!print*, 'Eig...',norm2(Eig)
 !do i=1,NDimX
 !  print*, i, Eig(i)
 !enddo
-print*, 'EigVecR',norm2(EigVecR)
+!print*, 'EigVecR',norm2(EigVecR)
 !do i=1,NdimX
 !  write(6,'(*(f13.8))') (EigVecR(i,j),j=1,NdimX)
 !enddo
