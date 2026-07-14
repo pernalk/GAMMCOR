@@ -40,8 +40,9 @@ select case(CalcParams%JobType)
 ! AC
 case(1,14,15,16)
   if (CalcParams%DBBSC==2.and.CalcParams%TwoMoInt>1) then
-     write(6,'(1x,a)') "ERROR! AC(n)-CBS[H] not ready with FOFO!"
-     stop "Error: check_Calc"
+     write(6,'(1x,a)') "AC(n)-CBS[H] with FOFO..."
+     !write(6,'(1x,a)') "ERROR! AC(n)-CBS[H] not ready with FOFO!"
+     !stop "Error: check_Calc"
    endif
 
 ! AC1
@@ -310,6 +311,7 @@ end select
   case(JOB_TYPE_ACFREQNTH)
      Flags%IFlAC  = 1
      Flags%IFlACFREQNTH = 1
+     Flags%IDBBSC = Input%CalcParams%DBBSC
 
   case(JOB_TYPE_AC1FREQNTH)
      Flags%IFlAC  = 1
