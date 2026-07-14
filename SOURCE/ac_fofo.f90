@@ -294,12 +294,14 @@ Do IGL=1,NGrid
        If(AC1.Eq.1) FF=WFact/XFactorial/2.D0
        XNorm1=Norm2(FF*C2Tilde)
        Write(6,'(X,"Order (n), |Delta_C|",I3,E14.4)')N,XNorm1
-       If(XNorm1.Lt.ErrMax) Exit
-       If(N.Gt.3.And.XNorm1.Gt.XNorm0) Then
-           Write(6,'(X,"Divergence detected. Expansion of C terminated at order ",I3,3F10.4)')N-1
-!          Write(6,'(X,"Divergence detected. Continue up to order Max_Cn",I3,3F10.4)')N
-           Exit
-       EndIf
+! KP 18.06.2026 (uncomment after tests)
+!       If(XNorm1.Lt.ErrMax) Exit
+!       If(N.Gt.3.And.XNorm1.Gt.XNorm0) Then
+!           Write(6,'(X,"Divergence detected. Expansion of C terminated at order ",I3,3F10.4)')N-1
+!!          Write(6,'(X,"Divergence detected. Continue up to order Max_Cn",I3,3F10.4)')N
+!           Exit
+!       EndIf
+
        XNorm0=XNorm1
        COMTilde=COMTilde+FF*C2Tilde
        C0Tilde=C1Tilde
