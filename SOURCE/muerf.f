@@ -238,7 +238,7 @@ C
       Double Precision, Allocatable :: OrbTGrid(:,:)
       Dimension IAct(NBasis),Ind2(NBasis)
       Dimension IndInt(NBasis),NSymNO(NBasis),NumOSym(15),MultpC(15,15)
-      Dimension OrbIGGrid(NBasis)
+      Dimension OrbIGGrid(NBasis),Occ0(NBasis)
 C
       double precision :: Twall,TCpu
 C
@@ -515,13 +515,120 @@ C     X IS DEFINED AS: < E(IJ)E(KL) > - DELTA(J,K) < E(IL) > = 2 GAM2(JLIK)
    40 Continue
       Close(10)
 C
+C KP 24.06.2026 [truncate summations w.r.t active to n_p>0.49]
+C
+c      NAct0=NAct
+c      Occ0=Occ
+c      NOccup0=NOccup
+c      Do I=INActive+1,NOccup0
+c        If(Occ(I).Lt.0.1D0) Then
+c           Occ(I)=Zero
+c           NOccup=NOccup-1
+c           NAct=NAct-1
+c        EndIf 
+c      EndDo  
+c      If(NAct.Ne.NAct0) 
+c     $ Write(6,'(\,1X,
+c     $ "*** mu(r) computed by truncating NAct to :",I3,\)') NAct 
+C 
+C RECONSTRUCT A SINGLET DETERMINANT FOR A GIVEN CAS AND OBTAIN CORRESPONDING RDMs 
+C
+      NAct0=NAct
+      Occ0=Occ
+      NOccup0=NOccup
+C
+      goto 777
+C
+      Occ(INActive+1:NOccup0)=0.0D0 
+      XElAct0=XELE-INActive
+      write(*,*)'active electrons: ',XElAct0
+      XElAct=0
+      NAct=0
+      NOccup=INActive
+      Do I=INActive+1,NOccup0
+        If(Occ0(I).Gt.0.6) Then
+           Occ(I)=1.D0
+           XElAct=XElAct+1 
+           NAct=NAct+1
+           NOccup=NOccup+1
+           write(*,*)i,occ(i),XElAct
+           If(XElAct.Eq.XElAct0) GoTo 100
+        ElseIf(Occ0(I).Gt.0.4) Then
+           Occ(I)=0.5D0
+           XElAct=XElAct+0.5
+           NAct=NAct+1
+           NOccup=NOccup+1
+           write(*,*)i,occ(i),XElAct
+           If(XElAct.Eq.XElAct0) GoTo 100
+        Else
+           Occ(I)=0.0D0
+        EndIf
+      EndDo 
+  100 Continue
+C
+      If(XElAct.Ne.XElAct0) Stop "Fatal Error in LOC_MU_CBS_CHOL"
+      Write(6,'(/,1X,
+     $ "*** mu(r) computed by truncating NAct to :",I3,/)') NAct 
+      write(*,*)'New Occupancies'
+      Do I=1,NAct0
+      Write(*,*)I+INActive,Occ(I+INActive) 
+      EndDo
+C
+C     2-RDM from idempotent 1-RDM:
+C         
+      Do IP=1,NAct
+         OccP=Occ(INActive+IP)
+         If(OccP.Eq.1.D0) Then
+            OccPa=1.D0
+            OccPb=1.D0
+         ElseIf(OccP.Eq.0.5D0) Then
+            OccPa=1.D0
+            OccPb=0.0D0
+         EndIf  
+      Do IQ=1,NAct
+         OccQ=Occ(INActive+IQ)
+         If(OccQ.Eq.1.D0) Then
+            OccQa=1.D0
+            OccQb=1.D0
+         ElseIf(OccQ.Eq.0.5D0) Then
+            OccQa=1.D0
+            OccQb=0.0D0
+         EndIf
+      Do IR=1,NAct
+      Do IS=1,NAct
+C
+         RDM2=Zero
+         If(IP.Eq.IR.And.IQ.Eq.IS) RDM2=RDM2
+     $   +OccPa*OccQa+OccPa*OccQb+OccPb*OccQa+OccPb*OccQb
+         If(IP.Eq.IS.And.IQ.Eq.IR) RDM2=RDM2
+     $   -OccPa*OccQa-OccPb*OccQb
+C
+         RDM2=RDM2/2.D0
+C
+         write(6,'(4I3,3F8.5)') ip,iq,ir,is,rdm2,
+     $   RDM2Act(NAddrRDM(IP,IQ,IR,IS,NAct0))
+     $ ,rdm2-RDM2Act(NAddrRDM(IP,IQ,IR,IS,NAct0))
+C
+         RDM2Act(NAddrRDM(IP,IQ,IR,IS,NAct0))=RDM2
+C
+      EndDo
+      EndDo
+      EndDo
+      EndDo
+C
+  777 Continue
+C
+CCCCCCCCCCCCCCCC
+C
       Allocate(RDM2val(NOccup,NOccup,NOccup,NOccup))
       Do L=1,NOccup
       Do K=1,NOccup
       Do J=1,NOccup
       Do I=1,NOccup
 C     change later from 1212 to 11,22!
-      RDM2val(I,K,J,L)=FRDM2(I,K,J,L,RDM2Act,Occ,Ind2,NAct,NBasis)
+C KP 24.06.2026
+      RDM2val(I,K,J,L)=FRDM2(I,K,J,L,RDM2Act,Occ,Ind2,NAct0,NBasis)
+c      RDM2val(I,K,J,L)=FRDM2(I,K,J,L,RDM2Act,Occ,Ind2,NAct,NBasis)
       Enddo
       Enddo
       Enddo
@@ -751,7 +858,9 @@ C
                If(Abs(ValQRS).Gt.1.D-8) Then
                Do IP=INActive+1,NOccup
                   OnTopAct=OnTopAct +
-     $            FRDM2(IP,IQ,IR,IS,RDM2Act,Occ,Ind2,NAct,NBasis)
+C KP 24.06.2026
+     $            FRDM2(IP,IQ,IR,IS,RDM2Act,Occ,Ind2,NAct0,NBasis)
+C     $            FRDM2(IP,IQ,IR,IS,RDM2Act,Occ,Ind2,NAct,NBasis)
      $            *OrbTGrid(IP,I)*ValQRS
                EndDo
                EndIf
@@ -786,7 +895,6 @@ C
       Do IP=1,NBasis
       Do IQ=1,IP
       XMuMAT(IP,IQ)=0d0
-C
       ISym=MultpC(NSymNO(IP),NSymNO(IQ))
       If(ISym.Eq.1) Then
 C
@@ -797,6 +905,12 @@ C
 C
       EndIf
       XMuMAT(IQ,IP)=XMuMAT(IP,IQ)
+C
+C KP 22.06.2026
+      If(IFlCore.Eq.0.And.(IP.Le.ICore.Or.IQ.Le.ICore)) Then
+      XMuMAT(IQ,IP)=0.0
+      XMuMAT(IP,IQ)=0.0 
+      EndIf
 C
       EndDo
       EndDo
@@ -835,6 +949,9 @@ C
       EndDo
 C
       AvMU=AvMU/XEl
+C
+C     KP 24.06.2026 [copy back unmodified Occ]
+      If(NAct.Ne.NAct0) Occ=Occ0
 C
       If(IFlCore.Eq.0) Then
       Do I=1,ICore
