@@ -91,7 +91,7 @@ C
       Call AC0CAS_FOFO(ECorr,ETot,Occ,UNOAO,URe,XOne,ABPLUS,ABMIN,
      $ IndN,IndX,IGem,NAcCAS,NInAcCAS,NElecBEmb,
      $ NDimX,NBasis,NDim,NInte1,
-     $ NoSt,'FFOO','FOFO',ICholesky,IDBBSC,IFlFCorr)
+     $ NoSt,'FFOO','FOFO',ICholesky,IDBBSC,IFlFCorr,IMSAC)
 C
 C     now Y01CAS_FOFO is used in SAPT only
 C      Call Y01CAS_FOFO(Occ,URe,XOne,ABPLUS,ABMIN,
@@ -2605,6 +2605,9 @@ C
 C
       Write(6,'(/," *** DONE WITH COMPUTING AB(1) MATRICES ***")')
 C
+      Write(6,'(/1x,a,f20.12)') 'ABPLUS1-INCR =',norm2(ABPLUS)
+      Write(6,'(1x,a,f20.12)')  'ABMIN1 -INCR =',norm2(ABMIN)
+C
 C ----------------------------------------------------------------    
 C     1ST-ORDER PART
 C
@@ -2672,8 +2675,8 @@ C
       EndDo
       EndDo
 C
-c     print*, 'XT.APLUS.X',norm2(ABPLUS)
-c     print*, 'YT.AMIN.Y ',norm2(ABMIN)
+      Write(6,'(/1x,a,f20.12)') 'XT.APLUS.X =',norm2(ABPLUS)
+      Write(6,'(1x,a,f20.12/)') 'YT.AMIN.Y  =',norm2(ABMIN)
 C
       XMAux(1:NoEig*NoEig)=Zero
 C
@@ -2713,10 +2716,13 @@ C     MS-AC0 switches on if there is an externally generated "scas_ene.dat"
 C     file. Maybe it is better to have a MS-AC0 JobType?
 C
       NoStMx=1
-      Call TRDM_MS(TRDMNO,Occ,UNOAO,NoStMx,NInte1,NBasis,IEx)
-      If(IEx.Eq.1) Write(6,'(/,2X,''MS-AC0: Computing H^eff for n='',I2,
+
+      If (IMSAC == 1) then
+         Call TRDM_MS(TRDMNO,Occ,UNOAO,NoStMx,NInte1,NBasis,IEx)
+         Write(6,'(/,2X,''MS-AC0: Computing H^eff for n='',I2,
      $ '' NoStates = '',
      $ I2,/)')NoSt,NoStMx
+      EndIf
 C
       IPairEig=0
       Do II=1,NoEig
@@ -7616,39 +7622,38 @@ C
       Character*32 Str0
       Logical ex
 C
-      Inquire(file='sacas_ene.dat',exist=ex)
-      If(ex) Then
-      IEx=1
-      Else
-      IEx=0
-      Return
-      EndIf
-C     grep ' !MCSCF STATE' filename.out > sacas_ene.dat
-      Open(10,File="sacas_ene.dat",Status='Old')
-C
-      NoStMx=0
-   20 Read(10,'(A32,F22.12)',End=40) Str0,EExcit(NoStMx+1)
-      Write(6,'(X,"SA-CAS Energy for state no ",I3,4X,F12.7)')
-     $ NoStMx+1,EExcit(NoStMx+1)
-      Read(10,*)
-      NoStMx=NoStMx+1
-      If(NoStMx.Gt.10) Stop 'Fatal error in TRDM_MS NoStMx>10!'
-      GoTo 20
-   40 Continue
-      Close(10)
+C      Inquire(file='sacas_ene.dat',exist=ex)
+C      If(ex) Then
+C      IEx=1
+C      Else
+C      IEx=0
+C      Return
+C      EndIf
+CC     grep ' !MCSCF STATE' filename.out > sacas_ene.dat
+C      Open(10,File="sacas_ene.dat",Status='Old')
+CC
+C      NoStMx=0
+C   20 Read(10,'(A32,F22.12)',End=40) Str0,EExcit(NoStMx+1)
+C      Write(6,'(X,"SA-CAS Energy for state no ",I3,4X,F12.7)')
+C     $ NoStMx+1,EExcit(NoStMx+1)
+C      Read(10,*)
+C      NoStMx=NoStMx+1
+C      If(NoStMx.Gt.10) Stop 'Fatal error in TRDM_MS NoStMx>10!'
+C      GoTo 20
+C   40 Continue
+C      Close(10)
 C
 C     mh 14.07.26: replace reading sacas_ene.dat 
 C                  file with reading energies from Molpro
 C
-C      HERE TEST: nstates = NoStMx ; ECasscf = EExcit
-C
-C      block
-C      real(8) :: ECASSCF(10)
-C      Call read_Ene_molpro(ECasscf,nstates,'2RDM')
-C      Print*, "EExcit  =", EExcit(1:NoStMx)
-C      print*, 'nstates = ',nstates
-C      Print*, "ECASSCF =", ECASscf(1:NStates)
-C      end block
+      Call read_Ene_molpro(EExcit,NoStMx,'2RDM')
+      If(NoStMx.Gt.10) Stop 'Fatal error in TRDM_MS NoStMx>10!'
+      II = 0
+      Do I=NoStMx,1,-1
+      II = II + 1
+      Write(6,'(X,"SA-CAS Energy for state no ",I3,4X,F12.7)')
+     $ II,EExcit(I)
+      EndDo
 C
 c     Allocate(TRDMNO(NoStMx,NBasis,NBasis))
 C

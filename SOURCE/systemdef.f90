@@ -323,9 +323,7 @@ end select
      Flags%IFunSR = Input%CalcParams%DFApp
      Flags%IFunSRKer = Input%CalcParams%Kernel
 
-  case(JOB_TYPE_AC0,JOB_TYPE_SRAC0,JOB_TYPE_MP2, JOB_TYPE_SRMP2)
-    ! HERE WILL BE CHANGED TO:
-    !Flags%IFlAC = 0
+  case(JOB_TYPE_AC0,JOB_TYPE_SRAC0,JOB_TYPE_MP2,JOB_TYPE_SRMP2,JOB_TYPE_MSAC0)
      Flags%IFlAC   = 1
      Flags%IFlSnd  = 1
      Flags%IFlAC0D = 0
@@ -354,6 +352,10 @@ end select
      if(Input%CalcParams%JobType==JOB_TYPE_SRAC0) then
        Flags%ICorrMD  = 1
        Flags%IFlFCorr = Input%CalcParams%FunCorr ! set fCAS/fCAS+fAC0
+     endif
+     ! MS-AC0
+     if(Input%CalcParams%JobType==JOB_TYPE_MSAC0) then
+       Flags%IMSAC = 1
      endif
 !     if(Input%CalcParams%DFApp==2) Flags%IFunSRKer = 1
 

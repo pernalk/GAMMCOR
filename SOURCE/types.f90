@@ -35,6 +35,7 @@ integer, parameter :: JOB_TYPE_SRAC0       = 18
 integer, parameter :: JOB_TYPE_MP2         = 19
 integer, parameter :: JOB_TYPE_SRMP2       = 20
 integer, parameter :: JOB_TYPE_SAPTOS      = 21
+integer, parameter :: JOB_TYPE_MSAC0       = 22
 
 integer, parameter :: SAPTLEVEL0 = 0
 integer, parameter :: SAPTLEVEL1 = 1
@@ -106,11 +107,11 @@ character(*),parameter :: PossibleInterface(5) = &
 [character(8) :: &
 'DALTON', 'MOLPRO', 'OWN', 'ORCA', 'PYSCF']
 
-character(*),parameter :: PossibleJobType(21) = &
+character(*),parameter :: PossibleJobType(22) = &
 [character(9) :: &
 'AC', 'AC0', 'ERPA', 'EERPA', 'SAPT', 'PDFT', 'CASPiDFT','CASPiDFTOpt','EERPA-1', & 
 'AC0D', 'AC0DNOSYMM', 'NLOCCORR', 'AC0DP', 'ACFREQ','ACFREQNTH','AC1FREQNTH', &
-'RESPONSE','SRAC0', 'MP2', 'SRMP2', 'SAPT-OS']
+'RESPONSE','SRAC0', 'MP2', 'SRMP2', 'SAPT-OS','MSAC0']
 
 character(*),parameter :: PossibleRDMType(7) = &
 [character(8) :: &
@@ -407,6 +408,7 @@ type FlagsData
      integer :: IFlFCorr  = 0 ! for SRAC0
      integer :: IDBBSC    = 0 ! for AC0
      integer :: IVEMB     = 0 ! for DMRG-in-DFT
+     integer :: IMSAC     = 0 ! for MS-AC0
      double precision :: Alpha = 0
      integer :: IModG   = 1
      integer :: NGOcc   = 0

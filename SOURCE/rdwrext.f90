@@ -289,7 +289,7 @@ character(8) :: label
     stket = stketIn
  endif
 
- write(LOUT,'(1x,a,i1,a,i1,a)') &
+ write(LOUT,'(/1x,a,i1,a,i1,a)') &
        'Reading <',stbr,'|',stket,'> 1-TRDM...'
 
  !check if any states declared in input
@@ -1082,7 +1082,7 @@ subroutine read_Ene_molpro(ECasscf,nstates,infile)
 implicit none
 
 integer,intent(out) :: nstates
-double precision,intent(out) :: ECasscf(8)
+double precision,intent(out) :: ECasscf(10)
 character(*),intent(in) :: infile
 
 integer :: iunit, ios
@@ -1099,6 +1099,7 @@ character(8) :: label
            endif
            if(label=='ENEINFO ') then
               read(iunit) nstates
+              !if (nstates > 10) stop "Error! No States > 10 in read_Ene_molpro!"
               read(iunit) ECasscf(1:nstates)
               exit fileloop
            endif

@@ -394,6 +394,9 @@ subroutine read_block_calculation(CalcParams, line)
            elseif (uppercase(val) == "SAPT-OS" .or. &
                    uppercase(val) == "SAPTOS") then
                CalcParams%JobType = JOB_TYPE_SAPTOS
+           elseif (uppercase(val) == "MSAC0" .or. &
+                   uppercase(val) == "MS-AC0") then
+               CalcParams%JobType = JOB_TYPE_MSAC0
            endif
 
      !case ("FRAGMENTS")

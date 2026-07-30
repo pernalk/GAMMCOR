@@ -19,7 +19,7 @@
       Common/AC/ IFlAC,IFlSnd,IFlAC0D,IFlAC0DP,IFlCore,IFlFrag1,IFl12,
      $ NoSt,ISymmAC0D,IFlACFREQ,IFlACFREQNTH,IFlAC1FREQNTH,Max_Cn,
      $ IFlRESPONSE,IFlCorrMD,IRedVirt,IOrbRelax,IOrbIncl,FreqOm(10),
-     $ IFlFCorr,IDBBSC,IHNO1,IVEMB,NFreqOm
+     $ IFlFCorr,IDBBSC,IHNO1,IVEMB,NFreqOm,IMSAC
       Common/THRGEM/ ThrGemAct
       Common/THR/ ThrSelAct,ThrAct,ThrQVirt,ThrQInact
 C

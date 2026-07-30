@@ -213,6 +213,10 @@ C     IVEMB    = 1 : activates DMRG-in-DFT embedding in AC0
 C
       IVEMB  = Flags%IVEMB
 C
+C     IMSAC    = 1 : activates MS-AC0
+C
+      IMSAC  = Flags%IMSAC
+C
 C     *************************************************************************
 C
 C     SELECT A LONG-RANGE DMFT FUNCTIONAL

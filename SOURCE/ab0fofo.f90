@@ -439,7 +439,7 @@ end subroutine ACABMAT0_FOFO
 subroutine AC0CAS_FOFO(ECorr,ETot,Occ,UNOAO,URe,XOne,ABPLUS,ABMIN, &
                        IndN,IndX,IGemIN,NAct,INActive,NElecBEmb,&
                        NDimX,NBasis,NDim,NInte1, &
-                       NoSt,IntJFile,IntKFile,ICholesky,IDBBSC,IFlFCorr)
+                       NoSt,IntJFile,IntKFile,ICholesky,IDBBSC,IFlFCorr,IMSAC)
 !
 !     A ROUTINE FOR COMPUTING AC0 INTEGRAND
 !     (FOFO VERSION, USED IN AC0-CAS and AC0-CBS[H])
@@ -460,6 +460,7 @@ integer,intent(in)           :: NDimX,NBasis,NDim,NInte1,NoSt
 integer,intent(in)           :: IndN(2,NDim),IndX(NDim),IGemIN(NBasis)
 integer,intent(in)           :: ICholesky
 integer,intent(in)           :: IDBBSC,IFlFCorr
+integer,intent(in)           :: IMSAC
 double precision,intent(in)  :: URe(NBasis,NBasis),Occ(NBasis),XOne(NInte1)
 real(8),intent(in)           :: UNOAO(NBasis,NBasis)
 character(*)                 :: IntJFile,IntKFile
@@ -642,8 +643,8 @@ call AB_CAS_FOFO(ABPLUS,ABMIN,val,URe,Occ,XOne,&
 !          follow a different IndNBlock order.
 !          Consequently, norm2(AB1) agrees, but elements are in different order.
 !
-      print*, 'ABPLUS1-my =',norm2(ABPLUS)
-      print*, 'ABMIN1 -my =',norm2(ABMIN)
+  write(lout,'(/1x,a,f20.12)') 'ABPLUS1-FOFO =',norm2(ABPLUS)
+  write(lout,'(1x,a,f20.12)')  'ABMIN1 -FOFO =',norm2(ABMIN)
 
 !call gclock('AB(1)',Tcpu,Twall)
 
@@ -681,8 +682,8 @@ associate(B => EblockIV)
 
 end associate
 
-print*, 'XT.APLUS.X',norm2(ABPLUS)
-print*, 'YT.AMIN.Y ',norm2(ABMIN)
+write(lout,'(/1x,a,f20.12)') 'XT.APLUS.X =',norm2(ABPLUS)
+write(lout,'(1x,a,f20.12/)') 'YT.AMIN.Y  =',norm2(ABMIN)
 
 work = 0d0
 do j=1,NDimX
@@ -693,17 +694,18 @@ do j=1,NDimX
    endif
 enddo
 
-! replace IEx with MS-AC0 keyword!
 NoStMx=1
-call TRDM_MS(TRDMNO,Occ,UNOAO,NoStMx,NInte1,NBasis,IEx)
+!
+! BEGIN MS-AC0
+!
+if (IMSAC == 1) then
 
-print*, 'NoStMx = ', NOStMx
+   call TRDM_MS(TRDMNO,Occ,UNOAO,NoStMx,NInte1,NBasis,IEx)
+   print*, 'NoStMx = ', NOStMx
+   write (lout, '(/, 2X, "MS-AC0: Computing H^eff for n=", I2, &
+              &" NoStates = ", I2, /)') NoSt, NoStMx
 
-if (IEx == 1) then
-    write (lout, '(/, 2X, "MS-AC0: Computing H^eff for n=", I2, &
-               &" NoStates = ", I2, /)') NoSt, NoStMx
-
-    call Eblock2Sblock(Eblock,EblockIV,Sblock,SblockIV,Occ,IndN,nblk,NBasis,NDimX)
+   call Eblock2Sblock(Eblock,EblockIV,Sblock,SblockIV,Occ,IndN,nblk,NBasis,NDimX)
 
 end if
 
@@ -728,9 +730,7 @@ do ISS=1,NoStMx
       !print*, 'Testing Two-Step BACKTRAN...'
       !call ABPM_HLFBCKTRN_R(work,ABMIN,EBlock,EBlockIV,nblk,NDimX)
       !call ABPM_HLFBCKTRN_L(ABMIN,ABPLUS,EBlock,EBlockIV,nblk,NDimX)
-      print*, 'regular AC0', norm2(ABPLUS)
 
-      deallocate(Eig,work)
    endif  ! if(ISS.Ne.NoSt)
 
    ! energy loop
@@ -883,6 +883,7 @@ do ISS=1,NoStMx
    deallocate(ints)
 
 enddo ! do ISS=1,NoStMx
+deallocate(Eig,work)
 
 ! deallocate blocks
 do iblk=1,nblk
