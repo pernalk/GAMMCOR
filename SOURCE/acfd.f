@@ -82,13 +82,13 @@ C
 C
       If(ITwoEl.eq.1) Then
 C      
-      Call AC0CAS(ECorr,ETot,TwoNO,Occ,URe,XOne,
+      Call AC0CAS(ECorr,ETot,TwoNO,Occ,UNOAO,URe,XOne,
      $ ABPLUS,ABMIN,EigVecR,Eig,
      $ IndN,IndX,NDimX,NBasis,NDim,NInte1,NInte2)
 C 
       ElseIf(ITwoEl.eq.3) Then
 C
-      Call AC0CAS_FOFO(ECorr,ETot,Occ,URe,XOne,ABPLUS,ABMIN,
+      Call AC0CAS_FOFO(ECorr,ETot,Occ,UNOAO,URe,XOne,ABPLUS,ABMIN,
      $ IndN,IndX,IGem,NAcCAS,NInAcCAS,NElecBEmb,
      $ NDimX,NBasis,NDim,NInte1,
      $ NoSt,'FFOO','FOFO',ICholesky,IDBBSC,IFlFCorr)
@@ -2047,7 +2047,7 @@ C
       End
 
 *Deck AC0CAS
-      Subroutine AC0CAS(ECorr,ETot,TwoNO,Occ,URe,XOne,
+      Subroutine AC0CAS(ECorr,ETot,TwoNO,Occ,UNOAO,URe,XOne,
      $ ABPLUS,ABMIN,EigY,Eig,
      $ IndN,IndX,NDimX,NBasis,NDim,NInte1,NInte2)
 C
@@ -2064,6 +2064,7 @@ c
 C
       Dimension
      $ URe(NBasis,NBasis),XOne(NInte1),Occ(NBasis),TwoNO(NInte2),
+     $ UNOAO(NBasis,NBasis),
      $ IndAux(NBasis),
      $ ABPLUS(NDimX*NDimX),ABMIN(NDimX*NDimX),
      $ Eig(NDimX),EigY(NDimX*NDimX),IndX(NDim),IndN(2,NDim)
@@ -2604,7 +2605,6 @@ C
 C
       Write(6,'(/," *** DONE WITH COMPUTING AB(1) MATRICES ***")')
 C
-      Print*, 'AB1-Ka',norm2(ABPLUS),norm2(ABMIN)
 C ----------------------------------------------------------------    
 C     1ST-ORDER PART
 C
@@ -2672,7 +2672,8 @@ C
       EndDo
       EndDo
 C
-      print*, 'AB-KA',norm2(ABPLUS),norm2(ABMIN)
+c     print*, 'XT.APLUS.X',norm2(ABPLUS)
+c     print*, 'YT.AMIN.Y ',norm2(ABMIN)
 C
       XMAux(1:NoEig*NoEig)=Zero
 C
@@ -2706,16 +2707,17 @@ C
 C
       EndDo
 C
-C      Print*, 'FIRST',norm2(XMAux)
-C
 C     BEGIN MS-AC0
+C
+C     MS-AC0 switches on if there is an externally generated "scas_ene.dat"
+C     file. Maybe it is better to have a MS-AC0 JobType?
 C
       NoStMx=1
       Call TRDM_MS(TRDMNO,Occ,UNOAO,NoStMx,NInte1,NBasis,IEx)
       If(IEx.Eq.1) Write(6,'(/,2X,''MS-AC0: Computing H^eff for n='',I2,
      $ '' NoStates = '',
      $ I2,/)')NoSt,NoStMx
-C      
+C
       IPairEig=0
       Do II=1,NoEig
       I=IndBlock(1,II)
@@ -2724,6 +2726,7 @@ C
       EndDo
 C
 C     LOOP OVER STATES
+C
       Do ISS=1,NoStMx
 C
       ABPLUS(1:NoEig*NoEig)=Zero
@@ -2839,7 +2842,9 @@ C
 C
       II=II+1
       EndDo
-      EndDo      
+      EndDo
+
+C     Print*, 'EigYm-Ka =', norm2(EigYm)
 C
       Do MU=1,NoEig
 C
@@ -2847,7 +2852,6 @@ C
       I1=IndBlock(1,I)
       I2=IndBlock(2,I)
       Ym=EigYm(I+(MU-1)*NoEig)/(C(I1)+C(I2))
-c      Ym=EigYmT(I+(MU-1)*NoEig)/(C(I1)+C(I2))
 C
       Do J=1,NoEig
       ABPLUS(I+(J-1)*NoEig)=ABPLUS(I+(J-1)*NoEig)
@@ -2894,12 +2898,7 @@ C
 C     If(ISS.Ne.NoSt)
       EndIf
 C
-      Print*, 'ABPLUS-Ka',norm2(ABPLUS(1:NoEig*NoEig))
-C
-C     FINALLY THE ENERGY CORRECTION
-C     TESTY Z sapt.f90 -- remove later! 
-C      Call check_loop(ABPLUS,Occ,IndN,IndBlock,
-C     $ NAct,INActive,NDimX,NDimX,NBasis)
+C     FINALLY, THE ENERGY CORRECTION
 C
       ECorrIJ=Zero
 C
@@ -7602,7 +7601,9 @@ C
       Parameter(Zero=0.D0,Half=0.5D0,One=1.D0,Two=2.D0)
 C
       Dimension URe(NBasis,NBasis),GammaS(100,NInte1),EExcit(10)
-      Dimension TRDMNO(10,NBasis,NBasis),Occ(NBasis),
+      Dimension TRDMNO(10,NBasis,NBasis)
+C     Real(8),Allocatable,Intent(out) :: TRDMNO(:,:,:)
+      Dimension Occ(NBasis),
      $          UNOAO(NBasis,NBasis)
       Double precision,dimension(NBasis,NBasis) :: dipx,dipy,dipz
 C
@@ -7636,14 +7637,36 @@ C
    40 Continue
       Close(10)
 C
+C     mh 14.07.26: replace reading sacas_ene.dat 
+C                  file with reading energies from Molpro
+C
+C      HERE TEST: nstates = NoStMx ; ECasscf = EExcit
+C
+C      block
+C      real(8) :: ECASSCF(10)
+C      Call read_Ene_molpro(ECasscf,nstates,'2RDM')
+C      Print*, "EExcit  =", EExcit(1:NoStMx)
+C      print*, 'nstates = ',nstates
+C      Print*, "ECASSCF =", ECASscf(1:NStates)
+C      end block
+C
+c     Allocate(TRDMNO(NoStMx,NBasis,NBasis))
+C
       NAc=NAcCAS
       NInAc=NInAcCAS
       INActive=NInAc
 C
 C     Prepare MO->NO_NoState
 C
+C     reference state declared in input:
+c     print*, 'Input State =', InSt(1,1), InSt(2,1) 
+c     print*, 'ISpinMs2    =', ISpinMs2
+C
       Call read_1rdm_molpro(GammaAB,NoSt,InSt(2,1),ISpinMs2,
      $ '2RDM',IWarn,NBasis)
+C
+c     Call read_1rdm_molpro(GammaAB,InSt(1,1),InSt(2,1),ISpinMs2,
+c    $ '2RDM',IWarn,NBasis)
 C
       Call CpySym(AUXM,GammaAB,NBasis)
 C
@@ -7710,12 +7733,14 @@ C
 C
 C     TRANSITION DIPOLE MOMENTS (FOR CHECKING)
 C    
-c      Call ReadDip(DipX,DipY,DipZ,UNOAO,'DIP',NBasis)
-      open(10,file='dipmom.dat')
-      read(10,*)DipX
-      read(10,*)DipY
-      read(10,*)DipZ
-      close(10)
+      Call ReadDip(DipX,DipY,DipZ,UNOAO,'DIP',NBasis)
+C
+C remove dipmom file : UNOAO was not correctly passed to AC0CAS!
+C      open(10,file='dipmom.dat')
+C      read(10,*)DipX
+C      read(10,*)DipY
+C      read(10,*)DipZ
+C      close(10)
 C
       TSDipZ=0
       TSDipY=0
@@ -7727,7 +7752,7 @@ C
       TSDipX = TSDipX + Two*TRDMNO(IKET,I,J)*dipx(I,J)
       Enddo
       Enddo
-      Write(6, '(X,I2,"->",I2, " Transition DipMom",4F15.8,/)')
+      Write(6, '(/X,I2,"->",I2, " Transition DipMom",4F15.8,/)')
      $ IBra,IKet, TSDipX,TSDipY,TSDipZ,
      $ SQRT(TSDipX**2+TSDipY**2+TSDipZ**2)
 C
@@ -7779,6 +7804,7 @@ C
 C 
       Return
       End
+C End Subroutine TRDM_MS
 
 *Deck TRDM_SACAS
       Subroutine TRDM_SACAS(XCAS,YCAS,NoState,EExcit,C,IPair,
@@ -8206,11 +8232,11 @@ C
       Call dgemm('N','T',NBasis,NBasis,NBasis,1d0,AUXM,NBasis,
      $           UNOAO,NBasis,0d0,dipx,NBasis)
 C
-      open(10,file='dipmom.dat')
-      write(10,*)DipX
-      write(10,*)DipY
-      write(10,*)DipZ
-      close(10)
+C      open(10,file='dipmom.dat')
+C      write(10,*)DipX
+C      write(10,*)DipY
+C      write(10,*)DipZ
+C      close(10)
       Return
       End
 

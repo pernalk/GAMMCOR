@@ -76,7 +76,7 @@ ETot   = 0
 FOFO2INCORE = .FALSE.
 ! set to TRUE to compare FOFO
 ! and INCORE Hessians for SA-CAS
-! FOFO2INCORE = .TRUE.
+!FOFO2INCORE = .TRUE.
 
 ! set dimensions
 NOccup = NAct + INActive
@@ -1401,7 +1401,7 @@ enddo
 deallocate(RDM2Act)
 
 call triang_to_sq(XOne,work1,NBasis)
-print*, 'XOne',norm2(XOne)
+!print*, 'XOne',norm2(XOne)
 call dgemm('N','N',NBasis,NBasis,NBasis,1d0,URe,NBasis,work1,NBasis,0d0,work2,NBasis)
 call dgemm('N','T',NBasis,NBasis,NBasis,1d0,work2,NBasis,URe,NBasis,0d0,HNO,NBasis)
 call sq_symmetrize(HNO,NBasis)
@@ -1779,6 +1779,89 @@ associate(B => Eblock(1))
 end associate
 
 end subroutine pack_Eblock
+
+subroutine Eblock2Sblock(Eblock,EblockIV,Sblock,SblockIV,Occ,IndN,nblk,NBasis,NDimX)
+!
+! Convert X and Y to XTilde (matX) and YTilde (matY):
+! XTilde = X / 2 / ( c_p + c_q ) - Y / 2 / ( c_p - c_q)
+! YTilde = X / 2 / ( c_p + c_q ) + Y / 2 / ( c_p - c_q)
+!
+implicit none
+
+integer,intent(in)           :: nblk,NBasis,NDimX
+integer,intent(in)           :: IndN(2,NDimX)
+double precision,intent(in)  :: Occ(NBasis)
+type(EBlockData),intent(in)  :: EBlock(nblk),EBlockIV
+
+type(EBlockData),intent(out) :: SBlockIV
+type(EBlockData),allocatable,intent(out) :: SBlock(:)
+
+integer                      :: i,j,ipos,iblk,ip,iq
+double precision             :: C(NBasis),fac,valY,valX
+
+fac = 1d0/sqrt(2d0)
+
+do i=1,NBasis
+   C(i) = sign(sqrt(Occ(i)),Occ(i)-0.5d0)
+enddo
+
+allocate(SBlock(nblk))
+
+! repack
+do iblk=1,nblk
+   associate(B => Eblock(iblk),&
+             A => Sblock(iblk))
+
+     A%n  = B%n
+     A%l1 = B%l1
+     A%l2 = B%l2
+     allocate(A%pos(A%n),A%vec(A%n))
+     A%pos(1:A%n)=B%pos(1:B%n)
+     A%vec(1:A%n)=B%vec(1:B%n)
+
+     allocate(A%matX(A%n,A%n),A%matY(A%n,A%n))
+     do i=1,B%n
+        ipos = B%pos(i)
+        ip = IndN(1,ipos)
+        iq = IndN(2,ipos)
+
+        valX = 1d0/(C(ip)+C(iq))
+        valY = 1d0/(C(ip)-C(iq))
+        A%matX(i,1:B%n) = 0.5d0*(B%matX(i,1:B%n)*valX - B%matY(i,1:B%n)*valY)
+        A%matY(i,1:B%n) = 0.5d0*(B%matX(i,1:B%n)*valX + B%matY(i,1:B%n)*valY)
+
+     enddo
+
+   end associate
+enddo
+! repack IV
+associate(B => EblockIV, &
+          A => SBlockIV )
+
+  A%n  = B%n
+  A%l1 = B%l1
+  A%l2 = B%l2
+  allocate(A%pos(A%n))
+  A%pos(1:A%n) = B%pos(1:B%n)
+
+  allocate(A%vec(A%n),A%matX(A%n,1),A%matY(A%n,1))
+  do i=1,A%n
+     ipos = B%pos(i)
+     ip = IndN(1,ipos)
+     iq = IndN(2,ipos)
+
+     valX = 1d0/(C(ip)+C(iq))
+     valY = 1d0/(C(ip)-C(iq))
+
+     A%matX(i,1) = 0.5d0*fac*(valX-valY)
+     A%matY(i,1) = 0.5d0*fac*(valX+valY)
+
+     A%vec(i) = B%vec(i)
+  enddo
+
+end associate
+
+end subroutine Eblock2Sblock
 
 subroutine dump_Eblock(Eblock,EblockIV,Occ,IndN,nblk,NBasis,NDimX,xy0file)
 !

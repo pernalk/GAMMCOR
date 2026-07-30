@@ -661,6 +661,10 @@ logical :: empty
 end subroutine read4_gen
 
 subroutine ABPM_TRAN(AMAT,AOUT,EBlock,EBlockIV,nblk,NDimX,isPl)
+!
+! AOUT =  X^T.AMAT.X (isPL)
+!      =  Y^T.AMAT.Y (.not. isPL)
+!
 implicit none
 
 integer,intent(in) :: nblk,NDimX
@@ -1163,6 +1167,11 @@ end associate
 end subroutine ABPM_HALFTRAN_GEN_L
 
 subroutine ABPM_HALFTRAN_GEN_R(AMAT,AOUT,fact,EBlock,EBlockIV,nblk,DimL,DimR,xyvar)
+! 
+! AOUT = AMAT.Eblock
+! 
+! AMAT has a block structure!
+!
 implicit none
 
 integer,intent(in) :: nblk,DimL,DimR
