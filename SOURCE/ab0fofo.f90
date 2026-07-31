@@ -494,6 +494,7 @@ double precision,allocatable :: MatFF(:,:)
 integer :: NoStMx,ISS
 integer :: IEx
 integer :: posblock(NBasis,NBasis)
+double precision :: ECorr0
 !real(8),allocatable :: TRDMNO(:,:,:)
 double precision :: TRDMNO(10,NBasis,NBasis)
 double precision,allocatable :: trdm(:,:)
@@ -813,7 +814,6 @@ do ISS=1,NoStMx
 
    print*, 'EAll,EIntra',EAll,Eintra
    ECorr = EAll - EIntra
-   print*, 'ECorr = ', ECorr
 
    !PRINT CONTRIBUTIONS TO ECorr FROM BLOCKS
    Write(6,'(/,X,"Contributions to AC0 from (Mu)(Nu) pairs of blocks")')
@@ -870,13 +870,13 @@ do ISS=1,NoStMx
    EndDo
    EndDo
 
-   if (NoStMx.Gt.1) Then
-      if(ISS.Eq.NoSt) Then
+   if (NoStMx>1) then
+      if(ISS==NoSt) then
          write(*,*) 'H_mn',ISS,NoSt,ETot+ECorr
-         !ECorr0=ECorr
+         ECorr0=ECorr
       else
          write(*,*) 'H_mn',ISS,NoSt,ECorr
-         !ECorr=ECorr0
+         ECorr=ECorr0
       endif
    endif
 
@@ -4850,66 +4850,10 @@ do iblk=iblk_start,nblk
    end associate
 enddo
 
-associate( B => SblockIV)
+! The IV block does not contribute, since both TRDMNO
+! indices have to be active.
 
-   do i=1,B%n
-      mu = mu + 1
-      nu=B%pos(i)
-      i1=IndN(1,nu)
-      i2=IndN(2,nu)
-      do i3=1,NBasis
-         ir=i1
-         ip=i2
-         iq=i3
-         ipq = pos(ip,iq)
-         if(ipq>0) then
-            !print*, 'part 1'
-            EigYm(ipq,mu) = EigYm(ipq,mu) &
-                          + B%matY(i,1)*TRDMNO(iq,ir) &
-                          - B%matX(i,1)*TRDMNO(ir,iq)
-         endif
-
-         ip=i1
-         ir=i2
-         iq=i3
-         ipq = pos(ip,iq)
-         if(ipq>0) then
-            !print*, 'part 2'
-            !print*, 'Y,trdm',B%matY(i,1),TRDMNO(iq,ir)
-            !print*, 'X,trdm',B%matX(i,1),TRDMNO(ir,iq)
-            EigYm(ipq,mu) = EigYm(ipq,mu) &
-                          - B%matY(i,1)*TRDMNO(ir,iq) &
-                          + B%matX(i,1)*TRDMNO(iq,ir)
-         endif
-
-         iq=i1
-         ir=i2
-         ip=i3
-         ipq = pos(ip,iq)
-         if(ipq>0) then
-            !print*, 'part 3'
-            EigYm(ipq,mu) = EigYm(ipq,mu) &
-                          - B%matY(i,1)*TRDMNO(ir,ip) &
-                          + B%matX(i,1)*TRDMNO(ip,ir)
-         endif
-
-         ir=i1
-         iq=i2
-         ip=i3
-         ipq = pos(ip,iq)
-         if(ipq>0) then
-            !print*, 'part 4'
-            EigYm(ipq,mu) = EigYm(ipq,mu) &
-                          + B%matY(i,1)*TRDMNO(ip,ir) &
-                          - B%matX(i,1)*TRDMNO(ir,ip)
-         endif
-
-      enddo
-   enddo
-
-end associate
-
-print*, 'EigYm-my =', norm2(EigYm)
+print*, 'EigYm =', norm2(EigYm)
 
 ! normalize EigYm
 do i=1,NBasis
