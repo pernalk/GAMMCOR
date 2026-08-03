@@ -1037,6 +1037,7 @@ nloop = (dimFO - 1) / MaxBatchSize + 1
 
 allocate(work(dimFO,MaxBatchSize))
 
+ECorrIJ= 0d0
 EAll   = 0d0
 EIntra = 0d0
 off = 0

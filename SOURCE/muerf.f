@@ -63,10 +63,10 @@ C
       Call LOC_MU_CBS_CHOL(XMuMat,ECorrMD,AvMU,UNOAO,Occ,
      $                     RdmFile,BasisSet,NBasis,.false.)
 
-      Call AC0CAS_FOFO(ECorr,ECASSCF,Occ,URe,XOne,ABPLUS,ABMIN,
+      Call AC0CAS_FOFO(ECorr,ECASSCF,Occ,UNOAO,URe,XOne,ABPLUS,ABMIN,
      $ IndN,IndX,IGem,NAcCAS,NInAcCAS,NElecBEmb,
      $ NDimX,NBasis,NDimX,NInte1,
-     $ NoSt,'FFOO','FOFO',ICholesky,IDBBSC,IFlFCorr)
+     $ NoSt,'FFOO','FOFO',ICholesky,IDBBSC,IFlFCorr,IMSAC)
 C
       Write
      $ (6,'(/1X,''CASSCF+ENuc, AC0-Corr    , Total'',6X,3F15.8)')
@@ -102,10 +102,10 @@ C
 C
 C     AC0-CBS[H] calculation
 C
-      Call AC0CAS_FOFO(ECorr,ECASSCF,Occ,URe,XOne,ABPLUS,ABMIN,
+      Call AC0CAS_FOFO(ECorr,ECASSCF,Occ,UNOAO,URe,XOne,ABPLUS,ABMIN,
      $ IndN,IndX,IGem,NAcCAS,NInAcCAS,NElecBEmb,
      $ NDimX,NBasis,NDimX,NInte1,
-     $ NoSt,'FFOO','FOFO',ICholesky,IDBBSC,IFlFCorr)
+     $ NoSt,'FFOO','FOFO',ICholesky,IDBBSC,IFlFCorr,IMSAC)
 C
       ElseIf (IFlSnd.Eq.0.and.IFlACFREQNTH.Eq.0) Then
 C
