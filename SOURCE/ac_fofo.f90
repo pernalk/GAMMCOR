@@ -92,9 +92,11 @@ deallocate(work1)
 end subroutine Project_DChol
 
 subroutine WIter_D12Chol(ECorr,AC1,Max_Cn,XOne,URe,Occ,EGOne,NGOcc,&
-   IGem,NAct,INActive,NElecBEmb,NELE,&
-   NBasis,NInte1,NDim,NGem,IndAux,&
-   IndN,IndX,NDimX,IDBBSC)
+                         IGem,NAct,INActive,NElecBEmb,NELE,&
+                         NBasis,NInte1,NDim,NGem,IndAux,&
+                         IndN,IndX,NDimX,IDBBSC)
+!
+!  doi: 10.1021/acs.jpclett.2c00993
 !
 !  AC energy cacluation using CHOLESKY VECTORS:
 !  (1) expanding AC integrand in alpha around alpha=0, up to Max_Cn order
@@ -132,30 +134,48 @@ double precision :: ECASSCF,PI,WFact,XFactorial,XN1,XN2,FF,OmI,XNorm0,XNorm1,Err
 character(:),allocatable :: twojfile,twokfile,IntKFile
 logical :: irdm2
 
-double precision, allocatable :: DChol(:,:),DCholT(:,:),DCholAct(:,:),DCholActT(:,:),WorkD(:,:)
+double precision, allocatable :: DChol(:,:),DCholAct(:,:),WorkD(:,:)
 double precision, allocatable :: APLUS0Tilde(:), APLUS1Tilde(:), A1(:), &
-                                 COMTilde(:),ABPLUS0(:),ABMIN0(:),ABPLUS1(:),ABMIN1(:), &
-                                 C0Tilde(:),C1Tilde(:),C2Tilde(:), &
-                                 WORK0(:),WORK1(:)
+                                 ABPLUS0(:),ABMIN0(:),ABPLUS1(:),ABMIN1(:)
+double precision, allocatable :: COMTilde(:), C0Tilde(:),C1Tilde(:),C2Tilde(:)
+double precision, allocatable :: WORK0(:),WORK1(:)
 
 integer :: nblk
 type(EblockData) :: A0blockIV,LambdaIV
 type(EblockData),allocatable :: A0block(:),Lambda(:)
 
+! DBBSC
+integer :: NCholErf
+double precision :: ECorrLR
+double precision, allocatable :: DBCholAct(:,:)
+
+! avoid module via interface
 interface
-subroutine read_D12_array(NCholesky, DChol, DCholAct, NDimX, NBasis, IndN, Occ, IndAux)
+subroutine create_D12_array(NCholesky, DChol, DCholAct, NDimX, NBasis, IndN, Occ, IndAux, CholFile)
    double precision, allocatable, intent(out) :: DChol(:,:), DCholAct(:,:)
    integer :: NCholesky
-   integer, intent(in) :: NDimX, NBasis, IndN(2,NDimX), IndAux(NBasis)
+   integer, intent(in) :: NDimX, NBasis
+   integer, intent(in) :: IndN(2,NDimX), IndAux(NBasis)
    double precision, intent(in) :: Occ(NBasis)
-end subroutine read_D12_array
+   character(len=*), intent(in) :: CholFile
+end subroutine create_D12_array
+
+! DBBSC
+subroutine create_D2B_array(NCholErf,DBCholErfAct,NDimX,NOccup,NBasis,IndN,Occ,IndAux,CholFile)
+   double precision, allocatable, intent(out) :: DBCholErfAct(:,:)
+   integer :: NCholErf
+   integer, intent(in)  :: NOccup,NDimX,NBasis
+   integer, intent(in)  :: IndN(2,NDimX),IndAux(NBasis)
+   double precision, intent(in) :: Occ(NBasis)
+   character(len=*), intent(in) :: CholFile
+end subroutine create_D2B_array
 end interface
 
-! Get DChol & DCholAct
-call read_D12_array(NCholesky, DChol, DCholAct, NDimX, NBasis, IndN, Occ, IndAux)
-DCholT = transpose(DChol)
-DCholActT = transpose(DCholAct)
-! ==========================================================================
+! Get DChol (D1) & DCholAct (D2)
+call create_D12_array(NCholesky, DChol, DCholAct, NDimX, NBasis, IndN, Occ, IndAux, 'cholvecs')
+!print*, 'DChol     =', norm2(DChol)
+!print*, 'DCholAct  =', norm2(DCholAct)
+! =============================================================================================
 
 NGrid=18
 
@@ -174,7 +194,12 @@ ICholesky = 1
 
 twojfile = 'FFOO'
 twokfile = 'FOFO'
-IntKFile = twokfile
+
+if (IDBBSC == 2) then
+   ! chol1vFR : Contains transformed Long-range Cholesky vecs: (L,pq*)
+   call create_D2B_array(NCholesky,DBCholAct,NDimX,NOccup,NBasis,IndN,Occ,IndAux,'chol1vFR')
+   !print*, 'NCholesky=',NCholesky
+endif
 
 allocate(ABPLUS1(NDimX*NDimX),ABMIN1(NDimX*NDimX))
 !call mem_alloc(ABPLUS1,NDimX*NDimX)
@@ -193,23 +218,24 @@ allocate(A0block(nblk))
 Call AC0BLOCK(Occ,URe,XOne, &
      IndN,IndX,IGem,NAct,INActive,NElecBEmb, &
      NDimX,NBasis,NDimX,NInte1,'FFOO','FOFO', &
-     ICholesky,A0BlockIV,A0Block,nblk,0,'DUMMY',0)
+     ICholesky,A0BlockIV,A0Block,nblk,0,'AC0BLK0')
 
 ! get AB1PLUS and AB1MIN
 ACAlpha=1.D0
 call AB_CAS_FOFO(ABPLUS1,ABMIN1,ECASSCF,URe,Occ,XOne, &
               IndN,IndX,IGem,NAct,INActive,NElecBEmb, &
               NDimX,NBasis,NDimX,&
-              NInte1,twojfile,twokfile,ICholesky,IDBBSC,ACAlpha,.false.)
+              NInte1,twojfile,twokfile,ICholesky,IDBBSC,ACAlpha,.true.)
+              ! AB1=.true: AB1 = AB1 - A0
 
 Call sq_symmetrize(ABPLUS1,NDimX)
 Call sq_symmetrize(ABMIN1,NDimX)
 
-! AB1 = AB1 - A0
-call add_blk_right(ABPLUS1,A0Block,A0BlockIV,-1d0,.false.,nblk,NDimX)
-call add_blk_right(ABMIN1, A0Block,A0BlockIV,-1d0,.true., nblk,NDimX)
-!print*, 'add_blk_right: ABPLUS1',norm2(ABPLUS1)
-!print*, 'add_blk_right: ABMIN1 ',norm2(ABMIN1)
+!call add_blk_right(ABPLUS1,A0Block,A0BlockIV,-1d0,.false.,nblk,NDimX) ! not necessary
+!call add_blk_right(ABMIN1, A0Block,A0BlockIV,-1d0,.true., nblk,NDimX) ! not necessary
+
+!print*, 'ABPLUS1',norm2(ABPLUS1)
+!print*, 'ABMIN1 ',norm2(ABMIN1)
 
 !Calc: A1=ABPLUS0*ABMIN1+ABPLUS1*ABMIN0
 allocate(A1(NDimX*NDimX))
@@ -223,13 +249,16 @@ EGOne(1)=ECASSCF
 !Calc: APLUS0Tilde=ABPLUS0.DChol
 allocate(APLUS0Tilde(NDimX*NCholesky))
 !call mem_alloc(APLUS0Tilde,NDimX*NCholesky)
-call ABPM_HALFTRAN_GEN_L(DCholT,APLUS0Tilde,0.0d0,A0Block,A0BlockIV,nblk,NDimX,NCholesky,'Y')
+call ABPM_BLKAT(NCholesky,NDimX,DChol,APLUS0Tilde,0.0d0,A0Block,A0BlockIV,nblk,'Y')
+!print*, 'regul APLUS0Tilde = ', norm2(APLUS0Tilde)
 
 !Calc: APLUS1Tilde=ABPLUS1.DChol
 allocate(APLUS1Tilde(NDimX*NCholesky))
 !call mem_alloc(APLUS1Tilde,NDimX*NCholesky)
-Call dgemm('N','N',NDimX,NCholesky,NDimX,1d0,ABPLUS1,NDimX,DCholT,NDimX,0.0d0,APLUS1Tilde,NDimX)
+Call dgemm('N','T',NDimX,NCholesky,NDimX,1d0,ABPLUS1,NDimX,DChol,NCholesky,0.0d0,APLUS1Tilde,NDimX)
+!print*, 'regul APLUS1Tilde = ', norm2(APLUS1Tilde)
 
+deallocate(DChol)
 deallocate(A0block)
 deallocate(A0BlockIV%vec,A0BlockIV%pos)
 
@@ -241,14 +270,14 @@ allocate(A0block(nblk))
 Call AC0BLOCK(Occ,URe,XOne, &
      IndN,IndX,IGem,NAct,INActive,NElecBEmb, &
      NDimX,NBasis,NDimX,NInte1,'FFOO','FOFO', &
-     ICholesky,A0BlockIV,A0Block,nblk,1,'A0BLK',0)
+     ICholesky,A0BlockIV,A0Block,nblk,1,'A0BLK')
 
 allocate(COMTilde(NDimX*NCholesky))
 !call mem_alloc(COMTilde,NDimX*NCholesky)
 COMTilde=0.0
 
-allocate(C0Tilde(NDimX*NCholesky),C1Tilde(NDimX*NCholesky),C2Tilde(NDimX*NCholesky),WORK0(NDimX*NCholesky))
-allocate(WORK1(NDimX*NCholesky))
+allocate(C0Tilde(NDimX*NCholesky),C1Tilde(NDimX*NCholesky),C2Tilde(NDimX*NCholesky))
+allocate(WORK0(NDimX*NCholesky),WORK1(NDimX*NCholesky))
 !call mem_alloc(C0Tilde,NDimX*NCholesky)
 !call mem_alloc(C1Tilde,NDimX*NCholesky)
 !call mem_alloc(C2Tilde,NDimX*NCholesky)
@@ -312,8 +341,16 @@ Do IGL=1,NGrid
    If(IGL.Eq.1) ErrMax=XNorm1
 EndDo
 
-deallocate(A1,WORK0,C0Tilde,C1Tilde,C2Tilde,Lambda,APLUS0Tilde,APLUS1Tilde)
-deallocate(ABMIN1,ABPLUS1,WORK1)
+deallocate(WORK0,C0Tilde,C1Tilde,C2Tilde,Lambda,APLUS0Tilde,APLUS1Tilde)
+
+if (IDBBSC == 2) then
+   ! calculate LR contribution to ACn-CBS[H]
+   call WIter_D12CholErf_CBSH(ECorrLR,AC1,Max_Cn,ABMIN1,ABPLUS1,A1,Occ,IndN,IndAux,&
+                              NAct,INActive,NDimX,NBasis,IDBBSC)
+endif
+
+deallocate(A1,ABMIN1,ABPLUS1,WORK1)
+
 !call mem_dealloc(WORK1)
 !call mem_dealloc(WORK0)
 !call mem_dealloc(C2tilde)
@@ -327,14 +364,24 @@ deallocate(ABMIN1,ABPLUS1,WORK1)
 
 !allocate(WorkD(NDimX,NCholesky))
 call mem_alloc(WorkD,NDimX,NCholesky)
-WorkD=0
+WorkD=0d0
 WorkD = RESHAPE(COMTilde, (/NDimX, NCholesky/))
-ECorr=0
-do j=1,NDimX
-   do i=1,NCholesky
-      ECorr=ECorr+DCholAct(i,j)*WorkD(j,i)
+
+ECorr=0d0
+if (IDBBSC ==2) then
+   do j=1,NDimX
+      do i=1,NCholesky
+         ECorr=ECorr+(DCholAct(i,j)+DBCholAct(i,j))*WorkD(j,i)
+      enddo
    enddo
-enddo
+   ECorr = ECorr + ECorrLR
+else
+  do j=1,NDimX
+     do i=1,NCholesky
+        ECorr=ECorr+DCholAct(i,j)*WorkD(j,i)
+     enddo
+  enddo
+endif
 
 deallocate(WorkD,COMTilde)
 !call mem_dealloc(WorkD)
@@ -351,6 +398,284 @@ Call RELEASE_AC0BLOCK(A0Block,A0blockIV,nblk)
 !call mem_report
 
 end subroutine WIter_D12Chol
+
+subroutine WIter_D12CholErf_CBSH(ECorrLR,AC1,Max_Cn,ABMIN1,ABPLUS1,A1,Occ,IndN,IndAux,NAct,INActive,NDimX,NBasis,IDBBSC)
+!
+! ECorrLR = - sum_p>q \sum_r>s \sum_L \int dOm CBLR(Om) D2B
+!
+! CBLR = CB*D1LR
+!
+use abfofo
+
+implicit none
+
+integer,intent(in) :: NAct,INActive,NDimX,NBasis
+integer,intent(in) :: Max_Cn,AC1
+integer,intent(in) :: IndN(2,NDimX),IndAux(NBasis)
+integer,intent(in) :: IDBBSC
+double precision,intent(in)  :: ABMIN1(NDimX,NDimX),ABPLUS1(NDimX,NDimX)
+double precision,intent(in)  :: A1(NDimX,NDimX)
+double precision,intent(in)  :: Occ(NBasis)
+double precision,intent(out) :: ECorrLR
+
+integer :: iunit
+integer :: NOccup
+integer :: IGL,NGrid
+integer :: NCholErf
+
+integer :: iblk,nblk
+integer :: i,j,n
+type(EblockData) :: A0blockIV,LambdaIV
+type(EblockData),allocatable :: A0block(:),Lambda(:)
+
+double precision :: XFreq(100),WFreq(100)
+
+double precision :: Pi
+double precision :: OmI,WFact
+double precision :: XNorm0,XNorm1,XFactorial
+double precision :: XN1,XN2,FF
+double precision :: ErrMax
+double precision,allocatable :: APLUS0Tilde(:),APLUS1Tilde(:)
+double precision,allocatable :: COMTilde(:)
+double precision,allocatable :: C0Tilde(:),C1Tilde(:),C2Tilde(:)
+double precision,allocatable :: Work0(:),Work1(:),WorkD(:,:)
+
+double precision,allocatable :: DCholErf(:,:),DBCholErfAct(:,:)
+
+! avoid module via interface
+interface
+subroutine create_D12_array(NCholesky, DChol, DCholAct, NDimX, NBasis, IndN, Occ, IndAux, CholFile)
+   double precision, allocatable, intent(out) :: DChol(:,:), DCholAct(:,:)
+   integer :: NCholesky
+   integer, intent(in) :: NDimX, NBasis, IndN(2,NDimX), IndAux(NBasis)
+   character(len=*), intent(in) :: CholFile
+   double precision, intent(in) :: Occ(NBasis)
+end subroutine create_D12_array
+
+! DBBSC
+subroutine create_D2B_array(NCholErf,DBCholErfAct,NDimX,NOccup,NBasis,IndN,Occ,IndAux,CholFile)
+   double precision, allocatable, intent(out) :: DBCholErfAct(:,:)
+   integer, intent(out) :: NCholErf
+   integer, intent(in)  :: NOccup,NDimX,NBasis
+   integer, intent(in)  :: IndN(2,NDimX),IndAux(NBasis)
+   double precision, intent(in) :: Occ(NBasis)
+   character(len=*), intent(in) :: CholFile
+end subroutine create_D2B_array
+end interface
+
+if (IDBBSC /= 2) stop "Error! WIter_D12_CBS[H]!"
+
+NGrid=18
+
+NOccup = NAct + INActive
+PI = 4.0*ATAN(1.0)
+
+! chol1vErf : Contains Long-range Cholesky vecs: (L|erf|pq)
+call create_D12_array(NCholErf,DCholErf,WorkD,NDimX,NBasis,IndN,Occ,IndAux,'cholvErf')
+! print*, 'NCholErf =',NCholErf
+! print*, 'DCholErf  =', norm2(DCholErf)
+deallocate(WorkD) ! only D1LR needed
+
+! chol1vLR : Contains transformed Long-range Cholesky vecs: (L|erf|pq*)
+call create_D2B_array(NCholErf,DBCholErfAct,NDimX,NOccup,NBasis,IndN,Occ,IndAux,'chol1vLR')
+! print*, 'NCholErf =',NCholErf
+! print*, 'DBCholErfAct =', norm2(DBCholErfAct)
+
+! read AC0BLOCK with ver=0 : A-(0) and A+(0) matrices
+!                            stored in X and Y
+open(newunit=iunit,file='AC0BLK0',status='OLD',form='UNFORMATTED')
+read(iunit) nblk
+allocate(A0Block(nblk))
+do iblk=1,nblk
+   associate(A => A0Block(iblk))
+     read(iunit) i, A%n, A%l1, A%l2
+     allocate(A%pos(A%n),A%matX(A%n,A%n),A%matY(A%n,A%n))
+     read(iunit) A%pos,A%matX,A%matY
+   end associate
+enddo
+associate(A => A0BlockIV)
+  read(iunit) A%n,A%l1,A%l2
+  allocate(A%pos(A%n),A%vec(A%n))
+  read(iunit) A%pos,A%vec
+end associate
+close(iunit)
+
+!Calc: APLUS0Tilde=ABPLUS0.DCholErf
+allocate(APLUS0Tilde(NDimX*NCholErf))
+call ABPM_BLKAT(NCholErf,NDimX,DCholErf,APLUS0Tilde,0.0d0,A0Block,A0BlockIV,nblk,'Y')
+!print*, 'cbs-h APLUS0Tilde = ', norm2(APLUS0Tilde)
+
+!Calc: APLUS1Tilde=ABPLUS1.DCholErf
+allocate(APLUS1Tilde(NDimX*NCholErf))
+Call dgemm('N','T',NDimX,NCholErf,NDimX,1d0,ABPLUS1,NDimX,DCholErf,NCholErf,0.0d0,APLUS1Tilde,NDimX)
+!print*, 'cbs-h APLUS0Tilde = ', norm2(APLUS1Tilde)
+
+deallocate(DCholErf)
+
+deallocate(A0block)
+deallocate(A0BlockIV%vec,A0BlockIV%pos)
+
+Call FreqGrid(XFreq,WFreq,NGrid)
+
+! Calc: A0
+!
+! read AC0BLOCK with ver=1 : A+(0).A-(0) matrix
+!                            stored in X
+open(newunit=iunit,file='A0BLK',status='OLD',form='UNFORMATTED')
+read(iunit) nblk
+allocate(A0Block(nblk))
+do iblk=1,nblk
+   associate(A => A0Block(iblk))
+     read(iunit) i, A%n, A%l1, A%l2
+     allocate(A%pos(A%n),A%matX(A%n,A%n),A%matY(A%n,A%n))
+     read(iunit) A%pos,A%matX
+   end associate
+enddo
+associate(A => A0BlockIV)
+  read(iunit) A%n,A%l1,A%l2
+  allocate(A%pos(A%n),A%vec(A%n))
+  read(iunit) A%pos,A%vec
+end associate
+close(iunit)
+
+allocate(COMTilde(NDimX*NCholErf))
+COMTilde=0d0
+
+allocate(C0Tilde(NDimX*NCholErf),C1Tilde(NDimX*NCholErf),C2Tilde(NDimX*NCholErf))
+allocate(Work0(NDimX*NCholErf),Work1(NDimX*NCholErf))
+
+allocate(Lambda(nblk))
+associate(A => A0BlockIV, L => LambdaIV)
+  L%n = A%n
+  L%l1 = A%l1
+  L%l2 = A%l2
+  allocate(L%pos(L%n),L%vec(L%n))
+end associate
+
+write(6,'(/1x,a)') "Calculate C^LR "
+
+Do IGL=1,NGrid
+   OmI=XFreq(IGL)
+   WFact=4.D0/PI*WFreq(IGL)
+
+!  Calc: LAMBDA=(A0+Om^2)^-1
+   Call INV_AC0BLK(OmI**2,Lambda,LambdaIV,A0Block,A0BlockIV,nblk,NDimX)
+
+!  Calc: C0Tilde=1/2 LAMBDA.APLUS0Tilde
+   Call ABPM_HALFTRAN_GEN_L(APLUS0Tilde,C0Tilde,0.0d0,Lambda,LambdaIV,nblk,NDimX,NCholErf,'X')
+   C0Tilde = 0.5d0*C0Tilde
+!
+!  Calc: C1Tilde=LAMBDA.(1/2 APLUS1Tilde - A1.C0Tilde)
+   Call dgemm('N','N',NDimX,NCholErf,NDimX,1.d0,A1,NDimX,C0Tilde,NDimX,0.0d0,WORK0,NDimX)
+   WORK0 = 0.5d0*APLUS1Tilde - WORK0
+   Call ABPM_HALFTRAN_GEN_L(WORK0,C1Tilde,0.0d0,Lambda,LambdaIV,nblk,NDimX,NCholErf,'X')
+
+   COMTilde=COMTilde+WFact*0.5d0*C1Tilde
+
+   XNorm0=1.0d5
+   XFactorial=1
+   Do N=2,Max_Cn
+       XFactorial=XFactorial*N
+       XN1=-N
+       XN2=-N*(N-1)
+       Call dgemm('N','N',NDimX,NCholErf,NDimX,XN2,ABMIN1,NDimX,C0Tilde,NDimX,0.0d0,WORK1,NDimX)
+       Call dgemm('N','N',NDimX,NCholErf,NDimX,1.d0,ABPLUS1,NDimX,WORK1,NDimX,0.0d0,WORK0,NDimX)
+       Call dgemm('N','N',NDimX,NCholErf,NDimX,XN1,A1,NDimX,C1Tilde,NDimX,1.0d0,WORK0,NDimX)
+       Call ABPM_HALFTRAN_GEN_L(WORK0,C2Tilde,0.0d0,Lambda,LambdaIV,nblk,NDimX,NCholErf,'X')
+       FF=WFact/XFactorial/(N+1)
+       If(AC1.Eq.1) FF=WFact/XFactorial/2.D0
+       XNorm1=Norm2(FF*C2Tilde)
+       Write(6,'(X,"Order (n), |Delta_CLR|",I3,E14.4)')N,XNorm1
+
+       XNorm0=XNorm1
+       COMTilde=COMTilde+FF*C2Tilde
+       C0Tilde=C1Tilde
+       C1Tilde=C2Tilde
+   EndDo
+
+   Write(6,'(X,"Omega, |C^LR|",I3,2F10.4)')IGL,OmI,Norm2(COMTilde)
+   If(IGL.Eq.1) ErrMax=XNorm1
+EndDo
+
+deallocate(C2Tilde,C1Tilde,C0Tilde)
+deallocate(Work1,Work0)
+deallocate(APLUS1Tilde,APLUS0Tilde)
+
+Call RELEASE_AC0BLOCK(A0Block,A0blockIV,nblk)
+
+allocate(WorkD(NDimX,NCholErf))
+WorkD = RESHAPE(COMTilde, (/NDimX, NCholErf/))
+
+ECorrLR = 0d0
+do j=1,NDimX
+   do i=1,NCholErf
+      ECorrLR=ECorrLR-DBCholErfAct(i,j)*WorkD(j,i)
+   enddo
+enddo
+
+print*, 'ECorrLR =',  ECorrLR
+
+deallocate(WorkD)
+
+end subroutine WIter_D12CholErf_CBSH
+
+subroutine create_D2B_array(NCholErf,D2B,NDimX,NOccup,NBasis,IndN,Occ,IndAux,filename)
+!
+! D2B = DBCholErfAct = (c(p)+c(q))*1/2*[ (L|erf|p*q) + (L|erf|pq*) ], p>q
+!
+! Called twice:
+!  a) with 1/r
+!  b) and with erf(mu r)/r
+!
+implicit none
+integer,intent(in) :: NOccup,NBasis,NDimX
+integer,intent(in) :: IndN(2,NDimX),IndAux(NBasis)
+double precision, intent(in) :: Occ(NBasis)
+character(len=*) :: filename
+
+integer :: NCholErf
+!integer,intent(out) :: NCholErf
+double precision,allocatable,intent(out) :: D2B(:,:)
+
+integer :: i,j,ip,iq,ipq,ir,is,irs,isr
+integer :: iunit
+double precision :: Crs,CICoef(NBasis),fac
+double precision, allocatable :: FFErfTr(:,:)
+
+fac = 0.5d0
+
+! read transformed LR cholesky (k|erf|FF*) vecs
+open(newunit=iunit,file=filename,form='unformatted')
+read(iunit) NCholErf
+allocate(FFErfTr(NCholErf,NBasis**2))
+read(iunit) FFErfTr
+close(iunit)
+
+do i=1,NBasis
+   CICoef(i) = sign(sqrt(Occ(i)),Occ(i)-0.5d0)
+enddo
+
+allocate(D2B(NCholErf,NDimX))
+
+D2B = 0d0
+do j=1,NDimX
+   ir=IndN(1,j)
+   is=IndN(2,j)
+   irs = is+(ir-1)*NBasis
+   isr = ir+(is-1)*NBasis
+   Crs = fac*(CICoef(ir)+CICoef(is))
+
+   if(IndAux(ir)*IndAux(is)==1) then
+      D2B(:,j) = (2.d0*Crs)*(FFErfTr(:,irs)+FFErfTr(:,isr))
+   else
+      D2B(:,j) = Crs*(FFErfTr(:,irs)+FFErfTr(:,isr))
+   endif
+
+enddo
+
+deallocate(FFErfTr)
+
+end subroutine create_D2B_array
 
 subroutine WIter_DChol(ECorr,Max_Cn,XOne,URe,Occ,EGOne,NGOcc,&
    IGem,NAct,INActive,NElecBEmb,NELE,&
@@ -473,7 +798,7 @@ allocate(A0block(nblk))
 Call AC0BLOCK(Occ,URe,XOne, &
      IndN,IndX,IGem,NAct,INActive,NElecBEmb, &
      NDimX,NBasis,NDimX,NInte1,'FFOO','FOFO', &
-     1,A0BlockIV,A0Block,nblk,1,'A0BLK',0)
+     1,A0BlockIV,A0Block,nblk,1,'A0BLK')
 
 allocate(COMTilde(NDimX*NCholesky),COMTildeAct(NDimX*NCholesky))
 COMTilde=0.0
@@ -646,7 +971,7 @@ allocate(A0block(nblk))
 Call AC0BLOCK(Occ,URe,XOne, &
       IndN,IndX,IGem,NAct,INActive,NElecBEmb, &
       NDimX,NBasis,NDimX,NInte1,'FFOO','FOFO', &
-      0,A0BlockIV,A0Block,nblk,0,'A0BLK',0)
+      0,A0BlockIV,A0Block,nblk,0,'A0BLK')
       !A0BlockIV,A0Block,nblk,1)
 
 COM=0d0
@@ -1315,54 +1640,58 @@ subroutine CIter_FOFO(PMat,ECorr,ACAlpha,XOne,URe,Occ,EGOne,NGOcc,&
 
 end subroutine CIter_FOFO
 
-
-subroutine read_D12_array(NCholesky, DChol, DCholAct, NDimX, NBasis, IndN, Occ, IndAux)
-
+subroutine create_D12_array(NCholesky, D1, D2, NDimX, NBasis, IndN, Occ, IndAux, filename)
+!
+! Ref1  : doi: 10.1021/acs.jpclett.2c00993
+! D1 = DChol
+! D2 = DCholAct
+!
    implicit none
-   integer, intent(in) :: NDimX, NBasis, IndN(2,NDimX), IndAux(NBasis)
+   integer, intent(in) :: NDimX, NBasis
+   integer, intent(in) :: IndN(2,NDimX), IndAux(NBasis)
    double precision, intent(in) :: Occ(NBasis)
-   double precision, allocatable, intent(out) :: DChol(:,:), DCholAct(:,:)
-   integer :: NCholesky, iunit, i, j, ir, is, irs
-   double precision, allocatable :: WorkD(:,:)
-   double precision :: Crs, CICoef(NBasis)
+   character(len=*) :: filename
+   double precision, allocatable, intent(out) :: D1(:,:), D2(:,:)
 
-   open(newunit=iunit,file='cholvecs',form='unformatted')
+   integer :: NCholesky, iunit, i, j, ir, is, irs
+   double precision :: Crs, CICoef(NBasis)
+   double precision, allocatable :: WorkD(:,:)
+
+   open(newunit=iunit,file=filename,form='unformatted')
    read(iunit) NCholesky
    allocate(WorkD(NCholesky,NBasis**2))
    read(iunit) WorkD
    close(iunit)
 
-   print*,'NCholesky',NCholesky
+   !print*,'NCholesky',NCholesky
+   !print*, 'WorkD =', norm2(workD)
 
-   allocate(DChol(NCholesky,NDimX), DCholAct(NCholesky,NDimX))
+   allocate(D1(NCholesky,NDimX), D2(NCholesky,NDimX))
 
    do i=1,NBasis
       CICoef(i) = sign(sqrt(Occ(i)),Occ(i)-0.5d0)
    enddo
 
-   DChol = 0
-   DCholAct = 0
+   D1 = 0d0
+   D2 = 0d0
    do j=1,NDimX
       ir=IndN(1,j)
       is=IndN(2,j)
       irs = is+(ir-1)*NBasis
       Crs=CICoef(ir)+CICoef(is)
-      do i=1,NCholesky
-!           DChol(i,j) = Crs*WorkD(i,irs)
-            DCholAct(i,j) = Crs*WorkD(i,irs)
-!           if(IndAux(ir)*IndAux(is)==1) DChol(i,j) = 2.D0*DChol(i,j)
-            if(IndAux(ir)*IndAux(is)==1) DCholAct(i,j) = 2.D0*DCholAct(i,j)
-      enddo
-      if(IndAux(ir)*IndAux(is).ne.1) then
-            do i=1,NCholesky
-!               DCholAct(i,j) = Crs*WorkD(i,irs)
-                DChol(i,j) = Crs*WorkD(i,irs)
-            enddo
+
+      if(IndAux(ir)*IndAux(is)==1) then
+         D2(:,j) = (2.d0*Crs)*WorkD(:,irs)
+      else
+         D1(:,j) = Crs*WorkD(:,irs)
+         D2(:,j) = D1(:,j)
       endif
+
    enddo
+
    deallocate(WorkD)
 
-end subroutine read_D12_array
+end subroutine create_D12_array
 
 subroutine read_D_array(NCholesky, DChol, DCholAct, NDimX, NBasis, IndN, Occ, IndAux)
 
@@ -1567,7 +1896,7 @@ subroutine AC0BLOCK(Occ,URe,XOne, &
                     IndN,IndX,IGemIN,NAct,INActive,NElecBEmb,&
                     NDimX,NBasis,NDim,NInte1, &
                     IntJFile,IntKFile,ICholesky, &
-                    A0BlockIV,A0block,nblk,ver,dumpfile,dump)
+                    A0BlockIV,A0block,nblk,ver,dumpfile)
 !
 !     A ROUTINE FOR COMPUTING : a) ver=0  ABPLUS^{(0)} and ABMIN^{(0)}
 !                                         (stored in matY and matX, respectively)
@@ -1589,7 +1918,7 @@ integer                      :: nblk
 double precision,intent(in)  :: URe(NBasis,NBasis),Occ(NBasis),XOne(NInte1)
 character(*)                 :: IntJFile,IntKFile
 character(*)                 :: dumpfile
-integer,intent(in)           :: ver,dump
+integer,intent(in)           :: ver
 
 integer          :: iunit
 integer          :: NOccup
@@ -2052,7 +2381,7 @@ allocate(A0block(nblk))
 Call AC0BLOCK(Occ,URe,XOne, &
      IndN,IndX,IGem,NAct,INActive,NElecBEmb, &
      NDimX,NBasis,NDimX,NInte1,'FFOO','FOFO', &
-     ICholesky,A0BlockIV,A0Block,nblk,0,'DUMMY',0)
+     ICholesky,A0BlockIV,A0Block,nblk,0,'DUMMY')
 
 ! get AB1PLUS and AB1MIN
 ACAlpha=1.D0
@@ -2090,7 +2419,7 @@ allocate(A0block(nblk))
 Call AC0BLOCK(Occ,URe,XOne, &
      IndN,IndX,IGem,NAct,INActive,NElecBEmb, &
      NDimX,NBasis,NDimX,NInte1,'FFOO','FOFO', &
-     ICholesky,A0BlockIV,A0Block,nblk,1,'A0BLK',0)
+     ICholesky,A0BlockIV,A0Block,nblk,1,'A0BLK')
 
 COMTilde=0.0
 

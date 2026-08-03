@@ -3864,7 +3864,6 @@ elseif(ICholesky==1) then
 
    elseif (IDBBSC==2) then
 
-   !stop "ACeneERPA_FOFO not ready with IDBBSC!"
    ! THIS CODE DOES NOT HAVE TO BE DOUBLED, I GUESS...
       open(newunit=iunit,file='cholvecs',form='unformatted')
       read(iunit) NCholesky

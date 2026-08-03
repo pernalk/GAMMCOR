@@ -1081,7 +1081,7 @@ integer :: i,ii,ipos,iblk
 integer :: maxEBlockN
 double precision,allocatable :: ABP(:,:),ABM(:,:)
 
-AOUT = fact*AOUT
+!AOUT = fact*AOUT
 
 maxEBlockN = maxval(EBlock%n)
 if(maxEBlockN > 1) allocate(ABP(maxEBlockN,DimR),ABM(maxEBlockN,DimR))
@@ -1095,7 +1095,7 @@ do iblk=1,nblk
      if(iB%n==1) then
 
         ipos = iB%pos(1)
-        AOUT(ipos,:) = iB%matY(1,1)*AMAT(ipos,:)
+        AOUT(ipos,:) = fact*AOUT(ipos,:)+iB%matY(1,1)*AMAT(ipos,:)
 
      else
 
@@ -1108,7 +1108,7 @@ do iblk=1,nblk
 
         do i=1,iB%n
            ipos = iB%pos(i)
-           AOUT(ipos,:) = ABM(i,:)
+           AOUT(ipos,:) = fact*AOUT(ipos,:)+ABM(i,:)
         enddo
 
      endif
@@ -1124,7 +1124,7 @@ do iblk=1,nblk
      if(iB%n==1) then
 
         ipos = iB%pos(1)
-        AOUT(ipos,:) = iB%matX(1,1)*AMAT(ipos,:)
+        AOUT(ipos,:) = fact*AOUT(ipos,:)+iB%matX(1,1)*AMAT(ipos,:)
 
      else
 
@@ -1137,7 +1137,7 @@ do iblk=1,nblk
 
         do i=1,iB%n
            ipos = iB%pos(i)
-           AOUT(ipos,:) = ABM(i,:)
+           AOUT(ipos,:) = fact*AOUT(ipos,:) + ABM(i,:)
         enddo
 
      endif
@@ -1159,16 +1159,90 @@ associate(B => EblockIV)
      !AOUT(ipos,:) = B%vec(i)*AMAT(ipos,:)
      ! MH 19.10.2022 change below is a bypass of some weird bug
      !               which is to be fixed!
-     AOUT(B%pos(i),:) = B%vec(i)*AMAT(B%pos(i),:)
+     AOUT(B%pos(i),:) = fact*AOUT(B%pos(i),:) + B%vec(i)*AMAT(B%pos(i),:)
   enddo
 
 end associate
 
 end subroutine ABPM_HALFTRAN_GEN_L
 
+subroutine ABPM_BLKAT(DimL,DimR,AMAT,AOUT,fact,EBlock,EBlockIV,nblk,xyvar)
+! 
+! AOUT(DimR,DimL) = EBlock.AMAT(DimL,DimR)^T
+! 
+! EBlock has a block structure!
+!
+implicit none
+
+integer,intent(in) :: nblk,DimL,DimR
+double precision,intent(in) :: fact
+character(*),intent(in) :: xyvar
+double precision,intent(in)    :: AMAT(DimL,DimR)
+double precision,intent(inout) :: AOUT(DimR,DimL)
+
+type(EBlockData),intent(in),target :: EBlock(nblk),EBlockIV
+
+integer :: i,ii,ipos,iblk
+integer :: maxEBlockN
+double precision,allocatable :: ABP(:,:),ABM(:,:)
+double precision,pointer :: mat(:,:)
+
+maxEBlockN = maxval(EBlock%n)
+if(maxEBlockN > 1) allocate(ABP(DimL,maxEBlockN),ABM(maxEBlockN,DimL))
+
+do iblk=1,nblk
+   associate(iB => Eblock(iblk))
+
+     select case(xyvar)
+     case ('Y','y')
+     mat => iB%matY
+     case ('X','x')
+     mat => iB%matX
+     end select
+
+     if(iB%n==1) then
+
+        ipos = iB%pos(1)
+        AOUT(ipos,:) = fact*AOUT(ipos,:) + mat(1,1)*AMAT(:,ipos)
+
+     else
+
+        do i=1,iB%n
+           ipos = iB%pos(i)
+           ABP(:,i) = AMAT(:,ipos)
+        enddo
+
+        call dgemm('N','T',iB%n,DimL,iB%n,1d0,mat,iB%n,ABP,DimL,0d0,ABM,maxEBlockN)
+
+        do i=1,iB%n
+           ipos = iB%pos(i)
+           AOUT(ipos,:) = fact*AOUT(ipos,:) + ABM(i,:)
+        enddo
+
+     endif
+
+   end associate
+enddo
+
+if(maxEBlockN > 1) deallocate(ABM,ABP)
+
+associate(B => EblockIV)
+
+  do i=1,B%n
+     !ipos = B%pos(i)
+     !AOUT(ipos,:) = B%vec(i)*AMAT(ipos,:)
+     ! MH 19.10.2022 change below is a bypass of some weird bug
+     !               which is to be fixed!
+     AOUT(B%pos(i),:) = fact*AOUT(B%pos(i),:) + B%vec(i)*AMAT(:,B%pos(i))
+  enddo
+
+end associate
+
+end subroutine ABPM_BLKAT
+
 subroutine ABPM_HALFTRAN_GEN_R(AMAT,AOUT,fact,EBlock,EBlockIV,nblk,DimL,DimR,xyvar)
 ! 
-! AOUT = AMAT.Eblock
+! AOUT = fact*AOUT + AMAT.Eblock
 ! 
 ! AMAT has a block structure!
 !
@@ -1186,7 +1260,7 @@ integer :: i,ii,ipos,iblk
 integer :: maxEBlockN
 double precision,allocatable :: ABP(:,:),ABM(:,:)
 
-AOUT = fact*AOUT
+!AOUT = fact*AOUT
 
 maxEBlockN = maxval(EBlock%n)
 if(maxEBlockN > 1) allocate(ABP(DimL,maxEBlockN),ABM(DimL,maxEBlockN))
@@ -1200,7 +1274,7 @@ case('Y','y')
         if(iB%n==1) then
 
            ipos = iB%pos(1)
-           AOUT(:,ipos) = AOUT(:,ipos) + iB%matY(1,1)*AMAT(:,ipos)
+           AOUT(:,ipos) = fact*AOUT(:,ipos) + iB%matY(1,1)*AMAT(:,ipos)
 
         else
    
@@ -1213,7 +1287,7 @@ case('Y','y')
 
            do i=1,iB%n
               ipos = iB%pos(i)
-              AOUT(:,ipos) = AOUT(:,ipos) + ABM(:,i)
+              AOUT(:,ipos) = fact*AOUT(:,ipos) + ABM(:,i)
            enddo
 
         endif
@@ -1229,7 +1303,7 @@ case('X','x')
         if(iB%n==1) then
 
            ipos = iB%pos(1)
-           AOUT(:,ipos) = AOUT(:,ipos) + iB%matX(1,1)*AMAT(:,ipos)
+           AOUT(:,ipos) = fact*AOUT(:,ipos) + iB%matX(1,1)*AMAT(:,ipos)
 
         else
 
@@ -1242,7 +1316,7 @@ case('X','x')
 
            do i=1,iB%n
               ipos = iB%pos(i)
-              AOUT(:,ipos) = AOUT(:,ipos) + ABM(:,i)
+              AOUT(:,ipos) = fact*AOUT(:,ipos) + ABM(:,i)
            enddo
 
         endif
@@ -1264,7 +1338,7 @@ associate(B => EblockIV)
      !AOUT(:,ipos) = AOUT(:,ipos) + B%vec(i)*AMAT(:,ipos)
      ! MH 19.10.2022 change below is a bypass of some weird bug
      !               which is to be fixed!  
-     AOUT(:,B%pos(i)) = AOUT(:,B%pos(i)) + B%vec(i)*AMAT(:,B%pos(i))
+     AOUT(:,B%pos(i)) = fact*AOUT(:,B%pos(i)) + B%vec(i)*AMAT(:,B%pos(i))
   enddo
 
 end associate
