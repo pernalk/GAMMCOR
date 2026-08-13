@@ -505,7 +505,7 @@ if(Flags%ICASSCF==0.and.Flags%ISERPA==0) then
         call AC0BLOCK(Mon%Occ,URe,XOne, &
              Mon%IndN,Mon%IndX,Mon%IGem,Mon%NAct,Mon%INAct,Mon%NElecBEmb, &
              Mon%NDimX,NBas,Mon%NDimX,NInte1,twojfile,twokfile,Flags%ICholesky, &
-             A0BlockIV,A0Block,nblk,1,abpm0file,1)
+             A0BlockIV,A0Block,nblk,1,abpm0file)
      endif
   case(TWOMO_FFFF)
      call Y01CAS_mithap(Mon%Occ,URe,XOne,ABPlus,ABMin, &
@@ -751,7 +751,7 @@ case(TWOMO_FOFO)
    call AC0BLOCK(Mon%Occ,URe,XOne, &
         Mon%IndN,Mon%IndX,Mon%IGem,Mon%NAct,Mon%INAct,Mon%NElecBEmb, &
         Mon%NDimX,NBas,Mon%NDimX,NInte1,twojfile,twokfile,Flags%ICholesky, &
-        A0BlockIV,A0Block,nblk,1,abpm0file,1)
+        A0BlockIV,A0Block,nblk,1,abpm0file)
 end select
 
 deallocate(TwoMO)
@@ -1300,7 +1300,7 @@ elseif(Flags%ICASSCF==1.and.Flags%ISERPA==0) then
         call AC0BLOCK(Mon%Occ,URe,XOne, &
              Mon%IndN,Mon%IndX,Mon%IGem,Mon%NAct,Mon%INAct,Mon%NElecBEmb, &
              Mon%NDimX,NBas,Mon%NDimX,NInte1,twojfile,twokfile,Flags%ICholesky, &
-             A0BlockIV,A0Block,nblk,1,abpm0file,1)
+             A0BlockIV,A0Block,nblk,1,abpm0file)
      endif
 
   case(TWOMO_FFFF)

@@ -65,7 +65,7 @@ C
       Call WIter_D12Chol(ECorr,0,Max_Cn,XOne,URe,Occ,
      $ EGOne,NGOcc,IGem,NAcCAS,NInAcCAS,NElecBEmb,NELE,
      $ NBasis,NInte1,NDim,NGem,IndAux,
-     $ IndN,IndX,NDimX)
+     $ IndN,IndX,NDimX,IDBBSC)
 C
       EndIf
 C
@@ -88,7 +88,7 @@ C
        Call WIter_D12Chol(ECorr,1,Max_Cn,XOne,URe,Occ,
      $ EGOne,NGOcc,IGem,NAcCAS,NInAcCAS,NElecBEmb,NELE,
      $ NBasis,NInte1,NDim,NGem,IndAux,
-     $ IndN,IndX,NDimX)
+     $ IndN,IndX,NDimX,IDBBSC)
 C
       ETot=EGOne(1)
       Write
