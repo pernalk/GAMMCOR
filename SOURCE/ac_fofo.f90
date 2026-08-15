@@ -115,7 +115,8 @@ use memory
 implicit none
 integer,intent(in) :: AC1,NGOcc,NBasis,NInte1,NDim,NGem,NDimX
 integer,intent(in) :: NAct,INActive,NElecBEmb,NELE
-integer,intent(in) :: IndN(2,NDim),IndX(NDim)
+integer,intent(in) :: IndN(2,NDimX),IndX(NDimX)
+!integer,intent(in) :: IndN(2,NDim),IndX(NDim)
 integer,intent(in) :: IndAux(NBasis),IGem(NBasis)
 integer,intent(in) :: IDBBSC
 double precision,intent(in) :: URe(NBasis,NBasis),Occ(NBasis),XOne(NInte1)
@@ -145,7 +146,7 @@ type(EblockData) :: A0blockIV,LambdaIV
 type(EblockData),allocatable :: A0block(:),Lambda(:)
 
 ! DBBSC
-integer :: NCholErf
+integer :: NCholErf,NCholFR
 double precision :: ECorrLR
 double precision, allocatable :: DBCholAct(:,:)
 
@@ -153,7 +154,8 @@ double precision, allocatable :: DBCholAct(:,:)
 interface
 subroutine create_D12_array(NCholesky, DChol, DCholAct, NDimX, NBasis, IndN, Occ, IndAux, CholFile)
    double precision, allocatable, intent(out) :: DChol(:,:), DCholAct(:,:)
-   integer :: NCholesky
+   integer,intent(out) :: NCholesky
+   !integer :: NCholesky
    integer, intent(in) :: NDimX, NBasis
    integer, intent(in) :: IndN(2,NDimX), IndAux(NBasis)
    double precision, intent(in) :: Occ(NBasis)
@@ -163,7 +165,7 @@ end subroutine create_D12_array
 ! DBBSC
 subroutine create_D2B_array(NCholErf,DBCholErfAct,NDimX,NOccup,NBasis,IndN,Occ,IndAux,CholFile)
    double precision, allocatable, intent(out) :: DBCholErfAct(:,:)
-   integer :: NCholErf
+   integer,intent(out) :: NCholErf
    integer, intent(in)  :: NOccup,NDimX,NBasis
    integer, intent(in)  :: IndN(2,NDimX),IndAux(NBasis)
    double precision, intent(in) :: Occ(NBasis)
@@ -178,6 +180,10 @@ call create_D12_array(NCholesky, DChol, DCholAct, NDimX, NBasis, IndN, Occ, IndA
 ! =============================================================================================
 
 NGrid=18
+
+
+print*, 'NDim  =', NDim
+print*, 'NDimX =', NDimX
 
 If(AC1.Eq.0) Then
 Write (6,'(/,X,''AC calculation through W_AC expansion around Alpha=0, Omega Grid = '',I3,&
@@ -196,9 +202,15 @@ twojfile = 'FFOO'
 twokfile = 'FOFO'
 
 if (IDBBSC == 2) then
-   ! chol1vFR : Contains transformed Long-range Cholesky vecs: (L,pq*)
-   call create_D2B_array(NCholesky,DBCholAct,NDimX,NOccup,NBasis,IndN,Occ,IndAux,'chol1vFR')
+   ! chol1vFR : Contains transformed full-range Cholesky vecs: (L,pq*)
+   call create_D2B_array(NCholFR,DBCholAct,NDimX,NOccup,NBasis,IndN,Occ,IndAux,'chol1vFR')
    !print*, 'NCholesky=',NCholesky
+   if (NCholFR /= NCholesky) then
+      write(6,*) 'ERROR: inconsistent number of Cholesky vectors'
+      write(6,*) 'NCholesky = ', NCholesky
+      write(6,*) 'NCholFR   = ', NCholFR
+      stop
+   endif
 endif
 
 allocate(ABPLUS1(NDimX*NDimX),ABMIN1(NDimX*NDimX))
@@ -228,8 +240,11 @@ call AB_CAS_FOFO(ABPLUS1,ABMIN1,ECASSCF,URe,Occ,XOne, &
               NInte1,twojfile,twokfile,ICholesky,IDBBSC,ACAlpha,.true.)
               ! AB1=.true: AB1 = AB1 - A0
 
-Call sq_symmetrize(ABPLUS1,NDimX)
-Call sq_symmetrize(ABMIN1,NDimX)
+ write(lout,'(/1x,a,f20.12)') 'ABPLUS1-FOFO =',norm2(ABPLUS1)
+ write(lout,'(1x,a,f20.12)')  'ABMIN1 -FOFO =',norm2(ABMIN1)
+
+!Call sq_symmetrize(ABPLUS1,NDimX)
+!Call sq_symmetrize(ABMIN1,NDimX)
 
 !call add_blk_right(ABPLUS1,A0Block,A0BlockIV,-1d0,.false.,nblk,NDimX) ! not necessary
 !call add_blk_right(ABMIN1, A0Block,A0BlockIV,-1d0,.true., nblk,NDimX) ! not necessary
@@ -274,7 +289,7 @@ Call AC0BLOCK(Occ,URe,XOne, &
 
 allocate(COMTilde(NDimX*NCholesky))
 !call mem_alloc(COMTilde,NDimX*NCholesky)
-COMTilde=0.0
+COMTilde=0d0
 
 allocate(C0Tilde(NDimX*NCholesky),C1Tilde(NDimX*NCholesky),C2Tilde(NDimX*NCholesky))
 allocate(WORK0(NDimX*NCholesky),WORK1(NDimX*NCholesky))
@@ -283,6 +298,9 @@ allocate(WORK0(NDimX*NCholesky),WORK1(NDimX*NCholesky))
 !call mem_alloc(C2Tilde,NDimX*NCholesky)
 !call mem_alloc(WORK0,NDimX*NCholesky)
 !call mem_alloc(WORK1,NDimX*NCholesky)
+
+!print*, 'Skip the loop...!'
+!print*, 'is it the AC0Block...?'
 allocate(Lambda(nblk))
 associate(A => A0BlockIV, L => LambdaIV)
   L%n = A%n
@@ -321,7 +339,8 @@ Do IGL=1,NGrid
        Call ABPM_HALFTRAN_GEN_L(WORK0,C2Tilde,0.0d0,Lambda,LambdaIV,nblk,NDimX,NCholesky,'X')
        FF=WFact/XFactorial/(N+1)
        If(AC1.Eq.1) FF=WFact/XFactorial/2.D0
-       XNorm1=Norm2(FF*C2Tilde)
+       XNorm1=abs(FF)*norm2(C2Tilde)
+       !XNorm1=Norm2(FF*C2Tilde)
        Write(6,'(X,"Order (n), |Delta_C|",I3,E14.4)')N,XNorm1
 ! KP 18.06.2026 (uncomment after tests)
 !       If(XNorm1.Lt.ErrMax) Exit
@@ -338,10 +357,13 @@ Do IGL=1,NGrid
    EndDo
 
    Write(6,'(X,"Omega, |C|",I3,2F10.4)')IGL,OmI,Norm2(COMTilde)
+   print*, IGL,OmI,Norm2(COMTilde)
    If(IGL.Eq.1) ErrMax=XNorm1
 EndDo
 
-deallocate(WORK0,C0Tilde,C1Tilde,C2Tilde,Lambda,APLUS0Tilde,APLUS1Tilde)
+deallocate(Lambda)
+deallocate(C0Tilde,C1Tilde,C2Tilde,APLUS0Tilde,APLUS1Tilde)
+deallocate(WORK1,WORK0)
 
 if (IDBBSC == 2) then
    ! calculate LR contribution to ACn-CBS[H]
@@ -349,7 +371,9 @@ if (IDBBSC == 2) then
                               NAct,INActive,NDimX,NBasis,IDBBSC)
 endif
 
-deallocate(A1,ABMIN1,ABPLUS1,WORK1)
+deallocate(A1)
+deallocate(ABMIN1)
+deallocate(ABPLUS1)
 
 !call mem_dealloc(WORK1)
 !call mem_dealloc(WORK0)
@@ -363,27 +387,33 @@ deallocate(A1,ABMIN1,ABPLUS1,WORK1)
 !call mem_dealloc(ABPLUS1)
 
 !allocate(WorkD(NDimX,NCholesky))
-call mem_alloc(WorkD,NDimX,NCholesky)
-WorkD=0d0
-WorkD = RESHAPE(COMTilde, (/NDimX, NCholesky/))
+!WorkD = reshape(COMTilde, [NDimX, NCholesky])
+
+!print*, 'TEST: D2B = 0'
+!print*, 'TEST: Eq 26 = 0'
+!DBCholAct=0d0
+!ECorrLR = 0d0
 
 ECorr=0d0
 if (IDBBSC ==2) then
    do j=1,NDimX
       do i=1,NCholesky
-         ECorr=ECorr+(DCholAct(i,j)+DBCholAct(i,j))*WorkD(j,i)
+         ECorr=ECorr+(DCholAct(i,j)+DBCholAct(i,j))*COMTilde(j+(i-1)*NDimX)
+         !ECorr=ECorr+(DCholAct(i,j)+DBCholAct(i,j))*WorkD(j,i)
       enddo
    enddo
    ECorr = ECorr + ECorrLR
 else
   do j=1,NDimX
      do i=1,NCholesky
-        ECorr=ECorr+DCholAct(i,j)*WorkD(j,i)
+        ECorr=ECorr+DCholAct(i,j)*COMTilde(j+(i-1)*NDimX)
+        !ECorr=ECorr+DCholAct(i,j)*WorkD(j,i)
      enddo
   enddo
 endif
 
-deallocate(WorkD,COMTilde)
+deallocate(COMTilde)
+!deallocate(WorkD,COMTilde)
 !call mem_dealloc(WorkD)
 !call mem_dealloc(COMTilde)
 
@@ -446,7 +476,8 @@ double precision,allocatable :: DCholErf(:,:),DBCholErfAct(:,:)
 interface
 subroutine create_D12_array(NCholesky, DChol, DCholAct, NDimX, NBasis, IndN, Occ, IndAux, CholFile)
    double precision, allocatable, intent(out) :: DChol(:,:), DCholAct(:,:)
-   integer :: NCholesky
+   integer,intent(out) :: NCholesky
+   !integer :: NCholesky
    integer, intent(in) :: NDimX, NBasis, IndN(2,NDimX), IndAux(NBasis)
    character(len=*), intent(in) :: CholFile
    double precision, intent(in) :: Occ(NBasis)
@@ -633,8 +664,8 @@ integer,intent(in) :: IndN(2,NDimX),IndAux(NBasis)
 double precision, intent(in) :: Occ(NBasis)
 character(len=*) :: filename
 
-integer :: NCholErf
-!integer,intent(out) :: NCholErf
+integer,intent(out) :: NCholErf
+!integer :: NCholErf
 double precision,allocatable,intent(out) :: D2B(:,:)
 
 integer :: i,j,ip,iq,ipq,ir,is,irs,isr
@@ -1651,12 +1682,16 @@ subroutine create_D12_array(NCholesky, D1, D2, NDimX, NBasis, IndN, Occ, IndAux,
    integer, intent(in) :: IndN(2,NDimX), IndAux(NBasis)
    double precision, intent(in) :: Occ(NBasis)
    character(len=*) :: filename
+   integer,intent(out) :: NCholesky
    double precision, allocatable, intent(out) :: D1(:,:), D2(:,:)
 
-   integer :: NCholesky, iunit, i, j, ir, is, irs
+   integer :: i, j, ir, is, irs
+   integer :: iunit
+   !integer :: NCholesky, iunit, i, j, ir, is, irs
    double precision :: Crs, CICoef(NBasis)
    double precision, allocatable :: WorkD(:,:)
 
+   ! read the number of cholesky vectors
    open(newunit=iunit,file=filename,form='unformatted')
    read(iunit) NCholesky
    allocate(WorkD(NCholesky,NBasis**2))

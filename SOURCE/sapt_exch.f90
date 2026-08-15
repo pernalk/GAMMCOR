@@ -77,6 +77,15 @@ double precision,allocatable :: work1(:)
  call get_one_mat('S',S,A%Monomer,NBas)
  call tran2MO(S,A%CMO,B%CMO,Sab,NBas)
 
+ block
+ double precision :: Saa(NBas,NBas)
+ print*, 'S-monomer matrix' 
+ call tran2MO(S,A%CMO,A%CMO,Saa,NBas)
+ do i=1,NBas
+    write(LOUT,'(*(f13.8))') (Saa(i,j),j=1,NBas)
+ enddo
+ end block
+
  call get_one_mat('V',Va,A%Monomer,NBas)
  call get_one_mat('V',Vb,B%Monomer,NBas)
 
