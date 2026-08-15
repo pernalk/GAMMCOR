@@ -1,5 +1,5 @@
 *Deck ReadDAL
-      Subroutine ReadDAL(BasisSet,XKin,XNuc,ENuc,Occ,URe,
+      Subroutine ReadDAL(XKin,XNuc,ENuc,Occ,URe,
      $ TwoEl,UMOAO,NInte1,NBasis,NInte2,NGem,Flags)
 C
 C     READ HAO, 2-EL INTEGRALS IN NO, C_COEFFICIENTS, IGEM FROM A DALTON_GENERATED FILE
@@ -18,6 +18,8 @@ C
 C     Cholesky modules
 C      use Cholesky
       use gammcor_integrals
+      use geom_input
+      use acpp_types, only: TACppData
 C
       Implicit Real*8 (A-H,O-Z)
       Character*60 FMultTab
@@ -38,7 +40,6 @@ C
 C
       Character*60 Line
       Character*30 Line1
-      Character(*) :: BasisSet
 C
       type(FlagsData) :: Flags
 C
@@ -55,7 +56,6 @@ C
       Real(F64),Allocatable :: DipX(:,:),DipY(:,:),DipZ(:,:)
       logical :: SortAngularMomenta
       character(:),allocatable :: XYZPath
-      character(:),allocatable :: BasisSetPath
 C
       Include 'commons.inc'
 C
@@ -68,8 +68,8 @@ C     IDMRG - integrals and RDM's read from external dmrg files
       If(IDMRG.Eq.1.And.ICASSCF.Eq.0) Stop 'Set ICASSCF TO 1'
 C
       If(IDMRG.Eq.1) Then
-      Call ReadDMRG(BasisSet,XKin,XNuc,ENuc,Occ,URe,
-     $ TwoEl,UMOAO,NInte1,NBasis,NInte2,NGem,iORCA)
+      Call ReadDMRG(XKin,XNuc,ENuc,Occ,URe,
+     $ TwoEl,UMOAO,NInte1,NBasis,NInte2,NGem,iORCA,Flags)
       Return
       EndIf
 C
@@ -240,12 +240,12 @@ C
 C
       Call auto2e_init()
 C
-      XYZPath = "./input.inp"
-      BasisSetPath = BasisSet
+      Call xyz_source(XYZPath, "./input.inp")
       SortAngularMomenta = .true.
 C
-      Call CholeskyOTF_ao_vecs(CholeskyVecsOTF,AOBasis,System,IUnits,
-     $            XYZPath,BasisSetPath,SortAngularMomenta,ICholeskyAccu)
+      Call CholeskyOTF_ao_vecs(Flags,CholeskyVecsOTF,AOBasis,
+     $     System,IUnits,
+     $            XYZPath,SortAngularMomenta,ICholeskyAccu)
       NCholesky = CholeskyVecsOTF%Chol2Data%NVecs
       if(Monomer.eq.1) call sys_Init(System,SYS_MONO_A)
       if(Monomer.eq.2) call sys_Init(System,SYS_MONO_B)
@@ -262,8 +262,9 @@ C
       Write(lout,'(1x,a)') 'Cholesky LR On-The-Fly'
       Write(lout,'(2x,a,f14.8)') 'MU = ',Alpha
       Write(lout,'(1x,3a6)') ('*******',i=1,3)
-      Call CholeskyOTF_ao_vecs(CholErfVecsOTF,AOBasis,System,IUnits,
-     $            XYZPath,BasisSetPath,SortAngularMomenta,ICholeskyAccu,
+      Call CholeskyOTF_ao_vecs(Flags,CholErfVecsOTF,AOBasis,
+     $     System,IUnits,
+     $            XYZPath,SortAngularMomenta,ICholeskyAccu,
      $            Alpha)
       NCholErf = CholErfVecsOTF%Chol2Data%NVecs
 C
@@ -353,7 +354,7 @@ C     print CASSCF dipole moments
       If (ICholeskyOTF==1) Then
 c
 c     If(NSym.gt.1) UAux = CAONO
-      Call DipMomOTF_ao(DipX,DipY,DipZ,BasisSetPath,XYZPath,
+      Call DipMomOTF_ao(Flags,DipX,DipY,DipZ,XYZPath,
      $                  IUnits,'DALTON')
       Call CompDipMomOTF(AOBasis,System,CAONO,Occ,
      $                   DipX,DipY,DipZ,NBasis,NBasis)
@@ -630,13 +631,17 @@ C     ReadDMRG: VERSION THAT WORKS WITH EUGENE'S INTS (IEugene=1)
 C               IT WORKS WITH ORCA OUTPUTS (IEugene=0)
 C
 *Deck ReadDMRG
-      Subroutine ReadDMRG(BasisSet,XKin,XNuc,ENuc,Occ,URe,
-     $                    TwoEl,UMOAO,NInte1,NBasis,NInte2,NGem,iORCA)
+      Subroutine ReadDMRG(XKin,XNuc,ENuc,Occ,URe,
+     $            TwoEl,UMOAO,NInte1,NBasis,NInte2,NGem,iORCA,Flags)
 C
+      use read_external
+      use print_units
       use types
       use sorter
 C     Cholesky modules
       use gammcor_integrals
+      use geom_input
+      use acpp_types, only: TACppData
 Cc     use Cholesky_old  ! create AOTWOSORT file
 CC     binary
 C      use Auto2eInterface
@@ -658,11 +663,11 @@ C
 C
 !      Parameter (Zero=0.D0,One=1.D0,Two=2.D0)
 C
+      type(FlagsData) :: Flags
       Real*8 XKin(NInte1),XNuc(NInte1),Occ(NBasis),URe(NBasis,NBasis),
      $ TwoEl(NInte2),UMOAO(NBasis*NBasis)
 C
       Character*60 FName,Aux1
-      Character(*) :: BasisSet
 C
       Include 'commons.inc'
 C
@@ -1016,15 +1021,15 @@ C
 
       block
        character(:),allocatable :: XYZPath
-       character(:),allocatable :: BasisSetPath
 
-      XYZPath = "./input.inp"
+      Call xyz_source(XYZPath, "./input.inp")
 
-      BasisSetPath = BasisSet
-      SortAngularMomenta = .false.
+      SortAngularMomenta = .false. 
 
-      Call CholeskyOTF_ao_vecs(CholeskyVecsOTF,AOBasis,System,IUnits,
-     $            XYZPath,BasisSetPath,SortAngularMomenta,ICholeskyAccu)
+
+      Call CholeskyOTF_ao_vecs(Flags,CholeskyVecsOTF,AOBasis,System,
+     $     IUnits,
+     $            XYZPath,SortAngularMomenta,ICholeskyAccu)
       if(Monomer.eq.1) call sys_Init(System,SYS_MONO_A)
       if(Monomer.eq.2) call sys_Init(System,SYS_MONO_B)
       if(Monomer.eq.3) call sys_Init(System,SYS_TOTAL)
@@ -1037,8 +1042,9 @@ C     generate LR-Cholesky integrals
       !Alpha=1d4 !test LR=FULL-RANGE
       Write(lout,'(2x,a,f14.8)') 'MU = ',Alpha
       Write(lout,'(1x,3a6)') ('*******',i=1,3)
-      Call CholeskyOTF_ao_vecs(CholErfVecsOTF,AOBasis,System,IUnits,
-     $            XYZPath,BasisSetPath,SortAngularMomenta,ICholeskyAccu,
+      Call CholeskyOTF_ao_vecs(Flags,CholErfVecsOTF,AOBasis,
+     $     System,IUnits,
+     $            XYZPath,SortAngularMomenta,ICholeskyAccu,
      $            Alpha)
       NCholErf = CholErfVecsOTF%Chol2Data%NVecs
 C
@@ -1936,8 +1942,8 @@ C
 C End Subroutine ReadDMRG
 
 *Deck LdInteg
-      Subroutine LdInteg(Title,BasisSet,XKin,XNuc,ENuc,Occ,URe,
-     $ TwoEl,UAOMO,NInte1,NBasis,NInte2,NGem)
+      Subroutine LdInteg(Title,XKin,XNuc,ENuc,Occ,URe,
+     $ TwoEl,UAOMO,NInte1,NBasis,NInte2,NGem,Flags)
 C
 C     READ/WRITE THE ONE- AND TWO-ELECTRON INTEGRALS
 C     INTERFACED WITH MOLPRO
@@ -1957,6 +1963,7 @@ C
 C
 C     Cholesky and THC modules
       use gammcor_integrals
+      use geom_input
 C
       use abmat
       use read_external
@@ -1966,6 +1973,7 @@ C
 c     Parameter (Half=0.5D0)
 c     Parameter (Zero=0.D0,Half=0.5D0,One=1.D0,Two=2.D0)
 C
+      type(FlagsData) :: Flags
       Real*8 XKin(NInte1),XNuc(NInte1),TwoEl(NInte2),
      $ UAOMO(NBasis,NBasis),URe(NBasis,NBasis),Occ(NBasis),
      $ UAux(NBasis,NBasis),
@@ -2009,11 +2017,10 @@ C     THC
       double precision, allocatable :: Xga(:,:)
 C
       character(:),allocatable :: XYZPath
-      character(:),allocatable :: BasisSetPath
 C
       Character*60 FName,Aux1
       Character*60 FMultTab
-      Character(*) :: Title,BasisSet
+      Character(*) :: Title
 C
       Include 'commons.inc'
 C
@@ -2168,12 +2175,12 @@ C     compute Cholesky vectors OTF
 
       Call auto2e_init()
 
-      XYZPath = "./input.inp"
-      BasisSetPath = BasisSet
+      Call xyz_source(XYZPath, "./input.inp")
       SortAngularMomenta = .true.
 
-      Call CholeskyOTF_ao_vecs(CholeskyVecsOTF,AOBasis,System,IUnits,
-     $            XYZPath,BasisSetPath,SortAngularMomenta,ICholeskyAccu)
+      Call CholeskyOTF_ao_vecs(Flags,CholeskyVecsOTF,AOBasis,
+     $     System,IUnits,
+     $            XYZPath,SortAngularMomenta,ICholeskyAccu)
       NCholesky = CholeskyVecsOTF%Chol2Data%NVecs
 
 C     set THC for FockOTF subroutine
@@ -2192,8 +2199,9 @@ C           and for sr kernel (optional)
       Write(lout,'(2x,a,f14.8)') 'MU = ',Alpha
       Write(lout,'(1x,3a6)') ('*******',i=1,3)
 
-      Call CholeskyOTF_ao_vecs(CholErfVecsOTF,AOBasis,System,IUnits,
-     $            XYZPath,BasisSetPath,SortAngularMomenta,ICholeskyAccu,
+      Call CholeskyOTF_ao_vecs(Flags,CholErfVecsOTF,AOBasis,
+     $     System,IUnits,
+     $            XYZPath,SortAngularMomenta,ICholeskyAccu,
      $            Alpha)
       NCholErf = CholErfVecsOTF%Chol2Data%NVecs
 
@@ -2203,15 +2211,14 @@ C
 c
       Call auto2e_init()
 c
-      XYZPath = "./input.inp"
-      BasisSetPath = BasisSet
+      Call xyz_source(XYZPath, "./input.inp")
       SortAngularMomenta = .true.
 
       ! pq \in AO; kappa \in NChol; g \in THC
       ! Rkpq(kappa,pq) = \sum_g X(g,p) X(g,q) Z(g,kappa)
       Print*, 'THC Step1: generate X(g,p) and Z(g,k) in AO'
-      Call THC_ao_vecs(Xgp,Zgk,AOBasis,System,IUnits,
-     $            XYZPath,BasisSetPath,SortAngularMomenta,ICholeskyAccu)
+      Call THC_ao_vecs(Flags,Xgp,Zgk,AOBasis,System,IUnits,
+     $            XYZPath,SortAngularMomenta,ICholeskyAccu)
 c
       NGridTHC=size(Zgk,dim=1)
       NCholeskyTHC=size(Zgk,dim=2)
@@ -2772,21 +2779,21 @@ C
 c      block
 C      Print*, 'CAONO =',norm2(CAONO)
 C      do j=1,NBasis
-C         write(6,'(*(f13.8))') (CAONO(i,j),i=1,NBasis)
+C         write(LOUT,'(*(f13.8))') (CAONO(i,j),i=1,NBasis)
 C      enddo
 C      Print*, 'CSAONO =',norm2(UAOMO)
 C      do j=1,NBasis
-C         write(6,'(*(f13.8))') (UAOMO(i,j),i=1,NBasis)
+C         write(LOUT,'(*(f13.8))') (UAOMO(i,j),i=1,NBasis)
 C      enddo
 C
 C       Print*, 'CAOMO =',norm2(CAOMO)
 C       do j=1,NBasis
-C          write(6,'(*(f13.8))') (CAOMO(i,j),i=1,NBasis)
+C          write(LOUT,'(*(f13.8))') (CAOMO(i,j),i=1,NBasis)
 C       enddo
 C
 C       Print*, 'JMOsr in MO basis =',norm2(JMOsr)
 C       do j=1,NBasis
-C          write(6,'(*(f13.8))') (JMOsr(i,j),i=1,NBasis)
+C          write(LOUT,'(*(f13.8))') (JMOsr(i,j),i=1,NBasis)
 C       enddo
 C
 C       end block
@@ -2799,7 +2806,7 @@ CCC    test Jsr in AO
 C      block
 C      Print*, 'JMOsr in AO basis =',norm2(JMOsr)
 C      do j=1,NBasis
-C         write(6,'(*(f13.8))') (JMOsr(i,j),i=1,NBasis)
+C         write(LOUT,'(*(f13.8))') (JMOsr(i,j),i=1,NBasis)
 C      enddo
 C      end block
 C
@@ -3051,7 +3058,7 @@ c     If(IFunSR.Eq.5) Then
 C
 C     test dipole moments
       If (ICholeskyOTF == 1) then
-      Call DipMomOTF_ao(DIpX,DIpY,DipZ,BasisSetPath,
+      Call DipMomOTF_ao(Flags,DIpX,DIpY,DipZ,
      $                  XYZPath,IUnits,'MOLPRO')
       Call CompDipMomOTF(AOBasis,System,CAONO,Occ,
      $                   DipX,DipY,DipZ,NBasis,NBasis)
@@ -3221,9 +3228,10 @@ C
       End
 C     c    End Subroutine LdInteg
 
-      subroutine ReadPYSCF(THCData, AuxData, BasisSet, CAONO, XKin,
+      subroutine ReadPYSCF_ORCA(THCData, AuxData, CAONO, XKin,
      &    XNuc, ENuc, Occ,      
-     &    URe, TwoEl, UMOAO,  NInte1, NBasis, NInte2, NGem, Flags, anSt)
+     &     URe, TwoEl, UMOAO,  NInte1, NBasis, NInte2, NGem,
+     &  Flags, anSt, interf)
       use interface_pp
       use print_units
       use types
@@ -3237,7 +3245,6 @@ C     c    End Subroutine LdInteg
 
       Implicit Real*8 (A-H,O-Z)
 
-      character(*) BasisSet
       integer NInte1, NInte2, NBasis
       real*8 ENuc
       real*8 XKin(NInte1), XNuc(NInte1)
@@ -3249,6 +3256,7 @@ C     c    End Subroutine LdInteg
       integer NGem
       type(FlagsData) Flags
       integer, dimension(2) :: anSt
+      integer :: interf
       integer :: start_count, end_count, count_rate, elapsed_count
       real :: elapsed_time
       type (tclock) :: timer
@@ -3269,16 +3277,21 @@ C     Cholesky OnTheFly
       type(TAOBasis) :: AOBasis
       logical :: SortAngularMomenta
       character(:),allocatable :: XYZPath
-      character(:),allocatable :: BasisSetPath
 
       Type(TCholeskyVecs) :: CholeskyVecs
       Real*8, Allocatable :: MatFF(:,:), FFErf(:,:)
 
-      call PYSCF_wrapper(THCData, AuxData, NInte1, NInte2,
+      if (interf == 1)then
+         call PYSCF_wrapper(THCData, AuxData, NInte1, NInte2,
+     $ NBasis, ENuc, CAONO,
+     $        XKin, TwoEl, Occ, NAc, NInAc, anSt, Flags)
+      else if (interf == 2)then
+      call ORCA_wrapper(THCData, AuxData, NInte1, NInte2,
      $ NBasis, ENuc, CAONO,
      $     XKin, TwoEl, Occ, NAc, NInAc, anSt, Flags)
+      end if
 
-
+      NELE = AuxData%Nel
       print*, Flags%Ifunsr
       if (IFunSR==4)then
 
@@ -3297,7 +3310,7 @@ C     Cholesky OnTheFly
       EndDo
 
       If(ICASSCF.Eq.1) Then
-
+         
          SumOcc=0.D0
          Do I=1,NInAc+NAc
             SumOcc=SumOcc+Occ(I)
@@ -3326,8 +3339,13 @@ C     Cholesky OnTheFly
       Write(6,'(2X,"Sum of Occupancies: ",E16.6)') SumOcc
                if(Flags%JobType .ne.  JOB_TYPE_MP2 .and.                    
      $   Flags%JobType .ne. JOB_TYPE_SRMP2)then
-         If(Abs(SumOcc-NELE).Gt.1.D-8)
-     $   Stop "Fatal Error: Occupancies do not sum up to NELE"
+                  If(Abs(2*SumOcc-NELE).Gt.1.D-8)then
+                     print*, '2*sum', 2*SumOcc
+                     print*, 'nele', NELE
+                     print*, 'Occ', occ
+                     print*, 'NELE', NELE
+!            Stop "Fatal Error: Occupancies do not sum up to NELEs"
+            end if
          end if
 
 
@@ -3336,7 +3354,11 @@ C     Cholesky OnTheFly
       EndIf
 
       If(ITwoEl.Eq.3) Then
-
+         if (interf==2)then
+            print*, 'something wrong in the input'
+            stop
+         end if
+         
          If (ICholeskyOTF==1) Then
             if (IFunSR.ne.4)then
 
@@ -3378,17 +3400,22 @@ C     Cholesky OnTheFly
             
          UMOAO = transpose(CAONO)
 
-         Else
+      Else
+         print*, 'itwoel', itwoel
             print*, 'This setting is not supported with PYSCF, exiting'
             stop
 
-         EndIf                  !ICholesky                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  
-
+         EndIf                  !ICholesky
+         
          Else
-            print*, 'This setting is now supported with PYSCF, :)'
-            UMOAO = transpose(CAONO)
-            call TwoNO1(TwoEl,UMOAO,NBasis,NInte2)
-         EndIf                  !ITwoEl                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     
+            !print*, 'This setting is  supported with PYSCF, :)'
+            ! orbitals from pyscf are canonical in virt and occ
+            ! and natural in active
+            
+            !UMOAO = transpose(CAONO)
+            !call TwoNO1(TwoEl,UMOAO,NBasis,NInte2)
+         EndIf                  !ITwoEl
+         
       return
       End
 C*    End Subroutine ReadPYSCF                                                           
@@ -5321,6 +5348,44 @@ C
       close(unit)
 
       End Subroutine basinfo_pyscf
+
+
+      Subroutine basinfo_orca(nbasis)
+      implicit none
+      integer, intent(out) :: nbasis
+      character(len=256) :: line, filename
+      integer :: pos, ios
+      logical ::filex1, filex2
+      
+      inquire(file='FCIDUMP', exist=filex1)
+      inquire(file='FCIDUMP-full', exist=filex2)
+
+      if (filex1)then
+         filename = 'FCIDUMP'
+      else if (filex2)then
+         filename = 'FCIDUMP-full'
+      else
+         print*, 'NO FCIDUMP file'
+         print*, 'initia.f/basinfo_orca'
+         stop
+      end if
+      
+      if (filex1 .or. filex2) then
+         open(unit=10, file=filename, status="old",
+     $        action="read", iostat=ios)
+         read(unit=10, fmt="(a)", iostat=ios) line
+         if (ios /= 0) then
+            print *, "FCIDUMP empty"
+            stop
+         end if
+         line = trim(adjustl(line))
+         pos = index(line, "NORB=")
+         if (pos > 0) read(line(pos+5:), *) nbasis
+      end if
+
+         print*, 'nbasis', nbasis
+
+      end subroutine basinfo_orca
       
 
       

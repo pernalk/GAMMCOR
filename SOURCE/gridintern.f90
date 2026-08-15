@@ -1,6 +1,8 @@
 module grid_internal
 
 use gammcor_integrals
+use types
+use geom_input
 
 contains
 
@@ -43,20 +45,20 @@ contains
 !
 !end subroutine internal_lda_ao_grid
 
-subroutine internal_lda_ao_orbgrid(GridType,BasisSetPath,AOBasis,Wg,Phi,NPoints,NAO,Units)
+subroutine internal_lda_ao_orbgrid(Flags,GridType,AOBasis,Wg,Phi,NPoints,NAO,Units)
 !
 ! returns : a) grid weights, Wg(Npoints)
 !           b) AO orbitals on a grid, Phi(NPoints,NAO)
 !
 implicit none
 
+type(FlagsData), intent(in) :: Flags
+
 type(TAOBasis)  :: AOBasis
 type(TSystem)   :: System
 
 integer,intent(in)  :: GridType
 integer,intent(in)  :: NAO
-character(*) :: BasisSetPath
-!character(:),allocatable :: BasisSetPath
 integer,intent(out) :: NPoints
 integer,optional :: Units
 
@@ -66,24 +68,16 @@ double precision, dimension(:), allocatable :: Wg
 integer :: Units0, NAOt
 double precision, dimension(:), allocatable :: Xg, Yg, Zg
 logical :: SortAngularMomenta
-character(:),allocatable :: XYZPath
-
-logical, parameter :: SpherAO = .true.
 !integer, parameter :: GridType = BECKE_PARAMS_MEDIUM
 
-XYZPath = "./input.inp"
 SortAngularMomenta = .true.
-
 ! set units
 if (present(Units)) then
    Units0 =  Units
 else
    Units0 = SYS_UNITS_ANGSTROM
 endif
-
-call auto2e_init()
-call sys_Read_XYZ(System, XYZPath, Units0)
-call basis_NewAOBasis(AOBasis, System, BasisSetPath, SpherAO, SortAngularMomenta)
+call geom_ReadSystemBasis(System, AOBasis, Flags, SortAngularMomenta, Units0)
 if (AOBasis%SpherAO) then
       NAOt = AOBasis%NAOSpher
 else
@@ -105,7 +99,7 @@ call gridfunc_Orbitals(Phi, Xg, Yg, Zg, NPoints, NAO, AOBasis)
 
 end subroutine internal_lda_ao_orbgrid
 
-subroutine internal_gga_ao_orbgrid(GridType,BasisSetPath,AOBasis,Wg,Phi,NPoints,NAO,Units)
+subroutine internal_gga_ao_orbgrid(Flags,GridType,AOBasis,Wg,Phi,NPoints,NAO,Units)
 !
 ! returns : a) grid weights, Wg(Npoints)
 !           b) Atomic orbitals and gradient components on the grid
@@ -116,13 +110,13 @@ subroutine internal_gga_ao_orbgrid(GridType,BasisSetPath,AOBasis,Wg,Phi,NPoints,
 !
 implicit none
 
+type(FlagsData), intent(in) :: Flags
+
 type(TAOBasis)  :: AOBasis
 type(TSystem)   :: System
 
 integer,intent(in)  :: GridType
 integer,intent(in)  :: NAO
-character(*)        :: BasisSetPath
-!character(:),allocatable :: BasisSetPath
 integer,intent(out) :: NPoints
 
 double precision, dimension(:,:,:), allocatable :: Phi
@@ -132,28 +126,20 @@ integer,optional :: Units
 
 integer :: NAOt, Units0
 double precision, dimension(:), allocatable :: Xg, Yg, Zg
-character(:),allocatable :: XYZPath
 logical :: SortAngularMomenta
 
-logical, parameter :: SpherAO = .true.
 !integer, parameter :: GridType = BECKE_PARAMS_SG1
 !integer, parameter :: GridType = BECKE_PARAMS_MEDIUM
 !integer, parameter :: GridType = BECKE_PARAMS_FINE
 !integer, parameter :: GridType = BECKE_PARAMS_XFINE
-
-XYZPath = "./input.inp"
 SortAngularMomenta = .true.
-
 ! set units
 if (present(Units)) then
    Units0 =  Units
 else
    Units0 = SYS_UNITS_ANGSTROM
 endif
-
-call auto2e_init()
-call sys_Read_XYZ(System, XYZPath, Units0)
-call basis_NewAOBasis(AOBasis, System, BasisSetPath, SpherAO, SortAngularMomenta)
+call geom_ReadSystemBasis(System, AOBasis, Flags, SortAngularMomenta, Units0)
 if (AOBasis%SpherAO) then
       NAOt = AOBasis%NAOSpher
 else
@@ -176,7 +162,7 @@ call gridfunc_Orbitals_Grad(Phi, Xg, Yg, Zg, AOBasis)
 
 end subroutine internal_gga_ao_orbgrid
 
-subroutine internal_lda_no_orbgrid(GridType,BasisSetPath,ExternalOrdering,CAONO,Wg,Phi,NPoints,NAO,NBasis,Units)
+subroutine internal_lda_no_orbgrid(Flags,GridType,ExternalOrdering,CAONO,Wg,Phi,NPoints,NAO,NBasis,Units)
 !
 ! Compute orbital on grid and perform AO-->NO transformation
 !
@@ -188,6 +174,8 @@ integer,intent(out) :: NPoints
 double precision, dimension(:,:), allocatable, intent(out) :: Phi
 double precision, dimension(:), allocatable, intent(out) :: Wg
 
+type(FlagsData), intent(in) :: Flags
+
 type(TAOBasis) :: AOBasis
 
 integer,intent(in) :: GridType
@@ -195,8 +183,6 @@ integer,intent(in) :: NAO,NBasis
 integer,intent(in) :: ExternalOrdering
 
 double precision,intent(in) :: CAONO(NAO,NBasis)
-character(*)        :: BasisSetPath
-!character(:),allocatable    :: BasisSetPath
 
 integer, optional :: Units
 
@@ -209,12 +195,12 @@ else
    Units0 = SYS_UNITS_ANGSTROM
 endif
 
-call internal_lda_ao_orbgrid(GridType,BasisSetPath,AOBasis,Wg,Phi,NPoints,NAO,Units0)
+call internal_lda_ao_orbgrid(Flags,GridType,AOBasis,Wg,Phi,NPoints,NAO,Units0)
 call internal_tran_lda_orbgrid(CAONO,Phi,AOBasis,ExternalOrdering,NPoints,NAO,NBasis)
 
 end subroutine internal_lda_no_orbgrid
 
-subroutine internal_gga_no_orbgrid(GridType,BasisSetPath,ExternalOrdering,CAONO, &
+subroutine internal_gga_no_orbgrid(Flags,GridType,ExternalOrdering,CAONO, &
                                    Wg,Phi,NPoints,NAO,NBasis,Units)
 !
 ! Compute orbital on grid and perform AO-->NO transformation
@@ -227,14 +213,14 @@ integer,intent(out) :: NPoints
 double precision, dimension(:,:,:), allocatable, intent(out) :: Phi
 double precision, dimension(:), allocatable, intent(out) :: Wg
 
+type(FlagsData), intent(in) :: Flags
+
 type(TAOBasis) :: AOBasis
 
 integer,intent(in) :: GridType
 integer,intent(in) :: NAO,NBasis
 integer,intent(in) :: ExternalOrdering
 double precision,intent(in) :: CAONO(NAO,NBasis)
-character(*) :: BasisSetPath
-!character(:),allocatable    :: BasisSetPath
 
 integer, optional :: Units
 
@@ -247,7 +233,7 @@ else
    Units0 = SYS_UNITS_ANGSTROM
 endif
 
-call internal_gga_ao_orbgrid(GridType,BasisSetPath,AOBasis,Wg,Phi,NPoints,NAO,Units0)
+call internal_gga_ao_orbgrid(Flags,GridType,AOBasis,Wg,Phi,NPoints,NAO,Units0)
 call internal_tran_gga_orbgrid(CAONO,Phi(:,:,1),Phi(:,:,2),Phi(:,:,3),Phi(:,:,4), &
                                AOBasis,ExternalOrdering,NPoints,NAO,NBasis)
 

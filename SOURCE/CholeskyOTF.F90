@@ -3,6 +3,7 @@
 module CholeskyOTF_interface
 
 use print_units
+use types
 use tran
 use basis_sets
 use sys_definitions
@@ -15,8 +16,8 @@ use OneElectronInts, only : ints1e_S
 
 contains
 
-subroutine CholeskyOTF_ao_vecs(CholeskyVecsOTF, &
-                          AOBasis,System,Units,XYZPath,BasisSetPath, &
+subroutine CholeskyOTF_ao_vecs(Flags,CholeskyVecsOTF, &
+                          AOBasis,System,Units,XYZPath, &
                           SortAngularMomenta, Accuracy, Omega)
 !
 !           Generate Cholesky vectors in AO basis on-the-fly
@@ -28,21 +29,20 @@ subroutine CholeskyOTF_ao_vecs(CholeskyVecsOTF, &
 !use CholeskyOTF, only: chol_CoulombMatrix_OTF, &
 !use basis_sets
 !use sys_definitions
-!use chol_definitions
+      !use chol_definitions
+      use types
 
             implicit none
-
+            type(FlagsData) :: Flags
             type(TCholeskyVecsOTF), intent(out)    :: CholeskyVecsOTF
             type(TAOBasis), intent(out)            :: AOBasis
             type(TSystem), intent(out)             :: System
             character(*), intent(in)               :: XYZPath
-            character(*), intent(in)               :: BasisSetPath
             logical, intent(in)                    :: SortAngularMomenta
             integer, intent(in)                    :: Units
             integer, intent(in)                    :: Accuracy
             double precision, optional, intent(in) :: Omega
-
-            logical, parameter :: SpherAO = .true.
+            integer :: ShellOrder
 
             ! Initialize the two-electron intergrals library
             !
@@ -57,8 +57,19 @@ subroutine CholeskyOTF_ao_vecs(CholeskyVecsOTF, &
             ! Read the basis set parameters from an EMSL text file
             ! (GAMESS-US format, no need for any edits, just download it straight from the website)
             !
-            call basis_NewAOBasis(AOBasis, System, &
-                            BasisSetPath, SpherAO, SortAngularMomenta)
+            if (SortAngularMomenta) then
+                  ShellOrder = SHELL_ORDER_BY_MOMENTUM
+            else
+                  ShellOrder = SHELL_ORDER_FIXED
+            end if
+            
+            if (Flags%BasisAssign%Initialized) then
+                  call basis_init(AOBasis, System, ShellOrder=ShellOrder, BasisAssign=Flags%BasisAssign)
+            else
+                  call basis_init(AObasis, System, ShellOrder=ShellOrder, &
+                        FilePath=Flags%BasisSetPath // Flags%BasisSet)
+            end if
+            call AObasis%display()
             !
             ! Compute Cholesky vectors in AO basis
             !
@@ -71,23 +82,21 @@ subroutine CholeskyOTF_ao_vecs(CholeskyVecsOTF, &
 
 end subroutine CholeskyOTF_ao_vecs
 
-subroutine THC_ao_vecs(Xgp, Zgk, &
-                       AOBasis,System,Units,XYZPath,BasisSetPath, &
+subroutine THC_ao_vecs(Flags, Xgp, Zgk, &
+                       AOBasis,System,Units,XYZPath,&
                        SortAngularMomenta, Accuracy)
-
+use types
             implicit none
-
+            type(FlagsData) :: Flags
             double precision, dimension(:, :), allocatable, intent(out) :: Xgp
             double precision, dimension(:, :), allocatable, intent(out) :: Zgk
             type(TAOBasis), intent(out)    :: AOBasis
             type(TSystem), intent(out)     :: System
             character(*), intent(in)       :: XYZPath
-            character(*), intent(in)       :: BasisSetPath
             logical, intent(in)            :: SortAngularMomenta
             integer, intent(in)            :: Units
             integer, intent(in)            :: Accuracy
-
-            logical, parameter :: SpherAO = .true.
+            integer :: ShellOrder
 
             ! Initialize the two-electron intergrals library
             !
@@ -102,8 +111,19 @@ subroutine THC_ao_vecs(Xgp, Zgk, &
             ! Read the basis set parameters from an EMSL text file
             ! (GAMESS-US format, no need for any edits, just download it straight from the website)
             !
-            call basis_NewAOBasis(AOBasis, System, &
-                            BasisSetPath, SpherAO, SortAngularMomenta)
+            if (SortAngularMomenta) then
+                  ShellOrder = SHELL_ORDER_BY_MOMENTUM
+            else
+                  ShellOrder = SHELL_ORDER_FIXED
+            end if
+
+            if (Flags%BasisAssign%Initialized) then
+                  call basis_init(AOBasis, System, ShellOrder=ShellOrder, BasisAssign=Flags%BasisAssign)
+            else
+                  call basis_init(AObasis, System, ShellOrder=ShellOrder, &
+                        FilePath=Flags%BasisSetPath // Flags%BasisSet)
+            end if
+            call AObasis%display()
             !
             ! Compute THC vectors in AO basis
             !
@@ -744,16 +764,16 @@ endif
 
 end subroutine CholeskyOTF_H0_test
 
-subroutine DipMomOTF_ao(Dx_extao,Dy_extao,Dz_extao,BasisSetPath,XYZPath,Units,Source)
+subroutine DipMomOTF_ao(Flags,Dx_extao,Dy_extao,Dz_extao,XYZPath,Units,Source)
 !
 ! calculate dipole moments
 !
 use Multipoles
 
-character(*), intent(in) :: BasisSetPath
 character(*), intent(in) :: XYZPath
 character(6),intent(in)  :: Source
 integer, intent(in)      :: Units
+type(FlagsData), intent(in) :: Flags
 real(F64), dimension(:, :), allocatable :: Dx_extao, Dy_extao, Dz_extao
 
 type(TSystem)  :: System
@@ -764,7 +784,7 @@ real(F64), dimension(:, :), allocatable :: Dx, Dy, Dz
 integer :: NAO
 integer            :: ORBITAL_ORDERING
 logical, parameter :: SortAngularMomenta = .false.
-logical, parameter :: SpherAO = .true.
+integer :: ShellOrder
 
 ! set orbital ordering
 if(trim(Source)=='MOLPRO') then
@@ -783,7 +803,20 @@ call auto2e_init()
 !
 call boys_init(4 * AUTO2E_MAXL)
 call sys_Read_XYZ(System, XYZPath, Units)
-call basis_NewAOBasis(AOBasis, System, BasisSetPath, SpherAO, SortAngularMomenta)
+
+if (SortAngularMomenta) then
+      ShellOrder = SHELL_ORDER_BY_MOMENTUM
+else
+      ShellOrder = SHELL_ORDER_FIXED
+end if
+
+if (Flags%BasisAssign%Initialized) then
+      call basis_init(AOBasis, System, ShellOrder=ShellOrder, BasisAssign=Flags%BasisAssign)
+else
+      call basis_init(AObasis, System, ShellOrder=ShellOrder, &
+            FilePath=Flags%BasisSetPath // Flags%BasisSet)
+end if
+
 NAO = AOBasis%NAOSpher
 
 !

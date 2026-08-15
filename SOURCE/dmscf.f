@@ -1,9 +1,10 @@
 *Deck DMSCF 
-      Subroutine DMSCF 
-     $ (Title,BasisSet,URe,Occ,XKin,XNuc,ENuc,UMOAO,TwoEl,
-     $     NBasis,NInte1,NInte2,NGem, THCData)
+      Subroutine DMSCF(Flags,
+     $ Title,URe,Occ,XKin,XNuc,ENuc,UMOAO,TwoEl,
+     $     NBasis,NInte1,NInte2,NGem, THCData, AuxData)
 
-      use acpp_types
+      use acpp_types, only: TTHCData, TACppData
+      use types
 
 C
 C     !!! XKin CONTAINS BOTH KINETIC AND EL-N CONTRIBUTIONS !!!
@@ -12,10 +13,11 @@ C
       Implicit Real*8 (A-H,O-Z)
 C
       Character*60 FMultTab,Title
-      Character(*) :: BasisSet
       type(TTHCData), intent(in) :: THCData
+      type(TACppData), intent(inout) :: AuxData
 C
       Include 'commons.inc'
+      type(FlagsData), intent(in) :: Flags
 C
       Parameter(Zero=0.0D0,Half=0.50D0,One=1.0D0,Two=2.0D0,Four=4.0D0)
 C
@@ -67,8 +69,8 @@ C
 C
       If(ICASSCF.Eq.1) Then
 C     
-      Call ACCAS(ETot,ENuc,TwoEl,URe,UReSav,Occ,XOne,
-     $  Title,BasisSet,NBasis,NInte1,NInte2,NGem, THCData)
+      Call ACCAS(Flags,ETot,ENuc,TwoEl,URe,UReSav,Occ,XOne,
+     $  Title,NBasis,NInte1,NInte2,NGem, THCData, AuxData)
 C
       Else
 C

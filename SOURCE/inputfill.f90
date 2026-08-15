@@ -141,6 +141,7 @@ integer, parameter        :: block_calculation = 1
 integer, parameter        :: block_system      = 2
 integer, parameter        :: block_flags       = 3
 integer, parameter        :: block_cholesky    = 4
+integer, parameter        :: block_basis       = 5
 character(:), allocatable :: line
 
  open(newunit=u, file=filename, status="old", &
@@ -179,6 +180,10 @@ character(:), allocatable :: line
              current_block = block_cholesky
              cycle lines
 
+       case ("BASISASSIGNEMENT")
+             current_block = block_basis
+             cycle lines
+
        case ("FLAGS")
              Input%iflag = Input%iflag + 1
              current_block = block_flags
@@ -198,11 +203,17 @@ character(:), allocatable :: line
              call read_block_system(Input%SystemInput(isys), line)
        else if (current_block == block_calculation) then
              call read_block_calculation(Input%CalcParams, line)
+             if (allocated(Input%CalcParams%BasisSetPath)) then
+                   call Input%BasisAssign%set_library_dir(Input%CalcParams%BasisSetPath)
+             end if
        else if (current_block == block_cholesky) then
              call read_block_cholesky(Input%CholeskyParams, line)
        else if (current_block == block_flags) then
              call read_block_flags(Input%Flags, line)
+       else if (current_block == block_basis) then
+             call read_block_basis(Input%BasisAssign, line, Input%CalcParams%BasisSetPath)
        end if
+       
  end do lines
 
 end subroutine read_inputfile
@@ -259,6 +270,25 @@ open(newunit=u, file=filename, status="old", &
 close(u)
 
 end subroutine sapt_scan_inputfile
+
+subroutine read_block_basis(BasisAssign, line, BasisPath)
+  use string
+  type(TBasisAssignment) :: BasisAssign
+  character(*), intent(in)   ::line
+  character(:), allocatable, intent(in) :: BasisPath
+  character(:), allocatable :: formatted_line
+  character(:), allocatable :: key, val
+
+  call split(line, key, val)
+  if (allocated(BasisPath)) then
+      formatted_line = key // " file " // BasisPath // "/" // val
+      call BasisAssign%read_line(formatted_line)
+  else
+      call BasisAssign%read_line(line)
+  end if
+
+end subroutine read_block_basis
+
 
 subroutine read_block_cholesky(CholeskyParams, line)
       type(CholeskyBlock), intent(inout) :: CholeskyParams
@@ -397,6 +427,18 @@ subroutine read_block_calculation(CalcParams, line)
            elseif (uppercase(val) == "MSAC0" .or. &
                    uppercase(val) == "MS-AC0") then
                CalcParams%JobType = JOB_TYPE_MSAC0
+           elseif (uppercase(val) == "PPERPA" ) then
+                 CalcParams%JobType = JOB_TYPE_PPERPA
+           elseif (uppercase(val) == "AC0PP" ) then
+                 CalcParams%JobType = JOB_TYPE_AC0PP
+           elseif (uppercase(val) == "ACPP" ) then
+                 CalcParams%JobType = JOB_TYPE_ACPP
+           elseif (uppercase(val) == "PPERPADMP" ) then
+                 CalcParams%JobType = JOB_TYPE_PPERPA_RDMDUMP
+           elseif (uppercase(val) == "DUCC" ) then
+                 CalcParams%JobType = JOB_TYPE_DUCC
+           elseif (uppercase(val) == "HHERPADMP" ) then
+                 CalcParams%JobType = JOB_TYPE_HHERPA_RDMDUMP
            endif
 
      !case ("FRAGMENTS")
@@ -655,7 +697,10 @@ subroutine read_block_calculation(CalcParams, line)
 
       case ("IPRINT")
             read(val,*) CalcParams%IPrint
-
+      case ("SPIN_RESOLVED", "SPINRES", "SPIN_RES")
+            read(val,*) CalcParams%SpinRes
+      case ("OLA_PATH")
+            read(val,*) CalcParams%ola_path
       end select
 end subroutine read_block_calculation
 
@@ -767,6 +812,9 @@ character(:), allocatable :: first, last
  case ("THRQINACT")
        SystemParams%DeclareThrQInact = .true.
        read(val,*) SystemParams%ThrQInact
+
+ case ("THRPP")
+       read(val,*) SystemParams%ThrPP
 
  case ("THRVIRT")
        read(val,*) SystemParams%ThrVirt
@@ -967,7 +1015,7 @@ integer :: imon
  if(Input%CalcParams%InterfaceType.ne.INTER_TYPE_DAL) then
     if(Input%CalcParams%NBasis==0) then
        !write(LOUT,'(1x,a)') 'FATAL ERROR: NBasis ENTRY MISSING'
-       write(LOUT,'(1x,a)') 'NBasis WILL BE READ FROM MOLPRO'
+       write(LOUT,'(1x,a)') 'NBasis WILL BE READ FROM MOLPRO or PYSCF or FCIDUMP'
        !stop
     endif
  elseif(Input%CalcParams%NBasis.lt.0) then

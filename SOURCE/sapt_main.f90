@@ -1332,11 +1332,9 @@ integer :: NCholesky
 integer :: IGridType
 real(8) :: UA(NBasis,NBasis),UB(NBasis,NBasis)
 real(8) :: XMuA(NBasis,NBasis),XMuB(NBasis,NBasis),AvMu
-character(:),allocatable :: BasisSet
 
 NOccupA = A%num0 + A%num1
 NOccupB = B%num0 + B%num1
-BasisSet = Flags%BasisSetPath // Flags%BasisSet
 
 UA = transpose(A%CAONO)
 UB = transpose(B%CAONO)
@@ -1344,7 +1342,7 @@ UB = transpose(B%CAONO)
 IGridType = 1 ! Molpro 
 
 call LOC_MU_CBS_AB(XMuA,XMuB,AvMu,UA,UB,NOccupA,A%Occ,NOccupB,B%Occ, &
-                   A%OF,B%OF,IGridType,BasisSet,SAPT%NCholesky,NBasis)
+                   A%OF,B%OF,IGridType,SAPT%NCholesky,NBasis)
 
 stop "here!"
 
@@ -2091,7 +2089,6 @@ integer :: iunit
 double precision             :: UNOAO(NBasis,NBasis)
 double precision             :: CorrMD
 character(:),allocatable     :: rdmfile
-character(:),allocatable     :: BasisSet
 !test
 double precision :: Tcpu,Twall
 
@@ -2134,11 +2131,10 @@ deallocate(Mon%FFErf)
 !
 print*, 'Computing mu(r) for monomer =', Mon%Monomer
 allocate(Mon%XMuMat(NBasis,NBasis))
-BasisSet = Flags%BasisSetPath // Flags%BasisSet
 UNOAO = transpose(Mon%CAONO)
 call FlagsToCommons(Mon,Flags)
-call LOC_MU_CBS_CHOL(Mon%XMuMat,CorrMD,Mon%AvMU, &
-                     UNOAO,Mon%Occ,rdmfile,BasisSet,NBasis,.true.)
+call LOC_MU_CBS_CHOL(Flags,Mon%XMuMat,CorrMD,Mon%AvMU, &
+                     UNOAO,Mon%Occ,rdmfile,NBasis,.true.)
 
 if(Mon%Monomer==1) call system('cp locmu.dat locmu_A.dat')
 if(Mon%Monomer==2) call system('cp locmu.dat locmu_B.dat')

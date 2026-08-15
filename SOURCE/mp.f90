@@ -11,8 +11,8 @@ module mp
       
       contains
 
-            subroutine mp2_driver(BasisSet, THCData, AuxData, CAONO, Flags)
-                  Character(*) :: BasisSet
+            subroutine mp2_driver(THCData, AuxData, CAONO, Flags)
+
                   type(TACppData), intent(in) :: AuxData
                   double precision, dimension(:,:), intent(in) :: CAONO
                   type(FlagsData), intent(in) :: Flags
@@ -114,7 +114,7 @@ module mp
                           CAONOT = transpose(CAONO)
                           allocate(XMuMat(nbasis, nbasis))
                            
-                          !Call LOC_MU_CBS_CHOL(XMuMat,ECorrMD,AvMU,URe, CAONOT,Occ_frozen,BasisSet,NBasis)
+                          !Call LOC_MU_CBS_CHOL(Flags,XMuMat,ECorrMD,AvMU,URe, CAONOT,Occ_frozen,NBasis)
 
                           call real_abt(THCData%TXgaErf, THCData%XgaErf, XMuMAT)
                           call real_abt(THCData%TXga, THCData%Xga, XMuMAT)                                 

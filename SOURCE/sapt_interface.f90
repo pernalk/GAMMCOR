@@ -1,6 +1,7 @@
 module sapt_inter
 
 use types
+use geom_input
 use timing
 use tran
 use sorter
@@ -60,7 +61,6 @@ double precision :: potnucA,potnucB
 double precision :: potnuc,emy,eactiv,emcscf
 
 character(:),allocatable :: XYZPath
-character(:),allocatable :: BasisSetPath
 
 double precision,allocatable :: work1(:),work2(:)
 double precision,allocatable :: work(:,:)
@@ -74,7 +74,6 @@ double precision,allocatable :: OneRdmA(:),OneRdmB(:)
 double precision,allocatable :: Xgp(:,:), Zgk(:,:)
 
 logical :: SortAngularMomenta
-character(:),allocatable :: BasisSet
 
 logical :: doRSH
 logical :: canoni
@@ -89,9 +88,6 @@ SAPT%monB%IPrint = SAPT%IPrint
 if (allocated(Flags%BasisSetPath)) then
    write(LOUT,'(/1x,"Flags:BasisSetPath ",a)') Flags%BasisSetPath
    write(LOUT,'(1x, "Flags:BasisSet ",a)')     Flags%BasisSet
-   BasisSet = Flags%BasisSetPath // Flags%BasisSet
-else
-   BasisSet = "Empty"
 endif
 
 ! set dimensions
@@ -309,13 +305,12 @@ SAPT%monB%NDim = NBasis*(NBasis-1)/2
        write(lout,'(1x,3a6)') ('******',i=1,3)
 
        call auto2e_init()
-
-       XYZPath = "./input.inp"
-       BasisSetPath = BasisSet
+       
+       call xyz_source(XYZPath, "./input.inp")
        SortAngularMomenta = .true.
 
-       call CholeskyOTF_ao_vecs(CholeskyVecsOTF,AOBasis,System,Flags%IUnits, &
-                                 XYZPath,BasisSetPath, &
+       call CholeskyOTF_ao_vecs(Flags,CholeskyVecsOTF,AOBasis,System,Flags%IUnits, &
+                                 XYZPath, &
                                  SortAngularMomenta,Flags%ICholeskyAccu)
 
        SAPT%NCholesky  = CholeskyVecsOTF%Chol2Data%NVecs
@@ -553,8 +548,6 @@ integer,intent(in)     :: NBasis
 integer(8) :: MemSrtSize
 
 character(:),allocatable :: XYZPath
-character(:),allocatable :: BasisSetPath
-character(:),allocatable :: BasisSet
 
 double precision :: Tcpu,Twall
 
@@ -859,7 +852,6 @@ integer,intent(in)     :: NBasis
 type(TSystem)          :: System
 
 character(:),allocatable :: XYZPath
-character(:),allocatable :: BasisSet, BasisSetPath
 
 integer :: i
 double precision :: Omega
@@ -870,11 +862,8 @@ doRSH = .false.
 if(Flags%IFunSR==1.or.Flags%IFunSR==2) doRSH = .true.
 if(.not.doRSH .and. Flags%IDBBSC/=2) stop "doRSH=F and CBS/=2! in Erf ERIs OTF!"
 
-XYZPath = "./input.inp"
+call xyz_source(XYZPath, "./input.inp")
 SortAngularMomenta = .true.
-
-! set basis set
-BasisSet = Flags%BasisSetPath // Flags%BasisSet
 
 ! set RS parameter
 if (Flags%IDBBSC==2) then
@@ -891,8 +880,8 @@ call auto2e_init()
 
 !Mon%Omega = 100.0
 !print*, 'Mon%OMega' , Mon%OMega
-call CholeskyOTF_ao_vecs(CholErfVecsOTF,AOBasis,System,Flags%IUnits, &
-                         XYZPath,BasisSet, &
+call CholeskyOTF_ao_vecs(Flags,CholErfVecsOTF,AOBasis,System,Flags%IUnits, &
+                         XYZPath, &
                          SortAngularMomenta,Flags%ICholeskyAccu, &
                          Omega)
 
@@ -914,32 +903,20 @@ double precision, dimension(:), allocatable :: Wg
 
 integer :: NAOt
 double precision, dimension(:), allocatable :: Xg, Yg, Zg
-
-character(:),allocatable :: XYZPath
-character(:),allocatable :: BasisSet, BasisSetPath
 logical :: SortAngularMomenta
-
-logical, parameter :: SpherAO = .true.
 integer, parameter :: GridType = BECKE_PARAMS_MEDIUM
-
-BasisSet = Flags%BasisSetPath // Flags%BasisSet
 
 ! set gridtype : where??
 ! ...
-! set units 
+! set units
 !Units = SYS_UNITS_BOHR
 
 if(Flags%ICholeskyOTF/=1) then
    ! with Cholesky OTF AOBasis and System already avail
 
-   XYZPath = "./input.inp"
-   BasisSetPath = BasisSet
+      ! units default to angstroms here, cf. geom_ReadSystemBasis(...,Units)
    SortAngularMomenta = .true.
-
-   call auto2e_init()
-   call sys_Read_XYZ(System, XYZPath)
-   !call sys_Read_XYZ(System, XYZPath, Units)
-   call basis_NewAOBasis(AOBasis, System, BasisSetPath, SpherAO, SortAngularMomenta)
+   call geom_ReadSystemBasis(System, AOBasis, Flags, SortAngularMomenta)
    if (AOBasis%SpherAO) then
          NAOt = AOBasis%NAOSpher
    else
@@ -1325,13 +1302,13 @@ character(:),allocatable :: rdmfile
 
  call triang_to_sq2(OneRdm,OrbAux,NBasis)
  call Diag8(OrbAux(1:NAct,1:NAct),NAct,NAct,Eval(1:NAct),work)
- !call Diag8(OrbAux,NBasis,NBasis,Eval,work)
+  !call Diag8(OrbAux,NBasis,NBasis,Eval,work)
 
 ! KP : it may happen that an active orbital has a negative tiny occupation. set it to a positive
  do i=1,NBasis
  Eval(i)=Abs(Eval(i))
  enddo
-! call dsyev('V','U',NBasis,OrbAux,NBasis,EVal,work,3*NBasis,info)
+ ! call dsyev('V','U',NBasis,OrbAux,NBasis,EVal,work,3*NBasis,info)
  call SortOcc(EVal,OrbAux(1:NAct,1:NAct),NAct)
  !call SortOcc(EVal,OrbAux,NBasis)
 

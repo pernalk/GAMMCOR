@@ -23,11 +23,14 @@ C
       use interface_pp
       use acpp_types
       use mp
+      use acpp
+      use acph_spinres
+      use ducc_simple
+      use geom_input, only : geom_DeleteScratch
 C
       Implicit Real*8 (A-H,O-Z)
 C
       Character*60 FMultTab,Title
-      Character(:),allocatable :: BasisSet
 C
       Real*8, Dimension(:), Allocatable :: Occ
       Real*8, Dimension(:), Allocatable :: URe
@@ -54,6 +57,8 @@ C
       type(SaptData)    :: Sapt
       type(TTHCData)   :: THCData
       type(TACppData)  :: AuxData
+      type(TInts)  :: IntsO
+      type(TInts)  :: IntsD
 C
       Include 'commons.inc'
 C
@@ -72,6 +77,7 @@ C
       Call check_Calc(Input%CalcParams)
       Call fill_Flags(Input,Flags)
       Call create_System(Input,Flags,System,Sapt)
+      Flags%BasisAssign = Input%BasisAssign
 C
       Call free_Input(Input)
 C
@@ -81,7 +87,6 @@ C     FILL COMMONS AND CONSTANTS
       NELE    = System%NELE
       Charge  = System%Charge
       NBasis  = System%NBasis
-      BasisSet= Flags%BasisSetPath // Flags%BasisSet
       IJobType = Flags%JobType
 C
       NCoreOrb = System%NCoreOrb
@@ -135,6 +140,8 @@ c     ITREXIO = Flags%ITREXIO
       IMOLPRO = Flags%IMOLPRO
       IDMRG   = Flags%IDMRG
       IPYSCF  = Flags%IPYSCF
+
+      AuxData%PYSCF = Flags%IPYSCF
 C
 C     IF IRes=1 - RESTART THE CALCULATIONS FROM A RESTART FILE
 C
@@ -297,7 +304,8 @@ C
       If(ISAPT.Eq.1) Call sapt_driver(Flags,Sapt)
 C
 C     NBasis READ FROM SIRIUS.RST
-      If(IDALTON.Eq.1) Call basinfo(NBasis,'SIRIUS.RST','DALTON')
+      If(IDALTON.Eq.1.and.Flags%IPP.eq.0)
+     $ Call basinfo(NBasis,'SIRIUS.RST','DALTON')
 CC
 C     *************************************************************************
 C
@@ -315,7 +323,7 @@ C
 C      Print*,'VALUE DECLARED IN INPUT: ',NoSt
 C
       ElseIf(IDALTON.Eq.0.and.IDMRG.Eq.0) Then
-         if (IPYSCF.ne.1) then
+         if (.not.(Flags%IPYSCF.eq.1.or.Flags%IPP.eq.1))then
             Call read_NoSt_molpro(NoSt,'2RDM')
          endif
       ElseIf(IDALTON.Eq.1) Then
@@ -335,6 +343,10 @@ C     SET THRESHOLD FOR QUASI-VIRTUAL ORBITALS IN CAS
       ThrQVirt  = System%ThrQVirt
 C     SET THRESHOLD FOR QUASI-INACTIVE ORBITALS IN CAS
       ThrQInact = System%ThrQInact
+      AuxData%ThrSelAct = ThrSelAct
+      AuxData%ThrQVirt = ThrQVirt
+      AuxData%ThrQInact = ThrQInact
+
 C
 C*************************************************************************
 C     READ THE INPUT AND PRINT THE INPUT DATA
@@ -343,13 +355,26 @@ C     OLD INPUT-READ
 C      Call RWInput(Title,ZNucl,Charge,NBasis)
 C
 C     CALCULATE THE DIMENSIONS
-      If(IDALTON.Eq.0.AND.IPYSCF.Eq.0) then
+      If(IDALTON.Eq.0.AND.Flags%IPP.Eq.0) then
 C        Call CheckNBa(NBasis,Title)
         Call basinfo(NBasis,'AOONEINT.mol','MOLPRO')
       endif
 
-      If(IPYSCF.Eq.1)then
-         Call basinfo_pyscf(nbasis)
+      If(Flags%IPP.Eq.1.or.IPYSCF.Eq.1)then
+         print*, ''
+         print*, 'Following OLA PP path'
+         print*, ''
+         if(Flags%IPYSCF.eq.1)then
+            Call basinfo_pyscf(nbasis)
+            print*, ''
+            print*, 'NBASIS read from PYSCF', nbasis
+            print*, ''
+         else if(Flags%IORCA.eq.1)then
+            Call basinfo_orca(nbasis)
+            print*, ''
+            print*, 'NBASIS read from FCIDUMP', nbasis
+            print*, ''
+         end if
       end if
 C
       Call DimSym(NBasis,NInte1,NInte2,MxHVec,MaxXV)
@@ -386,6 +411,10 @@ C
 C     FOR TESTS SWITCHIG IT OFF...
       If(ITwoEl.Eq.3) NInte2=1
       If(ITwoEl.Eq.2) NInte2=1
+      ! to  trzeba bedzie odkomentowac
+!      If(ITwoEl.eq.1.and.
+!     $     Flags%IORCA.eq.1.and.Flags%IPP.eq.1.
+!     $ and.Flags%SPINRES) NInte2=1
 C
       Allocate  (Occ(NBasis))
       Allocate  (URe(NBasis*NBasis))
@@ -410,18 +439,65 @@ C
       write(LOUT,'(8a10)') ('**********',i=1,8)
 C
       Call gclock('START',Tcpu,Twall)
+c      print*, 'Flags%SPINRES', Flags%SPINRES
+c      print*, 'ipp', Flags%ipp
 
-      if(IPYSCF.Eq.1) then
-         print*, 'here'
-         NoSt = 1
-         Call ReadPYSCF(THCData, AuxData, BasisSet, CAONO, 
+      if(IPYSCF.eq.1.or.Flags%IPP.eq.1)then
+         if(IPYSCF.eq.1) then
+c            if (Flags%SPINRES)then
+c               call read_PYSCF_spinres(THCData, AuxData,
+c     $              CAONO, Flags, TwoEl, IntsO)
+c            else
+            NoSt = 1
+
+
+       print*, 'this is for PYSCF'
+       call ReadPYSCF_ORCA(THCData, AuxData, CAONO, 
+     $  XKin,XNuc,ENuc,Occ,
+     $  URe,TwoEl,UMOAO,
+     $  NInte1,NBasis,NInte2,NGem,Flags, System%InSt(:,1), 1)
+
+
+            if (Flags%SPINRES)then
+            allocate(IntsO%ints2e(NInte2))
+            IntsO%ints2e = TwoEl
+            IntsO%NInte2 = NInte2
+            end if
+            if(InSt(2,1).gt.0) then
+               NoSt = System%InSt(1,1)
+            end if
+c            end if
+         else if(Flags%IORCA.Eq.1)then
+            if (Flags%SPINRES)then
+               print*, 'spinres'
+               
+               call read_ORCA_spinres(THCData, AuxData, Flags, IntsO)
+      else
+         print*, 'else'
+         if (Flags%JOBTYPE == JOB_TYPE_DUCC)then
+            print*, 'ducc'
+            call read_ORCA_ducc(THCData, AuxData, Flags, IntsO, IntsD)
+         else  if (Flags%JOBTYPE.eq.JOB_TYPE_PPERPA .or.
+     $           Flags%JOBTYPE==JOB_TYPE_AC0PP.or.
+     $           Flags%JOBTYPE==JOB_TYPE_ACPP.or.            
+     $           Flags%JOBTYPE==JOB_TYPE_PPERPA_RDMDUMP.or.
+     $           Flags%JOBTYPE==JOB_TYPE_HHERPA_RDMDUMP) then            
+            call read_ORCA(THCData, AuxData, Flags, CAONO, TwoEl)
+         else
+                print*, 'I am here - pluszon'
+          call ReadPYSCF_ORCA(THCData, AuxData, CAONO,
      $    XKin,XNuc,ENuc,Occ,
-     $        URe,TwoEl,UMOAO,
-     $        NInte1,NBasis,NInte2,NGem,Flags, System%InSt(:,1))
-         If(InSt(2,1).Gt.0) Then
-            NoSt = System%InSt(1,1)
-         End if
-      Else
+     $   URe,TwoEl,UMOAO,
+     $        NInte1,NBasis,NInte2,NGem,Flags, System%InSt(:,1), 2)
+         if(InSt(2,1).gt.0) then
+       NoSt = System%InSt(1,1)
+            end if
+
+            
+               end if 
+            end if
+         end if
+      else
 
 C
 C     LOAD THE INTEGRALS
@@ -436,8 +512,8 @@ C     temporarily set IFunSR to 6 to avoid loading integrals and their transform
       EndIf
 C
 
-      Call LdInteg(Title,BasisSet,XKin,XNuc,ENuc,Occ,URe,
-     $             TwoEl,UMOAO,NInte1,NBasis,NInte2,NGem)
+      Call LdInteg(Title, XKin,XNuc,ENuc,Occ,URe,
+     $             TwoEl,UMOAO,NInte1,NBasis,NInte2,NGem,Flags)
 C
 C     create cas_ss.molden file with NOs (useful after SA-CAS calculations to inspect 
 C     the character of NOs in a state requested in input.inp)
@@ -449,7 +525,7 @@ C     set back IFunSR to IFFSR
 C
       Else
 C
-      Call ReadDAL(BasisSet,XKin,XNuc,ENuc,Occ,URe,TwoEl,UMOAO,
+      Call ReadDAL(XKin,XNuc,ENuc,Occ,URe,TwoEl,UMOAO,
      $ NInte1,NBasis,NInte2,NGem,Flags)
 C
       EndIf
@@ -465,18 +541,31 @@ C
       Else
          select case(Input%CalcParams%JobType)
 
+         case(JOB_TYPE_PPERPA, JOB_TYPE_AC0PP, JOB_TYPE_ACPP,
+     $        JOB_TYPE_PPERPA_RDMDUMP,
+     $     JOB_TYPE_HHERPA_RDMDUMP)
+      AuxData%ThrPP = System%ThrPP
+      print*, 'hherpa'
+       call acpp_driver(THCData, AuxData, CAONO, Flags, TwoEl)
+
       case(JOB_TYPE_MP2, JOB_TYPE_SRMP2)
          IFlCore=0
          Flags%IFlCore = 0
 
-         call mp2_driver(BasisSet, THCData, AuxData, CAONO, Flags)
-c         call mp2_driver(BasisSet, URe,Occ, XKin,XNuc,ENuc,UMOAO,
-c     $        TwoEl,NBasis,NInte1,NInte2,NGem, THCData)
+         call mp2_driver(THCData, AuxData, CAONO, Flags)
+      case(JOB_TYPE_DUCC)
+       call acph_driver(THCData, AuxData, Flags, IntsO, IntsD)
       case default 
-!         IFlCore=0
-!     Flags%IFlCore = 0
-      Call DMSCF(Title,BasisSet,URe,Occ,XKin,XNuc,ENuc,UMOAO,
-     $        TwoEl,NBasis,NInte1,NInte2,NGem, THCData)
+c$$$      IFlCore=0
+c$$$      Flags%IFlCore = 0
+c$$$  call ala_CABS(THCData, AuxData, CAONO, Flags)
+         if (Flags%SPINRES)then
+
+       call acph_driver(THCData, AuxData, Flags, IntsO)
+         else
+      Call DMSCF(Flags,Title,URe,Occ,XKin,XNuc,ENuc,UMOAO,
+     $           TwoEl,NBasis,NInte1,NInte2,NGem, THCData, AuxData)
+      end if
       end select
       
       EndIf
@@ -494,6 +583,9 @@ C     Delete out-of-core integrals
          Call delfile('AOERFSORT')
          EndIf
       EndIf
+C
+C     Delete the scratch geometry file written for plain xyz input
+      Call geom_DeleteScratch()
 C
       Call free_System(System)
       Call gclock(PossibleJobType(Flags%JobType),Tcpu,Twall)

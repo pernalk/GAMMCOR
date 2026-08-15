@@ -287,6 +287,17 @@ end select
   Flags%ISERPA = 0
   Flags%IAPSG  = 0
 
+  if(Input%CalcParams%SpinRes) then
+        Flags%SPINRES = .true.
+        Flags%IPP = 1
+  end if
+  if(Input%CalcParams%ola_path) then
+        Flags%IPP = 1
+        Flags%OP = .true.
+  end if
+
+
+
   ! JobType
   select case(Input%CalcParams%JobType)
   case(JOB_TYPE_AC)
@@ -332,6 +343,17 @@ end select
      print*,'Input%CalcParams%PostCAS', Input%CalcParams%PostCAS
      print*,'Input%CalcParams%DFApp  ', Input%CalcParams%DFApp
      print*,'Flags%IFunSRKer         ', Input%CalcParams%Kernel
+     if(Input%CalcParams%SpinRes) then
+           Flags%SPINRES = .true.
+           Flags%IPP = 1
+     end if
+
+     if(Input%CalcParams%ola_path) then
+           Flags%IPP = 1
+           Flags%OP = .true.
+     end if
+
+
      ! SET sr FUNCTIONAL
      if(Input%CalcParams%DFApp==1) then
         Flags%IFunSR = 1
@@ -422,6 +444,17 @@ end select
      Flags%IFlSnd = 0
      Flags%IFlFrag1 = 1
      Flags%IFl12 = 1
+     if(Input%CalcParams%SpinRes) then
+           Flags%SPINRES = .true.
+           Flags%IPP = 1
+     end if
+     if(Input%CalcParams%ola_path) then
+           Flags%IPP = 1
+           Flags%OP = .true.
+     end if
+
+
+
 
   case(JOB_TYPE_SAPT,JOB_TYPE_SAPTOS)
      Flags%ISAPT  = 1
@@ -462,6 +495,14 @@ end select
 
   case(JOB_TYPE_NLOCCORR)
      Flags%IFunSR = 7
+
+case(JOB_TYPE_PPERPA, JOB_TYPE_AC0PP, JOB_TYPE_ACPP, JOB_TYPE_PPERPA_RDMDUMP,&
+      JOB_TYPE_HHERPA_RDMDUMP, JOB_TYPE_DUCC)
+      Flags%IPP = 1
+      Flags%OP = .true.
+        if(Input%CalcParams%SpinRes) then
+              Flags%SPINRES = .true.
+        end if
 
   end select
 
@@ -543,6 +584,7 @@ if(Flags%ISAPT.Eq.0) then
    System%EigFCI = Input%SystemInput(1)%EigFCI
    System%ThrAct = Input%SystemInput(1)%ThrAct
    System%ThrSelAct = Input%SystemInput(1)%ThrSelAct
+   System%ThrPP = Input%SystemInput(1)%ThrPP
    System%ThrVirt = Input%SystemInput(1)%ThrVirt
    System%ThrQVirt  = Input%SystemInput(1)%ThrQVirt
    System%ThrQInact = Input%SystemInput(1)%ThrQInact

@@ -341,7 +341,7 @@ end subroutine EneMCsrDFT
 
 subroutine PolarizAl(FreqOm,ECASSCF,UNOAO,XOne,URe,Occ,&
    IGem,NAct,INActive,NElecBEmb,NELE,NFreq,NBasis,NInte1,NGem,IndAux,&
-   IndN,IndX,NDimX,BasisSet,ICholesky,Max_Cn,IntIdx)
+   IndN,IndX,NDimX,ICholesky,Max_Cn,IntIdx)
 !
 ! Returns dynamic polarizability tensor for a given frequency FreqOm
 ! find C(omega) by expanding around Alpha=0 with a tolerance Eps or
@@ -354,7 +354,6 @@ integer,intent(in) :: NAct,INActive,NElecBEmb,NELE
 integer,intent(in) :: IndN(2,NDimX),IndX(NDimX),IndAux(NBasis),IGem(NBasis)
 integer,intent(in) :: IntIdx
 character(6) :: Source
-character(*) :: BasisSet
 !double precision,intent(in) :: FreqOm
 integer,intent(in) :: NFreq
 double precision,intent(in) :: FreqOm(NFreq)
@@ -384,7 +383,7 @@ ElseIf (IntIdx == 0) then
 EndIf
 
 XYZPath="./input.inp"
-!Call DipMomOTF_ao(DIpX,DIpY,DipZ,BasisSetPath,XYZPath,IUnits,'MOLPRO')
+!Call DipMomOTF_ao(DIpX,DIpY,DipZ,XYZPath,IUnits,'MOLPRO')
 !Call CompDipMomOTF(AOBasis,System,CAONO,Occ,DipX,DipY,DipZ,NBasis,NBasis)
 !stop "stop here..."
 

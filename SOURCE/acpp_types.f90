@@ -1,10 +1,13 @@
 module acpp_types
 
       use iso_fortran_env
+      use basis_definitions
 
       use types
 
+
       implicit none
+      integer, parameter :: I8 = int64
 
 
       type TAC0Block
@@ -37,7 +40,7 @@ module acpp_types
             double precision, dimension(:,:), allocatable :: Xga, Zgk
             double precision, dimension(:,:), allocatable :: Xgp, XgpErf
             integer :: ExternalOrdering
-            double precision, dimension(:), allocatable :: fij, fvw
+            double precision, dimension(:), allocatable :: fij, fvw, ftu
             double precision, dimension(:), allocatable :: eorbi, eorba
             integer :: NTHCErf, NCholErf
             double precision, dimension(:,:), allocatable :: XgaErf, ZgkErf
@@ -71,40 +74,96 @@ module acpp_types
             logical, dimension(6) :: run_inner = .false.
       end type TLoop
 
-
+      
 
       type TACppData
-            integer, dimension(:), allocatable    :: IndX_s, IndX_t
+            integer, dimension(:), allocatable    :: IndX_s, IndX_t, IndX
+            integer, dimension(:), allocatable    :: IndX_t_aa, IndX_t_bb
             integer, dimension(:,:), allocatable  :: IndN_s, IndN_t, IndN
+            integer, dimension(:,:), allocatable  :: IndN_t_aa, IndN_t_bb
             integer, dimension(:), allocatable    :: IndAux
+            integer, dimension(:, :), allocatable    :: IPair
+            integer, dimension(:), allocatable :: int_alpha
+            double precision :: alpha
             double precision, dimension(:, :), allocatable :: HNO0, HNO0_THC
+            double precision, dimension(:, :), allocatable :: CAONO_a, CAONO_b
+            double precision, dimension(:, :), allocatable :: CAONO, CMONO
+            double precision, dimension(:, :), allocatable :: HNOA
+            double precision, dimension(:), allocatable :: Eigs_s, Eigs_t, Eigs
+            double precision, dimension(:), allocatable :: Eigs_t_aa, Eigs_t_bb
+            integer, dimension(:), allocatable :: vplus_s, vplus_t
+            integer, dimension(:), allocatable :: vplus_t_aa, vplus_t_bb
+            double precision, dimension(:, :), allocatable :: Eigvec_s, Eigvec_t, Eigvec
+            double precision, dimension(:, :), allocatable :: Eigvec_t_aa, Eigvec_t_bb
             double precision, dimension(:, :, :, :), allocatable :: rdm2_pp
             double precision, dimension(:, :, :, :), allocatable :: rdm2_pm
+            double precision, dimension(:, :, :, :), allocatable :: ph_rdm2_aa
+            double precision, dimension(:, :, :, :), allocatable :: ph_rdm2_ab
+            double precision, dimension(:, :, :, :), allocatable :: rdm2_mm
+            double precision, dimension(:, :, :, :), allocatable :: rdm2_mp
+            double precision, dimension(:, :, :, :), allocatable :: rdm2_full
+            double precision, dimension(:, :, :, :), allocatable :: pp2rdm0
+            double precision, dimension(:, :), allocatable :: MxA, MxAt, MxS, MxSt
+            double precision, dimension(:, :), allocatable :: ABplus, ABmin
+            double precision, dimension(:, :), allocatable :: EigvecX
+            double precision, dimension(:, :), allocatable :: EigvX, EigvY
+            double precision, allocatable :: ABfull(:,:)
+            double precision, allocatable :: Nmetric(:,:)
+            type(TBasisAssignment) :: BasisAssign
+
+            double precision, dimension(:, :), allocatable :: rdm1_full
+            double precision, dimension(:, :), allocatable :: rdm1_p
+            double precision, dimension(:, :), allocatable :: rdm1_m
+            integer :: AAnegs, Apnegs, Amnegs
+
+
             double precision, dimension(:), allocatable :: TwoNO
             double precision, dimension(:), allocatable :: XOne
-            double precision, allocatable :: Occ(:), Occ_rohf(:)
+            double precision, allocatable :: Occ(:), Occ_rohf(:), cc(:)
+            double precision, allocatable :: n_p(:), n_m(:), n(:)
+            double precision :: W_aa_act0, W_ab_act0, W_aa0, W_ab0
             double precision :: ENuc
             double precision :: ECas
             double precision :: EROHF
+            logical :: pherpa_print = .false.
+            logical :: pperpa_print = .false.
+            integer :: Dyall = 1
+            integer :: GPF = 2
+            integer :: HType 
             integer :: general_version, version
             integer :: switch = 0
             integer :: ACType
             integer :: PYSCF = 0 
             integer :: ORCA = 0
             integer :: DALTON = 0
-            integer :: NDim, NDim_s, NDim_t
+            integer :: NDim, NDim_s, NDim_t, NDim_t_aa, NDim_t_bb 
             integer :: NBasis, NA, NI, NIA, NV, NEL
             integer, dimension(:), allocatable    :: IndMod, map
             integer, dimension(:), allocatable    :: IndAuxFirst
             integer, dimension(2) :: nst
-            integer :: true_NA, true_NI
+            integer :: true_NA, true_NI            
             integer :: NInte1, NInte2
             logical :: OnlyEnergy  = .false.
+            logical :: pptriplet = .false.
             integer :: iflmp2
             integer :: NCoreOrb
             double precision :: omega = 1.0
+            double precision :: ThrPP
+            logical :: spinsep = .true.
+            double precision :: ThrSelAct, ThrQVirt, ThrQInact
+            double precision :: E_ref_ducc
             
       end type TACppData
+
+      type TInts
+            integer :: ints1e_dim, ints2e_dim
+            integer :: NInte2
+            double precision, dimension(:, :), allocatable :: ints1e_aa, ints1e_bb
+            double precision, dimension(:, :), allocatable :: Aints1e_aa, Aints1e_bb
+            double precision, dimension(:), allocatable :: Aints2e_aa, Aints2e_ab
+            double precision, dimension(:), allocatable :: ints2e_aa, ints2e_bb, ints2e_ab
+            double precision, dimension(:), allocatable :: ints2e
+      end type TInts
 
 
       type TRdmData
@@ -258,6 +317,102 @@ contains
           this_mem = this_mem*togb
           write(*, '(A25, A1, F30.20)') name, ',', this_mem
     end subroutine CalcMem4
+
+
+      !    integer(8) function gmap(p, q, r, s)                                                               
+      !       integer, external :: naddr3                                                                  
+      !       integer, intent(in) :: p, q, r, s                                                            
+
+      !       gmap = naddr3(p, q, r, s)                                                                    
+      ! end function gmap           
+
+    integer(I8) function gmap(p, q, r, s) result(idx)
+        implicit none
+        integer, intent(in) :: p, q, r, s
+        integer(I8) :: ip, iq, ir, is
+        integer(I8) :: ij, kl
+
+        ip = int(p, I8)
+        iq = int(q, I8)
+        ir = int(r, I8)
+        is = int(s, I8)
+
+        ij = max(ip, iq) * (max(ip, iq) - 1_I8) / 2_I8 + min(ip, iq)
+        kl = max(ir, is) * (max(ir, is) - 1_I8) / 2_I8 + min(ir, is)
+
+        idx = max(ij, kl) * (max(ij, kl) - 1_I8) / 2_I8 + min(ij, kl)
+    end function gmap    
+
+
+    integer(I8) function gmap_4fold(p,q,r,s,nbasis) result(idx)
+          implicit none
+          integer, intent(in) :: p,q,r,s,nbasis
+          integer(I8) :: ip,iq,ir,is, nb
+          integer(I8) :: a1,b1,a2,b2, a,b, c, d
+
+          ip = int(p,I8); iq = int(q,I8); ir = int(r,I8); is = int(s,I8)
+          nb = int(nbasis,I8)
+
+          a1 = ip + (iq-1_I8)*nb
+          b1 = ir + (is-1_I8)*nb
+
+          a = min(a1,b1)
+          b = max(a1,b1)
+
+          a2 = iq + (ip-1_I8)*nb  
+          b2 = is + (ir-1_I8)*nb  
+
+          c = min(a2,b2)
+          d = max(a2,b2)
+          
+          if ( (c < a) .or. (c == a .and. d < b) ) then
+                a = c
+                b = d
+          end if
+
+          idx = b*(b-1_I8)/2_I8 + a
+    end function gmap_4fold
+
+       function erdm_ppx(rdm2, n, p, q, r, s, IAux, NI)
+            double precision :: erdm_ppx
+            double precision, dimension(:,:,:,:), intent(in) :: rdm2
+            double precision, dimension(:), intent(in) :: n
+            integer, dimension(:), intent(in) :: IAux
+            integer, intent(in) :: NI
+            integer, intent(in) :: s, p, q, r
+
+            if(IAux(p)==1.and.IAux(q)==1.and.IAux(r)==1.and.IAux(s)==1)then
+                  erdm_ppx = rdm2(p - NI, q - NI, r - NI, s - NI)
+            else
+                  erdm_ppx = 0.d+0
+                  if (p==r.and.q==s)then
+                        erdm_ppx = erdm_ppx + n(p) * n(q)
+                  end if
+                  if (p==s.and.q==r)then
+                        erdm_ppx = erdm_ppx - n(p) * n(q)
+                  end if
+            end if
+
+      end function erdm_ppx
+
+      function erdm_pmx(rdm2, n_p, n_m, p, q, r, s, IAux, NI)
+            double precision :: erdm_pmx
+            double precision, dimension(:,:,:,:), intent(in) :: rdm2
+            double precision, dimension(:), intent(in) :: n_p, n_m
+            integer, dimension(:), intent(in) :: IAux
+            integer, intent(in) :: NI
+            integer, intent(in) :: s, p, q, r
+
+            if(IAux(p)==1.and.IAux(q)==1.and.IAux(r)==1.and.IAux(s)==1)then
+                  erdm_pmx = rdm2(p - NI, q - NI, r - NI, s - NI)
+            else
+                  erdm_pmx = 0.d+0
+                  if (p==r.and.q==s)then
+                        erdm_pmx = erdm_pmx + n_p(p) * n_m(q)
+                  end if
+            end if
+
+      end function erdm_pmx
 
 
 

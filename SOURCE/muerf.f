@@ -1,6 +1,6 @@
 *Deck DBBSCH
-      Subroutine AC_CBSH(ETot,ENuc,URe,Occ,XOne,UNOAO,
-     $           BasisSet,NBasis,NInte1,NGem,IndAux,IndN,IndX,NDimX,
+      Subroutine AC_CBSH(Flags,ETot,ENuc,URe,Occ,XOne,UNOAO,
+     $           NBasis,NInte1,NGem,IndAux,IndN,IndX,NDimX,
      $           THCData)
 C
 C     Compute the CBS[H] correction
@@ -10,13 +10,14 @@ C     CBS[DFT] correction [E. Giner et al. 2018] is a byproduct
 C
       use ab0fofo
       use timing
+      use types
       use acpp_types
 C
       Implicit Real*8 (A-H,O-Z)
 
       include 'commons.inc'
 
-      character(*)       :: BasisSet
+      type(FlagsData), intent(in) :: Flags
       integer,intent(in) :: NBasis,NInte1
       integer,intent(in) :: NGem,NDimX
       integer,intent(in) :: IndAux(NBasis)
@@ -45,8 +46,7 @@ C
 ! analysis of AC
       double precision :: ECorrIJ(6,6)
 C
-      Parameter(Zero=0.D0,Half=0.5D0,One=1.D0,Two=2.D0)
-      Parameter(toeV=27.21138386d0)
+      Parameter(Half=0.5D0)
 C
       double precision :: Tcpu,Twall
 
@@ -60,8 +60,8 @@ c     set rdmfile
       ElseIf (IDBBSC.eq.1.and.ITwoEl.eq.3.and.ICholesky.ne.0) Then
 C
       print*, '0 calling loc_mu_cbs_chol from DBBSC...', Monomer
-      Call LOC_MU_CBS_CHOL(XMuMat,ECorrMD,AvMU,UNOAO,Occ,
-     $                     RdmFile,BasisSet,NBasis,.false.)
+      Call LOC_MU_CBS_CHOL(Flags,XMuMat,ECorrMD,AvMU,UNOAO,Occ,
+     $                     RdmFile,NBasis,.false.)
 
       Call AC0CAS_FOFO(ECorr,ECASSCF,Occ,UNOAO,URe,XOne,ABPLUS,ABMIN,
      $ IndN,IndX,IGem,NAcCAS,NInAcCAS,NElecBEmb,
@@ -80,8 +80,8 @@ C
 C
 C     Compute local mu(r): XMuMat(p,q) = <p|mu(r)|q>
       print*, '1 calling loc_mu_cbs_chol from DBBSC...', Monomer
-      Call LOC_MU_CBS_CHOL(XMuMat,CorrMD,AvMU,UNOAO,Occ,
-     $                     rdmfile,BasisSet,NBasis,.false.)
+      Call LOC_MU_CBS_CHOL(Flags,XMuMat,CorrMD,AvMU,UNOAO,Occ,
+     $                     rdmfile,NBasis,.false.)
 c     Print*, 'LOC_MU_CBS_CHOL: XMuMat = ',norm2(XMuMat)
 C
 C     ... test : recover AC0!
@@ -127,7 +127,7 @@ C
      $ " *** ERPA-CBS[H]-CAS Excitation Energies (a.u., eV) *** ")')
       Call SortEig(1,Eig,ABPLUS,EigVecR,NDimX)
       Do I=1,10
-      Write(6,'(I4,4X,2E16.6)') I,Eig(I),toeV*Eig(I)
+      Write(6,'(I4,4X,2E16.6)') I,Eig(I),toeV(Eig(I))
       EndDo
       Call ACEneERPA_FOFO(ECorr,ECorrIJ,EigVecR,Eig,Occ,
      $ IGem,IndN,IndX,NAcCAS+NInAcCAS,
@@ -189,10 +189,11 @@ c      Print*, 'ECorr = ', ECorr
 C *End Subroutine AC_CBSH
 
 *Deck LOC_MU_CBS_CHOL
-      Subroutine LOC_MU_CBS_CHOL(XMuMat,CorrMD,AvMU,
-     $                           UNOAO,Occ,Rdm2File,BasisSet,NBasis,
+      Subroutine LOC_MU_CBS_CHOL(Flags,XMuMat,CorrMD,AvMU,
+     $                           UNOAO,Occ,Rdm2File,NBasis,
      $                           DiskSav)
 C
+      use types
       use read_external
       use grid_internal
       use sapt_files
@@ -215,10 +216,11 @@ C    $ Four=4.D0)
 C
       Include 'commons.inc'
 C
+      type(FlagsData), intent(in) :: Flags
       Dimension UNOAO(NBasis,NBasis),Occ(NBasis),OccS(NBasis)
       Real*8 :: XMuMat(NBasis,NBasis)
       Logical :: DiskSav
-      Character(*) :: Rdm2File,BasisSet
+      Character(*) :: Rdm2File
 C
       Real*8 :: URe(NBasis,NBasis)
       Real*8 :: UNOSAO(NBasis,NBasis)
@@ -335,7 +337,7 @@ C
          Allocate(Work(NBasis,NBasis))
          Work = transpose(UNOAO)
          print*, 'igridtype', igridtype, ngrid, nbasis
-         Call internal_gga_no_orbgrid(IGridType,BasisSet,
+         Call internal_gga_no_orbgrid(Flags,IGridType,
      $                          IOrbOrder,Work,
      $                          WGrid,PhiGGA,NGrid,NBasis,NBasis,IUnits)
          OrbGrid  => PhiGGA(:,:,1)
@@ -985,7 +987,7 @@ C
 *Deck LOC_MU_CBS_AB
       Subroutine LOC_MU_CBS_AB(XMuA,XMuB,AvMU,
      $                        UA,UB,NOccupA,OccA,NOccupB,OccB,
-     $                        LA,LB,IGridType,BasisSet,NCholesky,NBasis)
+     $                        LA,LB,IGridType,NCholesky,NBasis)
 C
 C   compute mu(r) for noninteractig dimer
 C   used in SAPT with CBS[H]
@@ -1008,7 +1010,6 @@ C
       real(8),intent(in) :: LB(NCholesky,NOccupB*NBasis)
       real(8),intent(in) :: OccA(NOccupA),OccB(NOccupB)
       real(8),intent(out):: XMuA(NBasis,NBasis),XMuB(NBasis,NBasis)
-      Character(*) :: BasisSet
 
 C     LOCAL
 C

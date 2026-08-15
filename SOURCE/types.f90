@@ -1,8 +1,10 @@
 module types
 ! written by M. Hapka, M. Modrzejewski,
+!            A. Tucholska      
 !            K. Pernal
 
 use print_units
+use basis_definitions, only: TBasisAssignment
 
 integer, parameter :: INTER_TYPE_DAL  = 1
 integer, parameter :: INTER_TYPE_MOL  = 2
@@ -36,6 +38,13 @@ integer, parameter :: JOB_TYPE_MP2         = 19
 integer, parameter :: JOB_TYPE_SRMP2       = 20
 integer, parameter :: JOB_TYPE_SAPTOS      = 21
 integer, parameter :: JOB_TYPE_MSAC0       = 22
+integer, parameter :: JOB_TYPE_PPERPA     = 23
+integer, parameter :: JOB_TYPE_AC0PP     = 24
+integer, parameter :: JOB_TYPE_PPERPA_RDMDUMP     = 25
+integer, parameter :: JOB_TYPE_DUCC     = 26
+integer, parameter :: JOB_TYPE_HHERPA_RDMDUMP     = 27
+integer, parameter :: JOB_TYPE_ACPP     = 28
+
 
 integer, parameter :: SAPTLEVEL0 = 0
 integer, parameter :: SAPTLEVEL1 = 1
@@ -107,11 +116,12 @@ character(*),parameter :: PossibleInterface(5) = &
 [character(8) :: &
 'DALTON', 'MOLPRO', 'OWN', 'ORCA', 'PYSCF']
 
-character(*),parameter :: PossibleJobType(22) = &
+character(*),parameter :: PossibleJobType(28) = &
 [character(9) :: &
 'AC', 'AC0', 'ERPA', 'EERPA', 'SAPT', 'PDFT', 'CASPiDFT','CASPiDFTOpt','EERPA-1', & 
 'AC0D', 'AC0DNOSYMM', 'NLOCCORR', 'AC0DP', 'ACFREQ','ACFREQNTH','AC1FREQNTH', &
-'RESPONSE','SRAC0', 'MP2', 'SRMP2', 'SAPT-OS','MSAC0']
+'RESPONSE','SRAC0', 'MP2', 'SRMP2', 'SAPT-OS','MSAC0', &
+ 'PPERPA', 'AC0PP', 'PPERPADMP', 'DUCC', 'HHERPADMP', 'ACPP']
 
 character(*),parameter :: PossibleRDMType(7) = &
 [character(8) :: &
@@ -168,6 +178,8 @@ character(*),parameter :: PossibleUnits(2) = &
          logical :: Restart    = FLAG_RESTART
          logical :: Triplet    = FLAG_TRIPLET
          logical :: PostCAS    = FLAG_POSTCAS
+         logical :: SpinRes    = .false.
+         logical :: ola_path    = .false.
          integer :: IPrint     = 0
          double precision :: RPAThresh  = 1.0D-6
          double precision :: ThreshVirt = 1.0D-6
@@ -275,6 +287,8 @@ type SystemBlock
       double precision :: ThrQVirt  = 1.d-7
       ! ThrQInact for quasi-inactive orbs (0.9998...)
       double precision :: ThrQInact = 1.d-4
+      ! ThrPP for pp pairs
+      double precision :: ThrPP = 1.d-8
 
       double precision :: esrDFT(3) ! srDFT xc energy
 
@@ -394,6 +408,7 @@ type FlagsData
      integer :: ICholeskyAccu = CHOL_ACCU_DEFAULT
      double precision :: DCholeskyThr = -1.e0
      double precision :: DTHCThr = -1.e0
+     type(TBasisAssignment) :: BasisAssign
 
      integer :: IGridType = GRID_PARAMS_MEDIUM
      integer :: IUnits = UNITS_ANGSTROM
@@ -418,6 +433,7 @@ type FlagsData
      integer :: ISERPA  = 0 ! ERPA response
      integer :: ITrpl   = 0
      integer :: ISAPT   = 0
+     integer :: IPP     = 0
      integer :: IUHF    = 0
      integer :: IUKS    = 0
      integer :: ISAPTOS = 0
@@ -450,12 +466,15 @@ type FlagsData
      ! sapt_utils.f90
      integer :: DIISN  = 6
      integer :: DIISOn = 2
+     logical :: SPINRES = .false.
+     logical :: OP = .false.
 
 end type FlagsData
 
 type InputData
 
      type(CalculationBlock) :: CalcParams
+     type(TBasisAssignment) :: BasisAssign
      type(CholeskyBlock)    :: CholeskyParams
      type(SystemBlock),allocatable :: SystemInput(:)
      integer :: iflag = 0

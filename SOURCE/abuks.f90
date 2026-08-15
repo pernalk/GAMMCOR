@@ -2,6 +2,8 @@ module abuksfofo
 
 use print_units
 use gammcor_integrals
+use types
+use geom_input
 
 implicit none
 
@@ -302,14 +304,16 @@ deallocate(ints,work)
 
 end subroutine JK_UKS_AlfaBeta
 
-subroutine AB_UKS_KER(ABPLUS,Ca,Cb,Ena,Enb,IndNa,IndNb,xfac, &
-                      noa,nva,nob,nvb,NDimX,NAO,Units,GridType,ExternalOrdering,BasisSetPath)
+subroutine AB_UKS_KER(Flags,ABPLUS,Ca,Cb,Ena,Enb,IndNa,IndNb,xfac, &
+                      noa,nva,nob,nvb,NDimX,NAO,Units,GridType,ExternalOrdering)
 !
 ! obtain ALDA kernel
 !   GridType = 0 (Molpro)
 !   GridType = 1 (Internal)
 !
 implicit none
+
+type(FlagsData), intent(in) :: Flags
 
 integer,intent(in) :: Units,GridType
 integer,intent(in) :: ExternalOrdering
@@ -319,7 +323,7 @@ integer, intent(in) :: IndNa(2,noa*nva),IndNb(2,nob*nvb)
 real(8),intent(in) :: xfac
 real(8),intent(in) :: Ca(NAO,NAO),Cb(NAO,NAO)
 real(8),intent(in) :: Ena(NAO),Enb(NAO)
-character(*) :: BasisSetPath
+
 
 real(8),intent(inout) :: ABPLUS(NDimX,NDimX)
 
@@ -332,9 +336,9 @@ case (5) ! Molpro Grid
    call AB_UKS_KER_EXTGrid(ABPLUS,Ca,Cb,Ena,Enb,IndNa,IndNb,xfac, &
                            noa,nva,nob,nvb,NDimX,NAO)
 case (1,2,3,4) ! Internal Grid
-   call AB_UKS_KER_INTGrid(ABPLUS,Ca,Cb,Ena,Enb,IndNa,IndNb,xfac, &
+   call AB_UKS_KER_INTGrid(Flags,ABPLUS,Ca,Cb,Ena,Enb,IndNa,IndNb,xfac, &
                            noa,nva,nob,nvb,NDimX,NAO,Units,&
-                           GridType,ExternalOrdering,BasisSetPath)
+                           GridType,ExternalOrdering)
 case default
    write(6,*) "Error: Invalid Grid Type = ", GridType
    stop "in AB_UKS_KER"
@@ -350,10 +354,12 @@ end select
 
 end subroutine AB_UKS_KER
 
-subroutine AB_UKS_KER_INTGrid(ABPLUS,Ca,Cb,Ena,Enb,IndNa,IndNb,xfac, &
+subroutine AB_UKS_KER_INTGrid(Flags,ABPLUS,Ca,Cb,Ena,Enb,IndNa,IndNb,xfac, &
                               noa,nva,nob,nvb,NDimX,NAO,&
-                              Units,GridType,ExternalOrdering,BasisSetPath)
+                              Units,GridType,ExternalOrdering)
 implicit none
+
+type(FlagsData), intent(in) :: Flags
 
 type(TAOBasis)  :: AOBasis
 type(TSystem)   :: System
@@ -367,7 +373,6 @@ integer, intent(in) :: IndNa(2,noa*nva),IndNb(2,nob*nvb)
 real(8),intent(in) :: xfac
 real(8),intent(in) :: Ca(NAO,NAO),Cb(NAO,NAO)
 real(8),intent(in) :: Ena(NAO),Enb(NAO)
-character(*) :: BasisSetPath
 
 real(8),intent(inout) :: ABPLUS(NDimX,NDimX)
 
@@ -377,12 +382,9 @@ integer :: nvoa,nvob
 ! grid
 integer :: NAOt
 integer :: NGrid
-character(:), allocatable :: XYZPath
 real(8), dimension(:), allocatable :: Xg, Yg, Zg
 real(8), dimension(:), allocatable :: Wg
 logical :: SortAngularMomenta
-logical, parameter :: SpherAO = .true.
-
 integer :: offset, batchlen
 integer :: nbatches
 !integer,parameter :: maxlen = 7000
@@ -410,13 +412,9 @@ print*, 'Units =', Units
 print*, 'Orb Ordering =', ExternalOrdering
 write(LOUT,'(/,1x,a)') "Internal GRID"
 
-call auto2e_init()
-
-XYZPath = "./input.inp"
 SortAngularMomenta = .true.
+call geom_ReadSystemBasis(System, AOBasis, Flags, SortAngularMomenta, Units)
 
-call sys_Read_XYZ(System, XYZPath, Units)
-call basis_NewAOBasis(AOBasis, System, BasisSetPath, SpherAO, SortAngularMomenta)
 if (AOBasis%SpherAO) then
       NAOt = AOBasis%NAOSpher
 else

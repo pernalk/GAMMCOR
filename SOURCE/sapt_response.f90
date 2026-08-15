@@ -1782,7 +1782,7 @@ type(EblockData) :: A0blockIV
 type(EblockData),allocatable :: A0block(:)
 
 character(8) :: label
-character(:),allocatable :: BasisSetPath
+
 character(:),allocatable :: onefile,aoerfile,aosrfile, &
                             twokfile,twojerf,twokerf,  &
                             propfile,propfile0,propfile1,xy0file,rdmfile, &
@@ -1950,12 +1950,11 @@ elseif (InternalGrid == 1) then
    if (Flags%IFunSR == 1) doGGA = .false.
    if (Flags%IFunSR == 2) doGGA = .true.
 
-   BasisSetPath = Flags%BasisSetPath // Flags%BasisSet
 
    if(doGGA) then
       write(lout,'(/1x,a)') 'INTERNAL GRID GGA'
 
-      call internal_gga_no_orbgrid(Flags%IGridType,BasisSetPath,Flags%ORBITAL_ORDERING,CAONO,&
+      call internal_gga_no_orbgrid(Flags,Flags%IGridType,Flags%ORBITAL_ORDERING,CAONO,&
                                    WGrid,PhiGGA,NGrid,NAO,NBasis,Flags%IUnits)
       OrbGrid  => PhiGGA(:,:,1)
       OrbXGrid => PhiGGA(:,:,2)
@@ -1965,7 +1964,7 @@ elseif (InternalGrid == 1) then
    else
       write(lout,'(/1x,a)') 'INTERNAL GRID LDA'
 
-      call internal_lda_no_orbgrid(Flags%IGridType,BasisSetPath,Flags%ORBITAL_ORDERING,CAONO,&
+      call internal_lda_no_orbgrid(Flags,Flags%IGridType,Flags%ORBITAL_ORDERING,CAONO,&
                                    WGrid,PhiLDA,NGrid,NAO,NBasis,Flags%IUnits)
       OrbGrid  => PhiLDA
       OrbXGrid => PhiLDA
@@ -2242,7 +2241,7 @@ character(:),allocatable :: abfile
 character(:),allocatable :: propfile
 character(:),allocatable :: twojfileaa,twojfilebb
 character(:),allocatable :: twokfileaa,twokfilebb,twokfileab
-character(:),allocatable :: BasisSetPath
+
 
 integer :: iskipped
 double precision, parameter :: SmallE=1.D-3,BigE=1.D8
@@ -2287,11 +2286,11 @@ call AB_UKS_FOFO(ABPlus,ABMin,Mon%NOa,Mon%NVa,Mon%NOb,Mon%NVb,NDimX,NBasis, &
 if (Flags%InternalGrid == 0) Flags%IGridType = 5
 if (xfac.ne.1d0) then
    print*, " Units = ", Flags%Iunits
-   BasisSetPath = Flags%BasisSetPath // Flags%BasisSet
-   call AB_UKS_KER(ABPlus,Mon%UMO(:,:,1),Mon%UMO(:,:,2),Mon%UOrbE(:,1),Mon%UOrbE(:,2), &
+
+   call AB_UKS_KER(Flags,ABPlus,Mon%UMO(:,:,1),Mon%UMO(:,:,2),Mon%UOrbE(:,1),Mon%UOrbE(:,2), &
                    Mon%IndNa,Mon%IndNb,xfac, &
                    Mon%NOa,Mon%NVa,Mon%NOb,Mon%NVb,NDimX,NBasis, &
-                   Flags%IUnits,Flags%IGridType,Flags%ORBITAL_ORDERING,BasisSetPath)
+                   Flags%IUnits,Flags%IGridType,Flags%ORBITAL_ORDERING)
 endif
 
 open(newunit=iunit,file=abfile,form='unformatted')

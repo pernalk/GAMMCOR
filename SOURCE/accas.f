@@ -1,8 +1,8 @@
 *Deck ACCAS
-      Subroutine ACCAS(ETot,ENuc,TwoNO,URe,UNOAO,Occ,XOne,
-     $  Title,BasisSet,NBasis,NInte1,NInte2,NGem, THCData)
+      Subroutine ACCAS(Flags,ETot,ENuc,TwoNO,URe,UNOAO,Occ,XOne,
+     $  Title,NBasis,NInte1,NInte2,NGem, THCData, AuxData)
 C
-c     use types
+      use types
       use print_units
       use timing
       use read_external
@@ -17,9 +17,11 @@ C
       Implicit Real*8 (A-H,O-Z)
 C
       Character*60 FMultTab,Title
-      Character(*) :: BasisSet
+
       type(TTHCData), intent(in) :: THCData
+      type(TACppData), intent(in) :: AuxData
       Include 'commons.inc'
+      type(FlagsData), intent(in) :: Flags
 c
       Parameter(Half=0.5D0)
 c     Parameter(Zero=0.D0,Half=0.5D0,One=1.D0,Two=2.D0)
@@ -40,7 +42,7 @@ C
 C     START TIMING FOR AC PROCEDURES
 C
       call gclock('START',Tcpu,Twall)
-      If (ICholeskyOTF==1) Write(6,'(1x," BasisSet = ", A)') BasisSet
+c      If (ICholeskyOTF==1) Write(6,'(1x," BasisSet = ", A)') Flags%BasisSet
 
 c      NoEig=1
 c      NDimFull=NBasis*(NBasis-1)/2
@@ -176,7 +178,7 @@ C
      $   IGem,NAcCAS,NInAcCAS,NElecBEmb,NELE,NFreqOm,
      $   NBasis,NInte1,NGem,IndAux,
      $   IndN,IndX,NDimX,
-     $   BasisSet,ICholesky,Max_Cn,IntIdx)
+     $   ICholesky,Max_Cn,IntIdx)
       EndIf
 C
       Return
@@ -224,8 +226,8 @@ C
 C
 C this is a version of AC0 with CBS basis set corrections (SR integrals are required)
 C
-      Call AC_CBSH(ETot,ENuc,URe,Occ,XOne,UNOAO,
-     $   BasisSet,NBasis,NInte1,NGem,IndAux,IndN,IndX,NDimX,THCData)
+      Call AC_CBSH(Flags,ETot,ENuc,URe,Occ,XOne,UNOAO,
+     $   NBasis,NInte1,NGem,IndAux,IndN,IndX,NDimX,THCData)
 
       Call delfile('cholvecs')
       Call delfile('cholvErf')
@@ -248,7 +250,7 @@ c      If(ITwoEl.eq.1) then
 c      Call LOC_MU_CBS(XMuMAT,URe,UNOAO,Occ,TwoNO,NBasis,NInte2)
 c      stop
 
-      Call LOC_MU_CHOL(BasisSet,CorrMD,AvMU,URe,UNOAO,Occ,NBasis)
+      Call LOC_MU_CHOL(Flags,CorrMD,AvMU,URe,UNOAO,Occ,NBasis)
       Call delfile('cholvecs') ! delete cholesky vecs
       call gclock('LOC_MU_CHOL_v2',Tcpu,Twall)
       EndIf
@@ -261,13 +263,14 @@ C
 C
       ElseIf(IFunSR.Eq.3) Then
 C
-      Call RunDFOnTop(BasisSet,ETot,ENuc,TwoNO,URe,UNOAO,Occ,XOne,
+      Call RunDFOnTop(Flags, ETot,ENuc,TwoNO,URe,UNOAO,Occ,XOne,
      $  IndAux,IPair,IndN,IndX,NDimX,Title,NBasis,NInte1,NInte2,NGem)
 C
       Else
 C
-      Call RunACCASLR(BasisSet,ETot,ENuc,TwoNO,URe,UNOAO,Occ,XOne,
-     $  IndAux,IPair,IndN,IndX,NDimX,Title,NBasis,NInte1,NInte2,NGem)
+      Call RunACCASLR(Flags,ETot,ENuc,TwoNO,URe,UNOAO,Occ,XOne,
+     $ IndAux,IPair,IndN,IndX,NDimX,Title,NBasis,NInte1,NInte2,
+     $ NGem, AuxData)
 C
       call gclock('ACLR model',Tcpu,Twall)
 C
@@ -275,7 +278,7 @@ C     Corr,md correlation energy with local mu, requires Cholesky vecs
 C
       If (IFlCorrMD.Eq.1) Then
 c     If (ICholesky==0) Stop "Run SRAC0 with Cholesky!"
-      Call LOC_MU_CHOL(CorrMD,AvMU,URe,UNOAO,Occ,NBasis,0)
+      Call LOC_MU_CHOL(Flags,CorrMD,AvMU,URe,UNOAO,Occ,NBasis)
       Call delfile('cholvecs')
       call gclock('LOC_MU_CHOL_v2',Tcpu,Twall)
       EndIf
@@ -729,8 +732,10 @@ C
       End
 
 * Deck RunACCASLR
-      Subroutine RunACCASLR(BasisSet,ETot,ENuc,TwoNO,URe,UNOAO,Occ,XOne,
-     $  IndAux,IPair,IndN,IndX,NDimX,Title,NBasis,NInte1,NInte2,NGem)
+      Subroutine RunACCASLR(Flags,ETot,ENuc,TwoNO,URe,UNOAO, 
+     $     Occ,XOne,
+     $     IndAux,IPair,IndN,IndX,NDimX,Title,NBasis,NInte1,NInte2,
+     $ NGem, AuxData)
 C
       use sorter
       use abmat
@@ -739,12 +744,14 @@ C
       use read_external
       use grid_internal
       use timing
+      use acpp_types
 C
       Implicit Real*8 (A-H,O-Z)
 C
       Character*60 FMultTab,Title
-      Character(*) :: BasisSet
       Include 'commons.inc'
+      type(FlagsData), intent(in) :: Flags
+      type(TACppData), intent(in) :: AuxData
 C
       Character*60 FName
       Real*8, Dimension(:), Allocatable :: TwoEl2
@@ -907,7 +914,7 @@ c     Write(6,'(1x,a,i3)') 'InternalGrid =',InternalGrid
 C
       If (doGGA) Then
          Write(LOUT,'(/1x,a)') 'INTERNAL GRID GGA'
-         Call internal_gga_no_orbgrid(IGridType,BasisSet,
+         Call internal_gga_no_orbgrid(Flags,IGridType,
      $                          IOrbOrder,UAux,
      $                          WGrid,PhiGGA,NGrid,NBasis,NBasis,IUnits)
          OrbGrid  => PhiGGA(:,:,1)
@@ -916,7 +923,7 @@ C
          OrbZGrid => PhiGGA(:,:,4)
       ElseIf(.not.doGGA) Then
          Write(LOUT,'(/1x,a)') 'INTERNAL GRID LDA'
-         Call internal_lda_no_orbgrid(IGridType,BasisSet,
+         Call internal_lda_no_orbgrid(Flags,IGridType,
      $                          IOrbOrder,UAux,
      $                          WGrid,PhiLDA,NGrid,NBasis,NBasis,IUnits)
          OrbGrid  => PhiLDA
@@ -1206,7 +1213,7 @@ C KP 29.11.2025
           Inquire(file='RHOS.dat',exist=iexs) 
           If(iexs) Then
           Call SR_PBE_SPIN(EXCSPIN,URe,UNOAO,Occ,OrbGrid,OrbXGrid,
-     $    OrbYGrid,OrbZGrid,WGrid,NGrid,NInte1,NBasis)
+     $    OrbYGrid,OrbZGrid,WGrid,NGrid,NInte1,NBasis, AuxData)
           Write(6,'(/," SR_xc_PBE with spin densities",F15.8,/)')
      $    EXCSPIN
           EndIf
@@ -1356,7 +1363,7 @@ C
      $ (6,'(1X,''lrCASSCF+srDF[OnTop]+ENuc, lrAC0-Corr,Total'',3F15.8)')
      $ ECASSCF-XVSR+Del+ENuc,ECorr,ECASSCF-XVSR+Del+ENuc+ECorr
 C KP 29.11.2025
-      If(iexs) Write
+      If(iexs.or.AuxData%PYSCF.eq.1) Write
      $ (6,'(1X,''lrCASSCF+srDF[RhoC,RhoS]+ENuc, lrAC0-Corr,
      $ Total'',3F15.8)')
      $ ECASSCF-XVSR+EnHSR+EXCSPIN+ENuc,ECorr,
@@ -3544,15 +3551,17 @@ C
 c KP 29.11
 *Deck SR_PBE_SPIN  
       Subroutine SR_PBE_SPIN(EXCSPIN,URe,UNOAO,Occ,OrbGrid,OrbXGrid,
-     $ OrbYGrid,OrbZGrid,WGrid,NGrid,NInte1,NBasis)
+     $     OrbYGrid,OrbZGrid,WGrid,NGrid,NInte1,NBasis, AuxData)
+      use acpp_types
 C
 C     RETURNS A SR-PBE XC ENERGY COMPUTED WITH SPIN-FUNCTIONAL (USING SPIN AND CHARGE DENSITIES)
 C
       Implicit Real*8 (A-H,O-Z)
 C
-      Parameter(Zero=0.D0, Half=0.5D0, One=1.D0, Two=2.D0, Four=4.D0)
+      Parameter(Half=0.5D0)
 C
-      Include 'commons.inc' 
+      Include 'commons.inc'
+      type(TACppData), intent(in) :: AuxData
       Dimension URe(NBasis,NBasis),UNOAO(NBasis,NBasis),
      $ Occ(NBasis),
      $ Ind1(NBasis),Ind2(NBasis),
@@ -3817,7 +3826,7 @@ C
       End
 
 *Deck RunDFOnTop
-      Subroutine RunDFOnTop(BasisSet,ETot,ENuc,TwoNO,URe,UNOAO,Occ,XOne,
+      Subroutine RunDFOnTop(Flags, ETot,ENuc,TwoNO,URe,UNOAO,Occ,XOne,
      $  IndAux,IPair,IndN,IndX,NDimX,Title,NBasis,NInte1,NInte2,NGem)
 C
 C     ETot is calculated from MC-PDFT
@@ -3830,10 +3839,10 @@ C
       Implicit Real*8 (A-H,O-Z)
 C
       Character*60 FMultTab,Title
-      Character(*) :: BasisSet
       Include 'commons.inc'
 C
       Character*60 FName
+      type(FlagsData), intent(in) :: Flags
 c     Real*8, Dimension(:), Allocatable :: OrbGrid
 c     Real*8, Dimension(:), Allocatable :: OrbXGrid
 c     Real*8, Dimension(:), Allocatable :: OrbYGrid
@@ -3983,7 +3992,7 @@ C
       UAux=transpose(UNOAO)
       If (doGGA) Then
          Write(LOUT,'(/1x,a)') 'INTERNAL GRID GGA'
-         Call internal_gga_no_orbgrid(IGridType,BasisSet,
+         Call internal_gga_no_orbgrid(Flags,IGridType,
      $                          IOrbOrder,UAux,
      $                          WGrid,PhiGGA,NGrid,NBasis,NBasis,IUnits)
          OrbGrid  => PhiGGA(:,:,1)
@@ -3992,7 +4001,7 @@ C
          OrbZGrid => PhiGGA(:,:,4)
       ElseIf(.not.doGGA) Then
          Write(LOUT,'(/1x,a)') 'INTERNAL GRID LDA'
-         Call internal_lda_no_orbgrid(IGridType,BasisSet,
+         Call internal_lda_no_orbgrid(Flags,IGridType,
      $                          IOrbOrder,UAux,
      $                          WGrid,PhiLDA,NGrid,NBasis,NBasis,IUnits)
          OrbGrid  => PhiLDA
@@ -4219,7 +4228,7 @@ C
       End
 
 *Deck LOC_MU_CHOL_v2
-      Subroutine LOC_MU_CHOL(BasisSet,CorrMD,AvMU,
+      Subroutine LOC_MU_CHOL(Flags,CorrMD,AvMU,
      $                          URe,UNOAO,Occ,NBasis)
 C
       use timing
@@ -4240,8 +4249,8 @@ C
 c     Parameter(Zero=0.D0, Half=0.5D0, One=1.D0, Two=2.D0, Three=3.0D0,
 c    $ Four=4.D0)
 C
-      Character(*) :: BasisSet
       Include 'commons.inc'
+      type(FlagsData), intent(in) :: Flags
 C
       Dimension URe(NBasis,NBasis),UNOAO(NBasis,NBasis),Occ(NBasis)
 C
@@ -4324,7 +4333,7 @@ C
 !         Endif
          Allocate(Work(NBasis,NBasis))
          Work = transpose(UNOAO)
-         Call internal_gga_no_orbgrid(IGridType,BasisSet,
+         Call internal_gga_no_orbgrid(Flags,IGridType,
      $                          IOrbOrder,Work,
 !    $                          IOrbOrder,transpose(UNOAO),
      $                          WGrid,PhiGGA,NGrid,NBasis,NBasis,IUnits)
