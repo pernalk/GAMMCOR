@@ -51,7 +51,7 @@ extension, e.g. `cc-pvqz.txt`).
 |----------|---------|---------|
 | `*` | default basis for **every** atom | `* cc-pvdz.txt` |
 | element symbol | all atoms of that element | `Fe cc-pvqz.txt` |
-| atom number | one specific atom (line number in `xyz`, counting from 1) | `10 cc-pvtz.txt` |
+| atom number | one specific atom (atom number in `xyz`, counting from 1) | `10 cc-pvtz.txt` |
 | atom range | consecutive atoms `n-m` | `6-10 cc-pvtz.txt` |
 
 ### Priority
@@ -107,7 +107,7 @@ BasisAssignement
 end
 ```
 
-`10` is the **line number of the atom in the `xyz` block**, counting from 1:
+`10` is the **atom number of the atom in the `xyz` block**, counting from 1:
 
 ```
 xyz
