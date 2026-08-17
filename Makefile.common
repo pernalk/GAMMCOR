@@ -56,7 +56,7 @@ $(O)accas.o            : $(S)commons.inc $(O)priunit.o $(O)timing.o $(O)rdwrext.
 $(O)acfd.o             : $(S)commons.inc $(O)abmats.o $(O)abfofo.o  $(O)ab0fofo.o $(O)rdwrext.o
 $(O)ac_iter.o          : $(S)commons.inc $(O)abmats.o $(O)abfofo.o
 $(O)interpa.o          : $(S)commons.inc $(O)abmats.o $(O)abfofo.o $(O)ab0fofo.o
-$(O)lin.o              : $(S)lin.f90
+$(O)lin.o              : $(S)lin.f90 $(O)types.o
 $(O)muerf.o            : $(S)commons.inc $(O)ab0fofo.o $(O)timing.o $(O)gridintern.o $(O)sapt_files.o  $(O)acpp_types.o
 $(O)dftgrid.o          : $(S)commons.inc $(O)abmats.o
 $(O)caspidft.o         : $(S)commons.inc $(O)rdwrext.o
