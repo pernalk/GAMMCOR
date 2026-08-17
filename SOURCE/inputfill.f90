@@ -180,7 +180,7 @@ character(:), allocatable :: line
              current_block = block_cholesky
              cycle lines
 
-       case ("BASISASSIGNEMENT")
+       case ("BASISASSIGNEMENT", "BASISASSIGN")
              current_block = block_basis
              cycle lines
 
@@ -196,6 +196,11 @@ character(:), allocatable :: line
        case ("END")
              current_block = block_none
              cycle lines
+       case default
+             if (index(uppercase(line), "BASISASS") == 1) then
+                   current_block = block_basis
+                   cycle lines
+             endif             
 
        end select
 

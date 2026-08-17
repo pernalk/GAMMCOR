@@ -304,10 +304,9 @@ C
       If(ISAPT.Eq.1) Call sapt_driver(Flags,Sapt)
 C
 C     NBasis READ FROM SIRIUS.RST
-      If(IDALTON.Eq.1)then
-         if (Flags%IPYSCF.eq.0)
+      If(IDALTON.Eq.1.and.Flags%IPP.eq.0)
      $        Call basinfo(NBasis,'SIRIUS.RST','DALTON')
-      end if
+
 CC
 C     *************************************************************************
 C
@@ -357,12 +356,9 @@ C     OLD INPUT-READ
 C      Call RWInput(Title,ZNucl,Charge,NBasis)
 C
 C     CALCULATE THE DIMENSIONS
-      If(IDALTON.Eq.1)then
-         if (Flags%IPYSCF.eq.0)then
-c      If(IDALTON.Eq.0.AND.Flags%IPP.Eq.0) then
+         If(IDALTON.Eq.0.AND.Flags%IPP.Eq.0) then
 C        Call CheckNBa(NBasis,Title)
-         Call basinfo(NBasis,'AOONEINT.mol','MOLPRO')
-         endif
+        Call basinfo(NBasis,'AOONEINT.mol','MOLPRO')
       endif
 
       If(Flags%IPP.Eq.1.or.IPYSCF.Eq.1)then

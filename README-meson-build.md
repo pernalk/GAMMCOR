@@ -8,8 +8,22 @@ and they write to separate locations, so builds do not interfere.
 
 Meson ≥ 0.56 and Ninja.
 
+This must be done inside the Python virtual environment. First activate it:
+
 ```bash
-pip3 install --user meson
+source ~/.virtualenvs/my_env/bin/activate
+```
+
+Then install Meson:
+
+```bash
+pip install meson
+```
+
+or
+
+```bash
+pip3 install meson
 ```
 
 ## Layout
