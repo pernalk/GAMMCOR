@@ -156,7 +156,8 @@ module acpp_types
       end type TACppData
 
       type TInts
-            integer :: ints1e_dim, ints2e_dim
+            integer :: ints1e_dim
+            integer(8) :: ints2e_dim
             integer :: NInte2
             double precision, dimension(:, :), allocatable :: ints1e_aa, ints1e_bb
             double precision, dimension(:, :), allocatable :: Aints1e_aa, Aints1e_bb

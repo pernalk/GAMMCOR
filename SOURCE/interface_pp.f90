@@ -246,7 +246,7 @@ contains
             type(TACppData), intent(inout) :: AuxData
             double precision, dimension(:,:), allocatable, intent(out) :: CAONO
             type(FlagsData), intent(in) :: Flags
-            type(TInts), intent(out) :: Ints          
+            type(TInts), intent(inout) :: Ints
 
             double precision :: ECAS
             integer :: nbasis, ninactive, nactive, nvirtual
@@ -1142,7 +1142,7 @@ contains
 
             !call print_rdm_orca(AuxData)
 
-            Ints%ints2e_dim = NBasis * NBasis * (NBasis * NBasis + 1) / 2
+            Ints%ints2e_dim = int(NBasis,8)**2 * (int(NBasis,8)**2 + 1) / 2
             if (Flags%JOBTYPE == JOB_TYPE_DUCC)then
                   ! ints_aa=ints_bb
                   call read_fcidump_unrestricted('FCIDUMP', AuxData, Ints, NBasis, .true., .true.)
@@ -1264,8 +1264,8 @@ contains
 
             !call print_rdm_orca(AuxData)
 
-            Ints_full%ints2e_dim = NBasis * NBasis * (NBasis * NBasis + 1) / 2
-            Ints_ducc%ints2e_dim = NA * NA * (NA * NA + 1) / 2
+            Ints_full%ints2e_dim = int(NBasis,8)**2 * (int(NBasis,8)**2 + 1) / 2
+            Ints_ducc%ints2e_dim = int(NA,8)**2 * (int(NA,8)**2 + 1) / 2
             print*, 'Ints_full%ints2e_dim', Ints_full%ints2e_dim
             print*, 'Ints_ducc%ints2e_dim', Ints_ducc%ints2e_dim
             ! ints_aa=ints_bb

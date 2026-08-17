@@ -40,11 +40,11 @@ OBJ = $(O)mainp.o $(O)initia.o $(O)dmscf.o $(O)misc.o $(O)optocc.o \
 XOBJ = xcfun/fortran/xcfun_module.o xcfun/fortran/xcfun_autogen.o
 
 $(O)%.o : $(S)%.F90
-	$(FCC) -c -o $@ $< $(FFLAGS)
+	$(FCC) -c -o $@ $< $(FFLAGS) $(MODFLAG)
 $(O)%.o : $(S)%.f90
-	$(FCC) -c -o $@ $< $(FFLAGS)
+	$(FCC) -c -o $@ $< $(FFLAGS) $(MODFLAG)
 $(O)%.o : $(S)%.f
-	$(FCC) -c -o $@ $< $(FFLAGS)
+	$(FCC) -c -o $@ $< $(FFLAGS) $(MODFLAG)
 
 $(PROG) : $(OBJ)
 	$(FCC) -o $@ $^ $(XOBJ) $(FFLAGS) $(LIBS)
@@ -144,5 +144,5 @@ $(O)C_integrator.o                : $(O)iter_stats.o $(O)iter_algorithm.o $(O)la
 
 
 clean :
-	rm -f $(O)*.o *.mod $(PROG)
+	rm -f $(O)*.o $(O)*.mod $(PROG)
 

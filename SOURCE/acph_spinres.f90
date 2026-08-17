@@ -3158,7 +3158,7 @@ end do
 
             integer :: p, q, r, s
 
-            Ints%ints2e_dim = NBasis * NBasis * (NBasis * NBasis + 1) / 2
+            Ints%ints2e_dim = int(NBasis,8)**2 * (int(NBasis,8)**2 + 1) / 2
 
             if (allocated(Ints%ints2e_aa)) deallocate(Ints%ints2e_aa)
             if (allocated(Ints%ints2e_ab)) deallocate(Ints%ints2e_ab)

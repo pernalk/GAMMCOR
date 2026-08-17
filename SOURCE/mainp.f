@@ -304,8 +304,10 @@ C
       If(ISAPT.Eq.1) Call sapt_driver(Flags,Sapt)
 C
 C     NBasis READ FROM SIRIUS.RST
-      If(IDALTON.Eq.1.and.Flags%IPP.eq.0)
-     $ Call basinfo(NBasis,'SIRIUS.RST','DALTON')
+      If(IDALTON.Eq.1)then
+         if (Flags%IPYSCF.eq.0)
+     $        Call basinfo(NBasis,'SIRIUS.RST','DALTON')
+      end if
 CC
 C     *************************************************************************
 C
@@ -318,7 +320,7 @@ C
       InTrSt(1:2,1:1) = System%InTrSt
 C
       If(InSt(2,1).Gt.0) Then
-      NoSt = System%InSt(1,1)
+         NoSt = System%InSt(1,1)
 C
 C      Print*,'VALUE DECLARED IN INPUT: ',NoSt
 C
@@ -327,7 +329,7 @@ C
             Call read_NoSt_molpro(NoSt,'2RDM')
          endif
       ElseIf(IDALTON.Eq.1) Then
-      NoSt = 1
+         NoSt = 1
       Write(6,'(/,1x,a)') 'WARNING! ASSUMING RMDs CORRESPOND TO
      $                     GROUND STATE FROM DALTON OUTPUT (NoSt=1)!'
 C
@@ -355,9 +357,12 @@ C     OLD INPUT-READ
 C      Call RWInput(Title,ZNucl,Charge,NBasis)
 C
 C     CALCULATE THE DIMENSIONS
-      If(IDALTON.Eq.0.AND.Flags%IPP.Eq.0) then
+      If(IDALTON.Eq.1)then
+         if (Flags%IPYSCF.eq.0)then
+c      If(IDALTON.Eq.0.AND.Flags%IPP.Eq.0) then
 C        Call CheckNBa(NBasis,Title)
-        Call basinfo(NBasis,'AOONEINT.mol','MOLPRO')
+         Call basinfo(NBasis,'AOONEINT.mol','MOLPRO')
+         endif
       endif
 
       If(Flags%IPP.Eq.1.or.IPYSCF.Eq.1)then

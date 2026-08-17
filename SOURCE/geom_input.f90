@@ -59,6 +59,7 @@ contains
             end if
 
             if (Flags%BasisAssign%Initialized) then
+                  call warn_basis_keyword_ignored(Flags)
                   call basis_init(AOBasis, System, &
                         ShellOrder=ShellOrder, &
                         BasisAssign=Flags%BasisAssign)
@@ -69,6 +70,27 @@ contains
             end if
             call AObasis%display()
       end subroutine geom_ReadSystemBasis
+
+      subroutine warn_basis_keyword_ignored(Flags)
+            !
+            ! Say out loud that the BasisAssignement block takes precedence over
+            ! the Basis keyword left in the Calculation block. Printed next to the
+            ! basis set summary, so that the basis actually used in the calculation
+            ! cannot be confused with the one given by the Basis keyword.
+!
+            use display, only: msg, MSG_WARNING
+            implicit none
+            type(FlagsData), intent(in) :: Flags
+            
+            if(.not.Flags%BasisAssign%Initialized) return
+            if(.not.allocated(Flags%BasisSet)) return
+            if(len_trim(Flags%BasisSet)==0) return
+            
+            call msg("Warning: the BasisAssignement block overrides the Basis keyword &
+                  &from the Calculation block: " // trim(Flags%BasisSet) // " is ignored", &
+                  MSG_WARNING)
+            
+      end subroutine warn_basis_keyword_ignored
 
       subroutine xyz_source(XYZFile, InputFile)
             !

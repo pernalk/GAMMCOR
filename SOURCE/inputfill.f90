@@ -273,6 +273,7 @@ end subroutine sapt_scan_inputfile
 
 subroutine read_block_basis(BasisAssign, line, BasisPath)
   use string
+  use display, only: msg, MSG_ERROR
   type(TBasisAssignment) :: BasisAssign
   character(*), intent(in)   ::line
   character(:), allocatable, intent(in) :: BasisPath
@@ -281,13 +282,101 @@ subroutine read_block_basis(BasisAssign, line, BasisPath)
 
   call split(line, key, val)
   if (allocated(BasisPath)) then
+      call check_basis_assign_file(line, val, BasisPath)
       formatted_line = key // " file " // BasisPath // "/" // val
       call BasisAssign%read_line(formatted_line)
   else
-      call BasisAssign%read_line(line)
+      call msg("BasisPath is undefined in the BasisAssignement block line: " &
+            // trim(adjustl(line)), MSG_ERROR)
+      call msg("BasisPath has to be given in the Calculation block, &
+            &which has to precede the BasisAssignement block", MSG_ERROR)
+      error stop
   end if
 
 end subroutine read_block_basis
+
+subroutine check_basis_assign_file(line, val, BasisPath)
+!
+! Verify that the basis set file requested in a BasisAssignement line
+! is really present in BasisPath.
+!
+use string
+use display, only: msg, MSG_ERROR
+implicit none
+character(*), intent(in)              :: line
+character(:), allocatable, intent(in) :: val
+character(*), intent(in)              :: BasisPath
+
+character(:), allocatable :: FullPath, Suggestion
+logical :: FileExists
+
+ if(.not.allocated(val)) return
+ if(len_trim(val)==0) then
+    call msg("No basis set file given in the BasisAssignement block line: " &
+          // trim(adjustl(line)), MSG_ERROR)
+    call msg("Expected format: <selector> <basis set file>, e.g. * cc-pvdz.txt", &
+          MSG_ERROR)
+    error stop
+ endif
+
+ if(endswith(trim(BasisPath),"/")) then
+    FullPath = trim(BasisPath) // trim(adjustl(val))
+ else
+    FullPath = trim(BasisPath) // "/" // trim(adjustl(val))
+ endif
+ inquire(file=FullPath, exist=FileExists)
+ if(FileExists) return
+
+ call basis_file_suggestion(BasisPath, trim(adjustl(val)), Suggestion)
+
+ call msg("Basis set coefficients file  &
+       &is inaccessible: " // FullPath, MSG_ERROR)
+ call msg("Offending line in the BasisAssignement block: " &
+       // trim(adjustl(line)), MSG_ERROR)
+ if(len(Suggestion)>0) then
+    call msg("Did you mean: " // Suggestion, MSG_ERROR)
+ else
+    call msg("Check the contents of BasisPath: " // trim(BasisPath), MSG_ERROR)
+ endif
+ error stop
+
+end subroutine check_basis_assign_file
+
+subroutine basis_file_suggestion(BasisPath, Name, Suggestion)
+!
+! Look for the file name the user most likely meant to write:
+! the same name with one of the usual extensions and/or in lower case.
+! An empty string is returned if nothing similar is found in BasisPath.
+!
+use string
+implicit none
+character(*), intent(in)               :: BasisPath, Name
+character(:), allocatable, intent(out) :: Suggestion
+
+integer :: i, j
+character(5) :: Ext(4) = [character(5) :: '', '.txt', '.nw', '.gbs']
+character(:), allocatable :: Base, Cand
+logical :: FileExists
+
+ Suggestion = ''
+ do j=1,2
+    if(j==1) then
+       Base = Name
+    else
+       Base = lowercase(Name)
+    endif
+    do i=1,size(Ext)
+       Cand = Base // trim(Ext(i))
+       if(Cand==Name) cycle
+       inquire(file=trim(BasisPath)//"/"//Cand, exist=FileExists)
+       if(FileExists) then
+          Suggestion = Cand
+          return
+       endif
+    enddo
+ enddo
+
+end subroutine basis_file_suggestion
 
 
 subroutine read_block_cholesky(CholeskyParams, line)
@@ -1075,6 +1164,7 @@ subroutine print_Input(Input)
 ! A highly imperfect subroutine for Input print
 ! should be replaced with sth smarter
 !
+use display, only: msg, MSG_WARNING
 implicit none
 
 type(InputData) :: Input
@@ -1097,9 +1187,13 @@ associate( CalcParams => Input%CalcParams)
  if(allocated(CalcParams%BasisSet)) &
     write(LOUT,'(1x,a,4x,a)') "BASIS SET: ", &
                  CalcParams%BasisSet
- if(allocated(CalcParams%BasisSet)) &
+ if(allocated(CalcParams%BasisSetPath)) &
     write(LOUT,'(1x,a,4x,a)') "BASIS PATH:", &
                  CalcParams%BasisSetPath
+ if(Input%BasisAssign%Initialized.and.allocated(CalcParams%BasisSet)) &
+    call msg("Warning: the BasisAssignement block overrides the Basis keyword &
+          &from the Calculation block: " // trim(CalcParams%BasisSet) &
+          // " is ignored", MSG_WARNING)
  write(LOUT,' (1x,a,4x,a)') "INTERFACE: ", &
               PossibleInterface(CalcParams%InterfaceType)
  write(LOUT,' (1x,a,5x,a)') "JOB TYPE: ",  &
