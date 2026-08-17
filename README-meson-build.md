@@ -61,17 +61,8 @@ Each is also left in its build directory, as `build/gammcor` and
 
 ## Tests
 
-This will work once the tests folder is added to gammcor.
-
-```bash
-meson test -C build --suite short
-meson test -C build --suite full
-```
-
-Runs `gammcor-Testjobs/run_tests.py` against the binary just built, passing the
-test level as `short` or `full`. The script changes into its own directory, so
-the jobs always run inside `gammcor-Testjobs/` regardless of which build
-directory started them.
+Not wired up yet. Once a test suite lands in the tree, `test()` targets go back
+into `meson.build` and `meson test -C build` picks them up.
 
 ## Cleaning
 

@@ -204,37 +204,6 @@ post_build_target = custom_target('post_build_tasks',
   build_by_default : true,
 )
 
-# ---------------------------------------------------------------------------
-# Tests  ->  `meson test -C <builddir>`
-#
-# run_tests.py takes the gammcor EXECUTABLE as its first argument (not a build
-# directory) and an optional test level as its second. It chdir()s to its own
-# directory, so the jobs always run inside gammcor-Testjobs/ and write their
-# scratch files there, whichever build directory invoked them.
-#
-# Two suites are registered, so pick one:
-#   meson test -C build --suite short
-#   meson test -C build --suite full
-# ---------------------------------------------------------------------------
-py_test   = find_program('python3', required : false)
-run_tests = files('gammcor-Testjobs/run_tests.py')
-
-if py_test.found()
-  foreach level : ['short', 'full']
-    test(
-      'gammcor-' + level,
-      py_test,
-      # gammcor_exe resolves to the built binary's path and makes the test
-      # depend on it; post_build_target additionally forces the bin/ copy.
-      args        : [run_tests, gammcor_exe, level],
-      depends     : post_build_target,
-      suite       : level,
-      timeout     : 3600,
-      is_parallel : false,
-    )
-  endforeach
-endif
-
 summary({
   'profile'    : profile,
   'compiler'   : fc.get_id() + ' ' + fc.version(),
