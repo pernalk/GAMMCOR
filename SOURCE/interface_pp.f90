@@ -3060,6 +3060,7 @@ end subroutine save_2rdm_orca
           integer :: units, nbasis
           type (tclock) :: timer
           double precision :: val1, val2, val3
+          logical :: x2c
 
           ! Fock matrix diag                                                                                                                                                                                                                                                                                                
           double precision, dimension(:,:), allocatable :: Fockij, Fockvw
@@ -3122,24 +3123,50 @@ end subroutine save_2rdm_orca
                 print*, CAONO(1,2), CAONO(2, 1)
           end if
 
-          print*, 'canonicalize'
-          call canonicalize(CAONO, THCData%fij, THCData%fvw, AuxData, THCData, THCData%Xgp, AObasis, System)
-          ! open(unit=10,file='CAONO_can.bin',form='unformatted')
-          ! write(10) NBasis
-          ! write(10) CAONO
-          ! close(10)
+!          x2c = .true.
+          x2c = .false.
 
+          if (x2c == .true.)then
+                print*, 'przed canonicalize'
+                print*, 'nao', nao, nbasis
+                call canonicalize(CAONO, THCData%fij, THCData%fvw, AuxData, THCData, THCData%Xgp, AObasis, System, ext=.true.)
 
+                allocate(H0_extao(nao, nao))
+                H0_extao = AuxData%HNO0
+                ! do i =1, 5
+                !       do j = 1, 5
+                !             print*, 'AuxData%HNO0(i,j)=', i, j, AuxData%HNO0(i, j)
+                !       end do
+                ! end do
+                print*, 'po canonicalize'
+                print*, 'nao', nao, nbasis
+                print*, 'size CAONO', size(CAONO, dim=1), size(CAONO, dim=2)
+                print*, 'size AuxData%HNO0', size(AuxData%HNO0, dim=1), size(AuxData%HNO0, dim=2)
+                call real_ab(work, H0_extao, CAONO)
+                call real_atb(AuxData%HNO0, CAONO, work)
+          else
+                !
+                ! this is for the regular hamilotnian
+                !
+                print*, 'canonicalize'
+                !call canonicalize(CAONO, THCData%fij, THCData%fvw, AuxData, THCData, THCData%Xgp, AObasis, System, )
+                call canonicalize(CAONO, THCData%fij, THCData%fvw, AuxData, THCData, THCData%Xgp, AObasis, System, ext=.false.)
+                print*, 'po can'
+                ! open(unit=10,file='CAONO_can.bin',form='unformatted')
+                ! write(10) NBasis
+                ! write(10) CAONO
+                ! close(10)
 
-          allocate(H0_extao(nao, nao))
-          allocate(AuxData%HNO0_THC(nbasis, nbasis))
+                allocate(H0_extao(nao, nao))
+                allocate(AuxData%HNO0_THC(nbasis, nbasis))
 
-          call ints1e_gammcor_H0_extao(H0_extao, AObasis, System, THCData%ExternalOrdering)
-          print*, 'h01', H0_extao(1,1)
+                call ints1e_gammcor_H0_extao(H0_extao, AObasis, System, THCData%ExternalOrdering)
+                print*, 'h01', H0_extao(1,1)
 
-          call real_ab(work, H0_extao, CAONO)
-          call real_atb(AuxData%HNO0_THC, CAONO, work)
-
+                call real_ab(work, H0_extao, CAONO)
+                call real_atb(AuxData%HNO0_THC, CAONO, work)
+                AuxData%HNO0 = AuxData%HNO0_THC
+          end if
 
           THCData%NTHC=size(THCData%Xgp,dim=1)
           THCData%NChol=size(THCData%Zgk,dim=2)
@@ -3470,7 +3497,7 @@ end subroutine save_2rdm_orca
         end associate
     end subroutine calc_J_SR
 
-    subroutine canonicalize(CAONO, fij, fvw, AuxData, THCData, Xgp, AObasis, System)
+    subroutine canonicalize(CAONO, fij, fvw, AuxData, THCData, Xgp, AObasis, System, ext)
           use Cholesky_Gammcor
           use THC_Gammcor
           use OneElectronInts_Gammcor
@@ -3484,6 +3511,7 @@ end subroutine save_2rdm_orca
           type(TTHCData), intent(in) :: THCData
           type(TAOBASIS) :: AObasis
           type(TSystem) :: System
+          logical, intent(in),optional :: ext
 
 
           double precision, dimension(:,:), allocatable :: Cpi_extao, Cpv_extao
@@ -3505,11 +3533,26 @@ end subroutine save_2rdm_orca
             call CalcMem(Cpi_extao, 'Cpi_extao')
             call CalcMem(Cpv_extao, 'Cpv_extao')
 
+            if (ext == .false.)then
+                  print*, 'ext false'
+                  call thc_gammcor_F(Fockij, Fockvw, CAONO(:, 1:AuxData%NI),&
+                        CAONO(:, AuxData%NI+1:AuxData%NIA), &
+                        CAONO(:, AuxData%NIA+1:AuxData%NBasis), &
+                        AuxData%Occ(1:AuxData%NIA), Zgk, Xgp, AOBasis, System, ExternalOrdering)
+            else
+                  print*, 'ext true'
+                  print*, 'size AuxData%HNO0', size(AuxData%HNO0, dim=1), size(AuxData%HNO0, dim=2)
+                  call thc_gammcor_F(Fockij, Fockvw, CAONO(:, 1:AuxData%NI),&
+                        CAONO(:, AuxData%NI+1:AuxData%NIA), &
+                        CAONO(:, AuxData%NIA+1:AuxData%NBasis), &
+                        AuxData%Occ(1:AuxData%NIA), Zgk, Xgp, AOBasis, System, ExternalOrdering, &
+                        AuxData%HNO0)
+            end if
 
-            call thc_gammcor_F(Fockij, Fockvw, CAONO(:, 1:AuxData%NI),&
-                  CAONO(:, AuxData%NI+1:AuxData%NIA), &
-                  CAONO(:, AuxData%NIA+1:AuxData%NBasis), &
-                  AuxData%Occ(1:AuxData%NIA), Zgk, Xgp, AOBasis, System, ExternalOrdering)
+            ! call thc_gammcor_F(Fockij, Fockvw, CAONO(:, 1:AuxData%NI),&
+            !       CAONO(:, AuxData%NI+1:AuxData%NIA), &
+            !       CAONO(:, AuxData%NIA+1:AuxData%NBasis), &
+            !       AuxData%Occ(1:AuxData%NIA), Zgk, Xgp, AOBasis, System, ExternalOrdering)
 
 !            print*, 'AuxData%Occ', AuxData%Occ
 

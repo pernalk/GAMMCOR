@@ -425,7 +425,10 @@ subroutine read_block_cholesky(CholeskyParams, line)
               CholeskyParams%CholeskyAccu = CHOL_ACCU_TIGHT
            elseif (uppercase(val) == "LUDICROUS" .or. &
                    uppercase(val) == "L" ) then
-              CholeskyParams%CholeskyAccu = CHOL_ACCU_LUDICROUS
+                 CholeskyParams%CholeskyAccu = CHOL_ACCU_LUDICROUS
+           elseif (uppercase(val) == "DEBUG" .or. &
+                 uppercase(val) == "D" ) then
+                 CholeskyParams%CholeskyAccu = CHOL_ACCU_DEBUG
            endif
       case ("CHOLTHR","CHOLTHRESHOLD","CHOLESKYTHR","CHOLESKYTHRESHOLD")
             read(val, *) CholeskyParams%CholeskyThr
@@ -722,8 +725,21 @@ subroutine read_block_calculation(CalcParams, line)
            read(val,*) CalcParams%PostCAS
 
       case("MAX_CN")
-             read(val,*) CalcParams%Max_Cn
-
+            read(val,*) CalcParams%Max_Cn
+      case("MAX_CNPP")
+            read(val,*) CalcParams%Max_Cnpp
+      case("BATCHDIM")
+            read(val,*) CalcParams%BatchDim
+      case("HTYPE")
+            if (uppercase(val) == "DYALL")then
+                  CalcParmss%Htype = H_DYALL
+            elseif (uppercase(val) == "D")then
+                  CalcParams%Htype = H_DYALL
+            elseif (uppercase(val) == "GPF")then
+                  CalcParams%Htype = H_GPF
+            elseif (uppercase(val) == "G")then
+                  CalcParams%Htype = H_GPF
+            end if
       case("FREQOM")
              call read_freqarray(val,CalcParams%FreqOm,CalcParams%NFreqOm,',')
 

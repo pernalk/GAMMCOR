@@ -12,8 +12,9 @@ module acpp_types
 
       type TAC0Block
             double precision, dimension(:, :), allocatable :: ASing, ATrip
-            double precision, dimension(:), allocatable :: EigS, EigT
-            integer, dimension(:), allocatable :: vPlusS, vPlusT
+            double precision, dimension(:, :), allocatable :: ATripA
+            double precision, dimension(:), allocatable :: EigS, EigT, EigTA
+            integer, dimension(:), allocatable :: vPlusS, vPlusT, vPlusTA
             integer :: order
             integer, dimension(:, :), allocatable :: IndNS, IndNT
             integer, dimension(:, :), allocatable :: IndN1S, IndN1T
@@ -26,12 +27,36 @@ module acpp_types
             type(TAC0vaBlock), allocatable :: MiniBlocks(:)
       end type TAC0Block
 
-      type TAC0vaBlock
-            double precision, dimension(:,:), allocatable :: MiniAVS, MiniAVT
-            double precision, dimension(:), allocatable :: EigS, EigT
-            integer, dimension(:), allocatable :: ActListS, ActListT
-            integer, dimension(:,:), allocatable :: IndNS, IndNT
-            integer :: NDimS, NDimT
+ type TphAC0Block
+            double precision, dimension(:, :), allocatable :: APl, AMn
+            double precision, dimension(:), allocatable :: EigPl, EigMn
+            integer, dimension(:), allocatable :: vPlusPl, vPlusMn
+            integer :: order
+            integer, dimension(:, :), allocatable :: IndN
+            integer, dimension(:, :), allocatable :: IndN1S, IndN1T
+            integer, dimension(:, :), allocatable:: IndN2S, IndN2T
+            integer, dimension(:, :), allocatable :: MiniMap
+            integer :: NDim
+            integer :: NDim1S, NDim2S, NDim1T, NDim2T
+            character(:), allocatable :: name
+            integer :: type
+            type(TAC0MiniBlock), allocatable :: MiniBlocks(:)
+      end type TphAC0Block
+
+      type TAC0MiniBlock
+            double precision, dimension(:,:), allocatable :: A
+            double precision, dimension(:), allocatable :: Eig
+            integer, dimension(:), allocatable :: ActList
+            integer, dimension(:,:), allocatable :: IndN
+            integer :: NDim
+      end type TAC0MiniBlock      
+
+       type TAC0vaBlock
+            double precision, dimension(:,:), allocatable :: MiniAVS, MiniAVT, MiniAVTA
+            double precision, dimension(:), allocatable :: EigS, EigT, EigTA
+            integer, dimension(:), allocatable :: ActListS, ActListT, ActListTA
+            integer, dimension(:,:), allocatable :: IndNS, IndNT, indNTA
+            integer :: NDimS, NDimT, NDimTA
       end type TAC0vaBlock
 
 
@@ -41,6 +66,7 @@ module acpp_types
             double precision, dimension(:,:), allocatable :: Xgp, XgpErf
             integer :: ExternalOrdering
             double precision, dimension(:), allocatable :: fij, fvw, ftu
+            double precision, dimension(:,:,:), allocatable :: RFO, RFV
             double precision, dimension(:), allocatable :: eorbi, eorba
             integer :: NTHCErf, NCholErf
             double precision, dimension(:,:), allocatable :: XgaErf, ZgkErf
@@ -97,6 +123,7 @@ module acpp_types
             double precision, dimension(:, :), allocatable :: Eigvec_t_aa, Eigvec_t_bb
             double precision, dimension(:, :, :, :), allocatable :: rdm2_pp
             double precision, dimension(:, :, :, :), allocatable :: rdm2_pm
+            double precision, dimension(:, :, :, :), allocatable :: rdm2
             double precision, dimension(:, :, :, :), allocatable :: ph_rdm2_aa
             double precision, dimension(:, :, :, :), allocatable :: ph_rdm2_ab
             double precision, dimension(:, :, :, :), allocatable :: rdm2_mm
@@ -129,7 +156,8 @@ module acpp_types
             logical :: pperpa_print = .false.
             integer :: Dyall = 1
             integer :: GPF = 2
-            integer :: HType 
+            integer :: HType
+            integer :: BatchDim
             integer :: general_version, version
             integer :: switch = 0
             integer :: ACType
@@ -145,6 +173,7 @@ module acpp_types
             integer :: NInte1, NInte2
             logical :: OnlyEnergy  = .false.
             logical :: pptriplet = .false.
+            logical :: triplet = .false.
             integer :: iflmp2
             integer :: NCoreOrb
             double precision :: omega = 1.0
@@ -152,6 +181,8 @@ module acpp_types
             logical :: spinsep = .true.
             double precision :: ThrSelAct, ThrQVirt, ThrQInact
             double precision :: E_ref_ducc
+            integer, dimension(:,:), allocatable :: IPair
+            integer :: omegaorders = 0
             
       end type TACppData
 
@@ -178,6 +209,16 @@ module acpp_types
             double precision,allocatable :: rdm2_pp1_act(:,:,:,:), rdm2_pm1_act(:,:,:,:)
             ! like rdm2_pp2 but only active part 
             double precision,allocatable :: rdm2_pp2_act(:,:,:,:), rdm2_pm2_act(:,:,:,:)
+
+            ! rdm2_pp_12(i,j,k,l)  = rdm2_pp(i, k, j, l)
+            double precision,allocatable :: rdm2_pp_12(:,:,:,:), rdm2_pm_12(:,:,:,:)
+            ! rdm2_pp_13(i,j,k,l)  = rdm2_pp(i, l, k, j)                                                                                                                          
+            double precision,allocatable :: rdm2_pp_13(:,:,:,:), rdm2_pm_13(:,:,:,:)
+            ! like rdm2_pp_12 but only active part
+            double precision,allocatable :: rdm2_pp_12_act(:,:,:,:), rdm2_pm_12_act(:,:,:,:)
+            ! like rdm2_pp_13 but only active part 
+            double precision,allocatable :: rdm2_pp_13_act(:,:,:,:), rdm2_pm_13_act(:,:,:,:)
+
 
             double precision,allocatable :: rdm2_pp_act(:,:,:,:), rdm2_pm_act(:,:,:,:)
       end type TRdmData

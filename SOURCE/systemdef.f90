@@ -1,5 +1,6 @@
 module systemdef
-use types
+      use types
+      use acpp_types
 
 implicit none
 
@@ -532,13 +533,15 @@ endif
 
 end subroutine fill_Flags
 
-subroutine create_System(Input,Flags,System,SAPT)
+subroutine create_System(Input,Flags,System,SAPT, AuxData)
 implicit none
 
 type(InputData)   :: Input
 type(FlagsData)   :: Flags
 type(SystemBlock) :: System
 type(SaptData)    :: SAPT
+type(TACppData)  :: AuxData
+
 
 ! fill System
 if(Flags%ISAPT.Eq.0) then
@@ -603,9 +606,24 @@ if(Flags%ISAPT.Eq.0) then
 
    ! checkif Active Declared
    if(.not.Input%SystemInput(1)%NActFromRDM) then
-      System%NAct=Input%SystemInput(1)%NAct
-      print*, 'NAct from input!',System%NAct
+         System%NAct=Input%SystemInput(1)%NAct
+         print*, 'NAct from input!',System%NAct
    endif
+
+   AuxData%ThrSelAct = ThrSelAct
+   AuxData%ThrQVirt = ThrQVirt
+   AuxData%ThrQInact = ThrQInact
+   AuxData%NCoreOrb = System%NCoreOrb
+   AuxData%PYSCF = Flags%IPYSCF
+   AuxData%Batchdim = Input%CalcParams%BatchDim
+
+   if(Flags%IPP.Eq.1) then
+         AuxData%HType = Input%CalcParams%Htype
+         AuxData%omegaorders = Input%CalcParams%Max_Cnpp
+         AuxData%triplet = Input%CalcParams%triplet
+         AuxData%ThrPP = System%ThrPP
+   end if
+
 
   ! write(*,*) "ZNucl:",Input%SystemInput(1)%ZNucl
   ! write(*,*) "Sys-val:",System%XELE, System%NELE

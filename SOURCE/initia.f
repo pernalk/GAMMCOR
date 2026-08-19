@@ -105,7 +105,7 @@ C
 C
 C
 C     CholeskyOTF: read C(AO,NO) instead of C(SAO,NO)
-      If(ICholeskyOTF==1) Then
+      If(ICholeskyOTF==1 .or. ICholeskyTHC==1) Then
       If(NSym.gt.1) Then
 C
          Open(newunit=iunit,file="CAONO.dat",status='OLD',
@@ -463,6 +463,7 @@ C
       EndIf ! IFunSR for ICholesky=0
 C
       ElseIf (ICholesky==1) Then
+         If(ICholeskyTHC.ne.1)Then
 C
       If(MemType == 2) then       !MB
          MemMOTransfMB = MemVal
@@ -470,7 +471,8 @@ C
          MemMOTransfMB = MemVal * 1024_8
       Endif
       Write(LOUT,'(1x,a,i5,a)') 'Using ',MemMOTransfMB,
-     $                          ' MB for 3-indx Cholesky transformation'
+     $     ' MB for 3-indx Cholesky transformation'
+      Endif
 C
 C     CBS[H] + Dalton
       If (IDBBSC.Eq.2) IFunSRTmp=IFunSR ! Dalton only: CBS[H]-OTF (no BIN/INCORE)

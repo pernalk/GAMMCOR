@@ -76,7 +76,7 @@ C
       Call read_Input(Input)
       Call check_Calc(Input%CalcParams)
       Call fill_Flags(Input,Flags)
-      Call create_System(Input,Flags,System,Sapt)
+      Call create_System(Input,Flags,System,Sapt, AuxData)
       Flags%BasisAssign = Input%BasisAssign
 C
       Call free_Input(Input)
@@ -90,7 +90,7 @@ C     FILL COMMONS AND CONSTANTS
       IJobType = Flags%JobType
 C
       NCoreOrb = System%NCoreOrb
-      AuxData%NCoreOrb = System%NCoreOrb
+c      AuxData%NCoreOrb = System%NCoreOrb
       NStronglyOccOrb = System%NStronglyOccOrb
       NElecBEmb = System%NElecBEmb
 C
@@ -141,7 +141,7 @@ c     ITREXIO = Flags%ITREXIO
       IDMRG   = Flags%IDMRG
       IPYSCF  = Flags%IPYSCF
 
-      AuxData%PYSCF = Flags%IPYSCF
+c      AuxData%PYSCF = Flags%IPYSCF
 C
 C     IF IRes=1 - RESTART THE CALCULATIONS FROM A RESTART FILE
 C
@@ -344,9 +344,9 @@ C     SET THRESHOLD FOR QUASI-VIRTUAL ORBITALS IN CAS
       ThrQVirt  = System%ThrQVirt
 C     SET THRESHOLD FOR QUASI-INACTIVE ORBITALS IN CAS
       ThrQInact = System%ThrQInact
-      AuxData%ThrSelAct = ThrSelAct
-      AuxData%ThrQVirt = ThrQVirt
-      AuxData%ThrQInact = ThrQInact
+c      AuxData%ThrSelAct = ThrSelAct
+c      AuxData%ThrQVirt = ThrQVirt
+c      AuxData%ThrQInact = ThrQInact
 
 C
 C*************************************************************************
@@ -545,7 +545,7 @@ C
          case(JOB_TYPE_PPERPA, JOB_TYPE_AC0PP, JOB_TYPE_ACPP,
      $        JOB_TYPE_PPERPA_RDMDUMP,
      $     JOB_TYPE_HHERPA_RDMDUMP)
-      AuxData%ThrPP = System%ThrPP
+c      AuxData%ThrPP = System%ThrPP
       print*, 'hherpa'
        call acpp_driver(THCData, AuxData, CAONO, Flags, TwoEl)
 

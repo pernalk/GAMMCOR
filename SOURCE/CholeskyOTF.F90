@@ -314,7 +314,9 @@ if(trim(Source)=='MOLPRO') then
 elseif(trim(Source)=='ORCA  ') then
    ORBITAL_ORDERING = ORBITAL_ORDERING_ORCA
 elseif(trim(Source)=='DALTON') then
-   ORBITAL_ORDERING = ORBITAL_ORDERING_DALTON
+      ORBITAL_ORDERING = ORBITAL_ORDERING_DALTON
+elseif(trim(Source)=='PYSCF') then
+   ORBITAL_ORDERING = ORBITAL_ORDERING_PYSCF      
 endif
 
 ! Read whether to put ghost functions

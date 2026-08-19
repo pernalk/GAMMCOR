@@ -82,6 +82,7 @@ integer, parameter :: FLAG_H0TEST         = 1
 integer, parameter :: CHOL_ACCU_DEFAULT   = 1
 integer, parameter :: CHOL_ACCU_TIGHT     = 2
 integer, parameter :: CHOL_ACCU_LUDICROUS = 3
+integer, parameter :: CHOL_ACCU_DEBUG = 4
 double precision :: DCholeskyThr = -1.e0
 double precision :: DTHCThr = -1.e0
 
@@ -108,6 +109,9 @@ integer, parameter :: RESP_ERPA = 1
 integer, parameter :: RESP_APSG = 2
 integer, parameter :: RESP_DFT  = 3
 
+integer, parameter :: H_DYALL = 0
+integer, parameter :: H_GPF = 1
+
 logical, parameter :: FLAG_POSTCAS  = .FALSE.
 
 integer,parameter :: maxcen = 500 ! to match Dalton
@@ -133,7 +137,7 @@ character(*),parameter :: PossibleDFAType(3) = &
 
 character(*),parameter :: PossibleCholAccu(3) = &
 [character(9) :: &
-'DEFAULT', 'TIGHT', 'LUDICROUS']
+'DEFAULT', 'TIGHT', 'LUDICROUS', 'DEBUG']
 
 character(*),parameter :: PossibleGridType(6) = &
 [character(8) :: &
@@ -188,6 +192,9 @@ character(*),parameter :: PossibleUnits(2) = &
          character(:), allocatable :: BasisSet,BasisSetPath
          character(:), allocatable :: IntegralsFilePath
          integer :: Max_Cn = 3
+         integer :: Max_Cnpp = 0
+         integer :: Htype = 0
+         integer :: BatchDim
          integer :: NFreqOm
          double precision,allocatable :: FreqOm(:)
          logical :: CAlpha = .false.
