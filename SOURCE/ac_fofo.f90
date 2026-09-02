@@ -136,8 +136,9 @@ character(:),allocatable :: twojfile,twokfile,IntKFile
 logical :: irdm2
 
 double precision, allocatable :: DChol(:,:),DCholAct(:,:),WorkD(:,:)
-double precision, allocatable :: APLUS0Tilde(:), APLUS1Tilde(:), A1(:), &
-                                 ABPLUS0(:),ABMIN0(:),ABPLUS1(:),ABMIN1(:)
+double precision, allocatable :: APLUS0Tilde(:), APLUS1Tilde(:)
+double precision, allocatable :: ABPLUS1(:,:),ABMIN1(:,:), A1(:,:)
+!                                 ABPLUS0(:),ABMIN0(:),ABPLUS1(:),ABMIN1(:)
 double precision, allocatable :: COMTilde(:), C0Tilde(:),C1Tilde(:),C2Tilde(:)
 double precision, allocatable :: WORK0(:),WORK1(:)
 
@@ -213,7 +214,7 @@ if (IDBBSC == 2) then
    endif
 endif
 
-allocate(ABPLUS1(NDimX*NDimX),ABMIN1(NDimX*NDimX))
+allocate(ABPLUS1(NDimX,NDimX),ABMIN1(NDimX,NDimX))
 !call mem_alloc(ABPLUS1,NDimX*NDimX)
 !call mem_alloc(ABMIN1,NDimX*NDimX)
 
@@ -253,7 +254,7 @@ call AB_CAS_FOFO(ABPLUS1,ABMIN1,ECASSCF,URe,Occ,XOne, &
 !print*, 'ABMIN1 ',norm2(ABMIN1)
 
 !Calc: A1=ABPLUS0*ABMIN1+ABPLUS1*ABMIN0
-allocate(A1(NDimX*NDimX))
+allocate(A1(NDimX,NDimX))
 !call mem_alloc(A1,NDimX*NDimX)
 call ABPM_HALFTRAN_GEN_L(ABMIN1, A1,0.0d0,A0Block,A0BlockIV,nblk,NDimX,NDimX,'Y')
 call ABPM_HALFTRAN_GEN_R(ABPLUS1,A1,1.0d0,A0Block,A0BlockIV,nblk,NDimX,NDimX,'X')
