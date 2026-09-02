@@ -2451,7 +2451,9 @@ val_buf  = 0
 rdm24act = 0
 istate = 0
 jstate = 0
-do while(icount == BUFSIZE)
+!do while(icount == BUFSIZE)
+! seems that (sometimes) marker 256 ends 2-RDMs
+read_rdm: do while (icount == BUFSIZE)
 
    rc = trexio_read_rdm_2e_transition(f,offset,icount,idx_buf,val_buf)
 
@@ -2462,13 +2464,15 @@ do while(icount == BUFSIZE)
       idx_k = idx_buf(3,i)
       idx_l = idx_buf(4,i)
 
-      !write(6,'(a,4i3,es15.6)') 'i j k l', idx_i, idx_j, idx_k, idx_l,val_buf(i)
+     ! write(6,'(a,4i3,es15.6,2i3)') 'i j k l', idx_i, idx_j, idx_k, idx_l,val_buf(i),istate,jstate
       if ( idx_k==255 ) then
          jstate = jstate + 1
          if (jstate > istate) then
             istate = istate + 1
             jstate = 1
          endif
+      elseif ( idx_k==256 ) then
+         exit read_rdm
       else
          ! reorder 1212 to 1122 (SAPT convention) :
          rdm24act(idx_k,idx_i,idx_l,idx_j,istate,jstate) = 0.5d0*val_buf(i)
@@ -2477,7 +2481,7 @@ do while(icount == BUFSIZE)
    enddo
    offset = offset + icount
 
-enddo
+enddo read_rdm
 
 deallocate(idx_buf,val_buf)
 !do i=1,nstates
