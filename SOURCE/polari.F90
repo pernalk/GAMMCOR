@@ -42,7 +42,9 @@ double precision :: CICoef(NBasis),ipiv(NDimX)
 double precision :: UAux(NBasis,NBasis) 
 double precision :: DipX(NBasis,NBasis),DipY(NBasis,NBasis),DipZ(NBasis,NBasis)
 double precision :: DipCX(NDimX),DipCY(NDimX),DipCZ(NDimX)
-double precision :: ABPLUS(NDimX*NDimX),ABMIN(NDimX*NDimX),AIN(NDimX*NDimX),CMAT(NDimX*NDimX)
+double precision :: ABPLUS(NDimX,NDimX),ABMIN(NDimX,NDimX)
+double precision :: AIN(NDimX,NDimX),CMAT(NDimX,NDimX)
+!double precision :: ABPLUS(NDimX*NDimX),ABMIN(NDimX*NDimX),AIN(NDimX*NDimX),CMAT(NDimX*NDimX)
 double precision :: AXX,AYX,AXY,AZX,AXZ,AYY,AZY,AYZ,AZZ,Om,Alpha
 double precision :: ACAlpha
 double precision :: AISO
@@ -247,7 +249,8 @@ Om = FreqOm(im)
 
 AIN=0d0
 Do I=1,NDimX
-    AIN((I-1)*NDimX+I)=1.0
+    !AIN((I-1)*NDimX+I)=1.0
+    AIN(I,I)=1d0
 EndDo
 !  ABPLUS*ABMIN - 1 Om^2
 Call dgemm('N','N',NDimX,NDimX,NDimX,1d0,ABPLUS,NDimX,&

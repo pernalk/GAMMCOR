@@ -132,8 +132,10 @@ double precision,parameter :: BigE = 1.D8
           do i=1,ADimX
 
              val = val - fact * tmp(i,j) * &
-                              A%EigX(ipq+(i-1)*A%NDimX) * &
-                              B%EigX(irs+(j-1)*B%NDimX)
+                              A%EigX(ipq,i) * &
+                              B%EigX(irs,j)
+                              !A%EigX(ipq+(i-1)*A%NDimX) * &
+                              !B%EigX(irs+(j-1)*B%NDimX)
 
           enddo
        enddo
@@ -150,8 +152,10 @@ double precision,parameter :: BigE = 1.D8
           do i=1,ADimX
 
              val = val - fact * tmp(i,j) * &
-                              A%EigY(ipq+(i-1)*A%NDimX) * &
-                              B%EigY(irs+(j-1)*B%NDimX)
+                              A%EigY(ipq,i) * &
+                              B%EigY(irs,j)
+                              !A%EigY(ipq+(i-1)*A%NDimX) * &
+                              !B%EigY(irs+(j-1)*B%NDimX)
 
           enddo
        enddo
@@ -168,8 +172,10 @@ double precision,parameter :: BigE = 1.D8
           do i=1,ADimX
 
              val = val - fact * tmp(i,j) * &
-                              A%EigX(ipq+(i-1)*A%NDimX) * &
-                              B%EigY(irs+(j-1)*B%NDimX)
+                              A%EigX(ipq,i) * &
+                              B%EigY(irs,j)
+                              !A%EigX(ipq+(i-1)*A%NDimX) * &
+                              !B%EigY(irs+(j-1)*B%NDimX)
 
           enddo
        enddo
@@ -186,8 +192,10 @@ double precision,parameter :: BigE = 1.D8
           do i=1,ADimX
 
              val = val - fact * tmp(i,j) * &
-                              A%EigY(ipq+(i-1)*A%NDimX) * &
-                              B%EigX(irs+(j-1)*B%NDimX)
+                              A%EigY(ipq,i) * &
+                              B%EigX(irs,j)
+                              !A%EigY(ipq+(i-1)*A%NDimX) * &
+                              !B%EigX(irs+(j-1)*B%NDimX)
 
           enddo
        enddo

@@ -2364,8 +2364,9 @@ double precision,parameter :: BigE = 1.D8
  ! SAPT cubic
  ! A: get response properites
  if(A%Cubic) then
-   allocate(A%EigX(A%NDimX*A%NDimX),A%EigY(A%NDimX*A%NDimX),&
-            A%Eig(A%NDimX))
+   print*, 'cubic?'
+   allocate(A%EigX(A%NDimX,A%NDimX),A%EigY(A%NDimX,A%NDimX))
+   allocate(A%Eig(A%NDimX))
    if(A%ACAlpha==A%ACAlpha0) then
       propA = 'PROP_A0'
    elseif(A%ACAlpha==A%ACAlpha1) then
@@ -2378,8 +2379,8 @@ double precision,parameter :: BigE = 1.D8
  endif
  ! B: get response properties
  if(B%Cubic) then
-   allocate(B%EigX(B%NDimX*B%NDimX),B%EigY(B%NDimX*B%NDimX),&
-            B%Eig(B%NDimX))
+   allocate(B%EigX(B%NDimX,B%NDimX),B%EigY(B%NDimX,B%NDimX))
+   allocate(B%Eig(B%NDimX))
 
    if(B%ACAlpha==B%ACAlpha0) then
       propB = 'PROP_B0'
@@ -3059,8 +3060,8 @@ call gclock('START',Tcpu,Twall)
  ! SAPT cubic
  ! A: get response properites
  if(A%Cubic) then
-   allocate(A%EigX(A%NDimX*A%NDimX),A%EigY(A%NDimX*A%NDimX),&
-            A%Eig(A%NDimX))
+   allocate(A%EigX(A%NDimX,A%NDimX),A%EigY(A%NDimX,A%NDimX))
+   allocate(A%Eig(A%NDimX))
    if(A%ACAlpha==A%ACAlpha0) then
       propA = 'PROP_A0'
    elseif(A%ACAlpha==A%ACAlpha1) then
@@ -3073,8 +3074,8 @@ call gclock('START',Tcpu,Twall)
  endif
  ! B: get response properties
  if(B%Cubic) then
-   allocate(B%EigX(B%NDimX*B%NDimX),B%EigY(B%NDimX*B%NDimX),&
-            B%Eig(B%NDimX))
+   allocate(B%EigX(B%NDimX,B%NDimX),B%EigY(B%NDimX,B%NDimX))
+   allocatE(B%Eig(B%NDimX))
 
    if(B%ACAlpha==B%ACAlpha0) then
       propB = 'PROP_B0'
