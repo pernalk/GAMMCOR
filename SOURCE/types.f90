@@ -374,7 +374,7 @@ type SystemBlock
       double precision,allocatable :: RDM2val(:,:,:,:)
 
       double precision,allocatable :: dipm(:,:,:)
-      double precision,allocatable :: Eig(:),EigX(:),EigY(:)
+      double precision,allocatable :: Eig(:),EigX(:,:),EigY(:,:)
       double precision,allocatable :: AP(:,:),PP(:)
       !double precision  :: charg(maxcen),xyz(maxcen,3)
       double precision,allocatable :: charg(:),xyz(:,:)

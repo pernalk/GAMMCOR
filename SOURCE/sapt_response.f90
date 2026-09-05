@@ -28,11 +28,12 @@ integer,intent(in) :: NBas
 logical :: EChck
 
 double precision, allocatable :: XOne(:),TwoMO(:),URe(:,:)
-double precision, allocatable :: ABPlus(:),ABMin(:), &
-                                 EigVecR(:),Eig(:)
+double precision, allocatable :: ABPlus(:,:),ABMin(:,:), &
+                                 EigVecR(:,:),Eig(:)
 double precision, allocatable :: CMAT(:),EMAT(:),EMATM(:), &
                                  DMAT(:),DMATK(:)
-double precision, allocatable :: Eig0(:),Eig1(:),EigY0(:),EigY1(:)
+double precision, allocatable :: Eig0(:),Eig1(:)
+double precision, allocatable :: EigY0(:,:),EigY1(:,:)
 double precision, allocatable :: work1(:),work2(:)
 double precision,allocatable  :: workSq(:,:)
 
@@ -135,8 +136,8 @@ ACAlpha=One
 ! GVB
 if(Flags%ICASSCF==0.and.Flags%ISERPA==0) then
 
-  allocate(ABPlus(Mon%NDimX**2),ABMin(Mon%NDimX**2), &
-           EigVecR(Mon%NDimX**2),Eig(Mon%NDimX))
+  allocate(ABPlus(Mon%NDimX,Mon%NDimX),ABMin(Mon%NDimX,Mon%NDimX))
+  allocate(EigVecR(Mon%NDimX,Mon%NDimX),Eig(Mon%NDimX))
 
 ! ACAlpha=sqrt(2d0)/2.d0
 !   allocate(ABPlusT(Mon%NDim**2),ABMinT(Mon%NDim**2))
@@ -177,13 +178,13 @@ if(Flags%ICASSCF==0.and.Flags%ISERPA==0) then
 
   !deallocate(ABMinT,ABPlusT)
 
-  EigVecR = 0
-  Eig = 0
+  EigVecR = 0d0
+  Eig = 0d0
 
   !call ERPASYMM(EigVecR,Eig,ABPlus,ABMin,NBas,Mon%NDimX)
   ! for exch-disp
-  allocate(Mon%EigY(Mon%NDimX**2),Mon%EigX(Mon%NDimX**2),&
-           Mon%Eig(Mon%NDimX))
+  allocate(Mon%EigY(Mon%NDimX,Mon%NDimX),Mon%EigX(Mon%NDimX,Mon%NDimX))
+  allocate(Mon%Eig(Mon%NDimX))
   call ERPASYMMXY(Mon%EigY,Mon%EigX,Mon%Eig,ABPlus,ABMin,&
                   Mon%Occ,Mon%IndN,Mon%NDimX,NBas)
 
@@ -192,8 +193,9 @@ if(Flags%ICASSCF==0.and.Flags%ISERPA==0) then
      do i=1,Mon%NDimX
         ip = Mon%IndN(1,i)
         iq = Mon%IndN(2,i)
-        EigVecR((j-1)*Mon%NDimX+i)=(Mon%CICoef(ip)-Mon%CICoef(iq))&
-                                  *(Mon%EigY((j-1)*Mon%NDimX+i)-Mon%EigX((j-1)*Mon%NDimX+i))
+        !EigVecR((j-1)*Mon%NDimX+i)=(Mon%CICoef(ip)-Mon%CICoef(iq))&
+        !                          *(Mon%EigY((j-1)*Mon%NDimX+i)-Mon%EigX((j-1)*Mon%NDimX+i))
+        EigVecR(i,j)=(Mon%CICoef(ip)-Mon%CICoef(iq))*(Mon%EigY(i,j)-Mon%EigX(i,j))
      enddo
   enddo
 
@@ -240,8 +242,8 @@ if(Flags%ICASSCF==0.and.Flags%ISERPA==0) then
   ! CAS-SCF
   elseif(Flags%ICASSCF==1.and.Flags%ISERPA==0) then
 
-  allocate(ABPlus(Mon%NDimX**2),ABMin(Mon%NDimX**2),&
-            EigVecR(Mon%NDimX**2),Eig(Mon%NDimX))
+  allocate(ABPlus(Mon%NDimX,Mon%NDimX),ABMin(Mon%NDimX,Mon%NDimX))
+  allocate(EigVecR(Mon%NDimX,Mon%NDimX),Eig(Mon%NDimX))
 
   !if(Flags%ICholeskyOTF==1.or.Flags%ICholeskyBIN==1) then
   !! write cholesky vecs on disk!
@@ -307,8 +309,8 @@ if(Flags%ICASSCF==0.and.Flags%ISERPA==0) then
   print*, 'ABPlus',norm2(ABPlus)
   print*, 'ABMin',norm2(ABMin)
 
-  EigVecR = 0
-  Eig = 0
+  EigVecR = 0d0
+  Eig = 0d0
   ! HERE WORTH CHECKING SOME MORE FOR EXCITED STATE SELECTION...
   if(Mon%InSt(1,1) > 0) then
      write(lout,'(/1x,a,i2,a,i1)') 'Calculating reponse for state:',Mon%InSt(1,1),'.',Mon%InSt(2,1)
@@ -347,8 +349,9 @@ if(Flags%ICASSCF==0.and.Flags%ISERPA==0) then
 
   write(lout,'(1x,a/)') 'Solving symmetric eigenvalue equation...'
 
-  allocate(Mon%EigY(Mon%NDimX**2),Mon%EigX(Mon%NDimX**2),&
-           Mon%Eig(Mon%NDimX))
+  allocate(Mon%EigY(Mon%NDimX,Mon%NDimX),Mon%EigX(Mon%NDimX,Mon%NDimX))
+  allocate(Mon%Eig(Mon%NDimX))
+
   call ERPASYMMXY(Mon%EigY,Mon%EigX,Mon%Eig,ABPlus,ABMin,&
                   Mon%Occ,Mon%IndN,Mon%NDimX,NBas)
 
@@ -359,8 +362,9 @@ if(Flags%ICASSCF==0.and.Flags%ISERPA==0) then
      do i=1,Mon%NDimX
         ip = Mon%IndN(1,i)
         iq = Mon%IndN(2,i)
-        EigVecR((j-1)*Mon%NDimX+i)=(Mon%CICoef(ip)-Mon%CICoef(iq))&
-                                  *(Mon%EigY((j-1)*Mon%NDimX+i)-Mon%EigX((j-1)*Mon%NDimX+i))
+        !EigVecR((j-1)*Mon%NDimX+i)=(Mon%CICoef(ip)-Mon%CICoef(iq))&
+        !                          *(Mon%EigY((j-1)*Mon%NDimX+i)-Mon%EigX((j-1)*Mon%NDimX+i))
+        EigVecR(i,j)=(Mon%CICoef(ip)-Mon%CICoef(iq))*(Mon%EigY(i,j)-Mon%EigX(i,j))
      enddo
   enddo
 
@@ -515,13 +519,13 @@ if(Flags%ICASSCF==0.and.Flags%ISERPA==0) then
             NBas,Mon%NDim,NInte1,Mon%NoSt,twofile,Flags%IFlag0)
   case(TWOMO_INCORE)
 
-     allocate(EigY0(Mon%NDimX**2),EigY1(Mon%NDimX**2),&
-              Eig0(Mon%NDimX),Eig1(Mon%NDimX))
+     allocate(EigY0(Mon%NDimX,Mon%NDimX),EigY1(Mon%NDimX,Mon%NDimX))
+     allocate(Eig0(Mon%NDimX),Eig1(Mon%NDimX))
 
-      EigY0 = 0
-      EigY1 = 0
-      Eig0  = 0
-      Eig1  = 0
+      EigY0 = 0d0
+      EigY1 = 0d0
+      Eig0  = 0d0
+      Eig1  = 0d0
 
       !! silly AC0 energy test
       ! Call AC0CAS(ECorr,ETot,TwoMO,Mon%Occ,URe,XOne,&
@@ -824,8 +828,8 @@ integer                      :: iunit
 double precision             :: ECASSCF
 
 double precision, allocatable :: URe(:,:)
-double precision, allocatable :: ABPlus(:), ABMin(:)
-double precision, allocatable :: EigX(:),EigY(:),Eig(:)
+double precision, allocatable :: ABPlus(:,:), ABMin(:,:)
+double precision, allocatable :: EigX(:,:),EigY(:,:),Eig(:)
 
 call set_filenames(Mon,FNam)
 
@@ -836,10 +840,11 @@ do i=1,NBas
    URe(i,i) = 1d0
 enddo
 
-allocate(ABPlus(Mon%NDimX**2),ABMin(Mon%NDimX**2))
-allocate(EigX(Mon%NDimX**2),EigY(Mon%NDimX**2),Eig(Mon%NDimX))
+allocate(ABPlus(Mon%NDimX,Mon%NDimX),ABMin(Mon%NDimX,Mon%NDimX))
+allocate(EigX(Mon%NDimX,Mon%NDimX),EigY(Mon%NDimX,Mon%NDimX))
+allocate(Eig(Mon%NDimX))
 
-ECASSCF = 0
+ECASSCF = 0d0
 
 select case(Mon%TwoMoInt)
 case(TWOMO_FOFO)
@@ -909,8 +914,14 @@ integer          :: INegExcit
 double precision :: URe(NBas,NBas)
 character(:),allocatable      :: onefile,twofile,rdmfile,propfile
 double precision, allocatable :: work1(:),work2(:),XOne(:),TwoMO(:)
-double precision, allocatable :: ABPlus(:),ABMin(:),DMAT(:),DMATK(:),&
-                                 CMAT(:),EMAT(:),EMATM(:),EigVecR(:),Eig(:)
+!double precision, allocatable :: ABPlus(:,:),ABMin(:,:)
+!double precision, allocatable :: DMAT(:,:),DMATK(:,:)
+!double precision, allocatable :: CMAT(:,:),EMAT(:,:),EMATM(:,:)
+double precision, allocatable :: ABPlus(:),ABMin(:)
+double precision, allocatable :: DMAT(:),DMATK(:)
+double precision, allocatable :: CMAT(:),EMAT(:),EMATM(:)
+double precision, allocatable :: EigVecR(:,:),Eig(:)
+
 ! checks
  if(M%TwoMoInt/=TWOMO_INCORE) then
    write(LOUT,'(/,1x,a)') 'ERROR! PINO possible only with TwoMoInt==INCORE!'
@@ -993,11 +1004,15 @@ double precision, allocatable :: ABPlus(:),ABMin(:),DMAT(:),DMATK(:),&
  !if((iPINO==2).or.(iPINO==0)) then
  if(iPINO==2) then
     ! CAS/LR -- full linear response for CAS wfn
-    allocate(ABPlus(M%NDim**2),ABMin(M%NDim**2), &
-             CMAT(M%NDim**2),EMAT(NBas**2),EMATM(NBas**2),&
-             DMAT(M%NDim*NBas),DMATK(M%NDim*NBas),&
-             EigVecR(2*(M%NDimX+M%NDimN)*2*(M%NDimX+M%NDimN)),&
-             Eig(2*(M%NDimX+M%NDimN)))
+    !allocate(ABPlus(M%NDim,M%NDim),ABMin(M%NDim,M%NDim))
+    !allocate(CMAT(M%NDim,M%NDim),EMAT(NBas,NBas),EMATM(NBas,NBas))
+    !allocate(DMAT(M%NDim,NBas),DMATK(M%NDim,NBas))
+    allocate(ABPlus(M%NDim*M%NDim),ABMin(M%NDim*M%NDim))
+    allocate(CMAT(M%NDim*M%NDim),EMAT(NBas*NBas),EMATM(NBas*NBas))
+    allocate(DMAT(M%NDim*NBas),DMATK(M%NDim*NBas))
+
+    allocate(EigVecR(2*(M%NDimX+M%NDimN),2*(M%NDimX+M%NDimN)))
+    allocate(Eig(2*(M%NDimX+M%NDimN)))
 
     CMAT=0
     call APSG_NEST(ABPlus,ABMin,CMAT,EMAT,EMATM,DMAT,DMATK,&
@@ -1054,11 +1069,15 @@ double precision, allocatable :: ABPlus(:),ABMin(:),DMAT(:),DMATK(:),&
  ! GVB/TD-APSG
  elseif(iPINO==3) then
 
-    allocate(ABPlus(M%NDim**2),ABMin(M%NDim**2),  &
-             CMAT(M%NDim**2),EMAT(NBas**2),EMATM(NBas**2), &
-             DMAT(M%NDim*NBas),DMATK(M%NDim*NBas), &
-             EigVecR(2*(M%NDimX+M%NDimN)*2*(M%NDimX+M%NDimN)),&
-             Eig(2*(M%NDimX+M%NDimN)))
+    !allocate(ABPlus(M%NDim,M%NDim),ABMin(M%NDim,M%NDim))
+    !allocate(CMAT(M%NDim,M%NDim),EMAT(NBas,NBas),EMATM(NBas,NBas))
+    !allocate(DMAT(M%NDim,NBas),DMATK(M%NDim,NBas))
+    allocate(ABPlus(M%NDim*M%NDim),ABMin(M%NDim*M%NDim))
+    allocate(CMAT(M%NDim*M%NDim),EMAT(NBas*NBas),EMATM(NBas*NBas))
+    allocate(DMAT(M%NDim*NBas),DMATK(M%NDim*NBas))
+
+    allocate(EigVecR(2*(M%NDimX+M%NDimN),2*(M%NDimX+M%NDimN)))
+    allocate(Eig(2*(M%NDimX+M%NDimN)))
 
     CMAT = 0
     call APSG_NEST(ABPlus,ABMin,CMAT,EMAT,EMATM,DMAT,DMATK,&
@@ -1077,11 +1096,11 @@ double precision, allocatable :: ABPlus(:),ABMin(:),DMAT(:),DMATK(:),&
     ! we need eigenprolem (PINOVECREDXY)
     ! for CAS/LR and TD-GVB
 
-    EigVecR = 0
-    Eig = 0
+    Eig = 0d0
 
-    allocate(M%EigY((M%NDimX+M%NDimN)**2),M%EigX((M%NDimX+M%NDimN)**2),&
-             M%Eig(M%NDimX+M%NDimN))
+    allocate(M%EigY((M%NDimX+M%NDimN),(M%NDimX+M%NDimN)))
+    allocate(M%EigX((M%NDimX+M%NDimN),(M%NDimX+M%NDimN)))
+    allocate(M%Eig(M%NDimX+M%NDimN))
 
     !print*, 'dimernsions',M%NDimX,M%NDimN
     !print*,'ABPlus',norm2(ABPLus)
@@ -1098,8 +1117,8 @@ double precision, allocatable :: ABPlus(:),ABMin(:),DMAT(:),DMATK(:),&
                       NBas,M%NDimX,M%NDimN)
 
     print*, 'PINOVECREDXY:'
-    print*,'EigY',norm2(M%EigY(1:(M%NDimX+M%NDimN)**2))
-    print*,'EigX',norm2(M%EigX(1:(M%NDimX+M%NDimN)**2))
+    print*,'EigY',norm2(M%EigY)
+    print*,'EigX',norm2(M%EigX)
 
     Eig = M%Eig
 
@@ -1116,7 +1135,7 @@ double precision, allocatable :: ABPlus(:),ABMin(:),DMAT(:),DMATK(:),&
     enddo
 
     ! prepare EigVecR for E2disp
-    EigVecR = 0
+    EigVecR = 0d0
     do j=1,DimEx
        if(j<=M%NDimX) then
 
@@ -1124,15 +1143,17 @@ double precision, allocatable :: ABPlus(:),ABMin(:),DMAT(:),DMATK(:),&
           iq = M%IndN(2,j)
 
           do i=1,DimEx
-             EigVecR((i-1)*DimEx+j) = (M%CICoef(ip)-M%CICoef(iq))* &
-                                      (M%EigY((i-1)*DimEx+j)-M%EigX((i-1)*DimEx+j))
+             !EigVecR((i-1)*DimEx+j) = (M%CICoef(ip)-M%CICoef(iq))* &
+             !                         (M%EigY((i-1)*DimEx+j)-M%EigX((i-1)*DimEx+j))
+             EigVecR(j,i) = (M%CICoef(ip)-M%CICoef(iq))*(M%EigY(j,i)-M%EigX(j,i))
           enddo
 
        elseif(j>M%NDimX) then
 
           ii = j - M%NDimX
           do i=1,DimEx
-             EigVecR((i-1)*DimEx+j) = M%EigY((i-1)*DimEx+j)/M%CICoef(ii)
+             EigVecR(j,i) = M%EigY(j,i)/M%CICoef(ii)
+             !EigVecR((i-1)*DimEx+j) = M%EigY((i-1)*DimEx+j)/M%CICoef(ii)
           enddo
 
        endif
@@ -1178,9 +1199,11 @@ type(EblockData),allocatable :: A0block(:)
 type(EblockData) :: A0blockIV
 
 double precision :: ETot
-double precision, allocatable :: work1(:),work2(:),XOne(:),TwoMO(:)
-double precision, allocatable :: ABPlus(:), ABMin(:), URe(:,:),      &
-                                 EigY(:), EigY1(:), Eig(:), Eig1(:)
+double precision, allocatable :: XOne(:),TwoMO(:),URe(:,:)
+double precision, allocatable :: work1(:),work2(:)
+double precision, allocatable :: ABPlus(:,:),ABMin(:,:)
+double precision, allocatable :: EigY(:,:),EigY1(:,:)
+double precision, allocatable :: Eig(:), Eig1(:)
 character(8)                  :: label
 character(:),allocatable      :: twojfile,twokfile
 character(:),allocatable      :: onefile,twofile,propfile0,propfile1,rdmfile
@@ -1246,12 +1269,12 @@ if(Mon%TwoMoInt==TWOMO_INCORE) call LoadSaptTwoNO(Mon%Monomer,TwoMO,NBas,NInte2)
 ! GVB
 if(Flags%ICASSCF==0.and.Flags%ISERPA==0) then
 
-   allocate(EigY(Mon%NDimX**2), &
-        Eig(Mon%NDimX),Eig1(Mon%NDimX))
+   allocate(EigY(Mon%NDimX,Mon%NDimX))
+   allocate(Eig(Mon%NDimX),Eig1(Mon%NDimX))
 
-   EigY  = 0
-   Eig   = 0
-   Eig1  = 0
+   EigY  = 0d0
+   Eig   = 0d0
+   Eig1  = 0d0
 
    call Y01GVB(TwoMO,Mon%Occ,URe,XOne, &
         EigY,Eig,Eig1, &
@@ -1283,7 +1306,7 @@ elseif(Flags%ICASSCF==1.and.Flags%ISERPA==0) then
      deallocate(Mon%FF)
   endif
 
-  allocate(ABPlus(Mon%NDimX**2),ABMin(Mon%NDimX**2))
+  allocate(ABPlus(Mon%NDimX,Mon%NDimX),ABMin(Mon%NDimX,Mon%NDimX))
 
   select case(Mon%TwoMoInt)
   case(TWOMO_FOFO)
@@ -1310,13 +1333,13 @@ elseif(Flags%ICASSCF==1.and.Flags%ISERPA==0) then
             Mon%IndN,Mon%IndX,Mon%IGem,Mon%NAct,Mon%INAct,Mon%NDimX, &
             NBas,Mon%NDim,NInte1,Mon%NoSt,twofile,Flags%IFlag0)
   case(TWOMO_INCORE)
-     allocate(EigY(Mon%NDimX**2),EigY1(Mon%NDimX**2), &
-              Eig(Mon%NDimX),Eig1(Mon%NDimX))
+     allocate(EigY(Mon%NDimX,Mon%NDimX),EigY1(Mon%NDimX,Mon%NDimX))
+     allocate(Eig(Mon%NDimX),Eig1(Mon%NDimX))
 
-     EigY  = 0
-     EigY1 = 0
-     Eig   = 0
-     Eig1  = 0
+     EigY  = 0d0
+     EigY1 = 0d0
+     Eig   = 0d0
+     Eig1  = 0d0
 
      call Y01CAS(TwoMO,Mon%Occ,URe,XOne,ABPlus,ABMin, &
           EigY,EigY1,Eig,Eig1, &
@@ -1379,9 +1402,9 @@ double precision, allocatable :: XOne(:), &
                                  WGrid(:),XKer(:),OrbGrid(:),&
                                  OrbXGrid(:),OrbYGrid(:),OrbZGrid(:),&
                                  SRKer(:),SRKerW(:)
-double precision, allocatable :: ABPlus(:),ABMin(:),URe(:,:),VSR(:), &
-                                 EigY0(:),EigY1(:),Eig0(:),Eig1(:), &
-                                 EigVecR(:), Eig(:)
+double precision, allocatable :: ABPlus(:,:),ABMin(:,:),URe(:,:),VSR(:)
+double precision, allocatable :: EigY0(:,:),EigY1(:,:),Eig0(:),Eig1(:)
+double precision, allocatable :: EigVecR(:,:), Eig(:)
 integer          :: i,j,ip,iq,ii,ione
 double precision :: ACAlpha,Omega,EnSR,EnHSR,ECorr,ECASSCF,XVSR
 double precision :: Tcpu,Twall
@@ -1564,8 +1587,8 @@ ACAlpha=One
 ! UNCOUPLED-TEST
 !ACAlpha=1d-9
 
-allocate(ABPlus(Mon%NDimX**2),ABMin(Mon%NDimX**2),&
-         EigVecR(Mon%NDimX**2),Eig(Mon%NDimX))
+allocate(ABPlus(Mon%NDimX,Mon%NDimX),ABMin(Mon%NDimX,Mon%NDimX))
+allocate(EigVecR(Mon%NDimX,Mon%NDimX),Eig(Mon%NDimX))
 
 ! read 2-RDMs
 call system('cp '//rdmfile// ' rdm2.dat')
@@ -1625,13 +1648,13 @@ print*, 'EnSR',EnSR
 print*, 'Potnuc',Mon%PotNuc
 write(LOUT,'(/,1x,a,f15.8)') "Total lrCASSCF+ENuc+srDF Energy", ECASSCF-XVSR+EnSR+Mon%PotNuc
 
-EigVecR = 0
-Eig = 0
+EigVecR = 0d0
+Eig = 0d0
 if(Mon%NoSt==1) then
 !  call ERPASYMM1(EigVecR,Eig,ABPlus,ABMin,NBas,Mon%NDimX)
 
-   allocate(Mon%EigY(Mon%NDimX**2),Mon%EigX(Mon%NDimX**2),&
-            Mon%Eig(Mon%NDimX))
+   allocate(Mon%EigY(Mon%NDimX,Mon%NDimX),Mon%EigX(Mon%NDimX,Mon%NDimX))
+   allocate(Mon%Eig(Mon%NDimX))
    call ERPASYMMXY(Mon%EigY,Mon%EigX,Mon%Eig,ABPlus,ABMin,&
                    Mon%Occ,Mon%IndN,Mon%NDimX,NBas)
 
@@ -1642,8 +1665,9 @@ if(Mon%NoSt==1) then
        do i=1,Mon%NDimX
           ip = Mon%IndN(1,i)
           iq = Mon%IndN(2,i)
-          EigVecR((j-1)*Mon%NDimX+i)=(Mon%CICoef(ip)-Mon%CICoef(iq))&
-                                    *(Mon%EigY((j-1)*Mon%NDimX+i)-Mon%EigX((j-1)*Mon%NDimX+i))
+          EigVecR(i,j)=(Mon%CICoef(ip)-Mon%CICoef(iq))*(Mon%EigY(i,j)-Mon%EigX(i,j))
+          !EigVecR((j-1)*Mon%NDimX+i)=(Mon%CICoef(ip)-Mon%CICoef(iq))&
+          !                          *(Mon%EigY((j-1)*Mon%NDimX+i)-Mon%EigX((j-1)*Mon%NDimX+i))
        enddo
     enddo
 
@@ -1765,7 +1789,7 @@ double precision :: XVSRDalton
 double precision :: URe(NBasis,NBasis),CAONO(NBasis,NBasis)
 double precision :: h0ao(NBasis,NBasis)
 double precision :: ACAlpha
-double precision,allocatable :: ABPlus(:),ABMin(:),EigVecR(:)
+double precision,allocatable :: ABPlus(:,:),ABMin(:,:),EigVecR(:,:)
 double precision,allocatable :: VSR(:),VSRDalton(:),SRKer(:)
 double precision,allocatable :: WGrid(:)
 
@@ -2086,8 +2110,8 @@ if(Flags%ICholeskyOTF==1.or.Flags%ICholeskyBIN==1) then
    deallocate(Mon%FFErf)
 endif
 
-allocate(ABPlus(Mon%NDimX**2),ABMin(Mon%NDimX**2))
-allocate(EigVecR(Mon%NDimX**2))
+allocate(ABPlus(Mon%NDimX,Mon%NDimX),ABMin(Mon%NDimX,Mon%NDimX))
+allocate(EigVecR(Mon%NDimX,Mon%NDimX))
 
 ! read 2-RDMs
 call system('cp '//rdmfile// ' rdm2.dat')
@@ -2147,7 +2171,8 @@ EigVecR = 0
 ! IS EIGVECR REALLY NEEDED? We keep EigX and EigY?
 !
 if(Mon%NoSt==1) then
-   allocate(Mon%EigY(Mon%NDimX**2),Mon%EigX(Mon%NDimX**2),Mon%Eig(Mon%NDimX))
+   allocate(Mon%EigY(Mon%NDimX,Mon%NDimX),Mon%EigX(Mon%NDimX,Mon%NDimX))
+   allocate(Mon%Eig(Mon%NDimX))
    call ERPASYMMXY(Mon%EigY,Mon%EigX,Mon%Eig,ABPlus,ABMin,&
                    Mon%Occ,Mon%IndN,Mon%NDimX,NBasis)
 
@@ -2155,8 +2180,9 @@ if(Mon%NoSt==1) then
        do i=1,Mon%NDimX
           ip = Mon%IndN(1,i)
           iq = Mon%IndN(2,i)
-          EigVecR((j-1)*Mon%NDimX+i)=(Mon%CICoef(ip)-Mon%CICoef(iq))&
-                                    *(Mon%EigY((j-1)*Mon%NDimX+i)-Mon%EigX((j-1)*Mon%NDimX+i))
+          EigVecR(i,j)=(Mon%CICoef(ip)-Mon%CICoef(iq))*(Mon%EigY(i,j)-Mon%EigX(i,j))
+          !EigVecR((j-1)*Mon%NDimX+i)=(Mon%CICoef(ip)-Mon%CICoef(iq))&
+          !                          *(Mon%EigY((j-1)*Mon%NDimX+i)-Mon%EigX((j-1)*Mon%NDimX+i))
        enddo
     enddo
 else
@@ -2684,10 +2710,10 @@ case('AB','ab')
    ij1=0
    do j = 1,Mon%NDimX
       do i = 1,Mon%NDimX
-          ij  = (j-1)*Mon%NDimX + i
-          ij1 = (Mon%IndX(j)-1)*Mon%NDim + Mon%IndX(i)
-          matP(ij) = matP(ij1)
-          matM(ij) = matM(ij1)
+         ij  = (j-1)*Mon%NDimX + i
+         ij1 = (Mon%IndX(j)-1)*Mon%NDim + Mon%IndX(i)
+         matP(ij) = matP(ij1)
+         matM(ij) = matM(ij1)
       enddo
    enddo
 
@@ -2727,7 +2753,7 @@ subroutine writeResp(EVecZ,EVal,mon)
 implicit none
 
 character(*) :: mon
-double precision :: EVecZ(:), EVal(:)
+double precision :: EVecZ(:,:), EVal(:)
 integer :: iunit
 
  open(newunit=iunit,file=mon,form='unformatted')
@@ -2741,7 +2767,7 @@ subroutine writeRespXY(EVecX,EvecY,EVal,mon)
 implicit none
 
 character(*)     :: mon
-double precision :: EVecX(:),EVecY(:),EVal(:)
+double precision :: EVecX(:,:),EVecY(:,:),EVal(:)
 
 integer :: iunit
 

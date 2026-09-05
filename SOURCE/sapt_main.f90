@@ -504,10 +504,10 @@ elseif(Flags%ICholesky==1) then
    if (Flags%IRdm2Typ==11) then ! for BB in ERPA: temporary fix
       call e2disp(Flags,SAPT%monA,SAPT%monB,SAPT)
    else
-      if(.not.SAPT%CAlpha) then
-         call e2disp_Cmat_Chol_block(Flags,SAPT%monA,SAPT%monB,SAPT)
-      else if(SAPT%CAlpha) then
+      if(SAPT%CAlpha) then
          call e2disp_CAlphaTilde_block(Flags,SAPT%monA,SAPT%monB,SAPT)
+      else
+         call e2disp_Cmat_Chol_block(Flags,SAPT%monA,SAPT%monB,SAPT)
       endif
    endif
 
