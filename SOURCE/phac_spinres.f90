@@ -1,6 +1,6 @@
-module acph_spinres
+module phac_spinres
 
-      use acpp_types
+      use ppac_types
       use types
       use math_constants
       use real_linalg 
@@ -168,8 +168,8 @@ contains
                 case(1)                          
                       call msg("Starting PhERPA spinres incore")
 
-                      AuxData%HType =AuxData%GPF
-                      !                      AuxData%HType =AuxData%Dyall
+                      AuxData%HType = H_GPF
+                      !                      AuxData%HType =H_DYALL
                       rdm_dump = .false.
                       call pherpa_incore_driver(AuxData, Flags, Ints, IntsD, rdm_dump)
 
@@ -179,8 +179,8 @@ contains
                 case(1)                          
                       call msg("Starting phAC spinres incore")
 
-                      AuxData%HType =AuxData%GPF
-!                      AuxData%HType =AuxData%Dyall
+                      AuxData%HType = H_GPF
+!                      AuxData%HType =H_DYALL
                       call phac_incore_driver(AuxData, Flags, Ints, IntsD)                      
                 end select
 
@@ -232,7 +232,7 @@ contains
 
         print*, 'herea1'
         if (Flags%JOBTYPE .ne. JOB_TYPE_DUCC)then
-              if (Flags%IORCA == 1 .and. Flags%SPINRES) then
+              if (Flags%IORCA == 1 .and. Flags%Algorithm == ALG_SPINRES) then
                     ! Integrals already in 4-fold format (ints2e_aa, ints2e_ab)
                     print*, 'tak dobrze'
              else
@@ -277,7 +277,7 @@ contains
 
 
         if (Flags%JOBTYPE .ne. JOB_TYPE_DUCC)then
-             if (Flags%IORCA == 1 .and. Flags%SPINRES) then
+             if (Flags%IORCA == 1 .and. Flags%Algorithm == ALG_SPINRES) then
                  ! Integrals already in 4-fold format (ints2e_aa, ints2e_ab)
              else
                  call twoel_8fold_to_ints2e_4fold(Ints, AuxData%NBasis)
@@ -505,7 +505,7 @@ contains
                       if (IAux(i) == IAux(j)) then
                             Aints1e_aa(i, j) = Aints1e_aa(i, j) + (One - alpha) * AuxData%HNO0(i,j)
 
-                            if (AuxData%HType == AuxData%Dyall) then
+                            if (AuxData%HType == H_DYALL) then
                             !      print*, 'dyal'
                                   if (IAux(i) == 1) then
                                         i0 = 1
@@ -514,7 +514,7 @@ contains
                                         i0 = 1
                                         i1 = NIA
                                   end if
-                            else if (AuxData%HType == AuxData%GPF) then
+                            else if (AuxData%HType == H_GPF) then
                                   if (IAux(i) == 0) then
                                         i0 = NI + 1
                                         i1 = NIA
@@ -580,13 +580,13 @@ contains
 
                       idx = gmap_4fold(r,s,p,q,NBasis)
 
-                      if (AuxData%HType == AuxData%Dyall) then
+                      if (AuxData%HType == H_DYALL) then
                             if (.not. (IAux(p) == 1 .and. IAux(q) == 1 .and. &
                                   IAux(r) == 1 .and. IAux(s) == 1)) then
                                   AuxData%int_alpha(idx) = 0
                             end if
 
-                      else if (AuxData%HType == AuxData%GPF) then
+                      else if (AuxData%HType == H_GPF) then
                             if (.not. (IAux(p) == IAux(q) .and. &
                                   IAux(q) == IAux(r) .and. &
                                   IAux(r) == IAux(s))) then
@@ -803,13 +803,13 @@ contains
 
                       idx = gmap_4fold(r,s,p,q,NBasis)
 
-                      if (AuxData%HType == AuxData%Dyall) then
+                      if (AuxData%HType == H_DYALL) then
                             if (.not. (IAux(p) == 1 .and. IAux(q) == 1 .and. &
                                   IAux(r) == 1 .and. IAux(s) == 1)) then
                                   AuxData%int_alpha(idx) = 0
                             end if
 
-                      else if (AuxData%HType == AuxData%GPF) then
+                      else if (AuxData%HType == H_GPF) then
                             if (.not. (IAux(p) == IAux(q) .and. &
                                   IAux(q) == IAux(r) .and. &
                                   IAux(r) == IAux(s))) then
@@ -3507,4 +3507,4 @@ end do
 
    end subroutine write_fcidump_alpha_spinres
 
-   end module acph_spinres
+   end module phac_spinres

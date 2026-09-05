@@ -21,11 +21,9 @@ C
       use build_info
       use omp_lib
       use interface_pp
-      use acpp_types
-      use mp
-      use acpp
-      use acph_spinres
-      use ducc_simple
+      use ppac_types
+      use dispatcher
+      use print_utils
       use geom_input, only : geom_DeleteScratch
 C
       Implicit Real*8 (A-H,O-Z)
@@ -304,7 +302,7 @@ C
       If(ISAPT.Eq.1) Call sapt_driver(Flags,Sapt)
 C
 C     NBasis READ FROM SIRIUS.RST
-      If(IDALTON.Eq.1.and.Flags%IPP.eq.0)
+      If(IDALTON.Eq.1.and.Flags%Parser.Ne.PARSER_AT)
      $        Call basinfo(NBasis,'SIRIUS.RST','DALTON')
 
 CC
@@ -324,7 +322,7 @@ C
 C      Print*,'VALUE DECLARED IN INPUT: ',NoSt
 C
       ElseIf(IDALTON.Eq.0.and.IDMRG.Eq.0) Then
-         if (.not.(Flags%IPYSCF.eq.1.or.Flags%IPP.eq.1))then
+         if (Flags%Parser.Ne.PARSER_AT) then
             Call read_NoSt_molpro(NoSt,'2RDM')
          endif
       ElseIf(IDALTON.Eq.1) Then
@@ -356,25 +354,23 @@ C     OLD INPUT-READ
 C      Call RWInput(Title,ZNucl,Charge,NBasis)
 C
 C     CALCULATE THE DIMENSIONS
-         If(IDALTON.Eq.0.AND.Flags%IPP.Eq.0) then
-C        Call CheckNBa(NBasis,Title)
-        Call basinfo(NBasis,'AOONEINT.mol','MOLPRO')
-      endif
-
-      If(Flags%IPP.Eq.1.or.IPYSCF.Eq.1)then
-         print*, ''
-         print*, 'Following OLA PP path'
-         print*, ''
+      If(Flags%Parser.Eq.PARSER_AT) then
          if(Flags%IPYSCF.eq.1)then
             Call basinfo_pyscf(nbasis)
-            print*, ''
-            print*, 'NBASIS read from PYSCF', nbasis
-            print*, ''
          else if(Flags%IORCA.eq.1)then
             Call basinfo_orca(nbasis)
-            print*, ''
-            print*, 'NBASIS read from FCIDUMP', nbasis
-            print*, ''
+         else if(Flags%ICHRONUSQ.eq.1)then
+            !
+            ! not yet implemented
+            !
+            Call print_info('Source','ChronusQ')
+            Call print_info('Status','not yet implemented')
+            stop
+         end if
+      else
+         if(IDALTON.eq.0)then
+C        Call CheckNBa(NBasis,Title)
+            Call basinfo(NBasis,'AOONEINT.mol','MOLPRO')
          end if
       end if
 C
@@ -412,7 +408,7 @@ C
 C     FOR TESTS SWITCHIG IT OFF...
       If(ITwoEl.Eq.3) NInte2=1
       If(ITwoEl.Eq.2) NInte2=1
-      ! to  trzeba bedzie odkomentowac
+      ! to  trzeba bedzie wyrzucic
 !      If(ITwoEl.eq.1.and.
 !     $     Flags%IORCA.eq.1.and.Flags%IPP.eq.1.
 !     $ and.Flags%SPINRES) NInte2=1
@@ -421,7 +417,9 @@ C
       Allocate  (URe(NBasis*NBasis))
       Allocate  (XKin(NInte1))
       Allocate  (XNuc(NInte1))
-      Allocate  (TwoEl(NInte2))
+!      If(Flags%Parser.ne.PARSER_AT) then
+          Allocate  (TwoEl(NInte2))
+!      EndIf   
       Allocate  (UMOAO(NBasis*NBasis))
       Allocate  (CAONO(NBasis, NBasis))
 
@@ -440,63 +438,67 @@ C
       write(LOUT,'(8a10)') ('**********',i=1,8)
 C
       Call gclock('START',Tcpu,Twall)
-c      print*, 'Flags%SPINRES', Flags%SPINRES
-c      print*, 'ipp', Flags%ipp
 
-      if(IPYSCF.eq.1.or.Flags%IPP.eq.1)then
-         if(IPYSCF.eq.1) then
-c            if (Flags%SPINRES)then
-c               call read_PYSCF_spinres(THCData, AuxData,
-c     $              CAONO, Flags, TwoEl, IntsO)
-c            else
-            NoSt = 1
+      if(Flags%Parser.Eq.PARSER_AT)then
+         Call print_section('AT PARSER')
+         
+         if(Flags%ReaderType.Eq.RT_WRAPPER)then
+            Call print_info('Reader type','WRAPPER')
+            select case(Flags%Reader)
+            case(R_PYSCF)
+            Call print_info('Source','PySCF')
+               NoSt = 1
+               call ReadPYSCF_ORCA(THCData, AuxData, CAONO,
+     $              XKin, XNuc, ENuc, Occ, URe, TwoEl, UMOAO,
+     $              NInte1,NBasis,NInte2,NGem,Flags,
+     $              System%InSt(:,1), 1)
+               if (Flags%Algorithm.Eq.ALG_SPINRES) then
+                  allocate(IntsO%ints2e(NInte2))
+                  IntsO%ints2e = TwoEl
+                  IntsO%NInte2 = NInte2
+               end if
+               if(InSt(2,1).gt.0) then
+                  NoSt = System%InSt(1,1)
+               end if
+            case(R_ORCA)
+               Call print_info('Source','FCIDUMP')
+               call ReadPYSCF_ORCA(THCData, AuxData, CAONO,
+     $              XKin,XNuc,ENuc,Occ, URe,TwoEl,UMOAO,
+     $              NInte1,NBasis,NInte2,NGem,Flags,
+     $              System%InSt(:,1), 2)
+               if(InSt(2,1).gt.0) then
+                  NoSt = System%InSt(1,1)
+               end if
+            end select
 
-
-       print*, 'this is for PYSCF'
-       call ReadPYSCF_ORCA(THCData, AuxData, CAONO, 
-     $  XKin,XNuc,ENuc,Occ,
-     $  URe,TwoEl,UMOAO,
-     $  NInte1,NBasis,NInte2,NGem,Flags, System%InSt(:,1), 1)
-
-
-            if (Flags%SPINRES)then
-            allocate(IntsO%ints2e(NInte2))
-            IntsO%ints2e = TwoEl
-            IntsO%NInte2 = NInte2
-            end if
-            if(InSt(2,1).gt.0) then
-               NoSt = System%InSt(1,1)
-            end if
-c            end if
-         else if(Flags%IORCA.Eq.1)then
-            if (Flags%SPINRES)then
-               print*, 'spinres'
-               
+         else if(Flags%ReaderType.Eq.RT_DIRECT)then
+            Call print_info('Reader type','DIRECT')
+            select case(Flags%Reader)
+         case(R_PYSCF)
+            Call print_info('Source','PySCF')
+               call read_PYSCF(THCData, AuxData, CAONO, Flags)
+            case(R_PYSCFS)
+               Call print_info('Source','PySCF')
+               call read_PYSCF_spinres(THCData, AuxData, CAONO, Flags,
+     $              IntsO)
+            case(R_ORCA)
+               Call print_info('Source','FCIDUMP')
+               call read_ORCA(THCData, AuxData, Flags, CAONO, TwoEl)
+            case(R_ORCAS)
+               Call print_info('Source','FCIDUMP')
                call read_ORCA_spinres(THCData, AuxData, Flags, IntsO)
-      else
-         print*, 'else'
-         if (Flags%JOBTYPE == JOB_TYPE_DUCC)then
-            print*, 'ducc'
-            call read_ORCA_ducc(THCData, AuxData, Flags, IntsO, IntsD)
-         else  if (Flags%JOBTYPE.eq.JOB_TYPE_PPERPA .or.
-     $           Flags%JOBTYPE==JOB_TYPE_AC0PP.or.
-     $           Flags%JOBTYPE==JOB_TYPE_ACPP.or.            
-     $           Flags%JOBTYPE==JOB_TYPE_PPERPA_RDMDUMP.or.
-     $           Flags%JOBTYPE==JOB_TYPE_HHERPA_RDMDUMP) then            
-            call read_ORCA(THCData, AuxData, Flags, CAONO, TwoEl)
-         else
-                print*, 'I am here - pluszon'
-          call ReadPYSCF_ORCA(THCData, AuxData, CAONO,
-     $    XKin,XNuc,ENuc,Occ,
-     $   URe,TwoEl,UMOAO,
-     $        NInte1,NBasis,NInte2,NGem,Flags, System%InSt(:,1), 2)
-         if(InSt(2,1).gt.0) then
-       NoSt = System%InSt(1,1)
-            end if
+            case(R_ORCAD)
+               Call print_info('Source','FCIDUMP')
+               call read_ORCA_ducc(THCData, AuxData, Flags, IntsO,
+     $              IntsD)
+            case(R_CHRONUSQ)
+               Call print_info('Source','CHRONUSQ')
+               !
+               !not yet implemented
+               !
+               stop
+            end select
 
-            
-               end if 
-            end if
          end if
       else
 
@@ -540,34 +542,13 @@ C
       ElseIf(IFunSR.Eq.7) Then
       Call VV10(URe,UMOAO,Occ,NBasis)
       Else
-         select case(Input%CalcParams%JobType)
-
-         case(JOB_TYPE_PPERPA, JOB_TYPE_AC0PP, JOB_TYPE_ACPP,
-     $        JOB_TYPE_PPERPA_RDMDUMP,
-     $     JOB_TYPE_HHERPA_RDMDUMP)
-c      AuxData%ThrPP = System%ThrPP
-      print*, 'hherpa'
-       call acpp_driver(THCData, AuxData, CAONO, Flags, TwoEl)
-
-      case(JOB_TYPE_MP2, JOB_TYPE_SRMP2)
-         IFlCore=0
-         Flags%IFlCore = 0
-
-         call mp2_driver(THCData, AuxData, CAONO, Flags)
-      case(JOB_TYPE_DUCC)
-       call acph_driver(THCData, AuxData, Flags, IntsO, IntsD)
-      case default 
-c$$$      IFlCore=0
-c$$$      Flags%IFlCore = 0
-c$$$  call ala_CABS(THCData, AuxData, CAONO, Flags)
-         if (Flags%SPINRES)then
-
-       call acph_driver(THCData, AuxData, Flags, IntsO)
-         else
+         If(Flags%Dispatch.Eq.DISPATCH_AT) Then
+            Call dispatch_acxx(THCData, AuxData, CAONO, Flags,
+     $       TwoEl, IntsO, IntsD)
+      Else
       Call DMSCF(Flags,Title,URe,Occ,XKin,XNuc,ENuc,UMOAO,
      $           TwoEl,NBasis,NInte1,NInte2,NGem, THCData, AuxData)
-      end if
-      end select
+      EndIf
       
       EndIf
 C

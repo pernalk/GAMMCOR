@@ -1,4 +1,4 @@
-module ppAC_incore
+module ppac_simple_subs
 
       use iso_fortran_env
 
@@ -9,13 +9,13 @@ module ppAC_incore
       use clock
 
       use math_constants
-      use acpp_types
+      use ppac_types
+      use pp_utils   ! ddot_norm, orthogonalize_degen
 
 
       implicit none
 
       double precision, parameter :: tol = 1.d-4
-      integer, parameter :: pDyall = 0, pGPF = 1
       integer, parameter, private :: VVOO=1, VVAO=2, VVAA=3, VAOO=4
       integer, parameter, private :: VAAO=5, VAAA=6, AAOO=7, AAAO=8
       integer, parameter, private :: VAAO2 = 9
@@ -87,7 +87,7 @@ contains
             allocate(TwoNOA(AuxData%NInte2))
             allocate(AuxData%HNOA(NBasis, NBasis))
 
-            call PPERPA_init(AuxData, ACAlpha, Flags, TwoEl, TwoNOA)
+            call PPERPA_init_simple(AuxData, ACAlpha, Flags, TwoEl, TwoNOA)
 
             bl_name(IOO) = 'oo'
             bl_name(IVV) = 'vv'
@@ -147,15 +147,15 @@ contains
                   p = AuxData%IndN(1, i)
                   q = AuxData%IndN(2, i)
                   if (IndAux(p)==0 .and. IndAux(q)==0) then
-                        call updateIndices(AuxData, p, q, eigsPA(IOO)%IndN, eigsPA(IOO)%dim)
+                        call updateIndices_simple(AuxData, p, q, eigsPA(IOO)%IndN, eigsPA(IOO)%dim)
                   elseif (IndAux(p)==2 .and. IndAux(q)==2) then
-                        call updateIndices(AuxData, p, q, eigsPA(IVV)%IndN, eigsPA(IVV)%dim)
+                        call updateIndices_simple(AuxData, p, q, eigsPA(IVV)%IndN, eigsPA(IVV)%dim)
                   elseif (IndAux(p)==1 .and. IndAux(q)==1) then
-                        call updateIndices(AuxData, p, q, eigsPA(IAA)%IndN, eigsPA(IAA)%dim)
+                        call updateIndices_simple(AuxData, p, q, eigsPA(IAA)%IndN, eigsPA(IAA)%dim)
                   elseif (IndAux(p)==2 .and. IndAux(q)==1) then
-                        call updateIndices(AuxData, p, q, eigsPA(IVA)%IndN, eigsPA(IVA)%dim)
+                        call updateIndices_simple(AuxData, p, q, eigsPA(IVA)%IndN, eigsPA(IVA)%dim)
                   elseif (IndAux(p)==1 .and. IndAux(q)==0) then
-                        call updateIndices(AuxData, p, q, eigsPA(IAO)%IndN, eigsPA(IAO)%dim)
+                        call updateIndices_simple(AuxData, p, q, eigsPA(IAO)%IndN, eigsPA(IAO)%dim)
                   end if
             end do
 
@@ -164,15 +164,15 @@ contains
                   p = AuxData%IndN_t(1, i)
                   q = AuxData%IndN_t(2, i)
                   if (IndAux(p)==0 .and. IndAux(q)==0) then
-                        call updateIndices(AuxData, p, q, eigsPA(IOOT)%IndN, eigsPA(IOOT)%dim)
+                        call updateIndices_simple(AuxData, p, q, eigsPA(IOOT)%IndN, eigsPA(IOOT)%dim)
                   elseif (IndAux(p)==2 .and. IndAux(q)==2) then
-                        call updateIndices(AuxData, p, q, eigsPA(IVVT)%IndN, eigsPA(IVVT)%dim)
+                        call updateIndices_simple(AuxData, p, q, eigsPA(IVVT)%IndN, eigsPA(IVVT)%dim)
                   elseif (IndAux(p)==1 .and. IndAux(q)==1) then
-                        call updateIndices(AuxData, p, q, eigsPA(IAAT)%IndN, eigsPA(IAAT)%dim)
+                        call updateIndices_simple(AuxData, p, q, eigsPA(IAAT)%IndN, eigsPA(IAAT)%dim)
                   elseif (IndAux(p)==2 .and. IndAux(q)==1) then
-                        call updateIndices(AuxData, p, q, eigsPA(IVAT)%IndN, eigsPA(IVAT)%dim)
+                        call updateIndices_simple(AuxData, p, q, eigsPA(IVAT)%IndN, eigsPA(IVAT)%dim)
                   elseif (IndAux(p)==1 .and. IndAux(q)==0) then
-                        call updateIndices(AuxData, p, q, eigsPA(IAOT)%IndN, eigsPA(IAOT)%dim)
+                        call updateIndices_simple(AuxData, p, q, eigsPA(IAOT)%IndN, eigsPA(IAOT)%dim)
                   end if
             end do
 
@@ -180,15 +180,15 @@ contains
                   p = AuxData%IndN_t_aa(1, i)
                   q = AuxData%IndN_t_aa(2, i)
                   if (IndAux(p)==0 .and. IndAux(q)==0) then
-                        call updateIndices(AuxData, p, q, eigsPA(IOOT_AA)%IndN, eigsPA(IOOT_AA)%dim)
+                        call updateIndices_simple(AuxData, p, q, eigsPA(IOOT_AA)%IndN, eigsPA(IOOT_AA)%dim)
                   elseif (IndAux(p)==2 .and. IndAux(q)==2) then
-                        call updateIndices(AuxData, p, q, eigsPA(IVVT_AA)%IndN, eigsPA(IVVT_AA)%dim)
+                        call updateIndices_simple(AuxData, p, q, eigsPA(IVVT_AA)%IndN, eigsPA(IVVT_AA)%dim)
                   elseif (IndAux(p)==1 .and. IndAux(q)==1) then
-                        call updateIndices(AuxData, p, q, eigsPA(IAAT_AA)%IndN, eigsPA(IAAT_AA)%dim)
+                        call updateIndices_simple(AuxData, p, q, eigsPA(IAAT_AA)%IndN, eigsPA(IAAT_AA)%dim)
                   elseif (IndAux(p)==2 .and. IndAux(q)==1) then
-                        call updateIndices(AuxData, p, q, eigsPA(IVAT_AA)%IndN, eigsPA(IVAT_AA)%dim)
+                        call updateIndices_simple(AuxData, p, q, eigsPA(IVAT_AA)%IndN, eigsPA(IVAT_AA)%dim)
                   elseif (IndAux(p)==1 .and. IndAux(q)==0) then
-                        call updateIndices(AuxData, p, q, eigsPA(IAOT_AA)%IndN, eigsPA(IAOT_AA)%dim)
+                        call updateIndices_simple(AuxData, p, q, eigsPA(IAOT_AA)%IndN, eigsPA(IAOT_AA)%dim)
                   end if
             end do
 
@@ -196,15 +196,15 @@ contains
                   p = AuxData%IndN_t_bb(1, i)
                   q = AuxData%IndN_t_bb(2, i)
                   if (IndAux(p)==0 .and. IndAux(q)==0) then
-                        call updateIndices(AuxData, p, q, eigsPA(IOOT_BB)%IndN, eigsPA(IOOT_BB)%dim)
+                        call updateIndices_simple(AuxData, p, q, eigsPA(IOOT_BB)%IndN, eigsPA(IOOT_BB)%dim)
                   elseif (IndAux(p)==2 .and. IndAux(q)==2) then
-                        call updateIndices(AuxData, p, q, eigsPA(IVVT_BB)%IndN, eigsPA(IVVT_BB)%dim)
+                        call updateIndices_simple(AuxData, p, q, eigsPA(IVVT_BB)%IndN, eigsPA(IVVT_BB)%dim)
                   elseif (IndAux(p)==1 .and. IndAux(q)==1) then
-                        call updateIndices(AuxData, p, q, eigsPA(IAAT_BB)%IndN, eigsPA(IAAT_BB)%dim)
+                        call updateIndices_simple(AuxData, p, q, eigsPA(IAAT_BB)%IndN, eigsPA(IAAT_BB)%dim)
                   elseif (IndAux(p)==2 .and. IndAux(q)==1) then
-                        call updateIndices(AuxData, p, q, eigsPA(IVAT_BB)%IndN, eigsPA(IVAT_BB)%dim)
+                        call updateIndices_simple(AuxData, p, q, eigsPA(IVAT_BB)%IndN, eigsPA(IVAT_BB)%dim)
                   elseif (IndAux(p)==1 .and. IndAux(q)==0) then
-                        call updateIndices(AuxData, p, q, eigsPA(IAOT_BB)%IndN, eigsPA(IAOT_BB)%dim)
+                        call updateIndices_simple(AuxData, p, q, eigsPA(IAOT_BB)%IndN, eigsPA(IAOT_BB)%dim)
                   else
                         print*, 'to niewykorzystane', p, q
                   end if
@@ -235,7 +235,7 @@ contains
             ! i=IAA
             ! variant=1
             ! spsym = 0
-            ! call eigs0_block(.false., .false., eigsPA(i)%Eig, eigsPA(i)%Eigvec, eigsPA(i)%v_plus, AuxData%HNOA, TwoNOA, &            
+            ! call eigs0_block_simple(.false., .false., eigsPA(i)%Eig, eigsPA(i)%Eigvec, eigsPA(i)%v_plus, AuxData%HNOA, TwoNOA, &            
             !       AuxData, eigsPA(i)%IndN, eigsPA(i)%dim, spsym, Flags, variant)
 
  !           print*, 'wartosci wlasne tego bloku'!, i, bl_name(i), eigsPA(i)%dim
@@ -275,7 +275,7 @@ contains
                               isvv = .true.
                         end if
 
-                        call eigs0_block(isvv, isoo, eigsPA(i)%Eig, eigsPA(i)%Eigvec, eigsPA(i)%v_plus, AuxData%HNOA, TwoNOA, &            
+                        call eigs0_block_simple(isvv, isoo, eigsPA(i)%Eig, eigsPA(i)%Eigvec, eigsPA(i)%v_plus, AuxData%HNOA, TwoNOA, &            
                               AuxData, eigsPA(i)%IndN, eigsPA(i)%dim, spsym, Flags, variant)
 
                         print*, 'wartosci wlasne tego bloku', i, bl_name(i), eigsPA(i)%dim
@@ -302,7 +302,7 @@ contains
 
             call clock_start(timer0)
             ACAlpha = one
-            call PPERPA_init(AuxData, ACAlpha, Flags, TwoEl, TwoNOA)
+            call PPERPA_init_simple(AuxData, ACAlpha, Flags, TwoEl, TwoNOA)
             
             print*, 'TIME na PPERPA_init alphaone ', clock_readwall(timer0)
             print*, 'koniec init'
@@ -340,7 +340,7 @@ contains
                   print*, bbl_name(i), eigsPA(il)%dim, eigsPA(ir)%dim
 
 
-                  call calc_block(AuxData, i, eigsPA(il), eigsPA(ir), AuxData%HNOA, TwoEl, TWONOA,&
+                  call calc_block_simple(AuxData, i, eigsPA(il), eigsPA(ir), AuxData%HNOA, TwoEl, TWONOA,&
                         0, Flags, E_contr_s(i))
                   
                   !print*, 'Czas na sing ', bbl_name(i), ' ', clock_readwall(timer0)
@@ -360,19 +360,19 @@ contains
                   
                   ! 1. Averaged / Mixed (Variant 1)
                   print*, 'pierwszy block t1 (avg)'
-                  call calc_block(AuxData, i, eigsPA(il), eigsPA(ir), AuxData%HNOA, TwoEl, TWONOA, &
+                  call calc_block_simple(AuxData, i, eigsPA(il), eigsPA(ir), AuxData%HNOA, TwoEl, TWONOA, &
                         1, Flags, contr_t1, 1) 
 
                   ! 2. AAAA (Variant 2)
                   ! Indices +5 from Avg
                   print*, 'drugi block t2 (aaaa)'
-                  call calc_block(AuxData, i, eigsPA(il+5), eigsPA(ir+5), AuxData%HNOA, TwoEl, TWONOA, &
+                  call calc_block_simple(AuxData, i, eigsPA(il+5), eigsPA(ir+5), AuxData%HNOA, TwoEl, TWONOA, &
                         1, Flags, contr_t2, 2)
 
                   ! 3. BBBB (Variant 3)
                   ! Indices +10 from Avg
                   print*, 'trzeci block t3 (bbbb)'
-                  call calc_block(AuxData, i, eigsPA(il+10), eigsPA(ir+10), AuxData%HNOA, TwoEl, TWONOA, &
+                  call calc_block_simple(AuxData, i, eigsPA(il+10), eigsPA(ir+10), AuxData%HNOA, TwoEl, TWONOA, &
                         1, Flags, contr_t3, 3)
 
                   ! Sum
@@ -465,7 +465,7 @@ contains
             allocate(TwoNOA(AuxData%NInte2))
             allocate(AuxData%HNOA(NBasis, NBasis))
 
-            call PPERPA_init(AuxData, ACAlpha, Flags, TwoEl, TwoNOA)
+            call PPERPA_init_simple(AuxData, ACAlpha, Flags, TwoEl, TwoNOA)
 
             bl_name(IOO) = 'oo'
             bl_name(IVV) = 'vv'
@@ -514,15 +514,15 @@ contains
                   p = AuxData%IndN(1, i)
                   q = AuxData%IndN(2, i)
                   if (IndAux(p)==0 .and. IndAux(q)==0) then
-                        call updateIndices(AuxData, p, q, eigsPA(IOO)%IndN, eigsPA(IOO)%dim)
+                        call updateIndices_simple(AuxData, p, q, eigsPA(IOO)%IndN, eigsPA(IOO)%dim)
                   elseif (IndAux(p)==2 .and. IndAux(q)==2) then
-                        call updateIndices(AuxData, p, q, eigsPA(IVV)%IndN, eigsPA(IVV)%dim)
+                        call updateIndices_simple(AuxData, p, q, eigsPA(IVV)%IndN, eigsPA(IVV)%dim)
                   elseif (IndAux(p)==1 .and. IndAux(q)==1) then
-                        call updateIndices(AuxData, p, q, eigsPA(IAA)%IndN, eigsPA(IAA)%dim)
+                        call updateIndices_simple(AuxData, p, q, eigsPA(IAA)%IndN, eigsPA(IAA)%dim)
                   elseif ((IndAux(p)==2 .and. IndAux(q)==1).or.(IndAux(p)==1 .and. IndAux(q)==2)) then
-                        call updateIndices(AuxData, p, q, eigsPA(IVA)%IndN, eigsPA(IVA)%dim)
+                        call updateIndices_simple(AuxData, p, q, eigsPA(IVA)%IndN, eigsPA(IVA)%dim)
                   elseif ((IndAux(p)==1 .and. IndAux(q)==0).or. (IndAux(p)==0 .and. IndAux(q)==1) )then
-                        call updateIndices(AuxData, p, q, eigsPA(IAO)%IndN, eigsPA(IAO)%dim)
+                        call updateIndices_simple(AuxData, p, q, eigsPA(IAO)%IndN, eigsPA(IAO)%dim)
                   end if
             end do
 
@@ -532,15 +532,15 @@ contains
                   p = AuxData%IndN_t_aa(1, i)
                   q = AuxData%IndN_t_aa(2, i)
                   if (IndAux(p)==0 .and. IndAux(q)==0) then
-                        call updateIndices(AuxData, p, q, eigsPA(IOOT_AA)%IndN, eigsPA(IOOT_AA)%dim)
+                        call updateIndices_simple(AuxData, p, q, eigsPA(IOOT_AA)%IndN, eigsPA(IOOT_AA)%dim)
                   elseif (IndAux(p)==2 .and. IndAux(q)==2) then
-                        call updateIndices(AuxData, p, q, eigsPA(IVVT_AA)%IndN, eigsPA(IVVT_AA)%dim)
+                        call updateIndices_simple(AuxData, p, q, eigsPA(IVVT_AA)%IndN, eigsPA(IVVT_AA)%dim)
                   elseif (IndAux(p)==1 .and. IndAux(q)==1) then
-                        call updateIndices(AuxData, p, q, eigsPA(IAAT_AA)%IndN, eigsPA(IAAT_AA)%dim)
+                        call updateIndices_simple(AuxData, p, q, eigsPA(IAAT_AA)%IndN, eigsPA(IAAT_AA)%dim)
                   elseif (IndAux(p)==2 .and. IndAux(q)==1) then
-                        call updateIndices(AuxData, p, q, eigsPA(IVAT_AA)%IndN, eigsPA(IVAT_AA)%dim)
+                        call updateIndices_simple(AuxData, p, q, eigsPA(IVAT_AA)%IndN, eigsPA(IVAT_AA)%dim)
                   elseif (IndAux(p)==1 .and. IndAux(q)==0) then
-                        call updateIndices(AuxData, p, q, eigsPA(IAOT_AA)%IndN, eigsPA(IAOT_AA)%dim)
+                        call updateIndices_simple(AuxData, p, q, eigsPA(IAOT_AA)%IndN, eigsPA(IAOT_AA)%dim)
                   end if
             end do
 
@@ -548,15 +548,15 @@ contains
                   p = AuxData%IndN_t_bb(1, i)
                   q = AuxData%IndN_t_bb(2, i)
                   if (IndAux(p)==0 .and. IndAux(q)==0) then
-                        call updateIndices(AuxData, p, q, eigsPA(IOOT_BB)%IndN, eigsPA(IOOT_BB)%dim)
+                        call updateIndices_simple(AuxData, p, q, eigsPA(IOOT_BB)%IndN, eigsPA(IOOT_BB)%dim)
                   elseif (IndAux(p)==2 .and. IndAux(q)==2) then
-                        call updateIndices(AuxData, p, q, eigsPA(IVVT_BB)%IndN, eigsPA(IVVT_BB)%dim)
+                        call updateIndices_simple(AuxData, p, q, eigsPA(IVVT_BB)%IndN, eigsPA(IVVT_BB)%dim)
                   elseif (IndAux(p)==1 .and. IndAux(q)==1) then
-                        call updateIndices(AuxData, p, q, eigsPA(IAAT_BB)%IndN, eigsPA(IAAT_BB)%dim)
+                        call updateIndices_simple(AuxData, p, q, eigsPA(IAAT_BB)%IndN, eigsPA(IAAT_BB)%dim)
                   elseif (IndAux(p)==2 .and. IndAux(q)==1) then
-                        call updateIndices(AuxData, p, q, eigsPA(IVAT_BB)%IndN, eigsPA(IVAT_BB)%dim)
+                        call updateIndices_simple(AuxData, p, q, eigsPA(IVAT_BB)%IndN, eigsPA(IVAT_BB)%dim)
                   elseif (IndAux(p)==1 .and. IndAux(q)==0) then
-                        call updateIndices(AuxData, p, q, eigsPA(IAOT_BB)%IndN, eigsPA(IAOT_BB)%dim)
+                        call updateIndices_simple(AuxData, p, q, eigsPA(IAOT_BB)%IndN, eigsPA(IAOT_BB)%dim)
                   else
                         print*, 'to niewykorzystane', p, q
                   end if
@@ -609,7 +609,7 @@ contains
                               isvv = .true.
                         end if
 
-                        call eigs0_block(isvv, isoo, eigsPA(i)%Eig, eigsPA(i)%Eigvec, eigsPA(i)%v_plus, AuxData%HNOA, TwoNOA, &            
+                        call eigs0_block_simple(isvv, isoo, eigsPA(i)%Eig, eigsPA(i)%Eigvec, eigsPA(i)%v_plus, AuxData%HNOA, TwoNOA, &            
                               AuxData, eigsPA(i)%IndN, eigsPA(i)%dim, spsym, Flags, variant)
 
                         print*, 'wartosci wlasne tego bloku', i, bl_name(i)
@@ -632,7 +632,7 @@ contains
 
             call clock_start(timer0)
             ACAlpha = one
-            call PPERPA_init(AuxData, ACAlpha, Flags, TwoEl, TwoNOA)
+            call PPERPA_init_simple(AuxData, ACAlpha, Flags, TwoEl, TwoNOA)
 
             print*, 'TIME na PPERPA_init alphaone ', clock_readwall(timer0)
             print*, 'koniec init'
@@ -677,18 +677,18 @@ contains
 
                   ! mixed ABAB contribution
                   print*, 'mix contrib'
-                  call calc_block(AuxData, i, eigsPA(il), eigsPA(ir), AuxData%HNOA, TwoEl, TwoNOA, &
+                  call calc_block_simple(AuxData, i, eigsPA(il), eigsPA(ir), AuxData%HNOA, TwoEl, TwoNOA, &
                         2, Flags, contr_mix1, 4)
 
 
                   ! AAAA triplet contribution
                   print*, 'AAAA contrib'
-                  call calc_block(AuxData, i, eigsPA(il+offs1), eigsPA(ir+offs1), AuxData%HNOA, TwoEl, TwoNOA, &
+                  call calc_block_simple(AuxData, i, eigsPA(il+offs1), eigsPA(ir+offs1), AuxData%HNOA, TwoEl, TwoNOA, &
                         1, Flags, contr_t_AAAA, 2)
 
                   ! BBBB triplet contribution
                   print*, 'BBBB contrib'
-                  call calc_block(AuxData, i, eigsPA(il+offs2), eigsPA(ir+offs2), AuxData%HNOA, TwoEl, TwoNOA, &
+                  call calc_block_simple(AuxData, i, eigsPA(il+offs2), eigsPA(ir+offs2), AuxData%HNOA, TwoEl, TwoNOA, &
                         1, Flags, contr_t_BBBB, 3)
 
                   E_contr_s(i) = contr_mix1
@@ -719,7 +719,7 @@ contains
           end associate
     end subroutine ACPP0_incore_mix
     
-     subroutine eigs0_block(isvv, isoo, Eig, Eigvec, v_plus, Ha, TwoNOA, &
+     subroutine eigs0_block_simple(isvv, isoo, Eig, Eigvec, v_plus, Ha, TwoNOA, &
             AuxData, IndN, NDim, spin_symm, Flags, variant)
 
             logical, intent(in) :: isvv, isoo
@@ -794,7 +794,7 @@ contains
                         end if
                   else
                         print*, 'nonsym'
-                        call nonsymmetric_eigenproblem_block(Eig, Eig_i, Eigvec, MxA, MxS, v_plus, IndN, AuxData%IndAux, 1)
+                        call nonsymmetric_eigenproblem_block_simple(Eig, Eig_i, Eigvec, MxA, MxS, v_plus, IndN, AuxData%IndAux, 1)
                   end if
 
                   deallocate(MxA)
@@ -804,9 +804,9 @@ contains
             ! print*, 'Czas diagonalizacji sing: '//str(clock_readwall(timer),d=2)
 
 
-      end subroutine eigs0_block
+      end subroutine eigs0_block_simple
 
-      subroutine calc_block(AuxData, x, ePAl, ePAr,  Ha, TwoEl,  TWONOA, &
+      subroutine calc_block_simple(AuxData, x, ePAl, ePAr,  Ha, TwoEl,  TWONOA, &
             spin_symm, Flags, E_contr, variant)
             type(TACppData), intent(inout) :: AuxData
             integer, intent(in) :: x
@@ -1175,10 +1175,10 @@ contains
             deallocate(tempx)
 
           end associate
-    end subroutine calc_block
+    end subroutine calc_block_simple
 
 
-      subroutine updateIndices(AuxData, p, q, IndN, ind)
+      subroutine updateIndices_simple(AuxData, p, q, IndN, ind)
             type(TACppData), intent(inout) :: AuxData
             integer, intent(in) :: p, q
             integer, dimension(:,:), intent(inout) :: IndN
@@ -1188,10 +1188,10 @@ contains
             IndN(2,ind) = q
             ind = ind + 1
 
-      end subroutine updateIndices
+      end subroutine updateIndices_simple
 
 
-      subroutine nonsymmetric_eigenproblem_block(wr, wi, vr, A, S, v_plus, IndN, IndAux, AC_TYPE)
+      subroutine nonsymmetric_eigenproblem_block_simple(wr, wi, vr, A, S, v_plus, IndN, IndAux, AC_TYPE)
             double precision, dimension(:), intent(out)      :: wr
             double precision, dimension(:), intent(out)      :: wi
             double precision, dimension(:, :), allocatable   :: vl
@@ -1367,7 +1367,7 @@ contains
             !       print*, wr_plus(i)
             ! end do
 
-      end subroutine nonsymmetric_eigenproblem_block
+      end subroutine nonsymmetric_eigenproblem_block_simple
 
 
       subroutine pperpa_incore_opshell(MxA, MxS, AuxData, h, TwoEl, Ndim1, Ndim2, indn1, indn2, indx, spin_symm, multiply_by_S)
@@ -4170,7 +4170,7 @@ contains
       ! end function erdm_pmx
 
 
-      subroutine PPERPA_init(AuxData, ACAlpha, Flags, TwoEl, TwoNO)
+      subroutine PPERPA_init_simple(AuxData, ACAlpha, Flags, TwoEl, TwoNO)
             type(TACppData), intent(inout) :: AuxData
             double precision, dimension(:),      intent(in) :: TwoEl
             double precision, dimension(:),      intent(out) :: TwoNO
@@ -4236,90 +4236,7 @@ contains
                   end do
             end do
           end associate
-      end subroutine PPERPA_init
-
-           subroutine ddot_norm(vri, S, vrj, n, dd)
-            double precision, dimension(:), intent(in) :: vri, vrj
-	    double precision, dimension(:, :), intent(in) :: S
-            integer, intent(in) :: n
-            double precision, intent(out) :: dd
-            double precision, dimension(:), allocatable :: tempx
-
-            allocate(tempx(n))
-            tempx = zero
-            call real_av_x(tempx, S, n,  vrj, n, n, one, zero)
-
-            call real_vw_x(dd, vri, tempx, n)
-            deallocate(tempx)
-
-      end subroutine ddot_norm
-
-    subroutine orthogonalize_degen(n, countj, wr, vr, S_diag, dy, x)
-
-            integer, intent(in) :: n
-            double precision, dimension(:), intent(in) :: wr
-            double precision, dimension(:,:), intent(inout) :: vr
-            double precision, dimension(:), intent(in) :: S_diag
-            integer, dimension(:), intent(in) :: dy
-            integer, intent(in) :: x
-            integer, dimension(:), allocatable :: StartIdx, EndIdx
-            integer, intent(in) :: countj
-            double precision, parameter :: tol = 1.d-4
-            integer :: count, j, i
-
-
-            allocate(StartIdx(n))
-            allocate(EndIdx(n))
-
-            StartIdx = 0
-            EndIdx = 0
-            count = 1
-            j = 0
-
-            do i = 1, countj
-
-                  if (j==0)then
-
-                        StartIdx(count) = i
-                        if (i.eq.countj)then
-                              EndIdx(count) = i
-                        end if
-                        j = 1
-                  else
-                        if (abs(wr(i)-wr(i-1)).lt.tol)then
-
-                              if (i==n)then
-                                    EndIdx(count) = i
-                              end if
-                              if (i==countj)then
-                                    EndIdx(count) = i
-                              end if
-                        else
-
-                              EndIdx(count) = i-1
-
-                              if (i.ne.countj)then
-
-                                    count = count + 1
-                                    StartIdx(count)=i
-
-                              else
-                                    count = count+1
-                                    StartIdx(count) = i
-                                    EndIdx(count) = i
-                              end if
-
-                        end if
-                  end if
-            end do
-
-            if (StartIdx(1) == 0)then
-                  count = 0
-            end if
-
-
-            call Orthogonalize(vr, count, StartIdx(1:count), EndIdx(1:count), S_diag, dy, x)
-      end subroutine orthogonalize_degen
+      end subroutine PPERPA_init_simple
 
       function func_P3a(AuxData, TwoEl, s, p, q, r)
             double precision :: func_P3a
@@ -5232,4 +5149,4 @@ contains
             end associate
       end function func_P45_mp
 
-end module ppAC_incore
+end module ppac_simple_subs

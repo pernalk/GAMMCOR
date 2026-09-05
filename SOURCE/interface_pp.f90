@@ -1,6 +1,6 @@
 module interface_pp
 
-      use acpp_types
+      use ppac_types
       use math_constants
       use basis_sets
       use Cholesky_Gammcor
@@ -12,12 +12,10 @@ module interface_pp
       use real_linalg
       use sort
       use clock
+      use print_utils
 
-
-      
 
       implicit none
-
 
 contains
 
@@ -64,13 +62,11 @@ contains
             type(TSystem)  :: System
             integer :: ms2
 
-
-            print*, 'inside read pyscf'
-            print*, 'Flags%ITwoEl', Flags%ITwoEl
             if (Flags%ITwoEl.ne.1)then
+                  print*, 'Two electron integrals calculated with THC'
                   call GEOM_init(Flags, AuxData, AObasis, System)
             else
-
+                  print*, 'Two electron integrals read from file'
                   ! call read_fcidump_header("FCIDUMP", AuxData%NBasis, AuxData%Nel, ms2)
                   ! call read_fcidump_restricted('FCIDUMP', AuxData, TwoEl)
 
@@ -79,13 +75,13 @@ contains
                   read(unit) TwoEl
                   close(unit)
             end if
-            print*, 'past geom'
-            !-----------------------------------------------------------------------------------------------------
-            ! Check if there is a state specified in input 
-            !-----------------------------------------------------------------------------------------------------
-            print*, 'AuxData%nst', AuxData%nst
 
-            print*, 'Flags%JOBTYPE', Flags%JOBTYPE
+            !-----------------------------------------------------------------------------------------------------
+            ! Check if there is a state specified in input
+            !-----------------------------------------------------------------------------------------------------
+            call print_section('State and job setup')
+            call print_info('AuxData%nst', AuxData%nst)
+            call print_info('Flags%JobType', Flags%JobType)
 
             if (Flags%JOBTYPE == JOB_TYPE_MP2 .or. Flags%JOBTYPE == JOB_TYPE_SRMP2) then
                   call load_mp2_aux_data(AuxData)
@@ -95,14 +91,15 @@ contains
                   call load_cas_aux_data(suffix, AuxData, natural_orb)
                   AuxData%PYSCF = 1
 
-                  print *, 'NBasis:', AuxData%nbasis
-                  print *, 'NInactive:', AuxData%NI
-                  print *, 'NActive:', AuxData%NA
-                  print *, 'NVirtual:', AuxData%NV
-                  print *, 'CASSCF Energy:', AuxData%ECAS
-                  print *, 'Nuclear Energy:', AuxData%ENuc
-                  print *, 'Number of electrons:', AuxData%Nel
-                  print *, 'Natural orbitals', natural_orb, '(0 - not used, 1 - used)'
+                  call print_section('CASSCF data loaded')
+                  call print_info('NBasis', AuxData%nbasis)
+                  call print_info('NInactive', AuxData%NI)
+                  call print_info('NActive', AuxData%NA)
+                  call print_info('NVirtual', AuxData%NV)
+                  call print_info('CASSCF Energy', AuxData%ECAS)
+                  call print_info('Nuclear Energy', AuxData%ENuc)
+                  call print_info('Number of electrons', AuxData%Nel)
+                  call print_info('Natural orbitals used (0/1)', natural_orb)
                   
             end if
             
@@ -112,6 +109,7 @@ contains
               allocate(AuxData%HNO0(NBasis, NBasis))
               allocate(THCData%HNO(NBasis, NBasis))
               THCData%ExternalOrdering = ORBITAL_ORDERING_PYSCF
+              THCData%H0external = Flags%H0external
               allocate(THCData%fij(NI))
               allocate(THCData%fvw(NV))
 
@@ -129,30 +127,30 @@ contains
                     call load_density_matrices(suffix, AuxData, THCData, CAOMO, CAONO, Flags, AObasis, System, TwoEl)
 
                     
-                    print*, 'rdmyy'
-                    write(*, '("p", T6, "q", T11, "r", T16, "s", T25, "rdm_pp", T40, "rdm_mm", T55, "rdm_pm", T70, "rdm_mp", T85, "rdm_full")')
-                    associate(NA=>AuxData%NA)
-                      do i = 1, NA
-                            do j = 1, NA
-                                  do k = 1, NA
-                                        do l = 1, NA
-                                              if (abs(AuxData%rdm2_pp(i,j,k,l)) > 1.d-5 .or. &
-                                                    abs(AuxData%rdm2_mm(i,j,k,l)) > 1.d-5 .or. &
-                                                    abs(AuxData%rdm2_pm(i,j,k,l)) > 1.d-5 .or. &
-                                                    abs(AuxData%rdm2_mp(i,j,k,l)) > 1.d-5) then
+                    ! print*, 'rdmyy'
+                    ! write(*, '("p", T6, "q", T11, "r", T16, "s", T25, "rdm_pp", T40, "rdm_mm", T55, "rdm_pm", T70, "rdm_mp", T85, "rdm_full")')
+                    ! associate(NA=>AuxData%NA)
+                    !   do i = 1, NA
+                    !         do j = 1, NA
+                    !               do k = 1, NA
+                    !                     do l = 1, NA
+                    !                           if (abs(AuxData%rdm2_pp(i,j,k,l)) > 1.d-5 .or. &
+                    !                                 abs(AuxData%rdm2_mm(i,j,k,l)) > 1.d-5 .or. &
+                    !                                 abs(AuxData%rdm2_pm(i,j,k,l)) > 1.d-5 .or. &
+                    !                                 abs(AuxData%rdm2_mp(i,j,k,l)) > 1.d-5) then
 
-                                                    write(*, '(4I5, 5F15.8)') i, j, k, l, &
-                                                          AuxData%rdm2_pp(i,j,k,l), &
-                                                          AuxData%rdm2_mm(i,j,k,l), &
-                                                          AuxData%rdm2_pm(i,j,k,l), &
-                                                          AuxData%rdm2_mp(i,j,k,l), &
-                                                          AuxData%rdm2_full(i,j,k,l)
-                                              end if
-                                        end do
-                                  end do
-                            end do
-                      end do
-                    end associate
+                    !                                 write(*, '(4I5, 5F15.8)') i, j, k, l, &
+                    !                                       AuxData%rdm2_pp(i,j,k,l), &
+                    !                                       AuxData%rdm2_mm(i,j,k,l), &
+                    !                                       AuxData%rdm2_pm(i,j,k,l), &
+                    !                                       AuxData%rdm2_mp(i,j,k,l), &
+                    !                                       AuxData%rdm2_full(i,j,k,l)
+                    !                           end if
+                    !                     end do
+                    !               end do
+                    !         end do
+                    !   end do
+                    ! end associate
 
 
                     if (natural_orb == 0)then
@@ -542,10 +540,8 @@ contains
 
           inquire(file=trim(fname_baba), exist=ex_baba)
           if (ex_baba) then
-                print*, 'reading baba'
                 call load_2x2x2x2_array(trim(fname_baba), AuxData%rdm2_mp)
           else
-                print*, 'reading abab'
                 call load_2x2x2x2_array(trim(fname_abab), AuxData%rdm2_mp)
           end if
 
@@ -557,7 +553,6 @@ contains
           inquire(file=trim(fname_aa), exist=ex_aa)
           
           if (ex_aa) then
-                print*, 'reading aa'
                 call load_2x2_array_pyscf(trim(fname_aa), AuxData%rdm1_p)
           else
                 AuxData%rdm1_p = AuxData%rdm1_full / two
@@ -574,12 +569,12 @@ contains
           AuxData%rdm2_full = AuxData%rdm2_pp + AuxData%rdm2_mm +& 
                 AuxData%rdm2_pm + AuxData%rdm2_mp
 
-          print*, 'rdm1'
-          do i = 1, AuxData%NA
-                do j = 1, AuxData%NA
-                      write(*,'(2I5, 3F12.8)') i, j, AuxData%rdm1_p(i,j), AuxData%rdm1_m(i,j), AuxData%rdm1_full(i,j)
-                end do
-          end do
+          ! print*, 'rdm1'
+          ! do i = 1, AuxData%NA
+          !       do j = 1, AuxData%NA
+          !             write(*,'(2I5, 3F12.8)') i, j, AuxData%rdm1_p(i,j), AuxData%rdm1_m(i,j), AuxData%rdm1_full(i,j)
+          !       end do
+          ! end do
           ! AuxData%rdm2_pp = AuxData%rdm2_pp / two
           ! AuxData%rdm2_pm = AuxData%rdm2_pm / two
           ! AuxData%rdm2_mm = AuxData%rdm2_mm / two
@@ -652,15 +647,13 @@ contains
           unit = 20
           inquire(file="rdm1.bin", exist=exists)
           if (exists) then
-                print*, 'la1'
                 open(unit=unit, file="rdm1.bin", status="old", access="stream", form="unformatted")
           else
-                print*, 'la2'
                 open(unit=unit, file="occ.bin", status="old", access="stream", form="unformatted")
           endif
           read(unit) occ_temp
           close(unit)
-          print*, occ_temp, AuxData%NBasis
+          ! print*, occ_temp, AuxData%NBasis
 
           allocate(AuxData%Occ(AuxData%NBasis))
           AuxData%Occ = 0.0d0
@@ -702,10 +695,10 @@ contains
                   AuxData%n_m(i) = AuxData%rdm1_m(i-NI, i-NI)
                   AuxData%n(i) = AuxData%n_p(i)  + AuxData%n_m(i)
             end do
-            print*, 'AuxData%Occ', AuxData%Occ
-            print*, 'AuxData%n_p', AuxData%n_p
-            print*, 'AuxData%n_m', AuxData%n_m
-            print*, 'AuxData%n', AuxData%n
+            !print*, 'AuxData%Occ', AuxData%Occ
+            !print*, 'AuxData%n_p', AuxData%n_p
+            !print*, 'AuxData%n_m', AuxData%n_m
+            !print*, 'AuxData%n', AuxData%n
             
           end associate
           
@@ -2911,17 +2904,18 @@ end subroutine save_2rdm_orca
           units = Flags%IUnits
 
           SortAngularMomenta = .true.
-          print*, 'basis_path', Flags%BasisSetPath
+          call print_section('Geometry and basis setup')
+          call print_info('Basis set path', Flags%BasisSetPath)
           call geom_ReadSystemBasis(System, AObasis, Flags, SortAngularMomenta, Flags%IUnits)
-          print*, 'NAtoms = ', System%NAtoms
-          print*, 'NElectrons = ', System%NElectrons
+          call print_info('Number of atoms', System%NAtoms)
+          call print_info('Number of electrons', System%NElectrons)
 
           call sys_NuclearRepulsion(AuxData%ENuc,System)
           Nbasis = AObasis%NAOSpher
           AuxData%NBasis = AObasis%NAOSpher
           AuxData%NEL = System%NElectrons
-          print*, 'NEL', AuxData%NEL
-          print*, 'NBasis', AuxData%NBasis
+          call print_info('AuxData%NEL', AuxData%NEL)
+          call print_info('AuxData%NBasis', AuxData%NBasis)
           
     end subroutine GEOM_init
 
@@ -3088,12 +3082,9 @@ end subroutine save_2rdm_orca
           CholAccu = Flags%ICholeskyAccu
 
           if (CholThr < zero.or.THCThr <zero)then
-                print*, 'CholAccu', CholAccu
                 call thc_gammcor_XZ(THCData%Xgp, THCData%Zgk, AOBasis, System, CholAccu)
 
                 if (Flags%IDBBSC == 2 .or. Flags%IFunSR==4)then
-                      print*, 'funsr', Flags%IFunSR
-                      print*, 'omega', AuxData%Omega
                       call thc_gammcor_XZ(THCData%XgpErf, THCData%ZgkErf, AOBasis, System, CholAccu, Omega=AuxData%Omega)
                 end if
 
@@ -3115,20 +3106,18 @@ end subroutine save_2rdm_orca
           allocate(work(nao, nbasis))
 
           if (AuxData%PYSCF==1 .or. AuxData%ORCA==1)then
-                print*, 'here', AuxData%NI, AuxData%NIA, AuxData%NBasis
                 CAONO = CAONO_IN
-                print*, CAONO(1,2), CAONO(2, 1)
           else
                 CAONO = transpose(CAONO_IN)
-                print*, CAONO(1,2), CAONO(2, 1)
           end if
 
-!          x2c = .true.
-          x2c = .false.
+          !          x2c = .true.
+          !x2c = .false.
 
-          if (x2c == .true.)then
-                print*, 'przed canonicalize'
-                print*, 'nao', nao, nbasis
+          !if (x2c == .true.)then
+          if (THCData%H0external == .true.)then
+                !print*, 'przed canonicalize'
+                !print*, 'nao', nao, nbasis
                 call canonicalize(CAONO, THCData%fij, THCData%fvw, AuxData, THCData, THCData%Xgp, AObasis, System, ext=.true.)
 
                 allocate(H0_extao(nao, nao))
@@ -3138,20 +3127,20 @@ end subroutine save_2rdm_orca
                 !             print*, 'AuxData%HNO0(i,j)=', i, j, AuxData%HNO0(i, j)
                 !       end do
                 ! end do
-                print*, 'po canonicalize'
-                print*, 'nao', nao, nbasis
-                print*, 'size CAONO', size(CAONO, dim=1), size(CAONO, dim=2)
-                print*, 'size AuxData%HNO0', size(AuxData%HNO0, dim=1), size(AuxData%HNO0, dim=2)
+                !print*, 'po canonicalize'
+                !print*, 'nao', nao, nbasis
+                !print*, 'size CAONO', size(CAONO, dim=1), size(CAONO, dim=2)
+                !print*, 'size AuxData%HNO0', size(AuxData%HNO0, dim=1), size(AuxData%HNO0, dim=2)
                 call real_ab(work, H0_extao, CAONO)
                 call real_atb(AuxData%HNO0, CAONO, work)
           else
                 !
                 ! this is for the regular hamilotnian
                 !
-                print*, 'canonicalize'
+                !print*, 'canonicalize'
                 !call canonicalize(CAONO, THCData%fij, THCData%fvw, AuxData, THCData, THCData%Xgp, AObasis, System, )
                 call canonicalize(CAONO, THCData%fij, THCData%fvw, AuxData, THCData, THCData%Xgp, AObasis, System, ext=.false.)
-                print*, 'po can'
+                !print*, 'po can'
                 ! open(unit=10,file='CAONO_can.bin',form='unformatted')
                 ! write(10) NBasis
                 ! write(10) CAONO
@@ -3161,7 +3150,7 @@ end subroutine save_2rdm_orca
                 allocate(AuxData%HNO0_THC(nbasis, nbasis))
 
                 call ints1e_gammcor_H0_extao(H0_extao, AObasis, System, THCData%ExternalOrdering)
-                print*, 'h01', H0_extao(1,1)
+                !print*, 'h01', H0_extao(1,1)
 
                 call real_ab(work, H0_extao, CAONO)
                 call real_atb(AuxData%HNO0_THC, CAONO, work)
@@ -3521,27 +3510,27 @@ end subroutine save_2rdm_orca
 
           associate(Zgk=>THCData%Zgk, ExternalOrdering=>THCData%ExternalOrdering)
 
-            print*, 'order2', THCData%ExternalOrdering
-            print*, 'order3', ExternalOrdering
+            ! print*, 'order2', THCData%ExternalOrdering
+            ! print*, 'order3', ExternalOrdering
             allocate(Fockij(AuxData%NI, AuxData%NI))
             allocate(Fockvw(AuxData%NV, AuxData%NV))
             allocate(Cpi_extao(AuxData%nbasis, AuxData%NI))
             allocate(Cpv_extao(AuxData%nbasis, AuxData%NV))
 
-            call CalcMem(Fockij, 'Fockij')
-            call CalcMem(Fockvw, 'Fockvw')
-            call CalcMem(Cpi_extao, 'Cpi_extao')
-            call CalcMem(Cpv_extao, 'Cpv_extao')
+            ! call CalcMem(Fockij, 'Fockij')
+            ! call CalcMem(Fockvw, 'Fockvw')
+            ! call CalcMem(Cpi_extao, 'Cpi_extao')
+            ! call CalcMem(Cpv_extao, 'Cpv_extao')
 
             if (ext == .false.)then
-                  print*, 'ext false'
+                  ! print*, 'ext false'
                   call thc_gammcor_F(Fockij, Fockvw, CAONO(:, 1:AuxData%NI),&
                         CAONO(:, AuxData%NI+1:AuxData%NIA), &
                         CAONO(:, AuxData%NIA+1:AuxData%NBasis), &
                         AuxData%Occ(1:AuxData%NIA), Zgk, Xgp, AOBasis, System, ExternalOrdering)
             else
-                  print*, 'ext true'
-                  print*, 'size AuxData%HNO0', size(AuxData%HNO0, dim=1), size(AuxData%HNO0, dim=2)
+                  ! print*, 'ext true'
+                  ! print*, 'size AuxData%HNO0', size(AuxData%HNO0, dim=1), size(AuxData%HNO0, dim=2)
                   call thc_gammcor_F(Fockij, Fockvw, CAONO(:, 1:AuxData%NI),&
                         CAONO(:, AuxData%NI+1:AuxData%NIA), &
                         CAONO(:, AuxData%NIA+1:AuxData%NBasis), &
@@ -3566,16 +3555,16 @@ end subroutine save_2rdm_orca
             ! print*, ''
             if (AuxData%NI>0)then
                   call symmetric_eigenproblem(fij, Fockij, AuxData%NI, .true.)
-                  do i = 1, AuxData%NI
-                        print*, 'fij', i, fij(i)
-                  end do
+                  !do i = 1, AuxData%NI
+                  !      print*, 'fij', i, fij(i)
+                  !end do
             end if
             ! print*, fij
             ! print*, 'fvvww', AuxData%NV
             call symmetric_eigenproblem(fvw, Fockvw, AuxData%NV, .true.)
-            do i = 1, AuxData%NV
-                  print*, 'fvw', i, fvw(i)
-            end do
+            !do i = 1, AuxData%NV
+            !      print*, 'fvw', i, fvw(i)
+            !end do
 
             ! print*, fvw
 
@@ -3706,7 +3695,7 @@ end subroutine save_2rdm_orca
             do k = 1, NA
                 do j = 1, NA
                     do i = 1, NA
-                        val = two * rdm2(i, j, k, l)
+                        val = rdm2(i, j, k, l)
                         if (abs(val) > 1.0d-8) then
                               ! write(30, '(I4,1X,I4,1X,I4,1X,I4,1X,F19.12)') &
                               !       j, i, l, k, val

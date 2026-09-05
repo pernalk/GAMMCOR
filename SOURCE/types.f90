@@ -11,6 +11,7 @@ integer, parameter :: INTER_TYPE_MOL  = 2
 integer, parameter :: INTER_TYPE_OWN  = 3
 integer, parameter :: INTER_TYPE_ORCA = 4
 integer, parameter :: INTER_TYPE_PYSCF = 5
+integer, parameter :: INTER_TYPE_CHRONUSQ = 6
 
 integer, parameter :: TYPE_NO_SYM = 1
 integer, parameter :: TYPE_SYM = 0
@@ -44,7 +45,34 @@ integer, parameter :: JOB_TYPE_PPERPA_RDMDUMP     = 25
 integer, parameter :: JOB_TYPE_DUCC     = 26
 integer, parameter :: JOB_TYPE_HHERPA_RDMDUMP     = 27
 integer, parameter :: JOB_TYPE_ACPP     = 28
+integer, parameter :: JOB_TYPE_AC_REL     = 29
+integer, parameter :: JOB_TYPE_AC0_REL     = 30
 
+integer, parameter :: PARSER_MH = 0
+integer, parameter :: PARSER_AT = 1
+
+integer, parameter :: DISPATCH_KP = 0
+integer, parameter :: DISPATCH_AT = 1
+
+integer, parameter :: ALG_REGULAR = 0
+integer, parameter :: ALG_SPINRES = 1
+integer, parameter :: ALG_PPSIMPLE = 2
+
+integer, parameter :: INT_DEFAULT = 0
+integer, parameter :: INT_FCIDUMP = 1
+
+integer, parameter :: RT_WRAPPER = 0
+integer, parameter :: RT_DIRECT = 1
+
+integer, parameter :: R_PYSCF = 0
+integer, parameter :: R_PYSCFS = 1
+integer, parameter :: R_ORCA = 2
+integer, parameter :: R_ORCAS = 3
+integer, parameter :: R_ORCAD = 4
+integer, parameter :: R_CHRONUSQ = 5
+
+integer, parameter :: PPAC = 1
+integer, parameter :: HHAC = 0
 
 integer, parameter :: SAPTLEVEL0 = 0
 integer, parameter :: SAPTLEVEL1 = 1
@@ -111,21 +139,22 @@ integer, parameter :: RESP_DFT  = 3
 
 integer, parameter :: H_DYALL = 0
 integer, parameter :: H_GPF = 1
+integer, parameter :: H_MID = 2
 
 logical, parameter :: FLAG_POSTCAS  = .FALSE.
 
 integer,parameter :: maxcen = 500 ! to match Dalton
 
-character(*),parameter :: PossibleInterface(5) = &
+character(*),parameter :: PossibleInterface(6) = &
 [character(8) :: &
-'DALTON', 'MOLPRO', 'OWN', 'ORCA', 'PYSCF']
+'DALTON', 'MOLPRO', 'OWN', 'ORCA', 'PYSCF', 'CHRONUSQ']
 
-character(*),parameter :: PossibleJobType(28) = &
+character(*),parameter :: PossibleJobType(30) = &
 [character(9) :: &
 'AC', 'AC0', 'ERPA', 'EERPA', 'SAPT', 'PDFT', 'CASPiDFT','CASPiDFTOpt','EERPA-1', & 
 'AC0D', 'AC0DNOSYMM', 'NLOCCORR', 'AC0DP', 'ACFREQ','ACFREQNTH','AC1FREQNTH', &
 'RESPONSE','SRAC0', 'MP2', 'SRMP2', 'SAPT-OS','MSAC0', &
- 'PPERPA', 'AC0PP', 'PPERPADMP', 'DUCC', 'HHERPADMP', 'ACPP']
+ 'PPERPA', 'AC0PP', 'PPERPADMP', 'DUCC', 'HHERPADMP', 'ACPP', 'AC_REL', 'AC0_REL']
 
 character(*),parameter :: PossibleRDMType(7) = &
 [character(8) :: &
@@ -135,7 +164,7 @@ character(*),parameter :: PossibleDFAType(3) = &
 [character(8) :: &
 'srLDA', 'srPBE', 'PBE']
 
-character(*),parameter :: PossibleCholAccu(3) = &
+character(*),parameter :: PossibleCholAccu(4) = &
 [character(9) :: &
 'DEFAULT', 'TIGHT', 'LUDICROUS', 'DEBUG']
 
@@ -182,8 +211,9 @@ character(*),parameter :: PossibleUnits(2) = &
          logical :: Restart    = FLAG_RESTART
          logical :: Triplet    = FLAG_TRIPLET
          logical :: PostCAS    = FLAG_POSTCAS
-         logical :: SpinRes    = .false.
-         logical :: ola_path    = .false.
+         integer :: Algorithm  = ALG_REGULAR
+         integer :: Intformat  = INT_DEFAULT
+         integer :: Parser     = PARSER_MH
          integer :: IPrint     = 0
          double precision :: RPAThresh  = 1.0D-6
          double precision :: ThreshVirt = 1.0D-6
@@ -194,11 +224,10 @@ character(*),parameter :: PossibleUnits(2) = &
          integer :: Max_Cn = 3
          integer :: Max_Cnpp = 0
          integer :: Htype = 0
-         integer :: BatchDim
+         integer :: BatchDim = 1000
          integer :: NFreqOm
          double precision,allocatable :: FreqOm(:)
          logical :: CAlpha = .false.
-
          logical :: DeclareGrid = .false.
 end type CalculationBlock
 
@@ -367,7 +396,7 @@ type CholeskyBlock
       integer :: CholeskyAccu = CHOL_ACCU_DEFAULT
       double precision :: CholeskyThr  = -1.e0
       double precision :: THCThr       = -1.e0
-
+      logical :: H0external            = .false.
       integer :: H0test       = FLAG_H0TEST ! check 1el ints with CholeskyOTF
 
 end type CholeskyBlock
@@ -396,6 +425,7 @@ type FlagsData
      integer :: IPYSCF  = 0     
      integer :: IMOLPRO = 0
      integer :: IORCA   = 0
+     integer :: ICHRONUSQ   = 0
      integer :: IRes    = 0
      integer :: IAO     = 0
      integer :: INO     = 0
@@ -413,6 +443,7 @@ type FlagsData
      integer :: ICholeskyBIN  = FLAG_CHOLESKY_BIN
      integer :: ICholeskyOTF  = FLAG_CHOLESKY_OTF
      integer :: ICholeskyAccu = CHOL_ACCU_DEFAULT
+     logical :: H0external = .false.
      double precision :: DCholeskyThr = -1.e0
      double precision :: DTHCThr = -1.e0
      type(TBasisAssignment) :: BasisAssign
@@ -440,7 +471,6 @@ type FlagsData
      integer :: ISERPA  = 0 ! ERPA response
      integer :: ITrpl   = 0
      integer :: ISAPT   = 0
-     integer :: IPP     = 0
      integer :: IUHF    = 0
      integer :: IUKS    = 0
      integer :: ISAPTOS = 0
@@ -473,8 +503,12 @@ type FlagsData
      ! sapt_utils.f90
      integer :: DIISN  = 6
      integer :: DIISOn = 2
-     logical :: SPINRES = .false.
-     logical :: OP = .false.
+     integer :: Parser = PARSER_MH
+     integer :: Algorithm = ALG_REGULAR
+     integer :: Intformat = INT_DEFAULT
+     integer :: ReaderType = -1
+     integer :: Reader = -1
+     integer :: Dispatch = DISPATCH_KP
 
 end type FlagsData
 

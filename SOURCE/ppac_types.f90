@@ -1,14 +1,59 @@
-module acpp_types
+module ppac_types
 
       use iso_fortran_env
-      use basis_definitions
+      use basis_definitions, only: TBasisAssignment
 
       use types
 
 
       implicit none
       integer, parameter :: I8 = int64
+      
+      integer, parameter :: VER_PH_TDA_HF = 0
+      integer, parameter :: VER_PH_PPHH_TDA_HF = 1
+      integer, parameter :: VER_PPHH_TDA_HF = 2
+      integer, parameter :: VER_PH_RPA_HF = 3
+      integer, parameter :: VER_PP_RPA_MULTI = 4
+      integer, parameter :: VER_PH_PPHH_RPA_HF = 5
+      integer, parameter :: VER_PPHH_RPA_HF = 6
+      integer, parameter :: VER_PH_RPA_TDA_HF = 7
+      integer, parameter :: VER_PP_RPA_TDA_HF = 8
+      integer, parameter :: VER_PH_PPHH_RPA_TDA_HF = 9
+      integer, parameter :: VER_PPHH_RPA_TDA_HF = 10
+      integer, parameter :: VER_PP_RPATDA_MULTI = 11
+      integer, parameter :: VER_HH_RPA_MULTI = 12
 
+      integer, parameter :: BL_OOOO = 1
+      integer, parameter :: BL_OOAO = 2
+      integer, parameter :: BL_OOAA = 3
+      integer, parameter :: BL_OOVA = 4
+      integer, parameter :: BL_OOVV = 5
+      integer, parameter :: BL_AOOO = 6
+      integer, parameter :: BL_AOAO = 7
+      integer, parameter :: BL_AOAA = 8
+      integer, parameter :: BL_AOVA = 9
+      integer, parameter :: BL_AOVV = 10
+      integer, parameter :: BL_AAOO = 11
+      integer, parameter :: BL_AAAO = 12
+      integer, parameter :: BL_AAAA = 13
+      integer, parameter :: BL_AAVA = 14
+      integer, parameter :: BL_AAVV = 15
+      integer, parameter :: BL_VAOO = 16
+      integer, parameter :: BL_VAAO = 17
+      integer, parameter :: BL_VAAA = 18
+      integer, parameter :: BL_VAVA = 19
+      integer, parameter :: BL_VAVV = 20
+      integer, parameter :: BL_VVOO = 21
+      integer, parameter :: BL_VVAO = 22
+      integer, parameter :: BL_VVAA = 23
+      integer, parameter :: BL_VVVA = 24
+      integer, parameter :: BL_VVVV = 25
+
+      integer, parameter :: GENVER_PP = 0
+      integer, parameter :: GENVER_TDA_SING = 1
+      integer, parameter :: GENVER_TDA_TRIP = 2
+      integer, parameter :: GENVER_RPA_SING = 3
+      integer, parameter :: GENVER_RPA_TRIP = 4
 
       type TAC0Block
             double precision, dimension(:, :), allocatable :: ASing, ATrip
@@ -73,6 +118,7 @@ module acpp_types
             double precision, dimension(:,:), allocatable :: TXgaErf, TXga
             double precision, dimension(:,:), allocatable :: HNO
             double precision, dimension(:,:), allocatable :: J_SR
+            logical :: H0external = .false.
             
       end type TTHCData
 
@@ -154,8 +200,6 @@ module acpp_types
             double precision :: EROHF
             logical :: pherpa_print = .false.
             logical :: pperpa_print = .false.
-            integer :: Dyall = 1
-            integer :: GPF = 2
             integer :: HType
             integer :: BatchDim
             integer :: general_version, version
@@ -181,7 +225,6 @@ module acpp_types
             logical :: spinsep = .true.
             double precision :: ThrSelAct, ThrQVirt, ThrQInact
             double precision :: E_ref_ducc
-            integer, dimension(:,:), allocatable :: IPair
             integer :: omegaorders = 0
             
       end type TACppData
@@ -458,4 +501,4 @@ contains
 
 
 
-end module acpp_types
+end module ppac_types

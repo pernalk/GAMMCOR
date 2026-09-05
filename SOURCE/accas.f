@@ -7,7 +7,7 @@ C
       use timing
       use read_external
       use abfofo
-      use acpp_types
+      use ppac_types
       use polari
 
 C
@@ -744,7 +744,7 @@ C
       use read_external
       use grid_internal
       use timing
-      use acpp_types
+      use ppac_types
 C
       Implicit Real*8 (A-H,O-Z)
 C
@@ -3552,7 +3552,7 @@ c KP 29.11
 *Deck SR_PBE_SPIN  
       Subroutine SR_PBE_SPIN(EXCSPIN,URe,UNOAO,Occ,OrbGrid,OrbXGrid,
      $     OrbYGrid,OrbZGrid,WGrid,NGrid,NInte1,NBasis, AuxData)
-      use acpp_types
+      use ppac_types
 C
 C     RETURNS A SR-PBE XC ENERGY COMPUTED WITH SPIN-FUNCTIONAL (USING SPIN AND CHARGE DENSITIES)
 C

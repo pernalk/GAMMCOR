@@ -1,6 +1,6 @@
 module systemdef
       use types
-      use acpp_types
+      use ppac_types
 
 implicit none
 
@@ -168,7 +168,8 @@ else
    Flags%ICholeskyAccu = Input%CholeskyParams%CholeskyAccu
    Flags%DCholeskyThr  = Input%CholeskyParams%CholeskyThr
    Flags%DTHCThr       = Input%CholeskyParams%THCThr
-
+   Flags%H0external    = Input%CholeskyParams%H0external
+   
    Flags%IH0Test       = Input%CholeskyParams%H0Test
 
   ! set DFT grid
@@ -220,6 +221,7 @@ else
      Flags%IA = 1
 
   case(INTER_TYPE_ORCA)
+        if (Input%CalcParams%Intformat.ne.INT_FCIDUMP)then    
      Flags%IDALTON = 1
      Flags%ICASSCF = 1
      Flags%IDMRG   = 1
@@ -229,11 +231,22 @@ else
      Flags%NoSym   = 1
      Flags%IA = 1
      Flags%ORBITAL_ORDERING = 2 ! ORBITAL_ORDERING_ORCA
+     else
+           Flags%IDALTON = 0
+           Flags%IORCA = 1
+           Flags%ORBITAL_ORDERING = 2
+           Flags%Parser = PARSER_AT
+     end if
 
   case(INTER_TYPE_PYSCF)
      Flags%IDALTON = 0
      Flags%IPYSCF  = 1
      Flags%ORBITAL_ORDERING = 5 ! ORBITAL_ORDERING_PYSCF
+     Flags%Parser = PARSER_AT
+  case(INTER_TYPE_CHRONUSQ)
+     Flags%IDALTON = 0
+     Flags%ICHRONUSQ  = 1
+     Flags%Parser = PARSER_AT
 
 end select
 
@@ -288,13 +301,12 @@ end select
   Flags%ISERPA = 0
   Flags%IAPSG  = 0
 
-  if(Input%CalcParams%SpinRes) then
-        Flags%SPINRES = .true.
-        Flags%IPP = 1
+  Flags%Algorithm = Input%CalcParams%Algorithm
+  if(Flags%Algorithm == ALG_SPINRES) then
+        Flags%Parser = PARSER_AT
   end if
-  if(Input%CalcParams%ola_path) then
-        Flags%IPP = 1
-        Flags%OP = .true.
+  if(Input%CalcParams%Parser == PARSER_AT) then
+        Flags%Parser = PARSER_AT
   end if
 
 
@@ -344,17 +356,6 @@ end select
      print*,'Input%CalcParams%PostCAS', Input%CalcParams%PostCAS
      print*,'Input%CalcParams%DFApp  ', Input%CalcParams%DFApp
      print*,'Flags%IFunSRKer         ', Input%CalcParams%Kernel
-     if(Input%CalcParams%SpinRes) then
-           Flags%SPINRES = .true.
-           Flags%IPP = 1
-     end if
-
-     if(Input%CalcParams%ola_path) then
-           Flags%IPP = 1
-           Flags%OP = .true.
-     end if
-
-
      ! SET sr FUNCTIONAL
      if(Input%CalcParams%DFApp==1) then
         Flags%IFunSR = 1
@@ -445,14 +446,6 @@ end select
      Flags%IFlSnd = 0
      Flags%IFlFrag1 = 1
      Flags%IFl12 = 1
-     if(Input%CalcParams%SpinRes) then
-           Flags%SPINRES = .true.
-           Flags%IPP = 1
-     end if
-     if(Input%CalcParams%ola_path) then
-           Flags%IPP = 1
-           Flags%OP = .true.
-     end if
 
 
 
@@ -499,12 +492,62 @@ end select
 
 case(JOB_TYPE_PPERPA, JOB_TYPE_AC0PP, JOB_TYPE_ACPP, JOB_TYPE_PPERPA_RDMDUMP,&
       JOB_TYPE_HHERPA_RDMDUMP, JOB_TYPE_DUCC)
-      Flags%IPP = 1
-      Flags%OP = .true.
-        if(Input%CalcParams%SpinRes) then
-              Flags%SPINRES = .true.
+      Flags%Parser = PARSER_AT
+
+  end select
+
+  if (Flags%Parser == PARSER_AT) then
+        if (Flags%IPYSCF == 1) then
+              select case(Flags%JobType)
+              case(JOB_TYPE_PPERPA, JOB_TYPE_AC0PP, JOB_TYPE_ACPP, JOB_TYPE_PPERPA_RDMDUMP,&
+                    JOB_TYPE_HHERPA_RDMDUMP, JOB_TYPE_DUCC)
+                    Flags%ReaderType = RT_DIRECT
+              case default
+                    Flags%ReaderType = RT_WRAPPER
+              end select
+              Flags%Reader = R_PYSCF
         end if
 
+        if (Flags%IORCA == 1) then
+
+              select case (Input%CalcParams%JobType)
+              case (JOB_TYPE_PPERPA, JOB_TYPE_AC0PP, JOB_TYPE_ACPP, &
+                    JOB_TYPE_PPERPA_RDMDUMP, JOB_TYPE_HHERPA_RDMDUMP)
+
+                    Flags%ReaderType = RT_DIRECT
+                    Flags%Reader = R_ORCA
+
+              case (JOB_TYPE_DUCC) 
+                    Flags%ReaderType = RT_DIRECT
+                    Flags%Reader = R_ORCAD
+              case default
+
+                    Flags%ReaderType = RT_WRAPPER
+                    Flags%Reader = R_ORCA
+                    
+              end select
+
+              if (Flags%Algorithm == ALG_SPINRES) then
+                    Flags%ReaderType = RT_DIRECT
+                    Flags%Reader = R_ORCAS
+              end if
+        end if
+
+        if (Flags%ICHRONUSQ == 1) then
+              Flags%ReaderType = RT_DIRECT
+              Flags%Reader = R_CHRONUSQ
+        end if
+  end if
+
+  select case (Flags%JobType)
+  case (JOB_TYPE_PPERPA, JOB_TYPE_AC0PP, JOB_TYPE_ACPP, &
+        JOB_TYPE_PPERPA_RDMDUMP, JOB_TYPE_HHERPA_RDMDUMP, &
+        JOB_TYPE_MP2, JOB_TYPE_SRMP2, JOB_TYPE_DUCC)
+        Flags%Dispatch = DISPATCH_AT
+  case default
+        if (Flags%Algorithm == ALG_SPINRES) then
+              Flags%Dispatch = DISPATCH_AT
+        end if
   end select
 
  ! Triplet response
@@ -610,14 +653,14 @@ if(Flags%ISAPT.Eq.0) then
          print*, 'NAct from input!',System%NAct
    endif
 
-   AuxData%ThrSelAct = ThrSelAct
-   AuxData%ThrQVirt = ThrQVirt
-   AuxData%ThrQInact = ThrQInact
+   AuxData%ThrSelAct = System%ThrSelAct
+   AuxData%ThrQVirt = System%ThrQVirt
+   AuxData%ThrQInact = System%ThrQInact
    AuxData%NCoreOrb = System%NCoreOrb
    AuxData%PYSCF = Flags%IPYSCF
    AuxData%Batchdim = Input%CalcParams%BatchDim
 
-   if(Flags%IPP.Eq.1) then
+   if(Flags%Parser.Eq.PARSER_AT) then
          AuxData%HType = Input%CalcParams%Htype
          AuxData%omegaorders = Input%CalcParams%Max_Cnpp
          AuxData%triplet = Input%CalcParams%triplet

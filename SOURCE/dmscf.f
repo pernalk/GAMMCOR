@@ -3,7 +3,7 @@
      $ Title,URe,Occ,XKin,XNuc,ENuc,UMOAO,TwoEl,
      $     NBasis,NInte1,NInte2,NGem, THCData, AuxData)
 
-      use acpp_types, only: TTHCData, TACppData
+      use ppac_types, only: TTHCData, TACppData
       use types
 
 C

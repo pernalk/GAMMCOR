@@ -19,7 +19,7 @@ C     Cholesky modules
 C      use Cholesky
       use gammcor_integrals
       use geom_input
-      use acpp_types, only: TACppData
+      use ppac_types, only: TACppData
 C
       Implicit Real*8 (A-H,O-Z)
       Character*60 FMultTab
@@ -643,7 +643,7 @@ C
 C     Cholesky modules
       use gammcor_integrals
       use geom_input
-      use acpp_types, only: TACppData
+      use ppac_types, only: TACppData
 Cc     use Cholesky_old  ! create AOTWOSORT file
 CC     binary
 C      use Auto2eInterface
@@ -3237,7 +3237,7 @@ C     c    End Subroutine LdInteg
       use interface_pp
       use print_units
       use types
-      use acpp_types
+      use ppac_types
       use sorter
       use tran
       use tran_Chol

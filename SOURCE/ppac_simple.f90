@@ -1,17 +1,17 @@
-module acpp
+module ppac_simple
 
-      use acpp_types
+      use ppac_types
       use types
       use math_constants
       use real_linalg 
       use THC_Gammcor
       use sort
-      use ppAC_incore
+      use ppac_simple_subs
 
       implicit none
 contains
 
-      subroutine acpp_driver(THCData, AuxData, CAONO, Flags, TwoEl)
+      subroutine acpp_driver_simple(THCData, AuxData, CAONO, Flags, TwoEl)
 
 
             type(TACppData), intent(inout) :: AuxData
@@ -32,10 +32,14 @@ contains
               !              AuxData%spinsep = .false.
               AuxData%spinsep = .true.
               if (AuxData%spinsep == .true.)then
+
+!                    if ((Flags%Jobtype == JOB_TYPE_AC0PP &
+!                          .or. Flags%Jobtype == JOB_TYPE_ACPP)) then 
                     print*, ''
                     print*, 'THIS IS SPIN SEPARATED ADAPTED VERSION'
                     print*, ''
                     call select_pairs(AuxData)
+                    
               else
                     print*, ''
                     print*, 'THIS IS RAW SPIN VERSION'
@@ -113,7 +117,7 @@ contains
                           call msg("Starting ACPP incore")
                           AuxData%pperpa_print = .true.
                           AuxData%ACType = 0
-                          AuxData%HType = AuxData%Dyall
+                          AuxData%HType = H_DYALL
                           call ppac_incore_driver(AuxData, Flags, TwoEl)
 
                     end select
@@ -123,7 +127,7 @@ contains
               !             call msg("Starting ACHH incore")
               !             AuxData%pperpa_print = .true.
               !             AuxData%ACType = 0
-              !             AuxData%HType = AuxData%Dyall
+              !             AuxData%HType = H_DYALL
               !             call ppac_incore_driver(AuxData, Flags, TwoEl)
 
               !       end select
@@ -225,10 +229,9 @@ contains
               end select
 
               stop
-            end associate
+            end associate     
 
-      end subroutine acpp_driver
-
+      end subroutine acpp_driver_simple
 
       subroutine select_pairs(AuxData)
             type(TACppData), intent(inout) :: AuxData
@@ -238,7 +241,6 @@ contains
                   NI=>AuxData%NI, NA=>AuxData%NA, NV=>AuxData%NV, &
                   n_p=>AuxData%n_p, n_m=>AuxData%n_m)
 
-              AuxData%ThrPP = 1.d-9
 
               print*, 'AuxData%ThrPP', AuxData%ThrPP
 
@@ -365,7 +367,6 @@ contains
                   NI=>AuxData%NI, NA=>AuxData%NA, NV=>AuxData%NV, &
                   n_p=>AuxData%n_p, n_m=>AuxData%n_m)
 
-              AuxData%ThrPP = 1.d-9
 
               print*, 'AuxData%ThrPP', AuxData%ThrPP
 
@@ -479,7 +480,6 @@ contains
                   NI=>AuxData%NI, NA=>AuxData%NA, NV=>AuxData%NV, &
                   n_p=>AuxData%n_p, n_m=>AuxData%n_m)
 
-              AuxData%ThrPP = 1.d-9
 
               print*, 'AuxData%ThrPP', AuxData%ThrPP
 
@@ -608,7 +608,7 @@ contains
 !            print*, nn, 'nn'
 !            allocate(TwoNOA(nn))
 !            print*, 'AuxData%Ninte2', AuxData%Ninte2
-!            call PPERPA_init(AuxData, alpha, Flags, TwoEl, TwoNOA)
+!            call PPERPA_init_simple(AuxData, alpha, Flags, TwoEl, TwoNOA)
             
             if(spin_symm==0)then
                   NDim = AuxData%Ndim_s
@@ -625,7 +625,7 @@ contains
                   call  pperpa_incore_opshell(MxA, MxS, AuxData, AuxData%HNO0, &
                         TwoEl, AuxData%Ndim_s,  AuxData%Ndim_s, AuxData%IndN_s, AuxData%IndN_s, AuxData%IndX_s, spin_symm, 1)
                   !print*, 'Czas na sing pperpa', clock_readwall(timer0)   
-                  call nonsymmetric_eigenproblem_block(AuxData%Eigs_s, Eig_i, AuxData%Eigvec_s, MxA, MxS, &
+                  call nonsymmetric_eigenproblem_block_simple(AuxData%Eigs_s, Eig_i, AuxData%Eigvec_s, MxA, MxS, &
                         AuxData%vplus_s, AuxData%IndN_s, AuxData%IndAux, 1)                  
 
                   if (AuxData%pperpa_print) then
@@ -650,7 +650,7 @@ contains
                   call  pperpa_incore_opshell(MxA, MxS, AuxData, AuxData%HNO0, &
                         TwoEl, AuxData%Ndim_t, AuxData%Ndim_t, AuxData%IndN_t, AuxData%IndN_t, AuxData%IndX_t, spin_symm, 1)
                   if (AuxData%Ndim_t .gt. 0)then
-                        call nonsymmetric_eigenproblem_block(AuxData%Eigs_t, Eig_i, AuxData%Eigvec_t, MxA, MxS, &
+                        call nonsymmetric_eigenproblem_block_simple(AuxData%Eigs_t, Eig_i, AuxData%Eigvec_t, MxA, MxS, &
                               AuxData%vplus_t, AuxData%IndN_t, AuxData%IndAux, 1)
                   end if
 
@@ -669,7 +669,7 @@ contains
                   call  pperpa_incore_opshell_aaaa(MxA, MxS, AuxData, AuxData%HNO0, &
                         TwoEl, AuxData%Ndim_t, AuxData%Ndim_t, AuxData%IndN_t, AuxData%IndN_t, AuxData%IndX_t, 1 )
                   if (AuxData%Ndim_t .gt. 0)then
-                        call nonsymmetric_eigenproblem_block(AuxData%Eigs_t, Eig_i, AuxData%Eigvec_t, MxA, MxS, &
+                        call nonsymmetric_eigenproblem_block_simple(AuxData%Eigs_t, Eig_i, AuxData%Eigvec_t, MxA, MxS, &
                               AuxData%vplus_t, AuxData%IndN_t, AuxData%IndAux, 1)
                   end if
 
@@ -690,7 +690,7 @@ contains
                   
                   if (AuxData%Ndim_t .gt. 0)then
 
-                        call nonsymmetric_eigenproblem_block(AuxData%Eigs_t, Eig_i, AuxData%Eigvec_t, MxA, MxS, &
+                        call nonsymmetric_eigenproblem_block_simple(AuxData%Eigs_t, Eig_i, AuxData%Eigvec_t, MxA, MxS, &
                               AuxData%vplus_t, AuxData%IndN_t, AuxData%IndAux, 1)
                   end if
 
@@ -737,7 +737,7 @@ contains
 !            print*, nn, 'nn'
 !            allocate(TwoNOA(nn))
 !            print*, 'AuxData%Ninte2', AuxData%Ninte2
-            call PPERPA_init(AuxData, alpha, Flags, TwoEl, TwoNOA)
+            call PPERPA_init_simple(AuxData, alpha, Flags, TwoEl, TwoNOA)
             
             if(spin_symm==0)then
                   NDim = AuxData%Ndim_s
@@ -754,7 +754,7 @@ contains
                   call  pperpa_incore_opshell_mix(MxA, MxS, AuxData, AuxData%HNO0, &
                         TwoEl, AuxData%Ndim_s,  AuxData%Ndim_s, AuxData%IndN_s, AuxData%IndN_s, AuxData%IndX_s, 1)
                   !print*, 'Czas na sing pperpa', clock_readwall(timer0)   
-                  call nonsymmetric_eigenproblem_block(AuxData%Eigs_s, Eig_i, AuxData%Eigvec_s, MxA, MxS, &
+                  call nonsymmetric_eigenproblem_block_simple(AuxData%Eigs_s, Eig_i, AuxData%Eigvec_s, MxA, MxS, &
                         AuxData%vplus_s, AuxData%IndN_s, AuxData%IndAux, 1)                  
                   
                   if (AuxData%pperpa_print) then
@@ -779,7 +779,7 @@ contains
 			call  pperpa_incore_opshell_aaaa(MxA, MxS, AuxData, AuxData%HNO0, &
                               TwoEl, AuxData%Ndim_t_aa, AuxData%Ndim_t_aa, AuxData%IndN_t_aa, AuxData%IndN_t_aa, AuxData%IndX_t_aa, 1)
 			if (AuxData%Ndim_t_aa .gt. 0)then
-                              call nonsymmetric_eigenproblem_block(AuxData%Eigs_t_aa, Eig_i, AuxData%Eigvec_t_aa, MxA, MxS, &
+                              call nonsymmetric_eigenproblem_block_simple(AuxData%Eigs_t_aa, Eig_i, AuxData%Eigvec_t_aa, MxA, MxS, &
                                     AuxData%vplus_t_aa, AuxData%IndN_t_aa, AuxData%IndAux, 1)
 			end if
 
@@ -818,7 +818,7 @@ contains
                         call  pperpa_incore_opshell_bbbb(MxA, MxS, AuxData, AuxData%HNO0, &
                               TwoEl, AuxData%Ndim_t_bb, AuxData%Ndim_t_bb, AuxData%IndN_t_bb, AuxData%IndN_t_bb, AuxData%IndX_t_bb, 1)
                         if (AuxData%Ndim_t_bb .gt. 0)then
-                              call nonsymmetric_eigenproblem_block(AuxData%Eigs_t_bb, Eig_i, AuxData%Eigvec_t_bb, MxA, MxS, &
+                              call nonsymmetric_eigenproblem_block_simple(AuxData%Eigs_t_bb, Eig_i, AuxData%Eigvec_t_bb, MxA, MxS, &
                                     AuxData%vplus_t_bb, AuxData%IndN_t_bb, AuxData%IndAux, 1)
                         end if
 
@@ -873,7 +873,7 @@ contains
                   print*, 'for z = 0'
                   print*, 'alpha', alpha
                   call pperpa_incore_init(AuxData, alpha, Flags, TwoEl, TwoNOA)        
-                  !call PPERPA_init(AuxData, alpha, Flags, TwoEl, TwoNOA)
+                  !call PPERPA_init_simple(AuxData, alpha, Flags, TwoEl, TwoNOA)
             else
                   print*, 'for z = 1'
                   print*, 'alpha', alpha
@@ -918,7 +918,7 @@ contains
                   call  pperpa_incore_opshell(MxA, MxS, AuxData, AuxData%HNOA, &
                         TwoNOA, AuxData%Ndim_s,  AuxData%Ndim_s, AuxData%IndN_s, AuxData%IndN_s, AuxData%IndX_s, spin_symm, 1)
                   !print*, 'Czas na sing pperpa', clock_readwall(timer0)   
-                  call nonsymmetric_eigenproblem_block(AuxData%Eigs_s, Eig_i, AuxData%Eigvec_s, MxA, MxS, &
+                  call nonsymmetric_eigenproblem_block_simple(AuxData%Eigs_s, Eig_i, AuxData%Eigvec_s, MxA, MxS, &
                         AuxData%vplus_s, AuxData%IndN_s, AuxData%IndAux, 1)                  
 
                   !              if (AuxData%pperpa_print) then
@@ -949,7 +949,7 @@ contains
                         call  pperpa_incore_opshell(MxA, MxS, AuxData, AuxData%HNOA, &
                               TwoNOA, AuxData%Ndim_t, AuxData%Ndim_t, AuxData%IndN_t, AuxData%IndN_t, AuxData%IndX_t, spin_symm, 1)
                         if (AuxData%Ndim_t .gt. 0)then
-                              call nonsymmetric_eigenproblem_block(AuxData%Eigs_t, Eig_i, AuxData%Eigvec_t, MxA, MxS, &
+                              call nonsymmetric_eigenproblem_block_simple(AuxData%Eigs_t, Eig_i, AuxData%Eigvec_t, MxA, MxS, &
                                     AuxData%vplus_t, AuxData%IndN_t, AuxData%IndAux, 1)
                         end if
                         !                  if (AuxData%pperpa_print) then
@@ -981,7 +981,7 @@ contains
                         call  pperpa_incore_opshell_aaaa(MxA, MxS, AuxData, AuxData%HNOA, &
                               TwoNOA, AuxData%Ndim_t_aa, AuxData%Ndim_t_aa, AuxData%IndN_t_aa, AuxData%IndN_t_aa, AuxData%IndX_t_aa, 1)
                         if (AuxData%Ndim_t_aa .gt. 0)then
-                              call nonsymmetric_eigenproblem_block(AuxData%Eigs_t_aa, Eig_i, AuxData%Eigvec_t_aa, MxA, MxS, &
+                              call nonsymmetric_eigenproblem_block_simple(AuxData%Eigs_t_aa, Eig_i, AuxData%Eigvec_t_aa, MxA, MxS, &
                                     AuxData%vplus_t_aa, AuxData%IndN_t_aa, AuxData%IndAux, 1)
                         end if
 
@@ -1010,7 +1010,7 @@ contains
                         call  pperpa_incore_opshell_bbbb(MxA, MxS, AuxData, AuxData%HNOA, &
                               TwoNOA, AuxData%Ndim_t_bb, AuxData%Ndim_t_bb, AuxData%IndN_t_bb, AuxData%IndN_t_bb, AuxData%IndX_t_bb, 1)
                         if (AuxData%Ndim_t_bb .gt. 0)then
-                              call nonsymmetric_eigenproblem_block(AuxData%Eigs_t_bb, Eig_i, AuxData%Eigvec_t_bb, MxA, MxS, &
+                              call nonsymmetric_eigenproblem_block_simple(AuxData%Eigs_t_bb, Eig_i, AuxData%Eigvec_t_bb, MxA, MxS, &
                                     AuxData%vplus_t_bb, AuxData%IndN_t_bb, AuxData%IndAux, 1)
                         end if
 
@@ -1143,7 +1143,7 @@ contains
         call  pperpa_incore_opshell(MxA, MxS, AuxData, AuxData%HNOA, &
               TwoNOA, AuxData%Ndim_s,  AuxData%Ndim_s, AuxData%IndN_s, AuxData%IndN_s, AuxData%IndX_s, 0, 1)
         
-        call nonsymmetric_eigenproblem_block(AuxData%Eigs_s, Eig_i, AuxData%Eigvec_s, MxA, MxS, &
+        call nonsymmetric_eigenproblem_block_simple(AuxData%Eigs_s, Eig_i, AuxData%Eigvec_s, MxA, MxS, &
               AuxData%vplus_s, AuxData%IndN_s, AuxData%IndAux, 1)
         
         if (AuxData%pperpa_print) then
@@ -1173,7 +1173,7 @@ contains
         call  pperpa_incore_opshell(MxA, MxS, AuxData, AuxData%HNOA, &
               TwoNOA, AuxData%Ndim_t, AuxData%Ndim_t, AuxData%IndN_t, AuxData%IndN_t, AuxData%IndX_t, 1, 1)
         if (AuxData%Ndim_t .gt. 0)then
-              call nonsymmetric_eigenproblem_block(AuxData%Eigs_t, Eig_i, AuxData%Eigvec_t, MxA, MxS, &
+              call nonsymmetric_eigenproblem_block_simple(AuxData%Eigs_t, Eig_i, AuxData%Eigvec_t, MxA, MxS, &
                     AuxData%vplus_t, AuxData%IndN_t, AuxData%IndAux, 1)
         end if
 
@@ -1193,7 +1193,7 @@ contains
         call  pperpa_incore_opshell_aaaa(MxA, MxS, AuxData, AuxData%HNOA, &
               TwoNOA, AuxData%Ndim_t, AuxData%Ndim_t, AuxData%IndN_t, AuxData%IndN_t, AuxData%IndX_t, 1 )
         if (AuxData%Ndim_t .gt. 0)then
-              call nonsymmetric_eigenproblem_block(AuxData%Eigs_t_aa, Eig_i, AuxData%Eigvec_t_aa, MxA, MxS, &
+              call nonsymmetric_eigenproblem_block_simple(AuxData%Eigs_t_aa, Eig_i, AuxData%Eigvec_t_aa, MxA, MxS, &
                     AuxData%vplus_t_aa, AuxData%IndN_t, AuxData%IndAux, 1)
         end if
 
@@ -1212,7 +1212,7 @@ contains
               TwoNOA, AuxData%Ndim_t, AuxData%Ndim_t, AuxData%IndN_t, AuxData%IndN_t, AuxData%IndX_t, 1 )
 
         if (AuxData%Ndim_t .gt. 0)then
-              call nonsymmetric_eigenproblem_block(AuxData%Eigs_t_bb, Eig_i, AuxData%Eigvec_t_bb, MxA, MxS, &
+              call nonsymmetric_eigenproblem_block_simple(AuxData%Eigs_t_bb, Eig_i, AuxData%Eigvec_t_bb, MxA, MxS, &
                     AuxData%vplus_t_bb, AuxData%IndN_t, AuxData%IndAux, 1)
         end if
         if (AuxData%pperpa_print) then
@@ -1406,7 +1406,7 @@ contains
         logical, intent(out)                  :: cond
 
         associate(IAux=>AuxData%IndAux)
-          if (AuxData%HType == AuxData%Dyall) then
+          if (AuxData%HType == H_DYALL) then
 
                 cond = (IAux(p)==IAux(q) .and. IAux(p)==IAux(r) .and. &
                       IAux(p)==IAux(s) .and. IAux(p)==1)
@@ -1513,7 +1513,7 @@ contains
   !                     if (IAux(i) == IAux(j)) then
   !                           Aints1e_aa(i, j) = Aints1e_aa(i, j) + (One - alpha) * AuxData%HNO0(i,j)
 
-  !                           if (AuxData%HType == AuxData%Dyall) then
+  !                           if (AuxData%HType == H_DYALL) then
   !                           !      print*, 'dyal'                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          
   !                                 if (IAux(i) == 1) then
   !                                       i0 = 1
@@ -1522,7 +1522,7 @@ contains
   !                                       i0 = 1
   !                                       i1 = NIA
   !                                 end if
-  !                           else if (AuxData%HType == AuxData%GPF) then
+  !                           else if (AuxData%HType == H_GPF) then
   !                                 if (IAux(i) == 0) then
   !                                       i0 = NI + 1
   !                                       i1 = NIA
@@ -1572,13 +1572,13 @@ contains
 
   !                     idx = gmap_4fold(r,s,p,q,NBasis)
 
-  !                     if (AuxData%HType == AuxData%Dyall) then
+  !                     if (AuxData%HType == H_DYALL) then
   !                           if (.not. (IAux(p) == 1 .and. IAux(q) == 1 .and. &
   !                                 IAux(r) == 1 .and. IAux(s) == 1)) then
   !                                 AuxData%int_alpha(idx) = 0
   !                           end if
 
-  !                     else if (AuxData%HType == AuxData%GPF) then
+  !                     else if (AuxData%HType == H_GPF) then
   !                           if (.not. (IAux(p) == IAux(q) .and. &
   !                                 IAux(q) == IAux(r) .and. &
   !                                 IAux(r) == IAux(s))) then
@@ -1590,10 +1590,4 @@ contains
 
   !       end associate
   ! end subroutine erpa_init_incore
-
-
-
-
-
-
-end module acpp
+end module ppac_simple

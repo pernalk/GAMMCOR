@@ -440,7 +440,14 @@ subroutine read_block_cholesky(CholeskyParams, line)
                uppercase(val) == "FALSE".or.   &
                uppercase(val) == "F") then
                CholeskyParams%H0test = 0
-           endif
+         endif
+   case ("H0EXTERNAL")
+         if (uppercase(val) == ".TRUE.".or. &
+               uppercase(val) == "TRUE".or.   &
+               uppercase(val) == "T") then
+               CholeskyParams%H0external = .true.
+         endif
+
 
       end select
 
@@ -470,7 +477,9 @@ subroutine read_block_calculation(CalcParams, line)
                CalcParams%RDMType   = RDM_TYPE_DMRG
          elseif (uppercase(val) == "PYSCF")then
                CalcParams%InterfaceType = INTER_TYPE_PYSCF
-                CalcParams%RDMSource = INTER_TYPE_PYSCF               
+               CalcParams%RDMSource = INTER_TYPE_PYSCF
+         elseif (uppercase(val) == "CHRONUSQ")then
+               CalcParams%InterfaceType = INTER_TYPE_CHRONUSQ
            endif
 
       case ("JOBTYPE")
@@ -536,6 +545,10 @@ subroutine read_block_calculation(CalcParams, line)
                  CalcParams%JobType = JOB_TYPE_DUCC
            elseif (uppercase(val) == "HHERPADMP" ) then
                  CalcParams%JobType = JOB_TYPE_HHERPA_RDMDUMP
+           elseif (uppercase(val) == "AC_REL" ) then
+                 CalcParams%JobType = JOB_TYPE_AC_REL
+           elseif (uppercase(val) == "AC0_REL" ) then
+                 CalcParams%JobType = JOB_TYPE_AC0_REL                 
            endif
 
      !case ("FRAGMENTS")
@@ -592,23 +605,47 @@ subroutine read_block_calculation(CalcParams, line)
          elseif(uppercase(val) == 'INCORE'.or. &
                 uppercase(val) == 'IN-CORE') then
 
-            CalcParams%TwoMoInt = TWOMO_INCORE
+               CalcParams%TwoMoInt = TWOMO_INCORE
          endif
+      case ("PARSER")
+            if(uppercase(val) == 'AT') then
+                  ! Default parser is PARSER_MH
+               CalcParams%Parser = PARSER_AT
+         end if
 
-      case ("REDVIRT")
-           if (uppercase(val) == ".TRUE.".or. &
+   case ("ALGORITHM", "ALG")
+         if(uppercase(val) == 'SPINRES')then
+               ! default ALG_REGULAR
+               ! this is keyword for developer AT
+               CalcParams%Algorithm = ALG_SPINRES
+         else if(uppercase(val) == 'PPSIMPLE')then
+               ! default ALG_REGULAR
+               ! this is keyword for developer AT
+               CalcParams%Algorithm = ALG_PPSIMPLE
+         end if
+
+   case ("INTFORMAT")
+         if(uppercase(val) == 'FCIDUMP')then
+               ! default is just INT_DEFAULT = 0
+               ! the format file is figured out in reading interface
+               ! this is keyword for developer AT
+               CalcParams%Intformat = INT_FCIDUMP
+         end if
+
+   case ("REDVIRT")
+         if (uppercase(val) == ".TRUE.".or. &
                uppercase(val) == "TRUE".or.   &
                uppercase(val) == "T") then
                CalcParams%RedVirt = 1
-           endif
+         endif
 
-      case ("ORBRELAX")
-           if (uppercase(val) == ".FALSE.".or. &
+   case ("ORBRELAX")
+         if (uppercase(val) == ".FALSE.".or. &
                uppercase(val) == "FALSE".or.   &
                uppercase(val) == "F") then
                CalcParams%OrbRelax = 0
-           endif
-
+         endif
+           
       case ("ORBINCL", "ORBINCLUDE")
            if (uppercase(val) == ".TRUE.".or. &
                uppercase(val) == "TRUE".or.   &
@@ -732,7 +769,7 @@ subroutine read_block_calculation(CalcParams, line)
             read(val,*) CalcParams%BatchDim
       case("HTYPE")
             if (uppercase(val) == "DYALL")then
-                  CalcParmss%Htype = H_DYALL
+                  CalcParams%Htype = H_DYALL
             elseif (uppercase(val) == "D")then
                   CalcParams%Htype = H_DYALL
             elseif (uppercase(val) == "GPF")then
@@ -807,10 +844,6 @@ subroutine read_block_calculation(CalcParams, line)
 
       case ("IPRINT")
             read(val,*) CalcParams%IPrint
-      case ("SPIN_RESOLVED", "SPINRES", "SPIN_RES")
-            read(val,*) CalcParams%SpinRes
-      case ("OLA_PATH")
-            read(val,*) CalcParams%ola_path
       end select
 end subroutine read_block_calculation
 
@@ -948,7 +981,7 @@ character(:), allocatable :: first, last
       elseif(uppercase(val) == 'INCORE'.or. &
              uppercase(val) == 'IN-CORE') then
 
-         SystemParams%TwoMoInt = TWOMO_INCORE
+            SystemParams%TwoMoInt = TWOMO_INCORE
       endif
 
  case ("ISHF")

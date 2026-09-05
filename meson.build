@@ -76,6 +76,8 @@ sources = files(
 
   # -- infrastructure
   'SOURCE/priunit.f90',
+  'SOURCE/units.f90',
+  'SOURCE/print_utils.f90',
   'SOURCE/types.f90',
   'SOURCE/blocktypes.f90',
   'SOURCE/memory.f90',
@@ -126,12 +128,33 @@ sources = files(
   'SOURCE/ac_iter.f',
   'SOURCE/ac_fofo.f90',
   'SOURCE/ac_exact_2el.f',
-  'SOURCE/acpp_types.f90',
-  'SOURCE/acpp.f90',
-  'SOURCE/acph_spinres.f90',
-  'SOURCE/ppAC_incore.f90',
+  'SOURCE/ppac_types.f90',
+
+  # -- pp path: shared helpers
+  'SOURCE/quadratures.f90',
+  'SOURCE/pp_utils.f90',
+
+  # -- pp path: THC back end
+  'SOURCE/thc_auto_p0.f90',
+  'SOURCE/thc_auto_p2.f90',
+  'SOURCE/thc_auto_p3.f90',
+  'SOURCE/thc_energy.f90',
+
+  # -- pp path: AC0 kernels, one per integral back end
+  'SOURCE/ppac0.f90',
+  'SOURCE/ppac0_thc.f90',
+
+  # -- pp path: drivers
+  'SOURCE/ppac_subs.f90',
+  'SOURCE/ppac_dispatch.f90',
+  'SOURCE/ppac_simple_subs.f90',
+  'SOURCE/ppac_simple.f90',
+
+  # -- ph path and job routing
+  'SOURCE/phac_spinres.f90',
   'SOURCE/mp.f90',
   'SOURCE/ducc_simple.f90',
+  'SOURCE/dispatcher.f90',
   'SOURCE/polari.F90',
 
   # -- iterative solvers

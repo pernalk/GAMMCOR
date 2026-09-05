@@ -4,8 +4,13 @@ O = OBJ/
 PROG = gammcor
 
 OBJ = $(O)mainp.o $(O)initia.o $(O)dmscf.o $(O)misc.o $(O)optocc.o \
-       $(O)acpp_types.o $(O)interface_pp.o $(O)acpp.o $(O)acph_spinres.o $(O)ppAC_incore.o $(O)mp.o $(O)eigenno.o $(O)optnorb.o\
-       $(O)ducc_simple.o \
+       $(O)ppac_types.o $(O)interface_pp.o $(O)eigenno.o $(O)optnorb.o \
+       $(O)quadratures.o $(O)pp_utils.o \
+       $(O)thc_auto_p0.o $(O)thc_auto_p2.o $(O)thc_auto_p3.o $(O)thc_energy.o \
+       $(O)ppac0.o $(O)ppac0_thc.o \
+       $(O)ppac_subs.o $(O)ppac_dispatch.o \
+       $(O)ppac_simple_subs.o $(O)ppac_simple.o \
+       $(O)phac_spinres.o $(O)mp.o $(O)dispatcher.o\
        $(O)matvec.o $(O)hf.o $(O)matrix.o $(O)cpdmft.o \
        $(O)nonadia.o $(O)dftgrid.o $(O)lsd_sr.o $(O)dftfun_exerfpbe.o \
        $(O)dftfun_exerf.o $(O)dftfun_ecerfpbe.o $(O)dftfun_ecerf.o \
@@ -15,6 +20,7 @@ OBJ = $(O)mainp.o $(O)initia.o $(O)dmscf.o $(O)misc.o $(O)optocc.o \
        $(O)gridmolpro.o $(O)griddalton.o $(O)gridintern.o \
        $(O)sorter.o $(O)tran.o $(O)systemdef.o \
        $(O)priunit.o $(O)rdwrext.o \
+       $(O)units.o $(O)print_utils.o \
        $(O)types.o $(O)blocktypes.o \
        $(O)inputfill.o $(O)abmats.o $(O)abfofo.o $(O)ab0fofo.o \
        $(O)abchol.o \
@@ -49,20 +55,20 @@ $(O)%.o : $(S)%.f
 $(PROG) : $(OBJ)
 	$(FCC) -o $@ $^ $(XOBJ) $(FFLAGS) $(LIBS)
 
-$(O)mainp.o            : $(S)commons.inc $(O)memory.o $(O)types.o $(O)inputfill.o $(O)systemdef.o $(O)sapt_main.o $(O)git_info.o $(O)build_info.o  $(O)interface_pp.o $(O)acpp_types.o $(O)mp.o $(O)ducc_simple.o $(O)acpp.o $(O)acph_spinres.o $(O)ppAC_incore.o $(O)geom_input.o
-$(O)initia.o           : $(S)commons.inc $(O)memory.o $(O)priunit.o $(O)timing.o $(O)rdwrext.o $(O)sorter.o $(O)abmats.o $(O)types.o $(O)tran.o  $(O)tran_Chol.o $(O)CholeskyOTF.o $(O)gammint.o $(O)interface_pp.o $(O)acpp_types.o $(O)geom_input.o
+$(O)mainp.o            : $(S)commons.inc $(O)memory.o $(O)types.o $(O)inputfill.o $(O)systemdef.o $(O)sapt_main.o $(O)git_info.o $(O)build_info.o  $(O)interface_pp.o $(O)ppac_types.o $(O)mp.o $(O)ppac_dispatch.o $(O)ppac_simple.o $(O)phac_spinres.o $(O)dispatcher.o $(O)geom_input.o $(O)print_utils.o
+$(O)initia.o           : $(S)commons.inc $(O)memory.o $(O)priunit.o $(O)timing.o $(O)rdwrext.o $(O)sorter.o $(O)abmats.o $(O)types.o $(O)tran.o  $(O)tran_Chol.o $(O)CholeskyOTF.o $(O)gammint.o $(O)interface_pp.o $(O)ppac_types.o $(O)geom_input.o
 $(O)accas.o            : $(S)commons.inc $(O)priunit.o $(O)timing.o $(O)rdwrext.o $(O)sorter.o $(O)abmats.o $(O)abfofo.o $(O)ab0fofo.o \
-                         $(O)gridintern.o $(O)polari.o  $(O)acpp_types.o
+                         $(O)gridintern.o $(O)polari.o  $(O)ppac_types.o
 $(O)acfd.o             : $(S)commons.inc $(O)abmats.o $(O)abfofo.o  $(O)ab0fofo.o $(O)rdwrext.o
 $(O)ac_iter.o          : $(S)commons.inc $(O)abmats.o $(O)abfofo.o
 $(O)interpa.o          : $(S)commons.inc $(O)abmats.o $(O)abfofo.o $(O)ab0fofo.o
 $(O)lin.o              : $(S)lin.f90 $(O)types.o
-$(O)muerf.o            : $(S)commons.inc $(O)ab0fofo.o $(O)timing.o $(O)gridintern.o $(O)sapt_files.o  $(O)acpp_types.o
+$(O)muerf.o            : $(S)commons.inc $(O)ab0fofo.o $(O)timing.o $(O)gridintern.o $(O)sapt_files.o  $(O)ppac_types.o $(O)units.o
 $(O)dftgrid.o          : $(S)commons.inc $(O)abmats.o
 $(O)caspidft.o         : $(S)commons.inc $(O)rdwrext.o
 $(O)ac_exact_2el.o     : $(S)commons.inc
 $(O)cpdmft.o           : $(S)commons.inc
-$(O)dmscf.o            : $(S)commons.inc $(O)acpp_types.o
+$(O)dmscf.o            : $(S)commons.inc $(O)ppac_types.o
 $(O)eigenno.o          : $(S)commons.inc
 $(O)ekt.o              : $(S)commons.inc
 $(O)erpa.o             : $(S)commons.inc
@@ -83,24 +89,37 @@ $(O)ac_fofo.o          : $(O)abmats.o $(O)abfofo.o $(O)ab0fofo.o $(O)blocktypes.
                          $(O)lambda_calculator.o $(O)lambda_calculator_diag.o $(O)lambda_calculator_block.o $(O)lambda_calculator_projector.o
 
 $(O)types.o            : $(O)priunit.o
-$(O)acpp_types.o       : $(O)types.o
-$(O)acpp.o             : $(O)types.o $(O)acpp_types.o $(O)ppAC_incore.o
-$(O)acph_spinres.o  : $(O)types.o $(O)acpp_types.o 
-$(O)ppAC_incore.o      : $(O)types.o $(O)acpp_types.o $(O)lin.o
-$(O)mp.o               : $(O)types.o $(O)acpp_types.o
-$(O)ducc_simple.o      : $(O)types.o $(O)acpp_types.o
+$(O)ppac_types.o       : $(O)types.o
+$(O)quadratures.o      :
+$(O)pp_utils.o         : $(O)types.o $(O)lin.o
+$(O)thc_auto_p0.o      :
+$(O)thc_auto_p2.o      :
+$(O)thc_auto_p3.o      :
+$(O)thc_energy.o       : $(O)types.o $(O)ppac_types.o $(O)pp_utils.o $(O)lin.o
+$(O)ppac0.o            : $(O)types.o $(O)ppac_types.o $(O)pp_utils.o $(O)lin.o
+$(O)ppac0_thc.o        : $(O)types.o $(O)ppac_types.o $(O)pp_utils.o $(O)tran.o $(O)interface_pp.o $(O)geom_input.o \
+                         $(O)thc_auto_p0.o $(O)thc_auto_p2.o $(O)thc_auto_p3.o $(O)thc_energy.o
+$(O)ppac_subs.o        : $(O)types.o $(O)ppac_types.o $(O)pp_utils.o $(O)quadratures.o \
+                         $(O)ppac0.o $(O)interface_pp.o $(O)lin.o
+$(O)ppac_dispatch.o    : $(O)types.o $(O)ppac_types.o $(O)ppac_subs.o $(O)ppac0.o $(O)ppac0_thc.o
+$(O)ppac_simple_subs.o : $(O)types.o $(O)ppac_types.o $(O)lin.o
+$(O)ppac_simple.o      : $(O)types.o $(O)ppac_types.o $(O)ppac_simple_subs.o
+$(O)phac_spinres.o     : $(O)types.o $(O)ppac_types.o
+$(O)mp.o               : $(O)types.o $(O)ppac_types.o
+$(O)dispatcher.o       : $(O)types.o $(O)ppac_types.o $(O)ppac_dispatch.o $(O)ppac_simple.o \
+                         $(O)mp.o $(O)phac_spinres.o
 $(O)diis.o             : $(O)priunit.o
 $(O)inputfill.o        : $(O)types.o $(O)priunit.o
-$(O)systemdef.o        : $(O)types.o
+$(O)systemdef.o        : $(O)types.o $(O)ppac_types.o
 $(O)rdwrext.o          : $(O)priunit.o
 $(O)sorter.o           : $(O)priunit.o $(O)rdwrext.o
 $(O)tran.o             : $(O)blocktypes.o $(O)sorter.o
 $(O)tran_Chol.o        : $(O)tran.o
 $(O)geom_input.o       : $(O)types.o $(O)gammint.o
-$(O)interface_pp.o      : $(S)interface_pp.f90  $(O)acpp_types.o $(O)gammint.o $(O)geom_input.o
+$(O)interface_pp.o      : $(S)interface_pp.f90  $(O)ppac_types.o $(O)gammint.o $(O)geom_input.o
 $(O)abfofo.o           : $(O)priunit.o $(O)tran.o $(O)blocktypes.o $(O)abchol.o $(O)timing.o
 $(O)abmats.o           : $(O)priunit.o $(O)tran.o
-$(O)ab0fofo.o          : $(O)priunit.o $(O)tran.o $(O)blocktypes.o $(O)abfofo.o $(O)acpp_types.o
+$(O)ab0fofo.o          : $(O)priunit.o $(O)tran.o $(O)blocktypes.o $(O)abfofo.o $(O)ppac_types.o
 $(O)abuks.o            : $(O)priunit.o $(O)gridintern.o $(O)geom_input.o
 
 $(O)griddalton.o       : $(O)rdwrext.o
