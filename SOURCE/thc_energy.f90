@@ -9,7 +9,7 @@ module thc_energy
 
       use math_constants
       use ppac_types
-      use pp_utils
+      use print_utils
       use omp_lib
 
       implicit none
@@ -1317,9 +1317,9 @@ contains
       E_Corr = EAAoo+EAAooT + EAAao+EAAaoT+EVAoo+EVAooT+EVAao+EVAaoT+EVAao2+EVAao2T + &
             EVVoo+EVVooT+EVAaa+EVAaaT+EVVao+EVVaoT+ EVVaa+EVVaaT + two * (EAAooTA + EAAaoTA + EVVooTA + EVVaoTA + EVVaaTA + EVAooTA + EVAaaTA + EVAaoTA + EVAao2TA)
 
-      write(*, '(A18, A3, F20.15, A3, F20.15, A3, F20.15, A3, F20.15, A3, F20.15, A3, F20.15, A3, F20.15, A3, F20.15, A3, F20.15, A3)')&
-            'E_contr_all', ',', EAAoo+EAAooT, ',',EAAao+EAAaoT, ',',EVAoo+EVAooT, ',',EVAao2+EVAao2T, ',',EVVoo+EVVooT, ',',EVAao+EVAaoT, ',',EVAaa+EVAaaT, ',',EVVao+EVVaoT, ',',EVVaa+EVVaaT
-      write(*, '(A15, 2F20.15)')"E_ppAC0 = ", E_corr, ttoeV * E_corr
+!      write(*, '(A18, A3, F20.15, A3, F20.15, A3, F20.15, A3, F20.15, A3, F20.15, A3, F20.15, A3, F20.15, A3, F20.15, A3, F20.15, A3)')&
+!            'E_contr_all', ',', EAAoo+EAAooT, ',',EAAao+EAAaoT, ',',EVAoo+EVAooT, ',',EVAao2+EVAao2T, ',',EVVoo+EVVooT, ',',EVAao+EVAaoT, ',',EVAaa+EVAaaT, ',',EVVao+EVVaoT, ',',EVVaa+EVVaaT
+      !write(*, '(A15, 2F25.15)')"E_ppAC0 = ", E_corr, ttoeV * E_corr
 
       print*, ''
       write(*,'(A18,1X,A10,1X,A1,1X,A20,1X,A1,1X,A20,1X,A1,1X,A20)') &
@@ -1343,9 +1343,23 @@ contains
       write(*,'(A18,1X,F20.15,1X,A1,1X,F20.15,1X,A1,1X,F20.15,1X,A1,1X,F20.15)') &
             'E_vaao2,  ', EVAao2+EVAao2T+two * EVAao2TA, ',', EVAao2, ',', EVAao2T, ',', two * EVAao2TA
 
+      call print_section('Contributions to ppAC0 from (Mu)(Nu) pairs of blocks')
+      call print_block_contribution('(22)(11)', EAAoo + EAAooT + two * EAAooTA)
+      call print_block_contribution('(22)(21)', EAAao + EAAaoT + two * EAAaoTA)
+      call print_block_contribution('(32)(11)', EVAoo + EVAooT + two * EVAooTA)
+      call print_block_contribution('(32)(21)*', EVAao2 + EVAao2T + two * EVAao2TA)
+      call print_block_contribution('(32)(21)', EVAao  + EVAaoT  + two * EVAaoTA)
+      call print_block_contribution('(32)(22)', EVAaa + EVAaaT + two * EVAaaTA)
+      call print_block_contribution('(33)(11)', EVVoo + EVVooT + two * EVVooTA)
+      call print_block_contribution('(33)(21)', EVVao + EVVaoT + two * EVVaoTA)
+      call print_block_contribution('(33)(22)', EVVaa + EVVaaT + two * EVVaaTA)
       print*, ''
-      write(*, '(A15, 2F20.15)')"E_ppAC0 = ", E_corr, ttoeV * E_corr
+      write(*,'(2X,A)') '*  term used as the replacement in ff'
 
+      call print_section('Final energies')
+      call print_info('ECASSCF_THC', AuxData%ECAS_THC)
+      call print_info('E_ppAC0', E_corr)
+      print*, ''
 
     end associate
 end subroutine THC_energy_loop

@@ -11,6 +11,7 @@ module ppac_dispatch
       use ppac0
       use ppac_subs
       use ppac0_thc
+      use print_utils
 
       implicit none
       private

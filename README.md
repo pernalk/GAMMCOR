@@ -24,5 +24,12 @@ _Ulf Ekström, Lucas Visscher, Radovan Bast, Andreas J. Thorvaldsen and Kenneth 
 Arbitrary-Order Density Functional Response Theory from Automatic Differentiation, 
 Journal of Chemical Theory and Computation 6, 1971 (2010), DOI: 10.1021/ct100117s_.
 
+#### HDF5
+Used to read the PySCF interface file (`pyscf_data.h5`). The compiled libraries
+live in `hdf5/` and are committed; rebuild them with `hdf5/build_hdf5.sh` only
+if your compiler cannot read them. See `hdf5/README.md`.
+* Website: https://www.hdfgroup.org/solutions/hdf5/
+* Licence: BSD-style.
+
 #### TREXIO
 * Website: [TREXIO repository](https://github.com/TREX-CoE/trexio)

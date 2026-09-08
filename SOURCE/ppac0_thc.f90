@@ -9,6 +9,7 @@ module ppac0_thc
 
       use math_constants
       use pp_utils
+      use print_utils
       use ppac_types
       use thc_auto_p3
       use thc_auto_p0

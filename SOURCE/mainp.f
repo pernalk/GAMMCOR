@@ -558,12 +558,14 @@ C      Write(6,'(8a10)') ('**********',i=1,9)
       EndIf
 C
 C     Delete out-of-core integrals
+      if(Flags%Parser.Ne.PARSER_AT)then
       If(ITwoEl.Eq.2)  Call delfile('TWOMO')
       If (ICholeskyOTF==0) Then
          Call delfile('AOTWOSORT')
          If(IFunSR.Eq.1.Or.IFunSR.Eq.2.Or.IFunSR.Eq.4) Then
          Call delfile('AOERFSORT')
          EndIf
+      EndIf
       EndIf
 C
 C     Delete the scratch geometry file written for plain xyz input

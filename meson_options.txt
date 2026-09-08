@@ -1,0 +1,7 @@
+option('hdf5_root',
+  type        : 'string',
+  value       : '',
+  description : 'Prefix of an HDF5 installation built with the same Fortran ' +
+                'compiler as gammcor (expects include/hdf5.mod and ' +
+                'lib/libhdf5_fortran). Leave empty to autodetect from ' +
+                '$HDF5_ROOT, then h5fc on $PATH, then pkg-config.')

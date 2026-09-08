@@ -659,6 +659,7 @@ if(Flags%ISAPT.Eq.0) then
    AuxData%NCoreOrb = System%NCoreOrb
    AuxData%PYSCF = Flags%IPYSCF
    AuxData%Batchdim = Input%CalcParams%BatchDim
+   AuxData%nst        = System%InSt(:,1) 
 
    if(Flags%Parser.Eq.PARSER_AT) then
          AuxData%HType = Input%CalcParams%Htype

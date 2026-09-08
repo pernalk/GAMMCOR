@@ -4,7 +4,7 @@ O = OBJ/
 PROG = gammcor
 
 OBJ = $(O)mainp.o $(O)initia.o $(O)dmscf.o $(O)misc.o $(O)optocc.o \
-       $(O)ppac_types.o $(O)interface_pp.o $(O)eigenno.o $(O)optnorb.o \
+       $(O)ppac_types.o $(O)h5_reader.o $(O)interface_pp.o $(O)eigenno.o $(O)optnorb.o \
        $(O)quadratures.o $(O)pp_utils.o \
        $(O)thc_auto_p0.o $(O)thc_auto_p2.o $(O)thc_auto_p3.o $(O)thc_energy.o \
        $(O)ppac0.o $(O)ppac0_thc.o \
@@ -91,18 +91,19 @@ $(O)ac_fofo.o          : $(O)abmats.o $(O)abfofo.o $(O)ab0fofo.o $(O)blocktypes.
 $(O)types.o            : $(O)priunit.o
 $(O)ppac_types.o       : $(O)types.o
 $(O)quadratures.o      :
-$(O)pp_utils.o         : $(O)types.o $(O)lin.o
+$(O)pp_utils.o         : $(O)types.o $(O)lin.o $(O)quadratures.o
+$(O)print_utils.o      :
 $(O)thc_auto_p0.o      :
 $(O)thc_auto_p2.o      :
 $(O)thc_auto_p3.o      :
-$(O)thc_energy.o       : $(O)types.o $(O)ppac_types.o $(O)pp_utils.o $(O)lin.o
+$(O)thc_energy.o       : $(O)types.o $(O)ppac_types.o $(O)print_utils.o $(O)lin.o
 $(O)ppac0.o            : $(O)types.o $(O)ppac_types.o $(O)pp_utils.o $(O)lin.o
-$(O)ppac0_thc.o        : $(O)types.o $(O)ppac_types.o $(O)pp_utils.o $(O)tran.o $(O)interface_pp.o $(O)geom_input.o \
+$(O)ppac0_thc.o        : $(O)types.o $(O)ppac_types.o $(O)pp_utils.o $(O)print_utils.o $(O)tran.o $(O)interface_pp.o $(O)geom_input.o \
                          $(O)thc_auto_p0.o $(O)thc_auto_p2.o $(O)thc_auto_p3.o $(O)thc_energy.o
 $(O)ppac_subs.o        : $(O)types.o $(O)ppac_types.o $(O)pp_utils.o $(O)quadratures.o \
                          $(O)ppac0.o $(O)interface_pp.o $(O)lin.o
-$(O)ppac_dispatch.o    : $(O)types.o $(O)ppac_types.o $(O)ppac_subs.o $(O)ppac0.o $(O)ppac0_thc.o
-$(O)ppac_simple_subs.o : $(O)types.o $(O)ppac_types.o $(O)lin.o
+$(O)ppac_dispatch.o    : $(O)types.o $(O)ppac_types.o $(O)ppac_subs.o $(O)ppac0.o $(O)ppac0_thc.o $(O)print_utils.o
+$(O)ppac_simple_subs.o : $(O)types.o $(O)ppac_types.o $(O)lin.o $(O)pp_utils.o
 $(O)ppac_simple.o      : $(O)types.o $(O)ppac_types.o $(O)ppac_simple_subs.o
 $(O)phac_spinres.o     : $(O)types.o $(O)ppac_types.o
 $(O)mp.o               : $(O)types.o $(O)ppac_types.o
@@ -116,7 +117,8 @@ $(O)sorter.o           : $(O)priunit.o $(O)rdwrext.o
 $(O)tran.o             : $(O)blocktypes.o $(O)sorter.o
 $(O)tran_Chol.o        : $(O)tran.o
 $(O)geom_input.o       : $(O)types.o $(O)gammint.o
-$(O)interface_pp.o      : $(S)interface_pp.f90  $(O)ppac_types.o $(O)gammint.o $(O)geom_input.o
+$(O)interface_pp.o      : $(S)interface_pp.f90  $(O)ppac_types.o $(O)gammint.o $(O)geom_input.o $(O)print_utils.o $(O)h5_reader.o
+$(O)h5_reader.o       : $(S)h5_reader.f90
 $(O)abfofo.o           : $(O)priunit.o $(O)tran.o $(O)blocktypes.o $(O)abchol.o $(O)timing.o
 $(O)abmats.o           : $(O)priunit.o $(O)tran.o
 $(O)ab0fofo.o          : $(O)priunit.o $(O)tran.o $(O)blocktypes.o $(O)abfofo.o $(O)ppac_types.o

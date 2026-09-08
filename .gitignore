@@ -21,6 +21,7 @@ xcfun/include/xcfun_autogen.h
 xcfun/fortran/xcfun_autogen.f90
 xcfun/lib/libxcfun.*
 xcfun/**/*.o
+hdf5-old
 
 build/
 xcfun/geninterface
@@ -30,6 +31,7 @@ trexio/*.so*
 clean-build-test.sh
 SOURCE/git_info.f90
 SOURCE/build_info.f90
+SOURCE/interface_pp_legacy.f90
 basis_newAObasis_call_tree.md
 commit_msg.txt
 bazy-do-orca-backup/
@@ -43,3 +45,15 @@ SOURCE/IMPLEMENTATION_PLAN_CLAUDE.md
 SOURCE/implementation_plan_integration.md
 .vscode/
 PP_INTEGRATION_PLAN.md
+
+# HDF5: keep the compiled libraries and modules, drop everything else
+# (headers, .la, bin/, libhdf5.settings, the unpacked source in hdf5/src).
+/hdf5/*
+!/hdf5/README.md
+!/hdf5/build_hdf5.sh
+!/hdf5/include/
+/hdf5/include/*
+!/hdf5/include/*.mod
+!/hdf5/lib/
+/hdf5/lib/*
+!/hdf5/lib/*.a

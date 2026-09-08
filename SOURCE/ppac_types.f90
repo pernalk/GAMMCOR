@@ -197,6 +197,7 @@ module ppac_types
             double precision :: W_aa_act0, W_ab_act0, W_aa0, W_ab0
             double precision :: ENuc
             double precision :: ECas
+            double precision :: ECAS_THC = 0.d0
             double precision :: EROHF
             logical :: pherpa_print = .false.
             logical :: pperpa_print = .false.

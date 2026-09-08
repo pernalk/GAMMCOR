@@ -13,7 +13,10 @@ PARALLELIZATION   = -coarray=single -qmkl=parallel -qopenmp
 XCFUN                   =     -I xcfun/fortran
 CHOLESKY       =  -I ./gammcor-integrals/include
 
-COMMON_FLAGS = $(WARNINGS) $(PARALLELIZATION) $(XCFUN) $(CHOLESKY) -assume byterecl -heap-arrays 
+HDF5_ROOT      =  $(CURDIR)/hdf5
+HDF5           =  -I $(HDF5_ROOT)/include
+
+COMMON_FLAGS = $(WARNINGS) $(PARALLELIZATION) $(XCFUN) $(CHOLESKY) $(HDF5) -assume byterecl -heap-arrays 
 FFLAGS = $(COMMON_FLAGS) $(OPTIMIZATION) 
 DEBUG_FLAGS = -O0 -traceback -check all
 
@@ -22,10 +25,11 @@ DEBUG_FLAGS = -O0 -traceback -check all
 #
 XCFUN_LIB   =     -L./xcfun/lib/ -lxcfun
 CHOLESKY_LIB = ./gammcor-integrals/lib/cholesky.a
+HDF5_LIB = -L$(HDF5_ROOT)/lib -Wl,-rpath,$(HDF5_ROOT)/lib -lhdf5_hl_fortran -lhdf5_fortran -lhdf5_hl -lhdf5 -lz -lsz -ldl -lm
 
 #LIBS = $(MKL_LIB) $(XCFUN_LIB) $(CHOLESKY_LIB) -limf 
 
-LIBS = $(XCFUN_LIB) $(CHOLESKY_LIB) -limf 
+LIBS = $(XCFUN_LIB) $(CHOLESKY_LIB) $(HDF5_LIB) -limf 
 
 include Makefile.common
 

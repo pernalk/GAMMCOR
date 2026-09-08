@@ -13,11 +13,150 @@ module interface_pp
       use sort
       use clock
       use print_utils
+      use h5_reader
 
 
       implicit none
 
+
+      character(len=*), parameter :: PYSCF_H5 = 'pyscf_data.h5'
+      integer(HID_T) :: pyscf_fid = -1
+
 contains
+
+    subroutine pyscf_h5_open()
+          if (pyscf_fid /= -1) return
+          call h5_init()
+          pyscf_fid = h5_open(PYSCF_H5)
+    end subroutine pyscf_h5_open
+
+    subroutine pyscf_h5_close()
+          if (pyscf_fid == -1) return
+          call h5_close(pyscf_fid)
+          call h5_finish()
+          pyscf_fid = -1
+    end subroutine pyscf_h5_close
+
+    ! "_1.1" (or "" for a single-state job) -> "/POSTHF/STATES/1.1"
+    function pyscf_state_group(suffix) result(grp)
+          character(len=*), intent(in) :: suffix
+          character(len=64) :: grp
+          if (len_trim(suffix) == 0) then
+                grp = '/POSTHF/STATES/1.1'
+          else
+                grp = '/POSTHF/STATES/'//suffix(2:len_trim(suffix))
+          end if
+    end function pyscf_state_group
+
+
+    ! NBasis for the PySCF interface.  Called from mainp before read_PYSCF, so
+    ! it opens and closes the container itself.  Reads /REF/NBASIS when the
+    ! HDF5 file is there, otherwise falls back to a legacy auxdata<suffix>.txt.
+    subroutine basinfo_pyscf(nbasis)
+          integer, intent(out) :: nbasis
+
+          character(len=256) :: filename
+          character(len=:), allocatable :: command
+          character(len=15) :: temp_file = 'list.tmp'
+          integer :: unit, io_status
+          integer(HID_T) :: fid
+          integer :: iv(1)
+          logical :: h5_present
+
+          inquire(file=PYSCF_H5, exist=h5_present)
+          if (h5_present) then
+                call h5_init()
+                fid = h5_open(PYSCF_H5)
+                call h5_get(fid, '/REF/NBASIS', iv)
+                call h5_close(fid)
+                call h5_finish()
+                nbasis = iv(1)
+                return
+          end if
+
+          filename = ''
+          command = 'ls -1 auxda*.txt 2>/dev/null | head -n 1 >' // temp_file
+          call execute_command_line(command, wait=.true.)
+
+          open(newunit=unit, file=temp_file, status='old', &
+               action='read', iostat=io_status)
+          if (io_status == 0) then
+                read(unit, '(A)', iostat=io_status) filename
+                if (io_status /= 0) filename = ''
+                close(unit, status='delete')
+          end if
+
+          if (trim(filename) == '') then
+                print *, "ERROR: found neither ", PYSCF_H5, &
+                         " nor a legacy auxdata*.txt file"
+                stop
+          end if
+
+          open(newunit=unit, file=filename, status='old', action='read', &
+               iostat=io_status)
+          if (io_status /= 0) then
+                print *, "ERROR: cannot open ", trim(filename)
+                stop
+          end if
+          read(unit, *, iostat=io_status) nbasis
+          close(unit)
+          if (io_status /= 0) then
+                print *, "ERROR: no NBasis in ", trim(filename)
+                stop
+          end if
+
+    end subroutine basinfo_pyscf
+
+
+    ! NBasis for the ORCA interface, taken from the NORB= field of the
+    ! FCIDUMP header.
+    subroutine basinfo_orca(nbasis)
+          integer, intent(out) :: nbasis
+          character(len=256) :: line, filename
+          integer :: pos, ios, unit
+          logical :: filex1, filex2
+
+          inquire(file='FCIDUMP', exist=filex1)
+          inquire(file='FCIDUMP-full', exist=filex2)
+
+          if (filex1) then
+                filename = 'FCIDUMP'
+          else if (filex2) then
+                filename = 'FCIDUMP-full'
+          else
+                print*, 'NO FCIDUMP file'
+                print*, 'interface_pp.f90/basinfo_orca'
+                stop
+          end if
+
+          open(newunit=unit, file=filename, status="old", &
+               action="read", iostat=ios)
+          if (ios /= 0) then
+                print *, "ERROR: cannot open ", trim(filename)
+                stop
+          end if
+          read(unit, fmt="(a)", iostat=ios) line
+          close(unit)
+          if (ios /= 0) then
+                print *, "FCIDUMP empty"
+                stop
+          end if
+
+          line = trim(adjustl(line))
+          pos = index(line, "NORB=")
+          if (pos == 0) then
+                print *, "ERROR: no NORB= in the ", trim(filename), " header"
+                stop
+          end if
+          read(line(pos+5:), *, iostat=ios) nbasis
+          if (ios /= 0) then
+                print *, "ERROR: cannot parse NORB= in ", trim(filename)
+                stop
+          end if
+
+          print*, 'nbasis', nbasis
+
+    end subroutine basinfo_orca
 
 
       !subroutine interface_driver(THCData, AuxData, CAONO, Flags, TwoEl)
@@ -62,18 +201,17 @@ contains
             type(TSystem)  :: System
             integer :: ms2
 
+            call pyscf_h5_open()
+
             if (Flags%ITwoEl.ne.1)then
                   print*, 'Two electron integrals calculated with THC'
                   call GEOM_init(Flags, AuxData, AObasis, System)
             else
-                  print*, 'Two electron integrals read from file'
+                  print*, 'Two electron integrals read from ', PYSCF_H5
                   ! call read_fcidump_header("FCIDUMP", AuxData%NBasis, AuxData%Nel, ms2)
                   ! call read_fcidump_restricted('FCIDUMP', AuxData, TwoEl)
 
-                  unit = 21
-                  open(unit=unit, file='TWOEl.bin', status='old', access='stream', form='unformatted')
-                  read(unit) TwoEl
-                  close(unit)
+                  call h5_get(pyscf_fid, '/MOINTS/ERI', TwoEl)
             end if
 
             !-----------------------------------------------------------------------------------------------------
@@ -110,6 +248,7 @@ contains
               allocate(THCData%HNO(NBasis, NBasis))
               THCData%ExternalOrdering = ORBITAL_ORDERING_PYSCF
               THCData%H0external = Flags%H0external
+              print*, 'THCData%H0external:', THCData%H0external
               allocate(THCData%fij(NI))
               allocate(THCData%fvw(NV))
 
@@ -124,7 +263,11 @@ contains
               ! end do
 
               if (Flags%JOBTYPE /= JOB_TYPE_MP2 .and. Flags%JOBTYPE /= JOB_TYPE_SRMP2) then
-                    call load_density_matrices(suffix, AuxData, THCData, CAOMO, CAONO, Flags, AObasis, System, TwoEl)
+
+                    if (Flags%JOBTYPE == JOB_TYPE_AC0.and.Flags%ITwoEl > 1)then
+                          call load_density_matrices(suffix, AuxData, THCData, CAOMO, CAONO, Flags, AObasis, System, TwoEl, .true.)
+                    else
+                          call load_density_matrices(suffix, AuxData, THCData, CAOMO, CAONO, Flags, AObasis, System, TwoEl,  .false.)
 
                     
                     ! print*, 'rdmyy'
@@ -152,7 +295,7 @@ contains
                     !   end do
                     ! end associate
 
-
+                    end if
                     if (natural_orb == 0)then
                          
                           print*, 'transform to natural orbital basis'
@@ -176,6 +319,13 @@ contains
                     else
                           print*, 'natural orbitals'
                           call load_occupancy(AuxData)
+                          ! No MO->NO transformation is needed, but the later code
+                          ! (e.g. AB_CAS_FOFO) still expects rdm2.dat on disk, so
+                          ! dump the 2-RDM read from the h5 file here as well.
+                          if (allocated(AuxData%rdm2_full)) then
+                                print*, 'writing rdm2 full (natural orbitals)'
+                                call write_rdm2_dat(AuxData%rdm2_full, NA)
+                          end if
                     end if                          
               else
                     call load_rohf_occupation(AuxData)
@@ -234,6 +384,8 @@ contains
               end if
 
           end associate
+
+            call pyscf_h5_close()
             
     end subroutine read_PYSCF
 
@@ -388,22 +540,19 @@ contains
           character(len=*), intent(in) :: suffix
           type(TACppData), intent(inout) :: AuxData
           integer, intent(out) :: natural_orb
-          character(len=256) :: filename
-          integer :: unit, nat_flag
+          integer :: iv(1)
+          double precision :: dv(1)
 
-          write(filename, '("auxdata", A, ".txt")') trim(suffix)
-
-          unit = 10    
-          open(unit=unit, file=filename, status="old", action="read")
-          read(unit, *) AuxData%Nbasis
-          read(unit, *) AuxData%NI
-          read(unit, *) AuxData%NA
-          read(unit, *) AuxData%NV
-          read(unit, *) AuxData%ECAS
-          read(unit, *) AuxData%ENuc
-          read(unit, *) AuxData%NEL
-          read(unit, *) natural_orb
-          close(unit)
+          ! REF/ holds what auxdata<suffix>.txt used to; the CAS energy is
+          ! per state and lives on the state group as the ENERGY attribute.
+          call h5_get(pyscf_fid, '/REF/NBASIS', iv); AuxData%Nbasis = iv(1)
+          call h5_get(pyscf_fid, '/REF/NI',     iv); AuxData%NI     = iv(1)
+          call h5_get(pyscf_fid, '/REF/NA',     iv); AuxData%NA     = iv(1)
+          call h5_get(pyscf_fid, '/REF/NV',     iv); AuxData%NV     = iv(1)
+          call h5_get(pyscf_fid, '/REF/NEL',    iv); AuxData%NEL    = iv(1)
+          call h5_get(pyscf_fid, '/REF/NATORB', iv); natural_orb    = iv(1)
+          call h5_get(pyscf_fid, '/REF/ENUC',   dv); AuxData%ENuc   = dv(1)
+          call h5_attr(pyscf_fid, trim(pyscf_state_group(suffix)), 'ENERGY', AuxData%ECAS)
 
           AuxData%NIA = AuxData%NI + AuxData%NA
 
@@ -463,32 +612,29 @@ contains
     
     subroutine load_mp2_aux_data(AuxData)
           type(TACppData), intent(inout) :: AuxData
-          integer :: unit
+          integer :: iv(1)
+          double precision :: dv(1)
 
-          unit = 10
-          open(unit=unit, file="auxdata_rohf.txt", status="old", action="read")
-          read(unit, *) AuxData%Nbasis
-          read(unit, *) AuxData%NI
-          read(unit, *) AuxData%NA
-          read(unit, *) AuxData%NV
-          read(unit, *) AuxData%EROHF
-          read(unit, *) AuxData%ENuc
-          read(unit, *) AuxData%NEL
-          close(unit)
+          ! The ROHF export always writes a single state, tagged 1.1.
+          call h5_get(pyscf_fid, '/REF/NBASIS', iv); AuxData%Nbasis = iv(1)
+          call h5_get(pyscf_fid, '/REF/NI',     iv); AuxData%NI     = iv(1)
+          call h5_get(pyscf_fid, '/REF/NA',     iv); AuxData%NA     = iv(1)
+          call h5_get(pyscf_fid, '/REF/NV',     iv); AuxData%NV     = iv(1)
+          call h5_get(pyscf_fid, '/REF/NEL',    iv); AuxData%NEL    = iv(1)
+          call h5_get(pyscf_fid, '/REF/ENUC',   dv); AuxData%ENuc   = dv(1)
+          call h5_attr(pyscf_fid, '/POSTHF/STATES/1.1', 'ENERGY', AuxData%EROHF)
           AuxData%NIA = AuxData%NI + AuxData%NA
-          allocate(AuxData%IndAux(AuxData%NBasis))            
-          open(unit=21, file="mo_occ_int.bin", status="old", access="stream", form="unformatted")
-          read(21) AuxData%IndAux
-          close(21)
+          allocate(AuxData%IndAux(AuxData%NBasis))
+          call h5_get(pyscf_fid, '/SCF/MO_OCC_INT', AuxData%IndAux)
     end subroutine load_mp2_aux_data
 
-    subroutine load_density_matrices(suffix, AuxData, THCData, CAOMO, CAONO, Flags, AObasis, System, TwoEl)
-          ! Loads RDMs from binary files (PySCF path). Files (optional state suffix):
-          !   rdm2_aaaa.bin -> rdm2_pp,  rdm2_abab.bin -> rdm2_pm
-          !   rdm2_bbbb.bin -> rdm2_mm  (fallback: = rdm2_pp for closed-shell)
-          !   rdm2_baba.bin -> rdm2_mp  (fallback: = rdm2_pm)
-          !   rdm1a.bin -> rdm1_p,  rdm1b.bin -> rdm1_m
-          !   rdm1_full.bin -> rdm1_full (fallback: rdm1_p = rdm1_m = rdm1_full/2)
+    subroutine load_density_matrices(suffix, AuxData, THCData, CAOMO, CAONO, Flags, AObasis, System, TwoEl, only_full)
+          ! Loads RDMs from POSTHF/STATES/<state>/ in pyscf_data.h5:
+          !   RDM2_AAAA -> rdm2_pp,  RDM2_ABAB -> rdm2_pm
+          !   RDM2_BBBB -> rdm2_mm  (fallback: = rdm2_pp for closed-shell)
+          !   RDM2_BABA -> rdm2_mp  (fallback: = rdm2_pm)
+          !   RDM1_A -> rdm1_p,  RDM1_B -> rdm1_m
+          !   RDM1   -> rdm1_full (fallback: rdm1_p = rdm1_m = rdm1_full/2)
           ! rdm2_full = rdm2_pp + rdm2_mm + rdm2_pm + rdm2_mp  (computed here).
           
           character(len=*), intent(in) :: suffix
@@ -500,74 +646,101 @@ contains
           type(TAOBASIS), intent(in) :: AObasis
           type(TSystem), intent(in) :: System
           double precision, optional, intent(in) :: TwoEl(:)
+          logical, optional, intent(in) :: only_full
 
-          character(len=256) :: fname_aaaa, fname_abab, fname_bbbb, fname_baba, fname_aa, fname_bb
-          character(len=256) :: fname_rdm1, fname_rdm2
+          character(len=256) :: grp
+          character(len=256) :: name_aaaa, name_abab, name_bbbb, name_baba, name_aa, name_bb
+          character(len=256) :: name_rdm1, name_rdm2
           double precision, dimension(:), allocatable :: occ_temp
           integer :: unit
           integer :: i, j, k, l
           logical :: exists, ex_bbbb, ex_baba, ex_aa, ex_bb, ex_full
+          logical :: use_full
 
-          write(fname_aaaa, '("rdm2_aaaa", A, ".bin")') trim(suffix)
-          write(fname_abab, '("rdm2_abab", A, ".bin")') trim(suffix)
-          write(fname_bbbb, '("rdm2_bbbb", A, ".bin")') trim(suffix)
-          write(fname_baba, '("rdm2_baba", A, ".bin")') trim(suffix)
-          write(fname_rdm2, '("rdm2_full", A, ".bin")') trim(suffix)
-          write(fname_aa, '("rdm1a", A, ".bin")') trim(suffix)
-          write(fname_bb, '("rdm1b", A, ".bin")') trim(suffix)
-          write(fname_rdm1, '("rdm1_full", A, ".bin")') trim(suffix)
-
-          allocate(AuxData%rdm2_pp(AuxData%NA, AuxData%NA, AuxData%NA, AuxData%NA))
-          allocate(AuxData%rdm2_pm(AuxData%NA, AuxData%NA, AuxData%NA, AuxData%NA))
-          allocate(AuxData%rdm2_mm(AuxData%NA, AuxData%NA, AuxData%NA, AuxData%NA))
-          allocate(AuxData%rdm2_mp(AuxData%NA, AuxData%NA, AuxData%NA, AuxData%NA))
-          allocate(AuxData%rdm2_full(AuxData%NA, AuxData%NA, AuxData%NA, AuxData%NA))
-
+          grp = pyscf_state_group(suffix)
+          name_aa   = trim(grp)//'/RDM1_A'
+          name_bb   = trim(grp)//'/RDM1_B'
+          name_rdm1 = trim(grp)//'/RDM1'
           allocate(AuxData%rdm1_p(AuxData%NA, AuxData%NA))
           allocate(AuxData%rdm1_m(AuxData%NA, AuxData%NA))
           allocate(AuxData%rdm1_full(AuxData%NA, AuxData%NA))
+          allocate(AuxData%rdm2_full(AuxData%NA, AuxData%NA, AuxData%NA, AuxData%NA))
 
-          !call load_2x2x2x2_array(trim(fname_rdm2), AuxData%rdm2_full)
-          call load_2x2x2x2_array(trim(fname_aaaa), AuxData%rdm2_pp)
-          call load_2x2x2x2_array(trim(fname_abab), AuxData%rdm2_pm)
-
-          inquire(file=trim(fname_bbbb), exist=ex_bbbb)
-          if (ex_bbbb) then
-                call load_2x2x2x2_array(trim(fname_bbbb), AuxData%rdm2_mm)
-          else
-                call load_2x2x2x2_array(trim(fname_aaaa), AuxData%rdm2_mm)
+          ! only_full asks for the pre-assembled rdm2_full_reordered file. Older dumps
+          ! (produced before the pp branch existed) do not have it, but they do have the
+          ! spin blocks - in that case fall back to them and assemble rdm2_full below.
+          use_full = only_full
+          if (only_full)then
+             name_rdm2 = trim(grp)//'/RDM2_FULL_REORDERED'
+             exists = h5_exists(pyscf_fid, trim(name_rdm2))
+             if (exists)then
+                   call h5_get(pyscf_fid, trim(name_rdm2), AuxData%rdm2_full)
+             else
+                   write(*, '(1x,3a)') 'Dataset ', trim(name_rdm2), &
+                         ' not found - assembling rdm2_full from the spin blocks'
+                   use_full = .false.
+             end if
           end if
 
-          inquire(file=trim(fname_baba), exist=ex_baba)
-          if (ex_baba) then
-                call load_2x2x2x2_array(trim(fname_baba), AuxData%rdm2_mp)
-          else
-                call load_2x2x2x2_array(trim(fname_abab), AuxData%rdm2_mp)
+          if (.not. use_full)then
+                name_aaaa = trim(grp)//'/RDM2_AAAA'
+                name_abab = trim(grp)//'/RDM2_ABAB'
+                name_bbbb = trim(grp)//'/RDM2_BBBB'
+                name_baba = trim(grp)//'/RDM2_BABA'
+                name_rdm2 = trim(grp)//'/RDM2'
+
+                allocate(AuxData%rdm2_pp(AuxData%NA, AuxData%NA, AuxData%NA, AuxData%NA))
+                allocate(AuxData%rdm2_pm(AuxData%NA, AuxData%NA, AuxData%NA, AuxData%NA))
+                allocate(AuxData%rdm2_mm(AuxData%NA, AuxData%NA, AuxData%NA, AuxData%NA))
+                allocate(AuxData%rdm2_mp(AuxData%NA, AuxData%NA, AuxData%NA, AuxData%NA))
+                
+                
+                !call h5_get(pyscf_fid, trim(name_rdm2), AuxData%rdm2_full)
+                call h5_get(pyscf_fid, trim(name_aaaa), AuxData%rdm2_pp)
+                call h5_get(pyscf_fid, trim(name_abab), AuxData%rdm2_pm)
+
+                ex_bbbb = h5_exists(pyscf_fid, trim(name_bbbb))
+                if (ex_bbbb) then
+                      call h5_get(pyscf_fid, trim(name_bbbb), AuxData%rdm2_mm)
+                else
+                      call h5_get(pyscf_fid, trim(name_aaaa), AuxData%rdm2_mm)
+                end if
+
+                ex_baba = h5_exists(pyscf_fid, trim(name_baba))
+                if (ex_baba) then
+                      print*, 'reading baba'
+                      call h5_get(pyscf_fid, trim(name_baba), AuxData%rdm2_mp)
+                else
+                      print*, 'reading abab'
+                      call h5_get(pyscf_fid, trim(name_abab), AuxData%rdm2_mp)
+                end if
           end if
 
-          inquire(file=trim(fname_rdm1), exist=ex_full)
+          ex_full = h5_exists(pyscf_fid, trim(name_rdm1))
           if(ex_full)then
-                call load_2x2_array_pyscf(trim(fname_rdm1), AuxData%rdm1_full)
+                call h5_get(pyscf_fid, trim(name_rdm1), AuxData%rdm1_full)
           end if
 
-          inquire(file=trim(fname_aa), exist=ex_aa)
-          
+          ex_aa = h5_exists(pyscf_fid, trim(name_aa))
+
           if (ex_aa) then
-                call load_2x2_array_pyscf(trim(fname_aa), AuxData%rdm1_p)
+                call h5_get(pyscf_fid, trim(name_aa), AuxData%rdm1_p)
           else
                 AuxData%rdm1_p = AuxData%rdm1_full / two
           end if
           
-          inquire(file=trim(fname_bb), exist=ex_bb)
+          ex_bb = h5_exists(pyscf_fid, trim(name_bb))
           if (ex_bb) then
                 print*, 'reading bb'
-                call load_2x2_array_pyscf(trim(fname_bb), AuxData%rdm1_m)
+                call h5_get(pyscf_fid, trim(name_bb), AuxData%rdm1_m)
           else
                 AuxData%rdm1_m = AuxData%rdm1_full / two
           end if
 
-          AuxData%rdm2_full = AuxData%rdm2_pp + AuxData%rdm2_mm +& 
-                AuxData%rdm2_pm + AuxData%rdm2_mp
+          if (.not. use_full)then
+                AuxData%rdm2_full = AuxData%rdm2_pp + AuxData%rdm2_mm +&
+                      AuxData%rdm2_pm + AuxData%rdm2_mp
+          end if
 
           ! print*, 'rdm1'
           ! do i = 1, AuxData%NA
@@ -626,13 +799,7 @@ contains
           allocate(AuxData%Occ_rohf(AuxData%NBasis))
           allocate(AuxData%Occ(AuxData%NBasis))
 
-          unit = 20
-          inquire(file="occ_rohf.bin", exist=exists)
-          if (exists) then
-                open(unit=unit, file="occ_rohf.bin", status="old", access="stream", form="unformatted")
-          endif
-          read(unit) AuxData%Occ_rohf
-          close(unit)
+          call h5_get(pyscf_fid, '/SCF/MO_OCC', AuxData%Occ_rohf)
 
           AuxData%Occ = AuxData%Occ_rohf / two
     end subroutine load_rohf_occupation
@@ -643,21 +810,16 @@ contains
           integer :: unit
           logical :: exists                           
 
-          allocate(occ_temp(AuxData%NI + AuxData%NA))
-          unit = 20
-          inquire(file="rdm1.bin", exist=exists)
-          if (exists) then
-                open(unit=unit, file="rdm1.bin", status="old", access="stream", form="unformatted")
-          else
-                open(unit=unit, file="occ.bin", status="old", access="stream", form="unformatted")
-          endif
-          read(unit) occ_temp
-          close(unit)
+          ! POSTHF/OCC holds the CAS occupations of all NBasis orbitals; only the
+          ! inactive+active head of it is used, exactly as when the same numbers
+          ! were streamed out of rdm1.bin / occ.bin.
+          allocate(occ_temp(h5_size(pyscf_fid, '/POSTHF/OCC')))
+          call h5_get(pyscf_fid, '/POSTHF/OCC', occ_temp)
           ! print*, occ_temp, AuxData%NBasis
 
           allocate(AuxData%Occ(AuxData%NBasis))
           AuxData%Occ = 0.0d0
-          AuxData%Occ(1:AuxData%NI+AuxData%NA) = occ_temp
+          AuxData%Occ(1:AuxData%NI+AuxData%NA) = occ_temp(1:AuxData%NI+AuxData%NA)
 
           allocate(AuxData%IndAux(AuxData%NBasis))
           AuxData%IndAux = 2
@@ -718,8 +880,8 @@ contains
           ! If natural = 1, HCore are in NO basis.                                                                                                                                                                                        
           ! If natural = 0, HCore are in AO basis.                                                                                                                                                                                        
           !----------------------------------------------------------------------------------------
-          ! --- FCIDUMP modification: do not load HCore.bin as it's already read from FCIDUMP ---
-          call load_2x2_array_pyscf('HCore.bin', AuxData%HNO0)
+          ! --- FCIDUMP modification: do not load HCore as it's already read from FCIDUMP ---
+          call h5_get(pyscf_fid, '/INTS/CORE_HAMILTONIAN', AuxData%HNO0)
           ! -------------------------------------------------------------------------------------
 
           THCData%HNO = AuxData%HNO0
@@ -728,22 +890,12 @@ contains
           if (natural_orb==1) then
 
                 allocate(CAONO(AuxData%NBasis, AuxData%NBasis))
-                inquire(file='C.bin', exist=file_exists)
-                if (file_exists) then
-                      call load_2x2_array_pyscf('C.bin', CAONO)
-                else
-                      call load_2x2_array_pyscf('CAONO.bin', CAONO)
-                end if
+                call h5_get(pyscf_fid, '/POSTHF/ORB_COEFF', CAONO)
                 ! CAOMO is not needed/allocated here
           else
                 ! If not natural, we read Canonical MOs into CAOMO for later transformation
                 allocate(CAOMO(AuxData%NBasis, AuxData%NBasis))
-                inquire(file='C.bin', exist=file_exists)
-                if (file_exists) then
-                      call load_2x2_array_pyscf('C.bin', CAOMO)
-                else
-                      call load_2x2_array_pyscf('CAONO.bin', CAOMO)
-                end if
+                call h5_get(pyscf_fid, '/POSTHF/ORB_COEFF', CAOMO)
                 ! Allocate CAONO to be filled later by Trans2NO (or copied if MP2)
                 allocate(CAONO(AuxData%NBasis, AuxData%NBasis))
 
@@ -755,60 +907,46 @@ contains
     end subroutine load_one_electron_integrals
 
     subroutine resolve_state_suffix(AuxData, suffix)
+          ! Picks the POSTHF/STATES/<n>.<m> group to read from. The requested
+          ! state wins; without one (or when it is absent from the file) the
+          ! single state present is used, and an ambiguous file is an error.
           type(TACppData), intent(in) :: AuxData
           character(len=*), intent(out) :: suffix
-          character(len=256) :: filename
-          logical :: exists_generic, exists_specific
-          integer :: x, y, count, ios
+          character(len=256) :: grp
+          integer :: x, y, count
           integer :: detected_state(2)
 
           suffix = ""
-          inquire(file="auxdata.txt", exist=exists_generic, iostat=ios)
 
-          if (AuxData%nst(1) < 0) then
-                if (exists_generic) then
+          if (AuxData%nst(1) > 0) then
+                write(grp, '("/POSTHF/STATES/", I0, ".", I0)') AuxData%nst(1), AuxData%nst(2)
+                if (h5_exists(pyscf_fid, trim(grp))) then
+                      write(suffix, '("_", I0, ".", I0)') AuxData%nst(1), AuxData%nst(2)
                       return
                 end if
+                write(*, '(1x,3a)') 'Group ', trim(grp), ' not found in '//PYSCF_H5
+          end if
 
-                count = 0
-                do x = 1, 10
-                      do y = 1, 10
-                            write(filename, '("auxdata_", I0, ".", I0, ".txt")') x, y
-                            inquire(file=trim(filename), exist=exists_specific, iostat=ios)
-                            if (exists_specific) then
-                                  detected_state(1) = x
-                                  detected_state(2) = y
-                                  count = count + 1
-                            end if
-                      end do
-                end do
-
-                if (count == 0) then
-                      stop "Error: No auxdata files found."
-                end if
-
-                if (count == 1) then
-                      write(suffix, '("_", I0, ".", I0)') detected_state(1), detected_state(2)
-                else
-                      stop "Error: Multiple state-specific auxdata files found and no generic fallback."
-                end if
-
-          else if (AuxData%nst(1) > 0) then
-                write(suffix, '("_", I0, ".", I0)') AuxData%nst(1), AuxData%nst(2)
-                write(filename, '("auxdata", A, ".txt")') trim(suffix)
-                inquire(file=trim(filename), exist=exists_specific, iostat=ios)
-
-                if (exists_specific .and. exists_generic) then
-                      stop "Error: Ambiguous input. Both generic 'auxdata.txt' and the requested state file exist."
-                end if
-
-                if (.not. exists_specific) then
-                      if (exists_generic) then
-                            suffix = ""
-                      else
-                            stop "Error: Requested auxdata file not found and no generic fallback."
+          count = 0
+          do x = 1, 10
+                do y = 1, 10
+                      write(grp, '("/POSTHF/STATES/", I0, ".", I0)') x, y
+                      if (h5_exists(pyscf_fid, trim(grp))) then
+                            detected_state(1) = x
+                            detected_state(2) = y
+                            count = count + 1
                       end if
-                end if
+                end do
+          end do
+
+          if (count == 0) then
+                stop "Error: No POSTHF/STATES group found in pyscf_data.h5."
+          end if
+
+          if (count == 1) then
+                write(suffix, '("_", I0, ".", I0)') detected_state(1), detected_state(2)
+          else
+                stop "Error: Several states in pyscf_data.h5 - select one in the input."
           end if
     end subroutine resolve_state_suffix
     
@@ -2144,6 +2282,7 @@ end subroutine save_2rdm_orca
             end if          
           
             !allocate(AuxData%Occ(AuxData%NBasis))
+            if (.not. allocated(AuxData%Occ)) allocate(AuxData%Occ(NBasis))
             print*,  'AuxData%NBasis', AuxData%NBasis
             AuxData%Occ = zero
             AuxData%Occ(1: AuxData%NI) = One
@@ -2174,16 +2313,15 @@ end subroutine save_2rdm_orca
             !----------------------------------------------------------------------------
             
             
-            !allocate(AuxData%IndAux(NBasis))
-            !AuxData%IndAux = 2
-            !AuxData%IndAux(1:NI) = 0
-            !AuxData%IndAux(NI+1:NIA) = 1
+            if (.not. allocated(AuxData%IndAux)) allocate(AuxData%IndAux(AuxData%NBasis))
+            AuxData%IndAux = 2
+            AuxData%IndAux(1:AuxData%NI) = 0
+            AuxData%IndAux(AuxData%NI+1:AuxData%NIA) = 1
 
-          
-            call rdm2_MO_NO_trans(AuxData%rdm2_pp, CMONO_NA, NA)
-            call rdm2_MO_NO_trans(AuxData%rdm2_mm, CMONO_NA, NA)
-            call rdm2_MO_NO_trans(AuxData%rdm2_pm, CMONO_NA, NA)
-            call rdm2_MO_NO_trans(AuxData%rdm2_mp, CMONO_NA, NA)
+            if (allocated(AuxData%rdm2_pp)) call rdm2_MO_NO_trans(AuxData%rdm2_pp, CMONO_NA, NA)
+            if (allocated(AuxData%rdm2_mm)) call rdm2_MO_NO_trans(AuxData%rdm2_mm, CMONO_NA, NA)
+            if (allocated(AuxData%rdm2_pm)) call rdm2_MO_NO_trans(AuxData%rdm2_pm, CMONO_NA, NA)
+            if (allocated(AuxData%rdm2_mp)) call rdm2_MO_NO_trans(AuxData%rdm2_mp, CMONO_NA, NA)
             call rdm2_MO_NO_trans(AuxData%rdm2_full, CMONO_NA, NA)
 
             call rdm1_MO_NO_trans(AuxData%rdm1_p, CMONO_NA, NA)
@@ -2360,6 +2498,14 @@ end subroutine save_2rdm_orca
             end do
             
             write(*,'(A30, F20.15)') "sum of occupancies", suma
+
+            !----------------------------------------------------------------------------
+            ! prepare IndAux
+            !----------------------------------------------------------------------------
+            if (.not. allocated(AuxData%IndAux)) allocate(AuxData%IndAux(AuxData%NBasis))
+            AuxData%IndAux = 2
+            AuxData%IndAux(1:AuxData%NI) = 0
+            AuxData%IndAux(AuxData%NI+1:AuxData%NIA) = 1
             
             call rdm2_MO_NO_trans(AuxData%rdm2_pp, CMONO_NA, NA)
             call rdm2_MO_NO_trans(AuxData%rdm2_mm, CMONO_NA, NA)
@@ -3116,6 +3262,7 @@ end subroutine save_2rdm_orca
 
           !if (x2c == .true.)then
           if (THCData%H0external == .true.)then
+                print*, 'external true'
                 !print*, 'przed canonicalize'
                 !print*, 'nao', nao, nbasis
                 call canonicalize(CAONO, THCData%fij, THCData%fvw, AuxData, THCData, THCData%Xgp, AObasis, System, ext=.true.)
@@ -3133,6 +3280,8 @@ end subroutine save_2rdm_orca
                 !print*, 'size AuxData%HNO0', size(AuxData%HNO0, dim=1), size(AuxData%HNO0, dim=2)
                 call real_ab(work, H0_extao, CAONO)
                 call real_atb(AuxData%HNO0, CAONO, work)
+                allocate(AuxData%HNO0_THC(nbasis, nbasis))
+                AuxData%HNO0_THC = AuxData%HNO0 
           else
                 !
                 ! this is for the regular hamilotnian
@@ -3189,7 +3338,7 @@ end subroutine save_2rdm_orca
           if (Flags%JOBTYPE .ne. JOB_TYPE_MP2 .and. Flags%JOBTYPE .ne. JOB_TYPE_SRMP2) then
                 ETot0 = zero
                 do i = 1, NIA
-                      ETot0 = ETot0 + two* AuxData%Occ(i) * AuxData%HNO0_THC(i,i)
+                      ETot0 = ETot0 + two* AuxData%Occ(i) * AuxData%HNO0(i,i)
                       ! if (abs(AuxData%Occ(i) * AuxData%HNO0_THC(i,i)).gt.1.d-1)then
                       !       write(*, '(A10, I5, 3F20.8)')'etot-1', i, AuxData%Occ(i), AuxData%HNO0_THC(i,i), etot0
                       ! end if
@@ -3198,7 +3347,7 @@ end subroutine save_2rdm_orca
                 print*, 'Flags%JOBTYPE', Flags%JOBTYPE
                 ETot0 = zero
                 do i = 1, NIA
-                      ETot0 = ETot0 + AuxData%Occ_rohf(i) * AuxData%HNO0_THC(i,i)
+                      ETot0 = ETot0 + AuxData%Occ_rohf(i) * AuxData%HNO0(i,i)
                       ! if (abs(AuxData%Occ(i) * AuxData%HNO0_THC(i,i)).gt.1.d-1)then
                       !       write(*, '(A10, I5, 2F20.15)')'etot-1', i, AuxData%Occ(i), AuxData%HNO0_THC(i,i)
                       ! end if
@@ -3210,7 +3359,7 @@ end subroutine save_2rdm_orca
 
 
           CAONO_IN = CAONO
-          AuxData%OnlyEnergy = .true.
+          AuxData%OnlyEnergy = .false.
           if (AuxData%OnlyEnergy == .true.)then
 
                 ! if (Flags%IDBBSC == 2)then
@@ -3496,26 +3645,34 @@ end subroutine save_2rdm_orca
 
           double precision, dimension(:,:), intent(inout) :: CAONO
           double precision, dimension(:), intent(out) :: fij, fvw            
-          type(TACppData), intent(in) :: AuxData
+          type(TACppData), intent(inout) :: AuxData
           type(TTHCData), intent(in) :: THCData
           type(TAOBASIS) :: AObasis
           type(TSystem) :: System
           logical, intent(in),optional :: ext
 
 
-          double precision, dimension(:,:), allocatable :: Cpi_extao, Cpv_extao
-          double precision, dimension(:,:), allocatable :: Fockij, Fockvw
+          double precision, dimension(:,:), allocatable :: Cpi_extao, Cpv_extao, Cpa_empty
+          double precision, dimension(:,:), allocatable :: Fockij, Fockoo, Fockvw
+          double precision, dimension(:,:), allocatable :: H0oo, work
           double precision, dimension(:,:), intent(in) :: Xgp
+          double precision, dimension(:,:), allocatable :: Xgt
+          double precision, dimension(:,:,:), allocatable :: Rktu
           integer :: i, j
+          integer :: t, u, v, w, NChol, NGridTHC
+          double precision :: ECASSCF, ECumul, val, this
+          logical :: have_spinres, have_rdm
 
           associate(Zgk=>THCData%Zgk, ExternalOrdering=>THCData%ExternalOrdering)
 
             ! print*, 'order2', THCData%ExternalOrdering
             ! print*, 'order3', ExternalOrdering
             allocate(Fockij(AuxData%NI, AuxData%NI))
+            allocate(Fockoo(AuxData%NIA, AuxData%NIA))
             allocate(Fockvw(AuxData%NV, AuxData%NV))
             allocate(Cpi_extao(AuxData%nbasis, AuxData%NI))
             allocate(Cpv_extao(AuxData%nbasis, AuxData%NV))
+            allocate(Cpa_empty(AuxData%nbasis, 0))
 
             ! call CalcMem(Fockij, 'Fockij')
             ! call CalcMem(Fockvw, 'Fockvw')
@@ -3524,18 +3681,45 @@ end subroutine save_2rdm_orca
 
             if (ext == .false.)then
                   ! print*, 'ext false'
-                  call thc_gammcor_F(Fockij, Fockvw, CAONO(:, 1:AuxData%NI),&
-                        CAONO(:, AuxData%NI+1:AuxData%NIA), &
+                  call thc_gammcor_F(Fockoo, Fockvw, CAONO(:, 1:AuxData%NIA),&
+                        Cpa_empty, &
                         CAONO(:, AuxData%NIA+1:AuxData%NBasis), &
                         AuxData%Occ(1:AuxData%NIA), Zgk, Xgp, AOBasis, System, ExternalOrdering)
             else
                   ! print*, 'ext true'
                   ! print*, 'size AuxData%HNO0', size(AuxData%HNO0, dim=1), size(AuxData%HNO0, dim=2)
-                  call thc_gammcor_F(Fockij, Fockvw, CAONO(:, 1:AuxData%NI),&
-                        CAONO(:, AuxData%NI+1:AuxData%NIA), &
+                  call thc_gammcor_F(Fockoo, Fockvw, CAONO(:, 1:AuxData%NIA),&
+                        Cpa_empty, &
                         CAONO(:, AuxData%NIA+1:AuxData%NBasis), &
                         AuxData%Occ(1:AuxData%NIA), Zgk, Xgp, AOBasis, System, ExternalOrdering, &
                         AuxData%HNO0)
+            end if
+
+            if (AuxData%NI>0)then
+                  Fockij = Fockoo(1:AuxData%NI, 1:AuxData%NI)
+            end if
+
+            !
+            ! Spin-resolved 2-RDM (AC0PP path) or only the full 2-RDM (ph/AC0 path)
+            !
+            have_spinres = allocated(AuxData%rdm2_pp).and.allocated(AuxData%rdm2_pm)
+            have_rdm     = have_spinres.or.allocated(AuxData%rdm2_full)
+
+            if (have_rdm)then
+                  allocate(H0oo(AuxData%NIA, AuxData%NIA))
+                  if (ext == .false.)then
+                        H0oo = AuxData%HNO0(1:AuxData%NIA, 1:AuxData%NIA)
+                  else
+                        allocate(work(AuxData%NBasis, AuxData%NIA))
+                        call real_ab(work, AuxData%HNO0, CAONO(:, 1:AuxData%NIA))
+                        call real_atb(H0oo, CAONO(:, 1:AuxData%NIA), work)
+                  end if
+
+                  ! E = ENuc + Sum(p) Occ(p) * (H0(p,p) + F(p,p))
+                  ECASSCF = AuxData%enuc
+                  do i = 1, AuxData%NIA
+                        ECASSCF = ECASSCF + AuxData%Occ(i) * (H0oo(i,i) + Fockoo(i,i))
+                  end do
             end if
 
             ! call thc_gammcor_F(Fockij, Fockvw, CAONO(:, 1:AuxData%NI),&
@@ -3577,6 +3761,73 @@ end subroutine save_2rdm_orca
                   CAONO(:, 1:AuxData%NI)=Cpi_extao
             end if
             CAONO(:, AuxData%NIA+1:AuxData%NBasis) = Cpv_extao
+
+            !----------------------------------------------------------------------------
+            ! Active-space cumulant correction to the Fock energy.
+            !
+            !   E = ENuc + Sum(p) Occ(p)*(H0(p,p) + F(p,p))
+            !            + Sum(tuvw) [ Gamma(t,u,v,w) - Gamma_SD(t,u,v,w) ] * (tv|uw)
+            !
+            !   Gamma_SD(t,u,v,w) = 2*n(t)*n(u)*d(t,v)*d(u,w) - n(t)*n(u)*d(t,w)*d(u,v)
+            !
+            ! thc_gammcor_F builds F from the occupations only, so ECASSCF above already
+            ! contains Gamma_SD everywhere. For CASSCF the cumulant is nonzero ONLY when
+            ! all four indices are active, so only the NA**4 block of two-electron
+            ! integrals is needed - never the full NBasis**4 Rkab.
+            !
+            ! Gamma is taken as rdm2_pp + rdm2_pm (AC0PP path), or as rdm2_full/2 when
+            ! only the full 2-RDM was loaded (ph/AC0 path, only_full = .true.), since
+            ! rdm2_full = rdm2_pp + rdm2_mm + rdm2_pm + rdm2_mp = 2*(rdm2_pp + rdm2_pm).
+            !----------------------------------------------------------------------------
+            if (have_rdm)then
+
+                  NGridTHC = size(Xgp, dim=1)
+                  NChol    = size(Zgk, dim=2)
+
+                  allocate(Xgt(NGridTHC, AuxData%NA))
+                  allocate(Rktu(NChol, AuxData%NA, AuxData%NA))
+
+                  call thc_gammcor_Xga(Xgt, Xgp, CAONO(:, AuxData%NI+1:AuxData%NIA), &
+                        AOBasis, ExternalOrdering)
+                  call thc_gammcor_Rkab_2(Rktu, Xgt, Xgt, Zgk, AuxData%NA, AuxData%NA, &
+                        NChol, NGridTHC)
+
+                  ECumul = zero
+                  do t = 1, AuxData%NA
+                        do u = 1, AuxData%NA
+                              do v = 1, AuxData%NA
+                                    do w = 1, AuxData%NA
+
+                                          if (have_spinres)then
+                                                val = AuxData%rdm2_pp(t, u, v, w) &
+                                                    + AuxData%rdm2_pm(t, u, v, w)
+                                          else
+                                                val = frac12 * AuxData%rdm2_full(t, u, v, w)
+                                          end if
+
+                                          if (t==v.and.u==w) val = val - two * &
+                                                AuxData%Occ(AuxData%NI+t) * AuxData%Occ(AuxData%NI+u)
+
+                                          if (t==w.and.u==v) val = val + &
+                                                AuxData%Occ(AuxData%NI+t) * AuxData%Occ(AuxData%NI+u)
+
+                                          if (abs(val) > 1.d-12)then
+                                                call real_vw_x(this, Rktu(:, t, v), Rktu(:, u, w), NChol)
+                                                ECumul = ECumul + val * this
+                                          end if
+
+                                    end do
+                              end do
+                        end do
+                  end do
+
+                  deallocate(Xgt, Rktu)
+
+                  !Write(6,'(1X,''CASSCF Energy from Fock (no cumulant)'',X,F15.8)') ECASSCF
+                  !Write(6,'(1X,''Active-space cumulant correction'',5X,F15.8)') ECumul
+                  Write(6,'(1X,''Total CASSCF Energy from Fock'',5X,F15.8)') ECASSCF + ECumul
+                  AuxData%ECAS_THC = ECASSCF + ECumul
+            end if
             
           end associate
     end subroutine canonicalize

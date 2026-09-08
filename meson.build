@@ -45,6 +45,14 @@ cholesky_dep = declare_dependency(
   link_args : [root / 'gammcor-integrals/lib/cholesky.a'],
 )
 
+# HDF5: built into hdf5/ (see hdf5/README.md).
+hdf5_dep = declare_dependency(
+  include_directories : include_directories('hdf5/include'),
+  link_args : ['-L' + root / 'hdf5/lib', '-Wl,-rpath,' + root / 'hdf5/lib',
+               '-lhdf5_hl_fortran', '-lhdf5_fortran', '-lhdf5_hl', '-lhdf5',
+               '-lz', '-lsz', '-ldl', '-lm'],
+)
+
 # ---------------------------------------------------------------------------
 # Sources
 #   Meson deliberately has no glob: an explicit list is what makes an
@@ -90,6 +98,7 @@ sources = files(
   'SOURCE/sorter.f90',
   'SOURCE/git_info.f90',
   'SOURCE/build_info.f90',
+  'SOURCE/h5_reader.f90',
 
   # -- integrals / transformation / Cholesky
   'SOURCE/gammint.f90',
@@ -153,7 +162,6 @@ sources = files(
   # -- ph path and job routing
   'SOURCE/phac_spinres.f90',
   'SOURCE/mp.f90',
-  'SOURCE/ducc_simple.f90',
   'SOURCE/dispatcher.f90',
   'SOURCE/polari.F90',
 
@@ -199,7 +207,7 @@ gammcor_exe = executable(
   # SOURCE/ is on the include path so `include 'commons.inc'` resolves
   # regardless of the compiler's include-resolution rules.
   include_directories : include_directories('SOURCE'),
-  dependencies : [xcfun_dep, cholesky_dep],
+  dependencies : [xcfun_dep, cholesky_dep, hdf5_dep],
 )
 
 # ---------------------------------------------------------------------------
