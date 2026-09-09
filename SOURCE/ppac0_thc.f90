@@ -55,7 +55,7 @@ contains
             use Auto2eInterface
 
 
-            type(TACppData), intent(in) :: AuxData
+            type(TACppData), intent(inout) :: AuxData
             double precision, dimension(:), intent(in) :: XOne
             double precision, dimension(:,:), intent(in) :: CAONO_IN
             type(FlagsData), intent(in) :: Flags
@@ -149,7 +149,7 @@ contains
             use Auto2eInterface
 
 
-            type(TACppData), intent(in) :: AuxData
+            type(TACppData), intent(inout) :: AuxData
             double precision, dimension(:,:), intent(in) :: CAONO_IN
             type(FlagsData), intent(in) :: Flags
             type(TTHCData), intent(inout) :: THCData
@@ -174,11 +174,11 @@ contains
             
             if (AuxData%PYSCF==1)then
                   !call read_PYSCF(InputData, CAONO_PYSCF)
-                  print*, 'external ordering pyscf'
+                  call print_info('External ordering', 'PySCF')
                   !THCData%ExternalOrdering = ORBITAL_ORDERING_PYSCF
             else if (AuxData%ORCA==1)then
                   !THCData%ExternalOrdering = ORBITAL_ORDERING_ORCA
-                  print*, 'ordering', ORBITAL_ORDERING_ORCA
+                  call print_info('External ordering', 'ORCA')
             else  if (AuxData%DALTON==1)then
                   THCData%ExternalOrdering = ORBITAL_ORDERING_DALTON
             end if
@@ -213,7 +213,6 @@ contains
 
 
               call init_AC0Blocks(AuxData, ACBlocks, posS, posT)
-              call msg("acblock initialized")
 
 
               call init_rdm(RdmData, AuxData)
@@ -241,7 +240,6 @@ contains
               call clock_start(timer)
 
               if (AuxData%PYSCF==1.or.AuxData%ORCA ==1)then
-                    print*, 'yes py2'
                     !call THC_init(Flags, AuxData, THCData, AuxData%HNO0, HNO0_THC, CAONO, RdmData)
               else
                     call HNO0_init(AcAlpha, AuxData%XOne, HNO0, NBasis, AuxData%IndAux)
@@ -277,55 +275,44 @@ contains
               call tmsg('TIME FOR UPDATE HNO', timer, tdebug)
               call clock_start(timer)
 
+              call print_section('ppAC0 response blocks')
 
               do i = 1,2
                     call clock_start(timer)
-                    call imsg("Block numer", i)
-                    print*, ACBlocks(i)%name
                     call PPERPA0_THC_OOVV(AuxData, ACBlocks(i), HNO, posS, posT, AuxAA, BuxAA,Aux3X, Aux3B, ACAlpha, ACBlocks(i)%NdimS, ACBlocks(i)%IndNS)
-                    call tmsg('TIME FOR HESJAN '//ACBlocks(i)%name, timer, tdebug)
+                    call tmsg('Hessian '//ACBlocks(i)%name, timer, tdebug)
                     call clock_start(timer)
-                    call msg("eigenvalues")
                     call eigs(AuxData, ACBlocks(i), i)
-                    call tmsg('TIME FOR Eigens '//ACBlocks(i)%name, timer, tdebug)
+                    call tmsg('Diagonalization '//ACBlocks(i)%name, timer, tdebug)
               end do
 
               call clock_start(timer)
-              call imsg("Block numer", A0aa)
-              print*, ACBlocks(A0aa)%name
               call PPERPA0_THC_AA(AuxData, ACBlocks(A0aa), HNO, posS, posT, AuxAA, BuxAA,Aux3X, Aux3B, ACAlpha, ACBlocks(A0aa)%NdimS, ACBlocks(A0aa)%IndNS)
-              call tmsg('TIME FOR HESJAN '//ACBlocks(A0aa)%name, timer, tdebug)
+              call tmsg('Hessian '//ACBlocks(A0aa)%name, timer, tdebug)
               
               call clock_start(timer)
               call eigs(AuxData, ACBlocks(A0aa), A0aa)
-              call tmsg('TIME FOR Eigens '//ACBlocks(A0aa)%name, timer, tdebug)
+              call tmsg('Diagonalization '//ACBlocks(A0aa)%name, timer, tdebug)
 
               call clock_start(timer)
-              call imsg("Block numer", A0va)
-              print*, ACBlocks(A0va)%name
               call PPERPA0_THC_VA_Eigs(AuxData, ACBlocks(A0va), HNO, AuxAA, BuxAA,Aux3X, Aux3B, ACAlpha, ACBlocks(A0va)%NdimS, ACBlocks(A0va)%IndNS)
-              call tmsg('TIME FOR HESJAN AND EIGENS'//ACBlocks(A0va)%name, timer, tdebug)
+              call tmsg('Hessian and diagonalization '//ACBlocks(A0va)%name, timer, tdebug)
 
               call clock_start(timer)
-              call imsg("Block numer", A0oa)
-              print*, ACBlocks(A0oa)%name
               call PPERPA0_THC_OA_Eigs(AuxData, ACBlocks(A0oa), HNO, AuxAA, BuxAA,Aux3X, Aux3B, ACAlpha, ACBlocks(A0oa)%NdimS, ACBlocks(A0oa)%IndNS)
-              call toprule_double()
-              call tmsg('TIME FOR HESJAN AND EIGENS'//ACBlocks(A0oa)%name, timer, tdebug)
+              call tmsg('Hessian and diagonalization '//ACBlocks(A0oa)%name, timer, tdebug)
 
 
               do i = 9, 13                    
                     call clock_start(timer)
-                    call imsg("Block numer", i)
-                    print*, ACBlocks(i)%name, ACBlocks(i)%NDim1S, ACBlocks(i)%NDim2S
                     !call PPERPA_THC(AuxData, ACBlocks(i), HNO0, posS, posT, AuxII, AuxAA, BuxII, BuxAA,Aux3X, Aux3B, ACAlpha, ACBlocks(i)%Ndim1S, ACBlocks(i)%Ndim2S, ACBlocks(i)%IndN1S, ACBlocks(i)%IndN2S)
                     call PPERPA_THC(AuxData, ACBlocks(i), AuxData%HNO0, posS, posT, AuxII, AuxAA, BuxII, BuxAA,Aux3X, Aux3B, ACAlpha, ACBlocks(i)%Ndim1S, ACBlocks(i)%Ndim2S, ACBlocks(i)%IndN1S, ACBlocks(i)%IndN2S)
-                    call tmsg('TIME FOR HESJAN '//ACBlocks(i)%name, timer, tdebug)
+                    call tmsg('Hessian '//ACBlocks(i)%name, timer, tdebug)
               end do
               
               call clock_start(timer)
               call THC_energy_loop(THCData, ACBlocks, Flags, posS, posT, AuxData)
-              call tmsg('TIME FOR CORELLATION ENERGY ', timer, tdebug)
+              call tmsg('Correlation energy', timer, tdebug)
               !call THC_int_loop(AC0Block, AuxData, CAONO_IN, Flags, RdmData)
               !call 
 
@@ -612,6 +599,14 @@ contains
                     AC0Block(i)%name = BlockName(i)
               end do
 
+              call print_section('ppAC0 block dimensions')
+              write(*,'(2X,A10,2X,A12,2X,A12)') 'Block', 'Singlet', 'Triplet'
+              write(*,'(2X,A)') repeat('-', 40)
+              do i = 1, 5
+                    write(*,'(2X,A10,2X,I12,2X,I12)') trim(AC0Block(i)%name), &
+                          AC0Block(i)%NDimS, AC0Block(i)%NDimT
+              end do
+
               ! These blocks are too large and are calculated OTF
               
               !call InitA1Blocks(AC0Block, AuxData, A1vvoo, A0vv, A0oo)
@@ -707,29 +702,24 @@ contains
             associate(NA=>AuxData%NA, NV=>AuxData%NV, NI=>AuxData%NI, NIA=>AuxData%NIA, NBasis=>AuxData%NBasis)
 
               if (Ip == occ .and. Iq == occ)then
-                    print*, 'oo'
                     A0Block%type = A0oo
                     i0 = 1
                     i1 = NI
                     j0 = 1
                     j1 = NI
               else if (Ip == virt .and. Iq == virt) then
-                    print*, 'vv'
                     A0Block%type = A0vv
                     i0 = NIA+1
                     i1 = NBasis
                     j0 = NIA+1
                     j1 = NBasis
               else if (Ip == act .and. Iq == act) then
-                    print*, 'aa'
                     A0Block%type = A0aa
                     i0 = NI+1
                     i1 = NIA
                     j0 = NI+1
                     j1 = NIA
               else if (Ip == virt .and. Iq == act)then
-
-                    print*, 'va'
                     A0Block%type = A0va
                     i0 = NIA + 1
                     i1 = NBasis
@@ -745,7 +735,6 @@ contains
                           allocate(A0Block%MiniBlocks(i)%ActListTA(NA))
                     end do
               else if (Ip == occ .and. Iq == act)then
-                    print*, 'oa'
                     A0Block%type = A0oa
                     ! These are limits only for dim calculation.
                     ! In final version pairs are ordered OA
@@ -786,7 +775,6 @@ contains
                     end do
                     A0Block%NdimS = indS
                     A0Block%NdimT = indT
-                    print*, 'indT', indT
                     
                     allocate(A0Block%IndNS(2,indS))
                     allocate(A0Block%IndNT(2,indT))
@@ -820,7 +808,6 @@ contains
                     
                     A0Block%NdimS = NBl * NA
                     A0Block%NdimT = NBl * NA
-                    print*, 'other', A0Block%NdimT, nbl, na
                     allocate(A0Block%IndNS(2,NBl*NA))
                     allocate(A0Block%IndNT(2,NBl*NA))
 
@@ -1145,7 +1132,6 @@ contains
             allocate(Rkcd(THCData%NChol, nao, nao))
             Call thc_gammcor_Rkab_2(Rkab, THCData%Xga, THCData%Xga, THCData%Zgk, NBasis, NBasis,&
                   THCData%NChol, THCData%NTHC)
-            print*, 'a5'
             Call thc_gammcor_Rkab_2(Rkcd, THCData%Xga, THCData%Xga, THCData%Zgk, NBasis, NBasis,&
                   THCData%NChol, THCData%NTHC)
             
@@ -1456,15 +1442,8 @@ contains
               NIA = NI+NA
               NBasis = AuxData%NBasis
 
-              call ximsg('Nbasis',   NBasis, mnormal)
-              call ximsg('NI',   NI, mnormal)
-              call ximsg('NA',   NA, mnormal)
-              call ximsg('NIA',   NIA, mnormal)
-              call ximsg('NV',   NV, mnormal)
-
               allocate(ind_virt(2, (NV*(NV+1))/2))
               allocate(ind_va(2, (NV)*NA))
-              print*, 'a1'
               k = 1
               kk = 1
               do ii = 1, AuxData%NDim_s
@@ -1481,7 +1460,6 @@ contains
                     end if
 
               end do
-              print*, 'a2'
               ndim_virt = k -1
               nva = kk - 1
 
@@ -1500,9 +1478,7 @@ contains
 
               rdm2_nsum =  rdm2_pm_act  + rdm2_pp_act
               rdm2_nsum2 = rdm2_pm_13_act + rdm2_pp_13_act
-              print*, 'a3'
               allocate(V_axby(max(NA, NI, NV)**2))
-              print*, 'a4'
 
               if (Flags%Jobtype==JOB_TYPE_AC0PP)then
                     method = 0
@@ -1515,8 +1491,6 @@ contains
                     allocate(ACBlockList(6,6, 1))
                     call parse_config(loops, integral_dummy, TabChol, ACBlockList, method)
               end if
-              print*, 'a5'
-
               call clock_start(timer0)
 
               
@@ -1614,6 +1588,12 @@ contains
               if (modulo(NI, BatchDim)>0)NBatchI = NBatchI + 1
               if (modulo(NA, BatchDim)>0)NBatchA = NBatchA + 1
               if (modulo(NV, BatchDim)>0)NBatchV = NBatchV + 1
+
+              call print_info('NBatchI', NBatchI)
+              call print_info('NBatchA', NBatchA)
+              call print_info('NBatchV', NBatchV)
+
+              call print_section('THC integral transformation')
          
 
 
@@ -1658,13 +1638,6 @@ contains
               
               timer102 = timer102 + clock_readwall(timer)
 
-              print*, 'a11'
-              
-              call ximsg('NBatchI',   NBatchA, mnormal)
-              call ximsg('NBatchA',   NBatchA, mnormal)
-              call ximsg('NBatchV',   NBatchV, mnormal)
-
-              print*, 'a12'
               batchloop: do batch = 1, max(NBatchI, NBatchA, NBatchV)
 
                     b0IV = 1 + (batch-1) * BatchDim
@@ -1680,7 +1653,6 @@ contains
                     b1VV = min(b0VV+BatchDim-1, NBasis)
 
                     call clock_start(timer)              
-                    print*, 'a13'
                     if (b0IV <=NI)then
                           if (TabChol(4)==1)then
                                 do b = b0IV, b1IV
@@ -1688,7 +1660,6 @@ contains
                                 end do
                           end if
                     end if
-                    print*, 'a14'
                     if (TabChol(4)==1) call tmsg('TIME FOR RIV', timer, tdebug)
                     call clock_start(timer)
                     
@@ -1700,10 +1671,8 @@ contains
                                 end do
                           end if
                     end if
-                    print*, 'a15'
                     if (TabChol(5)==1) call tmsg('TIME FOR RVA', timer, tdebug)
                     call clock_start(timer)
-                    print*, 'a16'
 
                     if (b0VV <=NBasis)then
                           if (TabChol(6)==1)then
@@ -1712,7 +1681,6 @@ contains
                                 end do
                           end if
                     end if
-                    print*, 'a17'
                     if (TabChol(6)==1) call tmsg('TIME FOR RVV', timer, tdebug)
                     call clock_start(timer)
 
@@ -2863,6 +2831,7 @@ contains
                     end do caseloop
               end do batchloop
             end  associate
+#ifdef DEBUG
 call xmsg('timer3', timer3, mdebugg)
 call xmsg('timer3', timer3, mdebugg)
 call xmsg('timer4', timer4, mdebugg)
@@ -2951,6 +2920,7 @@ call xmsg('timer73', timer73, mdebugg)
 call xmsg('timer74', timer74, mdebugg)
 call xmsg('timer75', timer75, mdebugg)
 call xmsg('timer76', timer76, mdebugg)
+#endif
 
               ! print*, 't56', timer56
               ! print*, 't57', timer57
@@ -3670,7 +3640,7 @@ call xmsg('timer76', timer76, mdebugg)
 
 
       subroutine update_HNO_AC0(AuxData, HNO, wij, wvw, AuxII, BuxII)
-            type(TACppData), intent(in) :: AuxData
+            type(TACppData), intent(inout) :: AuxData
             double precision, dimension(:, :), intent(out) :: HNO
             double precision, dimension(:), intent(in) :: wij, wvw
             double precision, dimension(:,:), intent(in) :: AuxII, BuxII
@@ -3709,7 +3679,7 @@ call xmsg('timer76', timer76, mdebugg)
             !      write(*, '(I5, 3F40.20)')i, hno0(i,i), AuxData%Occ(i), AuxData%Occ(i)*two*hno0(i,i)
             end do
 
-            print*, 'etot1 z calk-thc', etot
+            AuxData%ECAS_oneelectr = etot
           end associate
             
         end subroutine update_HNO_AC0
@@ -4675,12 +4645,6 @@ call xmsg('timer76', timer76, mdebugg)
 
                   if (ACBlock%NDimS>0)then
                         call NonSymEigBlockTHC(ACBlock%EigS, ACBlock%ASing, Swork, ACBlock%vplusS, AuxData%IndAux, ACBlock%NDimS)
-
-                        print*, 'oto wartosci aa S'
-                        do ii = 1, size(ACBlock%EigS)
-                              print*, ii, ACBlock%EigS(ii), ACBlock%vplusS(ii)
-                        end do
-
                   end if
                         
                   deallocate(Swork)
@@ -4697,10 +4661,6 @@ call xmsg('timer76', timer76, mdebugg)
 
                   if (ACBlock%NDimT>0)then
                         call NonSymEigBlockTHC(ACBlock%EigT, ACBlock%ATrip, Swork, ACBlock%vplusT, AuxData%IndAux, ACBlock%NDimT)
-                        print*, 'oto wartosci aa TT'
-                        do ii = 1, size(ACBlock%EigT)
-                              print*, ii, ACBlock%EigT(ii), ACBlock%vplusT(ii)
-                        end do
                   end if
 
                   swork = zero
@@ -4711,85 +4671,12 @@ call xmsg('timer76', timer76, mdebugg)
                   end do
                   if (ACBlock%NDimT>0)then                  
                         call NonSymEigBlockTHC(ACBlock%EigTA, ACBlock%ATripA, Swork, ACBlock%vplusTA, AuxData%IndAux, ACBlock%NDimT)
-                        print*, 'oto wartosci aa TA'
-                        do ii = 1, size(ACBlock%EigTA)
-                              print*, ii, ACBlock%EigTA(ii), ACBlock%vplusTA(ii)
-                        end do
                   end if
 
                   if (ACBlock%type == A0aa) then
-
-                        print*, 'no to wolam divide '
                         call divide_AABlocks(ACBlock, 0)
                         call divide_AABlocks(ACBlock, 1)
                         call divide_AABlocks(ACBlock, 2)
-
-                        print*, 'Wartosci wlasne bloku minusowego', ACBlock%name, ACBlock%MiniBlocks(1)%NDimS
-                        do i = 1, ACBlock%MiniBlocks(1)%NDimS
-                              if (abs(ACBlock%MiniBlocks(1)%EigS(i)).gt.1.d-5)then
-                                    print*,  ACBlock%MiniBlocks(1)%EigS(i)
-                              end if
-                        end do
-
-                        print*, 'Wartosci wlasne bloku plusowego', ACBlock%name, ACBlock%MiniBlocks(2)%NDimS
-                        do i = 1, ACBlock%MiniBlocks(2)%NDimS
-                              if (abs(ACBlock%MiniBlocks(2)%EigS(i)).gt.1.d-5)then
-                                    print*,  ACBlock%MiniBlocks(2)%EigS(i)
-                              end if
-                        end do
-
-
-                        print*, 'Wartosci wlasne bloku minusowego', ACBlock%name, ACBlock%MiniBlocks(1)%NDimT
-                        do i = 1, ACBlock%MiniBlocks(1)%NDimT
-                              if (abs(ACBlock%MiniBlocks(1)%EigT(i)).gt.1.d-5)then
-                                    print*,  ACBlock%MiniBlocks(1)%EigT(i)
-                              end if
-                        end do
-
-                        print*, 'Wartosci wlasne bloku plusowego', ACBlock%name, ACBlock%MiniBlocks(2)%NDimT
-                        do i = 1, ACBlock%MiniBlocks(2)%NDimT
-                              if (abs(ACBlock%MiniBlocks(2)%EigT(i)).gt.1.d-5)then
-                                    print*,  ACBlock%MiniBlocks(2)%EigT(i)
-                              end if
-                        end do
-
-                        print*, 'Wartosci wlasne AAAA bloku minusowego', ACBlock%name, ACBlock%MiniBlocks(1)%NDimTA
-                        do i = 1, ACBlock%MiniBlocks(1)%NDimTA
-                              if (abs(ACBlock%MiniBlocks(1)%EigTA(i)).gt.1.d-5)then
-                                    print*,  ACBlock%MiniBlocks(1)%EigTA(i)
-                              end if
-                        end do
-
-                        print*, 'Wartosci wlasne AAAA bloku plusowego', ACBlock%name, ACBlock%MiniBlocks(2)%NDimTA
-                        do i = 1, ACBlock%MiniBlocks(2)%NDimTA
-                              if (abs(ACBlock%MiniBlocks(2)%EigTA(i)).gt.1.d-5)then
-                                    print*,  ACBlock%MiniBlocks(2)%EigTA(i)
-                              end if
-                        end do
-
-                        
-                  else
-                        ! print*, 'Wartosci wlasne bloku', ACBlock%name, ACBlock%NDimS
-                        ! do i = 1, ACBlock%NDimS
-                        !       if (abs(ACBlock%EigS(i)).gt.1.d-5)then
-                        !             print*,  ACBlock%EigS(i), ACBlock%vplusS(i)
-                        !       end if
-                        ! end do
-
-                        ! print*, 'Wartosci wlasne blokuT', ACBlock%name, ACBlock%NDimT
-                        ! do i = 1, ACBlock%NDimT
-                        !       if (abs(ACBlock%EigT(i)).gt.1.d-5)then
-                        !             print*,  ACBlock%EigT(i), ACBlock%vplusT(i)
-                        !       end if
-                        ! end do
-
-                        ! print*, 'Wartosci wlasne blokuTA', ACBlock%name, ACBlock%NDimT
-                        ! do i = 1, ACBlock%NDimT
-                        !       if (abs(ACBlock%EigTA(i)).gt.1.d-5)then
-                        !             print*,  ACBlock%EigTA(i), ACBlock%vplusTA(i)
-                        !       end if
-                        ! end do
-
                   end if
                   
             end if
@@ -4850,13 +4737,10 @@ call xmsg('timer76', timer76, mdebugg)
 
                   Npl = 0
                   Nmn = 0
-                  print*, 'ustawiam sobie bloczki TA', ACB%NDimt
                   do i = 1, ACB%NDimt
                         if (ACB%vplusT(i)==0) Nmn = Nmn + 1
                         if (ACB%vplusT(i)==1) Npl = Npl + 1   
                   end do
-                  print*, 'wyszlo mi Nmn', Nmn
-                  print*, 'wyszlo mi Npl', Npl
 
                   ACB%MiniBlocks(1)%NDimT = Nmn
                   ACB%MiniBlocks(2)%NDimT = Npl
@@ -4890,13 +4774,10 @@ call xmsg('timer76', timer76, mdebugg)
 
                   Npl = 0
                   Nmn = 0
-                  print*, 'ustawiam sobie bloczki TA', ACB%NDimt
                   do i = 1, ACB%NDimt
                         if (ACB%vplusTA(i)==0) Nmn = Nmn + 1
                         if (ACB%vplusTA(i)==1) Npl = Npl + 1   
                   end do
-                  print*, 'wyszlo mi Nmn', Nmn
-                  print*, 'wyszlo mi Npl', Npl
                   ACB%MiniBlocks(1)%NDimTA = Nmn
                   ACB%MiniBlocks(2)%NDimTA = Npl
 

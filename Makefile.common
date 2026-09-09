@@ -89,10 +89,10 @@ $(O)ac_fofo.o          : $(O)abmats.o $(O)abfofo.o $(O)ab0fofo.o $(O)blocktypes.
                          $(O)lambda_calculator.o $(O)lambda_calculator_diag.o $(O)lambda_calculator_block.o $(O)lambda_calculator_projector.o
 
 $(O)types.o            : $(O)priunit.o
-$(O)ppac_types.o       : $(O)types.o
+$(O)print_utils.o      :
+$(O)ppac_types.o       : $(O)types.o $(O)print_utils.o
 $(O)quadratures.o      :
 $(O)pp_utils.o         : $(O)types.o $(O)lin.o $(O)quadratures.o
-$(O)print_utils.o      :
 $(O)thc_auto_p0.o      :
 $(O)thc_auto_p2.o      :
 $(O)thc_auto_p3.o      :

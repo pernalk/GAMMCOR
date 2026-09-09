@@ -57,3 +57,5 @@ PP_INTEGRATION_PLAN.md
 !/hdf5/lib/
 /hdf5/lib/*
 !/hdf5/lib/*.a
+
+gammcor_tools/pyscf_data.h5

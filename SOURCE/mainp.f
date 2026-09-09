@@ -440,7 +440,7 @@ C
       Call gclock('START',Tcpu,Twall)
 
       if(Flags%Parser.Eq.PARSER_AT)then
-         Call print_section('AT PARSER')
+         Call print_section('System and reference AT PARSER')
          
          if(Flags%ReaderType.Eq.RT_WRAPPER)then
             Call print_info('Reader type','WRAPPER')

@@ -1230,7 +1230,7 @@ write(LOUT,'(8a10)') ('**********',i=1,8)
 
 associate( CalcParams => Input%CalcParams)
  ! CALCULATION BLOCK
- if(allocated(CalcParams%JobTitle)) then
+       if(allocated(CalcParams%JobTitle)) then
     write(LOUT,' (1x,a,4x,a)') "JOB TITLE: ", &
                  CalcParams%JobTitle
  else

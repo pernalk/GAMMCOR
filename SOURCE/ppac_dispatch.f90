@@ -53,21 +53,14 @@ contains
               if (AuxData%Dalton == 1)then
                     call fill_IndAuxMod(AuxData%Occ, AuxData%IndAux, AuxData%IndMod, NBasis, NI, NA, NV)
               end if
-              print*, 'RDSC nbasis', NBasis
 
 
               AuxData%version = VER_PP_RPA_MULTI
               AuxData%general_version = GENVER_PP
               AuxData%ACType = PPAC
 
-              print*, ''
-              write(*, '(A30, E14.4)')"ACPP Threshold for orbital pairs", AuxData%ThrPP
-              print*, ''
-            
-              call imsg("NBASIS:", AuxData%NBasis)
-              call imsg("NInactive:", AuxData%NI)
-              call imsg("NActive:", AuxData%NA)
-              call imsg("NVirt:", AuxData%NV)
+              call print_section('ppAC0 orbital-pair selection')
+              call print_info('ACPP Threshold for orbital pairs', AuxData%ThrPP)
             
 
             ind = 0
@@ -141,9 +134,9 @@ contains
 
 
 
-            call imsg("Original number of pq pairs", ij)
-            call imsg("Reduced number of pq pairs", ind)
-            call imsg("Reduced number of pq pairs", indt)
+            call print_info("Original number of pq pairs", ij)
+            call print_info("Reduced singlet pq pairs", ind)
+            call print_info("Reduced triplet pq pairs", indt)
 
             write(*, '(A5, 2A6, 2A14)') '#', 'i', 'j', 'Occ(i)', 'Occ(j)'
             write(*, '(A43)') repeat('-', 43) 
@@ -179,7 +172,8 @@ contains
                         select case(Flags%ICholeskyTHC)
 
                         case(1)                              
-                              call msg("Starting ppAC0 with THC integrals THC")
+                              call print_section('ppAC0 calculation')
+                              call print_info('Two-electron integrals', 'THC')
                               call clock_start(timer)
                               call ACPP0_THC(THCData, AuxData, CAONO, Flags)
                               call tmsg('TIME FOR ACPP0_THC', timer, 0)

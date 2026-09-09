@@ -16,9 +16,9 @@ CHOLESKY       =  -I ./gammcor-integrals/include
 HDF5_ROOT      =  $(CURDIR)/hdf5
 HDF5           =  -I $(HDF5_ROOT)/include
 
-COMMON_FLAGS = $(WARNINGS) $(PARALLELIZATION) $(XCFUN) $(CHOLESKY) $(HDF5) -assume byterecl -heap-arrays 
+COMMON_FLAGS = $(WARNINGS) $(PARALLELIZATION) $(XCFUN) $(CHOLESKY) $(HDF5) -assume byterecl -heap-arrays -fpp
 FFLAGS = $(COMMON_FLAGS) $(OPTIMIZATION) 
-DEBUG_FLAGS = -O0 -traceback -check all
+DEBUG_FLAGS = -O0 -traceback -check all -DDEBUG
 
 # MKL_LIB is not needed when -qmkl=parallel is used
 #MKL_LIB           =     -L$(MKL_ROOT)lib/intel64/ -lmkl_intel_ilp64 -lmkl_sequential -lmkl_core

@@ -248,7 +248,7 @@ contains
               allocate(THCData%HNO(NBasis, NBasis))
               THCData%ExternalOrdering = ORBITAL_ORDERING_PYSCF
               THCData%H0external = Flags%H0external
-              print*, 'THCData%H0external:', THCData%H0external
+              call print_info('THCData%H0external', merge('TRUE ', 'FALSE', THCData%H0external))
               allocate(THCData%fij(NI))
               allocate(THCData%fvw(NV))
 
@@ -3227,6 +3227,8 @@ end subroutine save_2rdm_orca
           THCThr = Flags%DTHCthr
           CholAccu = Flags%ICholeskyAccu
 
+          call print_section('Cholesky decomposition')
+
           if (CholThr < zero.or.THCThr <zero)then
                 call thc_gammcor_XZ(THCData%Xgp, THCData%Zgk, AOBasis, System, CholAccu)
 
@@ -3353,7 +3355,7 @@ end subroutine save_2rdm_orca
                       ! end if
                 end do
           end if
-          print*, 'etot1 z HNO thc', ETot0
+          AuxData%ECAS_oneelectr = ETot0
 
           AuxData%HNO0 = AuxData%HNO0_THC
 
@@ -3679,6 +3681,8 @@ end subroutine save_2rdm_orca
             ! call CalcMem(Cpi_extao, 'Cpi_extao')
             ! call CalcMem(Cpv_extao, 'Cpv_extao')
 
+            call print_section('THC Fock matrix')
+
             if (ext == .false.)then
                   ! print*, 'ext false'
                   call thc_gammcor_F(Fockoo, Fockvw, CAONO(:, 1:AuxData%NIA),&
@@ -3825,8 +3829,8 @@ end subroutine save_2rdm_orca
 
                   !Write(6,'(1X,''CASSCF Energy from Fock (no cumulant)'',X,F15.8)') ECASSCF
                   !Write(6,'(1X,''Active-space cumulant correction'',5X,F15.8)') ECumul
-                  Write(6,'(1X,''Total CASSCF Energy from Fock'',5X,F15.8)') ECASSCF + ECumul
                   AuxData%ECAS_THC = ECASSCF + ECumul
+                  call print_energy1('Total CASSCF Energy from Fock', AuxData%ECAS_THC)
             end if
             
           end associate

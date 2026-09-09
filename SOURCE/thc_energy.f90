@@ -120,6 +120,7 @@ contains
 
             BatchDim = 1000  
 !            BatchDim = RPArams%Batchdim
+            call print_section('ppAC0 energy evaluation')
             EVVoo = zero
             EVVao = zero
             EVVaa = zero
@@ -189,33 +190,39 @@ contains
             allocate(Rkby(NChol, NBasis))
             allocate(XXga(NTHC,NBasis))
 
+#ifdef DEBUG
             this_mem = (NChol*NBasis)*togb
-            write(*, '(A10, F30.20)') 'rkax', this_mem
+            call print_memory('rkax', this_mem)
 
             this_mem = (NChol*NBasis)*togb
-            write(*, '(A10, F30.20)') 'rkby', this_mem
+            call print_memory('rkby', this_mem)
 
             this_mem = (NTHC*NBasis)*togb
-            write(*, '(A10, F30.20)') 'xxga', this_mem
+            call print_memory('xxga', this_mem)
+#endif
 
 
             allocate(V_axby(max(NA, NI, NV, NIA)*max(NA, NI, NV, NIA)))
             allocate(V_bxay(max(NA, NI, NV, NIA)*max(NA, NI, NV, NIA)))
 
+#ifdef DEBUG
             this_mem = (NV*NV*2)*togb
-            write(*, '(A10, F30.20)') 'V_axby', this_mem
+            call print_memory('V_axby', this_mem)
 
             print*, 'naninv', na, ni, nv
             print*, max(na, ni, nv)
             print*, max(NA, NI, NV)*max(NA, NI, NV)
+#endif
 
 
             allocate(WorkAO(ACB(A0ao)%NDimS))
             allocate(WorkAOT(ACB(A0ao)%NDimS))
             allocate(WorkAA(ACB(A0aa)%NDimS))
             
+#ifdef DEBUG
             this_mem = (ACB(A0ao)%NDimS)*togb
-            write(*, '(A10, F30.20)') 'workao', this_mem
+            call print_memory('workao', this_mem)
+#endif
 
 
 
@@ -341,7 +348,8 @@ contains
                   call real_atb(AZaaoo, ACB(A0aa)%MiniBlocks(2)%MiniAVS, ACB(A1aaoo)%ASing)                  
             end if
             call tmsg('TIME FOR AZ AAOO ', timer, tdebug)
-            
+
+#ifdef DEBUG
             print*, 'size(AZaaooT, dim=1)', size(AZaaooT, dim=1)
             print*, 'size(AZaaooT, dim=2)', size(AZaaooT, dim=2)
             
@@ -365,7 +373,7 @@ contains
             print*, 'C to jest AZaaooTA o wymiarach', size(AZaaooTA, dim=1), size(AZaaooTA, dim=2)
             print*, 'A to jest ACB(A0aa)%MiniBlocks(2)%MiniAVTA o wymiarach', size(ACB(A0aa)%MiniBlocks(2)%MiniAVTA, dim=1), size(ACB(A0aa)%MiniBlocks(2)%MiniAVTA, dim=2)
             print*, 'B to jest ACB(A1aaoo)%ATripA o wymiarach, ', size(ACB(A1aaoo)%ATripA, dim=1), size(ACB(A1aaoo)%ATripA, dim=2)
-
+#endif
 
             
             call clock_start(timer)
@@ -425,10 +433,12 @@ contains
             AZvaooT = transpose(ACB(A1vaoo)%ATrip) !@@@ od razu konstruowac transponowana
             AZvaooTA = transpose(ACB(A1vaoo)%ATripA)
 
+#ifdef DEBUG
             print*, size(AZminiT, dim=1), 'size(AZminiT, dim=1)'
             print*, size(AZminiT, dim=2), 'size(AZminiT, dim=2)'
             print*, size(AZvaooT, dim=1), 'size(AZvaooT, dim=1)'
             print*, size(AZvaooT, dim=2), 'size(AZvaooT, dim=2)'
+#endif
 
             ds1 = size(AZminiT, dim=1)
             ds2 = size(AZminiT, dim=2)
@@ -857,9 +867,9 @@ contains
             call tmsg('TIME FOR ROO ', timer, tdebug)            
             call clock_start(timer)
 
-            call ximsg('NBatchI',   NBatchA, mnormal)                                                                                                                                                                                
-            call ximsg('NBatchA',   NBatchA, mnormal)                                                                                                                                                                                
-            call ximsg('NBatchV',   NBatchV, mnormal)                                                                                                                                                                                
+            call print_info('NBatchI', NBatchI)
+            call print_info('NBatchA', NBatchA)
+            call print_info('NBatchV', NBatchV)
 
             batchloop: do batch = 1, max(NBatchI, NBatchA, NBatchV)
  
@@ -1199,6 +1209,7 @@ contains
 
 
 
+#ifdef DEBUG
       call xmsg('timer10', timer10, mdebugg)
       call xmsg('timer11', timer11, mdebugg)
       call xmsg('timer12', timer12, mdebugg)
@@ -1224,6 +1235,7 @@ contains
       call xmsg('timer15', timer15, mdebugg)
       call xmsg('timer16', timer16, mdebugg)
       call xmsg('timer17', timer17, mdebugg)
+#endif
 
             
       ! print*, ''
@@ -1321,44 +1333,42 @@ contains
 !            'E_contr_all', ',', EAAoo+EAAooT, ',',EAAao+EAAaoT, ',',EVAoo+EVAooT, ',',EVAao2+EVAao2T, ',',EVVoo+EVVooT, ',',EVAao+EVAaoT, ',',EVAaa+EVAaaT, ',',EVVao+EVVaoT, ',',EVVaa+EVVaaT
       !write(*, '(A15, 2F25.15)')"E_ppAC0 = ", E_corr, ttoeV * E_corr
 
-      print*, ''
-      write(*,'(A18,1X,A10,1X,A1,1X,A20,1X,A1,1X,A20,1X,A1,1X,A20)') &
-            'name,  ', 'sum', ',', 's_ABAB', ',', 't_ABAB', ',', '2*tAAAA'
-      write(*,'(A18,1X,F20.15,1X,A1,1X,F20.15,1X,A1,1X,F20.15,1X,A1,1X,F20.15)') &
-            'E_vvoo,  ', EVVoo+EVVooT+two * EVVooTA, ',', EVVoo, ',', EVVooT, ',', two * EVVooTA
-      write(*,'(A18,1X,F20.15,1X,A1,1X,F20.15,1X,A1,1X,F20.15,1X,A1,1X,F20.15)') &
-            'E_vvao,  ', EVVao+EVVaoT+two * EVVaoTA, ',', EVVao, ',', EVVaoT, ',', two * EVVaoTA
-      write(*,'(A18,1X,F20.15,1X,A1,1X,F20.15,1X,A1,1X,F20.15,1X,A1,1X,F20.15)') &
-            'E_vvaa,  ', EVVaa+EVVaaT+two * EVVaaTA, ',', EVVaa, ',', EVVaaT, ',', two * EVVaaTA
-      write(*,'(A18,1X,F20.15,1X,A1,1X,F20.15,1X,A1,1X,F20.15,1X,A1,1X,F20.15)') &
-            'E_vaoo,  ', EVAoo+EVAooT+two * EVAooTA, ',', EVAoo, ',', EVAooT, ',', two * EVAooTA
-      write(*,'(A18,1X,F20.15,1X,A1,1X,F20.15,1X,A1,1X,F20.15,1X,A1,1X,F20.15)') &
-            'E_vaao,  ', EVAao+EVAaoT+two * EVAaoTA, ',', EVAao, ',', EVAaoT, ',', two * EVAaoTA
-      write(*,'(A18,1X,F20.15,1X,A1,1X,F20.15,1X,A1,1X,F20.15,1X,A1,1X,F20.15)') &
-            'E_vaaa,  ', EVAaa+EVAaaT+two * EVAaaTA, ',', EVAaa, ',', EVAaaT, ',', two * EVAaaTA
-      write(*,'(A18,1X,F20.15,1X,A1,1X,F20.15,1X,A1,1X,F20.15,1X,A1,1X,F20.15)') &
-            'E_aaoo,  ', EAAoo+EAAooT+two * EAAooTA, ',', EAAoo, ',', EAAooT, ',', two * EAAooTA
-      write(*,'(A18,1X,F20.15,1X,A1,1X,F20.15,1X,A1,1X,F20.15,1X,A1,1X,F20.15)') &
-            'E_aaao,  ', EAAao+EAAaoT+two * EAAaoTA, ',', EAAao, ',', EAAaoT, ',', two * EAAaoTA
-      write(*,'(A18,1X,F20.15,1X,A1,1X,F20.15,1X,A1,1X,F20.15,1X,A1,1X,F20.15)') &
-            'E_vaao2,  ', EVAao2+EVAao2T+two * EVAao2TA, ',', EVAao2, ',', EVAao2T, ',', two * EVAao2TA
+      call print_section('ppAC0 energy components')
+      write(*,'(2X,A12,4(1X,A14))') 'Component', 'Total [Eh]', 's_ABAB [Eh]', &
+            't_ABAB [Eh]', '2*t_AAAA [Eh]'
+      write(*,'(2X,A)') repeat('-', 72)
+      call print_energy_component('E_vvoo', EVVoo+EVVooT+two*EVVooTA, EVVoo, EVVooT, two*EVVooTA)
+      call print_energy_component('E_vvao', EVVao+EVVaoT+two*EVVaoTA, EVVao, EVVaoT, two*EVVaoTA)
+      call print_energy_component('E_vvaa', EVVaa+EVVaaT+two*EVVaaTA, EVVaa, EVVaaT, two*EVVaaTA)
+      call print_energy_component('E_vaoo', EVAoo+EVAooT+two*EVAooTA, EVAoo, EVAooT, two*EVAooTA)
+      call print_energy_component('E_vaao', EVAao+EVAaoT+two*EVAaoTA, EVAao, EVAaoT, two*EVAaoTA)
+      call print_energy_component('E_vaaa', EVAaa+EVAaaT+two*EVAaaTA, EVAaa, EVAaaT, two*EVAaaTA)
+      call print_energy_component('E_aaoo', EAAoo+EAAooT+two*EAAooTA, EAAoo, EAAooT, two*EAAooTA)
+      call print_energy_component('E_aaao', EAAao+EAAaoT+two*EAAaoTA, EAAao, EAAaoT, two*EAAaoTA)
+      call print_energy_component('E_vaao2', EVAao2+EVAao2T+two*EVAao2TA, EVAao2, EVAao2T, two*EVAao2TA)
 
       call print_section('Contributions to ppAC0 from (Mu)(Nu) pairs of blocks')
+      write(*,'(2X,A10,2X,A18)') 'Block pair', 'Contribution [Eh]'
+      write(*,'(2X,A)') repeat('-', 30)
       call print_block_contribution('(22)(11)', EAAoo + EAAooT + two * EAAooTA)
       call print_block_contribution('(22)(21)', EAAao + EAAaoT + two * EAAaoTA)
       call print_block_contribution('(32)(11)', EVAoo + EVAooT + two * EVAooTA)
       call print_block_contribution('(32)(21)*', EVAao2 + EVAao2T + two * EVAao2TA)
+      call print_block_contribution('(33)(11)', EVVoo + EVVooT + two * EVVooTA)
       call print_block_contribution('(32)(21)', EVAao  + EVAaoT  + two * EVAaoTA)
       call print_block_contribution('(32)(22)', EVAaa + EVAaaT + two * EVAaaTA)
-      call print_block_contribution('(33)(11)', EVVoo + EVVooT + two * EVVooTA)
       call print_block_contribution('(33)(21)', EVVao + EVVaoT + two * EVVaoTA)
       call print_block_contribution('(33)(22)', EVVaa + EVVaaT + two * EVVaaTA)
       print*, ''
       write(*,'(2X,A)') '*  term used as the replacement in ff'
 
       call print_section('Final energies')
-      call print_info('ECASSCF_THC', AuxData%ECAS_THC)
-      call print_info('E_ppAC0', E_corr)
+      call print_energy('CASSCF energy (one-electron)', AuxData%ECAS_oneelectr, &
+            ttoeV * AuxData%ECAS_oneelectr)
+      call print_energy('ECASSCF_THC', AuxData%ECAS_THC, ttoeV * AuxData%ECAS_THC)
+      call print_energy('E_ppAC0', E_corr, ttoeV * E_corr)
+      call print_energy('E_total', AuxData%ECAS_THC + E_corr, &
+            ttoeV * (AuxData%ECAS_THC + E_corr))
       print*, ''
 
     end associate

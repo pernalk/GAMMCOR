@@ -4,6 +4,7 @@ module ppac_types
       use basis_definitions, only: TBasisAssignment
 
       use types
+      use print_utils, only: print_memory
 
 
       implicit none
@@ -198,6 +199,7 @@ module ppac_types
             double precision :: ENuc
             double precision :: ECas
             double precision :: ECAS_THC = 0.d0
+            double precision :: ECAS_oneelectr = 0.d0
             double precision :: EROHF
             logical :: pherpa_print = .false.
             logical :: pperpa_print = .false.
@@ -352,7 +354,7 @@ contains
       end subroutine print_flags2
 
 
-          subroutine CalcMem(A, name)
+      subroutine CalcMem(A, name)
           double precision, dimension(:,:), intent(in) :: A
           double precision :: this_mem
           character(*), intent(in) :: name
@@ -362,7 +364,9 @@ contains
 
           this_mem = dble(size(A, dim=1)) * dble(size(A, dim=2))
           this_mem = this_mem*togb
-          write(*, '(A25, A1, F30.20)') name, ',', this_mem
+#ifdef DEBUG
+          call print_memory(name, this_mem)
+#endif
     end subroutine CalcMem
 
     subroutine CalcMemI(A, name)
@@ -375,7 +379,9 @@ contains
 
           this_mem = dble(size(A, dim=1)) * dble(size(A, dim=2))
           this_mem = this_mem*togb
-          write(*, '(A25, A1, F30.20)') name, ',', this_mem
+#ifdef DEBUG
+          call print_memory(name, this_mem)
+#endif
     end subroutine CalcMemI
 
     subroutine CalcMem3(A, name)
@@ -388,7 +394,9 @@ contains
 
           this_mem = dble(size(A, dim=1)) * dble(size(A, dim=2)) * dble(size(A, dim=3))
           this_mem = this_mem*togb
-          write(*, '(A25, A1, F30.20)') name, ',', this_mem
+#ifdef DEBUG          
+          call print_memory(name, this_mem)
+#endif
     end subroutine CalcMem3
 
     subroutine CalcMem4(A, name)
@@ -401,7 +409,9 @@ contains
 
           this_mem = dble(size(A, dim=1)) * dble(size(A, dim=2)) * dble(size(A, dim=3)) * dble(size(A, dim=4))
           this_mem = this_mem*togb
-          write(*, '(A25, A1, F30.20)') name, ',', this_mem
+#ifdef DEBUG          
+          call print_memory(name, this_mem)
+#endif
     end subroutine CalcMem4
 
 

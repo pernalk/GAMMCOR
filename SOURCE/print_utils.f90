@@ -6,7 +6,9 @@ module print_utils
     implicit none
     private
     public :: print_header, print_section, print_info, print_status, print_kv
-    public :: print_energy, print_block_contribution
+    public :: print_energy, print_energy_component, print_block_contribution
+    public :: print_energy1
+    public :: print_memory
     public :: prij, pri3, prix, pr2ix, pr4ix
     public :: mmsg, xmsg, ximsg, tmsg
     public :: MSG_DEB, MSG_PRIORITY_THR
@@ -126,9 +128,26 @@ contains
         character(len=*), intent(in) :: label
         double precision, intent(in) :: energy_eh, energy_ev
 
-        write(*,'(2X,A,":",2X,F18.10,1X,A,4X,F18.10,1X,A)') &
-            trim(label), energy_eh, 'Eh', energy_ev, 'eV'
+        write(*,'(2X,A,":",2X,F18.10,1X,A,4X,"(",F18.10,1X,A,")")') &
+            pad_label(label), energy_eh, 'Eh', energy_ev, 'eV'
     end subroutine print_energy
+
+    subroutine print_energy1(label, energy_eh)
+          character(len=*), intent(in) :: label
+          double precision, intent(in) :: energy_eh
+          
+          write(*,'(2X,A,":",2X,F18.10,1X,A,4X,"(",F18.10,1X,A,")")') &
+                pad_label(label), energy_eh, 'Eh'
+    end subroutine print_energy1
+
+    subroutine print_energy_component(label, total, singlet, triplet, triplet_aaaa)
+        character(len=*), intent(in) :: label
+        double precision, intent(in) :: total, singlet, triplet, triplet_aaaa
+        character(len=12) :: lbl
+
+        lbl = adjustl(label)
+        write(*,'(2X,A12,4(1X,F14.9))') lbl, total, singlet, triplet, triplet_aaaa
+    end subroutine print_energy_component
 
     subroutine print_block_contribution(block_pair, energy)
         character(len=*), intent(in) :: block_pair
@@ -136,8 +155,15 @@ contains
         character(len=block_label_width) :: lbl
 
         lbl = adjustl(block_pair)
-        write(*,'(2X,A,2X,F16.8)') lbl, energy
+        write(*,'(2X,A,2X,F18.10)') lbl, energy
     end subroutine print_block_contribution
+
+    subroutine print_memory(label, memory_gb)
+        character(len=*), intent(in) :: label
+        double precision, intent(in) :: memory_gb
+
+        write(*,'(2X,A,": ",ES12.4,1X,A)') pad_label(label), memory_gb, 'GB'
+    end subroutine print_memory
 
     !
     ! ---------------------------------------------------------------
