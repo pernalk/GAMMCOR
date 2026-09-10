@@ -2,7 +2,7 @@ import numpy as np
 from pyscf import gto, scf, mcscf, ao2mo, symm, tools, fci, mrpt
 import sys
 from copy import deepcopy
-# sys.path.append('/path/to/gammcor/')
+# sys.path.append('/path/to/gammcor/gammcor_tools/')
 
 try:
     from Pyscf2Gammcor import get_data_for_gammcor
@@ -17,11 +17,14 @@ except ImportError:
     Please open this file in a text editor and follow these steps:
 
     1. Find the line below (around line 7):
-       #sys.path.append('/path/to/gammcor/')
+       #sys.path.append('/path/to/gammcor/gammcor_tools/')
 
        a) Uncomment this line by removing the '#' at the beginning.
-       b) Replace the example path with the correct, full path to your
-          'gammcor' directory.
+       b) Replace the example path with the correct, full path to the
+          'gammcor_tools' directory inside your 'gammcor' directory.
+
+       Alternatively, install the tools once and skip this step for good:
+          pip install -e '/path/to/gammcor/gammcor_tools[pyscf]'
 
     2. Find the line inside the main part of the script:
        basis_file = '/path/to/gammcor/bazy-do-pyscf/cc-pvdz.nw'

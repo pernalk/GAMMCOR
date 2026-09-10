@@ -118,8 +118,7 @@ contains
 
             associate(Zgk=>THCData%Zgk, Xga=>THCData%Xga, ExternalOrdering=>THCData%ExternalOrdering, NChol=>THCData%NChol, NTHC=>THCData%NTHC)
 
-            BatchDim = 1000  
-!            BatchDim = RPArams%Batchdim
+            BatchDim = AuxData%Batchdim
             call print_section('ppAC0 energy evaluation')
             EVVoo = zero
             EVVao = zero

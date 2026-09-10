@@ -131,10 +131,9 @@ def basis_of_script(path):
 
 def main():
     parser = argparse.ArgumentParser(
-        prog='basis_dump',
         description=__doc__,
         formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog='example:\n  basis_dump CO_NiAg_dmrgscf.py\n')
+        epilog='example:\n  gammcor_basis CO_NiAg_dmrgscf.py\n')
     parser.add_argument('script', help='pyscf script to read `mol.basis` from')
     parser.add_argument('-o', '--output', default='baza.dat',
                         help='output file (default: baza.dat)')

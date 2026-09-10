@@ -1,0 +1,32 @@
+[build-system]
+requires = ["setuptools>=64"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "gammcor-tools"
+version = "0.1.0"
+description = "Command-line helpers for preparing and inspecting GammCor input data"
+readme = "README.md"
+requires-python = ">=3.8"
+dependencies = [
+    "numpy",
+    "h5py",
+]
+
+[project.optional-dependencies]
+# Only gammcor_basis and the Pyscf2Gammcor interface need PySCF; the three
+# HDF5 tools run with numpy + h5py alone.
+pyscf = ["pyscf"]
+
+[project.scripts]
+gammcor_basis  = "gammcor_tools.gammcor_basis:main"
+gammcor_2h5    = "gammcor_tools.gammcor_2h5:main"
+gammcor_2bin   = "gammcor_tools.gammcor_2bin:main"
+gammcor_h5info = "gammcor_tools.gammcor_h5info:main"
+
+[tool.setuptools]
+# Explicit lists rather than auto-discovery: this directory also holds the
+# compatibility shim and scratch test data, which flat-layout discovery
+# would either misread or refuse.
+packages = ["gammcor_tools"]
+py-modules = ["Pyscf2Gammcor"]
