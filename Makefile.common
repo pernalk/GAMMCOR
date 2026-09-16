@@ -96,7 +96,7 @@ $(O)pp_utils.o         : $(O)types.o $(O)lin.o $(O)quadratures.o
 $(O)thc_auto_p0.o      :
 $(O)thc_auto_p2.o      :
 $(O)thc_auto_p3.o      :
-$(O)thc_energy.o       : $(O)types.o $(O)ppac_types.o $(O)print_utils.o $(O)lin.o
+$(O)thc_energy.o       : $(O)types.o $(O)ppac_types.o $(O)print_utils.o $(O)lin.o $(O)gammint.o
 $(O)ppac0.o            : $(O)types.o $(O)ppac_types.o $(O)pp_utils.o $(O)lin.o
 $(O)ppac0_thc.o        : $(O)types.o $(O)ppac_types.o $(O)pp_utils.o $(O)print_utils.o $(O)tran.o $(O)interface_pp.o $(O)geom_input.o \
                          $(O)thc_auto_p0.o $(O)thc_auto_p2.o $(O)thc_auto_p3.o $(O)thc_energy.o
