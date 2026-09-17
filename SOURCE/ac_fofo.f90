@@ -182,7 +182,6 @@ call create_D12_array(NCholesky, DChol, DCholAct, NDimX, NBasis, IndN, Occ, IndA
 
 NGrid=18
 
-
 print*, 'NDim  =', NDim
 print*, 'NDimX =', NDimX
 
@@ -218,12 +217,20 @@ allocate(ABPLUS1(NDimX,NDimX),ABMIN1(NDimX,NDimX))
 !call mem_alloc(ABPLUS1,NDimX*NDimX)
 !call mem_alloc(ABMIN1,NDimX*NDimX)
 
-if(NAct==1) then
-  ! active-virtual block
-  nblk = NBasis - NAct - INActive
-else
+!if(NAct==1) then
+!  ! active-virtual block
+!  mh, 17.09.26: this works only
+!  if the single active orbital is doubly occupied
+!  not for doublet...
+!  nblk = NBasis - NAct - INActive
+!else
   nblk = 1 + NBasis - NAct
-endif
+!endif
+
+!print*, 'INActive ',INActive
+!print*, 'NAct     ',NAct
+!print*, 'NBasis   ',NBasis
+!print*, 'nblk 1   ',nblk
 
 allocate(A0block(nblk))
 ! AC0BLOCK with ver=0 stores A-(0) and A+(0) matrices

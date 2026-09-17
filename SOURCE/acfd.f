@@ -8312,7 +8312,7 @@ C
          NUC_DMZ = NUC_DMZ + Charg(i)*XYZ(i,3)
       Enddo
 C
-      Write(6,'(/,1X,A,3f12.8)') 'Nuclear Dipole Moment   ',
+      Write(6,'(/,1X,A,3f14.8)') 'Nuclear Dipole Moment   ',
      $                            NUC_DMX,NUC_DMY,NUC_DMZ
 C
 C     Electronic
@@ -8323,15 +8323,16 @@ C
          DM_Y = DM_Y + 2d0*Occ(i)*DipY(i,i)
          DM_Z = DM_Z + 2d0*Occ(i)*DipZ(i,i)
       Enddo
-      Write(6,'(1X,A,3f12.8)')   'Electronic Dipole Moment',
+c     Write(6,*)   'Electronic Dipole Moment',
+      Write(6,'(1X,A,3f14.8)')   'Electronic Dipole Moment',
      $                           DM_X,DM_Y,DM_Z
 C
-      Write(6,'(1X,A,3f12.8,/)') 'Total Dipole Moment     ',
+      Write(6,'(1X,A,3f14.8,/)') 'Total Dipole Moment     ',
      $                            NUC_DMX+DM_X,NUC_DMY+DM_Y,NUC_DMZ+DM_Z
 C
       DXYZ=SQRT((NUC_DMX+DM_X)**2+(NUC_DMY+DM_Y)**2+(NUC_DMZ+DM_Z)**2)
 C
-      Write(6,'(1X,A,2f12.8,/)') '|dipole moment| a.u./D', DXYZ,
+      Write(6,'(1X,A,2f14.8,/)') '|dipole moment| a.u./D', DXYZ,
      $ DXYZ/0.393456
 
       Deallocate(XYZ,Charg)
