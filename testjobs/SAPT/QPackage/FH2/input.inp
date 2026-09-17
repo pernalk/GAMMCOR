@@ -1,0 +1,36 @@
+Calculation
+ JobTitle   f-h2 7_20
+ Interface  TREXIO
+ JobType    dSRS
+ RDMType    CAS
+ IPrint     11
+end
+
+! define monA
+System
+ Monomer A
+ IRef1   2
+ IRef2   3
+ NAtoms  1
+ ZNucl   9
+ Charge  0
+ MOClass       TREXIO
+ ThrSelAct     1d-4
+ TrexFile      A.hdf5
+ TrexOrbFile   A0.hdf5
+ Cholesky2RDM  false
+end
+
+! define monB
+System
+ Monomer B
+ IRef1   1
+ IRef2   1
+ NAtoms  2
+ ZNucl   2
+ Charge  0
+ ThrSelAct     1d-4
+ TrexFile      B.hdf5
+ Cholesky2RDM  false
+end
+

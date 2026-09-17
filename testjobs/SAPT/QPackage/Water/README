@@ -1,0 +1,5 @@
+ * run CAS(8,8)/avdz for A,B monomers using Quantum Package 2
+   (generates hdf5 monomer files) 
+ * run dSAPT(CAS) using GammCor
+   (requires A.hdf5, B.hdf5, input.inp)
+

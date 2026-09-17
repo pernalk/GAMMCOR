@@ -1,0 +1,8 @@
+  F(2P)--H2, avdz: degenerate SAPT example
+
+ * start: run SA(3)-CAS(5,3)SCF calculation for F(2P) at R=7.0, Theta=90
+         to get the reference orbitals
+ * Run dSAPT(CAS) calculation for R=6.2:
+    --> rfh2.sh : bash sript that runs monomer calculations
+                  (QP2) and SAPT calculation (GammCor)
+                  for R = 6.2 bohr 

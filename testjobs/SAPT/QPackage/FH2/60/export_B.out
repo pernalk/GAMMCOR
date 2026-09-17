@@ -1,0 +1,238 @@
+Date: 17/09/2026 20:25:12
+===============
+Quantum Package
+===============
+
+Git Commit: Merge branch 'dev-stable' of https://github.com/QuantumPackage/qp2 into dev-stable
+Git Date  : Mon Dec 30 14:35:09 2024 +0100
+Git SHA1  : 2e95a05366bd7f9ff9a27a038d71a0a746a303de[m
+EZFIO Dir : cas_B
+
+
+Task server running : tcp://192.168.100.106:43189
+ * mo_label          Canonical
+* Number of determinants                                         1
+* mo_num                                                        92
+* N_int                                                          2
+ Read  mo_coef
+* Dimension of the psi arrays                                    1
+ Read psi_det
+* Number of unique beta determinants                             1
+* Number of unique alpha determinants                            1
+ Read psi_coef           1           1
+.. >>>>> [ IO READ: mo_class ] <<<<< ..
+ 
+.. >>>>> [ RES  MEM :          0.033 GB ] [ VIRT MEM :          0.731 GB ] <<<<< ..
+.. >>>>> [ WALL TIME:           0.02  s ] [ CPU  TIME:           0.10  s ] <<<<< ..
+ 
+
+Nuclear Coordinates (Angstroms)
+===============================
+
+================ ============ ============ ============ ============
+      Atom          Charge          X            Y            Z 
+================ ============ ============ ============ ============
+X                    0.000000     0.000000     0.000000     0.000000
+H                    1.000000     0.331795     0.000000     3.472461
+H                    1.000000    -0.331795     0.000000     3.089337
+================ ============ ============ ============ ============
+
+Minimal interatomic distance found:       0.7662 Angstrom
+ 
+.. >>>>> [ RES  MEM :          0.033 GB ] [ VIRT MEM :          0.731 GB ] <<<<< ..
+.. >>>>> [ WALL TIME:           0.02  s ] [ CPU  TIME:           0.11  s ] <<<<< ..
+ 
+* Nuclear repulsion energy                          0.6906077304581946    
+ TREXIO file : B.hdf5
+ 
+ N_states =           1
+ Electrons
+ Nuclei
+ Basis
+ 
+.. >>>>> [ RES  MEM :          0.036 GB ] [ VIRT MEM :          0.732 GB ] <<<<< ..
+.. >>>>> [ WALL TIME:           0.03  s ] [ CPU  TIME:           0.21  s ] <<<<< ..
+ 
+ 
+.. >>>>> [ RES  MEM :          0.036 GB ] [ VIRT MEM :          0.732 GB ] <<<<< ..
+.. >>>>> [ WALL TIME:           0.03  s ] [ CPU  TIME:           0.21  s ] <<<<< ..
+ 
+ AOs
+ AO one-e integrals
+ AO map initialized :               15487395
+ Providing the AO integrals
+ Sorting the map
+ AO integrals provided:
+  Size of AO map :            76.6710796356201      MB
+  Number of AO integrals :               6980521
+  cpu  time :   29.2333230000000      s
+  wall time :   3.99873495101929      s  ( x    7.31064283031521       )
+ AO two-e integrals
+ MOs
+ Providing the one-electron integrals
+ MO one-e integrals
+* Total available memory (GB)                                  753
+* Target maximum memory (GB)                                   753
+.. >>>>> [ RES  MEM :          0.244 GB ] [ VIRT MEM :          1.691 GB ] <<<<< ..
+ 
+ Cholesky decomposition of AO integrals
+ ======================================
+ 
+ ============ =============
+     Rank       Threshold
+ ============ =============
+         6       3.421E-01
+        93       3.705E-02
+       260       3.639E-03
+       371       3.573E-04
+       464       3.372E-05
+       570       3.266E-06
+       692       3.189E-07
+       815       3.142E-08
+       948       3.115E-09
+      1092       3.024E-10
+      1238       2.955E-11
+      1377       2.934E-12
+      1453       9.813E-13
+ ============ =============
+ 
+ Rank  :         1453 (   13.1791383219955       %)
+ 
+ Time to provide AO cholesky vectors =   5.163081487019857E-002  min
+ 
+ AO->MO Transformation of Cholesky vectors
+ -----------------------------------------
+ 
+ Time to provide MO cholesky vectors =   4.713177680969238E-004  min
+  cpu  time :   25.0078850000000      s
+  wall time :   3.12630105018616      s  ( x    7.99919284757010      )
+ MO two-e integrals
+ MO map initialized:                9152781
+ MO integrals cache: (           1 ,           92 )
+* Number of inactive MOs                                         0
+ Inactive MOs:
+ 
+* Number of active   MOs                                         1
+ Active MOs:
+           1
+ Wall time to provide state_av_act_2_rdm_ab_mo  2.329349517822266E-004
+ Wall time to provide state_av_act_2_rdm_aa_mo  6.198883056640625E-006
+ Wall time to provide state_av_act_2_rdm_bb_mo  5.006790161132812E-006
+ providing state_av_act_2_rdm_spin_trace_mo 
+ Time to provide state_av_act_2_rdm_spin_trace_mo  1.907348632812500E-006
+* Number of core     MOs                                         0
+ Core MOs:
+ 
+ Core, Inactive and Active MOs:
+           1
+ Two-e RDM
+ mo_num =  92
+ n_core_inact_act_orb =   1
+Wall time: 0:00:11
+
+Date: 17/09/2026 20:25:24
+===============
+Quantum Package
+===============
+
+Git Commit: Merge branch 'dev-stable' of https://github.com/QuantumPackage/qp2 into dev-stable
+Git Date  : Mon Dec 30 14:35:09 2024 +0100
+Git SHA1  : 2e95a05366bd7f9ff9a27a038d71a0a746a303de[m
+EZFIO Dir : cas_B
+
+
+Task server running : tcp://192.168.100.106:44459
+ 
+.. >>>>> [ RES  MEM :          0.031 GB ] [ VIRT MEM :          0.731 GB ] <<<<< ..
+.. >>>>> [ WALL TIME:           0.00  s ] [ CPU  TIME:           0.03  s ] <<<<< ..
+ 
+
+Nuclear Coordinates (Angstroms)
+===============================
+
+================ ============ ============ ============ ============
+      Atom          Charge          X            Y            Z 
+================ ============ ============ ============ ============
+X                    0.000000     0.000000     0.000000     0.000000
+H                    1.000000     0.331795     0.000000     3.472461
+H                    1.000000    -0.331795     0.000000     3.089337
+================ ============ ============ ============ ============
+
+Minimal interatomic distance found:       0.7662 Angstrom
+ 
+.. >>>>> [ RES  MEM :          0.032 GB ] [ VIRT MEM :          0.731 GB ] <<<<< ..
+.. >>>>> [ WALL TIME:           0.00  s ] [ CPU  TIME:           0.03  s ] <<<<< ..
+ 
+* Nuclear repulsion energy                          0.6906077304581946    
+ nuclear_repulsion:   0.690607730458195     
+ * mo_label          Canonical
+* Number of determinants                                         1
+* mo_num                                                        92
+* N_int                                                          2
+* Dimension of the psi arrays                                    1
+ Read  mo_coef
+ Read psi_det
+ Read psi_coef           1           1
+.. >>>>> [ IO READ: mo_class ] <<<<< ..
+* Total available memory (GB)                                  753
+* Target maximum memory (GB)                                   753
+.. >>>>> [ RES  MEM :          0.033 GB ] [ VIRT MEM :          0.731 GB ] <<<<< ..
+ 
+ Cholesky decomposition of AO integrals
+ ======================================
+ 
+ ============ =============
+     Rank       Threshold
+ ============ =============
+         6       3.421E-01
+        93       3.705E-02
+       260       3.639E-03
+       371       3.573E-04
+       464       3.372E-05
+       570       3.266E-06
+       692       3.189E-07
+       815       3.142E-08
+       948       3.115E-09
+      1092       3.024E-10
+      1238       2.955E-11
+      1377       2.934E-12
+      1453       9.813E-13
+ ============ =============
+ 
+ Rank  :         1453 (   13.1791383219955       %)
+ 
+ Time to provide AO cholesky vectors =   5.379908084869385E-002  min
+ 
+ AO->MO Transformation of Cholesky vectors
+ -----------------------------------------
+ 
+ Time to provide MO cholesky vectors =   4.727840423583984E-004  min
+  cpu  time :   26.0285490000000      s
+  wall time :   3.25645399093628      s  ( x    7.99291163715057      )
+ MO map initialized:                9152781
+ Providing the one-electron integrals
+ Providing the H_matrix_all_dets ...
+ H_matrix_all_dets done 
+* Number of unique beta determinants                             1
+* Number of unique alpha determinants                            1
+ Energy components
+ =================
+ 
+ Vnn  : Nucleus-Nucleus   potential energy
+ Ven  : Electron-Nucleus  potential energy
+ Vee  : Electron-Electron potential energy
+ Vecp : Potential energy of the pseudo-potentials
+ T    : Electronic kinetic energy
+ 
+ State            1
+ ---------
+ 
+ Vnn  =   0.690607730458195     
+ One-e    -2.47257655640819     
+ Vee  =   0.649587678242006     
+ Eele =   -1.82298887816618     
+ ETot =   -1.13238114770799     
+ 
+ 
+Wall time: 0:00:05
+

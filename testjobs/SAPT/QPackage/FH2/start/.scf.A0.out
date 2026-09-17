@@ -1,0 +1,103 @@
+qp_run - Quantum Package command 
+
+Usage:
+  
+  qp_run [-h] [-p <string>] [-s] [--] PROGRAM EZFIO_DIR
+  
+Arguments:
+  
+  PROGRAM                Name of the QP program to be run 
+  EZFIO_DIR              EZFIO directory 
+  
+Options:
+  
+  -h  --help             Prints the help message. 
+  -p  --prefix=<string>  Prefix before running the program, like gdb 
+                         or valgrind. 
+  -s  --slave            Required to run slave tasks in distributed
+                         environments. 
+  
+Description:
+  
+  Executes a Quantum Package binary file among these: 
+  
+  * 
+  * attachement_orb 
+  * basis_correction 
+  * cas_based_density 
+  * cas_based_on_top 
+  * cas_complete 
+  * casscf 
+  * ccsd 
+  * ccsd_space_orb 
+  * ccsd_spin_orb 
+  * cipsi_orb_opt 
+  * cis 
+  * cisd 
+  * deb_ao_2e_int 
+  * debug_gradient_list_opt 
+  * debug_gradient_opt 
+  * debug_hessian_list_opt 
+  * debug_hessian_opt 
+  * diagonalize_h 
+  * example_casscf_multistate.sh 
+  * export_gammcor 
+  * export_trexio 
+  * extra_basis 
+  * extra_nuclei 
+  * fci 
+  * fcidump 
+  * fcidump_pyscf 
+  * fit_1s_basis 
+  * four_idx_transform 
+  * gammcor_plugin 
+  * get_energy 
+  * hcore_guess 
+  * huckel_guess 
+  * import_integrals_ao_periodic 
+  * import_mo_coef_periodic 
+  * import_trexio_determinants 
+  * import_trexio_integrals 
+  * ks_scf 
+  * lccsd 
+  * molden 
+  * mp2 
+  * orb_opt 
+  * print_ci_vectors 
+  * print_detweights 
+  * print_dipole 
+  * print_energy 
+  * print_hamiltonian 
+  * print_mos 
+  * print_n2_related_stuff 
+  * print_sorted_wf_coef 
+  * print_su_pbe_ot 
+  * print_var_energy 
+  * print_wf 
+  * print_wf_qp_edit 
+  * properties 
+  * pt2 
+  * qp_add_extra_fit_system 
+  * qp_copy_extra_basis 
+  * qp_copy_extra_basis_to_usual_basis 
+  * qp_fit_1s_basis 
+  * rotate_mos 
+  * rs_ks_scf 
+  * save_natorb 
+  * save_natorb_no_ov_rot 
+  * save_natorb_no_ref 
+  * save_one_e_dm 
+  * save_ortho_mos 
+  * scf 
+  * sort_by_fock_energies 
+  * sort_wf 
+  * swap_mos 
+  * test_2_rdm 
+  * test_chol 
+  * test_chol_bas 
+  * test_dav 
+  * test_proj_op 
+  * truncate_wf 
+  * write_integrals_erf 
+  
+  

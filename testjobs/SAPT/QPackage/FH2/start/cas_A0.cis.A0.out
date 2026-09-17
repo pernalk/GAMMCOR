@@ -1,0 +1,152 @@
+Date: 17/09/2026 20:18:50
+===============
+Quantum Package
+===============
+
+Git Commit: Merge branch 'dev-stable' of https://github.com/QuantumPackage/qp2 into dev-stable
+Git Date  : Mon Dec 30 14:35:09 2024 +0100
+Git SHA1  : 2e95a05366bd7f9ff9a27a038d71a0a746a303de[m
+EZFIO Dir : cas_A0
+
+
+Task server running : tcp://192.168.100.100:36999
+ * mo_label          Canonical
+* Number of determinants                                         1
+* mo_num                                                        92
+* N_int                                                          2
+ Read  mo_coef
+.. >>>>> [ IO READ: mo_class ] <<<<< ..
+ 
+.. >>>>> [ RES  MEM :          0.032 GB ] [ VIRT MEM :          1.603 GB ] <<<<< ..
+.. >>>>> [ WALL TIME:           0.03  s ] [ CPU  TIME:           0.32  s ] <<<<< ..
+ 
+
+Nuclear Coordinates (Angstroms)
+===============================
+
+================ ============ ============ ============ ============
+      Atom          Charge          X            Y            Z 
+================ ============ ============ ============ ============
+F                    9.000000     0.000000     0.000000     0.000000
+X                    0.000000     0.383124     0.000000     3.704241
+X                    0.000000    -0.383124     0.000000     3.704241
+================ ============ ============ ============ ============
+
+Minimal interatomic distance found:       0.7662 Angstrom
+* Total available memory (GB)                                  187
+* Target maximum memory (GB)                                   187
+.. >>>>> [ RES  MEM :          0.032 GB ] [ VIRT MEM :          1.603 GB ] <<<<< ..
+ 
+ Cholesky decomposition of AO integrals
+ ======================================
+ 
+ ============ =============
+     Rank       Threshold
+ ============ =============
+         6       3.431E-01
+        93       3.696E-02
+       266       3.552E-03
+       383       3.470E-04
+       463       3.417E-05
+       571       3.388E-06
+       682       3.370E-07
+       807       3.269E-08
+       929       3.232E-09
+      1069       3.210E-10
+      1208       3.099E-11
+      1346       3.005E-12
+      1401       9.964E-13
+ ============ =============
+ 
+ Rank  :         1401 (   12.7074829931973       %)
+ 
+ Time to provide AO cholesky vectors =   9.745481411616007E-002  min
+ 
+ AO->MO Transformation of Cholesky vectors
+ -----------------------------------------
+ 
+ Time to provide MO cholesky vectors =   1.741902033487956E-003  min
+  cpu  time :   118.195473000000      s
+  wall time :   5.95442414283752      s  ( x    19.8500258236013      )
+ MO map initialized:                9152781
+ Providing the one-electron integrals
+ Providing the H_matrix_all_dets ...
+ H_matrix_all_dets done 
+ Diagonalization of H using Lapack
+ 
+.. >>>>> [ RES  MEM :          0.323 GB ] [ VIRT MEM :          2.037 GB ] <<<<< ..
+.. >>>>> [ WALL TIME:           6.10  s ] [ CPU  TIME:         120.81  s ] <<<<< ..
+ 
+* Nuclear repulsion energy                           0.000000000000000    
+ 
+.. >>>>> [ RES  MEM :          0.323 GB ] [ VIRT MEM :          2.037 GB ] <<<<< ..
+.. >>>>> [ WALL TIME:           6.10  s ] [ CPU  TIME:         120.83  s ] <<<<< ..
+ 
+* Energy of state    1                              -99.40209732873713    
+* S^2 of state    1                                 0.7500000000000000    
+* Number of active   MOs                                        91
+ Active MOs:
+           2           3           4           5           6           7
+           8           9          10          11          12          13
+          14          15          16          17          18          19
+          20          21          22          23          24          25
+          26          27          28          29          30          31
+          32          33          34          35          36          37
+          38          39          40          41          42          43
+          44          45          46          47          48          49
+          50          51          52          53          54          55
+          56          57          58          59          60          61
+          62          63          64          65          66          67
+          68          69          70          71          72          73
+          74          75          76          77          78          79
+          80          81          82          83          84          85
+          86          87          88          89          90          91
+          92
+* Number of virtual  MOs                                         0
+* Number of inactive MOs                                         0
+* Number of configurations                                     352
+ 
+.. >>>>> [ RES  MEM :          0.339 GB ] [ VIRT MEM :          2.060 GB ] <<<<< ..
+.. >>>>> [ WALL TIME:           6.11  s ] [ CPU  TIME:         120.98  s ] <<<<< ..
+ 
+ Providing the H_matrix_all_dets ...
+ MO integrals cache: (           1 ,           92 )
+ H_matrix_all_dets done 
+ Diagonalization of H using Lapack
+ 
+.. >>>>> [ RES  MEM :          1.258 GB ] [ VIRT MEM :          4.453 GB ] <<<<< ..
+.. >>>>> [ WALL TIME:          21.94  s ] [ CPU  TIME:         429.08  s ] <<<<< ..
+ 
+* Energy of state    1                              -99.41445193743500    
+* S^2 of state    1                                 0.7500000000000001    
+* Energy of state    2                              -99.40836029328722    
+* S^2 of state    2                                 0.7499999999999999    
+* Energy of state    3                              -99.40836028015964    
+* S^2 of state    3                                 0.7499999999999999    
+ 
+ N_det =          874
+ ******************************
+ Energies  of the states:
+           1  -99.4144519374350     
+           2  -99.4083602932872     
+           3  -99.4083602801596     
+ 
+ ******************************************************
+ Excitation energies (au)                     (eV)
+           2  6.091644147787179E-003  0.165758122344564     
+           3  6.091657275362650E-003  0.165758479555558     
+ 
+* Saved determinants                                           689
+ Diagonalization of H using Lapack
+ 
+.. >>>>> [ RES  MEM :          1.258 GB ] [ VIRT MEM :          4.453 GB ] <<<<< ..
+.. >>>>> [ WALL TIME:          23.13  s ] [ CPU  TIME:         445.77  s ] <<<<< ..
+ 
+* Energy of state    1                              -99.41445193743500    
+* S^2 of state    1                                 0.7500000000000001    
+* Energy of state    2                              -99.40836029328722    
+* S^2 of state    2                                 0.7499999999999999    
+* Energy of state    3                              -99.40836028015964    
+* S^2 of state    3                                 0.7499999999999999    
+Wall time: 0:00:24
+

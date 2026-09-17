@@ -1,0 +1,646 @@
+Date: 17/09/2026 20:19:42
+===============
+Quantum Package
+===============
+
+Git Commit: Merge branch 'dev-stable' of https://github.com/QuantumPackage/qp2 into dev-stable
+Git Date  : Mon Dec 30 14:35:09 2024 +0100
+Git SHA1  : 2e95a05366bd7f9ff9a27a038d71a0a746a303de[m
+EZFIO Dir : cas_A0
+
+
+Task server running : tcp://192.168.100.100:42549
+* mo_num                                                        92
+.. >>>>> [ IO READ: mo_class ] <<<<< ..
+* Number of active   MOs                                         3
+ Active MOs:
+           3           4           5
+* Number of core     MOs                                         2
+ Core MOs:
+           1           2
+* Number of inactive MOs                                         0
+ Inactive MOs:
+ 
+* Number of virtual  MOs                                        87
+ Virtual MOs:
+           6           7           8           9          10          11
+          12          13          14          15          16          17
+          18          19          20          21          22          23
+          24          25          26          27          28          29
+          30          31          32          33          34          35
+          36          37          38          39          40          41
+          42          43          44          45          46          47
+          48          49          50          51          52          53
+          54          55          56          57          58          59
+          60          61          62          63          64          65
+          66          67          68          69          70          71
+          72          73          74          75          76          77
+          78          79          80          81          82          83
+          84          85          86          87          88          89
+          90          91          92
+* N_int                                                          2
+ Read  mo_coef
+ * mo_label          Natural
+ pt2_max =   1.000000000000000E-010
+* Number of determinants                                         1
+* Dimension of the psi arrays                                    3
+ 
+.. >>>>> [ RES  MEM :          0.032 GB ] [ VIRT MEM :          1.604 GB ] <<<<< ..
+.. >>>>> [ WALL TIME:           0.03  s ] [ CPU  TIME:           0.42  s ] <<<<< ..
+ 
+
+Nuclear Coordinates (Angstroms)
+===============================
+
+================ ============ ============ ============ ============
+      Atom          Charge          X            Y            Z 
+================ ============ ============ ============ ============
+F                    9.000000     0.000000     0.000000     0.000000
+X                    0.000000     0.383124     0.000000     3.704241
+X                    0.000000    -0.383124     0.000000     3.704241
+================ ============ ============ ============ ============
+
+Minimal interatomic distance found:       0.7662 Angstrom
+* Total available memory (GB)                                  187
+* Target maximum memory (GB)                                   187
+.. >>>>> [ RES  MEM :          0.033 GB ] [ VIRT MEM :          1.604 GB ] <<<<< ..
+ 
+ Cholesky decomposition of AO integrals
+ ======================================
+ 
+ ============ =============
+     Rank       Threshold
+ ============ =============
+         6       3.431E-01
+        93       3.696E-02
+       266       3.552E-03
+       383       3.470E-04
+       463       3.417E-05
+       571       3.388E-06
+       682       3.370E-07
+       807       3.269E-08
+       929       3.232E-09
+      1069       3.210E-10
+      1208       3.099E-11
+      1346       3.005E-12
+      1401       9.964E-13
+ ============ =============
+ 
+ Rank  :         1401 (   12.7074829931973       %)
+ 
+ Time to provide AO cholesky vectors =   9.938140312830607E-002  min
+ 
+ AO->MO Transformation of Cholesky vectors
+ -----------------------------------------
+ 
+ Time to provide MO cholesky vectors =   1.614916324615478E-003  min
+  cpu  time :   120.674096000000      s
+  wall time :   6.06208014488220      s  ( x    19.9063841315059      )
+ MO map initialized:                9152781
+ Providing the one-electron integrals
+ Providing the H_matrix_all_dets ...
+ H_matrix_all_dets done 
+ 
+.. >>>>> [ RES  MEM :          0.323 GB ] [ VIRT MEM :          2.030 GB ] <<<<< ..
+.. >>>>> [ WALL TIME:           6.20  s ] [ CPU  TIME:         123.39  s ] <<<<< ..
+ 
+* Nuclear repulsion energy                           0.000000000000000    
+* Number of configurations                                       1
+ 
+.. >>>>> [ RES  MEM :          0.338 GB ] [ VIRT MEM :          2.054 GB ] <<<<< ..
+.. >>>>> [ WALL TIME:           6.21  s ] [ CPU  TIME:         123.48  s ] <<<<< ..
+ 
+ Diagonalization of H using Lapack
+ 
+.. >>>>> [ RES  MEM :          0.339 GB ] [ VIRT MEM :          2.054 GB ] <<<<< ..
+.. >>>>> [ WALL TIME:           6.21  s ] [ CPU  TIME:         123.52  s ] <<<<< ..
+ 
+* Energy of state    1                              -99.40069668964119    
+* S^2 of state    1                                 0.7500000000000000    
+--------------------------------------------------------------------------------
+ 
+.. >>>>> [ RES  MEM :          0.339 GB ] [ VIRT MEM :          2.054 GB ] <<<<< ..
+.. >>>>> [ WALL TIME:           6.21  s ] [ CPU  TIME:         123.53  s ] <<<<< ..
+ 
+* Number of generators                                           1
+* Number of comb teeth                                           1
+* Number of deleted  MOs                                         0
+ Using 1/c_max^2 weight in selection
+ # Total weight   0.3333333      0.3333333      0.3333333    
+* Number of unique beta determinants                             1
+* Number of unique alpha determinants                            1
+ 
+.. >>>>> [ RES  MEM :          0.339 GB ] [ VIRT MEM :          2.054 GB ] <<<<< ..
+.. >>>>> [ WALL TIME:           6.21  s ] [ CPU  TIME:         123.56  s ] <<<<< ..
+ 
+* Number of selectors                                            1
+* pt2_n_tasks_max                                                1
+* PT2 Energy denominator                            -99.40069668964119    
+* PT2 Energy denominator                             0.000000000000000    
+* PT2 Energy denominator                             0.000000000000000    
+* Estimated memory/thread (Gb)                      0.1490116119384766E-06
+ MO integrals cache: (           1 ,           92 )
+ Overlap of perturbed states:
+  3.085874738308504E-014  0.000000000000000E+000  0.000000000000000E+000
+  0.000000000000000E+000  0.000000000000000E+000  0.000000000000000E+000
+  0.000000000000000E+000  0.000000000000000E+000  0.000000000000000E+000
+ -------
+ Using 1/c_max^2 weight in selection
+ # Total weight   0.3333333      0.3333333      0.3333333    
+* Correlation ratio                                  1.000000000000000    
+ 
+Summary at N_det =            1
+-----------------------------------
+ 
+# ============ =============================
+                     State      1
+# ============ =============================
+# E             -99.40069669
+# PT2            -0.00000000     0.00000000
+# rPT2           -0.00000000     0.00000000
+#
+# E+PT2         -99.40069669     0.00000000
+# E+rPT2        -99.40069669     0.00000000
+# ============ =============================
+ 
+ N_det             =            1
+ N_states          =            3
+ N_cfg             =            1
+ N_csf             =            3
+ 
+ * State            1
+ < S^2 >         =   0.750000000000000     
+ E               =   -99.4006966896412     
+ Variance        =   1.002775458651909E-019  +/-   0.000000000000000E+000
+ PT norm         =   1.756665801542372E-007  +/-   0.000000000000000E+000
+ PT2             =  -5.561957144850638E-017  +/-   0.000000000000000E+000
+ rPT2            =  -5.561957144850466E-017  +/-   0.000000000000000E+000
+ E+PT2           =   -99.4006966896412       +/-   0.000000000000000E+000
+ E+rPT2          =   -99.4006966896412       +/-   0.000000000000000E+000
+ 
+ -----
+ Variational Energy difference (au | eV)
+ -----
+ Variational + perturbative Energy difference (au | eV)
+ -----
+ Variational + renormalized perturbative Energy difference (au | eV)
+ Providing the H_matrix_all_dets ...
+ H_matrix_all_dets done 
+ Diagonalization of H using Lapack
+ 
+.. >>>>> [ RES  MEM :          1.140 GB ] [ VIRT MEM :          4.554 GB ] <<<<< ..
+.. >>>>> [ WALL TIME:          19.99  s ] [ CPU  TIME:         142.53  s ] <<<<< ..
+ 
+* Energy of state    1                              -99.40069668964118    
+* S^2 of state    1                                 0.7500000000000001    
+* Energy of state    2                              -99.39889431884413    
+* S^2 of state    2                                 0.7500000000000000    
+* Energy of state    3                              -99.39889403185715    
+* S^2 of state    3                                 0.7500000000000000    
+* Saved determinants                                             3
+ Read mo_occ
+* Number of unique beta determinants                             3
+* Number of unique alpha determinants                            1
+ Core and Inactive MOs:
+           1           2
+ Wall time to provide state_av_act_2_rdm_ab_mo  5.960464477539062E-004
+ Wall time to provide state_av_act_2_rdm_aa_mo  2.002716064453125E-005
+ Wall time to provide state_av_act_2_rdm_bb_mo  1.788139343261719E-005
+ providing state_av_act_2_rdm_spin_trace_mo 
+ Time to provide state_av_act_2_rdm_spin_trace_mo  8.988380432128906E-005
+ Core, Inactive and Active MOs:
+           1           2           3           4           5
+ Providing cholesky_no_1_idx_transp
+ Time to provide cholesky_no_1_idx_transp =   3.453969955444336E-003
+ Providing cholesky_no_2_idx_transp
+ Time to provide  cholesky_no_2_idx_transp =   4.281997680664062E-004
+ Providing cholesky_no_total_transp 
+ Time to provide cholesky_no_total_transp =   8.285808563232422E-002
+ Providing bielecCI
+ Time to provide bielecCI =   1.859664916992188E-004
+ Providing bielecCI_no
+ Time to provide bielecCI_no =   2.059936523437500E-004
+ Using the state following casscf 
+ Ev,PT2  -99.4006966896412      -5.561957144850638E-017
+ 
+.. >>>>> [ RES  MEM :          1.244 GB ] [ VIRT MEM :          4.658 GB ] <<<<< ..
+.. >>>>> [ WALL TIME:          20.30  s ] [ CPU  TIME:         148.69  s ] <<<<< ..
+ 
+* CAS-SCF iteration =                                            1
+* State-average CAS-SCF energy =                    -99.39949501344753    
+state  1 E + PT2 energy =   -99.4006966896
+state  1     PT2 energy =    -0.0000000000
+state  2 Delta E+PT2    =    99.4006966896
+state  2 E + PT2 energy =     0.0000000000
+state  2     PT2 energy =     0.0000000000
+state  3 Delta E+PT2    =    99.4006966896
+state  3 E + PT2 energy =     0.0000000000
+state  3     PT2 energy =     0.0000000000
+* State-average CAS-SCF energy bis =                -33.13356556321373    
+*  PT2_MAX       =                                  0.1000000000000000E-09
+ 
+* Norm of gradients =                               0.1294026779538323    
+*      Core-active  gradients =                     0.3919025641638174E-05
+*      Core-virtual gradients =                     0.5463804799014176E-01
+*    Active-virtual gradients =                     0.1173019043242327    
+ 
+* Predicted energy improvement =                   -0.1240910782325944E-02
+ 
+* PT2_MAX for next iteration =                      0.1000000000000000E-09
+ pt2_max =   1.000000000000000E-010
+ 
+ AO->MO Transformation of Cholesky vectors
+ -----------------------------------------
+ 
+ Time to provide MO cholesky vectors =   1.415149370829264E-003  min
+  cpu  time :   1.68846600000001      s
+  wall time :  8.504295349121094E-002 s  ( x    19.8542728196112      )
+ MO map initialized:                9152781
+ Providing the one-electron integrals
+ Providing the H_matrix_all_dets ...
+ H_matrix_all_dets done 
+* Number of configurations                                       3
+ 
+.. >>>>> [ RES  MEM :          1.245 GB ] [ VIRT MEM :          4.658 GB ] <<<<< ..
+.. >>>>> [ WALL TIME:          33.22  s ] [ CPU  TIME:         182.08  s ] <<<<< ..
+ 
+ Diagonalization of H using Lapack
+ 
+.. >>>>> [ RES  MEM :          1.245 GB ] [ VIRT MEM :          4.658 GB ] <<<<< ..
+.. >>>>> [ WALL TIME:          33.22  s ] [ CPU  TIME:         182.11  s ] <<<<< ..
+ 
+* Energy of state    1                              -99.40012172032627    
+* S^2 of state    1                                 0.7500000000000001    
+* Energy of state    2                              -99.40011524503858    
+* S^2 of state    2                                 0.7499999999999999    
+* Energy of state    3                              -99.40011516605564    
+* S^2 of state    3                                 0.7500000000000000    
+* Saved determinants                                             3
+--------------------------------------------------------------------------------
+ 
+.. >>>>> [ RES  MEM :          1.245 GB ] [ VIRT MEM :          4.658 GB ] <<<<< ..
+.. >>>>> [ WALL TIME:          33.23  s ] [ CPU  TIME:         182.21  s ] <<<<< ..
+ 
+* Number of generators                                           3
+* Number of comb teeth                                           1
+ Using 1/c_max^2 weight in selection
+ # Total weight   0.3333333      0.3333333      0.3333333    
+* Number of unique beta determinants                             3
+* Number of unique alpha determinants                            1
+ 
+.. >>>>> [ RES  MEM :          1.245 GB ] [ VIRT MEM :          4.658 GB ] <<<<< ..
+.. >>>>> [ WALL TIME:          33.23  s ] [ CPU  TIME:         182.21  s ] <<<<< ..
+ 
+* Number of selectors                                            3
+* pt2_n_tasks_max                                                1
+* PT2 Energy denominator                            -99.40012172032627    
+* PT2 Energy denominator                            -99.40011524503858    
+* PT2 Energy denominator                            -99.40011516605564    
+* Estimated memory/thread (Gb)                      0.4470348358154297E-06
+ Overlap of perturbed states:
+  0.000000000000000E+000  0.000000000000000E+000  0.000000000000000E+000
+  0.000000000000000E+000  0.000000000000000E+000  0.000000000000000E+000
+  0.000000000000000E+000  0.000000000000000E+000  0.000000000000000E+000
+ -------
+ Using 1/c_max^2 weight in selection
+ # Total weight   0.3333333      0.3333333      0.3333333    
+* Correlation ratio                                  1.000000000000000    
+ 
+Summary at N_det =            3
+-----------------------------------
+ 
+# ============ ============================= ============================= =============================
+                     State      1                  State      2                  State      3
+# ============ ============================= ============================= =============================
+# E             -99.40012172                  -99.40011525                  -99.40011517
+# Excit. (au)     0.00000000                    0.00000648                    0.00000655
+# Excit. (eV)     0.00000000                    0.00017620                    0.00017835
+# PT2             0.00000000     0.00000000     0.00000000     0.00000000     0.00000000     0.00000000
+# rPT2            0.00000000     0.00000000     0.00000000     0.00000000     0.00000000     0.00000000
+#
+# E+PT2         -99.40012172     0.00000000   -99.40011525     0.00000000   -99.40011517     0.00000000
+# E+rPT2        -99.40012172     0.00000000   -99.40011525     0.00000000   -99.40011517     0.00000000
+# Excit. (au)     0.00000000     0.00000000     0.00000648     0.00000000     0.00000655     0.00000000
+# Excit. (eV)     0.00000000     0.00000000     0.00017620     0.00000000     0.00017835     0.00000000
+# ============ ============================= ============================= =============================
+ 
+ N_det             =            3
+ N_states          =            3
+ N_cfg             =            3
+ N_csf             =            5
+ 
+ * State            1
+ < S^2 >         =   0.750000000000000     
+ E               =   -99.4001217203263     
+ Variance        =   0.000000000000000E+000  +/-   0.000000000000000E+000
+ PT norm         =   0.000000000000000E+000  +/-                      NaN
+ PT2             =   0.000000000000000E+000  +/-   0.000000000000000E+000
+ rPT2            =   0.000000000000000E+000  +/-   0.000000000000000E+000
+ E+PT2           =   -99.4001217203263       +/-   0.000000000000000E+000
+ E+rPT2          =   -99.4001217203263       +/-   0.000000000000000E+000
+ 
+ * State            2
+ < S^2 >         =   0.750000000000000     
+ E               =   -99.4001152450386     
+ Variance        =   0.000000000000000E+000  +/-   0.000000000000000E+000
+ PT norm         =   0.000000000000000E+000  +/-                      NaN
+ PT2             =   0.000000000000000E+000  +/-   0.000000000000000E+000
+ rPT2            =   0.000000000000000E+000  +/-   0.000000000000000E+000
+ E+PT2           =   -99.4001152450386       +/-   0.000000000000000E+000
+ E+rPT2          =   -99.4001152450386       +/-   0.000000000000000E+000
+ 
+ * State            3
+ < S^2 >         =   0.750000000000000     
+ E               =   -99.4001151660556     
+ Variance        =   0.000000000000000E+000  +/-   0.000000000000000E+000
+ PT norm         =   0.000000000000000E+000  +/-                      NaN
+ PT2             =   0.000000000000000E+000  +/-   0.000000000000000E+000
+ rPT2            =   0.000000000000000E+000  +/-   0.000000000000000E+000
+ E+PT2           =   -99.4001151660556       +/-   0.000000000000000E+000
+ E+rPT2          =   -99.4001151660556       +/-   0.000000000000000E+000
+ 
+ -----
+ Variational Energy difference (au | eV)
+ Delta E =   6.475287690932419E-006  1.762016217245414E-004
+ Delta E =   6.554270626679681E-006  1.783508577170551E-004
+ -----
+ Variational + perturbative Energy difference (au | eV)
+ Delta E =   6.475287690932419E-006  1.762016217245414E-004
+ Delta E =   6.554270626679681E-006  1.783508577170551E-004
+ -----
+ Variational + renormalized perturbative Energy difference (au | eV)
+ Delta E =   6.475287690932419E-006  1.762016217245414E-004
+ Delta E =   6.554270626679681E-006  1.783508577170551E-004
+ 
+ # Transition dipoles:
+ ==============================================
+  Transition dipole moments (au)
+   #  Transition       X           Y           Z         ||MU||     Dip. str.   Osc. str.
+   1   0  ->  1   -0.000000   -0.000088   -0.000000    0.000088    0.000000    0.000000
+   2   0  ->  2    0.000049   -0.000000   -0.000000    0.000049    0.000000    0.000000
+ 
+  Transition dipole moments (D)
+   #  Transition       X           Y           Z         ||MU||     Dip. str.   Osc. str.
+   1   0  ->  1   -0.000000   -0.000225   -0.000000    0.000225    0.000000    0.000000
+   2   0  ->  2    0.000124   -0.000000   -0.000000    0.000124    0.000000    0.000000
+ ==============================================
+ 
+ Providing the H_matrix_all_dets ...
+ H_matrix_all_dets done 
+ Diagonalization of H using Lapack
+ 
+.. >>>>> [ RES  MEM :          1.246 GB ] [ VIRT MEM :          4.658 GB ] <<<<< ..
+.. >>>>> [ WALL TIME:          33.27  s ] [ CPU  TIME:         183.01  s ] <<<<< ..
+ 
+* Energy of state    1                              -99.40012172032633    
+* S^2 of state    1                                 0.7500000000000000    
+* Energy of state    2                              -99.40011524503868    
+* S^2 of state    2                                 0.7500000000000000    
+* Energy of state    3                              -99.40011516605568    
+* S^2 of state    3                                 0.7500000000000000    
+* Saved determinants                                             3
+* Number of unique beta determinants                             3
+* Number of unique alpha determinants                            1
+ Wall time to provide state_av_act_2_rdm_ab_mo  6.780624389648438E-004
+ Wall time to provide state_av_act_2_rdm_aa_mo  1.559257507324219E-004
+ Wall time to provide state_av_act_2_rdm_bb_mo  1.418590545654297E-004
+ providing state_av_act_2_rdm_spin_trace_mo 
+ Time to provide state_av_act_2_rdm_spin_trace_mo  9.393692016601562E-005
+ Providing cholesky_no_1_idx_transp
+ Time to provide cholesky_no_1_idx_transp =   1.339912414550781E-003
+ Providing cholesky_no_2_idx_transp
+ Time to provide  cholesky_no_2_idx_transp =   2.050399780273438E-004
+ Providing cholesky_no_total_transp 
+ Time to provide cholesky_no_total_transp =   1.626610755920410E-002
+ Providing bielecCI
+ Time to provide bielecCI =   1.418590545654297E-004
+ Providing bielecCI_no
+ Time to provide bielecCI_no =   5.130767822265625E-004
+ Using the state following casscf 
+ Ev,PT2  -99.4001217203263       0.000000000000000E+000
+ 
+.. >>>>> [ RES  MEM :          1.246 GB ] [ VIRT MEM :          4.660 GB ] <<<<< ..
+.. >>>>> [ WALL TIME:          33.54  s ] [ CPU  TIME:         188.21  s ] <<<<< ..
+ 
+* CAS-SCF iteration =                                            2
+* State-average CAS-SCF energy =                    -99.40011737714022    
+state  1 E + PT2 energy =   -99.4001217203
+state  1     PT2 energy =     0.0000000000
+state  2 Delta E+PT2    =     0.0000064753
+state  2 E + PT2 energy =   -99.4001152450
+state  2     PT2 energy =     0.0000000000
+state  3 Delta E+PT2    =     0.0000065543
+state  3 E + PT2 energy =   -99.4001151661
+state  3     PT2 energy =     0.0000000000
+* State-average CAS-SCF energy bis =                -99.40011737714016    
+*  PT2_MAX       =                                  0.1000000000000000E-09
+ 
+* Norm of gradients =                               0.4462418937817747E-03
+*      Core-active  gradients =                     0.7352759086618263E-07
+*      Core-virtual gradients =                     0.1958726944158575E-03
+*    Active-virtual gradients =                     0.4009559950192916E-03
+ 
+* Predicted energy improvement =                   -0.4045666139864264E-07
+ 
+* PT2_MAX for next iteration =                      0.1000000000000000E-09
+ pt2_max =   1.000000000000000E-010
+ 
+ AO->MO Transformation of Cholesky vectors
+ -----------------------------------------
+ 
+ Time to provide MO cholesky vectors =   1.445813973744710E-003  min
+  cpu  time :   1.73307200000002      s
+  wall time :  8.787322044372559E-002 s  ( x    19.7224136232709      )
+ MO map initialized:                9152781
+ Providing the one-electron integrals
+ Providing the H_matrix_all_dets ...
+ H_matrix_all_dets done 
+* Number of configurations                                       3
+ 
+.. >>>>> [ RES  MEM :          1.247 GB ] [ VIRT MEM :          4.660 GB ] <<<<< ..
+.. >>>>> [ WALL TIME:          46.47  s ] [ CPU  TIME:         221.70  s ] <<<<< ..
+ 
+ Diagonalization of H using Lapack
+ 
+.. >>>>> [ RES  MEM :          1.247 GB ] [ VIRT MEM :          4.660 GB ] <<<<< ..
+.. >>>>> [ WALL TIME:          46.47  s ] [ CPU  TIME:         221.70  s ] <<<<< ..
+ 
+* Energy of state    1                              -99.40011774017070    
+* S^2 of state    1                                 0.7500000000000001    
+* Energy of state    2                              -99.40011766338402    
+* S^2 of state    2                                 0.7500000000000002    
+* Energy of state    3                              -99.40011678860145    
+* S^2 of state    3                                 0.7500000000000001    
+* Saved determinants                                             3
+--------------------------------------------------------------------------------
+ 
+.. >>>>> [ RES  MEM :          1.247 GB ] [ VIRT MEM :          4.660 GB ] <<<<< ..
+.. >>>>> [ WALL TIME:          46.47  s ] [ CPU  TIME:         221.79  s ] <<<<< ..
+ 
+* Number of generators                                           3
+* Number of comb teeth                                           1
+ Using 1/c_max^2 weight in selection
+ # Total weight   0.3333333      0.3333333      0.3333333    
+* Number of unique beta determinants                             3
+* Number of unique alpha determinants                            1
+ 
+.. >>>>> [ RES  MEM :          1.247 GB ] [ VIRT MEM :          4.660 GB ] <<<<< ..
+.. >>>>> [ WALL TIME:          46.47  s ] [ CPU  TIME:         221.81  s ] <<<<< ..
+ 
+* Number of selectors                                            3
+* pt2_n_tasks_max                                                1
+* PT2 Energy denominator                            -99.40011774017070    
+* PT2 Energy denominator                            -99.40011766338402    
+* PT2 Energy denominator                            -99.40011678860145    
+* Estimated memory/thread (Gb)                      0.4470348358154297E-06
+ Overlap of perturbed states:
+  0.000000000000000E+000  0.000000000000000E+000  0.000000000000000E+000
+  0.000000000000000E+000  0.000000000000000E+000  0.000000000000000E+000
+  0.000000000000000E+000  0.000000000000000E+000  0.000000000000000E+000
+ -------
+ Using 1/c_max^2 weight in selection
+ # Total weight   0.3333333      0.3333333      0.3333333    
+* Correlation ratio                                  1.000000000000000    
+ 
+Summary at N_det =            3
+-----------------------------------
+ 
+# ============ ============================= ============================= =============================
+                     State      1                  State      2                  State      3
+# ============ ============================= ============================= =============================
+# E             -99.40011774                  -99.40011766                  -99.40011679
+# Excit. (au)     0.00000000                    0.00000008                    0.00000095
+# Excit. (eV)     0.00000000                    0.00000209                    0.00002589
+# PT2             0.00000000     0.00000000     0.00000000     0.00000000     0.00000000     0.00000000
+# rPT2            0.00000000     0.00000000     0.00000000     0.00000000     0.00000000     0.00000000
+#
+# E+PT2         -99.40011774     0.00000000   -99.40011766     0.00000000   -99.40011679     0.00000000
+# E+rPT2        -99.40011774     0.00000000   -99.40011766     0.00000000   -99.40011679     0.00000000
+# Excit. (au)     0.00000000     0.00000000     0.00000008     0.00000000     0.00000095     0.00000000
+# Excit. (eV)     0.00000000     0.00000000     0.00000209     0.00000000     0.00002589     0.00000000
+# ============ ============================= ============================= =============================
+ 
+ N_det             =            3
+ N_states          =            3
+ N_cfg             =            3
+ N_csf             =            5
+ 
+ * State            1
+ < S^2 >         =   0.750000000000000     
+ E               =   -99.4001177401707     
+ Variance        =   0.000000000000000E+000  +/-   0.000000000000000E+000
+ PT norm         =   0.000000000000000E+000  +/-                      NaN
+ PT2             =   0.000000000000000E+000  +/-   0.000000000000000E+000
+ rPT2            =   0.000000000000000E+000  +/-   0.000000000000000E+000
+ E+PT2           =   -99.4001177401707       +/-   0.000000000000000E+000
+ E+rPT2          =   -99.4001177401707       +/-   0.000000000000000E+000
+ 
+ * State            2
+ < S^2 >         =   0.750000000000000     
+ E               =   -99.4001176633840     
+ Variance        =   0.000000000000000E+000  +/-   0.000000000000000E+000
+ PT norm         =   0.000000000000000E+000  +/-                      NaN
+ PT2             =   0.000000000000000E+000  +/-   0.000000000000000E+000
+ rPT2            =   0.000000000000000E+000  +/-   0.000000000000000E+000
+ E+PT2           =   -99.4001176633840       +/-   0.000000000000000E+000
+ E+rPT2          =   -99.4001176633840       +/-   0.000000000000000E+000
+ 
+ * State            3
+ < S^2 >         =   0.750000000000000     
+ E               =   -99.4001167886015     
+ Variance        =   0.000000000000000E+000  +/-   0.000000000000000E+000
+ PT norm         =   0.000000000000000E+000  +/-                      NaN
+ PT2             =   0.000000000000000E+000  +/-   0.000000000000000E+000
+ rPT2            =   0.000000000000000E+000  +/-   0.000000000000000E+000
+ E+PT2           =   -99.4001167886015       +/-   0.000000000000000E+000
+ E+rPT2          =   -99.4001167886015       +/-   0.000000000000000E+000
+ 
+ -----
+ Variational Energy difference (au | eV)
+ Delta E =   7.678667657273763E-008  2.089472712988596E-006
+ Delta E =   9.515692482864324E-007  2.589352824679341E-005
+ -----
+ Variational + perturbative Energy difference (au | eV)
+ Delta E =   7.678667657273763E-008  2.089472712988596E-006
+ Delta E =   9.515692482864324E-007  2.589352824679341E-005
+ -----
+ Variational + renormalized perturbative Energy difference (au | eV)
+ Delta E =   7.678667657273763E-008  2.089472712988596E-006
+ Delta E =   9.515692482864324E-007  2.589352824679341E-005
+
+Extrapolated energies
+------------------------
+
+ 
+ State            1
+ 
+ =========== ===================
+ minimum PT2 Extrapolated energy
+ =========== ===================
+     0.0000        -99.40011973
+ =========== ===================
+ 
+ State            2
+ 
+ =========== =================== =================== ===================
+ minimum PT2 Extrapolated energy   Excitation (a.u)    Excitation (eV)  
+ =========== =================== =================== ===================
+     0.0000        -99.40011645         0.00000328         0.00008915
+ =========== =================== =================== ===================
+ 
+ State            3
+ 
+ =========== =================== =================== ===================
+ minimum PT2 Extrapolated energy   Excitation (a.u)    Excitation (eV)  
+ =========== =================== =================== ===================
+     0.0000        -99.40011598         0.00000375         0.00010212
+ =========== =================== =================== ===================
+ 
+ 
+ # Transition dipoles:
+ ==============================================
+  Transition dipole moments (au)
+   #  Transition       X           Y           Z         ||MU||     Dip. str.   Osc. str.
+   1   0  ->  1   -0.000000    0.000000    0.000000    0.000000    0.000000    0.000000
+   2   0  ->  2   -0.000000   -0.000088    0.000000    0.000088    0.000000    0.000000
+ 
+  Transition dipole moments (D)
+   #  Transition       X           Y           Z         ||MU||     Dip. str.   Osc. str.
+   1   0  ->  1   -0.000000    0.000000    0.000000    0.000000    0.000000    0.000000
+   2   0  ->  2   -0.000000   -0.000225    0.000000    0.000225    0.000000    0.000000
+ ==============================================
+ 
+ Providing the H_matrix_all_dets ...
+ H_matrix_all_dets done 
+ Diagonalization of H using Lapack
+ 
+.. >>>>> [ RES  MEM :          1.247 GB ] [ VIRT MEM :          4.660 GB ] <<<<< ..
+.. >>>>> [ WALL TIME:          46.53  s ] [ CPU  TIME:         222.83  s ] <<<<< ..
+ 
+* Energy of state    1                              -99.40011774017078    
+* S^2 of state    1                                 0.7500000000000001    
+* Energy of state    2                              -99.40011766338408    
+* S^2 of state    2                                 0.7500000000000000    
+* Energy of state    3                              -99.40011678860145    
+* S^2 of state    3                                 0.7499999999999999    
+* Saved determinants                                             3
+* Number of unique beta determinants                             3
+* Number of unique alpha determinants                            1
+ Wall time to provide state_av_act_2_rdm_ab_mo  1.521110534667969E-004
+ Wall time to provide state_av_act_2_rdm_aa_mo  2.408027648925781E-005
+ Wall time to provide state_av_act_2_rdm_bb_mo  6.699562072753906E-005
+ providing state_av_act_2_rdm_spin_trace_mo 
+ Time to provide state_av_act_2_rdm_spin_trace_mo  5.793571472167969E-005
+ Providing cholesky_no_1_idx_transp
+ Time to provide cholesky_no_1_idx_transp =   1.265048980712891E-003
+ Providing cholesky_no_2_idx_transp
+ Time to provide  cholesky_no_2_idx_transp =   9.679794311523438E-005
+ Providing cholesky_no_total_transp 
+ Time to provide cholesky_no_total_transp =   1.567792892456055E-002
+ Providing bielecCI
+ Time to provide bielecCI =   1.430511474609375E-004
+ Providing bielecCI_no
+ Time to provide bielecCI_no =   1.149177551269531E-004
+Program exited with code 174.
+Wall time: 0:00:48
+
