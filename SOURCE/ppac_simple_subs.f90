@@ -1,5 +1,5 @@
 module ppac_simple_subs
-
+     
       use iso_fortran_env
 
       use real_linalg !from gammcor integrals
@@ -11,6 +11,7 @@ module ppac_simple_subs
       use math_constants
       use ppac_types
       use pp_utils   ! ddot_norm, orthogonalize_degen
+      use print_utils
 
 
       implicit none
@@ -19,9 +20,11 @@ module ppac_simple_subs
       integer, parameter, private :: VVOO=1, VVAO=2, VVAA=3, VAOO=4
       integer, parameter, private :: VAAO=5, VAAA=6, AAOO=7, AAAO=8
       integer, parameter, private :: VAAO2 = 9
-
-
-
+      double precision, parameter, private :: ttoeV = 27.211399d+0
+      integer, parameter, private :: IOO=1, IVV=2, IAA=3, IVA=4, IAO=5
+      integer, parameter, private :: IOOT=6, IVVT=7, IAAT=8, IVAT=9, IAOT=10
+      integer, parameter, private :: IOOT_AA=11, IVVT_AA=12, IAAT_AA=13, IVAT_AA=14, IAOT_AA=15
+      integer, parameter, private :: IOOT_BB=16, IVVT_BB=17, IAAT_BB=18, IVAT_BB=19, IAOT_BB=20
 
 contains
 
@@ -48,17 +51,12 @@ contains
             integer :: ir, il
             integer, dimension(20) :: dim_st
             double precision, dimension(9) :: E_contr_s, E_contr_t
+            double precision, dimension(9) :: E_t_ABAB, E_t_AAAA, E_t_BBBB
             double precision :: contr_t1, contr_t2, contr_t3
             type(eigsBlockParams), dimension(20) :: eigsPA
             double precision :: ACAlpha,  ECorr_AC0
             integer :: variant
-            integer, parameter ::  IOO=1, IVV=2, IAA=3, IVA=4, IAO=5
-            integer, parameter :: IOOT=6, IVVT=7, IAAT=8, IVAT=9, IAOT = 10
-            integer, parameter :: IOOT_AA=11, IVVT_AA=12, IAAT_AA=13, IVAT_AA=14, IAOT_AA = 15
-            integer, parameter :: IOOT_BB=16, IVVT_BB=17, IAAT_BB=18, IVAT_BB=19, IAOT_BB = 20
             logical :: isvv, isoo
-
-            
             
 
             associate(Occ=>AuxData%Occ, ENuc=>AuxData%ENuc, NInte1=> AuxData%NInte1, &
@@ -69,48 +67,13 @@ contains
             ! 1oo, 2vv, 3aa, 4va, 5ao
             ! 6oot, 7vvt, 8aat, 9vat, 10aot
 
-            bbl_name(1) = 'vvoo'
-            bbl_name(2) = 'vvao'
-            bbl_name(3) = 'vvaa'
-
-            bbl_name(4) = 'vaoo'
-            bbl_name(5) = 'vaao'
-            bbl_name(6) = 'vaaa'
-
-            bbl_name(7) = 'aaoo'
-            bbl_name(8) = 'aaao'
-            bbl_name(9) = 'vaao2'
-
+            call name_blocks(bl_name, bbl_name)
 
             call clock_start(timer0)
             ACAlpha = zero
             allocate(TwoNOA(AuxData%NInte2))
             allocate(AuxData%HNOA(NBasis, NBasis))
-
             call PPERPA_init_simple(AuxData, ACAlpha, Flags, TwoEl, TwoNOA)
-
-            bl_name(IOO) = 'oo'
-            bl_name(IVV) = 'vv'
-            bl_name(IAA) = 'aa'
-            bl_name(IVA) = 'va'
-            bl_name(IAO) = 'ao'
-
-            bl_name(IOOT) = 'oot'
-            bl_name(IVVT) = 'vvt'
-            bl_name(IAAT) = 'aat'
-            bl_name(IVAT) = 'vat'
-            bl_name(IAOT) = 'aot'
-            bl_name(11) = 'oot_aa'
-            bl_name(12) = 'vvt_aa'
-            bl_name(13) = 'aat_aa'
-            bl_name(14) = 'vat_aa'
-            bl_name(15) = 'aot_aa'
-
-            bl_name(16) = 'oot_bb'
-            bl_name(17) = 'vvt_bb'
-            bl_name(18) = 'aat_bb'
-            bl_name(19) = 'vat_bb'
-            bl_name(20) = 'aot_bb'
 
 
             allocate(eigsPA(IOO)%IndN(2, (NI+1)*NI/2))
@@ -209,9 +172,6 @@ contains
                         print*, 'to niewykorzystane', p, q
                   end if
             end do
-
-            
-
             
             
             do i = 1, 20
@@ -251,8 +211,8 @@ contains
             
             call clock_start(timer0)
             do i = 1, 20
-                  print*, ''
-                  print*, 'teraz block', i, bl_name(i)
+                  !print*, ''
+                  !print*, 'teraz block', i, bl_name(i)
                   if (i.le.5)then
                         spsym = 0
                         variant = 1
@@ -278,25 +238,25 @@ contains
                         call eigs0_block_simple(isvv, isoo, eigsPA(i)%Eig, eigsPA(i)%Eigvec, eigsPA(i)%v_plus, AuxData%HNOA, TwoNOA, &            
                               AuxData, eigsPA(i)%IndN, eigsPA(i)%dim, spsym, Flags, variant)
 
-                        print*, 'wartosci wlasne tego bloku', i, bl_name(i), eigsPA(i)%dim
+                        !print*, 'wartosci wlasne tego bloku', i, bl_name(i), eigsPA(i)%dim
                         do j = 1, eigsPA(i)%dim
 !                              print*, j, eigsPA(i)%Eig(j), eigsPA(i)%v_plus(j)
                                     if (abs(eigsPA(i)%Eig(j)).gt.1.d-5)then
                                     !      if (eigsPA(i)%v_plus(j)==1)then
-                                                print*,  eigsPA(i)%Eig(j),eigsPA(i)%v_plus(j)
+                                          !print*,  eigsPA(i)%Eig(j),eigsPA(i)%v_plus(j)
                                      !     end if
                                     end if
                               end do
                               !                       end if
                               !if (i==3)stop
                   else
-                        print*, 'block', bl_name(i), 'dimension is 0'
+                        !print*, 'block', bl_name(i), 'dimension is 0'
                   end if
 !                  if (i>5)stop
             end do
-            print*, 'koniec blokow eigs0'
+            !print*, 'koniec blokow eigs0'
 !            stop
-            print*, 'TIME na all blocks ', clock_readwall(timer0)
+            !print*, 'TIME na all blocks ', clock_readwall(timer0)
 
             !    stop ! pamietaj odkomentowac parallel
 
@@ -304,8 +264,8 @@ contains
             ACAlpha = one
             call PPERPA_init_simple(AuxData, ACAlpha, Flags, TwoEl, TwoNOA)
             
-            print*, 'TIME na PPERPA_init alphaone ', clock_readwall(timer0)
-            print*, 'koniec init'
+            !print*, 'TIME na PPERPA_init alphaone ', clock_readwall(timer0)
+            !print*, 'koniec init'
 
             do i = 1, 3
                   block_pair(1, i) = 2
@@ -333,22 +293,22 @@ contains
             call clock_start(timer)
             ECorr_AC0 = zero
             do i = 1, 9
-                  print*, 'teraz robie blok A1 sing', i, bbl_name(i)
+                  !print*, 'teraz robie blok A1 sing', i, bbl_name(i)
                   il  = block_pair(1,i)
                   ir = block_pair(2,i)
                   call clock_start(timer0)
-                  print*, bbl_name(i), eigsPA(il)%dim, eigsPA(ir)%dim
+                  !print*, bbl_name(i), eigsPA(il)%dim, eigsPA(ir)%dim
 
 
                   call calc_block_simple(AuxData, i, eigsPA(il), eigsPA(ir), AuxData%HNOA, TwoEl, TWONOA,&
                         0, Flags, E_contr_s(i))
                   
                   !print*, 'Czas na sing ', bbl_name(i), ' ', clock_readwall(timer0)
-                  if (i <9)then
-                        write(*,'(A8, A4, A3, F20.15)') 'E_contr(', bbl_name(i), ')_s=', E_contr_s(i)
-                  else
-                        write(*,'(A8, A5, A3, F20.15)') 'E_contr(', bbl_name(i), ')_s=', E_contr_s(i)
-                  end if
+                  !if (i <9)then
+                  !      write(*,'(A8, A4, A3, F20.15)') 'E_contr(', bbl_name(i), ')_s=', E_contr_s(i)
+                  !else
+                  !      write(*,'(A8, A5, A3, F20.15)') 'E_contr(', bbl_name(i), ')_s=', E_contr_s(i)
+                  !end if
                   ECorr_AC0 = ECorr_AC0 + E_contr_s(i)
                   il = 5 + il
                   ir = 5 + ir
@@ -359,47 +319,78 @@ contains
                    ! Calculate Triplet Components
                   
                   ! 1. Averaged / Mixed (Variant 1)
-                  print*, 'pierwszy block t1 (avg)'
                   call calc_block_simple(AuxData, i, eigsPA(il), eigsPA(ir), AuxData%HNOA, TwoEl, TWONOA, &
                         1, Flags, contr_t1, 1) 
 
                   ! 2. AAAA (Variant 2)
                   ! Indices +5 from Avg
-                  print*, 'drugi block t2 (aaaa)'
                   call calc_block_simple(AuxData, i, eigsPA(il+5), eigsPA(ir+5), AuxData%HNOA, TwoEl, TWONOA, &
                         1, Flags, contr_t2, 2)
 
                   ! 3. BBBB (Variant 3)
                   ! Indices +10 from Avg
-                  print*, 'trzeci block t3 (bbbb)'
                   call calc_block_simple(AuxData, i, eigsPA(il+10), eigsPA(ir+10), AuxData%HNOA, TwoEl, TWONOA, &
                         1, Flags, contr_t3, 3)
 
                   ! Sum
 !                  E_contr_t(i) = three * contr_t1 !+ contr_t2 + contr_t3
                   E_contr_t(i) = contr_t1 + contr_t2 + contr_t3
-                  write(*, '(A10, F15.8, A10, F15.8, A10,F15.8)') 't_ABAB=', contr_t1, 't_AAAA=', contr_t2, 't_BBBB=', contr_t3
+                  E_t_ABAB(i) = contr_t1
+                  E_t_AAAA(i) = contr_t2
+                  E_t_BBBB(i) = contr_t3
+                  !write(*, '(A10, F15.8, A10, F15.8, A10,F15.8)') 't_ABAB=', contr_t1, 't_AAAA=', contr_t2, 't_BBBB=', contr_t3
                   !print*, 'Czas na trip ', bbl_name(i), ' ', clock_readwall(timer0)
 
-                  if (i <9)then
-                        write(*,'(A8, A4, A3, F20.15)') 'E_contr(', bbl_name(i), ')_t=', E_contr_t(i)
-                  else
-                        write(*,'(A8, A5, A3, F20.15)') 'E_contr(', bbl_name(i), ')_t=', E_contr_t(i)
-                  end if
+                  !if (i <9)then
+                  !      write(*,'(A8, A4, A3, F20.15)') 'E_contr(', bbl_name(i), ')_t=', E_contr_t(i)
+                  !else
+                  !      write(*,'(A8, A5, A3, F20.15)') 'E_contr(', bbl_name(i), ')_t=', E_contr_t(i)
+                  !end if
 
 
-                  if (i <9)then
-                        write(*,'(A8, A4, A2, F20.15)') 'E_contr(', bbl_name(i), ')=', E_contr_s(i) + E_contr_t(i)
-                  else
-                        write(*,'(A8, A5, A2, F20.15)') 'E_contr(', bbl_name(i), ')=', E_contr_s(i) + E_contr_t(i)
-                  end if
-                  print*, i, bbl_name(i)
+                  !if (i <9)then
+                  !      write(*,'(A8, A4, A2, F20.15)') 'E_contr(', bbl_name(i), ')=', E_contr_s(i) + E_contr_t(i)
+                  !else
+                  !      write(*,'(A8, A5, A2, F20.15)') 'E_contr(', bbl_name(i), ')=', E_contr_s(i) + E_contr_t(i)
+                  !end if
+                  !print*, i, bbl_name(i)
                   ECorr_AC0 = ECorr_AC0 + E_contr_t(i)
             end do
-            print*, 'TIME na all blocks ',  clock_readwall(timer)
+            !print*, 'TIME na all blocks ',  clock_readwall(timer)
 
+            call print_section('ppAC0 energy components')
+            write(*,'(2X,A12,4(1X,A14))') 'Component', 'Total [Eh]', 's_ABAB [Eh]', &
+                  't_ABAB [Eh]', 't_AAAA+BBBB'
+            write(*,'(2X,A)') repeat('-', 72)
+            do i = 1, 9
+                  call print_energy_component('E_'//trim(bbl_name(i)), E_contr_s(i) + E_contr_t(i), &
+                        E_contr_s(i), E_t_ABAB(i), E_t_AAAA(i) + E_t_BBBB(i))
+            end do
+
+            call print_section('Contributions to ppAC0 from (Mu)(Nu) pairs of blocks')
+            write(*,'(2X,A10,2X,A18)') 'Block pair', 'Contribution [Eh]'
+            write(*,'(2X,A)') repeat('-', 30)
+            call print_block_contribution('(22)(11)',  E_contr_s(aaoo)  + E_contr_t(aaoo))
+            call print_block_contribution('(22)(21)',  E_contr_s(aaao)  + E_contr_t(aaao))
+            call print_block_contribution('(32)(11)',  E_contr_s(vaoo)  + E_contr_t(vaoo))
+            call print_block_contribution('(32)(21)*', E_contr_s(vaao2) + E_contr_t(vaao2))
+            call print_block_contribution('(33)(11)',  E_contr_s(vvoo)  + E_contr_t(vvoo))
+            call print_block_contribution('(32)(21)',  E_contr_s(vaao)  + E_contr_t(vaao))
+            call print_block_contribution('(32)(22)',  E_contr_s(vaaa)  + E_contr_t(vaaa))
+            call print_block_contribution('(33)(21)',  E_contr_s(vvao)  + E_contr_t(vvao))
+            call print_block_contribution('(33)(22)',  E_contr_s(vvaa)  + E_contr_t(vvaa))
             print*, ''
-            write(*,'(A30, F25.15)') 'RDSC ACPP0 CONTR ECORR ', ECorr_AC0
+            write(*,'(2X,A)') '*  term used as the replacement in ff'
+
+            !print*, ''
+            !write(*,'(A30, F25.15)') 'RDSC ACPP0 CONTR ECORR ', ECorr_AC0
+            call print_section('Final energies')
+            call print_energy('CASSCF energy (one-electron)', AuxData%ECAS_oneelectr, &
+                  ttoeV * AuxData%ECAS_oneelectr)
+            call print_energy('ECASSCF_calc', AuxData%ECAS_calc, ttoeV * AuxData%ECAS_calc)
+            call print_energy('E_ppAC0', ECorr_AC0, ttoeV * ECorr_AC0)
+            call print_energy('E_total', AuxData%ECAS_calc + ECorr_AC0, &
+                  ttoeV * (AuxData%ECAS_calc + ECorr_AC0))
             print*, ''
           end associate
     end subroutine ACPP0_incore
@@ -426,6 +417,7 @@ contains
           integer :: dimw, spsym
           integer :: ir, il
           double precision, dimension(9) :: E_contr_s, E_contr_t
+          double precision, dimension(9) :: E_t_AAAA, E_t_BBBB
           double precision :: contr_mix1, contr_mix2, contr_mix3, contr_mix4
           double precision :: contr_t_AAAA, contr_t_BBBB
 
@@ -664,60 +656,113 @@ contains
             call clock_start(timer)
             ECorr_AC0 = zero
             do i = 1, 9
-                  print*, 'teraz robie blok A1 mix', i, bbl_name(i)
+                  !print*, 'teraz robie blok A1 mix', i, bbl_name(i)
                   il = block_pair(1, i)
                   ir = block_pair(2, i)
 
                   call clock_start(timer0)
-                  print*, bbl_name(i), eigsPA(il)%dim, eigsPA(ir)%dim
+                  !print*, bbl_name(i), eigsPA(il)%dim, eigsPA(ir)%dim
 
                   contr_mix1 = zero
                   contr_t_AAAA  = zero
                   contr_t_BBBB  = zero
 
                   ! mixed ABAB contribution
-                  print*, 'mix contrib'
                   call calc_block_simple(AuxData, i, eigsPA(il), eigsPA(ir), AuxData%HNOA, TwoEl, TwoNOA, &
                         2, Flags, contr_mix1, 4)
 
 
                   ! AAAA triplet contribution
-                  print*, 'AAAA contrib'
                   call calc_block_simple(AuxData, i, eigsPA(il+offs1), eigsPA(ir+offs1), AuxData%HNOA, TwoEl, TwoNOA, &
                         1, Flags, contr_t_AAAA, 2)
 
                   ! BBBB triplet contribution
-                  print*, 'BBBB contrib'
                   call calc_block_simple(AuxData, i, eigsPA(il+offs2), eigsPA(ir+offs2), AuxData%HNOA, TwoEl, TwoNOA, &
                         1, Flags, contr_t_BBBB, 3)
 
                   E_contr_s(i) = contr_mix1
                   E_contr_t(i) = contr_t_AAAA + contr_t_BBBB
+                  E_t_AAAA(i) = contr_t_AAAA
+                  E_t_BBBB(i) = contr_t_BBBB
 
-                  write(*, '(A12, F20.15)') 'contr_mix1', contr_mix1
-                  write(*, '(A12, F20.15)') 'contr_t_AAAA', contr_t_AAAA
-                  write(*, '(A12, F20.15)') 'contr_t_BBBB', contr_t_BBBB
+                  !write(*, '(A12, F20.15)') 'contr_mix1', contr_mix1
+                  !write(*, '(A12, F20.15)') 'contr_t_AAAA', contr_t_AAAA
+                  !write(*, '(A12, F20.15)') 'contr_t_BBBB', contr_t_BBBB
 
-                  if (i < 9) then
-                        write(*,'(A8, A4, A7, F20.15)') 'E_contr(', bbl_name(i), ')_mix = ', E_contr_s(i)
-                        write(*,'(A8, A4, A5, F20.15)') 'E_contr(', bbl_name(i), ')_t = ', E_contr_t(i)
-                        write(*,'(A8, A4, A3, F20.15)') 'E_contr(', bbl_name(i), ') = ', E_contr_s(i) + E_contr_t(i)
-                  else
-                        write(*,'(A8, A5, A7, F20.15)') 'E_contr(', bbl_name(i), ')_mix = ', E_contr_s(i)
-                        write(*,'(A8, A5, A5, F20.15)') 'E_contr(', bbl_name(i), ')_t = ', E_contr_t(i)
-                        write(*,'(A8, A5, A3, F20.15)') 'E_contr(', bbl_name(i), ') = ', E_contr_s(i) + E_contr_t(i)
-                  end if
-
-                  print*, i, bbl_name(i)
                   ECorr_AC0 = ECorr_AC0 + E_contr_s(i) + E_contr_t(i)
             end do
+            !print*, 'TIME na all blocks ', clock_readwall(timer)
 
-            print*, 'TIME na all blocks ', clock_readwall(timer)
+            call print_section('ppAC0 energy components (mixed ABAB)')
+            write(*,'(2X,A12,4(1X,A14))') 'Component', 'Total [Eh]', 'ABAB [Eh]', &
+                  't_AAAA [Eh]', 't_BBBB [Eh]'
+            write(*,'(2X,A)') repeat('-', 72)
+            do i = 1, 9
+                  call print_energy_component('E_'//trim(bbl_name(i)), E_contr_s(i) + E_contr_t(i), &
+                        E_contr_s(i), E_t_AAAA(i), E_t_BBBB(i))
+            end do
+
+            call print_section('Contributions to ppAC0 from (Mu)(Nu) pairs of blocks')
+            write(*,'(2X,A10,2X,A18)') 'Block pair', 'Contribution [Eh]'
+            write(*,'(2X,A)') repeat('-', 30)
+            call print_block_contribution('(22)(11)',  E_contr_s(aaoo)  + E_contr_t(aaoo))
+            call print_block_contribution('(22)(21)',  E_contr_s(aaao)  + E_contr_t(aaao))
+            call print_block_contribution('(32)(11)',  E_contr_s(vaoo)  + E_contr_t(vaoo))
+            call print_block_contribution('(32)(21)*', E_contr_s(vaao2) + E_contr_t(vaao2))
+            call print_block_contribution('(33)(11)',  E_contr_s(vvoo)  + E_contr_t(vvoo))
+            call print_block_contribution('(32)(21)',  E_contr_s(vaao)  + E_contr_t(vaao))
+            call print_block_contribution('(32)(22)',  E_contr_s(vaaa)  + E_contr_t(vaaa))
+            call print_block_contribution('(33)(21)',  E_contr_s(vvao)  + E_contr_t(vvao))
+            call print_block_contribution('(33)(22)',  E_contr_s(vvaa)  + E_contr_t(vvaa))
             print*, ''
-            write(*,'(A30, F25.15)') 'RDSC ACPP0 CONTR ECORR ', ECorr_AC0
+            write(*,'(2X,A)') '*  term used as the replacement in ff'
+
+            call print_section('Final energies')
+            call print_energy('CASSCF energy (one-electron)', AuxData%ECAS_oneelectr, &
+                  ttoeV * AuxData%ECAS_oneelectr)
+            call print_energy('ECASSCF_calc', AuxData%ECAS_calc, ttoeV * AuxData%ECAS_calc)
+            call print_energy('E_ppAC0', ECorr_AC0, ttoeV * ECorr_AC0)
+            call print_energy('E_total', AuxData%ECAS_calc + ECorr_AC0, &
+                  ttoeV * (AuxData%ECAS_calc + ECorr_AC0))
             print*, ''
           end associate
     end subroutine ACPP0_incore_mix
+
+      subroutine name_blocks(bl_name, bbl_name)
+            character(len=6), dimension(20), intent(out) :: bl_name
+            character(len=5), dimension(9), intent(out) :: bbl_name
+
+            bbl_name(1) = 'vvoo'
+            bbl_name(2) = 'vvao'
+            bbl_name(3) = 'vvaa'
+            bbl_name(4) = 'vaoo'
+            bbl_name(5) = 'vaao'
+            bbl_name(6) = 'vaaa'
+            bbl_name(7) = 'aaoo'
+            bbl_name(8) = 'aaao'
+            bbl_name(9) = 'vaao2'
+
+            bl_name(IOO) = 'oo'
+            bl_name(IVV) = 'vv'
+            bl_name(IAA) = 'aa'
+            bl_name(IVA) = 'va'
+            bl_name(IAO) = 'ao'
+            bl_name(IOOT) = 'oot'
+            bl_name(IVVT) = 'vvt'
+            bl_name(IAAT) = 'aat'
+            bl_name(IVAT) = 'vat'
+            bl_name(IAOT) = 'aot'
+            bl_name(IOOT_AA) = 'oot_aa'
+            bl_name(IVVT_AA) = 'vvt_aa'
+            bl_name(IAAT_AA) = 'aat_aa'
+            bl_name(IVAT_AA) = 'vat_aa'
+            bl_name(IAOT_AA) = 'aot_aa'
+            bl_name(IOOT_BB) = 'oot_bb'
+            bl_name(IVVT_BB) = 'vvt_bb'
+            bl_name(IAAT_BB) = 'aat_bb'
+            bl_name(IVAT_BB) = 'vat_bb'
+            bl_name(IAOT_BB) = 'aot_bb'
+      end subroutine name_blocks
     
      subroutine eigs0_block_simple(isvv, isoo, Eig, Eigvec, v_plus, Ha, TwoNOA, &
             AuxData, IndN, NDim, spin_symm, Flags, variant)
@@ -739,10 +784,6 @@ contains
             type (tclock) :: timer, timer0
             integer :: i
             integer, parameter :: multiply_by_S = 1
-            integer, parameter ::  IOO=1, IVV=2, IAA=3, IVA=4, IAO=5
-            integer, parameter :: IOOT=6, IVVT=7, IAAT=8, IVAT=9, IAOT = 10
-            integer, parameter :: IOOT_AA=11, IVVT_AA=12, IAAT_AA=13, IVAT_AA=14, IAOT_AA = 15
-            integer, parameter :: IOOT_BB=16, IVVT_BB=17, IAAT_BB=18, IVAT_BB=19, IAOT_BB = 20
             integer :: var
             
             var = 0
@@ -755,7 +796,7 @@ contains
 
                   !    call clock_start(timer)
 
-                  print*, 'ten wymiar to', NDim
+                  !print*, 'ten wymiar to', NDim
                   call clock_start(timer0)
                  
                   if (var == 2) then
@@ -793,7 +834,7 @@ contains
                               v_plus = 1
                         end if
                   else
-                        print*, 'nonsym'
+                        !print*, 'nonsym'
                         call nonsymmetric_eigenproblem_block_simple(Eig, Eig_i, Eigvec, MxA, MxS, v_plus, IndN, AuxData%IndAux, 1)
                   end if
 
@@ -861,7 +902,8 @@ contains
 
             call clock_start(timer)
             call clock_start(timerall)
-            
+
+            var = 0
             if (present(variant)) var = variant
 
             if (var == 2) then
@@ -1054,7 +1096,6 @@ contains
 !                  print*, 'Czas na trzecie petle: ', clock_readwall(timer)
 
             case default 
-                  print*, 'default'
                   call clock_start(timer)    
                   !    !$omp parallel do collapse(2)&
                   !    !$omp default(shared) &
@@ -4331,23 +4372,21 @@ contains
                         end do
                   end do
 
-                    if (s==11.and.p==11.and.q==12.and.r==12)then
-                          write(*, '(A7, F12.8)') 'bixiA', func_P3b
-                    end if
+                    ! if (s==11.and.p==11.and.q==12.and.r==12)then
+                    !       write(*, '(A7, F12.8)') 'bixiA', func_P3b
+                    ! end if
 
-                    if (s==12.and.p==12.and.q==11.and.r==11)then
-                          write(*, '(A7, F12.8)') 'bixiB', func_P3b
-                    end if
+                    ! if (s==12.and.p==12.and.q==11.and.r==11)then
+                    !       write(*, '(A7, F12.8)') 'bixiB', func_P3b
+                    ! end if
 
-                    if (s==11.and.p==12.and.q==11.and.r==12)then
-                          write(*, '(A7, F12.8)') 'bixiC', func_P3b
-                    end if
+                    ! if (s==11.and.p==12.and.q==11.and.r==12)then
+                    !       write(*, '(A7, F12.8)') 'bixiC', func_P3b
+                    ! end if
 
-                    if (s==12.and.p==11.and.q==12.and.r==11)then
-                          write(*, '(A7, F12.8)') 'bixiD', func_P3b
-                    end if
-
-
+                    ! if (s==12.and.p==11.and.q==12.and.r==11)then
+                    !       write(*, '(A7, F12.8)') 'bixiD', func_P3b
+                    ! end if
                   
             end if
 

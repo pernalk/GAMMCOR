@@ -5,9 +5,10 @@ module h5_reader
   private
   public :: HID_T
   public :: h5_init, h5_finish, h5_open, h5_close, h5_get, h5_attr, h5_exists, h5_size
+  public :: h5_attr_exists
 
   interface h5_get
-     module procedure get_d1, get_d2, get_d4, get_i1
+     module procedure get_d1, get_d2, get_d3, get_d4, get_i1
   end interface
 
   interface h5_attr
@@ -46,6 +47,14 @@ contains
     integer :: ierr
     call h5ltpath_valid_f(fid, path, .true., h5_exists, ierr)
     if (ierr /= 0) h5_exists = .false.
+  end function
+
+  logical function h5_attr_exists(fid, path, name)
+    integer(HID_T), intent(in) :: fid
+    character(len=*), intent(in) :: path, name
+    integer :: ierr
+    call h5aexists_by_name_f(fid, path, name, h5_attr_exists, ierr)
+    if (ierr /= 0) h5_attr_exists = .false.
   end function
 
   ! Total number of elements of a dataset -- lets the caller allocate before
@@ -89,6 +98,18 @@ contains
     character(len=*), intent(in) :: path
     double precision, intent(out) :: a(:,:,:,:)
     integer(HSIZE_T) :: dims(4)
+    integer :: ierr
+    call check_shape(fid, path, shape(a))
+    dims = int(shape(a), HSIZE_T)
+    call h5ltread_dataset_double_f(fid, path, a, dims, ierr)
+    if (ierr /= 0) error stop "h5_get: read failed "//path
+  end subroutine
+
+  subroutine get_d3(fid, path, a)
+    integer(HID_T), intent(in) :: fid
+    character(len=*), intent(in) :: path
+    double precision, intent(out) :: a(:,:,:)
+    integer(HSIZE_T) :: dims(3)
     integer :: ierr
     call check_shape(fid, path, shape(a))
     dims = int(shape(a), HSIZE_T)
@@ -143,14 +164,50 @@ contains
     val = buf(1)
   end subroutine
 
+  ! h5py stores str attributes as variable-length strings, which the
+  ! h5lt fixed-length reader cannot read (it returns the raw pointer bytes),
+  ! so the storage type is checked first and the vlen case is read by hand.
   subroutine attr_s(fid, path, name, val)
+    use iso_c_binding
     integer(HID_T), intent(in) :: fid
     character(len=*), intent(in) :: path, name
     character(len=*), intent(out) :: val
-    integer :: ierr
+    integer(HID_T) :: aid, tid, sid
+    logical :: vlen
+    integer :: ierr, i, n
+    type(c_ptr), target :: cbuf(1)
+    type(c_ptr) :: f_ptr
+    character(kind=c_char), pointer :: cstr(:)
+    interface
+       function c_strlen(s) bind(C, name='strlen') result(n)
+         import :: c_ptr, c_size_t
+         type(c_ptr), value :: s
+         integer(c_size_t) :: n
+       end function
+    end interface
     val = ""
-    call h5ltget_attribute_string_f(fid, path, name, val, ierr)
+    call h5aopen_by_name_f(fid, path, name, aid, ierr)
     if (ierr /= 0) error stop "h5_attr: missing "//trim(name)//" on "//path
+    call h5aget_type_f(aid, tid, ierr)
+    call h5tis_variable_str_f(tid, vlen, ierr)
+    if (vlen) then
+       call h5aget_space_f(aid, sid, ierr)
+       f_ptr = c_loc(cbuf(1))
+       call h5aread_f(aid, tid, f_ptr, ierr)
+       if (ierr /= 0) error stop "h5_attr: read failed "//trim(name)//" on "//path
+       n = int(c_strlen(cbuf(1)))
+       call c_f_pointer(cbuf(1), cstr, [n])
+       do i = 1, min(n, len(val))
+          val(i:i) = cstr(i)
+       end do
+       call h5dvlen_reclaim_f(tid, sid, H5P_DEFAULT_F, f_ptr, ierr)
+       call h5sclose_f(sid, ierr)
+    else
+       call h5ltget_attribute_string_f(fid, path, name, val, ierr)
+       if (ierr /= 0) error stop "h5_attr: read failed "//trim(name)//" on "//path
+    end if
+    call h5tclose_f(tid, ierr)
+    call h5aclose_f(aid, ierr)
   end subroutine
 
 end module

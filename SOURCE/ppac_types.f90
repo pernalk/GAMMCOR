@@ -197,8 +197,9 @@ module ppac_types
             double precision, allocatable :: n_p(:), n_m(:), n(:)
             double precision :: W_aa_act0, W_ab_act0, W_aa0, W_ab0
             double precision :: ENuc
-            double precision :: ECas
-            double precision :: ECAS_THC = 0.d0
+            double precision :: ECAS_read = 0.d0   ! CAS energy read from the external file (PySCF/ORCA)
+            double precision :: ECAS_THC = 0.d0    ! CAS energy from THC-factorized integrals
+            double precision :: ECAS_calc = 0.d0   ! CAS energy from RDMs + full TwoEl (check_energy_incore[_spinres])
             double precision :: ECAS_oneelectr = 0.d0
             double precision :: EROHF
             logical :: pherpa_print = .false.

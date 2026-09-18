@@ -47,12 +47,14 @@ integer, parameter :: JOB_TYPE_HHERPA_RDMDUMP     = 27
 integer, parameter :: JOB_TYPE_ACPP     = 28
 integer, parameter :: JOB_TYPE_AC_REL     = 29
 integer, parameter :: JOB_TYPE_AC0_REL     = 30
+integer, parameter :: JOB_TYPE_TDDFT     = 31
 
 integer, parameter :: PARSER_MH = 0
 integer, parameter :: PARSER_AT = 1
 
 integer, parameter :: DISPATCH_KP = 0
 integer, parameter :: DISPATCH_AT = 1
+integer, parameter :: DISPATCH_DD = 2
 
 integer, parameter :: ALG_REGULAR = 0
 integer, parameter :: ALG_SPINRES = 1
@@ -74,6 +76,11 @@ integer, parameter :: R_CHRONUSQ = 5
 integer, parameter :: PPAC = 1
 integer, parameter :: HHAC = 0
 
+#ifdef DEBUG
+integer, parameter :: PRT_MSG = 1
+#else
+integer, parameter :: PRT_MSG = 0
+#endif
 integer, parameter :: SAPTLEVEL0 = 0
 integer, parameter :: SAPTLEVEL1 = 1
 integer, parameter :: SAPTLEVEL2 = 2
@@ -97,6 +104,7 @@ integer, parameter :: RDM_TYPE_DMRG = 4
 integer, parameter :: RDM_TYPE_HF   = 5
 integer, parameter :: RDM_TYPE_UHF  = 6
 integer, parameter :: RDM_TYPE_UKS  = 7
+integer, parameter :: RDM_TYPE_RKS  = 8
 
 integer, parameter :: TWOMO_INCORE = 1
 integer, parameter :: TWOMO_FFFF   = 2
@@ -149,16 +157,17 @@ character(*),parameter :: PossibleInterface(6) = &
 [character(8) :: &
 'DALTON', 'MOLPRO', 'OWN', 'ORCA', 'PYSCF', 'CHRONUSQ']
 
-character(*),parameter :: PossibleJobType(30) = &
+character(*),parameter :: PossibleJobType(31) = &
 [character(9) :: &
 'AC', 'AC0', 'ERPA', 'EERPA', 'SAPT', 'PDFT', 'CASPiDFT','CASPiDFTOpt','EERPA-1', & 
 'AC0D', 'AC0DNOSYMM', 'NLOCCORR', 'AC0DP', 'ACFREQ','ACFREQNTH','AC1FREQNTH', &
 'RESPONSE','SRAC0', 'MP2', 'SRMP2', 'SAPT-OS','MSAC0', &
- 'PPERPA', 'AC0PP', 'PPERPADMP', 'DUCC', 'HHERPADMP', 'ACPP', 'AC_REL', 'AC0_REL']
+ 'PPERPA', 'AC0PP', 'PPERPADMP', 'DUCC', 'HHERPADMP', 'ACPP', 'AC_REL', 'AC0_REL', &
+ 'TDDFT']
 
-character(*),parameter :: PossibleRDMType(7) = &
+character(*),parameter :: PossibleRDMType(8) = &
 [character(8) :: &
-'GVB', 'APSG', 'CASSCF', 'DMRG', 'HF', 'UHF', 'UKS']
+'GVB', 'APSG', 'CASSCF', 'DMRG', 'HF', 'UHF', 'UKS', 'RKS']
 
 character(*),parameter :: PossibleDFAType(3) = &
 [character(8) :: &
@@ -509,6 +518,7 @@ type FlagsData
      integer :: ReaderType = -1
      integer :: Reader = -1
      integer :: Dispatch = DISPATCH_KP
+     integer :: RDMType = 0
 
 end type FlagsData
 

@@ -3,6 +3,7 @@ module print_utils
     use arithmetic, only : F64
     use display, only : STDOUNIT
     use clock
+    use types, only : PRT_MSG
     implicit none
     private
     public :: print_header, print_section, print_info, print_status, print_kv
@@ -11,11 +12,13 @@ module print_utils
     public :: print_memory
     public :: prij, pri3, prix, pr2ix, pr4ix
     public :: mmsg, xmsg, ximsg, tmsg
+    public :: print_deb, print_debi
     public :: MSG_DEB, MSG_PRIORITY_THR
 
     integer, parameter :: line_width  = 70
     integer, parameter :: label_width = 40
     integer, parameter :: block_label_width = 10
+    integer, parameter :: deb_label_width = 25
 
     !
     ! Message priorities: a message is printed only when its priority
@@ -36,7 +39,8 @@ module print_utils
         module procedure print_info_int_arr
         module procedure print_info_dble
         module procedure print_info_dble2
-    end interface print_info
+  end interface print_info
+  
 
 contains
 
@@ -270,5 +274,39 @@ contains
             p = MSG_NOR
         end if
     end function msg_priority
+
+    !
+    ! ---------------------------------------------------------------
+    ! Debug prints, gated on PRT_MSG (set in types.f90: 1 with -DDEBUG,
+    ! 0 otherwise). With PRT_MSG == 0 both routines return immediately.
+    ! The label column is kept even when msg is absent, so that values
+    ! printed with and without a label still line up.
+    ! ---------------------------------------------------------------
+    !
+    subroutine print_deb(val, msg)
+        double precision, intent(in) :: val
+        character(len=*), optional, intent(in) :: msg
+        character(len=deb_label_width) :: lbl
+
+        if (PRT_MSG /= 1) return
+
+        lbl = ''
+        if (present(msg)) lbl = msg
+        write(STDOUNIT,'(2X,A,1X,F22.15)') lbl, val
+        flush(STDOUNIT)
+    end subroutine print_deb
+
+    subroutine print_debi(val, msg)
+        integer, intent(in) :: val
+        character(len=*), optional, intent(in) :: msg
+        character(len=deb_label_width) :: lbl
+
+        if (PRT_MSG /= 1) return
+
+        lbl = ''
+        if (present(msg)) lbl = msg
+        write(STDOUNIT,'(2X,A,1X,I22)') lbl, val
+        flush(STDOUNIT)
+    end subroutine print_debi
 
 end module print_utils

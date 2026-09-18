@@ -255,6 +255,7 @@ end select
   if(Input%CalcParams%Restart) Flags%IRes = 1
 
 ! RDMType
+  Flags%RDMType = Input%CalcParams%RDMType
   select case(Input%CalcParams%RDMType)
   case(RDM_TYPE_GVB)
      Flags%IGVB = 1
@@ -291,6 +292,9 @@ end select
      Flags%IGVB = 0
      Flags%ICASSCF = 1
 
+  case(RDM_TYPE_RKS)
+        Flags%Parser = PARSER_AT
+        Flags%Dispatch = DISPATCH_DD
   case default
      write(LOUT,'(1x,a)') 'RDMType not declared! Assuming ICASSCF=1!'
      FLags%IGVB    = 0
@@ -490,7 +494,7 @@ end select
   case(JOB_TYPE_NLOCCORR)
      Flags%IFunSR = 7
 
-case(JOB_TYPE_PPERPA, JOB_TYPE_AC0PP, JOB_TYPE_ACPP, JOB_TYPE_PPERPA_RDMDUMP,&
+  case(JOB_TYPE_PPERPA, JOB_TYPE_AC0PP, JOB_TYPE_ACPP, JOB_TYPE_PPERPA_RDMDUMP,&
       JOB_TYPE_HHERPA_RDMDUMP, JOB_TYPE_DUCC)
       Flags%Parser = PARSER_AT
 
@@ -500,7 +504,7 @@ case(JOB_TYPE_PPERPA, JOB_TYPE_AC0PP, JOB_TYPE_ACPP, JOB_TYPE_PPERPA_RDMDUMP,&
         if (Flags%IPYSCF == 1) then
               select case(Flags%JobType)
               case(JOB_TYPE_PPERPA, JOB_TYPE_AC0PP, JOB_TYPE_ACPP, JOB_TYPE_PPERPA_RDMDUMP,&
-                    JOB_TYPE_HHERPA_RDMDUMP, JOB_TYPE_DUCC)
+                    JOB_TYPE_HHERPA_RDMDUMP, JOB_TYPE_DUCC, JOB_TYPE_MP2, JOB_TYPE_TDDFT)
                     Flags%ReaderType = RT_DIRECT
               case default
                     Flags%ReaderType = RT_WRAPPER
@@ -542,8 +546,16 @@ case(JOB_TYPE_PPERPA, JOB_TYPE_AC0PP, JOB_TYPE_ACPP, JOB_TYPE_PPERPA_RDMDUMP,&
   select case (Flags%JobType)
   case (JOB_TYPE_PPERPA, JOB_TYPE_AC0PP, JOB_TYPE_ACPP, &
         JOB_TYPE_PPERPA_RDMDUMP, JOB_TYPE_HHERPA_RDMDUMP, &
-        JOB_TYPE_MP2, JOB_TYPE_SRMP2, JOB_TYPE_DUCC)
+        JOB_TYPE_SRMP2, JOB_TYPE_DUCC)
         Flags%Dispatch = DISPATCH_AT
+  case (JOB_TYPE_MP2)
+        if (Input%CalcParams%RDMType == RDM_TYPE_RKS)then
+              Flags%Dispatch = DISPATCH_DD
+        else
+              Flags%Dispatch = DISPATCH_AT
+        end if
+  case (JOB_TYPE_TDDFT)
+        Flags%Dispatch = DISPATCH_DD
   case default
         if (Flags%Algorithm == ALG_SPINRES) then
               Flags%Dispatch = DISPATCH_AT

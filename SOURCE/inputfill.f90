@@ -527,6 +527,8 @@ subroutine read_block_calculation(CalcParams, line)
                  CalcParams%JobType = JOB_TYPE_MP2
            elseif (uppercase(val) == "SRMP2" ) then
                  CalcParams%JobType = JOB_TYPE_SRMP2
+           elseif (uppercase(val) == "TDDFT" ) then
+                 CalcParams%JobType = JOB_TYPE_TDDFT
            elseif (uppercase(val) == "SAPT-OS" .or. &
                    uppercase(val) == "SAPTOS") then
                CalcParams%JobType = JOB_TYPE_SAPTOS
@@ -581,7 +583,9 @@ subroutine read_block_calculation(CalcParams, line)
            elseif (uppercase(val) == "UKS" ) then
               CalcParams%RDMType = RDM_TYPE_UKS
            elseif (uppercase(val) == "UHF" ) then
-              CalcParams%RDMType = RDM_TYPE_UHF
+                 CalcParams%RDMType = RDM_TYPE_UHF
+           elseif (uppercase(val) == "RKS" ) then
+              CalcParams%RDMType = RDM_TYPE_RKS                 
            endif
 
       case ("UNITS")

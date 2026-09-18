@@ -45,11 +45,11 @@ module mp
                   integer i0, licznik
 
 
-
-
                   
-                  associate(Zgk=>THCData%Zgk, Xga=>THCData%Xga,  TXga=>THCData%TXga, ExternalOrdering=>THCData%ExternalOrdering, NChol=>THCData%NChol, NTHC=>THCData%NTHC, &
-                        XgaErf=>THCData%XgaErf, TXgaErf=>THCData%TXgaErf, ZgkErf=>THCData%ZgkErf, NCholErf=>THCData%NCholErf, NTHCErf=>THCData%NTHCErf, NBasis=>AuxData%NBasis, &
+                  associate(Zgk=>THCData%Zgk, Xga=>THCData%Xga,  TXga=>THCData%TXga, &
+                        ExternalOrdering=>THCData%ExternalOrdering, NChol=>THCData%NChol, NTHC=>THCData%NTHC, &
+                        XgaErf=>THCData%XgaErf, TXgaErf=>THCData%TXgaErf, &
+                        ZgkErf=>THCData%ZgkErf, NCholErf=>THCData%NCholErf, NTHCErf=>THCData%NTHCErf, NBasis=>AuxData%NBasis, &
                         NI=>AuxData%NI, NA=>AuxData%NA, NIA=>AuxData%NIA, NV=>AuxData%NV)
 
 

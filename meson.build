@@ -163,6 +163,8 @@ sources = files(
   'SOURCE/phac_spinres.f90',
   'SOURCE/mp.f90',
   'SOURCE/dispatcher.f90',
+  'SOURCE/tddft_types.f90',
+  'SOURCE/tddft.f90',
   'SOURCE/polari.F90',
 
   # -- iterative solvers

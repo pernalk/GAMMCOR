@@ -260,7 +260,7 @@ contains
 
         ecorr = ecorr * frac12 ! because  E_corr = frac12 * W^1
         write(*,'(/,1X,''ECASSCF+ENuc, AC1-Corr, ERPA-CASSCF'',6X,3F15.8)'), &
-              AuxData%ECas, ecorr, AuxData%ECas + ecorr
+              AuxData%ECAS_calc, ecorr, AuxData%ECAS_calc + ecorr
 
 
     end subroutine pherpa_incore_driver
@@ -378,7 +378,7 @@ contains
          else
 
                write(*,'(/,1X,''ECASSCF+ENuc, AC-Corr, ERPA-CASSCF'',6X,3F15.8)'), &
-                     AuxData%ECas, ecorr, AuxData%ECas + ecorr
+                     AuxData%ECAS_calc, ecorr, AuxData%ECAS_calc + ecorr
          end if
 
   end subroutine phAC_incore_driver

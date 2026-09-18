@@ -23,6 +23,8 @@ C
       use interface_pp
       use ppac_types
       use dispatcher
+      use tddft
+      use tddft_types, only : TtddftData
       use print_utils
       use geom_input, only : geom_DeleteScratch
 C
@@ -55,6 +57,7 @@ C
       type(SaptData)    :: Sapt
       type(TTHCData)   :: THCData
       type(TACppData)  :: AuxData
+      type(TtddftData)  :: TDDFTData
       type(TInts)  :: IntsO
       type(TInts)  :: IntsD
 C
@@ -475,8 +478,14 @@ C
             Call print_info('Reader type','DIRECT')
             select case(Flags%Reader)
          case(R_PYSCF)
-            Call print_info('Source','PySCF')
-               call read_PYSCF(THCData, AuxData, CAONO, Flags)
+               Call print_info('Source','PySCF')
+               AuxData%Ninte2 = Ninte2
+               if (Flags%RDMType == RDM_TYPE_RKS) then
+                  call read_PYSCF(THCData, AuxData, CAONO, 
+     $                 Flags, TwoEl, TDDFTData)
+               else
+                  call read_PYSCF(THCData, AuxData, CAONO, Flags, TwoEl)
+               end if
             case(R_PYSCFS)
                Call print_info('Source','PySCF')
                call read_PYSCF_spinres(THCData, AuxData, CAONO, Flags,
@@ -544,7 +553,9 @@ C
       Else
          If(Flags%Dispatch.Eq.DISPATCH_AT) Then
             Call dispatch_acxx(THCData, AuxData, CAONO, Flags,
-     $       TwoEl, IntsO, IntsD)
+     $        TwoEl, IntsO, IntsD)
+         Else If(Flags%Dispatch.Eq.DISPATCH_DD) Then
+            Call dispatch_tddft(THCData, TDDFTData, Flags, TwoEl)
       Else
       Call DMSCF(Flags,Title,URe,Occ,XKin,XNuc,ENuc,UMOAO,
      $           TwoEl,NBasis,NInte1,NInte2,NGem, THCData, AuxData)
@@ -566,6 +577,8 @@ C     Delete out-of-core integrals
          Call delfile('AOERFSORT')
          EndIf
       EndIf
+      else
+      call delfile('rdm2.dat')
       EndIf
 C
 C     Delete the scratch geometry file written for plain xyz input

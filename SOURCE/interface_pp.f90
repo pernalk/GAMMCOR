@@ -14,6 +14,7 @@ module interface_pp
       use clock
       use print_utils
       use h5_reader
+      use tddft_types
 
 
       implicit none
@@ -163,7 +164,7 @@ contains
       !end subroutine interface_driver
 
 
-      subroutine read_PYSCF(THCData, AuxData, CAONO, Flags, TwoEl)
+      subroutine read_PYSCF(THCData, AuxData, CAONO, Flags, TwoEl, TDDFTData)
             
 
             type(TTHCData), intent(inout) :: THCData
@@ -171,8 +172,8 @@ contains
             double precision, dimension(:,:), allocatable, intent(out) :: CAONO
             type(FlagsData), intent(in) :: Flags
             double precision, optional, intent(inout) :: TwoEl(:)
+            type(TtddftData), optional, intent(inout) :: TDDFTData
 
-            double precision :: ECAS
             integer :: nbasis, ninactive, nactive, nvirtual
             character(len=128) :: line
 
@@ -200,6 +201,15 @@ contains
             type(TAOBASIS) :: AObasis
             type(TSystem)  :: System
             integer :: ms2
+
+            if (Flags%RDMType == RDM_TYPE_RKS) then
+                  if (.not.present(TDDFTData)) then
+                        print*, 'read_PYSCF: TDDFTData is required for RDMType RKS'
+                        stop
+                  end if
+                  call read_PYSCF_dft(Flags, TDDFTData, TwoEl)
+                  return
+            end if
 
             call pyscf_h5_open()
 
@@ -234,7 +244,7 @@ contains
                   call print_info('NInactive', AuxData%NI)
                   call print_info('NActive', AuxData%NA)
                   call print_info('NVirtual', AuxData%NV)
-                  call print_info('CASSCF Energy', AuxData%ECAS)
+                  call print_info('CASSCF Energy', AuxData%ECAS_read)
                   call print_info('Nuclear Energy', AuxData%ENuc)
                   call print_info('Number of electrons', AuxData%Nel)
                   call print_info('Natural orbitals used (0/1)', natural_orb)
@@ -389,6 +399,225 @@ contains
             
     end subroutine read_PYSCF
 
+    subroutine read_PYSCF_dft(Flags, TDDFTData, TwoEl)
+
+            type(FlagsData), intent(in) :: Flags
+            type(TtddftData), intent(inout) :: TDDFTData
+            double precision, optional, intent(inout) :: TwoEl(:)
+
+            character(len=16) :: method
+
+            call pyscf_h5_open()
+
+            if (Flags%JobType /= JOB_TYPE_MP2 .and. Flags%JobType /= JOB_TYPE_TDDFT) then
+                  print*, 'read_PYSCF_dft: RDMType RKS supports only MP2 and TDDFT jobs'
+                  stop
+            end if
+
+            call h5_attr(pyscf_fid, '/', 'METHOD', method)
+            print*, 'method', method
+            if (trim(method) /= 'RKS') then
+                  print*, 'read_PYSCF_dft: ', PYSCF_H5, ' was not written for an RKS reference: ', trim(method)
+                  stop
+            end if
+
+            if (Flags%ITwoEl.ne.1)then
+                  print*, 'read_PYSCF_dft: THC integrals for the RKS reference are not implemented yet'
+                  stop
+            else
+                  print*, 'Two electron integrals read from ', PYSCF_H5
+                  call h5_get(pyscf_fid, '/MOINTS/ERI', TwoEl)
+            end if
+
+            call print_section('State and job setup')
+            call print_info('Flags%JobType', Flags%JobType)
+
+            call load_rks_data(TDDFTData)
+            if (Flags%JobType == JOB_TYPE_TDDFT) then
+                  call load_rks_grid(TDDFTData)
+                  call load_rks_tddft_ref(TDDFTData)
+            end if
+
+            call print_section('RKS data loaded')
+            call print_info('NBasis', TDDFTData%NBasis)
+            call print_info('NInactive', TDDFTData%NI)
+            call print_info('NVirtual', TDDFTData%NV)
+            call print_info('NCoreOrb (frozen)', TDDFTData%NCoreOrb)
+            call print_info('Number of electrons', TDDFTData%NEL)
+            call print_info('Nuclear Energy', TDDFTData%ENuc)
+            call print_info('RKS Energy', TDDFTData%EKS)
+            call print_info('XC functional', trim(TDDFTData%XC))
+            call print_info('XC type', trim(TDDFTData%XCType))
+            call print_info('HF exchange fraction', TDDFTData%XHF)
+            call print_info('MP2 scale', TDDFTData%XMP2)
+            call print_info('E(MP2) pyscf', TDDFTData%EMP2_pyscf)
+            call print_info('E(DH) pyscf', TDDFTData%EDH_pyscf)
+            if (TDDFTData%NGrid > 0) then
+                  call print_info('Grid points', TDDFTData%NGrid)
+                  call print_info('Grid components (rho, grad)', TDDFTData%NGridComp)
+            end if
+            if (TDDFTData%NExcS > 0) call print_info('pyscf singlet states', TDDFTData%NExcS)
+            if (TDDFTData%NExcT > 0) call print_info('pyscf triplet states', TDDFTData%NExcT)
+
+            call pyscf_h5_close()
+
+    end subroutine read_PYSCF_dft
+
+    subroutine load_rks_grid(TDDFTData)
+          type(TtddftData), intent(inout) :: TDDFTData
+
+          if (.not. h5_exists(pyscf_fid, '/GRID')) then
+                print*, 'load_rks_grid: no /GRID group in ', PYSCF_H5
+                stop
+          end if
+
+          associate(NBasis=>TDDFTData%NBasis, NGrid=>TDDFTData%NGrid, NComp=>TDDFTData%NGridComp)
+
+            NGrid = h5_size(pyscf_fid, '/GRID/WEIGHTS')
+            NComp = h5_size(pyscf_fid, '/GRID/RHO') / NGrid
+
+            allocate(TDDFTData%RGrid(3, NGrid))
+            allocate(TDDFTData%WGrid(NGrid))
+            allocate(TDDFTData%OrbGrid(NGrid, NBasis))
+            allocate(TDDFTData%RhoGrid(NGrid, NComp))
+            allocate(TDDFTData%VxcGrid(NGrid, NComp))
+            allocate(TDDFTData%FxcS(NGrid, NComp, NComp))
+            allocate(TDDFTData%FxcT(NGrid, NComp, NComp))
+            allocate(TDDFTData%VxcAO(NBasis, NBasis))
+
+            call h5_get(pyscf_fid, '/GRID/COORDS', TDDFTData%RGrid)
+            call h5_get(pyscf_fid, '/GRID/WEIGHTS', TDDFTData%WGrid)
+            call h5_get(pyscf_fid, '/GRID/AO', TDDFTData%OrbGrid)
+            if (NComp > 1) then
+                  allocate(TDDFTData%OrbXGrid(NGrid, NBasis))
+                  allocate(TDDFTData%OrbYGrid(NGrid, NBasis))
+                  allocate(TDDFTData%OrbZGrid(NGrid, NBasis))
+                  call h5_get(pyscf_fid, '/GRID/AO_X', TDDFTData%OrbXGrid)
+                  call h5_get(pyscf_fid, '/GRID/AO_Y', TDDFTData%OrbYGrid)
+                  call h5_get(pyscf_fid, '/GRID/AO_Z', TDDFTData%OrbZGrid)
+            end if
+            call h5_get(pyscf_fid, '/GRID/RHO', TDDFTData%RhoGrid)
+            call h5_get(pyscf_fid, '/GRID/VXC', TDDFTData%VxcGrid)
+            call h5_get(pyscf_fid, '/GRID/FXC_SINGLET', TDDFTData%FxcS)
+            call h5_get(pyscf_fid, '/GRID/FXC_TRIPLET', TDDFTData%FxcT)
+            call h5_get(pyscf_fid, '/DFT/VXC_AO', TDDFTData%VxcAO)
+
+            call print_info('Grid: int rho', dot_product(TDDFTData%WGrid, TDDFTData%RhoGrid(:, 1)))
+
+          end associate
+
+    end subroutine load_rks_grid
+
+    subroutine load_rks_tddft_ref(TDDFTData)
+          type(TtddftData), intent(inout) :: TDDFTData
+          integer :: nov
+
+          if (.not. h5_exists(pyscf_fid, '/TDDFT')) return
+
+          associate(NI=>TDDFTData%NI, NV=>TDDFTData%NV)
+
+            nov = NI * NV
+
+            if (h5_exists(pyscf_fid, '/TDDFT/SINGLET')) then
+                  TDDFTData%NExcS = h5_size(pyscf_fid, '/TDDFT/SINGLET/E')
+                  allocate(TDDFTData%ExcS(TDDFTData%NExcS))
+                  allocate(TDDFTData%OscS(TDDFTData%NExcS))
+                  allocate(TDDFTData%XS(NV, NI, TDDFTData%NExcS))
+                  allocate(TDDFTData%YS(NV, NI, TDDFTData%NExcS))
+                  call h5_get(pyscf_fid, '/TDDFT/SINGLET/E', TDDFTData%ExcS)
+                  call h5_get(pyscf_fid, '/TDDFT/SINGLET/OSC', TDDFTData%OscS)
+                  call h5_get(pyscf_fid, '/TDDFT/SINGLET/X', TDDFTData%XS)
+                  call h5_get(pyscf_fid, '/TDDFT/SINGLET/Y', TDDFTData%YS)
+                  if (h5_exists(pyscf_fid, '/TDDFT/SINGLET/A')) then
+                        allocate(TDDFTData%AS(nov, nov))
+                        allocate(TDDFTData%BS(nov, nov))
+                        call h5_get(pyscf_fid, '/TDDFT/SINGLET/A', TDDFTData%AS)
+                        call h5_get(pyscf_fid, '/TDDFT/SINGLET/B', TDDFTData%BS)
+                  end if
+            end if
+
+            if (h5_exists(pyscf_fid, '/TDDFT/TRIPLET')) then
+                  TDDFTData%NExcT = h5_size(pyscf_fid, '/TDDFT/TRIPLET/E')
+                  allocate(TDDFTData%ExcT(TDDFTData%NExcT))
+                  allocate(TDDFTData%XT(NV, NI, TDDFTData%NExcT))
+                  allocate(TDDFTData%YT(NV, NI, TDDFTData%NExcT))
+                  call h5_get(pyscf_fid, '/TDDFT/TRIPLET/E', TDDFTData%ExcT)
+                  call h5_get(pyscf_fid, '/TDDFT/TRIPLET/X', TDDFTData%XT)
+                  call h5_get(pyscf_fid, '/TDDFT/TRIPLET/Y', TDDFTData%YT)
+                  if (h5_exists(pyscf_fid, '/TDDFT/TRIPLET/A')) then
+                        allocate(TDDFTData%AT(nov, nov))
+                        allocate(TDDFTData%BT(nov, nov))
+                        call h5_get(pyscf_fid, '/TDDFT/TRIPLET/A', TDDFTData%AT)
+                        call h5_get(pyscf_fid, '/TDDFT/TRIPLET/B', TDDFTData%BT)
+                  end if
+            end if
+
+          end associate
+
+    end subroutine load_rks_tddft_ref
+
+    subroutine load_rks_data(TDDFTData)
+          type(TtddftData), intent(inout) :: TDDFTData
+          integer :: iv(1)
+          double precision :: dv(1)
+          double precision, dimension(:, :), allocatable :: work
+
+          call h5_get(pyscf_fid, '/REF/NBASIS', iv); TDDFTData%NBasis = iv(1)
+          call h5_get(pyscf_fid, '/REF/NI',     iv); TDDFTData%NI     = iv(1)
+          call h5_get(pyscf_fid, '/REF/NV',     iv); TDDFTData%NV     = iv(1)
+          call h5_get(pyscf_fid, '/REF/NEL',    iv); TDDFTData%NEL    = iv(1)
+          call h5_get(pyscf_fid, '/REF/ENUC',   dv); TDDFTData%ENuc   = dv(1)
+          if (h5_exists(pyscf_fid, '/REF/FROZEN')) then
+                call h5_get(pyscf_fid, '/REF/FROZEN', iv); TDDFTData%NCoreOrb = iv(1)
+          end if
+          call h5_get(pyscf_fid, '/SCF/TOTAL_ENERGY', dv); TDDFTData%EKS = dv(1)
+
+          associate(NBasis=>TDDFTData%NBasis)
+
+            TDDFTData%NInte1 = NBasis*(NBasis+1)/2
+            TDDFTData%NInte2 = TDDFTData%NInte1*(TDDFTData%NInte1+1)/2
+
+            allocate(TDDFTData%eorbs(NBasis))
+            allocate(TDDFTData%Occ(NBasis))
+            allocate(TDDFTData%CAOMO(NBasis, NBasis))
+            allocate(TDDFTData%HAO(NBasis, NBasis))
+            allocate(TDDFTData%HMO(NBasis, NBasis))
+            allocate(work(NBasis, NBasis))
+
+            call h5_get(pyscf_fid, '/SCF/MO_ENERGY', TDDFTData%eorbs)
+            call h5_get(pyscf_fid, '/SCF/MO_OCC', TDDFTData%Occ)
+            call h5_get(pyscf_fid, '/SCF/MO_COEFF', TDDFTData%CAOMO)
+            call h5_get(pyscf_fid, '/INTS/CORE_HAMILTONIAN', TDDFTData%HAO)
+
+            call real_ab(work, TDDFTData%HAO, TDDFTData%CAOMO)
+            call real_atb(TDDFTData%HMO, TDDFTData%CAOMO, work)
+
+            if (h5_exists(pyscf_fid, '/SCF/FOCK_MO')) then
+                  allocate(TDDFTData%FockMO(NBasis, NBasis))
+                  call h5_get(pyscf_fid, '/SCF/FOCK_MO', TDDFTData%FockMO)
+            end if
+
+          end associate
+
+          if (h5_exists(pyscf_fid, '/DFT')) then
+                call h5_attr(pyscf_fid, '/DFT', 'XC', TDDFTData%XC)
+                call h5_attr(pyscf_fid, '/DFT', 'XCTYPE', TDDFTData%XCType)
+                call h5_attr(pyscf_fid, '/DFT', 'HYB', TDDFTData%XHF)
+                call h5_attr(pyscf_fid, '/DFT', 'OMEGA', TDDFTData%Omega)
+                call h5_attr(pyscf_fid, '/DFT', 'ALPHA', TDDFTData%Alpha)
+                if (h5_attr_exists(pyscf_fid, '/DFT', 'MP2_SCALE')) then
+                      call h5_attr(pyscf_fid, '/DFT', 'MP2_SCALE', TDDFTData%XMP2)
+                end if
+                if (h5_exists(pyscf_fid, '/DFT/E_MP2_REF')) then
+                      call h5_get(pyscf_fid, '/DFT/E_MP2_REF', dv); TDDFTData%EMP2_pyscf = dv(1)
+                end if
+                if (h5_exists(pyscf_fid, '/DFT/E_DH_REF')) then
+                      call h5_get(pyscf_fid, '/DFT/E_DH_REF', dv); TDDFTData%EDH_pyscf = dv(1)
+                end if
+          end if
+
+    end subroutine load_rks_data
+
     subroutine read_PYSCF_spinres(THCData, AuxData, CAONO, Flags, Ints)
             
 
@@ -398,7 +627,6 @@ contains
             type(FlagsData), intent(in) :: Flags
             type(TInts), intent(inout) :: Ints
 
-            double precision :: ECAS
             integer :: nbasis, ninactive, nactive, nvirtual
             character(len=128) :: line
 
@@ -451,7 +679,7 @@ contains
           print*, Flags%ITwoEl
           AuxData%NInte2 = NInte2
           call read_PYSCF(THCData, AuxData, CAONO_PYSCF, Flags, TwoEl)
-          print*, 'zzz', AuxData%ECAS, AuxData%Enuc
+          print*, 'zzz', AuxData%ECAS_read, AuxData%Enuc
           ! if (Flags%ITwoEl==1)then
           !       AuxData%NInte2 = NInte2
           !       unit = 21
@@ -514,7 +742,7 @@ contains
           print*, 'writing rdm2 full'
           call write_rdm2_dat(AuxData%rdm2_full, AuxData%NA)
 
-          print*, 'zzz', AuxData%ECAS, AuxData%Enuc
+          print*, 'zzz', AuxData%ECAS_read, AuxData%Enuc
           print*, 'po read'
           CAONO = CAONO_PYSCF
           ENuc = AuxData%ENuc
@@ -552,7 +780,7 @@ contains
           call h5_get(pyscf_fid, '/REF/NEL',    iv); AuxData%NEL    = iv(1)
           call h5_get(pyscf_fid, '/REF/NATORB', iv); natural_orb    = iv(1)
           call h5_get(pyscf_fid, '/REF/ENUC',   dv); AuxData%ENuc   = dv(1)
-          call h5_attr(pyscf_fid, trim(pyscf_state_group(suffix)), 'ENERGY', AuxData%ECAS)
+          call h5_attr(pyscf_fid, trim(pyscf_state_group(suffix)), 'ENERGY', AuxData%ECAS_read)
 
           AuxData%NIA = AuxData%NI + AuxData%NA
 
@@ -3174,6 +3402,8 @@ end subroutine save_2rdm_orca
             Write(6,'(1X,''CASSCF Energy (w/o ENuc-q) calculated'',X,F15.8)')eone+etwo
             Write(6,'(1X,''Total CASSCF Energy calculated '',5X,F15.8)')eone+etwo+ AuxData%enuc
 
+            AuxData%ECAS_oneelectr = eone
+            AuxData%ECAS_calc = eone + etwo + AuxData%enuc
 
           end associate
                 
@@ -3569,7 +3799,7 @@ end subroutine save_2rdm_orca
                         Write(6,'(1X,''CASSCF Energy (one-electron) THC'',X,F15.8)')etot0
                         Write(6,'(1X,''CASSCF Energy (w/o ENuc-q) THC'',X,F15.8)')etot+etot0
                         Write(6,'(1X,''Total CASSCF Energy from THC '',5X,F15.8)')etot + etot0 + AuxData%enuc
-                        print*, 'ecas from pyscf', AuxData%Ecas
+                        print*, 'ecas from pyscf', AuxData%ECAS_read
                   end if
 !                  stop
                 end associate
@@ -4070,7 +4300,7 @@ end subroutine save_2rdm_orca
             print*, 'AuxData%enuc', AuxData%enuc
             Write(6,'(1X,''CASSCF Two-electron Energy calculated'',X,F15.8)') etwo
             Write(6,'(1X,''CASSCF Total Energy calculated '',5X,F15.8)') eone + etwo + AuxData%enuc
-            AuxData%ECas = eone + etwo + AuxData%enuc
+            AuxData%ECAS_calc = eone + etwo + AuxData%enuc
 
           end associate
                 

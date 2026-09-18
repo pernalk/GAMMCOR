@@ -290,13 +290,264 @@ def get_irrep_labels(irrep, point_group):
     return irreps.index(irrep) + 1
 
 
+def naddr3_pack(eri_full, n):
+    ninte1 = n * (n + 1) // 2
+    ninte2 = ninte1 * (ninte1 + 1) // 2
+    twono = np.zeros(ninte2)
+
+    p, q, r, s = np.meshgrid(np.arange(n), np.arange(n), np.arange(n), np.arange(n),
+                             indexing='ij')
+    i1, i2, i3, i4 = p + 1, q + 1, r + 1, s + 1
+    addr12 = (np.maximum(i1, i2) * (np.maximum(i1, i2) - 1)) // 2 + np.minimum(i1, i2)
+    addr34 = (np.maximum(i3, i4) * (np.maximum(i3, i4) - 1)) // 2 + np.minimum(i3, i4)
+    addr = (np.maximum(addr12, addr34) * (np.maximum(addr12, addr34) - 1)) // 2 \
+        + np.minimum(addr12, addr34)
+    twono[(addr - 1).ravel()] = eri_full.ravel()
+    return twono
+
+
+def _ks_grid_quantities(mol, mf):
+    grids = mf.grids
+    if grids.coords is None:
+        grids.build(with_non0tab=False)
+    ni = mf._numint
+    xctype = ni._xc_type(mf.xc)
+    deriv = 0 if xctype == 'LDA' else 1
+    ao = ni.eval_ao(mol, grids.coords, deriv=deriv)
+    if deriv == 0:
+        ao = ao[None]
+    rho = np.atleast_2d(ni.eval_rho(mol, ao, mf.make_rdm1(), xctype=xctype))
+    rho_ab = np.stack([rho / 2.0, rho / 2.0])
+    vxc, fxc = ni.eval_xc_eff(mf.xc, rho_ab, deriv=2, xctype=xctype)[1:3]
+    return {'coords': grids.coords, 'weights': grids.weights, 'ao': ao, 'rho': rho,
+            'vxc': vxc[0], 'fxc_s': fxc[0, :, 0, :] + fxc[0, :, 1, :],
+            'fxc_t': fxc[0, :, 0, :] - fxc[0, :, 1, :], 'xctype': xctype}
+
+
+def _ks_kernel_iajb(g, fxc, orbo, orbv):
+    ao, w = g['ao'], g['weights']
+    rho_o = np.einsum('xrp,pi->xri', ao, orbo)
+    rho_v = np.einsum('xrp,pi->xri', ao, orbv)
+    rho_ov = np.einsum('xri,ra->xria', rho_o, rho_v[0])
+    if ao.shape[0] > 1:
+        rho_ov[1:] += np.einsum('ri,xra->xria', rho_o[0], rho_v[1:])
+    w_ov = np.einsum('xyr,xria->yria', fxc * w, rho_ov)
+    return np.einsum('xria,xrjb->iajb', w_ov, rho_ov)
+
+
+def _ks_vxc_ao(g, nao):
+    ao, w, vxc = g['ao'], g['weights'], g['vxc']
+    v = np.einsum('rp,r,rq->pq', ao[0], w * vxc[0], ao[0])
+    if ao.shape[0] > 1:
+        vx = np.einsum('xrp,xr,rq->pq', ao[1:], w * vxc[1:], ao[0])
+        v += vx + vx.T
+    return v
+
+
+def _ks_get_ab(mol, mf, g, singlet):
+    mo_coeff, mo_occ, mo_energy = mf.mo_coeff, mf.mo_occ, mf.mo_energy
+    occidx = np.where(mo_occ == 2)[0]
+    viridx = np.where(mo_occ == 0)[0]
+    orbo, orbv = mo_coeff[:, occidx], mo_coeff[:, viridx]
+    nocc, nvir = orbo.shape[1], orbv.shape[1]
+    mo = np.hstack((orbo, orbv))
+    nmo = mo.shape[1]
+    omega, alpha, hyb = mf._numint.rsh_and_hybrid_coeff(mf.xc, mol.spin)
+
+    e_ia = mo_energy[viridx] - mo_energy[occidx, None]
+    a = np.diag(e_ia.ravel()).reshape(nocc, nvir, nocc, nvir)
+    b = np.zeros_like(a)
+
+    eri = ao2mo.general(mol, [orbo, mo, mo, mo], compact=False).reshape(nocc, nmo, nmo, nmo)
+    if singlet:
+        a += np.einsum('iabj->iajb', eri[:, nocc:, nocc:, :nocc]) * 2
+        b += np.einsum('iajb->iajb', eri[:, nocc:, :nocc, nocc:]) * 2
+    a -= np.einsum('ijba->iajb', eri[:, :nocc, nocc:, nocc:]) * hyb
+    b -= np.einsum('jaib->iajb', eri[:, nocc:, :nocc, nocc:]) * hyb
+    if omega != 0:
+        with mol.with_range_coulomb(omega):
+            eri = ao2mo.general(mol, [orbo, mo, mo, mo], compact=False).reshape(nocc, nmo, nmo, nmo)
+        k_fac = alpha - hyb
+        a -= np.einsum('ijba->iajb', eri[:, :nocc, nocc:, nocc:]) * k_fac
+        b -= np.einsum('jaib->iajb', eri[:, nocc:, :nocc, nocc:]) * k_fac
+
+    if g['xctype'] != 'HF':
+        iajb = _ks_kernel_iajb(g, g['fxc_s'] if singlet else g['fxc_t'], orbo, orbv)
+        a += iajb
+        b += iajb
+    return a, b
+
+
+def _casida_energies(a, b):
+    n = a.shape[0] * a.shape[1]
+    a = a.reshape(n, n)
+    b = b.reshape(n, n)
+    w2 = np.linalg.eigvals((a - b) @ (a + b))
+    return np.sort(np.sqrt(w2.real))
+
+
+def dump_ks_grid(dump, mol, mf, g):
+    nao = mol.nao_nr()
+    ao, w = g['ao'], g['weights']
+    dump.array('GRID/COORDS', g['coords'], attrs={'UNIT': 'bohr', 'DIMS': ['point', 'xyz']})
+    dump.array('GRID/WEIGHTS', w)
+    dump.array('GRID/AO', ao[0].T, attrs={'DIMS': ['ao', 'point'], 'ORDERING': 'PYSCF'})
+    if ao.shape[0] > 1:
+        dump.array('GRID/AO_X', ao[1].T, attrs={'DIMS': ['ao', 'point']})
+        dump.array('GRID/AO_Y', ao[2].T, attrs={'DIMS': ['ao', 'point']})
+        dump.array('GRID/AO_Z', ao[3].T, attrs={'DIMS': ['ao', 'point']})
+    dump.array('GRID/RHO', g['rho'], attrs={'DIMS': ['comp', 'point'],
+                                            'COMP': 'rho, d/dx, d/dy, d/dz'})
+    dump.array('GRID/VXC', g['vxc'], attrs={'DIMS': ['comp', 'point'], 'SPIN': 'alpha'})
+    dump.array('GRID/FXC_SINGLET', g['fxc_s'],
+               attrs={'DIMS': ['comp', 'comp', 'point'], 'DEF': 'f_aa + f_ab'})
+    dump.array('GRID/FXC_TRIPLET', g['fxc_t'],
+               attrs={'DIMS': ['comp', 'comp', 'point'], 'DEF': 'f_aa - f_ab'})
+    dump.array('DFT/VXC_AO', _ks_vxc_ao(g, nao).T)
+    with h5py.File(dump.filename, 'a') as f:
+        gg = f.require_group('GRID')
+        gg.attrs['NGRID'] = int(w.size)
+        gg.attrs['NCOMP'] = int(g['rho'].shape[0])
+        gg.attrs['LEVEL'] = int(mf.grids.level)
+        gg.attrs['XCTYPE'] = g['xctype']
+    nel = float(np.dot(w, g['rho'][0]))
+    print(f'GRID: {w.size} points, ncomp={g["rho"].shape[0]}, '
+          f'int rho = {nel:.8f} (nelectron {mol.nelectron})')
+
+
+def dump_ks_tddft(dump, mol, mf, g, tds, dump_ab=True):
+    nocc = int(np.sum(mf.mo_occ == 2))
+    nvir = int(np.sum(mf.mo_occ == 0))
+    for td in tds:
+        tag = 'SINGLET' if td.singlet else 'TRIPLET'
+        grp = f'TDDFT/{tag}'
+        e = np.asarray(td.e)
+        dump.array(f'{grp}/E', e, attrs={'UNIT': 'hartree'})
+        x = np.array([xy[0] for xy in td.xy])
+        y = np.array([xy[1] for xy in td.xy])
+        norm = 'X.X - Y.Y = 1/2'
+        dump.array(f'{grp}/X', x, attrs={'DIMS': ['state', 'occ', 'vir'], 'NORM': norm})
+        dump.array(f'{grp}/Y', y, attrs={'DIMS': ['state', 'occ', 'vir'], 'NORM': norm})
+        if td.singlet:
+            dump.array(f'{grp}/OSC', np.asarray(td.oscillator_strength()))
+        if dump_ab:
+            a, b = _ks_get_ab(mol, mf, g, td.singlet)
+            nov = nocc * nvir
+            idx = {'DIMS': ['ia', 'jb'], 'INDEX': 'ia = a + nvir*(i-1), a fastest (1-based)'}
+            dump.array(f'{grp}/A', a.reshape(nov, nov), attrs=idx)
+            dump.array(f'{grp}/B', b.reshape(nov, nov), attrs=idx)
+            w = _casida_energies(a, b)[:len(e)]
+            print(f'TDDFT/{tag}: max |omega(A,B) - td.e| = {np.max(np.abs(w - e)):.2e}')
+
+
+def dump_ks_for_gammcor(mol, mf, mymp=None, mp2_scale=None, dump_eri=True,
+                        dump_grid=False, tds=None, dump_ab=True, filename=H5FILE):
+    """RKS reference (+ pyscf MP2 result) -> HDF5, for the GAMMCOR RKS/MP2/TDDFT path.
+
+    mol, mf    : built Mole and converged dft.RKS
+    mymp       : converged mp.MP2(mf) (optional: reference energies, frozen-core count)
+    mp2_scale  : coefficient of E_MP2 in the double-hybrid energy (optional)
+    dump_eri   : write MOINTS/ERI (N^4/8 doubles) in the KS-MO basis
+    dump_grid  : write GRID/ (points, weights, AOs and gradients, rho, vxc, fxc)
+    tds        : converged TDDFT objects (singlet and/or triplet) -> TDDFT/
+    dump_ab    : also write the full A and B matrices for each td in tds
+    """
+    dump = _Dump(True, filename)
+    dump.provenance('RKS')
+    dump.system(mol)
+    dump.ao_extras(mol)
+    dump.scf_reference(mol, mf)
+
+    mo_coeff = np.asarray(mf.mo_coeff)
+    mo_occ = np.asarray(mf.mo_occ)
+    nbasis = mol.nao_nr()
+    nmo = mo_coeff.shape[1]
+    if nmo != nbasis:
+        raise RuntimeError(f'nmo={nmo} != nbasis={nbasis}: linear dependencies '
+                           'in the basis are not handled by the GAMMCOR readers')
+
+    NI = int(np.sum(mo_occ == 2.0))
+    NA = int(np.sum(mo_occ == 1.0))
+    NV = nbasis - NI - NA
+    if NA != 0:
+        raise RuntimeError('open-shell reference: dump_ks_for_gammcor handles RKS only')
+    frozen = 0
+    if mymp is not None and mymp.frozen is not None:
+        frozen = int(mymp.frozen) if np.isscalar(mymp.frozen) else len(mymp.frozen)
+
+    dump.int_array('SCF/MO_OCC_INT', mo_occ.astype(np.int32))
+
+    state_tag = '1.1'
+    sgrp = f'POSTHF/STATES/{state_tag}'
+    dump.array('INTS/CORE_HAMILTONIAN', mf.get_hcore().T)
+    dump.array('POSTHF/ORB_COEFF', mo_coeff.T,
+               attrs={'TYPE': 'CANONICAL', 'DIMS': ['mo', 'ao']})
+    dump.array('POSTHF/OCC', mo_occ / 2.0)
+
+    dump.aux(['NBASIS', 'NI', 'NA', 'NV', 'EROHF', 'ENUC', 'NEL', 'NATORB', 'FROZEN'],
+             [nbasis, NI, NA, NV, float(mf.e_tot), float(mol.energy_nuc()),
+              mol.nelectron, 0, frozen],
+             None, state_group=sgrp)
+    dump.orb_space(nbasis, NI, NA)
+    dump.state_meta(sgrp, state_tag, 1, float(mf.e_tot), 'A', 1)
+    dump.states_index([state_tag], [float(mf.e_tot)])
+
+    ni = mf._numint
+    omega, alpha, hyb = ni.rsh_and_hybrid_coeff(mf.xc, mol.spin)
+    with h5py.File(filename, 'a') as f:
+        g = f.require_group('DFT')
+        g.attrs['XC'] = str(mf.xc)
+        g.attrs['XCTYPE'] = str(ni._xc_type(mf.xc))
+        g.attrs['HYB'] = float(hyb)
+        g.attrs['OMEGA'] = float(omega)
+        g.attrs['ALPHA'] = float(alpha)
+        if mp2_scale is not None:
+            g.attrs['MP2_SCALE'] = float(mp2_scale)
+    dump.array('DFT/E_KS', np.array([mf.e_tot]))
+    if mymp is not None:
+        dump.array('DFT/E_MP2_REF', np.array([mymp.e_corr]))
+        if mp2_scale is not None:
+            dump.array('DFT/E_DH_REF', np.array([mf.e_tot + mp2_scale * mymp.e_corr]))
+
+    fock_mo = mo_coeff.T @ mf.get_fock() @ mo_coeff
+    dump.array('SCF/FOCK_MO', fock_mo.T, attrs={'DIMS': ['mo', 'mo']})
+    if not np.allclose(np.diag(fock_mo), mf.mo_energy, atol=1e-6):
+        print('WARNING: diag(Fock_MO) differs from mo_energy')
+
+    if dump_eri:
+        eri_mo = ao2mo.full(mol, mo_coeff)
+        eri_mo = ao2mo.restore(1, eri_mo, nmo)
+        twono = naddr3_pack(eri_mo, nmo)
+        print(f'MOINTS/ERI: {twono.size} doubles, {twono.nbytes/1024**2:.1f} MB')
+        dump.array('MOINTS/ERI', twono,
+                   attrs={'PACKING': 'NADDR3', 'NORB': int(nmo),
+                          'BASIS': 'MO', 'TRANSFORMED': 1})
+
+    if dump_grid or tds:
+        g = _ks_grid_quantities(mol, mf)
+        if dump_grid:
+            dump_ks_grid(dump, mol, mf, g)
+        if tds:
+            dump_ks_tddft(dump, mol, mf, g, tds, dump_ab)
+
+    print(f'wrote {filename}: NBASIS={nbasis} NI={NI} NV={NV} FROZEN={frozen}')
+
+
 def get_data_for_gammcor(mol, myhf, mycas, mymp = None, dump_eri=False, simple = True,
-                         dump_hdf5 = True):
+                         dump_hdf5 = True, dump_dft = False, mp2_scale = None,
+                         dump_grid = False, tds = None, dump_ab = True):
     """Process and export CASSCF calculation data for GAMMCOR.
 
     dump_hdf5 = True  -> one organized HDF5 file (H5FILE), see _Dump
     dump_hdf5 = False -> the legacy loose .bin/.txt files, exactly as before
+    dump_dft  = True  -> myhf is a converged RKS object; only the RKS/MP2/TDDFT
+                         data are written (dump_ks_for_gammcor), mycas is ignored
     """
+
+    if dump_dft:
+        dump_ks_for_gammcor(mol, myhf, mymp, mp2_scale=mp2_scale, dump_eri=dump_eri,
+                            dump_grid=dump_grid, tds=tds, dump_ab=dump_ab)
+        return
 
     storage_name = H5FILE
     lll = 180
@@ -621,6 +872,12 @@ def get_data_for_gammcor(mol, myhf, mycas, mymp = None, dump_eri=False, simple =
             dump.array(f'{sgrp}/RDM2_BBBB', dm2_spin_avg, 'rdm2_bbbb.bin', attrs=_rdm2_attrs)
             dump.array(f'{sgrp}/RDM2_ABAB', dm2_ab_avg, 'rdm2_abab.bin', attrs=_rdm2_attrs)
             dump.array(f'{sgrp}/RDM2_BABA', dm2_ab_avg, 'rdm2_baba.bin', attrs=_rdm2_attrs)
+
+#            dump.array(f'{sgrp}/RDM2_AAAA', dm2_aaaa, 'rdm2_aaaa.bin', attrs=_rdm2_attrs)
+#            dump.array(f'{sgrp}/RDM2_BBBB', dm2_bbbb, 'rdm2_bbbb.bin', attrs=_rdm2_attrs)
+#            dump.array(f'{sgrp}/RDM2_ABAB', dm2_abab, 'rdm2_abab.bin', attrs=_rdm2_attrs)
+#            dump.array(f'{sgrp}/RDM2_BABA', dm2_baba, 'rdm2_baba.bin', attrs=_rdm2_attrs)
+
             dm2_full_bin = 2.0*dm2s[1] + dm2s[0] + dm2s[2]
             dm2_full_reordered = 2.0 * (dm2_spin_avg + dm2_ab_avg)
         dump.array(f'{sgrp}/RDM2', dm2_full_bin, 'rdm2_full.bin',
@@ -643,6 +900,12 @@ def get_data_for_gammcor(mol, myhf, mycas, mymp = None, dump_eri=False, simple =
                    attrs={'SPIN_AVERAGED': 1})
         dump.array(f'{sgrp}/RDM1_B', dm1_spin_avb, 'rdm1b.bin',
                    attrs={'SPIN_AVERAGED': 1})
+
+#        dump.array(f'{sgrp}/RDM1_A', dm1s[0], 'rdm1a.bin',
+#                   attrs={'SPIN_AVERAGED': 1})
+#        dump.array(f'{sgrp}/RDM1_B', dm1s[1], 'rdm1b.bin',
+#                   attrs={'SPIN_AVERAGED': 1})
+ 
         dump.array(f'{sgrp}/RDM1', dm1s[0] + dm1s[1])
 
         rdm1p = np.zeros(nbasis)

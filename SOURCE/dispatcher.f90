@@ -31,14 +31,14 @@ contains
             select case(Flags%JobType)
 
             case(JOB_TYPE_PPERPA_RDMDUMP, JOB_TYPE_HHERPA_RDMDUMP)
-                  print*, 'acpp_driver_simple'
-                  call acpp_driver_simple(THCData, AuxData, CAONO, Flags, TwoEl)
+                  print*, 'ppac_dispatch_simple'
+                  call ppac_dispatch_simple(THCData, AuxData, CAONO, Flags, TwoEl)
                   
             case(JOB_TYPE_PPERPA, JOB_TYPE_AC0PP, JOB_TYPE_ACPP)
-
+                  print*, 'Flags%Algorithm', Flags%Algorithm
                   if (Flags%Algorithm == ALG_PPSIMPLE)then
-                        print*, 'acpp_driver_simple'
-                        call acpp_driver_simple(THCData, AuxData, CAONO, Flags, TwoEl)
+                        print*, 'ppac_dispatch_simple'
+                        call ppac_dispatch_simple(THCData, AuxData, CAONO, Flags, TwoEl)
                   else
                         print*, 'acpp_driver'
                         call acpp_driver(THCData, AuxData, Flags, CAONO)

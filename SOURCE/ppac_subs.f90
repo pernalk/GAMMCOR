@@ -14,7 +14,6 @@ module ppac_subs
       use ppac_types
       use ppac0
       use pp_utils
-      use interface_pp
 
       implicit none
 

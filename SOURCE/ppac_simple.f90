@@ -7,11 +7,14 @@ module ppac_simple
       use THC_Gammcor
       use sort
       use ppac_simple_subs
+      use print_utils
 
       implicit none
+
+      double precision, parameter, private :: ttoeV = 27.211399d+0
 contains
 
-      subroutine acpp_driver_simple(THCData, AuxData, CAONO, Flags, TwoEl)
+      subroutine ppac_dispatch_simple(THCData, AuxData, CAONO, Flags, TwoEl)
 
 
             type(TACppData), intent(inout) :: AuxData
@@ -29,8 +32,8 @@ contains
                   NV=>AuxData%NV, NBasis=>AuxData%NBasis, &
                   n_p=>AuxData%n_p, n_m=>AuxData%n_m)
 
-              !              AuxData%spinsep = .false.
-              AuxData%spinsep = .true.
+                            AuxData%spinsep = .false.
+              !AuxData%spinsep = .true.
               if (AuxData%spinsep == .true.)then
 
 !                    if ((Flags%Jobtype == JOB_TYPE_AC0PP &
@@ -231,7 +234,7 @@ contains
               stop
             end associate     
 
-      end subroutine acpp_driver_simple
+      end subroutine ppac_dispatch_simple
 
       subroutine select_pairs(AuxData)
             type(TACppData), intent(inout) :: AuxData
@@ -350,8 +353,10 @@ contains
               write(*, '(A43)') repeat('-', 43)
 
               do i = 1, min(100, AuxData%NDim_s)
-                    write(*, '(I5, 2I6, 2F15.8)') i, AuxData%IndN(1,i), AuxData%IndN(2,i), &
-                          Occ(AuxData%IndN(1,i)), Occ(AuxData%IndN(2,i))
+                    if (abs(Occ(AuxData%IndN(1,i))+ Occ(AuxData%IndN(2,i))).gt.1.d-10)then
+                          write(*, '(I5, 2I6, 2F15.8)') i, AuxData%IndN(1,i), AuxData%IndN(2,i), &
+                                Occ(AuxData%IndN(1,i)), Occ(AuxData%IndN(2,i))
+                    end if
               end do
 
             end associate
@@ -1047,30 +1052,37 @@ contains
 
         call pperpa_incore_allocate(AuxData)
         nn = size(TwoEl, dim=1)                                                                            
-        allocate(TwoNOA(nn))   
+        allocate(TwoNOA(nn))
+
+        AuxData%alpha = 0.00001!zero!0.000001!zero
+        call pperpa_incore_init(AuxData, AuxData%alpha, Flags, TwoEl, TwoNOA)
+
+        call pperpa_incore_iter(AuxData, Flags, TwoNOA)
+        call ppac_incore_energy(AuxData, W_0, TwoEl)
+        print*, 'w0_ac0', W_0
+
 
         AuxData%alpha = zero!0.000001!zero
         call pperpa_incore_init(AuxData, AuxData%alpha, Flags, TwoEl, TwoNOA)
 
         call pperpa_incore_iter(AuxData, Flags, TwoNOA)
         call ppac_incore_energy(AuxData, W_0, TwoEl)
-        write(*,'(/,1X,A5,1X,A15,1X,A15,1X,A15,1X)') &
-              'iter', 'ACalpha', 'wgrid(i)', 'W'
-        write(*,'(1X,I5,1X,F15.8,1X,F15.8,1X,F15.8,1X)') &
-              0, AuxData%alpha,  0.0, W_0
-!        stop
-        ngrid = 15
+        print*, 'w0', W_0
+
+        ngrid = 10
         allocate(xgrid(ngrid))
         allocate(wgrid(ngrid))
 
-        print*, 'ngrid', ngrid
-
         Call GauLeg(zero, one, xgrid, wgrid, ngrid)
 
+        call print_section('ppAC adiabatic connection integration')
+        call print_info('Gauss-Legendre grid points', ngrid)
+        print*, ''
+        write(*,'(2X,A5,4(1X,A15))') 'iter', 'alpha', 'w_i', 'W(alpha)-W(0)', 'Ecorr(cum.)'
+        write(*,'(2X,A)') repeat('-', 69)
+        write(*,'(2X,I5,4(1X,F15.8))') 0, zero, zero, zero, zero
+
         ecorr = zero
-        
-        write(*,'(/,1X,A5,1X,A15,1X,A15,1X,A15,1X,A15)') &
-              'iter', 'ACalpha', 'wgrid(i)', 'W', 'Ecorr_i'
         do i = 1, NGrid
               
               AuxData%alpha = xgrid(i)
@@ -1079,19 +1091,23 @@ contains
               call pperpa_incore_iter(AuxData, Flags, TwoNOA)
               call ppac_incore_energy(AuxData, W, TwoEl)
               ecorr = ecorr + (W-W_0) * wgrid(i)
-!              print*, 'iter', i, 'alpha', AuxData%alpha
-              write(*,'(1X,I5,1X,F15.8,1X,F15.8,1X,F15.8,1X,F15.8)') &
-                    i, AuxData%alpha,  wgrid(i), W-W_0, ecorr
+              write(*,'(2X,I5,4(1X,F15.8))') i, AuxData%alpha, wgrid(i), W-W_0, ecorr
               if (i==NGrid)then
                     ppAC1 = (W-W_0)/two
               end if
         end do
         
-        write(*,'(/,1X,''ECASSCF+ENuc, AC-Corr, ERPA-CASSCF'',6X,3F15.8)'), &
-              AuxData%ECas, ecorr, AuxData%ECas + ecorr
-
-        write(*,'(/,1X,''ECASSCF+ENuc, AC1-Corr, ERPA-CASSCF'',6X,3F15.8)'), &
-              AuxData%ECas, ppAC1, AuxData%ECas + ppAC1
+        call print_section('Final energies')
+        call print_energy('CASSCF energy (one-electron)', AuxData%ECAS_oneelectr, &
+              ttoeV * AuxData%ECAS_oneelectr)
+        call print_energy('ECASSCF_calc', AuxData%ECAS_calc, ttoeV * AuxData%ECAS_calc)
+        call print_energy('E_ppAC', ecorr, ttoeV * ecorr)
+        call print_energy('E_ppAC1', ppAC1, ttoeV * ppAC1)
+        call print_energy('E_total (ppAC)', AuxData%ECAS_calc + ecorr, &
+              ttoeV * (AuxData%ECAS_calc + ecorr))
+        call print_energy('E_total (ppAC1)', AuxData%ECAS_calc + ppAC1, &
+              ttoeV * (AuxData%ECAS_calc + ppAC1))
+        print*, ''
        
   end subroutine ppAC_incore_driver
 
@@ -1227,7 +1243,6 @@ contains
         deallocate(Eig_i)
         deallocate(MxA)
         deallocate(MxS)
-
 
 
   end subroutine pperpa_incore_iter
@@ -1483,111 +1498,4 @@ contains
           end associate
     end subroutine pperpa_incore_init
 
-
-    
-  ! subroutine erpa_init_incore(AuxData,  Flags, Ints)
-  !       type(TACppData), intent(inout) :: AuxData
-  !       type(TInts), intent(inout) :: Ints
-  !       type(FlagsData), intent(in) :: Flags
-
-  !       integer :: i, j, k,  t, l
-  !       integer :: i0, i1
-  !       double precision :: temp
-  !       integer(I8) :: nb, npair, pq, rs
-  !       integer :: p,q,r,s
-  !       integer(I8) :: a1,b1,a2,b2, a,b, c,d, idx
-
-
-  !       associate(Occ=>AuxData%Occ, ENuc=>AuxData%ENuc, &
-  !             NI=>AuxData%NI, NA=>AuxData%NA, NIA=>AuxData%NIA, &
-  !             NV=>AuxData%NV, NBasis=>AuxData%NBasis, IAux=>AuxData%IndAux, &
-  !             ints2e_aa=>Ints%ints2e_aa, ints2e_ab=>Ints%ints2e_ab, &
-  !             ints1e_aa=>Ints%ints1e_aa, Aints1e_aa=>Ints%Aints1e_aa, &
-  !             int_alpha=> AuxData%int_alpha, alpha=>AuxData%alpha)
-
-
-  !         Aints1e_aa = alpha * AuxData%HNO0
-
-  !         do i = 1, NBasis
-  !               do j = 1, NBasis
-  !                     if (IAux(i) == IAux(j)) then
-  !                           Aints1e_aa(i, j) = Aints1e_aa(i, j) + (One - alpha) * AuxData%HNO0(i,j)
-
-  !                           if (AuxData%HType == H_DYALL) then
-  !                           !      print*, 'dyal'                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          
-  !                                 if (IAux(i) == 1) then
-  !                                       i0 = 1
-  !                                       i1 = NI
-  !                                 else
-  !                                       i0 = 1
-  !                                       i1 = NIA
-  !                                 end if
-  !                           else if (AuxData%HType == H_GPF) then
-  !                                 if (IAux(i) == 0) then
-  !                                       i0 = NI + 1
-  !                                       i1 = NIA
-  !                                 else if (IAux(i) == 1) then
-  !                                       i0 = 1
-  !                                       i1 = NI
-  !                                 else
-  !                                       i0 = 1
-  !                                       i1 = NIA
-  !                                 end if
-  !                           end if
-
-  !                           temp = zero
-  !                           do t = i0, i1
-  !                                 temp = temp + occ(t) * &
-  !                                       ( ints2e_aa(gmap_4fold(t,t,i,j, NBasis)) &
-  !                                       + ints2e_ab(gmap_4fold(t,t,i,j, NBasis)) &
-  !                                       - ints2e_aa(gmap_4fold(t,i,t,j, NBasis)) )
-  !                           end do
-
-  !                           Aints1e_aa(i, j) = Aints1e_aa(i, j) + (One - alpha) * temp
-  !                     end if
-  !               end do
-  !         end do
-
-  !         nb    = int(NBasis, I8)
-  !         npair = nb*nb
-
-  !         AuxData%int_alpha = 1
-
-  !         do pq = 1_I8, npair
-  !               q = int((pq-1_I8)/nb + 1_I8)
-  !               p = int(pq - int(q-1,I8)*nb)
-
-  !               do rs = pq, npair
-  !                     s = int((rs-1_I8)/nb + 1_I8)
-  !                     r = int(rs - int(s-1,I8)*nb)
-
-  !                     a1 = pq; b1 = rs
-  !                     a  = min(a1,b1); b = max(a1,b1)
-
-  !                     a2 = int(q,I8) + (int(p,I8)-1_I8)*nb
-  !                     b2 = int(s,I8) + (int(r,I8)-1_I8)*nb
-  !                     c  = min(a2,b2); d = max(a2,b2)
-
-  !                     if ( (c < a) .or. (c == a .and. d < b) ) cycle
-
-  !                     idx = gmap_4fold(r,s,p,q,NBasis)
-
-  !                     if (AuxData%HType == H_DYALL) then
-  !                           if (.not. (IAux(p) == 1 .and. IAux(q) == 1 .and. &
-  !                                 IAux(r) == 1 .and. IAux(s) == 1)) then
-  !                                 AuxData%int_alpha(idx) = 0
-  !                           end if
-
-  !                     else if (AuxData%HType == H_GPF) then
-  !                           if (.not. (IAux(p) == IAux(q) .and. &
-  !                                 IAux(q) == IAux(r) .and. &
-  !                                 IAux(r) == IAux(s))) then
-  !                                 AuxData%int_alpha(idx) = 0
-  !                           end if
-  !                     end if
-  !               end do
-  !         end do
-
-  !       end associate
-  ! end subroutine erpa_init_incore
 end module ppac_simple
