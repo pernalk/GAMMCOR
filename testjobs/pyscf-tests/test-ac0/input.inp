@@ -1,5 +1,5 @@
 Calculation
- BasisPath /home/michalhapka/pr-dmft/bazy-do-pyscf/
+ BasisPath /home/michalhapka/pr-dmft/basis-for-pyscf/
  JobTitle   AC
  Interface  PYSCF
  JobType  AC0
