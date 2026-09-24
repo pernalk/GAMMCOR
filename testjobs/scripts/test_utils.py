@@ -1,3 +1,4 @@
+import os
 from scripts.colors import *
 
 def convert_level_to_int(level):
@@ -29,30 +30,21 @@ def start_test(test, units, RUN_GAMMCOR):
     runner = test.get('runner')
     return runner(units, test.get('fun'), RUN_GAMMCOR)
 
-def modify_input(units,BasisPath):
-    # in Cholesky OTF input.inp files
-    # set BasisPath to: local_path_gammcor/basis/
+def get_interface(filename):
+    with open(filename, 'r') as file:
+        for line in file:
+            words = line.lower().split()
+            if len(words) > 1 and words[0] == "interface":
+                return words[1]
+    return None
 
-    substring="gammcor"
-    index = BasisPath.rfind(substring)
-    if index != -1:
-        BasisPath = BasisPath[:index] + BasisPath[index + len(substring):]
-        BasisPySCFPath = BasisPath
-    BasisPath+="basis/"
-    BasisPySCFPath+="bazy-do-pyscf/"
+def set_basis_path(filenames, basis_path):
+    for filename in filenames:
+        append_string_to_line(filename, "BasisPath", basis_path)
 
-    for unit in units:
-      filename=unit['name']+"/input.inp"
-
-      if check_word_in_file(filename,"BasisPath"):
-         if check_word_in_file(filename,"PYSCF"):
-            print(filename,BasisPath)
-            remove_text_from_line(filename,"BasisPath")
-            append_string_to_line(filename,"BasisPath",BasisPySCFPath)
-         else:
-            print(filename,BasisPath)
-            remove_text_from_line(filename,"BasisPath")
-            append_string_to_line(filename,"BasisPath",BasisPath)
+def clear_basis_path(filenames):
+    for filename in filenames:
+        remove_text_from_line(filename, "BasisPath")
 
 def check_word_in_file(filename, word):
     with open(filename, 'r') as file:
@@ -79,7 +71,7 @@ def append_string_to_line(filename, word, value):
     # append with value
     with open(filename, 'w') as file:
         for line in lines:
-            if word.lower() in line.lower():
+            if line.lower().lstrip().startswith(word.lower()):
                 line = line.rstrip('\n') + ' ' + value + '\n'
             file.write(line)
 

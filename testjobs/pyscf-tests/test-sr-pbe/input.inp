@@ -1,5 +1,6 @@
 Calculation
- BasisPath /home/michalhapka/pr-dmft/basis-for-pyscf/
+! BasisPath defined as pyscf_basis_path in run_tests.py
+ BasisPath
  JobTitle   POSTCAS-LR
  Interface  PYSCF
  JobType    AC0

@@ -8,7 +8,8 @@ Calculation
  OrbIncl       .false.
  NBasis        58
  TwoMoInt      FOFO
- BasisPath /home/michalhapka/pr-dmft/basis/
+! BasisPath defined as basis_path in run_tests.py
+ BasisPath
 end
 
 CholeskyBlock

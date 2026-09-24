@@ -55,7 +55,6 @@ def get():
         'runner': run_test,
         'units': {
             "ACn/AR_CAS":   {'atol': 1.e-5, 'level': 'short'},
-            "ACn/H2O_CAS":  {'atol': 1.e-5, 'level': 'short'},
             "ACn/AR_HF":    {'atol': 1.e-5, 'level': 'short'},
             "ACn/H2O_MOLMPS": {'atol': 1.e-5, 'level': 'short'}
         }

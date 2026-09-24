@@ -1,5 +1,6 @@
 Calculation
- BasisPath /home/aleksandra.tucholska/test/gammcor/bazy-do-pyscf/
+! BasisPath defined as pyscf_basis_path in run_tests.py
+ BasisPath
  JobTitle   AC
  Interface  PYSCF
  JobType  AC

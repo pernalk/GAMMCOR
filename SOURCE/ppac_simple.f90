@@ -32,8 +32,8 @@ contains
                   NV=>AuxData%NV, NBasis=>AuxData%NBasis, &
                   n_p=>AuxData%n_p, n_m=>AuxData%n_m)
 
-                            AuxData%spinsep = .false.
-              !AuxData%spinsep = .true.
+              !AuxData%spinsep = .false.
+              AuxData%spinsep = .true.
               if (AuxData%spinsep == .true.)then
 
 !                    if ((Flags%Jobtype == JOB_TYPE_AC0PP &
@@ -1056,8 +1056,9 @@ contains
 
         AuxData%alpha = 0.00001!zero!0.000001!zero
         call pperpa_incore_init(AuxData, AuxData%alpha, Flags, TwoEl, TwoNOA)
-
+        print*, 'xx'
         call pperpa_incore_iter(AuxData, Flags, TwoNOA)
+        print*, 'yy'
         call ppac_incore_energy(AuxData, W_0, TwoEl)
         print*, 'w0_ac0', W_0
 
@@ -1409,7 +1410,7 @@ contains
 
           W = W_s + W_t + two * W_taa
 
-!          write(*,'(A30, 4F20.10)') 'ppac_incore_energy: W_s, W_t, W_aa =', W_s, W_t, W_taa, W
+          write(*,'(A30, 4F20.10)') 'ppac_incore_energy: W_s, W_t, W_aa =', W_s, W_t, W_taa, W
 
 
         end associate
