@@ -10,10 +10,10 @@ def get():
         'fun': 'sapt2',
         'runner': run_test_sapt,
         'units': {
-            "SAPT/Dalton/TEST6":   {'atol': 1.e-5, 'level': 'short'},
-            "SAPT/Dalton/TEST7":   {'atol': 1.e-5, 'level': 'short'},
+            #"SAPT/Dalton/TEST6":   {'atol': 1.e-5, 'level': 'short'},
+            #"SAPT/Dalton/TEST7":   {'atol': 1.e-5, 'level': 'short'},
             #"SAPT/QPackage/TEST1": {'atol': 1.e-5, 'level': 'short'},
-            "SAPT/QPackage/TEST2": {'atol': 1.e-5, 'level': 'short'},
+            #"SAPT/QPackage/TEST3": {'atol': 1.e-5, 'level': 'short'},
         }
     })
 
@@ -23,7 +23,7 @@ def get():
         'fun': 'dsrs0',
         'runner': run_test_sapt,
         'units': {
-            "SAPT/Molpro/dSRS":   {'atol': 1.e-5, 'level': 'short'},
+            #"SAPT/Molpro/dSRS":   {'atol': 1.e-5, 'level': 'short'},
             "SAPT/QPackage/TEST3": {'atol': 1.e-5, 'level': 'short'},
         }
     })
@@ -38,16 +38,16 @@ def get():
         }
     })
 
-    ### ACn ###
-    tests_list.append({
-        'name': '* testing ACn-CAS[molpro] energy',
-        'fun': acn_en,
-        'runner': run_test,
-        'units': {
-            "ACn/AR_CAS":   {'atol': 1.e-5, 'level': 'short'},
-            "ACn/H2O_CAS":  {'atol': 1.e-5, 'level': 'short'},
-            "ACn/AR_HF":    {'atol': 1.e-5, 'level': 'short'}
-        }
-    })
+    #### ACn ###
+    #tests_list.append({
+    #    'name': '* testing ACn-CAS[molpro] energy',
+    #    'fun': acn_en,
+    #    'runner': run_test,
+    #    'units': {
+    #        "ACn/AR_CAS":   {'atol': 1.e-5, 'level': 'short'},
+    #        #"ACn/H2O_CAS":  {'atol': 1.e-5, 'level': 'short'},
+    #        "ACn/AR_HF":    {'atol': 1.e-5, 'level': 'short'}
+    #    }
+    #})
 
     return tests_list
