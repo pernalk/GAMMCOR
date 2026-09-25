@@ -1,0 +1,3 @@
+[submodule "gammcor-integrals"]
+	path = gammcor-integrals
+	url = git@github.com:modrzejewski/gammcor-integrals.git
