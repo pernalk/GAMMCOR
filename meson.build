@@ -2,6 +2,7 @@ project(
   'gammcor',
   'fortran',
   version : '4.1',
+  meson_version : '>=1.1',
   default_options : [
     'warning_level=0',   # warnings are set per profile (-warn nounused)
     'buildtype=plain',   # Meson adds NO flags of its own: everything the
@@ -20,6 +21,29 @@ root = meson.project_source_root()
 # Profile metadata, set in the [properties] section of the native file.
 profile  = meson.get_external_property('profile',  'release')
 exe_name = meson.get_external_property('exe_name', 'gammcor')
+
+python = import('python').find_installation('python3')
+
+detect_cpu = root / 'gammcor-integrals/.meson/scripts/detect_cpu.py'
+if not import('fs').exists(detect_cpu)
+  error('gammcor-integrals is missing. Run:  git submodule update --init')
+endif
+cpu = get_option('cpu')
+cpu_info = cpu
+if cpu == 'auto'
+  cpu_lines = run_command(python, detect_cpu, check : true).stdout().strip().split('\n')
+  cpu = cpu_lines[0]
+  cpu_info = cpu + ' (auto: ' + cpu_lines[1] + ')'
+endif
+cpu_flags = {
+  'avx512'     : ['-xCORE-AVX512', '-qopt-zmm-usage=high'],
+  'avx512-amd' : ['-march=x86-64-v4'],
+  'avx2'       : ['-march=x86-64-v3'],
+  'native'     : ['-xHost'],
+  'dispatch'   : ['-march=x86-64-v3', '-axCORE-AVX512', '-qopt-zmm-usage=high'],
+}[cpu]
+add_project_arguments(cpu_flags, language : 'fortran')
+add_project_link_arguments(cpu_flags, language : 'fortran')
 
 # ---------------------------------------------------------------------------
 # Pre-built libraries shipped inside the tree.
@@ -45,7 +69,11 @@ cholesky_dep = declare_dependency(
   link_args : [root / 'gammcor-integrals/lib/cholesky.a'],
 )
 
-# HDF5: built into hdf5/ (see hdf5/README.md).
+# HDF5: built into hdf5/ by hdf5/build_hdf5.sh (see hdf5/README.md). Not
+# committed: its .mod files only work with the ifx version that built them.
+if not import('fs').exists(root / 'hdf5/lib/libhdf5_fortran.a')
+  error('HDF5 is not built. Run:  cd hdf5 && ./build_hdf5.sh')
+endif
 hdf5_dep = declare_dependency(
   include_directories : include_directories('hdf5/include'),
   link_args : ['-L' + root / 'hdf5/lib', '-Wl,-rpath,' + root / 'hdf5/lib',
@@ -210,6 +238,8 @@ gammcor_exe = executable(
   # regardless of the compiler's include-resolution rules.
   include_directories : include_directories('SOURCE'),
   dependencies : [xcfun_dep, cholesky_dep, hdf5_dep],
+  # `meson install -C build` puts it into <prefix>/bin/gammcor (conda package).
+  install : true,
 )
 
 # ---------------------------------------------------------------------------
@@ -217,7 +247,6 @@ gammcor_exe = executable(
 # success banner. `console : true` makes Ninja stream its output straight to
 # the terminal, and runs it last.
 # ---------------------------------------------------------------------------
-python     = import('python').find_installation('python3')
 post_build = files('.meson/scripts/post_build.py')
 
 post_build_target = custom_target('post_build_tasks',
@@ -240,5 +269,6 @@ post_build_target = custom_target('post_build_tasks',
 summary({
   'profile'    : profile,
   'compiler'   : fc.get_id() + ' ' + fc.version(),
+  'cpu'        : cpu_info,
   'executable' : 'bin' / exe_name,
 }, section : 'gammcor')

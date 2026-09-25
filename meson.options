@@ -1,0 +1,3 @@
+option('cpu', type : 'combo',
+       choices : ['auto', 'native', 'avx512', 'avx512-amd', 'avx2', 'dispatch'],
+       value : 'auto')

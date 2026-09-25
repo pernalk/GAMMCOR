@@ -46,20 +46,17 @@ SOURCE/implementation_plan_integration.md
 .vscode/
 PP_INTEGRATION_PLAN.md
 
-# HDF5: keep the compiled libraries and modules, drop everything else
-# (headers, .la, bin/, libhdf5.settings, the unpacked source in hdf5/src).
+# HDF5: built locally by hdf5/build_hdf5.sh (the .mod files depend on the exact
+# ifx version), so keep only the script and README.
 /hdf5/*
 !/hdf5/README.md
 !/hdf5/build_hdf5.sh
-!/hdf5/include/
-/hdf5/include/*
-!/hdf5/include/*.mod
-!/hdf5/lib/
-/hdf5/lib/*
-!/hdf5/lib/*.a
 
 gammcor_tools/pyscf_data.h5
 
 # gammcor_tools (python packaging)
 *.egg-info/
 __pycache__/
+
+# local planning notes
+implementation_plans/

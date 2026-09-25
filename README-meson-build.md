@@ -49,6 +49,11 @@ meson setup build       --native-file .meson/profiles/ifx.ini
 meson setup build-debug --native-file .meson/profiles/ifx-debug.ini
 ```
 
+The CPU flags are not in the profiles. They come from the option `cpu`:
+`auto` (default) detects the CPU at setup, or set it with `-Dcpu=avx512`,
+`avx512-amd`, `avx2`, `native` (`-xHost`) or `dispatch` (AVX2 + AVX-512,
+chosen at run time).
+
 The profile is bound to the build directory at setup time. Re-run only after
 deleting a build directory or editing a profile.
 

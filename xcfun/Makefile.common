@@ -2,7 +2,17 @@
 #convertible to regular Make format.
 
 #PATHS:=-Iinclude -Isrc -Isrc/taylor -Isrc/functionals -Llib -I/usr/include/x86_64-linux-gnu/c++/4.9/
-PATHS:=-Iinclude -Isrc -Isrc/taylor -Isrc/functionals -Llib -isystem /usr/include/c++/11 -isystem /usr/include/x86_64-linux-gnu/c++/11 -isystem /usr/include/x86_64-linux-gnu
+PATHS:=-Iinclude -Isrc -Isrc/taylor -Isrc/functionals -Llib
+# icx (clang) uses the newest /usr/lib/gcc/*/<N> for the C++ headers, even when
+# only an older libstdc++-dev is installed. Point it at the GCC that g++ belongs
+# to. Override with GCC_INSTALL_DIR=... ; empty (no g++) = icx default.
+# Instead of hardcoding "use GCC 11", it asks the system's g++ which GCC
+# version it is and tells icx to use that one, so the build works on any
+# machine without editing paths.
+GCC_INSTALL_DIR?=$(shell g++ -print-libgcc-file-name 2>/dev/null | xargs -r dirname)
+ifneq ($(GCC_INSTALL_DIR),)
+PATHS+=--gcc-install-dir=$(GCC_INSTALL_DIR)
+endif
 CFLAGS+=$(PATHS)
 
 BASE_OBJ:=src/xcfun.o src/functional.o src/parameters.o \
