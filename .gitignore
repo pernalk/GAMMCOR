@@ -64,3 +64,6 @@ implementation_plans/
 # install.sh
 install.log
 hdf5-build
+
+# rattler-build (conda/recipe.yaml)
+output/

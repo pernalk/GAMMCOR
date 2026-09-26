@@ -40,6 +40,9 @@ LOG="$PWD/install.log"
     echo "# ./install.sh $ARGS"
     echo "# $(date)  on $(hostname)"
 } > "$LOG"
+# Keep the terminal on fds 3 and 4: the ERR trap can fire inside run(), where
+# stdout and stderr go to install.log.
+exec 3>&1 4>&2
 
 # ---------------------------------------------------------------------------
 # Terminal UI
@@ -56,6 +59,44 @@ else
     GREEN="" YELLOW="" RED="" CYAN="" DIM="" BOLD="" RESET=""
 fi
 if [ -t 1 ] && [ $VERBOSE = 0 ]; then LIVE=1; else LIVE=0; fi
+
+# Ask the terminal for its background colour (OSC 11); return 0 if it is light.
+bg_is_light() {
+    [[ -t 0 && -t 1 ]] || return 1
+    local resp r g b
+    printf '\033]11;?\a' > /dev/tty
+    # -t: a terminal that does not answer must not hang the script
+    IFS= read -r -s -t 0.3 -d $'\a' resp < /dev/tty || true
+    [[ $resp =~ rgb:([0-9a-fA-F]{2})[0-9a-fA-F]*/([0-9a-fA-F]{2})[0-9a-fA-F]*/([0-9a-fA-F]{2}) ]] || return 1
+    r=$((16#${BASH_REMATCH[1]})); g=$((16#${BASH_REMATCH[2]})); b=$((16#${BASH_REMATCH[3]}))
+    (( (299 * r + 587 * g + 114 * b) / 1000 > 128 ))
+}
+
+# Logo colours: lavender (darker on a light background, or GAMMCOR_THEME=light) and red
+if [ -z "$RESET" ]; then
+    LAV="" LOGO_RED=""
+elif [ "${GAMMCOR_THEME:-}" = light ] || { [ -z "${GAMMCOR_THEME:-}" ] && bg_is_light; }; then
+    LAV=$'\e[38;5;60m' LOGO_RED=$'\e[38;5;203m'
+else
+    LAV=$'\e[38;5;146m' LOGO_RED=$'\e[38;5;203m'
+fi
+
+print_logo() {
+    local g=("╭───╴" "│ ──╮" "╰───╯")
+    local a=("  ●  " " ╱ ╲ " "●───●")
+    local m=("│╲  ╱│" "│ ╲╱ │" "│    │")
+    local c=("╭───╴" "│    " "╰───╴")
+    local o=("╭───╮" "│   │" "╰───╯")
+    local r=("╭───╮" "├───╯" "│  ╲ ")
+    local s=("█████" "█████" "█████")
+    local i
+    for i in 0 1 2; do
+        printf '  %s%s %s%s %s%s %s   %s %s %s   %s%s%s\n' \
+            "$LAV" "${g[i]}" "$LOGO_RED" "${a[i]}" "$LAV" "${m[i]}" "${m[i]}" \
+            "${c[i]}" "${o[i]}" "${r[i]}" "$LOGO_RED" "${s[i]}" "$RESET"
+    done
+}
+
 COLS=$(tput cols 2> /dev/null || echo 80)
 RULE=$(printf '─%.0s' $(seq 40))
 SPIN=(⠋ ⠙ ⠹ ⠸ ⠼ ⠴ ⠦ ⠧ ⠇ ⠏)
@@ -196,6 +237,7 @@ fail() {
 
 die() {
     trap - ERR
+    exec 1>&3 2>&4
     fail
     printf '\n%s%s%s\n' "$RED" "$*" "$RESET" >&2
     printf '%s\n' "$*" >> "$LOG"
@@ -205,6 +247,7 @@ die() {
 
 on_error() {
     trap - ERR
+    exec 1>&3 2>&4
     fail
     if [ $VERBOSE = 0 ]; then
         printf '\n%sLast 30 lines of install.log:%s\n' "$DIM" "$RESET" >&2
@@ -256,9 +299,11 @@ if [ -n "$PREFIX" ]; then add_step S_INSTALL "Install"; fi
 
 T_TOTAL=$(now)
 
-printf '\n%sGAMMCOR installation%s\n%s%s%s\n' "$BOLD" "$RESET" "$DIM" "$RULE" "$RESET"
+echo
+print_logo
+printf '%s%s%s\n' "$DIM" "$RULE" "$RESET"
 if [ $VERBOSE = 0 ]; then
-    printf '%sbuild output: install.log  (--verbose to show it here)%s\n' "$DIM" "$RESET"
+    printf '%sbuild output: install.log%s\n' "$DIM" "$RESET"
 fi
 echo
 if [ $LIVE = 1 ]; then printf '\e[?25l'; fi   # hide the cursor while redrawing
@@ -293,7 +338,10 @@ fi
 for tool in python3 meson ninja make; do
     command -v $tool > /dev/null || die "$tool not found."
 done
-python3 -m pip --version > /dev/null 2>&1 || die "pip not found for $(command -v python3)."
+# conda-build/rattler-build set $PYTHON to the host env's python; python3 on
+# PATH can be the build env's one there, and gammcor_tools must not go in it.
+PYTHON="${PYTHON:-python3}"
+"$PYTHON" -m pip --version > /dev/null 2>&1 || die "pip not found for $(command -v "$PYTHON")."
 
 ok "" "ifx:    $(ifx --version 2>&1 | sed -n 1p | awk '{print $3}')
 MKL:    $MKL
@@ -305,8 +353,32 @@ ninja:  $(ninja --version)"
 # ---------------------------------------------------------------------------
 begin $S_SRC "Checking the gammcor-integrals submodule"
 
+# A clone without --recursive leaves gammcor-integrals/ empty; fetch it here.
+# An archive download (zip/tar.gz from GitLab) has no .git and cannot fetch it.
+GAMMCOR_URL=https://gitlab.com/qchem/gammcor.git
 if [ ! -f gammcor-integrals/meson.build ]; then
-    run git submodule update --init || die "gammcor-integrals is missing. Clone with: git clone --recursive"
+    [ -e .git ] || die "Git submodule gammcor-integrals is missing.
+
+This copy of GAMMCOR is not a git repository (downloaded as an archive?),
+so the submodule cannot be fetched. Clone the repository with its submodules:
+
+  git clone --recursive $GAMMCOR_URL"
+
+    RUNLABEL="Fetching the gammcor-integrals submodule"
+    if [ $LIVE = 1 ]; then spin_stop; render; spin_start; fi
+    # GIT_TERMINAL_PROMPT=0: fail instead of waiting, invisibly, for a password
+    GIT_TERMINAL_PROMPT=0 run git submodule update --init --recursive || true
+    [ -f gammcor-integrals/meson.build ] || die "Git submodule gammcor-integrals is missing and could not be fetched
+(git output is in install.log).
+
+The repository was probably cloned without --recursive. Fetch the submodule
+inside this directory:
+
+  git submodule update --init --recursive
+
+or clone again, with submodules:
+
+  git clone --recursive $GAMMCOR_URL"
 fi
 
 ok "gammcor-integrals $(git -C gammcor-integrals rev-parse --short HEAD 2> /dev/null || true)"
@@ -332,14 +404,56 @@ if [ $CLEAN = 1 ]; then
     ok "previous builds removed"
 fi
 
+# Extra link flags for a conda environment (ifx and MKL from conda-forge):
+#  - conda-forge MKL (libmkl_intel_thread.so, 2026.1) calls __atomic_load and
+#    __atomic_compare_exchange from libatomic, which ifx -qmkl does not link;
+#  - the MKL, OpenMP and Intel runtime libraries are in <conda prefix>/lib,
+#    which is not on the loader path. conda puts -rpath in $LDFLAGS, but Meson
+#    ignores $LDFLAGS when the profile sets fortran_link_args.
+# Without them Meson's sanity check fails ("ifx cannot compile programs",
+# "executables ... are not runnable").
+# Meson links with --as-needed and places -latomic before the MKL libraries
+# that -qmkl appends, so the linker would drop libatomic as unused. Linking it
+# with --no-as-needed keeps it; one -Wl argument also stops Meson moving it.
+# The conda prefix is the one holding MKL: $MKLROOT if set (the conda recipe
+# sets MKLROOT=$PREFIX, the host env), else the active env. A oneAPI MKLROOT
+# has no libatomic.so next to MKL, so this adds nothing there.
+CONDA_LINK_ARGS=()
+CONDA_LIB="${MKLROOT:-$CONDA_PREFIX}/lib"
+if [ -f "$CONDA_LIB/libmkl_intel_thread.so" ] && [ -f "$CONDA_LIB/libatomic.so" ]; then
+    CONDA_LINK_ARGS=(-Wl,-rpath,"$CONDA_LIB" -Wl,--push-state,--no-as-needed,-latomic,--pop-state)
+fi
+
+# Print a native file that repeats fortran_link_args of <profile> with <args> appended.
+#   link_args_native_file <profile> <args>...
+link_args_native_file() {
+    python3 - "$@" <<'EOF'
+import ast, configparser, sys
+ini = configparser.ConfigParser(interpolation=None)
+ini.read(sys.argv[1])
+args = ast.literal_eval(ini['built-in options']['fortran_link_args'])
+print('[built-in options]')
+print(f"fortran_link_args = {args + sys.argv[2:]!r}")
+EOF
+}
+
 # Configure a Meson build directory, or update its options if it exists.
+# A directory left behind by a failed setup has meson-private/ but no
+# coredata.dat; meson setup starts it over.
 #   meson_setup <build dir> <source dir> [options...]
 meson_setup() {
     local dir=$1 src=$2; shift 2
-    if [ -d "$dir/meson-private" ]; then
+    local profile="$src/.meson/profiles/ifx.ini"
+    if [ -f "$dir/meson-private/coredata.dat" ]; then
         meson configure "$dir" "$@"
     else
-        meson setup "$dir" "$src" --native-file "$src/.meson/profiles/ifx.ini" "$@"
+        local native=(--native-file "$profile")
+        if [ ${#CONDA_LINK_ARGS[@]} -gt 0 ]; then
+            mkdir -p "$dir"
+            link_args_native_file "$profile" "${CONDA_LINK_ARGS[@]}" > "$dir/conda.ini"
+            native+=(--native-file "$PWD/$dir/conda.ini")
+        fi
+        meson setup "$dir" "$src" "${native[@]}" "$@"
     fi
 }
 
@@ -384,9 +498,9 @@ if [ -z "$PREFIX" ]; then
 else
     PIP_ARGS=(./gammcor_tools --no-deps --no-build-isolation)
 fi
-run python3 -m pip install "${PIP_ARGS[@]}" || die "pip install failed (details in install.log).
+run "$PYTHON" -m pip install "${PIP_ARGS[@]}" || die "pip install failed (details in install.log).
 If pip says 'externally-managed-environment', use a venv, a conda env,
-or run: python3 -m pip install --user ${PIP_ARGS[*]}"
+or run: $PYTHON -m pip install --user ${PIP_ARGS[*]}"
 
 ok "gammcor_tools, $(elapsed "$T_STEP")"
 
@@ -394,6 +508,8 @@ ok "gammcor_tools, $(elapsed "$T_STEP")"
 # 8. gammcor  ->  build/gammcor, bin/gammcor
 # ---------------------------------------------------------------------------
 begin $S_GAMMCOR "Building GAMMCOR"
+
+mkdir -p OBJ   # object directory of the Makefile build, for those who use make
 
 MESON_ARGS=(-Dcpu="$CPU")
 if [ -n "$PREFIX" ]; then MESON_ARGS+=(-Dprefix="$PREFIX"); fi
@@ -421,6 +537,7 @@ if [ $LIVE = 1 ]; then
 else
     printf '\n%s%s%s\n%s\n' "$DIM" "$RULE" "$RESET" "$FOOTER"
 fi
+printf '%sNo electrons were harmed during compilation.%s\n' "$LAV" "$RESET"
 printf '\n  gammcor  %s%s%s\n' "$CYAN" "$PWD/bin/gammcor" "$RESET"
 if [ -n "$PREFIX" ]; then printf '           %s%s%s\n' "$CYAN" "$PREFIX/bin/gammcor" "$RESET"; fi
 printf '  log      %s%s%s\n\n' "$DIM" "$LOG" "$RESET"

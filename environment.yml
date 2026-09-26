@@ -1,0 +1,32 @@
+# Conda environment for building and developing GAMMCOR.
+#
+#   conda env create -f environment.yml
+#   conda activate gammcor-dev
+#   conda env config vars set MKLROOT="$CONDA_PREFIX"    # once; -qmkl finds MKL through it
+#   conda activate gammcor-dev
+#   ./install.sh
+#
+# Everything comes from conda-forge. On Linux, conda-forge has no intel-openmp;
+# MKL and the Intel Fortran runtime use llvm-openmp instead (pulled in by them).
+name: gammcor-dev
+channels:
+  - conda-forge
+  - nodefaults
+dependencies:
+  - python>=3.10
+  - pip
+  # Intel oneAPI compilers and MKL
+  - ifx_linux-64         # Fortran: ifx
+  - dpcpp_linux-64       # C/C++: icx
+  - mkl-devel
+  # build tools
+  - meson
+  - ninja
+  - make
+  # HDF5 is built by install.sh against these
+  - zlib
+  - libaec
+  # gammcor_tools
+  - numpy
+  - h5py
+  - pyscf                # optional: only for the PySCF interface

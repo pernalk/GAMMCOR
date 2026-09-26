@@ -1,0 +1,137 @@
+# rattler-build recipe for the pre-compiled gammcor package.
+#
+#   rattler-build build -r conda/recipe.yaml -c conda-forge
+#
+# The binary is built by the same ./install.sh as a source install, with
+# --cpu dispatch (AVX2 + AVX-512 code paths, chosen at run time).
+
+context:
+  name: gammcor
+  version: "4.1"
+  hdf5_version: "1.14.5"
+
+package:
+  name: ${{ name }}
+  version: ${{ version }}
+
+source:
+  # The local checkout, with the gammcor-integrals submodule. .gitignore lists
+  # gammcor-integrals/, so it is not used as a filter; build output and local
+  # files are excluded here instead. For a release, use a git tag:
+  #   - git: https://gitlab.com/qchem/gammcor.git
+  #     tag: v-${{ version }}
+  - path: ..
+    use_gitignore: false
+    filter:
+      exclude:
+        - .git/**
+        - output/**                 # rattler-build's own output, if run from here
+        - build/**
+        - build-*/**
+        - bin/**
+        - OBJ/**
+        - gammcor-integrals/.git
+        - gammcor-integrals/build/**
+        - gammcor-integrals/lib/**
+        - hdf5/bin/**
+        - hdf5/include/**
+        - hdf5/lib/**
+        - hdf5/share/**
+        - hdf5/src/**
+        - xcfun/lib/libxcfun.*
+        - "**/*.o"
+        - "**/*.mod"
+        - install.log
+        - implementation_plans/**
+  # Second source: build_hdf5.sh gets the tarball through $HDF5_TARBALL
+  # instead of downloading it. file_name keeps it packed.
+  - url: https://github.com/HDFGroup/hdf5/releases/download/hdf5_${{ hdf5_version }}/hdf5-${{ hdf5_version }}.tar.gz
+    sha256: ec2e13c52e60f9a01491bb3158cb3778c985697131fc6a342262d32a26e58e44
+    file_name: hdf5-${{ hdf5_version }}.tar.gz
+    target_directory: hdf5-tarball
+
+build:
+  number: 0
+  skip:
+    - not linux
+  script:
+    content: |
+      # MKL is in the host env ($PREFIX), the compilers in the build env:
+      # -qmkl finds MKL through MKLROOT, and install.sh adds -latomic and an
+      # rpath to $MKLROOT/lib (rattler-build turns it into $ORIGIN/../lib).
+      export MKLROOT="$PREFIX"
+      export ZLIB_ROOT="$PREFIX"
+      export HDF5_TARBALL="$SRC_DIR/hdf5-tarball/hdf5-${{ hdf5_version }}.tar.gz"
+      # icx must use conda's g++ headers for XCFun, not a g++ on the system.
+      export GCC_INSTALL_DIR="$(dirname "$("$CXX" -print-libgcc-file-name)")"
+      ./install.sh --clean --cpu dispatch --prefix "$PREFIX" --jobs "$CPU_COUNT" --verbose
+
+requirements:
+  build:
+    - ifx_linux-64          # ifx
+    - dpcpp_linux-64        # icx (XCFun, HDF5)
+    - meson
+    - ninja
+    - make
+  host:
+    - python
+    - pip
+    - setuptools
+    - mkl-devel
+    - zlib
+    - libaec
+    # The Intel Fortran runtime (libicaf, libifcore, libimf, ...) must be in
+    # $PREFIX/lib, where the rpath points; in the build env only (as a
+    # dependency of ifx) the executables link but do not run.
+    - intel-fortran-rt
+  run:
+    - python
+    - numpy
+    - h5py
+    - mkl                   # full package: libmkl_avx2.so, libmkl_avx512.so, ...
+    - intel-fortran-rt      # libifcore, libimf, ...; pulls in intel-cmplr-lib-rt
+    - llvm-openmp           # libiomp5.so (conda-forge has no intel-openmp on linux-64)
+    - libgcc                # libatomic.so.1, needed by conda-forge MKL
+    - libzlib               # -lz
+    - libaec                # -lsz
+  # mkl-devel, zlib and libaec add their own run_exports; check the rendered
+  # recipe (rattler-build build --render-only) that nothing is pinned twice.
+
+tests:
+  - package_contents:
+      bin:
+        - gammcor
+        - gammcor_basis
+        - gammcor_2h5
+        - gammcor_2bin
+        - gammcor_h5info
+      site_packages:
+        - gammcor_tools
+  - script:
+      # The test inherits PATH and LD_LIBRARY_PATH of the shell that runs
+      # rattler-build (oneAPI, a dev env), so libraries and compilers from
+      # there must not count.
+      - unset LD_LIBRARY_PATH
+      - gammcor_h5info --help
+      # every shared library is found through the rpath
+      - ldd "$PREFIX/bin/gammcor"
+      - if ldd "$PREFIX/bin/gammcor" | grep "not found"; then exit 1; fi
+      # the package must not pull in the compiler
+      - if [ -e "$PREFIX/bin/ifx" ]; then echo "ifx is in the test env"; exit 1; fi
+      # AC0 energy of ethene, with the default MKL kernels and with AVX2 ones
+      - python run_test.py testjobs/AC0/ethene
+      - MKL_ENABLE_INSTRUCTIONS=AVX2 python run_test.py testjobs/AC0/ethene
+    files:
+      source:
+        - testjobs/AC0/ethene/
+      recipe:
+        - run_test.py
+    requirements:
+      run:
+        - python
+
+about:
+  homepage: https://gitlab.com/qchem/gammcor
+  license: GPL-3.0-only     # LICENSE is GPLv3; no "or any later version" notice found
+  license_file: LICENSE
+  summary: GAMMCOR – electron correlation from adiabatic connection and SAPT for multireference wavefunctions
