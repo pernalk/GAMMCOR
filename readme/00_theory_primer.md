@@ -2,7 +2,7 @@
 
 <!-- Sketch: the questions below follow the style of the beyond-rpa primer
 (one question per section, a short answer with literature keys from
-04_literature.md). Answers are still to be written. -->
+05_citation.md). Answers are still to be written. -->
 
 ## 1. What physical quantities can be computed with GAMMCOR?
 TODO

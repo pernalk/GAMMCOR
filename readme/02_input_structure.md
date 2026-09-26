@@ -3,16 +3,29 @@
 ## Running `gammcor`
 
 GAMMCOR always reads the file `input.inp` from the current directory. Go to
-the directory with the input and the files from the reference calculation,
-and start the program:
+the directory containing the input and the files from the reference
+calculation, then run the appropriate executable.
+
+### 1. Meson release build
 
 ```bash
 cd my_job
-gammcor > gammcor.out
+/path/to/gammcor/bin/gammcor
 ```
 
-If you built GAMMCOR from source, use the full path, e.g.
-`/path/to/gammcor/bin/gammcor > gammcor.out`.
+### 2. Meson debug build
+
+```bash
+cd my_job
+/path/to/gammcor/bin/gammcor-debug
+```
+
+### 3. Make build
+
+```bash
+cd my_job
+/path/to/gammcor/gammcor
+```
 
 <!-- TODO: threads. GAMMCOR uses OpenMP and threaded MKL. Confirm and describe:
 export OMP_NUM_THREADS=16  (= number of physical cores reserved for the job) -->
@@ -53,9 +66,12 @@ xyz
 end
 ```
 
-Which blocks are needed depends on the interface. With Molpro and Dalton, the
-geometry and basis set come from the files of the reference calculation, so
-`xyz` and the basis keywords are not needed. With PySCF they are.
+Which blocks are needed depends on the interface and on how the two-electron
+integrals are supplied. With Molpro and Dalton, the geometry and basis set come
+from the reference files. With PySCF, `BasisPath`, `Basis`, and `xyz` are needed
+when GAMMCOR constructs the integrals on the fly, including THC. They are not
+needed when PySCF has already written the integrals and the GAMMCOR input uses
+`TwoMoInt INCORE`.
 
 <!-- TODO: confirm which blocks are required for each interface. -->
 
@@ -67,12 +83,54 @@ Selects the program that computed the reference wave function.
 
 | Value | Program |
 |---|---|
-| `PYSCF` | PySCF, via `pyscf_data.h5` written by `gammcor_tools` (see [PySCF interface](#pyscf-interface)) |
+| `PYSCF` | PySCF, via `pyscf_data.h5` written by `gammcor_tools` (see [PySCF interface](03_pyscf_interface.md)) |
 | `MOLPRO` | Molpro |
 | `DALTON` | Dalton |
 | `ORCA` | ORCA |
-| `CHRONUSQ` | ChronusQ |
-| `OWN`, `NONE` | <!-- TODO --> |
+
+Put the interface files in the same directory as `input.inp`. File names are
+fixed and case-sensitive.
+
+#### PySCF files
+
+- `pyscf_data.h5` contains the molecular-orbital data, energies, density
+  matrices, and, when requested, two-electron integrals.
+
+#### Molpro files
+
+The Molpro examples in `testjobs/ACn/AR_CAS` and `testjobs/ACn/AR_HF` use:
+
+- `AOONEINT.mol` -- one-electron AO integrals and molecular information;
+- `AOTWOINT.mol` -- two-electron AO integrals or Cholesky vectors;
+- `MOLPRO.MOPUN` -- molecular-orbital coefficients;
+- `2RDM` -- the two-particle reduced density matrix;
+- `DIP` -- dipole integrals, needed only for calculations that use them.
+
+#### Dalton files
+
+The Dalton AC0 example in `testjobs/AC0/ethene` uses:
+
+- `SIRIUS.RST` -- orbital and symmetry information;
+- `SIRIFC` -- the Dalton interface data;
+- `AOONEINT` -- one-electron AO integrals;
+- `AOTWOINT` -- two-electron AO integrals;
+- `rdm2.dat` -- the two-particle reduced density matrix.
+
+#### ORCA files
+
+The ORCA examples in `testjobs/ACn/H2O_MOLMPS` and
+`testjobs/RDMCORR/H2O_MOLMPS` use:
+
+- `G1.bin` and `G2.bin` -- the one- and two-particle reduced density matrices;
+- `FACT.bin` -- one-electron integral data;
+- `NUC_REP.bin` -- the nuclear-repulsion energy;
+- `C0.bin` -- molecular-orbital coefficients, used when the integrals are
+  constructed on the fly;
+- `IPQRS.bin` -- additional ORCA interface data included with the test case.
+
+The supplied ORCA inputs use on-the-fly integrals and therefore need `C0.bin`.
+The test directories keep the complete exported file set, including
+`IPQRS.bin`.
 
 ### JobType
 
@@ -82,6 +140,8 @@ Selects the correlation method.
 |---|---|
 | `AC0` | linearized adiabatic connection <!-- TODO: ref --> |
 | `AC` | adiabatic connection <!-- TODO: ref --> |
+| `AC0PP` | linearized particle-particle adiabatic connection (ppAC0) |
+| `ACPP` | particle-particle adiabatic connection (ppAC) |
 | `ACFREQNTH` | ACn: adiabatic connection expanded up to order `Max_Cn` <!-- TODO: check wording --> |
 | `ERPA` | extended random-phase approximation |
 | `SAPT` | symmetry-adapted perturbation theory, for interaction energies of dimers |
@@ -92,7 +152,7 @@ Selects the correlation method.
 <!-- TODO: describe or drop the remaining JobType values found in SOURCE/inputfill.f90:
 AC1, EERPA (ERPA-2), EERPA-OLD (ERPA-1), CASPIDFTOPT, AC0D, AC0DNOSYMM, AC0DP,
 ACFREQ, AC1FREQNTH, RESPONSE, NLOCCORR, SRAC0, SRMP2, SAPT-OS, MSAC0, PPERPA,
-AC0PP, ACPP, PPERPADMP, HHERPADMP, DUCC, AC_REL, AC0_REL.
+PPERPADMP, HHERPADMP, DUCC, AC_REL, AC0_REL.
 Mark the ones meant for testing only, as in beyond-rpa's "Additional methods" table. -->
 
 ### RDMType
@@ -153,6 +213,7 @@ OTF with LUDICROUS. -->
 | `NActive` | <!-- TODO --> |
 | `NCore` | <!-- TODO --> |
 | `Monomer` | `A`, `B` or `AB`, for SAPT <!-- TODO --> |
+| `ThrPP` | threshold for selecting orbital pairs in `AC0PP` and `ACPP` calculations (default `1.d-8`) |
 
 ## Basis set
 
@@ -180,16 +241,41 @@ PySCF reads the `.nw` file, GAMMCOR the `.txt` file.
 
 ### Different basis sets for different atoms
 
-The `BasisAssignement` block assigns basis sets to elements, single atoms, or
-ranges of atoms. `BasisPath` is still needed; `Basis` is ignored when this block
-is present.
+The `BasisAssignement` block assigns different basis sets to elements, single
+atoms, or ranges of atoms. The standard input with one basis set for all atoms
+remains supported.
+
+`BasisPath` is still required in the `Calculation` block. If
+`BasisAssignement` is present, the `Basis` keyword is ignored:
+
+```text
+Calculation
+ BasisPath /path/to/gammcor/basis-for-pyscf
+ Basis     cc-pvdz.txt
+end
+
+BasisAssignement
+ * cc-pvdz.txt
+end
+```
+
+Each line in `BasisAssignement` has the form:
+
+```text
+<selector>  <basis-file>
+```
+
+`<basis-file>` must be the name of a file inside `BasisPath`, including its
+extension when the file has one.
+
+#### Selectors
 
 ```text
 BasisAssignement
- *    cc-pVDZ
- Fe   cc-pVQZ
- 10   cc-pVTZ
- 6-8  cc-pVTZ
+ *    cc-pvdz.txt
+ Fe   cc-pvqz.txt
+ 10   cc-pvtz.txt
+ 6-8  cc-pvtz.txt
 end
 ```
 
@@ -197,15 +283,65 @@ end
 |---|---|
 | `*` | every atom (fallback) |
 | element symbol, e.g. `Fe` | all atoms of that element |
-| number, e.g. `10` | one atom, counted from 1 in the `xyz` block |
-| range, e.g. `6-8` | consecutive atoms |
+| atom number, e.g. `10` | one atom, counted from 1 in the `xyz` block |
+| atom range, e.g. `6-8` | consecutive atoms in the `xyz` block |
 
-**Prioritization rules.** When several lines match an atom, the most specific wins:
+#### Priority
+
+When several rules match an atom, the most specific rule wins:
+
 1. **Atom number or range** (highest priority)
 2. **Element symbol**
 3. **Fallback `*`** (lowest priority)
 
-The order of the lines does not matter. More examples: [README-BasisAssignement.md](../README-BasisAssignement.md).
+The order of the lines does not matter.
+
+#### Examples
+
+One common basis set for all atoms:
+
+```text
+BasisAssignement
+ * cc-pvdz.txt
+end
+```
+
+A default basis set with different basis sets for selected elements:
+
+```text
+BasisAssignement
+ *  cc-pvdz.txt
+ Fe cc-pvqz.txt
+ S  cc-pvtz.txt
+end
+```
+
+A basis set assigned to one specific atom:
+
+```text
+BasisAssignement
+ *  cc-pvdz.txt
+ Fe cc-pvqz.txt
+ 10 cc-pvtz.txt
+end
+```
+
+Here, `10` refers to the tenth atom in the `xyz` block. The atom-specific rule
+takes priority over both the element rule and the default rule.
+
+Use a range when consecutive atoms in the `xyz` block should use the same
+basis set:
+
+```text
+BasisAssignement
+ *    cc-pvdz.txt
+ 1    cc-pvqz.txt
+ 6-10 cc-pvtz.txt
+end
+```
+
+In this example, atom 1 uses `cc-pvqz.txt`, atoms 6 through 10 use
+`cc-pvtz.txt`, and all remaining atoms use `cc-pvdz.txt`.
 
 ## Geometry
 
@@ -230,30 +366,4 @@ end
 
 The path may be relative or absolute.
 
-## PySCF interface
-
-With PySCF, the reference calculation is a Python script. At its end, call
-`get_data_for_gammcor`, which writes `pyscf_data.h5` for GAMMCOR:
-
-```python
-from gammcor_tools.Pyscf2Gammcor import get_data_for_gammcor
-
-# ... mol, myhf, mycas: your PySCF molecule, SCF and CASSCF objects ...
-
-get_data_for_gammcor(mol, myhf, mycas)
-```
-
-The `gammcor_tools` package is installed by `install.sh` and by the conda
-package. It also provides command-line tools:
-
-| Command | Purpose |
-|---|---|
-| `gammcor_basis script.py -o basis.txt` | extract the basis set from a PySCF script, in GAMMCOR format |
-| `gammcor_h5info pyscf_data.h5` | show the contents of a GAMMCOR HDF5 file |
-| `gammcor_2h5 JOBDIR -o pyscf_data.h5` | convert legacy `.bin`/`.txt` input files to HDF5 |
-| `gammcor_2bin pyscf_data.h5 -o JOBDIR` | convert HDF5 back to the legacy files |
-
-Run any command with `-h` to see its options. A complete example is in [Examples](03_examples.md).
-
-<!-- TODO: sections for the Molpro, Dalton and ORCA interfaces: which files
-GAMMCOR needs from each program and how to produce them. -->
+<!-- TODO: describe how to produce the Molpro, Dalton, and ORCA interface files. -->
