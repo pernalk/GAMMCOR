@@ -1,5 +1,10 @@
 # PySCF interface
 
+## Contents
+
+- [`get_data_for_gammcor` options](#get_data_for_gammcor-options)
+- [Command-line tools](#command-line-tools)
+
 With PySCF, the reference calculation is a Python script. At its end, call
 `get_data_for_gammcor`, which writes `pyscf_data.h5` for GAMMCOR:
 

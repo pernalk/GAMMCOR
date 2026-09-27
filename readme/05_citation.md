@@ -3,6 +3,51 @@
 Please cite the papers associated with each GAMMCOR method used in your work.
 Each entry below includes a DOI link and a complete BibTeX record.
 
+## Contents
+
+- [General GAMMCOR citations](#general-gammcor-citations)
+- [AC, AC0, and EERPA](#ac-ac0-and-eerpa)
+- [AC0D](#ac0d)
+- [ACn](#acn)
+- [SAPT](#sapt)
+- [AC0PP and ACPP](#ac0pp-and-acpp)
+
+## General GAMMCOR citations
+
+When publishing results obtained with GAMMCOR, cite both entries below. Then
+add the method-specific references from the following sections.
+
+<table>
+<thead>
+<tr><th>Reference</th><th>BibTeX</th></tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>GAMMCORSoftware</strong><br>K. Pernal, M. Hapka, M. Modrzejewski, A. Sokół, and A. Tucholska, <em>GAMMCOR</em>, computer software.<br><a href="https://github.com/pernalk/GAMMCOR">github.com/pernalk/GAMMCOR</a></td>
+<td><details><summary id="gammcorsoftware">BibTeX</summary><pre><code>@misc{GAMMCORSoftware,
+  author       = {Pernal, Katarzyna and Hapka, Micha{\l} and Modrzejewski, Marcin and Sok{\'o}{\l}, Adam and Tucholska, Aleksandra},
+  title        = {{GAMMCOR}},
+  howpublished = {Computer software},
+  url          = {https://github.com/pernalk/GAMMCOR}
+}</code></pre></details></td>
+</tr>
+<tr>
+<td><strong>Hapka2023GAMMCOR</strong><br>M. Hapka, A. Krzemińska, M. Modrzejewski, M. Przybytek, and K. Pernal, “Efficient Calculation of the Dispersion Energy for Multireference Systems with Cholesky Decomposition: Application to Excited-State Interactions,” <em>J. Phys. Chem. Lett.</em> <strong>14</strong>, 6895–6903 (2023).<br><a href="https://doi.org/10.1021/acs.jpclett.3c01568">doi:10.1021/acs.jpclett.3c01568</a></td>
+<td><details><summary id="hapka2023gammcor">BibTeX</summary><pre><code>@article{Hapka2023GAMMCOR,
+  author  = {Hapka, Micha{\l} and Krzemi{\'n}ska, Agnieszka and Modrzejewski, Marcin and Przybytek, Micha{\l} and Pernal, Katarzyna},
+  title   = {Efficient Calculation of the Dispersion Energy for Multireference Systems with Cholesky Decomposition: Application to Excited-State Interactions},
+  journal = {The Journal of Physical Chemistry Letters},
+  year    = {2023},
+  volume  = {14},
+  number  = {30},
+  pages   = {6895--6903},
+  doi     = {10.1021/acs.jpclett.3c01568},
+  url     = {https://doi.org/10.1021/acs.jpclett.3c01568}
+}</code></pre></details></td>
+</tr>
+</tbody>
+</table>
+
 ## AC, AC0, and EERPA
 
 <table>

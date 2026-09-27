@@ -1,5 +1,16 @@
 # Setup
 
+## Contents
+
+1. [For developers](#1-for-developers)
+   - [With conda (recommended)](#11-with-conda-recommended)
+   - [Without conda](#12-without-conda)
+   - [Recompiling after a source change](#13-recompiling-after-a-source-change)
+   - [Building with Make](#14-building-with-make)
+   - [Debug build](#15-debug-build)
+   - [Executables](#16-executables)
+2. [For non-developers](#2-for-non-developers)
+
 ## 1. For developers
 
 GAMMCOR supports Linux on x86-64 Intel and AMD processors with AVX2.

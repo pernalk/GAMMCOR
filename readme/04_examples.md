@@ -1,5 +1,16 @@
 # Examples
 
+## Contents
+
+1. [Exporting a reference from PySCF](#1-exporting-a-reference-from-pyscf)
+2. [ppAC0 and ppAC without THC](#2-ppac0-and-ppac-without-thc)
+3. [ppAC0 with THC](#3-ppac0-with-thc)
+4. [Molpro example from `testjobs`](#4-molpro-example-from-testjobs)
+5. [Dalton example from `testjobs`](#5-dalton-example-from-testjobs)
+6. [ORCA example from `testjobs`](#6-orca-example-from-testjobs)
+7. [Further PySCF examples in `testjobs`](#7-further-pyscf-examples-in-testjobs)
+8. [Running an example](#running-an-example)
+
 Run each calculation in its own directory. The directory must contain
 `input.inp` and the reference data required by the selected interface.
 

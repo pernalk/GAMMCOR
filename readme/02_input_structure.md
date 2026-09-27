@@ -1,5 +1,24 @@
 # Input
 
+## Contents
+
+- [Running `gammcor`](#running-gammcor)
+  - [Meson release build](#1-meson-release-build)
+  - [Meson debug build](#2-meson-debug-build)
+  - [Make build](#3-make-build)
+- [General Input Structure](#general-input-structure)
+- [Calculation block](#calculation-block)
+  - [Interface and required files](#interface)
+  - [JobType](#jobtype)
+  - [RDMType](#rdmtype)
+  - [TwoMoInt](#twomoint)
+  - [Other keywords](#other-keywords)
+- [CholeskyBlock](#choleskyblock)
+- [System block](#system-block)
+- [Basis set](#basis-set)
+  - [Different basis sets for different atoms](#different-basis-sets-for-different-atoms)
+- [Geometry](#geometry)
+
 ## Running `gammcor`
 
 GAMMCOR always reads the file `input.inp` from the current directory. Go to
