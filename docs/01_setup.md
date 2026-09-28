@@ -25,15 +25,24 @@ cd gammcor
 
 ### 1.1. With conda (recommended)
 
+If conda is not installed yet, the minimal installer
+[Miniconda](https://www.anaconda.com/docs/getting-started/miniconda/install)
+is enough. Follow the installation instructions on that page.
+
 Conda installs the compilers, libraries, and build tools listed in
 `environment.yml`. Compiler or MKL modules should not be loaded in the same
 shell.
 
+Create the environment under a name of your choice (here `gammcor-dev`),
+activate it, and build:
+
 ```bash
-conda env create -f environment.yml
+conda env create -f environment.yml -n gammcor-dev
 conda activate gammcor-dev
 ./install.sh
 ```
+
+If `-n` is omitted, the environment is named `gammcor-dev`.
 
 The current conda build has been tested with `ifx` 2026.1.1, `icx` 2026.1.1,
 oneMKL 2026.1.0, Python 3.13.15, Meson 1.12.1, and Ninja 1.13.2. These are

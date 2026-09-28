@@ -261,7 +261,8 @@ call AB_CAS_FOFO(ABPLUS1,ABMIN1,ECASSCF,URe,Occ,XOne, &
 !print*, 'ABMIN1 ',norm2(ABMIN1)
 
 !Calc: A1=ABPLUS0*ABMIN1+ABPLUS1*ABMIN0
-allocate(A1(NDimX,NDimX))
+ allocate(A1(NDimX,NDimX))
+ A1 = 0.d+0
 !call mem_alloc(A1,NDimX*NDimX)
 call ABPM_HALFTRAN_GEN_L(ABMIN1, A1,0.0d0,A0Block,A0BlockIV,nblk,NDimX,NDimX,'Y')
 call ABPM_HALFTRAN_GEN_R(ABPLUS1,A1,1.0d0,A0Block,A0BlockIV,nblk,NDimX,NDimX,'X')
@@ -271,6 +272,7 @@ EGOne(1)=ECASSCF
 
 !Calc: APLUS0Tilde=ABPLUS0.DChol
 allocate(APLUS0Tilde(NDimX*NCholesky))
+APLUS0Tilde = 0.d0
 !call mem_alloc(APLUS0Tilde,NDimX*NCholesky)
 call ABPM_BLKAT(NCholesky,NDimX,DChol,APLUS0Tilde,0.0d0,A0Block,A0BlockIV,nblk,'Y')
 !print*, 'regul APLUS0Tilde = ', norm2(APLUS0Tilde)
@@ -300,6 +302,9 @@ allocate(COMTilde(NDimX*NCholesky))
 COMTilde=0d0
 
 allocate(C0Tilde(NDimX*NCholesky),C1Tilde(NDimX*NCholesky),C2Tilde(NDimX*NCholesky))
+C0Tilde = 0.d0
+C1Tilde = 0.d0
+C2Tilde = 0.d0
 allocate(WORK0(NDimX*NCholesky),WORK1(NDimX*NCholesky))
 !call mem_alloc(C0Tilde,NDimX*NCholesky)
 !call mem_alloc(C1Tilde,NDimX*NCholesky)

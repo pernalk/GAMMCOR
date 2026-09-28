@@ -71,7 +71,7 @@ and ready-to-use BibTeX entries.
 * Katarzyna Pernal
 * Michał Hapka
 * Aleksandra Tucholska
-* Marcin Modrzejewski (`gammcor-integrals` submodule)
+* Marcin Modrzejewski
 
 <!-- TODO: names, ORCID links and what each person contributed, as in:
 * [Name Surname](https://orcid.org/...) (what they did) -->

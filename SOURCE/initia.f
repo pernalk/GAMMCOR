@@ -2724,12 +2724,13 @@ C
       block
       ! test subroutine for reading 1-rdm spin in AOs
       real(8) :: onerdms(NInte1)
-      !print*, 'reading 1-RDM(AO)/SPIN...'
+
       call read_1rdm_ao_spin_molpro(onerdms,'2RDM',ispin,NBasis)
-      print*, 'Test 1-rdm spin: ', norm2(onerdms)
-      !do i=1,NInte1
-      !print*, i,onerdms(i)
-      !enddo
+      if (ispin.eq.1) then
+         print*, 'Test 1-rdm spin: ', norm2(onerdms)
+      else
+         print*, 'Spin 1-RDM absent; skipping diagnostic.'
+      endif
       end block
 C
 C     If CASPiDFT then skip integral transformation

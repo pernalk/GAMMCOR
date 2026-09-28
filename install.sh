@@ -13,7 +13,7 @@
 #
 # Toolchain: ifx, icx, MKL and Python come from one place, never from a mix.
 #   conda     the active conda env has ifx and MKL ($CONDA_PREFIX/bin/ifx and
-#             $CONDA_PREFIX/lib/libmkl_rt.so), e.g. gammcor-dev from
+#             $CONDA_PREFIX/lib/libmkl_rt.so), e.g. an env created from
 #             environment.yml. Everything is taken from the env: $MKLROOT is
 #             ignored, and directories outside the env are dropped from
 #             LD_LIBRARY_PATH, LIBRARY_PATH and CPATH (for this script only).
@@ -661,8 +661,28 @@ fingerprint >> "$LOG"
     echo
 } >> "$LOG"
 
+# env_table <width>: lays out the "name: version path" rows read from stdin.
+# When a row is wider than <width>, every path goes on a line of its own, so
+# that a long path does not push the tool name off the screen:
+#   ifx:     2026.1.1
+#      └─ /long/path/to/envs/gammcor-dev/bin/ifx
+env_table() {
+    local w=$1 name ver path i wide=0 rows=()
+    while read -r name ver path; do
+        rows+=("$name" "$ver" "$path")
+        if [ $((20 + ${#path})) -gt "$w" ]; then wide=1; fi
+    done
+    for ((i = 0; i < ${#rows[@]}; i += 3)); do
+        if [ $wide = 0 ]; then
+            printf '%-8s %-10s %s\n' "${rows[i]}" "${rows[i+1]}" "${rows[i+2]}"
+        else
+            printf '%-8s %s\n   └─ %s\n' "${rows[i]}" "${rows[i+1]}" "${rows[i+2]}"
+        fi
+    done
+}
+
 # name: version, path
-ENV_SUMMARY=$(
+ENV_ROWS=$(
     v() { local s; s=$(version_of "$1"); printf '%s' "${s:-?}"; }
     printf '%-8s %-10s %s\n' \
         "ifx:" "$(v "$IFX")" "$IFX" \
@@ -674,10 +694,13 @@ ENV_SUMMARY=$(
     printf '%-8s %-10s %s\n' \
         "meson:" "$(v meson)" "$(command -v meson)" \
         "ninja:" "$(v ninja)" "$(command -v ninja)"
+)
+ENV_NOTES=$(
     if [ -n "$MISSING" ]; then printf 'not installed for python: %s\n' "$MISSING"; fi
     if [ -n "$PATHS_DROPPED" ]; then printf 'non-conda entries dropped from %s\n' "$PATHS_DROPPED"; fi
 )
-printf '%s\n' "$ENV_SUMMARY" >> "$LOG"
+printf '%s\n' "$ENV_ROWS" ${ENV_NOTES:+"$ENV_NOTES"} >> "$LOG"
+ENV_SUMMARY=$(env_table $((COLS - 6)) <<< "$ENV_ROWS"; printf '%s' "$ENV_NOTES")
 
 ok "" "$ENV_SUMMARY"
 
@@ -733,7 +756,8 @@ if [ "$CPU" = auto ]; then
     CPU=$(python3 gammcor-integrals/.meson/scripts/detect_cpu.py | sed -n 1p)
 fi
 
-ok "$CPU, $JOBS jobs"
+if [ "$JOBS" = 1 ]; then CORES="1 core"; else CORES="$JOBS cores"; fi
+ok "$CPU, compiling on $CORES in parallel"
 
 # ---------------------------------------------------------------------------
 # --clean: remove everything built by this script
