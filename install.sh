@@ -1,6 +1,7 @@
 #!/bin/bash
 # Builds GAMMCOR from source: gammcor-integrals, XCFun, HDF5, gammcor_tools,
-# gammcor. Steps that are already done are skipped, so running it again is cheap.
+# gammcor. Steps that are already done with the same toolchain are skipped, so
+# running it again is cheap.
 #
 #   ./install.sh [--prefix DIR] [--cpu TARGET] [--jobs N] [--clean] [--verbose]
 #
@@ -9,6 +10,28 @@
 #   --jobs N       parallel build jobs (default: nproc)
 #   --clean        rebuild everything
 #   --verbose      show compiler output on screen (it always goes to install.log)
+#
+# Toolchain: ifx, icx, MKL and Python come from one place, never from a mix.
+#   conda     the active conda env has ifx and MKL ($CONDA_PREFIX/bin/ifx and
+#             $CONDA_PREFIX/lib/libmkl_rt.so), e.g. gammcor-dev from
+#             environment.yml. Everything is taken from the env: $MKLROOT is
+#             ignored, and directories outside the env are dropped from
+#             LD_LIBRARY_PATH, LIBRARY_PATH and CPATH (for this script only).
+#             ifx, icx and python3 must resolve to $CONDA_PREFIX/bin: do not
+#             load compiler or MKL modules after `conda activate`. gammcor is
+#             linked with an RPATH to the env, so it keeps using the env's MKL
+#             even when such modules are loaded later.
+#   modules   anything else (no conda env, or one without ifx, such as base):
+#             ifx and icx from PATH, MKL from $MKLROOT (HPC modules or oneAPI
+#             setvars.sh). numpy and h5py, needed by gammcor_tools, must
+#             already be installed for python3.
+# gammcor_tools is installed with pip --no-deps in both modes: numpy and h5py
+# come from the conda env (environment.yml) or are installed by you.
+#
+# The toolchain (mode, ifx and its version, icx, MKL, python3) is stored in
+# .toolchain after a successful run. When it differs on the next run, the
+# changed fields are shown and everything is rebuilt, as with --clean, so
+# objects and .mod files from different compilers are never mixed.
 #
 # After the first build, recompile with:  meson compile -C build
 set -eE -o pipefail
@@ -29,7 +52,7 @@ while [ $# -gt 0 ]; do
         --jobs)   JOBS="$2"; shift 2 ;;
         --clean)  CLEAN=1;   shift ;;
         -v|--verbose) VERBOSE=1; shift ;;
-        -h|--help) sed -n '2,13p' "$0"; exit 0 ;;
+        -h|--help) awk 'NR > 1 { if (!/^#/) exit; print }' "$0"; exit 0 ;;
         *) echo "Unknown option: $1 (see ./install.sh --help)" >&2; exit 1 ;;
     esac
 done
@@ -103,9 +126,26 @@ SPIN=(⠋ ⠙ ⠹ ⠸ ⠼ ⠴ ⠦ ⠧ ⠇ ⠏)
 
 # Steps: name, state (pending|running|ok|fail), one-line info, extra lines
 NAMES=() STATE=() INFO=() EXTRA=()
+STEP_VARS=()    # names of the index variables, for insert_step
 add_step() {   # add_step <index variable> <name>
     printf -v "$1" %d ${#NAMES[@]}
     NAMES+=("$2"); STATE+=(pending); INFO+=(""); EXTRA+=("")
+    STEP_VARS+=("$1")
+}
+
+# Add a step at <position> once the list is on screen; the steps from there
+# on move down by one.
+insert_step() {   # insert_step <index variable> <name> <position>
+    local pos=$3 v
+    for v in "${STEP_VARS[@]}"; do
+        if [ "${!v}" -ge "$pos" ]; then printf -v "$v" %d $((${!v} + 1)); fi
+    done
+    NAMES=("${NAMES[@]:0:pos}" "$2" "${NAMES[@]:pos}")
+    STATE=("${STATE[@]:0:pos}" pending "${STATE[@]:pos}")
+    INFO=("${INFO[@]:0:pos}" "" "${INFO[@]:pos}")
+    EXTRA=("${EXTRA[@]:0:pos}" "" "${EXTRA[@]:pos}")
+    printf -v "$1" %d "$pos"
+    STEP_VARS+=("$1")
 }
 
 CUR=-1          # running step
@@ -284,6 +324,54 @@ elapsed() {
 }
 
 # ---------------------------------------------------------------------------
+# Toolchain helpers
+# ---------------------------------------------------------------------------
+NL=$'\n'
+STAMP=.toolchain                                   # toolchain of the last successful run
+FP_KEYS=(mode ifx ifx_version icx mkl python)      # its fields, in this order
+
+# Keep only the entries of a :-separated path variable that are inside
+# $CONDA_PREFIX; the others go into DROPPED.
+keep_conda_paths() {   # keep_conda_paths <variable>
+    local e entries kept=()
+    DROPPED=()
+    IFS=: read -ra entries <<< "${!1:-}"
+    for e in "${entries[@]}"; do
+        case "$e" in
+            "") ;;
+            "$CONDA_PREFIX" | "$CONDA_PREFIX"/*) kept+=("$e") ;;
+            *) DROPPED+=("$e") ;;
+        esac
+    done
+    if [ ${#kept[@]} -gt 0 ]; then
+        export "$1=$(IFS=:; echo "${kept[*]}")"
+    else
+        unset "$1"
+    fi
+}
+
+# MKL version from <include dir>/mkl_version.h, e.g. 2025.0.1 (empty if unknown)
+mkl_version() {   # mkl_version <include dir>
+    [ -f "$1/mkl_version.h" ] || return 0
+    awk '$1 == "#define" { v[$2] = $3 }
+         END { if ("__INTEL_MKL__" in v)
+                   printf "%s.%s.%s", v["__INTEL_MKL__"], v["__INTEL_MKL_MINOR__"], v["__INTEL_MKL_UPDATE__"] }' \
+        "$1/mkl_version.h" || true
+}
+
+# Are there artifacts of an earlier build?
+built_before() {
+    [ -e build ] || [ -e gammcor-integrals/build ] || [ -e hdf5/lib ] \
+        || compgen -G 'xcfun/lib/libxcfun.*' > /dev/null
+}
+
+# The current toolchain, in the format of the stamp file
+fingerprint() {
+    local key
+    for key in "${FP_KEYS[@]}"; do printf '%s=%s\n' "$key" "${FP[$key]}"; done
+}
+
+# ---------------------------------------------------------------------------
 # Steps
 # ---------------------------------------------------------------------------
 add_step S_ENV     "Environment"
@@ -313,7 +401,63 @@ if [ $LIVE = 1 ]; then printf '\e[?25l'; fi   # hide the cursor while redrawing
 # ---------------------------------------------------------------------------
 begin $S_ENV "Checking the environment"
 
-command -v ifx > /dev/null || die "ifx not found.
+# Toolchain mode, decided here once (see the header of this file)
+if [ -n "$CONDA_PREFIX" ] && [ -x "$CONDA_PREFIX/bin/ifx" ] \
+        && [ -f "$CONDA_PREFIX/lib/libmkl_rt.so" ]; then
+    MODE=conda
+    MODE_INFO="conda ($CONDA_PREFIX)"
+else
+    MODE=modules
+    MODE_INFO="modules"
+fi
+
+PATHS_DROPPED=""
+if [ $MODE = conda ]; then
+    # -qmkl links the MKL in $MKLROOT when it is set (an MKL module sets it);
+    # without it, -qmkl finds the MKL next to ifx, i.e. the env's.
+    unset MKLROOT
+    MKL="$CONDA_PREFIX/lib/libmkl_rt.so"
+    MKL_VERSION=$(mkl_version "$CONDA_PREFIX/include")
+
+    # A module loaded after `conda activate` puts its bin/ before the env's.
+    SHADOWED=""
+    for tool in ifx icx python3; do
+        path=$(command -v $tool || true)
+        if [ -z "$path" ] || [ "$(realpath "$(dirname "$path")")" != "$(realpath "$CONDA_PREFIX/bin")" ]; then
+            SHADOWED+="$NL  $(printf '%-8s %s' "$tool" "${path:-not found}")"
+        fi
+    done
+    [ -z "$SHADOWED" ] || die "The active conda env is $CONDA_PREFIX,
+but these tools do not come from its bin/:
+$SHADOWED
+
+A module loaded after \`conda activate\` is shadowing the env, and install.sh
+does not mix a conda env with modules. Unload that module (\`module list\`
+shows what is loaded):
+
+  module unload <module>
+
+or start again from a clean shell:
+
+  module purge
+  conda activate ${CONDA_DEFAULT_ENV:-$CONDA_PREFIX}
+  ./install.sh
+
+A tool that is 'not found' is missing from the env: update it from
+environment.yml (conda env update -f environment.yml)."
+
+    # Library and header directories of modules must not reach the compilers,
+    # the linker, or the test programs that Meson and configure run. This
+    # changes the environment of install.sh only, not of your shell.
+    for var in LD_LIBRARY_PATH LIBRARY_PATH CPATH; do
+        keep_conda_paths $var
+        if [ ${#DROPPED[@]} -gt 0 ]; then
+            printf 'dropped from %s: %s\n' "$var" "${DROPPED[*]}" >> "$LOG"
+            PATHS_DROPPED+="${PATHS_DROPPED:+, }$var (${#DROPPED[@]})"
+        fi
+    done
+else
+    command -v ifx > /dev/null || die "ifx not found.
 
 GAMMCOR is compiled with the Intel oneAPI compilers. Load Intel oneAPI into
 your environment.
@@ -323,30 +467,98 @@ On a workstation this may be:
   source /opt/intel/oneapi/setvars.sh
 
 On an HPC cluster, load the appropriate Intel compiler module
-(e.g. \`module avail intel\`)."
+(e.g. \`module avail intel\`).
 
-command -v icx > /dev/null || die "icx not found (Intel oneAPI C/C++ compiler), see above for ifx."
+Or build with conda instead: create the env from environment.yml, activate
+it (with no Intel modules loaded) and run ./install.sh again."
 
-if [ -n "$MKLROOT" ]; then
+    command -v icx > /dev/null || die "icx not found (Intel oneAPI C/C++ compiler), see above for ifx."
+
+    [ -n "$MKLROOT" ] || die "MKL not found: \$MKLROOT is not set.
+
+Load the MKL module that goes with the Intel compiler (e.g. \`module avail mkl\`),
+or source /opt/intel/oneapi/setvars.sh."
     MKL="$MKLROOT"
-elif [ -f "$CONDA_PREFIX/lib/libmkl_rt.so" ]; then
-    MKL="$CONDA_PREFIX/lib/libmkl_rt.so"
-else
-    die "MKL not found: \$MKLROOT is not set and there is no \$CONDA_PREFIX/lib/libmkl_rt.so."
+    MKL_VERSION=$(mkl_version "$MKLROOT/include")
+
+    # A conda env with ifx but without MKL: its ifx would be used with the MKL
+    # of a module. An MKLROOT that is itself a conda prefix (the conda recipe
+    # sets MKLROOT=$PREFIX, the host env) is not a module, so that is fine.
+    if [ -n "$CONDA_PREFIX" ] && [ ! -d "$MKLROOT/conda-meta" ]; then
+        for tool in ifx icx; do
+            case "$(command -v $tool)" in
+                "$CONDA_PREFIX"/*) die "$tool comes from the conda env $CONDA_PREFIX,
+but that env has no MKL ($CONDA_PREFIX/lib/libmkl_rt.so is missing),
+so MKL would come from \$MKLROOT=$MKLROOT.
+install.sh does not mix a conda env with modules. Either install MKL into the env:
+
+  conda install -c conda-forge mkl-devel
+
+or deactivate the env and use the modules only:
+
+  conda deactivate" ;;
+            esac
+        done
+    fi
 fi
 
 for tool in python3 meson ninja make; do
     command -v $tool > /dev/null || die "$tool not found."
 done
-# conda-build/rattler-build set $PYTHON to the host env's python; python3 on
-# PATH can be the build env's one there, and gammcor_tools must not go in it.
-PYTHON="${PYTHON:-python3}"
-"$PYTHON" -m pip --version > /dev/null 2>&1 || die "pip not found for $(command -v "$PYTHON")."
+if [ $MODE = conda ]; then
+    PYTHON=$(command -v python3)   # checked above: in $CONDA_PREFIX/bin
+else
+    # conda-build/rattler-build set $PYTHON to the host env's python; python3 on
+    # PATH can be the build env's one there, and gammcor_tools must not go in it.
+    py="${PYTHON:-python3}"
+    PYTHON=$(command -v "$py") || die "$py not found."
+fi
+"$PYTHON" -m pip --version > /dev/null 2>&1 || die "pip not found for $PYTHON."
 
-ok "" "ifx:    $(ifx --version 2>&1 | sed -n 1p | awk '{print $3}')
-MKL:    $MKL
+# Compare the toolchain with the one of the last successful run
+declare -A FP=(
+    [mode]=$MODE
+    [ifx]=$(realpath "$(command -v ifx)")
+    [ifx_version]=$(ifx --version 2>&1 | sed -n 1p)
+    [icx]=$(realpath "$(command -v icx)")
+    [mkl]="$MKL${MKL_VERSION:+ $MKL_VERSION}"
+    [python]=$(realpath "$PYTHON")
+)
+CLEAN_REASON=""
+STAMP_CHANGES=""
+if [ -f "$STAMP" ]; then
+    declare -A OLD=()
+    while IFS='=' read -r key value; do
+        case "$key" in "" | "#"*) continue ;; esac
+        OLD[$key]=$value
+    done < "$STAMP"
+    for key in "${FP_KEYS[@]}"; do
+        if [ "${OLD[$key]-}" != "${FP[$key]}" ]; then
+            STAMP_CHANGES+="${STAMP_CHANGES:+$NL}$key: ${OLD[$key]:-(none)} → ${FP[$key]}"
+        fi
+    done
+    if [ -n "$STAMP_CHANGES" ]; then CLEAN_REASON="toolchain changed"; fi
+elif built_before; then
+    # built before the stamp existed, or by a run that did not finish
+    CLEAN_REASON="no $STAMP stamp"
+fi
+fingerprint >> "$LOG"
+
+ok "" "mode:   $MODE_INFO
+ifx:    $(ifx --version 2>&1 | sed -n 1p | awk '{print $3}')
+MKL:    $MKL${MKL_VERSION:+ ($MKL_VERSION)}
+python: $PYTHON
 meson:  $(meson --version)
-ninja:  $(ninja --version)"
+ninja:  $(ninja --version)${PATHS_DROPPED:+
+non-conda entries dropped from $PATHS_DROPPED}"
+
+# Artifacts of another toolchain are removed before anything is built: the
+# skip logic below (HDF5 already built, meson configure of an existing build
+# directory, incremental XCFun make) is only safe with the same toolchain.
+if [ -n "$CLEAN_REASON" ] && [ $CLEAN = 0 ]; then
+    CLEAN=1
+    insert_step S_CLEAN "Clean" $((S_CPU + 1))
+fi
 
 # ---------------------------------------------------------------------------
 # 2. gammcor-integrals submodule
@@ -399,12 +611,16 @@ ok "$CPU, $JOBS jobs"
 # ---------------------------------------------------------------------------
 if [ $CLEAN = 1 ]; then
     begin $S_CLEAN "Removing previous builds"
-    run rm -rf build gammcor-integrals/build hdf5/lib hdf5/include
+    if [ -n "$STAMP_CHANGES" ]; then
+        printf 'toolchain changed since the last build:\n%s\n' "$STAMP_CHANGES" >> "$LOG"
+    fi
+    # the stamp goes too: it is written again only when this run succeeds
+    run rm -rf build gammcor-integrals/build hdf5/lib hdf5/include "$STAMP"
     run make -C xcfun clean
-    ok "previous builds removed"
+    ok "${CLEAN_REASON:+$CLEAN_REASON, }previous builds removed" "$STAMP_CHANGES"
 fi
 
-# Extra link flags for a conda environment (ifx and MKL from conda-forge):
+# Extra link flags for MKL from conda-forge (with ifx from conda-forge):
 #  - conda-forge MKL (libmkl_intel_thread.so, 2026.1) calls __atomic_load and
 #    __atomic_compare_exchange from libatomic, which ifx -qmkl does not link;
 #  - the MKL, OpenMP and Intel runtime libraries are in <conda prefix>/lib,
@@ -415,13 +631,21 @@ fi
 # Meson links with --as-needed and places -latomic before the MKL libraries
 # that -qmkl appends, so the linker would drop libatomic as unused. Linking it
 # with --no-as-needed keeps it; one -Wl argument also stops Meson moving it.
-# The conda prefix is the one holding MKL: $MKLROOT if set (the conda recipe
-# sets MKLROOT=$PREFIX, the host env), else the active env. A oneAPI MKLROOT
-# has no libatomic.so next to MKL, so this adds nothing there.
+# The conda prefix is the one holding MKL:
+#  - conda mode: the active env. --disable-new-dtags writes the rpath as
+#    RPATH, not RUNPATH: the loader searches LD_LIBRARY_PATH before RUNPATH
+#    but after RPATH, so gammcor keeps using the env's MKL and Intel runtime
+#    when Intel/MKL modules are loaded later.
+#  - modules mode: $MKLROOT, when it is a conda prefix (the conda recipe sets
+#    MKLROOT=$PREFIX, the host env). A oneAPI MKLROOT has no libatomic.so next
+#    to MKL, so this adds nothing there.
+ATOMIC_ARGS=(-Wl,--push-state,--no-as-needed,-latomic,--pop-state)
 CONDA_LINK_ARGS=()
-CONDA_LIB="${MKLROOT:-$CONDA_PREFIX}/lib"
-if [ -f "$CONDA_LIB/libmkl_intel_thread.so" ] && [ -f "$CONDA_LIB/libatomic.so" ]; then
-    CONDA_LINK_ARGS=(-Wl,-rpath,"$CONDA_LIB" -Wl,--push-state,--no-as-needed,-latomic,--pop-state)
+if [ $MODE = conda ]; then
+    CONDA_LINK_ARGS=(-Wl,--disable-new-dtags -Wl,-rpath,"$CONDA_PREFIX/lib")
+    if [ -f "$CONDA_PREFIX/lib/libatomic.so" ]; then CONDA_LINK_ARGS+=("${ATOMIC_ARGS[@]}"); fi
+elif [ -f "$MKLROOT/lib/libmkl_intel_thread.so" ] && [ -f "$MKLROOT/lib/libatomic.so" ]; then
+    CONDA_LINK_ARGS=(-Wl,-rpath,"$MKLROOT/lib" "${ATOMIC_ARGS[@]}")
 fi
 
 # Print a native file that repeats fortran_link_args of <profile> with <args> appended.
@@ -437,7 +661,8 @@ print(f"fortran_link_args = {args + sys.argv[2:]!r}")
 EOF
 }
 
-# Configure a Meson build directory, or update its options if it exists.
+# Configure a Meson build directory, or update its options if it exists
+# (it was built with the same toolchain: the Clean step removes it otherwise).
 # A directory left behind by a failed setup has meson-private/ but no
 # coredata.dat; meson setup starts it over.
 #   meson_setup <build dir> <source dir> [options...]
@@ -481,20 +706,24 @@ ok "$(elapsed "$T_STEP")$(warnings)"
 # ---------------------------------------------------------------------------
 begin $S_HDF5 "Building HDF5"
 
-if [ -f hdf5/lib/libhdf5_fortran.a ]; then
+if [ -f hdf5/lib/libhdf5_fortran.a ]; then   # same toolchain, see the Clean step
     ok "already built"
 else
+    # build_hdf5.sh prefers the system zlib (/usr) when ZLIB_ROOT is unset
+    if [ $MODE = conda ]; then export ZLIB_ROOT="$CONDA_PREFIX"; fi
     run ./hdf5/build_hdf5.sh
     ok "$(elapsed "$T_STEP")$(warnings)"
 fi
 
 # ---------------------------------------------------------------------------
-# 7. gammcor_tools (Python), into the current python3
+# 7. gammcor_tools (Python), into the python3 checked in step 1
 # ---------------------------------------------------------------------------
 begin $S_TOOLS "Installing gammcor_tools"
 
+# --no-deps: numpy and h5py come from the conda env (environment.yml) or are
+# installed by the user; pip must not bring them from PyPI into a conda env.
 if [ -z "$PREFIX" ]; then
-    PIP_ARGS=(-e ./gammcor_tools)
+    PIP_ARGS=(-e ./gammcor_tools --no-deps)
 else
     PIP_ARGS=(./gammcor_tools --no-deps --no-build-isolation)
 fi
@@ -502,7 +731,36 @@ run "$PYTHON" -m pip install "${PIP_ARGS[@]}" || die "pip install failed (detail
 If pip says 'externally-managed-environment', use a venv, a conda env,
 or run: $PYTHON -m pip install --user ${PIP_ARGS[*]}"
 
-ok "gammcor_tools, $(elapsed "$T_STEP")"
+# Run from /: in this directory, ./gammcor_tools would import as an (empty)
+# namespace package even if the installation did not work.
+(cd / && "$PYTHON" -c 'import gammcor_tools') >> "$LOG" 2>&1 \
+    || die "gammcor_tools was installed but does not import with $PYTHON
+(details in install.log)."
+
+MISSING=$(cd / && "$PYTHON" -c '
+import importlib.util
+print(" ".join(m for m in ("numpy", "h5py") if importlib.util.find_spec(m) is None))')
+TOOLS_INFO="gammcor_tools, $(elapsed "$T_STEP")"
+if [ -n "$MISSING" ]; then
+    if [ $MODE = conda ]; then
+        HOWTO="  conda install -c conda-forge $MISSING"
+    else
+        HOWTO="  $PYTHON -m pip install $MISSING
+
+or load a module that provides them"
+    fi
+    # A package build (--prefix) gets them as run dependencies of the package.
+    [ -n "$PREFIX" ] || die "gammcor_tools needs numpy and h5py, but $PYTHON
+does not have: $MISSING. install.sh does not install them (pip --no-deps).
+Install them with
+
+$HOWTO
+
+and run ./install.sh again."
+    TOOLS_INFO+=", without $MISSING"
+fi
+
+ok "$TOOLS_INFO"
 
 # ---------------------------------------------------------------------------
 # 8. gammcor  ->  build/gammcor, bin/gammcor
@@ -531,6 +789,12 @@ fi
 # ---------------------------------------------------------------------------
 # Done
 # ---------------------------------------------------------------------------
+# Only a run that got here vouches for the artifacts: record its toolchain.
+{
+    echo "# toolchain of the last successful ./install.sh, $(date)"
+    fingerprint
+} > "$STAMP"
+
 FOOTER="${GREEN}Done${RESET} in ${CYAN}$(elapsed "$T_TOTAL")${RESET}"
 if [ $LIVE = 1 ]; then
     render

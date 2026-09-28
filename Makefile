@@ -31,9 +31,9 @@ HDF5_LIB = -L$(HDF5_ROOT)/lib -Wl,-rpath,$(HDF5_ROOT)/lib -lhdf5_hl_fortran -lhd
 
 LIBS = $(XCFUN_LIB) $(CHOLESKY_LIB) $(HDF5_LIB) -limf
 
-# conda-forge ifx/MKL: MKL needs libatomic, and the runtime libraries live in $CONDA_PREFIX/lib
+
 ifneq ($(wildcard $(CONDA_PREFIX)/lib/libmkl_intel_thread.so),)
-  LIBS += -Wl,-rpath,$(CONDA_PREFIX)/lib -latomic
+  LIBS += -Wl,--disable-new-dtags -Wl,-rpath,$(CONDA_PREFIX)/lib -latomic
 endif
 
 include Makefile.common

@@ -6,7 +6,9 @@ set -e
 # Environment variables (all optional):
 #   JOBS          parallel make jobs                  (default: nproc)
 #   ZLIB_ROOT     zlib install prefix                 (default: /usr if it has
-#                 zlib.h, else $CONDA_PREFIX)
+#                 zlib.h, else $CONDA_PREFIX). install.sh sets it to
+#                 $CONDA_PREFIX in conda mode, so the default order only
+#                 applies in modules mode.
 #   HDF5_TARBALL  path to hdf5-$VERSION.tar.gz; no download (conda recipe)
 
 VERSION=1.14.5

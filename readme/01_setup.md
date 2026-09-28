@@ -97,8 +97,7 @@ build is incremental, so unchanged files are not recompiled:
 ```
 
 Run `./install.sh --clean` after changing a public module interface (arguments,
-types, or module variables), changing the compiler version, or when a full
-rebuild is required.
+types, or module variables), or when a full rebuild is required.
 
 ### 1.4. Building with Make
 

@@ -2,9 +2,14 @@
 #
 #   conda env create -f environment.yml
 #   conda activate gammcor-dev
-#   conda env config vars set MKLROOT="$CONDA_PREFIX"    # once; -qmkl finds MKL through it
-#   conda activate gammcor-dev
 #   ./install.sh
+#
+# install.sh sees ifx and MKL in the env and takes everything from it (conda
+# mode): -qmkl finds MKL next to ifx, so MKLROOT is not needed (install.sh
+# unsets it). Do not load Intel compiler or MKL modules after
+# `conda activate`; install.sh stops if ifx, icx or python3 do not come from
+# the env. If you set MKLROOT for this env earlier, it can go:
+#   conda env config vars unset MKLROOT -n gammcor-dev
 #
 # Everything comes from conda-forge. On Linux, conda-forge has no intel-openmp;
 # MKL and the Intel Fortran runtime use llvm-openmp instead (pulled in by them).
