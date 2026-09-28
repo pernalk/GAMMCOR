@@ -51,6 +51,10 @@ TODO
 
 ---
 
+<div align="center">
+
 | Previous | | Next |
 |:--|:--:|--:|
 |  | [↑ Back to README](../README.md) | [Setup →](01_setup.md) |
+
+</div>

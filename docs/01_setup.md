@@ -134,6 +134,10 @@ code are not required.
 
 ---
 
+<div align="center">
+
 | Previous | | Next |
 |:--|:--:|--:|
 |  | [↑ Back to README](../README.md) | [Input →](02_input_structure.md) |
+
+</div>

@@ -389,6 +389,10 @@ The path may be relative or absolute.
 
 ---
 
+<div align="center">
+
 | Previous | | Next |
 |:--|:--:|--:|
 | [← Setup](01_setup.md) | [↑ Back to README](../README.md) | [PySCF interface →](03_pyscf_interface.md) |
+
+</div>

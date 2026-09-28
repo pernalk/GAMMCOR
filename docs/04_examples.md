@@ -275,6 +275,10 @@ The Meson debug and Make executables are listed in [Running
 
 ---
 
+<div align="center">
+
 | Previous | | Next |
 |:--|:--:|--:|
 | [← PySCF interface](03_pyscf_interface.md) | [↑ Back to README](../README.md) | [Citation →](05_citation.md) |
+
+</div>

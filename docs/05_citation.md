@@ -254,6 +254,10 @@ add the method-specific references from the following sections.
 
 ---
 
+<div align="center">
+
 | Previous | | Next |
 |:--|:--:|--:|
 | [← Examples](04_examples.md) | [↑ Back to README](../README.md) |  |
+
+</div>

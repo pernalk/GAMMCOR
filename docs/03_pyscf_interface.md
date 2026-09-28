@@ -107,6 +107,10 @@ Practical PySCF inputs are shown in [Examples](04_examples.md).
 
 ---
 
+<div align="center">
+
 | Previous | | Next |
 |:--|:--:|--:|
 | [← Input](02_input_structure.md) | [↑ Back to README](../README.md) | [Examples →](04_examples.md) |
+
+</div>
