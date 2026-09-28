@@ -4,11 +4,12 @@
 
 1. [For developers](#1-for-developers)
    - [With conda (recommended)](#11-with-conda-recommended)
-   - [Without conda](#12-without-conda)
-   - [Recompiling after a source change](#13-recompiling-after-a-source-change)
-   - [Building with Make](#14-building-with-make)
-   - [Debug build](#15-debug-build)
-   - [Executables](#16-executables)
+   - [With an existing toolchain](#12-with-an-existing-toolchain)
+   - [Testing](#13-testing)
+   - [Recompiling after a source change](#14-recompiling-after-a-source-change)
+   - [Building with Make](#15-building-with-make)
+   - [Debug build](#16-debug-build)
+   - [Executables](#17-executables)
 2. [For non-developers](#2-for-non-developers)
 
 ## 1. For developers
@@ -38,50 +39,38 @@ The current conda build has been tested with `ifx` 2026.1.1, `icx` 2026.1.1,
 oneMKL 2026.1.0, Python 3.13.15, Meson 1.12.1, and Ninja 1.13.2. These are
 tested versions, not minimum requirements unless stated below.
 
-### 1.2. Without conda
+### 1.2. With an existing toolchain
 
-On a computing cluster, first load a module providing Python 3.10 or newer.
-The exact module name depends on the cluster:
+Prerequisites:
 
-```bash
-module avail python
-module load <python-module>
-```
+- Intel Fortran Compiler (`ifx`; tested with 2025.0.4 and 2026.1.1)
+- Intel C/C++ Compiler (`icx`; tested with 2025.0.4 and 2026.1.1)
+- Intel oneMKL (tested with 2025.0 and 2026.1.0)
+- GCC C++ compiler (`g++`)
+- Python 3.10 or newer, with `pip`, NumPy, and h5py
+- Meson 1.1 or newer
+- Ninja (tested with 1.13.2)
+- zlib, including the `zlib.h` header
 
-Create a private Python environment and install Meson and Ninja in it:
-
-```bash
-python3 -m venv ~/.venvs/gammcor
-source ~/.venvs/gammcor/bin/activate
-python -m pip install --upgrade pip
-python -m pip install "meson>=1.1" ninja
-```
-
-Next, load the Intel oneAPI compiler and MKL modules available on the cluster.
-Activate the Python environment again afterwards so that its executables remain
-first on `PATH`:
-
-```bash
-module avail intel mkl
-module load <intel-compiler-module>
-module load <mkl-module>
-source ~/.venvs/gammcor/bin/activate
-```
-
-The source build also requires Make, Git, `wget` or `curl`, and the zlib
-development files. Once all dependencies are available, build GAMMCOR:
+Build GAMMCOR and all necessary libraries:
 
 ```bash
 ./install.sh
 ```
 
-In a new terminal, load the same compiler, MKL, and Python modules and activate
-`~/.venvs/gammcor` before rebuilding GAMMCOR.
-
 The script builds GAMMCOR and its bundled dependencies. Run
 `./install.sh --help` to see the available build options.
 
-### 1.3. Recompiling after a source change
+### 1.3. Testing
+
+Run the test suite from the `testjobs` directory:
+
+```bash
+cd testjobs
+./run_tests.py gammcor
+```
+
+### 1.4. Recompiling after a source change
 
 After editing files in `SOURCE/`, rebuild GAMMCOR with:
 
@@ -97,20 +86,20 @@ build is incremental, so unchanged files are not recompiled:
 ```
 
 Run `./install.sh --clean` after changing a public module interface (arguments,
-types, or module variables), or when a full rebuild is required.
+types, or module variables), changing the compiler version, or when a full
+rebuild is required.
 
-### 1.4. Building with Make
+### 1.5. Building with Make
 
 Once the required libraries have been built, GAMMCOR can also be compiled with
-the top-level Makefile. For example, to use eight parallel jobs:
+the top-level Makefile. The following command runs one build job per
+available CPU core:
 
 ```bash
-make -j 8
+make -j $(nproc)
 ```
 
-Replace `8` with the number of CPU cores you want to use for compilation.
-
-### 1.5. Debug build
+### 1.6. Debug build
 
 The repository includes a separate Meson profile for debug builds:
 
@@ -119,7 +108,7 @@ meson setup build-debug --native-file .meson/profiles/ifx-debug.ini
 meson compile -C build-debug
 ```
 
-### 1.6. Executables
+### 1.7. Executables
 
 The compiled executables are written to:
 
@@ -142,3 +131,9 @@ conda install -c <channel> -c conda-forge gammcor
 
 This installs GAMMCOR and its command-line tools. A compiler and the source
 code are not required.
+
+---
+
+| Previous | | Next |
+|:--|:--:|--:|
+|  | [↑ Back to README](../README.md) | [Input →](02_input_structure.md) |

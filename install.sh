@@ -26,12 +26,22 @@
 #             setvars.sh). numpy and h5py, needed by gammcor_tools, must
 #             already be installed for python3.
 # gammcor_tools is installed with pip --no-deps in both modes: numpy and h5py
-# come from the conda env (environment.yml) or are installed by you.
+# come from the conda env (environment.yml) or are installed by you. They are
+# checked before anything is compiled.
 #
-# The toolchain (mode, ifx and its version, icx, MKL, python3) is stored in
+# install.log has every command that was run, quoted so that it can be copied
+# and run by hand; a failed one is also shown on screen.
+#
+# The toolchain (mode, ifx and its version, icx, MKL, python3, the GCC used by
+# icx) is stored in
 # .toolchain after a successful run. When it differs on the next run, the
 # changed fields are shown and everything is rebuilt, as with --clean, so
 # objects and .mod files from different compilers are never mixed.
+#
+# Without --prefix, the end of the script makes `gammcor` a command: a symlink to
+# bin/gammcor in $CONDA_PREFIX/bin (conda mode: there while the env is active)
+# or in ~/.local/bin (modules mode). A rebuild needs no new link. A file named
+# gammcor there that is not a symlink is left alone.
 #
 # After the first build, recompile with:  meson compile -C build
 set -eE -o pipefail
@@ -150,6 +160,7 @@ insert_step() {   # insert_step <index variable> <name> <position>
 
 CUR=-1          # running step
 RUNLABEL=""     # its label, e.g. "Building XCFun"
+LAST_COMMAND="" # command of run() that failed, see run()
 FOOTER=""
 DRAWN=0         # lines of the step list currently on screen
 SPIN_PID=""
@@ -243,10 +254,12 @@ begin() {   # begin <step index> <label shown while running>
     CUR=$1
     RUNLABEL=$2
     STATE[$CUR]=running
+    LAST_COMMAND=""
     LOG_MARK=$(wc -l < "$LOG")
     T_STEP=$(now)
     STEP_SECONDS=$SECONDS
-    printf '\n=== %s\n' "$RUNLABEL" >> "$LOG"
+    printf '\n=== [%s] Step %d of %d: %s\n' "$(date '+%F %T')" \
+        $((CUR + 1)) ${#NAMES[@]} "$RUNLABEL" >> "$LOG"
     if [ $LIVE = 1 ]; then
         FOOTER=$(footer_text)
         render
@@ -261,7 +274,7 @@ ok() {   # ok <info> [<extra lines>]
     STATE[$CUR]=ok
     INFO[$CUR]=$1
     EXTRA[$CUR]=${2:-}
-    printf '=== %s: ok %s\n' "${NAMES[$CUR]}" "$1" >> "$LOG"
+    printf '=== [%s] %s: ok %s\n' "$(date '+%F %T')" "${NAMES[$CUR]}" "$1" >> "$LOG"
     if [ $LIVE = 1 ]; then render; else step_line $CUR; fi
 }
 
@@ -275,36 +288,58 @@ fail() {
     if [ $LIVE = 1 ]; then render; else step_line $CUR; fi
 }
 
+# The command of run() that failed, to copy and run by hand (nothing if none)
+show_failed_command() {
+    if [ -n "$LAST_COMMAND" ]; then
+        printf '\n%sFailed command:%s\n  %s\n' "$DIM" "$RESET" "$LAST_COMMAND" >&2
+    fi
+}
+
 die() {
     trap - ERR
     exec 1>&3 2>&4
     fail
     printf '\n%s%s%s\n' "$RED" "$*" "$RESET" >&2
     printf '%s\n' "$*" >> "$LOG"
+    show_failed_command
     printf '\nFull log: %s\n' "$LOG" >&2
     exit 1
 }
 
 on_error() {
+    local status=$?
     trap - ERR
     exec 1>&3 2>&4
+    printf '\n[%s] FAILED with exit status %d%s\n' "$(date '+%F %T')" $status \
+        "${LAST_COMMAND:+: $LAST_COMMAND}" >> "$LOG"
     fail
     if [ $VERBOSE = 0 ]; then
         printf '\n%sLast 30 lines of install.log:%s\n' "$DIM" "$RESET" >&2
         tail -n 30 "$LOG" | sed 's/^/  /' >&2
     fi
+    show_failed_command
     printf '\nFull log: %s\n' "$LOG" >&2
 }
 trap on_error ERR
 trap 'spin_stop; if [ $LIVE = 1 ]; then printf "\e[?25h"; fi' EXIT
 
 # Run a build command: output to install.log (and to the screen with --verbose).
+# The command goes to install.log first, quoted, so that it can be copied from
+# there. A failure fires the ERR trap inside run() (unless run is followed by
+# ||), with LAST_COMMAND still naming the command; a success clears it.
 run() {
+    local arg quoted=()
+    for arg in "$@"; do quoted+=("$(printf '%q' "$arg")"); done
+    LAST_COMMAND="${quoted[*]}"
+    printf '\n[%s] $ %s\n' "$(date '+%F %T')" "$LAST_COMMAND" >> "$LOG"
     if [ $VERBOSE = 1 ]; then
         "$@" 2>&1 | tee -a "$LOG"
     else
         "$@" >> "$LOG" 2>&1
     fi
+    local status=$?
+    if [ $status = 0 ]; then LAST_COMMAND=""; fi
+    return $status
 }
 
 # ", N warnings" for the log lines written by the current step (empty if none)
@@ -328,7 +363,7 @@ elapsed() {
 # ---------------------------------------------------------------------------
 NL=$'\n'
 STAMP=.toolchain                                   # toolchain of the last successful run
-FP_KEYS=(mode ifx ifx_version icx mkl python)      # its fields, in this order
+FP_KEYS=(mode ifx ifx_version icx mkl python gcc)  # its fields, in this order
 
 # Keep only the entries of a :-separated path variable that are inside
 # $CONDA_PREFIX; the others go into DROPPED.
@@ -359,6 +394,15 @@ mkl_version() {   # mkl_version <include dir>
         "$1/mkl_version.h" || true
 }
 
+# The version at the start of the first word of `<program> --version` that
+# starts with one, e.g. 2025.0.4, or 1.13.2 from 1.13.2.git.kitware.jobserver-1
+# (ninja from PyPI)
+version_of() {   # version_of <program>
+    "$1" --version 2>&1 | awk '{
+        for (i = 1; i <= NF; i++)
+            if (match($i, /^[0-9]+\.[0-9]+(\.[0-9]+)*/)) { print substr($i, 1, RLENGTH); exit } }' || true
+}
+
 # Are there artifacts of an earlier build?
 built_before() {
     [ -e build ] || [ -e gammcor-integrals/build ] || [ -e hdf5/lib ] \
@@ -381,7 +425,7 @@ if [ $CLEAN = 1 ]; then add_step S_CLEAN "Clean"; fi
 add_step S_INT     "gammcor-integrals"
 add_step S_XCFUN   "XCFun"
 add_step S_HDF5    "HDF5"
-add_step S_TOOLS   "Python tools"
+add_step S_TOOLS   "Gammcor tools"
 add_step S_GAMMCOR "GAMMCOR"
 if [ -n "$PREFIX" ]; then add_step S_INSTALL "Install"; fi
 
@@ -513,16 +557,75 @@ else
     py="${PYTHON:-python3}"
     PYTHON=$(command -v "$py") || die "$py not found."
 fi
-"$PYTHON" -m pip --version > /dev/null 2>&1 || die "pip not found for $PYTHON."
+# python -s ignores the user site-packages (~/.local): in conda mode numpy,
+# h5py and gammcor_tools must be the env's. Not in modules mode, where
+# `pip install --user` is a common way to get numpy and h5py on a cluster.
+PY=("$PYTHON")
+if [ $MODE = conda ]; then PY+=(-s); fi
+"${PY[@]}" -m pip --version > /dev/null 2>&1 || die "pip not found for $PYTHON."
+
+# numpy and h5py, needed by gammcor_tools (installed with pip --no-deps in step
+# 7), are checked now rather than after everything is compiled. A package build
+# (--prefix) gets them as run dependencies of the package, so there they may
+# be missing. Run from /: see step 7.
+MISSING=$(cd / && "${PY[@]}" -c '
+import importlib.util
+print(" ".join(m for m in ("numpy", "h5py") if importlib.util.find_spec(m) is None))')
+NUMPY_H5PY=""
+if [ -n "$MISSING" ]; then
+    if [ $MODE = conda ]; then
+        HOWTO="  conda install -c conda-forge $MISSING"
+    else
+        HOWTO="  $PYTHON -m pip install $MISSING
+
+or load a module that provides them"
+    fi
+    [ -n "$PREFIX" ] || die "gammcor_tools needs numpy and h5py, but $PYTHON
+does not have: $MISSING. install.sh does not install them (pip --no-deps).
+Install them with
+
+$HOWTO
+
+and run ./install.sh again."
+else
+    NUMPY_H5PY=$(cd / && "${PY[@]}" -c '
+import os, numpy, h5py
+for m in (numpy, h5py):
+    print("%-8s %-10s %s" % (m.__name__ + ":", m.__version__, os.path.dirname(m.__file__)))' 2>&1) \
+        || die "numpy and h5py are installed for $PYTHON, but do not import:
+
+$NUMPY_H5PY"
+fi
+
+# The GCC whose C++ headers and libstdc++ icx uses for XCFun (passed to
+# xcfun/Makefile.common as GCC_INSTALL_DIR). The Makefile's default is the one
+# of g++ on PATH, which in conda mode is the system's: conda names its g++
+# e.g. x86_64-conda-linux-gnu-g++. Empty (no g++): icx chooses.
+if [ $MODE = conda ]; then
+    GXX=$(compgen -G "$CONDA_PREFIX/bin/*-g++" | sed -n 1p || true)
+else
+    GXX=$(command -v g++ || true)
+fi
+GCC_INSTALL_DIR=""
+if [ -n "$GXX" ]; then
+    GCC_INSTALL_DIR=$(dirname "$("$GXX" -print-libgcc-file-name)")
+fi
+
+# ifx by its absolute path: it goes into the Meson build directories (see
+# toolchain_native_file), so a later `meson compile -C build` does not take
+# another ifx from PATH.
+IFX=$(command -v ifx)
+ICX=$(command -v icx)
 
 # Compare the toolchain with the one of the last successful run
 declare -A FP=(
     [mode]=$MODE
-    [ifx]=$(realpath "$(command -v ifx)")
+    [ifx]=$(realpath "$IFX")
     [ifx_version]=$(ifx --version 2>&1 | sed -n 1p)
-    [icx]=$(realpath "$(command -v icx)")
+    [icx]=$(realpath "$ICX")
     [mkl]="$MKL${MKL_VERSION:+ $MKL_VERSION}"
     [python]=$(realpath "$PYTHON")
+    [gcc]=$GCC_INSTALL_DIR
 )
 CLEAN_REASON=""
 STAMP_CHANGES=""
@@ -544,13 +647,39 @@ elif built_before; then
 fi
 fingerprint >> "$LOG"
 
-ok "" "mode:   $MODE_INFO
-ifx:    $(ifx --version 2>&1 | sed -n 1p | awk '{print $3}')
-MKL:    $MKL${MKL_VERSION:+ ($MKL_VERSION)}
-python: $PYTHON
-meson:  $(meson --version)
-ninja:  $(ninja --version)${PATHS_DROPPED:+
-non-conda entries dropped from $PATHS_DROPPED}"
+# The environment the build tools see (in conda mode after the clean-up above)
+{
+    echo
+    printf '%-16s %s\n' "PATH:" "$PATH"
+    for var in LD_LIBRARY_PATH LIBRARY_PATH CPATH C_INCLUDE_PATH CPLUS_INCLUDE_PATH \
+            PYTHONPATH PYTHONHOME MKLROOT CC CXX FC CFLAGS FFLAGS LDFLAGS; do
+        printf '%-16s %s\n' "$var:" "${!var:-<unset>}"
+    done
+    if [ $MODE = modules ]; then
+        printf '%-16s %s\n' "modules:" "${LOADEDMODULES:-<not recorded by the module system>}"
+    fi
+    echo
+} >> "$LOG"
+
+# name: version, path
+ENV_SUMMARY=$(
+    v() { local s; s=$(version_of "$1"); printf '%s' "${s:-?}"; }
+    printf '%-8s %-10s %s\n' \
+        "ifx:" "$(v "$IFX")" "$IFX" \
+        "icx:" "$(v "$ICX")" "$ICX" \
+        "MKL:" "${MKL_VERSION:-?}" "$MKL"
+    if [ -n "$GXX" ]; then printf '%-8s %-10s %s\n' "g++:" "$(v "$GXX")" "$GXX"; fi
+    printf '%-8s %-10s %s\n' "python:" "$(v "$PYTHON")" "$PYTHON"
+    if [ -n "$NUMPY_H5PY" ]; then printf '%s\n' "$NUMPY_H5PY"; fi
+    printf '%-8s %-10s %s\n' \
+        "meson:" "$(v meson)" "$(command -v meson)" \
+        "ninja:" "$(v ninja)" "$(command -v ninja)"
+    if [ -n "$MISSING" ]; then printf 'not installed for python: %s\n' "$MISSING"; fi
+    if [ -n "$PATHS_DROPPED" ]; then printf 'non-conda entries dropped from %s\n' "$PATHS_DROPPED"; fi
+)
+printf '%s\n' "$ENV_SUMMARY" >> "$LOG"
+
+ok "" "$ENV_SUMMARY"
 
 # Artifacts of another toolchain are removed before anything is built: the
 # skip logic below (HDF5 already built, meson configure of an existing build
@@ -648,16 +777,22 @@ elif [ -f "$MKLROOT/lib/libmkl_intel_thread.so" ] && [ -f "$MKLROOT/lib/libatomi
     CONDA_LINK_ARGS=(-Wl,-rpath,"$MKLROOT/lib" "${ATOMIC_ARGS[@]}")
 fi
 
-# Print a native file that repeats fortran_link_args of <profile> with <args> appended.
-#   link_args_native_file <profile> <args>...
-link_args_native_file() {
+# Print a native file, read after <profile>, that sets fortran to <ifx> (an
+# absolute path, kept by the build directory) and, when <args> are given,
+# repeats fortran_link_args of <profile> with <args> appended.
+#   toolchain_native_file <profile> <ifx> [<args>...]
+toolchain_native_file() {
     python3 - "$@" <<'EOF'
 import ast, configparser, sys
-ini = configparser.ConfigParser(interpolation=None)
-ini.read(sys.argv[1])
-args = ast.literal_eval(ini['built-in options']['fortran_link_args'])
-print('[built-in options]')
-print(f"fortran_link_args = {args + sys.argv[2:]!r}")
+profile, ifx, extra = sys.argv[1], sys.argv[2], sys.argv[3:]
+print('[binaries]')
+print(f"fortran = {ifx!r}")
+if extra:
+    ini = configparser.ConfigParser(interpolation=None)
+    ini.read(profile)
+    args = ast.literal_eval(ini['built-in options']['fortran_link_args'])
+    print('[built-in options]')
+    print(f"fortran_link_args = {args + extra!r}")
 EOF
 }
 
@@ -670,15 +805,13 @@ meson_setup() {
     local dir=$1 src=$2; shift 2
     local profile="$src/.meson/profiles/ifx.ini"
     if [ -f "$dir/meson-private/coredata.dat" ]; then
-        meson configure "$dir" "$@"
+        run meson configure "$dir" "$@"
     else
-        local native=(--native-file "$profile")
-        if [ ${#CONDA_LINK_ARGS[@]} -gt 0 ]; then
-            mkdir -p "$dir"
-            link_args_native_file "$profile" "${CONDA_LINK_ARGS[@]}" > "$dir/conda.ini"
-            native+=(--native-file "$PWD/$dir/conda.ini")
-        fi
-        meson setup "$dir" "$src" "${native[@]}" "$@"
+        mkdir -p "$dir"
+        toolchain_native_file "$profile" "$IFX" "${CONDA_LINK_ARGS[@]}" \
+            > "$dir/toolchain.ini" 2>> "$LOG"
+        run meson setup "$dir" "$src" --native-file "$profile" \
+            --native-file "$PWD/$dir/toolchain.ini" "$@"
     fi
 }
 
@@ -687,7 +820,7 @@ meson_setup() {
 # ---------------------------------------------------------------------------
 begin $S_INT "Building gammcor-integrals"
 
-run meson_setup gammcor-integrals/build gammcor-integrals -Dcpu="$CPU"
+meson_setup gammcor-integrals/build gammcor-integrals -Dcpu="$CPU"
 run meson compile -C gammcor-integrals/build -j "$JOBS"
 
 ok "$(elapsed "$T_STEP")$(warnings)"
@@ -697,7 +830,7 @@ ok "$(elapsed "$T_STEP")$(warnings)"
 # ---------------------------------------------------------------------------
 begin $S_XCFUN "Building XCFun"
 
-run make -C xcfun intel
+run make -C xcfun intel GCC_INSTALL_DIR="$GCC_INSTALL_DIR"
 
 ok "$(elapsed "$T_STEP")$(warnings)"
 
@@ -727,38 +860,19 @@ if [ -z "$PREFIX" ]; then
 else
     PIP_ARGS=(./gammcor_tools --no-deps --no-build-isolation)
 fi
-run "$PYTHON" -m pip install "${PIP_ARGS[@]}" || die "pip install failed (details in install.log).
+run "${PY[@]}" -m pip install "${PIP_ARGS[@]}" || die "pip install failed (details in install.log).
 If pip says 'externally-managed-environment', use a venv, a conda env,
 or run: $PYTHON -m pip install --user ${PIP_ARGS[*]}"
 
 # Run from /: in this directory, ./gammcor_tools would import as an (empty)
 # namespace package even if the installation did not work.
-(cd / && "$PYTHON" -c 'import gammcor_tools') >> "$LOG" 2>&1 \
+(cd / && "${PY[@]}" -c 'import gammcor_tools') >> "$LOG" 2>&1 \
     || die "gammcor_tools was installed but does not import with $PYTHON
 (details in install.log)."
 
-MISSING=$(cd / && "$PYTHON" -c '
-import importlib.util
-print(" ".join(m for m in ("numpy", "h5py") if importlib.util.find_spec(m) is None))')
-TOOLS_INFO="gammcor_tools, $(elapsed "$T_STEP")"
-if [ -n "$MISSING" ]; then
-    if [ $MODE = conda ]; then
-        HOWTO="  conda install -c conda-forge $MISSING"
-    else
-        HOWTO="  $PYTHON -m pip install $MISSING
-
-or load a module that provides them"
-    fi
-    # A package build (--prefix) gets them as run dependencies of the package.
-    [ -n "$PREFIX" ] || die "gammcor_tools needs numpy and h5py, but $PYTHON
-does not have: $MISSING. install.sh does not install them (pip --no-deps).
-Install them with
-
-$HOWTO
-
-and run ./install.sh again."
-    TOOLS_INFO+=", without $MISSING"
-fi
+# numpy and h5py were checked in step 1: missing only in a package build
+TOOLS_INFO="$(elapsed "$T_STEP")"
+if [ -n "$MISSING" ]; then TOOLS_INFO+=", without $MISSING"; fi
 
 ok "$TOOLS_INFO"
 
@@ -772,7 +886,7 @@ mkdir -p OBJ   # object directory of the Makefile build, for those who use make
 MESON_ARGS=(-Dcpu="$CPU")
 if [ -n "$PREFIX" ]; then MESON_ARGS+=(-Dprefix="$PREFIX"); fi
 
-run meson_setup build . "${MESON_ARGS[@]}"
+meson_setup build . "${MESON_ARGS[@]}"
 run meson compile -C build -j "$JOBS"
 
 ok "$(elapsed "$T_STEP")$(warnings)"
@@ -784,6 +898,41 @@ if [ -n "$PREFIX" ]; then
     begin $S_INSTALL "Installing into $PREFIX"
     run meson install -C build
     ok "$PREFIX/bin/gammcor"
+fi
+
+# ---------------------------------------------------------------------------
+# 10. `gammcor` command (not with --prefix): a symlink to bin/gammcor in a
+#     directory on PATH, see the header of this file. No step of its own: it
+#     is shown in the summary at the end, and a failure here is only a note.
+# ---------------------------------------------------------------------------
+LINK=""
+LINK_NOTE=""
+if [ -z "$PREFIX" ]; then
+    if [ $MODE = conda ]; then LINK_DIR="$CONDA_PREFIX/bin"; else LINK_DIR="$HOME/.local/bin"; fi
+    OLD_TARGET=$(readlink "$LINK_DIR/gammcor" || true)
+    if [ -e "$LINK_DIR/gammcor" ] && [ ! -L "$LINK_DIR/gammcor" ]; then
+        LINK_NOTE="gammcor command not created: $LINK_DIR/gammcor exists and is not a symlink."
+    # a link from another GAMMCOR directory is replaced: the last install wins
+    elif ! { run mkdir -p "$LINK_DIR" && run ln -sfn "$PWD/bin/gammcor" "$LINK_DIR/gammcor"; }; then
+        LINK_NOTE="gammcor command not created: linking $LINK_DIR/gammcor failed (see install.log)."
+    else
+        LINK="$LINK_DIR/gammcor"
+        printf '=== [%s] gammcor command: %s\n' "$(date '+%F %T')" "$LINK" >> "$LOG"
+        if [ -n "$OLD_TARGET" ] && [ "$OLD_TARGET" != "$PWD/bin/gammcor" ]; then
+            LINK_NOTE="it pointed to $OLD_TARGET before"
+        fi
+        hash -r
+        case ":$PATH:" in
+            *":$LINK_DIR:"*)
+                FOUND=$(command -v gammcor || true)
+                if [ "$FOUND" != "$LINK" ]; then
+                    LINK_NOTE+="${LINK_NOTE:+$NL}another gammcor comes first on PATH: $FOUND"
+                fi ;;
+            *)
+                LINK_NOTE+="${LINK_NOTE:+$NL}$LINK_DIR is not on PATH. Add to ~/.bashrc:$NL"
+                LINK_NOTE+="  export PATH=\"\$HOME/.local/bin:\$PATH\"" ;;
+        esac
+    fi
 fi
 
 # ---------------------------------------------------------------------------
@@ -802,6 +951,10 @@ else
     printf '\n%s%s%s\n%s\n' "$DIM" "$RULE" "$RESET" "$FOOTER"
 fi
 printf '%sNo electrons were harmed during compilation.%s\n' "$LAV" "$RESET"
-printf '\n  gammcor  %s%s%s\n' "$CYAN" "$PWD/bin/gammcor" "$RESET"
-if [ -n "$PREFIX" ]; then printf '           %s%s%s\n' "$CYAN" "$PREFIX/bin/gammcor" "$RESET"; fi
-printf '  log      %s%s%s\n\n' "$DIM" "$LOG" "$RESET"
+printf '\n  executable  %s%s%s\n' "$CYAN" "$PWD/bin/gammcor" "$RESET"
+if [ -n "$PREFIX" ]; then printf '  installed   %s%s%s\n' "$CYAN" "$PREFIX/bin/gammcor" "$RESET"; fi
+if [ -n "$LINK" ]; then printf '  command     %sgammcor%s\n' "$CYAN" "$RESET"; fi
+if [ -n "$LINK_NOTE" ]; then
+    while IFS= read -r line; do printf '              %s%s%s\n' "$YELLOW" "$line" "$RESET"; done <<< "$LINK_NOTE"
+fi
+printf '  log         %s%s%s\n\n' "$DIM" "$LOG" "$RESET"

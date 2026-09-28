@@ -272,3 +272,9 @@ cd my_job
 
 The Meson debug and Make executables are listed in [Running
 `gammcor`](02_input_structure.md#running-gammcor).
+
+---
+
+| Previous | | Next |
+|:--|:--:|--:|
+| [← PySCF interface](03_pyscf_interface.md) | [↑ Back to README](../README.md) | [Citation →](05_citation.md) |

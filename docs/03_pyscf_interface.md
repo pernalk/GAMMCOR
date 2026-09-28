@@ -104,3 +104,9 @@ gammcor_h5info pyscf_data.h5 REF/ENUC
 Here `REF` is the name of an HDF5 group and `REF/ENUC` is the full path to one
 dataset in that group. Run any command with `-h` to see its remaining options.
 Practical PySCF inputs are shown in [Examples](04_examples.md).
+
+---
+
+| Previous | | Next |
+|:--|:--:|--:|
+| [← Input](02_input_structure.md) | [↑ Back to README](../README.md) | [Examples →](04_examples.md) |

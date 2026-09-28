@@ -251,3 +251,9 @@ add the method-specific references from the following sections.
 </tr>
 </tbody>
 </table>
+
+---
+
+| Previous | | Next |
+|:--|:--:|--:|
+| [← Examples](04_examples.md) | [↑ Back to README](../README.md) |  |

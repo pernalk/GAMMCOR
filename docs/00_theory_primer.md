@@ -48,3 +48,9 @@ TODO
 
 ## 10. What are the future directions?
 TODO
+
+---
+
+| Previous | | Next |
+|:--|:--:|--:|
+|  | [↑ Back to README](../README.md) | [Setup →](01_setup.md) |

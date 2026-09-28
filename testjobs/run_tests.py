@@ -1,5 +1,5 @@
 #! /usr/bin/env python
-import os,sys,glob, string,math
+import os,sys,glob, string,math,shutil
 from pathlib import Path
 import numpy as np
 from scripts import test_list, test_utils
@@ -38,7 +38,11 @@ if "--clean" in sys.argv[1:]:
 if len(sys.argv) < 2:
     raise Exception("Executable path not specified!")
 
-local_path_gammcor = os.path.abspath(sys.argv[1])
+# A bare name (e.g. `gammcor`) is looked up on PATH, like a shell command
+if "/" not in sys.argv[1] and shutil.which(sys.argv[1]):
+    local_path_gammcor = shutil.which(sys.argv[1])
+else:
+    local_path_gammcor = os.path.abspath(sys.argv[1])
 
 if local_path_gammcor.endswith("/gammcor"):
     RUN_GAMMCOR = local_path_gammcor 
