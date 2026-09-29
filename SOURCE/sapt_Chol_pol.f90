@@ -1889,7 +1889,7 @@ print*, 'A2A',norm2(A2A)
 
 !Calc: APLUS0Tilde=ABPLUS0.DChol
 allocate(ABP0TildeA(A%NDimX,NCholesky))
-ABP0TildeB = 0.d0 !AT initialize uninitialized matrix
+ABP0TildeA = 0.d0 !AT initialize uninitialized matrix
 
 call ABPM_HALFTRAN_GEN_L(transpose(A%DChol),ABP0TildeA,0.0d0,A0BlkA,A0BlkIVA,nblkA,A%NDimX,NCholesky,'Y')
 print*, 'APLUS0Tilde',norm2(ABP0TildeA)
