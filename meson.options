@@ -1,0 +1,7 @@
+option('cpu', type : 'combo',
+       choices : ['auto', 'native', 'avx512', 'avx512-amd', 'avx2', 'dispatch'],
+       value : 'auto')
+
+# Installation prefix of TREXIO: <prefix>/include/trexio_f.f90 and
+# <prefix>/lib/libtrexio.so. Empty: found with pkg-config.
+option('trexio', type : 'string', value : '')

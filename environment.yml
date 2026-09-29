@@ -1,0 +1,37 @@
+# Conda environment for building GAMMCOR (dSRS branch).
+#
+#   conda env create -f environment.yml -n <env-name>
+#   conda activate <env-name>
+#   ./install.sh
+#
+# <env-name> is any name you choose, e.g. gammcor-dsrs. Without -n, the env is
+# named gammcor-dsrs (the name: field below). An existing env, e.g. one made
+# from environment.yml of the main GAMMCOR branch, works too once it has
+# trexio (conda install -c conda-forge trexio); without it install.sh builds
+# TREXIO from source.
+#
+# install.sh sees ifx and MKL in the env and takes everything from it (conda
+# mode): -qmkl finds MKL next to ifx, so MKLROOT is not needed (install.sh
+# unsets it). Do not load Intel compiler or MKL modules after
+# `conda activate`; install.sh stops if ifx, icx or python3 do not come from
+# the env. If you set MKLROOT for this env earlier, it can go:
+#   conda env config vars unset MKLROOT -n <env-name>
+#
+# Everything comes from conda-forge. On Linux, conda-forge has no intel-openmp;
+# MKL and the Intel Fortran runtime use llvm-openmp instead (pulled in by them).
+name: gammcor-dsrs
+channels:
+  - conda-forge
+  - nodefaults
+dependencies:
+  - python>=3.10
+  # Intel oneAPI compilers and MKL
+  - ifx_linux-64         # Fortran: ifx
+  - dpcpp_linux-64       # C/C++: icx
+  - mkl-devel
+  # build tools
+  - meson
+  - ninja
+  - make
+  # TREXIO (with HDF5)
+  - trexio

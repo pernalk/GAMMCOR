@@ -28,3 +28,15 @@ SOURCE/trexio_f.f90
 trexio/*.so*
 *.out
 clean-build-test.sh
+# Meson build / install.sh
+bin/
+build-*/
+install.log
+.toolchain
+trexio/build/
+trexio/install/
+trexio/trexio-*.tar.gz*
+# HDF5: built locally by hdf5/build_hdf5.sh (install.sh, for TREXIO)
+/hdf5/*
+!/hdf5/README.md
+!/hdf5/build_hdf5.sh
