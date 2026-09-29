@@ -262,7 +262,7 @@ call AB_CAS_FOFO(ABPLUS1,ABMIN1,ECASSCF,URe,Occ,XOne, &
 
 !Calc: A1=ABPLUS0*ABMIN1+ABPLUS1*ABMIN0
  allocate(A1(NDimX,NDimX))
- A1 = 0.d+0
+ A1 = 0.d0 !AT initialize uninitialized matrix
 !call mem_alloc(A1,NDimX*NDimX)
 call ABPM_HALFTRAN_GEN_L(ABMIN1, A1,0.0d0,A0Block,A0BlockIV,nblk,NDimX,NDimX,'Y')
 call ABPM_HALFTRAN_GEN_R(ABPLUS1,A1,1.0d0,A0Block,A0BlockIV,nblk,NDimX,NDimX,'X')
@@ -272,7 +272,7 @@ EGOne(1)=ECASSCF
 
 !Calc: APLUS0Tilde=ABPLUS0.DChol
 allocate(APLUS0Tilde(NDimX*NCholesky))
-APLUS0Tilde = 0.d0
+APLUS0Tilde = 0.d0 !AT initialize uninitialized matrix  
 !call mem_alloc(APLUS0Tilde,NDimX*NCholesky)
 call ABPM_BLKAT(NCholesky,NDimX,DChol,APLUS0Tilde,0.0d0,A0Block,A0BlockIV,nblk,'Y')
 !print*, 'regul APLUS0Tilde = ', norm2(APLUS0Tilde)
@@ -302,7 +302,7 @@ allocate(COMTilde(NDimX*NCholesky))
 COMTilde=0d0
 
 allocate(C0Tilde(NDimX*NCholesky),C1Tilde(NDimX*NCholesky),C2Tilde(NDimX*NCholesky))
-C0Tilde = 0.d0
+C0Tilde = 0.d0 !AT initialize uninitialized matrices
 C1Tilde = 0.d0
 C2Tilde = 0.d0
 allocate(WORK0(NDimX*NCholesky),WORK1(NDimX*NCholesky))
@@ -546,6 +546,7 @@ close(iunit)
 
 !Calc: APLUS0Tilde=ABPLUS0.DCholErf
 allocate(APLUS0Tilde(NDimX*NCholErf))
+APLUS0Tilde = 0.d0 !AT initialize uninitialized matrix
 call ABPM_BLKAT(NCholErf,NDimX,DCholErf,APLUS0Tilde,0.0d0,A0Block,A0BlockIV,nblk,'Y')
 !print*, 'cbs-h APLUS0Tilde = ', norm2(APLUS0Tilde)
 
@@ -587,6 +588,9 @@ COMTilde=0d0
 
 allocate(C0Tilde(NDimX*NCholErf),C1Tilde(NDimX*NCholErf),C2Tilde(NDimX*NCholErf))
 allocate(Work0(NDimX*NCholErf),Work1(NDimX*NCholErf))
+C0Tilde = 0.d0 !AT initialize uninitialized matrix
+C1Tilde = 0.d0 
+C2Tilde = 0.d0 
 
 allocate(Lambda(nblk))
 associate(A => A0BlockIV, L => LambdaIV)
@@ -2447,11 +2451,13 @@ call add_blk_right(ABMIN1, A0Block,A0BlockIV,-1d0,.true., nblk,NDimX)
 
 !Calc: A1=ABPLUS0*ABMIN1+ABPLUS1*ABMIN0
 allocate(A1(NDimX*NDimX))
+A1 = 0.d0 !AT initialize uninitialized matrix
 call ABPM_HALFTRAN_GEN_L(ABMIN1, A1,0.0d0,A0Block,A0BlockIV,nblk,NDimX,NDimX,'Y')
 call ABPM_HALFTRAN_GEN_R(ABPLUS1,A1,1.0d0,A0Block,A0BlockIV,nblk,NDimX,NDimX,'X')
 
 !Calc: APLUS0Tilde=ABPLUS0.DProj
 allocate(APLUS0Tilde(NDimX*NProj))
+APLUS0Tilde = 0.d0 !AT initialize uninitialized matrix
 call ABPM_HALFTRAN_GEN_L(DProjT,APLUS0Tilde,0.0d0,A0Block,A0BlockIV,nblk,NDimX,NProj,'Y')
 
 !Calc: APLUS1Tilde=ABPLUS1.DProj
@@ -2472,6 +2478,10 @@ Call AC0BLOCK(Occ,URe,XOne, &
 COMTilde=0.0
 
 allocate(C0Tilde(NDimX*NProj),C1Tilde(NDimX*NProj),C2Tilde(NDimX*NProj),WORK0(NDimX*NProj))
+C0Tilde = 0.d0 !AT initialize uninitialized matrix
+C1Tilde = 0.d0 !AT initialize uninitialized matrix
+C2Tilde = 0.d0 !AT initialize uninitialized matrix
+
 allocate(WORK1(NDimX*NProj))
 allocate(Lambda(nblk))
 associate(A => A0BlockIV, L => LambdaIV)

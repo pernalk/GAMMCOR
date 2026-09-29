@@ -869,6 +869,8 @@ deallocate(ABPLUSB,work)
 ! get CTilde in an iterative manner
 
 allocate(CTildeA(A%NDimX,NCholesky),CTildeB(B%NDimX,NCholesky))
+CTildeA = 0.d0 !AT initialize uninitialized matrix
+CTildeB = 0.d0 !AT initialize uninitialized matrix
 allocate(CA(NCholesky,NCholesky),CB(NCholesky,NCholesky))
 
 NFreq = 12
@@ -1855,6 +1857,7 @@ endif
 ! monomer A
 allocate(ABPLUS1A(A%NDimX,A%NDimX),ABMIN1A(A%NDimX,A%NDimX))
 allocate(A1A(A%NDimX,A%NDimX),A2A(A%NDimX,A%NDimX))
+A1A = 0.d0 !AT initialize uninitialized matrix
 
 open(newunit=iunit,file='ABMAT_A',status='OLD',&
      access='SEQUENTIAL',form='UNFORMATTED')
@@ -1886,6 +1889,8 @@ print*, 'A2A',norm2(A2A)
 
 !Calc: APLUS0Tilde=ABPLUS0.DChol
 allocate(ABP0TildeA(A%NDimX,NCholesky))
+ABP0TildeB = 0.d0 !AT initialize uninitialized matrix
+
 call ABPM_HALFTRAN_GEN_L(transpose(A%DChol),ABP0TildeA,0.0d0,A0BlkA,A0BlkIVA,nblkA,A%NDimX,NCholesky,'Y')
 print*, 'APLUS0Tilde',norm2(ABP0TildeA)
 
@@ -1901,6 +1906,8 @@ deallocate(A0BlkA)
 ! monomer B
 allocate(ABPLUS1B(B%NDimX,B%NDimX),ABMIN1B(B%NDimX,B%NDimX))
 allocate(A1B(B%NDimX,B%NDimX),A2B(B%NDimX,B%NDimX))
+A1B = 0.d0 !AT initialize uninitialized matrix
+
 
 !allocate(ABPMB(B%NDimX,B%NDimX),ABPTildeB(B%NDimX,NCholesky))
 
@@ -1934,6 +1941,8 @@ print*, 'A2B',norm2(A2B)
 
 !Calc: APLUS0Tilde=ABPLUS0.DChol
 allocate(ABP0TildeB(B%NDimX,NCholesky))
+ABP0TildeB = 0.d0 !AT initialize uninitialized matrix
+
 call ABPM_HALFTRAN_GEN_L(transpose(B%DChol),ABP0TildeB,0.0d0,A0BlkB,A0BlkIVB,nblkB,B%NDimX,NCholesky,'Y')
 print*, 'APLUS0Tilde-b',norm2(ABP0TildeB)
 
@@ -1958,6 +1967,8 @@ print*, 'SAPT%MaxCn =', Max_Cn
 allocate(XFreq(NFreq),WFreq(NFreq))
 
 allocate(C0TildeA(A%NDimX,NCholesky),C0TildeB(B%NDimX,NCholesky))
+C0TildeA = 0.d0 !AT initialize uninitialized matrix
+C0TildeB = 0.d0 !AT initialize uninitialized matrix
 allocate(C1TildeA(A%NDimX,NCholesky),C1TildeB(B%NDimX,NCholesky))
 allocate(C2TildeA(A%NDimX,NCholesky),C2TildeB(B%NDimX,NCholesky))
 allocate(CTildeA(A%NDimX,NCholesky),CTildeB(B%NDimX,NCholesky))
@@ -2243,6 +2254,7 @@ call Sblock_to_ABMAT(A0BlkA,A0BlkIVA,A%IndN,A%CICoef,nblkA,NBasis,A%NDimX,'XY0_A
 
 !Calc: APLUS0Tilde=ABPLUS0.DChol
 allocate(ABP0TildeA(A%NDimX,NCholesky))
+ABP0TildeA = 0.d0 !AT initialize uninitialized matrix
 call ABPM_HALFTRAN_GEN_L(transpose(A%DChol),ABP0TildeA,0.0d0,A0BlkA,A0BlkIVA,nblkA,A%NDimX,NCholesky,'Y')
 print*, 'APLUS0Tilde-a',norm2(ABP0TildeA)
 
@@ -2253,6 +2265,7 @@ deallocate(A0BlkA)
 call Sblock_to_ABMAT(A0BlkB,A0BlkIVB,B%IndN,B%CICoef,nblkB,NBasis,B%NDimX,'XY0_B')
 
 allocate(ABP0TildeB(B%NDimX,NCholesky))
+ABP0TildeB = 0.d0 !AT initialize uninitialized matrix
 call ABPM_HALFTRAN_GEN_L(transpose(B%DChol),ABP0TildeB,0.0d0,A0BlkB,A0BlkIVB,nblkB,B%NDimX,NCholesky,'Y')
 print*, 'APLUS0Tilde-b',norm2(ABP0TildeB)
 
