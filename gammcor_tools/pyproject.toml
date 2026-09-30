@@ -29,4 +29,4 @@ gammcor_h5info = "gammcor_tools.gammcor_h5info:main"
 # compatibility shim and scratch test data, which flat-layout discovery
 # would either misread or refuse.
 packages = ["gammcor_tools"]
-py-modules = ["Pyscf2Gammcor"]
+py-modules = ["Pyscf2Gammcor", "embedding_potential"]
