@@ -4,8 +4,9 @@ module dispatcher
       use ppac_types
       use ppac_simple
       use mp
-      use phac_spinres
+      use phac_spinres, only: acph_spinres_driver
       use ppac_dispatch, only: acpp_driver
+      use phac_dispatch, only: acph_driver
 
 
       implicit none
@@ -50,15 +51,24 @@ contains
                   print*, 'mp2_driver'
                   call mp2_driver(THCData, AuxData, CAONO, Flags)
 
+            case(JOB_TYPE_AC0)
+                  if (Flags%ITwoEl == TWOMO_FOFO .and. Flags%ICholeskyTHC == 1) then
+                        print*, 'acph_driver'
+                        call acph_driver(THCData, AuxData, Flags, CAONO)
+                  else if (Flags%Algorithm == ALG_SPINRES) then
+                        print*, 'acph_spinres_driver'
+                        call acph_spinres_driver(THCData, AuxData, Flags, IntsO)
+                  end if
+
             case(JOB_TYPE_DUCC)
-                  print*, 'acph_driver'
-                  call acph_driver(THCData, AuxData, Flags, IntsO, IntsD)
+                  print*, 'acph_spinres_driver'
+                  call acph_spinres_driver(THCData, AuxData, Flags, IntsO, IntsD)
 
             case default
 
                   if (Flags%Algorithm == ALG_SPINRES) then
-                        print*, 'acph_driver'
-                        call acph_driver(THCData, AuxData, Flags, IntsO)
+                        print*, 'acph_spinres_driver'
+                        call acph_spinres_driver(THCData, AuxData, Flags, IntsO)
                   end if
 
             end select

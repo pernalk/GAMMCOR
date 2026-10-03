@@ -10,6 +10,7 @@ OBJ = $(O)mainp.o $(O)initia.o $(O)dmscf.o $(O)misc.o $(O)optocc.o \
        $(O)ppac0.o $(O)ppac0_thc.o \
        $(O)ppac_subs.o $(O)ppac_dispatch.o \
        $(O)ppac_simple_subs.o $(O)ppac_simple.o \
+       $(O)phac0_thc.o $(O)phac_dispatch.o \
        $(O)phac_spinres.o $(O)mp.o $(O)dispatcher.o\
        $(O)tddft_types.o $(O)tddft.o \
        $(O)matvec.o $(O)hf.o $(O)matrix.o $(O)cpdmft.o \
@@ -106,10 +107,12 @@ $(O)ppac_subs.o        : $(O)types.o $(O)ppac_types.o $(O)pp_utils.o $(O)quadrat
 $(O)ppac_dispatch.o    : $(O)types.o $(O)ppac_types.o $(O)ppac_subs.o $(O)ppac0.o $(O)ppac0_thc.o $(O)print_utils.o
 $(O)ppac_simple_subs.o : $(O)types.o $(O)ppac_types.o $(O)lin.o $(O)pp_utils.o
 $(O)ppac_simple.o      : $(O)types.o $(O)ppac_types.o $(O)ppac_simple_subs.o
+$(O)phac0_thc.o        : $(O)types.o $(O)ppac_types.o $(O)pp_utils.o $(O)print_utils.o $(O)tran.o $(O)thc_energy.o
+$(O)phac_dispatch.o    : $(O)types.o $(O)ppac_types.o $(O)phac0_thc.o $(O)print_utils.o
 $(O)phac_spinres.o     : $(O)types.o $(O)ppac_types.o
 $(O)mp.o               : $(O)types.o $(O)ppac_types.o
 $(O)dispatcher.o       : $(O)types.o $(O)ppac_types.o $(O)ppac_dispatch.o $(O)ppac_simple.o \
-                         $(O)mp.o $(O)phac_spinres.o
+                         $(O)mp.o $(O)phac_spinres.o $(O)phac_dispatch.o
 $(O)tddft_types.o      : $(O)types.o
 $(O)tddft.o            : $(O)types.o $(O)ppac_types.o $(O)tddft_types.o
 $(O)diis.o             : $(O)priunit.o

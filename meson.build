@@ -188,6 +188,8 @@ sources = files(
   'SOURCE/ppac_simple.f90',
 
   # -- ph path and job routing
+  'SOURCE/phac0_thc.f90',
+  'SOURCE/phac_dispatch.f90',
   'SOURCE/phac_spinres.f90',
   'SOURCE/mp.f90',
   'SOURCE/dispatcher.f90',

@@ -69,7 +69,7 @@ module phac_spinres
       implicit none
 contains
 
-  subroutine acph_driver(THCData, AuxData, Flags, Ints, IntsD)
+  subroutine acph_spinres_driver(THCData, AuxData, Flags, Ints, IntsD)
         
 
         type(TACppData), intent(inout) :: AuxData
@@ -189,7 +189,7 @@ contains
           stop
         end associate
 
-  end subroutine acph_driver
+  end subroutine acph_spinres_driver
 
   subroutine pherpa_allocate_init(AuxData, Ints)
         type(TACppData), intent(inout) :: AuxData

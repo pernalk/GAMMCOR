@@ -23,6 +23,7 @@ module ppac_types
       integer, parameter :: VER_PPHH_RPA_TDA_HF = 10
       integer, parameter :: VER_PP_RPATDA_MULTI = 11
       integer, parameter :: VER_HH_RPA_MULTI = 12
+      integer, parameter :: VER_PH_RPA_MULTI = 13
 
       integer, parameter :: BL_OOOO = 1
       integer, parameter :: BL_OOAO = 2
