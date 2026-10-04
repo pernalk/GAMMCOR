@@ -44,6 +44,8 @@
 # gammcor there that is not a symlink is left alone.
 #
 # After the first build, recompile with:  meson compile -C build
+# The debug build (bin/gammcor-debug) is configured too, but not compiled:
+#   meson compile -C build-debug
 set -eE -o pipefail
 
 cd "$(dirname "$0")"
@@ -768,7 +770,7 @@ if [ $CLEAN = 1 ]; then
         printf 'toolchain changed since the last build:\n%s\n' "$STAMP_CHANGES" >> "$LOG"
     fi
     # the stamp goes too: it is written again only when this run succeeds
-    run rm -rf build gammcor-integrals/build hdf5/lib hdf5/include "$STAMP"
+    run rm -rf build build-debug gammcor-integrals/build hdf5/lib hdf5/include "$STAMP"
     run make -C xcfun clean
     ok "${CLEAN_REASON:+$CLEAN_REASON, }previous builds removed" "$STAMP_CHANGES"
 fi
@@ -824,10 +826,9 @@ EOF
 # (it was built with the same toolchain: the Clean step removes it otherwise).
 # A directory left behind by a failed setup has meson-private/ but no
 # coredata.dat; meson setup starts it over.
-#   meson_setup <build dir> <source dir> [options...]
+#   meson_setup <build dir> <source dir> <profile> [options...]
 meson_setup() {
-    local dir=$1 src=$2; shift 2
-    local profile="$src/.meson/profiles/ifx.ini"
+    local dir=$1 src=$2 profile=$3; shift 3
     if [ -f "$dir/meson-private/coredata.dat" ]; then
         run meson configure "$dir" "$@"
     else
@@ -844,7 +845,7 @@ meson_setup() {
 # ---------------------------------------------------------------------------
 begin $S_INT "Building gammcor-integrals"
 
-meson_setup gammcor-integrals/build gammcor-integrals -Dcpu="$CPU"
+meson_setup gammcor-integrals/build gammcor-integrals gammcor-integrals/.meson/profiles/ifx.ini -Dcpu="$CPU"
 run meson compile -C gammcor-integrals/build -j "$JOBS"
 
 ok "$(elapsed "$T_STEP")$(warnings)"
@@ -910,8 +911,13 @@ mkdir -p OBJ   # object directory of the Makefile build, for those who use make
 MESON_ARGS=(-Dcpu="$CPU")
 if [ -n "$PREFIX" ]; then MESON_ARGS+=(-Dprefix="$PREFIX"); fi
 
-meson_setup build . "${MESON_ARGS[@]}"
+meson_setup build . .meson/profiles/ifx.ini "${MESON_ARGS[@]}"
 run meson compile -C build -j "$JOBS"
+
+# Debug build: only configured, compile it with  meson compile -C build-debug
+if [ -z "$PREFIX" ]; then
+    meson_setup build-debug . .meson/profiles/ifx-debug.ini -Dcpu="$CPU"
+fi
 
 ok "$(elapsed "$T_STEP")$(warnings)"
 

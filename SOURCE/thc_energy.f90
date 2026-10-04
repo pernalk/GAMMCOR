@@ -49,7 +49,7 @@ contains
             type (tclock) :: timer, timer0, timer90, timerx
             double precision :: timer10, timer11, timer12, timer13, timer14, timer15, timer16, timer17
             double precision :: timer18, timer19, timer33, timer34, timer35, timer36, timer21, timer37
-            double precision :: timer38, timer39, timer14a, timer18a, timer13x, timer13y, timer13z
+            double precision :: timer38, timer39, timer14a, timer18a
 
             
             double precision, dimension(:), allocatable :: WorkAO, WorkAA, V_axby, V_bxay, workAOT
@@ -771,9 +771,6 @@ contains
             timer11 = zero
             timer12 = zero
             timer13 = zero
-            timer13x = zero
-            timer13y = zero
-            timer13z = zero
             timer14 = zero
             timer14a = zero
             timer15 = zero
@@ -1061,41 +1058,6 @@ contains
                                     end do tloopIV
 
                               case(loopVA) ! loop 5
-                                    call clock_start(timer)
-                                    do a = NIA+1, NBasis
-                                          do b = b0VO, min(b1VO, a)
-                                                call real_aTb_x(V_axby, NIA, RVO(:,:,a-NIA), NChol, RVO(:,:,b-NIA), NChol, NIA, NIA, NChol, AcAlpha)
-                                          end do
-                                    end do
-                                    timer13x = timer13x + clock_readwall(timer)
-
-
-                                    call clock_start(timer)
-                                    !$omp parallel do default(shared) private(a, b, V_axby)
-                                    do a = NIA+1, NBasis
-                                          do b = b0VO, min(b1VO, a)
-                                                call real_aTb_x(V_axby, NIA, RVO(:,:,a-NIA), NChol, RVO(:,:,b-NIA), NChol, NIA, NIA, NChol, AcAlpha)
-                                          end do
-                                    end do
-                                    !$omp end parallel do 
-                                    timer13y = timer13y + clock_readwall(timer)
-
-
-                                    call clock_start(timer)
-                                    !$omp parallel do default(shared) private(a, b, V_axby)&
-                                    !$omp  collapse(2)                                    
-                                    do a = NIA+1, NBasis
-                                          do b = b0VO, b1VO
-                                                call real_aTb_x(V_axby, NIA, RVO(:,:,a-NIA), NChol, RVO(:,:,b-NIA), NChol, NIA, NIA, NChol, AcAlpha)
-                                          end do
-                                    end do
-                                    !$omp end parallel do 
-                                    timer13z = timer13z + clock_readwall(timer)
-
-
-
-
-                                                
                                     tloopVO: do a = NIA+1, NBasis
                                           if (a<b0VO.or.a>b1VO)then
                                                 call thc_gammcor_Rkab_Batch_a_Fixed_b(Rkax(:, 1:NIA), XXga(:, 1:NIA), Xga(:, 1:NIA), Xga(:, a), Zgk, NIA, NChol, NTHC)
@@ -1225,9 +1187,6 @@ contains
 
       
       call xmsg('timer13', timer13, mdebugg)
-      call xmsg('timer13x', timer13, mdebugg)
-      call xmsg('timer13y', timer13, mdebugg)
-      call xmsg('timer13z', timer13, mdebugg)
       
       call xmsg('timer14', timer14, mdebugg)
       call xmsg('timer14a', timer14a, mdebugg)

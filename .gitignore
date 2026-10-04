@@ -24,6 +24,7 @@ xcfun/**/*.o
 hdf5-old
 
 build/
+build-debug/
 xcfun/geninterface
 SOURCE/trexio_f.f90
 trexio/*.so*

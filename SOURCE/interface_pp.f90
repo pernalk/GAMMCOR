@@ -165,7 +165,18 @@ contains
 
 
       subroutine read_PYSCF(THCData, AuxData, CAONO, Flags, TwoEl, TDDFTData)
-            
+            !
+            ! Read the PySCF reference (pyscf_data.h5) and set up the 1-el Hamiltonian.
+            !
+            ! ITwoEl == 1 (INCORE): 2-el ints from /MOINTS/ERI, H0 = PySCF CORE_HAMILTONIAN
+            !     transformed AO->NO here; energy checked by check_energy_incore.
+            !     THC_init2/canonicalize are not called, H0external is ignored.
+            ! ITwoEl > 1 (FFFF/FOFO): 2-el ints from GAMMCOR THC via THC_init2.
+            !     HNO0 is still the PySCF AO core Hamiltonian on entry to THC_init2.
+            !     H0external = .false.: GAMMCOR T+Vne is used for H0 and the Fock matrix.
+            !     H0external = .true.:  PySCF H0 is used for H0 and the Fock matrix.
+            ! On exit AuxData%HNO0 and THCData%HNO hold H0 in the NO basis.
+            !
 
             type(TTHCData), intent(inout) :: THCData
             type(TACppData), intent(inout) :: AuxData
@@ -1095,6 +1106,11 @@ contains
     end subroutine load_npm
 
     subroutine load_one_electron_integrals(AuxData, THCData, CAOMO, CAONO, natural_orb, Flags)
+          !
+          ! Read PySCF /INTS/CORE_HAMILTONIAN (AO basis, PySCF ordering) into
+          ! AuxData%HNO0 and THCData%HNO, and /POSTHF/ORB_COEFF into CAONO
+          ! (natural_orb == 1) or CAOMO (natural_orb == 0).
+          !
           type(TACppData), intent(inout) :: AuxData
           type(TTHCData), intent(inout) :: THCData
           double precision, dimension(:,:), allocatable, intent(out) :: CAOMO, CAONO
@@ -2430,6 +2446,11 @@ end subroutine save_2rdm_orca
 
 
     subroutine Trans2NO_AO(THCData, AuxData, CAOMO, CAONO, Flags, TwoEl)
+          !
+          ! Build CAONO = CAOMO * CMONO from the active-space 1-RDM (natural_orb == 0).
+          ! Only for ITwoEl == 1 are TwoEl and AuxData%HNO0 transformed AO->NO;
+          ! otherwise HNO0 stays in the AO basis.
+          !
 
           
           type(TACppData), intent(inout) :: AuxData
@@ -3410,6 +3431,14 @@ end subroutine save_2rdm_orca
     end subroutine check_energy_incore
 
     subroutine THC_init2(Flags, THCData, AuxData,  AObasis, System, CAONO_IN)
+          !
+          ! THC setup for ITwoEl > 1: builds Xgp/Zgk (and Erf variants), calls
+          ! canonicalize, then sets AuxData%HNO0 = AuxData%HNO0_THC = H0 in the
+          ! canonicalized NO basis and Xga = Xgp transformed to that basis.
+          ! H0 source: THCData%H0external = .true.  -> AuxData%HNO0 on entry (PySCF AO);
+          !            THCData%H0external = .false. -> ints1e_gammcor_H0_extao (GAMMCOR AO).
+          ! CAONO_IN (AO x NO) is overwritten with the canonicalized orbitals.
+          !
 
           type(FlagsData), intent(in) :: Flags
           type(TACppData), intent(inout) :: AuxData
@@ -3868,6 +3897,17 @@ end subroutine save_2rdm_orca
     end subroutine calc_J_SR
 
     subroutine canonicalize(CAONO, fij, fvw, AuxData, THCData, Xgp, AObasis, System, ext)
+          !
+          ! Diagonalize the THC Fock matrix in the inactive and virtual blocks and
+          ! rotate those columns of CAONO (AO x NO); active orbitals are unchanged.
+          ! fij, fvw: inactive and virtual orbital energies.
+          ! ext = .false.: Fock and H0 from GAMMCOR T+Vne (ints1e_gammcor_H0_extao).
+          ! ext = .true.:  Fock and H0 from AuxData%HNO0 (external AO H0).
+          ! AuxData%HNO0 must be in the AO basis on entry and is not modified.
+          ! If 2-RDMs are present, prints the THC CASSCF energy
+          !     E = ENuc + Sum(p) Occ(p)*(H0(p,p) + F(p,p)) + active cumulant term
+          ! evaluated in the NO basis before the rotation.
+          !
           use Cholesky_Gammcor
           use THC_Gammcor
           use OneElectronInts_Gammcor
@@ -3886,7 +3926,7 @@ end subroutine save_2rdm_orca
 
           double precision, dimension(:,:), allocatable :: Cpi_extao, Cpv_extao, Cpa_empty
           double precision, dimension(:,:), allocatable :: Fockij, Fockoo, Fockvw
-          double precision, dimension(:,:), allocatable :: H0oo, work
+          double precision, dimension(:,:), allocatable :: H0oo, H0ao, work
           double precision, dimension(:,:), intent(in) :: Xgp
           double precision, dimension(:,:), allocatable :: Xgt
           double precision, dimension(:,:,:), allocatable :: Rktu
@@ -3941,13 +3981,15 @@ end subroutine save_2rdm_orca
 
             if (have_rdm)then
                   allocate(H0oo(AuxData%NIA, AuxData%NIA))
+                  allocate(work(AuxData%NBasis, AuxData%NIA))
                   if (ext == .false.)then
-                        H0oo = AuxData%HNO0(1:AuxData%NIA, 1:AuxData%NIA)
+                        allocate(H0ao(AuxData%NBasis, AuxData%NBasis))
+                        call ints1e_gammcor_H0_extao(H0ao, AObasis, System, ExternalOrdering)
+                        call real_ab(work, H0ao, CAONO(:, 1:AuxData%NIA))
                   else
-                        allocate(work(AuxData%NBasis, AuxData%NIA))
                         call real_ab(work, AuxData%HNO0, CAONO(:, 1:AuxData%NIA))
-                        call real_atb(H0oo, CAONO(:, 1:AuxData%NIA), work)
                   end if
+                  call real_atb(H0oo, CAONO(:, 1:AuxData%NIA), work)
 
                   ! E = ENuc + Sum(p) Occ(p) * (H0(p,p) + F(p,p))
                   ECASSCF = AuxData%enuc
