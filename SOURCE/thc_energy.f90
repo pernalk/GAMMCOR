@@ -216,7 +216,7 @@ contains
 
             allocate(WorkAO(ACB(A0ao)%NDimS))
             allocate(WorkAOT(ACB(A0ao)%NDimS))
-            allocate(WorkAA(ACB(A0aa)%NDimS))
+            allocate(WorkAA(max(ACB(A0aa)%NDimS, NA)))
             
 #ifdef DEBUG
             this_mem = (ACB(A0ao)%NDimS)*togb

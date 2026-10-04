@@ -34,32 +34,32 @@ contains
                   call print_info('External ordering', 'PySCF')
             end if
 
-            associate(NBasis=>AuxData%NBasis, map=>AuxData%map, Occ=>AuxData%Occ, NI=>AuxData%NI, NV=>AuxData%NV)
-              ACAlpha = one !because we are simultaneously calculating A1.
+            ! associate(NBasis=>AuxData%NBasis, map=>AuxData%map, Occ=>AuxData%Occ, NI=>AuxData%NI, NV=>AuxData%NV)
+            !   ACAlpha = one !because we are simultaneously calculating A1.
 
-              allocate(HNO0(NBasis, NBasis))
-              allocate(HNO(NBasis, NBasis))
-              allocate(CAONO(NBasis, NBasis))
-              CAONO = CAONO_IN
-              allocate(HNO0_THC(Nbasis, NBasis))
-              allocate(posS(NBasis, NBasis))
-              allocate(posT(NBasis, NBasis))
-              posS = 0
-              posT = 0
+            !   allocate(HNO0(NBasis, NBasis))
+            !   allocate(HNO(NBasis, NBasis))
+            !   allocate(CAONO(NBasis, NBasis))
+            !   CAONO = CAONO_IN
+            !   allocate(HNO0_THC(Nbasis, NBasis))
+            !   allocate(posS(NBasis, NBasis))
+            !   allocate(posT(NBasis, NBasis))
+            !   posS = 0
+            !   posT = 0
               
-              call init_AC0Blocks(AuxData, ACBlocks, posS, posT)
-              call init_rdm(RdmData, AuxData)
-              allocate(Aux3A(NBasis, NBasis))
-              allocate(AuxII(NBasis, NBasis))
-              allocate(AuxAA(NBasis, NBasis))
-              allocate(BuxII(NBasis, NBasis))
-              allocate(BuxAA(NBasis, NBasis))
+            !   call init_AC0Blocks(AuxData, ACBlocks, posS, posT)
+            !   call init_rdm(RdmData, AuxData)
+            !   allocate(Aux3A(NBasis, NBasis))
+            !   allocate(AuxII(NBasis, NBasis))
+            !   allocate(AuxAA(NBasis, NBasis))
+            !   allocate(BuxII(NBasis, NBasis))
+            !   allocate(BuxAA(NBasis, NBasis))
 
-              AuxII = zero
-              BuxII = zero
-              AuxAA = zero
-              BuxAA = zero
-              Aux3A = zero
+            !   AuxII = zero
+            !   BuxII = zero
+            !   AuxAA = zero
+            !   BuxAA = zero
+            !   Aux3A = zero
 
               !call THC_int_loop_ph(THCData, ACBlocks, AuxII, AuxAA, BuxII, BuxAA, Aux3X, Aux3B, &
               !Flags, AuxData, Occ, map, RdmData, posS, posT, AcAlpha)
@@ -75,7 +75,7 @@ contains
               ! call PPERPA_THC
               ! call THC_energy_loop
               
-            end associate
+!            end associate
             
             call msg('ACPH0_THC: not yet implemented')            
             stop
