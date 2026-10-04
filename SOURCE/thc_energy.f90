@@ -52,7 +52,7 @@ contains
             double precision :: timer38, timer39, timer14a, timer18a
 
             
-            double precision, dimension(:), allocatable :: WorkAO, WorkAA, V_axby, V_bxay, workAOT
+            double precision, dimension(:), allocatable :: WorkAO, WorkAA, V_axby, V_bxay
             double precision, dimension(:,:), allocatable :: AZaaoo, AZvaoo, AZvaaa, AZvaao
             double precision, dimension(:,:), allocatable :: AZminiaa, AZminiao, AZminiao2, AZmini
             double precision, dimension(:,:), allocatable :: AZminiaaao, AZaaao
@@ -118,7 +118,8 @@ contains
 
             associate(Zgk=>THCData%Zgk, Xga=>THCData%Xga, ExternalOrdering=>THCData%ExternalOrdering, NChol=>THCData%NChol, NTHC=>THCData%NTHC)
 
-            BatchDim = AuxData%Batchdim
+              !BatchDim = AuxData%Batchdim
+              Batchdim = 10000
             call print_section('ppAC0 energy evaluation')
             EVVoo = zero
             EVVao = zero
@@ -215,7 +216,6 @@ contains
 
 
             allocate(WorkAO(ACB(A0ao)%NDimS))
-            allocate(WorkAOT(ACB(A0ao)%NDimS))
             allocate(WorkAA(max(ACB(A0aa)%NDimS, NA)))
             
 #ifdef DEBUG
@@ -302,7 +302,6 @@ contains
             V_bxay = zero
 
             WorkAO = zero
-            WorkAOT = zero
             WorkAA = zero
 
             AZaaoo = zero
@@ -816,20 +815,20 @@ contains
                   allocate(RAA(Nchol, NA, min(NA, BatchDim)))
                   call CalcMem3(RAA, 'RAA')
             end if
-            if (TabChol(3) == 1)then
-                  allocate(ROO(Nchol, NIA, NIA))
-                  call CalcMem3(ROO, 'ROO')
-            end if
+            ! if (TabChol(3) == 1)then
+            !       allocate(ROO(Nchol, NIA, NIA))
+            !       call CalcMem3(ROO, 'ROO')
+            ! end if
             
             if (TabChol(4) == 1)then
                   allocate(RIV(Nchol, NV, min(NI, BatchDim)))
                   call CalcMem3(RIV, 'RIV')
             end if
 
-            if (TabChol(4) == 1)then
-                  allocate(RVI(Nchol, NI, min(NV, BatchDim)))
-                  call CalcMem3(RVI, 'RVI')
-            end if
+            ! if (TabChol(4) == 1)then
+            !       allocate(RVI(Nchol, NI, min(NV, BatchDim)))
+            !       call CalcMem3(RVI, 'RVI')
+            ! end if
             
             if (TabChol(5) == 1)then
                   allocate(RVA(Nchol, NA, min(NV, BatchDim)))
@@ -858,7 +857,7 @@ contains
             call tmsg('TIME FOR RAA ', timer, tdebug)            
             call clock_start(timer)
 
-            if (TabChol(3) == 1) call thc_gammcor_Rkab_2(ROO, Xga(:,1:NIA), Xga(:,1:NIA), Zgk, NIA, NIA, NChol, NTHC)
+            ! if (TabChol(3) == 1) call thc_gammcor_Rkab_2(ROO, Xga(:,1:NIA), Xga(:,1:NIA), Zgk, NIA, NIA, NChol, NTHC)
 
             call tmsg('TIME FOR ROO ', timer, tdebug)            
             call clock_start(timer)
@@ -907,15 +906,15 @@ contains
                   
                               
                   
-                  if (b0VI <= NBasis)then
-                        if (TabChol(4)==1)then
-                              call clock_start(timer)
-                              do b = b0VI, b1VI
-                                    call thc_gammcor_Rkab_Batch_a_Fixed_b(RVI(:, 1:NI, b-b0VI+1), XXga(:, 1:NI), Xga(:, 1:NI), Xga(:, b), Zgk, NI, NChol, NTHC)                                    
-                              end do
-                              call tmsg('TIME FOR RVI ', timer, tdebug)            
-                        end if
-                  end if
+                  ! if (b0VI <= NBasis)then
+                  !       if (TabChol(4)==1)then
+                  !             call clock_start(timer)
+                  !             do b = b0VI, b1VI
+                  !                   call thc_gammcor_Rkab_Batch_a_Fixed_b(RVI(:, 1:NI, b-b0VI+1), XXga(:, 1:NI), Xga(:, 1:NI), Xga(:, b), Zgk, NI, NChol, NTHC)                                    
+                  !             end do
+                  !             call tmsg('TIME FOR RVI ', timer, tdebug)            
+                  !       end if
+                  ! end if
 
 
                   if (b0VA <=NBasis)then
@@ -1076,7 +1075,7 @@ contains
 
                                                 call clock_start(timer)
                                                 pq = posS(a, b)
-                                                call vaao2_contr(EVAao2, AZvaao, ACB(A0va), ACB(A0ao), pq, a, b, 1, NIA, NI+1, NIA, AuxData, V_axby, workAO)
+                                                call vaao2_contr(EVAao2, AZvaao, ACB(A0va), ACB(A0ao), pq, a, b, 1, NIA, NI+1, NIA, AuxData, V_axby)
                                                 timer36 = timer36 + clock_readwall(timer)
 
                                                 call clock_start(timer)
@@ -1086,7 +1085,7 @@ contains
                                                 timer37 = timer37 + clock_readwall(timer)
 
                                                 call clock_start(timer)
-                                                call vaao_contr(EVAao, AZvaao, ACB(A0va), ACB(A0ao), pq, a, b, 1, NIA, 1, NI, AuxData, V_bxay, workAO)
+                                                call vaao_contr(EVAao, AZvaao, ACB(A0va), ACB(A0ao), pq, a, b, 1, NIA, 1, NI, AuxData, V_bxay)
                                                 timer38 = timer38 + clock_readwall(timer)
 
                                                 call clock_start(timer)
@@ -1111,7 +1110,7 @@ contains
                                                 call clock_start(timer)
                                                 pq = posS(a, b)
                                                 if (pq > 0)then
-                                                      call vvao_contr(EVVao, EVVaoT, ACB(A0vv), ACB(A0ao), pq, pqT, a, b, 1, NIA, 1, NIA, AuxData, V_axby, workAO, workAOT)
+                                                      call vvao_contr(EVVao, ACB(A0vv), ACB(A0ao), pq, a, b, 1, NIA, 1, NIA, AuxData, V_axby)
                                                 end if
                                                 timer14 = timer14 + clock_readwall(timer)
 
@@ -1408,15 +1407,14 @@ end function size_not_zero
     
     end subroutine vvoo_contr
 
-    subroutine vvao_contr(EVVao, EVVaoT, VV, AO,  pq, pqT, p, q, x0, x1, y0, y1, AuxData, V_axby, workAO, workAOT)
+    subroutine vvao_contr(EVVao, VV, AO,  pq, p, q, x0, x1, y0, y1, AuxData, V_axby)
 
-          double precision, intent(inout) :: EVVao, EVVaoT
+          double precision, intent(inout) :: EVVao
           type(TAC0Block), intent(in) :: VV, AO
-          integer, intent(in) :: p, q, pq, pqT
+          integer, intent(in) :: p, q, pq
           integer, intent(in) :: x0, x1, y0, y1
           type(TACppData), intent(in) :: AuxData
           double precision, dimension(x0:x1, y0:y1), intent(in) :: V_axby
-          double precision, dimension(:), intent(inout) :: workAO, workAOT
           integer :: t,u, km
 
           double precision :: val, valT, NumH, NumF
@@ -1972,7 +1970,7 @@ end function size_not_zero
 
 
 
-    subroutine vaao2_contr(EVAao, AZ, VA, AO,  pq, p, q, x0, x1, y0, y1, AuxData, Vpq, work)
+    subroutine vaao2_contr(EVAao, AZ, VA, AO,  pq, p, q, x0, x1, y0, y1, AuxData, Vpq)
 
           double precision, intent(inout) :: EVAao
           double precision, dimension(:,:), intent(in) :: AZ
@@ -1982,7 +1980,6 @@ end function size_not_zero
           type(TACppData), intent(in) :: AuxData
           double precision, dimension(x0:x1,y0:y1), intent(in) :: Vpq
 
-          double precision, dimension(:), intent(inout) :: work
           integer :: t,u, np, rs, r, s, i, l0, l1, np2
           double precision :: val, NumH, NumF
           integer :: k, n, km
@@ -2109,7 +2106,7 @@ end function size_not_zero
           end associate
     end subroutine vaao2_contrTA
 
-    subroutine vaao_contr(EVAao, AZ, VA, AO,  pq, p, q, x0, x1, y0, y1, AuxData, Vpq, work)
+    subroutine vaao_contr(EVAao, AZ, VA, AO,  pq, p, q, x0, x1, y0, y1, AuxData, Vpq)
               
           double precision, intent(inout) :: EVAao
           double precision, dimension(:,:), intent(in) :: AZ
@@ -2119,7 +2116,6 @@ end function size_not_zero
           type(TACppData), intent(in) :: AuxData
           double precision, dimension(x0:x1,y0:y1), intent(in) :: Vpq
 
-          double precision, dimension(:), intent(inout) :: work
           integer :: t,u, np, rs, r, s, i, l0, l1, np2
           double precision :: val, NumH, NumF
           integer :: k, n, km

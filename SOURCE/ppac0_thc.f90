@@ -651,7 +651,7 @@ contains
               allocate(AC0Block(A1ind)%IndN1S(2, NDim1St))
               allocate(AC0Block(A1ind)%IndN2S(2, NDim2St))
               allocate(AC0Block(A1ind)%IndN1T(2, NDim1Tt))
-              allocate(AC0Block(A1ind)%IndN2T(2, NDim1Tt))
+              allocate(AC0Block(A1ind)%IndN2T(2, NDim2Tt))
               call CalcMemI(AC0Block(A1ind)%IndN1S, 'AC0Block(A1ind)%IndN1S')
               call CalcMemI(AC0Block(A1ind)%IndN2S, 'AC0Block(A1ind)%IndN2S')
               call CalcMemI(AC0Block(A1ind)%IndN1T, 'AC0Block(A1ind)%IndN1T')
@@ -854,7 +854,7 @@ contains
                                           if ((abs((AuxData%Occ(i)+AuxData%Occ(j)-one)) > AuxData%ThrPP))then
                                                 indat = indat + 1
                                                 A0Block%MiniBlocks(i-Nbl0+1)%ActListT(indat) = j
-                                                A0Block%MiniBlocks(i-Nbl0+1)%NdimS = indat
+                                                A0Block%MiniBlocks(i-Nbl0+1)%NdimT = indat
                                           end if
                                     end if
                               end do
@@ -1090,7 +1090,8 @@ contains
 
 
               
-            BatchDim = AuxData%Batchdim
+            !BatchDim = AuxData%Batchdim
+            BatchDim = 10000 ! for 4000 basis function, we do not have to do batches at all
             if (BatchDim==0)then
                   print*, 'Request BatchDim at least 1'
                   stop
@@ -2992,10 +2993,6 @@ call xmsg('timer76', timer76, mdebugg)
                               call real_vw_x(val2A,  rdm2_pp_12_act(:,:,map(c),map(d)), V_axby, NA**2) !P3b2AAAA
                               ASing(rs, pq) = ASing(rs, pq) + (val1+val2)
 
-                              if (rs==5.and.pq==5)then
-                                    print*, 'p3a4', val1
-                                    print*, 'p3b2', val2
-                              end if
                               
                               if (d>b.and.c>a)then
                                     pq = posT(d, b)
@@ -3033,10 +3030,6 @@ call xmsg('timer76', timer76, mdebugg)
                               call real_vw_x(val2,  rdm2_pm_12_act(:,:,map(c),map(d)), V_axby, NA**2)!3b2
                               ASing(rs, pq) = ASing(rs, pq) + (val1+val2)
 
-                              if (rs==5.and.pq==5)then
-                                    print*, 'xp3a4', val1
-                                    print*, 'xp3b2', val2
-                              end if
 
 
                               if (d>b.and.c>a)then
@@ -3111,10 +3104,6 @@ call xmsg('timer76', timer76, mdebugg)
                               call real_vw_x(val2,  rdm2_pm_12_act(:,:,map(c),map(d)), V_axby, NA**2) !czarne P3b1
                               call real_vw_x(val2A,  rdm2_pp_12_act(:,:,map(c),map(d)), V_axby, NA**2) !czarne P3b1
                               ! P3a-3 P3b-1
-                              if (rs==5.and.pq==5)then
-                                    print*, 'p3a3', val1
-                                    print*, 'p3b1', val2
-                              end if
                               ASing(rs, pq) = ASing(rs, pq) + (val1+val2)
 
                               if (b>d.and.a>c)then
@@ -3830,7 +3819,6 @@ call xmsg('timer76', timer76, mdebugg)
             integer :: pq, rs, pqT, rsT
             double precision :: val, vals, valt, val1, val0
             double precision :: NumF, NumH
-            double precision :: u1, u2, u3, u4, u5
 
             integer :: lll
 
@@ -3858,8 +3846,6 @@ call xmsg('timer76', timer76, mdebugg)
                               val = val + two * ( BuxAA(q, s)) !P2a-1                             
                               val = val  - AuxAA(q, s)   !P2a-1
 
-                              u1 =  two * ( BuxAA(q, s)) !P2a-1                             
-                              u2 =   - AuxAA(q, s)   !P2a-1
 
                               
                               ! val = val - frac12 * Aux3A(q, s)
@@ -3868,14 +3854,7 @@ call xmsg('timer76', timer76, mdebugg)
                               val = val - frac12 * Aux3X(q, s)
                               val = val - frac12 * Aux3X(s, q)
                               
-                              u3 =  - frac12 * Aux3X(q, s)
-                              u4 =  - frac12 * Aux3X(s, q)
 
-                              if (rs==5.and.pq==5)then
-                                    print*, 'kupsko', (one- AuxData%Occ(p)-frac12 * AuxData%Occ(q) - frac12*AuxData%Occ(s)) * HNO(q,s)
-                                    write(*, '( 4F20.10)') u1, u2, u3, u4
-                                    
-                              end if
 
                         end if
                         
@@ -3887,8 +3866,6 @@ call xmsg('timer76', timer76, mdebugg)
                               val = val + two * (BuxAA(p,r))
                               val = val  - AuxAA(p,r)
                               
-                              u1 =  two * (BuxAA(p,r))
-                              u2 =   - AuxAA(p,r)
 
                               !val = val - frac12 * Aux3A(p, r)
                               !val = val - frac12 * Aux3B(r, p)
@@ -3897,13 +3874,7 @@ call xmsg('timer76', timer76, mdebugg)
                               val = val - frac12 * Aux3X(r, p)
 
                               
-                              u3 =  - frac12 * Aux3X(p, r)
-                              u4 =  - frac12 * Aux3X(r, p)
-                              if (rs==5.and.pq==5)then
-                                    print*, 'kupsko2', (one- AuxData%Occ(q)-frac12 * AuxData%Occ(p) - frac12*AuxData%Occ(r)) * HNO(p,r)
-                                    write(*, '( 4F20.10)') u1, u2, u3, u4
-                                    print*, HNO(p,r)
-                              end if
+
 
                         end if
 
@@ -3919,8 +3890,6 @@ call xmsg('timer76', timer76, mdebugg)
                               val = val - two     * (BuxAA(q,r ))
                               val = val + AuxAA(q,r)
 
-                              u1 =  - two     * (BuxAA(q,r ))
-                              u2 =  + AuxAA(q,r)
 
                               !val = val + frac12 * Aux3B(r, q)
                               !val = val + frac12 * Aux3A(q, r)
@@ -3928,13 +3897,7 @@ call xmsg('timer76', timer76, mdebugg)
                               val = val + frac12 * Aux3X(r, q)
                               val = val + frac12 * Aux3X(q, r)
 
-                              u3 =  frac12 * Aux3X(r, q)
-                              u4 =  frac12 * Aux3X(q, r)
 
-                              if (rs==5.and.pq==5)then
-                                    print*, 'kupsko3', (one- AuxData%Occ(p)-frac12 * AuxData%Occ(q) - frac12*AuxData%Occ(r)) * HNO(q,r)
-                                    write(*, '( 4F20.10)') u1, u2, u3, u4
-                              end if
 
                         end if
 
@@ -3946,22 +3909,12 @@ call xmsg('timer76', timer76, mdebugg)
                               val = val - two     * BuxAA(p,s) 
                               val = val  + AuxAA(p,s)
 
-                              u1 =  - two     * BuxAA(p,s) 
-                              u2 =   + AuxAA(p,s)
 
                               ! val = val + frac12 * Aux3B(s, p)
                               ! val = val + frac12 * Aux3A(p, s)
 
                               val = val + frac12 * Aux3X(s, p)
                               val = val + frac12 * Aux3X(p, s)
-
-                              u3 =  frac12 * Aux3X(s, p)
-                              u4 =  frac12 * Aux3X(p, s)
-
-                              if (rs==5.and.pq==5)then
-                                    print*, 'kupsko4', (one- AuxData%Occ(q)-frac12 * AuxData%Occ(p) - frac12*AuxData%Occ(s)) * HNO(p,s)
-                                    write(*, '( 4F20.10)') u1, u2, u3, u4
-                              end if
 
 
 
