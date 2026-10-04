@@ -306,7 +306,7 @@ SAPT%monB%NDim = NBasis*(NBasis-1)/2
 
        call auto2e_init()
        
-       call xyz_source(XYZPath, "./input.inp")
+       call xyz_source(XYZPath, InputPath)
        SortAngularMomenta = .true.
 
        call CholeskyOTF_ao_vecs(Flags,CholeskyVecsOTF,AOBasis,System,Flags%IUnits, &
@@ -862,7 +862,7 @@ doRSH = .false.
 if(Flags%IFunSR==1.or.Flags%IFunSR==2) doRSH = .true.
 if(.not.doRSH .and. Flags%IDBBSC/=2) stop "doRSH=F and CBS/=2! in Erf ERIs OTF!"
 
-call xyz_source(XYZPath, "./input.inp")
+call xyz_source(XYZPath, InputPath)
 SortAngularMomenta = .true.
 
 ! set RS parameter

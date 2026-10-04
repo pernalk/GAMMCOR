@@ -350,6 +350,7 @@ subroutine PolarizAl(FreqOm,ECASSCF,UNOAO,XOne,URe,Occ,&
 ! find C(omega) by expanding around Alpha=0 with a tolerance Eps or
 ! up to maximal order Max_Cn
 !
+use types, only : InputPath
 
 implicit none
 integer,intent(in) :: NBasis,NInte1,NGem,NDimX,Max_cn
@@ -385,7 +386,7 @@ ElseIf (IntIdx == 0) then
    Stop "Unknown Interface in PolarizAl!"
 EndIf
 
-XYZPath="./input.inp"
+XYZPath=InputPath
 !Call DipMomOTF_ao(DIpX,DIpY,DipZ,XYZPath,IUnits,'MOLPRO')
 !Call CompDipMomOTF(AOBasis,System,CAONO,Occ,DipX,DipY,DipZ,NBasis,NBasis)
 !stop "stop here..."
