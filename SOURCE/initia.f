@@ -240,7 +240,7 @@ C
 C
       Call auto2e_init()
 C
-      Call xyz_source(XYZPath, "./input.inp")
+      Call xyz_source(XYZPath, InputPath)
       SortAngularMomenta = .true.
 C
       Call CholeskyOTF_ao_vecs(Flags,CholeskyVecsOTF,AOBasis,
@@ -1024,7 +1024,7 @@ C
       block
        character(:),allocatable :: XYZPath
 
-      Call xyz_source(XYZPath, "./input.inp")
+      Call xyz_source(XYZPath, InputPath)
 
       SortAngularMomenta = .false. 
 
@@ -2177,7 +2177,7 @@ C     compute Cholesky vectors OTF
 
       Call auto2e_init()
 
-      Call xyz_source(XYZPath, "./input.inp")
+      Call xyz_source(XYZPath, InputPath)
       SortAngularMomenta = .true.
 
       Call CholeskyOTF_ao_vecs(Flags,CholeskyVecsOTF,AOBasis,
@@ -2213,7 +2213,7 @@ C
 c
       Call auto2e_init()
 c
-      Call xyz_source(XYZPath, "./input.inp")
+      Call xyz_source(XYZPath, InputPath)
       SortAngularMomenta = .true.
 
       ! pq \in AO; kappa \in NChol; g \in THC

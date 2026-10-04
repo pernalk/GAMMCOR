@@ -11,9 +11,15 @@ subroutine read_Input(Input)
 implicit none
 
 type(InputData) :: Input
-character(:), allocatable :: InputPath
+integer :: ArgLen
 
- InputPath = "./input.inp"
+ if (command_argument_count() >= 1) then
+    call get_command_argument(1, length=ArgLen)
+    allocate(character(ArgLen) :: InputPath)
+    call get_command_argument(1, InputPath)
+ else
+    InputPath = "./input.inp"
+ end if
  call sapt_scan_inputfile(InputPath, Input%CalcParams)
  call init_Input(InputPath, Input)
  call read_inputfile(InputPath, Input)

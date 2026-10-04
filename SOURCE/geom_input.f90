@@ -15,7 +15,6 @@ module geom_input
       public :: xyz_source
       public :: geom_DeleteScratch
 
-      character(*), parameter :: GEOM_INPUT_FILE = "./input.inp"
       character(*), parameter :: GEOM_SCRATCH_FILE = "gammcor_geom_tmp.inp"
 
 contains
@@ -45,7 +44,7 @@ contains
             if (present(InputFile)) then
                   call xyz_source(XYZPath, InputFile)
             else
-                  call xyz_source(XYZPath, GEOM_INPUT_FILE)
+                  call xyz_source(XYZPath, InputPath)
             end if
             call msg("Geometry read from " // XYZPath)
 
