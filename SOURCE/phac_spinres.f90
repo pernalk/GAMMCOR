@@ -262,7 +262,6 @@ contains
         write(*,'(/,1X,''ECASSCF+ENuc, AC1-Corr, ERPA-CASSCF'',6X,3F15.8)'), &
               AuxData%ECAS_calc, ecorr, AuxData%ECAS_calc + ecorr
 
-
     end subroutine pherpa_incore_driver
 
     subroutine phAC_incore_driver(AuxData, Flags, Ints, Ints_ducc)
