@@ -79,6 +79,9 @@ module thc_energy_ph
       integer, parameter, private :: phA0vo=1, phA0aa=2, phA0va=3, phA0oa=4
       integer, parameter, private :: phA1aavo=5, phA1aova=6, phA1aovo=7
       integer, parameter, private :: phA1aoao=8, phA1aava=9, phA1aoaa=10
+      ! transposed partners; folded into aova / aoaa / aava and freed by
+      ! symmetrize_A1_ph before the energy loop - never read here
+      integer, parameter, private :: phA1vaao=11, phA1aaao=12, phA1vaaa=13
 
       ! Xt eigenvectors of the two A0 blocks where Xt /= Yt (ao and aa); for
       ! vo and va Xt = Yt. Rows = pairs, columns = modes, in the layout of the

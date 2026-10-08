@@ -7,6 +7,7 @@ OBJ = $(O)mainp.o $(O)initia.o $(O)dmscf.o $(O)misc.o $(O)optocc.o \
        $(O)ppac_types.o $(O)h5_reader.o $(O)interface_pp.o $(O)eigenno.o $(O)optnorb.o \
        $(O)quadratures.o $(O)pp_utils.o \
        $(O)thc_auto_p0.o $(O)thc_auto_p2.o $(O)thc_auto_p3.o $(O)thc_energy.o \
+       $(O)thc_auto_p0_ph.o $(O)thc_auto_p2_ph.o $(O)thc_auto_p3_ph.o $(O)thc_energy_ph.o \
        $(O)ppac0.o $(O)ppac0_thc.o \
        $(O)ppac_subs.o $(O)ppac_dispatch.o \
        $(O)ppac_simple_subs.o $(O)ppac_simple.o \
@@ -98,7 +99,11 @@ $(O)pp_utils.o         : $(O)types.o $(O)lin.o $(O)quadratures.o
 $(O)thc_auto_p0.o      :
 $(O)thc_auto_p2.o      :
 $(O)thc_auto_p3.o      :
+$(O)thc_auto_p0_ph.o   :
+$(O)thc_auto_p2_ph.o   :
+$(O)thc_auto_p3_ph.o   :
 $(O)thc_energy.o       : $(O)types.o $(O)ppac_types.o $(O)print_utils.o $(O)lin.o $(O)gammint.o
+$(O)thc_energy_ph.o    : $(O)types.o $(O)ppac_types.o $(O)print_utils.o $(O)lin.o $(O)gammint.o
 $(O)ppac0.o            : $(O)types.o $(O)ppac_types.o $(O)pp_utils.o $(O)lin.o
 $(O)ppac0_thc.o        : $(O)types.o $(O)ppac_types.o $(O)pp_utils.o $(O)print_utils.o $(O)tran.o $(O)geom_input.o \
                          $(O)thc_auto_p0.o $(O)thc_auto_p2.o $(O)thc_auto_p3.o $(O)thc_energy.o
@@ -107,7 +112,8 @@ $(O)ppac_subs.o        : $(O)types.o $(O)ppac_types.o $(O)pp_utils.o $(O)quadrat
 $(O)ppac_dispatch.o    : $(O)types.o $(O)ppac_types.o $(O)ppac_subs.o $(O)ppac0.o $(O)ppac0_thc.o $(O)print_utils.o
 $(O)ppac_simple_subs.o : $(O)types.o $(O)ppac_types.o $(O)lin.o $(O)pp_utils.o
 $(O)ppac_simple.o      : $(O)types.o $(O)ppac_types.o $(O)ppac_simple_subs.o
-$(O)phac0_thc.o        : $(O)types.o $(O)ppac_types.o $(O)pp_utils.o $(O)print_utils.o $(O)tran.o $(O)thc_energy.o
+$(O)phac0_thc.o        : $(O)types.o $(O)ppac_types.o $(O)pp_utils.o $(O)print_utils.o $(O)tran.o $(O)thc_energy_ph.o \
+                         $(O)ppac0_thc.o $(O)thc_auto_p0_ph.o $(O)thc_auto_p2_ph.o $(O)thc_auto_p3_ph.o
 $(O)phac_dispatch.o    : $(O)types.o $(O)ppac_types.o $(O)phac0_thc.o $(O)print_utils.o
 $(O)phac_spinres.o     : $(O)types.o $(O)ppac_types.o
 $(O)mp.o               : $(O)types.o $(O)ppac_types.o

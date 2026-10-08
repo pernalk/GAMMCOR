@@ -75,15 +75,23 @@ module phac0_thc
       ! its higher-space member first, so phA1aova = rows (act,inact), columns
       ! (virt,act). This is the orientation of .skills/phtheory_a1_blocks2.md
       ! ("The ten blocks at a glance") and of the generated kernels in
-      ! auxilliary_codes/testy-python/ph_code_gen. Only one of each transposed
-      ! pair exists: A^(1) is symmetric for optimized orbitals and W^(1) needs
-      ! only the symmetric part (.skills/phtheory_erpa_and_w1.md Sec. 8).
+      ! auxilliary_codes/testy-python/ph_code_gen. W^(1) needs only the
+      ! symmetric part of A^(1) (.skills/phtheory_erpa_and_w1.md Sec. 8), and
+      ! A^(1) is symmetric only when the orbital gradient of the computed state
+      ! vanishes (state-specific CASSCF), not for SA-CASSCF. So the three
+      ! transposed partners of aova, aoaa, aava that carry an asymmetry are
+      ! built too - phA1vaao, phA1aaao, phA1vaaa - and symmetrize_A1_ph folds
+      ! each into its partner, A_RC <- 1/2 (A_RC + A_CR^T), and frees it
+      ! (.skills/phcode_plan_energy_terms.md Sec. 8). aovo and aavo have no
+      ! partner: aavo is exactly symmetric, the aovo asymmetry was measured to
+      ! have no effect on E_voao.
       ! NOTE the active+inactive pair is spelled 'ao' here but 'oa' in the A0 id
       ! phA0oa (inherited from pp's A0oa); both mean the same pair space.
       ! vovo, vova and vava have no id: they are never built (see the header).
       integer, parameter, private :: phA1aavo=5, phA1aova=6, phA1aovo=7
       integer, parameter, private :: phA1aoao=8, phA1aava=9, phA1aoaa=10
-      integer, parameter, private :: NBLOCKS_PH = 10
+      integer, parameter, private :: phA1vaao=11, phA1aaao=12, phA1vaaa=13
+      integer, parameter, private :: NBLOCKS_PH = 13
 
       integer, parameter, private :: tdebug = 0
       integer, parameter, private :: mdebugg = 50
@@ -94,7 +102,8 @@ module phac0_thc
       character(len=8), dimension(NBLOCKS_PH), parameter :: BlockName_ph = (/ &
             'A0vo    ', 'A0aa    ', 'A0va    ', 'A0oa    ', &
             'A1aavo  ', 'A1aova  ', 'A1aovo  ', &
-            'A1aoao  ', 'A1aava  ', 'A1aoaa  ' /)
+            'A1aoao  ', 'A1aava  ', 'A1aoaa  ', &
+            'A1vaao  ', 'A1aaao  ', 'A1vaaa  ' /)
 
 contains
 
@@ -218,6 +227,10 @@ contains
 
               if (dump_a1 == 1) call dump_A1_ph(AuxData, ACBlocks, THCData, rdm2)
 
+              ! A_RC <- 1/2 (A_RC + A_CR^T) for aova, aoaa, aava; frees the
+              ! transposed partners (after the dump, which writes raw blocks)
+              call symmetrize_A1_ph(ACBlocks)
+
               call clock_start(timer)
               call THC_energy_loop_ph(THCData, ACBlocks, Flags, pos, AuxData, rdm2)
               call tmsg('Correlation energy', timer, tdebug)
@@ -338,6 +351,11 @@ contains
             call InitA1Blocks_ph(AC0Block, AuxData, phA1aoao, phA0oa, phA0oa)
             call InitA1Blocks_ph(AC0Block, AuxData, phA1aava, phA0aa, phA0va)
             call InitA1Blocks_ph(AC0Block, AuxData, phA1aoaa, phA0oa, phA0aa)
+            ! transposed partners, folded into aova / aoaa / aava by
+            ! symmetrize_A1_ph before the energy
+            call InitA1Blocks_ph(AC0Block, AuxData, phA1vaao, phA0va, phA0oa)
+            call InitA1Blocks_ph(AC0Block, AuxData, phA1aaao, phA0aa, phA0oa)
+            call InitA1Blocks_ph(AC0Block, AuxData, phA1vaaa, phA0va, phA0aa)
 
       end subroutine init_AC0Blocks_ph
 
@@ -897,6 +915,21 @@ contains
                                                 call T5_aoaa(a, b, NI+1, NIA, NI+1, NIA, ACB(phA1aoaa)%APlus, ACB(phA1aoaa)%AMinus, map, pos, rdm2, NI+1, NIA, NI+1, NIA, V_axby, NA)
                                                 call D2_aoaa(a, b, NI+1, NIA, NI+1, NIA, ACB(phA1aoaa)%APlus, ACB(phA1aoaa)%AMinus, map, pos, rdm2_13ph, NI+1, NIA, NI+1, NIA, V_axby, NA)
                                                 call D5_aoaa(a, b, NI+1, NIA, NI+1, NIA, ACB(phA1aoaa)%APlus, ACB(phA1aoaa)%AMinus, map, pos, rdm2, NI+1, NIA, NI+1, NIA, V_axby, NA)
+                                                ! Aux3X(inactive, active): the WMAT part of the aa-ao delta sector
+                                                call P45_ph_IA(Aux3X, a, b, map, rdm2, NI+1, NIA, NI+1, NIA, V_axby, NI, NA)
+                                                ! transposed partner aaao (rows aa, cols ao), symmetrize_A1_ph folds it into aoaa
+                                                call d2a_IA_aaao_pqrs(ACB(phA1aaao)%APlus, ACB(phA1aaao)%AMinus, a, b, NI+1, NIA, NI+1, NIA, pos, Occ, V_axby)
+                                                call t4a_IA_aaao_pqrs(ACB(phA1aaao)%APlus, ACB(phA1aaao)%AMinus, a, b, NI+1, NIA, NI+1, NIA, pos, Occ, V_axby)
+                                                call d1b_IA_aaao_qrps(ACB(phA1aaao)%APlus, ACB(phA1aaao)%AMinus, a, b, NI+1, NIA, NI+1, NIA, pos, Occ, V_axby)
+                                                call t3b_IA_aaao_prqs(ACB(phA1aaao)%APlus, ACB(phA1aaao)%AMinus, a, b, NI+1, NIA, NI+1, NIA, pos, Occ, V_axby)
+                                                call t5a_IA_aaao_pqrs(ACB(phA1aaao)%APlus, ACB(phA1aaao)%AMinus, a, b, NI+1, NIA, NI+1, NIA, pos, Occ, V_axby)
+                                                call t5b_IA_aaao_prqs(ACB(phA1aaao)%APlus, ACB(phA1aaao)%AMinus, a, b, NI+1, NIA, NI+1, NIA, pos, Occ, V_axby)
+                                                call d6a_IA_aaao_pqrs(ACB(phA1aaao)%APlus, ACB(phA1aaao)%AMinus, a, b, NI+1, NIA, NI+1, NIA, pos, Occ, V_axby)
+                                                call d6b_IA_aaao_qrps(ACB(phA1aaao)%APlus, ACB(phA1aaao)%AMinus, a, b, NI+1, NIA, NI+1, NIA, pos, Occ, V_axby)
+                                                call T2_aaao(a, b, NI+1, NIA, NI+1, NIA, ACB(phA1aaao)%APlus, ACB(phA1aaao)%AMinus, map, pos, rdm2_13ph, NI+1, NIA, NI+1, NIA, V_axby, NA)
+                                                call T6_aaao(a, b, NI+1, NIA, NI+1, NIA, ACB(phA1aaao)%APlus, ACB(phA1aaao)%AMinus, map, pos, rdm2, NI+1, NIA, NI+1, NIA, V_axby, NA)
+                                                call D4_aaao(a, b, NI+1, NIA, NI+1, NIA, ACB(phA1aaao)%APlus, ACB(phA1aaao)%AMinus, map, pos, rdm2_13ph, NI+1, NIA, NI+1, NIA, V_axby, NA)
+                                                call D5_aaao(a, b, NI+1, NIA, NI+1, NIA, ACB(phA1aaao)%APlus, ACB(phA1aaao)%AMinus, map, pos, rdm2, NI+1, NIA, NI+1, NIA, V_axby, NA)
                                                 t_AAIA_ker = t_AAIA_ker + clock_readwall(timer)
                                           end do
                                     end if
@@ -961,6 +994,8 @@ contains
                                                 call t5a_IA_aavo_pqrs(ACB(phA1aavo)%APlus, ACB(phA1aavo)%AMinus, a, b, NIA+1, NBasis, NI+1, NIA, pos, Occ, V_axby)
                                                 call d6a_IA_aavo_pqrs(ACB(phA1aavo)%APlus, ACB(phA1aavo)%AMinus, a, b, NIA+1, NBasis, NI+1, NIA, pos, Occ, V_axby)
                                                 call d6b_AI_aova_qrps(ACB(phA1aova)%APlus, ACB(phA1aova)%AMinus, a, b, NIA+1, NBasis, NI+1, NIA, pos, Occ, V_axby)
+                                                ! transposed partner vaao (rows va, cols ao)
+                                                call d6b_IA_vaao_qrps(ACB(phA1vaao)%APlus, ACB(phA1vaao)%AMinus, a, b, NIA+1, NBasis, NI+1, NIA, pos, Occ, V_axby)
                                                 t_IVAA_ker = t_IVAA_ker + clock_readwall(timer)
                                           end do
                                     end if
@@ -997,6 +1032,12 @@ contains
                                                 call d6b_IA_aavo_qrps(ACB(phA1aavo)%APlus, ACB(phA1aavo)%AMinus, a, b, NI+1, NIA, NI+1, NIA, pos, Occ, V_axby)
                                                 call T5_aova(a, b, NI+1, NIA, NI+1, NIA, ACB(phA1aova)%APlus, ACB(phA1aova)%AMinus, map, pos, rdm2, NI+1, NIA, NI+1, NIA, V_axby, NA)
                                                 call D2_aova(a, b, NI+1, NIA, NI+1, NIA, ACB(phA1aova)%APlus, ACB(phA1aova)%AMinus, map, pos, rdm2_13ph, NI+1, NIA, NI+1, NIA, V_axby, NA)
+                                                ! transposed partner vaao (rows va, cols ao)
+                                                call t4a_IA_vaao_pqrs(ACB(phA1vaao)%APlus, ACB(phA1vaao)%AMinus, a, b, NI+1, NIA, NI+1, NIA, pos, Occ, V_axby)
+                                                call t3b_IA_vaao_prqs(ACB(phA1vaao)%APlus, ACB(phA1vaao)%AMinus, a, b, NI+1, NIA, NI+1, NIA, pos, Occ, V_axby)
+                                                call d6a_IA_vaao_pqrs(ACB(phA1vaao)%APlus, ACB(phA1vaao)%AMinus, a, b, NI+1, NIA, NI+1, NIA, pos, Occ, V_axby)
+                                                call T6_vaao(a, b, NI+1, NIA, NI+1, NIA, ACB(phA1vaao)%APlus, ACB(phA1vaao)%AMinus, map, pos, rdm2, NI+1, NIA, NI+1, NIA, V_axby, NA)
+                                                call D4_vaao(a, b, NI+1, NIA, NI+1, NIA, ACB(phA1vaao)%APlus, ACB(phA1vaao)%AMinus, map, pos, rdm2_13ph, NI+1, NIA, NI+1, NIA, V_axby, NA)
                                                 t_VAIA_ker = t_VAIA_ker + clock_readwall(timer)
                                           end do
                                     end if
@@ -1015,6 +1056,11 @@ contains
                                                 call T5_aava(a, b, NI+1, NIA, NI+1, NIA, ACB(phA1aava)%APlus, ACB(phA1aava)%AMinus, map, pos, rdm2, NI+1, NIA, NI+1, NIA, V_axby, NA)
                                                 call D2_aava(a, b, NI+1, NIA, NI+1, NIA, ACB(phA1aava)%APlus, ACB(phA1aava)%AMinus, map, pos, rdm2_13ph, NI+1, NIA, NI+1, NIA, V_axby, NA)
                                                 call D6_aava(a, b, NI+1, NIA, NI+1, NIA, ACB(phA1aava)%APlus, ACB(phA1aava)%AMinus, map, pos, rdm2, NI+1, NIA, NI+1, NIA, V_axby, NA)
+                                                ! transposed partner vaaa (rows va, cols aa)
+                                                call T4_vaaa(a, b, NI+1, NIA, NI+1, NIA, ACB(phA1vaaa)%APlus, ACB(phA1vaaa)%AMinus, map, pos, rdm2_13ph, NI+1, NIA, NI+1, NIA, V_axby, NA)
+                                                call T6_vaaa(a, b, NI+1, NIA, NI+1, NIA, ACB(phA1vaaa)%APlus, ACB(phA1vaaa)%AMinus, map, pos, rdm2, NI+1, NIA, NI+1, NIA, V_axby, NA)
+                                                call D4_vaaa(a, b, NI+1, NIA, NI+1, NIA, ACB(phA1vaaa)%APlus, ACB(phA1vaaa)%AMinus, map, pos, rdm2_13ph, NI+1, NIA, NI+1, NIA, V_axby, NA)
+                                                call D6_vaaa(a, b, NI+1, NIA, NI+1, NIA, ACB(phA1vaaa)%APlus, ACB(phA1vaaa)%AMinus, map, pos, rdm2, NI+1, NIA, NI+1, NIA, V_axby, NA)
                                                 t_VAAA_ker = t_VAAA_ker + clock_readwall(timer)
                                           end do
                                     end if
@@ -1033,6 +1079,8 @@ contains
                         t_tog_AVAA_int = t_tog_AVAA_int + clock_readwall(timer)
                         call clock_start(timer)
                         call D1_aava(e1, e2, NI+1, NIA, NI+1, NIA, ACB(phA1aava)%APlus, ACB(phA1aava)%AMinus, map, pos, rdm2_12, NI+1, NIA, NI+1, NIA, V_axby, NA)
+                        call T3_vaaa(e1, e2, NI+1, NIA, NI+1, NIA, ACB(phA1vaaa)%APlus, ACB(phA1vaaa)%AMinus, map, pos, rdm2_12, NI+1, NIA, NI+1, NIA, V_axby, NA)
+                        call D3_vaaa(e1, e2, NI+1, NIA, NI+1, NIA, ACB(phA1vaaa)%APlus, ACB(phA1vaaa)%AMinus, map, pos, rdm2_12, NI+1, NIA, NI+1, NIA, V_axby, NA)
                         t_tog_AVAA_ker = t_tog_AVAA_ker + clock_readwall(timer)
                   end do
             end do
@@ -1047,6 +1095,9 @@ contains
                         call clock_start(timer)
                         call T1_aoaa(e1, e2, NI+1, NIA, NI+1, NIA, ACB(phA1aoaa)%APlus, ACB(phA1aoaa)%AMinus, map, pos, rdm2_12, NI+1, NIA, NI+1, NIA, V_axby, NA)
                         call D1_aoaa(e1, e2, NI+1, NIA, NI+1, NIA, ACB(phA1aoaa)%APlus, ACB(phA1aoaa)%AMinus, map, pos, rdm2_12, NI+1, NIA, NI+1, NIA, V_axby, NA)
+                        call D3_aaao(e1, e2, NI+1, NIA, NI+1, NIA, ACB(phA1aaao)%APlus, ACB(phA1aaao)%AMinus, map, pos, rdm2_12, NI+1, NIA, NI+1, NIA, V_axby, NA)
+                        ! class AIAA: the same integral, generated with the pair as (e1,e2) = (act, inact)
+                        call T1_aaao(e2, e1, NI+1, NIA, NI+1, NIA, ACB(phA1aaao)%APlus, ACB(phA1aaao)%AMinus, map, pos, rdm2_12, NI+1, NIA, NI+1, NIA, V_axby, NA)
                         t_tog_IAAA_ker = t_tog_IAAA_ker + clock_readwall(timer)
                   end do
             end do
@@ -1073,6 +1124,7 @@ contains
                         t_tog_IVAA_int = t_tog_IVAA_int + clock_readwall(timer)
                         call clock_start(timer)
                         call D1_aova(e1, e2, NI+1, NIA, NI+1, NIA, ACB(phA1aova)%APlus, ACB(phA1aova)%AMinus, map, pos, rdm2_12, NI+1, NIA, NI+1, NIA, V_axby, NA)
+                        call D3_vaao(e1, e2, NI+1, NIA, NI+1, NIA, ACB(phA1vaao)%APlus, ACB(phA1vaao)%AMinus, map, pos, rdm2_12, NI+1, NIA, NI+1, NIA, V_axby, NA)
                         t_tog_IVAA_ker = t_tog_IVAA_ker + clock_readwall(timer)
                   end do
             end do
@@ -1368,6 +1420,70 @@ call xmsg('t_tog_VAAA_ker', t_tog_VAAA_ker, mdebugg)
             end associate
 
       end subroutine PHERPA_A1_THC
+
+
+      ! =============================================================================
+      ! Route A of .skills/phcode_plan_energy_terms.md Sec. 8. W^(1) sees only the
+      ! symmetric part of A^(1), but the energy loop reads one block of each
+      ! transposed pair and doubles it (m = 2). That is exact only when the two
+      ! orientations agree, i.e. when the orbital gradient of the computed state
+      ! vanishes (state-specific CASSCF), not for SA-CASSCF. For the three pairs
+      ! whose orientations differ, both blocks are built and folded here:
+      !
+      !   A_RC <- 1/2 (A_RC + A_CR^T)        for APlus and AMinus
+      !
+      !   aova <- vaao      aoaa <- aaao      aava <- vaaa
+      !
+      ! after which A_CR is freed, so the energy loop is unchanged. This is the
+      ! symmetric part AC0CAS_FOFO uses. Printed per pair: ||A_RC - A_CR^T||,
+      ! ~0 (convergence level) for state-specific CASSCF, O(0.1-1) for SA.
+      ! =============================================================================
+      subroutine symmetrize_A1_ph(ACB)
+            type(TAC0Block_ph), dimension(:), intent(inout) :: ACB
+
+            integer, dimension(2, 3), parameter :: pairs = reshape( &
+                  [phA1aova, phA1vaao, phA1aoaa, phA1aaao, phA1aava, phA1vaaa], [2, 3])
+            integer :: k, rc, cr, i, j
+            double precision :: dp, dm, sp, sm
+
+            call print_section('A1 symmetrization  A_RC <- 1/2 (A_RC + A_CR^T)')
+            write(*,'(2X,A16,4A16)') 'block <- partner', '||A+||', '||A+ - A+^T||', &
+                  '||A-||', '||A- - A-^T||'
+            write(*,'(2X,A)') repeat('-', 82)
+
+            do k = 1, 3
+                  rc = pairs(1, k)
+                  cr = pairs(2, k)
+                  if (ACB(rc)%NDim1 /= ACB(cr)%NDim2 .or. ACB(rc)%NDim2 /= ACB(cr)%NDim1) then
+                        call msg('symmetrize_A1_ph: '//trim(BlockName_ph(rc))//' and ' &
+                              //trim(BlockName_ph(cr))//' are not transposes')
+                        stop
+                  end if
+
+                  dp = zero
+                  dm = zero
+                  sp = zero
+                  sm = zero
+                  !$omp parallel do default(shared) private(i, j) reduction(+:dp, dm, sp, sm)
+                  do j = 1, ACB(rc)%NDim2
+                        do i = 1, ACB(rc)%NDim1
+                              dp = dp + (ACB(rc)%APlus(i, j) - ACB(cr)%APlus(j, i))**2
+                              dm = dm + (ACB(rc)%AMinus(i, j) - ACB(cr)%AMinus(j, i))**2
+                              sp = sp + ACB(rc)%APlus(i, j)**2
+                              sm = sm + ACB(rc)%AMinus(i, j)**2
+                              ACB(rc)%APlus(i, j) = frac12 * (ACB(rc)%APlus(i, j) + ACB(cr)%APlus(j, i))
+                              ACB(rc)%AMinus(i, j) = frac12 * (ACB(rc)%AMinus(i, j) + ACB(cr)%AMinus(j, i))
+                        end do
+                  end do
+                  !$omp end parallel do
+
+                  write(*,'(2X,A16,4ES16.4)') trim(BlockName_ph(rc))//' <- '//trim(BlockName_ph(cr)), &
+                        sqrt(sp), sqrt(dp), sqrt(sm), sqrt(dm)
+
+                  deallocate(ACB(cr)%APlus, ACB(cr)%AMinus)
+            end do
+
+      end subroutine symmetrize_A1_ph
 
 
       ! =============================================================================
@@ -1959,6 +2075,38 @@ call xmsg('t_tog_VAAA_ker', t_tog_VAAA_ker, mdebugg)
                   Aux3X(a, r) = Aux3X(a, r) + two * val
             end do
       end subroutine P45_ph_VA
+
+
+      ! Inactive-row part of Aux3X, the counterpart of P45_ph_VA. Called in the
+      ! (AA|IA) class: a active, b inactive, V_axby(x,y) = (a x|b y) with x,y
+      ! active. With the same G(q,r) = sum_{tuv in act} Gamma_turv (qt|uv) and
+      ! q = b inactive, (b t|u v) = (b y|a x) = V_axby(x,y) for t = y, u = a,
+      ! v = x, and Gamma_turv = Gamma(y,a,r,x) = Gamma(r,x,y,a) (pair symmetry,
+      ! as in P45_ph_VA), so
+      !   Aux3X(b,r) += 2 sum_{x,y in act} Gamma(r,x,y,a) (a x|b y)
+      ! Needed by PHERPA_A1_THC only for the aa-ao block (phA1aaao): d_pr
+      ! WMAT_q,s and d_sp WMAT_q,r with q inactive, .skills/phtheory_a1_blocks2.md
+      ! Block aa-ao. No other block reads an inactive row of Aux3X.
+      subroutine P45_ph_IA(Aux3X, a, b, map, rdm2, x0, x1, y0, y1, V_axby, NI, NA)
+            double precision, dimension(:,:), intent(inout) :: Aux3X
+            integer, intent(in) :: a, b, NI, NA
+            integer, dimension(:), intent(in) :: map
+            double precision, dimension(:,:,:,:), intent(in) :: rdm2
+            integer, intent(in) :: x0, x1, y0, y1
+            double precision, dimension(x0:x1, y0:y1), intent(in) :: V_axby
+            integer :: r, x, y
+            double precision :: val
+
+            do r = NI+1, NI+NA
+                  val = zero
+                  do y = y0, y1
+                        do x = x0, x1
+                              val = val + rdm2(map(r), map(x), map(y), map(a)) * V_axby(x, y)
+                        end do
+                  end do
+                  Aux3X(b, r) = Aux3X(b, r) + two * val
+            end do
+      end subroutine P45_ph_IA
 
 
       ! Route one two-electron contribution arspq into APlus/AMinus of a block.
