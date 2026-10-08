@@ -28,8 +28,8 @@ module ppac0_thc
 
       integer, parameter, private :: tdebug = 0
       integer, parameter, private :: mdebug = 0
-      integer, parameter, private :: mdebugg = 1
-      integer, parameter, private :: mnormal = 50
+      integer, parameter, private :: mdebugg = 0
+      integer, parameter, private :: mnormal = 0
       integer, parameter, private :: mverbose = 10
       integer, parameter, private :: merror = 100
 
@@ -300,7 +300,16 @@ contains
               call tmsg('Hessian and diagonalization '//ACBlocks(A0oa)%name, timer, tdebug)
 
 
-              do i = 9, 13                    
+              ! A1 blocks get the BARE one-electron integrals AuxData%HNO0, not HNO.
+              ! HNO (update_HNO_AC0) is the one-electron part of the Dyall H^(0):
+              ! h^core = h + 2*BuxII - AuxII on act-act, fij/fvw on the inactive and
+              ! virtual diagonals, zero elsewhere - right for the A0 blocks above.
+              ! A^(1) is the exact A, whose T0 terms carry plain h; PPERPA_THC adds
+              ! the AuxII/AuxAA/BuxII/BuxAA dressings itself. Passing HNO here would
+              ! lose every cross-space h element and double-count the dressing on the
+              ! inactive/virtual diagonals. The ph twin (PHERPA_A1_THC in
+              ! phac0_thc.f90) follows the same rule.
+              do i = 9, 13
                     call clock_start(timer)
                     !call PPERPA_THC(AuxData, ACBlocks(i), HNO0, posS, posT, AuxII, AuxAA, BuxII, BuxAA,Aux3X, Aux3B, ACAlpha, ACBlocks(i)%Ndim1S, ACBlocks(i)%Ndim2S, ACBlocks(i)%IndN1S, ACBlocks(i)%IndN2S)
                     call PPERPA_THC(AuxData, ACBlocks(i), AuxData%HNO0, posS, posT, AuxII, AuxAA, BuxII, BuxAA,Aux3X, Aux3B, ACAlpha, ACBlocks(i)%Ndim1S, ACBlocks(i)%Ndim2S, ACBlocks(i)%IndN1S, ACBlocks(i)%IndN2S)
@@ -2500,7 +2509,7 @@ contains
                     end do caseloop
               end do batchloop
             end  associate
-#ifdef DEBUG
+!#ifdef DEBUG
 call xmsg('timer3', timer3, mdebugg)
 call xmsg('timer3', timer3, mdebugg)
 call xmsg('timer4', timer4, mdebugg)
@@ -2589,7 +2598,7 @@ call xmsg('timer73', timer73, mdebugg)
 call xmsg('timer74', timer74, mdebugg)
 call xmsg('timer75', timer75, mdebugg)
 call xmsg('timer76', timer76, mdebugg)
-#endif
+!#endif
 
               ! print*, 't56', timer56
               ! print*, 't57', timer57
@@ -3296,6 +3305,14 @@ call xmsg('timer76', timer76, mdebugg)
       end subroutine parse_config
 
 
+      ! One-electron matrix of the Dyall Hamiltonian H^(0), for the A0 blocks ONLY
+      ! (used by both pp and ph):
+      !   HNO(i,i) = wij(i)                         i inactive (orbital energy)
+      !   HNO(v,v) = wvw(v)                         v virtual  (orbital energy)
+      !   HNO(q,s) = HNO0(q,s) + 2*BuxII - AuxII    q,s active (h^core)
+      !   all other elements zero (inact/virt off-diagonals, every cross-space one)
+      ! The A1 blocks need the bare h instead and get AuxData%HNO0 (PPERPA_THC,
+      ! PHERPA_A1_THC). Also sets AuxData%ECAS_oneelectr.
       subroutine update_HNO_AC0(AuxData, HNO, wij, wvw, AuxII, BuxII)
             type(TACppData), intent(inout) :: AuxData
             double precision, dimension(:, :), intent(out) :: HNO

@@ -19,6 +19,11 @@ module phac0_thc
       !   A1 has 9 blocks: the 3 diagonal-position ones (vovo, vava, oaoa) and
       !   6 off-diagonal couplings (one representative per transposed pair).
       !   There is no aaaa A1 block: the aa-aa part of A sits entirely in A0.
+      !   Only 6 of the 9 are built here. vovo, vova and vava never are: their
+      !   W^(1) contributions need only B^(1), a single integral term for these
+      !   three, so thc_energy_ph evaluates them on the fly from (IV|IV), (VA|IV)
+      !   and (VA|VA) (.skills/phtheory-E-contrib.md, "Three of the nine
+      !   collapse to integrals").
       !
       ! STORAGE (ph analogue of .skills/ppcode_a0_a1_blocks.md):
       !   One matrix pair (APlus/AMinus) per block - no ASing/ATrip/ATripA, no
@@ -29,8 +34,8 @@ module phac0_thc
       !     va / oa : block-diagonal in the non-active index -> MiniBlocks,
       !               one NA x NA mini matrix per virtual (va) / inactive (oa),
       !               active-local indexing, ThrQVirt/ThrQInact null filters
-      !     A1      : rectangular couplings; small ones allocated, the ones
-      !               involving the vo pair space (and vava) contracted OTF
+      !     A1      : rectangular couplings APlus/AMinus(NDim1, NDim2), all six
+      !               allocated
       !   The global pair -> position map is the single array pos(p,q)
       !   (ph analogue of posS; there is no posT).
       !
@@ -54,7 +59,7 @@ module phac0_thc
       use pp_utils
       use print_utils
       use ppac_types
-      use thc_energy
+      use thc_energy_ph
       use tran
       use omp_lib
 
@@ -63,21 +68,33 @@ module phac0_thc
 
       ! ph block ids. Prefixed ph* so they cannot be confused with the pp ids
       ! A0oo..A1vaao2 of ppac0_thc (both sets are private to their module).
-      ! A1 ids 5..9 are the blocks contracted on the fly (OTF), 10..13 the
-      ! allocated ones - same split idea as pp, where the vv* A1 blocks are OTF.
+      ! The A1 ids run contiguously from phA1aavo to NBLOCKS_PH. thc_energy_ph
+      ! keeps a copy of all ids - change both together.
       integer, parameter, private :: phA0vo=1, phA0aa=2, phA0va=3, phA0oa=4
-      integer, parameter, private :: phA1vovo=5, phA1vavo=6, phA1vooa=7
-      integer, parameter, private :: phA1voaa=8, phA1vava=9
-      integer, parameter, private :: phA1vaoa=10, phA1vaaa=11, phA1aaoa=12
-      integer, parameter, private :: phA1oaoa=13
-      integer, parameter, private :: NBLOCKS_PH = 13
+      ! A1 block ids. The name is <row pair><column pair>, each pair written with
+      ! its higher-space member first, so phA1aova = rows (act,inact), columns
+      ! (virt,act). This is the orientation of .skills/phtheory_a1_blocks2.md
+      ! ("The ten blocks at a glance") and of the generated kernels in
+      ! auxilliary_codes/testy-python/ph_code_gen. Only one of each transposed
+      ! pair exists: A^(1) is symmetric for optimized orbitals and W^(1) needs
+      ! only the symmetric part (.skills/phtheory_erpa_and_w1.md Sec. 8).
+      ! NOTE the active+inactive pair is spelled 'ao' here but 'oa' in the A0 id
+      ! phA0oa (inherited from pp's A0oa); both mean the same pair space.
+      ! vovo, vova and vava have no id: they are never built (see the header).
+      integer, parameter, private :: phA1aavo=5, phA1aova=6, phA1aovo=7
+      integer, parameter, private :: phA1aoao=8, phA1aava=9, phA1aoaa=10
+      integer, parameter, private :: NBLOCKS_PH = 10
 
       integer, parameter, private :: tdebug = 0
+      integer, parameter, private :: mdebugg = 50
+      ! 1 = write the A1 blocks plus everything needed to rebuild them in python
+      ! (h, Occ, active 2-RDM, full THC ERI) - see dump_A1_ph. Small systems only.
+      integer, parameter, private :: dump_a1 = 0
 
       character(len=8), dimension(NBLOCKS_PH), parameter :: BlockName_ph = (/ &
             'A0vo    ', 'A0aa    ', 'A0va    ', 'A0oa    ', &
-            'A1vovo  ', 'A1vavo  ', 'A1vooa  ', 'A1voaa  ', 'A1vava  ', &
-            'A1vaoa  ', 'A1vaaa  ', 'A1aaoa  ', 'A1oaoa  ' /)
+            'A1aavo  ', 'A1aova  ', 'A1aovo  ', &
+            'A1aoao  ', 'A1aava  ', 'A1aoaa  ' /)
 
 contains
 
@@ -96,6 +113,9 @@ contains
             double precision, dimension(:,:), allocatable :: AuxII, AuxAA, BuxII, BuxAA
             double precision, dimension(:,:), allocatable :: Aux3X
             double precision, dimension(:,:), allocatable :: HNO
+            double precision, dimension(:,:,:,:), allocatable :: rdm2, rdm2_12, rdm2_13ph
+            integer :: i
+            type (tclock) :: timer
 
 
             if (AuxData%PYSCF==1)then
@@ -122,35 +142,162 @@ contains
               BuxAA = zero
               Aux3X = zero
 
+              ! The spin-summed active 2-RDM, plus the two index-permuted copies
+              ! the genuine A1 kernels contract against (see init_rdm_perm_ph).
+              allocate(rdm2(NA, NA, NA, NA))
+              allocate(rdm2_12(NA, NA, NA, NA))
+              allocate(rdm2_13ph(NA, NA, NA, NA))
+              call clock_start(timer)
+              rdm2 = 0.5d0 * AuxData%rdm2_full
+              call init_rdm_perm_ph(rdm2, rdm2_12, rdm2_13ph, NA)
+              call tmsg('TIME FOR RDM2 PERMUTED COPIES', timer, tdebug)
+
+              call clock_start(timer)
               call THC_int_loop_ph(THCData, ACBlocks, AuxII, AuxAA, BuxII, BuxAA, &
-                    Aux3X, Flags, AuxData, Occ, map, 0.5d0*AuxData%rdm2_full, pos, One)
+                    Aux3X, Flags, AuxData, Occ, map, rdm2, rdm2_12, rdm2_13ph, pos, One)
+              call tmsg('TIME FOR THC LOOPS', timer, tdebug)
 
-              ! HNO: generalized Fock. Active block = HNO0 + 2*BuxII - AuxII
-              ! (= h^core), inactive/virtual diagonals from fij/fvw.
+              ! ---- Two different one-electron matrices: one for A0, one for A1 ----
+              !
+              ! HNO (A0 only). The one-electron part of the Dyall Hamiltonian H^(0),
+              ! built by update_HNO_AC0:
+              !   act-act    HNO(q,s) = h(q,s) + 2*BuxII(q,s) - AuxII(q,s)  = h^core
+              !   inact      HNO(i,i) = THCData%fij(i)   (orbital energy, diagonal)
+              !   virt       HNO(v,v) = THCData%fvw(v)   (orbital energy, diagonal)
+              !   everything else = 0  (off-diagonal inact-inact and virt-virt, and
+              !                         every cross-space element I-A, V-A, V-I)
+              ! The zeros and the fij/fvw diagonals are what H^(0) is, so this is
+              ! right for the A0 blocks - and wrong for anything else.
+              !
+              ! AuxData%HNO0 (A1 only). The bare one-electron integrals h(x,y) in the
+              ! NO basis, all elements (set in interface_pp, untouched since).
+              ! A^(1) is the exact A at alpha = 1: its delta sector needs
+              ! h(x,y) + sum_t n_t [2 (xy|tt) - (xt|ty)] for ANY pair of spaces,
+              ! including cross-space elements, and with the active part of the sum
+              ! dropped where the parent term is genuine (see Fel_ph). That cannot be
+              ! read off HNO: the cross-space elements are zero there, and fij/fvw
+              ! already contain the active dressing, which Fel_ph would add again.
+              ! So PHERPA_A1_THC gets AuxData%HNO0 and builds the dressing itself
+              ! from AuxII/BuxII/AuxAA/BuxAA - the same choice as pp, which passes
+              ! AuxData%HNO0 (not HNO) to PPERPA_THC.
               allocate(HNO(NBasis, NBasis))
+              call clock_start(timer)
               call update_HNO_AC0(AuxData, HNO, THCData%fij, THCData%fvw, AuxII, BuxII)
+              call tmsg('TIME FOR UPDATE HNO', timer, tdebug)
 
+              call clock_start(timer)
               call PHERPA0_THC_VO(AuxData, ACBlocks(phA0vo), THCData)
-              call PHERPA0_THC_AA(AuxData, ACBlocks(phA0aa), HNO, Aux3X)
-              call PHERPA0_THC_VA_Eigs(AuxData, ACBlocks(phA0va), THCData, HNO, Aux3X)
-              call PHERPA0_THC_OA_Eigs(AuxData, ACBlocks(phA0oa), THCData, HNO, Aux3X, AuxAA, BuxAA)
+              call tmsg('Hessian and diagonalization '//trim(BlockName_ph(phA0vo)), timer, tdebug)
 
-              ! -------- next steps (not yet implemented) --------
-              !A1 blocks (phA1vaoa..phA1oaoa) + OTF ones in the energy loop
-              !call THC_energy_loop_ph
+              call clock_start(timer)
+              call PHERPA0_THC_AA(AuxData, ACBlocks(phA0aa), HNO, Aux3X)
+              call tmsg('Hessian and diagonalization '//trim(BlockName_ph(phA0aa)), timer, tdebug)
+
+              call clock_start(timer)
+              call PHERPA0_THC_VA_Eigs(AuxData, ACBlocks(phA0va), THCData, HNO, Aux3X)
+              call tmsg('Hessian and diagonalization '//trim(BlockName_ph(phA0va)), timer, tdebug)
+
+              call clock_start(timer)
+              call PHERPA0_THC_OA_Eigs(AuxData, ACBlocks(phA0oa), THCData, HNO, Aux3X, AuxAA, BuxAA)
+              call tmsg('Hessian and diagonalization '//trim(BlockName_ph(phA0oa)), timer, tdebug)
+
+              ! A1 blocks. THC_int_loop_ph has already put the delta-free part
+              ! (occupation-number t*/d* kernels plus genuine T*/D* kernels) into
+              ! every block; PHERPA_A1_THC adds the delta sector built from the
+              ! BARE h (AuxData%HNO0, not HNO - see above) plus AuxII / BuxII /
+              ! AuxAA / BuxAA / Aux3X. One generic call per block, exactly as pp
+              ! does with PPERPA_THC in its do i = 9, 13 loop.
+              do i = phA1aavo, NBLOCKS_PH
+                    call clock_start(timer)
+                    call PHERPA_A1_THC(AuxData, ACBlocks(i), AuxData%HNO0, &
+                          AuxII, BuxII, AuxAA, BuxAA, Aux3X)
+                    call tmsg('Hessian '//trim(BlockName_ph(i)), timer, tdebug)
+              end do
+
+              if (dump_a1 == 1) call dump_A1_ph(AuxData, ACBlocks, THCData, rdm2)
+
+              call clock_start(timer)
+              call THC_energy_loop_ph(THCData, ACBlocks, Flags, pos, AuxData, rdm2)
+              call tmsg('Correlation energy', timer, tdebug)
 
             end associate
 
-            call msg('ACPH0_THC: A0 blocks assembled and diagonalized; A1/energy not yet implemented')
+            call msg('ACPH0_THC: energy loop incomplete - only E_vovo, E_vavo and E_vava are computed, the rest are zero')
             stop
 
       end subroutine ACPH0_THC
 
 
+      ! =============================================================================
+      ! Debug dump for the element-by-element check of the A1 blocks against
+      ! auxilliary_codes/testy-python/pherpa_simple.py (driver: check_a1_ph.py).
+      ! Everything the reference needs is written in the Fortran's own NO basis,
+      ! with the Fortran's own (THC) integrals, so THC error cancels and any
+      ! difference is a code error. Files, in the current directory:
+      !   ph_dump_info.dat   NBasis NI NA NV / Occ(1:NBasis) / HNO0(NBasis,NBasis)
+      !   ph_dump_rdm2.bin   rdm2(NA,NA,NA,NA) as passed to THC_int_loop_ph, stream
+      !   ph_dump_eri.bin    (pq|rs) from the THC factors, (NBasis**2,NBasis**2),
+      !                      column-major, row index p + NBasis*(q-1), stream
+      !   ph_dump_A1.dat     one line per element: block r s p q APlus AMinus,
+      !                      for the six stored A1 blocks (no vovo, vova, vava)
+      ! The ERI tensor is NBasis**4 doubles - only for small test systems.
+      ! =============================================================================
+      subroutine dump_A1_ph(AuxData, ACBlocks, THCData, rdm2)
+            use THC_Gammcor
+            type(TACppData), intent(in) :: AuxData
+            type(TAC0Block_ph), dimension(:), intent(in) :: ACBlocks
+            type(TTHCData), intent(in) :: THCData
+            double precision, dimension(:,:,:,:), intent(in) :: rdm2
+
+            double precision, dimension(:,:,:), allocatable :: Rfull
+            double precision, dimension(:,:), allocatable :: eri
+            integer :: u, i, pq, rs, N
+
+            N = AuxData%NBasis
+
+            open(newunit=u, file='ph_dump_info.dat', status='replace')
+            write(u, '(4I8)') N, AuxData%NI, AuxData%NA, AuxData%NV
+            write(u, '(ES26.17)') AuxData%Occ(1:N)
+            write(u, '(ES26.17)') AuxData%HNO0(1:N, 1:N)
+            close(u)
+
+            open(newunit=u, file='ph_dump_rdm2.bin', access='stream', form='unformatted', status='replace')
+            write(u) rdm2
+            close(u)
+
+            associate(Zgk=>THCData%Zgk, Xga=>THCData%Xga, &
+                  NChol=>THCData%NChol, NTHC=>THCData%NTHC)
+              allocate(Rfull(NChol, N, N))
+              call thc_gammcor_Rkab_2(Rfull, Xga(:,1:N), Xga(:,1:N), Zgk, N, N, NChol, NTHC)
+              allocate(eri(N**2, N**2))
+              call real_aTb_x(eri, N**2, Rfull, NChol, Rfull, NChol, N**2, N**2, NChol, One)
+            end associate
+            open(newunit=u, file='ph_dump_eri.bin', access='stream', form='unformatted', status='replace')
+            write(u) eri
+            close(u)
+
+            open(newunit=u, file='ph_dump_A1.dat', status='replace')
+            do i = phA1aavo, NBLOCKS_PH
+                  associate(B=>ACBlocks(i))
+                    do pq = 1, B%NDim2
+                          do rs = 1, B%NDim1
+                                write(u, '(A8,4I5,2ES26.17)') BlockName_ph(i), &
+                                      B%IndN1(1, rs), B%IndN1(2, rs), B%IndN2(1, pq), B%IndN2(2, pq), &
+                                      B%APlus(rs, pq), B%AMinus(rs, pq)
+                          end do
+                    end do
+                  end associate
+            end do
+            close(u)
+
+            call msg('dump_A1_ph: wrote ph_dump_{info,A1}.dat, ph_dump_{rdm2,eri}.bin')
+
+      end subroutine dump_A1_ph
+
+
       ! ph analogue of init_AC0Blocks (ppac0_thc). Builds the 4 A0 pair lists
-      ! and allocates the small A1 coupling blocks. A1 blocks that involve the
-      ! vo pair space, and vava, are too large to store - contracted OTF in the
-      ! energy loop, so only their parents' dimensions are recorded here.
+      ! and allocates the 6 stored A1 coupling blocks (no vovo, vova, vava -
+      ! see the module header).
       subroutine init_AC0Blocks_ph(AuxData, AC0Block, pos)
             type(TACppData), intent(in) :: AuxData
             type(TAC0Block_ph), dimension(NBLOCKS_PH), intent(inout) :: AC0Block
@@ -184,16 +331,14 @@ contains
                   write(*,'(2X,A10,2X,I12)') trim(AC0Block(i)%name), AC0Block(i)%NDim
             end do
 
-            ! These blocks are too large and are calculated OTF
-            !call InitA1Blocks_ph(AC0Block, AuxData, phA1vovo, phA0vo, phA0vo)
-            !call InitA1Blocks_ph(AC0Block, AuxData, phA1vavo, phA0va, phA0vo)
-            !call InitA1Blocks_ph(AC0Block, AuxData, phA1vooa, phA0vo, phA0oa)
-            !call InitA1Blocks_ph(AC0Block, AuxData, phA1voaa, phA0vo, phA0aa)
-            !call InitA1Blocks_ph(AC0Block, AuxData, phA1vava, phA0va, phA0va)
-            call InitA1Blocks_ph(AC0Block, AuxData, phA1vaoa, phA0va, phA0oa)
-            call InitA1Blocks_ph(AC0Block, AuxData, phA1vaaa, phA0va, phA0aa)
-            call InitA1Blocks_ph(AC0Block, AuxData, phA1aaoa, phA0aa, phA0oa)
-            call InitA1Blocks_ph(AC0Block, AuxData, phA1oaoa, phA0oa, phA0oa)
+            ! The two blocks with a vo side, aavo and aovo, are the large ones
+            ! (NA**2 * NI*NV and NA*NI * NI*NV doubles, twice).
+            call InitA1Blocks_ph(AC0Block, AuxData, phA1aavo, phA0aa, phA0vo)
+            call InitA1Blocks_ph(AC0Block, AuxData, phA1aova, phA0oa, phA0va)
+            call InitA1Blocks_ph(AC0Block, AuxData, phA1aovo, phA0oa, phA0vo)
+            call InitA1Blocks_ph(AC0Block, AuxData, phA1aoao, phA0oa, phA0oa)
+            call InitA1Blocks_ph(AC0Block, AuxData, phA1aava, phA0aa, phA0va)
+            call InitA1Blocks_ph(AC0Block, AuxData, phA1aoaa, phA0oa, phA0aa)
 
       end subroutine init_AC0Blocks_ph
 
@@ -414,13 +559,14 @@ contains
 
 
       ! Which integral classes run, ph-AC0 version of parse_config (ppac0_thc).
-      ! For the A0 blocks only three classes are needed (see the module
-      ! docstring and .skills/phtheory_a0_blocks.md):
-      !   (IA|IA) -> AuxII active block   sum_{t in I} n_t (qt|ts)
-      !   (AA|II) -> BuxII active block   sum_{t in I} n_t (qs|tt)
-      !   (AA|AA) -> AuxAA/BuxAA, Aux3X (P45_ph) and the aaaa gamma kernels
-      ! Everything else (A1 classes) stays off until the A1 terms are coded.
-      ! TabChol = [1,1,1,0,0,0]: no R vector with a virtual index is needed yet.
+      ! The full A0 + A1 set for the six stored A1 blocks: 12 of the 21 canonical
+      ! classes, each with at most one virtual index. The list was produced
+      ! together with the kernels; see call_tab_p2.dat / call_tab_dab.dat /
+      ! call-genuine.dat in auxilliary_codes/testy-python/ph_code_gen.
+      ! Not run: (IV|IV), (VA|IV), (VA|VA) and every (VV|..) class. They fed only
+      ! the vovo, vova, vava blocks (and the F(v,v') Fock elements of their delta
+      ! sector), which are not built - thc_energy_ph needs only their B^(1), from
+      ! (IV|IV), (VA|IV), (VA|VA) in its own loop. Hence no RVV either.
       subroutine parse_config_ph(loops, TabChol)
             type(TLoop), dimension(6), intent(out) :: loops
             integer, dimension(6), intent(out) :: TabChol
@@ -431,21 +577,33 @@ contains
                   loops(i)%run_inner = .false.
             end do
 
+            loops(1)%run_main = .true.        ! (II|..
+            loops(1)%run_inner(1) = .true.    ! (II|II)
             loops(2)%run_main = .true.        ! (IA|..
+            loops(2)%run_inner(1) = .true.    ! (IA|II)
             loops(2)%run_inner(2) = .true.    ! (IA|IA)
-
             loops(3)%run_main = .true.        ! (AA|..
             loops(3)%run_inner(1) = .true.    ! (AA|II)
+            loops(3)%run_inner(2) = .true.    ! (AA|IA)
             loops(3)%run_inner(3) = .true.    ! (AA|AA)
+            loops(4)%run_main = .true.        ! (IV|..
+            loops(4)%run_inner(1) = .true.    ! (IV|II)
+            loops(4)%run_inner(2) = .true.    ! (IV|IA)
+            loops(4)%run_inner(3) = .true.    ! (IV|AA)
+            loops(5)%run_main = .true.        ! (VA|..
+            loops(5)%run_inner(1) = .true.    ! (VA|II)
+            loops(5)%run_inner(2) = .true.    ! (VA|IA)
+            loops(5)%run_inner(3) = .true.    ! (VA|AA)
 
-            TabChol = (/ 1, 1, 1, 0, 0, 0 /)
+            ! RII, RIA, RAA, RIV, RVA; slot 6 (RVV) is never used in ph.
+            TabChol = (/ 1, 1, 1, 1, 1, 0 /)
 
       end subroutine parse_config_ph
 
 
       ! =============================================================================
       ! ph analogue of THC_int_loop (ppac0_thc). Same skeleton: R?? Cholesky-like
-      ! vectors from the THC factors, batch loop, caseloop over the six pair
+      ! vectors from the THC factors, caseloop over the six pair
       ! classes, V_axby = (a x| b y) built per fixed (a,b) by real_aTb_x and
       ! consumed immediately by the kernels - nothing four-index is ever stored.
       !
@@ -472,9 +630,11 @@ contains
       ! the assembly routines (next step).
       ! =============================================================================
       subroutine THC_int_loop_ph(THCData, ACB, AuxII, AuxAA, BuxII, BuxAA, &
-            Aux3X, Flags, AuxData, Occ, map, rdm2, pos, AcAlpha)
+            Aux3X, Flags, AuxData, Occ, map, rdm2, rdm2_12, rdm2_13ph, pos, AcAlpha)
             use THC_Gammcor
-            use thc_auto_p2
+            use thc_auto_p0_ph
+            use thc_auto_p2_ph
+            use thc_auto_p3_ph
 
             type(TTHCData), intent(in) :: THCData
             type(TAC0Block_ph), dimension(:), intent(inout) :: ACB
@@ -486,18 +646,37 @@ contains
             double precision, dimension(:), intent(in) :: Occ
             integer, dimension(:), intent(in) :: map
             double precision, dimension(:,:,:,:), intent(in) :: rdm2
+            ! Index-permuted copies of the same active 2-RDM, the ph analogue of
+            ! pp's rdm2_pm_12_act / rdm2_pm_13_act trick: they turn every genuine
+            ! contraction into a single ddot over NA**2 (see init_rdm_perm_ph).
+            double precision, dimension(:,:,:,:), intent(in) :: rdm2_12, rdm2_13ph
             integer, dimension(:,:), intent(in) :: pos
             double precision, intent(in) :: AcAlpha
 
             double precision, dimension(:), allocatable :: V_axby
             double precision, dimension(:,:,:), allocatable :: RII, RIA, RAA
+            double precision, dimension(:,:,:), allocatable :: RIV, RVA
             integer, dimension(6) :: TabChol
             type(TLoop), dimension(6) :: loops
             integer, parameter :: loopII=1, loopIA=2, loopAA=3, loopIV=4, loopVA=5, loopVV=6
             integer :: NI, NA, NV, NIA, NBasis
             integer :: a, b, ii
-            integer :: batch, BatchDim, NBatchI, NBatchA, NBatchV
-            type (tclock) :: timer0
+            integer :: e1, e2
+            type (tclock) :: timer, timer0
+            ! Accumulated wall times per integral class, as in pp THC_int_loop:
+            ! t_<class>_int = building V_axby (real_aTb_x / real_aTv_x), t_<class>_ker =
+            ! all kernels consuming it. tog_* are the genuine "together" loops after
+            ! the caseloop. Printed only in a -DDEBUG build.
+            double precision :: t_IIII_int, t_IIII_ker, t_IAII_int, t_IAII_ker
+            double precision :: t_IAIA_int, t_IAIA_ker, t_AAII_int, t_AAII_ker
+            double precision :: t_AAIA_int, t_AAIA_ker, t_AAAA_int, t_AAAA_ker
+            double precision :: t_IVII_int, t_IVII_ker, t_IVIA_int, t_IVIA_ker
+            double precision :: t_IVAA_int, t_IVAA_ker
+            double precision :: t_VAII_int, t_VAII_ker, t_VAIA_int, t_VAIA_ker
+            double precision :: t_VAAA_int, t_VAAA_ker
+            double precision :: t_tog_AVAA_int, t_tog_AVAA_ker, t_tog_IAAA_int, t_tog_IAAA_ker
+            double precision :: t_tog_IIAA_int, t_tog_IIAA_ker, t_tog_IVAA_int, t_tog_IVAA_ker
+            double precision :: t_tog_VAAA_int, t_tog_VAAA_ker
 
             associate(Zgk=>THCData%Zgk, Xga=>THCData%Xga, &
                   NChol=>THCData%NChol, NTHC=>THCData%NTHC)
@@ -510,94 +689,409 @@ contains
 
               call parse_config_ph(loops, TabChol)
 
+              t_IIII_int = zero
+              t_IIII_ker = zero
+              t_IAII_int = zero
+              t_IAII_ker = zero
+              t_IAIA_int = zero
+              t_IAIA_ker = zero
+              t_AAII_int = zero
+              t_AAII_ker = zero
+              t_AAIA_int = zero
+              t_AAIA_ker = zero
+              t_AAAA_int = zero
+              t_AAAA_ker = zero
+              t_IVII_int = zero
+              t_IVII_ker = zero
+              t_IVIA_int = zero
+              t_IVIA_ker = zero
+              t_IVAA_int = zero
+              t_IVAA_ker = zero
+              t_VAII_int = zero
+              t_VAII_ker = zero
+              t_VAIA_int = zero
+              t_VAIA_ker = zero
+              t_VAAA_int = zero
+              t_VAAA_ker = zero
+              t_tog_AVAA_int = zero
+              t_tog_AVAA_ker = zero
+              t_tog_IAAA_int = zero
+              t_tog_IAAA_ker = zero
+              t_tog_IIAA_int = zero
+              t_tog_IIAA_ker = zero
+              t_tog_IVAA_int = zero
+              t_tog_IVAA_ker = zero
+              t_tog_VAAA_int = zero
+              t_tog_VAAA_ker = zero
+
               allocate(V_axby(max(NA, NI, NV)**2))
 
-              ! Batching: kept for structural parity with pp. With
-              ! TabChol(4:6) = 0 nothing virtual is ever built, so a single
-              ! batch does all the work. When the A1 classes arrive, bring in
-              ! the RIV/RVA/RVV window refills from pp THC_int_loop - and mind
-              ! the BatchDim defects (.skills/ppcode_known_defects.md, A-D).
-              BatchDim = 10000
-              NBatchI = NI / BatchDim
-              NBatchA = NA / BatchDim
-              NBatchV = NV / BatchDim
-              if (modulo(NI, BatchDim)>0) NBatchI = NBatchI + 1
-              if (modulo(NA, BatchDim)>0) NBatchA = NBatchA + 1
-              if (modulo(NV, BatchDim)>0) NBatchV = NBatchV + 1
-
+              ! No batching: every R block is allocated in full. RVV, the only one
+              ! that could need it, is not used at all (see parse_config_ph).
               call print_section('ph THC integral transformation')
 
               if (TabChol(1) == 1) then
                     allocate(RII(NChol, NI, NI))
                     call CalcMem3(RII, 'RII')
+                    call clock_start(timer)
                     call thc_gammcor_Rkab_2(RII, Xga(:,1:NI), Xga(:,1:NI), Zgk, NI, NI, NChol, NTHC)
+                    call tmsg('TIME FOR RII', timer, tdebug)
               end if
               if (TabChol(2) == 1) then
                     allocate(RIA(NChol, NA, NI))
                     call CalcMem3(RIA, 'RIA')
+                    call clock_start(timer)
                     call thc_gammcor_Rkab_2(RIA, Xga(:,NI+1:NIA), Xga(:,1:NI), Zgk, NA, NI, NChol, NTHC)
+                    call tmsg('TIME FOR RIA', timer, tdebug)
               end if
               if (TabChol(3) == 1) then
                     allocate(RAA(NChol, NA, NA))
                     call CalcMem3(RAA, 'RAA')
+                    call clock_start(timer)
                     call thc_gammcor_Rkab_2(RAA, Xga(:,NI+1:NIA), Xga(:,NI+1:NIA), Zgk, NA, NA, NChol, NTHC)
+                    call tmsg('TIME FOR RAA', timer, tdebug)
+              end if
+
+              if (TabChol(4) == 1) then
+                    allocate(RIV(NChol, NV, NI))
+                    call CalcMem3(RIV, 'RIV')
+                    call clock_start(timer)
+                    call thc_gammcor_Rkab_2(RIV, Xga(:,NIA+1:NBasis), Xga(:,1:NI), Zgk, NV, NI, NChol, NTHC)
+                    call tmsg('TIME FOR RIV', timer, tdebug)
+              end if
+              if (TabChol(5) == 1) then
+                    allocate(RVA(NChol, NA, NV))
+                    call CalcMem3(RVA, 'RVA')
+                    call clock_start(timer)
+                    call thc_gammcor_Rkab_2(RVA, Xga(:,NI+1:NIA), Xga(:,NIA+1:NBasis), Zgk, NA, NV, NChol, NTHC)
+                    call tmsg('TIME FOR RVA', timer, tdebug)
               end if
 
               call clock_start(timer0)
 
-              batchloop: do batch = 1, max(NBatchI, NBatchA, NBatchV, 1)
+            caseloop: do ii = 1, 6
+                  if (loops(ii)%run_main)then
+                        select case(ii)
+                        case(loopII)
+                              do a = 1, NI
+                                    if (loops(ii)%run_inner(1)) then ! (II|II)
+                                          do b = 1, NI
+                                                call clock_start(timer)
+                                                call real_aTb_x(V_axby, NI, RII(:,:,a), NChol, RII(:,:,b), NChol, NI, NI, NChol, AcAlpha)
+                                                t_IIII_int = t_IIII_int + clock_readwall(timer)
+                                                call clock_start(timer)
+                                                call p2_IIII_qstt_qstt(BuxII, a, b, 1, NI, 1, NI, NI, NIA, NBasis, Occ, V_axby)
+                                                call p2_IIII_qtst_qtst(AuxII, a, b, 1, NI, 1, NI, NI, NIA, NBasis, Occ, V_axby)
+                                                t_IIII_ker = t_IIII_ker + clock_readwall(timer)
+                                          end do
+                                    end if
+                              end do
+                        case(loopIA)
+                              do a = 1, NI
+                                    if (loops(ii)%run_inner(1)) then ! (IA|II)
+                                          do b = 1, NI
+                                                call clock_start(timer)
+                                                call real_aTb_x(V_axby, NA, RIA(:,:,a), NChol, RII(:,:,b), NChol, NA, NI, NChol, AcAlpha)
+                                                t_IAII_int = t_IAII_int + clock_readwall(timer)
+                                                call clock_start(timer)
+                                                call p2_IAII_qstt_qstt(BuxII, a, b, NI+1, NIA, 1, NI, NI, NIA, NBasis, Occ, V_axby)
+                                                call p2_IAII_qstt_sqtt(BuxII, a, b, NI+1, NIA, 1, NI, NI, NIA, NBasis, Occ, V_axby)
+                                                call p2_IAII_qtst_tsqt(AuxII, a, b, NI+1, NIA, 1, NI, NI, NIA, NBasis, Occ, V_axby)
+                                                call p2_IAII_qtst_tqst(AuxII, a, b, NI+1, NIA, 1, NI, NI, NIA, NBasis, Occ, V_axby)
+                                                t_IAII_ker = t_IAII_ker + clock_readwall(timer)
+                                          end do
+                                    end if
+                                    if (loops(ii)%run_inner(2)) then ! (IA|IA)
+                                          do b = 1, NI
+                                                call clock_start(timer)
+                                                call real_aTb_x(V_axby, NA, RIA(:,:,a), NChol, RIA(:,:,b), NChol, NA, NA, NChol, AcAlpha)
+                                                t_IAIA_int = t_IAIA_int + clock_readwall(timer)
+                                                call clock_start(timer)
+                                                call p2_IAIA_qtst_qtst(AuxAA, a, b, NI+1, NIA, NI+1, NIA, NI, NIA, NBasis, Occ, V_axby)
+                                                call p2_IAIA_qtst_tqts(AuxII, a, b, NI+1, NIA, NI+1, NIA, NI, NIA, NBasis, Occ, V_axby)
+                                                call d2a_IA_aoao_pqrs(ACB(phA1aoao)%APlus, ACB(phA1aoao)%AMinus, a, b, NI+1, NIA, NI+1, NIA, pos, Occ, V_axby)
+                                                call t4a_II_aoao_pqrs(ACB(phA1aoao)%APlus, ACB(phA1aoao)%AMinus, a, b, NI+1, NIA, NI+1, NIA, pos, Occ, V_axby)
+                                                call d4a_AI_aoao_pqrs(ACB(phA1aoao)%APlus, ACB(phA1aoao)%AMinus, a, b, NI+1, NIA, NI+1, NIA, pos, Occ, V_axby)
+                                                call d1b_IA_aoao_qrps(ACB(phA1aoao)%APlus, ACB(phA1aoao)%AMinus, a, b, NI+1, NIA, NI+1, NIA, pos, Occ, V_axby)
+                                                call d3b_AI_aoao_qrps(ACB(phA1aoao)%APlus, ACB(phA1aoao)%AMinus, a, b, NI+1, NIA, NI+1, NIA, pos, Occ, V_axby)
+                                                call t5a_IA_aoao_pqrs(ACB(phA1aoao)%APlus, ACB(phA1aoao)%AMinus, a, b, NI+1, NIA, NI+1, NIA, pos, Occ, V_axby)
+                                                call t6a_AI_aoao_pqrs(ACB(phA1aoao)%APlus, ACB(phA1aoao)%AMinus, a, b, NI+1, NIA, NI+1, NIA, pos, Occ, V_axby)
+                                                call d6a_II_aoao_pqrs(ACB(phA1aoao)%APlus, ACB(phA1aoao)%AMinus, a, b, NI+1, NIA, NI+1, NIA, pos, Occ, V_axby)
+                                                call d6b_II_aoao_qrps(ACB(phA1aoao)%APlus, ACB(phA1aoao)%AMinus, a, b, NI+1, NIA, NI+1, NIA, pos, Occ, V_axby)
+                                                call T2_aoao(a, b, NI+1, NIA, NI+1, NIA, ACB(phA1aoao)%APlus, ACB(phA1aoao)%AMinus, map, pos, rdm2_13ph, NI+1, NIA, NI+1, NIA, V_axby, NA)
+                                                call D5_aoao(a, b, NI+1, NIA, NI+1, NIA, ACB(phA1aoao)%APlus, ACB(phA1aoao)%AMinus, map, pos, rdm2, NI+1, NIA, NI+1, NIA, V_axby, NA)
+                                                t_IAIA_ker = t_IAIA_ker + clock_readwall(timer)
+                                          end do
+                                    end if
+                              end do
+                        case(loopAA)
+                              do a = NI+1, NIA
+                                    if (loops(ii)%run_inner(1)) then ! (AA|II)
+                                          do b = 1, NI
+                                                call clock_start(timer)
+                                                call real_aTb_x(V_axby, NA, RAA(:,:,a-NI), NChol, RII(:,:,b), NChol, NA, NI, NChol, AcAlpha)
+                                                t_AAII_int = t_AAII_int + clock_readwall(timer)
+                                                call clock_start(timer)
+                                                call p2_AAII_qstt_ttqs(BuxAA, a, b, NI+1, NIA, 1, NI, NI, NIA, NBasis, Occ, V_axby)
+                                                call p2_AAII_qstt_qstt(BuxII, a, b, NI+1, NIA, 1, NI, NI, NIA, NBasis, Occ, V_axby)
+                                                call t3b_II_aoao_prqs(ACB(phA1aoao)%APlus, ACB(phA1aoao)%AMinus, a, b, NI+1, NIA, 1, NI, pos, Occ, V_axby)
+                                                call t5b_IA_aoao_prqs(ACB(phA1aoao)%APlus, ACB(phA1aoao)%AMinus, a, b, NI+1, NIA, 1, NI, pos, Occ, V_axby)
+                                                call t6b_AI_aoao_prqs(ACB(phA1aoao)%APlus, ACB(phA1aoao)%AMinus, a, b, NI+1, NIA, 1, NI, pos, Occ, V_axby)
+                                                t_AAII_ker = t_AAII_ker + clock_readwall(timer)
+                                          end do
+                                    end if
+                                    if (loops(ii)%run_inner(2)) then ! (AA|IA)
+                                          do b = 1, NI
+                                                call clock_start(timer)
+                                                call real_aTb_x(V_axby, NA, RAA(:,:,a-NI), NChol, RIA(:,:,b), NChol, NA, NA, NChol, AcAlpha)
+                                                t_AAIA_int = t_AAIA_int + clock_readwall(timer)
+                                                call clock_start(timer)
+                                                call p2_AAIA_qstt_ttqs(BuxAA, a, b, NI+1, NIA, NI+1, NIA, NI, NIA, NBasis, Occ, V_axby)
+                                                call p2_AAIA_qstt_ttsq(BuxAA, a, b, NI+1, NIA, NI+1, NIA, NI, NIA, NBasis, Occ, V_axby)
+                                                call p2_AAIA_qtst_stqt(AuxAA, a, b, NI+1, NIA, NI+1, NIA, NI, NIA, NBasis, Occ, V_axby)
+                                                call p2_AAIA_qtst_qtst(AuxAA, a, b, NI+1, NIA, NI+1, NIA, NI, NIA, NBasis, Occ, V_axby)
+                                                call t4a_AI_aoaa_pqrs(ACB(phA1aoaa)%APlus, ACB(phA1aoaa)%AMinus, a, b, NI+1, NIA, NI+1, NIA, pos, Occ, V_axby)
+                                                call d4a_AI_aoaa_pqrs(ACB(phA1aoaa)%APlus, ACB(phA1aoaa)%AMinus, a, b, NI+1, NIA, NI+1, NIA, pos, Occ, V_axby)
+                                                call t3b_AI_aoaa_prqs(ACB(phA1aoaa)%APlus, ACB(phA1aoaa)%AMinus, a, b, NI+1, NIA, NI+1, NIA, pos, Occ, V_axby)
+                                                call d3b_AI_aoaa_qrps(ACB(phA1aoaa)%APlus, ACB(phA1aoaa)%AMinus, a, b, NI+1, NIA, NI+1, NIA, pos, Occ, V_axby)
+                                                call t6a_AI_aoaa_pqrs(ACB(phA1aoaa)%APlus, ACB(phA1aoaa)%AMinus, a, b, NI+1, NIA, NI+1, NIA, pos, Occ, V_axby)
+                                                call d6a_AI_aoaa_pqrs(ACB(phA1aoaa)%APlus, ACB(phA1aoaa)%AMinus, a, b, NI+1, NIA, NI+1, NIA, pos, Occ, V_axby)
+                                                call t6b_AI_aoaa_prqs(ACB(phA1aoaa)%APlus, ACB(phA1aoaa)%AMinus, a, b, NI+1, NIA, NI+1, NIA, pos, Occ, V_axby)
+                                                call d6b_AI_aoaa_qrps(ACB(phA1aoaa)%APlus, ACB(phA1aoaa)%AMinus, a, b, NI+1, NIA, NI+1, NIA, pos, Occ, V_axby)
+                                                call T2_aoaa(a, b, NI+1, NIA, NI+1, NIA, ACB(phA1aoaa)%APlus, ACB(phA1aoaa)%AMinus, map, pos, rdm2_13ph, NI+1, NIA, NI+1, NIA, V_axby, NA)
+                                                call T5_aoaa(a, b, NI+1, NIA, NI+1, NIA, ACB(phA1aoaa)%APlus, ACB(phA1aoaa)%AMinus, map, pos, rdm2, NI+1, NIA, NI+1, NIA, V_axby, NA)
+                                                call D2_aoaa(a, b, NI+1, NIA, NI+1, NIA, ACB(phA1aoaa)%APlus, ACB(phA1aoaa)%AMinus, map, pos, rdm2_13ph, NI+1, NIA, NI+1, NIA, V_axby, NA)
+                                                call D5_aoaa(a, b, NI+1, NIA, NI+1, NIA, ACB(phA1aoaa)%APlus, ACB(phA1aoaa)%AMinus, map, pos, rdm2, NI+1, NIA, NI+1, NIA, V_axby, NA)
+                                                t_AAIA_ker = t_AAIA_ker + clock_readwall(timer)
+                                          end do
+                                    end if
+                                    if (loops(ii)%run_inner(3)) then ! (AA|AA)
+                                          do b = NI+1, NIA
+                                                call clock_start(timer)
+                                                call real_aTb_x(V_axby, NA, RAA(:,:,a-NI), NChol, RAA(:,:,b-NI), NChol, NA, NA, NChol, AcAlpha)
+                                                t_AAAA_int = t_AAAA_int + clock_readwall(timer)
+                                                call clock_start(timer)
+                                                call p2_AAAA_qstt_qstt(BuxAA, a, b, NI+1, NIA, NI+1, NIA, NI, NIA, NBasis, Occ, V_axby)
+                                                call p2_AAAA_qtst_qtst(AuxAA, a, b, NI+1, NIA, NI+1, NIA, NI, NIA, NBasis, Occ, V_axby)
+                                                call P45_ph(Aux3X, a, b, map, rdm2, NI+1, NIA, NI+1, NIA, V_axby, NI, NA)
+                                                call PhT12rp_gamma(ACB(phA0aa)%APlus, ACB(phA0aa)%AMinus, a, b, map, pos, rdm2, NI+1, NIA, NI+1, NIA, V_axby, NI, NA)
+                                                call PhT12qs_gamma(ACB(phA0aa)%APlus, ACB(phA0aa)%AMinus, a, b, map, pos, rdm2, NI+1, NIA, NI+1, NIA, V_axby, NI, NA)
+                                                call PhT56_gamma(ACB(phA0aa)%APlus, ACB(phA0aa)%AMinus, a, b, map, pos, rdm2, NI+1, NIA, NI+1, NIA, V_axby, NI, NA)
+                                                t_AAAA_ker = t_AAAA_ker + clock_readwall(timer)
+                                          end do
+                                    end if
+                              end do
+                        case(loopIV)
+                              do a = 1, NI
+                                    if (loops(ii)%run_inner(1)) then ! (IV|II)
+                                          do b = 1, NI
+                                                call clock_start(timer)
+                                                call real_aTb_x(V_axby, NV, RIV(:,:,a), NChol, RII(:,:,b), NChol, NV, NI, NChol, AcAlpha)
+                                                t_IVII_int = t_IVII_int + clock_readwall(timer)
+                                                call clock_start(timer)
+                                                call p2_IVII_qstt_qstt(BuxII, a, b, NIA+1, NBasis, 1, NI, NI, NIA, NBasis, Occ, V_axby)
+                                                call p2_IVII_qstt_sqtt(BuxII, a, b, NIA+1, NBasis, 1, NI, NI, NIA, NBasis, Occ, V_axby)
+                                                call p2_IVII_qtst_tsqt(AuxII, a, b, NIA+1, NBasis, 1, NI, NI, NIA, NBasis, Occ, V_axby)
+                                                call p2_IVII_qtst_tqst(AuxII, a, b, NIA+1, NBasis, 1, NI, NI, NIA, NBasis, Occ, V_axby)
+                                                t_IVII_ker = t_IVII_ker + clock_readwall(timer)
+                                          end do
+                                    end if
+                                    if (loops(ii)%run_inner(2)) then ! (IV|IA)
+                                          do b = 1, NI
+                                                call clock_start(timer)
+                                                call real_aTb_x(V_axby, NV, RIV(:,:,a), NChol, RIA(:,:,b), NChol, NV, NA, NChol, AcAlpha)
+                                                t_IVIA_int = t_IVIA_int + clock_readwall(timer)
+                                                call clock_start(timer)
+                                                call p2_IVIA_qtst_tstq(AuxII, a, b, NIA+1, NBasis, NI+1, NIA, NI, NIA, NBasis, Occ, V_axby)
+                                                call p2_IVIA_qtst_tqts(AuxII, a, b, NIA+1, NBasis, NI+1, NIA, NI, NIA, NBasis, Occ, V_axby)
+                                                call d2a_IA_aovo_pqrs(ACB(phA1aovo)%APlus, ACB(phA1aovo)%AMinus, a, b, NIA+1, NBasis, NI+1, NIA, pos, Occ, V_axby)
+                                                call t4a_II_aovo_pqrs(ACB(phA1aovo)%APlus, ACB(phA1aovo)%AMinus, a, b, NIA+1, NBasis, NI+1, NIA, pos, Occ, V_axby)
+                                                call d1b_IA_aovo_qrps(ACB(phA1aovo)%APlus, ACB(phA1aovo)%AMinus, a, b, NIA+1, NBasis, NI+1, NIA, pos, Occ, V_axby)
+                                                call t5a_IA_aovo_pqrs(ACB(phA1aovo)%APlus, ACB(phA1aovo)%AMinus, a, b, NIA+1, NBasis, NI+1, NIA, pos, Occ, V_axby)
+                                                call d6a_II_aovo_pqrs(ACB(phA1aovo)%APlus, ACB(phA1aovo)%AMinus, a, b, NIA+1, NBasis, NI+1, NIA, pos, Occ, V_axby)
+                                                call d6b_II_aovo_qrps(ACB(phA1aovo)%APlus, ACB(phA1aovo)%AMinus, a, b, NIA+1, NBasis, NI+1, NIA, pos, Occ, V_axby)
+                                                t_IVIA_ker = t_IVIA_ker + clock_readwall(timer)
+                                          end do
+                                    end if
+                                    if (loops(ii)%run_inner(3)) then ! (IV|AA)
+                                          do b = NI+1, NIA
+                                                call clock_start(timer)
+                                                call real_aTb_x(V_axby, NV, RIV(:,:,a), NChol, RAA(:,:,b-NI), NChol, NV, NA, NChol, AcAlpha)
+                                                t_IVAA_int = t_IVAA_int + clock_readwall(timer)
+                                                call clock_start(timer)
+                                                call p2_IVAA_qstt_qstt(BuxAA, a, b, NIA+1, NBasis, NI+1, NIA, NI, NIA, NBasis, Occ, V_axby)
+                                                call p2_IVAA_qstt_sqtt(BuxAA, a, b, NIA+1, NBasis, NI+1, NIA, NI, NIA, NBasis, Occ, V_axby)
+                                                call d2a_IA_aavo_pqrs(ACB(phA1aavo)%APlus, ACB(phA1aavo)%AMinus, a, b, NIA+1, NBasis, NI+1, NIA, pos, Occ, V_axby)
+                                                call t4a_IA_aavo_pqrs(ACB(phA1aavo)%APlus, ACB(phA1aavo)%AMinus, a, b, NIA+1, NBasis, NI+1, NIA, pos, Occ, V_axby)
+                                                call t5a_IA_aavo_pqrs(ACB(phA1aavo)%APlus, ACB(phA1aavo)%AMinus, a, b, NIA+1, NBasis, NI+1, NIA, pos, Occ, V_axby)
+                                                call d6a_IA_aavo_pqrs(ACB(phA1aavo)%APlus, ACB(phA1aavo)%AMinus, a, b, NIA+1, NBasis, NI+1, NIA, pos, Occ, V_axby)
+                                                call d6b_AI_aova_qrps(ACB(phA1aova)%APlus, ACB(phA1aova)%AMinus, a, b, NIA+1, NBasis, NI+1, NIA, pos, Occ, V_axby)
+                                                t_IVAA_ker = t_IVAA_ker + clock_readwall(timer)
+                                          end do
+                                    end if
+                              end do
+                        case(loopVA)
+                              do a = NIA+1, NBasis
+                                    if (loops(ii)%run_inner(1)) then ! (VA|II)
+                                          do b = 1, NI
+                                                call clock_start(timer)
+                                                call real_aTb_x(V_axby, NA, RVA(:,:,a-NIA), NChol, RII(:,:,b), NChol, NA, NI, NChol, AcAlpha)
+                                                t_VAII_int = t_VAII_int + clock_readwall(timer)
+                                                call clock_start(timer)
+                                                call p2_VAII_qstt_sqtt(BuxII, a, b, NI+1, NIA, 1, NI, NI, NIA, NBasis, Occ, V_axby)
+                                                call p2_VAII_qstt_qstt(BuxII, a, b, NI+1, NIA, 1, NI, NI, NIA, NBasis, Occ, V_axby)
+                                                call t3b_II_aovo_prqs(ACB(phA1aovo)%APlus, ACB(phA1aovo)%AMinus, a, b, NI+1, NIA, 1, NI, pos, Occ, V_axby)
+                                                call t5b_IA_aovo_prqs(ACB(phA1aovo)%APlus, ACB(phA1aovo)%AMinus, a, b, NI+1, NIA, 1, NI, pos, Occ, V_axby)
+                                                t_VAII_ker = t_VAII_ker + clock_readwall(timer)
+                                          end do
+                                    end if
+                                    if (loops(ii)%run_inner(2)) then ! (VA|IA)
+                                          do b = 1, NI
+                                                call clock_start(timer)
+                                                call real_aTb_x(V_axby, NA, RVA(:,:,a-NIA), NChol, RIA(:,:,b), NChol, NA, NA, NChol, AcAlpha)
+                                                t_VAIA_int = t_VAIA_int + clock_readwall(timer)
+                                                call clock_start(timer)
+                                                call p2_VAIA_qtst_stqt(AuxAA, a, b, NI+1, NIA, NI+1, NIA, NI, NIA, NBasis, Occ, V_axby)
+                                                call p2_VAIA_qtst_qtst(AuxAA, a, b, NI+1, NIA, NI+1, NIA, NI, NIA, NBasis, Occ, V_axby)
+                                                call t4a_AI_aova_pqrs(ACB(phA1aova)%APlus, ACB(phA1aova)%AMinus, a, b, NI+1, NIA, NI+1, NIA, pos, Occ, V_axby)
+                                                call d1b_IA_aavo_qrps(ACB(phA1aavo)%APlus, ACB(phA1aavo)%AMinus, a, b, NI+1, NIA, NI+1, NIA, pos, Occ, V_axby)
+                                                call t3b_IA_aavo_prqs(ACB(phA1aavo)%APlus, ACB(phA1aavo)%AMinus, a, b, NI+1, NIA, NI+1, NIA, pos, Occ, V_axby)
+                                                call t3b_AI_aova_prqs(ACB(phA1aova)%APlus, ACB(phA1aova)%AMinus, a, b, NI+1, NIA, NI+1, NIA, pos, Occ, V_axby)
+                                                call t5b_IA_aavo_prqs(ACB(phA1aavo)%APlus, ACB(phA1aavo)%AMinus, a, b, NI+1, NIA, NI+1, NIA, pos, Occ, V_axby)
+                                                call d6a_AI_aova_pqrs(ACB(phA1aova)%APlus, ACB(phA1aova)%AMinus, a, b, NI+1, NIA, NI+1, NIA, pos, Occ, V_axby)
+                                                call d6b_IA_aavo_qrps(ACB(phA1aavo)%APlus, ACB(phA1aavo)%AMinus, a, b, NI+1, NIA, NI+1, NIA, pos, Occ, V_axby)
+                                                call T5_aova(a, b, NI+1, NIA, NI+1, NIA, ACB(phA1aova)%APlus, ACB(phA1aova)%AMinus, map, pos, rdm2, NI+1, NIA, NI+1, NIA, V_axby, NA)
+                                                call D2_aova(a, b, NI+1, NIA, NI+1, NIA, ACB(phA1aova)%APlus, ACB(phA1aova)%AMinus, map, pos, rdm2_13ph, NI+1, NIA, NI+1, NIA, V_axby, NA)
+                                                t_VAIA_ker = t_VAIA_ker + clock_readwall(timer)
+                                          end do
+                                    end if
+                                    if (loops(ii)%run_inner(3)) then ! (VA|AA)
+                                          do b = NI+1, NIA
+                                                call clock_start(timer)
+                                                call real_aTb_x(V_axby, NA, RVA(:,:,a-NIA), NChol, RAA(:,:,b-NI), NChol, NA, NA, NChol, AcAlpha)
+                                                t_VAAA_int = t_VAAA_int + clock_readwall(timer)
+                                                call clock_start(timer)
+                                                call p2_VAAA_qstt_sqtt(BuxAA, a, b, NI+1, NIA, NI+1, NIA, NI, NIA, NBasis, Occ, V_axby)
+                                                call p2_VAAA_qstt_qstt(BuxAA, a, b, NI+1, NIA, NI+1, NIA, NI, NIA, NBasis, Occ, V_axby)
+                                                call p2_VAAA_qtst_stqt(AuxAA, a, b, NI+1, NIA, NI+1, NIA, NI, NIA, NBasis, Occ, V_axby)
+                                                call p2_VAAA_qtst_qtst(AuxAA, a, b, NI+1, NIA, NI+1, NIA, NI, NIA, NBasis, Occ, V_axby)
+                                                call P45_ph_VA(Aux3X, a, b, map, rdm2, NI+1, NIA, NI+1, NIA, V_axby, NI, NA)
+                                                call T4_aava(a, b, NI+1, NIA, NI+1, NIA, ACB(phA1aava)%APlus, ACB(phA1aava)%AMinus, map, pos, rdm2_13ph, NI+1, NIA, NI+1, NIA, V_axby, NA)
+                                                call T5_aava(a, b, NI+1, NIA, NI+1, NIA, ACB(phA1aava)%APlus, ACB(phA1aava)%AMinus, map, pos, rdm2, NI+1, NIA, NI+1, NIA, V_axby, NA)
+                                                call D2_aava(a, b, NI+1, NIA, NI+1, NIA, ACB(phA1aava)%APlus, ACB(phA1aava)%AMinus, map, pos, rdm2_13ph, NI+1, NIA, NI+1, NIA, V_axby, NA)
+                                                call D6_aava(a, b, NI+1, NIA, NI+1, NIA, ACB(phA1aava)%APlus, ACB(phA1aava)%AMinus, map, pos, rdm2, NI+1, NIA, NI+1, NIA, V_axby, NA)
+                                                t_VAAA_ker = t_VAAA_ker + clock_readwall(timer)
+                                          end do
+                                    end if
+                              end do
+                        end select
+                  end if
+            end do caseloop
 
-                    ! (RIV / RVA / RVV window refills go here - A1 step)
-
-                    caseloop: do ii = 1, 6
-                          if (loops(ii)%run_main)then
-                                select case(ii)
-                                case(loopII)
-                                      ! (II|II) - A1 step (phA1oaoa etc. need it)
-                                case(loopIA)
-                                      do a = 1, NI
-                                            ! run_inner(1): (IA|II) - A1 step
-                                            if (loops(ii)%run_inner(2)) then ! (IA|IA)
-                                                  do b = 1, NI
-                                                        call real_aTb_x(V_axby, NA, RIA(:,:,a), NChol, RIA(:,:,b), NChol, NA, NA, NChol, AcAlpha)
-                                                        call p2_IAIA_qtst_tqts(AuxII, a, b, NI+1, NIA, NI+1, NIA, NI, NIA, NBasis, Occ, V_axby)
-                                                  end do
-                                            end if
-                                      end do
-                                case(loopAA)
-                                      do a = NI+1, NIA
-                                            if (loops(ii)%run_inner(1)) then ! (AA|II)
-                                                  do b = 1, NI
-                                                        call real_aTb_x(V_axby, NA, RAA(:,:,a-NI), NChol, RII(:,:,b), NChol, NA, NI, NChol, AcAlpha)
-                                                        call p2_AAII_qstt_qstt(BuxII, a, b, NI+1, NIA, 1, NI, NI, NIA, NBasis, Occ, V_axby)
-                                                  end do
-                                            end if
-                                            ! run_inner(2): (AA|IA) - A1 step
-                                            if (loops(ii)%run_inner(3)) then ! (AA|AA)
-                                                  do b = NI+1, NIA
-                                                        call real_aTb_x(V_axby, NA, RAA(:,:,a-NI), NChol, RAA(:,:,b-NI), NChol, NA, NA, NChol, AcAlpha)
-                                                        call p2_AAAA_qstt_qstt(BuxAA, a, b, NI+1, NIA, NI+1, NIA, NI, NIA, NBasis, Occ, V_axby)
-                                                        call p2_AAAA_qtst_qtst(AuxAA, a, b, NI+1, NIA, NI+1, NIA, NI, NIA, NBasis, Occ, V_axby)
-                                                        call P45_ph(Aux3X, a, b, map, rdm2, NI+1, NIA, NI+1, NIA, V_axby, NI, NA)
-                                                        call PhT12rp_gamma(ACB(phA0aa)%APlus, ACB(phA0aa)%AMinus, a, b, map, pos, rdm2, NI+1, NIA, NI+1, NIA, V_axby, NI, NA)
-                                                        call PhT12qs_gamma(ACB(phA0aa)%APlus, ACB(phA0aa)%AMinus, a, b, map, pos, rdm2, NI+1, NIA, NI+1, NIA, V_axby, NI, NA)
-                                                        call PhT56_gamma(ACB(phA0aa)%APlus, ACB(phA0aa)%AMinus, a, b, map, pos, rdm2, NI+1, NIA, NI+1, NIA, V_axby, NI, NA)
-                                                  end do
-                                            end if
-                                      end do
-                                case(loopIV)
-                                      ! (IV|..) classes - A1 step (vo pair space)
-                                case(loopVA)
-                                      ! (VA|..) classes - A1 step
-                                case(loopVV)
-                                      ! (VV|..) classes - A1 step
-                                end select
-                          end if
-                    end do caseloop
-
-              end do batchloop
+            ! ---- genuine terms whose two summed indices sit in the SAME integral
+            !      pair: (AV|AA). V_axby(t,u) is built for one fixed pair
+            !      (e1,e2) at a time, exactly as pp does for the P3c*_gamma kernels.
+            do e1 = NI+1, NIA
+                  do e2 = NIA+1, NBasis
+                        call clock_start(timer)
+                        call real_aTv_x(V_axby, RAA(:,:,:), NChol, RVA(:, e1-NI, e2-NIA), NChol, NA**2, AcAlpha, Zero)
+                        t_tog_AVAA_int = t_tog_AVAA_int + clock_readwall(timer)
+                        call clock_start(timer)
+                        call D1_aava(e1, e2, NI+1, NIA, NI+1, NIA, ACB(phA1aava)%APlus, ACB(phA1aava)%AMinus, map, pos, rdm2_12, NI+1, NIA, NI+1, NIA, V_axby, NA)
+                        t_tog_AVAA_ker = t_tog_AVAA_ker + clock_readwall(timer)
+                  end do
+            end do
+            ! ---- genuine terms whose two summed indices sit in the SAME integral
+            !      pair: (IA|AA). V_axby(t,u) is built for one fixed pair
+            !      (e1,e2) at a time, exactly as pp does for the P3c*_gamma kernels.
+            do e1 = 1, NI
+                  do e2 = NI+1, NIA
+                        call clock_start(timer)
+                        call real_aTv_x(V_axby, RAA(:,:,:), NChol, RIA(:, e2-NI, e1), NChol, NA**2, AcAlpha, Zero)
+                        t_tog_IAAA_int = t_tog_IAAA_int + clock_readwall(timer)
+                        call clock_start(timer)
+                        call T1_aoaa(e1, e2, NI+1, NIA, NI+1, NIA, ACB(phA1aoaa)%APlus, ACB(phA1aoaa)%AMinus, map, pos, rdm2_12, NI+1, NIA, NI+1, NIA, V_axby, NA)
+                        call D1_aoaa(e1, e2, NI+1, NIA, NI+1, NIA, ACB(phA1aoaa)%APlus, ACB(phA1aoaa)%AMinus, map, pos, rdm2_12, NI+1, NIA, NI+1, NIA, V_axby, NA)
+                        t_tog_IAAA_ker = t_tog_IAAA_ker + clock_readwall(timer)
+                  end do
+            end do
+            ! ---- genuine terms whose two summed indices sit in the SAME integral
+            !      pair: (II|AA). V_axby(t,u) is built for one fixed pair
+            !      (e1,e2) at a time, exactly as pp does for the P3c*_gamma kernels.
+            do e1 = 1, NI
+                  do e2 = 1, NI
+                        call clock_start(timer)
+                        call real_aTv_x(V_axby, RAA(:,:,:), NChol, RII(:, e2, e1), NChol, NA**2, AcAlpha, Zero)
+                        t_tog_IIAA_int = t_tog_IIAA_int + clock_readwall(timer)
+                        call clock_start(timer)
+                        call T1_aoao(e1, e2, NI+1, NIA, NI+1, NIA, ACB(phA1aoao)%APlus, ACB(phA1aoao)%AMinus, map, pos, rdm2_12, NI+1, NIA, NI+1, NIA, V_axby, NA)
+                        t_tog_IIAA_ker = t_tog_IIAA_ker + clock_readwall(timer)
+                  end do
+            end do
+            ! ---- genuine terms whose two summed indices sit in the SAME integral
+            !      pair: (IV|AA). V_axby(t,u) is built for one fixed pair
+            !      (e1,e2) at a time, exactly as pp does for the P3c*_gamma kernels.
+            do e1 = 1, NI
+                  do e2 = NIA+1, NBasis
+                        call clock_start(timer)
+                        call real_aTv_x(V_axby, RAA(:,:,:), NChol, RIV(:, e2-NIA, e1), NChol, NA**2, AcAlpha, Zero)
+                        t_tog_IVAA_int = t_tog_IVAA_int + clock_readwall(timer)
+                        call clock_start(timer)
+                        call D1_aova(e1, e2, NI+1, NIA, NI+1, NIA, ACB(phA1aova)%APlus, ACB(phA1aova)%AMinus, map, pos, rdm2_12, NI+1, NIA, NI+1, NIA, V_axby, NA)
+                        t_tog_IVAA_ker = t_tog_IVAA_ker + clock_readwall(timer)
+                  end do
+            end do
+            ! ---- genuine terms whose two summed indices sit in the SAME integral
+            !      pair: (VA|AA). V_axby(t,u) is built for one fixed pair
+            !      (e1,e2) at a time, exactly as pp does for the P3c*_gamma kernels.
+            do e1 = NIA+1, NBasis
+                  do e2 = NI+1, NIA
+                        call clock_start(timer)
+                        call real_aTv_x(V_axby, RAA(:,:,:), NChol, RVA(:, e2-NI, e1-NIA), NChol, NA**2, AcAlpha, Zero)
+                        t_tog_VAAA_int = t_tog_VAAA_int + clock_readwall(timer)
+                        call clock_start(timer)
+                        call T3_aava(e1, e2, NI+1, NIA, NI+1, NIA, ACB(phA1aava)%APlus, ACB(phA1aava)%AMinus, map, pos, rdm2_12, NI+1, NIA, NI+1, NIA, V_axby, NA)
+                        t_tog_VAAA_ker = t_tog_VAAA_ker + clock_readwall(timer)
+                  end do
+            end do
 
               call tmsg('ph int loop', timer0, tdebug)
+!#ifdef DEBUG
+call xmsg('t_IIII_int', t_IIII_int, mdebugg)
+call xmsg('t_IIII_ker', t_IIII_ker, mdebugg)
+call xmsg('t_IAII_int', t_IAII_int, mdebugg)
+call xmsg('t_IAII_ker', t_IAII_ker, mdebugg)
+call xmsg('t_IAIA_int', t_IAIA_int, mdebugg)
+call xmsg('t_IAIA_ker', t_IAIA_ker, mdebugg)
+call xmsg('t_AAII_int', t_AAII_int, mdebugg)
+call xmsg('t_AAII_ker', t_AAII_ker, mdebugg)
+call xmsg('t_AAIA_int', t_AAIA_int, mdebugg)
+call xmsg('t_AAIA_ker', t_AAIA_ker, mdebugg)
+call xmsg('t_AAAA_int', t_AAAA_int, mdebugg)
+call xmsg('t_AAAA_ker', t_AAAA_ker, mdebugg)
+call xmsg('t_IVII_int', t_IVII_int, mdebugg)
+call xmsg('t_IVII_ker', t_IVII_ker, mdebugg)
+call xmsg('t_IVIA_int', t_IVIA_int, mdebugg)
+call xmsg('t_IVIA_ker', t_IVIA_ker, mdebugg)
+call xmsg('t_IVAA_int', t_IVAA_int, mdebugg)
+call xmsg('t_IVAA_ker', t_IVAA_ker, mdebugg)
+call xmsg('t_VAII_int', t_VAII_int, mdebugg)
+call xmsg('t_VAII_ker', t_VAII_ker, mdebugg)
+call xmsg('t_VAIA_int', t_VAIA_int, mdebugg)
+call xmsg('t_VAIA_ker', t_VAIA_ker, mdebugg)
+call xmsg('t_VAAA_int', t_VAAA_int, mdebugg)
+call xmsg('t_VAAA_ker', t_VAAA_ker, mdebugg)
+call xmsg('t_tog_AVAA_int', t_tog_AVAA_int, mdebugg)
+call xmsg('t_tog_AVAA_ker', t_tog_AVAA_ker, mdebugg)
+call xmsg('t_tog_IAAA_int', t_tog_IAAA_int, mdebugg)
+call xmsg('t_tog_IAAA_ker', t_tog_IAAA_ker, mdebugg)
+call xmsg('t_tog_IIAA_int', t_tog_IIAA_int, mdebugg)
+call xmsg('t_tog_IIAA_ker', t_tog_IIAA_ker, mdebugg)
+call xmsg('t_tog_IVAA_int', t_tog_IVAA_int, mdebugg)
+call xmsg('t_tog_IVAA_ker', t_tog_IVAA_ker, mdebugg)
+call xmsg('t_tog_VAAA_int', t_tog_VAAA_int, mdebugg)
+call xmsg('t_tog_VAAA_ker', t_tog_VAAA_ker, mdebugg)
+!#endif
 
             end associate
 
@@ -629,6 +1123,218 @@ contains
       ! the normalized Ytilde vectors in columns, AMinus the symmetrized scaled
       ! A_-, Eig the omega (negative entry = -sqrt|omega^2| flags a negative
       ! omega^2 mode). Each routine prints its eigenvalues.
+      ! =============================================================================
+      ! Index-permuted copies of the active 2-RDM - the ph analogue of the
+      ! rdm2_pm_12_act / rdm2_pm_13_act trick in ppac0_thc (init_rdm).
+      !
+      ! Every genuine A1 term is  sum_{tu in act} Gamma_{....} x (integral), and the
+      ! permutation of the integral is always chosen so that t and u land in the two
+      ! fastest-running slots of V_axby. The contraction is then a single ddot over
+      ! NA**2 (real_vw_x) - provided the 2-RDM is stored with t,u first. Which copy
+      ! a kernel needs follows from where u sits in the Gamma index string:
+      !
+      !   Gamma_tu..  ->  rdm2       (native, no copy needed)   T5 T6 D5 D6
+      !   Gamma_t.u.  ->  rdm2_12                               T1 T3 D1 D3
+      !   Gamma_t..u  ->  rdm2_13ph                             T2 T4 D2 D4
+      !
+      ! rdm2_13ph is NOT pp's rdm2_*_13_act: pp permutes (i,j,k,l)->(i,l,k,j),
+      ! ph needs (i,j,k,l)->(i,l,j,k).
+      ! =============================================================================
+      subroutine init_rdm_perm_ph(rdm2, rdm2_12, rdm2_13ph, NA)
+            double precision, dimension(:,:,:,:), intent(in) :: rdm2
+            double precision, dimension(:,:,:,:), intent(out) :: rdm2_12, rdm2_13ph
+            integer, intent(in) :: NA
+            integer :: i, j, k, l
+
+            do l = 1, NA
+                  do k = 1, NA
+                        do j = 1, NA
+                              do i = 1, NA
+                                    rdm2_12(i, k, j, l)   = rdm2(i, j, k, l)
+                                    rdm2_13ph(i, l, j, k) = rdm2(i, j, k, l)
+                              end do
+                        end do
+                  end do
+            end do
+
+      end subroutine init_rdm_perm_ph
+
+
+      ! One element of the dressed one-electron matrix used by PHERPA_A1_THC.
+      !
+      !   F(x,y) = h(x,y) + 2*BuxII(x,y) - AuxII(x,y)                   ind active
+      !   F(x,y) = h(x,y) + 2*BuxII(x,y) - AuxII(x,y)
+      !                   + 2*BuxAA(x,y) - AuxAA(x,y)                   otherwise
+      !
+      ! H0 is the BARE one-electron matrix AuxData%HNO0, never the A0 matrix HNO
+      ! (HNO is zero on every cross-space element and carries fij/fvw on the
+      ! inactive/virtual diagonals - see the note in ACPH0_THC).
+      !
+      ! ind is IndAux of the index whose occupation multiplies this piece. If that
+      ! index is active the parent term is genuine, so its factorized remainder
+      ! runs over INACTIVE t only, i.e. h^core = h + 2*BuxII - AuxII. Otherwise the
+      ! sum is unrestricted and the active part is added too, giving the full
+      ! generalized Fock matrix.
+      !
+      ! F(v,v') with both indices virtual is NOT available: THC_int_loop_ph runs no
+      ! class with two virtuals, so those elements of the dressings stay zero. Only
+      ! the vovo and vava blocks needed them, and they are not built.
+      function Fel_ph(x, y, ind, H0, AuxII, BuxII, AuxAA, BuxAA) result(f)
+            integer, intent(in) :: x, y, ind
+            double precision, dimension(:,:), intent(in) :: H0
+            double precision, dimension(:,:), intent(in) :: AuxII, BuxII, AuxAA, BuxAA
+            double precision :: f
+            integer, parameter :: SP_ACT = 1
+
+            f = H0(x, y) + two * BuxII(x, y) - AuxII(x, y)
+            if (ind .ne. SP_ACT) f = f + two * BuxAA(x, y) - AuxAA(x, y)
+
+      end function Fel_ph
+
+
+      ! =============================================================================
+      ! ph analogue of PPERPA_THC (ppac0_thc): post-loop assembly of ONE A1
+      ! coupling block. Called once per A1 block after THC_int_loop_ph has run.
+      !
+      ! WHAT THE INTEGRAL LOOP LEAVES BEHIND. On exit from THC_int_loop_ph the block
+      ! holds only the delta-FREE part of A^(1) +- B^(1): the occupation-number
+      ! two-electron terms (generated kernels t*/d*, types a and b of
+      ! .skills/phtheory_amatrix_reduction.md) plus the genuine 2-RDM ones
+      ! (generated kernels T*/D*). Nothing carrying a Kronecker delta is in yet.
+      !
+      ! WHAT THIS ROUTINE ADDS. The whole delta sector - types c and d, the WMAT
+      ! terms and T0 - which needs no two-electron integral of its own, only the
+      ! one-index dressings AuxII/AuxAA/BuxII/BuxAA already accumulated in the loop.
+      ! Each delta group collapses to one Fock-like element (checked symbolically
+      ! against .skills/phtheory_a1_blocks2.md, the boxes "APlus / AMin in terms of
+      ! Aux and Bux", for all nine blocks):
+      !
+      !   from A_rspq :  d_pr (T0 + T2c + T1d + WMAT_q,s) -> ( n_p - n_s ) F(q,s)
+      !                  d_sq (T0 + T4c + T3d + WMAT_p,r) -> ( n_q - n_r ) F(p,r)
+      !   from B_rspq :  d_qr (D0 + D2c + D1d + WMAT_p,s) -> ( n_q - n_s ) F(p,s)
+      !                  d_sp (D0 + D4c + D3d + WMAT_q,r) -> ( n_p - n_r ) F(q,r)
+      !
+      ! with F(x,y) = h(x,y) + sum_t n_t [ 2 (xy|tt) - (xt|ty) ]. APlus takes A + B
+      ! and AMinus takes A - B, so the two B groups enter AMinus with the opposite
+      ! sign - the same bookkeeping accum_A_ph does per element.
+      !
+      ! THE RANGE OF THE DRESSING SUM - the one subtle point. Where the parent term
+      ! is genuine (all its external Gamma indices active) its factorized remainder
+      ! has the summed index restricted to INACTIVE, because the active part was
+      ! absorbed into the genuine 2-RDM contraction (.skills/phtheory_a1_block.md).
+      ! Each of the four pieces above is multiplied by the occupation of exactly one
+      ! index, so the test is per index - that is what Fel_ph does. This is why the
+      ! dressings are split into II and AA parts at all, and it is what makes e.g.
+      ! the ao-ao block come out as
+      !   -d_pr[(1-n_p) hc + 2 BuxAA - AuxAA] + d_sq[(1-n_r) hc + 2 BuxAA - AuxAA]
+      ! (hc = h + 2 BuxII - AuxII) rather than the naive (n_p - n_s) F.
+      !
+      ! WHICH ONE-ELECTRON MATRIX. A^(1) is the exact A, so T0/D0 carry the BARE
+      ! h. The argument H0 must therefore be AuxData%HNO0, not the A0 matrix HNO
+      ! from update_HNO_AC0 (the Dyall one-electron operator: h^core only on the
+      ! act-act block, fij/fvw on the inactive/virtual diagonals, zero
+      ! elsewhere). The deltas here hit cross-space elements - e.g. F(v,i) in
+      ! ao-va via d_qr, F(a,i) in vo-va via d_pr, F(v,a) in aa-va via d_sq - which
+      ! HNO has as zero, and on the inactive/virtual diagonals HNO already holds
+      ! the full Fock, so Fel_ph would add the active dressing a second time.
+      ! Same convention as pp: PPERPA_THC also receives AuxData%HNO0.
+      !
+      ! Aux3X carries the genuine three-index WMAT, Aux3X(q,r) = 2 G(q,r) with
+      ! G(q,r) = sum_{tuv in act} Gamma_turv (qt|uv): q active from P45_ph in the
+      ! (AA|AA) class, q virtual from P45_ph_VA in the (VA|AA) class. It enters
+      ! with -1/2 (so as -G, the Form-2 WMAT), on each WMAT group whose single
+      ! external index is active (r for WMAT_p,r and WMAT_q,r, s for WMAT_q,s
+      ! and WMAT_p,s).
+      !
+      ! The routine is block-agnostic: it reads the row and column pair lists of the
+      ! block and decides everything from the spaces of p,q,r,s, so the same code
+      ! serves all six stored A1 blocks.
+      !
+      ! NOT DONE HERE: the metric (c-factor) scaling. A1 must get the same c
+      ! convention as A0 - see pitfall 1 of .skills/phcode_a0_aplus_aminus.md - and
+      ! that belongs with the energy loop.
+      !
+      ! @param[in]     AuxData  Occ, IndAux
+      ! @param[in,out] ACBlock  one A1 block; APlus/AMinus accumulated in place
+      ! @param[in]     H0       BARE one-electron integrals, AuxData%HNO0 (NOT HNO)
+      ! @param[in]     AuxII, BuxII  inactive part of the one-index dressings
+      ! @param[in]     AuxAA, BuxAA  active part of the one-index dressings
+      ! @param[in]     Aux3X    genuine WMAT matrix from P45_ph
+      ! =============================================================================
+      subroutine PHERPA_A1_THC(AuxData, ACBlock, H0, AuxII, BuxII, AuxAA, BuxAA, Aux3X)
+            type(TACppData), intent(in) :: AuxData
+            type(TAC0Block_ph), intent(inout) :: ACBlock
+            double precision, dimension(:,:), intent(in) :: H0
+            double precision, dimension(:,:), intent(in) :: AuxII, BuxII
+            double precision, dimension(:,:), intent(in) :: AuxAA, BuxAA
+            double precision, dimension(:,:), intent(in) :: Aux3X
+
+            integer, parameter :: SP_ACT = 1
+            integer :: p, q, r, s, pq, rs
+            double precision :: valP, valM, valA, valB
+
+            associate(Occ=>AuxData%Occ, IndAux=>AuxData%IndAux, &
+                  NDim1=>ACBlock%NDim1, NDim2=>ACBlock%NDim2, &
+                  IndN1=>ACBlock%IndN1, IndN2=>ACBlock%IndN2)
+
+              j_colloops: do pq = 1, NDim2
+                    i_rowloops: do rs = 1, NDim1
+
+                          r = IndN1(1, rs)
+                          s = IndN1(2, rs)
+                          p = IndN2(1, pq)
+                          q = IndN2(2, pq)
+
+                          valP = zero
+                          valM = zero
+
+                          ! ---- d_pr : T0 + T2c + T1d + WMAT_q,s, from A ----
+                          if (p == r) then
+                                valA = Occ(p) * Fel_ph(q, s, IndAux(p), H0, AuxII, BuxII, AuxAA, BuxAA) &
+                                     - Occ(s) * Fel_ph(q, s, IndAux(s), H0, AuxII, BuxII, AuxAA, BuxAA)
+                                if (IndAux(s) == SP_ACT) valA = valA - frac12 * Aux3X(q, s)
+                                valP = valP + valA
+                                valM = valM + valA
+                          end if
+
+                          ! ---- d_sq : T0 + T4c + T3d + WMAT_p,r, from A ----
+                          if (s == q) then
+                                valA = Occ(q) * Fel_ph(p, r, IndAux(q), H0, AuxII, BuxII, AuxAA, BuxAA) &
+                                     - Occ(r) * Fel_ph(p, r, IndAux(r), H0, AuxII, BuxII, AuxAA, BuxAA)
+                                if (IndAux(r) == SP_ACT) valA = valA - frac12 * Aux3X(p, r)
+                                valP = valP + valA
+                                valM = valM + valA
+                          end if
+
+                          ! ---- d_qr : D0 + D2c + D1d + WMAT_p,s, from B ----
+                          if (q == r) then
+                                valB = Occ(q) * Fel_ph(p, s, IndAux(q), H0, AuxII, BuxII, AuxAA, BuxAA) &
+                                     - Occ(s) * Fel_ph(p, s, IndAux(s), H0, AuxII, BuxII, AuxAA, BuxAA)
+                                if (IndAux(s) == SP_ACT) valB = valB - frac12 * Aux3X(p, s)
+                                valP = valP + valB
+                                valM = valM - valB
+                          end if
+
+                          ! ---- d_sp : D0 + D4c + D3d + WMAT_q,r, from B ----
+                          if (s == p) then
+                                valB = Occ(p) * Fel_ph(q, r, IndAux(p), H0, AuxII, BuxII, AuxAA, BuxAA) &
+                                     - Occ(r) * Fel_ph(q, r, IndAux(r), H0, AuxII, BuxII, AuxAA, BuxAA)
+                                if (IndAux(r) == SP_ACT) valB = valB - frac12 * Aux3X(q, r)
+                                valP = valP + valB
+                                valM = valM - valB
+                          end if
+
+                          ACBlock%APlus(rs, pq)  = ACBlock%APlus(rs, pq)  + valP
+                          ACBlock%AMinus(rs, pq) = ACBlock%AMinus(rs, pq) + valM
+
+                    end do i_rowloops
+              end do j_colloops
+
+            end associate
+
+      end subroutine PHERPA_A1_THC
+
+
       ! =============================================================================
 
 
@@ -1029,6 +1735,40 @@ contains
                   end do
             end do
       end subroutine P45_ph
+
+
+      ! Virtual-row part of Aux3X, for the A1 blocks. Called in the (VA|AA)
+      ! class: a virtual, b active, V_axby(x,y) = (a x|b y) with x,y active.
+      !
+      ! Aux3X(q,r) = 2 G(q,r),  G(q,r) = sum_{tuv in act} Gamma_turv (qt|uv),
+      ! is the genuine part of WMAT_q,r (both Form-1 halves, hence the 2; the
+      ! consumers apply -1/2). P45_ph builds it for q active from (AA|AA). For
+      ! q = a virtual the integrals are (VA|AA) and the two halves of P45_ph
+      ! become the same contraction, so
+      !   Aux3X(a,r) += 2 sum_{x,y in act} Gamma(r,y,x,b) (a x|b y)
+      ! Needed by PHERPA_A1_THC wherever a WMAT carries a virtual index next to
+      ! an active one: d_sq WMAT_p,r in ao-vo and aa-va, d_qr WMAT_p,s in aa-va.
+      ! Checked against pherpa_simple.py (check_a1_ph.py).
+      subroutine P45_ph_VA(Aux3X, a, b, map, rdm2, x0, x1, y0, y1, V_axby, NI, NA)
+            double precision, dimension(:,:), intent(inout) :: Aux3X
+            integer, intent(in) :: a, b, NI, NA
+            integer, dimension(:), intent(in) :: map
+            double precision, dimension(:,:,:,:), intent(in) :: rdm2
+            integer, intent(in) :: x0, x1, y0, y1
+            double precision, dimension(x0:x1, y0:y1), intent(in) :: V_axby
+            integer :: r, x, y
+            double precision :: val
+
+            do r = NI+1, NI+NA
+                  val = zero
+                  do y = y0, y1
+                        do x = x0, x1
+                              val = val + rdm2(map(r), map(y), map(x), map(b)) * V_axby(x, y)
+                        end do
+                  end do
+                  Aux3X(a, r) = Aux3X(a, r) + two * val
+            end do
+      end subroutine P45_ph_VA
 
 
       ! Route one two-electron contribution arspq into APlus/AMinus of a block.
