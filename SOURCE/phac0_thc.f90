@@ -122,6 +122,8 @@ contains
                   call print_info('External ordering', 'PySCF')
             end if
 
+            call set_frozen_ph(AuxData, Flags)
+
             associate(NBasis=>AuxData%NBasis, map=>AuxData%map, Occ=>AuxData%Occ, &
                   NI=>AuxData%NI, NA=>AuxData%NA, NV=>AuxData%NV)
 
@@ -221,9 +223,6 @@ contains
               call tmsg('Correlation energy', timer, tdebug)
 
             end associate
-
-            call msg('ACPH0_THC: energy loop incomplete - only E_vovo, E_vavo and E_vava are computed, the rest are zero')
-            stop
 
       end subroutine ACPH0_THC
 
@@ -379,23 +378,56 @@ contains
       end subroutine InitA1Blocks_ph
 
 
+      ! Frozen core: number of inactive orbitals excluded from the ph pair space.
+      !   Core 1                   -> 0
+      !   Core 0, NCoreOrb > 0     -> NCoreOrb
+      !   Core 0, NCoreOrb = 0     -> NI (all inactive, as phac_dispatch does)
+      ! Frozen orbitals stay doubly occupied in the reference: every sum over
+      ! occupied orbitals (AuxII, BuxII, fij, HNO, Fel_ph, ECAS) keeps 1..NI.
+      ! Only loops over the inactive member of a ph pair start at NFrozen + 1.
+      subroutine set_frozen_ph(AuxData, Flags)
+            type(TACppData), intent(inout) :: AuxData
+            type(FlagsData), intent(in) :: Flags
+
+            if (Flags%IFlCore == 1) then
+                  AuxData%NFrozen = 0
+            else if (AuxData%NCoreOrb > 0) then
+                  AuxData%NFrozen = AuxData%NCoreOrb
+            else
+                  AuxData%NFrozen = AuxData%NI
+            end if
+
+            if (AuxData%NFrozen < 0 .or. AuxData%NFrozen > AuxData%NI) then
+                  write(*,'(2X,A,I0,A,I0,A)') 'set_frozen_ph: NCoreOrb = ', AuxData%NFrozen, &
+                        ' outside 0..NI (NI = ', AuxData%NI, ')'
+                  stop
+            end if
+
+            call print_info('Frozen core orbitals (ph pairs)', AuxData%NFrozen)
+
+      end subroutine set_frozen_ph
+
+
       ! ph analogue of InitA0Blocks (ppac0_thc). Builds the pair list of one
       ! A0 block, fills the global pos(p,q) map, and allocates the storage.
       !
       ! Pair lists (first slot = higher space, V > A > I):
-      !   vo : all (v, i) pairs. The block is diagonal (canonical orbitals,
-      !        diagonal fockian), so APlus/AMinus get one column only.
+      !   vo : all (v, i) pairs, i >= NI0. The block is diagonal (canonical
+      !        orbitals, diagonal fockian), so APlus/AMinus get one column only.
       !   aa : active pairs (i, j), i > j, skipping nearly degenerate pairs
       !        (ThrSelAct) - those have ph metric n_i - n_j ~ 0 (null space).
       !   va : all (v, a) pairs in the main list; per-virtual MiniBlocks with
       !        ActList of actives passing |n_v + n_a| > ThrQVirt
       !        (n_a ~ 0 gives metric ~ 0).
-      !   oa : all (a, i) pairs in the main list; per-inactive MiniBlocks with
+      !   oa : all (a, i) pairs, i >= NI0, in the main list; per-inactive
+      !        MiniBlocks(NI0:NI), indexed by the global inactive index, with
       !        ActList of actives passing |n_i + n_a - 2| > ThrQInact
       !        (n_a ~ 1 gives metric ~ 0).
       !
-      ! TODO: IFlCore handling (frozen inactive pairs) as in
-      ! acph_spinres_driver is not applied here yet.
+      ! Frozen core: NI0 = NFrozen + 1 (set_frozen_ph). Pairs with a frozen
+      ! inactive orbital are not in any list and keep pos = 0, so every A1
+      ! kernel skips them through its pos guard. The frozen orbitals stay in
+      ! the reference sums (AuxII, BuxII, fij, HNO), which do not use pos.
       subroutine InitA0Blocks_ph(A0Block, AuxData, pos, Ip, Iq)
             type(TAC0Block_ph), intent(inout) :: A0Block
             type(TACppData), intent(in) :: AuxData
@@ -404,20 +436,22 @@ contains
             integer, parameter :: SP_OCC = 0, SP_ACT = 1, SP_VIRT = 2
 
             integer :: ind, inda
-            integer :: i, j, k, Nbl, Nbl0, Nbl1
+            integer :: i, j, k, Nbl, Nbl0, Nbl1, NI0
 
             associate(NA=>AuxData%NA, NV=>AuxData%NV, NI=>AuxData%NI, &
                   NIA=>AuxData%NIA, NBasis=>AuxData%NBasis, Occ=>AuxData%Occ)
 
+              NI0 = AuxData%NFrozen + 1
+
               if (Ip == SP_VIRT .and. Iq == SP_OCC)then
                     ! ------------- vo block: diagonal -------------
                     A0Block%type = phA0vo
-                    A0Block%NDim = NV * NI
+                    A0Block%NDim = NV * (NI - NI0 + 1)
                     allocate(A0Block%IndN(2, A0Block%NDim))
 
                     ind = 0
                     do i = NIA+1, NBasis
-                          do j = 1, NI
+                          do j = NI0, NI
                                 ind = ind + 1
                                 A0Block%IndN(1, ind) = i
                                 A0Block%IndN(2, ind) = j
@@ -510,17 +544,18 @@ contains
               else if (Ip == SP_OCC .and. Iq == SP_ACT)then
                     ! ------------- oa block: mini-blocks per inactive -------------
                     A0Block%type = phA0oa
-                    Nbl = NI
-                    Nbl0 = 1
+                    Nbl0 = NI0
                     Nbl1 = NI
+                    Nbl = Nbl1 - Nbl0 + 1
                     A0Block%NDim = Nbl * NA
 
                     allocate(A0Block%IndN(2, A0Block%NDim))
-                    allocate(A0Block%MiniBlocks(Nbl))
+                    ! indexed by the global inactive orbital, see header
+                    allocate(A0Block%MiniBlocks(Nbl0:Nbl1))
 
                     ind = 0
                     do i = Nbl0, Nbl1
-                          k = i - Nbl0 + 1
+                          k = i
                           allocate(A0Block%MiniBlocks(k)%ActList(NA))
                           A0Block%MiniBlocks(k)%ActList = 0
                           A0Block%MiniBlocks(k)%NDim = 0
@@ -543,7 +578,7 @@ contains
 
               ! mini-block matrices for the block-diagonal blocks
               if (A0Block%type == phA0va .or. A0Block%type == phA0oa)then
-                    do k = 1, Nbl
+                    do k = lbound(A0Block%MiniBlocks, 1), ubound(A0Block%MiniBlocks, 1)
                           allocate(A0Block%MiniBlocks(k)%MiniAPlus(NA, NA))
                           allocate(A0Block%MiniBlocks(k)%MiniAMinus(NA, NA))
                           A0Block%MiniBlocks(k)%MiniAPlus = zero
@@ -1432,7 +1467,7 @@ call xmsg('t_tog_VAAA_ker', t_tog_VAAA_ker, mdebugg)
                     end do
               end do
 
-              call pherpa_symm_block_ph(ACB_aa%APlus, ACB_aa%AMinus, ACB_aa%Eig, nd, nneg)
+              call pherpa_symm_block_ph(ACB_aa%APlus, ACB_aa%AMinus, ACB_aa%Eig, nd, nneg, AuxData%nst(1) > 1)
               call print_block_eigs_ph('A0aa', ACB_aa%Eig, nd)
               if (nneg .gt. 0) call imsg('A0aa negative/zero omega^2 modes', nneg)
 
@@ -1489,7 +1524,7 @@ call xmsg('t_tog_VAAA_ker', t_tog_VAAA_ker, mdebugg)
                           end do
                     end do
 
-                    call pherpa_symm_block_ph(workp, workm, eigw, nd, nneg)
+                    call pherpa_symm_block_ph(workp, workm, eigw, nd, nneg, AuxData%nst(1) > 1)
 
                     ! scatter back, active-local indexing (p = global - NI)
                     do jj = 1, nd
@@ -1515,7 +1550,8 @@ call xmsg('t_tog_VAAA_ker', t_tog_VAAA_ker, mdebugg)
       end subroutine PHERPA0_THC_VA_Eigs
 
 
-      ! oa block: one NA x NA eigenproblem per inactive i (s = q = i).
+      ! oa block: one NA x NA eigenproblem per correlated inactive i (s = q = i),
+      ! i = NI0..NI; frozen inactives have no mini-block (InitA0Blocks_ph).
       ! A(r,p) = (1 - n_r) HNO(p,r) + 2 BuxAA(p,r) - AuxAA(p,r)
       !          - 1/2 Aux3X(p,r) + d_pr (n_p - 1) f_ii,   B = 0.
       ! Scaling: (c_p + 1)(c_r + 1) plus channel, (c_p - 1)(c_r - 1) minus.
@@ -1543,7 +1579,7 @@ call xmsg('t_tog_VAAA_ker', t_tog_VAAA_ker, mdebugg)
               allocate(allgather(NI * NA))
               ngather = 0
 
-              do k = 1, NI
+              do k = AuxData%NFrozen + 1, NI
                     fii = THCData%fij(k)
                     nd = ACB_oa%MiniBlocks(k)%NDim
                     if (nd == 0) cycle
@@ -1567,7 +1603,7 @@ call xmsg('t_tog_VAAA_ker', t_tog_VAAA_ker, mdebugg)
                           end do
                     end do
 
-                    call pherpa_symm_block_ph(workp, workm, eigw, nd, nneg)
+                    call pherpa_symm_block_ph(workp, workm, eigw, nd, nneg, AuxData%nst(1) > 1)
 
                     do jj = 1, nd
                           p = ACB_oa%MiniBlocks(k)%ActList(jj)
@@ -1598,11 +1634,18 @@ call xmsg('t_tog_VAAA_ker', t_tog_VAAA_ker, mdebugg)
       ! In/out: APlus(nd,nd) in: scaled A_+, out: Ytilde vectors in columns;
       ! AMinus(nd,nd) in: scaled A_-, out: its symmetrized version;
       ! Eig(nd) out: omega, with -sqrt|omega^2| flagging negative modes (nneg).
-      subroutine pherpa_symm_block_ph(APlus, AMinus, Eig, nd, nneg)
+      !
+      ! Excited states (excited = .true., state index nst(1) > 1): A_+ is in
+      ! general indefinite - the block contains the de-excitation to the lower
+      ! state - and the A_+^(1/2) route above, which takes sqrt|lambda| of A_+,
+      ! then solves a different eigenproblem. The block goes to
+      ! pherpa_nonsymm_block_ph instead, with the same in/out contract.
+      subroutine pherpa_symm_block_ph(APlus, AMinus, Eig, nd, nneg, excited)
             double precision, dimension(:,:), intent(inout) :: APlus, AMinus
             double precision, dimension(:), intent(out) :: Eig
             integer, intent(in) :: nd
             integer, intent(out) :: nneg
+            logical, intent(in) :: excited
 
             double precision, dimension(:,:), allocatable :: work_a, work_b
             double precision, dimension(:), allocatable :: lambda, vec_tmp
@@ -1612,6 +1655,11 @@ call xmsg('t_tog_VAAA_ker', t_tog_VAAA_ker, mdebugg)
 
             nneg = 0
             if (nd == 0) return
+
+            if (excited) then
+                  call pherpa_nonsymm_block_ph(APlus, AMinus, Eig, nd, nneg)
+                  return
+            end if
 
             allocate(work_a(nd, nd))
             allocate(work_b(nd, nd))
@@ -1664,6 +1712,148 @@ call xmsg('t_tog_VAAA_ker', t_tog_VAAA_ker, mdebugg)
             deallocate(work_a, work_b, lambda, vec_tmp)
 
       end subroutine pherpa_symm_block_ph
+
+
+      ! Excited-state solver for one block: the non-symmetric counterpart of
+      ! pherpa_symm_block_ph, for an indefinite A_+. Template:
+      ! pherpa_nonsymm_spinres (phac_spinres.f90), but on the half-size
+      ! problem
+      !
+      !   A_+ A_- Y = omega^2 Y,     X = A_- Y / omega,
+      !
+      ! solved by nonsymmetric_eigenproblem (real_linalg) for the right
+      ! eigenvectors. Unlike the symmetric path, the eigenvectors of a
+      ! degenerate omega^2 are not A_- orthogonal. So the roots are sorted,
+      ! grouped by omega^2 (thr_deg), and in each group of real roots with
+      ! omega^2 > small the metric
+      !
+      !   S = 2/omega Yg^T A_- Yg = U s U^T,      Yg <- Yg U |s|^(-1/2)
+      !
+      ! is diagonalized: the new vectors are A_- orthogonal and normalized to
+      ! 2/omega Y^T A_- Y = sign(s). For a single root this is the usual
+      ! normalization. Roots with distinct omega^2 are A_- orthogonal anyway.
+      !
+      ! Modes and how they are flagged (all counted in nneg; Step 0.2 of the
+      ! energy drops every Eig <= 0):
+      !   s > 0                 physical excitation, Eig = +omega
+      !   s < 0                 de-excitation (physical omega = -omega),
+      !                         Eig = -omega, vector normalized to -1
+      !   omega^2 <= small      Eig = -sqrt|omega^2|, raw vector, as in the
+      !                         symmetric path
+      !   complex omega^2, s ~ 0     Eig = 0, zero vector
+      ! Out: APlus = Y in columns (ascending omega^2), AMinus = symmetrized
+      ! A_-, Eig = omega.
+      subroutine pherpa_nonsymm_block_ph(APlus, AMinus, Eig, nd, nneg)
+            double precision, dimension(:,:), intent(inout) :: APlus, AMinus
+            double precision, dimension(:), intent(out) :: Eig
+            integer, intent(in) :: nd
+            integer, intent(out) :: nneg
+
+            double precision, dimension(:,:), allocatable :: work_m, vl, vr
+            double precision, dimension(:,:), allocatable :: yg, ayg, sg
+            double precision, dimension(:), allocatable :: wr, wi, sval
+            integer, dimension(:), allocatable :: order
+            logical, dimension(:), allocatable :: is_real
+            double precision :: omega
+            integer :: i, j, k, g0, g1, ng, tmp
+            double precision, parameter :: small = 1.d-10
+            double precision, parameter :: small_imag = 1.d-8
+            double precision, parameter :: thr_deg = 1.d-8
+
+            nneg = 0
+            if (nd == 0) return
+
+            ! the raw blocks are symmetric only up to the CASSCF gradient
+            APlus = frac12 * (APlus + transpose(APlus))
+            AMinus = frac12 * (AMinus + transpose(AMinus))
+
+            allocate(work_m(nd, nd), vl(nd, nd), vr(nd, nd))
+            allocate(wr(nd), wi(nd), order(nd), is_real(nd))
+
+            ! A_+ A_- Y = omega^2 Y
+            call real_ab(work_m, APlus, AMinus)
+            call nonsymmetric_eigenproblem(wr, wi, vl, vr, work_m)
+
+            do k = 1, nd
+                  is_real(k) = abs(wi(k)) <= small_imag * max(one, abs(wr(k)))
+            end do
+
+            ! ascending omega^2, so that degenerate roots are adjacent
+            order = [(k, k = 1, nd)]
+            do i = 2, nd
+                  tmp = order(i)
+                  j = i - 1
+                  do while (j >= 1)
+                        if (wr(order(j)) <= wr(tmp)) exit
+                        order(j+1) = order(j)
+                        j = j - 1
+                  end do
+                  order(j+1) = tmp
+            end do
+
+            APlus = zero
+            Eig = zero
+            g0 = 1
+            do while (g0 <= nd)
+                  ! group g0..g1 (sorted positions) of degenerate real roots
+                  k = order(g0)
+                  g1 = g0
+                  if (is_real(k)) then
+                        do while (g1 < nd)
+                              if (.not. is_real(order(g1+1))) exit
+                              if (abs(wr(order(g1+1)) - wr(k)) > thr_deg) exit
+                              g1 = g1 + 1
+                        end do
+                  end if
+                  ng = g1 - g0 + 1
+
+                  if (.not. is_real(k)) then
+                        ! complex omega^2: dropped
+                        Eig(g0) = zero
+                        nneg = nneg + 1
+                  else if (wr(k) <= small) then
+                        ! negative or zero omega^2
+                        do i = g0, g1
+                              Eig(i) = -sqrt(abs(wr(order(i))))
+                              APlus(:, i) = vr(:, order(i))
+                        end do
+                        nneg = nneg + ng
+                  else
+                        omega = sqrt(wr(k))
+                        allocate(yg(nd, ng), ayg(nd, ng), sg(ng, ng), sval(ng))
+                        do i = 1, ng
+                              yg(:, i) = vr(:, order(g0+i-1))
+                        end do
+                        ! S = 2/omega Yg^T A_- Yg, then Yg U
+                        call real_ab(ayg, AMinus, yg)
+                        call real_aTb(sg, yg, ayg)
+                        sg = (two / omega) * frac12 * (sg + transpose(sg))
+                        call symmetric_eigenproblem(sval, sg, ng, .true.)
+                        call real_ab(ayg, yg, sg)
+                        do i = 1, ng
+                              j = g0 + i - 1
+                              if (sval(i) > small) then
+                                    Eig(j) = omega
+                                    APlus(:, j) = ayg(:, i) / sqrt(sval(i))
+                              else if (sval(i) < -small) then
+                                    ! negative norm: de-excitation
+                                    Eig(j) = -omega
+                                    APlus(:, j) = ayg(:, i) / sqrt(-sval(i))
+                                    nneg = nneg + 1
+                              else
+                                    Eig(j) = zero
+                                    nneg = nneg + 1
+                              end if
+                        end do
+                        deallocate(yg, ayg, sg, sval)
+                  end if
+
+                  g0 = g1 + 1
+            end do
+
+            deallocate(work_m, vl, vr, wr, wi, order, is_real)
+
+      end subroutine pherpa_nonsymm_block_ph
 
 
       ! Print the sorted eigenvalues of one A0 block (a.u. and eV), lowest 30.

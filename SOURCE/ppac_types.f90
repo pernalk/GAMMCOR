@@ -242,6 +242,9 @@ module ppac_types
             logical :: triplet = .false.
             integer :: iflmp2
             integer :: NCoreOrb
+            ! ph-AC0 THC frozen core: inactive orbitals 1..NFrozen are kept in
+            ! the reference but excluded from every ph pair (set_frozen_ph)
+            integer :: NFrozen = 0
             double precision :: omega = 1.0
             double precision :: ThrPP
             logical :: spinsep = .true.
