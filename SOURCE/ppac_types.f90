@@ -23,6 +23,7 @@ module ppac_types
       integer, parameter :: VER_PPHH_RPA_TDA_HF = 10
       integer, parameter :: VER_PP_RPATDA_MULTI = 11
       integer, parameter :: VER_HH_RPA_MULTI = 12
+      integer, parameter :: VER_PH_RPA_MULTI = 13
 
       integer, parameter :: BL_OOOO = 1
       integer, parameter :: BL_OOAO = 2
@@ -73,29 +74,46 @@ module ppac_types
             type(TAC0vaBlock), allocatable :: MiniBlocks(:)
       end type TAC0Block
 
- type TphAC0Block
-            double precision, dimension(:, :), allocatable :: APl, AMn
-            double precision, dimension(:), allocatable :: EigPl, EigMn
-            integer, dimension(:), allocatable :: vPlusPl, vPlusMn
-            integer :: order
-            integer, dimension(:, :), allocatable :: IndN
-            integer, dimension(:, :), allocatable :: IndN1S, IndN1T
-            integer, dimension(:, :), allocatable:: IndN2S, IndN2T
-            integer, dimension(:, :), allocatable :: MiniMap
-            integer :: NDim
-            integer :: NDim1S, NDim2S, NDim1T, NDim2T
-            character(:), allocatable :: name
-            integer :: type
-            type(TAC0MiniBlock), allocatable :: MiniBlocks(:)
-      end type TphAC0Block
-
-      type TAC0MiniBlock
-            double precision, dimension(:,:), allocatable :: A
+      ! ph-AC0 mini-block: the ph analogue of TAC0vaBlock. One NA x NA
+      ! eigenproblem per non-active orbital of a block-diagonal A0 block
+      ! (A0va: one per virtual, A0oa: one per inactive). ph has a single
+      ! spin channel, so one pair APlus/AMinus replaces the S/T/TA triple.
+      ! Indexing inside MiniAPlus/MiniAMinus/Eig is active-local
+      ! (p = global active index - NI), same convention as in pp.
+      type TAC0MiniBlock_ph
+            double precision, dimension(:,:), allocatable :: MiniAPlus, MiniAMinus
             double precision, dimension(:), allocatable :: Eig
             integer, dimension(:), allocatable :: ActList
-            integer, dimension(:,:), allocatable :: IndN
             integer :: NDim
-      end type TAC0MiniBlock      
+      end type TAC0MiniBlock_ph
+
+      ! ph-AC0 block: the ph analogue of TAC0Block. AC0 (ph) has one A matrix
+      ! per block instead of the ASing/ATrip/ATripA triple; what is stored are
+      ! the two half-problem combinations A_+ = N^{-1/2}(A+B)N^{-1/2} and
+      ! A_- = N^{-1/2}(A-B)N^{-1/2} (see .skills/phAC0-theory.tex). The ph
+      ! metric is N_pq = n_p - n_q (not the pp 1 - n_p - n_q).
+      !   order = 0 : A0 block. Pair list in IndN(2, NDim).
+      !               Storage scheme depends on the block (see phac0_thc):
+      !               vo diagonal -> APlus/AMinus(NDim, 1) hold one column;
+      !               aa full     -> APlus/AMinus(NDim, NDim);
+      !               va/oa       -> no APlus at all, MiniBlocks only.
+      !   order = 1 : A1 coupling block between two A0 parents, rectangular
+      !               APlus/AMinus(NDim1, NDim2); rows from IndN1 (parent 1),
+      !               columns from IndN2 (parent 2). Never diagonalised.
+      type TAC0Block_ph
+            double precision, dimension(:, :), allocatable :: APlus, AMinus
+            double precision, dimension(:), allocatable :: Eig
+            integer, dimension(:), allocatable :: vPlus
+            integer :: order
+            integer, dimension(:, :), allocatable :: IndN
+            integer, dimension(:, :), allocatable :: IndN1, IndN2
+            integer, dimension(:, :), allocatable :: MiniMap
+            integer :: NDim
+            integer :: NDim1, NDim2
+            character(:), allocatable :: name
+            integer :: type
+            type(TAC0MiniBlock_ph), allocatable :: MiniBlocks(:)
+      end type TAC0Block_ph
 
        type TAC0vaBlock
             double precision, dimension(:,:), allocatable :: MiniAVS, MiniAVT, MiniAVTA
@@ -224,6 +242,9 @@ module ppac_types
             logical :: triplet = .false.
             integer :: iflmp2
             integer :: NCoreOrb
+            ! ph-AC0 THC frozen core: inactive orbitals 1..NFrozen are kept in
+            ! the reference but excluded from every ph pair (set_frozen_ph)
+            integer :: NFrozen = 0
             double precision :: omega = 1.0
             double precision :: ThrPP
             logical :: spinsep = .true.

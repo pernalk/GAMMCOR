@@ -177,6 +177,12 @@ sources = files(
   'SOURCE/thc_auto_p3.f90',
   'SOURCE/thc_energy.f90',
 
+  # -- ph path: THC back end
+  'SOURCE/thc_auto_p0_ph.f90',
+  'SOURCE/thc_auto_p2_ph.f90',
+  'SOURCE/thc_auto_p3_ph.f90',
+  'SOURCE/thc_energy_ph.f90',
+
   # -- pp path: AC0 kernels, one per integral back end
   'SOURCE/ppac0.f90',
   'SOURCE/ppac0_thc.f90',
@@ -188,6 +194,8 @@ sources = files(
   'SOURCE/ppac_simple.f90',
 
   # -- ph path and job routing
+  'SOURCE/phac0_thc.f90',
+  'SOURCE/phac_dispatch.f90',
   'SOURCE/phac_spinres.f90',
   'SOURCE/mp.f90',
   'SOURCE/dispatcher.f90',

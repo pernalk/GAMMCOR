@@ -75,6 +75,7 @@ integer, parameter :: R_CHRONUSQ = 5
 
 integer, parameter :: PPAC = 1
 integer, parameter :: HHAC = 0
+integer, parameter :: PHAC = 2
 
 #ifdef DEBUG
 integer, parameter :: PRT_MSG = 1

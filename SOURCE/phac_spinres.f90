@@ -69,7 +69,7 @@ module phac_spinres
       implicit none
 contains
 
-  subroutine acph_driver(THCData, AuxData, Flags, Ints, IntsD)
+  subroutine acph_spinres_driver(THCData, AuxData, Flags, Ints, IntsD)
         
 
         type(TACppData), intent(inout) :: AuxData
@@ -189,7 +189,7 @@ contains
           stop
         end associate
 
-  end subroutine acph_driver
+  end subroutine acph_spinres_driver
 
   subroutine pherpa_allocate_init(AuxData, Ints)
         type(TACppData), intent(inout) :: AuxData
@@ -261,7 +261,6 @@ contains
         ecorr = ecorr * frac12 ! because  E_corr = frac12 * W^1
         write(*,'(/,1X,''ECASSCF+ENuc, AC1-Corr, ERPA-CASSCF'',6X,3F15.8)'), &
               AuxData%ECAS_calc, ecorr, AuxData%ECAS_calc + ecorr
-
 
     end subroutine pherpa_incore_driver
 

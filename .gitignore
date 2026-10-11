@@ -24,6 +24,7 @@ xcfun/**/*.o
 hdf5-old
 
 build/
+build-debug/
 xcfun/geninterface
 SOURCE/trexio_f.f90
 trexio/*.so*
@@ -45,6 +46,7 @@ SOURCE/IMPLEMENTATION_PLAN_CLAUDE.md
 SOURCE/implementation_plan_integration.md
 .vscode/
 PP_INTEGRATION_PLAN.md
+auxilliary_codes/
 
 # HDF5: built locally by hdf5/build_hdf5.sh (the .mod files depend on the exact
 # ifx version), so keep only the script and README.

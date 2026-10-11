@@ -131,6 +131,7 @@ implicit none
 type(InputData) :: Input
 type(FlagsData) :: Flags
 integer :: i
+logical :: ph_thc_at
 
 ! if block FLAGS present: CALCULATION block ignored
 ! default AC-GVB flags are overwritten by the user - good luck!
@@ -500,6 +501,12 @@ end select
 
   end select
 
+  ! phAC0 with FOFO + Cholesky THC integrals (PySCF only):
+  ! AT parser, direct PySCF reader, dispatch_acxx instead of DMSCF
+  ph_thc_at = (Flags%JobType == JOB_TYPE_AC0 .and. Flags%IPYSCF == 1 .and. &
+        Flags%ITwoEl == TWOMO_FOFO .and. Flags%ICholeskyTHC == 1)
+  if (ph_thc_at) Flags%Parser = PARSER_AT
+
   if (Flags%Parser == PARSER_AT) then
         if (Flags%IPYSCF == 1) then
               select case(Flags%JobType)
@@ -509,6 +516,7 @@ end select
               case default
                     Flags%ReaderType = RT_WRAPPER
               end select
+              if (ph_thc_at) Flags%ReaderType = RT_DIRECT
               Flags%Reader = R_PYSCF
         end if
 
@@ -561,6 +569,7 @@ end select
               Flags%Dispatch = DISPATCH_AT
         end if
   end select
+  if (ph_thc_at) Flags%Dispatch = DISPATCH_AT
 
  ! Triplet response
   if(Input%CalcParams%Triplet) Flags%ITrpl = 1
