@@ -15,6 +15,7 @@ module interface_pp
       use print_utils
       use h5_reader
       use tddft_types
+      use thc_exact_ints, only: canonicalize_exact
 
 
       implicit none
@@ -167,15 +168,33 @@ contains
       subroutine read_PYSCF(THCData, AuxData, CAONO, Flags, TwoEl, TDDFTData)
             !
             ! Read the PySCF reference (pyscf_data.h5) and set up the 1-el Hamiltonian.
+            ! Full scenario table: .skills/code_interface.md.
+            !
+            ! What the file holds (Pyscf2Gammcor.py):
+            !   /INTS/CORE_HAMILTONIAN  always AO (mf.get_hcore(), embedding included)
+            !   /POSTHF/ORB_COEFF       AO x MO; natural orbitals iff /REF/NATORB == 1
+            !   /MOINTS/ERI             NATORB == 1: NO basis (= ORB_COEFF);
+            !                           NATORB == 0 (incl. every SA-CASSCF job): AO
+            !   RDM1*, RDM2*            active block, in the ORB_COEFF active orbitals
+            !
+            ! natural_orb == 1: CAONO = ORB_COEFF, RDMs already NO, no MO->NO step.
+            ! natural_orb == 0: CAOMO = ORB_COEFF; Trans2NO_AO diagonalizes RDM1,
+            !     sets CAONO = CAOMO*CMONO, rotates the RDMs (and TwoEl if INCORE).
             !
             ! ITwoEl == 1 (INCORE): 2-el ints from /MOINTS/ERI, H0 = PySCF CORE_HAMILTONIAN
             !     transformed AO->NO here; energy checked by check_energy_incore.
             !     THC_init2/canonicalize are not called, H0external is ignored.
+            !     For JobType AC0/MSAC0 canonicalize_exact (thc_exact_ints) then
+            !     canonicalizes the inactive and virtual orbitals with the exact Fock
+            !     matrix of the computed state (rotates HNO0, TwoEl, CAONO).
             ! ITwoEl > 1 (FFFF/FOFO): 2-el ints from GAMMCOR THC via THC_init2.
-            !     HNO0 is still the PySCF AO core Hamiltonian on entry to THC_init2.
-            !     H0external = .false.: GAMMCOR T+Vne is used for H0 and the Fock matrix.
+            !     /MOINTS/ERI is not read. HNO0 is still the PySCF AO core Hamiltonian
+            !     on entry to THC_init2.
+            !     H0external = .false.: GAMMCOR T+Vne is used for H0 and the Fock matrix;
+            !                           the PySCF H0 is read but then discarded.
             !     H0external = .true.:  PySCF H0 is used for H0 and the Fock matrix.
-            ! On exit AuxData%HNO0 and THCData%HNO hold H0 in the NO basis.
+            !     CAONO is canonicalized (inactive and virtual blocks) by THC_init2.
+            ! On exit AuxData%HNO0 and THCData%HNO hold H0 in the (final) NO basis.
             !
 
             type(TTHCData), intent(inout) :: THCData
@@ -199,6 +218,7 @@ contains
             integer :: natural_orb
             integer :: anst(2)
             logical :: existsNosf, existsSf
+            logical :: need_rdm2_dat
             integer :: iostat
             character(len=10) :: suffix
             integer :: x, y
@@ -269,7 +289,7 @@ contains
               allocate(THCData%HNO(NBasis, NBasis))
               THCData%ExternalOrdering = ORBITAL_ORDERING_PYSCF
               THCData%H0external = Flags%H0external
-              call print_info('THCData%H0external', merge('TRUE ', 'FALSE', THCData%H0external))
+              call print_info('THCData%H0external', THCData%H0external)
               allocate(THCData%fij(NI))
               allocate(THCData%fvw(NV))
 
@@ -285,7 +305,8 @@ contains
 
               if (Flags%JOBTYPE /= JOB_TYPE_MP2 .and. Flags%JOBTYPE /= JOB_TYPE_SRMP2) then
 
-                    if (Flags%JOBTYPE == JOB_TYPE_AC0.and.Flags%ITwoEl > 1)then
+                    if ((Flags%JOBTYPE == JOB_TYPE_AC0 .or. Flags%JOBTYPE == JOB_TYPE_MSAC0) &
+                          .and. Flags%ITwoEl > 1)then
                           call load_density_matrices(suffix, AuxData, THCData, CAOMO, CAONO, Flags, AObasis, System, TwoEl, .true.)
                     else
                           call load_density_matrices(suffix, AuxData, THCData, CAOMO, CAONO, Flags, AObasis, System, TwoEl,  .false.)
@@ -317,6 +338,11 @@ contains
                     ! end associate
 
                     end if
+                    ! rdm2.dat is read only by the non-THC AC0/MSAC0 routes (AB_CAS_FOFO, ...);
+                    ! the THC routes (acph_driver in dispatcher) use AuxData%rdm2_full
+                    need_rdm2_dat = (Flags%JobType == JOB_TYPE_AC0 .or. Flags%JobType == JOB_TYPE_MSAC0) &
+                          .and. .not. (Flags%ITwoEl == TWOMO_FOFO .and. Flags%ICholeskyTHC == 1) &
+                          .and. .not. (Flags%ITwoEl == TWOMO_INCORE .and. Flags%Algorithm == ALG_THC)
                     if (natural_orb == 0)then
                          
                           print*, 'transform to natural orbital basis'
@@ -335,19 +361,23 @@ contains
                                 
 !                                AuxData%HNO0 = AuxData%HNO0_THC
                           end if
-                          print*, 'writing rdm2 full'
-                          call write_rdm2_dat(AuxData%rdm2_full, NA)
+                          if (need_rdm2_dat) then
+                                print*, 'writing rdm2 full'
+                                call write_rdm2_dat(AuxData%rdm2_full, NA)
+                          end if
                     else
                           print*, 'natural orbitals'
                           call load_occupancy(AuxData)
                           ! No MO->NO transformation is needed, but the later code
                           ! (e.g. AB_CAS_FOFO) still expects rdm2.dat on disk, so
                           ! dump the 2-RDM read from the h5 file here as well.
-                          if (allocated(AuxData%rdm2_full)) then
+                          if (need_rdm2_dat .and. allocated(AuxData%rdm2_full)) then
                                 print*, 'writing rdm2 full (natural orbitals)'
                                 call write_rdm2_dat(AuxData%rdm2_full, NA)
                           end if
-                    end if                          
+                    end if
+
+                    if (Flags%JOBTYPE == JOB_TYPE_MSAC0) call load_transition_rdm1(AuxData)
               else
                     call load_rohf_occupation(AuxData)
               end if
@@ -402,12 +432,21 @@ contains
                           end if
                           write(*, '(A15, I3, 2F12.7)') 'occupancy', i, AuxData%n_p(i),  AuxData%n_m(i)
                     end do
+
+                    ! AC0 / MS-AC0: canonicalize the inactive and virtual orbitals with
+                    ! the Fock matrix of the computed state, as THC_init2 does on the
+                    ! THC route. PySCF canonicalizes with the Fock matrix of its
+                    ! fcisolver density, which for SA-CASSCF is the state-averaged one.
+                    ! Rotates HNO0, TwoEl and CAONO, sets fij/fvw and ECAS_THC.
+                    if (Flags%JOBTYPE == JOB_TYPE_AC0 .or. Flags%JOBTYPE == JOB_TYPE_MSAC0) then
+                          call canonicalize_exact(THCData, AuxData, CAONO, TwoEl)
+                    end if
               end if
 
           end associate
 
             call pyscf_h5_close()
-            
+
     end subroutine read_PYSCF
 
     subroutine read_PYSCF_dft(Flags, TDDFTData, TwoEl)
@@ -667,6 +706,9 @@ contains
 
     subroutine PYSCF_wrapper(THCData, AuxData, NInte1, Ninte2, NBasis, &
           ENuc, CAONO, XKin, TwoEl, Occ, NAc, NInAc, anSt, Flags)
+          ! Legacy-style entry: calls read_PYSCF and copies its results out.
+          ! XKin = AuxData%HNO0 packed lower-triangular, i.e. H0 in the NO basis.
+          ! TwoEl is filled (NO basis) only for ITwoEl == 1.
 
           type(TTHCData), intent(out) :: THCData
           type(TACppData) :: AuxData
@@ -683,7 +725,7 @@ contains
           integer :: unit
 
           integer :: i, j, ab
-          integer, external :: NAddr3 
+          integer, external :: NAddr3
 
           AuxData%nst = anSt
           print*, 'inside wrapper'
@@ -776,6 +818,8 @@ contains
     end subroutine ORCA_wrapper
 
     subroutine load_cas_aux_data(suffix, AuxData, natural_orb)
+          ! Dimensions, ENuc, CAS energy and natural_orb (= /REF/NATORB) from the h5.
+          ! For ITwoEl > 1 this overwrites NBasis/NEL/ENuc already set by GEOM_init.
           character(len=*), intent(in) :: suffix
           type(TACppData), intent(inout) :: AuxData
           integer, intent(out) :: natural_orb
@@ -875,7 +919,12 @@ contains
           !   RDM1_A -> rdm1_p,  RDM1_B -> rdm1_m
           !   RDM1   -> rdm1_full (fallback: rdm1_p = rdm1_m = rdm1_full/2)
           ! rdm2_full = rdm2_pp + rdm2_mm + rdm2_pm + rdm2_mp  (computed here).
-          
+          ! only_full = .true. (AC0 with ITwoEl > 1): rdm2_full is read from
+          !   RDM2_FULL_REORDERED and rdm2_pp/pm/mm/mp are NOT allocated.
+          ! All RDMs are NA x NA in the active orbitals of /POSTHF/ORB_COEFF:
+          ! natural orbitals if natural_orb == 1, CASSCF MOs otherwise (then
+          ! Trans2NO_AO rotates them to NO). Nothing is transformed here.
+
           character(len=*), intent(in) :: suffix
           type(TACppData), intent(inout) :: AuxData
           type(TTHCData), intent(inout) :: THCData
@@ -1030,6 +1079,102 @@ contains
           
     end subroutine load_density_matrices
 
+    subroutine load_transition_rdm1(AuxData)
+          ! MS-AC0: for the reference I = nst = (n, m), read gamma^JI(p,q) =
+          ! 1/2 <J|E_qp|I> of every other state J = k.m of irrep m that has a TRDM
+          ! with I: POSTHF/TRANSITIONS/<J>_<I> as is, <I>_<J> transposed (the
+          ! exporter stores one per pair). Rotated to the active NOs of I with the
+          ! CMONO_NA of Trans2NO_AO, as the RDMs. Fills NJ, trdm, trdm_st.
+          type(TACppData), intent(inout) :: AuxData
+
+          character(len=16)  :: tag_i, tag_k
+          character(len=128) :: path_ki, path_ik
+          double precision, dimension(:,:), allocatable :: gamma, CMONO_NA
+          integer :: orient(10)
+          integer :: k, n, m, j, NI, NA
+
+          n = AuxData%nst(1)
+          m = AuxData%nst(2)
+          NI = AuxData%NI
+          NA = AuxData%NA
+
+          if (n <= 0) then
+                print*, 'ERROR! MSAC0 needs the reference state in the input: State n.m'
+                stop
+          end if
+          ! the TRDMs have the active size of the h5 file
+          if (size(AuxData%rdm1_full, dim=1) /= NA) then
+                print*, 'ERROR! MSAC0: Trans2NO_AO changed NA from', &
+                      size(AuxData%rdm1_full, dim=1), 'to', NA
+                stop
+          end if
+
+          write(tag_i, '(I0, ".", I0)') n, m
+
+          ! orient(k) = 1: <k.m>_<n.m> stored, -1: <n.m>_<k.m> stored, 0: none
+          orient = 0
+          do k = 1, 10
+                if (k == n) cycle
+                write(tag_k, '(I0, ".", I0)') k, m
+                path_ki = '/POSTHF/TRANSITIONS/'//trim(tag_k)//'_'//trim(tag_i)//'/TRDM1'
+                path_ik = '/POSTHF/TRANSITIONS/'//trim(tag_i)//'_'//trim(tag_k)//'/TRDM1'
+                if (h5_exists(pyscf_fid, trim(path_ki))) then
+                      orient(k) = 1
+                else if (h5_exists(pyscf_fid, trim(path_ik))) then
+                      orient(k) = -1
+                else if (h5_exists(pyscf_fid, '/POSTHF/STATES/'//trim(tag_k))) then
+                      print*, 'MS-AC0: state ', trim(tag_k), &
+                            ' has no TRDM with the reference (other spin?), skipped'
+                end if
+          end do
+
+          AuxData%NJ = count(orient /= 0)
+          if (allocated(AuxData%trdm)) deallocate(AuxData%trdm)
+          if (allocated(AuxData%trdm_st)) deallocate(AuxData%trdm_st)
+          allocate(AuxData%trdm(NA, NA, AuxData%NJ))
+          allocate(AuxData%trdm_st(2, AuxData%NJ))
+          allocate(gamma(NA, NA))
+          allocate(CMONO_NA(NA, NA))
+
+          if (allocated(AuxData%CMONO)) then
+                CMONO_NA = AuxData%CMONO(NI+1:NI+NA, NI+1:NI+NA)
+          else
+                ! natural orbitals in the file: no MO->NO rotation
+                CMONO_NA = zero
+                do k = 1, NA
+                      CMONO_NA(k, k) = one
+                end do
+          end if
+
+          j = 0
+          do k = 1, 10
+                if (orient(k) == 0) cycle
+                j = j + 1
+                write(tag_k, '(I0, ".", I0)') k, m
+                if (orient(k) == 1) then
+                      path_ki = '/POSTHF/TRANSITIONS/'//trim(tag_k)//'_'//trim(tag_i)//'/TRDM1'
+                      call h5_get(pyscf_fid, trim(path_ki), gamma)
+                else
+                      ! gamma^JI(p,q) = gamma^IJ(q,p) for real CI vectors
+                      path_ik = '/POSTHF/TRANSITIONS/'//trim(tag_i)//'_'//trim(tag_k)//'/TRDM1'
+                      call h5_get(pyscf_fid, trim(path_ik), gamma)
+                      gamma = transpose(gamma)
+                end if
+                call rdm1_MO_NO_trans(gamma, CMONO_NA, NA)
+                AuxData%trdm(:, :, j) = gamma
+                AuxData%trdm_st(1, j) = k
+                AuxData%trdm_st(2, j) = m
+          end do
+
+          write(*, '(1x, "MS-AC0: reference ", A, ", partners:")', advance='no') trim(tag_i)
+          do j = 1, AuxData%NJ
+                write(*, '(1x, I0, ".", I0)', advance='no') AuxData%trdm_st(1, j), AuxData%trdm_st(2, j)
+          end do
+          write(*, *)
+
+          deallocate(gamma, CMONO_NA)
+    end subroutine load_transition_rdm1
+
     subroutine load_rohf_occupation(AuxData)
           type(TACppData), intent(inout) :: AuxData
           integer :: unit
@@ -1110,6 +1255,9 @@ contains
           ! Read PySCF /INTS/CORE_HAMILTONIAN (AO basis, PySCF ordering) into
           ! AuxData%HNO0 and THCData%HNO, and /POSTHF/ORB_COEFF into CAONO
           ! (natural_orb == 1) or CAOMO (natural_orb == 0).
+          ! HNO0 is AO on exit for every natural_orb and ITwoEl; read_PYSCF
+          ! (INCORE) or THC_init2 (THC) moves it to the NO basis later.
+          ! For MP2/SRMP2 CAONO = CAOMO (no NO transformation).
           !
           type(TACppData), intent(inout) :: AuxData
           type(TTHCData), intent(inout) :: THCData
@@ -1119,10 +1267,9 @@ contains
           logical :: file_exists
           integer :: unit
 
-          !----------------------------------------------------------------------------------------                                                                                                                                       
-          ! READ 1-el integrals.                                                                                                                                                                                                          
-          ! If natural = 1, HCore are in NO basis.                                                                                                                                                                                        
-          ! If natural = 0, HCore are in AO basis.                                                                                                                                                                                        
+          !----------------------------------------------------------------------------------------
+          ! READ 1-el integrals.
+          ! HCore is always in the AO basis, whatever natural is.
           !----------------------------------------------------------------------------------------
           ! --- FCIDUMP modification: do not load HCore as it's already read from FCIDUMP ---
           call h5_get(pyscf_fid, '/INTS/CORE_HAMILTONIAN', AuxData%HNO0)
@@ -2448,8 +2595,15 @@ end subroutine save_2rdm_orca
     subroutine Trans2NO_AO(THCData, AuxData, CAOMO, CAONO, Flags, TwoEl)
           !
           ! Build CAONO = CAOMO * CMONO from the active-space 1-RDM (natural_orb == 0).
-          ! Only for ITwoEl == 1 are TwoEl and AuxData%HNO0 transformed AO->NO;
-          ! otherwise HNO0 stays in the AO basis.
+          ! Only for ITwoEl == 1 is TwoEl transformed AO->NO. HNO0 always stays in
+          ! the AO basis here; the caller (read_PYSCF) transforms it.
+          !
+          ! CMONO = 1 except the active block, which holds the eigenvectors of
+          ! rdm1_full sorted by decreasing occupation. On exit:
+          !   rdm1_p/m/full, rdm2_full and rdm2_pp/pm/mm/mp (if allocated) in NO;
+          !   Occ, IndAux, n_p/n_m/n set; NI/NA/NIA/NV recomputed from the occupations.
+          ! TwoEl is transformed with CAONO = CAOMO*CMONO, i.e. it must be AO on entry.
+          ! Pyscf2Gammcor.py guarantees that: with NATORB = 0 it always writes AO ERIs.
           !
 
           
@@ -2577,6 +2731,9 @@ end subroutine save_2rdm_orca
             call rdm1_MO_NO_trans(AuxData%rdm1_m, CMONO_NA, NA)
             call rdm1_MO_NO_trans(AuxData%rdm1_full, CMONO_NA, NA)
 
+            ! n_p/n_m/n from the NO-basis rdm1_p/m (natural_orb == 1 gets them via load_occupancy)
+            call load_npm(AuxData)
+
             ! if (present(rdm2_full)) then
             !       call rdm2_MO_NO_trans(rdm2_full, CMONO_NA, NA)
             ! end if
@@ -2597,9 +2754,18 @@ end subroutine save_2rdm_orca
                         CMONO(i,i) = One
                   end do
                   
-                  CMONO(NI+1:NIA, NI+1:NIA) = CMONO_NA 
-                  
+                  CMONO(NI+1:NIA, NI+1:NIA) = CMONO_NA
+
                   call real_ab(CAONO, CAOMO, CMONO)
+
+                  ! MS-AC0 rotates the TRDMs with the same CMONO_NA. Only then: an
+                  ! allocated AuxData%CMONO also switches on the back-transform in
+                  ! dump_ppRDM/dump_hhRDM.
+                  if (Flags%JobType == JOB_TYPE_MSAC0) then
+                        if (allocated(AuxData%CMONO)) deallocate(AuxData%CMONO)
+                        allocate(AuxData%CMONO(NBasis, NBasis))
+                        AuxData%CMONO = CMONO
+                  end if
 
                   if (Flags%ITwoel == 1)then
                         print*, 'Transforming 2-el (AO->NO) integrals'
@@ -2609,12 +2775,8 @@ end subroutine save_2rdm_orca
                         CAONOt = transpose(CAONO)
                         !CAONOt = transpose(CMONO)
                         call TwoNO1(TwoEl,CAONOt,NBasis,AuxData%NInte2)
-                        allocate(work(NBasis, NBasis))
-                        call real_ab(work, AuxData%HNO0, CAONO)
-                        call real_atb(AuxData%HNO0, CAONO, work)
-                        deallocate(work)
-                        !call real_ab(work, AuxData%HNO0, CMONO)
-                        !call real_atb(AuxData%HNO0, CMONO, work)
+                        ! HNO0 is NOT transformed here: read_PYSCF does AO->NO for
+                        ! both natural_orb branches; doing it here too applied it twice.
                   end if
  !           end if
 
@@ -3432,9 +3594,12 @@ end subroutine save_2rdm_orca
 
     subroutine THC_init2(Flags, THCData, AuxData,  AObasis, System, CAONO_IN)
           !
-          ! THC setup for ITwoEl > 1: builds Xgp/Zgk (and Erf variants), calls
+          ! THC setup for ITwoEl > 1: builds Xgp/Zgk (and Erf variants), or reads
+          ! them with THCLoad / writes them and stops with THCDump; then calls
           ! canonicalize, then sets AuxData%HNO0 = AuxData%HNO0_THC = H0 in the
           ! canonicalized NO basis and Xga = Xgp transformed to that basis.
+          ! Xgp is grid x AO; Zgk is grid x Cholesky and carries no orbital index,
+          ! so it is never transformed. Only Xgp -> Xga and H0 (AO -> NO) are.
           ! H0 source: THCData%H0external = .true.  -> AuxData%HNO0 on entry (PySCF AO);
           !            THCData%H0external = .false. -> ints1e_gammcor_H0_extao (GAMMCOR AO).
           ! CAONO_IN (AO x NO) is overwritten with the canonicalized orbitals.
@@ -3449,15 +3614,12 @@ end subroutine save_2rdm_orca
           double precision, dimension(:,:), intent(inout) :: CAONO_IN
           double precision, dimension(:,:), allocatable ::  CAONO
 
-          double precision :: CholThr, THCThr
-          integer :: CholAccu
           integer :: i, j, NAO, ij, ab, u
           double precision, allocatable :: Xgp(:,:)
           double precision, allocatable :: XgpErf(:,:), xmumat(:,:)
           integer :: NA, NI, NV, NIA, nnn
           integer :: unit
           integer :: units, nbasis
-          type (tclock) :: timer
           double precision :: val1, val2, val3
           logical :: x2c
 
@@ -3479,34 +3641,20 @@ end subroutine save_2rdm_orca
           NIA = NI+NA
           nbasis = AuxData%NBasis
 
-          call auto2e_init()
-          call clock_start(timer)
-          
-          CholThr = Flags%DCholeskyThr
-          THCThr = Flags%DTHCthr
-          CholAccu = Flags%ICholeskyAccu
-
-          call print_section('Cholesky decomposition')
-
-          if (CholThr < zero.or.THCThr <zero)then
-                call thc_gammcor_XZ(THCData%Xgp, THCData%Zgk, AOBasis, System, CholAccu)
-
-                if (Flags%IDBBSC == 2 .or. Flags%IFunSR==4)then
-                      call thc_gammcor_XZ(THCData%XgpErf, THCData%ZgkErf, AOBasis, System, CholAccu, Omega=AuxData%Omega)
-                end if
-
-          else
-                print*, 'CholeskyThreshold', CholThr
-                print*, 'THCThreshold', THCThr
-                call thc_gammcor_XZ(THCData%Xgp, THCData%Zgk, AOBasis, System,CholAccu, CholThr, THCThr)
-
-                if (Flags%IDBBSC == 2 .or.Flags%IFunSR==4)then
-
-                      call thc_gammcor_XZ(THCData%XgpErf, THCData%ZgkErf, AOBasis, System, CholAccu, CholThr, THCThr, Omega=AuxData%Omega)
-                end if
-
-                print*, 'CholeskyThreshold', CholThr
-                print*, 'THCThreshold', THCThr
+          select case (Flags%ITHCIO)
+          case (THC_IO_LOAD)
+                call thc_load_h5(Flags, THCData, AuxData, AObasis, System)
+          case default
+                call thc_factorize(Flags, THCData, AuxData, AObasis, System)
+          end select
+          if (Flags%ITHCIO == THC_IO_DUMP) then
+                call thc_dump_h5(Flags, THCData, AuxData, AObasis, System)
+                call print_section('THC factorization written to file (THCDump)')
+                call print_info('File', Flags%THCFile)
+                call print_info('NTHC', size(THCData%Xgp, dim=1))
+                call print_info('NChol', size(THCData%Zgk, dim=2))
+                write(*, '(/,2X,A)') 'THCDump: stopping after the dump'
+                stop
           end if
           allocate(CAONO(nbasis, nbasis))
           nao = nbasis
@@ -3837,6 +3985,216 @@ end subroutine save_2rdm_orca
 
     end subroutine THC_init2
 
+    subroutine thc_factorize(Flags, THCData, AuxData, AObasis, System)
+          !
+          ! Cholesky + THC factorization of the AO two-electron integrals:
+          ! Xgp (grid x AO) and Zgk (grid x Cholesky), plus XgpErf/ZgkErf for the
+          ! erf-attenuated integrals when IDBBSC == 2 or IFunSR == 4. Depends only
+          ! on geometry, basis and thresholds, not on orbitals or state, so the
+          ! result can be dumped/loaded (THCDump/THCLoad).
+          !
+          type(FlagsData), intent(in) :: Flags
+          type(TTHCData), intent(inout) :: THCData
+          type(TACppData), intent(in) :: AuxData
+          type(TAOBASIS), intent(in)  :: AObasis
+          type(TSystem), intent(in) :: System
+
+          double precision :: CholThr, THCThr
+          integer :: CholAccu
+          type (tclock) :: timer
+
+          call auto2e_init()
+          call clock_start(timer)
+          
+          CholThr = Flags%DCholeskyThr
+          THCThr = Flags%DTHCthr
+          CholAccu = Flags%ICholeskyAccu
+
+          call print_section('Cholesky decomposition')
+
+          if (CholThr < zero.or.THCThr <zero)then
+                call thc_gammcor_XZ(THCData%Xgp, THCData%Zgk, AOBasis, System, CholAccu)
+
+                if (Flags%IDBBSC == 2 .or. Flags%IFunSR==4)then
+                      call thc_gammcor_XZ(THCData%XgpErf, THCData%ZgkErf, AOBasis, System, CholAccu, Omega=AuxData%Omega)
+                end if
+
+          else
+                print*, 'CholeskyThreshold', CholThr
+                print*, 'THCThreshold', THCThr
+                call thc_gammcor_XZ(THCData%Xgp, THCData%Zgk, AOBasis, System,CholAccu, CholThr, THCThr)
+
+                if (Flags%IDBBSC == 2 .or.Flags%IFunSR==4)then
+
+                      call thc_gammcor_XZ(THCData%XgpErf, THCData%ZgkErf, AOBasis, System, CholAccu, CholThr, THCThr, Omega=AuxData%Omega)
+                end if
+
+                print*, 'CholeskyThreshold', CholThr
+                print*, 'THCThreshold', THCThr
+          end if
+
+    end subroutine thc_factorize
+
+    subroutine thc_dump_h5(Flags, THCData, AuxData, AObasis, System)
+          !
+          ! THCDump: write the output of thc_factorize to Flags%THCFile, with the
+          ! metadata thc_load_h5 checks. Layout:
+          !   /THC/XGP, /THC/ZGK              Xgp(NTHC,NAO), Zgk(:,NCHOL)
+          !   /THC/XGP_ERF, /THC/ZGK_ERF      only if the erf pair was computed
+          !   /META/NAO NAOCART NTHC NCHOL NATOMS CHOL_ACCU [NTHC_ERF NCHOL_ERF]
+          !   /META/COORDS ENUC CHOL_THR THC_THR OMEGA,  attribute BASIS on /
+          ! The HDF5 library is already open: THC_init2 runs inside read_PYSCF,
+          ! between pyscf_h5_open and pyscf_h5_close.
+          !
+          type(FlagsData), intent(in) :: Flags
+          type(TTHCData), intent(in) :: THCData
+          type(TACppData), intent(in) :: AuxData
+          type(TAOBASIS), intent(in)  :: AObasis
+          type(TSystem), intent(in) :: System
+
+          integer(HID_T) :: fid
+
+          fid = h5_create(Flags%THCFile)
+
+          call h5_put(fid, "/THC/XGP", THCData%Xgp)
+          call h5_put(fid, "/THC/ZGK", THCData%Zgk)
+          call h5_put(fid, "/META/NTHC", size(THCData%Xgp, dim=1))
+          call h5_put(fid, "/META/NCHOL", size(THCData%Zgk, dim=2))
+          if (allocated(THCData%XgpErf)) then
+                call h5_put(fid, "/THC/XGP_ERF", THCData%XgpErf)
+                call h5_put(fid, "/THC/ZGK_ERF", THCData%ZgkErf)
+                call h5_put(fid, "/META/NTHC_ERF", size(THCData%XgpErf, dim=1))
+                call h5_put(fid, "/META/NCHOL_ERF", size(THCData%ZgkErf, dim=2))
+          end if
+
+          call h5_put(fid, "/META/NAO", AObasis%NAOSpher)
+          call h5_put(fid, "/META/NAOCART", AObasis%NAOCart)
+          call h5_put(fid, "/META/NATOMS", System%NAtoms)
+          call h5_put(fid, "/META/COORDS", System%AtomCoords)
+          call h5_put(fid, "/META/ENUC", AuxData%ENuc)
+          call h5_put(fid, "/META/CHOL_ACCU", Flags%ICholeskyAccu)
+          call h5_put(fid, "/META/CHOL_THR", Flags%DCholeskyThr)
+          call h5_put(fid, "/META/THC_THR", Flags%DTHCThr)
+          call h5_put(fid, "/META/OMEGA", AuxData%Omega)
+          call h5_put_attr(fid, "/", "BASIS", thc_basis_name(Flags))
+
+          call h5_close(fid)
+
+    end subroutine thc_dump_h5
+
+    subroutine thc_load_h5(Flags, THCData, AuxData, AObasis, System)
+          !
+          ! THCLoad: read Xgp/Zgk (+ Erf pair) from Flags%THCFile in place of
+          ! thc_factorize. Stops first if the file was made for another molecule,
+          ! geometry, basis or Cholesky/THC settings, or lacks the erf pair this
+          ! run needs (IDBBSC == 2 or IFunSR == 4) with the same omega.
+          !
+          type(FlagsData), intent(in) :: Flags
+          type(TTHCData), intent(inout) :: THCData
+          type(TACppData), intent(in) :: AuxData
+          type(TAOBASIS), intent(in)  :: AObasis
+          type(TSystem), intent(in) :: System
+
+          integer(HID_T) :: fid
+          integer :: n, nthc, nchol
+          double precision :: x
+          double precision, allocatable :: coords(:,:)
+          character(len=256) :: basis
+          logical :: exists, need_erf
+
+          need_erf = (Flags%IDBBSC == 2 .or. Flags%IFunSR == 4)
+
+          inquire(file=Flags%THCFile, exist=exists)
+          if (.not. exists) then
+                write(*, '(1x,a)') 'THCLoad: file '//Flags%THCFile//' not found'
+                stop
+          end if
+          call h5_init()
+          fid = h5_open(Flags%THCFile)
+
+          ! --- same molecule and geometry
+          call h5_get(fid, "/META/NAO", n)
+          if (n /= AObasis%NAOSpher) call mismatch("number of AOs")
+          call h5_get(fid, "/META/NAOCART", n)
+          if (n /= AObasis%NAOCart) call mismatch("number of Cartesian AOs")
+          call h5_get(fid, "/META/NATOMS", n)
+          if (n /= System%NAtoms) call mismatch("number of atoms")
+          allocate(coords, mold=System%AtomCoords)
+          call h5_get(fid, "/META/COORDS", coords)
+          if (maxval(abs(coords - System%AtomCoords)) > 1.d-8) call mismatch("geometry")
+          call h5_get(fid, "/META/ENUC", x)
+          if (abs(x - AuxData%ENuc) > 1.d-8) call mismatch("nuclear repulsion energy")
+
+          ! --- same factorization settings
+          basis = ""
+          call h5_attr(fid, "/", "BASIS", basis)
+          if (trim(basis) /= thc_basis_name(Flags)) call mismatch("basis set ("//trim(basis)//")")
+          call h5_get(fid, "/META/CHOL_ACCU", n)
+          if (n /= Flags%ICholeskyAccu) call mismatch("Cholesky accuracy")
+          call h5_get(fid, "/META/CHOL_THR", x)
+          if (x /= Flags%DCholeskyThr) call mismatch("Cholesky threshold")
+          call h5_get(fid, "/META/THC_THR", x)
+          if (x /= Flags%DTHCThr) call mismatch("THC threshold")
+          if (need_erf) then
+                if (.not. h5_exists(fid, "/THC/XGP_ERF")) call mismatch("erf integrals (none in file)")
+                call h5_get(fid, "/META/OMEGA", x)
+                if (abs(x - AuxData%Omega) > 1.d-12) call mismatch("omega of the erf integrals")
+          end if
+
+          ! --- the factorization; NTHC/NChol are set later in THC_init2
+          if (allocated(THCData%Xgp)) deallocate(THCData%Xgp)
+          if (allocated(THCData%Zgk)) deallocate(THCData%Zgk)
+          call h5_get(fid, "/META/NTHC", nthc)
+          call h5_get(fid, "/META/NCHOL", nchol)
+          allocate(THCData%Xgp(nthc, h5_size(fid, "/THC/XGP")/nthc))
+          allocate(THCData%Zgk(h5_size(fid, "/THC/ZGK")/nchol, nchol))
+          call h5_get(fid, "/THC/XGP", THCData%Xgp)
+          call h5_get(fid, "/THC/ZGK", THCData%Zgk)
+          if (need_erf) then
+                if (allocated(THCData%XgpErf)) deallocate(THCData%XgpErf)
+                if (allocated(THCData%ZgkErf)) deallocate(THCData%ZgkErf)
+                call h5_get(fid, "/META/NTHC_ERF", nthc)
+                call h5_get(fid, "/META/NCHOL_ERF", nchol)
+                allocate(THCData%XgpErf(nthc, h5_size(fid, "/THC/XGP_ERF")/nthc))
+                allocate(THCData%ZgkErf(h5_size(fid, "/THC/ZGK_ERF")/nchol, nchol))
+                call h5_get(fid, "/THC/XGP_ERF", THCData%XgpErf)
+                call h5_get(fid, "/THC/ZGK_ERF", THCData%ZgkErf)
+          end if
+
+          call h5_close(fid)
+          call print_section('THC factorization read from file (THCLoad)')
+          call print_info('File', Flags%THCFile)
+          call print_info('NTHC', size(THCData%Xgp, dim=1))
+          call print_info('NChol', size(THCData%Zgk, dim=2))
+          if (need_erf) call print_info('NTHC (erf)', size(THCData%XgpErf, dim=1))
+
+    contains
+
+          subroutine mismatch(what)
+                character(len=*), intent(in) :: what
+                write(*, '(1x,a)') 'THCLoad: '//Flags%THCFile//' was made for a different '//what
+                write(*, '(1x,a)') '         than this run; redo THCDump for this input'
+                stop
+          end subroutine mismatch
+
+    end subroutine thc_load_h5
+
+    function thc_basis_name(Flags) result(name)
+          !
+          ! Basis-set label stored in / compared against the THC file.
+          !
+          type(FlagsData), intent(in) :: Flags
+          character(:), allocatable :: name
+
+          if (allocated(Flags%BasisSet)) then
+                name = trim(Flags%BasisSet)
+          else
+                name = "none"
+          end if
+          if (len(name) == 0) name = "none"
+
+    end function thc_basis_name
+
     subroutine calc_J_SR(CAONO, THCData, AuxData, AOBasis, System)
           use Cholesky_Gammcor
           use THC_Gammcor
@@ -4107,105 +4465,6 @@ end subroutine save_2rdm_orca
             
           end associate
     end subroutine canonicalize
-
-
-    subroutine canonicalize_incore(CAONO, rdm1, AuxData, natural, TwoEl)
-          
-          double precision, dimension(:,:), intent(in) :: rdm1
-          double precision, dimension(:,:), intent(inout) :: CAONO
-          double precision, dimension(:), allocatable :: fij, fvw            
-          type(TACppData), intent(in) :: AuxData
-          double precision, dimension(:), intent(in) :: TwoEl
-          integer, intent(in) :: natural
-          integer :: i, j, k, l, ii, jj
-          integer, external :: NAddr3 
-
-          double precision, dimension(:,:), allocatable :: Cpi_extao, Cpv_extao
-          double precision, dimension(:,:), allocatable :: Fockij, Fockvw
-
-          associate(NI=>AuxData%NI, NA=>AuxData%NA, NIA=>AuxData%NIA, NV=>AuxData%NV)
-            allocate(Fockij(NI, NI))
-            allocate(Fockvw(NV, NV))
-            allocate(fij(NI))
-            allocate(fvw(NV))
-            allocate(Cpi_extao(AuxData%nbasis, NI))
-            allocate(Cpv_extao(AuxData%nbasis, NV))
-
-            if (NI > 0)then
-                  ! inactive block
-                  do i = 1, NI
-                        do j = 1, NI
-                              Fockij(i, j) = AuxData%HNO0(i, j)
-                              do k = 1, NI
-                                    Fockij(i, j) = Fockij(i, j) + AuxData%Occ(k)*&
-                                          (Two*TwoEl(NAddr3(i, j, k, k))-TwoEl(NAddr3(i, k, j, k)))
-                              end do
-                              do k = NI+1, NIA
-                                    do l = NI+1, NIA
-                                          if (natural == 0)then
-                                                Fockij(i, j) = Fockij(i, j) * rdm1(k-NI, l-NI)*&
-                                                      (Two*TwoEl(NAddr3(i, j, k, l))-TwoEl(NAddr3(i, l, j, k)))
-                                          else
-                                                Fockij(i, j) = Fockij(i, j) * AuxData%Occ(k)*&
-                                                      (Two*TwoEl(NAddr3(i, j, k, l))-TwoEl(NAddr3(i, l, j, k)))                                                
-                                          end if
-                                    end do
-                              end do
-                        end do
-                  end do
-                  ! virtual block
-                  do i = 1, NV
-                        do j = 1, NV
-                              ii = i + NIA
-                              jj = j + NIA
-                              Fockvw(i, j) = AuxData%HNO0(ii, jj)
-                              do k = 1, NI
-                                    Fockvw(i, j) = Fockvw(i, j) + AuxData%Occ(k)*&
-                                          (Two*TwoEl(NAddr3(ii, jj, k, k))-TwoEl(NAddr3(ii, k, jj, k)))
-                              end do
-                              do k = NI+1, NIA
-                                    do l = NI+1, NIA
-                                          if (natural == 0)then
-                                                Fockvw(i, j) = Fockvw(i, j) + rdm1(k-NI, l-NI)* &
-                                                       (Two*TwoEl(NAddr3(ii, jj, k, l))-TwoEl(NAddr3(ii, l, jj, k)))
-                                          else
-                                                Fockvw(i, j) = Fockvw(i, j) + AuxData%Occ(k)*&
-                                                (Two*TwoEl(NAddr3(ii, jj, k, l))-TwoEl(NAddr3(ii, l, jj, k)))
-                                          end if
-                                    end do
-                              end do
-                        end do
-                  end do
-
-            end if
-            if (AuxData%NI>0)then
-                  call symmetric_eigenproblem(fij, Fockij, AuxData%NI, .true.)
-                  do i = 1, AuxData%NI
-                        print*, 'fij', i, fij(i)
-                  end do
-            end if
-
-
-            call symmetric_eigenproblem(fvw, Fockvw, AuxData%NV, .true.)
-                        do i = 1, AuxData%NV
-                  print*, 'fvw', i, fvw(i)
-            end do
-
-            ! print*, fvw
-
-            if (AuxData%NI>0)then
-                  call real_ab(Cpi_extao, CAONO(:, 1:AuxData%NI), Fockij)
-            end if
-
-
-            call real_ab(Cpv_extao, CAONO(:, AuxData%NIA+1:AuxData%NBasis), Fockvw)
-            if (AuxData%NI>0)then
-                  CAONO(:, 1:AuxData%NI)=Cpi_extao
-            end if
-
-            CAONO(:, AuxData%NIA+1:AuxData%NBasis) = Cpv_extao
-          end associate
-    end subroutine canonicalize_incore
 
 
     

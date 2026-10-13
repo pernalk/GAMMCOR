@@ -59,6 +59,8 @@ integer, parameter :: DISPATCH_DD = 2
 integer, parameter :: ALG_REGULAR = 0
 integer, parameter :: ALG_SPINRES = 1
 integer, parameter :: ALG_PPSIMPLE = 2
+! ph-AC0 THC code with exact PySCF integrals (TwoMoInt INCORE, thc_exact_ints)
+integer, parameter :: ALG_THC = 3
 
 integer, parameter :: INT_DEFAULT = 0
 integer, parameter :: INT_FCIDUMP = 1
@@ -122,6 +124,10 @@ integer, parameter :: CHOL_ACCU_LUDICROUS = 3
 integer, parameter :: CHOL_ACCU_DEBUG = 4
 double precision :: DCholeskyThr = -1.e0
 double precision :: DTHCThr = -1.e0
+! THC factorization (Xgp, Zgk): compute (NONE), compute+write+stop (DUMP), read (LOAD)
+integer, parameter :: THC_IO_NONE = 0
+integer, parameter :: THC_IO_DUMP = 1
+integer, parameter :: THC_IO_LOAD = 2
 
 integer, parameter :: GRID_PARAMS_SG1    = 1
 integer, parameter :: GRID_PARAMS_MEDIUM = 2
@@ -408,6 +414,8 @@ type CholeskyBlock
       double precision :: THCThr       = -1.e0
       logical :: H0external            = .false.
       integer :: H0test       = FLAG_H0TEST ! check 1el ints with CholeskyOTF
+      integer :: THCIO        = THC_IO_NONE
+      character(:), allocatable :: THCFile
 
 end type CholeskyBlock
 
@@ -456,6 +464,8 @@ type FlagsData
      logical :: H0external = .false.
      double precision :: DCholeskyThr = -1.e0
      double precision :: DTHCThr = -1.e0
+     integer :: ITHCIO = THC_IO_NONE
+     character(:), allocatable :: THCFile
      type(TBasisAssignment) :: BasisAssign
 
      integer :: IGridType = GRID_PARAMS_MEDIUM

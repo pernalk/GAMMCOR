@@ -119,6 +119,24 @@ def acn_en(file):
     S=s[a+58:a+72]
     return float(S)
 #
+def thc_ac0_en(file):
+    # THC/ph AC0 (and exact-integral variant): "  E_total   :   <value> Eh ..."
+    with open(file,'r') as f:
+        for line in f:
+            if line.split(':')[0].strip() == "E_total":
+                return float(line.split(':')[1].split()[0])
+    return None
+#
+def msac0_en(file):
+    # MS-AC0: E_total of the target state plus the H_eff elements H_mn 1.1 1.1, H_mn 2.1 1.1
+    vals = {}
+    with open(file,'r') as f:
+        for line in f:
+            w = line.split()
+            if len(w) == 4 and w[0] == "H_mn":
+                vals[(w[1], w[2])] = float(w[3])
+    return [thc_ac0_en(file), vals.get(("1.1","1.1")), vals.get(("2.1","1.1"))]
+#
 
 def run_single(dir,fun,RUN_GAMMCOR):
 # run calc in dir and extract data with fun

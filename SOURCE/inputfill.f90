@@ -441,6 +441,22 @@ subroutine read_block_cholesky(CholeskyParams, line)
       case ("THCTHR","THCTHRESHOLD")
             read(val, *) CholeskyParams%THCThr
 
+      case ("THCDUMP","THCLOAD")
+           if (uppercase(key) == "THCDUMP") then
+              if (CholeskyParams%THCIO == THC_IO_LOAD) &
+                 stop "THCDump and THCLoad cannot be used together!"
+              CholeskyParams%THCIO = THC_IO_DUMP
+           else
+              if (CholeskyParams%THCIO == THC_IO_DUMP) &
+                 stop "THCDump and THCLoad cannot be used together!"
+              CholeskyParams%THCIO = THC_IO_LOAD
+           endif
+           if (len_trim(val) == 0) then
+              CholeskyParams%THCFile = "thc.h5"
+           else
+              CholeskyParams%THCFile = trim(val)
+           endif
+
       case ("H0TEST")
            if (uppercase(val) == ".FALSE.".or. &
                uppercase(val) == "FALSE".or.   &
@@ -632,6 +648,13 @@ subroutine read_block_calculation(CalcParams, line)
                ! default ALG_REGULAR
                ! this is keyword for developer AT
                CalcParams%Algorithm = ALG_PPSIMPLE
+         else if(uppercase(val) == 'THC')then
+               ! with TwoMoInt INCORE and JobType AC0/MSAC0: the ph-AC0 THC
+               ! code run on the exact PySCF integrals (debug route)
+               CalcParams%Algorithm = ALG_THC
+         else
+               write(LOUT,'(1x,a,a)') 'ERROR! UNKNOWN Algorithm: ', trim(val)
+               stop
          end if
 
    case ("INTFORMAT")
@@ -1165,6 +1188,23 @@ integer :: imon
     stop
  endif
 
+ if(Input%CalcParams%Algorithm == ALG_THC) then
+    if((Input%CalcParams%JobType /= JOB_TYPE_AC0 .and. &
+        Input%CalcParams%JobType /= JOB_TYPE_MSAC0) .or. &
+        Input%CalcParams%TwoMoInt /= TWOMO_INCORE .or. &
+        Input%CalcParams%InterfaceType /= INTER_TYPE_PYSCF) then
+       write(LOUT,'(1x,a)') 'ERROR! Algorithm THC needs JobType AC0 or MSAC0,'
+       write(LOUT,'(1x,a)') '       TwoMoInt INCORE and Interface PYSCF'
+       stop
+    endif
+ endif
+
+ if(Input%CholeskyParams%THCIO /= THC_IO_NONE .and. &
+    Input%CholeskyParams%CholeskyTHC == 0) then
+    write(LOUT,'(1x,a)') 'ERROR! THCDump/THCLoad need Cholesky THC in CholeskyBlock'
+    stop
+ endif
+
  if(Input%CalcParams%InterfaceType.ne.INTER_TYPE_DAL) then
     if(Input%CalcParams%NBasis==0) then
        !write(LOUT,'(1x,a)') 'FATAL ERROR: NBasis ENTRY MISSING'
@@ -1260,6 +1300,8 @@ associate( CalcParams => Input%CalcParams)
           // " is ignored", MSG_WARNING)
  write(LOUT,' (1x,a,4x,a)') "INTERFACE: ", &
               PossibleInterface(CalcParams%InterfaceType)
+ if(CalcParams%Algorithm == ALG_THC) &
+    write(LOUT,'(1x,a,4x,a)') "ALGORITHM: ", "THC, EXACT INTEGRALS"
  write(LOUT,' (1x,a,5x,a)') "JOB TYPE: ",  &
                       PossibleJobType(CalcParams%JOBtype)
  if (CalcParams%IVEMB==1) &
@@ -1298,6 +1340,10 @@ associate( CholeskyParams => Input%CholeskyParams)
     endif
     write(LOUT,' (1x,a,a)') "CHOLESKY ACCU: ", &
                PossibleCholAccu(CholeskyParams%CholeskyAccu)
+    if(CholeskyParams%THCIO == THC_IO_DUMP) &
+       write(LOUT,'(1x,a,5x,a)') "THC DUMP:", CholeskyParams%THCFile
+    if(CholeskyParams%THCIO == THC_IO_LOAD) &
+       write(LOUT,'(1x,a,5x,a)') "THC LOAD:", CholeskyParams%THCFile
  endif
 end associate
 

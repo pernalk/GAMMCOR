@@ -51,10 +51,19 @@ contains
                   print*, 'mp2_driver'
                   call mp2_driver(THCData, AuxData, CAONO, Flags)
 
-            case(JOB_TYPE_AC0)
+            case(JOB_TYPE_AC0, JOB_TYPE_MSAC0)
                   if (Flags%ITwoEl == TWOMO_FOFO .and. Flags%ICholeskyTHC == 1) then
                         print*, 'acph_driver'
                         call acph_driver(THCData, AuxData, Flags, CAONO)
+                  else if (Flags%ITwoEl == TWOMO_INCORE .and. Flags%Algorithm == ALG_THC) then
+                        ! the THC code on the exact PySCF integrals: TwoEl (NO basis,
+                        ! already canonicalized by read_PYSCF, canonicalize_exact)
+                        ! travels in THCData
+                        print*, 'acph_driver (exact integrals)'
+                        call move_alloc(TwoEl, THCData%TwoEl)
+                        THCData%exact_ints = .true.
+                        call acph_driver(THCData, AuxData, Flags, CAONO)
+                        call move_alloc(THCData%TwoEl, TwoEl)
                   else if (Flags%Algorithm == ALG_SPINRES) then
                         print*, 'acph_spinres_driver'
                         call acph_spinres_driver(THCData, AuxData, Flags, IntsO)

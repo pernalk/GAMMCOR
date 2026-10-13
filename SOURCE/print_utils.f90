@@ -39,6 +39,7 @@ module print_utils
         module procedure print_info_int_arr
         module procedure print_info_dble
         module procedure print_info_dble2
+        module procedure print_info_log
   end interface print_info
   
 
@@ -84,8 +85,16 @@ contains
                 buf = trim(buf) // ', ' // trim(item)
             end if
         end do
-        write(*,'(2X,A,": ",A)') pad_label(label), trim(buf)
+        ! right-aligned like the I8 of print_info_int
+        write(*,'(2X,A,": ",A)') pad_label(label), &
+              repeat(' ', max(0, 8 - len_trim(buf))) // trim(buf)
     end subroutine print_info_int_arr
+
+    subroutine print_info_log(label, lval)
+        character(len=*), intent(in) :: label
+        logical, intent(in) :: lval
+        write(*,'(2X,A,": ",A8)') pad_label(label), merge('    TRUE', '   FALSE', lval)
+    end subroutine print_info_log
 
     subroutine print_info_dble(label, dval)
         character(len=*), intent(in) :: label
@@ -140,7 +149,7 @@ contains
           character(len=*), intent(in) :: label
           double precision, intent(in) :: energy_eh
           
-          write(*,'(2X,A,":",2X,F18.10,1X,A,4X,"(",F18.10,1X,A,")")') &
+          write(*,'(2X,A,":",2X,F18.10,1X,A)') &
                 pad_label(label), energy_eh, 'Eh'
     end subroutine print_energy1
 

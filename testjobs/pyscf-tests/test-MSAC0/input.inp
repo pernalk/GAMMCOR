@@ -1,0 +1,31 @@
+Calculation
+! BasisPath defined as pyscf_basis_path in run_tests.py
+ BasisPath
+ JobTitle MSAC0
+ Interface PYSCF
+ JobType MSAC0
+ RDMType CAS
+ TwoMoInt FOFO
+ Triplet False
+ Basis cc-pvdz.txt
+ units angstrom
+end
+
+System
+ state 1.1
+ znucl 12
+ Charge 0
+ ThrSelAct 1.d-4
+ ThrQVirt 1.d-4
+end
+
+Choleskyblock
+ Cholesky THC
+ Cholesky_Accuracy LUDICROUS
+end
+
+xyz
+2
+Li 0.0 0.0 0.0
+F 0.0 0.0 3.51
+end
