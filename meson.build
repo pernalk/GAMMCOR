@@ -178,6 +178,7 @@ sources = files(
   'SOURCE/thc_energy.f90',
 
   # -- ph path: THC back end
+  'SOURCE/thc_exact_ints.f90',
   'SOURCE/thc_auto_p0_ph.f90',
   'SOURCE/thc_auto_p2_ph.f90',
   'SOURCE/thc_auto_p3_ph.f90',

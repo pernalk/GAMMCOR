@@ -170,6 +170,10 @@ else
    Flags%DCholeskyThr  = Input%CholeskyParams%CholeskyThr
    Flags%DTHCThr       = Input%CholeskyParams%THCThr
    Flags%H0external    = Input%CholeskyParams%H0external
+   Flags%ITHCIO        = Input%CholeskyParams%THCIO
+   if( allocated(Input%CholeskyParams%THCFile)) then
+      Flags%THCFile = Input%CholeskyParams%THCFile
+   endif
    
    Flags%IH0Test       = Input%CholeskyParams%H0Test
 
@@ -501,11 +505,25 @@ end select
 
   end select
 
-  ! phAC0 with FOFO + Cholesky THC integrals (PySCF only):
+  ! phAC0 and MS-AC0 with the THC code (PySCF only): FOFO + Cholesky THC
+  ! integrals, or Algorithm THC + TwoMoInt INCORE, where the same code runs on
+  ! the exact integrals read from pyscf_data.h5 (thc_exact_ints).
   ! AT parser, direct PySCF reader, dispatch_acxx instead of DMSCF
-  ph_thc_at = (Flags%JobType == JOB_TYPE_AC0 .and. Flags%IPYSCF == 1 .and. &
-        Flags%ITwoEl == TWOMO_FOFO .and. Flags%ICholeskyTHC == 1)
+  ph_thc_at = ((Flags%JobType == JOB_TYPE_AC0 .or. Flags%JobType == JOB_TYPE_MSAC0) &
+        .and. Flags%IPYSCF == 1 .and. &
+        ((Flags%ITwoEl == TWOMO_FOFO .and. Flags%ICholeskyTHC == 1) .or. &
+         (Flags%ITwoEl == TWOMO_INCORE .and. Flags%Algorithm == ALG_THC)))
   if (ph_thc_at) Flags%Parser = PARSER_AT
+
+  ! MS-AC0: State n.m is the reference; the partners are the other states of
+  ! irrep m in pyscf_data.h5. Only InSt(:,1) reaches AuxData%nst, so a list
+  ! would be silently ignored.
+  if (ph_thc_at .and. Flags%JobType == JOB_TYPE_MSAC0 .and. &
+        Input%SystemInput(1)%NStates > 1) then
+        write(LOUT,'(1x,a)') 'ERROR! MSAC0 takes one State (the reference n.m);'
+        write(LOUT,'(1x,a)') 'the partner states are all other states of irrep m.'
+        stop
+  end if
 
   if (Flags%Parser == PARSER_AT) then
         if (Flags%IPYSCF == 1) then

@@ -23,6 +23,7 @@ gammcor_basis  = "gammcor_tools.gammcor_basis:main"
 gammcor_2h5    = "gammcor_tools.gammcor_2h5:main"
 gammcor_2bin   = "gammcor_tools.gammcor_2bin:main"
 gammcor_h5info = "gammcor_tools.gammcor_h5info:main"
+gammcor_heff   = "gammcor_tools.gammcor_heff:main"
 
 [tool.setuptools]
 # Explicit lists rather than auto-discovery: this directory also holds the

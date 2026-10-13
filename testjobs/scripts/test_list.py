@@ -33,6 +33,76 @@ def get():
         'runner': run_test,
         'units': {
             "pyscf-tests/test-ac0":  {'atol': 1.e-5, 'level': 'short'},
+            "pyscf-tests/test-ac0-incore-natorb":           {'atol': 1.e-5, 'level': 'short'},
+            "pyscf-tests/test-ac0-incore-canonical":        {'atol': 1.e-5, 'level': 'short'},
+            "pyscf-tests/test-ac0-incore-canonical-nosym":  {'atol': 1.e-5, 'level': 'short'},
+            "pyscf-tests/test-ac0-incore-rotated-active":   {'atol': 1.e-5, 'level': 'short'},
+        }
+    })
+
+    ### pyscf AC0 SA/SS, FOFO ###
+    tests_list.append({
+        'name': '* testing PySCF SA AC0-CAS energy (FOFO)',
+        'fun': ac0_en,
+        'runner': run_test,
+        'units': {
+            "pyscf-tests/test-SA-fofo":  {'atol': 1.e-5, 'level': 'short'},
+        }
+    })
+
+    tests_list.append({
+        'name': '* testing PySCF SS AC0-CAS energy (FOFO)',
+        'fun': ac0_en,
+        'runner': run_test,
+        'units': {
+            "pyscf-tests/test-SS-fofo":  {'atol': 1.e-5, 'level': 'short'},
+        }
+    })
+
+    ### pyscf AC0 SA/SS, THC ###
+    tests_list.append({
+        'name': '* testing PySCF SA AC0-CAS energy (THC)',
+        'fun': thc_ac0_en,
+        'runner': run_test,
+        'units': {
+            "pyscf-tests/test-SA-thc":  {'atol': 1.e-5, 'level': 'short'},
+        }
+    })
+
+    tests_list.append({
+        'name': '* testing PySCF SA AC0-CAS energy (THC, exact integrals)',
+        'fun': thc_ac0_en,
+        'runner': run_test,
+        'units': {
+            "pyscf-tests/test-SA-thc-exact":  {'atol': 1.e-5, 'level': 'short'},
+        }
+    })
+
+    tests_list.append({
+        'name': '* testing PySCF SS AC0-CAS energy (THC)',
+        'fun': thc_ac0_en,
+        'runner': run_test,
+        'units': {
+            "pyscf-tests/test-SS-thc":  {'atol': 1.e-5, 'level': 'short'},
+        }
+    })
+
+    tests_list.append({
+        'name': '* testing PySCF SS AC0-CAS energy (THC, exact integrals)',
+        'fun': thc_ac0_en,
+        'runner': run_test,
+        'units': {
+            "pyscf-tests/test-SS-thc-exact":  {'atol': 1.e-5, 'level': 'short'},
+        }
+    })
+
+    ### pyscf MS-AC0 ###
+    tests_list.append({
+        'name': '* testing PySCF MS-AC0 energy and H_mn 1.1 1.1, H_mn 2.1 1.1',
+        'fun': msac0_en,
+        'runner': run_test,
+        'units': {
+            "pyscf-tests/test-MSAC0":  {'atol': 1.e-5, 'level': 'short'},
         }
     })
 

@@ -5,39 +5,7 @@ from copy import deepcopy
 
 # sys.path.append('/path/to/gammcor/gammcor_tools/')
 
-try:
-    from Pyscf2Gammcor import get_data_for_gammcor
-except ImportError:
-    print("""
-    ====================================================================
-    !! ACTION REQUIRED: SCRIPT CONFIGURATION !!
-
-    Could not find the 'Pyscf2Gammcor' module. You need to configure
-    the paths in this script before running it.
-
-    Please open this file in a text editor and follow these steps:
-
-    1. Find the line below (around line 7):
-       #sys.path.append('/path/to/gammcor/gammcor_tools/')
-
-       a) Uncomment this line by removing the '#' at the beginning.
-       b) Replace the example path with the correct, full path to the
-          'gammcor_tools' directory inside your 'gammcor' directory.
-
-       Alternatively, install the tools once and skip this step for good:
-          pip install -e '/path/to/gammcor/gammcor_tools[pyscf]'
-
-    2. Find the line inside the main part of the script:
-       basis_file = '/path/to/gammcor/bazy-do-pyscf/cc-pvdz.nw'
-
-       a) Replace this example path with the correct, full path to your
-          basis file.
-
-    After editing and saving the file, run the script again.
-    ====================================================================
-    """)
-    sys.exit(1) 
-    
+from Pyscf2Gammcor import get_data_for_gammcor
 
 if __name__ == "__main__":
 

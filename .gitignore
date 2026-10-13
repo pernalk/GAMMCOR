@@ -48,6 +48,12 @@ SOURCE/implementation_plan_integration.md
 PP_INTEGRATION_PLAN.md
 auxilliary_codes/
 
+gammcor-phac0-thc.code-workspace
+!.skills/RDM_conventions.md
+!.skills/RDM_conventions_simple.md
+.testjobs_my/
+mini-tests.py
+
 # HDF5: built locally by hdf5/build_hdf5.sh (the .mod files depend on the exact
 # ifx version), so keep only the script and README.
 /hdf5/*
@@ -60,8 +66,6 @@ gammcor_tools/pyscf_data.h5
 *.egg-info/
 __pycache__/
 
-# local planning notes
-implementation_plans/
 
 # install.sh
 install.log

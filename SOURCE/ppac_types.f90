@@ -138,7 +138,11 @@ module ppac_types
             double precision, dimension(:,:), allocatable :: HNO
             double precision, dimension(:,:), allocatable :: J_SR
             logical :: H0external = .false.
-            
+            ! Algorithm THC + TwoMoInt INCORE: the THC code takes its integral
+            ! slabs from the exact packed integrals TwoEl (thc_exact_ints)
+            double precision, dimension(:), allocatable :: TwoEl
+            logical :: exact_ints = .false.
+
       end type TTHCData
 
       type tMxA
@@ -245,6 +249,11 @@ module ppac_types
             ! ph-AC0 THC frozen core: inactive orbitals 1..NFrozen are kept in
             ! the reference but excluded from every ph pair (set_frozen_ph)
             integer :: NFrozen = 0
+            ! MS-AC0: trdm(:,:,j) = gamma^JI(p,q) = 1/2 <J|E_qp|I> in the active NOs
+            ! of the reference I = nst; J = trdm_st(:,j) (state, irrep); NJ partners
+            integer :: NJ = 0
+            double precision, dimension(:,:,:), allocatable :: trdm
+            integer, dimension(:,:), allocatable :: trdm_st
             double precision :: omega = 1.0
             double precision :: ThrPP
             logical :: spinsep = .true.

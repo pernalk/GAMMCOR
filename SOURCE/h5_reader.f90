@@ -6,14 +6,23 @@ module h5_reader
       public :: HID_T
       public :: h5_init, h5_finish, h5_open, h5_close, h5_get, h5_attr, h5_exists, h5_size
       public :: h5_attr_exists
+      public :: h5_create, h5_put, h5_put_attr
 
       interface h5_get
-            module procedure get_d1, get_d2, get_d3, get_d4, get_i1
+            module procedure get_d0, get_d1, get_d2, get_d3, get_d4, get_i0, get_i1
       end interface h5_get
 
       interface h5_attr
             module procedure attr_d, attr_s
       end interface h5_attr
+
+      interface h5_put
+            module procedure put_d0, put_d1, put_d2, put_i0, put_i1
+      end interface h5_put
+
+      interface h5_put_attr
+            module procedure put_attr_d, put_attr_s
+      end interface h5_put_attr
 
 contains
 
@@ -34,6 +43,15 @@ contains
             call h5fopen_f(filename, H5F_ACC_RDONLY_F, fid, ierr)
             if (ierr /= 0) error stop "h5_open: cannot open "//filename
       end function h5_open
+
+      ! Create a new file for writing; an existing file is overwritten.
+      function h5_create(filename) result(fid)
+            character(len=*), intent(in) :: filename
+            integer(HID_T) :: fid
+            integer :: ierr
+            call h5fcreate_f(filename, H5F_ACC_TRUNC_F, fid, ierr)
+            if (ierr /= 0) error stop "h5_create: cannot create "//filename
+      end function h5_create
 
       subroutine h5_close(fid)
             integer(HID_T), intent(in) :: fid
@@ -153,6 +171,25 @@ contains
             if (ierr /= 0) error stop "h5_get: read failed "//path
       end subroutine get_i1
 
+      ! Scalars are stored as 1-element datasets (see put_d0/put_i0).
+      subroutine get_d0(fid, path, a)
+            integer(HID_T), intent(in) :: fid
+            character(len=*), intent(in) :: path
+            double precision, intent(out) :: a
+            double precision :: buf(1)
+            call get_d1(fid, path, buf)
+            a = buf(1)
+      end subroutine get_d0
+
+      subroutine get_i0(fid, path, a)
+            integer(HID_T), intent(in) :: fid
+            character(len=*), intent(in) :: path
+            integer, intent(out) :: a
+            integer :: buf(1)
+            call get_i1(fid, path, buf)
+            a = buf(1)
+      end subroutine get_i0
+
       subroutine attr_d(fid, path, name, val)
             integer(HID_T), intent(in) :: fid
             character(len=*), intent(in) :: path, name
@@ -221,5 +258,112 @@ contains
             call h5tclose_f(tid, ierr)
             call h5aclose_f(aid, ierr)
       end subroutine attr_s
+
+      ! ================= writers =================
+      ! Fortran writes column-major and the readers above read it back the same
+      ! way, so a(m,n) written here comes back as a(m,n) with h5_get.
+
+      ! Create the missing groups on the way to a dataset, e.g. /THC for /THC/XGP.
+      subroutine make_parents(fid, path)
+            integer(HID_T), intent(in) :: fid
+            character(len=*), intent(in) :: path
+            integer(HID_T) :: gid
+            logical :: exists
+            integer :: k, ierr
+            do k = 2, len(path)
+                  if (path(k:k) /= "/") cycle
+                  call h5lexists_f(fid, path(1:k-1), exists, ierr)
+                  if (exists) cycle
+                  call h5gcreate_f(fid, path(1:k-1), gid, ierr)
+                  if (ierr /= 0) error stop "h5_put: cannot create group "//path(1:k-1)
+                  call h5gclose_f(gid, ierr)
+            end do
+      end subroutine make_parents
+
+      subroutine put_d2(fid, path, a)
+            integer(HID_T), intent(in) :: fid
+            character(len=*), intent(in) :: path
+            double precision, intent(in) :: a(:,:)
+            integer(HSIZE_T) :: dims(2)
+            integer :: ierr
+            call make_parents(fid, path)
+            dims = int(shape(a), HSIZE_T)
+            call h5ltmake_dataset_double_f(fid, path, 2, dims, a, ierr)
+            if (ierr /= 0) error stop "h5_put: write failed "//path
+      end subroutine put_d2
+
+      subroutine put_d1(fid, path, a)
+            integer(HID_T), intent(in) :: fid
+            character(len=*), intent(in) :: path
+            double precision, intent(in) :: a(:)
+            integer(HSIZE_T) :: dims(1)
+            integer :: ierr
+            call make_parents(fid, path)
+            dims = int(shape(a), HSIZE_T)
+            call h5ltmake_dataset_double_f(fid, path, 1, dims, a, ierr)
+            if (ierr /= 0) error stop "h5_put: write failed "//path
+      end subroutine put_d1
+
+      subroutine put_i1(fid, path, a)
+            integer(HID_T), intent(in) :: fid
+            character(len=*), intent(in) :: path
+            integer, intent(in) :: a(:)
+            integer(HSIZE_T) :: dims(1)
+            integer :: ierr
+            call make_parents(fid, path)
+            dims = int(shape(a), HSIZE_T)
+            call h5ltmake_dataset_int_f(fid, path, 1, dims, a, ierr)
+            if (ierr /= 0) error stop "h5_put: write failed "//path
+      end subroutine put_i1
+
+      ! Scalars go through a named 1-element buffer rather than [a], for the
+      ! same temporary-array reason as the dims argument above.
+      subroutine put_d0(fid, path, a)
+            integer(HID_T), intent(in) :: fid
+            character(len=*), intent(in) :: path
+            double precision, intent(in) :: a
+            double precision :: buf(1)
+            buf(1) = a
+            call put_d1(fid, path, buf)
+      end subroutine put_d0
+
+      subroutine put_i0(fid, path, a)
+            integer(HID_T), intent(in) :: fid
+            character(len=*), intent(in) :: path
+            integer, intent(in) :: a
+            integer :: buf(1)
+            buf(1) = a
+            call put_i1(fid, path, buf)
+      end subroutine put_i0
+
+      ! Attributes are attached to an existing object (a dataset, a group or "/").
+      subroutine put_attr_d(fid, path, name, val)
+            integer(HID_T), intent(in) :: fid
+            character(len=*), intent(in) :: path, name
+            double precision, intent(in) :: val
+            double precision :: buf(1)
+            integer(SIZE_T) :: n
+            integer :: ierr
+            buf(1) = val
+            n = 1
+            call h5ltset_attribute_double_f(fid, path, name, buf, n, ierr)
+            if (ierr /= 0) then
+                  print *, "h5_put_attr: write failed ", trim(name), " on ", trim(path)
+                  error stop
+            end if
+      end subroutine put_attr_d
+
+      ! Written as a fixed-length string, which attr_s reads back directly.
+      subroutine put_attr_s(fid, path, name, val)
+            integer(HID_T), intent(in) :: fid
+            character(len=*), intent(in) :: path, name
+            character(len=*), intent(in) :: val
+            integer :: ierr
+            call h5ltset_attribute_string_f(fid, path, name, val, ierr)
+            if (ierr /= 0) then
+                  print *, "h5_put_attr: write failed ", trim(name), " on ", trim(path)
+                  error stop
+            end if
+      end subroutine put_attr_s
 
 end module h5_reader

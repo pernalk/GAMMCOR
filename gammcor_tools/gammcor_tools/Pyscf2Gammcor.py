@@ -231,6 +231,41 @@ def is_dmrgci(solver):
     return any(cls.__name__ == 'DMRGCI' for cls in type(solver).__mro__)
 
 
+TRDM1_CONVENTION = 'gamma^JI_pq = 1/2 <J|E_qp|I>, Fortran reads gamma(p,q)'
+
+
+def dump_transition_rdm1(dump, mycas, state_tags, state_solver):
+    """Write POSTHF/TRANSITIONS/<tagJ>_<tagI>/TRDM1 for every pair I < J
+    owned by the same fcisolver (other pairs vanish by symmetry or spin).
+
+    gamma^JI_pq = 1/2 <J|E_qp|I> = 0.5 * trans_rdm1(ci[J], ci[I])[p,q]
+    (PySCF: trans_rdm1(bra, ket)[p,q] = <bra|q^+ p|ket>, spin summed).
+    gamma.T is stored, so that Fortran's column-major h5_get sees gamma(p,q).
+    gamma^IJ = (gamma^JI)^T for real CI vectors, so only one is written.
+    Active orbitals of POSTHF/ORB_COEFF (the SA-CASSCF MOs).
+    """
+    ci = mycas.ci
+    ncas = mycas.ncas
+    pairs = []
+    for i in range(len(state_tags)):
+        for j in range(i + 1, len(state_tags)):
+            isolver, solver, nelec = state_solver[i]
+            if state_solver[j][0] != isolver:
+                continue
+            gamma = 0.5 * np.asarray(solver.trans_rdm1(ci[j], ci[i], ncas, nelec))
+            tag_i, tag_j = state_tags[i], state_tags[j]
+            dump.array(f'POSTHF/TRANSITIONS/{tag_j}_{tag_i}/TRDM1', gamma.T,
+                       f'trdm1_{tag_j}_{tag_i}.bin',
+                       attrs={'BRA': tag_j, 'KET': tag_i,
+                              'CONVENTION': TRDM1_CONVENTION,
+                              'BASIS': 'active MOs of POSTHF/ORB_COEFF'})
+            pairs.append((tag_j, tag_i, np.abs(gamma).max()))
+    if pairs:
+        print("\nTransition 1-RDMs written (bra_ket, max |gamma|):")
+        for tag_j, tag_i, gmax in pairs:
+            print(f"  {tag_j}_{tag_i}  {gmax:12.6e}")
+
+
 def calc_full_dm2(dm2s, thresh=1e-8):
     """
     Build and dump the spin-traced 2-RDM from spin blocks:
@@ -575,14 +610,20 @@ def get_data_for_gammcor(mol, myhf, mycas, mymp = None, dump_eri=False, simple =
         print(f"State averaging weights: {mycas.weights}\n")
 
         # Get state symmetries
+        # state_solver[i]: the fcisolver that owns state i, with its nelec.
+        # Transition densities are only written between states of one solver.
         if hasattr(mycas.fcisolver, 'fcisolvers'):
             solvers = mycas.fcisolver.fcisolvers
             state_symmetries = []
-            for solver in solvers:
+            state_solver = []
+            for isolver, solver in enumerate(solvers):
                 state_symmetries.extend([solver.wfnsym] * solver.nroots)
+                nelec_s = mycas.fcisolver._get_nelec(solver, mycas.nelecas)
+                state_solver.extend([(isolver, solver, nelec_s)] * solver.nroots)
         else:
             solver = mycas.fcisolver
             state_symmetries = [solver.wfnsym] * solver.nroots
+            state_solver = [(0, solver, mycas.nelecas)] * solver.nroots
 
         print("State-by-State Analysis:")
         print("-" * 70)
@@ -744,6 +785,9 @@ def get_data_for_gammcor(mol, myhf, mycas, mymp = None, dump_eri=False, simple =
             state_tags.append(state_tag)
             state_energies.append(energy)
 
+        # Transition 1-RDMs for MS-AC0 (same mycas.ci as the RDMs above)
+        dump_transition_rdm1(dump, mycas, state_tags, state_solver)
+
         # Save additional data
         HCore = myhf.get_hcore()
 
@@ -831,7 +875,15 @@ def get_data_for_gammcor(mol, myhf, mycas, mymp = None, dump_eri=False, simple =
     else:
         print(" State-specific CASSCF Analysis ".center(lll, f"{c}"))
 
-        occ = mycas.mo_occ  
+        occ = mycas.mo_occ
+        if occ is None:
+            # natorb = False: PySCF sets no mo_occ. Use the diagonal of the
+            # active 1-RDM (MO basis); GAMMCOR reads POSTHF/OCC only for
+            # natural orbitals and recomputes Occ in Trans2NO_AO otherwise.
+            occ = np.zeros(mycas.mo_coeff.shape[1])
+            occ[:mycas.ncore] = 2.0
+            dm1_cas = mycas.fcisolver.make_rdm1(mycas.ci, mycas.ncas, mycas.nelecas)
+            occ[mycas.ncore:mycas.ncore + mycas.ncas] = np.diag(dm1_cas)
         occ = occ / 2.0
 
         CAONO = mycas.mo_coeff  # Natural orbital coefficients
@@ -961,14 +1013,13 @@ def get_data_for_gammcor(mol, myhf, mycas, mymp = None, dump_eri=False, simple =
             dump.state_meta(sgrp, state_tag, 1, casscf_energy, 'A', 1,
                             active_irreps=active_irreps)
 
-            occ = mycas.mo_occ
-            
+            # occ is mo_occ/2 (or its natorb = False placeholder); print on the 0..2 scale
             print("\n=== Active Space Orbitals ===\n")
             print("{:<6} {:<12} {:<6}".format("MO#", "Occupancy", "Irrep"))
             for j in range(ncas):
                 print("{:<6} {:<18.9f} {:<6}".format(
                     j + ncore + 1,
-                    occ[j+ncore],
+                    2.0 * occ[j+ncore],
                     active_irreps[j]))
         else:
             # Print without symmetry labels
@@ -985,9 +1036,12 @@ def get_data_for_gammcor(mol, myhf, mycas, mymp = None, dump_eri=False, simple =
 
 
         if dump_eri:
-            
-            doMOtrans = True
-            
+
+            # Natural orbitals: ERI in the NO basis, GAMMCOR uses them as they are.
+            # Otherwise ERI in AO (as in the SA branch): GAMMCOR's Trans2NO_AO
+            # transforms them with CAONO = CAOMO*CMONO, which assumes AO input.
+            doMOtrans = bool(natorb)
+
             # This is version with MO transoformation done in pyscf
             start_time = time.time()
 

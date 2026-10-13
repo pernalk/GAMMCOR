@@ -25,6 +25,8 @@ contains
             type(TTHCData), intent(inout) :: THCData
             type (tclock) :: timer
             integer :: ij, ind, i, j, k
+            double precision :: E_corr
+            double precision, dimension(:), allocatable :: DeltaH
 
 
 
@@ -116,9 +118,20 @@ contains
 
             select case(Flags%Jobtype)
 
-            case(JOB_TYPE_AC0)
+            case(JOB_TYPE_AC0, JOB_TYPE_MSAC0)
 
                   select case(Flags%ITwoEl)
+
+                  case(TWOMO_INCORE)
+                        if (Flags%Algorithm == ALG_THC) then
+                              ! THCData%TwoEl is set up in dispatch_acxx, the
+                              ! canonicalization in read_PYSCF (thc_exact_ints)
+                              call print_section('phAC0 calculation')
+                              call print_info('Two-electron integrals', 'exact (PySCF), THC code')
+                              call clock_start(timer)
+                              call ACPH0_THC(THCData, AuxData, CAONO, Flags, E_corr, DeltaH)
+                              call tmsg('TIME FOR ACPH0_THC', timer, 0)
+                        end if
 
                   case(3)
                         select case(Flags%ICholeskyTHC)
@@ -127,7 +140,7 @@ contains
                               call print_section('phAC0 calculation')
                               call print_info('Two-electron integrals', 'THC')
                               call clock_start(timer)
-                              call ACPH0_THC(THCData, AuxData, CAONO, Flags)
+                              call ACPH0_THC(THCData, AuxData, CAONO, Flags, E_corr, DeltaH)
                               call tmsg('TIME FOR ACPH0_THC', timer, 0)
 
                         case default
