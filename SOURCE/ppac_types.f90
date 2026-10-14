@@ -224,6 +224,8 @@ module ppac_types
             double precision :: ECAS_calc = 0.d0   ! CAS energy from RDMs + full TwoEl (check_energy_incore[_spinres])
             double precision :: ECAS_oneelectr = 0.d0
             double precision :: EROHF
+            double precision :: EMP2_pyscf = 0.d0  ! PySCF MP2 E_corr (POSTHF/MP2/E_CORR), for comparison only
+            logical :: HasEMP2_pyscf = .false.
             logical :: pherpa_print = .false.
             logical :: pperpa_print = .false.
             integer :: HType

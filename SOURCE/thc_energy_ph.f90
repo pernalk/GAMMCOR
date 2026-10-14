@@ -1733,6 +1733,7 @@ contains
       ! Slab (b,a) is the transpose of slab (a,b), and after x <-> y it gives
       ! exactly the same sum (no A1 symmetry is assumed - it is all integrals).
       ! So the caller runs b <= a and the a /= b slabs count twice.
+      ! The sum itself is vovo_slab.
       ! =============================================================================
       subroutine vovo_contr(E_vovo, VO, pos, a, b, x0, x1, V_axby)
             double precision, intent(inout) :: E_vovo
@@ -1742,14 +1743,36 @@ contains
             integer, intent(in) :: x0, x1
             double precision, dimension(x0:x1, x0:x1), intent(in) :: V_axby
             double precision, dimension(x0:x1) :: om_a, om_b
-            double precision :: val
-            integer :: x, y
+            integer :: x
 
             ! vo has no filtered pairs, pos(x,a) > 0 always
             do x = x0, x1
                   om_a(x) = VO%Eig(pos(x, a))
                   om_b(x) = VO%Eig(pos(x, b))
             end do
+
+            call vovo_slab(E_vovo, om_a, om_b, a, b, x0, x1, V_axby)
+
+      end subroutine vovo_contr
+
+
+      ! =============================================================================
+      ! The sum of vovo_contr for one (IV|IV) slab, with the vo omegas given:
+      !
+      !   E_vovo += sum_{x,y} V_axby(x,y) [V_axby(y,x) - 2 V_axby(x,y)] / (om_a(x) + om_b(y))
+      !
+      ! om_a(x) = omega of the vo pair (x,a), om_b(y) = omega of (y,b). Doubled
+      ! for a /= b (the caller runs b <= a). Also used by mp2_energy_thc (mp.f90),
+      ! which takes omega = fvw - fij directly instead of the vo A0 block.
+      ! =============================================================================
+      subroutine vovo_slab(E_vovo, om_a, om_b, a, b, x0, x1, V_axby)
+            double precision, intent(inout) :: E_vovo
+            integer, intent(in) :: x0, x1
+            double precision, dimension(x0:x1), intent(in) :: om_a, om_b
+            integer, intent(in) :: a, b
+            double precision, dimension(x0:x1, x0:x1), intent(in) :: V_axby
+            double precision :: val
+            integer :: x, y
 
             val = zero
             !$omp parallel do default(shared) private(x, y) reduction(+:val)
@@ -1764,7 +1787,7 @@ contains
             if (a /= b) val = two * val
             E_vovo = E_vovo + val
 
-      end subroutine vovo_contr
+      end subroutine vovo_slab
 
 
       ! =============================================================================

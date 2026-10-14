@@ -475,6 +475,13 @@ def dump_ks_tddft(dump, mol, mf, g, tds, dump_ab=True):
             print(f'TDDFT/{tag}: max |omega(A,B) - td.e| = {np.max(np.abs(w - e)):.2e}')
 
 
+def frozen_count(mymp):
+    """Number of frozen orbitals of a pyscf MP2 object (0 if mymp is None)."""
+    if mymp is None or mymp.frozen is None:
+        return 0
+    return int(mymp.frozen) if np.isscalar(mymp.frozen) else len(mymp.frozen)
+
+
 def dump_ks_for_gammcor(mol, mf, mymp=None, mp2_scale=None, dump_eri=True,
                         dump_grid=False, tds=None, dump_ab=True, filename=H5FILE):
     """RKS reference (+ pyscf MP2 result) -> HDF5, for the GAMMCOR RKS/MP2/TDDFT path.
@@ -506,9 +513,7 @@ def dump_ks_for_gammcor(mol, mf, mymp=None, mp2_scale=None, dump_eri=True,
     NV = nbasis - NI - NA
     if NA != 0:
         raise RuntimeError('open-shell reference: dump_ks_for_gammcor handles RKS only')
-    frozen = 0
-    if mymp is not None and mymp.frozen is not None:
-        frozen = int(mymp.frozen) if np.isscalar(mymp.frozen) else len(mymp.frozen)
+    frozen = frozen_count(mymp)
 
     dump.int_array('SCF/MO_OCC_INT', mo_occ.astype(np.int32))
 
@@ -568,7 +573,7 @@ def dump_ks_for_gammcor(mol, mf, mymp=None, mp2_scale=None, dump_eri=True,
     print(f'wrote {filename}: NBASIS={nbasis} NI={NI} NV={NV} FROZEN={frozen}')
 
 
-def get_data_for_gammcor(mol, myhf, mycas, mymp = None, dump_eri=False, simple = True,
+def get_data_for_gammcor(mol, myhf, mycas = None, mymp = None, dump_eri=False, simple = True,
                          dump_hdf5 = True, dump_dft = False, mp2_scale = None,
                          dump_grid = False, tds = None, dump_ab = True):
     """Process and export CASSCF calculation data for GAMMCOR.
@@ -577,11 +582,17 @@ def get_data_for_gammcor(mol, myhf, mycas, mymp = None, dump_eri=False, simple =
     dump_hdf5 = False -> the legacy loose .bin/.txt files, exactly as before
     dump_dft  = True  -> myhf is a converged RKS object; only the RKS/MP2/TDDFT
                          data are written (dump_ks_for_gammcor), mycas is ignored
+    mycas = None      -> HF reference only, for JobType MP2/SRMP2
+                         (get_rohf_for_gammcor); mymp is optional, for checks
     """
 
     if dump_dft:
         dump_ks_for_gammcor(mol, myhf, mymp, mp2_scale=mp2_scale, dump_eri=dump_eri,
                             dump_grid=dump_grid, tds=tds, dump_ab=dump_ab)
+        return
+
+    if mycas is None:
+        get_rohf_for_gammcor(mol, myhf, mymp=mymp, dump_hdf5=dump_hdf5)
         return
 
     storage_name = H5FILE
@@ -978,10 +989,8 @@ def get_data_for_gammcor(mol, myhf, mycas, mymp = None, dump_eri=False, simple =
             natorb = 0
             print("Natural orbitals NOT used. mycas.natorb=", mycas.natorb)
             
-        frozen = 0
-        if mymp is not None:
-            frozen = mymp.frozen
-            
+        frozen = frozen_count(mymp)
+
         dump.aux(['NBASIS', 'NI', 'NA', 'NV', 'ECAS', 'ENUC', 'NEL', 'NATORB', 'FROZEN'],
                  [nbasis, NI, NA, NV, casscf_energy, Enuc, NEL, natorb, frozen],
                  'auxdata.txt', state_group=sgrp,
@@ -1109,10 +1118,13 @@ def get_data_for_gammcor(mol, myhf, mycas, mymp = None, dump_eri=False, simple =
             print(f"\nTime spent on ERI transformation and processing: {end_time - mid_time:.2f} seconds")
 
 
-def get_rohf_for_gammcor(mol, myhf, dump_hdf5 = True):
+def get_rohf_for_gammcor(mol, myhf, mymp = None, dump_hdf5 = True):
     """ROHF/MP2 export. Same quantities and the same conventions as
     get_rohf_for_gammcor in Pyscf2Gammcor_legacy.py; dump_hdf5 only changes where
     they land.
+
+    mymp: optional converged pyscf MP2, used only for checks in GAMMCOR
+          (REF/FROZEN vs NCoreOrb, POSTHF/MP2/E_CORR vs the GAMMCOR MP2 energy)
 
     dump_hdf5 = True  -> appended to H5FILE (SCF/, INTS/, REF/, POSTHF/)
     dump_hdf5 = False -> mo_occ_int.bin, occ_rohf.bin, auxdata_rohf.txt,
@@ -1153,9 +1165,14 @@ def get_rohf_for_gammcor(mol, myhf, dump_hdf5 = True):
     print(f"NA (pojedynczo obsadzone): {NA}")
     print(f"NV (wirtualne): {NV}")
 
+    if NA > 0:
+        print('NOTE: open-shell reference (NA > 0); GAMMCOR MP2/SRMP2 is closed-shell only')
+
+    frozen = frozen_count(mymp)
+
     occ = myhf.mo_occ
     CAONO = myhf.mo_coeff
-    HCore = mol.intor('int1e_kin') + mol.intor('int1e_nuc')
+    HCore = myhf.get_hcore()
 
     state_tag = '1.1'
     sgrp = f'POSTHF/STATES/{state_tag}'
@@ -1165,10 +1182,12 @@ def get_rohf_for_gammcor(mol, myhf, dump_hdf5 = True):
                attrs={'TYPE': 'CANONICAL', 'DIMS': ['mo', 'ao']})
     dump.array('SCF/MO_OCC', occ, 'occ_rohf.bin')
 
-    dump.aux(['NBASIS', 'NI', 'NA', 'NV', 'EROHF', 'ENUC', 'NEL'],
-             [nbasis, int(NI), int(NA), int(NV), ROHF, Enuc, NEL],
+    dump.aux(['NBASIS', 'NI', 'NA', 'NV', 'EROHF', 'ENUC', 'NEL', 'NATORB', 'FROZEN'],
+             [nbasis, int(NI), int(NA), int(NV), ROHF, Enuc, NEL, 0, frozen],
              'auxdata_rohf.txt', state_group=sgrp,
              legacy_text=f"{nbasis}\n{NI}\n{NA}\n{NV}\n{ROHF}\n{Enuc}\n{NEL}\n")
+    if mymp is not None:
+        dump.array('POSTHF/MP2/E_CORR', np.array([mymp.e_corr]))
     dump.orb_space(nbasis, NI, NA)
     dump.state_meta(sgrp, state_tag, 1, ROHF, 'A', 1)
     dump.states_index([state_tag], [ROHF])

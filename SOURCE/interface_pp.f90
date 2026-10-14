@@ -265,6 +265,7 @@ contains
             if (Flags%JOBTYPE == JOB_TYPE_MP2 .or. Flags%JOBTYPE == JOB_TYPE_SRMP2) then
                   call load_mp2_aux_data(AuxData)
                   AuxData%PYSCF = 1
+                  natural_orb = 0   ! HF canonical orbitals: CAONO = CAOMO
             else
                   call resolve_state_suffix(AuxData, suffix)
                   call load_cas_aux_data(suffix, AuxData, natural_orb)
@@ -907,8 +908,35 @@ contains
           call h5_get(pyscf_fid, '/REF/ENUC',   dv); AuxData%ENuc   = dv(1)
           call h5_attr(pyscf_fid, '/POSTHF/STATES/1.1', 'ENERGY', AuxData%EROHF)
           AuxData%NIA = AuxData%NI + AuxData%NA
+
+          if (AuxData%NA > 0) then
+                write(*, '(1x,a,i0,a)') 'ERROR: MP2/SRMP2 needs a closed-shell reference, NA = ', &
+                      AuxData%NA, ' singly occupied orbitals in pyscf_data.h5'
+                stop
+          end if
+
           allocate(AuxData%IndAux(AuxData%NBasis))
-          call h5_get(pyscf_fid, '/SCF/MO_OCC_INT', AuxData%IndAux)
+          AuxData%IndAux = 2
+          AuxData%IndAux(1:AuxData%NI) = 0
+          AuxData%IndAux(AuxData%NI+1:AuxData%NIA) = 1
+
+          ! Frozen core comes from NCoreOrb in input.inp; REF/FROZEN (pyscf MP2) is only checked.
+          call print_info('NCoreOrb (frozen, from input)', AuxData%NCoreOrb)
+          if (h5_exists(pyscf_fid, '/REF/FROZEN')) then
+                call h5_get(pyscf_fid, '/REF/FROZEN', iv)
+                call print_info('REF/FROZEN (pyscf)', iv(1))
+                if (iv(1) /= AuxData%NCoreOrb) then
+                      write(*, '(1x,a,i0,a,i0,a)') 'WARNING: NCoreOrb = ', AuxData%NCoreOrb, &
+                            ' differs from REF/FROZEN = ', iv(1), '; NCoreOrb is used'
+                end if
+          end if
+
+          if (h5_exists(pyscf_fid, '/POSTHF/MP2/E_CORR')) then
+                call h5_get(pyscf_fid, '/POSTHF/MP2/E_CORR', dv)
+                AuxData%EMP2_pyscf = dv(1)
+                AuxData%HasEMP2_pyscf = .true.
+                call print_info('PySCF MP2 E_corr', AuxData%EMP2_pyscf)
+          end if
     end subroutine load_mp2_aux_data
 
     subroutine load_density_matrices(suffix, AuxData, THCData, CAOMO, CAONO, Flags, AObasis, System, TwoEl, only_full)

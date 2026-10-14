@@ -594,6 +594,9 @@ end select
 
  ! Inactive
   Flags%IFlCore = Input%CalcParams%Core
+ ! MP2/SRMP2: core always frozen via NCoreOrb, also in mu(r) (LOC_MU_CBS_CHOL
+ ! reads the common IFlCore, copied from Flags%IFlCore in mainp before dispatch)
+  if (Flags%JobType == JOB_TYPE_MP2 .or. Flags%JobType == JOB_TYPE_SRMP2) Flags%IFlCore = 0
 
  !Flags%IFl12 = FLAG_DEBUG_FL12
 

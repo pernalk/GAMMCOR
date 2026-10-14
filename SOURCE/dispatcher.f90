@@ -46,8 +46,7 @@ contains
                   end if
 
             case(JOB_TYPE_MP2, JOB_TYPE_SRMP2)
-
-                  Flags%IFlCore = 0
+                  ! Flags%IFlCore = 0 is set in systemdef (fill_Flags)
                   print*, 'mp2_driver'
                   call mp2_driver(THCData, AuxData, CAONO, Flags)
 

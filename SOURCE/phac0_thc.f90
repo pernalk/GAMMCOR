@@ -114,7 +114,6 @@ contains
 
       subroutine ACPH0_THC(THCData, AuxData, CAONO_IN, Flags, E_corr, DeltaH)
             use THC_Gammcor
-            use ppac0_thc, only: update_HNO_AC0
 
             type(TACppData), intent(inout) :: AuxData
             double precision, dimension(:,:), intent(in) :: CAONO_IN

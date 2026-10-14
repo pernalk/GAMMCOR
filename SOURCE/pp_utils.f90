@@ -9,11 +9,66 @@ module pp_utils
 
       use math_constants
       use quadratures
+      use ppac_types
 
       implicit none
 
 
 contains
+
+
+      ! One-electron matrix of the Dyall Hamiltonian H^(0), for the A0 blocks ONLY
+      ! (used by both pp and ph):
+      !   HNO(i,i) = wij(i)                         i inactive (orbital energy)
+      !   HNO(v,v) = wvw(v)                         v virtual  (orbital energy)
+      !   HNO(q,s) = HNO0(q,s) + 2*BuxII - AuxII    q,s active (h^core)
+      !   all other elements zero (inact/virt off-diagonals, every cross-space one)
+      ! The A1 blocks need the bare h instead and get AuxData%HNO0 (PPERPA_THC,
+      ! PHERPA_A1_THC). Also sets AuxData%ECAS_oneelectr.                                                                                                                                                                                                                                                                                                           
+      subroutine update_HNO_AC0(AuxData, HNO, wij, wvw, AuxII, BuxII)
+            type(TACppData), intent(inout) :: AuxData
+            double precision, dimension(:, :), intent(out) :: HNO
+            double precision, dimension(:), intent(in) :: wij, wvw
+            double precision, dimension(:,:), intent(in) :: AuxII, BuxII
+            integer :: q, s, i
+            double precision :: etot
+
+            associate(NBasis=>AuxData%NBasis, IndAux=>AuxData%IndAux, NI=>AuxData%NI, NIA=>AuxData%NIA, NV=>AuxData%NV, HNO0=>AuxData%HNO0)
+
+
+              HNO = zero
+
+              do q = 1, NI
+                    HNO(q, q) = wij(q)
+              end do
+
+              do q = 1, NV
+                    HNO(q+NIA, q+NIA) = wvw(q)
+              end do
+
+              do q = NI+1, NIA
+                    do s = NI+1, NIA
+
+                          HNO(q, s) = HNO0(q, s)
+
+                          HNO(q,s) = HNO(q, s) + (Two * BuxII(q, s)  - AuxII(q,s))
+
+                    end do
+              end do
+
+
+
+
+            etot = 0
+            do i = 1, NBasis
+                  etot=etot + two* AuxData%Occ(i) * HNO0(i, i)
+            !      write(*, '(I5, 3F40.20)')i, hno0(i,i), AuxData%Occ(i), AuxData%Occ(i)*two*hno0(i,i)                                                                                                                                                                                                                                                              
+            end do
+
+            AuxData%ECAS_oneelectr = etot
+          end associate
+
+        end subroutine update_HNO_AC0
 
 
 
