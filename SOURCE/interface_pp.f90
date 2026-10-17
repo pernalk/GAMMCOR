@@ -262,8 +262,8 @@ contains
             call print_info('AuxData%nst', AuxData%nst)
             call print_info('Flags%JobType', Flags%JobType)
 
-            if (Flags%JOBTYPE == JOB_TYPE_MP2 .or. Flags%JOBTYPE == JOB_TYPE_SRMP2) then
-                  call load_mp2_aux_data(AuxData)
+            if (Flags%JOBTYPE == JOB_TYPE_MP2) then
+                  call load_mp2_aux_data(AuxData, Flags)
                   AuxData%PYSCF = 1
                   natural_orb = 0   ! HF canonical orbitals: CAONO = CAOMO
             else
@@ -304,7 +304,7 @@ contains
               !       end do
               ! end do
 
-              if (Flags%JOBTYPE /= JOB_TYPE_MP2 .and. Flags%JOBTYPE /= JOB_TYPE_SRMP2) then
+              if (Flags%JOBTYPE /= JOB_TYPE_MP2) then
 
                     if ((Flags%JOBTYPE == JOB_TYPE_AC0 .or. Flags%JOBTYPE == JOB_TYPE_MSAC0) &
                           .and. Flags%ITwoEl > 1)then
@@ -894,8 +894,9 @@ contains
 
     
     
-    subroutine load_mp2_aux_data(AuxData)
+    subroutine load_mp2_aux_data(AuxData, Flags)
           type(TACppData), intent(inout) :: AuxData
+          type(FlagsData), intent(in) :: Flags
           integer :: iv(1)
           double precision :: dv(1)
 
@@ -909,8 +910,10 @@ contains
           call h5_attr(pyscf_fid, '/POSTHF/STATES/1.1', 'ENERGY', AuxData%EROHF)
           AuxData%NIA = AuxData%NI + AuxData%NA
 
-          if (AuxData%NA > 0) then
-                write(*, '(1x,a,i0,a)') 'ERROR: MP2/SRMP2 needs a closed-shell reference, NA = ', &
+          ! NA > 0 (ROHF): JobType MP2 runs ROMP2, with cbs 2 ROMP2-CBS[H]. cbs 1
+          ! (CBS[DFT]) needs a spin-polarized PBE and is closed shell only.
+          if (AuxData%NA > 0 .and. Flags%IDBBSC == 1) then
+                write(*, '(1x,a,i0,a)') 'ERROR: MP2 with cbs 1 needs a closed-shell reference, NA = ', &
                       AuxData%NA, ' singly occupied orbitals in pyscf_data.h5'
                 stop
           end if
@@ -1285,7 +1288,7 @@ contains
           ! (natural_orb == 1) or CAOMO (natural_orb == 0).
           ! HNO0 is AO on exit for every natural_orb and ITwoEl; read_PYSCF
           ! (INCORE) or THC_init2 (THC) moves it to the NO basis later.
-          ! For MP2/SRMP2 CAONO = CAOMO (no NO transformation).
+          ! For MP2 CAONO = CAOMO (no NO transformation).
           !
           type(TACppData), intent(inout) :: AuxData
           type(TTHCData), intent(inout) :: THCData
@@ -1318,7 +1321,7 @@ contains
                 ! Allocate CAONO to be filled later by Trans2NO (or copied if MP2)
                 allocate(CAONO(AuxData%NBasis, AuxData%NBasis))
 
-                if (Flags%JOBTYPE == JOB_TYPE_MP2 .or. Flags%JOBTYPE == JOB_TYPE_SRMP2) then
+                if (Flags%JOBTYPE == JOB_TYPE_MP2) then
                       CAONO = CAOMO
                 end if
           endif
@@ -2825,7 +2828,7 @@ end subroutine save_2rdm_orca
             ! ETot0 = zero
             
             
-            ! if (Flags%JOBTYPE .ne. JOB_TYPE_MP2 .and. Flags%JOBTYPE .ne. JOB_TYPE_SRMP2) then                    
+            ! if (Flags%JOBTYPE .ne. JOB_TYPE_MP2) then                    
             !       do i = 1, NBasis
             !             ETot0 = ETot0 + two* AuxData%Occ(i) * AuxData%HNO0(i,i)                  
             !             !write(*, '(I5, 2F20.15)') i, AuxData%HNO0(i,i), AuxData%Occ(i)
@@ -3772,7 +3775,7 @@ end subroutine save_2rdm_orca
           end if
 
           
-          if (Flags%JOBTYPE .ne. JOB_TYPE_MP2 .and. Flags%JOBTYPE .ne. JOB_TYPE_SRMP2) then
+          if (Flags%JOBTYPE .ne. JOB_TYPE_MP2) then
                 ETot0 = zero
                 do i = 1, NIA
                       ETot0 = ETot0 + two* AuxData%Occ(i) * AuxData%HNO0(i,i)
@@ -3900,7 +3903,7 @@ end subroutine save_2rdm_orca
                   ! stop
 
                   
-                  if (Flags%JOBTYPE == JOB_TYPE_MP2 .or. Flags%JOBTYPE == JOB_TYPE_SRMP2) then                    
+                  if (Flags%JOBTYPE == JOB_TYPE_MP2) then
                         etot = zero
                         do i = 1, NI
                               do j = 1, NI

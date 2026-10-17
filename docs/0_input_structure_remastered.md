@@ -17,6 +17,11 @@ the input file (blocks, `end`, comments) see
   - [Where it is available](#where-it-is-available-1)
 - [Saving and reusing the THC factorization](#saving-and-reusing-the-thc-factorization)
 
+- [MP2 and MP2-CBS[H]](#mp2-and-mp2-cbsh)
+  - [How to switch it on](#how-to-switch-it-on-2)
+  - [What it does](#what-it-does-2)
+  - [Where it is available](#where-it-is-available-2)
+
 ## Frozen core
 
 ### How to switch it on
@@ -115,6 +120,7 @@ properties, or with core-valence basis sets (cc-pCVXZ), keep `Core 1`.
 | `JobType AC0` with THC integrals (`TwoMoInt FOFO`, `Cholesky THC`) | `Core 0`, all inactive orbitals or the lowest `NCore` |
 | `JobType AC0`, other integral modes | `Core 0` freezes all inactive orbitals; `NCore` is not used |
 | `JobType AC0PP`, `ACPP` (particle-particle AC) | **not yet implemented**: `Core` and `NCore` are ignored |
+| `JobType MP2` | always on; only `NCore` counts, and `NCore 0` freezes nothing (see [MP2 and MP2-CBS[H]](#mp2-and-mp2-cbsh)) |
 
 <!-- TODO: confirm which other AC0 routes honour Core 0 (the spin-resolved
 acph_spinres_driver does; the classic AC0CAS path does not appear to). Remove
@@ -245,3 +251,99 @@ gammcor_heff gammcor_1.out gammcor_2.out
 
 <!-- TODO: implemented (steps 1-5 of .implementation_plans/thc-dump-load.md)
 but not yet tested (step 7). -->
+
+## MP2 and MP2-CBS[H]
+
+### How to switch it on
+
+MP2 runs on a Hartree-Fock reference from PySCF. In the PySCF script, run
+HF (`scf.RHF`; for `spin > 0` it is ROHF) and write the dump without a CASSCF
+object:
+
+```python
+from gammcor_tools.Pyscf2Gammcor import get_data_for_gammcor
+myhf = scf.RHF(mol).run()
+mymp = mp.MP2(myhf).set_frozen().run()      # optional, only for checks
+get_data_for_gammcor(mol, myhf, mymp=mymp)
+```
+
+Then use `JobType MP2`. The basis-set correction is chosen with `CBS`,
+exactly as for AC0:
+
+```text
+Calculation
+ Interface  PYSCF
+ JobType    MP2
+ RDMType    CAS
+ TwoMoInt   FOFO
+ Basis      aug-cc-pvdz.txt
+ CBS        2
+end
+
+CholeskyBlock
+ Cholesky          THC
+ Cholesky_Accuracy L
+end
+
+System
+ ZNucl    14
+ Charge   0
+ NCore    2
+end
+```
+
+| Keyword | Block | Values |
+|---|---|---|
+| `JobType MP2` | `Calculation` | MP2 on the HF dump |
+| `CBS` | `Calculation` | absent or `0`: plain MP2; `1` (or `DBBSC`): MP2 + CBS[DFT]; `2` (or `H`, `CBS[H]`): MP2-CBS[H] |
+| `NCore` (`NCoreOrb`) | `System` | number of frozen core orbitals; `0` or absent: none frozen |
+| `Grid` | `Calculation` | grid for mu(r) with `CBS 1` or `2`; default `medium` |
+
+There is no separate `SRMP2` job type: SR-MP2 is `JobType MP2` with `CBS 2`.
+`TwoMoInt FOFO` with `Cholesky THC` is required.
+
+### What it does
+
+- **MP2** (`CBS 0`). Closed-shell MP2 with THC integrals. For an open-shell
+  (ROHF, high-spin) dump it runs ROMP2: semicanonical alpha and beta
+  orbitals, same-spin and opposite-spin doubles, and singles. ROMP2 is not
+  what PySCF prints as `mp.MP2(rohf)` (that is UMP2 on the unrotated ROHF
+  orbitals).
+- **MP2 + CBS[DFT]** (`CBS 1`). MP2 plus the density-based basis-set
+  correction of Giner et al., computed with a local range-separation
+  parameter mu(r) from the HF pair density. The integrals are not changed.
+- **MP2-CBS[H]** (`CBS 2`). The two-electron integrals in the MP2 numerator
+  are dressed with the short-range interaction weighted by mu(r); the orbital
+  energies are not changed. The output also prints plain MP2 and the
+  difference. For ROHF the doubles are dressed and the singles are not, as in
+  AC0-CBS[H].
+
+**Frozen core.** `NCore n` freezes the lowest `n` orbitals in the
+correlation energy and in mu(r). The frozen orbitals stay in the reference
+(Fock operator, HF energy). Unlike AC0, `Core 0` is not needed, and
+`NCore 0` means no frozen orbitals. `NCore` must be the core of this
+molecule (N atom 1, N2 2, SO2 7); a value copied from another molecule can
+freeze valence orbitals.
+
+The last output line:
+
+| Job | Line |
+|---|---|
+| MP2, closed shell | `HF+ENuc, MP2-Corr     , Total` |
+| MP2, open shell | `HF+ENuc, ROMP2-Corr   , Total` |
+| `CBS 1` | `HF+ENuc, MP2-CBS[DFT], Total` |
+| `CBS 2`, closed shell | `HF+ENuc, MP2-CBS[H]-Corr, Total` |
+| `CBS 2`, open shell | `HF+ENuc, ROMP2-CBS[H]-Corr, Total` |
+
+### Where it is available
+
+| Reference | `CBS 0` | `CBS 1` | `CBS 2` |
+|---|---|---|---|
+| RHF (closed shell) | yes | yes | yes |
+| ROHF (high spin) | yes (ROMP2) | **not available**: the program stops | yes (ROMP2-CBS[H]) |
+
+Only the PySCF interface with THC integrals. A CASSCF dump cannot be used for
+MP2, and the HF dump cannot be used for AC0.
+
+<!-- TODO: CBS 1, ROMP2-CBS[H] and the removal of JobType SRMP2 are written
+but not yet compiled or tested (.skills/mp2-code.md Sec. 7). -->

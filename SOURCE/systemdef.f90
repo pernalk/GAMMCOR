@@ -356,7 +356,7 @@ end select
      Flags%IFunSR = Input%CalcParams%DFApp
      Flags%IFunSRKer = Input%CalcParams%Kernel
 
-  case(JOB_TYPE_AC0,JOB_TYPE_SRAC0,JOB_TYPE_MP2,JOB_TYPE_SRMP2,JOB_TYPE_MSAC0)
+  case(JOB_TYPE_AC0,JOB_TYPE_SRAC0,JOB_TYPE_MP2,JOB_TYPE_MSAC0)
      Flags%IFlAC   = 1
      Flags%IFlSnd  = 1
      Flags%IFlAC0D = 0
@@ -572,7 +572,7 @@ end select
   select case (Flags%JobType)
   case (JOB_TYPE_PPERPA, JOB_TYPE_AC0PP, JOB_TYPE_ACPP, &
         JOB_TYPE_PPERPA_RDMDUMP, JOB_TYPE_HHERPA_RDMDUMP, &
-        JOB_TYPE_SRMP2, JOB_TYPE_DUCC)
+        JOB_TYPE_DUCC)
         Flags%Dispatch = DISPATCH_AT
   case (JOB_TYPE_MP2)
         if (Input%CalcParams%RDMType == RDM_TYPE_RKS)then
@@ -594,9 +594,9 @@ end select
 
  ! Inactive
   Flags%IFlCore = Input%CalcParams%Core
- ! MP2/SRMP2: core always frozen via NCoreOrb, also in mu(r) (LOC_MU_CBS_CHOL
- ! reads the common IFlCore, copied from Flags%IFlCore in mainp before dispatch)
-  if (Flags%JobType == JOB_TYPE_MP2 .or. Flags%JobType == JOB_TYPE_SRMP2) Flags%IFlCore = 0
+ ! MP2 (also with cbs 1/2): core always frozen via NCoreOrb, also in mu(r)
+ ! (LOC_MU_CBS_CHOL reads the common IFlCore, copied from Flags%IFlCore in mainp)
+  if (Flags%JobType == JOB_TYPE_MP2) Flags%IFlCore = 0
 
  !Flags%IFl12 = FLAG_DEBUG_FL12
 

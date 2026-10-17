@@ -575,7 +575,7 @@ def dump_ks_for_gammcor(mol, mf, mymp=None, mp2_scale=None, dump_eri=True,
 
 def get_data_for_gammcor(mol, myhf, mycas = None, mymp = None, dump_eri=False, simple = True,
                          dump_hdf5 = True, dump_dft = False, mp2_scale = None,
-                         dump_grid = False, tds = None, dump_ab = True):
+                         dump_grid = False, tds = None, dump_ab = True, filename = H5FILE):
     """Process and export CASSCF calculation data for GAMMCOR.
 
     dump_hdf5 = True  -> one organized HDF5 file (H5FILE), see _Dump
@@ -584,24 +584,26 @@ def get_data_for_gammcor(mol, myhf, mycas = None, mymp = None, dump_eri=False, s
                          data are written (dump_ks_for_gammcor), mycas is ignored
     mycas = None      -> HF reference only, for JobType MP2/SRMP2
                          (get_rohf_for_gammcor); mymp is optional, for checks
+    filename          -> HDF5 file name, e.g. pyscf_data_A.h5 for a SAPT monomer
     """
 
     if dump_dft:
         dump_ks_for_gammcor(mol, myhf, mymp, mp2_scale=mp2_scale, dump_eri=dump_eri,
-                            dump_grid=dump_grid, tds=tds, dump_ab=dump_ab)
+                            dump_grid=dump_grid, tds=tds, dump_ab=dump_ab,
+                            filename=filename)
         return
 
     if mycas is None:
-        get_rohf_for_gammcor(mol, myhf, mymp=mymp, dump_hdf5=dump_hdf5)
+        get_rohf_for_gammcor(mol, myhf, mymp=mymp, dump_hdf5=dump_hdf5,
+                             filename=filename)
         return
 
-    storage_name = H5FILE
     lll = 180
     c = "-"
     script_name = sys.argv[0].split('/')[-1].replace('.py', '')
 
     state_av = hasattr(mycas, 'weights') and mycas.weights is not None
-    dump = _Dump(dump_hdf5)
+    dump = _Dump(dump_hdf5, filename)
     dump.provenance('SA-CASSCF' if state_av else 'CASSCF')
     dump.system(mol)
     dump.ao_extras(mol)
@@ -859,18 +861,18 @@ def get_data_for_gammcor(mol, myhf, mycas = None, mymp = None, dump_eri=False, s
 
             
             twono[addrs.ravel()] = eri_mo.ravel()                
-            # Wymiary tablicy
-            print(f"Wymiary (shape): {twono.shape}")
+            # Array shape
+            print(f"Shape: {twono.shape}")
 
-            # Rozmiar w bajtach
-            print(f"Rozmiar w bajtach: {twono.nbytes}")
+            # Size in bytes
+            print(f"Size in bytes: {twono.nbytes}")
 
-            # Typ danych i rozmiar pojedynczego elementu
-            print(f"Typ danych: {twono.dtype}")
-            print(f"Bajtów na element: {twono.itemsize}")
+            # Data type and size of one element
+            print(f"Data type: {twono.dtype}")
+            print(f"Bytes per element: {twono.itemsize}")
 
-            # Rozmiar w MB
-            print(f"Rozmiar w MB: {twono.nbytes / (1024*1024):.2f}")
+            # Size in MB
+            print(f"Size in MB: {twono.nbytes / (1024*1024):.2f}")
             dump.array('MOINTS/ERI', twono, 'TWOEl.bin',
                        attrs={'PACKING': 'NADDR3', 'NORB': int(n_orb),
                               'BASIS': 'MO' if doMOtrans else 'AO',
@@ -1095,18 +1097,18 @@ def get_data_for_gammcor(mol, myhf, mycas = None, mymp = None, dump_eri=False, s
 
             
             twono[addrs.ravel()] = eri_mo.ravel()                
-            # Wymiary tablicy
-            print(f"Wymiary (shape): {twono.shape}")
+            # Array shape
+            print(f"Shape: {twono.shape}")
 
-            # Rozmiar w bajtach
-            print(f"Rozmiar w bajtach: {twono.nbytes}")
+            # Size in bytes
+            print(f"Size in bytes: {twono.nbytes}")
 
-            # Typ danych i rozmiar pojedynczego elementu
-            print(f"Typ danych: {twono.dtype}")
-            print(f"Bajtów na element: {twono.itemsize}")
+            # Data type and size of one element
+            print(f"Data type: {twono.dtype}")
+            print(f"Bytes per element: {twono.itemsize}")
 
-            # Rozmiar w MB
-            print(f"Rozmiar w MB: {twono.nbytes / (1024*1024):.2f}")
+            # Size in MB
+            print(f"Size in MB: {twono.nbytes / (1024*1024):.2f}")
             dump.array('MOINTS/ERI', twono, 'TWOEl.bin',
                        attrs={'PACKING': 'NADDR3', 'NORB': int(n_orb),
                               'BASIS': 'MO' if doMOtrans else 'AO',
@@ -1118,7 +1120,7 @@ def get_data_for_gammcor(mol, myhf, mycas = None, mymp = None, dump_eri=False, s
             print(f"\nTime spent on ERI transformation and processing: {end_time - mid_time:.2f} seconds")
 
 
-def get_rohf_for_gammcor(mol, myhf, mymp = None, dump_hdf5 = True):
+def get_rohf_for_gammcor(mol, myhf, mymp = None, dump_hdf5 = True, filename = H5FILE):
     """ROHF/MP2 export. Same quantities and the same conventions as
     get_rohf_for_gammcor in Pyscf2Gammcor_legacy.py; dump_hdf5 only changes where
     they land.
@@ -1130,7 +1132,7 @@ def get_rohf_for_gammcor(mol, myhf, mymp = None, dump_hdf5 = True):
     dump_hdf5 = False -> mo_occ_int.bin, occ_rohf.bin, auxdata_rohf.txt,
                          HCore.bin, C.bin, rdm2_rohf.dat
     """
-    dump = _Dump(dump_hdf5)
+    dump = _Dump(dump_hdf5, filename)
     dump.provenance('ROHF')
     dump.system(mol)
     dump.ao_extras(mol)
@@ -1148,7 +1150,7 @@ def get_rohf_for_gammcor(mol, myhf, mymp = None, dump_hdf5 = True):
             occ_integers[i] = 0
 
     dump.int_array('SCF/MO_OCC_INT', occ_integers, 'mo_occ_int.bin')
-    print(f"Zapisano tablice okupacji: {occ_integers}")
+    print(f"Saved occupation array: {occ_integers}")
 
     nbasis = mol.nao_nr()
     print('nbasis', nbasis)
@@ -1161,9 +1163,9 @@ def get_rohf_for_gammcor(mol, myhf, mymp = None, dump_hdf5 = True):
     Enuc = mol.energy_nuc()
     NEL = mol.nelectron
 
-    print(f"NI (podwojnie obsadzone): {NI}")
-    print(f"NA (pojedynczo obsadzone): {NA}")
-    print(f"NV (wirtualne): {NV}")
+    print(f"NI (doubly occupied): {NI}")
+    print(f"NA (singly occupied): {NA}")
+    print(f"NV (virtual): {NV}")
 
     if NA > 0:
         print('NOTE: open-shell reference (NA > 0); GAMMCOR MP2/SRMP2 is closed-shell only')
@@ -1193,13 +1195,13 @@ def get_rohf_for_gammcor(mol, myhf, mymp = None, dump_hdf5 = True):
     dump.states_index([state_tag], [ROHF])
 
     # ===================================================================
-    # Efektywne obsadzenie alfa to 0.5 dla wszystkich NA orbitali
+    # Effective alpha occupation is 0.5 for all NA orbitals
     occ_alpha_eff = np.full(NA, 0.5)
-    # Efektywne obsadzenie beta to 0.0 dla wszystkich NA orbitali
+    # Effective beta occupation is 0.0 for all NA orbitals
     occ_beta_eff = np.full(NA, 0.0)
 
     # ===================================================================
-    # Krok 2: Zbuduj 2-RDM. Konwencja dokladnie jak w Pyscf2Gammcor_legacy.py:
+    # Step 2: build the 2-RDM. Convention exactly as in Pyscf2Gammcor_legacy.py:
     #         X[I,J,K,L] = 2 * Gamma_JL,IK
     # ===================================================================
     rdm2_rohf = np.zeros((NA, NA, NA, NA))
@@ -1209,12 +1211,12 @@ def get_rohf_for_gammcor(mol, myhf, mymp = None, dump_hdf5 = True):
                 for l in range(NA):
                     gamma_JL_IK = 0.0
 
-                    # Czesc kulombowska
+                    # Coulomb part
                     if j == i and l == k:
                         gamma_JL_IK += (occ_alpha_eff[j] + occ_beta_eff[j]) * \
                                        (occ_alpha_eff[l] + occ_beta_eff[l])
 
-                    # Czesc wymienna
+                    # Exchange part
                     if j == k and l == i:
                         gamma_JL_IK -= (occ_alpha_eff[j] * occ_alpha_eff[l] +
                                         occ_beta_eff[j] * occ_beta_eff[l])

@@ -3340,8 +3340,7 @@ C     Cholesky OnTheFly
          EndDo
          
       Write(6,'(2X,"Sum of Occupancies: ",E16.6)') SumOcc
-               if(Flags%JobType .ne.  JOB_TYPE_MP2 .and.                    
-     $   Flags%JobType .ne. JOB_TYPE_SRMP2)then
+               if(Flags%JobType .ne.  JOB_TYPE_MP2)then
                   If(Abs(2*SumOcc-NELE).Gt.1.D-8)then
                      print*, '2*sum', 2*SumOcc
                      print*, 'nele', NELE
