@@ -120,7 +120,7 @@ def acn_en(file):
     return float(S)
 #
 def thc_ac0_en(file):
-    # THC/ph AC0 (and exact-integral variant): "  E_total   :   <value> Eh ..."
+    # THC/ph AC0: "  E_total   :   <value> Eh ..."
     with open(file,'r') as f:
         for line in f:
             if line.split(':')[0].strip() == "E_total":

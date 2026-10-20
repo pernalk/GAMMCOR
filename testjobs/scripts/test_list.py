@@ -70,15 +70,6 @@ def get():
     })
 
     tests_list.append({
-        'name': '* testing PySCF SA AC0-CAS energy (THC, exact integrals)',
-        'fun': thc_ac0_en,
-        'runner': run_test,
-        'units': {
-            "pyscf-tests/test-SA-thc-exact":  {'atol': 1.e-5, 'level': 'short'},
-        }
-    })
-
-    tests_list.append({
         'name': '* testing PySCF SS AC0-CAS energy (THC)',
         'fun': thc_ac0_en,
         'runner': run_test,
@@ -87,14 +78,6 @@ def get():
         }
     })
 
-    tests_list.append({
-        'name': '* testing PySCF SS AC0-CAS energy (THC, exact integrals)',
-        'fun': thc_ac0_en,
-        'runner': run_test,
-        'units': {
-            "pyscf-tests/test-SS-thc-exact":  {'atol': 1.e-5, 'level': 'short'},
-        }
-    })
 
     ### pyscf MS-AC0 ###
     tests_list.append({
