@@ -1,0 +1,30 @@
+Calculation
+ BasisPath
+ JobTitle   AC0
+ Interface  PYSCF
+ JobType  AC0
+ RDMType    CAS
+ TwoMoInt   FOFO
+ Basis cc-pvdz.txt
+ units angs
+ Core 0
+end
+
+
+System
+ znucl 14
+ NCoreOrb 2
+ Charge  0
+end
+
+
+Choleskyblock
+Cholesky OTF
+Cholesky_Accuracy L
+end
+
+xyz
+2
+N     0.0000000     0.0000000     -0.5570000
+N     0.0000000     0.0000000      0.5570000
+end

@@ -1,26 +1,11 @@
 module mp
 
       ! =============================================================================
-      ! MP2 and SR-MP2 (MP2-CBS[H]) with THC integrals, JobType MP2. As for AC0,
-      ! cbs in input (Flags%IDBBSC) picks the basis-set correction: 0 none,
-      ! 1 CBS[DFT] (E_MP2 + ECorrMD of loc_mu_thc), 2 CBS[H] (srmp2_energy_thc).
-      ! Reference: the HF or ROHF dump of the PySCF interface
-      ! (get_rohf_for_gammcor, load_mp2_aux_data).
-      !
-      ! Closed shell (NA = 0): mp2_energy_thc, described below.
-      ! Open shell (NA > 0): ROMP2 in two steps. romp2_semican builds separate
-      ! alpha and beta orbitals, romp2_energy_thc computes the energy in them.
-      ! Theory in .secret_sauce/.skills/mp2/theory-mp2.md Sec. 3.
-      ! ROMP2-CBS[H] (cbs 2, NA > 0): romp2_semican, then sromp2_energy_thc.
-      ! ROMP2 + CBS[DFT] (cbs 1, NA > 0): loc_mu_thc, then ROMP2 as for cbs 0.
-      ! cbs 1/2 closed shell: loc_mu_thc gives mu(r) and XMuMat,
-      ! srmp2_energy_thc is mp2_energy_thc with the CBS[H] integrals,
-      ! .secret_sauce/.skills/mp2/theory-mp2.md Sec. 5.
-      !
-      ! FROZEN CORE. Inactive orbitals 1..NCoreOrb (input) stay in the
-      ! reference (fij, Fock) and are left out of the pairs: a, b run NI0..NI,
-      ! NI0 = NCoreOrb + 1. AuxData%NFrozen is set only on the ph path.
-      !
+      ! MP2, ROMP2 and their CBS corrections with THC integrals (JobType MP2; cbs 0, 1
+      ! = CBS[DFT], 2 = CBS[H]) on the HF/ROHF dump of the PySCF interface.
+      ! Frozen core: orbitals 1..NCoreOrb stay in the reference (fij, Fock) and are
+      ! left out of the pairs (a, b run NI0..NI).
+      ! Code: .secret_sauce/.skills/mp2/code-mp2.md; theory: .secret_sauce/.skills/mp2/theory-mp2.md.
       ! =============================================================================
 
       use ppac_types
@@ -305,22 +290,9 @@ contains
       end subroutine vovo_slab
 
 
-      ! =============================================================================
-      ! ROMP2, part 1: semicanonical alpha and beta orbitals of the ROHF
-      ! reference (theory: .secret_sauce/.skills/mp2/theory-mp2.md Sec. 3).
-      !
-      ! f_a and f_b are built in the MO basis of THC_init2 (h = AuxData%HNO0,
-      ! J and K from thc_Fock_JK with Xga and unit vectors as orbitals). Their
-      ! sums over occupied orbitals start at 1, not NI0: frozen-core orbitals
-      ! are not correlated, but they still contribute to the Fock operator.
-      ! Each f_s is then diagonalized inside its occupied and its virtual
-      ! space. Frozen-core orbitals are not rotated.
-      !
-      ! Output (s = a, b): Xga_s = Xga U_s, orbital energies e_s, and the
-      ! occupied-virtual Fock block fov_s for the singles, with global indices
-      ! fov_a(NI0:NIA, NIA+1:NBasis), fov_b(NI0:NI, NI+1:NBasis). Optionally
-      ! the rotations U_s themselves (ROMP2-CBS[H] rotates more THC factors).
-      ! =============================================================================
+      ! ROMP2 part 1: semicanonical alpha and beta orbitals of the ROHF reference.
+      ! The Fock sums start at 1, not NI0: frozen core is not correlated but is in
+      ! the Fock operator. See .secret_sauce/.skills/mp2/code-mp2.md Sec. 4.
       subroutine romp2_semican(THCData, AuxData, Xga_a, Xga_b, e_a, e_b, fov_a, fov_b, Uout_a, Uout_b)
             !use mp_ext, only: mp_fock_jk
             use THCFock
@@ -449,18 +421,9 @@ contains
       end subroutine romp2_semican
 
 
-      ! =============================================================================
-      ! ROMP2, part 2: E_aa, E_bb, E_ab (doubles) and E_1 (singles) in the
-      ! orbitals of romp2_semican, formulas in .secret_sauce/.skills/mp2/theory-mp2.md Sec. 3.
-      !
-      ! For each occupied pair (i,j), V(A,B) = (iA|jB) is one product of the R
-      ! vectors, RA (alpha) or RB (beta). The same-spin sum runs over j < i
-      ! only and without the factor 1/2: the i = j term is zero and (j,i)
-      ! gives the same as (i,j).
-      !
-      ! Check: with NA = 0, E_aa = E_bb, E_1 = 0 and E_ab + 2 E_aa equals
-      ! mp2_energy_thc.
-      ! =============================================================================
+      ! ROMP2 part 2: E_aa, E_bb, E_ab and E_1 in the semicanonical orbitals. Same
+      ! spin over j < i without 1/2. Check: NA = 0 reproduces mp2_energy_thc.
+      ! See .secret_sauce/.skills/mp2/code-mp2.md Sec. 4, theory-mp2.md Sec. 3.
       subroutine romp2_energy_thc(THCData, AuxData, Xga_a, Xga_b, e_a, e_b, fov_a, fov_b, &
             E_aa, E_bb, E_ab, E_1)
 
@@ -591,14 +554,8 @@ contains
       end subroutine romp2_os_slab
 
 
-      ! =============================================================================
-      ! Same-spin ROMP2 sum for one pair of occupied orbitals i > j of one spin:
-      !
-      !   E += - sum_{A,B} V(A,B) [ V(A,B) - V(B,A) ] / (w_i(A) + w_j(B))
-      !
-      ! V(A,B) = (iA|jB) is the Coulomb and V(B,A) = (iB|jA) the exchange
-      ! integral; w_i(A) = e_s(A) - e_s(i), w_j(B) = e_s(B) - e_s(j).
-      ! =============================================================================
+      ! Same-spin ROMP2 sum for one pair i > j:
+      ! E += - sum_{A,B} V(A,B) [V(A,B) - V(B,A)] / (w_i(A) + w_j(B)).
       subroutine romp2_ss_slab(E, w_i, w_j, V)
             double precision, intent(inout) :: E
             double precision, dimension(:), intent(in) :: w_i, w_j
@@ -618,20 +575,10 @@ contains
       end subroutine romp2_ss_slab
 
 
-      ! =============================================================================
-      ! The local mu(r) of CBS[H] and the matrix XMuMat for an HF or ROHF
-      ! reference: the NAct = 0 case of LOC_MU_CBS_CHOL (muerf.f) with THC
-      ! instead of Cholesky vectors. Formulas in .secret_sauce/.skills/mp2/theory-mp2.md Sec. 5.
-      !
-      ! The frozen core is left out of f(r), the on-top density and the density
-      ! (as Occ(1:ICore) = 0 there), and its rows and columns of XMuMat are zero.
-      ! f(r) is built without R, from t_K^s(r) = sum_g Zgk(g,K) A_s(g,r) B(g,r),
-      ! in batches of grid points. For NA = 0 the operations are those of the
-      ! closed-shell code. CAONO must be the orbitals of Xga.
-      !
-      ! ECorrMD is the CBS[DFT] correction, PBECor of the total density
-      ! (zeta = 0) also for NA > 0, as in FOFO.
-      ! =============================================================================
+      ! Local mu(r) and XMuMat for an HF/ROHF reference (NAct = 0 case of
+      ! LOC_MU_CBS_CHOL, with THC factors). Frozen core left out (rows/cols of
+      ! XMuMat zero). CAONO must be the orbitals of Xga. ECorrMD = CBS[DFT].
+      ! See .secret_sauce/.skills/mp2/code-mp2.md, theory-mp2.md Sec. 5.
       subroutine loc_mu_thc(THCData, AuxData, CAONO, Flags, XMuMat, AvMU, ECorrMD)
             !use units
             use grid_internal
@@ -832,22 +779,9 @@ contains
       end subroutine loc_mu_thc
 
 
-      ! =============================================================================
-      ! MP2-CBS[H] (SR-MP2) for a closed-shell HF reference, theory in
-      ! .secret_sauce/.skills/mp2/theory-mp2.md Sec. 5. The same loop and vovo_slab as
-      ! mp2_energy_thc; only the slab V_axby(x,y) = (x a|y b) is dressed,
-      ! FR + dSR, with dSR built from XMuMat of loc_mu_thc:
-      !
-      !   V = FR(a)^T FR(b)
-      !     + 1/4 [FR1(a)^T FR(b) + FR2(a)^T FR(b) + FR(a)^T FR1(b) + FR(a)^T FR2(b)]
-      !     - 1/4 [LR1(a)^T LR(b) + LR2(a)^T LR(b) + LR(a)^T LR1(b) + LR(a)^T LR2(b)]
-      !
-      ! FR, LR: R vectors (NChol or NCholErf, virtual, occupied NI0..NI) from Xga,
-      ! XgaErf. In 1 the virtual and in 2 the occupied orbital is the
-      ! mu-weighted one (TXga = Xga XMuMat^T). Slab (b,a) is slab (a,b)^T, so
-      ! b <= a as in mp2_energy_thc. The undressed slab gives E_mp2 on the way.
-      ! Needs the erf THC factors (cbs 2 in input).
-      ! =============================================================================
+      ! MP2-CBS[H] closed shell: mp2_energy_thc with the slab dressed FR + dSR
+      ! (dSR from XMuMat of loc_mu_thc). Needs the erf THC factors (cbs 2).
+      ! See .secret_sauce/.skills/mp2/code-mp2.md, theory-mp2.md Sec. 5.
       subroutine srmp2_energy_thc(THCData, AuxData, CAONO, Flags, E_mp2, E_srmp2)
 
             type(TTHCData), intent(inout) :: THCData
@@ -953,16 +887,9 @@ contains
       end subroutine srmp2_energy_thc
 
 
-      ! =============================================================================
-      ! ROMP2-CBS[H] for an ROHF reference: romp2_energy_thc with the dressed
-      ! slab of srmp2_energy_thc, per spin. Theory in .secret_sauce/.skills/mp2/theory-mp2.md Sec. 5.
-      !
-      ! XMuMat is in the ROHF basis, so every THC factor goes to spin s with the
-      ! same U_s as Xga: X_s = X U_s for TXga, XgaErf and TXgaErf. The dressed
-      ! slab keeps V_ji = V_ij^T, so the same-spin loop j < i still holds.
-      ! E_* are the undressed ROMP2 doubles (computed on the way), D_* the
-      ! dressed ones. The singles E_1 stay undressed (FR). Needs cbs 2.
-      ! =============================================================================
+      ! ROMP2-CBS[H]: romp2_energy_thc with the dressed slab, per spin; every THC
+      ! factor rotated with U_s. Singles stay FR. Needs cbs 2.
+      ! See .secret_sauce/.skills/mp2/code-mp2.md, theory-mp2.md Sec. 5.
       subroutine sromp2_energy_thc(THCData, AuxData, CAONO, Flags, Xga_a, Xga_b, U_a, U_b, &
             e_a, e_b, fov_a, fov_b, E_aa, E_bb, E_ab, E_1, D_aa, D_bb, D_ab)
 

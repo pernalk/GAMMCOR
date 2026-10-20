@@ -16,7 +16,7 @@ os.chdir(SCRIPT_PATH)
 pyscf_basis_path = os.path.normpath(os.path.join(SCRIPT_PATH, "..", "basis-for-pyscf")) + "/"
 basis_path = os.path.normpath(os.path.join(SCRIPT_PATH, "..", "basis")) + "/"
 
-INPUTS = sorted(glob.glob("*/*/input.inp"))
+INPUTS = sorted(glob.glob("*/*/input.inp") + glob.glob("pyscf-tests/CBSH/*/input.inp"))
 PYSCF_INPUTS = [f for f in INPUTS if test_utils.get_interface(f) == "pyscf"]
 BASIS_INPUTS = [f for f in INPUTS if test_utils.get_interface(f) != "pyscf"]
 

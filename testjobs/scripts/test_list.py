@@ -116,6 +116,66 @@ def get():
         }
     })
 
+    tests_list.append({
+        'name': '* testing PySCF MP2 energy',
+        'fun': mp2_en,
+        'runner': run_test,
+        'units': {
+            "pyscf-tests/CBSH/test-mp2":              {'atol': 1.e-5, 'level': 'short'},
+            "pyscf-tests/CBSH/test-mp2-frozen":       {'atol': 1.e-5, 'level': 'short'},
+            "pyscf-tests/CBSH/test-mp2-cbsh":         {'atol': 1.e-5, 'level': 'short'},
+            "pyscf-tests/CBSH/test-mp2-frozen-cbsh":  {'atol': 1.e-5, 'level': 'short'},
+        }
+    })
+
+    tests_list.append({
+        'name': '* testing PySCF ROMP2 energy',
+        'fun': mp2_en,
+        'runner': run_test,
+        'units': {
+            "pyscf-tests/CBSH/test-romp2":             {'atol': 1.e-5, 'level': 'short'},
+            "pyscf-tests/CBSH/test-romp2-frozen":      {'atol': 1.e-5, 'level': 'short'},
+            "pyscf-tests/CBSH/test-romp2-cbsh":        {'atol': 1.e-5, 'level': 'short'},
+            "pyscf-tests/CBSH/test-romp2-frozen-cbsh": {'atol': 1.e-5, 'level': 'short'},
+        }
+    })
+
+    tests_list.append({
+        'name': '* testing PySCF CAS MP2 energy (FOFO)',
+        'fun': ac0_en,
+        'runner': run_test,
+        'units': {
+            "pyscf-tests/CBSH/test-mp2-cas-fofo":               {'atol': 1.e-5, 'level': 'short'},
+            "pyscf-tests/CBSH/test-mp2-cas-fofo-frozen":        {'atol': 1.e-5, 'level': 'short'},
+            "pyscf-tests/CBSH/test-mp2-cas-fofo-opshell":       {'atol': 1.e-5, 'level': 'short'},
+            "pyscf-tests/CBSH/test-mp2-cas-fofo-frozen-opshell": {'atol': 1.e-5, 'level': 'short'},
+        }
+    })
+
+    tests_list.append({
+        'name': '* testing PySCF CAS MP2 energy (THC)',
+        'fun': thc_ac0_en,
+        'runner': run_test,
+        'units': {
+            "pyscf-tests/CBSH/test-mp2-cas-thc":               {'atol': 1.e-5, 'level': 'short'},
+            "pyscf-tests/CBSH/test-mp2-cas-thc-frozen":        {'atol': 1.e-5, 'level': 'short'},
+            "pyscf-tests/CBSH/test-mp2-cas-thc-opshell":       {'atol': 1.e-5, 'level': 'short'},
+            "pyscf-tests/CBSH/test-mp2-cas-thc-frozen-opshell": {'atol': 1.e-5, 'level': 'short'},
+        }
+    })
+
+    tests_list.append({
+        'name': '* testing PySCF CAS MP2 CBS[H] energy (FOFO)',
+        'fun': ac0_cbsh_en,
+        'runner': run_test,
+        'units': {
+            "pyscf-tests/CBSH/test-mp2-cas-fofo-cbsh":               {'atol': 1.e-5, 'level': 'short'},
+            "pyscf-tests/CBSH/test-mp2-cas-fofo-frozen-cbsh":        {'atol': 1.e-5, 'level': 'short'},
+            "pyscf-tests/CBSH/test-mp2-cas-fofo-cbsh-opshell":       {'atol': 1.e-5, 'level': 'short'},
+            "pyscf-tests/CBSH/test-mp2-cas-fofo-frozen-cbsh-opshell": {'atol': 1.e-5, 'level': 'short'},
+        }
+    })
+
 
 
     ### ACn ###

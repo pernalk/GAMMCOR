@@ -166,36 +166,11 @@ contains
 
 
       subroutine read_PYSCF(THCData, AuxData, CAONO, Flags, TwoEl, TDDFTData)
-            !
-            ! Read the PySCF reference (pyscf_data.h5) and set up the 1-el Hamiltonian.
-            ! Full scenario table: .secret_sauce/.skills/common/code-pyscf-interface.md.
-            !
-            ! What the file holds (Pyscf2Gammcor.py):
-            !   /INTS/CORE_HAMILTONIAN  always AO (mf.get_hcore(), embedding included)
-            !   /POSTHF/ORB_COEFF       AO x MO; natural orbitals iff /REF/NATORB == 1
-            !   /MOINTS/ERI             NATORB == 1: NO basis (= ORB_COEFF);
-            !                           NATORB == 0 (incl. every SA-CASSCF job): AO
-            !   RDM1*, RDM2*            active block, in the ORB_COEFF active orbitals
-            !
-            ! natural_orb == 1: CAONO = ORB_COEFF, RDMs already NO, no MO->NO step.
-            ! natural_orb == 0: CAOMO = ORB_COEFF; Trans2NO_AO diagonalizes RDM1,
-            !     sets CAONO = CAOMO*CMONO, rotates the RDMs (and TwoEl if INCORE).
-            !
-            ! ITwoEl == 1 (INCORE): 2-el ints from /MOINTS/ERI, H0 = PySCF CORE_HAMILTONIAN
-            !     transformed AO->NO here; energy checked by check_energy_incore.
-            !     THC_init2/canonicalize are not called, H0external is ignored.
-            !     For JobType AC0/MSAC0 canonicalize_exact (thc_exact_ints) then
-            !     canonicalizes the inactive and virtual orbitals with the exact Fock
-            !     matrix of the computed state (rotates HNO0, TwoEl, CAONO).
-            ! ITwoEl > 1 (FFFF/FOFO): 2-el ints from GAMMCOR THC via THC_init2.
-            !     /MOINTS/ERI is not read. HNO0 is still the PySCF AO core Hamiltonian
-            !     on entry to THC_init2.
-            !     H0external = .false.: GAMMCOR T+Vne is used for H0 and the Fock matrix;
-            !                           the PySCF H0 is read but then discarded.
-            !     H0external = .true.:  PySCF H0 is used for H0 and the Fock matrix.
-            !     CAONO is canonicalized (inactive and virtual blocks) by THC_init2.
-            ! On exit AuxData%HNO0 and THCData%HNO hold H0 in the (final) NO basis.
-            !
+            ! Read the PySCF reference (pyscf_data.h5) and set up H0, orbitals, RDMs and
+            ! integrals in the final NO basis. The basis of /MOINTS/ERI follows NATORB
+            ! (NO for 1, AO for 0, every SA job); INCORE AC0/MSAC0 ends with
+            ! canonicalize_exact, THC goes through THC_init2.
+            ! Scenario table: .secret_sauce/.skills/common/code-pyscf-interface.md.
 
             type(TTHCData), intent(inout) :: THCData
             type(TACppData), intent(inout) :: AuxData
@@ -950,18 +925,9 @@ contains
     end subroutine load_mp2_aux_data
 
     subroutine load_density_matrices(suffix, AuxData, THCData, CAOMO, CAONO, Flags, AObasis, System, TwoEl, only_full)
-          ! Loads RDMs from POSTHF/STATES/<state>/ in pyscf_data.h5:
-          !   RDM2_AAAA -> rdm2_pp,  RDM2_ABAB -> rdm2_pm
-          !   RDM2_BBBB -> rdm2_mm  (fallback: = rdm2_pp for closed-shell)
-          !   RDM2_BABA -> rdm2_mp  (fallback: = rdm2_pm)
-          !   RDM1_A -> rdm1_p,  RDM1_B -> rdm1_m
-          !   RDM1   -> rdm1_full (fallback: rdm1_p = rdm1_m = rdm1_full/2)
-          ! rdm2_full = rdm2_pp + rdm2_mm + rdm2_pm + rdm2_mp  (computed here).
-          ! only_full = .true. (AC0 with ITwoEl > 1): rdm2_full is read from
-          !   RDM2_FULL_REORDERED and rdm2_pp/pm/mm/mp are NOT allocated.
-          ! All RDMs are NA x NA in the active orbitals of /POSTHF/ORB_COEFF:
-          ! natural orbitals if natural_orb == 1, CASSCF MOs otherwise (then
-          ! Trans2NO_AO rotates them to NO). Nothing is transformed here.
+          ! Load the RDMs of POSTHF/STATES/<state>/ (spin blocks, fallbacks, rdm2_full;
+          ! only_full reads RDM2_FULL_REORDERED). Active orbitals of ORB_COEFF; nothing
+          ! is transformed here. See .secret_sauce/.skills/common/code-pyscf-dump.md.
 
           character(len=*), intent(in) :: suffix
           type(TACppData), intent(inout) :: AuxData
@@ -1289,14 +1255,9 @@ contains
     end subroutine load_npm
 
     subroutine load_one_electron_integrals(AuxData, THCData, CAOMO, CAONO, natural_orb, Flags)
-          !
-          ! Read PySCF /INTS/CORE_HAMILTONIAN (AO basis, PySCF ordering) into
-          ! AuxData%HNO0 and THCData%HNO, and /POSTHF/ORB_COEFF into CAONO
-          ! (natural_orb == 1) or CAOMO (natural_orb == 0).
-          ! HNO0 is AO on exit for every natural_orb and ITwoEl; read_PYSCF
-          ! (INCORE) or THC_init2 (THC) moves it to the NO basis later.
-          ! For MP2 CAONO = CAOMO (no NO transformation).
-          !
+          ! Read /INTS/CORE_HAMILTONIAN (AO) into HNO0 and THCData%HNO, and ORB_COEFF
+          ! into CAONO (natural_orb == 1) or CAOMO. HNO0 is AO on exit; it is moved to
+          ! the NO basis later. See .secret_sauce/.skills/common/code-pyscf-interface.md.
           type(TACppData), intent(inout) :: AuxData
           type(TTHCData), intent(inout) :: THCData
           double precision, dimension(:,:), allocatable, intent(out) :: CAOMO, CAONO
@@ -3638,17 +3599,9 @@ end subroutine save_2rdm_orca
     end subroutine check_energy_incore
 
     subroutine THC_init2(Flags, THCData, AuxData,  AObasis, System, CAONO_IN)
-          !
-          ! THC setup for ITwoEl > 1: builds Xgp/Zgk (and Erf variants), or reads
-          ! them with THCLoad / writes them and stops with THCDump; then calls
-          ! canonicalize, then sets AuxData%HNO0 = AuxData%HNO0_THC = H0 in the
-          ! canonicalized NO basis and Xga = Xgp transformed to that basis.
-          ! Xgp is grid x AO; Zgk is grid x Cholesky and carries no orbital index,
-          ! so it is never transformed. Only Xgp -> Xga and H0 (AO -> NO) are.
-          ! H0 source: THCData%H0external = .true.  -> AuxData%HNO0 on entry (PySCF AO);
-          !            THCData%H0external = .false. -> ints1e_gammcor_H0_extao (GAMMCOR AO).
-          ! CAONO_IN (AO x NO) is overwritten with the canonicalized orbitals.
-          !
+          ! THC setup for ITwoEl > 1: build (or THCLoad / THCDump) Xgp, Zgk and the erf
+          ! pair, canonicalize, then H0 and Xga in the canonicalized NO basis; CAONO_IN
+          ! is overwritten. See .secret_sauce/.skills/common/code-pyscf-interface.md.
 
           type(FlagsData), intent(in) :: Flags
           type(TACppData), intent(inout) :: AuxData
@@ -4081,16 +4034,8 @@ end subroutine save_2rdm_orca
     end subroutine thc_factorize
 
     subroutine thc_dump_h5(Flags, THCData, AuxData, AObasis, System)
-          !
-          ! THCDump: write the output of thc_factorize to Flags%THCFile, with the
-          ! metadata thc_load_h5 checks. Layout:
-          !   /THC/XGP, /THC/ZGK              Xgp(NTHC,NAO), Zgk(:,NCHOL)
-          !   /THC/XGP_ERF, /THC/ZGK_ERF      only if the erf pair was computed
-          !   /META/NAO NAOCART NTHC NCHOL NATOMS CHOL_ACCU [NTHC_ERF NCHOL_ERF]
-          !   /META/COORDS ENUC CHOL_THR THC_THR OMEGA,  attribute BASIS on /
-          ! The HDF5 library is already open: THC_init2 runs inside read_PYSCF,
-          ! between pyscf_h5_open and pyscf_h5_close.
-          !
+          ! THCDump: write the thc_factorize output with the metadata thc_load_h5 checks.
+          ! Layout: .secret_sauce/.skills/common/code-pyscf-dump.md ("THC dump file").
           type(FlagsData), intent(in) :: Flags
           type(TTHCData), intent(in) :: THCData
           type(TACppData), intent(in) :: AuxData

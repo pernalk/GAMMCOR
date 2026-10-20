@@ -2,59 +2,13 @@
 module thc_energy_ph
 
       ! =============================================================================
-      ! ph-AC0 correlation energy with THC integrals. The ph analogue of
-      ! thc_energy (THC_energy_loop), called at the end of ACPH0_THC.
-      !
-      ! THEORY (see .secret_sauce/.skills/ph-ac0/theory-erpa-w1.md Sec. 4 and
-      ! .secret_sauce/.skills/ph-ac0/theory-energy-contributions.md): W^(1) splits into nine contributions, one
-      ! per pair of ph pair spaces (vo, va, ao, aa) minus aa-aa. Contribution
-      ! <C>-<R> sums over the integral (pq|rs) with (pq) in C and (rs) in R and
-      ! needs the single A1 block phA1<R><C> - name and block id read in opposite
-      ! directions by construction.
-      !
-      !   contribution  printed    integral class   A1 block
-      !   E_aoao        (21)(21)   (IA|IA)          phA1aoao
-      !   E_aaao        (22)(21)   (AA|IA)          phA1aoaa
-      !   E_voao        (31)(21)   (IV|IA)          phA1aovo
-      !   E_voaa        (31)(22)   (IV|AA)          phA1aavo
-      !   E_vovo        (31)(31)   (IV|IV)          none - closed form
-      !   E_vaao        (32)(21)   (VA|IA)          phA1aova
-      !   E_vaaa        (32)(22)   (VA|AA)          phA1aava
-      !   E_vavo        (32)(31)   (VA|IV)          none - closed form
-      !   E_vava        (32)(32)   (VA|VA)          none - closed form
-      !
-      ! CLOSED FORMS. phA1vovo, phA1vova and phA1vava are never built. These
-      ! three contributions have Xt = Yt on both sides, so they need only
-      ! A_plus^(1) - A_min^(1) = 2 B^(1), and B^(1) is a single integral term
-      ! (.secret_sauce/.skills/ph-ac0/theory-energy-contributions.md, "Three of the nine collapse to
-      ! integrals"), evaluated here on the fly from the same integral class:
-      !   vo-vo  B_rs,pq = -2 (pq|rs) + (qr|ps)
-      !   va-vo  B_rs,pq = n_q [ -2 (pq|rs) + (qr|ps) ]
-      !   va-va  B_rs,pq = - sum_{tu in act} G_tuqs (ur|pt)
-      !
-      ! The printed labels are those of the (Mu)(Nu) table of AC0CAS_FOFO
-      ! (ab0fofo.f90), 1 = inactive, 2 = active, 3 = virtual.
-      !
-      ! NOTATION. o means INACTIVE here, as in phac0_thc and the ph* notes. In
-      ! thc_energy the same letter means occupied = inactive + active (RVO, ROO).
-      !
-      ! INTERMEDIATES (.secret_sauce/.skills/ph-ac0/code-thc-energy.md Sec. 1-2). All metric (c)
-      ! factors live in three scaled eigenvector sets, Xp = Xt/d+, Ym = Yt/d-,
-      ! Yb = d+ Yt (TvecXp, TvecYm, TvecYb, built by build_vecXt + build_vecs
-      ! before the integral loop), so the A1 blocks are used raw. The numerator
-      ! of each A1-based contribution, Xp^T A+raw Xp - Ym^T A-raw Ym, is
-      ! projected, divided by the denominator and back-transformed into one
-      ! loop-ready pair-space matrix G per contribution (TprojXAp, TprojYAm for
-      ! the two terms with a vo side, TprojXApX, TprojYAmY for the four without,
-      ! then TdS and TG; build_G_<term>), contracted with the integrals by
-      ! G_contr.
-      !
-      ! All nine contributions are computed. Closed forms: E_vovo (vovo_contr),
-      ! E_vavo (vavo_contr), E_vava (vava_contr). Via G and G_contr: E_voao,
-      ! E_voaa, E_vaao, E_vaaa, E_aoao, E_aaao. For SA-CASSCF the A1 blocks
-      ! aova, aoaa and aava arrive here already symmetrized with their
-      ! transposed partners (symmetrize_A1_ph in phac0_thc,
-      ! .secret_sauce/.skills/ph-ac0/code-thc-energy.md Sec. 6).
+      ! ph-AC0 correlation energy with THC integrals, the nine contributions to W^(1)
+      ! (printed as the (Mu)(Nu) lines of AC0CAS_FOFO). All c factors live in the
+      ! scaled vectors Xp = Xt/d+, Ym = Yt/d-, Yb = d+ Yt, so the A1 blocks are used
+      ! raw; one loop-ready G per A1-based term, three closed forms (vovo, vavo,
+      ! vava). The A1 blocks are consumed (move_alloc chain). o means INACTIVE here.
+      ! Notes: .secret_sauce/.skills/ph-ac0/code-thc-energy.md (read before changing this module),
+      ! .secret_sauce/.skills/ph-ac0/theory-energy-contributions.md, .secret_sauce/.skills/ms-ac0/code-thc-ms-ac0.md.
       ! =============================================================================
 
       use real_linalg !from gammcor integrals
@@ -94,15 +48,9 @@ module thc_energy_ph
             double precision, dimension(:,:), allocatable :: aa
       end type TvecXt
 
-      ! The three scaled eigenvector sets that carry all the metric factors of
-      ! the energy, so that the A1 blocks are used raw (see build_vecs):
-      !   Xp = Xt / d+      Ym = Yt / d-      Yb = d+ Yt       (per pair row)
-      ! For a pair (1,2):  d+ = c_1 + c_2,   d- = c_1 - c_2,   with
-      !   c_i = 1 (inactive),  c_v = 0 (virtual),  c_a = sign(n_a - 1/2) sqrt(n_a) (active)
-      ! Same layout as TvecXt, plus va:
-      !   va(NA, NA, NV)   per virtual p: rows q - NI, columns mode slot
-      ! vo sides carry no vectors (Xp = 1, Ym = -1, Yb = 1, the 1/sqrt(2) go
-      ! into the prefactor).
+      ! Xp = Xt/d+, Ym = Yt/d-, Yb = d+ Yt per pair row (d+- = c_1 +- c_2); layout of
+      ! TvecXt plus va(NA,NA,NV). vo sides carry no vectors (Xp = 1, Ym = -1, Yb = 1).
+      ! See .secret_sauce/.skills/ph-ac0/code-thc-energy.md Sec. 1-2.
       type TvecXp
             double precision, dimension(:,:,:), allocatable :: ao, va
             double precision, dimension(:,:), allocatable :: aa
@@ -155,25 +103,9 @@ module thc_energy_ph
 contains
 
       ! =============================================================================
-      ! V_axby = (a x|b y) for one fixed (a, b), x and y local to their space.
-      ! What it is in terms of the (pq|rs) of each contribution:
-      !
-      !   (IA|IA)  E_aoao   a=q (I)  x=p (A)   b=s (I)  y=r (A)
-      !   (AA|IA)  E_aaao   a,x = p,q (A)      b=s (I)  y=r (A)
-      !   (IV|IA)  E_voao   a=q (I)  x=p (V)   b=s (I)  y=r (A)
-      !   (IV|AA)  E_voaa   a=q (I)  x=p (V)   b,y = r,s (A)
-      !   (IV|IV)  E_vovo   a=q (I)  x=p (V)   b=s (I)  y=r (V)
-      !   (VA|IA)  E_vaao   a=p (V)  x=q (A)   b=s (I)  y=r (A)
-      !   (VA|AA)  E_vaaa   a=p (V)  x=q (A)   b,y = r,s (A)
-      !   (VA|IV)  E_vavo   a=p (V)  x=q (A)   b=s (I)  y=r (V)   - all a at once, V_xay
-      !   (VA|VA)  E_vava   a=p (V)  x=q (A)   b=r (V)  y=s (A)
-      !
-      ! The (a, b) loops run over the full ranges, i.e. over both orientations
-      ! of the two pairs where both are in the same space - except (IV|IV) and
-      ! (VA|VA), which run b <= a (see vovo_contr, vava_contr), and (VA|IV),
-      ! which builds all virtual a in one gemm per b into V_xay(x,a,y) (see
-      ! vavo_contr). Inactive a, b run NI0..NI = NFrozen+1..NI (frozen core);
-      ! RIA and RIV are built for those orbitals only, with bounds NI0:NI.
+      ! Energy loop: one integral class per contribution (slab index map in
+      ! .secret_sauce/.skills/ph-ac0/code-thc-energy.md Sec. 4). Inactive a, b run NI0..NI;
+      ! (IV|IV) and (VA|VA) run b <= a, (VA|IV) builds all virtual a at once (V_xay).
       ! =============================================================================
       subroutine THC_energy_loop_ph(THCData, ACB, Flags, pos, AuxData, rdm2, E_corr_out, DeltaH_out)
             use THC_Gammcor
@@ -739,19 +671,8 @@ contains
       end subroutine THC_energy_loop_ph
 
 
-      ! =============================================================================
-      ! Rebuild Xt for the two A0 blocks where Xt /= Yt
-      ! (.secret_sauce/.skills/ph-ac0/theory-energy-contributions.md Sec. 2):
-      !
-      !   ao, per inactive s:  Xt(:,m)  = MiniAMinus(s) MiniAPlus(s)(:,m) / Eig(m)
-      !   aa:                  Xt(:,mu) = AMinus APlus(:,mu) / Eig(mu)
-      !
-      ! After pherpa_symm_block_ph, APlus / MiniAPlus hold Yt and AMinus /
-      ! MiniAMinus the symmetrized scaled A_-^(0). A mode with Eig <= 0 gets a
-      ! zero column: that is an empty mini-block slot (Eig = 0, outside ActList)
-      ! or an unstable mode (Eig = -sqrt|omega^2|, vector unnormalized). The
-      ! mini-block matrices are zero outside ActList x ActList, so so is Xt%ao.
-      ! =============================================================================
+      ! Xt = A_- Yt / Eig for the ao and aa blocks (Xt = Yt for vo, va). Modes with
+      ! Eig <= 0 get a zero column. See .secret_sauce/.skills/ph-ac0/code-thc-energy.md Sec. 3.
       subroutine build_vecXt(vecXt, OA, AA, NA, NI0, NI)
             type(TvecXt), intent(out) :: vecXt
             type(TAC0Block_ph), intent(in) :: OA, AA
@@ -789,30 +710,9 @@ contains
       end subroutine build_vecXt
 
 
-      ! =============================================================================
-      ! Steps 2-3 of .secret_sauce/.skills/ph-ac0/code-thc-energy.md Sec. 3. Builds the three
-      ! scaled vector sets from Yt (APlus / MiniAPlus) and Xt (vecXt):
-      !
-      !   Xp = Xt / d+        Ym = Yt / d-        Yb = d+ Yt          (per pair row)
-      !
-      ! With A_+-^c = A_+-raw / (d+- d+-), Xt^T A_+^c Xt = Xp^T A_+raw Xp and
-      ! Yt^T A_-^c Yt = Ym^T A_-raw Ym, and the d+_pq d+_rs of the energy goes
-      ! into Yb. So the A1 blocks are used raw and no kernel needs a c factor.
-      !
-      !   space  pair    d+          d-          Xt
-      !   ao     (r,s)   c_r + 1     c_r - 1     vecXt%ao
-      !   va     (p,q)   c_q         -c_q        = Yt
-      !   aa     (r,s)   c_r + c_s   c_r - c_s   vecXt%aa
-      !
-      ! 0.2, mode validity: a mode is used only if Eig > 0. That excludes the
-      ! empty mini-block slots (Eig = 0, outside ActList) and the unstable modes
-      ! pherpa_symm_block_ph flags with Eig = -sqrt|omega^2|. Their columns stay
-      ! zero in all three sets, so they drop out of every term.
-      !
-      ! Division only on ActList rows (va, ao) and IndN rows (aa), where d is
-      ! bounded away from 0 by ThrQVirt / ThrQInact / ThrSelAct; all other rows
-      ! of Yt and Xt are zero. vecXt is consumed: its arrays move into vecXp.
-      ! =============================================================================
+      ! Xp, Ym, Yb from Yt and Xt; a mode is used only if Eig > 0. Divides only on
+      ! ActList / IndN rows, where d is bounded away from 0. Consumes vecXt.
+      ! See .secret_sauce/.skills/ph-ac0/code-thc-energy.md Sec. 1, 3.
       subroutine build_vecs(vecXp, vecYm, vecYb, vecXt, OA, VA, AA, AuxData)
             type(TvecXp), intent(out) :: vecXp
             type(TvecYm), intent(out) :: vecYm
@@ -904,20 +804,10 @@ contains
       end subroutine build_vecs
 
 
-      ! =============================================================================
-      ! MS-AC0: transition amplitude Y^(J<-I) of the ao and va modes of the
-      ! reference I, from gamma = gamma^JI(p,q) = 1/2 <J|E_qp|I> in the active NOs
-      ! of I (.secret_sauce/.skills/ms-ac0/theory-ms-ac0.md eqs. 21, 22). With the untilded
-      ! X = (Xp - Ym)/2, Y = (Xp + Ym)/2:
-      !
-      !   ao, per correlated inactive k:  YJ = gamma^T Y - gamma X
-      !   va, per virtual k:              YJ = gamma^T X        (Y_va = 0: Ym%va = -Xp%va)
-      !
-      ! Layout of vecYb (rows r - NI, columns mode slot); YJ replaces vecYb on one
-      ! side of the off-diagonal energy. No aa: aa modes are excluded for J /= I,
-      ! as in INCORE and FOFO. Rows outside ActList are zeroed: gamma spreads
-      ! weight onto them, but those pairs are not in the ERPA of I.
-      ! =============================================================================
+      ! MS-AC0: Y^(J<-I) of the ao and va modes from gamma^JI (theory-ms-ac0.md eqs. 21,
+      ! 22): ao YJ = gamma^T Y - gamma X, va YJ = gamma^T X. No aa. Rows outside
+      ! ActList are zeroed (those pairs are not in the ERPA of I).
+      ! See .secret_sauce/.skills/ms-ac0/code-thc-ms-ac0.md Sec. 6.
       subroutine build_YJ(vecYJ, vecXp, vecYm, OA, VA, gamma, NA, NV, NI0, NI)
             type(TvecYb), intent(out) :: vecYJ
             type(TvecXp), intent(in) :: vecXp
@@ -970,31 +860,9 @@ contains
       end subroutine build_YJ
 
 
-      ! =============================================================================
-      ! Step 2: G%voao for E_voao, contribution vo-ao, (pq) in vo = column side,
-      ! (rs) in ao = row side, block phA1aovo (rows ao, columns vo). f = 2: both
-      ! orientations, the two 1/sqrt(2) of the vo vectors and the 2 of FOFO
-      ! step 3 (.secret_sauce/.skills/ph-ac0/code-thc-energy.md Sec. 1).
-      !
-      !   projXAp(k,pq) =   sum_rs Xp_ao(rs,k) A+raw(rs,pq)
-      !   projYAm(k,pq) = - sum_rs Ym_ao(rs,k) A-raw(rs,pq)         (Ym_vo = -1)
-      !   dS(k,pq)      = [projXAp - projYAm](k,pq) / (omega_k + omega_pq)
-      !   G(rs,pq)      = 2 sum_k Yb_ao(rs,k) dS(k,pq)
-      !
-      ! The vo side has no vectors, so only rows are transformed, one NA-row
-      ! slice per correlated inactive s: rows l0 = (s-NI0)*NA+1 .. l0+NA-1, in
-      ! which pair (r,s) sits at r - NI and mode (s,nu) at its slot. Invalid
-      ! modes (Eig <= 0) have zero vector columns and get dS = 0.
-      !
-      ! Storage chain, each stage in place in the previous one, peak = the A1
-      ! block plus one NA x D_vo buffer:
-      !   A1%APlus  -> projXAp%voao -> dS%voao -> G%voao
-      !   A1%AMinus -> projYAm%voao, freed after the combine
-      ! The A1 block is empty on return.
-      !
-      ! MS-AC0, per partner J: only the orientation with (pq) in ao survives
-      ! (YJ_vo = 0), f = 1:   GJ(rs,pq) = sum_k YJ_ao(rs,k) dS(k,pq)
-      ! =============================================================================
+      ! G%voao for E_voao from phA1aovo (rows ao, cols vo), f = 2; rows only, per
+      ! inactive slice. Consumes the A1 block. aovo is not symmetrized (no measured
+      ! effect for SA-CASSCF). See .secret_sauce/.skills/ph-ac0/code-thc-energy.md Sec. 4 (builders), 6.
       subroutine build_G_voao(G, A1, OA, VO, vecXp, vecYm, vecYb, NA, NI0, NI, vecYJ, GJ)
             type(TG), intent(inout) :: G
             type(TAC0Block_ph), intent(inout) :: A1
@@ -1069,30 +937,9 @@ contains
       end subroutine build_G_voao
 
 
-      ! =============================================================================
-      ! Step 3: G%voaa for E_voaa, contribution vo-aa, (pq) in vo = column side,
-      ! (rs) in aa = row side, block phA1aavo (rows aa, columns vo). f = 2, as
-      ! for E_voao. The aa twin of build_G_voao:
-      !
-      !   projXAp(mu,pq) =   sum_rs Xp_aa(rs,mu) A+raw(rs,pq)
-      !   projYAm(mu,pq) = - sum_rs Ym_aa(rs,mu) A-raw(rs,pq)       (Ym_vo = -1)
-      !   dS(mu,pq)      = [projXAp - projYAm](mu,pq) / (omega_mu + omega_pq)
-      !   G(rs,pq)       = 2 sum_mu Yb_aa(rs,mu) dS(mu,pq)
-      !
-      ! Rows are aa pairs pos(r,s), r > s, and aa modes mu, both D_aa = AA%NDim.
-      ! The aa side has no mini-blocks, so each row transform is one dense
-      ! D_aa x D_aa gemm. Columns are independent, so it is done in place over
-      ! column chunks of width nchunk with a D_aa x nchunk buffer. Invalid modes
-      ! (Eig <= 0) have zero vector columns and get dS = 0.
-      !
-      ! No symmetrization is needed for SA-CASSCF here: an aa pair and a vo pair
-      ! cannot share an orbital, so phA1aavo is symmetric with its transpose
-      ! for any orbitals (.secret_sauce/.skills/ph-ac0/code-thc-energy.md Sec. 6).
-      !
-      ! Storage chain, as in build_G_voao:
-      !   A1%APlus  -> projXAp%voaa -> dS%voaa -> G%voaa
-      !   A1%AMinus -> projYAm%voaa, freed after the combine
-      ! =============================================================================
+      ! G%voaa for E_voaa from phA1aavo (rows aa, cols vo), f = 2; one dense gemm per
+      ! column chunk. phA1aavo is exactly symmetric (aa and vo pairs share no
+      ! orbital). See .secret_sauce/.skills/ph-ac0/code-thc-energy.md Sec. 4 (builders).
       subroutine build_G_voaa(G, A1, AA, VO, vecXp, vecYm, vecYb)
             type(TG), intent(inout) :: G
             type(TAC0Block_ph), intent(inout) :: A1
@@ -1156,40 +1003,10 @@ contains
       end subroutine build_G_voaa
 
 
-      ! =============================================================================
-      ! Step 4: G%vaao for E_vaao, contribution va-ao, (pq) in va = column side,
-      ! (rs) in ao = row side, block phA1aova (rows ao, columns va). f = 4: both
-      ! orientations and the 2 of FOFO step 3, no vo side.
-      !
-      !   projXApX(k,n) = sum_{rs,pq} Xp_ao(rs,k) A+raw(rs,pq) Xp_va(pq,n)
-      !   projYAmY(k,n) = sum_{rs,pq} Ym_ao(rs,k) A-raw(rs,pq) Ym_va(pq,n)
-      !   dS(k,n)       = [projXApX - projYAmY](k,n) / (omega_(s,nu) + omega_(p,mu))
-      !   G(rs,pq)      = 4 sum_{k,n} Yb_ao(rs,k) dS(k,n) Yb_va(pq,n)
-      !
-      ! Both sides are mini-blocked, so both transforms go slice by slice, as
-      ! pp's AZvaao:
-      !   rows    per correlated inactive s: rows l0 = (s-NI0)*NA+1 .. l0+NA-1,
-      !           pair (r,s) at r - NI, mode (s,nu) at its slot;
-      !   columns per virtual p (k = p - NIA): columns (k-1)*NA+1 .. k*NA,
-      !           pair (p,q) at q - NI, mode (p,mu) at its slot.
-      ! The minus-channel sign of the va side is inside Ym_va = -Yt/c. A mode
-      ! pair with Eig <= 0 on either side gets dS = 0.
-      !
-      ! SA-CASSCF: phA1aova is NOT symmetric with its transpose unless the
-      ! state-specific orbital gradient vanishes (shared active orbital, r = q,
-      ! dB term). symmetrize_A1_ph has already replaced it by its symmetric
-      ! part, so the doubling of the two orientations here is exact.
-      !
-      ! Storage chain, peak = the A1 block plus an NA x D_va and a D_ao x NA
-      ! buffer:
-      !   A1%APlus  -> projXApX%vaao -> dS%vaao -> G%vaao
-      !   A1%AMinus -> projYAmY%vaao, freed after the combine
-      !
-      ! MS-AC0, per partner J: both orientations survive, f = 2 each:
-      !   GJ = 2 [ YJ_ao dS Yb_va^T + Yb_ao dS YJ_va^T ]
-      ! The first term needs dS itself (one extra D_ao x D_va buffer); the second
-      ! reuses 4 Yb_ao dS from the row back-transform, scaled by 1/2.
-      ! =============================================================================
+      ! G%vaao for E_vaao from phA1aova (rows ao, cols va), f = 4; rows per inactive,
+      ! then columns per virtual. The minus-channel sign of the va side is in
+      ! Ym_va = -Yt/c. phA1aova arrives symmetrized (symmetrize_A1_ph).
+      ! See .secret_sauce/.skills/ph-ac0/code-thc-energy.md Sec. 4 (builders), 6.
       subroutine build_G_vaao(G, A1, OA, VA, vecXp, vecYm, vecYb, NA, NV, NI0, NI, vecYJ, GJ)
             type(TG), intent(inout) :: G
             type(TAC0Block_ph), intent(inout) :: A1
@@ -1318,37 +1135,9 @@ contains
       end subroutine build_G_vaao
 
 
-      ! =============================================================================
-      ! Step 5: G%vaaa for E_vaaa, contribution va-aa, (pq) in va = column side,
-      ! (rs) in aa = row side, block phA1aava (rows aa, columns va). f = 4, as
-      ! for E_vaao.
-      !
-      !   projXApX(mu,n) = sum_{rs,pq} Xp_aa(rs,mu) A+raw(rs,pq) Xp_va(pq,n)
-      !   projYAmY(mu,n) = sum_{rs,pq} Ym_aa(rs,mu) A-raw(rs,pq) Ym_va(pq,n)
-      !   dS(mu,n)       = [projXApX - projYAmY](mu,n) / (omega_mu + omega_(p,mu'))
-      !   G(rs,pq)       = 4 sum_{mu,n} Yb_aa(rs,mu) dS(mu,n) Yb_va(pq,n)
-      !
-      ! Rows are aa pairs pos(r,s), r > s, and aa modes, both D_aa; the aa side
-      ! is dense. Columns are va pairs, per virtual p (k = p - NIA) the slice
-      ! (k-1)*NA+1 .. k*NA, pair (p,q) at q - NI, mode (p,mu) at its slot. The
-      ! two sides are transformed together, slice by slice:
-      !   A(:,slice) <- Xp_aa^T A(:,slice) Xp_va(:,:,k)
-      ! which keeps both buffers at D_aa x NA. The minus-channel sign of the va
-      ! side is inside Ym_va = -Yt/c. A mode pair with Eig <= 0 on either side
-      ! gets dS = 0.
-      !
-      ! SA-CASSCF: phA1aava is NOT symmetric with its transpose unless the
-      ! state-specific orbital gradient vanishes (shared active orbital, s = q
-      ! dA term and r = q dB term). symmetrize_A1_ph has already replaced it by
-      ! its symmetric part, so the doubling of the two orientations here is exact.
-      !
-      ! Storage chain:
-      !   A1%APlus  -> projXApX%vaaa -> dS%vaaa -> G%vaaa
-      !   A1%AMinus -> projYAmY%vaaa, freed after the combine
-      !
-      ! MS-AC0, per partner J: only the orientation with (pq) in va survives
-      ! (YJ_aa = 0), f = 2:   GJ = 2 Yb_aa dS YJ_va^T
-      ! =============================================================================
+      ! G%vaaa for E_vaaa from phA1aava (rows aa, cols va), f = 4; both sides per
+      ! virtual column slice. phA1aava arrives symmetrized (symmetrize_A1_ph).
+      ! See .secret_sauce/.skills/ph-ac0/code-thc-energy.md Sec. 4 (builders), 6.
       subroutine build_G_vaaa(G, A1, AA, VA, vecXp, vecYm, vecYb, NA, NV, vecYJ, GJ)
             type(TG), intent(inout) :: G
             type(TAC0Block_ph), intent(inout) :: A1
@@ -1435,31 +1224,9 @@ contains
       end subroutine build_G_vaaa
 
 
-      ! =============================================================================
-      ! Step 6: G%aoao for E_aoao, contribution ao-ao, (pq) and (rs) both in ao,
-      ! block phA1aoao (rows ao, columns ao). Diagonal combination: f = 2, the
-      ! 2 of FOFO step 3 only.
-      !
-      !   projXApX(k,n) = sum_{rs,pq} Xp_ao(rs,k) A+raw(rs,pq) Xp_ao(pq,n)
-      !   projYAmY(k,n) = sum_{rs,pq} Ym_ao(rs,k) A-raw(rs,pq) Ym_ao(pq,n)
-      !   dS(k,n)       = [projXApX - projYAmY](k,n) / (omega_(s,nu) + omega_(q,mu))
-      !   G(rs,pq)      = 2 sum_{k,n} Yb_ao(rs,k) dS(k,n) Yb_ao(pq,n)
-      !
-      ! Rows and columns have the same layout: per correlated inactive s the
-      ! slice (s-NI0)*NA+1 .. +NA, pair (r,s) at r - NI, mode (s,nu) at its
-      ! slot. Two passes, as in build_G_vaao: rows per s, then columns per q.
-      ! A mode pair with Eig <= 0 on either side gets dS = 0.
-      !
-      ! SA-CASSCF: no correction needed. The energy sums over all (pq) and all
-      ! (rs) of this one block, so it only sees the symmetric part of A^(1).
-      !
-      ! Storage chain:
-      !   A1%APlus  -> projXApX%aoao -> dS%aoao -> G%aoao
-      !   A1%AMinus -> projYAmY%aoao, freed after the combine
-      !
-      ! MS-AC0, per partner J: YJ on the (pq) = column side, f = 2:
-      !   GJ = 2 Yb_ao dS YJ_ao^T
-      ! =============================================================================
+      ! G%aoao for E_aoao from phA1aoao (rows ao, cols ao), f = 2 (diagonal); rows
+      ! per inactive, then columns per inactive. No symmetrization needed: one block,
+      ! all (pq), (rs). See .secret_sauce/.skills/ph-ac0/code-thc-energy.md Sec. 4 (builders).
       subroutine build_G_aoao(G, A1, OA, vecXp, vecYm, vecYb, NA, NI0, NI, vecYJ, GJ)
             type(TG), intent(inout) :: G
             type(TAC0Block_ph), intent(inout) :: A1
@@ -1558,37 +1325,9 @@ contains
       end subroutine build_G_aoao
 
 
-      ! =============================================================================
-      ! Step 7: G%aaao for E_aaao, contribution aa-ao, (pq) in aa = column side,
-      ! (rs) in ao = row side, block phA1aoaa (rows ao, columns aa). f = 4: both
-      ! orientations and the 2 of FOFO step 3, no vo side.
-      !
-      !   projXApX(k,mu) = sum_{rs,pq} Xp_ao(rs,k) A+raw(rs,pq) Xp_aa(pq,mu)
-      !   projYAmY(k,mu) = sum_{rs,pq} Ym_ao(rs,k) A-raw(rs,pq) Ym_aa(pq,mu)
-      !   dS(k,mu)       = [projXApX - projYAmY](k,mu) / (omega_(s,nu) + omega_mu)
-      !   G(rs,pq)       = 4 sum_{k,mu} Yb_ao(rs,k) dS(k,mu) Yb_aa(pq,mu)
-      !
-      ! The mirror of build_G_vaaa: rows are mini-blocked, per correlated
-      ! inactive s the slice (s-NI0)*NA+1 .. +NA, pair (r,s) at r - NI, mode
-      ! (s,nu) at its slot; columns are aa pairs pos(p,q), p > q, and aa modes,
-      ! both D_aa, dense. The two sides are transformed together, row slice by
-      ! row slice:
-      !   A(slice,:) <- Xp_ao(:,:,s)^T A(slice,:) Xp_aa
-      ! with two NA x D_aa buffers. A mode pair with Eig <= 0 on either side
-      ! gets dS = 0.
-      !
-      ! SA-CASSCF: phA1aoaa is NOT symmetric with its transpose unless the
-      ! state-specific orbital gradient vanishes (shared active orbital, r = p
-      ! dA term and r = q dB term). symmetrize_A1_ph has already replaced it by
-      ! its symmetric part, so the doubling of the two orientations here is exact.
-      !
-      ! Storage chain:
-      !   A1%APlus  -> projXApX%aaao -> dS%aaao -> G%aaao
-      !   A1%AMinus -> projYAmY%aaao, freed after the combine
-      !
-      ! MS-AC0, per partner J: only the orientation with (pq) in ao survives
-      ! (YJ_aa = 0), f = 2:   GJ = 2 YJ_ao dS Yb_aa^T
-      ! =============================================================================
+      ! G%aaao for E_aaao from phA1aoaa (rows ao, cols aa), f = 4; both sides per
+      ! inactive row slice. phA1aoaa arrives symmetrized (symmetrize_A1_ph).
+      ! See .secret_sauce/.skills/ph-ac0/code-thc-energy.md Sec. 4 (builders), 6.
       subroutine build_G_aaao(G, A1, OA, AA, vecXp, vecYm, vecYb, NA, NI0, NI, vecYJ, GJ)
             type(TG), intent(inout) :: G
             type(TAC0Block_ph), intent(inout) :: A1
@@ -1679,18 +1418,8 @@ contains
       end subroutine build_G_aaao
 
 
-      ! =============================================================================
-      ! Step 0.4: the one loop kernel of the six A1-based contributions. For one
-      ! integral slab V_axby(x,y) = (a x|b y),
-      !
-      !   E += sum_{x,y} V_axby(x,y) * G(rowidx(y), colidx(x))
-      !
-      ! G is the loop-ready pair-space matrix of the contribution (prefactor and
-      ! all c factors already inside), rows = row pairs (rs), columns = column
-      ! pairs (pq). colidx(x) is the column pair slab index x belongs to,
-      ! rowidx(y) the row pair; 0 skips the element (aa pair taken once, or
-      ! removed by ThrSelAct).
-      ! =============================================================================
+      ! The one loop kernel of the six A1-based terms:
+      ! E += sum_{x,y} V_axby(x,y) G(rowidx(y), colidx(x)); index 0 is skipped.
       subroutine G_contr(E, G, colidx, rowidx, nx, ny, V_axby)
             double precision, intent(inout) :: E
             double precision, dimension(:,:), intent(in) :: G
@@ -1717,23 +1446,9 @@ contains
       end subroutine G_contr
 
 
-      ! =============================================================================
-      ! E_vovo from one (IV|IV) slab, V_axby(x,y) = (x a|y b) = (pq|rs) with
-      ! p = x, q = a, r = y, s = b. The ph twin of vvoo_contr (thc_energy): both
-      ! A0 sides are diagonal, so no eigenvectors and no intermediate, and the A1
-      ! element is made of integrals from the same slab. Closed form in the code
-      ! convention (.secret_sauce/.skills/ph-ac0/theory-energy-contributions.md Sec. 3.1):
-      !
-      !   E_vovo = sum_{pq, rs}  (pq|rs) [ (qr|ps) - 2 (pq|rs) ] / (omega_pq + omega_rs)
-      !
-      ! with (qr|ps) = (y a|x b) = V_axby(y,x) and omega_pq = f_pp - f_qq =
-      ! VO%Eig(pos(p,q)). This is the closed-shell MP2 expression for the
-      ! inactive -> virtual doubles with the CAS orbital energies.
-      !
-      ! Slab (b,a) is the transpose of slab (a,b), and after x <-> y it gives
-      ! exactly the same sum (no A1 symmetry is assumed - it is all integrals).
-      ! So the caller runs b <= a and the a /= b slabs count twice.
-      ! =============================================================================
+      ! E_vovo from one (IV|IV) slab (closed form, no vectors, no A1). Slab (b,a)
+      ! gives the same sum, so the caller runs b <= a and a /= b counts twice.
+      ! See .secret_sauce/.skills/ph-ac0/code-thc-energy.md Sec. 4.
       subroutine vovo_contr(E_vovo, VO, pos, a, b, x0, x1, V_axby)
             double precision, intent(inout) :: E_vovo
             type(TAC0Block_ph), intent(in) :: VO
@@ -1767,31 +1482,9 @@ contains
       end subroutine vovo_contr
 
 
-      ! =============================================================================
-      ! E_vavo for one inactive s, from V_xay(x,a,y) = (a x|s y) over all virtual
-      ! a, y. Closed form in the code convention (.secret_sauce/.skills/ph-ac0/theory-energy-contributions.md
-      ! Sec. 3.2), p, r virtual, q, b active:
-      !
-      !   E_va-vo = 2 sum c_q (pq|rs) sum_mu sum_b c_b Yt_(p,mu)(q) Yt_(p,mu)(b)
-      !               [ (br|ps) - 2 (pb|rs) ] / (omega_(p,mu) + omega_rs)
-      !
-      ! and E_vavo is twice that (va-vo plus vo-va). With the c-scaled vectors of
-      ! the va mini-block of p, Yb(x,m) = c_x Yt_(p,m)(x) = vecYb%va(x,m,p):
-      !
-      !   U(m,r) = sum_x Yb(x,m) (p x|s r) = sum_x Yb(x,m) V_xay(x,p,r)  - (pq|rs), (pb|rs)
-      !   T(m,r) = sum_x Yb(x,m) (r x|s p) = sum_x Yb(x,m) V_xay(x,r,p)  - (br|ps)
-      !   E_vavo += 4 sum_{p,m,r} U(m,r) [ T(m,r) - 2 U(m,r) ] / (omega_(p,m) + omega_rs)
-      !
-      ! T takes slab a = r at column p, U slab a = p - the reason the caller builds
-      ! all virtual a at once for one s. m runs over the packed mode slots
-      ! ActList(jj) - NI of the mini-block; the other slots are empty, and the
-      ! columns of invalid modes are zero in Yb (build_vecs).
-      !
-      ! MS-AC0, per partner J: only the va-vo orientation survives (YJ_vo = 0).
-      ! YJ replaces Yb in U only; T - 2U is the B^(1) numerator and keeps Yb:
-      !   Ubar(m,r) = sum_x YJ_va(x,m) V_xay(x,p,r)
-      !   EJ(J)    += 2 sum_{p,m,r} Ubar(m,r) [ T(m,r) - 2 U(m,r) ] / (omega_(p,m) + omega_rs)
-      ! =============================================================================
+      ! E_vavo for one inactive s from V_xay = (a x|s y), all virtual a (T needs slab
+      ! a = r at column p). Both orientations. MS-AC0: YJ replaces Yb in U only.
+      ! See .secret_sauce/.skills/ph-ac0/code-thc-energy.md Sec. 4, .secret_sauce/.skills/ms-ac0/code-thc-ms-ac0.md Sec. 7.
       subroutine vavo_contr(E_vavo, VA, VO, Yb, pos, s, AuxData, NA, NV, V_xay, vecYJ, EJ)
             double precision, intent(inout) :: E_vavo
             type(TAC0Block_ph), intent(in) :: VA, VO
@@ -1853,38 +1546,10 @@ contains
       end subroutine vavo_contr
 
 
-      ! =============================================================================
-      ! E_vava from one (VA|VA) slab, V_axby(x,y) = (a x|b y) = (pq|rs) with
-      ! p = a, q = x, r = b, s = y. Closed form in the code convention
-      ! (.secret_sauce/.skills/ph-ac0/theory-energy-contributions.md Sec. 3.6), p, r virtual, q, s, b, c active:
-      !
-      !   E_vava = -4 sum c_q c_s (pq|rs) sum_{mu,nu} Yt_(p,mu)(q) Yt_(r,nu)(s)
-      !              / (omega_(p,mu) + omega_(r,nu))
-      !              * sum_bc Yt_(r,nu)(b) Yt_(p,mu)(c) / (c_b c_c) * sum_tu G_tucb (ur|pt)
-      !
-      ! Diagonal combination, no factor 2. With Yb = c Yt and Xp = Yt / c of the
-      ! va mini-blocks of p and r (build_vecs) it factorizes per slab:
-      !
-      !   M1(mu,nu) = sum_qs Yb^(p)(q,mu) V(q,s) Yb^(r)(s,nu)     = Yb^(p)T V Yb^(r)
-      !   K(c,b)    = sum_tu G_tucb (ur|pt) = sum_tu rdm2(t,u,c,b) V(t,u)
-      !   M2(mu,nu) = sum_cb Xp^(p)(c,mu) K(c,b) Xp^(r)(b,nu)     = Xp^(p)T K Xp^(r)
-      !   E_vava   += -4 sum_{mu,nu valid} M1(mu,nu) M2(mu,nu) / (omega_(p,mu) + omega_(r,nu))
-      !
-      ! (ur|pt) = (pt|ru) = V(t,u). In the convention of D6_vava, G_tucb =
-      ! rdm2(u,t,b,c) = rdm2(t,u,c,b) by the real-RDM symmetry
-      ! rdm2(1,2,3,4) = rdm2(2,1,4,3), so K is one ddot over NA**2 per (c,b).
-      !
-      ! Slab (b,a) is the transpose of slab (a,b); with the same symmetry K and
-      ! M1, M2 transpose with it and give the same sum. So the caller runs
-      ! b <= a and the a /= b slabs count twice.
-      !
-      ! MS-AC0, per partner J: YJ replaces one Yb in M1 (M2 is the numerator and
-      ! is unchanged). Slab (b,a) is no longer the same sum, so for a /= b both
-      ! slabs are written out instead of doubling:
-      !   a /= b:  M1J = YJ^(p)T V Yb^(r) + Yb^(p)T V YJ^(r)
-      !   a  = b:  M1J = YJ^(p)T V Yb^(p)
-      !   EJ(J)  += -4 sum M1J(mu,nu) M2(mu,nu) / (omega_(p,mu) + omega_(r,nu))
-      ! =============================================================================
+      ! E_vava from one (VA|VA) slab: M1 = Yb^T V Yb, K = rdm2 . V (one ddot per
+      ! (c,b), uses rdm2(1,2,3,4) = rdm2(2,1,4,3)), M2 = Xp^T K Xp. b <= a; for
+      ! MS-AC0 both slabs of a /= b are written out.
+      ! See .secret_sauce/.skills/ph-ac0/code-thc-energy.md Sec. 4, .secret_sauce/.skills/ms-ac0/code-thc-ms-ac0.md Sec. 7.
       subroutine vava_contr(E_vava, VA, Xp, Yb, rdm2, map, a, b, NIA, NA, V_axby, vecYJ, EJ)
             double precision, intent(inout) :: E_vava
             type(TAC0Block_ph), intent(in) :: VA
