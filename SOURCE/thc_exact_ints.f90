@@ -3,7 +3,7 @@ module thc_exact_ints
       ! =============================================================================
       ! Exact-integral debug route of the ph-AC0 THC code (phac0_thc, thc_energy_ph):
       ! Algorithm THC + TwoMoInt INCORE + JobType AC0/MSAC0, PySCF interface.
-      ! Plan and tests: implementation_plans/thc_with_exact.md.
+      ! Plan and tests: .secret_sauce/.implementation_plans/ph-ac0/plan-thc-exact-ints.md.
       !
       ! The THC code builds every integral slab it uses with one gemm over R
       ! blocks. With THCData%exact_ints set, each of those gemms is replaced by a

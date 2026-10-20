@@ -10,11 +10,12 @@ module mp
       ! Closed shell (NA = 0): mp2_energy_thc, described below.
       ! Open shell (NA > 0): ROMP2 in two steps. romp2_semican builds separate
       ! alpha and beta orbitals, romp2_energy_thc computes the energy in them.
-      ! Theory in .skills/mp2-theory.md Sec. 3.
+      ! Theory in .secret_sauce/.skills/mp2/theory-mp2.md Sec. 3.
       ! ROMP2-CBS[H] (cbs 2, NA > 0): romp2_semican, then sromp2_energy_thc.
+      ! ROMP2 + CBS[DFT] (cbs 1, NA > 0): loc_mu_thc, then ROMP2 as for cbs 0.
       ! cbs 1/2 closed shell: loc_mu_thc gives mu(r) and XMuMat,
       ! srmp2_energy_thc is mp2_energy_thc with the CBS[H] integrals,
-      ! .skills/mp2-theory.md Sec. 5.
+      ! .secret_sauce/.skills/mp2/theory-mp2.md Sec. 5.
       !
       ! FROZEN CORE. Inactive orbitals 1..NCoreOrb (input) stay in the
       ! reference (fij, Fock) and are left out of the pairs: a, b run NI0..NI,
@@ -106,6 +107,34 @@ contains
 
             case (1)
                   call loc_mu_thc(THCData, AuxData, CAONO, Flags, XMuMat, AvMU, ECorrMD)
+
+                  if (AuxData%NA > 0) then
+                        call romp2_semican(THCData, AuxData, Xga_a, Xga_b, e_a, e_b, fov_a, fov_b)
+                        call romp2_energy_thc(THCData, AuxData, Xga_a, Xga_b, e_a, e_b, fov_a, fov_b, &
+                              E_aa, E_bb, E_ab, E_1)
+                        E_doubles = E_aa + E_bb + E_ab
+                        E_mp2 = E_doubles + E_1
+
+                        call print_section('Final energies')
+                        call print_energy('E_HF (ROHF)', AuxData%EROHF, ttoeV * AuxData%EROHF)
+                        call print_energy('E_aa (doubles, alpha-alpha)', E_aa, ttoeV * E_aa)
+                        call print_energy('E_bb (doubles, beta-beta)', E_bb, ttoeV * E_bb)
+                        call print_energy('E_ab (doubles, alpha-beta)', E_ab, ttoeV * E_ab)
+                        call print_energy('E_doubles', E_doubles, ttoeV * E_doubles)
+                        call print_energy('E_1 (singles)', E_1, ttoeV * E_1)
+                        call print_energy('E_ROMP2', E_mp2, ttoeV * E_mp2)
+                        call print_energy('CBS[DFT] correction', ECorrMD, ttoeV * ECorrMD)
+                        call print_energy('E_ROMP2-CBS[DFT]', E_mp2 + ECorrMD, ttoeV * (E_mp2 + ECorrMD))
+                        call print_energy('E_total', AuxData%EROHF + E_mp2 + ECorrMD, &
+                              ttoeV * (AuxData%EROHF + E_mp2 + ECorrMD))
+                        write(*, '(/1X,"HF+ENuc, ROMP2-Corr   , Total",6X,3F15.8)') &
+                              AuxData%EROHF, E_mp2, AuxData%EROHF + E_mp2
+                        write(*, '(1X,"HF+ENuc, ROMP2-CBS[DFT], Total",5X,3F15.8)') &
+                              AuxData%EROHF, E_mp2 + ECorrMD, AuxData%EROHF + E_mp2 + ECorrMD
+                        print*, ''
+                        return
+                  end if
+
                   call mp2_energy_thc(THCData, AuxData, E_mp2)
 
                   call print_section('Final energies')
@@ -278,7 +307,7 @@ contains
 
       ! =============================================================================
       ! ROMP2, part 1: semicanonical alpha and beta orbitals of the ROHF
-      ! reference (theory: .skills/mp2-theory.md Sec. 3).
+      ! reference (theory: .secret_sauce/.skills/mp2/theory-mp2.md Sec. 3).
       !
       ! f_a and f_b are built in the MO basis of THC_init2 (h = AuxData%HNO0,
       ! J and K from thc_Fock_JK with Xga and unit vectors as orbitals). Their
@@ -422,7 +451,7 @@ contains
 
       ! =============================================================================
       ! ROMP2, part 2: E_aa, E_bb, E_ab (doubles) and E_1 (singles) in the
-      ! orbitals of romp2_semican, formulas in .skills/mp2-theory.md Sec. 3.
+      ! orbitals of romp2_semican, formulas in .secret_sauce/.skills/mp2/theory-mp2.md Sec. 3.
       !
       ! For each occupied pair (i,j), V(A,B) = (iA|jB) is one product of the R
       ! vectors, RA (alpha) or RB (beta). The same-spin sum runs over j < i
@@ -592,7 +621,7 @@ contains
       ! =============================================================================
       ! The local mu(r) of CBS[H] and the matrix XMuMat for an HF or ROHF
       ! reference: the NAct = 0 case of LOC_MU_CBS_CHOL (muerf.f) with THC
-      ! instead of Cholesky vectors. Formulas in .skills/mp2-theory.md Sec. 5.
+      ! instead of Cholesky vectors. Formulas in .secret_sauce/.skills/mp2/theory-mp2.md Sec. 5.
       !
       ! The frozen core is left out of f(r), the on-top density and the density
       ! (as Occ(1:ICore) = 0 there), and its rows and columns of XMuMat are zero.
@@ -600,8 +629,8 @@ contains
       ! in batches of grid points. For NA = 0 the operations are those of the
       ! closed-shell code. CAONO must be the orbitals of Xga.
       !
-      ! ECorrMD is the CBS[DFT] correction. For NA > 0 it is 0 and a message is
-      ! printed: PBECor is spin-unpolarized.
+      ! ECorrMD is the CBS[DFT] correction, PBECor of the total density
+      ! (zeta = 0) also for NA > 0, as in FOFO.
       ! =============================================================================
       subroutine loc_mu_thc(THCData, AuxData, CAONO, Flags, XMuMat, AvMU, ECorrMD)
             !use units
@@ -618,11 +647,12 @@ contains
             double precision, dimension(:), allocatable :: WGrid
             double precision, dimension(:), allocatable :: FPsiB, OnTop, XMuLoc
             double precision, dimension(:), allocatable :: RhoGrid, Sigma, Zk
-            double precision, dimension(:), allocatable :: RhoA, RhoB, SigmaAA, SigmaAB, SigmaBB
+            double precision, dimension(:), allocatable :: RhoA, RhoB
             double precision, dimension(:,:), allocatable :: phib, A, B, t, ta, work
             double precision :: rho_a, rho_b, gx_a, gy_a, gz_a, gx_b, gy_b, gz_b
             double precision :: XMu, XEl, Bet, OnTopC, SPi, Const
-            integer :: NI, NIA, NBasis, NI0, NGrid, nb, r0, r1, n, r, i, q
+            double precision :: XMuNegMin, XMuNegMax, XElNeg
+            integer :: NI, NIA, NBasis, NI0, NGrid, nb, r0, r1, n, r, i, q, ir, NMuNeg
             type (tclock) :: timer
 
             double precision, parameter :: ThrOnTop = 1d-8
@@ -645,10 +675,17 @@ contains
               ! orbitals and gradients on the grid, PhiGGA(r, p, 1:4)
               !call mp_gga_orbgrid(Flags, CAONO, WGrid, PhiGGA, NGrid, NBasis)
 
+              ! Grid in input.inp: SG1, MEDIUM (default), FINE or XFINE
+              if (Flags%IGridType > GRID_PARAMS_XFINE) then
+                    print*, 'ERROR: CBS with local mu needs an internal grid (Grid SG1/MEDIUM/FINE/XFINE)'
+                    stop
+              end if
+
               call internal_gga_no_orbgrid(Flags, Flags%IGridType, Flags%ORBITAL_ORDERING, CAONO, &
                   WGrid, PhiGGA, NGrid, NBasis, NBasis, Flags%IUnits)
 
               call print_info('The number of Grid Points', NGrid)
+              ! WGrid keeps the size of the initial Becke grid; only 1:NGrid is used
 
               ! f(r): FPsiB(r) = 2 sum_K t_K^a(r) t_K^b(r). t holds t^b (occupied
               ! NI0..NI); t^a = t^b + the part of the singly occupied NI+1..NIA.
@@ -682,10 +719,12 @@ contains
               allocate(OnTop(NGrid), XMuLoc(NGrid), RhoGrid(NGrid), Sigma(NGrid))
               ! rho_s = sum_{i in occ_s} phi_i^2, g_s = sum_{i in occ_s} phi_i grad phi_i,
               ! so grad rho = 2 (g_a + g_b). Closed shell: rho_a = rho_b.
-              ! NA > 0: the spin densities and their gradient products for the
-              ! spin-polarized PBE, with grad rho_s = 2 g_s.
-              if (NIA > NI) allocate(RhoA(NGrid), RhoB(NGrid), SigmaAA(NGrid), &
-                    SigmaAB(NGrid), SigmaBB(NGrid))
+              ! NA > 0: RhoA, RhoB are kept only for the DEBUG print below.
+              if (NIA > NI) allocate(RhoA(NGrid), RhoB(NGrid))
+              NMuNeg = 0
+              XMuNegMin = zero
+              XMuNegMax = -BigE
+              XElNeg = zero
               do r = 1, NGrid
                     rho_b = zero
                     gx_b = zero
@@ -714,22 +753,41 @@ contains
                     if (NIA > NI) then
                           RhoA(r) = rho_a
                           RhoB(r) = rho_b
-                          SigmaAA(r) = four * (gx_a**2 + gy_a**2 + gz_a**2)
-                          SigmaAB(r) = four * (gx_a * gx_b + gy_a * gy_b + gz_a * gz_b)
-                          SigmaBB(r) = four * (gx_b**2 + gy_b**2 + gz_b**2)
                     end if
 
                     XMuLoc(r) = BigE
                     if (OnTop(r) > ThrOnTop) XMuLoc(r) = sqrt(PI) / two * FPsiB(r) / OnTop(r)
-                    if (abs(XMuLoc(r)) > BigE) XMuLoc(r) = BigE
+                    if (XMuLoc(r) < zero) then
+                          NMuNeg = NMuNeg + 1
+                          XMuNegMin = min(XMuNegMin, XMuLoc(r))
+                          XMuNegMax = max(XMuNegMax, XMuLoc(r))
+                          XElNeg = XElNeg + RhoGrid(r) * WGrid(r)
+                    end if
+                    ! AT 18.10.2026 open shell: mu < 0 where rho_b -> 0 blows up exp(-mu)
+                    if (XMuLoc(r) < zero .or. XMuLoc(r) > BigE) XMuLoc(r) = BigE
               end do
               call print_info('OnTop', norm2(OnTop))
               call print_info('XMuLoc', norm2(XMuLoc))
+              call print_info('Points with mu < 0 (set to BigE)', NMuNeg)
+              if (NMuNeg > 0) then
+                    call print_info('  their mu, min', XMuNegMin)
+                    call print_info('  their mu, max', XMuNegMax)
+                    call print_info('  their electrons', XElNeg)
+              end if
+
+              ! DEBUG: negative mu(r) makes exp(-mu) blow up XMuMat
+              ir = minloc(XMuLoc, dim=1)
+              print*, 'DEBUG points with FPsiB < 0, mu < 0:', count(FPsiB < zero), count(XMuLoc < zero)
+              print*, 'DEBUG min mu, at point', XMuLoc(ir), ir
+              print*, 'DEBUG   FPsiB, OnTop, WGrid:', FPsiB(ir), OnTop(ir), WGrid(ir)
+              if (NIA > NI) print*, 'DEBUG   RhoA, RhoB:', RhoA(ir), RhoB(ir)
+              ir = maxloc(WGrid(1:NGrid) * exp(-XMuLoc), dim=1)
+              print*, 'DEBUG max WGrid*exp(-mu), mu, at point', WGrid(ir) * exp(-XMuLoc(ir)), XMuLoc(ir), ir
 
               ! XMuMat(p,q) = sum_r phi_p(r) phi_q(r) WGrid(r) exp(-XMuLoc(r))
               allocate(work(NGrid, NBasis))
               do q = 1, NBasis
-                    work(:,q) = PhiGGA(:,q,1) * WGrid * exp(-XMuLoc)
+                    work(:,q) = PhiGGA(:,q,1) * WGrid(1:NGrid) * exp(-XMuLoc)
               end do
               allocate(XMuMat(NBasis, NBasis))
               call real_aTb(XMuMat, PhiGGA(:,:,1), work)
@@ -737,15 +795,11 @@ contains
               XMuMat(1:NI0-1, :) = zero
               XMuMat(:, 1:NI0-1) = zero
               call print_info('XMuMAT', norm2(XMuMat))
+              print*, 'DEBUG max |XMuMat| at (p,q):', maxval(abs(XMuMat)), maxloc(abs(XMuMat))
 
-              ! CBS[DFT] correction and the average mu. Zk = 0 for NA > 0, so
-              ! ECorrMD stays 0 there.
+              ! CBS[DFT] correction and the average mu
               allocate(Zk(NGrid))
-              if (NIA > NI) then
-                    Zk = zero
-              else
-                    call PBECor(RhoGrid, Sigma, Zk, NGrid)
-              end if
+              call PBECor(RhoGrid, Sigma, Zk, NGrid)
               call print_info('RhoGrid', norm2(RhoGrid))
               call print_info('Zk', norm2(Zk))
 
@@ -770,13 +824,7 @@ contains
               end do
               AvMU = AvMU / XEl
 
-              if (NIA > NI) then
-                    write(*, '(/," CBS[DFT] correction: not available for open shell",'// &
-                          '" (PBECor is spin-unpolarized)")')
-                    write(*, '(" average Mu",F15.3/)') AvMU
-              else
-                    write(*, '(/," CBS[DFT] correction, average Mu",F15.8,F15.3/)') ECorrMD, AvMU
-              end if
+              write(*, '(/," CBS[DFT] correction, average Mu",F15.8,F15.3/)') ECorrMD, AvMU
               call tmsg('TIME FOR loc_mu_thc', timer, tdebug)
 
             end associate
@@ -786,7 +834,7 @@ contains
 
       ! =============================================================================
       ! MP2-CBS[H] (SR-MP2) for a closed-shell HF reference, theory in
-      ! .skills/mp2-theory.md Sec. 5. The same loop and vovo_slab as
+      ! .secret_sauce/.skills/mp2/theory-mp2.md Sec. 5. The same loop and vovo_slab as
       ! mp2_energy_thc; only the slab V_axby(x,y) = (x a|y b) is dressed,
       ! FR + dSR, with dSR built from XMuMat of loc_mu_thc:
       !
@@ -907,7 +955,7 @@ contains
 
       ! =============================================================================
       ! ROMP2-CBS[H] for an ROHF reference: romp2_energy_thc with the dressed
-      ! slab of srmp2_energy_thc, per spin. Theory in .skills/mp2-theory.md Sec. 5.
+      ! slab of srmp2_energy_thc, per spin. Theory in .secret_sauce/.skills/mp2/theory-mp2.md Sec. 5.
       !
       ! XMuMat is in the ROHF basis, so every THC factor goes to spin s with the
       ! same U_s as Xga: X_s = X U_s for TXga, XgaErf and TXgaErf. The dressed

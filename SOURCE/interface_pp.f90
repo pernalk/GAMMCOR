@@ -168,7 +168,7 @@ contains
       subroutine read_PYSCF(THCData, AuxData, CAONO, Flags, TwoEl, TDDFTData)
             !
             ! Read the PySCF reference (pyscf_data.h5) and set up the 1-el Hamiltonian.
-            ! Full scenario table: .skills/code_interface.md.
+            ! Full scenario table: .secret_sauce/.skills/common/code-pyscf-interface.md.
             !
             ! What the file holds (Pyscf2Gammcor.py):
             !   /INTS/CORE_HAMILTONIAN  always AO (mf.get_hcore(), embedding included)
@@ -232,6 +232,7 @@ contains
             type(TAOBASIS) :: AObasis
             type(TSystem)  :: System
             integer :: ms2
+            double precision :: ENucGeom
 
             if (Flags%RDMType == RDM_TYPE_RKS) then
                   if (.not.present(TDDFTData)) then
@@ -280,9 +281,20 @@ contains
                   call print_info('Nuclear Energy', AuxData%ENuc)
                   call print_info('Number of electrons', AuxData%Nel)
                   call print_info('Natural orbitals used (0/1)', natural_orb)
-                  
+
             end if
-            
+
+            ! Same molecule in input.inp and pyscf_data.h5?
+            if (Flags%ITwoEl.ne.1) then
+                  call sys_NuclearRepulsion(ENucGeom, System)
+                  if (System%NElectrons /= AuxData%NEL .or. abs(ENucGeom - AuxData%ENuc) > 1.d-6) then
+                        print*, 'ERROR: GAMMCOR and PySCF systems do not match'
+                        print*, 'NEL  GAMMCOR, PySCF:', System%NElectrons, AuxData%NEL
+                        print*, 'ENuc GAMMCOR, PySCF:', ENucGeom, AuxData%ENuc
+                        stop
+                  end if
+            end if
+
 
             associate(NI=>AuxData%NI, NA=>AuxData%NA, NV=>AuxData%NV, NBasis=>AuxData%NBasis, NIA=>AuxData%NIA)
 
@@ -910,13 +922,8 @@ contains
           call h5_attr(pyscf_fid, '/POSTHF/STATES/1.1', 'ENERGY', AuxData%EROHF)
           AuxData%NIA = AuxData%NI + AuxData%NA
 
-          ! NA > 0 (ROHF): JobType MP2 runs ROMP2, with cbs 2 ROMP2-CBS[H]. cbs 1
-          ! (CBS[DFT]) needs a spin-polarized PBE and is closed shell only.
-          if (AuxData%NA > 0 .and. Flags%IDBBSC == 1) then
-                write(*, '(1x,a,i0,a)') 'ERROR: MP2 with cbs 1 needs a closed-shell reference, NA = ', &
-                      AuxData%NA, ' singly occupied orbitals in pyscf_data.h5'
-                stop
-          end if
+          ! NA > 0 (ROHF): JobType MP2 runs ROMP2, with cbs 1 ROMP2 + CBS[DFT],
+          ! with cbs 2 ROMP2-CBS[H].
 
           allocate(AuxData%IndAux(AuxData%NBasis))
           AuxData%IndAux = 2
@@ -3495,6 +3502,13 @@ end subroutine save_2rdm_orca
           call print_section('Geometry and basis setup')
           call print_info('Basis set path', Flags%BasisSetPath)
           call geom_ReadSystemBasis(System, AObasis, Flags, SortAngularMomenta, Flags%IUnits)
+          ! Monomer A/B with a dimer xyz block ("1 1"): the atoms of the other
+          ! monomer keep their basis functions but have no nuclei and electrons
+          ! (pyscf ghost atoms), e.g. counterpoise monomers
+          if (Flags%ISAPT == 0 .and. System%SystemKind == SYS_DIMER) then
+                if (Flags%Monomer == MONOMER_A) call sys_Init(System, SYS_MONO_A)
+                if (Flags%Monomer == MONOMER_B) call sys_Init(System, SYS_MONO_B)
+          end if
           call print_info('Number of atoms', System%NAtoms)
           call print_info('Number of electrons', System%NElectrons)
 

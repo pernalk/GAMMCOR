@@ -604,6 +604,7 @@ endif
 
 ! SELECT ELECTRONIC STATE
 Flags%NoSt = Input%SystemInput(1)%NoSt
+Flags%Monomer = Input%SystemInput(1)%Monomer
 
 if(allocated(Input%CalcParams%JobTitle)) then
   Flags%JobTitle = Input%CalcParams%JobTitle

@@ -461,6 +461,9 @@ type FlagsData
      integer :: ICholeskyOTF  = FLAG_CHOLESKY_OTF
      integer :: ICholeskyAccu = CHOL_ACCU_DEFAULT
      logical :: H0external = .false.
+     ! System block Monomer (non-SAPT): A or B with a dimer xyz block makes
+     ! the other monomer's atoms ghosts in GEOM_init (counterpoise monomer)
+     integer :: Monomer = DIMER_AB
      double precision :: DCholeskyThr = -1.e0
      double precision :: DTHCThr = -1.e0
      integer :: ITHCIO = THC_IO_NONE

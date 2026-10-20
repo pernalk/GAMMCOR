@@ -4,13 +4,13 @@ module phac0_thc
       ! ph-AC0 with THC integrals. Mirrors the structure of ppac0_thc (ACPP_THC),
       ! but only the AC0 part and for the ph (particle-hole) ERPA problem.
       !
-      ! THEORY (see .skills/phtheory_erpa_and_w1.md and .skills/phtheory_a0_blocks.md):
+      ! THEORY (see .secret_sauce/.skills/ph-ac0/theory-erpa-w1.md and .secret_sauce/.skills/ph-ac0/theory-a0-blocks.md):
       !   The half-sized problem  A_+ A_- Ytilde = omega^2 Ytilde  is solved per
       !   A0 block, with A_+/- = N^{-1/2}(A+-B)N^{-1/2}. The ph metric is
       !   N_pq = n_p - n_q (NOT the pp metric 1 - n_p - n_q). W^(1) then couples
       !   the zeroth-order vectors through the A1 blocks.
       !
-      ! BLOCK STRUCTURE (see .skills/thc4_loops2.md for the integral classes):
+      ! BLOCK STRUCTURE (see .secret_sauce/.skills/common/code-integral-classes.md for the integral classes):
       !   A0 is block diagonal with 4 blocks: vo (VIVI), aa (AAAA), va (VAVA),
       !   oa (AIAI). Here, as everywhere in the Fortran, the letter o means
       !   INACTIVE. There is no all-inactive and no all-virtual ph block.
@@ -20,12 +20,12 @@ module phac0_thc
       !   Only 6 of the 9 are stored. vovo, vova and vava never are: their
       !   W^(1) contributions need only B^(1), a single integral term for these
       !   three, so thc_energy_ph evaluates them on the fly from (IV|IV), (VA|IV)
-      !   and (VA|VA) (.skills/phtheory-E-contrib.md, "Three of the nine
+      !   and (VA|VA) (.secret_sauce/.skills/ph-ac0/theory-energy-contributions.md, "Three of the nine
       !   collapse to integrals"). For aova, aoaa and aava the transposed
       !   partner is built too and folded in by symmetrize_A1_ph (see the A1
       !   block ids below).
       !
-      ! STORAGE (ph analogue of .skills/ppcode_a0_a1_blocks.md):
+      ! STORAGE (ph analogue of .secret_sauce/.skills/pp-ac0/code-thc-a0-a1-blocks.md):
       !   One matrix pair (APlus/AMinus) per block - no ASing/ATrip/ATripA, no
       !   IndNT/posT/indt: everything that exists twice in pp because of the
       !   triplet has no ph counterpart.
@@ -80,16 +80,16 @@ module phac0_thc
       integer, parameter, private :: phA0vo=1, phA0aa=2, phA0va=3, phA0oa=4
       ! A1 block ids. The name is <row pair><column pair>, each pair written with
       ! its higher-space member first, so phA1aova = rows (act,inact), columns
-      ! (virt,act). This is the orientation of .skills/phtheory_a1_blocks2.md
+      ! (virt,act). This is the orientation of .secret_sauce/.skills/ph-ac0/theory-a1-blocks/overview.md
       ! ("The ten blocks at a glance") and of the generated kernels in
       ! auxilliary_codes/testy-python/ph_code_gen. W^(1) needs only the
-      ! symmetric part of A^(1) (.skills/phtheory_erpa_and_w1.md Sec. 8), and
+      ! symmetric part of A^(1) (.secret_sauce/.skills/ph-ac0/theory-erpa-w1.md Sec. 5), and
       ! A^(1) is symmetric only when the orbital gradient of the computed state
       ! vanishes (state-specific CASSCF), not for SA-CASSCF. So the three
       ! transposed partners of aova, aoaa, aava that carry an asymmetry are
       ! built too - phA1vaao, phA1aaao, phA1vaaa - and symmetrize_A1_ph folds
       ! each into its partner, A_RC <- 1/2 (A_RC + A_CR^T), and frees it
-      ! (.skills/phcode_plan_energy_terms.md Sec. 8). aovo and aavo have no
+      ! (.secret_sauce/.skills/ph-ac0/code-thc-energy.md Sec. 6). aovo and aavo have no
       ! partner: aavo is exactly symmetric, the aovo asymmetry was measured to
       ! have no effect on E_voao.
       ! NOTE the active+inactive pair is spelled 'ao' here but 'oa' in the A0 id
@@ -615,8 +615,8 @@ contains
       !   t*/d* (generated, occupation-number terms) and T*/D* (generated,
       !   genuine 2-RDM terms)
       !                   -> the delta-free part of the A1 blocks phA1aavo..phA1vaaa
-      ! The generated kernels and their call lists: .skills/thc3_automated_ph.md.
-      ! Which kernel fills which A1 block: .skills/phcode_a1_blocks.md.
+      ! The generated kernels and their call lists: .secret_sauce/.skills/ph-ac0/code-thc-kernel-generator.md.
+      ! Which kernel fills which A1 block: .secret_sauce/.skills/ph-ac0/code-thc-a1.md.
       !
       ! RDM: ONE spin-summed active 2-RDM array rdm2 (the ph analogue of
       ! pp's rdm2_nsum; rdm2 = rdm2_full / 2, built in ACPH0_THC), plus its two
@@ -1284,15 +1284,15 @@ call xmsg('t_tog_VAAA_ker', t_tog_VAAA_ker, mdebugg)
       ! WHAT THE INTEGRAL LOOP LEAVES BEHIND. On exit from THC_int_loop_ph the block
       ! holds only the delta-FREE part of A^(1) +- B^(1): the occupation-number
       ! two-electron terms (generated kernels t*/d*, types a and b of
-      ! .skills/phtheory_amatrix_reduction.md) plus the genuine 2-RDM ones
+      ! .secret_sauce/.skills/ph-ac0/theory-amatrix-reduction.md) plus the genuine 2-RDM ones
       ! (generated kernels T*/D*). Nothing carrying a Kronecker delta is in yet.
       !
       ! WHAT THIS ROUTINE ADDS. The whole delta sector - types c and d, the WMAT
       ! terms and T0 - which needs no two-electron integral of its own, only the
       ! one-index dressings AuxII/AuxAA/BuxII/BuxAA already accumulated in the loop.
       ! Each delta group collapses to one Fock-like element (checked symbolically
-      ! against .skills/phtheory_a1_blocks2.md, the boxes "APlus / AMin in terms of
-      ! Aux and Bux", for all nine blocks):
+      ! against the boxes "APlus / AMin in terms of Aux and Bux" of the block files
+      ! in .secret_sauce/.skills/ph-ac0/theory-a1-blocks/):
       !
       !   from A_rspq :  d_pr (T0 + T2c + T1d + WMAT_q,s) -> ( n_p - n_s ) F(q,s)
       !                  d_sq (T0 + T4c + T3d + WMAT_p,r) -> ( n_q - n_r ) F(p,r)
@@ -1306,7 +1306,7 @@ call xmsg('t_tog_VAAA_ker', t_tog_VAAA_ker, mdebugg)
       ! THE RANGE OF THE DRESSING SUM - the one subtle point. Where the parent term
       ! is genuine (all its external Gamma indices active) its factorized remainder
       ! has the summed index restricted to INACTIVE, because the active part was
-      ! absorbed into the genuine 2-RDM contraction (.skills/phtheory_a1_blocks2.md).
+      ! absorbed into the genuine 2-RDM contraction (.secret_sauce/.skills/ph-ac0/theory-a1-blocks/overview.md).
       ! Each of the four pieces above is multiplied by the occupation of exactly one
       ! index, so the test is per index - that is what Fel_ph does. This is why the
       ! dressings are split into II and AA parts at all, and it is what makes e.g.
@@ -1420,7 +1420,7 @@ call xmsg('t_tog_VAAA_ker', t_tog_VAAA_ker, mdebugg)
 
 
       ! =============================================================================
-      ! Route A of .skills/phcode_plan_energy_terms.md Sec. 8. W^(1) sees only the
+      ! Route A of .secret_sauce/.skills/ph-ac0/code-thc-energy.md Sec. 6. W^(1) sees only the
       ! symmetric part of A^(1), but the energy loop reads one block of each
       ! transposed pair and doubles it (m = 2). That is exact only when the two
       ! orientations agree, i.e. when the orbital gradient of the computed state
@@ -1487,7 +1487,7 @@ call xmsg('t_tog_VAAA_ker', t_tog_VAAA_ker, mdebugg)
       ! A0 assembly + diagonalization, ph versions of PPERPA0_THC_OOVV /
       ! PPERPA0_THC_AA / PPERPA0_THC_VA_Eigs / PPERPA0_THC_OA_Eigs.
       !
-      ! Per-block A^(0) (see .skills/phtheory_a0_blocks.md; delta terms exactly
+      ! Per-block A^(0) (see .secret_sauce/.skills/ph-ac0/theory-a0-blocks.md; delta terms exactly
       ! as T0/TW1/TW2 of pherpa_incore_spinres at alpha = 0):
       !   vo : d_pr d_sq (f_vv - f_ii), diagonal; f from fij/fvw
       !   aa : [2-el genuine, already in APlus/AMinus from the int loop]
@@ -2115,7 +2115,7 @@ call xmsg('t_tog_VAAA_ker', t_tog_VAAA_ker, mdebugg)
       ! as in P45_ph_VA), so
       !   Aux3X(b,r) += 2 sum_{x,y in act} Gamma(r,x,y,a) (a x|b y)
       ! Needed by PHERPA_A1_THC only for the aa-ao block (phA1aaao): d_pr
-      ! WMAT_q,s and d_sp WMAT_q,r with q inactive, .skills/phtheory_a1_blocks2.md
+      ! WMAT_q,s and d_sp WMAT_q,r with q inactive, .secret_sauce/.skills/ph-ac0/theory-a1-blocks/aa-ao.md
       ! Block aa-ao. No other block reads an inactive row of Aux3X.
       subroutine P45_ph_IA(Aux3X, a, b, map, rdm2, x0, x1, y0, y1, V_axby, NI, NA)
             double precision, dimension(:,:), intent(inout) :: Aux3X

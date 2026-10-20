@@ -5,8 +5,8 @@ module thc_energy_ph
       ! ph-AC0 correlation energy with THC integrals. The ph analogue of
       ! thc_energy (THC_energy_loop), called at the end of ACPH0_THC.
       !
-      ! THEORY (see .skills/phtheory_erpa_and_w1.md Sec. 7 and
-      ! .skills/phtheory-E-contrib.md): W^(1) splits into nine contributions, one
+      ! THEORY (see .secret_sauce/.skills/ph-ac0/theory-erpa-w1.md Sec. 4 and
+      ! .secret_sauce/.skills/ph-ac0/theory-energy-contributions.md): W^(1) splits into nine contributions, one
       ! per pair of ph pair spaces (vo, va, ao, aa) minus aa-aa. Contribution
       ! <C>-<R> sums over the integral (pq|rs) with (pq) in C and (rs) in R and
       ! needs the single A1 block phA1<R><C> - name and block id read in opposite
@@ -26,7 +26,7 @@ module thc_energy_ph
       ! CLOSED FORMS. phA1vovo, phA1vova and phA1vava are never built. These
       ! three contributions have Xt = Yt on both sides, so they need only
       ! A_plus^(1) - A_min^(1) = 2 B^(1), and B^(1) is a single integral term
-      ! (.skills/phtheory-E-contrib.md, "Three of the nine collapse to
+      ! (.secret_sauce/.skills/ph-ac0/theory-energy-contributions.md, "Three of the nine collapse to
       ! integrals"), evaluated here on the fly from the same integral class:
       !   vo-vo  B_rs,pq = -2 (pq|rs) + (qr|ps)
       !   va-vo  B_rs,pq = n_q [ -2 (pq|rs) + (qr|ps) ]
@@ -38,7 +38,7 @@ module thc_energy_ph
       ! NOTATION. o means INACTIVE here, as in phac0_thc and the ph* notes. In
       ! thc_energy the same letter means occupied = inactive + active (RVO, ROO).
       !
-      ! INTERMEDIATES (.skills/phcode_plan_energy_terms.md). All metric (c)
+      ! INTERMEDIATES (.secret_sauce/.skills/ph-ac0/code-thc-energy.md Sec. 1-2). All metric (c)
       ! factors live in three scaled eigenvector sets, Xp = Xt/d+, Ym = Yt/d-,
       ! Yb = d+ Yt (TvecXp, TvecYm, TvecYb, built by build_vecXt + build_vecs
       ! before the integral loop), so the A1 blocks are used raw. The numerator
@@ -54,7 +54,7 @@ module thc_energy_ph
       ! E_voaa, E_vaao, E_vaaa, E_aoao, E_aaao. For SA-CASSCF the A1 blocks
       ! aova, aoaa and aava arrive here already symmetrized with their
       ! transposed partners (symmetrize_A1_ph in phac0_thc,
-      ! .skills/phcode_plan_energy_terms.md Sec. 8).
+      ! .secret_sauce/.skills/ph-ac0/code-thc-energy.md Sec. 6).
       ! =============================================================================
 
       use real_linalg !from gammcor integrals
@@ -741,7 +741,7 @@ contains
 
       ! =============================================================================
       ! Rebuild Xt for the two A0 blocks where Xt /= Yt
-      ! (.skills/phtheory-E-contrib.md Sec. 2):
+      ! (.secret_sauce/.skills/ph-ac0/theory-energy-contributions.md Sec. 2):
       !
       !   ao, per inactive s:  Xt(:,m)  = MiniAMinus(s) MiniAPlus(s)(:,m) / Eig(m)
       !   aa:                  Xt(:,mu) = AMinus APlus(:,mu) / Eig(mu)
@@ -790,7 +790,7 @@ contains
 
 
       ! =============================================================================
-      ! Steps 0.2 + 0.3 of .skills/phcode_plan_energy_terms.md. Builds the three
+      ! Steps 2-3 of .secret_sauce/.skills/ph-ac0/code-thc-energy.md Sec. 3. Builds the three
       ! scaled vector sets from Yt (APlus / MiniAPlus) and Xt (vecXt):
       !
       !   Xp = Xt / d+        Ym = Yt / d-        Yb = d+ Yt          (per pair row)
@@ -907,7 +907,7 @@ contains
       ! =============================================================================
       ! MS-AC0: transition amplitude Y^(J<-I) of the ao and va modes of the
       ! reference I, from gamma = gamma^JI(p,q) = 1/2 <J|E_qp|I> in the active NOs
-      ! of I (.skills/phtheory_MS-AC0.md eqs. 21, 22). With the untilded
+      ! of I (.secret_sauce/.skills/ms-ac0/theory-ms-ac0.md eqs. 21, 22). With the untilded
       ! X = (Xp - Ym)/2, Y = (Xp + Ym)/2:
       !
       !   ao, per correlated inactive k:  YJ = gamma^T Y - gamma X
@@ -974,7 +974,7 @@ contains
       ! Step 2: G%voao for E_voao, contribution vo-ao, (pq) in vo = column side,
       ! (rs) in ao = row side, block phA1aovo (rows ao, columns vo). f = 2: both
       ! orientations, the two 1/sqrt(2) of the vo vectors and the 2 of FOFO
-      ! step 3 (.skills/phcode_plan_energy_terms.md Sec. 1).
+      ! step 3 (.secret_sauce/.skills/ph-ac0/code-thc-energy.md Sec. 1).
       !
       !   projXAp(k,pq) =   sum_rs Xp_ao(rs,k) A+raw(rs,pq)
       !   projYAm(k,pq) = - sum_rs Ym_ao(rs,k) A-raw(rs,pq)         (Ym_vo = -1)
@@ -1087,7 +1087,7 @@ contains
       !
       ! No symmetrization is needed for SA-CASSCF here: an aa pair and a vo pair
       ! cannot share an orbital, so phA1aavo is symmetric with its transpose
-      ! for any orbitals (.skills/phcode_plan_energy_terms.md Sec. 8).
+      ! for any orbitals (.secret_sauce/.skills/ph-ac0/code-thc-energy.md Sec. 6).
       !
       ! Storage chain, as in build_G_voao:
       !   A1%APlus  -> projXAp%voaa -> dS%voaa -> G%voaa
@@ -1722,7 +1722,7 @@ contains
       ! p = x, q = a, r = y, s = b. The ph twin of vvoo_contr (thc_energy): both
       ! A0 sides are diagonal, so no eigenvectors and no intermediate, and the A1
       ! element is made of integrals from the same slab. Closed form in the code
-      ! convention (.skills/phtheory-E-contrib.md Sec. 3.1):
+      ! convention (.secret_sauce/.skills/ph-ac0/theory-energy-contributions.md Sec. 3.1):
       !
       !   E_vovo = sum_{pq, rs}  (pq|rs) [ (qr|ps) - 2 (pq|rs) ] / (omega_pq + omega_rs)
       !
@@ -1769,7 +1769,7 @@ contains
 
       ! =============================================================================
       ! E_vavo for one inactive s, from V_xay(x,a,y) = (a x|s y) over all virtual
-      ! a, y. Closed form in the code convention (.skills/phtheory-E-contrib.md
+      ! a, y. Closed form in the code convention (.secret_sauce/.skills/ph-ac0/theory-energy-contributions.md
       ! Sec. 3.2), p, r virtual, q, b active:
       !
       !   E_va-vo = 2 sum c_q (pq|rs) sum_mu sum_b c_b Yt_(p,mu)(q) Yt_(p,mu)(b)
@@ -1856,7 +1856,7 @@ contains
       ! =============================================================================
       ! E_vava from one (VA|VA) slab, V_axby(x,y) = (a x|b y) = (pq|rs) with
       ! p = a, q = x, r = b, s = y. Closed form in the code convention
-      ! (.skills/phtheory-E-contrib.md Sec. 3.6), p, r virtual, q, s, b, c active:
+      ! (.secret_sauce/.skills/ph-ac0/theory-energy-contributions.md Sec. 3.6), p, r virtual, q, s, b, c active:
       !
       !   E_vava = -4 sum c_q c_s (pq|rs) sum_{mu,nu} Yt_(p,mu)(q) Yt_(r,nu)(s)
       !              / (omega_(p,mu) + omega_(r,nu))

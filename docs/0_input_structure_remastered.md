@@ -249,7 +249,7 @@ input_2.inp     State 2.1, THCLoad thc.h5
 gammcor_heff gammcor_1.out gammcor_2.out
 ```
 
-<!-- TODO: implemented (steps 1-5 of .implementation_plans/thc-dump-load.md)
+<!-- TODO: implemented (steps 1-5 of .secret_sauce/.implementation_plans/thc/plan-thc-dump-load.md)
 but not yet tested (step 7). -->
 
 ## MP2 and MP2-CBS[H]
@@ -312,6 +312,9 @@ There is no separate `SRMP2` job type: SR-MP2 is `JobType MP2` with `CBS 2`.
 - **MP2 + CBS[DFT]** (`CBS 1`). MP2 plus the density-based basis-set
   correction of Giner et al., computed with a local range-separation
   parameter mu(r) from the HF pair density. The integrals are not changed.
+  For ROHF the PBE correlation is evaluated for the total density
+  (zeta = 0), as in the AC0 FOFO code; the spin enters through the on-top
+  pair density.
 - **MP2-CBS[H]** (`CBS 2`). The two-electron integrals in the MP2 numerator
   are dressed with the short-range interaction weighted by mu(r); the orbital
   energies are not changed. The output also prints plain MP2 and the
@@ -331,7 +334,8 @@ The last output line:
 |---|---|
 | MP2, closed shell | `HF+ENuc, MP2-Corr     , Total` |
 | MP2, open shell | `HF+ENuc, ROMP2-Corr   , Total` |
-| `CBS 1` | `HF+ENuc, MP2-CBS[DFT], Total` |
+| `CBS 1`, closed shell | `HF+ENuc, MP2-CBS[DFT], Total` |
+| `CBS 1`, open shell | `HF+ENuc, ROMP2-CBS[DFT], Total` |
 | `CBS 2`, closed shell | `HF+ENuc, MP2-CBS[H]-Corr, Total` |
 | `CBS 2`, open shell | `HF+ENuc, ROMP2-CBS[H]-Corr, Total` |
 
@@ -340,10 +344,11 @@ The last output line:
 | Reference | `CBS 0` | `CBS 1` | `CBS 2` |
 |---|---|---|---|
 | RHF (closed shell) | yes | yes | yes |
-| ROHF (high spin) | yes (ROMP2) | **not available**: the program stops | yes (ROMP2-CBS[H]) |
+| ROHF (high spin) | yes (ROMP2) | yes (ROMP2 + CBS[DFT]) | yes (ROMP2-CBS[H]) |
 
 Only the PySCF interface with THC integrals. A CASSCF dump cannot be used for
 MP2, and the HF dump cannot be used for AC0.
 
-<!-- TODO: CBS 1, ROMP2-CBS[H] and the removal of JobType SRMP2 are written
-but not yet compiled or tested (.skills/mp2-code.md Sec. 7). -->
+<!-- TODO: CBS 1 (closed and open shell), ROMP2-CBS[H] and the removal of
+JobType SRMP2 are written but not yet compiled or tested
+(.secret_sauce/.skills/mp2/code-mp2.md Sec. 7). -->

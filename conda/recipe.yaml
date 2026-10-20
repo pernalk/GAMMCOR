@@ -43,6 +43,7 @@ source:
         - "**/*.mod"
         - install.log
         - implementation_plans/**
+        - .secret_sauce/**            # private notes, separate git repo
   # Second source: build_hdf5.sh gets the tarball through $HDF5_TARBALL
   # instead of downloading it. file_name keeps it packed.
   - url: https://github.com/HDFGroup/hdf5/releases/download/hdf5_${{ hdf5_version }}/hdf5-${{ hdf5_version }}.tar.gz
