@@ -1,58 +1,12 @@
 module phac0_thc
 
       ! =============================================================================
-      ! ph-AC0 with THC integrals. Mirrors the structure of ppac0_thc (ACPP_THC),
-      ! but only the AC0 part and for the ph (particle-hole) ERPA problem.
-      !
-      ! THEORY (see .skills/phtheory_erpa_and_w1.md and .skills/phtheory_a0_blocks.md):
-      !   The half-sized problem  A_+ A_- Ytilde = omega^2 Ytilde  is solved per
-      !   A0 block, with A_+/- = N^{-1/2}(A+-B)N^{-1/2}. The ph metric is
-      !   N_pq = n_p - n_q (NOT the pp metric 1 - n_p - n_q). W^(1) then couples
-      !   the zeroth-order vectors through the A1 blocks.
-      !
-      ! BLOCK STRUCTURE (see .skills/thc4_loops2.md for the integral classes):
-      !   A0 is block diagonal with 4 blocks: vo (VIVI), aa (AAAA), va (VAVA),
-      !   oa (AIAI). Here, as everywhere in the Fortran, the letter o means
-      !   INACTIVE. There is no all-inactive and no all-virtual ph block.
-      !   A1 has 9 blocks: the 3 diagonal-position ones (vovo, vava, oaoa) and
-      !   6 off-diagonal couplings (one representative per transposed pair).
-      !   There is no aaaa A1 block: the aa-aa part of A sits entirely in A0.
-      !   Only 6 of the 9 are stored. vovo, vova and vava never are: their
-      !   W^(1) contributions need only B^(1), a single integral term for these
-      !   three, so thc_energy_ph evaluates them on the fly from (IV|IV), (VA|IV)
-      !   and (VA|VA) (.skills/phtheory-E-contrib.md, "Three of the nine
-      !   collapse to integrals"). For aova, aoaa and aava the transposed
-      !   partner is built too and folded in by symmetrize_A1_ph (see the A1
-      !   block ids below).
-      !
-      ! STORAGE (ph analogue of .skills/ppcode_a0_a1_blocks.md):
-      !   One matrix pair (APlus/AMinus) per block - no ASing/ATrip/ATripA, no
-      !   IndNT/posT/indt: everything that exists twice in pp because of the
-      !   triplet has no ph counterpart.
-      !     vo      : diagonal, APlus/AMinus(NDim,1) hold one column
-      !     aa      : full square APlus/AMinus(NDim,NDim)
-      !     va / oa : block-diagonal in the non-active index -> MiniBlocks,
-      !               one NA x NA mini matrix per virtual (va) / inactive (oa),
-      !               active-local indexing, ThrQVirt/ThrQInact null filters
-      !     A1      : rectangular couplings APlus/AMinus(NDim1, NDim2), the six
-      !               stored blocks plus the three transposed partners, which
-      !               symmetrize_A1_ph frees
-      !
-      ! INTEGRALS: every two-electron integral is taken from a slab V_axby built
-      !   from R blocks of the THC factors. With Algorithm THC + TwoMoInt INCORE
-      !   (THCData%exact_ints) the same slabs are filled from the exact PySCF
-      !   integrals instead (thc_exact_ints) and no R block is built.
-      !   The global pair -> position map is the single array pos(p,q)
-      !   (ph analogue of posS; there is no posT).
-      !
-      ! PAIR CONVENTIONS (same first-slot rule as pp: V > A > I, see
-      ! InitA0Blocks_ph): vo stores (virt, inact), aa stores (act_i, act_j)
-      ! with i > j, va stores (virt, act), oa stores (act, inact).
-      ! Null-space filters are the ph ones: aa drops nearly degenerate active
-      ! pairs (ThrSelAct, metric n_p - n_q ~ 0); va mini-blocks drop
-      ! quasi-virtual actives (ThrQVirt); oa mini-blocks drop quasi-inactive
-      ! actives (ThrQInact). These are the same filters as in
-      ! acph_spinres_driver (phac_spinres.f90), applied per block.
+      ! ph-AC0 with THC integrals: A0 blocks (assembly + diagonalization), A1 blocks
+      ! (int loop + delta sector + SA-CASSCF symmetrization), then the energy in
+      ! thc_energy_ph. With THCData%exact_ints every slab comes from the exact
+      ! integrals (thc_exact_ints). The letter o means INACTIVE here.
+      ! Notes: .secret_sauce/.skills/ph-ac0/code-thc-a0.md, code-thc-a1.md,
+      ! code-thc-energy.md, code-thc-exact-ints.md (read them before changing this module).
       ! =============================================================================
 
       use real_linalg !from gammcor integrals
@@ -78,23 +32,11 @@ module phac0_thc
       ! The A1 ids run contiguously from phA1aavo to NBLOCKS_PH. thc_energy_ph
       ! keeps a copy of all ids - change both together.
       integer, parameter, private :: phA0vo=1, phA0aa=2, phA0va=3, phA0oa=4
-      ! A1 block ids. The name is <row pair><column pair>, each pair written with
-      ! its higher-space member first, so phA1aova = rows (act,inact), columns
-      ! (virt,act). This is the orientation of .skills/phtheory_a1_blocks2.md
-      ! ("The ten blocks at a glance") and of the generated kernels in
-      ! auxilliary_codes/testy-python/ph_code_gen. W^(1) needs only the
-      ! symmetric part of A^(1) (.skills/phtheory_erpa_and_w1.md Sec. 8), and
-      ! A^(1) is symmetric only when the orbital gradient of the computed state
-      ! vanishes (state-specific CASSCF), not for SA-CASSCF. So the three
-      ! transposed partners of aova, aoaa, aava that carry an asymmetry are
-      ! built too - phA1vaao, phA1aaao, phA1vaaa - and symmetrize_A1_ph folds
-      ! each into its partner, A_RC <- 1/2 (A_RC + A_CR^T), and frees it
-      ! (.skills/phcode_plan_energy_terms.md Sec. 8). aovo and aavo have no
-      ! partner: aavo is exactly symmetric, the aovo asymmetry was measured to
-      ! have no effect on E_voao.
-      ! NOTE the active+inactive pair is spelled 'ao' here but 'oa' in the A0 id
-      ! phA0oa (inherited from pp's A0oa); both mean the same pair space.
-      ! vovo, vova and vava have no id: they are never built (see the header).
+      ! A1 block ids phA1<row pair><column pair>, higher space first in each pair
+      ! (the block names of theory-a1-blocks/ without the dash). 11-13 are the
+      ! transposed partners that symmetrize_A1_ph folds into aova/aoaa/aava and frees.
+      ! vovo, vova, vava are never built. 'ao' here = 'oa' in phA0oa (same pair space).
+      ! See .secret_sauce/.skills/ph-ac0/code-thc-a1.md Sec. 1.
       integer, parameter, private :: phA1aavo=5, phA1aova=6, phA1aovo=7
       integer, parameter, private :: phA1aoao=8, phA1aava=9, phA1aoaa=10
       integer, parameter, private :: phA1vaao=11, phA1aaao=12, phA1vaaa=13
@@ -175,29 +117,9 @@ contains
                     Aux3X, Flags, AuxData, Occ, map, rdm2, rdm2_12, rdm2_13ph, pos, One)
               call tmsg('TIME FOR THC LOOPS', timer, tdebug)
 
-              ! ---- Two different one-electron matrices: one for A0, one for A1 ----
-              !
-              ! HNO (A0 only). The one-electron part of the Dyall Hamiltonian H^(0),
-              ! built by update_HNO_AC0:
-              !   act-act    HNO(q,s) = h(q,s) + 2*BuxII(q,s) - AuxII(q,s)  = h^core
-              !   inact      HNO(i,i) = THCData%fij(i)   (orbital energy, diagonal)
-              !   virt       HNO(v,v) = THCData%fvw(v)   (orbital energy, diagonal)
-              !   everything else = 0  (off-diagonal inact-inact and virt-virt, and
-              !                         every cross-space element I-A, V-A, V-I)
-              ! The zeros and the fij/fvw diagonals are what H^(0) is, so this is
-              ! right for the A0 blocks - and wrong for anything else.
-              !
-              ! AuxData%HNO0 (A1 only). The bare one-electron integrals h(x,y) in the
-              ! NO basis, all elements (set in interface_pp, untouched since).
-              ! A^(1) is the exact A at alpha = 1: its delta sector needs
-              ! h(x,y) + sum_t n_t [2 (xy|tt) - (xt|ty)] for ANY pair of spaces,
-              ! including cross-space elements, and with the active part of the sum
-              ! dropped where the parent term is genuine (see Fel_ph). That cannot be
-              ! read off HNO: the cross-space elements are zero there, and fij/fvw
-              ! already contain the active dressing, which Fel_ph would add again.
-              ! So PHERPA_A1_THC gets AuxData%HNO0 and builds the dressing itself
-              ! from AuxII/BuxII/AuxAA/BuxAA - the same choice as pp, which passes
-              ! AuxData%HNO0 (not HNO) to PPERPA_THC.
+              ! HNO (Dyall operator, update_HNO_AC0) is for the A0 blocks only. The A1 delta
+              ! sector needs the BARE h, AuxData%HNO0: HNO is zero on cross-space elements
+              ! and its fij/fvw already hold the active dressing (.secret_sauce/.skills/ph-ac0/code-thc-a1.md Sec. 4).
               allocate(HNO(NBasis, NBasis))
               call clock_start(timer)
               call update_HNO_AC0(AuxData, HNO, THCData%fij, THCData%fvw, AuxII, BuxII)
@@ -364,26 +286,9 @@ contains
       end subroutine set_frozen_ph
 
 
-      ! ph analogue of InitA0Blocks (ppac0_thc). Builds the pair list of one
-      ! A0 block, fills the global pos(p,q) map, and allocates the storage.
-      !
-      ! Pair lists (first slot = higher space, V > A > I):
-      !   vo : all (v, i) pairs, i >= NI0. The block is diagonal (canonical
-      !        orbitals, diagonal fockian), so APlus/AMinus get one column only.
-      !   aa : active pairs (i, j), i > j, skipping nearly degenerate pairs
-      !        (ThrSelAct) - those have ph metric n_i - n_j ~ 0 (null space).
-      !   va : all (v, a) pairs in the main list; per-virtual MiniBlocks with
-      !        ActList of actives passing |n_v + n_a| > ThrQVirt
-      !        (n_a ~ 0 gives metric ~ 0).
-      !   oa : all (a, i) pairs, i >= NI0, in the main list; per-inactive
-      !        MiniBlocks(NI0:NI), indexed by the global inactive index, with
-      !        ActList of actives passing |n_i + n_a - 2| > ThrQInact
-      !        (n_a ~ 1 gives metric ~ 0).
-      !
-      ! Frozen core: NI0 = NFrozen + 1 (set_frozen_ph). Pairs with a frozen
-      ! inactive orbital are not in any list and keep pos = 0, so every A1
-      ! kernel skips them through its pos guard. The frozen orbitals stay in
-      ! the reference sums (AuxII, BuxII, fij, HNO), which do not use pos.
+      ! Pair list, pos(p,q) map and storage of one A0 block (vo, aa, va, oa), first
+      ! slot = higher space; pairs with a frozen inactive (< NI0) get pos = 0.
+      ! See .secret_sauce/.skills/ph-ac0/code-thc-a0.md Sec. 5.
       subroutine InitA0Blocks_ph(A0Block, AuxData, pos, Ip, Iq)
             type(TAC0Block_ph), intent(inout) :: A0Block
             type(TACppData), intent(in) :: AuxData
@@ -549,15 +454,9 @@ contains
       end subroutine InitA0Blocks_ph
 
 
-      ! Which integral classes run, ph-AC0 version of parse_config (ppac0_thc).
-      ! The full A0 + A1 set for the six stored A1 blocks: 12 of the 21 canonical
-      ! classes, each with at most one virtual index. The list was produced
-      ! together with the kernels; see call_tab_p2.dat / call_tab_dab.dat /
-      ! call-genuine.dat in auxilliary_codes/testy-python/ph_code_gen.
-      ! Not run: (IV|IV), (VA|IV), (VA|VA) and every (VV|..) class. They fed only
-      ! the vovo, vova, vava blocks (and the F(v,v') Fock elements of their delta
-      ! sector), which are not built - thc_energy_ph needs only their B^(1), from
-      ! (IV|IV), (VA|IV), (VA|VA) in its own loop. Hence no RVV either.
+      ! The 12 integral classes of the ph int loop (at most one virtual index).
+      ! (IV|IV), (VA|IV), (VA|VA) and (VV|..) are not run: only the unbuilt vovo,
+      ! vova, vava needed them. See .secret_sauce/.skills/ph-ac0/code-thc-a1.md Sec. 3.
       subroutine parse_config_ph(loops, TabChol)
             type(TLoop), dimension(6), intent(out) :: loops
             integer, dimension(6), intent(out) :: TabChol
@@ -593,41 +492,10 @@ contains
 
 
       ! =============================================================================
-      ! ph analogue of THC_int_loop (ppac0_thc). Same skeleton: R?? Cholesky-like
-      ! vectors from the THC factors, caseloop over the pair classes of
-      ! parse_config_ph, V_axby = (a x| b y) built per fixed (a,b) by real_aTb_x
-      ! and consumed immediately by the kernels - nothing four-index is ever
-      ! stored. After the caseloop, the "together" loops build V_axby(t,u) for
-      ! one fixed pair (e1,e2) with real_aTv_x, for the genuine terms whose two
-      ! summed indices sit in the same integral pair. In the exact-integral run
-      ! (THCData%exact_ints) each slab is filled from THCData%TwoEl instead
-      ! (exact_V_axby, exact_V_pair) and no R block is built.
-      !
-      ! What the kernels fill:
-      !   p2_*            -> AuxII, BuxII (sums over inactive t) and AuxAA, BuxAA
-      !                      (sums over active t), the one-index dressings
-      !                      sum_t n_t (qt|ts) and sum_t n_t (qs|tt)
-      !   P45_ph, P45_ph_VA, P45_ph_IA
-      !                   -> Aux3X, the genuine WMAT matrix (active, virtual and
-      !                      inactive rows)
-      !   PhT12rp_gamma, PhT12qs_gamma, PhT56_gamma
-      !                   -> ACB(phA0aa), the genuine two-electron terms of A0aa
-      !   t*/d* (generated, occupation-number terms) and T*/D* (generated,
-      !   genuine 2-RDM terms)
-      !                   -> the delta-free part of the A1 blocks phA1aavo..phA1vaaa
-      ! The generated kernels and their call lists: .skills/thc3_automated_ph.md.
-      ! Which kernel fills which A1 block: .skills/phcode_a1_blocks.md.
-      !
-      ! RDM: ONE spin-summed active 2-RDM array rdm2 (the ph analogue of
-      ! pp's rdm2_nsum; rdm2 = rdm2_full / 2, built in ACPH0_THC), plus its two
-      ! index-permuted copies (init_rdm_perm_ph). No kernel ever sees
-      ! spin-separated 2-RDMs.
-      !
-      ! On exit ACB(phA0aa) and the A1 blocks hold the UNSCALED two-electron
-      ! part only (no T0/h^core, no delta-WMAT terms, no metric division) -
-      ! exactly the role pp's int loop plays for ASing. The rest is added by
-      ! PHERPA0_THC_AA and PHERPA_A1_THC; the metric scaling of A1 is carried
-      ! by the scaled vectors of thc_energy_ph.
+      ! Integral loop. Per slab V_axby = (a x|b y) the kernels fill AuxII/BuxII/
+      ! AuxAA/BuxAA, Aux3X, the genuine A0aa terms and the delta-free part of the
+      ! A1 blocks; the "together" loops follow the caseloop. A0aa and A1 are left
+      ! unscaled and without delta terms. See .secret_sauce/.skills/ph-ac0/code-thc-a1.md Sec. 3.
       ! =============================================================================
       subroutine THC_int_loop_ph(THCData, ACB, AuxII, AuxAA, BuxII, BuxAA, &
             Aux3X, Flags, AuxData, Occ, map, rdm2, rdm2_12, rdm2_13ph, pos, AcAlpha)
@@ -1208,23 +1076,9 @@ call xmsg('t_tog_VAAA_ker', t_tog_VAAA_ker, mdebugg)
       end subroutine THC_int_loop_ph
 
 
-      ! =============================================================================
-      ! Index-permuted copies of the active 2-RDM - the ph analogue of the
-      ! rdm2_pm_12_act / rdm2_pm_13_act trick in ppac0_thc (init_rdm).
-      !
-      ! Every genuine A1 term is  sum_{tu in act} Gamma_{....} x (integral), and the
-      ! permutation of the integral is always chosen so that t and u land in the two
-      ! fastest-running slots of V_axby. The contraction is then a single ddot over
-      ! NA**2 (real_vw_x) - provided the 2-RDM is stored with t,u first. Which copy
-      ! a kernel needs follows from where u sits in the Gamma index string:
-      !
-      !   Gamma_tu..  ->  rdm2       (native, no copy needed)   T5 T6 D5 D6
-      !   Gamma_t.u.  ->  rdm2_12                               T1 T3 D1 D3
-      !   Gamma_t..u  ->  rdm2_13ph                             T2 T4 D2 D4
-      !
-      ! rdm2_13ph is NOT pp's rdm2_*_13_act: pp permutes (i,j,k,l)->(i,l,k,j),
-      ! ph needs (i,j,k,l)->(i,l,j,k).
-      ! =============================================================================
+      ! Two index-permuted copies of rdm2, so every genuine contraction is one ddot
+      ! over NA**2: rdm2_12(i,k,j,l) = rdm2_13ph(i,l,j,k) = rdm2(i,j,k,l).
+      ! rdm2_13ph is NOT pp's 13 permutation. See .secret_sauce/.skills/ph-ac0/code-thc-a1.md Sec. 5.
       subroutine init_rdm_perm_ph(rdm2, rdm2_12, rdm2_13ph, NA)
             double precision, dimension(:,:,:,:), intent(in) :: rdm2
             double precision, dimension(:,:,:,:), intent(out) :: rdm2_12, rdm2_13ph
@@ -1245,25 +1099,10 @@ call xmsg('t_tog_VAAA_ker', t_tog_VAAA_ker, mdebugg)
       end subroutine init_rdm_perm_ph
 
 
-      ! One element of the dressed one-electron matrix used by PHERPA_A1_THC.
-      !
-      !   F(x,y) = h(x,y) + 2*BuxII(x,y) - AuxII(x,y)                   ind active
-      !   F(x,y) = h(x,y) + 2*BuxII(x,y) - AuxII(x,y)
-      !                   + 2*BuxAA(x,y) - AuxAA(x,y)                   otherwise
-      !
-      ! H0 is the BARE one-electron matrix AuxData%HNO0, never the A0 matrix HNO
-      ! (HNO is zero on every cross-space element and carries fij/fvw on the
-      ! inactive/virtual diagonals - see the note in ACPH0_THC).
-      !
-      ! ind is IndAux of the index whose occupation multiplies this piece. If that
-      ! index is active the parent term is genuine, so its factorized remainder
-      ! runs over INACTIVE t only, i.e. h^core = h + 2*BuxII - AuxII. Otherwise the
-      ! sum is unrestricted and the active part is added too, giving the full
-      ! generalized Fock matrix.
-      !
-      ! F(v,v') with both indices virtual is NOT available: THC_int_loop_ph runs no
-      ! class with two virtuals, so those elements of the dressings stay zero. Only
-      ! the vovo and vava blocks needed them, and they are not built.
+      ! Dressed one-electron element for PHERPA_A1_THC: h + 2 BuxII - AuxII, plus
+      ! 2 BuxAA - AuxAA unless the index whose occupation multiplies it (ind) is
+      ! active. H0 must be AuxData%HNO0, never HNO. F(v,v') is not available.
+      ! See .secret_sauce/.skills/ph-ac0/code-thc-a1.md Sec. 4.
       function Fel_ph(x, y, ind, H0, AuxII, BuxII, AuxAA, BuxAA) result(f)
             integer, intent(in) :: x, y, ind
             double precision, dimension(:,:), intent(in) :: H0
@@ -1278,72 +1117,11 @@ call xmsg('t_tog_VAAA_ker', t_tog_VAAA_ker, mdebugg)
 
 
       ! =============================================================================
-      ! ph analogue of PPERPA_THC (ppac0_thc): post-loop assembly of ONE A1
-      ! coupling block. Called once per A1 block after THC_int_loop_ph has run.
-      !
-      ! WHAT THE INTEGRAL LOOP LEAVES BEHIND. On exit from THC_int_loop_ph the block
-      ! holds only the delta-FREE part of A^(1) +- B^(1): the occupation-number
-      ! two-electron terms (generated kernels t*/d*, types a and b of
-      ! .skills/phtheory_amatrix_reduction.md) plus the genuine 2-RDM ones
-      ! (generated kernels T*/D*). Nothing carrying a Kronecker delta is in yet.
-      !
-      ! WHAT THIS ROUTINE ADDS. The whole delta sector - types c and d, the WMAT
-      ! terms and T0 - which needs no two-electron integral of its own, only the
-      ! one-index dressings AuxII/AuxAA/BuxII/BuxAA already accumulated in the loop.
-      ! Each delta group collapses to one Fock-like element (checked symbolically
-      ! against .skills/phtheory_a1_blocks2.md, the boxes "APlus / AMin in terms of
-      ! Aux and Bux", for all nine blocks):
-      !
-      !   from A_rspq :  d_pr (T0 + T2c + T1d + WMAT_q,s) -> ( n_p - n_s ) F(q,s)
-      !                  d_sq (T0 + T4c + T3d + WMAT_p,r) -> ( n_q - n_r ) F(p,r)
-      !   from B_rspq :  d_qr (D0 + D2c + D1d + WMAT_p,s) -> ( n_q - n_s ) F(p,s)
-      !                  d_sp (D0 + D4c + D3d + WMAT_q,r) -> ( n_p - n_r ) F(q,r)
-      !
-      ! with F(x,y) = h(x,y) + sum_t n_t [ 2 (xy|tt) - (xt|ty) ]. APlus takes A + B
-      ! and AMinus takes A - B, so the two B groups enter AMinus with the opposite
-      ! sign - the same bookkeeping accum_A_ph does per element.
-      !
-      ! THE RANGE OF THE DRESSING SUM - the one subtle point. Where the parent term
-      ! is genuine (all its external Gamma indices active) its factorized remainder
-      ! has the summed index restricted to INACTIVE, because the active part was
-      ! absorbed into the genuine 2-RDM contraction (.skills/phtheory_a1_blocks2.md).
-      ! Each of the four pieces above is multiplied by the occupation of exactly one
-      ! index, so the test is per index - that is what Fel_ph does. This is why the
-      ! dressings are split into II and AA parts at all, and it is what makes e.g.
-      ! the ao-ao block come out as
-      !   -d_pr[(1-n_p) hc + 2 BuxAA - AuxAA] + d_sq[(1-n_r) hc + 2 BuxAA - AuxAA]
-      ! (hc = h + 2 BuxII - AuxII) rather than the naive (n_p - n_s) F.
-      !
-      ! WHICH ONE-ELECTRON MATRIX. A^(1) is the exact A, so T0/D0 carry the BARE
-      ! h. The argument H0 must therefore be AuxData%HNO0, not the A0 matrix HNO
-      ! from update_HNO_AC0 (the Dyall one-electron operator: h^core only on the
-      ! act-act block, fij/fvw on the inactive/virtual diagonals, zero
-      ! elsewhere). The deltas here hit cross-space elements - e.g. F(v,i) in
-      ! ao-va via d_qr, F(a,i) in vo-va via d_pr, F(v,a) in aa-va via d_sq - which
-      ! HNO has as zero, and on the inactive/virtual diagonals HNO already holds
-      ! the full Fock, so Fel_ph would add the active dressing a second time.
-      ! Same convention as pp: PPERPA_THC also receives AuxData%HNO0.
-      !
-      ! Aux3X carries the genuine three-index WMAT, Aux3X(q,r) = 2 G(q,r) with
-      ! G(q,r) = sum_{tuv in act} Gamma_turv (qt|uv): q active from P45_ph in the
-      ! (AA|AA) class, q virtual from P45_ph_VA in the (VA|AA) class. It enters
-      ! with -1/2 (so as -G, the Form-2 WMAT), on each WMAT group whose single
-      ! external index is active (r for WMAT_p,r and WMAT_q,r, s for WMAT_q,s
-      ! and WMAT_p,s).
-      !
-      ! The routine is block-agnostic: it reads the row and column pair lists of the
-      ! block and decides everything from the spaces of p,q,r,s, so the same code
-      ! serves all nine A1 blocks phA1aavo..phA1vaaa.
-      !
-      ! The blocks stay unscaled: the metric (c-factor) scaling of A1 is carried
-      ! by the scaled vectors Xp, Ym, Yb of thc_energy_ph (build_vecs).
-      !
-      ! @param[in]     AuxData  Occ, IndAux
-      ! @param[in,out] ACBlock  one A1 block; APlus/AMinus accumulated in place
-      ! @param[in]     H0       BARE one-electron integrals, AuxData%HNO0 (NOT HNO)
-      ! @param[in]     AuxII, BuxII  inactive part of the one-index dressings
-      ! @param[in]     AuxAA, BuxAA  active part of the one-index dressings
-      ! @param[in]     Aux3X    genuine WMAT matrix from P45_ph
+      ! Delta sector of one A1 block (types c, d, WMAT, T0) on top of the delta-free
+      ! part from the int loop. Block-agnostic: everything follows from the spaces of
+      ! p,q,r,s; the B groups enter AMinus with the opposite sign. H0 must be
+      ! AuxData%HNO0 (bare h), not HNO. The block stays unscaled.
+      ! See .secret_sauce/.skills/ph-ac0/code-thc-a1.md Sec. 3-4.
       ! =============================================================================
       subroutine PHERPA_A1_THC(AuxData, ACBlock, H0, AuxII, BuxII, AuxAA, BuxAA, Aux3X)
             type(TACppData), intent(in) :: AuxData
@@ -1419,22 +1197,10 @@ call xmsg('t_tog_VAAA_ker', t_tog_VAAA_ker, mdebugg)
       end subroutine PHERPA_A1_THC
 
 
-      ! =============================================================================
-      ! Route A of .skills/phcode_plan_energy_terms.md Sec. 8. W^(1) sees only the
-      ! symmetric part of A^(1), but the energy loop reads one block of each
-      ! transposed pair and doubles it (m = 2). That is exact only when the two
-      ! orientations agree, i.e. when the orbital gradient of the computed state
-      ! vanishes (state-specific CASSCF), not for SA-CASSCF. For the three pairs
-      ! whose orientations differ, both blocks are built and folded here:
-      !
-      !   A_RC <- 1/2 (A_RC + A_CR^T)        for APlus and AMinus
-      !
-      !   aova <- vaao      aoaa <- aaao      aava <- vaaa
-      !
-      ! after which A_CR is freed, so the energy loop is unchanged. This is the
-      ! symmetric part AC0CAS_FOFO uses. Printed per pair: ||A_RC - A_CR^T||,
-      ! ~0 (convergence level) for state-specific CASSCF, O(0.1-1) for SA.
-      ! =============================================================================
+      ! A_RC <- 1/2 (A_RC + A_CR^T) for aova<-vaao, aoaa<-aaao, aava<-vaaa (APlus and
+      ! AMinus), then frees the partners. Needed because the energy doubles one
+      ! orientation and A^(1) is symmetric only for a zero state-specific orbital
+      ! gradient (not SA-CASSCF). See .secret_sauce/.skills/ph-ac0/code-thc-energy.md Sec. 6.
       subroutine symmetrize_A1_ph(ACB)
             type(TAC0Block_ph), dimension(:), intent(inout) :: ACB
 
@@ -1484,30 +1250,9 @@ call xmsg('t_tog_VAAA_ker', t_tog_VAAA_ker, mdebugg)
 
 
       ! =============================================================================
-      ! A0 assembly + diagonalization, ph versions of PPERPA0_THC_OOVV /
-      ! PPERPA0_THC_AA / PPERPA0_THC_VA_Eigs / PPERPA0_THC_OA_Eigs.
-      !
-      ! Per-block A^(0) (see .skills/phtheory_a0_blocks.md; delta terms exactly
-      ! as T0/TW1/TW2 of pherpa_incore_spinres at alpha = 0):
-      !   vo : d_pr d_sq (f_vv - f_ii), diagonal; f from fij/fvw
-      !   aa : [2-el genuine, already in APlus/AMinus from the int loop]
-      !        + d_pr (n_p - n_s) HNO(q,s) + d_sq (n_q - n_r) HNO(p,r)
-      !        - 1/2 d_sq Aux3X(p,r) - 1/2 d_pr Aux3X(q,s)
-      !   va : per virtual v (p = r = v):  A(s,q) =
-      !        - n_s HNO(q,s) - 1/2 Aux3X(q,s) + d_sq n_q f_vv
-      !   oa : per inactive i (s = q = i): A(r,p) =
-      !        (1 - n_r) HNO(p,r) + 2 BuxAA(p,r) - AuxAA(p,r)
-      !        - 1/2 Aux3X(p,r) + d_pr (n_p - 1) f_ii
-      ! For va and oa the B part is zero at alpha = 0 (all its integrals are
-      ! first order), so A_+ and A_- differ only by the metric scaling.
-      !
-      ! Scaling (same c convention as pherpa_incore_spinres):
-      !   APlus  /= (c_p + c_q)(c_r + c_s),   AMinus /= (c_p - c_q)(c_r - c_s)
-      ! then the half-sized problem A_+ A_- Ytilde = omega^2 Ytilde is solved by
-      ! pherpa_symm_block_ph (port of pherpa_symm_spinres). On exit APlus holds
-      ! the normalized Ytilde vectors in columns, AMinus the symmetrized scaled
-      ! A_-, Eig the omega (negative entry = -sqrt|omega^2| flags a negative
-      ! omega^2 mode). Each routine prints its eigenvalues.
+      ! A0 assembly + diagonalization, one routine per block (vo, aa, va, oa).
+      ! Formulas: .secret_sauce/.skills/ph-ac0/theory-a0-blocks.md;
+      ! what each routine leaves in the block: .secret_sauce/.skills/ph-ac0/code-thc-a0.md Sec. 3-4.
       ! =============================================================================
 
 
@@ -1774,18 +1519,10 @@ call xmsg('t_tog_VAAA_ker', t_tog_VAAA_ker, mdebugg)
       end subroutine PHERPA0_THC_OA_Eigs
 
 
-      ! Port of pherpa_symm_spinres (phac_spinres.f90) for one block.
-      ! Solves A_+^(1/2) A_- A_+^(1/2) Z = omega^2 Z; Ytilde = A_+^(1/2) Z,
-      ! normalized to 2/omega Ytilde^T A_- Ytilde = 1.
-      ! In/out: APlus(nd,nd) in: scaled A_+, out: Ytilde vectors in columns;
-      ! AMinus(nd,nd) in: scaled A_-, out: its symmetrized version;
-      ! Eig(nd) out: omega, with -sqrt|omega^2| flagging negative modes (nneg).
-      !
-      ! Excited states (excited = .true., state index nst(1) > 1): A_+ is in
-      ! general indefinite - the block contains the de-excitation to the lower
-      ! state - and the A_+^(1/2) route above, which takes sqrt|lambda| of A_+,
-      ! then solves a different eigenproblem. The block goes to
-      ! pherpa_nonsymm_block_ph instead, with the same in/out contract.
+      ! Ground-state solver for one block (port of pherpa_symm_spinres):
+      ! A_+^1/2 A_- A_+^1/2 Z = omega^2 Z, Yt = A_+^1/2 Z, (2/omega) Yt^T A_- Yt = 1.
+      ! Out: APlus = Yt, AMinus = symmetrized A_-, Eig (<= 0 flags an unusable mode).
+      ! excited -> pherpa_nonsymm_block_ph. See .secret_sauce/.skills/ph-ac0/code-thc-a0.md Sec. 4.
       subroutine pherpa_symm_block_ph(APlus, AMinus, Eig, nd, nneg, excited)
             double precision, dimension(:,:), intent(inout) :: APlus, AMinus
             double precision, dimension(:), intent(out) :: Eig
@@ -1860,35 +1597,10 @@ call xmsg('t_tog_VAAA_ker', t_tog_VAAA_ker, mdebugg)
       end subroutine pherpa_symm_block_ph
 
 
-      ! Excited-state solver for one block: the non-symmetric counterpart of
-      ! pherpa_symm_block_ph, for an indefinite A_+. Template:
-      ! pherpa_nonsymm_spinres (phac_spinres.f90), but on the half-size
-      ! problem
-      !
-      !   A_+ A_- Y = omega^2 Y,     X = A_- Y / omega,
-      !
-      ! solved by nonsymmetric_eigenproblem (real_linalg) for the right
-      ! eigenvectors. Unlike the symmetric path, the eigenvectors of a
-      ! degenerate omega^2 are not A_- orthogonal. So the roots are sorted,
-      ! grouped by omega^2 (thr_deg), and in each group of real roots with
-      ! omega^2 > small the metric
-      !
-      !   S = 2/omega Yg^T A_- Yg = U s U^T,      Yg <- Yg U |s|^(-1/2)
-      !
-      ! is diagonalized: the new vectors are A_- orthogonal and normalized to
-      ! 2/omega Y^T A_- Y = sign(s). For a single root this is the usual
-      ! normalization. Roots with distinct omega^2 are A_- orthogonal anyway.
-      !
-      ! Modes and how they are flagged (all counted in nneg; Step 0.2 of the
-      ! energy drops every Eig <= 0):
-      !   s > 0                 physical excitation, Eig = +omega
-      !   s < 0                 de-excitation (physical omega = -omega),
-      !                         Eig = -omega, vector normalized to -1
-      !   omega^2 <= small      Eig = -sqrt|omega^2|, raw vector, as in the
-      !                         symmetric path
-      !   complex omega^2, s ~ 0     Eig = 0, zero vector
-      ! Out: APlus = Y in columns (ascending omega^2), AMinus = symmetrized
-      ! A_-, Eig = omega.
+      ! Excited-state solver for one block (indefinite A_+): A_+ A_- Y = omega^2 Y,
+      ! degenerate groups made A_- orthogonal, de-excitations and complex roots
+      ! flagged by Eig <= 0. Same in/out contract as pherpa_symm_block_ph.
+      ! See .secret_sauce/.skills/ph-ac0/code-thc-a0.md Sec. 4.
       subroutine pherpa_nonsymm_block_ph(APlus, AMinus, Eig, nd, nneg)
             double precision, dimension(:,:), intent(inout) :: APlus, AMinus
             double precision, dimension(:), intent(out) :: Eig
@@ -2034,16 +1746,8 @@ call xmsg('t_tog_VAAA_ker', t_tog_VAAA_ker, mdebugg)
       end subroutine print_block_eigs_ph
 
 
-      ! ph counterpart of pp's P45: the genuine (all-active) WMAT matrix,
-      ! a literal port of the wmat loop of pherpa_incore_spinres restricted to
-      ! all-active summation indices:
-      !   wmat(p,r) = sum_{tuv in act} [ rdm2(r,v,t,u) (uv|tp)
-      !                                + rdm2(r,v,u,t) (up|tv) ]
-      ! Class (AA|AA), V(x,y) = (a x| b y):
-      !   pattern 1: u=a, v=x, t=b, p=y -> Aux3X(y,r) += sum_x rdm2(r,x,b,a) V(x,y)
-      !   pattern 2: u=a, p=x, t=b, v=y -> Aux3X(x,r) += sum_y rdm2(r,y,a,b) V(x,y)
-      ! Consumed by the assembly as TW1 = -1/2 d_sq Aux3X(p,r),
-      ! TW2 = -1/2 d_pr Aux3X(q,s)  (tex: WMATpr and WMATqs).
+      ! Genuine WMAT matrix Aux3X(q,r) = 2 G(q,r), q active, class (AA|AA); the
+      ! consumers apply -1/2. See .secret_sauce/.skills/ph-ac0/code-thc-a1.md Sec. 4.
       subroutine P45_ph(Aux3X, a, b, map, rdm2, x0, x1, y0, y1, V_axby, NI, NA)
             double precision, dimension(:,:), intent(inout) :: Aux3X
             integer, intent(in) :: a, b, NI, NA
@@ -2073,18 +1777,8 @@ call xmsg('t_tog_VAAA_ker', t_tog_VAAA_ker, mdebugg)
       end subroutine P45_ph
 
 
-      ! Virtual-row part of Aux3X, for the A1 blocks. Called in the (VA|AA)
-      ! class: a virtual, b active, V_axby(x,y) = (a x|b y) with x,y active.
-      !
-      ! Aux3X(q,r) = 2 G(q,r),  G(q,r) = sum_{tuv in act} Gamma_turv (qt|uv),
-      ! is the genuine part of WMAT_q,r (both Form-1 halves, hence the 2; the
-      ! consumers apply -1/2). P45_ph builds it for q active from (AA|AA). For
-      ! q = a virtual the integrals are (VA|AA) and the two halves of P45_ph
-      ! become the same contraction, so
-      !   Aux3X(a,r) += 2 sum_{x,y in act} Gamma(r,y,x,b) (a x|b y)
-      ! Needed by PHERPA_A1_THC wherever a WMAT carries a virtual index next to
-      ! an active one: d_sq WMAT_p,r in ao-vo and aa-va, d_qr WMAT_p,s in aa-va.
-      ! Checked against pherpa_simple.py.
+      ! Virtual rows of Aux3X, class (VA|AA); needed by ao-vo and aa-va.
+      ! See .secret_sauce/.skills/ph-ac0/code-thc-a1.md Sec. 4.
       subroutine P45_ph_VA(Aux3X, a, b, map, rdm2, x0, x1, y0, y1, V_axby, NI, NA)
             double precision, dimension(:,:), intent(inout) :: Aux3X
             integer, intent(in) :: a, b, NI, NA
@@ -2107,16 +1801,8 @@ call xmsg('t_tog_VAAA_ker', t_tog_VAAA_ker, mdebugg)
       end subroutine P45_ph_VA
 
 
-      ! Inactive-row part of Aux3X, the counterpart of P45_ph_VA. Called in the
-      ! (AA|IA) class: a active, b inactive, V_axby(x,y) = (a x|b y) with x,y
-      ! active. With the same G(q,r) = sum_{tuv in act} Gamma_turv (qt|uv) and
-      ! q = b inactive, (b t|u v) = (b y|a x) = V_axby(x,y) for t = y, u = a,
-      ! v = x, and Gamma_turv = Gamma(y,a,r,x) = Gamma(r,x,y,a) (pair symmetry,
-      ! as in P45_ph_VA), so
-      !   Aux3X(b,r) += 2 sum_{x,y in act} Gamma(r,x,y,a) (a x|b y)
-      ! Needed by PHERPA_A1_THC only for the aa-ao block (phA1aaao): d_pr
-      ! WMAT_q,s and d_sp WMAT_q,r with q inactive, .skills/phtheory_a1_blocks2.md
-      ! Block aa-ao. No other block reads an inactive row of Aux3X.
+      ! Inactive rows of Aux3X, class (AA|IA); needed only by aa-ao (phA1aaao).
+      ! See .secret_sauce/.skills/ph-ac0/code-thc-a1.md Sec. 4.
       subroutine P45_ph_IA(Aux3X, a, b, map, rdm2, x0, x1, y0, y1, V_axby, NI, NA)
             double precision, dimension(:,:), intent(inout) :: Aux3X
             integer, intent(in) :: a, b, NI, NA

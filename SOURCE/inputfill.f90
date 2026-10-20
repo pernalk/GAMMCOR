@@ -547,8 +547,6 @@ subroutine read_block_calculation(CalcParams, line)
                  CalcParams%JobType = JOB_TYPE_SRAC0
            elseif (uppercase(val) == "MP2" ) then
                  CalcParams%JobType = JOB_TYPE_MP2
-           elseif (uppercase(val) == "SRMP2" ) then
-                 CalcParams%JobType = JOB_TYPE_SRMP2
            elseif (uppercase(val) == "TDDFT" ) then
                  CalcParams%JobType = JOB_TYPE_TDDFT
            elseif (uppercase(val) == "SAPT-OS" .or. &

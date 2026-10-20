@@ -170,7 +170,7 @@ Selects the correlation method.
 
 <!-- TODO: describe or drop the remaining JobType values found in SOURCE/inputfill.f90:
 AC1, EERPA (ERPA-2), EERPA-OLD (ERPA-1), CASPIDFTOPT, AC0D, AC0DNOSYMM, AC0DP,
-ACFREQ, AC1FREQNTH, RESPONSE, NLOCCORR, SRAC0, SRMP2, SAPT-OS, MSAC0, PPERPA,
+ACFREQ, AC1FREQNTH, RESPONSE, NLOCCORR, SRAC0, SAPT-OS, MSAC0, PPERPA,
 PPERPADMP, HHERPADMP, DUCC, AC_REL, AC0_REL.
 Mark the ones meant for testing only, as in beyond-rpa's "Additional methods" table. -->
 

@@ -136,6 +136,17 @@ def msac0_en(file):
             if len(w) == 4 and w[0] == "H_mn":
                 vals[(w[1], w[2])] = float(w[3])
     return [thc_ac0_en(file), vals.get(("1.1","1.1")), vals.get(("2.1","1.1"))]
+
+def mp2_en(file):
+    return thc_ac0_en(file)
+
+def ac0_cbsh_en(file):
+    with open(file, 'r') as f:
+        for line in f:
+            if "CASSCF+ENuc, AC0-CBS[H], Total" in line:
+                return float(line.split()[-1])
+    return None
+
 #
 
 def run_single(dir,fun,RUN_GAMMCOR):

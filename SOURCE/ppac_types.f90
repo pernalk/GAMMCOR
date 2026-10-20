@@ -90,7 +90,7 @@ module ppac_types
       ! ph-AC0 block: the ph analogue of TAC0Block. AC0 (ph) has one A matrix
       ! per block instead of the ASing/ATrip/ATripA triple; what is stored are
       ! the two half-problem combinations A_+ = N^{-1/2}(A+B)N^{-1/2} and
-      ! A_- = N^{-1/2}(A-B)N^{-1/2} (see .skills/phAC0-theory.tex). The ph
+      ! A_- = N^{-1/2}(A-B)N^{-1/2} (see .secret_sauce/.skills/ph-ac0/theory-erpa-w1.md). The ph
       ! metric is N_pq = n_p - n_q (not the pp 1 - n_p - n_q).
       !   order = 0 : A0 block. Pair list in IndN(2, NDim).
       !               Storage scheme depends on the block (see phac0_thc):

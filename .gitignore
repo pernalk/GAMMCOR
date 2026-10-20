@@ -52,6 +52,7 @@ gammcor-phac0-thc.code-workspace
 !.skills/RDM_conventions.md
 !.skills/RDM_conventions_simple.md
 .testjobs_my/
+testjobs/pyscf-tests/to-be-added
 mini-tests.py
 
 # HDF5: built locally by hdf5/build_hdf5.sh (the .mod files depend on the exact
@@ -74,3 +75,8 @@ hdf5-build
 
 # rattler-build (conda/recipe.yaml)
 output/
+skills/
+implementation_plans/
+/.secret_sauce/
+SOURCE/KAW-mp2.code-workspace
+

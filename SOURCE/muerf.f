@@ -808,6 +808,9 @@ C
       EndDo
       EndDo
 C
+C      AT 18.10.2026 for printing negative mu values
+C      NMuNeg=0
+C      XMuNegMin=Zero
       Do I=1,NGrid
 C
       Call DenGrid(I,RhoGrid(I),Occ,URe,OrbGrid,NGrid,NBasis)
@@ -882,12 +885,19 @@ C
       If(OnTop(I).Gt.ThrOnTop) Then
       XMuLoc(I)=SQRT(3.1415)/Two*FPsiB(I)/OnTop(I)
       EndIf
-      If(Abs(XMuLoc(I)).Gt.BigE) XMuLoc(I)=BigE
+C      AT 18.10.2026 printing negative mu values
+C      If(XMuLoc(I).Lt.Zero) Then
+C      NMuNeg=NMuNeg+1
+C      XMuNegMin=Min(XMuNegMin,XMuLoc(I))
+C      EndIf
+C     AT 18.10.2026 open shell: mu < 0 where rho_b -> 0 blows up exp(-mu)
+      If(XMuLoc(I).Lt.Zero.Or.XMuLoc(I).Gt.BigE) XMuLoc(I)=BigE
 C
       EndDo ! NGrid
 C
       Print*, 'OnTop', norm2(OnTop)
       print*, 'XMuLoc',norm2(XMuLoc)
+C      Print*, 'Points with mu < 0 (set to BigE), min mu',NMuNeg,XMuNegMin
 C
 C     COMPUTE XMuMAT MATRIX in NO
 C

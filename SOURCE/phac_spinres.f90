@@ -8,62 +8,10 @@ module phac_spinres
       use sort
 
       ! =============================================================================
-      ! MODULE-LEVEL CONVENTION NOTE (read before touching any integral or RDM)
-      ! =============================================================================
-      !
-      ! INTEGRAL STORAGE CONVENTION (FCIDUMP-derived):
-      !   ints2e_aa(p,q,r,s)  stores 2*(pq|rs)_physical for αα block
-      !   ints2e_bb(p,q,r,s)  stores 2*(pq|rs)_physical for ββ block
-      !   ints2e_ab(p,q,r,s)  stores   (pq|rs)_physical for αβ block
-      !   where (pq|rs) = ∫ φ_p*(1) φ_q(1) r12^-1 φ_r*(2) φ_s(2) dx1 dx2  [Mulliken]
-      !
-      !   CONSEQUENCE: any term contracting with ints2e_aa needs frac12 to cancel
-      !   the built-in factor of 2. Terms with ints2e_ab need no extra factor.
-      !   Example from energy: e2 = 0.25*(e2_aa + e2_bb) + e2_ab
-      !   The 0.25 = 0.5 (antisymm) * 0.5 (FCIDUMP factor)
-      !
-      ! TRANSLATION TO DIRAC NOTATION:
-      !   (pq|rs) [Mulliken] = <pr|qs> [Dirac/Pernal paper notation]
-      !   So ints2e_aa(p,q,r,s) = 2*<pr|qs>_aa
-      !
-      ! FULL/FINAL INTEGRALS vs DUCC INTEGRALS:
-      !   Full integrals (Ints):
-      !     - 8-fold symmetry: (pq|rs)=(qp|sr)=(rs|pq)=(sr|qp)=(pq|sr)=(qp|rs)=(rs|pq)=(sr|qp)
-      !     - ints2e_aa = ints2e_bb (spin-free for closed-shell reference)
-      !     - stored via gmap_4fold but physically 8-fold symmetric
-      !   DUCC integrals (IntsD, Ints_ducc):
-      !     - 4-fold symmetry only: (pq|rs)=(qp|sr)=(rs|pq)=(sr|qp)
-      !     - (pq|rs) ≠ (pq|sr) in general
-      !     - ints2e_aa ≠ ints2e_ab in general (no spin-free simplification)
-      !     - defined only in active space (indices 1..NA, global NI+1..NIA)
-      !
-      ! AC PATH HAMILTONIAN (Eq. 22-24 in Pernal JCP 2018):
-      !   H^α = H^(0) + α*H'
-      !   Two-electron part for AAAA block: g^α = (1-α)*g^DUCC + α*g^full  [erpa_init_incore_ducc]
-      !   Two-electron part for VVVV block: g^α = g^full  (independent of α, already correlated)
-      !   Two-electron part for mixed blocks: g^α = α*g^full
-      !   One-electron part for AA block:  h^α = (1-α)*h^DUCC + α*h^full
-      !   One-electron part for VV block:  h^α = h^full + (1-α)*[contraction with active RDM]
-      !
-      ! SPIN-FREE ERPA FOR SINGLET (Eq. 13-14 in ERPA_Singletxa notes):
-      !   X_{p+q+} = X_{p-q-} ≡ X_pq  (shared spatial amplitude)
-      !   Y_{p+q+} = Y_{p-q-} ≡ Y_pq
-      !   The ERPA matrix built here is A^{0,0} = A^{++++} + A^{++--} (Eq. 54)
-      !   which is spin-free and written in terms of spatial orbitals and
-      !   spin-summed 2-RDM: Γ^{0,0}_{pqrs} = Γ^{++++}_{pqrs} + Γ^{+-+-}_{pqrs}
-      !
-      ! NORMALIZATION OF ERPA EIGENVECTORS (Eq. 221-225 in pherpa.pdf):
-      !   Original: Y_ν^T N Y_ν - X_ν^T N X_ν = 1/2,  N_{pq,pq} = n_p - n_q
-      !   In tilde basis (pherpa_symm_spinres): 2/ω * Ỹ^T A- Ỹ = 1
-      !   Tilde vectors: X̃_pq = (c_p+c_q)(Y+X)_pq,  Ỹ_pq = (c_p-c_q)(Y-X)_pq
-      !   where c_p = +√n_p if n_p≥0.5, c_p = -√n_p if n_p<0.5  [ssqrt convention]
-      !   Key identity: (c_p+c_q)(c_p-c_q) = c_p²-c_q² = n_p-n_q
-      !
-      ! 2-RDM STORAGE (rdm2_pp, rdm2_pm etc., active indices 1..NA):
-      !   rdm2_pp(p,r,q,s) = Γ^{αααα}_{pqrs} = <0|a†_p a†_q a_s a_r|0>  [AAAA block]
-      !   rdm2_pm(p,r,q,s) = Γ^{αβαβ}_{pqrs}                             [AABB block]
-      !   Antisymmetry: Γ_{pqrs} = -Γ_{qprs} = -Γ_{pqsr} = Γ_{qpsr}
-      !   rdm1_p(p,q) = γ^α_{pq} = n_p δ_{pq}  (diagonal in natural orbital basis)
+      ! Conventions of this module (read before touching any integral or RDM):
+      ! ints2e_aa/bb store 2 (pq|rs) (use frac12), ints2e_ab stores (pq|rs); full vs
+      ! DUCC integrals; AC-path Hamiltonian per block; c-factor normalization;
+      ! rdm2_pp/rdm2_pm layout. See .secret_sauce/.skills/ph-ac0/code-spinres-conventions.md.
       ! =============================================================================
 
       implicit none

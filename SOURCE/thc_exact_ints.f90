@@ -1,27 +1,11 @@
 module thc_exact_ints
 
       ! =============================================================================
-      ! Exact-integral debug route of the ph-AC0 THC code (phac0_thc, thc_energy_ph):
-      ! Algorithm THC + TwoMoInt INCORE + JobType AC0/MSAC0, PySCF interface.
-      ! Plan and tests: implementation_plans/thc_with_exact.md.
-      !
-      ! The THC code builds every integral slab it uses with one gemm over R
-      ! blocks. With THCData%exact_ints set, each of those gemms is replaced by a
-      ! fill of the same slab, in the same layout, from the exact PySCF integrals
-      ! THCData%TwoEl (packed, TwoEl(NAddr3(p,q,r,s)) = (pq|rs), NO basis):
-      !
-      !   exact_V_axby  V(x,y)   = (x a|y b)    for real_aTb_x(V, ., Ra(:,:,a), ., Rb(:,:,b), ...)
-      !   exact_V_pair  V(x,y)   = (x y|c d)    for real_aTv_x(V, RAA, ., R(:,c,d), ...)
-      !   exact_V_xay   V(x,a,y) = (x a|y b)    for V_xay of the (VA|IV) class
-      !
-      ! Nothing else in the THC code changes, so the run gives the THC code with
-      ! exact integrals: any difference from INCORE AC0 is a code error, any
-      ! difference from the THC run is the THC error. The R blocks are not built.
-      !
-      ! The THC-only quantities set by canonicalize in THC_init2 - fij, fvw, the
-      ! inactive/virtual orbital rotation and ECAS_THC - come from
-      ! canonicalize_exact, which read_PYSCF calls for every INCORE AC0/MSAC0 run
-      ! (the PySCF-wrapper INCORE run included).
+      ! Exact-integral route of the ph-AC0 THC code (Algorithm THC + TwoMoInt INCORE):
+      ! each THC slab is filled from the packed exact integrals TwoEl instead of from
+      ! R blocks (exact_V_axby, exact_V_pair, exact_V_xay), and canonicalize_exact
+      ! replaces canonicalize. Not yet tested.
+      ! See .secret_sauce/.skills/ph-ac0/code-thc-exact-ints.md.
       ! =============================================================================
 
       use types
@@ -96,27 +80,11 @@ contains
 
 
       ! =============================================================================
-      ! The exact counterpart of canonicalize (interface_pp.f90), on the INCORE
-      ! integrals TwoEl (packed, NO basis). Called by read_PYSCF for every INCORE
-      ! AC0/MSAC0 run, so the PySCF-wrapper INCORE run (AC0CAS) and the
-      ! exact-integral THC run use the same orbitals.
-      !
-      !   F(p,q) = HNO0(p,q) + sum_{t <= NIA} Occ(t) [ 2 (pq|tt) - (pt|tq) ]
-      !
-      ! is the Fock matrix of the computed state (the one canonicalize builds with
-      ! THC integrals; Occ(t) is enough because the orbitals are NOs). PySCF
-      ! canonicalizes with the Fock matrix of its fcisolver density, which for
-      ! SA-CASSCF is the state-averaged one, so the inactive and virtual blocks of
-      ! F are diagonalized here for every reference:
-      !
-      !   fij, U_ii  from F(inact, inact)        fvw, U_vv  from F(virt, virt)
-      !   U = diag(U_ii, 1_act, U_vv)
-      !   HNO0 <- U^T HNO0 U,   TwoEl <- TwoEl rotated by U (TwoNO1),   CAONO <- CAONO U
-      !
-      ! The RDMs and the MS-AC0 transition 1-RDMs are active only and do not
-      ! change. ECAS_THC is the CAS energy from these integrals, by the same
-      ! formula as canonicalize. On exit THCData%fij/fvw hold the orbital
-      ! energies and THCData%HNO = AuxData%HNO0.
+      ! Exact counterpart of canonicalize, called by read_PYSCF for every INCORE
+      ! AC0/MSAC0 run: diagonalizes the inactive and virtual blocks of the Fock
+      ! matrix of the computed state (not the SA one PySCF used) and rotates HNO0,
+      ! TwoEl and CAONO; sets fij, fvw, ECAS_THC.
+      ! See .secret_sauce/.skills/ph-ac0/code-thc-exact-ints.md.
       ! =============================================================================
       subroutine canonicalize_exact(THCData, AuxData, CAONO, TwoEl)
             type(TTHCData), intent(inout) :: THCData

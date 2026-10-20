@@ -1,0 +1,28 @@
+Calculation
+ BasisPath
+ JobTitle   MP2
+ Interface  PYSCF
+ JobType  MP2
+ RDMType    CAS
+ TwoMoInt   FOFO
+ Basis aug-cc-pvdz.txt
+ units angs
+end
+
+
+System
+ znucl 7
+ NCoreOrb 1
+ Charge  0
+end
+
+
+Choleskyblock
+Cholesky THC
+Cholesky_Accuracy L
+end
+
+xyz
+1
+N     0.0000000     0.0000000     0.00000
+end
