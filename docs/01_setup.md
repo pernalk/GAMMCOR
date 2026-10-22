@@ -19,7 +19,7 @@ GAMMCOR supports Linux on x86-64 Intel and AMD processors with AVX2.
 Clone the repository with its submodules:
 
 ```bash
-git clone --recursive https://gitlab.com/qchem/gammcor.git
+git clone --recursive https://github.com/pernalk/GAMMCOR.git
 cd gammcor
 ```
 
