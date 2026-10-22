@@ -1,0 +1,379 @@
+ 
+ GIT INFO
+********************************************************************************
+ Branch:             IntOnTheFly
+ Revision (short):   200dce0
+ Revision (full):    200dce0b5dbff4f1ac5fac9f76aee9e60d3d896b
+ Latest commit date: Tue Sep 26 14:40:29 2023 +0200
+ Latest tag:         v-4.1
+ 
+ 
+ BUILD INFO
+********************************************************************************
+ Fortran compiler:   Intel 
+ /opt/intel/oneapi/compiler/2021.1.2/linux/bin/intel64/ifort
+ C++ compiler:       Clang /opt/intel/oneapi/compiler/2021.1.2/linux/bin/icx
+ C compiler:         Clang /opt/intel/oneapi/compiler/2021.1.2/linux/bin/icx
+ Compile options:    
+ -assume byterecl -heap-arrays -mkl=parallel -coarray=single -O3 -xHost
+ BLAS libraries:     
+ /opt/intel/oneapi/mkl/latest/lib/intel64/libmkl_intel_lp64.so /opt/intel/oneapi
+ /mkl/latest/lib/intel64/libmkl_intel_thread.so /opt/intel/oneapi/mkl/latest/lib
+ /intel64/libmkl_core.so /usr/lib/x86_64-linux-gnu/libiomp5.so -lpthread -lm -ld
+ l
+ 
+ NBasis WILL BE READ FROM MOLPRO or PYSCF or FCIDUMP
+
+ INPUT 
+********************************************************************************
+ JOB TITLE:     AC0
+ BASIS SET:     cc-pvdz.txt
+ BASIS PATH:    ../../
+ INTERFACE:     PYSCF   
+ JOB TYPE:      AC0      
+ RDM TYPE:      CASSCF  
+ RDM SOURCE:    PYSCF   
+ UNITS:         ANGSTROM
+
+ CHOLESKY :     .TRUE.
+ CHOLESKY ACCU: LUDICROUS
+
+ MONOMER:       AB      
+ ZNUCL:        14
+ CHARGE:        0
+
+
+ INPUT CHECK PASSED
+********************************************************************************
+ Input%CalcParams%PostCAS F
+ Input%CalcParams%DFApp             0
+ Flags%IFunSRKer                    1
+
+ SYSTEM 
+********************************************************************************
+ NUCLEAR CHARGE:   14
+ CHARGE:           0
+ PRINT LEVEL:      0
+
+
+ IFunSR=0
+
+ IFunSRKer=0
+
+ NoSt= 0
+
+ STARTING CALCULATIONS 
+********************************************************************************
+
+-- System and reference AT PARSER ------------------------------------
+ 
+  Reader type                             : DIRECT
+  Source                                  : PySCF
+ Two electron integrals calculated with THC
+
+-- Geometry and basis setup ------------------------------------------
+ 
+  Basis set path                          : ../../
+ Geometry read from ./input.inp
+ Atomic orbital basis set
+ . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 
+ atomic centers                               2
+ shell parameter sets                         6
+ spherical AOs                                28
+ max angular momentum                         2
+ parameter set                                ../../cc-pvdz.txt
+ . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 
+  Number of atoms                         :        2
+  Number of electrons                     :       14
+  AuxData%NEL                             :       14
+  AuxData%NBasis                          :       28
+
+-- State and job setup -----------------------------------------------
+ 
+  AuxData%nst                             : -255, -255
+  Flags%JobType                           :        2
+
+-- CASSCF data loaded ------------------------------------------------
+ 
+  NBasis                                  :       28
+  NInactive                               :        6
+  NActive                                 :        1
+  NVirtual                                :       21
+  CASSCF Energy                           :      -108.95109240
+  Nuclear Energy                          :        23.27619689
+  Number of electrons                     :       14
+  Natural orbitals used (0/1)             :        1
+  THCData%H0external                      :    FALSE
+ reading bb
+ natural orbitals
+
+-- Cholesky decomposition --------------------------------------------
+ 
+ Prescreening (pq|pq) integrals for the Cholesky decomposition
+ Shell pairs will be sorted according to their max elements
+ Max diagonal integral MaxDrs=4.1E+000
+ Applying Eq. 15 in J. Chem. Phys. 150, 194112 (2019); doi: 10.1063/1.5083802
+ Schwarz inequality: Dpq<min(10**(-8),Tau)**2/MaxDrs=2.4E-017
+ Trace of exact Coulomb matrix: 4.4E+001
+ Trace of discarded integrals: 0.0E+000
+ Discarded 0 out of 78 shell pairs
+ (0 out of 406 orbital pairs)
+
+ Step 1 of Cholesky decomposition: locating pivots
+ -------------------------------------------------
+ Dimensions of the Coulomb matrix: (406,406)
+ Threshold for diagonal matrix elements: Dpq > 1.0E-007
+ Max number of Cholesky vectors: 406
+ Rk storage block size: 500
+ Max dimension of 2e integrals buffer: (406,406)
+
+ ----------------------------------------------------------------------------
+ #    Dmax        Memory (MB)    NPivots     %    Time        
+ ----------------------------------------------------------------------------
+ 1    3.7E-002    2.8E+000       35          9    2.5E-002    
+ 2    3.6E-004    2.7E+000       125         37   2.1E-002    
+ 3    3.5E-006    1.8E+000       178         54   8.5E-003    
+ 4    9.4E-008    1.2E+000       233         100  6.8E-003    
+
+ Step 1 of the Cholesky decomposition completed
+ Computed 233 pivots
+ Largest residual Dpq: 9.4E-008
+ NCholesky/NAO = 8.3E+000
+ Step 1 of Cholesky decomposition completed in 6.4E-002 seconds
+ Detailed timings in seconds
+ Subtract prev contribs I (M-R**T*R)     1.1E-002
+ Subtract prev contribs II (Rk)          8.5E-003
+ Two-electron integrals                  3.5E-002
+ Reallocation                            4.1E-003
+
+ Step 2 of Cholesky decomposition completed in 5.5E-003 seconds
+ Detailed timings in seconds
+ Reduced-dimension matrix V    3.9E-003
+ V=L*L**T                      6.5E-004
+ L**(-1)                       8.9E-004
+
+
+ ----------------------------------------------------------------------------
+ Tensor hypercontraction
+ ----------------------------------------------------------------------------
+ Initial Becke grid: SG-1 7632 points
+ Discarded 596 points with Becke weight <= 0.0E+000
+ Discarded 1810 points with Max|PhiP(r)|**2 <= 1.0E-011
+ Final grid: 5226
+ Average 2613 points per atom
+
+ Pivoted Cholesky decomposition with on-the-fly generation of matrix S
+ ---------------------------------------------------------------------
+ QR relative pivot threshold Eps=1.0E-005
+ QR relative pivot threshold (reduced grid) Eps=1.0E-005
+ Block dimension: 500 Cholesky vectors per macro iteration
+ Starting from Becke grid composed of 5226 points
+ Cholesky absolute pivot threshold Eps**2=1.0E-010
+ Cholesky absolute pivot threshold (reduced grid) Eps**2=1.0E-010
+
+ ----------------------------------------------------------------------------
+ #    Dmax        Memory (MB)    NPivots     %    Time        
+ ----------------------------------------------------------------------------
+ 1    5.8E-011    1.6E+001       365         100  2.5E-001    
+ ----------------------------------------------------------------------------
+ Rank-revealing decomposition converged with 365 pivots
+ Average 182 points per atom
+ NGridTHC/NAO=1.3E+001
+ Reduced grid: 365 pivots
+ Reduced grid: NGridTHC/NAO=1.3E+001
+ Total time 2.5E-001 seconds
+
+ Detailed timings
+ ----------------
+ Orbital values Xgp                 8.5E-003
+ Overlap matrix S + Cholesky vecs   2.4E-001
+ Reallocation                       6.2E-006
+
+ THC grid completed in 2.6E-001 seconds
+ Least squares fitting of Z: LDL**T linear system solver
+ thc_Z will generate full-dimension Cholesky vecs on the fly
+ THC least squares completed in 1.9E-002 seconds
+
+
+-- THC Fock matrix ---------------------------------------------------
+ 
+ Started THC Fock matrix build
+ Fock matrix completed in 3.8E-002 seconds
+  Total CASSCF Energy from Fock           :     -108.9510934700 Eh
+ acph_driver
+
+-- phAC0 orbital-pair selection --------------------------------------
+ 
+  Threshold for quasi-degeneracy          :         0.00000001
+  Threshold for quasi-virtual orbital     :         0.00000010
+  Threshold for quasi-inactive orbital    :         0.00010000
+  Original number of pq pairs             :      378
+  Reduced number of pq pairs              :       21
+    #     i     j        Occ(i)        Occ(j)
+-------------------------------------------
+    1     8     7     0.00000000     1.00000000
+    2     9     7     0.00000000     1.00000000
+    3    10     7     0.00000000     1.00000000
+    4    11     7     0.00000000     1.00000000
+    5    12     7     0.00000000     1.00000000
+    6    13     7     0.00000000     1.00000000
+    7    14     7     0.00000000     1.00000000
+    8    15     7     0.00000000     1.00000000
+    9    16     7     0.00000000     1.00000000
+   10    17     7     0.00000000     1.00000000
+   11    18     7     0.00000000     1.00000000
+   12    19     7     0.00000000     1.00000000
+   13    20     7     0.00000000     1.00000000
+   14    21     7     0.00000000     1.00000000
+   15    22     7     0.00000000     1.00000000
+   16    23     7     0.00000000     1.00000000
+   17    24     7     0.00000000     1.00000000
+   18    25     7     0.00000000     1.00000000
+   19    26     7     0.00000000     1.00000000
+   20    27     7     0.00000000     1.00000000
+   21    28     7     0.00000000     1.00000000
+
+-- phAC0 calculation -------------------------------------------------
+ 
+  Two-electron integrals                  : THC
+  External ordering                       : PySCF
+  Frozen core orbitals (ph pairs)         :        2
+
+-- phAC0 block dimensions --------------------------------------------
+ 
+       Block          NDim
+  --------------------------
+        A0vo            84
+        A0aa             0
+        A0va            21
+        A0oa             4
+  TIME FOR RDM2 PERMUTED COPIES           :                0.000 [sec]
+
+-- ph THC integral transformation ------------------------------------
+ 
+  TIME FOR RII                            :                0.001 [sec]
+  TIME FOR RIA                            :                0.001 [sec]
+  TIME FOR RAA                            :                0.000 [sec]
+  TIME FOR RIV                            :                0.001 [sec]
+  TIME FOR RVA                            :                0.005 [sec]
+  ph int loop                             :                0.067 [sec]
+  t_IIII_int                              :              0.000357627868652
+  t_IIII_ker                              :              0.000032424926758
+  t_IAII_int                              :              0.000041961669922
+  t_IAII_ker                              :              0.000018596649170
+  t_IAIA_int                              :              0.000051498413086
+  t_IAIA_ker                              :              0.003358364105225
+  t_AAII_int                              :              0.000005722045898
+  t_AAII_ker                              :              0.000005006790161
+  t_AAIA_int                              :              0.000005722045898
+  t_AAIA_ker                              :              0.002330303192139
+  t_AAAA_int                              :              0.000001192092896
+  t_AAAA_ker                              :              0.000001907348633
+  t_IVII_int                              :              0.000810861587524
+  t_IVII_ker                              :              0.000020980834961
+  t_IVIA_int                              :              0.000089406967163
+  t_IVIA_ker                              :              0.000093936920166
+  t_IVAA_int                              :              0.000013351440430
+  t_IVAA_ker                              :              0.000008821487427
+  t_VAII_int                              :              0.000122547149658
+  t_VAII_ker                              :              0.000036478042603
+  t_VAIA_int                              :              0.000107049942017
+  t_VAIA_ker                              :              0.023696660995483
+  t_VAAA_int                              :              0.000020265579224
+  t_VAAA_ker                              :              0.007619619369507
+  t_tog_AVAA_int                          :              0.000013589859009
+  t_tog_AVAA_ker                          :              0.002797365188599
+  t_tog_IAAA_int                          :              0.000007152557373
+  t_tog_IAAA_ker                          :              0.001208782196045
+  t_tog_IIAA_int                          :              0.000027656555176
+  t_tog_IIAA_ker                          :              0.001605987548828
+  t_tog_IVAA_int                          :              0.000122070312500
+  t_tog_IVAA_ker                          :              0.011441707611084
+  t_tog_VAAA_int                          :              0.000013589859009
+  t_tog_VAAA_ker                          :              0.000938415527344
+  TIME FOR THC LOOPS                      :                0.081 [sec]
+  TIME FOR UPDATE HNO                     :                0.000 [sec]
+  Hessian and diagonalization A0vo        :                0.000 [sec]
+  Hessian and diagonalization A0aa        :                0.000 [sec]
+  Hessian and diagonalization A0va        :                0.001 [sec]
+  Hessian and diagonalization A0oa        :                0.000 [sec]
+  Hessian A1aavo                          :                0.000 [sec]
+  Hessian A1aova                          :                0.000 [sec]
+  Hessian A1aovo                          :                0.000 [sec]
+  Hessian A1aoao                          :                0.000 [sec]
+  Hessian A1aava                          :                0.000 [sec]
+  Hessian A1aoaa                          :                0.000 [sec]
+  Hessian A1vaao                          :                0.000 [sec]
+  Hessian A1aaao                          :                0.000 [sec]
+  Hessian A1vaaa                          :                0.000 [sec]
+
+-- A1 symmetrization  A_RC <- 1/2 (A_RC + A_CR^T) --------------------
+ 
+  block <- partner          ||A+||   ||A+ - A+^T||          ||A-||   ||A- - A-^T||
+  ----------------------------------------------------------------------------------
+  A1aova <- A1vaao      2.9706E-17      2.0607E-05      3.6274E-17      2.0607E-05
+  A1aoaa <- A1aaao      0.0000E+00      0.0000E+00      0.0000E+00      0.0000E+00
+  A1aava <- A1vaaa      0.0000E+00      0.0000E+00      0.0000E+00      0.0000E+00
+
+-- phAC0 energy evaluation -------------------------------------------
+ 
+  TIME FOR Xt (ao, aa)                    :                0.000 [sec]
+  TIME FOR Xp, Ym, Yb                     :                0.000 [sec]
+  TIME FOR YJ                             :                0.000 [sec]
+  TIME FOR G voao                         :                0.000 [sec]
+  TIME FOR G voaa                         :                0.000 [sec]
+  TIME FOR G vaao                         :                0.001 [sec]
+  TIME FOR G vaaa                         :                0.000 [sec]
+  TIME FOR G aoao                         :                0.000 [sec]
+  TIME FOR G aaao                         :                0.000 [sec]
+  TIME FOR RIA                            :                0.002 [sec]
+  TIME FOR RAA                            :                0.000 [sec]
+  TIME FOR RIV                            :                0.002 [sec]
+  TIME FOR RVA                            :                0.008 [sec]
+  ph energy loop                          :                0.066 [sec]
+  t_IAIA_int                              :              0.000023365020752
+  t_IAIA_ker                              :              0.003941297531128
+  t_AAIA_int                              :              0.000004053115845
+  t_AAIA_ker                              :              0.000946521759033
+  t_IVIA_int                              :              0.000047683715820
+  t_IVIA_ker                              :              0.005640268325806
+  t_IVAA_int                              :              0.000009775161743
+  t_IVAA_ker                              :              0.001297950744629
+  t_IVIV_int                              :              0.000306367874146
+  t_IVIV_ker                              :              0.003385782241821
+  t_VAIA_int                              :              0.000053644180298
+  t_VAIA_ker                              :              0.018340826034546
+  t_VAAA_int                              :              0.000021934509277
+  t_VAAA_ker                              :              0.004082679748535
+  t_VAIV_int                              :              0.000116109848022
+  t_VAIV_ker                              :              0.000135183334351
+  t_VAVA_int                              :              0.000102758407593
+  t_VAVA_ker                              :              0.023259878158569
+
+-- Contributions to phAC0 from (Mu)(Nu) pairs of blocks --------------
+ 
+  Block pair   Contribution [Eh]
+  ------------------------------
+  (21)(21)          0.0000000000
+  (22)(21)          0.0000000000
+  (31)(21)          0.0000000000
+  (31)(22)          0.0000000000
+  (31)(31)         -0.1631066566
+  (32)(21)          0.0000000000
+  (32)(22)          0.0000000000
+  (32)(31)         -0.1222068388
+  (32)(32)         -0.0259578127
+
+-- Final energies ----------------------------------------------------
+ 
+  CASSCF energy (one-electron)            :     -193.5624236807 Eh    (  -5267.1043421820 eV)
+  ECASSCF_THC                             :     -108.9510934700 Eh    (  -2964.7116758978 eV)
+  E_phAC0                                 :       -0.3112713080 Eh    (     -8.4701277604 eV)
+  E_total                                 :     -109.2623647780 Eh    (  -2973.1818036582 eV)
+ 
+  Correlation energy                      :                0.081 [sec]
+  TIME FOR ACPH0_THC                      :                0.167 [sec]
+ WARNING! NOT POSSIBLE TO DELETE rdm2.dat FILE
+
+ CPU  time in AC0                  is               11.638 s
+ Wall time in AC0                  is                0.696 s

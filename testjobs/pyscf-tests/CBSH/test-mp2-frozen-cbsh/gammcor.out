@@ -1,0 +1,331 @@
+ 
+ GIT INFO
+********************************************************************************
+ Branch:             IntOnTheFly
+ Revision (short):   200dce0
+ Revision (full):    200dce0b5dbff4f1ac5fac9f76aee9e60d3d896b
+ Latest commit date: Tue Sep 26 14:40:29 2023 +0200
+ Latest tag:         v-4.1
+ 
+ 
+ BUILD INFO
+********************************************************************************
+ Fortran compiler:   Intel 
+ /opt/intel/oneapi/compiler/2021.1.2/linux/bin/intel64/ifort
+ C++ compiler:       Clang /opt/intel/oneapi/compiler/2021.1.2/linux/bin/icx
+ C compiler:         Clang /opt/intel/oneapi/compiler/2021.1.2/linux/bin/icx
+ Compile options:    
+ -assume byterecl -heap-arrays -mkl=parallel -coarray=single -O3 -xHost
+ BLAS libraries:     
+ /opt/intel/oneapi/mkl/latest/lib/intel64/libmkl_intel_lp64.so /opt/intel/oneapi
+ /mkl/latest/lib/intel64/libmkl_intel_thread.so /opt/intel/oneapi/mkl/latest/lib
+ /intel64/libmkl_core.so /usr/lib/x86_64-linux-gnu/libiomp5.so -lpthread -lm -ld
+ l
+ 
+ NBasis WILL BE READ FROM MOLPRO or PYSCF or FCIDUMP
+
+ INPUT 
+********************************************************************************
+ JOB TITLE:     MP2
+ BASIS SET:     cc-pvdz.txt
+ BASIS PATH:    ../../
+ INTERFACE:     PYSCF   
+ JOB TYPE:      MP2      
+ RDM TYPE:      CASSCF  
+ RDM SOURCE:    PYSCF   
+ UNITS:         ANGSTROM
+ GRID TYPE:     MEDIUM  
+
+ CHOLESKY :     .TRUE.
+ CHOLESKY ACCU: LUDICROUS
+
+ MONOMER:       AB      
+ ZNUCL:        14
+ CHARGE:        0
+
+
+ INPUT CHECK PASSED
+********************************************************************************
+ Input%CalcParams%PostCAS F
+ Input%CalcParams%DFApp             0
+ Flags%IFunSRKer                    1
+
+ SYSTEM 
+********************************************************************************
+ NUCLEAR CHARGE:   14
+ CHARGE:           0
+ PRINT LEVEL:      0
+
+
+ IFunSR=0
+
+ IFunSRKer=0
+
+ NoSt= 0
+
+ STARTING CALCULATIONS 
+********************************************************************************
+
+-- System and reference AT PARSER ------------------------------------
+ 
+  Reader type                             : DIRECT
+  Source                                  : PySCF
+ Two electron integrals calculated with THC
+
+-- Geometry and basis setup ------------------------------------------
+ 
+  Basis set path                          : ../../
+ Geometry read from ./input.inp
+ Atomic orbital basis set
+ . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 
+ atomic centers                               2
+ shell parameter sets                         6
+ spherical AOs                                28
+ max angular momentum                         2
+ parameter set                                ../../cc-pvdz.txt
+ . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 
+  Number of atoms                         :        2
+  Number of electrons                     :       14
+  AuxData%NEL                             :       14
+  AuxData%NBasis                          :       28
+
+-- State and job setup -----------------------------------------------
+ 
+  AuxData%nst                             : -255, -255
+  Flags%JobType                           :       19
+  NCoreOrb (frozen, from input)           :        2
+  REF/FROZEN (pyscf)                      :        2
+  PySCF MP2 E_corr                        :        -0.31127139
+  THCData%H0external                      :    FALSE
+
+-- Cholesky decomposition --------------------------------------------
+ 
+ Prescreening (pq|pq) integrals for the Cholesky decomposition
+ Shell pairs will be sorted according to their max elements
+ Max diagonal integral MaxDrs=4.1E+000
+ Applying Eq. 15 in J. Chem. Phys. 150, 194112 (2019); doi: 10.1063/1.5083802
+ Schwarz inequality: Dpq<min(10**(-8),Tau)**2/MaxDrs=2.4E-017
+ Trace of exact Coulomb matrix: 4.4E+001
+ Trace of discarded integrals: 0.0E+000
+ Discarded 0 out of 78 shell pairs
+ (0 out of 406 orbital pairs)
+
+ Step 1 of Cholesky decomposition: locating pivots
+ -------------------------------------------------
+ Dimensions of the Coulomb matrix: (406,406)
+ Threshold for diagonal matrix elements: Dpq > 1.0E-007
+ Max number of Cholesky vectors: 406
+ Rk storage block size: 500
+ Max dimension of 2e integrals buffer: (406,406)
+
+ ----------------------------------------------------------------------------
+ #    Dmax        Memory (MB)    NPivots     %    Time        
+ ----------------------------------------------------------------------------
+ 1    3.7E-002    2.8E+000       35          9    2.4E-002    
+ 2    3.6E-004    2.7E+000       125         37   1.7E-002    
+ 3    3.5E-006    1.8E+000       178         54   8.2E-003    
+ 4    9.4E-008    1.2E+000       233         100  6.8E-003    
+
+ Step 1 of the Cholesky decomposition completed
+ Computed 233 pivots
+ Largest residual Dpq: 9.4E-008
+ NCholesky/NAO = 8.3E+000
+ Step 1 of Cholesky decomposition completed in 5.9E-002 seconds
+ Detailed timings in seconds
+ Subtract prev contribs I (M-R**T*R)     7.0E-003
+ Subtract prev contribs II (Rk)          8.4E-003
+ Two-electron integrals                  3.4E-002
+ Reallocation                            4.5E-003
+
+ Step 2 of Cholesky decomposition completed in 5.0E-003 seconds
+ Detailed timings in seconds
+ Reduced-dimension matrix V    3.4E-003
+ V=L*L**T                      7.4E-004
+ L**(-1)                       8.6E-004
+
+
+ ----------------------------------------------------------------------------
+ Tensor hypercontraction
+ ----------------------------------------------------------------------------
+ Initial Becke grid: SG-1 7632 points
+ Discarded 596 points with Becke weight <= 0.0E+000
+ Discarded 1810 points with Max|PhiP(r)|**2 <= 1.0E-011
+ Final grid: 5226
+ Average 2613 points per atom
+
+ Pivoted Cholesky decomposition with on-the-fly generation of matrix S
+ ---------------------------------------------------------------------
+ QR relative pivot threshold Eps=1.0E-005
+ QR relative pivot threshold (reduced grid) Eps=1.0E-005
+ Block dimension: 500 Cholesky vectors per macro iteration
+ Starting from Becke grid composed of 5226 points
+ Cholesky absolute pivot threshold Eps**2=1.0E-010
+ Cholesky absolute pivot threshold (reduced grid) Eps**2=1.0E-010
+
+ ----------------------------------------------------------------------------
+ #    Dmax        Memory (MB)    NPivots     %    Time        
+ ----------------------------------------------------------------------------
+ 1    5.8E-011    1.6E+001       365         100  9.4E-002    
+ ----------------------------------------------------------------------------
+ Rank-revealing decomposition converged with 365 pivots
+ Average 182 points per atom
+ NGridTHC/NAO=1.3E+001
+ Reduced grid: 365 pivots
+ Reduced grid: NGridTHC/NAO=1.3E+001
+ Total time 9.6E-002 seconds
+
+ Detailed timings
+ ----------------
+ Orbital values Xgp                 2.5E-003
+ Overlap matrix S + Cholesky vecs   9.2E-002
+ Reallocation                       5.0E-006
+
+ THC grid completed in 1.0E-001 seconds
+ Least squares fitting of Z: LDL**T linear system solver
+ thc_Z will generate full-dimension Cholesky vecs on the fly
+ THC least squares completed in 2.2E-002 seconds
+
+ Prescreening (pq|pq) integrals for the Cholesky decomposition
+ Shell pairs will be sorted according to their max elements
+ Max diagonal integral MaxDrs=1.1E+000
+ Applying Eq. 15 in J. Chem. Phys. 150, 194112 (2019); doi: 10.1063/1.5083802
+ Schwarz inequality: Dpq<min(10**(-8),Tau)**2/MaxDrs=9.3E-017
+ Trace of exact Coulomb matrix: 2.6E+001
+ Trace of discarded integrals: 0.0E+000
+ Discarded 0 out of 78 shell pairs
+ (0 out of 406 orbital pairs)
+
+ Step 1 of Cholesky decomposition: locating pivots
+ -------------------------------------------------
+ Dimensions of the Coulomb matrix: (406,406)
+ Threshold for diagonal matrix elements: Dpq > 1.0E-007
+ Max number of Cholesky vectors: 406
+ Rk storage block size: 500
+ Max dimension of 2e integrals buffer: (406,406)
+
+ ----------------------------------------------------------------------------
+ #    Dmax        Memory (MB)    NPivots     %    Time        
+ ----------------------------------------------------------------------------
+ 1    9.9E-003    2.8E+000       24          7    1.8E-002    
+ 2    8.0E-005    2.7E+000       88          34   1.1E-002    
+ 3    7.7E-007    2.3E+000       136         85   8.1E-003    
+ 4    9.7E-008    8.7E-001       162         100  2.4E-003    
+
+ Step 1 of the Cholesky decomposition completed
+ Computed 162 pivots
+ Largest residual Dpq: 9.7E-008
+ NCholesky/NAO = 5.8E+000
+ Step 1 of Cholesky decomposition completed in 4.2E-002 seconds
+ Detailed timings in seconds
+ Subtract prev contribs I (M-R**T*R)     2.1E-003
+ Subtract prev contribs II (Rk)          2.4E-003
+ Two-electron integrals                  3.2E-002
+ Reallocation                            7.8E-004
+
+ Step 2 of Cholesky decomposition completed in 2.6E-003 seconds
+ Detailed timings in seconds
+ Reduced-dimension matrix V    2.0E-003
+ V=L*L**T                      2.9E-004
+ L**(-1)                       3.0E-004
+
+
+ ----------------------------------------------------------------------------
+ Tensor hypercontraction
+ ----------------------------------------------------------------------------
+ Initial Becke grid: SG-1 7632 points
+ Discarded 596 points with Becke weight <= 0.0E+000
+ Discarded 1810 points with Max|PhiP(r)|**2 <= 1.0E-011
+ Final grid: 5226
+ Average 2613 points per atom
+
+ Pivoted Cholesky decomposition with on-the-fly generation of matrix S
+ ---------------------------------------------------------------------
+ QR relative pivot threshold Eps=1.0E-005
+ QR relative pivot threshold (reduced grid) Eps=1.0E-005
+ Block dimension: 500 Cholesky vectors per macro iteration
+ Starting from Becke grid composed of 5226 points
+ Cholesky absolute pivot threshold Eps**2=1.0E-010
+ Cholesky absolute pivot threshold (reduced grid) Eps**2=1.0E-010
+
+ ----------------------------------------------------------------------------
+ #    Dmax        Memory (MB)    NPivots     %    Time        
+ ----------------------------------------------------------------------------
+ 1    5.8E-011    1.6E+001       365         100  1.0E-001    
+ ----------------------------------------------------------------------------
+ Rank-revealing decomposition converged with 365 pivots
+ Average 182 points per atom
+ NGridTHC/NAO=1.3E+001
+ Reduced grid: 365 pivots
+ Reduced grid: NGridTHC/NAO=1.3E+001
+ Total time 1.0E-001 seconds
+
+ Detailed timings
+ ----------------
+ Orbital values Xgp                 3.7E-003
+ Overlap matrix S + Cholesky vecs   9.7E-002
+ Reallocation                       6.0E-006
+
+ THC grid completed in 1.1E-001 seconds
+ Least squares fitting of Z: LDL**T linear system solver
+ thc_Z will generate full-dimension Cholesky vecs on the fly
+ THC least squares completed in 1.2E-002 seconds
+
+
+-- THC Fock matrix ---------------------------------------------------
+ 
+ Started THC Fock matrix build
+ Fock matrix completed in 4.8E-002 seconds
+ Flags%JOBTYPE          19
+ mp2_driver
+
+-- CBS Correction with local Mu (THC) --------------------------------
+ 
+  Frozen core orbitals                    :        2
+ Geometry read from ./input.inp
+ Atomic orbital basis set
+ . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 
+ atomic centers                               2
+ shell parameter sets                         6
+ spherical AOs                                28
+ max angular momentum                         2
+ parameter set                                ../../cc-pvdz.txt
+ . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 
+ Initial Becke grid: medium 24192 points
+ Discarded 1924 points with Becke weight <= 0.0E+000
+ Discarded 5140 points with Max|PhiP(r)|**2 <= 1.0E-024
+ Final grid: 17128
+ Average 8564 points per atom
+  The number of Grid Points               :    17128
+  Total FPsiB                             :      1630.16682508
+  OnTop                                   :       651.09316295
+  XMuLoc                                  :      4994.61813634
+  XMuMAT                                  :         1.67106648
+  RhoGrid                                 :       173.11074340
+  Zk                                      :         8.10104630
+
+ CBS[DFT] correction, average Mu    -0.09181046          1.400
+
+  TIME FOR loc_mu_thc                     :                0.233 [sec]
+
+-- MP2-CBS[H] energy evaluation --------------------------------------
+ 
+  Frozen core orbitals                    :        2
+  Correlated inactive orbitals            :        5
+  Virtual orbitals                        :       21
+  TIME FOR RVI_FR, RVI_LR                 :                0.006 [sec]
+  TIME FOR MP2-CBS[H] energy loop         :                0.006 [sec]
+
+-- Final energies ----------------------------------------------------
+ 
+  E_HF                                    :     -108.9510923984 Eh    (  -2964.7116467396 eV)
+  E_MP2                                   :       -0.3112713080 Eh    (     -8.4701277604 eV)
+  E_MP2-CBS[H]                            :       -0.3829130852 Eh    (    -10.4196007444 eV)
+  CBS[H] correction                       :       -0.0716417772 Eh    (     -1.9494729840 eV)
+  E_total                                 :     -109.3340054837 Eh    (  -2975.1312474840 eV)
+
+ HF+ENuc, MP2-CBS[H]-Corr, Total      -108.95109240    -0.38291309  -109.33400548
+ 
+ WARNING! NOT POSSIBLE TO DELETE rdm2.dat FILE
+
+ CPU  time in MP2                  is               13.940 s
+ Wall time in MP2                  is                0.787 s

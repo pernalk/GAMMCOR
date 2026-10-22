@@ -1,0 +1,428 @@
+ 
+ GIT INFO
+********************************************************************************
+ Branch:             IntOnTheFly
+ Revision (short):   200dce0
+ Revision (full):    200dce0b5dbff4f1ac5fac9f76aee9e60d3d896b
+ Latest commit date: Tue Sep 26 14:40:29 2023 +0200
+ Latest tag:         v-4.1
+ 
+ 
+ BUILD INFO
+********************************************************************************
+ Fortran compiler:   Intel 
+ /opt/intel/oneapi/compiler/2021.1.2/linux/bin/intel64/ifort
+ C++ compiler:       Clang /opt/intel/oneapi/compiler/2021.1.2/linux/bin/icx
+ C compiler:         Clang /opt/intel/oneapi/compiler/2021.1.2/linux/bin/icx
+ Compile options:    
+ -assume byterecl -heap-arrays -mkl=parallel -coarray=single -O3 -xHost
+ BLAS libraries:     
+ /opt/intel/oneapi/mkl/latest/lib/intel64/libmkl_intel_lp64.so /opt/intel/oneapi
+ /mkl/latest/lib/intel64/libmkl_intel_thread.so /opt/intel/oneapi/mkl/latest/lib
+ /intel64/libmkl_core.so /usr/lib/x86_64-linux-gnu/libiomp5.so -lpthread -lm -ld
+ l
+ 
+ NBasis WILL BE READ FROM MOLPRO or PYSCF or FCIDUMP
+
+ INPUT 
+********************************************************************************
+ JOB TITLE:     AC0
+ BASIS SET:     aug-cc-pvdz.txt
+ BASIS PATH:    ../../
+ INTERFACE:     PYSCF   
+ JOB TYPE:      AC0      
+ RDM TYPE:      CASSCF  
+ RDM SOURCE:    PYSCF   
+ UNITS:         ANGSTROM
+
+ CHOLESKY :     .TRUE.
+ ALGORITHM:     ON-THE-FLY
+ CHOLESKY ACCU: LUDICROUS
+
+ MONOMER:       AB      
+ ZNUCL:         7
+ CHARGE:        0
+
+
+ INPUT CHECK PASSED
+********************************************************************************
+ Input%CalcParams%PostCAS F
+ Input%CalcParams%DFApp             0
+ Flags%IFunSRKer                    1
+
+ SYSTEM 
+********************************************************************************
+ NUCLEAR CHARGE:    7
+ CHARGE:           0
+ PRINT LEVEL:      0
+
+
+ IFunSR=0
+
+ IFunSRKer=0
+
+ NoSt= 0
+
+ STARTING CALCULATIONS 
+********************************************************************************
+
+-- System and reference AT PARSER ------------------------------------
+ 
+  Reader type                             : WRAPPER
+  Source                                  : PySCF
+ inside wrapper
+           3
+ Two electron integrals calculated with THC
+
+-- Geometry and basis setup ------------------------------------------
+ 
+  Basis set path                          : ../../
+ Geometry read from ./input.inp
+ Atomic orbital basis set
+ . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 
+ atomic centers                               1
+ shell parameter sets                         9
+ spherical AOs                                23
+ max angular momentum                         2
+ parameter set                                ../../aug-cc-pvdz.txt
+ . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 
+  Number of atoms                         :        1
+  Number of electrons                     :        7
+  AuxData%NEL                             :        7
+  AuxData%NBasis                          :       23
+
+-- State and job setup -----------------------------------------------
+ 
+  AuxData%nst                             : -255, -255
+  Flags%JobType                           :        2
+
+-- CASSCF data loaded ------------------------------------------------
+ 
+  NBasis                                  :       23
+  NInactive                               :        2
+  NActive                                 :        3
+  NVirtual                                :       18
+  CASSCF Energy                           :       -54.38987073
+  Nuclear Energy                          :         0.00000000
+  Number of electrons                     :        7
+  Natural orbitals used (0/1)             :        1
+  THCData%H0external                      :    FALSE
+ reading bb
+ natural orbitals
+ writing rdm2 full (natural orbitals)
+
+-- Cholesky decomposition --------------------------------------------
+ 
+ Prescreening (pq|pq) integrals for the Cholesky decomposition
+ Shell pairs will be sorted according to their max elements
+ Max diagonal integral MaxDrs=4.1E+000
+ Applying Eq. 15 in J. Chem. Phys. 150, 194112 (2019); doi: 10.1063/1.5083802
+ Schwarz inequality: Dpq<min(10**(-8),Tau)**2/MaxDrs=2.4E-017
+ Trace of exact Coulomb matrix: 2.6E+001
+ Trace of discarded integrals: 0.0E+000
+ Discarded 0 out of 45 shell pairs
+ (0 out of 276 orbital pairs)
+
+ Step 1 of Cholesky decomposition: locating pivots
+ -------------------------------------------------
+ Dimensions of the Coulomb matrix: (276,276)
+ Threshold for diagonal matrix elements: Dpq > 1.0E-007
+ Max number of Cholesky vectors: 276
+ Rk storage block size: 500
+ Max dimension of 2e integrals buffer: (276,276)
+
+ ----------------------------------------------------------------------------
+ #    Dmax        Memory (MB)    NPivots     %    Time        
+ ----------------------------------------------------------------------------
+ 1    4.1E-002    1.6E+000       25          9    2.1E-002    
+ 2    3.9E-004    1.6E+000       99          46   1.4E-002    
+ 3    3.4E-006    9.8E-001       126         78   8.5E-003    
+ 4    8.2E-008    3.2E-001       155         100  2.0E-003    
+
+ Step 1 of the Cholesky decomposition completed
+ Computed 155 pivots
+ Largest residual Dpq: 8.2E-008
+ NCholesky/NAO = 6.7E+000
+ Step 1 of Cholesky decomposition completed in 4.7E-002 seconds
+ Detailed timings in seconds
+ Subtract prev contribs I (M-R**T*R)     1.3E-002
+ Subtract prev contribs II (Rk)          7.5E-003
+ Two-electron integrals                  1.0E-002
+ Reallocation                            1.3E-002
+
+ Step 2 of Cholesky decomposition completed in 3.1E-003 seconds
+ Detailed timings in seconds
+ Reduced-dimension matrix V    1.7E-003
+ V=L*L**T                      9.7E-004
+ L**(-1)                       3.9E-004
+
+
+ ----------------------------------------------------------------------------
+ Tensor hypercontraction
+ ----------------------------------------------------------------------------
+ Initial Becke grid: SG-1 3816 points
+ Discarded 0 points with Becke weight <= 0.0E+000
+ Discarded 860 points with Max|PhiP(r)|**2 <= 1.0E-011
+ Final grid: 2956
+ Average 2956 points per atom
+
+ Pivoted Cholesky decomposition with on-the-fly generation of matrix S
+ ---------------------------------------------------------------------
+ QR relative pivot threshold Eps=1.0E-005
+ QR relative pivot threshold (reduced grid) Eps=1.0E-005
+ Block dimension: 500 Cholesky vectors per macro iteration
+ Starting from Becke grid composed of 2956 points
+ Cholesky absolute pivot threshold Eps**2=1.0E-010
+ Cholesky absolute pivot threshold (reduced grid) Eps**2=1.0E-010
+
+ ----------------------------------------------------------------------------
+ #    Dmax        Memory (MB)    NPivots     %    Time        
+ ----------------------------------------------------------------------------
+ 1    9.6E-011    5.3E+000       214         100  7.7E-002    
+ ----------------------------------------------------------------------------
+ Rank-revealing decomposition converged with 214 pivots
+ Average 214 points per atom
+ NGridTHC/NAO=9.3E+000
+ Reduced grid: 214 pivots
+ Reduced grid: NGridTHC/NAO=9.3E+000
+ Total time 7.9E-002 seconds
+
+ Detailed timings
+ ----------------
+ Orbital values Xgp                 8.1E-003
+ Overlap matrix S + Cholesky vecs   6.9E-002
+ Reallocation                       4.1E-006
+
+ THC grid completed in 1.1E-001 seconds
+ Least squares fitting of Z: LDL**T linear system solver
+ thc_Z will generate full-dimension Cholesky vecs on the fly
+ THC least squares completed in 6.0E-003 seconds
+
+
+-- THC Fock matrix ---------------------------------------------------
+ 
+ Started THC Fock matrix build
+ Fock matrix completed in 3.8E-002 seconds
+  Total CASSCF Energy from Fock           :      -54.3898696925 Eh
+ zzz  -54.3898707290863       0.000000000000000E+000
+ po read
+ AuxData%Occ   1.00000000000000        1.00000000000000     
+  0.500000000000000       0.500000000000000       0.500000000000000     
+  0.000000000000000E+000  0.000000000000000E+000  0.000000000000000E+000
+  0.000000000000000E+000  0.000000000000000E+000  0.000000000000000E+000
+  0.000000000000000E+000  0.000000000000000E+000  0.000000000000000E+000
+  0.000000000000000E+000  0.000000000000000E+000  0.000000000000000E+000
+  0.000000000000000E+000  0.000000000000000E+000  0.000000000000000E+000
+  0.000000000000000E+000  0.000000000000000E+000  0.000000000000000E+000
+           0
+  No of CAS inactive and active orbitals      2  3
+  CASSCF   Occupancy    Gem
+   1    0.100000E+01     1
+   2    0.100000E+01     1
+   3    0.500000E+00     2
+   4    0.500000E+00     2
+   5    0.500000E+00     2
+   6    0.000000E+00     3
+   7    0.000000E+00     3
+   8    0.000000E+00     3
+   9    0.000000E+00     3
+  10    0.000000E+00     3
+  11    0.000000E+00     3
+  12    0.000000E+00     3
+  13    0.000000E+00     3
+  14    0.000000E+00     3
+  15    0.000000E+00     3
+  16    0.000000E+00     3
+  17    0.000000E+00     3
+  18    0.000000E+00     3
+  19    0.000000E+00     3
+  20    0.000000E+00     3
+  21    0.000000E+00     3
+  22    0.000000E+00     3
+  23    0.000000E+00     3
+  Sum of Occupancies:     0.350000E+01
+ TIME FOR CHOL_GAMMCOR_Rkab  1.840114593505859E-003
+ TIME FOR WRITE MatFF  7.140636444091797E-004
+
+  NATURAL ORBITAL OCCUPANCIES
+  Orb   Occupancy       CICoef       Gem
+   1    0.100000E+01    0.000000E+00     1
+   2    0.100000E+01    0.000000E+00     1
+   3    0.500000E+00    0.000000E+00     2
+   4    0.500000E+00    0.000000E+00     2
+   5    0.500000E+00    0.000000E+00     2
+   6    0.000000E+00    0.000000E+00     3
+   7    0.000000E+00    0.000000E+00     3
+   8    0.000000E+00    0.000000E+00     3
+   9    0.000000E+00    0.000000E+00     3
+  10    0.000000E+00    0.000000E+00     3
+  11    0.000000E+00    0.000000E+00     3
+  12    0.000000E+00    0.000000E+00     3
+  13    0.000000E+00    0.000000E+00     3
+  14    0.000000E+00    0.000000E+00     3
+  15    0.000000E+00    0.000000E+00     3
+  16    0.000000E+00    0.000000E+00     3
+  17    0.000000E+00    0.000000E+00     3
+  18    0.000000E+00    0.000000E+00     3
+  19    0.000000E+00    0.000000E+00     3
+  20    0.000000E+00    0.000000E+00     3
+  21    0.000000E+00    0.000000E+00     3
+  22    0.000000E+00    0.000000E+00     3
+  23    0.000000E+00    0.000000E+00     3
+
+  Active Orbital  :    3    5.0000E-01
+  Active Orbital  :    4    5.0000E-01
+  Active Orbital  :    5    5.0000E-01
+
+  In ACCAS: Active Orbitals    3
+
+  Threshold for quasi-degeneracy         0.10000E-07
+  Threshold for quasi-virtual orbital    0.10000E-06
+  Threshold for quasi-inactive orbital   0.10000E-03
+  Discarding nearly degenerate pair    4   3
+  Discarding nearly degenerate pair    5   3
+  Discarding nearly degenerate pair    5   4
+
+  Number of pairs reduced to:    96
+  Accepted pairs read:
+      1    3    1    0.5000E+00    0.1000E+01
+      2    3    2    0.5000E+00    0.1000E+01
+      3    4    1    0.5000E+00    0.1000E+01
+      4    4    2    0.5000E+00    0.1000E+01
+      5    5    1    0.5000E+00    0.1000E+01
+      6    5    2    0.5000E+00    0.1000E+01
+      7    6    1    0.0000E+00    0.1000E+01
+      8    6    2    0.0000E+00    0.1000E+01
+      9    6    3    0.0000E+00    0.5000E+00
+     10    6    4    0.0000E+00    0.5000E+00
+     11    6    5    0.0000E+00    0.5000E+00
+     12    7    1    0.0000E+00    0.1000E+01
+     13    7    2    0.0000E+00    0.1000E+01
+     14    7    3    0.0000E+00    0.5000E+00
+     15    7    4    0.0000E+00    0.5000E+00
+     16    7    5    0.0000E+00    0.5000E+00
+     17    8    1    0.0000E+00    0.1000E+01
+     18    8    2    0.0000E+00    0.1000E+01
+     19    8    3    0.0000E+00    0.5000E+00
+     20    8    4    0.0000E+00    0.5000E+00
+     21    8    5    0.0000E+00    0.5000E+00
+     22    9    1    0.0000E+00    0.1000E+01
+     23    9    2    0.0000E+00    0.1000E+01
+     24    9    3    0.0000E+00    0.5000E+00
+     25    9    4    0.0000E+00    0.5000E+00
+     26    9    5    0.0000E+00    0.5000E+00
+     27   10    1    0.0000E+00    0.1000E+01
+     28   10    2    0.0000E+00    0.1000E+01
+     29   10    3    0.0000E+00    0.5000E+00
+     30   10    4    0.0000E+00    0.5000E+00
+     31   10    5    0.0000E+00    0.5000E+00
+     32   11    1    0.0000E+00    0.1000E+01
+     33   11    2    0.0000E+00    0.1000E+01
+     34   11    3    0.0000E+00    0.5000E+00
+     35   11    4    0.0000E+00    0.5000E+00
+     36   11    5    0.0000E+00    0.5000E+00
+     37   12    1    0.0000E+00    0.1000E+01
+     38   12    2    0.0000E+00    0.1000E+01
+     39   12    3    0.0000E+00    0.5000E+00
+     40   12    4    0.0000E+00    0.5000E+00
+     41   12    5    0.0000E+00    0.5000E+00
+     42   13    1    0.0000E+00    0.1000E+01
+     43   13    2    0.0000E+00    0.1000E+01
+     44   13    3    0.0000E+00    0.5000E+00
+     45   13    4    0.0000E+00    0.5000E+00
+     46   13    5    0.0000E+00    0.5000E+00
+     47   14    1    0.0000E+00    0.1000E+01
+     48   14    2    0.0000E+00    0.1000E+01
+     49   14    3    0.0000E+00    0.5000E+00
+     50   14    4    0.0000E+00    0.5000E+00
+     51   14    5    0.0000E+00    0.5000E+00
+     52   15    1    0.0000E+00    0.1000E+01
+     53   15    2    0.0000E+00    0.1000E+01
+     54   15    3    0.0000E+00    0.5000E+00
+     55   15    4    0.0000E+00    0.5000E+00
+     56   15    5    0.0000E+00    0.5000E+00
+     57   16    1    0.0000E+00    0.1000E+01
+     58   16    2    0.0000E+00    0.1000E+01
+     59   16    3    0.0000E+00    0.5000E+00
+     60   16    4    0.0000E+00    0.5000E+00
+     61   16    5    0.0000E+00    0.5000E+00
+     62   17    1    0.0000E+00    0.1000E+01
+     63   17    2    0.0000E+00    0.1000E+01
+     64   17    3    0.0000E+00    0.5000E+00
+     65   17    4    0.0000E+00    0.5000E+00
+     66   17    5    0.0000E+00    0.5000E+00
+     67   18    1    0.0000E+00    0.1000E+01
+     68   18    2    0.0000E+00    0.1000E+01
+     69   18    3    0.0000E+00    0.5000E+00
+     70   18    4    0.0000E+00    0.5000E+00
+     71   18    5    0.0000E+00    0.5000E+00
+     72   19    1    0.0000E+00    0.1000E+01
+     73   19    2    0.0000E+00    0.1000E+01
+     74   19    3    0.0000E+00    0.5000E+00
+     75   19    4    0.0000E+00    0.5000E+00
+     76   19    5    0.0000E+00    0.5000E+00
+     77   20    1    0.0000E+00    0.1000E+01
+     78   20    2    0.0000E+00    0.1000E+01
+     79   20    3    0.0000E+00    0.5000E+00
+     80   20    4    0.0000E+00    0.5000E+00
+     81   20    5    0.0000E+00    0.5000E+00
+     82   21    1    0.0000E+00    0.1000E+01
+     83   21    2    0.0000E+00    0.1000E+01
+     84   21    3    0.0000E+00    0.5000E+00
+     85   21    4    0.0000E+00    0.5000E+00
+     86   21    5    0.0000E+00    0.5000E+00
+     87   22    1    0.0000E+00    0.1000E+01
+     88   22    2    0.0000E+00    0.1000E+01
+     89   22    3    0.0000E+00    0.5000E+00
+     90   22    4    0.0000E+00    0.5000E+00
+     91   22    5    0.0000E+00    0.5000E+00
+     92   23    1    0.0000E+00    0.1000E+01
+     93   23    2    0.0000E+00    0.1000E+01
+     94   23    3    0.0000E+00    0.5000E+00
+     95   23    4    0.0000E+00    0.5000E+00
+     96   23    5    0.0000E+00    0.5000E+00
+
+ *** ADIABATIC CONNECTION CALCULATIONS ***
+
+
+ *** IFlCore=1: Inactive orbitals (n_p=1) included in ERPA correlation ***
+
+ ERPA alpha=0 eigenproblems for NoSt=           1
+ Act-Inact block done
+ Act-Vir block done
+
+ Active block of 2-RDM read from rdm2.dat
+ CASSCF 1-electron Energy        -73.90511401
+ CASSCF Energy (w/o ENuc)        -54.38986969
+
+ Warning: Hessian AB(1) matrices are symmetrized!
+          (AB_CAS_FOFO : AB1)
+
+ ABPLUS1-FOFO =      4.899770803564
+ ABMIN1 -FOFO =     13.352798340796
+
+ XT.APLUS.X =      2.664134058092
+ YT.AMIN.Y  =      2.675322321653
+
+ EAll,EIntra -7.481328104868694E-002  0.000000000000000E+000
+
+ Contributions to AC0 from (Mu)(Nu) pairs of blocks
+ (21)(21)     0.00000000
+ (22)(21)     0.00000000
+ (31)(21)    -0.00196601
+ (31)(22)     0.00000000
+ (31)(31)    -0.00718685
+ (32)(21)    -0.03061818
+ (32)(22)     0.00000000
+ (32)(31)    -0.01706732
+ (32)(32)    -0.01797493
+
+ ENuc     0.00000000
+
+ ECASSCF+ENuc, AC0-Corr, AC0-CASSCF        -54.38986969    -0.07481328   -54.46468297
+
+ CPU  time in AC  model            is                0.389 s
+ Wall time in AC  model            is                0.020 s
+
+ CPU  time in AC0                  is                5.416 s
+ Wall time in AC0                  is                0.354 s
