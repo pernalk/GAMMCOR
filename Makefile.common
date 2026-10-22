@@ -164,8 +164,7 @@ $(O)sapt_main.o        : $(O)types.o \
                          $(O)sapt_pol.o $(O)sapt_exch.o $(O)sapt_Chol_pol.o $(O)sapt_Chol_exch.o \
                          $(O)sapt_utils.o $(O)exdpino.o \
                          $(O)sapt_visual.o $(O)sapt_os.o \
-                         $(O)sapt_response.o $(O)sapt_interface.o $(O)tran_Chol.o $(O)timing.o \
-                         $(O)interface_sapt.o
+                         $(O)sapt_response.o $(O)sapt_interface.o $(O)tran_Chol.o $(O)timing.o
 
 $(O)exmisc.o           : $(O)types.o
 $(O)exappr.o           : $(O)exmisc.o
