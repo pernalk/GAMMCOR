@@ -27,6 +27,9 @@ dependencies:
   - ifx_linux-64         # Fortran: ifx
   - dpcpp_linux-64       # C/C++: icx
   - mkl-devel
+  # libicaf.so (ifx -coarray=single) links libmpi.so.12; intel-fortran-rt
+  # builds >=331 no longer pull in mpich, so request it explicitly
+  - mpich
   # build tools
   - meson
   - ninja
