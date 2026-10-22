@@ -29,6 +29,7 @@ xcfun/geninterface
 SOURCE/trexio_f.f90
 trexio/*.so*
 *.out
+!testjobs/**/gammcor.out
 clean-build-test.sh
 SOURCE/git_info.f90
 SOURCE/build_info.f90
