@@ -21,23 +21,29 @@ channels:
   - conda-forge
   - nodefaults
 dependencies:
-  - python>=3.10
-  - pip
-  # Intel oneAPI compilers and MKL
-  - ifx_linux-64         # Fortran: ifx
-  - dpcpp_linux-64       # C/C++: icx
-  - mkl-devel
-  # libicaf.so (ifx -coarray=single) links libmpi.so.12; intel-fortran-rt
-  # builds >=331 no longer pull in mpich, so request it explicitly
-  - mpich
+  - python=3.13.15
+  - pip=26.2.1
+  # Intel oneAPI compilers and MKL. The build number is pinned too: builds of
+  # the same version differ in their dependencies (build 331 dropped mpich).
+  - ifx_linux-64=2026.1.1=*_331       # Fortran: ifx
+  - dpcpp_linux-64=2026.1.1=*_331     # C/C++: icx
+  - mkl-devel=2026.1.0
+  - llvm-openmp=23.1.4               # OpenMP runtime (libiomp5.so) for ifx -qopenmp
+  - gxx_linux-64=16.2.0               # GCC headers and libstdc++ used by icx for XCFun
+  # libicaf.so (ifx -coarray=single) links libmpi.so.12, but intel-fortran-rt
+  # does not depend on an MPI. Intel MPI, not mpich: conda-forge's mpich links
+  # UCX, which prints a CUDA error on every program start on nodes with a CUDA
+  # driver but no GPU, and that breaks meson's compiler checks.
+  - conda-forge::impi_rt=2021.19.0
   # build tools
-  - meson
-  - ninja
-  - make
+  - meson=1.12.1
+  - ninja=1.13.2
+  - make=4.4.1
   # HDF5 is built by install.sh against these
-  - zlib
-  - libaec
+  - zlib=1.3.2
+  - libaec=1.1.5
   # gammcor_tools
-  - numpy
-  - h5py
-  - pyscf                # optional: only for the PySCF interface
+  - numpy=2.5.3
+  - h5py=3.16.0
+  - conda-forge::libcurl              # dependency of h5py's HDF5
+  - pyscf=2.14.0                      # optional: only for the PySCF interface
