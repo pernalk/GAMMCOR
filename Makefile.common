@@ -58,20 +58,20 @@ $(O)%.o : $(S)%.f
 $(PROG) : $(OBJ)
 	$(FCC) -o $@ $^ $(XOBJ) $(FFLAGS) $(LIBS)
 
-$(O)mainp.o            : $(S)commons.inc $(O)memory.o $(O)types.o $(O)inputfill.o $(O)systemdef.o $(O)sapt_main.o $(O)git_info.o $(O)build_info.o  $(O)interface_pp.o $(O)ppac_types.o $(O)mp.o $(O)ppac_dispatch.o $(O)ppac_simple.o $(O)phac_spinres.o $(O)dispatcher.o $(O)geom_input.o $(O)print_utils.o $(O)tddft.o $(O)tddft_types.o
+$(O)mainp.o            : $(S)commons.inc $(O)memory.o $(O)types.o $(O)inputfill.o $(O)systemdef.o $(O)sapt_main.o $(O)git_info.o $(O)build_info.o  $(O)interface_pp.o $(O)ppac_types.o $(O)mp.o $(O)ppac_dispatch.o $(O)ppac_simple.o $(O)phac_spinres.o $(O)dispatcher.o $(O)geom_input.o $(O)print_utils.o $(O)tddft.o $(O)tddft_types.o $(O)rdwrext.o $(O)timing.o
 $(O)initia.o           : $(S)commons.inc $(O)memory.o $(O)priunit.o $(O)timing.o $(O)rdwrext.o $(O)sorter.o $(O)abmats.o $(O)types.o $(O)tran.o  $(O)tran_Chol.o $(O)CholeskyOTF.o $(O)gammint.o $(O)interface_pp.o $(O)ppac_types.o $(O)geom_input.o
 $(O)accas.o            : $(S)commons.inc $(O)priunit.o $(O)timing.o $(O)rdwrext.o $(O)sorter.o $(O)abmats.o $(O)abfofo.o $(O)ab0fofo.o \
-                         $(O)gridintern.o $(O)polari.o  $(O)ppac_types.o
-$(O)acfd.o             : $(S)commons.inc $(O)abmats.o $(O)abfofo.o  $(O)ab0fofo.o $(O)rdwrext.o
+                         $(O)gridintern.o $(O)polari.o  $(O)ppac_types.o $(O)types.o
+$(O)acfd.o             : $(S)commons.inc $(O)abmats.o $(O)abfofo.o  $(O)ab0fofo.o $(O)rdwrext.o $(O)priunit.o $(O)tran.o
 $(O)ac_iter.o          : $(S)commons.inc $(O)abmats.o $(O)abfofo.o
 $(O)interpa.o          : $(S)commons.inc $(O)abmats.o $(O)abfofo.o $(O)ab0fofo.o
 $(O)lin.o              : $(S)lin.f90 $(O)types.o
-$(O)muerf.o            : $(S)commons.inc $(O)ab0fofo.o $(O)timing.o $(O)gridintern.o $(O)sapt_files.o  $(O)ppac_types.o $(O)units.o
+$(O)muerf.o            : $(S)commons.inc $(O)ab0fofo.o $(O)timing.o $(O)gridintern.o $(O)sapt_files.o  $(O)ppac_types.o $(O)units.o $(O)rdwrext.o $(O)types.o
 $(O)dftgrid.o          : $(S)commons.inc $(O)abmats.o
 $(O)caspidft.o         : $(S)commons.inc $(O)rdwrext.o
 $(O)ac_exact_2el.o     : $(S)commons.inc
 $(O)cpdmft.o           : $(S)commons.inc
-$(O)dmscf.o            : $(S)commons.inc $(O)ppac_types.o
+$(O)dmscf.o            : $(S)commons.inc $(O)ppac_types.o $(O)types.o
 $(O)eigenno.o          : $(S)commons.inc
 $(O)ekt.o              : $(S)commons.inc
 $(O)erpa.o             : $(S)commons.inc
@@ -89,13 +89,13 @@ $(O)vv10.o             : $(S)commons.inc
 $(O)ac_fofo.o          : $(O)abmats.o $(O)abfofo.o $(O)ab0fofo.o $(O)blocktypes.o \
                          $(O)memory.o \
                          $(O)C_integrator.o $(O)iter_algorithm.o $(O)iter_algorithm_diis.o $(O)iter_algorithm_damping.o \
-                         $(O)lambda_calculator.o $(O)lambda_calculator_diag.o $(O)lambda_calculator_block.o $(O)lambda_calculator_projector.o
+                         $(O)lambda_calculator.o $(O)lambda_calculator_diag.o $(O)lambda_calculator_block.o $(O)lambda_calculator_projector.o $(O)iter_stats.o $(O)priunit.o $(O)sapt_utils.o $(O)systemdef.o
 
 $(O)types.o            : $(O)priunit.o
 $(O)print_utils.o      : $(O)types.o
 $(O)ppac_types.o       : $(O)types.o $(O)print_utils.o
 $(O)quadratures.o      :
-$(O)pp_utils.o         : $(O)types.o $(O)lin.o $(O)quadratures.o
+$(O)pp_utils.o         : $(O)types.o $(O)lin.o $(O)quadratures.o $(O)ppac_types.o
 $(O)thc_auto_p0.o      :
 $(O)thc_auto_p2.o      :
 $(O)thc_auto_p3.o      :
@@ -105,19 +105,19 @@ $(O)thc_auto_p3_ph.o   :
 $(O)thc_energy.o       : $(O)types.o $(O)ppac_types.o $(O)print_utils.o $(O)lin.o $(O)gammint.o
 $(O)thc_exact_ints.o   : $(O)types.o $(O)ppac_types.o $(O)print_utils.o $(O)gammint.o
 $(O)thc_energy_ph.o    : $(O)types.o $(O)ppac_types.o $(O)print_utils.o $(O)lin.o $(O)gammint.o $(O)thc_exact_ints.o
-$(O)ppac0.o            : $(O)types.o $(O)ppac_types.o $(O)pp_utils.o $(O)lin.o
+$(O)ppac0.o            : $(O)types.o $(O)ppac_types.o $(O)pp_utils.o $(O)lin.o $(O)quadratures.o
 $(O)ppac0_thc.o        : $(O)types.o $(O)ppac_types.o $(O)pp_utils.o $(O)print_utils.o $(O)tran.o $(O)geom_input.o \
-                         $(O)thc_auto_p0.o $(O)thc_auto_p2.o $(O)thc_auto_p3.o $(O)thc_energy.o
+                         $(O)thc_auto_p0.o $(O)thc_auto_p2.o $(O)thc_auto_p3.o $(O)thc_energy.o $(O)gammint.o $(O)lin.o
 $(O)ppac_subs.o        : $(O)types.o $(O)ppac_types.o $(O)pp_utils.o $(O)quadratures.o \
                          $(O)ppac0.o $(O)lin.o
 $(O)ppac_dispatch.o    : $(O)types.o $(O)ppac_types.o $(O)ppac_subs.o $(O)ppac0.o $(O)ppac0_thc.o $(O)print_utils.o
-$(O)ppac_simple_subs.o : $(O)types.o $(O)ppac_types.o $(O)lin.o $(O)pp_utils.o
-$(O)ppac_simple.o      : $(O)types.o $(O)ppac_types.o $(O)ppac_simple_subs.o
+$(O)ppac_simple_subs.o : $(O)types.o $(O)ppac_types.o $(O)lin.o $(O)pp_utils.o $(O)print_utils.o
+$(O)ppac_simple.o      : $(O)types.o $(O)ppac_types.o $(O)ppac_simple_subs.o $(O)print_utils.o
 $(O)phac0_thc.o        : $(O)types.o $(O)ppac_types.o $(O)pp_utils.o $(O)print_utils.o $(O)tran.o $(O)thc_energy_ph.o $(O)thc_exact_ints.o \
-                         $(O)ppac0_thc.o $(O)thc_auto_p0_ph.o $(O)thc_auto_p2_ph.o $(O)thc_auto_p3_ph.o
+                         $(O)ppac0_thc.o $(O)thc_auto_p0_ph.o $(O)thc_auto_p2_ph.o $(O)thc_auto_p3_ph.o $(O)lin.o
 $(O)phac_dispatch.o    : $(O)types.o $(O)ppac_types.o $(O)phac0_thc.o $(O)print_utils.o
 $(O)phac_spinres.o     : $(O)types.o $(O)ppac_types.o
-$(O)mp.o               : $(O)types.o $(O)ppac_types.o
+$(O)mp.o               : $(O)types.o $(O)ppac_types.o $(O)gridintern.o $(O)print_utils.o
 $(O)dispatcher.o       : $(O)types.o $(O)ppac_types.o $(O)ppac_dispatch.o $(O)ppac_simple.o \
                          $(O)mp.o $(O)phac_spinres.o $(O)phac_dispatch.o $(O)thc_exact_ints.o
 $(O)tddft_types.o      : $(O)types.o
@@ -127,29 +127,29 @@ $(O)inputfill.o        : $(O)types.o $(O)priunit.o
 $(O)systemdef.o        : $(O)types.o $(O)ppac_types.o
 $(O)rdwrext.o          : $(O)priunit.o
 $(O)sorter.o           : $(O)priunit.o $(O)rdwrext.o
-$(O)tran.o             : $(O)blocktypes.o $(O)sorter.o
+$(O)tran.o             : $(O)blocktypes.o $(O)sorter.o $(O)priunit.o
 $(O)tran_Chol.o        : $(O)tran.o
 $(O)geom_input.o       : $(O)types.o $(O)gammint.o
 $(O)interface_pp.o      : $(S)interface_pp.f90  $(O)ppac_types.o $(O)gammint.o $(O)geom_input.o $(O)print_utils.o $(O)h5_reader.o $(O)tddft_types.o $(O)thc_exact_ints.o
 $(O)h5_reader.o       : $(S)h5_reader.f90
 $(O)abfofo.o           : $(O)priunit.o $(O)tran.o $(O)blocktypes.o $(O)abchol.o $(O)timing.o
 $(O)abmats.o           : $(O)priunit.o $(O)tran.o
-$(O)ab0fofo.o          : $(O)priunit.o $(O)tran.o $(O)blocktypes.o $(O)abfofo.o $(O)ppac_types.o
-$(O)abuks.o            : $(O)priunit.o $(O)gridintern.o $(O)geom_input.o
+$(O)ab0fofo.o          : $(O)priunit.o $(O)tran.o $(O)blocktypes.o $(O)abfofo.o $(O)ppac_types.o $(O)timing.o
+$(O)abuks.o            : $(O)priunit.o $(O)gridintern.o $(O)geom_input.o $(O)gammint.o $(O)types.o
 
 $(O)griddalton.o       : $(O)rdwrext.o
 $(O)gridintern.o       : $(O)gammint.o $(O)types.o $(O)geom_input.o
 
 $(O)CholeskyOTF.o      : $(O)types.o $(O)priunit.o $(O)tran.o
 $(O)gammint.o          : $(O)CholeskyOTF.o
-$(O)polari.o           : $(O)priunit.o $(O)tran.o $(O)abfofo.o $(O)rdwrext.o $(O)gammint.o
+$(O)polari.o           : $(O)priunit.o $(O)tran.o $(O)abfofo.o $(O)rdwrext.o $(O)gammint.o $(O)types.o
 
 $(O)sapt_utils.o       : $(O)types.o $(O)tran.o $(O)diis.o $(O)iter_stats.o $(O)abfofo.o
 $(O)sapt_interface.o   : $(O)types.o $(O)timing.o \
                          $(O)sorter.o $(O)tran.o $(O)CholeskyOTF.o $(O)abmats.o $(O)rdwrext.o $(O)gammint.o $(O)tran_Chol.o $(O)geom_input.o
-$(O)sapt_pol.o         : $(O)types.o $(O)tran.o $(O)sapt_utils.o $(O)rdwrext.o
+$(O)sapt_pol.o         : $(O)types.o $(O)tran.o $(O)sapt_utils.o $(O)rdwrext.o $(O)timing.o
 $(O)sapt_visual.o      : $(O)types.o
-$(O)sapt_os.o          : $(O)types.o $(O)sapt_utils.o
+$(O)sapt_os.o          : $(O)types.o $(O)sapt_utils.o $(O)timing.o
 $(O)sapt_exch.o        : $(O)types.o $(O)tran.o $(O)timing.o $(O)sapt_utils.o $(O)exmisc.o $(O)exi.o $(O)exappr.o $(O)srefex.o
 $(O)sapt_Chol_pol.o    : $(O)tran.o $(O)sapt_utils.o \
                          $(O)iter_stats.o $(O)iter_algorithm.o $(O)iter_algorithm_diis.o $(O)timing.o \
@@ -161,7 +161,7 @@ $(O)sapt_main.o        : $(O)types.o \
                          $(O)sapt_pol.o $(O)sapt_exch.o $(O)sapt_Chol_pol.o $(O)sapt_Chol_exch.o \
                          $(O)sapt_utils.o $(O)exdpino.o \
                          $(O)sapt_visual.o $(O)sapt_os.o \
-                         $(O)sapt_response.o $(O)sapt_interface.o $(O)tran_Chol.o
+                         $(O)sapt_response.o $(O)sapt_interface.o $(O)tran_Chol.o $(O)timing.o
 
 $(O)exmisc.o           : $(O)types.o
 $(O)exappr.o           : $(O)exmisc.o
