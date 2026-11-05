@@ -272,11 +272,12 @@ contains
             end if
 
             ! Same molecule in input.inp and pyscf_data.h5?
+            ! NEL is not compared: the xyz block carries no charge, so System%NElectrons
+            ! is the neutral count; NEL used further on is the one read from pyscf_data.h5
             if (Flags%ITwoEl.ne.1) then
                   call sys_NuclearRepulsion(ENucGeom, System)
-                  if (System%NElectrons /= AuxData%NEL .or. abs(ENucGeom - AuxData%ENuc) > 1.d-6) then
+                  if (abs(ENucGeom - AuxData%ENuc) > 1.d-6) then
                         print*, 'ERROR: GAMMCOR and PySCF systems do not match'
-                        print*, 'NEL  GAMMCOR, PySCF:', System%NElectrons, AuxData%NEL
                         print*, 'ENuc GAMMCOR, PySCF:', ENucGeom, AuxData%ENuc
                         stop
                   end if
