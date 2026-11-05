@@ -555,6 +555,10 @@ subroutine read_block_calculation(CalcParams, line)
            elseif (uppercase(val) == "MSAC0" .or. &
                    uppercase(val) == "MS-AC0") then
                CalcParams%JobType = JOB_TYPE_MSAC0
+           elseif (uppercase(val) == "SAMSAC0" .or. &
+                   uppercase(val) == "SA-MS-AC0" .or. &
+                   uppercase(val) == "SA_MS_AC0") then
+               CalcParams%JobType = JOB_TYPE_SAMSAC0
            elseif (uppercase(val) == "PPERPA" ) then
                  CalcParams%JobType = JOB_TYPE_PPERPA
            elseif (uppercase(val) == "AC0PP" ) then
@@ -647,7 +651,7 @@ subroutine read_block_calculation(CalcParams, line)
                ! this is keyword for developer AT
                CalcParams%Algorithm = ALG_PPSIMPLE
          else if(uppercase(val) == 'THC')then
-               ! with TwoMoInt INCORE and JobType AC0/MSAC0: the ph-AC0 THC
+               ! with TwoMoInt INCORE and JobType AC0/MSAC0/SAMSAC0: the ph-AC0 THC
                ! code run on the exact PySCF integrals (debug route)
                CalcParams%Algorithm = ALG_THC
          else
@@ -1188,10 +1192,11 @@ integer :: imon
 
  if(Input%CalcParams%Algorithm == ALG_THC) then
     if((Input%CalcParams%JobType /= JOB_TYPE_AC0 .and. &
-        Input%CalcParams%JobType /= JOB_TYPE_MSAC0) .or. &
+        Input%CalcParams%JobType /= JOB_TYPE_MSAC0 .and. &
+        Input%CalcParams%JobType /= JOB_TYPE_SAMSAC0) .or. &
         Input%CalcParams%TwoMoInt /= TWOMO_INCORE .or. &
         Input%CalcParams%InterfaceType /= INTER_TYPE_PYSCF) then
-       write(LOUT,'(1x,a)') 'ERROR! Algorithm THC needs JobType AC0 or MSAC0,'
+       write(LOUT,'(1x,a)') 'ERROR! Algorithm THC needs JobType AC0, MSAC0 or SAMSAC0,'
        write(LOUT,'(1x,a)') '       TwoMoInt INCORE and Interface PYSCF'
        stop
     endif

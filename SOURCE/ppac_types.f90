@@ -256,6 +256,19 @@ module ppac_types
             integer :: NJ = 0
             double precision, dimension(:,:,:), allocatable :: trdm
             integer, dimension(:,:), allocatable :: trdm_st
+            ! SA-MS-AC0 (JobType SAMSAC0): ensemble reference, every pair (J, I).
+            ! The MS_M states of the model space (state, irrep) and their CAS
+            ! energies; per pair j the ket I = trdm_ref(:,j) (trdm_st is the bra
+            ! J), trdm_diag(j) = (J == I), and trdm2(p,q,r,s,j) = Gamma^JI(p,q,r,s)
+            ! = <J|p+ q+ s r|I> (normalization of RDM2_FULL_REORDERED). trdm and
+            ! trdm2 are in the ensemble NOs.
+            logical :: samsac0 = .false.
+            integer :: MS_M = 0
+            integer, dimension(:,:), allocatable :: ms_st
+            double precision, dimension(:), allocatable :: ms_ecas
+            integer, dimension(:,:), allocatable :: trdm_ref
+            logical, dimension(:), allocatable :: trdm_diag
+            double precision, dimension(:,:,:,:,:), allocatable :: trdm2
             double precision :: omega = 1.0
             double precision :: ThrPP
             logical :: spinsep = .true.

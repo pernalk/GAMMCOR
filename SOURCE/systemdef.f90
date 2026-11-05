@@ -356,7 +356,7 @@ end select
      Flags%IFunSR = Input%CalcParams%DFApp
      Flags%IFunSRKer = Input%CalcParams%Kernel
 
-  case(JOB_TYPE_AC0,JOB_TYPE_SRAC0,JOB_TYPE_MP2,JOB_TYPE_MSAC0)
+  case(JOB_TYPE_AC0,JOB_TYPE_SRAC0,JOB_TYPE_MP2,JOB_TYPE_MSAC0,JOB_TYPE_SAMSAC0)
      Flags%IFlAC   = 1
      Flags%IFlSnd  = 1
      Flags%IFlAC0D = 0
@@ -387,7 +387,8 @@ end select
        Flags%IFlFCorr = Input%CalcParams%FunCorr ! set fCAS/fCAS+fAC0
      endif
      ! MS-AC0
-     if(Input%CalcParams%JobType==JOB_TYPE_MSAC0) then
+     if(Input%CalcParams%JobType==JOB_TYPE_MSAC0 .or. &
+        Input%CalcParams%JobType==JOB_TYPE_SAMSAC0) then
        Flags%IMSAC = 1
      endif
 !     if(Input%CalcParams%DFApp==2) Flags%IFunSRKer = 1
@@ -505,11 +506,12 @@ end select
 
   end select
 
-  ! phAC0 and MS-AC0 with the THC code (PySCF only): FOFO + Cholesky THC
-  ! integrals, or Algorithm THC + TwoMoInt INCORE, where the same code runs on
-  ! the exact integrals read from pyscf_data.h5 (thc_exact_ints).
+  ! phAC0, MS-AC0 and SA-MS-AC0 with the THC code (PySCF only): FOFO + Cholesky
+  ! THC integrals, or Algorithm THC + TwoMoInt INCORE, where the same code runs
+  ! on the exact integrals read from pyscf_data.h5 (thc_exact_ints).
   ! AT parser, direct PySCF reader, dispatch_acxx instead of DMSCF
-  ph_thc_at = ((Flags%JobType == JOB_TYPE_AC0 .or. Flags%JobType == JOB_TYPE_MSAC0) &
+  ph_thc_at = ((Flags%JobType == JOB_TYPE_AC0 .or. Flags%JobType == JOB_TYPE_MSAC0 &
+        .or. Flags%JobType == JOB_TYPE_SAMSAC0) &
         .and. Flags%IPYSCF == 1 .and. &
         ((Flags%ITwoEl == TWOMO_FOFO .and. Flags%ICholeskyTHC == 1) .or. &
          (Flags%ITwoEl == TWOMO_INCORE .and. Flags%Algorithm == ALG_THC)))
@@ -523,6 +525,21 @@ end select
         write(LOUT,'(1x,a)') 'ERROR! MSAC0 takes one State (the reference n.m);'
         write(LOUT,'(1x,a)') 'the partner states are all other states of irrep m.'
         stop
+  end if
+
+  ! SA-MS-AC0 exists only in the ph THC code; its model space is every state
+  ! in pyscf_data.h5 (one fcisolver), so no State is taken.
+  if (Flags%JobType == JOB_TYPE_SAMSAC0) then
+        if (.not. ph_thc_at) then
+              write(LOUT,'(1x,a)') 'ERROR! SAMSAC0 needs Interface PYSCF and either'
+              write(LOUT,'(1x,a)') 'TwoMoInt FOFO + Cholesky THC or TwoMoInt INCORE + Algorithm THC.'
+              stop
+        end if
+        if (Input%SystemInput(1)%DeclareSt) then
+              write(LOUT,'(1x,a)') 'ERROR! SAMSAC0 takes no State: the model space is every'
+              write(LOUT,'(1x,a)') 'state in pyscf_data.h5.'
+              stop
+        end if
   end if
 
   if (Flags%Parser == PARSER_AT) then
@@ -703,6 +720,7 @@ if(Flags%ISAPT.Eq.0) then
    AuxData%PYSCF = Flags%IPYSCF
    AuxData%Batchdim = Input%CalcParams%BatchDim
    AuxData%nst        = System%InSt(:,1) 
+   AuxData%samsac0    = (Flags%JobType == JOB_TYPE_SAMSAC0)
 
    if(Flags%Parser.Eq.PARSER_AT) then
          AuxData%HType = Input%CalcParams%Htype

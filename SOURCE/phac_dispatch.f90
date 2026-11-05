@@ -118,7 +118,7 @@ contains
 
             select case(Flags%Jobtype)
 
-            case(JOB_TYPE_AC0, JOB_TYPE_MSAC0)
+            case(JOB_TYPE_AC0, JOB_TYPE_MSAC0, JOB_TYPE_SAMSAC0)
 
                   select case(Flags%ITwoEl)
 
@@ -131,6 +131,7 @@ contains
                               call clock_start(timer)
                               call ACPH0_THC(THCData, AuxData, CAONO, Flags, E_corr, DeltaH)
                               call tmsg('TIME FOR ACPH0_THC', timer, 0)
+                              if (AuxData%samsac0) call report_samsac0(AuxData, E_corr, DeltaH)
                         end if
 
                   case(3)
@@ -142,6 +143,7 @@ contains
                               call clock_start(timer)
                               call ACPH0_THC(THCData, AuxData, CAONO, Flags, E_corr, DeltaH)
                               call tmsg('TIME FOR ACPH0_THC', timer, 0)
+                              if (AuxData%samsac0) call report_samsac0(AuxData, E_corr, DeltaH)
 
                         case default
                               !
@@ -165,6 +167,73 @@ contains
             end select
           end associate
       end subroutine acph_driver
+
+
+      ! SA-MS-AC0: H(J,I) = E^CAS_I delta_JI + Delta H_JI from the pairs of
+      ! THC_energy_loop_ph (j = J + (I-1) M), its symmetric part and their
+      ! eigenvalues, and the sum rule 1/M sum_I Delta H_II = E_corr(ens).
+      ! Energies without ENuc, as the H_mn lines; eigenvalues also with ENuc.
+      ! See .secret_sauce/.skills/ms-ac0/theory-sa-ms-ac0.md Sec. 2, 6.
+      subroutine report_samsac0(AuxData, E_corr, DeltaH)
+            use real_linalg
+            use thc_energy_ph, only: samsac0_ecas
+            type(TACppData), intent(in) :: AuxData
+            double precision, intent(in) :: E_corr
+            double precision, dimension(:), intent(in) :: DeltaH
+            double precision, dimension(:,:), allocatable :: H, Hs
+            double precision, dimension(:), allocatable :: eig
+            double precision :: trace
+            integer :: M, I, J
+
+            M = AuxData%MS_M
+            allocate(H(M, M), Hs(M, M), eig(M))
+            trace = zero
+            do I = 1, M
+                  do J = 1, M
+                        H(J, I) = DeltaH(J + (I - 1) * M)
+                  end do
+                  trace = trace + H(I, I)
+                  H(I, I) = H(I, I) + samsac0_ecas(AuxData, I) - AuxData%ENuc
+            end do
+            Hs = (H + transpose(H)) / two
+
+            call print_section('SA-MS-AC0 effective Hamiltonian (without ENuc)')
+            write(*, '(1x, a)') 'H(J,I), columns I = ket, rows J = bra:'
+            call print_states_row()
+            do J = 1, M
+                  write(*, '(1x, I4, ".", I0, 1x, *(F18.10))') AuxData%ms_st(:, J), H(J, :)
+            end do
+            write(*, '(/, 1x, a)') '(H + H^T)/2:'
+            call print_states_row()
+            do J = 1, M
+                  write(*, '(1x, I4, ".", I0, 1x, *(F18.10))') AuxData%ms_st(:, J), Hs(J, :)
+            end do
+            write(*, *)
+            write(*, '(1x, a, ES12.3)') 'max |H - H^T|                              :', &
+                  maxval(abs(H - transpose(H)))
+            write(*, '(1x, a, ES12.3)') 'sum rule 1/M sum_I Delta H_II - E_corr(ens) :', &
+                  trace / M - E_corr
+
+            call symmetric_eigenproblem(eig, Hs, M, .true.)
+            write(*, '(/, 1x, a)') 'SA-MS-AC0 energies, eigenvalues of (H + H^T)/2, and eigenvectors:'
+            write(*, '(1x, a6, 2a20)') 'root', 'E (no ENuc)', 'E_total'
+            do I = 1, M
+                  write(*, '(1x, I6, 2F20.10, 2x, *(F10.6))') I, eig(I), eig(I) + AuxData%ENuc, Hs(:, I)
+            end do
+            write(*, *)
+
+      contains
+
+            subroutine print_states_row()
+                  integer :: K
+                  write(*, '(8x)', advance='no')
+                  do K = 1, M
+                        write(*, '(8x, I4, ".", I0, 4x)', advance='no') AuxData%ms_st(:, K)
+                  end do
+                  write(*, *)
+            end subroutine print_states_row
+
+      end subroutine report_samsac0
 
 
 end module phac_dispatch

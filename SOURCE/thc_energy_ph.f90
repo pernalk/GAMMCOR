@@ -26,6 +26,12 @@ module thc_energy_ph
       implicit none
 
       integer, parameter, private :: tdebug = 0
+      ! SA-MS-AC0: .false. drops Term 2 from the aa amplitude (option b3 of
+      ! theory-sa-ms-ac0.md Sec. 5), for comparison only
+      logical, parameter, private :: samsac0_term2 = .true.
+      ! SA-MS-AC0 test T3 (plan-sa-ms-ac0 Phase 5): .true. writes the inputs and
+      ! YJ%aa of every pair to samsac0_yj_aa.txt (dump_samsac0_aa)
+      logical, parameter, private :: samsac0_dump = .false.
       integer, parameter, private :: mdebugg = 50
       double precision, parameter, private :: ttoeV = 27.211399d+0
 
@@ -133,10 +139,14 @@ contains
             type(TvecYm) :: vecYm
             type(TvecYb) :: vecYb
             ! MS-AC0: Y^(J<-I) per partner J, layout of vecYb, %aa unallocated
+            ! (SA-MS-AC0: per pair (J, I), %aa built)
             type(TvecYb), dimension(:), allocatable :: vecYJ
             type(TG) :: G
-            ! MS-AC0: G with one Yb replaced by YJ, per partner J (voaa stays empty)
+            ! MS-AC0: G with one Yb replaced by YJ, per partner J (voaa stays
+            ! empty; SA-MS-AC0 fills it)
             type(TG), dimension(:), allocatable :: GJ
+            ! SA-MS-AC0: active occupations (gamma_bar) and max |Term 2| per pair
+            double precision, dimension(:), allocatable :: occ_act, t2max
             ! G_contr index vectors: column / row pair of G for slab index x / y
             integer, dimension(:), allocatable :: colidx, rowidx
             integer, parameter :: loopII=1, loopIA=2, loopAA=3, loopIV=4, loopVA=5, loopVV=6
@@ -156,7 +166,12 @@ contains
             ! partner J (E_vovo and E_voaa have none); DeltaH = Delta H_JI
             double precision, dimension(:), allocatable :: EJ_voao, EJ_vaao, EJ_vaaa
             double precision, dimension(:), allocatable :: EJ_aoao, EJ_aaao, EJ_vavo, EJ_vava
+            double precision, dimension(:), allocatable :: EJ_voaa
             double precision, dimension(:), allocatable :: DeltaH
+            ! SA-MS-AC0, J = I: E_vovo (both sides vo, the core of gamma^II);
+            ! ket = I of the pair, Hval = the printed element of H
+            double precision :: EJ_vovo, Hval
+            integer, dimension(2) :: ket
             integer :: NJ
 
             ! Accumulated wall times per integral class, as in THC_int_loop_ph:
@@ -198,15 +213,32 @@ contains
               call tmsg('TIME FOR Xp, Ym, Yb', timer, tdebug)
 
               ! MS-AC0: transition amplitudes Y^(J<-I), one vector set per partner
-              ! J. NJ = 0 unless MSAC0, so the J loops below are then empty.
+              ! J. NJ = 0 unless MSAC0/SAMSAC0, so the J loops below are then empty.
+              ! SA-MS-AC0: every pair (J, I), J = I included, from the ensemble
+              ! vectors; ao core term and aa block (Term 1 + Term 2) in build_YJ.
               call clock_start(timer)
               NJ = AuxData%NJ
-              allocate(vecYJ(NJ), GJ(NJ))
+              allocate(vecYJ(NJ), GJ(NJ), t2max(NJ))
+              t2max = zero
+              if (AuxData%samsac0) then
+                    allocate(occ_act(NA))
+                    occ_act = AuxData%Occ(NI+1:NIA)
+              end if
               do j = 1, NJ
-                    call build_YJ(vecYJ(j), vecXp, vecYm, ACB(phA0oa), ACB(phA0va), &
-                          AuxData%trdm(:,:,j), NA, NV, NI0, NI)
+                    if (AuxData%samsac0) then
+                          call build_YJ(vecYJ(j), vecXp, vecYm, ACB(phA0oa), ACB(phA0va), &
+                                AuxData%trdm(:,:,j), NA, NV, NI0, NI, &
+                                is_diag=AuxData%trdm_diag(j), AA=ACB(phA0aa), &
+                                Gam2=AuxData%trdm2(:,:,:,:,j), Gam2_bar=AuxData%rdm2_full, &
+                                occ_act=occ_act, t2max=t2max(j))
+                    else
+                          call build_YJ(vecYJ(j), vecXp, vecYm, ACB(phA0oa), ACB(phA0va), &
+                                AuxData%trdm(:,:,j), NA, NV, NI0, NI)
+                    end if
               end do
               call tmsg('TIME FOR YJ', timer, tdebug)
+              if (AuxData%samsac0 .and. samsac0_dump) &
+                    call dump_samsac0_aa(AuxData, ACB(phA0aa), vecXp, vecYm, vecYJ, occ_act)
 
               ! Step 2: G%voao from phA1aovo (consumes the A1 block)
               call clock_start(timer)
@@ -217,7 +249,7 @@ contains
               ! Step 3: G%voaa from phA1aavo (consumes the A1 block)
               call clock_start(timer)
               call build_G_voaa(G, ACB(phA1aavo), ACB(phA0aa), ACB(phA0vo), &
-                    vecXp, vecYm, vecYb)
+                    vecXp, vecYm, vecYb, vecYJ, GJ)
               call tmsg('TIME FOR G voaa', timer, tdebug)
 
               ! Step 4: G%vaao from phA1aova (consumes the A1 block)
@@ -257,7 +289,8 @@ contains
               E_aaao = zero
 
               allocate(EJ_voao(NJ), EJ_vaao(NJ), EJ_vaaa(NJ), EJ_aoao(NJ), EJ_aaao(NJ), &
-                    EJ_vavo(NJ), EJ_vava(NJ), DeltaH(NJ))
+                    EJ_vavo(NJ), EJ_vava(NJ), EJ_voaa(NJ), DeltaH(NJ))
+              EJ_voaa = zero
               EJ_voao = zero
               EJ_vaao = zero
               EJ_vaaa = zero
@@ -476,6 +509,11 @@ contains
                                                         end if
                                                   end do
                                                   call G_contr(E_voaa, G%voaa, colidx, rowidx, NV, NA, V_axby)
+                                                  ! SA-MS-AC0 only (aa-left orientation)
+                                                  do j = 1, NJ
+                                                        if (allocated(GJ(j)%voaa)) &
+                                                              call G_contr(EJ_voaa(j), GJ(j)%voaa, colidx, rowidx, NV, NA, V_axby)
+                                                  end do
                                                   t_IVAA_ker = t_IVAA_ker + clock_readwall(timer)
                                             end do
                                       end if
@@ -638,28 +676,51 @@ contains
                     ttoeV * (AuxData%ECAS_THC + E_corr))
               print*, ''
 
-              ! MS-AC0: one row of H^eff, Delta H_JI per partner J, I = reference
+              ! MS-AC0: one row of H^eff, Delta H_JI per partner J, I = reference.
+              ! SA-MS-AC0: every element, I = trdm_ref; for J = I the vo left
+              ! side is the core of gamma^II, added as energies (delta_JI): all of
+              ! E_vovo and the vo-left half of E_voao, E_voaa, E_vavo.
               do j = 1, NJ
+                    EJ_vovo = zero
+                    ket = AuxData%nst
+                    if (AuxData%samsac0) then
+                          ket = AuxData%trdm_ref(:, j)
+                          if (AuxData%trdm_diag(j)) then
+                                EJ_vovo = E_vovo
+                                EJ_voao(j) = EJ_voao(j) + frac12 * E_voao
+                                EJ_voaa(j) = EJ_voaa(j) + frac12 * E_voaa
+                                EJ_vavo(j) = EJ_vavo(j) + frac12 * E_vavo
+                          end if
+                    end if
                     DeltaH(j) = EJ_aoao(j) + EJ_aaao(j) + EJ_voao(j) &
                           + EJ_vaao(j) + EJ_vaaa(j) + EJ_vavo(j) + EJ_vava(j)
+                    if (AuxData%samsac0) DeltaH(j) = DeltaH(j) + EJ_voaa(j) + EJ_vovo
                     write(*, '(/, 1x, a, I0, ".", I0, a, I0, ".", I0)') &
                           'MS-AC0: contributions to Delta H_JI, J = ', &
                           AuxData%trdm_st(1, j), AuxData%trdm_st(2, j), &
-                          ', I = ', AuxData%nst(1), AuxData%nst(2)
+                          ', I = ', ket(1), ket(2)
                     write(*,'(2X,A10,2X,A18)') 'Block pair', 'Contribution [Eh]'
                     write(*,'(2X,A)') repeat('-', 30)
                     call print_block_contribution('(21)(21)', EJ_aoao(j))
                     call print_block_contribution('(22)(21)', EJ_aaao(j))
                     call print_block_contribution('(31)(21)', EJ_voao(j))
-                    call print_block_contribution('(31)(22)', zero)
-                    call print_block_contribution('(31)(31)', zero)
+                    call print_block_contribution('(31)(22)', EJ_voaa(j))
+                    call print_block_contribution('(31)(31)', EJ_vovo)
                     call print_block_contribution('(32)(21)', EJ_vaao(j))
                     call print_block_contribution('(32)(22)', EJ_vaaa(j))
                     call print_block_contribution('(32)(31)', EJ_vavo(j))
                     call print_block_contribution('(32)(32)', EJ_vava(j))
+                    if (AuxData%samsac0) &
+                          write(*, '(2x, a, ES12.3)') 'max |Term 2| (aa amplitude)  :', t2max(j)
+                    ! the diagonal element carries E^CAS_I (without ENuc, as for MSAC0)
+                    Hval = DeltaH(j)
+                    if (AuxData%samsac0) then
+                          if (AuxData%trdm_diag(j)) Hval = Hval &
+                                + samsac0_ecas(AuxData, (j - 1) / AuxData%MS_M + 1) - AuxData%ENuc
+                    end if
                     write(*, '(1x, a, 2(1x, I0, ".", I0), F20.10)') 'H_mn', &
                           AuxData%trdm_st(1, j), AuxData%trdm_st(2, j), &
-                          AuxData%nst(1), AuxData%nst(2), DeltaH(j)
+                          ket(1), ket(2), Hval
               end do
               if (NJ > 0) print*, ''
 
@@ -669,6 +730,18 @@ contains
             end associate
 
       end subroutine THC_energy_loop_ph
+
+
+      ! SA-MS-AC0: E^CAS of model state I for H(I,I). The PySCF energies
+      ! (ms_ecas) shifted by the THC error of the ensemble CAS energy, so that
+      ! the state splittings are PySCF's and the diagonal averages to
+      ! ECAS_THC, the energy the ensemble AC0 is added to.
+      double precision function samsac0_ecas(AuxData, I)
+            type(TACppData), intent(in) :: AuxData
+            integer, intent(in) :: I
+            samsac0_ecas = AuxData%ms_ecas(I) + AuxData%ECAS_THC &
+                  - sum(AuxData%ms_ecas) / AuxData%MS_M
+      end function samsac0_ecas
 
 
       ! Xt = A_- Yt / Eig for the ao and aa blocks (Xt = Yt for vo, va). Modes with
@@ -807,17 +880,35 @@ contains
       ! MS-AC0: Y^(J<-I) of the ao and va modes from gamma^JI (theory-ms-ac0.md eqs. 21,
       ! 22): ao YJ = gamma^T Y - gamma X, va YJ = gamma^T X. No aa. Rows outside
       ! ActList are zeroed (those pairs are not in the ERPA of I).
+      ! SA-MS-AC0 (the optional arguments): is_diag (J = I) adds the core term
+      ! -Ym to ao; with AA present the aa block is built, Term 1 (eq. 19) plus
+      ! Term 2 minus delta_JI times the ensemble Term 2 (theory-sa-ms-ac0.md eq. S6),
+      ! Gam2 = Gamma^JI, Gam2_bar = the ensemble 2-RDM (RDM2_FULL_REORDERED normalization):
+      !   C = x gamma - gamma x + (dg x)^T + 1/2 sum_ab x_ab dG(a,:,b,:),  YJ(pos(r,s)) = C_rs + C_sr
+      !   dg = gamma - is_diag diag(occ_act), dG = Gam2 - is_diag Gam2_bar
+      ! x^mu by eq. (16): x_rs = X, x_sr = Y for the pair r > s, X = (Xp-Ym)/2,
+      ! Y = (Xp+Ym)/2. t2max = max |Term 2 part| over the aa block.
       ! See .secret_sauce/.skills/ms-ac0/code-thc-ms-ac0.md Sec. 6.
-      subroutine build_YJ(vecYJ, vecXp, vecYm, OA, VA, gamma, NA, NV, NI0, NI)
+      subroutine build_YJ(vecYJ, vecXp, vecYm, OA, VA, gamma, NA, NV, NI0, NI, &
+            is_diag, AA, Gam2, Gam2_bar, occ_act, t2max)
             type(TvecYb), intent(out) :: vecYJ
             type(TvecXp), intent(in) :: vecXp
             type(TvecYm), intent(in) :: vecYm
             type(TAC0Block_ph), intent(in) :: OA, VA
             double precision, dimension(:,:), intent(in) :: gamma
             integer, intent(in) :: NA, NV, NI0, NI
+            logical, optional, intent(in) :: is_diag
+            type(TAC0Block_ph), optional, intent(in) :: AA
+            double precision, dimension(:,:,:,:), optional, intent(in) :: Gam2, Gam2_bar
+            double precision, dimension(:), optional, intent(in) :: occ_act
+            double precision, optional, intent(out) :: t2max
             double precision, dimension(:,:), allocatable :: Xm, Ymu
             logical, dimension(:), allocatable :: keep
+            logical :: diag
             integer :: k, jj, x
+
+            diag = .false.
+            if (present(is_diag)) diag = is_diag
 
             allocate(Xm(NA, NA), Ymu(NA, NA), keep(NA))
 
@@ -828,6 +919,8 @@ contains
                   call real_aTb(vecYJ%ao(:,:,k), gamma, Ymu)
                   call real_ab(Ymu, gamma, Xm)
                   vecYJ%ao(:,:,k) = vecYJ%ao(:,:,k) - Ymu
+                  ! J = I: the inactive core of gamma^II (rows of Ym are 0 off ActList)
+                  if (diag) vecYJ%ao(:,:,k) = vecYJ%ao(:,:,k) - vecYm%ao(:,:,k)
 
                   associate(MB=>OA%MiniBlocks(k))
                     keep = .false.
@@ -857,7 +950,141 @@ contains
 
             deallocate(Xm, Ymu, keep)
 
+            if (present(AA)) call build_YJ_aa(vecYJ%aa, vecXp%aa, vecYm%aa, AA, gamma, &
+                  Gam2, Gam2_bar, occ_act, diag, NA, NI, t2max)
+
       end subroutine build_YJ
+
+
+      ! SA-MS-AC0 test T3: everything a Python reference needs to rebuild YJ%aa
+      ! from pyscf_data.h5 (active CMONO, IndN, Xp%aa, Ym%aa), and YJ%aa per pair.
+      ! Text, one number per line, arrays in Fortran order.
+      subroutine dump_samsac0_aa(AuxData, AA, vecXp, vecYm, vecYJ, occ_act)
+            type(TACppData), intent(in) :: AuxData
+            type(TAC0Block_ph), intent(in) :: AA
+            type(TvecXp), intent(in) :: vecXp
+            type(TvecYm), intent(in) :: vecYm
+            type(TvecYb), dimension(:), intent(in) :: vecYJ
+            double precision, dimension(:), intent(in) :: occ_act
+            integer :: u, j, i, k, NI, NA, nd
+
+            NI = AuxData%NI
+            NA = AuxData%NA
+            nd = AA%NDim
+            open(newunit=u, file='samsac0_yj_aa.txt', status='replace')
+            write(u, '(I0)') NA, nd, AuxData%MS_M, AuxData%NJ
+            write(u, '(I0)') AuxData%ms_st
+            write(u, '(I0)') ((AA%IndN(k, i) - NI, k = 1, 2), i = 1, nd)
+            write(u, '(ES25.17)') occ_act
+            if (allocated(AuxData%CMONO)) then
+                  write(u, '(ES25.17)') AuxData%CMONO(NI+1:NI+NA, NI+1:NI+NA)
+            else
+                  write(u, '(ES25.17)') ((merge(one, zero, i == k), i = 1, NA), k = 1, NA)
+            end if
+            write(u, '(ES25.17)') vecXp%aa
+            write(u, '(ES25.17)') vecYm%aa
+            do j = 1, AuxData%NJ
+                  write(u, '(I0)') AuxData%trdm_st(:, j), AuxData%trdm_ref(:, j)
+                  write(u, '(ES25.17)') vecYJ(j)%aa
+            end do
+            close(u)
+            print*, 'SA-MS-AC0: wrote samsac0_yj_aa.txt (test T3)'
+      end subroutine dump_samsac0_aa
+
+
+      ! SA-MS-AC0: the aa block of build_YJ, rows pos(r,s) = AA%IndN, columns the
+      ! aa modes (layout of vecYb%aa). Invalid modes have zero Xp, Ym columns,
+      ! hence zero x and a zero column here.
+      subroutine build_YJ_aa(YJaa, Xpaa, Ymaa, AA, gamma, Gam2, Gam2_bar, occ_act, &
+            is_diag, NA, NI, t2max)
+            double precision, dimension(:,:), allocatable, intent(out) :: YJaa
+            double precision, dimension(:,:), intent(in) :: Xpaa, Ymaa
+            type(TAC0Block_ph), intent(in) :: AA
+            double precision, dimension(:,:), intent(in) :: gamma
+            double precision, dimension(:,:,:,:), intent(in) :: Gam2, Gam2_bar
+            double precision, dimension(:), intent(in) :: occ_act
+            logical, intent(in) :: is_diag
+            integer, intent(in) :: NA, NI
+            double precision, intent(out) :: t2max
+            double precision, dimension(:,:), allocatable :: dg, xm, C, T2, W, Xmat, work
+            integer :: nd, i, m, r, s, a, b, p, q
+
+            nd = AA%NDim
+            allocate(YJaa(nd, nd))
+            YJaa = zero
+            t2max = zero
+            if (nd == 0) return
+
+            allocate(dg(NA, NA), xm(NA, NA), C(NA, NA), work(NA, NA))
+            allocate(W(NA*NA, NA*NA), Xmat(NA*NA, nd), T2(NA*NA, nd))
+
+            dg = gamma
+            if (is_diag) then
+                  do p = 1, NA
+                        dg(p, p) = dg(p, p) - occ_act(p)
+                  end do
+            end if
+
+            ! W(a + NA(b-1), p + NA(q-1)) = dG(a,p,b,q)
+            do q = 1, NA
+                  do b = 1, NA
+                        do p = 1, NA
+                              do a = 1, NA
+                                    if (is_diag) then
+                                          W(a+NA*(b-1), p+NA*(q-1)) = Gam2(a,p,b,q) - Gam2_bar(a,p,b,q)
+                                    else
+                                          W(a+NA*(b-1), p+NA*(q-1)) = Gam2(a,p,b,q)
+                                    end if
+                              end do
+                        end do
+                  end do
+            end do
+
+            ! Xmat(a + NA(b-1), mu) = x^mu_ab, eq. (16)
+            Xmat = zero
+            do m = 1, nd
+                  do i = 1, nd
+                        r = AA%IndN(1, i) - NI
+                        s = AA%IndN(2, i) - NI
+                        Xmat(r+NA*(s-1), m) = (Xpaa(i, m) - Ymaa(i, m)) / two
+                        Xmat(s+NA*(r-1), m) = (Xpaa(i, m) + Ymaa(i, m)) / two
+                  end do
+            end do
+
+            ! T2(p + NA(q-1), mu) = 1/2 sum_ab x^mu_ab dG(a,p,b,q)
+            call real_aTb(T2, W, Xmat)
+            T2 = frac12 * T2
+
+            do m = 1, nd
+                  xm = reshape(Xmat(:, m), [NA, NA])
+                  ! Term 2 part: (dg x)^T + T2
+                  call real_ab(work, dg, xm)
+                  C = transpose(work)
+                  if (samsac0_term2) then
+                        C = C + reshape(T2(:, m), [NA, NA])
+                  else
+                        C = zero
+                  end if
+                  do i = 1, nd
+                        r = AA%IndN(1, i) - NI
+                        s = AA%IndN(2, i) - NI
+                        t2max = max(t2max, abs(C(r, s) + C(s, r)))
+                  end do
+                  ! Term 1: x gamma - gamma x
+                  call real_ab(work, xm, gamma)
+                  C = C + work
+                  call real_ab(work, gamma, xm)
+                  C = C - work
+                  do i = 1, nd
+                        r = AA%IndN(1, i) - NI
+                        s = AA%IndN(2, i) - NI
+                        YJaa(i, m) = C(r, s) + C(s, r)
+                  end do
+            end do
+
+            deallocate(dg, xm, C, work, W, Xmat, T2)
+
+      end subroutine build_YJ_aa
 
 
       ! G%voao for E_voao from phA1aovo (rows ao, cols vo), f = 2; rows only, per
@@ -939,20 +1166,23 @@ contains
 
       ! G%voaa for E_voaa from phA1aavo (rows aa, cols vo), f = 2; one dense gemm per
       ! column chunk. phA1aavo is exactly symmetric (aa and vo pairs share no
-      ! orbital). See .secret_sauce/.skills/ph-ac0/code-thc-energy.md Sec. 4 (builders).
-      subroutine build_G_voaa(G, A1, AA, VO, vecXp, vecYm, vecYb)
+      ! orbital). SA-MS-AC0 (YJ%aa allocated): GJ = 1 YJ_aa dS, the aa-left
+      ! orientation. See .secret_sauce/.skills/ph-ac0/code-thc-energy.md Sec. 4 (builders).
+      subroutine build_G_voaa(G, A1, AA, VO, vecXp, vecYm, vecYb, vecYJ, GJ)
             type(TG), intent(inout) :: G
             type(TAC0Block_ph), intent(inout) :: A1
             type(TAC0Block_ph), intent(in) :: AA, VO
             type(TvecXp), intent(in) :: vecXp
             type(TvecYm), intent(in) :: vecYm
             type(TvecYb), intent(in) :: vecYb
+            type(TvecYb), dimension(:), intent(in) :: vecYJ
+            type(TG), dimension(:), intent(inout) :: GJ
             type(TprojXAp) :: projXAp
             type(TprojYAm) :: projYAm
             type(TdS) :: dS
             double precision, dimension(:,:), allocatable :: buf
             integer, parameter :: nchunk_max = 1024
-            integer :: nrow, ncol, nchunk, c0, nc, mu, pq
+            integer :: nrow, ncol, nchunk, c0, nc, mu, pq, jp
 
             nrow = A1%NDim1
             ncol = A1%NDim2
@@ -989,6 +1219,18 @@ contains
             !$omp end parallel do
             deallocate(projYAm%voaa)
             call move_alloc(projXAp%voaa, dS%voaa)
+
+            ! SA-MS-AC0: GJ = 1 YJ_aa dS, from dS before the back-transform below
+            do jp = 1, size(GJ)
+                  if (.not. allocated(vecYJ(jp)%aa)) cycle
+                  allocate(GJ(jp)%voaa(nrow, ncol))
+                  if (nrow == 0) cycle
+                  do c0 = 1, ncol, nchunk
+                        nc = min(nchunk, ncol - c0 + 1)
+                        call real_ab_x(GJ(jp)%voaa(1,c0), nrow, vecYJ(jp)%aa, nrow, &
+                              dS%voaa(1,c0), nrow, nrow, nc, nrow)
+                  end do
+            end do
 
             ! back-transform: aa modes -> aa pairs, with f = 2
             if (nrow > 0) then
@@ -1203,6 +1445,7 @@ contains
             ! back-transform both sides, per virtual k, with f = 4:
             !   G(:,slice) = 4 Yb_aa dS(:,slice) Yb_va(:,:,k)^T
             ! MS-AC0: GJ(:,slice) = 1/2 (4 Yb_aa dS(:,slice)) YJ_va(:,:,k)^T
+            ! SA-MS-AC0 (YJ%aa allocated): GJ += 2 YJ_aa dS(:,slice) Yb_va(:,:,k)^T
             do jp = 1, size(GJ)
                   allocate(GJ(jp)%vaaa(nrow, ncol))
             end do
@@ -1214,6 +1457,11 @@ contains
                         do jp = 1, size(GJ)
                               call real_abT_x(GJ(jp)%vaaa(1,c0), nrow, buf1, nrow, &
                                     vecYJ(jp)%va(1,1,k), NA, nrow, NA, NA, frac12)
+                              if (allocated(vecYJ(jp)%aa)) then
+                                    call real_ab_x(buf2, nrow, vecYJ(jp)%aa, nrow, dS%vaaa(1,c0), nrow, nrow, NA, nrow, two)
+                                    call real_abT_x(GJ(jp)%vaaa(1,c0), nrow, buf2, nrow, &
+                                          vecYb%va(1,1,k), NA, nrow, NA, NA, one, one)
+                              end if
                         end do
                         call real_abT_x(buf2, nrow, buf1, nrow, vecYb%va(1,1,k), NA, nrow, NA, NA)
                         dS%vaaa(:, c0:c1) = buf2
@@ -1392,6 +1640,7 @@ contains
 
             ! MS-AC0: GJ(slice,:) = 2 YJ_ao(:,:,s) dS(slice,:) Yb_aa^T, from dS
             ! before the back-transform below overwrites it
+            ! SA-MS-AC0 (YJ%aa allocated): GJ(slice,:) += 2 Yb_ao(:,:,s) dS(slice,:) YJ_aa^T
             do jp = 1, size(GJ)
                   allocate(GJ(jp)%aaao(nrow, ncol))
                   if (ncol == 0) cycle
@@ -1399,6 +1648,11 @@ contains
                         l0 = (s - NI0) * NA + 1
                         call real_ab_x(buf1, NA, vecYJ(jp)%ao(1,1,s), NA, dS%aaao(l0,1), nrow, NA, ncol, NA, two)
                         call real_abT_x(GJ(jp)%aaao(l0,1), nrow, buf1, NA, vecYb%aa, ncol, NA, ncol, ncol)
+                        if (allocated(vecYJ(jp)%aa)) then
+                              call real_ab_x(buf1, NA, vecYb%ao(1,1,s), NA, dS%aaao(l0,1), nrow, NA, ncol, NA, two)
+                              call real_abT_x(GJ(jp)%aaao(l0,1), nrow, buf1, NA, vecYJ(jp)%aa, ncol, NA, ncol, ncol, &
+                                    one, one)
+                        end if
                   end do
             end do
 

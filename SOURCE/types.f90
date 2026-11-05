@@ -47,6 +47,8 @@ integer, parameter :: JOB_TYPE_ACPP     = 28
 integer, parameter :: JOB_TYPE_AC_REL     = 29
 integer, parameter :: JOB_TYPE_AC0_REL     = 30
 integer, parameter :: JOB_TYPE_TDDFT     = 31
+! 32-34 are the relativistic jobs of branch chronusQ; same value there
+integer, parameter :: JOB_TYPE_SAMSAC0   = 35
 
 integer, parameter :: PARSER_MH = 0
 integer, parameter :: PARSER_AT = 1
@@ -163,13 +165,13 @@ character(*),parameter :: PossibleInterface(6) = &
 [character(8) :: &
 'DALTON', 'MOLPRO', 'OWN', 'ORCA', 'PYSCF', 'CHRONUSQ']
 
-character(*),parameter :: PossibleJobType(31) = &
+character(*),parameter :: PossibleJobType(35) = &
 [character(9) :: &
 'AC', 'AC0', 'ERPA', 'EERPA', 'SAPT', 'PDFT', 'CASPiDFT','CASPiDFTOpt','EERPA-1', & 
 'AC0D', 'AC0DNOSYMM', 'NLOCCORR', 'AC0DP', 'ACFREQ','ACFREQNTH','AC1FREQNTH', &
 'RESPONSE','SRAC0', 'MP2', '-', 'SAPT-OS','MSAC0', &
  'PPERPA', 'AC0PP', 'PPERPADMP', 'DUCC', 'HHERPADMP', 'ACPP', 'AC_REL', 'AC0_REL', &
- 'TDDFT']
+ 'TDDFT', '-', '-', '-', 'SAMSAC0']
 
 character(*),parameter :: PossibleRDMType(8) = &
 [character(8) :: &

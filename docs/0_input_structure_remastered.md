@@ -15,12 +15,16 @@ the input file (blocks, `end`, comments) see
   - [How to switch it on](#how-to-switch-it-on-1)
   - [What it does](#what-it-does-1)
   - [Where it is available](#where-it-is-available-1)
-- [Saving and reusing the THC factorization](#saving-and-reusing-the-thc-factorization)
-
-- [MP2 and MP2-CBS[H]](#mp2-and-mp2-cbsh)
+- [State-averaged MS-AC0 (SA-MS-AC0)](#state-averaged-ms-ac0-sa-ms-ac0)
   - [How to switch it on](#how-to-switch-it-on-2)
   - [What it does](#what-it-does-2)
   - [Where it is available](#where-it-is-available-2)
+- [Saving and reusing the THC factorization](#saving-and-reusing-the-thc-factorization)
+
+- [MP2 and MP2-CBS[H]](#mp2-and-mp2-cbsh)
+  - [How to switch it on](#how-to-switch-it-on-3)
+  - [What it does](#what-it-does-3)
+  - [Where it is available](#where-it-is-available-3)
 
 ## Frozen core
 
@@ -211,6 +215,83 @@ gammcor_heff gammcor_1.out gammcor_2.out
 |---|---|
 | Molpro | at most 10 states; all must have the **same symmetry** (not checked) |
 | PySCF, THC | state-averaged CASSCF only; only states of the reference's symmetry and spin |
+
+## State-averaged MS-AC0 (SA-MS-AC0)
+
+### How to switch it on
+
+Set `JobType SAMSAC0` (also accepted: `SA-MS-AC0`, `SA_MS_AC0`) and give **no**
+`State`: the model space is every state in `pyscf_data.h5`. One run gives the
+whole effective Hamiltonian.
+
+| Route | `Interface` | `TwoMoInt` | `CholeskyBlock` / `Algorithm` |
+|---|---|---|---|
+| PySCF, THC integrals | `PYSCF` | `FOFO` | `Cholesky THC` |
+| PySCF, exact integrals (test route) | `PYSCF` | `INCORE` | `Algorithm THC` in `Calculation` |
+
+Any other combination stops with an error, and so does a `State` entry.
+
+**PySCF.** Run a state-averaged CASSCF with **equal weights** over the states
+of one symmetry and spin (`mycas.natorb = False`, `mycas.fix_spin_(ss=0)` for
+singlets), and export with the transition 2-RDMs:
+
+```python
+get_data_for_gammcor(mol, myhf, mycas, dump_trdm2=True)
+```
+
+Input:
+
+```text
+Calculation
+ Interface PYSCF
+ JobType   SAMSAC0
+ RDMType   CAS
+ TwoMoInt  FOFO
+end
+
+System
+ ZNucl  12
+ Charge 0
+end
+
+CholeskyBlock
+ Cholesky THC
+end
+```
+
+### What it does
+
+MS-AC0 (above) builds each row of `H` from the AC0 response of one state, so
+`H` changes in a non-trivial way when the CASSCF states are mixed among
+themselves, and the method is unreliable near avoided crossings. SA-MS-AC0
+uses one response for all elements instead: that of the state-averaged
+(ensemble) density matrices of the model space. Every element `H(J,I)`, the
+diagonal included, is then computed by the same formula from the transition
+density matrices of the pair. Consequences:
+
+- **One run per geometry** instead of one per state.
+- **Invariant under mixing of the states**: rotating the CASSCF states among
+  themselves rotates `H` in the same way, and its eigenvalues do not change.
+- **One state = plain AC0**: with a single state in the file the result is the
+  AC0 energy of that state.
+- **Trace check**: the average of the diagonal corrections equals the AC0
+  correlation energy of the ensemble. The output prints the difference, which
+  must be zero.
+
+The run prints every element of `H` as `H_mn J I value` (without nuclear
+repulsion), then `H`, `(H + H^T)/2`, the largest `|H - H^T|` and the
+eigenvalues of `(H + H^T)/2`: the SA-MS-AC0 energies.
+
+### Where it is available
+
+| Route | Limits |
+|---|---|
+| PySCF, THC | state-averaged CASSCF with equal weights; all states of one symmetry and spin (one `fcisolver`); the transition 2-RDMs must be in the file (`dump_trdm2=True`) |
+
+<!-- TODO: in development (.secret_sauce/.implementation_plans/ms-ac0/plan-sa-ms-ac0.md).
+Done and tested on LiF: Phases 1-4 (keyword, ensemble, elements of H, report).
+Not yet: the rotation test and the LiF curve (Phase 5). -->
+
 
 ## Saving and reusing the THC factorization
 

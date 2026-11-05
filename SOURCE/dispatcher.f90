@@ -50,7 +50,7 @@ contains
                   print*, 'mp2_driver'
                   call mp2_driver(THCData, AuxData, CAONO, Flags)
 
-            case(JOB_TYPE_AC0, JOB_TYPE_MSAC0)
+            case(JOB_TYPE_AC0, JOB_TYPE_MSAC0, JOB_TYPE_SAMSAC0)
                   if (Flags%ITwoEl == TWOMO_FOFO .and. Flags%ICholeskyTHC == 1) then
                         print*, 'acph_driver'
                         call acph_driver(THCData, AuxData, Flags, CAONO)

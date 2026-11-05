@@ -194,6 +194,7 @@ contains
             integer :: anst(2)
             logical :: existsNosf, existsSf
             logical :: need_rdm2_dat
+            logical :: is_ms   ! MSAC0 or SAMSAC0: tests the two share
             integer :: iostat
             character(len=10) :: suffix
             integer :: x, y
@@ -217,6 +218,8 @@ contains
                   call read_PYSCF_dft(Flags, TDDFTData, TwoEl)
                   return
             end if
+
+            is_ms = (Flags%JOBTYPE == JOB_TYPE_MSAC0 .or. Flags%JOBTYPE == JOB_TYPE_SAMSAC0)
 
             call pyscf_h5_open()
 
@@ -243,8 +246,17 @@ contains
                   AuxData%PYSCF = 1
                   natural_orb = 0   ! HF canonical orbitals: CAONO = CAOMO
             else
-                  call resolve_state_suffix(AuxData, suffix)
-                  call load_cas_aux_data(suffix, AuxData, natural_orb)
+                  if (AuxData%samsac0) then
+                        ! SA-MS-AC0: the model space is every state in the file;
+                        ! the reference CAS energy is the ensemble average
+                        call load_ms_states(AuxData)
+                        write(suffix, '("_", I0, ".", I0)') AuxData%ms_st(1, 1), AuxData%ms_st(2, 1)
+                        call load_cas_aux_data(suffix, AuxData, natural_orb)
+                        AuxData%ECAS_read = sum(AuxData%ms_ecas) / AuxData%MS_M
+                  else
+                        call resolve_state_suffix(AuxData, suffix)
+                        call load_cas_aux_data(suffix, AuxData, natural_orb)
+                  end if
                   AuxData%PYSCF = 1
 
                   call print_section('CASSCF data loaded')
@@ -293,7 +305,10 @@ contains
 
               if (Flags%JOBTYPE /= JOB_TYPE_MP2) then
 
-                    if ((Flags%JOBTYPE == JOB_TYPE_AC0 .or. Flags%JOBTYPE == JOB_TYPE_MSAC0) &
+                    if (AuxData%samsac0) then
+                          call load_ensemble_density_matrices(AuxData, THCData, CAOMO, CAONO, Flags, &
+                                AObasis, System, TwoEl, Flags%ITwoEl > 1)
+                    else if ((Flags%JOBTYPE == JOB_TYPE_AC0 .or. is_ms) &
                           .and. Flags%ITwoEl > 1)then
                           call load_density_matrices(suffix, AuxData, THCData, CAOMO, CAONO, Flags, AObasis, System, TwoEl, .true.)
                     else
@@ -366,6 +381,7 @@ contains
                     end if
 
                     if (Flags%JOBTYPE == JOB_TYPE_MSAC0) call load_transition_rdm1(AuxData)
+                    if (AuxData%samsac0) call load_ms_pairs(AuxData)
               else
                     call load_rohf_occupation(AuxData)
               end if
@@ -426,7 +442,7 @@ contains
                     ! THC route. PySCF canonicalizes with the Fock matrix of its
                     ! fcisolver density, which for SA-CASSCF is the state-averaged one.
                     ! Rotates HNO0, TwoEl and CAONO, sets fij/fvw and ECAS_THC.
-                    if (Flags%JOBTYPE == JOB_TYPE_AC0 .or. Flags%JOBTYPE == JOB_TYPE_MSAC0) then
+                    if (Flags%JOBTYPE == JOB_TYPE_AC0 .or. is_ms) then
                           call canonicalize_exact(THCData, AuxData, CAONO, TwoEl)
                     end if
               end if
@@ -1138,17 +1154,7 @@ contains
           allocate(AuxData%trdm(NA, NA, AuxData%NJ))
           allocate(AuxData%trdm_st(2, AuxData%NJ))
           allocate(gamma(NA, NA))
-          allocate(CMONO_NA(NA, NA))
-
-          if (allocated(AuxData%CMONO)) then
-                CMONO_NA = AuxData%CMONO(NI+1:NI+NA, NI+1:NI+NA)
-          else
-                ! natural orbitals in the file: no MO->NO rotation
-                CMONO_NA = zero
-                do k = 1, NA
-                      CMONO_NA(k, k) = one
-                end do
-          end if
+          call active_CMONO(AuxData, CMONO_NA)
 
           j = 0
           do k = 1, 10
@@ -1178,6 +1184,289 @@ contains
 
           deallocate(gamma, CMONO_NA)
     end subroutine load_transition_rdm1
+
+    subroutine active_CMONO(AuxData, CMONO_NA)
+          ! Active block of the MO->NO rotation of Trans2NO_AO, which rotated the
+          ! RDMs; the (transition) RDMs read later get the same one. Identity
+          ! for natural orbitals in the file (CMONO not allocated).
+          type(TACppData), intent(in) :: AuxData
+          double precision, dimension(:,:), allocatable, intent(out) :: CMONO_NA
+          integer :: k, NI, NA
+
+          NI = AuxData%NI
+          NA = AuxData%NA
+          allocate(CMONO_NA(NA, NA))
+          if (allocated(AuxData%CMONO)) then
+                CMONO_NA = AuxData%CMONO(NI+1:NI+NA, NI+1:NI+NA)
+          else
+                CMONO_NA = zero
+                do k = 1, NA
+                      CMONO_NA(k, k) = one
+                end do
+          end if
+    end subroutine active_CMONO
+
+    subroutine load_ms_states(AuxData)
+          ! SA-MS-AC0: the model space is every POSTHF/STATES/<n.m> group. Fills
+          ! MS_M, ms_st (state, irrep) and ms_ecas (ENERGY attribute). Stops
+          ! unless all states share one irrep and have the weight 1/MS_M (an
+          ! equal-weight ensemble of one fcisolver).
+          type(TACppData), intent(inout) :: AuxData
+
+          character(len=64) :: grp
+          integer :: st(2, 100)
+          double precision :: w
+          integer :: x, y, K, M
+
+          M = 0
+          do y = 1, 10
+                do x = 1, 10
+                      write(grp, '("/POSTHF/STATES/", I0, ".", I0)') x, y
+                      if (h5_exists(pyscf_fid, trim(grp))) then
+                            M = M + 1
+                            st(:, M) = [x, y]
+                      end if
+                end do
+          end do
+
+          if (M == 0) stop "Error: No POSTHF/STATES group found in pyscf_data.h5."
+          if (any(st(2, 1:M) /= st(2, 1))) then
+                print*, 'ERROR! SAMSAC0: the states in pyscf_data.h5 belong to more than one irrep;'
+                print*, 'the model space must be the states of one fcisolver.'
+                stop
+          end if
+
+          AuxData%MS_M = M
+          if (allocated(AuxData%ms_st)) deallocate(AuxData%ms_st)
+          if (allocated(AuxData%ms_ecas)) deallocate(AuxData%ms_ecas)
+          allocate(AuxData%ms_st(2, M), AuxData%ms_ecas(M))
+          AuxData%ms_st = st(:, 1:M)
+
+          do K = 1, M
+                write(grp, '("/POSTHF/STATES/", I0, ".", I0)') st(1, K), st(2, K)
+                call h5_attr(pyscf_fid, trim(grp), 'ENERGY', AuxData%ms_ecas(K))
+                call h5_attr(pyscf_fid, trim(grp), 'WEIGHT', w)
+                if (abs(w - one / M) > 1.d-8) then
+                      write(*, '(1x, a, I0, ".", I0, a, F12.8, a, F12.8)') &
+                            'ERROR! SAMSAC0 needs equal weights: state ', st(1, K), st(2, K), &
+                            ' has ', w, ', expected 1/M = ', one / M
+                      stop
+                end if
+          end do
+
+          call print_section('SA-MS-AC0 model space')
+          call print_info('Number of states', M)
+          do K = 1, M
+                write(*, '(3x, I0, ".", I0, F20.10)') st(1, K), st(2, K), AuxData%ms_ecas(K)
+          end do
+    end subroutine load_ms_states
+
+    subroutine load_ensemble_density_matrices(AuxData, THCData, CAOMO, CAONO, Flags, &
+          AObasis, System, TwoEl, only_full)
+          ! SA-MS-AC0: the ensemble reference = the equal-weight average of the
+          ! RDMs of the MS_M states (load_ms_states). Each state is read by
+          ! load_density_matrices; every RDM it allocates (rdm1_p/m/full,
+          ! rdm2_full, and the spin blocks without only_full) is averaged.
+          type(TACppData), intent(inout) :: AuxData
+          type(TTHCData), intent(inout) :: THCData
+          double precision, dimension(:,:), allocatable, intent(inout) :: CAOMO
+          double precision, dimension(:,:), intent(inout) :: CAONO
+          type(FlagsData), intent(in) :: Flags
+          type(TAOBASIS), intent(in) :: AObasis
+          type(TSystem), intent(in) :: System
+          double precision, optional, intent(in) :: TwoEl(:)
+          logical, intent(in) :: only_full
+
+          double precision, dimension(:,:), allocatable :: s1p, s1m, s1f
+          double precision, dimension(:,:,:,:), allocatable :: s2f, s2pp, s2pm, s2mm, s2mp
+          character(len=10) :: suffix
+          integer :: K, M
+
+          M = AuxData%MS_M
+          do K = 1, M
+                write(suffix, '("_", I0, ".", I0)') AuxData%ms_st(1, K), AuxData%ms_st(2, K)
+                call load_density_matrices(suffix, AuxData, THCData, CAOMO, CAONO, Flags, &
+                      AObasis, System, TwoEl, only_full)
+                call add2(s1p, AuxData%rdm1_p)
+                call add2(s1m, AuxData%rdm1_m)
+                call add2(s1f, AuxData%rdm1_full)
+                call add4(s2f, AuxData%rdm2_full)
+                call add4(s2pp, AuxData%rdm2_pp)
+                call add4(s2pm, AuxData%rdm2_pm)
+                call add4(s2mm, AuxData%rdm2_mm)
+                call add4(s2mp, AuxData%rdm2_mp)
+          end do
+
+          call mean2(s1p, AuxData%rdm1_p)
+          call mean2(s1m, AuxData%rdm1_m)
+          call mean2(s1f, AuxData%rdm1_full)
+          call mean4(s2f, AuxData%rdm2_full)
+          call mean4(s2pp, AuxData%rdm2_pp)
+          call mean4(s2pm, AuxData%rdm2_pm)
+          call mean4(s2mm, AuxData%rdm2_mm)
+          call mean4(s2mp, AuxData%rdm2_mp)
+
+          write(*, '(1x, a, I0, a)') 'SA-MS-AC0: ensemble RDMs = average over ', M, ' states'
+
+    contains
+
+          ! s += a and free a (a = the RDM of one state, s = the running sum)
+          subroutine add2(s, a)
+                double precision, dimension(:,:), allocatable, intent(inout) :: s, a
+                if (.not. allocated(a)) return
+                if (allocated(s)) then
+                      s = s + a
+                      deallocate(a)
+                else
+                      call move_alloc(a, s)
+                end if
+          end subroutine add2
+
+          subroutine add4(s, a)
+                double precision, dimension(:,:,:,:), allocatable, intent(inout) :: s, a
+                if (.not. allocated(a)) return
+                if (allocated(s)) then
+                      s = s + a
+                      deallocate(a)
+                else
+                      call move_alloc(a, s)
+                end if
+          end subroutine add4
+
+          subroutine mean2(s, a)
+                double precision, dimension(:,:), allocatable, intent(inout) :: s, a
+                if (.not. allocated(s)) return
+                call move_alloc(s, a)
+                a = a / M
+          end subroutine mean2
+
+          subroutine mean4(s, a)
+                double precision, dimension(:,:,:,:), allocatable, intent(inout) :: s, a
+                if (.not. allocated(s)) return
+                call move_alloc(s, a)
+                a = a / M
+          end subroutine mean4
+
+    end subroutine load_ensemble_density_matrices
+
+    subroutine load_ms_pairs(AuxData)
+          ! SA-MS-AC0: every ordered pair (J, I) of the MS_M states, J = I
+          ! included, j = J + (I-1) MS_M. trdm(:,:,j) = gamma^JI(p,q) =
+          ! 1/2 <J|E_qp|I>, trdm2(:,:,:,:,j) = Gamma^JI(p,q,r,s) = <J|p+ q+ s r|I>:
+          !   J = I:   RDM1/2 and RDM2_FULL_REORDERED of the state;
+          !   J /= I:  TRANSITIONS/<J>_<I>/TRDM1, TRDM2 as read, or <I>_<J> with
+          !            gamma transposed and Gamma(p,q,r,s) <- Gamma(r,s,p,q).
+          ! Rotated to the ensemble NOs with the CMONO_NA of Trans2NO_AO.
+          ! Fills NJ, trdm, trdm2, trdm_st (bra J), trdm_ref (ket I), trdm_diag.
+          type(TACppData), intent(inout) :: AuxData
+
+          character(len=16)  :: tag_i, tag_j
+          character(len=128) :: grp_ji, grp_ij
+          double precision, dimension(:,:), allocatable :: gamma, CMONO_NA, dg
+          double precision, dimension(:,:,:,:), allocatable :: G, Gt
+          integer :: I, J, M, jp, NI, NA, p, q, r, s
+
+          M = AuxData%MS_M
+          NI = AuxData%NI
+          NA = AuxData%NA
+          ! the (T)RDMs have the active size of the h5 file
+          if (size(AuxData%rdm1_full, dim=1) /= NA) then
+                print*, 'ERROR! SAMSAC0: Trans2NO_AO changed NA from', &
+                      size(AuxData%rdm1_full, dim=1), 'to', NA
+                stop
+          end if
+
+          AuxData%NJ = M * M
+          if (allocated(AuxData%trdm)) deallocate(AuxData%trdm)
+          if (allocated(AuxData%trdm2)) deallocate(AuxData%trdm2)
+          if (allocated(AuxData%trdm_st)) deallocate(AuxData%trdm_st)
+          if (allocated(AuxData%trdm_ref)) deallocate(AuxData%trdm_ref)
+          if (allocated(AuxData%trdm_diag)) deallocate(AuxData%trdm_diag)
+          allocate(AuxData%trdm(NA, NA, M*M), AuxData%trdm2(NA, NA, NA, NA, M*M))
+          allocate(AuxData%trdm_st(2, M*M), AuxData%trdm_ref(2, M*M), AuxData%trdm_diag(M*M))
+          allocate(gamma(NA, NA), G(NA, NA, NA, NA), Gt(NA, NA, NA, NA))
+          call active_CMONO(AuxData, CMONO_NA)
+
+          jp = 0
+          do I = 1, M
+                write(tag_i, '(I0, ".", I0)') AuxData%ms_st(:, I)
+                do J = 1, M
+                      jp = jp + 1
+                      write(tag_j, '(I0, ".", I0)') AuxData%ms_st(:, J)
+                      grp_ji = '/POSTHF/TRANSITIONS/'//trim(tag_j)//'_'//trim(tag_i)
+                      grp_ij = '/POSTHF/TRANSITIONS/'//trim(tag_i)//'_'//trim(tag_j)
+                      if (I == J) then
+                            call h5_get(pyscf_fid, '/POSTHF/STATES/'//trim(tag_i)//'/RDM1', gamma)
+                            gamma = gamma / two
+                            call h5_get(pyscf_fid, '/POSTHF/STATES/'//trim(tag_i)//'/RDM2_FULL_REORDERED', G)
+                      else if (h5_exists(pyscf_fid, trim(grp_ji)//'/TRDM1')) then
+                            call need_trdm2(grp_ji)
+                            call h5_get(pyscf_fid, trim(grp_ji)//'/TRDM1', gamma)
+                            call h5_get(pyscf_fid, trim(grp_ji)//'/TRDM2', G)
+                      else if (h5_exists(pyscf_fid, trim(grp_ij)//'/TRDM1')) then
+                            ! real CI vectors: gamma^JI = (gamma^IJ)^T,
+                            ! Gamma^JI(p,q,r,s) = Gamma^IJ(r,s,p,q)
+                            call need_trdm2(grp_ij)
+                            call h5_get(pyscf_fid, trim(grp_ij)//'/TRDM1', gamma)
+                            gamma = transpose(gamma)
+                            call h5_get(pyscf_fid, trim(grp_ij)//'/TRDM2', Gt)
+                            do s = 1, NA
+                                  do r = 1, NA
+                                        do q = 1, NA
+                                              do p = 1, NA
+                                                    G(p, q, r, s) = Gt(r, s, p, q)
+                                              end do
+                                        end do
+                                  end do
+                            end do
+                      else
+                            print*, 'ERROR! SAMSAC0: no transition RDM between states ', &
+                                  trim(tag_j), ' and ', trim(tag_i), &
+                                  ' (other spin? every state must belong to one fcisolver)'
+                            stop
+                      end if
+                      call rdm1_MO_NO_trans(gamma, CMONO_NA, NA)
+                      call rdm2_MO_NO_trans(G, CMONO_NA, NA)
+                      AuxData%trdm(:, :, jp) = gamma
+                      AuxData%trdm2(:, :, :, :, jp) = G
+                      AuxData%trdm_st(:, jp) = AuxData%ms_st(:, J)
+                      AuxData%trdm_ref(:, jp) = AuxData%ms_st(:, I)
+                      AuxData%trdm_diag(jp) = (I == J)
+                end do
+          end do
+
+          ! The diagonal pairs average to the ensemble reference (must be ~0).
+          ! In the ensemble NOs each gamma^II is not diagonal, only their mean.
+          allocate(dg(NA, NA))
+          dg = zero
+          G = zero
+          do jp = 1, M*M
+                if (.not. AuxData%trdm_diag(jp)) cycle
+                dg = dg + AuxData%trdm(:, :, jp) / M
+                G = G + AuxData%trdm2(:, :, :, :, jp) / M
+          end do
+          do p = 1, NA
+                dg(p, p) = dg(p, p) - AuxData%Occ(NI+p)
+          end do
+          call print_info('SA-MS-AC0 pairs (J, I)', AuxData%NJ)
+          write(*, '(2x, a, ES12.3)') 'max |1/M sum_K gamma^KK - diag(Occ)|  :', maxval(abs(dg))
+          write(*, '(2x, a, ES12.3)') 'max |1/M sum_K Gamma^KK - rdm2_full|  :', &
+                maxval(abs(G - AuxData%rdm2_full))
+
+          deallocate(gamma, G, Gt, dg, CMONO_NA)
+
+    contains
+
+          subroutine need_trdm2(grp)
+                character(len=*), intent(in) :: grp
+                if (.not. h5_exists(pyscf_fid, trim(grp)//'/TRDM2')) then
+                      print*, 'ERROR! SAMSAC0 needs ', trim(grp)//'/TRDM2: re-export with'
+                      print*, '       get_data_for_gammcor(..., dump_trdm2=True)'
+                      stop
+                end if
+          end subroutine need_trdm2
+
+    end subroutine load_ms_pairs
 
     subroutine load_rohf_occupation(AuxData)
           type(TACppData), intent(inout) :: AuxData
@@ -2757,10 +3046,10 @@ end subroutine save_2rdm_orca
 
                   call real_ab(CAONO, CAOMO, CMONO)
 
-                  ! MS-AC0 rotates the TRDMs with the same CMONO_NA. Only then: an
-                  ! allocated AuxData%CMONO also switches on the back-transform in
-                  ! dump_ppRDM/dump_hhRDM.
-                  if (Flags%JobType == JOB_TYPE_MSAC0) then
+                  ! MS-AC0 and SA-MS-AC0 rotate the TRDMs with the same CMONO_NA.
+                  ! Only then: an allocated AuxData%CMONO also switches on the
+                  ! back-transform in dump_ppRDM/dump_hhRDM.
+                  if (Flags%JobType == JOB_TYPE_MSAC0 .or. Flags%JobType == JOB_TYPE_SAMSAC0) then
                         if (allocated(AuxData%CMONO)) deallocate(AuxData%CMONO)
                         allocate(AuxData%CMONO(NBasis, NBasis))
                         AuxData%CMONO = CMONO

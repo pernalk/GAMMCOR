@@ -1352,11 +1352,14 @@ call xmsg('t_tog_VAAA_ker', t_tog_VAAA_ker, mdebugg)
                     end do
               end do
 
-              call pherpa_symm_block_ph(ACB_aa%APlus, ACB_aa%AMinus, ACB_aa%Eig, nd, nneg, AuxData%nst(1) > 1)
+              ! excited-state solver for an excited state, and for the SA-MS-AC0
+              ! ensemble (not a ground state)
+              call pherpa_symm_block_ph(ACB_aa%APlus, ACB_aa%AMinus, ACB_aa%Eig, nd, nneg, &
+                    AuxData%nst(1) > 1 .or. AuxData%samsac0)
 #ifdef DEBUG
               call print_block_eigs_ph('A0aa', ACB_aa%Eig, nd)
 #endif
-              if (nneg .gt. 0) call imsg('A0aa negative/zero omega^2 modes', nneg)
+              if (nneg .gt. 0 .or. AuxData%samsac0) call imsg('A0aa negative/zero omega^2 modes', nneg)
 
             end associate
 
@@ -1375,6 +1378,7 @@ call xmsg('t_tog_VAAA_ker', t_tog_VAAA_ker, mdebugg)
             double precision, dimension(:,:), allocatable :: workp, workm
             double precision, dimension(:), allocatable :: eigw, allgather, c
             integer :: k, v, ii, jj, s, q, nd, nneg, ngather, i
+            integer :: nnegtot
             double precision :: val, den, fvv
 
             associate(Occ=>AuxData%Occ, NI=>AuxData%NI, NA=>AuxData%NA, &
@@ -1388,6 +1392,7 @@ call xmsg('t_tog_VAAA_ker', t_tog_VAAA_ker, mdebugg)
 
               allocate(allgather(NV * NA))
               ngather = 0
+              nnegtot = 0
 
               do k = 1, NV
                     v = NIA + k
@@ -1411,7 +1416,9 @@ call xmsg('t_tog_VAAA_ker', t_tog_VAAA_ker, mdebugg)
                           end do
                     end do
 
-                    call pherpa_symm_block_ph(workp, workm, eigw, nd, nneg, AuxData%nst(1) > 1)
+                    call pherpa_symm_block_ph(workp, workm, eigw, nd, nneg, &
+                          AuxData%nst(1) > 1 .or. AuxData%samsac0)
+                    nnegtot = nnegtot + nneg
 
                     ! scatter back, active-local indexing (p = global - NI)
                     do jj = 1, nd
@@ -1433,6 +1440,8 @@ call xmsg('t_tog_VAAA_ker', t_tog_VAAA_ker, mdebugg)
 #ifdef DEBUG
               call print_block_eigs_ph('A0va', allgather, ngather)
 #endif
+              ! SA-MS-AC0 only, so AC0/MSAC0 output is unchanged
+              if (AuxData%samsac0) call imsg('A0va negative/zero omega^2 modes', nnegtot)
 
             end associate
 
@@ -1454,6 +1463,7 @@ call xmsg('t_tog_VAAA_ker', t_tog_VAAA_ker, mdebugg)
             double precision, dimension(:,:), allocatable :: workp, workm
             double precision, dimension(:), allocatable :: eigw, allgather, c
             integer :: k, ii, jj, r, p, nd, nneg, ngather, i
+            integer :: nnegtot
             double precision :: val, den, fii
 
             associate(Occ=>AuxData%Occ, NI=>AuxData%NI, NA=>AuxData%NA, &
@@ -1467,6 +1477,7 @@ call xmsg('t_tog_VAAA_ker', t_tog_VAAA_ker, mdebugg)
 
               allocate(allgather(NI * NA))
               ngather = 0
+              nnegtot = 0
 
               do k = AuxData%NFrozen + 1, NI
                     fii = THCData%fij(k)
@@ -1492,7 +1503,9 @@ call xmsg('t_tog_VAAA_ker', t_tog_VAAA_ker, mdebugg)
                           end do
                     end do
 
-                    call pherpa_symm_block_ph(workp, workm, eigw, nd, nneg, AuxData%nst(1) > 1)
+                    call pherpa_symm_block_ph(workp, workm, eigw, nd, nneg, &
+                          AuxData%nst(1) > 1 .or. AuxData%samsac0)
+                    nnegtot = nnegtot + nneg
 
                     do jj = 1, nd
                           p = ACB_oa%MiniBlocks(k)%ActList(jj)
@@ -1513,6 +1526,8 @@ call xmsg('t_tog_VAAA_ker', t_tog_VAAA_ker, mdebugg)
 #ifdef DEBUG
               call print_block_eigs_ph('A0oa', allgather, ngather)
 #endif
+              ! SA-MS-AC0 only, so AC0/MSAC0 output is unchanged
+              if (AuxData%samsac0) call imsg('A0oa negative/zero omega^2 modes', nnegtot)
 
             end associate
 

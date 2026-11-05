@@ -232,9 +232,11 @@ def is_dmrgci(solver):
 
 
 TRDM1_CONVENTION = 'gamma^JI_pq = 1/2 <J|E_qp|I>, Fortran reads gamma(p,q)'
+TRDM2_CONVENTION = ('Gamma^JI_pqrs = <J|p^+ q^+ s r|I> (spin summed, GAMMCOR order, '
+                    'as RDM2_FULL_REORDERED), Fortran reads Gamma(p,q,r,s)')
 
 
-def dump_transition_rdm1(dump, mycas, state_tags, state_solver):
+def dump_transition_rdm1(dump, mycas, state_tags, state_solver, with_rdm2=False):
     """Write POSTHF/TRANSITIONS/<tagJ>_<tagI>/TRDM1 for every pair I < J
     owned by the same fcisolver (other pairs vanish by symmetry or spin).
 
@@ -243,6 +245,14 @@ def dump_transition_rdm1(dump, mycas, state_tags, state_solver):
     gamma.T is stored, so that Fortran's column-major h5_get sees gamma(p,q).
     gamma^IJ = (gamma^JI)^T for real CI vectors, so only one is written.
     Active orbitals of POSTHF/ORB_COEFF (the SA-CASSCF MOs).
+
+    with_rdm2: also write .../TRDM2 (NA^4), the transition 2-RDM for the aa
+    amplitude of SA-MS-AC0. PySCF trans_rdm12(bra, ket) gives
+    dm2[p,q,r,s] = <bra|p^+ r^+ s q|ket>; reorder_rdm makes it
+    Gamma^JI_pqrs = <J|p^+ q^+ s r|I>, the RDM2_FULL_REORDERED convention
+    (Gamma^II = RDM2_FULL_REORDERED of state I). Gamma.T (all axes reversed)
+    is stored, so Fortran sees Gamma^JI(p,q,r,s); Gamma^IJ(p,q,r,s) =
+    Gamma^JI(r,s,p,q) for real CI vectors.
     """
     ci = mycas.ci
     ncas = mycas.ncas
@@ -252,18 +262,67 @@ def dump_transition_rdm1(dump, mycas, state_tags, state_solver):
             isolver, solver, nelec = state_solver[i]
             if state_solver[j][0] != isolver:
                 continue
-            gamma = 0.5 * np.asarray(solver.trans_rdm1(ci[j], ci[i], ncas, nelec))
             tag_i, tag_j = state_tags[i], state_tags[j]
-            dump.array(f'POSTHF/TRANSITIONS/{tag_j}_{tag_i}/TRDM1', gamma.T,
-                       f'trdm1_{tag_j}_{tag_i}.bin',
-                       attrs={'BRA': tag_j, 'KET': tag_i,
-                              'CONVENTION': TRDM1_CONVENTION,
-                              'BASIS': 'active MOs of POSTHF/ORB_COEFF'})
-            pairs.append((tag_j, tag_i, np.abs(gamma).max()))
+            tgrp = f'POSTHF/TRANSITIONS/{tag_j}_{tag_i}'
+            attrs = {'BRA': tag_j, 'KET': tag_i,
+                     'BASIS': 'active MOs of POSTHF/ORB_COEFF'}
+            if with_rdm2:
+                # the state-average wrapper's trans_rdm12 takes lists of states
+                # and returns their weighted average; call it per pair
+                if hasattr(solver, 'states_trans_rdm12'):
+                    dm1, dm2 = (x[0] for x in solver.states_trans_rdm12(
+                        [ci[j]], [ci[i]], ncas, nelec))
+                else:
+                    dm1, dm2 = solver.trans_rdm12(ci[j], ci[i], ncas, nelec)
+                gamma = 0.5 * np.asarray(dm1)
+                Gamma = reorder_rdm(np.asarray(dm2))
+                dump.array(f'{tgrp}/TRDM2', Gamma.T, f'trdm2_{tag_j}_{tag_i}.bin',
+                           attrs={**attrs, 'CONVENTION': TRDM2_CONVENTION,
+                                  'INDEX_ORDER': 'GAMMCOR'})
+                # partial trace: sum_q Gamma_pqrq = (N_act - 1) <J|E_pr|I>
+                nact = sum(nelec) if hasattr(nelec, '__len__') else nelec
+                trace_err = np.abs(np.einsum('pqrq->pr', Gamma)
+                                   - (nact - 1) * 2.0 * gamma.T).max()
+            else:
+                gamma = 0.5 * np.asarray(solver.trans_rdm1(ci[j], ci[i], ncas, nelec))
+                Gamma, trace_err = None, None
+            dump.array(f'{tgrp}/TRDM1', gamma.T, f'trdm1_{tag_j}_{tag_i}.bin',
+                       attrs={**attrs, 'CONVENTION': TRDM1_CONVENTION})
+            pairs.append((tag_j, tag_i, np.abs(gamma).max(),
+                          None if Gamma is None else np.abs(Gamma).max(), trace_err))
     if pairs:
-        print("\nTransition 1-RDMs written (bra_ket, max |gamma|):")
-        for tag_j, tag_i, gmax in pairs:
-            print(f"  {tag_j}_{tag_i}  {gmax:12.6e}")
+        if with_rdm2:
+            print("\nTransition 1- and 2-RDMs written "
+                  "(bra_ket, max |gamma|, max |Gamma|, partial-trace error):")
+        else:
+            print("\nTransition 1-RDMs written (bra_ket, max |gamma|):")
+        for tag_j, tag_i, gmax, Gmax, terr in pairs:
+            if with_rdm2:
+                print(f"  {tag_j}_{tag_i}  {gmax:12.6e}  {Gmax:12.6e}  {terr:9.2e}")
+            else:
+                print(f"  {tag_j}_{tag_i}  {gmax:12.6e}")
+
+
+def rotate_model_states(mycas, U):
+    """A shallow copy of the SA-CASSCF object with the CI vectors mixed,
+    Phi_I = sum_J Psi_J U_JI, and e_states = diag(U^T diag(E) U). Returns the
+    copy and H0 = U^T diag(E) U (the roots are eigenstates of the CAS
+    Hamiltonian, so this is exact); the caller takes the state energies from
+    diag(H0) (e_states is read-only on the PySCF wrapper). The orbitals and the
+    equal-weight ensemble are unchanged. For the covariance test of SA-MS-AC0 only."""
+    import copy
+    U = np.asarray(U, dtype=np.float64)
+    M = len(mycas.ci)
+    if U.shape != (M, M) or not np.allclose(U.T @ U, np.eye(M), atol=1e-12):
+        raise ValueError(f'model_rotation must be a {M} x {M} orthogonal matrix')
+    E = np.asarray(mycas.e_states, dtype=np.float64)
+    H0 = U.T @ np.diag(E) @ U
+    rot = copy.copy(mycas)
+    rot.ci = [sum(U[J, I] * mycas.ci[J] for J in range(M)) for I in range(M)]
+    print("\nModel-space rotation applied before export; H0 = U^T diag(E) U:")
+    for row in H0:
+        print('  ' + ' '.join(f'{x:18.10f}' for x in row))
+    return rot, H0
 
 
 def calc_full_dm2(dm2s, thresh=1e-8):
@@ -575,7 +634,8 @@ def dump_ks_for_gammcor(mol, mf, mymp=None, mp2_scale=None, dump_eri=True,
 
 def get_data_for_gammcor(mol, myhf, mycas = None, mymp = None, dump_eri=False, simple = True,
                          dump_hdf5 = True, dump_dft = False, mp2_scale = None,
-                         dump_grid = False, tds = None, dump_ab = True, filename = H5FILE):
+                         dump_grid = False, tds = None, dump_ab = True, filename = H5FILE,
+                         dump_trdm2 = False, model_rotation = None):
     """Process and export CASSCF calculation data for GAMMCOR.
 
     dump_hdf5 = True  -> one organized HDF5 file (H5FILE), see _Dump
@@ -585,6 +645,13 @@ def get_data_for_gammcor(mol, myhf, mycas = None, mymp = None, dump_eri=False, s
     mycas = None      -> HF reference only, for JobType MP2/SRMP2
                          (get_rohf_for_gammcor); mymp is optional, for checks
     filename          -> HDF5 file name, e.g. pyscf_data_A.h5 for a SAPT monomer
+    dump_trdm2 = True -> SA-CASSCF only: also the transition 2-RDMs
+                         POSTHF/TRANSITIONS/<J>_<I>/TRDM2 (JobType SAMSAC0)
+    model_rotation    -> SA-CASSCF only, a test of SA-MS-AC0: an M x M orthogonal
+                         matrix U; the states are exported as Phi_I = sum_J Psi_J U_JI
+                         (same orbitals, same ensemble). ENERGY of state I is then
+                         <Phi_I|H|Phi_I> and POSTHF/H0_MODEL = U^T diag(E) U holds
+                         <Phi_K|H|Phi_L>, which GammCor's H lacks off the diagonal.
     """
 
     if dump_dft:
@@ -603,6 +670,13 @@ def get_data_for_gammcor(mol, myhf, mycas = None, mymp = None, dump_eri=False, s
     script_name = sys.argv[0].split('/')[-1].replace('.py', '')
 
     state_av = hasattr(mycas, 'weights') and mycas.weights is not None
+    h0_model = None
+    e_states = mycas.e_states if state_av else None
+    if model_rotation is not None:
+        if not state_av:
+            raise ValueError('model_rotation needs a state-averaged CASSCF')
+        mycas, h0_model = rotate_model_states(mycas, model_rotation)
+        e_states = np.diag(h0_model)
     dump = _Dump(dump_hdf5, filename)
     dump.provenance('SA-CASSCF' if state_av else 'CASSCF')
     dump.system(mol)
@@ -654,7 +728,7 @@ def get_data_for_gammcor(mol, myhf, mycas = None, mymp = None, dump_eri=False, s
 
         # Process each state
         symmetry_state_numbers = {}
-        for i, (symmetry_in, energy) in enumerate(zip(state_symmetries, mycas.e_states)):
+        for i, (symmetry_in, energy) in enumerate(zip(state_symmetries, e_states)):
             if not mol.symmetry:
                 symmetry = 'A'
             else:
@@ -798,8 +872,8 @@ def get_data_for_gammcor(mol, myhf, mycas = None, mymp = None, dump_eri=False, s
             state_tags.append(state_tag)
             state_energies.append(energy)
 
-        # Transition 1-RDMs for MS-AC0 (same mycas.ci as the RDMs above)
-        dump_transition_rdm1(dump, mycas, state_tags, state_solver)
+        # Transition 1-RDMs for MS-AC0, + 2-RDMs for SA-MS-AC0 (same mycas.ci as the RDMs above)
+        dump_transition_rdm1(dump, mycas, state_tags, state_solver, with_rdm2=dump_trdm2)
 
         # Save additional data
         HCore = myhf.get_hcore()
@@ -811,6 +885,10 @@ def get_data_for_gammcor(mol, myhf, mycas = None, mymp = None, dump_eri=False, s
                    attrs={'TYPE': 'CANONICAL', 'DIMS': ['mo', 'ao']})
         dump.array('INTS/CORE_HAMILTONIAN', HCore.T, 'HCore.bin')
         dump.states_index(state_tags, state_energies, mycas.weights)
+        if h0_model is not None:
+            dump.array('POSTHF/H0_MODEL', h0_model.T,
+                       attrs={'CONVENTION': '<Phi_K|H|Phi_L> of the exported (rotated) states, '
+                              'order of STATE_LABELS, with ENUC'})
 
 
         if dump_eri:
