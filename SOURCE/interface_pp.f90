@@ -1106,13 +1106,17 @@ contains
           ! with I: POSTHF/TRANSITIONS/<J>_<I> as is, <I>_<J> transposed (the
           ! exporter stores one per pair). Rotated to the active NOs of I with the
           ! CMONO_NA of Trans2NO_AO, as the RDMs. Fills NJ, trdm, trdm_st.
+          ! AAModes TRUE (ms_aa): also trdm2(:,:,:,:,j) = Gamma^JI(p,q,r,s) =
+          ! <J|p+ q+ s r|I> from .../TRDM2, <I>_<J> with Gamma(p,q,r,s) <-
+          ! Gamma(r,s,p,q), rotated like the RDM2 (as load_ms_pairs).
           type(TACppData), intent(inout) :: AuxData
 
           character(len=16)  :: tag_i, tag_k
           character(len=128) :: path_ki, path_ik
           double precision, dimension(:,:), allocatable :: gamma, CMONO_NA
+          double precision, dimension(:,:,:,:), allocatable :: G, Gt
           integer :: orient(10)
-          integer :: k, n, m, j, NI, NA
+          integer :: k, n, m, j, NI, NA, p, q, r, s
 
           n = AuxData%nst(1)
           m = AuxData%nst(2)
@@ -1156,6 +1160,11 @@ contains
           allocate(AuxData%trdm_st(2, AuxData%NJ))
           allocate(gamma(NA, NA))
           call active_CMONO(AuxData, CMONO_NA)
+          if (AuxData%ms_aa) then
+                if (allocated(AuxData%trdm2)) deallocate(AuxData%trdm2)
+                allocate(AuxData%trdm2(NA, NA, NA, NA, AuxData%NJ))
+                allocate(G(NA, NA, NA, NA), Gt(NA, NA, NA, NA))
+          end if
 
           j = 0
           do k = 1, 10
@@ -1175,6 +1184,30 @@ contains
                 AuxData%trdm(:, :, j) = gamma
                 AuxData%trdm_st(1, j) = k
                 AuxData%trdm_st(2, j) = m
+
+                if (AuxData%ms_aa) then
+                      if (orient(k) == 1) then
+                            path_ki = '/POSTHF/TRANSITIONS/'//trim(tag_k)//'_'//trim(tag_i)//'/TRDM2'
+                            call need_trdm2(path_ki)
+                            call h5_get(pyscf_fid, trim(path_ki), G)
+                      else
+                            ! Gamma^JI(p,q,r,s) = Gamma^IJ(r,s,p,q) for real CI vectors
+                            path_ik = '/POSTHF/TRANSITIONS/'//trim(tag_i)//'_'//trim(tag_k)//'/TRDM2'
+                            call need_trdm2(path_ik)
+                            call h5_get(pyscf_fid, trim(path_ik), Gt)
+                            do s = 1, NA
+                                  do r = 1, NA
+                                        do q = 1, NA
+                                              do p = 1, NA
+                                                    G(p, q, r, s) = Gt(r, s, p, q)
+                                              end do
+                                        end do
+                                  end do
+                            end do
+                      end if
+                      call rdm2_MO_NO_trans(G, CMONO_NA, NA)
+                      AuxData%trdm2(:, :, :, :, j) = G
+                end if
           end do
 
           write(*, '(1x, "MS-AC0: reference ", A, ", partners:")', advance='no') trim(tag_i)
@@ -1182,8 +1215,24 @@ contains
                 write(*, '(1x, I0, ".", I0)', advance='no') AuxData%trdm_st(1, j), AuxData%trdm_st(2, j)
           end do
           write(*, *)
+          if (AuxData%ms_aa) then
+                write(*, '(1x, a)') 'MS-AC0: AAModes TRUE, aa modes kept with the transition 2-RDMs'
+                deallocate(G, Gt)
+          end if
 
           deallocate(gamma, CMONO_NA)
+
+    contains
+
+          subroutine need_trdm2(path)
+                character(len=*), intent(in) :: path
+                if (.not. h5_exists(pyscf_fid, trim(path))) then
+                      print*, 'ERROR! MSAC0 with AAModes TRUE needs ', trim(path)
+                      print*, '       re-export with get_data_for_gammcor(..., dump_trdm2=True)'
+                      stop
+                end if
+          end subroutine need_trdm2
+
     end subroutine load_transition_rdm1
 
     subroutine active_CMONO(AuxData, CMONO_NA)

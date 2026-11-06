@@ -228,6 +228,10 @@ character(*),parameter :: PossibleUnits(2) = &
          logical :: Restart    = FLAG_RESTART
          logical :: Triplet    = FLAG_TRIPLET
          logical :: PostCAS    = FLAG_POSTCAS
+         ! MSAC0 (PySCF THC route): .true. keeps the aa modes on the left of
+         ! Delta H_JI, with the transition 2-RDM in their amplitude (needs
+         ! TRANSITIONS/<J>_<I>/TRDM2 in pyscf_data.h5). Default: no aa modes.
+         logical :: AAModes    = .false.
          integer :: Algorithm  = ALG_REGULAR
          integer :: Intformat  = INT_DEFAULT
          integer :: Parser     = PARSER_MH

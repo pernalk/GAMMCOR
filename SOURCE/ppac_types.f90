@@ -263,6 +263,9 @@ module ppac_types
             ! = <J|p+ q+ s r|I> (normalization of RDM2_FULL_REORDERED). trdm and
             ! trdm2 are in the ensemble NOs.
             logical :: samsac0 = .false.
+            ! MSAC0 with AAModes TRUE: aa modes kept, trdm2 read for every
+            ! partner J (pairs (J, I), J /= I, as trdm)
+            logical :: ms_aa = .false.
             integer :: MS_M = 0
             integer, dimension(:,:), allocatable :: ms_st
             double precision, dimension(:), allocatable :: ms_ecas

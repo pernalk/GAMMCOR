@@ -796,6 +796,19 @@ subroutine read_block_calculation(CalcParams, line)
       case ("POSTCAS")
            read(val,*) CalcParams%PostCAS
 
+      case ("AAMODES", "AA_MODES")
+           ! MSAC0: aa modes with the transition 2-RDM (default FALSE)
+           if (uppercase(val) == ".TRUE." .or. uppercase(val) == "TRUE" .or. &
+               uppercase(val) == "T") then
+              CalcParams%AAModes = .true.
+           elseif (uppercase(val) == ".FALSE." .or. uppercase(val) == "FALSE" .or. &
+                   uppercase(val) == "F") then
+              CalcParams%AAModes = .false.
+           else
+              write(LOUT,'(1x,a)') 'ERROR! AAModes takes TRUE or FALSE, got: '//trim(val)
+              stop
+           endif
+
       case("MAX_CN")
             read(val,*) CalcParams%Max_Cn
       case("MAX_CNPP")
@@ -1190,6 +1203,13 @@ integer :: imon
     stop
  endif
 
+ if(Input%CalcParams%AAModes .and. &
+    Input%CalcParams%JobType /= JOB_TYPE_MSAC0) then
+    write(LOUT,'(1x,a)') 'ERROR! AAModes TRUE is an option of JobType MSAC0 only'
+    write(LOUT,'(1x,a)') '       (SAMSAC0 always keeps the aa modes)'
+    stop
+ endif
+
  if(Input%CalcParams%Algorithm == ALG_THC) then
     if((Input%CalcParams%JobType /= JOB_TYPE_AC0 .and. &
         Input%CalcParams%JobType /= JOB_TYPE_MSAC0 .and. &
@@ -1309,6 +1329,8 @@ associate( CalcParams => Input%CalcParams)
                       PossibleJobType(CalcParams%JOBtype)
  if (CalcParams%IVEMB==1) &
  write(LOUT, '(1x,a,2x,a)')"DMRG-in-DFT: ", ".TRUE."
+ if (CalcParams%AAModes) &
+ write(LOUT, '(1x,a,5x,a)')"AA MODES: ", ".TRUE. (with transition 2-RDM)"
  write(LOUT,' (1x,a,5x,a)') "RDM TYPE: ",  &
               PossibleRDMType(CalcParams%RDMType)
  write(LOUT,' (1x,a,3x,a)') "RDM SOURCE: ",  &

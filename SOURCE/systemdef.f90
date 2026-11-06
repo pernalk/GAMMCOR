@@ -527,6 +527,13 @@ end select
         stop
   end if
 
+  ! AAModes (MSAC0 only, check_Input) exists only in the ph THC code
+  if (Input%CalcParams%AAModes .and. .not. ph_thc_at) then
+        write(LOUT,'(1x,a)') 'ERROR! AAModes TRUE needs Interface PYSCF and either'
+        write(LOUT,'(1x,a)') 'TwoMoInt FOFO + Cholesky THC or TwoMoInt INCORE + Algorithm THC.'
+        stop
+  end if
+
   ! SA-MS-AC0 exists only in the ph THC code; its model space is every state
   ! in pyscf_data.h5 (one fcisolver), so no State is taken.
   if (Flags%JobType == JOB_TYPE_SAMSAC0) then
@@ -721,6 +728,7 @@ if(Flags%ISAPT.Eq.0) then
    AuxData%Batchdim = Input%CalcParams%BatchDim
    AuxData%nst        = System%InSt(:,1) 
    AuxData%samsac0    = (Flags%JobType == JOB_TYPE_SAMSAC0)
+   AuxData%ms_aa      = (Flags%JobType == JOB_TYPE_MSAC0 .and. Input%CalcParams%AAModes)
 
    if(Flags%Parser.Eq.PARSER_AT) then
          AuxData%HType = Input%CalcParams%Htype

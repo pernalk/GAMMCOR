@@ -220,7 +220,7 @@ contains
               NJ = AuxData%NJ
               allocate(vecYJ(NJ), GJ(NJ), t2max(NJ))
               t2max = zero
-              if (AuxData%samsac0) then
+              if (AuxData%samsac0 .or. AuxData%ms_aa) then
                     allocate(occ_act(NA))
                     occ_act = AuxData%Occ(NI+1:NIA)
               end if
@@ -229,6 +229,14 @@ contains
                           call build_YJ(vecYJ(j), vecXp, vecYm, ACB(phA0oa), ACB(phA0va), &
                                 AuxData%trdm(:,:,j), NA, NV, NI0, NI, &
                                 is_diag=AuxData%trdm_diag(j), AA=ACB(phA0aa), &
+                                Gam2=AuxData%trdm2(:,:,:,:,j), Gam2_bar=AuxData%rdm2_full, &
+                                occ_act=occ_act, t2max=t2max(j))
+                    else if (AuxData%ms_aa) then
+                          ! MSAC0 + AAModes: J /= I only, so dg = gamma^JI and
+                          ! dG = Gamma^JI (Gam2_bar, occ_act unused)
+                          call build_YJ(vecYJ(j), vecXp, vecYm, ACB(phA0oa), ACB(phA0va), &
+                                AuxData%trdm(:,:,j), NA, NV, NI0, NI, &
+                                is_diag=.false., AA=ACB(phA0aa), &
                                 Gam2=AuxData%trdm2(:,:,:,:,j), Gam2_bar=AuxData%rdm2_full, &
                                 occ_act=occ_act, t2max=t2max(j))
                     else
@@ -695,6 +703,8 @@ contains
                     DeltaH(j) = EJ_aoao(j) + EJ_aaao(j) + EJ_voao(j) &
                           + EJ_vaao(j) + EJ_vaaa(j) + EJ_vavo(j) + EJ_vava(j)
                     if (AuxData%samsac0) DeltaH(j) = DeltaH(j) + EJ_voaa(j) + EJ_vovo
+                    ! MSAC0 + AAModes: the aa-left (31)(22) term (no vo-left core, J /= I)
+                    if (AuxData%ms_aa) DeltaH(j) = DeltaH(j) + EJ_voaa(j)
                     write(*, '(/, 1x, a, I0, ".", I0, a, I0, ".", I0)') &
                           'MS-AC0: contributions to Delta H_JI, J = ', &
                           AuxData%trdm_st(1, j), AuxData%trdm_st(2, j), &
@@ -710,7 +720,7 @@ contains
                     call print_block_contribution('(32)(22)', EJ_vaaa(j))
                     call print_block_contribution('(32)(31)', EJ_vavo(j))
                     call print_block_contribution('(32)(32)', EJ_vava(j))
-                    if (AuxData%samsac0) &
+                    if (AuxData%samsac0 .or. AuxData%ms_aa) &
                           write(*, '(2x, a, ES12.3)') 'max |Term 2| (aa amplitude)  :', t2max(j)
                     ! the diagonal element carries E^CAS_I (without ENuc, as for MSAC0)
                     Hval = DeltaH(j)

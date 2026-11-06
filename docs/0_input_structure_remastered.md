@@ -187,6 +187,32 @@ end
 A complete example (LiF, two states, a bond-length scan) is in
 `testjobs/pyscf-tests/test-MSAC0/LiF`.
 
+**Optional: aa modes (`AAModes`).** By default MS-AC0 leaves out the
+active-active (aa) excitations from the couplings `H(J,I)`, as the Molpro
+implementation does. With
+
+```text
+Calculation
+ ...
+ JobType   MSAC0
+ AAModes   TRUE
+end
+```
+
+the aa excitations are kept, and their contribution is computed with the
+transition 2-RDMs between the states. These must be in the file, so export
+with
+
+```python
+get_data_for_gammcor(mol, myhf, mycas, dump_trdm2=True)
+```
+
+(the run stops with this hint if they are missing).
+
+| Keyword | Block | Values |
+|---|---|---|
+| `AAModes` (also `AA_Modes`) | `Calculation` | `FALSE` (default): no aa modes; `TRUE`: aa modes with the transition 2-RDM. Accepts `TRUE`/`T`/`.TRUE.` and `FALSE`/`F`/`.FALSE.`; anything else stops |
+
 ### What it does
 
 MS-AC0 builds a small effective Hamiltonian `H` over the CASSCF states and
@@ -199,6 +225,9 @@ The run with reference `I` prints its elements of `H` as
  H_mn  I  I  value       the AC0 energy of state I, without nuclear repulsion
  H_mn  J  I  value       the coupling of state J to state I
 ```
+
+The diagonal `H(I,I)` is the same with and without `AAModes`; only the
+couplings `H(J,I)` change.
 
 `H(I,J)` and `H(J,I)` come from different runs and are not equal. The tool
 `gammcor_heff` (from `gammcor_tools`) collects them from the outputs of all
@@ -213,8 +242,12 @@ gammcor_heff gammcor_1.out gammcor_2.out
 
 | Route | Limits |
 |---|---|
-| Molpro | at most 10 states; all must have the **same symmetry** (not checked) |
-| PySCF, THC | state-averaged CASSCF only; only states of the reference's symmetry and spin |
+| Molpro | at most 10 states; all must have the **same symmetry** (not checked); no `AAModes` |
+| PySCF, THC | state-averaged CASSCF only; only states of the reference's symmetry and spin; `AAModes TRUE` needs `dump_trdm2=True` |
+
+`AAModes` is accepted only with `JobType MSAC0`, and only in the PySCF THC
+route; any other combination stops. `JobType SAMSAC0` always keeps the aa
+modes and does not take the keyword.
 
 ## State-averaged MS-AC0 (SA-MS-AC0)
 
