@@ -105,6 +105,8 @@ subroutine WIter_D12Chol(ECorr,AC1,Max_Cn,XOne,URe,Occ,EGOne,NGOcc,&
 !
 !  A difference with WIter_DChol: no need to compute COMTildeAct
 !
+!  Notation: DChol = D1, DCholAct = D2
+!
 use abfofo
 use systemdef
 ! only to use Y01CAS_FOFO
@@ -148,8 +150,13 @@ type(EblockData),allocatable :: A0block(:),Lambda(:)
 
 ! DBBSC
 integer :: NCholErf,NCholFR
+integer :: IC2EX
 double precision :: ECorrLR
+double precision :: ECorrTmp
 double precision, allocatable :: DBCholAct(:,:)
+double precision, allocatable :: ABPLUS1B(:,:)
+double precision, allocatable :: ABMIN1B(:,:)
+double precision, allocatable :: A1B(:,:)
 
 ! avoid module via interface
 interface
@@ -180,10 +187,17 @@ call create_D12_array(NCholesky, DChol, DCholAct, NDimX, NBasis, IndN, Occ, IndA
 !print*, 'DCholAct  =', norm2(DCholAct)
 ! =============================================================================================
 
+! set handling of A2 matrix in CBS[H]
+if (IDBBSC == 2) then
+ IC2EX = 1  ! A2 = A1PLUSB.A1MIN + A1PLUS.A1MINB
+ !IC2EX = 0  ! A2 = A1PLUS.A1MIN
+ !print*, 'Use approximate C(2)!'
+endif
+
 NGrid=18
 
-print*, 'NDim  =', NDim
-print*, 'NDimX =', NDimX
+!print*, 'NDim  =', NDim
+!print*, 'NDimX =', NDimX
 
 If(AC1.Eq.0) Then
 Write (6,'(/,X,''AC calculation through W_AC expansion around Alpha=0, Omega Grid = '',I3,&
@@ -248,8 +262,10 @@ call AB_CAS_FOFO(ABPLUS1,ABMIN1,ECASSCF,URe,Occ,XOne, &
               NInte1,twojfile,twokfile,ICholesky,IDBBSC,ACAlpha,.true.)
               ! AB1=.true: AB1 = AB1 - A0
 
- write(lout,'(/1x,a,f20.12)') 'ABPLUS1-FOFO =',norm2(ABPLUS1)
- write(lout,'(1x,a,f20.12)')  'ABMIN1 -FOFO =',norm2(ABMIN1)
+ write(lout,'(/1x,a,f20.12)') &
+    trim(merge('ABPLUS1B-FOFO =', 'ABPLUS1-FOFO = ', IDBBSC == 2)), norm2(ABPLUS1)
+ write(lout,'(1x,a,f20.12)') &
+    merge('ABMIN1B-FOFO =', 'ABMIN1 -FOFO =', IDBBSC == 2), norm2(ABMIN1)
 
 !Call sq_symmetrize(ABPLUS1,NDimX)
 !Call sq_symmetrize(ABMIN1,NDimX)
@@ -266,7 +282,7 @@ call AB_CAS_FOFO(ABPLUS1,ABMIN1,ECASSCF,URe,Occ,XOne, &
 !call mem_alloc(A1,NDimX*NDimX)
 call ABPM_HALFTRAN_GEN_L(ABMIN1, A1,0.0d0,A0Block,A0BlockIV,nblk,NDimX,NDimX,'Y')
 call ABPM_HALFTRAN_GEN_R(ABPLUS1,A1,1.0d0,A0Block,A0BlockIV,nblk,NDimX,NDimX,'X')
-!print*, 'A1',norm2(A1)
+print*, 'A1',norm2(A1)
 
 EGOne(1)=ECASSCF
 
@@ -282,6 +298,40 @@ allocate(APLUS1Tilde(NDimX*NCholesky))
 !call mem_alloc(APLUS1Tilde,NDimX*NCholesky)
 Call dgemm('N','T',NDimX,NCholesky,NDimX,1d0,ABPLUS1,NDimX,DChol,NCholesky,0.0d0,APLUS1Tilde,NDimX)
 !print*, 'regul APLUS1Tilde = ', norm2(APLUS1Tilde)
+
+if (IDBBSC == 2) then
+  ! At this point, A1, ABPLUS1, ABMIN1 are CBS[H]-modified
+  ! i.e., they include SR integrals
+
+  allocate(ABPLUS1B(NDimX,NDimX))
+  allocate(ABMIN1B(NDimX,NDimX))
+  allocate(A1B(NDimX,NDimX))
+  ! save A1B and ABPLUS1B for C^LR
+  ABPLUS1B = ABPLUS1
+  ABMIN1B  = ABMIN1
+  A1B      = A1
+
+  ! Construct A1, A+ and A- with non-modified integrals
+  call AB_CAS_FOFO(ABPLUS1,ABMIN1,ECASSCF,URe,Occ,XOne, &
+                IndN,IndX,IGem,NAct,INActive,NElecBEmb, &
+                NDimX,NBasis,NDimX, &
+                NInte1,twojfile,twokfile,ICholesky,0,ACAlpha,.true.)
+                ! AB1=.true: AB1 = AB1 - A0
+
+  write(lout,'(/1x,a,f20.12)') 'ABPLUS1-FOFO = ', norm2(ABPLUS1)
+  write(lout,'(1x,a,f20.12)')  'ABMIN1-FOFO  = ', norm2(ABMIN1)
+
+  A1 = 0.d0
+  call ABPM_HALFTRAN_GEN_L(ABMIN1, A1,0.0d0,A0Block,A0BlockIV,nblk,NDimX,NDimX,'Y')
+  call ABPM_HALFTRAN_GEN_R(ABPLUS1,A1,1.0d0,A0Block,A0BlockIV,nblk,NDimX,NDimX,'X')
+  print*, 'A1 regular= ', norm2(A1)
+
+endif
+!print*, 'test old'
+!allocate(ABPLUS1B(NDimX,NDimX))
+!allocate(A1B(NDimX,NDimX))
+!A1B = A1
+!ABPLUS1B = ABPLUS1
 
 deallocate(DChol)
 deallocate(A0block)
@@ -334,7 +384,11 @@ Do IGL=1,NGrid
    C0Tilde = 0.5d0*C0Tilde
 
 !  Calc: C1Tilde=LAMBDA.(1/2 APLUS1Tilde - A1.C0Tilde)
-   Call dgemm('N','N',NDimX,NCholesky,NDimX,1.d0,A1,NDimX,C0Tilde,NDimX,0.0d0,WORK0,NDimX)
+   if (IDBBSC==2) then
+      Call dgemm('N','N',NDimX,NCholesky,NDimX,1.d0,A1B,NDimX,C0Tilde,NDimX,0.0d0,WORK0,NDimX)
+   else
+      Call dgemm('N','N',NDimX,NCholesky,NDimX,1.d0,A1, NDimX,C0Tilde,NDimX,0.0d0,WORK0,NDimX)
+   endif
    WORK0 = 0.5d0*APLUS1Tilde - WORK0
    Call ABPM_HALFTRAN_GEN_L(WORK0,C1Tilde,0.0d0,Lambda,LambdaIV,nblk,NDimX,NCholesky,'X')
 
@@ -346,9 +400,34 @@ Do IGL=1,NGrid
        XFactorial=XFactorial*N
        XN1=-N
        XN2=-N*(N-1)
-       Call dgemm('N','N',NDimX,NCholesky,NDimX,XN2,ABMIN1,NDimX,C0Tilde,NDimX,0.0d0,WORK1,NDimX)
-       Call dgemm('N','N',NDimX,NCholesky,NDimX,1.d0,ABPLUS1,NDimX,WORK1,NDimX,0.0d0,WORK0,NDimX)
-       Call dgemm('N','N',NDimX,NCholesky,NDimX,XN1,A1,NDimX,C1Tilde,NDimX,1.0d0,WORK0,NDimX)
+       if (IC2EX == 1 .and. N == 2) then
+          ! WORK0 = XN2 * ABPLUS1B * ABMIN1 * C0Tilde
+          call dgemm('N','N',NDimX,NCholesky,NDimX, &
+               XN2,ABMIN1,NDimX,C0Tilde,NDimX, &
+               0.d0,WORK1,NDimX)
+          call dgemm('N','N',NDimX,NCholesky,NDimX, &
+               1.d0,ABPLUS1B,NDimX,WORK1,NDimX, &
+               0.d0,WORK0,NDimX)
+          ! Add XN2 * ABPLUS1 * ABMIN1B * C0Tilde
+          call dgemm('N','N',NDimX,NCholesky,NDimX, &
+               XN2,ABMIN1B,NDimX,C0Tilde,NDimX, &
+               0.d0,WORK1,NDimX)
+          call dgemm('N','N',NDimX,NCholesky,NDimX, &
+               1.d0,ABPLUS1,NDimX,WORK1,NDimX, &
+               1.d0,WORK0,NDimX)
+          !! should we subtract an extra A(1)+A(-)- term?
+          !! WORK0 -= XN2 * ABPLUS1 * ABMIN1 * C0Tilde
+          !call dgemm('N','N',NDimX,NCholesky,NDimX, &
+          !     -XN2,ABMIN1,NDimX,C0Tilde,NDimX, &
+          !     0.d0,WORK1,NDimX)
+          !call dgemm('N','N',NDimX,NCholesky,NDimX, &
+          !     1.d0,ABPLUS1,NDimX,WORK1,NDimX, &
+          !     1.d0,WORK0,NDimX)
+       else
+          call dgemm('N','N',NDimX,NCholesky,NDimX,XN2,ABMIN1,NDimX,C0Tilde,NDimX,0.0d0,WORK1,NDimX)
+          call dgemm('N','N',NDimX,NCholesky,NDimX,1.d0,ABPLUS1,NDimX,WORK1,NDimX,0.0d0,WORK0,NDimX)
+          call dgemm('N','N',NDimX,NCholesky,NDimX,XN1,A1,NDimX,C1Tilde,NDimX,1.0d0,WORK0,NDimX)
+       endif
        Call ABPM_HALFTRAN_GEN_L(WORK0,C2Tilde,0.0d0,Lambda,LambdaIV,nblk,NDimX,NCholesky,'X')
        FF=WFact/XFactorial/(N+1)
        If(AC1.Eq.1) FF=WFact/XFactorial/2.D0
@@ -380,13 +459,17 @@ deallocate(WORK1,WORK0)
 
 if (IDBBSC == 2) then
    ! calculate LR contribution to ACn-CBS[H]
-   call WIter_D12CholErf_CBSH(ECorrLR,AC1,Max_Cn,ABMIN1,ABPLUS1,A1,Occ,IndN,IndAux,&
-                              NAct,INActive,NDimX,NBasis,IDBBSC)
+   call WIter_D12CholErf_CBSH(ECorrLR,AC1,Max_Cn,ABMIN1,ABPLUS1,A1, &
+                              ABMIN1B,ABPLUS1B,A1B, &
+                              Occ,IndN,IndAux,NAct,INActive,NDimX,NBasis,IDBBSC,IC2EX)
 endif
 
 deallocate(A1)
 deallocate(ABMIN1)
 deallocate(ABPLUS1)
+! deallocate two extra matrices for CBS[H]
+if (IDBBSC ==2) deallocate(ABPLUS1B,A1B)
+if (IDBBSC ==2) deallocate(ABMIN1B)
 
 !call mem_dealloc(WORK1)
 !call mem_dealloc(WORK0)
@@ -408,13 +491,16 @@ deallocate(ABPLUS1)
 !ECorrLR = 0d0
 
 ECorr=0d0
+ECorrTmp=0d0
 if (IDBBSC ==2) then
    do j=1,NDimX
       do i=1,NCholesky
          ECorr=ECorr+(DCholAct(i,j)+DBCholAct(i,j))*COMTilde(j+(i-1)*NDimX)
          !ECorr=ECorr+(DCholAct(i,j)+DBCholAct(i,j))*WorkD(j,i)
+         ECorrTmp=ECorrTmp+DBCholAct(i,j)*COMTilde(j+(i-1)*NDimX)
       enddo
    enddo
+   print*, 'ECorr   ', ECorr-ECorrTmp
    ECorr = ECorr + ECorrLR
 else
   do j=1,NDimX
@@ -424,6 +510,8 @@ else
      enddo
   enddo
 endif
+print*, 'ECorr DB', ECorrTmp
+print*, 'ECorr LR', ECorrLR
 
 deallocate(COMTilde)
 !deallocate(WorkD,COMTilde)
@@ -442,7 +530,8 @@ Call RELEASE_AC0BLOCK(A0Block,A0blockIV,nblk)
 
 end subroutine WIter_D12Chol
 
-subroutine WIter_D12CholErf_CBSH(ECorrLR,AC1,Max_Cn,ABMIN1,ABPLUS1,A1,Occ,IndN,IndAux,NAct,INActive,NDimX,NBasis,IDBBSC)
+subroutine WIter_D12CholErf_CBSH(ECorrLR,AC1,Max_Cn,ABMIN1,ABPLUS1,A1,ABMIN1B,ABPLUS1B,A1B, &
+                                 Occ,IndN,IndAux,NAct,INActive,NDimX,NBasis,IDBBSC,IC2EX)
 !
 ! ECorrLR = - sum_p>q \sum_r>s \sum_L \int dOm CBLR(Om) D2B
 !
@@ -456,8 +545,11 @@ integer,intent(in) :: NAct,INActive,NDimX,NBasis
 integer,intent(in) :: Max_Cn,AC1
 integer,intent(in) :: IndN(2,NDimX),IndAux(NBasis)
 integer,intent(in) :: IDBBSC
+integer,intent(in) :: IC2EX
 double precision,intent(in)  :: ABMIN1(NDimX,NDimX),ABPLUS1(NDimX,NDimX)
 double precision,intent(in)  :: A1(NDimX,NDimX)
+double precision,intent(in)  :: ABMIN1B(NDimX,NDimX),ABPLUS1B(NDimX,NDimX)
+double precision,intent(in)  :: A1B(NDimX,NDimX)
 double precision,intent(in)  :: Occ(NBasis)
 double precision,intent(out) :: ECorrLR
 
@@ -465,6 +557,7 @@ integer :: iunit
 integer :: NOccup
 integer :: IGL,NGrid
 integer :: NCholErf
+integer :: NCholErfB ! consistency test
 
 integer :: iblk,nblk
 integer :: i,j,n
@@ -521,9 +614,13 @@ call create_D12_array(NCholErf,DCholErf,WorkD,NDimX,NBasis,IndN,Occ,IndAux,'chol
 deallocate(WorkD) ! only D1LR needed
 
 ! chol1vLR : Contains transformed Long-range Cholesky vecs: (L|erf|pq*)
-call create_D2B_array(NCholErf,DBCholErfAct,NDimX,NOccup,NBasis,IndN,Occ,IndAux,'chol1vLR')
+call create_D2B_array(NCholErfB,DBCholErfAct,NDimX,NOccup,NBasis,IndN,Occ,IndAux,'chol1vLR')
 ! print*, 'NCholErf =',NCholErf
 ! print*, 'DBCholErfAct =', norm2(DBCholErfAct)
+
+if (NCholErfB /= NCholErf) then
+   stop 'Inconsistent LR Cholesky dimensions'
+endif
 
 ! read AC0BLOCK with ver=0 : A-(0) and A+(0) matrices
 !                            stored in X and Y
@@ -550,10 +647,10 @@ APLUS0Tilde = 0.d0 !AT initialize uninitialized matrix
 call ABPM_BLKAT(NCholErf,NDimX,DCholErf,APLUS0Tilde,0.0d0,A0Block,A0BlockIV,nblk,'Y')
 !print*, 'cbs-h APLUS0Tilde = ', norm2(APLUS0Tilde)
 
-!Calc: APLUS1Tilde=ABPLUS1.DCholErf
+!Calc: APLUS1Tilde=ABPLUS1B.DCholErf
 allocate(APLUS1Tilde(NDimX*NCholErf))
-Call dgemm('N','T',NDimX,NCholErf,NDimX,1d0,ABPLUS1,NDimX,DCholErf,NCholErf,0.0d0,APLUS1Tilde,NDimX)
-!print*, 'cbs-h APLUS0Tilde = ', norm2(APLUS1Tilde)
+Call dgemm('N','T',NDimX,NCholErf,NDimX,1d0,ABPLUS1B,NDimX,DCholErf,NCholErf,0.0d0,APLUS1Tilde,NDimX)
+!print*, 'cbs-h APLUS1Tilde = ', norm2(APLUS1Tilde)
 
 deallocate(DCholErf)
 
@@ -613,8 +710,8 @@ Do IGL=1,NGrid
    Call ABPM_HALFTRAN_GEN_L(APLUS0Tilde,C0Tilde,0.0d0,Lambda,LambdaIV,nblk,NDimX,NCholErf,'X')
    C0Tilde = 0.5d0*C0Tilde
 !
-!  Calc: C1Tilde=LAMBDA.(1/2 APLUS1Tilde - A1.C0Tilde)
-   Call dgemm('N','N',NDimX,NCholErf,NDimX,1.d0,A1,NDimX,C0Tilde,NDimX,0.0d0,WORK0,NDimX)
+!  Calc: C1TildeB=LAMBDA.(1/2 APLUS1TildeB - A1B.C0Tilde)
+   Call dgemm('N','N',NDimX,NCholErf,NDimX,1.d0,A1B,NDimX,C0Tilde,NDimX,0.0d0,WORK0,NDimX)
    WORK0 = 0.5d0*APLUS1Tilde - WORK0
    Call ABPM_HALFTRAN_GEN_L(WORK0,C1Tilde,0.0d0,Lambda,LambdaIV,nblk,NDimX,NCholErf,'X')
 
@@ -626,9 +723,34 @@ Do IGL=1,NGrid
        XFactorial=XFactorial*N
        XN1=-N
        XN2=-N*(N-1)
-       Call dgemm('N','N',NDimX,NCholErf,NDimX,XN2,ABMIN1,NDimX,C0Tilde,NDimX,0.0d0,WORK1,NDimX)
-       Call dgemm('N','N',NDimX,NCholErf,NDimX,1.d0,ABPLUS1,NDimX,WORK1,NDimX,0.0d0,WORK0,NDimX)
-       Call dgemm('N','N',NDimX,NCholErf,NDimX,XN1,A1,NDimX,C1Tilde,NDimX,1.0d0,WORK0,NDimX)
+       if (IC2EX == 1 .and. N == 2) then
+          ! WORK0 = XN2 * ABPLUS1B * ABMIN1 * C0Tilde
+          call dgemm('N','N',NDimX,NCholErf,NDimX, &
+               XN2,ABMIN1,NDimX,C0Tilde,NDimX, &
+               0.d0,WORK1,NDimX)
+          call dgemm('N','N',NDimX,NCholErf,NDimX, &
+               1.d0,ABPLUS1B,NDimX,WORK1,NDimX, &
+               0.d0,WORK0,NDimX)
+          ! Add XN2 * ABPLUS1 * ABMIN1B * C0Tilde
+          call dgemm('N','N',NDimX,NCholErf,NDimX, &
+               XN2,ABMIN1B,NDimX,C0Tilde,NDimX, &
+               0.d0,WORK1,NDimX)
+          call dgemm('N','N',NDimX,NCholErf,NDimX, &
+               1.d0,ABPLUS1,NDimX,WORK1,NDimX, &
+               1.d0,WORK0,NDimX)
+          !! should we subtract an extra A(1)+A(-)- term?
+          !! WORK0 -= XN2 * ABPLUS1 * ABMIN1 * C0Tilde
+          !call dgemm('N','N',NDimX,NCholErf,NDimX, &
+          !     -XN2,ABMIN1,NDimX,C0Tilde,NDimX, &
+          !     0.d0,WORK1,NDimX)
+          !call dgemm('N','N',NDimX,NCholErf,NDimX, &
+          !     1.d0,ABPLUS1,NDimX,WORK1,NDimX, &
+          !     1.d0,WORK0,NDimX)
+       else
+          Call dgemm('N','N',NDimX,NCholErf,NDimX,XN2,ABMIN1,NDimX,C0Tilde,NDimX,0.0d0,WORK1,NDimX)
+          Call dgemm('N','N',NDimX,NCholErf,NDimX,1.d0,ABPLUS1,NDimX,WORK1,NDimX,0.0d0,WORK0,NDimX)
+          Call dgemm('N','N',NDimX,NCholErf,NDimX,XN1,A1,NDimX,C1Tilde,NDimX,1.0d0,WORK0,NDimX)
+       endif
        Call ABPM_HALFTRAN_GEN_L(WORK0,C2Tilde,0.0d0,Lambda,LambdaIV,nblk,NDimX,NCholErf,'X')
        FF=WFact/XFactorial/(N+1)
        If(AC1.Eq.1) FF=WFact/XFactorial/2.D0
