@@ -415,14 +415,14 @@ Do IGL=1,NGrid
           call dgemm('N','N',NDimX,NCholesky,NDimX, &
                1.d0,ABPLUS1,NDimX,WORK1,NDimX, &
                1.d0,WORK0,NDimX)
-          !! should we subtract an extra A(1)+A(-)- term?
-          !! WORK0 -= XN2 * ABPLUS1 * ABMIN1 * C0Tilde
-          !call dgemm('N','N',NDimX,NCholesky,NDimX, &
-          !     -XN2,ABMIN1,NDimX,C0Tilde,NDimX, &
-          !     0.d0,WORK1,NDimX)
-          !call dgemm('N','N',NDimX,NCholesky,NDimX, &
-          !     1.d0,ABPLUS1,NDimX,WORK1,NDimX, &
-          !     1.d0,WORK0,NDimX)
+          ! subtract an extra A(1)+A(-)- term
+          ! WORK0 -= XN2 * ABPLUS1 * ABMIN1 * C0Tilde
+          call dgemm('N','N',NDimX,NCholesky,NDimX, &
+                   -XN2,ABMIN1,NDimX,C0Tilde,NDimX, &
+                    0.d0,WORK1,NDimX)
+          call dgemm('N','N',NDimX,NCholesky,NDimX, &
+                    1.d0,ABPLUS1,NDimX,WORK1,NDimX, &
+                    1.d0,WORK0,NDimX)
        else
           call dgemm('N','N',NDimX,NCholesky,NDimX,XN2,ABMIN1,NDimX,C0Tilde,NDimX,0.0d0,WORK1,NDimX)
           call dgemm('N','N',NDimX,NCholesky,NDimX,1.d0,ABPLUS1,NDimX,WORK1,NDimX,0.0d0,WORK0,NDimX)
@@ -738,14 +738,14 @@ Do IGL=1,NGrid
           call dgemm('N','N',NDimX,NCholErf,NDimX, &
                1.d0,ABPLUS1,NDimX,WORK1,NDimX, &
                1.d0,WORK0,NDimX)
-          !! should we subtract an extra A(1)+A(-)- term?
-          !! WORK0 -= XN2 * ABPLUS1 * ABMIN1 * C0Tilde
-          !call dgemm('N','N',NDimX,NCholErf,NDimX, &
-          !     -XN2,ABMIN1,NDimX,C0Tilde,NDimX, &
-          !     0.d0,WORK1,NDimX)
-          !call dgemm('N','N',NDimX,NCholErf,NDimX, &
-          !     1.d0,ABPLUS1,NDimX,WORK1,NDimX, &
-          !     1.d0,WORK0,NDimX)
+          ! subtract an extra A(1)+A(-)- term
+          ! WORK0 -= XN2 * ABPLUS1 * ABMIN1 * C0Tilde
+          call dgemm('N','N',NDimX,NCholErf,NDimX,   &
+                    -XN2,ABMIN1,NDimX,C0Tilde,NDimX, &
+                     0.d0,WORK1,NDimX)
+          call dgemm('N','N',NDimX,NCholErf,NDimX,   &
+                     1.d0,ABPLUS1,NDimX,WORK1,NDimX, &
+                     1.d0,WORK0,NDimX)
        else
           Call dgemm('N','N',NDimX,NCholErf,NDimX,XN2,ABMIN1,NDimX,C0Tilde,NDimX,0.0d0,WORK1,NDimX)
           Call dgemm('N','N',NDimX,NCholErf,NDimX,1.d0,ABPLUS1,NDimX,WORK1,NDimX,0.0d0,WORK0,NDimX)
