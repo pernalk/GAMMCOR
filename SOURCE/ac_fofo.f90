@@ -192,6 +192,8 @@ if (IDBBSC == 2) then
  IC2EX = 1  ! A2 = A1PLUSB.A1MIN + A1PLUS.A1MINB
  !IC2EX = 0  ! A2 = A1PLUS.A1MIN
  !print*, 'Use approximate C(2)!'
+else
+ IC2EX = 0
 endif
 
 NGrid=18
