@@ -190,6 +190,7 @@ call create_D12_array(NCholesky, DChol, DCholAct, NDimX, NBasis, IndN, Occ, IndA
 ! set handling of A2 matrix in CBS[H]
 if (IDBBSC == 2) then
  IC2EX = 1  ! A2 = A1PLUSB.A1MIN + A1PLUS.A1MINB
+ print*, 'Use exact C(2)!'
  !IC2EX = 0  ! A2 = A1PLUS.A1MIN
  !print*, 'Use approximate C(2)!'
 else
@@ -428,8 +429,8 @@ Do IGL=1,NGrid
        else
           call dgemm('N','N',NDimX,NCholesky,NDimX,XN2,ABMIN1,NDimX,C0Tilde,NDimX,0.0d0,WORK1,NDimX)
           call dgemm('N','N',NDimX,NCholesky,NDimX,1.d0,ABPLUS1,NDimX,WORK1,NDimX,0.0d0,WORK0,NDimX)
-          call dgemm('N','N',NDimX,NCholesky,NDimX,XN1,A1,NDimX,C1Tilde,NDimX,1.0d0,WORK0,NDimX)
        endif
+       Call dgemm('N','N',NDimX,NCholesky,NDimX,XN1,A1,NDimX,C1Tilde,NDimX,1.0d0,WORK0,NDimX)
        Call ABPM_HALFTRAN_GEN_L(WORK0,C2Tilde,0.0d0,Lambda,LambdaIV,nblk,NDimX,NCholesky,'X')
        FF=WFact/XFactorial/(N+1)
        If(AC1.Eq.1) FF=WFact/XFactorial/2.D0
@@ -751,8 +752,8 @@ Do IGL=1,NGrid
        else
           Call dgemm('N','N',NDimX,NCholErf,NDimX,XN2,ABMIN1,NDimX,C0Tilde,NDimX,0.0d0,WORK1,NDimX)
           Call dgemm('N','N',NDimX,NCholErf,NDimX,1.d0,ABPLUS1,NDimX,WORK1,NDimX,0.0d0,WORK0,NDimX)
-          Call dgemm('N','N',NDimX,NCholErf,NDimX,XN1,A1,NDimX,C1Tilde,NDimX,1.0d0,WORK0,NDimX)
        endif
+       Call dgemm('N','N',NDimX,NCholErf,NDimX,XN1,A1,NDimX,C1Tilde,NDimX,1.0d0,WORK0,NDimX)
        Call ABPM_HALFTRAN_GEN_L(WORK0,C2Tilde,0.0d0,Lambda,LambdaIV,nblk,NDimX,NCholErf,'X')
        FF=WFact/XFactorial/(N+1)
        If(AC1.Eq.1) FF=WFact/XFactorial/2.D0
