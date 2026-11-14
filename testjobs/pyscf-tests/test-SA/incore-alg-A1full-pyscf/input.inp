@@ -1,0 +1,30 @@
+Calculation
+! BasisPath defined as pyscf_basis_path in run_tests.py
+ BasisPath
+ JobTitle   AC0
+ Interface  PYSCF
+ JobType  AC0
+ RDMType    CAS
+ TwoMoInt   INCORE
+ FullA1     TRUE
+ Triplet False
+ Basis cc-pvdz.txt
+ units angs
+end
+
+
+System
+ state 2.1
+ znucl 12
+ Charge  0
+ ThrSelAct    1.d-4
+ ThrQVirt      1.D-4
+end
+
+
+
+xyz
+2
+Li 0.0 0.0 0.0
+F 0.0 0.0 1.56
+end

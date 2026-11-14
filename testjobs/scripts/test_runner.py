@@ -7,12 +7,13 @@ from scripts.colors import *
 
 #
 def ac0_en(file):
-    f=open(file,'r')
-    s=f.read()
-    f.close()
-    a=s.find(" ECASSCF+ENuc, AC0-Corr, AC0-CASSCF")
-    S=s[a+70:a+83]
-    return float(S)
+    # last field of the first "ECASSCF+ENuc, AC0-Corr, AC0-CASSCF" line: the AC0
+    # total energy with all printed digits (8 decimals)
+    with open(file,'r') as f:
+        for line in f:
+            if "ECASSCF+ENuc, AC0-Corr, AC0-CASSCF" in line:
+                return float(line.split()[-1])
+    return None
 #
 def ac_en(file):
         f=open(file,'r')
@@ -137,6 +138,20 @@ def msac0_en(file):
                 vals[(w[1], w[2])] = float(w[3])
     return [thc_ac0_en(file), vals.get(("1.1","1.1")), vals.get(("2.1","1.1"))]
 
+def msac0_molpro_en(file):
+    # MS-AC0 of INCORE AC0CAS / AC0CAS_FOFO (Molpro interface): AC0 total energy
+    # of the reference state plus H_mn 1 1, H_mn 2 1 (states printed as integers)
+    vals = {}
+    etot = None
+    with open(file,'r') as f:
+        for line in f:
+            w = line.split()
+            if len(w) == 4 and w[0] == "H_mn":
+                vals[(w[1], w[2])] = float(w[3])
+            elif "ECASSCF+ENuc, AC0-Corr, AC0-CASSCF" in line and etot is None:
+                etot = float(w[-1])
+    return [etot, vals.get(("1","1")), vals.get(("2","1"))]
+
 def mp2_en(file):
     return thc_ac0_en(file)
 
@@ -168,35 +183,54 @@ def reference(dirl,fun):
                 ref_val.append(fun(dir+"/gammcor.out"))
         return ref_val
 #
-def run_test(units,fun,RUN_GAMMCOR):
+def _diff(a, b):
+    try:
+        return np.subtract(a, b)
+    except TypeError:
+        return f"{a} vs {b}"
+#
+def run_test(units,fun,RUN_GAMMCOR,compare=None):
+    # units: [{'name', 'atol', 'fun' (optional, overrides fun)}]
+    # Each unit is run once and checked against its own <name>/gammcor.out.
+    # compare: [(name_a, name_b, atol)]: the fresh results of two units of this
+    # test must also agree with each other (same parser output layout).
     no_passed = no_failed = 0
     failed_tests = []
-    
-    dirl = []
-    atol = []
-    rtol = []
-    for unit in units:
-        dirl.append(unit.get('name'))
-        atol.append(unit.get('atol'))
 
-    ref_val=reference(dirl,fun)
+    dirl = [unit.get('name') for unit in units]
+    atol = [unit.get('atol') for unit in units]
+    funl = [unit.get('fun') or fun for unit in units]
+
+    ref_val = [f(d+"/gammcor.out") for d, f in zip(dirl, funl)]
     print('ref :',ref_val)
     #
-    test_val=[]
-    for dir in dirl:
-        test_val.append(run_single(dir,fun,RUN_GAMMCOR))
-    #	
+    test_val = [run_single(d, f, RUN_GAMMCOR) for d, f in zip(dirl, funl)]
+    #
     print('test:',test_val)
     for i in range(len(dirl)):
         try:
             assert_allclose(test_val[i],ref_val[i],rtol=0,atol=atol[i])
-            print(f"{OKGREEN}{i+1}. passed with tol= {atol[i]} [Ha]{ENDC}")
+            print(f"{OKGREEN}{i+1}. passed with tol= {atol[i]} [Ha]  ({dirl[i]}){ENDC}")
             no_passed += 1
         except:
-            print(f"{FAIL}{i+1}. failed with errors:")
-            print(f"{np.subtract(test_val[i],ref_val[i])}{ENDC}")
+            print(f"{FAIL}{i+1}. failed with errors:  ({dirl[i]})")
+            print(f"{_diff(test_val[i],ref_val[i])}{ENDC}")
             no_failed += 1
-            failed_tests.append(f"{fun.__name__}: {dirl[i]}")
-    
+            failed_tests.append(f"{funl[i].__name__}: {dirl[i]}")
+
+    for a, b, tol in (compare or []):
+        if a not in dirl or b not in dirl:
+            continue      # one of the pair was not run at this test level
+        va, vb = test_val[dirl.index(a)], test_val[dirl.index(b)]
+        label = f"{a.split('/')[-1]} vs {b.split('/')[-1]}"
+        try:
+            assert_allclose(va,vb,rtol=0,atol=tol)
+            print(f"{OKGREEN}   cross-check {label}: passed with tol= {tol} [Ha]{ENDC}")
+            no_passed += 1
+        except:
+            print(f"{FAIL}   cross-check {label}: failed, diff {_diff(va,vb)}{ENDC}")
+            no_failed += 1
+            failed_tests.append(f"cross-check: {a} vs {b}")
+
     print()
     return {'passed': no_passed, 'failed': no_failed, 'failed_tests': failed_tests}

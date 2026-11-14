@@ -1,23 +1,20 @@
 """LiF: CAS(6,6), A1, SA-CASSCF over 2 states.
-Source: Li-F distance 1.56 angstrom (near equilibrium); SS for root 2 does not converge at 3.51
+Source: Li-F distance 3.51 angstrom
 """
 import numpy as np
-import pyscf
-from pyscf import gto, scf, mcscf, symm, fci
-from gammcor_tools.Pyscf2Gammcor import get_data_for_gammcor
+from pyscf import gto, scf, mcscf, symm
+from Pyscf2Gammcor import get_data_for_gammcor
 
 if __name__ == "__main__":
-    print("PySCF version:", pyscf.__version__, flush=True)
-
     mol = gto.Mole()
-    mol.basis = '../cc-pvdz.nw'
+    mol.basis = '../../../../basis-for-pyscf/cc-pvdz.nw'
     mol.unit = 'angs'
     mol.charge = 0
     mol.spin = 0
     mol.cart = False
     mol.symmetry = True
     mol.symmetry_subgroup = 'C2v'
-    mol.build(atom='Li 0.0 0.0 0.0\nF 0.0 0.0 1.56')
+    mol.build(atom='Li 0.0 0.0 0.0\nF 0.0 0.0 3.51')
 
     myhf = scf.RHF(mol)
     myhf.conv_tol = 1e-10
@@ -36,18 +33,11 @@ if __name__ == "__main__":
 
     ncas = {'A1': 2, 'B1': 2, 'B2': 2}
     ncore = {'A1': 3}
-
-    n_states = 2
-    weights = np.ones(n_states)/n_states
-
-    solver1 = fci.direct_spin0_symm.FCI(mol)
-    solver1.wfnsym = 'A1'
-    solver1.spin = 0
-    solver1 = fci.addons.fix_spin(solver1, shift=.2, ss=0)
-    solver1.nroots = n_states
-
     mycas = mcscf.CASSCF(myhf, 6, 6)
-    mcscf.state_average_mix_(mycas, [solver1], weights)
+    mycas.fix_spin_(ss=0.0)
+    mycas.fcisolver.wfnsym = 'A1'
+    mycas = mycas.state_average_([0.5, 0.5])
+    mycas.natorb = False
 
     mycas.conv_tol = 1e-9
     mycas.conv_tol_grad = 1e-5
@@ -58,5 +48,4 @@ if __name__ == "__main__":
     print("CASSCF converged:", mycas.converged)
     if not mycas.converged:
         raise RuntimeError("CASSCF did not converge; no GAMMCOR data exported")
-
-    get_data_for_gammcor(mol, myhf, mycas, dump_eri=True, simple=True)
+    get_data_for_gammcor(mol, myhf, mycas, dump_eri=True, simple=True, dump_hdf5=True)

@@ -362,6 +362,7 @@ end select
      Flags%IFlAC0D = 0
      Flags%IDBBSC  = Input%CalcParams%DBBSC
      Flags%IVEMB   = Input%CalcParams%IVEMB
+     Flags%FullA1  = Input%CalcParams%FullA1
      print*,'Input%CalcParams%PostCAS', Input%CalcParams%PostCAS
      print*,'Input%CalcParams%DFApp  ', Input%CalcParams%DFApp
      print*,'Flags%IFunSRKer         ', Input%CalcParams%Kernel

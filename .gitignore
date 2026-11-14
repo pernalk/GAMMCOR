@@ -81,3 +81,19 @@ implementation_plans/
 /.secret_sauce/
 SOURCE/KAW-mp2.code-workspace
 
+
+# editor backups
+*~
+
+# files written by gammcor runs in testjobs (the ones run_tests.py clean() removes);
+# tracked inputs with these names (e.g. a Dalton rdm2.dat) stay tracked
+testjobs/**/fort.*
+testjobs/**/FOFO
+testjobs/**/FFOO
+testjobs/**/fock.dat
+testjobs/**/cholvecs
+testjobs/**/A0BLK*
+testjobs/**/AC0BLK*
+testjobs/**/XY0
+testjobs/**/ure_casno.dat
+testjobs/**/rdm2.dat

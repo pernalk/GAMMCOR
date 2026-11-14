@@ -19,12 +19,16 @@ the input file (blocks, `end`, comments) see
   - [How to switch it on](#how-to-switch-it-on-2)
   - [What it does](#what-it-does-2)
   - [Where it is available](#where-it-is-available-2)
-- [Saving and reusing the THC factorization](#saving-and-reusing-the-thc-factorization)
-
-- [MP2 and MP2-CBS[H]](#mp2-and-mp2-cbsh)
+- [Full A^(1) in INCORE AC0 (FullA1)](#full-a1-in-incore-ac0-fulla1)
   - [How to switch it on](#how-to-switch-it-on-3)
   - [What it does](#what-it-does-3)
   - [Where it is available](#where-it-is-available-3)
+- [Saving and reusing the THC factorization](#saving-and-reusing-the-thc-factorization)
+
+- [MP2 and MP2-CBS[H]](#mp2-and-mp2-cbsh)
+  - [How to switch it on](#how-to-switch-it-on-4)
+  - [What it does](#what-it-does-4)
+  - [Where it is available](#where-it-is-available-4)
 
 ## Frozen core
 
@@ -184,8 +188,10 @@ CholeskyBlock
 end
 ```
 
-A complete example (LiF, two states, a bond-length scan) is in
-`testjobs/pyscf-tests/test-MSAC0/LiF`.
+A complete example (LiF, two states, reference state 1.1) is in
+`testjobs/pyscf-tests/test-MSAC0/thc-alg`; `thc-exact-alg` is the same run on
+exact integrals (`TwoMoInt INCORE` + `Algorithm THC`, exported with
+`dump_eri=True`).
 
 **Optional: aa modes (`AAModes`).** By default MS-AC0 leaves out the
 active-active (aa) excitations from the couplings `H(J,I)`, as the Molpro
@@ -324,6 +330,58 @@ eigenvalues of `(H + H^T)/2`: the SA-MS-AC0 energies.
 <!-- TODO: in development (.secret_sauce/.implementation_plans/ms-ac0/plan-sa-ms-ac0.md).
 Done and tested on LiF: Phases 1-4 (keyword, ensemble, elements of H, report).
 Not yet: the rotation test and the LiF curve (Phase 5). -->
+
+
+## Full A^(1) in INCORE AC0 (FullA1)
+
+### How to switch it on
+
+Add `FullA1 TRUE` to the `Calculation` block of an INCORE AC0 or MS-AC0 job:
+
+```text
+Calculation
+ .
+ .
+ JobType   AC0
+ TwoMoInt  INCORE
+ FullA1    TRUE
+end
+```
+
+| Keyword | Block | Values |
+|---|---|---|
+| `FullA1` (also `Full_A1`) | `Calculation` | `FALSE` (default): the lower triangle of `A^(1)` is computed and copied to the upper one; `TRUE`: the whole `A^(1)` is computed and symmetrized. Accepts `TRUE`/`T`/`.TRUE.` and `FALSE`/`F`/`.FALSE.`; anything else stops |
+
+The input echo shows `FULL A1: .TRUE.` when the keyword is on.
+
+### What it does
+
+AC0 needs the first-order ERPA matrices `A^(1)_+` and `A^(1)_-`. For a
+state-specific CASSCF reference they are symmetric, so the INCORE code
+computes one triangle and copies it to the other. For a state-averaged
+reference they are **not** symmetric: the orbitals are optimal for the
+ensemble, not for the state, and the orbital gradient of the state is not zero.
+The copied triangle then keeps only one of the two orientations, while the
+FOFO and THC codes use the symmetric part `1/2 (A^(1) + A^(1)^T)`.
+
+With `FullA1 TRUE` the INCORE code computes every element of `A^(1)` and
+replaces it by `1/2 (A^(1) + A^(1)^T)`, as the FOFO and THC codes do. The
+results then agree with FOFO and THC for state-averaged references too.
+Without it they differ in the contributions that use the inactive-active,
+active-virtual and active-active couplings, the `(32)(21)`, `(32)(22)` and
+`(22)(21)` lines of the output.
+
+- **State-specific reference:** no change in the energy, since `A^(1)` is
+  already symmetric.
+- **Cost:** building `A^(1)` takes about twice as long.
+
+### Where it is available
+
+| Route | `FullA1` |
+|---|---|
+| `TwoMoInt INCORE` (`AC0CAS`), Molpro or PySCF interface | used |
+| `TwoMoInt FOFO`, Cholesky OTF (`AC0CAS_FOFO`) | ignored: always symmetrized |
+| THC (`Cholesky THC`, or `TwoMoInt INCORE` + `Algorithm THC`) | ignored: always symmetrized |
 
 
 ## Saving and reusing the THC factorization

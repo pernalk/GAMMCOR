@@ -1,0 +1,17 @@
+Calculation
+ JobTitle   AC0
+ Interface  MOLPRO
+ JobType  AC0
+ RDMType    CAS
+ TwoMoInt   INCORE
+ FullA1     TRUE
+end
+
+
+System
+ state 2.1
+ znucl 12
+ Charge  0
+ ThrSelAct    1.d-4
+ ThrQVirt      1.D-4
+end

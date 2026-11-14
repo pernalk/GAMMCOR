@@ -1,0 +1,15 @@
+Calculation
+ JobTitle MSAC0
+ Interface MOLPRO
+ JobType MSAC0
+ RDMType CAS
+ TwoMoInt INCORE
+end
+
+System
+ state 1.1
+ znucl 12
+ Charge 0
+ ThrSelAct 1.d-4
+ ThrQVirt 1.d-4
+end

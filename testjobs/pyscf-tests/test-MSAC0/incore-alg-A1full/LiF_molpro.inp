@@ -1,0 +1,26 @@
+! LiF: CAS(6,6), 1A1, SA-CASSCF over 2 states, cc-pVDZ (as lif_pyscf.py).
+! Source: Li-F distance 3.51 angstrom
+gthresh,energy=1E-10,orbital=1E-10,grid=1.d-10
+
+geometry={
+2
+LiF
+Li     0.0000000000     0.0000000000     0.0000000000
+F      0.0000000000     0.0000000000     3.5100000000
+}
+
+CASORB = 2144.2
+
+basis=cc-pVDZ
+
+hf                      !Hartree-Fock
+
+{multi
+closed,3,0,0,0
+occ,5,2,2,0
+wf,12,1,0;state,2
+orbital,$CASORB
+natorb,2140.2
+print,orbitals}
+
+user,prdmft,cas

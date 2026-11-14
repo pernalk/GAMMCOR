@@ -292,6 +292,8 @@ C
       IFunSR=Flags%IFunSR
       IFunSRKer=Flags%IFunSRKer
       IFunSR2=Flags%IFunSR2
+      IFullA1=0
+      If(Flags%FullA1) IFullA1=1
 C
       If(IFunSRKer.Eq.2)Stop'Fatal Error: Kernel for PBE not available!'
       Write(*,'(/,1x,"IFunSR=",I1)')IFunSR

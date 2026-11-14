@@ -228,6 +228,7 @@ character(*),parameter :: PossibleUnits(2) = &
          logical :: Restart    = FLAG_RESTART
          logical :: Triplet    = FLAG_TRIPLET
          logical :: PostCAS    = FLAG_POSTCAS
+         logical :: FullA1     = .false.   ! INCORE AC0CAS: full A^(1), symmetrized (AB1_CAS)
          ! MSAC0 (PySCF THC route): .true. keeps the aa modes on the left of
          ! Delta H_JI, with the transition 2-RDM in their amplitude (needs
          ! TRANSITIONS/<J>_<I>/TRDM2 in pyscf_data.h5). Default: no aa modes.
@@ -490,6 +491,7 @@ type FlagsData
      integer :: IDBBSC    = 0 ! for AC0
      integer :: IVEMB     = 0 ! for DMRG-in-DFT
      integer :: IMSAC     = 0 ! for MS-AC0
+     logical :: FullA1    = .false.
      double precision :: Alpha = 0
      integer :: IModG   = 1
      integer :: NGOcc   = 0

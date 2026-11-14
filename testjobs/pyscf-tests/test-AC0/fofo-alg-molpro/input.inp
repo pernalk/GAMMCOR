@@ -1,0 +1,30 @@
+Calculation
+! BasisPath defined as basis_path in run_tests.py
+ BasisPath
+ JobTitle   AC
+ Interface  MOLPRO
+ JobType  AC0
+ RDMType    CAS
+ TwoMoInt   FOFO
+ Basis cc-pVDZ
+ units bohr
+end
+
+Choleskyblock
+Cholesky OTF
+Cholesky_Accuracy L
+end
+
+! the frame of the Molpro run (centre of mass at the origin, see N2_molpro.out)
+xyz
+2
+N    0.000000000    0.000000000  -1.037500000
+N    0.000000000    0.000000000   1.037500000
+end
+
+System
+ ZNucl           14
+ Charge          0
+ ThrSelAct       1.d-4
+ ThrQInact       1.d-2
+end

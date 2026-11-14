@@ -22,12 +22,15 @@ def prepare_test(test, TEST_LEVEL):
     for unit, details in test.get('units').items():
         if should_run(details.get('level'), TEST_LEVEL):
             units.append({'name': unit,
-                'atol': details.get('atol') })
+                'atol': details.get('atol'),
+                'fun': details.get('fun') })
     return units
 
 def start_test(test, units, RUN_GAMMCOR):
     print(f"{BOLD}{test.get('name')}{ENDC}")
     runner = test.get('runner')
+    if test.get('compare'):
+        return runner(units, test.get('fun'), RUN_GAMMCOR, test.get('compare'))
     return runner(units, test.get('fun'), RUN_GAMMCOR)
 
 def get_interface(filename):

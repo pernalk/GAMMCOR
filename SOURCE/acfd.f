@@ -4459,7 +4459,7 @@ C
       IR=IndBlock(1,IRow)
       IS=IndBlock(2,IRow)
 C
-      If(IFunSR.Eq.4) Then
+      If(IFunSR.Eq.4.Or.IFullA1.Eq.1) Then
       IColEnd=NoEig
       Else
       IColEnd=IRow
@@ -4654,7 +4654,7 @@ C
      $ ,F10.2)')END_TIME-START_TIME
       write(*,*)'icount',icount
 C
-      If(IFunSR.Eq.4) Then
+      If(IFunSR.Eq.4.Or.IFullA1.Eq.1) Then
 C
 C     POSTCAS: DIVIDE BY C'c AND SYMMETRIZE
 C

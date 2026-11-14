@@ -252,7 +252,7 @@ An ORCA AC0 example with relaxed one-particle density matrix options is in
 The repository also contains ready-to-inspect PySCF reference data and
 GAMMCOR inputs for:
 
-- `testjobs/pyscf-tests/test-ac0` -- AC0;
+- `testjobs/pyscf-tests/test-AC0` -- AC0 (N2 CAS(6,6); one folder per integral route: `fofo-alg-*`, `incore-alg-*`, `thc-alg`, `thc-exact-alg`);
 - `testjobs/pyscf-tests/test-ac` -- AC;
 - `testjobs/pyscf-tests/test-mcpdft` -- MC-PDFT;
 - `testjobs/pyscf-tests/test-sr-pbe` -- AC0 with a short-range PBE functional.

@@ -10,6 +10,7 @@
      $ InSt(2,100),InTrSt(2,1),ISpinMs2
       Common/BBC3/ IType(5000)
       Common/DFTSR/ Alpha,Cmix,IFunSR2
+      Common/FULLA1C/ IFullA1
       Common/Sym/ FMultTab,NoSym,MxSym
       Common/APSG/ IGem(5000),CICoef(5000)
       Common/DALTON/ NISHT_G,NASHT_G,ISAPSG

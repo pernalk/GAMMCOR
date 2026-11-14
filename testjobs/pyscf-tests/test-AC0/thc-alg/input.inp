@@ -5,7 +5,7 @@ Calculation
  Interface  PYSCF
  JobType  AC0
  RDMType    CAS
- TwoMoInt   INCORE
+ TwoMoInt   FOFO
 ! Triplet False
  Basis cc-pvdz.txt
  units bohr
@@ -16,7 +16,7 @@ end
 
 
 Choleskyblock
-Cholesky OTF
+Cholesky THC
 Cholesky_Accuracy L
 end
 

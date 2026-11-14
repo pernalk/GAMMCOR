@@ -1,0 +1,29 @@
+! N2: CAS(6,6), 1Ag, state-specific CASSCF, cc-pVDZ (as n2_pyscf.py).
+! Source: N-N distance 2.075 bohr
+! C2v (symmetry,x,y), not D2h: no two atoms are symmetry-equivalent, so the
+! Molpro AO integrals are plain AOs, as Cholesky OTF (FOFO) needs.
+! D2h -> C2v: Ag,B1u -> A1; B3u,B2g -> B1; B2u,B3g -> B2; B1g,Au -> A2
+gthresh,energy=1E-10,orbital=1E-10,grid=1.d-10
+
+symmetry,x,y
+geometry={
+N1
+N2,N1,r
+}
+r=2.075 bohr
+
+CASORB = 2144.2
+
+basis=cc-pVDZ
+
+hf                      !Hartree-Fock
+
+{multi
+closed,4,0,0,0
+occ,6,2,2,0
+wf,14,1,0;state,1
+orbital,$CASORB
+natorb,2140.2
+print,orbitals}
+
+user,prdmft,cas

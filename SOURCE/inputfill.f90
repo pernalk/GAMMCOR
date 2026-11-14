@@ -796,6 +796,20 @@ subroutine read_block_calculation(CalcParams, line)
       case ("POSTCAS")
            read(val,*) CalcParams%PostCAS
 
+      case ("FULLA1", "FULL_A1")
+           ! INCORE AC0CAS: build the full A^(1) and symmetrize it (default FALSE:
+           ! lower triangle copied, as in Molpro-interface INCORE)
+           if (uppercase(val) == ".TRUE." .or. uppercase(val) == "TRUE" .or. &
+               uppercase(val) == "T") then
+              CalcParams%FullA1 = .true.
+           elseif (uppercase(val) == ".FALSE." .or. uppercase(val) == "FALSE" .or. &
+                   uppercase(val) == "F") then
+              CalcParams%FullA1 = .false.
+           else
+              write(LOUT,'(1x,a)') 'ERROR! FullA1 takes TRUE or FALSE, got: '//trim(val)
+              stop
+           endif
+
       case ("AAMODES", "AA_MODES")
            ! MSAC0: aa modes with the transition 2-RDM (default FALSE)
            if (uppercase(val) == ".TRUE." .or. uppercase(val) == "TRUE" .or. &
@@ -1331,6 +1345,8 @@ associate( CalcParams => Input%CalcParams)
  write(LOUT, '(1x,a,2x,a)')"DMRG-in-DFT: ", ".TRUE."
  if (CalcParams%AAModes) &
  write(LOUT, '(1x,a,5x,a)')"AA MODES: ", ".TRUE. (with transition 2-RDM)"
+ if (CalcParams%FullA1) &
+ write(LOUT, '(1x,a,7x,a)')"FULL A1: ", ".TRUE. (INCORE AC0CAS: full A^(1), symmetrized)"
  write(LOUT,' (1x,a,5x,a)') "RDM TYPE: ",  &
               PossibleRDMType(CalcParams%RDMType)
  write(LOUT,' (1x,a,3x,a)') "RDM SOURCE: ",  &
