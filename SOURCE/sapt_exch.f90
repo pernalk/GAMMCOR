@@ -165,7 +165,12 @@ double precision,allocatable :: work1(:)
           'TWOB3A','AOTWOSORT')
  endif
 
- call make_K(NBas,PB,Kb,'AOTWOSORT')
+ if (allocated(B%Kmat)) then
+   Kb = B%Kmat
+ else
+   print*, 'make Kmat for B!'
+   call make_K(NBas,PB,Kb,'AOTWOSORT')
+ endif
 
 ! block
 ! integer :: ip,iq,ir,is
@@ -2605,7 +2610,11 @@ double precision,parameter :: BigE = 1.D8
        tindA(ipq) = tindA(ipq) + (A%Occ(ip)-A%Occ(iq))*WbAA(ip,iq)
 
     enddo
-    call dgemv('T',A%NDimX,A%NDimX,1d0,A%EigY-A%EigX,A%NDimX,tindA,1,0d0,uA,1)
+    !call dgemv('T',A%NDimX,A%NDimX,1d0,A%EigY-A%EigX,A%NDimX,tindA,1,0d0,uA,1)
+    ! uA = EigY^T * tindA
+    ! uA = uA - EigX^T * tindA
+    call dgemv('T',A%NDimX,A%NDimX, 1d0,A%EigY,A%NDimX,tindA,1,0.d0,uA,1)
+    call dgemv('T',A%NDimX,A%NDimX,-1d0,A%EigX,A%NDimX,tindA,1,1.d0,uA,1)
     !print*, 'uA',norm2(uA)
 
     uB = 0
@@ -2618,7 +2627,9 @@ double precision,parameter :: BigE = 1.D8
        tindB(irs) = tindB(irs) + (B%Occ(ir)-B%Occ(is))*WaBB(ir,is)
 
     enddo
-    call dgemv('T',B%NDimX,B%NDimX,1d0,B%EigY-B%EigX,B%NDimX,tindB,1,0d0,uB,1)
+    !call dgemv('T',B%NDimX,B%NDimX,1d0,B%EigY-B%EigX,B%NDimX,tindB,1,0d0,uB,1)
+    call dgemv('T',B%NDimX,B%NDimX, 1d0,B%EigY,B%NDimX,tindB,1,0d0,uB,1)
+    call dgemv('T',B%NDimX,B%NDimX,-1d0,B%EigX,B%NDimX,tindB,1,1d0,uB,1)
     !print*, 'uB',norm2(uB)
 
     if (approx) then

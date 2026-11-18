@@ -21,6 +21,8 @@ subroutine sapt_interface(Flags,SAPT,NBasis,AOBasis,CholeskyVecsOTF)
 !
 ! Possible interface: Dalton, Molpro
 !
+! PySCF interface: interaface_sapt.f90
+!
 
 ! Read 1-RDM, get C(AO,NO) and Occ from diagonalization
 !     -- canonicalize orbitals, if needed
@@ -104,11 +106,6 @@ SAPT%monB%NDim = NBasis*(NBasis-1)/2
  SAPT%doRSH = .false.
  if(Flags%IFunSR==1.or.Flags%IFunSR==2) SAPT%doRSH = .true.
  doRSH = SAPT%doRSH
-
-! set semicoupled dispersion
- if(Flags%ICASSCF==0) then
-    SAPT%SemiCoupled = .false.
- endif
 
 ! read and dump 1-electron integrals
  if(SAPT%InterfaceType==1) then
@@ -424,6 +421,12 @@ SAPT%monB%NDim = NBasis*(NBasis-1)/2
        SAPT%monB%CMO(j,i) = Cb(ij)
     enddo
  enddo
+
+ !print*, 'Monomer CNO=', sapt%MonA%Monomer, norm2(Ca)
+ !call print_sqmat(sapt%monA%CMO,NBasis)
+
+! print*, 'Monomer CNO=', sapt%Monb%Monomer
+! call print_sqmat(sapt%monb%CMO,NBasis)
 
  !! test
  !write(LOUT,*) 'sapt_interface: CNO'
@@ -2613,7 +2616,8 @@ implicit none
 
 type(SystemBlock) :: mon
 type(FlagsData) :: Flags
-integer :: nbas!, ICASSCF, ISHF, IFlCore
+integer :: nbas
+integer :: ndim
 integer :: i, j, ij, icnt
 integer :: ind, ind_ij
 integer :: IAuxGem(nbas)
@@ -2733,7 +2737,9 @@ endif
  print*, 'num2',mon%num2
 
 ! active pairs
- allocate(mon%IPair(nbas,nbas),mon%IndX(mon%NDim),mon%IndN(2,mon%NDim))
+
+ ndim = nbas*(nbas-1)/2
+ allocate(mon%IPair(nbas,nbas),mon%IndX(ndim),mon%IndN(2,ndim))
 
  mon%IPair(1:nbas,1:nbas) = 0
 
@@ -2840,7 +2846,7 @@ endif
 
  elseif(Flags%ICASSCF==1.and.Flags%ISERPA==2.and.mon%NELE==1) then
 
-    allocate(mon%IndXh(mon%NDim))
+    allocate(mon%IndXh(ndim))
     ij=0
     ind = 0
     do i=1,nbas
@@ -2878,7 +2884,7 @@ endif
     write(LOUT,'(1x,a)') 'WARNING!!! Be!'
     write(LOUT,'(1x,a,e15.5)') 'Threshold for active orbitals: ', mon%ThrSelAct
     ! write(*,*) 'Be?, ONLY ACTIVE PAIRS!'
-    allocate(mon%IndXh(mon%NDim))
+    allocate(mon%IndXh(ndim))
 
     ij=0
     ind = 0
@@ -3122,6 +3128,15 @@ character(8)                 :: label
  A%WPot = Va + Ja
  B%WPot = Vb + Jb
 
+ if (.not.allocated(A%Jmat)) then
+   A%Jmat = Ja
+   B%Jmat = Jb
+ endif
+
+ !print*, 'VmatA  =', norm2(Va)
+ !print*, 'JmatA  =', norm2(Ja)
+ !print*, 'WPotA  =', norm2(A%WPot)
+
  deallocate(Jb,Ja,Vb,Va,Pb,Pa)
 
 end subroutine calc_elpot
@@ -3253,11 +3268,12 @@ character(len=1), parameter :: label(2) = [ 'A', 'B' ]
          write(*,'(/1x,A,A,A)') 'Monomer ', label(im), ' coordinates:'
          write(*,'(A8,3A14)') 'Charge', 'X', 'Y', 'Z'
          do i = 1, mon(im)%ncen
-             write(*,'(I8,3F14.6)') &
-                 int(mon(im)%charg(i)), mon(im)%xyz(i,1:3)
+             write(*,'(I8,3F14.6)') int(mon(im)%charg(i)), &
+                 mon(im)%xyz(i,1),mon(im)%xyz(i,2),mon(im)%xyz(i,3)
          end do
      end do
  end associate
+
 
  Vnn=0d0
  do ia=1,A%NCen

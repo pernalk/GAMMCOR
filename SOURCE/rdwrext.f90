@@ -1114,7 +1114,7 @@ end subroutine read_Ene_molpro
 
 subroutine read_dip_molpro(matdx,matdy,matdz,infile,nbasis)
 !
-! Purpose: read dipole integrals and unpack withour symmetry
+! Purpose: read dipole integrals and unpack without symmetry
 !
 implicit none
 

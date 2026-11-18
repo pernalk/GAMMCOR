@@ -807,7 +807,9 @@ do iblk=1,nblk
    case('Y','y')
       call dgemv('T',A%n,A%n,1d0,A%matY,A%n,ABP,1,0d0,ABM,1)
    case('YX','yx')
-      call dgemv('T',A%n,A%n,1d0,A%matY-A%matX,A%n,ABP,1,0d0,ABM,1)
+     !call dgemv('T',A%n,A%n,1d0,A%matY-A%matX,A%n,ABP,1,0d0,ABM,1)
+      call dgemv('T',A%n,A%n, 1d0,A%matY,A%n,ABP,1,0.d0,ABM,1)
+      call dgemv('T',A%n,A%n,-1d0,A%matX,A%n,ABP,1,1.d0,ABM,1)
    end select
 
    AOUT(A%l1:A%l2) = AOUT(A%l1:A%l2) + ABM

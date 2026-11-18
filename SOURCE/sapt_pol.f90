@@ -62,7 +62,8 @@ double precision,external  :: trace
  call get_one_mat('V',Va,A%Monomer,NBas)
  call get_one_mat('V',Vb,B%Monomer,NBas)
 
- call make_J1(NBas,PA,Ja,'AOTWOSORT')
+! call make_J1(NBas,PA,Ja,'AOTWOSORT')
+  Ja = A%Jmat
 
 ! Tr[Pa.Va + Pb.Vb + Pb.Ja]
  work=0
