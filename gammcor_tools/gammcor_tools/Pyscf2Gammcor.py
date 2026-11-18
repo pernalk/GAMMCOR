@@ -153,6 +153,26 @@ class _Dump:
             g.attrs['NBASIS'] = int(mol.nao_nr())
             g.attrs['ORDERING'] = 'PYSCF'
 
+    def dipole_ao(self, mol):
+        """Write electronic AO dipole integrals in atomic units."""
+        origin = (0.0, 0.0, 0.0)
+        with mol.with_common_orig(origin):
+            dip = -mol.intor('int1e_r', comp=3)
+
+        for axis, matrix in zip(('X', 'Y', 'Z'), dip):
+            self.array(
+                f'INTS/DIPOLE_{axis}',
+                matrix.T,
+                f'Dipole{axis}.bin',
+                attrs={
+                    'BASIS': 'AO',
+                    'OPERATOR': '-r',
+                    'UNIT': 'au',
+                    'ORIGIN_BOHR': origin,
+                    'DIMS': ['ao', 'ao'],
+                },
+            )
+
     def scf_reference(self, mol, myhf):
         if not self.hdf5:
             return
@@ -542,7 +562,7 @@ def frozen_count(mymp):
 
 
 def dump_ks_for_gammcor(mol, mf, mymp=None, mp2_scale=None, dump_eri=True,
-                        dump_grid=False, tds=None, dump_ab=True, filename=H5FILE):
+                        dump_grid=False, tds=None, dump_ab=True, dump_dip=False, filename=H5FILE):
     """RKS reference (+ pyscf MP2 result) -> HDF5, for the GAMMCOR RKS/MP2/TDDFT path.
 
     mol, mf    : built Mole and converged dft.RKS
@@ -622,6 +642,9 @@ def dump_ks_for_gammcor(mol, mf, mymp=None, mp2_scale=None, dump_eri=True,
                    attrs={'PACKING': 'NADDR3', 'NORB': int(nmo),
                           'BASIS': 'MO', 'TRANSFORMED': 1})
 
+    if dump_dip:
+       dump.dipole_ao(mol)
+
     if dump_grid or tds:
         g = _ks_grid_quantities(mol, mf)
         if dump_grid:
@@ -634,7 +657,8 @@ def dump_ks_for_gammcor(mol, mf, mymp=None, mp2_scale=None, dump_eri=True,
 
 def get_data_for_gammcor(mol, myhf, mycas = None, mymp = None, dump_eri=False, simple = True,
                          dump_hdf5 = True, dump_dft = False, mp2_scale = None,
-                         dump_grid = False, tds = None, dump_ab = True, filename = H5FILE,
+                         dump_grid = False, tds = None, dump_ab = True, dump_dip = False, 
+                         filename = H5FILE,
                          dump_trdm2 = False, model_rotation = None):
     """Process and export CASSCF calculation data for GAMMCOR.
 
@@ -654,14 +678,20 @@ def get_data_for_gammcor(mol, myhf, mycas = None, mymp = None, dump_eri=False, s
                          <Phi_K|H|Phi_L>, which GammCor's H lacks off the diagonal.
     """
 
+    force_ao_eri = isinstance(dump_eri, str) and dump_eri == "ao"
+    if not isinstance(dump_eri, bool) and not force_ao_eri:
+        raise ValueError('dump_eri must be False, True, or "ao"')
+    if force_ao_eri and (dump_dft or mycas is None or not dump_hdf5):
+        raise ValueError('dump_eri="ao" requires CASSCF HDF5 export')
+
     if dump_dft:
         dump_ks_for_gammcor(mol, myhf, mymp, mp2_scale=mp2_scale, dump_eri=dump_eri,
-                            dump_grid=dump_grid, tds=tds, dump_ab=dump_ab,
+                            dump_grid=dump_grid, tds=tds, dump_ab=dump_ab, dump_dip=dump_dip,
                             filename=filename)
         return
 
     if mycas is None:
-        get_rohf_for_gammcor(mol, myhf, mymp=mymp, dump_hdf5=dump_hdf5,
+        get_rohf_for_gammcor(mol, myhf, mymp=mymp, dump_hdf5=dump_hdf5, dump_dip=dump_dip,
                              filename=filename)
         return
 
@@ -913,6 +943,7 @@ def get_data_for_gammcor(mol, myhf, mycas = None, mymp = None, dump_eri=False, s
                 n_orb = mol.nao
                 t2 = time.time()
                 print(f"\nTime spent on ERI transformation and processing: {t2 - t1:.2f} seconds")
+                print(f"doMOtrans: {doMOtrans}")
 
 
             mid_time = time.time()
@@ -961,7 +992,8 @@ def get_data_for_gammcor(mol, myhf, mycas = None, mymp = None, dump_eri=False, s
             print(f"\nTime spent on ERI transformation and processing: {end_time - start_time:.2f} seconds")
             print(f"\nTime spent on ERI transformation and processing: {end_time - mid_time:.2f} seconds")
 
-
+        if dump_dip:
+               dump.dipole_ao(mol)
 
     else:
         print(" State-specific CASSCF Analysis ".center(lll, f"{c}"))
@@ -1129,7 +1161,7 @@ def get_data_for_gammcor(mol, myhf, mycas = None, mymp = None, dump_eri=False, s
             # Natural orbitals: ERI in the NO basis, GAMMCOR uses them as they are.
             # Otherwise ERI in AO (as in the SA branch): GAMMCOR's Trans2NO_AO
             # transforms them with CAONO = CAOMO*CMONO, which assumes AO input.
-            doMOtrans = bool(natorb)
+            doMOtrans = bool(natorb) and not force_ao_eri
 
             # This is version with MO transoformation done in pyscf
             start_time = time.time()
@@ -1157,7 +1189,6 @@ def get_data_for_gammcor(mol, myhf, mycas = None, mymp = None, dump_eri=False, s
             ninte1 = nbasis * (nbasis + 1) // 2
             ninte2 = ninte1 * (ninte1 + 1) // 2
             twono = np.zeros(ninte2)
-                
 
 
             p, q, r, s = np.meshgrid(np.arange(n_orb), np.arange(n_orb), np.arange(n_orb), np.arange(n_orb), indexing='ij')
@@ -1197,8 +1228,11 @@ def get_data_for_gammcor(mol, myhf, mycas = None, mymp = None, dump_eri=False, s
             print(f"\nTime spent on ERI transformation and processing: {end_time - start_time:.2f} seconds")
             print(f"\nTime spent on ERI transformation and processing: {end_time - mid_time:.2f} seconds")
 
+        if dump_dip:
+               dump.dipole_ao(mol)
 
-def get_rohf_for_gammcor(mol, myhf, mymp = None, dump_hdf5 = True, filename = H5FILE):
+
+def get_rohf_for_gammcor(mol, myhf, mymp = None, dump_hdf5 = True, dump_dip=False, filename = H5FILE):
     """ROHF/MP2 export. Same quantities and the same conventions as
     get_rohf_for_gammcor in Pyscf2Gammcor_legacy.py; dump_hdf5 only changes where
     they land.
