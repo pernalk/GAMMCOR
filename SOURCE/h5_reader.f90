@@ -7,6 +7,7 @@ module h5_reader
       public :: h5_init, h5_finish, h5_open, h5_close, h5_get, h5_attr, h5_exists, h5_size
       public :: h5_attr_exists
       public :: h5_create, h5_put, h5_put_attr
+      public :: h5_shape
 
       interface h5_get
             module procedure get_d0, get_d1, get_d2, get_d3, get_d4, get_i0, get_i1
@@ -105,6 +106,32 @@ contains
             if (any(fdims(1:size(want)) /= int(want, HSIZE_T))) &
                   error stop "h5_get: shape mismatch for "//path
       end subroutine check_shape
+
+      subroutine h5_shape(fid, path, dims)
+            integer(HID_T), intent(in) :: fid
+            character(len=*), intent(in) :: path
+            integer, allocatable, intent(out) :: dims(:)
+
+            integer(HSIZE_T), allocatable :: fdims(:)
+            integer(SIZE_T) :: tsize
+            integer :: rank, tclass, ierr
+
+            call h5ltget_dataset_ndims_f(fid, path, rank, ierr)
+            if (ierr /= 0) then
+                  print *, 'h5_shape: cannot read rank of ', trim(path)
+                  error stop
+            end if
+
+            allocate(fdims(rank), dims(rank))
+
+            call h5ltget_dataset_info_f(fid, path, fdims, tclass, tsize, ierr)
+            if (ierr /= 0) then
+                  print *, 'h5_shape: cannot read shape of ', trim(path)
+                  error stop
+            end if
+
+            dims = int(fdims)
+      end subroutine h5_shape
 
       ! The dims argument of the h5lt readers is passed through a named local
       ! rather than as int(shape(a), HSIZE_T): an array expression forces the

@@ -3,6 +3,7 @@ module sapt_main
 use types
 use timing
 use sapt_inter
+use interface_sapt ! pyscf
 use sapt_resp
 use sapt_pol
 use sapt_Chol_pol
@@ -33,9 +34,15 @@ type(TCholeskyVecsOTF) :: CholErfVecsOTF
 
 integer :: i
 integer :: NBasis
+integer :: NAO,NMO
 double precision :: Tcpu,Twall
 
  Flags%SaptLevel = SAPT%SaptLevel
+
+! set semicoupled dispersion
+ if(Flags%ICASSCF==0) then
+    SAPT%SemiCoupled = .false.
+ endif
 
 ! ERPA
  Flags%IFlAC  = 0
@@ -52,22 +59,54 @@ double precision :: Tcpu,Twall
  if(Flags%IRedVirt==1) call sapt_driver_red(Flags,SAPT)
 
  call gclock('START',Tcpu,Twall)
- call sapt_basinfo(SAPT,NBasis)
- call sapt_interface(Flags,SAPT,NBasis,AOBasis,CholeskyVecsOTF)
 
- call sapt_mon_ints(SAPT%monA,Flags,NBasis,AOBasis,CholeskyVecsOTF)
- if(Flags%IDBBSC==2) call sapt_mon_lr_ints(SAPT%monA,Flags,NBasis,AOBasis,CholErfVecsOTF)
- call sapt_response(Flags,SAPT%monA,SAPT%EnChck,NBasis)
+ if (SAPT%InterfaceType==5) then ! SAPT PySCF interface
 
- call sapt_mon_ints(SAPT%monB,Flags,NBasis,AOBasis,CholeskyVecsOTF)
- if(Flags%IDBBSC==2) call sapt_mon_lr_ints(SAPT%monB,Flags,NBasis,AOBasis,CholErfVecsOTF)
- call sapt_response(Flags,SAPT%monB,SAPT%EnChck,NBasis)
+    call sapt_pyscf_driver(Flags,SAPT,NAO,NMO)
 
- call sapt_ab_ints(Flags,SAPT%monA,SAPT%monB,SAPT%iPINO,NBasis,AOBasis,CholeskyVecsOTF)
- !call sapt_ab_lr_ints(Flags,SAPT,SAPT%monA,SAPT%monB,NBasis,AOBasis,CholeskyVecsOTF,CholErfVecsOTF)
- !if(Flags%IDBBSC==2) call sapt_ab_lr_ints(Flags,SAPT,SAPT%monA,SAPT%monB,NBasis,AOBasis,CholeskyVecsOTF,CholErfVecsOTF)
+    call sapt_pyscf_mon_ints(Flags,SAPT%monA,SAPT%TwoEl4,NAO,NMO)
+    call sapt_response(Flags,SAPT%monA,SAPT%EnChck,NMO)
 
-! jump to open-shell SAPT(MC)
+    call sapt_pyscf_mon_ints(Flags,SAPT%monB,SAPT%TwoEl4,NAO,NMO)
+    call sapt_response(Flags,SAPT%monB,SAPT%EnChck,NMO)
+
+    SAPT%Vnn = calc_vnn(SAPT%monA,SAPT%monB)
+    call sapt_pyscf_ab_ints(SAPT%monA,SAPT%monB,SAPT%TwoEl4,NAO,NMO)
+
+    call e1elst(SAPT%monA,SAPT%monB,SAPT)
+    call e1exch_NaNb(Flags,SAPT%monA,SAPT%monB,SAPT)
+    call e2ind(Flags,SAPT%monA,SAPT%monB,SAPT)
+    call e2disp(Flags,SAPT%monA,SAPT%monB,SAPT)
+    call e2exind(Flags,SAPT%monA,SAPT%monB,SAPT)
+    call e2exdisp(Flags,SAPT%monA,SAPT%monB,SAPT)
+
+    call summary_sapt(SAPT)
+
+    call print_warn(SAPT)
+    call free_SAPT(Flags,SAPT)
+    
+    call gclock('SAPT',Tcpu,Twall)
+
+    stop
+
+ else ! SAPT Dalton, Molpro interface
+
+    call sapt_basinfo(SAPT,NBasis)
+    call sapt_interface(Flags,SAPT,NBasis,AOBasis,CholeskyVecsOTF)
+    call sapt_mon_ints(SAPT%monA,Flags,NBasis,AOBasis,CholeskyVecsOTF)
+    if(Flags%IDBBSC==2) call sapt_mon_lr_ints(SAPT%monA,Flags,NBasis,AOBasis,CholErfVecsOTF)
+    call sapt_response(Flags,SAPT%monA,SAPT%EnChck,NBasis)
+    
+    call sapt_mon_ints(SAPT%monB,Flags,NBasis,AOBasis,CholeskyVecsOTF)
+    if(Flags%IDBBSC==2) call sapt_mon_lr_ints(SAPT%monB,Flags,NBasis,AOBasis,CholErfVecsOTF)
+    call sapt_response(Flags,SAPT%monB,SAPT%EnChck,NBasis)
+   
+    call sapt_ab_ints(Flags,SAPT%monA,SAPT%monB,SAPT%iPINO,NBasis,AOBasis,CholeskyVecsOTF)
+    !call sapt_ab_lr_ints(Flags,SAPT,SAPT%monA,SAPT%monB,NBasis,AOBasis,CholeskyVecsOTF,CholErfVecsOTF)
+    !if(Flags%IDBBSC==2) call sapt_ab_lr_ints(Flags,SAPT,SAPT%monA,SAPT%monB,NBasis,AOBasis,CholeskyVecsOTF,CholErfVecsOTF)
+ endif
+
+ ! jump to open-shell SAPT(MC)
  print *, 'ISAPT-OS Flag =', Flags%ISAPTOS
  if(Flags%ISAPTOS) call sapt_OpenShell(Flags,SAPT,Tcpu,TWall,NBasis)
 
@@ -98,7 +137,7 @@ double precision :: Tcpu,Twall
 
     call e1elst(SAPT%monA,SAPT%monB,SAPT)
     call e1exchs2(Flags,SAPT%monA,SAPT%monB,SAPT)
-    !call e1exch_NaNb(Flags,SAPT%monA,SAPT%monB,SAPT)
+    call e1exch_NaNb(Flags,SAPT%monA,SAPT%monB,SAPT)
     !if(SAPT%monA%NELE==1.and.SAPT%monB%NELE==1) call hl_2el(Flags,SAPT%monA,SAPT%monB,SAPT)
 
     if(SAPT%SaptLevel==0) then
@@ -1936,6 +1975,251 @@ NInte1 = NBasis*(NBasis+1)/2
  !if(Mon%TwoMoInt==1) deallocate(TwoMO)
 
 end subroutine sapt_mon_ints
+
+subroutine sapt_pyscf_mon_ints(Flags,mon,TwoEl,nao,nmo)
+!
+! a) incore 4-index transformation to FOFO and FFOO
+! b) calculate J and K matrices (AO)
+! c) calculate electrostaic potential (Omega): W = V + J
+!
+implicit none
+
+type(FlagsData)    :: Flags
+type(SystemBlock)  :: Mon
+integer,intent(in) :: nao, nmo
+real(8),intent(in) :: TwoEl(nao,nao,nao,nao)
+
+integer                   :: i
+real(8)                   :: C_occ(nao,nmo), D(nao,nao)
+real(8)                   :: Jmat(nao,nao),Kmat(nao,nao)
+real(8),allocatable       :: W(:,:,:,:)
+character(:),allocatable  :: twojfile, twokfile
+
+! set file names
+ if(Mon%Monomer==1) then
+    twojfile = 'FFOOAA'
+    twokfile = 'FOFOAA'
+ elseif(Mon%Monomer==2) then
+    twojfile = 'FFOOBB'
+    twokfile = 'FOFOBB'
+ endif
+
+ if ((mon%num0+mon%num1) .ne. mon%NOccup) stop "dim error in sapt_pyscf_mon_ints!"
+
+            allocate(W(nmo,nmo,mon%NOccup,mon%NOccup))
+            call tran4gen_incore(TwoEl, W, NAO,   &
+                                 mon%CMO, nmo, &
+                                 mon%CMO, nmo, &
+                                 mon%CMO,(mon%num0+mon%num1),&
+                                 mon%CMO,(mon%num0+mon%num1))
+            call write2disk(W, & 
+                            nmo, &
+                            nmo, &
+                            mon%num0+mon%num1, &
+                            mon%num0+mon%num1, &
+                            twojfile)
+            deallocate(W)
+
+            allocate(W(nmo,mon%NOccup,nmo,mon%NOccup))
+            call tran4gen_incore(TwoEl,W, NAO, &
+                                 mon%CMO, nmo, &
+                                 mon%CMO, (mon%num0+mon%num1), &
+                                 mon%CMO, nmo, &
+                                 mon%CMO, (mon%num0+mon%num1))
+            call write2disk(W, &
+                            nmo, &
+                            mon%num0+mon%num1, &
+                            nmo, &
+                            mon%num0+mon%num1, &
+                            twokfile)
+            deallocate(W)
+
+            ! calculate monomer's electrostatic potential
+            ! C_occ(:, i) = occ(i) * C(:, i)
+            ! D(nao, nao) = C_occ  * C^T
+            do i=1,nmo
+               C_occ(1:nao,i) = 2d0*Mon%Occ(i) * Mon%CMO(1:nao,i)
+            end do
+            call dgemm('N','T',nao,nao,nmo,1.d0,C_occ,nao,Mon%CMO,nao,0.d0,D,nao)
+
+            ! J(mu, nu) = sum_{lam, sig} A(mu, nu, lam, sig) * D(lam, sig)
+            call dgemv('N',nao*nao,nao*nao,1.d0,TwoEl,nao*nao,D,1,0.d0,Jmat,1)
+
+            if (Mon%Monomer == 2) then
+               do i=1,nao
+                  call dgemv('N',nao,nao*nao,1.d0,TwoEl(1,1,1,i),nao,D,1,0.d0,Kmat(1,i),1)
+               end do
+
+               allocate(Mon%Kmat(nao,nao))
+               Mon%Kmat = 0.5d0*Kmat
+            endif
+
+            allocate(Mon%Jmat(nao,nao),Mon%WPot(nao,nao))
+
+            Mon%Jmat = Jmat
+            Mon%WPot = Mon%V + Jmat
+
+            !print*, 'Vmat =', norm2(Mon%V)
+            !print*, 'Jmat =', norm2(Jmat)
+            !print*, 'WPot =', norm2(Mon%WPot)
+
+end subroutine sapt_pyscf_mon_ints
+
+subroutine sapt_pyscf_ab_ints(A,B,TwoEl,NAO,NMO)
+
+implicit none
+
+!type(FlagsData)    :: Flags
+type(SystemBlock)   :: A,B
+integer,intent(in)  :: nao, nmo
+real(8),intent(in)  :: TwoEl(nao,nao,nao,nao)
+
+real(8),allocatable :: W(:,:,:,:)
+
+
+            ! integrals for e1exch
+            allocate(W(nmo,A%NOccup,nmo,B%NOccup))
+            call tran4gen_incore(TwoEl,W, NAO, &
+                                 A%CMO, nmo, &
+                                 A%CMO, (A%num0+A%num1), &
+                                 A%CMO, nmo, &
+                                 B%CMO, (B%num0+B%num1))
+            call write2disk(W,   &
+                            nmo, &
+                            A%num0+A%num1, &
+                            nmo, &
+                            B%num0+B%num1, &
+                            'FOFOAAAB')
+            call tran4gen_incore(TwoEl,W, NAO, &
+                                 A%CMO, nmo, &
+                                 A%CMO, (A%num0+A%num1), &
+                                 B%CMO, nmo, &
+                                 B%CMO, (B%num0+B%num1))
+            call write2disk(W,   &
+                            nmo, &
+                            A%num0+A%num1, &
+                            nmo, &
+                            B%num0+B%num1, &
+                            'FOFOAABB')
+            deallocate(W)
+            allocate(W(nmo,B%NOccup,nmo,A%NOccup))
+            call tran4gen_incore(TwoEl,W, NAO, &
+                                 B%CMO, nmo, &
+                                 B%CMO, (B%num0+B%num1), &
+                                 B%CMO, nmo, &
+                                 A%CMO, (A%num0+A%num1))
+            call write2disk(W,   &
+                            nmo, &
+                            B%num0+B%num1, &
+                            nmo, &
+                            A%num0+A%num1, &
+                            'FOFOBBBA')
+            deallocate(W)
+
+            ! additional for e2exch-ind
+            allocate(W(nmo,B%NOccup,nmo,B%NOccup))
+            call tran4gen_incore(TwoEl,W, NAO, &
+                                 B%CMO, nmo, &
+                                 B%CMO, (B%num0+B%num1), &
+                                 A%CMO, nmo, &
+                                 B%CMO, (B%num0+B%num1))
+            call write2disk(W,   &
+                            nmo, &
+                            B%num0+B%num1, &
+                            nmo, &
+                            B%num0+B%num1, &
+                            'FOFOBBAB')
+            deallocate(W)
+            allocate(W(nmo,A%NOccup,nmo,A%NOccup))
+            call tran4gen_incore(TwoEl,W, NAO, &
+                                 A%CMO, nmo, &
+                                 A%CMO, (A%num0+A%num1), &
+                                 B%CMO, nmo, &
+                                 A%CMO, (A%num0+A%num1))
+            call write2disk(W,   &
+                            nmo, &
+                            A%num0+A%num1, &
+                            nmo, &
+                            A%num0+A%num1, &
+                            'FOFOAABA')
+            deallocate(W)
+            allocate(W(nmo,nmo,A%NOccup,B%NOccup))
+            call tran4gen_incore(TwoEl, W, NAO, &
+                                 A%CMO, nmo, &
+                                 B%CMO, nmo, &
+                                 A%CMO,(A%num0+A%num1),&
+                                 B%CMO,(B%num0+B%num1))
+            call write2disk(W, &
+                            nmo, &
+                            nmo, &
+                            A%num0+A%num1, &
+                            B%num0+B%num1, &
+                            'FFOOABAB')
+            deallocate(W)
+            ! OVOVAABB for e2disp
+            allocate(W(B%NIA,B%NA+B%NV,A%NIA,A%NA+A%NV))
+            call tran4gen_incore(TwoEl, W, NAO,&
+                                 B%CMO, B%NIA, &
+                                 B%CMO(1:nao,B%num0+1:nmo), B%num1+B%num2,&
+                                 A%CMO, A%NIA, &
+                                 A%CMO(1:nao,A%num0+1:nmo), A%num1+A%num2)
+            call write2disk(W, &
+                            B%num0+B%num1, &
+                            B%num1+B%num2, &
+                            A%num0+A%num1, &
+                            A%num1+A%num2, &
+                            'TWOMOAB')
+                !call tran4_gen(NBasis,&
+                !    A%num0+A%num1,A%CMO,&
+                !    A%num1+A%num2,A%CMO(1:NBasis,A%num0+1:NBasis),&
+                !    B%num0+B%num1,B%CMO,&
+                !    B%num1+B%num2,B%CMO(1:NBasis,B%num0+1:NBasis),&
+                !    'TWOMOAB','AOTWOSORT')
+            deallocate(W)
+
+            ! integrals for e2exch-disp
+            allocate(W(nmo,B%NOccup,nmo,A%NOccup))
+            call tran4gen_incore(TwoEl,W, NAO, &
+                                 A%CMO, nmo, &
+                                 B%CMO, (B%num0+B%num1), &
+                                 B%CMO, nmo, &
+                                 A%CMO, (A%num0+A%num1))
+            call write2disk(W,   &
+                            nmo, &
+                            B%num0+B%num1, &
+                            nmo, &
+                            A%num0+A%num1, &
+                            'FOFOABBA')
+            deallocate(W)
+            allocate(W(nmo,nmo,A%NOccup,A%NOccup))
+            call tran4gen_incore(TwoEl, W, NAO, &
+                                 B%CMO, nmo, &
+                                 A%CMO, nmo, &
+                                 A%CMO,(A%num0+A%num1),&
+                                 A%CMO,(A%num0+A%num1))
+            call write2disk(W,   &
+                            nmo, &
+                            nmo, &
+                            A%num0+A%num1, &
+                            A%num0+A%num1, &
+                            'FFOOBAAA')
+            deallocate(W)
+            allocate(W(nmo,nmo,B%NOccup,B%NOccup))
+            !FFOOABBB
+            call tran4gen_incore(TwoEl, W, NAO, &
+                                 A%CMO, nmo, &
+                                 B%CMO, nmo, &
+                                 B%CMO,(B%num0+B%num1),&
+                                 B%CMO,(B%num0+B%num1))
+            call write2disk(W,   &
+                            nmo, &
+                            nmo, &
+                            B%num0+B%num1, &
+                            B%num0+B%num1, &
+                            'FFOOABBB')
+            deallocate(W)
+
+end subroutine sapt_pyscf_ab_ints
 
 subroutine saptuks_mon_ints(Mon,Flags,NBasis,AOBasis,CholeskyVecsOTF)
 !

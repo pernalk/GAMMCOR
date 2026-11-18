@@ -227,6 +227,7 @@ sources = files(
   'SOURCE/sapt_visual.f90',
   'SOURCE/sapt_files.f90',
   'SOURCE/sapt_os.f90',
+  'SOURCE/interface_sapt.f90',
 
   # -- exchange
   'SOURCE/exmisc.f90',

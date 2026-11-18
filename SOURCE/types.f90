@@ -282,6 +282,8 @@ type SystemBlock
       ! CBS[H]: number of strongly occupied (all > 0.5) orbs
       integer :: NStronglyOccOrb = 0
       integer :: NAct, INAct
+      integer :: NOccup
+      integer :: NI,NA,NIA,NV ! alternative inactive, active, noccup
       integer :: ISwitchAct = 0
       integer :: NActS(8), INActS(8)
 
@@ -309,6 +311,10 @@ type SystemBlock
       integer :: NVZero = 0
       integer :: TwoMoInt = TWOMO_INCORE
       integer :: NatOrb = 0 ! if 1, natural orbs from Molpro
+
+      ! V, H=T+V
+      double precision, allocatable :: V(:,:),HNO0(:,:)
+
       ! ha = Va + Ja + Jb - Ka
       double precision, allocatable :: ha(:,:),hb(:,:)
       double precision, allocatable :: Ka(:,:),Kb(:,:)
@@ -387,10 +393,14 @@ type SystemBlock
       double precision,allocatable :: VsrKS(:,:),Jsr(:,:)
 
       ! open-shell SAPT rdms
+      double precision,allocatable :: rdm1_full(:,:)
+      double precision,allocatable :: rdm2_full(:,:,:,:)
+      double precision,allocatable :: rdm1_p(:,:),rdm1_m(:,:)
       double precision,allocatable :: g1a(:,:), g1b(:,:)
       double precision,allocatable :: g2aa(:,:),g2bb(:,:)
       double precision,allocatable :: g2ab(:,:),g2ba(:,:)
       double precision,allocatable :: g2aaba(:,:,:,:),g2bbab(:,:,:,:)
+
       ! RDM2 = RDM200
       double precision,allocatable :: RDM2(:),RDM201(:)
       double precision,allocatable :: RDM2val(:,:,:,:)
@@ -578,6 +588,10 @@ type SaptData
      ! Visualize
      double precision,allocatable :: Qmat(:,:),ALOC(:,:),BLOC(:,:)
      double precision,allocatable :: QelA(:),QelB(:)
+     ! PySCF
+     double precision,allocatable :: TwoEl(:)
+     double precision,allocatable :: TwoEl4(:,:,:,:)
+
      integer :: InterfaceType = INTER_TYPE_DAL
      integer :: SaptLevel = SAPTLEVEL2
      integer :: SaptExch  = 0
@@ -594,7 +608,7 @@ type SaptData
      logical :: CAlpha = .false.
      logical :: Visual  = .false.
      ! MH : add keyword!
-     logical :: SemiCoupled = .true.
+     logical :: SemiCoupled = .false.
      logical :: Wexcit  = .false.
      logical :: noE2exi = .true.
      logical :: EnChck  = .true., HFCheck=.true.
